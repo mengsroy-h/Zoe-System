@@ -795,18 +795,27 @@
     }
 
     async function verifyAdminRoleThenProceed(user) {
+        let role;
         try {
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
-            const role = roleSnap.val();
-            if (role !== 'admin') {
-                await fb.signOut(auth).catch(() => {});
-                clearRememberedSession(true);
-                showLoginModalWithPrefill();
-                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeAdmin ទេ! សូមប្រើ ZoeW ឬ Zscan ជំនួសវិញ។");
-                return;
-            }
+            role = roleSnap.val();
         } catch (e) {
+            // Fail CLOSED, not open: if we can't confirm the role, we must not assume
+            // it's fine and fall through to granting access -- that's the exact hole
+            // this check exists to close.
             console.error("Role verification failed:", e);
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
+        if (role !== 'admin') {
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeAdmin ទេ! សូមប្រើ ZoeW ឬ Zscan ជំនួសវិញ។");
+            return;
         }
 
         const activated = await ensureAppActivated();
@@ -1126,7 +1135,7 @@
             }
 
             deletedItems.unshift(trashItem);
-            saveSingleDeletedItemToFirebase(trashItem);
+            saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
         } finally {
@@ -1244,9 +1253,12 @@
         // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
         // already-open session — ensureAppActivated() is otherwise only called at login, so a
         // device left running (common for a fixed scanning station) would keep working until
-        // someone happens to reload it. Re-checking periodically closes that gap.
+        // someone happens to reload it. Re-checking periodically closes that gap. Skipped
+        // while any other modal is open (e.g. mid-scan phoneModal entry) so the full-screen
+        // activationModal can't pop over it and bury in-progress, unsaved input; it just
+        // tries again on the next tick instead.
         setInterval(() => {
-            if (auth && auth.currentUser && isDatabaseInitialized) {
+            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
                 ensureAppActivated();
             }
         }, LICENSE_RECHECK_INTERVAL_MS);
@@ -2468,8 +2480,16 @@
 
         const skipBtn = document.getElementById('phoneModalSkipBtn');
         const confirmBtn = document.getElementById('phoneModalConfirmBtn');
+        const cancelBtn = document.getElementById('phoneModalCancelBtn');
+        const phoneModalEl = document.getElementById('phoneModal');
         if (skipBtn) skipBtn.disabled = true;
         if (confirmBtn) confirmBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        // Also blocks the global Escape/backdrop-click dismiss handlers (dismissModal())
+        // for as long as the claim+save below is in flight, so the modal can't be yanked
+        // away while its save is still happening in the background -- the disabled
+        // buttons above only stop clicks on the buttons themselves.
+        if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
 
         try {
             // Final, server-side-atomic guard against two devices saving the exact same
@@ -2497,6 +2517,8 @@
         } finally {
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
+            if (phoneModalEl) phoneModalEl.removeAttribute('data-nodismiss');
         }
     }
 

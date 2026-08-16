@@ -502,18 +502,27 @@
     }
 
     async function verifyWorkerRoleThenProceed(user) {
+        let role;
         try {
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
-            const role = roleSnap.val();
-            if (role !== 'admin' && role !== 'worker') {
-                await fb.signOut(auth).catch(() => {});
-                clearRememberedSession(true);
-                showLoginModalWithPrefill();
-                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
-                return;
-            }
+            role = roleSnap.val();
         } catch (e) {
+            // Fail CLOSED, not open: if we can't confirm the role, we must not assume
+            // it's fine and fall through to granting access -- that's the exact hole
+            // this check exists to close.
             console.error("Role verification failed:", e);
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
+        if (role !== 'admin' && role !== 'worker') {
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
+            return;
         }
 
         const activated = await ensureAppActivated();
@@ -953,8 +962,10 @@
 
         // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
         // already-open session — ensureAppActivated() is otherwise only called at login.
+        // Skipped while any other modal is open so the full-screen activationModal can't
+        // pop over it and bury in-progress input; it just tries again on the next tick.
         setInterval(() => {
-            if (auth && auth.currentUser && isDatabaseInitialized) {
+            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
                 ensureAppActivated();
             }
         }, LICENSE_RECHECK_INTERVAL_MS);

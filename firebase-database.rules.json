@@ -44,9 +44,11 @@
             "isFromDeletion": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "time": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "createdAt": { ".validate": "newData.isNumber() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
-            "lockerUpdatedAt": { ".validate": "newData.isNumber()" }
+            "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
           }
-        }
+        },
+        "$other": { ".validate": false }
       }
     },
 
@@ -85,9 +87,11 @@
             "isFromDeletion": { ".validate": "newData.isBoolean()" },
             "time": { ".validate": "newData.isString()" },
             "createdAt": { ".validate": "newData.isNumber()" },
-            "lockerUpdatedAt": { ".validate": "newData.isNumber()" }
+            "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
           }
-        }
+        },
+        "$other": { ".validate": false }
       }
     },
 

@@ -1,62 +1,6 @@
-/*
- * ZoeLicense — offline-verifiable, server-checked activation keys.
- *
- * How it stays hard to bypass/crack:
- *  - Keys are ECDSA P-256 signed tokens. This file only ever holds the PUBLIC
- *    key, which can verify signatures but cannot be used to forge new ones.
- *    The matching PRIVATE key lives only in the operator's own custody and is
- *    pasted into ZoeKeyGen at signing time — it is never committed to source
- *    or shipped to any deployed app.
- *  - Editing localStorage cannot extend a key: the expiry is inside the
- *    signed payload, so changing it breaks the signature.
- *  - Revocation and admin-side expiry edits (both shortening AND ZoeKeyGen's
- *    "Extend" action) are driven by the server-side `license_keys/{app}/{id}`
- *    record, re-checked on every login and every 15 minutes while an app
- *    stays open online — the *server's* expiresAt is authoritative once
- *    activated, not the expiry baked into the signed key string, so Extend
- *    actually lengthens validity instead of being capped at the original
- *    signed expiry (see verifySignatureAndScope / getStatus below).
- *  - This file is identical across ZoeAdmin, ZoeW, Zscan and ZoeKeyGen —
- *    keep all copies in sync (same PUBLIC_KEYS_JWK) if the signing keypair is
- *    ever rotated. See the PUBLIC_KEYS_JWK comment below for the rotation
- *    steps — it supports listing more than one key so rotation doesn't
- *    invalidate every key already issued under the old one.
- */
 (function (global) {
     'use strict';
 
-    /*
-     * PUBLIC_KEYS_JWK — public keys accepted for signature verification, newest first.
-     * Normally holds exactly one entry: the current signing keypair's public half, generated
-     * in ZoeKeyGen's "Signing Key" panel. Keep a SECOND (older) entry here only while rotating
-     * to a new signing keypair, so keys already issued under the old private key keep verifying
-     * until they naturally expire — then delete the old entry once nothing depends on it.
-     *
-     * How to add a new pair during rotation (repeat in ALL 4 copies of this file — ZoeAdmin,
-     * ZoeW, Zscan, ZoeKeyGen — then redeploy all 4 apps together so no device is left checking
-     * against a public key list that doesn't match what ZoeKeyGen is currently signing with):
-     *
-     *   1. In ZoeKeyGen -> "Signing Key" panel, click "បង្កើត Keypair ថ្មី" (Generate New
-     *      Keypair). Copy the new Public Key JWK it shows you.
-     *   2. Add it as a NEW element at the FRONT of the array below, keeping the old one(s) so
-     *      already-issued keys still verify:
-     *
-     *        const PUBLIC_KEYS_JWK = [
-     *            { "key_ops": ["verify"], "ext": true, "kty": "EC",
-     *              "x": "NEW_X_VALUE_HERE", "y": "NEW_Y_VALUE_HERE", "crv": "P-256" },
-     *            { "key_ops": ["verify"], "ext": true, "kty": "EC",  // old — keep until its keys expire
-     *              "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
-     *              "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0", "crv": "P-256" }
-     *        ];
-     *
-     *   3. Redeploy all 4 apps with the updated array.
-     *   4. Back in ZoeKeyGen, paste the NEW Private Key JWK into "Load Key" — every key
-     *      generated from now on is signed with the new pair. Keys generated before step 3 was
-     *      live on every device still verify fine, since the old public key is still listed.
-     *   5. Once every key signed with the OLD private key has either expired or been reissued,
-     *      delete the old entry from the array (in all 4 copies) and redeploy once more to
-     *      finish the rotation.
-     */
     const PUBLIC_KEYS_JWK = [
         {
             "key_ops": ["verify"],
@@ -158,14 +102,6 @@
         }
     }
 
-    // Signature + target-app check only — deliberately does NOT enforce payload.exp.
-    // getStatus() uses this (not verifyKeyString) for its ongoing re-verification: the
-    // signed exp is a one-time floor checked at activate() (below), not a hard ceiling
-    // for the life of the key, because ZoeKeyGen's "Extend" action only ever patches the
-    // server-side expiresAt — it never re-signs a new keyString. If expiry were re-derived
-    // from the immutable signed payload on every getStatus() call, Extend would silently
-    // stop working the moment the *original* signed exp passed, no matter how far the
-    // admin had pushed expiresAt forward on the server.
     async function verifySignatureAndScope(keyString, appCode) {
         const parsed = parseKeyString(keyString);
         if (!parsed) return { valid: false, reason: 'format' };
@@ -177,10 +113,6 @@
         return { valid: true, payload: parsed.payload };
     }
 
-    // Full check including the signed expiry — used only at activate() time, so a key
-    // that was already expired the moment it was signed can't be redeemed in the first
-    // place. Not used for ongoing getStatus() re-verification (see
-    // verifySignatureAndScope above).
     async function verifyKeyString(keyString, appCode) {
         const result = await verifySignatureAndScope(keyString, appCode);
         if (!result.valid) return result;
@@ -219,13 +151,6 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            // Seeded to "now", not 0: getStatus()'s offline-grace check measures how long
-            // it's been since a *confirmed* online check. Seeding to 0 (epoch) meant a
-            // device that activates without ever completing a successful online check
-            // (LICENSE_DB_URL left unconfigured, or offline at the exact moment of
-            // activation) would read as having been silent for 50+ years and immediately
-            // report offline-grace-exceeded — contradicting the documented fallback that
-            // signature-only offline checking keeps working without the license DB set up.
             lastOnlineCheck: Date.now(),
             onlineExp: result.payload.exp * 1000
         };
@@ -233,13 +158,6 @@
         return { valid: true, payload: result.payload };
     }
 
-    // Dedicated Firebase project used ONLY for license_keys — intentionally separate from the
-    // ZoeAdmin/ZoeW/Zscan business Firebase project, so a compromise of one never exposes the
-    // other. Its Realtime Database allows public, unauthenticated READ of license_keys (the
-    // records hold no sensitive data — just expiry/revoked/note), so this is a plain REST call
-    // with no SDK, no auth, and no dependency on whichever Firebase project the calling app is
-    // itself logged into. Only ZoeKeyGen (which needs to WRITE) uses the full Firebase SDK
-    // against this same project, gated by its own Authentication + user_roles.
     const LICENSE_DB_URL = 'https://zoew-z1-default-rtdb.firebaseio.com';
 
     async function checkOnline(appCode, keyId) {
@@ -274,9 +192,6 @@
 
         const now = Date.now();
 
-        // Always re-verify online — getStatus() only runs at login (not on every frame), so
-        // there's no meaningful cost, and this is how a revoke or expiry edit actually takes
-        // effect promptly instead of waiting out a stale cached check.
         const online = await checkOnline(appCode, record.id);
         if (online.ok === true) {
             record.lastOnlineCheck = now;
@@ -286,15 +201,7 @@
             clearLocalRecord(appCode);
             return { state: 'required', reason: online.reason };
         }
-        // online.ok === null => network unreachable or not configured yet, fall through to offline evaluation below
 
-        // record.onlineExp is the server's expiresAt as of the last successful check (it's
-        // seeded to the signed exp at activate() time, so it's always a sane value even
-        // before the first online check completes). It — not the original signed exp — is
-        // the ceiling, so an admin extending expiresAt in ZoeKeyGen actually takes effect.
-        // A device can't fake this locally: without a successful online check confirming an
-        // extension, it's stuck with whatever onlineExp it last legitimately received, and
-        // OFFLINE_GRACE_MS below still forces a fresh server check every 3 days regardless.
         const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
 
         if (now > ceiling) {

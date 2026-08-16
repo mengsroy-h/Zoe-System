@@ -357,8 +357,6 @@ function logoutApp() {
     });
 }
 
-/* ---------------- Signing key handling (session-memory only) ---------------- */
-
 let signingPrivateKeyJwk = null;
 
 function updateSigningKeyBadge() {
@@ -422,8 +420,6 @@ function copyTextarea(id) {
     });
 }
 
-/* ---------------- Key generation ---------------- */
-
 let lastGeneratedKey = '';
 
 let isGeneratingKey = false;
@@ -479,8 +475,6 @@ function copyGeneratedKey() {
     if (!lastGeneratedKey) return;
     navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
 }
-
-/* ---------------- Key list / manage ---------------- */
 
 let keyListCache = [];
 const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zscan', ALL: 'ទាំង ៣' };
@@ -587,8 +581,6 @@ async function confirmExtendKey() {
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
     }
 }
-
-/* ---------------- Boot ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase();

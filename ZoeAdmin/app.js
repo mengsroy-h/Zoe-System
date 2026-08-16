@@ -268,12 +268,6 @@
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
-            // Wired up here (immediately once db exists) rather than inside
-            // initDatabaseListeners(), which only runs after login + role-check +
-            // license-check all resolve — those async round trips could take a few
-            // seconds, during which the dot would otherwise sit on its default
-            // "offline" HTML state and misreport connectivity that was fine the
-            // whole time.
             fb.onValue(dbRefConnected, (snap) => {
                 const statusDot = document.getElementById('statusDot');
                 const statusText = document.getElementById('firebaseStatusText');
@@ -611,13 +605,6 @@
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
 
-        // The header secret is AES-GCM encrypted with a key derived from the Security PIN,
-        // and that key only ever lives in memory for the current tab (never persisted) — it's
-        // set when the PIN is entered via requestPinBeforeConfig(), not on ordinary
-        // login/auto-login. So right after a fresh login (or a page refresh, which always
-        // restarts with lookupSecretKey === null), a scan here would silently omit the auth
-        // header, the request would most likely fail server-side, and admin would just see
-        // "no auto-fill" with zero explanation. Surface it once instead of failing silently.
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
             if (!lookupLockedNoticeShown) {
                 lookupLockedNoticeShown = true;
@@ -800,9 +787,6 @@
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
             role = roleSnap.val();
         } catch (e) {
-            // Fail CLOSED, not open: if we can't confirm the role, we must not assume
-            // it's fine and fall through to granting access -- that's the exact hole
-            // this check exists to close.
             console.error("Role verification failed:", e);
             await fb.signOut(auth).catch(() => {});
             clearRememberedSession(true);
@@ -927,10 +911,6 @@
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
         }
-
-        // dbRefConnected's listener is wired up in initFirebase() itself, immediately
-        // once db exists, so the status dot reflects real connectivity from page load
-        // instead of sitting on its default "offline" markup until login finishes.
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
@@ -1158,9 +1138,6 @@
 
         if (deletedItems.length !== initialLen) {
             saveDeletedToFirebase();
-            // Frees the barcode(s) up for reuse now that they're gone for good -- matches
-            // isBarcodeAlreadyUsed()'s own rule that a barcode stays claimed as long as it's
-            // in scanHistory OR deletedItems, not just scanHistory.
             releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
@@ -1250,13 +1227,6 @@
             }
         }, 60000);
 
-        // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
-        // already-open session — ensureAppActivated() is otherwise only called at login, so a
-        // device left running (common for a fixed scanning station) would keep working until
-        // someone happens to reload it. Re-checking periodically closes that gap. Skipped
-        // while any other modal is open (e.g. mid-scan phoneModal entry) so the full-screen
-        // activationModal can't pop over it and bury in-progress, unsaved input; it just
-        // tries again on the next tick instead.
         setInterval(() => {
             if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
                 ensureAppActivated();
@@ -2350,34 +2320,18 @@
         return scanHistory.some(matchesCode) || deletedItems.some(matchesCode);
     }
 
-    // isBarcodeAlreadyUsed() above only checks the realtime-synced local cache -- it
-    // cannot see a write another device made moments ago that hasn't synced down yet.
-    // For two devices scanning the exact same physical barcode within that window, this
-    // Firebase Transaction on a dedicated registry node is the actual atomic guard:
-    // whichever device's transaction runs first against the server wins the claim, the
-    // other is told the barcode is taken. Released again once the barcode's trash record
-    // is permanently purged (see releaseBarcodesInRegistry), matching how
-    // isBarcodeAlreadyUsed() itself treats "still in trash" as still claimed.
     function barcodeRegistryKey(code) {
         const normalized = String(code || '').trim().toUpperCase();
-        // Firebase RTDB keys can't contain . # $ [ ] / or ASCII control characters --
-        // percent-encode anything outside that set so an odd manually-typed barcode can
-        // never produce an invalid or unintentionally-nested path.
         return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
     }
 
-    // Returns 'claimed' (we own it now), 'taken' (someone else already does), or
-    // 'unknown' (couldn't reach Firebase to confirm either way -- caller falls back to
-    // trusting the local isBarcodeAlreadyUsed() check rather than blocking scanning
-    // entirely just because the network hiccuped, matching this app's usual degrade-
-    // gracefully-offline behavior).
     async function claimBarcodeInRegistry(code) {
         const key = barcodeRegistryKey(code);
         if (!db || !fb || !key) return 'unknown';
         try {
             const result = await fb.runTransaction(fb.ref(db, `zoew_barcode_registry/${key}`), (current) => {
                 if (current === null) return true;
-                return; // undefined return aborts the transaction -- already claimed
+                return;
             });
             return result.committed ? 'claimed' : 'taken';
         } catch (e) {
@@ -2485,15 +2439,9 @@
         if (skipBtn) skipBtn.disabled = true;
         if (confirmBtn) confirmBtn.disabled = true;
         if (cancelBtn) cancelBtn.disabled = true;
-        // Also blocks the global Escape/backdrop-click dismiss handlers (dismissModal())
-        // for as long as the claim+save below is in flight, so the modal can't be yanked
-        // away while its save is still happening in the background -- the disabled
-        // buttons above only stop clicks on the buttons themselves.
         if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
 
         try {
-            // Final, server-side-atomic guard against two devices saving the exact same
-            // barcode within the same instant -- see claimBarcodeInRegistry's comment.
             const claim = await claimBarcodeInRegistry(barcodeToSave);
             if (claim === 'taken') {
                 closeModal('phoneModal');
@@ -2513,7 +2461,6 @@
             closeModal('phoneModal');
             showToast("រក្សាទុកបានជោគជ័យ!");
         } catch (e) {
-            // addOrUpdateEntry's own Firebase-save call already toasts its failure message.
         } finally {
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;

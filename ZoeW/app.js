@@ -230,12 +230,6 @@
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
-            // Wired up here (immediately once db exists) rather than inside
-            // initDatabaseListeners(), which only runs after login + role-check +
-            // license-check all resolve — those async round trips could take a few
-            // seconds, during which the dot would otherwise sit on its default
-            // "offline" HTML state and misreport connectivity that was fine the
-            // whole time.
             fb.onValue(dbRefConnected, (snap) => {
                 const statusDot = document.getElementById('statusDot');
                 const statusText = document.getElementById('firebaseStatusText');
@@ -507,9 +501,6 @@
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
             role = roleSnap.val();
         } catch (e) {
-            // Fail CLOSED, not open: if we can't confirm the role, we must not assume
-            // it's fine and fall through to granting access -- that's the exact hole
-            // this check exists to close.
             console.error("Role verification failed:", e);
             await fb.signOut(auth).catch(() => {});
             clearRememberedSession(true);
@@ -633,10 +624,6 @@
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
         }
-
-        // dbRefConnected's listener is wired up in initFirebase() itself, immediately
-        // once db exists, so the status dot reflects real connectivity from page load
-        // instead of sitting on its default "offline" markup until login finishes.
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
@@ -849,10 +836,6 @@
         }
     }
 
-    // Mirrors ZoeAdmin's barcode registry release logic -- ZoeW never creates new
-    // barcodes (only ZoeAdmin does, via its own claimBarcodeInRegistry), but ZoeW's own
-    // automatic/manual trash purges below must free the same registry entries ZoeAdmin
-    // claimed, or a purged-here barcode would stay permanently unreusable.
     function barcodeRegistryKey(code) {
         const normalized = String(code || '').trim().toUpperCase();
         return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
@@ -960,10 +943,6 @@
             }
         }, 60000);
 
-        // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
-        // already-open session — ensureAppActivated() is otherwise only called at login.
-        // Skipped while any other modal is open so the full-screen activationModal can't
-        // pop over it and bury in-progress input; it just tries again on the next tick.
         setInterval(() => {
             if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
                 ensureAppActivated();

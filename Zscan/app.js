@@ -194,7 +194,7 @@ async function ensureAppActivated() {
     if (msgEl) {
         msgEl.textContent = (status.state === 'offline-grace-exceeded')
             ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
-            : 'សូមបញ្ចូល Activation Key សម្រាប់ Zscan ដើម្បីបន្ត។';
+            : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ Zscan ដើម្បីបន្ត។');
     }
     openModal('activationModal');
     const keyInput = document.getElementById('activationKeyInput');
@@ -218,6 +218,12 @@ async function submitActivationKey() {
         document.getElementById('logoutBtn').style.display = '';
         initDatabaseListeners();
         showLockerPicker(true);
+    } else {
+        // Key was valid locally (signature/app/expiry all checked out in activate() above)
+        // but the server-side check inside ensureAppActivated() just rejected it (revoked /
+        // not found / server-expired) -- without this, nothing here ever told the user that,
+        // so the modal would silently reset to its original text with zero visible feedback.
+        showToast('⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ');
     }
 }
 

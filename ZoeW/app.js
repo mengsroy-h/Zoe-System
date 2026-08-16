@@ -417,6 +417,7 @@
     }
 
     function showLoginModalWithPrefill() {
+        closeModal('activationModal');
         openModalHelper('loginModal');
         const savedEmail = localStorage.getItem('remembered_email');
         const emailInput = document.getElementById('loginEmailInput');
@@ -424,6 +425,56 @@
         if (savedEmail && emailInput) {
             emailInput.value = savedEmail;
             if (rememberCb) rememberCb.checked = true;
+        }
+    }
+
+    const LICENSE_APP_CODE = 'ZOW';
+
+    function licenseFailureMessage(reason) {
+        switch (reason) {
+            case 'app-mismatch': return 'Key នេះមិនមែនសម្រាប់ ZoeW ទេ!';
+            case 'expired':
+            case 'expired-server': return 'Key នេះបានផុតកំណត់ហើយ!';
+            case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
+            case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
+            case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
+            default: return 'Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យម្តងទៀត។';
+        }
+    }
+
+    async function ensureAppActivated() {
+        const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
+        if (status.state === 'active') {
+            closeModal('activationModal');
+            return true;
+        }
+        const msgEl = document.getElementById('activationModalMsg');
+        if (msgEl) {
+            msgEl.textContent = (status.state === 'offline-grace-exceeded')
+                ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
+                : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។';
+        }
+        openModalHelper('activationModal');
+        return false;
+    }
+
+    async function submitActivationKey() {
+        const input = document.getElementById('activationKeyInput');
+        const keyStr = input ? input.value.trim() : '';
+        if (!keyStr) { alert('សូមបញ្ចូល Activation Key!'); return; }
+        const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
+        if (!result.valid) {
+            alert(licenseFailureMessage(result.reason));
+            return;
+        }
+        if (input) input.value = '';
+        const activated = await ensureAppActivated();
+        if (activated) {
+            showToast("✅ Active ជោគជ័យ!");
+            if (!isDatabaseInitialized) {
+                initDatabaseListeners();
+                isDatabaseInitialized = true;
+            }
         }
     }
 
@@ -440,6 +491,12 @@
             }
         } catch (e) {
             console.error("Role verification failed:", e);
+        }
+
+        const activated = await ensureAppActivated();
+        if (!activated) {
+            closeModal('loginModal');
+            return;
         }
 
         closeModal('loginModal');

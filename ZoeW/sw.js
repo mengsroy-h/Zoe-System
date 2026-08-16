@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-shell-v8';
+const CACHE_VERSION = 'zoew-shell-v9';
 
 const APP_SHELL = [
     './',
@@ -6,6 +6,7 @@ const APP_SHELL = [
     './style.css',
     './app.js',
     './firebase-loader.js',
+    './license-verify.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'

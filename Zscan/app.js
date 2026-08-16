@@ -112,14 +112,7 @@ async function initFirebase() {
     sdk.onAuthStateChanged(auth, (user) => {
         document.getElementById('bootLoading').classList.add('hidden');
         if (user) {
-            currentUserEmail = user.email || null;
-            closeModal('loginModal');
-            document.getElementById('logoutBtn').style.display = '';
-            initDatabaseListeners();
-            showLockerPicker(true);
-            isFirebaseSessionExpired(user).then((expired) => {
-                if (expired) forceExpireSession();
-            });
+            verifyRoleThenProceed(user);
         } else {
             currentUserEmail = null;
             detachDatabaseListeners();
@@ -152,6 +145,31 @@ async function isFirebaseSessionExpired(user) {
 function forceExpireSession() {
     const doneFn = () => showToast('ផុតកំណត់ ៤ ម៉ោងហើយ! សូមវាយពាក្យសម្ងាត់ និងចុចចូលប្រព័ន្ធម្ដងទៀត។');
     window.firebaseSDK.signOut(auth).then(doneFn).catch(doneFn);
+}
+
+async function verifyRoleThenProceed(user) {
+    try {
+        const roleSnap = await window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`));
+        const role = roleSnap.val();
+        if (role !== 'admin' && role !== 'worker' && role !== 'scanner') {
+            await window.firebaseSDK.signOut(auth).catch(() => {});
+            currentUserEmail = null;
+            openModal('loginModal');
+            showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zscan ទេ!');
+            return;
+        }
+    } catch (e) {
+        console.error('Role verification failed:', e);
+    }
+
+    currentUserEmail = user.email || null;
+    closeModal('loginModal');
+    document.getElementById('logoutBtn').style.display = '';
+    initDatabaseListeners();
+    showLockerPicker(true);
+    isFirebaseSessionExpired(user).then((expired) => {
+        if (expired) forceExpireSession();
+    });
 }
 
 let listenersAttached = false;

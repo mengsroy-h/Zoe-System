@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zscan-shell-v5';
+const CACHE_VERSION = 'zscan-shell-v6';
 
 const APP_SHELL = [
     './',

@@ -702,6 +702,35 @@
         }
     }
 
+    async function verifyAdminRoleThenProceed(user) {
+        try {
+            const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
+            const role = roleSnap.val();
+            if (role !== 'admin') {
+                await fb.signOut(auth).catch(() => {});
+                clearRememberedSession(true);
+                showLoginModalWithPrefill();
+                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeAdmin ទេ! សូមប្រើ ZoeW ឬ Zscan ជំនួសវិញ។");
+                return;
+            }
+        } catch (e) {
+            console.error("Role verification failed:", e);
+        }
+
+        closeModal('loginModal');
+        showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+
+        if (!isDatabaseInitialized) {
+            initDatabaseListeners();
+            isDatabaseInitialized = true;
+        }
+        safeFocusScanner();
+
+        isFirebaseSessionExpired(user).then((expired) => {
+            if (expired) forceExpireSession();
+        });
+    }
+
     function setupAuthListener() {
         if (!auth) return;
 
@@ -713,18 +742,7 @@
         authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
             if (user) {
                 autoLoginAttempted = false;
-                closeModal('loginModal');
-                showToast("ចូលប្រព័ន្ធជោគជ័យ!");
-
-                if (!isDatabaseInitialized) {
-                    initDatabaseListeners();
-                    isDatabaseInitialized = true;
-                }
-                safeFocusScanner();
-
-                isFirebaseSessionExpired(user).then((expired) => {
-                    if (expired) forceExpireSession();
-                });
+                verifyAdminRoleThenProceed(user);
             } else {
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
@@ -2445,6 +2463,18 @@
             let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
             itemToTrash.id = generateUniqueId();
             itemToTrash.deletedAt = Date.now();
+            itemToTrash.cod = parseFloat(removedBc.cod) || 0;
+            itemToTrash.dod = parseFloat(removedBc.dod) || 0;
+            itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
+            itemToTrash.barcode = removedBc.code;
+            itemToTrash.locker = removedBc.locker || "N/A";
+            itemToTrash.time = removedBc.time || item.time;
+            itemToTrash.isClosed = removedBc.isClosed || false;
+            if (itemToTrash.isClosed) {
+                itemToTrash.closedAt = item.closedAt || Date.now();
+            } else {
+                delete itemToTrash.closedAt;
+            }
             deletedItems.unshift(itemToTrash);
             saveSingleDeletedItemToFirebase(itemToTrash);
 

@@ -7,14 +7,14 @@
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || root.child('user_roles').child(auth.uid).val() === 'admin')",
         ".write": false,
-        ".validate": "newData.isString() && (newData.val() === 'admin' || newData.val() === 'worker')"
+        ".validate": "newData.isString() && (newData.val() === 'admin' || newData.val() === 'worker' || newData.val() === 'scanner')"
       }
     },
 
     "zoew_scan_history_cod_dod": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
       "$itemId": {
-        ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || (root.child('user_roles').child(auth.uid).val() === 'worker' && (newData.exists() || (data.child('isClosed').val() === true && data.child('closedAt').exists() && (now - data.child('closedAt').val()) > 7200000) || (data.child('isClosed').val() !== true && data.child('createdAt').exists() && (now - data.child('createdAt').val()) > 691200000))) || (root.child('user_roles').child(auth.uid).val() === 'scanner' && data.exists() && newData.exists()))",
         "id":    { ".validate": "newData.isString()" },
         "cod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "dod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -51,35 +51,69 @@
     },
 
     "zoew_recently_deleted_cod_dod": {
-      ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       "$itemId": {
-        ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()"
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+        "id":    { ".validate": "newData.isString()" },
+        "cod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "dod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "price": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "count": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "phone": { ".validate": "newData.isString()" },
+        "barcode": { ".validate": "newData.isString()" },
+        "locker": { ".validate": "newData.isString()" },
+        "isClosed": { ".validate": "newData.isBoolean()" },
+        "isCalled": { ".validate": "newData.isBoolean()" },
+        "callMark": { ".validate": "newData.isString()" },
+        "callMarkTime": { ".validate": "newData.isNumber()" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "closedAt": { ".validate": "newData.isNumber()" },
+        "scanDate": { ".validate": "newData.isString()" },
+        "time": { ".validate": "newData.isString()" },
+        "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+        "lockerUpdatedBy": { ".validate": "newData.isString()" },
+        "deletedAt": { ".validate": "newData.isNumber()" },
+        "isFromDeletion": { ".validate": "newData.isBoolean()" },
+        "barcodes": {
+          "$idx": {
+            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "code":   { ".validate": "newData.isString()" },
+            "locker": { ".validate": "newData.isString()" },
+            "isClosed":   { ".validate": "newData.isBoolean()" },
+            "isDeducted": { ".validate": "newData.isBoolean()" },
+            "isFromDeletion": { ".validate": "newData.isBoolean()" },
+            "time": { ".validate": "newData.isString()" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "lockerUpdatedAt": { ".validate": "newData.isNumber()" }
+          }
+        }
       }
     },
 
     "zoew_daily_revenue_cod_dod": {
-      ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       "$date": {
-        ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
-        "codDollar":  { ".validate": "newData.isNumber()" },
-        "dodDollar":  { ".validate": "newData.isNumber()" },
-        "totalCount": { ".validate": "newData.isNumber()" }
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+        "codDollar":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "dodDollar":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "totalCount": { ".validate": "newData.isNumber() && newData.val() >= 0" }
       }
     },
 
     "zoew_monthly_revenue_cod_dod": {
-      ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+      ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       "$month": {
-        "codDollar":  { ".validate": "newData.isNumber()" },
-        "dodDollar":  { ".validate": "newData.isNumber()" },
-        "totalCount": { ".validate": "newData.isNumber()" }
+        "codDollar":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "dodDollar":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "totalCount": { ".validate": "newData.isNumber() && newData.val() >= 0" }
       }
     },
 
     "zoew_settings": {
       "exchange_rate": {
-        ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+        ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
         ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
         ".validate": "newData.isNumber() && newData.val() > 0"
       }

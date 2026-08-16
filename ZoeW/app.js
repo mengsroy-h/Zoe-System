@@ -427,6 +427,34 @@
         }
     }
 
+    async function verifyWorkerRoleThenProceed(user) {
+        try {
+            const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
+            const role = roleSnap.val();
+            if (role !== 'admin' && role !== 'worker') {
+                await fb.signOut(auth).catch(() => {});
+                clearRememberedSession(true);
+                showLoginModalWithPrefill();
+                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
+                return;
+            }
+        } catch (e) {
+            console.error("Role verification failed:", e);
+        }
+
+        closeModal('loginModal');
+        showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+
+        if (!isDatabaseInitialized) {
+            initDatabaseListeners();
+            isDatabaseInitialized = true;
+        }
+
+        isFirebaseSessionExpired(user).then((expired) => {
+            if (expired) forceExpireSession();
+        });
+    }
+
     function setupAuthListener() {
         if (!auth) return;
 
@@ -438,17 +466,7 @@
         authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
             if (user) {
                 autoLoginAttempted = false;
-                closeModal('loginModal');
-                showToast("ចូលប្រព័ន្ធជោគជ័យ!");
-
-                if (!isDatabaseInitialized) {
-                    initDatabaseListeners();
-                    isDatabaseInitialized = true;
-                }
-
-                isFirebaseSessionExpired(user).then((expired) => {
-                    if (expired) forceExpireSession();
-                });
+                verifyWorkerRoleThenProceed(user);
             } else {
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
@@ -744,7 +762,7 @@
             }
 
             deletedItems.unshift(trashItem);
-            saveDeletedToFirebase().catch(() => {});
+            saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
         } finally {
@@ -1666,7 +1684,7 @@
             const index = deletedItems.findIndex(i => i.id === id);
             if(index !== -1) {
                 deletedItems.splice(index, 1);
-                saveDeletedToFirebase().catch(() => {});
+                deleteSingleDeletedItemFromFirebase(id).catch(() => {});
                 renderRecentlyDeleted();
             }
         }
@@ -1733,6 +1751,32 @@
             lastSyncedDeletedKeys = currentKeys;
         }).catch((error) => {
             console.error("Error saving deleted items: ", error);
+            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
+            throw error;
+        });
+    }
+
+    function saveSingleDeletedItemToFirebase(item) {
+        if (!dbRefDeleted) return Promise.resolve();
+        if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
+            return saveDeletedToFirebase();
+        }
+        return fb.update(dbRefDeleted, { [item.id]: item }).then(() => {
+            lastSyncedDeletedKeys.add(item.id);
+        }).catch((error) => {
+            console.error("Error saving deleted item: ", error);
+            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
+            throw error;
+        });
+    }
+
+    function deleteSingleDeletedItemFromFirebase(id) {
+        if (!dbRefDeleted) return Promise.resolve();
+        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return saveDeletedToFirebase();
+        return fb.update(dbRefDeleted, { [id]: null }).then(() => {
+            lastSyncedDeletedKeys.delete(id);
+        }).catch((error) => {
+            console.error("Error deleting deleted item: ", error);
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });

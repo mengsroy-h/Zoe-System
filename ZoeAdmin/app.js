@@ -279,6 +279,47 @@
         return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    let lookupSecretKey = null;
+
+    async function deriveLookupSecretKey(pin) {
+        try {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']);
+            return await crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt: enc.encode('zoeadmin_lookup_api_secret_v1'), iterations: 150000, hash: 'SHA-256' },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function encryptLookupSecret(plainText) {
+        if (!lookupSecretKey || !plainText) return null;
+        try {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, lookupSecretKey, new TextEncoder().encode(plainText));
+            return { iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function decryptLookupSecret(encObj) {
+        if (!lookupSecretKey || !encObj || !Array.isArray(encObj.data) || !Array.isArray(encObj.iv)) return '';
+        try {
+            const iv = new Uint8Array(encObj.iv);
+            const data = new Uint8Array(encObj.data);
+            const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, lookupSecretKey, data);
+            return new TextDecoder().decode(plainBuf);
+        } catch (e) {
+            return '';
+        }
+    }
+
     let pinTargetAction = null;
 
     function requestPinBeforeConfig(targetAction) {
@@ -306,6 +347,7 @@
         }
         try {
             localStorage.setItem('zoew_security_pin_hash', await hashPin(pinVal));
+            lookupSecretKey = await deriveLookupSecretKey(pinVal);
         } catch (e) {
             alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
             return;
@@ -339,6 +381,7 @@
             if (savedPin && (await hashPin(enteredPin)) === savedPin) {
                 localStorage.removeItem('zoew_pin_fail_count');
                 localStorage.removeItem('zoew_pin_lockout_until');
+                lookupSecretKey = await deriveLookupSecretKey(enteredPin);
                 closeModal('pinModal');
                 (pinTargetAction || openConfigModal)();
             } else {
@@ -431,7 +474,7 @@
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
         if (headerValueIn) {
             headerValueIn.value = '';
-            headerValueIn.placeholder = cfg.headerValue ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
+            headerValueIn.placeholder = (cfg.headerValueEnc || cfg.headerValue) ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
         }
         setVal('lookupApiPhoneFieldInput', cfg.phoneField || 'phone');
         setVal('lookupApiCodFieldInput', cfg.codField || 'cod');
@@ -440,7 +483,7 @@
         openModalHelper('lookupApiConfigModal');
     }
 
-    function saveLookupApiConfig() {
+    async function saveLookupApiConfig() {
         const enabledCb = document.getElementById('lookupApiEnabledCheckbox');
         const urlIn = document.getElementById('lookupApiUrlInput');
         const headerNameIn = document.getElementById('lookupApiHeaderNameInput');
@@ -459,13 +502,21 @@
 
         const existingCfg = getLookupApiConfig() || {};
         const headerValueRaw = headerValueIn ? headerValueIn.value.trim() : '';
-        const headerValue = headerValueRaw || existingCfg.headerValue || '';
+        let headerValueEnc = existingCfg.headerValueEnc || null;
+
+        if (headerValueRaw) {
+            if (!lookupSecretKey) {
+                alert("សម័យ PIN បានផុតកំណត់! សូមបិទ Config នេះ ហើយបើកម្តងទៀតដើម្បីបញ្ចូល PIN សាជាថ្មី មុននឹងផ្លាស់ប្តូរ Secret។");
+                return;
+            }
+            headerValueEnc = await encryptLookupSecret(headerValueRaw);
+        }
 
         const cfg = {
             enabled: enabled,
             url: url,
             headerName: headerNameIn ? headerNameIn.value.trim() : '',
-            headerValue: headerValue,
+            headerValueEnc: headerValueEnc,
             phoneField: (phoneFieldIn && phoneFieldIn.value.trim()) || 'phone',
             codField: (codFieldIn && codFieldIn.value.trim()) || 'cod',
             dodField: (dodFieldIn && dodFieldIn.value.trim()) || 'dod'
@@ -495,7 +546,8 @@
         const headers = {};
         const hName = headerNameIn ? headerNameIn.value.trim() : '';
         const existingCfg = getLookupApiConfig() || {};
-        const hValue = (headerValueIn ? headerValueIn.value.trim() : '') || existingCfg.headerValue || '';
+        const typedValue = headerValueIn ? headerValueIn.value.trim() : '';
+        const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
         if (hName && hValue) headers[hName] = hValue;
 
         showToast("កំពុងសាកល្បង API...");
@@ -520,7 +572,12 @@
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
-            if (cfg.headerName && cfg.headerValue) headers[cfg.headerName] = cfg.headerValue;
+            if (cfg.headerName && cfg.headerValueEnc) {
+                const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                if (decrypted) headers[cfg.headerName] = decrypted;
+            } else if (cfg.headerName && cfg.headerValue) {
+                headers[cfg.headerName] = cfg.headerValue;
+            }
 
             const res = await fetch(targetUrl, { headers });
             if (!res.ok) throw new Error('HTTP ' + res.status);

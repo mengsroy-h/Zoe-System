@@ -24,8 +24,8 @@
         "key_ops": ["verify"],
         "ext": true,
         "kty": "EC",
-        "x": "3gamzSd9XbD2ME38fJMt4aJoWGCdHppQlcwIipGSUiI",
-        "y": "rAAi09lF_IclIj5NxrDEtgQoKuPYmlq6sfEzx94B-zk",
+        "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
+        "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0",
         "crv": "P-256"
     };
 

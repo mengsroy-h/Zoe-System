@@ -15,6 +15,7 @@
       ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
       "$itemId": {
         ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+        "id":    { ".validate": "newData.isString()" },
         "cod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "dod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "price": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -25,6 +26,13 @@
         "isClosed": { ".validate": "newData.isBoolean()" },
         "isCalled": { ".validate": "newData.isBoolean()" },
         "callMark": { ".validate": "newData.isString()" },
+        "callMarkTime": { ".validate": "newData.isNumber()" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "closedAt": { ".validate": "newData.isNumber()" },
+        "scanDate": { ".validate": "newData.isString()" },
+        "time": { ".validate": "newData.isString()" },
+        "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+        "lockerUpdatedBy": { ".validate": "newData.isString()" },
         "barcodes": {
           "$idx": {
             "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -32,7 +40,11 @@
             "code":   { ".validate": "newData.isString()" },
             "locker": { ".validate": "newData.isString()" },
             "isClosed":   { ".validate": "newData.isBoolean()" },
-            "isDeducted": { ".validate": "newData.isBoolean()" }
+            "isDeducted": { ".validate": "newData.isBoolean()" },
+            "isFromDeletion": { ".validate": "newData.isBoolean()" },
+            "time": { ".validate": "newData.isString()" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "lockerUpdatedAt": { ".validate": "newData.isNumber()" }
           }
         }
       }

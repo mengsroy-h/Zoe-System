@@ -29,6 +29,15 @@ function showToast(msg) {
 }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function dismissModal(modalEl) {
+    if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
+    const fnName = modalEl.getAttribute('data-close');
+    if (fnName && typeof window[fnName] === 'function') {
+        window[fnName]();
+    } else {
+        closeModal(modalEl.id);
+    }
+}
 function playBeep() {
     try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -734,28 +743,46 @@ async function assignLockerToEntry(code) {
         showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
         return;
     }
-    const { itemId, barcodeIdx, item } = entry;
+    const { itemId } = entry;
     const ts = Date.now();
-    const updates = {};
     const previousLocker = getEntryCurrentLocker(entry);
-
-    if (barcodeIdx !== null) {
-        updates[`${itemId}/barcodes/${barcodeIdx}/locker`] = activeLocker;
-        updates[`${itemId}/barcodes/${barcodeIdx}/lockerUpdatedAt`] = ts;
-        if (item.barcodes.length === 1) {
-            updates[`${itemId}/locker`] = activeLocker;
-            updates[`${itemId}/lockerUpdatedAt`] = ts;
-        }
-    } else {
-        updates[`${itemId}/locker`] = activeLocker;
-        updates[`${itemId}/lockerUpdatedAt`] = ts;
-    }
-    updates[`${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
+    let phoneForToast = entry.item.phone || '';
+    let matched = false;
 
     try {
-        await window.firebaseSDK.update(dbRefHistory, updates);
+        const itemRef = window.firebaseSDK.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
+        const result = await window.firebaseSDK.runTransaction(itemRef, (currentItem) => {
+            matched = false;
+            if (!currentItem) return currentItem;
+            if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
+                const b = currentItem.barcodes.find(bc => bc && bc.code === code);
+                if (!b) return currentItem;
+                b.locker = activeLocker;
+                b.lockerUpdatedAt = ts;
+                if (currentItem.barcodes.length === 1) {
+                    currentItem.locker = activeLocker;
+                    currentItem.lockerUpdatedAt = ts;
+                }
+            } else if (currentItem.barcode === code) {
+                currentItem.locker = activeLocker;
+                currentItem.lockerUpdatedAt = ts;
+            } else {
+                return currentItem;
+            }
+            currentItem.lockerUpdatedBy = currentUserEmail || null;
+            phoneForToast = currentItem.phone || '';
+            matched = true;
+            return currentItem;
+        });
+
+        if (!result.committed || !matched) {
+            playErrorFeedback();
+            showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
+            return;
+        }
+
         playSuccessFeedback();
-        const phoneRaw = item.phone ? sanitizePhoneNumber(item.phone) : '';
+        const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
         if (previousLocker && previousLocker !== activeLocker && previousLocker !== 'N/A') {
             showToast(`✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${activeLocker}`);
@@ -877,6 +904,17 @@ function bindEventListeners() {
 
     document.getElementById('lockerSettingsCancelBtn').addEventListener('click', () => closeModal('lockerSettingsModal'));
     document.getElementById('lockerSettingsSaveBtn').addEventListener('click', saveLockerSettings);
+
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.classList.contains('open')) {
+            dismissModal(e.target);
+        }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const openModalEl = document.querySelector('.modal.open');
+        if (openModalEl) dismissModal(openModalEl);
+    });
 }
 bindEventListeners();
 

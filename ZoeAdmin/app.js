@@ -273,10 +273,27 @@
         }
     }
 
-    async function hashPin(pin) {
+    async function hashPinLegacy(pin) {
         const enc = new TextEncoder().encode(pin);
         const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
         return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function hashPin(pin) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+            { name: 'PBKDF2', salt: enc.encode('zoeadmin_pin_verify_v2'), iterations: 150000, hash: 'SHA-256' },
+            keyMaterial,
+            256
+        );
+        return 'pbkdf2:' + Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function verifyStoredPin(enteredPin, savedHash) {
+        if (!savedHash) return false;
+        if (savedHash.startsWith('pbkdf2:')) return (await hashPin(enteredPin)) === savedHash;
+        return (await hashPinLegacy(enteredPin)) === savedHash;
     }
 
     let lookupSecretKey = null;
@@ -378,7 +395,10 @@
 
         isVerifyingPin = true;
         try {
-            if (savedPin && (await hashPin(enteredPin)) === savedPin) {
+            if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
+                if (!savedPin.startsWith('pbkdf2:')) {
+                    localStorage.setItem('zoew_security_pin_hash', await hashPin(enteredPin));
+                }
                 localStorage.removeItem('zoew_pin_fail_count');
                 localStorage.removeItem('zoew_pin_lockout_until');
                 lookupSecretKey = await deriveLookupSecretKey(enteredPin);

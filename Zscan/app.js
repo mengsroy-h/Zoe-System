@@ -219,10 +219,25 @@ function logoutApp() {
     window.firebaseSDK.signOut(auth).then(doneFn).catch(doneFn);
 }
 
-async function hashPin(pin) {
+async function hashPinLegacy(pin) {
     const enc = new TextEncoder().encode(pin);
     const buf = await crypto.subtle.digest('SHA-256', enc);
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function hashPin(pin) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt: enc.encode('zscan_pin_verify_v2'), iterations: 150000, hash: 'SHA-256' },
+        keyMaterial,
+        256
+    );
+    return 'pbkdf2:' + Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function verifyStoredPin(enteredPin, savedHash) {
+    if (!savedHash) return false;
+    if (savedHash.startsWith('pbkdf2:')) return (await hashPin(enteredPin)) === savedHash;
+    return (await hashPinLegacy(enteredPin)) === savedHash;
 }
 function requestPinBeforeConfig(target) {
     pinTargetAction = target === 'locker' ? openLockerSettingsModal : openConfigModal;
@@ -260,7 +275,10 @@ async function verifySecurityPin() {
     const enteredPin = pinInputEl.value;
     pinInputEl.value = '';
     const savedPin = localStorage.getItem('zoew_security_pin_hash');
-    if (savedPin && (await hashPin(enteredPin)) === savedPin) {
+    if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
+        if (!savedPin.startsWith('pbkdf2:')) {
+            localStorage.setItem('zoew_security_pin_hash', await hashPin(enteredPin));
+        }
         localStorage.removeItem('zoew_pin_fail_count');
         localStorage.removeItem('zoew_pin_lockout_until');
         closeModal('pinModal');

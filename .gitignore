@@ -1,0 +1,11 @@
+# Original compressed archives (source folders already extracted and tracked)
+*.rar
+*.zip
+
+# OS artifacts
+Thumbs.db
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/

@@ -145,7 +145,7 @@
         document.body.style.overflow = '';
         editingItemId = null;
         markingItemId = null;
-        isModalOpen = false;
+        isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
     }
 
     function preconnectToDatabaseHost(cfg) {
@@ -455,6 +455,8 @@
                 : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។';
         }
         openModalHelper('activationModal');
+        const keyInput = document.getElementById('activationKeyInput');
+        if (keyInput) keyInput.focus();
         return false;
     }
 

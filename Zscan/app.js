@@ -175,6 +175,8 @@ async function ensureAppActivated() {
             : 'សូមបញ្ចូល Activation Key សម្រាប់ Zscan ដើម្បីបន្ត។';
     }
     openModal('activationModal');
+    const keyInput = document.getElementById('activationKeyInput');
+    if (keyInput) keyInput.focus();
     return false;
 }
 

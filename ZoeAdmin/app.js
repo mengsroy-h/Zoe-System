@@ -166,8 +166,8 @@
         pendingBarcode = "";
         editingItemId = null;
         markingItemId = null;
-        isModalOpen = false;
-        safeFocusScanner();
+        isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
+        if (!isModalOpen) safeFocusScanner();
     }
 
     function cleanupResources() {
@@ -730,6 +730,8 @@
                 : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeAdmin ដើម្បីបន្ត។';
         }
         openModalHelper('activationModal');
+        const keyInput = document.getElementById('activationKeyInput');
+        if (keyInput) keyInput.focus();
         return false;
     }
 
@@ -1884,7 +1886,7 @@
         const hwInput = document.getElementById('hwScannerInput');
 
         document.addEventListener('click', (e) => {
-            if (!isModalOpen && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && !isMobileDevice()) {
+            if (!isModalOpen && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && !isMobileDevice()) {
                 if (hwInput) hwInput.focus();
             }
         });

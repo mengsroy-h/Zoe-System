@@ -575,7 +575,8 @@ function openExtendModal(id) {
 async function confirmExtendKey() {
     const row = keyListCache.find((r) => r.id === extendTargetId);
     if (!row) { closeModal('extendModal'); return; }
-    const days = parseFloat(document.getElementById('extendDaysInput').value) || 30;
+    const days = parseFloat(document.getElementById('extendDaysInput').value);
+    if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
     const newExpiresAt = Date.now() + Math.round(days * 86400000);
     try {
         await Promise.all(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt })));

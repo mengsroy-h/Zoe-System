@@ -69,8 +69,8 @@
 
     "zoew_monthly_revenue_cod_dod": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
       "$month": {
-        ".write": "auth != null && root.child('user_roles').child(auth.uid).exists()",
         "codDollar":  { ".validate": "newData.isNumber()" },
         "dodDollar":  { ".validate": "newData.isNumber()" },
         "totalCount": { ".validate": "newData.isNumber()" }

@@ -818,29 +818,49 @@
     }
 
     async function submitActivationKey() {
-        const input = document.getElementById('activationKeyInput');
-        const keyStr = input ? input.value.trim() : '';
-        if (!keyStr) { alert('សូមបញ្ចូល Activation Key!'); return; }
-        const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
-        if (!result.valid) {
-            alert(licenseFailureMessage(result.reason));
-            return;
-        }
-        if (input) input.value = '';
-        const activated = await ensureAppActivated();
-        if (activated) {
-            showToast("✅ Active ជោគជ័យ!");
-            if (!isDatabaseInitialized) {
-                initDatabaseListeners();
-                isDatabaseInitialized = true;
+        const btn = document.getElementById('activationSubmitBtn');
+        const originalBtnText = btn ? btn.textContent : '';
+        // Whatever happens inside this function must always end in visible feedback -- this
+        // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zscan (an
+        // unbounded fetch hang, alert() silently failing in an installed-PWA context, a missing
+        // else branch after a valid-locally-but-server-rejected key), each fixed individually.
+        // This top-level try/catch/finally is the backstop: if any *other*, not-yet-found
+        // exception is thrown anywhere in this call chain, it now surfaces as a visible toast
+        // with the real error message instead of vanishing as a silent unhandled rejection, and
+        // the button is guaranteed to be re-enabled either way. alert() also replaced with
+        // showToast() here for the same reason Zscan's was.
+        if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
+        try {
+            const input = document.getElementById('activationKeyInput');
+            const keyStr = input ? input.value.trim() : '';
+            if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
+            const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
+            if (!result.valid) {
+                showToast(licenseFailureMessage(result.reason));
+                return;
             }
-            safeFocusScanner();
-        } else {
-            // Key was valid locally (signature/app/expiry all checked out in activate()
-            // above) but the server-side check inside ensureAppActivated() just rejected it
-            // (revoked / not found / server-expired) -- without this, nothing here ever told
-            // the user that, so the modal would silently reset to its original text.
-            showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
+            if (input) input.value = '';
+            const activated = await ensureAppActivated();
+            if (activated) {
+                showToast("✅ Active ជោគជ័យ!");
+                if (!isDatabaseInitialized) {
+                    initDatabaseListeners();
+                    isDatabaseInitialized = true;
+                }
+                safeFocusScanner();
+            } else {
+                // Key was valid locally (signature/app/expiry all checked out in activate()
+                // above) but the server-side check inside ensureAppActivated() just rejected it
+                // (revoked / not found / server-expired) -- without this, nothing here ever told
+                // the user that, so the modal would silently reset to its original text.
+                showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
+            }
+        } catch (e) {
+            console.error('submitActivationKey failed:', e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
+            showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = originalBtnText; }
         }
     }
 

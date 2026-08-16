@@ -268,6 +268,20 @@
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
+            // Wired up here (immediately once db exists) rather than inside
+            // initDatabaseListeners(), which only runs after login + role-check +
+            // license-check all resolve — those async round trips could take a few
+            // seconds, during which the dot would otherwise sit on its default
+            // "offline" HTML state and misreport connectivity that was fine the
+            // whole time.
+            fb.onValue(dbRefConnected, (snap) => {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('firebaseStatusText');
+                const online = snap.val() === true;
+                if (statusDot) statusDot.classList.toggle('offline', !online);
+                if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+            });
+
             setupAuthListener();
             return true;
         } catch (e) {
@@ -879,29 +893,18 @@
 
     function initDatabaseListeners() {
         if (!db) return;
-        
+
         if (isDatabaseInitialized) {
             if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
             if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
             if (dbRefHistory) fb.off(dbRefHistory);
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-            if (dbRefConnected) fb.off(dbRefConnected);
         }
 
-        if (!dbRefConnected) dbRefConnected = fb.ref(db, '.info/connected');
-        fb.onValue(dbRefConnected, (snap) => {
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('firebaseStatusText');
-            
-            if (snap.val() === true) {
-                if (statusDot) statusDot.classList.remove('offline');
-                if (statusText) statusText.innerText = "ភ្ជាប់ Server រួចរាល់";
-            } else {
-                if (statusDot) statusDot.classList.add('offline');
-                if (statusText) statusText.innerText = "ក្រៅបណ្ដាញ";
-            }
-        });
+        // dbRefConnected's listener is wired up in initFirebase() itself, immediately
+        // once db exists, so the status dot reflects real connectivity from page load
+        // instead of sitting on its default "offline" markup until login finishes.
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {

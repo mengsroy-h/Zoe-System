@@ -117,6 +117,14 @@
         ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
         ".validate": "newData.isNumber() && newData.val() > 0"
       }
+    },
+
+    "zoew_barcode_registry": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+      "$barcodeKey": {
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+        ".validate": "newData.isBoolean() && newData.val() === true"
+      }
     }
   }
 }

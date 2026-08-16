@@ -1138,14 +1138,21 @@
         const currentTime = Date.now();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let initialLen = deletedItems.length;
+        let purgedBarcodes = [];
 
         deletedItems = deletedItems.filter(item => {
             let deletedTime = item.deletedAt || currentTime;
-            return (currentTime - deletedTime <= tenDaysMs);
+            const expired = (currentTime - deletedTime > tenDaysMs);
+            if (expired) purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+            return !expired;
         });
 
         if (deletedItems.length !== initialLen) {
             saveDeletedToFirebase();
+            // Frees the barcode(s) up for reuse now that they're gone for good -- matches
+            // isBarcodeAlreadyUsed()'s own rule that a barcode stays claimed as long as it's
+            // in scanHistory OR deletedItems, not just scanHistory.
+            releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
 
@@ -2331,6 +2338,60 @@
         return scanHistory.some(matchesCode) || deletedItems.some(matchesCode);
     }
 
+    // isBarcodeAlreadyUsed() above only checks the realtime-synced local cache -- it
+    // cannot see a write another device made moments ago that hasn't synced down yet.
+    // For two devices scanning the exact same physical barcode within that window, this
+    // Firebase Transaction on a dedicated registry node is the actual atomic guard:
+    // whichever device's transaction runs first against the server wins the claim, the
+    // other is told the barcode is taken. Released again once the barcode's trash record
+    // is permanently purged (see releaseBarcodesInRegistry), matching how
+    // isBarcodeAlreadyUsed() itself treats "still in trash" as still claimed.
+    function barcodeRegistryKey(code) {
+        const normalized = String(code || '').trim().toUpperCase();
+        // Firebase RTDB keys can't contain . # $ [ ] / or ASCII control characters --
+        // percent-encode anything outside that set so an odd manually-typed barcode can
+        // never produce an invalid or unintentionally-nested path.
+        return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    }
+
+    // Returns 'claimed' (we own it now), 'taken' (someone else already does), or
+    // 'unknown' (couldn't reach Firebase to confirm either way -- caller falls back to
+    // trusting the local isBarcodeAlreadyUsed() check rather than blocking scanning
+    // entirely just because the network hiccuped, matching this app's usual degrade-
+    // gracefully-offline behavior).
+    async function claimBarcodeInRegistry(code) {
+        const key = barcodeRegistryKey(code);
+        if (!db || !fb || !key) return 'unknown';
+        try {
+            const result = await fb.runTransaction(fb.ref(db, `zoew_barcode_registry/${key}`), (current) => {
+                if (current === null) return true;
+                return; // undefined return aborts the transaction -- already claimed
+            });
+            return result.committed ? 'claimed' : 'taken';
+        } catch (e) {
+            return 'unknown';
+        }
+    }
+
+    function collectItemBarcodes(item) {
+        if (!item) return [];
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
+            return item.barcodes.map(b => b && b.code).filter(Boolean);
+        }
+        return item.barcode ? [item.barcode] : [];
+    }
+
+    function releaseBarcodesInRegistry(codes) {
+        if (!db || !fb || !codes || !codes.length) return Promise.resolve();
+        const updates = {};
+        codes.forEach((code) => {
+            const key = barcodeRegistryKey(code);
+            if (key) updates[key] = null;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
+    }
+
     function triggerScanAction(barcode) {
         if (isModalOpen) return;
 
@@ -2370,7 +2431,7 @@
         }, 150);
     }
 
-    function confirmPhone(isSkip = false) {
+    async function confirmPhone(isSkip = false) {
         const phoneEl = document.getElementById('modalPhoneInput');
         const lockerEl = document.getElementById('modalLockerInput');
         const codEl = document.getElementById('modalCodInput');
@@ -2395,20 +2456,52 @@
             localStorage.setItem('last_entered_locker', rawLocker);
         }
 
-        if (isBarcodeAlreadyUsed(pendingBarcode)) {
+        const barcodeToSave = pendingBarcode;
+
+        if (isBarcodeAlreadyUsed(barcodeToSave)) {
             closeModal('phoneModal');
-            showToast(`⚠️ លេខ Barcode នេះ (${pendingBarcode}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
+            showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
             safeFocusScanner();
             return;
         }
 
-        addOrUpdateEntry(pendingBarcode, phone, cod, dod, locker);
-        closeModal('phoneModal');
-        showToast("រក្សាទុកបានជោគជ័យ!");
+        const skipBtn = document.getElementById('phoneModalSkipBtn');
+        const confirmBtn = document.getElementById('phoneModalConfirmBtn');
+        if (skipBtn) skipBtn.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = true;
+
+        try {
+            // Final, server-side-atomic guard against two devices saving the exact same
+            // barcode within the same instant -- see claimBarcodeInRegistry's comment.
+            const claim = await claimBarcodeInRegistry(barcodeToSave);
+            if (claim === 'taken') {
+                closeModal('phoneModal');
+                showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
+                if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+                safeFocusScanner();
+                return;
+            }
+
+            try {
+                await addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
+            } catch (saveError) {
+                if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
+                throw saveError;
+            }
+
+            closeModal('phoneModal');
+            showToast("រក្សាទុកបានជោគជ័យ!");
+        } catch (e) {
+            // addOrUpdateEntry's own Firebase-save call already toasts its failure message.
+        } finally {
+            if (skipBtn) skipBtn.disabled = false;
+            if (confirmBtn) confirmBtn.disabled = false;
+        }
     }
 
     function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A") {
+        let savePromise;
         const now = new Date();
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
@@ -2461,7 +2554,7 @@
 
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
-            saveSingleHistoryItemToFirebase(item);
+            savePromise = saveSingleHistoryItemToFirebase(item);
         } else {
             let newItem = {
                 id: generateUniqueId(),
@@ -2480,10 +2573,11 @@
             };
 
             scanHistory.push(newItem);
-            saveSingleHistoryItemToFirebase(newItem);
+            savePromise = saveSingleHistoryItemToFirebase(newItem);
         }
 
         updateRecentPhonesList();
+        return savePromise;
     }
 
     function openViewListModal(id) {
@@ -3007,8 +3101,9 @@
         if (confirm("លុបជាអចិន្ត្រៃយ៍?")) {
             const index = deletedItems.findIndex(i => i.id === id);
             if(index !== -1) {
-                deletedItems.splice(index, 1);
+                const purgedItem = deletedItems.splice(index, 1)[0];
                 deleteSingleDeletedItemFromFirebase(id);
+                releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
                 renderRecentlyDeleted();
             }
         }

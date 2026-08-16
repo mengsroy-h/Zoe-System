@@ -641,48 +641,86 @@
         });
     }
 
-    // Moves a stale item out of active history into the trash bin using a Firebase transaction,
-    // so that when ZoeAdmin and ZoeW are both open at once, only one of them "wins" the item and
-    // performs the revenue deduction / trash insert exactly once (prevents double-deduction races
-    // and prevents items from vanishing without a trace — see barcode-memory requirement).
     async function claimAndCleanupItem(id, reason) {
         if (!db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
         cleanupInFlight.add(id);
 
-        let claimedItem = null;
+        let claimedWhole = null;
+        let claimedPartial = null;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const result = await fb.runTransaction(itemRef, (currentItem) => {
-                claimedItem = null;
+                claimedWhole = null;
+                claimedPartial = null;
                 if (!currentItem) return currentItem;
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || Date.now();
 
                 if (reason === 'abandon') {
                     if (currentItem.isClosed || (Date.now() - ts) <= EIGHT_DAYS_MS) return currentItem;
+
+                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
+                        const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
+                        const stillActive = currentItem.barcodes.filter(b => b.isClosed);
+                        if (staleOpen.length === 0) return currentItem;
+
+                        if (stillActive.length === 0) {
+                            claimedWhole = currentItem;
+                            return null;
+                        }
+
+                        claimedPartial = { ...currentItem, barcodes: staleOpen };
+                        const updated = { ...currentItem, barcodes: stillActive };
+                        updated.count = stillActive.length;
+                        updated.cod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                        updated.dod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                        updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                        updated.barcode = stillActive[0].code;
+                        updated.isClosed = true;
+                        if (!updated.closedAt) updated.closedAt = Date.now();
+                        return updated;
+                    }
+
+                    claimedWhole = currentItem;
+                    return null;
                 } else {
                     if (!currentItem.isClosed || !currentItem.closedAt || (Date.now() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
+                    claimedWhole = currentItem;
+                    return null;
                 }
-
-                claimedItem = currentItem;
-                return null;
             });
 
-            if (!result.committed || !claimedItem) return;
+            if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
-            const trashItem = { ...claimedItem, id };
-            trashItem.deletedAt = Date.now();
-
-            if (reason === 'abandon') {
+            let trashItem;
+            if (claimedPartial) {
+                trashItem = { ...claimedPartial, id: generateUniqueId() };
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                trashItem.count = trashItem.barcodes.length;
+                trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                trashItem.price = Math.round((trashItem.cod + trashItem.dod) * 100) / 100;
+                trashItem.barcode = trashItem.barcodes[0].code;
+                trashItem.isClosed = false;
+                delete trashItem.closedAt;
+                trashItem.deletedAt = Date.now();
                 trashItem.isFromDeletion = false;
-                if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                    trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
-                }
-                let targetCod = parseFloat(trashItem.cod) || 0;
-                let targetDod = parseFloat(trashItem.dod) || 0;
-                let targetCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
-                addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -targetCod, -targetDod, -targetCount);
+                addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -trashItem.cod, -trashItem.dod, -trashItem.count);
             } else {
-                trashItem.isFromDeletion = true;
+                trashItem = { ...claimedWhole, id };
+                trashItem.deletedAt = Date.now();
+
+                if (reason === 'abandon') {
+                    trashItem.isFromDeletion = false;
+                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                    }
+                    let targetCod = parseFloat(trashItem.cod) || 0;
+                    let targetDod = parseFloat(trashItem.dod) || 0;
+                    let targetCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
+                    addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -targetCod, -targetDod, -targetCount);
+                } else {
+                    trashItem.isFromDeletion = true;
+                }
             }
 
             deletedItems.unshift(trashItem);
@@ -784,7 +822,28 @@
 
         window.addEventListener('scroll', closeGlobalMoreMenu, true);
         window.addEventListener('resize', closeGlobalMoreMenu);
+
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.style.display === 'flex') {
+                dismissModal(e.target);
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const openModalEl = Array.from(document.querySelectorAll('.modal')).find(m => m.style.display === 'flex');
+            if (openModalEl) dismissModal(openModalEl);
+        });
     });
+
+    function dismissModal(modalEl) {
+        if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
+        const fnName = modalEl.getAttribute('data-close');
+        if (fnName && typeof window[fnName] === 'function') {
+            window[fnName]();
+        } else {
+            closeModal(modalEl.id);
+        }
+    }
 
     function closeGlobalMoreMenu() {
         const globalMenu = document.getElementById('globalMoreMenu');

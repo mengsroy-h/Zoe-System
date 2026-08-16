@@ -426,7 +426,10 @@ function copyTextarea(id) {
 
 let lastGeneratedKey = '';
 
+let isGeneratingKey = false;
+
 async function generateLicenseKey() {
+    if (isGeneratingKey) return;
     if (!signingPrivateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
     if (!db || !auth || !auth.currentUser) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
 
@@ -435,6 +438,10 @@ async function generateLicenseKey() {
     const note = document.getElementById('genNoteInput').value.trim();
 
     if (days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+
+    const genBtn = document.getElementById('genGenerateBtn');
+    isGeneratingKey = true;
+    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងបង្កើត...'; }
 
     try {
         const { keyString, payload } = await window.ZoeLicense.signNewKey(signingPrivateKeyJwk, {
@@ -462,6 +469,9 @@ async function generateLicenseKey() {
     } catch (e) {
         console.error(e);
         alert('មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
+    } finally {
+        isGeneratingKey = false;
+        if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     }
 }
 

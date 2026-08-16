@@ -710,6 +710,7 @@
     }
 
     const LICENSE_APP_CODE = 'ADM';
+    const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
 
     function licenseFailureMessage(reason) {
         switch (reason) {
@@ -1212,6 +1213,16 @@
                 }
             }
         }, 60000);
+
+        // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
+        // already-open session — ensureAppActivated() is otherwise only called at login, so a
+        // device left running (common for a fixed scanning station) would keep working until
+        // someone happens to reload it. Re-checking periodically closes that gap.
+        setInterval(() => {
+            if (auth && auth.currentUser && isDatabaseInitialized) {
+                ensureAppActivated();
+            }
+        }, LICENSE_RECHECK_INTERVAL_MS);
 
         try {
             const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];

@@ -435,6 +435,7 @@
     }
 
     const LICENSE_APP_CODE = 'ZOW';
+    const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
 
     function licenseFailureMessage(reason) {
         switch (reason) {
@@ -913,6 +914,14 @@
                 }
             }
         }, 60000);
+
+        // Revoking/expiring a key in ZoeKeyGen must not sit unnoticed for the rest of an
+        // already-open session — ensureAppActivated() is otherwise only called at login.
+        setInterval(() => {
+            if (auth && auth.currentUser && isDatabaseInitialized) {
+                ensureAppActivated();
+            }
+        }, LICENSE_RECHECK_INTERVAL_MS);
 
         setupSwipeGestures();
         updateRecentPhonesList();

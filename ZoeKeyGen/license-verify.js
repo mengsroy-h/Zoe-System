@@ -10,35 +10,71 @@
  *  - Editing localStorage cannot extend a key: the expiry is inside the
  *    signed payload, so changing it breaks the signature.
  *  - Revocation and admin-side expiry edits are enforced server-side via the
- *    Firebase `license_keys/{app}/{id}` record, re-checked on every login
- *    while online, so a key can be shut off even before it would naturally
- *    expire.
+ *    Firebase `license_keys/{app}/{id}` record, re-checked on every login and
+ *    every 15 minutes while an app stays open online, so a key can be shut
+ *    off even before it would naturally expire.
  *  - This file is identical across ZoeAdmin, ZoeW, Zscan and ZoeKeyGen —
- *    keep all copies in sync (same PUBLIC_KEY_JWK) if the signing keypair is
- *    ever rotated.
+ *    keep all copies in sync (same PUBLIC_KEYS_JWK) if the signing keypair is
+ *    ever rotated. See the PUBLIC_KEYS_JWK comment below for the rotation
+ *    steps — it supports listing more than one key so rotation doesn't
+ *    invalidate every key already issued under the old one.
  */
 (function (global) {
     'use strict';
 
-    const PUBLIC_KEY_JWK = {
-        "key_ops": ["verify"],
-        "ext": true,
-        "kty": "EC",
-        "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
-        "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0",
-        "crv": "P-256"
-    };
+    /*
+     * PUBLIC_KEYS_JWK — public keys accepted for signature verification, newest first.
+     * Normally holds exactly one entry: the current signing keypair's public half, generated
+     * in ZoeKeyGen's "Signing Key" panel. Keep a SECOND (older) entry here only while rotating
+     * to a new signing keypair, so keys already issued under the old private key keep verifying
+     * until they naturally expire — then delete the old entry once nothing depends on it.
+     *
+     * How to add a new pair during rotation (repeat in ALL 4 copies of this file — ZoeAdmin,
+     * ZoeW, Zscan, ZoeKeyGen — then redeploy all 4 apps together so no device is left checking
+     * against a public key list that doesn't match what ZoeKeyGen is currently signing with):
+     *
+     *   1. In ZoeKeyGen -> "Signing Key" panel, click "បង្កើត Keypair ថ្មី" (Generate New
+     *      Keypair). Copy the new Public Key JWK it shows you.
+     *   2. Add it as a NEW element at the FRONT of the array below, keeping the old one(s) so
+     *      already-issued keys still verify:
+     *
+     *        const PUBLIC_KEYS_JWK = [
+     *            { "key_ops": ["verify"], "ext": true, "kty": "EC",
+     *              "x": "NEW_X_VALUE_HERE", "y": "NEW_Y_VALUE_HERE", "crv": "P-256" },
+     *            { "key_ops": ["verify"], "ext": true, "kty": "EC",  // old — keep until its keys expire
+     *              "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
+     *              "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0", "crv": "P-256" }
+     *        ];
+     *
+     *   3. Redeploy all 4 apps with the updated array.
+     *   4. Back in ZoeKeyGen, paste the NEW Private Key JWK into "Load Key" — every key
+     *      generated from now on is signed with the new pair. Keys generated before step 3 was
+     *      live on every device still verify fine, since the old public key is still listed.
+     *   5. Once every key signed with the OLD private key has either expired or been reissued,
+     *      delete the old entry from the array (in all 4 copies) and redeploy once more to
+     *      finish the rotation.
+     */
+    const PUBLIC_KEYS_JWK = [
+        {
+            "key_ops": ["verify"],
+            "ext": true,
+            "kty": "EC",
+            "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
+            "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0",
+            "crv": "P-256"
+        }
+    ];
 
     const KEY_PREFIX = 'ZOEKEY-';
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
-    let cachedPublicKey = null;
-    async function getPublicKey() {
-        if (cachedPublicKey) return cachedPublicKey;
-        cachedPublicKey = await crypto.subtle.importKey(
-            'jwk', PUBLIC_KEY_JWK, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
-        );
-        return cachedPublicKey;
+    let cachedPublicKeys = null;
+    async function getPublicKeys() {
+        if (cachedPublicKeys) return cachedPublicKeys;
+        cachedPublicKeys = await Promise.all(PUBLIC_KEYS_JWK.map((jwk) => crypto.subtle.importKey(
+            'jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
+        )));
+        return cachedPublicKeys;
     }
 
     function b64urlToBytes(b64url) {
@@ -106,9 +142,14 @@
 
     async function verifySignature(payloadB64, sigBytes) {
         try {
-            const pubKey = await getPublicKey();
+            const pubKeys = await getPublicKeys();
             const data = new TextEncoder().encode(payloadB64);
-            return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data);
+            for (const pubKey of pubKeys) {
+                if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data)) {
+                    return true;
+                }
+            }
+            return false;
         } catch (e) {
             return false;
         }

@@ -87,7 +87,12 @@
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            navigator.serviceWorker.register('./sw.js').then((reg) => {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                });
+                window.addEventListener('focus', () => reg.update().catch(() => {}));
+            }).catch(() => {});
         });
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {

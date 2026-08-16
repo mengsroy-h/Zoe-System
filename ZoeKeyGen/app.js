@@ -39,11 +39,27 @@
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            navigator.serviceWorker.register('./sw.js').then((reg) => {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                });
+                window.addEventListener('focus', () => reg.update().catch(() => {}));
+            }).catch(() => {});
         });
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
+            // A Signing Key pasted into memory has nowhere else it's saved -- silently
+            // reloading out from under an admin mid-session would just discard it
+            // (see loadSigningKey below), reproducing the exact "have to paste it in
+            // again" pain this update-checking change is otherwise meant to reduce.
+            // Defer the reload until nothing would be lost by it.
+            if (typeof signingPrivateKeyJwk !== 'undefined' && signingPrivateKeyJwk) {
+                if (typeof showToast === 'function') {
+                    showToast('🔄 មានកំណែថ្មី — សូម Refresh ដោយខ្លួនឯងពេលងាយ (ដើម្បីកុំបាត់ Signing Key ដែលកំពុង Load)');
+                }
+                return;
+            }
             swReloadedOnce = true;
             window.location.reload();
         });
@@ -163,7 +179,7 @@ async function verifyStoredPin(enteredPin, savedHash) {
 
 let pinTargetAction = null;
 
-function requestPinBeforeConfig(targetAction) {
+function requestPinBeforeConfig(targetAction, message) {
     pinTargetAction = targetAction || openConfigModal;
     const savedPin = localStorage.getItem('zoew_security_pin_hash');
     if (!savedPin) {
@@ -171,7 +187,68 @@ function requestPinBeforeConfig(targetAction) {
     } else {
         const pinIn = document.getElementById('securityPinInput');
         if (pinIn) pinIn.value = '';
+        const msgEl = document.getElementById('pinModalMsg');
+        if (msgEl) msgEl.textContent = message || 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig';
         openModalHelper('pinModal');
+    }
+}
+
+// Derives a session-only AES-GCM key from the Security PIN, used purely to encrypt the
+// Signing Private Key at rest in sessionStorage when the admin opts in via the "remember"
+// checkbox -- a different salt from hashPin()'s PBKDF2 above so the two derived values
+// can never collide even though they share the same source PIN. Never itself persisted;
+// re-derived fresh every time the PIN is entered (deterministic, so it always matches).
+let signingKeySessionKey = null;
+
+async function deriveSigningKeySessionKey(pin) {
+    try {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']);
+        return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: enc.encode('zoekeygen_signing_key_at_rest_v1'), iterations: 150000, hash: 'SHA-256' },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    } catch (e) {
+        return null;
+    }
+}
+
+const SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
+
+async function persistSigningKeyForSession() {
+    if (!signingKeySessionKey || !signingPrivateKeyJwk) return;
+    try {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipherBuf = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv }, signingKeySessionKey, new TextEncoder().encode(JSON.stringify(signingPrivateKeyJwk))
+        );
+        sessionStorage.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
+        showToast('🔒 Signing Key ត្រូវបានចងចាំសម្រាប់ Session នេះ (Encrypted ដោយ PIN)');
+    } catch (e) {}
+}
+
+async function tryRestoreSigningKeyFromSession() {
+    if (signingPrivateKeyJwk || !signingKeySessionKey) return;
+    const raw = sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+    if (!raw) return;
+    try {
+        const encObj = JSON.parse(raw);
+        const plainBuf = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: new Uint8Array(encObj.iv) }, signingKeySessionKey, new Uint8Array(encObj.data)
+        );
+        signingPrivateKeyJwk = JSON.parse(new TextDecoder().decode(plainBuf));
+        updateSigningKeyBadge();
+        const cb = document.getElementById('rememberSigningKeyCheckbox');
+        if (cb) cb.checked = true;
+        showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
+    } catch (e) {
+        // Wrong PIN (decrypt/auth failure) or corrupted blob -- drop it rather than keep
+        // failing silently on every future reload; admin can re-load and re-remember it.
+        sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+        showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
 }
 
@@ -184,6 +261,7 @@ async function saveNewSecurityPin() {
     }
     try {
         localStorage.setItem('zoew_security_pin_hash', await hashPin(pinVal));
+        signingKeySessionKey = await deriveSigningKeySessionKey(pinVal);
     } catch (e) {
         alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
         return;
@@ -216,6 +294,7 @@ async function verifySecurityPin() {
         if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
             localStorage.removeItem('zoew_pin_fail_count');
             localStorage.removeItem('zoew_pin_lockout_until');
+            signingKeySessionKey = await deriveSigningKeySessionKey(enteredPin);
             closeModal('pinModal');
             (pinTargetAction || openConfigModal)();
         } else {
@@ -385,6 +464,15 @@ async function loadSigningKey() {
         input.value = '';
         updateSigningKeyBadge();
         showToast('Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
+
+        const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+        if (rememberCb && rememberCb.checked) {
+            if (signingKeySessionKey) {
+                await persistSigningKeyForSession();
+            } else {
+                requestPinBeforeConfig(persistSigningKeyForSession, 'បញ្ចូល PIN ដើម្បីចងចាំ Signing Key នេះសម្រាប់ Session នេះ');
+            }
+        }
     } catch (e) {
         alert('Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។');
     }
@@ -393,6 +481,9 @@ async function loadSigningKey() {
 function clearSigningKey() {
     signingPrivateKeyJwk = null;
     document.getElementById('privateKeyInput').value = '';
+    sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+    const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+    if (rememberCb) rememberCb.checked = false;
     updateSigningKeyBadge();
     showToast('បានសម្អាត Signing Key ចេញពីសតិ');
 }
@@ -585,6 +676,14 @@ async function confirmExtendKey() {
 document.addEventListener('DOMContentLoaded', () => {
     initFirebase();
     updateSigningKeyBadge();
+
+    // If a Signing Key was remembered (opted in via the checkbox) before this reload --
+    // whether from a manual refresh, an OS backgrounding the app and later restoring it,
+    // or our own SW-update reload -- prompt for the PIN to unlock it instead of leaving
+    // the admin to paste the whole private key in again from their password manager.
+    if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
+        requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
+    }
 
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('mousedown', (e) => {

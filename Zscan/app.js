@@ -68,6 +68,14 @@ function withTimeout(promise, ms, timeoutMsg) {
     ]);
 }
 
+function debounce(fn, ms) {
+    let timer = null;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+    };
+}
+
 function parseFirebaseConfigLenient(raw) {
     raw = (raw || '').trim();
     try { return JSON.parse(raw); } catch (e) {}
@@ -141,7 +149,7 @@ async function initFirebase() {
 
     setInterval(() => {
         if (auth && auth.currentUser && listenersAttached && !isAnyModalOpen()) {
-            ensureAppActivated();
+            ensureAppActivated().catch((e) => { if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'periodic ensureAppActivated' }); });
         }
     }, LICENSE_RECHECK_INTERVAL_MS);
 }
@@ -252,6 +260,12 @@ async function verifyRoleThenProceed(user) {
 }
 
 let listenersAttached = false;
+// Coalesces the list re-render triggered by Firebase onValue(dbRefHistory) so a burst of
+// near-simultaneous writes (multiple scanners active at once) rebuilds the table once
+// instead of once per event. buildBarcodeIndex() stays immediate since scan/save flows
+// need it fresh on every event.
+const debouncedRenderList = debounce(() => { if (currentTab === 'list') renderList(); }, 120);
+
 function initDatabaseListeners() {
     if (listenersAttached) return;
     listenersAttached = true;
@@ -259,7 +273,7 @@ function initDatabaseListeners() {
     sdk.onValue(dbRefHistory, (snap) => {
         historyData = snap.val() || {};
         buildBarcodeIndex();
-        if (currentTab === 'list') renderList();
+        debouncedRenderList();
     }, (err) => {
         console.error('Firebase history listener error:', err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase history listener error:' });
@@ -301,10 +315,13 @@ async function loginWithFirebase() {
     const sdk = window.firebaseSDK;
     try {
         await sdk.setPersistence(auth, remember ? sdk.browserLocalPersistence : sdk.browserSessionPersistence);
-        await sdk.signInWithEmailAndPassword(auth, email, password);
+        await withTimeout(sdk.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (remember) localStorage.setItem('remembered_email', email); else localStorage.removeItem('remembered_email');
     } catch (e) {
-        errBox.textContent = 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!';
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loginWithFirebase' });
+        errBox.textContent = e && e.message === 'Login timed out'
+            ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+            : 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!';
         errBox.style.display = 'block';
     } finally {
         btn.disabled = false; btn.textContent = 'ចូលប្រព័ន្ធ';
@@ -502,6 +519,7 @@ let ownCaptureCanvas = null;
 let ownCaptureCtx = null;
 let lastScannedCode = null;
 let lastScanTime = 0;
+let cameraStoppedByVisibility = false;
 const SCAN_FORMATS_ZXING = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
 const SCAN_FORMATS_NATIVE = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'];
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -696,8 +714,8 @@ function startZxingVideoScan(videoElement) {
     function loop(timestamp) {
         if (!currentStream || !isCameraScanning || !zxingLoopActive) return;
         if (!decoding && timestamp - lastCheck > 130) {
+            lastCheck = timestamp;
             if (!isAnyModalOpen() && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
-                lastCheck = timestamp;
                 decoding = true;
                 try {
                     const crop = getCoverCropRect(videoElement, container);
@@ -822,7 +840,7 @@ function getEntryCurrentLocker(entry) {
 }
 
 function handleScannedCode(code) {
-    if (document.getElementById('locationWarningModal').classList.contains('open')) return;
+    if (isAnyModalOpen()) return;
     if (!activeLocker) {
         playErrorFeedback();
         showToast('⚠️ សូមជ្រើសរើសទីតាំង Locker សិន!');
@@ -875,7 +893,7 @@ async function assignLockerToEntry(code) {
 
     try {
         const itemRef = window.firebaseSDK.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
-        const result = await window.firebaseSDK.runTransaction(itemRef, (currentItem) => {
+        const result = await withTimeout(window.firebaseSDK.runTransaction(itemRef, (currentItem) => {
             matched = false;
             if (!currentItem) return currentItem;
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
@@ -897,7 +915,7 @@ async function assignLockerToEntry(code) {
             phoneForToast = currentItem.phone || '';
             matched = true;
             return currentItem;
-        });
+        }), 12000, 'Save timed out');
 
         if (!result.committed || !matched) {
             playErrorFeedback();
@@ -1010,7 +1028,7 @@ function bindEventListeners() {
     const hw = document.getElementById('hwScannerInput');
     hw.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitManualBarcode(); } });
 
-    document.getElementById('listSearchInput').addEventListener('input', renderList);
+    document.getElementById('listSearchInput').addEventListener('input', debounce(renderList, 150));
     document.getElementById('listLockerFilter').addEventListener('change', renderList);
 
     document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); loginWithFirebase(); });
@@ -1040,6 +1058,22 @@ function bindEventListeners() {
         const openModalEl = document.querySelector('.modal.open');
         if (openModalEl) dismissModal(openModalEl);
     });
+
+    // The camera stays open (indicator light on, battery/GPU draining) whenever the tab is
+    // just backgrounded/screen-locked mid-shift, since only the decode loop pauses while
+    // hidden -- release the stream outright and re-request it on return, same as reopening
+    // the scan tab manually.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            if (isCameraScanning && currentTab === 'scan') {
+                cameraStoppedByVisibility = true;
+                stopScanner();
+            }
+        } else if (cameraStoppedByVisibility) {
+            cameraStoppedByVisibility = false;
+            if (currentTab === 'scan' && !isAnyModalOpen()) requestCameraPermission();
+        }
+    });
 }
 bindEventListeners();
 
@@ -1061,6 +1095,10 @@ window.addEventListener('load', () => {
                 if (document.visibilityState === 'visible') reg.update().catch(() => {});
             });
             window.addEventListener('focus', () => reg.update().catch(() => {}));
+            // Belt-and-suspenders for a scanning shift where the app stays foregrounded
+            // for hours without ever blurring/backgrounding -- visibilitychange/focus
+            // would never fire, so also poll periodically.
+            setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
         }).catch(() => {});
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {

@@ -44,6 +44,10 @@
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
+                // Belt-and-suspenders for a session left open and foregrounded for hours
+                // without ever blurring/backgrounding -- visibilitychange/focus would
+                // never fire, so also poll periodically.
+                setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
         let swReloadedOnce = false;
@@ -396,15 +400,23 @@ async function doLogin() {
     const password = passIn ? passIn.value : '';
     if (!email || !password) { alert("សូមបញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់!"); return; }
 
+    const loginBtn = document.getElementById('loginBtn');
+    const originalBtnText = loginBtn ? loginBtn.textContent : '';
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
     try {
         if (!fb || !auth) { fb = await waitForFirebaseSDK(); }
         await fb.setPersistence(auth, rememberCb && rememberCb.checked ? fb.browserLocalPersistence : fb.browserSessionPersistence);
-        await fb.signInWithEmailAndPassword(auth, email, password);
+        await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
         else localStorage.removeItem('remembered_email');
         if (passIn) passIn.value = '';
     } catch (e) {
-        alert("ចូលប្រព័ន្ធមិនបានទេ! សូមពិនិត្យអ៊ីមែល/ពាក្យសម្ងាត់ម្តងទៀត។");
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'doLogin' });
+        alert(e && e.message === 'Login timed out'
+            ? "អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។"
+            : "ចូលប្រព័ន្ធមិនបានទេ! សូមពិនិត្យអ៊ីមែល/ពាក្យសម្ងាត់ម្តងទៀត។");
+    } finally {
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalBtnText; }
     }
 }
 
@@ -563,7 +575,7 @@ async function generateLicenseKey() {
             createdBy: auth.currentUser.email || auth.currentUser.uid
         };
 
-        await Promise.all(targetPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record)));
+        await withTimeout(Promise.all(targetPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record))), 15000, 'Generate key timed out');
 
         lastGeneratedKey = keyString;
         document.getElementById('genResultKey').textContent = keyString;
@@ -573,8 +585,10 @@ async function generateLicenseKey() {
         refreshKeyList();
     } catch (e) {
         console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: '' });
-        alert('មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
+        alert(e && e.message === 'Generate key timed out'
+            ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+            : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
         isGeneratingKey = false;
         if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
@@ -598,7 +612,7 @@ async function refreshKeyList() {
     if (!tbody || !db) return;
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     try {
-        const snap = await fb.get(fb.ref(db, 'license_keys'));
+        const snap = await withTimeout(fb.get(fb.ref(db, 'license_keys')), 15000, 'Refresh timed out');
         const data = snap.exists() ? snap.val() : {};
         const seen = {};
         const rows = [];
@@ -661,10 +675,18 @@ async function toggleRevokeKey(id) {
     const newRevoked = !row.revoked;
     if (!confirm(newRevoked ? 'តើអ្នកចង់ Revoke Key នេះមែនទេ? អ្នកប្រើប្រាស់នឹងលែងចូល App បានក្នុងពេលឆាប់ៗ។' : 'សង្គ្រោះ Key នេះមកវិញ?')) return;
     try {
-        await Promise.all(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${id}`), { revoked: newRevoked })));
-        showToast(newRevoked ? 'Key ត្រូវបាន Revoke!' : 'Key ត្រូវបានសង្គ្រោះមកវិញ!');
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
+        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+        if (failedPaths.length === 0) {
+            showToast(newRevoked ? 'Key ត្រូវបាន Revoke!' : 'Key ត្រូវបានសង្គ្រោះមកវិញ!');
+        } else if (failedPaths.length < row.paths.length) {
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key ត្រូវបាន${newRevoked ? ' Revoke' : 'សង្គ្រោះ'}សម្រាប់ App: ${row.paths.filter(p => !failedPaths.includes(p)).join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — សូមសាកល្បងម្តងទៀត ព្រោះ Key នេះនៅតែអាចប្រើបានលើ App ដែលបរាជ័យ!`);
+        } else {
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        }
         refreshKeyList();
     } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
     }
 }
@@ -684,11 +706,19 @@ async function confirmExtendKey() {
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
     const newExpiresAt = Date.now() + Math.round(days * 86400000);
     try {
-        await Promise.all(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt })));
-        showToast('បានបន្ថែមសុពលភាពរួចរាល់!');
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
+        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+        if (failedPaths.length === 0) {
+            showToast('បានបន្ថែមសុពលភាពរួចរាល់!');
+        } else if (failedPaths.length < row.paths.length) {
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
+        } else {
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        }
         closeModal('extendModal');
         refreshKeyList();
     } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
     }
 }

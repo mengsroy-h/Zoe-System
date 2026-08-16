@@ -100,6 +100,10 @@
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
+                // Belt-and-suspenders for a session that's left open and foregrounded for
+                // hours without ever blurring/backgrounding (e.g. a front-desk device) --
+                // visibilitychange/focus would never fire, so also poll periodically.
+                setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
         let swReloadedOnce = false;
@@ -236,6 +240,26 @@
             }, timeoutMs);
         });
     }
+
+    function debounce(fn, ms) {
+        let timer = null;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), ms);
+        };
+    }
+
+    // Coalesces the DOM re-render (and the O(n) auto-cleanup sweep) triggered by Firebase
+    // onValue(dbRefHistory) so a burst of near-simultaneous writes (multiple scanners, bulk
+    // edits) does this once instead of once per event. The 2h/8d cleanup rules operate on
+    // hour/day-scale windows, so a ~120ms delay changes nothing about correctness. Direct-
+    // action call sites elsewhere still call applyCurrentFilter() immediately for instant
+    // feedback on the acting device.
+    const debouncedRenderAfterHistorySync = debounce(() => {
+        runAutomaticCleanupRules();
+        applyCurrentFilter();
+        updateRecentPhonesList();
+    }, 120);
 
     function withTimeout(promise, ms, timeoutMsg) {
         return Promise.race([
@@ -590,7 +614,7 @@
         showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
     }
 
-    async function testLookupApiConfig() {
+    async function testLookupApiConfig(btnEl) {
         const urlIn = document.getElementById('lookupApiUrlInput');
         const headerNameIn = document.getElementById('lookupApiHeaderNameInput');
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
@@ -613,12 +637,16 @@
         if (hName && hValue) headers[hName] = hValue;
 
         showToast("កំពុងសាកល្បង API...");
+        if (btnEl) btnEl.disabled = true;
         try {
-            const res = await fetch(testUrl, { headers });
+            const res = await withTimeout(fetch(testUrl, { headers }), 10000, 'Test API timed out');
             const text = await res.text();
             alert("ស្ថានភាព HTTP៖ " + res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + text.substring(0, 1500));
         } catch (e) {
-            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + e.message);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'testLookupApiConfig' });
+            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (e && e.message === 'Test API timed out' ? "អស់ពេល (Timeout) — សូមពិនិត្យ URL ឬការតភ្ជាប់អ៊ីនធឺណិត" : e.message));
+        } finally {
+            if (btnEl) btnEl.disabled = false;
         }
     }
 
@@ -651,7 +679,7 @@
                 headers[cfg.headerName] = cfg.headerValue;
             }
 
-            const res = await fetch(targetUrl, { headers });
+            const res = await withTimeout(fetch(targetUrl, { headers }), 10000, 'Auto lookup timed out');
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
 
@@ -999,9 +1027,7 @@
 
             lastSyncedHistoryKeys = new Set(scanHistory.map(item => item.id).filter(Boolean));
 
-            runAutomaticCleanupRules();
-            applyCurrentFilter();
-            updateRecentPhonesList();
+            debouncedRenderAfterHistorySync();
         });
 
         fb.onValue(dbRefDeleted, (snapshot) => {
@@ -1216,7 +1242,8 @@
         if(!toast) return;
         toast.innerText = msg;
         toast.className = "show";
-        setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
     }
 
     function getFormattedDate(d = new Date()) {
@@ -1261,7 +1288,7 @@
 
         setInterval(() => {
             if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
-                ensureAppActivated();
+                ensureAppActivated().catch((e) => { if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'periodic ensureAppActivated' }); });
             }
         }, LICENSE_RECHECK_INTERVAL_MS);
 
@@ -2707,6 +2734,9 @@
 
         const freshItem = scanHistory.find(i => i.id === itemId);
         const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
+        const previousState = freshItem && freshB
+            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt }
+            : null;
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -2748,7 +2778,19 @@
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling barcode close: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
+            if (previousState) {
+                const revertItem = scanHistory.find(i => i.id === itemId);
+                const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
+                if (revertItem && revertB) {
+                    revertB.isClosed = previousState.isClosed;
+                    revertItem.isClosed = previousState.itemIsClosed;
+                    if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
+                    else delete revertItem.closedAt;
+                    openViewListModal(itemId);
+                    applyCurrentFilter();
+                }
+            }
         }
     }
 
@@ -2832,8 +2874,9 @@
     function handleCallAction(id) {
         const item = scanHistory.find(i => i.id === id);
         if (item) {
+            const wasCalled = item.isCalled;
             item.isCalled = true;
-            patchHistoryItemFields(item, { isCalled: true });
+            patchHistoryItemFields(item, { isCalled: true }, { isCalled: wasCalled });
         }
     }
 
@@ -2851,14 +2894,16 @@
     function setCallMark(mark) {
         const item = scanHistory.find(i => i.id === markingItemId);
         if (item) {
+            const prevCallMark = item.callMark;
+            const prevCallMarkTime = item.callMarkTime;
             if (mark) {
                 item.callMark = mark;
                 item.callMarkTime = Date.now();
-                patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime });
+                patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
             } else {
                 delete item.callMark;
                 delete item.callMarkTime;
-                patchHistoryItemFields(item, { callMark: null, callMarkTime: null });
+                patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
             }
             applyCurrentFilter();
             showToast(mark ? "បានសម្គាល់រួចរាល់!" : "បានសម្អាតការសម្គាល់!");
@@ -2892,8 +2937,9 @@
 
         const item = scanHistory.find(i => i.id === editingItemId);
         if (item) {
+            const prevPhone = item.phone;
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone });
+            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone });
             updateRecentPhonesList();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
@@ -2909,6 +2955,9 @@
         if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}បញ្ជីនេះមែនទេ?`)) return;
 
         const freshItem = scanHistory.find(i => i.id === id);
+        const previousState = freshItem
+            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
+            : null;
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -2945,7 +2994,19 @@
         } catch (error) {
             console.error("Error toggling close status: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling close status: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
+            if (previousState) {
+                const revertItem = scanHistory.find(i => i.id === id);
+                if (revertItem) {
+                    revertItem.isClosed = previousState.isClosed;
+                    if (previousState.closedAt !== undefined) revertItem.closedAt = previousState.closedAt;
+                    else delete revertItem.closedAt;
+                    if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
+                        revertItem.barcodes.forEach((b, i) => { if (previousState.barcodeStates[i] !== undefined) b.isClosed = previousState.barcodeStates[i]; });
+                    }
+                    applyCurrentFilter();
+                }
+            }
         }
     }
 
@@ -3157,7 +3218,7 @@
         });
     }
 
-    function patchHistoryItemFields(item, fields) {
+    function patchHistoryItemFields(item, fields, previousFields) {
         if (!dbRefHistory) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             return saveHistoryToFirebase();
@@ -3170,7 +3231,17 @@
         return fb.update(dbRefHistory, updates).catch((error) => {
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
+            if (previousFields) {
+                const revertItem = scanHistory.find(i => i.id === item.id);
+                if (revertItem) {
+                    Object.keys(previousFields).forEach((key) => {
+                        if (previousFields[key] === undefined) delete revertItem[key];
+                        else revertItem[key] = previousFields[key];
+                    });
+                    applyCurrentFilter();
+                }
+            }
         });
     }
 

@@ -61,6 +61,13 @@ function waitForFirebaseSDK() {
     });
 }
 
+function withTimeout(promise, ms, timeoutMsg) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg || 'Timed out')), ms))
+    ]);
+}
+
 function parseFirebaseConfigLenient(raw) {
     raw = (raw || '').trim();
     try { return JSON.parse(raw); } catch (e) {}
@@ -209,10 +216,11 @@ async function submitActivationKey() {
 async function verifyRoleThenProceed(user) {
     let role;
     try {
-        const roleSnap = await window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`));
+        const roleSnap = await withTimeout(window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
         role = roleSnap.val();
     } catch (e) {
         console.error('Role verification failed:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Role verification failed:' });
         await window.firebaseSDK.signOut(auth).catch(() => {});
         currentUserEmail = null;
         openModal('loginModal');
@@ -254,6 +262,7 @@ function initDatabaseListeners() {
         if (currentTab === 'list') renderList();
     }, (err) => {
         console.error('Firebase history listener error:', err);
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase history listener error:' });
         showToast('⚠️ បរាជ័យក្នុងការទាញយកទិន្នន័យ! សូមពិនិត្យការតភ្ជាប់ Firebase ឬសិទ្ធិចូលប្រើ');
     });
 }
@@ -388,9 +397,16 @@ async function verifySecurityPin() {
 function openConfigModal() {
     const raw = localStorage.getItem('zoew_firebase_config') || '';
     document.getElementById('configInput').value = raw;
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
     openModal('configModal');
 }
 function saveFirebaseConfig() {
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) {
+        ZoeErrors.setDsn(dsnInput.value);
+        ZoeErrors.init('zscan');
+    }
     const raw = document.getElementById('configInput').value;
     let cfg;
     try { cfg = parseFirebaseConfigLenient(raw); } catch (e) { showToast('Config មិនត្រឹមត្រូវទេ (JSON invalid)!'); return; }
@@ -506,6 +522,7 @@ function initScanEngine() {
         imageDecodeCodeReader = new ZXing.BrowserBarcodeReader(500, imageHints);
     } catch (e) {
         console.error('ZXing initialization error:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'ZXing initialization error:' });
     }
     if ('BarcodeDetector' in window) {
         try {
@@ -900,6 +917,7 @@ async function assignLockerToEntry(code) {
         playErrorFeedback();
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
         console.error(err);
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
     }
 }
 
@@ -1025,9 +1043,12 @@ function bindEventListeners() {
 }
 bindEventListeners();
 
+if (window.ZoeErrors) ZoeErrors.init('zscan');
+
 initFirebase().catch(err => {
     document.getElementById('bootLoading').innerHTML = '⚠️ មិនអាចភ្ជាប់ Firebase SDK បានទេ សូម Refresh ទំព័រនេះម្តងទៀត';
     console.error(err);
+    if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
 });
 (function waitForZXingThenInitScanEngine() {
     if (typeof ZXing === 'undefined') { setTimeout(waitForZXingThenInitScanEngine, 300); return; }

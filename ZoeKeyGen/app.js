@@ -98,6 +98,13 @@ function closeModal(id) {
     if (el) el.classList.remove('active');
 }
 
+function withTimeout(promise, ms, timeoutMsg) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg || 'Timed out')), ms))
+    ]);
+}
+
 function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
@@ -154,6 +161,7 @@ async function initFirebase() {
         return true;
     } catch (e) {
         console.error("Invalid Saved Config", e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Invalid Saved Config" });
         checkPinAndOpenConfig();
         return false;
     } finally {
@@ -331,10 +339,17 @@ function openConfigModal() {
         const cfgInput = document.getElementById('firebaseConfigInput');
         if (cfgInput) cfgInput.value = savedConfig;
     }
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
     openModalHelper('configModal');
 }
 
 function saveFirebaseConfig() {
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) {
+        ZoeErrors.setDsn(dsnInput.value);
+        ZoeErrors.init('zoekeygen');
+    }
     const cfgInput = document.getElementById('firebaseConfigInput');
     if (!cfgInput) return;
     const raw = cfgInput.value.trim();
@@ -395,7 +410,7 @@ async function doLogin() {
 
 async function verifyAdminRoleThenProceed(user) {
     try {
-        const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
+        const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
         const role = roleSnap.val();
         if (role !== 'admin') {
             await fb.signOut(auth).catch(() => {});
@@ -405,7 +420,10 @@ async function verifyAdminRoleThenProceed(user) {
         }
     } catch (e) {
         console.error("Role verification failed:", e);
-        showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ!");
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
+        await fb.signOut(auth).catch(() => {});
+        showLoginModalWithPrefill();
+        showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
         return;
     }
 
@@ -555,6 +573,7 @@ async function generateLicenseKey() {
         refreshKeyList();
     } catch (e) {
         console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: '' });
         alert('មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
         isGeneratingKey = false;
@@ -599,6 +618,7 @@ async function refreshKeyList() {
         renderKeyList();
     } catch (e) {
         console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: '' });
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';
     }
 }
@@ -674,6 +694,7 @@ async function confirmExtendKey() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
     initFirebase();
     updateSigningKeyBadge();
 

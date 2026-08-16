@@ -191,6 +191,13 @@
         });
     }
 
+    function withTimeout(promise, ms, timeoutMsg) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg || 'Timed out')), ms))
+        ]);
+    }
+
     async function initFirebase() {
         const savedConfig = localStorage.getItem('zoew_firebase_config');
         if (!savedConfig) {
@@ -247,6 +254,7 @@
             return true;
         } catch (e) {
             console.error("Invalid Saved Config", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Invalid Saved Config" });
             checkPinAndOpenConfig(true);
             return false;
         } finally {
@@ -367,10 +375,17 @@
             const cfgInput = document.getElementById('firebaseConfigInput');
             if(cfgInput) cfgInput.value = savedConfig;
         }
+        const dsnInput = document.getElementById('sentryDsnInput');
+        if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
         openModalHelper('configModal');
     }
 
     function saveFirebaseConfig() {
+        const dsnInput = document.getElementById('sentryDsnInput');
+        if (dsnInput && window.ZoeErrors) {
+            ZoeErrors.setDsn(dsnInput.value);
+            ZoeErrors.init('zoew');
+        }
         const cfgInput = document.getElementById('firebaseConfigInput');
         if(!cfgInput) return;
         const raw = cfgInput.value.trim();
@@ -503,10 +518,11 @@
     async function verifyWorkerRoleThenProceed(user) {
         let role;
         try {
-            const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
+            const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
             role = roleSnap.val();
         } catch (e) {
             console.error("Role verification failed:", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
             await fb.signOut(auth).catch(() => {});
             clearRememberedSession(true);
             showLoginModalWithPrefill();
@@ -836,6 +852,7 @@
             saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
         } finally {
             cleanupInFlight.delete(id);
         }
@@ -938,6 +955,7 @@
     }
 
     window.addEventListener('load', function () {
+        if (window.ZoeErrors) ZoeErrors.init('zoew');
         initFirebase();
 
         setInterval(async () => {
@@ -1526,6 +1544,7 @@
             });
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling barcode close: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
         }
     }
@@ -1645,6 +1664,7 @@
             });
         } catch (error) {
             console.error("Error toggling close status: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling close status: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
         }
     }
@@ -1767,6 +1787,7 @@
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
             console.error("Restore failed: ", restoredId, error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             try {
                 const [histSnap, delSnap] = await Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]);
                 const histData = histSnap.val();
@@ -1777,6 +1798,7 @@
                 lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
             } catch (resyncError) {
                 console.error("Resync after failed restore also failed: ", resyncError);
+                if (window.ZoeErrors) ZoeErrors.capture(resyncError, { context: "Resync after failed restore also failed: " });
             }
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
@@ -1816,6 +1838,7 @@
             lastSyncedHistoryKeys = currentKeys;
         }).catch((error) => {
             console.error("Error saving history: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
             throw error;
         });
@@ -1833,6 +1856,7 @@
         });
         return fb.update(dbRefHistory, updates).catch((error) => {
             console.error("Error patching history item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
         });
     }
@@ -1857,6 +1881,7 @@
             lastSyncedDeletedKeys = currentKeys;
         }).catch((error) => {
             console.error("Error saving deleted items: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted items: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
@@ -1871,6 +1896,7 @@
             lastSyncedDeletedKeys.add(item.id);
         }).catch((error) => {
             console.error("Error saving deleted item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
@@ -1883,6 +1909,7 @@
             lastSyncedDeletedKeys.delete(id);
         }).catch((error) => {
             console.error("Error deleting deleted item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });

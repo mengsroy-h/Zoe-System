@@ -166,7 +166,14 @@
         }
         try {
             const url = LICENSE_DB_URL.replace(/\/+$/, '') + '/license_keys/' + appCode + '/' + keyId + '.json';
-            const res = await fetch(url, { cache: 'no-store' });
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            let res;
+            try {
+                res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
             if (!res.ok) return { ok: null, reason: 'network' };
             const data = await res.json();
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-shell-v5';
+const CACHE_VERSION = 'zoekeygen-shell-v7';
 
 const APP_SHELL = [
     './',
@@ -7,6 +7,7 @@ const APP_SHELL = [
     './app.js',
     './firebase-loader.js',
     './license-verify.js',
+    './error-reporting.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'

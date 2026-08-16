@@ -10,7 +10,7 @@
  *  - Editing localStorage cannot extend a key: the expiry is inside the
  *    signed payload, so changing it breaks the signature.
  *  - Revocation and admin-side expiry edits are enforced server-side via the
- *    Firebase `license_keys/{app}/{id}` record, re-checked periodically
+ *    Firebase `license_keys/{app}/{id}` record, re-checked on every login
  *    while online, so a key can be shut off even before it would naturally
  *    expire.
  *  - This file is identical across ZoeAdmin, ZoeW, Zscan and ZoeKeyGen —
@@ -31,7 +31,6 @@
 
     const KEY_PREFIX = 'ZOEKEY-';
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
-    const ONLINE_RECHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
     let cachedPublicKey = null;
     async function getPublicKey() {
@@ -205,20 +204,20 @@
         }
 
         const now = Date.now();
-        const needsRecheck = !record.lastOnlineCheck || (now - record.lastOnlineCheck) > ONLINE_RECHECK_INTERVAL_MS;
 
-        if (needsRecheck) {
-            const online = await checkOnline(appCode, record.id);
-            if (online.ok === true) {
-                record.lastOnlineCheck = now;
-                record.onlineExp = online.expiresAt;
-                saveLocalRecord(appCode, record);
-            } else if (online.ok === false) {
-                clearLocalRecord(appCode);
-                return { state: 'required', reason: online.reason };
-            }
-            // online.ok === null => network unreachable or not configured yet, fall through to offline evaluation below
+        // Always re-verify online — getStatus() only runs at login (not on every frame), so
+        // there's no meaningful cost, and this is how a revoke or expiry edit actually takes
+        // effect promptly instead of waiting out a stale cached check.
+        const online = await checkOnline(appCode, record.id);
+        if (online.ok === true) {
+            record.lastOnlineCheck = now;
+            record.onlineExp = online.expiresAt;
+            saveLocalRecord(appCode, record);
+        } else if (online.ok === false) {
+            clearLocalRecord(appCode);
+            return { state: 'required', reason: online.reason };
         }
+        // online.ok === null => network unreachable or not configured yet, fall through to offline evaluation below
 
         const onlineExpMs = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
         const ceiling = Math.min(record.exp * 1000, onlineExpMs);

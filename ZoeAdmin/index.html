@@ -34,6 +34,7 @@
     <script defer src="https://unpkg.com/@zxing/library@0.23.0/umd/index.min.js" integrity="sha384-0ASr5PEWAMtTnWsn0PzKmioHVDA4+QqFiJr94io/0DCrGP6E1gRAmbO6O8y5WZW9" crossorigin="anonymous"></script>
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
+    <script src="./error-reporting.js"></script>
 
     <link rel="stylesheet" href="./style.css">
 </head>
@@ -239,6 +240,8 @@
   "databaseURL": "...",
   "projectId": "..."
 }'></textarea>
+        <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
+        <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
             <button class="btn-confirm" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
@@ -278,7 +281,7 @@
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-skip" onclick="testLookupApiConfig()">🧪 សាកល្បង</button>
+                <button class="btn-skip" onclick="testLookupApiConfig(this)">🧪 សាកល្បង</button>
                 <button class="btn-confirm" onclick="saveLookupApiConfig()">រក្សាទុក</button>
             </div>
             <button class="btn-cancel" onclick="closeModal('lookupApiConfigModal')">បោះបង់</button>

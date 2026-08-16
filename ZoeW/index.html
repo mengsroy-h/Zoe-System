@@ -31,6 +31,7 @@
 
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
+    <script src="./error-reporting.js"></script>
 
     <link rel="stylesheet" href="./style.css">
 </head>
@@ -202,6 +203,8 @@
   "databaseURL": "...",
   "projectId": "..."
 }'></textarea>
+        <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
+        <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
             <button class="btn-confirm" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>

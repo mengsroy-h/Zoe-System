@@ -131,6 +131,12 @@ async function initFirebase() {
             if (await isFirebaseSessionExpired(auth.currentUser)) forceExpireSession();
         }
     }, 60000);
+
+    setInterval(() => {
+        if (auth && auth.currentUser && listenersAttached && !isAnyModalOpen()) {
+            ensureAppActivated();
+        }
+    }, LICENSE_RECHECK_INTERVAL_MS);
 }
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
@@ -149,6 +155,7 @@ function forceExpireSession() {
 }
 
 const LICENSE_APP_CODE = 'SCN';
+const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 function licenseFailureMessage(reason) {
     switch (reason) {
@@ -200,18 +207,24 @@ async function submitActivationKey() {
 }
 
 async function verifyRoleThenProceed(user) {
+    let role;
     try {
         const roleSnap = await window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`));
-        const role = roleSnap.val();
-        if (role !== 'admin' && role !== 'worker' && role !== 'scanner') {
-            await window.firebaseSDK.signOut(auth).catch(() => {});
-            currentUserEmail = null;
-            openModal('loginModal');
-            showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zscan ទេ!');
-            return;
-        }
+        role = roleSnap.val();
     } catch (e) {
         console.error('Role verification failed:', e);
+        await window.firebaseSDK.signOut(auth).catch(() => {});
+        currentUserEmail = null;
+        openModal('loginModal');
+        showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។');
+        return;
+    }
+    if (role !== 'admin' && role !== 'worker' && role !== 'scanner') {
+        await window.firebaseSDK.signOut(auth).catch(() => {});
+        currentUserEmail = null;
+        openModal('loginModal');
+        showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zscan ទេ!');
+        return;
     }
 
     const activated = await ensureAppActivated();

@@ -230,6 +230,14 @@
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
+            fb.onValue(dbRefConnected, (snap) => {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('firebaseStatusText');
+                const online = snap.val() === true;
+                if (statusDot) statusDot.classList.toggle('offline', !online);
+                if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+            });
+
             setupAuthListener();
             return true;
         } catch (e) {
@@ -435,6 +443,7 @@
     }
 
     const LICENSE_APP_CODE = 'ZOW';
+    const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
 
     function licenseFailureMessage(reason) {
         switch (reason) {
@@ -487,18 +496,24 @@
     }
 
     async function verifyWorkerRoleThenProceed(user) {
+        let role;
         try {
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
-            const role = roleSnap.val();
-            if (role !== 'admin' && role !== 'worker') {
-                await fb.signOut(auth).catch(() => {});
-                clearRememberedSession(true);
-                showLoginModalWithPrefill();
-                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
-                return;
-            }
+            role = roleSnap.val();
         } catch (e) {
             console.error("Role verification failed:", e);
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
+        if (role !== 'admin' && role !== 'worker') {
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
+            return;
         }
 
         const activated = await ensureAppActivated();
@@ -608,21 +623,7 @@
             if (dbRefHistory) fb.off(dbRefHistory);
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-            if (dbRefConnected) fb.off(dbRefConnected);
         }
-
-        fb.onValue(dbRefConnected, (snap) => {
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('firebaseStatusText');
-            
-            if (snap.val() === true) {
-                if (statusDot) statusDot.classList.remove('offline');
-                if (statusText) statusText.innerText = "ភ្ជាប់ Server រួចរាល់";
-            } else {
-                if (statusDot) statusDot.classList.add('offline');
-                if (statusText) statusText.innerText = "ក្រៅបណ្ដាញ";
-            }
-        });
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
@@ -835,18 +836,46 @@
         }
     }
 
+    function barcodeRegistryKey(code) {
+        const normalized = String(code || '').trim().toUpperCase();
+        return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    }
+
+    function collectItemBarcodes(item) {
+        if (!item) return [];
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
+            return item.barcodes.map(b => b && b.code).filter(Boolean);
+        }
+        return item.barcode ? [item.barcode] : [];
+    }
+
+    function releaseBarcodesInRegistry(codes) {
+        if (!db || !fb || !codes || !codes.length) return Promise.resolve();
+        const updates = {};
+        codes.forEach((code) => {
+            const key = barcodeRegistryKey(code);
+            if (key) updates[key] = null;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
+    }
+
     function runAutomaticDeletedCleanup() {
         const currentTime = Date.now();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let initialLen = deletedItems.length;
+        let purgedBarcodes = [];
 
         deletedItems = deletedItems.filter(item => {
             let deletedTime = item.deletedAt || currentTime;
-            return (currentTime - deletedTime <= tenDaysMs);
+            const expired = (currentTime - deletedTime > tenDaysMs);
+            if (expired) purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+            return !expired;
         });
 
         if (deletedItems.length !== initialLen) {
             saveDeletedToFirebase().catch(() => {});
+            releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
 
@@ -913,6 +942,12 @@
                 }
             }
         }, 60000);
+
+        setInterval(() => {
+            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
+                ensureAppActivated();
+            }
+        }, LICENSE_RECHECK_INTERVAL_MS);
 
         setupSwipeGestures();
         updateRecentPhonesList();
@@ -1748,8 +1783,9 @@
         if (confirm("លុបជាអចិន្ត្រៃយ៍?")) {
             const index = deletedItems.findIndex(i => i.id === id);
             if(index !== -1) {
-                deletedItems.splice(index, 1);
+                const purgedItem = deletedItems.splice(index, 1)[0];
                 deleteSingleDeletedItemFromFirebase(id).catch(() => {});
+                releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
                 renderRecentlyDeleted();
             }
         }

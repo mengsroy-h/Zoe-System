@@ -1,44 +1,27 @@
-/*
- * ZoeLicense — offline-verifiable, server-checked activation keys.
- *
- * How it stays hard to bypass/crack:
- *  - Keys are ECDSA P-256 signed tokens. This file only ever holds the PUBLIC
- *    key, which can verify signatures but cannot be used to forge new ones.
- *    The matching PRIVATE key lives only in the operator's own custody and is
- *    pasted into ZoeKeyGen at signing time — it is never committed to source
- *    or shipped to any deployed app.
- *  - Editing localStorage cannot extend a key: the expiry is inside the
- *    signed payload, so changing it breaks the signature.
- *  - Revocation and admin-side expiry edits are enforced server-side via the
- *    Firebase `license_keys/{app}/{id}` record, re-checked on every login
- *    while online, so a key can be shut off even before it would naturally
- *    expire.
- *  - This file is identical across ZoeAdmin, ZoeW, Zscan and ZoeKeyGen —
- *    keep all copies in sync (same PUBLIC_KEY_JWK) if the signing keypair is
- *    ever rotated.
- */
 (function (global) {
     'use strict';
 
-    const PUBLIC_KEY_JWK = {
-        "key_ops": ["verify"],
-        "ext": true,
-        "kty": "EC",
-        "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
-        "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0",
-        "crv": "P-256"
-    };
+    const PUBLIC_KEYS_JWK = [
+        {
+            "key_ops": ["verify"],
+            "ext": true,
+            "kty": "EC",
+            "x": "jxAByrOhnR-oWCdhyWt7hsJMpz2gzLjIYYVDhwg3ZLs",
+            "y": "uZohHyeHFD3gAWST4Tc1vCKCkndzmwGPCUdhLAN1MM0",
+            "crv": "P-256"
+        }
+    ];
 
     const KEY_PREFIX = 'ZOEKEY-';
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
-    let cachedPublicKey = null;
-    async function getPublicKey() {
-        if (cachedPublicKey) return cachedPublicKey;
-        cachedPublicKey = await crypto.subtle.importKey(
-            'jwk', PUBLIC_KEY_JWK, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
-        );
-        return cachedPublicKey;
+    let cachedPublicKeys = null;
+    async function getPublicKeys() {
+        if (cachedPublicKeys) return cachedPublicKeys;
+        cachedPublicKeys = await Promise.all(PUBLIC_KEYS_JWK.map((jwk) => crypto.subtle.importKey(
+            'jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
+        )));
+        return cachedPublicKeys;
     }
 
     function b64urlToBytes(b64url) {
@@ -106,15 +89,20 @@
 
     async function verifySignature(payloadB64, sigBytes) {
         try {
-            const pubKey = await getPublicKey();
+            const pubKeys = await getPublicKeys();
             const data = new TextEncoder().encode(payloadB64);
-            return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data);
+            for (const pubKey of pubKeys) {
+                if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data)) {
+                    return true;
+                }
+            }
+            return false;
         } catch (e) {
             return false;
         }
     }
 
-    async function verifyKeyString(keyString, appCode) {
+    async function verifySignatureAndScope(keyString, appCode) {
         const parsed = parseKeyString(keyString);
         if (!parsed) return { valid: false, reason: 'format' };
         const sigOk = await verifySignature(parsed.payloadB64, parsed.sigBytes);
@@ -122,10 +110,16 @@
         if (parsed.payload.a !== appCode && parsed.payload.a !== 'ALL') {
             return { valid: false, reason: 'app-mismatch', payload: parsed.payload };
         }
-        if (Date.now() > parsed.payload.exp * 1000) {
-            return { valid: false, reason: 'expired', payload: parsed.payload };
-        }
         return { valid: true, payload: parsed.payload };
+    }
+
+    async function verifyKeyString(keyString, appCode) {
+        const result = await verifySignatureAndScope(keyString, appCode);
+        if (!result.valid) return result;
+        if (Date.now() > result.payload.exp * 1000) {
+            return { valid: false, reason: 'expired', payload: result.payload };
+        }
+        return result;
     }
 
     function storageKey(appCode) {
@@ -157,20 +151,13 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            lastOnlineCheck: 0,
+            lastOnlineCheck: Date.now(),
             onlineExp: result.payload.exp * 1000
         };
         saveLocalRecord(appCode, record);
         return { valid: true, payload: result.payload };
     }
 
-    // Dedicated Firebase project used ONLY for license_keys — intentionally separate from the
-    // ZoeAdmin/ZoeW/Zscan business Firebase project, so a compromise of one never exposes the
-    // other. Its Realtime Database allows public, unauthenticated READ of license_keys (the
-    // records hold no sensitive data — just expiry/revoked/note), so this is a plain REST call
-    // with no SDK, no auth, and no dependency on whichever Firebase project the calling app is
-    // itself logged into. Only ZoeKeyGen (which needs to WRITE) uses the full Firebase SDK
-    // against this same project, gated by its own Authentication + user_roles.
     const LICENSE_DB_URL = 'https://zoew-z1-default-rtdb.firebaseio.com';
 
     async function checkOnline(appCode, keyId) {
@@ -197,7 +184,7 @@
         const record = loadLocalRecord(appCode);
         if (!record) return { state: 'required' };
 
-        const sigCheck = await verifyKeyString(record.keyString, appCode);
+        const sigCheck = await verifySignatureAndScope(record.keyString, appCode);
         if (!sigCheck.valid) {
             clearLocalRecord(appCode);
             return { state: 'required', reason: sigCheck.reason };
@@ -205,9 +192,6 @@
 
         const now = Date.now();
 
-        // Always re-verify online — getStatus() only runs at login (not on every frame), so
-        // there's no meaningful cost, and this is how a revoke or expiry edit actually takes
-        // effect promptly instead of waiting out a stale cached check.
         const online = await checkOnline(appCode, record.id);
         if (online.ok === true) {
             record.lastOnlineCheck = now;
@@ -217,10 +201,8 @@
             clearLocalRecord(appCode);
             return { state: 'required', reason: online.reason };
         }
-        // online.ok === null => network unreachable or not configured yet, fall through to offline evaluation below
 
-        const onlineExpMs = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
-        const ceiling = Math.min(record.exp * 1000, onlineExpMs);
+        const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
 
         if (now > ceiling) {
             clearLocalRecord(appCode);

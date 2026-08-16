@@ -268,6 +268,14 @@
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
+            fb.onValue(dbRefConnected, (snap) => {
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('firebaseStatusText');
+                const online = snap.val() === true;
+                if (statusDot) statusDot.classList.toggle('offline', !online);
+                if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+            });
+
             setupAuthListener();
             return true;
         } catch (e) {
@@ -591,9 +599,19 @@
         return path.split('.').reduce((acc, key) => (acc !== null && acc !== undefined && acc[key] !== undefined) ? acc[key] : null, obj);
     }
 
+    let lookupLockedNoticeShown = false;
+
     async function attemptAutoLookup(barcode) {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
+
+        if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            if (!lookupLockedNoticeShown) {
+                lookupLockedNoticeShown = true;
+                showToast("🔒 ស្វែងរកអតិថិជនស្វ័យប្រវត្តិត្រូវការ Config PIN — សូមបើក ⚙️ Config ១ដងដើម្បីដោះសោសម្រាប់វគ្គនេះ");
+            }
+            return;
+        }
 
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
@@ -710,6 +728,7 @@
     }
 
     const LICENSE_APP_CODE = 'ADM';
+    const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
 
     function licenseFailureMessage(reason) {
         switch (reason) {
@@ -763,18 +782,24 @@
     }
 
     async function verifyAdminRoleThenProceed(user) {
+        let role;
         try {
             const roleSnap = await fb.get(fb.ref(db, `user_roles/${user.uid}`));
-            const role = roleSnap.val();
-            if (role !== 'admin') {
-                await fb.signOut(auth).catch(() => {});
-                clearRememberedSession(true);
-                showLoginModalWithPrefill();
-                showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeAdmin ទេ! សូមប្រើ ZoeW ឬ Zscan ជំនួសវិញ។");
-                return;
-            }
+            role = roleSnap.val();
         } catch (e) {
             console.error("Role verification failed:", e);
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
+        if (role !== 'admin') {
+            await fb.signOut(auth).catch(() => {});
+            clearRememberedSession(true);
+            showLoginModalWithPrefill();
+            showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeAdmin ទេ! សូមប្រើ ZoeW ឬ Zscan ជំនួសវិញ។");
+            return;
         }
 
         const activated = await ensureAppActivated();
@@ -878,29 +903,14 @@
 
     function initDatabaseListeners() {
         if (!db) return;
-        
+
         if (isDatabaseInitialized) {
             if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
             if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
             if (dbRefHistory) fb.off(dbRefHistory);
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-            if (dbRefConnected) fb.off(dbRefConnected);
         }
-
-        if (!dbRefConnected) dbRefConnected = fb.ref(db, '.info/connected');
-        fb.onValue(dbRefConnected, (snap) => {
-            const statusDot = document.getElementById('statusDot');
-            const statusText = document.getElementById('firebaseStatusText');
-            
-            if (snap.val() === true) {
-                if (statusDot) statusDot.classList.remove('offline');
-                if (statusText) statusText.innerText = "ភ្ជាប់ Server រួចរាល់";
-            } else {
-                if (statusDot) statusDot.classList.add('offline');
-                if (statusText) statusText.innerText = "ក្រៅបណ្ដាញ";
-            }
-        });
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
@@ -1105,7 +1115,7 @@
             }
 
             deletedItems.unshift(trashItem);
-            saveSingleDeletedItemToFirebase(trashItem);
+            saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
         } finally {
@@ -1117,14 +1127,18 @@
         const currentTime = Date.now();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let initialLen = deletedItems.length;
+        let purgedBarcodes = [];
 
         deletedItems = deletedItems.filter(item => {
             let deletedTime = item.deletedAt || currentTime;
-            return (currentTime - deletedTime <= tenDaysMs);
+            const expired = (currentTime - deletedTime > tenDaysMs);
+            if (expired) purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+            return !expired;
         });
 
         if (deletedItems.length !== initialLen) {
             saveDeletedToFirebase();
+            releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
 
@@ -1212,6 +1226,12 @@
                 }
             }
         }, 60000);
+
+        setInterval(() => {
+            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
+                ensureAppActivated();
+            }
+        }, LICENSE_RECHECK_INTERVAL_MS);
 
         try {
             const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
@@ -2300,6 +2320,44 @@
         return scanHistory.some(matchesCode) || deletedItems.some(matchesCode);
     }
 
+    function barcodeRegistryKey(code) {
+        const normalized = String(code || '').trim().toUpperCase();
+        return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
+    }
+
+    async function claimBarcodeInRegistry(code) {
+        const key = barcodeRegistryKey(code);
+        if (!db || !fb || !key) return 'unknown';
+        try {
+            const result = await fb.runTransaction(fb.ref(db, `zoew_barcode_registry/${key}`), (current) => {
+                if (current === null) return true;
+                return;
+            });
+            return result.committed ? 'claimed' : 'taken';
+        } catch (e) {
+            return 'unknown';
+        }
+    }
+
+    function collectItemBarcodes(item) {
+        if (!item) return [];
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
+            return item.barcodes.map(b => b && b.code).filter(Boolean);
+        }
+        return item.barcode ? [item.barcode] : [];
+    }
+
+    function releaseBarcodesInRegistry(codes) {
+        if (!db || !fb || !codes || !codes.length) return Promise.resolve();
+        const updates = {};
+        codes.forEach((code) => {
+            const key = barcodeRegistryKey(code);
+            if (key) updates[key] = null;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
+    }
+
     function triggerScanAction(barcode) {
         if (isModalOpen) return;
 
@@ -2339,7 +2397,7 @@
         }, 150);
     }
 
-    function confirmPhone(isSkip = false) {
+    async function confirmPhone(isSkip = false) {
         const phoneEl = document.getElementById('modalPhoneInput');
         const lockerEl = document.getElementById('modalLockerInput');
         const codEl = document.getElementById('modalCodInput');
@@ -2364,20 +2422,55 @@
             localStorage.setItem('last_entered_locker', rawLocker);
         }
 
-        if (isBarcodeAlreadyUsed(pendingBarcode)) {
+        const barcodeToSave = pendingBarcode;
+
+        if (isBarcodeAlreadyUsed(barcodeToSave)) {
             closeModal('phoneModal');
-            showToast(`⚠️ លេខ Barcode នេះ (${pendingBarcode}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
+            showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
             safeFocusScanner();
             return;
         }
 
-        addOrUpdateEntry(pendingBarcode, phone, cod, dod, locker);
-        closeModal('phoneModal');
-        showToast("រក្សាទុកបានជោគជ័យ!");
+        const skipBtn = document.getElementById('phoneModalSkipBtn');
+        const confirmBtn = document.getElementById('phoneModalConfirmBtn');
+        const cancelBtn = document.getElementById('phoneModalCancelBtn');
+        const phoneModalEl = document.getElementById('phoneModal');
+        if (skipBtn) skipBtn.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (cancelBtn) cancelBtn.disabled = true;
+        if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
+
+        try {
+            const claim = await claimBarcodeInRegistry(barcodeToSave);
+            if (claim === 'taken') {
+                closeModal('phoneModal');
+                showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
+                if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+                safeFocusScanner();
+                return;
+            }
+
+            try {
+                await addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
+            } catch (saveError) {
+                if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
+                throw saveError;
+            }
+
+            closeModal('phoneModal');
+            showToast("រក្សាទុកបានជោគជ័យ!");
+        } catch (e) {
+        } finally {
+            if (skipBtn) skipBtn.disabled = false;
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (cancelBtn) cancelBtn.disabled = false;
+            if (phoneModalEl) phoneModalEl.removeAttribute('data-nodismiss');
+        }
     }
 
     function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A") {
+        let savePromise;
         const now = new Date();
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
@@ -2430,7 +2523,7 @@
 
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
-            saveSingleHistoryItemToFirebase(item);
+            savePromise = saveSingleHistoryItemToFirebase(item);
         } else {
             let newItem = {
                 id: generateUniqueId(),
@@ -2449,10 +2542,11 @@
             };
 
             scanHistory.push(newItem);
-            saveSingleHistoryItemToFirebase(newItem);
+            savePromise = saveSingleHistoryItemToFirebase(newItem);
         }
 
         updateRecentPhonesList();
+        return savePromise;
     }
 
     function openViewListModal(id) {
@@ -2976,8 +3070,9 @@
         if (confirm("លុបជាអចិន្ត្រៃយ៍?")) {
             const index = deletedItems.findIndex(i => i.id === id);
             if(index !== -1) {
-                deletedItems.splice(index, 1);
+                const purgedItem = deletedItems.splice(index, 1)[0];
                 deleteSingleDeletedItemFromFirebase(id);
+                releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
                 renderRecentlyDeleted();
             }
         }

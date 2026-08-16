@@ -190,10 +190,10 @@ async function ensureAppActivated() {
 async function submitActivationKey() {
     const input = document.getElementById('activationKeyInput');
     const keyStr = input ? input.value.trim() : '';
-    if (!keyStr) { alert('សូមបញ្ចូល Activation Key!'); return; }
+    if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
     const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
     if (!result.valid) {
-        alert(licenseFailureMessage(result.reason));
+        showToast(licenseFailureMessage(result.reason));
         return;
     }
     if (input) input.value = '';
@@ -335,7 +335,7 @@ function requestPinBeforeConfig(target) {
     const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
-        alert(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secs} វិនាទី។`);
+        showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secs} វិនាទី។`);
         return;
     }
     document.getElementById('pinInput').value = '';
@@ -344,8 +344,8 @@ function requestPinBeforeConfig(target) {
 async function saveNewSecurityPin() {
     const pin = document.getElementById('newPinInput').value;
     const confirmPin = document.getElementById('confirmPinInput').value;
-    if (!pin || pin.length < 6) { alert('PIN ត្រូវមានយ៉ាងតិច ៦ខ្ទង់!'); return; }
-    if (pin !== confirmPin) { alert('PIN ទាំងពីរមិនដូចគ្នាទេ!'); return; }
+    if (!pin || pin.length < 6) { showToast('PIN ត្រូវមានយ៉ាងតិច ៦ខ្ទង់!'); return; }
+    if (pin !== confirmPin) { showToast('PIN ទាំងពីរមិនដូចគ្នាទេ!'); return; }
     localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
     closeModal('pinSetupModal');
     document.getElementById('newPinInput').value = '';
@@ -357,7 +357,7 @@ async function verifySecurityPin() {
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
         closeModal('pinModal');
-        alert(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secs} វិនាទី។`);
+        showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secs} វិនាទី។`);
         return;
     }
     const pinInputEl = document.getElementById('pinInput');
@@ -377,10 +377,10 @@ async function verifySecurityPin() {
         if (failCount >= 5) {
             localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
             localStorage.setItem('zoew_pin_fail_count', '0');
-            alert("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី មុននឹងសាកល្បងម្តងទៀត។");
+            showToast("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី មុននឹងសាកល្បងម្តងទៀត។");
         } else {
             localStorage.setItem('zoew_pin_fail_count', failCount.toString());
-            alert("លេខ PIN មិនត្រឹមត្រូវទេ!");
+            showToast("លេខ PIN មិនត្រឹមត្រូវទេ!");
         }
     }
 }
@@ -393,8 +393,8 @@ function openConfigModal() {
 function saveFirebaseConfig() {
     const raw = document.getElementById('configInput').value;
     let cfg;
-    try { cfg = parseFirebaseConfigLenient(raw); } catch (e) { alert('Config មិនត្រឹមត្រូវទេ (JSON invalid)!'); return; }
-    if (!cfg.apiKey || !cfg.databaseURL) { alert('Config ត្រូវការយ៉ាងតិច apiKey និង databaseURL!'); return; }
+    try { cfg = parseFirebaseConfigLenient(raw); } catch (e) { showToast('Config មិនត្រឹមត្រូវទេ (JSON invalid)!'); return; }
+    if (!cfg.apiKey || !cfg.databaseURL) { showToast('Config ត្រូវការយ៉ាងតិច apiKey និង databaseURL!'); return; }
     localStorage.setItem('zoew_firebase_config', JSON.stringify(cfg));
     closeModal('configModal');
     showToast('✅ Config ត្រូវបានរក្សាទុក! កំពុងផ្ទុកឡើងវិញ...');
@@ -1035,7 +1035,12 @@ initFirebase().catch(err => {
 })();
 window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') reg.update().catch(() => {});
+            });
+            window.addEventListener('focus', () => reg.update().catch(() => {}));
+        }).catch(() => {});
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;

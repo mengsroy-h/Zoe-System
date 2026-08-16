@@ -87,7 +87,20 @@
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            navigator.serviceWorker.register('./sw.js').then((reg) => {
+                // The implicit update check at registration time only runs once per
+                // page load, which for an installed/standalone PWA can mean "once per
+                // cold launch" -- if someone just switches away and back (multitasking)
+                // without a fresh launch, a newer deployed version could sit unnoticed
+                // until they happen to fully close and reopen the app. Re-checking
+                // whenever the app comes back to the foreground closes that gap, so a
+                // new deploy is picked up automatically instead of requiring a manual
+                // uninstall/reinstall of the PWA.
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                });
+                window.addEventListener('focus', () => reg.update().catch(() => {}));
+            }).catch(() => {});
         });
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {

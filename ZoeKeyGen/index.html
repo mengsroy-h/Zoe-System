@@ -55,16 +55,21 @@
 
     <div class="app-card">
         <div class="card-header">
-            <div class="card-title">🔑 Signing Key (មិន Save ទុកទេ)</div>
+            <div class="card-title">🔑 Signing Key</div>
             <span class="badge" id="signingKeyStatusBadge" style="background:var(--danger-light); color:#a3123a;">មិនទាន់ Load</span>
         </div>
         <div class="card-subtitle" style="margin-bottom:10px;">
-            Private Key មិនត្រូវបានរក្សាទុកនៅឯណាឡើយ (មិនមែន localStorage មិនមែន Firebase) — វានៅតែក្នុងសតិ browser
-            រហូតដល់អ្នកបិទទំព័រ។ សូមរក្សា Private Key របស់អ្នកឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។
+            Private Key មិនត្រូវបានរក្សាទុកនៅឯណាឡើយ ជាលំនាំដើម (មិនមែន localStorage មិនមែន Firebase) — វានៅតែក្នុងសតិ browser
+            រហូតដល់អ្នកបិទទំព័រ ឬ Refresh។ សូមរក្សា Private Key របស់អ្នកឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។
+            ចង់ចៀសវាង Paste ម្តងទៀតរាល់ពេល Reload/Multitasking? ជ្រើសរើសខាងក្រោម (ត្រូវការ PIN ដើម្បីការពារ)។
         </div>
 
         <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON)</label>
         <textarea id="privateKeyInput" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'></textarea>
+        <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
+            <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
+            🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
+        </label>
         <div class="btn-row mb-8">
             <button class="btn-primary" onclick="loadSigningKey()">📥 Load Key</button>
             <button class="btn-secondary" onclick="clearSigningKey()">🗑️ សម្អាត</button>
@@ -144,7 +149,7 @@
 <div id="pinModal" class="modal">
     <div class="modal-content" style="max-width: 300px;">
         <h3>🔒 បញ្ចូល Security PIN</h3>
-        <p>សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
+        <p id="pinModalMsg">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN" autocomplete="off">
         <div class="modal-btns">
             <div class="modal-btns-row">

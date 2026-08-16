@@ -2,6 +2,9 @@
 *.rar
 *.zip
 
+# Local reference guides (kept on this machine only, not versioned)
+*.pdf
+
 # OS artifacts
 Thumbs.db
 .DS_Store

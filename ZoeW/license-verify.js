@@ -9,10 +9,13 @@
  *    or shipped to any deployed app.
  *  - Editing localStorage cannot extend a key: the expiry is inside the
  *    signed payload, so changing it breaks the signature.
- *  - Revocation and admin-side expiry edits are enforced server-side via the
- *    Firebase `license_keys/{app}/{id}` record, re-checked on every login and
- *    every 15 minutes while an app stays open online, so a key can be shut
- *    off even before it would naturally expire.
+ *  - Revocation and admin-side expiry edits (both shortening AND ZoeKeyGen's
+ *    "Extend" action) are driven by the server-side `license_keys/{app}/{id}`
+ *    record, re-checked on every login and every 15 minutes while an app
+ *    stays open online — the *server's* expiresAt is authoritative once
+ *    activated, not the expiry baked into the signed key string, so Extend
+ *    actually lengthens validity instead of being capped at the original
+ *    signed expiry (see verifySignatureAndScope / getStatus below).
  *  - This file is identical across ZoeAdmin, ZoeW, Zscan and ZoeKeyGen —
  *    keep all copies in sync (same PUBLIC_KEYS_JWK) if the signing keypair is
  *    ever rotated. See the PUBLIC_KEYS_JWK comment below for the rotation
@@ -155,7 +158,15 @@
         }
     }
 
-    async function verifyKeyString(keyString, appCode) {
+    // Signature + target-app check only — deliberately does NOT enforce payload.exp.
+    // getStatus() uses this (not verifyKeyString) for its ongoing re-verification: the
+    // signed exp is a one-time floor checked at activate() (below), not a hard ceiling
+    // for the life of the key, because ZoeKeyGen's "Extend" action only ever patches the
+    // server-side expiresAt — it never re-signs a new keyString. If expiry were re-derived
+    // from the immutable signed payload on every getStatus() call, Extend would silently
+    // stop working the moment the *original* signed exp passed, no matter how far the
+    // admin had pushed expiresAt forward on the server.
+    async function verifySignatureAndScope(keyString, appCode) {
         const parsed = parseKeyString(keyString);
         if (!parsed) return { valid: false, reason: 'format' };
         const sigOk = await verifySignature(parsed.payloadB64, parsed.sigBytes);
@@ -163,10 +174,20 @@
         if (parsed.payload.a !== appCode && parsed.payload.a !== 'ALL') {
             return { valid: false, reason: 'app-mismatch', payload: parsed.payload };
         }
-        if (Date.now() > parsed.payload.exp * 1000) {
-            return { valid: false, reason: 'expired', payload: parsed.payload };
-        }
         return { valid: true, payload: parsed.payload };
+    }
+
+    // Full check including the signed expiry — used only at activate() time, so a key
+    // that was already expired the moment it was signed can't be redeemed in the first
+    // place. Not used for ongoing getStatus() re-verification (see
+    // verifySignatureAndScope above).
+    async function verifyKeyString(keyString, appCode) {
+        const result = await verifySignatureAndScope(keyString, appCode);
+        if (!result.valid) return result;
+        if (Date.now() > result.payload.exp * 1000) {
+            return { valid: false, reason: 'expired', payload: result.payload };
+        }
+        return result;
     }
 
     function storageKey(appCode) {
@@ -198,7 +219,14 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            lastOnlineCheck: 0,
+            // Seeded to "now", not 0: getStatus()'s offline-grace check measures how long
+            // it's been since a *confirmed* online check. Seeding to 0 (epoch) meant a
+            // device that activates without ever completing a successful online check
+            // (LICENSE_DB_URL left unconfigured, or offline at the exact moment of
+            // activation) would read as having been silent for 50+ years and immediately
+            // report offline-grace-exceeded — contradicting the documented fallback that
+            // signature-only offline checking keeps working without the license DB set up.
+            lastOnlineCheck: Date.now(),
             onlineExp: result.payload.exp * 1000
         };
         saveLocalRecord(appCode, record);
@@ -238,7 +266,7 @@
         const record = loadLocalRecord(appCode);
         if (!record) return { state: 'required' };
 
-        const sigCheck = await verifyKeyString(record.keyString, appCode);
+        const sigCheck = await verifySignatureAndScope(record.keyString, appCode);
         if (!sigCheck.valid) {
             clearLocalRecord(appCode);
             return { state: 'required', reason: sigCheck.reason };
@@ -260,8 +288,14 @@
         }
         // online.ok === null => network unreachable or not configured yet, fall through to offline evaluation below
 
-        const onlineExpMs = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
-        const ceiling = Math.min(record.exp * 1000, onlineExpMs);
+        // record.onlineExp is the server's expiresAt as of the last successful check (it's
+        // seeded to the signed exp at activate() time, so it's always a sane value even
+        // before the first online check completes). It — not the original signed exp — is
+        // the ceiling, so an admin extending expiresAt in ZoeKeyGen actually takes effect.
+        // A device can't fake this locally: without a successful online check confirming an
+        // extension, it's stuck with whatever onlineExp it last legitimately received, and
+        // OFFLINE_GRACE_MS below still forces a fresh server check every 3 days regardless.
+        const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
 
         if (now > ceiling) {
             clearLocalRecord(appCode);

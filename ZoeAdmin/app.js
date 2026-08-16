@@ -605,9 +605,26 @@
         return path.split('.').reduce((acc, key) => (acc !== null && acc !== undefined && acc[key] !== undefined) ? acc[key] : null, obj);
     }
 
+    let lookupLockedNoticeShown = false;
+
     async function attemptAutoLookup(barcode) {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
+
+        // The header secret is AES-GCM encrypted with a key derived from the Security PIN,
+        // and that key only ever lives in memory for the current tab (never persisted) — it's
+        // set when the PIN is entered via requestPinBeforeConfig(), not on ordinary
+        // login/auto-login. So right after a fresh login (or a page refresh, which always
+        // restarts with lookupSecretKey === null), a scan here would silently omit the auth
+        // header, the request would most likely fail server-side, and admin would just see
+        // "no auto-fill" with zero explanation. Surface it once instead of failing silently.
+        if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            if (!lookupLockedNoticeShown) {
+                lookupLockedNoticeShown = true;
+                showToast("🔒 ស្វែងរកអតិថិជនស្វ័យប្រវត្តិត្រូវការ Config PIN — សូមបើក ⚙️ Config ១ដងដើម្បីដោះសោសម្រាប់វគ្គនេះ");
+            }
+            return;
+        }
 
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));

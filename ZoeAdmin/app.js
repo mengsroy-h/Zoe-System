@@ -89,6 +89,12 @@
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').catch(() => {});
         });
+        let swReloadedOnce = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (swReloadedOnce) return;
+            swReloadedOnce = true;
+            window.location.reload();
+        });
     }
 
     let firebaseConfig = null;

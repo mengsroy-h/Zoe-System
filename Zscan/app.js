@@ -1023,5 +1023,11 @@ initFirebase().catch(err => {
 window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
+        let swReloadedOnce = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (swReloadedOnce) return;
+            swReloadedOnce = true;
+            window.location.reload();
+        });
     }
 });

@@ -8,6 +8,16 @@
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
 
+    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
+    // screen recording from a real device (Zoescan, same activation-modal pattern) showed the
+    // native tap-highlight ripple landing squarely on this button on repeated taps, yet
+    // submitActivationKey() never visibly ran -- consistent with the inline onclick= attribute
+    // simply not firing on that device/browser combination, a known-enough mobile WebView/Chrome
+    // quirk that addEventListener is not susceptible to. Guarded by the btn.disabled check inside
+    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
+    const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
+    if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -743,6 +753,7 @@
 
     async function submitActivationKey() {
         const btn = document.getElementById('activationSubmitBtn');
+        if (btn && btn.disabled) return;
         const originalBtnText = btn ? btn.textContent : '';
         // Whatever happens inside this function must always end in visible feedback -- this
         // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zoescan (an

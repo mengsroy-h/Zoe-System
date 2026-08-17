@@ -8,6 +8,16 @@
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
 
+    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
+    // screen recording from a real device (Zoescan, same activation-modal pattern) showed the
+    // native tap-highlight ripple landing squarely on this button on repeated taps, yet
+    // submitActivationKey() never visibly ran -- consistent with the inline onclick= attribute
+    // simply not firing on that device/browser combination, a known-enough mobile WebView/Chrome
+    // quirk that addEventListener is not susceptible to. Guarded by the btn.disabled check inside
+    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
+    const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
+    if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -453,6 +463,7 @@
 
     async function submitActivationKey() {
         const btn = document.getElementById('activationSubmitBtn');
+        if (btn && btn.disabled) return;
         const originalBtnText = btn ? btn.textContent : '';
         // Whatever happens inside this function must always end in visible feedback -- this
         // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zoescan (an
@@ -1897,27 +1908,23 @@
         }
 
         if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-            await Promise.all(itemToRestore.barcodes.map(async (restoredBc, idx) => {
+            // Matches ZoeAdmin's executeRestoreItem() exactly: credit straight off the barcode's
+            // own isDeducted flag, no server-side dedup transaction. itemToRestore is a stable
+            // snapshot spliced out of deletedItems before any await, so it can't be re-read as
+            // "still deducted" by a second concurrent restore of the same trash entry -- and once
+            // this function's own deleteSingleDeletedItemFromFirebase() call below removes the
+            // entry from Firebase, a second restore attempt on it fails the deletedItems lookup
+            // above instead of reaching this point. The transaction this replaced kept the barcode
+            // marked isDeducted:true (skipping the credit) whenever it aborted for any reason
+            // (e.g. the trash write from the 8-day auto-abandon path racing an early restore) --
+            // exactly "removed correctly subtracts, but restore doesn't add it back".
+            itemToRestore.barcodes.forEach((restoredBc) => {
                 if (!restoredBc.isDeducted) return;
-                let shouldCredit = true;
-                if (db && fb && /^[a-zA-Z0-9_-]+$/.test(itemToRestore.id)) {
-                    try {
-                        const dedupRef = fb.ref(db, `zoew_recently_deleted_cod_dod/${itemToRestore.id}/barcodes/${idx}/isDeducted`);
-                        const txResult = await fb.runTransaction(dedupRef, (current) => (current === true ? false : undefined));
-                        shouldCredit = !!txResult.committed;
-                    } catch (creditError) {
-                        console.error("Restore revenue-credit transaction failed: ", creditError);
-                        if (window.ZoeErrors) ZoeErrors.capture(creditError, { context: "Restore revenue-credit transaction failed: " });
-                        shouldCredit = false;
-                    }
-                }
-                if (shouldCredit) {
-                    const targetCod = parseFloat(restoredBc.cod) || 0;
-                    const targetDod = parseFloat(restoredBc.dod) || 0;
-                    addRevenueToDailyAndMonthlyRecord(itemToRestore.scanDate || getFormattedDate(), targetCod, targetDod, 1);
-                }
+                const targetCod = parseFloat(restoredBc.cod) || 0;
+                const targetDod = parseFloat(restoredBc.dod) || 0;
+                addRevenueToDailyAndMonthlyRecord(itemToRestore.scanDate || getFormattedDate(), targetCod, targetDod, 1);
                 restoredBc.isDeducted = false;
-            }));
+            });
         }
 
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate));

@@ -49,9 +49,25 @@ function safeFocusScanner() {
     const hwInput = document.getElementById('hwScannerInput');
     if (hwInput) hwInput.focus();
 }
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('open');
+    // Match ZoeAdmin/ZoeW's modal mechanics exactly (confirmed working on real devices where
+    // Zoescan's class-only toggle was not): force the display and lock body scroll directly
+    // instead of relying solely on the .modal.open CSS rule, and block the scanning view /
+    // camera behind the modal from remaining scrollable/interactive underneath while a modal
+    // (e.g. the activation key prompt) is up on mobile.
+    el.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
 function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('open');
+        el.style.display = 'none';
+    }
+    if (!document.querySelector('.modal.open')) document.body.style.overflow = '';
     safeFocusScanner();
 }
 function dismissModal(modalEl) {
@@ -263,6 +279,7 @@ async function ensureAppActivated() {
 
 async function submitActivationKey() {
     const btn = document.getElementById('activationSubmitBtn');
+    if (btn && btn.disabled) return;
     const originalBtnText = btn ? btn.textContent : '';
     // Whatever happens inside this function must always end in visible feedback -- this app
     // has repeatedly hit "tapped Activate, nothing happened at all" bugs (an unbounded fetch
@@ -1198,6 +1215,16 @@ function bindEventListeners() {
 
     document.getElementById('lockerSettingsCancelBtn').addEventListener('click', () => closeModal('lockerSettingsModal'));
     document.getElementById('lockerSettingsSaveBtn').addEventListener('click', saveLockerSettings);
+
+    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
+    // screen recording from a real device showed the native tap-highlight ripple landing squarely
+    // on this button on repeated taps, yet submitActivationKey() never visibly ran (button text
+    // never changed even once) -- consistent with the inline onclick= attribute simply not firing
+    // on that device/browser combination, a known-enough mobile WebView/Chrome quirk that
+    // addEventListener is not susceptible to. Guarded by the btn.disabled check inside
+    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
+    const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
+    if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 
     document.addEventListener('click', (e) => {
         if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.classList.contains('open')) {

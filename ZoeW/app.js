@@ -1,3 +1,13 @@
+    // Mobile: pasting a long value (e.g. an activation key) then dismissing the on-screen keyboard
+    // resizes the visual viewport, and position:fixed elements (every .modal here) can be left with
+    // stale hit-testing afterward on some Android/iOS browser versions -- the modal visibly repaints
+    // in the right place, but taps on it don't register at all (not even the CSS :active flash) until
+    // something forces a layout recalc. Forcing one on every keyboard show/hide keeps modal buttons
+    // tappable right after the keyboard closes, which is exactly when a user taps "Submit" post-paste.
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
+    }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -1944,7 +1954,14 @@
         pendingRestoreId = null;
 
         try {
-            await Promise.all([saveHistoryToFirebase(), saveDeletedToFirebase()]);
+            // Must be a targeted single-key delete (not the whole-list saveDeletedToFirebase(),
+            // which diffs against the in-memory deletedItems array) -- the live onValue(dbRefDeleted)
+            // listener can refresh that array from the server mid-flight (this function awaits a
+            // revenue-credit transaction first), re-adding the item we just spliced out locally
+            // before the diff-based save ever runs. That left the item permanently stuck in the
+            // trash while still being re-pushed into history on every restore attempt, since the
+            // history-side push already happened from the untouched local itemToRestore snapshot.
+            await Promise.all([saveHistoryToFirebase(), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
             syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();

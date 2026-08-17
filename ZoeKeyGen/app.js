@@ -1,4 +1,15 @@
 (function () {
+    // Mobile: pasting a long value (e.g. a signing/activation key) then dismissing the on-screen
+    // keyboard resizes the visual viewport, and position:fixed elements (every .modal here) can be
+    // left with stale hit-testing afterward on some Android/iOS browser versions -- the modal
+    // visibly repaints in the right place, but taps on it don't register at all (not even the CSS
+    // :active flash) until something forces a layout recalc. Forcing one on every keyboard show/hide
+    // keeps modal buttons tappable right after the keyboard closes, exactly when a user taps
+    // "Submit" post-paste.
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
+    }
+
     function kickUserOut() {
         window.location.replace("about:blank");
     }

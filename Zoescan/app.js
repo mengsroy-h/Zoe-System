@@ -183,6 +183,7 @@ async function initFirebase() {
             document.getElementById('lockerPickerScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.add('hidden');
             updateAuthButton(false);
+            closeModal('activationModal');
             openModal('loginModal');
             const remembered = localStorage.getItem('remembered_email');
             if (remembered) document.getElementById('loginEmailInput').value = remembered;
@@ -194,6 +195,12 @@ async function initFirebase() {
             if (await isFirebaseSessionExpired(auth.currentUser)) forceExpireSession();
         }
     }, 60000);
+
+    setInterval(() => {
+        if (auth && auth.currentUser && listenersAttached && !isAnyModalOpen()) {
+            ensureAppActivated().catch((e) => { if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'periodic ensureAppActivated' }); });
+        }
+    }, LICENSE_RECHECK_INTERVAL_MS);
 }
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
@@ -209,6 +216,87 @@ async function isFirebaseSessionExpired(user) {
 function forceExpireSession() {
     const doneFn = () => showToast('ផុតកំណត់ ៤ ម៉ោងហើយ! សូមវាយពាក្យសម្ងាត់ និងចុចចូលប្រព័ន្ធម្ដងទៀត។');
     window.firebaseSDK.signOut(auth).then(doneFn).catch(doneFn);
+}
+
+const LICENSE_APP_CODE = 'SCN';
+const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
+
+function licenseFailureMessage(reason) {
+    switch (reason) {
+        case 'app-mismatch': return 'Key នេះមិនមែនសម្រាប់ Zoescan ទេ!';
+        case 'expired':
+        case 'expired-server': return 'Key នេះបានផុតកំណត់ហើយ!';
+        case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
+        case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
+        case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
+        default: return 'Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យម្តងទៀត។';
+    }
+}
+
+async function ensureAppActivated() {
+    const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
+    if (status.state === 'active') {
+        closeModal('activationModal');
+        return true;
+    }
+    const msgEl = document.getElementById('activationModalMsg');
+    if (msgEl) {
+        msgEl.textContent = (status.state === 'offline-grace-exceeded')
+            ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
+            : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ Zoescan ដើម្បីបន្ត។');
+    }
+    openModal('activationModal');
+    const keyInput = document.getElementById('activationKeyInput');
+    if (keyInput) keyInput.focus();
+    return false;
+}
+
+async function submitActivationKey() {
+    const btn = document.getElementById('activationSubmitBtn');
+    const originalBtnText = btn ? btn.textContent : '';
+    // Whatever happens inside this function must always end in visible feedback -- this app
+    // has repeatedly hit "tapped Activate, nothing happened at all" bugs (an unbounded fetch
+    // hang, alert() silently failing in this PWA context, a missing else branch after a
+    // valid-locally-but-server-rejected key), each fixed individually. This top-level
+    // try/catch/finally is one backstop: if any *other*, not-yet-found exception is thrown
+    // anywhere in this call chain, it now surfaces as a visible toast with the real error
+    // message instead of vanishing as a silent unhandled promise rejection. But try/catch
+    // alone can't save us from something that just hangs forever without ever throwing or
+    // resolving (e.g. a corrupted IndexedDB making an internal SDK call never settle) -- every
+    // individual await already has its own timeout, but as a second backstop against a hang in
+    // a spot that doesn't, the two awaited calls below are also wrapped in an outer 20s
+    // withTimeout() each, guaranteeing this function always reaches its finally block.
+    if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
+    try {
+        const input = document.getElementById('activationKeyInput');
+        const keyStr = input ? input.value.trim() : '';
+        if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
+        const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
+        if (!result.valid) {
+            showToast(licenseFailureMessage(result.reason));
+            return;
+        }
+        if (input) input.value = '';
+        const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
+        if (activated) {
+            showToast('✅ Active ជោគជ័យ!');
+            updateAuthButton(true);
+            initDatabaseListeners();
+            showLockerPicker(true);
+        } else {
+            // Key was valid locally (signature/app/expiry all checked out in activate() above)
+            // but the server-side check inside ensureAppActivated() just rejected it (revoked /
+            // not found / server-expired) -- without this, nothing here ever told the user that,
+            // so the modal would silently reset to its original text with zero visible feedback.
+            showToast('⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ');
+        }
+    } catch (e) {
+        console.error('submitActivationKey failed:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
+        showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = originalBtnText; }
+    }
 }
 
 async function verifyRoleThenProceed(user, myAuthGeneration) {
@@ -232,6 +320,25 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
         currentUserEmail = null;
         openModal('loginModal');
         showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zoescan ទេ!');
+        return;
+    }
+
+    let activated;
+    try {
+        // Same hang risk as submitActivationKey() -- this runs right after every successful
+        // login/resume, so a hang here (not just a thrown error) is exactly what would leave
+        // a returning worker stuck with #bootLoading long gone but nothing else shown either.
+        activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
+    } catch (e) {
+        if (myAuthGeneration !== authGeneration) return;
+        console.error('Activation check failed:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Activation check after login' });
+        showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។');
+        return;
+    }
+    if (myAuthGeneration !== authGeneration) return;
+    if (!activated) {
+        closeModal('loginModal');
         return;
     }
 

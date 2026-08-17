@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-shell-v25';
+const CACHE_VERSION = 'zoew-shell-v27';
 
 const APP_SHELL = [
     './',
@@ -6,6 +6,7 @@ const APP_SHELL = [
     './style.css',
     './app.js',
     './firebase-loader.js',
+    './license-verify.js',
     './error-reporting.js',
     './manifest.json',
     './icon-192.png',
@@ -25,7 +26,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
-            Promise.all(keys.filter((key) => !key.startsWith('zoew-')).map((key) => caches.delete(key)))
+            Promise.all(keys.filter((key) => key.startsWith('zoew-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
         )
     );
     self.clients.claim();

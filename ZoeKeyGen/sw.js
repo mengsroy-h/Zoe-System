@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeadmin-shell-v28';
+const CACHE_VERSION = 'zoekeygen-shell-v13';
 
 const APP_SHELL = [
     './',
@@ -26,7 +26,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
-            Promise.all(keys.filter((key) => key.startsWith('zoeadmin-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
+            Promise.all(keys.filter((key) => key.startsWith('zoekeygen-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
         )
     );
     self.clients.claim();

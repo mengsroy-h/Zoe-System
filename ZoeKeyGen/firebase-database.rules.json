@@ -1,0 +1,31 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "user_roles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false,
+        ".validate": "newData.isString() && newData.val() === 'admin'"
+      }
+    },
+
+    "license_keys": {
+      ".read": true,
+      "$appCode": {
+        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        "$keyId": {
+          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
+          "expiresAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
+          "revoked":   { ".validate": "newData.isBoolean()" },
+          "scope":     { ".validate": "newData.isString()" },
+          "note":      { ".validate": "newData.isString()" },
+          "createdBy": { ".validate": "newData.isString()" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}

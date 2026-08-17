@@ -397,6 +397,7 @@
     }
 
     function showLoginModalWithPrefill() {
+        closeModal('activationModal');
         openModalHelper('loginModal');
         const savedEmail = localStorage.getItem('remembered_email');
         const emailInput = document.getElementById('loginEmailInput');
@@ -404,6 +405,88 @@
         if (savedEmail && emailInput) {
             emailInput.value = savedEmail;
             if (rememberCb) rememberCb.checked = true;
+        }
+    }
+
+    const LICENSE_APP_CODE = 'ZOW';
+    const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
+
+    function licenseFailureMessage(reason) {
+        switch (reason) {
+            case 'app-mismatch': return 'Key នេះមិនមែនសម្រាប់ ZoeW ទេ!';
+            case 'expired':
+            case 'expired-server': return 'Key នេះបានផុតកំណត់ហើយ!';
+            case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
+            case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
+            case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
+            default: return 'Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យម្តងទៀត។';
+        }
+    }
+
+    async function ensureAppActivated() {
+        const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
+        if (status.state === 'active') {
+            closeModal('activationModal');
+            return true;
+        }
+        const msgEl = document.getElementById('activationModalMsg');
+        if (msgEl) {
+            msgEl.textContent = (status.state === 'offline-grace-exceeded')
+                ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
+                : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
+        }
+        openModalHelper('activationModal');
+        const keyInput = document.getElementById('activationKeyInput');
+        if (keyInput) keyInput.focus();
+        return false;
+    }
+
+    async function submitActivationKey() {
+        const btn = document.getElementById('activationSubmitBtn');
+        const originalBtnText = btn ? btn.textContent : '';
+        // Whatever happens inside this function must always end in visible feedback -- this
+        // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zoescan (an
+        // unbounded fetch hang, alert() silently failing in an installed-PWA context, a missing
+        // else branch after a valid-locally-but-server-rejected key), each fixed individually.
+        // This top-level try/catch/finally is the backstop: if any *other*, not-yet-found
+        // exception is thrown anywhere in this call chain, it now surfaces as a visible toast
+        // with the real error message instead of vanishing as a silent unhandled rejection, and
+        // the button is guaranteed to be re-enabled either way. alert() also replaced with
+        // showToast() here for the same reason Zoescan's was. Every individual await already
+        // has its own timeout, but as a second backstop against a hang in a spot that doesn't
+        // (e.g. a corrupted IndexedDB making an internal SDK call never settle), the two
+        // awaited calls below are also wrapped in an outer 20s withTimeout() each.
+        if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
+        try {
+            const input = document.getElementById('activationKeyInput');
+            const keyStr = input ? input.value.trim() : '';
+            if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
+            const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
+            if (!result.valid) {
+                showToast(licenseFailureMessage(result.reason));
+                return;
+            }
+            if (input) input.value = '';
+            const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
+            if (activated) {
+                showToast("✅ Active ជោគជ័យ!");
+                if (!isDatabaseInitialized) {
+                    initDatabaseListeners();
+                    isDatabaseInitialized = true;
+                }
+            } else {
+                // Key was valid locally (signature/app/expiry all checked out in activate()
+                // above) but the server-side check inside ensureAppActivated() just rejected it
+                // (revoked / not found / server-expired) -- without this, nothing here ever told
+                // the user that, so the modal would silently reset to its original text.
+                showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
+            }
+        } catch (e) {
+            console.error('submitActivationKey failed:', e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
+            showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = originalBtnText; }
         }
     }
 
@@ -428,6 +511,26 @@
             clearRememberedSession(true);
             showLoginModalWithPrefill();
             showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeW ទេ! សូមប្រើកម្មវិធីត្រឹមត្រូវសម្រាប់គណនីនេះ។");
+            return;
+        }
+
+        let activated;
+        try {
+            // Same hang risk as submitActivationKey() -- this runs right after every
+            // successful login/resume, so a hang here (not just a thrown error) is exactly
+            // what would leave a returning worker stuck on a blank screen with the login
+            // modal already closed-in-spirit but nothing else shown either.
+            activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
+        } catch (e) {
+            if (myAuthGeneration !== authGeneration) return;
+            console.error("Activation check failed:", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Activation check after login" });
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
+        if (myAuthGeneration !== authGeneration) return;
+        if (!activated) {
+            closeModal('loginModal');
             return;
         }
 
@@ -973,6 +1076,12 @@
                 }
             }
         }, 60000);
+
+        setInterval(() => {
+            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
+                ensureAppActivated().catch((e) => { if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'periodic ensureAppActivated' }); });
+            }
+        }, LICENSE_RECHECK_INTERVAL_MS);
 
         setupSwipeGestures();
         updateRecentPhonesList();

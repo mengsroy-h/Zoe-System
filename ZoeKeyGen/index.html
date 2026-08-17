@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ZoeKeyGen - បង្កើត Activation Key</title>
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="apple-mobile-web-app-title" content="ZoeKeyGen">
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js" crossorigin>
+
+    <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
+    <script>
+        if (window.Sentry && typeof window.Sentry.onLoad === 'function') {
+            window.Sentry.onLoad(function () {
+                try { window.Sentry.setTag('app', 'zoekeygen'); } catch (e) {}
+            });
+        }
+    </script>
+    <script type="module" src="./firebase-loader.js"></script>
+    <script src="./license-verify.js"></script>
+    <script src="./error-reporting.js"></script>
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<header class="app-navbar">
+    <div class="app-brand">
+        <div class="brand-logo">Key</div>
+        <div class="brand-info">
+            <h1>ZoeKeyGen</h1>
+            <span><div class="status-dot offline" id="statusDot"></div> <span id="firebaseStatusText">ក្រៅបណ្ដាញ</span></span>
+        </div>
+    </div>
+    <div class="nav-right-actions">
+        <button class="security-btn" onclick="openConfigFlow()">⚙️ Config</button>
+        <button class="security-btn" id="navAuthBtn" onclick="showLoginModalWithPrefill()">🔑 ចូល</button>
+    </div>
+</header>
+
+<div class="app-container" id="appContainer" style="display:none;">
+
+    <div class="app-card">
+        <div class="card-header">
+            <div class="card-title">🔑 Signing Key</div>
+            <span class="badge" id="signingKeyStatusBadge" style="background:var(--danger-light); color:#a3123a;">មិនទាន់ Load</span>
+        </div>
+        <div class="card-subtitle" style="margin-bottom:10px;">
+            Private Key មិនត្រូវបានរក្សាទុកនៅឯណាឡើយ ជាលំនាំដើម (មិនមែន localStorage មិនមែន Firebase) — វានៅតែក្នុងសតិ browser
+            រហូតដល់អ្នកបិទទំព័រ ឬ Refresh។ សូមរក្សា Private Key របស់អ្នកឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។
+            ចង់ចៀសវាង Paste ម្តងទៀតរាល់ពេល Reload/Multitasking? ជ្រើសរើសខាងក្រោម (ត្រូវការ PIN ដើម្បីការពារ)។
+        </div>
+
+        <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON)</label>
+        <textarea id="privateKeyInput" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'></textarea>
+        <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
+            <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
+            🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
+        </label>
+        <div class="btn-row mb-8">
+            <button class="btn-primary" onclick="loadSigningKey()">📥 Load Key</button>
+            <button class="btn-secondary" onclick="clearSigningKey()">🗑️ សម្អាត</button>
+        </div>
+
+        <details>
+            <summary style="cursor:pointer; font-size:11.5px; color:var(--text-muted); font-weight:600;">មិនទាន់មាន Signing Key? បង្កើត Keypair ថ្មី</summary>
+            <div style="margin-top:10px;">
+                <div class="danger-box">
+                    ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗទាំងអស់ (ដែល Verify ដោយ Public Key ចាស់) ប្រើលែងកើតទៀត លុះត្រាតែ
+                    អ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុងឯកសារ <code>license-verify.js</code> របស់ ZoeAdmin, ZoeW, Zoescan និង ZoeKeyGen ទាំងអស់ រួច Deploy ឡើងវិញ។
+                </div>
+                <button class="btn-secondary" style="width:100%;" onclick="generateNewKeypair()">🆕 បង្កើត Keypair ថ្មី</button>
+            </div>
+        </details>
+    </div>
+
+    <div class="app-card">
+        <div class="card-header">
+            <div class="card-title">✨ បង្កើត Key ថ្មី</div>
+        </div>
+
+        <div class="form-grid">
+            <div class="col-half">
+                <label for="genAppSelect">សម្រាប់កម្មវិធី</label>
+                <select id="genAppSelect">
+                    <option value="ADM">ZoeAdmin</option>
+                    <option value="ZOW">ZoeW</option>
+                    <option value="SCN">Zoescan</option>
+                    <option value="ALL">ទាំង ៣ កម្មវិធី (ALL)</option>
+                </select>
+            </div>
+            <div class="col-half">
+                <label for="genDaysInput">សុពលភាព (ថ្ងៃ)</label>
+                <input type="number" id="genDaysInput" value="30" min="1" step="1">
+            </div>
+            <div>
+                <label for="genNoteInput">កំណត់ចំណាំ (ជម្រើស — ឧ. ឈ្មោះបុគ្គលិក/ឧបករណ៍)</label>
+                <input type="text" id="genNoteInput" placeholder="ឧ. ម៉ាស៊ីនស្កេនកន្លែងទី ១">
+            </div>
+        </div>
+        <button class="btn-primary" style="width:100%;" id="genGenerateBtn" onclick="generateLicenseKey()">🔐 Generate Key</button>
+
+        <div id="genResultBox" class="hidden" style="margin-top:12px;">
+            <label>Key ដែលបានបង្កើត (ចម្លងផ្ញើឲ្យអ្នកប្រើប្រាស់)</label>
+            <div class="key-output" id="genResultKey"></div>
+            <button class="btn-secondary" style="width:100%;" onclick="copyGeneratedKey()">📋 ចម្លង Key</button>
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="card-header">
+            <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
+            <button class="btn-mini" onclick="refreshKeyList()">🔄 Refresh</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>App</th>
+                        <th>ID</th>
+                        <th>ចំណាំ</th>
+                        <th>ផុតកំណត់</th>
+                        <th>ស្ថានភាព</th>
+                        <th>សកម្មភាព</th>
+                    </tr>
+                </thead>
+                <tbody id="keyListBody">
+                    <tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<div id="pinModal" class="modal">
+    <div class="modal-content" style="max-width: 300px;">
+        <h3>🔒 បញ្ចូល Security PIN</h3>
+        <p id="pinModalMsg">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
+        <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN" autocomplete="off">
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
+                <button class="btn-cancel" onclick="closeModal('pinModal')">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pinSetupModal" class="modal">
+    <div class="modal-content" style="max-width: 300px;">
+        <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
+        <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ (យ៉ាងតិច ៦ តួអក្សរ)</p>
+        <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
+        <div class="modal-btns">
+            <button class="btn-confirm" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
+        </div>
+    </div>
+</div>
+
+<div id="configModal" class="modal">
+    <div class="modal-content" style="max-width: 380px;">
+        <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
+        <p>ត្រូវប្រើ Firebase Project <b>ដាច់ដោយឡែក</b> សម្រាប់ License (មិនមែន Project របស់ ZoeAdmin/ZoeW/Zoescan ទេ) — មើលជំហានបង្កើតក្នុង README.md។</p>
+        <textarea id="firebaseConfigInput" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "databaseURL": "...",
+  "projectId": "..."
+}'></textarea>
+        <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
+        <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
+        <div class="modal-btns">
+            <button class="btn-confirm" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
+            <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="loginModal" class="modal" data-nodismiss="true">
+    <div class="modal-content">
+        <h3>🔐 ចូលប្រើប្រាស់ ZoeKeyGen</h3>
+        <p>តម្រូវឲ្យប្រើគណនី Admin ដូចគ្នានឹង ZoeAdmin</p>
+        <form id="loginForm" onsubmit="return false;">
+            <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល" required autocomplete="username">
+            <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
+            <label class="remember-container">
+                <input type="checkbox" id="rememberMeCheckbox">
+                <span>ចងចាំអ៊ីមែល</span>
+            </label>
+            <div class="modal-btns">
+                <button type="submit" class="btn-confirm" id="loginBtn" onclick="doLogin()">ចូលប្រព័ន្ធ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="keypairModal" class="modal">
+    <div class="modal-content" style="max-width: 460px;">
+        <h3>🆕 Keypair ថ្មីត្រូវបានបង្កើត</h3>
+        <div class="danger-box" style="text-align:left;">
+            រក្សាទុក Private Key ខាងក្រោមឲ្យបានសុវត្ថិភាព (ឧ. Password Manager)។ វានឹងបាត់បង់ជារៀងរហូតបើអ្នកបិទប្រអប់នេះ
+            ដោយមិនបានចម្លងទុក! កុំដាក់វាចូល Git ឬបញ្ជូនតាម Chat/Email ធម្មតាឡើយ។
+        </div>
+        <label style="text-align:left;">Private Key (សម្ងាត់ — កុំចែក)</label>
+        <textarea id="newPrivateKeyOutput" readonly style="min-height:90px;"></textarea>
+        <button class="btn-secondary" style="width:100%; margin-bottom:12px;" onclick="copyTextarea('newPrivateKeyOutput')">📋 ចម្លង Private Key</button>
+
+        <label style="text-align:left;">Public Key (ដាក់ក្នុង license-verify.js គ្រប់ App)</label>
+        <textarea id="newPublicKeyOutput" readonly style="min-height:70px;"></textarea>
+        <button class="btn-secondary" style="width:100%;" onclick="copyTextarea('newPublicKeyOutput')">📋 ចម្លង Public Key</button>
+
+        <div class="modal-btns" style="margin-top:12px;">
+            <button class="btn-cancel" onclick="closeModal('keypairModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="extendModal" class="modal">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3>⏳ បន្ថែមសុពលភាព</h3>
+        <p>បញ្ចូលចំនួនថ្ងៃបន្ថែម គិតចាប់ពីពេលនេះ</p>
+        <input type="number" id="extendDaysInput" value="30" min="1" step="1">
+        <div class="modal-btns">
+            <button class="btn-confirm" onclick="confirmExtendKey()">រក្សាទុក</button>
+            <button class="btn-cancel" onclick="closeModal('extendModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

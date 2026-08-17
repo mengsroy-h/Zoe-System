@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoescan-shell-v1';
+const CACHE_VERSION = 'zoescan-shell-v2';
 
 const APP_SHELL = [
     './',
@@ -6,6 +6,7 @@ const APP_SHELL = [
     './style.css',
     './security.js',
     './firebase-init.js',
+    './license-verify.js',
     './error-reporting.js',
     './app.js',
     './manifest.json',

@@ -2,6 +2,7 @@
 <html lang="km">
 <head>
     <meta charset="UTF-8">
+    <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ZoeAdmin - ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (Admin)</title>
 
@@ -339,7 +340,7 @@
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="submitManualAdjustment()">បញ្ជាក់ការកែប្រែ</button>
+                <button class="btn-confirm" id="manualAdjustSubmitBtn" onclick="submitManualAdjustment()">បញ្ជាក់ការកែប្រែ</button>
                 <button class="btn-cancel" onclick="closeModal('manualAdjustModal')">បោះបង់</button>
             </div>
         </div>

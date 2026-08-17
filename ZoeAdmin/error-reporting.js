@@ -3,6 +3,7 @@
 
     const DSN_STORAGE_KEY = 'zoe_sentry_dsn';
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/7.120.3/bundle.min.js';
+    const SDK_LOAD_TIMEOUT_MS = 10000;
 
     let loadPromise = null;
 
@@ -10,22 +11,55 @@
         if (global.Sentry) return Promise.resolve(global.Sentry);
         if (loadPromise) return loadPromise;
         loadPromise = new Promise((resolve, reject) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                loadPromise = null;
+                reject(new Error('Sentry SDK load timed out'));
+            }, SDK_LOAD_TIMEOUT_MS);
             const script = document.createElement('script');
             script.src = SENTRY_SDK_URL;
             script.crossOrigin = 'anonymous';
-            script.onload = () => resolve(global.Sentry);
-            script.onerror = () => { loadPromise = null; reject(new Error('Sentry SDK failed to load')); };
+            script.onload = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(global.Sentry);
+            };
+            script.onerror = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                loadPromise = null;
+                reject(new Error('Sentry SDK failed to load'));
+            };
             document.head.appendChild(script);
         });
         return loadPromise;
     }
 
+    function tagApp(appName) {
+        if (!global.Sentry || typeof global.Sentry.onLoad !== 'function') return;
+        global.Sentry.onLoad(() => {
+            try {
+                if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
+            } catch (e) {}
+        });
+    }
+
     async function init(appName, release) {
+        // The Loader Script in index.html (one shared project/DSN across all three apps)
+        // already auto-initializes Sentry on its own -- tag it here so events can still be
+        // told apart by app in a shared project, regardless of whether a DSN was ever
+        // manually entered below.
+        tagApp(appName);
+
         const dsn = getDsn();
-        if (!dsn) return false;
+        if (!dsn) return !!global.Sentry;
         try {
             const Sentry = await loadSentrySdk();
-            if (!Sentry) return false;
+            if (!Sentry || typeof Sentry.init !== 'function') return false;
             Sentry.init({
                 dsn: dsn,
                 environment: appName || 'unknown',
@@ -34,6 +68,7 @@
                 sampleRate: 1.0,
                 tracesSampleRate: 0
             });
+            if (typeof Sentry.setTag === 'function') Sentry.setTag('app', appName || 'unknown');
             return true;
         } catch (e) {
             console.error('Sentry init failed:', e);

@@ -1,5 +1,6 @@
 let app, auth, db, dbRefHistory, dbRefConnected;
 let currentUserEmail = null;
+let authGeneration = 0;
 let historyData = {};
 let barcodeIndex = {};
 let activeLocker = localStorage.getItem('zscan_active_locker') || '';
@@ -102,14 +103,6 @@ function addPreconnect(origin) {
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-// If Firebase Auth's own IndexedDB-backed session storage gets into a corrupted/stuck state
-// (observed on a real device: only a full manual "clear browser cache/site data" recovered
-// it, and only that -- a plain reload or even a fresh private tab did not), no amount of
-// redeploying new code can repair data that was already broken before the new code arrived.
-// This does automatically what the manual cache-clear did: drop every "firebase*"-named
-// IndexedDB database for this origin, then reload once so the SDK re-initializes against
-// clean storage. Guarded by a sessionStorage flag so a genuinely unrelated problem can't
-// cause an infinite reload loop -- it fires at most once per browser session.
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
         document.getElementById('bootLoading').classList.add('hidden');
@@ -160,18 +153,15 @@ async function initFirebase() {
         document.getElementById('firebaseStatusText').textContent = online ? 'ភ្ជាប់ Server រួចរាល់' : 'ក្រៅបណ្ដាញ';
     });
 
-    // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a degraded
-    // network right after a resume/reload, its first callback can simply never fire, leaving
-    // #bootLoading stuck visible forever with nothing else shown. Fall back to auto-recovery
-    // if the initial callback hasn't landed within 8s; harmless if the real callback fires
-    // moments later, since it will just correctly log the worker in or reopen the modal.
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
 
     sdk.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);
         document.getElementById('bootLoading').classList.add('hidden');
+        authGeneration++;
+        const myAuthGeneration = authGeneration;
         if (user) {
-            verifyRoleThenProceed(user);
+            verifyRoleThenProceed(user, myAuthGeneration);
         } else {
             currentUserEmail = null;
             detachDatabaseListeners();
@@ -206,12 +196,13 @@ function forceExpireSession() {
     window.firebaseSDK.signOut(auth).then(doneFn).catch(doneFn);
 }
 
-async function verifyRoleThenProceed(user) {
+async function verifyRoleThenProceed(user, myAuthGeneration) {
     let role;
     try {
         const roleSnap = await withTimeout(window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
         role = roleSnap.val();
     } catch (e) {
+        if (myAuthGeneration !== authGeneration) return;
         console.error('Role verification failed:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Role verification failed:' });
         await window.firebaseSDK.signOut(auth).catch(() => {});
@@ -220,6 +211,7 @@ async function verifyRoleThenProceed(user) {
         showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។');
         return;
     }
+    if (myAuthGeneration !== authGeneration) return;
     if (role !== 'admin' && role !== 'worker' && role !== 'scanner') {
         await window.firebaseSDK.signOut(auth).catch(() => {});
         currentUserEmail = null;
@@ -239,10 +231,6 @@ async function verifyRoleThenProceed(user) {
 }
 
 let listenersAttached = false;
-// Coalesces the list re-render triggered by Firebase onValue(dbRefHistory) so a burst of
-// near-simultaneous writes (multiple scanners active at once) rebuilds the table once
-// instead of once per event. buildBarcodeIndex() stays immediate since scan/save flows
-// need it fresh on every event.
 const debouncedRenderList = debounce(() => { if (currentTab === 'list') renderList(); }, 120);
 
 function initDatabaseListeners() {
@@ -357,7 +345,10 @@ async function saveNewSecurityPin() {
     document.getElementById('confirmPinInput').value = '';
     (pinTargetAction || openConfigModal)();
 }
+let isVerifyingPin = false;
 async function verifySecurityPin() {
+    if (isVerifyingPin) return;
+
     const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
@@ -368,25 +359,30 @@ async function verifySecurityPin() {
     const pinInputEl = document.getElementById('pinInput');
     const enteredPin = pinInputEl.value;
     pinInputEl.value = '';
-    const savedPin = localStorage.getItem('zoew_security_pin_hash');
-    if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
-        if (!savedPin.startsWith('pbkdf2:')) {
-            localStorage.setItem('zoew_security_pin_hash', await hashPin(enteredPin));
-        }
-        localStorage.removeItem('zoew_pin_fail_count');
-        localStorage.removeItem('zoew_pin_lockout_until');
-        closeModal('pinModal');
-        (pinTargetAction || openConfigModal)();
-    } else {
-        let failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
-        if (failCount >= 5) {
-            localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
-            localStorage.setItem('zoew_pin_fail_count', '0');
-            showToast("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី មុននឹងសាកល្បងម្តងទៀត។");
+    isVerifyingPin = true;
+    try {
+        const savedPin = localStorage.getItem('zoew_security_pin_hash');
+        if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
+            if (!savedPin.startsWith('pbkdf2:')) {
+                localStorage.setItem('zoew_security_pin_hash', await hashPin(enteredPin));
+            }
+            localStorage.removeItem('zoew_pin_fail_count');
+            localStorage.removeItem('zoew_pin_lockout_until');
+            closeModal('pinModal');
+            (pinTargetAction || openConfigModal)();
         } else {
-            localStorage.setItem('zoew_pin_fail_count', failCount.toString());
-            showToast("លេខ PIN មិនត្រឹមត្រូវទេ!");
+            let failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+            if (failCount >= 5) {
+                localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
+                localStorage.setItem('zoew_pin_fail_count', '0');
+                showToast("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី មុននឹងសាកល្បងម្តងទៀត។");
+            } else {
+                localStorage.setItem('zoew_pin_fail_count', failCount.toString());
+                showToast("លេខ PIN មិនត្រឹមត្រូវទេ!");
+            }
         }
+    } finally {
+        isVerifyingPin = false;
     }
 }
 
@@ -1038,10 +1034,6 @@ function bindEventListeners() {
         if (openModalEl) dismissModal(openModalEl);
     });
 
-    // The camera stays open (indicator light on, battery/GPU draining) whenever the tab is
-    // just backgrounded/screen-locked mid-shift, since only the decode loop pauses while
-    // hidden -- release the stream outright and re-request it on return, same as reopening
-    // the scan tab manually.
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             if (isCameraScanning && currentTab === 'scan') {
@@ -1074,16 +1066,20 @@ window.addEventListener('load', () => {
                 if (document.visibilityState === 'visible') reg.update().catch(() => {});
             });
             window.addEventListener('focus', () => reg.update().catch(() => {}));
-            // Belt-and-suspenders for a scanning shift where the app stays foregrounded
-            // for hours without ever blurring/backgrounding -- visibilitychange/focus
-            // would never fire, so also poll periodically.
             setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
         }).catch(() => {});
         let swReloadedOnce = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
             swReloadedOnce = true;
-            window.location.reload();
+            const reloadWhenIdle = () => {
+                if (isAnyModalOpen() || isCameraScanning) {
+                    setTimeout(reloadWhenIdle, 3000);
+                } else {
+                    window.location.reload();
+                }
+            };
+            reloadWhenIdle();
         });
     }
 });

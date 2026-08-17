@@ -88,21 +88,10 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
-                // The implicit update check at registration time only runs once per
-                // page load, which for an installed/standalone PWA can mean "once per
-                // cold launch" -- if someone just switches away and back (multitasking)
-                // without a fresh launch, a newer deployed version could sit unnoticed
-                // until they happen to fully close and reopen the app. Re-checking
-                // whenever the app comes back to the foreground closes that gap, so a
-                // new deploy is picked up automatically instead of requiring a manual
-                // uninstall/reinstall of the PWA.
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
-                // Belt-and-suspenders for a session that's left open and foregrounded for
-                // hours without ever blurring/backgrounding (e.g. a front-desk device) --
-                // visibilitychange/focus would never fire, so also poll periodically.
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
@@ -110,7 +99,14 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
             swReloadedOnce = true;
-            window.location.reload();
+            const reloadWhenIdle = () => {
+                if (isModalOpen || isCameraScanning) {
+                    setTimeout(reloadWhenIdle, 3000);
+                } else {
+                    window.location.reload();
+                }
+            };
+            reloadWhenIdle();
         });
     }
 
@@ -125,6 +121,8 @@
     let dbRefExchangeRate = null;
     let dbRefConnected = null;
     let authUnsubscribe = null;
+    let authRecoveryTimeout = null;
+    let authGeneration = 0;
 
     let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
     
@@ -249,12 +247,6 @@
         };
     }
 
-    // Coalesces the DOM re-render (and the O(n) auto-cleanup sweep) triggered by Firebase
-    // onValue(dbRefHistory) so a burst of near-simultaneous writes (multiple scanners, bulk
-    // edits) does this once instead of once per event. The 2h/8d cleanup rules operate on
-    // hour/day-scale windows, so a ~120ms delay changes nothing about correctness. Direct-
-    // action call sites elsewhere still call applyCurrentFilter() immediately for instant
-    // feedback on the acting device.
     const debouncedRenderAfterHistorySync = debounce(() => {
         runAutomaticCleanupRules();
         applyCurrentFilter();
@@ -501,11 +493,15 @@
         openModalHelper('configModal');
     }
 
-    function saveFirebaseConfig() {
+    async function saveFirebaseConfig() {
         const dsnInput = document.getElementById('sentryDsnInput');
+        const dsnEntered = dsnInput ? dsnInput.value.trim() : '';
         if (dsnInput && window.ZoeErrors) {
             ZoeErrors.setDsn(dsnInput.value);
-            ZoeErrors.init('zoeadmin');
+            const sentryOk = await ZoeErrors.init('zoeadmin');
+            if (dsnEntered && !sentryOk) {
+                showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
+            }
         }
         const cfgInput = document.getElementById('firebaseConfigInput');
         if(!cfgInput) return;
@@ -783,12 +779,13 @@
         }
     }
 
-    async function verifyAdminRoleThenProceed(user) {
+    async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
         let role;
         try {
             const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
             role = roleSnap.val();
         } catch (e) {
+            if (myAuthGeneration !== authGeneration) return;
             console.error("Role verification failed:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
             await fb.signOut(auth).catch(() => {});
@@ -797,6 +794,7 @@
             showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
             return;
         }
+        if (myAuthGeneration !== authGeneration) return;
         if (role !== 'admin') {
             await fb.signOut(auth).catch(() => {});
             clearRememberedSession(true);
@@ -821,15 +819,6 @@
 
     const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-    // If Firebase Auth's own IndexedDB-backed session storage gets into a corrupted/stuck
-    // state (observed on a real device: only a full manual "clear browser cache/site data"
-    // recovered it, and only that -- a plain reload or even a fresh private tab did not), no
-    // amount of redeploying new code can repair data that was already broken before the new
-    // code arrived. This does automatically what the manual cache-clear did: drop every
-    // "firebase*"-named IndexedDB database for this origin, then reload once so the SDK
-    // re-initializes against clean storage. Guarded by a sessionStorage flag so a genuinely
-    // unrelated problem can't cause an infinite reload loop -- it fires at most once per
-    // browser session.
     async function attemptAuthStorageRecovery() {
         if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
             showLoginModalWithPrefill();
@@ -860,21 +849,21 @@
             try { authUnsubscribe(); } catch (e) {}
             authUnsubscribe = null;
         }
+        if (authRecoveryTimeout) {
+            clearTimeout(authRecoveryTimeout);
+            authRecoveryTimeout = null;
+        }
 
-        // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a
-        // degraded network right after a resume/reload, its first callback can simply never
-        // fire, and since #appContainer/loginModal are gated behind either branch below,
-        // that leaves a permanently blank screen with nothing shown. Fall back to
-        // auto-recovery if the initial callback hasn't landed within 8s; harmless if the real
-        // callback fires moments later, since it will just correctly log the admin in or
-        // reopen the modal.
-        const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
+        authRecoveryTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
 
         authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
-            clearTimeout(initialAuthTimeout);
+            clearTimeout(authRecoveryTimeout);
+            authRecoveryTimeout = null;
+            authGeneration++;
+            const myAuthGeneration = authGeneration;
             if (user) {
                 autoLoginAttempted = false;
-                verifyAdminRoleThenProceed(user);
+                verifyAdminRoleThenProceed(user, myAuthGeneration);
             } else {
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
@@ -897,6 +886,9 @@
             checkPinAndOpenConfig();
             return;
         }
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn && loginBtn.disabled) return;
+
         const emailInput = document.getElementById('loginEmailInput');
         const passInput = document.getElementById('loginPasswordInput');
         const rememberCb = document.getElementById('rememberMeCheckbox');
@@ -909,6 +901,8 @@
             alert("សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
             return;
         }
+
+        if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
 
         fb.setPersistence(auth, rememberMe ? fb.browserLocalPersistence : fb.browserSessionPersistence)
             .then(() => {
@@ -925,6 +919,9 @@
             })
             .catch((error) => {
                 alert("ការចូលប្រព័ន្ធមិនជោគជ័យ៖ " + error.message);
+            })
+            .finally(() => {
+                if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
             });
     }
 
@@ -940,6 +937,12 @@
                 showToast("បានចាកចេញពីប្រព័ន្ធ!");
             });
         }
+    }
+
+    function handleDbListenerError(err) {
+        console.error('Firebase listener error:', err);
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
+        showToast('⚠️ បរាជ័យក្នុងការទាញយកទិន្នន័យ! សូមពិនិត្យការតភ្ជាប់ Firebase ឬសិទ្ធិចូលប្រើ ហើយ Refresh ទំព័រ');
     }
 
     function initDatabaseListeners() {
@@ -961,17 +964,17 @@
                     localStorage.setItem('zoew_exchange_rate', exchangeRateRiel);
                     applyCurrentFilter();
                 }
-            });
+            }, handleDbListenerError);
         }
 
         fb.onValue(dbRefDailyRevenue, (snapshot) => {
             dailyRevenueData = snapshot.val() || {};
             applyCurrentFilter();
-        });
+        }, handleDbListenerError);
 
         fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
             monthlyRevenueData = snapshot.val() || {};
-        });
+        }, handleDbListenerError);
 
         fb.onValue(dbRefHistory, (snapshot) => {
             const data = snapshot.val();
@@ -1011,7 +1014,7 @@
             lastSyncedHistoryKeys = new Set(scanHistory.map(item => item.id).filter(Boolean));
 
             debouncedRenderAfterHistorySync();
-        });
+        }, handleDbListenerError);
 
         fb.onValue(dbRefDeleted, (snapshot) => {
             const data = snapshot.val();
@@ -1027,7 +1030,7 @@
             });
             lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
             runAutomaticDeletedCleanup();
-        });
+        }, handleDbListenerError);
 
         isDatabaseInitialized = true;
     }
@@ -1415,10 +1418,15 @@
         if(dodChangeIn) dodChangeIn.value = '';
         const countChangeIn = document.getElementById('manualCountChangeInput');
         if(countChangeIn) countChangeIn.value = '';
+        const submitBtn = document.getElementById('manualAdjustSubmitBtn');
+        if(submitBtn) submitBtn.disabled = false;
         openModalHelper('manualAdjustModal');
     }
 
     function submitManualAdjustment() {
+        const submitBtn = document.getElementById('manualAdjustSubmitBtn');
+        if (submitBtn && submitBtn.disabled) return;
+
         const dateInputEl = document.getElementById('manualDateInput');
         const codChangeEl = document.getElementById('manualCodChangeInput');
         const dodChangeEl = document.getElementById('manualDodChangeInput');
@@ -1441,6 +1449,7 @@
             return;
         }
 
+        if (submitBtn) submitBtn.disabled = true;
         addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
 
         closeModal('manualAdjustModal');
@@ -2490,16 +2499,25 @@
                 return;
             }
 
+            const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
+            const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
+            const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
+
             try {
                 await addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
             } catch (saveError) {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
+                scanHistory = historySnapshot;
+                dailyRevenueData = dailySnapshot;
+                monthlyRevenueData = monthlySnapshot;
+                applyCurrentFilter();
                 throw saveError;
             }
 
             closeModal('phoneModal');
             showToast("រក្សាទុកបានជោគជ័យ!");
         } catch (e) {
+            showToast(`⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
         } finally {
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;
@@ -2639,63 +2657,79 @@
         openModalHelper('viewListModal');
     }
 
-    function removeSingleBarcode(itemId, barcodeCode) {
+    async function removeSingleBarcode(itemId, barcodeCode) {
         const item = scanHistory.find(i => i.id === itemId);
         if (!item || !item.barcodes) return;
 
         const bcIndex = item.barcodes.findIndex(b => b.code === barcodeCode);
         if (bcIndex === -1) return;
 
-        if (confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) {
-            const removedBc = item.barcodes.splice(bcIndex, 1)[0];
-            
-            if (!removedBc.isDeducted) {
-                const targetCod = parseFloat(removedBc.cod) || 0;
-                const targetDod = parseFloat(removedBc.dod) || 0;
+        if (!confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return;
 
-                addRevenueToDailyAndMonthlyRecord(item.scanDate || getFormattedDate(), -targetCod, -targetDod, -1);
-                removedBc.isDeducted = true; 
+        const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+        const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
+        const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
+
+        const removedBc = item.barcodes.splice(bcIndex, 1)[0];
+
+        if (!removedBc.isDeducted) {
+            const targetCod = parseFloat(removedBc.cod) || 0;
+            const targetDod = parseFloat(removedBc.dod) || 0;
+
+            addRevenueToDailyAndMonthlyRecord(item.scanDate || getFormattedDate(), -targetCod, -targetDod, -1);
+            removedBc.isDeducted = true;
+        }
+
+        removedBc.isFromDeletion = false;
+
+        let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
+        itemToTrash.id = generateUniqueId();
+        itemToTrash.deletedAt = Date.now();
+        itemToTrash.cod = parseFloat(removedBc.cod) || 0;
+        itemToTrash.dod = parseFloat(removedBc.dod) || 0;
+        itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
+        itemToTrash.barcode = removedBc.code;
+        itemToTrash.locker = removedBc.locker || "N/A";
+        itemToTrash.time = removedBc.time || item.time;
+        itemToTrash.isClosed = removedBc.isClosed || false;
+        if (itemToTrash.isClosed) {
+            itemToTrash.closedAt = item.closedAt || Date.now();
+        } else {
+            delete itemToTrash.closedAt;
+        }
+        deletedItems.unshift(itemToTrash);
+
+        let historyWritePromise;
+        if (item.barcodes.length === 0) {
+            const itemIndex = scanHistory.findIndex(i => i.id === itemId);
+            if (itemIndex !== -1) {
+                scanHistory.splice(itemIndex, 1);
             }
-            
-            removedBc.isFromDeletion = false;
+            closeModal('viewListModal');
+            historyWritePromise = deleteSingleHistoryItemFromFirebase(itemId);
+        } else {
+            item.count = item.barcodes.length;
+            item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            item.price = Math.round((item.cod + item.dod) * 100) / 100;
+            item.barcode = item.barcodes[0].code;
+            openViewListModal(itemId);
+            historyWritePromise = saveSingleHistoryItemToFirebase(item);
+        }
 
-            let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
-            itemToTrash.id = generateUniqueId();
-            itemToTrash.deletedAt = Date.now();
-            itemToTrash.cod = parseFloat(removedBc.cod) || 0;
-            itemToTrash.dod = parseFloat(removedBc.dod) || 0;
-            itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
-            itemToTrash.barcode = removedBc.code;
-            itemToTrash.locker = removedBc.locker || "N/A";
-            itemToTrash.time = removedBc.time || item.time;
-            itemToTrash.isClosed = removedBc.isClosed || false;
-            if (itemToTrash.isClosed) {
-                itemToTrash.closedAt = item.closedAt || Date.now();
-            } else {
-                delete itemToTrash.closedAt;
-            }
-            deletedItems.unshift(itemToTrash);
-            saveSingleDeletedItemToFirebase(itemToTrash);
+        applyCurrentFilter();
 
-            if (item.barcodes.length === 0) {
-                const itemIndex = scanHistory.findIndex(i => i.id === itemId);
-                if (itemIndex !== -1) {
-                    scanHistory.splice(itemIndex, 1);
-                }
-                closeModal('viewListModal');
-                deleteSingleHistoryItemFromFirebase(itemId);
-            } else {
-                item.count = item.barcodes.length;
-                item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                item.price = Math.round((item.cod + item.dod) * 100) / 100;
-                item.barcode = item.barcodes[0].code;
-                openViewListModal(itemId);
-                saveSingleHistoryItemToFirebase(item);
-            }
-
-            applyCurrentFilter();
+        try {
+            await Promise.all([historyWritePromise, saveSingleDeletedItemToFirebase(itemToTrash)]);
             showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+        } catch (e) {
+            scanHistory = historySnapshot;
+            deletedItems = deletedSnapshot;
+            dailyRevenueData = dailySnapshot;
+            monthlyRevenueData = monthlySnapshot;
+            applyCurrentFilter();
+            showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
     }
 
@@ -2987,22 +3021,33 @@
         }
     }
 
-    function deleteSingleItem(id) {
+    async function deleteSingleItem(id) {
         const index = scanHistory.findIndex(i => i.id === id);
         if (index === -1) return;
 
-        if (confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) {
-            let removed = scanHistory.splice(index, 1)[0];
-            removed.deletedAt = Date.now();
-            removed.isFromDeletion = true;
-            
-            deletedItems.unshift(removed);
+        if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) return;
 
-            deleteSingleHistoryItemFromFirebase(id);
-            saveSingleDeletedItemToFirebase(removed);
+        const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+
+        let removed = scanHistory.splice(index, 1)[0];
+        removed.deletedAt = Date.now();
+        removed.isFromDeletion = true;
+
+        deletedItems.unshift(removed);
+
+        applyCurrentFilter();
+        updateRecentPhonesList();
+
+        try {
+            await Promise.all([deleteSingleHistoryItemFromFirebase(id), saveSingleDeletedItemToFirebase(removed)]);
+            showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+        } catch (e) {
+            scanHistory = historySnapshot;
+            deletedItems = deletedSnapshot;
             applyCurrentFilter();
             updateRecentPhonesList();
-            showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+            showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
     }
 
@@ -3143,15 +3188,23 @@
         }
     }
 
-    function permanentlyDeleteItem(id) {
-        if (confirm("លុបជាអចិន្ត្រៃយ៍?")) {
-            const index = deletedItems.findIndex(i => i.id === id);
-            if(index !== -1) {
-                const purgedItem = deletedItems.splice(index, 1)[0];
-                deleteSingleDeletedItemFromFirebase(id);
-                releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
-                renderRecentlyDeleted();
-            }
+    async function permanentlyDeleteItem(id) {
+        if (!confirm("លុបជាអចិន្ត្រៃយ៍?")) return;
+
+        const index = deletedItems.findIndex(i => i.id === id);
+        if (index === -1) return;
+
+        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+        const purgedItem = deletedItems.splice(index, 1)[0];
+        renderRecentlyDeleted();
+
+        try {
+            await deleteSingleDeletedItemFromFirebase(id);
+            releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
+        } catch (e) {
+            deletedItems = deletedSnapshot;
+            renderRecentlyDeleted();
+            showToast("⚠️ លុបជាអចិន្ត្រៃយ៍មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
     }
 

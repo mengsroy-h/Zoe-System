@@ -530,19 +530,22 @@
         // exception is thrown anywhere in this call chain, it now surfaces as a visible toast
         // with the real error message instead of vanishing as a silent unhandled rejection, and
         // the button is guaranteed to be re-enabled either way. alert() also replaced with
-        // showToast() here for the same reason Zscan's was.
+        // showToast() here for the same reason Zscan's was. Every individual await already
+        // has its own timeout, but as a second backstop against a hang in a spot that doesn't
+        // (e.g. a corrupted IndexedDB making an internal SDK call never settle), the two
+        // awaited calls below are also wrapped in an outer 20s withTimeout() each.
         if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
         try {
             const input = document.getElementById('activationKeyInput');
             const keyStr = input ? input.value.trim() : '';
             if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
-            const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
+            const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
             if (!result.valid) {
                 showToast(licenseFailureMessage(result.reason));
                 return;
             }
             if (input) input.value = '';
-            const activated = await ensureAppActivated();
+            const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
                 if (!isDatabaseInitialized) {
@@ -587,7 +590,19 @@
             return;
         }
 
-        const activated = await ensureAppActivated();
+        let activated;
+        try {
+            // Same hang risk as submitActivationKey() -- this runs right after every
+            // successful login/resume, so a hang here (not just a thrown error) is exactly
+            // what would leave a returning worker stuck on a blank screen with the login
+            // modal already closed-in-spirit but nothing else shown either.
+            activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
+        } catch (e) {
+            console.error("Activation check failed:", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Activation check after login" });
+            showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។");
+            return;
+        }
         if (!activated) {
             closeModal('loginModal');
             return;
@@ -614,7 +629,17 @@
             authUnsubscribe = null;
         }
 
+        // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a
+        // degraded network right after a resume/reload, its first callback can simply never
+        // fire, and since #appContainer/loginModal are gated behind either branch below,
+        // that leaves a permanently blank screen with nothing shown. Fall back to the login
+        // modal if the initial callback hasn't landed within 8s; harmless if the real
+        // callback fires moments later, since it will just correctly log the worker in or
+        // reopen the modal.
+        const initialAuthTimeout = setTimeout(() => { showLoginModalWithPrefill(); }, 8000);
+
         authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
+            clearTimeout(initialAuthTimeout);
             if (user) {
                 autoLoginAttempted = false;
                 verifyWorkerRoleThenProceed(user);

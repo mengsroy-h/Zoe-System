@@ -448,7 +448,15 @@ async function verifyAdminRoleThenProceed(user) {
 function setupAuthListener() {
     if (!auth) return;
     if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
+    // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a degraded
+    // network right after a resume/reload, its first callback can simply never fire, and
+    // since #appContainer defaults to display:none until either branch below runs, that
+    // leaves a permanently blank screen with nothing shown at all. Fall back to the login
+    // modal if the initial callback hasn't landed within 8s; harmless if the real callback
+    // fires moments later, since it will just correctly log the admin in or reopen the modal.
+    const initialAuthTimeout = setTimeout(() => { showLoginModalWithPrefill(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
+        clearTimeout(initialAuthTimeout);
         if (user) {
             verifyAdminRoleThenProceed(user);
         } else {

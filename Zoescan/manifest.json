@@ -1,7 +1,7 @@
 {
-  "name": "Zscan - កំណត់ទីតាំង Locker",
-  "short_name": "Zscan",
-  "description": "កំណត់ទីតាំង Locker (Zscan)",
+  "name": "Zoescan - កំណត់ទីតាំង Locker",
+  "short_name": "Zoescan",
+  "description": "កំណត់ទីតាំង Locker (Zoescan)",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

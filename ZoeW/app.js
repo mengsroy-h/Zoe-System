@@ -1,90 +1,3 @@
-    (function () {
-        function kickUserOut() {
-            window.location.replace("about:blank");
-        }
-
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        let devToolsHitCount = 0;
-        let consoleTrapHitCount = 0;
-
-        document.addEventListener('keydown', function (e) {
-            if (
-                e.key === 'F12' ||
-                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.key === 'K' || e.key === 'k')) ||
-                (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's')) ||
-                (e.metaKey && e.altKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.key === 'U' || e.key === 'u' || e.key === 'K' || e.key === 'k'))
-            ) {
-                e.preventDefault();
-                e.stopPropagation();
-                kickUserOut();
-                return false;
-            }
-        }, true);
-
-        document.addEventListener('contextmenu', function (e) {
-            e.preventDefault();
-            return false;
-        }, true);
-
-        function checkDevTools() {
-            if (isMobile) return;
-            const widthThreshold = window.outerWidth - window.innerWidth > 160;
-            const heightThreshold = window.outerHeight - window.innerHeight > 160;
-            if (widthThreshold || heightThreshold) {
-                devToolsHitCount++;
-                if (devToolsHitCount >= 2) {
-                    kickUserOut();
-                }
-            } else {
-                devToolsHitCount = 0;
-            }
-        }
-
-        function secureDebugger() {
-            if (isMobile) return;
-            function probe() {
-                debugger;
-            }
-            function loop() {
-                const startTime = performance.now();
-                try {
-                    probe();
-                } catch(e) {}
-                const endTime = performance.now();
-                if (endTime - startTime > 1000) {
-                    kickUserOut();
-                }
-            }
-            setInterval(loop, 1000);
-        }
-
-        function checkConsoleTrap() {
-            if (isMobile) return;
-            let triggered = false;
-            const bait = new Image();
-            Object.defineProperty(bait, 'id', {
-                get() {
-                    triggered = true;
-                    return '';
-                }
-            });
-            console.log(bait);
-            console.clear();
-            if (triggered) {
-                consoleTrapHitCount++;
-                if (consoleTrapHitCount >= 2) {
-                    kickUserOut();
-                }
-            } else {
-                consoleTrapHitCount = 0;
-            }
-        }
-
-        setInterval(checkDevTools, 1000);
-        setInterval(checkConsoleTrap, 1000);
-        secureDebugger();
-    })();
-
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -103,6 +16,7 @@
                 if (isModalOpen) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
+                    sessionStorage.setItem('zoew_sw_updated', '1');
                     window.location.reload();
                 }
             };
@@ -246,6 +160,10 @@
                 if (dbRefExchangeRate) { try { fb.off(dbRefExchangeRate); } catch (e) {} }
                 if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
                 isDatabaseInitialized = false;
+                scanHistory = [];
+                deletedItems = [];
+                dailyRevenueData = {};
+                monthlyRevenueData = {};
                 if (typeof fb.deleteApp === 'function') {
                     await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
                 }
@@ -515,6 +433,7 @@
 
         closeModal('loginModal');
         showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+        updateAuthButton(true);
 
         if (!isDatabaseInitialized) {
             initDatabaseListeners();
@@ -580,9 +499,16 @@
                     if (dbRefHistory) fb.off(dbRefHistory);
                     if (dbRefDeleted) fb.off(dbRefDeleted);
                     if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-                    if (dbRefConnected) fb.off(dbRefConnected);
                     isDatabaseInitialized = false;
                 }
+                scanHistory = [];
+                deletedItems = [];
+                dailyRevenueData = {};
+                monthlyRevenueData = {};
+                applyCurrentFilter();
+                renderRecentlyDeleted();
+                updateRecentPhonesList();
+                updateAuthButton(false);
 
                 showLoginModalWithPrefill();
             }
@@ -632,6 +558,18 @@
             .finally(() => {
                 if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
             });
+    }
+
+    function updateAuthButton(isLoggedIn) {
+        const btn = document.getElementById('navAuthBtn');
+        if (!btn) return;
+        if (isLoggedIn) {
+            btn.textContent = '🚪 ចាកចេញ';
+            btn.onclick = logoutApp;
+        } else {
+            btn.textContent = '🔑 ចូល';
+            btn.onclick = showLoginModalWithPrefill;
+        }
     }
 
     function logoutApp() {
@@ -789,11 +727,13 @@
 
         let claimedWhole = null;
         let claimedPartial = null;
+        let claimedUpdatedRemainder = null;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const result = await fb.runTransaction(itemRef, (currentItem) => {
                 claimedWhole = null;
                 claimedPartial = null;
+                claimedUpdatedRemainder = null;
                 if (!currentItem) return currentItem;
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || Date.now();
 
@@ -819,6 +759,7 @@
                         updated.barcode = stillActive[0].code;
                         updated.isClosed = true;
                         if (!updated.closedAt) updated.closedAt = Date.now();
+                        claimedUpdatedRemainder = updated;
                         return updated;
                     }
 
@@ -867,6 +808,12 @@
 
             deletedItems.unshift(trashItem);
             saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
+
+            if (claimedPartial) {
+                syncScannerLookupEntry(id, claimedUpdatedRemainder);
+            } else {
+                clearScannerLookupEntry(id);
+            }
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
@@ -897,6 +844,44 @@
         });
         if (!Object.keys(updates).length) return Promise.resolve();
         return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
+    }
+
+    function buildScannerLookupPayload(item) {
+        const payload = {
+            id: item.id,
+            phone: item.phone || '',
+            barcode: item.barcode || '',
+            locker: item.locker || ''
+        };
+        if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
+        if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
+            const barcodesObj = {};
+            item.barcodes.forEach((b, idx) => {
+                if (!b) return;
+                const entry = { code: b.code || '', locker: b.locker || '' };
+                if (b.lockerUpdatedAt) entry.lockerUpdatedAt = b.lockerUpdatedAt;
+                barcodesObj[idx] = entry;
+            });
+            payload.barcodes = barcodesObj;
+        }
+        return payload;
+    }
+
+    function syncScannerLookupEntry(itemId, item) {
+        if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), buildScannerLookupPayload(item)).catch((error) => {
+            console.error('Error syncing scanner lookup entry: ', error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry: ' });
+        });
+    }
+
+    function clearScannerLookupEntry(itemId) {
+        if (!db || !fb || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), null).catch((error) => {
+            console.error('Error clearing scanner lookup entry: ', error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry: ' });
+        });
     }
 
     function runAutomaticDeletedCleanup() {
@@ -973,6 +958,11 @@
     }
 
     window.addEventListener('load', function () {
+        if (sessionStorage.getItem('zoew_sw_updated')) {
+            sessionStorage.removeItem('zoew_sw_updated');
+            showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
+        }
+
         if (window.ZoeErrors) ZoeErrors.init('zoew');
         initFirebase();
 
@@ -1063,6 +1053,9 @@
             let codDollar = Math.round(((parseFloat(current && current.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
             let dodDollar = Math.round(((parseFloat(current && current.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = (parseFloat(current && current.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
+            }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
@@ -1080,6 +1073,9 @@
             let codDollar = Math.round(((parseFloat(existing.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
             let dodDollar = Math.round(((parseFloat(existing.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = (parseFloat(existing.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { context: ymKey, codDollar, dodDollar, totalCount });
+            }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
@@ -1644,7 +1640,7 @@
         if (item) {
             const prevPhone = item.phone;
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone });
+            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone }).then(() => syncScannerLookupEntry(item.id, item));
             updateRecentPhonesList();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
@@ -1740,7 +1736,7 @@
                 <td style="text-align: center;">
                     <div style="display:flex; gap:4px; justify-content:center;">
                         <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" onclick="promptRestoreDeletedItem('${escapeForInlineJsAttr(item.id)}')">🔄</button>
-                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="permanentlyDeleteItem('${escapeForInlineJsAttr(item.id)}')">✖️</button>
+                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
                     </div>
                 </td>
             `;
@@ -1773,26 +1769,47 @@
         }
 
         let itemToRestore = deletedItems.splice(index, 1)[0];
-        delete itemToRestore.deletedAt; 
+        delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         if (itemToRestore.isClosed) {
             itemToRestore.closedAt = Date.now();
+        } else {
+            itemToRestore.createdAt = Date.now();
+        }
+
+        if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+            await Promise.all(itemToRestore.barcodes.map(async (restoredBc, idx) => {
+                if (!restoredBc.isDeducted) return;
+                let shouldCredit = true;
+                if (db && fb && /^[a-zA-Z0-9_-]+$/.test(itemToRestore.id)) {
+                    try {
+                        const dedupRef = fb.ref(db, `zoew_recently_deleted_cod_dod/${itemToRestore.id}/barcodes/${idx}/isDeducted`);
+                        const txResult = await fb.runTransaction(dedupRef, (current) => (current === true ? false : undefined));
+                        shouldCredit = !!txResult.committed;
+                    } catch (creditError) {
+                        console.error("Restore revenue-credit transaction failed: ", creditError);
+                        if (window.ZoeErrors) ZoeErrors.capture(creditError, { context: "Restore revenue-credit transaction failed: " });
+                        shouldCredit = false;
+                    }
+                }
+                if (shouldCredit) {
+                    const targetCod = parseFloat(restoredBc.cod) || 0;
+                    const targetDod = parseFloat(restoredBc.dod) || 0;
+                    addRevenueToDailyAndMonthlyRecord(itemToRestore.scanDate || getFormattedDate(), targetCod, targetDod, 1);
+                }
+                restoredBc.isDeducted = false;
+            }));
         }
 
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate));
 
+        let restoredResultItem;
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
             if (!targetItem.barcodes) targetItem.barcodes = [];
-            
+
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        addRevenueToDailyAndMonthlyRecord(targetItem.scanDate || getFormattedDate(), targetCod, targetDod, 1);
-                        restoredBc.isDeducted = false;
-                    }
                     targetItem.barcodes.push(restoredBc);
                 });
             }
@@ -1807,18 +1824,10 @@
             } else {
                 delete targetItem.closedAt;
             }
+            restoredResultItem = targetItem;
         } else {
-            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-                itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        addRevenueToDailyAndMonthlyRecord(itemToRestore.scanDate || getFormattedDate(), targetCod, targetDod, 1);
-                        restoredBc.isDeducted = false;
-                    }
-                });
-            }
             scanHistory.push(itemToRestore);
+            restoredResultItem = itemToRestore;
         }
 
         const restoredId = pendingRestoreId;
@@ -1827,6 +1836,7 @@
 
         try {
             await Promise.all([saveHistoryToFirebase(), saveDeletedToFirebase()]);
+            syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
             updateRecentPhonesList();
@@ -1852,15 +1862,34 @@
         }
     }
 
-    async function permanentlyDeleteItem(id) {
-        if (!confirm("លុបជាអចិន្ត្រៃយ៍?")) return;
+    let pendingPermanentDeleteId = null;
+
+    function promptPermanentDelete(id) {
+        pendingPermanentDeleteId = id;
+        const recentlyModal = document.getElementById('recentlyDeletedModal');
+        if (recentlyModal) recentlyModal.style.display = 'none';
+        openModalHelper('permanentDeleteWarningModal');
+    }
+
+    function cancelPermanentDelete() {
+        pendingPermanentDeleteId = null;
+        closeModal('permanentDeleteWarningModal');
+        openRecentlyDeletedModal();
+    }
+
+    async function executePermanentDelete() {
+        const id = pendingPermanentDeleteId;
+        pendingPermanentDeleteId = null;
+        closeModal('permanentDeleteWarningModal');
+        if (!id) { openRecentlyDeletedModal(); return; }
 
         const index = deletedItems.findIndex(i => i.id === id);
-        if (index === -1) return;
+        if (index === -1) { openRecentlyDeletedModal(); return; }
 
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const purgedItem = deletedItems.splice(index, 1)[0];
         renderRecentlyDeleted();
+        openRecentlyDeletedModal();
 
         try {
             await deleteSingleDeletedItemFromFirebase(id);

@@ -49,10 +49,6 @@
     }
 
     async function init(appName, release) {
-        // The Loader Script in index.html (one shared project/DSN across all three apps)
-        // already auto-initializes Sentry on its own -- tag it here so events can still be
-        // told apart by app in a shared project, regardless of whether a DSN was ever
-        // manually entered below.
         tagApp(appName);
 
         const dsn = getDsn();

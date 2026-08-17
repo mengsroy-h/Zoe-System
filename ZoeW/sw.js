@@ -25,7 +25,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
-            Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key)))
+            Promise.all(keys.filter((key) => !key.startsWith('zoew-')).map((key) => caches.delete(key)))
         )
     );
     self.clients.claim();

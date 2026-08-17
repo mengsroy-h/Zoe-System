@@ -48,7 +48,7 @@
         </div>
     </div>
     <div class="nav-right-actions">
-        <button class="security-btn" onclick="logoutApp()">🚪 ចាកចេញ</button>
+        <button class="security-btn" id="navAuthBtn" onclick="showLoginModalWithPrefill()">🔑 ចូល</button>
         <div class="credit-tag">Powered By ZoeW</div>
     </div>
 </header>
@@ -188,6 +188,7 @@
         <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal('pinSetupModal')">បោះបង់</button>
             <button class="btn-confirm" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
         </div>
     </div>
@@ -325,6 +326,19 @@
             <div class="modal-btns-row">
                 <button class="btn-confirm" onclick="executeRestoreItem()">យល់ព្រមស្តារ</button>
                 <button class="btn-cancel" onclick="cancelRestoreItem()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="permanentDeleteWarningModal" class="modal" style="z-index: 1060;" data-close="cancelPermanentDelete">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3 style="color: #ef4444;">🗑️ លុបជាអចិន្ត្រៃយ៍</h3>
+        <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
+        <div class="modal-btns" style="margin-top: 10px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" style="background:#ef4444;" onclick="executePermanentDelete()">លុបជាអចិន្ត្រៃយ៍</button>
+                <button class="btn-cancel" onclick="cancelPermanentDelete()">បោះបង់</button>
             </div>
         </div>
     </div>

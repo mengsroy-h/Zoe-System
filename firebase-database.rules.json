@@ -12,7 +12,7 @@
     },
 
     "zoew_scan_history_cod_dod": {
-      ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       "$itemId": {
         ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || (root.child('user_roles').child(auth.uid).val() === 'worker' && (newData.exists() || (data.child('isClosed').val() === true && data.child('closedAt').exists() && (now - data.child('closedAt').val()) > 7200000) || (data.child('isClosed').val() !== true && data.child('createdAt').exists() && (now - data.child('createdAt').val()) > 691200000))) || (root.child('user_roles').child(auth.uid).val() === 'scanner' && data.exists() && newData.exists()))",
         "id":    { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
@@ -44,6 +44,28 @@
             "isFromDeletion": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "time": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "createdAt": { ".validate": "newData.isNumber() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+            "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "zoew_scanner_lookup": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).exists()",
+      "$itemId": {
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker' || (root.child('user_roles').child(auth.uid).val() === 'scanner' && data.exists() && newData.exists()))",
+        "id":    { ".validate": "newData.isString()" },
+        "phone": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+        "barcode": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+        "locker": { ".validate": "newData.isString()" },
+        "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
+        "lockerUpdatedBy": { ".validate": "newData.isString()" },
+        "barcodes": {
+          "$idx": {
+            "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "locker": { ".validate": "newData.isString()" },
             "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }

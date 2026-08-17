@@ -1,90 +1,3 @@
-    (function () {
-        function kickUserOut() {
-            window.location.replace("about:blank");
-        }
-
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        let devToolsHitCount = 0;
-        let consoleTrapHitCount = 0;
-
-        document.addEventListener('keydown', function (e) {
-            if (
-                e.key === 'F12' ||
-                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.key === 'K' || e.key === 'k')) ||
-                (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's')) ||
-                (e.metaKey && e.altKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c' || e.key === 'U' || e.key === 'u' || e.key === 'K' || e.key === 'k'))
-            ) {
-                e.preventDefault();
-                e.stopPropagation();
-                kickUserOut();
-                return false;
-            }
-        }, true);
-
-        document.addEventListener('contextmenu', function (e) {
-            e.preventDefault();
-            return false;
-        }, true);
-
-        function checkDevTools() {
-            if (isMobile) return;
-            const widthThreshold = window.outerWidth - window.innerWidth > 160;
-            const heightThreshold = window.outerHeight - window.innerHeight > 160;
-            if (widthThreshold || heightThreshold) {
-                devToolsHitCount++;
-                if (devToolsHitCount >= 2) {
-                    kickUserOut();
-                }
-            } else {
-                devToolsHitCount = 0;
-            }
-        }
-
-        function secureDebugger() {
-            if (isMobile) return;
-            function probe() {
-                debugger;
-            }
-            function loop() {
-                const startTime = performance.now();
-                try {
-                    probe();
-                } catch(e) {}
-                const endTime = performance.now();
-                if (endTime - startTime > 1000) {
-                    kickUserOut();
-                }
-            }
-            setInterval(loop, 1000);
-        }
-
-        function checkConsoleTrap() {
-            if (isMobile) return;
-            let triggered = false;
-            const bait = new Image();
-            Object.defineProperty(bait, 'id', {
-                get() {
-                    triggered = true;
-                    return '';
-                }
-            });
-            console.log(bait);
-            console.clear();
-            if (triggered) {
-                consoleTrapHitCount++;
-                if (consoleTrapHitCount >= 2) {
-                    kickUserOut();
-                }
-            } else {
-                consoleTrapHitCount = 0;
-            }
-        }
-
-        setInterval(checkDevTools, 1000);
-        setInterval(checkConsoleTrap, 1000);
-        secureDebugger();
-    })();
-
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -103,6 +16,7 @@
                 if (isModalOpen || isCameraScanning) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
+                    sessionStorage.setItem('zoeadmin_just_updated', '1');
                     window.location.reload();
                 }
             };
@@ -284,6 +198,10 @@
                 if (dbRefExchangeRate) { try { fb.off(dbRefExchangeRate); } catch (e) {} }
                 if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
                 isDatabaseInitialized = false;
+                scanHistory = [];
+                deletedItems = [];
+                dailyRevenueData = {};
+                monthlyRevenueData = {};
                 if (typeof fb.deleteApp === 'function') {
                     await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
                 }
@@ -805,6 +723,7 @@
 
         closeModal('loginModal');
         showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+        updateAuthButton(true);
 
         if (!isDatabaseInitialized) {
             initDatabaseListeners();
@@ -871,9 +790,16 @@
                     if (dbRefHistory) fb.off(dbRefHistory);
                     if (dbRefDeleted) fb.off(dbRefDeleted);
                     if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-                    if (dbRefConnected) fb.off(dbRefConnected);
                     isDatabaseInitialized = false;
                 }
+                scanHistory = [];
+                deletedItems = [];
+                dailyRevenueData = {};
+                monthlyRevenueData = {};
+                applyCurrentFilter();
+                renderRecentlyDeleted();
+                updateRecentPhonesList();
+                updateAuthButton(false);
 
                 showLoginModalWithPrefill();
             }
@@ -923,6 +849,18 @@
             .finally(() => {
                 if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
             });
+    }
+
+    function updateAuthButton(isLoggedIn) {
+        const btn = document.getElementById('navAuthBtn');
+        if (!btn) return;
+        if (isLoggedIn) {
+            btn.textContent = '🚪 ចាកចេញ';
+            btn.onclick = logoutApp;
+        } else {
+            btn.textContent = '🔑 ចូល';
+            btn.onclick = showLoginModalWithPrefill;
+        }
     }
 
     function logoutApp() {
@@ -1080,11 +1018,13 @@
 
         let claimedWhole = null;
         let claimedPartial = null;
+        let updatedRemainder = null;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const result = await fb.runTransaction(itemRef, (currentItem) => {
                 claimedWhole = null;
                 claimedPartial = null;
+                updatedRemainder = null;
                 if (!currentItem) return currentItem;
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || Date.now();
 
@@ -1110,6 +1050,7 @@
                         updated.barcode = stillActive[0].code;
                         updated.isClosed = true;
                         if (!updated.closedAt) updated.closedAt = Date.now();
+                        updatedRemainder = updated;
                         return updated;
                     }
 
@@ -1123,6 +1064,12 @@
             });
 
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
+
+            if (claimedWhole) {
+                clearScannerLookupEntry(id);
+            } else if (claimedPartial && updatedRemainder) {
+                syncScannerLookupEntry(id, updatedRemainder);
+            }
 
             let trashItem;
             if (claimedPartial) {
@@ -1264,6 +1211,11 @@
         if (window.ZoeErrors) ZoeErrors.init('zoeadmin');
         initFirebase();
 
+        if (sessionStorage.getItem('zoeadmin_just_updated')) {
+            sessionStorage.removeItem('zoeadmin_just_updated');
+            showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
+        }
+
         setInterval(async () => {
             if (auth && auth.currentUser) {
                 if (await isFirebaseSessionExpired(auth.currentUser)) {
@@ -1377,6 +1329,9 @@
             let codDollar = Math.round(((parseFloat(current && current.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
             let dodDollar = Math.round(((parseFloat(current && current.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = (parseFloat(current && current.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
+            }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
@@ -1394,6 +1349,9 @@
             let codDollar = Math.round(((parseFloat(existing.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
             let dodDollar = Math.round(((parseFloat(existing.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = (parseFloat(existing.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { context: ymKey, codDollar, dodDollar, totalCount });
+            }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
@@ -1407,6 +1365,13 @@
         }).catch(() => {
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
         });
+    }
+
+    function isMonthKeyRetained(ymKey) {
+        const keys = new Set(Object.keys(monthlyRevenueData));
+        keys.add(ymKey);
+        const latestThreeKeys = Array.from(keys).sort().reverse().slice(0, 3);
+        return latestThreeKeys.includes(ymKey);
     }
 
     function openManualAdjustModal() {
@@ -1447,6 +1412,13 @@
         if (adjParsedDate.getFullYear() !== adjYear || adjParsedDate.getMonth() !== adjMonth - 1 || adjParsedDate.getDate() !== adjDay) {
             alert("កាលបរិច្ឆេទមិនត្រឹមត្រូវទេ! សូមពិនិត្យខែ/ថ្ងៃម្តងទៀត (ឧ. ខែកុម្ភៈគ្មានថ្ងៃទី 30 ទេ)។");
             return;
+        }
+
+        const adjYmKey = dateVal.substring(0, 7);
+        if (!isMonthKeyRetained(adjYmKey)) {
+            if (!confirm("⚠️ ខែនេះលើសពីរយៈពេលរក្សាទុក ៣ខែ ការកែប្រែនឹងមិនត្រូវបានរក្សាទុកទេ! (ប្រព័ន្ធរក្សាទុកតែ ៣ ខែចុងក្រោយប៉ុណ្ណោះ) តើអ្នកចង់បន្តទេ?")) {
+                return;
+            }
         }
 
         if (submitBtn) submitBtn.disabled = true;
@@ -1604,6 +1576,7 @@
             <button onclick="requestPinBeforeConfig(); document.getElementById('globalMoreMenu').classList.remove('show');">⚙️ Config / Reconfig</button>
             <button onclick="requestPinBeforeConfig(openLookupApiConfigModal); document.getElementById('globalMoreMenu').classList.remove('show');">🔌 API ស្វែងរកអតិថិជន</button>
             <button onclick="openExchangeRateModal(); document.getElementById('globalMoreMenu').classList.remove('show');">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
+            <button style="opacity:0.55; font-size:10.5px; border-top:1px dashed var(--border-color); margin-top:4px; padding-top:8px;" onclick="rebuildScannerLookupData(); document.getElementById('globalMoreMenu').classList.remove('show');">🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ</button>
             <button class="delete-opt" onclick="clearHistory(); document.getElementById('globalMoreMenu').classList.remove('show');">❌ លុបទាំងអស់</button>
         `;
 
@@ -1814,6 +1787,48 @@
         }
     }
 
+    const KHMER_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanskhmer/NotoSansKhmer%5Bwdth,wght%5D.ttf';
+    let khmerFontBase64 = null;
+    let khmerFontLoadPromise = null;
+
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+    }
+
+    async function ensureKhmerFontForPdf(doc) {
+        if (!khmerFontBase64) {
+            if (!khmerFontLoadPromise) {
+                khmerFontLoadPromise = fetch(KHMER_FONT_URL)
+                    .then((res) => {
+                        if (!res.ok) throw new Error('Khmer font fetch failed: ' + res.status);
+                        return res.arrayBuffer();
+                    })
+                    .then((buf) => arrayBufferToBase64(buf));
+            }
+            try {
+                khmerFontBase64 = await khmerFontLoadPromise;
+            } catch (e) {
+                khmerFontLoadPromise = null;
+                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Khmer font load failed for PDF export' });
+                return false;
+            }
+        }
+        try {
+            doc.addFileToVFS('NotoSansKhmer.ttf', khmerFontBase64);
+            doc.addFont('NotoSansKhmer.ttf', 'NotoSansKhmer', 'normal');
+            return true;
+        } catch (e) {
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Khmer font registration failed for PDF export' });
+            return false;
+        }
+    }
+
     async function exportDataAsPDF() {
         const rows = buildExportRows();
         if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
@@ -1824,11 +1839,41 @@
             await loadScriptOnce('jspdfAutotable');
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'landscape' });
+
+            const khmerFontReady = await ensureKhmerFontForPdf(doc);
+            if (khmerFontReady) {
+                doc.setFont('NotoSansKhmer', 'normal');
+            } else {
+                showToast("⚠️ អក្សរខ្មែរប្រហែលជាមិនបង្ហាញត្រឹមត្រូវក្នុង PDF នេះទេ");
+            }
+
             const head = [['No', 'Phone', 'Barcode', 'Locker', 'COD ($)', 'DOD ($)', 'Total ($)', 'Status', 'Date', 'Time']];
             const body = rows.map(r => [r.no, r.phone, r.barcode, r.locker, r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), r.status === 'យកហើយ' ? 'Closed' : 'Open', r.scanDate, r.time]);
+
+            const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
+            const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
+            const totalAll = Math.round((totalCod + totalDod) * 100) / 100;
+            body.push(['សរុប', '', '', '', totalCod.toFixed(2), totalDod.toFixed(2), totalAll.toFixed(2), `${rows.length} កញ្ចប់`, '', '']);
+
             doc.setFontSize(12);
             doc.text('ZoeAdmin - Package History Export (' + getCurrentFilterLabel() + ')', 14, 12);
-            doc.autoTable({ head: head, body: body, startY: 18, styles: { fontSize: 8 } });
+
+            doc.autoTable({
+                head: head,
+                body: body,
+                startY: 18,
+                styles: { fontSize: 8, font: khmerFontReady ? 'NotoSansKhmer' : undefined },
+                didDrawPage: (data) => {
+                    const pageSize = doc.internal.pageSize;
+                    const pageHeight = pageSize.getHeight ? pageSize.getHeight() : pageSize.height;
+                    const pageWidth = pageSize.getWidth ? pageSize.getWidth() : pageSize.width;
+                    doc.setFontSize(8);
+                    if (khmerFontReady) doc.setFont('NotoSansKhmer', 'normal');
+                    doc.text('ទំព័រ ' + data.pageNumber, data.settings.margin.left, pageHeight - 8);
+                    doc.text('នាំចេញនៅ ' + new Date().toLocaleString('km-KH'), pageWidth - data.settings.margin.right, pageHeight - 8, { align: 'right' });
+                }
+            });
+
             doc.save(getExportFilenameBase() + '.pdf');
             showToast("✅ បាន Export ជា PDF ជោគជ័យ!");
         } catch (e) {
@@ -2406,6 +2451,52 @@
         return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
     }
 
+    function buildScannerLookupPayload(item) {
+        const payload = {
+            id: item.id,
+            phone: item.phone || '',
+            barcode: item.barcode || '',
+            locker: item.locker || ''
+        };
+        if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
+        if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
+        if (item.barcodes && Array.isArray(item.barcodes)) {
+            payload.barcodes = item.barcodes.map((b) => {
+                if (!b) return { code: '', locker: '' };
+                const bcEntry = { code: b.code || '', locker: b.locker || '' };
+                if (b.lockerUpdatedAt) bcEntry.lockerUpdatedAt = b.lockerUpdatedAt;
+                return bcEntry;
+            });
+        }
+        return payload;
+    }
+
+    function syncScannerLookupEntry(itemId, item) {
+        if (!db || !fb || !itemId || !item) return Promise.resolve();
+        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: buildScannerLookupPayload(item) }).catch((error) => {
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
+        });
+    }
+
+    function clearScannerLookupEntry(itemId) {
+        if (!db || !fb || !itemId) return Promise.resolve();
+        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: null }).catch((error) => {
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry' });
+        });
+    }
+
+    function rebuildScannerLookupData() {
+        if (!confirm("តើអ្នកពិតជាចង់កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញសម្រាប់ទិន្នន័យទាំងអស់មែនទេ? (ប្រើសម្រាប់ Sync ជាមួយ Zoescan តែម្តងគត់ មិនប៉ះពាល់ដល់ទិន្នន័យសំខាន់ទេ)")) return;
+        let migratedCount = 0;
+        scanHistory.forEach(item => {
+            if (item && item.id) {
+                syncScannerLookupEntry(item.id, item);
+                migratedCount++;
+            }
+        });
+        showToast(`✅ បាន Sync ទិន្នន័យ Scanner Lookup ចំនួន ${migratedCount} កំណត់ត្រាជោគជ័យ!`);
+    }
+
     function triggerScanAction(barcode) {
         if (isModalOpen) return;
 
@@ -2490,7 +2581,7 @@
         if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
 
         try {
-            const claim = await claimBarcodeInRegistry(barcodeToSave);
+            const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
             if (claim === 'taken') {
                 closeModal('phoneModal');
                 showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
@@ -2504,7 +2595,7 @@
             const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
 
             try {
-                await addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
+                await withTimeout(addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker), 15000, 'Save timed out');
             } catch (saveError) {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
                 scanHistory = historySnapshot;
@@ -2580,7 +2671,7 @@
 
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
-            savePromise = saveSingleHistoryItemToFirebase(item);
+            savePromise = saveSingleHistoryItemToFirebase(item).then(() => { syncScannerLookupEntry(item.id, item); });
         } else {
             let newItem = {
                 id: generateUniqueId(),
@@ -2599,7 +2690,7 @@
             };
 
             scanHistory.push(newItem);
-            savePromise = saveSingleHistoryItemToFirebase(newItem);
+            savePromise = saveSingleHistoryItemToFirebase(newItem).then(() => { syncScannerLookupEntry(newItem.id, newItem); });
         }
 
         updateRecentPhonesList();
@@ -2686,6 +2777,7 @@
         let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
         itemToTrash.id = generateUniqueId();
         itemToTrash.deletedAt = Date.now();
+        itemToTrash.isFromDeletion = false;
         itemToTrash.cod = parseFloat(removedBc.cod) || 0;
         itemToTrash.dod = parseFloat(removedBc.dod) || 0;
         itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
@@ -2701,12 +2793,14 @@
         deletedItems.unshift(itemToTrash);
 
         let historyWritePromise;
+        let wasFullyRemoved = false;
         if (item.barcodes.length === 0) {
             const itemIndex = scanHistory.findIndex(i => i.id === itemId);
             if (itemIndex !== -1) {
                 scanHistory.splice(itemIndex, 1);
             }
             closeModal('viewListModal');
+            wasFullyRemoved = true;
             historyWritePromise = deleteSingleHistoryItemFromFirebase(itemId);
         } else {
             item.count = item.barcodes.length;
@@ -2722,6 +2816,8 @@
 
         try {
             await Promise.all([historyWritePromise, saveSingleDeletedItemToFirebase(itemToTrash)]);
+            if (wasFullyRemoved) clearScannerLookupEntry(itemId);
+            else syncScannerLookupEntry(itemId, item);
             showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
         } catch (e) {
             scanHistory = historySnapshot;
@@ -2950,7 +3046,7 @@
         if (item) {
             const prevPhone = item.phone;
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone });
+            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone }).then(() => { syncScannerLookupEntry(item.id, item); });
             updateRecentPhonesList();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
@@ -3041,6 +3137,7 @@
 
         try {
             await Promise.all([deleteSingleHistoryItemFromFirebase(id), saveSingleDeletedItemToFirebase(removed)]);
+            clearScannerLookupEntry(id);
             showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         } catch (e) {
             scanHistory = historySnapshot;
@@ -3076,7 +3173,7 @@
                 <td style="text-align: center;">
                     <div style="display:flex; gap:4px; justify-content:center;">
                         <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" onclick="promptRestoreDeletedItem('${escapeForInlineJsAttr(item.id)}')">🔄</button>
-                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="permanentlyDeleteItem('${escapeForInlineJsAttr(item.id)}')">✖️</button>
+                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
                     </div>
                 </td>
             `;
@@ -3117,10 +3214,12 @@
 
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate));
 
+        let resultingLiveItem;
+
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
             if (!targetItem.barcodes) targetItem.barcodes = [];
-            
+
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
                     if (restoredBc.isDeducted) {
@@ -3143,6 +3242,15 @@
             } else {
                 delete targetItem.closedAt;
             }
+
+            if (itemToRestore.callMarkTime && (!targetItem.callMarkTime || itemToRestore.callMarkTime > targetItem.callMarkTime)) {
+                targetItem.isCalled = itemToRestore.isCalled;
+                if (itemToRestore.callMark) targetItem.callMark = itemToRestore.callMark;
+                else delete targetItem.callMark;
+                targetItem.callMarkTime = itemToRestore.callMarkTime;
+            }
+
+            resultingLiveItem = targetItem;
         } else {
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
@@ -3155,6 +3263,7 @@
                 });
             }
             scanHistory.push(itemToRestore);
+            resultingLiveItem = itemToRestore;
         }
 
         const restoredId = pendingRestoreId;
@@ -3163,6 +3272,7 @@
 
         try {
             await Promise.all([saveHistoryToFirebase(), saveDeletedToFirebase()]);
+            if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
             updateRecentPhonesList();
@@ -3188,15 +3298,34 @@
         }
     }
 
-    async function permanentlyDeleteItem(id) {
-        if (!confirm("លុបជាអចិន្ត្រៃយ៍?")) return;
+    let pendingPermanentDeleteId = null;
+
+    function promptPermanentDelete(id) {
+        pendingPermanentDeleteId = id;
+        const recentlyModal = document.getElementById('recentlyDeletedModal');
+        if (recentlyModal) recentlyModal.style.display = 'none';
+        openModalHelper('permanentDeleteWarningModal');
+    }
+
+    function cancelPermanentDelete() {
+        pendingPermanentDeleteId = null;
+        closeModal('permanentDeleteWarningModal');
+        openRecentlyDeletedModal();
+    }
+
+    async function executePermanentDelete() {
+        const id = pendingPermanentDeleteId;
+        pendingPermanentDeleteId = null;
+        closeModal('permanentDeleteWarningModal');
+        if (!id) { openRecentlyDeletedModal(); return; }
 
         const index = deletedItems.findIndex(i => i.id === id);
-        if (index === -1) return;
+        if (index === -1) { openRecentlyDeletedModal(); return; }
 
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const purgedItem = deletedItems.splice(index, 1)[0];
         renderRecentlyDeleted();
+        openRecentlyDeletedModal();
 
         try {
             await deleteSingleDeletedItemFromFirebase(id);
@@ -3546,6 +3675,7 @@
 
     function clearHistory() {
         if (confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) {
+            const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
             scanHistory.forEach(item => {
                 item.deletedAt = Date.now();
                 item.isFromDeletion = true;
@@ -3554,6 +3684,7 @@
             scanHistory = [];
             saveHistoryToFirebase();
             saveDeletedToFirebase();
+            clearedIds.forEach(id => clearScannerLookupEntry(id));
             applyCurrentFilter();
             updateRecentPhonesList();
             showToast("បានលុបប្រវត្តិទាំងអស់!");

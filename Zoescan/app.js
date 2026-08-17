@@ -28,8 +28,22 @@ function showToast(msg) {
     clearTimeout(showToast._t);
     showToast._t = setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
 }
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+function safeFocusScanner() {
+    if (isMobileDevice() || currentTab !== 'scan') return;
+    if (document.querySelector('.modal.open')) return;
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) return;
+    const hwInput = document.getElementById('hwScannerInput');
+    if (hwInput) hwInput.focus();
+}
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    safeFocusScanner();
+}
 function dismissModal(modalEl) {
     if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
     const fnName = modalEl.getAttribute('data-close');
@@ -102,6 +116,7 @@ function addPreconnect(origin) {
 }
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
+const APP_UPDATED_TOAST_FLAG = 'zoe_app_updated_notice';
 
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
@@ -144,7 +159,7 @@ async function initFirebase() {
     auth = sdk.getAuth(app);
     db = sdk.getDatabase(app);
     try { sdk.goOnline(db); } catch (e) {}
-    dbRefHistory = sdk.ref(db, 'zoew_scan_history_cod_dod');
+    dbRefHistory = sdk.ref(db, 'zoew_scanner_lookup');
     dbRefConnected = sdk.ref(db, '.info/connected');
 
     sdk.onValue(dbRefConnected, (snap) => {
@@ -167,7 +182,7 @@ async function initFirebase() {
             detachDatabaseListeners();
             document.getElementById('lockerPickerScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.add('hidden');
-            document.getElementById('logoutBtn').style.display = 'none';
+            updateAuthButton(false);
             openModal('loginModal');
             const remembered = localStorage.getItem('remembered_email');
             if (remembered) document.getElementById('loginEmailInput').value = remembered;
@@ -216,13 +231,13 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
         await window.firebaseSDK.signOut(auth).catch(() => {});
         currentUserEmail = null;
         openModal('loginModal');
-        showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zscan ទេ!');
+        showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zoescan ទេ!');
         return;
     }
 
     currentUserEmail = user.email || null;
     closeModal('loginModal');
-    document.getElementById('logoutBtn').style.display = '';
+    updateAuthButton(true);
     initDatabaseListeners();
     showLockerPicker(true);
     isFirebaseSessionExpired(user).then((expired) => {
@@ -271,6 +286,7 @@ function buildBarcodeIndex() {
     barcodeIndex = idx;
 }
 
+let loginGeneration = 0;
 async function loginWithFirebase() {
     const email = document.getElementById('loginEmailInput').value.trim();
     const password = document.getElementById('loginPasswordInput').value;
@@ -280,18 +296,21 @@ async function loginWithFirebase() {
     errBox.style.display = 'none';
     btn.disabled = true; btn.textContent = 'កំពុងចូល...';
     const sdk = window.firebaseSDK;
+    const myLoginGeneration = ++loginGeneration;
     try {
         await sdk.setPersistence(auth, remember ? sdk.browserLocalPersistence : sdk.browserSessionPersistence);
         await withTimeout(sdk.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
+        if (myLoginGeneration !== loginGeneration) return;
         if (remember) localStorage.setItem('remembered_email', email); else localStorage.removeItem('remembered_email');
     } catch (e) {
+        if (myLoginGeneration !== loginGeneration) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loginWithFirebase' });
         errBox.textContent = e && e.message === 'Login timed out'
             ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
             : 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!';
         errBox.style.display = 'block';
     } finally {
-        btn.disabled = false; btn.textContent = 'ចូលប្រព័ន្ធ';
+        if (myLoginGeneration === loginGeneration) { btn.disabled = false; btn.textContent = 'ចូលប្រព័ន្ធ'; }
     }
 }
 function logoutApp() {
@@ -299,6 +318,11 @@ function logoutApp() {
     stopScanner();
     const doneFn = () => localStorage.removeItem('remembered_email');
     window.firebaseSDK.signOut(auth).then(doneFn).catch(doneFn);
+}
+function updateAuthButton(isLoggedIn) {
+    const btn = document.getElementById('logoutBtn');
+    if (!btn) return;
+    btn.textContent = isLoggedIn ? '🚪 ចាកចេញ' : '🔑 ចូល';
 }
 
 async function hashPinLegacy(pin) {
@@ -397,7 +421,7 @@ function saveFirebaseConfig() {
     const dsnInput = document.getElementById('sentryDsnInput');
     if (dsnInput && window.ZoeErrors) {
         ZoeErrors.setDsn(dsnInput.value);
-        ZoeErrors.init('zscan');
+        ZoeErrors.init('zoescan');
     }
     const raw = document.getElementById('configInput').value;
     let cfg;
@@ -476,6 +500,7 @@ function switchTab(tab) {
     document.getElementById('tabListBtn').classList.toggle('active', tab === 'list');
     if (tab === 'list') renderList();
     if (tab !== 'scan') stopScanner();
+    else safeFocusScanner();
 }
 
 let currentStream = null;
@@ -503,6 +528,14 @@ function isAnyModalOpen() {
     return !!document.querySelector('.modal.open');
 }
 
+function initNativeDetector() {
+    if ('BarcodeDetector' in window) {
+        try {
+            nativeDetector = new BarcodeDetector({ formats: SCAN_FORMATS_NATIVE });
+        } catch (e) { nativeDetector = null; }
+    }
+}
+
 function initScanEngine() {
     try {
         const possibleFormats = SCAN_FORMATS_ZXING.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
@@ -516,11 +549,6 @@ function initScanEngine() {
     } catch (e) {
         console.error('ZXing initialization error:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'ZXing initialization error:' });
-    }
-    if ('BarcodeDetector' in window) {
-        try {
-            nativeDetector = new BarcodeDetector({ formats: SCAN_FORMATS_NATIVE });
-        } catch (e) { nativeDetector = null; }
     }
 }
 
@@ -853,6 +881,7 @@ function confirmLocationChange() {
     if (code) assignLockerToEntry(code);
 }
 
+let assignGeneration = 0;
 async function assignLockerToEntry(code) {
     const entry = barcodeIndex[code];
     if (!entry) {
@@ -865,20 +894,27 @@ async function assignLockerToEntry(code) {
     const previousLocker = getEntryCurrentLocker(entry);
     let phoneForToast = entry.item.phone || '';
     let matched = false;
+    let matchedBarcodeIdx = null;
+    let singleBarcodeItem = false;
+    const myAssignGeneration = ++assignGeneration;
 
     try {
-        const itemRef = window.firebaseSDK.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
-        const result = await withTimeout(window.firebaseSDK.runTransaction(itemRef, (currentItem) => {
+        const lookupRef = window.firebaseSDK.ref(db, `zoew_scanner_lookup/${itemId}`);
+        const result = await withTimeout(window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
             matched = false;
+            matchedBarcodeIdx = null;
+            singleBarcodeItem = false;
             if (!currentItem) return currentItem;
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const b = currentItem.barcodes.find(bc => bc && bc.code === code);
-                if (!b) return currentItem;
-                b.locker = activeLocker;
-                b.lockerUpdatedAt = ts;
+                const idx = currentItem.barcodes.findIndex(bc => bc && bc.code === code);
+                if (idx === -1) return currentItem;
+                currentItem.barcodes[idx].locker = activeLocker;
+                currentItem.barcodes[idx].lockerUpdatedAt = ts;
+                matchedBarcodeIdx = idx;
                 if (currentItem.barcodes.length === 1) {
                     currentItem.locker = activeLocker;
                     currentItem.lockerUpdatedAt = ts;
+                    singleBarcodeItem = true;
                 }
             } else if (currentItem.barcode === code) {
                 currentItem.locker = activeLocker;
@@ -892,11 +928,31 @@ async function assignLockerToEntry(code) {
             return currentItem;
         }), 12000, 'Save timed out');
 
+        if (myAssignGeneration !== assignGeneration) return;
+
         if (!result.committed || !matched) {
             playErrorFeedback();
             showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
             return;
         }
+
+        const mirrorUpdates = {};
+        if (matchedBarcodeIdx !== null) {
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = activeLocker;
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
+            if (singleBarcodeItem) {
+                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = activeLocker;
+                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
+            }
+        } else {
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = activeLocker;
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
+        }
+        mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
+
+        await withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out');
+
+        if (myAssignGeneration !== assignGeneration) return;
 
         playSuccessFeedback();
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
@@ -907,6 +963,7 @@ async function assignLockerToEntry(code) {
             showToast(`✅ បានកំណត់ទីតាំង ${activeLocker}${who}`);
         }
     } catch (err) {
+        if (myAssignGeneration !== assignGeneration) return;
         playErrorFeedback();
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
         console.error(err);
@@ -980,7 +1037,9 @@ function renderList() {
 
 function bindEventListeners() {
     document.getElementById('settingsBtn').addEventListener('click', () => requestPinBeforeConfig());
-    document.getElementById('logoutBtn').addEventListener('click', logoutApp);
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        if (auth && auth.currentUser) logoutApp(); else openModal('loginModal');
+    });
 
     document.getElementById('selectCustomLockerBtn').addEventListener('click', selectCustomLocker);
     document.getElementById('lockerSettingsLink').addEventListener('click', () => requestPinBeforeConfig('locker'));
@@ -1048,16 +1107,22 @@ function bindEventListeners() {
 }
 bindEventListeners();
 
-if (window.ZoeErrors) ZoeErrors.init('zscan');
+if (window.ZoeErrors) ZoeErrors.init('zoescan');
 
 initFirebase().catch(err => {
     document.getElementById('bootLoading').innerHTML = '⚠️ មិនអាចភ្ជាប់ Firebase SDK បានទេ សូម Refresh ទំព័រនេះម្តងទៀត';
     console.error(err);
     if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
 });
-(function waitForZXingThenInitScanEngine() {
-    if (typeof ZXing === 'undefined') { setTimeout(waitForZXingThenInitScanEngine, 300); return; }
-    initScanEngine();
+initNativeDetector();
+(function waitForZXingThenInitScanEngine(deadline) {
+    deadline = deadline || (Date.now() + 15000);
+    if (typeof ZXing !== 'undefined') { initScanEngine(); return; }
+    if (Date.now() >= deadline) {
+        showToast('⚠️ មិនអាចផ្ទុកម៉ាស៊ីនស្កេន Barcode បានទេ! កាមេរ៉ាអាចនឹងប្រើការមិនកើត សូម Refresh ទំព័រ ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូលដោយដៃ');
+        return;
+    }
+    setTimeout(() => waitForZXingThenInitScanEngine(deadline), 300);
 })();
 window.addEventListener('load', () => {
     if ('serviceWorker' in navigator) {
@@ -1076,6 +1141,7 @@ window.addEventListener('load', () => {
                 if (isAnyModalOpen() || isCameraScanning) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
+                    sessionStorage.setItem(APP_UPDATED_TOAST_FLAG, '1');
                     window.location.reload();
                 }
             };
@@ -1083,3 +1149,7 @@ window.addEventListener('load', () => {
         });
     }
 });
+if (sessionStorage.getItem(APP_UPDATED_TOAST_FLAG)) {
+    sessionStorage.removeItem(APP_UPDATED_TOAST_FLAG);
+    showToast('កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅');
+}

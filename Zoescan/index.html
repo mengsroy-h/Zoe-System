@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Zscan - កំណត់ទីតាំង Locker</title>
-<meta name="description" content="Zscan - ស្កេន Barcode កំណត់ទីតាំង Locker សម្រាប់កញ្ចប់ដែលមានក្នុងប្រព័ន្ធ ZoeAdmin/ZoeW">
+<title>Zoescan - កំណត់ទីតាំង Locker</title>
+<meta name="description" content="Zoescan - ស្កេន Barcode កំណត់ទីតាំង Locker សម្រាប់កញ្ចប់ដែលមានក្នុងប្រព័ន្ធ ZoeAdmin/ZoeW">
 <meta name="theme-color" content="#e31837">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Zscan">
+<meta name="apple-mobile-web-app-title" content="Zoescan">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
@@ -44,13 +44,13 @@
     <div class="app-brand">
         <div class="brand-logo">Zs</div>
         <div class="brand-info">
-            <h1>Zscan — កំណត់ទីតាំង Locker</h1>
+            <h1>Zoescan — កំណត់ទីតាំង Locker</h1>
             <span><div class="status-dot offline" id="statusDot"></div> <span id="firebaseStatusText">ក្រៅបណ្ដាញ</span></span>
         </div>
     </div>
     <div class="nav-right-actions">
         <button class="icon-btn" id="settingsBtn" title="ការកំណត់">⚙️</button>
-        <button class="security-btn" id="logoutBtn" style="display:none;">🚪 ចាកចេញ</button>
+        <button class="security-btn" id="logoutBtn">🔑 ចូល</button>
         <div class="credit-tag">Powered By ZoeW</div>
     </div>
 </header>
@@ -58,7 +58,7 @@
 <main class="app-main" id="appMain">
     <div id="bootLoading" class="screen-loading">
         <div class="spinner"></div>
-        <div>កំពុងចាប់ផ្ដើម Zscan...</div>
+        <div>កំពុងចាប់ផ្ដើម Zoescan...</div>
     </div>
 
     <div id="lockerPickerScreen" class="hidden">

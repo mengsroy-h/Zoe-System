@@ -100,6 +100,42 @@ function addPreconnect(origin) {
     } catch (e) {}
 }
 
+const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
+
+// If Firebase Auth's own IndexedDB-backed session storage gets into a corrupted/stuck state
+// (observed on a real device: only a full manual "clear browser cache/site data" recovered
+// it, and only that -- a plain reload or even a fresh private tab did not), no amount of
+// redeploying new code can repair data that was already broken before the new code arrived.
+// This does automatically what the manual cache-clear did: drop every "firebase*"-named
+// IndexedDB database for this origin, then reload once so the SDK re-initializes against
+// clean storage. Guarded by a sessionStorage flag so a genuinely unrelated problem can't
+// cause an infinite reload loop -- it fires at most once per browser session.
+async function attemptAuthStorageRecovery() {
+    if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
+        document.getElementById('bootLoading').classList.add('hidden');
+        openModal('loginModal');
+        const remembered = localStorage.getItem('remembered_email');
+        if (remembered) document.getElementById('loginEmailInput').value = remembered;
+        return;
+    }
+    sessionStorage.setItem(AUTH_STUCK_RECOVERY_FLAG, '1');
+    try {
+        if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
+            const dbs = await indexedDB.databases();
+            await Promise.all(dbs
+                .filter((d) => d.name && /firebase/i.test(d.name))
+                .map((d) => new Promise((resolve) => {
+                    const req = indexedDB.deleteDatabase(d.name);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => resolve();
+                    req.onblocked = () => resolve();
+                }))
+            );
+        }
+    } catch (e) {}
+    window.location.reload();
+}
+
 async function initFirebase() {
     const raw = localStorage.getItem('zoew_firebase_config');
     if (!raw) { openConfigModal(); return; }
@@ -126,15 +162,10 @@ async function initFirebase() {
 
     // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a degraded
     // network right after a resume/reload, its first callback can simply never fire, leaving
-    // #bootLoading stuck visible forever with nothing else shown. Fall back to the login
-    // screen if the initial callback hasn't landed within 8s; harmless if the real callback
-    // fires moments later, since it will just correctly log the worker in or reopen the modal.
-    const initialAuthTimeout = setTimeout(() => {
-        document.getElementById('bootLoading').classList.add('hidden');
-        openModal('loginModal');
-        const remembered = localStorage.getItem('remembered_email');
-        if (remembered) document.getElementById('loginEmailInput').value = remembered;
-    }, 8000);
+    // #bootLoading stuck visible forever with nothing else shown. Fall back to auto-recovery
+    // if the initial callback hasn't landed within 8s; harmless if the real callback fires
+    // moments later, since it will just correctly log the worker in or reopen the modal.
+    const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
 
     sdk.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);

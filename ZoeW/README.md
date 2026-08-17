@@ -27,10 +27,6 @@
 - មានកូដ PIN ដាច់ដោយឡែកសម្រាប់ការកែប្រែការកំណត់រចនាសម្ព័ន្ធ (Config)
 - Logout លុបទិន្នន័យអតិថិជនចេញពីអេក្រង់ភ្លាមៗ (មិនទុកសល់ឲ្យអ្នកប្រើបន្ទាប់ឃើញ ក្នុងករណីប្រើ Device រួម)
 
-### ចំណុចខ្វះខាតដែលទទួលស្គាល់ (Known Accepted Risks)
-
-គណនី Worker (ដែលបានចូល ZoeW) មានសិទ្ធិសរសេរ `cod`/`dod`/`price`/`count`/`barcode` និងស្ថិតិចំណូលប្រចាំថ្ងៃ/ខែបានដោយផ្ទាល់តាម Firebase API ជាង UI ZoeW ផ្តល់ឲ្យ (Insider-risk តែប៉ុណ្ណោះ — ត្រូវការគណនី Worker ត្រឹមត្រូវជាមុនសិន)។ សូមមើលព័ត៌មានលម្អិតក្នុង [ZoeAdmin/README.md](../ZoeAdmin/README.md#ចំណុចខ្វះខាតដែលទទួលស្គាល់-known-accepted-risks)។
-
 ## អាជ្ញាប័ណ្ណ (License)
 
 គម្រោងនេះជាកម្មសិទ្ធិឯកជន (Private/Proprietary) — Powered By ZoeW

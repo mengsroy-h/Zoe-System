@@ -1,20 +1,7 @@
-    // Mobile: pasting a long value (e.g. an activation key) then dismissing the on-screen keyboard
-    // resizes the visual viewport, and position:fixed elements (every .modal here) can be left with
-    // stale hit-testing afterward on some Android/iOS browser versions -- the modal visibly repaints
-    // in the right place, but taps on it don't register at all (not even the CSS :active flash) until
-    // something forces a layout recalc. Forcing one on every keyboard show/hide keeps modal buttons
-    // tappable right after the keyboard closes, which is exactly when a user taps "Submit" post-paste.
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
 
-    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
-    // screen recording from a real device (Zoescan, same activation-modal pattern) showed the
-    // native tap-highlight ripple landing squarely on this button on repeated taps, yet
-    // submitActivationKey() never visibly ran -- consistent with the inline onclick= attribute
-    // simply not firing on that device/browser combination, a known-enough mobile WebView/Chrome
-    // quirk that addEventListener is not susceptible to. Guarded by the btn.disabled check inside
-    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
     const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
     if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 
@@ -136,12 +123,6 @@
     }
 
     function withTimeout(promise, ms, timeoutMsg) {
-        // Constructed here, synchronously, at the call site -- not inside the setTimeout callback
-        // below. An Error's .stack is captured at construction time, and once the timer callback
-        // fires it runs past the async boundary with no caller frame left to capture; every timeout
-        // error from every withTimeout() call across the app was showing the exact same one-line
-        // stack in Sentry, making "X timed out" reports impossible to trace back to which specific
-        // call site fired. Building it up front preserves the real caller chain.
         const timeoutErr = new Error(timeoutMsg || 'Timed out');
         return Promise.race([
             promise,
@@ -472,18 +453,6 @@
         const btn = document.getElementById('activationSubmitBtn');
         if (btn && btn.disabled) return;
         const originalBtnText = btn ? btn.textContent : '';
-        // Whatever happens inside this function must always end in visible feedback -- this
-        // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zoescan (an
-        // unbounded fetch hang, alert() silently failing in an installed-PWA context, a missing
-        // else branch after a valid-locally-but-server-rejected key), each fixed individually.
-        // This top-level try/catch/finally is the backstop: if any *other*, not-yet-found
-        // exception is thrown anywhere in this call chain, it now surfaces as a visible toast
-        // with the real error message instead of vanishing as a silent unhandled rejection, and
-        // the button is guaranteed to be re-enabled either way. alert() also replaced with
-        // showToast() here for the same reason Zoescan's was. Every individual await already
-        // has its own timeout, but as a second backstop against a hang in a spot that doesn't
-        // (e.g. a corrupted IndexedDB making an internal SDK call never settle), the two
-        // awaited calls below are also wrapped in an outer 20s withTimeout() each.
         if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
         try {
             const input = document.getElementById('activationKeyInput');
@@ -503,10 +472,6 @@
                     isDatabaseInitialized = true;
                 }
             } else {
-                // Key was valid locally (signature/app/expiry all checked out in activate()
-                // above) but the server-side check inside ensureAppActivated() just rejected it
-                // (revoked / not found / server-expired) -- without this, nothing here ever told
-                // the user that, so the modal would silently reset to its original text.
                 showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
             }
         } catch (e) {
@@ -544,10 +509,6 @@
 
         let activated;
         try {
-            // Same hang risk as submitActivationKey() -- this runs right after every
-            // successful login/resume, so a hang here (not just a thrown error) is exactly
-            // what would leave a returning worker stuck on a blank screen with the login
-            // modal already closed-in-spirit but nothing else shown either.
             activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
         } catch (e) {
             if (myAuthGeneration !== authGeneration) return;
@@ -745,15 +706,6 @@
             }, handleDbListenerError);
         }
 
-        // dbRefExchangeRate above is guarded with `if (dbRefExchangeRate)` before calling
-        // onValue() on it, but these four were not -- a real crash from production (Sentry:
-        // "Cannot read properties of undefined (reading '_repo')" inside onValue, called from
-        // initDatabaseListeners) showed one of these refs is undefined when this runs, most
-        // likely during the re-init teardown window in initFirebase() (existing Firebase app
-        // being deleted and a new one created after re-saving Config): `db` itself and
-        // isDatabaseInitialized get reset there, but these ref variables are only unsubscribed
-        // (fb.off), not nulled, so a listener re-init racing that window sees a stale/dangling
-        // ref instead of catching it via the `if (!db) return;` guard at the top of this function.
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
                 dailyRevenueData = snapshot.val() || {};
@@ -1932,16 +1884,6 @@
         }
 
         if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-            // Matches ZoeAdmin's executeRestoreItem() exactly: credit straight off the barcode's
-            // own isDeducted flag, no server-side dedup transaction. itemToRestore is a stable
-            // snapshot spliced out of deletedItems before any await, so it can't be re-read as
-            // "still deducted" by a second concurrent restore of the same trash entry -- and once
-            // this function's own deleteSingleDeletedItemFromFirebase() call below removes the
-            // entry from Firebase, a second restore attempt on it fails the deletedItems lookup
-            // above instead of reaching this point. The transaction this replaced kept the barcode
-            // marked isDeducted:true (skipping the credit) whenever it aborted for any reason
-            // (e.g. the trash write from the 8-day auto-abandon path racing an early restore) --
-            // exactly "removed correctly subtracts, but restore doesn't add it back".
             itemToRestore.barcodes.forEach((restoredBc) => {
                 if (!restoredBc.isDeducted) return;
                 const targetCod = parseFloat(restoredBc.cod) || 0;
@@ -1985,13 +1927,6 @@
         pendingRestoreId = null;
 
         try {
-            // Must be a targeted single-key delete (not the whole-list saveDeletedToFirebase(),
-            // which diffs against the in-memory deletedItems array) -- the live onValue(dbRefDeleted)
-            // listener can refresh that array from the server mid-flight (this function awaits a
-            // revenue-credit transaction first), re-adding the item we just spliced out locally
-            // before the diff-based save ever runs. That left the item permanently stuck in the
-            // trash while still being re-pushed into history on every restore attempt, since the
-            // history-side push already happened from the untouched local itemToRestore snapshot.
             await Promise.all([saveHistoryToFirebase(), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
             syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
             openRecentlyDeletedModal();

@@ -1,11 +1,11 @@
 (function () {
-    // Mobile: pasting a long value (e.g. a signing/activation key) then dismissing the on-screen
-    // keyboard resizes the visual viewport, and position:fixed elements (every .modal here) can be
-    // left with stale hit-testing afterward on some Android/iOS browser versions -- the modal
-    // visibly repaints in the right place, but taps on it don't register at all (not even the CSS
-    // :active flash) until something forces a layout recalc. Forcing one on every keyboard show/hide
-    // keeps modal buttons tappable right after the keyboard closes, exactly when a user taps
-    // "Submit" post-paste.
+    
+    
+    
+    
+    
+    
+    
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
@@ -55,9 +55,9 @@
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
-                // Belt-and-suspenders for a session left open and foregrounded for hours
-                // without ever blurring/backgrounding -- visibilitychange/focus would
-                // never fire, so also poll periodically.
+                
+                
+                
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
@@ -68,13 +68,13 @@
             const reloadWhenIdle = () => {
                 if (swReloadedOnce) return;
                 const modalOpen = !!document.querySelector('.modal.active');
-                // A Signing Key pasted into memory has nowhere else it's saved -- silently
-                // reloading out from under an admin mid-session would just discard it (see
-                // loadSigningKey below), reproducing the exact "have to paste it in again"
-                // pain this update-checking change is otherwise meant to reduce. Defer the
-                // reload (keep retrying, same as the other 3 apps) until nothing would be
-                // lost by it -- once the key is cleared or the admin logs out, this then
-                // proceeds on its own without requiring a manual refresh.
+                
+                
+                
+                
+                
+                
+                
                 if (modalOpen || (typeof signingPrivateKeyJwk !== 'undefined' && signingPrivateKeyJwk)) {
                     if (!modalOpen && !keyLoadedWarningShown && typeof showToast === 'function') {
                         keyLoadedWarningShown = true;
@@ -125,12 +125,12 @@ function closeModal(id) {
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-    // Constructed here, synchronously, at the call site -- not inside the setTimeout callback
-    // below. An Error's .stack is captured at construction time, and once the timer callback
-    // fires it runs past the async boundary with no caller frame left to capture; every timeout
-    // error from every withTimeout() call across the app was showing the exact same one-line
-    // stack in Sentry, making "X timed out" reports impossible to trace back to which specific
-    // call site fired. Building it up front preserves the real caller chain.
+    
+    
+    
+    
+    
+    
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     return Promise.race([
         promise,
@@ -234,11 +234,11 @@ function requestPinBeforeConfig(targetAction, message) {
     }
 }
 
-// Derives a session-only AES-GCM key from the Security PIN, used purely to encrypt the
-// Signing Private Key at rest in sessionStorage when the admin opts in via the "remember"
-// checkbox -- a different salt from hashPin()'s PBKDF2 above so the two derived values
-// can never collide even though they share the same source PIN. Never itself persisted;
-// re-derived fresh every time the PIN is entered (deterministic, so it always matches).
+
+
+
+
+
 let signingKeySessionKey = null;
 
 async function deriveSigningKeySessionKey(pin) {
@@ -286,8 +286,8 @@ async function tryRestoreSigningKeyFromSession() {
         if (cb) cb.checked = true;
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
-        // Wrong PIN (decrypt/auth failure) or corrupted blob -- drop it rather than keep
-        // failing silently on every future reload; admin can re-load and re-remember it.
+        
+        
         sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
@@ -411,11 +411,11 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     document.getElementById('appContainer').style.display = 'none';
-    // Every path that lands here means the admin is no longer verified as authenticated
-    // (explicit logout, failed role check, expired/rejected session) -- the master signing
-    // key must not remain usable in memory or in its PIN-encrypted sessionStorage copy past
-    // that point, otherwise whoever next uses this tab (no re-login required, or a
-    // different/lower-trust login) could still sign new activation keys with it.
+    
+    
+    
+    
+    
     clearSigningKey();
     openModalHelper('loginModal');
     const savedEmail = localStorage.getItem('remembered_email');
@@ -483,14 +483,14 @@ async function verifyAdminRoleThenProceed(user) {
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-// If Firebase Auth's own IndexedDB-backed session storage gets into a corrupted/stuck state
-// (observed on a real device: only a full manual "clear browser cache/site data" recovered
-// it, and only that -- a plain reload or even a fresh private tab did not), no amount of
-// redeploying new code can repair data that was already broken before the new code arrived.
-// This does automatically what the manual cache-clear did: drop every "firebase*"-named
-// IndexedDB database for this origin, then reload once so the SDK re-initializes against
-// clean storage. Guarded by a sessionStorage flag so a genuinely unrelated problem can't
-// cause an infinite reload loop -- it fires at most once per browser session.
+
+
+
+
+
+
+
+
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
         showLoginModalWithPrefill();
@@ -517,12 +517,12 @@ async function attemptAuthStorageRecovery() {
 function setupAuthListener() {
     if (!auth) return;
     if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
-    // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a degraded
-    // network right after a resume/reload, its first callback can simply never fire, and
-    // since #appContainer defaults to display:none until either branch below runs, that
-    // leaves a permanently blank screen with nothing shown at all. Fall back to auto-recovery
-    // if the initial callback hasn't landed within 8s; harmless if the real callback fires
-    // moments later, since it will just correctly log the admin in or reopen the modal.
+    
+    
+    
+    
+    
+    
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);
@@ -824,10 +824,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
     }
 
-    // If a Signing Key was remembered (opted in via the checkbox) before this reload --
-    // whether from a manual refresh, an OS backgrounding the app and later restoring it,
-    // or our own SW-update reload -- prompt for the PIN to unlock it instead of leaving
-    // the admin to paste the whole private key in again from their password manager.
+    
+    
+    
+    
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }

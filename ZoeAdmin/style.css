@@ -562,3 +562,26 @@
         #toast.show { visibility: visible; animation: fadein 0.3s, fadeout 0.5s 2.2s; }
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 24px; opacity: 1;} }
         @keyframes fadeout { from {bottom: 24px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        .print-only { display: none; }
+        #pdfExportPrintArea h2 { font-size: 14px; margin: 0 0 10px; }
+        #pdfExportPrintArea table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        #pdfExportPrintArea th, #pdfExportPrintArea td { border: 1px solid #999; padding: 4px 6px; text-align: left; }
+        #pdfExportPrintArea th { background: #eee; }
+        #pdfExportPrintArea .export-total-row td { font-weight: 700; background: #f5f5f5; }
+        #pdfExportPrintArea .export-footer { font-size: 9px; color: #555; margin-top: 8px; }
+
+        @media print {
+            /* jsPDF can't shape Khmer script (coeng subscripts, pre-base vowel reordering) --
+               it just maps codepoints to glyphs via the font's cmap with no OpenType shaping,
+               so Khmer text came out visibly broken regardless of which font was embedded.
+               Printing this HTML instead lets the browser's own text engine (which does full
+               Khmer shaping) render it, then "Save as PDF" in the print dialog captures that
+               correctly-shaped output -- same fix used for Zoe-System-Guide.pdf this session. */
+            body * { visibility: hidden; }
+            #pdfExportPrintArea, #pdfExportPrintArea * { visibility: visible; }
+            #pdfExportPrintArea {
+                display: block; position: absolute; top: 0; left: 0; width: 100%;
+            }
+            @page { size: landscape; margin: 10mm; }
+        }

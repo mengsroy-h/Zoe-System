@@ -1,9 +1,3 @@
-// Mobile: pasting a long value (e.g. an activation key) then dismissing the on-screen keyboard
-// resizes the visual viewport, and position:fixed elements (every .modal here) can be left with
-// stale hit-testing afterward on some Android/iOS browser versions -- the modal visibly repaints
-// in the right place, but taps on it don't register at all (not even the CSS :active flash) until
-// something forces a layout recalc. Forcing one on every keyboard show/hide keeps modal buttons
-// tappable right after the keyboard closes, which is exactly when a user taps "Submit" post-paste.
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
 }
@@ -53,11 +47,6 @@ function openModal(id) {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.add('open');
-    // Match ZoeAdmin/ZoeW's modal mechanics exactly (confirmed working on real devices where
-    // Zoescan's class-only toggle was not): force the display and lock body scroll directly
-    // instead of relying solely on the .modal.open CSS rule, and block the scanning view /
-    // camera behind the modal from remaining scrollable/interactive underneath while a modal
-    // (e.g. the activation key prompt) is up on mobile.
     el.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
@@ -103,12 +92,6 @@ function waitForFirebaseSDK() {
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-    // Constructed here, synchronously, at the call site -- not inside the setTimeout callback
-    // below. An Error's .stack is captured at construction time, and once the timer callback
-    // fires it runs past the async boundary with no caller frame left to capture; every timeout
-    // error from every withTimeout() call across the app was showing the exact same one-line
-    // stack (this line) in Sentry, making "X timed out" reports impossible to trace back to
-    // which specific call site fired. Building it up front preserves the real caller chain.
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     return Promise.race([
         promise,
@@ -288,18 +271,6 @@ async function submitActivationKey() {
     const btn = document.getElementById('activationSubmitBtn');
     if (btn && btn.disabled) return;
     const originalBtnText = btn ? btn.textContent : '';
-    // Whatever happens inside this function must always end in visible feedback -- this app
-    // has repeatedly hit "tapped Activate, nothing happened at all" bugs (an unbounded fetch
-    // hang, alert() silently failing in this PWA context, a missing else branch after a
-    // valid-locally-but-server-rejected key), each fixed individually. This top-level
-    // try/catch/finally is one backstop: if any *other*, not-yet-found exception is thrown
-    // anywhere in this call chain, it now surfaces as a visible toast with the real error
-    // message instead of vanishing as a silent unhandled promise rejection. But try/catch
-    // alone can't save us from something that just hangs forever without ever throwing or
-    // resolving (e.g. a corrupted IndexedDB making an internal SDK call never settle) -- every
-    // individual await already has its own timeout, but as a second backstop against a hang in
-    // a spot that doesn't, the two awaited calls below are also wrapped in an outer 20s
-    // withTimeout() each, guaranteeing this function always reaches its finally block.
     if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
     try {
         const input = document.getElementById('activationKeyInput');
@@ -318,10 +289,6 @@ async function submitActivationKey() {
             initDatabaseListeners();
             showLockerPicker(true);
         } else {
-            // Key was valid locally (signature/app/expiry all checked out in activate() above)
-            // but the server-side check inside ensureAppActivated() just rejected it (revoked /
-            // not found / server-expired) -- without this, nothing here ever told the user that,
-            // so the modal would silently reset to its original text with zero visible feedback.
             showToast('⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ');
         }
     } catch (e) {
@@ -359,9 +326,6 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
 
     let activated;
     try {
-        // Same hang risk as submitActivationKey() -- this runs right after every successful
-        // login/resume, so a hang here (not just a thrown error) is exactly what would leave
-        // a returning worker stuck with #bootLoading long gone but nothing else shown either.
         activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
     } catch (e) {
         if (myAuthGeneration !== authGeneration) return;
@@ -391,10 +355,6 @@ const debouncedRenderList = debounce(() => { if (currentTab === 'list') renderLi
 
 function initDatabaseListeners() {
     if (listenersAttached) return;
-    // Same crash class as ZoeAdmin/ZoeW's initDatabaseListeners() (Sentry: "Cannot read
-    // properties of undefined (reading '_repo')" inside onValue) -- dbRefHistory can be unset
-    // if this runs before initFirebase() has finished setting it up. submitActivationKey()'s
-    // success path calls this unconditionally, so a key submitted in that window would hit it.
     if (!dbRefHistory) return;
     listenersAttached = true;
     const sdk = window.firebaseSDK;
@@ -1228,13 +1188,6 @@ function bindEventListeners() {
     document.getElementById('lockerSettingsCancelBtn').addEventListener('click', () => closeModal('lockerSettingsModal'));
     document.getElementById('lockerSettingsSaveBtn').addEventListener('click', saveLockerSettings);
 
-    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
-    // screen recording from a real device showed the native tap-highlight ripple landing squarely
-    // on this button on repeated taps, yet submitActivationKey() never visibly ran (button text
-    // never changed even once) -- consistent with the inline onclick= attribute simply not firing
-    // on that device/browser combination, a known-enough mobile WebView/Chrome quirk that
-    // addEventListener is not susceptible to. Guarded by the btn.disabled check inside
-    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
     const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
     if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 

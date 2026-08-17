@@ -1,20 +1,7 @@
-    // Mobile: pasting a long value (e.g. an activation key) then dismissing the on-screen keyboard
-    // resizes the visual viewport, and position:fixed elements (every .modal here) can be left with
-    // stale hit-testing afterward on some Android/iOS browser versions -- the modal visibly repaints
-    // in the right place, but taps on it don't register at all (not even the CSS :active flash) until
-    // something forces a layout recalc. Forcing one on every keyboard show/hide keeps modal buttons
-    // tappable right after the keyboard closes, which is exactly when a user taps "Submit" post-paste.
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
 
-    // Belt-and-suspenders alongside the inline onclick= already on this button in the HTML: a
-    // screen recording from a real device (Zoescan, same activation-modal pattern) showed the
-    // native tap-highlight ripple landing squarely on this button on repeated taps, yet
-    // submitActivationKey() never visibly ran -- consistent with the inline onclick= attribute
-    // simply not firing on that device/browser combination, a known-enough mobile WebView/Chrome
-    // quirk that addEventListener is not susceptible to. Guarded by the btn.disabled check inside
-    // submitActivationKey() itself so this can't double-fire alongside the inline handler.
     const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
     if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 
@@ -188,12 +175,6 @@
     }, 120);
 
     function withTimeout(promise, ms, timeoutMsg) {
-        // Constructed here, synchronously, at the call site -- not inside the setTimeout callback
-        // below. An Error's .stack is captured at construction time, and once the timer callback
-        // fires it runs past the async boundary with no caller frame left to capture; every timeout
-        // error from every withTimeout() call across the app was showing the exact same one-line
-        // stack in Sentry, making "X timed out" reports impossible to trace back to which specific
-        // call site fired. Building it up front preserves the real caller chain.
         const timeoutErr = new Error(timeoutMsg || 'Timed out');
         return Promise.race([
             promise,
@@ -762,18 +743,6 @@
         const btn = document.getElementById('activationSubmitBtn');
         if (btn && btn.disabled) return;
         const originalBtnText = btn ? btn.textContent : '';
-        // Whatever happens inside this function must always end in visible feedback -- this
-        // exact flow has repeatedly hit "tapped Activate, nothing happened" bugs in Zoescan (an
-        // unbounded fetch hang, alert() silently failing in an installed-PWA context, a missing
-        // else branch after a valid-locally-but-server-rejected key), each fixed individually.
-        // This top-level try/catch/finally is the backstop: if any *other*, not-yet-found
-        // exception is thrown anywhere in this call chain, it now surfaces as a visible toast
-        // with the real error message instead of vanishing as a silent unhandled rejection, and
-        // the button is guaranteed to be re-enabled either way. alert() also replaced with
-        // showToast() here for the same reason Zoescan's was. Every individual await already
-        // has its own timeout, but as a second backstop against a hang in a spot that doesn't
-        // (e.g. a corrupted IndexedDB making an internal SDK call never settle), the two
-        // awaited calls below are also wrapped in an outer 20s withTimeout() each.
         if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
         try {
             const input = document.getElementById('activationKeyInput');
@@ -794,10 +763,6 @@
                 }
                 safeFocusScanner();
             } else {
-                // Key was valid locally (signature/app/expiry all checked out in activate()
-                // above) but the server-side check inside ensureAppActivated() just rejected it
-                // (revoked / not found / server-expired) -- without this, nothing here ever told
-                // the user that, so the modal would silently reset to its original text.
                 showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
             }
         } catch (e) {
@@ -835,10 +800,6 @@
 
         let activated;
         try {
-            // Same hang risk as submitActivationKey() -- this runs right after every
-            // successful login/resume, so a hang here (not just a thrown error) is exactly
-            // what would leave a returning admin stuck on a blank screen with the login
-            // modal already closed-in-spirit but nothing else shown either.
             activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
         } catch (e) {
             if (myAuthGeneration !== authGeneration) return;
@@ -1037,15 +998,6 @@
             }, handleDbListenerError);
         }
 
-        // dbRefExchangeRate above is guarded with `if (dbRefExchangeRate)` before calling
-        // onValue() on it, but these four were not -- a real crash from production (Sentry:
-        // "Cannot read properties of undefined (reading '_repo')" inside onValue, called from
-        // initDatabaseListeners) showed one of these refs is undefined when this runs, most
-        // likely during the re-init teardown window in initFirebase() (existing Firebase app
-        // being deleted and a new one created after the admin re-saves Config): `db` itself and
-        // isDatabaseInitialized get reset there, but these ref variables are only unsubscribed
-        // (fb.off), not nulled, so a listener re-init racing that window sees a stale/dangling
-        // ref instead of catching it via the `if (!db) return;` guard at the top of this function.
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
                 dailyRevenueData = snapshot.val() || {};
@@ -1850,9 +1802,7 @@
     }
 
     const EXPORT_LIBS = {
-        xlsx: { url: 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js', integrity: 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw' },
-        jspdf: { url: 'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js', integrity: 'sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/' },
-        jspdfAutotable: { url: 'https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js', integrity: 'sha384-fCAW/rDWORTbQXSiB7mOg0QtQ5c+r0f544y6XoKjuVva0nMBlCpNUjiFeG5iMdS3' }
+        xlsx: { url: 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js', integrity: 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw' }
     };
     const loadedScriptPromises = {};
 
@@ -1942,100 +1892,53 @@
         }
     }
 
-    const KHMER_FONT_URL = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanskhmer/NotoSansKhmer%5Bwdth,wght%5D.ttf';
-    let khmerFontBase64 = null;
-    let khmerFontLoadPromise = null;
-
-    function arrayBufferToBase64(buffer) {
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-        }
-        return btoa(binary);
-    }
-
-    async function ensureKhmerFontForPdf(doc) {
-        if (!khmerFontBase64) {
-            if (!khmerFontLoadPromise) {
-                khmerFontLoadPromise = fetch(KHMER_FONT_URL)
-                    .then((res) => {
-                        if (!res.ok) throw new Error('Khmer font fetch failed: ' + res.status);
-                        return res.arrayBuffer();
-                    })
-                    .then((buf) => arrayBufferToBase64(buf));
-            }
-            try {
-                khmerFontBase64 = await khmerFontLoadPromise;
-            } catch (e) {
-                khmerFontLoadPromise = null;
-                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Khmer font load failed for PDF export' });
-                return false;
-            }
-        }
-        try {
-            doc.addFileToVFS('NotoSansKhmer.ttf', khmerFontBase64);
-            doc.addFont('NotoSansKhmer.ttf', 'NotoSansKhmer', 'normal');
-            return true;
-        } catch (e) {
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Khmer font registration failed for PDF export' });
-            return false;
-        }
-    }
-
-    async function exportDataAsPDF() {
+    function exportDataAsPDF() {
         const rows = buildExportRows();
         if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
         closeModal('exportDataModal');
-        showToast("កំពុងរៀបចំ PDF...");
-        try {
-            await loadScriptOnce('jspdf');
-            await loadScriptOnce('jspdfAutotable');
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape' });
 
-            const khmerFontReady = await ensureKhmerFontForPdf(doc);
-            if (khmerFontReady) {
-                doc.setFont('NotoSansKhmer', 'normal');
-            } else {
-                showToast("⚠️ អក្សរខ្មែរប្រហែលជាមិនបង្ហាញត្រឹមត្រូវក្នុង PDF នេះទេ");
-            }
+        const printArea = document.getElementById('pdfExportPrintArea');
+        if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
 
-            const head = [['No', 'Phone', 'Barcode', 'Locker', 'COD ($)', 'DOD ($)', 'Total ($)', 'Status', 'Date', 'Time']];
-            const body = rows.map(r => [r.no, r.phone, r.barcode, r.locker, r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), r.status === 'យកហើយ' ? 'Closed' : 'Open', r.scanDate, r.time]);
+        const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
+        const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
+        const totalAll = Math.round((totalCod + totalDod) * 100) / 100;
 
-            const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
-            const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
-            const totalAll = Math.round((totalCod + totalDod) * 100) / 100;
-            body.push(['សរុប', '', '', '', totalCod.toFixed(2), totalDod.toFixed(2), totalAll.toFixed(2), `${rows.length} កញ្ចប់`, '', '']);
+        const bodyRows = rows.map(r => `<tr>
+            <td>${r.no}</td>
+            <td>${sanitizeInput(r.phone)}</td>
+            <td>${sanitizeInput(r.barcode)}</td>
+            <td>${sanitizeInput(r.locker)}</td>
+            <td>${r.cod.toFixed(2)}</td>
+            <td>${r.dod.toFixed(2)}</td>
+            <td>${r.total.toFixed(2)}</td>
+            <td>${sanitizeInput(r.status)}</td>
+            <td>${sanitizeInput(r.scanDate)}</td>
+            <td>${sanitizeInput(r.time)}</td>
+        </tr>`).join('');
 
-            doc.setFontSize(12);
-            doc.text('ZoeAdmin - Package History Export (' + getCurrentFilterLabel() + ')', 14, 12);
+        printArea.innerHTML = `
+            <h2>ZoeAdmin — របាយការណ៍ប្រវត្តិកញ្ចប់ (${sanitizeInput(getCurrentFilterLabel())})</h2>
+            <table>
+                <thead><tr>${EXPORT_HEADERS.map(h => `<th>${sanitizeInput(h)}</th>`).join('')}</tr></thead>
+                <tbody>
+                    ${bodyRows}
+                    <tr class="export-total-row">
+                        <td colspan="4">សរុប (${rows.length} កញ្ចប់)</td>
+                        <td>${totalCod.toFixed(2)}</td>
+                        <td>${totalDod.toFixed(2)}</td>
+                        <td>${totalAll.toFixed(2)}</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date().toLocaleString('km-KH'))}</p>
+        `;
 
-            doc.autoTable({
-                head: head,
-                body: body,
-                startY: 18,
-                styles: { fontSize: 8, font: khmerFontReady ? 'NotoSansKhmer' : undefined },
-                didDrawPage: (data) => {
-                    const pageSize = doc.internal.pageSize;
-                    const pageHeight = pageSize.getHeight ? pageSize.getHeight() : pageSize.height;
-                    const pageWidth = pageSize.getWidth ? pageSize.getWidth() : pageSize.width;
-                    doc.setFontSize(8);
-                    if (khmerFontReady) doc.setFont('NotoSansKhmer', 'normal');
-                    doc.text('ទំព័រ ' + data.pageNumber, data.settings.margin.left, pageHeight - 8);
-                    doc.text('នាំចេញនៅ ' + new Date().toLocaleString('km-KH'), pageWidth - data.settings.margin.right, pageHeight - 8, { align: 'right' });
-                }
-            });
-
-            doc.save(getExportFilenameBase() + '.pdf');
-            showToast("✅ បាន Export ជា PDF ជោគជ័យ!");
-        } catch (e) {
-            console.error("PDF export failed:", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "PDF export failed:" });
-            showToast("❌ Export PDF បរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត");
-        }
+        const originalTitle = document.title;
+        document.title = getExportFilenameBase();
+        window.addEventListener('afterprint', () => { document.title = originalTitle; }, { once: true });
+        window.print();
     }
 
     function exportDataAsCsvForSheets() {
@@ -3426,13 +3329,6 @@
         pendingRestoreId = null;
 
         try {
-            // Must be a targeted single-key delete (not the whole-list saveDeletedToFirebase(),
-            // which diffs against the in-memory deletedItems array) -- the live onValue(dbRefDeleted)
-            // listener can refresh that array from the server mid-flight (this function awaits a
-            // revenue-credit transaction first), re-adding the item we just spliced out locally
-            // before the diff-based save ever runs. That left the item permanently stuck in the
-            // trash while still being re-pushed into history on every restore attempt, since the
-            // history-side push already happened from the untouched local itemToRestore snapshot.
             await Promise.all([saveHistoryToFirebase(), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
             if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();

@@ -125,9 +125,16 @@ function closeModal(id) {
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
+    // Constructed here, synchronously, at the call site -- not inside the setTimeout callback
+    // below. An Error's .stack is captured at construction time, and once the timer callback
+    // fires it runs past the async boundary with no caller frame left to capture; every timeout
+    // error from every withTimeout() call across the app was showing the exact same one-line
+    // stack in Sentry, making "X timed out" reports impossible to trace back to which specific
+    // call site fired. Building it up front preserves the real caller chain.
+    const timeoutErr = new Error(timeoutMsg || 'Timed out');
     return Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg || 'Timed out')), ms))
+        new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
     ]);
 }
 

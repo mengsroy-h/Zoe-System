@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeadmin-shell-v23';
+const CACHE_VERSION = 'zoeadmin-shell-v24';
 
 const APP_SHELL = [
     './',
@@ -6,7 +6,6 @@ const APP_SHELL = [
     './style.css',
     './app.js',
     './firebase-loader.js',
-    './license-verify.js',
     './error-reporting.js',
     './manifest.json',
     './icon-192.png',

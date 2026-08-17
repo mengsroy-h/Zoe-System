@@ -34,7 +34,6 @@
 
 <script defer src="https://unpkg.com/@zxing/library@0.23.0/umd/index.min.js" integrity="sha384-0ASr5PEWAMtTnWsn0PzKmioHVDA4+QqFiJr94io/0DCrGP6E1gRAmbO6O8y5WZW9" crossorigin="anonymous"></script>
 <script type="module" src="./firebase-init.js"></script>
-<script src="./license-verify.js"></script>
 <script src="./error-reporting.js"></script>
 
 </head>
@@ -224,18 +223,6 @@
         <div class="modal-btns">
             <button class="btn-cancel" id="lockerSettingsCancelBtn">បោះបង់</button>
             <button class="btn-confirm" id="lockerSettingsSaveBtn">រក្សាទុក</button>
-        </div>
-    </div>
-</div>
-
-<div id="activationModal" class="modal" data-nodismiss="true">
-    <div class="modal-content">
-        <h3>🔑 ត្រូវការ Activation Key</h3>
-        <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ Zscan ដើម្បីបន្ត។</p>
-        <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: 11px;"></textarea>
-        <div class="modal-btns">
-            <button class="btn-confirm" id="activationSubmitBtn" onclick="submitActivationKey()">ដាក់ Active</button>
-            <button class="btn-cancel" onclick="logoutApp()">ចាកចេញ</button>
         </div>
     </div>
 </div>

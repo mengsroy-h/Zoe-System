@@ -384,6 +384,11 @@ const debouncedRenderList = debounce(() => { if (currentTab === 'list') renderLi
 
 function initDatabaseListeners() {
     if (listenersAttached) return;
+    // Same crash class as ZoeAdmin/ZoeW's initDatabaseListeners() (Sentry: "Cannot read
+    // properties of undefined (reading '_repo')" inside onValue) -- dbRefHistory can be unset
+    // if this runs before initFirebase() has finished setting it up. submitActivationKey()'s
+    // success path calls this unconditionally, so a key submitted in that window would hit it.
+    if (!dbRefHistory) return;
     listenersAttached = true;
     const sdk = window.firebaseSDK;
     sdk.onValue(dbRefHistory, (snap) => {

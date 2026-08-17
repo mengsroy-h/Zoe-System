@@ -1030,15 +1030,29 @@
             }, handleDbListenerError);
         }
 
-        fb.onValue(dbRefDailyRevenue, (snapshot) => {
-            dailyRevenueData = snapshot.val() || {};
-            applyCurrentFilter();
-        }, handleDbListenerError);
+        // dbRefExchangeRate above is guarded with `if (dbRefExchangeRate)` before calling
+        // onValue() on it, but these four were not -- a real crash from production (Sentry:
+        // "Cannot read properties of undefined (reading '_repo')" inside onValue, called from
+        // initDatabaseListeners) showed one of these refs is undefined when this runs, most
+        // likely during the re-init teardown window in initFirebase() (existing Firebase app
+        // being deleted and a new one created after the admin re-saves Config): `db` itself and
+        // isDatabaseInitialized get reset there, but these ref variables are only unsubscribed
+        // (fb.off), not nulled, so a listener re-init racing that window sees a stale/dangling
+        // ref instead of catching it via the `if (!db) return;` guard at the top of this function.
+        if (dbRefDailyRevenue) {
+            fb.onValue(dbRefDailyRevenue, (snapshot) => {
+                dailyRevenueData = snapshot.val() || {};
+                applyCurrentFilter();
+            }, handleDbListenerError);
+        }
 
-        fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
-            monthlyRevenueData = snapshot.val() || {};
-        }, handleDbListenerError);
+        if (dbRefMonthlyRevenue) {
+            fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
+                monthlyRevenueData = snapshot.val() || {};
+            }, handleDbListenerError);
+        }
 
+        if (dbRefHistory) {
         fb.onValue(dbRefHistory, (snapshot) => {
             const data = snapshot.val();
             if (!data) scanHistory = [];
@@ -1078,7 +1092,9 @@
 
             debouncedRenderAfterHistorySync();
         }, handleDbListenerError);
+        }
 
+        if (dbRefDeleted) {
         fb.onValue(dbRefDeleted, (snapshot) => {
             const data = snapshot.val();
             if (!data) deletedItems = [];
@@ -1094,6 +1110,7 @@
             lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
             runAutomaticDeletedCleanup();
         }, handleDbListenerError);
+        }
 
         isDatabaseInitialized = true;
     }

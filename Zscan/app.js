@@ -124,7 +124,20 @@ async function initFirebase() {
         document.getElementById('firebaseStatusText').textContent = online ? 'ភ្ជាប់ Server រួចរាល់' : 'ក្រៅបណ្ដាញ';
     });
 
+    // onAuthStateChanged is an ongoing listener with no inherent deadline -- on a degraded
+    // network right after a resume/reload, its first callback can simply never fire, leaving
+    // #bootLoading stuck visible forever with nothing else shown. Fall back to the login
+    // screen if the initial callback hasn't landed within 8s; harmless if the real callback
+    // fires moments later, since it will just correctly log the worker in or reopen the modal.
+    const initialAuthTimeout = setTimeout(() => {
+        document.getElementById('bootLoading').classList.add('hidden');
+        openModal('loginModal');
+        const remembered = localStorage.getItem('remembered_email');
+        if (remembered) document.getElementById('loginEmailInput').value = remembered;
+    }, 8000);
+
     sdk.onAuthStateChanged(auth, (user) => {
+        clearTimeout(initialAuthTimeout);
         document.getElementById('bootLoading').classList.add('hidden');
         if (user) {
             verifyRoleThenProceed(user);
@@ -209,22 +222,26 @@ async function submitActivationKey() {
     // has repeatedly hit "tapped Activate, nothing happened at all" bugs (an unbounded fetch
     // hang, alert() silently failing in this PWA context, a missing else branch after a
     // valid-locally-but-server-rejected key), each fixed individually. This top-level
-    // try/catch/finally is the backstop: if any *other*, not-yet-found exception is thrown
+    // try/catch/finally is one backstop: if any *other*, not-yet-found exception is thrown
     // anywhere in this call chain, it now surfaces as a visible toast with the real error
-    // message instead of vanishing as a silent unhandled promise rejection, and the button
-    // is guaranteed to be re-enabled either way.
+    // message instead of vanishing as a silent unhandled promise rejection. But try/catch
+    // alone can't save us from something that just hangs forever without ever throwing or
+    // resolving (e.g. a corrupted IndexedDB making an internal SDK call never settle) -- every
+    // individual await already has its own timeout, but as a second backstop against a hang in
+    // a spot that doesn't, the two awaited calls below are also wrapped in an outer 20s
+    // withTimeout() each, guaranteeing this function always reaches its finally block.
     if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
     try {
         const input = document.getElementById('activationKeyInput');
         const keyStr = input ? input.value.trim() : '';
         if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
-        const result = await ZoeLicense.activate(keyStr, LICENSE_APP_CODE);
+        const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
         if (!result.valid) {
             showToast(licenseFailureMessage(result.reason));
             return;
         }
         if (input) input.value = '';
-        const activated = await ensureAppActivated();
+        const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
         if (activated) {
             showToast('✅ Active ជោគជ័យ!');
             document.getElementById('logoutBtn').style.display = '';
@@ -268,7 +285,18 @@ async function verifyRoleThenProceed(user) {
         return;
     }
 
-    const activated = await ensureAppActivated();
+    let activated;
+    try {
+        // Same hang risk as submitActivationKey() -- this runs right after every successful
+        // login/resume, so a hang here (not just a thrown error) is exactly what would leave
+        // a returning worker stuck with #bootLoading long gone but nothing else shown either.
+        activated = await withTimeout(ensureAppActivated(), 20000, 'Activation check timed out');
+    } catch (e) {
+        console.error('Activation check failed:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Activation check after login' });
+        showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិប្រើប្រាស់បានទេ! សូមសាកល្បងចូលម្តងទៀត។');
+        return;
+    }
     if (!activated) {
         closeModal('loginModal');
         return;

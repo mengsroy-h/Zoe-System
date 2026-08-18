@@ -2,9 +2,7 @@
 
 **Zoe-System** ជាសំណុំ App ចំនួន **៤** (4 independent PWAs) សម្រាប់គ្រប់គ្រងកញ្ចប់ទំនិញ
 (Parcel/Package) របស់អតិថិជន ចាប់ពីការស្កេន Barcode បញ្ចូលកញ្ចប់ថ្មី, កំណត់ទីតាំង Locker,
-ការទទួល/បិទបញ្ជី, រហូតដល់ការគណនាប្រាក់ត្រូវទារ (COD/DOD) និងស្ថិតិចំណូល។ App នីមួយៗសរសេរដោយ
-**Vanilla JavaScript សុទ្ធ** (គ្មាន Framework, គ្មាន Build Step) ហើយ Deploy ដាច់ដោយឡែកពីគ្នា
-ជា Netlify Site របស់ខ្លួន។
+ការទទួល/បិទបញ្ជី, រហូតដល់ការគណនាប្រាក់ត្រូវទារ (COD/DOD) និងស្ថិតិចំណូល។
 
 ## App ទាំង ៤
 
@@ -33,22 +31,6 @@
   Verification Logic សម្រាប់ផ្ទៀងផ្ទាត់ Activation Key ពី ZoeKeyGen)។
 - **១ Sentry Project រួម** សម្រាប់ App ទាំង ៤ ញែកគ្នាដោយ Tag `app`
   (`zoeadmin`/`zoew`/`zoescan`/`zoekeygen`)។
-
-## គោលការណ៍អាជីវកម្មសំខាន់
-
-"**លុប**" (Delete កញ្ចប់ទាំងមូល) និង "**ដក**" (Remove Barcode តែមួយ) ជាគោលការណ៍អាជីវកម្ម
-ដាច់ដោយឡែកពីគ្នា ប៉ះពាល់ស្ថិតិចំណូលខុសគ្នា — សូមមើលព័ត៌មានលម្អិតក្នុង
-[ZoeAdmin/README.md](ZoeAdmin/README.md#គោលការណ៍-លុប-vs-ដក-delete-vs-remove-policy)។
-
-## សម្រាប់អ្នកអភិវឌ្ឍន៍ (Developers / AI Assistants)
-
-[CLAUDE.md](CLAUDE.md) ក្នុង Repo នេះមានព័ត៌មានលម្អិតបច្ចេកទេសពេញលេញសម្រាប់ការធ្វើការបន្ត —
-Known bug classes ដែលធ្លាប់ជួសជុលរួច, Business rule ពិសេស (Delete vs Remove, Timestamp/clock
-rule), Style convention (Code គ្មាន Comment ដោយចេតនា), និងរបៀប Triage Sentry report។ **សូម
-អាន CLAUDE.md មុននឹងកែប្រែកូដណាមួយ** — ជាពិសេសកូដទាក់ទងនឹងចំណូល (Revenue) ឬស្ថិតិ Pickup។
-
-Guide ពេញលេញ (PDF, មិន Track ក្នុង Git — មើល `.gitignore`) មាននៅ `Zoe-System-Guide.pdf`
-សម្រាប់អ្នកមាន Local copy។
 
 ## អាជ្ញាប័ណ្ណ (License)
 

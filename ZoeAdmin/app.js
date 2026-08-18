@@ -1543,34 +1543,55 @@
         });
     }
 
-    function addPickupToDailyRecord(scanDateStr, customersToAdd, packagesToAdd) {
+    function getPickupPhoneKey(item) {
+        const rawPhone = item && item.phone;
+        if (!rawPhone || rawPhone === "គ្មានលេខ") return '__item_' + (item && item.id);
+        const safePhone = String(rawPhone).replace(/[^a-zA-Z0-9_-]/g, '_');
+        return safePhone || ('__item_' + (item && item.id));
+    }
+
+    function countPickedUpCustomers(record) {
+        return record && record.pickedUpPhones ? Object.keys(record.pickedUpPhones).length : 0;
+    }
+
+    function addPickupToDailyRecord(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
         if (!scanDateStr) scanDateStr = getFormattedDate();
 
         if (!dailyPickupData[scanDateStr]) {
-            dailyPickupData[scanDateStr] = { customersPickedUp: 0, packagesPickedUp: 0 };
+            dailyPickupData[scanDateStr] = { packagesPickedUp: 0, pickedUpPhones: {} };
+        }
+        const record = dailyPickupData[scanDateStr];
+        if (!record.pickedUpPhones) record.pickedUpPhones = {};
+
+        record.packagesPickedUp = (parseFloat(record.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+        if (record.packagesPickedUp < 0) record.packagesPickedUp = 0;
+
+        if (phoneKey && customerRefDelta) {
+            const refCount = (parseFloat(record.pickedUpPhones[phoneKey]) || 0) + customerRefDelta;
+            if (refCount <= 0) delete record.pickedUpPhones[phoneKey];
+            else record.pickedUpPhones[phoneKey] = refCount;
         }
 
-        dailyPickupData[scanDateStr].customersPickedUp = (parseFloat(dailyPickupData[scanDateStr].customersPickedUp) || 0) + (parseFloat(customersToAdd) || 0);
-        dailyPickupData[scanDateStr].packagesPickedUp = (parseFloat(dailyPickupData[scanDateStr].packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
-
-        if (dailyPickupData[scanDateStr].customersPickedUp < 0) dailyPickupData[scanDateStr].customersPickedUp = 0;
-        if (dailyPickupData[scanDateStr].packagesPickedUp < 0) dailyPickupData[scanDateStr].packagesPickedUp = 0;
-
-        commitDailyPickupDelta(scanDateStr, customersToAdd, packagesToAdd);
+        commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd);
     }
 
-    function commitDailyPickupDelta(scanDateStr, customersToAdd, packagesToAdd) {
+    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
         if (!dbRefDailyPickup) return;
         const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
         fb.runTransaction(dateRef, (current) => {
-            let customersPickedUp = (parseFloat(current && current.customersPickedUp) || 0) + (parseFloat(customersToAdd) || 0);
-            let packagesPickedUp = (parseFloat(current && current.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
-            if (customersPickedUp < 0 || packagesPickedUp < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily pickup underflow clamped to 0'), { context: scanDateStr, customersPickedUp, packagesPickedUp });
+            const record = (current && typeof current === 'object') ? current : {};
+            const pickedUpPhones = (record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? { ...record.pickedUpPhones } : {};
+            let packagesPickedUp = (parseFloat(record.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+            if (packagesPickedUp < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily pickup underflow clamped to 0'), { context: scanDateStr, packagesPickedUp });
+                packagesPickedUp = 0;
             }
-            if (customersPickedUp < 0) customersPickedUp = 0;
-            if (packagesPickedUp < 0) packagesPickedUp = 0;
-            return { customersPickedUp, packagesPickedUp };
+            if (phoneKey && customerRefDelta) {
+                const refCount = (parseFloat(pickedUpPhones[phoneKey]) || 0) + customerRefDelta;
+                if (refCount <= 0) delete pickedUpPhones[phoneKey];
+                else pickedUpPhones[phoneKey] = refCount;
+            }
+            return { packagesPickedUp, pickedUpPhones };
         }).catch(() => {
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         });
@@ -2198,13 +2219,13 @@
         }
 
         if (!isSearchScoped && targetDateKey && dailyPickupData[targetDateKey]) {
-            selectedClosedCount = parseFloat(dailyPickupData[targetDateKey].customersPickedUp) || 0;
+            selectedClosedCount = countPickedUpCustomers(dailyPickupData[targetDateKey]);
             selectedPackagesPickedUpCount = parseFloat(dailyPickupData[targetDateKey].packagesPickedUp) || 0;
         } else if (!isSearchScoped && currentFilterMode === 'all') {
-            selectedClosedCount = Object.values(dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.customersPickedUp) || 0), 0);
+            selectedClosedCount = Object.values(dailyPickupData).reduce((sum, d) => sum + countPickedUpCustomers(d), 0);
             selectedPackagesPickedUpCount = Object.values(dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.packagesPickedUp) || 0), 0);
         } else {
-            selectedClosedCount = filteredList.filter(item => item.isClosed).length;
+            selectedClosedCount = new Set(filteredList.filter(item => item.isClosed).map(item => getPickupPhoneKey(item))).size;
             selectedPackagesPickedUpCount = filteredList.reduce((sum, item) => {
                 if (!item.isClosed) return sum;
                 if (item.barcodes && Array.isArray(item.barcodes)) {
@@ -3118,6 +3139,7 @@
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
+        let pickupPhoneKey = null;
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -3125,15 +3147,14 @@
             if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
-            const pickupPackages = freshItem.barcodes.length;
+            pickupPhoneKey = getPickupPhoneKey(freshItem);
+            pickupPackageDelta = desiredClosed ? 1 : -1;
             if (!previousState.itemIsClosed && allClosedLocal) {
                 pickupCustomerDelta = 1;
-                pickupPackageDelta = pickupPackages;
             } else if (previousState.itemIsClosed && !allClosedLocal) {
                 pickupCustomerDelta = -1;
-                pickupPackageDelta = -pickupPackages;
             }
-            if (pickupCustomerDelta !== 0) addPickupToDailyRecord(pickupScanDate, pickupCustomerDelta, pickupPackageDelta);
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             openViewListModal(itemId);
             applyCurrentFilter();
@@ -3184,9 +3205,9 @@
                     applyCurrentFilter();
                 }
             }
-            if (pickupCustomerDelta !== 0) {
+            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
                 const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, -pickupCustomerDelta, -pickupPackageDelta);
+                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
             }
         }
     }
@@ -3357,6 +3378,7 @@
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
+        let pickupPhoneKey = null;
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -3368,10 +3390,18 @@
             }
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
-            const pickupPackages = freshItem.barcodes && Array.isArray(freshItem.barcodes) ? freshItem.barcodes.length : (parseFloat(freshItem.count) || 1);
+            pickupPhoneKey = getPickupPhoneKey(freshItem);
+            if (previousState.barcodeStates) {
+                previousState.barcodeStates.forEach((wasClosed) => {
+                    if (desiredClosed && !wasClosed) pickupPackageDelta += 1;
+                    else if (!desiredClosed && wasClosed) pickupPackageDelta -= 1;
+                });
+            } else {
+                const pickupPackages = parseFloat(freshItem.count) || 1;
+                pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
+            }
             pickupCustomerDelta = desiredClosed ? 1 : -1;
-            pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
-            addPickupToDailyRecord(pickupScanDate, pickupCustomerDelta, pickupPackageDelta);
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             applyCurrentFilter();
         }
@@ -3413,9 +3443,9 @@
                     applyCurrentFilter();
                 }
             }
-            if (pickupCustomerDelta !== 0) {
+            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
                 const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, -pickupCustomerDelta, -pickupPackageDelta);
+                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
             }
         }
     }

@@ -85,39 +85,75 @@ The "អតិថិជនយក" (Customers Picked Up) stat card (`index.html` 
 to be a live count derived from `scanHistory` (`filteredList.filter(isClosed).length`), so
 it silently *decreased* as closed items aged past the 2-hour auto-cleanup and moved to
 trash. Fixed the same way revenue already solves this structural gap: a Firebase-persisted
-per-day node, `zoew_daily_pickup_cod_dod/{date}` → `{customersPickedUp, packagesPickedUp}`,
-written via `addPickupToDailyRecord()`/`commitDailyPickupDelta()` (mirrors
-`addRevenueToDailyAndMonthlyRecord()`/`commitDailyRevenueDelta()` — `runTransaction`,
-clamp-to-0 safety net; no monthly bucket, since only the daily stat card needed this). A
-second line, `todayPackagesPickedUpCount`, now sits under the customer count in the same
-stat card in both `ZoeAdmin/index.html` and `ZoeW/index.html`, showing total packages
-picked up (distinct from customer count since one order can have multiple barcodes).
+per-day node, `zoew_daily_pickup_cod_dod/{date}`, written via
+`addPickupToDailyRecord()`/`commitDailyPickupDelta()` (mirrors
+`addRevenueToDailyAndMonthlyRecord()`/`commitDailyRevenueDelta()`'s `runTransaction` +
+clamp-to-0 pattern; no monthly bucket, only the daily stat card needed this). A second
+line, `todayPackagesPickedUpCount`, sits under the customer count in the same stat card in
+both `ZoeAdmin/index.html` and `ZoeW/index.html`.
+
+**Two different identities, tracked two different ways** (per user's explicit correction on
+2026-08-18 — the first version incorrectly tied both to whole-order completion):
+- **Customer** = unique **phone number** for the day, not "1 per closed order." Node shape:
+  `pickedUpPhones: { [phoneKey]: refCount }`, where `refCount` is how many *currently-closed*
+  orders reference that phone today; the displayed count is `Object.keys(pickedUpPhones)
+  .length` (`countPickedUpCustomers()`), never a stored scalar, so multiple orders under the
+  same phone closing/reopening independently can never double-count or prematurely zero out
+  — the phone only drops out once its last closed order is reopened. Items with no phone
+  logged (`phone === "គ្មានលេខ"`) each count as their own separate customer (confirmed with
+  user) via a per-item fallback key (`getPickupPhoneKey()`: `'__item_' + id`) rather than
+  collapsing onto one shared bucket.
+- **Package** = each individual **barcode**, counted the instant *that barcode* transitions
+  open→closed, independent of whether the rest of its order is done — not batched with the
+  order's other barcodes. So if a customer picks up 1 of their 2 packages, that 1 is counted
+  immediately even though the order (and therefore the customer) isn't "done" yet.
 
 Increment/decrement hooks live in `toggleCloseStatus(id)` and
 `toggleIndividualBarcodeClose(itemId, barcodeCode)` in **both** `ZoeAdmin/app.js` and
-`ZoeW/app.js`, firing only on the transition into/out of fully-closed (not on every toggle
-call), with the delta reversed in the existing revert-on-Firebase-failure catch block.
-`claimAndCleanupItem()`'s automatic 2h/8d sweep was deliberately left untouched — it never
-calls the toggle functions, so it can't move this counter, same as revenue's `'close'`
-reason already didn't. Resolved open design question (confirmed with user): explicitly
-re-opening a closed item **does** decrement the counter back down (symmetric with revenue's
+`ZoeW/app.js`. `toggleIndividualBarcodeClose` always applies exactly ±1 package (this
+barcode's own transition, unconditional since `desiredClosed` is always the toggle's
+opposite) and only a customer ref-delta when the whole order's `isClosed` crosses the
+fully-closed boundary. `toggleCloseStatus` (whole-order close/reopen) diffs each barcode's
+*previous* state against the new one and only counts barcodes that actually transition —
+this matters because it can be invoked on an order where some barcodes were already closed
+individually, and double-counting those would be wrong. Both revert the exact applied delta
+in the existing revert-on-Firebase-failure catch block. `claimAndCleanupItem()`'s automatic
+2h/8d sweep was deliberately left untouched — it never calls the toggle functions, so it
+can't move this counter, same as revenue's `'close'` reason already didn't. Explicitly
+re-opening a closed item **does** decrement (confirmed with user, symmetric with revenue's
 "explicit corrections adjust, automatic cleanup never does" precedent). Deleting (លុប) or
 restoring a closed item does not touch this counter either, for the same reason it doesn't
-touch revenue — delete/restore never calls the toggle functions, so no hook was needed
-there.
+touch revenue — delete/restore never calls the toggle functions.
 
-**Known, intentionally-uncounted edge case (confirmed with user 2026-08-18):** if a
-multi-barcode item has only *some* barcodes closed when the other(s) go stale and get
-auto-abandoned after 8 days (`claimAndCleanupItem(id, 'abandon')`), the remainder's
-`isClosed` flips to `true` as a side effect of that transaction (all *remaining* barcodes
-happen to be closed) — but since this flip never passes through `toggleCloseStatus`/
-`toggleIndividualBarcodeClose`, it is never added to the pickup count, and the item then
-silently ages into the normal 2h close→trash sweep the same way. Net effect: a customer
-who picked up part of a multi-barcode order, where the rest went stale and got abandoned,
-is never counted in "អតិថិជនយក" for any of it. Confirmed intentional, not a bug to fix —
-per the user, an uncollected barcode in this scenario gets physically returned to the
-central branch rather than picked up, so it isn't a real pickup event and correctly falls
-under the same "automatic cleanup never touches this stat" rule as everything else here.
+**Known, intentionally-uncounted edge case (confirmed with user 2026-08-18):** if the *last*
+open barcode in a multi-barcode order goes stale and gets auto-abandoned after 8 days
+(`claimAndCleanupItem(id, 'abandon')`), the remainder's `isClosed` flips to `true` as a side
+effect of that transaction — but since this flip never passes through the toggle functions,
+none of the already-closed barcodes in that order retroactively add to the customer count
+if they hadn't already (they may well have already counted their own package delta
+individually, per the per-barcode rule above — only the *customer* half of this specific
+transition is what's skipped). Confirmed intentional: an uncollected barcode in this
+scenario gets physically returned to the central branch, so its abandonment isn't a pickup
+event and correctly follows "automatic cleanup never touches this stat."
+
+**Known unfixed edge case (not raised by user, noted for awareness):** the customer ref-delta
+on reopen re-derives the phone key from the item's *current* `phone` field
+(`getPickupPhoneKey(freshItem)`). If a phone number is edited (`saveEditedPhone()`) between
+an order being closed and later reopened, the reopen's decrement lands on the *new* phone's
+bucket, not the one actually incremented at close time — leaving a stale +1 on the old phone
+and an erroneous (harmlessly clamped) decrement on the new one. Narrow, rare sequence; not
+fixed since it wasn't asked for and correctly fixing it means snapshotting the phoneKey used
+at close time onto the item itself, a bigger change than today's scope.
+
+**Firebase rules gotcha hit while building this:** the root rules doc is default-deny
+(`.read: false, .write: false`), and `firebase-database.rules.json` in this repo is **not
+deployed automatically** — Netlify only serves the static app files; the rules JSON must be
+manually pasted into Firebase Console → Realtime Database → Rules → Publish. Shipping the
+`zoew_daily_pickup_cod_dod` client code without a matching rule block caused every
+read/write to fail with `permission_denied` in production (confirmed via a live Sentry
+breadcrumb) until the rule was added and manually published. When adding any new Firebase
+path, add its rule in the same change and flag to the user that it needs manual publishing
+— don't assume the schema-code and the rules are deployed together.
 
 ## Error patterns that are EXPECTED / already handled — do not "fix" these
 

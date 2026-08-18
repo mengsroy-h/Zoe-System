@@ -132,8 +132,10 @@
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       "$date": {
         ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
-        "customersPickedUp": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-        "packagesPickedUp":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "packagesPickedUp": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "pickedUpPhones": {
+          "$phoneKey": { ".validate": "newData.isNumber() && newData.val() > 0" }
+        },
         "$other": { ".validate": false }
       }
     },

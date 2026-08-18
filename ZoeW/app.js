@@ -2245,29 +2245,7 @@
         });
     }
 
-    function renderHistory(dataToRender = scanHistory) {
-        const tbody = document.getElementById('historyTableBody');
-        const countSpan = document.getElementById('count');
-        if(!tbody || !countSpan) return;
-        tbody.innerHTML = '';
-        countSpan.innerText = dataToRender.length;
-
-        if (dataToRender.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 16px;">📦 គ្មានទិន្នន័យបង្ហាញទេ</td></tr>`;
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        const currentTime = Date.now();
-        const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-
-        for (let i = dataToRender.length - 1; i >= 0; i--) {
-            const item = dataToRender[i];
-            const tr = document.createElement('tr');
-            if (item.isClosed) {
-                tr.classList.add('closed-row');
-            }
-
+    function buildHistoryRowHtml(item, rowNum, isOld, needsRecall) {
             let phoneDisplay = item.phone === "គ្មានលេខ" ? `<span style="color:#ef4444; font-style:italic;">គ្មានលេខ</span>` : `<span class="phone-clickable" onclick="openCallMarkModal('${escapeForInlineJsAttr(item.id)}')" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`;
 
             let rowNumClass = '';
@@ -2275,9 +2253,6 @@
             if (item.callMark === 'no-answer') { rowNumClass = 'row-num-no-answer'; rowNumLabel = 'ខល អត់លើក'; }
             else if (item.callMark === 'no-connect') { rowNumClass = 'row-num-no-connect'; rowNumLabel = 'ខល អត់ចូល'; }
             else if (item.callMark === 'wrong-number') { rowNumClass = 'row-num-wrong-number'; rowNumLabel = 'ខុសលេខ'; }
-
-            let needsRecall = (item.callMark === 'no-answer' || item.callMark === 'no-connect') &&
-                item.callMarkTime && (currentTime - item.callMarkTime) >= FOUR_HOURS_MS;
 
             let lockerLoc = "N/A";
             if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
@@ -2314,10 +2289,7 @@
                 </div>
             `;
             
-            let itemAgeTime = item.createdAt || parseTimestampFromId(item.id) || currentTime;
-            let isOld = (currentTime - itemAgeTime) > twentyFourHoursMs;
-            
-            let ageBadge = isOld 
+            let ageBadge = isOld
                 ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>` 
                 : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
 
@@ -2374,8 +2346,8 @@
                 `;
             }
 
-            tr.innerHTML = `
-                <td style="text-align: center;">${rowNumClass ? `<span class="row-num-mark ${rowNumClass}" title="${rowNumLabel}">${i + 1}</span>` : (i + 1)}</td>
+            const html = `
+                <td style="text-align: center;">${rowNumClass ? `<span class="row-num-mark ${rowNumClass}" title="${rowNumLabel}">${rowNum}</span>` : rowNum}</td>
                 <td>
                     <div class="customer-info-stack">
                         <div class="phone-title">
@@ -2403,8 +2375,68 @@
                     </div>
                 </td>
             `;
-            fragment.appendChild(tr);
+            return { isClosedRow: !!item.isClosed, html: html };
+    }
+
+    function renderHistory(dataToRender = scanHistory) {
+        const tbody = document.getElementById('historyTableBody');
+        const countSpan = document.getElementById('count');
+        if (!tbody || !countSpan) return;
+        countSpan.innerText = dataToRender.length;
+
+        if (dataToRender.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 16px;">📦 គ្មានទិន្នន័យបង្ហាញទេ</td></tr>`;
+            return;
         }
-        tbody.appendChild(fragment);
+
+        if (tbody.children.length && !tbody.children[0].dataset.id) {
+            tbody.innerHTML = '';
+        }
+
+        const existingRows = new Map();
+        Array.from(tbody.children).forEach((tr) => {
+            if (tr.dataset.id) existingRows.set(tr.dataset.id, tr);
+        });
+
+        const currentTime = Date.now();
+        const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+        const seenIds = new Set();
+        let prevNode = null;
+
+        for (let i = dataToRender.length - 1; i >= 0; i--) {
+            const item = dataToRender[i];
+            const rowNum = i + 1;
+            seenIds.add(item.id);
+
+            const itemAgeTime = item.createdAt || parseTimestampFromId(item.id) || currentTime;
+            const isOld = (currentTime - itemAgeTime) > twentyFourHoursMs;
+            const needsRecall = (item.callMark === 'no-answer' || item.callMark === 'no-connect') &&
+                item.callMarkTime && (currentTime - item.callMarkTime) >= FOUR_HOURS_MS;
+
+            const signature = JSON.stringify(item) + '|' + rowNum + '|' + exchangeRateRiel + '|' + isOld + '|' + needsRecall;
+
+            let tr = existingRows.get(item.id);
+            if (!tr) {
+                tr = document.createElement('tr');
+                tr.dataset.id = item.id;
+            }
+            if (tr.dataset.sig !== signature) {
+                const built = buildHistoryRowHtml(item, rowNum, isOld, needsRecall);
+                tr.className = built.isClosedRow ? 'closed-row' : '';
+                tr.innerHTML = built.html;
+                tr.dataset.sig = signature;
+            }
+
+            if (prevNode === null) {
+                if (tbody.firstChild !== tr) tbody.insertBefore(tr, tbody.firstChild);
+            } else if (prevNode.nextSibling !== tr) {
+                tbody.insertBefore(tr, prevNode.nextSibling);
+            }
+            prevNode = tr;
+        }
+
+        existingRows.forEach((tr, id) => {
+            if (!seenIds.has(id)) tr.remove();
+        });
     }
 

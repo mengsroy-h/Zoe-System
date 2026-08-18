@@ -173,6 +173,13 @@ function withTimeout(promise, ms, timeoutMsg) {
     ]);
 }
 
+function retryAsync(fn, attempts, delayMs) {
+    return fn().catch((err) => {
+        if (attempts <= 1) throw err;
+        return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
+    });
+}
+
 function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
@@ -722,12 +729,17 @@ async function generateLicenseKey() {
             createdBy: auth.currentUser.email || auth.currentUser.uid
         };
 
-        const results = await withTimeout(Promise.allSettled(targetPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record))), 15000, 'Generate key timed out');
+        const results = await withTimeout(Promise.allSettled(targetPaths.map((p) => retryAsync(() => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record), 3, 1000))), 25000, 'Generate key timed out');
         const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
         const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
 
         if (succeededPaths.length === 0) {
             throw (results.find((r) => r.status === 'rejected') || {}).reason || new Error('Generate key failed');
+        }
+
+        if (failedPaths.length > 0) {
+            const correctedRecord = Object.assign({}, record, { appPaths: succeededPaths });
+            await Promise.allSettled(succeededPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), correctedRecord))).catch(() => {});
         }
 
         lastGeneratedKey = keyString;
@@ -781,7 +793,7 @@ async function refreshKeyList() {
                 seen[id] = true;
                 const rec = bucket[id] || {};
                 const scope = rec.scope || appCode;
-                const paths = scope === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [scope];
+                const paths = Array.isArray(rec.appPaths) ? rec.appPaths : (scope === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [scope]);
                 rows.push(Object.assign({ id: id, scope: scope, paths: paths }, rec));
             });
         });

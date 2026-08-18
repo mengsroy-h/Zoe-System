@@ -513,6 +513,9 @@
         const enabledCb = document.getElementById('lookupApiEnabledCheckbox');
         if (enabledCb) enabledCb.checked = !!cfg.enabled;
 
+        const autoSubmitCb = document.getElementById('lookupApiAutoSubmitCheckbox');
+        if (autoSubmitCb) autoSubmitCb.checked = !!cfg.autoSubmit;
+
         setVal('lookupApiUrlInput', cfg.url);
         setVal('lookupApiHeaderNameInput', cfg.headerName);
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
@@ -529,6 +532,7 @@
 
     async function saveLookupApiConfig() {
         const enabledCb = document.getElementById('lookupApiEnabledCheckbox');
+        const autoSubmitCb = document.getElementById('lookupApiAutoSubmitCheckbox');
         const urlIn = document.getElementById('lookupApiUrlInput');
         const headerNameIn = document.getElementById('lookupApiHeaderNameInput');
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
@@ -558,6 +562,7 @@
 
         const cfg = {
             enabled: enabled,
+            autoSubmit: autoSubmitCb ? autoSubmitCb.checked : false,
             url: url,
             headerName: headerNameIn ? headerNameIn.value.trim() : '',
             headerValueEnc: headerValueEnc,
@@ -644,12 +649,14 @@
             if (pendingBarcode !== barcode || !isModalOpen) return;
 
             let filledAny = false;
+            let phoneWasAutoFilled = false;
 
             const phoneVal = getNestedField(data, cfg.phoneField);
             const phoneEl = document.getElementById('modalPhoneInput');
             if (phoneVal && phoneEl && !phoneEl.value) {
                 phoneEl.value = String(phoneVal).trim().replace(/^(\+?855-?)/, '0');
                 filledAny = true;
+                phoneWasAutoFilled = true;
             }
 
             const codVal = getNestedField(data, cfg.codField);
@@ -666,7 +673,12 @@
                 filledAny = true;
             }
 
-            if (filledAny) showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
+            if (cfg.autoSubmit && phoneWasAutoFilled && pendingBarcode === barcode && isModalOpen) {
+                showToast("✅ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
+                confirmPhone(false);
+            } else if (filledAny) {
+                showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
+            }
         } catch (e) {
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });

@@ -1227,18 +1227,21 @@
     function runAutomaticDeletedCleanup() {
         const currentTime = getServerNow();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
-        let initialLen = deletedItems.length;
         let purgedBarcodes = [];
+        let purgedIds = [];
 
         deletedItems = deletedItems.filter(item => {
             let deletedTime = item.deletedAt || currentTime;
             const expired = (currentTime - deletedTime > tenDaysMs);
-            if (expired) purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+            if (expired) {
+                purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+                if (item.id) purgedIds.push(item.id);
+            }
             return !expired;
         });
 
-        if (deletedItems.length !== initialLen) {
-            saveDeletedToFirebase();
+        if (purgedIds.length > 0) {
+            deleteMultipleDeletedItemsFromFirebase(purgedIds);
             releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
@@ -3340,7 +3343,7 @@
         pendingRestoreId = null;
 
         try {
-            await Promise.all([saveHistoryToFirebase(), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
+            await Promise.all([saveSingleHistoryItemToFirebase(resultingLiveItem), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
             if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
@@ -3535,6 +3538,40 @@
         }).catch((error) => {
             console.error("Error deleting deleted item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting deleted item: " });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
+            throw error;
+        });
+    }
+
+    function deleteMultipleDeletedItemsFromFirebase(ids) {
+        if (!dbRefDeleted || !ids || !ids.length) return Promise.resolve();
+        const updates = {};
+        ids.forEach(id => {
+            if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(dbRefDeleted, updates).then(() => {
+            ids.forEach(id => lastSyncedDeletedKeys.delete(id));
+        }).catch((error) => {
+            console.error("Error purging deleted items: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error purging deleted items: " });
+            showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
+            throw error;
+        });
+    }
+
+    function saveMultipleDeletedItemsToFirebase(items) {
+        if (!dbRefDeleted || !items || !items.length) return Promise.resolve();
+        const updates = {};
+        items.forEach(item => {
+            if (item && item.id && /^[a-zA-Z0-9_-]+$/.test(item.id)) updates[item.id] = item;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(dbRefDeleted, updates).then(() => {
+            items.forEach(item => { if (item && item.id) lastSyncedDeletedKeys.add(item.id); });
+        }).catch((error) => {
+            console.error("Error saving deleted items: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted items: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
@@ -3745,14 +3782,15 @@
     function clearHistory() {
         if (confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) {
             const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
-            scanHistory.forEach(item => {
+            const clearedItems = scanHistory.map(item => {
                 item.deletedAt = getServerNow();
                 item.isFromDeletion = true;
-                deletedItems.unshift(item);
+                return item;
             });
+            clearedItems.forEach(item => deletedItems.unshift(item));
             scanHistory = [];
             saveHistoryToFirebase();
-            saveDeletedToFirebase();
+            saveMultipleDeletedItemsToFirebase(clearedItems);
             clearedIds.forEach(id => clearScannerLookupEntry(id));
             applyCurrentFilter();
             updateRecentPhonesList();

@@ -649,7 +649,16 @@ async function generateLicenseKey() {
 
     const genBtn = document.getElementById('genGenerateBtn');
     isGeneratingKey = true;
-    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងបង្កើត...'; }
+    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
+
+    const timeSynced = window.ZoeLicense ? await window.ZoeLicense.syncServerTime() : false;
+    if (!timeSynced) {
+        isGeneratingKey = false;
+        if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
+        return;
+    }
+    if (genBtn) { genBtn.textContent = 'កំពុងបង្កើត...'; }
 
     try {
         const { keyString, payload } = await window.ZoeLicense.signNewKey(signingPrivateKeyJwk, {
@@ -666,13 +675,24 @@ async function generateLicenseKey() {
             createdBy: auth.currentUser.email || auth.currentUser.uid
         };
 
-        await withTimeout(Promise.all(targetPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record))), 15000, 'Generate key timed out');
+        const results = await withTimeout(Promise.allSettled(targetPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record))), 15000, 'Generate key timed out');
+        const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
+        const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
+
+        if (succeededPaths.length === 0) {
+            throw (results.find((r) => r.status === 'rejected') || {}).reason || new Error('Generate key failed');
+        }
 
         lastGeneratedKey = keyString;
         document.getElementById('genResultKey').textContent = keyString;
         document.getElementById('genResultBox').classList.remove('hidden');
         document.getElementById('genNoteInput').value = '';
-        showToast('Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
+
+        if (failedPaths.length === 0) {
+            showToast('Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
+        } else {
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key នេះកត់ត្រាទុកសម្រាប់តែ App: ${succeededPaths.join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — Key នេះនឹងមិនអាចប្រើប្រាស់នៅ App ដែលបរាជ័យទេ លុះត្រាតែបង្កើត Key ថ្មីដាច់ដោយឡែកសម្រាប់ App នោះ។`);
+        }
         refreshKeyList();
     } catch (e) {
         console.error(e);

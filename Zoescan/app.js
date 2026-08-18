@@ -1067,18 +1067,26 @@ async function assignLockerToEntry(code) {
         }
         mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
 
-        await withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out');
-
-        if (myAssignGeneration !== assignGeneration) return;
-
-        playSuccessFeedback();
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
-        if (previousLocker && previousLocker !== activeLocker && previousLocker !== 'N/A') {
-            showToast(`✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${activeLocker}`);
-        } else {
-            showToast(`✅ បានកំណត់ទីតាំង ${activeLocker}${who}`);
+        const successMsg = (previousLocker && previousLocker !== activeLocker && previousLocker !== 'N/A')
+            ? `✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${activeLocker}`
+            : `✅ បានកំណត់ទីតាំង ${activeLocker}${who}`;
+
+        try {
+            await withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out');
+        } catch (mirrorErr) {
+            if (myAssignGeneration !== assignGeneration) return;
+            console.error('Mirror update to scan history failed: ', mirrorErr);
+            if (window.ZoeErrors) ZoeErrors.capture(mirrorErr, { context: 'assignLockerToEntry mirror update failed' });
+            playSuccessFeedback();
+            showToast(`⚠️ ទីតាំង${who} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "Sync Scanner Lookup"`);
+            return;
         }
+
+        if (myAssignGeneration !== assignGeneration) return;
+        playSuccessFeedback();
+        showToast(successMsg);
     } catch (err) {
         if (myAssignGeneration !== assignGeneration) return;
         playErrorFeedback();

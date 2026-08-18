@@ -997,18 +997,21 @@
     function runAutomaticDeletedCleanup() {
         const currentTime = getServerNow();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
-        let initialLen = deletedItems.length;
         let purgedBarcodes = [];
+        let purgedIds = [];
 
         deletedItems = deletedItems.filter(item => {
             let deletedTime = item.deletedAt || currentTime;
             const expired = (currentTime - deletedTime > tenDaysMs);
-            if (expired) purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+            if (expired) {
+                purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
+                if (item.id) purgedIds.push(item.id);
+            }
             return !expired;
         });
 
-        if (deletedItems.length !== initialLen) {
-            saveDeletedToFirebase().catch(() => {});
+        if (purgedIds.length > 0) {
+            deleteMultipleDeletedItemsFromFirebase(purgedIds).catch(() => {});
             releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
@@ -1938,7 +1941,7 @@
         pendingRestoreId = null;
 
         try {
-            await Promise.all([saveHistoryToFirebase(), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
+            await Promise.all([saveSingleHistoryItemToFirebase(restoredResultItem), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
             syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
@@ -2030,6 +2033,20 @@
         });
     }
 
+    function saveSingleHistoryItemToFirebase(item) {
+        if (!dbRefHistory) return Promise.resolve();
+        if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
+            return saveHistoryToFirebase();
+        }
+        lastSyncedHistoryKeys.add(item.id);
+        return fb.update(dbRefHistory, { [item.id]: item }).catch((error) => {
+            console.error("Error saving history item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history item: " });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
+            throw error;
+        });
+    }
+
     function patchHistoryItemFields(item, fields, previousFields) {
         if (!dbRefHistory) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
@@ -2107,6 +2124,23 @@
             console.error("Error deleting deleted item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
+            throw error;
+        });
+    }
+
+    function deleteMultipleDeletedItemsFromFirebase(ids) {
+        if (!dbRefDeleted || !ids || !ids.length) return Promise.resolve();
+        const updates = {};
+        ids.forEach(id => {
+            if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
+        });
+        if (!Object.keys(updates).length) return Promise.resolve();
+        return fb.update(dbRefDeleted, updates).then(() => {
+            ids.forEach(id => lastSyncedDeletedKeys.delete(id));
+        }).catch((error) => {
+            console.error("Error purging deleted items: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error purging deleted items: " });
+            showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
             throw error;
         });
     }

@@ -20,7 +20,7 @@
           "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "expiresAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":   { ".validate": "newData.isBoolean()" },
-          "scope":     { ".validate": "newData.isString()" },
+          "scope":     { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },
           "createdBy": { ".validate": "newData.isString()" },
           "$other": { ".validate": false }

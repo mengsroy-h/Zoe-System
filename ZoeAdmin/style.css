@@ -259,6 +259,7 @@
         }
         .stat-card .label { font-size: 9.5px; color: var(--text-muted); margin-bottom: 2px; display: block; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
         .stat-card .value { font-size: 12px; font-weight: 700; color: var(--primary); }
+        .stat-card .sub-value { font-size: 9px; color: var(--text-muted); display: block; margin-top: 1px; font-weight: 500; }
         .stat-card.total-pkg { background: var(--primary-light); border-color: #fca5a5; }
         .stat-card.total-pkg .value { color: var(--primary-hover); }
 

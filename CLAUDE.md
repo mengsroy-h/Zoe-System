@@ -79,51 +79,45 @@ parameter (used implicitly as "today" by callers all over both apps) and
 revenue gets bucketed under) were both missed on the first pass and only caught by asking
 "check again, in case something wasn't fixed" and re-auditing with the wider search.
 
-## PENDING TASK (requested 2026-08-18, not yet implemented): persistent daily pickup-count stat
+## Persistent daily pickup-count stat (implemented 2026-08-18)
 
-The "អតិថិជនយក" (Customers Picked Up) stat card in both ZoeAdmin and ZoeW
-(`index.html`, element id `todayClosedCount`, computed in `updateDailyScheduleStats()`
-in each app's `app.js`) is currently a **live count derived from `scanHistory`**:
-`selectedClosedCount = filteredList.filter(item => item.isClosed).length`. Because the
-2-hour auto-cleanup rule moves closed items out of `scanHistory` into trash, any customer
-who picked up their package more than 2 hours ago silently disappears from this count —
-so the displayed number for "today" keeps *decreasing* over the course of the day as
-earlier pickups age past 2 hours, even though those customers genuinely picked up. This
-makes it useless for tracking "how many customers picked up today" as a stable running
-total. This is the same structural gap as revenue would have if it weren't persisted —
-compare to how `zoew_daily_revenue_cod_dod`/`dailyRevenueData` already solves this via
-`addRevenueToDailyAndMonthlyRecord()`/`commitDailyRevenueDelta()`: a Firebase-persisted
-per-day counter that the 2h/8d auto-cleanup transactions never touch, only explicit
-revenue-affecting actions (ដក/Remove) do.
+The "អតិថិជនយក" (Customers Picked Up) stat card (`index.html` id `todayClosedCount`) used
+to be a live count derived from `scanHistory` (`filteredList.filter(isClosed).length`), so
+it silently *decreased* as closed items aged past the 2-hour auto-cleanup and moved to
+trash. Fixed the same way revenue already solves this structural gap: a Firebase-persisted
+per-day node, `zoew_daily_pickup_cod_dod/{date}` → `{customersPickedUp, packagesPickedUp}`,
+written via `addPickupToDailyRecord()`/`commitDailyPickupDelta()` (mirrors
+`addRevenueToDailyAndMonthlyRecord()`/`commitDailyRevenueDelta()` — `runTransaction`,
+clamp-to-0 safety net; no monthly bucket, since only the daily stat card needed this). A
+second line, `todayPackagesPickedUpCount`, now sits under the customer count in the same
+stat card in both `ZoeAdmin/index.html` and `ZoeW/index.html`, showing total packages
+picked up (distinct from customer count since one order can have multiple barcodes).
 
-**Requested fix** (from the user, in their own words): make the "អតិថិជនយក" count stay
-anchored/fixed per specific day (i.e. persistent, immune to the auto-cleanup-to-trash
-transition), and add a second line showing the **total number of packages picked up**
-underneath the customer count in the same stat card (one customer/order can have multiple
-barcodes/packages, so this is a distinct number from the customer count).
+Increment/decrement hooks live in `toggleCloseStatus(id)` and
+`toggleIndividualBarcodeClose(itemId, barcodeCode)` in **both** `ZoeAdmin/app.js` and
+`ZoeW/app.js`, firing only on the transition into/out of fully-closed (not on every toggle
+call), with the delta reversed in the existing revert-on-Firebase-failure catch block.
+`claimAndCleanupItem()`'s automatic 2h/8d sweep was deliberately left untouched — it never
+calls the toggle functions, so it can't move this counter, same as revenue's `'close'`
+reason already didn't. Resolved open design question (confirmed with user): explicitly
+re-opening a closed item **does** decrement the counter back down (symmetric with revenue's
+"explicit corrections adjust, automatic cleanup never does" precedent). Deleting (លុប) or
+restoring a closed item does not touch this counter either, for the same reason it doesn't
+touch revenue — delete/restore never calls the toggle functions, so no hook was needed
+there.
 
-**Implementation notes for whoever picks this up:**
-- Needs a new persisted per-day Firebase node (e.g. `zoew_daily_pickup_cod_dod` with
-  `{customersPickedUp, packagesPickedUp}` per date, or new fields added to the existing
-  `zoew_daily_revenue_cod_dod` record) — mirror the existing daily-revenue transaction
-  pattern (`runTransaction`, clamp-to-0 safety net, retained-months pruning) rather than
-  inventing a new persistence style.
-- Increment hooks belong in `toggleCloseStatus(id)` (whole-item close — one customer, all
-  their barcodes) and `toggleIndividualBarcodeClose(itemId, barcodeCode)` (per-barcode
-  close within a multi-barcode item) in **both** `ZoeAdmin/app.js` and `ZoeW/app.js`
-  (independently duplicated, mirror the fix to both). Only increment on the transition
-  into fully-closed, not on every toggle call.
-- Must NOT be touched by `claimAndCleanupItem()`'s automatic 2h close→trash sweep — that
-  sweep should keep incrementing nothing and decrementing nothing, exactly like revenue's
-  `'close'` reason already does today.
-- Open design question to resolve with the user before implementing: should explicitly
-  re-opening a closed item (toggling `isClosed` back to false, i.e. undoing a pickup) or
-  restoring a permanently-deleted closed item decrement the counter back down? (Revenue's
-  precedent: explicit corrections adjust the stat, automatic cleanup never does — worth
-  confirming this pickup counter should follow the identical rule rather than assuming it.)
-- UI: add the packages-picked-up number under the `todayClosedCount` stat card in both
-  `ZoeAdmin/index.html` and `ZoeW/index.html` (same `stats-grid` block, ~line 98-111 in
-  ZoeAdmin, ~line 66-79 in ZoeW).
+**Known, intentionally-uncounted edge case (confirmed with user 2026-08-18):** if a
+multi-barcode item has only *some* barcodes closed when the other(s) go stale and get
+auto-abandoned after 8 days (`claimAndCleanupItem(id, 'abandon')`), the remainder's
+`isClosed` flips to `true` as a side effect of that transaction (all *remaining* barcodes
+happen to be closed) — but since this flip never passes through `toggleCloseStatus`/
+`toggleIndividualBarcodeClose`, it is never added to the pickup count, and the item then
+silently ages into the normal 2h close→trash sweep the same way. Net effect: a customer
+who picked up part of a multi-barcode order, where the rest went stale and got abandoned,
+is never counted in "អតិថិជនយក" for any of it. Confirmed intentional, not a bug to fix —
+per the user, an uncollected barcode in this scenario gets physically returned to the
+central branch rather than picked up, so it isn't a real pickup event and correctly falls
+under the same "automatic cleanup never touches this stat" rule as everything else here.
 
 ## Error patterns that are EXPECTED / already handled — do not "fix" these
 

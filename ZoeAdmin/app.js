@@ -51,6 +51,7 @@
     let dbRefDeleted = null;
     let dbRefDailyRevenue = null;
     let dbRefMonthlyRevenue = null;
+    let dbRefDailyPickup = null;
     let dbRefExchangeRate = null;
     let dbRefConnected = null;
     let dbRefServerTimeOffset = null;
@@ -80,7 +81,8 @@
     let isInitializingFirebase = false;
     let dailyRevenueData = {};
     let monthlyRevenueData = {};
-    let currentFilterMode = 'today'; 
+    let dailyPickupData = {};
+    let currentFilterMode = 'today';
     let customFilterDate = '';
     let pendingBarcode = "";
     let lastScannedCode = "";
@@ -228,6 +230,7 @@
                 if (dbRefDeleted) { try { fb.off(dbRefDeleted); } catch (e) {} }
                 if (dbRefDailyRevenue) { try { fb.off(dbRefDailyRevenue); } catch (e) {} }
                 if (dbRefMonthlyRevenue) { try { fb.off(dbRefMonthlyRevenue); } catch (e) {} }
+                if (dbRefDailyPickup) { try { fb.off(dbRefDailyPickup); } catch (e) {} }
                 if (dbRefExchangeRate) { try { fb.off(dbRefExchangeRate); } catch (e) {} }
                 if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
                 if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
@@ -236,6 +239,7 @@
                 deletedItems = [];
                 dailyRevenueData = {};
                 monthlyRevenueData = {};
+                dailyPickupData = {};
                 if (typeof fb.deleteApp === 'function') {
                     await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
                 }
@@ -253,6 +257,7 @@
             dbRefDeleted = fb.ref(db, 'zoew_recently_deleted_cod_dod');
             dbRefDailyRevenue = fb.ref(db, 'zoew_daily_revenue_cod_dod');
             dbRefMonthlyRevenue = fb.ref(db, 'zoew_monthly_revenue_cod_dod');
+            dbRefDailyPickup = fb.ref(db, 'zoew_daily_pickup_cod_dod');
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
 
@@ -913,6 +918,7 @@
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
                     if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
+                    if (dbRefDailyPickup) fb.off(dbRefDailyPickup);
                     if (dbRefHistory) fb.off(dbRefHistory);
                     if (dbRefDeleted) fb.off(dbRefDeleted);
                     if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
@@ -922,6 +928,7 @@
                 deletedItems = [];
                 dailyRevenueData = {};
                 monthlyRevenueData = {};
+                dailyPickupData = {};
                 applyCurrentFilter();
                 renderRecentlyDeleted();
                 updateRecentPhonesList();
@@ -1015,6 +1022,7 @@
         if (isDatabaseInitialized) {
             if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
             if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
+            if (dbRefDailyPickup) fb.off(dbRefDailyPickup);
             if (dbRefHistory) fb.off(dbRefHistory);
             if (dbRefDeleted) fb.off(dbRefDeleted);
             if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
@@ -1041,6 +1049,13 @@
         if (dbRefMonthlyRevenue) {
             fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
                 monthlyRevenueData = snapshot.val() || {};
+            }, handleDbListenerError);
+        }
+
+        if (dbRefDailyPickup) {
+            fb.onValue(dbRefDailyPickup, (snapshot) => {
+                dailyPickupData = snapshot.val() || {};
+                debouncedRenderAfterHistorySync();
             }, handleDbListenerError);
         }
 
@@ -1525,6 +1540,39 @@
             return latestThreeMonths;
         }).catch(() => {
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
+        });
+    }
+
+    function addPickupToDailyRecord(scanDateStr, customersToAdd, packagesToAdd) {
+        if (!scanDateStr) scanDateStr = getFormattedDate();
+
+        if (!dailyPickupData[scanDateStr]) {
+            dailyPickupData[scanDateStr] = { customersPickedUp: 0, packagesPickedUp: 0 };
+        }
+
+        dailyPickupData[scanDateStr].customersPickedUp = (parseFloat(dailyPickupData[scanDateStr].customersPickedUp) || 0) + (parseFloat(customersToAdd) || 0);
+        dailyPickupData[scanDateStr].packagesPickedUp = (parseFloat(dailyPickupData[scanDateStr].packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+
+        if (dailyPickupData[scanDateStr].customersPickedUp < 0) dailyPickupData[scanDateStr].customersPickedUp = 0;
+        if (dailyPickupData[scanDateStr].packagesPickedUp < 0) dailyPickupData[scanDateStr].packagesPickedUp = 0;
+
+        commitDailyPickupDelta(scanDateStr, customersToAdd, packagesToAdd);
+    }
+
+    function commitDailyPickupDelta(scanDateStr, customersToAdd, packagesToAdd) {
+        if (!dbRefDailyPickup) return;
+        const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
+        fb.runTransaction(dateRef, (current) => {
+            let customersPickedUp = (parseFloat(current && current.customersPickedUp) || 0) + (parseFloat(customersToAdd) || 0);
+            let packagesPickedUp = (parseFloat(current && current.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+            if (customersPickedUp < 0 || packagesPickedUp < 0) {
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily pickup underflow clamped to 0'), { context: scanDateStr, customersPickedUp, packagesPickedUp });
+            }
+            if (customersPickedUp < 0) customersPickedUp = 0;
+            if (packagesPickedUp < 0) packagesPickedUp = 0;
+            return { customersPickedUp, packagesPickedUp };
+        }).catch(() => {
+            showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         });
     }
 
@@ -2121,7 +2169,8 @@
 
     function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
         let selectedAllPackages = 0;
-        let selectedClosedCount = filteredList.filter(item => item.isClosed).length;
+        let selectedClosedCount = 0;
+        let selectedPackagesPickedUpCount = 0;
         let codTotal = 0;
         let dodTotal = 0;
 
@@ -2141,6 +2190,23 @@
             selectedAllPackages = Object.values(dailyRevenueData).reduce((sum, d) => sum + (parseFloat(d.totalCount) || 0), 0);
         } else {
             selectedAllPackages = filteredList.reduce((sum, item) => {
+                if (item.barcodes && Array.isArray(item.barcodes)) {
+                    return sum + item.barcodes.length;
+                }
+                return sum + (parseFloat(item.count) || 1);
+            }, 0);
+        }
+
+        if (!isSearchScoped && targetDateKey && dailyPickupData[targetDateKey]) {
+            selectedClosedCount = parseFloat(dailyPickupData[targetDateKey].customersPickedUp) || 0;
+            selectedPackagesPickedUpCount = parseFloat(dailyPickupData[targetDateKey].packagesPickedUp) || 0;
+        } else if (!isSearchScoped && currentFilterMode === 'all') {
+            selectedClosedCount = Object.values(dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.customersPickedUp) || 0), 0);
+            selectedPackagesPickedUpCount = Object.values(dailyPickupData).reduce((sum, d) => sum + (parseFloat(d.packagesPickedUp) || 0), 0);
+        } else {
+            selectedClosedCount = filteredList.filter(item => item.isClosed).length;
+            selectedPackagesPickedUpCount = filteredList.reduce((sum, item) => {
+                if (!item.isClosed) return sum;
                 if (item.barcodes && Array.isArray(item.barcodes)) {
                     return sum + item.barcodes.length;
                 }
@@ -2185,7 +2251,8 @@
         safeSetText('grandTotalCount', filteredRemainingCount);
         safeSetText('todayTotalCount', selectedAllPackages);
         safeSetText('todayClosedCount', selectedClosedCount);
-        
+        safeSetText('todayPackagesPickedUpCount', selectedPackagesPickedUpCount);
+
         safeSetText('summaryCodDollar', `$${codTotal.toFixed(2)}`);
         safeSetText('summaryCodRiel', `${codRiel.toLocaleString()} ៛`);
         safeSetText('summaryDodDollar', `$${dodTotal.toFixed(2)}`);
@@ -3049,11 +3116,25 @@
         const previousState = freshItem && freshB
             ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt }
             : null;
+        let pickupCustomerDelta = 0;
+        let pickupPackageDelta = 0;
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
             if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
+
+            const pickupScanDate = freshItem.scanDate || getFormattedDate();
+            const pickupPackages = freshItem.barcodes.length;
+            if (!previousState.itemIsClosed && allClosedLocal) {
+                pickupCustomerDelta = 1;
+                pickupPackageDelta = pickupPackages;
+            } else if (previousState.itemIsClosed && !allClosedLocal) {
+                pickupCustomerDelta = -1;
+                pickupPackageDelta = -pickupPackages;
+            }
+            if (pickupCustomerDelta !== 0) addPickupToDailyRecord(pickupScanDate, pickupCustomerDelta, pickupPackageDelta);
+
             openViewListModal(itemId);
             applyCurrentFilter();
         }
@@ -3102,6 +3183,10 @@
                     openViewListModal(itemId);
                     applyCurrentFilter();
                 }
+            }
+            if (pickupCustomerDelta !== 0) {
+                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+                addPickupToDailyRecord(pickupScanDate, -pickupCustomerDelta, -pickupPackageDelta);
             }
         }
     }
@@ -3270,6 +3355,8 @@
         const previousState = freshItem
             ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
             : null;
+        let pickupCustomerDelta = 0;
+        let pickupPackageDelta = 0;
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -3279,6 +3366,13 @@
                 delete freshItem.closedAt;
                 if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = false);
             }
+
+            const pickupScanDate = freshItem.scanDate || getFormattedDate();
+            const pickupPackages = freshItem.barcodes && Array.isArray(freshItem.barcodes) ? freshItem.barcodes.length : (parseFloat(freshItem.count) || 1);
+            pickupCustomerDelta = desiredClosed ? 1 : -1;
+            pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
+            addPickupToDailyRecord(pickupScanDate, pickupCustomerDelta, pickupPackageDelta);
+
             applyCurrentFilter();
         }
         showToast(`បាន${actionText}បញ្ជីជោគជ័យ!`);
@@ -3318,6 +3412,10 @@
                     }
                     applyCurrentFilter();
                 }
+            }
+            if (pickupCustomerDelta !== 0) {
+                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+                addPickupToDailyRecord(pickupScanDate, -pickupCustomerDelta, -pickupPackageDelta);
             }
         }
     }

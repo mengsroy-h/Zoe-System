@@ -658,8 +658,8 @@ async function generateLicenseKey() {
 
         const targetPaths = appSelect === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [appSelect];
         const record = {
-            issuedAt: Date.now(),
-            expiresAt: Date.now() + Math.round(days * 86400000),
+            issuedAt: window.ZoeLicense.getServerNow(),
+            expiresAt: window.ZoeLicense.getServerNow() + Math.round(days * 86400000),
             revoked: false,
             scope: appSelect,
             note: note || '',
@@ -735,7 +735,7 @@ function renderKeyList() {
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនទាន់មាន Key</td></tr>';
         return;
     }
-    const now = Date.now();
+    const now = window.ZoeLicense.getServerNow();
     tbody.innerHTML = keyListCache.map((row) => {
         let statusHtml;
         if (row.revoked) statusHtml = '<span class="badge badge-revoked">Revoked</span>';
@@ -795,7 +795,7 @@ async function confirmExtendKey() {
     if (!row) { closeModal('extendModal'); return; }
     const days = parseFloat(document.getElementById('extendDaysInput').value);
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
-    const newExpiresAt = Date.now() + Math.round(days * 86400000);
+    const newExpiresAt = window.ZoeLicense.getServerNow() + Math.round(days * 86400000);
     try {
         const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
@@ -818,16 +818,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
     initFirebase();
     updateSigningKeyBadge();
+    if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
 
     if (sessionStorage.getItem('zoekeygen_just_updated')) {
         sessionStorage.removeItem('zoekeygen_just_updated');
         showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
     }
 
-    
-    
-    
-    
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }

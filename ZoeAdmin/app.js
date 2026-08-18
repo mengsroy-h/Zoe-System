@@ -1320,6 +1320,7 @@
 
     window.addEventListener('load', function () {
         if (window.ZoeErrors) ZoeErrors.init('zoeadmin');
+        if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         initFirebase();
 
         if (sessionStorage.getItem('zoeadmin_just_updated')) {

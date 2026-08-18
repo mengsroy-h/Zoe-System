@@ -42,9 +42,42 @@ retry deadlines) intentionally still use raw `Date.now()` — don't "fix" those 
 don't need server sync and `getServerNow()` isn't even in scope at the point some of them
 run (e.g. before Firebase has initialized).
 
+`license-verify.js` (shared, byte-identical across all 4 apps) has its **own separate**
+`getServerNow()`/`serverTimeOffsetMs` — it cannot use each app's SDK-based
+`.info/serverTimeOffset` listener because it's REST-only (plain `fetch`, no Firebase SDK
+access, by design — it's the shared module ZoeAdmin/ZoeW/Zoescan/ZoeKeyGen all load
+identically). Instead it reads the standard HTTP `Date` response header on every request it
+already makes (`checkOnline()`), and exposes `syncServerTime()` (a lightweight fetch whose
+only purpose is capturing that header) for callers that don't naturally trigger a request
+early — ZoeKeyGen calls it at startup so key `issuedAt`/`expiresAt` (the values baked into
+the cryptographically signed key payload itself, via `signNewKey()`) aren't wrong from
+the admin's own device clock, which can never be corrected after the fact once signed.
+ZoeAdmin/ZoeW/Zoescan also call it at startup for a warm cache, though their own
+`ensureAppActivated()` → `getStatus()` → `checkOnline()` flow would self-correct it anyway
+on first use. If you touch `license-verify.js`, copy the change identically to all 4
+apps' copies (`cp` + `md5sum` to confirm byte-identical) — don't hand-edit each one.
+
+**Lesson from auditing this**: grepping only `Date.now()` missed real spots — also check
+`new Date()` (no args, same meaning). Missed on the first pass: `getFormattedDate(d = new
+Date())`'s default parameter (used implicitly as "today" by callers throughout both apps)
+and `addOrUpdateEntry()`'s `const now = new Date()` (ZoeAdmin — sets the scanDate a new
+parcel's revenue gets bucketed under). Only caught via a second, wider-search pass after
+being asked to re-check. When auditing this class of bug again, also grep the *shared*
+`license-verify.js` and `ZoeKeyGen/app.js`, not just the 3 business apps — easy to forget
+since ZoeKeyGen doesn't participate in the retention/revenue system, but it still
+independently writes clock-dependent timestamps (key issuedAt/expiresAt).
+
 Retention/auto-cleanup windows (do not change without being asked): closed parcels
 auto-move to trash after 2 hours; still-open parcels after 8 days; anything in trash is
 permanently purged after 10 days.
+
+When auditing for raw device-time usage, grep for **both** `Date.now()` and `new Date()`
+(no arguments) — they mean the same "current device time" but a search for only the first
+form misses real ones. This bit us once: `getFormattedDate(d = new Date())`'s default
+parameter (used implicitly as "today" by callers all over both apps) and
+`addOrUpdateEntry()`'s `const now = new Date()` (ZoeAdmin — sets the scanDate a new parcel's
+revenue gets bucketed under) were both missed on the first pass and only caught by asking
+"check again, in case something wasn't fixed" and re-auditing with the wider search.
 
 ## Error patterns that are EXPECTED / already handled — do not "fix" these
 

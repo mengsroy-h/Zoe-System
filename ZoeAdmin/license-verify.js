@@ -15,6 +15,11 @@
     const KEY_PREFIX = 'ZOEKEY-';
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
+    let serverTimeOffsetMs = 0;
+    function getServerNow() {
+        return Date.now() + serverTimeOffsetMs;
+    }
+
     let cachedPublicKeys = null;
     async function getPublicKeys() {
         if (cachedPublicKeys) return cachedPublicKeys;
@@ -116,7 +121,7 @@
     async function verifyKeyString(keyString, appCode) {
         const result = await verifySignatureAndScope(keyString, appCode);
         if (!result.valid) return result;
-        if (Date.now() > result.payload.exp * 1000) {
+        if (getServerNow() > result.payload.exp * 1000) {
             return { valid: false, reason: 'expired', payload: result.payload };
         }
         return result;
@@ -151,7 +156,7 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            lastOnlineCheck: Date.now(),
+            lastOnlineCheck: getServerNow(),
             onlineExp: result.payload.exp * 1000
         };
         saveLocalRecord(appCode, record);
@@ -175,15 +180,42 @@
                 clearTimeout(timer);
             }
             if (!res.ok) return { ok: null, reason: 'network' };
+            const dateHeader = res.headers.get('Date');
+            if (dateHeader) {
+                const serverMs = new Date(dateHeader).getTime();
+                if (!isNaN(serverMs)) serverTimeOffsetMs = serverMs - Date.now();
+            }
             const data = await res.json();
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };
-            if (typeof data.expiresAt === 'number' && Date.now() > data.expiresAt) {
+            if (typeof data.expiresAt === 'number' && getServerNow() > data.expiresAt) {
                 return { ok: false, reason: 'expired-server' };
             }
             return { ok: true, expiresAt: data.expiresAt };
         } catch (e) {
             return { ok: null, reason: 'network' };
+        }
+    }
+
+    async function syncServerTime() {
+        if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return false;
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            let res;
+            try {
+                res = await fetch(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', { cache: 'no-store', signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+            const dateHeader = res.headers.get('Date');
+            if (!dateHeader) return false;
+            const serverMs = new Date(dateHeader).getTime();
+            if (isNaN(serverMs)) return false;
+            serverTimeOffsetMs = serverMs - Date.now();
+            return true;
+        } catch (e) {
+            return false;
         }
     }
 
@@ -197,7 +229,7 @@
             return { state: 'required', reason: sigCheck.reason };
         }
 
-        const now = Date.now();
+        const now = getServerNow();
 
         const online = await checkOnline(appCode, record.id);
         if (online.ok === true) {
@@ -241,7 +273,7 @@
         const days = opts.days;
         const note = opts.note;
         const id = randomKeyId();
-        const now = Math.floor(Date.now() / 1000);
+        const now = Math.floor(getServerNow() / 1000);
         const exp = now + Math.round(days * 86400);
         const payload = { a: appCode, id: id, iat: now, exp: exp };
         if (note) payload.note = String(note).slice(0, 60);
@@ -270,6 +302,8 @@
         parseKeyString: parseKeyString,
         checkOnline: checkOnline,
         signNewKey: signNewKey,
-        generateKeyPair: generateKeyPair
+        generateKeyPair: generateKeyPair,
+        getServerNow: getServerNow,
+        syncServerTime: syncServerTime
     };
 })(window);

@@ -1074,6 +1074,7 @@
         }
 
         if (window.ZoeErrors) ZoeErrors.init('zoew');
+        if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         initFirebase();
 
         setInterval(async () => {

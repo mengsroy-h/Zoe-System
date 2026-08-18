@@ -1228,6 +1228,7 @@ function bindEventListeners() {
 bindEventListeners();
 
 if (window.ZoeErrors) ZoeErrors.init('zoescan');
+if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
 
 initFirebase().catch(err => {
     document.getElementById('bootLoading').innerHTML = '⚠️ មិនអាចភ្ជាប់ Firebase SDK បានទេ សូម Refresh ទំព័រនេះម្តងទៀត';

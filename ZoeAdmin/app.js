@@ -2631,7 +2631,7 @@
             applyCurrentFilter();
             return;
         }
-        let searched = getFilteredDataByDate().filter(item => item.phone && item.phone.includes(phoneQuery));
+        let searched = scanHistory.filter(item => item.phone && item.phone.includes(phoneQuery));
         renderHistory(searched);
         updateDailyScheduleStats(searched, true);
     }

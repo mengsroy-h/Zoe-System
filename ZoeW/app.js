@@ -208,6 +208,7 @@
             fb.onValue(fb.ref(db, '.info/serverTimeOffset'), (snap) => {
                 const val = snap.val();
                 if (typeof val === 'number') serverTimeOffsetMs = val;
+                if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
             });
 
             setupAuthListener();

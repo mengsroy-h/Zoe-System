@@ -219,6 +219,10 @@
         }
     }
 
+    function setServerTimeOffset(ms) {
+        if (typeof ms === 'number' && !isNaN(ms)) serverTimeOffsetMs = ms;
+    }
+
     async function getStatus(appCode) {
         const record = loadLocalRecord(appCode);
         if (!record) return { state: 'required' };
@@ -304,6 +308,7 @@
         signNewKey: signNewKey,
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,
-        syncServerTime: syncServerTime
+        syncServerTime: syncServerTime,
+        setServerTimeOffset: setServerTimeOffset
     };
 })(window);

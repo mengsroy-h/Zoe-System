@@ -193,6 +193,7 @@ async function initFirebase() {
     sdk.onValue(sdk.ref(db, '.info/serverTimeOffset'), (snap) => {
         const val = snap.val();
         if (typeof val === 'number') serverTimeOffsetMs = val;
+        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
     });
 
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);

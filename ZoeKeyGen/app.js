@@ -99,6 +99,22 @@ let db = null;
 let authUnsubscribe = null;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
+let dbRefServerTimeOffset = null;
+let serverTimeOffsetMs = 0;
+let serverTimeSynced = false;
+let serverTimeSyncWaiters = [];
+
+function getServerNow() {
+    return Date.now() + serverTimeOffsetMs;
+}
+
+function waitForServerTimeSync(timeoutMs) {
+    if (serverTimeSynced) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(serverTimeSynced), timeoutMs);
+        serverTimeSyncWaiters.push(() => { clearTimeout(timer); resolve(true); });
+    });
+}
 
 function showToast(msg) {
     const container = document.getElementById('toastContainer');
@@ -171,6 +187,7 @@ async function initFirebase() {
         const existingApps = fb.getApps();
         if (existingApps.length) {
             if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
+            if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
             if (typeof fb.deleteApp === 'function') {
                 await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
             }
@@ -188,6 +205,15 @@ async function initFirebase() {
             const online = snap.val() === true;
             if (dot) dot.classList.toggle('online', online);
             if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+        });
+
+        dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
+        fb.onValue(dbRefServerTimeOffset, (snap) => {
+            const val = snap.val();
+            if (typeof val === 'number') serverTimeOffsetMs = val;
+            serverTimeSynced = true;
+            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+            serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
         });
 
         setupAuthListener();
@@ -651,7 +677,7 @@ async function generateLicenseKey() {
     isGeneratingKey = true;
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
 
-    const timeSynced = window.ZoeLicense ? await window.ZoeLicense.syncServerTime() : false;
+    const timeSynced = await waitForServerTimeSync(15000);
     if (!timeSynced) {
         isGeneratingKey = false;
         if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
@@ -667,8 +693,8 @@ async function generateLicenseKey() {
 
         const targetPaths = appSelect === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [appSelect];
         const record = {
-            issuedAt: window.ZoeLicense.getServerNow(),
-            expiresAt: window.ZoeLicense.getServerNow() + Math.round(days * 86400000),
+            issuedAt: getServerNow(),
+            expiresAt: getServerNow() + Math.round(days * 86400000),
             revoked: false,
             scope: appSelect,
             note: note || '',
@@ -755,7 +781,7 @@ function renderKeyList() {
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនទាន់មាន Key</td></tr>';
         return;
     }
-    const now = window.ZoeLicense.getServerNow();
+    const now = getServerNow();
     tbody.innerHTML = keyListCache.map((row) => {
         let statusHtml;
         if (row.revoked) statusHtml = '<span class="badge badge-revoked">Revoked</span>';
@@ -815,7 +841,7 @@ async function confirmExtendKey() {
     if (!row) { closeModal('extendModal'); return; }
     const days = parseFloat(document.getElementById('extendDaysInput').value);
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
-    const newExpiresAt = window.ZoeLicense.getServerNow() + Math.round(days * 86400000);
+    const newExpiresAt = getServerNow() + Math.round(days * 86400000);
     try {
         const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
@@ -838,7 +864,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
     initFirebase();
     updateSigningKeyBadge();
-    if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
 
     if (sessionStorage.getItem('zoekeygen_just_updated')) {
         sessionStorage.removeItem('zoekeygen_just_updated');

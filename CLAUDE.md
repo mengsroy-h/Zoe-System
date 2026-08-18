@@ -14,6 +14,17 @@ app's `app.js` is a **separate file with independently duplicated logic** — a 
 app's function does not automatically apply to the same-named function in another app.
 Always check whether a bug/fix applies to just one app or needs mirroring across siblings.
 
+## Project status (verify before assuming this is still current)
+
+As of 2026-08-18 this project is **not yet deployed for real users** — no live production
+data, no real customers. That's the basis for treating some revenue/data-integrity bugs
+found during audits as safe to fix directly rather than only proposing them for human
+review (see point 5 under "When triaging a Sentry report" below). Before leaning on that
+looser default, confirm it's still true — ask the user or look for signs of having gone
+live (custom domain traffic, user-facing announcements, revenue figures that look like real
+transaction volume rather than test data). This never extended to the core Delete-vs-Remove
+business logic itself — that's deliberate policy, not a bug, regardless of launch status.
+
 ## Core business rule: "លុប" (Delete) vs "ដក" (Remove) — READ BEFORE TOUCHING REVENUE CODE
 
 This is a deliberate business rule, not a bug, and gets misdiagnosed as one easily:
@@ -193,6 +204,57 @@ path, add its rule in the same change and flag to the user that it needs manual 
   confirmed via a real-device screen recording (native tap ripple appeared, handler never
   ran). Activation-key submit buttons now also bind via `addEventListener('click', ...)` as
   a backup alongside the inline `onclick=`.
+- **Zoescan's CSP `script-src` lacks `'unsafe-inline'`**, unlike the other 3 apps — any bare
+  `onclick=` attribute added to Zoescan's HTML is silently dead on some browsers. Always pair
+  a new Zoescan `onclick=` with an `addEventListener('click', ...)` backup (already done for
+  the activation-modal buttons). Re-check this asymmetry specifically before adding any new
+  inline handler to Zoescan — it's a structural difference from the other 3 apps' CSP, not a
+  one-off fix, so it will keep being relevant.
+- **Firebase multi-step writes aren't atomic — compensate, don't assume**: RTDB's
+  `runTransaction` (needed for cross-device conflict safety) and multi-path `update()` can't
+  be combined into one atomic operation. Established pattern: apply local/optimistic state
+  first, fire the Firebase write, and on failure reverse the exact applied delta in the
+  `.catch()` (revenue via `addRevenueToDailyAndMonthlyRecord` with negated values, pickup-stat
+  via `addPickupToDailyRecord` with negated deltas). `retryAsync(fn, attempts, delayMs)` (near
+  `withTimeout`) adds retry-with-backoff before giving up — used for `claimAndCleanupItem`'s
+  trash write (4 attempts, ZoeAdmin+ZoeW) and ZoeKeyGen's `appPaths` corrective tag write (3
+  attempts). When a compensable write can leave local-only state behind if retries are
+  exhausted (e.g. an optimistically `unshift`-ed trash item with no matching Firebase write),
+  the exhausted-retry `.catch` must also undo *that* local mutation, not just reverse the
+  revenue/stat delta — missed on `claimAndCleanupItem` in both ZoeAdmin and ZoeW until a
+  2026-08-18 follow-up audit caught it (the parcel record briefly existed only in memory,
+  then vanished silently on next resync, even though revenue was correctly reversed).
+- **Restore-from-trash must be one atomic multi-path write**: `executeRestoreItem`'s
+  history-write + trash-delete uses one `fb.update(fb.ref(db), {two top-level paths})` call
+  rather than two separate writes/`Promise.all` — avoids double-applying the revenue add-back
+  if the first write succeeds and a second, separate write fails on retry.
+- **`isClosed` must be recomputed after any `barcodes[]` mutation, not just at
+  create/toggle-time**: any code path that adds/removes barcodes from an item's `barcodes[]`
+  array (not just the explicit toggle functions) must recompute `item.isClosed =
+  barcodes.length > 0 && barcodes.every(b => b.isClosed)` and set/clear `closedAt` to match.
+  `executeRestoreItem`'s restore-merge already did this; `removeSingleBarcode` (ZoeAdmin) did
+  not, until a 2026-08-18 follow-up audit found it — an item could get stuck permanently
+  misclassified as "open" if its last remaining barcode(s) happened to already be
+  individually closed, breaking the 2h/8d retention classification and silently skipping
+  pickup-stat credit. If you add a new `barcodes[]` mutation path, recompute `isClosed`
+  there too — but do NOT pair it with a pickup-stat credit call
+  (`addPickupToDailyRecord`), since that crediting is deliberately scoped only to the
+  explicit toggle functions (`toggleCloseStatus`/`toggleIndividualBarcodeClose`), matching
+  how the restore-merge path already doesn't credit it either.
+- **ZoeKeyGen ALL-scope key generation is not all-or-nothing**: `generateLicenseKey()`
+  writes the key to 3 separate Firebase paths (one per target app) in parallel; if some
+  succeed and some fail, a corrective follow-up write tags the surviving records with
+  `appPaths` so the key list can show accurate per-app coverage. That corrective write now
+  retries (`retryAsync`, 3 attempts) and captures to Sentry + warns the operator if it still
+  fails — it used to be a silent one-shot `.catch(() => {})`. Left unfixed, a failed tag
+  write let `renderKeyList()` wrongly assume full 3-app coverage (its
+  `scope === 'ALL' ? [3 apps] : [scope]` fallback only trusts a partial-coverage signal when
+  `appPaths` was actually recorded) and let `toggleRevokeKey`/`confirmExtendKey` write to
+  paths that never had a real key record — Firebase RTDB `update()` on a nonexistent path
+  silently creates a sparse node there instead of erroring. `renderKeyList()` now also shows
+  a persistent ⚠️ badge (with a tooltip listing which apps are actually covered) whenever
+  `appPaths` is present and shorter than 3, so partial coverage stays visible after a reload,
+  not just in the one-time generation-time alert.
 
 ## Style conventions
 
@@ -220,4 +282,5 @@ path, add its rule in the same change and flag to the user that it needs manual 
    than inventing a new one. There's also an old reference copy of ZoeAdmin/ZoeW the user can
    provide on request, from before recent changes, useful for confirming intended behavior.
 5. This system tracks real money (COD/DOD revenue) — prefer a suggested fix for human
-   review over auto-applying anything non-trivial.
+   review over auto-applying anything non-trivial (see "Project status" above for the
+   current pre-launch exception to this default, and re-verify it still applies).

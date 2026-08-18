@@ -737,9 +737,16 @@ async function generateLicenseKey() {
             throw (results.find((r) => r.status === 'rejected') || {}).reason || new Error('Generate key failed');
         }
 
+        let appPathsTagFailed = false;
         if (failedPaths.length > 0) {
             const correctedRecord = Object.assign({}, record, { appPaths: succeededPaths });
-            await Promise.allSettled(succeededPaths.map((p) => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), correctedRecord))).catch(() => {});
+            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), correctedRecord), 3, 1000)));
+            appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
+            if (appPathsTagFailed) {
+                const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
+                console.error('Failed to tag appPaths after partial key generation', tagErr);
+                if (window.ZoeErrors) ZoeErrors.capture(tagErr, { context: 'generateLicenseKey appPaths tagging failed after retries', keyId: payload.id, succeededPaths, failedPaths });
+            }
         }
 
         lastGeneratedKey = keyString;
@@ -750,7 +757,10 @@ async function generateLicenseKey() {
         if (failedPaths.length === 0) {
             showToast('Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
         } else {
-            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key នេះកត់ត្រាទុកសម្រាប់តែ App: ${succeededPaths.join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — Key នេះនឹងមិនអាចប្រើប្រាស់នៅ App ដែលបរាជ័យទេ លុះត្រាតែបង្កើត Key ថ្មីដាច់ដោយឡែកសម្រាប់ App នោះ។`);
+            const extraWarning = appPathsTagFailed
+                ? '\n\n⚠️ បន្ថែមទៀត Key List នៅក្នុង App នេះប្រហែលជាមិនបង្ហាញត្រឹមត្រូវថា Key នេះ Active នៅ App ណាខ្លះទេ — សូមពិនិត្យផ្ទាល់នៅ Firebase Console (path license_keys) មុននឹង Revoke ឬបន្ថែមសុពលភាព Key នេះ។'
+                : '';
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key នេះកត់ត្រាទុកសម្រាប់តែ App: ${succeededPaths.join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — Key នេះនឹងមិនអាចប្រើប្រាស់នៅ App ដែលបរាជ័យទេ លុះត្រាតែបង្កើត Key ថ្មីដាច់ដោយឡែកសម្រាប់ App នោះ។${extraWarning}`);
         }
         refreshKeyList();
     } catch (e) {
@@ -823,8 +833,14 @@ function renderKeyList() {
 
         const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
 
+        const isPartialAll = row.scope === 'ALL' && Array.isArray(row.appPaths) && row.appPaths.length > 0 && row.appPaths.length < 3;
+        const scopeLabel = escapeHtml(APP_LABELS[row.scope] || row.scope);
+        const scopeHtml = isPartialAll
+            ? `<span class="badge badge-scope" title="${escapeHtml('សកម្មតែលើ: ' + row.paths.map((p) => APP_LABELS[p] || p).join(', '))}">${scopeLabel} ⚠️</span>`
+            : `<span class="badge badge-scope">${scopeLabel}</span>`;
+
         return `<tr>
-            <td><span class="badge badge-scope">${escapeHtml(APP_LABELS[row.scope] || row.scope)}</span></td>
+            <td>${scopeHtml}</td>
             <td>${escapeHtml(row.id)}</td>
             <td class="note-cell">${escapeHtml(row.note || '-')}</td>
             <td>${expStr}</td>

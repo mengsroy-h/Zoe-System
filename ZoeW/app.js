@@ -68,8 +68,6 @@
 
     let scanHistory = [];
     let deletedItems = [];
-    let lastSyncedHistoryKeys = new Set();
-    let lastSyncedDeletedKeys = new Set();
     let dailyRevenueData = {};
     let monthlyRevenueData = {};
     let dailyPickupData = {};
@@ -803,8 +801,6 @@
                 }
             });
 
-            lastSyncedHistoryKeys = new Set(scanHistory.map(item => item.id).filter(Boolean));
-
             debouncedRenderAfterHistorySync();
         }, handleDbListenerError);
         }
@@ -822,7 +818,6 @@
                     item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
             });
-            lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
             runAutomaticDeletedCleanup();
         }, handleDbListenerError);
         }
@@ -969,6 +964,8 @@
                 if (revenueDeducted) {
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, revenueCod, revenueDod, revenueCount);
                 }
+                const staleIdx = deletedItems.findIndex(i => i.id === trashItem.id);
+                if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
             });
@@ -2201,8 +2198,6 @@
                 [`zoew_scan_history_cod_dod/${restoredResultItem.id}`]: restoredResultItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            lastSyncedHistoryKeys.add(restoredResultItem.id);
-            lastSyncedDeletedKeys.delete(itemToRestore.id);
             syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
@@ -2216,10 +2211,8 @@
                 const [histSnap, delSnap] = await Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]);
                 const histData = histSnap.val();
                 scanHistory = histData ? Object.keys(histData).map(k => histData[k]) : [];
-                lastSyncedHistoryKeys = new Set(scanHistory.map(item => item.id).filter(Boolean));
                 const delData = delSnap.val();
                 deletedItems = delData ? Object.keys(delData).map(k => delData[k]) : [];
-                lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
             } catch (resyncError) {
                 console.error("Resync after failed restore also failed: ", resyncError);
                 if (window.ZoeErrors) ZoeErrors.capture(resyncError, { context: "Resync after failed restore also failed: " });
@@ -2278,7 +2271,6 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
-        lastSyncedHistoryKeys.add(item.id);
         return fb.update(dbRefHistory, { [item.id]: item }).catch((error) => {
             console.error("Error saving history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history item: " });
@@ -2296,7 +2288,6 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
-        lastSyncedHistoryKeys.add(item.id);
         const updates = {};
         Object.keys(fields).forEach(key => {
             updates[`${item.id}/${key}`] = fields[key];
@@ -2327,9 +2318,7 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
-        return fb.update(dbRefDeleted, { [item.id]: item }).then(() => {
-            lastSyncedDeletedKeys.add(item.id);
-        }).catch((error) => {
+        return fb.update(dbRefDeleted, { [item.id]: item }).catch((error) => {
             console.error("Error saving deleted item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
@@ -2346,9 +2335,7 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
-        return fb.update(dbRefDeleted, { [id]: null }).then(() => {
-            lastSyncedDeletedKeys.delete(id);
-        }).catch((error) => {
+        return fb.update(dbRefDeleted, { [id]: null }).catch((error) => {
             console.error("Error deleting deleted item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
@@ -2363,9 +2350,7 @@
             if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
         });
         if (!Object.keys(updates).length) return Promise.resolve();
-        return fb.update(dbRefDeleted, updates).then(() => {
-            ids.forEach(id => lastSyncedDeletedKeys.delete(id));
-        }).catch((error) => {
+        return fb.update(dbRefDeleted, updates).catch((error) => {
             console.error("Error purging deleted items: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error purging deleted items: " });
             showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");

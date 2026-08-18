@@ -64,7 +64,6 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
-            overscroll-behavior-y: none;
         }
 
         @media (display-mode: standalone) {

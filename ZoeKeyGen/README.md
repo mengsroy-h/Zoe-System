@@ -72,9 +72,6 @@ Key ត្រូវបានផលិតឡើងជាមួយ **ហត្ថ�
 - **Key មិនអាចក្លែងបន្លំបាន** បើគ្មាន Private Key — នេះជាគណិតវិទ្យា Cryptography ពិត មិនមែនគ្រាន់តែជា Obfuscation ទេ។
 - **Key មិនអាចពន្យារពេលដោយកែ localStorage** ព្រោះថ្ងៃផុតកំណត់ស្ថិតនៅក្នុងហត្ថលេខាផ្ទាល់។
 - **License Database ដាច់ដោយឡែកពី Business Database** — សូម្បីតែ Project របស់ ZoeAdmin មានបញ្ហា Rules/Leak Config ក៏ដោយ Private Signing Key និងគណនី Admin របស់ License មិនរងផលប៉ះពាល់ដែរ។ ចំណុច `license_keys` អនុញ្ញាតឲ្យអានជាសាធារណៈដោយចេតនា ព្រោះមិនមានទិន្នន័យសម្ងាត់ (គ្រាន់តែជា ID/ថ្ងៃផុតកំណត់/Revoked flag) ដូច្នេះមិនប៉ះពាល់សុវត្ថិភាពទេ។
-- **Revocation ដំណើរការពិតប្រាកដ** តាមរយៈ Firebase Rules ខាង Server (មិនមែនពឹងលើ Client ស្មោះត្រង់ទេ)។
-- **ដែនកំណត់ស្មោះត្រង់**៖ ZoeAdmin/ZoeW/Zoescan ជា Static PWA គ្មាន Server Backend ផ្ទាល់ខ្លួន (Netlify + Firebase Client SDK តែប៉ុណ្ណោះ)។ អ្នកប្រើប្រាស់ដែលមានចំណេះដឹង Technical ខ្ពស់ និងចូលដំណើរការ Browser DevTools/កូដ Source ដោយផ្ទាល់ អាចនិយាយបានថា "កែកូដ App ដើម្បីលុបចោលការត្រួតពិនិត្យ Activation ទាំងស្រុង" — នេះជាដែនកំណត់ជាមូលដ្ឋានរបស់កម្មវិធី Client-side ណាមួយ (មិនមែនតែ ZoeSystem ទេ)។ ការការពារពិតប្រាកដសម្រាប់ទិន្នន័យអាជីវកម្ម គឺ Firebase Authentication + Database Rules ដែលមានស្រាប់ (មិនអាស្រ័យលើ Activation Key ទេ)។ Activation Key ជាស្រទាប់បន្ថែម ដើម្បីគ្រប់គ្រងថាឧបករណ៍/បុគ្គលិកណាមួយអាច "ដំណើរការ App" បានប៉ុណ្ណោះ មិនមែនការពារទិន្នន័យផ្ទាល់ទេ។
-- កុំចែក Private Key តាម Chat/Email ធម្មតា។ កុំ Commit វាចូល Git ជាដាច់ខាត។
 
 ## អាជ្ញាប័ណ្ណ (License)
 

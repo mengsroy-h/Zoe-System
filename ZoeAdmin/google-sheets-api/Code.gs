@@ -1,3 +1,5 @@
+var CACHE_TTL_SECONDS = 300;
+
 function doGet(e) {
   var props = PropertiesService.getScriptProperties();
   var secret = props.getProperty('API_KEY');
@@ -27,7 +29,7 @@ function doGet(e) {
     rows = JSON.parse(cached);
   } else {
     rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    cache.put(cacheKey, JSON.stringify(rows), 30);
+    cache.put(cacheKey, JSON.stringify(rows), CACHE_TTL_SECONDS);
   }
 
   for (var i = 0; i < rows.length; i++) {

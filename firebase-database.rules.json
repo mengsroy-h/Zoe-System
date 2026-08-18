@@ -128,6 +128,16 @@
       }
     },
 
+    "zoew_daily_pickup_cod_dod": {
+      ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+      "$date": {
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
+        "customersPickedUp": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "packagesPickedUp":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "$other": { ".validate": false }
+      }
+    },
+
     "zoew_monthly_revenue_cod_dod": {
       ".read": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
       ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",

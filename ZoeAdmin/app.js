@@ -1371,6 +1371,7 @@
 
         setupHardwareScanner();
         setupSwipeGestures();
+        setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();
 
@@ -1629,11 +1630,18 @@
         const sidebar = document.getElementById('sidebarSection');
         const mainSection = document.getElementById('mainSection');
         const tableResponsive = document.getElementById('tableResponsive');
+        const appContainer = document.getElementById('appContainer');
         if(!sidebar || !mainSection || !tableResponsive) return;
 
         let startY = 0;
         let currentY = 0;
         let isDragging = false;
+
+        function syncPullToRefreshLock() {
+            if (appContainer) {
+                appContainer.classList.toggle('history-expanded', sidebar.classList.contains('collapsed'));
+            }
+        }
 
         tableResponsive.addEventListener('touchstart', (e) => {
             startY = e.touches[0].clientY;
@@ -1647,6 +1655,7 @@
             if (scrollTop === 0 && diffY > 30 && window.innerWidth < 992) {
                 if (sidebar.classList.contains('collapsed')) {
                     sidebar.classList.remove('collapsed');
+                    syncPullToRefreshLock();
                 }
             }
         }, { passive: true });
@@ -1665,10 +1674,12 @@
 
             if (diffY < -30 && !sidebar.classList.contains('collapsed')) {
                 sidebar.classList.add('collapsed');
+                syncPullToRefreshLock();
                 isDragging = false;
             }
             else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
                 sidebar.classList.remove('collapsed');
+                syncPullToRefreshLock();
                 isDragging = false;
             }
         }, { passive: true });
@@ -1681,8 +1692,79 @@
         if (dragHandle) {
             dragHandle.addEventListener('click', () => {
                 sidebar.classList.toggle('collapsed');
+                syncPullToRefreshLock();
             });
         }
+
+        syncPullToRefreshLock();
+    }
+
+    function setupIOSPullToRefresh() {
+        if (window.navigator.standalone !== true) return;
+
+        const appContainer = document.getElementById('appContainer');
+        const tableResponsive = document.getElementById('tableResponsive');
+        if (!appContainer) return;
+
+        const indicator = document.createElement('div');
+        indicator.className = 'ptr-indicator';
+        indicator.innerHTML = '<div class="ptr-spinner"></div>';
+        document.body.appendChild(indicator);
+
+        const threshold = 100;
+        const maxPull = 160;
+        let startY = 0;
+        let lastPull = 0;
+        let pulling = false;
+        let refreshing = false;
+
+        function atTop() {
+            if (isModalOpen || refreshing) return false;
+            if (appContainer.classList.contains('history-expanded')) return false;
+            if (appContainer.scrollTop > 0) return false;
+            if (tableResponsive && tableResponsive.scrollTop > 0) return false;
+            return true;
+        }
+
+        function reset() {
+            pulling = false;
+            lastPull = 0;
+            indicator.classList.add('snapping');
+            indicator.classList.remove('visible');
+            indicator.style.transform = 'translateY(-50px)';
+        }
+
+        document.addEventListener('touchstart', (e) => {
+            if (!atTop()) { pulling = false; return; }
+            startY = e.touches[0].clientY;
+            lastPull = 0;
+            pulling = true;
+            indicator.classList.remove('snapping');
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!pulling) return;
+            if (!atTop()) { reset(); return; }
+            const diffY = e.touches[0].clientY - startY;
+            if (diffY <= 0) { reset(); return; }
+            e.preventDefault();
+            lastPull = Math.min(diffY, maxPull);
+            indicator.classList.add('visible');
+            indicator.style.transform = 'translateY(' + (lastPull - 50) + 'px)';
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            if (!pulling) return;
+            pulling = false;
+            if (lastPull >= threshold) {
+                refreshing = true;
+                indicator.classList.add('snapping');
+                indicator.style.transform = 'translateY(16px)';
+                setTimeout(() => window.location.reload(), 200);
+            } else {
+                reset();
+            }
+        }, { passive: true });
     }
 
     function toggleHeaderMoreDropdown(event) {

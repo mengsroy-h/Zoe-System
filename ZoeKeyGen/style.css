@@ -196,3 +196,17 @@ td.note-cell { white-space: normal; max-width: 140px; }
 .hidden { display: none !important; }
 .text-muted { color: var(--text-muted); }
 .mb-8 { margin-bottom: 8px; }
+
+.ptr-indicator {
+    position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; width: 28px; height: 28px;
+    margin-left: -14px; border-radius: 50%; background: var(--card-bg); box-shadow: var(--shadow-md);
+    display: flex; align-items: center; justify-content: center; z-index: 500; opacity: 0;
+    transform: translateY(-50px); pointer-events: none;
+}
+.ptr-indicator.visible { opacity: 1; }
+.ptr-indicator.snapping { transition: transform 0.2s ease, opacity 0.2s ease; }
+.ptr-indicator .ptr-spinner {
+    width: 14px; height: 14px; border: 2px solid var(--primary-light); border-top-color: var(--primary);
+    border-radius: 50%; animation: ptrSpin 0.7s linear infinite;
+}
+@keyframes ptrSpin { to { transform: rotate(360deg); } }

@@ -32,6 +32,16 @@ If revenue numbers behave unexpectedly, first determine which of these two flows
 involved (check for the `isFromDeletion` flag and whether the trash item has 1 barcode vs
 the full original set) before proposing a fix.
 
+All timestamps that feed retention/revenue decisions (`createdAt`, `closedAt`, `deletedAt`,
+`lockerUpdatedAt`, and the "now" used to compare against them) are computed via
+`getServerNow()` in each app (`Date.now() + serverTimeOffsetMs`, where the offset is kept
+live from Firebase's `.info/serverTimeOffset`), not raw `Date.now()` — a wrong device clock
+must not be able to skew the 2h/8d/10d windows or misdate revenue. Purely local/cosmetic
+timers (PIN lockout, ID generation salt, scan-debounce, "recent" UI badges, script-load
+retry deadlines) intentionally still use raw `Date.now()` — don't "fix" those too, they
+don't need server sync and `getServerNow()` isn't even in scope at the point some of them
+run (e.g. before Firebase has initialized).
+
 Retention/auto-cleanup windows (do not change without being asked): closed parcels
 auto-move to trash after 2 hours; still-open parcels after 8 days; anything in trash is
 permanently purged after 10 days.

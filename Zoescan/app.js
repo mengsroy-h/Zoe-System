@@ -3,6 +3,12 @@ if (window.visualViewport) {
 }
 
 let app, auth, db, dbRefHistory, dbRefConnected;
+
+let serverTimeOffsetMs = 0;
+function getServerNow() {
+    return Date.now() + serverTimeOffsetMs;
+}
+
 let currentUserEmail = null;
 let authGeneration = 0;
 let historyData = {};
@@ -184,6 +190,11 @@ async function initFirebase() {
         document.getElementById('firebaseStatusText').textContent = online ? 'ភ្ជាប់ Server រួចរាល់' : 'ក្រៅបណ្ដាញ';
     });
 
+    sdk.onValue(sdk.ref(db, '.info/serverTimeOffset'), (snap) => {
+        const val = snap.val();
+        if (typeof val === 'number') serverTimeOffsetMs = val;
+    });
+
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
 
     sdk.onAuthStateChanged(auth, (user) => {
@@ -224,7 +235,7 @@ async function isFirebaseSessionExpired(user) {
     try {
         const authTimeMs = new Date((await window.firebaseSDK.getIdTokenResult(user)).authTime).getTime();
         if (isNaN(authTimeMs)) return false;
-        return (Date.now() - authTimeMs) > FOUR_HOURS_MS;
+        return (getServerNow() - authTimeMs) > FOUR_HOURS_MS;
     } catch (e) {
         return false;
     }
@@ -996,7 +1007,7 @@ async function assignLockerToEntry(code) {
         return;
     }
     const { itemId } = entry;
-    const ts = Date.now();
+    const ts = getServerNow();
     const previousLocker = getEntryCurrentLocker(entry);
     let phoneForToast = entry.item.phone || '';
     let matched = false;

@@ -79,8 +79,13 @@
     let activeParentItemId = null;
     let pendingRestoreId = null;
 
+    let serverTimeOffsetMs = 0;
+    function getServerNow() {
+        return Date.now() + serverTimeOffsetMs;
+    }
+
     let nativeDetector = null;
-    let isModalOpen = false; 
+    let isModalOpen = false;
     let searchTimer = null;
     let isDatabaseInitialized = false;
     let globalAudioCtx = null;
@@ -236,6 +241,11 @@
                 const online = snap.val() === true;
                 if (statusDot) statusDot.classList.toggle('offline', !online);
                 if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+            });
+
+            fb.onValue(fb.ref(db, '.info/serverTimeOffset'), (snap) => {
+                const val = snap.val();
+                if (typeof val === 'number') serverTimeOffsetMs = val;
             });
 
             setupAuthListener();
@@ -676,7 +686,7 @@
             const tokenResult = await fb.getIdTokenResult(user);
             const authTimeMs = new Date(tokenResult.authTime).getTime();
             if (isNaN(authTimeMs)) return false;
-            return (Date.now() - authTimeMs) > FOUR_HOURS_MS;
+            return (getServerNow() - authTimeMs) > FOUR_HOURS_MS;
         } catch (e) {
             return false;
         }
@@ -1021,7 +1031,7 @@
             scanHistory.forEach(item => { 
                 if(!item.id) item.id = generateUniqueId();
                 if (!item.createdAt) {
-                    item.createdAt = parseTimestampFromId(item.id) || Date.now();
+                    item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
                 
                 if (item.cod === undefined) {
@@ -1063,7 +1073,7 @@
             deletedItems.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
                 if (!item.createdAt) {
-                    item.createdAt = parseTimestampFromId(item.id) || Date.now();
+                    item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
             });
             lastSyncedDeletedKeys = new Set(deletedItems.map(item => item.id).filter(Boolean));
@@ -1096,7 +1106,7 @@
     const cleanupInFlight = new Set();
 
     function runAutomaticCleanupRules() {
-        const currentTime = Date.now();
+        const currentTime = getServerNow();
 
         scanHistory.forEach(item => {
             if (!item.id) return;
@@ -1127,10 +1137,10 @@
                 claimedPartial = null;
                 updatedRemainder = null;
                 if (!currentItem) return currentItem;
-                const ts = currentItem.createdAt || parseTimestampFromId(id) || Date.now();
+                const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
                 if (reason === 'abandon') {
-                    if (currentItem.isClosed || (Date.now() - ts) <= EIGHT_DAYS_MS) return currentItem;
+                    if (currentItem.isClosed || (getServerNow() - ts) <= EIGHT_DAYS_MS) return currentItem;
 
                     if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                         const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
@@ -1150,7 +1160,7 @@
                         updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
                         updated.barcode = stillActive[0].code;
                         updated.isClosed = true;
-                        if (!updated.closedAt) updated.closedAt = Date.now();
+                        if (!updated.closedAt) updated.closedAt = getServerNow();
                         updatedRemainder = updated;
                         return updated;
                     }
@@ -1158,7 +1168,7 @@
                     claimedWhole = currentItem;
                     return null;
                 } else {
-                    if (!currentItem.isClosed || !currentItem.closedAt || (Date.now() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
+                    if (!currentItem.isClosed || !currentItem.closedAt || (getServerNow() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
                     claimedWhole = currentItem;
                     return null;
                 }
@@ -1183,12 +1193,12 @@
                 trashItem.barcode = trashItem.barcodes[0].code;
                 trashItem.isClosed = false;
                 delete trashItem.closedAt;
-                trashItem.deletedAt = Date.now();
+                trashItem.deletedAt = getServerNow();
                 trashItem.isFromDeletion = false;
                 addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -trashItem.cod, -trashItem.dod, -trashItem.count);
             } else {
                 trashItem = { ...claimedWhole, id };
-                trashItem.deletedAt = Date.now();
+                trashItem.deletedAt = getServerNow();
 
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
@@ -1215,7 +1225,7 @@
     }
 
     function runAutomaticDeletedCleanup() {
-        const currentTime = Date.now();
+        const currentTime = getServerNow();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let initialLen = deletedItems.length;
         let purgedBarcodes = [];
@@ -1280,7 +1290,7 @@
         showToast._t = setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
     }
 
-    function getFormattedDate(d = new Date()) {
+    function getFormattedDate(d = new Date(getServerNow())) {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -1780,7 +1790,7 @@
     }
 
     function getFilteredDataByDate() {
-        const today = new Date();
+        const today = new Date(getServerNow());
         const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
         const dayBefore = new Date(today); dayBefore.setDate(today.getDate() - 2);
 
@@ -1991,7 +2001,7 @@
         let dodTotal = 0;
 
         let targetDateKey = "";
-        const today = new Date();
+        const today = new Date(getServerNow());
         const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
         const dayBefore = new Date(today); dayBefore.setDate(today.getDate() - 2);
 
@@ -2677,7 +2687,7 @@
 
     function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A") {
         let savePromise;
-        const now = new Date();
+        const now = new Date(getServerNow());
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
         
@@ -2770,7 +2780,7 @@
             let cVal = parseFloat(item.cod !== undefined ? item.cod : item.price) || 0;
             let dVal = parseFloat(item.dod) || 0;
             let lVal = item.locker || "N/A";
-            item.barcodes = [{ code: item.barcode, time: item.time, cod: cVal, dod: dVal, locker: lVal, isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || Date.now() }];
+            item.barcodes = [{ code: item.barcode, time: item.time, cod: cVal, dod: dVal, locker: lVal, isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || getServerNow() }];
         }
 
         item.barcodes.forEach((b, idx) => {
@@ -2834,7 +2844,7 @@
 
         let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
         itemToTrash.id = generateUniqueId();
-        itemToTrash.deletedAt = Date.now();
+        itemToTrash.deletedAt = getServerNow();
         itemToTrash.isFromDeletion = false;
         itemToTrash.cod = parseFloat(removedBc.cod) || 0;
         itemToTrash.dod = parseFloat(removedBc.dod) || 0;
@@ -2844,7 +2854,7 @@
         itemToTrash.time = removedBc.time || item.time;
         itemToTrash.isClosed = removedBc.isClosed || false;
         if (itemToTrash.isClosed) {
-            itemToTrash.closedAt = item.closedAt || Date.now();
+            itemToTrash.closedAt = item.closedAt || getServerNow();
         } else {
             delete itemToTrash.closedAt;
         }
@@ -2906,7 +2916,7 @@
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
-            if (allClosedLocal) freshItem.closedAt = Date.now(); else delete freshItem.closedAt;
+            if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
             openViewListModal(itemId);
             applyCurrentFilter();
         }
@@ -2928,7 +2938,7 @@
                         isClosed: currentItem.isClosed || false,
                         isDeducted: false,
                         isFromDeletion: false,
-                        createdAt: currentItem.createdAt || Date.now()
+                        createdAt: currentItem.createdAt || getServerNow()
                     }];
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
@@ -2936,7 +2946,7 @@
                 b.isClosed = desiredClosed;
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
                 currentItem.isClosed = allClosed;
-                if (allClosed) currentItem.closedAt = Date.now();
+                if (allClosed) currentItem.closedAt = getServerNow();
                 else delete currentItem.closedAt;
                 return currentItem;
             });
@@ -3063,7 +3073,7 @@
             const prevCallMarkTime = item.callMarkTime;
             if (mark) {
                 item.callMark = mark;
-                item.callMarkTime = Date.now();
+                item.callMarkTime = getServerNow();
                 patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
             } else {
                 delete item.callMark;
@@ -3126,7 +3136,7 @@
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
-                freshItem.closedAt = Date.now();
+                freshItem.closedAt = getServerNow();
                 if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = true);
             } else {
                 delete freshItem.closedAt;
@@ -3144,7 +3154,7 @@
                 if (!currentItem) return currentItem;
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
-                    currentItem.closedAt = Date.now();
+                    currentItem.closedAt = getServerNow();
                     if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
                         currentItem.barcodes.forEach(b => b.isClosed = true);
                     }
@@ -3185,7 +3195,7 @@
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
 
         let removed = scanHistory.splice(index, 1)[0];
-        removed.deletedAt = Date.now();
+        removed.deletedAt = getServerNow();
         removed.isFromDeletion = true;
 
         deletedItems.unshift(removed);
@@ -3267,7 +3277,7 @@
         delete itemToRestore.deletedAt; 
         delete itemToRestore.isFromDeletion;
         if (itemToRestore.isClosed) {
-            itemToRestore.closedAt = Date.now();
+            itemToRestore.closedAt = getServerNow();
         }
 
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate));
@@ -3296,7 +3306,7 @@
             targetItem.price = Math.round((targetItem.cod + targetItem.dod) * 100) / 100;
             targetItem.isClosed = targetItem.barcodes.length > 0 && targetItem.barcodes.every(b => b.isClosed);
             if (targetItem.isClosed) {
-                targetItem.closedAt = Date.now();
+                targetItem.closedAt = getServerNow();
             } else {
                 delete targetItem.closedAt;
             }
@@ -3735,7 +3745,7 @@
         if (confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) {
             const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
             scanHistory.forEach(item => {
-                item.deletedAt = Date.now();
+                item.deletedAt = getServerNow();
                 item.isFromDeletion = true;
                 deletedItems.unshift(item);
             });

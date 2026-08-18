@@ -16,6 +16,7 @@
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
     let serverTimeOffsetMs = 0;
+    let serverTimeSynced = false;
     function getServerNow() {
         return Date.now() + serverTimeOffsetMs;
     }
@@ -183,7 +184,10 @@
             const dateHeader = res.headers.get('Date');
             if (dateHeader) {
                 const serverMs = new Date(dateHeader).getTime();
-                if (!isNaN(serverMs)) serverTimeOffsetMs = serverMs - Date.now();
+                if (!isNaN(serverMs)) {
+                    serverTimeOffsetMs = serverMs - Date.now();
+                    serverTimeSynced = true;
+                }
             }
             const data = await res.json();
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
@@ -213,6 +217,7 @@
             const serverMs = new Date(dateHeader).getTime();
             if (isNaN(serverMs)) return false;
             serverTimeOffsetMs = serverMs - Date.now();
+            serverTimeSynced = true;
             return true;
         } catch (e) {
             return false;
@@ -220,7 +225,14 @@
     }
 
     function setServerTimeOffset(ms) {
-        if (typeof ms === 'number' && !isNaN(ms)) serverTimeOffsetMs = ms;
+        if (typeof ms === 'number' && !isNaN(ms)) {
+            serverTimeOffsetMs = ms;
+            serverTimeSynced = true;
+        }
+    }
+
+    function getServerTimeOffset() {
+        return serverTimeSynced ? serverTimeOffsetMs : null;
     }
 
     async function getStatus(appCode) {
@@ -309,6 +321,7 @@
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,
         syncServerTime: syncServerTime,
-        setServerTimeOffset: setServerTimeOffset
+        setServerTimeOffset: setServerTimeOffset,
+        getServerTimeOffset: getServerTimeOffset
     };
 })(window);

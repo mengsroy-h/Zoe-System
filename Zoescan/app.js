@@ -364,6 +364,7 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
 
 let listenersAttached = false;
 const debouncedRenderList = debounce(() => { if (currentTab === 'list') renderList(); }, 120);
+const debouncedBuildBarcodeIndex = debounce(() => { buildBarcodeIndex(); }, 120);
 
 function initDatabaseListeners() {
     if (listenersAttached) return;
@@ -372,7 +373,7 @@ function initDatabaseListeners() {
     const sdk = window.firebaseSDK;
     sdk.onValue(dbRefHistory, (snap) => {
         historyData = snap.val() || {};
-        buildBarcodeIndex();
+        debouncedBuildBarcodeIndex();
         debouncedRenderList();
     }, (err) => {
         console.error('Firebase history listener error:', err);
@@ -691,6 +692,15 @@ async function requestCameraPermission() {
         currentStream = stream;
         isCameraScanning = true;
         isCameraStarting = false;
+
+        const videoTrackForEndedCheck = stream.getVideoTracks()[0];
+        if (videoTrackForEndedCheck) {
+            videoTrackForEndedCheck.addEventListener('ended', () => {
+                if (currentStream !== stream) return;
+                stopScanner();
+                showToast('🚫 កាមេរ៉ាបានផ្តាច់ ឬត្រូវបានដកសិទ្ធិ');
+            });
+        }
 
         document.getElementById('permission-box').classList.add('hidden');
         document.getElementById('video-container').classList.remove('hidden');
@@ -1046,8 +1056,6 @@ async function assignLockerToEntry(code) {
             return currentItem;
         }), 12000, 'Save timed out');
 
-        if (myAssignGeneration !== assignGeneration) return;
-
         if (!result.committed || !matched) {
             playErrorFeedback();
             showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
@@ -1077,23 +1085,24 @@ async function assignLockerToEntry(code) {
         try {
             await withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out');
         } catch (mirrorErr) {
-            if (myAssignGeneration !== assignGeneration) return;
             console.error('Mirror update to scan history failed: ', mirrorErr);
             if (window.ZoeErrors) ZoeErrors.capture(mirrorErr, { context: 'assignLockerToEntry mirror update failed' });
-            playSuccessFeedback();
+            if (myAssignGeneration === assignGeneration) {
+                playSuccessFeedback();
+            }
             showToast(`⚠️ ទីតាំង${who} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "Sync Scanner Lookup"`);
             return;
         }
 
-        if (myAssignGeneration !== assignGeneration) return;
-        playSuccessFeedback();
+        if (myAssignGeneration === assignGeneration) {
+            playSuccessFeedback();
+        }
         showToast(successMsg);
     } catch (err) {
-        if (myAssignGeneration !== assignGeneration) return;
         playErrorFeedback();
-        showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
         console.error(err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
+        showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
     }
 }
 
@@ -1211,6 +1220,9 @@ function bindEventListeners() {
     const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
     if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 
+    const activationLogoutBtnEl = document.getElementById('activationLogoutBtn');
+    if (activationLogoutBtnEl) activationLogoutBtnEl.addEventListener('click', logoutApp);
+
     document.addEventListener('click', (e) => {
         if (e.target && e.target.classList && e.target.classList.contains('modal') && e.target.classList.contains('open')) {
             dismissModal(e.target);
@@ -1227,6 +1239,10 @@ function bindEventListeners() {
             if (isCameraScanning && currentTab === 'scan') {
                 cameraStoppedByVisibility = true;
                 stopScanner();
+            } else if (isCameraStarting && currentTab === 'scan') {
+                cameraStoppedByVisibility = true;
+                cameraRequestId++;
+                isCameraStarting = false;
             }
         } else if (cameraStoppedByVisibility) {
             cameraStoppedByVisibility = false;

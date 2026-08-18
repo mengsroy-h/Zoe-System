@@ -5,6 +5,18 @@
     const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
     if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
 
+    const bindClickBackup = (id, handler) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('click', handler);
+    };
+    bindClickBackup('activationLogoutBtn', logoutApp);
+    bindClickBackup('pinConfirmBtn', verifySecurityPin);
+    bindClickBackup('pinSetupSaveBtn', saveNewSecurityPin);
+    bindClickBackup('configSaveBtn', saveFirebaseConfig);
+    bindClickBackup('editPhoneSaveBtn', saveEditedPhone);
+    bindClickBackup('restoreConfirmBtn', executeRestoreItem);
+    bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -41,6 +53,7 @@
     let dbRefMonthlyRevenue = null;
     let dbRefExchangeRate = null;
     let dbRefConnected = null;
+    let dbRefServerTimeOffset = null;
     let authUnsubscribe = null;
     let authRecoveryTimeout = null;
     let authGeneration = 0;
@@ -187,6 +200,13 @@
         ]);
     }
 
+    function retryAsync(fn, attempts, delayMs) {
+        return fn().catch((err) => {
+            if (attempts <= 1) throw err;
+            return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
+        });
+    }
+
     async function initFirebase() {
         const savedConfig = localStorage.getItem('zoew_firebase_config');
         if (!savedConfig) {
@@ -210,6 +230,7 @@
                 if (dbRefMonthlyRevenue) { try { fb.off(dbRefMonthlyRevenue); } catch (e) {} }
                 if (dbRefExchangeRate) { try { fb.off(dbRefExchangeRate); } catch (e) {} }
                 if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
+                if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
                 isDatabaseInitialized = false;
                 scanHistory = [];
                 deletedItems = [];
@@ -243,7 +264,8 @@
                 if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
             });
 
-            fb.onValue(fb.ref(db, '.info/serverTimeOffset'), (snap) => {
+            dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
+            fb.onValue(dbRefServerTimeOffset, (snap) => {
                 const val = snap.val();
                 if (typeof val === 'number') serverTimeOffsetMs = val;
                 if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
@@ -1004,7 +1026,7 @@
                 if (val && !isNaN(val)) {
                     exchangeRateRiel = parseFloat(val);
                     localStorage.setItem('zoew_exchange_rate', exchangeRateRiel);
-                    applyCurrentFilter();
+                    debouncedRenderAfterHistorySync();
                 }
             }, handleDbListenerError);
         }
@@ -1012,7 +1034,7 @@
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
                 dailyRevenueData = snapshot.val() || {};
-                applyCurrentFilter();
+                debouncedRenderAfterHistorySync();
             }, handleDbListenerError);
         }
 
@@ -1184,6 +1206,9 @@
             }
 
             let trashItem;
+            let revenueDeducted = false;
+            let revenueScanDate = null;
+            let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
                 trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
@@ -1196,7 +1221,12 @@
                 delete trashItem.closedAt;
                 trashItem.deletedAt = getServerNow();
                 trashItem.isFromDeletion = false;
-                addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -trashItem.cod, -trashItem.dod, -trashItem.count);
+                revenueScanDate = trashItem.scanDate || getFormattedDate();
+                revenueCod = trashItem.cod;
+                revenueDod = trashItem.dod;
+                revenueCount = trashItem.count;
+                addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+                revenueDeducted = true;
             } else {
                 trashItem = { ...claimedWhole, id };
                 trashItem.deletedAt = getServerNow();
@@ -1206,17 +1236,25 @@
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
                         trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
                     }
-                    let targetCod = parseFloat(trashItem.cod) || 0;
-                    let targetDod = parseFloat(trashItem.dod) || 0;
-                    let targetCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
-                    addRevenueToDailyAndMonthlyRecord(trashItem.scanDate || getFormattedDate(), -targetCod, -targetDod, -targetCount);
+                    revenueScanDate = trashItem.scanDate || getFormattedDate();
+                    revenueCod = parseFloat(trashItem.cod) || 0;
+                    revenueDod = parseFloat(trashItem.dod) || 0;
+                    revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+                    revenueDeducted = true;
                 } else {
                     trashItem.isFromDeletion = true;
                 }
             }
 
             deletedItems.unshift(trashItem);
-            saveSingleDeletedItemToFirebase(trashItem).catch(() => {});
+            retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500).catch((trashErr) => {
+                if (revenueDeducted) {
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, revenueCod, revenueDod, revenueCount);
+                }
+                console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
+            });
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
@@ -2787,6 +2825,10 @@
         }
 
         addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
+        const revertRevenueOnSaveFailure = (err) => {
+            addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
+            throw err;
+        };
 
         if (existingIndex !== -1) {
             let item = scanHistory[existingIndex];
@@ -2826,7 +2868,7 @@
 
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
-            savePromise = saveSingleHistoryItemToFirebase(item).then(() => { syncScannerLookupEntry(item.id, item); });
+            savePromise = saveSingleHistoryItemToFirebase(item).catch(revertRevenueOnSaveFailure).then(() => { syncScannerLookupEntry(item.id, item); });
         } else {
             let newItem = {
                 id: generateUniqueId(),
@@ -2845,7 +2887,7 @@
             };
 
             scanHistory.push(newItem);
-            savePromise = saveSingleHistoryItemToFirebase(newItem).then(() => { syncScannerLookupEntry(newItem.id, newItem); });
+            savePromise = saveSingleHistoryItemToFirebase(newItem).catch(revertRevenueOnSaveFailure).then(() => { syncScannerLookupEntry(newItem.id, newItem); });
         }
 
         updateRecentPhonesList();
@@ -2919,12 +2961,17 @@
 
         const removedBc = item.barcodes.splice(bcIndex, 1)[0];
 
+        let deductionApplied = false;
+        let deductedCod = 0;
+        let deductedDod = 0;
+        const revenueScanDate = item.scanDate || getFormattedDate();
         if (!removedBc.isDeducted) {
-            const targetCod = parseFloat(removedBc.cod) || 0;
-            const targetDod = parseFloat(removedBc.dod) || 0;
+            deductedCod = parseFloat(removedBc.cod) || 0;
+            deductedDod = parseFloat(removedBc.dod) || 0;
 
-            addRevenueToDailyAndMonthlyRecord(item.scanDate || getFormattedDate(), -targetCod, -targetDod, -1);
+            addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
             removedBc.isDeducted = true;
+            deductionApplied = true;
         }
 
         removedBc.isFromDeletion = false;
@@ -2975,6 +3022,9 @@
             else syncScannerLookupEntry(itemId, item);
             showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
         } catch (e) {
+            if (deductionApplied) {
+                addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
+            }
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
             dailyRevenueData = dailySnapshot;
@@ -3367,9 +3417,10 @@
             itemToRestore.closedAt = getServerNow();
         }
 
-        let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate));
+        let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
 
         let resultingLiveItem;
+        const appliedRevenueDeltas = [];
 
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
@@ -3380,7 +3431,9 @@
                     if (restoredBc.isDeducted) {
                         const targetCod = parseFloat(restoredBc.cod) || 0;
                         const targetDod = parseFloat(restoredBc.dod) || 0;
-                        addRevenueToDailyAndMonthlyRecord(targetItem.scanDate || getFormattedDate(), targetCod, targetDod, 1);
+                        const revenueScanDate = targetItem.scanDate || getFormattedDate();
+                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
+                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
                         restoredBc.isDeducted = false;
                     }
                     targetItem.barcodes.push(restoredBc);
@@ -3412,7 +3465,9 @@
                     if (restoredBc.isDeducted) {
                         const targetCod = parseFloat(restoredBc.cod) || 0;
                         const targetDod = parseFloat(restoredBc.dod) || 0;
-                        addRevenueToDailyAndMonthlyRecord(itemToRestore.scanDate || getFormattedDate(), targetCod, targetDod, 1);
+                        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
+                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
+                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
                         restoredBc.isDeducted = false;
                     }
                 });
@@ -3426,13 +3481,23 @@
         pendingRestoreId = null;
 
         try {
-            await Promise.all([saveSingleHistoryItemToFirebase(resultingLiveItem), deleteSingleDeletedItemFromFirebase(itemToRestore.id)]);
+            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+            if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
+                throw new Error('Unsafe id during restore');
+            }
+            await fb.update(fb.ref(db), {
+                [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
+                [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
+            });
+            lastSyncedHistoryKeys.add(resultingLiveItem.id);
+            lastSyncedDeletedKeys.delete(itemToRestore.id);
             if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
             updateRecentPhonesList();
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
+            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -1));
             console.error("Restore failed: ", restoredId, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             try {
@@ -3492,36 +3557,14 @@
         }
     }
 
-    function saveHistoryToFirebase() {
-        if (!dbRefHistory) return Promise.resolve();
-        const historyObj = {};
-        const currentKeys = new Set();
-        scanHistory.forEach(item => {
-            if (item.id && /^[a-zA-Z0-9_-]+$/.test(item.id)) {
-                historyObj[item.id] = item;
-                currentKeys.add(item.id);
-            } else if (item.id) {
-                console.error('Skipping item with unsafe id: ', item.id);
-            }
-        });
-        lastSyncedHistoryKeys.forEach(key => {
-            if (!currentKeys.has(key)) historyObj[key] = null;
-        });
-
-        return fb.update(dbRefHistory, historyObj).then(() => {
-            lastSyncedHistoryKeys = currentKeys;
-        }).catch((error) => {
-            console.error("Error saving history: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
-            throw error;
-        });
-    }
-
     function saveSingleHistoryItemToFirebase(item) {
         if (!dbRefHistory) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
-            return saveHistoryToFirebase();
+            const err = new Error('Refusing to save history item with missing/unsafe id');
+            console.error(err.message, item && item.id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveSingleHistoryItemToFirebase' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
         }
         lastSyncedHistoryKeys.add(item.id);
         return fb.update(dbRefHistory, { [item.id]: item }).catch((error) => {
@@ -3535,7 +3578,11 @@
     function patchHistoryItemFields(item, fields, previousFields) {
         if (!dbRefHistory) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
-            return saveHistoryToFirebase();
+            const err = new Error('Refusing to patch history item with missing/unsafe id');
+            console.error(err.message, item && item.id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'patchHistoryItemFields' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
         }
         lastSyncedHistoryKeys.add(item.id);
         const updates = {};
@@ -3559,35 +3606,15 @@
         });
     }
 
-    function saveDeletedToFirebase() {
-        if (!dbRefDeleted) return Promise.resolve();
-        const deletedObj = {};
-        const currentKeys = new Set();
-        deletedItems.forEach(item => {
-            if (item.id && /^[a-zA-Z0-9_-]+$/.test(item.id)) {
-                deletedObj[item.id] = item;
-                currentKeys.add(item.id);
-            } else if (item.id) {
-                console.error('Skipping item with unsafe id: ', item.id);
-            }
-        });
-        lastSyncedDeletedKeys.forEach(key => {
-            if (!currentKeys.has(key)) deletedObj[key] = null;
-        });
-
-        return fb.update(dbRefDeleted, deletedObj).then(() => {
-            lastSyncedDeletedKeys = currentKeys;
-        }).catch((error) => {
-            console.error("Error saving deleted items: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted items: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
-            throw error;
-        });
-    }
-
     function deleteSingleHistoryItemFromFirebase(id) {
         if (!dbRefHistory) return Promise.resolve();
-        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return saveHistoryToFirebase();
+        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+            const err = new Error('Refusing to delete history item with missing/unsafe id');
+            console.error(err.message, id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'deleteSingleHistoryItemFromFirebase' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
+        }
         return fb.update(dbRefHistory, { [id]: null }).then(() => {
             lastSyncedHistoryKeys.delete(id);
         }).catch((error) => {
@@ -3601,7 +3628,11 @@
     function saveSingleDeletedItemToFirebase(item) {
         if (!dbRefDeleted) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
-            return saveDeletedToFirebase();
+            const err = new Error('Refusing to save deleted item with missing/unsafe id');
+            console.error(err.message, item && item.id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveSingleDeletedItemToFirebase' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
         }
         return fb.update(dbRefDeleted, { [item.id]: item }).then(() => {
             lastSyncedDeletedKeys.add(item.id);
@@ -3615,7 +3646,13 @@
 
     function deleteSingleDeletedItemFromFirebase(id) {
         if (!dbRefDeleted) return Promise.resolve();
-        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return saveDeletedToFirebase();
+        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+            const err = new Error('Refusing to delete deleted item with missing/unsafe id');
+            console.error(err.message, id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'deleteSingleDeletedItemFromFirebase' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
+        }
         return fb.update(dbRefDeleted, { [id]: null }).then(() => {
             lastSyncedDeletedKeys.delete(id);
         }).catch((error) => {
@@ -3872,7 +3909,15 @@
             });
             clearedItems.forEach(item => deletedItems.unshift(item));
             scanHistory = [];
-            saveHistoryToFirebase();
+            if (dbRefHistory) {
+                fb.set(dbRefHistory, null).then(() => {
+                    lastSyncedHistoryKeys = new Set();
+                }).catch((error) => {
+                    console.error("Error clearing history: ", error);
+                    if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });
+                    showToast("⚠️ បរាជ័យក្នុងការលុបប្រវត្តិទាំងអស់ពី Firebase!");
+                });
+            }
             saveMultipleDeletedItemsToFirebase(clearedItems);
             clearedIds.forEach(id => clearScannerLookupEntry(id));
             applyCurrentFilter();

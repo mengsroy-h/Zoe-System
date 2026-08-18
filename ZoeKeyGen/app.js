@@ -111,8 +111,27 @@ function getServerNow() {
 function waitForServerTimeSync(timeoutMs) {
     if (serverTimeSynced) return Promise.resolve(true);
     return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(serverTimeSynced), timeoutMs);
-        serverTimeSyncWaiters.push(() => { clearTimeout(timer); resolve(true); });
+        let settled = false;
+        const finish = (result) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(result);
+        };
+        const timer = setTimeout(() => finish(serverTimeSynced), timeoutMs);
+        serverTimeSyncWaiters.push(() => finish(true));
+
+        if (window.ZoeLicense) {
+            window.ZoeLicense.syncServerTime().then((ok) => {
+                if (settled || serverTimeSynced || !ok) return;
+                const offset = window.ZoeLicense.getServerTimeOffset();
+                if (typeof offset === 'number') {
+                    serverTimeOffsetMs = offset;
+                    serverTimeSynced = true;
+                    finish(true);
+                }
+            }).catch(() => {});
+        }
     });
 }
 
@@ -191,6 +210,8 @@ async function initFirebase() {
             if (typeof fb.deleteApp === 'function') {
                 await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
             }
+            serverTimeSynced = false;
+            serverTimeOffsetMs = 0;
         }
 
         const firebaseApp = fb.getApps().length ? fb.getApps()[0] : fb.initializeApp(firebaseConfig);
@@ -841,6 +862,11 @@ async function confirmExtendKey() {
     if (!row) { closeModal('extendModal'); return; }
     const days = parseFloat(document.getElementById('extendDaysInput').value);
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+    const timeSynced = await waitForServerTimeSync(15000);
+    if (!timeSynced) {
+        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
+        return;
+    }
     const newExpiresAt = getServerNow() + Math.round(days * 86400000);
     try {
         const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
@@ -924,6 +950,7 @@ function setupIOSPullToRefresh() {
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
+    if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
     initFirebase();
     updateSigningKeyBadge();
     setupIOSPullToRefresh();

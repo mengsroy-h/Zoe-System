@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeadmin-v6';
+const CACHE_VERSION = 'zoeadmin-v7';
 
 const APP_SHELL = [
     './',
@@ -40,20 +40,28 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== self.location.origin) return;
 
     event.respondWith(
-        fetch(request)
-            .then((response) => {
-                if (response && response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+        caches.open(CACHE_VERSION).then((cache) =>
+            cache.match(request).then((cached) => {
+                const networkFetch = fetch(request)
+                    .then((response) => {
+                        if (response && response.ok) cache.put(request, response.clone());
+                        return response;
+                    })
+                    .catch(() => null);
+
+                if (!cached) {
+                    return networkFetch.then((response) => {
+                        if (response) return response;
+                        if (request.mode === 'navigate') return caches.match('./index.html');
+                        return Response.error();
+                    });
                 }
-                return response;
+
+                return Promise.race([
+                    networkFetch.then((response) => response || cached),
+                    new Promise((resolve) => setTimeout(() => resolve(cached), 3000))
+                ]);
             })
-            .catch(() =>
-                caches.match(request).then((cached) => {
-                    if (cached) return cached;
-                    if (request.mode === 'navigate') return caches.match('./index.html');
-                    return Response.error();
-                })
-            )
+        )
     );
 });

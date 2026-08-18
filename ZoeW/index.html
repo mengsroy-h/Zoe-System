@@ -176,7 +176,7 @@
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
         <div class="modal-btns">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
+                <button class="btn-confirm" id="pinConfirmBtn" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
                 <button class="btn-cancel" onclick="closeModal('pinModal')">បោះបង់</button>
             </div>
         </div>
@@ -190,7 +190,7 @@
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
             <button class="btn-cancel" onclick="closeModal('pinSetupModal')">បោះបង់</button>
-            <button class="btn-confirm" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
+            <button class="btn-confirm" id="pinSetupSaveBtn" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
         </div>
     </div>
 </div>
@@ -208,7 +208,7 @@
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
-            <button class="btn-confirm" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
+            <button class="btn-confirm" id="configSaveBtn" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
         </div>
     </div>
@@ -241,7 +241,7 @@
         <input type="tel" id="editPhoneInput" placeholder="លេខទូរស័ព្ទថ្មី" list="recentPhonesList">
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="saveEditedPhone()">រក្សាទុក</button>
+                <button class="btn-confirm" id="editPhoneSaveBtn" onclick="saveEditedPhone()">រក្សាទុក</button>
                 <button class="btn-cancel" onclick="closeModal('editPhoneModal')">បោះបង់</button>
             </div>
         </div>
@@ -325,7 +325,7 @@
         <p>តើអ្នកពិតជាចង់ស្តារទិន្នន័យកញ្ចប់អីវ៉ាន់នេះពីធុងសំរាមមែនទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="executeRestoreItem()">យល់ព្រមស្តារ</button>
+                <button class="btn-confirm" id="restoreConfirmBtn" onclick="executeRestoreItem()">យល់ព្រមស្តារ</button>
                 <button class="btn-cancel" onclick="cancelRestoreItem()">បោះបង់</button>
             </div>
         </div>
@@ -338,7 +338,7 @@
         <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" style="background:#ef4444;" onclick="executePermanentDelete()">លុបជាអចិន្ត្រៃយ៍</button>
+                <button class="btn-confirm" style="background:#ef4444;" id="permanentDeleteConfirmBtn" onclick="executePermanentDelete()">លុបជាអចិន្ត្រៃយ៍</button>
                 <button class="btn-cancel" onclick="cancelPermanentDelete()">បោះបង់</button>
             </div>
         </div>
@@ -356,7 +356,7 @@
         <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: 11px;"></textarea>
         <div class="modal-btns">
             <button class="btn-confirm" id="activationSubmitBtn" onclick="submitActivationKey()">ដាក់ Active</button>
-            <button class="btn-cancel" onclick="logoutApp()">ចាកចេញ</button>
+            <button class="btn-cancel" id="activationLogoutBtn" onclick="logoutApp()">ចាកចេញ</button>
         </div>
         <p style="margin-top:10px; font-size:11.5px; color:var(--text-muted); text-align:center;">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:600;">@mengsroyhun</a> តាម Telegram</p>
     </div>

@@ -3941,9 +3941,11 @@
             });
             clearedItems.forEach(item => deletedItems.unshift(item));
             scanHistory = [];
-            if (dbRefHistory) {
-                fb.set(dbRefHistory, null).then(() => {
-                    lastSyncedHistoryKeys = new Set();
+            if (dbRefHistory && clearedIds.length > 0) {
+                const clearUpdates = {};
+                clearedIds.forEach(id => { clearUpdates[id] = null; });
+                fb.update(dbRefHistory, clearUpdates).then(() => {
+                    clearedIds.forEach(id => lastSyncedHistoryKeys.delete(id));
                 }).catch((error) => {
                     console.error("Error clearing history: ", error);
                     if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });

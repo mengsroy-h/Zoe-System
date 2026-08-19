@@ -237,6 +237,9 @@
     <div class="modal-content" style="max-width: 360px;">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>សូមបិទភ្ជាប់ JSON ឬ JavaScript Object config របស់ Firebase នៅទីនេះ៖</p>
+        <div class="modal-btns" style="margin-bottom:10px;">
+            <button type="button" class="btn-skip" onclick="openConfigQrScanner()">📷 ស្កេន QR (Setup Link)</button>
+        </div>
         <textarea id="firebaseConfigInput" placeholder='{
   "apiKey": "...",
   "authDomain": "...",
@@ -248,6 +251,17 @@
         <div class="modal-btns">
             <button class="btn-confirm" id="configSaveBtn" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="configQrScanModal" class="modal">
+    <div class="modal-content" style="max-width: 360px;">
+        <h3>📷 ស្កេន QR (Setup Link)</h3>
+        <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
+        <video id="configQrVideo" style="width:100%; border-radius:8px; background:#000;" playsinline muted autoplay></video>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeConfigQrScanner()">បោះបង់</button>
         </div>
     </div>
 </div>

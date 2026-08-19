@@ -24,12 +24,15 @@
     <link rel="dns-prefetch" href="https://www.gstatic.com">
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="dns-prefetch" href="https://unpkg.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js" crossorigin>
 
+    <script defer src="https://unpkg.com/@zxing/library@0.23.0/umd/index.min.js" integrity="sha384-0ASr5PEWAMtTnWsn0PzKmioHVDA4+QqFiJr94io/0DCrGP6E1gRAmbO6O8y5WZW9" crossorigin="anonymous"></script>
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
     <script src="./error-reporting.js"></script>
@@ -200,6 +203,9 @@
     <div class="modal-content" style="max-width: 360px;">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>សូមបិទភ្ជាប់ JSON ឬ JavaScript Object config របស់ Firebase នៅទីនេះ៖</p>
+        <div class="modal-btns" style="margin-bottom:10px;">
+            <button type="button" class="btn-skip" onclick="openConfigQrScanner()">📷 ស្កេន QR (Setup Link)</button>
+        </div>
         <textarea id="firebaseConfigInput" placeholder='{
   "apiKey": "...",
   "authDomain": "...",
@@ -211,6 +217,17 @@
         <div class="modal-btns">
             <button class="btn-confirm" id="configSaveBtn" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
             <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="configQrScanModal" class="modal">
+    <div class="modal-content" style="max-width: 360px;">
+        <h3>📷 ស្កេន QR (Setup Link)</h3>
+        <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
+        <video id="configQrVideo" style="width:100%; border-radius:8px; background:#000;" playsinline muted autoplay></video>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeConfigQrScanner()">បោះបង់</button>
         </div>
     </div>
 </div>

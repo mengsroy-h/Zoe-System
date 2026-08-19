@@ -866,3 +866,53 @@ client business's project (account issue, accidental deletion, quota problem) wo
 - Root `.gitignore` updated: `node_modules/`, `firebase-backup/config.json`, `firebase-backup/secrets/`,
   `firebase-backup/backups/`, `firebase-backup/backup.log`.
 - Does not touch any of the 4 apps, Firebase rules, or CACHE_VERSION — purely additive, isolated tooling.
+
+## Config-modal QR scanner for Setup Link (added 2026-08-19)
+
+Added at the user's request as a companion to the Setup Link feature — instead of the vendor reading the
+generated link/QR out loud or the target device relying on an external system camera app to open the
+Setup Link URL, ZoeAdmin/ZoeW/Zoescan's own Config modal now has a "📷 ស្កេន QR (Setup Link)" button that
+scans the same QR with the device's own camera and auto-fills the Config textarea, so the human still
+reviews and clicks the existing "Save" button — no new silent-save path.
+
+**Explicit user constraint, honored by design**: the existing parcel/barcode-scanning feature (ZoeAdmin's
+and Zoescan's `liveScanCodeReader`/`codeReader`, restricted to 1D barcode formats) must not be touched or
+affected in any way. This is why the new scanner uses a **completely separate `ZXing.BrowserQRCodeReader`
+instance** (a QR-only decoder class, structurally incapable of matching barcode formats — not the same
+multi-format reader used for barcode scanning, and not achieved by broadening that reader's format hints)
+with its own isolated variables (`configQrReader`, `configQrScanActive`), own camera stream (via ZXing's
+own `decodeFromVideoDevice`), own video element (`#configQrVideo`), and own modal (`#configQrScanModal`).
+Zero lines of the existing barcode-scanning code path were modified in any of the three apps.
+
+- **Shared logic**: `decodeSetupPayload(setupParam)` (extracted as a small helper in all 3 apps, reused by
+  both `applySetupLinkFromUrl()` and the new scanner) decodes+validates the same base64 payload the Setup
+  Link URL already used — one already-reviewed decode path, not a second parallel implementation.
+- **Flow**: `openConfigQrScanner()` opens `#configQrScanModal` on top of the already-open `#configModal`
+  (both apps' existing `openModalHelper`/`closeModal` — or Zoescan's `openModal`/`closeModal` — already
+  support multiple simultaneously-open `.modal` elements correctly, confirmed by reading their
+  implementations rather than assumed) and starts the QR-only reader. On a successful decode,
+  `handleConfigQrResult(text)` parses the scanned string as a URL, extracts the `?setup=` param, decodes it
+  via the shared helper, stops the scanner, and — unlike the URL-param flow's `confirm()` dialog — simply
+  **pretty-prints the config into the existing Config textarea** (`firebaseConfigInput` in ZoeAdmin/ZoeW,
+  `configInput` in Zoescan) for the human to review and click the pre-existing Save button themselves. No
+  new auto-save path was introduced; this reuses the same trusted, already-existing save/validate code
+  every manual paste already goes through.
+- **ZoeAdmin, Zoescan**: already had `@zxing/library@0.23.0` loaded (pinned version + SRI hash, for the
+  barcode-scanning feature) and the necessary CSP (`unpkg.com` in `script-src`, `worker-src 'self' blob:`)
+  and `Permissions-Policy: camera=(self)` — reused as-is, zero infra changes needed for these two apps.
+- **ZoeW**: previously had **no camera capability at all** by design (`Permissions-Policy: camera=()`, no
+  ZXing, no scan feature of any kind — deliberately, since ZoeW's role never needed a camera). Adding this
+  feature there required, for the first time in ZoeW: loading the identical pinned `@zxing/library@0.23.0`
+  script tag (same URL + SRI hash as ZoeAdmin, byte-for-byte, not a different version), adding `unpkg.com`
+  to `script-src` and `worker-src 'self' blob:` to `netlify.toml`'s CSP, and changing
+  `Permissions-Policy` from `camera=()` to `camera=(self)`. **This was confirmed explicitly with the user
+  before implementing** (a real security-posture change, not something to silently decide) — they chose to
+  add it to all 3 apps for consistency rather than skip ZoeW.
+- Verified via `node --check` on all 3 apps' `app.js`, HTML tag-balance check on all 3 `index.html`, and the
+  exact `ZXing.BrowserQRCodeReader`/`decodeFromVideoDevice`/`Result.getText()` API surface confirmed against
+  the real `@zxing/library@0.23.0` TypeScript definitions (downloaded from `registry.npmjs.org` for
+  inspection, matching the same verification-over-assumption approach used for the vendored `qrcode.js`) —
+  **not verified against a real camera/device in this session** (no browser/camera available), so the
+  vendor should test the actual scan-to-fill flow once after deploying.
+- `CACHE_VERSION` bumped in the 3 affected apps' `sw.js` (zoeadmin-v21, zoew-v18, zoescan-v18); ZoeKeyGen
+  untouched this round.

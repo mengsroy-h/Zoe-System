@@ -195,12 +195,26 @@
     <div class="modal-content">
         <h3>⚙️ Firebase Config</h3>
         <p>បិទភ្ជាប់ Firebase Config Object (JSON) ដូចគ្នានឹង ZoeAdmin/ZoeW ព្រោះទាំង ៣ កម្មវិធីអានទិន្នន័យរួមគ្នា។</p>
+        <div class="modal-btns" style="margin-bottom:10px;">
+            <button type="button" class="btn-cancel" id="configQrScanOpenBtn">📷 ស្កេន QR (Setup Link)</button>
+        </div>
         <textarea id="configInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"..."}'></textarea>
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
             <button class="btn-cancel" id="configCancelBtn">បោះបង់</button>
             <button class="btn-confirm" id="configSaveBtn">រក្សាទុក</button>
+        </div>
+    </div>
+</div>
+
+<div id="configQrScanModal" class="modal">
+    <div class="modal-content">
+        <h3>📷 ស្កេន QR (Setup Link)</h3>
+        <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
+        <video id="configQrVideo" style="width:100%; border-radius:8px; background:#000;" playsinline muted autoplay></video>
+        <div class="modal-btns">
+            <button class="btn-cancel" id="configQrScanCancelBtn">បោះបង់</button>
         </div>
     </div>
 </div>

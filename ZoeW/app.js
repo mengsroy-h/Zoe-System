@@ -1339,6 +1339,11 @@
             }
         }, LICENSE_RECHECK_INTERVAL_MS);
 
+        setInterval(sweepRecallHighlights, 60000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) sweepRecallHighlights();
+        });
+
         setupSwipeGestures();
         setupIOSPullToRefresh();
         updateRecentPhonesList();
@@ -2006,6 +2011,28 @@
         }, 300);
     }
 
+    let lastRecallSignature = '';
+
+    function refreshCurrentHistoryView() {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        if (phoneInput && sanitizePhoneNumber(phoneInput.value)) searchByPhone();
+        else applyCurrentFilter();
+    }
+
+    function sweepRecallHighlights() {
+        if (!scanHistory || !scanHistory.length) return;
+        const now = getServerNow();
+        let signature = '';
+        scanHistory.forEach((item) => {
+            if ((item.callMark === 'no-answer' || item.callMark === 'no-connect') && item.callMarkTime && (now - item.callMarkTime) >= FOUR_HOURS_MS) {
+                signature += item.id + ',';
+            }
+        });
+        if (signature === lastRecallSignature) return;
+        lastRecallSignature = signature;
+        refreshCurrentHistoryView();
+    }
+
     function searchByPhone() {
         const phoneInput = document.getElementById('searchPhoneInput');
         let phoneQuery = sanitizePhoneNumber(phoneInput ? phoneInput.value : '');
@@ -2223,9 +2250,23 @@
         const item = scanHistory.find(i => i.id === editingItemId);
         if (item) {
             const prevPhone = item.phone;
+            const patchFields = { phone: newPhone };
+            const previousFields = { phone: prevPhone };
+            if (newPhone !== prevPhone && item.callMark === 'wrong-number') {
+                previousFields.callMark = item.callMark;
+                previousFields.callMarkTime = item.callMarkTime;
+                previousFields.isCalled = item.isCalled;
+                delete item.callMark;
+                delete item.callMarkTime;
+                item.isCalled = false;
+                patchFields.callMark = null;
+                patchFields.callMarkTime = null;
+                patchFields.isCalled = false;
+            }
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone }).then(() => syncScannerLookupEntry(item.id, item));
+            patchHistoryItemFields(item, patchFields, previousFields).then(() => syncScannerLookupEntry(item.id, item));
             updateRecentPhonesList();
+            refreshCurrentHistoryView();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
 
@@ -2643,7 +2684,9 @@
 
             let callAction = '';
             if (item.phone !== "គ្មានលេខ") {
-                if (item.isCalled && !needsRecall) {
+                if (item.callMark === 'wrong-number') {
+                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" onclick="openEditModal('${escapeForInlineJsAttr(item.id)}')" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
+                } else if (item.isCalled && !needsRecall) {
                     callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
                 } else {
                     let recallClass = needsRecall ? ' call-btn-recall' : '';
@@ -2769,7 +2812,7 @@
             if (tr.dataset.id) existingRows.set(tr.dataset.id, tr);
         });
 
-        const currentTime = Date.now();
+        const currentTime = getServerNow();
         const twentyFourHoursMs = 24 * 60 * 60 * 1000;
         const seenIds = new Set();
         let prevNode = null;

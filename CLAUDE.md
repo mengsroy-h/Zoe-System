@@ -983,53 +983,74 @@ own, since they were added after that round's dedicated review had already run.
   value secret, an explicit "clear from memory" action leaving a live derived-key handle behind was worth
   closing for defense-in-depth. Now set to `null` alongside `signingPrivateKeyJwk`.
 - `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v22, zoew-v19, zoescan-v19, zoekeygen-v12) since all 4
-  `app.js` got real behavior changes above. **No Firebase rules files were touched in the fixes applied this
-  round** — see the proposed-but-not-applied rules item below, which does need one.
+  `app.js` got real behavior changes above.
 
-### Proposed for human review, NOT applied (revenue/data-integrity-adjacent, per this project's live-production
-policy) — awaiting the user's decision
-1. **Firebase rules gap: `zoew_scan_history_cod_dod/$itemId`'s top-level `cod`/`dod`/`price` fields are still
-   worker-writable-when-existing**, unlike their nested `barcodes/$idx/{cod,dod}` counterparts and unlike
-   `zoew_recently_deleted_cod_dod`'s equivalent fields — all of which the first "final" audit round explicitly
-   hardened to an "admin OR not-yet-existing OR unchanged" pattern. The top-level fields on the *live* item
-   record were missed by that pass. Not dead data: `item.cod`/`item.dod` is read directly for dashboard totals
-   whenever an item has no `barcodes[]` (the legacy/single-barcode shape), and ZoeAdmin's
-   `openEditBarcodePriceModal`/`saveEditedBarcodePrice` seed a *new* `barcodes[0]` from these exact top-level
-   values the first time a legacy item is touched there — so a worker-poisoned top-level value can become the
-   new "trusted" baseline all future remove/restore revenue-delta (`isDeducted`) math is computed from for
-   that item. Proposed fix: extend the same already-established hardening pattern to `firebase-database.rules.
-   json`'s `zoew_scan_history_cod_dod/$itemId/{cod,dod,price}` (root rules file). Needs manual publish in
-   Firebase Console per this repo's standard process either way.
-2. **ZoeAdmin `removeSingleBarcode`'s outer-catch snapshot revert can discard a fresher listener-delivered
-   revenue snapshot under a narrow race.** On outer `fb.update()` failure, the catch both (a) calls
-   `addRevenueToDailyAndMonthlyRecord(...)` to properly compensate the deducted amount, which mutates
-   `dailyRevenueData`/`monthlyRevenueData` in place via its own transaction, **and** (b) immediately
-   overwrites both variables wholesale with the pre-op snapshot taken at function start — silently discarding
-   whatever a concurrent Firebase `onValue` listener delivered from another device during the `await` window,
-   the same double-basis failure mode the round-4 object-identity-check fix in `commitDailyRevenueDelta` was
-   built to prevent, just not extended to this function's outer, coarser-grained revert. Narrower window than
-   the already-fixed `claimAndCleanupItem` case (a single un-retried request, not up to ~22.5s of retries),
-   but the same structural gap. Proposed fix: drop the wholesale revenue-object reassignment from the outer
-   catch (the compensating call already reverts the delta correctly on its own) or gate it behind the same
-   object-identity check `commitDailyRevenueDelta` uses.
-3. **Setup Link's URL-param flow (`applySetupLinkFromUrl()`, all 3 business apps) bypasses the Security PIN
-   gate that protects every other way of changing `zoew_firebase_config`.** Every other path to this
-   `localStorage` key — the manual Config-modal textarea, and even the new QR-scan-to-textarea flow — goes
-   through `checkPinAndOpenConfig()`/`requestPinBeforeConfig()` (PBKDF2-150k-hashed PIN, required even on a
-   device's very first run). `applySetupLinkFromUrl()` runs unconditionally on page load, before
-   `initFirebase()`, decodes the `?setup=` param, shows a plain `window.confirm()` naming the `projectId`, and
-   writes straight to `localStorage` on OK — no PIN involved anywhere in that chain. Concretely: anyone who
-   gets a device to open `https://<site>/?setup=<attacker-or-just-wrong-config>` (phishing, a mis-sent link at
-   200-300-business vendor scale, a link forwarded outside the vendor's private channel) can silently repoint
-   that device's entire Firebase connection with one click-through of a generic-sounding dialog, without
-   knowing the shop's PIN at all — CSP's `connect-src` allowlist doesn't help here since an attacker's own
-   Firebase project matches the same `*.firebaseio.com`/`*.firebasedatabase.app` patterns. This is a genuine
-   product-design tension, not a clean-cut bug, which is why it's proposed rather than silently patched: a
-   brand-new device has no PIN yet (`initFirebase()` itself calls `checkPinAndOpenConfig(true)` to *create*
-   one on first run when no config exists), so naively gating this flow on "PIN must already be set" could
-   break the legitimate first-time-setup case the Setup Link feature exists for. Needs a product decision from
-   the user on how first-run vs. already-configured devices should be handled differently here — not something
-   to decide unilaterally.
+### Follow-up: user reviewed the 3 proposed items and said "fix all of them, make it secure, don't let it be
+bypassable" — here's what was actually done for each
+2 of the 3 were safely fixable and are now fixed; the 3rd was investigated further *while implementing* and
+turned out to be unsafe to apply as originally proposed — it was reverted rather than shipped, since a broken
+production app is worse than a narrow, already-partially-mitigated gap. Details below.
+
+1. **NOT applied, reverted after investigation — Firebase rules gap on `zoew_scan_history_cod_dod/$itemId`'s
+   top-level `cod`/`dod`/`price`.** The proposed fix (extend the same "admin OR not-yet-existing OR unchanged"
+   pattern already used for the nested `barcodes/$idx/{cod,dod}` fields) was drafted and JSON-validated, but
+   before committing it, traced every ZoeW (`worker`-role) code path that writes to this exact top-level field
+   set on an *existing* record — and found three real, currently-shipping ones that legitimately need to:
+   `claimAndCleanupItem`'s automatic 8-day stale-open partial-claim branch (`ZoeW/app.js` ~line 1056-1058,
+   recomputes `updated.cod/dod/price` from the still-active barcodes and writes it via `runTransaction` on the
+   live item), `restoreClaimedItemToScanHistory` (~line 1010-1012, the round-4 trash-write-failure recovery
+   transaction that restores reclaimed barcodes back into the live record), and `executeRestoreItem`'s
+   merge-into-existing-open-order branch (~line 2366-2368, the common "restore from trash while a matching open
+   order already exists" case). All three run under the worker's own authenticated session and all three write
+   a *recomputed sum* of `barcodes[].cod/dod` into these top-level fields on a record that already exists —
+   exactly the write shape the proposed "admin OR unchanged" rule would reject. Applying the proposed rule as
+   drafted would have silently broken the 8-day auto-cleanup, the trash-recovery safety net, and restore-merge
+   for every ZoeW user, in exchange for closing a narrower gap (a compromised/malicious worker account crafting
+   a raw REST write to fabricate these exact fields). The fundamental problem is that Firebase RTDB's rules
+   language has no aggregate/sum function, so a rule can't verify "this new top-level value equals the sum of
+   this record's own `barcodes[].cod/dod`" — the same "no declarative rule can verify a delta's history is
+   honest — that fundamentally requires a trusted server (Cloud Functions), which this project doesn't have"
+   conclusion the first "final" audit round already reached for the sibling problem (worker write access to
+   the daily/monthly revenue nodes), and for the same reason. **Change reverted; `firebase-database.rules.json`
+   is unchanged from before this round.** This is now a confirmed, deliberately-accepted limitation in the same
+   category as that earlier "safe subset only" decision, not an oversight — revisit only if/when a trusted
+   backend (Cloud Functions or similar) is ever added to this project.
+2. **Fixed — ZoeAdmin `removeSingleBarcode`'s outer-catch snapshot revert.** Removed the wholesale
+   `dailyRevenueData = dailySnapshot; monthlyRevenueData = monthlySnapshot;` reassignment (and the now-unused
+   snapshot variables) from the failure-catch block. The existing `addRevenueToDailyAndMonthlyRecord(...)` call
+   right above it already reverses the applied delta correctly and object-identity-safely via its own
+   transaction — the wholesale reassignment was only ever redundant in the simple case and actively harmful
+   under the race (discarding a fresher listener-delivered snapshot from a concurrent device). `scanHistory`/
+   `deletedItems` snapshot-revert is untouched, since that wasn't part of the flagged finding. **Note for a
+   future round**: the same snapshot-then-wholesale-revert shape also exists in the new-parcel-scan save flow
+   (`ZoeAdmin/app.js` ~line 3286-3298, inside the phone-modal confirm handler) — not fixed this round since it
+   wasn't part of what was audited/proposed, flagging for awareness only.
+3. **Fixed — Setup Link's URL-param flow no longer bypasses the Security PIN gate**, in all 3 business apps.
+   `applySetupLinkFromUrl()` no longer writes straight to `localStorage`; it now routes through the exact same
+   PIN gate every other config change already uses:
+   - **ZoeAdmin** already had a general-purpose `pinTargetAction` callback mechanism (`requestPinBeforeConfig
+     (targetAction)`, already used elsewhere for the lookup-API config modal) — reused directly:
+     `applySetupLinkFromUrl()` now calls `requestPinBeforeConfig(() => { openConfigModal(); <pre-fill textarea
+     with the parsed config>; })`.
+   - **ZoeW and Zoescan** had no such callback mechanism (`requestPinBeforeConfig()` always just opens
+     `openConfigModal()` unconditionally after success), so both gained a small `pendingSetupLinkConfig`
+     module-level variable instead: `applySetupLinkFromUrl()` stashes the parsed config there and calls the
+     existing `requestPinBeforeConfig()`; `openConfigModal()` now checks it first (pre-filling and consuming
+     it) before falling back to its old behavior of loading the saved config from `localStorage`.
+   - In every app the old `window.confirm()` naming the `projectId` was dropped entirely — the PIN-gated Config
+     modal itself, showing the actual JSON in a reviewable/editable textarea before the existing "រក្សាទុក"
+     (Save) button is explicitly clicked, is a strictly stronger confirmation than a generic `confirm()` dialog
+     ever was, and it's the exact same review step the already-correct QR-scan-to-textarea flow already uses.
+   - **First-run devices are unaffected and not weakened**: `requestPinBeforeConfig()`/`checkPinAndOpenConfig()`
+     already open `pinSetupModal` (create-a-new-PIN) when no PIN exists yet, so a brand-new device opening a
+     Setup Link still gets the config pre-filled and still must set a PIN before it can ever be saved — strictly
+     *more* secure than before (previously the URL flow saved with **zero** PIN involvement even on a fresh
+     device), not a regression of the legitimate first-time-setup case the feature exists for.
+   - Verified the boot-sequence interaction is safe: `applySetupLinkFromUrl()` still runs before `initFirebase()`
+     on page load in all 3 apps; on a config-less first-run device, `initFirebase()`'s own `checkPinAndOpenConfig
+     (true)` call (which doesn't touch `pinTargetAction`/`pendingSetupLinkConfig`) can also fire right after,
+     redundantly reopening the same already-open `pinSetupModal` — harmless (idempotent) and doesn't clobber the
+     Setup Link's pending config or callback.
 
 ### Not yet done as of this handoff — lower-priority items noted but not applied
 - QR-scan camera-open failures always show the same generic "check camera permission" toast regardless of

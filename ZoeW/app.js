@@ -371,10 +371,15 @@
     }
 
     function openConfigModal() {
-        const savedConfig = localStorage.getItem('zoew_firebase_config');
-        if (savedConfig) {
-            const cfgInput = document.getElementById('firebaseConfigInput');
-            if(cfgInput) cfgInput.value = savedConfig;
+        const cfgInput = document.getElementById('firebaseConfigInput');
+        if (pendingSetupLinkConfig) {
+            if (cfgInput) cfgInput.value = JSON.stringify(pendingSetupLinkConfig, null, 2);
+            pendingSetupLinkConfig = null;
+        } else {
+            const savedConfig = localStorage.getItem('zoew_firebase_config');
+            if (savedConfig) {
+                if (cfgInput) cfgInput.value = savedConfig;
+            }
         }
         const dsnInput = document.getElementById('sentryDsnInput');
         if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
@@ -430,6 +435,8 @@
         return parsed;
     }
 
+    let pendingSetupLinkConfig = null;
+
     function applySetupLinkFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const setupParam = params.get('setup');
@@ -445,14 +452,9 @@
             return;
         }
 
-        const confirmed = window.confirm(
-            "តើអ្នកចង់កំណត់ Firebase Config ថ្មីនេះឬទេ?\n\nProject: " + (parsed.projectId || "(មិនស្គាល់)") +
-            "\n\nការកំណត់នេះនឹងជំនួសការកំណត់ចាស់ (បើមាន)។"
-        );
-        if (!confirmed) return;
-
-        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-        showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+        pendingSetupLinkConfig = parsed;
+        showToast('សូមផ្ទៀងផ្ទាត់ PIN ដើម្បីអនុវត្ត Setup Link');
+        requestPinBeforeConfig();
     }
 
     let configQrReader = null;

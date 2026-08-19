@@ -779,3 +779,38 @@ forward unresolved through all four rounds since — is now closed. The user che
 directly and confirmed it matches the dedicated `zoe-license`-equivalent project actually used for
 license/activation data, not ZoeW's business database. The "zoew-z1" naming was just a misleading label, not
 a real mix-up. No code or config change needed; nothing outstanding from this thread remains.
+
+## Setup Link — Firebase Config provisioning helper (added 2026-08-19)
+
+Added at the user's request after clarifying the deployment model: this system is not distributed as
+source/self-hosted per client — the vendor (user) personally provisions a separate Firebase project per
+client business and personally configures every one of that business's devices with a `zoew_firebase_config`
+pointing at it. With 200-300 client businesses, manually pasting Config JSON into every single device was
+identified as the biggest operational bottleneck (bigger than any code bug found in four audit rounds).
+
+- **ZoeKeyGen** (vendor-only tool, never given to clients) gained a "🔗 បង្កើត Setup Link" card: paste a
+  business's Firebase Config JSON once, pick which of the 3 business apps + its deployed Base URL (remembered
+  per-app in `localStorage` for reuse across future links), and it produces a link shaped like
+  `https://<app-site>/?setup=<base64-encoded-config>` plus a "Copy Link" button.
+- **ZoeAdmin/ZoeW/Zoescan** each gained `applySetupLinkFromUrl()`, called once on boot (before
+  `initFirebase()`, mirroring the existing `zoew_firebase_config`/`saveFirebaseConfig()` pattern in each app)
+  — decodes the `?setup=` param, shows a native `confirm()` naming the target `projectId` before saving
+  anything, writes to the same `zoew_firebase_config` localStorage key the manual Config modal already uses,
+  and always strips the query string via `history.replaceState` immediately regardless of whether the user
+  confirms or cancels, so the encoded config never lingers in the address bar/browser history.
+- Firebase client config (`apiKey`/`databaseURL`/etc.) is not treated as a secret anywhere else in this
+  codebase (protection is server-side Rules, not secrecy — same reasoning already applied to the existing
+  plain-textarea Config modal), so embedding it in a URL introduces no new class of risk versus the status
+  quo; the new card's own copy still tells the vendor to send the link privately (e.g. Telegram) rather than
+  posting it publicly, consistent with how activation keys are already handled.
+- **QR code generation was requested alongside the link but not implemented this session**: this session's
+  network egress policy rejects `unpkg.com` (confirmed via `$HTTPS_PROXY/__agentproxy/status`, showing a
+  `connect_rejected`/403 for that host) — the same class of block noted in the first audit round's Firebase
+  emulator-testing attempt. A hand-written QR encoder was deliberately avoided rather than risk shipping a
+  subtly-broken one with no way to test-scan it in this environment. Per this policy's own instructions, did
+  not attempt to route around the block. The copyable link is the shipped deliverable; QR is a real follow-up
+  if/when a specific library + version can be fetched and its integrity verified (either from an allowed
+  host, or vendored by the user with a hash they compute themselves on their own machine).
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v10).
+- Not yet committed/pushed as of writing this note — see git log on this branch to confirm current state if
+  resuming.

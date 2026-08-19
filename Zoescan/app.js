@@ -578,6 +578,33 @@ function saveFirebaseConfig() {
     setTimeout(() => window.location.reload(), 900);
 }
 
+function applySetupLinkFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const setupParam = params.get('setup');
+    if (!setupParam) return;
+
+    history.replaceState(null, '', window.location.pathname + window.location.hash);
+
+    let parsed;
+    try {
+        const json = decodeURIComponent(escape(atob(setupParam)));
+        parsed = JSON.parse(json);
+        if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
+    } catch (e) {
+        showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "តើអ្នកចង់កំណត់ Firebase Config ថ្មីនេះឬទេ?\n\nProject: " + (parsed.projectId || "(មិនស្គាល់)") +
+        "\n\nការកំណត់នេះនឹងជំនួសការកំណត់ចាស់ (បើមាន)។"
+    );
+    if (!confirmed) return;
+
+    localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
+    showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+}
+
 function getLockerPrefix() { return localStorage.getItem('zscan_locker_prefix') || 'ទូ'; }
 function getLockerCount() { return parseInt(localStorage.getItem('zscan_locker_count') || '24') || 24; }
 function openLockerSettingsModal() {
@@ -1337,6 +1364,7 @@ bindEventListeners();
 
 if (window.ZoeErrors) ZoeErrors.init('zoescan');
 if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
+applySetupLinkFromUrl();
 
 initFirebase().catch(err => {
     document.getElementById('bootLoading').innerHTML = '⚠️ មិនអាចភ្ជាប់ Firebase SDK បានទេ សូម Refresh ទំព័រនេះម្តងទៀត';

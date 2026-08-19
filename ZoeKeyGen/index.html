@@ -131,6 +131,44 @@
 
     <div class="app-card">
         <div class="card-header">
+            <div class="card-title">🔗 បង្កើត Setup Link</div>
+        </div>
+        <div class="card-subtitle" style="margin-bottom:10px;">
+            បង្កើត Link មួយសម្រាប់កំណត់ Firebase Config ដោយស្វ័យប្រវត្តិលើឧបករណ៍អតិថិជន — បើក Link នេះម្តងលើឧបករណ៍គោលដៅ
+            (App នឹងសួរបញ្ជាក់មុននឹងកំណត់) ជំនួសការ Paste Config JSON ដោយដៃរាល់ឧបករណ៍។ Config Firebase មិនមែនជាព័ត៌មានសម្ងាត់ទេ
+            (សុវត្ថិភាពពិតប្រាកដស្ថិតនៅ Server-side Rules) ប៉ុន្តែសូមចម្លងផ្ញើ Link នេះទៅឧបករណ៍គោលដៅផ្ទាល់ (ឧ. តាម Telegram) មិនមែនផ្សព្វផ្សាយជាសាធារណៈ។
+        </div>
+
+        <div class="form-grid">
+            <div class="col-half">
+                <label for="setupLinkAppSelect">សម្រាប់កម្មវិធី</label>
+                <select id="setupLinkAppSelect" onchange="onSetupLinkAppChange()">
+                    <option value="">-- ជ្រើសរើស --</option>
+                    <option value="ADM">ZoeAdmin</option>
+                    <option value="ZOW">ZoeW</option>
+                    <option value="SCN">Zoescan</option>
+                </select>
+            </div>
+            <div class="col-half">
+                <label for="setupLinkUrlInput">Base URL របស់ App នោះ (ចងចាំដោយស្វ័យប្រវត្តិ)</label>
+                <input type="text" id="setupLinkUrlInput" placeholder="https://your-app.netlify.app">
+            </div>
+        </div>
+
+        <label for="setupLinkConfigInput">Firebase Config (JSON) របស់ជំនួញនេះ — ដូចគ្នាសម្រាប់ App ទាំង ៣</label>
+        <textarea id="setupLinkConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"..."}'></textarea>
+
+        <button class="btn-primary" style="width:100%;" onclick="generateSetupLink()">🔗 បង្កើត Link</button>
+
+        <div id="setupLinkResultBox" class="hidden" style="margin-top:12px;">
+            <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
+            <div class="key-output" id="setupLinkResultText" style="word-break:break-all;"></div>
+            <button class="btn-secondary" style="width:100%;" onclick="copySetupLink()">📋 ចម្លង Link</button>
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
             <button class="btn-mini" onclick="refreshKeyList()">🔄 Refresh</button>
             <button class="btn-mini" onclick="migrateLegacyLicenseKeyMetadata()" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>

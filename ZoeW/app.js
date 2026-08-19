@@ -423,6 +423,33 @@
         }
     }
 
+    function applySetupLinkFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const setupParam = params.get('setup');
+        if (!setupParam) return;
+
+        history.replaceState(null, '', window.location.pathname + window.location.hash);
+
+        let parsed;
+        try {
+            const json = decodeURIComponent(escape(atob(setupParam)));
+            parsed = JSON.parse(json);
+            if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
+        } catch (e) {
+            showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "តើអ្នកចង់កំណត់ Firebase Config ថ្មីនេះឬទេ?\n\nProject: " + (parsed.projectId || "(មិនស្គាល់)") +
+            "\n\nការកំណត់នេះនឹងជំនួសការកំណត់ចាស់ (បើមាន)។"
+        );
+        if (!confirmed) return;
+
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
+        showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+    }
+
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
     const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
@@ -1193,6 +1220,7 @@
     window.addEventListener('load', function () {
         if (window.ZoeErrors) ZoeErrors.init('zoew');
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
+        applySetupLinkFromUrl();
         initFirebase();
 
         setInterval(async () => {

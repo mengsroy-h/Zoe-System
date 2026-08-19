@@ -3896,9 +3896,11 @@
                 patchFields.isCalled = false;
             }
             item.phone = newPhone;
-            patchHistoryItemFields(item, patchFields, previousFields).then(() => { syncScannerLookupEntry(item.id, item); });
+            patchHistoryItemFields(item, patchFields, previousFields).then(() => syncScannerLookupEntry(item.id, item));
             updateRecentPhonesList();
-            refreshCurrentHistoryView();
+            const searchInput = document.getElementById('searchPhoneInput');
+            if (searchInput) searchInput.value = '';
+            applyCurrentFilter();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
 

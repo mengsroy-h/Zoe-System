@@ -1573,7 +1573,7 @@ blinking" case noted earlier, since there is no longer a mark to blink on. `clai
 automatic 2h/8d sweep is deliberately untouched, matching how pickup-stat crediting is scoped to the
 explicit toggles only — those items are moving to trash anyway.
 
-`CACHE_VERSION` bumped (zoeadmin-v30, zoew-v27).
+`CACHE_VERSION` bumped (zoeadmin-v32, zoew-v29).
 
 ### Two mechanisms from that work, refined on request
 - **The bare `setTimeout(refreshCurrentHistoryView, 0)` in `handleCallAction` became
@@ -1585,6 +1585,15 @@ explicit toggles only — those items are moving to trash anyway.
   discarded an active phone search — at the worst possible moment, since the worker had just hit a save
   error and would lose the row they were looking at. It now uses `refreshCurrentHistoryView()`, which
   re-runs `searchByPhone()` when a search is active. `setCallMark` got the same change.
+
+`saveEditedPhone` deliberately goes the other way, on the user's call: after a successful edit it **clears
+the search box and calls `applyCurrentFilter()`**, so the view returns to the full day list. Keeping the
+search would have hidden the row the worker just edited, since the new number no longer matches the old
+query. The box is cleared rather than left populated so the state stays coherent — otherwise the next
+background refresh (the 60s recall sweep, a Firebase update) would flip the table back to search results.
+Its *failure* path still goes through the revert above and keeps the search, which is right: the write
+failed, the old number is back, and it still matches the query. `saveEditedPhone` is now byte-identical
+across the two apps (one leftover brace-style difference was aligned while editing it).
 
 The remaining ~40 `applyCurrentFilter()` call sites across the two apps were **deliberately left alone**.
 Some are correct as they stand (a filter button, or `searchByPhone` exiting an empty search, should reset

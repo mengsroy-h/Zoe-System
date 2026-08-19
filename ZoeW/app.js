@@ -33,7 +33,7 @@
             swReloadedOnce = true;
             const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if (isModalOpen && (Date.now() - pendingSince) < 10 * 60 * 1000) {
+                if ((isModalOpen || criticalWriteInFlight > 0) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem('zoew_sw_updated', '1');
@@ -80,6 +80,7 @@
     let pendingRestoreId = null;
 
     let isModalOpen = false;
+    let criticalWriteInFlight = 0;
     let searchTimer = null;
     let isDatabaseInitialized = false;
     let authUnsubscribe = null;
@@ -1868,6 +1869,7 @@
 
         if (!db || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return;
 
+        criticalWriteInFlight++;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             await fb.runTransaction(itemRef, (currentItem) => {
@@ -1914,6 +1916,8 @@
                 const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
                 addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
             }
+        } finally {
+            criticalWriteInFlight--;
         }
     }
 
@@ -1985,7 +1989,10 @@
         if (item) {
             const prevPhone = item.phone;
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone }).then(() => syncScannerLookupEntry(item.id, item));
+            criticalWriteInFlight++;
+            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone })
+                .then(() => syncScannerLookupEntry(item.id, item))
+                .finally(() => { criticalWriteInFlight--; });
             updateRecentPhonesList();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
@@ -2037,6 +2044,7 @@
 
         if (!db || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
 
+        criticalWriteInFlight++;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             await fb.runTransaction(itemRef, (currentItem) => {
@@ -2075,6 +2083,8 @@
                 const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
                 addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
             }
+        } finally {
+            criticalWriteInFlight--;
         }
     }
 

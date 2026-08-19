@@ -768,7 +768,14 @@ every modified `.js`, and comment-free grep re-verified on every changed line. N
 Firebase rules files were touched this round, so no manual-publish step is needed. `CACHE_VERSION` was bumped
 a second time in ZoeAdmin/ZoeW/Zoescan's `sw.js` (zoeadmin-v19, zoew-v16, zoescan-v16) to cover this follow-up
 batch; ZoeKeyGen's `sw.js` was untouched this round (stays at zoekeygen-v9) since neither follow-up item
-touches ZoeKeyGen. The long-open question about `license-verify.js`'s `LICENSE_DB_URL` possibly being a
-mixed-up copy of ZoeW's business DB URL (first flagged in the very first audit round) remains unresolved and
-cannot be checked from a git-only session — still needs the user's direct confirmation in the Firebase
-console.
+touches ZoeKeyGen.
+
+This round's PR (#13) was merged to `main` at the user's explicit request in this session.
+
+**RESOLVED 2026-08-19 (confirmed by user):** the long-open question about `license-verify.js`'s
+`LICENSE_DB_URL` (`https://zoew-z1-default-rtdb.firebaseio.com`, byte-identical across all 4 apps) possibly
+being a mixed-up copy of ZoeW's business DB URL — first flagged in the very first audit round, carried
+forward unresolved through all four rounds since — is now closed. The user checked the Firebase Console
+directly and confirmed it matches the dedicated `zoe-license`-equivalent project actually used for
+license/activation data, not ZoeW's business database. The "zoew-z1" naming was just a misleading label, not
+a real mix-up. No code or config change needed; nothing outstanding from this thread remains.

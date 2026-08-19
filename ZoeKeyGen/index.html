@@ -274,7 +274,7 @@
         <button class="btn-secondary" style="width:100%;" onclick="copyTextarea('newPublicKeyOutput')">📋 ចម្លង Public Key</button>
 
         <div class="modal-btns" style="margin-top:12px;">
-            <button class="btn-cancel" onclick="closeModal('keypairModal')">បិទ</button>
+            <button class="btn-cancel" onclick="dismissKeypairModal()">បិទ</button>
         </div>
     </div>
 </div>
@@ -283,6 +283,7 @@
     <div class="modal-content" style="max-width: 320px;">
         <h3>⏳ បន្ថែមសុពលភាព</h3>
         <p>បញ្ចូលចំនួនថ្ងៃបន្ថែម គិតចាប់ពីពេលនេះ</p>
+        <p style="font-size:12px; color:#a3123a; text-align:left; line-height:1.5;">⚠️ ការបន្ថែមសុពលភាពធ្វើការតែលើគ្រឿងដែល Activate រួចហើយប៉ុណ្ណោះ។ បន្ទាប់ពីថ្ងៃផុតកំណត់ដើមរបស់ Key កន្លងផុត Key នេះ <strong>លែងអាច Activate លើគ្រឿងថ្មី ឬគ្រឿងដែល Reset រួច</strong>បានទៀតទេ — ករណីនោះត្រូវបង្កើត Key ថ្មីជំនួស។</p>
         <input type="number" id="extendDaysInput" value="30" min="1" step="1">
         <div class="modal-btns">
             <button class="btn-confirm" onclick="confirmExtendKey()">រក្សាទុក</button>

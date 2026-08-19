@@ -1,0 +1,23 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "user_roles": { "$uid": { ".read": true } },
+    "items": {
+      "$itemId": {
+        ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || (root.child('user_roles').child(auth.uid).val() === 'scanner' && data.exists() && newData.exists()))",
+        ".read": true,
+        "barcodes": {
+          "$idx": {
+            ".validate": "root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()",
+            "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "cod":    { ".validate": "newData.isNumber()" },
+            "locker": { ".validate": "newData.isString()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

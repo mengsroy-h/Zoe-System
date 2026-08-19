@@ -73,7 +73,7 @@
     let authGeneration = 0;
 
     let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
-    
+
     let codeReader = null;
     let liveScanCodeReader = null;
     let currentStream = null;
@@ -127,7 +127,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
-        document.body.style.overflow = 'hidden'; 
+        document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'flex';
     }
@@ -202,7 +202,7 @@
 
     const debouncedRenderAfterHistorySync = debounce(() => {
         runAutomaticCleanupRules();
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
         updateRecentPhonesList();
     }, 120);
 
@@ -451,6 +451,7 @@
     }
 
     function checkPinAndOpenConfig(isFirstTime = false) {
+        pinTargetAction = null;
         let savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
@@ -502,7 +503,7 @@
             if (!parsed.apiKey || !parsed.databaseURL) {
                 throw new Error("Missing apiKey or databaseURL");
             }
-            
+
             localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
             showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
             closeModal('configModal');
@@ -542,8 +543,32 @@
         });
     }
 
+    function cancelPinSetupFlow() {
+        pinTargetAction = null;
+        closeModal('pinSetupModal');
+    }
+
+    function cancelPinEntryFlow() {
+        pinTargetAction = null;
+        closeModal('pinModal');
+    }
+
     let configQrReader = null;
     let configQrScanActive = false;
+
+    function isInAppBrowser() {
+        return /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
+    }
+
+    function describeCameraError(err) {
+        const name = err && err.name;
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return '🚫 កាមេរ៉ាត្រូវបានបិទសិទ្ធិ! សូមអនុញ្ញាតកាមេរ៉ាក្នុង Browser Settings រួចសាកល្បងម្តងទៀត';
+        if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return '🚫 រកមិនឃើញកាមេរ៉ានៅលើឧបករណ៍នេះទេ';
+        if (name === 'NotReadableError' || name === 'TrackStartError') return '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង — សូមបិទកម្មវិធីនោះសិន';
+        if (name === 'OverconstrainedError') return '🚫 កាមេរ៉ារបស់ឧបករណ៍នេះមិនគាំទ្រការកំណត់ដែលត្រូវការទេ';
+        if (name === 'SecurityError') return '🚫 ត្រូវបើកតាម HTTPS ទើបប្រើកាមេរ៉ាបាន';
+        return '❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission';
+    }
 
     function closeConfigQrScanner() {
         configQrScanActive = false;
@@ -564,6 +589,9 @@
             showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
             return;
         }
+        if (isInAppBrowser()) {
+            showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — ក្នុង App ដូចជា Facebook/Messenger កាមេរ៉ាអាចប្រើមិនបាន');
+        }
         openModalHelper('configQrScanModal');
         configQrScanActive = true;
         try {
@@ -575,7 +603,7 @@
         } catch (e) {
             console.error('Config QR scanner error:', e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
-            showToast("❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission");
+            showToast(describeCameraError(e));
             closeConfigQrScanner();
         }
     }
@@ -993,10 +1021,10 @@
         const rateInput = document.getElementById('exchangeRateInput');
         let val = rateInput ? (parseFloat(rateInput.value) || 4100) : 4100;
         if (val <= 0) val = 4100;
-        
+
         exchangeRateRiel = val;
         localStorage.setItem('zoew_exchange_rate', val);
-        
+
         if (dbRefExchangeRate) {
             fb.set(dbRefExchangeRate, val).catch(() => {
                 showToast("⚠️ បរាជ័យក្នុងការ Save អត្រាប្រាក់ទៅ Firebase!");
@@ -1005,7 +1033,7 @@
 
         closeModal('exchangeRateModal');
         showToast(`បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛`);
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
     }
 
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
@@ -1121,6 +1149,7 @@
             if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
             const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
             if (!result.valid) {
+                if (input) input.value = '';
                 showToast(licenseFailureMessage(result.reason));
                 return;
             }
@@ -1402,12 +1431,12 @@
             else if (Array.isArray(data)) scanHistory = data.filter(item => item !== null);
             else scanHistory = Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
 
-            scanHistory.forEach(item => { 
+            scanHistory.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
                 if (!item.createdAt) {
                     item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
-                
+
                 if (item.cod === undefined) {
                     item.cod = item.price !== undefined ? parseFloat(item.price) || 0 : 0;
                 } else {
@@ -1427,6 +1456,7 @@
                         b.cod = parseFloat(b.cod) || 0;
                         b.dod = parseFloat(b.dod) || 0;
                         if (b.isDeducted === undefined) b.isDeducted = false;
+                        if (b.isFromDeletion === undefined) b.isFromDeletion = false;
                     });
                 }
             });
@@ -1458,7 +1488,7 @@
     function updateRecentPhonesList() {
         const datalist = document.getElementById('recentPhonesList');
         if (!datalist) return;
-        
+
         let phonesSet = new Set();
         scanHistory.forEach(item => {
             if (item.phone && item.phone !== "គ្មានលេខ") {
@@ -1573,10 +1603,10 @@
 
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
-            if (claimedWhole) {
-                clearScannerLookupEntry(id);
-            } else if (claimedPartial && updatedRemainder) {
+            if (claimedPartial && updatedRemainder) {
                 syncScannerLookupEntry(id, updatedRemainder);
+            } else {
+                clearScannerLookupEntry(id);
             }
 
             let trashItem;
@@ -1585,7 +1615,7 @@
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
-                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
                 trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
                 trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
@@ -1608,7 +1638,7 @@
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                     }
                     revenueScanDate = trashItem.scanDate || getFormattedDate();
                     revenueCod = parseFloat(trashItem.cod) || 0;
@@ -1618,6 +1648,9 @@
                     revenueDeducted = true;
                 } else {
                     trashItem.isFromDeletion = true;
+                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+                    }
                 }
             }
 
@@ -1632,7 +1665,9 @@
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
                 try {
-                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
@@ -1664,8 +1699,9 @@
         });
 
         if (purgedIds.length > 0) {
-            deleteMultipleDeletedItemsFromFirebase(purgedIds).catch(() => {});
-            releaseBarcodesInRegistry(purgedBarcodes);
+            deleteMultipleDeletedItemsFromFirebase(purgedIds)
+                .then(() => releaseBarcodesInRegistry(purgedBarcodes))
+                .catch(() => {});
         }
     }
 
@@ -1769,6 +1805,11 @@
             }
         }, LICENSE_RECHECK_INTERVAL_MS);
 
+        setInterval(sweepRecallHighlights, 60000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) sweepRecallHighlights();
+        });
+
         try {
             const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
             const possibleFormats = oneDFormatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
@@ -1816,10 +1857,21 @@
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
-            const openModalEl = openModals[openModals.length - 1];
+            const openModalEl = topmostModal(openModals);
             if (openModalEl) dismissModal(openModalEl);
         });
     });
+
+    function topmostModal(openModals) {
+        let top = null;
+        let topZ = -Infinity;
+        openModals.forEach((m) => {
+            const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
+            const z = isNaN(parsed) ? 0 : parsed;
+            if (z >= topZ) { topZ = z; top = m; }
+        });
+        return top;
+    }
 
     function dismissModal(modalEl) {
         if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
@@ -1892,7 +1944,7 @@
                 if (recordRef.codDollar < 0) recordRef.codDollar = 0;
                 if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
                 if (recordRef.totalCount < 0) recordRef.totalCount = 0;
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
         });
@@ -1993,7 +2045,7 @@
                     if (refCount <= 0) delete recordRef.pickedUpPhones[phoneKey];
                     else recordRef.pickedUpPhones[phoneKey] = refCount;
                 }
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         });
@@ -2058,7 +2110,7 @@
 
         closeModal('manualAdjustModal');
         showToast("កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
     }
 
     function openDailyStatsModal() {
@@ -2352,7 +2404,7 @@
         customFilterDate = '';
         const customDateInput = document.getElementById('customDateInput');
         if(customDateInput) customDateInput.value = '';
-        
+
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
         if (mode === 'today') {
             const el = document.getElementById('btnFilterToday');
@@ -2378,7 +2430,7 @@
         const customDateInput = document.getElementById('customDateInput');
         const val = customDateInput ? customDateInput.value : '';
         if (!val) return;
-        
+
         currentFilterMode = 'custom';
         customFilterDate = val;
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -2764,6 +2816,7 @@
 
     function setupVisibilityHandling() {
         document.addEventListener('visibilitychange', () => {
+            if (document.hidden && configQrScanActive) closeConfigQrScanner();
             if (document.hidden && isCameraScanning) {
                 stopCurrentStream();
                 const permBox = document.getElementById('permission-box');
@@ -3027,6 +3080,37 @@
         }, 300);
     }
 
+    let lastRecallSignature = '';
+    let pendingHistoryViewRefresh = null;
+
+    function scheduleHistoryViewRefresh() {
+        if (pendingHistoryViewRefresh) return;
+        pendingHistoryViewRefresh = setTimeout(() => {
+            pendingHistoryViewRefresh = null;
+            refreshCurrentHistoryView();
+        }, 0);
+    }
+
+    function refreshCurrentHistoryView() {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        if (phoneInput && sanitizePhoneNumber(phoneInput.value)) searchByPhone();
+        else applyCurrentFilter();
+    }
+
+    function sweepRecallHighlights() {
+        if (!scanHistory || !scanHistory.length) return;
+        const now = getServerNow();
+        let signature = '';
+        scanHistory.forEach((item) => {
+            if ((item.callMark === 'no-answer' || item.callMark === 'no-connect') && item.callMarkTime && (now - item.callMarkTime) >= FOUR_HOURS_MS) {
+                signature += item.id + ',';
+            }
+        });
+        if (signature === lastRecallSignature) return;
+        lastRecallSignature = signature;
+        refreshCurrentHistoryView();
+    }
+
     function searchByPhone() {
         const phoneInput = document.getElementById('searchPhoneInput');
         let phoneQuery = sanitizePhoneNumber(phoneInput ? phoneInput.value : '');
@@ -3144,7 +3228,7 @@
         };
         if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
         if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
-        if (item.barcodes && Array.isArray(item.barcodes)) {
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
             payload.barcodes = item.barcodes.map((b) => {
                 if (!b) return { code: '', locker: '' };
                 const bcEntry = { code: b.code || '', locker: b.locker || '' };
@@ -3156,15 +3240,17 @@
     }
 
     function syncScannerLookupEntry(itemId, item) {
-        if (!db || !fb || !itemId || !item) return Promise.resolve();
-        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: buildScannerLookupPayload(item) }).catch((error) => {
+        if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), buildScannerLookupPayload(item)).catch((error) => {
+            console.error('Error syncing scanner lookup entry:', error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
         });
     }
 
     function clearScannerLookupEntry(itemId) {
-        if (!db || !fb || !itemId) return Promise.resolve();
-        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: null }).catch((error) => {
+        if (!db || !fb || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), null).catch((error) => {
+            console.error('Error clearing scanner lookup entry:', error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry' });
         });
     }
@@ -3200,10 +3286,10 @@
         pendingBarcode = cleanBarcode;
         const modalBcText = document.getElementById('modalBarcodeText');
         if(modalBcText) modalBcText.innerText = cleanBarcode;
-        
+
         const modalPhoneInput = document.getElementById('modalPhoneInput');
         if(modalPhoneInput) modalPhoneInput.value = "";
-        
+
         const modalLockerInput = document.getElementById('modalLockerInput');
         if(modalLockerInput) modalLockerInput.value = lastEnteredLocker;
 
@@ -3211,7 +3297,7 @@
         if(modalCodInput) modalCodInput.value = "";
         const modalDodInput = document.getElementById('modalDodInput');
         if(modalDodInput) modalDodInput.value = "";
-        
+
         openModalHelper('phoneModal');
         const lookupPromise = attemptAutoLookup(cleanBarcode);
 
@@ -3284,17 +3370,13 @@
             }
 
             const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
-            const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
-            const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
 
             try {
                 await withTimeout(addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker), 15000, 'Save timed out');
             } catch (saveError) {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
                 scanHistory = historySnapshot;
-                dailyRevenueData = dailySnapshot;
-                monthlyRevenueData = monthlySnapshot;
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
                 throw saveError;
             }
 
@@ -3315,7 +3397,7 @@
         const now = new Date(getServerNow());
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
-        
+
         const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeString = `${timeFormatted} (${dateString})`;
 
@@ -3343,12 +3425,12 @@
                 item.barcodes = [{ code: oldCode, time: oldTime, cod: oldCod, dod: oldDod, locker: oldLocker, isClosed: oldIsClosed, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || currentTimeMillis }];
             }
 
-            item.barcodes.push({ 
-                code: barcode, 
-                time: timeString, 
-                cod: cod, 
-                dod: dod, 
-                locker: locker, 
+            item.barcodes.push({
+                code: barcode,
+                time: timeString,
+                cod: cod,
+                dod: dod,
+                locker: locker,
                 isClosed: false,
                 isDeducted: false,
                 isFromDeletion: false,
@@ -3520,7 +3602,7 @@
             openViewListModal(itemId);
         }
 
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
 
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
@@ -3542,7 +3624,7 @@
             }
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
     }
@@ -3560,7 +3642,7 @@
         const freshItem = scanHistory.find(i => i.id === itemId);
         const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
         const previousState = freshItem && freshB
-            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt }
+            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -3570,10 +3652,14 @@
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
             if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
+            if (desiredClosed) {
+                delete freshItem.callMark;
+                delete freshItem.callMarkTime;
+            }
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
-            pickupPackageDelta = desiredClosed ? 1 : -1;
+            pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
             if (!previousState.itemIsClosed && allClosedLocal) {
                 pickupCustomerDelta = 1;
             } else if (previousState.itemIsClosed && !allClosedLocal) {
@@ -3582,7 +3668,7 @@
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             openViewListModal(itemId);
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
         showToast(`បាន${actionText}ស្ថានភាព Barcode រួចរាល់!`);
 
@@ -3612,6 +3698,10 @@
                 currentItem.isClosed = allClosed;
                 if (allClosed) currentItem.closedAt = getServerNow();
                 else delete currentItem.closedAt;
+                if (desiredClosed) {
+                    delete currentItem.callMark;
+                    delete currentItem.callMarkTime;
+                }
                 return currentItem;
             });
         } catch (error) {
@@ -3626,8 +3716,12 @@
                     revertItem.isClosed = previousState.itemIsClosed;
                     if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
                     else delete revertItem.closedAt;
+                    if (previousState.itemCallMark !== undefined) revertItem.callMark = previousState.itemCallMark;
+                    else delete revertItem.callMark;
+                    if (previousState.itemCallMarkTime !== undefined) revertItem.callMarkTime = previousState.itemCallMarkTime;
+                    else delete revertItem.callMarkTime;
                     openViewListModal(itemId);
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
             if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
@@ -3680,14 +3774,14 @@
         const item = scanHistory.find(i => i.id === activeParentItemId);
         if (item) {
             if (!item.barcodes || !Array.isArray(item.barcodes)) {
-                item.barcodes = [{ code: item.barcode, time: item.time, cod: parseFloat(item.cod) || 0, dod: parseFloat(item.dod) || 0, locker: item.locker || "N/A", isClosed: item.isClosed || false, isDeducted: false }];
+                item.barcodes = [{ code: item.barcode, time: item.time, cod: parseFloat(item.cod) || 0, dod: parseFloat(item.dod) || 0, locker: item.locker || "N/A", isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || getServerNow() }];
             }
 
             let targetB = item.barcodes.find(b => b.code === activeEditingBarcode);
             if (targetB) {
                 let oldCod = parseFloat(targetB.cod) || 0;
                 let oldDod = parseFloat(targetB.dod) || 0;
-                
+
                 let codDiff = Math.round((newCod - oldCod) * 100) / 100;
                 let dodDiff = Math.round((newDod - oldDod) * 100) / 100;
 
@@ -3703,7 +3797,7 @@
                 }
 
                 saveSingleHistoryItemToFirebase(item);
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
                 showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
             }
 
@@ -3717,9 +3811,16 @@
     function handleCallAction(id) {
         const item = scanHistory.find(i => i.id === id);
         if (item) {
-            const wasCalled = item.isCalled;
+            const patchFields = { isCalled: true };
+            const previousFields = { isCalled: item.isCalled };
+            if (item.callMark === 'no-answer' || item.callMark === 'no-connect') {
+                previousFields.callMarkTime = item.callMarkTime;
+                item.callMarkTime = getServerNow();
+                patchFields.callMarkTime = item.callMarkTime;
+            }
             item.isCalled = true;
-            patchHistoryItemFields(item, { isCalled: true }, { isCalled: wasCalled });
+            patchHistoryItemFields(item, patchFields, previousFields);
+            scheduleHistoryViewRefresh();
         }
     }
 
@@ -3748,7 +3849,7 @@
                 delete item.callMarkTime;
                 patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
             }
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             showToast(mark ? "បានសម្គាល់រួចរាល់!" : "បានសម្អាតការសម្គាល់!");
         }
         closeModal('callMarkModal');
@@ -3763,9 +3864,9 @@
         if(editModalBarcodeText) editModalBarcodeText.innerText = item.barcode;
         const editPhoneInput = document.getElementById('editPhoneInput');
         if(editPhoneInput) editPhoneInput.value = item.phone === "គ្មានលេខ" ? "" : item.phone;
-        
+
         openModalHelper('editPhoneModal');
-        
+
         setTimeout(() => {
             if(editPhoneInput) editPhoneInput.focus();
         }, 150);
@@ -3781,9 +3882,43 @@
         const item = scanHistory.find(i => i.id === editingItemId);
         if (item) {
             const prevPhone = item.phone;
+            const patchFields = { phone: newPhone };
+            const previousFields = { phone: prevPhone };
+            if (newPhone !== prevPhone && item.callMark === 'wrong-number') {
+                previousFields.callMark = item.callMark;
+                previousFields.callMarkTime = item.callMarkTime;
+                previousFields.isCalled = item.isCalled;
+                delete item.callMark;
+                delete item.callMarkTime;
+                item.isCalled = false;
+                patchFields.callMark = null;
+                patchFields.callMarkTime = null;
+                patchFields.isCalled = false;
+            }
+            const prevPickupKey = getPickupPhoneKey(item);
             item.phone = newPhone;
-            patchHistoryItemFields(item, { phone: newPhone }, { phone: prevPhone }).then(() => { syncScannerLookupEntry(item.id, item); });
+            const nextPickupKey = getPickupPhoneKey(item);
+            const pickupDate = item.scanDate || getFormattedDate();
+            let pickupRefMoved = false;
+            if (item.isClosed && prevPickupKey !== nextPickupKey) {
+                addPickupToDailyRecord(pickupDate, prevPickupKey, -1, 0);
+                addPickupToDailyRecord(pickupDate, nextPickupKey, 1, 0);
+                pickupRefMoved = true;
+            }
+            const revertPickupRefMove = () => {
+                if (!pickupRefMoved) return;
+                pickupRefMoved = false;
+                addPickupToDailyRecord(pickupDate, nextPickupKey, -1, 0);
+                addPickupToDailyRecord(pickupDate, prevPickupKey, 1, 0);
+            };
+            patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
+                if (saved) syncScannerLookupEntry(item.id, item);
+                else revertPickupRefMove();
+            }).catch(revertPickupRefMove);
             updateRecentPhonesList();
+            const searchInput = document.getElementById('searchPhoneInput');
+            if (searchInput) searchInput.value = '';
+            applyCurrentFilter();
             showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
         }
 
@@ -3799,7 +3934,7 @@
 
         const freshItem = scanHistory.find(i => i.id === id);
         const previousState = freshItem
-            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
+            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -3808,6 +3943,8 @@
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
                 freshItem.closedAt = getServerNow();
+                delete freshItem.callMark;
+                delete freshItem.callMarkTime;
                 if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = true);
             } else {
                 delete freshItem.closedAt;
@@ -3816,19 +3953,20 @@
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
+            const alreadyInDesiredState = !!previousState.isClosed === desiredClosed;
             if (previousState.barcodeStates) {
                 previousState.barcodeStates.forEach((wasClosed) => {
                     if (desiredClosed && !wasClosed) pickupPackageDelta += 1;
                     else if (!desiredClosed && wasClosed) pickupPackageDelta -= 1;
                 });
-            } else {
+            } else if (!alreadyInDesiredState) {
                 const pickupPackages = parseFloat(freshItem.count) || 1;
                 pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
             }
-            pickupCustomerDelta = desiredClosed ? 1 : -1;
+            pickupCustomerDelta = alreadyInDesiredState ? 0 : (desiredClosed ? 1 : -1);
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
         showToast(`បាន${actionText}បញ្ជីជោគជ័យ!`);
 
@@ -3841,6 +3979,8 @@
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
+                    delete currentItem.callMark;
+                    delete currentItem.callMarkTime;
                     if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
                         currentItem.barcodes.forEach(b => b.isClosed = true);
                     }
@@ -3862,10 +4002,14 @@
                     revertItem.isClosed = previousState.isClosed;
                     if (previousState.closedAt !== undefined) revertItem.closedAt = previousState.closedAt;
                     else delete revertItem.closedAt;
+                    if (previousState.callMark !== undefined) revertItem.callMark = previousState.callMark;
+                    else delete revertItem.callMark;
+                    if (previousState.callMarkTime !== undefined) revertItem.callMarkTime = previousState.callMarkTime;
+                    else delete revertItem.callMarkTime;
                     if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
                         revertItem.barcodes.forEach((b, i) => { if (previousState.barcodeStates[i] !== undefined) b.isClosed = previousState.barcodeStates[i]; });
                     }
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
             if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
@@ -3887,10 +4031,13 @@
         let removed = scanHistory.splice(index, 1)[0];
         removed.deletedAt = getServerNow();
         removed.isFromDeletion = true;
+        if (removed.barcodes && Array.isArray(removed.barcodes)) {
+            removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+        }
 
         deletedItems.unshift(removed);
 
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
         updateRecentPhonesList();
 
         try {
@@ -3909,7 +4056,7 @@
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
@@ -3973,6 +4120,7 @@
         }
 
         let itemToRestore = deletedItems.splice(index, 1)[0];
+        const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         if (itemToRestore.isClosed) {
@@ -3981,25 +4129,36 @@
             itemToRestore.createdAt = getServerNow();
         }
 
+        const appliedRevenueDeltas = [];
+        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
+        if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+            itemToRestore.barcodes.forEach((restoredBc) => {
+                if (restoredBc.isDeducted) {
+                    const targetCod = parseFloat(restoredBc.cod) || 0;
+                    const targetDod = parseFloat(restoredBc.dod) || 0;
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
+                    appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod, count: 1 });
+                    restoredBc.isDeducted = false;
+                }
+                restoredBc.isFromDeletion = false;
+            });
+        } else if (restoredWasRemoved) {
+            const legacyCod = parseFloat(itemToRestore.cod) || 0;
+            const legacyDod = parseFloat(itemToRestore.dod) || 0;
+            const legacyCount = parseFloat(itemToRestore.count) || 1;
+            addRevenueToDailyAndMonthlyRecord(revenueScanDate, legacyCod, legacyDod, legacyCount);
+            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
+        }
+
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
 
         let resultingLiveItem;
-        const appliedRevenueDeltas = [];
-
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
             if (!targetItem.barcodes) targetItem.barcodes = [];
 
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        const revenueScanDate = targetItem.scanDate || getFormattedDate();
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
-                        restoredBc.isDeducted = false;
-                    }
                     targetItem.barcodes.push(restoredBc);
                 });
             }
@@ -4024,18 +4183,6 @@
 
             resultingLiveItem = targetItem;
         } else {
-            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-                itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
-                        restoredBc.isDeducted = false;
-                    }
-                });
-            }
             scanHistory.push(itemToRestore);
             resultingLiveItem = itemToRestore;
         }
@@ -4053,13 +4200,13 @@
                 [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
-            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -1));
+            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             try {
@@ -4074,7 +4221,7 @@
             }
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
     }
 
@@ -4135,7 +4282,7 @@
     }
 
     function patchHistoryItemFields(item, fields, previousFields) {
-        if (!dbRefHistory) return Promise.resolve();
+        if (!dbRefHistory) return Promise.resolve(false);
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to patch history item with missing/unsafe id');
             console.error(err.message, item && item.id);
@@ -4147,7 +4294,7 @@
         Object.keys(fields).forEach(key => {
             updates[`${item.id}/${key}`] = fields[key];
         });
-        return fb.update(dbRefHistory, updates).catch((error) => {
+        return fb.update(dbRefHistory, updates).then(() => true).catch((error) => {
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
@@ -4158,9 +4305,10 @@
                         if (previousFields[key] === undefined) delete revertItem[key];
                         else revertItem[key] = previousFields[key];
                     });
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
+            return false;
         });
     }
 
@@ -4261,7 +4409,7 @@
             if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
                 let allLockers = item.barcodes.map(b => b.locker || "N/A").filter(l => l && l !== "N/A");
                 let uniqueLockers = [...new Set(allLockers)];
-                
+
                 if (uniqueLockers.length > 1) {
                     lockerLoc = `${uniqueLockers.join(', ')} (${uniqueLockers.length} កន្លែង)`;
                 } else if (uniqueLockers.length === 1) {
@@ -4275,7 +4423,9 @@
 
             let callAction = '';
             if (item.phone !== "គ្មានលេខ") {
-                if (item.isCalled && !needsRecall) {
+                if (item.callMark === 'wrong-number') {
+                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" onclick="openEditModal('${escapeForInlineJsAttr(item.id)}')" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
+                } else if (item.isCalled && !needsRecall) {
                     callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
                 } else {
                     let recallClass = needsRecall ? ' call-btn-recall' : '';
@@ -4291,9 +4441,9 @@
                     <button class="more-btn" onclick="toggleMoreDropdown(event, '${escapeForInlineJsAttr(item.id)}')">⋮</button>
                 </div>
             `;
-            
+
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>` 
+                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>`
                 : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
 
             let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;
@@ -4405,7 +4555,7 @@
             if (tr.dataset.id) existingRows.set(tr.dataset.id, tr);
         });
 
-        const currentTime = Date.now();
+        const currentTime = getServerNow();
         const twentyFourHoursMs = 24 * 60 * 60 * 1000;
         const seenIds = new Set();
         let prevNode = null;
@@ -4459,11 +4609,14 @@
         const clearedItems = scanHistory.map(item => {
             item.deletedAt = getServerNow();
             item.isFromDeletion = true;
+            if (item.barcodes && Array.isArray(item.barcodes)) {
+                item.barcodes = item.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+            }
             return item;
         });
         clearedItems.forEach(item => deletedItems.unshift(item));
         scanHistory = [];
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
         updateRecentPhonesList();
 
         try {
@@ -4484,7 +4637,7 @@
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("⚠️ លុបប្រវត្តិទាំងអស់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }

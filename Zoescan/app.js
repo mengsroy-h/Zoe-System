@@ -71,6 +71,16 @@ function closeModal(id) {
     }
     safeFocusScanner();
 }
+function topmostModal(openModals) {
+    let top = null;
+    let topZ = -Infinity;
+    openModals.forEach((m) => {
+        const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
+        const z = isNaN(parsed) ? 0 : parsed;
+        if (z >= topZ) { topZ = z; top = m; }
+    });
+    return top;
+}
 function dismissModal(modalEl) {
     if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
     const fnName = modalEl.getAttribute('data-close');
@@ -182,9 +192,9 @@ async function attemptAuthStorageRecovery() {
 
 async function initFirebase() {
     const raw = localStorage.getItem('zoew_firebase_config');
-    if (!raw) { openConfigModal(); return; }
+    if (!raw) { requestPinBeforeConfig(); return; }
     let cfg;
-    try { cfg = JSON.parse(raw); } catch (e) { openConfigModal(); return; }
+    try { cfg = JSON.parse(raw); } catch (e) { requestPinBeforeConfig(); return; }
 
     addPreconnect(cfg.databaseURL);
     if (cfg.authDomain) addPreconnect(`https://${cfg.authDomain}`);
@@ -613,8 +623,34 @@ function applySetupLinkFromUrl() {
     requestPinBeforeConfig();
 }
 
+function cancelPinSetupFlow() {
+    pendingSetupLinkConfig = null;
+    pinTargetAction = null;
+    closeModal('pinSetupModal');
+}
+
+function cancelPinEntryFlow() {
+    pendingSetupLinkConfig = null;
+    pinTargetAction = null;
+    closeModal('pinModal');
+}
+
 let configQrReader = null;
 let configQrScanActive = false;
+
+function isInAppBrowser() {
+    return /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
+}
+
+function describeCameraError(err) {
+    const name = err && err.name;
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return '🚫 កាមេរ៉ាត្រូវបានបិទសិទ្ធិ! សូមអនុញ្ញាតកាមេរ៉ាក្នុង Browser Settings រួចសាកល្បងម្តងទៀត';
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return '🚫 រកមិនឃើញកាមេរ៉ានៅលើឧបករណ៍នេះទេ';
+    if (name === 'NotReadableError' || name === 'TrackStartError') return '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង — សូមបិទកម្មវិធីនោះសិន';
+    if (name === 'OverconstrainedError') return '🚫 កាមេរ៉ារបស់ឧបករណ៍នេះមិនគាំទ្រការកំណត់ដែលត្រូវការទេ';
+    if (name === 'SecurityError') return '🚫 ត្រូវបើកតាម HTTPS ទើបប្រើកាមេរ៉ាបាន';
+    return '❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission';
+}
 
 function closeConfigQrScanner() {
     configQrScanActive = false;
@@ -635,6 +671,9 @@ async function openConfigQrScanner() {
         showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
         return;
     }
+    if (isInAppBrowser()) {
+        showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — ក្នុង App ដូចជា Facebook/Messenger កាមេរ៉ាអាចប្រើមិនបាន');
+    }
     openModal('configQrScanModal');
     configQrScanActive = true;
     try {
@@ -646,7 +685,7 @@ async function openConfigQrScanner() {
     } catch (e) {
         console.error('Config QR scanner error:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
-        showToast("❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission");
+        showToast(describeCameraError(e));
         closeConfigQrScanner();
     }
 }
@@ -799,8 +838,7 @@ function initScanEngine() {
 
 async function requestCameraPermission() {
     if (isCameraStarting) return;
-    const inAppBrowser = /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
-    if (inAppBrowser) {
+    if (isInAppBrowser()) {
         showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — កម្មវិធីនេះមិនអាចប្រើកាមេរ៉ាក្នុង App ក្នុងកម្មវិធីផ្សេងបានទេ');
     }
     isCameraStarting = true;
@@ -852,12 +890,9 @@ async function requestCameraPermission() {
         }
     } catch (err) {
         isCameraStarting = false;
-        let msg = 'មិនអាចបើកកាមេរ៉ាបានទេ!';
-        if (err && err.name === 'NotAllowedError') msg = '🚫 សូមអនុញ្ញាតការប្រើប្រាស់កាមេរ៉ាក្នុង Browser Settings';
-        else if (err && err.name === 'NotFoundError') msg = '🚫 រកមិនឃើញកាមេរ៉ាទេ';
-        else if (err && err.name === 'NotReadableError') msg = '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង';
-        else if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'requestCameraPermission' });
-        showToast(msg);
+        const knownCameraError = err && ['NotAllowedError', 'PermissionDeniedError', 'NotFoundError', 'DevicesNotFoundError', 'NotReadableError', 'TrackStartError', 'OverconstrainedError', 'SecurityError'].indexOf(err.name) !== -1;
+        if (!knownCameraError && window.ZoeErrors) ZoeErrors.capture(err, { context: 'requestCameraPermission' });
+        showToast(describeCameraError(err));
     }
 }
 
@@ -1218,7 +1253,7 @@ async function assignLockerToEntry(code) {
             } else {
                 return currentItem;
             }
-            currentItem.lockerUpdatedBy = currentUserEmail || null;
+            if (currentUserEmail) currentItem.lockerUpdatedBy = currentUserEmail;
             phoneForToast = currentItem.phone || '';
             matched = true;
             return currentItem;
@@ -1243,10 +1278,11 @@ async function assignLockerToEntry(code) {
             entry.item.locker = targetLocker;
             entry.item.lockerUpdatedAt = ts;
         }
-        entry.item.lockerUpdatedBy = currentUserEmail || null;
+        if (currentUserEmail) entry.item.lockerUpdatedBy = currentUserEmail;
 
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/code`] = code;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
             if (singleBarcodeItem) {
@@ -1257,7 +1293,7 @@ async function assignLockerToEntry(code) {
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
         }
-        mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
+        if (currentUserEmail) mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail;
 
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
@@ -1385,10 +1421,10 @@ function bindEventListeners() {
 
     document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); loginWithFirebase(); });
 
-    document.getElementById('pinSetupCancelBtn').addEventListener('click', () => closeModal('pinSetupModal'));
+    document.getElementById('pinSetupCancelBtn').addEventListener('click', cancelPinSetupFlow);
     document.getElementById('pinSetupSaveBtn').addEventListener('click', saveNewSecurityPin);
 
-    document.getElementById('pinCancelBtn').addEventListener('click', () => closeModal('pinModal'));
+    document.getElementById('pinCancelBtn').addEventListener('click', cancelPinEntryFlow);
     document.getElementById('pinConfirmBtn').addEventListener('click', verifySecurityPin);
 
     document.getElementById('configCancelBtn').addEventListener('click', () => closeModal('configModal'));
@@ -1415,12 +1451,12 @@ function bindEventListeners() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        const openModals = document.querySelectorAll('.modal.open');
-        const openModalEl = openModals[openModals.length - 1];
+        const openModalEl = topmostModal(Array.from(document.querySelectorAll('.modal.open')));
         if (openModalEl) dismissModal(openModalEl);
     });
 
     document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && configQrScanActive) closeConfigQrScanner();
         if (document.visibilityState === 'hidden') {
             if (isCameraScanning && currentTab === 'scan') {
                 cameraStoppedByVisibility = true;

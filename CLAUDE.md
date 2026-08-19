@@ -1,5 +1,29 @@
 # Zoe-System
 
+> ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
+>
+> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-90pmhb`** (ជុំ audit ទី៦ + គោលការណ៍ លុប/ដក
+> + ការបិទចំណុចដែលនៅសល់)។ Branch នេះមាន `...-7f6izx` ទាំងស្រុងនៅក្នុងវា (fast-forward) បូកបន្ថែម
+> ២ commit ថ្មី។ Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`**
+> (ម្ចាស់គម្រោងគ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
+>
+> **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude) — នៅសល់តែប៉ុណ្ណេះ:**
+> 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
+> 2. Publish `ZoeKeyGen/firebase-database.rules.json` — Console ZoeKeyGen
+>
+> ដរាបណាមិន publish ៣ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា):
+> scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន · `license_keys` លែងអានបាន
+> ជាសាធារណៈត្រង់ node មេ។
+>
+> **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។** រឿង 8-day partial cleanup សម្រេចរួច (បន្ធូរ per-barcode
+> lock សម្រាប់ `worker` — មូលហេតុពេញលេញនៅ section **"Follow-up session"** ខាងក្រោម)។
+>
+> **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (រក divergence រវាង
+> ZoeAdmin/ZoeW) និង `node audit-tools/policy-test.js` (ផ្ទៀងផ្ទាត់គោលការណ៍ លុប/ដក)។ សម្រាប់ rules
+> រត់ emulator រួច `bash audit-tools/emu/real.sh` និង `bash audit-tools/emu/partial-claim.sh`។ មើល
+> `audit-tools/README.md`។ លម្អិតពេញលេញនៅ section **"Sixth deep-audit pass"** ខាងក្រោម។
+
+
 4 independent PWAs (vanilla JS, no framework, no build step), each deployed as its own
 Netlify site, sharing ONE Sentry project distinguished by the `app` tag:
 
@@ -401,6 +425,22 @@ actually wrong, Online Revoke/Extend checks would already be visibly broken for 
 silent failure) — which argues it's probably fine, just an oddly-named project. **Please confirm
 this is genuinely the dedicated `zoe-license` project's URL and not a mixed-up copy of ZoeW's
 business DB URL** — README updated to flag this for verification either way.
+
+### Three remaining items closed on request
+- **The pickup-stat phone-edit gap** (open since 2026-08-18, listed as "known unfixed edge case" above).
+  Editing the phone of an order that is *already closed* now moves its `pickedUpPhones` ref from the old
+  key to the new one, so the later reopen's −1 lands on the bucket that was actually incremented. Fixed at
+  the moment of the edit rather than by snapshotting the key onto the item, deliberately: the item schema
+  in `firebase-database.rules.json` ends with `$other: { ".validate": false }`, so a new field would be
+  rejected until the rules were published — a deploy-ordering hazard with two publishes already pending.
+  Moving the ref needs no schema change and is equally correct across devices, since the pickup node is
+  shared and the move is written immediately. `patchHistoryItemFields` now resolves `true`/`false` instead
+  of `undefined` so the caller can undo the move when the write fails; existing callers ignore the value.
+- **ZoeW's dead `saveSingleHistoryItemToFirebase`** removed. It is genuinely dead in ZoeW only — ZoeAdmin
+  has three live call sites and keeps its copy.
+- The `applyCurrentFilter()` conversion described above.
+
+`CACHE_VERSION` bumped (zoeadmin-v33, zoew-v30).
 
 ### Not yet done as of this handoff
 - Nothing critical is mid-edit. All changes described above are complete, syntax-checked
@@ -1073,3 +1113,518 @@ production app is worse than a narrow, already-partially-mitigated gap. Details 
 All fixes above are committed, `node --check`-clean on every modified `.js`, and HTML div-tag-balance-checked
 on every modified `.html`. Nothing is mid-edit. No Firebase rules files were touched by the fixes actually
 applied this round.
+
+## Sixth deep-audit pass (2026-08-19, branch `claude/deep-audit-bug-fixes-7f6izx`) — handoff notes
+
+Requested as another meticulous final round: the user was explicitly not yet satisfied because *every
+previous round kept finding new bugs*, and asked for a thorough, gap-free sweep plus a README tidy-up.
+Branch started exactly at `main` (commit `aab9b03`, i.e. right after PR #17 merged), no carry-over.
+
+**Method note (differs from rounds 1-5):** this round was run *inline, single-threaded*, not with 5 parallel
+research agents — the session's operating rules forbade spawning subagents unless the user asks. Instead of
+fan-out, coverage came from purpose-built static checkers written during the session (kept in the scratchpad,
+worth rebuilding if useful):
+- a **sibling-divergence differ** that extracts every top-level function from `ZoeAdmin/app.js` and
+  `ZoeW/app.js` by name and diffs same-named pairs. At round start: 103 shared functions, 78 identical,
+  25 different — this is what surfaced the `claimAndCleanupItem` and scanner-lookup findings below, and it is
+  by far the highest-yield tool for this codebase's "independently duplicated logic" problem. Re-run it first
+  in any future round.
+- a **`getElementById` ↔ HTML `id=` cross-checker** (both directions) and an **inline-`on*=` handler ↔
+  function-existence checker**, per app — all clean except the dynamically-created `zoeUpdateBanner`.
+- a **`data-close` target checker** (every `data-close="fn"` resolves to a real global function).
+- a **referenced-Firebase-path ↔ rules-file coverage** check (all paths covered).
+- a **token-equivalence-proving whitespace trimmer** (acorn tokenize → strip → re-tokenize → refuse to write
+  unless the token stream is byte-identical). Used it to safely strip 26 + 12 trailing-whitespace lines from
+  ZoeAdmin/ZoeW `app.js` without risking a change inside a template literal.
+- acorn comment scan across all 8 `app.js`/`license-verify.js` files: **0 comments** — convention still holds.
+
+### Fixed (safe, non-revenue, applied directly)
+- **Zoescan: the round-5 Setup-Link PIN gate was fully bypassable on a config-less device** (a real regression
+  of that round's own fix, in Zoescan only). Boot order is `applySetupLinkFromUrl()` → `initFirebase()`, and
+  Zoescan's `initFirebase()` called `openConfigModal()` **directly** when no config was saved (ZoeAdmin/ZoeW
+  route the same case through `checkPinAndOpenConfig(true)`). Since `openConfigModal()` is the sole consumer of
+  `pendingSetupLinkConfig`, the Setup Link's config got pre-filled into a Config modal that opened with **zero
+  PIN involvement** — exactly what round 5 set out to prevent. Both of Zoescan's no-config early returns now
+  call `requestPinBeforeConfig()` instead. Side effect worth knowing: a brand-new Zoescan device now sees
+  `pinSetupModal` before the Config modal, matching ZoeAdmin/ZoeW's long-standing first-run behavior.
+- **All 3 business apps: an abandoned Setup Link stayed armed indefinitely and could silently pre-fill
+  *another business's* Firebase config into a later, unrelated Config open.** `pendingSetupLinkConfig`
+  (ZoeW/Zoescan) and `pinTargetAction` (ZoeAdmin) were only ever consumed on success — cancelling the PIN
+  prompt left them set. With the 200-300-client provisioning model this is a genuine mis-provisioning risk
+  (a vendor opening Config to *check* the current config sees a different one pre-filled, and Save is one tap
+  away). Added `cancelPinSetupFlow()`/`cancelPinEntryFlow()` in all 3 apps, wired to both the cancel buttons
+  and (via `data-close=` on `pinModal`/`pinSetupModal`) the backdrop-click and Escape paths. ZoeAdmin's
+  `checkPinAndOpenConfig()` also now resets `pinTargetAction` up front, since its no-PIN branch opens
+  `pinSetupModal` directly and would otherwise inherit a stale callback.
+- **ZoeAdmin + ZoeW: `claimAndCleanupItem` left `zoew_scanner_lookup` permanently desynced from
+  `zoew_scan_history_cod_dod` whenever the trash write failed and the round-2 recovery restored the parcel.**
+  Both apps updated the lookup node assuming the claim was final (ZoeAdmin before the trash write, ZoeW after),
+  and `restoreClaimedItemToScanHistory()` put the parcel back without ever re-syncing it — so a restored parcel
+  was invisible to Zoescan ("barcode not found", no locker assignable) with no error anywhere. Now both apps
+  clear/sync immediately after the claim transaction commits (the narrower of the two windows) **and** re-sync
+  from `restoreResult.snapshot.val()` when the recovery succeeds. Also renamed ZoeW's `claimedUpdatedRemainder`
+  → `updatedRemainder`; **`claimAndCleanupItem` is now byte-identical across the two apps**, verified by the
+  divergence differ.
+- **ZoeAdmin/ZoeW: `buildScannerLookupPayload`, `syncScannerLookupEntry`, `clearScannerLookupEntry` had drifted
+  apart** — ZoeW wrote `barcodes` as an index-keyed object skipping nulls (which for a sparse array can make
+  RTDB return an object, and every consumer tests `Array.isArray`), ZoeAdmin wrote a dense array with
+  placeholders; ZoeW validated the itemId with a regex and used `set(child)`, ZoeAdmin used
+  `update(parent, {[id]: …})` with no id validation. Unified all three on the safer shape (dense array +
+  itemId regex guard + `set`). All three are now identical across the apps.
+- **ZoeAdmin/ZoeW/Zoescan: the Config QR scanner's camera was never released when the app was backgrounded.**
+  Round 3 fixed exactly this bug class for Zoescan's main barcode scanner and round 5 fixed the QR scanner's
+  logout/backdrop/Escape paths, but no app's `visibilitychange` handler knew about `configQrScanActive`
+  (ZoeW had no camera visibility handler at all — it never had a camera before the QR feature). All three now
+  call `closeConfigQrScanner()` when the document goes hidden.
+- **ZoeAdmin/ZoeW: Escape dismissed the wrong modal when a stacked dialog sits *earlier* in DOM order.**
+  Round 5 changed the Escape handler from "first open modal" to "last open modal in DOM order" to fix the
+  `configModal`/`configQrScanModal` pair, but `editBarcodePriceModal` (inline `z-index: 1050`) is declared
+  *before* `viewListModal` in ZoeAdmin's HTML while opening visually on top of it — so Escape closed the
+  background list instead of the visible edit dialog. Replaced the DOM-order heuristic with a shared
+  `topmostModal()` that ranks open modals by computed `z-index` and falls back to DOM order on ties (`>=`),
+  which is correct for both pairs. Applied to all 3 apps.
+- **ZoeAdmin/ZoeW: `runAutomaticDeletedCleanup()` released barcodes from `zoew_barcode_registry` in parallel
+  with the trash-purge write instead of after it** — if the purge failed, the barcode was freed while its
+  parcel was still sitting in (and restorable from) the trash, so the same barcode could be scanned in again as
+  a duplicate. `executePermanentDelete()` already chained these correctly; the automatic sweep now does too.
+- **`license-verify.js` (all 4 copies): `checkOnline()` skipped the server-clock sync on any non-OK HTTP
+  response**, because the `!res.ok` early return sat above the `Date`-header capture — so exactly when the
+  license DB was erroring (e.g. right after a rules change) `getStatus()` fell back to the raw device clock for
+  its expiry/offline-grace decisions. Moved the header capture above the early return. Re-copied to all 4 apps;
+  all still hash to one value (`md5sum` verified).
+- **`firebase-backup/backup.js` hardening** (round 5 flagged the path handling and never fixed it): backups now
+  write to a `.partial` temp file and `rename()` into place, so an interrupted run can't leave a truncated
+  `.json.gz` that both looks like a valid backup and consumes a `keepCount` slot (pushing a good one out) —
+  the worst failure mode a backup tool can have. `keepCount` is validated as an integer ≥ 1 (a negative value
+  previously made the prune loop delete *everything*, including the backup just written). `business.name` is
+  validated against `^[A-Za-z0-9._-]+$` before being used as a directory name, and a missing name is a clean
+  per-business failure instead of a `path.join` crash. Failure/success lines now label a nameless entry `#N`
+  rather than printing `undefined`. `main()` got a top-level `.catch`. **Verified by running it** against a
+  stubbed `firebase-admin`: all four validation paths, per-business failure isolation, exit code 1 on any
+  failure, rotation keeping exactly `keepCount`, zero `.partial` leftovers, and a gzip write/read round-trip.
+- Small: ZoeAdmin/ZoeW now clear the activation-key textarea on the *invalid* path too (Zoescan already did,
+  round 4); trailing-whitespace cruft stripped from ZoeAdmin/ZoeW `app.js` (token-equivalence proven).
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v24, zoew-v21, zoescan-v21, zoekeygen-v13) — ZoeKeyGen
+  included because its `license-verify.js` copy changed. **No Firebase rules file was modified by any applied
+  fix, so nothing from this round needs a manual publish.**
+
+### README work (the second half of the request)
+- **Root `README.md` rewritten/extended**: added the `firebase-backup/` tool to the app table, a full
+  Firebase-path/reader table for the business DB, a "Provisioning" section documenting the Setup Link + QR flow
+  end-to-end (including that both paths are PIN-gated and human-confirmed), and a backup section. Kept the
+  existing architecture notes.
+- **Fixed a genuinely broken doc reference**: `ZoeAdmin/README.md` pointed twice at `google-sheets-api/README.md`,
+  a path that has **never existed in this repo** (confirmed via `git log --all`). Replaced with a new inline
+  **"Lookup API"** section documenting the actual contract read out of the code — the `{barcode}` URL
+  placeholder, the `?list=1` / `{rows:[…]}` list endpoint, the PIN-derived encryption of the header secret,
+  the configurable nested field paths, the 15-minute cache, and the CSP `connect-src` constraint.
+- Added Setup Link / QR bullets to all 3 business-app READMEs; documented Zoescan's locker-occupancy warning;
+  documented that ZoeW now uses the camera (QR only) — a real security-posture change that was undocumented.
+- Documented the backup tool's new `.partial`/rename behavior and `keepCount`/`name` validation.
+- Added a link checker: every relative Markdown link in all 6 READMEs now resolves.
+
+### Reported to the user, NOT applied (revenue / pickup-stat / rules — live-production policy)
+Written up for human review rather than auto-applied, per "Project status" + point 5 of "When triaging".
+1. **[pickup stat] `toggleCloseStatus` applies a ±1 customer delta unconditionally.** `desiredClosed` is
+   computed from the pre-`confirm()` object, but `previousState` is re-read from `scanHistory` *after* the
+   blocking dialog (the whole reason `freshItem` exists). If another device closed the order during the dialog,
+   the package delta correctly computes 0 but the customer refCount still gets +1 — leaving a stale ref that
+   keeps the phone in `pickedUpPhones` after all its orders are reopened. `toggleIndividualBarcodeClose` guards
+   its *customer* delta on a real boundary crossing but has the same unguarded shape for its *package* delta.
+   Proposed fix: derive both deltas from `previousState` vs. desired, not from `desiredClosed` alone.
+2. **[revenue] `executeRestoreItem` never adds revenue back for a legacy item with no `barcodes[]` array**,
+   even though the 8-day abandon sweep *did* subtract its top-level `cod`/`dod` (`claimAndCleanupItem` handles
+   the no-`barcodes[]` case explicitly; the restore path only iterates `itemToRestore.barcodes`). Asymmetric —
+   money is subtracted and never returned. Same in both apps.
+3. **[revenue] `confirmPhone`'s wholesale `dailyRevenueData`/`monthlyRevenueData` snapshot revert** (the exact
+   leftover round 5 flagged for a later round). Unlike `removeSingleBarcode`'s, it is *not* purely redundant:
+   on the 15s `withTimeout` path `addOrUpdateEntry`'s own `revertRevenueOnSaveFailure` has not run yet. But
+   `addOrUpdateEntry` owns the correct targeted revert and will apply it whenever the write actually settles,
+   so the snapshot assignment can go — and should, because it discards a concurrent listener refresh from
+   another device. `scanHistory = historySnapshot` in the same catch is load-bearing (nothing else undoes the
+   local item) and should stay.
+4. **[revenue, latent] `executeRestoreItem`'s merge branch buckets the add-back under `targetItem.scanDate`
+   in ZoeAdmin but `itemToRestore.scanDate` in ZoeW.** The subtraction always used the trash item's scanDate,
+   so ZoeW's is the symmetric one. Currently unreachable-in-practice (the merge match requires equal scanDates
+   unless ids collide, which they shouldn't), but it is a latent cross-day revenue misallocation and the last
+   remaining real divergence between the two `executeRestoreItem`s.
+5. **[rules, ZoeKeyGen] `license_keys` is world-readable at the parent node**, so an unauthenticated
+   `GET /license_keys.json` dumps every key id + `expiresAt` + `revoked` for every client. `checkOnline()` only
+   ever reads `/license_keys/{appCode}/{keyId}.json`, so moving `.read: true` down to `$keyId` and granting
+   admin `.read` at the parent (for `refreshKeyList()`) keeps both working while removing enumeration.
+   Note `syncServerTime()` is unaffected — it deliberately ignores the response status and only reads the
+   `Date` header. Needs a manual Console publish.
+6. **[data integrity] Zoescan's mirror write addresses barcodes by array index.** `assignLockerToEntry()` takes
+   `matchedBarcodeIdx` from the *lookup* node and writes
+   `zoew_scan_history_cod_dod/{id}/barcodes/{idx}/locker`. If the two nodes desync (which finding 3 above could
+   cause), the write lands on the wrong barcode — or, if the index is past the end, creates a sparse array so
+   `barcodes` reads back as an **object**, and every `Array.isArray` consumer in ZoeAdmin/ZoeW silently drops
+   the parcel's barcodes from the UI, revenue sums and `isClosed` recomputation. Robust fix is to match by
+   `code` inside a transaction instead of by index; it touches the hot scan path, so it was not done unasked.
+7. **[operational] ZoeKeyGen "Extend" updates only the server `expiresAt`, not the signed payload's `exp`.**
+   Already-activated devices keep working (`getStatus` uses the server ceiling), but `activate()` →
+   `verifyKeyString()` rejects on the *signed* expiry — so an extended key **cannot be re-activated on a reset
+   or replacement device** once the original signed date passes. Design question (extend vs. reissue), flagged
+   rather than changed.
+
+### Confirmed clean this round (checked, no change needed — don't re-audit blind)
+- `escapeForInlineJsAttr()` in ZoeAdmin/ZoeW is genuinely correct for the `onclick="fn('…')"` context
+  (escapes `&` first, so `&#39;`-style entity smuggling can't reconstitute a quote after HTML decoding, and
+  backslash before quote). It is **not** the ZoeKeyGen bug class that used plain HTML escaping in an `on*=`
+  attribute — that one is still fixed.
+- All `onValue(dbRefX, …)` calls in all 3 apps are `if (dbRefX)`-guarded (ZoeAdmin's history/deleted guards are
+  just oddly indented, which makes them look unguarded in a quick grep).
+- Raw `Date.now()`/`new Date()` audit re-run over all 4 `app.js` + `license-verify.js`: every remaining raw use
+  is one of the intentionally-exempt cosmetic/local ones (PIN lockout, id salt, scan debounce, script-load
+  deadline, lookup cache TTL/cooldowns, `renderHistory` badges).
+- Every Firebase path the apps touch has a matching rules block; all `getElementById` IDs exist; all inline
+  handlers and `data-close` targets resolve; Zoescan still has exactly 2 inline `onclick=` and both keep their
+  `addEventListener` backups (its CSP still lacks `'unsafe-inline'`); no inline `<script>` blocks in Zoescan.
+- `submitManualAdjustment()`'s `submitBtn.disabled = true` with no re-enable **is not a bug** —
+  `openManualAdjustModal()` re-enables it on every open. (Looked like a real one at first; verified.)
+- Service worker cache-cleanup filters are still each scoped to their own `<app>-` prefix.
+
+### Not yet done as of this handoff
+All applied fixes are committed, `node --check`-clean, JSON-validated, comment-free-verified, HTML
+tag-balance- and wiring-checked, and the backup tool was executed end-to-end against a stub. Nothing is
+mid-edit. No rules file changed, so no manual publish is needed for anything applied this round — items 5
+above would need one *if* the user asks for it.
+
+### Follow-up in the same session — per-barcode លុប/ដក marker + all 7 flagged items applied
+
+The user restated the Delete-vs-Remove policy in their own words (confirming it is policy, not a bug),
+added the missing business rationale, and then authorised fixing all 7 flagged items "so long as លុប/ដក
+behaviour does not change". Two clarifications worth keeping:
+- **"បិទ" = "យកហើយ"** — closed means the customer collected the parcel. Count and value stay in the
+  daily/monthly stats permanently; the 2-hour auto-cleanup must never move them.
+- **The 8-day window exists because an uncollected parcel is physically returned to the central branch.**
+  That is why ដក subtracts *both* the money and the package count, and why restoring adds both back.
+Windows stay 2h / 8d / 10d exactly as before.
+
+**Per-barcode marker (the new part).** `isFromDeletion` already existed on each barcode, in both Firebase
+schemas and in the rules, but was **dead**: only ever written `false` at creation, never set on any លុប
+path, and never read. So a barcode inside a deleted (លុប) order read as `false`, i.e. indistinguishable
+from a removed (ដក) one. It is now written on every path:
+- លុប — `deleteSingleItem`, `clearHistory`, `claimAndCleanupItem` reason `'close'` → each barcode gets
+  `isFromDeletion: true`, `isDeducted` untouched (stays `false`; no money moves).
+- ដក — `claimAndCleanupItem` partial + whole-abandon, `removeSingleBarcode` → each barcode gets
+  `isFromDeletion: false` alongside `isDeducted: true`.
+- Restore — `executeRestoreItem` now clears `isFromDeletion` on every restored barcode (it is live again),
+  next to the existing `isDeducted` reset.
+- The `dbRefHistory` normalizer defaults a missing `isFromDeletion` to `false`, so pre-existing records
+  backfill on their next full write.
+`isDeducted` remains the *only* field that drives money — the marker is additive and nothing depends on it
+for correctness, which matters because trash records already in production do not carry it.
+**No Firebase rules change was needed** — `isFromDeletion` is already in both schemas, and every write is
+to a brand-new trash record (`!data.exists()`), so the worker-role validate passes.
+
+**Verified by executing the real code**: `scratchpad/policy-test.js` slices the actual
+`claimAndCleanupItem` trash-construction block and `executeRestoreItem` revenue block out of both
+`app.js` files, runs them in a `vm` context with stubbed helpers, and asserts 27 invariants per app —
+លុប→restore→លុប→restore leaves the stats byte-identical; ដក→restore→ដក→restore subtracts and adds back
+exactly; partial claims only move the claimed barcodes; legacy items behave symmetrically both ways.
+Worth rebuilding in a future round; it is the only executable proof of the policy in the repo.
+
+**The 7 flagged items — all now applied, none changing លុប/ដក semantics:**
+1. `toggleCloseStatus`/`toggleIndividualBarcodeClose` now derive the pickup deltas from `previousState`
+   (re-read after the blocking `confirm()`) instead of from `desiredClosed` alone, via
+   `alreadyInDesiredState`. Closes the stale-dialog race that left a phantom customer refCount.
+2. Legacy items with no `barcodes[]` now get their ដក value added back on restore, keyed off the
+   item-level marker captured as `restoredWasRemoved` *before* `isFromDeletion` is deleted. Conservative:
+   only an explicit `isFromDeletion === false` triggers the add-back, so an ancient record missing the
+   field behaves exactly as it does today.
+3. `confirmPhone`'s wholesale `dailyRevenueData`/`monthlyRevenueData` snapshot revert removed;
+   `addOrUpdateEntry`'s `revertRevenueOnSaveFailure` owns that revert and is object-identity-safe.
+   `scanHistory = historySnapshot` stays — nothing else undoes the local item.
+4. Resolved as a side effect of hoisting: `executeRestoreItem`'s revenue block is now one shared block
+   ahead of the merge/create branches, always keyed on `itemToRestore.scanDate`. **`executeRestoreItem`
+   and `claimAndCleanupItem` are now byte-identical across ZoeAdmin and ZoeW** (verified by the differ;
+   ZoeW's `restoredResultItem` renamed to ZoeAdmin's `resultingLiveItem`).
+5. `ZoeKeyGen/firebase-database.rules.json`: `.read: true` moved down from `license_keys` to
+   `license_keys/$appCode/$keyId`, with admin `.read` added at the parent for `refreshKeyList()`.
+   `checkOnline()` reads one exact key path so it is unaffected; `syncServerTime()` ignores the response
+   status entirely and only reads the `Date` header, so it is unaffected too.
+   **This one needs a manual publish in the ZoeKeyGen Firebase Console.**
+6. Zoescan's mirror write now also sends `barcodes/{idx}/code`. Because that field is scanner-locked to
+   its existing value, Firebase itself rejects the write if the index no longer points at that barcode.
+   A full fix (match by code inside a transaction) is **not possible**: a transaction requires read access
+   to `zoew_scan_history_cod_dod`, which the scanner role deliberately does not have. Residual gap: an
+   index past the end of the array still passes (`!data.exists()`) and creates a sparse entry. A rules
+   guard (`barcodes/$idx` must have children `code`/`cod`/`dod`) would close it, but was **not** applied —
+   it would permanently reject writes to any production barcode that happens to be missing `cod`/`dod`,
+   which cannot be verified from here.
+7. ZoeKeyGen's Extend modal now states plainly that extending moves the server ceiling only, and that
+   after the key's original signed expiry it can no longer be activated on a new or reset device.
+   Behaviour deliberately unchanged (re-signing would produce a different key string).
+
+`CACHE_VERSION` bumped again for all 4 (zoeadmin-v26, zoew-v23, zoescan-v22, zoekeygen-v14).
+`ZoeAdmin/README.md`'s Delete-vs-Remove section now documents the per-barcode marker table.
+
+### Newly found this round, reported but NOT applied (needs a rules decision)
+**ZoeW's automatic 8-day *partial* claim is rejected by the rules whenever the stale-open barcode is not
+last in `barcodes[]`.** `claimAndCleanupItem` writes the compacted remainder, which shifts array indices;
+the per-barcode `cod`/`dod`/`isDeducted`/`time`/`createdAt`/`isFromDeletion` validates are all
+`admin || !data.exists() || unchanged`, so a shifted index makes an admin-locked field change value under
+a `worker` session and the whole transaction is refused. ZoeAdmin (admin role) is unaffected, and the
+sweep succeeds whenever an admin opens ZoeAdmin, which is presumably why this has never been noticed.
+No declarative rule can express "this is a permutation of the same barcodes", so the options are: relax
+those per-barcode locks for `worker`, or accept that partial 8-day cleanup is admin-only. Flagged for the
+user rather than decided here.
+
+### #6 fully closed — verified on a live Firebase RTDB emulator
+The round-1/round-5 blocker ("emulator unreachable, rules reasoned through by hand") **no longer applies**:
+`npm i firebase-tools` works, and the emulator jar runs directly with
+`java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1`.
+Two gotchas cost several attempts — the CLI's `emulators:start` cannot upload rules through this session's
+proxy (use the jar directly), and **both** `.settings/rules.json` and any `auth_variable_override` request
+need `-H "Authorization: Bearer owner"`, otherwise rules silently stay wide open and every test bogusly
+passes. Always assert that a known-bad write is actually DENIED before trusting a rules test run.
+
+Empirically settled: **a `.validate` on `barcodes/$idx` IS evaluated for a child-only write** (e.g.
+`PATCH .../barcodes/9/locker`). So the guard now added to `zoew_scan_history_cod_dod/$itemId/barcodes/$idx`
+— `root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()`, i.e. *a scanner may
+modify an existing barcode but never create one* — blocks the out-of-range write that would otherwise
+create a sparse array and make the whole parcel's `barcodes` read back as an object. Chosen over a
+`hasChildren(['code','cod','dod'])` guard specifically because it does not depend on which fields legacy
+production barcodes happen to carry. **Needs a manual publish** (root rules file).
+Verified 7/7 against the real rules file: valid mirror write allowed, out-of-range denied, wrong-code
+denied, legacy item-level locker allowed, admin adding a barcode allowed, worker closing a barcode allowed,
+worker restoring a new item allowed.
+
+The same run also **empirically confirmed the partial-claim finding**: a worker rewriting a compacted
+`barcodes` remainder (index 0 becomes what used to be index 1) is DENIED. Still unfixed — it needs a
+decision on relaxing the per-barcode admin locks for `worker`.
+
+### #6 fully closed — verified on a live Firebase RTDB emulator
+The round-1/round-5 blocker ("emulator unreachable, rules reasoned through by hand") **no longer applies**:
+`npm i firebase-tools` works, and the emulator jar runs directly with
+`java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1`.
+Three gotchas cost several attempts and are worth remembering: the CLI's `emulators:start` cannot upload
+rules through this session's proxy (run the jar directly); **both** `.settings/rules.json` and any
+`auth_variable_override` request need `-H "Authorization: Bearer owner"`, otherwise rules silently stay
+wide open and every test bogusly passes; and a stray `pkill -f firebase-database-emulator` matches the
+tool's own shell command line and kills the session. Always assert a known-bad write is actually DENIED
+before trusting a rules run — that check is what caught both false-pass rounds here.
+
+Empirically settled: **a `.validate` on `barcodes/$idx` IS evaluated for a child-only write** (e.g.
+`PATCH .../barcodes/9/locker`). So the guard now added to `zoew_scan_history_cod_dod/$itemId/barcodes/$idx`
+— `root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()`, i.e. *a scanner may
+modify an existing barcode but never create one* — blocks the out-of-range write that would otherwise
+create a sparse array and make the whole parcel's `barcodes` read back as an object, silently dropping it
+from every `Array.isArray` consumer. Chosen over a `hasChildren(['code','cod','dod'])` guard specifically
+because it does not depend on which fields legacy production barcodes happen to carry.
+**Needs a manual publish** (root rules file). Verified 7/7 against the real rules file: valid mirror write
+allowed, out-of-range denied, wrong-code denied, legacy item-level locker allowed, admin adding a barcode
+allowed, worker closing a barcode allowed, worker restoring a new item allowed.
+
+The same run also **empirically confirmed the partial-claim finding**: a worker rewriting a compacted
+`barcodes` remainder (index 0 becomes what used to be index 1) is DENIED by the existing per-barcode admin
+locks. Still unfixed — it needs a decision on relaxing those locks for `worker`.
+The harness lives at `scratchpad/emu/{real.sh,real.rules.json}`; rebuild it in any future rules round.
+
+## Follow-up session (2026-08-19, branch `claude/deep-audit-bug-fixes-90pmhb`) — handoff notes
+
+Not a new audit round. The user asked to read the START HERE block, then to "fix whatever is still not
+done". Branch fast-forwarded from `claude/deep-audit-bug-fixes-7f6izx` (so it contains all of round 6),
+plus the two commits below. Round 6's own findings were spot-checked in the code rather than trusted from
+these notes — all 7 of the items it says it applied are genuinely applied (`alreadyInDesiredState`,
+`restoredWasRemoved`, the removed `confirmPhone` snapshot revert, `executeRestoreItem`/
+`claimAndCleanupItem`/`restoreClaimedItemToScanHistory`/`toggleCloseStatus` byte-identical across
+ZoeAdmin/ZoeW per `audit-tools/extract.js`, the `license_keys/$appCode/$keyId` `.read` move, the
+`barcodes/{idx}/code` mirror field, and the Extend modal's signed-expiry warning).
+
+### The four low-priority items round 5 listed and never applied — all now applied
+- **QR Setup Link scanner showed one generic "check camera permission" toast for every failure** in all
+  3 business apps. Round 5 flagged this as misleading specifically because it also fires when the real
+  cause is the dual-stream refusal it added in the same round. Added `describeCameraError(err)` (denied /
+  no camera / in use by another app / overconstrained / non-HTTPS / unknown), identical in ZoeAdmin, ZoeW
+  and Zoescan. Zoescan's main-scanner catch now also reports *unrecognised* `getUserMedia` error names to
+  Sentry instead of silently showing a generic string for them.
+- **No in-app-browser warning before opening the QR scanner**, unlike Zoescan's main barcode scanner which
+  already warned proactively. Added `isInAppBrowser()` (same UA test, now shared) and a warning toast in
+  all 3 apps' `openConfigQrScanner()`. Zoescan's main scanner now calls the same helper instead of its own
+  inline copy of the regex.
+- **ZoeKeyGen `persistSigningKeyForSession()` could no-op with zero feedback.** Root cause is one level up
+  from where round 5 pointed: `deriveSigningKeySessionKey()` swallows its own exception and **returns
+  null**, so `saveNewSecurityPin()`/`verifySecurityPin()` proceed normally, show "PIN saved", and then call
+  `persistSigningKeyForSession()`, whose `!signingKeySessionKey` guard returns silently. The user ticked
+  "remember this key", got a success toast, and nothing was remembered. Both that guard and the
+  `encrypt`/`sessionStorage` catch now clear the `rememberSigningKeyCheckbox` and say so; the catch also
+  captures to Sentry. Deliberately still fails closed — nothing is ever stored unencrypted.
+- **Zoescan wrote `lockerUpdatedBy` as `null`** when `currentUserEmail` was empty, in the lookup
+  transaction, the local entry, and the scan-history mirror. A null in a multi-path update *deletes* the
+  child (`.validate` is skipped for deletes, so this was never a rules rejection — the round-5 note's
+  guess about that was wrong), silently dropping who last set the locker. Now the field is simply omitted
+  when there is no email, matching what `buildScannerLookupPayload()` in ZoeAdmin/ZoeW already did.
+
+`CACHE_VERSION` bumped for all 4 (zoeadmin-v27, zoew-v24, zoescan-v23, zoekeygen-v15).
+
+### The one open decision — resolved: worker may now rewrite a compacted `barcodes[]`
+Round 6 left this for the user: ZoeW's automatic 8-day *partial* claim is rejected whenever compacting
+`barcodes[]` shifts indices, because the per-barcode `cod`/`dod`/`isDeducted`/`isFromDeletion`/`time`/
+`createdAt` validates read `admin || !data.exists() || unchanged`. Presented as three options (accept
+admin-only and stop the retry noise / relax the locks for `worker` / delete-then-recreate the node in two
+writes, which works under the current rules because `.validate` is skipped on a delete and `!data.exists()`
+holds on the recreate). **The user chose relaxing the locks**, and made the argument that settled it:
+*ZoeW has no UI that sets a barcode's `cod`/`dod` at all.* Verified — every `cod`/`dod` write in
+`ZoeW/app.js` is a recomputed sum, a normalizer reading the existing value, or the legacy-shape migration
+that builds `barcodes[]` from the item's own existing values; `openEditBarcodePriceModal`/
+`saveEditedBarcodePrice`/`removeSingleBarcode` are ZoeAdmin-only.
+
+Also found while weighing it, and worth remembering because it changes how much these per-barcode locks
+were ever worth: **`zoew_daily_revenue_cod_dod` and `zoew_monthly_revenue_cod_dod` accept arbitrary
+worker-written absolute values** (`.validate` is only `isNumber() && >= 0`) — the "explicitly NOT fixed"
+item from the very first audit round. A malicious worker could already rewrite the day's revenue total
+directly, so the per-barcode lock was never the boundary it looked like; it protects the source records
+(the evidence trail), not the totals. The **trash node's** money locks (`zoew_recently_deleted_cod_dod`)
+were deliberately left admin-only — that is where the restore add-back value is read from.
+
+So the six fields now use `!== 'scanner'` instead of `=== 'admin'`, matching how `code`/`isClosed` in the
+same block already treat a worker. **No app code changed** — `claimAndCleanupItem` was always correct;
+only the rules refused it. `restoreClaimedItemToScanHistory` and `executeRestoreItem`'s merge branch both
+*append* to `barcodes[]`, so existing indices keep their values and neither was ever affected.
+
+**Verified on a live RTDB emulator against the real rules file**, not reasoned through by hand — new
+suite `audit-tools/emu/partial-claim.sh`, 9/9:
+- allowed: the compacted-remainder write (index 0 going from AAA to BBB), and creating the matching trash record
+- still denied: scanner changing a barcode's `cod`, scanner changing an existing `code`, scanner creating
+  a barcode out of range, worker rewriting an *existing* trash barcode's `cod`, worker rewriting the trash
+  item-level `cod`, and an unauthenticated write
+- asserted explicitly as the accepted cost: a worker *can* now edit a live barcode's `cod` directly
+Re-ran the existing `real.sh` suite too (8/8). Confirmed the **previous** rules denied the same compacted
+write, so the relaxation is provably what fixes it.
+
+Two emulator gotchas beyond the three round 6 documented: `~/.cache/firebase/emulators/` is empty after a
+plain `npm i firebase-tools` — run `firebase setup:emulators:database` to fetch the jar. And a request
+carrying `-H "Authorization: Bearer owner"` *without* an `auth_variable_override` is treated as the project
+owner and **bypasses rules entirely**, so an "unauthenticated write is denied" test written that way is a
+false pass; send no Authorization header at all for that case.
+
+**`firebase-database.rules.json` (root) needs a manual publish** in each business's Firebase Console —
+same as it already did for round 6's scanner guard, which is still unpublished. No app-code change came
+with this one, so no `CACHE_VERSION` bump for it.
+
+### Round 3's open product decision — resolved: keep the wipe, stop it being silent
+Round 3 flagged, and deliberately did not decide, that an involuntary logout silently destroys a
+freshly-generated, not-yet-copied signing keypair. The user asked for a recommendation and then approved
+it on the condition that it not weaken security. **The wipe itself is unchanged and still
+unconditional** — `closeModal('keypairModal')` blanks `newPrivateKeyOutput` on every path, including the
+bulk modal-close inside `showLoginModalWithPrefill()`, so no auth-null transition can leave a private
+signing key in the DOM. Nothing was added that can cancel that.
+
+What changed is only that the loss is now visible and, on deliberate paths, preventable:
+- `keypairPrivateCopied` is set by `copyTextarea('newPrivateKeyOutput')` (both the clipboard-API and the
+  `execCommand` fallback path, so a fallback copy counts too) and reset by `generateNewKeypair()` and by
+  `showLoginModalWithPrefill()`. `hasUncopiedKeypair()` additionally requires the modal to be `active`
+  and the textarea to be non-empty, so it can never fire on a fresh page load.
+- The modal's "បិទ" button now calls a new `dismissKeypairModal()` that confirms first when the key is
+  uncopied. This is the *only* deliberate dismiss path — ZoeKeyGen has no backdrop-click or Escape
+  handling at all, unlike the 3 business apps (the round 2 note about a backdrop handler here does not
+  match the current code). The confirm is deliberately **not** inside `closeModal()`: a blocking prompt on
+  the forced-logout path would be wrong, and letting it be cancelled would weaken the wipe.
+- `logoutApp()` confirms before signing out when a key is uncopied. Aborting a user-initiated logout is
+  the user's own choice, so this changes no security boundary.
+- Any involuntary path (role-check failure/timeout, auth session lost) still wipes with no prompt, but
+  now raises a distinct `alert()` naming what was lost and why, fired after the login modal is shown. The
+  pre-existing "បានសម្អាត Signing Key ចេញពីសតិ" toast is about the *loaded* key, which is why the loss
+  used to read as unexplained.
+- `kickUserOut()` (the devtools guard) is untouched and uncoverable by design — it replaces the document
+  with `about:blank`, which destroys the key correctly and leaves nowhere to show a message.
+
+Worth knowing if this comes up again: losing the key is costly but not unrecoverable. The generated pair
+is not deployed yet, so regenerating costs nothing — unless the **public** half was already pasted into
+all 4 apps' `license-verify.js` and shipped, in which case the re-deploy has to be redone. Previously
+issued keys keep verifying either way, since `PUBLIC_KEYS_JWK` is an array.
+
+`CACHE_VERSION` bumped to zoekeygen-v16.
+
+### Call-mark feature work (asked for after the audit items were closed)
+The user asked to check the phone call-marking and the "call again after 4 hours" prompt in ZoeAdmin and
+ZoeW. `handleCallAction`, `openCallMarkModal`, `setCallMark` and `renderHistory` are byte-identical across
+the two apps, and the recall logic itself was already written correctly — but two things made it unreliable:
+
+- **Nothing ever woke it up.** `needsRecall` is computed only inside `renderHistory`, and `renderHistory`
+  only runs on a data change or a filter/search change. There is no timer, and neither app's
+  `visibilitychange` handler re-renders. On a busy day the live listener fires often enough that the
+  highlight looked like it worked; on a quiet stretch, or with the app left open, it could be hours late.
+  Added `sweepRecallHighlights()` (60s interval + on return to the foreground): it builds a signature of
+  the ids whose 4 hours are up and re-renders only when that set changes, so an unchanged list costs one
+  cheap loop a minute and no DOM work. It re-renders via `refreshCurrentHistoryView()`, which re-runs
+  `searchByPhone()` when a phone search is active — a bare `applyCurrentFilter()` on a timer would have
+  silently wiped the worker's search results every minute.
+- **Mixed clocks.** `callMarkTime` is written with `getServerNow()` but `renderHistory` compared it against
+  `Date.now()`, so a device clock off by N hours moved the reminder by N hours. Both now use
+  `getServerNow()`, which was already in scope there. (This is the `renderHistory` raw-`Date.now()` use
+  that round 5 listed as cosmetic — it stops being cosmetic once the 4-hour prompt is relied on.)
+
+The blinking green/red recall style is **deliberately unchanged** — the user was asked and chose to keep it.
+
+Also added, per the user: a row marked `wrong-number` shows an **edit-phone button in place of** the call
+button (explicitly not in addition to it — the row must keep the same three controls so it does not
+overflow a phone screen). `saveEditedPhone()` clears the `wrong-number` mark and resets `isCalled` when the
+number actually changed, so the row returns to a fresh green call button; the mark, the time and `isCalled`
+travel in the same `patchHistoryItemFields` call as the phone, so a failed write reverts all of it
+together. Saving an unchanged number keeps the mark, since nothing was corrected. New `.fix-phone-btn`
+style reuses the purple the `row-num-wrong-number` label already uses.
+
+**Then decided by the user and applied:** `handleCallAction()` now also restarts the 4-hour clock
+(`callMarkTime = getServerNow()`) when the item carries a `no-answer`/`no-connect` mark. The user's rule,
+in their words: after calling again the button goes back to the normal colour, **the mark itself is not
+deleted** so the row stays easy to recognise, and 4 hours later it blinks again. `callMark` is deliberately
+untouched, so the row-number label keeps reading "ខល អត់លើក"/"ខល អត់ចូល" — only the timer moves. Both
+fields travel in one `patchHistoryItemFields` call, so a failed write reverts them together. The re-render
+is deferred with `setTimeout(..., 0)` on purpose: `handleCallAction` is the `onclick` of an
+`<a href="tel:">`, and replacing the row's `innerHTML` synchronously inside that handler would tear out the
+anchor before the browser follows the link. Marking again still restarts the clock too — `setCallMark`
+rewrites `callMarkTime` unconditionally, including when the same mark is re-selected.
+
+**Then also asked for:** closing a parcel now clears the call mark outright. The user's reasoning is that
+a collected parcel means the customer was reached, so the mark is stale the moment it is closed. Applied in
+both explicit toggle paths — `toggleCloseStatus` (whole order) and `toggleIndividualBarcodeClose` (a single
+barcode, which the user asked for explicitly: any collected barcode clears that phone's mark) — in the
+local optimistic update, in the `runTransaction` body, and restored in the failure revert, all four guarded
+by `if (desiredClosed)` so reopening never clears anything. Reopening does not bring the mark back; it is
+gone for good, which is what "សម្អាតដោយស្វ័យប្រវត្តិ" asks for. This also removes the "closed row keeps
+blinking" case noted earlier, since there is no longer a mark to blink on. `claimAndCleanupItem`'s
+automatic 2h/8d sweep is deliberately untouched, matching how pickup-stat crediting is scoped to the
+explicit toggles only — those items are moving to trash anyway.
+
+`CACHE_VERSION` bumped (zoeadmin-v32, zoew-v29).
+
+### Two mechanisms from that work, refined on request
+- **The bare `setTimeout(refreshCurrentHistoryView, 0)` in `handleCallAction` became
+  `scheduleHistoryViewRefresh()`.** The deferral itself is load-bearing and stays — `handleCallAction` is
+  the `onclick` of an `<a href="tel:">`, so re-rendering synchronously would tear the anchor out before the
+  browser opens the dialer. What changed is that a named function documents that in a codebase that bans
+  comments, and it now coalesces: a second call in the same tick is dropped, so a burst renders once.
+- **`patchHistoryItemFields`'s failure revert re-rendered with `applyCurrentFilter()`**, which silently
+  discarded an active phone search — at the worst possible moment, since the worker had just hit a save
+  error and would lose the row they were looking at. It now uses `refreshCurrentHistoryView()`, which
+  re-runs `searchByPhone()` when a search is active. `setCallMark` got the same change.
+
+`saveEditedPhone` deliberately goes the other way, on the user's call: after a successful edit it **clears
+the search box and calls `applyCurrentFilter()`**, so the view returns to the full day list. Keeping the
+search would have hidden the row the worker just edited, since the new number no longer matches the old
+query. The box is cleared rather than left populated so the state stays coherent — otherwise the next
+background refresh (the 60s recall sweep, a Firebase update) would flip the table back to search results.
+Its *failure* path still goes through the revert above and keeps the search, which is right: the write
+failed, the old number is back, and it still matches the query. `saveEditedPhone` is now byte-identical
+across the two apps (one leftover brace-style difference was aligned while editing it).
+
+**Then finished, on the user's instruction** (they also confirmed they are currently the only person using
+the system, so the propose-first caution does not apply for now): all the remaining `applyCurrentFilter()`
+call sites were classified and 28 of them converted (19 ZoeAdmin, 9 ZoeW). The rule applied was **a repaint
+caused by data changing preserves the current view; a repaint the user asked for by changing view does
+not.** 12 sites keep `applyCurrentFilter()` on purpose: `filterDataByDate`, `filterDataByCustomDate`,
+`searchByPhone`'s empty-query branch, `refreshCurrentHistoryView`'s own else branch, `setupAuthListener`
+(fresh session) and `saveEditedPhone` (clears the box deliberately, see above).
+
+The biggest one by far was **`debouncedRenderAfterHistorySync`** — the Firebase history listener's repaint,
+which fires on every change from any device. A worker with a phone search open had it wiped every time
+anyone anywhere scanned a parcel.
+
+### Not yet done as of this handoff
+Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the
+rules file, comment-free-verified on every changed line, tag-balance- and wiring-checked on the one
+modified `.html`, and the rules change is emulator-verified. The only outstanding work is the two manual
+Console publishes listed in START HERE.

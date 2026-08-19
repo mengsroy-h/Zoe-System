@@ -578,6 +578,13 @@ function saveFirebaseConfig() {
     setTimeout(() => window.location.reload(), 900);
 }
 
+function decodeSetupPayload(setupParam) {
+    const json = decodeURIComponent(escape(atob(setupParam)));
+    const parsed = JSON.parse(json);
+    if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
+    return parsed;
+}
+
 function applySetupLinkFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const setupParam = params.get('setup');
@@ -587,9 +594,7 @@ function applySetupLinkFromUrl() {
 
     let parsed;
     try {
-        const json = decodeURIComponent(escape(atob(setupParam)));
-        parsed = JSON.parse(json);
-        if (!parsed.apiKey || !parsed.databaseURL) throw new Error('missing apiKey/databaseURL');
+        parsed = decodeSetupPayload(setupParam);
     } catch (e) {
         showToast("❌ Setup Link មិនត្រឹមត្រូវទេ!");
         return;
@@ -603,6 +608,67 @@ function applySetupLinkFromUrl() {
 
     localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
     showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+}
+
+let configQrReader = null;
+let configQrScanActive = false;
+
+function closeConfigQrScanner() {
+    configQrScanActive = false;
+    if (configQrReader) {
+        try { configQrReader.reset(); } catch (e) {}
+        configQrReader = null;
+    }
+    closeModal('configQrScanModal');
+}
+
+async function openConfigQrScanner() {
+    if (configQrScanActive) return;
+    if (typeof ZXing === 'undefined') {
+        showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
+        return;
+    }
+    openModal('configQrScanModal');
+    configQrScanActive = true;
+    try {
+        configQrReader = new ZXing.BrowserQRCodeReader(500);
+        await configQrReader.decodeFromVideoDevice(null, 'configQrVideo', (result) => {
+            if (!configQrScanActive || !result) return;
+            handleConfigQrResult(result.getText());
+        });
+    } catch (e) {
+        console.error('Config QR scanner error:', e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
+        showToast("❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission");
+        closeConfigQrScanner();
+    }
+}
+
+function handleConfigQrResult(text) {
+    if (!configQrScanActive) return;
+    let setupParam = null;
+    try {
+        setupParam = new URL(text).searchParams.get('setup');
+    } catch (e) {
+        setupParam = null;
+    }
+    if (!setupParam) {
+        showToast("❌ QR នេះមិនមែនជា Setup Link ត្រឹមត្រូវទេ!");
+        return;
+    }
+
+    let parsed;
+    try {
+        parsed = decodeSetupPayload(setupParam);
+    } catch (e) {
+        showToast("❌ QR Setup Link មិនត្រឹមត្រូវទេ!");
+        return;
+    }
+
+    closeConfigQrScanner();
+    const cfgInput = document.getElementById('configInput');
+    if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
+    showToast('✅ បានស្កេន QR ជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក"');
 }
 
 function getLockerPrefix() { return localStorage.getItem('zscan_locker_prefix') || 'ទូ'; }
@@ -1320,6 +1386,8 @@ function bindEventListeners() {
 
     document.getElementById('configCancelBtn').addEventListener('click', () => closeModal('configModal'));
     document.getElementById('configSaveBtn').addEventListener('click', saveFirebaseConfig);
+    document.getElementById('configQrScanOpenBtn').addEventListener('click', openConfigQrScanner);
+    document.getElementById('configQrScanCancelBtn').addEventListener('click', closeConfigQrScanner);
 
     document.getElementById('locationWarningCancelBtn').addEventListener('click', cancelLocationChange);
     document.getElementById('locationWarningConfirmBtn').addEventListener('click', confirmLocationChange);

@@ -826,6 +826,93 @@ identified as the biggest operational bottleneck (bigger than any code bug found
   again (zoekeygen-v11). Note: `qrcode.js` is third-party vendored code, kept as-is including its own
   comments — the project's comment-free convention applies only to this codebase's own `app.js`/
   `license-verify.js`, not to vendored libraries.
-- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v10).
-- Not yet committed/pushed as of writing this note — see git log on this branch to confirm current state if
-  resuming.
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v11).
+
+This round's PR (#15) was merged to `main` at the user's explicit request in this session.
+
+## Firebase Backup Tool (added 2026-08-19)
+
+Added at the user's request as a follow-up to the "what's missing before public launch" discussion — the
+biggest unaddressed data-safety gap identified was that Firebase RTDB has no backup at all; losing a
+client business's project (account issue, accidental deletion, quota problem) would be unrecoverable.
+
+- New top-level `firebase-backup/` directory, **not part of any of the 4 deployed apps** — a standalone
+  Node.js CLI tool the vendor runs themselves (locally or via a scheduled task), using `firebase-admin`
+  with a per-business service account key (bypasses RTDB rules entirely, unlike the client SDK — the
+  correct approach for a trusted, vendor-only backup script).
+- `backup.js` reads `config.json` (gitignored, never committed — contains real business names +
+  paths to real service-account key files) listing one entry per business (name, service account path,
+  database URL), does a full root (`/`) export per business, gzips it to
+  `backups/<business>/<ISO-timestamp>.json.gz`, and prunes older backups beyond `keepCount` (default 30).
+  One business failing (bad credentials, missing file, network error) doesn't stop the others — each is
+  independently try/caught and reported; the process exits non-zero only if *any* failed, so a scheduled
+  task can alert on it.
+- `config.example.json` is the committed template; `config.json`, `firebase-backup/secrets/` (where the
+  downloaded service-account JSON keys go), and `firebase-backup/backups/` (the output) are all in
+  `.gitignore` — service account keys are genuine credentials (unlike the client-side Firebase config used
+  elsewhere in this project, which is intentionally not secret), so they must never be committed.
+- **Verified working this session**: ran `npm install` (167 packages, no vulnerabilities), confirmed the
+  missing-config error path, confirmed per-business failure isolation with a fake config (one missing file
+  + one malformed service-account key — both failed independently with clear messages, exit code 1,
+  neither crashed the process), and independently verified the gzip write/read round-trip and the
+  prune-to-`keepCount` rotation logic with a standalone test (5 fake dated backups → correctly kept only
+  the newest 3). **Not verified against a real Firebase project** — no live project/service-account key
+  available in this session; the vendor should do one real end-to-end run after setup.
+- README (`firebase-backup/README.md`, in Khmer) covers: getting a service-account key from the Firebase
+  Console, `config.json` setup, manual run, Windows Task Scheduler + cron scheduling instructions, and a
+  documented-but-not-built manual restore procedure (restore is deliberately not a one-command script,
+  since it can overwrite live data — the README gives the few lines of code needed, for a human to run
+  deliberately when actually needed).
+- Root `.gitignore` updated: `node_modules/`, `firebase-backup/config.json`, `firebase-backup/secrets/`,
+  `firebase-backup/backups/`, `firebase-backup/backup.log`.
+- Does not touch any of the 4 apps, Firebase rules, or CACHE_VERSION — purely additive, isolated tooling.
+
+## Config-modal QR scanner for Setup Link (added 2026-08-19)
+
+Added at the user's request as a companion to the Setup Link feature — instead of the vendor reading the
+generated link/QR out loud or the target device relying on an external system camera app to open the
+Setup Link URL, ZoeAdmin/ZoeW/Zoescan's own Config modal now has a "📷 ស្កេន QR (Setup Link)" button that
+scans the same QR with the device's own camera and auto-fills the Config textarea, so the human still
+reviews and clicks the existing "Save" button — no new silent-save path.
+
+**Explicit user constraint, honored by design**: the existing parcel/barcode-scanning feature (ZoeAdmin's
+and Zoescan's `liveScanCodeReader`/`codeReader`, restricted to 1D barcode formats) must not be touched or
+affected in any way. This is why the new scanner uses a **completely separate `ZXing.BrowserQRCodeReader`
+instance** (a QR-only decoder class, structurally incapable of matching barcode formats — not the same
+multi-format reader used for barcode scanning, and not achieved by broadening that reader's format hints)
+with its own isolated variables (`configQrReader`, `configQrScanActive`), own camera stream (via ZXing's
+own `decodeFromVideoDevice`), own video element (`#configQrVideo`), and own modal (`#configQrScanModal`).
+Zero lines of the existing barcode-scanning code path were modified in any of the three apps.
+
+- **Shared logic**: `decodeSetupPayload(setupParam)` (extracted as a small helper in all 3 apps, reused by
+  both `applySetupLinkFromUrl()` and the new scanner) decodes+validates the same base64 payload the Setup
+  Link URL already used — one already-reviewed decode path, not a second parallel implementation.
+- **Flow**: `openConfigQrScanner()` opens `#configQrScanModal` on top of the already-open `#configModal`
+  (both apps' existing `openModalHelper`/`closeModal` — or Zoescan's `openModal`/`closeModal` — already
+  support multiple simultaneously-open `.modal` elements correctly, confirmed by reading their
+  implementations rather than assumed) and starts the QR-only reader. On a successful decode,
+  `handleConfigQrResult(text)` parses the scanned string as a URL, extracts the `?setup=` param, decodes it
+  via the shared helper, stops the scanner, and — unlike the URL-param flow's `confirm()` dialog — simply
+  **pretty-prints the config into the existing Config textarea** (`firebaseConfigInput` in ZoeAdmin/ZoeW,
+  `configInput` in Zoescan) for the human to review and click the pre-existing Save button themselves. No
+  new auto-save path was introduced; this reuses the same trusted, already-existing save/validate code
+  every manual paste already goes through.
+- **ZoeAdmin, Zoescan**: already had `@zxing/library@0.23.0` loaded (pinned version + SRI hash, for the
+  barcode-scanning feature) and the necessary CSP (`unpkg.com` in `script-src`, `worker-src 'self' blob:`)
+  and `Permissions-Policy: camera=(self)` — reused as-is, zero infra changes needed for these two apps.
+- **ZoeW**: previously had **no camera capability at all** by design (`Permissions-Policy: camera=()`, no
+  ZXing, no scan feature of any kind — deliberately, since ZoeW's role never needed a camera). Adding this
+  feature there required, for the first time in ZoeW: loading the identical pinned `@zxing/library@0.23.0`
+  script tag (same URL + SRI hash as ZoeAdmin, byte-for-byte, not a different version), adding `unpkg.com`
+  to `script-src` and `worker-src 'self' blob:` to `netlify.toml`'s CSP, and changing
+  `Permissions-Policy` from `camera=()` to `camera=(self)`. **This was confirmed explicitly with the user
+  before implementing** (a real security-posture change, not something to silently decide) — they chose to
+  add it to all 3 apps for consistency rather than skip ZoeW.
+- Verified via `node --check` on all 3 apps' `app.js`, HTML tag-balance check on all 3 `index.html`, and the
+  exact `ZXing.BrowserQRCodeReader`/`decodeFromVideoDevice`/`Result.getText()` API surface confirmed against
+  the real `@zxing/library@0.23.0` TypeScript definitions (downloaded from `registry.npmjs.org` for
+  inspection, matching the same verification-over-assumption approach used for the vendored `qrcode.js`) —
+  **not verified against a real camera/device in this session** (no browser/camera available), so the
+  vendor should test the actual scan-to-fill flow once after deploying.
+- `CACHE_VERSION` bumped in the 3 affected apps' `sw.js` (zoeadmin-v21, zoew-v18, zoescan-v18); ZoeKeyGen
+  untouched this round.

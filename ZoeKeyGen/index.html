@@ -39,6 +39,7 @@
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
     <script src="./error-reporting.js"></script>
+    <script src="./qrcode.js"></script>
 
     <link rel="stylesheet" href="./style.css">
 </head>
@@ -164,6 +165,7 @@
             <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
             <div class="key-output" id="setupLinkResultText" style="word-break:break-all;"></div>
             <button class="btn-secondary" style="width:100%;" onclick="copySetupLink()">📋 ចម្លង Link</button>
+            <div id="setupLinkQrContainer" style="margin-top:10px; text-align:center;"></div>
         </div>
     </div>
 

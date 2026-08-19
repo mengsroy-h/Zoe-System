@@ -803,14 +803,22 @@ identified as the biggest operational bottleneck (bigger than any code bug found
   plain-textarea Config modal), so embedding it in a URL introduces no new class of risk versus the status
   quo; the new card's own copy still tells the vendor to send the link privately (e.g. Telegram) rather than
   posting it publicly, consistent with how activation keys are already handled.
-- **QR code generation was requested alongside the link but not implemented this session**: this session's
+- **QR code generation was requested alongside the link.** Initially not implemented because this session's
   network egress policy rejects `unpkg.com` (confirmed via `$HTTPS_PROXY/__agentproxy/status`, showing a
   `connect_rejected`/403 for that host) — the same class of block noted in the first audit round's Firebase
-  emulator-testing attempt. A hand-written QR encoder was deliberately avoided rather than risk shipping a
-  subtly-broken one with no way to test-scan it in this environment. Per this policy's own instructions, did
-  not attempt to route around the block. The copyable link is the shipped deliverable; QR is a real follow-up
-  if/when a specific library + version can be fetched and its integrity verified (either from an allowed
-  host, or vendored by the user with a hash they compute themselves on their own machine).
+  emulator-testing attempt — and a hand-written QR encoder was deliberately avoided rather than risk shipping
+  a subtly-broken one with no way to test-scan it in this environment. **Resolved in the same session**: the
+  user fetched `qrcode-generator` (Kazuhiko Arase, MIT license — the exact library that had been recommended)
+  from their own machine and pasted its full source, which was then vendored locally as
+  `ZoeKeyGen/qrcode.js` (loaded via a plain same-origin `<script src="./qrcode.js">` tag — no CDN, no CSP
+  change needed, unlike the originally-considered unpkg approach). `generateSetupLink()` now also renders the
+  link into a scannable QR (via `qrcode(0, 'M').createSvgTag(...)`, inline SVG into
+  `#setupLinkQrContainer`, wrapped in try/catch so a failure degrades to link-only rather than breaking
+  generation), and `showLoginModalWithPrefill()` clears the QR container on logout alongside the other
+  Setup Link fields. Added to the service worker's `APP_SHELL` precache list and `CACHE_VERSION` bumped
+  again (zoekeygen-v11). Note: `qrcode.js` is third-party vendored code, kept as-is including its own
+  comments — the project's comment-free convention applies only to this codebase's own `app.js`/
+  `license-verify.js`, not to vendored libraries.
 - `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v10).
 - Not yet committed/pushed as of writing this note — see git log on this branch to confirm current state if
   resuming.

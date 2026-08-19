@@ -472,6 +472,8 @@ function showLoginModalWithPrefill() {
     if (setupLinkResultText) setupLinkResultText.textContent = '';
     const setupLinkResultBox = document.getElementById('setupLinkResultBox');
     if (setupLinkResultBox) setupLinkResultBox.classList.add('hidden');
+    const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
+    if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
 
     clearSigningKey();
     openModalHelper('loginModal');
@@ -847,6 +849,22 @@ function generateSetupLink() {
     lastGeneratedSetupLink = baseUrl + '/?setup=' + encodeURIComponent(b64);
     if (resultText) resultText.textContent = lastGeneratedSetupLink;
     if (resultBox) resultBox.classList.remove('hidden');
+
+    const qrContainer = document.getElementById('setupLinkQrContainer');
+    if (qrContainer) {
+        qrContainer.innerHTML = '';
+        try {
+            if (window.qrcode) {
+                const qr = qrcode(0, 'M');
+                qr.addData(lastGeneratedSetupLink);
+                qr.make();
+                qrContainer.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8 });
+            }
+        } catch (e) {
+            qrContainer.innerHTML = '';
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+        }
+    }
 }
 
 function copySetupLink() {

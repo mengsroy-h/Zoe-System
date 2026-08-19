@@ -1522,6 +1522,43 @@ issued keys keep verifying either way, since `PUBLIC_KEYS_JWK` is an array.
 
 `CACHE_VERSION` bumped to zoekeygen-v16.
 
+### Call-mark feature work (asked for after the audit items were closed)
+The user asked to check the phone call-marking and the "call again after 4 hours" prompt in ZoeAdmin and
+ZoeW. `handleCallAction`, `openCallMarkModal`, `setCallMark` and `renderHistory` are byte-identical across
+the two apps, and the recall logic itself was already written correctly — but two things made it unreliable:
+
+- **Nothing ever woke it up.** `needsRecall` is computed only inside `renderHistory`, and `renderHistory`
+  only runs on a data change or a filter/search change. There is no timer, and neither app's
+  `visibilitychange` handler re-renders. On a busy day the live listener fires often enough that the
+  highlight looked like it worked; on a quiet stretch, or with the app left open, it could be hours late.
+  Added `sweepRecallHighlights()` (60s interval + on return to the foreground): it builds a signature of
+  the ids whose 4 hours are up and re-renders only when that set changes, so an unchanged list costs one
+  cheap loop a minute and no DOM work. It re-renders via `refreshCurrentHistoryView()`, which re-runs
+  `searchByPhone()` when a phone search is active — a bare `applyCurrentFilter()` on a timer would have
+  silently wiped the worker's search results every minute.
+- **Mixed clocks.** `callMarkTime` is written with `getServerNow()` but `renderHistory` compared it against
+  `Date.now()`, so a device clock off by N hours moved the reminder by N hours. Both now use
+  `getServerNow()`, which was already in scope there. (This is the `renderHistory` raw-`Date.now()` use
+  that round 5 listed as cosmetic — it stops being cosmetic once the 4-hour prompt is relied on.)
+
+The blinking green/red recall style is **deliberately unchanged** — the user was asked and chose to keep it.
+
+Also added, per the user: a row marked `wrong-number` shows an **edit-phone button in place of** the call
+button (explicitly not in addition to it — the row must keep the same three controls so it does not
+overflow a phone screen). `saveEditedPhone()` clears the `wrong-number` mark and resets `isCalled` when the
+number actually changed, so the row returns to a fresh green call button; the mark, the time and `isCalled`
+travel in the same `patchHistoryItemFields` call as the phone, so a failed write reverts all of it
+together. Saving an unchanged number keeps the mark, since nothing was corrected. New `.fix-phone-btn`
+style reuses the purple the `row-num-wrong-number` label already uses.
+
+**Left alone, worth knowing:** `handleCallAction()` still only sets `isCalled = true` — it does not touch
+`callMark`/`callMarkTime`. So once a no-answer/no-connect item passes 4 hours it keeps blinking no matter
+how many times it is called again; the only way to stop it is to clear the mark in the call-mark modal.
+That is a workflow decision (restart the 4-hour clock on each call vs. clear the mark vs. leave it), so it
+was reported rather than changed.
+
+`CACHE_VERSION` bumped (zoeadmin-v28, zoew-v25).
+
 ### Not yet done as of this handoff
 Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the
 rules file, comment-free-verified on every changed line, tag-balance- and wiring-checked on the one

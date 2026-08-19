@@ -6,8 +6,9 @@
 > (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
 > Netlify deploy `main` ស្វ័យប្រវត្តិ ដូច្នេះ **កូដទៅដល់ production រួចហើយ**។
 >
-> ⚠️ `claude/deep-audit-bug-fixes-90pmhb` (ជុំ ៦ follow-up) **នៅតែមិនទាន់ merge** — កុំយកបន្ត
-> ពីវា។ ចាប់ផ្តើម branch ថ្មីពី `main` ជានិច្ច។
+> ✅ **branch `claude/*` ទាំងអស់ merge ចូល `main` អស់ហើយ** (ផ្ទៀងផ្ទាត់ 2026-08-19 ដោយ
+> `git rev-list --count origin/main..origin/<branch>` = 0 លើគ្រប់ branch)។ រួមទាំង
+> `...-90pmhb` ដែរ (PR #18, `8dab82b`)។ ចាប់ផ្តើម branch ថ្មីពី `main` ជានិច្ច។
 >
 > ✅ **Rules ទាំងពីរ publish រួចរាល់ហើយ** (អ្នកប្រើបញ្ជាក់ 2026-08-19) — `firebase-database.rules.json`
 > (root) និង `ZoeKeyGen/firebase-database.rules.json`។ ដូច្នេះ ៤ យ៉ាងនេះមានប្រសិទ្ធភាពហើយ៖
@@ -1687,8 +1688,7 @@ Console publishes listed in START HERE.
 
 Requested as another final round: the user was still not satisfied because *every previous round kept
 finding new bugs*, and asked for a thorough, gap-free sweep plus a README tidy-up. Branch started exactly
-at `main` (commit `cec65e9`, i.e. right after PR #19 merged) — **nothing carried over from
-`...-90pmhb`, which is still unmerged**. Run inline and single-threaded again (no subagents), reading all
+at `main` (commit `cec65e9`, i.e. right after PR #19 merged). Run inline and single-threaded again (no subagents), reading all
 four `app.js` end to end plus every rules file, HTML, `netlify.toml`, `sw.js`, `license-verify.js`,
 `error-reporting.js`, `firebase-backup/backup.js` and the Apps Script template.
 
@@ -1808,6 +1808,17 @@ rules. The only outstanding work is the two manual Console publishes listed in S
 **Merged to `main` at the user's explicit request in this session** — PR #20, merge commit `acd5a9f`,
 `mergeable_state: clean` with every Netlify check green beforehand. A follow-up doc-only PR #21
 (`6d67c83`) corrected the START HERE block afterwards.
+
+**CORRECTION 2026-08-19 — a claim this round got wrong.** The START HERE block written earlier in this
+same session warned that `claude/deep-audit-bug-fixes-90pmhb` was "still unmerged". **That was false.**
+It was inherited verbatim from the previous round's START HERE (true when written) and copied forward
+without being checked; PR #18 (`8dab82b`) had merged that branch in the meantime. Verified properly with
+`git rev-list --count origin/main..origin/<branch>`, which is 0 for **every** `claude/*` branch. The one
+branch that still shows a commit of its own, `claude/zoeadmin-debug-logs-uvqb4l`, holds work that is
+already on `main` under a different commit (`4a8e04e`, same title, landed via PR #12) — nothing there is
+unique. This is the second time in two rounds that an unverified "state of the world" line in a handoff
+note propagated as fact. **Check branch/merge claims with git before writing them down, every time** —
+the note is not evidence.
 
 **RESOLVED 2026-08-19 (confirmed by the user): both rules files have been published.** Root
 `firebase-database.rules.json` and `ZoeKeyGen/firebase-database.rules.json` are live in their respective

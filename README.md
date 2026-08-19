@@ -44,13 +44,25 @@
 |---|---|---|
 | `zoew_scan_history_cod_dod` | `admin`, `worker` | កញ្ចប់សកម្មទាំងអស់ (រួម COD/DOD, barcodes[]) |
 | `zoew_recently_deleted_cod_dod` | `admin`, `worker` | ធុងសំរាម (លុប ១០ថ្ងៃ ស្វ័យប្រវត្តិ) |
-| `zoew_scanner_lookup` | គ្រប់តួនាទី | ទិន្នន័យកាត់តម្រឹមសម្រាប់ Zoescan (Phone + Barcode + Locker តែប៉ុណ្ណោះ) |
+| `zoew_scanner_lookup` | គ្រប់តួនាទី | ទិន្នន័យកាត់តម្រឹមសម្រាប់ Zoescan (Phone + Barcode + Locker + `isClosed` តែប៉ុណ្ណោះ — គ្មាន COD/DOD) |
 | `zoew_daily_revenue_cod_dod` | `admin`, `worker` | ស្ថិតិចំណូលប្រចាំថ្ងៃ (Persistent) |
 | `zoew_monthly_revenue_cod_dod` | `admin`, `worker` | ស្ថិតិចំណូលប្រចាំខែ (រក្សា ៣ខែចុងក្រោយ) |
 | `zoew_daily_pickup_cod_dod` | `admin`, `worker` | ស្ថិតិអតិថិជន/កញ្ចប់ដែលបានយក ប្រចាំថ្ងៃ (Persistent) |
 | `zoew_barcode_registry` | `admin`, `worker` | ការពារ Barcode ស្ទួន (ដោះលែងតែពេលលុបអចិន្ត្រៃយ៍) |
 | `zoew_settings/exchange_rate` | `admin`, `worker` | អត្រាប្តូរប្រាក់ (សរសេរបានតែ `admin`) |
 | `user_roles/$uid` | ម្ចាស់គណនី + `admin` | តួនាទី `admin`/`worker`/`scanner` |
+
+## គោលការណ៍អាជីវកម្មសំខាន់បំផុត — "លុប" vs "ដក"
+
+មុននឹងប៉ះកូដដែលទាក់ទងនឹងចំណូល សូមអានតារាងពេញនៅ
+[ZoeAdmin/README.md](ZoeAdmin/README.md) (ផ្នែក "គោលការណ៍ លុប vs ដក") ។ សង្ខេប៖
+
+- **លុប (Delete)** = លុបកញ្ចប់ទាំងមូល — **មិនប៉ះស្ថិតិចំណូលឡើយ** ក្នុងទិសដៅណាក៏ដោយ (Idempotent)
+- **ដក (Remove)** = ដក Barcode តែមួយ (ឬការសម្អាតស្វ័យប្រវត្តិ ៨ថ្ងៃ) — **ដកតម្លៃចេញពីស្ថិតិ**
+  ហើយត្រូវបូកត្រឡប់វិញពេលស្តារ
+
+នេះជាគោលការណ៍ដោយចេតនា **មិនមែន Bug ទេ** — គេច្រឡំវាថាជា Bug ជាញឹកញាប់។ វាត្រូវបានផ្ទៀងផ្ទាត់
+ដោយ `node audit-tools/policy-test.js` ដែលរត់លើកូដពិតប្រាកដ។
 
 ## ដំឡើងសម្រាប់អតិថិជនថ្មី (Provisioning)
 
@@ -67,6 +79,19 @@ JSON ដោយដៃលើគ្រប់ Device សូមប្រើ **Setup L
    ពិនិត្យ រួចចុច "រក្សាទុក" ដោយខ្លួនឯង — គ្មានផ្លូវណារក្សាទុកស្វ័យប្រវត្តិដោយស្ងាត់ៗទេ។
    លើ Device ថ្មីដែលមិនទាន់មាន PIN ប្រព័ន្ធនឹងបង្ខំឲ្យកំណត់ PIN ជាមុនសិន។
 4. បន្ទាប់មក Paste Rules (`firebase-database.rules.json`) ចូល Firebase Console ហើយ Publish។
+
+## Firebase Rules — ត្រូវ Publish ដោយដៃ
+
+`firebase-database.rules.json` (Root) និង `ZoeKeyGen/firebase-database.rules.json` **មិន Deploy
+ស្វ័យប្រវត្តិទេ** — Netlify Serve តែ Static files ប៉ុណ្ណោះ។ រាល់ពេលកែ Rules ត្រូវ Paste ដោយដៃចូល
+Firebase Console → Realtime Database → Rules → **Publish** សម្រាប់ Project នីមួយៗ។
+
+ការបន្ថែម Path ឬវាលថ្មីណាមួយ **ត្រូវកែ Rules ក្នុងការផ្លាស់ប្តូរតែមួយ** ជាមួយកូដ — ព្រោះ
+`$other: { ".validate": false }` នៅគ្រប់ Schema មានន័យថាវាលដែលមិនស្គាល់ត្រូវបាន **បដិសេធ**
+មិនមែនមិនអើពើទេ ហើយការសរសេរទាំងមូលនឹងបរាជ័យ។
+
+មុន Publish អាចផ្ទៀងផ្ទាត់លើ RTDB emulator ជាមុនបាន — មើល
+[audit-tools/README.md](audit-tools/README.md)។
 
 ## ការពារទិន្នន័យ (Backup)
 

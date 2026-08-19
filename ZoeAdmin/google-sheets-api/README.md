@@ -78,9 +78,10 @@ Barcode ថ្មីក្នុង ZoeAdmin, វានឹងហៅ API នេ�
   localStorage ឧបករណ៍ — កុំប្រើលេខសម្ងាត់ដដែលពីកន្លែងផ្សេង
 - **Who has access: Anyone** មានន័យថា នរណាម្នាក់ដែលដឹង URL នេះអាចហៅបានដោយផ្ទាល់ (URL
   ដើរតួដូច token) — កុំចែក URL នេះជាសាធារណៈ, `key=` ជាការការពារបន្ថែមមួយស្រទាប់ប៉ុណ្ណោះ
-- Sheet មិនមែនជា production database ដែលមាន access rules ដូច Firebase Rules ទេ — សមស្រប
-  សម្រាប់ដំណាក់កាលឥឡូវនេះ (មិនទាន់ Launch ជាផ្លូវការ); ប្រសិនបើចង់សុវត្ថិភាពខ្ពស់ជាងនេះនាពេល
-  អនាគត គួរផ្លាស់ទៅប្រើ Backend ផ្ទាល់ខ្លួន (ឧ. Cloud Function) ជំនួស Apps Script
+- Sheet មិនមែនជា production database ដែលមាន access rules ដូច Firebase Rules ទេ — វាផ្ទុកតែ
+  ទិន្នន័យ Lookup (Barcode/COD/DOD/Phone) មិនមែនកំណត់ត្រាអាជីវកម្មពិតទេ, ហើយវាមិនអាចសរសេរ
+  ចូល Firebase បានឡើយ។ ប្រសិនបើចង់សុវត្ថិភាពខ្ពស់ជាងនេះ គួរផ្លាស់ទៅប្រើ Backend ផ្ទាល់ខ្លួន
+  (ឧ. Cloud Function) ជំនួស Apps Script
 
 ## ដែនកំណត់ (Limitations)
 

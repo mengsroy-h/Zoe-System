@@ -222,10 +222,13 @@ async function initFirebase() {
         } else {
             currentUserEmail = null;
             detachDatabaseListeners();
+            renderList();
             document.getElementById('lockerPickerScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.add('hidden');
             updateAuthButton(false);
-            closeModal('activationModal');
+            document.querySelectorAll('.modal').forEach((m) => {
+                if (m.id !== 'loginModal') closeModal(m.id);
+            });
             openModal('loginModal');
             const remembered = localStorage.getItem('remembered_email');
             if (remembered) document.getElementById('loginEmailInput').value = remembered;

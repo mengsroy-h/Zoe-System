@@ -456,7 +456,9 @@
     }
 
     function showLoginModalWithPrefill() {
-        closeModal('activationModal');
+        document.querySelectorAll('.modal').forEach((m) => {
+            if (m.id !== 'loginModal') closeModal(m.id);
+        });
         openModalHelper('loginModal');
         const savedEmail = localStorage.getItem('remembered_email');
         const emailInput = document.getElementById('loginEmailInput');

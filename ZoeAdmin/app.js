@@ -747,6 +747,16 @@
         body.innerHTML = html;
     }
 
+    function clearCustomerDataTableCache() {
+        customerDataTableRows = null;
+        customerDataTableFetchedAt = 0;
+        customerDataTableFetchPromise = null;
+        const body = document.getElementById('customerDataTableBody');
+        if (body) body.innerHTML = '';
+        const statusEl = document.getElementById('customerDataTableStatus');
+        if (statusEl) statusEl.textContent = '';
+    }
+
     function findCustomerDataTableRow(barcode) {
         if (!customerDataTableRows || !barcode) return null;
         const target = String(barcode).trim().toUpperCase();
@@ -904,7 +914,9 @@
     }
 
     function showLoginModalWithPrefill() {
-        closeModal('activationModal');
+        document.querySelectorAll('.modal').forEach((m) => {
+            if (m.id !== 'loginModal') closeModal(m.id);
+        });
         openModalHelper('loginModal');
         const savedEmail = localStorage.getItem('remembered_email');
         const emailInput = document.getElementById('loginEmailInput');
@@ -1100,6 +1112,7 @@
                 dailyRevenueData = {};
                 monthlyRevenueData = {};
                 dailyPickupData = {};
+                clearCustomerDataTableCache();
                 applyCurrentFilter();
                 renderRecentlyDeleted();
                 updateRecentPhonesList();

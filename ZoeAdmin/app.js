@@ -2507,8 +2507,8 @@
                 const dod = parseFloat(b.dod) || 0;
                 rows.push({
                     no: rowNum,
-                    phone: item.phone === "គ្មានលេខ" ? "" : (item.phone || ''),
-                    barcode: b.code || '',
+                    phone: item.phone === "គ្មានលេខ" ? "" : String(item.phone || ''),
+                    barcode: String(b.code || ''),
                     locker: b.locker || 'N/A',
                     cod: cod,
                     dod: dod,
@@ -2523,6 +2523,21 @@
     }
 
     const EXPORT_HEADERS = ['ល.រ', 'លេខទូរស័ព្ទ', 'Barcode', 'ទីតាំង Locker', 'COD ($)', 'DOD ($)', 'សរុប ($)', 'ស្ថានភាព', 'ថ្ងៃស្កេន', 'ម៉ោង'];
+    const EXPORT_TEXT_COLUMN_INDEXES = [1, 2];
+
+    function forceExportTextCells(ws, rowCount) {
+        for (let r = 1; r <= rowCount; r++) {
+            EXPORT_TEXT_COLUMN_INDEXES.forEach(c => {
+                const cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+                if (!cell) return;
+                cell.t = 's';
+                cell.v = String(cell.v === undefined || cell.v === null ? '' : cell.v);
+                cell.z = '@';
+                delete cell.w;
+                delete cell.f;
+            });
+        }
+    }
 
     function openExportDataModal() {
         const lbl = document.getElementById('exportFilterLabel');
@@ -2539,10 +2554,11 @@
             await loadScriptOnce('xlsx');
             const aoa = [EXPORT_HEADERS, ...rows.map(r => [r.no, r.phone, r.barcode, r.locker, r.cod, r.dod, r.total, r.status, r.scanDate, r.time])];
             const ws = XLSX.utils.aoa_to_sheet(aoa);
+            forceExportTextCells(ws, rows.length);
             ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'ប្រវត្តិ');
-            XLSX.writeFile(wb, getExportFilenameBase() + '.xlsx');
+            XLSX.writeFile(wb, getExportFilenameBase() + '.xlsx', { bookSST: true });
             showToast("✅ បាន Export ជា Excel ជោគជ័យ!");
         } catch (e) {
             console.error("Excel export failed:", e);
@@ -2610,9 +2626,13 @@
             if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
             return s;
         };
+        const sheetsText = (val) => {
+            const s = String(val === undefined || val === null ? '' : val);
+            return s === '' ? '' : '="' + s.replace(/"/g, '""') + '"';
+        };
         const lines = [EXPORT_HEADERS.map(csvEscape).join(',')];
         rows.forEach(r => {
-            lines.push([r.no, r.phone, r.barcode, r.locker, r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), r.status, r.scanDate, r.time].map(csvEscape).join(','));
+            lines.push([r.no, sheetsText(r.phone), sheetsText(r.barcode), r.locker, r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), r.status, r.scanDate, r.time].map(csvEscape).join(','));
         });
 
         const csvContent = '\uFEFF' + lines.join('\r\n');

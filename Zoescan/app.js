@@ -1130,6 +1130,21 @@ async function assignLockerToEntry(code) {
             return;
         }
 
+        if (matchedBarcodeIdx !== null) {
+            if (entry.item.barcodes && entry.item.barcodes[matchedBarcodeIdx]) {
+                entry.item.barcodes[matchedBarcodeIdx].locker = targetLocker;
+                entry.item.barcodes[matchedBarcodeIdx].lockerUpdatedAt = ts;
+            }
+            if (singleBarcodeItem) {
+                entry.item.locker = targetLocker;
+                entry.item.lockerUpdatedAt = ts;
+            }
+        } else {
+            entry.item.locker = targetLocker;
+            entry.item.lockerUpdatedAt = ts;
+        }
+        entry.item.lockerUpdatedBy = currentUserEmail || null;
+
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;

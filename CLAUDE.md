@@ -717,38 +717,58 @@ math, or any Firebase rules file — so nothing from this round needs a manual r
 - `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v18, zoew-v15, zoescan-v15, zoekeygen-v9) since all 4
   `app.js` got real behavior changes above.
 
-### Explicitly not auto-decided (flagged for the user, not fixed)
-- **Zoescan: client-side eventual-consistency race in the locker-occupancy warning.** `findLockerOccupant()`
-  only consults the local `barcodeIndex`, which is rebuilt exclusively from a debounced (120ms) Firebase
-  `onValue` snapshot — nothing optimistically patches it right after a successful `assignLockerToEntry()`
-  write. If a worker scans barcode A into locker "ទូ5" and then scans a *different* order's barcode B into
-  the same locker before A's write round-trips back through the listener (plausible on weak warehouse wifi,
-  and structurally unavoidable across two different physical scanner devices scanning concurrently — no
-  amount of client-side patching closes that half of the window), B is silently double-assigned with no
-  warning shown, even though the warning modal exists specifically to catch this. Not data loss — both
-  writes land correctly in Firebase and are visible/correctable in the list view — but it's a missed
-  real-world safety check that gets more likely, not less, once this app is handling more daily volume
-  across more users. This is an inherent limitation of the client-only, no-backend architecture (same
-  category of trade-off already accepted for the worker-role revenue-write-access decision above), not a
-  one-line bug fix — flagging for a product/architecture decision rather than picking a partial mitigation
-  unilaterally.
-- **ZoeAdmin/ZoeW: optimistic local revenue/pickup-stat caches aren't reverted if the underlying
-  `runTransaction` write rejects outright** (as opposed to succeeding-but-clamped-to-0, which already is
-  handled). `addRevenueToDailyAndMonthlyRecord`/`addPickupToDailyRecord` update the local
-  `dailyRevenueData`/`monthlyRevenueData`/`dailyPickupData` objects immediately for a snappy UI, then fire
-  the real Firebase transaction; a hard failure (permission denied, network down) only shows a toast, it
-  never rolls the local number back. The actual stored Firebase value is never wrong — every transaction
-  recomputes from the live server value on its next successful run, not from the client's cache — so this
-  is a transient wrong number on screen until something else refreshes that date's listener or the page
-  reloads, not a real revenue miscalculation. Byte-identical pattern in both apps, so not a mirroring gap
-  either. Flagging rather than fixing because it touches the revenue/pickup stat-commit functions directly,
-  which this project's live-production policy says should be proposed for human review rather than
-  auto-patched, even though the actual stored data was never at risk here.
+### Initially flagged for the user, then explicitly authorized and implemented in the same session
+Two items were first written up as proposals rather than auto-fixed, since one is revenue/pickup-stat-commit
+code and the other is physical-locker-assignment correctness — both categories this project's live-production
+policy says should go to human review rather than being silently patched. The user's response was "ចំណុច 2
+កែចុះ" (fix both), so both were implemented directly in this same session, immediately after the two items
+above were first reported.
+
+1. **[FIXED] Zoescan: client-side eventual-consistency race in the locker-occupancy warning.**
+   `findLockerOccupant()` only consulted the local `barcodeIndex`, rebuilt exclusively from a debounced
+   (120ms) Firebase `onValue` snapshot on `zoew_scanner_lookup` — nothing optimistically patched it right
+   after a successful `assignLockerToEntry()` write, so scanning a second, different order into the same
+   locker within that round-trip window produced no warning. **Fix**: `assignLockerToEntry()` now patches
+   the matched `barcodeIndex` entry's `item` object in place (`.locker`/`.lockerUpdatedAt`/`.lockerUpdatedBy`,
+   handling both the multi-barcode `barcodes[idx]` shape and the single-barcode/legacy shape) immediately
+   after the primary `zoew_scanner_lookup` transaction commits, before the mirror-write step. Because
+   `barcodeIndex[code].item` is the exact same object reference `historyData[itemId]` holds (not a copy),
+   this closes the race for scans on the *same* device/session — the very next scan sees the just-assigned
+   locker without waiting for the listener. This is safe even if a concurrent listener refresh replaced
+   `barcodeIndex` mid-`await` (the patch would then land on an orphaned object no longer referenced by the
+   live index — a harmless no-op, not a corruption risk). **Does not and cannot fully close the cross-device
+   half of the race** — two different physical Zoescan sessions scanning into the same locker at the same
+   instant still isn't something any client-side patch can prevent; that would need a server-side lock
+   (Cloud Functions), which this project doesn't have. Reduces the practical window from "up to a few
+   seconds, every scan" down to "only truly simultaneous scans from two different devices" — a real
+   improvement, not a full close.
+2. **[FIXED] ZoeAdmin/ZoeW: optimistic local revenue/pickup-stat caches weren't reverted on an outright
+   `runTransaction` rejection** (as opposed to succeeding-but-clamped-to-0, which was already handled).
+   `commitDailyRevenueDelta`/`commitMonthlyRevenueDelta`/`commitDailyPickupDelta`'s `.catch()` blocks now
+   negate the exact delta back onto `dailyRevenueData[scanDateStr]`/`monthlyRevenueData[ymKey]`/
+   `dailyPickupData[scanDateStr]` (same clamp-to-0 pattern as the forward path), then `commitDailyRevenueDelta`
+   and `commitDailyPickupDelta` also call `applyCurrentFilter()` to refresh the always-visible summary stat
+   cards immediately (monthly has no persistent on-screen display — it's read fresh from
+   `monthlyRevenueData` whenever its modal is opened, so no explicit re-render call is needed there).
+   **Race-safety**: each `commit*Delta` function captures `const recordRef = xData[key]` synchronously at
+   its own start (before the `await`-yielding `fb.runTransaction` call), and the revert in `.catch()` only
+   applies `if (xData[key] === recordRef)` — object-identity-checked. This matters because `dailyRevenueData`/
+   `monthlyRevenueData`/`dailyPickupData` are each wholesale-replaced (not mutated) whenever their Firebase
+   `onValue` listener fires; if a listener delivered a fresh authoritative snapshot while our failed
+   transaction was still in flight, that snapshot already reflects reality (our delta never committed
+   server-side), so blindly re-subtracting on top of it would double-count the failure. The identity check
+   makes the revert a no-op in that case instead of a new bug — implemented this way specifically to avoid
+   introducing the double-subtraction failure mode this project has repeatedly flagged as the thing to watch
+   for around revenue math. Applied identically to both ZoeAdmin and ZoeW (byte-for-byte-mirrored logic, per
+   this project's usual pattern for shared-shape functions across the two apps).
 
 ### Not yet done as of this handoff
-All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep
-re-verified on every changed line. Nothing is mid-edit. No Firebase rules files were touched this round, so
-no manual-publish step is needed. The long-open question about `license-verify.js`'s `LICENSE_DB_URL`
-possibly being a mixed-up copy of ZoeW's business DB URL (first flagged in the very first audit round)
-remains unresolved and cannot be checked from a git-only session — still needs the user's direct
-confirmation in the Firebase console.
+All fixes above (both the original batch and these 2 follow-ups) are committed, `node --check`-clean on
+every modified `.js`, and comment-free grep re-verified on every changed line. Nothing is mid-edit. No
+Firebase rules files were touched this round, so no manual-publish step is needed. `CACHE_VERSION` was bumped
+a second time in ZoeAdmin/ZoeW/Zoescan's `sw.js` (zoeadmin-v19, zoew-v16, zoescan-v16) to cover this follow-up
+batch; ZoeKeyGen's `sw.js` was untouched this round (stays at zoekeygen-v9) since neither follow-up item
+touches ZoeKeyGen. The long-open question about `license-verify.js`'s `LICENSE_DB_URL` possibly being a
+mixed-up copy of ZoeW's business DB URL (first flagged in the very first audit round) remains unresolved and
+cannot be checked from a git-only session — still needs the user's direct confirmation in the Firebase
+console.

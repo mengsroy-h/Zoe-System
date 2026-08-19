@@ -451,6 +451,34 @@
     </div>
 </div>
 
+<div id="customerDataTableModal" class="modal">
+    <div class="modal-content" style="max-width: 760px; text-align: left; display: flex; flex-direction: column; height: 88vh;">
+        <h3 style="text-align:center;">📊 តារាងអតិថិជន (Barcode / DOD / COD / Phone)</h3>
+        <p style="text-align:center;">ទាញពី Google Sheet — Read-only, ស្វែងរកលឿនក្នុងឧបករណ៍ដោយផ្ទាល់</p>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+            <input type="text" id="customerDataTableSearchInput" oninput="filterCustomerDataTable()" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." style="margin-bottom:0; text-align:left;" autocomplete="off">
+            <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" onclick="fetchCustomerDataTableRows(true)">🔄</button>
+        </div>
+        <p id="customerDataTableStatus" style="font-size:10.5px; color:var(--text-muted); margin-bottom:6px;"></p>
+        <div class="table-responsive" style="flex:1; min-height:0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:32%;">Barcode</th>
+                        <th style="width:22%;">DOD ($)</th>
+                        <th style="width:22%;">COD ($)</th>
+                        <th style="width:24%;">Phone</th>
+                    </tr>
+                </thead>
+                <tbody id="customerDataTableBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-btns" style="margin-top:8px;">
+            <button class="btn-cancel" onclick="closeModal('customerDataTableModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
 <div id="recentlyDeletedModal" class="modal">
     <div class="modal-content" style="max-width: 400px;">
         <h3>🗑️ ទិន្នន័យលុបបណ្តោះអាសន្ន</h3>

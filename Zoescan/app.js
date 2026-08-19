@@ -312,6 +312,7 @@ async function submitActivationKey() {
         if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
         const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
         if (!result.valid) {
+            if (input) input.value = '';
             showToast(licenseFailureMessage(result.reason));
             return;
         }
@@ -1128,6 +1129,21 @@ async function assignLockerToEntry(code) {
             showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
             return;
         }
+
+        if (matchedBarcodeIdx !== null) {
+            if (entry.item.barcodes && entry.item.barcodes[matchedBarcodeIdx]) {
+                entry.item.barcodes[matchedBarcodeIdx].locker = targetLocker;
+                entry.item.barcodes[matchedBarcodeIdx].lockerUpdatedAt = ts;
+            }
+            if (singleBarcodeItem) {
+                entry.item.locker = targetLocker;
+                entry.item.lockerUpdatedAt = ts;
+            }
+        } else {
+            entry.item.locker = targetLocker;
+            entry.item.lockerUpdatedAt = ts;
+        }
+        entry.item.lockerUpdatedBy = currentUserEmail || null;
 
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {

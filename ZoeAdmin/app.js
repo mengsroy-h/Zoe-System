@@ -856,6 +856,7 @@
             return;
         }
 
+        const myGeneration = customerDataTableSessionGeneration;
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
@@ -872,6 +873,7 @@
             );
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
+            if (myGeneration !== customerDataTableSessionGeneration) return;
 
             const phoneVal = getNestedField(data, cfg.phoneField);
             const codVal = getNestedField(data, cfg.codField);
@@ -879,6 +881,7 @@
             autoLookupLastFailedAt = 0;
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
+            if (myGeneration !== customerDataTableSessionGeneration) return;
             autoLookupLastFailedAt = Date.now();
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
@@ -949,7 +952,9 @@
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
             'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
-            'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput'
+            'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
+            'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
+            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1025,6 +1030,7 @@
             const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
+                updateAuthButton(true);
                 if (!isDatabaseInitialized) {
                     initDatabaseListeners();
                     isDatabaseInitialized = true;
@@ -1765,6 +1771,7 @@
 
     function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd) {
         if (!dbRefDailyRevenue) return;
+        const recordRef = dailyRevenueData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
         fb.runTransaction(dateRef, (current) => {
             let codDollar = Math.round(((parseFloat(current && current.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
@@ -1778,12 +1785,22 @@
             if (totalCount < 0) totalCount = 0;
             return { codDollar, dodDollar, totalCount };
         }).catch(() => {
+            if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
+                recordRef.codDollar = Math.round(((parseFloat(recordRef.codDollar) || 0) - (parseFloat(codToAdd) || 0)) * 100) / 100;
+                recordRef.dodDollar = Math.round(((parseFloat(recordRef.dodDollar) || 0) - (parseFloat(dodToAdd) || 0)) * 100) / 100;
+                recordRef.totalCount = (parseFloat(recordRef.totalCount) || 0) - (parseFloat(countToAdd) || 0);
+                if (recordRef.codDollar < 0) recordRef.codDollar = 0;
+                if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
+                if (recordRef.totalCount < 0) recordRef.totalCount = 0;
+                applyCurrentFilter();
+            }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
         });
     }
 
     function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd) {
         if (!dbRefMonthlyRevenue) return;
+        const recordRef = monthlyRevenueData[ymKey];
         fb.runTransaction(dbRefMonthlyRevenue, (current) => {
             const months = (current && typeof current === 'object') ? current : {};
             const existing = months[ymKey] || {};
@@ -1804,6 +1821,14 @@
             });
             return latestThreeMonths;
         }).catch(() => {
+            if (recordRef && monthlyRevenueData[ymKey] === recordRef) {
+                recordRef.codDollar = Math.round(((parseFloat(recordRef.codDollar) || 0) - (parseFloat(codToAdd) || 0)) * 100) / 100;
+                recordRef.dodDollar = Math.round(((parseFloat(recordRef.dodDollar) || 0) - (parseFloat(dodToAdd) || 0)) * 100) / 100;
+                recordRef.totalCount = (parseFloat(recordRef.totalCount) || 0) - (parseFloat(countToAdd) || 0);
+                if (recordRef.codDollar < 0) recordRef.codDollar = 0;
+                if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
+                if (recordRef.totalCount < 0) recordRef.totalCount = 0;
+            }
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
         });
     }
@@ -1842,6 +1867,7 @@
 
     function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
         if (!dbRefDailyPickup) return;
+        const recordRef = dailyPickupData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
         fb.runTransaction(dateRef, (current) => {
             const record = (current && typeof current === 'object') ? current : {};
@@ -1858,6 +1884,17 @@
             }
             return { packagesPickedUp, pickedUpPhones };
         }).catch(() => {
+            if (recordRef && dailyPickupData[scanDateStr] === recordRef) {
+                recordRef.packagesPickedUp = (parseFloat(recordRef.packagesPickedUp) || 0) - (parseFloat(packagesToAdd) || 0);
+                if (recordRef.packagesPickedUp < 0) recordRef.packagesPickedUp = 0;
+                if (phoneKey && customerRefDelta) {
+                    if (!recordRef.pickedUpPhones) recordRef.pickedUpPhones = {};
+                    const refCount = (parseFloat(recordRef.pickedUpPhones[phoneKey]) || 0) - customerRefDelta;
+                    if (refCount <= 0) delete recordRef.pickedUpPhones[phoneKey];
+                    else recordRef.pickedUpPhones[phoneKey] = refCount;
+                }
+                applyCurrentFilter();
+            }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         });
     }
@@ -2402,7 +2439,7 @@
                     </tr>
                 </tbody>
             </table>
-            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date().toLocaleString('km-KH'))}</p>
+            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date(getServerNow()).toLocaleString('km-KH'))}</p>
         `;
 
         const originalTitle = document.title;

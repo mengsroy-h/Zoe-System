@@ -301,7 +301,13 @@ async function deriveSigningKeySessionKey(pin) {
 const SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
 
 async function persistSigningKeyForSession() {
-    if (!signingKeySessionKey || !signingPrivateKeyJwk) return;
+    if (!signingPrivateKeyJwk) return;
+    const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+    if (!signingKeySessionKey) {
+        if (rememberCb) rememberCb.checked = false;
+        showToast('⚠️ មិនអាចចងចាំ Signing Key បានទេ (បង្កើតសោពី PIN មិនបាន) — សូម Load Key ម្តងទៀតពេលត្រូវការ');
+        return;
+    }
     try {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const cipherBuf = await crypto.subtle.encrypt(
@@ -309,7 +315,11 @@ async function persistSigningKeyForSession() {
         );
         sessionStorage.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
         showToast('🔒 Signing Key ត្រូវបានចងចាំសម្រាប់ Session នេះ (Encrypted ដោយ PIN)');
-    } catch (e) {}
+    } catch (e) {
+        if (rememberCb) rememberCb.checked = false;
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'persistSigningKeyForSession' });
+        showToast('⚠️ មិនអាចចងចាំ Signing Key សម្រាប់ Session នេះបានទេ — សូម Load Key ម្តងទៀតពេលត្រូវការ');
+    }
 }
 
 async function tryRestoreSigningKeyFromSession() {

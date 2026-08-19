@@ -556,6 +556,20 @@
     let configQrReader = null;
     let configQrScanActive = false;
 
+    function isInAppBrowser() {
+        return /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
+    }
+
+    function describeCameraError(err) {
+        const name = err && err.name;
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return '🚫 កាមេរ៉ាត្រូវបានបិទសិទ្ធិ! សូមអនុញ្ញាតកាមេរ៉ាក្នុង Browser Settings រួចសាកល្បងម្តងទៀត';
+        if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return '🚫 រកមិនឃើញកាមេរ៉ានៅលើឧបករណ៍នេះទេ';
+        if (name === 'NotReadableError' || name === 'TrackStartError') return '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង — សូមបិទកម្មវិធីនោះសិន';
+        if (name === 'OverconstrainedError') return '🚫 កាមេរ៉ារបស់ឧបករណ៍នេះមិនគាំទ្រការកំណត់ដែលត្រូវការទេ';
+        if (name === 'SecurityError') return '🚫 ត្រូវបើកតាម HTTPS ទើបប្រើកាមេរ៉ាបាន';
+        return '❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission';
+    }
+
     function closeConfigQrScanner() {
         configQrScanActive = false;
         if (configQrReader) {
@@ -575,6 +589,9 @@
             showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
             return;
         }
+        if (isInAppBrowser()) {
+            showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — ក្នុង App ដូចជា Facebook/Messenger កាមេរ៉ាអាចប្រើមិនបាន');
+        }
         openModalHelper('configQrScanModal');
         configQrScanActive = true;
         try {
@@ -586,7 +603,7 @@
         } catch (e) {
             console.error('Config QR scanner error:', e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
-            showToast("❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission");
+            showToast(describeCameraError(e));
             closeConfigQrScanner();
         }
     }

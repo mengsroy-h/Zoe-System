@@ -638,6 +638,20 @@ function cancelPinEntryFlow() {
 let configQrReader = null;
 let configQrScanActive = false;
 
+function isInAppBrowser() {
+    return /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
+}
+
+function describeCameraError(err) {
+    const name = err && err.name;
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return '🚫 កាមេរ៉ាត្រូវបានបិទសិទ្ធិ! សូមអនុញ្ញាតកាមេរ៉ាក្នុង Browser Settings រួចសាកល្បងម្តងទៀត';
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return '🚫 រកមិនឃើញកាមេរ៉ានៅលើឧបករណ៍នេះទេ';
+    if (name === 'NotReadableError' || name === 'TrackStartError') return '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង — សូមបិទកម្មវិធីនោះសិន';
+    if (name === 'OverconstrainedError') return '🚫 កាមេរ៉ារបស់ឧបករណ៍នេះមិនគាំទ្រការកំណត់ដែលត្រូវការទេ';
+    if (name === 'SecurityError') return '🚫 ត្រូវបើកតាម HTTPS ទើបប្រើកាមេរ៉ាបាន';
+    return '❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission';
+}
+
 function closeConfigQrScanner() {
     configQrScanActive = false;
     if (configQrReader) {
@@ -657,6 +671,9 @@ async function openConfigQrScanner() {
         showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
         return;
     }
+    if (isInAppBrowser()) {
+        showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — ក្នុង App ដូចជា Facebook/Messenger កាមេរ៉ាអាចប្រើមិនបាន');
+    }
     openModal('configQrScanModal');
     configQrScanActive = true;
     try {
@@ -668,7 +685,7 @@ async function openConfigQrScanner() {
     } catch (e) {
         console.error('Config QR scanner error:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
-        showToast("❌ មិនអាចបើក Camera បានទេ! សូមអនុញ្ញាត Camera Permission");
+        showToast(describeCameraError(e));
         closeConfigQrScanner();
     }
 }
@@ -821,8 +838,7 @@ function initScanEngine() {
 
 async function requestCameraPermission() {
     if (isCameraStarting) return;
-    const inAppBrowser = /FBAN|FBAV|Instagram|Messenger|MicroMessenger|Line\//i.test(navigator.userAgent);
-    if (inAppBrowser) {
+    if (isInAppBrowser()) {
         showToast('⚠️ សូមបើកតាម Browser ធម្មតា (Chrome/Safari) ដើម្បីប្រើកាមេរ៉ា — កម្មវិធីនេះមិនអាចប្រើកាមេរ៉ាក្នុង App ក្នុងកម្មវិធីផ្សេងបានទេ');
     }
     isCameraStarting = true;
@@ -874,12 +890,9 @@ async function requestCameraPermission() {
         }
     } catch (err) {
         isCameraStarting = false;
-        let msg = 'មិនអាចបើកកាមេរ៉ាបានទេ!';
-        if (err && err.name === 'NotAllowedError') msg = '🚫 សូមអនុញ្ញាតការប្រើប្រាស់កាមេរ៉ាក្នុង Browser Settings';
-        else if (err && err.name === 'NotFoundError') msg = '🚫 រកមិនឃើញកាមេរ៉ាទេ';
-        else if (err && err.name === 'NotReadableError') msg = '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង';
-        else if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'requestCameraPermission' });
-        showToast(msg);
+        const knownCameraError = err && ['NotAllowedError', 'PermissionDeniedError', 'NotFoundError', 'DevicesNotFoundError', 'NotReadableError', 'TrackStartError', 'OverconstrainedError', 'SecurityError'].indexOf(err.name) !== -1;
+        if (!knownCameraError && window.ZoeErrors) ZoeErrors.capture(err, { context: 'requestCameraPermission' });
+        showToast(describeCameraError(err));
     }
 }
 
@@ -1240,7 +1253,7 @@ async function assignLockerToEntry(code) {
             } else {
                 return currentItem;
             }
-            currentItem.lockerUpdatedBy = currentUserEmail || null;
+            if (currentUserEmail) currentItem.lockerUpdatedBy = currentUserEmail;
             phoneForToast = currentItem.phone || '';
             matched = true;
             return currentItem;
@@ -1265,7 +1278,7 @@ async function assignLockerToEntry(code) {
             entry.item.locker = targetLocker;
             entry.item.lockerUpdatedAt = ts;
         }
-        entry.item.lockerUpdatedBy = currentUserEmail || null;
+        if (currentUserEmail) entry.item.lockerUpdatedBy = currentUserEmail;
 
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {
@@ -1280,7 +1293,7 @@ async function assignLockerToEntry(code) {
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
         }
-        mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
+        if (currentUserEmail) mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail;
 
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';

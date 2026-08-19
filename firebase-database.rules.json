@@ -61,12 +61,14 @@
         "phone": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
         "barcode": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
         "locker": { ".validate": "newData.isString()" },
+        "isClosed": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
         "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
         "lockerUpdatedBy": { ".validate": "newData.isString()" },
         "barcodes": {
           "$idx": {
             "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "locker": { ".validate": "newData.isString()" },
+            "isClosed": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }

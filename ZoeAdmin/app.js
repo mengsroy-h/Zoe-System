@@ -150,6 +150,7 @@
     function waitForFirebaseSDK(timeoutMs = 15000) {
         if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
         return new Promise((resolve, reject) => {
+            const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
             let timer = null;
             const onReady = () => {
                 clearTimeout(timer);
@@ -159,7 +160,7 @@
             timer = setTimeout(() => {
                 window.removeEventListener('firebasesdkready', onReady);
                 if (window.firebaseSDK) resolve(window.firebaseSDK);
-                else reject(new Error('Firebase SDK failed to load (network/CDN issue)'));
+                else reject(notReadyErr);
             }, timeoutMs);
         });
     }
@@ -650,16 +651,15 @@
 
         if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
 
-        const headers = {};
-        if (cfg.headerName && cfg.headerValueEnc) {
-            const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-            if (decrypted) headers[cfg.headerName] = decrypted;
-        } else if (cfg.headerName && cfg.headerValue) {
-            headers[cfg.headerName] = cfg.headerValue;
-        }
-
         customerDataTableFetchPromise = (async () => {
             try {
+                const headers = {};
+                if (cfg.headerName && cfg.headerValueEnc) {
+                    const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                    if (decrypted) headers[cfg.headerName] = decrypted;
+                } else if (cfg.headerName && cfg.headerValue) {
+                    headers[cfg.headerName] = cfg.headerValue;
+                }
                 const res = await withTimeout(fetch(listUrl, { headers }), 15000, 'Customer table fetch timed out');
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
@@ -1523,7 +1523,6 @@
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         initFirebase();
         prefetchCustomerDataTableRowsIfConfigured();
-
 
         setInterval(() => {
             prefetchCustomerDataTableRowsIfConfigured();
@@ -2955,13 +2954,19 @@
         if(modalDodInput) modalDodInput.value = "";
         
         openModalHelper('phoneModal');
-        attemptAutoLookup(cleanBarcode);
+        const lookupPromise = attemptAutoLookup(cleanBarcode);
 
         const lookupCfg = getLookupApiConfig();
         if (!lookupCfg || !lookupCfg.enabled) {
             setTimeout(() => {
                 if(modalPhoneInput) modalPhoneInput.focus();
             }, 150);
+        } else {
+            lookupPromise.finally(() => {
+                if (isModalOpen && pendingBarcode === cleanBarcode && modalPhoneInput && !modalPhoneInput.value) {
+                    modalPhoneInput.focus();
+                }
+            });
         }
     }
 

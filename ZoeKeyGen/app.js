@@ -1,11 +1,5 @@
 (function () {
-    
-    
-    
-    
-    
-    
-    
+
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
@@ -55,9 +49,7 @@
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
-                
-                
-                
+
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
@@ -129,19 +121,19 @@ function openModalHelper(id) {
 function closeModal(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
+    if (id === 'keypairModal') {
+        const out = document.getElementById('newPrivateKeyOutput');
+        if (out) out.value = '';
+    }
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-    
-    
-    
-    
-    
-    
+
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let timer;
     return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
+        promise.finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
     ]);
 }
 
@@ -155,6 +147,7 @@ function retryAsync(fn, attempts, delayMs) {
 function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
+        const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
         let timer = null;
         const onReady = () => {
             clearTimeout(timer);
@@ -164,7 +157,7 @@ function waitForFirebaseSDK(timeoutMs = 15000) {
         timer = setTimeout(() => {
             window.removeEventListener('firebasesdkready', onReady);
             if (window.firebaseSDK) resolve(window.firebaseSDK);
-            else reject(new Error('Firebase SDK failed to load (network/CDN issue)'));
+            else reject(notReadyErr);
         }, timeoutMs);
     });
 }
@@ -260,11 +253,6 @@ function requestPinBeforeConfig(targetAction, message) {
     }
 }
 
-
-
-
-
-
 let signingKeySessionKey = null;
 
 async function deriveSigningKeySessionKey(pin) {
@@ -312,8 +300,7 @@ async function tryRestoreSigningKeyFromSession() {
         if (cb) cb.checked = true;
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
-        
-        
+
         sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
@@ -437,11 +424,7 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     document.getElementById('appContainer').style.display = 'none';
-    
-    
-    
-    
-    
+
     clearSigningKey();
     openModalHelper('loginModal');
     const savedEmail = localStorage.getItem('remembered_email');
@@ -509,14 +492,6 @@ async function verifyAdminRoleThenProceed(user) {
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-
-
-
-
-
-
-
-
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
         showLoginModalWithPrefill();
@@ -543,12 +518,7 @@ async function attemptAuthStorageRecovery() {
 function setupAuthListener() {
     if (!auth) return;
     if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
-    
-    
-    
-    
-    
-    
+
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);
@@ -786,7 +756,7 @@ async function refreshKeyList() {
         renderKeyList();
     } catch (e) {
         console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: '' });
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'refreshKeyList' });
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';
     }
 }
@@ -957,7 +927,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSigningKeyBadge();
     setupIOSPullToRefresh();
 
-
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }
@@ -965,7 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('mousedown', (e) => {
             if (e.target === modal && modal.dataset.nodismiss !== 'true') {
-                modal.classList.remove('active');
+                closeModal(modal.id);
             }
         });
     });

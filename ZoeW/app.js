@@ -112,6 +112,7 @@
     function waitForFirebaseSDK(timeoutMs = 15000) {
         if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
         return new Promise((resolve, reject) => {
+            const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
             let timer = null;
             const onReady = () => {
                 clearTimeout(timer);
@@ -121,16 +122,17 @@
             timer = setTimeout(() => {
                 window.removeEventListener('firebasesdkready', onReady);
                 if (window.firebaseSDK) resolve(window.firebaseSDK);
-                else reject(new Error('Firebase SDK failed to load (network/CDN issue)'));
+                else reject(notReadyErr);
             }, timeoutMs);
         });
     }
 
     function withTimeout(promise, ms, timeoutMsg) {
         const timeoutErr = new Error(timeoutMsg || 'Timed out');
+        let timer;
         return Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
+            promise.finally(() => clearTimeout(timer)),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
         ]);
     }
 
@@ -2160,6 +2162,14 @@
             } else {
                 delete targetItem.closedAt;
             }
+
+            if (itemToRestore.callMarkTime && (!targetItem.callMarkTime || itemToRestore.callMarkTime > targetItem.callMarkTime)) {
+                targetItem.isCalled = itemToRestore.isCalled;
+                if (itemToRestore.callMark) targetItem.callMark = itemToRestore.callMark;
+                else delete targetItem.callMark;
+                targetItem.callMarkTime = itemToRestore.callMarkTime;
+            }
+
             restoredResultItem = targetItem;
         } else {
             scanHistory.push(itemToRestore);

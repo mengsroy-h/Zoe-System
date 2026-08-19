@@ -42,7 +42,7 @@ Key ត្រូវបានផលិតឡើងជាមួយ **ហត្ថ�
 នៅក្នុង ZoeKeyGen ផ្នែក **"Signing Key"** ចុច "បង្កើត Keypair ថ្មី" (Generate New Keypair) — Popup នឹងបង្ហាញ Private Key និង Public Key។
 
 - **ចម្លង Private Key ទៅរក្សាទុកកន្លែងសុវត្ថិភាព** (Password Manager) — នេះជា "Master Secret" របស់ប្រព័ន្ធ License ទាំងមូល។
-- **ចម្លង Public Key** ទៅជំនួស `PUBLIC_KEY_JWK` ក្នុងឯកសារ `license-verify.js` របស់ **ទាំង ៤ App** (ZoeAdmin, ZoeW, Zoescan, ZoeKeyGen) រួច Deploy ឡើងវិញ។
+- **ចម្លង Public Key** ទៅដាក់ក្នុង Array `PUBLIC_KEYS_JWK` ក្នុងឯកសារ `license-verify.js` របស់ **ទាំង ៤ App** (ZoeAdmin, ZoeW, Zoescan, ZoeKeyGen) រួច Deploy ឡើងវិញ។
 
 ចាប់ពីពេលនេះ រាល់ពេលចង់បង្កើត Key អ្នកគ្រាន់តែបិទភ្ជាប់ Private Key ដែលបានរក្សាទុកចូល "Signing Key" រួចចុច Load Key។
 

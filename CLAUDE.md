@@ -409,3 +409,136 @@ business DB URL** — README updated to flag this for verification either way.
 - Two rules files changed this session (`firebase-database.rules.json` at repo root, and
   `ZoeKeyGen/firebase-database.rules.json`) both need **manual publishing** in their respective
   Firebase Consoles — this repo's rules JSON is never auto-deployed by Netlify.
+
+## Second deep-audit pass (2026-08-19, branch `claude/deep-audit-cleanup-n4bar6`) — handoff notes
+
+Requested explicitly as a confirmatory **final** round, after PR #6 (`claude/customer-table-timeout-x3sc9v`,
+landed on top of the first "final" audit above) showed that round hadn't actually been the last word —
+the user asked to re-confirm nothing else was left, plus a repo-wide comment-cleanup check. Ran 5 parallel
+research agents again (one per app, plus one cross-cutting infra pass), each re-checking every bug class
+listed above for regressions and independently hunting for anything new, with explicit extra scrutiny on
+the 5 commits that had landed since the first "final" audit and were never part of a dedicated review
+(`d7924f9`..`49137a4`: the customer-table fetch dedup fix, and the two-stage PWA auto-update rewrite that
+added then fully removed a forced-reload/write-guard mechanism in favor of "apply on next natural launch").
+Agents were research-only (no edits); findings were triaged and safe ones applied directly in this same
+session — none of this round touched Delete-vs-Remove, retention-window semantics, or any live revenue math.
+
+**Comment-cleanup check (the second half of this round's request):** re-verified byte-for-byte that every
+`app.js`/`license-verify.js` across all 4 apps is still comment-free (grepped `//`/`/*` excluding
+string/regex-literal false positives — zero real comments found). Also found and fixed something the prior
+round's cleanup missed: **`ZoeKeyGen/app.js` had 7 spots of leftover blank-line cruft** (up to 9 consecutive
+blank lines in one place) — dead whitespace left behind where explanatory comments used to sit, from the
+`a6aa840`/`bbbff1d` comment-strip passes, never trimmed afterward. Collapsed to single blank lines matching
+the rest of the codebase's spacing; confirmed via `git log -p` on each spot that this was leftover cruft,
+not intentional spacing, before touching it.
+
+### Fixed (safe, non-revenue, applied directly)
+- **ZoeAdmin `customerDataTableFetchPromise` dedup guard had a real gap**: the in-flight-promise guard added
+  in `d7924f9` was checked before the promise was assigned, with an `await decryptLookupSecret(...)` in
+  between when a header-secret lookup config is used — a second caller landing in that window could still
+  start a duplicate fetch, and each duplicate's `finally` nulled the *shared* flag. Fixed by moving the whole
+  header-building/decrypt step inside the async IIFE, so the guard assignment is synchronous with no gap.
+- **ZoeAdmin auto-focus regression when lookup is enabled but misses**: `triggerScanAction()` only skipped
+  the phone-input auto-focus when the lookup API was *disabled* — when it was enabled but a barcode simply
+  had no match (cache miss, 404, timeout), the phone field was never focused at all, forcing a manual tap
+  every time. Now focuses the phone field once the lookup settles, only if it's still empty and the same
+  scan is still pending (guards against stealing focus from an autoSubmit-closed modal or a superseded scan).
+- **`withTimeout()`'s timer-leak fix (landed in ZoeAdmin only, in `d7924f9`) mirrored to ZoeW, Zoescan,
+  ZoeKeyGen** — each app's independently-duplicated `withTimeout` now also captures and clears its internal
+  `setTimeout` once the wrapped promise settles, instead of leaving a dangling timer alive for the rest of
+  the timeout window on every call that resolves early.
+- **`waitForFirebaseSDK()`'s timeout `Error` now constructed synchronously at the call site in all 4 apps**
+  — it was being built inside the `setTimeout` callback in all 4 (ZoeAdmin/ZoeW/ZoeKeyGen shared one shape,
+  Zoescan a slightly different one), the exact same stack-trace-losing class of bug `withTimeout()` itself
+  was fixed for in commit `4e03a3a` — every "Firebase SDK failed to load" Sentry report was collapsing to
+  the same one-line stack with no caller info. This helper was apparently missed when that fix was applied.
+- **ZoeW `executeRestoreItem` now preserves `callMark`/`callMarkTime`/`isCalled` on merge-restore**, mirroring
+  ZoeAdmin's already-reviewed fix (from the first "final" audit round) that ZoeW's independently-duplicated
+  copy of this function never received — confirmed via `git log -S` this logic never existed in ZoeW at any
+  point. Without it, a call-mark ("no answer" etc.) silently vanished if the marked order later got merged
+  back in from a restore, in ZoeW only.
+- **Zoescan `findLockerOccupant()` false-positive-warned on every barcode of a multi-barcode order sharing a
+  locker with its own sibling** — it only excluded the scanned barcode's own code, not the item/order it
+  belongs to, so scanning the 2nd+ barcode of the same order into the same locker (the exact use case
+  `barcodes[]` exists for) triggered the occupancy-warning modal every time. Now also excludes entries
+  belonging to the same `itemId`.
+- **Zoescan camera didn't auto-resume after backgrounding if a modal was open at the time**: the
+  `visibilitychange` handler unconditionally cleared `cameraStoppedByVisibility` on resume, even when a
+  modal (e.g. the locker-occupancy warning above) was blocking the immediate resume — once the modal later
+  closed, nothing re-armed the camera. Now the flag survives while a modal is open, and `closeModal()`
+  resumes the camera once the last modal closes, if it's still pending.
+- Small Sentry-observability nits: two Zoescan `ZoeErrors.capture()` calls and one ZoeKeyGen call had empty
+  `context: ''` (now `'assignLockerToEntry'`, `'initFirebase bootstrap'`, `'refreshKeyList'`); Zoescan's
+  `requestCameraPermission()` catch didn't report unrecognized `getUserMedia` error types at all (only the
+  3 known ones got a friendly toast) — now captures those too.
+- **ZoeKeyGen**: the freshly-generated private key left in the "Generate New Keypair" modal's textarea
+  survived closing the modal via Cancel or backdrop-click (only a subsequent generate/page-reload cleared
+  it), contradicting the modal's own "will be lost forever" copy. `closeModal('keypairModal')` now clears
+  it; the backdrop-click handler was switched to call `closeModal()` instead of toggling the CSS class
+  directly, so both dismiss paths get the same cleanup.
+- Doc nits: 3 READMEs (ZoeAdmin/ZoeW/Zoescan) described a forced-reload "update complete" toast that
+  commit `96038fa` had already removed — updated to describe the actual apply-on-next-launch behavior.
+  Zoescan's recovery toast quoted a ZoeAdmin button label ("Sync Scanner Lookup") that doesn't literally
+  exist — corrected to the real label. ZoeKeyGen's README referenced a singular `PUBLIC_KEY_JWK` where the
+  actual constant is the array `PUBLIC_KEYS_JWK`.
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v12, zoew-v11, zoescan-v11, zoekeygen-v5) since all 4
+  `app.js` got real behavior changes above. **No Firebase rules files were touched this round — nothing
+  from this round needs manual publishing.**
+
+### Explicitly NOT fixed — proposed for human review (touches revenue/data-integrity/retention, or is
+### high-blast-radius/needs a design decision; per current live-production policy, not auto-applied)
+1. **[HIGH] `claimAndCleanupItem`'s trash-write can permanently lose a parcel if retries are exhausted** —
+   present identically in both ZoeAdmin and ZoeW. The Firebase transaction that removes/strips the item from
+   `zoew_scan_history_cod_dod` commits *first*; only afterward does it try to save the removed data into
+   `zoew_recently_deleted_cod_dod` via `retryAsync` (4 attempts, ~22.5s). If all 4 fail (e.g. a sustained
+   `permission_denied` outage — this has happened in this codebase before), the failure handler correctly
+   reverses the revenue delta and the optimistic local trash entry, but **never writes the removed data back
+   to `zoew_scan_history_cod_dod`** — the parcel is gone from both places, with only a Sentry capture, no
+   in-app toast. This is distinct from (and deeper than) the "phantom local trash entry" gap fixed in the
+   2026-08-18 follow-up audit. Needs a deliberate fix (write-back-on-exhausted-retry, or reorder the writes)
+   applied identically to both apps, not a quick patch.
+2. **[MEDIUM-HIGH] ZoeW's `executeRestoreItem` resets `createdAt` on restoring a still-open item; ZoeAdmin's
+   copy never has** — `git log -S` confirms ZoeW has done this since before the `getServerNow()` migration
+   and ZoeAdmin has never done it. Consequence: restoring an item from the 8-day stale-open ("ដក") trash flow
+   gives it a fresh 8-day window in ZoeW but leaves the old (already-expired) `createdAt` in ZoeAdmin, which
+   would likely re-flag it as stale and auto-abandon it again almost immediately, re-triggering the
+   revenue-deduction cycle. CLAUDE.md says not to change retention-window behavior without being asked, and
+   it's genuinely unclear which app has the intended behavior — needs a decision, not a guess.
+3. **[MEDIUM] ZoeKeyGen `license_keys` public-read node exposes more than intended**: rules deliberately
+   allow public read (`checkOnline()` needs it, no Firebase Auth on the 3 business-app end-user devices) on
+   the premise that the node holds no secrets — but it also carries `note` (free-text, README suggests
+   putting employee names/locations in it) and `createdBy` (issuing admin's email), both readable by any
+   end-user device running ZoeAdmin/ZoeW/Zoescan doing a routine license check. Fix would split the node into
+   a public `{revoked, expiresAt}` subset and an admin-only-read subset for the rest — a schema/rules change
+   needing careful migration of already-issued keys plus another manual Firebase Console publish.
+4. **[MEDIUM-HIGH, narrow] ZoeKeyGen's partial-ALL-coverage badge can fail to show in exactly the case it
+   exists for**: `renderKeyList()` keys the badge off `row.appPaths`, but `refreshKeyList()`'s dedup picks
+   whichever app-bucket (ADM→ZOW→SCN, fixed order) is iterated first that contains a given key ID, rather
+   than merging across buckets — so if the winning bucket happens to lack `appPaths` (e.g. two independent
+   corrective-write failures on a scope=ALL key), the fallback silently assumes full 3-app coverage and the
+   warning badge never renders, even though a device on the missing app will pass activation, then get
+   deactivated on its first periodic re-check. Correct fix means deriving coverage from the true union of
+   buckets where the key actually exists, not a single winning bucket's fallback — nontrivial rewrite of
+   `refreshKeyList()`'s dedup logic, in code that gates production device access, so flagged rather than
+   attempted live.
+5. **[design decision, not a bug] All 4 apps lost their only "update available" signal when the PWA
+   forced-reload mechanism was fully removed in `96038fa`** — two independent audit agents (ZoeAdmin-focused
+   and cross-cutting) flagged this same gap. The removal was a deliberate, reasonable tradeoff (avoiding the
+   old mechanism's "interrupt mid-write" risk), and background `reg.update()` polling still keeps the
+   installed service worker current — but there is now no code path at all that tells a user a new version
+   is ready, so a long-lived open session (plausible for an all-shift admin/worker tab) can run stale
+   indefinitely with zero signal. Worth a deliberate choice rather than a silent default: e.g. a passive,
+   non-forcing "🔄 New version available — refresh when convenient" banner on `controllerchange`, with no
+   auto-reload. Not built this round since it's a UX/behavior change across all 4 live apps.
+6. **[LOW] ZoeKeyGen `generateLicenseKey()`'s 25s timeout doesn't cancel the underlying `retryAsync` writes**
+   — a "timed out" error shown to the admin doesn't guarantee the write actually failed; it can complete in
+   the background afterward with no `refreshKeyList()` call, and a manual retry after seeing "timed out" can
+   produce a confusing (harmless) duplicate key. Lower priority than the above; would need an `AbortController`
+   plumbed through `retryAsync` to fix properly.
+
+### Not yet done as of this handoff
+All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep re-verified
+repo-wide. Nothing is mid-edit. The 6 items above are intentionally left as proposals, not code — they need
+the user's decision (items 2 and 5) or are non-trivial enough to warrant a dedicated follow-up rather than
+folding into a "confirm + cleanup" pass (items 1, 3, 4, 6), consistent with this project's live-production
+policy of proposing revenue/data-integrity/high-blast-radius changes rather than auto-applying them.

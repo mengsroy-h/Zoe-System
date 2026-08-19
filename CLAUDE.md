@@ -1575,6 +1575,23 @@ explicit toggles only — those items are moving to trash anyway.
 
 `CACHE_VERSION` bumped (zoeadmin-v30, zoew-v27).
 
+### Two mechanisms from that work, refined on request
+- **The bare `setTimeout(refreshCurrentHistoryView, 0)` in `handleCallAction` became
+  `scheduleHistoryViewRefresh()`.** The deferral itself is load-bearing and stays — `handleCallAction` is
+  the `onclick` of an `<a href="tel:">`, so re-rendering synchronously would tear the anchor out before the
+  browser opens the dialer. What changed is that a named function documents that in a codebase that bans
+  comments, and it now coalesces: a second call in the same tick is dropped, so a burst renders once.
+- **`patchHistoryItemFields`'s failure revert re-rendered with `applyCurrentFilter()`**, which silently
+  discarded an active phone search — at the worst possible moment, since the worker had just hit a save
+  error and would lose the row they were looking at. It now uses `refreshCurrentHistoryView()`, which
+  re-runs `searchByPhone()` when a search is active. `setCallMark` got the same change.
+
+The remaining ~40 `applyCurrentFilter()` call sites across the two apps were **deliberately left alone**.
+Some are correct as they stand (a filter button, or `searchByPhone` exiting an empty search, should reset
+the view), and each of the rest needs its own judgement about whether it is a user-initiated view change or
+a background refresh. Converting them wholesale on a live system would be a much larger change than what
+was asked for. If a future round wants to finish this, that is the distinction to apply.
+
 ### Not yet done as of this handoff
 Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the
 rules file, comment-free-verified on every changed line, tag-balance- and wiring-checked on the one

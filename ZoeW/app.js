@@ -2012,6 +2012,15 @@
     }
 
     let lastRecallSignature = '';
+    let pendingHistoryViewRefresh = null;
+
+    function scheduleHistoryViewRefresh() {
+        if (pendingHistoryViewRefresh) return;
+        pendingHistoryViewRefresh = setTimeout(() => {
+            pendingHistoryViewRefresh = null;
+            refreshCurrentHistoryView();
+        }, 0);
+    }
 
     function refreshCurrentHistoryView() {
         const phoneInput = document.getElementById('searchPhoneInput');
@@ -2207,7 +2216,7 @@
             }
             item.isCalled = true;
             patchHistoryItemFields(item, patchFields, previousFields);
-            setTimeout(refreshCurrentHistoryView, 0);
+            scheduleHistoryViewRefresh();
         }
     }
 
@@ -2236,7 +2245,7 @@
                 delete item.callMarkTime;
                 patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
             }
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             showToast(mark ? "បានសម្គាល់រួចរាល់!" : "បានសម្អាតការសម្គាល់!");
         }
         closeModal('callMarkModal');
@@ -2629,7 +2638,7 @@
                         if (previousFields[key] === undefined) delete revertItem[key];
                         else revertItem[key] = previousFields[key];
                     });
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
         });

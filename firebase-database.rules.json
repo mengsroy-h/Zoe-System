@@ -36,15 +36,15 @@
         "barcodes": {
           "$idx": {
             ".validate": "root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()",
-            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
-            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "locker": { ".validate": "newData.isString()" },
             "isClosed":   { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
-            "isDeducted": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
-            "isFromDeletion": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
-            "time": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
-            "createdAt": { ".validate": "newData.isNumber() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+            "isDeducted": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "isFromDeletion": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "time": { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "createdAt": { ".validate": "newData.isNumber() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "lockerUpdatedAt": { ".validate": "newData.isNumber()" },
             "$other": { ".validate": false }
           }

@@ -536,6 +536,7 @@
             const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
+                updateAuthButton(true);
                 if (!isDatabaseInitialized) {
                     initDatabaseListeners();
                     isDatabaseInitialized = true;

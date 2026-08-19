@@ -312,6 +312,7 @@ async function submitActivationKey() {
         if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
         const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
         if (!result.valid) {
+            if (input) input.value = '';
             showToast(licenseFailureMessage(result.reason));
             return;
         }

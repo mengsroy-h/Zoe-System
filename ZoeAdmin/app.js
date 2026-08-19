@@ -856,6 +856,7 @@
             return;
         }
 
+        const myGeneration = customerDataTableSessionGeneration;
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
@@ -872,6 +873,7 @@
             );
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
+            if (myGeneration !== customerDataTableSessionGeneration) return;
 
             const phoneVal = getNestedField(data, cfg.phoneField);
             const codVal = getNestedField(data, cfg.codField);
@@ -879,6 +881,7 @@
             autoLookupLastFailedAt = 0;
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
+            if (myGeneration !== customerDataTableSessionGeneration) return;
             autoLookupLastFailedAt = Date.now();
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
@@ -949,7 +952,9 @@
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
             'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
-            'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput'
+            'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
+            'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
+            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1025,6 +1030,7 @@
             const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
+                updateAuthButton(true);
                 if (!isDatabaseInitialized) {
                     initDatabaseListeners();
                     isDatabaseInitialized = true;
@@ -2402,7 +2408,7 @@
                     </tr>
                 </tbody>
             </table>
-            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date().toLocaleString('km-KH'))}</p>
+            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date(getServerNow()).toLocaleString('km-KH'))}</p>
         `;
 
         const originalTitle = document.title;

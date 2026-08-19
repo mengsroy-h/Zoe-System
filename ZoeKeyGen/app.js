@@ -459,6 +459,12 @@ function showLoginModalWithPrefill() {
         if (m.id !== 'loginModal') closeModal(m.id);
     });
 
+    lastGeneratedKey = '';
+    const genResultKey = document.getElementById('genResultKey');
+    if (genResultKey) genResultKey.textContent = '';
+    const genResultBox = document.getElementById('genResultBox');
+    if (genResultBox) genResultBox.classList.add('hidden');
+
     clearSigningKey();
     openModalHelper('loginModal');
     const savedEmail = localStorage.getItem('remembered_email');
@@ -690,6 +696,7 @@ async function generateLicenseKey() {
     }
     if (genBtn) { genBtn.textContent = 'កំពុងបង្កើត...'; }
 
+    const myGeneration = keyListSessionGeneration;
     try {
         const { keyString, payload } = await window.ZoeLicense.signNewKey(signingPrivateKeyJwk, {
             appCode: appSelect, days: days, note: note
@@ -714,6 +721,7 @@ async function generateLicenseKey() {
         }), 3, 1000)));
         writePromise.then((bgResults) => {
             if (!generateAlreadyTimedOut) return;
+            if (myGeneration !== keyListSessionGeneration) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);

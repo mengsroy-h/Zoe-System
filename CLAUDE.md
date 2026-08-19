@@ -656,3 +656,99 @@ not a bug: `refreshKeyList()` merges `license_keys` + `license_keys_meta` for th
 regardless of which node the data physically lives in, so the page was never going to visibly change. Worth
 remembering if this same confusion comes up again after a future PII-handling change.) Nothing is
 outstanding from either the second or third audit round as of this handoff.
+
+## Fourth deep-audit pass (2026-08-19, branch `claude/detailed-audit-d0k07u`) — handoff notes
+
+Requested by the user as one more meticulous, whole-project pass ("audit as thoroughly as possible, in
+case anything isn't right — this is the final audit round before going public to 200-300 users") before
+public rollout. Branch started exactly at `main` (commit `4a8e04e`), no carry-over from a prior unmerged
+branch. Ran 5 parallel research-only agents again (one per app plus one cross-cutting infra/rules pass),
+each re-checking every bug class documented above for regressions and independently hunting for anything
+new, with explicit extra scrutiny on two ZoeAdmin commits that landed after the third round closed out and
+were never reviewed on their own: `8b2293d` (customer-lookup timeout/retry hardening) and `4a8e04e`
+(customer-lookup cooldown/TTL hardening, PR #12). Findings were triaged and safe ones applied directly in
+this same session; nothing here touches Delete-vs-Remove, retention-window semantics, revenue transaction
+math, or any Firebase rules file — so nothing from this round needs a manual rules publish.
+
+### Fixed (safe, non-revenue, applied directly)
+- **ZoeAdmin `attemptAutoLookup()`'s failure/success cooldown state had no session-generation guard**
+  (`app.js`), unlike the sibling `fetchCustomerDataTableRows()` which already had one from a prior round.
+  A per-barcode lookup that was still in flight (up to ~31.5s: 15s timeout + 1.5s backoff + 15s timeout)
+  when a logout happened could write `autoLookupLastFailedAt` or fill stale lookup data into the phone
+  modal for whichever *new* session was now active. Captured `myGeneration = customerDataTableSessionGeneration`
+  at call start and guard both the success (data-fill) and failure (cooldown-write) branches on it, mirroring
+  the existing pattern.
+- **ZoeAdmin `clearSensitiveModalFields()` was missing `phoneModal`'s and `manualAdjustModal`'s fields** —
+  the single most-used modal in the app (every new-parcel scan goes through `phoneModal`) left the last
+  customer's phone number and COD/DOD amounts sitting in raw DOM `value` attributes after logout on a shared
+  device, inspectable via DevTools, since `closeModal()` only does `display:none` and neither the modal's
+  success path (`confirmPhone()`) nor logout ever blanked the inputs. Same threat model the third round's
+  logout-hardening work was written to close for every *other* modal — this one was missed. Added
+  `modalPhoneInput`, `modalLockerInput`, `modalCodInput`, `modalDodInput` (customer-facing) and
+  `manualDateInput`, `manualCodChangeInput`, `manualDodChangeInput`, `manualCountChangeInput`
+  (revenue-adjustment entry, lower sensitivity but same gap) to the blank-list.
+- **ZoeAdmin/ZoeW: header auth button (`navAuthBtn`) never flipped to the "logout" state when a license was
+  activated *after* login**, only when it was already active at login time — `updateAuthButton(true)` was
+  called from `verifyWorkerRoleThenProceed`/its ZoeAdmin equivalent but never from `submitActivationKey()`'s
+  success path in either app. A worker/admin who logged in with an expired license, then entered a valid
+  activation key, ended up fully authenticated (scanning etc. all worked) but the header button still read
+  "🔑 ចូល" and re-opened the login form instead of logging out. Added `updateAuthButton(true)` to both apps'
+  `submitActivationKey()` success branch. UI-state only, no security impact (the session genuinely was valid).
+- **ZoeAdmin PDF/print export footer timestamp used raw `new Date()` instead of `getServerNow()`**
+  (`app.js`, the "នាំចេញនៅ" / "Exported at" line) — the only "now" display in the whole file that didn't,
+  inconsistent with the other three. Cosmetic only (doesn't feed retention/revenue logic), fixed for
+  consistency.
+- **Zoescan: a rejected/invalid activation key was left sitting in the textarea**, only the success path
+  cleared it. Low sensitivity (activation keys are meant to be shared over Telegram, not a real credential),
+  but consistent with the shared-device-hardening theme — now cleared on the invalid-result path too.
+- **ZoeKeyGen: a freshly-generated license key stayed visible (plaintext, with a working Copy button) in
+  `#genResultBox` after logout**, readable and copyable by the next admin who logs into the same browser
+  tab without a page reload — same bug class as the third round's `clearSensitiveModalFields()` work, just
+  never extended to ZoeKeyGen's key-generation result box (a plain `&lt;div&gt;`, not a `.modal`, so the
+  existing bulk modal-close sweep never touched it). `showLoginModalWithPrefill()` now also resets
+  `lastGeneratedKey = ''` and blanks/hides `#genResultKey`/`#genResultBox`.
+- **ZoeKeyGen `generateLicenseKey()`'s background timeout-recovery handler (the `writePromise.then(...)`
+  that fires when a client-perceived-as-timed-out write actually lands late) had no session-generation
+  guard**, unlike `refreshKeyList()` itself. If the original admin logged out and a second admin logged in
+  within the ~25s+ window before the late write resolved, the second admin would see a toast naming the
+  first admin's key ID/app-scope and an unrequested key-list refresh. Narrow, information-disclosure-only
+  (key ID + app labels, not the signed key string), but same fix pattern as everywhere else — added a
+  `myGeneration` check before acting.
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v18, zoew-v15, zoescan-v15, zoekeygen-v9) since all 4
+  `app.js` got real behavior changes above.
+
+### Explicitly not auto-decided (flagged for the user, not fixed)
+- **Zoescan: client-side eventual-consistency race in the locker-occupancy warning.** `findLockerOccupant()`
+  only consults the local `barcodeIndex`, which is rebuilt exclusively from a debounced (120ms) Firebase
+  `onValue` snapshot — nothing optimistically patches it right after a successful `assignLockerToEntry()`
+  write. If a worker scans barcode A into locker "ទូ5" and then scans a *different* order's barcode B into
+  the same locker before A's write round-trips back through the listener (plausible on weak warehouse wifi,
+  and structurally unavoidable across two different physical scanner devices scanning concurrently — no
+  amount of client-side patching closes that half of the window), B is silently double-assigned with no
+  warning shown, even though the warning modal exists specifically to catch this. Not data loss — both
+  writes land correctly in Firebase and are visible/correctable in the list view — but it's a missed
+  real-world safety check that gets more likely, not less, once this app is handling more daily volume
+  across more users. This is an inherent limitation of the client-only, no-backend architecture (same
+  category of trade-off already accepted for the worker-role revenue-write-access decision above), not a
+  one-line bug fix — flagging for a product/architecture decision rather than picking a partial mitigation
+  unilaterally.
+- **ZoeAdmin/ZoeW: optimistic local revenue/pickup-stat caches aren't reverted if the underlying
+  `runTransaction` write rejects outright** (as opposed to succeeding-but-clamped-to-0, which already is
+  handled). `addRevenueToDailyAndMonthlyRecord`/`addPickupToDailyRecord` update the local
+  `dailyRevenueData`/`monthlyRevenueData`/`dailyPickupData` objects immediately for a snappy UI, then fire
+  the real Firebase transaction; a hard failure (permission denied, network down) only shows a toast, it
+  never rolls the local number back. The actual stored Firebase value is never wrong — every transaction
+  recomputes from the live server value on its next successful run, not from the client's cache — so this
+  is a transient wrong number on screen until something else refreshes that date's listener or the page
+  reloads, not a real revenue miscalculation. Byte-identical pattern in both apps, so not a mirroring gap
+  either. Flagging rather than fixing because it touches the revenue/pickup stat-commit functions directly,
+  which this project's live-production policy says should be proposed for human review rather than
+  auto-patched, even though the actual stored data was never at risk here.
+
+### Not yet done as of this handoff
+All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep
+re-verified on every changed line. Nothing is mid-edit. No Firebase rules files were touched this round, so
+no manual-publish step is needed. The long-open question about `license-verify.js`'s `LICENSE_DB_URL`
+possibly being a mixed-up copy of ZoeW's business DB URL (first flagged in the very first audit round)
+remains unresolved and cannot be checked from a git-only session — still needs the user's direct
+confirmation in the Firebase console.

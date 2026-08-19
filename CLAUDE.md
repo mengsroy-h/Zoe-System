@@ -916,3 +916,160 @@ Zero lines of the existing barcode-scanning code path were modified in any of th
   vendor should test the actual scan-to-fill flow once after deploying.
 - `CACHE_VERSION` bumped in the 3 affected apps' `sw.js` (zoeadmin-v21, zoew-v18, zoescan-v18); ZoeKeyGen
   untouched this round.
+
+## Fifth deep-audit pass (2026-08-19, branch `claude/detailed-audit-pyi4gq`) — handoff notes
+
+Requested by the user ahead of adding 2-3 new features in one batch, specifically worried something had
+been missed by that point. Ran 5 parallel research-only agents again (one per app plus one cross-cutting
+infra pass), each re-checking every documented bug class for regressions and independently hunting for
+anything new, with explicit extra scrutiny on the Setup Link / Config-modal QR scanner / Firebase-backup-tool
+work added at the end of the fourth round — all three were built and self-verified (`node --check`, tag-
+balance, byte-diffs) in that same session but never actually reviewed by a fresh 5-agent audit pass of their
+own, since they were added after that round's dedicated review had already run.
+
+### Fixed (safe, non-revenue, applied directly)
+- **Config-modal QR scanner: camera never released except via its own exact Cancel button — regression of
+  the "camera stays on after logout" bug class already fixed once for Zoescan's main scanner in round 3.**
+  All three agents covering ZoeAdmin/ZoeW/Zoescan independently found the identical gap (the feature was
+  copied to all three apps in the same commit with the same omission): `closeConfigQrScanner()` was wired
+  only to the modal's "បោះបង់" button, so backdrop-click, the Escape key, and logout/4h-forced-expiry/role-
+  check-failure all left the QR camera stream running indefinitely and left `configQrScanActive` stuck
+  `true` — permanently breaking the "📷 ស្កេន QR" button until a full page reload. A second, distinct bug
+  compounded it: the Escape-key handler in all three apps picks the *first* open `.modal` in DOM order
+  (`Array.from(...).find(...)` / `document.querySelector('.modal.open')`), and `configModal` (opened first,
+  still open underneath) always precedes `configQrScanModal` in each app's HTML — so Escape was silently
+  dismissing the wrong, invisible modal instead of the visible QR scanner. **Fix, mirrored identically across
+  ZoeAdmin/ZoeW/Zoescan**: added `data-close="closeConfigQrScanner"` to each app's `#configQrScanModal` (same
+  mechanism `restoreWarningModal`/`permanentDeleteWarningModal` already use), which correctly fixes backdrop-
+  click since the click target naturally resolves to the topmost stacked modal; changed each app's Escape-key
+  handler to pick the *last* open modal instead of the first (topmost/most-recently-opened, matching what a
+  user actually sees and expects Escape to close — a small generically-correct fix, not QR-specific); and
+  added an explicit `closeConfigQrScanner()` call to ZoeAdmin's/ZoeW's `showLoginModalWithPrefill()` and to
+  Zoescan's `onAuthStateChanged` sign-out branch (both before their generic bulk modal-close loops, which
+  call plain `closeModal()` and don't consult `data-close`), matching the exact pattern Zoescan's round-3
+  camera fix already established for its main scanner.
+- **QR scanner could open a second concurrent camera stream on top of the already-running main barcode
+  scanner in ZoeAdmin and Zoescan** — untested on real hardware per the round-4 handoff notes, and flagged
+  independently by both apps' agents as a real risk to the core scan-to-locker/scan-to-parcel workflow (a
+  modal being open only pauses the main scanner's *decode loop*, not its underlying `getUserMedia` stream,
+  so it stays live and reachable the whole time Settings/Config is open). Rather than attempt an unverified
+  stop-then-auto-resume dance across two independent camera consumers, `openConfigQrScanner()` in both apps
+  now simply refuses to open (with a clear toast asking the user to close the barcode scanner first) while
+  `isCameraScanning`/`isCameraStarting` is true — guarantees only one `getUserMedia` stream is ever requested
+  at a time, closing the risk entirely instead of hoping simultaneous streams behave. (ZoeW has no main
+  scanner/camera capability of any other kind, so this guard doesn't apply there.)
+- **`clearSensitiveModalFields()` gaps** (the shared-device logout-hardening sweep from rounds 3-4, found
+  incomplete in a few more spots): ZoeAdmin's `lookupSecretKey` (the PIN-derived `CryptoKey` that decrypts the
+  saved customer-lookup API secret) was never reset on logout — since the whole file is top-level script code
+  with no wrapping IIFE, every function stays directly callable from DevTools for the rest of the page's life,
+  so a PIN entered once during a shift kept unlocking authenticated lookup-API calls long after logout,
+  defeating the PIN gate's own stated purpose. Also added to ZoeAdmin's blank-list: `lookupApiHeaderValueInput`
+  (the lookup-API secret's own input field, left with a readable DOM value if the config modal was cancelled
+  rather than saved) and `editModalBarcodeText` (the barcode label in the edit-phone modal). ZoeW got the same
+  `editModalBarcodeText` fix (present with the identical omission — a gap shared by both apps since the field
+  predates the hardening sweep, not a fix that landed in one sibling and not the other).
+- **ZoeKeyGen `refreshKeyList()` had no partial-failure fallback**: it read `license_keys` and
+  `license_keys_meta` via `Promise.all`, so a rejection on *either* read (a `license_keys_meta` permission
+  hiccup right after a rules publish, a revoked `user_roles` entry mid-session, a network blip — this project
+  has hit "rules not published yet" as a real recurring incident) blanked the *entire* key list, even though
+  the publicly-readable `license_keys` node might have loaded fine. Switched to `Promise.allSettled`: the
+  public node's data now renders unconditionally as long as that read itself succeeds, and only degrades
+  gracefully (falling back to the existing no-meta-record derivation already used per-row) if the meta read
+  specifically fails, which now also gets its own Sentry capture rather than surfacing only as a generic full-
+  page failure.
+- **ZoeKeyGen `clearSigningKey()` didn't null the derived `signingKeySessionKey` `CryptoKey` handle** — low
+  real-world impact (the key is non-extractable, and its only use is decrypting the `sessionStorage` blob the
+  same function already deletes), but for a variable that exists specifically to protect the system's highest-
+  value secret, an explicit "clear from memory" action leaving a live derived-key handle behind was worth
+  closing for defense-in-depth. Now set to `null` alongside `signingPrivateKeyJwk`.
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v22, zoew-v19, zoescan-v19, zoekeygen-v12) since all 4
+  `app.js` got real behavior changes above.
+
+### Follow-up: user reviewed the 3 proposed items and said "fix all of them, make it secure, don't let it be
+bypassable" — here's what was actually done for each
+2 of the 3 were safely fixable and are now fixed; the 3rd was investigated further *while implementing* and
+turned out to be unsafe to apply as originally proposed — it was reverted rather than shipped, since a broken
+production app is worse than a narrow, already-partially-mitigated gap. Details below.
+
+1. **NOT applied, reverted after investigation — Firebase rules gap on `zoew_scan_history_cod_dod/$itemId`'s
+   top-level `cod`/`dod`/`price`.** The proposed fix (extend the same "admin OR not-yet-existing OR unchanged"
+   pattern already used for the nested `barcodes/$idx/{cod,dod}` fields) was drafted and JSON-validated, but
+   before committing it, traced every ZoeW (`worker`-role) code path that writes to this exact top-level field
+   set on an *existing* record — and found three real, currently-shipping ones that legitimately need to:
+   `claimAndCleanupItem`'s automatic 8-day stale-open partial-claim branch (`ZoeW/app.js` ~line 1056-1058,
+   recomputes `updated.cod/dod/price` from the still-active barcodes and writes it via `runTransaction` on the
+   live item), `restoreClaimedItemToScanHistory` (~line 1010-1012, the round-4 trash-write-failure recovery
+   transaction that restores reclaimed barcodes back into the live record), and `executeRestoreItem`'s
+   merge-into-existing-open-order branch (~line 2366-2368, the common "restore from trash while a matching open
+   order already exists" case). All three run under the worker's own authenticated session and all three write
+   a *recomputed sum* of `barcodes[].cod/dod` into these top-level fields on a record that already exists —
+   exactly the write shape the proposed "admin OR unchanged" rule would reject. Applying the proposed rule as
+   drafted would have silently broken the 8-day auto-cleanup, the trash-recovery safety net, and restore-merge
+   for every ZoeW user, in exchange for closing a narrower gap (a compromised/malicious worker account crafting
+   a raw REST write to fabricate these exact fields). The fundamental problem is that Firebase RTDB's rules
+   language has no aggregate/sum function, so a rule can't verify "this new top-level value equals the sum of
+   this record's own `barcodes[].cod/dod`" — the same "no declarative rule can verify a delta's history is
+   honest — that fundamentally requires a trusted server (Cloud Functions), which this project doesn't have"
+   conclusion the first "final" audit round already reached for the sibling problem (worker write access to
+   the daily/monthly revenue nodes), and for the same reason. **Change reverted; `firebase-database.rules.json`
+   is unchanged from before this round.** This is now a confirmed, deliberately-accepted limitation in the same
+   category as that earlier "safe subset only" decision, not an oversight — revisit only if/when a trusted
+   backend (Cloud Functions or similar) is ever added to this project.
+2. **Fixed — ZoeAdmin `removeSingleBarcode`'s outer-catch snapshot revert.** Removed the wholesale
+   `dailyRevenueData = dailySnapshot; monthlyRevenueData = monthlySnapshot;` reassignment (and the now-unused
+   snapshot variables) from the failure-catch block. The existing `addRevenueToDailyAndMonthlyRecord(...)` call
+   right above it already reverses the applied delta correctly and object-identity-safely via its own
+   transaction — the wholesale reassignment was only ever redundant in the simple case and actively harmful
+   under the race (discarding a fresher listener-delivered snapshot from a concurrent device). `scanHistory`/
+   `deletedItems` snapshot-revert is untouched, since that wasn't part of the flagged finding. **Note for a
+   future round**: the same snapshot-then-wholesale-revert shape also exists in the new-parcel-scan save flow
+   (`ZoeAdmin/app.js` ~line 3286-3298, inside the phone-modal confirm handler) — not fixed this round since it
+   wasn't part of what was audited/proposed, flagging for awareness only.
+3. **Fixed — Setup Link's URL-param flow no longer bypasses the Security PIN gate**, in all 3 business apps.
+   `applySetupLinkFromUrl()` no longer writes straight to `localStorage`; it now routes through the exact same
+   PIN gate every other config change already uses:
+   - **ZoeAdmin** already had a general-purpose `pinTargetAction` callback mechanism (`requestPinBeforeConfig
+     (targetAction)`, already used elsewhere for the lookup-API config modal) — reused directly:
+     `applySetupLinkFromUrl()` now calls `requestPinBeforeConfig(() => { openConfigModal(); <pre-fill textarea
+     with the parsed config>; })`.
+   - **ZoeW and Zoescan** had no such callback mechanism (`requestPinBeforeConfig()` always just opens
+     `openConfigModal()` unconditionally after success), so both gained a small `pendingSetupLinkConfig`
+     module-level variable instead: `applySetupLinkFromUrl()` stashes the parsed config there and calls the
+     existing `requestPinBeforeConfig()`; `openConfigModal()` now checks it first (pre-filling and consuming
+     it) before falling back to its old behavior of loading the saved config from `localStorage`.
+   - In every app the old `window.confirm()` naming the `projectId` was dropped entirely — the PIN-gated Config
+     modal itself, showing the actual JSON in a reviewable/editable textarea before the existing "រក្សាទុក"
+     (Save) button is explicitly clicked, is a strictly stronger confirmation than a generic `confirm()` dialog
+     ever was, and it's the exact same review step the already-correct QR-scan-to-textarea flow already uses.
+   - **First-run devices are unaffected and not weakened**: `requestPinBeforeConfig()`/`checkPinAndOpenConfig()`
+     already open `pinSetupModal` (create-a-new-PIN) when no PIN exists yet, so a brand-new device opening a
+     Setup Link still gets the config pre-filled and still must set a PIN before it can ever be saved — strictly
+     *more* secure than before (previously the URL flow saved with **zero** PIN involvement even on a fresh
+     device), not a regression of the legitimate first-time-setup case the feature exists for.
+   - Verified the boot-sequence interaction is safe: `applySetupLinkFromUrl()` still runs before `initFirebase()`
+     on page load in all 3 apps; on a config-less first-run device, `initFirebase()`'s own `checkPinAndOpenConfig
+     (true)` call (which doesn't touch `pinTargetAction`/`pendingSetupLinkConfig`) can also fire right after,
+     redundantly reopening the same already-open `pinSetupModal` — harmless (idempotent) and doesn't clobber the
+     Setup Link's pending config or callback.
+
+### Not yet done as of this handoff — lower-priority items noted but not applied
+- QR-scan camera-open failures always show the same generic "check camera permission" toast regardless of
+  the actual error (ZoeAdmin/Zoescan) — misleading if the real cause is the now-blocked dual-stream conflict;
+  `requestCameraPermission()`'s existing per-error-type messaging could be reused.
+- No in-app-browser (Facebook/Instagram/Messenger/Line) warning before opening the QR scanner, unlike the
+  main barcode scanner's `requestCameraPermission()`, which already warns proactively.
+- `firebase-backup/backup.js` doesn't sanitize `business.name`/paths from the vendor-authored, gitignored
+  `config.json` before using them as filesystem paths — low risk given the trusted-input design (no
+  command-injection surface exists at all in that script), but worth a defensive `../`/absolute-path check.
+- ZoeKeyGen's `persistSigningKeyForSession()` can silently no-op with zero user feedback if WebCrypto's
+  `deriveKey` fails during first-time PIN setup — fails closed (no insecure storage), just confusing; rare.
+- Zoescan's `lockerUpdatedBy` mirror-write could theoretically send `null` instead of a string if
+  `currentUserEmail` were ever empty while authenticated, which the rules schema would reject — narrow/
+  theoretical, `currentUserEmail` should never be empty for an authenticated session.
+- ZoeW/ZoeAdmin's `renderHistory()` age/recall UI badges use raw `Date.now()` — purely cosmetic (24h "new/old"
+  badge, 4h "call again" hint), doesn't feed retention or revenue decisions, arguably within the spirit of the
+  existing cosmetic-timer exemption though not explicitly named there; flagged for awareness only.
+
+All fixes above are committed, `node --check`-clean on every modified `.js`, and HTML div-tag-balance-checked
+on every modified `.html`. Nothing is mid-edit. No Firebase rules files were touched by the fixes actually
+applied this round.

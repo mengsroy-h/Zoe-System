@@ -223,6 +223,7 @@ async function initFirebase() {
             currentUserEmail = null;
             cameraStoppedByVisibility = false;
             stopScanner();
+            closeConfigQrScanner();
             detachDatabaseListeners();
             renderList();
             document.getElementById('lockerPickerScreen').classList.add('hidden');
@@ -555,9 +556,16 @@ async function verifySecurityPin() {
     }
 }
 
+let pendingSetupLinkConfig = null;
+
 function openConfigModal() {
-    const raw = localStorage.getItem('zoew_firebase_config') || '';
-    document.getElementById('configInput').value = raw;
+    if (pendingSetupLinkConfig) {
+        document.getElementById('configInput').value = JSON.stringify(pendingSetupLinkConfig, null, 2);
+        pendingSetupLinkConfig = null;
+    } else {
+        const raw = localStorage.getItem('zoew_firebase_config') || '';
+        document.getElementById('configInput').value = raw;
+    }
     const dsnInput = document.getElementById('sentryDsnInput');
     if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
     openModal('configModal');
@@ -600,14 +608,9 @@ function applySetupLinkFromUrl() {
         return;
     }
 
-    const confirmed = window.confirm(
-        "តើអ្នកចង់កំណត់ Firebase Config ថ្មីនេះឬទេ?\n\nProject: " + (parsed.projectId || "(មិនស្គាល់)") +
-        "\n\nការកំណត់នេះនឹងជំនួសការកំណត់ចាស់ (បើមាន)។"
-    );
-    if (!confirmed) return;
-
-    localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-    showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+    pendingSetupLinkConfig = parsed;
+    showToast('សូមផ្ទៀងផ្ទាត់ PIN ដើម្បីអនុវត្ត Setup Link');
+    requestPinBeforeConfig();
 }
 
 let configQrReader = null;
@@ -624,6 +627,10 @@ function closeConfigQrScanner() {
 
 async function openConfigQrScanner() {
     if (configQrScanActive) return;
+    if (isCameraScanning || isCameraStarting) {
+        showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
+        return;
+    }
     if (typeof ZXing === 'undefined') {
         showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
         return;
@@ -1408,7 +1415,8 @@ function bindEventListeners() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        const openModalEl = document.querySelector('.modal.open');
+        const openModals = document.querySelectorAll('.modal.open');
+        const openModalEl = openModals[openModals.length - 1];
         if (openModalEl) dismissModal(openModalEl);
     });
 

@@ -534,14 +534,12 @@
             return;
         }
 
-        const confirmed = window.confirm(
-            "តើអ្នកចង់កំណត់ Firebase Config ថ្មីនេះឬទេ?\n\nProject: " + (parsed.projectId || "(មិនស្គាល់)") +
-            "\n\nការកំណត់នេះនឹងជំនួសការកំណត់ចាស់ (បើមាន)។"
-        );
-        if (!confirmed) return;
-
-        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-        showToast("✅ បានកំណត់ Firebase Config ថ្មីរួចរាល់!");
+        requestPinBeforeConfig(() => {
+            openConfigModal();
+            const cfgInput = document.getElementById('firebaseConfigInput');
+            if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
+            showToast('✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+        });
     }
 
     let configQrReader = null;
@@ -558,6 +556,10 @@
 
     async function openConfigQrScanner() {
         if (configQrScanActive) return;
+        if (isCameraScanning || isCameraStarting) {
+            showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
+            return;
+        }
         if (typeof ZXing === 'undefined') {
             showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
             return;
@@ -1042,12 +1044,14 @@
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;
+        lookupSecretKey = null;
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
             'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
             'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
             'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
-            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput'
+            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
+            'editModalBarcodeText', 'lookupApiHeaderValueInput'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1059,6 +1063,7 @@
 
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
+        closeConfigQrScanner();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1810,7 +1815,8 @@
         });
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
-            const openModalEl = Array.from(document.querySelectorAll('.modal')).find(m => m.style.display === 'flex');
+            const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
+            const openModalEl = openModals[openModals.length - 1];
             if (openModalEl) dismissModal(openModalEl);
         });
     });
@@ -3455,8 +3461,6 @@
 
         const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
-        const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
-        const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
 
         const removedBc = freshItem.barcodes.splice(freshBcIndex, 1)[0];
 
@@ -3538,8 +3542,6 @@
             }
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
-            dailyRevenueData = dailySnapshot;
-            monthlyRevenueData = monthlySnapshot;
             applyCurrentFilter();
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }

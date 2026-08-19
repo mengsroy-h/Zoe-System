@@ -31,8 +31,9 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
             swReloadedOnce = true;
+            const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if (isModalOpen || isCameraScanning) {
+                if ((isModalOpen || isCameraScanning) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem('zoeadmin_just_updated', '1');
@@ -194,9 +195,10 @@
 
     function withTimeout(promise, ms, timeoutMsg) {
         const timeoutErr = new Error(timeoutMsg || 'Timed out');
+        let timer;
         return Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
+            promise.finally(() => clearTimeout(timer)),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
         ]);
     }
 
@@ -615,6 +617,7 @@
 
     let customerDataTableRows = null;
     let customerDataTableFetchedAt = 0;
+    let customerDataTableFetchPromise = null;
     const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
 
     function buildCustomerListApiUrl(cfg) {
@@ -652,6 +655,11 @@
             return;
         }
 
+        if (customerDataTableFetchPromise) {
+            if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
+            return customerDataTableFetchPromise;
+        }
+
         const listUrl = buildCustomerListApiUrl(cfg);
         if (!listUrl) return;
 
@@ -665,21 +673,28 @@
             headers[cfg.headerName] = cfg.headerValue;
         }
 
-        try {
-            const res = await withTimeout(fetch(listUrl, { headers }), 15000, 'Customer table fetch timed out');
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
-            if (data && data.error) throw new Error(data.error);
-            const rows = Array.isArray(data && data.rows) ? data.rows : [];
-            customerDataTableRows = rows;
-            customerDataTableFetchedAt = Date.now();
-            renderCustomerDataTableStatus(rows);
-            filterCustomerDataTable();
-        } catch (e) {
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
-            if (statusEl) statusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
-            if (customerDataTableRows) filterCustomerDataTable();
-        }
+        customerDataTableFetchPromise = (async () => {
+            try {
+                const res = await withTimeout(fetch(listUrl, { headers }), 15000, 'Customer table fetch timed out');
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                if (data && data.error) throw new Error(data.error);
+                const rows = Array.isArray(data && data.rows) ? data.rows : [];
+                customerDataTableRows = rows;
+                customerDataTableFetchedAt = Date.now();
+                renderCustomerDataTableStatus(rows);
+                filterCustomerDataTable();
+            } catch (e) {
+                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
+                const curStatusEl = document.getElementById('customerDataTableStatus');
+                if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
+                if (customerDataTableRows) filterCustomerDataTable();
+            } finally {
+                customerDataTableFetchPromise = null;
+            }
+        })();
+
+        return customerDataTableFetchPromise;
     }
 
     function renderCustomerDataTableStatus(rows) {

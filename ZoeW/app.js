@@ -31,8 +31,9 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
             swReloadedOnce = true;
+            const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if (isModalOpen) {
+                if (isModalOpen && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem('zoew_sw_updated', '1');

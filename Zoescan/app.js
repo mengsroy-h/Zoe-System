@@ -1392,8 +1392,9 @@ window.addEventListener('load', () => {
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (swReloadedOnce) return;
             swReloadedOnce = true;
+            const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if (isAnyModalOpen() || isCameraScanning) {
+                if ((isAnyModalOpen() || isCameraScanning) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem(APP_UPDATED_TOAST_FLAG, '1');

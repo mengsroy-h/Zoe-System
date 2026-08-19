@@ -2,23 +2,25 @@
 
 > ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
 >
-> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-7f6izx`** (ជុំ audit ទី៦ + គោលការណ៍ លុប/ដក)។
-> Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`** (ម្ចាស់គម្រោង
-> គ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
+> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-90pmhb`** (ជុំ audit ទី៦ + គោលការណ៍ លុប/ដក
+> + ការបិទចំណុចដែលនៅសល់)។ Branch នេះមាន `...-7f6izx` ទាំងស្រុងនៅក្នុងវា (fast-forward) បូកបន្ថែម
+> ២ commit ថ្មី។ Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`**
+> (ម្ចាស់គម្រោងគ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
 >
-> **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude):**
+> **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude) — នៅសល់តែប៉ុណ្ណេះ:**
 > 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
 > 2. Publish `ZoeKeyGen/firebase-database.rules.json` — Console ZoeKeyGen
 >
-> ដរាបណាមិន publish ការការពារ ២ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា):
-> scanner បង្កើត barcode មិនបាន · `license_keys` លែងអានបានជាសាធារណៈត្រង់ node មេ។
+> ដរាបណាមិន publish ៣ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា):
+> scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន · `license_keys` លែងអានបាន
+> ជាសាធារណៈត្រង់ node មេ។
 >
-> **នៅសល់ត្រូវការការសម្រេច ១:** ZoeW ធ្វើ 8-day *partial* cleanup មិនកើត — rules ច្រានចោលពេល index
-> ក្នុង `barcodes[]` រំកិល (ផ្ទៀងផ្ទាត់លើ emulator រួច)។ ការកែត្រូវបន្ធូរ per-barcode admin lock សម្រាប់
-> `worker`។ ZoeAdmin មិនប៉ះពាល់ទេ។
+> **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។** រឿង 8-day partial cleanup សម្រេចរួច (បន្ធូរ per-barcode
+> lock សម្រាប់ `worker` — មូលហេតុពេញលេញនៅ section **"Follow-up session"** ខាងក្រោម)។
 >
 > **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (រក divergence រវាង
-> ZoeAdmin/ZoeW) និង `node audit-tools/policy-test.js` (ផ្ទៀងផ្ទាត់គោលការណ៍ លុប/ដក)។ មើល
+> ZoeAdmin/ZoeW) និង `node audit-tools/policy-test.js` (ផ្ទៀងផ្ទាត់គោលការណ៍ លុប/ដក)។ សម្រាប់ rules
+> រត់ emulator រួច `bash audit-tools/emu/real.sh` និង `bash audit-tools/emu/partial-claim.sh`។ មើល
 > `audit-tools/README.md`។ លម្អិតពេញលេញនៅ section **"Sixth deep-audit pass"** ខាងក្រោម។
 
 
@@ -1403,3 +1405,90 @@ The same run also **empirically confirmed the partial-claim finding**: a worker 
 `barcodes` remainder (index 0 becomes what used to be index 1) is DENIED by the existing per-barcode admin
 locks. Still unfixed — it needs a decision on relaxing those locks for `worker`.
 The harness lives at `scratchpad/emu/{real.sh,real.rules.json}`; rebuild it in any future rules round.
+
+## Follow-up session (2026-08-19, branch `claude/deep-audit-bug-fixes-90pmhb`) — handoff notes
+
+Not a new audit round. The user asked to read the START HERE block, then to "fix whatever is still not
+done". Branch fast-forwarded from `claude/deep-audit-bug-fixes-7f6izx` (so it contains all of round 6),
+plus the two commits below. Round 6's own findings were spot-checked in the code rather than trusted from
+these notes — all 7 of the items it says it applied are genuinely applied (`alreadyInDesiredState`,
+`restoredWasRemoved`, the removed `confirmPhone` snapshot revert, `executeRestoreItem`/
+`claimAndCleanupItem`/`restoreClaimedItemToScanHistory`/`toggleCloseStatus` byte-identical across
+ZoeAdmin/ZoeW per `audit-tools/extract.js`, the `license_keys/$appCode/$keyId` `.read` move, the
+`barcodes/{idx}/code` mirror field, and the Extend modal's signed-expiry warning).
+
+### The four low-priority items round 5 listed and never applied — all now applied
+- **QR Setup Link scanner showed one generic "check camera permission" toast for every failure** in all
+  3 business apps. Round 5 flagged this as misleading specifically because it also fires when the real
+  cause is the dual-stream refusal it added in the same round. Added `describeCameraError(err)` (denied /
+  no camera / in use by another app / overconstrained / non-HTTPS / unknown), identical in ZoeAdmin, ZoeW
+  and Zoescan. Zoescan's main-scanner catch now also reports *unrecognised* `getUserMedia` error names to
+  Sentry instead of silently showing a generic string for them.
+- **No in-app-browser warning before opening the QR scanner**, unlike Zoescan's main barcode scanner which
+  already warned proactively. Added `isInAppBrowser()` (same UA test, now shared) and a warning toast in
+  all 3 apps' `openConfigQrScanner()`. Zoescan's main scanner now calls the same helper instead of its own
+  inline copy of the regex.
+- **ZoeKeyGen `persistSigningKeyForSession()` could no-op with zero feedback.** Root cause is one level up
+  from where round 5 pointed: `deriveSigningKeySessionKey()` swallows its own exception and **returns
+  null**, so `saveNewSecurityPin()`/`verifySecurityPin()` proceed normally, show "PIN saved", and then call
+  `persistSigningKeyForSession()`, whose `!signingKeySessionKey` guard returns silently. The user ticked
+  "remember this key", got a success toast, and nothing was remembered. Both that guard and the
+  `encrypt`/`sessionStorage` catch now clear the `rememberSigningKeyCheckbox` and say so; the catch also
+  captures to Sentry. Deliberately still fails closed — nothing is ever stored unencrypted.
+- **Zoescan wrote `lockerUpdatedBy` as `null`** when `currentUserEmail` was empty, in the lookup
+  transaction, the local entry, and the scan-history mirror. A null in a multi-path update *deletes* the
+  child (`.validate` is skipped for deletes, so this was never a rules rejection — the round-5 note's
+  guess about that was wrong), silently dropping who last set the locker. Now the field is simply omitted
+  when there is no email, matching what `buildScannerLookupPayload()` in ZoeAdmin/ZoeW already did.
+
+`CACHE_VERSION` bumped for all 4 (zoeadmin-v27, zoew-v24, zoescan-v23, zoekeygen-v15).
+
+### The one open decision — resolved: worker may now rewrite a compacted `barcodes[]`
+Round 6 left this for the user: ZoeW's automatic 8-day *partial* claim is rejected whenever compacting
+`barcodes[]` shifts indices, because the per-barcode `cod`/`dod`/`isDeducted`/`isFromDeletion`/`time`/
+`createdAt` validates read `admin || !data.exists() || unchanged`. Presented as three options (accept
+admin-only and stop the retry noise / relax the locks for `worker` / delete-then-recreate the node in two
+writes, which works under the current rules because `.validate` is skipped on a delete and `!data.exists()`
+holds on the recreate). **The user chose relaxing the locks**, and made the argument that settled it:
+*ZoeW has no UI that sets a barcode's `cod`/`dod` at all.* Verified — every `cod`/`dod` write in
+`ZoeW/app.js` is a recomputed sum, a normalizer reading the existing value, or the legacy-shape migration
+that builds `barcodes[]` from the item's own existing values; `openEditBarcodePriceModal`/
+`saveEditedBarcodePrice`/`removeSingleBarcode` are ZoeAdmin-only.
+
+Also found while weighing it, and worth remembering because it changes how much these per-barcode locks
+were ever worth: **`zoew_daily_revenue_cod_dod` and `zoew_monthly_revenue_cod_dod` accept arbitrary
+worker-written absolute values** (`.validate` is only `isNumber() && >= 0`) — the "explicitly NOT fixed"
+item from the very first audit round. A malicious worker could already rewrite the day's revenue total
+directly, so the per-barcode lock was never the boundary it looked like; it protects the source records
+(the evidence trail), not the totals. The **trash node's** money locks (`zoew_recently_deleted_cod_dod`)
+were deliberately left admin-only — that is where the restore add-back value is read from.
+
+So the six fields now use `!== 'scanner'` instead of `=== 'admin'`, matching how `code`/`isClosed` in the
+same block already treat a worker. **No app code changed** — `claimAndCleanupItem` was always correct;
+only the rules refused it. `restoreClaimedItemToScanHistory` and `executeRestoreItem`'s merge branch both
+*append* to `barcodes[]`, so existing indices keep their values and neither was ever affected.
+
+**Verified on a live RTDB emulator against the real rules file**, not reasoned through by hand — new
+suite `audit-tools/emu/partial-claim.sh`, 9/9:
+- allowed: the compacted-remainder write (index 0 going from AAA to BBB), and creating the matching trash record
+- still denied: scanner changing a barcode's `cod`, scanner changing an existing `code`, scanner creating
+  a barcode out of range, worker rewriting an *existing* trash barcode's `cod`, worker rewriting the trash
+  item-level `cod`, and an unauthenticated write
+- asserted explicitly as the accepted cost: a worker *can* now edit a live barcode's `cod` directly
+Re-ran the existing `real.sh` suite too (8/8). Confirmed the **previous** rules denied the same compacted
+write, so the relaxation is provably what fixes it.
+
+Two emulator gotchas beyond the three round 6 documented: `~/.cache/firebase/emulators/` is empty after a
+plain `npm i firebase-tools` — run `firebase setup:emulators:database` to fetch the jar. And a request
+carrying `-H "Authorization: Bearer owner"` *without* an `auth_variable_override` is treated as the project
+owner and **bypasses rules entirely**, so an "unauthenticated write is denied" test written that way is a
+false pass; send no Authorization header at all for that case.
+
+**`firebase-database.rules.json` (root) needs a manual publish** in each business's Firebase Console —
+same as it already did for round 6's scanner guard, which is still unpublished. No app-code change came
+with this one, so no `CACHE_VERSION` bump for it.
+
+### Not yet done as of this handoff
+Nothing is mid-edit. Both commits are `node --check`-clean on every modified `.js`, JSON-validated on the
+rules file, comment-free-verified on every changed line, and the rules change is emulator-verified. The
+only outstanding work is the two manual Console publishes listed in START HERE.

@@ -460,6 +460,8 @@ function saveFirebaseConfig() {
 }
 
 function showLoginModalWithPrefill() {
+    const losingUncopiedKeypair = hasUncopiedKeypair();
+    keypairPrivateCopied = false;
     document.getElementById('appContainer').style.display = 'none';
     keyListSessionGeneration++;
     keyListCache = [];
@@ -487,6 +489,9 @@ function showLoginModalWithPrefill() {
 
     clearSigningKey();
     openModalHelper('loginModal');
+    if (losingUncopiedKeypair) {
+        alert('⚠️ Keypair ថ្មីដែលអ្នកទើបបង្កើត ត្រូវបានលុបចោល ព្រោះអ្នកបានចាកចេញពីប្រព័ន្ធ ហើយអ្នកមិនទាន់បានចម្លង Private Key ទុកទេ។ នេះជាការការពារ (Private Key មិនត្រូវនៅសល់លើឧបករណ៍បន្ទាប់ពី Logout)។ សូមចូលម្តងទៀត ហើយបង្កើត Keypair ថ្មី — កុំភ្លេចចម្លងវាភ្លាមៗ។');
+    }
     const savedEmail = localStorage.getItem('remembered_email');
     const emailInput = document.getElementById('loginEmailInput');
     const rememberCb = document.getElementById('rememberMeCheckbox');
@@ -591,6 +596,7 @@ function setupAuthListener() {
 
 function logoutApp() {
     if (!fb || !auth) return;
+    if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
     fb.signOut(auth).then(() => {
         localStorage.removeItem('remembered_email');
         document.getElementById('appContainer').style.display = 'none';
@@ -666,10 +672,26 @@ function clearSigningKey() {
     showToast('បានសម្អាត Signing Key ចេញពីសតិ');
 }
 
+let keypairPrivateCopied = false;
+
+function hasUncopiedKeypair() {
+    if (keypairPrivateCopied) return false;
+    const modal = document.getElementById('keypairModal');
+    if (!modal || !modal.classList.contains('active')) return false;
+    const out = document.getElementById('newPrivateKeyOutput');
+    return !!(out && out.value);
+}
+
+function dismissKeypairModal() {
+    if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key ទុកនៅឡើយទេ! បើបិទប្រអប់នេះ វានឹងបាត់បង់ជារៀងរហូត ហើយអ្នកត្រូវបង្កើត Keypair ថ្មីម្តងទៀត។ បិទមែនទេ?')) return;
+    closeModal('keypairModal');
+}
+
 async function generateNewKeypair() {
     if (!confirm('ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗប្រើលែងកើត លុះត្រាតែអ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុង license-verify.js របស់គ្រប់ App ។ បន្តទេ?')) return;
     try {
         const { publicKeyJwk, privateKeyJwk } = await window.ZoeLicense.generateKeyPair();
+        keypairPrivateCopied = false;
         document.getElementById('newPrivateKeyOutput').value = JSON.stringify(privateKeyJwk);
         document.getElementById('newPublicKeyOutput').value = JSON.stringify(publicKeyJwk);
         openModalHelper('keypairModal');
@@ -684,8 +706,12 @@ function copyTextarea(id) {
     el.removeAttribute('readonly');
     el.select();
     el.setAttribute('readonly', 'true');
-    navigator.clipboard?.writeText(el.value).then(() => showToast('បានចម្លង!')).catch(() => {
-        try { document.execCommand('copy'); showToast('បានចម្លង!'); } catch (e) {}
+    const markCopied = () => {
+        if (id === 'newPrivateKeyOutput') keypairPrivateCopied = true;
+        showToast('បានចម្លង!');
+    };
+    navigator.clipboard?.writeText(el.value).then(markCopied).catch(() => {
+        try { document.execCommand('copy'); markCopied(); } catch (e) {}
     });
 }
 

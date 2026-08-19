@@ -1488,7 +1488,42 @@ false pass; send no Authorization header at all for that case.
 same as it already did for round 6's scanner guard, which is still unpublished. No app-code change came
 with this one, so no `CACHE_VERSION` bump for it.
 
+### Round 3's open product decision — resolved: keep the wipe, stop it being silent
+Round 3 flagged, and deliberately did not decide, that an involuntary logout silently destroys a
+freshly-generated, not-yet-copied signing keypair. The user asked for a recommendation and then approved
+it on the condition that it not weaken security. **The wipe itself is unchanged and still
+unconditional** — `closeModal('keypairModal')` blanks `newPrivateKeyOutput` on every path, including the
+bulk modal-close inside `showLoginModalWithPrefill()`, so no auth-null transition can leave a private
+signing key in the DOM. Nothing was added that can cancel that.
+
+What changed is only that the loss is now visible and, on deliberate paths, preventable:
+- `keypairPrivateCopied` is set by `copyTextarea('newPrivateKeyOutput')` (both the clipboard-API and the
+  `execCommand` fallback path, so a fallback copy counts too) and reset by `generateNewKeypair()` and by
+  `showLoginModalWithPrefill()`. `hasUncopiedKeypair()` additionally requires the modal to be `active`
+  and the textarea to be non-empty, so it can never fire on a fresh page load.
+- The modal's "បិទ" button now calls a new `dismissKeypairModal()` that confirms first when the key is
+  uncopied. This is the *only* deliberate dismiss path — ZoeKeyGen has no backdrop-click or Escape
+  handling at all, unlike the 3 business apps (the round 2 note about a backdrop handler here does not
+  match the current code). The confirm is deliberately **not** inside `closeModal()`: a blocking prompt on
+  the forced-logout path would be wrong, and letting it be cancelled would weaken the wipe.
+- `logoutApp()` confirms before signing out when a key is uncopied. Aborting a user-initiated logout is
+  the user's own choice, so this changes no security boundary.
+- Any involuntary path (role-check failure/timeout, auth session lost) still wipes with no prompt, but
+  now raises a distinct `alert()` naming what was lost and why, fired after the login modal is shown. The
+  pre-existing "បានសម្អាត Signing Key ចេញពីសតិ" toast is about the *loaded* key, which is why the loss
+  used to read as unexplained.
+- `kickUserOut()` (the devtools guard) is untouched and uncoverable by design — it replaces the document
+  with `about:blank`, which destroys the key correctly and leaves nowhere to show a message.
+
+Worth knowing if this comes up again: losing the key is costly but not unrecoverable. The generated pair
+is not deployed yet, so regenerating costs nothing — unless the **public** half was already pasted into
+all 4 apps' `license-verify.js` and shipped, in which case the re-deploy has to be redone. Previously
+issued keys keep verifying either way, since `PUBLIC_KEYS_JWK` is an array.
+
+`CACHE_VERSION` bumped to zoekeygen-v16.
+
 ### Not yet done as of this handoff
-Nothing is mid-edit. Both commits are `node --check`-clean on every modified `.js`, JSON-validated on the
-rules file, comment-free-verified on every changed line, and the rules change is emulator-verified. The
-only outstanding work is the two manual Console publishes listed in START HERE.
+Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the
+rules file, comment-free-verified on every changed line, tag-balance- and wiring-checked on the one
+modified `.html`, and the rules change is emulator-verified. The only outstanding work is the two manual
+Console publishes listed in START HERE.

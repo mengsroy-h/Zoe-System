@@ -61,34 +61,6 @@
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
-        let swReloadedOnce = false;
-        let keyLoadedWarningShown = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (swReloadedOnce) return;
-            const reloadWhenIdle = () => {
-                if (swReloadedOnce) return;
-                const modalOpen = !!document.querySelector('.modal.active');
-                
-                
-                
-                
-                
-                
-                
-                if (modalOpen || (typeof signingPrivateKeyJwk !== 'undefined' && signingPrivateKeyJwk)) {
-                    if (!modalOpen && !keyLoadedWarningShown && typeof showToast === 'function') {
-                        keyLoadedWarningShown = true;
-                        showToast('🔄 មានកំណែថ្មី — នឹង Refresh ដោយស្វ័យប្រវត្តិពេល Signing Key ត្រូវបានសម្អាត ឬអាច Refresh ដោយខ្លួនឯងឥឡូវនេះ');
-                    }
-                    setTimeout(reloadWhenIdle, 3000);
-                    return;
-                }
-                swReloadedOnce = true;
-                sessionStorage.setItem('zoekeygen_just_updated', '1');
-                window.location.reload();
-            };
-            reloadWhenIdle();
-        });
     }
 })();
 
@@ -985,10 +957,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSigningKeyBadge();
     setupIOSPullToRefresh();
 
-    if (sessionStorage.getItem('zoekeygen_just_updated')) {
-        sessionStorage.removeItem('zoekeygen_just_updated');
-        showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
-    }
 
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');

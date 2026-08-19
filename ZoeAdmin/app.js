@@ -27,21 +27,6 @@
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
-        let swReloadedOnce = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (swReloadedOnce) return;
-            swReloadedOnce = true;
-            const pendingSince = Date.now();
-            const reloadWhenIdle = () => {
-                if (isModalOpen && (Date.now() - pendingSince) < 10 * 60 * 1000) {
-                    setTimeout(reloadWhenIdle, 3000);
-                } else {
-                    sessionStorage.setItem('zoeadmin_just_updated', '1');
-                    window.location.reload();
-                }
-            };
-            reloadWhenIdle();
-        });
     }
 
     let firebaseConfig = null;
@@ -1539,10 +1524,6 @@
         initFirebase();
         prefetchCustomerDataTableRowsIfConfigured();
 
-        if (sessionStorage.getItem('zoeadmin_just_updated')) {
-            sessionStorage.removeItem('zoeadmin_just_updated');
-            showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
-        }
 
         setInterval(() => {
             prefetchCustomerDataTableRowsIfConfigured();

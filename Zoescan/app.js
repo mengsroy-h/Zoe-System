@@ -145,7 +145,6 @@ function addPreconnect(origin) {
 }
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
-const APP_UPDATED_TOAST_FLAG = 'zoe_app_updated_notice';
 
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
@@ -1056,7 +1055,6 @@ function confirmLocationChange() {
 }
 
 let assignGeneration = 0;
-let scanWriteInFlight = false;
 async function assignLockerToEntry(code) {
     const entry = barcodeIndex[code];
     if (!entry) {
@@ -1074,7 +1072,6 @@ async function assignLockerToEntry(code) {
     let singleBarcodeItem = false;
     const myAssignGeneration = ++assignGeneration;
 
-    scanWriteInFlight = true;
     try {
         const lookupRef = window.firebaseSDK.ref(db, `zoew_scanner_lookup/${itemId}`);
         const result = await withTimeout(window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
@@ -1152,8 +1149,6 @@ async function assignLockerToEntry(code) {
         console.error(err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
-    } finally {
-        scanWriteInFlight = false;
     }
 }
 
@@ -1392,24 +1387,5 @@ window.addEventListener('load', () => {
             window.addEventListener('focus', () => reg.update().catch(() => {}));
             setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
         }).catch(() => {});
-        let swReloadedOnce = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (swReloadedOnce) return;
-            swReloadedOnce = true;
-            const pendingSince = Date.now();
-            const reloadWhenIdle = () => {
-                if ((isAnyModalOpen() || scanWriteInFlight) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
-                    setTimeout(reloadWhenIdle, 3000);
-                } else {
-                    sessionStorage.setItem(APP_UPDATED_TOAST_FLAG, '1');
-                    window.location.reload();
-                }
-            };
-            reloadWhenIdle();
-        });
     }
 });
-if (sessionStorage.getItem(APP_UPDATED_TOAST_FLAG)) {
-    sessionStorage.removeItem(APP_UPDATED_TOAST_FLAG);
-    showToast('កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅');
-}

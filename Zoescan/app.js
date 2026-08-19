@@ -62,7 +62,13 @@ function closeModal(id) {
         el.classList.remove('open');
         el.style.display = 'none';
     }
-    if (!document.querySelector('.modal.open')) document.body.style.overflow = '';
+    if (!document.querySelector('.modal.open')) {
+        document.body.style.overflow = '';
+        if (cameraStoppedByVisibility && currentTab === 'scan') {
+            cameraStoppedByVisibility = false;
+            requestCameraPermission();
+        }
+    }
     safeFocusScanner();
 }
 function dismissModal(modalEl) {
@@ -92,16 +98,18 @@ function playErrorFeedback() { if (navigator.vibrate) navigator.vibrate([100, 60
 function waitForFirebaseSDK() {
     return new Promise((resolve, reject) => {
         if (window.firebaseSDK) return resolve();
-        const timeout = setTimeout(() => reject(new Error('Firebase SDK timeout')), 15000);
+        const timeoutErr = new Error('Firebase SDK timeout');
+        const timeout = setTimeout(() => reject(timeoutErr), 15000);
         window.addEventListener('firebasesdkready', () => { clearTimeout(timeout); resolve(); }, { once: true });
     });
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let timer;
     return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
+        promise.finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
     ]);
 }
 
@@ -736,6 +744,7 @@ async function requestCameraPermission() {
         if (err && err.name === 'NotAllowedError') msg = '🚫 សូមអនុញ្ញាតការប្រើប្រាស់កាមេរ៉ាក្នុង Browser Settings';
         else if (err && err.name === 'NotFoundError') msg = '🚫 រកមិនឃើញកាមេរ៉ាទេ';
         else if (err && err.name === 'NotReadableError') msg = '🚫 កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង';
+        else if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'requestCameraPermission' });
         showToast(msg);
     }
 }
@@ -984,10 +993,11 @@ function isEntryBarcodeClosed(entry) {
     return !!item.isClosed;
 }
 
-function findLockerOccupant(locker, excludeCode) {
+function findLockerOccupant(locker, excludeCode, excludeItemId) {
     for (const code in barcodeIndex) {
         if (code === excludeCode) continue;
         const entry = barcodeIndex[code];
+        if (excludeItemId && entry.itemId === excludeItemId) continue;
         if (isEntryBarcodeClosed(entry)) continue;
         if (getEntryCurrentLocker(entry) === locker) return { code, entry };
     }
@@ -1008,7 +1018,7 @@ function handleScannedCode(code) {
         return;
     }
     const currentLocker = getEntryCurrentLocker(entry);
-    const occupant = findLockerOccupant(activeLocker, code);
+    const occupant = findLockerOccupant(activeLocker, code, entry.itemId);
 
     if (currentLocker && currentLocker !== 'N/A' && currentLocker !== activeLocker) {
         playErrorFeedback();
@@ -1136,7 +1146,7 @@ async function assignLockerToEntry(code) {
             if (myAssignGeneration === assignGeneration) {
                 playSuccessFeedback();
             }
-            showToast(`⚠️ ទីតាំង${who} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "Sync Scanner Lookup"`);
+            showToast(`⚠️ ទីតាំង${who} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ"`);
             return;
         }
 
@@ -1147,7 +1157,7 @@ async function assignLockerToEntry(code) {
     } catch (err) {
         playErrorFeedback();
         console.error(err);
-        if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'assignLockerToEntry' });
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
     }
 }
@@ -1290,9 +1300,9 @@ function bindEventListeners() {
                 cameraRequestId++;
                 isCameraStarting = false;
             }
-        } else if (cameraStoppedByVisibility) {
+        } else if (cameraStoppedByVisibility && !isAnyModalOpen()) {
             cameraStoppedByVisibility = false;
-            if (currentTab === 'scan' && !isAnyModalOpen()) requestCameraPermission();
+            if (currentTab === 'scan') requestCameraPermission();
         }
     });
 }
@@ -1304,7 +1314,7 @@ if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
 initFirebase().catch(err => {
     document.getElementById('bootLoading').innerHTML = '⚠️ មិនអាចភ្ជាប់ Firebase SDK បានទេ សូម Refresh ទំព័រនេះម្តងទៀត';
     console.error(err);
-    if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
+    if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'initFirebase bootstrap' });
 });
 initNativeDetector();
 (function waitForZXingThenInitScanEngine(deadline) {
@@ -1377,6 +1387,28 @@ function setupIOSPullToRefresh() {
     }, { passive: true });
 }
 
+function showUpdateAvailableBanner() {
+    if (document.getElementById('zoeUpdateBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'zoeUpdateBanner';
+    banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+    const label = document.createElement('span');
+    label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
+    const refreshBtn = document.createElement('button');
+    refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
+    refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;';
+    refreshBtn.addEventListener('click', () => window.location.reload());
+    const dismissBtn = document.createElement('button');
+    dismissBtn.textContent = '✕';
+    dismissBtn.setAttribute('aria-label', 'បិទ');
+    dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;';
+    dismissBtn.addEventListener('click', () => banner.remove());
+    banner.appendChild(label);
+    banner.appendChild(refreshBtn);
+    banner.appendChild(dismissBtn);
+    document.body.appendChild(banner);
+}
+
 window.addEventListener('load', () => {
     setupIOSPullToRefresh();
     if ('serviceWorker' in navigator) {
@@ -1387,5 +1419,10 @@ window.addEventListener('load', () => {
             window.addEventListener('focus', () => reg.update().catch(() => {}));
             setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
         }).catch(() => {});
+
+        const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (hadControllerAtLoad) showUpdateAvailableBanner();
+        });
     }
 });

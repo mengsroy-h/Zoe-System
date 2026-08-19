@@ -1,11 +1,5 @@
 (function () {
-    
-    
-    
-    
-    
-    
-    
+
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
@@ -48,6 +42,28 @@
     }
     setInterval(checkDevTools, 1000);
 
+    function showUpdateAvailableBanner() {
+        if (document.getElementById('zoeUpdateBanner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'zoeUpdateBanner';
+        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        const label = document.createElement('span');
+        label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
+        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;';
+        refreshBtn.addEventListener('click', () => window.location.reload());
+        const dismissBtn = document.createElement('button');
+        dismissBtn.textContent = '✕';
+        dismissBtn.setAttribute('aria-label', 'បិទ');
+        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;';
+        dismissBtn.addEventListener('click', () => banner.remove());
+        banner.appendChild(label);
+        banner.appendChild(refreshBtn);
+        banner.appendChild(dismissBtn);
+        document.body.appendChild(banner);
+    }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -55,11 +71,14 @@
                     if (document.visibilityState === 'visible') reg.update().catch(() => {});
                 });
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
-                
-                
-                
+
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
+
+            const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (hadControllerAtLoad) showUpdateAvailableBanner();
+            });
         });
     }
 })();
@@ -129,19 +148,19 @@ function openModalHelper(id) {
 function closeModal(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
+    if (id === 'keypairModal') {
+        const out = document.getElementById('newPrivateKeyOutput');
+        if (out) out.value = '';
+    }
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-    
-    
-    
-    
-    
-    
+
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let timer;
     return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(timeoutErr), ms))
+        promise.finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
     ]);
 }
 
@@ -155,6 +174,7 @@ function retryAsync(fn, attempts, delayMs) {
 function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
+        const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
         let timer = null;
         const onReady = () => {
             clearTimeout(timer);
@@ -164,7 +184,7 @@ function waitForFirebaseSDK(timeoutMs = 15000) {
         timer = setTimeout(() => {
             window.removeEventListener('firebasesdkready', onReady);
             if (window.firebaseSDK) resolve(window.firebaseSDK);
-            else reject(new Error('Firebase SDK failed to load (network/CDN issue)'));
+            else reject(notReadyErr);
         }, timeoutMs);
     });
 }
@@ -260,11 +280,6 @@ function requestPinBeforeConfig(targetAction, message) {
     }
 }
 
-
-
-
-
-
 let signingKeySessionKey = null;
 
 async function deriveSigningKeySessionKey(pin) {
@@ -312,8 +327,7 @@ async function tryRestoreSigningKeyFromSession() {
         if (cb) cb.checked = true;
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
-        
-        
+
         sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
@@ -437,11 +451,7 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     document.getElementById('appContainer').style.display = 'none';
-    
-    
-    
-    
-    
+
     clearSigningKey();
     openModalHelper('loginModal');
     const savedEmail = localStorage.getItem('remembered_email');
@@ -509,14 +519,6 @@ async function verifyAdminRoleThenProceed(user) {
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
-
-
-
-
-
-
-
-
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
         showLoginModalWithPrefill();
@@ -543,12 +545,7 @@ async function attemptAuthStorageRecovery() {
 function setupAuthListener() {
     if (!auth) return;
     if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
-    
-    
-    
-    
-    
-    
+
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);
@@ -694,16 +691,38 @@ async function generateLicenseKey() {
         });
 
         const targetPaths = appSelect === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [appSelect];
-        const record = {
-            issuedAt: getServerNow(),
+        const publicRecord = {
             expiresAt: getServerNow() + Math.round(days * 86400000),
-            revoked: false,
+            revoked: false
+        };
+        const metaRecord = {
+            issuedAt: getServerNow(),
             scope: appSelect,
             note: note || '',
             createdBy: auth.currentUser.email || auth.currentUser.uid
         };
 
-        const results = await withTimeout(Promise.allSettled(targetPaths.map((p) => retryAsync(() => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), record), 3, 1000))), 25000, 'Generate key timed out');
+        let generateAlreadyTimedOut = false;
+        const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(() => fb.update(fb.ref(db), {
+            [`license_keys/${p}/${payload.id}`]: publicRecord,
+            [`license_keys_meta/${p}/${payload.id}`]: metaRecord
+        }), 3, 1000)));
+        writePromise.then((bgResults) => {
+            if (!generateAlreadyTimedOut) return;
+            const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
+            if (bgSucceededPaths.length > 0) {
+                showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
+                refreshKeyList();
+            }
+        });
+
+        let results;
+        try {
+            results = await withTimeout(writePromise, 25000, 'Generate key timed out');
+        } catch (timeoutErr) {
+            if (timeoutErr && timeoutErr.message === 'Generate key timed out') generateAlreadyTimedOut = true;
+            throw timeoutErr;
+        }
         const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
         const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
 
@@ -713,8 +732,7 @@ async function generateLicenseKey() {
 
         let appPathsTagFailed = false;
         if (failedPaths.length > 0) {
-            const correctedRecord = Object.assign({}, record, { appPaths: succeededPaths });
-            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.set(fb.ref(db, `license_keys/${p}/${payload.id}`), correctedRecord), 3, 1000)));
+            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.update(fb.ref(db, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths }), 3, 1000)));
             appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
             if (appPathsTagFailed) {
                 const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
@@ -766,27 +784,38 @@ async function refreshKeyList() {
     if (!tbody || !db) return;
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     try {
-        const snap = await withTimeout(fb.get(fb.ref(db, 'license_keys')), 15000, 'Refresh timed out');
-        const data = snap.exists() ? snap.val() : {};
-        const seen = {};
-        const rows = [];
+        const [publicSnap, metaSnap] = await withTimeout(Promise.all([
+            fb.get(fb.ref(db, 'license_keys')),
+            fb.get(fb.ref(db, 'license_keys_meta'))
+        ]), 15000, 'Refresh timed out');
+        const publicData = publicSnap.exists() ? publicSnap.val() : {};
+        const metaData = metaSnap.exists() ? metaSnap.val() : {};
+
+        const byId = {};
         ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {
-            const bucket = data[appCode] || {};
+            const bucket = publicData[appCode] || {};
             Object.keys(bucket).forEach((id) => {
-                if (seen[id]) return;
-                seen[id] = true;
-                const rec = bucket[id] || {};
-                const scope = rec.scope || appCode;
-                const paths = Array.isArray(rec.appPaths) ? rec.appPaths : (scope === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [scope]);
-                rows.push(Object.assign({ id: id, scope: scope, paths: paths }, rec));
+                if (!byId[id]) byId[id] = { id: id, existsIn: [], record: {} };
+                byId[id].existsIn.push(appCode);
+                Object.assign(byId[id].record, bucket[id]);
             });
         });
+
+        const rows = Object.keys(byId).map((id) => {
+            const entry = byId[id];
+            const metaAppCode = entry.existsIn.find((appCode) => metaData[appCode] && metaData[appCode][id]) || entry.existsIn[0];
+            const meta = (metaData[metaAppCode] && metaData[metaAppCode][id]) || {};
+            const paths = entry.existsIn.slice().sort();
+            const scope = meta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
+            return Object.assign({ id: id, scope: scope, paths: paths }, entry.record, meta);
+        });
+
         rows.sort((a, b) => (b.issuedAt || 0) - (a.issuedAt || 0));
         keyListCache = rows;
         renderKeyList();
     } catch (e) {
         console.error(e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: '' });
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'refreshKeyList' });
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';
     }
 }
@@ -807,7 +836,7 @@ function renderKeyList() {
 
         const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
 
-        const isPartialAll = row.scope === 'ALL' && Array.isArray(row.appPaths) && row.appPaths.length > 0 && row.appPaths.length < 3;
+        const isPartialAll = row.scope === 'ALL' && Array.isArray(row.paths) && row.paths.length > 0 && row.paths.length < 3;
         const scopeLabel = escapeHtml(APP_LABELS[row.scope] || row.scope);
         const scopeHtml = isPartialAll
             ? `<span class="badge badge-scope" title="${escapeHtml('សកម្មតែលើ: ' + row.paths.map((p) => APP_LABELS[p] || p).join(', '))}">${scopeLabel} ⚠️</span>`
@@ -827,6 +856,50 @@ function renderKeyList() {
             </td>
         </tr>`;
     }).join('');
+}
+
+async function migrateLegacyLicenseKeyMetadata() {
+    if (!db || !auth || !auth.currentUser) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
+    if (!confirm('ដំណើរការនេះនឹងផ្លាស់ទី Note/Email/Scope/appPaths ចេញពី Key សាធារណៈ (license_keys) ទៅកន្លែងឯកជន (license_keys_meta)។\n\n⚠️ ត្រូវ Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) មិនដូច្នេះទេ ដំណើរការនេះនឹងបរាជ័យ។\n\nបន្តទេ?')) return;
+
+    try {
+        const snap = await withTimeout(fb.get(fb.ref(db, 'license_keys')), 15000, 'Migration read timed out');
+        const data = snap.exists() ? snap.val() : {};
+        const updates = {};
+        let migratedCount = 0;
+        const META_FIELDS = ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'];
+
+        ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {
+            const bucket = data[appCode] || {};
+            Object.keys(bucket).forEach((id) => {
+                const rec = bucket[id] || {};
+                const hasLegacyFields = META_FIELDS.some((f) => rec[f] !== undefined);
+                if (!hasLegacyFields) return;
+                const meta = {};
+                META_FIELDS.forEach((f) => {
+                    if (rec[f] !== undefined) {
+                        meta[f] = rec[f];
+                        updates[`license_keys/${appCode}/${id}/${f}`] = null;
+                    }
+                });
+                updates[`license_keys_meta/${appCode}/${id}`] = meta;
+                migratedCount++;
+            });
+        });
+
+        if (migratedCount === 0) {
+            showToast('គ្មាន Key ចាស់ត្រូវការ Migrate ទេ — ស្អាតរួចហើយ!');
+            return;
+        }
+
+        await withTimeout(retryAsync(() => fb.update(fb.ref(db), updates), 3, 1500), 30000, 'Migration write timed out');
+        showToast(`✅ បាន Migrate Key ចំនួន ${migratedCount} ដោយជោគជ័យ!`);
+        refreshKeyList();
+    } catch (e) {
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'migrateLegacyLicenseKeyMetadata' });
+        alert('Migrate មិនជោគជ័យទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួចហើយ រួចសាកល្បងម្តងទៀត។');
+    }
 }
 
 async function toggleRevokeKey(id) {
@@ -957,7 +1030,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSigningKeyBadge();
     setupIOSPullToRefresh();
 
-
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }
@@ -965,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('mousedown', (e) => {
             if (e.target === modal && modal.dataset.nodismiss !== 'true') {
-                modal.classList.remove('active');
+                closeModal(modal.id);
             }
         });
     });

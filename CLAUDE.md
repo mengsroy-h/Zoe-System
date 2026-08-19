@@ -16,14 +16,22 @@ Always check whether a bug/fix applies to just one app or needs mirroring across
 
 ## Project status (verify before assuming this is still current)
 
-As of 2026-08-18 this project is **not yet deployed for real users** — no live production
-data, no real customers. That's the basis for treating some revenue/data-integrity bugs
-found during audits as safe to fix directly rather than only proposing them for human
-review (see point 5 under "When triaging a Sentry report" below). Before leaning on that
-looser default, confirm it's still true — ask the user or look for signs of having gone
-live (custom domain traffic, user-facing announcements, revenue figures that look like real
-transaction volume rather than test data). This never extended to the core Delete-vs-Remove
-business logic itself — that's deliberate policy, not a bug, regardless of launch status.
+**UPDATE 2026-08-19: this project is now LIVE — real customers are actively using it.** The
+user confirmed this explicitly while reviewing PR #5 (`claude/deep-audit-final-8lur4w`) and
+asked to merge that PR themselves rather than have it merged automatically, specifically
+because of the risk of disrupting live customer usage. **The pre-launch "safe to auto-fix
+non-trivial revenue/data-integrity bugs directly" exception described below no longer
+applies as of this update** — treat this system as carrying real money and real customer
+data from now on. Revenue/data-integrity fixes should go back to being proposed for human
+review rather than auto-applied (see point 5 under "When triaging a Sentry report" below,
+without the pre-launch exception). Do not merge PRs into `main` unless explicitly asked to —
+the user wants to control exactly when changes reach production.
+
+(Historical note, no longer operative: as of 2026-08-18 this project was believed not yet
+deployed for real users, which was the basis for a looser default of fixing some
+revenue/data-integrity bugs directly rather than only proposing them. That exception is
+superseded by the update above. This never extended to the core Delete-vs-Remove business
+logic itself in any case — that's deliberate policy, not a bug, regardless of launch status.)
 
 ## Core business rule: "លុប" (Delete) vs "ដក" (Remove) — READ BEFORE TOUCHING REVENUE CODE
 

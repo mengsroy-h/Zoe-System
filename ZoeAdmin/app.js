@@ -2961,9 +2961,12 @@
         openModalHelper('phoneModal');
         attemptAutoLookup(cleanBarcode);
 
-        setTimeout(() => {
-            if(modalPhoneInput) modalPhoneInput.focus();
-        }, 150);
+        const lookupCfg = getLookupApiConfig();
+        if (!lookupCfg || !lookupCfg.enabled) {
+            setTimeout(() => {
+                if(modalPhoneInput) modalPhoneInput.focus();
+            }, 150);
+        }
     }
 
     async function confirmPhone(isSkip = false) {

@@ -23,6 +23,9 @@
           "scope":     { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },
           "createdBy": { ".validate": "newData.isString()" },
+          "appPaths": {
+            "$idx": { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN')" }
+          },
           "$other": { ".validate": false }
         }
       }

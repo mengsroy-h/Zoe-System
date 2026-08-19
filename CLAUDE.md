@@ -16,14 +16,22 @@ Always check whether a bug/fix applies to just one app or needs mirroring across
 
 ## Project status (verify before assuming this is still current)
 
-As of 2026-08-18 this project is **not yet deployed for real users** — no live production
-data, no real customers. That's the basis for treating some revenue/data-integrity bugs
-found during audits as safe to fix directly rather than only proposing them for human
-review (see point 5 under "When triaging a Sentry report" below). Before leaning on that
-looser default, confirm it's still true — ask the user or look for signs of having gone
-live (custom domain traffic, user-facing announcements, revenue figures that look like real
-transaction volume rather than test data). This never extended to the core Delete-vs-Remove
-business logic itself — that's deliberate policy, not a bug, regardless of launch status.
+**UPDATE 2026-08-19: this project is now LIVE — real customers are actively using it.** The
+user confirmed this explicitly while reviewing PR #5 (`claude/deep-audit-final-8lur4w`) and
+asked to merge that PR themselves rather than have it merged automatically, specifically
+because of the risk of disrupting live customer usage. **The pre-launch "safe to auto-fix
+non-trivial revenue/data-integrity bugs directly" exception described below no longer
+applies as of this update** — treat this system as carrying real money and real customer
+data from now on. Revenue/data-integrity fixes should go back to being proposed for human
+review rather than auto-applied (see point 5 under "When triaging a Sentry report" below,
+without the pre-launch exception). Do not merge PRs into `main` unless explicitly asked to —
+the user wants to control exactly when changes reach production.
+
+(Historical note, no longer operative: as of 2026-08-18 this project was believed not yet
+deployed for real users, which was the basis for a looser default of fixing some
+revenue/data-integrity bugs directly rather than only proposing them. That exception is
+superseded by the update above. This never extended to the core Delete-vs-Remove business
+logic itself in any case — that's deliberate policy, not a bug, regardless of launch status.)
 
 ## Core business rule: "លុប" (Delete) vs "ដក" (Remove) — READ BEFORE TOUCHING REVENUE CODE
 
@@ -284,3 +292,120 @@ path, add its rule in the same change and flag to the user that it needs manual 
 5. This system tracks real money (COD/DOD revenue) — prefer a suggested fix for human
    review over auto-applying anything non-trivial (see "Project status" above for the
    current pre-launch exception to this default, and re-verify it still applies).
+
+## Final deep-audit pass (2026-08-19, branch `claude/deep-audit-final-8lur4w`) — handoff notes
+
+Requested as a last audit round before full deployment. Ran 5 parallel research agents (one per
+app plus one cross-cutting infra/rules pass), each instructed to check the known bug classes
+above and hunt for new ones, then triaged and fixed the findings directly (pre-launch exception
+applies; nothing here touches the Delete-vs-Remove policy itself). **If resuming in a new
+session: everything below is already committed on this branch — check `git log` on it before
+redoing anything.**
+
+### Fixed
+- **ZoeAdmin `clearHistory()` ("Delete All") had zero snapshot/revert** — could permanently wipe
+  the whole dataset with no trash backup if the trash-save write failed after the history-clear
+  write succeeded (highest blast-radius finding of the audit). Now snapshots both arrays and does
+  one atomic multi-path `fb.update(fb.ref(db), {...})`, reverting on failure. Same atomic-write
+  pattern also applied to `removeSingleBarcode` and `deleteSingleItem` (previously two independent
+  `Promise.all`-raced writes that could partially fail while the UI claimed a full revert).
+  `removeSingleBarcode` also now re-fetches the item/barcode index fresh after the blocking
+  `confirm()` dialog (mirrors `toggleCloseStatus`'s existing pattern). Dead helper functions
+  (`deleteSingleHistoryItemFromFirebase`, `saveMultipleDeletedItemsToFirebase`) removed since the
+  refactor made them unused.
+- **Zoescan `assignLockerToEntry()` read the live global `activeLocker` instead of a value
+  snapshotted at call time** — across two `await`s (up to 12s each), a worker switching lockers
+  mid-write could get the wrong locker recorded, and the primary write vs. the
+  `zoew_scan_history_cod_dod` mirror write could each land a *different* locker value for the same
+  barcode. Fixed by capturing `const targetLocker = activeLocker` once up front. Mirror-update
+  failure now also retries via a newly-added `retryAsync` (matching the pattern used elsewhere in
+  the codebase) instead of failing after one attempt.
+- **Zoescan locker occupancy warning added** (per explicit user request during this session) —
+  scanning a barcode into a locker that already holds a different *open* barcode now warns
+  symmetrically to the existing "barcode already has a different locker" warning, via the same
+  `locationWarningModal`/`pendingLocationCode` confirm flow. Closed/picked-up occupants don't
+  trigger it (`isEntryBarcodeClosed` check) since they no longer physically occupy the locker.
+- **ZoeKeyGen `firebase-database.rules.json`** (its own, separate-project rules file) was missing
+  an `appPaths` field in the `$keyId` schema; `$other: false` meant the corrective partial-failure
+  tagging write in `generateLicenseKey()` — and the ⚠️ partial-coverage badge in `renderKeyList()`
+  that depends on it — was **permanently, deterministically rejected**, not just occasionally
+  failing. Added an `appPaths` validation block. **Needs manual publish in Firebase Console** (this
+  repo's rules JSON is never auto-deployed — see the "Firebase rules gotcha" note above).
+- **ZoeKeyGen stored-XSS → signing-key exfiltration path**: `renderKeyList()` built
+  `onclick="toggleRevokeKey('${escapeHtml(row.id)}')"` — HTML-entity escaping does not make a
+  string safe inside an `on*=` attribute (the browser HTML-decodes before parsing it as JS), so a
+  compromised admin-role account (without the separately-held signing private key) could plant a
+  crafted Firebase key-id and run JS in another admin's session, reading `signingPrivateKeyJwk`
+  out of memory/sessionStorage. Fixed by switching to `data-key-id`/`data-action` attributes plus a
+  single delegated `addEventListener('click', ...)` on `#keyListBody`.
+- **`license-verify.js` `getStatus()`** computed `now` *before* `checkOnline()` refreshed the
+  server-time offset, so the very first status check after a fresh page load could misjudge
+  expiry/offline-grace using the raw (uncorrected) device clock. Moved the `getServerNow()` call to
+  after `checkOnline()` resolves. Propagated identically to all 4 apps' copies (`cp` + `md5sum`
+  confirmed — all four still hash to `04d2db7b8977a12c3ddd76542ddba684`).
+- **ZoeKeyGen `loadSigningKey()`** accepted any structurally-valid EC P-256 private key without
+  checking it actually pairs with the public key baked into `license-verify.js` — a stale/wrong
+  key would show "Loaded ✓" and every key issued with it would silently fail verification
+  everywhere. Now calls `window.ZoeLicense.verifyKeyString()` on the smoke-test-signed key and
+  rejects the load if it doesn't verify.
+- **ZoeAdmin `netlify.toml` CSP `connect-src`** used a bare `https:` scheme-wildcard (any HTTPS
+  host reachable) instead of an explicit allowlist like the other 3 apps. Narrowed to the same
+  Firebase/Sentry hosts plus `script.google.com`/`*.googleusercontent.com` (needed for the
+  Google Sheets/Apps Script lookup feature).
+- **Root `firebase-database.rules.json` worker-role hardening (safe subset only — see below)**:
+  `zoew_scan_history_cod_dod/$itemId/barcodes/$idx/{cod,dod}` and
+  `zoew_recently_deleted_cod_dod/$itemId/{cod,dod}` (top-level and nested `barcodes/$idx/{cod,dod}`)
+  were writable by `worker` at any time with zero protection — a worker could inflate/deflate a
+  barcode's cod/dod value before triggering a remove/restore to fabricate revenue deltas. Tightened
+  to the same "`admin` OR not-yet-existing OR unchanged" pattern already used elsewhere in this
+  same rules file for other admin-locked fields (not a new pattern — just extended to two fields
+  that had been missed). Verified safe by tracing every legitimate ZoeW write path for these exact
+  fields (none exist — ZoeW only ever *sums* per-barcode cod/dod into aggregates, never writes a
+  fresh value into an existing barcode's own cod/dod). **Also needs manual publish in Firebase
+  Console.**
+- Small: ZoeAdmin/ZoeKeyGen README staleness (missing Excel/CSV export + Customer Data Table
+  view; misleading "LICENSE_DB_URL is a placeholder" wording when it's actually already filled
+  in — see open question below); unhandled-rejection `.catch(() => {})` added to
+  `runAutomaticDeletedCleanup`'s purge call.
+
+### Explicitly NOT fixed (deliberate scope decisions, made together with the user this session)
+- **Worker role can still write arbitrary absolute values directly to
+  `zoew_daily_revenue_cod_dod` / `zoew_monthly_revenue_cod_dod` / `zoew_daily_pickup_cod_dod`**,
+  and can still create brand-new `zoew_scan_history_cod_dod`/`zoew_recently_deleted_cod_dod`
+  entries. Investigated a full lockdown ("workers can only update, never create") but it would
+  break ZoeW's real, reachable "restore from trash" feature (`executeRestoreItem`'s create-new-entry
+  branch is the *common* restore case, not an edge case). Deeper still: revenue/pickup nodes are
+  updated via client-computed read-modify-write transactions, so no declarative rule can verify a
+  delta's *history* is honest — that fundamentally requires a trusted server (Cloud Functions),
+  which this project doesn't have (static Netlify + client-direct Firebase RTDB, no backend). User
+  chose "safe subset only" — see fixed items above for what that covered. Revisit if/when a backend
+  trust boundary is ever added.
+- Firebase RTDB emulator testing was attempted (to verify rules changes empirically rather than by
+  hand) but blocked: `firebase-tools` needs `firebase-public.firebaseio.com`, which this session's
+  network egress policy rejected with 403. Per that policy's own instructions, did not attempt to
+  route around it. **The rules changes above were reasoned through manually and cross-checked
+  against every actual write call site in the app code, but were never run against a live
+  Firebase project or the Rules Playground — verify there before/after publishing.**
+- Minor/low-priority findings noted but not applied (pick up later if useful): ZoeW has a dead
+  `saveSingleHistoryItemToFirebase` function (harmless, unused); ZoeKeyGen's `toggleRevokeKey`/
+  `confirmExtendKey` trust the client-side path cache without an existence check before writing;
+  ZoeKeyGen's signing-key PIN minimum is only 6 characters; Zoescan's "barcode not found" toast can
+  theoretically fire in the first instant before the Firebase listener's initial payload arrives.
+
+### Open question for the user
+`ZoeKeyGen/license-verify.js`'s `LICENSE_DB_URL` constant (byte-identical across all 4 apps) is
+hardcoded to `https://zoew-z1-default-rtdb.firebaseio.com` — but ZoeKeyGen is supposed to use a
+**separate** Firebase project (`zoe-license` per the README's setup instructions), not ZoeW's
+business database. The hostname strongly resembles "ZoeW," which is suspicious, though if it were
+actually wrong, Online Revoke/Extend checks would already be visibly broken for everyone (not a
+silent failure) — which argues it's probably fine, just an oddly-named project. **Please confirm
+this is genuinely the dedicated `zoe-license` project's URL and not a mixed-up copy of ZoeW's
+business DB URL** — README updated to flag this for verification either way.
+
+### Not yet done as of this handoff
+- Nothing critical is mid-edit. All changes described above are complete, syntax-checked
+  (`node --check` on every modified `.js`, JSON-validated on both rules files), and either
+  committed or about to be committed in the same push as this note.
+- Two rules files changed this session (`firebase-database.rules.json` at repo root, and
+  `ZoeKeyGen/firebase-database.rules.json`) both need **manual publishing** in their respective
+  Firebase Consoles — this repo's rules JSON is never auto-deployed by Netlify.

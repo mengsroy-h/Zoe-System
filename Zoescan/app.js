@@ -105,6 +105,13 @@ function withTimeout(promise, ms, timeoutMsg) {
     ]);
 }
 
+function retryAsync(fn, attempts, delayMs) {
+    return fn().catch((err) => {
+        if (attempts <= 1) throw err;
+        return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
+    });
+}
+
 function debounce(fn, ms) {
     let timer = null;
     return function (...args) {
@@ -970,6 +977,24 @@ function getEntryCurrentLocker(entry) {
     return item.locker || null;
 }
 
+function isEntryBarcodeClosed(entry) {
+    const { barcodeIdx, item } = entry;
+    if (barcodeIdx !== null) {
+        return !!(item.barcodes[barcodeIdx] && item.barcodes[barcodeIdx].isClosed);
+    }
+    return !!item.isClosed;
+}
+
+function findLockerOccupant(locker, excludeCode) {
+    for (const code in barcodeIndex) {
+        if (code === excludeCode) continue;
+        const entry = barcodeIndex[code];
+        if (isEntryBarcodeClosed(entry)) continue;
+        if (getEntryCurrentLocker(entry) === locker) return { code, entry };
+    }
+    return null;
+}
+
 function handleScannedCode(code) {
     if (isAnyModalOpen()) return;
     if (!activeLocker) {
@@ -984,16 +1009,37 @@ function handleScannedCode(code) {
         return;
     }
     const currentLocker = getEntryCurrentLocker(entry);
+    const occupant = findLockerOccupant(activeLocker, code);
+
     if (currentLocker && currentLocker !== 'N/A' && currentLocker !== activeLocker) {
         playErrorFeedback();
         pendingLocationCode = code;
         const phoneRaw = entry.item.phone ? sanitizePhoneNumber(entry.item.phone) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
-        document.getElementById('locationWarningText').innerText =
-            `Barcode "${code}"${who} កំពុងស្ថិតនៅទីតាំង ${currentLocker} ។ តើអ្នកចង់ប្តូរទីតាំងទៅ ${activeLocker} ដែរឬទេ?`;
+        let msg = `Barcode "${code}"${who} កំពុងស្ថិតនៅទីតាំង ${currentLocker} ។ តើអ្នកចង់ប្តូរទីតាំងទៅ ${activeLocker} ដែរឬទេ?`;
+        if (occupant) {
+            const occPhoneRaw = occupant.entry.item.phone ? sanitizePhoneNumber(occupant.entry.item.phone) : '';
+            const occWho = occPhoneRaw ? ` (${occPhoneRaw})` : '';
+            msg += ` (ចំណាំ៖ ទីតាំង ${activeLocker} មាន Barcode "${occupant.code}"${occWho} ស្ថិតនៅរួចហើយ)`;
+        }
+        document.getElementById('locationWarningTitle').innerText = '⚠️ Barcode នេះមានទីតាំងស្រាប់';
+        document.getElementById('locationWarningText').innerText = msg;
         openModal('locationWarningModal');
         return;
     }
+
+    if (occupant) {
+        playErrorFeedback();
+        pendingLocationCode = code;
+        const occPhoneRaw = occupant.entry.item.phone ? sanitizePhoneNumber(occupant.entry.item.phone) : '';
+        const occWho = occPhoneRaw ? ` (${occPhoneRaw})` : '';
+        document.getElementById('locationWarningTitle').innerText = '⚠️ ទីតាំងនេះមានកញ្ចប់ស្រាប់';
+        document.getElementById('locationWarningText').innerText =
+            `ទីតាំង ${activeLocker} មាន Barcode "${occupant.code}"${occWho} ស្ថិតនៅរួចហើយ។ តើអ្នកចង់ដាក់ Barcode "${code}" នៅទីតាំងដដែលនេះទេ?`;
+        openModal('locationWarningModal');
+        return;
+    }
+
     assignLockerToEntry(code);
 }
 
@@ -1019,6 +1065,7 @@ async function assignLockerToEntry(code) {
     }
     const { itemId } = entry;
     const ts = getServerNow();
+    const targetLocker = activeLocker;
     const previousLocker = getEntryCurrentLocker(entry);
     let phoneForToast = entry.item.phone || '';
     let matched = false;
@@ -1036,16 +1083,16 @@ async function assignLockerToEntry(code) {
             if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                 const idx = currentItem.barcodes.findIndex(bc => bc && bc.code === code);
                 if (idx === -1) return currentItem;
-                currentItem.barcodes[idx].locker = activeLocker;
+                currentItem.barcodes[idx].locker = targetLocker;
                 currentItem.barcodes[idx].lockerUpdatedAt = ts;
                 matchedBarcodeIdx = idx;
                 if (currentItem.barcodes.length === 1) {
-                    currentItem.locker = activeLocker;
+                    currentItem.locker = targetLocker;
                     currentItem.lockerUpdatedAt = ts;
                     singleBarcodeItem = true;
                 }
             } else if (currentItem.barcode === code) {
-                currentItem.locker = activeLocker;
+                currentItem.locker = targetLocker;
                 currentItem.lockerUpdatedAt = ts;
             } else {
                 return currentItem;
@@ -1064,26 +1111,26 @@ async function assignLockerToEntry(code) {
 
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = activeLocker;
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
             if (singleBarcodeItem) {
-                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = activeLocker;
+                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
                 mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
             }
         } else {
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = activeLocker;
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
         }
         mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail || null;
 
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
-        const successMsg = (previousLocker && previousLocker !== activeLocker && previousLocker !== 'N/A')
-            ? `✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${activeLocker}`
-            : `✅ បានកំណត់ទីតាំង ${activeLocker}${who}`;
+        const successMsg = (previousLocker && previousLocker !== targetLocker && previousLocker !== 'N/A')
+            ? `✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${targetLocker}`
+            : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;
 
         try {
-            await withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out');
+            await retryAsync(() => withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out'), 3, 1500);
         } catch (mirrorErr) {
             console.error('Mirror update to scan history failed: ', mirrorErr);
             if (window.ZoeErrors) ZoeErrors.capture(mirrorErr, { context: 'assignLockerToEntry mirror update failed' });

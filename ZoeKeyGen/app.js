@@ -634,7 +634,9 @@ async function loadSigningKey() {
     try {
         const jwk = JSON.parse(raw);
         if (!jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
-        await window.ZoeLicense.signNewKey(jwk, { appCode: 'ADM', days: 1, note: '' });
+        const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: 'ADM', days: 1, note: '' });
+        const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, 'ADM');
+        if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
         signingPrivateKeyJwk = jwk;
         input.value = '';
         updateSigningKeyBadge();
@@ -847,8 +849,8 @@ function renderKeyList() {
             <td>${statusHtml}</td>
             <td>
                 <div class="btn-row">
-                    <button class="btn-mini" onclick="toggleRevokeKey('${escapeHtml(row.id)}')">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
-                    <button class="btn-mini" onclick="openExtendModal('${escapeHtml(row.id)}')">⏳ បន្ថែម</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
                 </div>
             </td>
         </tr>`;
@@ -999,4 +1001,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    const keyListBody = document.getElementById('keyListBody');
+    if (keyListBody) {
+        keyListBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-key-id]');
+            if (!btn) return;
+            const id = btn.dataset.keyId;
+            if (btn.dataset.action === 'revoke') toggleRevokeKey(id);
+            else if (btn.dataset.action === 'extend') openExtendModal(id);
+        });
+    }
 });

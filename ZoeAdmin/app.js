@@ -1438,7 +1438,7 @@
         });
 
         if (purgedIds.length > 0) {
-            deleteMultipleDeletedItemsFromFirebase(purgedIds);
+            deleteMultipleDeletedItemsFromFirebase(purgedIds).catch(() => {});
             releaseBarcodesInRegistry(purgedBarcodes);
         }
     }
@@ -3194,17 +3194,22 @@
 
         if (!confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return;
 
+        const freshItem = scanHistory.find(i => i.id === itemId);
+        if (!freshItem || !freshItem.barcodes) return;
+        const freshBcIndex = freshItem.barcodes.findIndex(b => b.code === barcodeCode);
+        if (freshBcIndex === -1) return;
+
         const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
         const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
 
-        const removedBc = item.barcodes.splice(bcIndex, 1)[0];
+        const removedBc = freshItem.barcodes.splice(freshBcIndex, 1)[0];
 
         let deductionApplied = false;
         let deductedCod = 0;
         let deductedDod = 0;
-        const revenueScanDate = item.scanDate || getFormattedDate();
+        const revenueScanDate = freshItem.scanDate || getFormattedDate();
         if (!removedBc.isDeducted) {
             deductedCod = parseFloat(removedBc.cod) || 0;
             deductedDod = parseFloat(removedBc.dod) || 0;
@@ -3216,7 +3221,7 @@
 
         removedBc.isFromDeletion = false;
 
-        let itemToTrash = { ...item, barcodes: [removedBc], count: 1 };
+        let itemToTrash = { ...freshItem, barcodes: [removedBc], count: 1 };
         itemToTrash.id = generateUniqueId();
         itemToTrash.deletedAt = getServerNow();
         itemToTrash.isFromDeletion = false;
@@ -3225,49 +3230,55 @@
         itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
         itemToTrash.barcode = removedBc.code;
         itemToTrash.locker = removedBc.locker || "N/A";
-        itemToTrash.time = removedBc.time || item.time;
+        itemToTrash.time = removedBc.time || freshItem.time;
         itemToTrash.isClosed = removedBc.isClosed || false;
         if (itemToTrash.isClosed) {
-            itemToTrash.closedAt = item.closedAt || getServerNow();
+            itemToTrash.closedAt = freshItem.closedAt || getServerNow();
         } else {
             delete itemToTrash.closedAt;
         }
         deletedItems.unshift(itemToTrash);
 
-        let historyWritePromise;
         let wasFullyRemoved = false;
-        if (item.barcodes.length === 0) {
+        if (freshItem.barcodes.length === 0) {
             const itemIndex = scanHistory.findIndex(i => i.id === itemId);
             if (itemIndex !== -1) {
                 scanHistory.splice(itemIndex, 1);
             }
             closeModal('viewListModal');
             wasFullyRemoved = true;
-            historyWritePromise = deleteSingleHistoryItemFromFirebase(itemId);
         } else {
-            item.count = item.barcodes.length;
-            item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            item.price = Math.round((item.cod + item.dod) * 100) / 100;
-            item.barcode = item.barcodes[0].code;
-            item.isClosed = item.barcodes.length > 0 && item.barcodes.every(b => b.isClosed);
-            if (item.isClosed) {
-                if (!item.closedAt) item.closedAt = getServerNow();
+            freshItem.count = freshItem.barcodes.length;
+            freshItem.cod = Math.round(freshItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            freshItem.dod = Math.round(freshItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            freshItem.price = Math.round((freshItem.cod + freshItem.dod) * 100) / 100;
+            freshItem.barcode = freshItem.barcodes[0].code;
+            freshItem.isClosed = freshItem.barcodes.length > 0 && freshItem.barcodes.every(b => b.isClosed);
+            if (freshItem.isClosed) {
+                if (!freshItem.closedAt) freshItem.closedAt = getServerNow();
             } else {
-                delete item.closedAt;
+                delete freshItem.closedAt;
             }
             openViewListModal(itemId);
-            historyWritePromise = saveSingleHistoryItemToFirebase(item);
         }
 
         applyCurrentFilter();
 
         try {
-            await Promise.all([historyWritePromise, saveSingleDeletedItemToFirebase(itemToTrash)]);
+            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+            if (!itemId || !safeIdPattern.test(itemId) || !itemToTrash.id || !safeIdPattern.test(itemToTrash.id)) {
+                throw new Error('Unsafe id during removeSingleBarcode');
+            }
+            await fb.update(fb.ref(db), {
+                [`zoew_scan_history_cod_dod/${itemId}`]: wasFullyRemoved ? null : freshItem,
+                [`zoew_recently_deleted_cod_dod/${itemToTrash.id}`]: itemToTrash
+            });
             if (wasFullyRemoved) clearScannerLookupEntry(itemId);
-            else syncScannerLookupEntry(itemId, item);
+            else syncScannerLookupEntry(itemId, freshItem);
             showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
         } catch (e) {
+            console.error("Error removing single barcode: ", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error removing single barcode: " });
             if (deductionApplied) {
                 addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
             }
@@ -3627,10 +3638,19 @@
         updateRecentPhonesList();
 
         try {
-            await Promise.all([deleteSingleHistoryItemFromFirebase(id), saveSingleDeletedItemToFirebase(removed)]);
+            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+            if (!id || !safeIdPattern.test(id) || !removed.id || !safeIdPattern.test(removed.id)) {
+                throw new Error('Unsafe id during deleteSingleItem');
+            }
+            await fb.update(fb.ref(db), {
+                [`zoew_scan_history_cod_dod/${id}`]: null,
+                [`zoew_recently_deleted_cod_dod/${removed.id}`]: removed
+            });
             clearScannerLookupEntry(id);
             showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
         } catch (e) {
+            console.error("Error deleting single item: ", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });
             scanHistory = historySnapshot;
             deletedItems = deletedSnapshot;
             applyCurrentFilter();
@@ -3886,23 +3906,6 @@
         });
     }
 
-    function deleteSingleHistoryItemFromFirebase(id) {
-        if (!dbRefHistory) return Promise.resolve();
-        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
-            const err = new Error('Refusing to delete history item with missing/unsafe id');
-            console.error(err.message, id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'deleteSingleHistoryItemFromFirebase' });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
-            return Promise.reject(err);
-        }
-        return fb.update(dbRefHistory, { [id]: null }).catch((error) => {
-            console.error("Error deleting history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting history item: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
-            throw error;
-        });
-    }
-
     function saveSingleDeletedItemToFirebase(item) {
         if (!dbRefDeleted) return Promise.resolve();
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
@@ -3948,21 +3951,6 @@
             console.error("Error purging deleted items: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error purging deleted items: " });
             showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
-            throw error;
-        });
-    }
-
-    function saveMultipleDeletedItemsToFirebase(items) {
-        if (!dbRefDeleted || !items || !items.length) return Promise.resolve();
-        const updates = {};
-        items.forEach(item => {
-            if (item && item.id && /^[a-zA-Z0-9_-]+$/.test(item.id)) updates[item.id] = item;
-        });
-        if (!Object.keys(updates).length) return Promise.resolve();
-        return fb.update(dbRefDeleted, updates).catch((error) => {
-            console.error("Error saving deleted items: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted items: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
     }
@@ -4201,29 +4189,45 @@
         });
     }
 
-    function clearHistory() {
-        if (confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) {
-            const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
-            const clearedItems = scanHistory.map(item => {
-                item.deletedAt = getServerNow();
-                item.isFromDeletion = true;
-                return item;
+    async function clearHistory() {
+        if (!confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) return;
+
+        const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
+        if (clearedIds.length === 0) return;
+
+        const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
+
+        const clearedItems = scanHistory.map(item => {
+            item.deletedAt = getServerNow();
+            item.isFromDeletion = true;
+            return item;
+        });
+        clearedItems.forEach(item => deletedItems.unshift(item));
+        scanHistory = [];
+        applyCurrentFilter();
+        updateRecentPhonesList();
+
+        try {
+            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+            const updates = {};
+            clearedItems.forEach(item => {
+                if (!item.id || !safeIdPattern.test(item.id)) {
+                    throw new Error('Unsafe id during clearHistory');
+                }
+                updates[`zoew_scan_history_cod_dod/${item.id}`] = null;
+                updates[`zoew_recently_deleted_cod_dod/${item.id}`] = item;
             });
-            clearedItems.forEach(item => deletedItems.unshift(item));
-            scanHistory = [];
-            if (dbRefHistory && clearedIds.length > 0) {
-                const clearUpdates = {};
-                clearedIds.forEach(id => { clearUpdates[id] = null; });
-                fb.update(dbRefHistory, clearUpdates).catch((error) => {
-                    console.error("Error clearing history: ", error);
-                    if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });
-                    showToast("⚠️ បរាជ័យក្នុងការលុបប្រវត្តិទាំងអស់ពី Firebase!");
-                });
-            }
-            saveMultipleDeletedItemsToFirebase(clearedItems);
+            await fb.update(fb.ref(db), updates);
             clearedIds.forEach(id => clearScannerLookupEntry(id));
+            showToast("បានលុបប្រវត្តិទាំងអស់!");
+        } catch (error) {
+            console.error("Error clearing history: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });
+            scanHistory = historySnapshot;
+            deletedItems = deletedSnapshot;
             applyCurrentFilter();
             updateRecentPhonesList();
-            showToast("បានលុបប្រវត្តិទាំងអស់!");
+            showToast("⚠️ លុបប្រវត្តិទាំងអស់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
     }

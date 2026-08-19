@@ -245,9 +245,8 @@
             return { state: 'required', reason: sigCheck.reason };
         }
 
-        const now = getServerNow();
-
         const online = await checkOnline(appCode, record.id);
+        const now = getServerNow();
         if (online.ok === true) {
             record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;

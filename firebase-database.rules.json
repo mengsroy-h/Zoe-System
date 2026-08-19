@@ -35,8 +35,8 @@
         "lockerUpdatedBy": { ".validate": "newData.isString()" },
         "barcodes": {
           "$idx": {
-            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
-            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
+            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
             "locker": { ".validate": "newData.isString()" },
             "isClosed":   { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },
@@ -79,8 +79,8 @@
       "$itemId": {
         ".write": "auth != null && (root.child('user_roles').child(auth.uid).val() === 'admin' || root.child('user_roles').child(auth.uid).val() === 'worker')",
         "id":    { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
-        "cod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
-        "dod":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "cod":   { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+        "dod":   { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
         "price": { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "count": { ".validate": "newData.isNumber() && newData.val() >= 0" },
         "phone": { ".validate": "newData.isString()" },
@@ -100,8 +100,8 @@
         "isFromDeletion": { ".validate": "newData.isBoolean() && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
         "barcodes": {
           "$idx": {
-            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
-            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
+            "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "code":   { ".validate": "newData.isString()" },
             "locker": { ".validate": "newData.isString()" },
             "isClosed":   { ".validate": "newData.isBoolean()" },

@@ -3239,19 +3239,21 @@
         return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
     }
 
-    function buildScannerLookupPayload(item) {
+    function buildScannerLookupPayload(item, omitClosedState) {
         const payload = {
             id: item.id,
             phone: item.phone || '',
             barcode: item.barcode || '',
             locker: item.locker || ''
         };
+        if (!omitClosedState) payload.isClosed = !!item.isClosed;
         if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
         if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
         if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
             payload.barcodes = item.barcodes.map((b) => {
-                if (!b) return { code: '', locker: '' };
+                if (!b) return omitClosedState ? { code: '', locker: '' } : { code: '', locker: '', isClosed: false };
                 const bcEntry = { code: b.code || '', locker: b.locker || '' };
+                if (!omitClosedState) bcEntry.isClosed = !!b.isClosed;
                 if (b.lockerUpdatedAt) bcEntry.lockerUpdatedAt = b.lockerUpdatedAt;
                 return bcEntry;
             });
@@ -3261,10 +3263,13 @@
 
     function syncScannerLookupEntry(itemId, item) {
         if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
-        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), buildScannerLookupPayload(item)).catch((error) => {
-            console.error('Error syncing scanner lookup entry:', error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
-        });
+        const entryRef = fb.ref(db, `zoew_scanner_lookup/${itemId}`);
+        return fb.set(entryRef, buildScannerLookupPayload(item))
+            .catch(() => fb.set(entryRef, buildScannerLookupPayload(item, true)))
+            .catch((error) => {
+                console.error('Error syncing scanner lookup entry:', error);
+                if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
+            });
     }
 
     function clearScannerLookupEntry(itemId) {
@@ -3696,7 +3701,7 @@
 
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
-            await fb.runTransaction(itemRef, (currentItem) => {
+            const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
                 if (!currentItem) return currentItem;
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
                     currentItem.barcodes = [{
@@ -3724,6 +3729,11 @@
                 }
                 return currentItem;
             });
+            const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
+            if (committedItem) {
+                if (!committedItem.id) committedItem.id = itemId;
+                syncScannerLookupEntry(itemId, committedItem);
+            }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling barcode close: " });
@@ -3812,11 +3822,34 @@
                 item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
                 item.price = Math.round((item.cod + item.dod) * 100) / 100;
 
-                if (codDiff !== 0 || dodDiff !== 0) {
-                    addRevenueToDailyAndMonthlyRecord(item.scanDate || getFormattedDate(), codDiff, dodDiff, 0);
+                const revenueScanDate = item.scanDate || getFormattedDate();
+                const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
+                if (revenueApplied) {
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
                 }
 
-                saveSingleHistoryItemToFirebase(item);
+                const editedItemId = item.id;
+                const editedBarcodeCode = activeEditingBarcode;
+                saveSingleHistoryItemToFirebase(item).catch(() => {
+                    if (revenueApplied) {
+                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
+                    }
+                    const revertItem = scanHistory.find(i => i.id === editedItemId);
+                    const revertB = revertItem && Array.isArray(revertItem.barcodes)
+                        ? revertItem.barcodes.find(b => b.code === editedBarcodeCode)
+                        : null;
+                    if (revertB) {
+                        revertB.cod = oldCod;
+                        revertB.dod = oldDod;
+                        revertItem.cod = Math.round(revertItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                        revertItem.dod = Math.round(revertItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                        revertItem.price = Math.round((revertItem.cod + revertItem.dod) * 100) / 100;
+                    }
+                    refreshCurrentHistoryView();
+                    const viewListEl = document.getElementById('viewListModal');
+                    if (viewListEl && viewListEl.style.display === 'flex') openViewListModal(editedItemId);
+                    showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                });
                 refreshCurrentHistoryView();
                 showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
             }
@@ -3994,7 +4027,7 @@
 
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-            await fb.runTransaction(itemRef, (currentItem) => {
+            const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
                 if (!currentItem) return currentItem;
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
@@ -4012,6 +4045,11 @@
                 }
                 return currentItem;
             });
+            const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
+            if (committedItem) {
+                if (!committedItem.id) committedItem.id = id;
+                syncScannerLookupEntry(id, committedItem);
+            }
         } catch (error) {
             console.error("Error toggling close status: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling close status: " });
@@ -4308,7 +4346,7 @@
             console.error(err.message, item && item.id);
             if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'patchHistoryItemFields' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
-            return Promise.reject(err);
+            return Promise.resolve(false);
         }
         const updates = {};
         Object.keys(fields).forEach(key => {

@@ -2,26 +2,32 @@
 
 > ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
 >
-> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-90pmhb`** (ជុំ audit ទី៦ + គោលការណ៍ លុប/ដក
-> + ការបិទចំណុចដែលនៅសល់)។ Branch នេះមាន `...-7f6izx` ទាំងស្រុងនៅក្នុងវា (fast-forward) បូកបន្ថែម
-> ២ commit ថ្មី។ Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`**
+> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-lubg8l`** (ជុំ audit ទី៧ — ជុំ final)។
+> Branch ចេញពី `main` (commit `cec65e9`) ដោយផ្ទាល់ គ្មានអ្វីយកបន្តពី branch មុនដែលមិនទាន់ merge។
+> Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`**
 > (ម្ចាស់គម្រោងគ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
 >
 > **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude) — នៅសល់តែប៉ុណ្ណេះ:**
 > 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
 > 2. Publish `ZoeKeyGen/firebase-database.rules.json` — Console ZoeKeyGen
 >
-> ដរាបណាមិន publish ៣ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា):
-> scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន · `license_keys` លែងអានបាន
-> ជាសាធារណៈត្រង់ node មេ។
+> ដដែលនឹងជុំមុន បូក **ចំណុចថ្មីមួយ**៖ ជុំនេះបន្ថែមវាល `isClosed` ចូល `zoew_scanner_lookup` ក្នុង
+> rules root។ ដរាបណាមិន publish ៤ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា
+> **គ្មានអ្វីខូចទេ**): scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន ·
+> `license_keys` លែងអានបានជាសាធារណៈត្រង់ node មេ · Zoescan រំលងទូដែលអតិថិជនយករួច។
 >
-> **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។** រឿង 8-day partial cleanup សម្រេចរួច (បន្ធូរ per-barcode
-> lock សម្រាប់ `worker` — មូលហេតុពេញលេញនៅ section **"Follow-up session"** ខាងក្រោម)។
+> **ការ deploy មិនចាំបាច់តម្រៀបលំដាប់ទេ** — `syncScannerLookupEntry()` សរសេរម្តងទៀតដោយដក
+> `isClosed` ចេញ ប្រសិនបើ Firebase បដិសេធ ដូច្នេះ push កូដមុន publish rules ក៏មិនខូចដែរ
+> (បានផ្ទៀងផ្ទាត់លើ emulator ជាមួយ rules ចាស់)។
 >
-> **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (រក divergence រវាង
-> ZoeAdmin/ZoeW) និង `node audit-tools/policy-test.js` (ផ្ទៀងផ្ទាត់គោលការណ៍ លុប/ដក)។ សម្រាប់ rules
-> រត់ emulator រួច `bash audit-tools/emu/real.sh` និង `bash audit-tools/emu/partial-claim.sh`។ មើល
-> `audit-tools/README.md`។ លម្អិតពេញលេញនៅ section **"Sixth deep-audit pass"** ខាងក្រោម។
+> **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។**
+>
+> **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (divergence
+> ZoeAdmin↔ZoeW), `node audit-tools/shared-fns.js` (divergence ទាំង ៤ App — **ថ្មីជុំនេះ**),
+> `node audit-tools/policy-test.js` (គោលការណ៍ លុប/ដក) និង `node audit-tools/lookup-closed-test.js`
+> (ការព្រមានទីតាំងជាន់គ្នា)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
+> `partial-claim.sh` និង `scanner-lookup-closed.sh`។ មើល `audit-tools/README.md`។
+> លម្អិតពេញលេញនៅ section **"Seventh deep-audit pass"** ខាងក្រោម។
 
 
 4 independent PWAs (vanilla JS, no framework, no build step), each deployed as its own
@@ -1557,10 +1563,17 @@ What changed is only that the loss is now visible and, on deliberate paths, prev
   `showLoginModalWithPrefill()`. `hasUncopiedKeypair()` additionally requires the modal to be `active`
   and the textarea to be non-empty, so it can never fire on a fresh page load.
 - The modal's "បិទ" button now calls a new `dismissKeypairModal()` that confirms first when the key is
-  uncopied. This is the *only* deliberate dismiss path — ZoeKeyGen has no backdrop-click or Escape
-  handling at all, unlike the 3 business apps (the round 2 note about a backdrop handler here does not
-  match the current code). The confirm is deliberately **not** inside `closeModal()`: a blocking prompt on
-  the forced-logout path would be wrong, and letting it be cancelled would weaken the wipe.
+  uncopied. The confirm is deliberately **not** inside `closeModal()`: a blocking prompt on the
+  forced-logout path would be wrong, and letting it be cancelled would weaken the wipe.
+  **CORRECTION (round 7):** this note originally claimed the "បិទ" button was the *only* deliberate
+  dismiss path and that "ZoeKeyGen has no backdrop-click or Escape handling at all". The Escape half is
+  right; the backdrop half was **wrong** — `DOMContentLoaded` attaches a `mousedown` handler to every
+  `.modal` (the round 2 note was accurate). It called `closeModal(modal.id)` directly, so a backdrop
+  click wiped an uncopied private signing key with no confirmation, which is exactly what
+  `dismissKeypairModal()` exists to prevent. Fixed in round 7 by giving `keypairModal` a
+  `data-close="dismissKeypairModal"` and making that handler honour it, matching the 3 business apps.
+  Lesson: verify a "this app has no X" claim against the code before writing it into a handoff note —
+  it survived two rounds unchallenged.
 - `logoutApp()` confirms before signing out when a key is uncopied. Aborting a user-initiated logout is
   the user's own choice, so this changes no security boundary.
 - Any involuntary path (role-check failure/timeout, auth session lost) still wipes with no prompt, but
@@ -1667,3 +1680,125 @@ Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js
 rules file, comment-free-verified on every changed line, tag-balance- and wiring-checked on the one
 modified `.html`, and the rules change is emulator-verified. The only outstanding work is the two manual
 Console publishes listed in START HERE.
+
+## Seventh deep-audit pass (2026-08-19, branch `claude/deep-audit-bug-fixes-lubg8l`) — handoff notes
+
+Requested as another final round: the user was still not satisfied because *every previous round kept
+finding new bugs*, and asked for a thorough, gap-free sweep plus a README tidy-up. Branch started exactly
+at `main` (commit `cec65e9`, i.e. right after PR #19 merged) — **nothing carried over from
+`...-90pmhb`, which is still unmerged**. Run inline and single-threaded again (no subagents), reading all
+four `app.js` end to end plus every rules file, HTML, `netlify.toml`, `sw.js`, `license-verify.js`,
+`error-reporting.js`, `firebase-backup/backup.js` and the Apps Script template.
+
+### The method change that mattered most this round
+Round 6's differ only compares **ZoeAdmin ↔ ZoeW**, so a helper that is meant to be a single
+implementation can drift in **Zoescan or ZoeKeyGen** and nobody sees it. New tool
+**`audit-tools/shared-fns.js`** diffs every function shared by three or more apps and reports only those
+not on a documented `EXPECTED_DIVERGENT` allowlist. Run against the pre-round code it flags exactly two,
+both real (see below). **Run it alongside `extract.js` at the start of every future round.**
+
+### Fixed
+- **[HIGHEST IMPACT] Zoescan's locker-occupancy warning has never actually skipped a collected parcel.**
+  `findLockerOccupant()` calls `isEntryBarcodeClosed()` to exempt an occupant the customer already picked
+  up — the behaviour the user explicitly asked for when the feature was built in round 1, and which
+  `Zoescan/README.md` has always claimed. That check **could never be true**: it reads `isClosed` off
+  `zoew_scanner_lookup`, and neither `buildScannerLookupPayload()` ever wrote the field nor did the rules
+  schema permit it (`$other: { ".validate": false }` at both the item and barcode level). So for the
+  ~2 hours between a pickup and the 2h sweep clearing the lookup entry, **re-using that locker popped a
+  blocking "this locker already has a package" modal every time** — the everyday case in a busy shop, and
+  the kind of false alarm that trains staff to click through the real warnings too. Fixed in three parts:
+  the rules now allow `isClosed` on `zoew_scanner_lookup/$itemId` and `.../barcodes/$idx` (scanner-locked
+  to its existing value, same shape as the sibling fields); `buildScannerLookupPayload()` carries the
+  item-level and per-barcode closed state; and `toggleCloseStatus()`/`toggleIndividualBarcodeClose()` sync
+  the lookup entry **from the committed transaction snapshot** so the state actually propagates on pickup
+  and reopen. `syncScannerLookupEntry()` retries once with the field stripped, so **deploy order does not
+  matter** — shipping the code before the rules are published degrades to today's behaviour instead of
+  rejecting the whole write (proven on the emulator against the old rules file).
+- **[revenue] ZoeAdmin `saveEditedBarcodePrice()` had no failure compensation at all** — the one
+  revenue-moving path in the codebase that never got the treatment. It applied
+  `addRevenueToDailyAndMonthlyRecord(...)` optimistically and then called
+  `saveSingleHistoryItemToFirebase(item)` bare: no `.catch`, no revert, and (since that helper rethrows)
+  an unhandled rejection on top. A failed write left the daily *and* monthly totals moved while the
+  barcode's own `cod`/`dod` never persisted — a permanent, silent divergence between the revenue nodes and
+  the records they are supposed to sum. Now reverses the exact delta, restores the barcode from its
+  captured old values, recomputes the item aggregate from `barcodes[]` (rather than a stale snapshot, so a
+  concurrent listener refresh can't be clobbered), re-renders and re-opens the barcode list if it is still
+  on screen. ZoeAdmin-only — ZoeW has no barcode-price editing.
+- **[ZoeKeyGen, security] A backdrop click on the keypair modal destroyed an uncopied private signing key
+  with no confirmation.** `DOMContentLoaded` attaches a `mousedown` handler to every `.modal` that called
+  `closeModal(modal.id)` directly, bypassing `dismissKeypairModal()`'s guard entirely — so the *deliberate*
+  dismiss path the round-6 follow-up built a confirm for could still be reached silently. The handler now
+  honours `data-close`, and `keypairModal` carries `data-close="dismissKeypairModal"`. (See the CORRECTION
+  note in the round-6 follow-up section — the claim that ZoeKeyGen has no backdrop handler was wrong.)
+- **[Zoescan] `waitForFirebaseSDK()` was the odd one out of four** (found by the new differ): it never
+  removed its `firebasesdkready` listener on timeout, and — unlike the other three — did not re-check
+  `window.firebaseSDK` before rejecting, so an SDK that arrived a moment after the 15s deadline left
+  Zoescan stuck on its boot-error screen where the others recover. Aligned to the shared shape. Round 2's
+  note says this helper was fixed "in all 4"; only the Error-construction half was.
+- **[Zoescan] A PIN lockout left a Setup Link armed with no way to cancel it.**
+  `requestPinBeforeConfig()`'s lockout branch returns **without opening any modal**, so neither
+  `cancelPinSetupFlow()` nor `cancelPinEntryFlow()` (round 6's fix for exactly this hazard) can ever fire —
+  `pendingSetupLinkConfig` stayed set indefinitely and the next Config open silently pre-filled a different
+  business's Firebase config. Both it and `pinTargetAction` are now cleared on that path.
+- **[Zoescan] `saveNewSecurityPin()`/`verifySecurityPin()` had no guard around WebCrypto**, unlike the
+  other three apps — a `crypto.subtle` failure did nothing at all, with no message. Both now report and
+  capture.
+- **[ZoeKeyGen] `logoutApp()`'s `signOut().then()` had no `.catch()`** — an offline logout left the UI
+  signed in and raised an unhandled rejection. Now runs the same cleanup on both paths, like the 3
+  business apps.
+- **`patchHistoryItemFields()` resolves `false` instead of rejecting** on its unsafe-id guard (both apps),
+  matching its write-failure path, so the three bare call sites (`handleCallAction`, `setCallMark` ×2)
+  can't produce an unhandled rejection.
+- Small: leftover blank line in ZoeKeyGen's `withTimeout` (old comment-strip cruft).
+- `CACHE_VERSION` bumped once in all four (zoeadmin-v35, zoew-v31, zoescan-v24, zoekeygen-v17). Only one
+  bump this round on purpose — nothing from this branch has been deployed, so a second bump would be noise.
+
+### New tests (rebuild these in future rounds — they are executable proof, not prose)
+- `audit-tools/shared-fns.js` — 4-way helper differ, described above. Exits 1 on unexpected drift.
+- `audit-tools/lookup-closed-test.js` — slices the real `buildScannerLookupPayload` (ZoeAdmin) and
+  `buildBarcodeIndex`/`isEntryBarcodeClosed`/`findLockerOccupant` (Zoescan) into a `vm` and asserts 13
+  invariants: the payload carries the closed state, Zoescan reads it back for both the `barcodes[]` and
+  legacy shapes, a collected parcel's locker is not reported occupied, an uncollected one still is, a
+  sibling barcode of the same order is still exempt, and the stripped fallback degrades rather than
+  breaking the index. **6 of the 13 fail against the pre-round code** — checked, so it is not vacuous.
+- `audit-tools/emu/scanner-lookup-closed.sh` — 10/10 against the real rules on a live RTDB emulator, and
+  it asserts the known-bad writes (scanner flipping `isClosed`, a string instead of a boolean, an unknown
+  field, an unauthenticated write) are actually DENIED before any pass is trusted. Also confirmed the
+  **previously published** rules reject the `isClosed` write and accept the stripped fallback — which is
+  what makes the deploy order safe. Re-ran `real.sh` (8/8) and `partial-claim.sh` (9/9): no regressions.
+
+### Confirmed clean this round (checked, no change needed — don't re-audit blind)
+- Every field the apps write to `zoew_scan_history_cod_dod` and `zoew_recently_deleted_cod_dod` is in the
+  rules schema, in both directions; `executeRestoreItem` correctly deletes `deletedAt`/`isFromDeletion`
+  before writing back to scan history (they are not in that schema).
+- No duplicate HTML `id=` in any of the four apps. Every function referenced from inline `on*=` in HTML
+  **and** from `app.js`-generated HTML strings, plus every `data-close` target, resolves to a genuine
+  top-level (global) function — verified by parsing rather than grepping.
+- `loginModal` and `activationModal` carry `data-nodismiss` in all three business apps.
+- The Apps Script template's `key=` query-parameter auth vs. the app's HTTP-header secret is **not** a
+  mismatch — `google-sheets-api/README.md` documents the Google restriction and says to leave the header
+  fields empty. `buildCustomerListApiUrl()` rewrites both URL orderings correctly.
+- Service-worker cache-cleanup filters are still each scoped to their own `<app>-` prefix, and no prefix
+  is a prefix of another.
+- `license-verify.js` still byte-identical across all four (`md5sum` = one value); 0 comments and 0
+  trailing whitespace across all 8 `app.js`/`license-verify.js` files (acorn, not regex).
+- `firebase-backup/backup.js` re-read: the round-6 `.partial`+rename, `keepCount` and `name` validation
+  are all correct, and the prune sort is chronological because the ISO timestamp sorts lexically.
+
+### Known-but-not-fixed (deliberate, carried forward)
+- Existing `zoew_scanner_lookup` entries in production gain `isClosed` only when their parcel is next
+  touched (closed, reopened, restored, phone-edited, or via ZoeAdmin's "🔄 កំណត់ទិន្នន័យ Scanner Lookup
+  ឡើងវិញ"). Already-closed entries age out within 2 hours anyway, so no migration was written.
+- `executeRestoreItem`'s merge branch pushes restored barcodes without deduplicating by `code`
+  (`restoreClaimedItemToScanHistory` does). Only reachable if a trash item's id collides with a live
+  scan-history id, which the id generator makes implausible. Left alone rather than widening a
+  revenue-adjacent function for a case that cannot currently occur.
+- Everything the earlier rounds listed as deliberately accepted still stands: worker-writable
+  revenue/pickup totals, no aggregate verification without a trusted backend, and ZoeKeyGen "Extend"
+  moving only the server ceiling.
+
+### Not yet done as of this handoff
+Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the
+rules file, comment-free- and whitespace-verified with acorn, div-tag-balance- and wiring-checked on the
+modified HTML, and the rules change is emulator-verified against both the new and the previously published
+rules. The only outstanding work is the two manual Console publishes listed in START HERE.

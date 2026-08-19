@@ -105,12 +105,21 @@ function playBeep() {
 function playSuccessFeedback() { playBeep(); if (navigator.vibrate) navigator.vibrate(150); }
 function playErrorFeedback() { if (navigator.vibrate) navigator.vibrate([100, 60, 100]); }
 
-function waitForFirebaseSDK() {
+function waitForFirebaseSDK(timeoutMs = 15000) {
+    if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
-        if (window.firebaseSDK) return resolve();
-        const timeoutErr = new Error('Firebase SDK timeout');
-        const timeout = setTimeout(() => reject(timeoutErr), 15000);
-        window.addEventListener('firebasesdkready', () => { clearTimeout(timeout); resolve(); }, { once: true });
+        const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
+        let timer = null;
+        const onReady = () => {
+            clearTimeout(timer);
+            resolve(window.firebaseSDK);
+        };
+        window.addEventListener('firebasesdkready', onReady, { once: true });
+        timer = setTimeout(() => {
+            window.removeEventListener('firebasesdkready', onReady);
+            if (window.firebaseSDK) resolve(window.firebaseSDK);
+            else reject(notReadyErr);
+        }, timeoutMs);
     });
 }
 
@@ -508,6 +517,8 @@ function requestPinBeforeConfig(target) {
     const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secs = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        pendingSetupLinkConfig = null;
+        pinTargetAction = null;
         showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secs} វិនាទី។`);
         return;
     }
@@ -519,7 +530,13 @@ async function saveNewSecurityPin() {
     const confirmPin = document.getElementById('confirmPinInput').value;
     if (!pin || pin.length < 6) { showToast('PIN ត្រូវមានយ៉ាងតិច ៦ខ្ទង់!'); return; }
     if (pin !== confirmPin) { showToast('PIN ទាំងពីរមិនដូចគ្នាទេ!'); return; }
-    localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
+    try {
+        localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'saveNewSecurityPin' });
+        showToast('មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។');
+        return;
+    }
     closeModal('pinSetupModal');
     document.getElementById('newPinInput').value = '';
     document.getElementById('confirmPinInput').value = '';
@@ -561,6 +578,9 @@ async function verifySecurityPin() {
                 showToast("លេខ PIN មិនត្រឹមត្រូវទេ!");
             }
         }
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'verifySecurityPin' });
+        showToast('មិនអាចផ្ទៀងផ្ទាត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។');
     } finally {
         isVerifyingPin = false;
     }

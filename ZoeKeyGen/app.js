@@ -155,7 +155,6 @@ function closeModal(id) {
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     let timer;
     return Promise.race([
@@ -597,12 +596,13 @@ function setupAuthListener() {
 function logoutApp() {
     if (!fb || !auth) return;
     if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
-    fb.signOut(auth).then(() => {
+    const finishLogout = () => {
         localStorage.removeItem('remembered_email');
         document.getElementById('appContainer').style.display = 'none';
         updateAuthButton(false);
         showLoginModalWithPrefill();
-    });
+    };
+    fb.signOut(auth).then(finishLogout).catch(finishLogout);
 }
 
 function updateAuthButton(isLoggedIn) {
@@ -1183,9 +1183,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('mousedown', (e) => {
-            if (e.target === modal && modal.dataset.nodismiss !== 'true') {
-                closeModal(modal.id);
-            }
+            if (e.target !== modal || modal.dataset.nodismiss === 'true') return;
+            const fnName = modal.getAttribute('data-close');
+            if (fnName && typeof window[fnName] === 'function') window[fnName]();
+            else closeModal(modal.id);
         });
     });
 

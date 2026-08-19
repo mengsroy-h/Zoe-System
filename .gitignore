@@ -19,3 +19,4 @@ firebase-backup/config.json
 firebase-backup/secrets/
 firebase-backup/backups/
 firebase-backup/backup.log
+audit-tools/emu/real.rules.json

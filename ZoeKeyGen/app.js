@@ -155,7 +155,6 @@ function closeModal(id) {
 }
 
 function withTimeout(promise, ms, timeoutMsg) {
-
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     let timer;
     return Promise.race([

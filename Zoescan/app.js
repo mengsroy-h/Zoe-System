@@ -105,12 +105,21 @@ function playBeep() {
 function playSuccessFeedback() { playBeep(); if (navigator.vibrate) navigator.vibrate(150); }
 function playErrorFeedback() { if (navigator.vibrate) navigator.vibrate([100, 60, 100]); }
 
-function waitForFirebaseSDK() {
+function waitForFirebaseSDK(timeoutMs = 15000) {
+    if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
-        if (window.firebaseSDK) return resolve();
-        const timeoutErr = new Error('Firebase SDK timeout');
-        const timeout = setTimeout(() => reject(timeoutErr), 15000);
-        window.addEventListener('firebasesdkready', () => { clearTimeout(timeout); resolve(); }, { once: true });
+        const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
+        let timer = null;
+        const onReady = () => {
+            clearTimeout(timer);
+            resolve(window.firebaseSDK);
+        };
+        window.addEventListener('firebasesdkready', onReady, { once: true });
+        timer = setTimeout(() => {
+            window.removeEventListener('firebasesdkready', onReady);
+            if (window.firebaseSDK) resolve(window.firebaseSDK);
+            else reject(notReadyErr);
+        }, timeoutMs);
     });
 }
 

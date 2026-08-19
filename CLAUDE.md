@@ -1562,11 +1562,18 @@ is deferred with `setTimeout(..., 0)` on purpose: `handleCallAction` is the `onc
 anchor before the browser follows the link. Marking again still restarts the clock too — `setCallMark`
 rewrites `callMarkTime` unconditionally, including when the same mark is re-selected.
 
-**Still left alone:** a row that has been closed (បិទ = collected) but carries an old no-answer mark keeps
-blinking until the 2-hour auto-cleanup moves it to trash, since `needsRecall` never looks at `isClosed`.
-Offered to the user, not asked for, so not changed.
+**Then also asked for:** closing a parcel now clears the call mark outright. The user's reasoning is that
+a collected parcel means the customer was reached, so the mark is stale the moment it is closed. Applied in
+both explicit toggle paths — `toggleCloseStatus` (whole order) and `toggleIndividualBarcodeClose` (a single
+barcode, which the user asked for explicitly: any collected barcode clears that phone's mark) — in the
+local optimistic update, in the `runTransaction` body, and restored in the failure revert, all four guarded
+by `if (desiredClosed)` so reopening never clears anything. Reopening does not bring the mark back; it is
+gone for good, which is what "សម្អាតដោយស្វ័យប្រវត្តិ" asks for. This also removes the "closed row keeps
+blinking" case noted earlier, since there is no longer a mark to blink on. `claimAndCleanupItem`'s
+automatic 2h/8d sweep is deliberately untouched, matching how pickup-stat crediting is scoped to the
+explicit toggles only — those items are moving to trash anyway.
 
-`CACHE_VERSION` bumped (zoeadmin-v29, zoew-v26).
+`CACHE_VERSION` bumped (zoeadmin-v30, zoew-v27).
 
 ### Not yet done as of this handoff
 Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the

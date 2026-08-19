@@ -2106,7 +2106,7 @@
         const freshItem = scanHistory.find(i => i.id === itemId);
         const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
         const previousState = freshItem && freshB
-            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt }
+            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -2116,6 +2116,10 @@
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
             if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
+            if (desiredClosed) {
+                delete freshItem.callMark;
+                delete freshItem.callMarkTime;
+            }
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
@@ -2158,6 +2162,10 @@
                 currentItem.isClosed = allClosed;
                 if (allClosed) currentItem.closedAt = getServerNow();
                 else delete currentItem.closedAt;
+                if (desiredClosed) {
+                    delete currentItem.callMark;
+                    delete currentItem.callMarkTime;
+                }
                 return currentItem;
             });
         } catch (error) {
@@ -2172,6 +2180,10 @@
                     revertItem.isClosed = previousState.itemIsClosed;
                     if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
                     else delete revertItem.closedAt;
+                    if (previousState.itemCallMark !== undefined) revertItem.callMark = previousState.itemCallMark;
+                    else delete revertItem.callMark;
+                    if (previousState.itemCallMarkTime !== undefined) revertItem.callMarkTime = previousState.itemCallMarkTime;
+                    else delete revertItem.callMarkTime;
                     openViewListModal(itemId);
                     applyCurrentFilter();
                 }
@@ -2289,7 +2301,7 @@
 
         const freshItem = scanHistory.find(i => i.id === id);
         const previousState = freshItem
-            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
+            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -2298,6 +2310,8 @@
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
                 freshItem.closedAt = getServerNow();
+                delete freshItem.callMark;
+                delete freshItem.callMarkTime;
                 if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = true);
             } else {
                 delete freshItem.closedAt;
@@ -2332,6 +2346,8 @@
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
+                    delete currentItem.callMark;
+                    delete currentItem.callMarkTime;
                     if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
                         currentItem.barcodes.forEach(b => b.isClosed = true);
                     }
@@ -2353,6 +2369,10 @@
                     revertItem.isClosed = previousState.isClosed;
                     if (previousState.closedAt !== undefined) revertItem.closedAt = previousState.closedAt;
                     else delete revertItem.closedAt;
+                    if (previousState.callMark !== undefined) revertItem.callMark = previousState.callMark;
+                    else delete revertItem.callMark;
+                    if (previousState.callMarkTime !== undefined) revertItem.callMarkTime = previousState.callMarkTime;
+                    else delete revertItem.callMarkTime;
                     if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
                         revertItem.barcodes.forEach((b, i) => { if (previousState.barcodeStates[i] !== undefined) b.isClosed = previousState.barcodeStates[i]; });
                     }

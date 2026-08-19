@@ -145,7 +145,6 @@ function addPreconnect(origin) {
 }
 
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
-const APP_UPDATED_TOAST_FLAG = 'zoe_app_updated_notice';
 
 async function attemptAuthStorageRecovery() {
     if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
@@ -1388,23 +1387,5 @@ window.addEventListener('load', () => {
             window.addEventListener('focus', () => reg.update().catch(() => {}));
             setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
         }).catch(() => {});
-        let swReloadedOnce = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (swReloadedOnce) return;
-            swReloadedOnce = true;
-            const reloadWhenIdle = () => {
-                if (isAnyModalOpen() || isCameraScanning) {
-                    setTimeout(reloadWhenIdle, 3000);
-                } else {
-                    sessionStorage.setItem(APP_UPDATED_TOAST_FLAG, '1');
-                    window.location.reload();
-                }
-            };
-            reloadWhenIdle();
-        });
     }
 });
-if (sessionStorage.getItem(APP_UPDATED_TOAST_FLAG)) {
-    sessionStorage.removeItem(APP_UPDATED_TOAST_FLAG);
-    showToast('កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅');
-}

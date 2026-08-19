@@ -27,20 +27,6 @@
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
         });
-        let swReloadedOnce = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (swReloadedOnce) return;
-            swReloadedOnce = true;
-            const reloadWhenIdle = () => {
-                if (isModalOpen) {
-                    setTimeout(reloadWhenIdle, 3000);
-                } else {
-                    sessionStorage.setItem('zoew_sw_updated', '1');
-                    window.location.reload();
-                }
-            };
-            reloadWhenIdle();
-        });
     }
 
     let firebaseConfig = null;
@@ -1122,11 +1108,6 @@
     }
 
     window.addEventListener('load', function () {
-        if (sessionStorage.getItem('zoew_sw_updated')) {
-            sessionStorage.removeItem('zoew_sw_updated');
-            showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
-        }
-
         if (window.ZoeErrors) ZoeErrors.init('zoew');
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         initFirebase();

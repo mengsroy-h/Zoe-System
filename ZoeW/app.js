@@ -2186,9 +2186,16 @@
     function handleCallAction(id) {
         const item = scanHistory.find(i => i.id === id);
         if (item) {
-            const wasCalled = item.isCalled;
+            const patchFields = { isCalled: true };
+            const previousFields = { isCalled: item.isCalled };
+            if (item.callMark === 'no-answer' || item.callMark === 'no-connect') {
+                previousFields.callMarkTime = item.callMarkTime;
+                item.callMarkTime = getServerNow();
+                patchFields.callMarkTime = item.callMarkTime;
+            }
             item.isCalled = true;
-            patchHistoryItemFields(item, { isCalled: true }, { isCalled: wasCalled });
+            patchHistoryItemFields(item, patchFields, previousFields);
+            setTimeout(refreshCurrentHistoryView, 0);
         }
     }
 

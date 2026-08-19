@@ -1551,13 +1551,22 @@ travel in the same `patchHistoryItemFields` call as the phone, so a failed write
 together. Saving an unchanged number keeps the mark, since nothing was corrected. New `.fix-phone-btn`
 style reuses the purple the `row-num-wrong-number` label already uses.
 
-**Left alone, worth knowing:** `handleCallAction()` still only sets `isCalled = true` — it does not touch
-`callMark`/`callMarkTime`. So once a no-answer/no-connect item passes 4 hours it keeps blinking no matter
-how many times it is called again; the only way to stop it is to clear the mark in the call-mark modal.
-That is a workflow decision (restart the 4-hour clock on each call vs. clear the mark vs. leave it), so it
-was reported rather than changed.
+**Then decided by the user and applied:** `handleCallAction()` now also restarts the 4-hour clock
+(`callMarkTime = getServerNow()`) when the item carries a `no-answer`/`no-connect` mark. The user's rule,
+in their words: after calling again the button goes back to the normal colour, **the mark itself is not
+deleted** so the row stays easy to recognise, and 4 hours later it blinks again. `callMark` is deliberately
+untouched, so the row-number label keeps reading "ខល អត់លើក"/"ខល អត់ចូល" — only the timer moves. Both
+fields travel in one `patchHistoryItemFields` call, so a failed write reverts them together. The re-render
+is deferred with `setTimeout(..., 0)` on purpose: `handleCallAction` is the `onclick` of an
+`<a href="tel:">`, and replacing the row's `innerHTML` synchronously inside that handler would tear out the
+anchor before the browser follows the link. Marking again still restarts the clock too — `setCallMark`
+rewrites `callMarkTime` unconditionally, including when the same mark is re-selected.
 
-`CACHE_VERSION` bumped (zoeadmin-v28, zoew-v25).
+**Still left alone:** a row that has been closed (បិទ = collected) but carries an old no-answer mark keeps
+blinking until the 2-hour auto-cleanup moves it to trash, since `needsRecall` never looks at `isClosed`.
+Offered to the user, not asked for, so not changed.
+
+`CACHE_VERSION` bumped (zoeadmin-v29, zoew-v26).
 
 ### Not yet done as of this handoff
 Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the

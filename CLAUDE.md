@@ -1354,3 +1354,30 @@ worker restoring a new item allowed.
 The same run also **empirically confirmed the partial-claim finding**: a worker rewriting a compacted
 `barcodes` remainder (index 0 becomes what used to be index 1) is DENIED. Still unfixed — it needs a
 decision on relaxing the per-barcode admin locks for `worker`.
+
+### #6 fully closed — verified on a live Firebase RTDB emulator
+The round-1/round-5 blocker ("emulator unreachable, rules reasoned through by hand") **no longer applies**:
+`npm i firebase-tools` works, and the emulator jar runs directly with
+`java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1`.
+Three gotchas cost several attempts and are worth remembering: the CLI's `emulators:start` cannot upload
+rules through this session's proxy (run the jar directly); **both** `.settings/rules.json` and any
+`auth_variable_override` request need `-H "Authorization: Bearer owner"`, otherwise rules silently stay
+wide open and every test bogusly passes; and a stray `pkill -f firebase-database-emulator` matches the
+tool's own shell command line and kills the session. Always assert a known-bad write is actually DENIED
+before trusting a rules run — that check is what caught both false-pass rounds here.
+
+Empirically settled: **a `.validate` on `barcodes/$idx` IS evaluated for a child-only write** (e.g.
+`PATCH .../barcodes/9/locker`). So the guard now added to `zoew_scan_history_cod_dod/$itemId/barcodes/$idx`
+— `root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()`, i.e. *a scanner may
+modify an existing barcode but never create one* — blocks the out-of-range write that would otherwise
+create a sparse array and make the whole parcel's `barcodes` read back as an object, silently dropping it
+from every `Array.isArray` consumer. Chosen over a `hasChildren(['code','cod','dod'])` guard specifically
+because it does not depend on which fields legacy production barcodes happen to carry.
+**Needs a manual publish** (root rules file). Verified 7/7 against the real rules file: valid mirror write
+allowed, out-of-range denied, wrong-code denied, legacy item-level locker allowed, admin adding a barcode
+allowed, worker closing a barcode allowed, worker restoring a new item allowed.
+
+The same run also **empirically confirmed the partial-claim finding**: a worker rewriting a compacted
+`barcodes` remainder (index 0 becomes what used to be index 1) is DENIED by the existing per-barcode admin
+locks. Still unfixed — it needs a decision on relaxing those locks for `worker`.
+The harness lives at `scratchpad/emu/{real.sh,real.rules.json}`; rebuild it in any future rules round.

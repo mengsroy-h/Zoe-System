@@ -35,6 +35,7 @@
         "lockerUpdatedBy": { ".validate": "newData.isString()" },
         "barcodes": {
           "$idx": {
+            ".validate": "root.child('user_roles').child(auth.uid).val() !== 'scanner' || data.exists()",
             "cod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "dod":    { ".validate": "newData.isNumber() && newData.val() >= 0 && (root.child('user_roles').child(auth.uid).val() === 'admin' || !data.exists() || newData.val() === data.val())" },
             "code":   { ".validate": "newData.isString() && (root.child('user_roles').child(auth.uid).val() !== 'scanner' || !data.exists() || newData.val() === data.val())" },

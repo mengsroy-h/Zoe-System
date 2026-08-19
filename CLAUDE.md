@@ -2,10 +2,12 @@
 
 > ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
 >
-> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-lubg8l`** (ជុំ audit ទី៧ — ជុំ final)។
-> Branch ចេញពី `main` (commit `cec65e9`) ដោយផ្ទាល់ គ្មានអ្វីយកបន្តពី branch មុនដែលមិនទាន់ merge។
-> Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`**
-> (ម្ចាស់គម្រោងគ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
+> ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
+> (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
+> Netlify deploy `main` ស្វ័យប្រវត្តិ ដូច្នេះ **កូដទៅដល់ production រួចហើយ**។
+>
+> ⚠️ `claude/deep-audit-bug-fixes-90pmhb` (ជុំ ៦ follow-up) **នៅតែមិនទាន់ merge** — កុំយកបន្ត
+> ពីវា។ ចាប់ផ្តើម branch ថ្មីពី `main` ជានិច្ច។
 >
 > **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude) — នៅសល់តែប៉ុណ្ណេះ:**
 > 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
@@ -16,9 +18,9 @@
 > **គ្មានអ្វីខូចទេ**): scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន ·
 > `license_keys` លែងអានបានជាសាធារណៈត្រង់ node មេ · Zoescan រំលងទូដែលអតិថិជនយករួច។
 >
-> **ការ deploy មិនចាំបាច់តម្រៀបលំដាប់ទេ** — `syncScannerLookupEntry()` សរសេរម្តងទៀតដោយដក
-> `isClosed` ចេញ ប្រសិនបើ Firebase បដិសេធ ដូច្នេះ push កូដមុន publish rules ក៏មិនខូចដែរ
-> (បានផ្ទៀងផ្ទាត់លើ emulator ជាមួយ rules ចាស់)។
+> **កូដ deploy មុន rules ក៏មិនខូចដែរ** (ស្ថានភាពពិតឥឡូវនេះ) — `syncScannerLookupEntry()` សរសេរ
+> ម្តងទៀតដោយដក `isClosed` ចេញ ប្រសិនបើ Firebase បដិសេធ ដូច្នេះ Zoescan គ្រាន់តែធ្វើដូចមុន
+> រហូតដល់ publish (បានផ្ទៀងផ្ទាត់លើ emulator ជាមួយ rules ចាស់ជាក់ស្តែង)។
 >
 > **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។**
 >
@@ -1802,3 +1804,7 @@ Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js
 rules file, comment-free- and whitespace-verified with acorn, div-tag-balance- and wiring-checked on the
 modified HTML, and the rules change is emulator-verified against both the new and the previously published
 rules. The only outstanding work is the two manual Console publishes listed in START HERE.
+
+**Merged to `main` at the user's explicit request in this session** — PR #20, merge commit `acd5a9f`,
+`mergeable_state: clean` with every Netlify check green beforehand. The rules publishes are still
+outstanding; the code is live without them and degrades safely, per the fallback above.

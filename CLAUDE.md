@@ -808,11 +808,17 @@ identified as the biggest operational bottleneck (bigger than any code bug found
   `connect_rejected`/403 for that host) — the same class of block noted in the first audit round's Firebase
   emulator-testing attempt — and a hand-written QR encoder was deliberately avoided rather than risk shipping
   a subtly-broken one with no way to test-scan it in this environment. **Resolved in the same session**: the
-  user fetched `qrcode-generator` v2.0.4 (Kazuhiko Arase, MIT license — the exact library that had been
-  recommended, and the latest npm version as of vendoring) from their own machine and pasted its full source,
-  which was then vendored locally as `ZoeKeyGen/qrcode.js` (loaded via a plain same-origin
-  `<script src="./qrcode.js">` tag — no CDN, no CSP change needed, unlike the originally-considered unpkg
-  approach). `generateSetupLink()` now also renders the
+  user's first paste came from the exact `unpkg.com/qrcode-generator@1.4.4` URL originally suggested in
+  chat — confirmed by downloading the real v1.4.4 npm tarball for comparison, which matched byte-for-byte
+  except one line (`renderTo2dContext()`'s `fillRect` had `row`/`col` swapped, a genuine bug in that old
+  version, fixed upstream by v2.0.4 — corrected here to match the current release). The user then ran
+  `npm install qrcode-generator@2.0.4` themselves and uploaded the actual installed
+  `node_modules/qrcode-generator/dist/qrcode.js` file directly, which was copied in as the final
+  `ZoeKeyGen/qrcode.js` — **verified byte-for-byte identical (`diff`, zero output) against the real
+  `qrcode-generator@2.0.4` tarball downloaded from `registry.npmjs.org` for comparison** (Kazuhiko Arase, MIT
+  license — `registry.npmjs.org` is in this session's `noProxy` allowlist, so it was reachable directly even
+  though `unpkg.com` is not). Loaded via a plain same-origin `<script src="./qrcode.js">` tag — no CDN, no
+  CSP change needed. `generateSetupLink()` now also renders the
   link into a scannable QR (via `qrcode(0, 'M').createSvgTag(...)`, inline SVG into
   `#setupLinkQrContainer`, wrapped in try/catch so a failure degrades to link-only rather than breaking
   generation), and `showLoginModalWithPrefill()` clears the QR container on logout alongside the other

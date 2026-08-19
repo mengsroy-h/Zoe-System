@@ -583,17 +583,17 @@ var qrcode = function() {
 
       var img = '';
       img += '<img';
-      img += ' src="';
+      img += '\u0020src="';
       img += _this.createDataURL(cellSize, margin);
       img += '"';
-      img += ' width="';
+      img += '\u0020width="';
       img += size;
       img += '"';
-      img += ' height="';
+      img += '\u0020height="';
       img += size;
       img += '"';
       if (alt) {
-        img += ' alt="';
+        img += '\u0020alt="';
         img += escapeXml(alt);
         img += '"';
       }
@@ -1768,7 +1768,7 @@ var qrcode = function() {
       if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
         throw 'sjis not supported.';
       }
-    }('友', 0x9746);
+    }('\u53cb', 0x9746);
 
     var _bytes = stringToBytes(data);
 

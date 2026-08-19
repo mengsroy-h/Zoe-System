@@ -1056,6 +1056,7 @@ function confirmLocationChange() {
 }
 
 let assignGeneration = 0;
+let scanWriteInFlight = false;
 async function assignLockerToEntry(code) {
     const entry = barcodeIndex[code];
     if (!entry) {
@@ -1073,6 +1074,7 @@ async function assignLockerToEntry(code) {
     let singleBarcodeItem = false;
     const myAssignGeneration = ++assignGeneration;
 
+    scanWriteInFlight = true;
     try {
         const lookupRef = window.firebaseSDK.ref(db, `zoew_scanner_lookup/${itemId}`);
         const result = await withTimeout(window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
@@ -1150,6 +1152,8 @@ async function assignLockerToEntry(code) {
         console.error(err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: '' });
         showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកបានទេ សូមព្យាយាមម្តងទៀត');
+    } finally {
+        scanWriteInFlight = false;
     }
 }
 
@@ -1394,7 +1398,7 @@ window.addEventListener('load', () => {
             swReloadedOnce = true;
             const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if ((isAnyModalOpen() || isCameraScanning) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
+                if ((isAnyModalOpen() || scanWriteInFlight) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem(APP_UPDATED_TOAST_FLAG, '1');

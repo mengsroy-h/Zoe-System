@@ -33,7 +33,7 @@
             swReloadedOnce = true;
             const pendingSince = Date.now();
             const reloadWhenIdle = () => {
-                if ((isModalOpen || isCameraScanning) && (Date.now() - pendingSince) < 10 * 60 * 1000) {
+                if (isModalOpen && (Date.now() - pendingSince) < 10 * 60 * 1000) {
                     setTimeout(reloadWhenIdle, 3000);
                 } else {
                     sessionStorage.setItem('zoeadmin_just_updated', '1');

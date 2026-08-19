@@ -565,11 +565,11 @@ All fixes above (both the original 16 and these 6) are committed, `node --check`
 bumped a second time in all 4 `sw.js` (zoeadmin-v13, zoew-v12, zoescan-v12, zoekeygen-v6) to cover this
 second batch of behavior changes. Nothing is mid-edit.
 
-**`ZoeKeyGen/firebase-database.rules.json` needs manual publishing** in the Firebase Console (this repo's
-rules JSON is never auto-deployed by Netlify) — it now has a new `license_keys_meta` node. **After publishing,
-click "🔒 Migrate PII ចាស់"** in ZoeKeyGen's Key List card once to move existing keys' `note`/`createdBy`/etc.
-out of the public node — new keys split correctly on their own, but already-issued keys' metadata stays
-exposed at the old public path until that button is run. No other rules files changed this round.
+**UPDATE 2026-08-19 (confirmed by user):** `ZoeKeyGen/firebase-database.rules.json`'s `license_keys_meta`
+node has been manually published in the Firebase Console. Still needs confirmation whether the one-time
+"🔒 Migrate PII ចាស់" button in ZoeKeyGen's Key List card has been run — until it has, already-issued keys'
+`note`/`createdBy`/etc. stay exposed at the old public `license_keys` path even though new keys now split
+correctly on their own. No other rules files changed this round.
 
 ## Third deep-audit pass (2026-08-19, branch `claude/deep-audit-final-tkeqbq`) — handoff notes
 
@@ -641,5 +641,18 @@ the propose-first live-production exception.
 ### Not yet done as of this handoff
 All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep
 re-verified repo-wide. Nothing is mid-edit. No rules-file changes this round, so no manual-publish step is
-needed beyond the two still-outstanding items already noted above from the second audit round (`ZoeKeyGen/
-firebase-database.rules.json`'s `license_keys_meta` node + the one-time "🔒 Migrate PII ចាស់" button).
+needed from this round itself. From the second audit round: `license_keys_meta` rule publish is confirmed
+done (per user, 2026-08-19) — still need to confirm whether "🔒 Migrate PII ចាស់" has been run.
+
+This round's PR (#9) was merged to `main` at the user's explicit request in this session.
+
+**Note for next session, in case this comes up again:** after publishing the rule, the user clicked
+"🔒 Migrate PII ចាស់" and reported nothing visibly changed ("key didn't disappear, still shows normally").
+This is expected, not a bug — `refreshKeyList()` merges `license_keys` (public) + `license_keys_meta`
+(private) for display, so the ZoeKeyGen admin UI is *designed* to keep showing `note`/`createdBy` either way
+regardless of which node they physically live in. The migration's effect is only visible by inspecting the
+raw `license_keys/{appCode}/{keyId}` node in Firebase Console directly (those fields should be gone from
+there and present under `license_keys_meta/{appCode}/{keyId}` instead) — there was never a UI element where
+this data was shown to unauthenticated end-users in the first place, so nothing in any of the 4 apps' visible
+UI was ever expected to change. Still waiting on the user to confirm via Console inspection (or the toast
+message they saw on click) whether the migration write itself actually succeeded.

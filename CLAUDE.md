@@ -570,3 +570,76 @@ rules JSON is never auto-deployed by Netlify) — it now has a new `license_keys
 click "🔒 Migrate PII ចាស់"** in ZoeKeyGen's Key List card once to move existing keys' `note`/`createdBy`/etc.
 out of the public node — new keys split correctly on their own, but already-issued keys' metadata stays
 exposed at the old public path until that button is run. No other rules files changed this round.
+
+## Third deep-audit pass (2026-08-19, branch `claude/deep-audit-final-tkeqbq`) — handoff notes
+
+Requested as another confirmatory round after commit `184157f` ("Harden logout data-clearing across all 4
+apps for shared-device use") landed on top of the second audit round without a dedicated review of its own.
+Ran 5 parallel research agents again (one per app plus one cross-cutting infra pass), each re-checking every
+bug class listed above for regressions and independently hunting for anything new, with explicit extra
+scrutiny on `184157f` specifically. Agents were research-only (no edits); findings were triaged and applied
+directly in this same session — all of them were completeness gaps in the shared-device logout hardening
+itself, none touched Delete-vs-Remove, retention-window semantics, or live revenue math, so none required
+the propose-first live-production exception.
+
+### Fixed
+- **Zoescan: camera could stay on indefinitely after logout (the most severe finding this round).**
+  `forceExpireSession()` (the 4h auto-logout) never called `stopScanner()` — it just signed out — so an
+  actively-scanning camera kept running completely unattended after a forced session expiry, decode loop and
+  all. Separately, `184157f`'s new bulk modal-close loop in the sign-out branch could re-trigger `closeModal()`'s
+  pre-existing "resume camera if the last modal just closed" side effect when a modal happened to be open at
+  logout time (e.g. after backgrounding mid-scan with `locationWarningModal` up), turning the camera back on
+  right after logging out. Fixed at the source: the sign-out branch of `onAuthStateChanged` now sets
+  `cameraStoppedByVisibility = false` and calls `stopScanner()` unconditionally, before the modal bulk-close
+  loop runs — covers both the forced-expiry gap and the modal-reopen side effect in one place.
+- **ZoeAdmin/ZoeW: modal fields kept sensitive data in the live DOM after logout, only hidden via `display:
+  none`.** `openViewListModal`, `openCallMarkModal`, `openEditBarcodePriceModal`, and the edit-phone flow all
+  write phone numbers/barcode lists/prices directly into specific elements (`innerText`/`innerHTML`/`value`),
+  and `closeModal()` never blanked them — so after logout on a shared device, the previous user's data was
+  still readable via DevTools even though nothing was visible on screen. Added `clearSensitiveModalFields()`
+  to both apps (called from `showLoginModalWithPrefill()`, so it fires on every sign-out path: explicit
+  logout, 4h forced expiry, role-check failure) that blanks every known sensitive field plus the search boxes
+  (`searchPhoneInput`, `hwScannerInput`, `customerDataTableSearchInput` in ZoeAdmin) and resets the stale
+  `pendingRestoreId`/`pendingPermanentDeleteId`/`activeParentItemId` variables that the generic bulk-close
+  loop doesn't reach (those are only nulled by the `data-close`-attributed cancel handlers, not by
+  `closeModal()` itself).
+- **All 4 apps: the just-typed login password was left sitting in the password input's DOM `value` after a
+  login attempt**, retrievable via devtools or a "reveal password" control by whoever uses the device next.
+  Now cleared in a `finally` block after every login attempt (success or failure) in ZoeAdmin, ZoeW, Zoescan,
+  and ZoeKeyGen alike.
+- **ZoeAdmin's customer-table fetch and ZoeKeyGen's key-list fetch could survive logout and silently
+  repopulate the "cleared" cache/DOM** — two agents independently flagged the same race shape: `clearCustomer
+  DataTableCache()`/`showLoginModalWithPrefill()`'s cache-clear didn't cancel an in-flight fetch, so a slow
+  request (up to 15s) that was already running at logout time would resolve afterward and write its result
+  back into the in-memory cache and visible table — worse for ZoeAdmin specifically, since it also refreshed
+  `customerDataTableFetchedAt`, making the *next* login's fetch think the stale data was still fresh and skip
+  re-fetching entirely. Fixed with a session-generation counter in both apps
+  (`customerDataTableSessionGeneration` / `keyListSessionGeneration`, incremented on every clear): each fetch
+  captures the generation at start and checks it before writing back results, so a stale fetch's response is
+  silently discarded instead of clobbering a newer session's state.
+- **ZoeKeyGen: duplicate "Signing Key cleared from memory" toast on role-check failure/timeout** (pre-existing,
+  not introduced by `184157f`, purely cosmetic) — `verifyAdminRoleThenProceed`'s two failure branches called
+  `fb.signOut(auth)` (which itself triggers `onAuthStateChanged(null)` → `showLoginModalWithPrefill()`) and
+  then called `showLoginModalWithPrefill()` a second time explicitly right after. Removed the redundant
+  explicit calls; the centralized `onAuthStateChanged` handler already covers it, matching the pattern
+  ZoeAdmin/ZoeW already use (their equivalent double-call is harmless there since nothing in their version of
+  `showLoginModalWithPrefill()` shows a toast, so it was never visibly a bug in those two apps — left as-is).
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v15, zoew-v14, zoescan-v14, zoekeygen-v8). **No Firebase
+  rules files were touched this round — nothing from this round needs manual publishing.**
+
+### Explicitly not auto-decided (flagged for the user, not fixed)
+- **ZoeKeyGen: an involuntary logout (role-check timeout/failure, session expiry) silently destroys an
+  unsaved, not-yet-copied private key with no distinct warning.** `showLoginModalWithPrefill()` force-closes
+  every modal including `keypairModal`, whose `closeModal()` special-case wipes the generated-key textarea —
+  correct behavior for the deliberate Cancel/backdrop-click case it was built for in the second audit round,
+  but it now also fires silently on every *involuntary* auth-null transition, and only the unrelated "Signing
+  Key cleared from memory" toast fires, not anything naming the lost key. This is a real security-vs-UX
+  trade-off (arguably the right call given how catastrophic a leaked signing key would be) rather than a
+  clear-cut bug, so it wasn't decided unilaterally — if a distinct warning or a "copy before this closes"
+  confirmation is wanted, that's a product decision for the user to make.
+
+### Not yet done as of this handoff
+All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep
+re-verified repo-wide. Nothing is mid-edit. No rules-file changes this round, so no manual-publish step is
+needed beyond the two still-outstanding items already noted above from the second audit round (`ZoeKeyGen/
+firebase-database.rules.json`'s `license_keys_meta` node + the one-time "🔒 Migrate PII ចាស់" button).

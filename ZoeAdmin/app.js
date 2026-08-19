@@ -631,6 +631,7 @@
     let customerDataTableRows = null;
     let customerDataTableFetchedAt = 0;
     let customerDataTableFetchPromise = null;
+    let customerDataTableSessionGeneration = 0;
     const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
 
     function buildCustomerListApiUrl(cfg) {
@@ -678,6 +679,7 @@
 
         if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
 
+        const myGeneration = customerDataTableSessionGeneration;
         customerDataTableFetchPromise = (async () => {
             try {
                 const headers = {};
@@ -691,18 +693,20 @@
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 if (data && data.error) throw new Error(data.error);
+                if (myGeneration !== customerDataTableSessionGeneration) return;
                 const rows = Array.isArray(data && data.rows) ? data.rows : [];
                 customerDataTableRows = rows;
                 customerDataTableFetchedAt = Date.now();
                 renderCustomerDataTableStatus(rows);
                 filterCustomerDataTable();
             } catch (e) {
+                if (myGeneration !== customerDataTableSessionGeneration) return;
                 if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
                 const curStatusEl = document.getElementById('customerDataTableStatus');
                 if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
                 if (customerDataTableRows) filterCustomerDataTable();
             } finally {
-                customerDataTableFetchPromise = null;
+                if (myGeneration === customerDataTableSessionGeneration) customerDataTableFetchPromise = null;
             }
         })();
 
@@ -748,6 +752,7 @@
     }
 
     function clearCustomerDataTableCache() {
+        customerDataTableSessionGeneration++;
         customerDataTableRows = null;
         customerDataTableFetchedAt = 0;
         customerDataTableFetchPromise = null;
@@ -913,7 +918,25 @@
         });
     }
 
+    function clearSensitiveModalFields() {
+        pendingRestoreId = null;
+        pendingPermanentDeleteId = null;
+        activeParentItemId = null;
+        const fieldsToBlank = [
+            'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
+            'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
+            'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput'
+        ];
+        fieldsToBlank.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if ('value' in el) el.value = '';
+            else el.textContent = '';
+        });
+    }
+
     function showLoginModalWithPrefill() {
+        clearSensitiveModalFields();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1165,6 +1188,7 @@
             })
             .finally(() => {
                 if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
+                if (passInput) passInput.value = '';
             });
     }
 

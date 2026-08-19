@@ -455,7 +455,23 @@
         });
     }
 
+    function clearSensitiveModalFields() {
+        pendingRestoreId = null;
+        pendingPermanentDeleteId = null;
+        const fieldsToBlank = [
+            'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
+            'editPhoneInput', 'searchPhoneInput'
+        ];
+        fieldsToBlank.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if ('value' in el) el.value = '';
+            else el.textContent = '';
+        });
+    }
+
     function showLoginModalWithPrefill() {
+        clearSensitiveModalFields();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -704,6 +720,7 @@
             })
             .finally(() => {
                 if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
+                if (passInput) passInput.value = '';
             });
     }
 

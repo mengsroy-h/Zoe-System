@@ -221,11 +221,16 @@ async function initFirebase() {
             verifyRoleThenProceed(user, myAuthGeneration);
         } else {
             currentUserEmail = null;
+            cameraStoppedByVisibility = false;
+            stopScanner();
             detachDatabaseListeners();
             renderList();
             document.getElementById('lockerPickerScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.add('hidden');
             updateAuthButton(false);
+            pendingLocationCode = null;
+            const listSearchEl = document.getElementById('listSearchInput');
+            if (listSearchEl) listSearchEl.value = '';
             document.querySelectorAll('.modal').forEach((m) => {
                 if (m.id !== 'loginModal') closeModal(m.id);
             });
@@ -446,7 +451,10 @@ async function loginWithFirebase() {
             : 'អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!';
         errBox.style.display = 'block';
     } finally {
-        if (myLoginGeneration === loginGeneration) { btn.disabled = false; btn.textContent = 'ចូលប្រព័ន្ធ'; }
+        if (myLoginGeneration === loginGeneration) {
+            btn.disabled = false; btn.textContent = 'ចូលប្រព័ន្ធ';
+            document.getElementById('loginPasswordInput').value = '';
+        }
     }
 }
 function logoutApp() {

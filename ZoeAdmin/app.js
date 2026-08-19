@@ -613,6 +613,113 @@
         }
     }
 
+    let customerDataTableRows = null;
+    let customerDataTableFetchedAt = 0;
+    const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
+
+    function buildCustomerListApiUrl(cfg) {
+        if (!cfg || !cfg.url) return null;
+        let url = cfg.url.trim();
+        if (/[?&]code=/.test(url)) {
+            url = url.replace(/([?&])code=[^&]*/, '$1list=1');
+        } else {
+            url += (url.indexOf('?') !== -1 ? '&' : '?') + 'list=1';
+        }
+        return url;
+    }
+
+    function openCustomerDataTableModal() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.url) {
+            alert("សូមកំណត់ Config API ស្វែងរកអតិថិជនជាមុនសិន (⋯ ➜ 🔌 API ស្វែងរកអតិថិជន) មុននឹងបើកតារាងនេះ។");
+            return;
+        }
+        const searchInput = document.getElementById('customerDataTableSearchInput');
+        if (searchInput) searchInput.value = '';
+        openModalHelper('customerDataTableModal');
+        fetchCustomerDataTableRows(false);
+    }
+
+    async function fetchCustomerDataTableRows(force) {
+        const cfg = getLookupApiConfig();
+        const statusEl = document.getElementById('customerDataTableStatus');
+        if (!cfg || !cfg.url) return;
+
+        const isFresh = customerDataTableRows && (Date.now() - customerDataTableFetchedAt < CUSTOMER_TABLE_CACHE_MS);
+        if (!force && isFresh) {
+            renderCustomerDataTableStatus(customerDataTableRows);
+            filterCustomerDataTable();
+            return;
+        }
+
+        const listUrl = buildCustomerListApiUrl(cfg);
+        if (!listUrl) return;
+
+        if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
+
+        const headers = {};
+        if (cfg.headerName && cfg.headerValueEnc) {
+            const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+            if (decrypted) headers[cfg.headerName] = decrypted;
+        } else if (cfg.headerName && cfg.headerValue) {
+            headers[cfg.headerName] = cfg.headerValue;
+        }
+
+        try {
+            const res = await withTimeout(fetch(listUrl, { headers }), 15000, 'Customer table fetch timed out');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (data && data.error) throw new Error(data.error);
+            const rows = Array.isArray(data && data.rows) ? data.rows : [];
+            customerDataTableRows = rows;
+            customerDataTableFetchedAt = Date.now();
+            renderCustomerDataTableStatus(rows);
+            filterCustomerDataTable();
+        } catch (e) {
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
+            if (statusEl) statusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
+            if (customerDataTableRows) filterCustomerDataTable();
+        }
+    }
+
+    function renderCustomerDataTableStatus(rows) {
+        const statusEl = document.getElementById('customerDataTableStatus');
+        if (!statusEl) return;
+        const ts = customerDataTableFetchedAt ? new Date(customerDataTableFetchedAt).toLocaleTimeString('km-KH') : '';
+        statusEl.textContent = rows.length + ' ជួរដេក' + (ts ? (' — ទាញយកចុងក្រោយ ' + ts) : '');
+    }
+
+    function filterCustomerDataTable() {
+        const body = document.getElementById('customerDataTableBody');
+        if (!body) return;
+        const rows = customerDataTableRows || [];
+        const searchInput = document.getElementById('customerDataTableSearchInput');
+        const q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+
+        const filtered = q ? rows.filter((r) =>
+            String(r.barcode || '').toLowerCase().indexOf(q) !== -1 ||
+            String(r.phone || '').toLowerCase().indexOf(q) !== -1 ||
+            String(r.cod || '').indexOf(q) !== -1 ||
+            String(r.dod || '').indexOf(q) !== -1
+        ) : rows;
+
+        if (filtered.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:16px;">' + (rows.length === 0 ? 'មិនទាន់មានទិន្នន័យ' : 'រកមិនឃើញ') + '</td></tr>';
+            return;
+        }
+
+        const maxRender = 500;
+        const toRender = filtered.slice(0, maxRender);
+        let html = toRender.map((r) =>
+            '<tr><td>' + sanitizeInput(r.barcode) + '</td><td>' + Number(r.dod || 0).toFixed(2) +
+            '</td><td>' + Number(r.cod || 0).toFixed(2) + '</td><td>' + sanitizeInput(r.phone) + '</td></tr>'
+        ).join('');
+        if (filtered.length > maxRender) {
+            html += '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:8px;">... និងមាន ' + (filtered.length - maxRender) + ' ជួរដេកទៀត (សូមស្វែងរកឲ្យតូចជាងនេះ)</td></tr>';
+        }
+        body.innerHTML = html;
+    }
+
     function getNestedField(obj, path) {
         if (!obj || !path) return null;
         return path.split('.').reduce((acc, key) => (acc !== null && acc !== undefined && acc[key] !== undefined) ? acc[key] : null, obj);
@@ -1895,6 +2002,7 @@
             <button onclick="openExportDataModal(); document.getElementById('globalMoreMenu').classList.remove('show');">📤 Export Data</button>
             <button onclick="requestPinBeforeConfig(); document.getElementById('globalMoreMenu').classList.remove('show');">⚙️ Config / Reconfig</button>
             <button onclick="requestPinBeforeConfig(openLookupApiConfigModal); document.getElementById('globalMoreMenu').classList.remove('show');">🔌 API ស្វែងរកអតិថិជន</button>
+            <button onclick="openCustomerDataTableModal(); document.getElementById('globalMoreMenu').classList.remove('show');">📊 តារាងអតិថិជន</button>
             <button onclick="openExchangeRateModal(); document.getElementById('globalMoreMenu').classList.remove('show');">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
             <button style="opacity:0.55; font-size:10.5px; border-top:1px dashed var(--border-color); margin-top:4px; padding-top:8px;" onclick="rebuildScannerLookupData(); document.getElementById('globalMoreMenu').classList.remove('show');">🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ</button>
             <button class="delete-opt" onclick="clearHistory(); document.getElementById('globalMoreMenu').classList.remove('show');">❌ លុបទាំងអស់</button>

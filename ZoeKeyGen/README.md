@@ -35,7 +35,7 @@ Key ត្រូវបានផលិតឡើងជាមួយ **ហត្ថ�
 
 ### ជំហានទី ៣ — ភ្ជាប់ Database URL ចូល App ទាំង ៤ (ធ្វើម្តងគត់)
 
-ឯកសារ `license-verify.js` (ដូចគ្នាបេះបិទក្នុង ZoeAdmin, ZoeW, Zoescan, ZoeKeyGen) មាន Constant មួយឈ្មោះ `LICENSE_DB_URL` ដែលកំពុងតែជា Placeholder (`REPLACE_WITH_LICENSE_DATABASE_URL`)។ ត្រូវជំនួសវាដោយ **Database URL** ពិតប្រាកដពីជំហានទី ១.៧ (ឧ. `https://zoe-license-default-rtdb.firebasedatabase.app`) ក្នុងឯកសារទាំង ៤ ច្បាប់ រួច Deploy ឡើងវិញ។ បើគ្មានជំហាននេះ App ទាំង ៣ (ZoeAdmin/ZoeW/Zoescan) នៅតែដំណើរការជាមួយ Key ដែលមានហត្ថលេខាត្រឹមត្រូវបាន (ការត្រួតពិនិត្យ Offline តាមហត្ថលេខានៅតែដំណើរការធម្មតា) ប៉ុន្តែមុខងារ Revoke ភ្លាមៗ/ផ្ទៀងផ្ទាត់ Online នឹងមិនដំណើរការទេ។
+ឯកសារ `license-verify.js` (ដូចគ្នាបេះបិទក្នុង ZoeAdmin, ZoeW, Zoescan, ZoeKeyGen) មាន Constant មួយឈ្មោះ `LICENSE_DB_URL` ដែលត្រូវតែជា **Database URL** ពិតប្រាកដនៃ Project `zoe-license` ដាច់ដោយឡែក ពីជំហានទី ១.៧ (ឧ. `https://zoe-license-default-rtdb.firebasedatabase.app`) — **មិនមែន** Database URL របស់ ZoeW (ទិន្នន័យអាជីវកម្ម) ទេ។ តម្លៃបច្ចុប្បន្នដែលកត់ត្រាទុកក្នុងឯកសារទាំង ៤ ច្បាប់គឺ `https://zoew-z1-default-rtdb.firebaseio.com` — សូមផ្ទៀងផ្ទាត់ម្តងទៀតថានេះពិតជា URL របស់ Project `zoe-license` មែន (ឈ្មោះ `zoew-z1` អាចជា Project ID ចាស់/ខាងក្នុងតែប៉ុណ្ណោះ) មិនមែនជា URL របស់ App ZoeW ខុសដោយចៃដន្យទេ មុននឹង Deploy។ បើ URL ខុស App ទាំង ៣ (ZoeAdmin/ZoeW/Zoescan) នៅតែដំណើរការជាមួយ Key ដែលមានហត្ថលេខាត្រឹមត្រូវបាន (ការត្រួតពិនិត្យ Offline តាមហត្ថលេខានៅតែដំណើរការធម្មតា) ប៉ុន្តែមុខងារ Revoke ភ្លាមៗ/ផ្ទៀងផ្ទាត់ Online នឹងមិនដំណើរការទេ។ បើត្រូវការផ្លាស់ប្តូរ សូមកែក្នុងឯកសារទាំង ៤ ច្បាប់ឲ្យដូចគ្នាបេះបិទ (`cp` + `md5sum`) រួច Deploy ឡើងវិញ។
 
 ### ជំហានទី ៤ — បង្កើត Signing Keypair (ធ្វើម្តងគត់)
 

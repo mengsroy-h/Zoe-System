@@ -1269,6 +1269,7 @@ async function assignLockerToEntry(code) {
 
         const mirrorUpdates = {};
         if (matchedBarcodeIdx !== null) {
+            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/code`] = code;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
             mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
             if (singleBarcodeItem) {

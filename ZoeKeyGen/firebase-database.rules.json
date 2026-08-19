@@ -12,10 +12,11 @@
     },
 
     "license_keys": {
-      ".read": true,
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {
         ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
         "$keyId": {
+          ".read": true,
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
           "expiresAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":   { ".validate": "newData.isBoolean()" },

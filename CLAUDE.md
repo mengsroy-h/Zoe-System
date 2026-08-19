@@ -1249,3 +1249,84 @@ All applied fixes are committed, `node --check`-clean, JSON-validated, comment-f
 tag-balance- and wiring-checked, and the backup tool was executed end-to-end against a stub. Nothing is
 mid-edit. No rules file changed, so no manual publish is needed for anything applied this round — items 5
 above would need one *if* the user asks for it.
+
+### Follow-up in the same session — per-barcode លុប/ដក marker + all 7 flagged items applied
+
+The user restated the Delete-vs-Remove policy in their own words (confirming it is policy, not a bug),
+added the missing business rationale, and then authorised fixing all 7 flagged items "so long as លុប/ដក
+behaviour does not change". Two clarifications worth keeping:
+- **"បិទ" = "យកហើយ"** — closed means the customer collected the parcel. Count and value stay in the
+  daily/monthly stats permanently; the 2-hour auto-cleanup must never move them.
+- **The 8-day window exists because an uncollected parcel is physically returned to the central branch.**
+  That is why ដក subtracts *both* the money and the package count, and why restoring adds both back.
+Windows stay 2h / 8d / 10d exactly as before.
+
+**Per-barcode marker (the new part).** `isFromDeletion` already existed on each barcode, in both Firebase
+schemas and in the rules, but was **dead**: only ever written `false` at creation, never set on any លុប
+path, and never read. So a barcode inside a deleted (លុប) order read as `false`, i.e. indistinguishable
+from a removed (ដក) one. It is now written on every path:
+- លុប — `deleteSingleItem`, `clearHistory`, `claimAndCleanupItem` reason `'close'` → each barcode gets
+  `isFromDeletion: true`, `isDeducted` untouched (stays `false`; no money moves).
+- ដក — `claimAndCleanupItem` partial + whole-abandon, `removeSingleBarcode` → each barcode gets
+  `isFromDeletion: false` alongside `isDeducted: true`.
+- Restore — `executeRestoreItem` now clears `isFromDeletion` on every restored barcode (it is live again),
+  next to the existing `isDeducted` reset.
+- The `dbRefHistory` normalizer defaults a missing `isFromDeletion` to `false`, so pre-existing records
+  backfill on their next full write.
+`isDeducted` remains the *only* field that drives money — the marker is additive and nothing depends on it
+for correctness, which matters because trash records already in production do not carry it.
+**No Firebase rules change was needed** — `isFromDeletion` is already in both schemas, and every write is
+to a brand-new trash record (`!data.exists()`), so the worker-role validate passes.
+
+**Verified by executing the real code**: `scratchpad/policy-test.js` slices the actual
+`claimAndCleanupItem` trash-construction block and `executeRestoreItem` revenue block out of both
+`app.js` files, runs them in a `vm` context with stubbed helpers, and asserts 27 invariants per app —
+លុប→restore→លុប→restore leaves the stats byte-identical; ដក→restore→ដក→restore subtracts and adds back
+exactly; partial claims only move the claimed barcodes; legacy items behave symmetrically both ways.
+Worth rebuilding in a future round; it is the only executable proof of the policy in the repo.
+
+**The 7 flagged items — all now applied, none changing លុប/ដក semantics:**
+1. `toggleCloseStatus`/`toggleIndividualBarcodeClose` now derive the pickup deltas from `previousState`
+   (re-read after the blocking `confirm()`) instead of from `desiredClosed` alone, via
+   `alreadyInDesiredState`. Closes the stale-dialog race that left a phantom customer refCount.
+2. Legacy items with no `barcodes[]` now get their ដក value added back on restore, keyed off the
+   item-level marker captured as `restoredWasRemoved` *before* `isFromDeletion` is deleted. Conservative:
+   only an explicit `isFromDeletion === false` triggers the add-back, so an ancient record missing the
+   field behaves exactly as it does today.
+3. `confirmPhone`'s wholesale `dailyRevenueData`/`monthlyRevenueData` snapshot revert removed;
+   `addOrUpdateEntry`'s `revertRevenueOnSaveFailure` owns that revert and is object-identity-safe.
+   `scanHistory = historySnapshot` stays — nothing else undoes the local item.
+4. Resolved as a side effect of hoisting: `executeRestoreItem`'s revenue block is now one shared block
+   ahead of the merge/create branches, always keyed on `itemToRestore.scanDate`. **`executeRestoreItem`
+   and `claimAndCleanupItem` are now byte-identical across ZoeAdmin and ZoeW** (verified by the differ;
+   ZoeW's `restoredResultItem` renamed to ZoeAdmin's `resultingLiveItem`).
+5. `ZoeKeyGen/firebase-database.rules.json`: `.read: true` moved down from `license_keys` to
+   `license_keys/$appCode/$keyId`, with admin `.read` added at the parent for `refreshKeyList()`.
+   `checkOnline()` reads one exact key path so it is unaffected; `syncServerTime()` ignores the response
+   status entirely and only reads the `Date` header, so it is unaffected too.
+   **This one needs a manual publish in the ZoeKeyGen Firebase Console.**
+6. Zoescan's mirror write now also sends `barcodes/{idx}/code`. Because that field is scanner-locked to
+   its existing value, Firebase itself rejects the write if the index no longer points at that barcode.
+   A full fix (match by code inside a transaction) is **not possible**: a transaction requires read access
+   to `zoew_scan_history_cod_dod`, which the scanner role deliberately does not have. Residual gap: an
+   index past the end of the array still passes (`!data.exists()`) and creates a sparse entry. A rules
+   guard (`barcodes/$idx` must have children `code`/`cod`/`dod`) would close it, but was **not** applied —
+   it would permanently reject writes to any production barcode that happens to be missing `cod`/`dod`,
+   which cannot be verified from here.
+7. ZoeKeyGen's Extend modal now states plainly that extending moves the server ceiling only, and that
+   after the key's original signed expiry it can no longer be activated on a new or reset device.
+   Behaviour deliberately unchanged (re-signing would produce a different key string).
+
+`CACHE_VERSION` bumped again for all 4 (zoeadmin-v26, zoew-v23, zoescan-v22, zoekeygen-v14).
+`ZoeAdmin/README.md`'s Delete-vs-Remove section now documents the per-barcode marker table.
+
+### Newly found this round, reported but NOT applied (needs a rules decision)
+**ZoeW's automatic 8-day *partial* claim is rejected by the rules whenever the stale-open barcode is not
+last in `barcodes[]`.** `claimAndCleanupItem` writes the compacted remainder, which shifts array indices;
+the per-barcode `cod`/`dod`/`isDeducted`/`time`/`createdAt`/`isFromDeletion` validates are all
+`admin || !data.exists() || unchanged`, so a shifted index makes an admin-locked field change value under
+a `worker` session and the whole transaction is refused. ZoeAdmin (admin role) is unaffected, and the
+sweep succeeds whenever an admin opens ZoeAdmin, which is presumably why this has never been noticed.
+No declarative rule can express "this is a permutation of the same barcodes", so the options are: relax
+those per-barcode locks for `worker`, or accept that partial 8-day cleanup is admin-only. Flagged for the
+user rather than decided here.

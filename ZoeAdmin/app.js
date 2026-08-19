@@ -1439,6 +1439,7 @@
                         b.cod = parseFloat(b.cod) || 0;
                         b.dod = parseFloat(b.dod) || 0;
                         if (b.isDeducted === undefined) b.isDeducted = false;
+                        if (b.isFromDeletion === undefined) b.isFromDeletion = false;
                     });
                 }
             });
@@ -1597,7 +1598,7 @@
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
-                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
                 trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
                 trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
@@ -1620,7 +1621,7 @@
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                     }
                     revenueScanDate = trashItem.scanDate || getFormattedDate();
                     revenueCod = parseFloat(trashItem.cod) || 0;
@@ -1630,6 +1631,9 @@
                     revenueDeducted = true;
                 } else {
                     trashItem.isFromDeletion = true;
+                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+                    }
                 }
             }
 
@@ -3313,16 +3317,12 @@
             }
 
             const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
-            const dailySnapshot = JSON.parse(JSON.stringify(dailyRevenueData));
-            const monthlySnapshot = JSON.parse(JSON.stringify(monthlyRevenueData));
 
             try {
                 await withTimeout(addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker), 15000, 'Save timed out');
             } catch (saveError) {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
                 scanHistory = historySnapshot;
-                dailyRevenueData = dailySnapshot;
-                monthlyRevenueData = monthlySnapshot;
                 applyCurrentFilter();
                 throw saveError;
             }
@@ -3602,7 +3602,7 @@
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
-            pickupPackageDelta = desiredClosed ? 1 : -1;
+            pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
             if (!previousState.itemIsClosed && allClosedLocal) {
                 pickupCustomerDelta = 1;
             } else if (previousState.itemIsClosed && !allClosedLocal) {
@@ -3709,7 +3709,7 @@
         const item = scanHistory.find(i => i.id === activeParentItemId);
         if (item) {
             if (!item.barcodes || !Array.isArray(item.barcodes)) {
-                item.barcodes = [{ code: item.barcode, time: item.time, cod: parseFloat(item.cod) || 0, dod: parseFloat(item.dod) || 0, locker: item.locker || "N/A", isClosed: item.isClosed || false, isDeducted: false }];
+                item.barcodes = [{ code: item.barcode, time: item.time, cod: parseFloat(item.cod) || 0, dod: parseFloat(item.dod) || 0, locker: item.locker || "N/A", isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || getServerNow() }];
             }
 
             let targetB = item.barcodes.find(b => b.code === activeEditingBarcode);
@@ -3845,16 +3845,17 @@
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
+            const alreadyInDesiredState = !!previousState.isClosed === desiredClosed;
             if (previousState.barcodeStates) {
                 previousState.barcodeStates.forEach((wasClosed) => {
                     if (desiredClosed && !wasClosed) pickupPackageDelta += 1;
                     else if (!desiredClosed && wasClosed) pickupPackageDelta -= 1;
                 });
-            } else {
+            } else if (!alreadyInDesiredState) {
                 const pickupPackages = parseFloat(freshItem.count) || 1;
                 pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
             }
-            pickupCustomerDelta = desiredClosed ? 1 : -1;
+            pickupCustomerDelta = alreadyInDesiredState ? 0 : (desiredClosed ? 1 : -1);
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             applyCurrentFilter();
@@ -3916,6 +3917,9 @@
         let removed = scanHistory.splice(index, 1)[0];
         removed.deletedAt = getServerNow();
         removed.isFromDeletion = true;
+        if (removed.barcodes && Array.isArray(removed.barcodes)) {
+            removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+        }
 
         deletedItems.unshift(removed);
 
@@ -4002,6 +4006,7 @@
         }
 
         let itemToRestore = deletedItems.splice(index, 1)[0];
+        const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         if (itemToRestore.isClosed) {
@@ -4010,25 +4015,36 @@
             itemToRestore.createdAt = getServerNow();
         }
 
+        const appliedRevenueDeltas = [];
+        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
+        if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+            itemToRestore.barcodes.forEach((restoredBc) => {
+                if (restoredBc.isDeducted) {
+                    const targetCod = parseFloat(restoredBc.cod) || 0;
+                    const targetDod = parseFloat(restoredBc.dod) || 0;
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
+                    appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod, count: 1 });
+                    restoredBc.isDeducted = false;
+                }
+                restoredBc.isFromDeletion = false;
+            });
+        } else if (restoredWasRemoved) {
+            const legacyCod = parseFloat(itemToRestore.cod) || 0;
+            const legacyDod = parseFloat(itemToRestore.dod) || 0;
+            const legacyCount = parseFloat(itemToRestore.count) || 1;
+            addRevenueToDailyAndMonthlyRecord(revenueScanDate, legacyCod, legacyDod, legacyCount);
+            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
+        }
+
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
 
         let resultingLiveItem;
-        const appliedRevenueDeltas = [];
-
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
             if (!targetItem.barcodes) targetItem.barcodes = [];
 
             if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                 itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        const revenueScanDate = targetItem.scanDate || getFormattedDate();
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
-                        restoredBc.isDeducted = false;
-                    }
                     targetItem.barcodes.push(restoredBc);
                 });
             }
@@ -4053,18 +4069,6 @@
 
             resultingLiveItem = targetItem;
         } else {
-            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-                itemToRestore.barcodes.forEach(restoredBc => {
-                    if (restoredBc.isDeducted) {
-                        const targetCod = parseFloat(restoredBc.cod) || 0;
-                        const targetDod = parseFloat(restoredBc.dod) || 0;
-                        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
-                        restoredBc.isDeducted = false;
-                    }
-                });
-            }
             scanHistory.push(itemToRestore);
             resultingLiveItem = itemToRestore;
         }
@@ -4082,13 +4086,13 @@
                 [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            if (resultingLiveItem && resultingLiveItem.id) syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
             updateRecentPhonesList();
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
-            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -1));
+            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             try {
@@ -4488,6 +4492,9 @@
         const clearedItems = scanHistory.map(item => {
             item.deletedAt = getServerNow();
             item.isFromDeletion = true;
+            if (item.barcodes && Array.isArray(item.barcodes)) {
+                item.barcodes = item.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+            }
             return item;
         });
         clearedItems.forEach(item => deletedItems.unshift(item));

@@ -939,6 +939,7 @@
                         b.cod = parseFloat(b.cod) || 0;
                         b.dod = parseFloat(b.dod) || 0;
                         if (b.isDeducted === undefined) b.isDeducted = false;
+                        if (b.isFromDeletion === undefined) b.isFromDeletion = false;
                     });
                 }
             });
@@ -1097,7 +1098,7 @@
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
-                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
                 trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
                 trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
@@ -1120,7 +1121,7 @@
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true }));
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                     }
                     revenueScanDate = trashItem.scanDate || getFormattedDate();
                     revenueCod = parseFloat(trashItem.cod) || 0;
@@ -1130,6 +1131,9 @@
                     revenueDeducted = true;
                 } else {
                     trashItem.isFromDeletion = true;
+                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+                    }
                 }
             }
 
@@ -2071,7 +2075,7 @@
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
-            pickupPackageDelta = desiredClosed ? 1 : -1;
+            pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
             if (!previousState.itemIsClosed && allClosedLocal) {
                 pickupCustomerDelta = 1;
             } else if (previousState.itemIsClosed && !allClosedLocal) {
@@ -2237,16 +2241,17 @@
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
+            const alreadyInDesiredState = !!previousState.isClosed === desiredClosed;
             if (previousState.barcodeStates) {
                 previousState.barcodeStates.forEach((wasClosed) => {
                     if (desiredClosed && !wasClosed) pickupPackageDelta += 1;
                     else if (!desiredClosed && wasClosed) pickupPackageDelta -= 1;
                 });
-            } else {
+            } else if (!alreadyInDesiredState) {
                 const pickupPackages = parseFloat(freshItem.count) || 1;
                 pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
             }
-            pickupCustomerDelta = desiredClosed ? 1 : -1;
+            pickupCustomerDelta = alreadyInDesiredState ? 0 : (desiredClosed ? 1 : -1);
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             applyCurrentFilter();
@@ -2354,6 +2359,7 @@
         }
 
         let itemToRestore = deletedItems.splice(index, 1)[0];
+        const restoredWasRemoved = itemToRestore.isFromDeletion === false;
         delete itemToRestore.deletedAt;
         delete itemToRestore.isFromDeletion;
         if (itemToRestore.isClosed) {
@@ -2363,21 +2369,29 @@
         }
 
         const appliedRevenueDeltas = [];
+        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
         if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
             itemToRestore.barcodes.forEach((restoredBc) => {
-                if (!restoredBc.isDeducted) return;
-                const targetCod = parseFloat(restoredBc.cod) || 0;
-                const targetDod = parseFloat(restoredBc.dod) || 0;
-                const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
-                addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod });
-                restoredBc.isDeducted = false;
+                if (restoredBc.isDeducted) {
+                    const targetCod = parseFloat(restoredBc.cod) || 0;
+                    const targetDod = parseFloat(restoredBc.dod) || 0;
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
+                    appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod, count: 1 });
+                    restoredBc.isDeducted = false;
+                }
+                restoredBc.isFromDeletion = false;
             });
+        } else if (restoredWasRemoved) {
+            const legacyCod = parseFloat(itemToRestore.cod) || 0;
+            const legacyDod = parseFloat(itemToRestore.dod) || 0;
+            const legacyCount = parseFloat(itemToRestore.count) || 1;
+            addRevenueToDailyAndMonthlyRecord(revenueScanDate, legacyCod, legacyDod, legacyCount);
+            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
         }
 
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
 
-        let restoredResultItem;
+        let resultingLiveItem;
         if (existingItemIndex !== -1) {
             let targetItem = scanHistory[existingItemIndex];
             if (!targetItem.barcodes) targetItem.barcodes = [];
@@ -2406,10 +2420,10 @@
                 targetItem.callMarkTime = itemToRestore.callMarkTime;
             }
 
-            restoredResultItem = targetItem;
+            resultingLiveItem = targetItem;
         } else {
             scanHistory.push(itemToRestore);
-            restoredResultItem = itemToRestore;
+            resultingLiveItem = itemToRestore;
         }
 
         const restoredId = pendingRestoreId;
@@ -2418,20 +2432,20 @@
 
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
-            if (!restoredResultItem.id || !safeIdPattern.test(restoredResultItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
+            if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
                 throw new Error('Unsafe id during restore');
             }
             await fb.update(fb.ref(db), {
-                [`zoew_scan_history_cod_dod/${restoredResultItem.id}`]: restoredResultItem,
+                [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            syncScannerLookupEntry(restoredResultItem.id, restoredResultItem);
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
             applyCurrentFilter();
             updateRecentPhonesList();
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
-            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -1));
+            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             try {

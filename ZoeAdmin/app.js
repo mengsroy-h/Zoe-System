@@ -720,6 +720,23 @@
         body.innerHTML = html;
     }
 
+    function findCustomerDataTableRow(barcode) {
+        if (!customerDataTableRows || !barcode) return null;
+        const target = String(barcode).trim().toUpperCase();
+        for (let i = 0; i < customerDataTableRows.length; i++) {
+            const r = customerDataTableRows[i];
+            if (String(r.barcode || '').trim().toUpperCase() === target) return r;
+        }
+        return null;
+    }
+
+    function prefetchCustomerDataTableRowsIfConfigured() {
+        const cfg = getLookupApiConfig();
+        if (cfg && cfg.url) {
+            fetchCustomerDataTableRows(false);
+        }
+    }
+
     function getNestedField(obj, path) {
         if (!obj || !path) return null;
         return path.split('.').reduce((acc, key) => (acc !== null && acc !== undefined && acc[key] !== undefined) ? acc[key] : null, obj);
@@ -727,9 +744,48 @@
 
     let lookupLockedNoticeShown = false;
 
+    function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
+        if (pendingBarcode !== barcode || !isModalOpen) return;
+
+        let filledAny = false;
+        let phoneWasAutoFilled = false;
+
+        const phoneEl = document.getElementById('modalPhoneInput');
+        if (phoneVal && phoneEl && !phoneEl.value) {
+            phoneEl.value = String(phoneVal).trim().replace(/^(\+?855-?)/, '0');
+            filledAny = true;
+            phoneWasAutoFilled = true;
+        }
+
+        const codEl = document.getElementById('modalCodInput');
+        if (codVal !== null && codVal !== undefined && !isNaN(parseFloat(codVal)) && codEl && !codEl.value) {
+            codEl.value = parseFloat(codVal);
+            filledAny = true;
+        }
+
+        const dodEl = document.getElementById('modalDodInput');
+        if (dodVal !== null && dodVal !== undefined && !isNaN(parseFloat(dodVal)) && dodEl && !dodEl.value) {
+            dodEl.value = parseFloat(dodVal);
+            filledAny = true;
+        }
+
+        if (cfg.autoSubmit && phoneWasAutoFilled && pendingBarcode === barcode && isModalOpen) {
+            showToast("✅ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
+            confirmPhone(false);
+        } else if (filledAny) {
+            showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
+        }
+    }
+
     async function attemptAutoLookup(barcode) {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
+
+        const cachedRow = findCustomerDataTableRow(barcode);
+        if (cachedRow) {
+            applyLookupFillToModal(barcode, cachedRow.phone, cachedRow.cod, cachedRow.dod, cfg);
+            return;
+        }
 
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
             if (!lookupLockedNoticeShown) {
@@ -753,39 +809,10 @@
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
 
-            if (pendingBarcode !== barcode || !isModalOpen) return;
-
-            let filledAny = false;
-            let phoneWasAutoFilled = false;
-
             const phoneVal = getNestedField(data, cfg.phoneField);
-            const phoneEl = document.getElementById('modalPhoneInput');
-            if (phoneVal && phoneEl && !phoneEl.value) {
-                phoneEl.value = String(phoneVal).trim().replace(/^(\+?855-?)/, '0');
-                filledAny = true;
-                phoneWasAutoFilled = true;
-            }
-
             const codVal = getNestedField(data, cfg.codField);
-            const codEl = document.getElementById('modalCodInput');
-            if (codVal !== null && codVal !== undefined && !isNaN(parseFloat(codVal)) && codEl && !codEl.value) {
-                codEl.value = parseFloat(codVal);
-                filledAny = true;
-            }
-
             const dodVal = getNestedField(data, cfg.dodField);
-            const dodEl = document.getElementById('modalDodInput');
-            if (dodVal !== null && dodVal !== undefined && !isNaN(parseFloat(dodVal)) && dodEl && !dodEl.value) {
-                dodEl.value = parseFloat(dodVal);
-                filledAny = true;
-            }
-
-            if (cfg.autoSubmit && phoneWasAutoFilled && pendingBarcode === barcode && isModalOpen) {
-                showToast("✅ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
-                confirmPhone(false);
-            } else if (filledAny) {
-                showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
-            }
+            applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
@@ -1495,11 +1522,16 @@
         if (window.ZoeErrors) ZoeErrors.init('zoeadmin');
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         initFirebase();
+        prefetchCustomerDataTableRowsIfConfigured();
 
         if (sessionStorage.getItem('zoeadmin_just_updated')) {
             sessionStorage.removeItem('zoeadmin_just_updated');
             showToast("កម្មវិធីត្រូវបានធ្វើបច្ចុប្បន្នភាព ✅");
         }
+
+        setInterval(() => {
+            prefetchCustomerDataTableRowsIfConfigured();
+        }, CUSTOMER_TABLE_CACHE_MS);
 
         setInterval(async () => {
             if (auth && auth.currentUser) {

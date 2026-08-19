@@ -71,7 +71,8 @@ Key ត្រូវបានផលិតឡើងជាមួយ **ហត្ថ�
 
 - **Key មិនអាចក្លែងបន្លំបាន** បើគ្មាន Private Key — នេះជាគណិតវិទ្យា Cryptography ពិត មិនមែនគ្រាន់តែជា Obfuscation ទេ។
 - **Key មិនអាចពន្យារពេលដោយកែ localStorage** ព្រោះថ្ងៃផុតកំណត់ស្ថិតនៅក្នុងហត្ថលេខាផ្ទាល់។
-- **License Database ដាច់ដោយឡែកពី Business Database** — សូម្បីតែ Project របស់ ZoeAdmin មានបញ្ហា Rules/Leak Config ក៏ដោយ Private Signing Key និងគណនី Admin របស់ License មិនរងផលប៉ះពាល់ដែរ។ ចំណុច `license_keys` អនុញ្ញាតឲ្យអានជាសាធារណៈដោយចេតនា ព្រោះមិនមានទិន្នន័យសម្ងាត់ (គ្រាន់តែជា ID/ថ្ងៃផុតកំណត់/Revoked flag) ដូច្នេះមិនប៉ះពាល់សុវត្ថិភាពទេ។
+- **License Database ដាច់ដោយឡែកពី Business Database** — សូម្បីតែ Project របស់ ZoeAdmin មានបញ្ហា Rules/Leak Config ក៏ដោយ Private Signing Key និងគណនី Admin របស់ License មិនរងផលប៉ះពាល់ដែរ។
+- **`license_keys` (សាធារណៈ) vs `license_keys_meta` (Admin-only)**: `license_keys/{app}/{id}` អនុញ្ញាតឲ្យអានជាសាធារណៈដោយចេតនា ព្រោះ App ទាំង ៣ (ZoeAdmin/ZoeW/Zoescan) ត្រូវការត្រួតពិនិត្យ Key នេះមុនពេលមាន Auth — ប៉ុន្តែឥឡូវនេះមានតែ `expiresAt`/`revoked` ប៉ុណ្ណោះនៅទីនោះ។ `note`/`createdBy` (អ៊ីមែល Admin)/`issuedAt`/`scope`/`appPaths` ត្រូវផ្លាស់ទីទៅ `license_keys_meta` ដែលអាន/សរសេរបានតែ Admin ប៉ុណ្ណោះ។ **បើ Publish Rules ថ្មីនេះលើ Project ដែលធ្លាប់មាន Key រួចហើយ សូមចុចប៊ូតុង "🔒 Migrate PII ចាស់" ក្នុងផ្នែក "បញ្ជី Key ទាំងអស់" ម្តងគត់** ដើម្បីផ្លាស់ទីទិន្នន័យចាស់ចេញពី Path សាធារណៈ — Key ដែលបង្កើតថ្មីៗនឹងបំបែកដោយស្វ័យប្រវត្តិស្រាប់។
 
 ## អាជ្ញាប័ណ្ណ (License)
 

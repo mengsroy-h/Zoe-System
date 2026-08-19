@@ -485,60 +485,88 @@ not intentional spacing, before touching it.
   `app.js` got real behavior changes above. **No Firebase rules files were touched this round — nothing
   from this round needs manual publishing.**
 
-### Explicitly NOT fixed — proposed for human review (touches revenue/data-integrity/retention, or is
-### high-blast-radius/needs a design decision; per current live-production policy, not auto-applied)
-1. **[HIGH] `claimAndCleanupItem`'s trash-write can permanently lose a parcel if retries are exhausted** —
-   present identically in both ZoeAdmin and ZoeW. The Firebase transaction that removes/strips the item from
-   `zoew_scan_history_cod_dod` commits *first*; only afterward does it try to save the removed data into
-   `zoew_recently_deleted_cod_dod` via `retryAsync` (4 attempts, ~22.5s). If all 4 fail (e.g. a sustained
-   `permission_denied` outage — this has happened in this codebase before), the failure handler correctly
-   reverses the revenue delta and the optimistic local trash entry, but **never writes the removed data back
-   to `zoew_scan_history_cod_dod`** — the parcel is gone from both places, with only a Sentry capture, no
-   in-app toast. This is distinct from (and deeper than) the "phantom local trash entry" gap fixed in the
-   2026-08-18 follow-up audit. Needs a deliberate fix (write-back-on-exhausted-retry, or reorder the writes)
-   applied identically to both apps, not a quick patch.
-2. **[MEDIUM-HIGH] ZoeW's `executeRestoreItem` resets `createdAt` on restoring a still-open item; ZoeAdmin's
-   copy never has** — `git log -S` confirms ZoeW has done this since before the `getServerNow()` migration
-   and ZoeAdmin has never done it. Consequence: restoring an item from the 8-day stale-open ("ដក") trash flow
-   gives it a fresh 8-day window in ZoeW but leaves the old (already-expired) `createdAt` in ZoeAdmin, which
-   would likely re-flag it as stale and auto-abandon it again almost immediately, re-triggering the
-   revenue-deduction cycle. CLAUDE.md says not to change retention-window behavior without being asked, and
-   it's genuinely unclear which app has the intended behavior — needs a decision, not a guess.
-3. **[MEDIUM] ZoeKeyGen `license_keys` public-read node exposes more than intended**: rules deliberately
-   allow public read (`checkOnline()` needs it, no Firebase Auth on the 3 business-app end-user devices) on
-   the premise that the node holds no secrets — but it also carries `note` (free-text, README suggests
-   putting employee names/locations in it) and `createdBy` (issuing admin's email), both readable by any
-   end-user device running ZoeAdmin/ZoeW/Zoescan doing a routine license check. Fix would split the node into
-   a public `{revoked, expiresAt}` subset and an admin-only-read subset for the rest — a schema/rules change
-   needing careful migration of already-issued keys plus another manual Firebase Console publish.
-4. **[MEDIUM-HIGH, narrow] ZoeKeyGen's partial-ALL-coverage badge can fail to show in exactly the case it
-   exists for**: `renderKeyList()` keys the badge off `row.appPaths`, but `refreshKeyList()`'s dedup picks
-   whichever app-bucket (ADM→ZOW→SCN, fixed order) is iterated first that contains a given key ID, rather
-   than merging across buckets — so if the winning bucket happens to lack `appPaths` (e.g. two independent
-   corrective-write failures on a scope=ALL key), the fallback silently assumes full 3-app coverage and the
-   warning badge never renders, even though a device on the missing app will pass activation, then get
-   deactivated on its first periodic re-check. Correct fix means deriving coverage from the true union of
-   buckets where the key actually exists, not a single winning bucket's fallback — nontrivial rewrite of
-   `refreshKeyList()`'s dedup logic, in code that gates production device access, so flagged rather than
-   attempted live.
-5. **[design decision, not a bug] All 4 apps lost their only "update available" signal when the PWA
-   forced-reload mechanism was fully removed in `96038fa`** — two independent audit agents (ZoeAdmin-focused
-   and cross-cutting) flagged this same gap. The removal was a deliberate, reasonable tradeoff (avoiding the
-   old mechanism's "interrupt mid-write" risk), and background `reg.update()` polling still keeps the
-   installed service worker current — but there is now no code path at all that tells a user a new version
-   is ready, so a long-lived open session (plausible for an all-shift admin/worker tab) can run stale
-   indefinitely with zero signal. Worth a deliberate choice rather than a silent default: e.g. a passive,
-   non-forcing "🔄 New version available — refresh when convenient" banner on `controllerchange`, with no
-   auto-reload. Not built this round since it's a UX/behavior change across all 4 live apps.
-6. **[LOW] ZoeKeyGen `generateLicenseKey()`'s 25s timeout doesn't cancel the underlying `retryAsync` writes**
-   — a "timed out" error shown to the admin doesn't guarantee the write actually failed; it can complete in
-   the background afterward with no `refreshKeyList()` call, and a manual retry after seeing "timed out" can
-   produce a confusing (harmless) duplicate key. Lower priority than the above; would need an `AbortController`
-   plumbed through `retryAsync` to fix properly.
+### Initially proposed, then explicitly authorized by the user and implemented in the same session
+The 6 items below were first written up as proposals (not applied), per this project's live-production
+policy of not auto-applying revenue/data-integrity/high-blast-radius changes. The user's response was
+"fix all 6, it's fine" — an explicit override for this specific batch — so all 6 were then implemented
+directly in this same session. Recording both the original reasoning and what was actually built, since
+items 2 and 3 involved real judgment calls worth understanding if something looks off later.
+
+1. **[HIGH, FIXED] `claimAndCleanupItem`'s trash-write could permanently lose a parcel if retries were
+   exhausted** (ZoeAdmin + ZoeW, identical gap in both). The Firebase transaction that removes/strips the
+   item from `zoew_scan_history_cod_dod` commits *first*; only afterward does it try to save the removed
+   data into `zoew_recently_deleted_cod_dod` via `retryAsync` (4 attempts, ~22.5s). If all 4 failed, the
+   failure handler already correctly reversed the revenue delta and the optimistic local trash entry, but
+   never wrote the removed data back to `zoew_scan_history_cod_dod` — the parcel was gone from both places.
+   **Fix**: added `restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial)` in both apps — on
+   exhausted trash-write retries, it runs a *second* `runTransaction` on the original item ref that either
+   restores the whole claimed item (merging with whatever's there now, in case of concurrent changes) or
+   merges the reclaimed stale-open barcodes back into the current remainder (partial-claim case), stripping
+   `isDeducted` off them since they're live again, not in trash. Wrapped in `retryAsync` (3 attempts) too.
+   If *that* also fails, there's no further automated recovery — captures to Sentry with full context and
+   shows a `showToast` (not a blocking `alert`, since this fires from an unattended background sweep) telling
+   staff to check the item manually. Also changed the outer `retryAsync(...).catch()` from fire-and-forget to
+   `await`ed, so `cleanupInFlight` now stays held for the whole compensating chain (closes a pre-existing
+   window where a second automatic sweep could re-enter the same item mid-recovery).
+2. **[MEDIUM-HIGH, FIXED — judgment call] ZoeW reset `createdAt` on restoring a still-open item; ZoeAdmin
+   never did.** Reasoned through rather than guessed: both apps already reset `closedAt` on restoring a
+   *closed* item, deliberately giving it a fresh window before the 2h auto-cleanup can re-claim it — it would
+   be inconsistent for the open-item case not to get the same treatment, and *not* resetting `createdAt` means
+   an item restored from the 8-day stale-open ("ដក") trash flow (which by definition already has an
+   `createdAt` older than 8 days) would almost immediately get re-flagged as stale and auto-abandoned again on
+   the very next cleanup pass — defeating the entire point of a human choosing to restore it. **Fix**: mirrored
+   ZoeW's `else { itemToRestore.createdAt = getServerNow(); }` into ZoeAdmin's `executeRestoreItem`, so both
+   apps now always give a restored item (open or closed) a fresh retention clock as of restore time. If this
+   isn't actually the intended behavior, flag it — it was a reasoned choice, not a certainty.
+3. **[MEDIUM, FIXED] ZoeKeyGen's `license_keys` public-read node exposed more than intended** — `note`
+   (free-text, README used to suggest employee names/locations) and `createdBy` (issuing admin's email) were
+   stored at the same path any of the 3 business apps' end-user devices fetch unauthenticated on every routine
+   license check. **Fix**: split the schema. `license_keys/{appCode}/{keyId}` now holds only `{expiresAt,
+   revoked}` (all `checkOnline()` ever reads) and stays public-read. A new node, `license_keys_meta/{appCode}
+   /{keyId}`, holds `{issuedAt, scope, note, createdBy, appPaths}` and is admin-read/write only. Updated
+   `ZoeKeyGen/firebase-database.rules.json` accordingly (**needs manual publish — see below**),
+   `generateLicenseKey()` now writes both nodes atomically per target app via one multi-path `fb.update()`
+   (so the verification record and its metadata can never split), and `refreshKeyList()` now reads and merges
+   both nodes. **Cannot migrate already-existing keys' data from this environment** (no live Firebase access,
+   git-only session) — added a one-time "🔒 Migrate PII ចាស់" button in the Key List card
+   (`migrateLegacyLicenseKeyMetadata()` in `ZoeKeyGen/app.js`) that the admin runs themselves, once, *after*
+   publishing the new rules: it reads every existing `license_keys` record, copies any legacy `note`/
+   `createdBy`/`issuedAt`/`scope`/`appPaths` fields into `license_keys_meta`, and nulls them out of the public
+   node in one atomic multi-path update. README updated to describe the split and point at the button.
+4. **[MEDIUM-HIGH narrow, FIXED — resolved as a side effect of #3] ZoeKeyGen's partial-ALL-coverage badge
+   could fail to show in exactly the case it exists for** — `refreshKeyList()`'s old dedup picked whichever
+   app-bucket (ADM→ZOW→SCN, fixed order) was iterated first that contained a given key ID, with a
+   scope-derived fallback that silently assumed full 3-app coverage whenever `appPaths` was missing. The
+   rewrite for #3 (reading `license_keys` per app-bucket to merge with the new meta node) naturally derives
+   real coverage from the *true* union of buckets where the key actually, verifiably exists — `paths` is now
+   always accurate regardless of whether the `appPaths` corrective tag ever landed. `renderKeyList()`'s badge
+   condition was switched from checking `row.appPaths` to checking `row.paths`, so the badge can no longer
+   silently fail to show due to a missing tag.
+5. **[design decision, FIXED] All 4 apps lost their only "update available" signal when the PWA forced-reload
+   mechanism was fully removed in `96038fa`.** **Fix**: added a passive, non-forcing update banner to all 4
+   apps (`showUpdateAvailableBanner()`, same shape in each) — a fixed bottom bar with a "Refresh ឥឡូវនេះ"
+   button and a dismiss "✕", built via plain DOM APIs with inline styles (no HTML/CSS file changes needed).
+   Wired to `navigator.serviceWorker`'s `controllerchange` event, gated on `hadControllerAtLoad` (captured
+   once per page load, before the listener attaches) so it only fires for a genuine mid-session update — not
+   for the very first `controllerchange` a brand-new install fires when its service worker first takes
+   control (there being no "update," just an initial claim, in that case). No auto-reload; the user decides
+   when to refresh, same as the "apply on next natural launch" model already in place.
+6. **[LOW, FIXED] ZoeKeyGen `generateLicenseKey()`'s 25s timeout didn't cancel the underlying `retryAsync`
+   writes** — true cancellation isn't practical (the Firebase JS SDK has no abort support for RTDB writes), so
+   the fix instead closes the *silent* half of the problem: the write promise is now captured before racing it
+   against the timeout, and if the timeout fires first, a background `.then()` on that same promise is armed
+   (via a `generateAlreadyTimedOut` flag) to show a toast and call `refreshKeyList()` if the writes eventually
+   land anyway — so an admin who retried after a false "timed out" now finds out if the original attempt also
+   succeeded, instead of a silent duplicate key with no explanation.
 
 ### Not yet done as of this handoff
-All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep re-verified
-repo-wide. Nothing is mid-edit. The 6 items above are intentionally left as proposals, not code — they need
-the user's decision (items 2 and 5) or are non-trivial enough to warrant a dedicated follow-up rather than
-folding into a "confirm + cleanup" pass (items 1, 3, 4, 6), consistent with this project's live-production
-policy of proposing revenue/data-integrity/high-blast-radius changes rather than auto-applying them.
+All fixes above (both the original 16 and these 6) are committed, `node --check`-clean on every modified
+`.js`, JSON-validated on both rules files, and comment-free grep re-verified repo-wide. `CACHE_VERSION` was
+bumped a second time in all 4 `sw.js` (zoeadmin-v13, zoew-v12, zoescan-v12, zoekeygen-v6) to cover this
+second batch of behavior changes. Nothing is mid-edit.
+
+**`ZoeKeyGen/firebase-database.rules.json` needs manual publishing** in the Firebase Console (this repo's
+rules JSON is never auto-deployed by Netlify) — it now has a new `license_keys_meta` node. **After publishing,
+click "🔒 Migrate PII ចាស់"** in ZoeKeyGen's Key List card once to move existing keys' `note`/`createdBy`/etc.
+out of the public node — new keys split correctly on their own, but already-issued keys' metadata stays
+exposed at the old public path until that button is run. No other rules files changed this round.

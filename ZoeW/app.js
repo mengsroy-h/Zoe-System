@@ -17,6 +17,28 @@
     bindClickBackup('restoreConfirmBtn', executeRestoreItem);
     bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
 
+    function showUpdateAvailableBanner() {
+        if (document.getElementById('zoeUpdateBanner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'zoeUpdateBanner';
+        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        const label = document.createElement('span');
+        label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
+        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;';
+        refreshBtn.addEventListener('click', () => window.location.reload());
+        const dismissBtn = document.createElement('button');
+        dismissBtn.textContent = '✕';
+        dismissBtn.setAttribute('aria-label', 'បិទ');
+        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;';
+        dismissBtn.addEventListener('click', () => banner.remove());
+        banner.appendChild(label);
+        banner.appendChild(refreshBtn);
+        banner.appendChild(dismissBtn);
+        document.body.appendChild(banner);
+    }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -26,6 +48,11 @@
                 window.addEventListener('focus', () => reg.update().catch(() => {}));
                 setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
             }).catch(() => {});
+
+            const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (hadControllerAtLoad) showUpdateAvailableBanner();
+            });
         });
     }
 
@@ -852,6 +879,32 @@
         });
     }
 
+    async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
+        const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
+        return retryAsync(() => fb.runTransaction(itemRef, (currentItem) => {
+            if (claimedWhole) {
+                return currentItem || claimedWhole;
+            }
+            const reclaimed = claimedPartial.barcodes.map(({ isDeducted, ...rest }) => rest);
+            const base = currentItem || { ...claimedPartial, barcodes: [] };
+            const existingCodes = new Set((base.barcodes || []).map(b => b.code));
+            const merged = [...(base.barcodes || []), ...reclaimed.filter(b => !existingCodes.has(b.code))];
+            const updated = { ...base, barcodes: merged };
+            updated.count = merged.length;
+            updated.cod = Math.round(merged.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            updated.dod = Math.round(merged.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+            updated.barcode = merged[0] ? merged[0].code : updated.barcode;
+            updated.isClosed = merged.length > 0 && merged.every(b => b.isClosed);
+            if (updated.isClosed) {
+                if (!updated.closedAt) updated.closedAt = getServerNow();
+            } else {
+                delete updated.closedAt;
+            }
+            return updated;
+        }), 3, 1500);
+    }
+
     async function claimAndCleanupItem(id, reason) {
         if (!db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
         cleanupInFlight.add(id);
@@ -948,7 +1001,7 @@
             }
 
             deletedItems.unshift(trashItem);
-            retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500).catch((trashErr) => {
+            await retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500).catch(async (trashErr) => {
                 if (revenueDeducted) {
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, revenueCod, revenueDod, revenueCount);
                 }
@@ -956,6 +1009,14 @@
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
+
+                try {
+                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                } catch (restoreErr) {
+                    console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
+                    showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
+                }
             });
 
             if (claimedPartial) {

@@ -17,9 +17,20 @@
         ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
         "$keyId": {
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
-          "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "expiresAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
           "revoked":   { ".validate": "newData.isBoolean()" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "license_keys_meta": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+      "$appCode": {
+        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        "$keyId": {
+          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
           "scope":     { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },
           "createdBy": { ".validate": "newData.isString()" },

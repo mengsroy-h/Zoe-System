@@ -1,5 +1,27 @@
 # Zoe-System
 
+> ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
+>
+> ការងារចុងក្រោយនៅលើ branch **`claude/deep-audit-bug-fixes-7f6izx`** (ជុំ audit ទី៦ + គោលការណ៍ លុប/ដក)។
+> Push រួចរាល់ · working tree ស្អាត · គ្មានអ្វីកែពាក់កណ្តាល · **មិនទាន់ merge ចូល `main`** (ម្ចាស់គម្រោង
+> គ្រប់គ្រងពេលណាកូដទៅដល់ production ដោយខ្លួនឯង)។
+>
+> **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude):**
+> 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
+> 2. Publish `ZoeKeyGen/firebase-database.rules.json` — Console ZoeKeyGen
+>
+> ដរាបណាមិន publish ការការពារ ២ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា):
+> scanner បង្កើត barcode មិនបាន · `license_keys` លែងអានបានជាសាធារណៈត្រង់ node មេ។
+>
+> **នៅសល់ត្រូវការការសម្រេច ១:** ZoeW ធ្វើ 8-day *partial* cleanup មិនកើត — rules ច្រានចោលពេល index
+> ក្នុង `barcodes[]` រំកិល (ផ្ទៀងផ្ទាត់លើ emulator រួច)។ ការកែត្រូវបន្ធូរ per-barcode admin lock សម្រាប់
+> `worker`។ ZoeAdmin មិនប៉ះពាល់ទេ។
+>
+> **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (រក divergence រវាង
+> ZoeAdmin/ZoeW) និង `node audit-tools/policy-test.js` (ផ្ទៀងផ្ទាត់គោលការណ៍ លុប/ដក)។ មើល
+> `audit-tools/README.md`។ លម្អិតពេញលេញនៅ section **"Sixth deep-audit pass"** ខាងក្រោម។
+
+
 4 independent PWAs (vanilla JS, no framework, no build step), each deployed as its own
 Netlify site, sharing ONE Sentry project distinguished by the `app` tag:
 

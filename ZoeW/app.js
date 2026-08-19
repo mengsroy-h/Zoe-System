@@ -107,7 +107,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
-        document.body.style.overflow = 'hidden'; 
+        document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'flex';
     }
@@ -418,7 +418,7 @@
             if (!parsed.apiKey || !parsed.databaseURL) {
                 throw new Error("Missing apiKey or databaseURL");
             }
-            
+
             localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
             showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
             closeModal('configModal');
@@ -455,6 +455,16 @@
         pendingSetupLinkConfig = parsed;
         showToast('សូមផ្ទៀងផ្ទាត់ PIN ដើម្បីអនុវត្ត Setup Link');
         requestPinBeforeConfig();
+    }
+
+    function cancelPinSetupFlow() {
+        pendingSetupLinkConfig = null;
+        closeModal('pinSetupModal');
+    }
+
+    function cancelPinEntryFlow() {
+        pendingSetupLinkConfig = null;
+        closeModal('pinModal');
     }
 
     let configQrReader = null;
@@ -625,6 +635,7 @@
             if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
             const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
             if (!result.valid) {
+                if (input) input.value = '';
                 showToast(licenseFailureMessage(result.reason));
                 return;
             }
@@ -903,12 +914,12 @@
             else if (Array.isArray(data)) scanHistory = data.filter(item => item !== null);
             else scanHistory = Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
 
-            scanHistory.forEach(item => { 
+            scanHistory.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
                 if (!item.createdAt) {
                     item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
-                
+
                 if (item.cod === undefined) {
                     item.cod = item.price !== undefined ? parseFloat(item.price) || 0 : 0;
                 } else {
@@ -959,7 +970,7 @@
     function updateRecentPhonesList() {
         const datalist = document.getElementById('recentPhonesList');
         if (!datalist) return;
-        
+
         let phonesSet = new Set();
         scanHistory.forEach(item => {
             if (item.phone && item.phone !== "គ្មានលេខ") {
@@ -1027,13 +1038,13 @@
 
         let claimedWhole = null;
         let claimedPartial = null;
-        let claimedUpdatedRemainder = null;
+        let updatedRemainder = null;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const result = await fb.runTransaction(itemRef, (currentItem) => {
                 claimedWhole = null;
                 claimedPartial = null;
-                claimedUpdatedRemainder = null;
+                updatedRemainder = null;
                 if (!currentItem) return currentItem;
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
@@ -1059,7 +1070,7 @@
                         updated.barcode = stillActive[0].code;
                         updated.isClosed = true;
                         if (!updated.closedAt) updated.closedAt = getServerNow();
-                        claimedUpdatedRemainder = updated;
+                        updatedRemainder = updated;
                         return updated;
                     }
 
@@ -1073,6 +1084,12 @@
             });
 
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
+
+            if (claimedPartial && updatedRemainder) {
+                syncScannerLookupEntry(id, updatedRemainder);
+            } else {
+                clearScannerLookupEntry(id);
+            }
 
             let trashItem;
             let revenueDeducted = false;
@@ -1127,19 +1144,15 @@
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
                 try {
-                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
             });
-
-            if (claimedPartial) {
-                syncScannerLookupEntry(id, claimedUpdatedRemainder);
-            } else {
-                clearScannerLookupEntry(id);
-            }
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
@@ -1182,14 +1195,12 @@
         if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
         if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
         if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
-            const barcodesObj = {};
-            item.barcodes.forEach((b, idx) => {
-                if (!b) return;
-                const entry = { code: b.code || '', locker: b.locker || '' };
-                if (b.lockerUpdatedAt) entry.lockerUpdatedAt = b.lockerUpdatedAt;
-                barcodesObj[idx] = entry;
+            payload.barcodes = item.barcodes.map((b) => {
+                if (!b) return { code: '', locker: '' };
+                const bcEntry = { code: b.code || '', locker: b.locker || '' };
+                if (b.lockerUpdatedAt) bcEntry.lockerUpdatedAt = b.lockerUpdatedAt;
+                return bcEntry;
             });
-            payload.barcodes = barcodesObj;
         }
         return payload;
     }
@@ -1197,16 +1208,16 @@
     function syncScannerLookupEntry(itemId, item) {
         if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
         return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), buildScannerLookupPayload(item)).catch((error) => {
-            console.error('Error syncing scanner lookup entry: ', error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry: ' });
+            console.error('Error syncing scanner lookup entry:', error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
         });
     }
 
     function clearScannerLookupEntry(itemId) {
         if (!db || !fb || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
         return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), null).catch((error) => {
-            console.error('Error clearing scanner lookup entry: ', error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry: ' });
+            console.error('Error clearing scanner lookup entry:', error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry' });
         });
     }
 
@@ -1227,8 +1238,9 @@
         });
 
         if (purgedIds.length > 0) {
-            deleteMultipleDeletedItemsFromFirebase(purgedIds).catch(() => {});
-            releaseBarcodesInRegistry(purgedBarcodes);
+            deleteMultipleDeletedItemsFromFirebase(purgedIds)
+                .then(() => releaseBarcodesInRegistry(purgedBarcodes))
+                .catch(() => {});
         }
     }
 
@@ -1327,10 +1339,24 @@
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
-            const openModalEl = openModals[openModals.length - 1];
+            const openModalEl = topmostModal(openModals);
             if (openModalEl) dismissModal(openModalEl);
         });
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && configQrScanActive) closeConfigQrScanner();
+        });
     });
+
+    function topmostModal(openModals) {
+        let top = null;
+        let topZ = -Infinity;
+        openModals.forEach((m) => {
+            const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
+            const z = isNaN(parsed) ? 0 : parsed;
+            if (z >= topZ) { topZ = z; top = m; }
+        });
+        return top;
+    }
 
     function dismissModal(modalEl) {
         if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
@@ -1787,7 +1813,7 @@
         customFilterDate = '';
         const customDateInput = document.getElementById('customDateInput');
         if(customDateInput) customDateInput.value = '';
-        
+
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
         if (mode === 'today') {
             const el = document.getElementById('btnFilterToday');
@@ -1813,7 +1839,7 @@
         const customDateInput = document.getElementById('customDateInput');
         const val = customDateInput ? customDateInput.value : '';
         if (!val) return;
-        
+
         currentFilterMode = 'custom';
         customFilterDate = val;
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -2158,9 +2184,9 @@
         if(editModalBarcodeText) editModalBarcodeText.innerText = item.barcode;
         const editPhoneInput = document.getElementById('editPhoneInput');
         if(editPhoneInput) editPhoneInput.value = item.phone === "គ្មានលេខ" ? "" : item.phone;
-        
+
         openModalHelper('editPhoneModal');
-        
+
         setTimeout(() => {
             if(editPhoneInput) editPhoneInput.focus();
         }, 150);
@@ -2572,7 +2598,7 @@
             if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
                 let allLockers = item.barcodes.map(b => b.locker || "N/A").filter(l => l && l !== "N/A");
                 let uniqueLockers = [...new Set(allLockers)];
-                
+
                 if (uniqueLockers.length > 1) {
                     lockerLoc = `${uniqueLockers.join(', ')} (${uniqueLockers.length} កន្លែង)`;
                 } else if (uniqueLockers.length === 1) {
@@ -2596,15 +2622,15 @@
 
             let closeBtnText = item.isClosed ? "❌ បើក" : "✅ បិទ";
             let closeAction = `<button class="btn-sm close-btn btn-primary-action" onclick="toggleCloseStatus('${escapeForInlineJsAttr(item.id)}')">${closeBtnText}</button>`;
-            
+
             let moreDropdown = `
                 <div class="more-dropdown">
                     <button class="more-btn" onclick="toggleMoreDropdown(event, '${escapeForInlineJsAttr(item.id)}')">⋮</button>
                 </div>
             `;
-            
+
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>` 
+                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>`
                 : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
 
             let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;

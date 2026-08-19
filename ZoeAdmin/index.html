@@ -207,7 +207,7 @@
     </div>
 </div>
 
-<div id="pinModal" class="modal">
+<div id="pinModal" class="modal" data-close="cancelPinEntryFlow">
     <div class="modal-content" style="max-width: 300px;">
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p>សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
@@ -215,19 +215,19 @@
         <div class="modal-btns">
             <div class="modal-btns-row">
                 <button class="btn-confirm" id="pinConfirmBtn" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
-                <button class="btn-cancel" onclick="closeModal('pinModal')">បោះបង់</button>
+                <button class="btn-cancel" onclick="cancelPinEntryFlow()">បោះបង់</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="pinSetupModal" class="modal">
+<div id="pinSetupModal" class="modal" data-close="cancelPinSetupFlow">
     <div class="modal-content" style="max-width: 300px;">
         <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
         <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal('pinSetupModal')">បោះបង់</button>
+            <button class="btn-cancel" onclick="cancelPinSetupFlow()">បោះបង់</button>
             <button class="btn-confirm" id="pinSetupSaveBtn" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
         </div>
     </div>

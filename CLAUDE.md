@@ -1073,3 +1073,179 @@ production app is worse than a narrow, already-partially-mitigated gap. Details 
 All fixes above are committed, `node --check`-clean on every modified `.js`, and HTML div-tag-balance-checked
 on every modified `.html`. Nothing is mid-edit. No Firebase rules files were touched by the fixes actually
 applied this round.
+
+## Sixth deep-audit pass (2026-08-19, branch `claude/deep-audit-bug-fixes-7f6izx`) — handoff notes
+
+Requested as another meticulous final round: the user was explicitly not yet satisfied because *every
+previous round kept finding new bugs*, and asked for a thorough, gap-free sweep plus a README tidy-up.
+Branch started exactly at `main` (commit `aab9b03`, i.e. right after PR #17 merged), no carry-over.
+
+**Method note (differs from rounds 1-5):** this round was run *inline, single-threaded*, not with 5 parallel
+research agents — the session's operating rules forbade spawning subagents unless the user asks. Instead of
+fan-out, coverage came from purpose-built static checkers written during the session (kept in the scratchpad,
+worth rebuilding if useful):
+- a **sibling-divergence differ** that extracts every top-level function from `ZoeAdmin/app.js` and
+  `ZoeW/app.js` by name and diffs same-named pairs. At round start: 103 shared functions, 78 identical,
+  25 different — this is what surfaced the `claimAndCleanupItem` and scanner-lookup findings below, and it is
+  by far the highest-yield tool for this codebase's "independently duplicated logic" problem. Re-run it first
+  in any future round.
+- a **`getElementById` ↔ HTML `id=` cross-checker** (both directions) and an **inline-`on*=` handler ↔
+  function-existence checker**, per app — all clean except the dynamically-created `zoeUpdateBanner`.
+- a **`data-close` target checker** (every `data-close="fn"` resolves to a real global function).
+- a **referenced-Firebase-path ↔ rules-file coverage** check (all paths covered).
+- a **token-equivalence-proving whitespace trimmer** (acorn tokenize → strip → re-tokenize → refuse to write
+  unless the token stream is byte-identical). Used it to safely strip 26 + 12 trailing-whitespace lines from
+  ZoeAdmin/ZoeW `app.js` without risking a change inside a template literal.
+- acorn comment scan across all 8 `app.js`/`license-verify.js` files: **0 comments** — convention still holds.
+
+### Fixed (safe, non-revenue, applied directly)
+- **Zoescan: the round-5 Setup-Link PIN gate was fully bypassable on a config-less device** (a real regression
+  of that round's own fix, in Zoescan only). Boot order is `applySetupLinkFromUrl()` → `initFirebase()`, and
+  Zoescan's `initFirebase()` called `openConfigModal()` **directly** when no config was saved (ZoeAdmin/ZoeW
+  route the same case through `checkPinAndOpenConfig(true)`). Since `openConfigModal()` is the sole consumer of
+  `pendingSetupLinkConfig`, the Setup Link's config got pre-filled into a Config modal that opened with **zero
+  PIN involvement** — exactly what round 5 set out to prevent. Both of Zoescan's no-config early returns now
+  call `requestPinBeforeConfig()` instead. Side effect worth knowing: a brand-new Zoescan device now sees
+  `pinSetupModal` before the Config modal, matching ZoeAdmin/ZoeW's long-standing first-run behavior.
+- **All 3 business apps: an abandoned Setup Link stayed armed indefinitely and could silently pre-fill
+  *another business's* Firebase config into a later, unrelated Config open.** `pendingSetupLinkConfig`
+  (ZoeW/Zoescan) and `pinTargetAction` (ZoeAdmin) were only ever consumed on success — cancelling the PIN
+  prompt left them set. With the 200-300-client provisioning model this is a genuine mis-provisioning risk
+  (a vendor opening Config to *check* the current config sees a different one pre-filled, and Save is one tap
+  away). Added `cancelPinSetupFlow()`/`cancelPinEntryFlow()` in all 3 apps, wired to both the cancel buttons
+  and (via `data-close=` on `pinModal`/`pinSetupModal`) the backdrop-click and Escape paths. ZoeAdmin's
+  `checkPinAndOpenConfig()` also now resets `pinTargetAction` up front, since its no-PIN branch opens
+  `pinSetupModal` directly and would otherwise inherit a stale callback.
+- **ZoeAdmin + ZoeW: `claimAndCleanupItem` left `zoew_scanner_lookup` permanently desynced from
+  `zoew_scan_history_cod_dod` whenever the trash write failed and the round-2 recovery restored the parcel.**
+  Both apps updated the lookup node assuming the claim was final (ZoeAdmin before the trash write, ZoeW after),
+  and `restoreClaimedItemToScanHistory()` put the parcel back without ever re-syncing it — so a restored parcel
+  was invisible to Zoescan ("barcode not found", no locker assignable) with no error anywhere. Now both apps
+  clear/sync immediately after the claim transaction commits (the narrower of the two windows) **and** re-sync
+  from `restoreResult.snapshot.val()` when the recovery succeeds. Also renamed ZoeW's `claimedUpdatedRemainder`
+  → `updatedRemainder`; **`claimAndCleanupItem` is now byte-identical across the two apps**, verified by the
+  divergence differ.
+- **ZoeAdmin/ZoeW: `buildScannerLookupPayload`, `syncScannerLookupEntry`, `clearScannerLookupEntry` had drifted
+  apart** — ZoeW wrote `barcodes` as an index-keyed object skipping nulls (which for a sparse array can make
+  RTDB return an object, and every consumer tests `Array.isArray`), ZoeAdmin wrote a dense array with
+  placeholders; ZoeW validated the itemId with a regex and used `set(child)`, ZoeAdmin used
+  `update(parent, {[id]: …})` with no id validation. Unified all three on the safer shape (dense array +
+  itemId regex guard + `set`). All three are now identical across the apps.
+- **ZoeAdmin/ZoeW/Zoescan: the Config QR scanner's camera was never released when the app was backgrounded.**
+  Round 3 fixed exactly this bug class for Zoescan's main barcode scanner and round 5 fixed the QR scanner's
+  logout/backdrop/Escape paths, but no app's `visibilitychange` handler knew about `configQrScanActive`
+  (ZoeW had no camera visibility handler at all — it never had a camera before the QR feature). All three now
+  call `closeConfigQrScanner()` when the document goes hidden.
+- **ZoeAdmin/ZoeW: Escape dismissed the wrong modal when a stacked dialog sits *earlier* in DOM order.**
+  Round 5 changed the Escape handler from "first open modal" to "last open modal in DOM order" to fix the
+  `configModal`/`configQrScanModal` pair, but `editBarcodePriceModal` (inline `z-index: 1050`) is declared
+  *before* `viewListModal` in ZoeAdmin's HTML while opening visually on top of it — so Escape closed the
+  background list instead of the visible edit dialog. Replaced the DOM-order heuristic with a shared
+  `topmostModal()` that ranks open modals by computed `z-index` and falls back to DOM order on ties (`>=`),
+  which is correct for both pairs. Applied to all 3 apps.
+- **ZoeAdmin/ZoeW: `runAutomaticDeletedCleanup()` released barcodes from `zoew_barcode_registry` in parallel
+  with the trash-purge write instead of after it** — if the purge failed, the barcode was freed while its
+  parcel was still sitting in (and restorable from) the trash, so the same barcode could be scanned in again as
+  a duplicate. `executePermanentDelete()` already chained these correctly; the automatic sweep now does too.
+- **`license-verify.js` (all 4 copies): `checkOnline()` skipped the server-clock sync on any non-OK HTTP
+  response**, because the `!res.ok` early return sat above the `Date`-header capture — so exactly when the
+  license DB was erroring (e.g. right after a rules change) `getStatus()` fell back to the raw device clock for
+  its expiry/offline-grace decisions. Moved the header capture above the early return. Re-copied to all 4 apps;
+  all still hash to one value (`md5sum` verified).
+- **`firebase-backup/backup.js` hardening** (round 5 flagged the path handling and never fixed it): backups now
+  write to a `.partial` temp file and `rename()` into place, so an interrupted run can't leave a truncated
+  `.json.gz` that both looks like a valid backup and consumes a `keepCount` slot (pushing a good one out) —
+  the worst failure mode a backup tool can have. `keepCount` is validated as an integer ≥ 1 (a negative value
+  previously made the prune loop delete *everything*, including the backup just written). `business.name` is
+  validated against `^[A-Za-z0-9._-]+$` before being used as a directory name, and a missing name is a clean
+  per-business failure instead of a `path.join` crash. Failure/success lines now label a nameless entry `#N`
+  rather than printing `undefined`. `main()` got a top-level `.catch`. **Verified by running it** against a
+  stubbed `firebase-admin`: all four validation paths, per-business failure isolation, exit code 1 on any
+  failure, rotation keeping exactly `keepCount`, zero `.partial` leftovers, and a gzip write/read round-trip.
+- Small: ZoeAdmin/ZoeW now clear the activation-key textarea on the *invalid* path too (Zoescan already did,
+  round 4); trailing-whitespace cruft stripped from ZoeAdmin/ZoeW `app.js` (token-equivalence proven).
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v24, zoew-v21, zoescan-v21, zoekeygen-v13) — ZoeKeyGen
+  included because its `license-verify.js` copy changed. **No Firebase rules file was modified by any applied
+  fix, so nothing from this round needs a manual publish.**
+
+### README work (the second half of the request)
+- **Root `README.md` rewritten/extended**: added the `firebase-backup/` tool to the app table, a full
+  Firebase-path/reader table for the business DB, a "Provisioning" section documenting the Setup Link + QR flow
+  end-to-end (including that both paths are PIN-gated and human-confirmed), and a backup section. Kept the
+  existing architecture notes.
+- **Fixed a genuinely broken doc reference**: `ZoeAdmin/README.md` pointed twice at `google-sheets-api/README.md`,
+  a path that has **never existed in this repo** (confirmed via `git log --all`). Replaced with a new inline
+  **"Lookup API"** section documenting the actual contract read out of the code — the `{barcode}` URL
+  placeholder, the `?list=1` / `{rows:[…]}` list endpoint, the PIN-derived encryption of the header secret,
+  the configurable nested field paths, the 15-minute cache, and the CSP `connect-src` constraint.
+- Added Setup Link / QR bullets to all 3 business-app READMEs; documented Zoescan's locker-occupancy warning;
+  documented that ZoeW now uses the camera (QR only) — a real security-posture change that was undocumented.
+- Documented the backup tool's new `.partial`/rename behavior and `keepCount`/`name` validation.
+- Added a link checker: every relative Markdown link in all 6 READMEs now resolves.
+
+### Reported to the user, NOT applied (revenue / pickup-stat / rules — live-production policy)
+Written up for human review rather than auto-applied, per "Project status" + point 5 of "When triaging".
+1. **[pickup stat] `toggleCloseStatus` applies a ±1 customer delta unconditionally.** `desiredClosed` is
+   computed from the pre-`confirm()` object, but `previousState` is re-read from `scanHistory` *after* the
+   blocking dialog (the whole reason `freshItem` exists). If another device closed the order during the dialog,
+   the package delta correctly computes 0 but the customer refCount still gets +1 — leaving a stale ref that
+   keeps the phone in `pickedUpPhones` after all its orders are reopened. `toggleIndividualBarcodeClose` guards
+   its *customer* delta on a real boundary crossing but has the same unguarded shape for its *package* delta.
+   Proposed fix: derive both deltas from `previousState` vs. desired, not from `desiredClosed` alone.
+2. **[revenue] `executeRestoreItem` never adds revenue back for a legacy item with no `barcodes[]` array**,
+   even though the 8-day abandon sweep *did* subtract its top-level `cod`/`dod` (`claimAndCleanupItem` handles
+   the no-`barcodes[]` case explicitly; the restore path only iterates `itemToRestore.barcodes`). Asymmetric —
+   money is subtracted and never returned. Same in both apps.
+3. **[revenue] `confirmPhone`'s wholesale `dailyRevenueData`/`monthlyRevenueData` snapshot revert** (the exact
+   leftover round 5 flagged for a later round). Unlike `removeSingleBarcode`'s, it is *not* purely redundant:
+   on the 15s `withTimeout` path `addOrUpdateEntry`'s own `revertRevenueOnSaveFailure` has not run yet. But
+   `addOrUpdateEntry` owns the correct targeted revert and will apply it whenever the write actually settles,
+   so the snapshot assignment can go — and should, because it discards a concurrent listener refresh from
+   another device. `scanHistory = historySnapshot` in the same catch is load-bearing (nothing else undoes the
+   local item) and should stay.
+4. **[revenue, latent] `executeRestoreItem`'s merge branch buckets the add-back under `targetItem.scanDate`
+   in ZoeAdmin but `itemToRestore.scanDate` in ZoeW.** The subtraction always used the trash item's scanDate,
+   so ZoeW's is the symmetric one. Currently unreachable-in-practice (the merge match requires equal scanDates
+   unless ids collide, which they shouldn't), but it is a latent cross-day revenue misallocation and the last
+   remaining real divergence between the two `executeRestoreItem`s.
+5. **[rules, ZoeKeyGen] `license_keys` is world-readable at the parent node**, so an unauthenticated
+   `GET /license_keys.json` dumps every key id + `expiresAt` + `revoked` for every client. `checkOnline()` only
+   ever reads `/license_keys/{appCode}/{keyId}.json`, so moving `.read: true` down to `$keyId` and granting
+   admin `.read` at the parent (for `refreshKeyList()`) keeps both working while removing enumeration.
+   Note `syncServerTime()` is unaffected — it deliberately ignores the response status and only reads the
+   `Date` header. Needs a manual Console publish.
+6. **[data integrity] Zoescan's mirror write addresses barcodes by array index.** `assignLockerToEntry()` takes
+   `matchedBarcodeIdx` from the *lookup* node and writes
+   `zoew_scan_history_cod_dod/{id}/barcodes/{idx}/locker`. If the two nodes desync (which finding 3 above could
+   cause), the write lands on the wrong barcode — or, if the index is past the end, creates a sparse array so
+   `barcodes` reads back as an **object**, and every `Array.isArray` consumer in ZoeAdmin/ZoeW silently drops
+   the parcel's barcodes from the UI, revenue sums and `isClosed` recomputation. Robust fix is to match by
+   `code` inside a transaction instead of by index; it touches the hot scan path, so it was not done unasked.
+7. **[operational] ZoeKeyGen "Extend" updates only the server `expiresAt`, not the signed payload's `exp`.**
+   Already-activated devices keep working (`getStatus` uses the server ceiling), but `activate()` →
+   `verifyKeyString()` rejects on the *signed* expiry — so an extended key **cannot be re-activated on a reset
+   or replacement device** once the original signed date passes. Design question (extend vs. reissue), flagged
+   rather than changed.
+
+### Confirmed clean this round (checked, no change needed — don't re-audit blind)
+- `escapeForInlineJsAttr()` in ZoeAdmin/ZoeW is genuinely correct for the `onclick="fn('…')"` context
+  (escapes `&` first, so `&#39;`-style entity smuggling can't reconstitute a quote after HTML decoding, and
+  backslash before quote). It is **not** the ZoeKeyGen bug class that used plain HTML escaping in an `on*=`
+  attribute — that one is still fixed.
+- All `onValue(dbRefX, …)` calls in all 3 apps are `if (dbRefX)`-guarded (ZoeAdmin's history/deleted guards are
+  just oddly indented, which makes them look unguarded in a quick grep).
+- Raw `Date.now()`/`new Date()` audit re-run over all 4 `app.js` + `license-verify.js`: every remaining raw use
+  is one of the intentionally-exempt cosmetic/local ones (PIN lockout, id salt, scan debounce, script-load
+  deadline, lookup cache TTL/cooldowns, `renderHistory` badges).
+- Every Firebase path the apps touch has a matching rules block; all `getElementById` IDs exist; all inline
+  handlers and `data-close` targets resolve; Zoescan still has exactly 2 inline `onclick=` and both keep their
+  `addEventListener` backups (its CSP still lacks `'unsafe-inline'`); no inline `<script>` blocks in Zoescan.
+- `submitManualAdjustment()`'s `submitBtn.disabled = true` with no re-enable **is not a bug** —
+  `openManualAdjustModal()` re-enables it on every open. (Looked like a real one at first; verified.)
+- Service worker cache-cleanup filters are still each scoped to their own `<app>-` prefix.
+
+### Not yet done as of this handoff
+All applied fixes are committed, `node --check`-clean, JSON-validated, comment-free-verified, HTML
+tag-balance- and wiring-checked, and the backup tool was executed end-to-end against a stub. Nothing is
+mid-edit. No rules file changed, so no manual publish is needed for anything applied this round — items 5
+above would need one *if* the user asks for it.

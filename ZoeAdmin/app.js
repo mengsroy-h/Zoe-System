@@ -73,7 +73,7 @@
     let authGeneration = 0;
 
     let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
-    
+
     let codeReader = null;
     let liveScanCodeReader = null;
     let currentStream = null;
@@ -127,7 +127,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
-        document.body.style.overflow = 'hidden'; 
+        document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'flex';
     }
@@ -451,6 +451,7 @@
     }
 
     function checkPinAndOpenConfig(isFirstTime = false) {
+        pinTargetAction = null;
         let savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
@@ -502,7 +503,7 @@
             if (!parsed.apiKey || !parsed.databaseURL) {
                 throw new Error("Missing apiKey or databaseURL");
             }
-            
+
             localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
             showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
             closeModal('configModal');
@@ -540,6 +541,16 @@
             if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
             showToast('✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
         });
+    }
+
+    function cancelPinSetupFlow() {
+        pinTargetAction = null;
+        closeModal('pinSetupModal');
+    }
+
+    function cancelPinEntryFlow() {
+        pinTargetAction = null;
+        closeModal('pinModal');
     }
 
     let configQrReader = null;
@@ -993,10 +1004,10 @@
         const rateInput = document.getElementById('exchangeRateInput');
         let val = rateInput ? (parseFloat(rateInput.value) || 4100) : 4100;
         if (val <= 0) val = 4100;
-        
+
         exchangeRateRiel = val;
         localStorage.setItem('zoew_exchange_rate', val);
-        
+
         if (dbRefExchangeRate) {
             fb.set(dbRefExchangeRate, val).catch(() => {
                 showToast("⚠️ បរាជ័យក្នុងការ Save អត្រាប្រាក់ទៅ Firebase!");
@@ -1121,6 +1132,7 @@
             if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
             const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
             if (!result.valid) {
+                if (input) input.value = '';
                 showToast(licenseFailureMessage(result.reason));
                 return;
             }
@@ -1402,12 +1414,12 @@
             else if (Array.isArray(data)) scanHistory = data.filter(item => item !== null);
             else scanHistory = Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
 
-            scanHistory.forEach(item => { 
+            scanHistory.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
                 if (!item.createdAt) {
                     item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
-                
+
                 if (item.cod === undefined) {
                     item.cod = item.price !== undefined ? parseFloat(item.price) || 0 : 0;
                 } else {
@@ -1458,7 +1470,7 @@
     function updateRecentPhonesList() {
         const datalist = document.getElementById('recentPhonesList');
         if (!datalist) return;
-        
+
         let phonesSet = new Set();
         scanHistory.forEach(item => {
             if (item.phone && item.phone !== "គ្មានលេខ") {
@@ -1573,10 +1585,10 @@
 
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
-            if (claimedWhole) {
-                clearScannerLookupEntry(id);
-            } else if (claimedPartial && updatedRemainder) {
+            if (claimedPartial && updatedRemainder) {
                 syncScannerLookupEntry(id, updatedRemainder);
+            } else {
+                clearScannerLookupEntry(id);
             }
 
             let trashItem;
@@ -1632,7 +1644,9 @@
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
                 try {
-                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
@@ -1664,8 +1678,9 @@
         });
 
         if (purgedIds.length > 0) {
-            deleteMultipleDeletedItemsFromFirebase(purgedIds).catch(() => {});
-            releaseBarcodesInRegistry(purgedBarcodes);
+            deleteMultipleDeletedItemsFromFirebase(purgedIds)
+                .then(() => releaseBarcodesInRegistry(purgedBarcodes))
+                .catch(() => {});
         }
     }
 
@@ -1816,10 +1831,21 @@
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
-            const openModalEl = openModals[openModals.length - 1];
+            const openModalEl = topmostModal(openModals);
             if (openModalEl) dismissModal(openModalEl);
         });
     });
+
+    function topmostModal(openModals) {
+        let top = null;
+        let topZ = -Infinity;
+        openModals.forEach((m) => {
+            const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
+            const z = isNaN(parsed) ? 0 : parsed;
+            if (z >= topZ) { topZ = z; top = m; }
+        });
+        return top;
+    }
 
     function dismissModal(modalEl) {
         if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
@@ -2352,7 +2378,7 @@
         customFilterDate = '';
         const customDateInput = document.getElementById('customDateInput');
         if(customDateInput) customDateInput.value = '';
-        
+
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
         if (mode === 'today') {
             const el = document.getElementById('btnFilterToday');
@@ -2378,7 +2404,7 @@
         const customDateInput = document.getElementById('customDateInput');
         const val = customDateInput ? customDateInput.value : '';
         if (!val) return;
-        
+
         currentFilterMode = 'custom';
         customFilterDate = val;
         document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -2764,6 +2790,7 @@
 
     function setupVisibilityHandling() {
         document.addEventListener('visibilitychange', () => {
+            if (document.hidden && configQrScanActive) closeConfigQrScanner();
             if (document.hidden && isCameraScanning) {
                 stopCurrentStream();
                 const permBox = document.getElementById('permission-box');
@@ -3144,7 +3171,7 @@
         };
         if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
         if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
-        if (item.barcodes && Array.isArray(item.barcodes)) {
+        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
             payload.barcodes = item.barcodes.map((b) => {
                 if (!b) return { code: '', locker: '' };
                 const bcEntry = { code: b.code || '', locker: b.locker || '' };
@@ -3156,15 +3183,17 @@
     }
 
     function syncScannerLookupEntry(itemId, item) {
-        if (!db || !fb || !itemId || !item) return Promise.resolve();
-        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: buildScannerLookupPayload(item) }).catch((error) => {
+        if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), buildScannerLookupPayload(item)).catch((error) => {
+            console.error('Error syncing scanner lookup entry:', error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
         });
     }
 
     function clearScannerLookupEntry(itemId) {
-        if (!db || !fb || !itemId) return Promise.resolve();
-        return fb.update(fb.ref(db, 'zoew_scanner_lookup'), { [itemId]: null }).catch((error) => {
+        if (!db || !fb || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
+        return fb.set(fb.ref(db, `zoew_scanner_lookup/${itemId}`), null).catch((error) => {
+            console.error('Error clearing scanner lookup entry:', error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing scanner lookup entry' });
         });
     }
@@ -3200,10 +3229,10 @@
         pendingBarcode = cleanBarcode;
         const modalBcText = document.getElementById('modalBarcodeText');
         if(modalBcText) modalBcText.innerText = cleanBarcode;
-        
+
         const modalPhoneInput = document.getElementById('modalPhoneInput');
         if(modalPhoneInput) modalPhoneInput.value = "";
-        
+
         const modalLockerInput = document.getElementById('modalLockerInput');
         if(modalLockerInput) modalLockerInput.value = lastEnteredLocker;
 
@@ -3211,7 +3240,7 @@
         if(modalCodInput) modalCodInput.value = "";
         const modalDodInput = document.getElementById('modalDodInput');
         if(modalDodInput) modalDodInput.value = "";
-        
+
         openModalHelper('phoneModal');
         const lookupPromise = attemptAutoLookup(cleanBarcode);
 
@@ -3315,7 +3344,7 @@
         const now = new Date(getServerNow());
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
-        
+
         const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeString = `${timeFormatted} (${dateString})`;
 
@@ -3343,12 +3372,12 @@
                 item.barcodes = [{ code: oldCode, time: oldTime, cod: oldCod, dod: oldDod, locker: oldLocker, isClosed: oldIsClosed, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || currentTimeMillis }];
             }
 
-            item.barcodes.push({ 
-                code: barcode, 
-                time: timeString, 
-                cod: cod, 
-                dod: dod, 
-                locker: locker, 
+            item.barcodes.push({
+                code: barcode,
+                time: timeString,
+                cod: cod,
+                dod: dod,
+                locker: locker,
                 isClosed: false,
                 isDeducted: false,
                 isFromDeletion: false,
@@ -3687,7 +3716,7 @@
             if (targetB) {
                 let oldCod = parseFloat(targetB.cod) || 0;
                 let oldDod = parseFloat(targetB.dod) || 0;
-                
+
                 let codDiff = Math.round((newCod - oldCod) * 100) / 100;
                 let dodDiff = Math.round((newDod - oldDod) * 100) / 100;
 
@@ -3763,9 +3792,9 @@
         if(editModalBarcodeText) editModalBarcodeText.innerText = item.barcode;
         const editPhoneInput = document.getElementById('editPhoneInput');
         if(editPhoneInput) editPhoneInput.value = item.phone === "គ្មានលេខ" ? "" : item.phone;
-        
+
         openModalHelper('editPhoneModal');
-        
+
         setTimeout(() => {
             if(editPhoneInput) editPhoneInput.focus();
         }, 150);
@@ -4261,7 +4290,7 @@
             if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
                 let allLockers = item.barcodes.map(b => b.locker || "N/A").filter(l => l && l !== "N/A");
                 let uniqueLockers = [...new Set(allLockers)];
-                
+
                 if (uniqueLockers.length > 1) {
                     lockerLoc = `${uniqueLockers.join(', ')} (${uniqueLockers.length} កន្លែង)`;
                 } else if (uniqueLockers.length === 1) {
@@ -4291,9 +4320,9 @@
                     <button class="more-btn" onclick="toggleMoreDropdown(event, '${escapeForInlineJsAttr(item.id)}')">⋮</button>
                 </div>
             `;
-            
+
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>` 
+                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>`
                 : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
 
             let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;

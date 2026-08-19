@@ -71,6 +71,16 @@ function closeModal(id) {
     }
     safeFocusScanner();
 }
+function topmostModal(openModals) {
+    let top = null;
+    let topZ = -Infinity;
+    openModals.forEach((m) => {
+        const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
+        const z = isNaN(parsed) ? 0 : parsed;
+        if (z >= topZ) { topZ = z; top = m; }
+    });
+    return top;
+}
 function dismissModal(modalEl) {
     if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
     const fnName = modalEl.getAttribute('data-close');
@@ -182,9 +192,9 @@ async function attemptAuthStorageRecovery() {
 
 async function initFirebase() {
     const raw = localStorage.getItem('zoew_firebase_config');
-    if (!raw) { openConfigModal(); return; }
+    if (!raw) { requestPinBeforeConfig(); return; }
     let cfg;
-    try { cfg = JSON.parse(raw); } catch (e) { openConfigModal(); return; }
+    try { cfg = JSON.parse(raw); } catch (e) { requestPinBeforeConfig(); return; }
 
     addPreconnect(cfg.databaseURL);
     if (cfg.authDomain) addPreconnect(`https://${cfg.authDomain}`);
@@ -611,6 +621,18 @@ function applySetupLinkFromUrl() {
     pendingSetupLinkConfig = parsed;
     showToast('សូមផ្ទៀងផ្ទាត់ PIN ដើម្បីអនុវត្ត Setup Link');
     requestPinBeforeConfig();
+}
+
+function cancelPinSetupFlow() {
+    pendingSetupLinkConfig = null;
+    pinTargetAction = null;
+    closeModal('pinSetupModal');
+}
+
+function cancelPinEntryFlow() {
+    pendingSetupLinkConfig = null;
+    pinTargetAction = null;
+    closeModal('pinModal');
 }
 
 let configQrReader = null;
@@ -1385,10 +1407,10 @@ function bindEventListeners() {
 
     document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); loginWithFirebase(); });
 
-    document.getElementById('pinSetupCancelBtn').addEventListener('click', () => closeModal('pinSetupModal'));
+    document.getElementById('pinSetupCancelBtn').addEventListener('click', cancelPinSetupFlow);
     document.getElementById('pinSetupSaveBtn').addEventListener('click', saveNewSecurityPin);
 
-    document.getElementById('pinCancelBtn').addEventListener('click', () => closeModal('pinModal'));
+    document.getElementById('pinCancelBtn').addEventListener('click', cancelPinEntryFlow);
     document.getElementById('pinConfirmBtn').addEventListener('click', verifySecurityPin);
 
     document.getElementById('configCancelBtn').addEventListener('click', () => closeModal('configModal'));
@@ -1415,12 +1437,12 @@ function bindEventListeners() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        const openModals = document.querySelectorAll('.modal.open');
-        const openModalEl = openModals[openModals.length - 1];
+        const openModalEl = topmostModal(Array.from(document.querySelectorAll('.modal.open')));
         if (openModalEl) dismissModal(openModalEl);
     });
 
     document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && configQrScanActive) closeConfigQrScanner();
         if (document.visibilityState === 'hidden') {
             if (isCameraScanning && currentTab === 'scan') {
                 cameraStoppedByVisibility = true;

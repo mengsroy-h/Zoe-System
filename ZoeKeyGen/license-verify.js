@@ -180,7 +180,6 @@
             } finally {
                 clearTimeout(timer);
             }
-            if (!res.ok) return { ok: null, reason: 'network' };
             const dateHeader = res.headers.get('Date');
             if (dateHeader) {
                 const serverMs = new Date(dateHeader).getTime();
@@ -189,6 +188,7 @@
                     serverTimeSynced = true;
                 }
             }
+            if (!res.ok) return { ok: null, reason: 'network' };
             const data = await res.json();
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };

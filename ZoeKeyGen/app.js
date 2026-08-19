@@ -451,6 +451,12 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     document.getElementById('appContainer').style.display = 'none';
+    keyListCache = [];
+    const keyListBody = document.getElementById('keyListBody');
+    if (keyListBody) keyListBody.innerHTML = '';
+    document.querySelectorAll('.modal').forEach((m) => {
+        if (m.id !== 'loginModal') closeModal(m.id);
+    });
 
     clearSigningKey();
     openModalHelper('loginModal');

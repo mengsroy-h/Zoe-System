@@ -451,6 +451,7 @@ function saveFirebaseConfig() {
 
 function showLoginModalWithPrefill() {
     document.getElementById('appContainer').style.display = 'none';
+    keyListSessionGeneration++;
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
     if (keyListBody) keyListBody.innerHTML = '';
@@ -486,7 +487,6 @@ async function doLogin() {
         await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
         else localStorage.removeItem('remembered_email');
-        if (passIn) passIn.value = '';
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'doLogin' });
         alert(e && e.message === 'Login timed out'
@@ -494,6 +494,7 @@ async function doLogin() {
             : "ចូលប្រព័ន្ធមិនបានទេ! សូមពិនិត្យអ៊ីមែល/ពាក្យសម្ងាត់ម្តងទៀត។");
     } finally {
         if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalBtnText; }
+        if (passIn) passIn.value = '';
     }
 }
 
@@ -503,7 +504,6 @@ async function verifyAdminRoleThenProceed(user) {
         const role = roleSnap.val();
         if (role !== 'admin') {
             await fb.signOut(auth).catch(() => {});
-            showLoginModalWithPrefill();
             showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeKeyGen ទេ! តម្រូវឲ្យជា Admin ប៉ុណ្ណោះ។");
             return;
         }
@@ -511,7 +511,6 @@ async function verifyAdminRoleThenProceed(user) {
         console.error("Role verification failed:", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
         await fb.signOut(auth).catch(() => {});
-        showLoginModalWithPrefill();
         showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
         return;
     }
@@ -779,6 +778,7 @@ function copyGeneratedKey() {
 }
 
 let keyListCache = [];
+let keyListSessionGeneration = 0;
 const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zoescan', ALL: 'ទាំង ៣' };
 
 function escapeHtml(str) {
@@ -789,11 +789,13 @@ async function refreshKeyList() {
     const tbody = document.getElementById('keyListBody');
     if (!tbody || !db) return;
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
+    const myGeneration = keyListSessionGeneration;
     try {
         const [publicSnap, metaSnap] = await withTimeout(Promise.all([
             fb.get(fb.ref(db, 'license_keys')),
             fb.get(fb.ref(db, 'license_keys_meta'))
         ]), 15000, 'Refresh timed out');
+        if (myGeneration !== keyListSessionGeneration) return;
         const publicData = publicSnap.exists() ? publicSnap.val() : {};
         const metaData = metaSnap.exists() ? metaSnap.val() : {};
 
@@ -820,6 +822,7 @@ async function refreshKeyList() {
         keyListCache = rows;
         renderKeyList();
     } catch (e) {
+        if (myGeneration !== keyListSessionGeneration) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'refreshKeyList' });
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';

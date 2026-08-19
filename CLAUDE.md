@@ -826,6 +826,43 @@ identified as the biggest operational bottleneck (bigger than any code bug found
   again (zoekeygen-v11). Note: `qrcode.js` is third-party vendored code, kept as-is including its own
   comments — the project's comment-free convention applies only to this codebase's own `app.js`/
   `license-verify.js`, not to vendored libraries.
-- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v10).
-- Not yet committed/pushed as of writing this note — see git log on this branch to confirm current state if
-  resuming.
+- `CACHE_VERSION` bumped in all 4 `sw.js` (zoeadmin-v20, zoew-v17, zoescan-v17, zoekeygen-v11).
+
+This round's PR (#15) was merged to `main` at the user's explicit request in this session.
+
+## Firebase Backup Tool (added 2026-08-19)
+
+Added at the user's request as a follow-up to the "what's missing before public launch" discussion — the
+biggest unaddressed data-safety gap identified was that Firebase RTDB has no backup at all; losing a
+client business's project (account issue, accidental deletion, quota problem) would be unrecoverable.
+
+- New top-level `firebase-backup/` directory, **not part of any of the 4 deployed apps** — a standalone
+  Node.js CLI tool the vendor runs themselves (locally or via a scheduled task), using `firebase-admin`
+  with a per-business service account key (bypasses RTDB rules entirely, unlike the client SDK — the
+  correct approach for a trusted, vendor-only backup script).
+- `backup.js` reads `config.json` (gitignored, never committed — contains real business names +
+  paths to real service-account key files) listing one entry per business (name, service account path,
+  database URL), does a full root (`/`) export per business, gzips it to
+  `backups/<business>/<ISO-timestamp>.json.gz`, and prunes older backups beyond `keepCount` (default 30).
+  One business failing (bad credentials, missing file, network error) doesn't stop the others — each is
+  independently try/caught and reported; the process exits non-zero only if *any* failed, so a scheduled
+  task can alert on it.
+- `config.example.json` is the committed template; `config.json`, `firebase-backup/secrets/` (where the
+  downloaded service-account JSON keys go), and `firebase-backup/backups/` (the output) are all in
+  `.gitignore` — service account keys are genuine credentials (unlike the client-side Firebase config used
+  elsewhere in this project, which is intentionally not secret), so they must never be committed.
+- **Verified working this session**: ran `npm install` (167 packages, no vulnerabilities), confirmed the
+  missing-config error path, confirmed per-business failure isolation with a fake config (one missing file
+  + one malformed service-account key — both failed independently with clear messages, exit code 1,
+  neither crashed the process), and independently verified the gzip write/read round-trip and the
+  prune-to-`keepCount` rotation logic with a standalone test (5 fake dated backups → correctly kept only
+  the newest 3). **Not verified against a real Firebase project** — no live project/service-account key
+  available in this session; the vendor should do one real end-to-end run after setup.
+- README (`firebase-backup/README.md`, in Khmer) covers: getting a service-account key from the Firebase
+  Console, `config.json` setup, manual run, Windows Task Scheduler + cron scheduling instructions, and a
+  documented-but-not-built manual restore procedure (restore is deliberately not a one-command script,
+  since it can overwrite live data — the README gives the few lines of code needed, for a human to run
+  deliberately when actually needed).
+- Root `.gitignore` updated: `node_modules/`, `firebase-backup/config.json`, `firebase-backup/secrets/`,
+  `firebase-backup/backups/`, `firebase-backup/backup.log`.
+- Does not touch any of the 4 apps, Firebase rules, or CACHE_VERSION — purely additive, isolated tooling.

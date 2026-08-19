@@ -1,0 +1,16 @@
+{
+  "backupDir": "./backups",
+  "keepCount": 30,
+  "businesses": [
+    {
+      "name": "example-business-1",
+      "serviceAccountPath": "./secrets/example-business-1-service-account.json",
+      "databaseURL": "https://example-business-1-default-rtdb.firebaseio.com"
+    },
+    {
+      "name": "zoekeygen-license-project",
+      "serviceAccountPath": "./secrets/zoekeygen-service-account.json",
+      "databaseURL": "https://zoe-license-default-rtdb.firebaseio.com"
+    }
+  ]
+}

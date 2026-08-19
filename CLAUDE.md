@@ -1422,6 +1422,45 @@ The same run also **empirically confirmed the partial-claim finding**: a worker 
 locks. Still unfixed — it needs a decision on relaxing those locks for `worker`.
 The harness lives at `scratchpad/emu/{real.sh,real.rules.json}`; rebuild it in any future rules round.
 
+## Export: phone/barcode must be TEXT, not numbers (fixed 2026-08-19, branch `claude/export-excel-sheets-issues-afkyyq`)
+
+The user reported the Excel export mangling phone numbers and the Google Sheet export mangling barcodes
+(`0977173546` losing its leading zero, `77130525210213` shown as `7.71305E+13`). PDF was confirmed fine by
+the user and was deliberately not touched. Export code lives **only in ZoeAdmin** — ZoeW/Zoescan/ZoeKeyGen
+have none, so there was nothing to mirror.
+
+**Root cause of the `.xlsx` half, worth remembering:** `XLSX.utils.aoa_to_sheet()` *did* type these cells
+correctly as `t: 's'`, so the bug was invisible in the in-memory sheet. But `XLSX.writeFile()` **without
+`bookSST: true`** emits string cells as OOXML `t="str"` — which means *"cached string result of a formula"*,
+not *"text"*. Excel tolerates it; Google Sheets falls back to reading `<v>` as a number, which is exactly why
+only the numeric-looking columns broke while Khmer text and `N/A` survived. Verified by unzipping the
+generated file and reading `xl/worksheets/sheet1.xml`. **Do not diagnose this class of bug from the
+in-memory cell object — inspect the emitted XML.**
+
+Fix (all in `ZoeAdmin/app.js`):
+- `buildExportRows()` coerces `phone`/`barcode` with `String(...)`, defensively, in case an old record ever
+  stored either as a number.
+- `forceExportTextCells(ws, rowCount)` + `EXPORT_TEXT_COLUMN_INDEXES = [1, 2]` set `t: 's'` and `z: '@'`
+  (text number format, `numFmtId="49"`) on the phone/barcode data cells. If a column is ever added or
+  reordered in `EXPORT_HEADERS`, update those indexes to match.
+- `XLSX.writeFile(..., { bookSST: true })` writes real shared strings (`t="s"`), removing `t="str"` entirely.
+  SheetJS also emits `<ignoredErrors numberStoredAsText="1">` on its own, so Excel shows no green
+  "number stored as text" triangles.
+- CSV path: `sheetsText()` wraps phone/barcode in the `="…"` formula form, the standard way to survive Google
+  Sheets' import conversion (and Excel opening the `.csv` directly). It nests correctly inside the existing
+  `csvEscape`, which doubles the inner quotes. Empty values stay empty rather than becoming an empty formula.
+  Caveat: if the user unticks "Convert text to numbers, dates, and formulas" during Sheets import, the cell
+  shows the literal formula text — that setting is on by default.
+
+COD/DOD/total deliberately stay **numeric** in the xlsx so SUM still works; only columns 1 and 2 are forced
+to text. Verified by a scratchpad harness (`xlsxtest/verify.js`) that slices the real `EXPORT_HEADERS`,
+`forceExportTextCells`, and `csvEscape`/`sheetsText` blocks out of `ZoeAdmin/app.js` with `vm`, writes a real
+`.xlsx`, reads it back, and asserts leading zeros, 15-digit barcodes, empty phones, and numeric COD all
+round-trip. (Harness gotcha: a top-level `const` inside `vm.runInContext` is *not* exposed on the context
+object — function declarations are. Re-export it explicitly or the test silently reads shifted rows.)
+
+`CACHE_VERSION` bumped (zoeadmin-v34). No Firebase rules change, so nothing new needs a manual publish.
+
 ## Follow-up session (2026-08-19, branch `claude/deep-audit-bug-fixes-90pmhb`) — handoff notes
 
 Not a new audit round. The user asked to read the START HERE block, then to "fix whatever is still not

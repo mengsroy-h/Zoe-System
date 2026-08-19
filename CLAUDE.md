@@ -9,20 +9,20 @@
 > ⚠️ `claude/deep-audit-bug-fixes-90pmhb` (ជុំ ៦ follow-up) **នៅតែមិនទាន់ merge** — កុំយកបន្ត
 > ពីវា។ ចាប់ផ្តើម branch ថ្មីពី `main` ជានិច្ច។
 >
-> **ត្រូវការសកម្មភាពដោយដៃ (មនុស្ស មិនមែន Claude) — នៅសល់តែប៉ុណ្ណេះ:**
-> 1. Publish `firebase-database.rules.json` (root) — Console របស់អាជីវកម្មនីមួយៗ
-> 2. Publish `ZoeKeyGen/firebase-database.rules.json` — Console ZoeKeyGen
+> ✅ **Rules ទាំងពីរ publish រួចរាល់ហើយ** (អ្នកប្រើបញ្ជាក់ 2026-08-19) — `firebase-database.rules.json`
+> (root) និង `ZoeKeyGen/firebase-database.rules.json`។ ដូច្នេះ ៤ យ៉ាងនេះមានប្រសិទ្ធភាពហើយ៖
+> scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន · `license_keys` លែងអានបាន
+> ជាសាធារណៈត្រង់ node មេ · **Zoescan រំលងទូដែលអតិថិជនយករួច**។
 >
-> ដដែលនឹងជុំមុន បូក **ចំណុចថ្មីមួយ**៖ ជុំនេះបន្ថែមវាល `isClosed` ចូល `zoew_scanner_lookup` ក្នុង
-> rules root។ ដរាបណាមិន publish ៤ យ៉ាងខាងក្រោមមិនទាន់មានប្រសិទ្ធភាព (App នៅដំណើរការធម្មតា
-> **គ្មានអ្វីខូចទេ**): scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន ·
-> `license_keys` លែងអានបានជាសាធារណៈត្រង់ node មេ · Zoescan រំលងទូដែលអតិថិជនយករួច។
+> **គ្មានអ្វីនៅសល់ទេ — ទាំងកូដ ទាំង rules ទៅដល់ production អស់ហើយ។**
 >
-> **កូដ deploy មុន rules ក៏មិនខូចដែរ** (ស្ថានភាពពិតឥឡូវនេះ) — `syncScannerLookupEntry()` សរសេរ
-> ម្តងទៀតដោយដក `isClosed` ចេញ ប្រសិនបើ Firebase បដិសេធ ដូច្នេះ Zoescan គ្រាន់តែធ្វើដូចមុន
-> រហូតដល់ publish (បានផ្ទៀងផ្ទាត់លើ emulator ជាមួយ rules ចាស់ជាក់ស្តែង)។
+> ចំណាំសម្រាប់ជុំក្រោយ៖ entry ចាស់ក្នុង `zoew_scanner_lookup` ទទួលវាល `isClosed` លុះត្រាតែកញ្ចប់នោះ
+> ត្រូវប៉ះម្តងទៀត (បិទ/បើក/ស្តារ/កែលេខ ឬប៊ូតុង "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" ក្នុង
+> ZoeAdmin)។ entry ដែលបិទរួចនឹងរលាយចេញក្នុង ២ម៉ោងដោយខ្លួនឯង ដូច្នេះមិនបានសរសេរ migration ទេ។
 >
-> **គ្មានចំណុចណាត្រូវការការសម្រេចទៀតទេ។**
+> ការផ្ទៀងផ្ទាត់ថា publish ពិតជាចូល៖ ពី session នេះ **ធ្វើមិនបានទេ** (network policy ទប់ការទៅ
+> `*.firebaseio.com`, ហើយ node អាជីវកម្មទាំងអស់ត្រូវការ auth)។ បើចង់ផ្ទៀងផ្ទាត់ដោយដៃ៖ បើក Zoescan
+> ស្កេនកញ្ចប់ចូលទូដែលទើបមានអតិថិជនយកចេញ — មិនគួរឡើងប្រអប់ព្រមានទៀតទេ។
 >
 > **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (divergence
 > ZoeAdmin↔ZoeW), `node audit-tools/shared-fns.js` (divergence ទាំង ៤ App — **ថ្មីជុំនេះ**),
@@ -1806,5 +1806,13 @@ modified HTML, and the rules change is emulator-verified against both the new an
 rules. The only outstanding work is the two manual Console publishes listed in START HERE.
 
 **Merged to `main` at the user's explicit request in this session** — PR #20, merge commit `acd5a9f`,
-`mergeable_state: clean` with every Netlify check green beforehand. The rules publishes are still
-outstanding; the code is live without them and degrades safely, per the fallback above.
+`mergeable_state: clean` with every Netlify check green beforehand. A follow-up doc-only PR #21
+(`6d67c83`) corrected the START HERE block afterwards.
+
+**RESOLVED 2026-08-19 (confirmed by the user): both rules files have been published.** Root
+`firebase-database.rules.json` and `ZoeKeyGen/firebase-database.rules.json` are live in their respective
+Consoles, so the scanner `$idx` guard, the worker partial-claim relaxation, the `license_keys` read move
+and the new `zoew_scanner_lookup` `isClosed` field are all in effect. **Nothing from rounds 6 or 7 is
+outstanding any more.** This could not be verified from the session itself — the network policy rejects
+`*.firebaseio.com` and every business node needs auth — so it rests on the user's confirmation; the
+practical check is to scan a parcel into a just-emptied locker in Zoescan and see no warning.

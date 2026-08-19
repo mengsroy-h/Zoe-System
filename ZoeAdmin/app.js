@@ -558,6 +558,10 @@
 
     async function openConfigQrScanner() {
         if (configQrScanActive) return;
+        if (isCameraScanning || isCameraStarting) {
+            showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
+            return;
+        }
         if (typeof ZXing === 'undefined') {
             showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
             return;
@@ -1042,12 +1046,14 @@
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;
+        lookupSecretKey = null;
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
             'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
             'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
             'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
-            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput'
+            'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
+            'editModalBarcodeText', 'lookupApiHeaderValueInput'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1059,6 +1065,7 @@
 
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
+        closeConfigQrScanner();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1810,7 +1817,8 @@
         });
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
-            const openModalEl = Array.from(document.querySelectorAll('.modal')).find(m => m.style.display === 'flex');
+            const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
+            const openModalEl = openModals[openModals.length - 1];
             if (openModalEl) dismissModal(openModalEl);
         });
     });

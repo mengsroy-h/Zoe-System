@@ -223,6 +223,7 @@ async function initFirebase() {
             currentUserEmail = null;
             cameraStoppedByVisibility = false;
             stopScanner();
+            closeConfigQrScanner();
             detachDatabaseListeners();
             renderList();
             document.getElementById('lockerPickerScreen').classList.add('hidden');
@@ -624,6 +625,10 @@ function closeConfigQrScanner() {
 
 async function openConfigQrScanner() {
     if (configQrScanActive) return;
+    if (isCameraScanning || isCameraStarting) {
+        showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
+        return;
+    }
     if (typeof ZXing === 'undefined') {
         showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
         return;
@@ -1408,7 +1413,8 @@ function bindEventListeners() {
     });
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        const openModalEl = document.querySelector('.modal.open');
+        const openModals = document.querySelectorAll('.modal.open');
+        const openModalEl = openModals[openModals.length - 1];
         if (openModalEl) dismissModal(openModalEl);
     });
 

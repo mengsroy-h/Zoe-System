@@ -647,6 +647,7 @@ async function loadSigningKey() {
 
 function clearSigningKey() {
     signingPrivateKeyJwk = null;
+    signingKeySessionKey = null;
     document.getElementById('privateKeyInput').value = '';
     sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
@@ -886,13 +887,19 @@ async function refreshKeyList() {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     const myGeneration = keyListSessionGeneration;
     try {
-        const [publicSnap, metaSnap] = await withTimeout(Promise.all([
+        const [publicResult, metaResult] = await withTimeout(Promise.allSettled([
             fb.get(fb.ref(db, 'license_keys')),
             fb.get(fb.ref(db, 'license_keys_meta'))
         ]), 15000, 'Refresh timed out');
         if (myGeneration !== keyListSessionGeneration) return;
+        if (publicResult.status === 'rejected') throw publicResult.reason;
+        const publicSnap = publicResult.value;
         const publicData = publicSnap.exists() ? publicSnap.val() : {};
-        const metaData = metaSnap.exists() ? metaSnap.val() : {};
+        if (metaResult.status === 'rejected') {
+            console.error(metaResult.reason);
+            if (window.ZoeErrors) ZoeErrors.capture(metaResult.reason, { context: 'refreshKeyList metaSnap' });
+        }
+        const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
 
         const byId = {};
         ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {

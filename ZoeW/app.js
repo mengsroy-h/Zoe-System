@@ -553,7 +553,7 @@
         pendingPermanentDeleteId = null;
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
-            'editPhoneInput', 'searchPhoneInput'
+            'editPhoneInput', 'searchPhoneInput', 'editModalBarcodeText'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -565,6 +565,7 @@
 
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
+        closeConfigQrScanner();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1323,7 +1324,8 @@
         });
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
-            const openModalEl = Array.from(document.querySelectorAll('.modal')).find(m => m.style.display === 'flex');
+            const openModals = Array.from(document.querySelectorAll('.modal')).filter(m => m.style.display === 'flex');
+            const openModalEl = openModals[openModals.length - 1];
             if (openModalEl) dismissModal(openModalEl);
         });
     });

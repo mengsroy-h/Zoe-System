@@ -465,6 +465,16 @@ function showLoginModalWithPrefill() {
     const genResultBox = document.getElementById('genResultBox');
     if (genResultBox) genResultBox.classList.add('hidden');
 
+    lastGeneratedSetupLink = '';
+    const setupLinkConfigInput = document.getElementById('setupLinkConfigInput');
+    if (setupLinkConfigInput) setupLinkConfigInput.value = '';
+    const setupLinkResultText = document.getElementById('setupLinkResultText');
+    if (setupLinkResultText) setupLinkResultText.textContent = '';
+    const setupLinkResultBox = document.getElementById('setupLinkResultBox');
+    if (setupLinkResultBox) setupLinkResultBox.classList.add('hidden');
+    const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
+    if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
+
     clearSigningKey();
     openModalHelper('loginModal');
     const savedEmail = localStorage.getItem('remembered_email');
@@ -783,6 +793,83 @@ async function generateLicenseKey() {
 function copyGeneratedKey() {
     if (!lastGeneratedKey) return;
     navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
+}
+
+const SETUP_LINK_URL_KEYS = { ADM: 'zoekeygen_setup_url_ADM', ZOW: 'zoekeygen_setup_url_ZOW', SCN: 'zoekeygen_setup_url_SCN' };
+let lastGeneratedSetupLink = '';
+
+function onSetupLinkAppChange() {
+    const sel = document.getElementById('setupLinkAppSelect');
+    const urlInput = document.getElementById('setupLinkUrlInput');
+    if (!sel || !urlInput) return;
+    const storageKey = SETUP_LINK_URL_KEYS[sel.value];
+    urlInput.value = storageKey ? (localStorage.getItem(storageKey) || '') : '';
+}
+
+function generateSetupLink() {
+    const sel = document.getElementById('setupLinkAppSelect');
+    const urlInput = document.getElementById('setupLinkUrlInput');
+    const cfgInput = document.getElementById('setupLinkConfigInput');
+    const resultBox = document.getElementById('setupLinkResultBox');
+    const resultText = document.getElementById('setupLinkResultText');
+    if (!sel || !urlInput || !cfgInput) return;
+
+    const appCode = sel.value;
+    if (!appCode) { alert('សូមជ្រើសរើសកម្មវិធីគោលដៅ!'); return; }
+
+    const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
+    if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
+
+    const raw = cfgInput.value.trim();
+    if (!raw) { alert('សូមបញ្ចូល Firebase Config!'); return; }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (e) {
+        alert('Firebase Config JSON មិនត្រឹមត្រូវទេ!');
+        return;
+    }
+    if (!parsed.apiKey || !parsed.databaseURL) {
+        alert('Firebase Config ត្រូវមាន apiKey និង databaseURL!');
+        return;
+    }
+
+    const storageKey = SETUP_LINK_URL_KEYS[appCode];
+    if (storageKey) localStorage.setItem(storageKey, baseUrl);
+
+    let b64;
+    try {
+        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+    } catch (e) {
+        alert('មិនអាចបង្កើត Link បានទេ! សូមពិនិត្យ Config JSON');
+        return;
+    }
+
+    lastGeneratedSetupLink = baseUrl + '/?setup=' + encodeURIComponent(b64);
+    if (resultText) resultText.textContent = lastGeneratedSetupLink;
+    if (resultBox) resultBox.classList.remove('hidden');
+
+    const qrContainer = document.getElementById('setupLinkQrContainer');
+    if (qrContainer) {
+        qrContainer.innerHTML = '';
+        try {
+            if (window.qrcode) {
+                const qr = qrcode(0, 'M');
+                qr.addData(lastGeneratedSetupLink);
+                qr.make();
+                qrContainer.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8 });
+            }
+        } catch (e) {
+            qrContainer.innerHTML = '';
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+        }
+    }
+}
+
+function copySetupLink() {
+    if (!lastGeneratedSetupLink) return;
+    navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('បានចម្លង Link!')).catch(() => {});
 }
 
 let keyListCache = [];

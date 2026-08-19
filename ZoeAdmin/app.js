@@ -632,7 +632,9 @@
     let customerDataTableFetchedAt = 0;
     let customerDataTableFetchPromise = null;
     let customerDataTableSessionGeneration = 0;
-    const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
+    let customerDataTableLastFailedAt = 0;
+    const CUSTOMER_TABLE_CACHE_MS = 15 * 60 * 1000;
+    const CUSTOMER_TABLE_FAIL_COOLDOWN_MS = 60 * 1000;
 
     function buildCustomerListApiUrl(cfg) {
         if (!cfg || !cfg.url) return null;
@@ -674,6 +676,10 @@
             return customerDataTableFetchPromise;
         }
 
+        if (!force && customerDataTableLastFailedAt && (Date.now() - customerDataTableLastFailedAt < CUSTOMER_TABLE_FAIL_COOLDOWN_MS)) {
+            return;
+        }
+
         const listUrl = buildCustomerListApiUrl(cfg);
         if (!listUrl) return;
 
@@ -700,10 +706,12 @@
                 const rows = Array.isArray(data && data.rows) ? data.rows : [];
                 customerDataTableRows = rows;
                 customerDataTableFetchedAt = Date.now();
+                customerDataTableLastFailedAt = 0;
                 renderCustomerDataTableStatus(rows);
                 filterCustomerDataTable();
             } catch (e) {
                 if (myGeneration !== customerDataTableSessionGeneration) return;
+                customerDataTableLastFailedAt = Date.now();
                 if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
                 const curStatusEl = document.getElementById('customerDataTableStatus');
                 if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
@@ -759,6 +767,8 @@
         customerDataTableRows = null;
         customerDataTableFetchedAt = 0;
         customerDataTableFetchPromise = null;
+        customerDataTableLastFailedAt = 0;
+        autoLookupLastFailedAt = 0;
         const body = document.getElementById('customerDataTableBody');
         if (body) body.innerHTML = '';
         const statusEl = document.getElementById('customerDataTableStatus');
@@ -788,6 +798,8 @@
     }
 
     let lookupLockedNoticeShown = false;
+    let autoLookupLastFailedAt = 0;
+    const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
 
     function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
         if (pendingBarcode !== barcode || !isModalOpen) return;
@@ -840,6 +852,10 @@
             return;
         }
 
+        if (autoLookupLastFailedAt && (Date.now() - autoLookupLastFailedAt < AUTO_LOOKUP_FAIL_COOLDOWN_MS)) {
+            return;
+        }
+
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
@@ -860,8 +876,10 @@
             const phoneVal = getNestedField(data, cfg.phoneField);
             const codVal = getNestedField(data, cfg.codField);
             const dodVal = getNestedField(data, cfg.dodField);
+            autoLookupLastFailedAt = 0;
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
+            autoLookupLastFailedAt = Date.now();
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
         }

@@ -617,12 +617,12 @@
         showToast("កំពុងសាកល្បង API...");
         if (btnEl) btnEl.disabled = true;
         try {
-            const res = await withTimeout(fetch(testUrl, { headers }), 10000, 'Test API timed out');
+            const res = await withTimeout(fetch(testUrl, { headers }), 20000, 'Test API timed out');
             const text = await res.text();
             alert("ស្ថានភាព HTTP៖ " + res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + text.substring(0, 1500));
         } catch (e) {
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'testLookupApiConfig' });
-            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (e && e.message === 'Test API timed out' ? "អស់ពេល (Timeout) — សូមពិនិត្យ URL ឬការតភ្ជាប់អ៊ីនធឺណិត" : e.message));
+            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (e && e.message === 'Test API timed out' ? "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត" : e.message));
         } finally {
             if (btnEl) btnEl.disabled = false;
         }
@@ -689,7 +689,10 @@
                 } else if (cfg.headerName && cfg.headerValue) {
                     headers[cfg.headerName] = cfg.headerValue;
                 }
-                const res = await withTimeout(fetch(listUrl, { headers }), 15000, 'Customer table fetch timed out');
+                const res = await retryAsync(
+                    () => withTimeout(fetch(listUrl, { headers }), 20000, 'Customer table fetch timed out'),
+                    2, 2000
+                );
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 if (data && data.error) throw new Error(data.error);
@@ -847,7 +850,10 @@
                 headers[cfg.headerName] = cfg.headerValue;
             }
 
-            const res = await withTimeout(fetch(targetUrl, { headers }), 10000, 'Auto lookup timed out');
+            const res = await retryAsync(
+                () => withTimeout(fetch(targetUrl, { headers }), 15000, 'Auto lookup timed out'),
+                2, 1500
+            );
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
 

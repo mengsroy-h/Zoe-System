@@ -180,7 +180,7 @@
 
     const debouncedRenderAfterHistorySync = debounce(() => {
         runAutomaticCleanupRules();
-        applyCurrentFilter();
+        refreshCurrentHistoryView();
         updateRecentPhonesList();
     }, 120);
 
@@ -1455,7 +1455,7 @@
                 if (recordRef.codDollar < 0) recordRef.codDollar = 0;
                 if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
                 if (recordRef.totalCount < 0) recordRef.totalCount = 0;
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
         });
@@ -1556,7 +1556,7 @@
                     if (refCount <= 0) delete recordRef.pickedUpPhones[phoneKey];
                     else recordRef.pickedUpPhones[phoneKey] = refCount;
                 }
-                applyCurrentFilter();
+                refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
         });
@@ -2141,7 +2141,7 @@
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             openViewListModal(itemId);
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
         showToast(`បាន${actionText}ស្ថានភាព Barcode រួចរាល់!`);
 
@@ -2194,7 +2194,7 @@
                     if (previousState.itemCallMarkTime !== undefined) revertItem.callMarkTime = previousState.itemCallMarkTime;
                     else delete revertItem.callMarkTime;
                     openViewListModal(itemId);
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
             if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
@@ -2291,8 +2291,26 @@
                 patchFields.callMarkTime = null;
                 patchFields.isCalled = false;
             }
+            const prevPickupKey = getPickupPhoneKey(item);
             item.phone = newPhone;
-            patchHistoryItemFields(item, patchFields, previousFields).then(() => syncScannerLookupEntry(item.id, item));
+            const nextPickupKey = getPickupPhoneKey(item);
+            const pickupDate = item.scanDate || getFormattedDate();
+            let pickupRefMoved = false;
+            if (item.isClosed && prevPickupKey !== nextPickupKey) {
+                addPickupToDailyRecord(pickupDate, prevPickupKey, -1, 0);
+                addPickupToDailyRecord(pickupDate, nextPickupKey, 1, 0);
+                pickupRefMoved = true;
+            }
+            const revertPickupRefMove = () => {
+                if (!pickupRefMoved) return;
+                pickupRefMoved = false;
+                addPickupToDailyRecord(pickupDate, nextPickupKey, -1, 0);
+                addPickupToDailyRecord(pickupDate, prevPickupKey, 1, 0);
+            };
+            patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
+                if (saved) syncScannerLookupEntry(item.id, item);
+                else revertPickupRefMove();
+            }).catch(revertPickupRefMove);
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
             if (searchInput) searchInput.value = '';
@@ -2344,7 +2362,7 @@
             pickupCustomerDelta = alreadyInDesiredState ? 0 : (desiredClosed ? 1 : -1);
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
         showToast(`បាន${actionText}បញ្ជីជោគជ័យ!`);
 
@@ -2387,7 +2405,7 @@
                     if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
                         revertItem.barcodes.forEach((b, i) => { if (previousState.barcodeStates[i] !== undefined) b.isClosed = previousState.barcodeStates[i]; });
                     }
-                    applyCurrentFilter();
+                    refreshCurrentHistoryView();
                 }
             }
             if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
@@ -2537,7 +2555,7 @@
             });
             syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
             openRecentlyDeletedModal();
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
@@ -2556,7 +2574,7 @@
             }
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
-            applyCurrentFilter();
+            refreshCurrentHistoryView();
         }
     }
 
@@ -2599,25 +2617,8 @@
         }
     }
 
-    function saveSingleHistoryItemToFirebase(item) {
-        if (!dbRefHistory) return Promise.resolve();
-        if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
-            const err = new Error('Refusing to save history item with missing/unsafe id');
-            console.error(err.message, item && item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveSingleHistoryItemToFirebase' });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
-            return Promise.reject(err);
-        }
-        return fb.update(dbRefHistory, { [item.id]: item }).catch((error) => {
-            console.error("Error saving history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history item: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
-            throw error;
-        });
-    }
-
     function patchHistoryItemFields(item, fields, previousFields) {
-        if (!dbRefHistory) return Promise.resolve();
+        if (!dbRefHistory) return Promise.resolve(false);
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to patch history item with missing/unsafe id');
             console.error(err.message, item && item.id);
@@ -2629,7 +2630,7 @@
         Object.keys(fields).forEach(key => {
             updates[`${item.id}/${key}`] = fields[key];
         });
-        return fb.update(dbRefHistory, updates).catch((error) => {
+        return fb.update(dbRefHistory, updates).then(() => true).catch((error) => {
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
@@ -2643,6 +2644,7 @@
                     refreshCurrentHistoryView();
                 }
             }
+            return false;
         });
     }
 

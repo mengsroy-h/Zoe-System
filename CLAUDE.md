@@ -426,6 +426,22 @@ silent failure) — which argues it's probably fine, just an oddly-named project
 this is genuinely the dedicated `zoe-license` project's URL and not a mixed-up copy of ZoeW's
 business DB URL** — README updated to flag this for verification either way.
 
+### Three remaining items closed on request
+- **The pickup-stat phone-edit gap** (open since 2026-08-18, listed as "known unfixed edge case" above).
+  Editing the phone of an order that is *already closed* now moves its `pickedUpPhones` ref from the old
+  key to the new one, so the later reopen's −1 lands on the bucket that was actually incremented. Fixed at
+  the moment of the edit rather than by snapshotting the key onto the item, deliberately: the item schema
+  in `firebase-database.rules.json` ends with `$other: { ".validate": false }`, so a new field would be
+  rejected until the rules were published — a deploy-ordering hazard with two publishes already pending.
+  Moving the ref needs no schema change and is equally correct across devices, since the pickup node is
+  shared and the move is written immediately. `patchHistoryItemFields` now resolves `true`/`false` instead
+  of `undefined` so the caller can undo the move when the write fails; existing callers ignore the value.
+- **ZoeW's dead `saveSingleHistoryItemToFirebase`** removed. It is genuinely dead in ZoeW only — ZoeAdmin
+  has three live call sites and keeps its copy.
+- The `applyCurrentFilter()` conversion described above.
+
+`CACHE_VERSION` bumped (zoeadmin-v33, zoew-v30).
+
 ### Not yet done as of this handoff
 - Nothing critical is mid-edit. All changes described above are complete, syntax-checked
   (`node --check` on every modified `.js`, JSON-validated on both rules files), and either
@@ -1595,11 +1611,17 @@ Its *failure* path still goes through the revert above and keeps the search, whi
 failed, the old number is back, and it still matches the query. `saveEditedPhone` is now byte-identical
 across the two apps (one leftover brace-style difference was aligned while editing it).
 
-The remaining ~40 `applyCurrentFilter()` call sites across the two apps were **deliberately left alone**.
-Some are correct as they stand (a filter button, or `searchByPhone` exiting an empty search, should reset
-the view), and each of the rest needs its own judgement about whether it is a user-initiated view change or
-a background refresh. Converting them wholesale on a live system would be a much larger change than what
-was asked for. If a future round wants to finish this, that is the distinction to apply.
+**Then finished, on the user's instruction** (they also confirmed they are currently the only person using
+the system, so the propose-first caution does not apply for now): all the remaining `applyCurrentFilter()`
+call sites were classified and 28 of them converted (19 ZoeAdmin, 9 ZoeW). The rule applied was **a repaint
+caused by data changing preserves the current view; a repaint the user asked for by changing view does
+not.** 12 sites keep `applyCurrentFilter()` on purpose: `filterDataByDate`, `filterDataByCustomDate`,
+`searchByPhone`'s empty-query branch, `refreshCurrentHistoryView`'s own else branch, `setupAuthListener`
+(fresh session) and `saveEditedPhone` (clears the box deliberately, see above).
+
+The biggest one by far was **`debouncedRenderAfterHistorySync`** — the Firebase history listener's repaint,
+which fires on every change from any device. A worker with a phone search open had it wiped every time
+anyone anywhere scanned a parcel.
 
 ### Not yet done as of this handoff
 Nothing is mid-edit. Every commit is `node --check`-clean on every modified `.js`, JSON-validated on the

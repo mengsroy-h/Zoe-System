@@ -565,11 +565,12 @@ All fixes above (both the original 16 and these 6) are committed, `node --check`
 bumped a second time in all 4 `sw.js` (zoeadmin-v13, zoew-v12, zoescan-v12, zoekeygen-v6) to cover this
 second batch of behavior changes. Nothing is mid-edit.
 
-**UPDATE 2026-08-19 (confirmed by user):** `ZoeKeyGen/firebase-database.rules.json`'s `license_keys_meta`
-node has been manually published in the Firebase Console. Still needs confirmation whether the one-time
-"🔒 Migrate PII ចាស់" button in ZoeKeyGen's Key List card has been run — until it has, already-issued keys'
-`note`/`createdBy`/etc. stay exposed at the old public `license_keys` path even though new keys now split
-correctly on their own. No other rules files changed this round.
+**RESOLVED 2026-08-19 (confirmed by user):** `ZoeKeyGen/firebase-database.rules.json`'s `license_keys_meta`
+node has been manually published in the Firebase Console, and the one-time "🔒 Migrate PII ចាស់" button in
+ZoeKeyGen's Key List card has been run successfully — user confirmed both the "✅ បាន Migrate Key ចំនួន X
+ដោយជោគជ័យ!" success toast and, directly in the Firebase Console, that migrated `note`/`createdBy`/etc. now
+live under `license_keys_meta` rather than the public `license_keys` path. All outstanding items from the
+second audit round are now fully closed out. No other rules files changed this round.
 
 ## Third deep-audit pass (2026-08-19, branch `claude/deep-audit-final-tkeqbq`) — handoff notes
 
@@ -641,18 +642,17 @@ the propose-first live-production exception.
 ### Not yet done as of this handoff
 All fixes above are committed, `node --check`-clean on every modified `.js`, and comment-free grep
 re-verified repo-wide. Nothing is mid-edit. No rules-file changes this round, so no manual-publish step is
-needed from this round itself. From the second audit round: `license_keys_meta` rule publish is confirmed
-done (per user, 2026-08-19) — still need to confirm whether "🔒 Migrate PII ចាស់" has been run.
+needed from this round itself.
 
 This round's PR (#9) was merged to `main` at the user's explicit request in this session.
 
-**Note for next session, in case this comes up again:** after publishing the rule, the user clicked
-"🔒 Migrate PII ចាស់" and reported nothing visibly changed ("key didn't disappear, still shows normally").
-This is expected, not a bug — `refreshKeyList()` merges `license_keys` (public) + `license_keys_meta`
-(private) for display, so the ZoeKeyGen admin UI is *designed* to keep showing `note`/`createdBy` either way
-regardless of which node they physically live in. The migration's effect is only visible by inspecting the
-raw `license_keys/{appCode}/{keyId}` node in Firebase Console directly (those fields should be gone from
-there and present under `license_keys_meta/{appCode}/{keyId}` instead) — there was never a UI element where
-this data was shown to unauthenticated end-users in the first place, so nothing in any of the 4 apps' visible
-UI was ever expected to change. Still waiting on the user to confirm via Console inspection (or the toast
-message they saw on click) whether the migration write itself actually succeeded.
+**Second audit round's outstanding items are now fully resolved (confirmed 2026-08-19):** the
+`license_keys_meta` rule was published in the Firebase Console, and the user ran "🔒 Migrate PII ចាស់" —
+confirmed via the "✅ បាន Migrate Key ចំនួន X ដោយជោគជ័យ!" success toast and by inspecting the raw Firebase
+data directly, where migrated `note`/`createdBy`/etc. now correctly live under `license_keys_meta` instead of
+the public `license_keys` path. (Along the way, the user initially thought the migration hadn't worked
+because the ZoeKeyGen Key List page still displayed note/email normally after clicking — that's expected,
+not a bug: `refreshKeyList()` merges `license_keys` + `license_keys_meta` for the admin's own display
+regardless of which node the data physically lives in, so the page was never going to visibly change. Worth
+remembering if this same confusion comes up again after a future PII-handling change.) Nothing is
+outstanding from either the second or third audit round as of this handoff.

@@ -11,14 +11,26 @@
 > **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។**
 > លម្អិតនៅ section **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។
 >
-> 🔴 **តេស្តលើទូរស័ព្ទពិត (04:28) បង្ហាញថាការកែនោះដើរ តែមូលហេតុទី ៣ នៅសល់** — stack trace ចង្អុល
-> `app.js:1364` (បន្ទាត់ថ្មី) ហើយ toast ជាអត្ថបទថ្មី ➜ PWA update ចូលពិត និង login លែងស្ងាត់ទៀត។
-> ប៉ុន្តែ role check នៅតែ timeout។ រកឃើញមូលហេតុទី ៣៖ **RTDB មិនអាចភ្ជាប់មុន auth token មកដល់**
-> (`establishConnection_` await `authTokenProvider_.getToken()` — មានក្នុង source ច្បាស់) ហើយលើ
-> ឧបករណ៍នោះ `accounts:lookup` ចំណាយ **១៤.៨៧ វិនាទី** ចំណែក timer មាន ១៥ វិនាទី ➜ ចាញ់ជាប្រព័ន្ធ។
-> បូកនឹង `WebSocketConnection.healthyTimeout = 30000` មុនប្ដូរទៅ long-polling។
-> **កែហើយ (មិនទាន់ merge)**៖ រង់ចាំ `.info/connected` សិន (រហូត ៤៥ វិនាទី) ទើបអាន `user_roles` —
-> ឈប់ប្រណាំងនឹង timer។ មើល section ចុងឯកសារ។
+> 🔴 **មូលហេតុទី ៣ (រង់ចាំ `.info/connected`) បាន merge ចូល `main` ហើយ** — PR #25, commit `f1f62c5`,
+> merge `715d42b`។ (START HERE ធ្លាប់សរសេរថា "មិនទាន់ merge" — **ខុស**, ផ្ទៀងផ្ទាត់ដោយ git ហើយ។)
+>
+> 🔴 **តេស្តលើទូរស័ព្ទពិត (04:48) — មូលហេតុទី ៤។ PWA update ចូលពិត មិនបាច់ reinstall ទេ។**
+> ភស្តុតាង៖ stack trace គឺ `app.js:213` + `app.js:1222` ដែល **ត្រូវនឹង `origin/main` (715d42b) បេះបិទ**
+> ហើយគម្លាតពីការចុច login ដល់កំហុសគឺ **៦០.០១ វិនាទី** = ៤៥ (រង់ចាំភ្ជាប់) + ១៥ (អាន)។ កូដចាស់ឲ្យ ១៥។
+> ➜ ដូច្នេះ **កូដថ្មីកំពុងដើរនៅលើទូរស័ព្ទរួចហើយ** — បញ្ហាមិនមែននៅត្រង់ cache ទេ។
+>
+> មូលហេតុទី ៤៖ **RTDB socket មិនឡើងសោះ ខណៈ HTTPS ធម្មតាដើរល្អ**។ ក្នុង breadcrumb ដដែលនោះ
+> `identitytoolkit` 200, `script.google.com` 200, និង `GET zoew-z1-default-rtdb.firebaseio.com/.json`
+> ឆ្លើយ 401 ក្នុង ៧៩៣ms (401 នេះជារឿងធម្មតា — `syncServerTime()` អាន header `Date` តែប៉ុណ្ណោះ)។
+> ពោលគឺ **REST ទៅ firebaseio.com ដើរ តែ channel realtime មិនដើរ** ➜ `.info/connected` នៅ false
+> លើស ៤៥ វិនាទី ➜ អស់ថវិការង់ចាំ ➜ អាន ➜ timeout ➜ login មិនចូលដដែល។
+>
+> **កែហើយ (branch `claude/busy-franklin-5g26ja`)** ២ យ៉ាង៖
+> ១. **អាន `user_roles` តាម REST ស្របគ្នានឹង SDK** ពេល socket មិនទាន់ឡើង — អ្នកណាឆ្លើយមុន យកអ្នកនោះ។
+>    REST ប្រើ token របស់អ្នកប្រើ និងឆ្លងកាត់ rules ដដែល ដូច្នេះ **មិនបន្ធូរសុវត្ថិភាពទេ**។
+> ២. **CSP `script-src` ទទួល `*.firebaseio.com` / `*.firebasedatabase.app`** — long-polling របស់
+>    Firebase ផ្ទុក `<script>` ពី host នោះ ដូច្នេះពីមុន ពេល WebSocket ត្រូវបានទប់ RTDB **គ្មានផ្លូវ
+>    បម្រុងសោះ**។ ឥឡូវមាន។ លម្អិតនៅ section ចុងឯកសារ។
 >
 > ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
 > (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
@@ -1965,3 +1977,88 @@ long-polling — ធំជាង timer ១៥ វិនាទីទ្វេដ�
 តេស្តឡើងជា **98/98** (ថែម scenario ៥ និង ៦ ក្នុង `auth-recovery-test.js`)។ ផ្ទៀងផ្ទាត់មិនទទេ៖
 ធ្លាក់ ២០ ចំណុចលើ `origin/main` (ដែលមានការកែ login រួច តែគ្មានការរង់ចាំភ្ជាប់)។
 `CACHE_VERSION` bump ម្តងទៀត (zoeadmin-v37, zoew-v33, zoescan-v26, zoekeygen-v19)។
+
+### មូលហេតុទី ៤ (រកឃើញ 2026-08-20, branch `claude/busy-franklin-5g26ja`) — socket ស្លាប់ តែ HTTPS ដើរ
+
+**មុនគេ៖ បញ្ជាក់ថា PWA update ចូលរួចហើយ។** អ្នកប្រើសង្ស័យថាកូដចាស់នៅ cache។ មិនមែនទេ។
+Stack trace ក្នុង Sentry គឺ `withTimeout (app.js:213)` ← `verifyAdminRoleThenProceed (app.js:1222)`
+ហើយ `git show origin/main:ZoeAdmin/app.js | sed -n '213p;1222p'` ចេញបន្ទាត់ទាំងពីរនោះបេះបិទ។
+លើសពីនេះ គម្លាតពី `accounts:lookup` (04:48:33.758) ដល់កំហុស (04:49:33.770) គឺ **៦០.០១ វិនាទី**
+= `ROLE_CHECK_CONNECT_WAIT_MS` ៤៥ + `withTimeout` ១៥ — ចំនួនដែលមានតែក្នុងកូដក្រោយ PR #25។
+ហើយ toast ក្នុងរូបថតគឺអត្ថបទថ្មី "កំពុងភ្ជាប់ Server..."។ **វិធីពិនិត្យនេះគួរប្រើរាល់ពេល**
+មុននឹងសន្មតថាជាបញ្ហា cache៖ ផ្គូផ្គងលេខបន្ទាត់ក្នុង stack ទៅនឹង `origin/main` ដោយ `git show`។
+
+**មូលហេតុ។** នៅជុំមុន គេសន្មតថា RTDB មិនភ្ជាប់ព្រោះ auth token យឺត (`establishConnection_` await
+`getToken()`)។ ជុំនេះ `accounts:lookup` ចំណាយត្រឹម ២.៣៧ វិនាទី តែ `.info/connected` នៅតែ false
+លើស ៤៥ វិនាទី — ដូច្នេះការពន្យល់នោះមិនគ្រប់គ្រាន់ទេ។ អ្វីដែល breadcrumb បង្ហាញច្បាស់៖
+
+| សំណើ | លទ្ធផល |
+|---|---|
+| `POST identitytoolkit.googleapis.com/v1/accounts:lookup` | 200 |
+| `GET script.google.com/macros/.../exec?list=1` | 200 |
+| `GET zoew-z1-default-rtdb.firebaseio.com/.json?shallow=true` | **401 ក្នុង ៧៩៣ms** |
+| RTDB realtime channel | **គ្មានការភ្ជាប់សោះ** |
+
+401 នោះមិនមែនជាកំហុសទេ — `syncServerTime()` ក្នុង `license-verify.js` មិនអាន body ទេ គ្រាន់តែអាន
+header `Date` (root ត្រូវបានបិទតាំងពីជុំ ៦ ដែលផ្លាស់ `.read` ចុះទៅ `license_keys/$appCode/$keyId`)។
+តម្លៃពិតរបស់វាគឺ៖ **វាបង្ហាញថា HTTPS ទៅ `*.firebaseio.com` ដើរល្អនៅលើឧបករណ៍នោះ** — មានតែ
+channel realtime ទេដែលមិនដើរ។ (បណ្ដាញ 4G+ / VPN / proxy ដែលទប់ WebSocket គឺជាការពន្យល់សមហេតុផល។)
+
+**កំហុសកូដពិតទី ១ — គ្មានផ្លូវបម្រុងសម្រាប់អាន role។** ទាំង SDK `get()` និង `.info/connected`
+ពឹងលើ socket តែមួយ។ បើ socket មិនឡើង គ្មានអ្វីអាចអាន `user_roles` បានទេ ទោះ HTTPS ដើរក៏ដោយ។
+
+**កំហុសកូដពិតទី ២ — CSP ទប់ផ្លូវបម្រុងរបស់ Firebase ខ្លួនឯង។** `BrowserPollConnection` (long-polling
+ដែល SDK ប្ដូរទៅប្រើពេល WebSocket បរាជ័យ) ផ្ទុកទិន្នន័យតាម `<script src="https://<ns>.firebaseio.com/.lp?…">`
+ខាងក្នុង iframe `about:blank` ដែលទទួលមរតក CSP របស់ទំព័រមេ។ `script-src` ទាំង ៤ App **មិនមាន**
+`*.firebaseio.com` ទេ ➜ script ត្រូវបានទប់ ➜ **ពេល WebSocket ត្រូវបានទប់ RTDB គ្មាន transport ណាដើរសោះ**។
+`connect-src` មាន `wss://*.firebaseio.com` ស្រាប់ហើយ ដូច្នេះគេងាយស្មានថាគ្រប់គ្រាន់ — មិនគ្រប់ទេ
+ព្រោះ long-polling ជា `script-src` មិនមែន `connect-src`។
+
+### អ្វីដែលបានកែ (ទាំង ៤ App)
+- **`awaitDatabaseConnection()` ត្រូវបានជំនួសដោយ `readUserRole(user)`** (byte-identical ទាំង ៤ —
+  ប្រើ `window.firebaseSDK` ដូច helper ចាស់)។ ឥរិយាបថ៖
+  - **ភ្ជាប់រួចហើយ ➜ ដូចមុនបេះបិទ**៖ SDK `get()` + `withTimeout(15000)`។ គ្មានសំណើ REST បន្ថែម
+    លើផ្លូវធម្មតាទេ (មានតេស្តបញ្ជាក់) — ដូច្នេះកូដថ្មីដើរតែក្នុងករណីដែលខូចរួចហើយ។
+  - **មិនទាន់ភ្ជាប់ ➜ បើក ២ ផ្លូវស្របគ្នា**៖ SDK `get()` និង
+    `GET {databaseURL}/user_roles/{uid}.json?auth={idToken}`។ អ្នកណាឆ្លើយមុន យកអ្នកនោះ។
+    បើផ្លូវណាមួយបរាជ័យ ផ្លូវម្ខាងទៀត **នៅតែបន្តរង់ចាំ** រហូតដល់ `ROLE_CHECK_CONNECT_WAIT_MS` (៤៥ វិនាទី)។
+    បើបរាជ័យទាំងពីរ ➜ បោះកំហុសរបស់ **SDK** មុន (វាផ្ទុក `permission_denied`) ទើប REST ទើប timeout។
+- **`readUserRoleViaRest()`** ប្រើ `?auth=` (GET សាមញ្ញ គ្មាន preflight — សំខាន់ ព្រោះទាំងមូលនេះមាន
+  ដើម្បីដើរពេលអ្វីៗដទៃខូច)។ `readDatabaseUrlFromConfig()` អាន `zoew_firebase_config` ពី
+  `localStorage` ដោយផ្ទាល់ ជំនួសអថេរ `firebaseConfig` — ព្រោះ **Zoescan គ្មានអថេរនោះទេ**
+  ហើយ helper ត្រូវតែដូចគ្នាទាំង ៤។
+- **សុវត្ថិភាពមិនប្រែ**៖ REST ឆ្លងកាត់ rules ដដែល (`user_roles/$uid` អានបានតែដោយម្ចាស់ ឬ admin)
+  ហើយកូដនៅតែបដិសេធ role ខុស និងនៅតែ `signOut()` លើ `permission_denied`។ មានតេស្តទាំង ២ ចំណុច។
+- **`lastRoleRestOutcome`** (`'ok'` / `'http 401'` / `'blocked: …'` / `'unavailable'` / `'not needed'`)
+  ត្រូវបានផ្ញើទៅ Sentry ជាមួយ `connected` ក្នុង `ZoeErrors.capture(...)`។ ជុំក្រោយនឹងលែងស្មានទៀត៖
+  របាយការណ៍នឹងប្រាប់ត្រង់ៗថា REST ដើរឬអត់ ខណៈ socket ស្លាប់។
+- **`error-reporting.js` (byte-identical ទាំង ៤) ទទួល `beforeBreadcrumb`** ដែលលុប
+  `auth=` / `access_token=` / `id_token=` / `key=` ចេញពី URL ក្នុង breadcrumb មុនផ្ញើទៅ Sentry។
+  Sentry មាន scrubbing ខាង server ស្រាប់ តែ ID token ជាព័ត៌មានសម្ងាត់ដែល **យើងទើបតែដាក់ចូល URL**
+  ដូច្នេះមិនគួរពឹងលើ default របស់អ្នកដទៃទេ។
+- **CSP `script-src` ថែម `https://*.firebaseio.com https://*.firebasedatabase.app`** ក្នុង
+  `netlify.toml` ទាំង ៤ ➜ long-polling របស់ Firebase ដើរវិញបាន។ នេះមិនត្រឹមតែជួយ login ទេ —
+  វាជួយ **ទិន្នន័យទាំងមូល** ព្រោះ `onValue` listener ក៏ពឹងលើ transport ដដែល។
+  (ហានិភ័យតូច៖ script ដែលអនុញ្ញាតគឺ JSONP នៃ DB របស់ខ្លួនឯង។ Zoescan នៅតែគ្មាន `'unsafe-inline'` ដដែល។)
+
+### តេស្ត — `audit-tools/auth-recovery-test.js` ឡើងជា **142/142**
+Scenario ថ្មី ៥ ➜ ៩៖ គ្មាន `databaseURL` ➜ រង់ចាំ socket ដដែល · socket ឡើងវិញ ➜ ចូលបាន ·
+socket ស្លាប់ + REST ដើរ ➜ **ចូលបានតាម REST** (ផ្ទៀងផ្ទាត់ URL ពិត រួមទាំង token) ·
+REST 401 ➜ **មិនបណ្ដេញចេញ** នៅតែរង់ចាំ socket · role ខុសមកពី REST ➜ `signOut()` ដដែល ·
+ហើយ scenario ១ ថែម "មិនស្នើ REST ទេ ពេលភ្ជាប់រួចហើយ"។ Harness ទទួល fake `fetch` និង
+`localStorage` ដែលកំណត់បាន។
+
+**មិនមែនតេស្តទទេទេ — បានផ្ទៀងផ្ទាត់៖** ចម្លង tree ទាំងមូល រួចប្ដូរ `readUserRoleViaRest(user)`
+ជា `Promise.reject(...)` (= ឥរិយាបថចាស់ គ្មានផ្លូវ REST) ➜ **ធ្លាក់ ៤៤/១៤២** ហើយចំណុច fail-closed
+ទាំងអស់ (`permission_denied` ➜ signOut, role ខុស ➜ signOut) **ជោគជ័យទាំងមុន និងក្រោយ**។
+*អន្ទាក់ថ្មី៖ `origin/main` ក្នុង session នេះជា ref ចាស់ខ្លាំង (នៅមាន `Zscan/`)។ ត្រូវ
+`git fetch origin main` សិន មុននឹងយក baseline ណាមួយ — បើមិនដូច្នេះ `git archive origin/main`
+ចេញ tree ខុសទាំងស្រុង។*
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v38, zoew-v34, zoescan-v27, zoekeygen-v20)។
+**គ្មានការប្ដូរ Firebase rules ទេ ➜ គ្មាន publish ថ្មី។**
+
+### នៅសល់ បើ socket នៅតែមិនឡើងក្រោយ deploy នេះ
+ការកែនេះធានាថា **login ចូលបាន** និងផ្ដល់ transport បម្រុងឲ្យ RTDB។ បើ Sentry ជុំក្រោយបង្ហាញ
+`restRoleRead: "ok"` ជាមួយ `connected: false` ញឹកញាប់ នោះមានន័យថា socket ពិតជាត្រូវបានទប់នៅលើ
+បណ្ដាញនោះ ហើយជំហានបន្ទាប់គឺពិនិត្យ VPN / data-saver / proxy របស់ឧបករណ៍ ឬសាកល្បង WiFi ផ្សេង។

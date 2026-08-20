@@ -373,6 +373,92 @@ function seedData() {
                 JSON.stringify(revBeforeGhostEdit) + ' ➜ ' + JSON.stringify(ghostEdit.rev));
         }
 
+        // ផ្លូវបរាជ័យ៖ Firebase បដិសេធការសរសេរ ➜ ស្ថានភាព និងលុយត្រូវត្រឡប់មកដើមវិញ
+        {
+            await page.evaluate((dk) => {
+                window.__fakeStore.zoew_scan_history_cod_dod.id_4000_eee = {
+                    id: 'id_4000_eee', phone: '0611222333', scanDate: dk, createdAt: Date.now() - 200,
+                    cod: 12, dod: 3, price: 15, count: 1, barcode: 'FF1', time: '14:00', isClosed: false,
+                    barcodes: [{ code: 'FF1', time: '14:00', cod: 12, dod: 3, locker: 'E1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 200 }]
+                };
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[dk];
+                rev.codDollar = (rev.codDollar || 0) + 12;
+                rev.dodDollar = (rev.dodDollar || 0) + 3;
+                rev.totalCount = (rev.totalCount || 0) + 1;
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+
+            const before = await page.evaluate((dk) => ({
+                rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] },
+                pick: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk] || {})),
+                item: JSON.parse(JSON.stringify(window.__fakeStore.zoew_scan_history_cod_dod.id_4000_eee))
+            }), seed._dateKey);
+
+            // បដិសេធតែការសរសេរទៅ record នេះ — ស្ថិតិត្រូវសរសេរបានធម្មតា ដើម្បីមើលការ revert
+            await page.evaluate(() => {
+                const origTxn = window.firebaseSDK.runTransaction;
+                const origUpd = window.firebaseSDK.update;
+                window.__unblock = () => { window.firebaseSDK.runTransaction = origTxn; window.firebaseSDK.update = origUpd; };
+                const blocked = (p) => String(p || '').indexOf('id_4000_eee') !== -1;
+                window.firebaseSDK.runTransaction = function (r, fn) {
+                    if (blocked(r.path)) return Promise.reject(new Error('permission_denied'));
+                    return origTxn.call(this, r, fn);
+                };
+                window.firebaseSDK.update = function (r, obj) {
+                    if (blocked(r.path) || Object.keys(obj).some(blocked)) return Promise.reject(new Error('permission_denied'));
+                    return origUpd.call(this, r, obj);
+                };
+            });
+
+            await page.evaluate(() => window.toggleCloseStatus('id_4000_eee'));
+            await page.waitForTimeout(700);
+            const afterFail = await page.evaluate((dk) => ({
+                pick: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk] || {})),
+                localClosed: (typeof scanHistory !== 'undefined' ? scanHistory : []).filter((i) => i.id === 'id_4000_eee').map((i) => i.isClosed)[0],
+                serverClosed: window.__fakeStore.zoew_scan_history_cod_dod.id_4000_eee.isClosed
+            }), seed._dateKey);
+            check(JSON.stringify(afterFail.pick) === JSON.stringify(before.pick),
+                app + ': បិទបញ្ជីបរាជ័យ ➜ ស្ថិតិត្រឡប់មកដើមវិញ',
+                JSON.stringify(before.pick) + ' ➜ ' + JSON.stringify(afterFail.pick));
+            check(afterFail.localClosed === false && afterFail.serverClosed === false,
+                app + ': បិទបញ្ជីបរាជ័យ ➜ ស្ថានភាពក្នុងសតិត្រឡប់មកបើកវិញ', JSON.stringify(afterFail));
+
+            if (app === 'ZoeAdmin') {
+                await page.evaluate(() => {
+                    window.openEditBarcodePriceModal('id_4000_eee', 'FF1');
+                    document.getElementById('editBcCodInput').value = '50';
+                    document.getElementById('editBcDodInput').value = '0';
+                    window.saveEditedBarcodePrice();
+                });
+                await page.waitForTimeout(700);
+                const afterPriceFail = await page.evaluate((dk) => ({
+                    rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] },
+                    localCod: (typeof scanHistory !== 'undefined' ? scanHistory : []).filter((i) => i.id === 'id_4000_eee').map((i) => i.barcodes[0].cod)[0]
+                }), seed._dateKey);
+                check(afterPriceFail.rev.codDollar === before.rev.codDollar && afterPriceFail.rev.dodDollar === before.rev.dodDollar,
+                    'ZoeAdmin: កែទឹកប្រាក់បរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
+                    JSON.stringify(before.rev) + ' ➜ ' + JSON.stringify(afterPriceFail.rev));
+                check(afterPriceFail.localCod === 12, 'ZoeAdmin: កែទឹកប្រាក់បរាជ័យ ➜ តម្លៃក្នុងសតិត្រឡប់មកដើម', String(afterPriceFail.localCod));
+
+                await page.evaluate(() => window.deleteSingleItem('id_4000_eee'));
+                await page.waitForTimeout(700);
+                const afterDelFail = await page.evaluate(() => ({
+                    stillLive: !!window.__fakeStore.zoew_scan_history_cod_dod.id_4000_eee,
+                    inTrash: Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).indexOf('id_4000_eee') !== -1,
+                    localHas: (typeof scanHistory !== 'undefined' ? scanHistory : []).some((i) => i.id === 'id_4000_eee'),
+                    localTrash: (typeof deletedItems !== 'undefined' ? deletedItems : []).some((i) => i.id === 'id_4000_eee')
+                }));
+                check(afterDelFail.stillLive && !afterDelFail.inTrash && afterDelFail.localHas && !afterDelFail.localTrash,
+                    'ZoeAdmin: លុបបរាជ័យ ➜ កញ្ចប់នៅដដែល មិនជាប់ក្នុងធុងសំរាមក្នុងសតិ', JSON.stringify(afterDelFail));
+            }
+
+            await page.evaluate(() => window.__unblock());
+            for (let i = errors.length - 1; i >= 0; i--) {
+                if (/permission_denied/.test(errors[i])) errors.splice(i, 1);
+            }
+        }
+
         // ចុចគ្រប់ប៊ូតុងដែលមើលឃើញ (បើក modal នីមួយៗ) ហើយមើលថាមួយណា crash
         const clickErrors = [];
         const btnIds = await page.evaluate(() => {

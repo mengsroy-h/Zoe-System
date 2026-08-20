@@ -18,6 +18,16 @@
 | `barcode-shape-test.js` | ដក normalizer ពិតរបស់ `dbRefHistory` (ZoeAdmin+ZoeW) និង `buildBarcodeIndex` (Zoescan) រួចផ្ទៀងផ្ទាត់ថា `barcodes` ដែល Firebase ត្រឡប់មកជា **object មានចន្លោះ** ឬជា **array ដែលមាន `null`** មិនធ្វើឲ្យកញ្ចប់បាត់ និងមិន throw ចេញពី callback (28 assertion) — `BARCODE_APP_DIR=<dir>` |
 | `setup-link-logout-test.js` | ផ្ទៀងផ្ទាត់ថា Setup Link ដែលបើកចោល **មិនរស់រានក្រោយចាកចេញ** (មិនអាចបំពេញ config អាជីវកម្មផ្សេងចូលប្រអប់ Config ពេលក្រោយ) តែ Setup Link ដែលអ្នកប្រើកំពុងវាយ PIN ពិតៗ **មិនត្រូវបោះចោល** (21 assertion) — `SETUP_APP_DIR=<dir>` |
 | `phone-search-swipe-test.js` | ដក `setupSwipeGestures`/`positionPhoneSuggestBox` ពិត (ZoeAdmin+ZoeW) រួចផ្ទៀងផ្ទាត់ថាការអូសឡើងលើ **មិនបំបាត់ប្រអប់ស្វែងរកលេខ** ខណៈ **ឥរិយាបថអូសដើម (ឡើង➜ប្រវត្តិឡើង / ចុះ➜ប្រវត្តិចុះ) នៅដដែល** (18 assertion) — `SWIPE_APP_DIR=<dir>` |
+| `raw-read-shape-test.js` | ដក **ផ្លូវអានឆៅទាំង ៦** (transaction + ធុងសំរាម) ចេញពី `app.js` រួចផ្ទៀងផ្ទាត់ថារូបរាង `barcodes` មិនធម្មតាមិនធ្វើឲ្យកញ្ចប់បាត់ ឬធ្វើឲ្យ throw (38 assertion) — `RAWREAD_APP_DIR=<dir>` |
+| `devtools-guard-test.js` | ផ្ទៀងផ្ទាត់ថា `checkDevTools()` របស់ ZoeKeyGen **មិនបណ្តេញអ្នកប្រើពេល zoom ឬបង្រួម window** តែនៅតែចាប់ devtools ពិត (8 assertion) — `DEVGUARD_APP_DIR=<dir>` |
+| `concurrent-scan-test.js` | ដក `addOrUpdateEntry` ពិត រួចរត់ជាមួយ Firebase ក្លែងក្លាយដែលមាន **retry-on-conflict ពិត** និង `update()` អសមកាល ➜ ធ្វើតេស្តការប្រណាំងបានដោយគ្មាន emulator។ គ្របការស្កេនព្រមគ្នាពី ២ ឧបករណ៍ និងករណី order បិទរួចលើ server (22 assertion) — `CONCSCAN_APP_DIR=<dir>` |
+| `payload-schema.js` | ប្រៀបធៀប property ដែលកូដសរសេរទៅ Firebase នឹង schema ក្នុង rules (រាយតែកន្លែងដែល `$other: false`) — ត្រូវការ `acorn` |
+| `boot-runtime.js` | boot **ទាំង ៤ App ក្នុង Chromium ពិត** ដោយទប់សំណើក្រៅ រួចចាប់ `pageerror`/`console.error` — `BOOT_APP_DIR=<dir>` |
+| `setup-link-browser-test.js` | ដើរផ្លូវ provisioning ពេញលេញក្នុង browser ពិត៖ `?setup=` ➜ PIN gate ➜ ប្រអប់ Config ដែលបំពេញរួច ➜ **គ្មានអ្វីរក្សាទុករហូតដល់មនុស្សចុច Save** (18 assertion) — `SETUPLINK_APP_DIR=<dir>` |
+| `ui-flow-test.js` | **ឧបករណ៍ខ្លាំងជាងគេសម្រាប់រកកំហុសថ្មី។** boot ZoeAdmin/ZoeW/Zoescan ក្នុង Chromium ជាមួយ **Firebase ក្លែងក្លាយក្នុងសតិ** (ដាក់ចូលមុន script រត់ តាម `addInitScript`, ហើយ `license-verify.js` ត្រូវជំនួសតាម `page.route`) រួចដើរ UI ពិត៖ បិទ/បើកបញ្ជី, លុប➜ស្តារ ២ ជុំ, ដក➜ស្តារ, កែទឹកប្រាក់, **ការប្រណាំងឧបករណ៍ច្រើន**, **ផ្លូវបរាជ័យ `permission_denied`**, និងចុចគ្រប់ប៊ូតុង (41 assertion) — `UIFLOW_APP_DIR=<dir>`។ ត្រូវការ `playwright-core`; បើគ្មាន **SKIP ដោយស្អាត** |
+| `layout-check.js` | ផ្ទុក App ទាំង ៤ នៅ **320/360/412/768px** រួចរាយធាតុណាដែលលើសទទឹងអេក្រង់ដោយគ្មាន ancestor ដែល scroll បាន — ព្រមទាំង **បើក modal នីមួយៗដាច់ដោយឡែក** (48 assertion) — `LAYOUT_APP_DIR=<dir>`។ ប៊ូតុងតូចជាង 24px ជា `note` មិនមែន `FAIL` (ជម្រើសរចនា) |
+| `field-shape-test.js` | seed record ដែលមានរូបរាងវាល **ក្រៅពី `barcodes`**៖ លេខទូរស័ព្ទ/barcode ជាចំនួន, cod/dod/count ជា string, `isClosed: "false"`, null, legacy `price`, `count` មិនត្រូវនឹង `barcodes.length`, និង HTML ក្នុងលេខទូរស័ព្ទ — រួច assert ថា listener មិន throw, គ្មានអ្វីបាត់ពីតម្រង "ទាំងអស់", គ្មាន NaN/`[object Object]`, និង **គ្មាន XSS** (18 assertion) — `FIELDSHAPE_APP_DIR=<dir>` |
+| `setup-link-roundtrip-test.js` | កិច្ចសន្យាឆ្លង App៖ រត់បន្ទាត់ encode ពិតរបស់ `generateSetupLink()` (ZoeKeyGen) និង `decodeSetupPayload()` ពិតរបស់ App ទាំង ៣ **ក្នុង vm តែមួយ** ➜ round-trip ជាមួយអក្សរខ្មែរ, emoji, `+`/`/` និង URL ពិត (23 assertion) — `SETUPRT_APP_DIR=<dir>` |
 | `state-hygiene.js` | រកអថេរ state កម្រិត module ដែល **រស់រានក្រោយចាកចេញដោយគ្មានហេតុផលកត់ត្រា** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥, ៦ និង ៧ — រកឃើញដោយភ្នែករាល់ជុំ) — ត្រូវការ `acorn` |
 | `css-classes.js` | រក class ដែល HTML ឬ `app.js` ប្រើ តែ **គ្មានច្បាប់ក្នុង `style.css`** ➜ ធាតុឡើងគ្មានរចនាបថ |
 | `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
@@ -34,6 +44,20 @@
 
 `state-hygiene.js` និង `css-classes.js` មាន allowlist ដូចគ្នាដែរ (`ACCEPTED` / `IGNORE`) — ធាតុនីមួយៗ
 មានហេតុផលសរសេរជាប់។ ដាក់ធាតុចូលទាល់តែបានតាមដានរួចថាវាពិតជាគ្មានគ្រោះថ្នាក់។
+
+**ការត្រួតពិនិត្យ ៥ ត្រូវការ Chromium** (`boot-runtime`, `setup-link-browser-test`, `ui-flow`,
+`layout-check`, `field-shape`) — `npm i playwright-core`, រួច Chromium នៅ
+`/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (ប្តូរបានតាម `*_CHROME`)។ បើគ្មាន វា
+**SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់។
+
+**អន្ទាក់ ៣ ក្នុង harness ដែលមាន Firebase ក្លែងក្លាយ** (បើសាង harness ថ្មី ឬកែ `ui-flow-test.js`)៖
+1. `snapshot.val()` ត្រូវត្រឡប់ **ច្បាប់ចម្លងជ្រៅ** — បើត្រឡប់ reference ទៅ store នោះ
+   `dailyPickupData` ក្លាយជា alias នៃ Firebase ហើយការកែក្នុងសតិ **និង** transaction បូកទាំងពីរ។
+2. អថេរ `let` កម្រិត module **មិនស្ថិតលើ `window`** — មានតែ `function` declaration ទេ។
+   អានវាដោយឈ្មោះទទេក្នុង `page.evaluate` (`typeof x !== 'undefined' ? x : {}`)។
+3. seed ត្រូវប្រាកដនិយម៖ ចំណូលថ្ងៃ **≥** ផលបូក item បើមិនដូច្នេះ clamp-to-0 បាញ់ ហើយ
+   ការ revert មើលទៅដូចមិនស៊ីមេទ្រី ខណៈវាត្រឹមត្រូវ។ វាលពិតគឺ `codDollar`/`dodDollar`/
+   `totalCount` និង `packagesPickedUp`។
 
 `shared-fns.js` មាន allowlist `EXPECTED_DIVERGENT` នៅខាងលើឯកសារ — helper ដែលបែកគ្នាដោយចេតនា
 (label ជាក់លាក់តាម App, PBKDF2 salt, `initFirebase` ។ល។)។ បើបន្ថែម helper ចែករំលែកថ្មីមួយ

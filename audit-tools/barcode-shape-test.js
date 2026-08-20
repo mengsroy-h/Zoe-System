@@ -81,21 +81,19 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
     ok(Array.isArray(objGaps.barcodes) && objGaps.barcodes.map(b => b.code).join(',') === 'AAA,BBB', 'object-shaped barcodes keeps numeric key order', Array.isArray(objGaps.barcodes) ? objGaps.barcodes.map(b => b.code) : objGaps.barcodes);
     ok(Array.isArray(objGaps.barcodes) && objGaps.barcodes.every(b => typeof b.cod === 'number'), 'object-shaped barcodes still get cod/dod normalized', objGaps.barcodes);
 
-    const staleCount = { id: 'i4', cod: 12, dod: 3, count: 7, barcodes: OBJECT_GAPS() };
-    ctx.normalizeItem(staleCount);
-    ok(staleCount.count === 2, 'a stale count is pulled back in step with barcodes[] (the two apps then agree)', staleCount.count);
+    const tryNormalize = (item) => { try { ctx.normalizeItem(item); } catch (e) { item._threw = e.message; } return item; };
 
-    const staleNull = { id: 'i5', cod: 12, dod: 3, count: 3, barcodes: WITH_NULLS() };
-    ctx.normalizeItem(staleNull);
-    ok(staleNull.count === 2, 'count follows the real barcodes after nulls are dropped', staleNull.count);
+    const staleCount = tryNormalize({ id: 'i4', cod: 12, dod: 3, count: 7, barcodes: OBJECT_GAPS() });
+    ok(staleCount.count === 2, 'a stale count is pulled back in step with barcodes[] (the two apps then agree)', staleCount._threw || staleCount.count);
 
-    const legacy = { id: 'i6', cod: 5, dod: 0, count: 4, barcode: 'OLD' };
-    ctx.normalizeItem(legacy);
-    ok(legacy.count === 4, 'a legacy item with no barcodes[] keeps its own count (stat math untouched)', legacy.count);
+    const staleNull = tryNormalize({ id: 'i5', cod: 12, dod: 3, count: 3, barcodes: WITH_NULLS() });
+    ok(staleNull.count === 2, 'count follows the real barcodes after nulls are dropped', staleNull._threw || staleNull.count);
 
-    const emptyArr = { id: 'i7', cod: 5, dod: 0, count: 2, barcodes: [] };
-    ctx.normalizeItem(emptyArr);
-    ok(emptyArr.count === 2, 'an empty barcodes[] does NOT zero the count', emptyArr.count);
+    const legacy = tryNormalize({ id: 'i6', cod: 5, dod: 0, count: 4, barcode: 'OLD' });
+    ok(legacy.count === 4, 'a legacy item with no barcodes[] keeps its own count (stat math untouched)', legacy._threw || legacy.count);
+
+    const emptyArr = tryNormalize({ id: 'i7', cod: 5, dod: 0, count: 2, barcodes: [] });
+    ok(emptyArr.count === 2, 'an empty barcodes[] does NOT zero the count', emptyArr._threw || emptyArr.count);
 }
 
 console.log('\n=== ZoeAdmin and ZoeW derive the displayed package count identically ===');

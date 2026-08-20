@@ -2509,3 +2509,147 @@ zoekeygen-v25។ **គ្មានការប្ដូរ Firebase rules ➜ �
 (`zoeadmin`, `zoew`, `zoescan`, `zoekeygen`) បៃតងមុន merge។ ក្រោយ merge
 `git rev-list --count origin/main..origin/claude/phone-number-audit-8-9-tsyi3c` = 0។
 Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។
+
+## ជុំ ១១ — deep audit (2026-08-20, branch `claude/deep-audit-jcog87`)
+
+ស្នើដោយអ្នកប្រើ ព្រមទាំងសំណួរត្រង់ៗ៖ *"រាល់ការ audit មុនមុនអ្នកមិនបានមើលគ្រប់ជ្រុងជ្រោយទេឬ?"*
+ចម្លើយស្មោះត្រង់នៅចុង section នេះ។ Branch ចេញពី `main` (`db02393`) ដោយផ្ទាល់។ រត់ inline
+single-threaded ដូចជុំ ៦-១០។
+
+**អ្នកប្រើផ្តល់បរិបទសំខាន់ ២ ក្នុង session៖** PR #35/#36 ត្រូវបានធ្វើឡើងដោយ **Claude AI លើទូរស័ព្ទ**
+(ដូច្នេះជាកូដដែលទទួលការត្រួតពិនិត្យតិចជាងគេ — ពិនិត្យវាមុនគេ) និងថា Zoescan មានផ្លូវស្តារតាមប៊ូតុង
+"🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" របស់ ZoeAdmin (ត្រូវ — តែមើលកំហុសទី ១ ខាងក្រោម)។
+
+### ស្ថានភាពពេលចាប់ផ្តើម — ឧបករណ៍ចាស់ទាំងអស់ស្អាត
+`extract.js` 101 identical / 23 different · `shared-fns.js` UNEXPECTED 0 · `wiring.js` ស្អាត ·
+`dom-hygiene.js` ស្អាត · តេស្ត ៣០៨ assertion ជោគជ័យទាំងអស់។ ដូច្នេះកំហុសថ្មីនឹង **មិនមកពី
+ឧបករណ៍ចាស់ទេ** — ត្រូវសាងឧបករណ៍ថ្មីសម្រាប់ថ្នាក់កំហុសដែលមិនដែលពិនិត្យ។
+
+### កំហុសទី ១ (ធ្ងន់ធ្ងរបំផុត) — Firebase ត្រឡប់ `barcodes` មក ៣ រូបរាង តែកូដស្គាល់តែ ១
+RTDB ត្រឡប់ array ដដែលមកក្នុងរូបរាងខុសគ្នា អាស្រ័យលើថាតើ key ជាប់គ្នាឬអត់៖
+| រូបរាង | កូដមុនកែធ្វើអ្វី |
+|---|---|
+| `[A, B]` (ជាប់គ្នា) | ត្រឹមត្រូវ |
+| `[A, null, B]` (ចន្លោះតិច) | **throw** `Cannot read properties of null (reading 'cod')` |
+| `{0:A, 2:B}` (ចន្លោះច្រើន) | `Array.isArray` = false ➜ **បោះបង់ barcode ទាំងអស់ស្ងាត់ៗ** |
+
+- **រូបរាង `null`** — normalizer ធ្វើ `b.cod = parseFloat(b.cod) || 0` ដោយគ្មាន guard។ វា throw
+  **ចេញពីខាងក្នុង callback របស់ `onValue`** ដូច្នេះ `debouncedRenderAfterHistorySync()` **មិនដែលរត់**
+  ➜ តារាងកញ្ចប់ឈប់ update ទាំងស្រុង។ ចំណាំ៖ `buildScannerLookupPayload` **មាន** guard null ស្រាប់
+  (`if (!b) return ...`) — ភស្តុតាងថាវាជាការភ្លេចមួយកន្លែង មិនមែនជាការសម្រេចទេ។
+- **រូបរាង object** — `Array.isArray` guard ទាំង ៦៩ កន្លែងក្នុង ៣ App ធ្លាក់ទៅរូបរាង legacy
+  barcode តែមួយ ➜ ផលបូកលុយខុស, `isClosed` ខុស, ហើយក្នុង **Zoescan barcode នោះរកមិនឃើញ ➜
+  កំណត់ទីតាំង locker មិនបាន ➜ រកកញ្ចប់អតិថិជនមិនឃើញ**។
+  **ប៊ូតុង "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" ស្តារករណីនេះមិនបានទេ** ព្រោះ
+  `buildScannerLookupPayload` ប្រើ `Array.isArray` ដដែល ➜ វាសរសេរ lookup entry **គ្មាន `barcodes`
+  សោះ**។ ក្រោយការកែនេះ ប៊ូតុងនោះទើបស្តារបានពិត។
+
+**កែ**៖ `barcodeEntriesOf(value)` ថ្មី — **byte-identical ទាំង ៣ App អាជីវកម្ម** — ត្រឡប់
+`{barcode, index}` តាមលំដាប់ key ជាលេខ ដោយច្រោះ null ចេញ។
+- **ZoeAdmin/ZoeW**៖ normalizer សាង array ក្រាស់ឡើងវិញ (២ App នេះរក barcode តាម `code` មិនមែនតាម
+  index ហើយវាសរសេរ item ទាំងមូល ដូច្នេះការបង្រួមសុវត្ថិភាព — ហើយការសរសេរបន្ទាប់ **ជួសជុល record
+  ក្នុង Firebase** ដោយស្វ័យប្រវត្តិ)។ បន្ថែម `if (!b || typeof b !== 'object') return;` ដែរ។
+- **Zoescan**៖ index **រក្សា key ជាលេខដើម** ព្រោះ `assignLockerToEntry()` សរសេរទៅ
+  `zoew_scan_history_cod_dod/{id}/barcodes/{idx}/...` — index ដែលបង្រួមរួចនឹងចុះខុសកន្លែង។
+  **នេះជាចំណុចដែលងាយធ្វើខុសបំផុតក្នុងការកែនេះ** — មានតេស្ត assert ដោយឡែក។
+
+### កំហុសទី ២ — Setup Link ដែលបើកចោល រស់រានក្រោយចាកចេញ (ZoeW, Zoescan)
+ជុំ ៦ បិទផ្លូវ cancel (`cancelPinSetupFlow`/`cancelPinEntryFlow`) **តែភ្លេចផ្លូវ logout**។
+`showLoginModalWithPrefill()` និងសាខា sign-out របស់ Zoescan បិទ `pinModal` ដោយ `closeModal()`
+ដោយផ្ទាល់ — មិនឆ្លងកាត់ `data-close` ទេ — ដូច្នេះ `pendingSetupLinkConfig` នៅដដែល។ ក្រោយមក
+ពេលអ្នកណាម្នាក់បើកប្រអប់ Config ធម្មតា វា **បំពេញ config របស់អាជីវកម្មផ្សេងចូល** ហើយប៊ូតុង
+"រក្សាទុក" នៅចម្ងាយមួយចុច។ នេះជាហានិភ័យ mis-provisioning ពិត សម្រាប់គំរូអតិថិជន ២០០-៣០០។
+ZoeAdmin រួចខ្លួនដោយសារ `checkPinAndOpenConfig()` reset `pinTargetAction` ជាមុន (ជុំ ៦)។
+
+**កែ**៖ សម្អាតពេលចាកចេញទាំង ៤ App — **តែមាន guard `isPinFlowPending()`** ដូច្នេះ Setup Link ដែល
+អ្នកប្រើ **កំពុងវាយ PIN ពិតៗ** មិនត្រូវបោះចោលទេ។ `isPinFlowPending()` ត្រូវបានចម្លងពី ZoeKeyGen
+(ជុំ ១០) ទៅ ៣ App ទៀត។ វានៅក្នុង `EXPECTED_DIVERGENT` ព្រោះ ZoeKeyGen ប្រើ `classList('active')`
+ចំណែក ៣ App ទៀតប្រើ `style.display === 'flex'` — ដូច `openModalHelper`/`closeModal` ស្រាប់។
+**ផ្ទៀងផ្ទាត់ថាការកែនេះមិនបំផ្លាញការដំឡើងលើកដំបូង**៖ លើឧបករណ៍គ្មាន config, `initFirebase()`
+return **មុន** បង្កើត auth listener ទាំង ៣ App ដូច្នេះ `showLoginModalWithPrefill()` មិនរត់ពេល boot។
+
+### កំហុសទី ៣ — ZoeAdmin ទាញតារាងអតិថិជនរាល់ ១៥ នាទី ដោយគ្មាន auth check
+`setInterval(prefetchCustomerDataTableRowsIfConfigured, CUSTOMER_TABLE_CACHE_MS)` គឺជា timer **តែមួយ
+ក្នុង ៤** ដែលគ្មាន guard `auth.currentUser` (ឯទៀតទាំងអស់មាន)។ ផល ២៖
+១. `clearCustomerDataTableCache()` ពេលចាកចេញ ត្រូវបាន **លុបចោលវិញរៀងរាល់ ១៥ នាទី ជារៀងរហូត** —
+   ការងារអនាម័យទិន្នន័យលើឧបករណ៍រួមរបស់ជុំ ៣/៤/៥/៨ ត្រូវបានបំបាត់ដោយស្ងាត់។ ការការពារ
+   `customerDataTableSessionGeneration` មិនជួយទេ ព្រោះ **គ្មានការចាកចេញកើតឡើងកំឡុង fetch នោះ**។
+២. ឧបករណ៍ដែលទុកចោលនៅអេក្រង់ login នៅតែហៅ Apps Script `?list=1` រាល់ ១៥ នាទី — ខ្ជះខ្ជាយ quota។
+**កែ**៖ guard នៅក្នុង `prefetchCustomerDataTableRowsIfConfigured()` ផ្ទាល់ ហើយហៅវាម្តងក្រោយ
+ការផ្ទៀងផ្ទាត់ role ជោគជ័យ ដូច្នេះ cache នៅតែក្តៅទាន់ពេលមុនស្កេនដំបូង។
+
+### កំហុសទី ៤ — `localStorage.setItem` ខាងក្នុង listener (ថ្នាក់ដដែលនឹងទី ១)
+`onValue` របស់អត្រាប្តូរប្រាក់ធ្វើ `setItem` ដោយគ្មាន try — លើឧបករណ៍ដែលផ្ទុកពេញ
+`QuotaExceededError` នឹងសម្លាប់ callback មុន `debouncedRenderAfterHistorySync()`។ ដាក់ try/catch។
+(នេះជា `setItem` **តែមួយគត់** ក្នុង callback របស់ `onValue` ទាំង ៤ App — ពិនិត្យដោយ script។)
+
+### កំហុសទី ៥ — `env()` គ្មាន fallback (ថ្នាក់ដដែលនឹងជុំ ៩ តែជុំ ៩ កែតែ toast)
+បើ browser មិនស្គាល់ `env()` នោះ **ការប្រកាសទាំងមូលត្រូវបោះចោល**៖
+- `.app-navbar { padding: calc(8px + env(safe-area-inset-top)) ... }` ➜ navbar **គ្មាន padding សោះ**
+- `.ptr-indicator { top: calc(env(...) + 10px) }` លើធាតុ `position: fixed` ➜ `top: auto`
+បន្ថែម fallback នាំមុខ។ ពិនិត្យ `env()` ទាំង ១៦ កន្លែង៖ ២ ដែលនៅសល់មិនត្រូវការទេ ព្រោះមាន
+ការប្រកាសសុវត្ថិភាពនាំមុខរួចហើយ (`padding: 8px` និង `min-height: 100dvh` មូលដ្ឋាន)។
+
+### ឧបករណ៍ថ្មី ៤ — ប្តូរ **ថ្នាក់** កំហុសទៅជាការត្រួតពិនិត្យស្វ័យប្រវត្តិ
+នេះជាចម្លើយពិតចំពោះសំណួររបស់អ្នកប្រើ — កុំរកកំហុសដដែលដោយភ្នែករាល់ជុំ៖
+- **`state-hygiene.js`** — អថេរ state កម្រិត module ដែលរស់រានក្រោយចាកចេញដោយគ្មានហេតុផលកត់ត្រា។
+  **ថ្នាក់នេះត្រូវបានរកឃើញដោយភ្នែកនៅជុំ ៣, ៤, ៥, ៦ និង ៧** (lookupSecretKey, pendingRestoreId,
+  signingKeySessionKey, pendingSetupLinkConfig ។ល។)។ វារកឃើញកំហុសទី ២ ភ្លាមៗ។
+- **`css-classes.js`** — class ដែល JS/HTML ប្រើ តែគ្មានច្បាប់ CSS។
+- **`barcode-shape-test.js`** (28) និង **`setup-link-logout-test.js`** (21)។
+
+### ភស្តុតាងថាតេស្តមិនទទេ
+- `barcode-shape-test.js` ➜ **ធ្លាក់ ១៦/២៨** លើ `origin/main` រួមទាំង throw ពិត
+  `Cannot read properties of null (reading 'cod')` និង Zoescan ចេញ `["AAA"]` (បាត់ `BBB`)។
+- `setup-link-logout-test.js` ➜ **ធ្លាក់ ៦/១៥** លើ `origin/main` ដោយបង្ហាញ
+  `{"projectId":"business-B"}` នៅរស់រានក្រោយចាកចេញ។
+*អន្ទាក់៖ ត្រូវ `git archive origin/main` ចូលថតដាច់ដោយឡែក រួចប្រើ `<TOOL>_APP_DIR=` — កុំយក `HEAD`។*
+
+### ពិនិត្យហើយស្អាត — កុំ audit ឡើងវិញដោយងងឹតងងុល
+- **PR #35/#36 (ធ្វើលើទូរស័ព្ទ) គ្មានកំហុសទេ** — តាមដាន guard ទាំងអស់៖ `phoneModalDismissPromptOpen`
+  ត្រឹមត្រូវ (`confirm()` ទប់ thread ដូច្នេះ `setTimeout(...,0)` មិនអាចរត់មុន handler ទី ២);
+  `pdfExportOriginalTitle === null` ត្រឹមត្រូវ (ការពារ title ត្រូវរក្សាទុកជាឈ្មោះឯកសារ ពេល
+  `afterprint` មិនបាញ់); `data-nodismiss` ថេរលើ `phoneModal` ត្រឹមត្រូវ; ការដក `{once:true}`
+  មិនធ្វើឲ្យ listener កកកុញទេ ព្រោះ `addEventListener` dedupe function reference ដដែល។
+- **NaN ក្នុងលុយ**៖ ពិនិត្យ `parseFloat`/`parseInt`/`Number()` គ្រប់កន្លែងទាំង ៤ App — មាន guard
+  គ្រប់ (`|| 0`, `isNaN(...)`, `val && !isNaN(val)`)។ គ្មានផ្លូវ NaN ចូលស្ថិតិទេ។
+- `forEach(async` / `.map(async` គ្មាន `Promise.all` — **គ្មានសោះ** ទាំង ៤ App។
+- `.find()`/`.findIndex()` គ្រប់កន្លែងមាន guard `-1`/`!item`។
+- Service worker ទាំង ៤ ដូចគ្នាបេះបិទ លើកលែងតែ `CACHE_VERSION`, prefix នៃការសម្អាត និង APP_SHELL;
+  `url.origin !== self.location.origin` នៅដើម handler `fetch` ➜ **REST ដែលមាន token មិនចូល cache**។
+- `manifest.json` ទាំង ៤ ត្រឹមត្រូវ (`id`/`start_url`/`scope` ដូចគ្នា, icon `any maskable`)។
+- `netlify.toml`៖ CSP ទាំង ៤ ត្រឹមត្រូវតាមតម្រូវការរបស់ App នីមួយៗ (Zoescan នៅតែគ្មាន
+  `'unsafe-inline'`; ZoeW គ្មាន `script.google.com` ព្រោះវាគ្មាន lookup)។
+- `EXPORT_TEXT_COLUMN_INDEXES = [1, 2]` នៅត្រូវនឹង `EXPORT_HEADERS` (1=ទូរស័ព្ទ, 2=Barcode)។
+- `readUserRoleViaRest()` មិនដែលដាក់ URL (ដែលមាន token) ចូលសារកំហុស ឬ Sentry extra ទេ —
+  `lastRoleRestOutcome` ផ្ទុកតែ status/សារដែលសម្អាតរួច។ `isFirebaseDatabaseHost()` តឹងត្រឹមត្រូវ។
+- `license-verify.js` និង `error-reporting.js` នៅ byte-identical ទាំង ៤; comment = 0;
+  trailing whitespace = 0; rules JSON ទាំងពីរ valid។
+
+### រកឃើញ តែ **មិនបានកែ** ដោយចេតនា (ត្រូវការការសម្រេចរបស់អ្នកប្រើ)
+- **`item.count` ទល់នឹង `barcodes.length`**៖ ZoeAdmin បង្ហាញ `item.count` លើប៊ូតុងបញ្ជីកញ្ចប់
+  ចំណែក ZoeW បង្ហាញ `barcodes.length`។ បើ ២ តម្លៃនេះខុសគ្នា ២ App បង្ហាញលេខខុសគ្នា។ **មិនកែទេ**
+  ព្រោះ `item.count` ត្រូវបានអានក្នុងគណនាស្ថិតិពិត (បន្ទាត់ 1755, 2836, 2853, 2883, 4345, 4535)
+  ដូច្នេះការធ្វើ normalize វាអាចផ្លាស់ប្តូរតួលេខស្ថិតិ — ជាការសម្រេចរបស់អ្នកប្រើ។
+- **`google-sheets-api/Code.gs` fail-open**៖ បើ ScriptProperty `API_KEY` មិនបានកំណត់ នោះ
+  `if (secret && key !== secret)` រំលងការត្រួតពិនិត្យទាំងស្រុង ➜ អ្នកណាដែលមាន URL អាចទាញ
+  **បញ្ជីអតិថិជនទាំងមូល** (`?list=1`)។ README ណែនាំឲ្យទុកវាទទេ ដូច្នេះនេះជាការសម្រេចផលិតផល
+  មិនមែនកំហុសកូដទេ — តែគួរដឹង។
+- **ការ re-provision ឧបករណ៍ដែលមាន config រួច តែចាកចេញរួច តាម Setup Link មិនដើរទេ** (ឥរិយាបថចាស់
+  មិនមែនការតំរែតំរង់ថ្មីទេ)៖ `applySetupLinkFromUrl()` បើក `pinModal` រួច auth listener បាញ់ `null`
+  ហើយ `showLoginModalWithPrefill()` បិទវាជំនួសដោយ `loginModal`។ ការកែ guard ខាងលើរក្សា Setup Link
+  ទុកក្នុងករណីនោះ ដូច្នេះការបើក Config បន្ទាប់នឹងបំពេញវា — តែគ្មានផ្លូវស្វ័យប្រវត្តិទេ។
+- អ្វីៗដែលជុំមុនទទួលយកដោយចេតនា នៅដដែលទាំងអស់។
+
+### ចម្លើយចំពោះសំណួររបស់អ្នកប្រើ — "ជុំមុនមិនបានមើលគ្រប់ជ្រុងជ្រោយទេឬ?"
+ស្មោះត្រង់៖ **ជុំមុនៗពិតជាមិនបានគ្របគ្រប់ជ្រុងទេ តែមិនមែនព្រោះមើលរំលងកន្លែងដដែលទេ។** កំហុស ៥
+ក្នុងជុំនេះ គ្មានមួយណាស្ថិតក្នុងកូដដែលជុំមុនអានហើយវិនិច្ឆ័យខុសនោះទេ — វាស្ថិតក្នុង **ឆាកដែល
+មិនធ្លាប់មានឧបករណ៍ណាពិនិត្យ**៖ រូបរាងទិន្នន័យដែល Firebase ត្រឡប់មក (ទី ១), អថេរ state ពេលចាកចេញ
+(ទី ២), timer ដែលគ្មាន auth guard (ទី ៣), និង CSS (ទី ៥)។ ជុំនីមួយៗបានបន្ថែមឧបករណ៍ ហើយឧបករណ៍
+ទាំងនោះឥឡូវ **ស្អាតទាំងអស់** — នោះជាមូលហេតុដែលកំហុសដដែលមិនត្រឡប់មកវិញ។ របៀបធ្វើឲ្យវាចប់គឺ
+បន្តប្តូរ *ថ្នាក់* កំហុសនីមួយៗទៅជាការត្រួតពិនិត្យស្វ័យប្រវត្តិ ដូចជុំនេះធ្វើ ៤ — មិនមែនអានកូដ
+ដដែលឡើងវិញឲ្យខ្លាំងជាងមុនទេ។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v45, zoew-v39, zoescan-v33, zoekeygen-v26)។
+**គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+Suite សរុប៖ 191 + 55 + 28 + 21 + 19 + 13 + 13 + 10 + 7 = **357 assertion** បៃតងទាំងអស់។

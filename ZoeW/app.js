@@ -475,6 +475,12 @@
         closeModal('pinModal');
     }
 
+    function isPinFlowPending() {
+        const pinEl = document.getElementById('pinModal');
+        const setupEl = document.getElementById('pinSetupModal');
+        return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
+    }
+
     let configQrReader = null;
     let configQrScanActive = false;
 
@@ -604,7 +610,7 @@
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
         closeConfigQrScanner();
-        pendingSetupLinkConfig = null;
+        if (!isPinFlowPending()) pendingSetupLinkConfig = null;
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });

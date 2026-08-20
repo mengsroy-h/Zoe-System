@@ -254,8 +254,7 @@ async function initFirebase() {
         } else {
             pendingRoleRecheck = false;
             currentUserEmail = null;
-            pendingSetupLinkConfig = null;
-            pinTargetAction = null;
+            if (!isPinFlowPending()) { pendingSetupLinkConfig = null; pinTargetAction = null; }
             cameraStoppedByVisibility = false;
             stopScanner();
             closeConfigQrScanner();
@@ -795,6 +794,12 @@ function cancelPinEntryFlow() {
     pendingSetupLinkConfig = null;
     pinTargetAction = null;
     closeModal('pinModal');
+}
+
+function isPinFlowPending() {
+    const pinEl = document.getElementById('pinModal');
+    const setupEl = document.getElementById('pinSetupModal');
+    return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
 }
 
 let configQrReader = null;

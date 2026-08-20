@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoescan-v32';
+const CACHE_VERSION = 'zoescan-v33';
 
 const APP_SHELL = [
     './',

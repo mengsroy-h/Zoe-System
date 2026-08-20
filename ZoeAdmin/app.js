@@ -574,6 +574,12 @@
         closeModal('pinModal');
     }
 
+    function isPinFlowPending() {
+        const pinEl = document.getElementById('pinModal');
+        const setupEl = document.getElementById('pinSetupModal');
+        return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
+    }
+
     let configQrReader = null;
     let configQrScanActive = false;
 
@@ -1093,7 +1099,7 @@
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
         restoreAfterPdfExport();
-        pinTargetAction = null;
+        if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;

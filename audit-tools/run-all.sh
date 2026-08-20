@@ -33,7 +33,8 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test lookup-closed-test auth-recovery-test keylist-consistency-test \
          license-grace-test phone-suggest-test zoescan-list-test keygen-pin-flow-test \
-         barcode-shape-test setup-link-logout-test phone-search-swipe-test; do
+         barcode-shape-test setup-link-logout-test phone-search-swipe-test \
+         raw-read-shape-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -74,6 +75,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     echo "== បញ្ជាក់ថាតេស្តមិនទទេ (រត់លើ $BASE) =="
     echo "   ខាងក្រោមនេះ *គួរតែធ្លាក់* — បើវាជោគជ័យ នោះតេស្តមិនចាប់អ្វីទេ"
     BARCODE_APP_DIR="$BASE" node audit-tools/barcode-shape-test.js 2>&1 | tail -1 | sed 's/^/   barcode-shape:   /'
+    RAWREAD_APP_DIR="$BASE" node audit-tools/raw-read-shape-test.js 2>&1 | tail -1 | sed 's/^/   raw-read-shape:  /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     SWIPE_APP_DIR="$BASE"   node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   phone-swipe:     /'
 fi

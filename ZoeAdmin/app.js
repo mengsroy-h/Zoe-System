@@ -1624,6 +1624,7 @@
                 if (!item.createdAt) {
                     item.createdAt = parseTimestampFromId(item.id) || getServerNow();
                 }
+                normalizeBarcodesOf(item);
             });
             runAutomaticDeletedCleanup();
         }, handleDbListenerError);
@@ -1667,10 +1668,11 @@
     async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
         const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
         return retryAsync(() => fb.runTransaction(itemRef, (currentItem) => {
+            normalizeBarcodesOf(currentItem);
             if (claimedWhole) {
                 return currentItem || claimedWhole;
             }
-            const reclaimed = claimedPartial.barcodes.map(({ isDeducted, ...rest }) => rest);
+            const reclaimed = barcodeEntriesOf(claimedPartial.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
             const base = currentItem || { ...claimedPartial, barcodes: [] };
             const existingCodes = new Set((base.barcodes || []).map(b => b.code));
             const merged = [...(base.barcodes || []), ...reclaimed.filter(b => !existingCodes.has(b.code))];
@@ -1704,6 +1706,7 @@
                 claimedPartial = null;
                 updatedRemainder = null;
                 if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
                 if (reason === 'abandon') {
@@ -1872,6 +1875,20 @@
                 .filter((e) => e.barcode !== null && e.barcode !== undefined);
         }
         return [];
+    }
+
+    function normalizeBarcodesOf(item) {
+        if (!item || typeof item !== 'object') return item;
+        if (item.barcodes === null || item.barcodes === undefined) return item;
+        const list = barcodeEntriesOf(item.barcodes)
+            .map((e) => e.barcode)
+            .filter((b) => b && typeof b === 'object');
+        if (!list.length && !Array.isArray(item.barcodes)) {
+            delete item.barcodes;
+            return item;
+        }
+        item.barcodes = list;
+        return item;
     }
 
     function sanitizeInput(str) {
@@ -4096,6 +4113,7 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
                 if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
                     currentItem.barcodes = [{
                         code: currentItem.barcode,
@@ -4422,6 +4440,7 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
                 if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
@@ -4663,9 +4682,9 @@
             try {
                 const [histSnap, delSnap] = await Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]);
                 const histData = histSnap.val();
-                scanHistory = histData ? Object.keys(histData).map(k => histData[k]) : [];
+                scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
                 const delData = delSnap.val();
-                deletedItems = delData ? Object.keys(delData).map(k => delData[k]) : [];
+                deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
             } catch (resyncError) {
                 console.error("Resync after failed restore also failed: ", resyncError);
                 if (window.ZoeErrors) ZoeErrors.capture(resyncError, { context: "Resync after failed restore also failed: " });

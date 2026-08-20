@@ -142,10 +142,19 @@ function seedData() {
             }
         },
         zoew_recently_deleted_cod_dod: {},
-        zoew_daily_revenue_cod_dod: { [d]: { cod: 35, dod: 2, count: 3 } },
+        zoew_daily_revenue_cod_dod: { [d]: { codDollar: 35, dodDollar: 2, totalCount: 3 } },
         zoew_monthly_revenue_cod_dod: {},
         zoew_daily_pickup_cod_dod: {},
-        zoew_scanner_lookup: {},
+        zoew_scanner_lookup: {
+            id_1000_aaa: {
+                phone: '0968490421', barcode: 'BB2', isClosed: false,
+                barcodes: [
+                    { code: 'BB1', cod: 10, dod: 0, locker: 'A1', isClosed: false },
+                    { code: 'BB2', cod: 20, dod: 0, locker: 'N/A', isClosed: false }
+                ]
+            },
+            id_1001_bbb: { phone: '0777123456', barcode: 'CC1', isClosed: false, barcodes: [{ code: 'CC1', cod: 5, dod: 2, locker: 'A1', isClosed: true }] }
+        },
         zoew_barcode_registry: {},
         zoew_settings: { exchange_rate: 4100 },
         _dateKey: d
@@ -155,7 +164,7 @@ function seedData() {
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8530;
-    for (const app of ['ZoeAdmin', 'ZoeW']) {
+    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);
@@ -178,6 +187,34 @@ function seedData() {
         await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seed) + ');');
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(2500);
+
+        if (app === 'Zoescan') {
+            await page.waitForTimeout(800);
+            const zs = await page.evaluate(() => ({
+                listenerThrew: window.__listenerThrew || null,
+                indexed: Object.keys(typeof barcodeIndex !== 'undefined' ? barcodeIndex : {}).sort(),
+                openModals: [...document.querySelectorAll('.modal')].filter((m) => getComputedStyle(m).display !== 'none').map((m) => m.id)
+            }));
+            check(!zs.listenerThrew, 'Zoescan: listener មិន throw ពេល boot', zs.listenerThrew);
+            check(zs.indexed.join(',') === 'BB1,BB2,CC1', 'Zoescan: index barcode គ្រប់គ្រាន់ពី lookup', JSON.stringify(zs));
+
+            // ទីតាំង A1 មាន BB1 (បើក) និង CC1 (បិទរួច) ➜ CC1 មិនត្រូវរាប់ថាកាន់ទីតាំង
+            const occ = await page.evaluate(() => {
+                const f = window.findLockerOccupant('A1', 'BB2');
+                return f ? { code: f.code, itemId: f.itemId } : null;
+            });
+            check(occ && occ.code === 'BB1', 'Zoescan: ការព្រមានទីតាំង ➜ រំលងកញ្ចប់ដែលយកហើយ', JSON.stringify(occ));
+
+            const occSelf = await page.evaluate(() => {
+                const f = window.findLockerOccupant('A1', 'BB1');
+                return f ? { code: f.code } : null;
+            });
+            check(occSelf === null, 'Zoescan: មិនព្រមានលើ barcode របស់ខ្លួនឯង', JSON.stringify(occSelf));
+
+            const real0 = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
+            check(real0.length === 0, 'Zoescan: គ្មានកំហុស runtime ពេល boot', real0.slice(0, 3).join(' | '));
+            await ctx.close(); server.close(); port++; continue;
+        }
 
         const booted = await page.evaluate(() => ({
             rows: document.querySelectorAll('#historyTableBody tr').length,
@@ -202,6 +239,7 @@ function seedData() {
         // --- the real race: item vanishes server-side between confirm() and the transaction ---
         await page.evaluate(() => {
             const orig = window.firebaseSDK.runTransaction;
+            window.__restoreTxn = () => { window.firebaseSDK.runTransaction = orig; };
             window.firebaseSDK.runTransaction = function (r, fn) {
                 if (String(r.path).indexOf('zoew_scan_history_cod_dod/id_1000_aaa') === 0) {
                     delete window.__fakeStore.zoew_scan_history_cod_dod.id_1000_aaa;
@@ -218,6 +256,68 @@ function seedData() {
         check(afterGhost.packages === 1 && afterGhost.phones === 1,
             app + ': កញ្ចប់រលាយពី server ➜ ស្ថិតិមិនកើនខុស',
             'រំពឹង packages=1 phones=1 តែបាន ' + JSON.stringify(afterGhost));
+
+        await page.evaluate((dk) => {
+            window.__restoreTxn();
+            window.__fakeStore.zoew_scan_history_cod_dod.id_3000_ddd = {
+                id: 'id_3000_ddd', phone: '0700111222', scanDate: dk, createdAt: Date.now() - 300,
+                cod: 30, dod: 0, price: 30, count: 2, barcode: 'EE2', time: '13:00', isClosed: false,
+                barcodes: [
+                    { code: 'EE1', time: '13:00', cod: 10, dod: 0, locker: 'D1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 300 },
+                    { code: 'EE2', time: '13:01', cod: 20, dod: 0, locker: 'D2', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 290 }
+                ]
+            };
+            window.__fireAll();
+        }, seed._dateKey);
+        await page.waitForTimeout(300);
+
+        // លុប ➜ ស្តារ ➜ លុប ➜ ស្តារ ត្រូវតែមិនផ្លាស់ចំណូលសោះ (គោលការណ៍ លុប)
+        if (app === 'ZoeAdmin') {
+            const revBefore = await page.evaluate((dk) => JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[dk]), seed._dateKey);
+            for (let cycle = 0; cycle < 2; cycle++) {
+                await page.evaluate(() => window.deleteSingleItem('id_3000_ddd'));
+                await page.waitForTimeout(400);
+                const trashId = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod)[0]);
+                await page.evaluate((tid) => { window.promptRestoreDeletedItem(tid); window.executeRestoreItem(); }, trashId);
+                await page.waitForTimeout(500);
+            }
+            const revAfter = await page.evaluate((dk) => JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[dk]), seed._dateKey);
+            check(revBefore === revAfter, 'ZoeAdmin: លុប➜ស្តារ ២ ជុំ ➜ ចំណូលមិនប្រែសោះ', 'មុន ' + revBefore + ' ក្រោយ ' + revAfter);
+            const restored = await page.evaluate(() => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_3000_ddd;
+                return it ? { n: (it.barcodes || []).length, cod: it.cod, hasDeletedAt: 'deletedAt' in it, hasFromDel: 'isFromDeletion' in it } : null;
+            });
+            check(restored && restored.n === 2 && restored.cod === 30, 'ZoeAdmin: លុប➜ស្តារ ➜ កញ្ចប់ត្រឡប់មកគ្រប់', JSON.stringify(restored));
+            check(restored && !restored.hasDeletedAt && !restored.hasFromDel, 'ZoeAdmin: ស្តារ ➜ លុប deletedAt/isFromDeletion ចេញ', JSON.stringify(restored));
+        }
+
+        // ដក ➜ ស្តារ ត្រូវដកលុយចេញ រួចបូកមកវិញឲ្យត្រូវបេះបិទ
+        if (app === 'ZoeAdmin') {
+            const rev0 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
+            await page.evaluate(() => window.removeSingleBarcode('id_3000_ddd', 'EE1'));
+            await page.waitForTimeout(500);
+            const rev1 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
+            check(Math.round((rev0.codDollar - rev1.codDollar) * 100) / 100 === 10 && (rev0.totalCount - rev1.totalCount) === 1,
+                'ZoeAdmin: ដក ➜ ដកលុយ ១០ និងចំនួន ១ ចេញ', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev1));
+            const trashState = await page.evaluate(() => {
+                const t = Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod)[0];
+                return t ? { isFromDeletion: t.isFromDeletion, bDeducted: t.barcodes[0].isDeducted, code: t.barcodes[0].code } : null;
+            });
+            check(trashState && trashState.isFromDeletion === false && trashState.bDeducted === true && trashState.code === 'EE1',
+                'ZoeAdmin: ដក ➜ ធុងសំរាមសម្គាល់ isDeducted និង isFromDeletion=false', JSON.stringify(trashState));
+            const tid = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod)[0]);
+            await page.evaluate((t) => { window.promptRestoreDeletedItem(t); window.executeRestoreItem(); }, tid);
+            await page.waitForTimeout(500);
+            const rev2 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
+            check(rev2.codDollar === rev0.codDollar && rev2.dodDollar === rev0.dodDollar && rev2.totalCount === rev0.totalCount,
+                'ZoeAdmin: ដក ➜ ស្តារ ➜ លុយត្រឡប់មកគ្រប់', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev2));
+            const back = await page.evaluate(() => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_3000_ddd;
+                return it ? { n: it.barcodes.length, deducted: it.barcodes.map(b => b.isDeducted), cod: it.cod } : null;
+            });
+            check(back && back.n === 2 && back.deducted.every(d => d === false) && back.cod === 30,
+                'ZoeAdmin: ដក ➜ ស្តារ ➜ barcode ត្រឡប់មក isDeducted ត្រូវ clear', JSON.stringify(back));
+        }
 
         if (app === 'ZoeAdmin') {
             // ការកែទឹកប្រាក់តាម barcode មិនត្រូវសរសេរជាន់ការផ្លាស់ប្តូររបស់ឧបករណ៍ផ្សេង

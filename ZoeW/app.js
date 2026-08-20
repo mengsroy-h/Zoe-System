@@ -1798,6 +1798,13 @@
         let currentY = 0;
         let isDragging = false;
 
+        function phoneSearchIsActive() {
+            const box = document.getElementById('phoneSuggestBox');
+            if (box && box.classList.contains('show')) return true;
+            const input = document.getElementById('searchPhoneInput');
+            return !!(input && document.activeElement === input && input.value.trim());
+        }
+
         function syncPullToRefreshLock() {
             if (appContainer) {
                 appContainer.classList.toggle('history-expanded', sidebar.classList.contains('collapsed'));
@@ -1833,7 +1840,7 @@
             let diffY = currentY - startY;
             let scrollTop = tableResponsive.scrollTop;
 
-            if (diffY < -30 && !sidebar.classList.contains('collapsed')) {
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !phoneSearchIsActive()) {
                 sidebar.classList.add('collapsed');
                 syncPullToRefreshLock();
                 isDragging = false;
@@ -1852,6 +1859,7 @@
         const dragHandle = document.getElementById('dragHandle');
         if (dragHandle) {
             dragHandle.addEventListener('click', () => {
+                if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
                 sidebar.classList.toggle('collapsed');
                 syncPullToRefreshLock();
             });
@@ -2262,7 +2270,7 @@
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box || !box.classList.contains('show')) return;
         const rect = phoneInput.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        if (rect.bottom < 0 || rect.top > window.innerHeight || (rect.width === 0 && rect.height === 0)) {
             hidePhoneSuggestions();
             return;
         }

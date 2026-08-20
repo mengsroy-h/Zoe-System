@@ -106,6 +106,19 @@ const meta = { ADM: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2
     ok('បង្ហាញថ្ងៃផុតកំណត់ដែលមកមុនគេ (មិនលាក់ App ដែលមិនបានបន្ថែម)',
         row.expiresAt === 1000, row.expiresAt);
 
+    // a key that predates the license_keys_meta split still carries its note in the
+    // public node, and migrateLegacyLicenseKeyMetadata() only runs once the admin can
+    // see those keys in the list.
+    const legacyOnly = {
+        ADM: { K3: { expiresAt: 4000, revoked: false, note: 'ហាង ចាស់', issuedAt: 9, scope: 'ADM', createdBy: 'a@x.com' } }
+    };
+    r = await build(legacyOnly, {});
+    row = r.rendered[0];
+    ok('Key ចាស់ (មិនទាន់ Migrate) នៅតែបង្ហាញ note', row.note === 'ហាង ចាស់', row.note);
+    ok('Key ចាស់ នៅតែមាន issuedAt សម្រាប់តម្រៀប', row.issuedAt === 9, row.issuedAt);
+    ok('Key ចាស់ នៅតែមាន scope', row.scope === 'ADM', row.scope);
+    ok('ហើយ note បង្ហាញក្នុងតារាង', r.html.indexOf('ហាង ចាស់') !== -1);
+
     r = await build(singleApp, meta);
     row = r.rendered[0];
     ok('Key មួយ App ➜ មិនរាយការណ៍ថាមិនត្រូវគ្នា', row.inconsistent === false, row.inconsistent);

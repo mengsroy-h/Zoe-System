@@ -11,6 +11,7 @@
 | `lookup-closed-test.js` | ដក `buildScannerLookupPayload` (ZoeAdmin) + `findLockerOccupant` (Zoescan) ពិត រួចផ្ទៀងផ្ទាត់ថាការព្រមានទីតាំងជាន់គ្នា **រំលងកញ្ចប់ដែលយកហើយ** (13 assertion) |
 | `auth-recovery-test.js` | ដក `loginWithFirebase`/`doLogin`/`verify*RoleThenProceed`/`retryPendingRoleCheck` ពិត ចេញពី **ទាំង ៤ App** រួចផ្ទៀងផ្ទាត់ការស្ដារ session ពេលបណ្ដាញយឺត និងផ្លូវ REST ពេល socket ស្លាប់ (142 assertion) — គំរូ `onAuthStateChanged` ធ្វើតាម `AuthImpl.notifyAuthListeners` ពិតរបស់ `@firebase/auth@1.13.4` |
 | `keylist-consistency-test.js` | ដក `refreshKeyList`/`renderKeyList` ពិតរបស់ ZoeKeyGen រួចផ្ទៀងផ្ទាត់ថា Key ដែលមានស្ថានភាពខុសគ្នារវាង App **មិនត្រូវបានបង្រួមបាត់** (15 assertion) |
+| `license-grace-test.js` | ដក `activate`/`getStatus`/`checkOnline` ពិតរបស់ `license-verify.js` រួចផ្ទៀងផ្ទាត់ថាការ paste Key ដដែលឡើងវិញពេលក្រៅបណ្ដាញ **មិន reset ការអនុគ្រោះ ៣ ថ្ងៃ** និងថា Key ដែល Revoke ត្រូវបានបដិសេធតាំងពី Activate (13 assertion) |
 | `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
 | `dom-hygiene.js` | រកវាល**ណាមួយ**ដែលត្រូវបានសរសេរដោយទិន្នន័យអតិថិជន តែ **មិនត្រូវបានលុបចោលពេលចាកចេញ** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥ និង ៨) — ត្រូវការ `acorn` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |

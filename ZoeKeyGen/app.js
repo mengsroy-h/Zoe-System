@@ -1059,7 +1059,14 @@ async function refreshKeyList() {
             const metaAppCode = entry.existsIn.find((appCode) => metaData[appCode] && metaData[appCode][id]) || entry.existsIn[0];
             const meta = (metaData[metaAppCode] && metaData[metaAppCode][id]) || {};
             const paths = entry.existsIn.slice().sort();
-            const scope = meta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
+            const legacyMeta = {};
+            paths.forEach((p) => {
+                const rec = entry.perApp[p] || {};
+                ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'].forEach((f) => {
+                    if (rec[f] !== undefined) legacyMeta[f] = rec[f];
+                });
+            });
+            const scope = meta.scope || legacyMeta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
             const revokedFlags = paths.map((p) => !!entry.perApp[p].revoked);
             const expiryValues = paths.map((p) => entry.perApp[p].expiresAt);
             const revoked = revokedFlags.every((v) => v);
@@ -1070,7 +1077,7 @@ async function refreshKeyList() {
             });
             const inconsistent = revokedFlags.some((v) => v !== revokedFlags[0])
                 || expiryValues.some((v) => v !== expiryValues[0]);
-            return Object.assign({ id: id }, meta, {
+            return Object.assign({ id: id }, legacyMeta, meta, {
                 scope: scope, paths: paths, perApp: entry.perApp,
                 inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt
             });

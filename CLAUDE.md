@@ -2264,3 +2264,73 @@ Scenario ថ្មី ១០-១២៖ បើក App ធម្មតា ➜ **�
 **Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើ** — PR #30, merge commit `382e797` (រួមទាំង
 section "ជុំ ៨ (បន្ត) — ZoeW និង ZoeKeyGen" ខាងលើដែរ)។ Netlify preview ទាំង ៤ បៃតងមុន merge
 ហើយ `git rev-list --count origin/main..origin/claude/busy-franklin-5g26ja` = 0 ក្រោយ merge។
+
+## ជុំ ៩ (2026-08-20, branch `claude/busy-franklin-5g26ja`) — audit ការកែរបស់ខ្លួនឯង
+
+Branch ចេញពី `main` (`74f7378`) ដោយផ្ទាល់។ វិធីសាស្ត្រជុំនេះ៖ **ពិនិត្យកូដដែលទើបតែ ship ខ្លាំងជាងគេ**
+(PR #26/#28/#30) ព្រោះវាថ្មីជាងគេ និងមានការត្រួតពិនិត្យតិចជាងគេ។ វាបានផល។
+
+### កែហើយ
+- **[regression ដែលខ្ញុំបង្កើតក្នុង session នេះ] `refreshKeyList()` បំបាត់ note របស់ Key ចាស់។**
+  ការសរសេរឡើងវិញក្នុង PR #30 ជំនួស `Object.assign(..., entry.record, meta)` ដោយយកតែ `meta` —
+  តែ **Key ដែលមិនទាន់ Migrate ផ្ទុក `note`/`issuedAt`/`scope`/`createdBy` នៅក្នុង node សាធារណៈ
+  `license_keys` ខ្លួនឯង** (នោះជាមូលហេតុដែលប៊ូតុង "🔒 Migrate PII ចាស់" មាន)។ ដូច្នេះក្រោយ PR #30
+  Key ចាស់នឹងបង្ហាញ note ទទេ និងបាត់ `issuedAt` (ខូចការតម្រៀប) — ពោលគឺអ្នកគ្រប់គ្រងលែងដឹងថា Key ណា
+  ជារបស់ហាងណា **មុនពេល Migrate**។ ឥឡូវ `legacyMeta` ត្រូវបានប្រមូលពី node សាធារណៈ រួចដាក់ក្រោម
+  `meta` (meta ឈ្នះ ដូចឥរិយាបថដើម)។ តេស្តឡើងជា **19/19** ហើយ **ធ្លាក់ ៣ លើ `origin/main`**។
+- **Zoescan គ្មាន toast "ចូលប្រព័ន្ធជោគជ័យ" សោះ** (អ្នកប្រើរាយការណ៍)។ វាមិនធ្លាប់មានទេ — មិនមែន
+  ការកែជុំមុនធ្វើឲ្យបាត់ទេ។ បន្ថែម ដោយ gate លើ `listenersAttached` (ទង់ដែលមានស្រាប់ ហើយ
+  `detachDatabaseListeners()` reset) ដូច្នេះការត្រួតពិនិត្យ role ជាថ្មីមិនប្រកាសម្ដងទៀត។
+- **CSS `env()` គ្មាន fallback។** `bottom: calc(24px + env(safe-area-inset-bottom))` — បើ browser
+  មិនស្គាល់ `env()` ការប្រកាសទាំងមូលត្រូវបានបោះចោល ➜ `bottom: auto` ➜ **ដុំ toast ទៅលើកំពូលទំព័រ**។
+  បន្ថែម `bottom: 24px;` នាំមុខទាំង ៤ (រួមទាំង ZoeKeyGen ដែលមានលំនាំនេះតាំងពីយូរ)។
+
+### ឧបករណ៍តេស្តត្រូវបានធ្វើឲ្យតឹងរឹង
+Stub `initDatabaseListeners()` ក្នុង harness **មិនធ្វើតាមការពិត** — Zoescan ពិតប្រាកដមាន
+`if (listenersAttached) return; listenersAttached = true;` ខាងក្នុង តែ stub គ្រាន់តែរាប់។ ដូច្នេះ
+stub មិនអាចចាប់ការបើក listener ស្ទួនបានទេ ហើយវាធ្វើឲ្យខ្ញុំយល់ច្រឡំមួយភ្លែតថាការ gate របស់
+Zoescan ខូច។ ឥឡូវ stub ធ្វើតាមការការពារពិត។ Scenario ១២ ក៏តម្រូវឲ្យ **ទាំង ៤ App** ប្រកាស
+ចូលប្រព័ន្ធ **ត្រឹមតែម្ដង** (មុននេះវាទទួលយក ០ សម្រាប់ Zoescan)។ **179/179**។
+
+### រន្ធអនុគ្រោះ ៣ ថ្ងៃ — **កែហើយ** តាមការសម្រេចរបស់អ្នកប្រើ ("កែចុះ")
+**ការ paste Key ដដែលឡើងវិញពេលនៅក្រៅបណ្ដាញ អាច reset ការអនុគ្រោះ ៣ ថ្ងៃ បានឥតកំណត់។**
+ដានពេញលេញ៖ `getStatus()` ➜ `offline-grace-exceeded` ក្រោយ ៣ ថ្ងៃគ្មានការផ្ទៀងផ្ទាត់ online ➜
+`ensureAppActivated()` បើកប្រអប់ Activation ➜ អ្នកប្រើ paste Key ដដែល ➜ `submitActivationKey()`
+➜ `ZoeLicense.activate()` ដែល **ពិនិត្យតែ signature និង exp ដែលបាន sign ប៉ុណ្ណោះ គ្មានបណ្ដាញសោះ**
+➜ វាសរសេរ `lastOnlineCheck: getServerNow()` ➜ ការអនុគ្រោះចាប់ផ្ដើមរាប់ថ្មី។
+ដូច្នេះ "៣ ថ្ងៃ" ជាការរំលឹក មិនមែនជាដែនកំណត់ទេ។ ការ Revoke នៅតែដើរភ្លាមៗ **ពេលមានបណ្ដាញ**
+(`getStatus` ហៅ `checkOnline` រាល់ដង ហើយលុប record ពេល `ok === false`) — ចន្លោះនេះមានតែពេល
+ក្រៅបណ្ដាញសុទ្ធសាធ។
+**ការកែដែលបានអនុវត្ត** — ការកែដ៏ឆោតល្ងង់ (កុំសរសេរ `lastOnlineCheck` លុះត្រាមានបណ្ដាញ) នឹង
+**ចាក់សោហាងដែលដំឡើងថ្មីនៅកន្លែងគ្មានអ៊ីនធឺណិត** ដូច្នេះមិនបានធ្វើបែបនោះទេ។ ជំនួសវិញ `activate()`៖
+1. ហៅ `checkOnline()` ពិតប្រាកដ។ `ok === false` (revoked / not-found / expired-server) ➜
+   **បដិសេធតាំងពី Activate** ជាមួយមូលហេតុនោះ (មុននេះ Key ដែល Revoke អាច Activate បាន)។
+   វា **មិនលុប** record ដែលកំពុងដំណើរការទេ — ការ paste Key ខូចមិនត្រូវបំផ្លាញ Activation ល្អ។
+2. `ok === true` ➜ រំកិល `lastOnlineCheck` និងយក `expiresAt` ពី Server (ដូច `getStatus`)។
+3. `ok === null` (គ្មានបណ្ដាញ) ➜ **បើជា Key *ដដែល* រក្សា `lastOnlineCheck` ចាស់** ដូច្នេះការ paste
+   ឡើងវិញមិនបានអ្វីទេ។ Key **ថ្មីពិត** ឬការ Activate លើកដំបូង នៅតែចាប់ផ្ដើមរាប់ថ្មី — ដូច្នេះ
+   ការដំឡើងក្រៅបណ្ដាញនៅតែដើរដដែល។
+គ្មានវាលថ្មីក្នុង schema ➜ គ្មាន migration។ `license-verify.js` នៅ byte-identical ទាំង ៤ (`md5sum`)។
+
+តេស្តថ្មី **`audit-tools/license-grace-test.js` (13/13)** ដក `activate`/`getStatus`/`checkOnline`
+ពិតចេញមកដាក់ក្នុង `vm` ជាមួយ `fetch` និង `localStorage` ក្លែងក្លាយ។ **មិនមែនតេស្តទទេទេ**៖
+រត់លើ `license-verify.js` ចាស់ ➜ **ធ្លាក់ ៤** រួមទាំង `getStatus` ចេញ `"active"` ក្រោយ paste
+ឡើងវិញ (ជារន្ធពិត) និង Key ដែល Revoke ត្រូវបានទទួលយក។
+
+**នៅសល់ដោយចេតនា**៖ ការលុប site data នៅតែ reset បាន — គ្មានផ្លូវការពារខាង client ដោយគ្មាន
+backend ដែលទុកចិត្តបាន (ដូចដែលបានកត់ត្រាតាំងពីជុំដំបូង)។ ការកែនេះលើកកម្ពស់ពី "ចុចប៊ូតុងម្ដងទៀត"
+ទៅ "លុប site data" ហើយធ្វើឲ្យផ្លូវធម្មតាមានភាពស្មោះត្រង់។
+
+### ពិនិត្យហើយស្អាត
+- `license-verify.js` អានពេញ (326 បន្ទាត់)៖ `checkOnline` អាន **node តាម App** (`license_keys/{app}/{id}`)
+  ដូច្នេះការ Revoke មិនពេញលេញត្រូវបានអនុវត្តត្រឹមត្រូវក្នុងគ្រប់ App — បញ្ហាដែលកែក្នុង PR #30 ជា
+  **បញ្ហាបង្ហាញសុទ្ធ** ដូចដែលបានសរសេរ។ `onlineExp = undefined` ធ្លាក់ត្រឡប់ទៅ `exp` ដែល sign រួច។
+  `keyId` ក្នុង URL មិន encode ទេ តែវាឆ្លងកាត់ការផ្ទៀងផ្ទាត់ signature ជាមុន ដូច្នេះត្រូវការ private key។
+- Toast ថ្មី៖ គ្មានសារណាមួយមាន `\n` ដូច្នេះ `innerText` ➜ `textContent` **មិនប្តូរឥរិយាបថទេ**។
+  `pointer-events: none` ជា inherited ដូច្នេះ `.toast` មិនស្ទាក់ការចុច។ ដែនកំណត់ ៤ លុប node ដែល
+  detach រួច — `remove()` លើ node detached ជា no-op។
+- `showLockerPicker(true)` រំលងពេលមាន locker រួច ➜ ការត្រួតពិនិត្យ role ជាថ្មីមិនបញ្ជូនកម្មករ
+  ត្រឡប់ទៅអេក្រង់ជ្រើស locker វិញទេ។
+
+`CACHE_VERSION` bump ទាំង ៤ ពីរដង (បញ្ចប់នៅ zoeadmin-v42, zoew-v37, zoescan-v31, zoekeygen-v24)។
+**គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

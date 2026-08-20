@@ -17,7 +17,7 @@
     bindClickBackup('restoreConfirmBtn', executeRestoreItem);
     bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
     bindClickBackup('phoneModalCancelBtn', () => closeModal('phoneModal'));
-    bindClickBackup('phoneModalCloseX', () => closeModal('phoneModal'));
+    bindClickBackup('phoneModalCloseX', dismissPhoneModal);
 
     function showUpdateAvailableBanner() {
         if (document.getElementById('zoeUpdateBanner')) return;
@@ -119,6 +119,7 @@
 
     let nativeDetector = null;
     let isModalOpen = false;
+    let phoneModalDismissPromptOpen = false;
     let searchTimer = null;
     let isDatabaseInitialized = false;
     let globalAudioCtx = null;
@@ -149,6 +150,16 @@
         markingItemId = null;
         isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
         if (!isModalOpen) safeFocusScanner();
+    }
+
+    function dismissPhoneModal() {
+        if (phoneModalDismissPromptOpen) return;
+        const modalEl = document.getElementById('phoneModal');
+        if (!modalEl || modalEl.style.display !== 'flex') return;
+        phoneModalDismissPromptOpen = true;
+        setTimeout(() => { phoneModalDismissPromptOpen = false; }, 0);
+        if (!confirm("តើអ្នកពិតជាចង់បោះបង់កញ្ចប់នេះមែនទេ? ព័ត៌មានដែលបានវាយបញ្ចូល (លេខទូរស័ព្ទ, Locker, COD, DOD) នឹងបាត់ ហើយកញ្ចប់នេះនឹងមិនត្រូវបានរក្សាទុកទេ។")) return;
+        closeModal('phoneModal');
     }
 
     function cleanupResources() {

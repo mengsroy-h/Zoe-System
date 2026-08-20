@@ -2211,3 +2211,52 @@ window នោះលើសទៅដល់វា។ បើវានៅឆ្ងា
 សម្អាត, និង `setupLinkUrlInput` ដែលជា Base URL សាធារណៈ រក្សាទុកក្នុង localStorage ដោយចេតនា)។
 
 `CACHE_VERSION` bump តែ ZoeKeyGen (zoekeygen-v21)។ **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**
+
+## Toast: លោតលឿនពេក · ចេញស្ទួន · និងសារត្រូវបានលុបចោល (fixed 2026-08-20)
+
+អ្នកប្រើរាយការណ៍ ២ រឿង រួចស្នើមួយទៀត។ ទាំង ៣ ជាបញ្ហាពិត។
+
+### ១. "បណ្ដាញយឺត! កំពុងភ្ជាប់ Server..." លោតរាល់ពេលបើក App
+`verify*RoleThenProceed` មាន `if (!isDatabaseConnected) showToast(...)` **នៅដើមមុខងារ**។
+`isDatabaseConnected` ចាប់ផ្ដើមជា `false` ហើយក្លាយជា `true` លុះត្រា `.info/connected` បាញ់ —
+ដែលមិនអាចទាន់នៅ tick ដំបូងបានឡើយ។ ដូច្នេះសារនេះលោត **១០០% នៃការបើក App** ទោះបណ្ដាញលឿនក៏ដោយ។
+អ្នកប្រើនិយាយត្រូវ៖ វាគួរលោតតែពេលយឺតពិត។
+
+**កែ**៖ ផ្លាស់សារចូល `readUserRole()` រួចដាក់ `setTimeout` `SLOW_NETWORK_NOTICE_MS = 4000`។
+`finish()` លុប timer នោះចោល ដូច្នេះបើអានបានមុន ៤ វិនាទី (ទាំង socket ទាំង REST) **គ្មានសារសោះ**។
+
+### ២. "ចូលប្រព័ន្ធជោគជ័យ!" ចេញពីរដង
+`verify*RoleThenProceed` ប្រកាសចូលប្រព័ន្ធ **រាល់ដងដែលវារត់ចប់ដោយជោគជ័យ** មិនមែនតែពេលឆ្លងកាត់
+ពី "មិនទាន់ចូល" ទៅ "ចូលរួច" ទេ។ វារត់ច្រើនដងបានពិត៖ ការត្រួតពិនិត្យពេល boot, ការចូលដោយដៃ
+(`loginWithFirebase` ហៅដោយខ្លួនឯងតាំងពី PR #24), និង `retryPendingRoleCheck()` ពី
+`.info/connected` និង `visibilitychange`។ ZoeAdmin/ZoeW/Zoescan ប្រើ element `#toast` តែមួយ
+ដូច្នេះវាមើលទៅដូចសារពីរលោតបន្តគ្នា; **ZoeKeyGen ត្រួតសារ ដូច្នេះវាឃើញច្បាស់ជាងគេ**
+(ក្នុងរូបថតមានពីរជាន់គ្នា) ហើយ ZoeKeyGen **គ្មានការការពារសោះ**។
+
+**កែ**៖ ZoeAdmin/ZoeW ប្រកាសតែពេល `isDatabaseInitialized` នៅ `false` (ទង់ដែលមានស្រាប់ ហើយ
+ត្រូវ reset ពេលចាកចេញ)។ ZoeKeyGen គ្មានទង់បែបនោះ ➜ បន្ថែម `isSignedInUiActive` ដែល
+`showLoginModalWithPrefill()` reset។ `refreshKeyList()` នៅតែរត់រាល់ដងដោយចេតនា — ការទាញបញ្ជី
+ថ្មីមិនបង្កគ្រោះថ្នាក់ទេ។
+
+### ៣. (ស្នើបន្ថែម) "ធ្វើឲ្យ toast ទាំងអស់ដើរ realtime"
+ZoeAdmin/ZoeW/Zoescan ប្រើ `#toast` **តែមួយ** ហើយ `showToast()` សរសេរជាន់លើអត្ថបទចាស់ ព្រមទាំង
+`clearTimeout(showToast._t)` — ដូច្នេះសារពីរដែលមកជិតគ្នា **សារទី ១ បាត់ទាំងស្រុង** មុនអ្នកប្រើ
+អានទាន់។ ZoeKeyGen មានលំនាំត្រឹមត្រូវរួចហើយ (container + append)។
+
+**កែ**៖ `showToast()` ឥឡូវ **byte-identical ទាំង ៤ App** — បង្កើត `<div class="toast">` ថ្មីរាល់ដង
+បញ្ចូលទៅ `#toastContainer` ហើយលុបខ្លួនឯងក្រោយ ៣ វិនាទី ដូច្នេះសារជាន់គ្នាបានដោយគ្មានសារណាបាត់។
+បន្ថែម **ដែនកំណត់ ៤ សារ** (លុបចាស់ជាងគេចេញ) ដែល ZoeKeyGen ក៏មិនធ្លាប់មាន — ការពារអេក្រង់ពេញ
+ពេលមានសារច្រើនជាប់គ្នា។ HTML ប្ដូរ `<div id="toast">` ➜ `<div class="toast-container"
+id="toastContainer">` និង CSS ប្ដូរពី `visibility` + `@keyframes fadein/fadeout` ទៅ flex column
++ transition (រក្សារូបរាងដើមរបស់ App នីមួយៗ)។ Keyframes ដែលលែងប្រើត្រូវលុបចោល។
+**`showToast` ត្រូវបានដកចេញពី `EXPECTED_DIVERGENT` ក្នុង `shared-fns.js`** — ឥឡូវវាត្រូវតែដូចគ្នា
+(identical ឡើងពី 16 ➜ 17)។
+
+### តេស្ត — `auth-recovery-test.js` ឡើងជា **175/175**
+Scenario ថ្មី ១០-១២៖ បើក App ធម្មតា ➜ **គ្មានសារ "បណ្ដាញយឺត" សោះ** (ទាំងភ្លាមៗ ទាំងក្រោយចូលរួច) ·
+យឺតពិត ➜ នៅ ៣ វិនាទីនៅស្ងាត់ តែនៅ ៥ វិនាទីត្រូវប្រាប់ · ការត្រួតពិនិត្យ role ជាថ្មីលើ session
+ដដែល ➜ **មិនប្រកាសចូលប្រព័ន្ធម្ដងទៀត**។ Scenario ៥ ចាស់ត្រូវបានកែ (វា assert ថាសារលោតភ្លាមៗ
+ដែលជាឥរិយាបថដែលកំពុងកែ)។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v40, zoew-v35, zoescan-v29, zoekeygen-v22)។
+**គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

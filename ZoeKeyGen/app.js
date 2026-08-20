@@ -93,6 +93,7 @@ let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
 let lastRoleRestOutcome = '';
 const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
+const SLOW_NETWORK_NOTICE_MS = 4000;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
@@ -134,6 +135,7 @@ function waitForServerTimeSync(timeoutMs) {
 function showToast(msg) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
+    while (container.children.length >= 4) container.removeChild(container.firstChild);
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = msg;
@@ -468,6 +470,7 @@ function showLoginModalWithPrefill() {
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
     document.getElementById('appContainer').style.display = 'none';
+    isSignedInUiActive = false;
     keyListSessionGeneration++;
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
@@ -588,10 +591,15 @@ function readUserRole(user) {
         let sdkError = null;
         let restError = null;
         let timer = null;
+        let slowNoticeTimer = setTimeout(() => {
+            slowNoticeTimer = null;
+            if (!settled) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
+        }, SLOW_NETWORK_NOTICE_MS);
         const finish = (fn, value) => {
             if (settled) return;
             settled = true;
             if (timer) clearTimeout(timer);
+            if (slowNoticeTimer) clearTimeout(slowNoticeTimer);
             fn(value);
         };
         const onFailure = () => {
@@ -613,7 +621,6 @@ function retryPendingRoleCheck() {
 
 async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     pendingRoleRecheck = false;
-    if (!isDatabaseConnected) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
     try {
         const role = await readUserRole(user);
         if (myAuthGeneration !== authGeneration) return;
@@ -640,7 +647,8 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     closeModal('loginModal');
     document.getElementById('appContainer').style.display = 'flex';
     updateAuthButton(true);
-    showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    if (!isSignedInUiActive) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    isSignedInUiActive = true;
     refreshKeyList();
 }
 
@@ -1007,6 +1015,7 @@ function copySetupLink() {
     navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('បានចម្លង Link!')).catch(() => {});
 }
 
+let isSignedInUiActive = false;
 let keyListCache = [];
 let keyListSessionGeneration = 0;
 const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zoescan', ALL: 'ទាំង ៣' };

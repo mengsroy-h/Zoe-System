@@ -13,7 +13,6 @@ const ACCEPTED = {
     customerDataTableBody: 'clearCustomerDataTableCache() blanks it on the sign-out branch',
     exchangeRateInput: 'exchange rate, not customer data',
     activationModalMsg: 'status text only',
-    toast: 'transient status text',
     exportFilterLabel: 'filter name only, no rows',
     loginEmailInput: 'remembered email, prefilled on purpose',
     loginError: 'error text only',

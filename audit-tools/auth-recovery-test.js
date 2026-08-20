@@ -155,6 +155,8 @@ function buildContext(app) {
         var lastRoleRestOutcome = '';
         var isDatabaseConnected = true;
         var ROLE_CHECK_CONNECT_WAIT_MS = 45000;
+        var SLOW_NETWORK_NOTICE_MS = 4000;
+        var isSignedInUiActive = false;
         var authUnsubscribe = null;
         var authRecoveryTimeout = null;
         var autoLoginAttempted = false;
@@ -312,7 +314,7 @@ async function run(app) {
     h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
     vm.runInContext('setupAuthListener();', h.ctx);
     await drain();
-    ok('ប្រាប់អ្នកប្រើថាកំពុងភ្ជាប់', h.log.toasts.some((t) => t.indexOf('កំពុងភ្ជាប់') !== -1), h.log.toasts);
+    ok('មិនប្រាប់ថាបណ្ដាញយឺតភ្លាមៗ', h.log.toasts.every((t) => t.indexOf('កំពុងភ្ជាប់') === -1), h.log.toasts);
     ok('គ្មាន databaseURL ➜ មិនស្នើ REST', h.log.rest.length === 0, h.log.rest.length);
     ok('កត់ត្រាថាផ្លូវ REST ប្រើមិនបាន', h.ctx.lastRoleRestOutcome === 'unavailable', h.ctx.lastRoleRestOutcome);
 
@@ -395,6 +397,68 @@ async function run(app) {
     await drain();
     ok('role ខុសពី REST ➜ signOut ដដែល', h.log.signOuts === 1, h.log.signOuts);
     ok('មិនបានបើក listener ទិន្នន័យទេ', h.log.dbInit === 0, h.log.dbInit);
+
+    // ---- Scenario 10: the slow-network notice must not fire on a normal launch ----
+    console.log('-- ១០. សារ "បណ្ដាញយឺត" មិនត្រូវលោតពេលបើក App ធម្មតា --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    ok('មិនលោតសារភ្លាមៗ', h.log.toasts.every((t) => t.indexOf('កំពុងភ្ជាប់') === -1), h.log.toasts);
+
+    await advance(h, 1000);
+    respondRest(h, 0, app.role);
+    await drain();
+    ok('ភ្ជាប់បានក្នុង ១ វិនាទី ➜ គ្មានសារ "បណ្ដាញយឺត" សោះ',
+        h.log.toasts.every((t) => t.indexOf('កំពុងភ្ជាប់') === -1), h.log.toasts);
+    ok('ហើយចូលបានធម្មតា', h.log.dbInit === 1, h.log.dbInit);
+
+    await advance(h, 10000);
+    ok('សារមិនលោតយឺតក្រោយចូលរួចហើយ',
+        h.log.toasts.every((t) => t.indexOf('កំពុងភ្ជាប់') === -1), h.log.toasts);
+
+    console.log('-- ១១. តែបើយឺតពិត ➜ ត្រូវប្រាប់អ្នកប្រើ --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.setConfig(null);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    await advance(h, 3000);
+    ok('នៅ ៣ វិនាទី នៅមិនទាន់លោត', h.log.toasts.every((t) => t.indexOf('កំពុងភ្ជាប់') === -1), h.log.toasts);
+    await advance(h, 2000);
+    ok('នៅ ៥ វិនាទី ទើបប្រាប់អ្នកប្រើ', h.log.toasts.some((t) => t.indexOf('កំពុងភ្ជាប់') !== -1), h.log.toasts);
+
+    // ---- Scenario 12: the sign-in announcement must not repeat ----
+    console.log('-- ១២. សារ "ចូលប្រព័ន្ធជោគជ័យ" មិនត្រូវចេញពីរដង --');
+    h = buildContext(app);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    h.log.gets[0].resolve({ val: () => app.role });
+    await drain();
+    const successAfterFirst = h.log.toasts.filter((t) => t.indexOf('ជោគជ័យ') !== -1).length;
+
+    vm.runInContext('authGeneration++; ' + app.verify + '(auth.currentUser, authGeneration);', h.ctx);
+    await drain();
+    h.log.gets[h.log.gets.length - 1].resolve({ val: () => app.role });
+    await drain();
+    const successAfterSecond = h.log.toasts.filter((t) => t.indexOf('ជោគជ័យ') !== -1).length;
+    ok('ការត្រួតពិនិត្យ role ជាថ្មី មិនប្រកាសចូលប្រព័ន្ធម្ដងទៀត',
+        successAfterSecond === successAfterFirst, { first: successAfterFirst, second: successAfterSecond });
+    if (app.label === 'ZoeAdmin' || app.label === 'ZoeW') {
+        ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
+    } else {
+        // Zoescan guards inside initDatabaseListeners (listenersAttached) and ZoeKeyGen
+        // refreshes its key list on every verify on purpose, so both call through twice.
+        ok('ការហៅជាថ្មីមិនបង្កើតបញ្ហា', h.log.dbInit === 2, h.log.dbInit);
+    }
+    if (app.label === 'Zoescan') {
+        const zsSrc = fs.readFileSync(path.join(root, app.file), 'utf8');
+        ok('Zoescan ការពារ listener ស្ទួនខាងក្នុង initDatabaseListeners',
+            /function initDatabaseListeners\(\) \{\s*if \(listenersAttached\) return;/.test(zsSrc));
+    }
 
     // ---- Scenario 3: a genuine error must still fail closed ----
     console.log('-- ៣. កំហុសពិតប្រាកដ (permission_denied) នៅតែត្រូវបណ្ដេញចេញ --');

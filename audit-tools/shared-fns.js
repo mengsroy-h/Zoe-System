@@ -19,7 +19,7 @@ const EXPECTED_DIVERGENT = new Set([
     'loginWithFirebase', 'logoutApp', 'openConfigModal', 'openConfigQrScanner', 'openModalHelper',
     'requestPinBeforeConfig', 'retryPendingRoleCheck', 'sanitizePhoneNumber', 'saveFirebaseConfig',
     'saveNewSecurityPin',
-    'setupAuthListener', 'setupIOSPullToRefresh', 'showLoginModalWithPrefill', 'showToast',
+    'setupAuthListener', 'setupIOSPullToRefresh', 'showLoginModalWithPrefill',
     'submitActivationKey', 'updateAuthButton', 'verifySecurityPin', 'verifyStoredPin'
 ]);
 

@@ -35,14 +35,16 @@
 >    Firebase ផ្ទុក `<script>` ពី host នោះ ដូច្នេះពីមុន ពេល WebSocket ត្រូវបានទប់ RTDB **គ្មានផ្លូវ
 >    បម្រុងសោះ**។ ឥឡូវមាន។ លម្អិតនៅ section ចុងឯកសារ។
 >
-> 🟣 **Audit ជុំទី ១០ (2026-08-20) — រកឃើញកំហុសពិត ៩ កែអស់ហើយ។** ក្នុងនោះ **៣ ជាកំហុសក្នុងកូដ
+> 🟣 **Audit ជុំទី ១០ (2026-08-20) — រកឃើញកំហុសពិត ៩ កែអស់ហើយ ហើយ merge ចូល `main` រួចរាល់
+> (PR #34, merge commit `dcde742`)។** ក្នុងនោះ **៣ ជាកំហុសក្នុងកូដ
 > ដុំស្នើលេខថ្មីខ្លួនឯង** (រកឃើញដោយអាន diff របស់ខ្លួនម្តងទៀត), ២ ក្នុង ZoeKeyGen (PIN flow រត់
 > callback ខុស ➜ ប្រអប់ Config បើកមិនចេញ), ២ ក្នុង Zoescan (តម្រងទីតាំងខុសពី dropdown), ១ សុវត្ថិភាព
 > ទាំង ៤ App (**ID token អាចទៅ host ក្រៅ Firebase** បើ config ត្រូវបានពុល) និង ១ ក្នុងការ deploy
 > (rules JSON របស់ ZoeKeyGen អានបានជាសាធារណៈ)។ តេស្តថ្មី ២ + scenario ថ្មី ១ — សរុប **១៩១ + 55 +
 > 10 + 7** assertion។ លម្អិតនៅ section **"ជុំ ១០"** ចុងឯកសារ។
 >
-> 🔵 **ស្វែងរកលេខទូរស័ព្ទ៖ វាយកន្ទុយលេខ ៣-៤ ខ្ទង់ បានឃើញដុំស្នើលេខវិញហើយ (2026-08-20)** — អ្នកប្រើ
+> 🔵 **ស្វែងរកលេខទូរស័ព្ទ៖ វាយកន្ទុយលេខ ៣-៤ ខ្ទង់ បានឃើញដុំស្នើលេខវិញហើយ (2026-08-20, merge
+> ក្នុង PR #34 ដដែល)** — អ្នកប្រើ
 > រាយការណ៍ថាក្រោយជុំ ៨/៩ ត្រូវវាយលេខ **ពេញ** ទើបឃើញ suggestion (ពីមុនវាយ ៣-៤ ខ្ទង់ក៏ឡើង)។
 > មូលហេតុ **មិនមែន** ការកែជុំ ៨/៩ ទេ — កូដស្វែងរកមិនប្រែសោះ។ វាជា `<datalist>` របស់ browser
 > ដែលការផ្គូផ្គងអាស្រ័យលើ browser (Chrome ថ្មីផ្គូផ្គងតែ **ដើមលេខ**) បូកនឹងកំហុសពិតមួយ៖
@@ -2501,3 +2503,9 @@ session ដដែលនេះ** — ត្រូវរកឃើញដោយអ�
 
 `CACHE_VERSION`៖ zoeadmin-v43, zoew-v38 (bump ក្នុង commit ដំបូងនៃ branch នេះ), zoescan-v32,
 zoekeygen-v25។ **គ្មានការប្ដូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+
+**Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើក្នុង session នេះ** — PR #34, merge commit `dcde742`
+(branch ចេញពី `2f7da14` ដោយផ្ទាល់)។ `mergeable_state: clean` ហើយ Netlify preview ទាំង ៤
+(`zoeadmin`, `zoew`, `zoescan`, `zoekeygen`) បៃតងមុន merge។ ក្រោយ merge
+`git rev-list --count origin/main..origin/claude/phone-number-audit-8-9-tsyi3c` = 0។
+Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។

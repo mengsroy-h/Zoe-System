@@ -599,7 +599,9 @@
         pendingPermanentDeleteId = null;
         const fieldsToBlank = [
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
-            'editPhoneInput', 'searchPhoneInput', 'editModalBarcodeText', 'phoneSuggestBox'
+            'editPhoneInput', 'searchPhoneInput', 'editModalBarcodeText', 'phoneSuggestBox',
+            'deletedTableBody', 'dailyStatsContainer', 'monthlyStatsContainer',
+            'menuContentContainer'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);

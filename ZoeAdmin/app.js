@@ -472,6 +472,7 @@
     }
 
     function checkPinAndOpenConfig(isFirstTime = false) {
+        if (isPinFlowPending()) return;
         pinTargetAction = null;
         let savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (!savedPin) {

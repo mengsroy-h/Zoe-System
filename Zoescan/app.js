@@ -258,6 +258,10 @@ async function initFirebase() {
             pendingLocationCode = null;
             const listSearchEl = document.getElementById('listSearchInput');
             if (listSearchEl) listSearchEl.value = '';
+            const warnTitleEl = document.getElementById('locationWarningTitle');
+            if (warnTitleEl) warnTitleEl.innerText = '';
+            const warnTextEl = document.getElementById('locationWarningText');
+            if (warnTextEl) warnTextEl.innerText = '';
             document.querySelectorAll('.modal').forEach((m) => {
                 if (m.id !== 'loginModal') closeModal(m.id);
             });

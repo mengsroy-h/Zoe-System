@@ -9,14 +9,18 @@
 | `shared-fns.js` | diff helper ដែលចែករំលែក **ទាំង ៤ App** (មិនត្រឹមតែ ZoeAdmin↔ZoeW) រួចរាយតែអ្វីដែលបែកគ្នាដោយមិនរំពឹងទុក — ត្រូវការ `acorn` |
 | `policy-test.js` | ដក block ពិតរបស់ `claimAndCleanupItem` + `executeRestoreItem` ចេញពី `app.js` ទាំងពីរ រួចផ្ទៀងផ្ទាត់គោលការណ៍ **លុប/ដក** (27 assertion/App) |
 | `lookup-closed-test.js` | ដក `buildScannerLookupPayload` (ZoeAdmin) + `findLockerOccupant` (Zoescan) ពិត រួចផ្ទៀងផ្ទាត់ថាការព្រមានទីតាំងជាន់គ្នា **រំលងកញ្ចប់ដែលយកហើយ** (13 assertion) |
-| `auth-recovery-test.js` | ដក `loginWithFirebase`/`doLogin`/`verify*RoleThenProceed`/`retryPendingRoleCheck` ពិត ចេញពី **ទាំង ៤ App** រួចផ្ទៀងផ្ទាត់ការស្ដារ session ពេលបណ្ដាញយឺត (70 assertion) — គំរូ `onAuthStateChanged` ធ្វើតាម `AuthImpl.notifyAuthListeners` ពិតរបស់ `@firebase/auth@1.13.4` |
-| `idcheck.js` | `getElementById(...)` ទាំងអស់ត្រូវមាន `id=` ក្នុង HTML |
-| `fncheck.js` | function ក្នុង inline `on*=` ទាំងអស់ត្រូវមានក្នុង `app.js` |
+| `auth-recovery-test.js` | ដក `loginWithFirebase`/`doLogin`/`verify*RoleThenProceed`/`retryPendingRoleCheck` ពិត ចេញពី **ទាំង ៤ App** រួចផ្ទៀងផ្ទាត់ការស្ដារ session ពេលបណ្ដាញយឺត និងផ្លូវ REST ពេល socket ស្លាប់ (142 assertion) — គំរូ `onAuthStateChanged` ធ្វើតាម `AuthImpl.notifyAuthListeners` ពិតរបស់ `@firebase/auth@1.13.4` |
+| `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
+| `dom-hygiene.js` | រកវាលក្នុង modal ដែលត្រូវបានសរសេរដោយទិន្នន័យអតិថិជន តែ **មិនត្រូវបានលុបចោលពេលចាកចេញ** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥ និង ៨) — ត្រូវការ `acorn` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |
 | `trimws.js <files>` | លុប trailing whitespace ដោយបញ្ជាក់ថា token stream មិនប្រែ |
 | `emu/real.sh` | តេស្ត `firebase-database.rules.json` ពិត លើ RTDB emulator |
 | `emu/partial-claim.sh` | តេស្តថា worker សរសេរ `barcodes[]` ដែលបង្រួមរួច (8-day partial claim) បាន |
 | `emu/scanner-lookup-closed.sh` | តេស្ត field `isClosed` ថ្មីលើ `zoew_scanner_lookup` |
+
+`dom-hygiene.js` មាន allowlist `ACCEPTED` នៅខាងលើឯកសារ ដែល **រាល់ធាតុមានហេតុផលសរសេរជាប់** —
+វាល​ដែលមិនមែនជាទិន្នន័យអតិថិជន ឬវាលដែលមានផ្លូវលុបចោលឯទៀតរួចហើយ។ ធាតុគ្មានហេតុផលនឹងលាក់
+ការលេចធ្លាយពិតបន្ទាប់ ដូច្នេះកុំបន្ថែមដោយគ្មានការពន្យល់។
 
 `shared-fns.js` មាន allowlist `EXPECTED_DIVERGENT` នៅខាងលើឯកសារ — helper ដែលបែកគ្នាដោយចេតនា
 (label ជាក់លាក់តាម App, PBKDF2 salt, `initFirebase` ។ល។)។ បើបន្ថែម helper ចែករំលែកថ្មីមួយ

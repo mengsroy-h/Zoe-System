@@ -1085,7 +1085,8 @@
             'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
             'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
             'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
-            'editModalBarcodeText', 'lookupApiHeaderValueInput'
+            'editModalBarcodeText', 'lookupApiHeaderValueInput',
+            'modalBarcodeText', 'pdfExportPrintArea'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -2707,7 +2708,11 @@
 
         const originalTitle = document.title;
         document.title = getExportFilenameBase();
-        window.addEventListener('afterprint', () => { document.title = originalTitle; }, { once: true });
+        window.addEventListener('afterprint', () => {
+            document.title = originalTitle;
+            const area = document.getElementById('pdfExportPrintArea');
+            if (area) area.innerHTML = '';
+        }, { once: true });
         window.print();
     }
 

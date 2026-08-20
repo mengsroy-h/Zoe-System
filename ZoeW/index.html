@@ -128,7 +128,7 @@
             </div>
             <div class="search-and-actions">
                 <div class="search-box">
-                    <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" list="recentPhonesList">
+                    <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" autocomplete="off">
                     <button onclick="searchByPhone()">🔍</button>
                 </div>
             </div>
@@ -363,6 +363,7 @@
     </div>
 </div>
 
+<div class="phone-suggest" id="phoneSuggestBox"></div>
 <div id="globalMoreMenu" class="more-menu">
     <div id="menuContentContainer"></div>
 </div>

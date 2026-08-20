@@ -132,6 +132,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
+        hidePhoneSuggestions();
         document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'flex';
@@ -1076,6 +1077,7 @@
     }
 
     function clearSensitiveModalFields() {
+        hidePhoneSuggestions();
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;
@@ -1087,7 +1089,7 @@
             'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
             'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
             'editModalBarcodeText', 'lookupApiHeaderValueInput',
-            'modalBarcodeText', 'pdfExportPrintArea'
+            'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1195,8 +1197,23 @@
         }
     }
 
+    function isFirebaseDatabaseHost(url) {
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'https:') return false;
+            const host = parsed.hostname.toLowerCase();
+            return host.endsWith('.firebaseio.com') || host.endsWith('.firebasedatabase.app');
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function readUserRoleViaRest(user) {
         const base = readDatabaseUrlFromConfig();
+        if (base && !isFirebaseDatabaseHost(base)) {
+            lastRoleRestOutcome = 'blocked: non-firebase databaseURL';
+            throw new Error('REST role check unavailable');
+        }
         if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
             lastRoleRestOutcome = 'unavailable';
             throw new Error('REST role check unavailable');
@@ -1589,17 +1606,10 @@
         const datalist = document.getElementById('recentPhonesList');
         if (!datalist) return;
 
-        let phonesSet = new Set();
-        scanHistory.forEach(item => {
-            if (item.phone && item.phone !== "គ្មានលេខ") {
-                phonesSet.add(item.phone);
-            }
-        });
-
         datalist.innerHTML = '';
-        Array.from(phonesSet).slice(0, 30).forEach(phone => {
+        collectPhoneSuggestions('', RECENT_PHONES_MAX).forEach(entry => {
             const option = document.createElement('option');
-            option.value = phone;
+            option.value = entry.phone;
             datalist.appendChild(option);
         });
     }
@@ -1946,6 +1956,7 @@
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();
+        setupPhoneSuggestions();
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.more-btn') && !e.target.closest('.header-more-btn') && !e.target.closest('#globalMoreMenu')) {
@@ -3243,6 +3254,186 @@
         refreshCurrentHistoryView();
     }
 
+    const PHONE_SUGGEST_MAX = 12;
+    const RECENT_PHONES_MAX = 300;
+    let phoneSuggestItems = [];
+    let phoneSuggestActiveIndex = -1;
+    let phoneSuggestHideTimer = null;
+
+    function normalizePhoneDigits(value) {
+        return String(value === null || value === undefined ? '' : value).replace(/[^0-9]/g, '');
+    }
+
+    function collectPhoneSuggestions(rawQuery, limit) {
+        const queryDigits = normalizePhoneDigits(rawQuery);
+        const byPhone = new Map();
+        scanHistory.forEach((item) => {
+            if (!item || !item.phone || item.phone === "គ្មានលេខ") return;
+            const digits = normalizePhoneDigits(item.phone);
+            if (!digits) return;
+            if (queryDigits && digits.indexOf(queryDigits) === -1) return;
+            const stamp = item.createdAt || parseTimestampFromId(item.id) || 0;
+            const packages = (item.barcodes && item.barcodes.length) ? item.barcodes.length : 1;
+            const found = byPhone.get(item.phone);
+            if (found) {
+                found.packages += packages;
+                if (stamp > found.stamp) found.stamp = stamp;
+            } else {
+                byPhone.set(item.phone, { phone: item.phone, digits: digits, packages: packages, stamp: stamp });
+            }
+        });
+        const rankOf = (digits) => {
+            if (!queryDigits) return 1;
+            if (digits.endsWith(queryDigits)) return 0;
+            if (digits.startsWith(queryDigits)) return 1;
+            return 2;
+        };
+        return Array.from(byPhone.values()).sort((a, b) => {
+            const rankA = rankOf(a.digits);
+            const rankB = rankOf(b.digits);
+            if (rankA !== rankB) return rankA - rankB;
+            return b.stamp - a.stamp;
+        }).slice(0, limit || PHONE_SUGGEST_MAX);
+    }
+
+    function renderPhoneSuggestions(matches) {
+        const box = document.getElementById('phoneSuggestBox');
+        if (!box) return;
+        box.textContent = '';
+        phoneSuggestItems = matches;
+        phoneSuggestActiveIndex = -1;
+        matches.forEach((entry, index) => {
+            const row = document.createElement('div');
+            row.className = 'phone-suggest-item';
+            row.setAttribute('data-index', String(index));
+            const number = document.createElement('span');
+            number.className = 'phone-suggest-number';
+            number.textContent = entry.phone;
+            const meta = document.createElement('span');
+            meta.className = 'phone-suggest-meta';
+            meta.textContent = entry.packages + ' កញ្ចប់';
+            row.appendChild(number);
+            row.appendChild(meta);
+            box.appendChild(row);
+        });
+    }
+
+    function positionPhoneSuggestBox() {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        const box = document.getElementById('phoneSuggestBox');
+        if (!phoneInput || !box || !box.classList.contains('show')) return;
+        const rect = phoneInput.getBoundingClientRect();
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+            hidePhoneSuggestions();
+            return;
+        }
+        box.style.width = rect.width + 'px';
+        box.style.left = rect.left + 'px';
+        const boxHeight = box.offsetHeight;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) {
+            box.style.top = (rect.top - boxHeight - 4) + 'px';
+        } else {
+            box.style.top = (rect.bottom + 4) + 'px';
+        }
+    }
+
+    function showPhoneSuggestions() {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        const box = document.getElementById('phoneSuggestBox');
+        if (!phoneInput || !box) return;
+        if (phoneSuggestHideTimer) { clearTimeout(phoneSuggestHideTimer); phoneSuggestHideTimer = null; }
+        if (document.activeElement !== phoneInput) return;
+        const matches = collectPhoneSuggestions(phoneInput.value);
+        if (!matches.length) {
+            hidePhoneSuggestions();
+            return;
+        }
+        renderPhoneSuggestions(matches);
+        box.classList.add('show');
+        positionPhoneSuggestBox();
+    }
+
+    function hidePhoneSuggestions() {
+        if (phoneSuggestHideTimer) { clearTimeout(phoneSuggestHideTimer); phoneSuggestHideTimer = null; }
+        phoneSuggestItems = [];
+        phoneSuggestActiveIndex = -1;
+        const box = document.getElementById('phoneSuggestBox');
+        if (!box) return;
+        box.classList.remove('show');
+        box.textContent = '';
+    }
+
+    function setPhoneSuggestActive(index) {
+        const box = document.getElementById('phoneSuggestBox');
+        if (!box) return;
+        const rows = box.querySelectorAll('.phone-suggest-item');
+        if (!rows.length) return;
+        let target = index;
+        if (target < 0) target = rows.length - 1;
+        if (target >= rows.length) target = 0;
+        phoneSuggestActiveIndex = target;
+        rows.forEach((row, i) => {
+            if (i === target) row.classList.add('active');
+            else row.classList.remove('active');
+        });
+        rows[target].scrollIntoView({ block: 'nearest' });
+    }
+
+    function applyPhoneSuggestion(phone) {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        if (!phoneInput) return;
+        phoneInput.value = phone;
+        hidePhoneSuggestions();
+        searchByPhone();
+    }
+
+    function setupPhoneSuggestions() {
+        const phoneInput = document.getElementById('searchPhoneInput');
+        const box = document.getElementById('phoneSuggestBox');
+        if (!phoneInput || !box) return;
+        phoneInput.addEventListener('input', showPhoneSuggestions);
+        phoneInput.addEventListener('focus', showPhoneSuggestions);
+        phoneInput.addEventListener('blur', () => {
+            if (phoneSuggestHideTimer) clearTimeout(phoneSuggestHideTimer);
+            phoneSuggestHideTimer = setTimeout(hidePhoneSuggestions, 150);
+        });
+        phoneInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                hidePhoneSuggestions();
+                return;
+            }
+            if (e.key === 'Enter') {
+                if (phoneSuggestActiveIndex >= 0 && phoneSuggestItems[phoneSuggestActiveIndex]) {
+                    e.preventDefault();
+                    applyPhoneSuggestion(phoneSuggestItems[phoneSuggestActiveIndex].phone);
+                } else {
+                    hidePhoneSuggestions();
+                    searchByPhone();
+                }
+                return;
+            }
+            if (!phoneSuggestItems.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setPhoneSuggestActive(phoneSuggestActiveIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setPhoneSuggestActive(phoneSuggestActiveIndex - 1);
+            }
+        });
+        box.addEventListener('mousedown', (e) => { e.preventDefault(); });
+        box.addEventListener('click', (e) => {
+            const row = e.target && e.target.closest ? e.target.closest('.phone-suggest-item') : null;
+            if (!row) return;
+            const index = parseInt(row.getAttribute('data-index'), 10);
+            if (isNaN(index) || !phoneSuggestItems[index]) return;
+            applyPhoneSuggestion(phoneSuggestItems[index].phone);
+        });
+        window.addEventListener('scroll', positionPhoneSuggestBox, { capture: true, passive: true });
+        window.addEventListener('resize', positionPhoneSuggestBox);
+    }
+
     function searchByPhone() {
         const phoneInput = document.getElementById('searchPhoneInput');
         let phoneQuery = sanitizePhoneNumber(phoneInput ? phoneInput.value : '');
@@ -3250,7 +3441,12 @@
             applyCurrentFilter();
             return;
         }
-        let searched = scanHistory.filter(item => item.phone && item.phone.includes(phoneQuery));
+        const queryDigits = normalizePhoneDigits(phoneQuery);
+        let searched = scanHistory.filter(item => {
+            if (!item.phone) return false;
+            if (!queryDigits) return item.phone.includes(phoneQuery);
+            return normalizePhoneDigits(item.phone).indexOf(queryDigits) !== -1;
+        });
         renderHistory(searched);
         updateDailyScheduleStats(searched, true);
     }

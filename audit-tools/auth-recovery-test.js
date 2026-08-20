@@ -3,9 +3,10 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
+const appRoot = process.env.AUTH_APP_DIR ? path.resolve(process.env.AUTH_APP_DIR) : root;
 
 function sliceFns(file, names) {
-    const src = fs.readFileSync(path.join(root, file), 'utf8');
+    const src = fs.readFileSync(path.join(appRoot, file), 'utf8');
     return names.map((name) => {
         let start = src.indexOf('function ' + name + '(');
         if (start === -1) throw new Error('not found: ' + name + ' in ' + file);
@@ -133,7 +134,7 @@ function buildContext(app) {
         console,
         setTimeout: fakeSetTimeout,
         clearTimeout: fakeClearTimeout,
-        Promise, Error, JSON, Date, String, Number, Object, Array, isNaN, parseFloat,
+        Promise, Error, JSON, Date, String, Number, Object, Array, isNaN, parseFloat, URL,
         document: doc,
         localStorage: {
             getItem: (k) => (k === 'zoew_firebase_config' ? configJson : null),
@@ -202,6 +203,9 @@ function buildContext(app) {
     vm.runInContext(preamble, ctx);
     const wanted = ['withTimeout', 'readDatabaseUrlFromConfig', 'readUserRoleViaRest', 'readUserRole',
         'retryPendingRoleCheck', app.verify, app.login];
+    if (fs.readFileSync(path.join(appRoot, app.file), 'utf8').indexOf('function isFirebaseDatabaseHost(') !== -1) {
+        wanted.splice(2, 0, 'isFirebaseDatabaseHost');
+    }
     if (app.boot === 'setupAuthListener') wanted.push('setupAuthListener');
     vm.runInContext(sliceFns(app.file, wanted), ctx);
     if (app.boot === 'inline') {
@@ -240,7 +244,7 @@ async function run(app) {
         // Zoescan keeps its onAuthStateChanged callback inline inside initFirebase,
         // so it cannot be sliced out by name. Assert the real source still matches
         // the stand-in this harness registers, otherwise the run below is fiction.
-        const src = fs.readFileSync(path.join(root, app.file), 'utf8');
+        const src = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
         const shape = /authGeneration\+\+;\s*const myAuthGeneration = authGeneration;\s*if \(user\) \{\s*verifyRoleThenProceed\(user, myAuthGeneration\);/;
         ok('listener ខាងក្នុង initFirebase នៅតែមានរូបរាងដូចដែល harness សន្មត់', shape.test(src));
         ok('listener សម្អាតទង់ពេល sign-out', /\} else \{\s*pendingRoleRecheck = false;/.test(src));
@@ -305,6 +309,22 @@ async function run(app) {
     await drain();
     ok('មិនត្រួតពិនិត្យឡើងវិញទេ ពេលគ្មានទង់រង់ចាំ (គ្មាន loop)',
         h.log.gets.length === getsBeforeReconnect + 1, h.log.gets.length);
+
+    // ---- Scenario 4b: a databaseURL that is not a Firebase RTDB host never receives the ID token ----
+    console.log('-- ៤ខ. databaseURL មិនមែន Firebase ➜ មិនផ្ញើ ID token ទៅទីនោះ --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.setConfig('{"apiKey":"k","databaseURL":"https://evil.googleusercontent.com"}');
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    ok('មិនស្នើ REST ទៅ host ក្រៅ Firebase សោះ', h.log.rest.length === 0, h.log.rest);
+    ok('កត់ត្រាមូលហេតុទៅ Sentry', h.ctx.lastRoleRestOutcome === 'blocked: non-firebase databaseURL', h.ctx.lastRoleRestOutcome);
+    h.setConnected(true);
+    h.log.gets[0].resolve({ val: () => app.role });
+    await drain();
+    ok('socket ឡើងវិញ ➜ នៅតែចូលបានធម្មតា', h.log.dbInit === 1 && h.log.signOuts === 0,
+        { dbInit: h.log.dbInit, signOuts: h.log.signOuts });
 
     // ---- Scenario 5: the socket is not up and no REST fallback is reachable ----
     console.log('-- ៥. RTDB មិនទាន់ភ្ជាប់ ហើយគ្មានផ្លូវ REST — មិនត្រូវប្រណាំងនឹង timer --');
@@ -455,7 +475,7 @@ async function run(app) {
         ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
     }
     if (app.label === 'Zoescan') {
-        const zsSrc = fs.readFileSync(path.join(root, app.file), 'utf8');
+        const zsSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
         ok('Zoescan ការពារ listener ស្ទួនខាងក្នុង initDatabaseListeners',
             /function initDatabaseListeners\(\) \{\s*if \(listenersAttached\) return;/.test(zsSrc));
     }

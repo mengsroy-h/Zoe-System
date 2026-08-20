@@ -335,6 +335,13 @@
         .search-box input { flex: 1; min-width: 0; padding: 12px 14px; font-size: 14px; min-height: 44px; border: 1px solid var(--border-color); border-radius: var(--radius-md); outline: none; background: #f8fafc; box-sizing: border-box; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
         .search-box input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--accent-blue-light); background: #fff; }
         .search-box button { background-color: var(--accent-blue); color: white; border: none; padding: 0 16px; font-size: 15px; min-height: 44px; border-radius: var(--radius-md); cursor: pointer; flex-shrink: 0; }
+        .phone-suggest { display: none; position: fixed; z-index: 1045; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .phone-suggest.show { display: block; }
+        .phone-suggest-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); }
+        .phone-suggest-item:last-child { border-bottom: none; }
+        .phone-suggest-item:hover, .phone-suggest-item.active { background: #f1f5f9; }
+        .phone-suggest-number { font-size: 14px; font-weight: 700; color: var(--text-main); letter-spacing: 0.3px; }
+        .phone-suggest-meta { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
         .history-section { 
             flex: 1; 

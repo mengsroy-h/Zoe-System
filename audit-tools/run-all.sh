@@ -41,7 +41,7 @@ done
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
 run "extract.js (ZoeAdmin vs ZoeW)" node audit-tools/extract.js /tmp/zoe-fns
-for t in shared-fns wiring dom-hygiene state-hygiene comments; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done

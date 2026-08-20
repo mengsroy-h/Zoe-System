@@ -1,16 +1,18 @@
 # Zoe-System
 
-> ## ⚡ START HERE — អានផ្នែកនេះមុនគេ (ធ្វើបច្ចុប្បន្នភាព 2026-08-20, ក្រោយជុំ audit ទី ១១)
+> ## ⚡ START HERE — អានផ្នែកនេះមុនគេ (ធ្វើបច្ចុប្បន្នភាព 2026-08-20, ក្រោយជុំ audit ទី ១២)
 >
 > ឯកសារនេះត្រូវបានសរសេរឲ្យ **session Claude ថ្មីទាំងស្រុង** អាចបន្តការងារបាន ដោយមិនចាំបាច់មាន
 > ប្រវត្តិការសន្ទនាមុន។ អានប្លុកនេះ + section **"របៀបធ្វើ audit លើគម្រោងនេះ"** ខាងក្រោមភ្លាម
 > ជាការគ្រប់គ្រាន់ដើម្បីចាប់ផ្តើម។
 >
 > ### ស្ថានភាពកូដ
-> **អ្វីៗទាំងអស់ រហូតដល់ជុំ audit ទី ១១ ស្ថិតនៅក្នុង `main` រួចរាល់ហើយ** — PR #37 (merge
-> `2fb09cb`, ជុំ ១១) និង PR #38 (merge `7b905dd`, ការទាញតារាងប្រវត្តិឡើងពេលស្វែងរក)។
-> ផ្ទៀងផ្ទាត់ដោយ `git rev-list --count origin/main..origin/claude/deep-audit-jcog87` = **0**។
-> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។ **គ្មានការងារណាមិនទាន់ merge ទេ។**
+> **អ្វីៗរហូតដល់ជុំ ១១ ស្ថិតក្នុង `main` រួចរាល់** (PR #37/#38/#39, HEAD `321a5d6`)។
+> **ជុំ ១២ ស្ថិតលើ `claude/deep-audit-yi21xn` ហើយ *មិនទាន់* merge ទេ** — វាកែកំហុស ៤ ដែល
+> ២ ក្នុងនោះជាការតំរែតំរង់ដែលជុំមុនបង្កើត (Setup Link របស់ ZoeAdmin, និងការកែរូបរាង `barcodes`
+> ដែលមិនពេញលេញ)។ **ផ្ទៀងផ្ទាត់ជានិច្ចដោយ `git rev-list --count origin/main..origin/<branch>`
+> — កុំចម្លងបន្ទាត់នេះមកដាក់ដោយមិនរត់ពាក្យបញ្ជា។**
+> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។
 >
 > **Firebase rules ទាំងពីរ publish រួចរាល់ហើយ** (root និង `ZoeKeyGen/`) ហើយ **ជុំ ១១ មិនប្តូរ
 > rules ទេ ➜ គ្មាន publish ថ្មីត្រូវធ្វើ**។ Rules JSON ក្នុង repo នេះ **មិន deploy ស្វ័យប្រវត្តិទេ**
@@ -45,7 +47,17 @@
 > - **Zoescan៖ QR ដែលមិនមែន Setup Link ធ្វើឲ្យ toast ចេញឡើងវិញរាល់ frame** — រំខានតែប៉ុណ្ណោះ។
 > - **`google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
 >
-> ### កំហុសដែលទើបកែក្នុងជុំ ១១ (កុំ audit ឡើងវិញដោយងងឹតងងុល)
+> ### កំហុសដែលទើបកែក្នុងជុំ ១២ (កុំ audit ឡើងវិញដោយងងឹតងងុល)
+> ១. **រូបរាង `barcodes` លើផ្លូវអានឆៅទាំង ៦** — ជុំ ១១ កែតែ normalizer នៃ `onValue`; ធុងសំរាម
+>    និង `runTransaction` ទាំង ៤ អានពី server ដោយផ្ទាល់។ `normalizeBarcodesOf()` ថ្មី។
+> ២. **Setup Link របស់ ZoeAdmin មិនដែលដំណើរការ** — `checkPinAndOpenConfig()` លុប
+>    `pinTargetAction` ដែល `applySetupLinkFromUrl()` ទើបកំណត់។
+> ៣. **ZoeKeyGen បណ្តេញអ្នកប្រើខ្លួនឯងពេល zoom / window តូច** (`about:blank` គ្មានសារ)។
+> ៤. **ZXing មិន load ➜ ZoeAdmin កាមេរ៉ាបើក តែស្កេនមិនចូល** ដោយស្ងាត់។
+> ៥. **`addOrUpdateEntry` ជា read-modify-write** ➜ ZoeAdmin ២ ឧបករណ៍ស្កេនព្រមគ្នា ➜ barcode
+>    មួយបាត់ ខណៈលុយរាប់ទាំងពីរ។ ឥឡូវជា `runTransaction`។
+>
+> ### កំហុសដែលកែក្នុងជុំ ១១ (កុំ audit ឡើងវិញដោយងងឹតងងុល)
 > ១. **`barcodes` មក ៣ រូបរាងពី Firebase** — `[A,null,B]` ធ្វើឲ្យ throw ក្នុង `onValue` callback
 >    ➜ តារាងឈប់ update; `{0:A,2:B}` ធ្វើឲ្យបាត់ barcode ➜ Zoescan កំណត់ locker មិនបាន។
 >    កែដោយ `barcodeEntriesOf()` (byte-identical ៣ App)។ **Zoescan រក្សា index ជាលេខដើម**
@@ -84,9 +96,11 @@ Always check whether a bug/fix applies to just one app or needs mirroring across
 npm i acorn                      # ឧបករណ៍ ៥ ត្រូវការវា; បើអត់ វារំលង ហើយប្រាប់អ្នក
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
-`run-all.sh` រត់ **ការត្រួតពិនិត្យ ២៣** (តេស្តឥរិយាបថ 438 assertion + checker រចនាសម្ព័ន្ធ ៧ +
-ទម្លាប់គម្រោង ៦)។ **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថា
-កំហុសដែលរកឃើញក្នុងជុំ ១-១១ មិនបានត្រឡប់មកវិញទេ។
+`run-all.sh` រត់ **ការត្រួតពិនិត្យ ២៩** (តេស្តឥរិយាបថ + checker រចនាសម្ព័ន្ធ + ទម្លាប់គម្រោង,
+សរុប 547 assertion)។ **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថា
+កំហុសដែលរកឃើញក្នុងជុំ ១-១២ មិនបានត្រឡប់មកវិញទេ។
+ការត្រួតពិនិត្យ ២ ប្រើ **Chromium ពិត** (`boot-runtime`, `setup-link`) — ត្រូវការ
+`npm i playwright-core`; បើគ្មាន វា **SKIP ដោយស្អាត** មិនធ្លាក់ទេ។
 
 ### ជំហានទី ១ — កុំចាប់ផ្តើមដោយអានកូដពីដើមដល់ចប់
 ជុំ ៦ ដល់ ១១ បង្ហាញច្បាស់៖ **កំហុសថ្មីស្ទើរតែមិនដែលរកឃើញដោយការអានកូដដដែលឡើងវិញទេ។** វារកឃើញដោយ៖
@@ -106,15 +120,23 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | អថេរ state សល់ក្រោយចាកចេញ | `state-hygiene.js` |
 | class គ្មានច្បាប់ CSS | `css-classes.js` |
 | comment / trailing whitespace | `comments.js` |
+| payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
+| កំហុស runtime ពេល boot (App ពិតក្នុង Chromium) | `boot-runtime.js` |
+| ផ្លូវ provisioning ពេញលេញ (`?setup=` ➜ PIN ➜ Config) | `setup-link-browser-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
 
 ### ជំហានទី ៣ — ថ្នាក់ដែល **មិនទាន់** មានឧបករណ៍ (ឆាកសម្រាប់ជុំក្រោយ)
 ទាំងនេះជាកន្លែងដែលកំហុសនៅសល់។ ការសាងឧបករណ៍ថ្មីមួយសម្រាប់ថ្នាក់មួយ = ការវិនិយោគល្អជាងគេ៖
-- **payload ដែលសរសេរទៅ Firebase ទល់នឹង schema ក្នុង rules** (ឥឡូវផ្ទៀងផ្ទាត់ដោយដៃ)
-- **រូបរាងទិន្នន័យផ្សេងទៀតដែល RTDB អាចត្រឡប់មក** (ជុំ ១១ គ្របតែ `barcodes`)
-- **ការប្រណាំងរវាងឧបករណ៍ច្រើន** (គ្មានផ្លូវធ្វើតេស្តដោយគ្មាន emulator ពិត)
+- **រូបរាងទិន្នន័យផ្សេងទៀតដែល RTDB អាចត្រឡប់មក** — ជុំ ១១ និង ១២ គ្របតែ `barcodes`
+  (ជុំ ១២ គ្របផ្លូវអានទាំង ៦ មិនត្រឹមតែ normalizer)។ វាលផ្សេងទៀតមិនទាន់ពិនិត្យទេ
+- **ការប្រណាំងរវាងឧបករណ៍ច្រើន** — ជុំ ១២ កែមួយក្នុង `addOrUpdateEntry` ហើយបន្សល់ទុក
+  `concurrent-scan-test.js` ជាលំនាំ៖ Firebase ក្លែងក្លាយដែលមាន retry-on-conflict ពិត
+  ➜ **អាចធ្វើតេស្តបានដោយគ្មាន emulator**។ ផ្លូវសរសេរផ្សេងទៀតមិនទាន់គ្របទេ
+- **អន្តរកម្ម UI ជម្រៅ ក្នុង browser ពិត** — ជុំ ១២ បើកឆាកនេះ (`boot-runtime.js`,
+  `setup-link-browser-test.js`) ហើយវារកឃើញ ៣ ក្នុង ៤។ **នៅមានច្រើនទៀតដែលអាចធ្វើតេស្តបាន៖**
+  ការស្កេន, ការបិទកញ្ចប់, ការស្វែងរក — ត្រូវការ Firebase ក្លែងក្លាយ
 - **ការប្រើអង្គចងចាំ / ដំណើរការ** ពេល `scanHistory` ធំ
 - **CSS ដែលបំបែកលើអេក្រង់តូច** (ជុំ ៩ និង ១១ រកឃើញ ២ — ប្រហែលមានទៀត)
 
@@ -2824,3 +2846,148 @@ Zoescan/ZoeKeyGen មិនប៉ះ (គ្មាន sidebar ស្វែងរ
 
 `CACHE_VERSION` bump (zoeadmin-v48, zoew-v42)។ **គ្មានការប្តូរ rules ➜ គ្មាន publish ថ្មី។**
 Zoescan/ZoeKeyGen មិនប៉ះ។ Suite សរុប៖ **450 assertion** — បៃតងទាំងអស់។
+
+## ជុំ ១២ — deep audit (2026-08-20, branch `claude/deep-audit-yi21xn`)
+
+ស្នើដោយអ្នកប្រើ ជាមួយសំណួរដដែលនឹងជុំ ១១៖ *"រាល់ការ audit មុនមុនអ្នកមិនបានមើលគ្រប់ជ្រុងជ្រោយទេឬ?"*
+ចម្លើយនៅចុង section។ Branch ចេញពី `main` (`321a5d6`) ដោយផ្ទាល់។ រត់ inline single-threaded។
+អ្នកប្រើអនុញ្ញាតច្បាស់លាស់៖ *"អោយតែកំហុសកែទាំងអស់"* ➜ ការកែដែលប៉ះលុយក៏បានអនុវត្តដែរ។
+
+### ស្ថានភាពពេលចាប់ផ្តើម
+ការត្រួតពិនិត្យទាំង ២៣ បៃតង (450 assertion)។ `git log 7b905dd..origin/main` = commit ឯកសារតែមួយ
+➜ **គ្មានកូដដែលមិនទាន់មានឯកសារ** ➜ កំហុសថ្មីត្រូវតែមកពីឆាកដែលគ្មានឧបករណ៍ណាធ្លាប់ប៉ះ។
+
+### កំហុសទី ១ (ធ្ងន់បំផុត) — ការកែរូបរាង `barcodes` ជុំ ១១ គ្របតែ **ផ្លូវអានតែមួយ**
+ជុំ ១១ បានបង្កើតការពិតដ៏សំខាន់៖ RTDB ត្រឡប់ array ដដែលមក ៣ រូបរាង (`[A,B]` · `[A,null,B]` ·
+`{0:A,2:B}`) ហើយបានកែ normalizer នៃ `onValue` របស់ប្រវត្តិ។ **តែផ្លូវអានទិន្នន័យឆៅមាន ៦ មិនមែន ១។**
+`runTransaction` អាន **ពី server ដោយផ្ទាល់** មិនឆ្លងកាត់ normalizer ណាមួយទេ ហើយធុងសំរាមគ្មាន
+normalizer សោះ។ លទ្ធផលតាមផ្លូវនីមួយៗ៖
+
+| ផ្លូវ | រូបរាង object | រូបរាង null |
+|---|---|---|
+| `dbRefDeleted` (ធុងសំរាម) | `executeRestoreItem` ធ្លាក់ទៅសាខា legacy ➜ **ស្តារដោយគ្មាន barcode សោះ** ហើយបន្ថែមលុយកម្រិត item ខុស | throw កណ្តាល loop **ក្រោយ** លុយត្រូវបានបន្ថែមខ្លះ |
+| `toggleIndividualBarcodeClose` | **សរសេរជាន់ `barcodes` ទាំងមូលដោយ barcode តែមួយ** ➜ barcode ឯទៀតបាត់ជារៀងរហូតក្នុង Firebase | throw ➜ បិទកញ្ចប់មិនបាន |
+| `toggleCloseStatus` | barcode មិនត្រូវបានបិទ តែ item ប្តូរជា closed ➜ មិនស៊ីគ្នា | throw |
+| `claimAndCleanupItem` | ចាត់ទុកជា legacy ➜ ដកលុយកម្រិត item ជំនួសតាម barcode | throw ➜ ការសម្អាត 2h/8d ជាប់គាំងជារៀងរហូត |
+| `restoreClaimedItemToScanHistory` | `.map` លើ object ➜ throw ➜ **កញ្ចប់បាត់** (នេះជាផ្លូវសង្គ្រោះចុងក្រោយ) | throw |
+| `executeRestoreItem` resync | សរសេរ `fb.get()` ឆៅចូល `scanHistory`/`deletedItems` ដោយរំលង normalizer ទាំងអស់ | ដូចគ្នា |
+
+**ចំណុចដែលធ្វើឲ្យវាគ្រោះថ្នាក់ជាងធម្មតា៖** ការកែជុំ ១១ ធ្វើឲ្យ **UI មើលទៅត្រឹមត្រូវ** (normalizer
+កែច្បាប់ចម្លងក្នុងសតិ) ខណៈ transaction សរសេរទិន្នន័យខូចចូល Firebase។ អ្នកប្រើនឹងមិនឃើញអ្វីខុសទេ
+រហូតដល់លុយបាត់។
+
+**កែ**៖ `normalizeBarcodesOf(item)` ថ្មី ក្បែរ `barcodeEntriesOf` (byte-identical ZoeAdmin/ZoeW)
+ត្រូវបានហៅនៅគ្រប់ផ្លូវអានឆៅទាំង ៦។ **Zoescan រក្សា index ជាលេខដើម** ព្រោះ mirror write ចង្អុលទៅ
+`barcodes/{idx}` ដោយផ្ទាល់ — ការបង្រួម index នឹងចុះខុសកន្លែង។ Rules អនុញ្ញាតការសរសេរដែលបានរៀបចំ
+ឡើងវិញរួចហើយ (ការបន្ធូរ `!== 'scanner'` ជុំ ៦ ដែលបានផ្ទៀងផ្ទាត់លើ emulator) ➜ គ្មាន rules ថ្មី។
+
+### កំហុសទី ២ — Setup Link របស់ ZoeAdmin **មិនដែលដំណើរការសោះ**
+មុខងារដែលសាងឡើងសម្រាប់អតិថិជន ២០០-៣០០ ត្រូវបានបំបែកដោយការកែជុំ ៦។ លំដាប់ boot៖
+`applySetupLinkFromUrl()` ➜ `requestPinBeforeConfig(callback)` កំណត់ `pinTargetAction` ➜ រួច
+`initFirebase()` ហៅ `checkPinAndOpenConfig(true)` ដែលជុំ ៦ បានបន្ថែម `pinTargetAction = null`
+នៅបន្ទាត់ដំបូង ➜ **callback ត្រូវបានលុបមួយបន្ទាត់ក្រោយមក**។ អ្នកលក់ផ្ញើ link ➜ ហាងកំណត់ PIN ➜
+**ប្រអប់ Config បើកទទេ** ➜ ត្រូវ paste ដោយដៃ ដែលជាបញ្ហាដែល Setup Link កើតឡើងដើម្បីដោះស្រាយ។
+ZoeW/Zoescan មិនរងផលទេ (ពួកវាប្រើ `pendingSetupLinkConfig` ដែល `checkPinAndOpenConfig` មិនប៉ះ)។
+**កែ**៖ `checkPinAndOpenConfig()` return មុន ពេល `isPinFlowPending()` — guard ដដែលដែលជុំ ១១
+បន្ថែមទៅ ZoeKeyGen សម្រាប់កំហុសដូចគ្នាបញ្ច្រាស។
+
+### កំហុសទី ៣ — ZoeKeyGen បណ្តេញអ្នកគ្រប់គ្រងខ្លួនឯងចេញ
+`checkDevTools()` បាញ់ពេល `outerWidth - innerWidth > 160`។ នោះមិនមែនសញ្ញាណរបស់ devtools ទេ —
+**zoom ចូល** បង្រួម `innerWidth` ខណៈ `outerWidth` នៅដដែល, ហើយ window តូច ឬ side panel ក៏ដូចគ្នា។
+ពីរ tick ក្រោយ (~២ វិនាទី) ទំព័រក្លាយជា `about:blank` **គ្មានសារសោះ** ➜ អ្នកប្រើគិតថា App ខូច។
+**វាស់ពិត មិនមែនវែកញែក**៖ បើក ZoeKeyGen ក្នុង Chromium នៅ viewport 320px ➜
+`outerWidth=500 innerWidth=320` គម្លាត 180 ➜ navigate ទៅ `about:blank` ដោយគ្មាន devtools។
+**កែ**៖ វាស់គម្លាតទល់នឹង baseline ដែលចាប់ពេល load ហើយបាញ់តែពេល **អក្ស័យតែមួយ** កើន —
+devtools ចត​នឹងគែមតែមួយ ចំណែក zoom និងការប្តូរទំហំ window ផ្លាស់ទាំងពីរ។ ការបណ្តេញ, ការរំលង
+ទូរស័ព្ទ, keyboard shortcut និង hit-count នៅដដែលទាំងអស់។
+
+### កំហុសទី ៤ — CDN យឺត ➜ ZoeAdmin ស្កេនមិនចូល ដោយគ្មានសញ្ញា
+App ទាំង ៣ ទាញ `@zxing/library` ពី unpkg តាម `<script defer>` **តែមានតែ Zoescan** ដែលដោះស្រាយ
+ការមិន load។ ZoeAdmin សាង `codeReader`/`liveScanCodeReader` តែម្តងក្នុង `DOMContentLoaded` ➜
+CDN យឺត/ត្រូវទប់ ➜ ទាំងពីរនៅ null **ជារៀងរហូត**។ រោគសញ្ញាអាក្រក់៖ **កាមេរ៉ាបើក វីដេអូដើរ តែ
+គ្មាន barcode ចូល** ព្រោះ `catch (e) {}` ទទេក្នុង decode loop លេប `ReferenceError` រាល់ frame។
+**កែ**៖ ចម្លង `waitForZXingThenInitScanEngine` របស់ Zoescan (poll 300ms, deadline ១៥ វិនាទី,
+រួច toast ប្រាប់ឲ្យ refresh ឬប្រើម៉ាស៊ីនស្កេនដៃ) ហើយ loop រំលងពេល reader ជា null។
+
+### វិធីសាស្ត្រថ្មី — **រត់ App ពិតក្នុង Chromium**
+កំហុសទី ២, ៣ និង ៤ **មិនអាចរកឃើញដោយឧបករណ៍ static ណាមួយទេ** — ទាំងបីត្រូវការការរត់ពិត។
+នេះជាឆាកដែលគ្មានជុំណាធ្លាប់ប៉ះ ហើយវាបានផលភ្លាមៗ។ ឧបករណ៍ថ្មី ២៖
+- **`boot-runtime.js`** — boot ទាំង ៤ App ក្នុង Chromium ដោយទប់សំណើក្រៅ រួចចាប់ `pageerror`
+  និង `console.error`។ វារកឃើញកំហុសទី ៤។
+- **`setup-link-browser-test.js`** — ដើរផ្លូវ provisioning ពិត៖ `?setup=` ➜ PIN gate ➜
+  ប្រអប់ Config ដែលបំពេញរួច ➜ ហើយ assert ថា **គ្មានអ្វីត្រូវរក្សាទុករហូតដល់មនុស្សចុច Save**។
+  វារកឃើញកំហុសទី ២។ 18/18 ទីនេះ, ZoeAdmin ធ្លាក់លើ `main`។
+ទាំងពីរ **SKIP ដោយស្អាត** ពេលគ្មាន playwright-core ឬ Chromium ➜ `run-all.sh` នៅតែរត់បាន។
+
+### ឧបករណ៍ថ្មីទី ៣ — `payload-schema.js` (ប្តូរការផ្ទៀងផ្ទាត់ដោយដៃ ➜ ស្វ័យប្រវត្តិ)
+Runbook រាយ "payload ↔ schema ក្នុង rules" ជាថ្នាក់ដែលផ្ទៀងផ្ទាត់ដោយដៃ ហើយវាធ្លាប់បង្ក
+production outage (`zoew_daily_pickup_cod_dod` ➜ `permission_denied`)។ ឥឡូវ acorn ប្រមូល
+គ្រប់ property ដែលកូដកំណត់លើអថេររាងជា item/trash/barcode រួចប្រៀបនឹង rules — រាយការណ៍តែកន្លែង
+ដែល `$other: false` (ជាកន្លែងតែមួយដែល field ចម្លែកត្រូវបានបដិសេធពិត)។ អថេររាងជា item ធ្វើដំណើរ
+**ទាំងពីរទិស** ដូច្នេះវាត្រូវបានពិនិត្យទល់នឹងសហភាព; ហានិភ័យតាមទិសត្រូវបានគ្របដាច់ដោយឡែក —
+`scan_history` គ្មាន `deletedAt`/`isFromDeletion` ដូច្នេះផ្លូវស្តារទាំង ២ ត្រូវលុបវាមុនសរសេរត្រឡប់។
+**Mutation-tested មិនមែនសន្មតថាបៃតង**៖ បន្ថែម barcode field ក្រៅ schema, និងលុប
+`delete itemToRestore.isFromDeletion` — ចាប់បានទាំងពីរ។
+
+### ភស្តុតាងថាតេស្តមិនទទេ
+| តេស្ត | ទីនេះ | លើ `origin/main` |
+|---|---|---|
+| `raw-read-shape-test` | 38/38 | **ធ្លាក់ ២២** (រួម `["AAA"]` — barcode ត្រូវលុបចោលពិត) |
+| `devtools-guard-test` | 8/8 | **ធ្លាក់ ៣** (ការការពារពិតទាំង ២ ជោគជ័យទាំងមុន និងក្រោយ) |
+| `setup-link-browser-test` | 18/18 | **ធ្លាក់ ១** (ZoeAdmin មិនបំពេញ Config) |
+| `boot-runtime` | PASS | **FAIL** (`ZXing is not defined`) |
+
+### ពិនិត្យហើយស្អាត — កុំ audit ឡើងវិញដោយងងឹតងងុល
+- **CSS `env()` ទាំង ១៧ ស្អាត** — line 54-55 ផ្តល់ `min-height: 100vh/100dvh` មូលដ្ឋានដល់ media
+  query នៅ 69-70, ហើយ `padding: 8px` នាំមុខ `padding-bottom: calc(...)`។ ជុំ ១១ ត្រូវ។
+- **Layout @320px ស្អាតទាំង ៤ App** — គ្មានការលើសទទឹង គ្មាន scroll ផ្តេក (វាស់ក្នុង Chromium
+  ដោយបើក modal ម្តងមួយៗ)។
+- **Zoescan `openModal` កំណត់ទាំង `.open` និង `style.display`** ➜ `isPinFlowPending()` (ដែល
+  ពិនិត្យ `display`) ដំណើរការត្រឹមត្រូវ។ តេស្តដំបូងរបស់ខ្ញុំរាយការណ៍ថាខុស — **តេស្តខុស មិនមែនកូដ**;
+  ផ្ទៀងផ្ទាត់មុនកែ។
+- ការការពារ barcode ស្ទួនប្រើ `runTransaction` ➜ សុវត្ថិភាពឆ្លងឧបករណ៍។
+- Export ទាំង ៤ App៖ `firebase-loader`/`firebase-init` export គ្រប់អ្វីដែល `app.js` ប្រើ។
+- ផ្លូវ PIN ➜ Config លើឧបករណ៍ថ្មី ដំណើរការទាំង ៣ App (វាស់ក្នុង browser ពិត)។
+- `data-nodismiss` លើ `loginModal`/`activationModal` (និង `phoneModal` ក្នុង ZoeAdmin) ទប់ Escape ពិត។
+
+### កំហុសទី ៥ — ការស្កេនកញ្ចប់ថ្មីជា read-modify-write មិនមែន transaction
+ដំបូងត្រូវបានរាយការណ៍ជាចំណុចដែលមិនបានកែ (ព្រោះវាប៉ះផ្លូវក្តៅបំផុត) រួចអ្នកប្រើឆ្លើយថា
+*"កែបង្ហើយទៅ"* ➜ បានកែ។ `addOrUpdateEntry` merge branch អាន `item.barcodes` ក្នុងសតិ push
+barcode ថ្មី រួចសរសេរ item **ទាំងមូល** តាម `update()`។ ZoeAdmin ២ ឧបករណ៍ស្កេនចូលលេខទូរស័ព្ទ
+ដដែលក្នុងវិនាទីដដែល ➜ ទាំងពីរសាង item ចេញពីការអានចាស់ ➜ **ការសរសេរចុងក្រោយឈ្នះ ➜ barcode
+មួយបាត់**។ ខណៈនោះ revenue ប្រើ transaction ដាច់ដោយឡែក ➜ **ស្កេនទាំងពីរត្រូវបានរាប់** ➜
+តួលេខប្រចាំថ្ងៃលើសពី barcode ដែលវាគួរបូក។
+
+**កែ**៖ merge រត់ក្នុង `runTransaction` ➜ ការសរសេរប្រណាំងបណ្តាលឲ្យ re-run មិនមែនការសរសេរជាន់។
+**closure `mergeScannedBarcodeInto()` តែមួយ ត្រូវបានអនុវត្តទាំងលើ item ក្នុងសតិ (UI optimistic)
+និងខាងក្នុង transaction** ➜ តក្កវិជ្ជា merge មានតែមួយ មិនមែនពីរដែលអាចបែកគ្នា (ជាកំហុសដែល
+គម្រោងនេះជួបម្តងហើយម្តងទៀត)។ បន្ថែម៖ merge ជា idempotent (រំលង barcode ដែលមានស្រាប់ —
+សំខាន់ព្រោះ RTDB អាចរត់ update function ច្រើនដង) · `normalizeBarcodesOf()` រត់លើតម្លៃ server
+ជាមុន · `syncScannerLookupEntry` ទទួល committed snapshot ជំនួស item ក្នុងសតិ ·
+ពេលបរាជ័យ ការកែក្នុងសតិត្រូវបានស្តារ ជាមួយ revenue delta (មុននេះ item រក្សា barcode លើស
+ក្នុងសតិរហូតដល់ listener បាញ់)។
+**ZoeAdmin តែប៉ុណ្ណោះ** — ZoeW មិនអាចបង្កើតកញ្ចប់ ហើយគ្មានច្បាប់ចម្លងនៃ function នេះទេ។
+គ្មានការប្តូរ rules (admin អាចសរសេរ field ទាំងនេះរួចហើយ)។
+
+**`concurrent-scan-test.js` ថ្មី** ដក `addOrUpdateEntry` ពិតមករត់ជាមួយ Firebase ក្លែងក្លាយ ដែល
+`runTransaction` មាន **retry-on-conflict ពិត** និង `update()` **អសមកាល** (ជា network round trip)។
+15/15 ទីនេះ · **ធ្លាក់ ៣ លើ `origin/main`** ដោយបង្ហាញ `["AAA","BBB"]` — barcode របស់ឧបករណ៍
+ផ្សេងបាត់ពិត។ *អន្ទាក់ដែលជួប៖ ការក្លែងធ្វើដំបូងធ្វើឲ្យ `update()` **សមកាល** ➜ ការសរសេររបស់
+ឧបករណ៍ផ្សេងចុះ **ក្រោយ** ➜ តេស្តជោគជ័យលើ baseline ក្លែងក្លាយ។ ការធ្វើតេស្តការប្រណាំងត្រូវតែ
+ដាក់ការសរសេររបស់ឧបករណ៍ផ្សេង **ក្នុងចន្លោះ** នៃការអាន និងការសរសេរ។*
+
+### ចម្លើយចំពោះសំណួររបស់អ្នកប្រើ (ដដែលនឹងជុំ ១១ តែឥឡូវមានទិន្នន័យបន្ថែម)
+កំហុសទាំង ៥ ជុំនេះ **គ្មានមួយណាស្ថិតក្នុងកូដដែលជុំមុនអានហើយវិនិច្ឆ័យខុសទេ**៖
+- ទី ១ ជាការ **កែមិនពេញលេញ** របស់ជុំ ១១ — ជុំនោះកែផ្លូវអាន ១ ក្នុងចំណោម ៦
+- ទី ២ ជា **ការតំរែតំរង់ដែលជុំ ៦ បង្កើត** ដោយការកែមួយផ្សេង ហើយគ្មានតេស្តណាគ្របផ្លូវពេញលេញ
+- ទី ៣ និង ៤ ស្ថិតក្នុង **ឆាកដែលគ្មានឧបករណ៍ណាធ្លាប់ប៉ះ** — ការរត់ App ពិត
+- ទី ៥ ស្ថិតក្នុងថ្នាក់ដែល runbook ចាត់ទុកថា **មិនអាចធ្វើតេស្តបាន** — ការក្លែងធ្វើ Firebase
+  ជាមួយ retry-on-conflict បង្ហាញថាវាធ្វើតេស្តបាន ដោយគ្មាន emulator
+លំនាំច្បាស់៖ **ជុំនីមួយៗរកឃើញអ្វីដែលឧបករណ៍ថ្មីរបស់ជុំនោះមើលឃើញ។** ការអានកូដឡើងវិញឲ្យខ្លាំងជាងមុន
+មិនបានផលទេ។ ឧបករណ៍ចាស់ទាំង ២៣ បៃតងតាំងពីដើមជុំនេះ — នោះជាភស្តុតាងថាកំហុសចាស់មិនត្រឡប់មកវិញ។
+មេរៀនបន្ថែមជុំនេះ៖ **ការកែមួយអាចមិនពេញលេញ ទោះវាត្រឹមត្រូវ** (ទី ១) ហើយ **ការកែមួយអាចបំបែក
+មុខងារផ្សេង** (ទី ២) — ដូច្នេះតេស្តត្រូវគ្របផ្លូវ *ពេញលេញ* មិនមែនត្រឹមមុខងារដែលទើបកែទេ។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v52, zoew-v43, zoescan-v34, zoekeygen-v27)។
+**គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+Suite សរុប៖ **547 assertion** — បៃតងទាំងអស់ (**29 ការត្រួតពិនិត្យ**)។

@@ -1407,13 +1407,14 @@ async function assignLockerToEntry(code) {
             matchedBarcodeIdx = null;
             singleBarcodeItem = false;
             if (!currentItem) return currentItem;
-            if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                const idx = currentItem.barcodes.findIndex(bc => bc && bc.code === code);
-                if (idx === -1) return currentItem;
-                currentItem.barcodes[idx].locker = targetLocker;
-                currentItem.barcodes[idx].lockerUpdatedAt = ts;
-                matchedBarcodeIdx = idx;
-                if (currentItem.barcodes.length === 1) {
+            const lookupEntries = barcodeEntriesOf(currentItem.barcodes);
+            if (lookupEntries.length) {
+                const found = lookupEntries.find(e => e.barcode && e.barcode.code === code);
+                if (!found) return currentItem;
+                found.barcode.locker = targetLocker;
+                found.barcode.lockerUpdatedAt = ts;
+                matchedBarcodeIdx = found.index;
+                if (lookupEntries.length === 1) {
                     currentItem.locker = targetLocker;
                     currentItem.lockerUpdatedAt = ts;
                     singleBarcodeItem = true;

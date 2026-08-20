@@ -20,3 +20,9 @@ firebase-backup/secrets/
 firebase-backup/backups/
 firebase-backup/backup.log
 audit-tools/emu/real.rules.json
+
+# Audit-tool dependencies (acorn, playwright-core) are installed on demand per
+# the runbook. Never commit them: Netlify publishes the repo root as static
+# files and would try to npm install a package.json it finds there.
+/package.json
+/package-lock.json

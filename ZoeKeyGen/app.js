@@ -29,11 +29,14 @@
         return false;
     }, true);
 
+    const baseWidthGap = window.outerWidth - window.innerWidth;
+    const baseHeightGap = window.outerHeight - window.innerHeight;
+
     function checkDevTools() {
         if (isMobile) return;
-        const widthThreshold = window.outerWidth - window.innerWidth > 160;
-        const heightThreshold = window.outerHeight - window.innerHeight > 160;
-        if (widthThreshold || heightThreshold) {
+        const widthGrew = (window.outerWidth - window.innerWidth) - baseWidthGap > 160;
+        const heightGrew = (window.outerHeight - window.innerHeight) - baseHeightGap > 160;
+        if (widthGrew !== heightGrew) {
             devToolsHitCount++;
             if (devToolsHitCount >= 2) kickUserOut();
         } else {

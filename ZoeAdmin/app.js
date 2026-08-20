@@ -3865,8 +3865,14 @@
         if (existingIndex !== -1) {
             let item = scanHistory[existingIndex];
             const itemSnapshot = { ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes };
+            let reopenedFromClosed = false;
+            let reopenedScanDate = dateString;
+            let reopenedPhoneKey = null;
 
             const mergeScannedBarcodeInto = (target) => {
+                reopenedFromClosed = target.isClosed === true;
+                reopenedScanDate = target.scanDate || dateString;
+                reopenedPhoneKey = getPickupPhoneKey(target);
                 normalizeBarcodesOf(target);
                 if (!target.barcodes || !Array.isArray(target.barcodes)) {
                     let oldCod = parseFloat(target.cod !== undefined ? target.cod : target.price) || 0;
@@ -3910,7 +3916,12 @@
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
             savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
-                .then((committedItem) => { syncScannerLookupEntry(item.id, committedItem || item); })
+                .then((committedItem) => {
+                    if (reopenedFromClosed && reopenedPhoneKey) {
+                        addPickupToDailyRecord(reopenedScanDate, reopenedPhoneKey, -1, 0);
+                    }
+                    syncScannerLookupEntry(item.id, committedItem || item);
+                })
                 .catch((err) => {
                     const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
                     if (revertIndex !== -1) scanHistory[revertIndex] = itemSnapshot;

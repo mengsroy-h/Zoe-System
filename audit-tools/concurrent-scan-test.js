@@ -72,6 +72,7 @@ function makeFirebase(server) {
 
 function makeCtx(server, fbSet) {
     const revenue = { cod: 0, dod: 0, count: 0 };
+    const pickup = [];
     const scanHistory = [];
     const ctx = {
         console, Math, JSON, Promise, setTimeout, Date, parseFloat, parseInt, isNaN, Error, Object, Array, String, RegExp,
@@ -81,15 +82,18 @@ function makeCtx(server, fbSet) {
         getFormattedDate: () => '2026-08-20',
         generateUniqueId: () => 'id_new_' + Math.random().toString(36).slice(2, 8),
         addRevenueToDailyAndMonthlyRecord: (d, c, dd, n) => { revenue.cod += c; revenue.dod += dd; revenue.count += n; },
+        addPickupToDailyRecord: (d, key, cust, pkg) => { pickup.push({ d, key, cust, pkg }); },
         syncScannerLookupEntry: () => {},
         updateRecentPhonesList: () => {},
         refreshCurrentHistoryView: () => {},
         showToast: () => {},
         window: {},
-        revenue
+        revenue,
+        pickup
     };
     vm.createContext(ctx);
-    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'saveSingleHistoryItemToFirebase',
+    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
+                      'saveSingleHistoryItemToFirebase',
                       'mergeBarcodeIntoHistoryItem', 'addOrUpdateEntry']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
@@ -159,6 +163,37 @@ function runScenario2() {
         ok(ctx.revenue.count === 1 && ctx.revenue.cod === 7, 'លុយបូកតែ barcode ថ្មី', ctx.revenue);
         const local = ctx.scanHistory.find((i) => i.id === 'ord1');
         ok(local && local.barcodes.length === 2, 'ស្ថានភាពក្នុងសតិត្រូវបានធ្វើបច្ចុប្បន្នភាពភ្លាម', local && local.barcodes.length);
+        ok(ctx.pickup.length === 0, 'order ដែលបើកស្រាប់ ➜ មិនប៉ះស្ថិតិយកកញ្ចប់', JSON.stringify(ctx.pickup));
+        runScenario2b();
+    });
+}
+
+// ===== scenario 2b: server copy already closed (another device) ➜ customer must uncount =====
+function runScenario2b() {
+    console.log('\n=== ឧបករណ៍ផ្សេងបិទ order រួច ខណៈយើងស្កេនកញ្ចប់ថ្មីចូល ===');
+    const server = {};
+    seedOrder(server, ['AAA']);
+    server['ord1'].isClosed = true;
+    server['ord1'].closedAt = 1755000000000;
+    server['ord1'].barcodes[0].isClosed = true;
+    const fbSet = makeFirebase(server);
+    const ctx = makeCtx(server, fbSet);
+    // ច្បាប់ចម្លងក្នុងសតិនៅយឺត — នៅបើកដដែល (នេះជាមូលហេតុដែល addOrUpdateEntry ជ្រើសវា)
+    const stale = JSON.parse(JSON.stringify(server['ord1']));
+    stale.isClosed = false;
+    delete stale.closedAt;
+    stale.barcodes[0].isClosed = false;
+    ctx.scanHistory.push(stale);
+
+    ctx.addOrUpdateEntry('BBB', '0977173546', 7, 0, 'L1').then(() => {
+        const it = server['ord1'];
+        ok(it.isClosed === false && it.closedAt === undefined, 'order ត្រូវបានបើកវិញលើ server');
+        ok(it.barcodes.length === 2, 'barcode ថ្មីត្រូវបានបន្ថែម', it.barcodes.map((b) => b.code));
+        ok(ctx.pickup.length === 1, 'មានការកែស្ថិតិយកកញ្ចប់តែមួយ', JSON.stringify(ctx.pickup));
+        const p = ctx.pickup[0] || {};
+        ok(p.cust === -1 && p.pkg === 0, 'ដកអតិថិជន ១ ចេញ តែមិនប៉ះចំនួនកញ្ចប់', JSON.stringify(p));
+        ok(p.key === '0977173546', 'ដកចេញពី bucket លេខទូរស័ព្ទត្រឹមត្រូវ', p.key);
+        ok(it.barcodes[0].isClosed === true, 'barcode ដែលយកហើយ នៅតែបិទដដែល');
         runScenario3();
     });
 }

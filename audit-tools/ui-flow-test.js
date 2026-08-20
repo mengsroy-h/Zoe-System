@@ -373,6 +373,41 @@ function seedData() {
                 JSON.stringify(revBeforeGhostEdit) + ' ➜ ' + JSON.stringify(ghostEdit.rev));
         }
 
+        // ឧបករណ៍ផ្សេងបិទបញ្ជី ខណៈយើងស្កេនកញ្ចប់ថ្មីចូលបញ្ជីដដែល
+        if (app === 'ZoeAdmin') {
+            await page.evaluate((dk) => {
+                window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff = {
+                    id: 'id_5000_fff', phone: '0655444333', scanDate: dk, createdAt: Date.now() - 150,
+                    cod: 8, dod: 0, price: 8, count: 1, barcode: 'GG1', time: '15:00', isClosed: false,
+                    barcodes: [{ code: 'GG1', time: '15:00', cod: 8, dod: 0, locker: 'F1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() - 150 }]
+                };
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+            // បិទវាតាមផ្លូវធម្មតា ➜ ស្ថិតិកើន
+            await page.evaluate(() => window.toggleCloseStatus('id_5000_fff'));
+            await page.waitForTimeout(500);
+            const pickClosed = await page.evaluate((dk) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk])), seed._dateKey);
+            // ធ្វើឲ្យច្បាប់ចម្លងក្នុងសតិយឺត (ដូចជា listener មិនទាន់មកដល់) រួចស្កេនកញ្ចប់ថ្មី
+            await page.evaluate(() => {
+                const local = scanHistory.find((i) => i.id === 'id_5000_fff');
+                if (local) { local.isClosed = false; local.barcodes.forEach((b) => { b.isClosed = false; }); }
+            });
+            await page.evaluate(() => window.addOrUpdateEntry('GG2', '0655444333', 'F2', 4, 0));
+            await page.waitForTimeout(700);
+            const after = await page.evaluate((dk) => ({
+                serverClosed: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.isClosed,
+                n: window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff.barcodes.length,
+                pick: JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_pickup_cod_dod[dk]))
+            }), seed._dateKey);
+            const phoneKey = '0655444333';
+            const stillCounted = after.pick.pickedUpPhones && after.pick.pickedUpPhones[phoneKey];
+            check(after.serverClosed === false && after.n === 2, 'ZoeAdmin: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
+            check(!stillCounted,
+                'ZoeAdmin: បញ្ជីបើកវិញដោយការស្កេន ➜ លែងរាប់ជាអតិថិជនយកហើយ',
+                'pickedUpPhones=' + JSON.stringify(after.pick.pickedUpPhones) + ' (មុនស្កេន ' + JSON.stringify(pickClosed.pickedUpPhones) + ')');
+        }
+
         // ផ្លូវបរាជ័យ៖ Firebase បដិសេធការសរសេរ ➜ ស្ថានភាព និងលុយត្រូវត្រឡប់មកដើមវិញ
         {
             await page.evaluate((dk) => {

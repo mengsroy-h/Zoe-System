@@ -48,6 +48,7 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
             document: fakeDom(pinOpen),
             localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
             hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {},
+            setPhoneSearchPulledUp() {},
             closeModal() {}, openModalHelper() {}, openConfigModal() {}
         };
         ctx[stateVar] = { projectId: 'business-B' };

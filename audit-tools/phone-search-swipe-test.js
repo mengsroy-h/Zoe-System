@@ -54,6 +54,7 @@ function buildEnv(src, { searchActive, suggestOpen }) {
         console,
         window: { innerWidth: 400 },
         hidePhoneSuggestions() { els.phoneSuggestBox.classList.remove('show'); },
+        setPhoneSearchPulledUp(on) { els.sidebarSection.classList.toggle('search-focus', !!on); },
         document: {
             getElementById: (id) => els[id] || null,
             activeElement: searchActive ? els.searchPhoneInput : null
@@ -116,6 +117,63 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
             'tapping the drag handle still collapses, even mid-search (explicit user intent)');
         ok(!els.phoneSuggestBox.classList.contains('show'),
             'and it closes the suggestion list first, so nothing is left floating');
+    }
+
+    console.log(`\n=== ${app} — tapping the search box pulls the history table up ===`);
+    {
+        const mkSidebar = () => ({ classList: makeClassList() });
+        const build = (innerWidth) => {
+            const sidebar = mkSidebar();
+            const ctx = {
+                console, window: { innerWidth },
+                setTimeout: () => {}, positionPhoneSuggestBox() {},
+                document: { getElementById: (id) => (id === 'sidebarSection' ? sidebar : null) }
+            };
+            vm.createContext(ctx);
+            vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
+            return { ctx, sidebar };
+        };
+
+        if (!sliceFn(src, 'setPhoneSearchPulledUp')) {
+            ok(false, 'setPhoneSearchPulledUp is defined (tapping the search box pulls the table up)');
+        } else {
+        const a = build(400);
+        a.ctx.setPhoneSearchPulledUp(true);
+        ok(a.sidebar.classList.contains('search-focus'),
+            'focusing the search box hides everything above it, so the history table gets the screen');
+
+        a.ctx.setPhoneSearchPulledUp(false);
+        ok(!a.sidebar.classList.contains('search-focus'),
+            'leaving an empty search box puts the cards back');
+
+        const b = build(400);
+        b.sidebar.classList.add('collapsed');
+        b.ctx.setPhoneSearchPulledUp(true);
+        ok(!b.sidebar.classList.contains('collapsed'),
+            'pulling up clears a prior full collapse, so the search box can never end up hidden');
+
+        const d = build(1200);
+        d.ctx.setPhoneSearchPulledUp(true);
+        ok(!d.sidebar.classList.contains('search-focus'),
+            'on desktop the sidebar is a real column, so nothing is hidden');
+        }
+    }
+
+    console.log(`\n=== ${app} — getting back out of search mode ===`);
+    {
+        const { els, handlers } = buildEnv(src, { searchActive: true, suggestOpen: true });
+        els.sidebarSection.classList.add('search-focus');
+        els.tableResponsive.scrollTop = 0;
+        swipe(handlers, 'mainSection', 200, 300);
+        ok(!els.sidebarSection.classList.contains('search-focus'),
+            'swiping DOWN brings the cards back even while searching');
+    }
+    {
+        const { els, handlers } = buildEnv(src, { searchActive: true, suggestOpen: true });
+        els.sidebarSection.classList.add('search-focus');
+        handlers.dragHandle.click();
+        ok(!els.sidebarSection.classList.contains('search-focus'),
+            'the drag handle also exits search mode');
     }
 
     console.log(`\n=== ${app} — positionPhoneSuggestBox hides on a zero-size (collapsed) input ===`);

@@ -46,6 +46,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema; do
     run "$t" node "audit-tools/$t.js"
 done
 run "css-classes" node audit-tools/css-classes.js
+run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="

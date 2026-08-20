@@ -1991,20 +1991,15 @@
             retryPendingRoleCheck();
         });
 
-        try {
-            const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
-            const possibleFormats = oneDFormatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
-            const hints = new Map();
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
-            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-            codeReader = new ZXing.BrowserBarcodeReader(500, hints);
-            const liveHints = new Map();
-            liveHints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
-            liveScanCodeReader = new ZXing.BrowserBarcodeReader(500, liveHints);
-        } catch (e) {
-            console.error("ZXing Initialization error: ", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "ZXing Initialization error: " });
-        }
+        (function waitForZXingThenInitScanEngine(deadline) {
+            deadline = deadline || (Date.now() + 15000);
+            if (typeof ZXing !== 'undefined') { initScanEngine(); return; }
+            if (Date.now() >= deadline) {
+                showToast('⚠️ មិនអាចផ្ទុកម៉ាស៊ីនស្កេន Barcode បានទេ! កាមេរ៉ាអាចនឹងប្រើការមិនកើត សូម Refresh ទំព័រ ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូលដោយដៃ');
+                return;
+            }
+            setTimeout(() => waitForZXingThenInitScanEngine(deadline), 300);
+        })();
 
         if ('BarcodeDetector' in window) {
             try {
@@ -3240,6 +3235,23 @@
 
     let ownCaptureCanvas = null;
     let ownCaptureCtx = null;
+    function initScanEngine() {
+        try {
+            const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
+            const possibleFormats = oneDFormatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
+            const hints = new Map();
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
+            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+            codeReader = new ZXing.BrowserBarcodeReader(500, hints);
+            const liveHints = new Map();
+            liveHints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
+            liveScanCodeReader = new ZXing.BrowserBarcodeReader(500, liveHints);
+        } catch (e) {
+            console.error("ZXing Initialization error: ", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "ZXing Initialization error: " });
+        }
+    }
+
     function decodeBarcodeFromCanvasManual(reader, canvas) {
         const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
         const binarizer = new ZXing.HybridBinarizer(luminanceSource);
@@ -3274,7 +3286,7 @@
                         ownCaptureCanvas.height = Math.round(crop.sHeight * scale);
                         ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, ownCaptureCanvas.width, ownCaptureCanvas.height);
 
-                        const text = decodeBarcodeFromCanvasManual(liveScanCodeReader, ownCaptureCanvas);
+                        const text = liveScanCodeReader ? decodeBarcodeFromCanvasManual(liveScanCodeReader, ownCaptureCanvas) : '';
                         if (text && !isModalOpen) processScannedCode(text);
                     } catch (e) {
                     } finally {

@@ -76,6 +76,7 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--border-color);
+            padding: 8px 12px;
             padding: calc(8px + env(safe-area-inset-top)) 12px 8px 12px;
             display: flex;
             justify-content: space-between;
@@ -196,6 +197,7 @@
 
         .ptr-indicator {
             position: fixed;
+            top: 10px;
             top: calc(env(safe-area-inset-top) + 10px);
             left: 50%;
             width: 28px;

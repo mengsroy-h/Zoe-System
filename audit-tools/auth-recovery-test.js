@@ -190,6 +190,7 @@ function buildContext(app) {
         var listenersAttached = false;
         var loginGeneration = 0;
         function safeFocusScanner() {}
+        function prefetchCustomerDataTableRowsIfConfigured() {}
         function clearCustomerDataTableCache() {}
         function applyCurrentFilter() {}
         function renderRecentlyDeleted() {}

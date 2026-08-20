@@ -21,7 +21,7 @@ function slice(file, names) {
 const ctx = vm.createContext({ console });
 vm.runInContext('var historyData = {}; var barcodeIndex = {};', ctx);
 vm.runInContext(slice('ZoeAdmin/app.js', ['buildScannerLookupPayload']), ctx);
-vm.runInContext(slice('Zoescan/app.js', ['buildBarcodeIndex', 'getEntryCurrentLocker', 'isEntryBarcodeClosed', 'findLockerOccupant']), ctx);
+vm.runInContext(slice('Zoescan/app.js', ['barcodeEntriesOf', 'buildBarcodeIndex', 'getEntryCurrentLocker', 'isEntryBarcodeClosed', 'findLockerOccupant']), ctx);
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {

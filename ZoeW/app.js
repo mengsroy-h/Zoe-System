@@ -604,6 +604,7 @@
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
         closeConfigQrScanner();
+        pendingSetupLinkConfig = null;
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1014,7 +1015,7 @@
                 const val = snapshot.val();
                 if (val && !isNaN(val)) {
                     exchangeRateRiel = parseFloat(val);
-                    localStorage.setItem('zoew_exchange_rate', exchangeRateRiel);
+                    try { localStorage.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
                     debouncedRenderAfterHistorySync();
                 }
             }, handleDbListenerError);
@@ -1067,8 +1068,13 @@
 
                 item.price = Math.round((item.cod + item.dod) * 100) / 100;
 
+                if (Array.isArray(item.barcodes) || (item.barcodes && typeof item.barcodes === 'object')) {
+                    item.barcodes = barcodeEntriesOf(item.barcodes).map(e => e.barcode);
+                }
+
                 if (item.barcodes && Array.isArray(item.barcodes)) {
                     item.barcodes.forEach(b => {
+                        if (!b || typeof b !== 'object') return;
                         b.cod = parseFloat(b.cod) || 0;
                         b.dod = parseFloat(b.dod) || 0;
                         if (b.isDeducted === undefined) b.isDeducted = false;
@@ -1390,6 +1396,22 @@
 
     function generateUniqueId() {
         return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function barcodeEntriesOf(value) {
+        if (Array.isArray(value)) {
+            const out = [];
+            value.forEach((b, i) => { if (b !== null && b !== undefined) out.push({ barcode: b, index: i }); });
+            return out;
+        }
+        if (value && typeof value === 'object') {
+            return Object.keys(value)
+                .filter((k) => /^\d+$/.test(k))
+                .sort((a, b) => Number(a) - Number(b))
+                .map((k) => ({ barcode: value[k], index: Number(k) }))
+                .filter((e) => e.barcode !== null && e.barcode !== undefined);
+        }
+        return [];
     }
 
     function sanitizeInput(str) {

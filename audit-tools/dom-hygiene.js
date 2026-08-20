@@ -35,7 +35,10 @@ const ACCEPTED = {
     listLockerFilter: 'locker filter <option> list',
     count: 'row count',
     historyTableBody: 'renderHistory([]) replaces it with the empty-state row on logout',
-    listTableBody: 'detachDatabaseListeners() clears historyData, then renderList() repaints empty'
+    listTableBody: 'detachDatabaseListeners() clears historyData, then renderList() repaints empty',
+    activationSubmitBtn: 'button label only ("កំពុងពិនិត្យ...") — no customer data',
+    themeToggleBtn: 'ZoeAdminV2 theme button label (an emoji) — blanking it would erase the icon',
+    sortSelect: 'ZoeAdminV2 sort preference; a <select> whose value must survive, not customer data'
 };
 
 function walk(n, cb) {
@@ -49,38 +52,90 @@ function walk(n, cb) {
 }
 
 let totalGaps = 0;
-for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+for (const app of ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
     const src = fs.readFileSync(root + '/' + app + '/app.js', 'utf8');
     const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
 
     // ids that get written with data at runtime
     const written = new Map();
-    // map: variable name -> id, from `const x = document.getElementById('id')`
-    const varToId = new Map();
-    walk(ast, (n) => {
-        if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init &&
-            n.init.type === 'CallExpression' && n.init.callee.type === 'MemberExpression' &&
-            n.init.callee.property.name === 'getElementById' &&
-            n.init.arguments[0] && n.init.arguments[0].type === 'Literal') {
-            varToId.set(n.id.name, n.init.arguments[0].value);
-        }
-    });
-    walk(ast, (n) => {
-        if (n.type !== 'AssignmentExpression' || n.left.type !== 'MemberExpression') return;
-        const prop = n.left.property && n.left.property.name;
-        if (!['value', 'innerText', 'textContent', 'innerHTML'].includes(prop)) return;
-        // skip constant assignments (literals) — those aren't leaked data
-        if (n.right.type === 'Literal') return;
-        const obj = n.left.object;
-        let id = null;
-        if (obj.type === 'Identifier') id = varToId.get(obj.name) || null;
-        else if (obj.type === 'CallExpression' && obj.callee.type === 'MemberExpression' &&
-                 obj.callee.property.name === 'getElementById' && obj.arguments[0] &&
-                 obj.arguments[0].type === 'Literal') id = obj.arguments[0].value;
-        if (!id) return;
-        const line = src.slice(0, n.start).split('\n').length;
-        if (!written.has(id)) written.set(id, line);
-    });
+
+    // Resolve `const x = document.getElementById('id')` with real lexical scoping.
+    // A single global name->id map silently keeps only the LAST binding, and this codebase
+    // reuses generic names heavily (`tbody`, `container`, `el`, `btn`, `input`) — that blind
+    // spot hid a real leak (`deletedTableBody`) for twelve audit rounds. Keep the scoping.
+    const FN_TYPES = ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'];
+
+    // walk a subtree WITHOUT descending into nested functions
+    function walkOwn(root, cb) {
+        (function rec(n, isRoot) {
+            if (!n || typeof n.type !== 'string') return;
+            if (!isRoot && FN_TYPES.includes(n.type)) return;
+            cb(n);
+            for (const k of Object.keys(n)) {
+                const v = n[k];
+                if (Array.isArray(v)) v.forEach((c) => rec(c, false));
+                else if (v && typeof v.type === 'string') rec(v, false);
+            }
+        })(root, true);
+    }
+
+    function directChildFunctions(root) {
+        const out = [];
+        (function rec(n, isRoot) {
+            if (!n || typeof n.type !== 'string') return;
+            if (!isRoot && FN_TYPES.includes(n.type)) { out.push(n); return; }
+            for (const k of Object.keys(n)) {
+                const v = n[k];
+                if (Array.isArray(v)) v.forEach((c) => rec(c, false));
+                else if (v && typeof v.type === 'string') rec(v, false);
+            }
+        })(root, true);
+        return out;
+    }
+
+    const scopes = [];
+    (function build(node, parent) {
+        const scope = { node: node, parent: parent, bind: new Map() };
+        scopes.push(scope);
+        walkOwn(node, (n) => {
+            if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init &&
+                n.init.type === 'CallExpression' && n.init.callee.type === 'MemberExpression' &&
+                n.init.callee.property.name === 'getElementById' &&
+                n.init.arguments[0] && n.init.arguments[0].type === 'Literal') {
+                if (!scope.bind.has(n.id.name)) scope.bind.set(n.id.name, new Set());
+                scope.bind.get(n.id.name).add(n.init.arguments[0].value);
+            }
+        });
+        directChildFunctions(node).forEach((c) => build(c, scope));
+    })(ast, null);
+
+    for (const scope of scopes) {
+        walkOwn(scope.node, (n) => {
+            if (n.type !== 'AssignmentExpression' || n.left.type !== 'MemberExpression') return;
+            const prop = n.left.property && n.left.property.name;
+            if (!['value', 'innerText', 'textContent', 'innerHTML'].includes(prop)) return;
+            // skip constant assignments (literals) — those aren't leaked data
+            if (n.right.type === 'Literal') return;
+            const obj = n.left.object;
+            const ids = [];
+            if (obj.type === 'Identifier') {
+                let s = scope;
+                while (s) {
+                    if (s.bind.has(obj.name)) { ids.push(...s.bind.get(obj.name)); break; }
+                    s = s.parent;
+                }
+            } else if (obj.type === 'CallExpression' && obj.callee.type === 'MemberExpression' &&
+                     obj.callee.property.name === 'getElementById' && obj.arguments[0] &&
+                     obj.arguments[0].type === 'Literal') {
+                ids.push(obj.arguments[0].value);
+            }
+            if (!ids.length) return;
+            const line = src.slice(0, n.start).split('\n').length;
+            for (const id of ids) {
+                if (!written.has(id) || written.get(id) > line) written.set(id, line);
+            }
+        });
+    }
 
     // what clearSensitiveModalFields / showLoginModalWithPrefill actually blanks
     const cleared = new Set();

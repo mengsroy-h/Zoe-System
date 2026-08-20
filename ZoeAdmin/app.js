@@ -1593,6 +1593,7 @@
 
                 if (Array.isArray(item.barcodes) || (item.barcodes && typeof item.barcodes === 'object')) {
                     item.barcodes = barcodeEntriesOf(item.barcodes).map(e => e.barcode);
+                    if (item.barcodes.length) item.count = item.barcodes.length;
                 }
 
                 if (item.barcodes && Array.isArray(item.barcodes)) {
@@ -4875,9 +4876,10 @@
             let calledBadge = item.isCalled ? `<span class="called-badge">ខល</span>` : "";
             let scanTimeDisplay = item.time ? `<span class="scan-time-tag">🕒 ${sanitizeInput(item.time)}</span>` : "";
 
+            let totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
             let viewListBtn = '';
-            if (item.count > 1) {
-                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${item.count})</button>`;
+            if (totalPackageCount > 1) {
+                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${totalPackageCount})</button>`;
             } else {
                 viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')" style="background:#fef08a; color:#854d0e; border-color:#fde047;">💵 កែ/ដកកញ្ចប់</button>`;
             }

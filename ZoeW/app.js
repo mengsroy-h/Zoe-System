@@ -593,6 +593,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        if (!isPinFlowPending()) pendingSetupLinkConfig = null;
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         const fieldsToBlank = [
@@ -610,7 +611,6 @@
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
         closeConfigQrScanner();
-        if (!isPinFlowPending()) pendingSetupLinkConfig = null;
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
         });
@@ -1076,6 +1076,7 @@
 
                 if (Array.isArray(item.barcodes) || (item.barcodes && typeof item.barcodes === 'object')) {
                     item.barcodes = barcodeEntriesOf(item.barcodes).map(e => e.barcode);
+                    if (item.barcodes.length) item.count = item.barcodes.length;
                 }
 
                 if (item.barcodes && Array.isArray(item.barcodes)) {

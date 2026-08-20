@@ -2626,15 +2626,36 @@ return **មុន** បង្កើត auth listener ទាំង ៣ App ដ�
 - `license-verify.js` និង `error-reporting.js` នៅ byte-identical ទាំង ៤; comment = 0;
   trailing whitespace = 0; rules JSON ទាំងពីរ valid។
 
-### រកឃើញ តែ **មិនបានកែ** ដោយចេតនា (ត្រូវការការសម្រេចរបស់អ្នកប្រើ)
-- **`item.count` ទល់នឹង `barcodes.length`**៖ ZoeAdmin បង្ហាញ `item.count` លើប៊ូតុងបញ្ជីកញ្ចប់
-  ចំណែក ZoeW បង្ហាញ `barcodes.length`។ បើ ២ តម្លៃនេះខុសគ្នា ២ App បង្ហាញលេខខុសគ្នា។ **មិនកែទេ**
-  ព្រោះ `item.count` ត្រូវបានអានក្នុងគណនាស្ថិតិពិត (បន្ទាត់ 1755, 2836, 2853, 2883, 4345, 4535)
-  ដូច្នេះការធ្វើ normalize វាអាចផ្លាស់ប្តូរតួលេខស្ថិតិ — ជាការសម្រេចរបស់អ្នកប្រើ។
-- **`google-sheets-api/Code.gs` fail-open**៖ បើ ScriptProperty `API_KEY` មិនបានកំណត់ នោះ
-  `if (secret && key !== secret)` រំលងការត្រួតពិនិត្យទាំងស្រុង ➜ អ្នកណាដែលមាន URL អាចទាញ
-  **បញ្ជីអតិថិជនទាំងមូល** (`?list=1`)។ README ណែនាំឲ្យទុកវាទទេ ដូច្នេះនេះជាការសម្រេចផលិតផល
-  មិនមែនកំហុសកូដទេ — តែគួរដឹង។
+### កំហុសទី ៦ និង ៧ — កែក្រោយមក តាមការអនុញ្ញាតរបស់អ្នកប្រើ ("កែទាំងអស់ចុះ ... អោយសុីសង្វាក់គ្នា")
+ទាំងពីរនេះដំបូងត្រូវបានរាយការណ៍ជាការស្នើ (ព្រោះមួយប៉ះស្ថិតិ មួយទៀតប៉ះ deploy) រួចអ្នកប្រើអនុញ្ញាត។
+
+**ទី ៦ — `item.count` ទល់នឹង `barcodes.length`។** ZoeAdmin បង្ហាញ `item.count` ចំណែក ZoeW
+បង្ហាញ `barcodes.length` ➜ ២ App អាចបង្ហាញលេខកញ្ចប់ **ខុសគ្នាសម្រាប់ការបញ្ជាទិញតែមួយ**។
+កែ ២ កន្លែង៖ (១) normalizer កំណត់ `item.count = item.barcodes.length` **តែពេល `barcodes` ជា
+array ពិត និងមិនទទេ** — ដូច្នេះ item legacy (គ្មាន `barcodes[]`) និង array ទទេ **រក្សា `count`
+ដដែល ហើយគណនាស្ថិតិមិនប្រែ**; (២) ZoeAdmin ប្រើ expression `totalPackageCount` ដដែលនឹង ZoeW។
+ហេតុផលថាវាសុវត្ថិភាព៖ **គ្រប់ផ្លូវសរសេរទាំងអស់** (`addOrUpdateEntry`, `removeSingleBarcode`,
+`claimAndCleanupItem` ×2, `executeRestoreItem`) គណនា `count` ចេញពី `barcodes.length` រួចហើយ —
+ដូច្នេះ record ណាដែលខុសគ្នា គឺខូចរួចជាស្រេច ហើយការ normalize ធ្វើឲ្យស្ថិតិ **ត្រូវ** វិញ។
+ចំណាំ៖ ការកែ barcodes ខាងលើ (ទី ១) អាច**បង្កើត**ភាពខុសគ្នានេះ ព្រោះការច្រោះ `null` ចេញ
+ធ្វើឲ្យ `barcodes.length` តូចជាង `count` ចាស់ — ដូច្នេះ ២ ការកែនេះទៅជាមួយគ្នា។
+
+**ទី ៧ — `google-sheets-api/Code.gs` fail-open។** `if (secret && key !== secret)` មានន័យថា
+បើ ScriptProperty `API_KEY` **មិនបានកំណត់** នោះការត្រួតពិនិត្យត្រូវបាន **រំលងទាំងស្រុង** ➜
+អ្នកណាដែលដឹង URL អាចទាញ **បញ្ជីអតិថិជនទាំងមូល** តាម `?list=1` (Web App ជា "Anyone")។
+README តម្រូវឲ្យកំណត់ `API_KEY` នៅ step 2.3 រួចហើយ ដូច្នេះនេះជារន្ធសម្រាប់អ្នកដែលភ្លេចជំហាននោះ។
+ឥឡូវ **fail closed**៖ គ្មាន `API_KEY` ➜ ឆ្លើយ `API_KEY script property is not set`។
+**មិនប៉ះការដំឡើងដែលមានស្រាប់ទេ** ព្រោះ `Code.gs` ជា *template* — អ្នកលក់ copy វាចូល Apps
+Script ខ្លួនឯង ដូច្នេះការកែ repo មិនប្តូរ script ដែល deploy រួច។ README ព្រមានឲ្យ copy ជំនាន់
+ថ្មីទៅជំនួស ហើយ deploy ម្តងទៀត។
+
+### ការបែកគ្នាដែលខ្ញុំបង្កើតឡើងខ្លួនឯង រួចកែវិញ
+`extract.js` ចាប់បាន `showLoginModalWithPrefill` ក្លាយជាបែកគ្នា (២៣ ➜ ២៤) ព្រោះខ្ញុំដាក់ការ
+reset ក្នុង **កន្លែងខុសគ្នា**៖ ZoeAdmin ក្នុង `clearSensitiveModalFields()` តែ ZoeW ក្នុង
+`showLoginModalWithPrefill()`។ ផ្លាស់ ZoeW ចូល `clearSensitiveModalFields()` ដែរ ➜ ត្រឡប់មក
+**២៣ divergent ដូចដើម** ហើយ identical ឡើងពី ១០១ ➜ **១០៣**។ **រត់ `extract.js` ក្រោយកែរាល់ដង។**
+
+### រកឃើញ តែ **មិនបានកែ** ដោយចេតនា
 - **ការ re-provision ឧបករណ៍ដែលមាន config រួច តែចាកចេញរួច តាម Setup Link មិនដើរទេ** (ឥរិយាបថចាស់
   មិនមែនការតំរែតំរង់ថ្មីទេ)៖ `applySetupLinkFromUrl()` បើក `pinModal` រួច auth listener បាញ់ `null`
   ហើយ `showLoginModalWithPrefill()` បិទវាជំនួសដោយ `loginModal`។ ការកែ guard ខាងលើរក្សា Setup Link
@@ -2652,7 +2673,8 @@ return **មុន** បង្កើត auth listener ទាំង ៣ App ដ�
 
 `CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v45, zoew-v39, zoescan-v33, zoekeygen-v26)។
 **គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
-Suite សរុប (រាប់ដោយ script មិនមែនដោយដៃ)៖ 191 + 55 + 52 + 28 + 21 + 19 + 18 + 13 + 13 + 10 + 7 = **427 assertion** បៃតងទាំងអស់។
+Suite សរុប (រាប់ដោយ script មិនមែនដោយដៃ)៖ **438 assertion** + ឧបករណ៍មេកានិក ៦ — បៃតងទាំងអស់។
+`CACHE_VERSION` ចុងក្រោយ៖ zoeadmin-v47, zoew-v41, zoescan-v33, zoekeygen-v26។
 
 ## ស្វែងរកលេខទូរស័ព្ទ៖ ការអូសឡើងលើបំបាត់ប្រអប់ស្វែងរក (fixed 2026-08-20, ជុំ ១១)
 

@@ -80,6 +80,32 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
     ok(Array.isArray(objGaps.barcodes) && objGaps.barcodes.length === 2, 'object-shaped barcodes keeps BOTH barcodes (parcel not lost)', objGaps.barcodes);
     ok(Array.isArray(objGaps.barcodes) && objGaps.barcodes.map(b => b.code).join(',') === 'AAA,BBB', 'object-shaped barcodes keeps numeric key order', Array.isArray(objGaps.barcodes) ? objGaps.barcodes.map(b => b.code) : objGaps.barcodes);
     ok(Array.isArray(objGaps.barcodes) && objGaps.barcodes.every(b => typeof b.cod === 'number'), 'object-shaped barcodes still get cod/dod normalized', objGaps.barcodes);
+
+    const staleCount = { id: 'i4', cod: 12, dod: 3, count: 7, barcodes: OBJECT_GAPS() };
+    ctx.normalizeItem(staleCount);
+    ok(staleCount.count === 2, 'a stale count is pulled back in step with barcodes[] (the two apps then agree)', staleCount.count);
+
+    const staleNull = { id: 'i5', cod: 12, dod: 3, count: 3, barcodes: WITH_NULLS() };
+    ctx.normalizeItem(staleNull);
+    ok(staleNull.count === 2, 'count follows the real barcodes after nulls are dropped', staleNull.count);
+
+    const legacy = { id: 'i6', cod: 5, dod: 0, count: 4, barcode: 'OLD' };
+    ctx.normalizeItem(legacy);
+    ok(legacy.count === 4, 'a legacy item with no barcodes[] keeps its own count (stat math untouched)', legacy.count);
+
+    const emptyArr = { id: 'i7', cod: 5, dod: 0, count: 2, barcodes: [] };
+    ctx.normalizeItem(emptyArr);
+    ok(emptyArr.count === 2, 'an empty barcodes[] does NOT zero the count', emptyArr.count);
+}
+
+console.log('\n=== ZoeAdmin and ZoeW derive the displayed package count identically ===');
+{
+    const a = fs.readFileSync(path.join(ROOT, 'ZoeAdmin', 'app.js'), 'utf8');
+    const w = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+    const expr = /let totalPackageCount = item\.barcodes && Array\.isArray\(item\.barcodes\) \? item\.barcodes\.length : \(parseFloat\(item\.count\) \|\| 1\);/;
+    ok(expr.test(a), 'ZoeAdmin uses the shared totalPackageCount expression');
+    ok(expr.test(w), 'ZoeW uses the shared totalPackageCount expression');
+    ok(!/\$\{item\.count\}/.test(a), 'ZoeAdmin no longer prints item.count straight into the row');
 }
 
 console.log('\n=== Zoescan — buildBarcodeIndex ===');

@@ -1098,6 +1098,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        setPhoneSearchPulledUp(false);
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -2414,6 +2415,10 @@
                 syncPullToRefreshLock();
                 isDragging = false;
             }
+            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
+                setPhoneSearchPulledUp(false);
+                isDragging = false;
+            }
         }, { passive: true });
 
         mainSection.addEventListener('touchend', () => {
@@ -2424,6 +2429,7 @@
         if (dragHandle) {
             dragHandle.addEventListener('click', () => {
                 if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
+                setPhoneSearchPulledUp(false);
                 sidebar.classList.toggle('collapsed');
                 syncPullToRefreshLock();
             });
@@ -3448,15 +3454,34 @@
         searchByPhone();
     }
 
+
+    function setPhoneSearchPulledUp(on) {
+        const sidebar = document.getElementById('sidebarSection');
+        if (!sidebar) return;
+        if (on && window.innerWidth >= 992) return;
+        const already = sidebar.classList.contains('search-focus');
+        if (already === !!on) return;
+        sidebar.classList.toggle('search-focus', !!on);
+        if (on) sidebar.classList.remove('collapsed');
+        positionPhoneSuggestBox();
+        setTimeout(positionPhoneSuggestBox, 180);
+        setTimeout(positionPhoneSuggestBox, 340);
+    }
     function setupPhoneSuggestions() {
         const phoneInput = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box) return;
         phoneInput.addEventListener('input', showPhoneSuggestions);
-        phoneInput.addEventListener('focus', showPhoneSuggestions);
+        phoneInput.addEventListener('focus', () => {
+            setPhoneSearchPulledUp(true);
+            showPhoneSuggestions();
+        });
         phoneInput.addEventListener('blur', () => {
             if (phoneSuggestHideTimer) clearTimeout(phoneSuggestHideTimer);
-            phoneSuggestHideTimer = setTimeout(hidePhoneSuggestions, 150);
+            phoneSuggestHideTimer = setTimeout(() => {
+                hidePhoneSuggestions();
+                if (!phoneInput.value.trim()) setPhoneSearchPulledUp(false);
+            }, 150);
         });
         phoneInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {

@@ -98,6 +98,7 @@ function makeContext(app) {
         applyCurrentFilter: () => { rendered.filterCalls++; rendered.rows = null; }
     };
     const ctx = vm.createContext(sandbox);
+vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper'];
     const optional = ['normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');

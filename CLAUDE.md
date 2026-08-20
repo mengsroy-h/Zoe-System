@@ -2155,3 +2155,108 @@ success)។ ក្រោយ merge `git rev-list --count origin/main..origin/clau
   suite ថ្មីមួយក្នុង `audit-tools/emu/`។
 - ចំណុចដែលជុំមុនទទួលយកដោយចេតនានៅដដែល៖ worker សរសេរតួលេខ revenue/pickup បាន, គ្មានការផ្ទៀងផ្ទាត់
   aggregate ដោយគ្មាន backend ដែលទុកចិត្តបាន, និង ZoeKeyGen "Extend" ផ្លាស់តែពិដានខាង server។
+
+## ជុំ ៨ (បន្ត) — ZoeW និង ZoeKeyGen ដោយឡែក (2026-08-20)
+
+អ្នកប្រើសួរ "ចុះ ZoeKeyGen, ZoeW" ព្រោះជុំ ៨ កែតែ ZoeAdmin និង Zoescan។ ត្រូវហើយ — ២ App នោះ
+ឆ្លងកាត់តែឧបករណ៍មេកានិក មិនទាន់មានការអានលម្អិតទេ។ ជុំបន្តនេះធ្វើវា។
+
+### ZoeW — ស្អាត (គ្មានអ្វីត្រូវកែ)
+`extract.js` រាយ function ២៣ ដែលបែកគ្នាពី ZoeAdmin។ **បាន diff ទាំង ២៣** — សុទ្ធតែជាភាពខុសគ្នា
+ស្របច្បាប់៖ salt PBKDF2 តាម App (`zoeadmin_` ទល់ `zoew_`), ស្លាក Sentry, ឈ្មោះ App ក្នុងសារ,
+មុខងារ ZoeAdmin-only (`pendingBarcode`, `safeFocusScanner`, `clearCustomerDataTableCache`,
+`lookupSecretKey`, យន្តការ `pinTargetAction` ដែល ZoeW ជំនួសដោយ `pendingSetupLinkConfig`)។
+**ZoeW គ្មានកូដរបស់ខ្លួនឯងទេ ក្រៅពី `verifyWorkerRoleThenProceed`** — អ្វីៗសល់ចែករំលែកជាមួយ
+ZoeAdmin ហើយដូចគ្នាបេះបិទ។ ដូច្នេះការកែក្នុង ZoeAdmin គ្របដណ្ដប់ ZoeW ស្រាប់។
+
+### ZoeKeyGen — រកឃើញកំហុសពិត ១ (និងកែតូចៗ ៤)
+**[សំខាន់] `refreshKeyList()` បង្រួម record របស់ App ទាំង ៣ ចូលគ្នា ដោយ "អ្នកចុងក្រោយឈ្នះ"។**
+```js
+Object.assign(byId[id].record, bucket[id]);   // ADM ➜ ZOW ➜ SCN
+```
+សម្រាប់ Key scope ALL វាអាន `license_keys/{ADM,ZOW,SCN}/{id}` ហើយសរសេរជាន់គ្នា ដូច្នេះ
+**តម្លៃរបស់ SCN ឈ្នះជានិច្ច**។ ធម្មតាមិនអីទេ ព្រោះ bucket ទាំង ៣ ដូចគ្នា — **លើកលែងតែក្រោយ
+"ជោគជ័យមិនពេញលេញ"** ដែលជាករណីដែល `toggleRevokeKey`/`confirmExtendKey` មានប្រអប់ព្រមានសម្រាប់វា។
+ពេលនោះ bucket **ខុសគ្នាពិត** ហើយបញ្ជីបង្ហាញតែមួយ ដោយស្ងាត់៖
+- Revoke បរាជ័យត្រង់ ADM តែជោគជ័យ ZOW/SCN ➜ បញ្ជីបង្ហាញ **Revoked** ➜ អ្នកគ្រប់គ្រងជឿថាចប់
+  តែ **អ្នកប្រើ ZoeAdmin នៅតែចូលបាន**។
+- បន្ថែមសុពលភាពបរាជ័យត្រង់ ADM ➜ បញ្ជីបង្ហាញថ្ងៃថ្មី ➜ គ្មានផ្លូវដឹងថា ZoeAdmin មិនបានបន្ថែម
+  ➜ ក្រុមហ៊ុនអតិថិជនឈប់ដំណើរការនៅថ្ងៃចាស់ដោយគ្មានការព្រមាន។
+
+**កែ**៖ រក្សា `perApp` តាម App ជំនួសការបង្រួម រួច
+- `revoked` = ពិតតែពេល **គ្រប់** bucket revoked (ដូច្នេះប៊ូតុង Revoke នៅតែបញ្ចប់ការងារបាន
+  ជំនួសឲ្យការត្រឡប់ក្រោយ) · `expiresAt` = **តូចជាងគេ** (ថ្ងៃដែល App ណាមួយឈប់ដំណើរការមុនគេ)
+- ផ្លាក **⚠️ មិនត្រូវគ្នា** ថ្មីក្នុងតារាង ជាមួយ tooltip រាយតម្លៃតាម App
+កែតែផ្នែក **បង្ហាញ** ប៉ុណ្ណោះ — គ្មានផ្លូវសរសេរណាប្រែទេ (`confirmExtendKey` គណនាពី `days` រួចហើយ)។
+
+កែតូចៗ៖ `confirmExtendKey` លែងទុកប្រអប់បើកចោលលើផ្លូវកំហុស (ឥឡូវបិទ + `refreshKeyList()`) ·
+`loadSigningKey` លែងបង្រួមកំហុសទាំងអស់ជាសារតែមួយ — ឥឡូវរាយការណ៍ទៅ Sentry ហើយប្រាប់ដាច់ដោយឡែក
+ពេល Private Key **មិនផ្គូផ្គង** នឹង Public Key ក្នុង `license-verify.js` (ជាករណីច្រឡំដ៏គ្រោះថ្នាក់
+ដែលជុំ ៥ បន្ថែមការត្រួតពិនិត្យសម្រាប់វា) · លុប blank line សល់ពី comment-strip ក្នុង
+`tryRestoreSigningKeyFromSession`។
+
+### តេស្តថ្មី — `audit-tools/keylist-consistency-test.js` (15/15)
+ដក `refreshKeyList`/`renderKeyList`/`escapeHtml` **ពិត** ចេញពី `ZoeKeyGen/app.js` ដាក់ក្នុង `vm`
+ជាមួយ `fb.get` ក្លែងក្លាយ។ **មិនមែនតេស្តទទេទេ**៖ រត់លើ `origin/main` (មុនកែ) តាមរយៈ
+`KEYLIST_APP_JS=... node ...` ➜ **ធ្លាក់ ៩/១៥** រួមទាំង "Revoke មិនពេញលេញ ➜ មិនរាប់ថា Revoked"
+(ចេញ `true` = កំហុស) និង "ថ្ងៃផុតកំណត់មកមុនគេ" (ចេញ `2000` ជំនួស `1000`)។
+
+### `dom-hygiene.js` ត្រូវបានធ្វើឲ្យរឹងមាំ
+ជុំ ៨ ច្រោះតែ id **ក្នុង `.modal`** ដោយស្កេន ៦០០០ តួអក្សរបន្ទាប់ពី modal នីមួយៗ។ ត្រឡប់មកមើល
+ឡើងវិញ៖ `pdfExportPrintArea` **មិននៅក្នុង modal ទេ** — វាត្រូវបានចាប់បានដោយ **សំណាង** ព្រោះ
+window នោះលើសទៅដល់វា។ បើវានៅឆ្ងាយជាងនេះ ឧបករណ៍នឹងខកខាន។ ឥឡូវលុបការច្រោះ `.modal` ចោល
+ហើយពឹងលើ allowlist `ACCEPTED` វិញ (ដែលរាល់ធាតុមានហេតុផលសរសេរជាប់) — បានពិនិត្យ ២១ ធាតុថ្មី
+ទាំងអស់៖ សុទ្ធតែជា UI chrome ឬត្រូវបានលុបដោយផ្លូវឯទៀត (ឧ. `historyTableBody` ដែល
+`renderHistory([])` ជំនួសដោយជួរទទេ, `listTableBody` ដែល `detachDatabaseListeners()`+`renderList()`
+សម្អាត, និង `setupLinkUrlInput` ដែលជា Base URL សាធារណៈ រក្សាទុកក្នុង localStorage ដោយចេតនា)។
+
+`CACHE_VERSION` bump តែ ZoeKeyGen (zoekeygen-v21)។ **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**
+
+## Toast: លោតលឿនពេក · ចេញស្ទួន · និងសារត្រូវបានលុបចោល (fixed 2026-08-20)
+
+អ្នកប្រើរាយការណ៍ ២ រឿង រួចស្នើមួយទៀត។ ទាំង ៣ ជាបញ្ហាពិត។
+
+### ១. "បណ្ដាញយឺត! កំពុងភ្ជាប់ Server..." លោតរាល់ពេលបើក App
+`verify*RoleThenProceed` មាន `if (!isDatabaseConnected) showToast(...)` **នៅដើមមុខងារ**។
+`isDatabaseConnected` ចាប់ផ្ដើមជា `false` ហើយក្លាយជា `true` លុះត្រា `.info/connected` បាញ់ —
+ដែលមិនអាចទាន់នៅ tick ដំបូងបានឡើយ។ ដូច្នេះសារនេះលោត **១០០% នៃការបើក App** ទោះបណ្ដាញលឿនក៏ដោយ។
+អ្នកប្រើនិយាយត្រូវ៖ វាគួរលោតតែពេលយឺតពិត។
+
+**កែ**៖ ផ្លាស់សារចូល `readUserRole()` រួចដាក់ `setTimeout` `SLOW_NETWORK_NOTICE_MS = 4000`។
+`finish()` លុប timer នោះចោល ដូច្នេះបើអានបានមុន ៤ វិនាទី (ទាំង socket ទាំង REST) **គ្មានសារសោះ**។
+
+### ២. "ចូលប្រព័ន្ធជោគជ័យ!" ចេញពីរដង
+`verify*RoleThenProceed` ប្រកាសចូលប្រព័ន្ធ **រាល់ដងដែលវារត់ចប់ដោយជោគជ័យ** មិនមែនតែពេលឆ្លងកាត់
+ពី "មិនទាន់ចូល" ទៅ "ចូលរួច" ទេ។ វារត់ច្រើនដងបានពិត៖ ការត្រួតពិនិត្យពេល boot, ការចូលដោយដៃ
+(`loginWithFirebase` ហៅដោយខ្លួនឯងតាំងពី PR #24), និង `retryPendingRoleCheck()` ពី
+`.info/connected` និង `visibilitychange`។ ZoeAdmin/ZoeW/Zoescan ប្រើ element `#toast` តែមួយ
+ដូច្នេះវាមើលទៅដូចសារពីរលោតបន្តគ្នា; **ZoeKeyGen ត្រួតសារ ដូច្នេះវាឃើញច្បាស់ជាងគេ**
+(ក្នុងរូបថតមានពីរជាន់គ្នា) ហើយ ZoeKeyGen **គ្មានការការពារសោះ**។
+
+**កែ**៖ ZoeAdmin/ZoeW ប្រកាសតែពេល `isDatabaseInitialized` នៅ `false` (ទង់ដែលមានស្រាប់ ហើយ
+ត្រូវ reset ពេលចាកចេញ)។ ZoeKeyGen គ្មានទង់បែបនោះ ➜ បន្ថែម `isSignedInUiActive` ដែល
+`showLoginModalWithPrefill()` reset។ `refreshKeyList()` នៅតែរត់រាល់ដងដោយចេតនា — ការទាញបញ្ជី
+ថ្មីមិនបង្កគ្រោះថ្នាក់ទេ។
+
+### ៣. (ស្នើបន្ថែម) "ធ្វើឲ្យ toast ទាំងអស់ដើរ realtime"
+ZoeAdmin/ZoeW/Zoescan ប្រើ `#toast` **តែមួយ** ហើយ `showToast()` សរសេរជាន់លើអត្ថបទចាស់ ព្រមទាំង
+`clearTimeout(showToast._t)` — ដូច្នេះសារពីរដែលមកជិតគ្នា **សារទី ១ បាត់ទាំងស្រុង** មុនអ្នកប្រើ
+អានទាន់។ ZoeKeyGen មានលំនាំត្រឹមត្រូវរួចហើយ (container + append)។
+
+**កែ**៖ `showToast()` ឥឡូវ **byte-identical ទាំង ៤ App** — បង្កើត `<div class="toast">` ថ្មីរាល់ដង
+បញ្ចូលទៅ `#toastContainer` ហើយលុបខ្លួនឯងក្រោយ ៣ វិនាទី ដូច្នេះសារជាន់គ្នាបានដោយគ្មានសារណាបាត់។
+បន្ថែម **ដែនកំណត់ ៤ សារ** (លុបចាស់ជាងគេចេញ) ដែល ZoeKeyGen ក៏មិនធ្លាប់មាន — ការពារអេក្រង់ពេញ
+ពេលមានសារច្រើនជាប់គ្នា។ HTML ប្ដូរ `<div id="toast">` ➜ `<div class="toast-container"
+id="toastContainer">` និង CSS ប្ដូរពី `visibility` + `@keyframes fadein/fadeout` ទៅ flex column
++ transition (រក្សារូបរាងដើមរបស់ App នីមួយៗ)។ Keyframes ដែលលែងប្រើត្រូវលុបចោល។
+**`showToast` ត្រូវបានដកចេញពី `EXPECTED_DIVERGENT` ក្នុង `shared-fns.js`** — ឥឡូវវាត្រូវតែដូចគ្នា
+(identical ឡើងពី 16 ➜ 17)។
+
+### តេស្ត — `auth-recovery-test.js` ឡើងជា **175/175**
+Scenario ថ្មី ១០-១២៖ បើក App ធម្មតា ➜ **គ្មានសារ "បណ្ដាញយឺត" សោះ** (ទាំងភ្លាមៗ ទាំងក្រោយចូលរួច) ·
+យឺតពិត ➜ នៅ ៣ វិនាទីនៅស្ងាត់ តែនៅ ៥ វិនាទីត្រូវប្រាប់ · ការត្រួតពិនិត្យ role ជាថ្មីលើ session
+ដដែល ➜ **មិនប្រកាសចូលប្រព័ន្ធម្ដងទៀត**។ Scenario ៥ ចាស់ត្រូវបានកែ (វា assert ថាសារលោតភ្លាមៗ
+ដែលជាឥរិយាបថដែលកំពុងកែ)។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v40, zoew-v35, zoescan-v29, zoekeygen-v22)។
+**គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

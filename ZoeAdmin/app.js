@@ -75,6 +75,7 @@
     let isDatabaseConnected = false;
     let lastRoleRestOutcome = '';
     const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
+    const SLOW_NETWORK_NOTICE_MS = 4000;
 
     let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
 
@@ -1231,10 +1232,15 @@
             let sdkError = null;
             let restError = null;
             let timer = null;
+            let slowNoticeTimer = setTimeout(() => {
+                slowNoticeTimer = null;
+                if (!settled) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
+            }, SLOW_NETWORK_NOTICE_MS);
             const finish = (fn, value) => {
                 if (settled) return;
                 settled = true;
                 if (timer) clearTimeout(timer);
+                if (slowNoticeTimer) clearTimeout(slowNoticeTimer);
                 fn(value);
             };
             const onFailure = () => {
@@ -1256,7 +1262,6 @@
 
     async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
         pendingRoleRecheck = false;
-        if (!isDatabaseConnected) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
         let role;
         try {
             role = await readUserRole(user);
@@ -1302,7 +1307,8 @@
         }
 
         closeModal('loginModal');
-        showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+        const wasAlreadySignedIn = isDatabaseInitialized;
+        if (!wasAlreadySignedIn) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
         updateAuthButton(true);
 
         if (!isDatabaseInitialized) {
@@ -1838,12 +1844,18 @@
     }
 
     function showToast(msg) {
-        const toast = document.getElementById("toast");
-        if(!toast) return;
-        toast.innerText = msg;
-        toast.className = "show";
-        clearTimeout(showToast._t);
-        showToast._t = setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        while (container.children.length >= 4) container.removeChild(container.firstChild);
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        container.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     function getFormattedDate(d = new Date(getServerNow())) {

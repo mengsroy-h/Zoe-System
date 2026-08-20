@@ -93,6 +93,7 @@ let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
 let lastRoleRestOutcome = '';
 const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
+const SLOW_NETWORK_NOTICE_MS = 4000;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
@@ -134,6 +135,7 @@ function waitForServerTimeSync(timeoutMs) {
 function showToast(msg) {
     const container = document.getElementById('toastContainer');
     if (!container) return;
+    while (container.children.length >= 4) container.removeChild(container.firstChild);
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.textContent = msg;
@@ -343,7 +345,6 @@ async function tryRestoreSigningKeyFromSession() {
         if (cb) cb.checked = true;
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
-
         sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
@@ -469,6 +470,7 @@ function showLoginModalWithPrefill() {
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
     document.getElementById('appContainer').style.display = 'none';
+    isSignedInUiActive = false;
     keyListSessionGeneration++;
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
@@ -589,10 +591,15 @@ function readUserRole(user) {
         let sdkError = null;
         let restError = null;
         let timer = null;
+        let slowNoticeTimer = setTimeout(() => {
+            slowNoticeTimer = null;
+            if (!settled) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
+        }, SLOW_NETWORK_NOTICE_MS);
         const finish = (fn, value) => {
             if (settled) return;
             settled = true;
             if (timer) clearTimeout(timer);
+            if (slowNoticeTimer) clearTimeout(slowNoticeTimer);
             fn(value);
         };
         const onFailure = () => {
@@ -614,7 +621,6 @@ function retryPendingRoleCheck() {
 
 async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     pendingRoleRecheck = false;
-    if (!isDatabaseConnected) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
     try {
         const role = await readUserRole(user);
         if (myAuthGeneration !== authGeneration) return;
@@ -641,7 +647,8 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     closeModal('loginModal');
     document.getElementById('appContainer').style.display = 'flex';
     updateAuthButton(true);
-    showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    if (!isSignedInUiActive) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    isSignedInUiActive = true;
     refreshKeyList();
 }
 
@@ -753,7 +760,10 @@ async function loadSigningKey() {
             }
         }
     } catch (e) {
-        alert('Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។');
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loadSigningKey' });
+        alert(e && e.message === 'private key does not pair with the shipped public key'
+            ? 'Private Key នេះមិនផ្គូផ្គងនឹង Public Key ដែលមានក្នុង license-verify.js ទេ! Key ដែលចេញដោយវានឹងផ្ទៀងផ្ទាត់មិនកើតនៅគ្រប់ App។ សូមប្រើ Private Key ដែលត្រូវគ្នា ឬដាក់ Public Key ថ្មីទៅក្នុង App ទាំងអស់សិន។'
+            : 'Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។');
     }
 }
 
@@ -1005,6 +1015,7 @@ function copySetupLink() {
     navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('បានចម្លង Link!')).catch(() => {});
 }
 
+let isSignedInUiActive = false;
 let keyListCache = [];
 let keyListSessionGeneration = 0;
 const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zoescan', ALL: 'ទាំង ៣' };
@@ -1037,9 +1048,9 @@ async function refreshKeyList() {
         ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {
             const bucket = publicData[appCode] || {};
             Object.keys(bucket).forEach((id) => {
-                if (!byId[id]) byId[id] = { id: id, existsIn: [], record: {} };
+                if (!byId[id]) byId[id] = { id: id, existsIn: [], perApp: {} };
                 byId[id].existsIn.push(appCode);
-                Object.assign(byId[id].record, bucket[id]);
+                byId[id].perApp[appCode] = bucket[id] || {};
             });
         });
 
@@ -1049,7 +1060,20 @@ async function refreshKeyList() {
             const meta = (metaData[metaAppCode] && metaData[metaAppCode][id]) || {};
             const paths = entry.existsIn.slice().sort();
             const scope = meta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
-            return Object.assign({ id: id, scope: scope, paths: paths }, entry.record, meta);
+            const revokedFlags = paths.map((p) => !!entry.perApp[p].revoked);
+            const expiryValues = paths.map((p) => entry.perApp[p].expiresAt);
+            const revoked = revokedFlags.every((v) => v);
+            let expiresAt;
+            expiryValues.forEach((v) => {
+                if (typeof v !== 'number') return;
+                if (expiresAt === undefined || v < expiresAt) expiresAt = v;
+            });
+            const inconsistent = revokedFlags.some((v) => v !== revokedFlags[0])
+                || expiryValues.some((v) => v !== expiryValues[0]);
+            return Object.assign({ id: id }, meta, {
+                scope: scope, paths: paths, perApp: entry.perApp,
+                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt
+            });
         });
 
         rows.sort((a, b) => (b.issuedAt || 0) - (a.issuedAt || 0));
@@ -1078,6 +1102,13 @@ function renderKeyList() {
         else statusHtml = '<span class="badge badge-active">Active</span>';
 
         const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
+
+        if (row.inconsistent) {
+            const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
+                + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
+                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH') : '-')).join(' · ');
+            statusHtml += ` <span class="badge badge-revoked" title="${escapeHtml('ស្ថានភាពមិនដូចគ្នារវាង App (ការធ្វើបច្ចុប្បន្នភាពមុនជោគជ័យមិនពេញលេញ)៖ ' + perAppText)}">⚠️ មិនត្រូវគ្នា</span>`;
+        }
 
         const isPartialAll = row.scope === 'ALL' && Array.isArray(row.paths) && row.paths.length > 0 && row.paths.length < 3;
         const scopeLabel = escapeHtml(APP_LABELS[row.scope] || row.scope);
@@ -1200,7 +1231,9 @@ async function confirmExtendKey() {
         refreshKeyList();
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
+        closeModal('extendModal');
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        refreshKeyList();
     }
 }
 

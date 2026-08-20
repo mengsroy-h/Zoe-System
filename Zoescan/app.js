@@ -385,8 +385,23 @@ function readDatabaseUrlFromConfig() {
     }
 }
 
+function isFirebaseDatabaseHost(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host.endsWith('.firebaseio.com') || host.endsWith('.firebasedatabase.app');
+    } catch (e) {
+        return false;
+    }
+}
+
 async function readUserRoleViaRest(user) {
     const base = readDatabaseUrlFromConfig();
+    if (base && !isFirebaseDatabaseHost(base)) {
+        lastRoleRestOutcome = 'blocked: non-firebase databaseURL';
+        throw new Error('REST role check unavailable');
+    }
     if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
         lastRoleRestOutcome = 'unavailable';
         throw new Error('REST role check unavailable');
@@ -1252,6 +1267,10 @@ function decodeBarcodeFromImageDataUrl(dataUrl) {
     img.src = dataUrl;
 }
 
+function normalizePhoneDigits(value) {
+    return String(value === null || value === undefined ? '' : value).replace(/[^0-9]/g, '');
+}
+
 function getEntryCurrentLocker(entry) {
     const { barcodeIdx, item } = entry;
     if (barcodeIdx !== null) {
@@ -1471,7 +1490,6 @@ function getItemLatestLockerTs(item) {
 
 function renderList() {
     const search = (document.getElementById('listSearchInput').value || '').trim().toLowerCase();
-    const lockerFilter = document.getElementById('listLockerFilter').value;
 
     let assigned = Object.keys(historyData).map(id => ({ id, ...historyData[id] }))
         .filter(it => getItemLockerSummary(it).length > 0);
@@ -1485,8 +1503,14 @@ function renderList() {
         optHtml += `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`;
     });
     if (filterSelect.innerHTML !== optHtml) { filterSelect.innerHTML = optHtml; filterSelect.value = prevVal; }
+    const lockerFilter = filterSelect.value;
 
-    if (search) assigned = assigned.filter(it => sanitizePhoneNumber(it.phone || '').toLowerCase().includes(search));
+    const searchDigits = normalizePhoneDigits(search);
+    if (search) assigned = assigned.filter(it => {
+        const phone = sanitizePhoneNumber(it.phone || '');
+        if (!searchDigits) return phone.toLowerCase().includes(search);
+        return normalizePhoneDigits(phone).indexOf(searchDigits) !== -1;
+    });
     if (lockerFilter) assigned = assigned.filter(it => getItemLockerSummary(it).includes(lockerFilter));
 
     assigned.sort((a, b) => getItemLatestLockerTs(a) - getItemLatestLockerTs(b));

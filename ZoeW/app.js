@@ -112,6 +112,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
+        hidePhoneSuggestions();
         document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'flex';
@@ -697,8 +698,23 @@
         }
     }
 
+    function isFirebaseDatabaseHost(url) {
+        try {
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'https:') return false;
+            const host = parsed.hostname.toLowerCase();
+            return host.endsWith('.firebaseio.com') || host.endsWith('.firebasedatabase.app');
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function readUserRoleViaRest(user) {
         const base = readDatabaseUrlFromConfig();
+        if (base && !isFirebaseDatabaseHost(base)) {
+            lastRoleRestOutcome = 'blocked: non-firebase databaseURL';
+            throw new Error('REST role check unavailable');
+        }
         if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
             lastRoleRestOutcome = 'unavailable';
             throw new Error('REST role check unavailable');
@@ -2153,6 +2169,7 @@
     const RECENT_PHONES_MAX = 300;
     let phoneSuggestItems = [];
     let phoneSuggestActiveIndex = -1;
+    let phoneSuggestHideTimer = null;
 
     function normalizePhoneDigits(value) {
         return String(value === null || value === undefined ? '' : value).replace(/[^0-9]/g, '');
@@ -2236,6 +2253,7 @@
         const phoneInput = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box) return;
+        if (phoneSuggestHideTimer) { clearTimeout(phoneSuggestHideTimer); phoneSuggestHideTimer = null; }
         if (document.activeElement !== phoneInput) return;
         const matches = collectPhoneSuggestions(phoneInput.value);
         if (!matches.length) {
@@ -2248,6 +2266,7 @@
     }
 
     function hidePhoneSuggestions() {
+        if (phoneSuggestHideTimer) { clearTimeout(phoneSuggestHideTimer); phoneSuggestHideTimer = null; }
         phoneSuggestItems = [];
         phoneSuggestActiveIndex = -1;
         const box = document.getElementById('phoneSuggestBox');
@@ -2286,7 +2305,10 @@
         if (!phoneInput || !box) return;
         phoneInput.addEventListener('input', showPhoneSuggestions);
         phoneInput.addEventListener('focus', showPhoneSuggestions);
-        phoneInput.addEventListener('blur', () => { setTimeout(hidePhoneSuggestions, 150); });
+        phoneInput.addEventListener('blur', () => {
+            if (phoneSuggestHideTimer) clearTimeout(phoneSuggestHideTimer);
+            phoneSuggestHideTimer = setTimeout(hidePhoneSuggestions, 150);
+        });
         phoneInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 hidePhoneSuggestions();
@@ -2319,7 +2341,7 @@
             if (isNaN(index) || !phoneSuggestItems[index]) return;
             applyPhoneSuggestion(phoneSuggestItems[index].phone);
         });
-        window.addEventListener('scroll', positionPhoneSuggestBox, true);
+        window.addEventListener('scroll', positionPhoneSuggestBox, { capture: true, passive: true });
         window.addEventListener('resize', positionPhoneSuggestBox);
     }
 

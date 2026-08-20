@@ -413,8 +413,15 @@ async function verifySecurityPin() {
     }
 }
 
+function isPinFlowPending() {
+    const pinModal = document.getElementById('pinModal');
+    const pinSetupModal = document.getElementById('pinSetupModal');
+    return !!((pinModal && pinModal.classList.contains('active')) || (pinSetupModal && pinSetupModal.classList.contains('active')));
+}
+
 function checkPinAndOpenConfig() {
     const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    pinTargetAction = openConfigModal;
     if (!savedPin) openModalHelper('pinSetupModal');
     else requestPinBeforeConfig(openConfigModal);
 }
@@ -554,8 +561,23 @@ function readDatabaseUrlFromConfig() {
     }
 }
 
+function isFirebaseDatabaseHost(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host.endsWith('.firebaseio.com') || host.endsWith('.firebasedatabase.app');
+    } catch (e) {
+        return false;
+    }
+}
+
 async function readUserRoleViaRest(user) {
     const base = readDatabaseUrlFromConfig();
+    if (base && !isFirebaseDatabaseHost(base)) {
+        lastRoleRestOutcome = 'blocked: non-firebase databaseURL';
+        throw new Error('REST role check unavailable');
+    }
     if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
         lastRoleRestOutcome = 'unavailable';
         throw new Error('REST role check unavailable');
@@ -1318,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', () => {
         retryPendingRoleCheck();
     });
 
-    if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
+    if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY) && !isPinFlowPending()) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }
 

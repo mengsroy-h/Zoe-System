@@ -35,6 +35,13 @@
 >    Firebase ផ្ទុក `<script>` ពី host នោះ ដូច្នេះពីមុន ពេល WebSocket ត្រូវបានទប់ RTDB **គ្មានផ្លូវ
 >    បម្រុងសោះ**។ ឥឡូវមាន។ លម្អិតនៅ section ចុងឯកសារ។
 >
+> 🟣 **Audit ជុំទី ១០ (2026-08-20) — រកឃើញកំហុសពិត ៩ កែអស់ហើយ។** ក្នុងនោះ **៣ ជាកំហុសក្នុងកូដ
+> ដុំស្នើលេខថ្មីខ្លួនឯង** (រកឃើញដោយអាន diff របស់ខ្លួនម្តងទៀត), ២ ក្នុង ZoeKeyGen (PIN flow រត់
+> callback ខុស ➜ ប្រអប់ Config បើកមិនចេញ), ២ ក្នុង Zoescan (តម្រងទីតាំងខុសពី dropdown), ១ សុវត្ថិភាព
+> ទាំង ៤ App (**ID token អាចទៅ host ក្រៅ Firebase** បើ config ត្រូវបានពុល) និង ១ ក្នុងការ deploy
+> (rules JSON របស់ ZoeKeyGen អានបានជាសាធារណៈ)។ តេស្តថ្មី ២ + scenario ថ្មី ១ — សរុប **១៩១ + 55 +
+> 10 + 7** assertion។ លម្អិតនៅ section **"ជុំ ១០"** ចុងឯកសារ។
+>
 > 🔵 **ស្វែងរកលេខទូរស័ព្ទ៖ វាយកន្ទុយលេខ ៣-៤ ខ្ទង់ បានឃើញដុំស្នើលេខវិញហើយ (2026-08-20)** — អ្នកប្រើ
 > រាយការណ៍ថាក្រោយជុំ ៨/៩ ត្រូវវាយលេខ **ពេញ** ទើបឃើញ suggestion (ពីមុនវាយ ៣-៤ ខ្ទង់ក៏ឡើង)។
 > មូលហេតុ **មិនមែន** ការកែជុំ ៨/៩ ទេ — កូដស្វែងរកមិនប្រែសោះ។ វាជា `<datalist>` របស់ browser
@@ -2409,3 +2416,88 @@ backend ដែលទុកចិត្តបាន (ដូចដែលបាន�
 
 `CACHE_VERSION` bump (zoeadmin-v43, zoew-v38)។ **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**
 Zoescan/ZoeKeyGen មិនប៉ះ (គ្មានវាលស្វែងរកលេខទូរស័ព្ទ)។
+
+## ជុំ ១០ — deep audit ទាំង ៤ App (2026-08-20, branch `claude/phone-number-audit-8-9-tsyi3c`)
+
+ស្នើដោយអ្នកប្រើភ្លាមក្រោយការកែ "ស្វែងរកលេខទូរស័ព្ទ"៖ *"ធ្វើ deep audit លម្អិតឡើងវិញគ្រប់ផ្នែក
+ទាំងអស់ ទាំង ៤ App"*។ រត់ inline single-threaded (គ្មាន subagent) ដូចជុំ ៦-៩។ **អាន Zoescan
+(1726 បន្ទាត់) និង ZoeKeyGen (1344 បន្ទាត់) ពេញទាំងស្រុង** — ២ App នេះទទួលការអានតិចជាងគេពីមុន។
+ZoeAdmin/ZoeW គ្របដោយ `extract.js` (101 identical / 23 different, ដូចមុន) បូកនឹងការអាន diff
+របស់ការកែថ្មីៗ។
+
+### វិធីសាស្ត្រ — កូដថ្មីជាងគេ ត្រូវពិនិត្យខ្លាំងជាងគេ
+មេរៀនជុំ ៩ ដដែល ហើយវាបានផលម្តងទៀត៖ **កំហុស ៣ ក្នុង ៩ គឺនៅក្នុងដុំស្នើលេខដែលទើបសរសេរក្នុង
+session ដដែលនេះ** — ត្រូវរកឃើញដោយអាន diff របស់ខ្លួនឯងម្តងទៀតដោយសង្ស័យ មិនមែនដោយឧបករណ៍ទេ។
+
+### កែហើយ
+- **[ZoeAdmin/ZoeW — កូដថ្មីរបស់ខ្លួនឯង] ដុំស្នើលេខអណ្តែតលើ modal។** `.phone-suggest` មាន
+  `z-index: 1045` តែ `.modal` មាន `1000` — ដូច្នេះពេលស្កេន barcode ខណៈវាលស្វែងរកកំពុង focus
+  (`phoneModal` លោតឡើង) ដុំស្នើលេខអណ្តែតលើប្រអប់ ហើយ**ចុចបាន**ទៀតផង។ ឥឡូវ `openModalHelper()`
+  ហៅ `hidePhoneSuggestions()` — កន្លែងតែមួយគ្របគ្រប់ modal ទាំងអស់។
+- **[ZoeAdmin/ZoeW] blur ➜ focus ក្នុង ១៥០ms បិទដុំដោយខុស។** `blur` ដាក់ `setTimeout(hide, 150)`
+  ដែលគ្មានអ្នកលុបចោល ដូច្នេះការចុចវាលឡើងវិញភ្លាមៗ បើកដុំរួចវាត្រូវបិទវិញក្នុង ១៥០ms។ ឥឡូវ
+  `phoneSuggestHideTimer` ត្រូវបាន clear ក្នុង `showPhoneSuggestions()` និង `hidePhoneSuggestions()`។
+- **[ZoeAdmin/ZoeW] `scroll` listener ប្តូរទៅ `{ passive: true }`** (វាដើរលើគ្រប់ការ scroll)។
+- **[ZoeKeyGen] `checkPinAndOpenConfig()` មិន reset `pinTargetAction` — ការកែជុំ ៦ មិនដែលទៅដល់
+  App ទី ៤។** សាខាគ្មាន PIN បើក `pinSetupModal` ដោយផ្ទាល់ ដូច្នេះ `saveNewSecurityPin()` ហៅ
+  `(pinTargetAction || openConfigModal)()` ➜ **រត់ callback ចាស់** (ឧ. `persistSigningKeyForSession`)
+  ជំនួសការបើកប្រអប់ Config។ លទ្ធផល៖ លើឧបករណ៍ដែល config ខូច/បាត់ អ្នកគ្រប់គ្រងកំណត់ PIN រួច
+  **ប្រអប់ Config មិនបើកសោះ** — គ្មានផ្លូវជួសជុលតាម UI។
+- **[ZoeKeyGen] ការស្ដារ Signing Key ជាន់លើ PIN flow របស់ Config។** ក្នុង `DOMContentLoaded`,
+  `initFirebase()` ហៅ `checkPinAndOpenConfig()` **ដោយ synchronous** (មុន `await` ដំបូង) ពេលគ្មាន
+  config; បន្ទាត់បន្ទាប់មកទៀត `requestPinBeforeConfig(tryRestoreSigningKeyFromSession, ...)`
+  សរសេរជាន់ `pinTargetAction` ភ្លាម ➜ លទ្ធផលដូចខាងលើ។ ឥឡូវមាន `isPinFlowPending()` ជាឆ្នាំង៖
+  បើ `pinModal`/`pinSetupModal` បើករួច ការស្ដារ Signing Key ត្រូវរំលង។
+- **[Zoescan] `renderList()` អានតម្រងទីតាំង *មុន* សាង `<select>` ឡើងវិញ។** ពេលកញ្ចប់ចុងក្រោយក្នុង
+  ទូដែលកំពុងត្រង ត្រូវអតិថិជនយកចេញ ➜ ជម្រើសនោះបាត់ពី dropdown ➜ `filterSelect.value` ក្លាយជា `''`
+  តែអថេរ `lockerFilter` នៅផ្ទុកតម្លៃចាស់ ➜ **តារាងទទេ ខណៈ dropdown សរសេរថា "ទីតាំងទាំងអស់"**។
+  ឥឡូវ `lockerFilter` ត្រូវអានក្រោយការសាងឡើងវិញ។
+- **[Zoescan] ការស្វែងរកលេខក្នុងបញ្ជី ប្រៀបតាមតួលេខសុទ្ធ** ដូច ZoeAdmin/ZoeW ➜ `012-345 678`
+  រកឃើញដោយវាយ `345678`។ `normalizePhoneDigits` ឥឡូវចែករំលែក ៣ App (byte-identical)។
+- **[ទាំង ៤ App — សុវត្ថិភាព] `readUserRoleViaRest()` ផ្ញើ Firebase ID token ទៅ host ណាក៏បាន**
+  ដែលស្ថិតក្នុង `databaseURL` នៃ `zoew_firebase_config`។ CSP `connect-src` អនុញ្ញាត
+  `*.googleapis.com`, `script.google.com`, `*.googleusercontent.com` ដែរ ដូច្នេះ config ដែលត្រូវពុល
+  (តាម Setup Link ក្លែងក្លាយ) អាច **លួច ID token** — សញ្ញាសម្គាល់ដែលមានសិទ្ធិលើ project ទាំងមូល។
+  ឥឡូវ `isFirebaseDatabaseHost()` តម្រូវឲ្យជា `https://` + `*.firebaseio.com` ឬ
+  `*.firebasedatabase.app`; បើមិនមែន ផ្លូវ REST ត្រូវរំលង (SDK នៅដើរដដែល) ហើយ Sentry ទទួល
+  `restRoleRead: "blocked: non-firebase databaseURL"`។ **នេះជាកន្លែងតែមួយគត់ក្នុងកូដដែលដាក់ token
+  ចូល URL** (បន្ថែមក្នុង PR #26)។
+- **[ZoeKeyGen — deploy] `ZoeKeyGen/firebase-database.rules.json` ត្រូវបានបម្រើជាសាធារណៈ**
+  ព្រោះ `publish = "."` ➜ អ្នកណាក៏ទាញយកផែនទី schema ពេញលេញនៃ DB License បាន (រួមទាំងកន្លែងណា
+  អានបានដោយគ្មាន auth)។ បន្ថែម `[[redirects]]` 404 (`force = true`, ដាក់ **មុន** catch-all
+  `/* ➜ /index.html 200` ព្រោះ Netlify ដំណើរការតាមលំដាប់ ហើយឯកសារពិតឈ្នះ redirect ដែលគ្មាន `force`)។
+
+### តេស្តថ្មី (ភស្តុតាងរត់បាន មិនមែនអត្ថបទ)
+- **`audit-tools/zoescan-list-test.js` (7/7)** — ដក `renderList` ពិត ដាក់ក្នុង `vm` ជាមួយ `<select>`
+  ក្លែងក្លាយដែល **ធ្វើតាមឥរិយាបថពិត**៖ ការកំណត់ `.value` ទៅតម្លៃដែលគ្មាន `<option>` ក្លាយជា `''`។
+  លើ tree មុនកែ ➜ ធ្លាក់ ២ (តារាងទទេខុស + ការស្វែងរកលេខមានសញ្ញា)។
+- **`audit-tools/keygen-pin-flow-test.js` (10/10)** — លើ tree មុនកែ ➜ **ធ្លាក់ ៦** រួមទាំង
+  "ក្រោយកំណត់ PIN ➜ បើកប្រអប់ Config ពិត" ដែលចេញ `"persistKey"`។
+- **`auth-recovery-test.js` ឡើងជា 191** (scenario ៤ខ ថ្មី)។ លើ tree មុនកែ ➜ ធ្លាក់ ៨ ហើយ log
+  បង្ហាញ URL ពិត `https://evil.googleusercontent.com/user_roles/…?auth=id-token-…` — ភស្តុតាងផ្ទាល់
+  ថា token ធ្លាយមែន។ Harness ទទួល `AUTH_APP_DIR` ដើម្បីរត់លើ tree ផ្សេង។
+- `phone-suggest-test.js` ឡើងជា **55** (បើក modal ➜ ដុំបិទ; blur➜focus ក្នុង ១៥០ms ➜ ដុំនៅបើក)។
+  លើ tree មុនកែ ➜ ធ្លាក់ ៣។
+
+### ពិនិត្យហើយស្អាត — កុំ audit ឡើងវិញដោយងងឹតងងុល
+- **`activate()` ក្នុង `license-verify.js` reset `onlineExp` ទៅ `exp` ដែល sign រួច ពេលក្រៅបណ្ដាញ**
+  ដែលមើលទៅដូចជាបំបាត់ការបន្ថែមសុពលភាពពី server។ **តាមដានហើយ — ទៅដល់មិនបានទេ**៖
+  `verifyKeyString()` បដិសេធ Key ដែលហួស `exp` ដែល sign រួច ដូច្នេះការ activate ឡើងវិញកើតបានតែ
+  មុនថ្ងៃនោះ ដែលពិដានទាំងពីរនៅតែជាអនាគត។ **មិនបានកែ** (កុំប៉ះឯកសារនេះដោយគ្មានហេតុផលពិត)។
+- **export របស់ `firebaseSDK` ↔ ការប្រើពិត ទាំង ៤ App**៖ គ្មានអ្វីខ្វះ។ Zoescan ប្រើ
+  `firebase-init.js` ផ្ទាល់ខ្លួន (តូចជាង គ្មាន `deleteApp`/`set`) — មិនអីទេ ព្រោះវាមិនប្រើវា
+  ហើយ `saveFirebaseConfig()` របស់វា **reload ទំព័រពេញ** ដូច្នេះការ re-init មិនត្រូវការ `deleteApp`។
+- `APP_SHELL` ក្នុង `sw.js` ទាំង ៤ គ្របឯកសារពិតទាំងអស់លើ disk។
+- Firebase path ↔ rules៖ ត្រូវគ្នាទាំង ២ ទិស (គ្មាន path ក្រៅ rules, គ្មាន block មិនប្រើ)។
+- `JSON.parse` គ្រប់កន្លែងទាំង ៤ App នៅក្នុង try/catch។
+- Link Markdown ទាំងអស់ក្នុង README ដំណើរការ។ `license-verify.js` និង `error-reporting.js`
+  នៅ byte-identical ទាំង ៤ (`md5sum` = ១ តម្លៃ)។ comment = 0, trailing whitespace = 0។
+
+### ទទួលយកដោយចេតនា (មិនកែ)
+- `README.md` របស់ App នីមួយៗក៏ត្រូវបានបម្រើជាសាធារណៈដែរ (`publish = "."`) — ជាឯកសារ គ្មានអាថ៌កំបាំង។
+- Zoescan៖ QR ដែលមិនមែន Setup Link ធ្វើឲ្យ toast ចេញឡើងវិញរាល់ frame ដែល decode បាន (រំខានតែប៉ុណ្ណោះ)។
+- អ្វីៗដែលជុំមុនទទួលយករួច នៅដដែល៖ worker សរសេរតួលេខ revenue/pickup បាន, គ្មានការផ្ទៀងផ្ទាត់
+  aggregate ដោយគ្មាន backend, ZoeKeyGen "Extend" ផ្លាស់តែពិដាន server។
+
+`CACHE_VERSION`៖ zoeadmin-v43, zoew-v38 (bump ក្នុង commit ដំបូងនៃ branch នេះ), zoescan-v32,
+zoekeygen-v25។ **គ្មានការប្ដូរ Firebase rules ➜ គ្មាន publish ថ្មី។**

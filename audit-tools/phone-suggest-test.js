@@ -27,7 +27,12 @@ function ok(label, cond, detail) {
 
 function makeContext(app) {
     const datalistOptions = [];
-    const searchInput = { value: '', getBoundingClientRect: () => ({ top: 200, bottom: 244, left: 10, width: 300 }) };
+    const listeners = {};
+    const searchInput = {
+        value: '',
+        getBoundingClientRect: () => ({ top: 200, bottom: 244, left: 10, width: 300 }),
+        addEventListener: (type, fn) => { listeners[type] = fn; }
+    };
     const suggestBox = {
         children: [],
         classes: {},
@@ -40,6 +45,7 @@ function makeContext(app) {
         },
         appendChild: (el) => { suggestBox.children.push(el); },
         querySelectorAll: () => suggestBox.children,
+        addEventListener: () => {},
         offsetHeight: 100
     };
     Object.defineProperty(suggestBox, 'textContent', {
@@ -57,6 +63,8 @@ function makeContext(app) {
     const rendered = { rows: null, filterCalls: 0 };
     const sandbox = {
         console,
+        setTimeout,
+        clearTimeout,
         scanHistory: [],
         window: { innerHeight: 800, addEventListener: () => {} },
         document: {
@@ -67,6 +75,7 @@ function makeContext(app) {
                 if (id === 'recentPhonesList') return datalist;
                 return null;
             },
+            body: { style: {} },
             createElement: () => ({
                 className: '',
                 textContent: '',
@@ -89,18 +98,20 @@ function makeContext(app) {
         applyCurrentFilter: () => { rendered.filterCalls++; rendered.rows = null; }
     };
     const ctx = vm.createContext(sandbox);
-    const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone'];
-    const optional = ['normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions'];
+    const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper'];
+    const optional = ['normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');
     const present = optional.filter((n) => src.indexOf('function ' + n + '(') !== -1);
     const consts = src.match(/const PHONE_SUGGEST_MAX = \d+;/);
     const consts2 = src.match(/const RECENT_PHONES_MAX = \d+;/);
+    const stateDecls = (src.match(/^ *let phoneSuggest\w+ = .*$/gm) || []).join('\n');
     vm.runInContext((consts ? consts[0] : 'const PHONE_SUGGEST_MAX = 8;') + '\n' +
-        (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') +
-        '\nlet phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;', ctx);
+        (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') + '\n' +
+        (stateDecls || 'let phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;') +
+        '\nlet isModalOpen = false;', ctx);
     vm.runInContext(slice(app + '/app.js', names.concat(present)), ctx);
     const maxRows = consts ? parseInt(consts[0].replace(/\D/g, ''), 10) : 8;
-    return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, has: (n) => present.indexOf(n) !== -1 };
+    return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, listeners, has: (n) => present.indexOf(n) !== -1 };
 }
 
 function itemsFixture() {
@@ -172,6 +183,15 @@ function itemsFixture() {
     h.ctx.searchByPhone();
     ok('ទទេ ➜ ត្រឡប់ទៅតម្រងធម្មតា', h.rendered.filterCalls === 1, h.rendered.filterCalls);
 
+    console.log('-- ដុំស្នើលេខមិនត្រូវអណ្តែតលើ modal --');
+    if (h.has('showPhoneSuggestions')) {
+        h.searchInput.value = '421';
+        h.ctx.showPhoneSuggestions();
+        ok('ដុំបើករួច មុនបើក modal', h.suggestBox.classList.contains('show'));
+        h.ctx.openModalHelper('phoneModal');
+        ok('បើក modal ➜ ដុំបិទដោយស្វ័យប្រវត្តិ', !h.suggestBox.classList.contains('show'));
+    }
+
     console.log('-- ទំហំ ២០០-៣០០ លេខ --');
     if (h.has('collectPhoneSuggestions')) {
         const big = [];
@@ -195,5 +215,30 @@ function itemsFixture() {
     ok('"គ្មានលេខ" មិនចូល datalist', h.datalistOptions.indexOf('គ្មានលេខ') === -1);
 });
 
-console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));
-process.exit(fail === 0 ? 0 : 1);
+function blurRaceCheck() {
+    return new Promise((resolve) => {
+        console.log('\n=== blur ➜ focus ក្នុង ១៥០ms ===');
+        const h = makeContext('ZoeAdmin');
+        h.ctx.scanHistory = itemsFixture();
+        if (!h.has('setupPhoneSuggestions')) { ok('មាន setupPhoneSuggestions', false); return resolve(); }
+        h.ctx.setupPhoneSuggestions();
+        h.searchInput.value = '421';
+        h.listeners.focus();
+        ok('focus ➜ ដុំបើក', h.suggestBox.classList.contains('show'));
+        h.listeners.blur();
+        h.listeners.focus();
+        setTimeout(() => {
+            ok('focus ឡើងវិញក្នុង ១៥០ms ➜ ដុំនៅតែបើក', h.suggestBox.classList.contains('show'));
+            h.listeners.blur();
+            setTimeout(() => {
+                ok('blur ហើយទុកចោល ➜ ដុំបិទ', !h.suggestBox.classList.contains('show'));
+                resolve();
+            }, 260);
+        }, 260);
+    });
+}
+
+blurRaceCheck().then(() => {
+    console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));
+    process.exit(fail === 0 ? 0 : 1);
+});

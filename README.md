@@ -13,7 +13,7 @@
 | **Zoescan** | `admin`, `worker`, `scanner` | កំណត់ទីតាំង Locker ប៉ុណ្ណោះ (មិនអាចបញ្ចូល/លុបកញ្ចប់) | [Zoescan/README.md](Zoescan/README.md) |
 | **ZoeKeyGen** | `admin` (Firebase Project ដាច់ដោយឡែក) | បង្កើត/Revoke/Extend Activation Key + បង្កើត Setup Link/QR សម្រាប់ App ទាំង ៣ខាងលើ | [ZoeKeyGen/README.md](ZoeKeyGen/README.md) |
 
-ឧបករណ៍បន្ថែម (មិនមែន App ដែល Deploy ជូនអតិថិជនទេ)៖
+ឧបករណ៍បន្ថែម៖
 
 | ថត | អ្វី | README |
 |---|---|---|
@@ -27,12 +27,6 @@
   Parcel/COD/DOD)។ Rules នៅ [firebase-database.rules.json](firebase-database.rules.json)
   (Root) ត្រូវ Paste ដោយដៃទៅ Firebase Console → Realtime Database → Rules → Publish —
   **មិន Deploy ស្វ័យប្រវត្តិទេ** ព្រោះ Netlify Serve តែ Static files ប៉ុណ្ណោះ។
-- **ZoeKeyGen** ប្រើ Firebase Project **ដាច់ដោយឡែកទាំងស្រុង** ពី ៣ App ខាងលើ (មិនប៉ះពាល់
-  ទិន្នន័យអាជីវកម្ម ទោះ Project នេះមានបញ្ហាក៏ដោយ) — Rules ផ្ទាល់ខ្លួននៅ
-  `ZoeKeyGen/firebase-database.rules.json`។
-- **សំខាន់**៖ ទោះ ZoeAdmin និង ZoeW មានមុខងារស្រដៀងគ្នាច្រើន (delete/restore/pickup-stat/
-  revenue) `app.js` របស់ App នីមួយៗគឺ **ជា File ដាច់ដោយឡែក ស្ទួនគ្នា** — ការជួសជុល Bug
-  ក្នុង App មួយ **មិន Auto-apply** ទៅ App ដទៃទេ ត្រូវពិនិត្យ Mirror ដោយដៃរាល់ពេល។
 - `license-verify.js` ត្រូវតែ **Byte-identical** គ្រប់ទាំង ៤ App (Shared Public Key +
   Verification Logic សម្រាប់ផ្ទៀងផ្ទាត់ Activation Key ពី ZoeKeyGen)។
 - **១ Sentry Project រួម** សម្រាប់ App ទាំង ៤ ញែកគ្នាដោយ Tag `app`

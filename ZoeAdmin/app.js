@@ -16,6 +16,8 @@
     bindClickBackup('editPhoneSaveBtn', saveEditedPhone);
     bindClickBackup('restoreConfirmBtn', executeRestoreItem);
     bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
+    bindClickBackup('phoneModalCancelBtn', () => closeModal('phoneModal'));
+    bindClickBackup('phoneModalCloseX', dismissPhoneModal);
 
     function showUpdateAvailableBanner() {
         if (document.getElementById('zoeUpdateBanner')) return;
@@ -117,6 +119,7 @@
 
     let nativeDetector = null;
     let isModalOpen = false;
+    let phoneModalDismissPromptOpen = false;
     let searchTimer = null;
     let isDatabaseInitialized = false;
     let globalAudioCtx = null;
@@ -147,6 +150,16 @@
         markingItemId = null;
         isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
         if (!isModalOpen) safeFocusScanner();
+    }
+
+    function dismissPhoneModal() {
+        if (phoneModalDismissPromptOpen) return;
+        const modalEl = document.getElementById('phoneModal');
+        if (!modalEl || modalEl.style.display !== 'flex') return;
+        phoneModalDismissPromptOpen = true;
+        setTimeout(() => { phoneModalDismissPromptOpen = false; }, 0);
+        if (!confirm("តើអ្នកពិតជាចង់បោះបង់កញ្ចប់នេះមែនទេ? ព័ត៌មានដែលបានវាយបញ្ចូល (លេខទូរស័ព្ទ, Locker, COD, DOD) នឹងបាត់ ហើយកញ្ចប់នេះនឹងមិនត្រូវបានរក្សាទុកទេ។")) return;
+        closeModal('phoneModal');
     }
 
     function cleanupResources() {
@@ -1078,6 +1091,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        restoreAfterPdfExport();
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;
@@ -2686,6 +2700,17 @@
         }
     }
 
+    let pdfExportOriginalTitle = null;
+
+    function restoreAfterPdfExport() {
+        if (pdfExportOriginalTitle !== null) {
+            document.title = pdfExportOriginalTitle;
+            pdfExportOriginalTitle = null;
+        }
+        const area = document.getElementById('pdfExportPrintArea');
+        if (area) area.innerHTML = '';
+    }
+
     function exportDataAsPDF() {
         const rows = buildExportRows();
         if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
@@ -2729,13 +2754,9 @@
             <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date(getServerNow()).toLocaleString('km-KH'))}</p>
         `;
 
-        const originalTitle = document.title;
+        if (pdfExportOriginalTitle === null) pdfExportOriginalTitle = document.title;
         document.title = getExportFilenameBase();
-        window.addEventListener('afterprint', () => {
-            document.title = originalTitle;
-            const area = document.getElementById('pdfExportPrintArea');
-            if (area) area.innerHTML = '';
-        }, { once: true });
+        window.addEventListener('afterprint', restoreAfterPdfExport);
         window.print();
     }
 
@@ -3686,11 +3707,11 @@
         const skipBtn = document.getElementById('phoneModalSkipBtn');
         const confirmBtn = document.getElementById('phoneModalConfirmBtn');
         const cancelBtn = document.getElementById('phoneModalCancelBtn');
-        const phoneModalEl = document.getElementById('phoneModal');
+        const closeXBtn = document.getElementById('phoneModalCloseX');
         if (skipBtn) skipBtn.disabled = true;
         if (confirmBtn) confirmBtn.disabled = true;
         if (cancelBtn) cancelBtn.disabled = true;
-        if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
+        if (closeXBtn) closeXBtn.disabled = true;
 
         try {
             const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
@@ -3721,7 +3742,7 @@
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;
             if (cancelBtn) cancelBtn.disabled = false;
-            if (phoneModalEl) phoneModalEl.removeAttribute('data-nodismiss');
+            if (closeXBtn) closeXBtn.disabled = false;
         }
     }
 

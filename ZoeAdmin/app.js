@@ -4013,94 +4013,126 @@
 
         if (!confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return;
 
-        const freshItem = scanHistory.find(i => i.id === itemId);
-        if (!freshItem || !freshItem.barcodes) return;
-        const freshBcIndex = freshItem.barcodes.findIndex(b => b.code === barcodeCode);
-        if (freshBcIndex === -1) return;
-
-        const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
-        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
-
-        const removedBc = freshItem.barcodes.splice(freshBcIndex, 1)[0];
-
-        let deductionApplied = false;
-        let deductedCod = 0;
-        let deductedDod = 0;
-        const revenueScanDate = freshItem.scanDate || getFormattedDate();
-        if (!removedBc.isDeducted) {
-            deductedCod = parseFloat(removedBc.cod) || 0;
-            deductedDod = parseFloat(removedBc.dod) || 0;
-
-            addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
-            removedBc.isDeducted = true;
-            deductionApplied = true;
+        if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) {
+            const idErr = new Error('Unsafe id during removeSingleBarcode');
+            console.error(idErr.message, itemId);
+            if (window.ZoeErrors) ZoeErrors.capture(idErr, { context: 'removeSingleBarcode' });
+            showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
+            return;
         }
 
-        removedBc.isFromDeletion = false;
-
-        let itemToTrash = { ...freshItem, barcodes: [removedBc], count: 1 };
-        itemToTrash.id = generateUniqueId();
-        itemToTrash.deletedAt = getServerNow();
-        itemToTrash.isFromDeletion = false;
-        itemToTrash.cod = parseFloat(removedBc.cod) || 0;
-        itemToTrash.dod = parseFloat(removedBc.dod) || 0;
-        itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
-        itemToTrash.barcode = removedBc.code;
-        itemToTrash.locker = removedBc.locker || "N/A";
-        itemToTrash.time = removedBc.time || freshItem.time;
-        itemToTrash.isClosed = removedBc.isClosed || false;
-        if (itemToTrash.isClosed) {
-            itemToTrash.closedAt = freshItem.closedAt || getServerNow();
-        } else {
-            delete itemToTrash.closedAt;
-        }
-        deletedItems.unshift(itemToTrash);
-
-        let wasFullyRemoved = false;
-        if (freshItem.barcodes.length === 0) {
-            const itemIndex = scanHistory.findIndex(i => i.id === itemId);
-            if (itemIndex !== -1) {
-                scanHistory.splice(itemIndex, 1);
-            }
-            closeModal('viewListModal');
-            wasFullyRemoved = true;
-        } else {
-            freshItem.count = freshItem.barcodes.length;
-            freshItem.cod = Math.round(freshItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            freshItem.dod = Math.round(freshItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            freshItem.price = Math.round((freshItem.cod + freshItem.dod) * 100) / 100;
-            freshItem.barcode = freshItem.barcodes[0].code;
-            freshItem.isClosed = freshItem.barcodes.length > 0 && freshItem.barcodes.every(b => b.isClosed);
-            if (freshItem.isClosed) {
-                if (!freshItem.closedAt) freshItem.closedAt = getServerNow();
-            } else {
-                delete freshItem.closedAt;
-            }
-            openViewListModal(itemId);
-        }
-
-        refreshCurrentHistoryView();
-
+        let claimedParent = null;
+        let claimedBarcode = null;
+        let claimedWhole = null;
         try {
-            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
-            if (!itemId || !safeIdPattern.test(itemId) || !itemToTrash.id || !safeIdPattern.test(itemToTrash.id)) {
-                throw new Error('Unsafe id during removeSingleBarcode');
-            }
-            await fb.update(fb.ref(db), {
-                [`zoew_scan_history_cod_dod/${itemId}`]: wasFullyRemoved ? null : freshItem,
-                [`zoew_recently_deleted_cod_dod/${itemToTrash.id}`]: itemToTrash
+            const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
+                claimedParent = null;
+                claimedBarcode = null;
+                claimedWhole = null;
+                if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
+                if (!Array.isArray(currentItem.barcodes)) return currentItem;
+                const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
+                if (idx === -1) return currentItem;
+                claimedParent = currentItem;
+                claimedBarcode = currentItem.barcodes[idx];
+                const kept = currentItem.barcodes.filter((b, i) => i !== idx);
+                if (kept.length === 0) {
+                    claimedWhole = currentItem;
+                    return null;
+                }
+                const updated = { ...currentItem, barcodes: kept };
+                updated.count = kept.length;
+                updated.cod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                updated.dod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                updated.barcode = kept[0].code;
+                updated.isClosed = kept.every(b => b.isClosed);
+                if (updated.isClosed) {
+                    if (!updated.closedAt) updated.closedAt = getServerNow();
+                } else {
+                    delete updated.closedAt;
+                }
+                return updated;
             });
-            if (wasFullyRemoved) clearScannerLookupEntry(itemId);
-            else syncScannerLookupEntry(itemId, freshItem);
-            showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+
+            if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
+
+            if (!claimedBarcode) {
+                refreshCurrentHistoryView();
+                showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
+                return;
+            }
+
+            const committedItem = result.snapshot ? result.snapshot.val() : null;
+            const localIdx = scanHistory.findIndex(i => i.id === itemId);
+            if (claimedWhole) {
+                if (localIdx !== -1) scanHistory.splice(localIdx, 1);
+                closeModal('viewListModal');
+            } else if (localIdx !== -1 && committedItem) {
+                scanHistory[localIdx] = { ...committedItem, id: itemId };
+            }
+
+            let deductedCod = 0;
+            let deductedDod = 0;
+            let deductionApplied = false;
+            const revenueScanDate = claimedParent.scanDate || getFormattedDate();
+            if (!claimedBarcode.isDeducted) {
+                deductedCod = parseFloat(claimedBarcode.cod) || 0;
+                deductedDod = parseFloat(claimedBarcode.dod) || 0;
+                addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
+                deductionApplied = true;
+            }
+
+            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };
+            const itemToTrash = { ...claimedParent, barcodes: [removedBc], count: 1 };
+            itemToTrash.id = generateUniqueId();
+            itemToTrash.deletedAt = getServerNow();
+            itemToTrash.isFromDeletion = false;
+            itemToTrash.cod = parseFloat(removedBc.cod) || 0;
+            itemToTrash.dod = parseFloat(removedBc.dod) || 0;
+            itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
+            itemToTrash.barcode = removedBc.code;
+            itemToTrash.locker = removedBc.locker || "N/A";
+            itemToTrash.time = removedBc.time || claimedParent.time;
+            itemToTrash.isClosed = removedBc.isClosed || false;
+            if (itemToTrash.isClosed) {
+                itemToTrash.closedAt = claimedParent.closedAt || getServerNow();
+            } else {
+                delete itemToTrash.closedAt;
+            }
+
+            deletedItems.unshift(itemToTrash);
+            if (!claimedWhole) openViewListModal(itemId);
+            refreshCurrentHistoryView();
+
+            await retryAsync(() => saveSingleDeletedItemToFirebase(itemToTrash), 4, 1500).then(() => {
+                if (claimedWhole) clearScannerLookupEntry(itemId);
+                else if (committedItem) syncScannerLookupEntry(itemId, committedItem);
+                showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+            }).catch(async (trashErr) => {
+                if (deductionApplied) {
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
+                }
+                const staleIdx = deletedItems.findIndex(i => i.id === itemToTrash.id);
+                if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
+                console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'removeSingleBarcode trash write failed after retries', itemId });
+                try {
+                    const restoreResult = await restoreClaimedItemToScanHistory(itemId, claimedWhole, claimedWhole ? null : { ...claimedParent, barcodes: [claimedBarcode] });
+                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    if (restoredItem) syncScannerLookupEntry(itemId, restoredItem);
+                    refreshCurrentHistoryView();
+                    showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                } catch (restoreErr) {
+                    console.error('Failed to restore barcode to scan history after trash write failure for', itemId, restoreErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'removeSingleBarcode restore-after-trash-failure also failed', itemId });
+                    showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + barcodeCode + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
+                }
+            });
         } catch (e) {
             console.error("Error removing single barcode: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error removing single barcode: " });
-            if (deductionApplied) {
-                addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
-            }
-            scanHistory = historySnapshot;
-            deletedItems = deletedSnapshot;
             refreshCurrentHistoryView();
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
@@ -4365,6 +4397,7 @@
                         addRevenueToDailyAndMonthlyRecord(revenueScanDate, correctionCod, correctionDod, 0);
                     }
                     if (committedItem) syncScannerLookupEntry(editedItemId, committedItem);
+                    showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
                 }).catch(() => {
                     if (revenueApplied) {
                         addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
@@ -4386,7 +4419,6 @@
                     showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                 });
                 refreshCurrentHistoryView();
-                showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
             }
 
             closeModal('editBarcodePriceModal');
@@ -4633,37 +4665,71 @@
 
         if (!confirm(`តើអ្នកពិតជាចង់លុបទិន្នន័យនេះមែនទេ?`)) return;
 
-        const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
-        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
-
-        let removed = scanHistory.splice(index, 1)[0];
-        removed.deletedAt = getServerNow();
-        removed.isFromDeletion = true;
-        if (removed.barcodes && Array.isArray(removed.barcodes)) {
-            removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+        if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+            const idErr = new Error('Unsafe id during deleteSingleItem');
+            console.error(idErr.message, id);
+            if (window.ZoeErrors) ZoeErrors.capture(idErr, { context: 'deleteSingleItem' });
+            showToast("⚠️ លុបមិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
+            return;
         }
 
-        deletedItems.unshift(removed);
-
-        refreshCurrentHistoryView();
-        updateRecentPhonesList();
-
+        let claimedWhole = null;
         try {
-            const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
-            if (!id || !safeIdPattern.test(id) || !removed.id || !safeIdPattern.test(removed.id)) {
-                throw new Error('Unsafe id during deleteSingleItem');
-            }
-            await fb.update(fb.ref(db), {
-                [`zoew_scan_history_cod_dod/${id}`]: null,
-                [`zoew_recently_deleted_cod_dod/${removed.id}`]: removed
+            const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+                claimedWhole = null;
+                if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
+                claimedWhole = currentItem;
+                return null;
             });
-            clearScannerLookupEntry(id);
-            showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+
+            if (!result || !result.committed) throw new Error('Delete item transaction was not committed');
+
+            const localIdx = scanHistory.findIndex(i => i.id === id);
+            if (localIdx !== -1) scanHistory.splice(localIdx, 1);
+
+            if (!claimedWhole) {
+                refreshCurrentHistoryView();
+                updateRecentPhonesList();
+                showToast("⚠️ ទិន្នន័យនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
+                return;
+            }
+
+            const removed = { ...claimedWhole, id };
+            removed.deletedAt = getServerNow();
+            removed.isFromDeletion = true;
+            if (Array.isArray(removed.barcodes)) {
+                removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+            }
+
+            deletedItems.unshift(removed);
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+
+            await retryAsync(() => saveSingleDeletedItemToFirebase(removed), 4, 1500).then(() => {
+                clearScannerLookupEntry(id);
+                showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+            }).catch(async (trashErr) => {
+                const staleIdx = deletedItems.findIndex(i => i.id === removed.id);
+                if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
+                console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'deleteSingleItem trash write failed after retries', itemId: id });
+                try {
+                    const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, null);
+                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
+                    refreshCurrentHistoryView();
+                    updateRecentPhonesList();
+                    showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                } catch (restoreErr) {
+                    console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'deleteSingleItem restore-after-trash-failure also failed', itemId: id });
+                    showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
+                }
+            });
         } catch (e) {
             console.error("Error deleting single item: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });
-            scanHistory = historySnapshot;
-            deletedItems = deletedSnapshot;
             refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");

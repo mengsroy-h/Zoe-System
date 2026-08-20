@@ -90,6 +90,8 @@ let db = null;
 let authUnsubscribe = null;
 let authGeneration = 0;
 let pendingRoleRecheck = false;
+let isDatabaseConnected = false;
+const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
@@ -226,6 +228,7 @@ async function initFirebase() {
             const online = snap.val() === true;
             if (dot) dot.classList.toggle('online', online);
             if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+            isDatabaseConnected = online;
             if (online) retryPendingRoleCheck();
         });
 
@@ -536,6 +539,29 @@ async function doLogin() {
     }
 }
 
+function awaitDatabaseConnection(timeoutMs) {
+    return new Promise((resolve) => {
+        if (isDatabaseConnected) { resolve(true); return; }
+        if (!window.firebaseSDK || !db) { resolve(false); return; }
+        let settled = false;
+        let unsubscribe = null;
+        let timer = null;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            if (unsubscribe) { try { unsubscribe(); } catch (e) {} }
+            resolve(value);
+        };
+        timer = setTimeout(() => finish(false), timeoutMs);
+        try {
+            unsubscribe = window.firebaseSDK.onValue(window.firebaseSDK.ref(db, '.info/connected'), (snap) => {
+                if (snap.val() === true) finish(true);
+            });
+        } catch (e) { finish(false); }
+    });
+}
+
 function retryPendingRoleCheck() {
     if (!pendingRoleRecheck) return;
     if (!auth || !auth.currentUser) return;
@@ -545,6 +571,11 @@ function retryPendingRoleCheck() {
 
 async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     pendingRoleRecheck = false;
+    if (!isDatabaseConnected) {
+        showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
+        await awaitDatabaseConnection(ROLE_CHECK_CONNECT_WAIT_MS);
+        if (myAuthGeneration !== authGeneration) return;
+    }
     try {
         const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
         if (myAuthGeneration !== authGeneration) return;

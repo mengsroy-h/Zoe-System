@@ -4,9 +4,21 @@
 >
 > 🔴 **ថ្មីបំផុត (2026-08-20)** — អ្នកប្រើរាយការណ៍ថា ZoeAdmin បិទ App រួចបើកវិញ ➜ ដុំ "ក្រៅបណ្ដាញ"
 > ➜ សុំឲ្យ login ➜ login **មិនចូល**។ រកឃើញមូលហេតុពិត ២ (មិនមែនបញ្ហាបណ្ដាញសុទ្ធសាធទេ) ហើយ
-> បានកែក្នុង branch `claude/zoeadmin-login-offline-6ktcqp` — មើល section
-> **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។ កែទាំង ៤ App។
-> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។** នៅមិនទាន់ merge ចូល `main`។
+> កែទាំង ៤ App ហើយ **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #24, merge commit `65eb0f6`
+> (branch `claude/zoeadmin-login-offline-6ktcqp`, ចេញពី `8c56254` ដោយផ្ទាល់)។ Netlify preview
+> ទាំង ៤ បៃតងមុន merge ហើយ `git rev-list --count origin/main..origin/<branch>` = 0 ក្រោយ merge។
+> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។
+> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។**
+> លម្អិតនៅ section **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។
+>
+> 🔴 **តេស្តលើទូរស័ព្ទពិត (04:28) បង្ហាញថាការកែនោះដើរ តែមូលហេតុទី ៣ នៅសល់** — stack trace ចង្អុល
+> `app.js:1364` (បន្ទាត់ថ្មី) ហើយ toast ជាអត្ថបទថ្មី ➜ PWA update ចូលពិត និង login លែងស្ងាត់ទៀត។
+> ប៉ុន្តែ role check នៅតែ timeout។ រកឃើញមូលហេតុទី ៣៖ **RTDB មិនអាចភ្ជាប់មុន auth token មកដល់**
+> (`establishConnection_` await `authTokenProvider_.getToken()` — មានក្នុង source ច្បាស់) ហើយលើ
+> ឧបករណ៍នោះ `accounts:lookup` ចំណាយ **១៤.៨៧ វិនាទី** ចំណែក timer មាន ១៥ វិនាទី ➜ ចាញ់ជាប្រព័ន្ធ។
+> បូកនឹង `WebSocketConnection.healthyTimeout = 30000` មុនប្ដូរទៅ long-polling។
+> **កែហើយ (មិនទាន់ merge)**៖ រង់ចាំ `.info/connected` សិន (រហូត ៤៥ វិនាទី) ទើបអាន `user_roles` —
+> ឈប់ប្រណាំងនឹង timer។ មើល section ចុងឯកសារ។
 >
 > ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
 > (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
@@ -1933,3 +1945,23 @@ baseline ផ្ទុកការកែស្រាប់ ហើយចំនួ�
   license DB មិនទាក់ទង `.info/connected`)។ ឥឡូវយ៉ាងហោចណាស់ការ login ដោយដៃដំណើរការវិញបាន។
 
 `CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v36, zoew-v32, zoescan-v25, zoekeygen-v18)។
+
+### មូលហេតុទី ៣ (រកឃើញក្រោយ deploy 2026-08-20) — role check ប្រណាំងនឹងការភ្ជាប់ RTDB
+ការកែខាងលើដើរពិត (បញ្ជាក់ដោយ stack `app.js:1364` និង toast ថ្មី) តែ role check នៅតែ timeout។
+មូលហេតុ៖ `PersistentConnection.establishConnection_()` **await `authTokenProvider_.getToken()`
+មុននឹងបើក socket** (មានសរសេរច្បាស់ក្នុង `@firebase/database@1.1.4`) ដូច្នេះ RTDB មិនអាចភ្ជាប់
+មុន Firebase Auth ឆ្លើយ។ លើឧបករណ៍អ្នកប្រើ `accounts:lookup` ចំណាយ **១៤.៨៧ វិនាទី** ខណៈ
+`withTimeout(..., 15000)` រត់ស្របគ្នា ➜ role check **ចាញ់ជាប្រព័ន្ធ មិនមែនចៃដន្យ**។ លើសពីនេះ
+`WebSocketConnection.healthyTimeout = 30000` ➜ បើ socket ជាប់គាំង វារង់ ៣០ វិនាទីមុនប្ដូរទៅ
+long-polling — ធំជាង timer ១៥ វិនាទីទ្វេដង។
+
+**ដំណោះស្រាយ (ទាំង ៤ App)**៖ `awaitDatabaseConnection(ms)` ថ្មី (byte-identical ទាំង ៤ —
+ប្រើ `window.firebaseSDK` ដើម្បីកុំបែកគ្នា) រង់ចាំ `.info/connected` រហូតដល់
+`ROLE_CHECK_CONNECT_WAIT_MS = 45000` **មុននឹងអាន `user_roles`**។ បើភ្ជាប់រួចហើយ វាបន្តភ្លាម
+(គ្មានការពន្យារ)។ បើមិនទាន់ វាបង្ហាញ toast "កំពុងភ្ជាប់ Server..." រួចរង់ចាំ។ សំណាញ់សុវត្ថិភាព
+ចាស់នៅដដែល៖ បើភ្ជាប់មិនបានសោះ ➜ អាន ➜ timeout ➜ មិន signOut ➜ ដាក់ទង់ព្យាយាមឡើងវិញ។
+`isDatabaseConnected` ត្រូវបានកត់ក្នុង handler `.info/connected` ដែលមានស្រាប់។
+
+តេស្តឡើងជា **98/98** (ថែម scenario ៥ និង ៦ ក្នុង `auth-recovery-test.js`)។ ផ្ទៀងផ្ទាត់មិនទទេ៖
+ធ្លាក់ ២០ ចំណុចលើ `origin/main` (ដែលមានការកែ login រួច តែគ្មានការរង់ចាំភ្ជាប់)។
+`CACHE_VERSION` bump ម្តងទៀត (zoeadmin-v37, zoew-v33, zoescan-v26, zoekeygen-v19)។

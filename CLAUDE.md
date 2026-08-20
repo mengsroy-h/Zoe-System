@@ -2334,3 +2334,6 @@ backend ដែលទុកចិត្តបាន (ដូចដែលបាន�
 
 `CACHE_VERSION` bump ទាំង ៤ ពីរដង (បញ្ចប់នៅ zoeadmin-v42, zoew-v37, zoescan-v31, zoekeygen-v24)។
 **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**
+
+**Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើ** — PR #32, merge commit `c46d43a`។ Netlify preview
+ទាំង ៤ បៃតងមុន merge ហើយ `git rev-list --count origin/main..origin/<branch>` = 0 ក្រោយ merge។

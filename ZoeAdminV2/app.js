@@ -95,6 +95,10 @@
     let torchOn = false;
 
     let scanHistory = [];
+    let activeTabName = 'orders';
+    let statusFilterMode = 'all';
+    let sortMode = 'newest';
+    let historySeqById = new Map();
     let deletedItems = [];
     let isInitializingFirebase = false;
     let dailyRevenueData = {};
@@ -332,7 +336,7 @@
         const enc = new TextEncoder();
         const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits']);
         const bits = await crypto.subtle.deriveBits(
-            { name: 'PBKDF2', salt: enc.encode('zoeadmin_pin_verify_v2'), iterations: 150000, hash: 'SHA-256' },
+            { name: 'PBKDF2', salt: enc.encode('zoeadminv2_pin_verify_v2'), iterations: 150000, hash: 'SHA-256' },
             keyMaterial,
             256
         );
@@ -352,7 +356,7 @@
             const enc = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']);
             return await crypto.subtle.deriveKey(
-                { name: 'PBKDF2', salt: enc.encode('zoeadmin_lookup_api_secret_v1'), iterations: 150000, hash: 'SHA-256' },
+                { name: 'PBKDF2', salt: enc.encode('zoeadminv2_lookup_api_secret_v1'), iterations: 150000, hash: 'SHA-256' },
                 keyMaterial,
                 { name: 'AES-GCM', length: 256 },
                 false,
@@ -498,7 +502,7 @@
         const dsnEntered = dsnInput ? dsnInput.value.trim() : '';
         if (dsnInput && window.ZoeErrors) {
             ZoeErrors.setDsn(dsnInput.value);
-            const sentryOk = await ZoeErrors.init('zoeadmin');
+            const sentryOk = await ZoeErrors.init('zoeadminv2');
             if (dsnEntered && !sentryOk) {
                 showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
             }
@@ -1099,7 +1103,6 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
-        setPhoneSearchPulledUp(false);
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -1115,7 +1118,7 @@
             'editModalBarcodeText', 'lookupApiHeaderValueInput',
             'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
             'deletedTableBody', 'dailyStatsContainer', 'monthlyStatsContainer',
-            'menuContentContainer'
+            'menuContentContainer', 'ordersOpenBadge'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1496,6 +1499,7 @@
     function updateAuthButton(isLoggedIn) {
         const btn = document.getElementById('navAuthBtn');
         if (!btn) return;
+        btn.classList.toggle('logged-in', !!isLoggedIn);
         if (isLoggedIn) {
             btn.textContent = '🚪 ចាកចេញ';
             btn.onclick = logoutApp;
@@ -1963,7 +1967,7 @@
     }
 
     window.addEventListener('load', function () {
-        if (window.ZoeErrors) ZoeErrors.init('zoeadmin');
+        if (window.ZoeErrors) ZoeErrors.init('zoeadminv2');
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();
@@ -2013,7 +2017,10 @@
         }
 
         setupHardwareScanner();
-        setupSwipeGestures();
+        setupThemeWatcher();
+        restoreListPreferences();
+        setupTabNavigation();
+        setupKeyboardShortcuts();
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();
@@ -2301,7 +2308,7 @@
         let sortedKeys = Object.keys(dailyRevenueData).sort().reverse();
 
         if (sortedKeys.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
+            container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
         } else {
             sortedKeys.forEach(dateStr => {
                 let data = dailyRevenueData[dateStr];
@@ -2338,7 +2345,7 @@
         let sortedKeys = Object.keys(monthlyRevenueData).sort().reverse();
 
         if (sortedKeys.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
+            container.innerHTML = `<p style="text-align: center; color: var(--text-muted); padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
         } else {
             sortedKeys.forEach(ym => {
                 let data = monthlyRevenueData[ym];
@@ -2367,90 +2374,222 @@
         openModalHelper('monthlyStatsModal');
     }
 
-    function setupSwipeGestures() {
-        const sidebar = document.getElementById('sidebarSection');
-        const mainSection = document.getElementById('mainSection');
-        const tableResponsive = document.getElementById('tableResponsive');
-        const appContainer = document.getElementById('appContainer');
-        if(!sidebar || !mainSection || !tableResponsive) return;
+    const TAB_NAMES = ['scan', 'orders', 'money', 'more'];
+    const STATUS_FILTER_MODES = ['all', 'open', 'closed', 'uncalled', 'recall'];
+    const SORT_MODES = ['newest', 'oldest', 'packages', 'value'];
 
-        let startY = 0;
-        let currentY = 0;
-        let isDragging = false;
+    function switchTab(name) {
+        if (TAB_NAMES.indexOf(name) === -1) return;
+        activeTabName = name;
+        try { localStorage.setItem('zoeadminv2_active_tab', name); } catch (e) {}
 
-        function phoneSearchIsActive() {
-            const box = document.getElementById('phoneSuggestBox');
-            if (box && box.classList.contains('show')) return true;
-            const input = document.getElementById('searchPhoneInput');
-            return !!(input && document.activeElement === input && input.value.trim());
-        }
-
-        function syncPullToRefreshLock() {
-            if (appContainer) {
-                appContainer.classList.toggle('history-expanded', sidebar.classList.contains('collapsed'));
-            }
-        }
-
-        tableResponsive.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-        }, { passive: true });
-
-        tableResponsive.addEventListener('touchmove', (e) => {
-            currentY = e.touches[0].clientY;
-            let diffY = currentY - startY;
-            let scrollTop = tableResponsive.scrollTop;
-
-            if (scrollTop === 0 && diffY > 30 && window.innerWidth < 992) {
-                if (sidebar.classList.contains('collapsed')) {
-                    sidebar.classList.remove('collapsed');
-                    syncPullToRefreshLock();
-                }
-            }
-        }, { passive: true });
-
-        mainSection.addEventListener('touchstart', (e) => {
-            if (window.innerWidth >= 992) return;
-            startY = e.touches[0].clientY;
-            isDragging = true;
-        }, { passive: true });
-
-        mainSection.addEventListener('touchmove', (e) => {
-            if (!isDragging || window.innerWidth >= 992) return;
-            currentY = e.touches[0].clientY;
-            let diffY = currentY - startY;
-            let scrollTop = tableResponsive.scrollTop;
-
-            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !phoneSearchIsActive()) {
-                sidebar.classList.add('collapsed');
-                syncPullToRefreshLock();
-                isDragging = false;
-            }
-            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
-                sidebar.classList.remove('collapsed');
-                syncPullToRefreshLock();
-                isDragging = false;
-            }
-            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
-                setPhoneSearchPulledUp(false);
-                isDragging = false;
-            }
-        }, { passive: true });
-
-        mainSection.addEventListener('touchend', () => {
-            isDragging = false;
+        document.querySelectorAll('.tab-panel').forEach((panel) => {
+            panel.classList.toggle('active', panel.getAttribute('data-tab') === name);
+        });
+        document.querySelectorAll('.tab-btn').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab-target') === name);
         });
 
-        const dragHandle = document.getElementById('dragHandle');
-        if (dragHandle) {
-            dragHandle.addEventListener('click', () => {
-                if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
-                setPhoneSearchPulledUp(false);
-                sidebar.classList.toggle('collapsed');
-                syncPullToRefreshLock();
-            });
-        }
+        const appContainer = document.getElementById('appContainer');
+        if (appContainer) appContainer.classList.toggle('history-expanded', name === 'orders');
 
-        syncPullToRefreshLock();
+        closeGlobalMoreMenu();
+        hidePhoneSuggestions();
+        if (name === 'scan') safeFocusScanner();
+    }
+
+    function setupTabNavigation() {
+        let stored = '';
+        try { stored = localStorage.getItem('zoeadminv2_active_tab') || ''; } catch (e) {}
+        switchTab(TAB_NAMES.indexOf(stored) !== -1 ? stored : 'orders');
+    }
+
+    function updateOrdersTabBadge() {
+        const badge = document.getElementById('ordersOpenBadge');
+        if (!badge) return;
+        let openCount = 0;
+        getFilteredDataByDate().forEach((item) => { if (item && !item.isClosed) openCount++; });
+        badge.textContent = openCount > 0 ? (openCount > 99 ? '99+' : String(openCount)) : '';
+    }
+
+    function resolveThemePref(pref) {
+        if (pref === 'dark') return 'dark';
+        if (pref === 'light') return 'light';
+        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+
+    function applyThemeUi() {
+        const pref = document.documentElement.getAttribute('data-theme-pref') || 'auto';
+        const resolved = resolveThemePref(pref);
+        document.documentElement.setAttribute('data-theme', resolved);
+
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) {
+            btn.textContent = pref === 'light' ? '\u2600\uFE0F' : (pref === 'dark' ? '\uD83C\uDF19' : '\uD83C\uDF17');
+            btn.title = pref === 'light' ? 'ផ្ទាំងភ្លឺ' : (pref === 'dark' ? 'ផ្ទាំងងងឹត' : 'តាមប្រព័ន្ធ');
+        }
+        document.querySelectorAll('.theme-opt').forEach((opt) => {
+            opt.classList.toggle('active', opt.getAttribute('data-theme-opt') === pref);
+        });
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', resolved === 'dark' ? '#080B15' : '#4338CA');
+    }
+
+    function setTheme(pref) {
+        const next = ['auto', 'light', 'dark'].indexOf(pref) === -1 ? 'auto' : pref;
+        document.documentElement.setAttribute('data-theme-pref', next);
+        try { localStorage.setItem('zoeadminv2_theme', next); } catch (e) {}
+        applyThemeUi();
+    }
+
+    function cycleTheme() {
+        const order = ['auto', 'light', 'dark'];
+        const current = document.documentElement.getAttribute('data-theme-pref') || 'auto';
+        const idx = order.indexOf(current);
+        setTheme(order[(idx + 1) % order.length]);
+    }
+
+    function setupThemeWatcher() {
+        applyThemeUi();
+        if (!window.matchMedia) return;
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const onChange = () => {
+            if ((document.documentElement.getAttribute('data-theme-pref') || 'auto') === 'auto') applyThemeUi();
+        };
+        if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onChange);
+        else if (typeof mq.addListener === 'function') mq.addListener(onChange);
+    }
+
+    function itemPackageCount(item) {
+        if (item && Array.isArray(item.barcodes)) return item.barcodes.length;
+        return parseFloat(item && item.count) || 1;
+    }
+
+    function itemActiveValue(item) {
+        if (!item) return 0;
+        if (Array.isArray(item.barcodes)) {
+            return item.barcodes.reduce((sum, b) => {
+                if (!b || b.isClosed) return sum;
+                return sum + (parseFloat(b.cod) || 0) + (parseFloat(b.dod) || 0);
+            }, 0);
+        }
+        if (item.isClosed) return 0;
+        return (parseFloat(item.cod) || 0) + (parseFloat(item.dod) || 0);
+    }
+
+    function itemNeedsRecall(item, nowMs) {
+        if (!item) return false;
+        return (item.callMark === 'no-answer' || item.callMark === 'no-connect') &&
+            !!item.callMarkTime && (nowMs - item.callMarkTime) >= FOUR_HOURS_MS;
+    }
+
+    function itemStamp(item) {
+        if (!item) return 0;
+        return item.createdAt || parseTimestampFromId(item.id) || 0;
+    }
+
+    function applyListRefinements(list) {
+        const source = Array.isArray(list) ? list : [];
+        historySeqById = new Map();
+        source.slice().sort((a, b) => itemStamp(a) - itemStamp(b)).forEach((item, idx) => {
+            if (item && item.id) historySeqById.set(item.id, idx + 1);
+        });
+
+        const nowMs = getServerNow();
+        let out = source.slice();
+        if (statusFilterMode === 'open') out = out.filter((i) => i && !i.isClosed);
+        else if (statusFilterMode === 'closed') out = out.filter((i) => i && !!i.isClosed);
+        else if (statusFilterMode === 'uncalled') out = out.filter((i) => i && !i.isClosed && !i.isCalled && i.phone !== 'គ្មានលេខ');
+        else if (statusFilterMode === 'recall') out = out.filter((i) => itemNeedsRecall(i, nowMs));
+
+        if (sortMode === 'oldest') out.sort((a, b) => itemStamp(a) - itemStamp(b));
+        else if (sortMode === 'packages') out.sort((a, b) => itemPackageCount(b) - itemPackageCount(a));
+        else if (sortMode === 'value') out.sort((a, b) => itemActiveValue(b) - itemActiveValue(a));
+        else out.sort((a, b) => itemStamp(b) - itemStamp(a));
+
+        return out;
+    }
+
+    function setStatusFilter(mode) {
+        if (STATUS_FILTER_MODES.indexOf(mode) === -1) return;
+        statusFilterMode = mode;
+        try { localStorage.setItem('zoeadminv2_status_filter', mode); } catch (e) {}
+        document.querySelectorAll('.status-chip').forEach((chip) => {
+            chip.classList.toggle('active', chip.getAttribute('data-status') === mode);
+        });
+        refreshCurrentHistoryView();
+    }
+
+    function setSortMode(mode) {
+        if (SORT_MODES.indexOf(mode) === -1) return;
+        sortMode = mode;
+        try { localStorage.setItem('zoeadminv2_sort_mode', mode); } catch (e) {}
+        refreshCurrentHistoryView();
+    }
+
+    function restoreListPreferences() {
+        let storedStatus = '';
+        let storedSort = '';
+        try {
+            storedStatus = localStorage.getItem('zoeadminv2_status_filter') || '';
+            storedSort = localStorage.getItem('zoeadminv2_sort_mode') || '';
+        } catch (e) {}
+        if (STATUS_FILTER_MODES.indexOf(storedStatus) !== -1) statusFilterMode = storedStatus;
+        if (SORT_MODES.indexOf(storedSort) !== -1) sortMode = storedSort;
+
+        document.querySelectorAll('.status-chip').forEach((chip) => {
+            chip.classList.toggle('active', chip.getAttribute('data-status') === statusFilterMode);
+        });
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.value = sortMode;
+    }
+
+    function clearPhoneSearch() {
+        const input = document.getElementById('searchPhoneInput');
+        if (!input) return;
+        input.value = '';
+        hidePhoneSuggestions();
+        applyCurrentFilter();
+        input.focus();
+    }
+
+    function copyPhoneToClipboard(phone) {
+        const value = String(phone || '');
+        if (!value) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value)
+                .then(() => showToast('📋 ចម្លងលេខរួចរាល់៖ ' + value))
+                .catch(() => showToast('⚠️ ចម្លងលេខមិនបានទេ'));
+            return;
+        }
+        try {
+            const tmp = document.createElement('textarea');
+            tmp.value = value;
+            tmp.setAttribute('readonly', '');
+            tmp.style.position = 'fixed';
+            tmp.style.opacity = '0';
+            document.body.appendChild(tmp);
+            tmp.select();
+            document.execCommand('copy');
+            document.body.removeChild(tmp);
+            showToast('📋 ចម្លងលេខរួចរាល់៖ ' + value);
+        } catch (e) {
+            showToast('⚠️ ចម្លងលេខមិនបានទេ');
+        }
+    }
+
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (isModalOpen) return;
+            const input = document.getElementById('searchPhoneInput');
+            if (!input) return;
+            e.preventDefault();
+            switchTab('orders');
+            input.focus();
+        });
     }
 
     function setupIOSPullToRefresh() {
@@ -2863,8 +3002,9 @@
 
         const selectedFilterTitle = document.getElementById('selectedFilterTitle');
         if(selectedFilterTitle) selectedFilterTitle.innerText = titleText;
-        renderHistory(filteredData);
+        renderHistory(applyListRefinements(filteredData));
         updateDailyScheduleStats(filteredData);
+        updateOrdersTabBadge();
     }
 
     function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
@@ -3486,33 +3626,18 @@
         searchByPhone();
     }
 
-
-    function setPhoneSearchPulledUp(on) {
-        const sidebar = document.getElementById('sidebarSection');
-        if (!sidebar) return;
-        if (on && window.innerWidth >= 992) return;
-        const already = sidebar.classList.contains('search-focus');
-        if (already === !!on) return;
-        sidebar.classList.toggle('search-focus', !!on);
-        if (on) sidebar.classList.remove('collapsed');
-        positionPhoneSuggestBox();
-        setTimeout(positionPhoneSuggestBox, 180);
-        setTimeout(positionPhoneSuggestBox, 340);
-    }
     function setupPhoneSuggestions() {
         const phoneInput = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box) return;
         phoneInput.addEventListener('input', showPhoneSuggestions);
         phoneInput.addEventListener('focus', () => {
-            setPhoneSearchPulledUp(true);
             showPhoneSuggestions();
         });
         phoneInput.addEventListener('blur', () => {
             if (phoneSuggestHideTimer) clearTimeout(phoneSuggestHideTimer);
             phoneSuggestHideTimer = setTimeout(() => {
                 hidePhoneSuggestions();
-                if (!phoneInput.value.trim()) setPhoneSearchPulledUp(false);
             }, 150);
         });
         phoneInput.addEventListener('keydown', (e) => {
@@ -3564,8 +3689,9 @@
             if (!queryDigits) return item.phone.includes(phoneQuery);
             return normalizePhoneDigits(item.phone).indexOf(queryDigits) !== -1;
         });
-        renderHistory(searched);
+        renderHistory(applyListRefinements(searched));
         updateDailyScheduleStats(searched, true);
+        updateOrdersTabBadge();
     }
 
     function decodeImageFile(e) {
@@ -4574,7 +4700,7 @@
         tbody.innerHTML = '';
 
         if (deletedItems.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យដែលបានលុបទេ</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 12px;">គ្មានទិន្នន័យដែលបានលុបទេ</td></tr>`;
             return;
         }
 
@@ -4587,8 +4713,8 @@
                 <td><span class="barcode-tag">${sanitizeInput(displayCode)}</span></td>
                 <td style="text-align: center;">
                     <div style="display:flex; gap:4px; justify-content:center;">
-                        <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" onclick="promptRestoreDeletedItem('${escapeForInlineJsAttr(item.id)}')">🔄</button>
-                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
+                        <button class="btn-sm" style="background:var(--success); color:#fff; padding:4px 8px; min-height:26px;" onclick="promptRestoreDeletedItem('${escapeForInlineJsAttr(item.id)}')">🔄</button>
+                        <button class="btn-sm" style="background:var(--danger); color:#fff; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
                     </div>
                 </td>
             `;
@@ -4924,7 +5050,13 @@
     }
 
     function buildHistoryRowHtml(item, rowNum, isOld, needsRecall) {
-            let phoneDisplay = item.phone === "គ្មានលេខ" ? `<span style="color:#ef4444; font-style:italic;">គ្មានលេខ</span>` : `<span class="phone-clickable" onclick="openCallMarkModal('${escapeForInlineJsAttr(item.id)}')" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`;
+            const safeId = escapeForInlineJsAttr(item.id);
+            const hasPhone = item.phone !== "គ្មានលេខ";
+
+            let phoneDisplay = hasPhone
+                ? `<span class="phone-clickable" onclick="openCallMarkModal('${safeId}')" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`
+                  + `<button type="button" class="copy-phone-btn" onclick="copyPhoneToClipboard('${escapeForInlineJsAttr(item.phone)}')" title="ចម្លងលេខ" aria-label="ចម្លងលេខ">⧉</button>`
+                : `<span class="no-phone">គ្មានលេខ</span>`;
 
             let rowNumClass = '';
             let rowNumLabel = '';
@@ -4934,9 +5066,8 @@
 
             let lockerLoc = "N/A";
             if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
-                let allLockers = item.barcodes.map(b => b.locker || "N/A").filter(l => l && l !== "N/A");
+                let allLockers = item.barcodes.map(b => (b && b.locker) || "N/A").filter(l => l && l !== "N/A");
                 let uniqueLockers = [...new Set(allLockers)];
-
                 if (uniqueLockers.length > 1) {
                     lockerLoc = `${uniqueLockers.join(', ')} (${uniqueLockers.length} កន្លែង)`;
                 } else if (uniqueLockers.length === 1) {
@@ -4949,50 +5080,42 @@
             }
 
             let callAction = '';
-            if (item.phone !== "គ្មានលេខ") {
+            if (hasPhone) {
                 if (item.callMark === 'wrong-number') {
-                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" onclick="openEditModal('${escapeForInlineJsAttr(item.id)}')" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
+                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" onclick="openEditModal('${safeId}')" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
                 } else if (item.isCalled && !needsRecall) {
-                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
+                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${safeId}')" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
                 } else {
                     let recallClass = needsRecall ? ' call-btn-recall' : '';
-                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm call-btn btn-primary-action${recallClass}" title="${needsRecall ? 'សូមខលម្ដងទៀត' : ''}">📞 ខល</a>`;
+                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${safeId}')" class="btn-sm call-btn btn-primary-action${recallClass}" title="${needsRecall ? 'សូមខលម្ដងទៀត' : ''}">📞 ខល</a>`;
                 }
             }
 
             let closeBtnText = item.isClosed ? "❌ បើក" : "✅ បិទ";
-            let closeAction = `<button class="btn-sm close-btn btn-primary-action" onclick="toggleCloseStatus('${escapeForInlineJsAttr(item.id)}')">${closeBtnText}</button>`;
+            let closeAction = `<button class="btn-sm close-btn btn-primary-action" onclick="toggleCloseStatus('${safeId}')">${closeBtnText}</button>`;
 
-            let moreDropdown = `
-                <div class="more-dropdown">
-                    <button class="more-btn" onclick="toggleMoreDropdown(event, '${escapeForInlineJsAttr(item.id)}')">⋮</button>
-                </div>
-            `;
+            let moreDropdown = `<div class="more-dropdown"><button class="more-btn" onclick="toggleMoreDropdown(event, '${safeId}')" title="បន្ថែម" aria-label="បន្ថែម">⋮</button></div>`;
 
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>`
-                : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
-
-            let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;
-            let calledBadge = item.isCalled ? `<span class="called-badge">ខល</span>` : "";
+                ? `<span class="badge badge-old">ចាស់</span>`
+                : `<span class="badge badge-new">ថ្មី</span>`;
+            let statusBadge = item.isClosed ? `<span class="badge closed-badge">យកហើយ</span>` : ageBadge;
+            let calledBadge = item.isCalled ? `<span class="badge called-badge">ខល</span>` : "";
             let scanTimeDisplay = item.time ? `<span class="scan-time-tag">🕒 ${sanitizeInput(item.time)}</span>` : "";
 
             let totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
-            let viewListBtn = '';
-            if (totalPackageCount > 1) {
-                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${totalPackageCount})</button>`;
-            } else {
-                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')" style="background:#fef08a; color:#854d0e; border-color:#fde047;">💵 កែ/ដកកញ្ចប់</button>`;
-            }
+            let viewListBtn = totalPackageCount > 1
+                ? `<button class="btn-view-list" onclick="openViewListModal('${safeId}')">📦 បញ្ជី (${totalPackageCount})</button>`
+                : `<button class="btn-view-list single" onclick="openViewListModal('${safeId}')">💵 កែ/ដក</button>`;
 
             let activeCod = 0;
             let activeDod = 0;
             let activeCount = parseFloat(item.count) || 1;
 
             if (item.barcodes && Array.isArray(item.barcodes)) {
-                activeCod = item.barcodes.filter(b => !b.isClosed).reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0);
-                activeDod = item.barcodes.filter(b => !b.isClosed).reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0);
-                activeCount = item.barcodes.filter(b => !b.isClosed).length;
+                activeCod = item.barcodes.filter(b => b && !b.isClosed).reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0);
+                activeDod = item.barcodes.filter(b => b && !b.isClosed).reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0);
+                activeCount = item.barcodes.filter(b => b && !b.isClosed).length;
             } else {
                 activeCod = !item.isClosed ? (parseFloat(item.cod) || 0) : 0;
                 activeDod = !item.isClosed ? (parseFloat(item.dod) || 0) : 0;
@@ -5002,85 +5125,63 @@
             activeCod = Math.round(activeCod * 100) / 100;
             activeDod = Math.round(activeDod * 100) / 100;
 
-            let priceDisplayHtml = '';
             let hasCod = activeCod > 0;
             let hasDod = activeDod > 0;
-
-            if (hasCod && hasDod) {
-                let codRiel = Math.round(activeCod * exchangeRateRiel);
-                let dodRiel = Math.round(activeDod * exchangeRateRiel);
-                priceDisplayHtml = `
-                    <div style="font-size: 10px;">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
-                    <div style="font-size: 10px; margin-top:2px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
-                `;
-            } else if (hasCod) {
-                let codRiel = Math.round(activeCod * exchangeRateRiel);
-                priceDisplayHtml = `
-                    <div style="font-size: 10.5px;">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong></div>
-                    <div style="font-size: 9.5px; color: var(--text-muted);">${codRiel.toLocaleString()} ៛</div>
-                `;
-            } else if (hasDod) {
-                let dodRiel = Math.round(activeDod * exchangeRateRiel);
-                priceDisplayHtml = `
-                    <div style="font-size: 10.5px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong></div>
-                    <div style="font-size: 9.5px; color: var(--text-muted);">${dodRiel.toLocaleString()} ៛</div>
-                `;
+            let moneyChips = '';
+            if (hasCod) moneyChips += `<span class="mchip cod">COD $${activeCod.toFixed(2)}</span>`;
+            if (hasDod) moneyChips += `<span class="mchip dod">DOD $${activeDod.toFixed(2)}</span>`;
+            if (hasCod || hasDod) {
+                let totalRiel = Math.round((activeCod + activeDod) * exchangeRateRiel);
+                moneyChips += `<span class="mchip riel">${totalRiel.toLocaleString()} ៛</span>`;
             } else {
-                priceDisplayHtml = `
-                    <div style="font-size: 10.5px; color: var(--text-muted);">0.00 $ (0 ៛)</div>
-                `;
+                moneyChips = `<span class="mchip zero">$0.00 · 0 ៛</span>`;
             }
 
+            let cardClass = 'order-card';
+            if (item.isClosed) cardClass += ' closed-row';
+            else if (needsRecall) cardClass += ' is-recall';
+            else if (item.callMark === 'wrong-number') cardClass += ' is-wrong';
+
             const html = `
-                <td style="text-align: center;">${rowNumClass ? `<span class="row-num-mark ${rowNumClass}" title="${rowNumLabel}">${rowNum}</span>` : rowNum}</td>
-                <td>
-                    <div class="customer-info-stack">
-                        <div class="phone-title">
-                            📱 ${phoneDisplay} ${calledBadge}${statusBadge}
-                        </div>
-                        <div>
-                            ${viewListBtn}
-                        </div>
-                        ${scanTimeDisplay}
-                    </div>
-                </td>
-                <td style="text-align: left; padding-left: 6px;">
-                    <div style="margin-bottom:3px;">
-                        <span class="locker-badge">ទីតាំង: ${sanitizeInput(lockerLoc)}</span>
-                    </div>
-                    ${priceDisplayHtml}
-                    <div style="margin-top:3px;">
-                        <span class="count-badge">កញ្ចប់សរុប: ${activeCount}</span>
-                    </div>
-                </td>
-                <td>
-                    <div class="action-group">
-                        ${callAction}
-                        ${closeAction}${moreDropdown}
-                    </div>
-                </td>
+                <div class="oc-top">
+                    <span class="oc-num ${rowNumClass}" title="${rowNumLabel || 'លេខរៀងតាមការស្កេន'}">${rowNum}</span>
+                    <div class="phone-title">${phoneDisplay}</div>
+                    <div class="oc-badges">${calledBadge}${statusBadge}</div>
+                </div>
+                <div class="oc-meta">
+                    ${scanTimeDisplay}
+                    <span class="locker-badge">📍 ${sanitizeInput(lockerLoc)}</span>
+                    <span class="count-badge">📦 ${activeCount} / ${totalPackageCount}</span>
+                </div>
+                <div class="oc-money">${moneyChips}</div>
+                <div class="oc-actions">
+                    ${callAction}
+                    ${closeAction}
+                    ${viewListBtn}
+                    ${moreDropdown}
+                </div>
             `;
-            return { isClosedRow: !!item.isClosed, html: html };
+            return { cardClass: cardClass, html: html };
     }
 
     function renderHistory(dataToRender = scanHistory) {
-        const tbody = document.getElementById('historyTableBody');
+        const listEl = document.getElementById('historyTableBody');
         const countSpan = document.getElementById('count');
-        if (!tbody || !countSpan) return;
+        if (!listEl || !countSpan) return;
         countSpan.innerText = dataToRender.length;
 
         if (dataToRender.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 16px;">📦 គ្មានទិន្នន័យបង្ហាញទេ</td></tr>`;
+            listEl.innerHTML = `<div class="empty-state"><span class="es-ico">📦</span><span class="es-title">គ្មានទិន្នន័យបង្ហាញទេ</span><span class="es-hint">សាកល្បងប្តូរតម្រងថ្ងៃ ឬស្ថានភាព</span></div>`;
             return;
         }
 
-        if (tbody.children.length && !tbody.children[0].dataset.id) {
-            tbody.innerHTML = '';
+        if (listEl.children.length && !listEl.children[0].dataset.id) {
+            listEl.innerHTML = '';
         }
 
         const existingRows = new Map();
-        Array.from(tbody.children).forEach((tr) => {
-            if (tr.dataset.id) existingRows.set(tr.dataset.id, tr);
+        Array.from(listEl.children).forEach((el) => {
+            if (el.dataset.id) existingRows.set(el.dataset.id, el);
         });
 
         const currentTime = getServerNow();
@@ -5088,40 +5189,39 @@
         const seenIds = new Set();
         let prevNode = null;
 
-        for (let i = dataToRender.length - 1; i >= 0; i--) {
+        for (let i = 0; i < dataToRender.length; i++) {
             const item = dataToRender[i];
-            const rowNum = i + 1;
+            const rowNum = historySeqById.get(item.id) || (i + 1);
             seenIds.add(item.id);
 
             const itemAgeTime = item.createdAt || parseTimestampFromId(item.id) || currentTime;
             const isOld = (currentTime - itemAgeTime) > twentyFourHoursMs;
-            const needsRecall = (item.callMark === 'no-answer' || item.callMark === 'no-connect') &&
-                item.callMarkTime && (currentTime - item.callMarkTime) >= FOUR_HOURS_MS;
+            const needsRecall = itemNeedsRecall(item, currentTime);
 
             const signature = JSON.stringify(item) + '|' + rowNum + '|' + exchangeRateRiel + '|' + isOld + '|' + needsRecall;
 
-            let tr = existingRows.get(item.id);
-            if (!tr) {
-                tr = document.createElement('tr');
-                tr.dataset.id = item.id;
+            let card = existingRows.get(item.id);
+            if (!card) {
+                card = document.createElement('div');
+                card.dataset.id = item.id;
             }
-            if (tr.dataset.sig !== signature) {
+            if (card.dataset.sig !== signature) {
                 const built = buildHistoryRowHtml(item, rowNum, isOld, needsRecall);
-                tr.className = built.isClosedRow ? 'closed-row' : '';
-                tr.innerHTML = built.html;
-                tr.dataset.sig = signature;
+                card.className = built.cardClass;
+                card.innerHTML = built.html;
+                card.dataset.sig = signature;
             }
 
             if (prevNode === null) {
-                if (tbody.firstChild !== tr) tbody.insertBefore(tr, tbody.firstChild);
-            } else if (prevNode.nextSibling !== tr) {
-                tbody.insertBefore(tr, prevNode.nextSibling);
+                if (listEl.firstChild !== card) listEl.insertBefore(card, listEl.firstChild);
+            } else if (prevNode.nextSibling !== card) {
+                listEl.insertBefore(card, prevNode.nextSibling);
             }
-            prevNode = tr;
+            prevNode = card;
         }
 
-        existingRows.forEach((tr, id) => {
-            if (!seenIds.has(id)) tr.remove();
+        existingRows.forEach((el, id) => {
+            if (!seenIds.has(id)) el.remove();
         });
     }
 

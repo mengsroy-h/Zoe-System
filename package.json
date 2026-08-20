@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "acorn": "^8.18.0",
-    "playwright-core": "^1.62.1"
-  }
-}

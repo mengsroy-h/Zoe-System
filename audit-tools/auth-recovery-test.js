@@ -173,7 +173,7 @@ function buildContext(app) {
         function showLoginModalWithPrefill() { __log.loginModalShown++; }
         function clearRememberedSession() {}
         function updateAuthButton(v) { __log.authButton = v; }
-        function initDatabaseListeners() { __log.dbInit++; }
+        function initDatabaseListeners() { if (listenersAttached) return; listenersAttached = true; __log.dbInit++; }
         function refreshKeyList() { __log.dbInit++; }
         function showLockerPicker() {}
         function detachDatabaseListeners() {}
@@ -445,14 +445,14 @@ async function run(app) {
     h.log.gets[h.log.gets.length - 1].resolve({ val: () => app.role });
     await drain();
     const successAfterSecond = h.log.toasts.filter((t) => t.indexOf('ជោគជ័យ') !== -1).length;
+    ok('ប្រកាសចូលប្រព័ន្ធម្ដង', successAfterFirst === 1, successAfterFirst);
     ok('ការត្រួតពិនិត្យ role ជាថ្មី មិនប្រកាសចូលប្រព័ន្ធម្ដងទៀត',
         successAfterSecond === successAfterFirst, { first: successAfterFirst, second: successAfterSecond });
-    if (app.label === 'ZoeAdmin' || app.label === 'ZoeW') {
-        ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
+    if (app.label === 'ZoeKeyGen') {
+        // ZoeKeyGen refetches its key list on every verify on purpose.
+        ok('ZoeKeyGen ទាញបញ្ជី Key ឡើងវិញ (ចេតនា)', h.log.dbInit === 2, h.log.dbInit);
     } else {
-        // Zoescan guards inside initDatabaseListeners (listenersAttached) and ZoeKeyGen
-        // refreshes its key list on every verify on purpose, so both call through twice.
-        ok('ការហៅជាថ្មីមិនបង្កើតបញ្ហា', h.log.dbInit === 2, h.log.dbInit);
+        ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
     }
     if (app.label === 'Zoescan') {
         const zsSrc = fs.readFileSync(path.join(root, app.file), 'utf8');

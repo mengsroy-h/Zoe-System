@@ -499,7 +499,9 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
     currentUserEmail = user.email || null;
     closeModal('loginModal');
     updateAuthButton(true);
+    const wasAlreadySignedIn = listenersAttached;
     initDatabaseListeners();
+    if (!wasAlreadySignedIn) showToast('ចូលប្រព័ន្ធជោគជ័យ!');
     showLockerPicker(true);
     isFirebaseSessionExpired(user).then((expired) => {
         if (expired) forceExpireSession();

@@ -1091,6 +1091,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        restoreAfterPdfExport();
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         activeParentItemId = null;
@@ -2699,6 +2700,17 @@
         }
     }
 
+    let pdfExportOriginalTitle = null;
+
+    function restoreAfterPdfExport() {
+        if (pdfExportOriginalTitle !== null) {
+            document.title = pdfExportOriginalTitle;
+            pdfExportOriginalTitle = null;
+        }
+        const area = document.getElementById('pdfExportPrintArea');
+        if (area) area.innerHTML = '';
+    }
+
     function exportDataAsPDF() {
         const rows = buildExportRows();
         if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
@@ -2742,13 +2754,9 @@
             <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date(getServerNow()).toLocaleString('km-KH'))}</p>
         `;
 
-        const originalTitle = document.title;
+        if (pdfExportOriginalTitle === null) pdfExportOriginalTitle = document.title;
         document.title = getExportFilenameBase();
-        window.addEventListener('afterprint', () => {
-            document.title = originalTitle;
-            const area = document.getElementById('pdfExportPrintArea');
-            if (area) area.innerHTML = '';
-        }, { once: true });
+        window.addEventListener('afterprint', restoreAfterPdfExport);
         window.print();
     }
 

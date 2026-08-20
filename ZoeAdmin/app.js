@@ -3686,11 +3686,9 @@
         const skipBtn = document.getElementById('phoneModalSkipBtn');
         const confirmBtn = document.getElementById('phoneModalConfirmBtn');
         const cancelBtn = document.getElementById('phoneModalCancelBtn');
-        const phoneModalEl = document.getElementById('phoneModal');
         if (skipBtn) skipBtn.disabled = true;
         if (confirmBtn) confirmBtn.disabled = true;
         if (cancelBtn) cancelBtn.disabled = true;
-        if (phoneModalEl) phoneModalEl.setAttribute('data-nodismiss', 'true');
 
         try {
             const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
@@ -3721,7 +3719,6 @@
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;
             if (cancelBtn) cancelBtn.disabled = false;
-            if (phoneModalEl) phoneModalEl.removeAttribute('data-nodismiss');
         }
     }
 

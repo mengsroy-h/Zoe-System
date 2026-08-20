@@ -25,7 +25,10 @@
 > ពោលគឺ **REST ទៅ firebaseio.com ដើរ តែ channel realtime មិនដើរ** ➜ `.info/connected` នៅ false
 > លើស ៤៥ វិនាទី ➜ អស់ថវិការង់ចាំ ➜ អាន ➜ timeout ➜ login មិនចូលដដែល។
 >
-> **កែហើយ (branch `claude/busy-franklin-5g26ja`)** ២ យ៉ាង៖
+> **កែហើយ និង merge ចូល `main` រួចរាល់ហើយ** — PR #26, merge commit `7139952`
+> (branch `claude/busy-franklin-5g26ja`, ចេញពី `715d42b` ដោយផ្ទាល់)។ Netlify preview ទាំង ៤ បៃតង
+> មុន merge (`mergeable_state: clean`) ហើយ `git rev-list --count origin/main..origin/<branch>` = 0
+> ក្រោយ merge។ Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។ ២ យ៉ាង៖
 > ១. **អាន `user_roles` តាម REST ស្របគ្នានឹង SDK** ពេល socket មិនទាន់ឡើង — អ្នកណាឆ្លើយមុន យកអ្នកនោះ។
 >    REST ប្រើ token របស់អ្នកប្រើ និងឆ្លងកាត់ rules ដដែល ដូច្នេះ **មិនបន្ធូរសុវត្ថិភាពទេ**។
 > ២. **CSP `script-src` ទទួល `*.firebaseio.com` / `*.firebasedatabase.app`** — long-polling របស់
@@ -2057,6 +2060,10 @@ REST 401 ➜ **មិនបណ្ដេញចេញ** នៅតែរង់ច�
 
 `CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v38, zoew-v34, zoescan-v27, zoekeygen-v20)។
 **គ្មានការប្ដូរ Firebase rules ទេ ➜ គ្មាន publish ថ្មី។**
+
+**Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើក្នុង session នេះ** — PR #26, merge commit `7139952`។
+Netlify deploy preview ទាំង ៤ (`zoeadmin`, `zoew`, `zoescan`, `zoekeygen`) បៃតងមុន merge ហើយ
+`git rev-list --count origin/main..origin/claude/busy-franklin-5g26ja` = 0 ក្រោយ merge។
 
 ### នៅសល់ បើ socket នៅតែមិនឡើងក្រោយ deploy នេះ
 ការកែនេះធានាថា **login ចូលបាន** និងផ្ដល់ transport បម្រុងឲ្យ RTDB។ បើ Sentry ជុំក្រោយបង្ហាញ

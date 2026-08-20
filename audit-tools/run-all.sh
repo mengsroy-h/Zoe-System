@@ -34,7 +34,8 @@ echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេ
 for t in policy-test lookup-closed-test auth-recovery-test keylist-consistency-test \
          license-grace-test phone-suggest-test zoescan-list-test keygen-pin-flow-test \
          barcode-shape-test setup-link-logout-test phone-search-swipe-test \
-         raw-read-shape-test devtools-guard-test concurrent-scan-test; do
+         raw-read-shape-test devtools-guard-test concurrent-scan-test \
+         setup-link-roundtrip-test; do
     run "$t" node "audit-tools/$t.js"
 done
 

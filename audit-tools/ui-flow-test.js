@@ -352,7 +352,47 @@ function seedData() {
             check(merged.closed1 === true, 'ZoeAdmin: កែទឹកប្រាក់ ➜ មិនលុបការបិទរបស់ឧបករណ៍ផ្សេង', JSON.stringify(merged));
             check(merged.locker0 === 'Z9', 'ZoeAdmin: កែទឹកប្រាក់ ➜ មិនលុបទីតាំងរបស់ Zoescan', JSON.stringify(merged));
             check(merged.itemCod === 35, 'ZoeAdmin: កែទឹកប្រាក់ ➜ ផលបូក item ត្រូវ', JSON.stringify(merged));
+
+            // ឧបករណ៍ផ្សេងលុបកញ្ចប់នេះ ➜ ការកែទឹកប្រាក់មិនត្រូវធ្វើឲ្យវារស់ឡើងវិញ
+            const revBeforeGhostEdit = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
+            await page.evaluate(() => {
+                window.openEditBarcodePriceModal('id_2000_ccc', 'DD1');
+                delete window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc;
+                document.getElementById('editBcCodInput').value = '99';
+                document.getElementById('editBcDodInput').value = '0';
+                window.saveEditedBarcodePrice();
+            });
+            await page.waitForTimeout(700);
+            const ghostEdit = await page.evaluate((dk) => ({
+                resurrected: !!window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc,
+                rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }
+            }), seed._dateKey);
+            check(ghostEdit.resurrected === false, 'ZoeAdmin: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ មិនរស់ឡើងវិញ', JSON.stringify(ghostEdit));
+            check(ghostEdit.rev.codDollar === revBeforeGhostEdit.codDollar && ghostEdit.rev.dodDollar === revBeforeGhostEdit.dodDollar,
+                'ZoeAdmin: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ ចំណូលមិនប្រែ',
+                JSON.stringify(revBeforeGhostEdit) + ' ➜ ' + JSON.stringify(ghostEdit.rev));
         }
+
+        // ចុចគ្រប់ប៊ូតុងដែលមើលឃើញ (បើក modal នីមួយៗ) ហើយមើលថាមួយណា crash
+        const clickErrors = [];
+        const btnIds = await page.evaluate(() => {
+            const skip = /logout|signout|ចាកចេញ|delete|លុប|clear|reset|export|print/i;
+            return [...document.querySelectorAll('button')]
+                .filter((b) => b.id && getComputedStyle(b).display !== 'none' && !skip.test(b.id))
+                .map((b) => b.id);
+        });
+        for (const bid of btnIds) {
+            const before = errors.length;
+            await page.evaluate((id) => { const b = document.getElementById(id); if (b) b.click(); }, bid);
+            await page.waitForTimeout(120);
+            if (errors.length > before) clickErrors.push(bid + ' ➜ ' + errors[errors.length - 1].slice(0, 160));
+            await page.evaluate(() => {
+                [...document.querySelectorAll('.modal')].forEach((m) => { if (!m.hasAttribute('data-nodismiss')) m.style.display = 'none'; });
+            });
+        }
+        check(clickErrors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e)).length === 0,
+            app + ': ចុចប៊ូតុងទាំងអស់ ➜ គ្មាន crash',
+            clickErrors.slice(0, 6).join('\n        '));
 
         const real = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
         check(real.length === 0, app + ': គ្មានកំហុស runtime ពេលធ្វើអន្តរកម្ម', real.slice(0, 3).join(' | '));

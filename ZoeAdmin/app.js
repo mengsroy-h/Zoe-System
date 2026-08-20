@@ -4316,12 +4316,34 @@
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
                 }
 
-                mergeBarcodeIntoHistoryItem(editedItemId, applyEditedPriceTo, item).then((committedItem) => {
+                serverApplied = false;
+                fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
+                    serverApplied = false;
+                    if (!currentItem) return currentItem;
+                    return applyEditedPriceTo(currentItem);
+                }).then((result) => {
+                    if (!result || !result.committed) {
+                        throw new Error('Barcode price transaction was not committed');
+                    }
+                    const committedItem = result.snapshot ? result.snapshot.val() : null;
+                    if (committedItem && !committedItem.id) committedItem.id = editedItemId;
                     if (!serverApplied) {
                         if (revenueApplied) {
                             addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
                         }
-                        showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ! ទឹកប្រាក់មិនត្រូវបានកែទេ។");
+                        const staleItem = scanHistory.find(i => i.id === editedItemId);
+                        const staleB = staleItem && Array.isArray(staleItem.barcodes)
+                            ? staleItem.barcodes.find(b => b.code === editedBarcodeCode)
+                            : null;
+                        if (staleB) {
+                            staleB.cod = oldCod;
+                            staleB.dod = oldDod;
+                            staleItem.cod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                            staleItem.dod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                            staleItem.price = Math.round((staleItem.cod + staleItem.dod) * 100) / 100;
+                            refreshCurrentHistoryView();
+                        }
+                        showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! ទឹកប្រាក់មិនត្រូវបានកែទេ។");
                         return;
                     }
                     const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;

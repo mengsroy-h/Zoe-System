@@ -4113,6 +4113,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -4143,6 +4152,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -4169,12 +4179,16 @@
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = itemId;
                 syncScannerLookupEntry(itemId, committedItem);
+            }
+            if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -4257,12 +4271,44 @@
                 let codDiff = Math.round((newCod - oldCod) * 100) / 100;
                 let dodDiff = Math.round((newDod - oldDod) * 100) / 100;
 
-                targetB.cod = newCod;
-                targetB.dod = newDod;
+                const editedItemId = item.id;
+                const editedBarcodeCode = activeEditingBarcode;
+                let serverOldCod = null;
+                let serverOldDod = null;
+                let serverApplied = false;
 
-                item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                item.price = Math.round((item.cod + item.dod) * 100) / 100;
+                const applyEditedPriceTo = (target) => {
+                    serverApplied = false;
+                    serverOldCod = null;
+                    serverOldDod = null;
+                    normalizeBarcodesOf(target);
+                    if (!target.barcodes || !Array.isArray(target.barcodes)) {
+                        target.barcodes = [{
+                            code: target.barcode,
+                            time: target.time,
+                            cod: parseFloat(target.cod !== undefined ? target.cod : target.price) || 0,
+                            dod: parseFloat(target.dod) || 0,
+                            locker: target.locker || "N/A",
+                            isClosed: target.isClosed || false,
+                            isDeducted: false,
+                            isFromDeletion: false,
+                            createdAt: target.createdAt || getServerNow()
+                        }];
+                    }
+                    const b = target.barcodes.find(bc => bc && bc.code === editedBarcodeCode);
+                    if (!b) return target;
+                    serverOldCod = parseFloat(b.cod) || 0;
+                    serverOldDod = parseFloat(b.dod) || 0;
+                    b.cod = newCod;
+                    b.dod = newDod;
+                    target.cod = Math.round(target.barcodes.reduce((sum, bc) => sum + (parseFloat(bc.cod) || 0), 0) * 100) / 100;
+                    target.dod = Math.round(target.barcodes.reduce((sum, bc) => sum + (parseFloat(bc.dod) || 0), 0) * 100) / 100;
+                    target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                    serverApplied = true;
+                    return target;
+                };
+
+                applyEditedPriceTo(item);
 
                 const revenueScanDate = item.scanDate || getFormattedDate();
                 const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
@@ -4270,9 +4316,23 @@
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
                 }
 
-                const editedItemId = item.id;
-                const editedBarcodeCode = activeEditingBarcode;
-                saveSingleHistoryItemToFirebase(item).catch(() => {
+                mergeBarcodeIntoHistoryItem(editedItemId, applyEditedPriceTo, item).then((committedItem) => {
+                    if (!serverApplied) {
+                        if (revenueApplied) {
+                            addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
+                        }
+                        showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធ! ទឹកប្រាក់មិនត្រូវបានកែទេ។");
+                        return;
+                    }
+                    const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;
+                    const actualDodDiff = Math.round((newDod - serverOldDod) * 100) / 100;
+                    const correctionCod = Math.round((actualCodDiff - (revenueApplied ? codDiff : 0)) * 100) / 100;
+                    const correctionDod = Math.round((actualDodDiff - (revenueApplied ? dodDiff : 0)) * 100) / 100;
+                    if (correctionCod !== 0 || correctionDod !== 0) {
+                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, correctionCod, correctionDod, 0);
+                    }
+                    if (committedItem) syncScannerLookupEntry(editedItemId, committedItem);
+                }).catch(() => {
                     if (revenueApplied) {
                         addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
                     }
@@ -4434,6 +4494,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -4470,6 +4539,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 currentItem.isClosed = desiredClosed;
@@ -4486,12 +4556,16 @@
                         currentItem.barcodes.forEach(b => b.isClosed = false);
                     }
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = id;
                 syncScannerLookupEntry(id, committedItem);
+            }
+            if (!serverApplied || !(closeResult && closeResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);

@@ -2509,6 +2509,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -2539,6 +2548,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -2565,12 +2575,16 @@
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = itemId;
                 syncScannerLookupEntry(itemId, committedItem);
+            }
+            if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -2730,6 +2744,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -2766,6 +2789,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 currentItem.isClosed = desiredClosed;
@@ -2782,12 +2806,16 @@
                         currentItem.barcodes.forEach(b => b.isClosed = false);
                     }
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = id;
                 syncScannerLookupEntry(id, committedItem);
+            }
+            if (!serverApplied || !(closeResult && closeResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);

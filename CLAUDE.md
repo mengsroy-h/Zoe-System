@@ -7,9 +7,10 @@
 > ជាការគ្រប់គ្រាន់ដើម្បីចាប់ផ្តើម។
 >
 > ### ស្ថានភាពកូដ
-> **អ្វីៗទាំងអស់រហូតដល់ជុំ audit ទី ១០ ស្ថិតនៅក្នុង `main` រួចរាល់ហើយ** ហើយ Netlify deploy
-> `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។ **ជុំទី ១១ នៅក្នុង PR #37 (branch
-> `claude/deep-audit-jcog87`) — បើក មិនទាន់ merge។** បើ PR នោះ merge រួច សូមកែបន្ទាត់នេះ។
+> **អ្វីៗទាំងអស់ រហូតដល់ជុំ audit ទី ១១ ស្ថិតនៅក្នុង `main` រួចរាល់ហើយ** — PR #37 (merge
+> `2fb09cb`, ជុំ ១១) និង PR #38 (merge `7b905dd`, ការទាញតារាងប្រវត្តិឡើងពេលស្វែងរក)។
+> ផ្ទៀងផ្ទាត់ដោយ `git rev-list --count origin/main..origin/claude/deep-audit-jcog87` = **0**។
+> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។ **គ្មានការងារណាមិនទាន់ merge ទេ។**
 >
 > **Firebase rules ទាំងពីរ publish រួចរាល់ហើយ** (root និង `ZoeKeyGen/`) ហើយ **ជុំ ១១ មិនប្តូរ
 > rules ទេ ➜ គ្មាន publish ថ្មីត្រូវធ្វើ**។ Rules JSON ក្នុង repo នេះ **មិន deploy ស្វ័យប្រវត្តិទេ**
@@ -55,6 +56,11 @@
 > ៥. **`env()` គ្មាន fallback** លើ `.app-navbar` និង `.ptr-indicator`។
 > ៦. **ការអូសឡើងលើបំបាត់ប្រអប់ស្វែងរកលេខ** (រាយការណ៍ដោយវីដេអូ)។
 > ៧. **`item.count` ទល់នឹង `barcodes.length`** + **`Code.gs` fail-open**។
+>
+> ### មុខងារដែលបន្ថែមក្រោយជុំ ១១ (PR #38)
+> **ចុចប្រអប់ស្វែងរកលេខ ➜ កាត sidebar ទាំងអស់បិទ លើកលែងកាតស្វែងរក** ➜ តារាងប្រវត្តិឡើងពី
+> ~០ ជួរ ទៅ ៥ ជួរ។ **កុំច្រឡំវាជា `.collapsed`** — `.collapsed` បិទ sidebar ទាំងមូល រួមទាំង
+> ប្រអប់ស្វែងរក ដែលជាកំហុសក្នុងវីដេអូជុំ ១១។ លម្អិតនៅ section ចុងក្រោយនៃឯកសារនេះ។
 
 
 4 independent PWAs (vanilla JS, no framework, no build step), each deployed as its own
@@ -2760,3 +2766,61 @@ overflow: hidden` — ដូច្នេះវាបិទ **ប្រអប់�
 
 `CACHE_VERSION` bump (zoeadmin-v46, zoew-v40)។ **គ្មានការប្តូរ rules ➜ គ្មាន publish ថ្មី។**
 Zoescan/ZoeKeyGen មិនប៉ះ (គ្មាន sidebar ស្វែងរកលេខបែបនេះ)។
+
+
+## ចុចប្រអប់ស្វែងរក ➜ តារាងប្រវត្តិទាញឡើងលើ (added 2026-08-20, PR #38)
+
+ស្នើដោយអ្នកប្រើភ្លាមក្រោយជុំ ១១៖ លើទូរស័ព្ទ sidebar (កាតកាមេរ៉ា, Barcode scanner, ស្ថិតិ) ស៊ី
+កន្លែងស្ទើរតែទាំងអេក្រង់ ដូច្នេះពេលចុចប្រអប់ស្វែងរក keyboard គ្របអ្វីដែលនៅសល់ ហើយតារាងប្រវត្តិ
+ត្រូវរុញធ្លាក់ក្រោមបាត — ស្ទើរតែមើលមិនឃើញជួរណាទេ។
+
+### ការសម្រេចសំខាន់ — **កុំប្រើ `.collapsed`**
+`.collapsed` បិទ **sidebar ទាំងមូល** ដែលរួមទាំង `#searchPhoneInput` ខ្លួនវាផង — នោះជាកំហុស
+ដែលអ្នកប្រើរាយការណ៍ដោយវីដេអូក្នុងជុំ ១១។ ដូច្នេះ mode ថ្មីនេះបិទ **កូនទាំងអស់លើកលែងកូនចុងក្រោយ**៖
+```css
+.sidebar-section.search-focus > *:not(:last-child) { max-height: 0; opacity: 0; ... }
+.sidebar-section.search-focus { gap: 0; }
+```
+វាដើរបានព្រោះ **កាតស្វែងរកជាកូនចុងក្រោយនៃ `.sidebar-section` ទាំង ZoeAdmin និង ZoeW**
+(ZoeAdmin មានកូន ៤, ZoeW មានកូន ២)។ **បើថ្ងៃណាមួយបន្ថែមកាតថ្មីនៅក្រោមកាតស្វែងរក ច្បាប់នេះនឹងខូច**
+— ត្រូវប្តូរទៅ selector ជាក់លាក់ជំនួស `:not(:last-child)`។
+
+ប្រើ `max-height`/`opacity` មិនមែន `display: none` **ដោយចេតនា**៖ `display: none` លើកាតកាមេរ៉ា
+អាចបញ្ឈប់ការបញ្ជូន frame ➜ ខូចការស្កេន barcode។ ការកាត់ត្រឹមកម្ពស់ 0 ទុក video ឲ្យនៅ render ដដែល។
+
+### JS
+`setPhoneSearchPulledUp(on)` — **byte-identical ទាំង ZoeAdmin និង ZoeW**៖
+- `focus` លើ `#searchPhoneInput` ➜ បើក · `blur` ហើយវាល **ទទេ** ➜ បិទ (បើមានលេខ វានៅបើក
+  ដើម្បីឲ្យអ្នកប្រើមើលលទ្ធផល)
+- វា **លុប `.collapsed` ចេញ** ពេលបើក ដូច្នេះប្រអប់ស្វែងរកមិនអាចទៅលាក់ខាងក្រោយ mode ថ្មីបានទេ
+- **no-op លើ `innerWidth >= 992`** (desktop — sidebar ជា column ពិត)
+- ហៅ `positionPhoneSuggestBox()` ៣ ដង (0ms, 180ms, 340ms) ព្រោះ CSS transition ចំណាយ ~280ms
+  ហើយដុំស្នើលេខជា `position: fixed` ដែលត្រូវតាមទីតាំងថ្មីរបស់ input
+- ត្រូវបាន reset ក្នុង `clearSensitiveModalFields()` (ចាកចេញ)
+
+**ផ្លូវត្រឡប់ ៣** (ដើម្បីកុំឲ្យអ្នកប្រើជាប់គាំង)៖ blur ពេលវាលទទេ · អូសចុះលើតារាងប្រវត្តិ ·
+ចុច `dragHandle`។
+
+### ទំនាក់ទំនងនឹងការកែជុំ ១១
+`phoneSearchIsActive()` (ជុំ ១១) នៅដដែល — វាទប់ការអូសឡើងកុំឲ្យបិទ sidebar ពេលកំពុងស្វែងរក។
+ឥឡូវការអូសឡើងគ្មានអ្វីត្រូវធ្វើទេ (ទាញឡើងរួចហើយ) ហើយ **ការអូសចុះ** បានសាខាថ្មីមួយដែល
+ហៅ `setPhoneSearchPulledUp(false)`។
+
+### តេស្ត — `audit-tools/phone-search-swipe-test.js` ឡើងជា **30 assertion**
+លើ `main` មុនកែ ➜ **ធ្លាក់ ៦** (18/24)។ **assertion ២ ដែលអ្នកប្រើសុំកុំឲ្យប៉ះ ("អូសឡើង ➜
+ប្រវត្តិឡើង" និង "អូសចុះ ➜ ប្រវត្តិចុះ") ជោគជ័យទាំងមុន និងក្រោយ។**
+
+**បានផ្ទៀងផ្ទាត់ដោយរូបភាពពិត** (Playwright + Chromium ក្នុង container, viewport 412×780)៖
+តារាងប្រវត្តិឡើងពី ~០ ជួរ ទៅ **៥ ជួរ**។ Script នៅ scratchpad — សាងឡើងវិញបានដោយ
+`npm i playwright-core` រួចប្រើ `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`,
+បម្រើថត App តាម HTTP server តូចមួយ, រួច `page.evaluate` លាក់ modal និងហៅ `renderHistory()`
+ដោយទិន្នន័យក្លែងក្លាយ។ **font ខ្មែរមិនមានក្នុង container ➜ អក្សរបែក តែ layout ត្រឹមត្រូវ។**
+
+### អន្ទាក់ដែលជួប (harness មិនមែនកូដ App)
+ការបន្ថែម `setPhoneSearchPulledUp()` ធ្វើឲ្យតេស្ត ៣ គាំង ព្រោះ harness របស់វាដក function ពិត
+មករត់ក្នុង `vm` ហើយមិនមាន stub សម្រាប់វា — `phone-suggest-test`, `setup-link-logout-test` និង
+`phone-search-swipe-test` (លើ tree មុនកែ)។ **រាល់ពេលបន្ថែមការហៅ function ថ្មីចូលផ្លូវដែលមាន
+តេស្តរួច ត្រូវពិនិត្យ harness ទាំងអស់ដែលដក function នោះមករត់។**
+
+`CACHE_VERSION` bump (zoeadmin-v48, zoew-v42)។ **គ្មានការប្តូរ rules ➜ គ្មាន publish ថ្មី។**
+Zoescan/ZoeKeyGen មិនប៉ះ។ Suite សរុប៖ **450 assertion** — បៃតងទាំងអស់។

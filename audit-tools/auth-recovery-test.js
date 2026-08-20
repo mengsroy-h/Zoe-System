@@ -80,8 +80,27 @@ function buildContext(app) {
             log.gets.push(entry);
             return entry.promise;
         },
-        off() {}, onValue() {}, getIdTokenResult() { return Promise.resolve({ authTime: new Date().toISOString() }); }
+        off() {},
+        onValue(ref, cb) {
+            if (!ref || ref.path !== '.info/connected') return () => {};
+            conn.listeners.push(cb);
+            cb({ val: () => conn.value });
+            return () => {
+                const i = conn.listeners.indexOf(cb);
+                if (i >= 0) conn.listeners.splice(i, 1);
+            };
+        },
+        getIdTokenResult() { return Promise.resolve({ authTime: new Date().toISOString() }); }
     };
+    const conn = { value: false, listeners: [] };
+    // Mirrors what each app's .info/connected handler in initFirebase does
+    // (asserted against the real source in run() below).
+    function setConnected(value) {
+        conn.value = value;
+        vm.runInContext('isDatabaseConnected = ' + (value ? 'true' : 'false') + ';', ctx);
+        conn.listeners.slice().forEach((cb) => cb({ val: () => value }));
+        if (value) vm.runInContext('retryPendingRoleCheck();', ctx);
+    }
 
     const els = {};
     const doc = {
@@ -111,6 +130,8 @@ function buildContext(app) {
     const preamble = `
         var authGeneration = 0;
         var pendingRoleRecheck = false;
+        var isDatabaseConnected = true;
+        var ROLE_CHECK_CONNECT_WAIT_MS = 45000;
         var authUnsubscribe = null;
         var authRecoveryTimeout = null;
         var autoLoginAttempted = false;
@@ -154,7 +175,7 @@ function buildContext(app) {
         function checkPinAndOpenConfig() {}
     `;
     vm.runInContext(preamble, ctx);
-    const wanted = ['withTimeout', 'retryPendingRoleCheck', app.verify, app.login];
+    const wanted = ['withTimeout', 'awaitDatabaseConnection', 'retryPendingRoleCheck', app.verify, app.login];
     if (app.boot === 'setupAuthListener') wanted.push('setupAuthListener');
     vm.runInContext(sliceFns(app.file, wanted), ctx);
     if (app.boot === 'inline') {
@@ -166,7 +187,7 @@ function buildContext(app) {
             '   else { pendingRoleRecheck = false; }' +
             ' }); }', ctx);
     }
-    return { ctx, clock, log, auth, fb, els };
+    return { ctx, clock, log, auth, fb, els, setConnected };
 }
 
 const flush = () => new Promise((r) => setImmediate(r));
@@ -250,6 +271,40 @@ async function run(app) {
     await drain();
     ok('មិនត្រួតពិនិត្យឡើងវិញទេ ពេលគ្មានទង់រង់ចាំ (គ្មាន loop)',
         h.log.gets.length === getsBeforeReconnect + 1, h.log.gets.length);
+
+    // ---- Scenario 5: the connection is not up yet (the real 2026-08-20 cause) ----
+    console.log('-- ៥. RTDB មិនទាន់ភ្ជាប់ (មូលហេតុពិត) — មិនត្រូវប្រណាំងនឹង timer --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    ok('មិនអាន user_roles ទេ ខណៈ .info/connected នៅ false', h.log.gets.length === 0, h.log.gets.length);
+    ok('ប្រាប់អ្នកប្រើថាកំពុងភ្ជាប់', h.log.toasts.some((t) => t.indexOf('កំពុងភ្ជាប់') !== -1), h.log.toasts);
+
+    await advance(h, 20000);
+    ok('នៅតែរង់ចាំ មិនទាន់អស់ពេលនៅ 20 វិនាទី (WebSocket មាន 30 វិនាទី)', h.log.gets.length === 0, h.log.gets.length);
+
+    h.setConnected(true);
+    await drain();
+    ok('ភ្ជាប់បាន ➜ ទើបអាន user_roles', h.log.gets.length === 1, h.log.gets.length);
+    h.log.gets[0].resolve({ val: () => app.role });
+    await drain();
+    ok('ចូលបានដោយស្វ័យប្រវត្តិ ដោយគ្មានកំហុសបង្ហាញសោះ',
+        h.log.dbInit === 1 && h.log.signOuts === 0, { dbInit: h.log.dbInit, signOuts: h.log.signOuts });
+
+    console.log('-- ៦. បើភ្ជាប់មិនបានសោះ សំណាញ់សុវត្ថិភាពចាស់នៅដដែល --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    await advance(h, 45000);
+    ok('ក្រោយអស់ថវិការង់ចាំ ទើបព្យាយាមអាន', h.log.gets.length === 1, h.log.gets.length);
+    await advance(h, 15000);
+    ok('រួចអស់ពេល ➜ មិន signOut ដាក់ទង់ព្យាយាមឡើងវិញ',
+        h.log.signOuts === 0 && h.ctx.pendingRoleRecheck === true,
+        { signOuts: h.log.signOuts, pending: h.ctx.pendingRoleRecheck });
 
     // ---- Scenario 3: a genuine error must still fail closed ----
     console.log('-- ៣. កំហុសពិតប្រាកដ (permission_denied) នៅតែត្រូវបណ្ដេញចេញ --');

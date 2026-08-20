@@ -34,7 +34,7 @@ echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេ
 for t in policy-test lookup-closed-test auth-recovery-test keylist-consistency-test \
          license-grace-test phone-suggest-test zoescan-list-test keygen-pin-flow-test \
          barcode-shape-test setup-link-logout-test phone-search-swipe-test \
-         raw-read-shape-test devtools-guard-test; do
+         raw-read-shape-test devtools-guard-test concurrent-scan-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -79,6 +79,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     BARCODE_APP_DIR="$BASE" node audit-tools/barcode-shape-test.js 2>&1 | tail -1 | sed 's/^/   barcode-shape:   /'
     RAWREAD_APP_DIR="$BASE" node audit-tools/raw-read-shape-test.js 2>&1 | tail -1 | sed 's/^/   raw-read-shape:  /'
     DEVGUARD_APP_DIR="$BASE" node audit-tools/devtools-guard-test.js 2>&1 | tail -1 | sed 's/^/   devtools-guard:  /'
+    CONCSCAN_APP_DIR="$BASE" node audit-tools/concurrent-scan-test.js 2>&1 | tail -1 | sed 's/^/   concurrent-scan: /'
     SETUPLINK_APP_DIR="$BASE" node audit-tools/setup-link-browser-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     SWIPE_APP_DIR="$BASE"   node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   phone-swipe:     /'

@@ -3862,43 +3862,59 @@
 
         if (existingIndex !== -1) {
             let item = scanHistory[existingIndex];
+            const itemSnapshot = { ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes };
 
-            if (!item.barcodes || !Array.isArray(item.barcodes)) {
-                let oldCod = parseFloat(item.cod !== undefined ? item.cod : item.price) || 0;
-                let oldDod = parseFloat(item.dod) || 0;
-                let oldCode = item.barcode || barcode;
-                let oldTime = item.time || timeString;
-                let oldIsClosed = item.isClosed || false;
-                let oldLocker = item.locker || "N/A";
-                item.barcodes = [{ code: oldCode, time: oldTime, cod: oldCod, dod: oldDod, locker: oldLocker, isClosed: oldIsClosed, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || currentTimeMillis }];
-            }
+            const mergeScannedBarcodeInto = (target) => {
+                normalizeBarcodesOf(target);
+                if (!target.barcodes || !Array.isArray(target.barcodes)) {
+                    let oldCod = parseFloat(target.cod !== undefined ? target.cod : target.price) || 0;
+                    let oldDod = parseFloat(target.dod) || 0;
+                    let oldCode = target.barcode || barcode;
+                    let oldTime = target.time || timeString;
+                    let oldIsClosed = target.isClosed || false;
+                    let oldLocker = target.locker || "N/A";
+                    target.barcodes = [{ code: oldCode, time: oldTime, cod: oldCod, dod: oldDod, locker: oldLocker, isClosed: oldIsClosed, isDeducted: false, isFromDeletion: false, createdAt: target.createdAt || currentTimeMillis }];
+                }
 
-            item.barcodes.push({
-                code: barcode,
-                time: timeString,
-                cod: cod,
-                dod: dod,
-                locker: locker,
-                isClosed: false,
-                isDeducted: false,
-                isFromDeletion: false,
-                createdAt: currentTimeMillis
-            });
+                if (!target.barcodes.some(b => b && b.code === barcode)) {
+                    target.barcodes.push({
+                        code: barcode,
+                        time: timeString,
+                        cod: cod,
+                        dod: dod,
+                        locker: locker,
+                        isClosed: false,
+                        isDeducted: false,
+                        isFromDeletion: false,
+                        createdAt: currentTimeMillis
+                    });
+                }
 
-            item.count = item.barcodes.length;
-            item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            item.price = Math.round((item.cod + item.dod) * 100) / 100;
-            item.barcode = barcode;
-            item.time = timeString;
-            item.scanDate = dateString;
-            item.isClosed = false;
-            delete item.closedAt;
-            item.isCalled = false;
+                target.count = target.barcodes.length;
+                target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                target.barcode = barcode;
+                target.time = timeString;
+                target.scanDate = dateString;
+                target.isClosed = false;
+                delete target.closedAt;
+                target.isCalled = false;
+                return target;
+            };
+
+            mergeScannedBarcodeInto(item);
 
             scanHistory.splice(existingIndex, 1);
             scanHistory.push(item);
-            savePromise = saveSingleHistoryItemToFirebase(item).catch(revertRevenueOnSaveFailure).then(() => { syncScannerLookupEntry(item.id, item); });
+            savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
+                .then((committedItem) => { syncScannerLookupEntry(item.id, committedItem || item); })
+                .catch((err) => {
+                    const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
+                    if (revertIndex !== -1) scanHistory[revertIndex] = itemSnapshot;
+                    refreshCurrentHistoryView();
+                    return revertRevenueOnSaveFailure(err);
+                });
         } else {
             let newItem = {
                 id: generateUniqueId(),
@@ -4745,6 +4761,32 @@
             renderRecentlyDeleted();
             showToast("⚠️ លុបជាអចិន្ត្រៃយ៍មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
+    }
+
+    function mergeBarcodeIntoHistoryItem(id, mergeFn, fallbackItem) {
+        if (!db || !fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+            const err = new Error('Refusing to merge barcode into history item with missing/unsafe id');
+            console.error(err.message, id);
+            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'mergeBarcodeIntoHistoryItem' });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
+            return Promise.reject(err);
+        }
+        return fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+            if (!currentItem) return fallbackItem;
+            return mergeFn(currentItem);
+        }).then((result) => {
+            if (!result || !result.committed) {
+                throw new Error('Barcode merge transaction was not committed');
+            }
+            const committed = result.snapshot ? result.snapshot.val() : null;
+            if (committed && !committed.id) committed.id = id;
+            return committed;
+        }).catch((error) => {
+            console.error("Error merging barcode into history item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error merging barcode into history item: " });
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
+            throw error;
+        });
     }
 
     function saveSingleHistoryItemToFirebase(item) {

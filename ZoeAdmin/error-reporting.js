@@ -39,6 +39,19 @@
         return loadPromise;
     }
 
+    function redactUrl(url) {
+        if (typeof url !== 'string') return url;
+        return url.replace(/([?&](?:auth|access_token|id_token|key)=)[^&#]+/gi, '$1[redacted]');
+    }
+
+    function redactBreadcrumb(crumb) {
+        try {
+            if (crumb && crumb.data && typeof crumb.data.url === 'string') crumb.data.url = redactUrl(crumb.data.url);
+            if (crumb && typeof crumb.message === 'string') crumb.message = redactUrl(crumb.message);
+        } catch (e) {}
+        return crumb;
+    }
+
     function tagApp(appName) {
         if (!global.Sentry || typeof global.Sentry.onLoad !== 'function') return;
         global.Sentry.onLoad(() => {
@@ -62,7 +75,8 @@
                 release: release || undefined,
                 sendDefaultPii: false,
                 sampleRate: 1.0,
-                tracesSampleRate: 0
+                tracesSampleRate: 0,
+                beforeBreadcrumb: redactBreadcrumb
             });
             if (typeof Sentry.setTag === 'function') Sentry.setTag('app', appName || 'unknown');
             return true;

@@ -13,6 +13,7 @@ let currentUserEmail = null;
 let authGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
+let lastRoleRestOutcome = '';
 const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
 let historyData = {};
 let barcodeIndex = {};
@@ -361,26 +362,68 @@ async function submitActivationKey() {
     }
 }
 
-function awaitDatabaseConnection(timeoutMs) {
-    return new Promise((resolve) => {
-        if (isDatabaseConnected) { resolve(true); return; }
-        if (!window.firebaseSDK || !db) { resolve(false); return; }
+function readDatabaseUrlFromConfig() {
+    try {
+        const raw = localStorage.getItem('zoew_firebase_config');
+        if (!raw) return '';
+        const cfg = JSON.parse(raw);
+        const url = cfg && cfg.databaseURL ? String(cfg.databaseURL) : '';
+        return url.replace(/\/+$/, '');
+    } catch (e) {
+        return '';
+    }
+}
+
+async function readUserRoleViaRest(user) {
+    const base = readDatabaseUrlFromConfig();
+    if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
+        lastRoleRestOutcome = 'unavailable';
+        throw new Error('REST role check unavailable');
+    }
+    let res;
+    try {
+        const token = await user.getIdToken();
+        res = await fetch(base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token), { cache: 'no-store' });
+    } catch (e) {
+        lastRoleRestOutcome = 'blocked: ' + ((e && e.message) || 'unknown');
+        throw e;
+    }
+    if (!res.ok) {
+        lastRoleRestOutcome = 'http ' + res.status;
+        throw new Error('REST role check failed: ' + res.status);
+    }
+    const value = await res.json();
+    lastRoleRestOutcome = 'ok';
+    return value;
+}
+
+function readUserRole(user) {
+    const sdkRead = window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)).then((snap) => snap.val());
+    if (isDatabaseConnected) {
+        lastRoleRestOutcome = 'not needed';
+        return withTimeout(sdkRead, 15000, 'Role check timed out');
+    }
+    const timeoutErr = new Error('Role check timed out');
+    const restRead = readUserRoleViaRest(user);
+    return new Promise((resolve, reject) => {
         let settled = false;
-        let unsubscribe = null;
+        let outstanding = 2;
+        let sdkError = null;
+        let restError = null;
         let timer = null;
-        const finish = (value) => {
+        const finish = (fn, value) => {
             if (settled) return;
             settled = true;
             if (timer) clearTimeout(timer);
-            if (unsubscribe) { try { unsubscribe(); } catch (e) {} }
-            resolve(value);
+            fn(value);
         };
-        timer = setTimeout(() => finish(false), timeoutMs);
-        try {
-            unsubscribe = window.firebaseSDK.onValue(window.firebaseSDK.ref(db, '.info/connected'), (snap) => {
-                if (snap.val() === true) finish(true);
-            });
-        } catch (e) { finish(false); }
+        const onFailure = () => {
+            outstanding--;
+            if (outstanding === 0) finish(reject, sdkError || restError || timeoutErr);
+        };
+        timer = setTimeout(() => finish(reject, timeoutErr), ROLE_CHECK_CONNECT_WAIT_MS);
+        sdkRead.then((value) => finish(resolve, value), (err) => { sdkError = err; onFailure(); });
+        restRead.then((value) => finish(resolve, value), (err) => { restError = err; onFailure(); });
     });
 }
 
@@ -393,19 +436,14 @@ function retryPendingRoleCheck() {
 
 async function verifyRoleThenProceed(user, myAuthGeneration) {
     pendingRoleRecheck = false;
-    if (!isDatabaseConnected) {
-        showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
-        await awaitDatabaseConnection(ROLE_CHECK_CONNECT_WAIT_MS);
-        if (myAuthGeneration !== authGeneration) return;
-    }
+    if (!isDatabaseConnected) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
     let role;
     try {
-        const roleSnap = await withTimeout(window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
-        role = roleSnap.val();
+        role = await readUserRole(user);
     } catch (e) {
         if (myAuthGeneration !== authGeneration) return;
         console.error('Role verification failed:', e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Role verification failed:' });
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Role verification failed:', connected: isDatabaseConnected, restRoleRead: lastRoleRestOutcome });
         if (e && e.message === 'Role check timed out') {
             pendingRoleRecheck = true;
             openModal('loginModal');

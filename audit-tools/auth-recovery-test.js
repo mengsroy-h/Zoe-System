@@ -34,7 +34,20 @@ const APPS = [
 
 function buildContext(app) {
     const clock = { now: 0, seq: 0, timers: [] };
-    const log = { toasts: [], signOuts: 0, gets: [], loginModalShown: 0, dbInit: 0, alerts: [] };
+    const log = { toasts: [], signOuts: 0, gets: [], loginModalShown: 0, dbInit: 0, alerts: [], rest: [] };
+    let configJson = '{"apiKey":"k","databaseURL":"https://demo-default-rtdb.firebaseio.com/"}';
+
+    function fakeFetch(url, opts) {
+        const entry = { url, opts, resolve: null, reject: null };
+        entry.promise = new Promise((res, rej) => { entry.resolve = res; entry.reject = rej; });
+        entry.respond = (body, status) => entry.resolve({
+            ok: (status || 200) < 400,
+            status: status || 200,
+            json: () => Promise.resolve(body)
+        });
+        log.rest.push(entry);
+        return entry.promise;
+    }
 
     const fakeSetTimeout = (fn, ms) => {
         const t = { fn, at: clock.now + (ms || 0), id: ++clock.seq, cleared: false };
@@ -58,7 +71,11 @@ function buildContext(app) {
             auth.listeners.slice().forEach((cb) => cb(auth.currentUser));
         }
     }
+    function makeUser(email) {
+        return { uid: 'uid-' + email, email, getIdToken: () => Promise.resolve('id-token-' + email) };
+    }
     function restorePersistedUser(user) {
+        if (user && !user.getIdToken) user.getIdToken = () => Promise.resolve('id-token-' + user.email);
         auth.currentUser = user;
         auth.lastNotifiedUid = user ? user.uid : null;
     }
@@ -66,7 +83,7 @@ function buildContext(app) {
     const fb = {
         onAuthStateChanged(a, cb) { a.listeners.push(cb); cb(a.currentUser); return () => {}; },
         signInWithEmailAndPassword(a, email) {
-            a.currentUser = { uid: 'uid-' + email, email };
+            a.currentUser = makeUser(email);
             notifyAuthListeners();
             return Promise.resolve({ user: a.currentUser });
         },
@@ -118,7 +135,12 @@ function buildContext(app) {
         clearTimeout: fakeClearTimeout,
         Promise, Error, JSON, Date, String, Number, Object, Array, isNaN, parseFloat,
         document: doc,
-        localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        localStorage: {
+            getItem: (k) => (k === 'zoew_firebase_config' ? configJson : null),
+            setItem() {}, removeItem() {}
+        },
+        fetch: fakeFetch,
+        encodeURIComponent,
         alert: (m) => log.alerts.push(m),
         fb, auth, db: {},
         window: { firebaseSDK: fb },
@@ -130,6 +152,7 @@ function buildContext(app) {
     const preamble = `
         var authGeneration = 0;
         var pendingRoleRecheck = false;
+        var lastRoleRestOutcome = '';
         var isDatabaseConnected = true;
         var ROLE_CHECK_CONNECT_WAIT_MS = 45000;
         var authUnsubscribe = null;
@@ -175,7 +198,8 @@ function buildContext(app) {
         function checkPinAndOpenConfig() {}
     `;
     vm.runInContext(preamble, ctx);
-    const wanted = ['withTimeout', 'awaitDatabaseConnection', 'retryPendingRoleCheck', app.verify, app.login];
+    const wanted = ['withTimeout', 'readDatabaseUrlFromConfig', 'readUserRoleViaRest', 'readUserRole',
+        'retryPendingRoleCheck', app.verify, app.login];
     if (app.boot === 'setupAuthListener') wanted.push('setupAuthListener');
     vm.runInContext(sliceFns(app.file, wanted), ctx);
     if (app.boot === 'inline') {
@@ -187,7 +211,14 @@ function buildContext(app) {
             '   else { pendingRoleRecheck = false; }' +
             ' }); }', ctx);
     }
-    return { ctx, clock, log, auth, fb, els, setConnected };
+    return { ctx, clock, log, auth, fb, els, setConnected, setConfig: (v) => { configJson = v; } };
+}
+
+function respondRest(h, index, body, status) {
+    const entry = h.log.rest[index];
+    if (!entry) { ok('មានសំណើ REST ទី ' + (index + 1) + ' ដើម្បីឆ្លើយតប', false, h.log.rest.length); return false; }
+    entry.respond(body, status);
+    return true;
 }
 
 const flush = () => new Promise((r) => setImmediate(r));
@@ -236,6 +267,7 @@ async function run(app) {
     h.log.gets[1].resolve({ val: () => app.role });
     await drain();
     ok('ចូលប្រព័ន្ធជោគជ័យ', h.log.dbInit === 1 && h.log.authButton === true, { dbInit: h.log.dbInit, btn: h.log.authButton });
+    ok('មិនស្នើ REST ទេ ពេលភ្ជាប់រួចហើយ', h.log.rest.length === 0, h.log.rest.length);
 
     const signOutsBefore = h.log.signOuts;
     await advance(h, 20000);
@@ -272,39 +304,97 @@ async function run(app) {
     ok('មិនត្រួតពិនិត្យឡើងវិញទេ ពេលគ្មានទង់រង់ចាំ (គ្មាន loop)',
         h.log.gets.length === getsBeforeReconnect + 1, h.log.gets.length);
 
-    // ---- Scenario 5: the connection is not up yet (the real 2026-08-20 cause) ----
-    console.log('-- ៥. RTDB មិនទាន់ភ្ជាប់ (មូលហេតុពិត) — មិនត្រូវប្រណាំងនឹង timer --');
+    // ---- Scenario 5: the socket is not up and no REST fallback is reachable ----
+    console.log('-- ៥. RTDB មិនទាន់ភ្ជាប់ ហើយគ្មានផ្លូវ REST — មិនត្រូវប្រណាំងនឹង timer --');
     h = buildContext(app);
     vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.setConfig(null);
     h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
     vm.runInContext('setupAuthListener();', h.ctx);
     await drain();
-    ok('មិនអាន user_roles ទេ ខណៈ .info/connected នៅ false', h.log.gets.length === 0, h.log.gets.length);
     ok('ប្រាប់អ្នកប្រើថាកំពុងភ្ជាប់', h.log.toasts.some((t) => t.indexOf('កំពុងភ្ជាប់') !== -1), h.log.toasts);
+    ok('គ្មាន databaseURL ➜ មិនស្នើ REST', h.log.rest.length === 0, h.log.rest.length);
+    ok('កត់ត្រាថាផ្លូវ REST ប្រើមិនបាន', h.ctx.lastRoleRestOutcome === 'unavailable', h.ctx.lastRoleRestOutcome);
 
     await advance(h, 20000);
-    ok('នៅតែរង់ចាំ មិនទាន់អស់ពេលនៅ 20 វិនាទី (WebSocket មាន 30 វិនាទី)', h.log.gets.length === 0, h.log.gets.length);
+    ok('នៅតែរង់ចាំ មិនអស់ពេលនៅ 20 វិនាទី (WebSocket មាន 30 វិនាទី)',
+        h.log.signOuts === 0 && h.ctx.pendingRoleRecheck === false && h.log.loginModalShown === 0,
+        { signOuts: h.log.signOuts, pending: h.ctx.pendingRoleRecheck, modal: h.log.loginModalShown });
 
     h.setConnected(true);
-    await drain();
-    ok('ភ្ជាប់បាន ➜ ទើបអាន user_roles', h.log.gets.length === 1, h.log.gets.length);
     h.log.gets[0].resolve({ val: () => app.role });
     await drain();
-    ok('ចូលបានដោយស្វ័យប្រវត្តិ ដោយគ្មានកំហុសបង្ហាញសោះ',
+    ok('ភ្ជាប់បាន ➜ ចូលបានដោយស្វ័យប្រវត្តិ ដោយគ្មានកំហុសបង្ហាញសោះ',
         h.log.dbInit === 1 && h.log.signOuts === 0, { dbInit: h.log.dbInit, signOuts: h.log.signOuts });
 
     console.log('-- ៦. បើភ្ជាប់មិនបានសោះ សំណាញ់សុវត្ថិភាពចាស់នៅដដែល --');
     h = buildContext(app);
     vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.setConfig(null);
     h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
     vm.runInContext('setupAuthListener();', h.ctx);
     await drain();
     await advance(h, 45000);
-    ok('ក្រោយអស់ថវិការង់ចាំ ទើបព្យាយាមអាន', h.log.gets.length === 1, h.log.gets.length);
-    await advance(h, 15000);
-    ok('រួចអស់ពេល ➜ មិន signOut ដាក់ទង់ព្យាយាមឡើងវិញ',
+    ok('អស់ថវិការង់ចាំ ➜ មិន signOut ដាក់ទង់ព្យាយាមឡើងវិញ',
         h.log.signOuts === 0 && h.ctx.pendingRoleRecheck === true,
         { signOuts: h.log.signOuts, pending: h.ctx.pendingRoleRecheck });
+
+    // ---- Scenario 7: the socket is dead but plain HTTPS still works (2026-08-20 #4) ----
+    console.log('-- ៧. Socket ស្លាប់ តែ HTTPS ដើរ ➜ អាន role តាម REST --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    ok('ចាប់ផ្ដើមអាន SDK ភ្លាម ដោយមិនរង់ចាំ socket', h.log.gets.length === 1, h.log.gets.length);
+    ok('ហើយស្នើ REST ស្របគ្នា', h.log.rest.length === 1, h.log.rest.length);
+    ok('URL REST ចង្អុលទៅ user_roles របស់អ្នកប្រើ ជាមួយ token',
+        h.log.rest.length === 1 &&
+        h.log.rest[0].url === 'https://demo-default-rtdb.firebaseio.com/user_roles/uid-a%40x.com.json?auth=id-token-a%40x.com',
+        h.log.rest.length ? h.log.rest[0].url : null);
+
+    respondRest(h, 0, app.role);
+    await drain();
+    ok('ចូលបានតាម REST ទោះ socket មិនឡើង', h.log.dbInit === 1 && h.log.signOuts === 0,
+        { dbInit: h.log.dbInit, signOuts: h.log.signOuts });
+    ok('កត់ត្រាថា REST ជាអ្នកឆ្លើយ', h.ctx.lastRoleRestOutcome === 'ok', h.ctx.lastRoleRestOutcome);
+
+    await advance(h, 60000);
+    ok('SDK get ដែលនៅព្យួរ មិនបង្កើត timeout ក្រោយចូលបានហើយ',
+        h.log.signOuts === 0 && h.ctx.pendingRoleRecheck === false && h.log.dbInit === 1,
+        { signOuts: h.log.signOuts, pending: h.ctx.pendingRoleRecheck, dbInit: h.log.dbInit });
+
+    // ---- Scenario 8: REST is reachable but refused — must not shortcut the wait ----
+    console.log('-- ៨. REST ត្រូវបានបដិសេធ (401) ➜ នៅតែរង់ចាំ socket --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    respondRest(h, 0, null, 401);
+    await drain();
+    ok('401 មិនបណ្ដេញអ្នកប្រើចេញភ្លាមទេ',
+        h.log.signOuts === 0 && h.log.loginModalShown === 0,
+        { signOuts: h.log.signOuts, modal: h.log.loginModalShown });
+    ok('កត់ត្រាលេខកូដ HTTP សម្រាប់ Sentry', h.ctx.lastRoleRestOutcome === 'http 401', h.ctx.lastRoleRestOutcome);
+
+    h.setConnected(true);
+    h.log.gets[0].resolve({ val: () => app.role });
+    await drain();
+    ok('socket ត្រឡប់មកវិញ ➜ ចូលបាន', h.log.dbInit === 1 && h.log.signOuts === 0,
+        { dbInit: h.log.dbInit, signOuts: h.log.signOuts });
+
+    // ---- Scenario 9: REST must not be able to bypass the role gate ----
+    console.log('-- ៩. REST មិនអាចរំលងការត្រួតពិនិត្យ role បានទេ --');
+    h = buildContext(app);
+    vm.runInContext('isDatabaseConnected = false;', h.ctx);
+    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
+    vm.runInContext('setupAuthListener();', h.ctx);
+    await drain();
+    respondRest(h, 0, 'nonsense-role');
+    await drain();
+    ok('role ខុសពី REST ➜ signOut ដដែល', h.log.signOuts === 1, h.log.signOuts);
+    ok('មិនបានបើក listener ទិន្នន័យទេ', h.log.dbInit === 0, h.log.dbInit);
 
     // ---- Scenario 3: a genuine error must still fail closed ----
     console.log('-- ៣. កំហុសពិតប្រាកដ (permission_denied) នៅតែត្រូវបណ្ដេញចេញ --');

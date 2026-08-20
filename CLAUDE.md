@@ -2260,3 +2260,7 @@ Scenario ថ្មី ១០-១២៖ បើក App ធម្មតា ➜ **�
 
 `CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v40, zoew-v35, zoescan-v29, zoekeygen-v22)។
 **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**
+
+**Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើ** — PR #30, merge commit `382e797` (រួមទាំង
+section "ជុំ ៨ (បន្ត) — ZoeW និង ZoeKeyGen" ខាងលើដែរ)។ Netlify preview ទាំង ៤ បៃតងមុន merge
+ហើយ `git rev-list --count origin/main..origin/claude/busy-franklin-5g26ja` = 0 ក្រោយ merge។

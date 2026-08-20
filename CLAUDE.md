@@ -2292,7 +2292,7 @@ stub មិនអាចចាប់ការបើក listener ស្ទួន�
 Zoescan ខូច។ ឥឡូវ stub ធ្វើតាមការការពារពិត។ Scenario ១២ ក៏តម្រូវឲ្យ **ទាំង ៤ App** ប្រកាស
 ចូលប្រព័ន្ធ **ត្រឹមតែម្ដង** (មុននេះវាទទួលយក ០ សម្រាប់ Zoescan)។ **179/179**។
 
-### រាយការណ៍ តែ *មិន* បានកែ — សម្រេចដោយអ្នកប្រើ
+### រន្ធអនុគ្រោះ ៣ ថ្ងៃ — **កែហើយ** តាមការសម្រេចរបស់អ្នកប្រើ ("កែចុះ")
 **ការ paste Key ដដែលឡើងវិញពេលនៅក្រៅបណ្ដាញ អាច reset ការអនុគ្រោះ ៣ ថ្ងៃ បានឥតកំណត់។**
 ដានពេញលេញ៖ `getStatus()` ➜ `offline-grace-exceeded` ក្រោយ ៣ ថ្ងៃគ្មានការផ្ទៀងផ្ទាត់ online ➜
 `ensureAppActivated()` បើកប្រអប់ Activation ➜ អ្នកប្រើ paste Key ដដែល ➜ `submitActivationKey()`
@@ -2301,8 +2301,25 @@ Zoescan ខូច។ ឥឡូវ stub ធ្វើតាមការការ�
 ដូច្នេះ "៣ ថ្ងៃ" ជាការរំលឹក មិនមែនជាដែនកំណត់ទេ។ ការ Revoke នៅតែដើរភ្លាមៗ **ពេលមានបណ្ដាញ**
 (`getStatus` ហៅ `checkOnline` រាល់ដង ហើយលុប record ពេល `ok === false`) — ចន្លោះនេះមានតែពេល
 ក្រៅបណ្ដាញសុទ្ធសាធ។
-ការកែគឺ៖ កុំសរសេរ `lastOnlineCheck` ក្នុង `activate()` លុះត្រា `checkOnline()` ជោគជ័យ។ **មិនបានធ្វើទេ**
-ព្រោះវាជាការសម្រេចចិត្តអាជីវកម្ម៖ ហាងដែលដំឡើងថ្មីនៅកន្លែងគ្មានអ៊ីនធឺណិតនឹងលែងអាច Activate បាន។
+**ការកែដែលបានអនុវត្ត** — ការកែដ៏ឆោតល្ងង់ (កុំសរសេរ `lastOnlineCheck` លុះត្រាមានបណ្ដាញ) នឹង
+**ចាក់សោហាងដែលដំឡើងថ្មីនៅកន្លែងគ្មានអ៊ីនធឺណិត** ដូច្នេះមិនបានធ្វើបែបនោះទេ។ ជំនួសវិញ `activate()`៖
+1. ហៅ `checkOnline()` ពិតប្រាកដ។ `ok === false` (revoked / not-found / expired-server) ➜
+   **បដិសេធតាំងពី Activate** ជាមួយមូលហេតុនោះ (មុននេះ Key ដែល Revoke អាច Activate បាន)។
+   វា **មិនលុប** record ដែលកំពុងដំណើរការទេ — ការ paste Key ខូចមិនត្រូវបំផ្លាញ Activation ល្អ។
+2. `ok === true` ➜ រំកិល `lastOnlineCheck` និងយក `expiresAt` ពី Server (ដូច `getStatus`)។
+3. `ok === null` (គ្មានបណ្ដាញ) ➜ **បើជា Key *ដដែល* រក្សា `lastOnlineCheck` ចាស់** ដូច្នេះការ paste
+   ឡើងវិញមិនបានអ្វីទេ។ Key **ថ្មីពិត** ឬការ Activate លើកដំបូង នៅតែចាប់ផ្ដើមរាប់ថ្មី — ដូច្នេះ
+   ការដំឡើងក្រៅបណ្ដាញនៅតែដើរដដែល។
+គ្មានវាលថ្មីក្នុង schema ➜ គ្មាន migration។ `license-verify.js` នៅ byte-identical ទាំង ៤ (`md5sum`)។
+
+តេស្តថ្មី **`audit-tools/license-grace-test.js` (13/13)** ដក `activate`/`getStatus`/`checkOnline`
+ពិតចេញមកដាក់ក្នុង `vm` ជាមួយ `fetch` និង `localStorage` ក្លែងក្លាយ។ **មិនមែនតេស្តទទេទេ**៖
+រត់លើ `license-verify.js` ចាស់ ➜ **ធ្លាក់ ៤** រួមទាំង `getStatus` ចេញ `"active"` ក្រោយ paste
+ឡើងវិញ (ជារន្ធពិត) និង Key ដែល Revoke ត្រូវបានទទួលយក។
+
+**នៅសល់ដោយចេតនា**៖ ការលុប site data នៅតែ reset បាន — គ្មានផ្លូវការពារខាង client ដោយគ្មាន
+backend ដែលទុកចិត្តបាន (ដូចដែលបានកត់ត្រាតាំងពីជុំដំបូង)។ ការកែនេះលើកកម្ពស់ពី "ចុចប៊ូតុងម្ដងទៀត"
+ទៅ "លុប site data" ហើយធ្វើឲ្យផ្លូវធម្មតាមានភាពស្មោះត្រង់។
 
 ### ពិនិត្យហើយស្អាត
 - `license-verify.js` អានពេញ (326 បន្ទាត់)៖ `checkOnline` អាន **node តាម App** (`license_keys/{app}/{id}`)
@@ -2315,5 +2332,5 @@ Zoescan ខូច។ ឥឡូវ stub ធ្វើតាមការការ�
 - `showLockerPicker(true)` រំលងពេលមាន locker រួច ➜ ការត្រួតពិនិត្យ role ជាថ្មីមិនបញ្ជូនកម្មករ
   ត្រឡប់ទៅអេក្រង់ជ្រើស locker វិញទេ។
 
-`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v41, zoew-v36, zoescan-v30, zoekeygen-v23)។
+`CACHE_VERSION` bump ទាំង ៤ ពីរដង (បញ្ចប់នៅ zoeadmin-v42, zoew-v37, zoescan-v31, zoekeygen-v24)។
 **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

@@ -150,6 +150,14 @@
     async function activate(keyString, appCode) {
         const result = await verifyKeyString(keyString, appCode);
         if (!result.valid) return result;
+        const previous = loadLocalRecord(appCode);
+        const online = await checkOnline(appCode, result.payload.id);
+        if (online.ok === false) {
+            return { valid: false, reason: online.reason, payload: result.payload };
+        }
+        const now = getServerNow();
+        const reactivatingSameKey = !!(previous && previous.id === result.payload.id &&
+            typeof previous.lastOnlineCheck === 'number');
         const record = {
             keyString: keyString.trim(),
             id: result.payload.id,
@@ -157,8 +165,12 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            lastOnlineCheck: getServerNow(),
-            onlineExp: result.payload.exp * 1000
+            lastOnlineCheck: online.ok === true
+                ? now
+                : (reactivatingSameKey ? previous.lastOnlineCheck : now),
+            onlineExp: (online.ok === true && typeof online.expiresAt === 'number')
+                ? online.expiresAt
+                : result.payload.exp * 1000
         };
         saveLocalRecord(appCode, record);
         return { valid: true, payload: result.payload };

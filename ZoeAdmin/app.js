@@ -1113,7 +1113,9 @@
             'modalPhoneInput', 'modalLockerInput', 'modalCodInput', 'modalDodInput',
             'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
             'editModalBarcodeText', 'lookupApiHeaderValueInput',
-            'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox'
+            'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
+            'deletedTableBody', 'dailyStatsContainer', 'monthlyStatsContainer',
+            'menuContentContainer'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);

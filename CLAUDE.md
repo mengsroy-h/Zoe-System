@@ -7,18 +7,13 @@
 > ជាការគ្រប់គ្រាន់ដើម្បីចាប់ផ្តើម។
 >
 > ### ស្ថានភាពកូដ (ផ្ទៀងផ្ទាត់ដោយ git នៅ 2026-08-20)
-> **អ្វីៗរហូតដល់ជុំ ១២ ស្ថិតក្នុង `main` រួចរាល់** — `origin/main` = `dfc84d4`
-> (PR #40, merge នៃ `claude/deep-audit-yi21xn`)។ `git rev-list --count origin/main..origin/<b>`
-> = **0 សម្រាប់គ្រប់ branch `claude/*` ចាស់ទាំងអស់**។
-> *(ការអះអាងចាស់ក្នុងប្លុកនេះថាជុំ ១២ "មិនទាន់ merge" គឺ **ខុស** — វាត្រូវ merge ក្នុង PR #40
-> ក្រោយពេលសរសេរបន្ទាត់នោះ។ នេះជាលើកទី ៣ ដែលបន្ទាត់ស្ថានភាពត្រូវចម្លងបន្តដោយមិនផ្ទៀងផ្ទាត់។)*
-> **ផ្ទៀងផ្ទាត់ជានិច្ចដោយ `git rev-list --count origin/main..origin/<branch>` — កុំចម្លងបន្ទាត់
-> នេះមកដាក់ដោយមិនរត់ពាក្យបញ្ជា។**
->
-> **ការងារបច្ចុប្បន្ន៖ `claude/zoeadmin-v2-app-9sk19b`** — បន្ថែម **App ទី ៥ `ZoeAdminV2/`**
-> (ការរចនាឡើងវិញនៃ ZoeAdmin, មុខងារដដែល, Activation Key `ADM` ដដែល, គ្មាន rules ថ្មី)។
-> លម្អិតនៅ section ចុងក្រោយនៃឯកសារនេះ។ **ឥឡូវមាន App ៥ មិនមែន ៤ ទេ** — ពេលកែ
-> `license-verify.js` ឬ `error-reporting.js` ត្រូវ `cp` ទៅ **ទាំង ៥**។
+> **អ្វីៗរហូតដល់ជុំ ១២ ស្ថិតក្នុង `main` រួចរាល់** — ជុំ ១២ ត្រូវ merge ក្នុង **PR #40**
+> (`dfc84d4`), ហើយការកែ `dom-hygiene.js` + ការលុបទិន្នន័យក្នុង DOM ពេលចាកចេញ ក្នុង **PR #41**។
+> `git rev-list --count origin/main..origin/<b>` = **0 សម្រាប់គ្រប់ branch `claude/*`**។
+> *(ការអះអាងចាស់ក្នុងប្លុកនេះថាជុំ ១២ "មិនទាន់ merge" គឺ **ខុស** — នេះជាលើកទី ៣ ដែលបន្ទាត់
+> ស្ថានភាពត្រូវចម្លងបន្តដោយមិនផ្ទៀងផ្ទាត់។ លម្អិតនៅ section ចុងក្រោយ។)*
+> **ផ្ទៀងផ្ទាត់ជានិច្ចដោយ `git rev-list --count origin/main..origin/<branch>`
+> — កុំចម្លងបន្ទាត់នេះមកដាក់ដោយមិនរត់ពាក្យបញ្ជា។**
 > Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។
 >
 > **Firebase rules ទាំងពីរ publish រួចរាល់ហើយ** (root និង `ZoeKeyGen/`) ហើយ **ជុំ ១១ មិនប្តូរ
@@ -2999,98 +2994,63 @@ barcode ថ្មី រួចសរសេរ item **ទាំងមូល** ត
 **គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
 Suite សរុប៖ **547 assertion** — បៃតងទាំងអស់ (**29 ការត្រួតពិនិត្យ**)។
 
-## ZoeAdminV2 — App ទី ៥ (added 2026-08-20, branch `claude/zoeadmin-v2-app-9sk19b`)
+## `dom-hygiene.js` ខ្វាក់អស់ ១២ ជុំ — កែហើយ (2026-08-20, PR #41)
 
-អ្នកប្រើស្នើ៖ *"បង្កើត app ដូច ZoeAdmin ថ្មីមួយ ... របៀបថា version 2 ... ការរចនា ពណ៌ អី ដោយគំនិត
-អ្នកផ្ទាល់"* បន្ថែម៖ *"new logo new style ui up to your idea"*។ ដូច្នេះ **រូបរាងជាការសម្រេចរបស់
-ខ្ញុំទាំងស្រុង តែមុខងារអាជីវកម្មត្រូវរក្សាដដែល**។
+**ស្ថានភាព git ត្រឹមត្រូវ** (ផ្ទៀងផ្ទាត់ដោយ `git rev-list`, មិនមែនចម្លងបន្ទាត់ចាស់)៖ ជុំ ១២
+ត្រូវ merge ចូល `main` រួចរាល់ក្នុង **PR #40** (`dfc84d4`) — ការអះអាងក្នុង START HERE ថាវា
+"មិនទាន់ merge" គឺ **ខុស** ហើយត្រូវកែហើយ។ នេះជាលើកទី ៣ ដែលបន្ទាត់ស្ថានភាពត្រូវចម្លងបន្តដោយ
+មិនផ្ទៀងផ្ទាត់។
 
-### ការសម្រេចស្នូល — fork តក្កវិជ្ជា កុំសរសេរឡើងវិញ
-`ZoeAdmin/app.js` មាន ៥១៧០ បន្ទាត់ ដែលឆ្លងកាត់ **audit ១២ ជុំ** ហើយកាន់លុយពិត។ ការសរសេរ
-ឡើងវិញនឹងនាំកំហុសទាំងអស់នោះមកវិញ។ ដូច្នេះ V2 = **កូដដដែល + HTML/CSS ថ្មីទាំងស្រុង** ហើយ
-**រក្សា `id` គ្រប់ណាដែល `app.js` ត្រូវការ** (ផ្ទៀងផ្ទាត់ដោយ script៖ ៨៦ id, បាត់តែ
-`zoeUpdateBanner` ដែលបង្កើតដោយ JS និង `dragHandle` ដែលលុបចេញដោយចេតនា)។
+### កំហុសក្នុងឧបករណ៍
+`dom-hygiene.js` ប្រើ map `name -> id` **តែមួយជាសកល** ដូច្នេះឈ្មោះអថេរដដែលដែលភ្ជាប់ទៅ id
+ច្រើន **រក្សាតែធាតុចុងក្រោយ**។ គម្រោងនេះប្រើឈ្មោះទូទៅច្រើនណាស់ — ក្នុង ZoeAdmin តែមួយ៖
 
-**Activation Key ប្រើ `ADM` ដដែល** ➜ Key ដែលមានស្រាប់ដំណើរការភ្លាម, ZoeKeyGen មិនប្តូរ។
-**គ្មានការប្តូរ Firebase rules** ➜ គ្មាន publish ថ្មី (V2 ប៉ះ path ដដែលនឹង ZoeAdmin)។
+| ឈ្មោះអថេរ | ភ្ជាប់ទៅ id ចំនួន |
+|---|---|
+| `container` | **៦** (`toastContainer`, `dailyStatsContainer`, `monthlyStatsContainer`, `menuContentContainer`, `video-container`, `barcodeListContainer`) |
+| `el` | ៤ (`btnFilterToday/Yesterday/DayBefore/All`) |
+| `tbody` | ២ — **`historyTableBody` និង `deletedTableBody`** |
+| `btn`, `input`, `searchInput` | ២ ក្នុងមួយៗ |
 
-### អ្វីដែលកែក្នុង `app.js` (កុំច្រឡំថាជា drift)
-1. `zoeadmin` ➜ `zoeadminv2`៖ Sentry tag (២ កន្លែង) និង **PBKDF2 salt ទាំង ២**
-   (`zoeadminv2_pin_verify_v2`, `zoeadminv2_lookup_api_secret_v1`) — PIN/secret មិនឆ្លងគ្នា
-2. `setupSwipeGestures()` ➜ `switchTab()`/`setupTabNavigation()`/`updateOrdersTabBadge()`
-3. `setPhoneSearchPulledUp()` **លុបចោល** ព្រមទាំង class `collapsed`/`search-focus` — លែងត្រូវការ
-   ព្រោះបញ្ជីមានផ្ទាំង (tab) ផ្ទាល់ខ្លួន។ `history-expanded` នៅដដែល (pull-to-refresh guard)
-4. `buildHistoryRowHtml()`/`renderHistory()` សរសេរឡើងវិញជា **កាត `<div>`** ជំនួស `<tr>` —
-   **រក្សា algorithm diff តាម `data-sig` ដដែល** ដូច្នេះ performance មិនថយ
-5. បន្ថែម៖ theme (`setTheme`/`cycleTheme`/`applyThemeUi`/`setupThemeWatcher`),
-   តម្រង/តម្រៀប (`applyListRefinements`/`setStatusFilter`/`setSortMode`/`restoreListPreferences`),
-   `clearPhoneSearch`, `copyPhoneToClipboard`, `setupKeyboardShortcuts`
+ការជាន់គ្នា `tbody` លាក់កំហុសពិត៖ រាល់ការសរសេរទៅ `deletedTableBody` ត្រូវរាប់ថាជា
+`historyTableBody` ដែលស្ថិតក្នុង `ACCEPTED` ➜ **បៃតងក្លែងក្លាយ**។
 
-**អន្ទាក់ដែលដោះស្រាយហើយ — កុំ "កែ" វិញ៖**
-- `renderHistory` ឥឡូវ render **index 0 នៅលើគេ** (ZoeAdmin ដើម render បញ្ច្រាស)។ លេខ "ល.រ"
-  មិនមែនជា index ទេ — វាមកពី `historySeqById` ដែលបង្កើតពីបញ្ជីតាមលំដាប់ពេលវេលា **មុនត្រង/តម្រៀប**
-  ដូច្នេះ **លេខរៀងតាមការស្កេននៅដដែល ទោះប្តូរការតម្រៀបក៏ដោយ**
-- `updateDailyScheduleStats()` ទទួលបញ្ជី **មិនទាន់ត្រង status** ដោយចេតនា — ស្ថិតិលុយត្រូវតាម
-  **ថ្ងៃ** មិនមែនតាមតម្រងស្ថានភាពទេ
-- CSS មាន **alias tokens** (`--primary`, `--accent-blue`, `--accent-purple`, `--text-muted`,
-  `--border-color`, `--success`, `--success-light`) ព្រោះ `app.js` សរសេរ inline style យោង
-  ឈ្មោះទាំងនោះ។ **បើលុប alias ចោល markup ដែល JS បង្កើតនឹងខូចពណ៌ក្នុងផ្ទាំងងងឹត**
-- `#permission-box` លំនាំដើម `display:block`; `#video-container`, `.video-controls-overlay`,
-  `.zoom-slider-wrap`, `.torch-toggle-btn` លំនាំដើម `display:none` — ព្រោះ JS កំណត់
-  `block`/`flex`/`none` ដោយផ្ទាល់
-- ម៉ាស៊ីនស្កេន Bluetooth focus ស្វ័យប្រវត្តិ **តែលើកុំព្យូទ័រ** (`!isMobileDevice()`) ហើយលើ
-  កុំព្យូទ័រ (≥992px) ផ្ទាំងទាំងអស់មើលឃើញព្រមគ្នា ➜ គ្មានការតំរែតំរង់
-
-### កំហុសពិតដែលរកឃើញតាមផ្លូវ — `dom-hygiene.js` ខ្វាក់ ១២ ជុំមកហើយ
-ពេលដាក់ V2 ចូល `dom-hygiene.js` វារាយការណ៍ `deletedTableBody` ជាចន្លោះ ខណៈ ZoeAdmin ស្អាត។
-មូលហេតុ៖ ឧបករណ៍ប្រើ **map តែមួយ `name -> id`** ជាសកល ដូច្នេះឈ្មោះអថេរដដែលដែលភ្ជាប់ទៅ id ច្រើន
-**រក្សាតែធាតុចុងក្រោយ**។ ក្នុង ZoeAdmin `const tbody = getElementById(...)` ភ្ជាប់ទៅ **ទាំង**
-`historyTableBody` **និង** `deletedTableBody` ➜ ធាតុមួយត្រូវបាត់។ ក្នុង V2 ខ្ញុំប្តូរឈ្មោះអថេរ
-ក្នុង `renderHistory` ទៅ `listEl` ➜ ការជាន់គ្នាបាត់ ➜ កំហុសលេចចេញ។
-
-ឈ្មោះដែលជាន់គ្នាក្នុង ZoeAdmin៖ `container` (៦ id!), `tbody` (២), `el` (៤), `btn` (២),
-`input` (២), `searchInput` (២)។
-
-**កែឧបករណ៍**៖ `dom-hygiene.js` ឥឡូវប្រើ **lexical scoping ពិត** — `walkOwn()` មិនចុះទៅក្នុង
-function ខាងក្នុង, សង់ខ្សែសង្វាក់ scope មាន parent, រួចដោះស្រាយឈ្មោះឡើងលើតាមខ្សែសង្វាក់នោះ។
+### ការកែ
+`walkOwn()` ដើរ subtree **ដោយមិនចុះទៅក្នុង function ខាងក្នុង**; scope មាន parent link;
+ឈ្មោះត្រូវដោះស្រាយដោយឡើងលើតាមខ្សែសង្វាក់ scope។
 
 **ភស្តុតាងថាមិនទទេ** (រត់លើ `git archive origin/main` = `dfc84d4`, កូដ production មិនកែ)៖
+
 | ឧបករណ៍ | លទ្ធផល |
 |---|---|
-| ចាស់ | ✅ 0 ចន្លោះ (**បៃតងក្លែងក្លាយ**) |
-| ថ្មី | ❌ 8 ចន្លោះ — `deletedTableBody`, `dailyStatsContainer`, `monthlyStatsContainer`, `menuContentContainer` ក្នុង **ទាំង ZoeAdmin និង ZoeW** |
+| ចាស់ | ✅ 0 ចន្លោះ — **បៃតងក្លែងក្លាយ** |
+| ថ្មី | ❌ 8 ចន្លោះ (៤ ក្នុង ZoeAdmin, ៤ ក្នុង ZoeW) |
 
-`deletedTableBody` ផ្ទុក **លេខទូរស័ព្ទ + barcode របស់អតិថិជន** ➜ នៅសល់ក្នុង DOM ក្រោយចាកចេញ
-លើឧបករណ៍រួម។ នេះជា **ថ្នាក់កំហុសដដែលនឹងជុំ ៣, ៤, ៥ និង ៨** ដែលជុំទាំងនោះកែដោយផ្ទាល់ជា
-"safe, non-revenue"។ ដូច្នេះបានកែដូចគ្នា — បន្ថែម ៤ id ចូល `fieldsToBlank` ក្នុង **ZoeAdmin
-និង ZoeW** (commit ដាច់ដោយឡែក ងាយ revert)។ `CACHE_VERSION` bump (zoeadmin-v53, zoew-v44)។
-ធាតុដែលដាក់ក្នុង `ACCEPTED` មានហេតុផលពិត៖ `activationSubmitBtn` (ស្លាកប៊ូតុង),
-`themeToggleBtn` (emoji), `sortSelect` (`<select>` ដែលតម្លៃត្រូវរស់)។
+### កំហុសដែលវារកឃើញ — កែហើយ
+`deletedTableBody` (**លេខទូរស័ព្ទ + barcode អតិថិជន**), `dailyStatsContainer`,
+`monthlyStatsContainer`, `menuContentContainer` មិនដែលត្រូវលុបពេលចាកចេញ ➜ អានបានតាម DevTools
+ដោយអ្នកប្រើបន្ទាប់លើឧបករណ៍រួម។ **ថ្នាក់ដដែលនឹងជុំ ៣, ៤, ៥ និង ៨** ដែលជុំទាំងនោះកែដោយផ្ទាល់ជា
+"safe, non-revenue" — ដូច្នេះកែដូចគ្នា៖ បន្ថែម ៤ id ចូល `fieldsToBlank` ក្នុង **ZoeAdmin
+និង ZoeW**។
 
-### ឧបករណ៍ audit ដែលទទួល V2
-`wiring.js`, `css-classes.js`, `dom-hygiene.js`, `comments.js`, `boot-runtime.js`,
-`setup-link-browser-test.js` (បន្ថែម selector map) និង `run-all.sh` (`node --check` ×5,
-byte-identical ×5, trailing whitespace ×5, CACHE_VERSION ×5)។
+**ហេតុអ្វីសុវត្ថិភាព**៖ `clearSensitiveModalFields()` មានកន្លែងហៅ **តែមួយគត់** — ក្នុង
+`showLoginModalWithPrefill()` ➜ រត់តែពេលចាកចេញ។ វាលទាំង ៤ សរសេរ `innerHTML` ពេញឡើងវិញរាល់ពេល
+បើក (`renderRecentlyDeleted`, `openDailyStatsModal`, `openMonthlyStatsModal`,
+`toggleMoreDropdown`) ➜ **គ្មានផលប៉ះពាល់មុខងារ**។ គ្មានការប៉ះ លុប/ដក, ចំណូល, rules ឬ markup។
+`CACHE_VERSION` bump (zoeadmin-v53, zoew-v44)។
 
-**មិនបានបន្ថែមចូល** `extract.js` (ZoeAdmin↔ZoeW ប៉ុណ្ណោះតាមការរចនា) និង `shared-fns.js`
-(V2 បែកគ្នាដោយចេតនាលើ function UI — ការបន្ថែមនឹងត្រូវការ `EXPECTED_DIVERGENT` វែង
-ដែលនឹងលាក់ drift ពិត)។ **បើថ្ងៃណាចង់បន្ថែម ត្រូវរាយហេតុផលម្តងមួយៗ។**
+`ACCEPTED` ទទួលធាតុថ្មី ១ ដែលមានហេតុផលពិត៖ `activationSubmitBtn` (ស្លាកប៊ូតុងតែប៉ុណ្ណោះ)។
 
-លទ្ធផលចុងក្រោយ៖ **29 ការត្រួតពិនិត្យបៃតងទាំងអស់** (547+ assertion)។
+### ZoeAdminV2 — សាកល្បងរួច តែ **មិនរក្សាទុកក្នុង `main`**
+ក្នុង session ដដែល បានសាងសង់ App ទី ៥ `ZoeAdminV2/` (ការរចនាឡើងវិញនៃ ZoeAdmin ជាមួយផ្ទាំងងងឹត,
+tab ខាងក្រោម, បញ្ជីជាកាត, តម្រង/តម្រៀប, logo ថ្មី) ហើយ merge ចូល `main` ដោយច្រឡំ។
+**អ្នកប្រើសម្រេចថាមិនចង់ push V2 ទេ** ➜ ត្រូវបាន revert ចេញវិញ។
 
-### ការផ្ទៀងផ្ទាត់ដោយភ្នែក (Chromium ពិត)
-ថត screenshot ក្នុង scratchpad — មើលទាំង **ភ្លឺ/ងងឹត × ទូរស័ព្ទ/កុំព្យូទ័រ** ដោយបញ្ចូល
-`scanHistory` ក្លែងក្លាយរួចហៅ `filterDataByDate('all')`។
-**Font ខ្មែរមិនមានក្នុង container** ➜ ដំណោះស្រាយ៖ `npm pack @fontsource/kantumruy-pro` រួច
-បង្កើត `@font-face` ជា data-URI ហើយ `page.addStyleTag(...)` — មិនត្រូវពឹង `fc-cache` ទេ
-ព្រោះ Chromium មិនអាន `.woff` ពី fontconfig។ **រក្សាវិធីនេះសម្រាប់ជុំក្រោយ។**
-
-### Logo ថ្មី
-"Z" ដិត + ធ្នឹមស្កេន cyan លើ gradient `#4338CA → #7C3AED → #06B6D4`។ ប្រភព SVG នៅ scratchpad;
-`icon-192.png`/`icon-512.png` render ដោយ Chromium (`page.screenshot` លើ SVG, `omitBackground`)។
-**បើត្រូវប្តូរ logo ថ្ងៃក្រោយ ត្រូវ render ឡើងវិញទាំង ២ ទំហំ ហើយ bump `CACHE_VERSION`។**
-
-### មិនទាន់ធ្វើ
-- **មិនទាន់សាកលើឧបករណ៍ពិត** (កាមេរ៉ា, ម៉ាស៊ីនស្កេន Bluetooth, Firebase ពិត) — គ្មានក្នុង session
-- Netlify site សម្រាប់ `ZoeAdminV2/` **អ្នកប្រើត្រូវបង្កើតដោយខ្លួនឯង**
-- ZoeAdmin ដើម **មិនប៉ះ** ក្រៅពីការកែ `fieldsToBlank` ខាងលើ
+**កូដនៅមានក្នុងប្រវត្តិ git** — យកមកវិញបានគ្រប់ពេលដោយ៖
+```bash
+git checkout 51fe4a3 -- ZoeAdminV2
+```
+(commit `51fe4a3`, ស្ថិតក្រោម merge `73d084b`។ ZIP ក៏បានផ្ញើជូនអ្នកប្រើដែរ។)
+**បើថ្ងៃណាចង់យកមកវិញ ត្រូវចាំថា៖** V2 ត្រូវការការចុះឈ្មោះក្នុង `wiring.js`, `css-classes.js`,
+`dom-hygiene.js`, `comments.js`, `boot-runtime.js`, `setup-link-browser-test.js` និង
+`run-all.sh` ផងដែរ — ការទាំងនោះក៏ស្ថិតក្នុង `51fe4a3` ដដែល។

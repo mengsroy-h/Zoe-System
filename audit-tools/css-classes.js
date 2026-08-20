@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
 
 const IGNORE = new Set([
     'hidden', 'active', 'open', 'visible', 'current', 'offline', 'show', 'selected',

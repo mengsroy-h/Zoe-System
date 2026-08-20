@@ -36,9 +36,7 @@ const ACCEPTED = {
     count: 'row count',
     historyTableBody: 'renderHistory([]) replaces it with the empty-state row on logout',
     listTableBody: 'detachDatabaseListeners() clears historyData, then renderList() repaints empty',
-    activationSubmitBtn: 'button label only ("កំពុងពិនិត្យ...") — no customer data',
-    themeToggleBtn: 'ZoeAdminV2 theme button label (an emoji) — blanking it would erase the icon',
-    sortSelect: 'ZoeAdminV2 sort preference; a <select> whose value must survive, not customer data'
+    activationSubmitBtn: 'button label only ("កំពុងពិនិត្យ...") — no customer data'
 };
 
 function walk(n, cb) {
@@ -52,7 +50,7 @@ function walk(n, cb) {
 }
 
 let totalGaps = 0;
-for (const app of ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
     const src = fs.readFileSync(root + '/' + app + '/app.js', 'utf8');
     const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
 

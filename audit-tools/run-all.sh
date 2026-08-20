@@ -51,8 +51,8 @@ run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
-printf '  %-32s ' "node --check លើ app.js ទាំង ៥"
-if for a in ZoeAdmin ZoeAdminV2 ZoeW Zoescan ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
+printf '  %-32s ' "node --check លើ app.js ទាំង ៤"
+if for a in ZoeAdmin ZoeW Zoescan ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 printf '  %-32s ' "rules JSON valid"
@@ -60,17 +60,17 @@ if python3 -c "import json;json.load(open('firebase-database.rules.json'));json.
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 for f in license-verify.js error-reporting.js; do
-    printf '  %-32s ' "$f byte-identical ×5"
-    if [ "$(md5sum ZoeAdmin/$f ZoeAdminV2/$f ZoeW/$f Zoescan/$f ZoeKeyGen/$f | awk '{print $1}' | sort -u | wc -l)" = "1" ]; then
+    printf '  %-32s ' "$f byte-identical ×4"
+    if [ "$(md5sum ZoeAdmin/$f ZoeW/$f Zoescan/$f ZoeKeyGen/$f | awk '{print $1}' | sort -u | wc -l)" = "1" ]; then
         echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 done
 
 printf '  %-32s ' "គ្មាន trailing whitespace"
-if [ "$(cat ZoeAdmin/app.js ZoeAdminV2/app.js ZoeW/app.js Zoescan/app.js ZoeKeyGen/app.js | grep -c '[[:space:]]$')" = "0" ]; then
+if [ "$(cat ZoeAdmin/app.js ZoeW/app.js Zoescan/app.js ZoeKeyGen/app.js | grep -c '[[:space:]]$')" = "0" ]; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 printf '  %-32s ' "CACHE_VERSION"
-grep -h CACHE_VERSION ZoeAdmin/sw.js ZoeAdminV2/sw.js ZoeW/sw.js Zoescan/sw.js ZoeKeyGen/sw.js | grep -o "'[a-z0-9]*-v[0-9]*'" | tr '\n' ' '; echo
+grep -h CACHE_VERSION ZoeAdmin/sw.js ZoeW/sw.js Zoescan/sw.js ZoeKeyGen/sw.js | grep -o "'[a-z]*-v[0-9]*'" | tr '\n' ' '; echo
 
 if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     echo

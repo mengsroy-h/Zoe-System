@@ -1,15 +1,14 @@
 # Zoe-System — ប្រព័ន្ធគ្រប់គ្រងកញ្ចប់ទំនិញ
 
-**Zoe-System** ជាសំណុំ App ចំនួន **៥** (5 independent PWAs) សម្រាប់គ្រប់គ្រងកញ្ចប់ទំនិញ
+**Zoe-System** ជាសំណុំ App ចំនួន **៤** (4 independent PWAs) សម្រាប់គ្រប់គ្រងកញ្ចប់ទំនិញ
 (Parcel/Package) របស់អតិថិជន ចាប់ពីការស្កេន Barcode បញ្ចូលកញ្ចប់ថ្មី, កំណត់ទីតាំង Locker,
 ការទទួល/បិទបញ្ជី, រហូតដល់ការគណនាប្រាក់ត្រូវទារ (COD/DOD) និងស្ថិតិចំណូល។
 
-## App ទាំង ៥
+## App ទាំង ៤
 
 | App | តួនាទីអនុញ្ញាត | មុខងារសំខាន់ | README |
 |---|---|---|---|
 | **ZoeAdmin** | `admin` | App គ្រប់គ្រងសំខាន់ — បញ្ចូល/លុប/កែប្រែកញ្ចប់ទាំងអស់, Export PDF/Excel/CSV, ស្ថិតិពេញលេញ | [ZoeAdmin/README.md](ZoeAdmin/README.md) |
-| **ZoeAdminV2** | `admin` | ការរចនាឡើងវិញនៃ ZoeAdmin — មុខងារដូចគ្នា + ផ្ទាំងងងឹត, Tab ខាងក្រោម, បញ្ជីជាកាត, តម្រងស្ថានភាព/តម្រៀប។ Site ដាច់ដោយឡែក, Activation Key `ADM` ដដែល | [ZoeAdminV2/README.md](ZoeAdminV2/README.md) |
 | **ZoeW** | `admin`, `worker` | ទទួល/តាមដានកញ្ចប់ — បិទ/បើកបញ្ជី, កែលេខទូរស័ព្ទ, មើលស្ថិតិ (មិនអាចបញ្ចូលកញ្ចប់ថ្មី) | [ZoeW/README.md](ZoeW/README.md) |
 | **Zoescan** | `admin`, `worker`, `scanner` | កំណត់ទីតាំង Locker ប៉ុណ្ណោះ (មិនអាចបញ្ចូល/លុបកញ្ចប់) | [Zoescan/README.md](Zoescan/README.md) |
 | **ZoeKeyGen** | `admin` (Firebase Project ដាច់ដោយឡែក) | បង្កើត/Revoke/Extend Activation Key + បង្កើត Setup Link/QR សម្រាប់ App ទាំង ៣ខាងលើ | [ZoeKeyGen/README.md](ZoeKeyGen/README.md) |
@@ -24,14 +23,14 @@
 
 - **Vanilla JS, គ្មាន Framework, គ្មាន Build Step** — គ្រាន់តែ Static files (HTML/CSS/JS)
   Deploy ត្រង់ៗ។ App នីមួយៗមាន `netlify.toml` ផ្ទាល់ខ្លួន ហើយ Deploy ជា Netlify Site ដាច់ដោយឡែក។
-- **ZoeAdmin, ZoeAdminV2, ZoeW, Zoescan** ចែករំលែក Firebase Realtime Database តែមួយ (ទិន្នន័យអាជីវកម្ម —
+- **ZoeAdmin, ZoeW, Zoescan** ចែករំលែក Firebase Realtime Database តែមួយ (ទិន្នន័យអាជីវកម្ម —
   Parcel/COD/DOD)។ Rules នៅ [firebase-database.rules.json](firebase-database.rules.json)
   (Root) ត្រូវ Paste ដោយដៃទៅ Firebase Console → Realtime Database → Rules → Publish —
   **មិន Deploy ស្វ័យប្រវត្តិទេ** ព្រោះ Netlify Serve តែ Static files ប៉ុណ្ណោះ។
-- `license-verify.js` ត្រូវតែ **Byte-identical** គ្រប់ទាំង ៥ App (Shared Public Key +
+- `license-verify.js` ត្រូវតែ **Byte-identical** គ្រប់ទាំង ៤ App (Shared Public Key +
   Verification Logic សម្រាប់ផ្ទៀងផ្ទាត់ Activation Key ពី ZoeKeyGen)។
-- **១ Sentry Project រួម** សម្រាប់ App ទាំង ៥ ញែកគ្នាដោយ Tag `app`
-  (`zoeadmin`/`zoeadminv2`/`zoew`/`zoescan`/`zoekeygen`)។
+- **១ Sentry Project រួម** សម្រាប់ App ទាំង ៤ ញែកគ្នាដោយ Tag `app`
+  (`zoeadmin`/`zoew`/`zoescan`/`zoekeygen`)។
 
 ## ទិន្នន័យក្នុង Firebase (Business DB)
 

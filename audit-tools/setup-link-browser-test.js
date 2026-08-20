@@ -27,8 +27,7 @@ const CONFIG = { apiKey: 'AIzaFAKE', authDomain: 'biz-a.firebaseapp.com',
 const PAYLOAD = Buffer.from(JSON.stringify(CONFIG)).toString('base64');
 
 const SEL = {
-    ZoeAdmin:   { pin: '#newSecurityPinInput', confirm: '#confirmSecurityPinInput', config: '#firebaseConfigInput' },
-    ZoeAdminV2: { pin: '#newSecurityPinInput', confirm: '#confirmSecurityPinInput', config: '#firebaseConfigInput' },
+    ZoeAdmin: { pin: '#newSecurityPinInput', confirm: '#confirmSecurityPinInput', config: '#firebaseConfigInput' },
     ZoeW:     { pin: '#newSecurityPinInput', confirm: '#confirmSecurityPinInput', config: '#firebaseConfigInput' },
     Zoescan:  { pin: '#newPinInput',         confirm: '#confirmPinInput',         config: '#configInput' }
 };
@@ -36,7 +35,7 @@ const SEL = {
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8810;
-    for (const app of ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan']) {
+    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan']) {
         const sel = SEL[app];
         const server = await serve(path.join(ROOT, app), port);
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });

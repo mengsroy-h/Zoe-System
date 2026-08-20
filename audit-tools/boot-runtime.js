@@ -33,7 +33,7 @@ function serve(dir, port) {
     const browser = await chromium.launch({ executablePath: CHROME });
     let problems = 0;
     let port = 8410;
-    for (const app of ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });

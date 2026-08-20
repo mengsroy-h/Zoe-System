@@ -24,7 +24,19 @@ const ACCEPTED = {
     locationWarningTitle: "Zoescan blanks it in onAuthStateChanged's sign-out branch",
     locationWarningText: "Zoescan blanks it in onAuthStateChanged's sign-out branch",
     newPrivateKeyOutput: "closeModal('keypairModal') wipes it on every dismiss path",
-    newPublicKeyOutput: 'public half of the keypair, not a secret'
+    newPublicKeyOutput: 'public half of the keypair, not a secret',
+    setupLinkUrlInput: 'Base URL of the target site, deliberately remembered in localStorage',
+    firebaseStatusText: 'connection status label',
+    navAuthBtn: 'auth button label',
+    logoutBtn: 'button label',
+    btnFilterAll: 'filter button label',
+    selectedFilterTitle: 'filter name only',
+    zoomSlider: 'camera zoom value',
+    activeLockerLabel: 'locker name the worker chose, not customer data',
+    listLockerFilter: 'locker filter <option> list',
+    count: 'row count',
+    historyTableBody: 'renderHistory([]) replaces it with the empty-state row on logout',
+    listTableBody: 'detachDatabaseListeners() clears historyData, then renderList() repaints empty'
 };
 
 function walk(n, cb) {
@@ -86,20 +98,11 @@ for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
         for (const m of body.matchAll(/'([A-Za-z][\w-]*)'/g)) cleared.add(m[1]);
     }
 
-    // ids the app itself declares as sensitive-ish: anything in a .modal or a result box
-    const html = fs.readFileSync(root + '/' + app + '/index.html', 'utf8');
-    const inModal = new Set();
-    for (const m of html.matchAll(/<div[^>]*class="[^"]*\bmodal\b[^"]*"[^>]*>/g)) {
-        const start = m.index;
-        const chunk = html.slice(start, start + 6000);
-        for (const idm of chunk.matchAll(/\bid="([^"]+)"/g)) inModal.add(idm[1]);
-    }
-
     const gaps = [...written.entries()]
-        .filter(([id]) => inModal.has(id) && !cleared.has(id) && !ACCEPTED[id])
+        .filter(([id]) => !cleared.has(id) && !ACCEPTED[id])
         .sort((a, b) => a[1] - b[1]);
     totalGaps += gaps.length;
-    console.log('--- ' + app + ' --- modal ids written with data but never blanked on logout: ' + gaps.length);
+    console.log('--- ' + app + ' --- ids written with data but never blanked on logout: ' + gaps.length);
     gaps.forEach(([id, line]) => console.log('    ⚠ ' + id + '   (first written at app.js:' + line + ')'));
 }
 console.log(totalGaps === 0

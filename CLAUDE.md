@@ -2155,3 +2155,59 @@ success)។ ក្រោយ merge `git rev-list --count origin/main..origin/clau
   suite ថ្មីមួយក្នុង `audit-tools/emu/`។
 - ចំណុចដែលជុំមុនទទួលយកដោយចេតនានៅដដែល៖ worker សរសេរតួលេខ revenue/pickup បាន, គ្មានការផ្ទៀងផ្ទាត់
   aggregate ដោយគ្មាន backend ដែលទុកចិត្តបាន, និង ZoeKeyGen "Extend" ផ្លាស់តែពិដានខាង server។
+
+## ជុំ ៨ (បន្ត) — ZoeW និង ZoeKeyGen ដោយឡែក (2026-08-20)
+
+អ្នកប្រើសួរ "ចុះ ZoeKeyGen, ZoeW" ព្រោះជុំ ៨ កែតែ ZoeAdmin និង Zoescan។ ត្រូវហើយ — ២ App នោះ
+ឆ្លងកាត់តែឧបករណ៍មេកានិក មិនទាន់មានការអានលម្អិតទេ។ ជុំបន្តនេះធ្វើវា។
+
+### ZoeW — ស្អាត (គ្មានអ្វីត្រូវកែ)
+`extract.js` រាយ function ២៣ ដែលបែកគ្នាពី ZoeAdmin។ **បាន diff ទាំង ២៣** — សុទ្ធតែជាភាពខុសគ្នា
+ស្របច្បាប់៖ salt PBKDF2 តាម App (`zoeadmin_` ទល់ `zoew_`), ស្លាក Sentry, ឈ្មោះ App ក្នុងសារ,
+មុខងារ ZoeAdmin-only (`pendingBarcode`, `safeFocusScanner`, `clearCustomerDataTableCache`,
+`lookupSecretKey`, យន្តការ `pinTargetAction` ដែល ZoeW ជំនួសដោយ `pendingSetupLinkConfig`)។
+**ZoeW គ្មានកូដរបស់ខ្លួនឯងទេ ក្រៅពី `verifyWorkerRoleThenProceed`** — អ្វីៗសល់ចែករំលែកជាមួយ
+ZoeAdmin ហើយដូចគ្នាបេះបិទ។ ដូច្នេះការកែក្នុង ZoeAdmin គ្របដណ្ដប់ ZoeW ស្រាប់។
+
+### ZoeKeyGen — រកឃើញកំហុសពិត ១ (និងកែតូចៗ ៤)
+**[សំខាន់] `refreshKeyList()` បង្រួម record របស់ App ទាំង ៣ ចូលគ្នា ដោយ "អ្នកចុងក្រោយឈ្នះ"។**
+```js
+Object.assign(byId[id].record, bucket[id]);   // ADM ➜ ZOW ➜ SCN
+```
+សម្រាប់ Key scope ALL វាអាន `license_keys/{ADM,ZOW,SCN}/{id}` ហើយសរសេរជាន់គ្នា ដូច្នេះ
+**តម្លៃរបស់ SCN ឈ្នះជានិច្ច**។ ធម្មតាមិនអីទេ ព្រោះ bucket ទាំង ៣ ដូចគ្នា — **លើកលែងតែក្រោយ
+"ជោគជ័យមិនពេញលេញ"** ដែលជាករណីដែល `toggleRevokeKey`/`confirmExtendKey` មានប្រអប់ព្រមានសម្រាប់វា។
+ពេលនោះ bucket **ខុសគ្នាពិត** ហើយបញ្ជីបង្ហាញតែមួយ ដោយស្ងាត់៖
+- Revoke បរាជ័យត្រង់ ADM តែជោគជ័យ ZOW/SCN ➜ បញ្ជីបង្ហាញ **Revoked** ➜ អ្នកគ្រប់គ្រងជឿថាចប់
+  តែ **អ្នកប្រើ ZoeAdmin នៅតែចូលបាន**។
+- បន្ថែមសុពលភាពបរាជ័យត្រង់ ADM ➜ បញ្ជីបង្ហាញថ្ងៃថ្មី ➜ គ្មានផ្លូវដឹងថា ZoeAdmin មិនបានបន្ថែម
+  ➜ ក្រុមហ៊ុនអតិថិជនឈប់ដំណើរការនៅថ្ងៃចាស់ដោយគ្មានការព្រមាន។
+
+**កែ**៖ រក្សា `perApp` តាម App ជំនួសការបង្រួម រួច
+- `revoked` = ពិតតែពេល **គ្រប់** bucket revoked (ដូច្នេះប៊ូតុង Revoke នៅតែបញ្ចប់ការងារបាន
+  ជំនួសឲ្យការត្រឡប់ក្រោយ) · `expiresAt` = **តូចជាងគេ** (ថ្ងៃដែល App ណាមួយឈប់ដំណើរការមុនគេ)
+- ផ្លាក **⚠️ មិនត្រូវគ្នា** ថ្មីក្នុងតារាង ជាមួយ tooltip រាយតម្លៃតាម App
+កែតែផ្នែក **បង្ហាញ** ប៉ុណ្ណោះ — គ្មានផ្លូវសរសេរណាប្រែទេ (`confirmExtendKey` គណនាពី `days` រួចហើយ)។
+
+កែតូចៗ៖ `confirmExtendKey` លែងទុកប្រអប់បើកចោលលើផ្លូវកំហុស (ឥឡូវបិទ + `refreshKeyList()`) ·
+`loadSigningKey` លែងបង្រួមកំហុសទាំងអស់ជាសារតែមួយ — ឥឡូវរាយការណ៍ទៅ Sentry ហើយប្រាប់ដាច់ដោយឡែក
+ពេល Private Key **មិនផ្គូផ្គង** នឹង Public Key ក្នុង `license-verify.js` (ជាករណីច្រឡំដ៏គ្រោះថ្នាក់
+ដែលជុំ ៥ បន្ថែមការត្រួតពិនិត្យសម្រាប់វា) · លុប blank line សល់ពី comment-strip ក្នុង
+`tryRestoreSigningKeyFromSession`។
+
+### តេស្តថ្មី — `audit-tools/keylist-consistency-test.js` (15/15)
+ដក `refreshKeyList`/`renderKeyList`/`escapeHtml` **ពិត** ចេញពី `ZoeKeyGen/app.js` ដាក់ក្នុង `vm`
+ជាមួយ `fb.get` ក្លែងក្លាយ។ **មិនមែនតេស្តទទេទេ**៖ រត់លើ `origin/main` (មុនកែ) តាមរយៈ
+`KEYLIST_APP_JS=... node ...` ➜ **ធ្លាក់ ៩/១៥** រួមទាំង "Revoke មិនពេញលេញ ➜ មិនរាប់ថា Revoked"
+(ចេញ `true` = កំហុស) និង "ថ្ងៃផុតកំណត់មកមុនគេ" (ចេញ `2000` ជំនួស `1000`)។
+
+### `dom-hygiene.js` ត្រូវបានធ្វើឲ្យរឹងមាំ
+ជុំ ៨ ច្រោះតែ id **ក្នុង `.modal`** ដោយស្កេន ៦០០០ តួអក្សរបន្ទាប់ពី modal នីមួយៗ។ ត្រឡប់មកមើល
+ឡើងវិញ៖ `pdfExportPrintArea` **មិននៅក្នុង modal ទេ** — វាត្រូវបានចាប់បានដោយ **សំណាង** ព្រោះ
+window នោះលើសទៅដល់វា។ បើវានៅឆ្ងាយជាងនេះ ឧបករណ៍នឹងខកខាន។ ឥឡូវលុបការច្រោះ `.modal` ចោល
+ហើយពឹងលើ allowlist `ACCEPTED` វិញ (ដែលរាល់ធាតុមានហេតុផលសរសេរជាប់) — បានពិនិត្យ ២១ ធាតុថ្មី
+ទាំងអស់៖ សុទ្ធតែជា UI chrome ឬត្រូវបានលុបដោយផ្លូវឯទៀត (ឧ. `historyTableBody` ដែល
+`renderHistory([])` ជំនួសដោយជួរទទេ, `listTableBody` ដែល `detachDatabaseListeners()`+`renderList()`
+សម្អាត, និង `setupLinkUrlInput` ដែលជា Base URL សាធារណៈ រក្សាទុកក្នុង localStorage ដោយចេតនា)។
+
+`CACHE_VERSION` bump តែ ZoeKeyGen (zoekeygen-v21)។ **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

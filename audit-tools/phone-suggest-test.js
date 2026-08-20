@@ -99,7 +99,8 @@ function makeContext(app) {
         (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') +
         '\nlet phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;', ctx);
     vm.runInContext(slice(app + '/app.js', names.concat(present)), ctx);
-    return { ctx, searchInput, suggestBox, datalistOptions, rendered, has: (n) => present.indexOf(n) !== -1 };
+    const maxRows = consts ? parseInt(consts[0].replace(/\D/g, ''), 10) : 8;
+    return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, has: (n) => present.indexOf(n) !== -1 };
 }
 
 function itemsFixture() {
@@ -135,7 +136,7 @@ function itemsFixture() {
         ok('សញ្ញា - និងចន្លោះមិនរារាំង៖ "345678" រក 012-345 678',
             h.ctx.collectPhoneSuggestions('345678').some((e) => e.phone === '012-345 678'),
             h.ctx.collectPhoneSuggestions('345678').map((e) => e.phone));
-        ok('លទ្ធផលមិនលើស PHONE_SUGGEST_MAX', h.ctx.collectPhoneSuggestions('').length <= 8,
+        ok('លទ្ធផលមិនលើស PHONE_SUGGEST_MAX', h.ctx.collectPhoneSuggestions('').length === h.maxRows,
             h.ctx.collectPhoneSuggestions('').length);
         ok('ពេលទទេ ➜ លេខថ្មីជាងគេឡើងមុន', h.ctx.collectPhoneSuggestions('')[0].phone === '012-345 678',
             h.ctx.collectPhoneSuggestions('')[0].phone);
@@ -170,6 +171,22 @@ function itemsFixture() {
     h.searchInput.value = '';
     h.ctx.searchByPhone();
     ok('ទទេ ➜ ត្រឡប់ទៅតម្រងធម្មតា', h.rendered.filterCalls === 1, h.rendered.filterCalls);
+
+    console.log('-- ទំហំ ២០០-៣០០ លេខ --');
+    if (h.has('collectPhoneSuggestions')) {
+        const big = [];
+        for (let i = 0; i < 350; i++) {
+            big.push({ id: 'p' + i, phone: '011' + String(200000 + i), createdAt: 1000 + i, barcodes: [{ code: 'D' + i }] });
+        }
+        h.ctx.scanHistory = big;
+        const last = h.ctx.collectPhoneSuggestions('200349');
+        ok('លេខទី ៣៥០ (ចុងក្រោយ) នៅតែរកឃើញ', last.length === 1 && last[0].phone === '011200349', last.map((e) => e.phone));
+        const first = h.ctx.collectPhoneSuggestions('200000');
+        ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011200000', first.map((e) => e.phone));
+        h.ctx.updateRecentPhonesList();
+        ok('datalist ផ្ទុកបាន ៣០០ លេខ', h.datalistOptions.length === 300, h.datalistOptions.length);
+        h.ctx.scanHistory = itemsFixture();
+    }
 
     console.log('-- datalist សម្រាប់វាលបញ្ចូលលេខ --');
     h.ctx.updateRecentPhonesList();

@@ -2389,7 +2389,9 @@ backend ដែលទុកចិត្តបាន (ដូចដែលបាន�
   លំដាប់៖ **កន្ទុយត្រូវគ្នា ➜ ដើមត្រូវគ្នា ➜ កណ្តាល** រួចតម្រៀបតាមភាពថ្មី (`createdAt`)។
   បង្ហាញយ៉ាងច្រើន ៨ ជួរ ជាមួយចំនួនកញ្ចប់សរុបរបស់លេខនោះ។
 - **`updateRecentPhonesList()` លែងកាត់ត្រឹម ៣០** — ឥឡូវហៅ `collectPhoneSuggestions('',
-  RECENT_PHONES_MAX)` (២០០ តាមភាពថ្មី) ដូច្នេះវាល ២ ទៀតទទួលផលដែរ។
+  RECENT_PHONES_MAX)` (**៣០០** តាមភាពថ្មី តាមការស្នើរបស់អ្នកប្រើ) ដូច្នេះវាល ២ ទៀតទទួលផលដែរ។
+  **ការផ្គូផ្គងខ្លួនវាគ្មានដែនកំណត់សោះ** — `collectPhoneSuggestions(query)` ដើរលើ `scanHistory`
+  ទាំងមូល; `PHONE_SUGGEST_MAX` (១២) កំណត់តែ **ចំនួនជួរដែលបង្ហាញក្នុងដុំ** (ដុំ scroll បាន)។
 - **`searchByPhone()` ច្រោះតាមតួលេខសុទ្ធដែរ** (បើ query គ្មានតួលេខសោះ ➜ ត្រឡប់ទៅ `.includes()`
   ដើម ដើម្បីកុំឲ្យផ្គូផ្គងអ្វីៗទាំងអស់)។
 - **អនាម័យ DOM** (ថ្នាក់កំហុសជុំ ៣/៤/៥/៨)៖ ដុំស្នើលេខផ្ទុកលេខទូរស័ព្ទអតិថិជន ដូច្នេះ
@@ -2398,11 +2400,11 @@ backend ដែលទុកចិត្តបាន (ដូចដែលបាន�
 - ក្តារចុច៖ ព្រួញឡើង/ចុះ ជ្រើស, Enter យក, Escape បិទ, ចុចក្រៅបិទ។ `mousedown` ត្រូវ
   `preventDefault()` ដើម្បីកុំឲ្យ blur បិទដុំមុនការចុចធ្លាក់។
 
-### តេស្ត — `audit-tools/phone-suggest-test.js` (42/42)
+### តេស្ត — `audit-tools/phone-suggest-test.js` (48/48)
 ដក `collectPhoneSuggestions`/`showPhoneSuggestions`/`hidePhoneSuggestions`/`searchByPhone`/
 `updateRecentPhonesList` **ពិត** ចេញពី **ទាំង ២ App** ដាក់ក្នុង `vm` ជាមួយ DOM ក្លែងក្លាយ។
 **មិនមែនតេស្តទទេទេ**៖ `PHONE_APP_DIR=<baseline> node audit-tools/phone-suggest-test.js` លើ
-`origin/main` ➜ **ធ្លាក់ ៨/១៤** រួមទាំង "លេខលើសពី ៣០ មិនត្រូវកាត់ចោល" (ចេញ ៣០) និង
+`origin/main` ➜ **ធ្លាក់ ៨/១៤** (មុខងារថ្មីមិនទាន់មាន) រួមទាំង "លេខលើសពី ៣០ មិនត្រូវកាត់ចោល" (ចេញ ៣០) និង
 "លេខថ្មីជាងគេនៅដើមបញ្ជី" (ចេញលេខចាស់ជាងគេ) — ពោលគឺវាបង្ហាញកំហុសពិតដែលពន្យល់ភាពមិនទៀងទាត់។
 
 `CACHE_VERSION` bump (zoeadmin-v43, zoew-v38)។ **គ្មានការប្ដូរ rules ➜ គ្មាន publish ថ្មី។**

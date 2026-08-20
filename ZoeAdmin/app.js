@@ -3238,8 +3238,8 @@
         refreshCurrentHistoryView();
     }
 
-    const PHONE_SUGGEST_MAX = 8;
-    const RECENT_PHONES_MAX = 200;
+    const PHONE_SUGGEST_MAX = 12;
+    const RECENT_PHONES_MAX = 300;
     let phoneSuggestItems = [];
     let phoneSuggestActiveIndex = -1;
 

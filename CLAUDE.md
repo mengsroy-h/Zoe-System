@@ -4,9 +4,15 @@
 >
 > 🔴 **ថ្មីបំផុត (2026-08-20)** — អ្នកប្រើរាយការណ៍ថា ZoeAdmin បិទ App រួចបើកវិញ ➜ ដុំ "ក្រៅបណ្ដាញ"
 > ➜ សុំឲ្យ login ➜ login **មិនចូល**។ រកឃើញមូលហេតុពិត ២ (មិនមែនបញ្ហាបណ្ដាញសុទ្ធសាធទេ) ហើយ
-> បានកែក្នុង branch `claude/zoeadmin-login-offline-6ktcqp` — មើល section
-> **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។ កែទាំង ៤ App។
-> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។** នៅមិនទាន់ merge ចូល `main`។
+> កែទាំង ៤ App ហើយ **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #24, merge commit `65eb0f6`
+> (branch `claude/zoeadmin-login-offline-6ktcqp`, ចេញពី `8c56254` ដោយផ្ទាល់)។ Netlify preview
+> ទាំង ៤ បៃតងមុន merge ហើយ `git rev-list --count origin/main..origin/<branch>` = 0 ក្រោយ merge។
+> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។
+> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។**
+> លម្អិតនៅ section **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។
+>
+> ⚠️ នៅសល់តែមួយ៖ **មិនទាន់បានតេស្តលើទូរស័ព្ទពិតទេ** — សូមបិទ ZoeAdmin រួចបើកវិញលើបណ្ដាញយឺត
+> ដើម្បីបញ្ជាក់ថាវាស្ដារឡើងវិញដោយខ្លួនឯង។
 >
 > ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
 > (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។

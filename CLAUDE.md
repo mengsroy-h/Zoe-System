@@ -2652,7 +2652,7 @@ return **មុន** បង្កើត auth listener ទាំង ៣ App ដ�
 
 `CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v45, zoew-v39, zoescan-v33, zoekeygen-v26)។
 **គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
-Suite សរុប៖ 191 + 55 + 28 + 21 + 19 + 13 + 13 + 10 + 7 = **357 assertion** បៃតងទាំងអស់។
+Suite សរុប (រាប់ដោយ script មិនមែនដោយដៃ)៖ 191 + 55 + 52 + 28 + 21 + 19 + 18 + 13 + 13 + 10 + 7 = **427 assertion** បៃតងទាំងអស់។
 
 ## ស្វែងរកលេខទូរស័ព្ទ៖ ការអូសឡើងលើបំបាត់ប្រអប់ស្វែងរក (fixed 2026-08-20, ជុំ ១១)
 

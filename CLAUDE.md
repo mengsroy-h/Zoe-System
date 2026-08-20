@@ -2142,6 +2142,12 @@ Branch ចេញពី `main` (`c39d611`) ដោយផ្ទាល់។ រត�
 - `extract.js` 91 identical / 23 different (ដូចមុនកែបេះបិទ), `shared-fns.js` UNEXPECTED: 0,
   `auth-recovery-test.js` 142/142, `policy-test.js` និង `lookup-closed-test.js` ជោគជ័យទាំងអស់។
 
+### Merge
+**Merge ចូល `main` តាមការស្នើរបស់អ្នកប្រើក្នុង session នេះ** — PR #28, merge commit `3fa1a78`
+(branch ចេញពី `c39d611` ដោយផ្ទាល់)។ `mergeable_state: clean` ហើយ Netlify status ទាំងអស់បៃតងមុន
+merge (ZoeW/ZoeKeyGen ត្រូវបាន Netlify រំលង ព្រោះគ្មានឯកសាររបស់ site ទាំងនោះប្រែ — វារាយការណ៍ជា
+success)។ ក្រោយ merge `git rev-list --count origin/main..origin/claude/busy-franklin-5g26ja` = 0។
+
 ### មិនបានធ្វើជុំនេះ
 - **មិនបានរត់ emulator** — គ្មាន rules ណាប្រែ ហើយការកែទាំង ៣ ជា DOM សុទ្ធ។ ផ្លូវ REST នៃ PR #26
   មិនទាន់បានផ្ទៀងផ្ទាត់លើ emulator ដែរ តែវាអាន path ដដែល (`user_roles/{uid}`) ក្រោម rules ដដែល

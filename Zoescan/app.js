@@ -11,6 +11,7 @@ function getServerNow() {
 
 let currentUserEmail = null;
 let authGeneration = 0;
+let pendingRoleRecheck = false;
 let historyData = {};
 let barcodeIndex = {};
 let activeLocker = localStorage.getItem('zscan_active_locker') || '';
@@ -221,6 +222,7 @@ async function initFirebase() {
         const online = snap.val() === true;
         document.getElementById('statusDot').classList.toggle('offline', !online);
         document.getElementById('firebaseStatusText').textContent = online ? 'ភ្ជាប់ Server រួចរាល់' : 'ក្រៅបណ្ដាញ';
+        if (online) retryPendingRoleCheck();
     });
 
     sdk.onValue(sdk.ref(db, '.info/serverTimeOffset'), (snap) => {
@@ -239,6 +241,7 @@ async function initFirebase() {
         if (user) {
             verifyRoleThenProceed(user, myAuthGeneration);
         } else {
+            pendingRoleRecheck = false;
             currentUserEmail = null;
             cameraStoppedByVisibility = false;
             stopScanner();
@@ -355,7 +358,15 @@ async function submitActivationKey() {
     }
 }
 
+function retryPendingRoleCheck() {
+    if (!pendingRoleRecheck) return;
+    if (!auth || !auth.currentUser) return;
+    authGeneration++;
+    verifyRoleThenProceed(auth.currentUser, authGeneration);
+}
+
 async function verifyRoleThenProceed(user, myAuthGeneration) {
+    pendingRoleRecheck = false;
     let role;
     try {
         const roleSnap = await withTimeout(window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
@@ -364,6 +375,12 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
         if (myAuthGeneration !== authGeneration) return;
         console.error('Role verification failed:', e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Role verification failed:' });
+        if (e && e.message === 'Role check timed out') {
+            pendingRoleRecheck = true;
+            openModal('loginModal');
+            showToast('⚠️ ការតភ្ជាប់អ៊ីនធឺណិតយឺត! មិនទាន់ផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ — ប្រព័ន្ធនឹងព្យាយាមម្ដងទៀតដោយស្វ័យប្រវត្តិ។');
+            return;
+        }
         await window.firebaseSDK.signOut(auth).catch(() => {});
         currentUserEmail = null;
         openModal('loginModal');
@@ -460,10 +477,15 @@ async function loginWithFirebase() {
     const sdk = window.firebaseSDK;
     const myLoginGeneration = ++loginGeneration;
     try {
+        const generationAtLogin = authGeneration;
         await sdk.setPersistence(auth, remember ? sdk.browserLocalPersistence : sdk.browserSessionPersistence);
-        await withTimeout(sdk.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
+        const cred = await withTimeout(sdk.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (myLoginGeneration !== loginGeneration) return;
         if (remember) localStorage.setItem('remembered_email', email); else localStorage.removeItem('remembered_email');
+        if (authGeneration === generationAtLogin && cred && cred.user) {
+            authGeneration++;
+            verifyRoleThenProceed(cred.user, authGeneration);
+        }
     } catch (e) {
         if (myLoginGeneration !== loginGeneration) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loginWithFirebase' });
@@ -1486,9 +1508,12 @@ function bindEventListeners() {
                 cameraRequestId++;
                 isCameraStarting = false;
             }
-        } else if (cameraStoppedByVisibility && !isAnyModalOpen()) {
-            cameraStoppedByVisibility = false;
-            if (currentTab === 'scan') requestCameraPermission();
+        } else {
+            retryPendingRoleCheck();
+            if (cameraStoppedByVisibility && !isAnyModalOpen()) {
+                cameraStoppedByVisibility = false;
+                if (currentTab === 'scan') requestCameraPermission();
+            }
         }
     });
 }

@@ -97,6 +97,7 @@
     let authUnsubscribe = null;
     let authRecoveryTimeout = null;
     let authGeneration = 0;
+    let pendingRoleRecheck = false;
 
     function sanitizePhoneNumber(phoneStr) {
         if (!phoneStr) return '';
@@ -242,6 +243,7 @@
                 const online = snap.val() === true;
                 if (statusDot) statusDot.classList.toggle('offline', !online);
                 if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+                if (online) retryPendingRoleCheck();
             });
 
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -677,7 +679,15 @@
         }
     }
 
+    function retryPendingRoleCheck() {
+        if (!pendingRoleRecheck) return;
+        if (!auth || !auth.currentUser) return;
+        authGeneration++;
+        verifyWorkerRoleThenProceed(auth.currentUser, authGeneration);
+    }
+
     async function verifyWorkerRoleThenProceed(user, myAuthGeneration) {
+        pendingRoleRecheck = false;
         let role;
         try {
             const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
@@ -686,6 +696,12 @@
             if (myAuthGeneration !== authGeneration) return;
             console.error("Role verification failed:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
+            if (e && e.message === 'Role check timed out') {
+                pendingRoleRecheck = true;
+                showLoginModalWithPrefill();
+                showToast("⚠️ ការតភ្ជាប់អ៊ីនធឺណិតយឺត! មិនទាន់ផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ — ប្រព័ន្ធនឹងព្យាយាមម្ដងទៀតដោយស្វ័យប្រវត្តិ។");
+                return;
+            }
             await fb.signOut(auth).catch(() => {});
             clearRememberedSession(true);
             showLoginModalWithPrefill();
@@ -779,6 +795,7 @@
                 autoLoginAttempted = false;
                 verifyWorkerRoleThenProceed(user, myAuthGeneration);
             } else {
+                pendingRoleRecheck = false;
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
                     if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
@@ -827,6 +844,8 @@
 
         if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
 
+        const generationAtLogin = authGeneration;
+
         fb.setPersistence(auth, rememberMe ? fb.browserLocalPersistence : fb.browserSessionPersistence)
             .then(() => {
                 return fb.signInWithEmailAndPassword(auth, email, password);
@@ -838,6 +857,11 @@
                     localStorage.setItem('remembered_email', email);
                 } else {
                     localStorage.removeItem('remembered_email');
+                }
+
+                if (authGeneration === generationAtLogin && userCredential && userCredential.user) {
+                    authGeneration++;
+                    verifyWorkerRoleThenProceed(userCredential.user, authGeneration);
                 }
             })
             .catch((error) => {
@@ -1346,7 +1370,9 @@
 
         setInterval(sweepRecallHighlights, 60000);
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) sweepRecallHighlights();
+            if (document.hidden) return;
+            sweepRecallHighlights();
+            retryPendingRoleCheck();
         });
 
         setupSwipeGestures();

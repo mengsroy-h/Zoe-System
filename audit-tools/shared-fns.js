@@ -17,7 +17,8 @@ const EXPECTED_DIVERGENT = new Set([
     'forceExpireSession', 'handleConfigQrResult', 'hashPin', 'hashPinLegacy',
     'initDatabaseListeners', 'initFirebase', 'isFirebaseSessionExpired', 'licenseFailureMessage',
     'loginWithFirebase', 'logoutApp', 'openConfigModal', 'openConfigQrScanner', 'openModalHelper',
-    'requestPinBeforeConfig', 'sanitizePhoneNumber', 'saveFirebaseConfig', 'saveNewSecurityPin',
+    'requestPinBeforeConfig', 'retryPendingRoleCheck', 'sanitizePhoneNumber', 'saveFirebaseConfig',
+    'saveNewSecurityPin',
     'setupAuthListener', 'setupIOSPullToRefresh', 'showLoginModalWithPrefill', 'showToast',
     'submitActivationKey', 'updateAuthButton', 'verifySecurityPin', 'verifyStoredPin'
 ]);

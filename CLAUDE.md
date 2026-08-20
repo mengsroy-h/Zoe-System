@@ -1,6 +1,12 @@
 # Zoe-System
 
-> ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-19)
+> ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-20)
+>
+> 🔴 **ថ្មីបំផុត (2026-08-20)** — អ្នកប្រើរាយការណ៍ថា ZoeAdmin បិទ App រួចបើកវិញ ➜ ដុំ "ក្រៅបណ្ដាញ"
+> ➜ សុំឲ្យ login ➜ login **មិនចូល**។ រកឃើញមូលហេតុពិត ២ (មិនមែនបញ្ហាបណ្ដាញសុទ្ធសាធទេ) ហើយ
+> បានកែក្នុង branch `claude/zoeadmin-login-offline-6ktcqp` — មើល section
+> **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។ កែទាំង ៤ App។
+> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។** នៅមិនទាន់ merge ចូល `main`។
 >
 > ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
 > (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
@@ -27,8 +33,9 @@
 >
 > **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (divergence
 > ZoeAdmin↔ZoeW), `node audit-tools/shared-fns.js` (divergence ទាំង ៤ App — **ថ្មីជុំនេះ**),
-> `node audit-tools/policy-test.js` (គោលការណ៍ លុប/ដក) និង `node audit-tools/lookup-closed-test.js`
-> (ការព្រមានទីតាំងជាន់គ្នា)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
+> `node audit-tools/policy-test.js` (គោលការណ៍ លុប/ដក), `node audit-tools/lookup-closed-test.js`
+> (ការព្រមានទីតាំងជាន់គ្នា) និង `node audit-tools/auth-recovery-test.js` (ការស្ដារ session ពេល
+> បណ្ដាញយឺត — **ថ្មី 2026-08-20**)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
 > `partial-claim.sh` និង `scanner-lookup-closed.sh`។ មើល `audit-tools/README.md`។
 > លម្អិតពេញលេញនៅ section **"Seventh deep-audit pass"** ខាងក្រោម។
 
@@ -1827,3 +1834,92 @@ and the new `zoew_scanner_lookup` `isClosed` field are all in effect. **Nothing 
 outstanding any more.** This could not be verified from the session itself — the network policy rejects
 `*.firebaseio.com` and every business node needs auth — so it rests on the user's confirmation; the
 practical check is to scan a parcel into a just-emptied locker in Zoescan and see no warning.
+
+## ZoeAdmin: បិទ App រួចបើកវិញ ➜ "ក្រៅបណ្ដាញ" ➜ login មិនចូល (fixed 2026-08-20, branch `claude/zoeadmin-login-offline-6ktcqp`)
+
+អ្នកប្រើស្កេនអីវ៉ាន់ ១-២ រួចបិទ App ហើយបើកវិញ។ ទទួលបានដុំ "ក្រៅបណ្ដាញ" ➜ ប្រអប់ login ➜ វាយ
+ពាក្យសម្ងាត់ ➜ **គ្មានអ្វីកើតឡើងសោះ** ➜ ប្រហែល ១០ វិនាទីក្រោយមក toast
+"⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ!" ហើយត្រូវបានបណ្ដេញចេញ។ Sentry បង្ហាញ
+`Error: Role check timed out`។ **នេះជាកំហុសកូដ ២ យ៉ាងជាន់គ្នា មិនមែនគ្រាន់តែបណ្ដាញយឺតទេ។**
+
+### មូលហេតុទី ១ — `onAuthStateChanged` **មិនបាញ់ទេ** ពេលចូលដោយគណនីដដែល
+នេះជាចំណុចសំខាន់បំផុត ហើយងាយនឹងភ្លេច។ `AuthImpl.notifyAuthListeners()` ក្នុង
+`@firebase/auth@1.13.4` (ជាកំណែក្នុង `firebase@12.17.1` ដែល `firebase-loader.js` load ពី gstatic)
+មាន dedup តាម uid៖
+
+```js
+notifyAuthListeners() {
+    if (!this._isInitialized) return;
+    this.idTokenSubscription.next(this.currentUser);
+    const currentUid = this.currentUser?.uid ?? null;
+    if (this.lastNotifiedUid !== currentUid) {      // ⬅ dedup
+        this.lastNotifiedUid = currentUid;
+        this.authStateSubscription.next(this.currentUser);
+    }
+}
+```
+
+ហើយ `_initializeWithPersistence()` កំណត់ `lastNotifiedUid` ភ្លាមៗក្រោយស្ដារ session ចាស់ —
+**មុន** listener ណាមួយចុះឈ្មោះផង។ ដូច្នេះ បើអ្នកប្រើនៅ sign-in ជាមួយ uid X ស្រាប់ ហើយ
+`signInWithEmailAndPassword` ជាមួយ X ម្ដងទៀត ➜ **គ្មាន callback ទេ**។ (`onIdTokenChanged` បាញ់
+ចុះ តែ `firebase-loader.js` មិន export វាសោះ។)
+
+កូដទាំង ៤ App ដាក់ការងារ "ចូលបានហើយ" **ទាំងស្រុង** ក្នុង `onAuthStateChanged` — `loginWithFirebase`
+ត្រឹមតែរក្សា `remembered_email` ប៉ុណ្ណោះ។ ដូច្នេះការចុច "ចូលប្រព័ន្ធ" ជោគជ័យ (Firebase ឆ្លើយ 200)
+ប៉ុន្តែ **App មិនដឹងអ្វីទាំងអស់**៖ ប្រអប់មិនបិទ គ្មាន toast គ្មាន listener។ = "login fail"។
+
+### មូលហេតុទី ២ — role check ដែលអស់ពេល **បណ្ដេញអ្នកប្រើចេញ** ដោយគ្មានឱកាសសង្គ្រោះ
+RTDB `get()` **គ្មាន timeout ខាងក្នុងទេ** — `PersistentConnection.get()` ដាក់ចូល
+`outstandingGets_` រួចរង់ចាំរហូតដល់ភ្ជាប់បាន (បញ្ជាក់ក្នុង `@firebase/database@1.1.4`)។
+ពេលបើក App ថ្មីលើបណ្ដាញ 4G យឺត WebSocket ទៅ RTDB មិនទាន់ភ្ជាប់ ➜ `fb.get('user_roles/<uid>')`
+ព្យួរ ➜ `withTimeout(..., 15000)` បោះកំហុស ➜ កូដចាស់ធ្វើ `signOut()` + លុប session។
+ដុំ "ក្រៅបណ្ដាញ" ជា `.info/connected` ដដែល — សញ្ញាតែមួយបញ្ជាក់ថា socket មិនទាន់ឡើង។
+
+Timeline ពិតពី Sentry (ផ្ទៀងផ្ទាត់ហើយ)៖ session ស្ដារនៅ 03:26:47.767 ➜ role check ចាប់ផ្ដើម ➜
+អ្នកប្រើចុច login ដោយខ្លួនឯងនៅ 03:26:52.684 (ជោគជ័យ តែស្ងាត់) ➜ 03:27:02.826 គឺ **15.06 វិនាទី
+ក្រោយការស្ដារ session** — ដូច្នេះ role check ដែលអស់ពេលនោះជា **របស់ការ boot ដើម** មិនមែនរបស់
+ការ login ដោយដៃទេ។ វាបានបណ្ដេញអ្នកប្រើដែលទើបតែចូលបានជោគជ័យ។
+
+### អ្វីដែលបានកែ (ទាំង ៤ App)
+- **`loginWithFirebase`/`doLogin` លែងពឹងលើ `onAuthStateChanged` ទៀត**៖ ចាប់ `generationAtLogin =
+  authGeneration` មុន sign-in ហើយបើក្រោយ sign-in ជោគជ័យ generation **មិនប្រែ** (= callback មិន
+  បាញ់) នោះវាហៅ `verify*RoleThenProceed(cred.user, ++authGeneration)` ដោយខ្លួនឯង។ ពេល uid
+  **ប្រែ** មែន callback បាញ់មុន promise resolve ដូច្នេះ generation ប្រែ ➜ រំលង ➜ **គ្មានការ
+  ត្រួតពិនិត្យស្ទួន**។
+- **`retryPendingRoleCheck()` ថ្មី + ទង់ `pendingRoleRecheck`**៖ ពេល role check អស់ពេល
+  (`e.message === 'Role check timed out'` ប៉ុណ្ណោះ) វា **លែង `signOut()` ទៀត** — រក្សា session
+  ទុក បង្ហាញប្រអប់ login និង toast ថានឹងព្យាយាមម្ដងទៀត។ បន្ទាប់មក handler `.info/connected`
+  ដែលមានស្រាប់ (និង `visibilitychange` ក្នុង ៣ App ដែលមាន) ហៅ `retryPendingRoleCheck()`
+  ➜ **App ស្ដារឡើងវិញដោយស្វ័យប្រវត្តិ ដោយអ្នកប្រើមិនបាច់វាយពាក្យសម្ងាត់សោះ**។
+- **កំហុសពិត នៅតែ fail closed ដដែល**៖ `permission_denied` ឬ role ខុស ➜ `signOut()` ដដែល។
+  ការសម្រេចមិន `signOut()` ប៉ះតែផ្លូវ timeout ប៉ុណ្ណោះ ហើយវាមិនបន្ធូរសុវត្ថិភាពទេ — ព្រំដែនពិត
+  គឺ RTDB rules មិនមែនការ `signOut()` ទេ ហើយកូដនៅតែមិនបើក listener រហូតដល់ role ត្រូវបានបញ្ជាក់។
+- **ZoeKeyGen ទទួល `authGeneration` ជាលើកដំបូង** (៣ App ទៀតមានស្រាប់) — មុននេះ role check ចាស់
+  ដែលអស់ពេល គ្មានអ្វីលុបចោលវាបានទេ។
+
+### តេស្ត — `audit-tools/auth-recovery-test.js` (ថ្មី)
+ដក `withTimeout`, `retryPendingRoleCheck`, `verify*RoleThenProceed`, `setupAuthListener` និង
+`loginWithFirebase` **ពិត** ចេញពី `ZoeAdmin/app.js` + `ZoeW/app.js` ដាក់ក្នុង `vm` ជាមួយ fake
+Firebase ដែល `onAuthStateChanged` ចម្លង dedup `lastNotifiedUid` ពិត និង fake clock សម្រាប់រំកិល
+15 វិនាទី។ **34/34 ជោគជ័យ**។
+**មិនមែនតេស្តទទេទេ — បានផ្ទៀងផ្ទាត់៖** រត់វាលើកូដ **មុនកែ** (`git archive HEAD` ចូលថតដាច់ដោយឡែក)
+➜ **ធ្លាក់ ២០/៣៤** រួមទាំង "App ចាប់ផ្ដើមការត្រួតពិនិត្យ role ថ្មីដោយខ្លួនឯង" និង "ការត្រួតពិនិត្យ
+ចាស់ដែលអស់ពេល មិនបណ្ដេញអ្នកប្រើចេញ" — ពោលគឺវាបង្កើតឡើងវិញនូវបញ្ហាដែលអ្នកប្រើរាយការណ៍បេះបិទ។
+ចំណុច ៤ អំពី fail-closed (`permission_denied`, role ខុស) **ជោគជ័យទាំងមុន និងក្រោយ** — ភស្តុតាងថា
+មិនបានបន្ធូរផ្លូវសុវត្ថិភាព។
+
+### ការបែកគ្នាថ្មីរវាង ZoeAdmin↔ZoeW (ត្រឹមត្រូវ មិនមែន drift)
+`extract.js` ចាប់បាន `loginWithFirebase` និង `retryPendingRoleCheck` ថាបែកគ្នា។ ពិនិត្យហើយ —
+**បន្ទាត់តែមួយគត់** គឺឈ្មោះ function ជាក់លាក់តាម App (`verifyAdminRoleThenProceed` ទល់នឹង
+`verifyWorkerRoleThenProceed`) ដូច `setupAuthListener` ដែលមានក្នុងបញ្ជីបែកគ្នាស្រាប់។
+`retryPendingRoleCheck` ត្រូវបានបន្ថែមចូល `EXPECTED_DIVERGENT` ក្នុង `shared-fns.js`។
+
+### ចំណុចដែលឃើញតាមផ្លូវ តែមិនបានកែ (មិនស្ថិតក្នុងវិសាលភាព)
+- `autoLoginAttempted` (ZoeAdmin, ZoeW) ត្រូវបានសរសេរ `false` ២ កន្លែង **តែគ្មានកន្លែងណាអាន** —
+  អថេរស្លាប់។
+- `zoew_login_time` ក្នុង `localStorage` ត្រូវបាន `removeItem` ប៉ុណ្ណោះ — គ្មានកន្លែងណា `setItem`
+  ឬអានទេ។ `clearRememberedSession()` ជាក់ស្តែងធ្វើតែការលុប `remembered_email` ប៉ុណ្ណោះ។
+- ផ្លូវ `ensureAppActivated()` អស់ពេល នៅតែគ្មានការព្យាយាមឡើងវិញស្វ័យប្រវត្តិ (វាជា REST ទៅ
+  license DB មិនទាក់ទង `.info/connected`)។ ឥឡូវយ៉ាងហោចណាស់ការ login ដោយដៃដំណើរការវិញបាន។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v36, zoew-v32, zoescan-v25, zoekeygen-v18)។

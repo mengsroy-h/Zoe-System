@@ -88,6 +88,8 @@ let fb = null;
 let auth = null;
 let db = null;
 let authUnsubscribe = null;
+let authGeneration = 0;
+let pendingRoleRecheck = false;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
@@ -224,6 +226,7 @@ async function initFirebase() {
             const online = snap.val() === true;
             if (dot) dot.classList.toggle('online', online);
             if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+            if (online) retryPendingRoleCheck();
         });
 
         dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -513,10 +516,15 @@ async function doLogin() {
     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
     try {
         if (!fb || !auth) { fb = await waitForFirebaseSDK(); }
+        const generationAtLogin = authGeneration;
         await fb.setPersistence(auth, rememberCb && rememberCb.checked ? fb.browserLocalPersistence : fb.browserSessionPersistence);
-        await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
+        const cred = await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
         else localStorage.removeItem('remembered_email');
+        if (authGeneration === generationAtLogin && cred && cred.user) {
+            authGeneration++;
+            verifyAdminRoleThenProceed(cred.user, authGeneration);
+        }
     } catch (e) {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'doLogin' });
         alert(e && e.message === 'Login timed out'
@@ -528,9 +536,18 @@ async function doLogin() {
     }
 }
 
-async function verifyAdminRoleThenProceed(user) {
+function retryPendingRoleCheck() {
+    if (!pendingRoleRecheck) return;
+    if (!auth || !auth.currentUser) return;
+    authGeneration++;
+    verifyAdminRoleThenProceed(auth.currentUser, authGeneration);
+}
+
+async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
+    pendingRoleRecheck = false;
     try {
         const roleSnap = await withTimeout(fb.get(fb.ref(db, `user_roles/${user.uid}`)), 15000, 'Role check timed out');
+        if (myAuthGeneration !== authGeneration) return;
         const role = roleSnap.val();
         if (role !== 'admin') {
             await fb.signOut(auth).catch(() => {});
@@ -538,8 +555,15 @@ async function verifyAdminRoleThenProceed(user) {
             return;
         }
     } catch (e) {
+        if (myAuthGeneration !== authGeneration) return;
         console.error("Role verification failed:", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:" });
+        if (e && e.message === 'Role check timed out') {
+            pendingRoleRecheck = true;
+            showLoginModalWithPrefill();
+            showToast("⚠️ ការតភ្ជាប់អ៊ីនធឺណិតយឺត! មិនទាន់ផ្ទៀងផ្ទាត់សិទ្ធិបានទេ — ប្រព័ន្ធនឹងព្យាយាមម្ដងទៀតដោយស្វ័យប្រវត្តិ។");
+            return;
+        }
         await fb.signOut(auth).catch(() => {});
         showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
         return;
@@ -584,9 +608,12 @@ function setupAuthListener() {
     const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
     authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
         clearTimeout(initialAuthTimeout);
+        authGeneration++;
+        const myAuthGeneration = authGeneration;
         if (user) {
-            verifyAdminRoleThenProceed(user);
+            verifyAdminRoleThenProceed(user, myAuthGeneration);
         } else {
+            pendingRoleRecheck = false;
             updateAuthButton(false);
             showLoginModalWithPrefill();
         }

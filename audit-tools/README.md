@@ -9,6 +9,7 @@
 | `shared-fns.js` | diff helper ដែលចែករំលែក **ទាំង ៤ App** (មិនត្រឹមតែ ZoeAdmin↔ZoeW) រួចរាយតែអ្វីដែលបែកគ្នាដោយមិនរំពឹងទុក — ត្រូវការ `acorn` |
 | `policy-test.js` | ដក block ពិតរបស់ `claimAndCleanupItem` + `executeRestoreItem` ចេញពី `app.js` ទាំងពីរ រួចផ្ទៀងផ្ទាត់គោលការណ៍ **លុប/ដក** (27 assertion/App) |
 | `lookup-closed-test.js` | ដក `buildScannerLookupPayload` (ZoeAdmin) + `findLockerOccupant` (Zoescan) ពិត រួចផ្ទៀងផ្ទាត់ថាការព្រមានទីតាំងជាន់គ្នា **រំលងកញ្ចប់ដែលយកហើយ** (13 assertion) |
+| `auth-recovery-test.js` | ដក `loginWithFirebase`/`verify*RoleThenProceed`/`retryPendingRoleCheck` ពិត ចេញពី ZoeAdmin+ZoeW រួចផ្ទៀងផ្ទាត់ការស្ដារ session ពេលបណ្ដាញយឺត (34 assertion) — គំរូ `onAuthStateChanged` ធ្វើតាម `AuthImpl.notifyAuthListeners` ពិតរបស់ `@firebase/auth@1.13.4` |
 | `idcheck.js` | `getElementById(...)` ទាំងអស់ត្រូវមាន `id=` ក្នុង HTML |
 | `fncheck.js` | function ក្នុង inline `on*=` ទាំងអស់ត្រូវមានក្នុង `app.js` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |

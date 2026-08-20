@@ -1204,6 +1204,11 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSigningKeyBadge();
     setupIOSPullToRefresh();
 
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        retryPendingRoleCheck();
+    });
+
     if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY)) {
         requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
     }

@@ -26,8 +26,10 @@ function ok(label, cond, detail) {
 }
 
 const APPS = [
-    { file: 'ZoeAdmin/app.js', label: 'ZoeAdmin', verify: 'verifyAdminRoleThenProceed', login: 'loginWithFirebase', role: 'admin' },
-    { file: 'ZoeW/app.js', label: 'ZoeW', verify: 'verifyWorkerRoleThenProceed', login: 'loginWithFirebase', role: 'worker' }
+    { file: 'ZoeAdmin/app.js', label: 'ZoeAdmin', verify: 'verifyAdminRoleThenProceed', login: 'loginWithFirebase', role: 'admin', boot: 'setupAuthListener' },
+    { file: 'ZoeW/app.js', label: 'ZoeW', verify: 'verifyWorkerRoleThenProceed', login: 'loginWithFirebase', role: 'worker', boot: 'setupAuthListener' },
+    { file: 'Zoescan/app.js', label: 'Zoescan', verify: 'verifyRoleThenProceed', login: 'loginWithFirebase', role: 'scanner', boot: 'inline' },
+    { file: 'ZoeKeyGen/app.js', label: 'ZoeKeyGen', verify: 'verifyAdminRoleThenProceed', login: 'doLogin', role: 'admin', boot: 'setupAuthListener' }
 ];
 
 function buildContext(app) {
@@ -97,10 +99,10 @@ function buildContext(app) {
         clearTimeout: fakeClearTimeout,
         Promise, Error, JSON, Date, String, Number, Object, Array, isNaN, parseFloat,
         document: doc,
-        window: {},
         localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
         alert: (m) => log.alerts.push(m),
         fb, auth, db: {},
+        window: { firebaseSDK: fb },
         __log: log, __clock: clock, __els: els,
         __restorePersistedUser: restorePersistedUser
     };
@@ -126,6 +128,20 @@ function buildContext(app) {
         function clearRememberedSession() {}
         function updateAuthButton(v) { __log.authButton = v; }
         function initDatabaseListeners() { __log.dbInit++; }
+        function refreshKeyList() { __log.dbInit++; }
+        function showLockerPicker() {}
+        function detachDatabaseListeners() {}
+        function renderList() {}
+        function stopScanner() {}
+        function closeConfigQrScanner() {}
+        function openModal(id) { if (id === 'loginModal') __log.loginModalShown++; }
+        function updateSigningKeyBadge() {}
+        function waitForFirebaseSDK() { return Promise.resolve(fb); }
+        var currentUserEmail = null;
+        var cameraStoppedByVisibility = false;
+        var pendingLocationCode = null;
+        var listenersAttached = false;
+        var loginGeneration = 0;
         function safeFocusScanner() {}
         function clearCustomerDataTableCache() {}
         function applyCurrentFilter() {}
@@ -138,7 +154,18 @@ function buildContext(app) {
         function checkPinAndOpenConfig() {}
     `;
     vm.runInContext(preamble, ctx);
-    vm.runInContext(sliceFns(app.file, ['withTimeout', 'retryPendingRoleCheck', app.verify, 'setupAuthListener', app.login]), ctx);
+    const wanted = ['withTimeout', 'retryPendingRoleCheck', app.verify, app.login];
+    if (app.boot === 'setupAuthListener') wanted.push('setupAuthListener');
+    vm.runInContext(sliceFns(app.file, wanted), ctx);
+    if (app.boot === 'inline') {
+        vm.runInContext('function setupAuthListener() {' +
+            ' fb.onAuthStateChanged(auth, function (user) {' +
+            '   authGeneration++;' +
+            '   var myAuthGeneration = authGeneration;' +
+            '   if (user) { ' + app.verify + '(user, myAuthGeneration); }' +
+            '   else { pendingRoleRecheck = false; }' +
+            ' }); }', ctx);
+    }
     return { ctx, clock, log, auth, fb, els };
 }
 
@@ -154,6 +181,16 @@ async function advance(h, ms) {
 
 async function run(app) {
     console.log('\n===== ' + app.label + ' =====');
+
+    if (app.boot === 'inline') {
+        // Zoescan keeps its onAuthStateChanged callback inline inside initFirebase,
+        // so it cannot be sliced out by name. Assert the real source still matches
+        // the stand-in this harness registers, otherwise the run below is fiction.
+        const src = fs.readFileSync(path.join(root, app.file), 'utf8');
+        const shape = /authGeneration\+\+;\s*const myAuthGeneration = authGeneration;\s*if \(user\) \{\s*verifyRoleThenProceed\(user, myAuthGeneration\);/;
+        ok('listener ខាងក្នុង initFirebase នៅតែមានរូបរាងដូចដែល harness សន្មត់', shape.test(src));
+        ok('listener សម្អាតទង់ពេល sign-out', /\} else \{\s*pendingRoleRecheck = false;/.test(src));
+    }
 
     // ---- Scenario 1: reopen the app on a slow network, then log in again ----
     console.log('-- ១. បើក App ឡើងវិញ ពេលបណ្ដាញយឺត រួចចូលប្រព័ន្ធម្ដងទៀត --');

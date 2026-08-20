@@ -1895,18 +1895,28 @@ Timeline ពិតពី Sentry (ផ្ទៀងផ្ទាត់ហើយ)៖ 
   ការសម្រេចមិន `signOut()` ប៉ះតែផ្លូវ timeout ប៉ុណ្ណោះ ហើយវាមិនបន្ធូរសុវត្ថិភាពទេ — ព្រំដែនពិត
   គឺ RTDB rules មិនមែនការ `signOut()` ទេ ហើយកូដនៅតែមិនបើក listener រហូតដល់ role ត្រូវបានបញ្ជាក់។
 - **ZoeKeyGen ទទួល `authGeneration` ជាលើកដំបូង** (៣ App ទៀតមានស្រាប់) — មុននេះ role check ចាស់
-  ដែលអស់ពេល គ្មានអ្វីលុបចោលវាបានទេ។
+  ដែលអស់ពេល គ្មានអ្វីលុបចោលវាបានទេ។ វាក៏ទទួល handler `visibilitychange` ជាលើកដំបូងដែរ
+  (មុននេះមានតែ handler របស់ service-worker update ក្នុង IIFE ខាងលើ) ដូច្នេះទាំង ៤ App ស្ដារ
+  ដូចគ្នាទាំង ២ ផ្លូវ៖ `.info/connected` និងការត្រឡប់មកមុខវិញ។
 
-### តេស្ត — `audit-tools/auth-recovery-test.js` (ថ្មី)
+### តេស្ត — `audit-tools/auth-recovery-test.js` (ថ្មី) — គ្របទាំង ៤ App
 ដក `withTimeout`, `retryPendingRoleCheck`, `verify*RoleThenProceed`, `setupAuthListener` និង
-`loginWithFirebase` **ពិត** ចេញពី `ZoeAdmin/app.js` + `ZoeW/app.js` ដាក់ក្នុង `vm` ជាមួយ fake
+`loginWithFirebase`/`doLogin` **ពិត** ចេញពី `app.js` **ទាំង ៤** ដាក់ក្នុង `vm` ជាមួយ fake
 Firebase ដែល `onAuthStateChanged` ចម្លង dedup `lastNotifiedUid` ពិត និង fake clock សម្រាប់រំកិល
-15 វិនាទី។ **34/34 ជោគជ័យ**។
-**មិនមែនតេស្តទទេទេ — បានផ្ទៀងផ្ទាត់៖** រត់វាលើកូដ **មុនកែ** (`git archive HEAD` ចូលថតដាច់ដោយឡែក)
-➜ **ធ្លាក់ ២០/៣៤** រួមទាំង "App ចាប់ផ្ដើមការត្រួតពិនិត្យ role ថ្មីដោយខ្លួនឯង" និង "ការត្រួតពិនិត្យ
-ចាស់ដែលអស់ពេល មិនបណ្ដេញអ្នកប្រើចេញ" — ពោលគឺវាបង្កើតឡើងវិញនូវបញ្ហាដែលអ្នកប្រើរាយការណ៍បេះបិទ។
-ចំណុច ៤ អំពី fail-closed (`permission_denied`, role ខុស) **ជោគជ័យទាំងមុន និងក្រោយ** — ភស្តុតាងថា
-មិនបានបន្ធូរផ្លូវសុវត្ថិភាព។
+15 វិនាទី។ **70/70 ជោគជ័យ**។
+
+Zoescan ដាក់ callback `onAuthStateChanged` របស់វា **ខាងក្នុង `initFirebase`** ដូច្នេះដកតាមឈ្មោះ
+មិនបាន — harness ចុះឈ្មោះ callback ជំនួសមួយ ហើយ **assert លើ source ពិត** ថារូបរាងនៅដដែល
+(`authGeneration++` ➜ `verifyRoleThenProceed(user, myAuthGeneration)` និងការសម្អាតទង់ពេល
+sign-out)។ បើ Zoescan ប្តូរ listener នោះថ្ងៃណា តេស្តនឹងបរាជ័យ មិនស្ងាត់ទេ។
+
+**មិនមែនតេស្តទទេទេ — បានផ្ទៀងផ្ទាត់៖** រត់វាលើ tree **មុនកែ** (`git archive origin/main` គឺ
+`8c56254` ចូលថតដាច់ដោយឡែក) ➜ **ធ្លាក់ ៤១/៧០** លើគ្រប់ App រួមទាំង "App ចាប់ផ្ដើមការត្រួតពិនិត្យ
+role ថ្មីដោយខ្លួនឯង" និង "ការត្រួតពិនិត្យចាស់ដែលអស់ពេល មិនបណ្ដេញអ្នកប្រើចេញ" — ពោលគឺវាបង្កើត
+ឡើងវិញនូវបញ្ហាដែលអ្នកប្រើរាយការណ៍បេះបិទ។ ចំណុច fail-closed ទាំង ៨ (`permission_denied`, role ខុស)
+**ជោគជ័យទាំងមុន និងក្រោយ** — ភស្តុតាងថាមិនបានបន្ធូរផ្លូវសុវត្ថិភាព។
+*អន្ទាក់៖ ត្រូវ `git archive origin/main` មិនមែន `HEAD` ទេ បើបាន commit ការកែរួចហើយ — បើមិនដូច្នេះ
+baseline ផ្ទុកការកែស្រាប់ ហើយចំនួនបរាជ័យតិចជាងការពិត។*
 
 ### ការបែកគ្នាថ្មីរវាង ZoeAdmin↔ZoeW (ត្រឹមត្រូវ មិនមែន drift)
 `extract.js` ចាប់បាន `loginWithFirebase` និង `retryPendingRoleCheck` ថាបែកគ្នា។ ពិនិត្យហើយ —

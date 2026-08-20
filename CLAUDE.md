@@ -61,8 +61,9 @@
 > **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (divergence
 > ZoeAdmin↔ZoeW), `node audit-tools/shared-fns.js` (divergence ទាំង ៤ App — **ថ្មីជុំនេះ**),
 > `node audit-tools/policy-test.js` (គោលការណ៍ លុប/ដក), `node audit-tools/lookup-closed-test.js`
-> (ការព្រមានទីតាំងជាន់គ្នា) និង `node audit-tools/auth-recovery-test.js` (ការស្ដារ session ពេល
-> បណ្ដាញយឺត — **ថ្មី 2026-08-20**)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
+> (ការព្រមានទីតាំងជាន់គ្នា), `node audit-tools/auth-recovery-test.js` (ការស្ដារ session ពេល
+> បណ្ដាញយឺត), `node audit-tools/wiring.js` (HTML↔JS — **ថ្មីជុំ ៨**) និង
+> `node audit-tools/dom-hygiene.js` (ទិន្នន័យសល់ក្នុង DOM ក្រោយចាកចេញ — **ថ្មីជុំ ៨**)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
 > `partial-claim.sh` និង `scanner-lookup-closed.sh`។ មើល `audit-tools/README.md`។
 > លម្អិតពេញលេញនៅ section **"Seventh deep-audit pass"** ខាងក្រោម។
 
@@ -2069,3 +2070,82 @@ Netlify deploy preview ទាំង ៤ (`zoeadmin`, `zoew`, `zoescan`, `zoekeyg
 ការកែនេះធានាថា **login ចូលបាន** និងផ្ដល់ transport បម្រុងឲ្យ RTDB។ បើ Sentry ជុំក្រោយបង្ហាញ
 `restRoleRead: "ok"` ជាមួយ `connected: false` ញឹកញាប់ នោះមានន័យថា socket ពិតជាត្រូវបានទប់នៅលើ
 បណ្ដាញនោះ ហើយជំហានបន្ទាប់គឺពិនិត្យ VPN / data-saver / proxy របស់ឧបករណ៍ ឬសាកល្បង WiFi ផ្សេង។
+
+## Eighth deep-audit pass (2026-08-20, branch `claude/busy-franklin-5g26ja`) — handoff notes
+
+ស្នើដោយអ្នកប្រើភ្លាមក្រោយ PR #26/#27 merge ("ធ្វើ audit ជុំមួយទៀត មើលមានអ្វីខុសទៀតអត់")។
+Branch ចេញពី `main` (`c39d611`) ដោយផ្ទាល់។ រត់ inline single-threaded ដូចជុំ ៦ និង ៧ (គ្មាន subagent)។
+
+### វិធីសាស្ត្រ — ធ្វើឲ្យថ្នាក់កំហុសដែលកើតឡើងវិញ ក្លាយជាឧបករណ៍
+ជុំ ៣, ៤ និង ៥ រកឃើញ **ថ្នាក់កំហុសដដែល ៣ ដងជាប់គ្នា**៖ វាលក្នុង modal ដែលផ្ទុកទិន្នន័យអតិថិជន
+ហើយ `closeModal()` គ្រាន់តែ `display:none` ដូច្នេះទិន្នន័យនៅសល់ក្នុង DOM បន្ទាប់ពីចាកចេញ។ រាល់ជុំ
+បន្ថែមវាលបាត់ ២-៣ ដោយដៃ រួចជុំក្រោយរកឃើញទៀត។ ជុំនេះសរសេរ **`audit-tools/dom-hygiene.js`**
+ជំនួស៖ វា parse `app.js` ដោយ acorn រកគ្រប់ id ដែលទទួលការសរសេរ *មិនមែន literal* ទៅ
+`.value`/`.innerText`/`.textContent`/`.innerHTML`, ច្រោះយកតែ id ដែលនៅក្នុង `.modal` ក្នុង HTML,
+រួចប្រៀបនឹងអ្វីដែល `clearSensitiveModalFields()`/`showLoginModalWithPrefill()` លុបពិត។
+វារកឃើញ ៣ ចំណុចដែលការអានដោយភ្នែក ៥ ជុំមុនមិនឃើញ។ **រត់វារាល់ជុំ។**
+
+ក៏បានបញ្ចូល **`audit-tools/wiring.js`** (acorn) ដែល **ជំនួស `idcheck.js` និង `fncheck.js`**
+(លុបចោលហើយ)។ ២ ឧបករណ៍ចាស់ជា regex ហើយ `fncheck.js` មើលតែ inline `on*=` ក្នុង **HTML** ប៉ុណ្ណោះ —
+ចំណែក App ទាំងនេះបង្កើត handler ភាគច្រើនចេញពី **string ក្នុង `app.js`** ដូច្នេះវាខ្វាក់ចំពោះភាគច្រើន។
+`wiring.js` គ្រប​ទាំង ២ ប្រភព បូកនឹង id ស្ទួន, គោលដៅ `data-close` និង `onValue(dbRefX)` គ្មាន guard។
+
+### កែហើយ — ទាំង ៣ ជាថ្នាក់កំហុសដដែល (ទិន្នន័យសល់ក្នុង DOM ក្រោយចាកចេញ)
+- **[ធំជាងគេ] ZoeAdmin `pdfExportPrintArea` ផ្ទុករបាយការណ៍ Export ពេញលេញ ហើយគ្មានកន្លែងណាលុបវា
+  ទាល់តែសោះ។** `exportDataAsPDF()` សរសេរតារាងទាំងមូល — **លេខទូរស័ព្ទ, barcode, ទីតាំង locker,
+  COD/DOD និងសរុប របស់អតិថិជនគ្រប់រូបក្នុងតម្រងនោះ** — ចូល `innerHTML` របស់ `<div class="print-only">`
+  មួយ រួច `window.print()`។ `print-only` លាក់វាពីអេក្រង់ តែវានៅក្នុង DOM។ គ្មាន `afterprint`
+  cleanup គ្មានការលុបពេលចាកចេញ ➜ របាយការណ៍ទាំងមូលនៅអានបានតាម DevTools រហូតដល់ reload ទំព័រ
+  **រួមទាំងបន្ទាប់ពីអ្នកប្រើផ្សេងចូលប្រព័ន្ធលើឧបករណ៍រួម**។ នេះជា payload ធំជាងវាលណាមួយដែលជុំ ៣-៥
+  បានបិទ (ជួរទាំងអស់ ជំនួសឲ្យជួរតែមួយ)។ កែ ២ កន្លែង៖ `afterprint` លុបភ្លាមក្រោយបោះពុម្ព
+  (បិទចន្លោះក្នុង session ដែរ) និងបន្ថែម `pdfExportPrintArea` ចូល `clearSensitiveModalFields()`
+  ជាសំណាញ់ (browser ទូរស័ព្ទខ្លះមិនបាញ់ `afterprint` ទេ)។
+- **ZoeAdmin `modalBarcodeText`** — barcode នៃកញ្ចប់ចុងក្រោយដែលស្កេន នៅក្នុង `phoneModal`។ ជុំ ៤
+  បន្ថែម `modalPhoneInput`/`modalLockerInput`/`modalCodInput`/`modalDodInput` នៃ modal **ដដែល**
+  ចូលបញ្ជីលុប តែភ្លេចវាលនេះ — គំរូ "ភ្លេចបងប្អូនក្នុង modal ដដែល" បេះបិទ។
+- **Zoescan `locationWarningText`/`locationWarningTitle`** — សារព្រមានទីតាំងជាន់គ្នាផ្ទុក barcode
+  **និងលេខទូរស័ព្ទអតិថិជន** (`occPhoneRaw`)។ Zoescan គ្មាន `clearSensitiveModalFields()` ទេ ដូច្នេះ
+  លុបក្នុងសាខា sign-out នៃ `onAuthStateChanged` ជាមួយ `listSearchInput` ដែលមានស្រាប់។
+
+`CACHE_VERSION` bump តែ ២ (zoeadmin-v39, zoescan-v28) — ZoeW និង ZoeKeyGen មិនប្រែ។
+**គ្មានការប្ដូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+
+### ពិនិត្យហើយស្អាត — កុំ audit ឡើងវិញដោយងងឹតងងុល
+- **`getIdToken()` ក្នុង URL មិនចូល cache ទេ**៖ `sw.js` ទាំង ៤ មាន
+  `if (url.origin !== self.location.origin) return;` នៅដើម handler `fetch` ដូច្នេះសំណើ REST
+  ឆ្លងដែនមិនឆ្លងកាត់ Cache Storage សោះ។ (ពិនិត្យដោយចេតនា ព្រោះ PR #26 ទើបដាក់ token ចូល URL។)
+  បូកនឹង `beforeBreadcrumb` ដែល PR #26 បន្ថែម ដែលលុប `auth=` មុនផ្ញើទៅ Sentry។
+- **`fetchCustomerDataTableRows`'s `customerDataTableFetchPromise` មិនអាចជាប់គាំងទេ** — មើលទៅដូច
+  អាចជាប់ (`finally` លុបវាតែពេល generation ដូច) តែ `clearCustomerDataTableCache()` ជាកន្លែងតែមួយគត់
+  ដែលបង្កើន generation ហើយវា **លុប promise នៅបន្ទាត់ដដែល**។ guard នៅក្នុង `finally` ចាំបាច់ ដើម្បី
+  កុំឲ្យ fetch ចាស់លុប promise របស់ fetch ថ្មី។ ត្រឹមត្រូវដូចដែលសរសេរ។
+- **ការហៅ promise ដោយគ្មាន `await`/`.catch` ចំនួន ៧០ កន្លែង** (`audit-tools` មិនរក្សាឧបករណ៍នេះទេ
+  ព្រោះវាមានសំឡេងរំខានច្រើន) — ពិនិត្យរួច **គ្មានមួយណាជាកំហុសទេ**៖ `syncScannerLookupEntry`,
+  `clearScannerLookupEntry`, `releaseBarcodesInRegistry` មាន `.catch` ខាងក្នុង;
+  `claimAndCleanupItem`, `confirmPhone`, `assignLockerToEntry`, `refreshKeyList`, `toggleRevokeKey`,
+  `loginWithFirebase`, `requestCameraPermission` មាន try/catch គ្របទាំងស្រុង;
+  `patchHistoryItemFields` resolve `true/false` មិន reject។
+- **នាឡិកា**៖ រត់ការស្វែងរក `Date.now()` + `new Date()` ឡើងវិញលើ `app.js` ទាំង ៤ និង
+  `license-verify.js`។ អ្វីដែលនៅសល់ជា exemption ដែលមានឯកសាររួច (PIN lockout, id salt,
+  scan debounce ×2, script-load deadline, lookup cache TTL/cooldown)។ `renderHistory` ប្រើ
+  `getServerNow()` ទាំង ZoeAdmin និង ZoeW ហើយ `addOrUpdateEntry` ប្រើ `new Date(getServerNow())`។
+- **`EXPORT_TEXT_COLUMN_INDEXES = [1, 2]` នៅត្រូវនឹង `EXPORT_HEADERS`** (index 1 = លេខទូរស័ព្ទ,
+  2 = Barcode)។ ឯកសារ export ព្រមានថាត្រូវធ្វើសមកាលកម្មដោយដៃ — ពិនិត្យហើយ ត្រូវ។
+- **ZoeKeyGen `user_roles/$uid` អានបានដោយម្ចាស់ខ្លួនឯង** (`auth.uid === $uid`) ដូច rules អាជីវកម្ម
+  ដូច្នេះផ្លូវ REST នៃ PR #26 ដើរនៅ ZoeKeyGen ដែរ។
+- Zoescan នៅមាន inline `onclick=` ត្រឹម ២ ហើយ **ទាំងពីរមាន `addEventListener` backup**
+  (`activationSubmitBtn`, `activationLogoutBtn`) — CSP របស់វានៅតែគ្មាន `'unsafe-inline'`។
+- Firebase path ↔ rules៖ គ្រប់ path ដែល App ប៉ះមាន block ក្នុង rules ហើយ **គ្មាន block ណាមិនប្រើ**
+  ទាំង DB អាជីវកម្ម និង DB ZoeKeyGen។ Link Markdown ១០ ក្នុង README ទាំង ៦ ដំណើរការគ្រប់។
+- `license-verify.js` និង `error-reporting.js` នៅ byte-identical ទាំង ៤ (`md5sum`);
+  0 comment និង 0 trailing whitespace លើ `app.js`/`license-verify.js` ទាំង ៨ (acorn)។
+- `extract.js` 91 identical / 23 different (ដូចមុនកែបេះបិទ), `shared-fns.js` UNEXPECTED: 0,
+  `auth-recovery-test.js` 142/142, `policy-test.js` និង `lookup-closed-test.js` ជោគជ័យទាំងអស់។
+
+### មិនបានធ្វើជុំនេះ
+- **មិនបានរត់ emulator** — គ្មាន rules ណាប្រែ ហើយការកែទាំង ៣ ជា DOM សុទ្ធ។ ផ្លូវ REST នៃ PR #26
+  មិនទាន់បានផ្ទៀងផ្ទាត់លើ emulator ដែរ តែវាអាន path ដដែល (`user_roles/{uid}`) ក្រោម rules ដដែល
+  ជាមួយ `auth` ដដែលនឹង SDK ដូច្នេះបើ SDK អាចអាន REST ក៏អានបានដែរ។ បើចង់ភស្តុតាង សូមបន្ថែម
+  suite ថ្មីមួយក្នុង `audit-tools/emu/`។
+- ចំណុចដែលជុំមុនទទួលយកដោយចេតនានៅដដែល៖ worker សរសេរតួលេខ revenue/pickup បាន, គ្មានការផ្ទៀងផ្ទាត់
+  aggregate ដោយគ្មាន backend ដែលទុកចិត្តបាន, និង ZoeKeyGen "Extend" ផ្លាស់តែពិដានខាង server។

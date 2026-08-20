@@ -16,6 +16,8 @@
     bindClickBackup('editPhoneSaveBtn', saveEditedPhone);
     bindClickBackup('restoreConfirmBtn', executeRestoreItem);
     bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
+    bindClickBackup('phoneModalCancelBtn', () => closeModal('phoneModal'));
+    bindClickBackup('phoneModalCloseX', () => closeModal('phoneModal'));
 
     function showUpdateAvailableBanner() {
         if (document.getElementById('zoeUpdateBanner')) return;
@@ -3686,9 +3688,11 @@
         const skipBtn = document.getElementById('phoneModalSkipBtn');
         const confirmBtn = document.getElementById('phoneModalConfirmBtn');
         const cancelBtn = document.getElementById('phoneModalCancelBtn');
+        const closeXBtn = document.getElementById('phoneModalCloseX');
         if (skipBtn) skipBtn.disabled = true;
         if (confirmBtn) confirmBtn.disabled = true;
         if (cancelBtn) cancelBtn.disabled = true;
+        if (closeXBtn) closeXBtn.disabled = true;
 
         try {
             const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
@@ -3719,6 +3723,7 @@
             if (skipBtn) skipBtn.disabled = false;
             if (confirmBtn) confirmBtn.disabled = false;
             if (cancelBtn) cancelBtn.disabled = false;
+            if (closeXBtn) closeXBtn.disabled = false;
         }
     }
 

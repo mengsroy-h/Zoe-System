@@ -476,6 +476,7 @@ function saveFirebaseConfig() {
 function showLoginModalWithPrefill() {
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
+    if (!isPinFlowPending()) pinTargetAction = null;
     document.getElementById('appContainer').style.display = 'none';
     isSignedInUiActive = false;
     keyListSessionGeneration++;

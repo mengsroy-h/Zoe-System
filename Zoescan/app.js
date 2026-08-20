@@ -254,6 +254,7 @@ async function initFirebase() {
         } else {
             pendingRoleRecheck = false;
             currentUserEmail = null;
+            if (!isPinFlowPending()) { pendingSetupLinkConfig = null; pinTargetAction = null; }
             cameraStoppedByVisibility = false;
             stopScanner();
             closeConfigQrScanner();
@@ -550,14 +551,31 @@ function detachDatabaseListeners() {
     barcodeIndex = {};
 }
 
+function barcodeEntriesOf(value) {
+    if (Array.isArray(value)) {
+        const out = [];
+        value.forEach((b, i) => { if (b !== null && b !== undefined) out.push({ barcode: b, index: i }); });
+        return out;
+    }
+    if (value && typeof value === 'object') {
+        return Object.keys(value)
+            .filter((k) => /^\d+$/.test(k))
+            .sort((a, b) => Number(a) - Number(b))
+            .map((k) => ({ barcode: value[k], index: Number(k) }))
+            .filter((e) => e.barcode !== null && e.barcode !== undefined);
+    }
+    return [];
+}
+
 function buildBarcodeIndex() {
     const idx = {};
     Object.keys(historyData).forEach((itemId) => {
         const item = historyData[itemId];
         if (!item) return;
-        if (Array.isArray(item.barcodes) && item.barcodes.length) {
-            item.barcodes.forEach((b, i) => {
-                if (b && b.code) idx[b.code] = { itemId, barcodeIdx: i, item };
+        const entries = barcodeEntriesOf(item.barcodes);
+        if (entries.length) {
+            entries.forEach((e) => {
+                if (e.barcode && e.barcode.code) idx[e.barcode.code] = { itemId, barcodeIdx: e.index, item };
             });
         } else if (item.barcode) {
             idx[item.barcode] = { itemId, barcodeIdx: null, item };
@@ -776,6 +794,12 @@ function cancelPinEntryFlow() {
     pendingSetupLinkConfig = null;
     pinTargetAction = null;
     closeModal('pinModal');
+}
+
+function isPinFlowPending() {
+    const pinEl = document.getElementById('pinModal');
+    const setupEl = document.getElementById('pinSetupModal');
+    return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
 }
 
 let configQrReader = null;

@@ -76,6 +76,7 @@ label { display: block; font-size: 11px; font-weight: 600; color: var(--text-mut
     background: rgba(255,255,255,0.98);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
+    padding: 10px 16px;
     padding: calc(10px + env(safe-area-inset-top)) 16px 10px 16px;
     display: flex;
     justify-content: space-between;
@@ -198,7 +199,7 @@ td.note-cell { white-space: normal; max-width: 140px; }
 .mb-8 { margin-bottom: 8px; }
 
 .ptr-indicator {
-    position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; width: 28px; height: 28px;
+    position: fixed; top: 10px; top: calc(env(safe-area-inset-top) + 10px); left: 50%; width: 28px; height: 28px;
     margin-left: -14px; border-radius: 50%; background: var(--card-bg); box-shadow: var(--shadow-md);
     display: flex; align-items: center; justify-content: center; z-index: 500; opacity: 0;
     transform: translateY(-50px); pointer-events: none;

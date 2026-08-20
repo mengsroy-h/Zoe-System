@@ -475,6 +475,12 @@
         closeModal('pinModal');
     }
 
+    function isPinFlowPending() {
+        const pinEl = document.getElementById('pinModal');
+        const setupEl = document.getElementById('pinSetupModal');
+        return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
+    }
+
     let configQrReader = null;
     let configQrScanActive = false;
 
@@ -587,6 +593,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        if (!isPinFlowPending()) pendingSetupLinkConfig = null;
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
         const fieldsToBlank = [
@@ -1014,7 +1021,7 @@
                 const val = snapshot.val();
                 if (val && !isNaN(val)) {
                     exchangeRateRiel = parseFloat(val);
-                    localStorage.setItem('zoew_exchange_rate', exchangeRateRiel);
+                    try { localStorage.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
                     debouncedRenderAfterHistorySync();
                 }
             }, handleDbListenerError);
@@ -1067,8 +1074,14 @@
 
                 item.price = Math.round((item.cod + item.dod) * 100) / 100;
 
+                if (Array.isArray(item.barcodes) || (item.barcodes && typeof item.barcodes === 'object')) {
+                    item.barcodes = barcodeEntriesOf(item.barcodes).map(e => e.barcode);
+                    if (item.barcodes.length) item.count = item.barcodes.length;
+                }
+
                 if (item.barcodes && Array.isArray(item.barcodes)) {
                     item.barcodes.forEach(b => {
+                        if (!b || typeof b !== 'object') return;
                         b.cod = parseFloat(b.cod) || 0;
                         b.dod = parseFloat(b.dod) || 0;
                         if (b.isDeducted === undefined) b.isDeducted = false;
@@ -1390,6 +1403,22 @@
 
     function generateUniqueId() {
         return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function barcodeEntriesOf(value) {
+        if (Array.isArray(value)) {
+            const out = [];
+            value.forEach((b, i) => { if (b !== null && b !== undefined) out.push({ barcode: b, index: i }); });
+            return out;
+        }
+        if (value && typeof value === 'object') {
+            return Object.keys(value)
+                .filter((k) => /^\d+$/.test(k))
+                .sort((a, b) => Number(a) - Number(b))
+                .map((k) => ({ barcode: value[k], index: Number(k) }))
+                .filter((e) => e.barcode !== null && e.barcode !== undefined);
+        }
+        return [];
     }
 
     function sanitizeInput(str) {
@@ -1770,6 +1799,13 @@
         let currentY = 0;
         let isDragging = false;
 
+        function phoneSearchIsActive() {
+            const box = document.getElementById('phoneSuggestBox');
+            if (box && box.classList.contains('show')) return true;
+            const input = document.getElementById('searchPhoneInput');
+            return !!(input && document.activeElement === input && input.value.trim());
+        }
+
         function syncPullToRefreshLock() {
             if (appContainer) {
                 appContainer.classList.toggle('history-expanded', sidebar.classList.contains('collapsed'));
@@ -1805,7 +1841,7 @@
             let diffY = currentY - startY;
             let scrollTop = tableResponsive.scrollTop;
 
-            if (diffY < -30 && !sidebar.classList.contains('collapsed')) {
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !phoneSearchIsActive()) {
                 sidebar.classList.add('collapsed');
                 syncPullToRefreshLock();
                 isDragging = false;
@@ -1824,6 +1860,7 @@
         const dragHandle = document.getElementById('dragHandle');
         if (dragHandle) {
             dragHandle.addEventListener('click', () => {
+                if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
                 sidebar.classList.toggle('collapsed');
                 syncPullToRefreshLock();
             });
@@ -2234,7 +2271,7 @@
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box || !box.classList.contains('show')) return;
         const rect = phoneInput.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        if (rect.bottom < 0 || rect.top > window.innerHeight || (rect.width === 0 && rect.height === 0)) {
             hidePhoneSuggestions();
             return;
         }

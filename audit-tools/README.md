@@ -15,6 +15,11 @@
 | `phone-suggest-test.js` | ដក `collectPhoneSuggestions`/`showPhoneSuggestions`/`searchByPhone`/`updateRecentPhonesList` ពិតរបស់ ZoeAdmin+ZoeW រួចផ្ទៀងផ្ទាត់ថាការវាយ **កន្ទុយលេខ ៣-៤ ខ្ទង់** បង្ហាញលេខត្រូវគ្នា និងថាបញ្ជីលេខ **មិនត្រូវកាត់ត្រឹម ៣០** ទៀត (48 assertion) — `PHONE_APP_DIR=<dir>` ដើម្បីរត់លើ tree ផ្សេង |
 | `zoescan-list-test.js` | ដក `renderList` ពិតរបស់ Zoescan រួចផ្ទៀងផ្ទាត់ថាតម្រងទីតាំង **មិនខុសពីអ្វីដែល dropdown បង្ហាញ** និងថាការស្វែងរកលេខដើរតាមកន្ទុយលេខ (7 assertion) — `ZOESCAN_APP_DIR=<dir>` |
 | `keygen-pin-flow-test.js` | ដក `checkPinAndOpenConfig`/`requestPinBeforeConfig`/`isPinFlowPending` ពិតរបស់ ZoeKeyGen រួចផ្ទៀងផ្ទាត់ថា PIN flow **មិនរត់ callback ចាស់** (10 assertion) — `KEYGEN_APP_DIR=<dir>` |
+| `barcode-shape-test.js` | ដក normalizer ពិតរបស់ `dbRefHistory` (ZoeAdmin+ZoeW) និង `buildBarcodeIndex` (Zoescan) រួចផ្ទៀងផ្ទាត់ថា `barcodes` ដែល Firebase ត្រឡប់មកជា **object មានចន្លោះ** ឬជា **array ដែលមាន `null`** មិនធ្វើឲ្យកញ្ចប់បាត់ និងមិន throw ចេញពី callback (28 assertion) — `BARCODE_APP_DIR=<dir>` |
+| `setup-link-logout-test.js` | ផ្ទៀងផ្ទាត់ថា Setup Link ដែលបើកចោល **មិនរស់រានក្រោយចាកចេញ** (មិនអាចបំពេញ config អាជីវកម្មផ្សេងចូលប្រអប់ Config ពេលក្រោយ) តែ Setup Link ដែលអ្នកប្រើកំពុងវាយ PIN ពិតៗ **មិនត្រូវបោះចោល** (21 assertion) — `SETUP_APP_DIR=<dir>` |
+| `phone-search-swipe-test.js` | ដក `setupSwipeGestures`/`positionPhoneSuggestBox` ពិត (ZoeAdmin+ZoeW) រួចផ្ទៀងផ្ទាត់ថាការអូសឡើងលើ **មិនបំបាត់ប្រអប់ស្វែងរកលេខ** ខណៈ **ឥរិយាបថអូសដើម (ឡើង➜ប្រវត្តិឡើង / ចុះ➜ប្រវត្តិចុះ) នៅដដែល** (18 assertion) — `SWIPE_APP_DIR=<dir>` |
+| `state-hygiene.js` | រកអថេរ state កម្រិត module ដែល **រស់រានក្រោយចាកចេញដោយគ្មានហេតុផលកត់ត្រា** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥, ៦ និង ៧ — រកឃើញដោយភ្នែករាល់ជុំ) — ត្រូវការ `acorn` |
+| `css-classes.js` | រក class ដែល HTML ឬ `app.js` ប្រើ តែ **គ្មានច្បាប់ក្នុង `style.css`** ➜ ធាតុឡើងគ្មានរចនាបថ |
 | `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
 | `dom-hygiene.js` | រកវាល**ណាមួយ**ដែលត្រូវបានសរសេរដោយទិន្នន័យអតិថិជន តែ **មិនត្រូវបានលុបចោលពេលចាកចេញ** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥ និង ៨) — ត្រូវការ `acorn` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |
@@ -26,6 +31,9 @@
 `dom-hygiene.js` មាន allowlist `ACCEPTED` នៅខាងលើឯកសារ ដែល **រាល់ធាតុមានហេតុផលសរសេរជាប់** —
 វាល​ដែលមិនមែនជាទិន្នន័យអតិថិជន ឬវាលដែលមានផ្លូវលុបចោលឯទៀតរួចហើយ។ ធាតុគ្មានហេតុផលនឹងលាក់
 ការលេចធ្លាយពិតបន្ទាប់ ដូច្នេះកុំបន្ថែមដោយគ្មានការពន្យល់។
+
+`state-hygiene.js` និង `css-classes.js` មាន allowlist ដូចគ្នាដែរ (`ACCEPTED` / `IGNORE`) — ធាតុនីមួយៗ
+មានហេតុផលសរសេរជាប់។ ដាក់ធាតុចូលទាល់តែបានតាមដានរួចថាវាពិតជាគ្មានគ្រោះថ្នាក់។
 
 `shared-fns.js` មាន allowlist `EXPECTED_DIVERGENT` នៅខាងលើឯកសារ — helper ដែលបែកគ្នាដោយចេតនា
 (label ជាក់លាក់តាម App, PBKDF2 salt, `initFirebase` ។ល។)។ បើបន្ថែម helper ចែករំលែកថ្មីមួយ

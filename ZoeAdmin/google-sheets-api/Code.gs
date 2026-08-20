@@ -7,7 +7,10 @@ function doGet(e) {
   var key = params.key || '';
   var code = (params.code || '').toString().trim().toUpperCase();
 
-  if (secret && key !== secret) {
+  if (!secret) {
+    return jsonResponse({ error: 'API_KEY script property is not set - see step 2.3 in README.md' });
+  }
+  if (key !== secret) {
     return jsonResponse({ error: 'unauthorized' });
   }
 

@@ -1,90 +1,60 @@
 # Zoe-System
 
-> ## ⚡ START HERE — ស្ថានភាពបច្ចុប្បន្ន (2026-08-20)
+> ## ⚡ START HERE — អានផ្នែកនេះមុនគេ (ធ្វើបច្ចុប្បន្នភាព 2026-08-20, ក្រោយជុំ audit ទី ១១)
 >
-> 🔴 **ថ្មីបំផុត (2026-08-20)** — អ្នកប្រើរាយការណ៍ថា ZoeAdmin បិទ App រួចបើកវិញ ➜ ដុំ "ក្រៅបណ្ដាញ"
-> ➜ សុំឲ្យ login ➜ login **មិនចូល**។ រកឃើញមូលហេតុពិត ២ (មិនមែនបញ្ហាបណ្ដាញសុទ្ធសាធទេ) ហើយ
-> កែទាំង ៤ App ហើយ **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #24, merge commit `65eb0f6`
-> (branch `claude/zoeadmin-login-offline-6ktcqp`, ចេញពី `8c56254` ដោយផ្ទាល់)។ Netlify preview
-> ទាំង ៤ បៃតងមុន merge ហើយ `git rev-list --count origin/main..origin/<branch>` = 0 ក្រោយ merge។
-> Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។
-> **មិនប៉ះ rules ទេ ដូច្នេះគ្មាន publish ថ្មី។**
-> លម្អិតនៅ section **"ZoeAdmin: បិទ App រួចបើកវិញ ➜ login មិនចូល"** ខាងក្រោមចុងឯកសារ។
+> ឯកសារនេះត្រូវបានសរសេរឲ្យ **session Claude ថ្មីទាំងស្រុង** អាចបន្តការងារបាន ដោយមិនចាំបាច់មាន
+> ប្រវត្តិការសន្ទនាមុន។ អានប្លុកនេះ + section **"របៀបធ្វើ audit លើគម្រោងនេះ"** ខាងក្រោមភ្លាម
+> ជាការគ្រប់គ្រាន់ដើម្បីចាប់ផ្តើម។
 >
-> 🔴 **មូលហេតុទី ៣ (រង់ចាំ `.info/connected`) បាន merge ចូល `main` ហើយ** — PR #25, commit `f1f62c5`,
-> merge `715d42b`។ (START HERE ធ្លាប់សរសេរថា "មិនទាន់ merge" — **ខុស**, ផ្ទៀងផ្ទាត់ដោយ git ហើយ។)
+> ### ស្ថានភាពកូដ
+> **អ្វីៗទាំងអស់រហូតដល់ជុំ audit ទី ១០ ស្ថិតនៅក្នុង `main` រួចរាល់ហើយ** ហើយ Netlify deploy
+> `main` ស្វ័យប្រវត្តិ ➜ ដល់ production។ **ជុំទី ១១ នៅក្នុង PR #37 (branch
+> `claude/deep-audit-jcog87`) — បើក មិនទាន់ merge។** បើ PR នោះ merge រួច សូមកែបន្ទាត់នេះ។
 >
-> 🔴 **តេស្តលើទូរស័ព្ទពិត (04:48) — មូលហេតុទី ៤។ PWA update ចូលពិត មិនបាច់ reinstall ទេ។**
-> ភស្តុតាង៖ stack trace គឺ `app.js:213` + `app.js:1222` ដែល **ត្រូវនឹង `origin/main` (715d42b) បេះបិទ**
-> ហើយគម្លាតពីការចុច login ដល់កំហុសគឺ **៦០.០១ វិនាទី** = ៤៥ (រង់ចាំភ្ជាប់) + ១៥ (អាន)។ កូដចាស់ឲ្យ ១៥។
-> ➜ ដូច្នេះ **កូដថ្មីកំពុងដើរនៅលើទូរស័ព្ទរួចហើយ** — បញ្ហាមិនមែននៅត្រង់ cache ទេ។
+> **Firebase rules ទាំងពីរ publish រួចរាល់ហើយ** (root និង `ZoeKeyGen/`) ហើយ **ជុំ ១១ មិនប្តូរ
+> rules ទេ ➜ គ្មាន publish ថ្មីត្រូវធ្វើ**។ Rules JSON ក្នុង repo នេះ **មិន deploy ស្វ័យប្រវត្តិទេ**
+> — Netlify បម្រើតែឯកសារ static; ត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ។
+> ដូច្នេះ **រាល់ពេលបន្ថែម path ថ្មីក្នុង Firebase ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយប្រាប់
+> អ្នកប្រើថាត្រូវ publish ដោយដៃ។**
 >
-> មូលហេតុទី ៤៖ **RTDB socket មិនឡើងសោះ ខណៈ HTTPS ធម្មតាដើរល្អ**។ ក្នុង breadcrumb ដដែលនោះ
-> `identitytoolkit` 200, `script.google.com` 200, និង `GET zoew-z1-default-rtdb.firebaseio.com/.json`
-> ឆ្លើយ 401 ក្នុង ៧៩៣ms (401 នេះជារឿងធម្មតា — `syncServerTime()` អាន header `Date` តែប៉ុណ្ណោះ)។
-> ពោលគឺ **REST ទៅ firebaseio.com ដើរ តែ channel realtime មិនដើរ** ➜ `.info/connected` នៅ false
-> លើស ៤៥ វិនាទី ➜ អស់ថវិការង់ចាំ ➜ អាន ➜ timeout ➜ login មិនចូលដដែល។
+> ### ច្បាប់ដែលមិនអាចរំលងបាន
+> ១. **ប្រព័ន្ធនេះកំពុងដំណើរការជាមួយអតិថិជនពិត និងលុយពិត (COD/DOD)។** កុំ merge ចូល `main`
+>    ដោយគ្មានការស្នើច្បាស់លាស់ពីអ្នកប្រើ។
+> ២. **"លុប" (Delete) ទល់នឹង "ដក" (Remove) ជាគោលការណ៍អាជីវកម្ម មិនមែនកំហុសទេ** — អានផ្នែក
+>    "Core business rule" ខាងក្រោមឲ្យចប់ មុននឹងប៉ះកូដណាមួយដែលទាក់ទងចំណូល។
+> ៣. **កូដ `app.js` ត្រូវតែគ្មាន comment** (ទម្លាប់គម្រោង, commit `a6aa840`)។ `qrcode.js` ជា
+>    library ខាងក្រៅ — លើកលែង។
+> ៤. **`license-verify.js` និង `error-reporting.js` ត្រូវតែ byte-identical ទាំង ៤ App។**
+>    ប្រើ `cp` + `md5sum` កុំកែម្តងមួយ App។
+> ៥. **App នីមួយៗមាន `app.js` ដាច់ដោយឡែក ដែលកូដស្ទួនគ្នា** — ការកែក្នុង App មួយ **មិន**
+>    អនុវត្តទៅ App ដទៃដោយស្វ័យប្រវត្តិទេ។ ពិនិត្យជានិច្ចថាតើត្រូវចម្លងទៅបងប្អូនឬអត់។
+> ៦. **កុំសរសេរការអះអាងអំពី git/branch/merge ដោយមិនផ្ទៀងផ្ទាត់** — ប្រើ
+>    `git rev-list --count origin/main..origin/<branch>`។ រឿងនេះខុស ២ ដងក្នុង ២ ជុំជាប់គ្នា
+>    ព្រោះចម្លងបន្ទាត់ចាស់មកដាក់។ **ឯកសារនេះមិនមែនជាភស្តុតាងទេ — git ទើបជាភស្តុតាង។**
 >
-> **កែហើយ និង merge ចូល `main` រួចរាល់ហើយ** — PR #26, merge commit `7139952`
-> (branch `claude/busy-franklin-5g26ja`, ចេញពី `715d42b` ដោយផ្ទាល់)។ Netlify preview ទាំង ៤ បៃតង
-> មុន merge (`mergeable_state: clean`) ហើយ `git rev-list --count origin/main..origin/<branch>` = 0
-> ក្រោយ merge។ Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។ ២ យ៉ាង៖
-> ១. **អាន `user_roles` តាម REST ស្របគ្នានឹង SDK** ពេល socket មិនទាន់ឡើង — អ្នកណាឆ្លើយមុន យកអ្នកនោះ។
->    REST ប្រើ token របស់អ្នកប្រើ និងឆ្លងកាត់ rules ដដែល ដូច្នេះ **មិនបន្ធូរសុវត្ថិភាពទេ**។
-> ២. **CSP `script-src` ទទួល `*.firebaseio.com` / `*.firebasedatabase.app`** — long-polling របស់
->    Firebase ផ្ទុក `<script>` ពី host នោះ ដូច្នេះពីមុន ពេល WebSocket ត្រូវបានទប់ RTDB **គ្មានផ្លូវ
->    បម្រុងសោះ**។ ឥឡូវមាន។ លម្អិតនៅ section ចុងឯកសារ។
+> ### អ្វីដែលទទួលយកដោយចេតនា — កុំរាយការណ៍ជាកំហុសថ្មី
+> - **worker អាចសរសេរតួលេខ revenue/pickup ដោយផ្ទាល់** — គ្មាន rule ណាអាចផ្ទៀងផ្ទាត់ប្រវត្តិ
+>   នៃ delta បានទេ ដោយគ្មាន backend ដែលទុកចិត្តបាន (Cloud Functions)។ គម្រោងនេះគ្មាន backend។
+> - **គ្មានការផ្ទៀងផ្ទាត់ aggregate** ដោយហេតុផលដដែល។
+> - **ZoeKeyGen "Extend" ផ្លាស់តែពិដានខាង server** មិនមែន `exp` ដែល sign រួច — ដូច្នេះ Key
+>   ដែលបន្ថែមសុពលភាព **activate លើឧបករណ៍ថ្មីមិនបាន** ក្រោយថ្ងៃ sign ដើម។ ប្រអប់ប្រាប់រួចហើយ។
+> - **ការលុប site data reset ការអនុគ្រោះ ៣ ថ្ងៃបាន** — គ្មានផ្លូវការពារខាង client។
+> - **ការ re-provision ឧបករណ៍ដែលមាន config រួច តែចាកចេញរួច តាម Setup Link មិនដើរស្វ័យប្រវត្តិ**
+>   — អ្នកប្រើសម្រេចទុកដដែល (2026-08-20) ព្រោះការកែប៉ះផ្លូវ login ដែលផុយបំផុត។
+> - **Zoescan៖ QR ដែលមិនមែន Setup Link ធ្វើឲ្យ toast ចេញឡើងវិញរាល់ frame** — រំខានតែប៉ុណ្ណោះ។
+> - **`google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
 >
-> 🟣 **Audit ជុំទី ១០ (2026-08-20) — រកឃើញកំហុសពិត ៩ កែអស់ហើយ ហើយ merge ចូល `main` រួចរាល់
-> (PR #34, merge commit `dcde742`)។** ក្នុងនោះ **៣ ជាកំហុសក្នុងកូដ
-> ដុំស្នើលេខថ្មីខ្លួនឯង** (រកឃើញដោយអាន diff របស់ខ្លួនម្តងទៀត), ២ ក្នុង ZoeKeyGen (PIN flow រត់
-> callback ខុស ➜ ប្រអប់ Config បើកមិនចេញ), ២ ក្នុង Zoescan (តម្រងទីតាំងខុសពី dropdown), ១ សុវត្ថិភាព
-> ទាំង ៤ App (**ID token អាចទៅ host ក្រៅ Firebase** បើ config ត្រូវបានពុល) និង ១ ក្នុងការ deploy
-> (rules JSON របស់ ZoeKeyGen អានបានជាសាធារណៈ)។ តេស្តថ្មី ២ + scenario ថ្មី ១ — សរុប **១៩១ + 55 +
-> 10 + 7** assertion។ លម្អិតនៅ section **"ជុំ ១០"** ចុងឯកសារ។
->
-> 🔵 **ស្វែងរកលេខទូរស័ព្ទ៖ វាយកន្ទុយលេខ ៣-៤ ខ្ទង់ បានឃើញដុំស្នើលេខវិញហើយ (2026-08-20, merge
-> ក្នុង PR #34 ដដែល)** — អ្នកប្រើ
-> រាយការណ៍ថាក្រោយជុំ ៨/៩ ត្រូវវាយលេខ **ពេញ** ទើបឃើញ suggestion (ពីមុនវាយ ៣-៤ ខ្ទង់ក៏ឡើង)។
-> មូលហេតុ **មិនមែន** ការកែជុំ ៨/៩ ទេ — កូដស្វែងរកមិនប្រែសោះ។ វាជា `<datalist>` របស់ browser
-> ដែលការផ្គូផ្គងអាស្រ័យលើ browser (Chrome ថ្មីផ្គូផ្គងតែ **ដើមលេខ**) បូកនឹងកំហុសពិតមួយ៖
-> `updateRecentPhonesList()` កាត់បញ្ជីត្រឹម **៣០ លេខដំបូង** តាមលំដាប់ `scanHistory` (ចាស់មុន) ➜
-> ថ្ងៃមមាញឹក លេខដែលត្រូវការធ្លាក់ចេញពីបញ្ជី ➜ គ្មាន suggestion សោះ ➜ ក្រោយ ២ ម៉ោង បញ្ជីស្រាល
-> វិញ ➜ "ដើរវិញ"។ ដូច្នេះវាឡើងចុះ មិនទៀងទាត់។ **កែហើយ**៖ ដុំស្នើលេខផ្ទាល់ខ្លួន (មិនពឹង browser
-> ទៀត) ដែលផ្គូផ្គង **កន្ទុយលេខ ➜ ដើមលេខ ➜ កណ្តាល** និងលែងកាត់ត្រឹម ៣០។ លម្អិតនៅ section
-> **"ស្វែងរកលេខទូរស័ព្ទ"** ចុងឯកសារ។
->
-> ជុំ audit ទី៧ (ជុំ final) **បាន merge ចូល `main` រួចរាល់ហើយ** — PR #20, merge commit `acd5a9f`
-> (branch `claude/deep-audit-bug-fixes-lubg8l`, ចេញពី `cec65e9` ដោយផ្ទាល់)។ CI ស្អាតមុន merge។
-> Netlify deploy `main` ស្វ័យប្រវត្តិ ដូច្នេះ **កូដទៅដល់ production រួចហើយ**។
->
-> ✅ **branch `claude/*` ទាំងអស់ merge ចូល `main` អស់ហើយ** (ផ្ទៀងផ្ទាត់ 2026-08-19 ដោយ
-> `git rev-list --count origin/main..origin/<branch>` = 0 លើគ្រប់ branch)។ រួមទាំង
-> `...-90pmhb` ដែរ (PR #18, `8dab82b`)។ ចាប់ផ្តើម branch ថ្មីពី `main` ជានិច្ច។
->
-> ✅ **Rules ទាំងពីរ publish រួចរាល់ហើយ** (អ្នកប្រើបញ្ជាក់ 2026-08-19) — `firebase-database.rules.json`
-> (root) និង `ZoeKeyGen/firebase-database.rules.json`។ ដូច្នេះ ៤ យ៉ាងនេះមានប្រសិទ្ធភាពហើយ៖
-> scanner បង្កើត barcode មិនបាន · ZoeW ធ្វើ 8-day *partial* cleanup បាន · `license_keys` លែងអានបាន
-> ជាសាធារណៈត្រង់ node មេ · **Zoescan រំលងទូដែលអតិថិជនយករួច**។
->
-> **គ្មានអ្វីនៅសល់ទេ — ទាំងកូដ ទាំង rules ទៅដល់ production អស់ហើយ។**
->
-> ចំណាំសម្រាប់ជុំក្រោយ៖ entry ចាស់ក្នុង `zoew_scanner_lookup` ទទួលវាល `isClosed` លុះត្រាតែកញ្ចប់នោះ
-> ត្រូវប៉ះម្តងទៀត (បិទ/បើក/ស្តារ/កែលេខ ឬប៊ូតុង "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" ក្នុង
-> ZoeAdmin)។ entry ដែលបិទរួចនឹងរលាយចេញក្នុង ២ម៉ោងដោយខ្លួនឯង ដូច្នេះមិនបានសរសេរ migration ទេ។
->
-> ការផ្ទៀងផ្ទាត់ថា publish ពិតជាចូល៖ ពី session នេះ **ធ្វើមិនបានទេ** (network policy ទប់ការទៅ
-> `*.firebaseio.com`, ហើយ node អាជីវកម្មទាំងអស់ត្រូវការ auth)។ បើចង់ផ្ទៀងផ្ទាត់ដោយដៃ៖ បើក Zoescan
-> ស្កេនកញ្ចប់ចូលទូដែលទើបមានអតិថិជនយកចេញ — មិនគួរឡើងប្រអប់ព្រមានទៀតទេ។
->
-> **មុននឹងចាប់ផ្តើម audit ជុំក្រោយ:** រត់ `node audit-tools/extract.js /tmp/fns` (divergence
-> ZoeAdmin↔ZoeW), `node audit-tools/shared-fns.js` (divergence ទាំង ៤ App — **ថ្មីជុំនេះ**),
-> `node audit-tools/policy-test.js` (គោលការណ៍ លុប/ដក), `node audit-tools/lookup-closed-test.js`
-> (ការព្រមានទីតាំងជាន់គ្នា), `node audit-tools/auth-recovery-test.js` (ការស្ដារ session ពេល
-> បណ្ដាញយឺត), `node audit-tools/wiring.js` (HTML↔JS — **ថ្មីជុំ ៨**) និង
-> `node audit-tools/dom-hygiene.js` (ទិន្នន័យសល់ក្នុង DOM ក្រោយចាកចេញ — **ថ្មីជុំ ៨**)។ សម្រាប់ rules រត់ emulator រួច `bash audit-tools/emu/real.sh`,
-> `partial-claim.sh` និង `scanner-lookup-closed.sh`។ មើល `audit-tools/README.md`។
-> លម្អិតពេញលេញនៅ section **"Seventh deep-audit pass"** ខាងក្រោម។
+> ### កំហុសដែលទើបកែក្នុងជុំ ១១ (កុំ audit ឡើងវិញដោយងងឹតងងុល)
+> ១. **`barcodes` មក ៣ រូបរាងពី Firebase** — `[A,null,B]` ធ្វើឲ្យ throw ក្នុង `onValue` callback
+>    ➜ តារាងឈប់ update; `{0:A,2:B}` ធ្វើឲ្យបាត់ barcode ➜ Zoescan កំណត់ locker មិនបាន។
+>    កែដោយ `barcodeEntriesOf()` (byte-identical ៣ App)។ **Zoescan រក្សា index ជាលេខដើម**
+>    ព្រោះ `assignLockerToEntry` សរសេរទៅ `barcodes/{idx}`។
+> ២. **Setup Link ដែលបើកចោល រស់រានក្រោយចាកចេញ** ➜ បំពេញ config អាជីវកម្មផ្សេង។
+> ៣. **timer ទាញតារាងអតិថិជន គ្មាន auth guard** (ZoeAdmin)។
+> ៤. **`localStorage.setItem` ក្នុង `onValue` callback** អាចសម្លាប់ callback។
+> ៥. **`env()` គ្មាន fallback** លើ `.app-navbar` និង `.ptr-indicator`។
+> ៦. **ការអូសឡើងលើបំបាត់ប្រអប់ស្វែងរកលេខ** (រាយការណ៍ដោយវីដេអូ)។
+> ៧. **`item.count` ទល់នឹង `barcodes.length`** + **`Code.gs` fail-open**។
 
 
 4 independent PWAs (vanilla JS, no framework, no build step), each deployed as its own
@@ -100,6 +70,86 @@ ZoeAdmin/ZoeW/Zoescan share a single Firebase Realtime Database (business data) 
 app's `app.js` is a **separate file with independently duplicated logic** — a fix in one
 app's function does not automatically apply to the same-named function in another app.
 Always check whether a bug/fix applies to just one app or needs mirroring across siblings.
+
+## របៀបធ្វើ audit លើគម្រោងនេះ (runbook — session ថ្មីអានត្រង់នេះ)
+
+### ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
+```bash
+npm i acorn                      # ឧបករណ៍ ៥ ត្រូវការវា; បើអត់ វារំលង ហើយប្រាប់អ្នក
+bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
+```
+`run-all.sh` រត់ **ការត្រួតពិនិត្យ ២៣** (តេស្តឥរិយាបថ 438 assertion + checker រចនាសម្ព័ន្ធ ៧ +
+ទម្លាប់គម្រោង ៦)។ **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថា
+កំហុសដែលរកឃើញក្នុងជុំ ១-១១ មិនបានត្រឡប់មកវិញទេ។
+
+### ជំហានទី ១ — កុំចាប់ផ្តើមដោយអានកូដពីដើមដល់ចប់
+ជុំ ៦ ដល់ ១១ បង្ហាញច្បាស់៖ **កំហុសថ្មីស្ទើរតែមិនដែលរកឃើញដោយការអានកូដដដែលឡើងវិញទេ។** វារកឃើញដោយ៖
+- **ឧបករណ៍ថ្នាក់ថ្មី** — ជុំ ១១ រកបាន ៥ ក្នុង ៧ ដោយឧបករណ៍ដែលទើបសរសេរនៅជុំនោះឯង
+- **កូដដែលទើប ship** — ជុំ ៩ និង ១០ រកកំហុសក្នុងកូដដែលសរសេរនៅ session ដដែល។
+  **រត់ `git log --oneline <ចំណុចចុងក្រោយក្នុង CLAUDE.md>..HEAD` ជានិច្ច** ដើម្បីរក commit
+  ដែលមិនទាន់មានឯកសារ — នោះជាកូដដែលត្រួតពិនិត្យតិចជាងគេ
+- **របាយការណ៍ពិតពីអ្នកប្រើ** (Sentry, វីដេអូ) — មានតម្លៃជាងការស្មានច្រើន
+
+### ជំហានទី ២ — ថ្នាក់កំហុសដែលមានឧបករណ៍រួចហើយ (កុំរកដោយភ្នែក)
+| ថ្នាក់ | ឧបករណ៍ |
+|---|---|
+| ZoeAdmin↔ZoeW បែកគ្នា | `extract.js /tmp/fns` — **រត់នេះមុនគេ ហើយម្តងទៀតក្រោយកែ** |
+| helper ចែករំលែក ៣-៤ App បែកគ្នា | `shared-fns.js` |
+| HTML↔JS មិនត្រូវគ្នា (id, `on*=`, `data-close`) | `wiring.js` |
+| ទិន្នន័យអតិថិជនសល់ក្នុង DOM ក្រោយចាកចេញ | `dom-hygiene.js` |
+| អថេរ state សល់ក្រោយចាកចេញ | `state-hygiene.js` |
+| class គ្មានច្បាប់ CSS | `css-classes.js` |
+| comment / trailing whitespace | `comments.js` |
+
+ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
+សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
+
+### ជំហានទី ៣ — ថ្នាក់ដែល **មិនទាន់** មានឧបករណ៍ (ឆាកសម្រាប់ជុំក្រោយ)
+ទាំងនេះជាកន្លែងដែលកំហុសនៅសល់។ ការសាងឧបករណ៍ថ្មីមួយសម្រាប់ថ្នាក់មួយ = ការវិនិយោគល្អជាងគេ៖
+- **payload ដែលសរសេរទៅ Firebase ទល់នឹង schema ក្នុង rules** (ឥឡូវផ្ទៀងផ្ទាត់ដោយដៃ)
+- **រូបរាងទិន្នន័យផ្សេងទៀតដែល RTDB អាចត្រឡប់មក** (ជុំ ១១ គ្របតែ `barcodes`)
+- **ការប្រណាំងរវាងឧបករណ៍ច្រើន** (គ្មានផ្លូវធ្វើតេស្តដោយគ្មាន emulator ពិត)
+- **ការប្រើអង្គចងចាំ / ដំណើរការ** ពេល `scanHistory` ធំ
+- **CSS ដែលបំបែកលើអេក្រង់តូច** (ជុំ ៩ និង ១១ រកឃើញ ២ — ប្រហែលមានទៀត)
+
+### ជំហានទី ៤ — ច្បាប់សម្រាប់តេស្តគ្រប់ពេល
+**តេស្តត្រូវតែដកកូដ *ពិត* ចេញពី `app.js` មករត់ក្នុង `vm` — កុំសរសេរតេស្តលើកូដចម្លង។**
+ហើយ **ត្រូវបញ្ជាក់ថាតេស្តមិនទទេ**៖
+```bash
+git fetch origin main                      # សំខាន់ — origin/main ក្នុង session អាចចាស់
+rm -rf /tmp/baseline && mkdir /tmp/baseline
+git archive origin/main | tar -x -C /tmp/baseline
+bash audit-tools/run-all.sh /tmp/baseline  # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
+```
+បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវាមិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។
+*អន្ទាក់៖ ត្រូវ `git archive origin/main` មិនមែន `HEAD` ទេ បើបាន commit ការកែរួចហើយ។*
+
+### ជំហានទី ៥ — មុន commit
+```bash
+node --check <ឯកសារ .js ដែលកែ>
+bash audit-tools/run-all.sh
+node audit-tools/extract.js /tmp/fns   # តើខ្ញុំបានបង្កើតការបែកគ្នាថ្មីទេ?
+```
+រួច **bump `CACHE_VERSION`** ក្នុង `sw.js` នៃ App ណាដែល `app.js`/`index.html`/`style.css` ប្រែ។
+លំនាំ `<app>-vN`; filter សម្អាត cache ត្រូវតែនៅតែស្កេនតែ prefix របស់ខ្លួន។
+
+### Firebase RTDB emulator (សម្រាប់ការកែ rules តែប៉ុណ្ណោះ)
+```bash
+npm i firebase-tools
+npx firebase setup:emulators:database     # ចាំបាច់ — ថត cache ទទេក្រោយ npm i
+java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1
+cp firebase-database.rules.json audit-tools/emu/real.rules.json
+bash audit-tools/emu/real.sh
+```
+**អន្ទាក់ដែលចំណាយពេលច្រើនម្តងហើយម្តងទៀត៖**
+- `emulators:start` របស់ CLI **upload rules មិនបាន** តាម proxy — រត់ jar ដោយផ្ទាល់
+- ទាំង `.settings/rules.json` និង `auth_variable_override` ត្រូវការ
+  `-H "Authorization: Bearer owner"` បើអត់ **rules នៅបើកចំហ ហើយតេស្តជោគជ័យក្លែងក្លាយ**
+- សំណើដែលមាន `Bearer owner` **តែគ្មាន** `auth_variable_override` = ម្ចាស់ project ➜ **រំលង rules**។
+  សម្រាប់តេស្ត "unauthenticated ត្រូវបានបដិសេធ" **កុំផ្ញើ Authorization header សោះ**
+- `pkill -f firebase-database-emulator` ត្រូវនឹង command line របស់ shell ខ្លួនឯង ➜ សម្លាប់ session
+- **ត្រូវ assert ថាការសរសេរដែលដឹងថាខុស ពិតជាត្រូវបានបដិសេធ** មុននឹងទុកចិត្តលទ្ធផលណាមួយ
+
 
 ## Project status (verify before assuming this is still current)
 
@@ -2509,3 +2559,204 @@ zoekeygen-v25។ **គ្មានការប្ដូរ Firebase rules ➜ �
 (`zoeadmin`, `zoew`, `zoescan`, `zoekeygen`) បៃតងមុន merge។ ក្រោយ merge
 `git rev-list --count origin/main..origin/claude/phone-number-audit-8-9-tsyi3c` = 0។
 Netlify deploy `main` ស្វ័យប្រវត្តិ ➜ **កូដទៅដល់ production ហើយ**។
+
+## ជុំ ១១ — deep audit (2026-08-20, branch `claude/deep-audit-jcog87`)
+
+ស្នើដោយអ្នកប្រើ ព្រមទាំងសំណួរត្រង់ៗ៖ *"រាល់ការ audit មុនមុនអ្នកមិនបានមើលគ្រប់ជ្រុងជ្រោយទេឬ?"*
+ចម្លើយស្មោះត្រង់នៅចុង section នេះ។ Branch ចេញពី `main` (`db02393`) ដោយផ្ទាល់។ រត់ inline
+single-threaded ដូចជុំ ៦-១០។
+
+**អ្នកប្រើផ្តល់បរិបទសំខាន់ ២ ក្នុង session៖** PR #35/#36 ត្រូវបានធ្វើឡើងដោយ **Claude AI លើទូរស័ព្ទ**
+(ដូច្នេះជាកូដដែលទទួលការត្រួតពិនិត្យតិចជាងគេ — ពិនិត្យវាមុនគេ) និងថា Zoescan មានផ្លូវស្តារតាមប៊ូតុង
+"🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" របស់ ZoeAdmin (ត្រូវ — តែមើលកំហុសទី ១ ខាងក្រោម)។
+
+### ស្ថានភាពពេលចាប់ផ្តើម — ឧបករណ៍ចាស់ទាំងអស់ស្អាត
+`extract.js` 101 identical / 23 different · `shared-fns.js` UNEXPECTED 0 · `wiring.js` ស្អាត ·
+`dom-hygiene.js` ស្អាត · តេស្ត ៣០៨ assertion ជោគជ័យទាំងអស់។ ដូច្នេះកំហុសថ្មីនឹង **មិនមកពី
+ឧបករណ៍ចាស់ទេ** — ត្រូវសាងឧបករណ៍ថ្មីសម្រាប់ថ្នាក់កំហុសដែលមិនដែលពិនិត្យ។
+
+### កំហុសទី ១ (ធ្ងន់ធ្ងរបំផុត) — Firebase ត្រឡប់ `barcodes` មក ៣ រូបរាង តែកូដស្គាល់តែ ១
+RTDB ត្រឡប់ array ដដែលមកក្នុងរូបរាងខុសគ្នា អាស្រ័យលើថាតើ key ជាប់គ្នាឬអត់៖
+| រូបរាង | កូដមុនកែធ្វើអ្វី |
+|---|---|
+| `[A, B]` (ជាប់គ្នា) | ត្រឹមត្រូវ |
+| `[A, null, B]` (ចន្លោះតិច) | **throw** `Cannot read properties of null (reading 'cod')` |
+| `{0:A, 2:B}` (ចន្លោះច្រើន) | `Array.isArray` = false ➜ **បោះបង់ barcode ទាំងអស់ស្ងាត់ៗ** |
+
+- **រូបរាង `null`** — normalizer ធ្វើ `b.cod = parseFloat(b.cod) || 0` ដោយគ្មាន guard។ វា throw
+  **ចេញពីខាងក្នុង callback របស់ `onValue`** ដូច្នេះ `debouncedRenderAfterHistorySync()` **មិនដែលរត់**
+  ➜ តារាងកញ្ចប់ឈប់ update ទាំងស្រុង។ ចំណាំ៖ `buildScannerLookupPayload` **មាន** guard null ស្រាប់
+  (`if (!b) return ...`) — ភស្តុតាងថាវាជាការភ្លេចមួយកន្លែង មិនមែនជាការសម្រេចទេ។
+- **រូបរាង object** — `Array.isArray` guard ទាំង ៦៩ កន្លែងក្នុង ៣ App ធ្លាក់ទៅរូបរាង legacy
+  barcode តែមួយ ➜ ផលបូកលុយខុស, `isClosed` ខុស, ហើយក្នុង **Zoescan barcode នោះរកមិនឃើញ ➜
+  កំណត់ទីតាំង locker មិនបាន ➜ រកកញ្ចប់អតិថិជនមិនឃើញ**។
+  **ប៊ូតុង "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ" ស្តារករណីនេះមិនបានទេ** ព្រោះ
+  `buildScannerLookupPayload` ប្រើ `Array.isArray` ដដែល ➜ វាសរសេរ lookup entry **គ្មាន `barcodes`
+  សោះ**។ ក្រោយការកែនេះ ប៊ូតុងនោះទើបស្តារបានពិត។
+
+**កែ**៖ `barcodeEntriesOf(value)` ថ្មី — **byte-identical ទាំង ៣ App អាជីវកម្ម** — ត្រឡប់
+`{barcode, index}` តាមលំដាប់ key ជាលេខ ដោយច្រោះ null ចេញ។
+- **ZoeAdmin/ZoeW**៖ normalizer សាង array ក្រាស់ឡើងវិញ (២ App នេះរក barcode តាម `code` មិនមែនតាម
+  index ហើយវាសរសេរ item ទាំងមូល ដូច្នេះការបង្រួមសុវត្ថិភាព — ហើយការសរសេរបន្ទាប់ **ជួសជុល record
+  ក្នុង Firebase** ដោយស្វ័យប្រវត្តិ)។ បន្ថែម `if (!b || typeof b !== 'object') return;` ដែរ។
+- **Zoescan**៖ index **រក្សា key ជាលេខដើម** ព្រោះ `assignLockerToEntry()` សរសេរទៅ
+  `zoew_scan_history_cod_dod/{id}/barcodes/{idx}/...` — index ដែលបង្រួមរួចនឹងចុះខុសកន្លែង។
+  **នេះជាចំណុចដែលងាយធ្វើខុសបំផុតក្នុងការកែនេះ** — មានតេស្ត assert ដោយឡែក។
+
+### កំហុសទី ២ — Setup Link ដែលបើកចោល រស់រានក្រោយចាកចេញ (ZoeW, Zoescan)
+ជុំ ៦ បិទផ្លូវ cancel (`cancelPinSetupFlow`/`cancelPinEntryFlow`) **តែភ្លេចផ្លូវ logout**។
+`showLoginModalWithPrefill()` និងសាខា sign-out របស់ Zoescan បិទ `pinModal` ដោយ `closeModal()`
+ដោយផ្ទាល់ — មិនឆ្លងកាត់ `data-close` ទេ — ដូច្នេះ `pendingSetupLinkConfig` នៅដដែល។ ក្រោយមក
+ពេលអ្នកណាម្នាក់បើកប្រអប់ Config ធម្មតា វា **បំពេញ config របស់អាជីវកម្មផ្សេងចូល** ហើយប៊ូតុង
+"រក្សាទុក" នៅចម្ងាយមួយចុច។ នេះជាហានិភ័យ mis-provisioning ពិត សម្រាប់គំរូអតិថិជន ២០០-៣០០។
+ZoeAdmin រួចខ្លួនដោយសារ `checkPinAndOpenConfig()` reset `pinTargetAction` ជាមុន (ជុំ ៦)។
+
+**កែ**៖ សម្អាតពេលចាកចេញទាំង ៤ App — **តែមាន guard `isPinFlowPending()`** ដូច្នេះ Setup Link ដែល
+អ្នកប្រើ **កំពុងវាយ PIN ពិតៗ** មិនត្រូវបោះចោលទេ។ `isPinFlowPending()` ត្រូវបានចម្លងពី ZoeKeyGen
+(ជុំ ១០) ទៅ ៣ App ទៀត។ វានៅក្នុង `EXPECTED_DIVERGENT` ព្រោះ ZoeKeyGen ប្រើ `classList('active')`
+ចំណែក ៣ App ទៀតប្រើ `style.display === 'flex'` — ដូច `openModalHelper`/`closeModal` ស្រាប់។
+**ផ្ទៀងផ្ទាត់ថាការកែនេះមិនបំផ្លាញការដំឡើងលើកដំបូង**៖ លើឧបករណ៍គ្មាន config, `initFirebase()`
+return **មុន** បង្កើត auth listener ទាំង ៣ App ដូច្នេះ `showLoginModalWithPrefill()` មិនរត់ពេល boot។
+
+### កំហុសទី ៣ — ZoeAdmin ទាញតារាងអតិថិជនរាល់ ១៥ នាទី ដោយគ្មាន auth check
+`setInterval(prefetchCustomerDataTableRowsIfConfigured, CUSTOMER_TABLE_CACHE_MS)` គឺជា timer **តែមួយ
+ក្នុង ៤** ដែលគ្មាន guard `auth.currentUser` (ឯទៀតទាំងអស់មាន)។ ផល ២៖
+១. `clearCustomerDataTableCache()` ពេលចាកចេញ ត្រូវបាន **លុបចោលវិញរៀងរាល់ ១៥ នាទី ជារៀងរហូត** —
+   ការងារអនាម័យទិន្នន័យលើឧបករណ៍រួមរបស់ជុំ ៣/៤/៥/៨ ត្រូវបានបំបាត់ដោយស្ងាត់។ ការការពារ
+   `customerDataTableSessionGeneration` មិនជួយទេ ព្រោះ **គ្មានការចាកចេញកើតឡើងកំឡុង fetch នោះ**។
+២. ឧបករណ៍ដែលទុកចោលនៅអេក្រង់ login នៅតែហៅ Apps Script `?list=1` រាល់ ១៥ នាទី — ខ្ជះខ្ជាយ quota។
+**កែ**៖ guard នៅក្នុង `prefetchCustomerDataTableRowsIfConfigured()` ផ្ទាល់ ហើយហៅវាម្តងក្រោយ
+ការផ្ទៀងផ្ទាត់ role ជោគជ័យ ដូច្នេះ cache នៅតែក្តៅទាន់ពេលមុនស្កេនដំបូង។
+
+### កំហុសទី ៤ — `localStorage.setItem` ខាងក្នុង listener (ថ្នាក់ដដែលនឹងទី ១)
+`onValue` របស់អត្រាប្តូរប្រាក់ធ្វើ `setItem` ដោយគ្មាន try — លើឧបករណ៍ដែលផ្ទុកពេញ
+`QuotaExceededError` នឹងសម្លាប់ callback មុន `debouncedRenderAfterHistorySync()`។ ដាក់ try/catch។
+(នេះជា `setItem` **តែមួយគត់** ក្នុង callback របស់ `onValue` ទាំង ៤ App — ពិនិត្យដោយ script។)
+
+### កំហុសទី ៥ — `env()` គ្មាន fallback (ថ្នាក់ដដែលនឹងជុំ ៩ តែជុំ ៩ កែតែ toast)
+បើ browser មិនស្គាល់ `env()` នោះ **ការប្រកាសទាំងមូលត្រូវបោះចោល**៖
+- `.app-navbar { padding: calc(8px + env(safe-area-inset-top)) ... }` ➜ navbar **គ្មាន padding សោះ**
+- `.ptr-indicator { top: calc(env(...) + 10px) }` លើធាតុ `position: fixed` ➜ `top: auto`
+បន្ថែម fallback នាំមុខ។ ពិនិត្យ `env()` ទាំង ១៦ កន្លែង៖ ២ ដែលនៅសល់មិនត្រូវការទេ ព្រោះមាន
+ការប្រកាសសុវត្ថិភាពនាំមុខរួចហើយ (`padding: 8px` និង `min-height: 100dvh` មូលដ្ឋាន)។
+
+### ឧបករណ៍ថ្មី ៤ — ប្តូរ **ថ្នាក់** កំហុសទៅជាការត្រួតពិនិត្យស្វ័យប្រវត្តិ
+នេះជាចម្លើយពិតចំពោះសំណួររបស់អ្នកប្រើ — កុំរកកំហុសដដែលដោយភ្នែករាល់ជុំ៖
+- **`state-hygiene.js`** — អថេរ state កម្រិត module ដែលរស់រានក្រោយចាកចេញដោយគ្មានហេតុផលកត់ត្រា។
+  **ថ្នាក់នេះត្រូវបានរកឃើញដោយភ្នែកនៅជុំ ៣, ៤, ៥, ៦ និង ៧** (lookupSecretKey, pendingRestoreId,
+  signingKeySessionKey, pendingSetupLinkConfig ។ល។)។ វារកឃើញកំហុសទី ២ ភ្លាមៗ។
+- **`css-classes.js`** — class ដែល JS/HTML ប្រើ តែគ្មានច្បាប់ CSS។
+- **`barcode-shape-test.js`** (28) និង **`setup-link-logout-test.js`** (21)។
+
+### ភស្តុតាងថាតេស្តមិនទទេ
+- `barcode-shape-test.js` ➜ **ធ្លាក់ ១៦/២៨** លើ `origin/main` រួមទាំង throw ពិត
+  `Cannot read properties of null (reading 'cod')` និង Zoescan ចេញ `["AAA"]` (បាត់ `BBB`)។
+- `setup-link-logout-test.js` ➜ **ធ្លាក់ ៦/១៥** លើ `origin/main` ដោយបង្ហាញ
+  `{"projectId":"business-B"}` នៅរស់រានក្រោយចាកចេញ។
+*អន្ទាក់៖ ត្រូវ `git archive origin/main` ចូលថតដាច់ដោយឡែក រួចប្រើ `<TOOL>_APP_DIR=` — កុំយក `HEAD`។*
+
+### ពិនិត្យហើយស្អាត — កុំ audit ឡើងវិញដោយងងឹតងងុល
+- **PR #35/#36 (ធ្វើលើទូរស័ព្ទ) គ្មានកំហុសទេ** — តាមដាន guard ទាំងអស់៖ `phoneModalDismissPromptOpen`
+  ត្រឹមត្រូវ (`confirm()` ទប់ thread ដូច្នេះ `setTimeout(...,0)` មិនអាចរត់មុន handler ទី ២);
+  `pdfExportOriginalTitle === null` ត្រឹមត្រូវ (ការពារ title ត្រូវរក្សាទុកជាឈ្មោះឯកសារ ពេល
+  `afterprint` មិនបាញ់); `data-nodismiss` ថេរលើ `phoneModal` ត្រឹមត្រូវ; ការដក `{once:true}`
+  មិនធ្វើឲ្យ listener កកកុញទេ ព្រោះ `addEventListener` dedupe function reference ដដែល។
+- **NaN ក្នុងលុយ**៖ ពិនិត្យ `parseFloat`/`parseInt`/`Number()` គ្រប់កន្លែងទាំង ៤ App — មាន guard
+  គ្រប់ (`|| 0`, `isNaN(...)`, `val && !isNaN(val)`)។ គ្មានផ្លូវ NaN ចូលស្ថិតិទេ។
+- `forEach(async` / `.map(async` គ្មាន `Promise.all` — **គ្មានសោះ** ទាំង ៤ App។
+- `.find()`/`.findIndex()` គ្រប់កន្លែងមាន guard `-1`/`!item`។
+- Service worker ទាំង ៤ ដូចគ្នាបេះបិទ លើកលែងតែ `CACHE_VERSION`, prefix នៃការសម្អាត និង APP_SHELL;
+  `url.origin !== self.location.origin` នៅដើម handler `fetch` ➜ **REST ដែលមាន token មិនចូល cache**។
+- `manifest.json` ទាំង ៤ ត្រឹមត្រូវ (`id`/`start_url`/`scope` ដូចគ្នា, icon `any maskable`)។
+- `netlify.toml`៖ CSP ទាំង ៤ ត្រឹមត្រូវតាមតម្រូវការរបស់ App នីមួយៗ (Zoescan នៅតែគ្មាន
+  `'unsafe-inline'`; ZoeW គ្មាន `script.google.com` ព្រោះវាគ្មាន lookup)។
+- `EXPORT_TEXT_COLUMN_INDEXES = [1, 2]` នៅត្រូវនឹង `EXPORT_HEADERS` (1=ទូរស័ព្ទ, 2=Barcode)។
+- `readUserRoleViaRest()` មិនដែលដាក់ URL (ដែលមាន token) ចូលសារកំហុស ឬ Sentry extra ទេ —
+  `lastRoleRestOutcome` ផ្ទុកតែ status/សារដែលសម្អាតរួច។ `isFirebaseDatabaseHost()` តឹងត្រឹមត្រូវ។
+- `license-verify.js` និង `error-reporting.js` នៅ byte-identical ទាំង ៤; comment = 0;
+  trailing whitespace = 0; rules JSON ទាំងពីរ valid។
+
+### កំហុសទី ៦ និង ៧ — កែក្រោយមក តាមការអនុញ្ញាតរបស់អ្នកប្រើ ("កែទាំងអស់ចុះ ... អោយសុីសង្វាក់គ្នា")
+ទាំងពីរនេះដំបូងត្រូវបានរាយការណ៍ជាការស្នើ (ព្រោះមួយប៉ះស្ថិតិ មួយទៀតប៉ះ deploy) រួចអ្នកប្រើអនុញ្ញាត។
+
+**ទី ៦ — `item.count` ទល់នឹង `barcodes.length`។** ZoeAdmin បង្ហាញ `item.count` ចំណែក ZoeW
+បង្ហាញ `barcodes.length` ➜ ២ App អាចបង្ហាញលេខកញ្ចប់ **ខុសគ្នាសម្រាប់ការបញ្ជាទិញតែមួយ**។
+កែ ២ កន្លែង៖ (១) normalizer កំណត់ `item.count = item.barcodes.length` **តែពេល `barcodes` ជា
+array ពិត និងមិនទទេ** — ដូច្នេះ item legacy (គ្មាន `barcodes[]`) និង array ទទេ **រក្សា `count`
+ដដែល ហើយគណនាស្ថិតិមិនប្រែ**; (២) ZoeAdmin ប្រើ expression `totalPackageCount` ដដែលនឹង ZoeW។
+ហេតុផលថាវាសុវត្ថិភាព៖ **គ្រប់ផ្លូវសរសេរទាំងអស់** (`addOrUpdateEntry`, `removeSingleBarcode`,
+`claimAndCleanupItem` ×2, `executeRestoreItem`) គណនា `count` ចេញពី `barcodes.length` រួចហើយ —
+ដូច្នេះ record ណាដែលខុសគ្នា គឺខូចរួចជាស្រេច ហើយការ normalize ធ្វើឲ្យស្ថិតិ **ត្រូវ** វិញ។
+ចំណាំ៖ ការកែ barcodes ខាងលើ (ទី ១) អាច**បង្កើត**ភាពខុសគ្នានេះ ព្រោះការច្រោះ `null` ចេញ
+ធ្វើឲ្យ `barcodes.length` តូចជាង `count` ចាស់ — ដូច្នេះ ២ ការកែនេះទៅជាមួយគ្នា។
+
+**ទី ៧ — `google-sheets-api/Code.gs` fail-open។** `if (secret && key !== secret)` មានន័យថា
+បើ ScriptProperty `API_KEY` **មិនបានកំណត់** នោះការត្រួតពិនិត្យត្រូវបាន **រំលងទាំងស្រុង** ➜
+អ្នកណាដែលដឹង URL អាចទាញ **បញ្ជីអតិថិជនទាំងមូល** តាម `?list=1` (Web App ជា "Anyone")។
+README តម្រូវឲ្យកំណត់ `API_KEY` នៅ step 2.3 រួចហើយ ដូច្នេះនេះជារន្ធសម្រាប់អ្នកដែលភ្លេចជំហាននោះ។
+ឥឡូវ **fail closed**៖ គ្មាន `API_KEY` ➜ ឆ្លើយ `API_KEY script property is not set`។
+**មិនប៉ះការដំឡើងដែលមានស្រាប់ទេ** ព្រោះ `Code.gs` ជា *template* — អ្នកលក់ copy វាចូល Apps
+Script ខ្លួនឯង ដូច្នេះការកែ repo មិនប្តូរ script ដែល deploy រួច។ README ព្រមានឲ្យ copy ជំនាន់
+ថ្មីទៅជំនួស ហើយ deploy ម្តងទៀត។
+
+### ការបែកគ្នាដែលខ្ញុំបង្កើតឡើងខ្លួនឯង រួចកែវិញ
+`extract.js` ចាប់បាន `showLoginModalWithPrefill` ក្លាយជាបែកគ្នា (២៣ ➜ ២៤) ព្រោះខ្ញុំដាក់ការ
+reset ក្នុង **កន្លែងខុសគ្នា**៖ ZoeAdmin ក្នុង `clearSensitiveModalFields()` តែ ZoeW ក្នុង
+`showLoginModalWithPrefill()`។ ផ្លាស់ ZoeW ចូល `clearSensitiveModalFields()` ដែរ ➜ ត្រឡប់មក
+**២៣ divergent ដូចដើម** ហើយ identical ឡើងពី ១០១ ➜ **១០៣**។ **រត់ `extract.js` ក្រោយកែរាល់ដង។**
+
+### រកឃើញ តែ **មិនបានកែ** ដោយចេតនា
+- **ការ re-provision ឧបករណ៍ដែលមាន config រួច តែចាកចេញរួច តាម Setup Link មិនដើរស្វ័យប្រវត្តិទេ**
+  (ឥរិយាបថចាស់ មិនមែនការតំរែតំរង់ថ្មីទេ)៖ `applySetupLinkFromUrl()` បើក `pinModal` រួច auth
+  listener បាញ់ `null` ហើយ `showLoginModalWithPrefill()` បិទវាជំនួសដោយ `loginModal`។ ការកែ guard
+  `isPinFlowPending()` ខាងលើរក្សា Setup Link ទុកក្នុងករណីនោះ ដូច្នេះ **ការបើក Config បន្ទាប់
+  នឹងបំពេញវាឲ្យ** — គ្រាន់តែគ្មានផ្លូវបើកខ្លួនឯងក្រោយ login ទេ។
+  **✅ សម្រេចដោយអ្នកប្រើ (2026-08-20)៖ ទុកដដែល។** ត្រូវបានស្នើឲ្យបន្ថែមការបើកស្វ័យប្រវត្តិក្រោយ
+  login ហើយអ្នកប្រើឆ្លើយថា *"មិនអីទេទុកចឹងហើយសុវត្តិភាព"*។ ហេតុផល៖ ការធ្វើវាតម្រូវឲ្យប៉ះ
+  `verify*RoleThenProceed` ដែលជាផ្លូវ login — កន្លែងផុយបំផុតក្នុងគម្រោងនេះ (មូលហេតុ ៤ ជាប់គ្នា
+  ក្នុង PR #24/#25/#26)។ **ជុំក្រោយកុំលើកវាឡើងជាកំហុសទៀត** — វាជាការសម្រេចដោយចេតនា។
+- អ្វីៗដែលជុំមុនទទួលយកដោយចេតនា នៅដដែលទាំងអស់។
+
+### ចម្លើយចំពោះសំណួររបស់អ្នកប្រើ — "ជុំមុនមិនបានមើលគ្រប់ជ្រុងជ្រោយទេឬ?"
+ស្មោះត្រង់៖ **ជុំមុនៗពិតជាមិនបានគ្របគ្រប់ជ្រុងទេ តែមិនមែនព្រោះមើលរំលងកន្លែងដដែលទេ។** កំហុស ៥
+ក្នុងជុំនេះ គ្មានមួយណាស្ថិតក្នុងកូដដែលជុំមុនអានហើយវិនិច្ឆ័យខុសនោះទេ — វាស្ថិតក្នុង **ឆាកដែល
+មិនធ្លាប់មានឧបករណ៍ណាពិនិត្យ**៖ រូបរាងទិន្នន័យដែល Firebase ត្រឡប់មក (ទី ១), អថេរ state ពេលចាកចេញ
+(ទី ២), timer ដែលគ្មាន auth guard (ទី ៣), និង CSS (ទី ៥)។ ជុំនីមួយៗបានបន្ថែមឧបករណ៍ ហើយឧបករណ៍
+ទាំងនោះឥឡូវ **ស្អាតទាំងអស់** — នោះជាមូលហេតុដែលកំហុសដដែលមិនត្រឡប់មកវិញ។ របៀបធ្វើឲ្យវាចប់គឺ
+បន្តប្តូរ *ថ្នាក់* កំហុសនីមួយៗទៅជាការត្រួតពិនិត្យស្វ័យប្រវត្តិ ដូចជុំនេះធ្វើ ៤ — មិនមែនអានកូដ
+ដដែលឡើងវិញឲ្យខ្លាំងជាងមុនទេ។
+
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v45, zoew-v39, zoescan-v33, zoekeygen-v26)។
+**គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+Suite សរុប (រាប់ដោយ script មិនមែនដោយដៃ)៖ **438 assertion** + ឧបករណ៍មេកានិក ៦ — បៃតងទាំងអស់។
+`CACHE_VERSION` ចុងក្រោយ៖ zoeadmin-v47, zoew-v41, zoescan-v33, zoekeygen-v26។
+
+## ស្វែងរកលេខទូរស័ព្ទ៖ ការអូសឡើងលើបំបាត់ប្រអប់ស្វែងរក (fixed 2026-08-20, ជុំ ១១)
+
+អ្នកប្រើផ្ញើវីដេអូ៖ កំពុងស្វែងរកលេខទូរស័ព្ទ ហើយពេលអូសឡើងលើ ដុំស្នើលេខ **បាត់ទាំងស្រុង**
+ព្រោះប្រអប់ប្រវត្តិឡើងគ្របលើ keyboard។ លក្ខខណ្ឌច្បាស់លាស់របស់អ្នកប្រើ៖ **កុំប៉ះឥរិយាបថ
+"អូសឡើង ➜ ប្រអប់ប្រវត្តិទាញឡើង / អូសចុះ ➜ ប្រអប់ប្រវត្តិចុះវិញ"**។
+
+### មូលហេតុ
+`#searchPhoneInput` ស្ថិតនៅ **ក្នុង `.sidebar-section`**។ `setupSwipeGestures()` ដាក់
+`sidebar.classList.add('collapsed')` ពេលអូសឡើង ដែល CSS កំណត់ `max-height: 0; opacity: 0;
+overflow: hidden` — ដូច្នេះវាបិទ **ប្រអប់ស្វែងរកដែលអ្នកប្រើកំពុងវាយ** ជាមួយផង។ បន្ទាប់មក
+`positionPhoneSuggestBox()` អាន rect ដែលមានទំហំ 0 ➜ លាក់ដុំស្នើលេខ ➜ វាមិនត្រឡប់មកវិញទេ
+ព្រោះមានតែ `input`/`focus` ប៉ុណ្ណោះដែលបង្ហាញវាឡើងវិញ។
+
+### អ្វីដែលបានកែ (ZoeAdmin និង ZoeW — នៅតែ byte-identical)
+- `phoneSearchIsActive()` ថ្មីក្នុង `setupSwipeGestures()`៖ ពិត នៅពេលដុំស្នើលេខកំពុងបើក
+  **ឬ** `searchPhoneInput` កំពុង focus ហើយមានអក្សរក្នុងវា។
+- ការអូសឡើងលើ **រំលងការបិទ sidebar** តែពេលនោះប៉ុណ្ណោះ។ តារាងប្រវត្តិនៅតែ scroll បានធម្មតា
+  ដូច្នេះអ្នកប្រើនៅតែមើលលទ្ធផលបាន ដោយប្រអប់ស្វែងរកមិនបាត់។
+- ប៊ូតុងអូស (`dragHandle`) នៅតែបិទបានជានិច្ច (ជាចេតនាច្បាស់លាស់របស់អ្នកប្រើ) ហើយវា
+  `hidePhoneSuggestions()` ជាមុន ដូច្នេះគ្មានដុំអណ្តែតសល់។
+- `positionPhoneSuggestBox()` លាក់ដុំបើ rect ជា 0×0 (ការពារពេល sidebar បិទតាមផ្លូវផ្សេង)។
+
+### ភស្តុតាង — `audit-tools/phone-search-swipe-test.js` (18 assertion)
+ដក `setupSwipeGestures` ពិតចូល `vm` ជាមួយ DOM ក្លែងក្លាយដែលចាប់ handler ពិត។ លើ `origin/main`
+➜ **ធ្លាក់ ១០/១៨** — **តែ assertion ២ ដែលអ្នកប្រើសុំកុំឲ្យប៉ះ ("អូសឡើង ➜ ប្រវត្តិឡើង" និង
+"អូសចុះ ➜ ប្រវត្តិចុះ") ជោគជ័យទាំងមុន និងក្រោយ** — ភស្តុតាងផ្ទាល់ថាឥរិយាបថដើមមិនប្រែ។
+
+`CACHE_VERSION` bump (zoeadmin-v46, zoew-v40)។ **គ្មានការប្តូរ rules ➜ គ្មាន publish ថ្មី។**
+Zoescan/ZoeKeyGen មិនប៉ះ (គ្មាន sidebar ស្វែងរកលេខបែបនេះ)។

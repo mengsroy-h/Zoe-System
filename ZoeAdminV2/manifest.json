@@ -1,0 +1,28 @@
+{
+  "name": "ZoeAdmin V2 — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់",
+  "short_name": "ZoeAdmin V2",
+  "description": "ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (Admin) ជំនាន់ទី ២ — ស្កេន, ចំណូល COD/DOD, ស្ថិតិ",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F4F6FC",
+  "theme_color": "#4338CA",
+  "lang": "km",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeAdmin', 'ZoeAdminV2', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
 
 let issues = 0;
 function bad(app, kind, detail) { console.log('  ⚠ [' + app + '] ' + kind + ': ' + detail); issues++; }

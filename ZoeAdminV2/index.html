@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ZoeAdmin V2 — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់</title>
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4338CA">
+    <meta name="apple-mobile-web-app-title" content="ZoeAdmin V2">
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+    <link rel="apple-touch-icon" href="./icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="dns-prefetch" href="https://unpkg.com">
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js" crossorigin>
+
+    <script defer src="https://unpkg.com/@zxing/library@0.23.0/umd/index.min.js" integrity="sha384-vJKMoQaBpNZQ3D4qLTGjqot0uwDc/Al5PArqE5wIw2Y/j0YnCJPD9Xt1FUnjNprh" crossorigin="anonymous"></script>
+    <script type="module" src="./firebase-loader.js"></script>
+    <script src="./license-verify.js"></script>
+    <script src="./error-reporting.js"></script>
+
+    <script>
+        (function () {
+            try {
+                var pref = localStorage.getItem('zoeadminv2_theme') || 'auto';
+                var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme-pref', pref);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.documentElement.setAttribute('data-theme-pref', 'auto');
+            }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<datalist id="recentPhonesList"></datalist>
+
+<header class="topbar">
+    <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+            <defs>
+                <linearGradient id="bmTile" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#4338CA"/>
+                    <stop offset="0.5" stop-color="#7C3AED"/>
+                    <stop offset="1" stop-color="#06B6D4"/>
+                </linearGradient>
+                <linearGradient id="bmBeam" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="#7DF9FF" stop-opacity="0"/>
+                    <stop offset="0.2" stop-color="#7DF9FF" stop-opacity="0.95"/>
+                    <stop offset="0.8" stop-color="#A5F3FC" stop-opacity="0.95"/>
+                    <stop offset="1" stop-color="#A5F3FC" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <rect width="512" height="512" rx="116" fill="url(#bmTile)"/>
+            <path d="M148,148 L364,148 L364,198 L232,314 L364,314 L364,364 L148,364 L148,314 L280,198 L148,198 Z" fill="#FFFFFF"/>
+            <rect x="104" y="252" width="304" height="8" rx="4" fill="url(#bmBeam)"/>
+        </svg>
+        <div class="brand-text">
+            <div class="brand-line">
+                <h1>ZoeAdmin</h1>
+                <span class="brand-chip">V2</span>
+            </div>
+            <div class="conn-pill" id="connPill">
+                <span class="status-dot offline" id="statusDot"></span>
+                <span id="firebaseStatusText">ក្រៅបណ្ដាញ</span>
+            </div>
+        </div>
+    </div>
+    <div class="topbar-actions">
+        <button type="button" class="icon-btn" id="themeToggleBtn" onclick="cycleTheme()" title="ប្តូរផ្ទាំងពណ៌" aria-label="ប្តូរផ្ទាំងពណ៌">🌗</button>
+        <button type="button" class="auth-btn" id="navAuthBtn" onclick="showLoginModalWithPrefill()">🔑 ចូល</button>
+    </div>
+</header>
+
+<div class="app-container" id="appContainer">
+
+    <div class="sidebar-section" id="sidebarSection">
+
+        <section class="tab-panel" id="panelScan" data-tab="scan">
+            <div class="app-card scanner-section">
+                <div class="card-head">
+                    <span class="card-title">📷 ស្កេនកាមេរ៉ា</span>
+                </div>
+                <div id="permission-box">
+                    <p>🔒 កម្មវិធីទាមទារការអនុញ្ញាតប្រើប្រាស់កាមេរ៉ា</p>
+                    <button type="button" onclick="requestCameraPermission()">🔓 បើកកាមេរ៉ា</button>
+                </div>
+                <div id="video-container">
+                    <div class="scan-frame"></div>
+                    <div class="scan-line"></div>
+                    <video id="video" playsinline autoplay muted></video>
+                    <button type="button" class="camera-close-btn" id="cameraCloseBtn" onclick="closeCameraManually()" title="បិទកាមេរ៉ា">✖</button>
+                    <div class="video-controls-overlay" id="videoControlsOverlay">
+                        <div class="zoom-slider-wrap" id="zoomSliderWrap">
+                            <span>🔍</span>
+                            <input type="range" id="zoomSlider" min="1" max="1" step="0.1" value="1">
+                        </div>
+                        <button type="button" class="torch-toggle-btn" id="torchToggleBtn" onclick="toggleTorch()">💡</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="app-card" id="hardwareScannerBox">
+                <div class="card-head">
+                    <span class="card-title">⚡ ស្កេនដោយម៉ាស៊ីន / វាយដោយដៃ</span>
+                </div>
+                <label class="field-label" for="hwScannerInput">Bluetooth / USB Scanner ឬវាយបញ្ចូល Barcode ផ្ទាល់</label>
+                <div class="scanner-input-wrapper">
+                    <span class="icon">⚡</span>
+                    <input type="text" id="hwScannerInput" placeholder="ស្កេន Barcode..." autocomplete="off">
+                    <button type="button" class="btn-submit-barcode" onclick="submitManualBarcode()">បញ្ជូន</button>
+                </div>
+                <div class="upload-row">
+                    <label class="file-upload-btn" for="fileInput">🖼️ ស្កេនពីរូបថត</label>
+                    <input type="file" id="fileInput" accept="image/*" onchange="decodeImageFile(event)">
+                </div>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="panelMoney" data-tab="money">
+            <div class="app-card">
+                <div class="card-head">
+                    <span class="card-title">📦 សង្ខេប (<span id="selectedFilterTitle">ថ្ងៃនេះ</span>)</span>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card accent-brand">
+                        <span class="label">កញ្ចប់នៅសល់</span>
+                        <span class="value" id="grandTotalCount">0</span>
+                    </div>
+                    <div class="stat-card accent-cyan">
+                        <span class="label">ស្កេនតាមថ្ងៃ</span>
+                        <span class="value" id="todayTotalCount">0</span>
+                    </div>
+                    <div class="stat-card accent-green">
+                        <span class="label">អតិថិជនយក</span>
+                        <span class="value" id="todayClosedCount">0</span>
+                        <span class="sub-value">📦 <span id="todayPackagesPickedUpCount">0</span> កញ្ចប់</span>
+                    </div>
+                </div>
+
+                <div class="money-board">
+                    <div class="money-row cod">
+                        <span class="money-tag">COD</span>
+                        <div class="money-values">
+                            <span class="money-usd" id="summaryCodDollar">$0.00</span>
+                            <span class="money-khr" id="summaryCodRiel">0 ៛</span>
+                        </div>
+                    </div>
+                    <div class="money-row dod">
+                        <span class="money-tag">DOD</span>
+                        <div class="money-values">
+                            <span class="money-usd" id="summaryDodDollar">$0.00</span>
+                            <span class="money-khr" id="summaryDodRiel">0 ៛</span>
+                        </div>
+                    </div>
+                    <div class="money-row grand">
+                        <span class="money-tag">សរុប</span>
+                        <div class="money-values">
+                            <span class="money-usd" id="summaryTotalDollar">$0.00</span>
+                            <span class="money-khr" id="summaryTotalRiel">0 ៛</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="app-card">
+                <div class="card-head">
+                    <span class="card-title">📈 របាយការណ៍</span>
+                </div>
+                <div class="action-tiles">
+                    <button type="button" class="action-tile" onclick="openDailyStatsModal()">
+                        <span class="tile-ico">📅</span><span class="tile-label">កញ្ចប់ប្រចាំថ្ងៃ</span>
+                    </button>
+                    <button type="button" class="action-tile" onclick="openMonthlyStatsModal()">
+                        <span class="tile-ico">📊</span><span class="tile-label">ស្ថិតិចំណូល</span>
+                    </button>
+                    <button type="button" class="action-tile" onclick="openManualAdjustModal()">
+                        <span class="tile-ico">✏️</span><span class="tile-label">កែទឹកប្រាក់</span>
+                    </button>
+                    <button type="button" class="action-tile" onclick="openExchangeRateModal()">
+                        <span class="tile-ico">💱</span><span class="tile-label">អត្រាប្រាក់</span>
+                    </button>
+                    <button type="button" class="action-tile" onclick="openExportDataModal()">
+                        <span class="tile-ico">📤</span><span class="tile-label">Export</span>
+                    </button>
+                    <button type="button" class="action-tile" onclick="openRecentlyDeletedModal()">
+                        <span class="tile-ico">🗑️</span><span class="tile-label">ធុងសំរាម</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="tab-panel" id="panelMore" data-tab="more">
+            <div class="app-card">
+                <div class="card-head">
+                    <span class="card-title">🔗 ទិន្នន័យ & ការតភ្ជាប់</span>
+                </div>
+                <div class="menu-list">
+                    <button type="button" class="menu-row" onclick="openCustomerDataTableModal()">
+                        <span class="mr-ico">📊</span>
+                        <span class="mr-text"><strong>តារាងអតិថិជន</strong><small>ទាញពី Google Sheet — អានតែប៉ុណ្ណោះ</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                    <button type="button" class="menu-row" onclick="requestPinBeforeConfig(openLookupApiConfigModal)">
+                        <span class="mr-ico">🔌</span>
+                        <span class="mr-text"><strong>API ស្វែងរកអតិថិជន</strong><small>បំពេញលេខ/COD/DOD ស្វ័យប្រវត្តិពេលស្កេន</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                    <button type="button" class="menu-row" onclick="requestPinBeforeConfig()">
+                        <span class="mr-ico">⚙️</span>
+                        <span class="mr-text"><strong>Config / Reconfig Firebase</strong><small>ការពារដោយ Security PIN</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                    <button type="button" class="menu-row" onclick="rebuildScannerLookupData()">
+                        <span class="mr-ico">🔄</span>
+                        <span class="mr-text"><strong>កំណត់ Scanner Lookup ឡើងវិញ</strong><small>ជួសជុលពេល Zoescan រកកញ្ចប់មិនឃើញ</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="app-card">
+                <div class="card-head">
+                    <span class="card-title">🎨 រូបរាងកម្មវិធី</span>
+                </div>
+                <div class="theme-picker" id="themePicker">
+                    <button type="button" class="theme-opt" data-theme-opt="auto" onclick="setTheme('auto')">🌗 ស្វ័យប្រវត្តិ</button>
+                    <button type="button" class="theme-opt" data-theme-opt="light" onclick="setTheme('light')">☀️ ភ្លឺ</button>
+                    <button type="button" class="theme-opt" data-theme-opt="dark" onclick="setTheme('dark')">🌙 ងងឹត</button>
+                </div>
+            </div>
+
+            <div class="app-card">
+                <div class="card-head">
+                    <span class="card-title">⚠️ តំបន់គ្រោះថ្នាក់</span>
+                </div>
+                <div class="menu-list">
+                    <button type="button" class="menu-row danger" onclick="clearHistory()">
+                        <span class="mr-ico">❌</span>
+                        <span class="mr-text"><strong>លុបប្រវត្តិទាំងអស់</strong><small>ផ្លាស់ទៅធុងសំរាមមុន — អាចស្តារវិញបាន</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                    <button type="button" class="menu-row" onclick="logoutApp()">
+                        <span class="mr-ico">🚪</span>
+                        <span class="mr-text"><strong>ចាកចេញពីប្រព័ន្ធ</strong><small>សម្អាតទិន្នន័យចេញពីឧបករណ៍នេះ</small></span>
+                        <span class="mr-arrow">›</span>
+                    </button>
+                </div>
+                <p class="build-note">ZoeAdmin <strong>V2</strong> · Powered by ZoeW</p>
+            </div>
+        </section>
+    </div>
+
+    <div class="main-section" id="mainSection">
+        <section class="tab-panel active" id="panelOrders" data-tab="orders">
+            <div class="app-card history-section">
+                <div class="orders-head">
+                    <div class="orders-title">
+                        <span class="card-title">📋 ប្រវត្តិ</span>
+                        <span class="count-pill"><span id="count">0</span> នាក់</span>
+                    </div>
+                    <button type="button" class="header-more-btn" onclick="toggleHeaderMoreDropdown(event)" title="បន្ថែម" aria-label="បន្ថែម">⋯</button>
+                </div>
+
+                <div class="search-box">
+                    <span class="search-ico">🔍</span>
+                    <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" autocomplete="off">
+                    <button type="button" class="search-clear" onclick="clearPhoneSearch()" title="សម្អាត" aria-label="សម្អាត">✕</button>
+                </div>
+
+                <div class="chip-row" id="dateChipRow">
+                    <button type="button" class="date-filter-btn active" id="btnFilterToday" onclick="filterDataByDate('today')">ថ្ងៃនេះ</button>
+                    <button type="button" class="date-filter-btn" id="btnFilterYesterday" onclick="filterDataByDate('yesterday')">ម្សិលមិញ</button>
+                    <button type="button" class="date-filter-btn" id="btnFilterDayBefore" onclick="filterDataByDate('dayBefore')">ម្សិលម្ងៃ</button>
+                    <button type="button" class="date-filter-btn" id="btnFilterAll" onclick="filterDataByDate('all')">ទាំងអស់</button>
+                    <label class="date-pick" title="រើសថ្ងៃផ្សេង">
+                        <span>📅</span>
+                        <input type="date" id="customDateInput" onchange="filterDataByCustomDate()">
+                    </label>
+                </div>
+
+                <div class="refine-row">
+                    <div class="chip-row status-chips" id="statusChipRow">
+                        <button type="button" class="status-chip active" data-status="all" onclick="setStatusFilter('all')">ទាំងអស់</button>
+                        <button type="button" class="status-chip" data-status="open" onclick="setStatusFilter('open')">នៅសល់</button>
+                        <button type="button" class="status-chip" data-status="closed" onclick="setStatusFilter('closed')">យកហើយ</button>
+                        <button type="button" class="status-chip" data-status="uncalled" onclick="setStatusFilter('uncalled')">មិនទាន់ខល</button>
+                        <button type="button" class="status-chip" data-status="recall" onclick="setStatusFilter('recall')">ត្រូវខលឡើងវិញ</button>
+                    </div>
+                    <select id="sortSelect" class="sort-select" onchange="setSortMode(this.value)" aria-label="តម្រៀប">
+                        <option value="newest">🕒 ថ្មីបំផុត</option>
+                        <option value="oldest">🕘 ចាស់បំផុត</option>
+                        <option value="packages">📦 កញ្ចប់ច្រើន</option>
+                        <option value="value">💵 ទឹកប្រាក់ច្រើន</option>
+                    </select>
+                </div>
+
+                <div class="call-mark-legend">
+                    <span class="row-num-no-answer">🔕 ខល អត់លើក</span>
+                    <span class="row-num-no-connect">📵 ខល អត់ចូល</span>
+                    <span class="row-num-wrong-number">❗ ខុសលេខ</span>
+                </div>
+
+                <div class="table-responsive" id="tableResponsive">
+                    <div class="order-list" id="historyTableBody"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<nav class="tabbar" id="tabBar">
+    <button type="button" class="tab-btn" data-tab-target="scan" onclick="switchTab('scan')">
+        <span class="tab-ico">📷</span><span class="tab-label">ស្កេន</span>
+    </button>
+    <button type="button" class="tab-btn active" data-tab-target="orders" onclick="switchTab('orders')">
+        <span class="tab-ico">📋<span class="tab-badge" id="ordersOpenBadge"></span></span><span class="tab-label">ប្រវត្តិ</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab-target="money" onclick="switchTab('money')">
+        <span class="tab-ico">💰</span><span class="tab-label">ចំណូល</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab-target="more" onclick="switchTab('more')">
+        <span class="tab-ico">⚙️</span><span class="tab-label">ផ្សេងៗ</span>
+    </button>
+</nav>
+
+<div id="pinModal" class="modal" data-close="cancelPinEntryFlow">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3>🔒 បញ្ចូល Security PIN</h3>
+        <p>សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
+        <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="pinConfirmBtn" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
+                <button class="btn-cancel" onclick="cancelPinEntryFlow()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pinSetupModal" class="modal" data-close="cancelPinSetupFlow">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
+        <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
+        <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="pinSetupSaveBtn" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
+                <button class="btn-cancel" onclick="cancelPinSetupFlow()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="configModal" class="modal">
+    <div class="modal-content" style="max-width: 380px;">
+        <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
+        <p>សូមបិទភ្ជាប់ JSON ឬ JavaScript Object config របស់ Firebase នៅទីនេះ៖</p>
+        <div class="modal-btns" style="margin-bottom:10px;">
+            <button type="button" class="btn-skip" onclick="openConfigQrScanner()">📷 ស្កេន QR (Setup Link)</button>
+        </div>
+        <textarea id="firebaseConfigInput" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "databaseURL": "...",
+  "projectId": "..."
+}'></textarea>
+        <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
+        <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="configSaveBtn" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
+                <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="configQrScanModal" class="modal" data-close="closeConfigQrScanner">
+    <div class="modal-content" style="max-width: 360px;">
+        <h3>📷 ស្កេន QR (Setup Link)</h3>
+        <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
+        <video id="configQrVideo" class="qr-video" playsinline muted autoplay></video>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeConfigQrScanner()">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="lookupApiConfigModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <h3>🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ</h3>
+        <p style="text-align:left;">ភ្ជាប់ទៅប្រព័ន្ធផ្ទាល់ខ្លួនរបស់អ្នក (Google Sheet/Apps Script, ប្រព័ន្ធក្រុមហ៊ុន...) ដើម្បីស្កេន Barcode រួចទាញយក លេខទូរស័ព្ទ/COD/DOD ដោយស្វ័យប្រវត្តិ។</p>
+
+        <label class="remember-container">
+            <input type="checkbox" id="lookupApiEnabledCheckbox">
+            <span>បើកការទាញយកទិន្នន័យស្វ័យប្រវត្តិពេលស្កេន</span>
+        </label>
+
+        <label class="remember-container">
+            <input type="checkbox" id="lookupApiAutoSubmitCheckbox">
+            <span>រក្សាទុកភ្លាមៗពេលរកឃើញលេខទូរស័ព្ទ (មិនចាំចុច "យល់ព្រម")</span>
+        </label>
+
+        <label class="field-label" for="lookupApiUrlInput">URL API (ដាក់ {barcode} ជំនួសកន្លែងលេខបាកូដ):</label>
+        <input type="text" id="lookupApiUrlInput" placeholder="https://your-api.com/lookup?code={barcode}">
+
+        <label class="field-label" for="lookupApiHeaderNameInput">ឈ្មោះ Header (ជម្រើស, ឧ. X-API-Key):</label>
+        <input type="text" id="lookupApiHeaderNameInput" placeholder="ឧ. X-API-Key ឬ Authorization">
+
+        <label class="field-label" for="lookupApiHeaderValueInput">តម្លៃ Header / API Key / Secret (ជម្រើស — ទុកទទេដើម្បីរក្សាតម្លៃចាស់):</label>
+        <input type="password" autocomplete="off" id="lookupApiHeaderValueInput" placeholder="ឧ. Bearer xxxxx ឬ Secret Key">
+
+        <label class="field-label" for="lookupApiPhoneFieldInput">ឈ្មោះ Field លេខទូរស័ព្ទក្នុង JSON:</label>
+        <input type="text" id="lookupApiPhoneFieldInput" placeholder="ឧ. phone ឬ data.phone">
+
+        <label class="field-label" for="lookupApiCodFieldInput">ឈ្មោះ Field COD ក្នុង JSON:</label>
+        <input type="text" id="lookupApiCodFieldInput" placeholder="ឧ. cod ឬ data.cod">
+
+        <label class="field-label" for="lookupApiDodFieldInput">ឈ្មោះ Field DOD ក្នុង JSON:</label>
+        <input type="text" id="lookupApiDodFieldInput" placeholder="ឧ. dod ឬ data.dod">
+
+        <div class="modal-btns" style="margin-top: 6px;">
+            <div class="modal-btns-row">
+                <button class="btn-skip" onclick="testLookupApiConfig(this)">🧪 សាកល្បង</button>
+                <button class="btn-confirm" onclick="saveLookupApiConfig()">រក្សាទុក</button>
+            </div>
+            <button class="btn-cancel" onclick="closeModal('lookupApiConfigModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="exchangeRateModal" class="modal">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3>💱 កំណត់អត្រាប្តូរប្រាក់ (1$ = ? ៛)</h3>
+        <p>បញ្ចូលអត្រាប្តូរប្រាក់រៀលសម្រាប់ 1 ដុល្លារ (USD)</p>
+        <input type="number" id="exchangeRateInput" placeholder="ឧ. 4100" min="1" step="1">
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" onclick="saveExchangeRate()">រក្សាទុក</button>
+                <button class="btn-cancel" onclick="closeModal('exchangeRateModal')">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loginModal" class="modal" style="display: none;" data-nodismiss="true">
+    <div class="modal-content login-card">
+        <svg class="login-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+            <rect width="512" height="512" rx="116" fill="url(#bmTile)"/>
+            <path d="M148,148 L364,148 L364,198 L232,314 L364,314 L364,364 L148,364 L148,314 L280,198 L148,198 Z" fill="#FFFFFF"/>
+            <rect x="104" y="252" width="304" height="8" rx="4" fill="url(#bmBeam)"/>
+        </svg>
+        <h3>ចូលប្រើប្រាស់ប្រព័ន្ធ</h3>
+        <p>សូមបញ្ចូល អ៊ីមែល/User ID និង ពាក្យសម្ងាត់</p>
+        <form onsubmit="event.preventDefault(); loginWithFirebase();">
+            <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល ឬ User ID" required autocomplete="username">
+            <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
+            <label class="remember-container">
+                <input type="checkbox" id="rememberMeCheckbox" checked>
+                <span>ចងចាំគណនី និងចូលប្រព័ន្ធស្វ័យប្រវត្តិរយៈពេល ៤ ម៉ោង</span>
+            </label>
+            <div class="modal-btns">
+                <button type="submit" class="btn-confirm" id="loginBtn">ចូលប្រព័ន្ធ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="manualAdjustModal" class="modal">
+    <div class="modal-content" style="max-width: 350px;">
+        <h3>⚙️ កែប្រែ COD, DOD & កញ្ចប់ដោយដៃ</h3>
+        <p>ជ្រើសរើសកាលបរិច្ឆេទ (YYYY-MM-DD) និងចំនួនដែលចង់កែប្រែ</p>
+
+        <label class="field-label" for="manualDateInput">កាលបរិច្ឆេទ (YYYY-MM-DD):</label>
+        <input type="text" id="manualDateInput" placeholder="ឧ. 2026-06-05">
+
+        <label class="field-label" for="manualCodChangeInput">ទឹកប្រាក់ COD ($) [+ បន្ថែម, - ដកចេញ]:</label>
+        <input type="number" id="manualCodChangeInput" placeholder="ឧ. -5.00 ឬ 10.00" step="0.01">
+
+        <label class="field-label" for="manualDodChangeInput">ទឹកប្រាក់ DOD ($) [+ បន្ថែម, - ដកចេញ]:</label>
+        <input type="number" id="manualDodChangeInput" placeholder="ឧ. -2.00 ឬ 5.00" step="0.01">
+
+        <label class="field-label" for="manualCountChangeInput">ចំនួនកញ្ចប់ [+ បន្ថែម, - ដកចេញ]:</label>
+        <input type="number" id="manualCountChangeInput" placeholder="ឧ. -2 ឬ 1" step="1">
+
+        <div class="modal-btns" style="margin-top: 6px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="manualAdjustSubmitBtn" onclick="submitManualAdjustment()">បញ្ជាក់ការកែប្រែ</button>
+                <button class="btn-cancel" onclick="closeModal('manualAdjustModal')">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="phoneModal" class="modal" data-nodismiss="true">
+    <div class="modal-content">
+        <button type="button" class="modal-close-x" id="phoneModalCloseX" onclick="dismissPhoneModal()" title="បិទ" aria-label="បិទ">✖</button>
+        <h3>🎉 ស្កេនបានជោគជ័យ!</h3>
+        <p>Barcode: <strong id="modalBarcodeText" class="mono-strong"></strong></p>
+        <input type="tel" id="modalPhoneInput" placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList">
+        <input type="text" id="modalLockerInput" placeholder="ទីតាំង Locker (ឧ. A1)">
+        <div class="dual-field">
+            <input type="number" id="modalCodInput" placeholder="COD ($)" step="0.01" min="0">
+            <input type="number" id="modalDodInput" placeholder="DOD ($)" step="0.01" min="0">
+        </div>
+        <div class="modal-btns" style="margin-top: 6px;">
+            <div class="modal-btns-row">
+                <button class="btn-skip" id="phoneModalSkipBtn" onclick="confirmPhone(true)">រំលង</button>
+                <button class="btn-confirm" id="phoneModalConfirmBtn" onclick="confirmPhone(false)">យល់ព្រម</button>
+            </div>
+            <button class="btn-cancel" id="phoneModalCancelBtn" onclick="closeModal('phoneModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="editPhoneModal" class="modal">
+    <div class="modal-content">
+        <h3>✏️ កែប្រែព័ត៌មានអតិថិជន</h3>
+        <p>Barcode: <strong id="editModalBarcodeText" class="mono-strong"></strong></p>
+        <input type="tel" id="editPhoneInput" placeholder="លេខទូរស័ព្ទថ្មី" list="recentPhonesList">
+        <div class="modal-btns" style="margin-top: 6px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="editPhoneSaveBtn" onclick="saveEditedPhone()">រក្សាទុក</button>
+                <button class="btn-cancel" onclick="closeModal('editPhoneModal')">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="callMarkModal" class="modal">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3>📞 សម្គាល់ការខល</h3>
+        <p>លេខទូរស័ព្ទ៖ <strong id="callMarkPhoneText" class="accent-text"></strong></p>
+        <div class="modal-btns" style="margin-top: 6px;">
+            <button class="call-mark-opt call-mark-no-answer" onclick="setCallMark('no-answer')">🔕 ខល អត់លើក</button>
+            <button class="call-mark-opt call-mark-no-connect" onclick="setCallMark('no-connect')">📵 ខល អត់ចូល</button>
+            <button class="call-mark-opt call-mark-wrong-number" onclick="setCallMark('wrong-number')">❗ ខុសលេខ</button>
+            <button class="btn-cancel" onclick="setCallMark(null)">🔄 សម្អាតសម្គាល់</button>
+            <button class="btn-cancel" onclick="closeModal('callMarkModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="editBarcodePriceModal" class="modal" style="z-index: 1050;" data-close="closeEditBarcodeModal">
+    <div class="modal-content">
+        <h3>💵 កែទឹកប្រាក់តាមកញ្ចប់ (COD & DOD)</h3>
+        <p>Barcode: <strong id="editBcPcText" class="accent-text mono-strong"></strong></p>
+        <div class="dual-field">
+            <input type="number" id="editBcCodInput" placeholder="COD ថ្មី ($)" step="0.01" min="0">
+            <input type="number" id="editBcDodInput" placeholder="DOD ថ្មី ($)" step="0.01" min="0">
+        </div>
+        <div class="modal-btns" style="margin-top: 6px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" onclick="saveEditedBarcodePrice()">រក្សាទុក</button>
+                <button class="btn-cancel" onclick="closeEditBarcodeModal()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="viewListModal" class="modal">
+    <div class="modal-content" style="max-width: 460px;">
+        <h3>📦 បញ្ជីអីវ៉ាន់ទាំងអស់</h3>
+        <p>លេខទូរស័ព្ទ៖ <strong id="listModalPhoneText" class="accent-text"></strong></p>
+        <div class="scroll-pane" id="barcodeListContainer"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal('viewListModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="dailyStatsModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <h3>📅 កញ្ចប់ & ចំណូល (COD/DOD) ប្រចាំថ្ងៃ</h3>
+        <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
+        <div class="scroll-pane" id="dailyStatsContainer"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal('dailyStatsModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="monthlyStatsModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <h3>📊 ស្ថិតិចំណូល COD & DOD ៣ ខែចុងក្រោយ</h3>
+        <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
+        <div class="scroll-pane" id="monthlyStatsContainer"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal('monthlyStatsModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="customerDataTableModal" class="modal">
+    <div class="modal-content wide-modal">
+        <h3>📊 តារាងអតិថិជន</h3>
+        <p>ទាញពី Google Sheet — Read-only, ស្វែងរកលឿនក្នុងឧបករណ៍ដោយផ្ទាល់</p>
+        <div class="inline-search-row">
+            <input type="text" id="customerDataTableSearchInput" oninput="filterCustomerDataTable()" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." autocomplete="off">
+            <button type="button" class="btn-cancel refresh-btn" onclick="fetchCustomerDataTableRows(true)">🔄</button>
+        </div>
+        <p id="customerDataTableStatus" class="status-line"></p>
+        <div class="table-responsive grow-pane">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:32%;">Barcode</th>
+                        <th style="width:22%;">DOD ($)</th>
+                        <th style="width:22%;">COD ($)</th>
+                        <th style="width:24%;">Phone</th>
+                    </tr>
+                </thead>
+                <tbody id="customerDataTableBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-btns" style="margin-top:8px;">
+            <button class="btn-cancel" onclick="closeModal('customerDataTableModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="recentlyDeletedModal" class="modal">
+    <div class="modal-content" style="max-width: 420px;">
+        <h3>🗑️ ទិន្នន័យលុបបណ្តោះអាសន្ន</h3>
+        <p>លុបអចិន្ត្រៃយ៍បន្ទាប់ពី ១០ ថ្ងៃ</p>
+        <div class="table-responsive scroll-pane">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ទូរស័ព្ទ</th>
+                        <th>Barcode</th>
+                        <th style="text-align: center;">សកម្មភាព</th>
+                    </tr>
+                </thead>
+                <tbody id="deletedTableBody"></tbody>
+            </table>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="closeModal('recentlyDeletedModal')">បិទ</button>
+        </div>
+    </div>
+</div>
+
+<div id="restoreWarningModal" class="modal" style="z-index: 1060;" data-close="cancelRestoreItem">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3 class="warn-title">⚠️ បញ្ជាក់ការស្តារទិន្នន័យ</h3>
+        <p>តើអ្នកពិតជាចង់ស្តារទិន្នន័យកញ្ចប់អីវ៉ាន់នេះពីធុងសំរាមមែនទេ?</p>
+        <div class="modal-btns" style="margin-top: 10px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="restoreConfirmBtn" onclick="executeRestoreItem()">យល់ព្រមស្តារ</button>
+                <button class="btn-cancel" onclick="cancelRestoreItem()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="permanentDeleteWarningModal" class="modal" style="z-index: 1060;" data-close="cancelPermanentDelete">
+    <div class="modal-content" style="max-width: 320px;">
+        <h3 class="danger-title">🗑️ លុបជាអចិន្ត្រៃយ៍</h3>
+        <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
+        <div class="modal-btns" style="margin-top: 10px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm btn-danger" id="permanentDeleteConfirmBtn" onclick="executePermanentDelete()">លុបជាអចិន្ត្រៃយ៍</button>
+                <button class="btn-cancel" onclick="cancelPermanentDelete()">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="exportDataModal" class="modal">
+    <div class="modal-content" style="max-width: 340px;">
+        <h3>📤 Export ទិន្នន័យ</h3>
+        <p>Export ទិន្នន័យប្រវត្តិដែលកំពុងបង្ហាញ (តាមតម្រង «<span id="exportFilterLabel">ថ្ងៃនេះ</span>») ចេញជាឯកសារ</p>
+        <div class="modal-btns export-list">
+            <button class="btn-confirm export-xlsx" onclick="exportDataAsExcel()">📗 Excel (.xlsx)</button>
+            <button class="btn-confirm export-pdf" onclick="exportDataAsPDF()">📕 PDF (.pdf)</button>
+            <button class="btn-confirm export-csv" onclick="exportDataAsCsvForSheets()">📊 Google Sheet (.csv)</button>
+            <button class="btn-cancel" onclick="closeModal('exportDataModal')">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div class="phone-suggest" id="phoneSuggestBox"></div>
+<div id="globalMoreMenu" class="more-menu">
+    <div id="menuContentContainer"></div>
+</div>
+
+<div id="activationModal" class="modal" style="display: none;" data-nodismiss="true">
+    <div class="modal-content" style="max-width: 380px;">
+        <h3>🔑 ត្រូវការ Activation Key</h3>
+        <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ ZoeAdmin ដើម្បីបន្ត។</p>
+        <textarea id="activationKeyInput" class="key-input" placeholder="ZOEKEY-..."></textarea>
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="activationSubmitBtn" onclick="submitActivationKey()">ដាក់ Active</button>
+                <button class="btn-cancel" id="activationLogoutBtn" onclick="logoutApp()">ចាកចេញ</button>
+            </div>
+        </div>
+        <p class="foot-note">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer">@mengsroyhun</a> តាម Telegram</p>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div id="pdfExportPrintArea" class="print-only"></div>
+
+<script src="./app.js"></script>
+
+</body>
+</html>

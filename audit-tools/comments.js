@@ -1,8 +1,8 @@
 const fs = require('fs');
 let acorn;
 try { acorn = require('acorn'); } catch (e) { acorn = null; }
-const files = ['ZoeAdmin/app.js','ZoeW/app.js','Zoescan/app.js','ZoeKeyGen/app.js',
-               'ZoeAdmin/license-verify.js','ZoeW/license-verify.js','Zoescan/license-verify.js','ZoeKeyGen/license-verify.js'];
+const files = ['ZoeAdmin/app.js','ZoeAdminV2/app.js','ZoeW/app.js','Zoescan/app.js','ZoeKeyGen/app.js',
+               'ZoeAdmin/license-verify.js','ZoeAdminV2/license-verify.js','ZoeW/license-verify.js','Zoescan/license-verify.js','ZoeKeyGen/license-verify.js'];
 if (!acorn) { console.log('acorn not available — falling back to regex scan'); }
 for (const f of files) {
   const src = fs.readFileSync(f, 'utf8');

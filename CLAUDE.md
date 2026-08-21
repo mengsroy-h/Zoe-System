@@ -41,6 +41,10 @@
 > ៦. **កុំសរសេរការអះអាងអំពី git/branch/merge ដោយមិនផ្ទៀងផ្ទាត់** — ប្រើ
 >    `git rev-list --count origin/main..origin/<branch>`។ រឿងនេះខុស ២ ដងក្នុង ២ ជុំជាប់គ្នា
 >    ព្រោះចម្លងបន្ទាត់ចាស់មកដាក់។ **ឯកសារនេះមិនមែនជាភស្តុតាងទេ — git ទើបជាភស្តុតាង។**
+> ៧. **កំណែ App (`APP_VERSION`) ត្រូវដូចគ្នាទាំង ៤ និងត្រូវនឹង `manifest.json`។** វា **មិនមែន**
+>    ជា `CACHE_VERSION` ទេ — `CACHE_VERSION` ជាកូនសោ Cache (`<app>-vN`) ដែល bump រាល់ការប្តូរ
+>    ឯកសារ ចំណែក `APP_VERSION` ជាកំណែផលិតផលតាម semver ដែលបង្ហាញ **តែក្នុងប្រអប់ login**។
+>    ក្រោយកែកំណែ រត់ `node audit-tools/version-check.js`។ លម្អិតនៅ section ចុងក្រោយនៃឯកសារនេះ។
 >
 > ### អ្វីដែលទទួលយកដោយចេតនា — កុំរាយការណ៍ជាកំហុសថ្មី
 > - **worker អាចសរសេរតួលេខ revenue/pickup ដោយផ្ទាល់** — គ្មាន rule ណាអាចផ្ទៀងផ្ទាត់ប្រវត្តិ
@@ -3461,3 +3465,104 @@ listener របស់យើងមិនទាន់ដល់ ➜ App បូក *
 
 `CACHE_VERSION` bump ZoeAdmin និង ZoeW (zoeadmin-v57, zoew-v47) — Zoescan/ZoeKeyGen មិនប្រែ។
 **គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+
+## កំណែ App តាមស្តង់ដារ — `APP_VERSION = '1.0.0'` (added 2026-08-21, branch `claude/app-versioning-standard-h589nq`)
+
+ស្នើដោយអ្នកប្រើ៖ *"ចង់អោយ app ទាំង4 មាន version ត្រឹមត្រូវតាមស្តង់ដារ (កំណែប្រព័ន្ធ: 1.0.0)"*។
+មុននេះ **គ្មាន App ណាមួយមានលេខកំណែសោះ** — មានតែ `CACHE_VERSION` ក្នុង `sw.js` ដែលជាកូនសោ Cache
+មិនមែនកំណែផលិតផលទេ ហើយអ្នកប្រើមើលមិនឃើញវាទាល់តែសោះ។ ដូច្នេះពេលមានបញ្ហាពីហាងណាមួយ គ្មានវិធីដឹងថា
+ឧបករណ៍នោះកំពុងរត់កូដមួយណា។
+
+Branch ចេញពី `main` (`a9852eb`) ដោយផ្ទាល់ — ផ្ទៀងផ្ទាត់ដោយ `git rev-list --count origin/main..HEAD` = 0
+មុនចាប់ផ្តើម។
+
+### ស្តង់ដារដែលបានកំណត់
+កំណែតែមួយរួមគ្នាសម្រាប់ App ទាំង ៤ តាម **Semantic Versioning** (`MAJOR.MINOR.PATCH`) ចាប់ផ្តើមនៅ `1.0.0`។
+
+| កន្លែង | តួនាទី |
+|---|---|
+| `const APP_VERSION = '1.0.0';` នៅ **បន្ទាត់ដំបូង** នៃ `app.js` ទាំង ៤ | **ប្រភពតែមួយនៃការពិត** |
+| `"version": "1.0.0"` ក្នុង `manifest.json` ទាំង ៤ | កំណែរបស់ PWA ដែលដំឡើងលើឧបករណ៍ |
+| `renderAppVersionLabels()` — **byte-identical ទាំង ៤** | បំពេញ `កំណែប្រព័ន្ធ: 1.0.0` ចូលធាតុ `[data-app-version]` |
+| `<div class="app-version-line" data-app-version></div>` ក្នុង `loginModal` | **កន្លែងបង្ហាញតែមួយគត់** |
+
+**ហេតុអ្វីជា attribute មិនមែនអក្សរដិតក្នុង HTML៖** ការសរសេរលេខផ្ទាល់ក្នុង `index.html` មានន័យថា
+រាល់ការប្តូរកំណែត្រូវកែច្រើនកន្លែង ➜ ថ្ងៃណាមួយ App មួយនៅលេខចាស់ ដោយគ្មានអ្វីចាប់បាន។ ឥឡូវមាន
+កន្លែងកែតែ ២ ក្នុងមួយ App (`app.js` + `manifest.json`) ហើយ checker បង្ខំឲ្យវាដូចគ្នា។
+
+### ការសម្រេចរបស់អ្នកប្រើកំឡុង session — បង្ហាញ **តែក្នុងប្រអប់ login**
+ជំហានដំបូងបានដាក់កំណែ ៣ កន្លែងក្នុងមួយ App (ស្លាកតូច `v1.0.0` ក្នុង navbar + បន្ទាត់ពេញក្នុង
+`loginModal` និង `configModal`)។ អ្នកប្រើឆ្លើយថា *"ដាក់តែលើ modal login បានហើយ"* ➜ ស្លាក navbar
+និងបន្ទាត់ក្នុង `configModal` ត្រូវបានដកចេញ រួមទាំងច្បាប់ CSS `.brand-info .app-version-badge`
+និងទម្រង់ `'short'` ក្នុង `renderAppVersionLabels()`។ **កុំបន្ថែមវាត្រឡប់ទៅ navbar វិញដោយគ្មាន
+ការស្នើ** — នេះជាការសម្រេចដោយចេតនា។
+
+### `CACHE_VERSION` **មិនមែន** កំណែ App — កុំយកទៅច្រឡំគ្នា
+`CACHE_VERSION` (`<app>-vN`) នៅតែជាកូនសោ Cache របស់ Service Worker ដែលត្រូវ bump រាល់ពេល
+`app.js`/`index.html`/`style.css` ប្រែ។ វាកើនញឹកញាប់ជាង `APP_VERSION` ច្រើន (ឧ. `zoeadmin-v58`
+ខណៈ App នៅ `1.0.0`)។ **មិនបានយកវាទៅភ្ជាប់នឹង `APP_VERSION` ដោយចេតនា**៖ filter សម្អាត Cache
+និងបន្ទាត់រាយក្នុង `run-all.sh` ពឹងលើរូបរាង `<app>-vN` ហើយអត្ថន័យរបស់វាខុសគ្នា — មួយជាកូនសោ Cache
+មួយទៀតជាកំណែផលិតផល។
+
+### របៀបប្តូរកំណែលើកក្រោយ
+១. `APP_VERSION` ក្នុង `app.js` **ទាំង ៤** · ២. `"version"` ក្នុង `manifest.json` **ទាំង ៤** ·
+៣. bump `CACHE_VERSION` របស់ App ដែលឯកសារប្រែ · ៤. `node audit-tools/version-check.js`
+(វាធ្លាក់ភ្លាមបើភ្លេចកន្លែងណាមួយ)។
+
+### ឧបករណ៍ថ្មី ១ + ការពង្រីក ១
+- **`audit-tools/version-check.js` ថ្មី (30 assertion)** — acorn parse `app.js` ទាំង ៤៖ `APP_VERSION`
+  ជា semver, ដូចគ្នាទាំង ៤, ត្រូវនឹង `manifest.json` នីមួយៗ, `renderAppVersionLabels()` មាន
+  byte-identical និងត្រូវបានហៅ, យក `APP_VERSION` មិនមែនអក្សរដិត, ហើយកន្លែងបង្ហាញមាន **១ ប៉ុណ្ណោះ
+  ហើយនៅក្នុង `loginModal`**។ បញ្ចូលក្នុង `run-all.sh` ទាំងបញ្ជីធម្មតា និងប្លុកប្រៀបធៀប baseline
+  (`VERSION_APP_DIR=<dir>`)។
+- **`audit-tools/boot-runtime.js` ត្រូវបានពង្រីក** ➜ ក្រៅពីចាប់កំហុស runtime វាឥឡូវ assert ថា
+  **កំណែបង្ហាញពិតក្នុង Chromium ពិត** (អាន `[data-app-version]` ក្រោយ boot ហើយប្រៀបនឹង
+  `APP_VERSION` ដែលអានចេញពី `app.js`)។ នេះជាភាពខុសគ្នារវាង "ធាតុមានក្នុង HTML" និង "អ្នកប្រើឃើញលេខ"។
+
+### ភស្តុតាងថាតេស្តមិនទទេ (mutation + baseline)
+`git archive origin/main` ចូលថតដាច់ដោយឡែក (`a9852eb`) រួចរត់៖
+
+| តេស្ត | លើកូដថ្មី | លើ baseline / mutant |
+|---|---|---|
+| `version-check` | 30/30 | **ធ្លាក់ 24 លើ `origin/main`** (exit 1) |
+| `boot-runtime` (ផ្នែកកំណែ) | 4/4 | **ធ្លាក់ 4 លើ `origin/main`** — `កំណែមិនបានបង្ហាញ: []` |
+| mutant៖ `manifest.json` របស់ ZoeW ទៅ `1.0.1` | — | **ធ្លាក់** (ចាប់ការ drift) |
+| mutant៖ `APP_VERSION` របស់ Zoescan ទៅ `'1.0'` | — | **ធ្លាក់** (semver + មិនដូចគ្នា) |
+| mutant៖ ដកកន្លែងបង្ហាញចេញពី ZoeKeyGen | — | **ធ្លាក់** |
+| mutant៖ `renderAppVersionLabels()` សរសេរលេខដិតជំនួស `APP_VERSION` | — | **ធ្លាក់** (byte-identical បែក) |
+| mutant៖ ផ្លាស់កន្លែងបង្ហាញពី `loginModal` ទៅ `configModal` | — | **ធ្លាក់** |
+
+### អន្ទាក់ CSS ដែលជួប (កត់ទុកកុំឲ្យធ្វើម្តងទៀត)
+ជំហានដំបូង ស្លាក navbar ត្រូវបានដាក់ក្នុង `.brand-info span` ដែលមានច្បាប់ស្រាប់
+`color: var(--success)` (បៃតង = ស្ថានភាព online)។ ច្បាប់ថ្មី `.app-version-badge` មាន
+specificity **ទាបជាង** (0,1,0 ធៀបនឹង 0,1,1) ➜ ស្លាកកំណែឡើងជា **ពណ៌បៃតងដូចសញ្ញា online** ដែល
+ច្រឡំបាន។ **រកឃើញដោយវាស់ `getComputedStyle` ក្នុង Chromium ពិត មិនមែនដោយអានកូដទេ** — screenshot
+តែម្នាក់ឯងក៏ស្ទើរតែមើលមិនឃើញដែរ ព្រោះ font ខ្មែរខ្វះក្នុង container។ ការកែគឺ
+`.brand-info .app-version-badge`។ ក្រោយមក ស្លាក navbar ត្រូវដកចេញទាំងស្រុងតាមការសម្រេចរបស់អ្នកប្រើ
+ដូច្នេះច្បាប់នោះលែងមាន — តែ **មេរៀននៅដដែល៖ ធាតុថ្មីក្នុង `.brand-info span` ត្រូវការ
+specificity យ៉ាងតិច (0,2,0)**។
+
+### ពិនិត្យហើយស្អាត
+- `layout-check` 48/48 នៅ 320/360/412/768px ក្រោយការកែ — បន្ទាត់កំណែក្នុង `loginModal`
+  មិនធ្វើឲ្យលើសទទឹង (`document.documentElement.scrollWidth` = 320 នៅ viewport 320)។
+- ច្បាប់ `.app-version-line` ត្រូវបានដាក់ក្បែរ `.remember-container` (ប្លុក CSS របស់ប្រអប់ login)
+  ក្នុង `style.css` ទាំង ៤ — មិនមែនក្នុងប្លុក navbar ដែលវាធ្លាក់ចូលដំបូងទេ។
+- `renderAppVersionLabels()` ហៅនៅ **បន្ទាត់ដំបូងបំផុត** នៃ `app.js` បាន ព្រោះ script ទាំង ៤
+  ស្ថិតនៅចុង `<body>` (Zoescan ប្រើ `defer`) ➜ DOM រួចរាល់ហើយ។ `APP_VERSION` ត្រូវប្រកាស
+  **មុន** ការហៅ ព្រោះ `const` មាន TDZ (ការហៅមុនប្រកាសនឹង throw ទោះ function hoisted ក៏ដោយ)។
+- `extract.js`, `shared-fns`, `wiring`, `dom-hygiene`, `state-hygiene`, `comments`,
+  `payload-schema`, `compensation-order`, `css-classes` — បៃតងទាំងអស់ គ្មានការបែកគ្នាថ្មី។
+  (`renderAppVersionLabels` ចែករំលែកទាំង ៤ ហើយ **មិនស្ថិតក្នុង `EXPECTED_DIVERGENT`** ដូច្នេះ
+  `shared-fns.js` បង្ខំឲ្យវាដូចគ្នាជារៀងរហូត។)
+- `dom-hygiene.js` មិនប៉ះពាល់៖ បន្ទាត់កំណែប្រើ `querySelectorAll` គ្មាន `id` ហើយអត្ថបទជាលេខកំណែ
+  មិនមែនទិន្នន័យអតិថិជនទេ។
+
+### លទ្ធផលរួម
+Suite ឡើងពី **37 ការត្រួតពិនិត្យ / 758 assertion** ទៅ **38 ការត្រួតពិនិត្យ / 792 assertion**
+(រាប់ដោយ script ពីលទ្ធផល `run-all.sh` ពិត មិនមែនដោយដៃ — លេខ "33/725" ក្នុង section ជុំ ១៣
+គឺចាស់ហើយ ព្រោះជុំ ១៤ មិនបានធ្វើបច្ចុប្បន្នភាពវា)។
+`CACHE_VERSION` bump ទាំង ៤ (zoeadmin-v58, zoew-v48, zoescan-v35, zoekeygen-v28) ព្រោះ
+`app.js`, `index.html` និង `style.css` ប្រែទាំង ៤ App។
+**គ្មានការប្តូរ Firebase rules ➜ គ្មាន publish ថ្មី។**
+ឯកសារ៖ ផ្នែក "កំណែ App (Versioning)" ក្នុង `README.md` (root), ផ្នែក "កំណែ App (Version)" ក្នុង
+README ទាំង ៤, និងជួរ `version-check.js` ក្នុង `audit-tools/README.md`។

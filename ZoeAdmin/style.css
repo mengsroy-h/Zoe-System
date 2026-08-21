@@ -537,6 +537,7 @@
             margin: 0;
             cursor: pointer;
         }
+        .app-version-line { margin-top: 10px; text-align: center; font-size: 10.5px; color: var(--text-muted); font-weight: 600; }
 
         .barcode-list-item { 
             display: flex; 

@@ -66,6 +66,14 @@ function serve(dir, port) {
         if (real.length) { real.forEach((e) => console.log('   FAIL  ' + e)); problems += real.length; }
         else console.log('   ok    គ្មានកំហុស runtime ពេល boot');
 
+        const versionLabels = await page.evaluate(() =>
+            [...document.querySelectorAll('[data-app-version]')].map((el) => el.textContent));
+        const declaredVersion = (fs.readFileSync(path.join(dir, 'app.js'), 'utf8')
+            .match(/const APP_VERSION = '([^']+)'/) || [])[1];
+        const rendered = versionLabels.length === 1 && versionLabels[0] === 'កំណែប្រព័ន្ធ: ' + declaredVersion;
+        if (rendered) console.log('   ok    កំណែបង្ហាញពិតក្នុងប្រអប់ login: ' + JSON.stringify(versionLabels));
+        else { console.log('   FAIL  កំណែមិនបានបង្ហាញ: ' + JSON.stringify(versionLabels)); problems++; }
+
         await ctx.close();
         server.close();
         port++;

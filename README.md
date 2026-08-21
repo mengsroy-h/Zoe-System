@@ -32,6 +32,33 @@
 - **១ Sentry Project រួម** សម្រាប់ App ទាំង ៤ ញែកគ្នាដោយ Tag `app`
   (`zoeadmin`/`zoew`/`zoescan`/`zoekeygen`)។
 
+## កំណែ App (Versioning)
+
+App ទាំង ៤ ប្រើ **កំណែតែមួយរួមគ្នា តាមស្តង់ដារ [Semantic Versioning](https://semver.org)**
+(`MAJOR.MINOR.PATCH`) — បច្ចុប្បន្ន **`1.0.0`**។
+
+| កន្លែង | តួនាទី |
+|---|---|
+| `const APP_VERSION = '1.0.0';` នៅដើម `app.js` របស់ App នីមួយៗ | **ប្រភពតែមួយនៃការពិត** |
+| `"version": "1.0.0"` ក្នុង `manifest.json` របស់ App នីមួយៗ | កំណែរបស់ PWA ដែលដំឡើងលើឧបករណ៍ |
+| `renderAppVersionLabels()` (byte-identical ទាំង ៤) | បំពេញអត្ថបទ `កំណែប្រព័ន្ធ: 1.0.0` ចូលធាតុដែលមាន `data-app-version` |
+| `<div class="app-version-line" data-app-version></div>` ក្នុង `loginModal` | **កន្លែងបង្ហាញតែមួយគត់** — អ្នកប្រើឃើញកំណែពេលចូលប្រព័ន្ធ |
+
+**`CACHE_VERSION` ក្នុង `sw.js` មិនមែនជាកំណែ App ទេ** — វាជាកូនសោ Cache (`<app>-vN`)
+ដែលត្រូវ Bump រាល់ពេល `app.js`/`index.html`/`style.css` ប្រែ ដើម្បីឲ្យ Service Worker
+ទាញឯកសារថ្មី។ វាកើនញឹកញាប់ជាង `APP_VERSION` ច្រើន។
+
+### របៀបប្តូរកំណែ
+
+១. ប្តូរ `APP_VERSION` ក្នុង `app.js` **ទាំង ៤** ឲ្យដូចគ្នា
+២. ប្តូរ `"version"` ក្នុង `manifest.json` **ទាំង ៤** ឲ្យត្រូវនឹងលេខនោះ
+៣. Bump `CACHE_VERSION` ក្នុង `sw.js` របស់ App ដែលឯកសារប្រែ
+៤. រត់ `node audit-tools/version-check.js` — វាធ្លាក់ភ្លាមបើមានកន្លែងណាមួយភ្លេច
+
+កំណែត្រូវបានផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិដោយ `audit-tools/version-check.js` (ស៊ីគ្នារវាង
+`app.js` ↔ `manifest.json` ↔ `index.html`) និងដោយ `audit-tools/boot-runtime.js`
+(បង្ហាញពិតក្នុង Chromium ពិត) — ទាំងពីរស្ថិតក្នុង `bash audit-tools/run-all.sh`។
+
 ## ទិន្នន័យក្នុង Firebase (Business DB)
 
 | Path | អ្នកអាន | ខ្លឹមសារ |

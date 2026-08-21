@@ -22,7 +22,7 @@
 | `devtools-guard-test.js` | ផ្ទៀងផ្ទាត់ថា `checkDevTools()` របស់ ZoeKeyGen **មិនបណ្តេញអ្នកប្រើពេល zoom ឬបង្រួម window** តែនៅតែចាប់ devtools ពិត (8 assertion) — `DEVGUARD_APP_DIR=<dir>` |
 | `concurrent-scan-test.js` | ដក `addOrUpdateEntry` ពិត រួចរត់ជាមួយ Firebase ក្លែងក្លាយដែលមាន **retry-on-conflict ពិត** និង `update()` អសមកាល ➜ ធ្វើតេស្តការប្រណាំងបានដោយគ្មាន emulator។ គ្របការស្កេនព្រមគ្នាពី ២ ឧបករណ៍ និងករណី order បិទរួចលើ server (22 assertion) — `CONCSCAN_APP_DIR=<dir>` |
 | `payload-schema.js` | ប្រៀបធៀប property ដែលកូដសរសេរទៅ Firebase នឹង schema ក្នុង rules (រាយតែកន្លែងដែល `$other: false`) — ត្រូវការ `acorn` |
-| `boot-runtime.js` | boot **ទាំង ៤ App ក្នុង Chromium ពិត** ដោយទប់សំណើក្រៅ រួចចាប់ `pageerror`/`console.error` — `BOOT_APP_DIR=<dir>` |
+| `boot-runtime.js` | boot **ទាំង ៤ App ក្នុង Chromium ពិត** ដោយទប់សំណើក្រៅ រួចចាប់ `pageerror`/`console.error` ព្រមទាំង assert ថា **កំណែបង្ហាញពិតក្នុងប្រអប់ login** (`កំណែប្រព័ន្ធ: <APP_VERSION>`) — `BOOT_APP_DIR=<dir>` |
 | `setup-link-browser-test.js` | ដើរផ្លូវ provisioning ពេញលេញក្នុង browser ពិត៖ `?setup=` ➜ PIN gate ➜ ប្រអប់ Config ដែលបំពេញរួច ➜ **គ្មានអ្វីរក្សាទុករហូតដល់មនុស្សចុច Save** (18 assertion) — `SETUPLINK_APP_DIR=<dir>` |
 | `ui-flow-test.js` | **ឧបករណ៍ខ្លាំងជាងគេសម្រាប់រកកំហុសថ្មី។** boot ZoeAdmin/ZoeW/Zoescan ក្នុង Chromium ជាមួយ **Firebase ក្លែងក្លាយក្នុងសតិ** (ដាក់ចូលមុន script រត់ តាម `addInitScript`, ហើយ `license-verify.js` ត្រូវជំនួសតាម `page.route`) រួចដើរ UI ពិត៖ បិទ/បើកបញ្ជី, លុប➜ស្តារ ២ ជុំ, ដក➜ស្តារ, កែទឹកប្រាក់, **ការប្រណាំងឧបករណ៍ច្រើន**, **ផ្លូវបរាជ័យ `permission_denied`**, និងចុចគ្រប់ប៊ូតុង (41 assertion) — `UIFLOW_APP_DIR=<dir>`។ ត្រូវការ `playwright-core`; បើគ្មាន **SKIP ដោយស្អាត** |
 | `layout-check.js` | ផ្ទុក App ទាំង ៤ នៅ **320/360/412/768px** រួចរាយធាតុណាដែលលើសទទឹងអេក្រង់ដោយគ្មាន ancestor ដែល scroll បាន — ព្រមទាំង **បើក modal នីមួយៗដាច់ដោយឡែក** (48 assertion) — `LAYOUT_APP_DIR=<dir>`។ ប៊ូតុងតូចជាង 24px ជា `note` មិនមែន `FAIL` (ជម្រើសរចនា) |
@@ -37,6 +37,7 @@
 | `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
 | `dom-hygiene.js` | រកវាល**ណាមួយ**ដែលត្រូវបានសរសេរដោយទិន្នន័យអតិថិជន តែ **មិនត្រូវបានលុបចោលពេលចាកចេញ** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥ និង ៨) — ត្រូវការ `acorn` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |
+| `version-check.js` | កំណែ App៖ `APP_VERSION` ក្នុង `app.js` ទាំង ៤ ត្រូវជា semver, ដូចគ្នាទាំង ៤, ត្រូវនឹង `version` ក្នុង `manifest.json` នីមួយៗ, ហើយ `renderAppVersionLabels()` ត្រូវ byte-identical និងត្រូវបានហៅ។ ថែមទាំង assert ថាកន្លែងបង្ហាញ (`data-app-version`) មាន **១ ប៉ុណ្ណោះ ហើយនៅក្នុង `loginModal`** (30 assertion) — ត្រូវការ `acorn` · `VERSION_APP_DIR=<dir>` |
 | `trimws.js <files>` | លុប trailing whitespace ដោយបញ្ជាក់ថា token stream មិនប្រែ |
 | `emu/real.sh` | តេស្ត `firebase-database.rules.json` ពិត លើ RTDB emulator |
 | `emu/partial-claim.sh` | តេស្តថា worker សរសេរ `barcodes[]` ដែលបង្រួមរួច (8-day partial claim) បាន |

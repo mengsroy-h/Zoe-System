@@ -1,3 +1,13 @@
+const APP_VERSION = '1.0.0';
+
+function renderAppVersionLabels() {
+    document.querySelectorAll('[data-app-version]').forEach((el) => {
+        el.textContent = 'កំណែប្រព័ន្ធ: ' + APP_VERSION;
+    });
+}
+
+renderAppVersionLabels();
+
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
 }

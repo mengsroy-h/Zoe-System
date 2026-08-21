@@ -2719,7 +2719,10 @@
             patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
                 if (saved) syncScannerLookupEntry(item.id, item);
                 else revertPickupRefMove();
-            }).catch(revertPickupRefMove);
+            }, revertPickupRefMove).catch((postErr) => {
+                console.error('saveEditedPhone post-patch handler failed: ', postErr);
+                if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedPhone post-patch handler' });
+            });
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
             if (searchInput) searchInput.value = '';
@@ -2973,6 +2976,7 @@
         closeModal('restoreWarningModal');
         pendingRestoreId = null;
 
+        let restoreWriteOk = false;
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
             if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
@@ -2982,11 +2986,7 @@
                 [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
-            openRecentlyDeletedModal();
-            refreshCurrentHistoryView();
-            updateRecentPhonesList();
-            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
+            restoreWriteOk = true;
         } catch (error) {
             appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
@@ -3004,6 +3004,13 @@
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
+        }
+        if (restoreWriteOk) {
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
+            openRecentlyDeletedModal();
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         }
     }
 

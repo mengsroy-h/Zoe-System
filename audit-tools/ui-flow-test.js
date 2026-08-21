@@ -111,9 +111,17 @@ const FAKE_SDK = function (seed) {
         goOnline: () => {},
         runTransaction: (r, fn) => {
             window.__writeLog.push({ op: 'txn', path: r.path });
-            const cur = getPath(r.path);
-            const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
+            let cur = getPath(r.path);
+            let next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
             if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(r.path) });
+            const conflict = window.__txnConflict;
+            if (conflict && String(r.path).indexOf(conflict.path) === 0) {
+                window.__txnConflict = null;
+                conflict.mutate(getPath(r.path));
+                cur = getPath(r.path);
+                next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
+                if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(r.path) });
+            }
             setPath(r.path, next); fireAll();
             return Promise.resolve({ committed: true, snapshot: snapOf(r.path) });
         }
@@ -554,6 +562,266 @@ function seedData() {
         }
 
 
+
+
+
+        // --- ការសរសេរធុងសំរាមជោគជ័យ តែ handler ក្រោយនោះ throw ➜ មិនត្រូវរត់ការសង្គ្រោះ ---
+        if (app === 'ZoeAdmin') {
+            await page.evaluate((dk) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_ph_x = {
+                    id: 'id_ph_x', phone: '0677000111', scanDate: dk, createdAt: now - 240,
+                    cod: 21, dod: 0, price: 21, count: 2, barcode: 'PH1', time: '19:00', isClosed: false,
+                    barcodes: [
+                        { code: 'PH1', time: '19:00', cod: 9, dod: 0, locker: 'N1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 240 },
+                        { code: 'PH2', time: '19:01', cod: 12, dod: 0, locker: 'N2', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 230 }
+                    ]
+                };
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[dk];
+                rev.codDollar = Math.round((rev.codDollar + 21) * 100) / 100;
+                rev.totalCount = rev.totalCount + 2;
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+
+            const revPh0 = await page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
+            await page.evaluate(() => {
+                window.__origSync = window.syncScannerLookupEntry;
+                window.syncScannerLookupEntry = function () { throw new Error('post-success handler blew up'); };
+                window.removeSingleBarcode('id_ph_x', 'PH1');
+            });
+            await page.waitForTimeout(1200);
+            const phState = await page.evaluate((k) => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_ph_x;
+                return {
+                    codes: it ? it.barcodes.map((b) => b.code).sort().join(',') : null,
+                    inTrash: Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod).some((t) => t.barcode === 'PH1'),
+                    rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }
+                };
+            }, seed._dateKey);
+            await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
+
+            check(phState.codes === 'PH2',
+                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ កញ្ចប់មិនត្រូវរស់ឡើងវិញ', JSON.stringify(phState.codes));
+            check(phState.inTrash === true,
+                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ ធាតុធុងសំរាមនៅដដែល', JSON.stringify(phState.inTrash));
+            check(Math.round((revPh0.codDollar - phState.rev.codDollar) * 100) / 100 === 9 && (revPh0.totalCount - phState.rev.totalCount) === 1,
+                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ លុយនៅតែកាត់ត្រឹមត្រូវ មិនបញ្ច្រាស',
+                JSON.stringify(revPh0) + ' ➜ ' + JSON.stringify(phState.rev));
+
+            await page.evaluate((dk) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_ph_y = {
+                    id: 'id_ph_y', phone: '0677000222', scanDate: dk, createdAt: now - 220,
+                    cod: 10, dod: 0, price: 10, count: 1, barcode: 'PY1', time: '19:05', isClosed: false,
+                    barcodes: [{ code: 'PY1', time: '19:05', cod: 10, dod: 0, locker: 'N3', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 220 }]
+                };
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[dk];
+                rev.codDollar = Math.round((rev.codDollar + 10) * 100) / 100;
+                rev.totalCount = rev.totalCount + 1;
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+            const revPy0 = await page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
+            await page.evaluate(() => {
+                window.syncScannerLookupEntry = function () { throw new Error('post-success handler blew up'); };
+                window.openEditBarcodePriceModal('id_ph_y', 'PY1');
+                document.getElementById('editBcCodInput').value = '25';
+                document.getElementById('editBcDodInput').value = '0';
+                window.saveEditedBarcodePrice();
+            });
+            await page.waitForTimeout(1000);
+            const pyState = await page.evaluate((k) => ({
+                serverCod: window.__fakeStore.zoew_scan_history_cod_dod.id_ph_y.barcodes[0].cod,
+                rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }
+            }), seed._dateKey);
+            await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
+            check(pyState.serverCod === 25,
+                'ZoeAdmin: កែទឹកប្រាក់ ➜ handler ក្រោយជោគជ័យ throw ➜ តម្លៃថ្មីនៅដដែល', JSON.stringify(pyState.serverCod));
+            check(Math.round((pyState.rev.codDollar - revPy0.codDollar) * 100) / 100 === 15,
+                'ZoeAdmin: កែទឹកប្រាក់ ➜ handler throw ➜ ចំណូលមិនត្រូវបញ្ច្រាសខុស',
+                JSON.stringify(revPy0) + ' ➜ ' + JSON.stringify(pyState.rev));
+
+
+            await page.evaluate((dk) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_recently_deleted_cod_dod.id_ph_z = {
+                    id: 'id_ph_z', phone: '0677000333', scanDate: dk, createdAt: now - 200,
+                    cod: 14, dod: 0, price: 14, count: 1, barcode: 'PZ1', time: '19:10',
+                    isClosed: false, isFromDeletion: false, deletedAt: now - 100,
+                    barcodes: [{ code: 'PZ1', time: '19:10', cod: 14, dod: 0, locker: 'N4', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 200 }]
+                };
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+            const revPz0 = await page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
+            await page.evaluate(() => {
+                window.syncScannerLookupEntry = function () { throw new Error('post-success handler blew up'); };
+                window.promptRestoreDeletedItem('id_ph_z');
+                window.executeRestoreItem();
+            });
+            await page.waitForTimeout(1000);
+            const pzState = await page.evaluate((k) => ({
+                live: !!window.__fakeStore.zoew_scan_history_cod_dod.id_ph_z,
+                stillTrash: !!window.__fakeStore.zoew_recently_deleted_cod_dod.id_ph_z,
+                rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }
+            }), seed._dateKey);
+            await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
+            check(pzState.live === true && pzState.stillTrash === false,
+                'ZoeAdmin: ស្តារ ➜ handler ក្រោយជោគជ័យ throw ➜ ការស្តារនៅជាប់', JSON.stringify(pzState));
+            check(Math.round((pzState.rev.codDollar - revPz0.codDollar) * 100) / 100 === 14,
+                'ZoeAdmin: ស្តារ ➜ handler throw ➜ លុយមិនត្រូវបញ្ច្រាសខុស',
+                JSON.stringify(revPz0) + ' ➜ ' + JSON.stringify(pzState.rev));
+
+            for (let i = errors.length - 1; i >= 0; i--) {
+                if (/post-success handler blew up|Error removing single barcode|Restore failed/.test(errors[i])) errors.splice(i, 1);
+            }
+        }
+        // --- RTDB អាចរត់ update function ច្រើនដង ➜ ការរត់ទី ២ ត្រូវសម្រេចដោយខ្លួនឯង ---
+        if (app === 'ZoeAdmin') {
+            const revRr = () => page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
+            await page.evaluate((dk) => {
+                const now = Date.now();
+                const mk = (id, phone, bcs) => ({
+                    id, phone, scanDate: dk, createdAt: now - 260,
+                    cod: bcs.reduce((s, b) => s + b.cod, 0), dod: 0,
+                    price: bcs.reduce((s, b) => s + b.cod, 0), count: bcs.length,
+                    barcode: bcs[0].code, time: '18:00', isClosed: false,
+                    barcodes: bcs.map((b) => ({
+                        code: b.code, time: '18:00', cod: b.cod, dod: 0, locker: 'M1',
+                        isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 260
+                    }))
+                });
+                const S = window.__fakeStore.zoew_scan_history_cod_dod;
+                S.id_rr_keep = mk('id_rr_keep', '0688000111', [{ code: 'RK1', cod: 10 }, { code: 'RK2', cod: 20 }]);
+                S.id_rr_gone = mk('id_rr_gone', '0688000222', [{ code: 'RG1', cod: 13 }, { code: 'RG2', cod: 17 }]);
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[dk];
+                rev.codDollar = Math.round((rev.codDollar + 60) * 100) / 100;
+                rev.totalCount = rev.totalCount + 4;
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+
+            const revRr0 = await revRr();
+            await page.evaluate(() => {
+                window.__txnConflict = {
+                    path: 'zoew_scan_history_cod_dod/id_rr_keep',
+                    mutate: (srv) => { if (srv && srv.barcodes) srv.barcodes[1].isClosed = true; }
+                };
+                window.removeSingleBarcode('id_rr_keep', 'RK1');
+            });
+            await page.waitForTimeout(900);
+            const rrKeep = await page.evaluate(() => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_rr_keep;
+                return it ? { n: it.barcodes.length, code: it.barcodes[0].code, closed: it.barcodes[0].isClosed, cod: it.cod } : null;
+            });
+            const revRr1 = await revRr();
+            check(rrKeep && rrKeep.n === 1 && rrKeep.code === 'RK2' && rrKeep.closed === true && rrKeep.cod === 20,
+                'ZoeAdmin: transaction រត់ម្តងទៀត ➜ យកលទ្ធផលនៃការរត់ចុងក្រោយ', JSON.stringify(rrKeep));
+            check(Math.round((revRr0.codDollar - revRr1.codDollar) * 100) / 100 === 10 && (revRr0.totalCount - revRr1.totalCount) === 1,
+                'ZoeAdmin: transaction រត់ម្តងទៀត ➜ កាត់លុយតែម្តង', JSON.stringify(revRr0) + ' ➜ ' + JSON.stringify(revRr1));
+
+            const revRr2 = await revRr();
+            const trashRr0 = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).length);
+            await page.evaluate(() => {
+                window.__txnConflict = {
+                    path: 'zoew_scan_history_cod_dod/id_rr_gone',
+                    mutate: (srv) => {
+                        if (!srv || !srv.barcodes) return;
+                        srv.barcodes = srv.barcodes.filter((b) => b.code !== 'RG1');
+                        srv.count = 1; srv.cod = 17; srv.price = 17; srv.barcode = 'RG2';
+                    }
+                };
+                window.removeSingleBarcode('id_rr_gone', 'RG1');
+            });
+            await page.waitForTimeout(900);
+            const revRr3 = await revRr();
+            const trashRr1 = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).length);
+            check(revRr3.codDollar === revRr2.codDollar && revRr3.totalCount === revRr2.totalCount,
+                'ZoeAdmin: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ មិនកាត់លុយ (អថេរត្រូវ reset)',
+                JSON.stringify(revRr2) + ' ➜ ' + JSON.stringify(revRr3));
+            check(trashRr1 === trashRr0,
+                'ZoeAdmin: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ គ្មានធាតុធុងសំរាម', trashRr0 + ' ➜ ' + trashRr1);
+            await page.evaluate(() => { window.__txnConflict = null; });
+        }
+        // --- transaction ជោគជ័យ តែការសរសេរធុងសំរាមបរាជ័យអស់ ៤ ដង ➜ ត្រូវស្តារកញ្ចប់មកវិញ ---
+        if (app === 'ZoeAdmin') {
+            await page.evaluate((dk) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_tw_rem = {
+                    id: 'id_tw_rem', phone: '0699111000', scanDate: dk, createdAt: now - 300,
+                    cod: 25, dod: 0, price: 25, count: 2, barcode: 'TW1', time: '17:00', isClosed: false,
+                    barcodes: [
+                        { code: 'TW1', time: '17:00', cod: 10, dod: 0, locker: 'L1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 300 },
+                        { code: 'TW2', time: '17:01', cod: 15, dod: 0, locker: 'L2', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 290 }
+                    ]
+                };
+                window.__fakeStore.zoew_scan_history_cod_dod.id_tw_del = {
+                    id: 'id_tw_del', phone: '0699111222', scanDate: dk, createdAt: now - 280,
+                    cod: 6, dod: 0, price: 6, count: 1, barcode: 'TD1', time: '17:02', isClosed: false,
+                    barcodes: [{ code: 'TD1', time: '17:02', cod: 6, dod: 0, locker: 'L3', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 280 }]
+                };
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[dk];
+                rev.codDollar = Math.round((rev.codDollar + 31) * 100) / 100;
+                rev.totalCount = rev.totalCount + 3;
+                window.__fireAll();
+            }, seed._dateKey);
+            await page.waitForTimeout(300);
+
+            // ទប់តែការសរសេរទៅធុងសំរាម — transaction និងស្ថិតិត្រូវដើរធម្មតា ដើម្បីមើលការស្តារ
+            await page.evaluate(() => {
+                const origUpd = window.firebaseSDK.update;
+                window.__unblockTrash = () => { window.firebaseSDK.update = origUpd; };
+                window.firebaseSDK.update = function (r, obj) {
+                    if (String(r.path || '').indexOf('zoew_recently_deleted_cod_dod') !== -1) {
+                        return Promise.reject(new Error('permission_denied'));
+                    }
+                    return origUpd.call(this, r, obj);
+                };
+            });
+
+            const revTw0 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
+            await page.evaluate(() => window.removeSingleBarcode('id_tw_rem', 'TW1'));
+            await page.waitForTimeout(14000);
+            const remState = await page.evaluate((dk) => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_tw_rem;
+                return {
+                    rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] },
+                    codes: it ? it.barcodes.map((b) => b.code).sort() : null,
+                    deducted: it ? it.barcodes.map((b) => !!b.isDeducted) : null,
+                    localTrash: (typeof deletedItems !== 'undefined' ? deletedItems : []).some((t) => t.barcode === 'TW1'),
+                    serverTrash: Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod).some((t) => t.barcode === 'TW1')
+                };
+            }, seed._dateKey);
+            check(remState.codes && remState.codes.join(',') === 'TW1,TW2',
+                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ', JSON.stringify(remState.codes));
+            check(remState.deducted && remState.deducted.every((d) => d === false),
+                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ isDeducted ត្រូវ clear លើកញ្ចប់ដែលរស់វិញ', JSON.stringify(remState.deducted));
+            check(remState.rev.codDollar === revTw0.codDollar && remState.rev.totalCount === revTw0.totalCount,
+                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
+                JSON.stringify(revTw0) + ' ➜ ' + JSON.stringify(remState.rev));
+            check(remState.localTrash === false && remState.serverTrash === false,
+                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(remState));
+
+            await page.evaluate(() => window.deleteSingleItem('id_tw_del'));
+            await page.waitForTimeout(14000);
+            const delState = await page.evaluate(() => ({
+                live: !!window.__fakeStore.zoew_scan_history_cod_dod.id_tw_del,
+                codes: window.__fakeStore.zoew_scan_history_cod_dod.id_tw_del
+                    ? window.__fakeStore.zoew_scan_history_cod_dod.id_tw_del.barcodes.map((b) => b.code) : null,
+                localTrash: (typeof deletedItems !== 'undefined' ? deletedItems : []).some((t) => t.id === 'id_tw_del'),
+                serverTrash: !!window.__fakeStore.zoew_recently_deleted_cod_dod.id_tw_del
+            }));
+            check(delState.live && delState.codes && delState.codes.join(',') === 'TD1',
+                'ZoeAdmin: លុប ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ មិនបាត់', JSON.stringify(delState));
+            check(delState.localTrash === false && delState.serverTrash === false,
+                'ZoeAdmin: លុប ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(delState));
+
+            await page.evaluate(() => window.__unblockTrash());
+            for (let i = errors.length - 1; i >= 0; i--) {
+                if (/permission_denied|Trash write permanently failed|Error saving deleted item/.test(errors[i])) errors.splice(i, 1);
+            }
+        }
         // --- ច្បាប់សម្អាតស្វ័យប្រវត្តិ៖ 2h លុប · 8d ដក · មិនកាត់លុយស្ទួន ---
         {
             const revAuto = () => page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);

@@ -4106,10 +4106,9 @@
             if (!claimedWhole) openViewListModal(itemId);
             refreshCurrentHistoryView();
 
+            let trashSaved = false;
             await retryAsync(() => saveSingleDeletedItemToFirebase(itemToTrash), 4, 1500).then(() => {
-                if (claimedWhole) clearScannerLookupEntry(itemId);
-                else if (committedItem) syncScannerLookupEntry(itemId, committedItem);
-                showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+                trashSaved = true;
             }).catch(async (trashErr) => {
                 if (deductionApplied) {
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
@@ -4118,18 +4117,28 @@
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'removeSingleBarcode trash write failed after retries', itemId });
+                let restoredItem = null;
+                let restoreOk = false;
                 try {
                     const restoreResult = await restoreClaimedItemToScanHistory(itemId, claimedWhole, claimedWhole ? null : { ...claimedParent, barcodes: [claimedBarcode] });
-                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
-                    if (restoredItem) syncScannerLookupEntry(itemId, restoredItem);
-                    refreshCurrentHistoryView();
-                    showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                    restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    restoreOk = true;
                 } catch (restoreErr) {
                     console.error('Failed to restore barcode to scan history after trash write failure for', itemId, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'removeSingleBarcode restore-after-trash-failure also failed', itemId });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + barcodeCode + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
+                if (restoreOk) {
+                    if (restoredItem) syncScannerLookupEntry(itemId, restoredItem);
+                    refreshCurrentHistoryView();
+                    showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                }
             });
+            if (trashSaved) {
+                if (claimedWhole) clearScannerLookupEntry(itemId);
+                else if (committedItem) syncScannerLookupEntry(itemId, committedItem);
+                showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+            }
         } catch (e) {
             console.error("Error removing single barcode: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error removing single barcode: " });
@@ -4398,7 +4407,7 @@
                     }
                     if (committedItem) syncScannerLookupEntry(editedItemId, committedItem);
                     showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
-                }).catch(() => {
+                }, () => {
                     if (revenueApplied) {
                         addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
                     }
@@ -4417,6 +4426,9 @@
                     const viewListEl = document.getElementById('viewListModal');
                     if (viewListEl && viewListEl.style.display === 'flex') openViewListModal(editedItemId);
                     showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                }).catch((postErr) => {
+                    console.error('saveEditedBarcodePrice post-transaction handler failed: ', postErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedBarcodePrice post-transaction handler' });
                 });
                 refreshCurrentHistoryView();
             }
@@ -4534,7 +4546,10 @@
             patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
                 if (saved) syncScannerLookupEntry(item.id, item);
                 else revertPickupRefMove();
-            }).catch(revertPickupRefMove);
+            }, revertPickupRefMove).catch((postErr) => {
+                console.error('saveEditedPhone post-patch handler failed: ', postErr);
+                if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedPhone post-patch handler' });
+            });
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
             if (searchInput) searchInput.value = '';
@@ -4706,27 +4721,36 @@
             refreshCurrentHistoryView();
             updateRecentPhonesList();
 
+            let trashSaved = false;
             await retryAsync(() => saveSingleDeletedItemToFirebase(removed), 4, 1500).then(() => {
-                clearScannerLookupEntry(id);
-                showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+                trashSaved = true;
             }).catch(async (trashErr) => {
                 const staleIdx = deletedItems.findIndex(i => i.id === removed.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'deleteSingleItem trash write failed after retries', itemId: id });
+                let restoredItem = null;
+                let restoreOk = false;
                 try {
                     const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, null);
-                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
-                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
-                    refreshCurrentHistoryView();
-                    updateRecentPhonesList();
-                    showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                    restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    restoreOk = true;
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'deleteSingleItem restore-after-trash-failure also failed', itemId: id });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
+                if (restoreOk) {
+                    if (restoredItem) syncScannerLookupEntry(id, restoredItem);
+                    refreshCurrentHistoryView();
+                    updateRecentPhonesList();
+                    showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                }
             });
+            if (trashSaved) {
+                clearScannerLookupEntry(id);
+                showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+            }
         } catch (e) {
             console.error("Error deleting single item: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });
@@ -4865,6 +4889,7 @@
         closeModal('restoreWarningModal');
         pendingRestoreId = null;
 
+        let restoreWriteOk = false;
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
             if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
@@ -4874,11 +4899,7 @@
                 [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
-            openRecentlyDeletedModal();
-            refreshCurrentHistoryView();
-            updateRecentPhonesList();
-            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
+            restoreWriteOk = true;
         } catch (error) {
             appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
@@ -4896,6 +4917,13 @@
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
+        }
+        if (restoreWriteOk) {
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
+            openRecentlyDeletedModal();
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         }
     }
 

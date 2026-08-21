@@ -1,4 +1,4 @@
-    const APP_VERSION = '1.0.1';
+    const APP_VERSION = '1.0.2';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -140,6 +140,19 @@
         if (!phoneStr) return '';
         let trimmed = phoneStr.trim();
         trimmed = trimmed.replace(/^(\+?855-?)/, '0');
+        return trimmed;
+    }
+
+    function normalizeStoredPhone(phoneStr) {
+        if (!phoneStr) return '';
+        let trimmed = String(phoneStr).trim();
+        trimmed = trimmed.replace(/^[='"\s-]+/, '');
+        if (/^\+?855/.test(trimmed)) {
+            trimmed = trimmed.replace(/^\+?855[\s-]*/, '');
+        }
+        if (/^\d/.test(trimmed) && trimmed.charAt(0) !== '0') {
+            trimmed = '0' + trimmed;
+        }
         return trimmed;
     }
 
@@ -971,7 +984,7 @@
 
         const phoneEl = document.getElementById('modalPhoneInput');
         if (phoneVal && phoneEl && !phoneEl.value) {
-            phoneEl.value = String(phoneVal).trim().replace(/^(\+?855-?)/, '0');
+            phoneEl.value = normalizeStoredPhone(phoneVal);
             filledAny = true;
             phoneWasAutoFilled = true;
         }
@@ -3806,7 +3819,7 @@
         const codEl = document.getElementById('modalCodInput');
         const dodEl = document.getElementById('modalDodInput');
 
-        let phone = isSkip ? "គ្មានលេខ" : sanitizePhoneNumber(phoneEl ? phoneEl.value : '');
+        let phone = isSkip ? "គ្មានលេខ" : normalizeStoredPhone(phoneEl ? phoneEl.value : '');
         let rawLocker = lockerEl ? lockerEl.value.trim() : '';
         let locker = rawLocker;
         let cod = codEl ? (parseFloat(codEl.value) || 0) : 0;
@@ -4591,7 +4604,7 @@
 
     function saveEditedPhone() {
         const editPhoneInput = document.getElementById('editPhoneInput');
-        let newPhone = sanitizePhoneNumber(editPhoneInput ? editPhoneInput.value : '');
+        let newPhone = normalizeStoredPhone(editPhoneInput ? editPhoneInput.value : '');
         if (!newPhone) {
             newPhone = "គ្មានលេខ";
         }

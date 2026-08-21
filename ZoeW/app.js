@@ -1,4 +1,4 @@
-    const APP_VERSION = '1.0.1';
+    const APP_VERSION = '1.0.2';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -117,6 +117,23 @@
         if (!phoneStr) return '';
         let trimmed = phoneStr.trim();
         trimmed = trimmed.replace(/^(\+?855-?)/, '0');
+        return trimmed;
+    }
+
+    function normalizeStoredPhone(phoneStr) {
+        if (!phoneStr) return '';
+        return String(phoneStr).split(/[\/,]/).map(normalizeOneStoredPhone).filter(Boolean).join('/');
+    }
+
+    function normalizeOneStoredPhone(part) {
+        let trimmed = String(part).trim();
+        trimmed = trimmed.replace(/^[='"\s-]+/, '');
+        if (/^\+?855/.test(trimmed)) {
+            trimmed = trimmed.replace(/^\+?855[\s-]*/, '');
+        }
+        if (/^\d/.test(trimmed) && trimmed.charAt(0) !== '0') {
+            trimmed = '0' + trimmed;
+        }
         return trimmed;
     }
 
@@ -2707,7 +2724,7 @@
 
     function saveEditedPhone() {
         const editPhoneInput = document.getElementById('editPhoneInput');
-        let newPhone = sanitizePhoneNumber(editPhoneInput ? editPhoneInput.value : '');
+        let newPhone = normalizeStoredPhone(editPhoneInput ? editPhoneInput.value : '');
         if (!newPhone) {
             newPhone = "គ្មានលេខ";
         }

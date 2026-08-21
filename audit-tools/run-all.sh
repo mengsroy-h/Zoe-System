@@ -42,7 +42,7 @@ done
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
 run "extract.js (ZoeAdmin vs ZoeW)" node audit-tools/extract.js /tmp/zoe-fns
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order version-check; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -93,6 +93,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     FIELDSHAPE_APP_DIR="$BASE" node audit-tools/field-shape-test.js 2>&1 | tail -1 | sed 's/^/   field-shape:     /'
     SLOWWRITE_APP_DIR="$BASE" node audit-tools/slow-write-test.js 2>&1 | tail -1 | sed 's/^/   slow-write:      /'
     COMP_APP_DIR="$BASE" node audit-tools/compensation-order.js 2>&1 | tail -1 | sed 's/^/   compensation:    /'
+    STALEWRITE_APP_DIR="$BASE" node audit-tools/stale-write.js 2>&1 | tail -1 | sed 's/^/   stale-write:     /'
     VERSION_APP_DIR="$BASE" node audit-tools/version-check.js 2>&1 | tail -1 | sed 's/^/   version-check:   /'
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'

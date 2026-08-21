@@ -360,6 +360,61 @@ async function scanOnce(page, code) {
         await ctx.close();
     }
 
+    // ---------- Scenario D: Zoescan — ការកំណត់ទីតាំង timeout រួច commit យឺត ----------
+    {
+        const zdir = path.join(ROOT, 'Zoescan');
+        const zserver = await serve(zdir);
+        const zport = zserver.address().port;
+        const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
+        const page = await ctx.newPage();
+        page.on('dialog', (d) => d.accept());
+        await page.route('**', (route) => {
+            const u = route.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + zport)) return route.continue();
+            return route.abort();
+        });
+        const seed = seedData();
+        const now = Date.now();
+        seed.user_roles = { 'admin-uid': 'scanner' };
+        seed.zoew_scan_history_cod_dod = {
+            it_z: {
+                id: 'it_z', phone: '0961119999', scanDate: seed._dateKey, createdAt: now - 5000,
+                cod: 6, dod: 0, price: 6, count: 1, barcode: 'ZS1', time: '10:00', isClosed: false,
+                barcodes: [{ code: 'ZS1', time: '10:00', cod: 6, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 5000 }]
+            }
+        };
+        seed.zoew_scanner_lookup = {
+            it_z: { id: 'it_z', phone: '0961119999', barcode: 'ZS1', locker: '', isClosed: false, barcodes: [{ code: 'ZS1', cod: 6, dod: 0, locker: 'N/A', isClosed: false }] }
+        };
+        await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await page.addInitScript("window.localStorage.setItem('zscan_active_locker', 'L7');");
+        await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seed) + ');');
+        await page.goto('http://127.0.0.1:' + zport + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.waitForTimeout(2500);
+
+        await page.evaluate(() => { if (window.chooseLocker) window.chooseLocker('L7'); });
+        // withTimeout(txn, 12000) -> 120ms real; ធ្វើឲ្យវាចុះនៅ 600ms real
+        await page.evaluate(() => { window.__slow = [{ match: 'zoew_scanner_lookup', landAfterMs: 600 }]; });
+        await page.evaluate(() => { try { window.assignLockerToEntry('ZS1'); } catch (e) {} });
+        await page.waitForTimeout(2500);
+
+        const zst = await page.evaluate(() => {
+            const s = window.__fakeStore;
+            const look = s.zoew_scanner_lookup.it_z;
+            const hist = s.zoew_scan_history_cod_dod.it_z;
+            const lb = look && look.barcodes ? (Array.isArray(look.barcodes) ? look.barcodes : Object.values(look.barcodes)) : [];
+            const hb = hist && hist.barcodes ? (Array.isArray(hist.barcodes) ? hist.barcodes : Object.values(hist.barcodes)) : [];
+            return { lookLocker: lb[0] && lb[0].locker, histLocker: hb[0] && hb[0].locker };
+        });
+        check(!(zst.lookLocker === 'L7' && zst.histLocker !== 'L7'),
+            'D: Zoescan ការកំណត់ទីតាំងចុះយឺត ➜ Scanner Lookup និងប្រវត្តិមិនបែកគ្នា',
+            JSON.stringify(zst));
+
+        await ctx.close();
+        zserver.close();
+    }
+
     server.close();
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));

@@ -37,6 +37,7 @@
 | `wiring.js` | ការតភ្ជាប់ HTML↔JS ទាំងអស់ក្នុងមួយឧបករណ៍៖ `getElementById` ↔ `id=` (រាប់ទាំង id ដែល `app.js` បង្កើតជា string), id ស្ទួន, function ក្នុង inline `on*=` **ទាំងក្នុង HTML និងក្នុង HTML ដែល `app.js` បង្កើត**, គោលដៅ `data-close`, និង `onValue(dbRefX)` ដែលគ្មាន guard — ត្រូវការ `acorn` |
 | `dom-hygiene.js` | រកវាល**ណាមួយ**ដែលត្រូវបានសរសេរដោយទិន្នន័យអតិថិជន តែ **មិនត្រូវបានលុបចោលពេលចាកចេញ** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥ និង ៨) — ត្រូវការ `acorn` |
 | `comments.js` | រាប់ comment (ត្រូវតែ 0) + trailing whitespace — ត្រូវការ `acorn` |
+| `stale-write.js` | រកការសរសេរ **item ទាំងមូល** ទៅ `zoew_scan_history_cod_dod` / `zoew_recently_deleted_cod_dod` ដែលសង់ចេញពី `scanHistory`/`deletedItems` **ក្នុងសតិ** ➜ លុបការងាររបស់ឧបករណ៍ផ្សេង។ ការសរសេរដែលមានការអាន `fb.get` លើ node ជាក់លាក់ **មុន** ការសរសេរ ត្រូវបានទទួលយក។ ថ្នាក់នេះកើតឡើងក្នុងជុំ ១២, ១៣ និង ១៥ — ត្រូវការ `acorn` · `STALEWRITE_APP_DIR=<dir>` |
 | `version-check.js` | កំណែ App៖ `APP_VERSION` ក្នុង `app.js` ទាំង ៤ ត្រូវជា semver, ដូចគ្នាទាំង ៤, ត្រូវនឹង `version` ក្នុង `manifest.json` នីមួយៗ, ហើយ `renderAppVersionLabels()` ត្រូវ byte-identical និងត្រូវបានហៅ។ ថែមទាំង assert ថាកន្លែងបង្ហាញ (`data-app-version`) មាន **១ ប៉ុណ្ណោះ ហើយនៅក្នុង `loginModal`** (30 assertion) — ត្រូវការ `acorn` · `VERSION_APP_DIR=<dir>` |
 | `trimws.js <files>` | លុប trailing whitespace ដោយបញ្ជាក់ថា token stream មិនប្រែ |
 | `emu/real.sh` | តេស្ត `firebase-database.rules.json` ពិត លើ RTDB emulator |

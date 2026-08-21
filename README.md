@@ -35,13 +35,13 @@
 ## កំណែ App (Versioning)
 
 App ទាំង ៤ ប្រើ **កំណែតែមួយរួមគ្នា តាមស្តង់ដារ [Semantic Versioning](https://semver.org)**
-(`MAJOR.MINOR.PATCH`) — បច្ចុប្បន្ន **`1.0.0`**។
+(`MAJOR.MINOR.PATCH`) — បច្ចុប្បន្ន **`1.0.1`**។
 
 | កន្លែង | តួនាទី |
 |---|---|
-| `const APP_VERSION = '1.0.0';` នៅដើម `app.js` របស់ App នីមួយៗ | **ប្រភពតែមួយនៃការពិត** |
-| `"version": "1.0.0"` ក្នុង `manifest.json` របស់ App នីមួយៗ | កំណែរបស់ PWA ដែលដំឡើងលើឧបករណ៍ |
-| `renderAppVersionLabels()` (byte-identical ទាំង ៤) | បំពេញអត្ថបទ `កំណែប្រព័ន្ធ: 1.0.0` ចូលធាតុដែលមាន `data-app-version` |
+| `const APP_VERSION = '1.0.1';` នៅដើម `app.js` របស់ App នីមួយៗ | **ប្រភពតែមួយនៃការពិត** |
+| `"version": "1.0.1"` ក្នុង `manifest.json` របស់ App នីមួយៗ | កំណែរបស់ PWA ដែលដំឡើងលើឧបករណ៍ |
+| `renderAppVersionLabels()` (byte-identical ទាំង ៤) | បំពេញអត្ថបទ `កំណែប្រព័ន្ធ: 1.0.1` ចូលធាតុដែលមាន `data-app-version` |
 | `<div class="app-version-line" data-app-version></div>` ក្នុង `loginModal` | **កន្លែងបង្ហាញតែមួយគត់** — អ្នកប្រើឃើញកំណែពេលចូលប្រព័ន្ធ |
 
 **`CACHE_VERSION` ក្នុង `sw.js` មិនមែនជាកំណែ App ទេ** — វាជាកូនសោ Cache (`<app>-vN`)
@@ -54,6 +54,9 @@ App ទាំង ៤ ប្រើ **កំណែតែមួយរួមគ្�
 ២. ប្តូរ `"version"` ក្នុង `manifest.json` **ទាំង ៤** ឲ្យត្រូវនឹងលេខនោះ
 ៣. Bump `CACHE_VERSION` ក្នុង `sw.js` របស់ App ដែលឯកសារប្រែ
 ៤. រត់ `node audit-tools/version-check.js` — វាធ្លាក់ភ្លាមបើមានកន្លែងណាមួយភ្លេច
+
+**ច្បាប់៖ រាល់ជុំ audit ត្រូវឡើងកំណែ** (ការស្នើរបស់អ្នកប្រើ 2026-08-21) — ជុំកែកំហុសឡើង PATCH
+(ឧ. ជុំ ១៥ = `1.0.1`)។
 
 កំណែត្រូវបានផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិដោយ `audit-tools/version-check.js` (ស៊ីគ្នារវាង
 `app.js` ↔ `manifest.json` ↔ `index.html`) និងដោយ `audit-tools/boot-runtime.js`

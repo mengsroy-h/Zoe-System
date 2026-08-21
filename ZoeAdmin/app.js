@@ -4198,6 +4198,7 @@
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
         let serverApplied = false;
+        let serverPackageDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4205,6 +4206,12 @@
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
+        const reconcilePackageDeltaWithServer = () => {
+            if (serverPackageDelta === pickupPackageDelta) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
@@ -4237,6 +4244,7 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
+                serverPackageDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -4254,6 +4262,7 @@
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
                 if (!b) return currentItem;
+                serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
                 b.isClosed = desiredClosed;
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
                 currentItem.isClosed = allClosed;
@@ -4273,6 +4282,8 @@
             }
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
                 revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePackageDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -4607,6 +4618,7 @@
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
         let serverApplied = false;
+        let serverPackageDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4614,6 +4626,12 @@
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
+        const reconcilePackageDeltaWithServer = () => {
+            if (serverPackageDelta === pickupPackageDelta) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
@@ -4652,21 +4670,28 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
+                serverPackageDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
+                const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
+                if (serverBarcodes) {
+                    serverBarcodes.forEach((b) => {
+                        if (desiredClosed && !b.isClosed) serverPackageDelta += 1;
+                        else if (!desiredClosed && b.isClosed) serverPackageDelta -= 1;
+                    });
+                } else if (!!currentItem.isClosed !== desiredClosed) {
+                    const serverPackages = parseFloat(currentItem.count) || 1;
+                    serverPackageDelta = desiredClosed ? serverPackages : -serverPackages;
+                }
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
-                        currentItem.barcodes.forEach(b => b.isClosed = true);
-                    }
+                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = true);
                 } else {
                     delete currentItem.closedAt;
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
-                        currentItem.barcodes.forEach(b => b.isClosed = false);
-                    }
+                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = false);
                 }
                 serverApplied = true;
                 return currentItem;
@@ -4678,6 +4703,8 @@
             }
             if (!serverApplied || !(closeResult && closeResult.committed)) {
                 revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePackageDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);

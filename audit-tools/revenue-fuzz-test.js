@@ -74,6 +74,54 @@ const BOOT = function (seed) {
     function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
     window.__fireAll = fireAll;
     window.__setPath = (p, v) => { setPath(p, v); fireAll(); };
+    // ការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដែល listener របស់យើងមិនទាន់ទទួល — ថ្នាក់កំហុសរបស់ជុំ ១៣
+    window.__otherDevice = (kind, pick) => {
+        const hist = store.zoew_scan_history_cod_dod || {};
+        const ids = Object.keys(hist);
+        if (!ids.length) return null;
+        const id = ids[Math.floor(pick * ids.length) % ids.length];
+        const it = hist[id];
+        if (!it) return null;
+        const bcs = Array.isArray(it.barcodes) ? it.barcodes.filter(Boolean) : [];
+        if (kind === 'delete') {
+            // លុប៖ ផ្លាស់ទៅធុងសំរាម ដោយមិនប៉ះចំណូល (គោលការណ៍ លុប)
+            const copy = JSON.parse(JSON.stringify(it));
+            copy.deletedAt = Date.now();
+            copy.isFromDeletion = true;
+            if (Array.isArray(copy.barcodes)) copy.barcodes = copy.barcodes.map((b) => Object.assign({}, b, { isFromDeletion: true }));
+            store.zoew_recently_deleted_cod_dod[id] = copy;
+            delete hist[id];
+            return 'other:delete';
+        }
+        if (kind === 'remove' && bcs.length > 1) {
+            // ដក៖ យក barcode ១ ចេញ ហើយកាត់ចំណូលចេញ (គោលការណ៍ ដក)
+            const idx = Math.floor(pick * bcs.length) % bcs.length;
+            const gone = bcs[idx];
+            const kept = bcs.filter((_, i) => i !== idx);
+            const r2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+            it.barcodes = kept;
+            it.count = kept.length;
+            it.cod = r2(kept.reduce((a, b) => a + (parseFloat(b.cod) || 0), 0));
+            it.dod = r2(kept.reduce((a, b) => a + (parseFloat(b.dod) || 0), 0));
+            it.price = r2(it.cod + it.dod);
+            const trashId = id + '_rm' + Math.floor(pick * 1e6);
+            store.zoew_recently_deleted_cod_dod[trashId] = Object.assign({}, it, {
+                id: trashId, deletedAt: Date.now(), isFromDeletion: false, count: 1,
+                cod: parseFloat(gone.cod) || 0, dod: parseFloat(gone.dod) || 0,
+                price: r2((parseFloat(gone.cod) || 0) + (parseFloat(gone.dod) || 0)),
+                barcode: gone.code, isClosed: !!gone.isClosed,
+                barcodes: [Object.assign({}, gone, { isDeducted: true, isFromDeletion: false })]
+            });
+            const rev = (store.zoew_daily_revenue_cod_dod || {})[it.scanDate];
+            if (rev) {
+                rev.codDollar = r2((parseFloat(rev.codDollar) || 0) - (parseFloat(gone.cod) || 0));
+                rev.dodDollar = r2((parseFloat(rev.dodDollar) || 0) - (parseFloat(gone.dod) || 0));
+                rev.totalCount = (parseFloat(rev.totalCount) || 0) - 1;
+            }
+            return 'other:remove';
+        }
+        return null;
+    };
 
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
@@ -133,6 +181,15 @@ const BOOT = function (seed) {
             if (bcs && bcs.length) bcs.forEach((b) => { if (b.isDeducted !== true) addBc(b); });
             else if (it.isDeducted !== true) addBc({ cod: it.cod, dod: it.dod });
         });
+        let closedBarcodes = 0;
+        const countClosed = (bag) => Object.keys(bag).forEach((id) => {
+            const it = bag[id];
+            if (!it || it.scanDate !== dateKey) return;
+            const bcs = bcsOf(it);
+            if (bcs && bcs.length) bcs.forEach((b) => { if (b.isClosed === true) closedBarcodes++; });
+            else if (it.isClosed === true) closedBarcodes++;
+        });
+        countClosed(hist); countClosed(trash);
         const rev = (s.zoew_daily_revenue_cod_dod || {})[dateKey] || { codDollar: 0, dodDollar: 0, totalCount: 0 };
         const pick = (s.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
         const phones = pick.pickedUpPhones || {};
@@ -142,6 +199,7 @@ const BOOT = function (seed) {
             expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
             expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
             pkg: parseFloat(pick.packagesPickedUp) || 0,
+            expectPkg: closedBarcodes,
             zeroRefPhones: badRef
         };
     };
@@ -218,6 +276,11 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                 const wanted = OPNAMES[Math.floor(r() * OPNAMES.length)];
                 const pick = r();
                 const amt = Math.round(r() * 4000) / 100;
+                if (r() < 0.35) {
+                    const kind = r() < 0.45 ? 'delete' : 'remove';
+                    const injected = await page.evaluate((a) => window.__otherDevice(a.kind, a.pick), { kind, pick: r() });
+                    if (injected) { trail.push(injected); if (process.env.FUZZ_DEBUG === '1') console.log('    ~ ' + injected); }
+                }
                 const done = await page.evaluate(async (args) => {
                     const { wanted, pick, amt, isAdmin } = args;
                     const live = (typeof scanHistory !== 'undefined' ? scanHistory : []).filter(Boolean);
@@ -287,9 +350,21 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                 }
                 if (inv.zeroRefPhones.length) { broke = 'pickedUpPhones មាន refCount សូន្យ/អវិជ្ជមាន ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv); break; }
                 if (inv.pkg < 0) { broke = 'packagesPickedUp អវិជ្ជមាន ក្រោយ [' + trail.join(' > ') + ']'; break; }
+                if (inv.pkg !== inv.expectPkg) {
+                    broke = 'ស្ថិតិយកកញ្ចប់ខុសពីចំនួន barcode ដែលបិទ ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv);
+                    if (process.env.FUZZ_DEBUG === '1') {
+                        const dump = await page.evaluate(() => ({
+                            hist: window.__fakeStore.zoew_scan_history_cod_dod,
+                            trash: window.__fakeStore.zoew_recently_deleted_cod_dod,
+                            pickup: window.__fakeStore.zoew_daily_pickup_cod_dod
+                        }));
+                        console.log('    DUMP ' + JSON.stringify(dump));
+                    }
+                    break;
+                }
             }
             appRuns++;
-            if (broke) { appFail++; if (!lastDetail) lastDetail = 'seed=' + (1000 + run * 7) + ' ' + broke; }
+            if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
         check(appFail === 0, app + ': invariant ចំណូល រក្សាបាន ក្នុង ' + appRuns + ' លំដាប់ចៃដន្យ × ' + OPS + ' ប្រតិបត្តិការ', lastDetail);

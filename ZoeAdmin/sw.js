@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeadmin-v53';
+const CACHE_VERSION = 'zoeadmin-v56';
 
 const APP_SHELL = [
     './',

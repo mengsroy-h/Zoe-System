@@ -2509,6 +2509,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
@@ -2539,6 +2548,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -2565,12 +2575,16 @@
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = itemId;
                 syncScannerLookupEntry(itemId, committedItem);
+            }
+            if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -2705,7 +2719,10 @@
             patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
                 if (saved) syncScannerLookupEntry(item.id, item);
                 else revertPickupRefMove();
-            }).catch(revertPickupRefMove);
+            }, revertPickupRefMove).catch((postErr) => {
+                console.error('saveEditedPhone post-patch handler failed: ', postErr);
+                if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedPhone post-patch handler' });
+            });
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
             if (searchInput) searchInput.value = '';
@@ -2730,6 +2747,15 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let serverApplied = false;
+        const revertPickupDeltaAfterNoOp = () => {
+            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            pickupCustomerDelta = 0;
+            pickupPackageDelta = 0;
+            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
@@ -2766,6 +2792,7 @@
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
+                serverApplied = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 currentItem.isClosed = desiredClosed;
@@ -2782,12 +2809,16 @@
                         currentItem.barcodes.forEach(b => b.isClosed = false);
                     }
                 }
+                serverApplied = true;
                 return currentItem;
             });
             const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
             if (committedItem) {
                 if (!committedItem.id) committedItem.id = id;
                 syncScannerLookupEntry(id, committedItem);
+            }
+            if (!serverApplied || !(closeResult && closeResult.committed)) {
+                revertPickupDeltaAfterNoOp();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);
@@ -2945,6 +2976,7 @@
         closeModal('restoreWarningModal');
         pendingRestoreId = null;
 
+        let restoreWriteOk = false;
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
             if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
@@ -2954,11 +2986,7 @@
                 [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
-            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
-            openRecentlyDeletedModal();
-            refreshCurrentHistoryView();
-            updateRecentPhonesList();
-            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
+            restoreWriteOk = true;
         } catch (error) {
             appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
             console.error("Restore failed: ", restoredId, error);
@@ -2976,6 +3004,13 @@
             alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
+        }
+        if (restoreWriteOk) {
+            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
+            openRecentlyDeletedModal();
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         }
     }
 

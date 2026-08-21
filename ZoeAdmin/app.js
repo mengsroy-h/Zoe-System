@@ -3791,6 +3791,11 @@
         }
 
         const barcodeToSave = pendingBarcode;
+        if (!barcodeToSave) {
+            closeModal('phoneModal');
+            showToast(`⚠️ សូមស្កេនម្ដងទៀត។`);
+            return;
+        }
 
         if (isBarcodeAlreadyUsed(barcodeToSave)) {
             closeModal('phoneModal');
@@ -3810,7 +3815,16 @@
         if (closeXBtn) closeXBtn.disabled = true;
 
         try {
-            const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
+            const claimPromise = claimBarcodeInRegistry(barcodeToSave);
+            let claim;
+            try {
+                claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
+            } catch (claimError) {
+                claimPromise.then((lateClaim) => {
+                    if (lateClaim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
+                }, () => {});
+                throw claimError;
+            }
             if (claim === 'taken') {
                 closeModal('phoneModal');
                 showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
@@ -3821,12 +3835,24 @@
 
             const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
 
-            try {
-                await withTimeout(addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker), 15000, 'Save timed out');
-            } catch (saveError) {
+            const rollbackFailedSave = () => {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
                 scanHistory = historySnapshot;
                 refreshCurrentHistoryView();
+            };
+
+            const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
+            try {
+                await withTimeout(savePromise, 15000, 'Save timed out');
+            } catch (saveError) {
+                if (saveError && saveError.message === 'Save timed out') {
+                    savePromise.then(() => {
+                        showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
+                        refreshCurrentHistoryView();
+                    }, rollbackFailedSave);
+                } else {
+                    rollbackFailedSave();
+                }
                 throw saveError;
             }
 
@@ -3868,8 +3894,10 @@
             let reopenedFromClosed = false;
             let reopenedScanDate = dateString;
             let reopenedPhoneKey = null;
+            let mergeAddedBarcode = false;
 
             const mergeScannedBarcodeInto = (target) => {
+                mergeAddedBarcode = false;
                 reopenedFromClosed = target.isClosed === true;
                 reopenedScanDate = target.scanDate || dateString;
                 reopenedPhoneKey = getPickupPhoneKey(target);
@@ -3885,6 +3913,7 @@
                 }
 
                 if (!target.barcodes.some(b => b && b.code === barcode)) {
+                    mergeAddedBarcode = true;
                     target.barcodes.push({
                         code: barcode,
                         time: timeString,
@@ -3917,12 +3946,15 @@
             scanHistory.push(item);
             savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
                 .then((committedItem) => {
+                    if (!mergeAddedBarcode) {
+                        addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
+                        showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
+                    }
                     if (reopenedFromClosed && reopenedPhoneKey) {
                         addPickupToDailyRecord(reopenedScanDate, reopenedPhoneKey, -1, 0);
                     }
                     syncScannerLookupEntry(item.id, committedItem || item);
-                })
-                .catch((err) => {
+                }, (err) => {
                     const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
                     if (revertIndex !== -1) scanHistory[revertIndex] = itemSnapshot;
                     refreshCurrentHistoryView();
@@ -4166,6 +4198,7 @@
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
         let serverApplied = false;
+        let serverPackageDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4173,6 +4206,12 @@
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
+        const reconcilePackageDeltaWithServer = () => {
+            if (serverPackageDelta === pickupPackageDelta) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem && freshB) {
             freshB.isClosed = desiredClosed;
@@ -4205,6 +4244,7 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
+                serverPackageDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -4222,6 +4262,7 @@
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
                 if (!b) return currentItem;
+                serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
                 b.isClosed = desiredClosed;
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
                 currentItem.isClosed = allClosed;
@@ -4241,6 +4282,8 @@
             }
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
                 revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePackageDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -4575,6 +4618,7 @@
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
         let serverApplied = false;
+        let serverPackageDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4582,6 +4626,12 @@
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+        };
+        const reconcilePackageDeltaWithServer = () => {
+            if (serverPackageDelta === pickupPackageDelta) return;
+            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem) {
             freshItem.isClosed = desiredClosed;
@@ -4620,21 +4670,28 @@
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
+                serverPackageDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
+                const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
+                if (serverBarcodes) {
+                    serverBarcodes.forEach((b) => {
+                        if (desiredClosed && !b.isClosed) serverPackageDelta += 1;
+                        else if (!desiredClosed && b.isClosed) serverPackageDelta -= 1;
+                    });
+                } else if (!!currentItem.isClosed !== desiredClosed) {
+                    const serverPackages = parseFloat(currentItem.count) || 1;
+                    serverPackageDelta = desiredClosed ? serverPackages : -serverPackages;
+                }
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
-                        currentItem.barcodes.forEach(b => b.isClosed = true);
-                    }
+                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = true);
                 } else {
                     delete currentItem.closedAt;
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes)) {
-                        currentItem.barcodes.forEach(b => b.isClosed = false);
-                    }
+                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = false);
                 }
                 serverApplied = true;
                 return currentItem;
@@ -4646,6 +4703,8 @@
             }
             if (!serverApplied || !(closeResult && closeResult.committed)) {
                 revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePackageDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);

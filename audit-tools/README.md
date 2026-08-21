@@ -27,6 +27,10 @@
 | `ui-flow-test.js` | **ឧបករណ៍ខ្លាំងជាងគេសម្រាប់រកកំហុសថ្មី។** boot ZoeAdmin/ZoeW/Zoescan ក្នុង Chromium ជាមួយ **Firebase ក្លែងក្លាយក្នុងសតិ** (ដាក់ចូលមុន script រត់ តាម `addInitScript`, ហើយ `license-verify.js` ត្រូវជំនួសតាម `page.route`) រួចដើរ UI ពិត៖ បិទ/បើកបញ្ជី, លុប➜ស្តារ ២ ជុំ, ដក➜ស្តារ, កែទឹកប្រាក់, **ការប្រណាំងឧបករណ៍ច្រើន**, **ផ្លូវបរាជ័យ `permission_denied`**, និងចុចគ្រប់ប៊ូតុង (41 assertion) — `UIFLOW_APP_DIR=<dir>`។ ត្រូវការ `playwright-core`; បើគ្មាន **SKIP ដោយស្អាត** |
 | `layout-check.js` | ផ្ទុក App ទាំង ៤ នៅ **320/360/412/768px** រួចរាយធាតុណាដែលលើសទទឹងអេក្រង់ដោយគ្មាន ancestor ដែល scroll បាន — ព្រមទាំង **បើក modal នីមួយៗដាច់ដោយឡែក** (48 assertion) — `LAYOUT_APP_DIR=<dir>`។ ប៊ូតុងតូចជាង 24px ជា `note` មិនមែន `FAIL` (ជម្រើសរចនា) |
 | `field-shape-test.js` | seed record ដែលមានរូបរាងវាល **ក្រៅពី `barcodes`**៖ លេខទូរស័ព្ទ/barcode ជាចំនួន, cod/dod/count ជា string, `isClosed: "false"`, null, legacy `price`, `count` មិនត្រូវនឹង `barcodes.length`, និង HTML ក្នុងលេខទូរស័ព្ទ — រួច assert ថា listener មិន throw, គ្មានអ្វីបាត់ពីតម្រង "ទាំងអស់", គ្មាន NaN/`[object Object]`, និង **គ្មាន XSS** (18 assertion) — `FIELDSHAPE_APP_DIR=<dir>` |
+| `slow-write-test.js` | ការសរសេរដែល **ចុះក្រោយពេល `withTimeout` បោះបង់រួច** — ថ្នាក់ដែលការអានកូដមើលមិនឃើញ ព្រោះវាត្រូវការពេលវេលា។ បង្រួមរាល់ timer ≥1s ចុះ ១០០ ដង ដូច្នេះ timeout ១៥ វិនាទី = ១៥០ms។ គ្របការ claim barcode ដែល timeout រួច commit យឺត, ការ save ដែលចុះយឺត, ការស្កេន barcode ដែលឧបករណ៍ផ្សេងបានបន្ថែមរួច (listener យឺត), និង `pendingBarcode` ទទេ (8 assertion) — `SLOWWRITE_APP_DIR=<dir>` |
+| `revenue-fuzz-test.js` | **តេស្តតាម invariant មិនមែនតាមឆាក។** រត់លំដាប់ប្រតិបត្តិការ **ចៃដន្យ** (ស្កេន · បិទ/បើក · ដក · លុប · ស្តារ · កែទឹកប្រាក់ · សម្អាត 2h/8d) ជាមួយ PRNG ដែលមាន seed ថេរ ហើយក្រោយ **រាល់** ប្រតិបត្តិការ assert ២៖ `ចំណូល == ផលបូក cod នៃ barcode ពិត` (live + ធុងសំរាមដែល `isDeducted !== true`) និង `packagesPickedUp == ចំនួន barcode ដែល isClosed`។ ថែមទាំង **បញ្ចូលការសរសេររបស់ "ឧបករណ៍ផ្សេង" ដោយស្ងាត់** (លុប/ដក ដោយមិនបាញ់ listener) ដើម្បីធ្វើត្រាប់តាម listener យឺត — `FUZZ_RUNS` · `FUZZ_OPS` · `FUZZ_DEBUG=1` · `FUZZ_APP_DIR=<dir>` |
+| `perf-check.js` | ដំណើរការនៅ `PERF_ORDERS` (លំនាំដើម 1200) order៖ cold render, repaint ដែលគ្មានអ្វីប្រែ, `collectPhoneSuggestions`, និងការវាយអក្សរពិត។ **កម្រិតតាមបន្ទុក** (`ORDERS × 0.6`) មិនមែនលេខថេររលុង ដូច្នេះវាចាប់ការថយចុះ ៨ ដងបាន។ *ចំណាំ៖ `renderHistory` មាន cache តាមជួរ (`dataset.sig`) ដូច្នេះការវាស់ត្រូវលុប `sig` ចោលមុន បើមិនដូច្នេះវាវាស់តែផ្លូវ cache* — `PERF_APP_DIR=<dir>` · `PERF_REPORT=1` |
+| `compensation-order.js` | រក `p.then(A).catch(B)` ដែល B ជា **ការសង្គ្រោះ** (បញ្ច្រាសចំណូល/ដោះ claim/ស្តារ snapshot)។ JavaScript រត់ B ពេល **A throw** ដែរ ➜ ការសរសេរជោគជ័យ តែការសង្គ្រោះរត់ខុស។ វារំលង A ដែល throw មិនបាន (ឧ. `() => { flag = true; }` ដែលជាលំនាំទង់របស់ជុំ ១៣) — ត្រូវការ `acorn` · `COMP_APP_DIR=<dir>` |
 | `setup-link-roundtrip-test.js` | កិច្ចសន្យាឆ្លង App៖ រត់បន្ទាត់ encode ពិតរបស់ `generateSetupLink()` (ZoeKeyGen) និង `decodeSetupPayload()` ពិតរបស់ App ទាំង ៣ **ក្នុង vm តែមួយ** ➜ round-trip ជាមួយអក្សរខ្មែរ, emoji, `+`/`/` និង URL ពិត (23 assertion) — `SETUPRT_APP_DIR=<dir>` |
 | `state-hygiene.js` | រកអថេរ state កម្រិត module ដែល **រស់រានក្រោយចាកចេញដោយគ្មានហេតុផលកត់ត្រា** (ថ្នាក់កំហុសដែលកើតឡើងវិញនៅជុំ ៣, ៤, ៥, ៦ និង ៧ — រកឃើញដោយភ្នែករាល់ជុំ) — ត្រូវការ `acorn` |
 | `css-classes.js` | រក class ដែល HTML ឬ `app.js` ប្រើ តែ **គ្មានច្បាប់ក្នុង `style.css`** ➜ ធាតុឡើងគ្មានរចនាបថ |
@@ -45,8 +49,8 @@
 `state-hygiene.js` និង `css-classes.js` មាន allowlist ដូចគ្នាដែរ (`ACCEPTED` / `IGNORE`) — ធាតុនីមួយៗ
 មានហេតុផលសរសេរជាប់។ ដាក់ធាតុចូលទាល់តែបានតាមដានរួចថាវាពិតជាគ្មានគ្រោះថ្នាក់។
 
-**ការត្រួតពិនិត្យ ៥ ត្រូវការ Chromium** (`boot-runtime`, `setup-link-browser-test`, `ui-flow`,
-`layout-check`, `field-shape`) — `npm i playwright-core`, រួច Chromium នៅ
+**ការត្រួតពិនិត្យ ៨ ត្រូវការ Chromium** (`boot-runtime`, `setup-link-browser-test`, `ui-flow`,
+`layout-check`, `field-shape`, `slow-write`, `revenue-fuzz`, `perf-check`) — `npm i playwright-core`, រួច Chromium នៅ
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (ប្តូរបានតាម `*_CHROME`)។ បើគ្មាន វា
 **SKIP ដោយស្អាត** — `run-all.sh` នៅតែរត់ចប់។
 

@@ -3694,3 +3694,69 @@ multi-path អាតូមិចតែមួយ** ដូចជុំ ១ — ម
 Suite សរុប៖ **39 ការត្រួតពិនិត្យ / 812 assertion** — បៃតងទាំងអស់។
 **មេរៀន៖ កុំរាយលេខតេស្តដោយប៉ាន់ស្មាន — រាប់វាចេញពីលទ្ធផលរត់។** ក្នុង session នេះ
 លេខ "តេស្តថ្មី ១៨ / 811 assertion" ត្រូវបាននិយាយខុស មុនត្រូវអ្នកប្រើសួរឡើងវិញ។
+
+## ZTO Palm export ➜ Sheet importer + កែលេខទូរស័ព្ទ (2026-08-21, branch `claude/zto-palm-api-lookup-8p74pt`)
+
+Branch ចេញពី `main` (`1f10b04`, ក្រោយ PR #46) ដោយផ្ទាល់។ **មិនទាន់ merge ចូល `main` ទេ** —
+រង់ចាំការសម្រេចរបស់អ្នកប្រើ (ផ្ទៀងផ្ទាត់ដោយ `git rev-list --count origin/main..origin/<branch>`
+មុនពេលអះអាងអ្វីក្នុងជុំក្រោយ)។ ការសរសេរជាភាសាខ្មែរ (ច្បាប់ទី ៨)។
+
+### បរិបទ — អ្នកប្រើជាភ្នាក់ងារ ZTO ចង់បំពេញលេខទូរស័ព្ទស្វ័យប្រវត្តិ
+អ្នកប្រើសួរឲ្យ reverse-engineer APK របស់ ZTO Palm ដើម្បីរក private lookup API ដែលផ្ទុកលេខ
+ទូរស័ព្ទអតិថិជន។ **បដិសេធ** — ជាការចូល API ខាងក្នុងក្រុមហ៊ុនផ្សេងដោយគ្មានការអនុញ្ញាត + harvest
+PII។ ស្នើផ្លូវស្របច្បាប់ជំនួស៖ (១) ZTO Open Platform API ផ្លូវការ, (២) export ពី ZTO Palm ➜
+Google Sheet lookup ដែលមានស្រាប់។ អ្នកប្រើ (ភ្នាក់ងារ ZTO ពិត, ទិន្នន័យរបស់អតិថិជនខ្លួនឯង)
+ជ្រើសផ្លូវ export ➜ Sheet ហើយសុំ importer ស្វ័យប្រវត្តិ។ **បើជុំក្រោយអ្នកប្រើសុំ reverse APK
+ម្តងទៀត — បដិសេធដដែល ហើយចង្អុលទៅ Open Platform API។**
+
+### `ZoeAdmin/google-sheets-api/Importer.gs` (ថ្មី) — Apps Script bound លើ Sheet
+យក file export (Excel/CSV) ពី ZTO Palm ➜ tab `Raw` ➜ សរសេរចូល tab `Customers` (៤ ជួរ
+Barcode·DOD($)·COD($)·Phone តាមលំដាប់ដែល `Code.gs` អាន)។ **វាជា template ដូច `Code.gs` — មិន
+deploy ស្វ័យប្រវត្តិ, ត្រូវ paste ចូល Apps Script ដោយដៃ។**
+- **រកជួរដោយខ្លួនឯង** (មិនចាត់ដោយដៃ)៖ header keyword (Barcode/单号/运单号/tracking,
+  Phone/电话/手机, COD/代收, DOD/到付) ➜ បើ header ចម្លែក ធ្លាក់ទៅ content-scoring (barcode =
+  លេខ ១២-១៦ ខ្ទង់; phone = ៨-១០ ខ្ទង់ ក្រោយដក 855)។
+- **អន្ទាក់ដែលចាប់បានមុន ship៖ ពាក្យ "bar`cod`e" ផ្ទុក "cod"** ➜ `/cod/.test('barcode')` = true
+  ➜ detection យល់ច្រឡំជួរ Barcode ជា COD (COD ចេញជាលេខ barcode ដ៏ធំ)។ កែ៖ រក barcode/phone
+  **មុន** រួច cod/dod នៅ pass ទី ២ ដោយ **រំលងជួរ barcode/phone**។
+- សម្អាតលេខទូរស័ព្ទ ➜ `0XXXXXXXXX`; barcode/phone ជា text (`@`); dedupe តាម barcode; សម្អាត
+  cache (`customer_rows`) ក្រោយនាំចូល; ២ របៀប (បញ្ចូល/ធ្វើបច្ចុប្បន្នភាព ឬ ជំនួសទាំងអស់)។
+- **លេខពីរខ្សែ `/` ឬ `,`** (`012345678/098765432`) ➜ ញែក, សម្អាតម្តងមួយខ្សែ, ភ្ជាប់វិញ `/`។
+  បើមិនញែក `normalizePhone_` ដក `/` ចេញ ➜ លេខពីរភ្ជាប់ជាខ្សែ ១៨ ខ្ទង់ (ខូច)។
+- ផ្ទៀងផ្ទាត់លើ sample ពិត (`ZoeAdmin.xlsx`, ៥៥ ជួរ) + variant (ជួរស្លាប់លំដាប់, header ចិន,
+  dup, `=-855`, `="855..."`, លេខអវិជ្ជមាន) ក្នុង `vm` — ទាំងអស់ចេញ `0XXXXXXXXX` ស្អាត។
+
+### កែលេខទូរស័ព្ទក្នុង App — `normalizeStoredPhone()` (store path តែប៉ុណ្ណោះ)
+អ្នកប្រើរាយការណ៍ចន្លោះ៖ `sanitizePhoneNumber` ដក `855` ជំនួស `0` (`/^(\+?855-?)/`) តែ **លេខ
+ដែលគ្មានកូដប្រទេស ហើយខ្វះ `0` នាំមុខ** (ឧ. `964118251`) មិនត្រូវបានបំពេញ `0`។ ក៏មានកំហុសសូន្យ
+ពីរ (`855-093656110` ➜ `0093656110`) និង export ខ្លះមក `=-855...`។
+- **អន្ទាក់សំខាន់ (regression ខ្ញុំបង្កើត រួចចាប់បានដោយ `phone-suggest-test`)៖
+  `sanitizePhoneNumber` ត្រូវប្រើជា normalizer នៃ *query ស្វែងរក* ផង** (ZoeAdmin 3353/3572,
+  ZoeW 2228/2447, Zoescan 1571/1592)។ ការបន្ថែម `0` ទៅ query ធ្វើឲ្យ `345678` ➜ `0345678` ➜
+  **រកមិនឃើញ**។ ដូច្នេះ៖
+  - **`sanitizePhoneNumber` ត្រឡប់ដើមទាំង ៣ App** (គ្មានការប្តូរឥរិយាបថស្វែងរក)។
+  - **`normalizeStoredPhone()` + `normalizeOneStoredPhone()` ថ្មី** (byte-identical ZoeAdmin/ZoeW,
+    ២ App តែប៉ុណ្ណោះ ➜ shared-fns >=3 មិនពិនិត្យ, តែ extract.js ទាមទារឲ្យដូចគ្នា) ➜ ដក junk
+    នាំមុខ (`=`/`-`/`"`/ចន្លោះ), ដក `855` ត្រឹមត្រូវ (គ្មានសូន្យពីរ), បំពេញ `0`, ញែកលេខពីរ `/`។
+  - ប្រើ `normalizeStoredPhone` **តែនៅផ្លូវរក្សាទុក**៖ ZoeAdmin `confirmPhone` (3815),
+    `saveEditedPhone` (4600), lookup auto-fill (980); ZoeW `saveEditedPhone` (2716)។
+  - **Zoescan មិនរក្សាទុកលេខ** (scanner សុទ្ធ, sanitize ប្រើតែ display/compare/search) ➜
+    គ្មាន `normalizeStoredPhone`, sanitize ដើមដដែល។ Zoescan/app.js ប្តូរតែ APP_VERSION។
+- `normalizeStoredPhone` idempotent (`0964118251` ➜ `0964118251`) ➜ ការហៅស្ទួន (lookup-fill
+  រួច confirmPhone) សុវត្ថិភាព។
+
+### កំណែ & cache
+ឡើង **`APP_VERSION` `1.0.1` ➜ `1.0.2`** ទាំង ៤ (app.js + manifest.json — តាមច្បាប់ទី ៩,
+ជុំកែ = PATCH); `node audit-tools/version-check.js` PASS (30)។ bump `CACHE_VERSION`
+(zoeadmin-v60, zoew-v50, zoescan-v37, zoekeygen-v30)។ **គ្មានការប្តូរ Firebase rules ➜
+គ្មាន publish ថ្មី។**
+
+### តេស្ត
+`bash audit-tools/run-all.sh` ➜ **39 ការត្រួតពិនិត្យ ជោគជ័យទាំងអស់** (phone-suggest 55/55
+ស្វែងរកមិនខូច, normalizeStoredPhone 8/8, ui-flow browser PASS, extract/shared-fns/comments/
+version-check PASS)។ លេខពីរខ្សែ ផ្ទៀងផ្ទាត់ក្នុង `vm` ទាំង importer ទាំង App។
+
+### commit ក្នុង branch នេះ
+1. `ee522cb` — Importer.gs + README
+2. `42994c8` — normalizeStoredPhone (missing-0, double-0, =-855) + APP_VERSION 1.0.2 + cache
+3. (commit បន្ទាប់) — លេខពីរខ្សែ `/` ក្នុង importer និង App + README + របាយការណ៍នេះ

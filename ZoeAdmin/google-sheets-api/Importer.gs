@@ -200,7 +200,17 @@ function cleanBarcode_(v) {
 
 function normalizePhone_(v) {
   if (v === null || v === undefined) return '';
-  var d = v.toString().replace(/\D/g, '');
+  var parts = v.toString().split(/[\/,]/);
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var one = normalizeOnePhone_(parts[i]);
+    if (one) out.push(one);
+  }
+  return out.join('/');
+}
+
+function normalizeOnePhone_(part) {
+  var d = part.toString().replace(/\D/g, '');
   if (!d) return '';
   if (d.indexOf('855') === 0) d = d.substring(3);
   if (d.charAt(0) !== '0') d = '0' + d;

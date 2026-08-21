@@ -122,7 +122,11 @@
 
     function normalizeStoredPhone(phoneStr) {
         if (!phoneStr) return '';
-        let trimmed = String(phoneStr).trim();
+        return String(phoneStr).split(/[\/,]/).map(normalizeOneStoredPhone).filter(Boolean).join('/');
+    }
+
+    function normalizeOneStoredPhone(part) {
+        let trimmed = String(part).trim();
         trimmed = trimmed.replace(/^[='"\s-]+/, '');
         if (/^\+?855/.test(trimmed)) {
             trimmed = trimmed.replace(/^\+?855[\s-]*/, '');

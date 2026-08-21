@@ -4628,9 +4628,26 @@
                 addPickupToDailyRecord(pickupDate, nextPickupKey, -1, 0);
                 addPickupToDailyRecord(pickupDate, prevPickupKey, 1, 0);
             };
-            patchHistoryItemFields(item, patchFields, previousFields).then((saved) => {
-                if (saved) syncScannerLookupEntry(item.id, item);
-                else revertPickupRefMove();
+            let serverWasClosed = null;
+            const reconcilePickupRefWithServer = () => {
+                if (serverWasClosed === null || prevPickupKey === nextPickupKey) return;
+                if (serverWasClosed && !pickupRefMoved) {
+                    addPickupToDailyRecord(pickupDate, prevPickupKey, -1, 0);
+                    addPickupToDailyRecord(pickupDate, nextPickupKey, 1, 0);
+                    pickupRefMoved = true;
+                } else if (!serverWasClosed && pickupRefMoved) {
+                    revertPickupRefMove();
+                }
+            };
+            patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
+                serverWasClosed = !!serverItem.isClosed;
+            }).then((saved) => {
+                if (saved) {
+                    reconcilePickupRefWithServer();
+                    syncScannerLookupEntry(item.id, item);
+                } else {
+                    revertPickupRefMove();
+                }
             }, revertPickupRefMove).catch((postErr) => {
                 console.error('saveEditedPhone post-patch handler failed: ', postErr);
                 if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedPhone post-patch handler' });
@@ -5137,8 +5154,8 @@
         });
     }
 
-    function patchHistoryItemFields(item, fields, previousFields) {
-        if (!dbRefHistory) return Promise.resolve(false);
+    function patchHistoryItemFields(item, fields, previousFields, onServerItem) {
+        if (!dbRefHistory || !db || !fb) return Promise.resolve(false);
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to patch history item with missing/unsafe id');
             console.error(err.message, item && item.id);
@@ -5146,24 +5163,40 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.resolve(false);
         }
-        const updates = {};
-        Object.keys(fields).forEach(key => {
-            updates[`${item.id}/${key}`] = fields[key];
-        });
-        return fb.update(dbRefHistory, updates).then(() => true).catch((error) => {
+        const revertLocalFields = () => {
+            if (!previousFields) return;
+            const revertItem = scanHistory.find(i => i.id === item.id);
+            if (!revertItem) return;
+            Object.keys(previousFields).forEach((key) => {
+                if (previousFields[key] === undefined) delete revertItem[key];
+                else revertItem[key] = previousFields[key];
+            });
+            refreshCurrentHistoryView();
+        };
+        let serverItemExisted = false;
+        return fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+            serverItemExisted = false;
+            if (!currentItem) return currentItem;
+            normalizeBarcodesOf(currentItem);
+            if (onServerItem) onServerItem(currentItem);
+            Object.keys(fields).forEach((key) => {
+                if (fields[key] === null) delete currentItem[key];
+                else currentItem[key] = fields[key];
+            });
+            serverItemExisted = true;
+            return currentItem;
+        }).then((result) => {
+            if (!serverItemExisted || !(result && result.committed)) {
+                revertLocalFields();
+                showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
+                return false;
+            }
+            return true;
+        }, (error) => {
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
-            if (previousFields) {
-                const revertItem = scanHistory.find(i => i.id === item.id);
-                if (revertItem) {
-                    Object.keys(previousFields).forEach((key) => {
-                        if (previousFields[key] === undefined) delete revertItem[key];
-                        else revertItem[key] = previousFields[key];
-                    });
-                    refreshCurrentHistoryView();
-                }
-            }
+            revertLocalFields();
             return false;
         });
     }

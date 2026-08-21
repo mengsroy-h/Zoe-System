@@ -3640,10 +3640,14 @@ multi-path អាតូមិចតែមួយ** ដូចជុំ ១ — ម
   `{...b}`) ហើយ **ទទួលយក** ការសរសេរដែលមាន `fb.get` លើ node ជាក់លាក់ **មុន** ការសរសេរនោះ។
   **មិនទទេ៖ ធ្លាក់ ២ លើ `origin/main`** (`executeRestoreItem` ទាំង ២ App)។
   ថ្នាក់នេះកើតឡើងក្នុងជុំ ១២, ១៣ និង ១៥ — ឥឡូវវាក្លាយជាការត្រួតពិនិត្យស្វ័យប្រវត្តិ។
-- **`ui-flow-test.js` ឡើងពី 95 ➜ 107** — ស្ថានភាព ៦ សម្រាប់ស្ថិតិអតិថិជន (ក/ខ/គ × ២ App)
-  និង ៦ សម្រាប់ការស្តារ។ **ធ្លាក់ ១០ លើ `origin/main`**។
+- **`ui-flow-test.js` ឡើងពី 95 ➜ 111** — ស្ថានភាព ៦ សម្រាប់ស្ថិតិអតិថិជន (ក/ខ/គ × ២ App)
+  និង ៦ សម្រាប់ការស្តារ ព្រមទាំង ៤ សម្រាប់ការកែលេខទូរស័ព្ទ។ **ធ្លាក់ ១៤ លើ `origin/main`**។
 - **`slow-write-test.js` ឡើងពី 8 ➜ 9** — Scenario D សម្រាប់ Zoescan។ **ធ្លាក់ ១ លើ `origin/main`**
   ដោយបង្ហាញ `{"lookLocker":"L7","histLocker":"N/A"}` — desync ពិត។
+
+**`ui-flow-test.js` ប្តូរពី port ថេរ 8530 ទៅ port ចៃដន្យ** (`s.listen(0, '127.0.0.1')` ដូច
+`slow-write-test.js`) — ការរត់ ២ instance ស្របគ្នា (កូដថ្មី ទល់នឹង baseline) ធ្លាក់ដោយ
+`EADDRINUSE` ដែលមើលទៅដូចកំហុសកូដ។
 
 **អន្ទាក់ក្នុង harness ដែលចំណាយពេល (កត់ទុក)៖** `fb.runTransaction` ក្លែងក្លាយហៅ `fireAll()`
 **ដោយ synchronous** ➜ listener បាញ់ភ្លាម ➜ `scanHistory` ត្រូវសាងឡើងវិញពី server ➜
@@ -3651,10 +3655,21 @@ multi-path អាតូមិចតែមួយ** ដូចជុំ ១ — ម
 ហើយកែ store **ក្រោយ** ការហៅចុងក្រោយដែលបាញ់ listener (ក្នុងករណីនេះ `zoew_monthly_revenue_cod_dod`
 ដែលរត់ក្រោយ `zoew_daily_revenue_cod_dod`)។
 
+### កំហុសទី ៥ — `patchHistoryItemFields` ជា `update` ➜ បង្កើត record ខ្មោច និងផ្លាស់ ref ខុស
+ដំបូងត្រូវបានរាយការណ៍ជាចំណុច "មិនកែ" រួចអ្នកប្រើឆ្លើយថា *"កែទាំងអស់អោយហើយទៅ ទុកធ្វើអី?"*
+➜ បានកែ។ ២ ផលក្នុងកំហុសតែមួយ៖
+- **record ខ្មោច** — `fb.update(dbRefHistory, {'<id>/callMark': x})` លើកញ្ចប់ដែលឧបករណ៍ផ្សេង
+  លុប/ផ្លាស់ចូលធុងសំរាមរួច **បង្កើត node ថ្មីដែលមានតែ field នោះ** (rules គ្មាន `.validate`
+  កម្រិត item) ➜ ជួរខូចក្នុងតារាង គ្មាន barcodes គ្មានលុយ ហើយ sweep ៨ ថ្ងៃនឹងព្យាយាមដកវា។
+  ប៉ះ `handleCallAction`, `setCallMark` និង `saveEditedPhone` ទាំងអស់។
+- **pickup ref ផ្លាស់ខុស** — `saveEditedPhone` សម្រេចផ្លាស់ ref តាម `item.isClosed` **ក្នុងសតិ**។
+
+**កែ**៖ `patchHistoryItemFields` ប្តូរទៅ `runTransaction` (សរសេរតែពេល node មានពិត;
+`null` ក្នុង `fields` ក្លាយជា `delete`) ហើយទទួល callback ទី ៤ `onServerItem` ដែលឲ្យអ្នកហៅ
+អានស្ថានភាពពិតរបស់ server មុនការប្តូរ។ `saveEditedPhone` ប្រើវាដើម្បីកែតម្រូវការផ្លាស់ ref
+ក្រោយ commit។ ទាំងពីរនៅ byte-identical ទាំង ២ App។
+
 ### រកឃើញ តែមិនបានកែដោយចេតនា
-- **`saveEditedPhone` ផ្លាស់ pickup ref តាម `item.isClosed` ក្នុងសតិ** — បើ server ខុស ref អាចចុះ
-  ខុសកន្លែង។ ចង្អៀតខ្លាំង (ត្រូវកែលេខ ខណៈឧបករណ៍ផ្សេងបិទ/បើកបញ្ជីដដែលក្នុងវិនាទីជាមួយគ្នា) ហើយ
-  ការកែត្រូវប្តូរ `patchHistoryItemFields` ទៅ transaction ដែលជាការពង្រីកវិសាលភាពធំ។
 - អ្វីៗដែលជុំមុនទទួលយកដោយចេតនា នៅដដែលទាំងអស់ (រួមទាំងតំបន់ម៉ោងឧបករណ៍ពីជុំ ១៤)។
 
 ### ចម្លើយចំពោះសំណួររបស់អ្នកប្រើ

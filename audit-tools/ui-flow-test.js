@@ -19,7 +19,7 @@ function ok(name) { console.log('  ok    ' + name); pass++; }
 function bad(name, detail) { console.log('  FAIL  ' + name + (detail ? '\n        ' + detail : '')); fail++; }
 function check(cond, name, detail) { cond ? ok(name) : bad(name, detail); }
 
-function serve(dir, port) {
+function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -29,7 +29,7 @@ function serve(dir, port) {
             rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' });
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
@@ -171,11 +171,11 @@ function seedData() {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    let port = 8530;
     for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
-        const server = await serve(dir, port);
+        const server = await serve(dir);
+        const port = server.address().port;
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         const errors = [];
@@ -221,7 +221,7 @@ function seedData() {
 
             const real0 = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
             check(real0.length === 0, 'Zoescan: គ្មានកំហុស runtime ពេល boot', real0.slice(0, 3).join(' | '));
-            await ctx.close(); server.close(); port++; continue;
+            await ctx.close(); server.close(); continue;
         }
 
         const booted = await page.evaluate(() => ({
@@ -422,6 +422,64 @@ function seedData() {
             check(!stillCounted,
                 'ZoeAdmin: បញ្ជីបើកវិញដោយការស្កេន ➜ លែងរាប់ជាអតិថិជនយកហើយ',
                 'pickedUpPhones=' + JSON.stringify(after.pick.pickedUpPhones) + ' (មុនស្កេន ' + JSON.stringify(pickClosed.pickedUpPhones) + ')');
+        }
+
+        // --- ការកែលេខទូរស័ព្ទ ត្រូវពឹងលើស្ថានភាពពិតរបស់ server ---
+        {
+            const dk = seed._dateKey;
+            await page.evaluate((a) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a = {
+                    id: 'id_ph_a', phone: '0914000001', scanDate: a.dk, createdAt: now - 40000,
+                    cod: 5, dod: 0, price: 5, count: 1, barcode: 'PH1', time: '07:00', isClosed: false,
+                    barcodes: [{ code: 'PH1', time: '07:00', cod: 5, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 40000 }]
+                };
+                window.__fakeStore.zoew_scan_history_cod_dod.id_ph_b = {
+                    id: 'id_ph_b', phone: '0914000002', scanDate: a.dk, createdAt: now - 30000,
+                    cod: 5, dod: 0, price: 5, count: 1, barcode: 'PH2', time: '07:10', isClosed: false,
+                    barcodes: [{ code: 'PH2', time: '07:10', cod: 5, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 30000 }]
+                };
+                window.__fireAll();
+            }, { dk: dk });
+            await page.waitForTimeout(300);
+
+            // ក. server បិទបញ្ជីរួច (យើងមិនទាន់ដឹង) ➜ ការកែលេខត្រូវផ្លាស់ ref ទៅលេខថ្មី
+            await page.evaluate((a) => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a;
+                it.isClosed = true; it.closedAt = Date.now(); it.barcodes[0].isClosed = true;
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || { packagesPickedUp: 0, pickedUpPhones: {} };
+                p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
+                p.pickedUpPhones = p.pickedUpPhones || {};
+                p.pickedUpPhones['0914000001'] = 1;
+                window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
+            }, { dk: dk });
+            await page.evaluate(() => {
+                window.openEditModal('id_ph_a');
+                document.getElementById('editPhoneInput').value = '0914000009';
+                window.saveEditedPhone();
+            });
+            await page.waitForTimeout(700);
+            const phA = await page.evaluate((a) => {
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || {};
+                const ph = p.pickedUpPhones || {};
+                return { old: ph['0914000001'] || 0, neu: ph['0914000009'] || 0, serverPhone: window.__fakeStore.zoew_scan_history_cod_dod.id_ph_a.phone };
+            }, { dk: dk });
+            check(phA.serverPhone === '0914000009' && phA.old === 0 && phA.neu === 1,
+                app + ': កែលេខលើបញ្ជីដែល server បិទរួច ➜ ref ផ្លាស់ទៅលេខថ្មី', JSON.stringify(phA));
+
+            // ខ. ឧបករណ៍ផ្សេងលុបកញ្ចប់ ➜ ការកែលេខមិនត្រូវបង្កើត record ខ្មោច
+            await page.evaluate(() => { delete window.__fakeStore.zoew_scan_history_cod_dod.id_ph_b; });
+            await page.evaluate(() => {
+                window.openEditModal('id_ph_b');
+                document.getElementById('editPhoneInput').value = '0914000008';
+                window.saveEditedPhone();
+            });
+            await page.waitForTimeout(700);
+            const phB = await page.evaluate(() => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_ph_b;
+                return { exists: !!it, keys: it ? Object.keys(it) : [] };
+            });
+            check(phB.exists === false, app + ': កែលេខលើកញ្ចប់ដែលលែងមាន ➜ មិនបង្កើត record ខ្មោច', JSON.stringify(phB));
         }
 
         // --- ការស្តារពីធុងសំរាម ត្រូវធ្វើលើច្បាប់ចម្លងរបស់ server ---
@@ -1255,7 +1313,6 @@ function seedData() {
 
         await ctx.close();
         server.close();
-        port++;
     }
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));

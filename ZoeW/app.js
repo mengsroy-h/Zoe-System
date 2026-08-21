@@ -1,4 +1,4 @@
-    const APP_VERSION = '1.0.2';
+    const APP_VERSION = '1.0.4';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -924,6 +924,7 @@
                 autoLoginAttempted = false;
                 verifyWorkerRoleThenProceed(user, myAuthGeneration);
             } else {
+                resetClearHistoryOperationState();
                 pendingRoleRecheck = false;
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
@@ -951,7 +952,7 @@
 
     function loginWithFirebase() {
         if (!auth) {
-            alert("សូមកំណត់រចនាសម្ព័ន្ធ FirebaseConfig ជាមុនសិន!");
+            alert("សូមកំណត់រចនាសម្ព័ន្ធ Firebase Config ជាមុនសិន!");
             checkPinAndOpenConfig();
             return;
         }
@@ -967,7 +968,7 @@
         const rememberMe = rememberCb ? rememberCb.checked : false;
 
         if (!email || !password) {
-            alert("សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
+            alert("សូមបញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់!");
             return;
         }
 
@@ -1017,10 +1018,12 @@
     function logoutApp() {
         if (auth) {
             fb.signOut(auth).then(() => {
+                resetClearHistoryOperationState();
                 clearRememberedSession(false);
                 showLoginModalWithPrefill();
                 showToast("បានចាកចេញពីប្រព័ន្ធ!");
             }).catch(() => {
+                resetClearHistoryOperationState();
                 clearRememberedSession(false);
                 showLoginModalWithPrefill();
                 showToast("បានចាកចេញពីប្រព័ន្ធ!");
@@ -1105,7 +1108,7 @@
                 item.price = Math.round((item.cod + item.dod) * 100) / 100;
 
                 if (Array.isArray(item.barcodes) || (item.barcodes && typeof item.barcodes === 'object')) {
-                    item.barcodes = barcodeEntriesOf(item.barcodes).map(e => e.barcode);
+                    normalizeBarcodesOf(item);
                     if (item.barcodes.length) item.count = item.barcodes.length;
                 }
 
@@ -1158,12 +1161,14 @@
     }
 
     const cleanupInFlight = new Set();
+    let deletedCleanupInFlight = false;
 
     function runAutomaticCleanupRules() {
         const currentTime = getServerNow();
 
         scanHistory.forEach(item => {
             if (!item.id) return;
+            if (item.clearClaim) return;
             let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
             if (!item.isClosed && (currentTime - itemTimestamp > EIGHT_DAYS_MS)) {
@@ -1179,13 +1184,29 @@
 
     async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
         const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
+        let clearClaimBlocked = false;
         return retryAsync(() => fb.runTransaction(itemRef, (currentItem) => {
+            clearClaimBlocked = false;
+            if (currentItem && currentItem.clearClaim) {
+                clearClaimBlocked = true;
+                return;
+            }
             normalizeBarcodesOf(currentItem);
             if (claimedWhole) {
-                return currentItem || claimedWhole;
+                if (currentItem) return currentItem;
+                const updated = cloneRestoreItem(claimedWhole);
+                delete updated.restoreClaim;
+                delete updated.restoreClaimId;
+                delete updated.restoreClaimToken;
+                return updated;
             }
             const reclaimed = barcodeEntriesOf(claimedPartial.barcodes).map(({ barcode }) => { const { isDeducted, ...rest } = barcode; return rest; });
             const base = currentItem || { ...claimedPartial, barcodes: [] };
+            if (!currentItem) {
+                delete base.restoreClaim;
+                delete base.restoreClaimId;
+                delete base.restoreClaimToken;
+            }
             const existingCodes = new Set((base.barcodes || []).map(b => b.code));
             const merged = [...(base.barcodes || []), ...reclaimed.filter(b => !existingCodes.has(b.code))];
             const updated = { ...base, barcodes: merged };
@@ -1201,7 +1222,10 @@
                 delete updated.closedAt;
             }
             return updated;
-        }), 3, 1500);
+        }), 3, 1500).then((result) => {
+            if (clearClaimBlocked || !result || !result.committed) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
+            return result;
+        });
     }
 
     async function claimAndCleanupItem(id, reason) {
@@ -1218,6 +1242,7 @@
                 claimedPartial = null;
                 updatedRemainder = null;
                 if (!currentItem) return currentItem;
+                if (currentItem.clearClaim) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
@@ -1259,7 +1284,8 @@
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
             if (claimedPartial && updatedRemainder) {
-                syncScannerLookupEntry(id, updatedRemainder);
+                const committedRemainder = result.snapshot && typeof result.snapshot.val === 'function' ? result.snapshot.val() : updatedRemainder;
+                if (committedRemainder) syncScannerLookupEntry(id, committedRemainder);
             } else {
                 clearScannerLookupEntry(id);
             }
@@ -1362,6 +1388,7 @@
     }
 
     function buildScannerLookupPayload(item, omitClosedState) {
+        const itemBarcodes = barcodeEntriesOf(item && item.barcodes).filter((entry) => entry.barcode && typeof entry.barcode === 'object');
         const payload = {
             id: item.id,
             phone: item.phone || '',
@@ -1371,23 +1398,138 @@
         if (!omitClosedState) payload.isClosed = !!item.isClosed;
         if (item.lockerUpdatedAt) payload.lockerUpdatedAt = item.lockerUpdatedAt;
         if (item.lockerUpdatedBy) payload.lockerUpdatedBy = item.lockerUpdatedBy;
-        if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length) {
-            payload.barcodes = item.barcodes.map((b) => {
-                if (!b) return omitClosedState ? { code: '', locker: '' } : { code: '', locker: '', isClosed: false };
+        if (!itemBarcodes.length) payload.lockerAssignment = { revision: Number.isInteger(item.lockerRevision) && item.lockerRevision >= 0 ? item.lockerRevision : 0 };
+        if (itemBarcodes.length) {
+            const barcodeEntries = itemBarcodes.map(({ barcode: b, index: fallbackIndex }) => {
                 const bcEntry = { code: b.code || '', locker: b.locker || '' };
                 if (!omitClosedState) bcEntry.isClosed = !!b.isClosed;
                 if (b.lockerUpdatedAt) bcEntry.lockerUpdatedAt = b.lockerUpdatedAt;
-                return bcEntry;
+                if (b.lockerUpdatedBy) bcEntry.lockerUpdatedBy = b.lockerUpdatedBy;
+                if (scannerLockerRevision(b.lockerRevision)) bcEntry.lockerRevision = b.lockerRevision;
+                Object.defineProperty(bcEntry, SCANNER_LOOKUP_BARCODE_INDEX_FIELD, { value: true, configurable: true });
+                return { barcode: bcEntry, index: scannerLookupBarcodeIndex(b, fallbackIndex) };
             });
+            payload.barcodes = buildScannerLookupBarcodeCollection(barcodeEntries);
         }
+        return payload;
+    }
+
+    const SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';
+    const LOCKER_PENDING_LEASE_MS = 2 * 60 * 1000;
+    const LOCKER_PENDING_MAX_FUTURE_MS = 30 * 1000;
+
+    function scannerLookupBarcodeIndex(barcode, fallbackIndex) {
+        const index = barcode && barcode[SCANNER_LOOKUP_BARCODE_INDEX_FIELD];
+        return Number.isInteger(index) && index >= 0 ? index : fallbackIndex;
+    }
+
+    function buildScannerLookupBarcodeCollection(entries) {
+        const ordered = entries.slice().sort((a, b) => a.index - b.index);
+        const dense = ordered.every((entry, index) => entry.index === index);
+        if (dense) return ordered.map(entry => entry.barcode);
+        const sparse = {};
+        ordered.forEach((entry) => { sparse[entry.index] = entry.barcode; });
+        return sparse;
+    }
+
+    function scannerLockerUpdatedAt(value) {
+        return typeof value === 'number' && isFinite(value) ? value : 0;
+    }
+
+    function scannerLockerRevision(value) {
+        return typeof value === 'number' && isFinite(value) && value >= 0 ? value : 0;
+    }
+
+    function cloneScannerLockerPending(value) {
+        return value && typeof value === 'object' ? { ...value } : null;
+    }
+
+    function cloneFreshScannerLockerPending(value, expectedCode, committedRevision, authoritativeRevision) {
+        const pending = cloneScannerLockerPending(value);
+        if (!pending || pending.code !== expectedCode || typeof pending.locker !== 'string' || typeof pending.updatedBy !== 'string') return null;
+        const revision = scannerLockerRevision(pending.revision);
+        const updatedAt = scannerLockerUpdatedAt(pending.updatedAt);
+        const currentTime = typeof getServerNow === 'function' ? getServerNow() : Date.now();
+        if (!revision || revision <= committedRevision || revision <= authoritativeRevision || !updatedAt || updatedAt > currentTime + LOCKER_PENDING_MAX_FUTURE_MS || currentTime - updatedAt > LOCKER_PENDING_LEASE_MS) return null;
+        return pending;
+    }
+
+    function preserveNewerScannerLocker(currentEntry, nextEntry, includeUpdatedBy) {
+        if (!currentEntry || typeof currentEntry !== 'object' || !nextEntry || typeof nextEntry !== 'object') return nextEntry;
+        const currentRevision = scannerLockerRevision(currentEntry.lockerRevision);
+        const nextRevision = scannerLockerRevision(nextEntry.lockerRevision);
+        const currentPending = cloneFreshScannerLockerPending(currentEntry.lockerPending, nextEntry.code, currentRevision, nextRevision);
+        const keepCurrent = !!currentPending || currentRevision > nextRevision ||
+            (currentRevision === nextRevision && scannerLockerUpdatedAt(currentEntry.lockerUpdatedAt) > scannerLockerUpdatedAt(nextEntry.lockerUpdatedAt));
+        if (keepCurrent) {
+            nextEntry.locker = currentEntry.locker || '';
+            if (currentEntry.lockerUpdatedAt) nextEntry.lockerUpdatedAt = currentEntry.lockerUpdatedAt;
+            else delete nextEntry.lockerUpdatedAt;
+            if (includeUpdatedBy) {
+                if (currentEntry.lockerUpdatedBy) nextEntry.lockerUpdatedBy = currentEntry.lockerUpdatedBy;
+                else delete nextEntry.lockerUpdatedBy;
+            }
+            if (currentRevision) nextEntry.lockerRevision = currentRevision;
+            else delete nextEntry.lockerRevision;
+        }
+        if (currentPending) nextEntry.lockerPending = currentPending;
+        else delete nextEntry.lockerPending;
+        return nextEntry;
+    }
+
+    function preserveLegacyScannerLockerAssignment(currentEntry, payload) {
+        if (barcodeEntriesOf(payload.barcodes).length) return payload;
+        const currentAssignment = currentEntry && currentEntry.lockerAssignment;
+        const historyRevision = scannerLockerRevision(payload.lockerAssignment && payload.lockerAssignment.revision);
+        if (!currentAssignment || typeof currentAssignment !== 'object') {
+            payload.lockerAssignment = { revision: historyRevision };
+            return payload;
+        }
+        const assignmentRevision = scannerLockerRevision(currentAssignment.revision);
+        const assignment = { revision: historyRevision };
+        const pending = assignmentRevision === historyRevision
+            ? cloneFreshScannerLockerPending(currentAssignment.pending, payload.barcode, assignmentRevision, historyRevision)
+            : null;
+        if (pending) assignment.pending = pending;
+        if (pending) {
+            payload.locker = currentEntry.locker || '';
+            if (currentEntry.lockerUpdatedAt) payload.lockerUpdatedAt = currentEntry.lockerUpdatedAt;
+            else delete payload.lockerUpdatedAt;
+            if (currentEntry.lockerUpdatedBy) payload.lockerUpdatedBy = currentEntry.lockerUpdatedBy;
+            else delete payload.lockerUpdatedBy;
+        }
+        payload.lockerAssignment = assignment;
+        return payload;
+    }
+
+    function mergeScannerLookupPayload(currentEntry, item, omitClosedState) {
+        const payload = buildScannerLookupPayload(item, omitClosedState);
+        if (!currentEntry || typeof currentEntry !== 'object') return payload;
+        const payloadBarcodes = barcodeEntriesOf(payload.barcodes);
+        if (!payloadBarcodes.length) return preserveLegacyScannerLockerAssignment(currentEntry, payload);
+        const currentBarcodesByCode = new Map();
+        barcodeEntriesOf(currentEntry.barcodes).forEach((entry) => {
+            if (entry.barcode && entry.barcode.code) currentBarcodesByCode.set(entry.barcode.code, entry);
+        });
+        const usedIndexes = new Set();
+        const mergedBarcodes = payloadBarcodes.map(({ barcode, index }) => {
+            const matching = barcode && barcode.code ? currentBarcodesByCode.get(barcode.code) : null;
+            const sourceHasPhysicalIndex = !!(barcode && barcode[SCANNER_LOOKUP_BARCODE_INDEX_FIELD]);
+            const targetIndex = !sourceHasPhysicalIndex && matching && !usedIndexes.has(matching.index) ? matching.index : index;
+            usedIndexes.add(targetIndex);
+            delete barcode[SCANNER_LOOKUP_BARCODE_INDEX_FIELD];
+            return { barcode: preserveNewerScannerLocker(matching && matching.barcode, barcode, true), index: targetIndex };
+        });
+        payload.barcodes = buildScannerLookupBarcodeCollection(mergedBarcodes);
         return payload;
     }
 
     function syncScannerLookupEntry(itemId, item) {
         if (!db || !fb || !item || !itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return Promise.resolve();
         const entryRef = fb.ref(db, `zoew_scanner_lookup/${itemId}`);
-        return fb.set(entryRef, buildScannerLookupPayload(item))
-            .catch(() => fb.set(entryRef, buildScannerLookupPayload(item, true)))
+        const sync = (omitClosedState) => fb.runTransaction(entryRef, (currentEntry) => mergeScannerLookupPayload(currentEntry, item, omitClosedState));
+        return sync(false)
+            .catch(() => sync(true))
             .catch((error) => {
                 console.error('Error syncing scanner lookup entry:', error);
                 if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error syncing scanner lookup entry' });
@@ -1402,27 +1544,41 @@
         });
     }
 
-    function runAutomaticDeletedCleanup() {
+    async function runAutomaticDeletedCleanup() {
+        if (deletedCleanupInFlight) return;
         const currentTime = getServerNow();
         let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let purgedBarcodes = [];
         let purgedIds = [];
 
-        deletedItems = deletedItems.filter(item => {
+        deletedItems.forEach(item => {
+            if (!item || item.restoreClaim) return;
             let deletedTime = item.deletedAt || currentTime;
             const expired = (currentTime - deletedTime > tenDaysMs);
             if (expired) {
                 purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
                 if (item.id) purgedIds.push(item.id);
             }
-            return !expired;
         });
 
         if (purgedIds.length > 0) {
-            deleteMultipleDeletedItemsFromFirebase(purgedIds)
-                .then(() => releaseBarcodesInRegistry(purgedBarcodes))
-                .catch(() => {});
+            deletedCleanupInFlight = true;
+            try {
+                await deleteMultipleDeletedItemsFromFirebase(purgedIds);
+                const purgedSet = new Set(purgedIds);
+                deletedItems = deletedItems.filter(item => !purgedSet.has(item.id));
+                await releaseBarcodesInRegistry(purgedBarcodes);
+            } catch (e) {
+            } finally {
+                deletedCleanupInFlight = false;
+            }
         }
+    }
+
+    function runScheduledCleanup() {
+        if (!db || !isDatabaseInitialized) return;
+        runAutomaticCleanupRules();
+        runAutomaticDeletedCleanup();
     }
 
     function parseTimestampFromId(idStr) {
@@ -1458,8 +1614,12 @@
         if (!item || typeof item !== 'object') return item;
         if (item.barcodes === null || item.barcodes === undefined) return item;
         const list = barcodeEntriesOf(item.barcodes)
-            .map((e) => e.barcode)
-            .filter((b) => b && typeof b === 'object');
+            .filter((e) => e.barcode && typeof e.barcode === 'object')
+            .map((e) => {
+                const barcode = { ...e.barcode };
+                Object.defineProperty(barcode, SCANNER_LOOKUP_BARCODE_INDEX_FIELD, { value: e.index, configurable: true });
+                return barcode;
+            });
         if (!list.length && !Array.isArray(item.barcodes)) {
             delete item.barcodes;
             return item;
@@ -1536,9 +1696,11 @@
         }, LICENSE_RECHECK_INTERVAL_MS);
 
         setInterval(sweepRecallHighlights, 60000);
+        setInterval(runScheduledCleanup, 60000);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) return;
             sweepRecallHighlights();
+            runScheduledCleanup();
             retryPendingRoleCheck();
         });
 
@@ -2590,6 +2752,7 @@
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
+                if (currentItem.clearClaim) return;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
                     currentItem.barcodes = [{
@@ -2777,7 +2940,7 @@
             }).then((saved) => {
                 if (saved) {
                     reconcilePickupRefWithServer();
-                    syncScannerLookupEntry(item.id, item);
+                    syncScannerLookupEntry(item.id, saved);
                 } else {
                     revertPickupRefMove();
                 }
@@ -2869,6 +3032,7 @@
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
+                if (currentItem.clearClaim) return;
                 normalizeBarcodesOf(currentItem);
                 const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
                 if (serverBarcodes) {
@@ -2977,117 +3141,304 @@
         openRecentlyDeletedModal();
     }
 
-    async function executeRestoreItem() {
-        if (!pendingRestoreId) return;
-        const index = deletedItems.findIndex(i => i.id === pendingRestoreId);
-        if(index === -1) {
-            closeModal('restoreWarningModal');
-            alert("⚠️ រកមិនឃើញទិន្នន័យនេះក្នុងធុងសំរាមទេ (វាអាចត្រូវបានស្តារ ឬលុបចោលរួចហើយពី device ផ្សេង)");
-            pendingRestoreId = null;
-            openRecentlyDeletedModal();
-            return;
-        }
+    const RESTORE_CLAIM_LEASE_MS = 2 * 60 * 1000;
+    const activeRestoreClaims = new Map();
 
-        let itemToRestore = deletedItems.splice(index, 1)[0];
-        const restoredWasRemoved = itemToRestore.isFromDeletion === false;
-        delete itemToRestore.deletedAt;
-        delete itemToRestore.isFromDeletion;
-        if (itemToRestore.isClosed) {
-            itemToRestore.closedAt = getServerNow();
-        } else {
-            itemToRestore.createdAt = getServerNow();
-        }
+    function cloneRestoreItem(item) {
+        if (!item || typeof item !== 'object') return null;
+        const cloned = { ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => b && typeof b === 'object' ? { ...b } : b) : item.barcodes };
+        normalizeBarcodesOf(cloned);
+        return cloned;
+    }
 
-        const appliedRevenueDeltas = [];
-        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
-        if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-            itemToRestore.barcodes.forEach((restoredBc) => {
-                if (restoredBc.isDeducted) {
-                    const targetCod = parseFloat(restoredBc.cod) || 0;
-                    const targetDod = parseFloat(restoredBc.dod) || 0;
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, targetCod, targetDod, 1);
-                    appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod, count: 1 });
-                    restoredBc.isDeducted = false;
-                }
-                restoredBc.isFromDeletion = false;
+    function isRestoreMergeTarget(target, itemToRestore) {
+        return !!(target && !target.clearClaim && itemToRestore && itemToRestore.phone !== "គ្មានលេខ" && target.phone === itemToRestore.phone && Array.isArray(target.barcodes) && Array.isArray(itemToRestore.barcodes) && target.scanDate === itemToRestore.scanDate && !target.isClosed);
+    }
+
+    async function findRestoreTargetId(itemToRestore) {
+        if (!itemToRestore || !itemToRestore.id || !dbRefHistory || !fb) return itemToRestore && itemToRestore.id;
+        try {
+            const historySnap = await fb.get(dbRefHistory);
+            const history = historySnap && historySnap.val();
+            if (!history || typeof history !== 'object') return itemToRestore.id;
+            const matchingId = Object.keys(history).find((id) => {
+                const candidate = cloneRestoreItem(history[id]);
+                return candidate && isRestoreMergeTarget(candidate, itemToRestore);
             });
-        } else if (restoredWasRemoved) {
-            const legacyCod = parseFloat(itemToRestore.cod) || 0;
-            const legacyDod = parseFloat(itemToRestore.dod) || 0;
-            const legacyCount = parseFloat(itemToRestore.count) || 1;
-            addRevenueToDailyAndMonthlyRecord(revenueScanDate, legacyCod, legacyDod, legacyCount);
-            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
+            return matchingId || itemToRestore.id;
+        } catch (e) {
+            return itemToRestore.id;
         }
+    }
 
-        const applyRestoreMergeInto = (target) => {
-            if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
-            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-                itemToRestore.barcodes.forEach(restoredBc => {
-                    if (!target.barcodes.some(b => b && b.code === restoredBc.code)) target.barcodes.push({ ...restoredBc });
-                });
+    function isActiveRestoreClaim(claim) {
+        const claimedAt = claim && parseFloat(claim.claimedAt);
+        const now = getServerNow();
+        return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now && (now - claimedAt) < RESTORE_CLAIM_LEASE_MS);
+    }
+
+    function generateRestoreClaimToken() {
+        return 'restore_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
+    }
+
+    async function claimDeletedItemForRestore(id, token, targetId) {
+        let claimedItem = null;
+        let replacedClaim = null;
+        let claimStatus = 'ALREADY_RESTORED';
+        const trashRef = fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`);
+        const result = await fb.runTransaction(trashRef, (currentItem) => {
+            claimedItem = null;
+            replacedClaim = null;
+            claimStatus = 'ALREADY_RESTORED';
+            if (!currentItem || typeof currentItem !== 'object') return;
+            const existingClaim = currentItem.restoreClaim;
+            if (existingClaim && existingClaim.token !== token && isActiveRestoreClaim(existingClaim)) {
+                claimStatus = 'RESTORE_IN_PROGRESS';
+                return;
             }
-            target.count = target.barcodes.length;
-            target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            target.price = Math.round((target.cod + target.dod) * 100) / 100;
-            target.isClosed = target.barcodes.length > 0 && target.barcodes.every(b => b.isClosed);
-            if (target.isClosed) {
-                target.closedAt = getServerNow();
-            } else {
-                delete target.closedAt;
+            if (existingClaim && existingClaim.token !== token) {
+                replacedClaim = { token: existingClaim.token, targetId: existingClaim.targetId };
             }
-            if (itemToRestore.callMarkTime && (!target.callMarkTime || itemToRestore.callMarkTime > target.callMarkTime)) {
-                target.isCalled = itemToRestore.isCalled;
-                if (itemToRestore.callMark) target.callMark = itemToRestore.callMark;
-                else delete target.callMark;
-                target.callMarkTime = itemToRestore.callMarkTime;
+            claimedItem = cloneRestoreItem(currentItem);
+            delete claimedItem.restoreClaim;
+            delete claimedItem.restoreClaimId;
+            delete claimedItem.restoreClaimToken;
+            if (!claimedItem.id) claimedItem.id = id;
+            currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
+            claimStatus = 'CLAIMED';
+            return currentItem;
+        });
+        if (!result || !result.committed || !claimedItem) throw new Error(claimStatus);
+        return { item: claimedItem, replacedClaim };
+    }
+
+    async function bindRestoreClaimTarget(id, token, targetId) {
+        let bound = false;
+        const result = await fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+            bound = false;
+            if (!currentItem || !currentItem.restoreClaim || currentItem.restoreClaim.token !== token) return;
+            currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
+            bound = true;
+            return currentItem;
+        });
+        if (!bound || !result || !result.committed) throw new Error('RESTORE_CLAIM_LOST');
+    }
+
+    async function clearRestoreHistoryMarker(targetId, sourceId, token) {
+        if (!targetId || !sourceId || !token) return;
+        await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
+            if (!currentItem || currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== token) return;
+            delete currentItem.restoreClaimId;
+            delete currentItem.restoreClaimToken;
+            return currentItem;
+        });
+    }
+
+    async function clearRestoreFinalization(sourceId, token) {
+        if (!sourceId || !token) return;
+        await fb.runTransaction(fb.ref(db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
+            if (!currentFinalization || currentFinalization.token !== token) return;
+            return null;
+        });
+    }
+
+    async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto) {
+        let targetChanged = false;
+        let committedItem = null;
+        const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
+            targetChanged = false;
+            committedItem = null;
+            if (currentItem) normalizeBarcodesOf(currentItem);
+            if (currentItem && currentItem.clearClaim) {
+                targetChanged = true;
+                return;
             }
+            if (targetId !== itemToRestore.id && !isRestoreMergeTarget(currentItem, itemToRestore)) {
+                targetChanged = true;
+                return;
+            }
+            const target = currentItem ? applyRestoreMergeInto(currentItem) : cloneRestoreItem(itemToRestore);
+            if (!target) return;
+            target.id = targetId;
+            target.restoreClaimId = sourceId;
+            target.restoreClaimToken = token;
+            committedItem = target;
             return target;
+        });
+        if (targetChanged) return { targetChanged: true, item: null };
+        if (!result || !result.committed || !committedItem) throw new Error('RESTORE_HISTORY_WRITE_FAILED');
+        const snapshotItem = result.snapshot ? cloneRestoreItem(result.snapshot.val()) : committedItem;
+        return { targetChanged: false, item: snapshotItem };
+    }
+
+    function appendRestoreRevenueIncrements(updates, deltas) {
+        const daily = {};
+        const monthly = {};
+        deltas.forEach((delta) => {
+            const scanDate = delta.scanDate || getFormattedDate();
+            const month = scanDate.substring(0, 7);
+            if (!daily[scanDate]) daily[scanDate] = { cod: 0, dod: 0, count: 0 };
+            if (!monthly[month]) monthly[month] = { cod: 0, dod: 0, count: 0 };
+            daily[scanDate].cod += parseFloat(delta.cod) || 0;
+            daily[scanDate].dod += parseFloat(delta.dod) || 0;
+            daily[scanDate].count += parseFloat(delta.count) || 0;
+            monthly[month].cod += parseFloat(delta.cod) || 0;
+            monthly[month].dod += parseFloat(delta.dod) || 0;
+            monthly[month].count += parseFloat(delta.count) || 0;
+        });
+        const append = (path, amount) => {
+            if (amount) updates[path] = fb.increment(amount);
         };
+        Object.keys(daily).forEach((scanDate) => {
+            const delta = daily[scanDate];
+            append(`zoew_daily_revenue_cod_dod/${scanDate}/codDollar`, delta.cod);
+            append(`zoew_daily_revenue_cod_dod/${scanDate}/dodDollar`, delta.dod);
+            append(`zoew_daily_revenue_cod_dod/${scanDate}/totalCount`, delta.count);
+        });
+        Object.keys(monthly).forEach((month) => {
+            const delta = monthly[month];
+            append(`zoew_monthly_revenue_cod_dod/${month}/codDollar`, delta.cod);
+            append(`zoew_monthly_revenue_cod_dod/${month}/dodDollar`, delta.dod);
+            append(`zoew_monthly_revenue_cod_dod/${month}/totalCount`, delta.count);
+        });
+    }
 
-        let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
-
-        let resultingLiveItem;
-        if (existingItemIndex !== -1) {
-            resultingLiveItem = applyRestoreMergeInto(scanHistory[existingItemIndex]);
-        } else {
-            scanHistory.push(itemToRestore);
-            resultingLiveItem = itemToRestore;
+    async function finalizeClaimedRestore(sourceId, token, targetId, revenueDeltas) {
+        const updates = {
+            [`zoew_restore_finalizations/${sourceId}`]: { token, targetId, finalizedAt: getServerNow() },
+            [`zoew_recently_deleted_cod_dod/${sourceId}`]: null,
+            [`zoew_scan_history_cod_dod/${targetId}/restoreClaimId`]: null,
+            [`zoew_scan_history_cod_dod/${targetId}/restoreClaimToken`]: null
+        };
+        appendRestoreRevenueIncrements(updates, revenueDeltas);
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await fb.update(fb.ref(db), updates);
+                return;
+            } catch (error) {
+                lastError = error;
+                let trashSnapshot;
+                try {
+                    trashSnapshot = await fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${sourceId}`));
+                } catch (readError) {
+                    throw error;
+                }
+                if (!trashSnapshot.exists()) return;
+                const currentTrash = trashSnapshot.val();
+                const currentClaim = currentTrash && currentTrash.restoreClaim;
+                if (!currentClaim || currentClaim.token !== token || currentClaim.targetId !== targetId) throw new Error('RESTORE_CLAIM_LOST');
+                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+            }
         }
+        throw lastError || new Error('RESTORE_FINAL_WRITE_FAILED');
+    }
 
+    async function executeRestoreItem() {
         const restoredId = pendingRestoreId;
+        if (!restoredId || !db || !fb || !dbRefDeleted) return;
         closeModal('restoreWarningModal');
         pendingRestoreId = null;
-
-        let restoreWriteOk = false;
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
-            if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
+            if (!safeIdPattern.test(restoredId)) {
                 throw new Error('Unsafe id during restore');
             }
-            const [liveSnap, trashSnap] = await Promise.all([
-                fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${resultingLiveItem.id}`)),
-                fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${itemToRestore.id}`))
-            ]);
-            if (!trashSnap.exists()) throw new Error('ALREADY_RESTORED');
-            const serverLiveItem = normalizeBarcodesOf(liveSnap.val());
-            let restorePayload = itemToRestore;
-            if (serverLiveItem && typeof serverLiveItem === 'object') {
-                if (!serverLiveItem.id) serverLiveItem.id = resultingLiveItem.id;
-                restorePayload = applyRestoreMergeInto(serverLiveItem);
+            const existingClaim = activeRestoreClaims.get(restoredId);
+            const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
+            let targetId = existingClaim ? existingClaim.targetId : null;
+            if (!targetId) {
+                const previewSnap = await fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${restoredId}`));
+                if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
+                const previewItem = cloneRestoreItem(previewSnap.val());
+                if (!previewItem) throw new Error('ALREADY_RESTORED');
+                targetId = await findRestoreTargetId(previewItem);
             }
-            await fb.update(fb.ref(db), {
-                [`zoew_scan_history_cod_dod/${restorePayload.id}`]: restorePayload,
-                [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
-            });
-            restoreWriteOk = true;
-            const liveIndex = scanHistory.findIndex(i => i.id === restorePayload.id);
-            if (liveIndex !== -1) scanHistory[liveIndex] = restorePayload;
-            else scanHistory.push(restorePayload);
-            resultingLiveItem = restorePayload;
+            const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
+            activeRestoreClaims.set(restoredId, { token, targetId });
+            if (claimed.replacedClaim && claimed.replacedClaim.targetId) {
+                await clearRestoreHistoryMarker(claimed.replacedClaim.targetId, restoredId, claimed.replacedClaim.token).catch(() => {});
+            }
+
+            let itemToRestore = claimed.item;
+            const restoredWasRemoved = itemToRestore.isFromDeletion === false;
+            delete itemToRestore.deletedAt;
+            delete itemToRestore.isFromDeletion;
+            delete itemToRestore.restoreClaim;
+            delete itemToRestore.restoreClaimId;
+            delete itemToRestore.restoreClaimToken;
+            if (itemToRestore.isClosed) {
+                itemToRestore.closedAt = getServerNow();
+            } else {
+                itemToRestore.createdAt = getServerNow();
+            }
+
+            const appliedRevenueDeltas = [];
+            const revenueScanDate = itemToRestore.scanDate || getFormattedDate();
+            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+                itemToRestore.barcodes.forEach((restoredBc) => {
+                    if (restoredBc.isDeducted) {
+                        const targetCod = parseFloat(restoredBc.cod) || 0;
+                        const targetDod = parseFloat(restoredBc.dod) || 0;
+                        appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: targetCod, dod: targetDod, count: 1 });
+                        restoredBc.isDeducted = false;
+                    }
+                    restoredBc.isFromDeletion = false;
+                });
+            } else if (restoredWasRemoved) {
+                const legacyCod = parseFloat(itemToRestore.cod) || 0;
+                const legacyDod = parseFloat(itemToRestore.dod) || 0;
+                const legacyCount = parseFloat(itemToRestore.count) || 1;
+                appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
+            }
+
+            const applyRestoreMergeInto = (target) => {
+                if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
+                if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+                    itemToRestore.barcodes.forEach(restoredBc => {
+                        if (!target.barcodes.some(b => b && b.code === restoredBc.code)) target.barcodes.push({ ...restoredBc });
+                    });
+                }
+                target.count = target.barcodes.length;
+                target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                target.isClosed = target.barcodes.length > 0 && target.barcodes.every(b => b.isClosed);
+                if (target.isClosed) {
+                    target.closedAt = getServerNow();
+                } else {
+                    delete target.closedAt;
+                }
+                if (itemToRestore.callMarkTime && (!target.callMarkTime || itemToRestore.callMarkTime > target.callMarkTime)) {
+                    target.isCalled = itemToRestore.isCalled;
+                    if (itemToRestore.callMark) target.callMark = itemToRestore.callMark;
+                    else delete target.callMark;
+                    target.callMarkTime = itemToRestore.callMarkTime;
+                }
+                return target;
+            };
+
+            let prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+            if (prepared.targetChanged && targetId !== itemToRestore.id) {
+                targetId = itemToRestore.id;
+                await bindRestoreClaimTarget(restoredId, token, targetId);
+                activeRestoreClaims.set(restoredId, { token, targetId });
+                prepared = await applyClaimedRestoreToHistory(targetId, restoredId, token, itemToRestore, applyRestoreMergeInto);
+            }
+            if (prepared.targetChanged || !prepared.item) throw new Error('RESTORE_TARGET_CHANGED');
+            await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas);
+            activeRestoreClaims.delete(restoredId);
+            await clearRestoreFinalization(restoredId, token).catch(() => {});
+            const finalSnap = await fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`));
+            const resultingLiveItem = finalSnap.exists() ? cloneRestoreItem(finalSnap.val()) : prepared.item;
+            if (resultingLiveItem) syncScannerLookupEntry(targetId, resultingLiveItem);
+            openRecentlyDeletedModal();
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
-            const alreadyRestored = !!(error && error.message === 'ALREADY_RESTORED');
-            appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
+            const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));
+            if (error && error.message === 'RESTORE_CLAIM_LOST') activeRestoreClaims.delete(restoredId);
             if (!alreadyRestored) {
                 console.error("Restore failed: ", restoredId, error);
                 if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
@@ -3105,17 +3456,10 @@
             if (alreadyRestored) {
                 alert("⚠️ ទិន្នន័យនេះត្រូវបានស្តារ ឬលុបចោលរួចហើយពី device ផ្សេង! ស្ថានភាពត្រូវបានធ្វើបច្ចុប្បន្នភាពវិញ។");
             } else {
-                alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
+                alert("❌ ស្តារទិន្នន័យបរាជ័យ! ទិន្នន័យនៅរក្សាទុកដោយសុវត្ថិភាព ហើយអាចសាកល្បងម្តងទៀតបាន។\n\nមូលហេតុ: " + (error && error.message ? error.message : error));
             }
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
-        }
-        if (restoreWriteOk) {
-            syncScannerLookupEntry(resultingLiveItem.id, resultingLiveItem);
-            openRecentlyDeletedModal();
-            refreshCurrentHistoryView();
-            updateRecentPhonesList();
-            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         }
     }
 
@@ -3182,6 +3526,7 @@
             serverItemExisted = false;
             if (!currentItem) return currentItem;
             normalizeBarcodesOf(currentItem);
+            if (currentItem.clearClaim) return;
             if (onServerItem) onServerItem(currentItem);
             Object.keys(fields).forEach((key) => {
                 if (fields[key] === null) delete currentItem[key];
@@ -3195,7 +3540,9 @@
                 showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
                 return false;
             }
-            return true;
+            const committedItem = result.snapshot ? normalizeBarcodesOf(result.snapshot.val()) : null;
+            if (committedItem && !committedItem.id) committedItem.id = item.id;
+            return committedItem || true;
         }, (error) => {
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
@@ -3451,3 +3798,165 @@
         });
     }
 
+    const CLEAR_HISTORY_CLAIM_LEASE_MS = 2 * 60 * 1000;
+    const activeClearHistoryClaims = new Map();
+    let clearHistoryInFlight = false;
+
+    function resetClearHistoryOperationState() {
+        clearHistoryInFlight = false;
+        activeRestoreClaims.clear();
+        activeClearHistoryClaims.clear();
+    }
+
+    function isActiveClearHistoryClaim(claim) {
+        const claimedAt = claim && parseFloat(claim.claimedAt);
+        const now = getServerNow();
+        return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now && (now - claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS);
+    }
+
+    function generateClearHistoryClaimToken() {
+        return 'clear_' + generateUniqueId() + '_' + Math.random().toString(36).slice(2);
+    }
+
+    function buildClearHistoryTrashItem(item, id) {
+        const trashItem = cloneRestoreItem(item);
+        if (!trashItem) return null;
+        trashItem.id = id;
+        delete trashItem.clearClaim;
+        delete trashItem.restoreClaim;
+        delete trashItem.restoreClaimId;
+        delete trashItem.restoreClaimToken;
+        trashItem.deletedAt = getServerNow();
+        trashItem.isFromDeletion = true;
+        if (Array.isArray(trashItem.barcodes)) {
+            trashItem.barcodes = trashItem.barcodes.map((barcode) => ({ ...barcode, isFromDeletion: true }));
+        }
+        return trashItem;
+    }
+
+    async function claimHistoryItemForClear(id, token) {
+        let claimedItem = null;
+        let status = 'CLEAR_HISTORY_MISSING';
+        const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
+        const result = await fb.runTransaction(itemRef, (currentItem) => {
+            claimedItem = null;
+            status = 'CLEAR_HISTORY_MISSING';
+            if (!currentItem || typeof currentItem !== 'object') return;
+            if (currentItem.restoreClaimId || currentItem.restoreClaimToken) {
+                status = 'RESTORE_IN_PROGRESS';
+                return;
+            }
+            const existingClaim = currentItem.clearClaim;
+            if (existingClaim && existingClaim.token !== token && isActiveClearHistoryClaim(existingClaim)) {
+                status = 'CLEAR_HISTORY_IN_PROGRESS';
+                return;
+            }
+            claimedItem = cloneRestoreItem(currentItem);
+            if (!claimedItem) return;
+            delete claimedItem.clearClaim;
+            currentItem.clearClaim = { token, claimedAt: getServerNow() };
+            status = 'CLEAR_HISTORY_CLAIMED';
+            return currentItem;
+        });
+        if (!result || !result.committed || !claimedItem) throw new Error(status);
+        return claimedItem;
+    }
+
+    async function clearClearHistoryFinalization(id, token) {
+        await fb.runTransaction(fb.ref(db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
+            if (!currentFinalization || currentFinalization.token !== token) return;
+            return null;
+        });
+    }
+
+    async function finalizeClaimedHistoryClear(id, token, trashItem) {
+        const updates = {
+            [`zoew_clear_history_finalizations/${id}`]: { token, finalizedAt: getServerNow() },
+            [`zoew_recently_deleted_cod_dod/${id}`]: trashItem,
+            [`zoew_scan_history_cod_dod/${id}`]: null,
+            [`zoew_scanner_lookup/${id}`]: null
+        };
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await fb.update(fb.ref(db), updates);
+                return;
+            } catch (error) {
+                lastError = error;
+                let historySnapshot;
+                let trashSnapshot;
+                let finalizationSnapshot;
+                try {
+                    [historySnapshot, trashSnapshot, finalizationSnapshot] = await Promise.all([
+                        fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${id}`)),
+                        fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`)),
+                        fb.get(fb.ref(db, `zoew_clear_history_finalizations/${id}`))
+                    ]);
+                } catch (readError) {
+                    throw error;
+                }
+                const finalization = finalizationSnapshot.exists() ? finalizationSnapshot.val() : null;
+                if (!historySnapshot.exists() && trashSnapshot.exists() && finalization && finalization.token === token) return;
+                const currentHistory = historySnapshot.exists() ? historySnapshot.val() : null;
+                if (!currentHistory || !currentHistory.clearClaim || currentHistory.clearClaim.token !== token) {
+                    throw new Error('CLEAR_HISTORY_CLAIM_LOST');
+                }
+                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+            }
+        }
+        throw lastError || new Error('CLEAR_HISTORY_FINAL_WRITE_FAILED');
+    }
+
+    async function clearHistory() {
+        if (clearHistoryInFlight || !confirm("តើអ្នកពិតជាចង់លុបប្រវត្តិទាំងអស់មែនទេ?")) return;
+        const clearedIds = scanHistory.map(item => item.id).filter(Boolean);
+        if (clearedIds.length === 0) return;
+        const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+        if (!dbRefHistory || !dbRefDeleted || !db || !fb || clearedIds.some(id => !safeIdPattern.test(id))) {
+            showToast("⚠️ មិនអាចលុបប្រវត្តិបានទេ! សូមពិនិត្យការតភ្ជាប់ Firebase ហើយសាកល្បងម្តងទៀត។");
+            return;
+        }
+
+        clearHistoryInFlight = true;
+        let clearedCount = 0;
+        let blockedCount = 0;
+        let failedCount = 0;
+        try {
+            for (const id of clearedIds) {
+                const previous = activeClearHistoryClaims.get(id);
+                const token = previous || generateClearHistoryClaimToken();
+                try {
+                    const claimedItem = await claimHistoryItemForClear(id, token);
+                    activeClearHistoryClaims.set(id, token);
+                    const trashItem = buildClearHistoryTrashItem(claimedItem, id);
+                    if (!trashItem) throw new Error('CLEAR_HISTORY_SOURCE_INVALID');
+                    await finalizeClaimedHistoryClear(id, token, trashItem);
+                    activeClearHistoryClaims.delete(id);
+                    await clearClearHistoryFinalization(id, token).catch(() => {});
+                    clearedCount++;
+                } catch (error) {
+                    const code = error && error.message;
+                    if (code === 'CLEAR_HISTORY_MISSING' || code === 'CLEAR_HISTORY_IN_PROGRESS' || code === 'RESTORE_IN_PROGRESS' || code === 'CLEAR_HISTORY_CLAIM_LOST') {
+                        blockedCount++;
+                    } else {
+                        failedCount++;
+                        console.error('Error clearing history item:', id, error);
+                        if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing history item', itemId: id });
+                    }
+                }
+            }
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            if (clearedCount && !blockedCount && !failedCount) {
+                showToast("បានលុបប្រវត្តិទាំងអស់!");
+            } else if (clearedCount) {
+                showToast(`⚠️ បានលុប ${clearedCount} ធាតុ។ ធាតុខ្លះកំពុងត្រូវបានកែពីឧបករណ៍ផ្សេង ឬអាចសាកល្បងម្ដងទៀតបាន។`);
+            } else if (blockedCount) {
+                showToast("⚠️ ធាតុខ្លះត្រូវបានកែ ឬស្តារពីឧបករណ៍ផ្សេង។ សូមរង់ចាំបន្តិច ហើយសាកល្បងម្ដងទៀត។");
+            } else {
+                showToast("⚠️ លុបប្រវត្តិទាំងអស់មិនបានជោគជ័យ! ទិន្នន័យនៅរក្សាទុកដោយសុវត្ថិភាព ហើយអាចសាកល្បងម្តងទៀតបាន។");
+            }
+        } finally {
+            clearHistoryInFlight = false;
+        }
+    }

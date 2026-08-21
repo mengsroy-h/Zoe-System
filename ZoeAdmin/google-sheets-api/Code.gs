@@ -31,10 +31,27 @@ function doGet(e) {
   var cached = cache.get(cacheKey);
   var rows;
   if (cached) {
-    rows = JSON.parse(cached);
-  } else {
+    try {
+      rows = JSON.parse(cached);
+      if (!Array.isArray(rows)) rows = null;
+    } catch (e) {
+      rows = null;
+      try {
+        cache.remove(cacheKey);
+      } catch (ignore) {
+      }
+    }
+  }
+  if (!rows) {
     rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    cache.put(cacheKey, JSON.stringify(rows), CACHE_TTL_SECONDS);
+    var serializedRows = JSON.stringify(rows);
+    var serializedBytes = Utilities.newBlob(serializedRows).getBytes().length;
+    if (serializedBytes <= 90000) {
+      try {
+        cache.put(cacheKey, serializedRows, CACHE_TTL_SECONDS);
+      } catch (e) {
+      }
+    }
   }
 
   if (isList) {

@@ -18,7 +18,7 @@ Barcode ថ្មីក្នុង ZoeAdmin, វានឹងហៅ API នេ�
 មធ្យោបាយងាយបំផុត៖ នាំចូល `customer-template.csv` (ក្នុង folder នេះ) ចូល Sheet ថ្មី តាម
 **File ➜ Import ➜ Upload ➜ Replace current sheet**។
 
-### ការរៀបចំអោយស្អាត (Formatting)
+### ការរៀបចំឱ្យស្អាត (Formatting)
 
 1. **View ➜ Freeze ➜ 1 row** — ឲ្យ header ជាប់ពេល scroll
 2. Bold + ដាក់ពណ៌ background លើ row ១ (header)
@@ -115,7 +115,7 @@ Barcode ថ្មីក្នុង ZoeAdmin, វានឹងហៅ API នេ�
 `doGet` ក៏ទទួល `list=1` ជំនួស `code=...` (URL: `...?list=1&key=YOUR_API_KEY`) ដែលឆ្លើយត្រឡប់
 ជួរដេកទាំងអស់ក្នុង Sheet ជា `{"rows":[{"barcode":...,"dod":...,"cod":...,"phone":...}, ...]}`
 ជំនួសមួយជួរដេកតែម្តង។ ZoeAdmin ប្រើ Endpoint នេះសម្រាប់ Feature **"📊 តារាងអតិថិជន"** (ម៉ឺនុយ
-"⋯") — ទាញយកជួរដេកទាំងអស់ម្តងកាល (គោរព Cache ៥នាទីដដែល), រួចស្វែងរក/ត្រង Barcode/COD/DOD/Phone
+"⋯") — ទាញយកជួរដេកទាំងអស់ម្តងម្កាល (គោរព Cache ៥នាទីដដែល), រួចស្វែងរក/ត្រង Barcode/COD/DOD/Phone
 ដោយផ្ទាល់ក្នុងឧបករណ៍ (មិនហៅ API ម្តងទៀតរាល់ពេលវាយអក្សរនោះទេ — លឿនជាង Google Sheet/AppSheet/
 Retool ព្រោះមិនចាំបាច់រង់ចាំ Network ក្នុងការស្វែងរកម្តងៗ)។ Config URL ដដែលនឹងប្រើទាំង Lookup
 ម្តងមួយ (ពេលស្កេន) និង List ទាំងអស់ (តារាងនេះ) — ZoeAdmin ស្រង់ `list=1` ចេញពី URL Config

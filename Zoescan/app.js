@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.4';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -19,7 +19,7 @@ function getServerNow() {
     return Date.now() + serverTimeOffsetMs;
 }
 
-let currentUserEmail = null;
+let currentUserId = null;
 let authGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
@@ -263,7 +263,7 @@ async function initFirebase() {
             verifyRoleThenProceed(user, myAuthGeneration);
         } else {
             pendingRoleRecheck = false;
-            currentUserEmail = null;
+            currentUserId = null;
             if (!isPinFlowPending()) { pendingSetupLinkConfig = null; pinTargetAction = null; }
             cameraStoppedByVisibility = false;
             stopScanner();
@@ -492,7 +492,7 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
             return;
         }
         await window.firebaseSDK.signOut(auth).catch(() => {});
-        currentUserEmail = null;
+        currentUserId = null;
         openModal('loginModal');
         showToast('⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិចូលប្រព័ន្ធបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។');
         return;
@@ -500,7 +500,7 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
     if (myAuthGeneration !== authGeneration) return;
     if (role !== 'admin' && role !== 'worker' && role !== 'scanner') {
         await window.firebaseSDK.signOut(auth).catch(() => {});
-        currentUserEmail = null;
+        currentUserId = null;
         openModal('loginModal');
         showToast('⛔ គណនីនេះគ្មានសិទ្ធិចូល Zoescan ទេ!');
         return;
@@ -522,7 +522,7 @@ async function verifyRoleThenProceed(user, myAuthGeneration) {
         return;
     }
 
-    currentUserEmail = user.email || null;
+    currentUserId = user.uid || null;
     closeModal('loginModal');
     updateAuthButton(true);
     const wasAlreadySignedIn = listenersAttached;
@@ -679,7 +679,7 @@ function requestPinBeforeConfig(target) {
 async function saveNewSecurityPin() {
     const pin = document.getElementById('newPinInput').value;
     const confirmPin = document.getElementById('confirmPinInput').value;
-    if (!pin || pin.length < 6) { showToast('PIN ត្រូវមានយ៉ាងតិច ៦ខ្ទង់!'); return; }
+    if (!pin || pin.length < 6) { showToast('PIN ត្រូវមានយ៉ាងតិច ៦ ខ្ទង់!'); return; }
     if (pin !== confirmPin) { showToast('PIN ទាំងពីរមិនដូចគ្នាទេ!'); return; }
     try {
         localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
@@ -911,8 +911,16 @@ function saveLockerSettings() {
     showToast('✅ បានរក្សាទុកការកំណត់ទូ');
 }
 
+function isValidLockerName(value) {
+    const locker = String(value || '').trim();
+    return locker.length > 0 && locker.length <= 64 && locker.toUpperCase() !== 'N/A';
+}
 function showLockerPicker(skipIfActive) {
     stopScanner();
+    if (!isValidLockerName(activeLocker)) {
+        activeLocker = '';
+        localStorage.removeItem('zscan_active_locker');
+    }
     if (skipIfActive && activeLocker) { showAppScreen(); return; }
     document.getElementById('appScreen').classList.add('hidden');
     document.getElementById('lockerPickerScreen').classList.remove('hidden');
@@ -935,14 +943,19 @@ function renderLockerGrid() {
     grid.appendChild(frag);
 }
 function chooseLocker(val) {
-    activeLocker = val;
-    localStorage.setItem('zscan_active_locker', val);
+    const locker = String(val || '').trim();
+    if (!isValidLockerName(locker)) {
+        showToast('⚠️ ទីតាំង Locker មិនត្រឹមត្រូវទេ។ សូមជ្រើសរើសទីតាំងពិតប្រាកដ។');
+        return;
+    }
+    activeLocker = locker;
+    localStorage.setItem('zscan_active_locker', locker);
     showAppScreen();
 }
 function selectCustomLocker() {
     const input = document.getElementById('customLockerInput');
     const val = input.value.trim();
-    if (!val) { showToast('សូមបញ្ចូលទីតាំង!'); return; }
+    if (!isValidLockerName(val)) { showToast('សូមបញ្ចូលទីតាំងពិតប្រាកដ (មិនអាចជា N/A និងមិនលើស 64 តួអក្សរ)!'); return; }
     input.value = '';
     chooseLocker(val);
 }
@@ -1400,125 +1413,160 @@ async function assignLockerToEntry(code) {
         showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
         return;
     }
-    const { itemId } = entry;
+    const { itemId, barcodeIdx } = entry;
     const ts = getServerNow();
     const targetLocker = activeLocker;
+    if (!isValidLockerName(targetLocker)) {
+        playErrorFeedback();
+        showToast('⚠️ សូមជ្រើសរើសទីតាំង Locker ពិតប្រាកដសិន។');
+        showLockerPicker();
+        return;
+    }
     const previousLocker = getEntryCurrentLocker(entry);
-    let phoneForToast = entry.item.phone || '';
-    let matched = false;
-    let matchedBarcodeIdx = null;
-    let singleBarcodeItem = false;
+    const updatedBy = currentUserId || '';
     const myAssignGeneration = ++assignGeneration;
+    const phoneRaw = entry.item.phone ? sanitizePhoneNumber(entry.item.phone) : '';
+    const who = phoneRaw ? ` (${phoneRaw})` : '';
+    const successMsg = (previousLocker && previousLocker !== targetLocker && previousLocker !== 'N/A')
+        ? `✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${targetLocker}`
+        : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;
+    let reservationHandled = false;
+    let assignmentReported = false;
 
-    const buildLockerMirrorUpdates = () => {
+    const assignmentBase = `zoew_scanner_lookup/${itemId}`;
+    const historyBase = `zoew_scan_history_cod_dod/${itemId}`;
+    const buildAssignmentUpdates = (revision) => {
         const updates = {};
-        if (matchedBarcodeIdx !== null) {
-            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/code`] = code;
-            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
-            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
-            if (singleBarcodeItem) {
-                updates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
-                updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
-            }
+        if (barcodeIdx !== null) {
+            const barcodeBase = `barcodes/${barcodeIdx}`;
+            updates[`${assignmentBase}/${barcodeBase}/locker`] = targetLocker;
+            updates[`${assignmentBase}/${barcodeBase}/lockerUpdatedAt`] = ts;
+            updates[`${assignmentBase}/${barcodeBase}/lockerUpdatedBy`] = updatedBy;
+            updates[`${assignmentBase}/${barcodeBase}/lockerRevision`] = revision;
+            updates[`${assignmentBase}/${barcodeBase}/lockerPending`] = null;
+            updates[`${historyBase}/${barcodeBase}/locker`] = targetLocker;
+            updates[`${historyBase}/${barcodeBase}/lockerUpdatedAt`] = ts;
+            updates[`${historyBase}/${barcodeBase}/lockerUpdatedBy`] = updatedBy;
+            updates[`${historyBase}/${barcodeBase}/lockerRevision`] = revision;
         } else {
-            updates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
-            updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
+            updates[`${assignmentBase}/locker`] = targetLocker;
+            updates[`${assignmentBase}/lockerUpdatedAt`] = ts;
+            updates[`${assignmentBase}/lockerUpdatedBy`] = updatedBy;
+            updates[`${assignmentBase}/lockerAssignment/revision`] = revision;
+            updates[`${assignmentBase}/lockerAssignment/pending`] = null;
+            updates[`${historyBase}/locker`] = targetLocker;
+            updates[`${historyBase}/lockerUpdatedAt`] = ts;
+            updates[`${historyBase}/lockerUpdatedBy`] = updatedBy;
+            updates[`${historyBase}/lockerRevision`] = revision;
         }
-        if (currentUserEmail) updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail;
         return updates;
     };
-    const writeLockerMirror = () => retryAsync(() => withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), buildLockerMirrorUpdates()), 12000, 'Save timed out'), 3, 1500);
+    const updateLocalEntry = () => {
+        const liveEntry = barcodeIndex[code];
+        if (!liveEntry || liveEntry.itemId !== itemId || liveEntry.barcodeIdx !== barcodeIdx) return;
+        if (barcodeIdx !== null) {
+            const barcode = liveEntry.item.barcodes && liveEntry.item.barcodes[barcodeIdx];
+            if (!barcode) return;
+            barcode.locker = targetLocker;
+            barcode.lockerUpdatedAt = ts;
+            barcode.lockerUpdatedBy = updatedBy;
+        } else {
+            liveEntry.item.locker = targetLocker;
+            liveEntry.item.lockerUpdatedAt = ts;
+            liveEntry.item.lockerUpdatedBy = updatedBy;
+        }
+    };
+    const reportAssignment = (late) => {
+        if (assignmentReported) return;
+        assignmentReported = true;
+        updateLocalEntry();
+        if (myAssignGeneration === assignGeneration) playSuccessFeedback();
+        showToast(late ? `✅ ទីតាំង ${targetLocker} បានចុះយឺត ប៉ុន្តែជោគជ័យ! មិនបាច់ស្កេនម្តងទៀតទេ។` : successMsg);
+    };
+    const handleFinalWriteError = (err) => {
+        console.error('Locker assignment update failed: ', err);
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'assignLockerToEntry final update' });
+        playErrorFeedback();
+        showToast('⚠️ ការស្កេនផ្សេងទៀតបានប្តូរទីតាំងនេះរួចហើយ។ សូមស្កេន Barcode ម្តងទៀត។');
+    };
+    const finalizeReservation = async (result, lateReservation) => {
+        if (reservationHandled) return;
+        if (!result || !result.committed) {
+            playErrorFeedback();
+            showToast('⚠️ ទិន្នន័យ Barcode នេះបានផ្លាស់ប្តូររួចហើយ។ សូមស្កេនម្តងទៀត។');
+            return;
+        }
+        const reserved = result.snapshot && result.snapshot.val ? result.snapshot.val() : null;
+        const pending = barcodeIdx !== null ? reserved && reserved.lockerPending : reserved && reserved.pending;
+        if (!pending || !Number.isInteger(pending.revision) || pending.revision < 1 || pending.code !== code || pending.locker !== targetLocker || pending.updatedAt !== ts || pending.updatedBy !== updatedBy) {
+            if (!lateReservation) {
+                playErrorFeedback();
+                showToast('⚠️ ការស្កេនផ្សេងទៀតបានប្តូរទីតាំងនេះរួចហើយ។ សូមស្កេន Barcode ម្តងទៀត។');
+            }
+            return;
+        }
+        reservationHandled = true;
+        const finalWrite = window.firebaseSDK.update(window.firebaseSDK.ref(db), buildAssignmentUpdates(pending.revision));
+        try {
+            await withTimeout(finalWrite, 12000, 'Save timed out');
+            reportAssignment(lateReservation);
+        } catch (err) {
+            if (err && err.message === 'Save timed out') {
+                finalWrite.then(() => reportAssignment(true), handleFinalWriteError);
+                showToast('⏳ កំពុងរក្សាទុកទីតាំង… សូមកុំស្កេន Barcode នេះម្ដងទៀត។');
+                return;
+            }
+            handleFinalWriteError(err);
+        }
+    };
 
     try {
-        const lookupRef = window.firebaseSDK.ref(db, `zoew_scanner_lookup/${itemId}`);
-        const lookupTxnPromise = window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
-            matched = false;
-            matchedBarcodeIdx = null;
-            singleBarcodeItem = false;
-            if (!currentItem) return currentItem;
-            const lookupEntries = barcodeEntriesOf(currentItem.barcodes);
-            if (lookupEntries.length) {
-                const found = lookupEntries.find(e => e.barcode && e.barcode.code === code);
-                if (!found) return currentItem;
-                found.barcode.locker = targetLocker;
-                found.barcode.lockerUpdatedAt = ts;
-                matchedBarcodeIdx = found.index;
-                if (lookupEntries.length === 1) {
-                    currentItem.locker = targetLocker;
-                    currentItem.lockerUpdatedAt = ts;
-                    singleBarcodeItem = true;
+        const reservationPath = barcodeIdx !== null
+            ? `${assignmentBase}/barcodes/${barcodeIdx}`
+            : `${assignmentBase}/lockerAssignment`;
+        const reservationPromise = window.firebaseSDK.runTransaction(window.firebaseSDK.ref(db, reservationPath), (current) => {
+            if (barcodeIdx !== null) {
+                if (!current || current.code !== code) return;
+                const committedRevision = Number.isInteger(current.lockerRevision) && current.lockerRevision >= 0 ? current.lockerRevision : 0;
+                const pendingRevision = current.lockerPending && Number.isInteger(current.lockerPending.revision) && current.lockerPending.revision >= 0
+                    ? current.lockerPending.revision : committedRevision;
+                return {
+                    ...current,
+                    lockerPending: {
+                        revision: Math.max(committedRevision, pendingRevision) + 1,
+                        code,
+                        locker: targetLocker,
+                        updatedAt: ts,
+                        updatedBy
+                    }
+                };
+            }
+            const currentState = current && typeof current === 'object' ? current : {};
+            const committedRevision = Number.isInteger(currentState.revision) && currentState.revision >= 0 ? currentState.revision : 0;
+            const pendingRevision = currentState.pending && Number.isInteger(currentState.pending.revision) && currentState.pending.revision >= 0
+                ? currentState.pending.revision : committedRevision;
+            return {
+                revision: committedRevision,
+                pending: {
+                    revision: Math.max(committedRevision, pendingRevision) + 1,
+                    code,
+                    locker: targetLocker,
+                    updatedAt: ts,
+                    updatedBy
                 }
-            } else if (currentItem.barcode === code) {
-                currentItem.locker = targetLocker;
-                currentItem.lockerUpdatedAt = ts;
-            } else {
-                return currentItem;
-            }
-            if (currentUserEmail) currentItem.lockerUpdatedBy = currentUserEmail;
-            phoneForToast = currentItem.phone || '';
-            matched = true;
-            return currentItem;
+            };
         });
-        let result;
         try {
-            result = await withTimeout(lookupTxnPromise, 12000, 'Save timed out');
-        } catch (lookupTimeoutErr) {
-            lookupTxnPromise.then((lateResult) => {
-                if (!lateResult || !lateResult.committed || !matched) return;
-                writeLockerMirror().then(() => {
-                    showToast(`✅ ទីតាំង ${targetLocker} បានចុះយឺត ប៉ុន្តែជោគជ័យ! មិនបាច់ស្កេនម្តងទៀតទេ។`);
-                }, (lateMirrorErr) => {
-                    console.error('Late mirror update to scan history failed: ', lateMirrorErr);
-                    if (window.ZoeErrors) ZoeErrors.capture(lateMirrorErr, { context: 'assignLockerToEntry late mirror update failed' });
-                    showToast(`⚠️ ទីតាំង ${targetLocker} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ"`);
-                });
-            }, () => {});
-            throw lookupTimeoutErr;
-        }
-
-        if (!result.committed || !matched) {
-            playErrorFeedback();
-            showToast(`❌ Barcode "${code}" លែងមានក្នុងប្រព័ន្ធទៀតហើយ! សូមស្កេនម្តងទៀត`);
-            return;
-        }
-
-        if (matchedBarcodeIdx !== null) {
-            if (entry.item.barcodes && entry.item.barcodes[matchedBarcodeIdx]) {
-                entry.item.barcodes[matchedBarcodeIdx].locker = targetLocker;
-                entry.item.barcodes[matchedBarcodeIdx].lockerUpdatedAt = ts;
+            const result = await withTimeout(reservationPromise, 12000, 'Save timed out');
+            await finalizeReservation(result, false);
+        } catch (err) {
+            if (err && err.message === 'Save timed out') {
+                reservationPromise.then((result) => finalizeReservation(result, true), handleFinalWriteError);
+                showToast('⏳ កំពុងពិនិត្យការកំណត់ទីតាំង… សូមកុំស្កេន Barcode នេះម្ដងទៀត។');
+                return;
             }
-            if (singleBarcodeItem) {
-                entry.item.locker = targetLocker;
-                entry.item.lockerUpdatedAt = ts;
-            }
-        } else {
-            entry.item.locker = targetLocker;
-            entry.item.lockerUpdatedAt = ts;
+            throw err;
         }
-        if (currentUserEmail) entry.item.lockerUpdatedBy = currentUserEmail;
-
-        const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
-        const who = phoneRaw ? ` (${phoneRaw})` : '';
-        const successMsg = (previousLocker && previousLocker !== targetLocker && previousLocker !== 'N/A')
-            ? `✅ ប្តូរទីតាំង${who} ពី ${previousLocker} ➜ ${targetLocker}`
-            : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;
-
-        try {
-            await writeLockerMirror();
-        } catch (mirrorErr) {
-            console.error('Mirror update to scan history failed: ', mirrorErr);
-            if (window.ZoeErrors) ZoeErrors.capture(mirrorErr, { context: 'assignLockerToEntry mirror update failed' });
-            if (myAssignGeneration === assignGeneration) {
-                playSuccessFeedback();
-            }
-            showToast(`⚠️ ទីតាំង${who} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ"`);
-            return;
-        }
-
-        if (myAssignGeneration === assignGeneration) {
-            playSuccessFeedback();
-        }
-        showToast(successMsg);
     } catch (err) {
         playErrorFeedback();
         console.error(err);

@@ -67,7 +67,14 @@ const FAKE_SDK = function (seed) {
             cur = cur[parts[i]];
         }
         const last = parts[parts.length - 1];
-        if (val === null) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(val));
+        if (val === null) {
+            delete cur[last];
+        } else if (val && typeof val === 'object' && Object.prototype.hasOwnProperty.call(val, '__fakeIncrement')) {
+            const current = Number(cur[last]);
+            cur[last] = (Number.isFinite(current) ? current : 0) + Number(val.__fakeIncrement);
+        } else {
+            cur[last] = JSON.parse(JSON.stringify(val));
+        }
     }
     function snapOf(p) {
         const v = getPath(p);
@@ -109,6 +116,7 @@ const FAKE_SDK = function (seed) {
             fireAll(); return Promise.resolve();
         },
         goOnline: () => {},
+        increment: (amount) => ({ __fakeIncrement: Number(amount) }),
         runTransaction: (r, fn) => {
             window.__writeLog.push({ op: 'txn', path: r.path });
             let cur = getPath(r.path);
@@ -507,15 +515,14 @@ function seedData() {
                 const orig = window.firebaseSDK.runTransaction;
                 let armed = true;
                 window.firebaseSDK.runTransaction = function (r, fn) {
-                    const out = orig.call(this, r, fn);
-                    if (armed && String(r.path).indexOf('zoew_monthly_revenue_cod_dod') === 0) {
+                    if (armed && String(r.path).indexOf('zoew_scan_history_cod_dod/id_rs_live') === 0) {
                         armed = false;
                         window.firebaseSDK.runTransaction = orig;
                         const it = window.__fakeStore.zoew_scan_history_cod_dod.id_rs_live;
                         it.barcodes[0].isClosed = true;
                         it.barcodes[0].locker = 'RZ9';
                     }
-                    return out;
+                    return orig.call(this, r, fn);
                 };
             });
             await page.evaluate(() => { window.promptRestoreDeletedItem('id_rs_trash'); window.executeRestoreItem(); });

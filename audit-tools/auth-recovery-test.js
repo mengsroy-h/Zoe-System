@@ -183,6 +183,8 @@ function buildContext(app) {
         function closeConfigQrScanner() {}
         function openModal(id) { if (id === 'loginModal') __log.loginModalShown++; }
         function updateSigningKeyBadge() {}
+        function requestSessionSigningKeyRestoreIfEligible() {}
+        function enforceSessionOnlyAuthPersistence() { return Promise.resolve(); }
         function waitForFirebaseSDK() { return Promise.resolve(fb); }
         var currentUserEmail = null;
         var cameraStoppedByVisibility = false;
@@ -198,6 +200,7 @@ function buildContext(app) {
         function attemptAuthStorageRecovery() { __log.storageRecovery = true; }
         function isFirebaseSessionExpired() { return Promise.resolve(false); }
         function forceExpireSession() {}
+        function resetClearHistoryOperationState() {}
         function ensureAppActivated() { return Promise.resolve(activationAllowed); }
         function checkPinAndOpenConfig() {}
     `;

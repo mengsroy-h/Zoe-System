@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.4';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -102,6 +102,7 @@ let auth = null;
 let db = null;
 let authUnsubscribe = null;
 let authGeneration = 0;
+let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
 let lastRoleRestOutcome = '';
@@ -160,6 +161,37 @@ function showToast(msg) {
     }, 3000);
 }
 
+function invalidateSensitiveSession() {
+    sensitiveSessionGeneration++;
+}
+
+function captureSensitiveSession(requireAuthorizedUi) {
+    const user = auth && auth.currentUser ? auth.currentUser : null;
+    if (requireAuthorizedUi && (!user || !isSignedInUiActive)) return null;
+    return { sensitiveSessionGeneration, authGeneration, user };
+}
+
+function isSensitiveSessionCurrent(token, requireAuthorizedUi) {
+    if (!token || token.sensitiveSessionGeneration !== sensitiveSessionGeneration) return false;
+    if (!requireAuthorizedUi) return true;
+    return !!(auth && auth.currentUser === token.user && authGeneration === token.authGeneration && isSignedInUiActive);
+}
+
+function clearPinInputValues() {
+    const pinIn = document.getElementById('securityPinInput');
+    if (pinIn) pinIn.value = '';
+    const newPinIn = document.getElementById('newSecurityPinInput');
+    if (newPinIn) newPinIn.value = '';
+}
+
+function clearKeypairOutputs() {
+    keypairPrivateCopied = false;
+    const privateOut = document.getElementById('newPrivateKeyOutput');
+    if (privateOut) privateOut.value = '';
+    const publicOut = document.getElementById('newPublicKeyOutput');
+    if (publicOut) publicOut.value = '';
+}
+
 function openModalHelper(id) {
     const el = document.getElementById(id);
     if (el) el.classList.add('active');
@@ -168,9 +200,13 @@ function openModalHelper(id) {
 function closeModal(id) {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active');
+    if (id === 'pinModal' || id === 'pinSetupModal') {
+        invalidateSensitiveSession();
+        clearPinInputValues();
+        pinTargetAction = null;
+    }
     if (id === 'keypairModal') {
-        const out = document.getElementById('newPrivateKeyOutput');
-        if (out) out.value = '';
+        clearKeypairOutputs();
     }
 }
 
@@ -208,6 +244,13 @@ function waitForFirebaseSDK(timeoutMs = 15000) {
     });
 }
 
+async function enforceSessionOnlyAuthPersistence() {
+    if (!fb || !auth || typeof fb.setPersistence !== 'function' || !fb.browserSessionPersistence) {
+        throw new Error('Firebase session persistence unavailable');
+    }
+    await fb.setPersistence(auth, fb.browserSessionPersistence);
+}
+
 async function initFirebase() {
     const savedConfig = localStorage.getItem('zoew_firebase_config');
     if (!savedConfig) {
@@ -216,6 +259,7 @@ async function initFirebase() {
     }
     if (isInitializingFirebase) return false;
     isInitializingFirebase = true;
+    invalidateSensitiveSession();
 
     try {
         firebaseConfig = JSON.parse(savedConfig);
@@ -234,6 +278,7 @@ async function initFirebase() {
 
         const firebaseApp = fb.getApps().length ? fb.getApps()[0] : fb.initializeApp(firebaseConfig);
         auth = fb.getAuth(firebaseApp);
+        await enforceSessionOnlyAuthPersistence();
         db = fb.getDatabase(firebaseApp);
         try { fb.goOnline(db); } catch (e) {}
 
@@ -289,12 +334,11 @@ let pinTargetAction = null;
 
 function requestPinBeforeConfig(targetAction, message) {
     pinTargetAction = targetAction || openConfigModal;
+    clearPinInputValues();
     const savedPin = localStorage.getItem('zoew_security_pin_hash');
     if (!savedPin) {
         openModalHelper('pinSetupModal');
     } else {
-        const pinIn = document.getElementById('securityPinInput');
-        if (pinIn) pinIn.value = '';
         const msgEl = document.getElementById('pinModalMsg');
         if (msgEl) msgEl.textContent = message || 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig';
         openModalHelper('pinModal');
@@ -322,9 +366,12 @@ async function deriveSigningKeySessionKey(pin) {
 const SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
 
 async function persistSigningKeyForSession() {
-    if (!signingPrivateKeyJwk) return;
+    const operation = captureSensitiveSession(true);
+    const privateKeyJwk = signingPrivateKeyJwk;
+    const sessionKey = signingKeySessionKey;
+    if (!operation || !privateKeyJwk) return;
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
-    if (!signingKeySessionKey) {
+    if (!sessionKey) {
         if (rememberCb) rememberCb.checked = false;
         showToast('⚠️ មិនអាចចងចាំ Signing Key បានទេ (បង្កើតសោពី PIN មិនបាន) — សូម Load Key ម្តងទៀតពេលត្រូវការ');
         return;
@@ -332,11 +379,13 @@ async function persistSigningKeyForSession() {
     try {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const cipherBuf = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv }, signingKeySessionKey, new TextEncoder().encode(JSON.stringify(signingPrivateKeyJwk))
+            { name: 'AES-GCM', iv }, sessionKey, new TextEncoder().encode(JSON.stringify(privateKeyJwk))
         );
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
         sessionStorage.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
         showToast('🔒 Signing Key ត្រូវបានចងចាំសម្រាប់ Session នេះ (Encrypted ដោយ PIN)');
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
         if (rememberCb) rememberCb.checked = false;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'persistSigningKeyForSession' });
         showToast('⚠️ មិនអាចចងចាំ Signing Key សម្រាប់ Session នេះបានទេ — សូម Load Key ម្តងទៀតពេលត្រូវការ');
@@ -344,21 +393,29 @@ async function persistSigningKeyForSession() {
 }
 
 async function tryRestoreSigningKeyFromSession() {
-    if (signingPrivateKeyJwk || !signingKeySessionKey) return;
+    const operation = captureSensitiveSession(true);
+    const sessionKey = signingKeySessionKey;
+    if (!operation || signingPrivateKeyJwk || !sessionKey) return;
     const raw = sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY);
     if (!raw) return;
     try {
         const encObj = JSON.parse(raw);
         const plainBuf = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: new Uint8Array(encObj.iv) }, signingKeySessionKey, new Uint8Array(encObj.data)
+            { name: 'AES-GCM', iv: new Uint8Array(encObj.iv) }, sessionKey, new Uint8Array(encObj.data)
         );
-        signingPrivateKeyJwk = JSON.parse(new TextDecoder().decode(plainBuf));
+        const restoredKeyJwk = JSON.parse(new TextDecoder().decode(plainBuf));
+        await validateSigningKeyAgainstShippedPublicKey(restoredKeyJwk);
+        if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
+        signingPrivateKeyJwk = restoredKeyJwk;
         updateSigningKeyBadge();
         const cb = document.getElementById('rememberSigningKeyCheckbox');
         if (cb) cb.checked = true;
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
         sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+        const cb = document.getElementById('rememberSigningKeyCheckbox');
+        if (cb) cb.checked = false;
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
     }
 }
@@ -367,13 +424,21 @@ async function saveNewSecurityPin() {
     const newPinIn = document.getElementById('newSecurityPinInput');
     const pinVal = newPinIn ? newPinIn.value.trim() : '';
     if (!pinVal || pinVal.length < 6) {
+        if (newPinIn) newPinIn.value = '';
         alert("Security PIN ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ ដើម្បីសុវត្ថិភាព!");
         return;
     }
+    const pinGeneration = sensitiveSessionGeneration;
+    const targetAction = pinTargetAction || openConfigModal;
     try {
-        localStorage.setItem('zoew_security_pin_hash', await hashPin(pinVal));
-        signingKeySessionKey = await deriveSigningKeySessionKey(pinVal);
+        const pinHash = await hashPin(pinVal);
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        const derivedKey = await deriveSigningKeySessionKey(pinVal);
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        localStorage.setItem('zoew_security_pin_hash', pinHash);
+        signingKeySessionKey = derivedKey;
     } catch (e) {
+        if (pinGeneration !== sensitiveSessionGeneration) return;
         alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
         return;
     } finally {
@@ -381,7 +446,7 @@ async function saveNewSecurityPin() {
     }
     closeModal('pinSetupModal');
     showToast("បានកំណត់ Security PIN រួចរាល់!");
-    (pinTargetAction || openConfigModal)();
+    targetAction();
 }
 
 let isVerifyingPin = false;
@@ -400,15 +465,21 @@ async function verifySecurityPin() {
         return;
     }
 
+    const pinGeneration = sensitiveSessionGeneration;
     isVerifyingPin = true;
     try {
         if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
+            if (pinGeneration !== sensitiveSessionGeneration) return;
             localStorage.removeItem('zoew_pin_fail_count');
             localStorage.removeItem('zoew_pin_lockout_until');
-            signingKeySessionKey = await deriveSigningKeySessionKey(enteredPin);
+            const derivedKey = await deriveSigningKeySessionKey(enteredPin);
+            if (pinGeneration !== sensitiveSessionGeneration) return;
+            signingKeySessionKey = derivedKey;
+            const targetAction = pinTargetAction || openConfigModal;
             closeModal('pinModal');
-            (pinTargetAction || openConfigModal)();
+            targetAction();
         } else {
+            if (pinGeneration !== sensitiveSessionGeneration) return;
             const failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
             if (failCount >= 5) {
                 localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
@@ -420,6 +491,7 @@ async function verifySecurityPin() {
             }
         }
     } catch (e) {
+        if (pinGeneration !== sensitiveSessionGeneration) return;
         alert("មិនអាចផ្ទៀងផ្ទាត់ PIN បានទេ!");
     } finally {
         isVerifyingPin = false;
@@ -430,6 +502,12 @@ function isPinFlowPending() {
     const pinModal = document.getElementById('pinModal');
     const pinSetupModal = document.getElementById('pinSetupModal');
     return !!((pinModal && pinModal.classList.contains('active')) || (pinSetupModal && pinSetupModal.classList.contains('active')));
+}
+
+function requestSessionSigningKeyRestoreIfEligible() {
+    if (!isSignedInUiActive || !auth || !auth.currentUser || signingPrivateKeyJwk) return;
+    if (!sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY) || isPinFlowPending()) return;
+    requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
 }
 
 function checkPinAndOpenConfig() {
@@ -487,8 +565,12 @@ function saveFirebaseConfig() {
 }
 
 function showLoginModalWithPrefill() {
+    invalidateSensitiveSession();
     const losingUncopiedKeypair = hasUncopiedKeypair();
     keypairPrivateCopied = false;
+    isGeneratingKey = false;
+    const genBtn = document.getElementById('genGenerateBtn');
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     if (!isPinFlowPending()) pinTargetAction = null;
     document.getElementById('appContainer').style.display = 'none';
     isSignedInUiActive = false;
@@ -500,11 +582,7 @@ function showLoginModalWithPrefill() {
         if (m.id !== 'loginModal') closeModal(m.id);
     });
 
-    lastGeneratedKey = '';
-    const genResultKey = document.getElementById('genResultKey');
-    if (genResultKey) genResultKey.textContent = '';
-    const genResultBox = document.getElementById('genResultBox');
-    if (genResultBox) genResultBox.classList.add('hidden');
+    clearGeneratedKeyResult();
 
     lastGeneratedSetupLink = '';
     const setupLinkConfigInput = document.getElementById('setupLinkConfigInput');
@@ -516,18 +594,18 @@ function showLoginModalWithPrefill() {
     const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
     if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
 
-    clearSigningKey();
+    clearSigningKey(true);
     openModalHelper('loginModal');
     if (losingUncopiedKeypair) {
         alert('⚠️ Keypair ថ្មីដែលអ្នកទើបបង្កើត ត្រូវបានលុបចោល ព្រោះអ្នកបានចាកចេញពីប្រព័ន្ធ ហើយអ្នកមិនទាន់បានចម្លង Private Key ទុកទេ។ នេះជាការការពារ (Private Key មិនត្រូវនៅសល់លើឧបករណ៍បន្ទាប់ពី Logout)។ សូមចូលម្តងទៀត ហើយបង្កើត Keypair ថ្មី — កុំភ្លេចចម្លងវាភ្លាមៗ។');
     }
     const savedEmail = localStorage.getItem('remembered_email');
     const emailInput = document.getElementById('loginEmailInput');
+    const passwordInput = document.getElementById('loginPasswordInput');
     const rememberCb = document.getElementById('rememberMeCheckbox');
-    if (savedEmail && emailInput) {
-        emailInput.value = savedEmail;
-        if (rememberCb) rememberCb.checked = true;
-    }
+    if (emailInput) emailInput.value = savedEmail || '';
+    if (passwordInput) passwordInput.value = '';
+    if (rememberCb) rememberCb.checked = !!savedEmail;
 }
 
 async function doLogin() {
@@ -544,7 +622,7 @@ async function doLogin() {
     try {
         if (!fb || !auth) { fb = await waitForFirebaseSDK(); }
         const generationAtLogin = authGeneration;
-        await fb.setPersistence(auth, rememberCb && rememberCb.checked ? fb.browserLocalPersistence : fb.browserSessionPersistence);
+        await enforceSessionOnlyAuthPersistence();
         const cred = await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
         if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
         else localStorage.removeItem('remembered_email');
@@ -685,6 +763,7 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     updateAuthButton(true);
     if (!isSignedInUiActive) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
     isSignedInUiActive = true;
+    requestSessionSigningKeyRestoreIfEligible();
     refreshKeyList();
 }
 
@@ -733,15 +812,15 @@ function setupAuthListener() {
 }
 
 function logoutApp() {
-    if (!fb || !auth) return;
     if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
-    const finishLogout = () => {
-        localStorage.removeItem('remembered_email');
-        document.getElementById('appContainer').style.display = 'none';
-        updateAuthButton(false);
-        showLoginModalWithPrefill();
-    };
-    fb.signOut(auth).then(finishLogout).catch(finishLogout);
+    authGeneration++;
+    pendingRoleRecheck = false;
+    updateAuthButton(false);
+    showLoginModalWithPrefill();
+    if (!fb || !auth) return;
+    fb.signOut(auth).catch(() => {
+        showToast('⚠️ មិនអាចចាកចេញពី Firebase បានភ្លាមៗទេ។ សូម Refresh ហើយចូលម្ដងទៀត។');
+    });
 }
 
 function updateAuthButton(isLoggedIn) {
@@ -772,18 +851,25 @@ function updateSigningKeyBadge() {
     }
 }
 
+async function validateSigningKeyAgainstShippedPublicKey(jwk) {
+    if (!jwk || !jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
+    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: 'ADM', days: 1, note: '' });
+    const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, 'ADM');
+    if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
+}
+
 async function loadSigningKey() {
     const input = document.getElementById('privateKeyInput');
-    const raw = input.value.trim();
+    const raw = input ? input.value.trim() : '';
     if (!raw) { alert('សូមបិទភ្ជាប់ Private Key JWK សិន!'); return; }
+    const operation = captureSensitiveSession(true);
+    if (!operation) { alert('សូមចូលប្រព័ន្ធជាមុនសិន!'); return; }
     try {
         const jwk = JSON.parse(raw);
-        if (!jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
-        const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: 'ADM', days: 1, note: '' });
-        const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, 'ADM');
-        if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
+        await validateSigningKeyAgainstShippedPublicKey(jwk);
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         signingPrivateKeyJwk = jwk;
-        input.value = '';
+        if (input) input.value = '';
         updateSigningKeyBadge();
         showToast('Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
 
@@ -796,6 +882,7 @@ async function loadSigningKey() {
             }
         }
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loadSigningKey' });
         alert(e && e.message === 'private key does not pair with the shipped public key'
             ? 'Private Key នេះមិនផ្គូផ្គងនឹង Public Key ដែលមានក្នុង license-verify.js ទេ! Key ដែលចេញដោយវានឹងផ្ទៀងផ្ទាត់មិនកើតនៅគ្រប់ App។ សូមប្រើ Private Key ដែលត្រូវគ្នា ឬដាក់ Public Key ថ្មីទៅក្នុង App ទាំងអស់សិន។'
@@ -803,15 +890,20 @@ async function loadSigningKey() {
     }
 }
 
-function clearSigningKey() {
+function clearSigningKey(silent) {
+    invalidateSensitiveSession();
     signingPrivateKeyJwk = null;
     signingKeySessionKey = null;
-    document.getElementById('privateKeyInput').value = '';
+    const input = document.getElementById('privateKeyInput');
+    if (input) input.value = '';
     sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
     if (rememberCb) rememberCb.checked = false;
+    isGeneratingKey = false;
+    const genBtn = document.getElementById('genGenerateBtn');
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     updateSigningKeyBadge();
-    showToast('បានសម្អាត Signing Key ចេញពីសតិ');
+    if (!silent) showToast('បានសម្អាត Signing Key ចេញពីសតិ');
 }
 
 let keypairPrivateCopied = false;
@@ -830,14 +922,18 @@ function dismissKeypairModal() {
 }
 
 async function generateNewKeypair() {
+    const operation = captureSensitiveSession(true);
+    if (!operation) { alert('សូមចូលប្រព័ន្ធជាមុនសិន!'); return; }
     if (!confirm('ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗប្រើលែងកើត លុះត្រាតែអ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុង license-verify.js របស់គ្រប់ App ។ បន្តទេ?')) return;
     try {
         const { publicKeyJwk, privateKeyJwk } = await window.ZoeLicense.generateKeyPair();
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         keypairPrivateCopied = false;
         document.getElementById('newPrivateKeyOutput').value = JSON.stringify(privateKeyJwk);
         document.getElementById('newPublicKeyOutput').value = JSON.stringify(publicKeyJwk);
         openModalHelper('keypairModal');
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         alert('មិនអាចបង្កើត Keypair បានទេ!');
     }
 }
@@ -845,10 +941,13 @@ async function generateNewKeypair() {
 function copyTextarea(id) {
     const el = document.getElementById(id);
     if (!el) return;
+    const operation = captureSensitiveSession(true);
+    if (!operation) return;
     el.removeAttribute('readonly');
     el.select();
     el.setAttribute('readonly', 'true');
     const markCopied = () => {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         if (id === 'newPrivateKeyOutput') keypairPrivateCopied = true;
         showToast('បានចម្លង!');
     };
@@ -859,12 +958,22 @@ function copyTextarea(id) {
 
 let lastGeneratedKey = '';
 
+function clearGeneratedKeyResult() {
+    lastGeneratedKey = '';
+    const genResultKey = document.getElementById('genResultKey');
+    if (genResultKey) genResultKey.textContent = '';
+    const genResultBox = document.getElementById('genResultBox');
+    if (genResultBox) genResultBox.classList.add('hidden');
+}
+
 let isGeneratingKey = false;
 
 async function generateLicenseKey() {
     if (isGeneratingKey) return;
-    if (!signingPrivateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
-    if (!db || !auth || !auth.currentUser) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
+    const operation = captureSensitiveSession(true);
+    const privateKeyJwk = signingPrivateKeyJwk;
+    if (!privateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
+    if (!db || !operation) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
 
     const appSelect = document.getElementById('genAppSelect').value;
     const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
@@ -876,20 +985,20 @@ async function generateLicenseKey() {
     isGeneratingKey = true;
     if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
 
-    const timeSynced = await waitForServerTimeSync(15000);
-    if (!timeSynced) {
-        isGeneratingKey = false;
-        if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
-        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
-        return;
-    }
-    if (genBtn) { genBtn.textContent = 'កំពុងបង្កើត...'; }
-
     const myGeneration = keyListSessionGeneration;
     try {
-        const { keyString, payload } = await window.ZoeLicense.signNewKey(signingPrivateKeyJwk, {
+        const timeSynced = await waitForServerTimeSync(15000);
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!timeSynced) {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
+            return;
+        }
+        if (genBtn) genBtn.textContent = 'កំពុងបង្កើត...';
+
+        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, {
             appCode: appSelect, days: days, note: note
         });
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
 
         const targetPaths = appSelect === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [appSelect];
         const publicRecord = {
@@ -900,7 +1009,7 @@ async function generateLicenseKey() {
             issuedAt: getServerNow(),
             scope: appSelect,
             note: note || '',
-            createdBy: auth.currentUser.email || auth.currentUser.uid
+            createdBy: operation.user.email || operation.user.uid
         };
 
         let generateAlreadyTimedOut = false;
@@ -910,7 +1019,7 @@ async function generateLicenseKey() {
         }), 3, 1000)));
         writePromise.then((bgResults) => {
             if (!generateAlreadyTimedOut) return;
-            if (myGeneration !== keyListSessionGeneration) return;
+            if (myGeneration !== keyListSessionGeneration || !isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
             const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
             if (bgSucceededPaths.length > 0) {
                 showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
@@ -925,6 +1034,7 @@ async function generateLicenseKey() {
             if (timeoutErr && timeoutErr.message === 'Generate key timed out') generateAlreadyTimedOut = true;
             throw timeoutErr;
         }
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
         const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
         const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
 
@@ -935,6 +1045,7 @@ async function generateLicenseKey() {
         let appPathsTagFailed = false;
         if (failedPaths.length > 0) {
             const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.update(fb.ref(db, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths }), 3, 1000)));
+            if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
             appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
             if (appPathsTagFailed) {
                 const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
@@ -943,6 +1054,7 @@ async function generateLicenseKey() {
             }
         }
 
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
         lastGeneratedKey = keyString;
         document.getElementById('genResultKey').textContent = keyString;
         document.getElementById('genResultBox').classList.remove('hidden');
@@ -958,12 +1070,14 @@ async function generateLicenseKey() {
         }
         refreshKeyList();
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
         console.error(e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
         alert(e && e.message === 'Generate key timed out'
             ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
             : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
         isGeneratingKey = false;
         if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     }
@@ -1354,9 +1468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         retryPendingRoleCheck();
     });
 
-    if (sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY) && !isPinFlowPending()) {
-        requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
-    }
+    requestSessionSigningKeyRestoreIfEligible();
 
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('mousedown', (e) => {

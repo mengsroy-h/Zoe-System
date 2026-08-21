@@ -22,8 +22,8 @@ function buildRunner(appFile) {
 
     // --- real block 2: executeRestoreItem's revenue + marker block ---
     const restoreBlock = slice(src,
-        '        const appliedRevenueDeltas = [];\n        const revenueScanDate = itemToRestore.scanDate || getFormattedDate();',
-        "            appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });\n        }",
+        '            const appliedRevenueDeltas = [];\n            const revenueScanDate = itemToRestore.scanDate || getFormattedDate();',
+        "                appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });\n            }",
         'restore');
 
     const prelude = `
@@ -52,6 +52,9 @@ ${claimBlock}
             delete itemToRestore.deletedAt;
             delete itemToRestore.isFromDeletion;
 ${restoreBlock}
+            appliedRevenueDeltas.forEach((delta) => {
+                addRevenueToDailyAndMonthlyRecord(delta.scanDate, delta.cod, delta.dod, delta.count);
+            });
             return { itemToRestore, appliedRevenueDeltas };
         }
     `);

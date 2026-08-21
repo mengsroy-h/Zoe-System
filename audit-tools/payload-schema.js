@@ -58,6 +58,13 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
     const liveFields = schemaFields(TARGETS['zoew_scan_history_cod_dod/$itemId']);
     const trashOnly = [...schemaFields(TARGETS['zoew_recently_deleted_cod_dod/$itemId'])]
         .filter((f) => !liveFields.has(f));
+    const clearBuilderAt = src.indexOf('function buildClearHistoryTrashItem(');
+    const clearBuilderEnd = clearBuilderAt === -1 ? -1 : src.indexOf('async function claimHistoryItemForClear(', clearBuilderAt);
+    const clearBuilder = clearBuilderAt === -1 ? '' : src.slice(clearBuilderAt, clearBuilderEnd === -1 ? clearBuilderAt + 3000 : clearBuilderEnd);
+    const itemFieldsStrippedBeforeTrash = new Set();
+    const strippedFieldPattern = /delete\s+trashItem\.([A-Za-z_$][\w$]*)/g;
+    let strippedFieldMatch;
+    while ((strippedFieldMatch = strippedFieldPattern.exec(clearBuilder))) itemFieldsStrippedBeforeTrash.add(strippedFieldMatch[1]);
 
     const CHECKS = [
         ['item', 'zoew_recently_deleted_cod_dod/$itemId'],
@@ -68,7 +75,8 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
         const node = TARGETS[target];
         const allowed = schemaFields(node);
         const open = allowsOther(node);
-        const unknown = [...found[bucket].entries()].filter(([f]) => !allowed.has(f));
+        const unknown = [...found[bucket].entries()].filter(([f]) => !allowed.has(f) &&
+            !(bucket === 'item' && target === 'zoew_recently_deleted_cod_dod/$itemId' && itemFieldsStrippedBeforeTrash.has(f)));
         console.log(`\n=== ${app} — ${bucket} ➜ ${target} ${open ? '($other បើក)' : '($other បិទ)'} ===`);
         if (!unknown.length) { console.log('   ok    គ្រប់ field ដែលកូដកំណត់ មានក្នុង schema'); continue; }
         for (const [f, line] of unknown) {

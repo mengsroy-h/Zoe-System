@@ -3791,6 +3791,11 @@
         }
 
         const barcodeToSave = pendingBarcode;
+        if (!barcodeToSave) {
+            closeModal('phoneModal');
+            showToast(`⚠️ សូមស្កេនម្ដងទៀត។`);
+            return;
+        }
 
         if (isBarcodeAlreadyUsed(barcodeToSave)) {
             closeModal('phoneModal');
@@ -3810,7 +3815,16 @@
         if (closeXBtn) closeXBtn.disabled = true;
 
         try {
-            const claim = await withTimeout(claimBarcodeInRegistry(barcodeToSave), 15000, 'Barcode claim timed out');
+            const claimPromise = claimBarcodeInRegistry(barcodeToSave);
+            let claim;
+            try {
+                claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
+            } catch (claimError) {
+                claimPromise.then((lateClaim) => {
+                    if (lateClaim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
+                }, () => {});
+                throw claimError;
+            }
             if (claim === 'taken') {
                 closeModal('phoneModal');
                 showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
@@ -3821,12 +3835,24 @@
 
             const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
 
-            try {
-                await withTimeout(addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker), 15000, 'Save timed out');
-            } catch (saveError) {
+            const rollbackFailedSave = () => {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
                 scanHistory = historySnapshot;
                 refreshCurrentHistoryView();
+            };
+
+            const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
+            try {
+                await withTimeout(savePromise, 15000, 'Save timed out');
+            } catch (saveError) {
+                if (saveError && saveError.message === 'Save timed out') {
+                    savePromise.then(() => {
+                        showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
+                        refreshCurrentHistoryView();
+                    }, rollbackFailedSave);
+                } else {
+                    rollbackFailedSave();
+                }
                 throw saveError;
             }
 
@@ -3868,8 +3894,10 @@
             let reopenedFromClosed = false;
             let reopenedScanDate = dateString;
             let reopenedPhoneKey = null;
+            let mergeAddedBarcode = false;
 
             const mergeScannedBarcodeInto = (target) => {
+                mergeAddedBarcode = false;
                 reopenedFromClosed = target.isClosed === true;
                 reopenedScanDate = target.scanDate || dateString;
                 reopenedPhoneKey = getPickupPhoneKey(target);
@@ -3885,6 +3913,7 @@
                 }
 
                 if (!target.barcodes.some(b => b && b.code === barcode)) {
+                    mergeAddedBarcode = true;
                     target.barcodes.push({
                         code: barcode,
                         time: timeString,
@@ -3917,12 +3946,15 @@
             scanHistory.push(item);
             savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
                 .then((committedItem) => {
+                    if (!mergeAddedBarcode) {
+                        addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
+                        showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
+                    }
                     if (reopenedFromClosed && reopenedPhoneKey) {
                         addPickupToDailyRecord(reopenedScanDate, reopenedPhoneKey, -1, 0);
                     }
                     syncScannerLookupEntry(item.id, committedItem || item);
-                })
-                .catch((err) => {
+                }, (err) => {
                     const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
                     if (revertIndex !== -1) scanHistory[revertIndex] = itemSnapshot;
                     refreshCurrentHistoryView();

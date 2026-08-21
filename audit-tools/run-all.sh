@@ -42,7 +42,7 @@ done
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
 run "extract.js (ZoeAdmin vs ZoeW)" node audit-tools/extract.js /tmp/zoe-fns
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -52,6 +52,9 @@ run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
+run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
+run "revenue-fuzz (browser ពិត)" node audit-tools/revenue-fuzz-test.js
+run "perf (browser ពិត)"       node audit-tools/perf-check.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -88,6 +91,9 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     UIFLOW_APP_DIR="$BASE" node audit-tools/ui-flow-test.js 2>&1 | tail -1 | sed 's/^/   ui-flow:         /'
     LAYOUT_APP_DIR="$BASE" node audit-tools/layout-check.js 2>&1 | tail -1 | sed 's/^/   layout:          /'
     FIELDSHAPE_APP_DIR="$BASE" node audit-tools/field-shape-test.js 2>&1 | tail -1 | sed 's/^/   field-shape:     /'
+    SLOWWRITE_APP_DIR="$BASE" node audit-tools/slow-write-test.js 2>&1 | tail -1 | sed 's/^/   slow-write:      /'
+    COMP_APP_DIR="$BASE" node audit-tools/compensation-order.js 2>&1 | tail -1 | sed 's/^/   compensation:    /'
+    PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     SWIPE_APP_DIR="$BASE"   node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   phone-swipe:     /'
 fi

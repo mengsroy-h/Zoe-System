@@ -45,6 +45,9 @@ function makeCtx(src) {
     vm.createContext(ctx);
     const helper = extractFn(src, 'barcodeEntriesOf');
     if (helper) vm.runInContext(helper, ctx);
+    vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
+    const normalizer = extractFn(src, 'normalizeBarcodesOf');
+    if (normalizer) vm.runInContext(normalizer, ctx);
     vm.runInContext('function normalizeItem(item) ' + extractNormalizer(src), ctx);
     return ctx;
 }

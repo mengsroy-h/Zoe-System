@@ -52,6 +52,7 @@ function makeCtx(src) {
         TWO_HOURS_MS: 2 * 60 * 60 * 1000
     };
     vm.createContext(ctx);
+    vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);

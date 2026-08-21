@@ -19,8 +19,8 @@ function slice(file, names) {
 }
 
 const ctx = vm.createContext({ console });
-vm.runInContext('var historyData = {}; var barcodeIndex = {};', ctx);
-vm.runInContext(slice('ZoeAdmin/app.js', ['buildScannerLookupPayload']), ctx);
+vm.runInContext("var historyData = {}; var barcodeIndex = {}; var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
+vm.runInContext(slice('ZoeAdmin/app.js', ['barcodeEntriesOf', 'scannerLockerRevision', 'scannerLookupBarcodeIndex', 'buildScannerLookupBarcodeCollection', 'buildScannerLookupPayload']), ctx);
 vm.runInContext(slice('Zoescan/app.js', ['barcodeEntriesOf', 'buildBarcodeIndex', 'getEntryCurrentLocker', 'isEntryBarcodeClosed', 'findLockerOccupant']), ctx);
 
 let pass = 0, fail = 0;

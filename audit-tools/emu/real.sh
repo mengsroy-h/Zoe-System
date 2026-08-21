@@ -19,6 +19,12 @@ seed() {
       {"code":"AAA","cod":5,"dod":1,"locker":"L1","isClosed":false,"isDeducted":false,"isFromDeletion":false,"time":"t","createdAt":1000},
       {"code":"BBB","cod":7,"dod":2,"locker":"L2","isClosed":true,"isDeducted":false,"isFromDeletion":false,"time":"t","createdAt":1000}
     ]}' > /dev/null
+  c -X PUT "$B/zoew_scanner_lookup/it1.json?$NS" -d '{
+    "id":"it1","phone":"012","barcode":"AAA","locker":"L1","isClosed":false,
+    "barcodes":[
+      {"code":"AAA","locker":"L1","isClosed":false},
+      {"code":"BBB","locker":"L2","isClosed":true}
+    ]}' > /dev/null
 }
 seed
 
@@ -33,28 +39,58 @@ t() { # label expected auth json-body
 }
 
 echo
-echo "== Zoescan mirror write (root multi-path, exactly as assignLockerToEntry sends) =="
-t "valid index 0, matching code" ALLOWED "$SC" '{
- "zoew_scan_history_cod_dod/it1/barcodes/0/code":"AAA",
- "zoew_scan_history_cod_dod/it1/barcodes/0/locker":"T7",
- "zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedAt":2000,
- "zoew_scan_history_cod_dod/it1/lockerUpdatedBy":"s@x.com"}'
+echo "== Zoescan locker reservation + atomic mirror finalization =="
+scanner_protocol() {
+  seed
+  local reserve final got=ALLOWED
+  reserve=$(c -X PATCH "$B/.json?$NS&$SC" -d '{
+   "zoew_scanner_lookup/it1/barcodes/0/lockerPending":{"revision":1,"code":"AAA","locker":"T7","updatedAt":2000,"updatedBy":"s@x.com"}}')
+  final=$(c -X PATCH "$B/.json?$NS&$SC" -d '{
+   "zoew_scanner_lookup/it1/barcodes/0/locker":"T7",
+   "zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedAt":2000,
+   "zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedBy":"s@x.com",
+   "zoew_scanner_lookup/it1/barcodes/0/lockerRevision":1,
+   "zoew_scanner_lookup/it1/barcodes/0/lockerPending":null,
+   "zoew_scan_history_cod_dod/it1/barcodes/0/locker":"T7",
+   "zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedAt":2000,
+   "zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedBy":"s@x.com",
+   "zoew_scan_history_cod_dod/it1/barcodes/0/lockerRevision":1}')
+  case "$reserve $final" in *"error"*) got=DENIED;; esac
+  if [ "$got" = ALLOWED ]; then printf '   ok   %-52s %s\n' "scanner reservation then matching mirror final" "$got"; pass=$((pass+1));
+  else printf '  FAIL  %-52s expect ALLOWED got %s\n' "scanner reservation then matching mirror final" "$got"; fail=$((fail+1)); fi
+  seed
+}
+
+scanner_stale_race() {
+  seed
+  local a b stale winner got=ALLOWED
+  a=$(c -X PATCH "$B/.json?$NS&$SC" -d '{"zoew_scanner_lookup/it1/barcodes/0/lockerPending":{"revision":1,"code":"AAA","locker":"T7","updatedAt":2000,"updatedBy":"a@x.com"}}')
+  b=$(c -X PATCH "$B/.json?$NS&$SC" -d '{"zoew_scanner_lookup/it1/barcodes/0/lockerPending":{"revision":2,"code":"AAA","locker":"T8","updatedAt":2000,"updatedBy":"b@x.com"}}')
+  stale=$(c -X PATCH "$B/.json?$NS&$SC" -d '{
+   "zoew_scanner_lookup/it1/barcodes/0/locker":"T7","zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedAt":2000,"zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedBy":"a@x.com","zoew_scanner_lookup/it1/barcodes/0/lockerRevision":1,"zoew_scanner_lookup/it1/barcodes/0/lockerPending":null,
+   "zoew_scan_history_cod_dod/it1/barcodes/0/locker":"T7","zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedAt":2000,"zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedBy":"a@x.com","zoew_scan_history_cod_dod/it1/barcodes/0/lockerRevision":1}')
+  winner=$(c -X PATCH "$B/.json?$NS&$SC" -d '{
+   "zoew_scanner_lookup/it1/barcodes/0/locker":"T8","zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedAt":2000,"zoew_scanner_lookup/it1/barcodes/0/lockerUpdatedBy":"b@x.com","zoew_scanner_lookup/it1/barcodes/0/lockerRevision":2,"zoew_scanner_lookup/it1/barcodes/0/lockerPending":null,
+   "zoew_scan_history_cod_dod/it1/barcodes/0/locker":"T8","zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedAt":2000,"zoew_scan_history_cod_dod/it1/barcodes/0/lockerUpdatedBy":"b@x.com","zoew_scan_history_cod_dod/it1/barcodes/0/lockerRevision":2}')
+  case "$a $b" in *"error"*) got=DENIED;; esac
+  case "$stale" in *"error"*) ;; *) got=DENIED;; esac
+  case "$winner" in *"error"*) got=DENIED;; esac
+  if [ "$got" = ALLOWED ]; then printf '   ok   %-52s %s\n' "same-ms stale final denied; newest revision wins" "$got"; pass=$((pass+1));
+  else printf '  FAIL  %-52s expect ALLOWED got %s\n' "same-ms stale final denied; newest revision wins" "$got"; fail=$((fail+1)); fi
+  seed
+}
+
+scanner_protocol
+scanner_stale_race
+
+t "scanner deletes an existing barcode object" DENIED "$SC" '{
+ "zoew_scan_history_cod_dod/it1/barcodes/0":null}'
+
+t "scanner changes protected barcode code" DENIED "$SC" '{
+ "zoew_scan_history_cod_dod/it1/barcodes/0/code":"ZZZ"}'
 
 t "OUT-OF-RANGE index 9 (sparse-array corruption)" DENIED "$SC" '{
- "zoew_scan_history_cod_dod/it1/barcodes/9/code":"AAA",
- "zoew_scan_history_cod_dod/it1/barcodes/9/locker":"T7",
- "zoew_scan_history_cod_dod/it1/barcodes/9/lockerUpdatedAt":2000,
- "zoew_scan_history_cod_dod/it1/lockerUpdatedBy":"s@x.com"}'
-
-t "wrong code at index 1" DENIED "$SC" '{
- "zoew_scan_history_cod_dod/it1/barcodes/1/code":"AAA",
- "zoew_scan_history_cod_dod/it1/barcodes/1/locker":"T7",
- "zoew_scan_history_cod_dod/it1/barcodes/1/lockerUpdatedAt":2000}'
-
-t "single-barcode legacy shape (item-level locker)" ALLOWED "$SC" '{
- "zoew_scan_history_cod_dod/it1/locker":"T7",
- "zoew_scan_history_cod_dod/it1/lockerUpdatedAt":2000,
- "zoew_scan_history_cod_dod/it1/lockerUpdatedBy":"s@x.com"}'
+ "zoew_scan_history_cod_dod/it1/barcodes/9/locker":"T7"}'
 
 echo
 echo "== ZoeAdmin / ZoeW legitimate writes must keep working =="

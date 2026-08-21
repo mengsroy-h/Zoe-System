@@ -33,8 +33,13 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test lookup-closed-test auth-recovery-test keylist-consistency-test \
          license-grace-test phone-suggest-test zoescan-list-test keygen-pin-flow-test \
+         keygen-session-security-test \
          barcode-shape-test setup-link-logout-test phone-search-swipe-test \
-         raw-read-shape-test devtools-guard-test concurrent-scan-test \
+         raw-read-shape-test devtools-guard-test concurrent-scan-test scanner-locker-race-test \
+         restore-finalization-fence-test \
+         restore-race-test clear-history-claim-test google-sheets-cache-test \
+         scanner-lookup-merge-test lookup-config-secret-test \
+         clear-history-finalization-fence-test \
          setup-link-roundtrip-test; do
     run "$t" node "audit-tools/$t.js"
 done
@@ -46,6 +51,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
+run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js

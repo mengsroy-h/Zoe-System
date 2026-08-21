@@ -92,6 +92,7 @@ function makeCtx(server, fbSet) {
         pickup
     };
     vm.createContext(ctx);
+    vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
                       'saveSingleHistoryItemToFirebase',
                       'mergeBarcodeIntoHistoryItem', 'addOrUpdateEntry']) {

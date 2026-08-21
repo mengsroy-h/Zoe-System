@@ -54,7 +54,7 @@ t "worker writes payload WITHOUT isClosed (fallback)" ALLOWED "$WK" '{
  "zoew_scanner_lookup/it1":{"id":"it1","phone":"012","barcode":"AAA","locker":"L1",
   "barcodes":[{"code":"AAA","locker":"L1"},{"code":"BBB","locker":"L2"}]}}'
 
-t "scanner assigns locker, isClosed unchanged" ALLOWED "$SC" '{
+t "scanner direct locker write without reservation/mirror" DENIED "$SC" '{
  "zoew_scanner_lookup/it1":{"id":"it1","phone":"012","barcode":"AAA","locker":"L1","isClosed":false,
   "barcodes":[{"code":"AAA","locker":"T7","lockerUpdatedAt":2000,"isClosed":false},{"code":"BBB","locker":"L2","isClosed":true}],
   "lockerUpdatedBy":"s@x.com"}}'

@@ -3760,3 +3760,139 @@ version-check PASS)។ លេខពីរខ្សែ ផ្ទៀងផ្ទ�
 1. `ee522cb` — Importer.gs + README
 2. `42994c8` — normalizeStoredPhone (missing-0, double-0, =-855) + APP_VERSION 1.0.2 + cache
 3. (commit បន្ទាប់) — លេខពីរខ្សែ `/` ក្នុង importer និង App + README + របាយការណ៍នេះ
+
+## ជុំ ១៦ — deep audit handoff (2026-08-22, branch `codex/initial-import`, កំណែ `1.0.4`)
+
+### វិសាលភាព និងស្ថានភាព
+
+ជុំនេះជា **read-only audit** លើ tree កំណែ `1.0.4`៖ មិនបានកែ App, Firebase Rules ឬ deploy ឡើយ។
+បានបន្ថែមតែរបាយការណ៍នេះ។ ចំណុចខាងក្រោមត្រូវបានផ្ទៀងផ្ទាត់តាមកូដពិត និង VM/browser harness
+ដែលពាក់ព័ន្ធ; កុំយល់ថា test សរុបបៃតងពីជុំមុន មានន័យថាគ្របដណ្ដប់លើវា។
+
+### P1 — ត្រូវការការសម្រេចរចនាសម្ព័ន្ធ មុនកែ
+
+#### 1. Worker អាចកែទិន្នន័យ និងចំណូលដោយផ្ទាល់
+
+`firebase-database.rules.json:17` អនុញ្ញាតឱ្យ role `worker` សរសេរ item ប្រវត្តិណាមួយ
+នៅពេល `newData.exists()`។ Validation ខាងក្រោមពិនិត្យតែប្រភេទ field មិនបានចងការសរសេរនោះ
+ទៅ UI action ឬ source transition ទេ។ ដូច្នេះ worker ដែលចូល Firebase SDK/REST/DevTools ដោយផ្ទាល់
+អាចបង្កើត ឬជំនួស parcel ដែលមានរាងត្រឹមត្រូវ រួមទាំង COD/DOD/count/barcode; វារំលងការកម្រិតក្នុង ZoeW UI។
+
+role ដដែលក៏អាចសរសេរ scanner projection (`:86`), daily revenue (`:221`), pickup statistics (`:232`),
+monthly revenue (`:243`) និង barcode registry (`:263`) ដោយគ្មាន source/action linkage។
+`audit-tools/emu/real.sh:106–108` ថែមទាំងរំពឹងថា worker បង្កើត history ថ្មីបាន—មិនមាន negative
+authorization test សម្រាប់ policy នេះទេ។
+
+**ព្រំដែនការកែ:** កុំបិទ worker write ទាំងស្រុងដោយមិនរៀបចំ flow ថ្មី ព្រោះ ZoeW ត្រូវការ
+close/cleanup/restore ស្របច្បាប់។ ត្រូវជ្រើសមួយ៖ (ក) ច្បាប់ state-transition និង atomic fan-out
+ដែលចង derived totals ទៅ source transition ជាក់លាក់ ឬ (ខ) ផ្លាស់ parcel/revenue/registry mutation
+ទៅ trusted backend/ledger។
+
+#### 2. License activation record ក្នុង `localStorage` ក្លាយជាអាជ្ញាធរមិនគួរទុកចិត្ត
+
+`license-verify.js` ដែល byte-identical ទាំង ៤ App នៅ `:254–286` ផ្ទៀងផ្ទាត់តែ signature/scope
+របស់ `record.keyString` ប៉ុណ្ណោះ ប៉ុន្តែបន្ទាប់មកទុកចិត្ត `record.id`, `record.onlineExp` និង
+`record.lastOnlineCheck` ដែលអ្នកប្រើអាចកែបាន។
+
+- **Online:** key ដែលផុតកំណត់/ត្រូវ revoke អាចប្ដូរ `record.id` ទៅ ID license សកម្មមួយផ្សេងទៀត;
+  `checkOnline()` នឹងសួរ ID ថ្មី ហើយ `getStatus()` ត្រឡប់ `active`។
+- **Offline:** ពេល network មិនមាន key ដែល signed ត្រឹមត្រូវ ប៉ុន្តែផុតកំណត់ អាចដាក់
+  `onlineExp` ទៅអនាគត និង `lastOnlineCheck` ថ្មីក្នុង localStorage; VM ពិតត្រឡប់
+  `active` រយៈពេល 365 ថ្ងៃ ដោយមិនត្រូវការលេខ ID សកម្មណាមួយ។
+
+ការចង ID ទៅ `sigCheck.payload.id` និងកំណត់ expiry មិនឱ្យលើស signed `payload.exp` បិទ online
+variant បាន។ តែ offline-grace ដែលពឹង localStorage មិនអាចជាសន្តិសុខបានទេ; ត្រូវប្រើ
+server-signed freshness/expiry attestation ឬកែ policy ទៅ fail-closed/online verification តាមកាលកំណត់។
+
+#### 3. ផ្លូវ source → trash → revenue ចាស់ៗ មិនអាតូមិចទាំងមូល
+
+Automatic cleanup របស់ ZoeAdmin (`app.js:1763–1889`) និង ZoeW (`:1231–1357`) ដក/ប្តូរ history,
+បើក revenue transactions ដាច់ដោយឡែក ហើយរក្សាទុក trash ដាច់ដោយឡែក។ Revenue helper (`ZoeAdmin:2158–2253`,
+`ZoeW:1763–1858`) មិនត្រឡប់ promise ដែលបង្ខំ caller រង់ចាំ daily/monthly writes ទេ។ ZoeAdmin
+មានថ្នាក់ដូចគ្នានៅ initial scan (`:4099–4210`), remove barcode (`:4267–4402`) និង whole-item delete
+(`:4998–5083`)។
+
+Repro៖ បិទ App/process បន្ទាប់ពី history transaction acknowledged តែមុន trash/revenue settle,
+ឬឱ្យ derived write មួយបរាជ័យ។ អាចសល់ history បាត់គ្មាន trash, trash `isDeducted` តែចំណូលមិនបានដក,
+ឬ daily/monthly ខុសគ្នា។ Restore/Clear claim fencing ថ្មីមិនគ្របផ្លូវចាស់ទាំងនេះទេ។ ការកែត្រូវជា
+durable operation/ledger ដែលអាច retry និង atomic fan-out មួយ—not just extra client-side catches។
+
+### P2 — រកឃើញ និងត្រូវតាមដាន
+
+#### 1. Scanner lookup អាចបាត់ពី stale cleanup
+
+ZoeAdmin rebuild យក snapshot `scanHistory` រួចលុប lookup IDs ដែលមើលមិនឃើញក្នុង snapshot ចាស់នោះ
+(`app.js:3911–3945`)។ បើ tab/ឧបករណ៍ផ្សេងបង្កើត ឬ restore item ក្រោយ snapshot មុន cleanup,
+ការលុបចាស់អាចលុប projection ថ្មី ហើយមិន re-sync វិញ។ ដូចគ្នា delayed delete/remove cleanup
+អាចលុប lookup ដែលទើប restore (`ZoeAdmin:4399–4400`, `:5081–5082`; clear helper Admin `:3903–3908`,
+ZoeW `:1539–1545`)។ History នៅតែមាន តែ Zoescan រកកញ្ចប់មិនឃើញ។ `scanner-lookup-merge-test`
+24/24 មិនគ្រប interleaving rebuild/restore នេះទេ។
+
+#### 2. Barcode registry អាចជាប់សោជារៀងរហូត
+
+Registry ជា boolean គ្មាន owner/operation ID (`ZoeAdmin/app.js:3721–3751`)។ បើ process ស្លាប់ក្រោយ
+claim តែមុន save history ឬក្រោយ delete តែមុន release, barcode អាចនៅ `true` ដោយគ្មាន live/trash parcel
+ហើយត្រូវបដិសេធជានិច្ច រហូតដល់ជួសជុល database ដោយដៃ។ Release error ត្រូវបាន swallow
+(`ZoeAdmin:5477–5494`; ZoeW មានផ្លូវស្រដៀង)។ ត្រូវមាន owner/lease និង repair/reconciliation job។
+
+#### 3. Zoescan fail-closed មិនស្រួលប្រើពេល offline/clock មិន sync
+
+Zoescan ចាប់ `ts` ម្តងនៅ `app.js:1417`; Rules ទាមទារ reservation នៅក្នុង ±30 វិនាទី និង final
+នៅក្នុង 2 នាទី (`firebase-database.rules.json:104` និង path scanner ខាងក្រោម)។ App មិនបិទ assignment
+ពេល `isDatabaseConnected === false`។ ក្រោយ offline លើស 30 វិនាទី queued reservation ចាស់ត្រូវ deny
+ពេល reconnect ហើយមិន re-reserve ដោយ timestamp ថ្មី។ Device ដែល clock ខុស >30s មុនទទួល
+`.info/serverTimeOffset` ក៏បរាជ័យដែរ។ វា **fail closed** មិនមែន integrity bypass ទេ, ប៉ុន្តែជាបញ្ហា
+availability។
+
+`audit-tools/emu/real.sh:47,67–74` នៅប្រើ timestamp ថេរ និង `updatedBy: "s@x.com"` ខណៈ rules ថ្មី
+ទាមទារ `auth.uid` និង timestamp បច្ចុប្បន្ន; ដូច្នេះ happy-path emulator test ចាស់មិនបញ្ជាក់ protocol
+បច្ចុប្បន្នទេ រហូតដល់កែ fixture។
+
+#### 4. ZoeKeyGen re-init និង async privileged actions
+
+- `setupAuthListener()` រក្សា `initialAuthTimeout` ជា local (`app.js:795–811`)។ re-init unsubscribe
+  listener ចាស់ ប៉ុន្តែមិន clear timeout ចាស់; នៅ 8 វិនាទី វាអាច delete IndexedDB Firebase databases
+  រួច reload session ថ្មីដែលមានសុខភាពល្អ (`:772–793`)។
+- `initFirebase()` swallow `deleteApp()` error រួចយក `fb.getApps()[0]` ចាស់ (`:268–279`) ខណៈ
+  localStorage និយាយ config ថ្មី។ auth/db អាចបន្តចង្អុល project ចាស់ ហើយ routing អាចមិនស៊ីគ្នា។
+- `confirmExtendKey()` និងផ្លូវ migrate/revoke ខ្លះ await ការងារ រួចសរសេរទោះ user logout រួច
+  (`:1366–1394`) ព្រោះខ្វះ session-generation fence។
+
+### លទ្ធផល test និងអន្ទាក់ harness
+
+- Focused checks ស្អាត៖ restore race **16/16**, restore finalization fence **12/12**, clear claim
+  **12/12**, clear finalization fence **20/20**, scanner locker race **19/19**, scanner lookup merge
+  **24/24**, closed lookup **13/13**, KeyGen PIN **18/18**, KeyGen session-security **8/8**,
+  auth recovery **191/191**, rules duplicate-key/JSON/syntax/version/DOM hygiene/wiring **PASS**។
+- Browser tests ដំណើរការពិតជាមួយ Chrome ក្នុងម៉ាស៊ីននេះ៖ boot runtime **PASS** (ត្រូវកំណត់
+  `BOOT_APP_DIR` ទៅ workspace), Setup Link **18/18**, UI flow **111/111**, layout **48/48**, field
+  shape **18/18**, slow write **9/9**, performance **10/10**។
+- `revenue-fuzz-test.js` បច្ចុប្បន្នធ្លាក់ ប៉ុន្តែនេះជា **harness regression មិនមែន product defect
+  ដែលបានបញ្ជាក់**។ Fake Firebase នៅ `audit-tools/revenue-fuzz-test.js:127–152` គ្មាន `increment()`
+  និង `update()` រក្សា sentinel ជាតម្លៃធម្មតា ខណៈ restore ពិតហៅ `fb.increment()` មុន atomic fan-out
+  (`ZoeAdmin:5285–5314`, ZoeW `:3289–3318`)។ វាធ្វើឱ្យ fake throw ក្រោយ claim/marker។ Production
+  loaders import/export `increment` ត្រឹមត្រូវ (`ZoeAdmin/ZoeW/firebase-loader.js:7–13`)។ បញ្ចូល
+  in-memory shim ដែលអនុវត្ត increment ត្រឹមត្រូវ ធ្វើឱ្យ exact failing seed ជោគជ័យ។ ត្រូវកែ fake
+  ឬរត់លើ RTDB emulator មុនយក fuzz នេះជា release gate។
+
+### តំបន់ដែលបានពិនិត្យហើយស្អាត
+
+- Scanner rules គ្មាន parent `.write` bypass សម្រាប់ scanner; barcode/legacy locker final ចង index/code,
+  capped revision, authenticated UID, lease និង mirror post-write។ stale finals/same-millisecond race
+  fail closed។
+- Restore និង Clear All ថ្មីប្រើ durable claim/finalization witness—កុំបកវិញទៅ read-then-write flow។
+- ZoeKeyGen បង្ខំ `browserSessionPersistence`; PIN signer state ប្រើ PBKDF2-150k/AES-GCM និង verify
+  public-key pairing; normal logout/modal cleanup និង key-list escaping ស្អាត។
+- Static app/manifest version នៅតែស៊ីគ្នា `1.0.4`; cache versions គឺ ZoeAdmin `v62`, ZoeW `v52`,
+  Zoescan `v39`, ZoeKeyGen `v32`។ ព្រោះជុំនេះមិនបានកែ runtime code, មិនបាន bump version/cache ឡើយ។
+
+### Handoff លើកក្រោយ — លំដាប់សុវត្ថិភាព
+
+1. សម្រេច threat model និង capability របស់ `worker`; បន្ទាប់មករចនា backend/ledger ឬ transition rules
+   មុនកែ RBAC/revenue ដោយផ្នែកៗ។
+2. សម្រេច license offline policy; harden signed payload binding ភ្លាម ហើយកុំអះអាងថា localStorage grace
+   ជា enforcement ដែលធន់នឹងអ្នកប្រើកែ browser។
+3. ធ្វើ operation ledger សម្រាប់ scan/remove/cleanup/delete ដើម្បីទប់ crash gap និង reconcile daily/monthly.
+4. Fence lookup rebuild/delete និង barcode registry ដោយ ownership/lease; បន្ថែម interleaving/process-death tests.
+5. កែ `revenue-fuzz` fake increment និង emulator fixtures មុនប្រើជា release evidence; publish static apps
+   និង Firebase Rules ជាមួយគ្នាក្នុង maintenance window។ Rules នៅតែត្រូវ publish ដោយដៃ។

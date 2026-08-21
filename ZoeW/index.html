@@ -76,7 +76,7 @@
                     <span class="value" id="todayTotalCount">0</span>
                 </div>
                 <div class="stat-card">
-                    <span class="label">អតិថិជនយក</span>
+                    <span class="label">អតិថិជនមកយក</span>
                     <span class="value" id="todayClosedCount">0</span>
                     <span class="sub-value">📦 <span id="todayPackagesPickedUpCount">0</span></span>
                 </div>
@@ -235,7 +235,7 @@
 <div id="loginModal" class="modal" style="display: none;" data-nodismiss="true">
     <div class="modal-content">
         <h3>🔐 ចូលប្រើប្រាស់ប្រព័ន្ធ</h3>
-        <p>សូមបញ្ចូល អ៊ីមែល/User ID និង ពាក្យសម្ងាត់</p>
+        <p>សូមបញ្ចូលអ៊ីមែល/User ID និងពាក្យសម្ងាត់</p>
         <form onsubmit="event.preventDefault(); loginWithFirebase();">
             <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល ឬ User ID" required autocomplete="username">
             <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
@@ -275,7 +275,7 @@
             <button class="call-mark-opt call-mark-no-answer" onclick="setCallMark('no-answer')">🔕 ខល អត់លើក</button>
             <button class="call-mark-opt call-mark-no-connect" onclick="setCallMark('no-connect')">📵 ខល អត់ចូល</button>
             <button class="call-mark-opt call-mark-wrong-number" onclick="setCallMark('wrong-number')">❗ ខុសលេខ</button>
-            <button class="btn-cancel" onclick="setCallMark(null)">🔄 សម្អាតសម្គាល់</button>
+            <button class="btn-cancel" onclick="setCallMark(null)">🔄 សម្អាតការសម្គាល់</button>
             <button class="btn-cancel" onclick="closeModal('callMarkModal')">បិទ</button>
         </div>
     </div>
@@ -318,7 +318,7 @@
 
 <div id="recentlyDeletedModal" class="modal">
     <div class="modal-content" style="max-width: 400px;">
-        <h3>🗑️ ទិន្នន័យលុបបណ្តោះអាសន្ន</h3>
+        <h3>🗑️ ទិន្នន័យដែលបានលុបជាបណ្តោះអាសន្ន</h3>
         <p>លុបអចិន្ត្រៃយ៍បន្ទាប់ពី ១០ ថ្ងៃ</p>
         <div class="table-responsive" style="max-height: 200px; margin-bottom: 8px;">
             <table>

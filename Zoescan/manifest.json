@@ -2,7 +2,7 @@
   "name": "Zoescan - កំណត់ទីតាំង Locker",
   "short_name": "Zoescan",
   "description": "កំណត់ទីតាំង Locker (Zoescan)",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,4 +1,4 @@
-    const APP_VERSION = '1.0.0';
+    const APP_VERSION = '1.0.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3715,16 +3715,41 @@
         });
     }
 
-    function rebuildScannerLookupData() {
+    async function rebuildScannerLookupData() {
         if (!confirm("តើអ្នកពិតជាចង់កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញសម្រាប់ទិន្នន័យទាំងអស់មែនទេ? (ប្រើសម្រាប់ Sync ជាមួយ Zoescan តែម្តងគត់ មិនប៉ះពាល់ដល់ទិន្នន័យសំខាន់ទេ)")) return;
-        let migratedCount = 0;
+        if (!db || !fb) { showToast("⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ!"); return; }
+        showToast("⏳ កំពុង Sync ទិន្នន័យ Scanner Lookup...");
+        const liveIds = new Set();
+        const syncJobs = [];
         scanHistory.forEach(item => {
             if (item && item.id) {
-                syncScannerLookupEntry(item.id, item);
-                migratedCount++;
+                liveIds.add(item.id);
+                syncJobs.push(syncScannerLookupEntry(item.id, item));
             }
         });
-        showToast(`✅ បាន Sync ទិន្នន័យ Scanner Lookup ចំនួន ${migratedCount} កំណត់ត្រាជោគជ័យ!`);
+
+        let staleCount = 0;
+        try {
+            const lookupSnap = await withTimeout(fb.get(fb.ref(db, 'zoew_scanner_lookup')), 20000, 'Scanner lookup read timed out');
+            const lookupData = lookupSnap.val();
+            if (lookupData && typeof lookupData === 'object') {
+                const staleUpdates = {};
+                Object.keys(lookupData).forEach((lookupId) => {
+                    if (!liveIds.has(lookupId) && /^[a-zA-Z0-9_-]+$/.test(lookupId)) {
+                        staleUpdates[lookupId] = null;
+                        staleCount++;
+                    }
+                });
+                if (staleCount) await fb.update(fb.ref(db, 'zoew_scanner_lookup'), staleUpdates);
+            }
+        } catch (staleErr) {
+            console.error('Stale scanner lookup cleanup failed: ', staleErr);
+            if (window.ZoeErrors) ZoeErrors.capture(staleErr, { context: 'rebuildScannerLookupData stale cleanup' });
+            showToast("⚠️ លុបធាតុ Scanner Lookup ចាស់មិនបានទេ! សូមសាកល្បងម្តងទៀត។");
+        }
+
+        await Promise.all(syncJobs);
+        showToast(`✅ បាន Sync ទិន្នន័យ Scanner Lookup ចំនួន ${liveIds.size} កំណត់ត្រា` + (staleCount ? ` និងលុបធាតុចាស់ ${staleCount}` : '') + ` ជោគជ័យ!`);
     }
 
     function triggerScanAction(barcode) {
@@ -4209,6 +4234,7 @@
         let pickupPhoneKey = null;
         let serverApplied = false;
         let serverPackageDelta = 0;
+        let serverCustomerDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4217,10 +4243,13 @@
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
-        const reconcilePackageDeltaWithServer = () => {
-            if (serverPackageDelta === pickupPackageDelta) return;
+        const reconcilePickupDeltaWithServer = () => {
+            const customerDiff = serverCustomerDelta - pickupCustomerDelta;
+            const packageDiff = serverPackageDelta - pickupPackageDelta;
+            if (customerDiff === 0 && packageDiff === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, customerDiff, packageDiff);
+            pickupCustomerDelta = serverCustomerDelta;
             pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem && freshB) {
@@ -4255,6 +4284,7 @@
             const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
+                serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
@@ -4272,9 +4302,11 @@
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
                 if (!b) return currentItem;
+                const wasItemClosed = !!currentItem.isClosed;
                 serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
                 b.isClosed = desiredClosed;
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
+                serverCustomerDelta = (!wasItemClosed && allClosed) ? 1 : ((wasItemClosed && !allClosed) ? -1 : 0);
                 currentItem.isClosed = allClosed;
                 if (allClosed) currentItem.closedAt = getServerNow();
                 else delete currentItem.closedAt;
@@ -4293,7 +4325,7 @@
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
                 revertPickupDeltaAfterNoOp();
             } else {
-                reconcilePackageDeltaWithServer();
+                reconcilePickupDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling barcode close: ", error);
@@ -4629,6 +4661,7 @@
         let pickupPhoneKey = null;
         let serverApplied = false;
         let serverPackageDelta = 0;
+        let serverCustomerDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
@@ -4637,10 +4670,13 @@
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
-        const reconcilePackageDeltaWithServer = () => {
-            if (serverPackageDelta === pickupPackageDelta) return;
+        const reconcilePickupDeltaWithServer = () => {
+            const customerDiff = serverCustomerDelta - pickupCustomerDelta;
+            const packageDiff = serverPackageDelta - pickupPackageDelta;
+            if (customerDiff === 0 && packageDiff === 0) return;
             const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, 0, serverPackageDelta - pickupPackageDelta);
+            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, customerDiff, packageDiff);
+            pickupCustomerDelta = serverCustomerDelta;
             pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem) {
@@ -4681,6 +4717,7 @@
             const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
+                serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
                 const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
@@ -4693,6 +4730,7 @@
                     const serverPackages = parseFloat(currentItem.count) || 1;
                     serverPackageDelta = desiredClosed ? serverPackages : -serverPackages;
                 }
+                serverCustomerDelta = (!!currentItem.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();
@@ -4714,7 +4752,7 @@
             if (!serverApplied || !(closeResult && closeResult.committed)) {
                 revertPickupDeltaAfterNoOp();
             } else {
-                reconcilePackageDeltaWithServer();
+                reconcilePickupDeltaWithServer();
             }
         } catch (error) {
             console.error("Error toggling close status: ", error);
@@ -4917,38 +4955,37 @@
             appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });
         }
 
+        const applyRestoreMergeInto = (target) => {
+            if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
+            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
+                itemToRestore.barcodes.forEach(restoredBc => {
+                    if (!target.barcodes.some(b => b && b.code === restoredBc.code)) target.barcodes.push({ ...restoredBc });
+                });
+            }
+            target.count = target.barcodes.length;
+            target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            target.price = Math.round((target.cod + target.dod) * 100) / 100;
+            target.isClosed = target.barcodes.length > 0 && target.barcodes.every(b => b.isClosed);
+            if (target.isClosed) {
+                target.closedAt = getServerNow();
+            } else {
+                delete target.closedAt;
+            }
+            if (itemToRestore.callMarkTime && (!target.callMarkTime || itemToRestore.callMarkTime > target.callMarkTime)) {
+                target.isCalled = itemToRestore.isCalled;
+                if (itemToRestore.callMark) target.callMark = itemToRestore.callMark;
+                else delete target.callMark;
+                target.callMarkTime = itemToRestore.callMarkTime;
+            }
+            return target;
+        };
+
         let existingItemIndex = scanHistory.findIndex(i => i.id === itemToRestore.id || (itemToRestore.phone !== "គ្មានលេខ" && i.phone === itemToRestore.phone && itemToRestore.barcodes && i.barcodes && i.scanDate === itemToRestore.scanDate && !i.isClosed));
 
         let resultingLiveItem;
         if (existingItemIndex !== -1) {
-            let targetItem = scanHistory[existingItemIndex];
-            if (!targetItem.barcodes) targetItem.barcodes = [];
-
-            if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
-                itemToRestore.barcodes.forEach(restoredBc => {
-                    targetItem.barcodes.push(restoredBc);
-                });
-            }
-
-            targetItem.count = targetItem.barcodes.length;
-            targetItem.cod = Math.round(targetItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            targetItem.dod = Math.round(targetItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            targetItem.price = Math.round((targetItem.cod + targetItem.dod) * 100) / 100;
-            targetItem.isClosed = targetItem.barcodes.length > 0 && targetItem.barcodes.every(b => b.isClosed);
-            if (targetItem.isClosed) {
-                targetItem.closedAt = getServerNow();
-            } else {
-                delete targetItem.closedAt;
-            }
-
-            if (itemToRestore.callMarkTime && (!targetItem.callMarkTime || itemToRestore.callMarkTime > targetItem.callMarkTime)) {
-                targetItem.isCalled = itemToRestore.isCalled;
-                if (itemToRestore.callMark) targetItem.callMark = itemToRestore.callMark;
-                else delete targetItem.callMark;
-                targetItem.callMarkTime = itemToRestore.callMarkTime;
-            }
-
-            resultingLiveItem = targetItem;
+            resultingLiveItem = applyRestoreMergeInto(scanHistory[existingItemIndex]);
         } else {
             scanHistory.push(itemToRestore);
             resultingLiveItem = itemToRestore;
@@ -4964,15 +5001,33 @@
             if (!resultingLiveItem.id || !safeIdPattern.test(resultingLiveItem.id) || !itemToRestore.id || !safeIdPattern.test(itemToRestore.id)) {
                 throw new Error('Unsafe id during restore');
             }
+            const [liveSnap, trashSnap] = await Promise.all([
+                fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${resultingLiveItem.id}`)),
+                fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${itemToRestore.id}`))
+            ]);
+            if (!trashSnap.exists()) throw new Error('ALREADY_RESTORED');
+            const serverLiveItem = normalizeBarcodesOf(liveSnap.val());
+            let restorePayload = itemToRestore;
+            if (serverLiveItem && typeof serverLiveItem === 'object') {
+                if (!serverLiveItem.id) serverLiveItem.id = resultingLiveItem.id;
+                restorePayload = applyRestoreMergeInto(serverLiveItem);
+            }
             await fb.update(fb.ref(db), {
-                [`zoew_scan_history_cod_dod/${resultingLiveItem.id}`]: resultingLiveItem,
+                [`zoew_scan_history_cod_dod/${restorePayload.id}`]: restorePayload,
                 [`zoew_recently_deleted_cod_dod/${itemToRestore.id}`]: null
             });
             restoreWriteOk = true;
+            const liveIndex = scanHistory.findIndex(i => i.id === restorePayload.id);
+            if (liveIndex !== -1) scanHistory[liveIndex] = restorePayload;
+            else scanHistory.push(restorePayload);
+            resultingLiveItem = restorePayload;
         } catch (error) {
+            const alreadyRestored = !!(error && error.message === 'ALREADY_RESTORED');
             appliedRevenueDeltas.forEach((d) => addRevenueToDailyAndMonthlyRecord(d.scanDate, -d.cod, -d.dod, -d.count));
-            console.error("Restore failed: ", restoredId, error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
+            if (!alreadyRestored) {
+                console.error("Restore failed: ", restoredId, error);
+                if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
+            }
             try {
                 const [histSnap, delSnap] = await Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]);
                 const histData = histSnap.val();
@@ -4983,7 +5038,11 @@
                 console.error("Resync after failed restore also failed: ", resyncError);
                 if (window.ZoeErrors) ZoeErrors.capture(resyncError, { context: "Resync after failed restore also failed: " });
             }
-            alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
+            if (alreadyRestored) {
+                alert("⚠️ ទិន្នន័យនេះត្រូវបានស្តារ ឬលុបចោលរួចហើយពី device ផ្សេង! ស្ថានភាពត្រូវបានធ្វើបច្ចុប្បន្នភាពវិញ។");
+            } else {
+                alert("❌ ស្តារទិន្នន័យបរាជ័យ! មូលហេតុ: " + (error && error.message ? error.message : error) + "\n\nសូមថតរូបអេក្រង់នេះ ហើយផ្ញើសួរអ្នកបច្ចេកទេស។");
+            }
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
         }

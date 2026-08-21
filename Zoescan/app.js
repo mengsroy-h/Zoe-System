@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -1410,9 +1410,28 @@ async function assignLockerToEntry(code) {
     let singleBarcodeItem = false;
     const myAssignGeneration = ++assignGeneration;
 
+    const buildLockerMirrorUpdates = () => {
+        const updates = {};
+        if (matchedBarcodeIdx !== null) {
+            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/code`] = code;
+            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
+            updates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
+            if (singleBarcodeItem) {
+                updates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
+                updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
+            }
+        } else {
+            updates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
+            updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
+        }
+        if (currentUserEmail) updates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail;
+        return updates;
+    };
+    const writeLockerMirror = () => retryAsync(() => withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), buildLockerMirrorUpdates()), 12000, 'Save timed out'), 3, 1500);
+
     try {
         const lookupRef = window.firebaseSDK.ref(db, `zoew_scanner_lookup/${itemId}`);
-        const result = await withTimeout(window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
+        const lookupTxnPromise = window.firebaseSDK.runTransaction(lookupRef, (currentItem) => {
             matched = false;
             matchedBarcodeIdx = null;
             singleBarcodeItem = false;
@@ -1439,7 +1458,23 @@ async function assignLockerToEntry(code) {
             phoneForToast = currentItem.phone || '';
             matched = true;
             return currentItem;
-        }), 12000, 'Save timed out');
+        });
+        let result;
+        try {
+            result = await withTimeout(lookupTxnPromise, 12000, 'Save timed out');
+        } catch (lookupTimeoutErr) {
+            lookupTxnPromise.then((lateResult) => {
+                if (!lateResult || !lateResult.committed || !matched) return;
+                writeLockerMirror().then(() => {
+                    showToast(`✅ ទីតាំង ${targetLocker} បានចុះយឺត ប៉ុន្តែជោគជ័យ! មិនបាច់ស្កេនម្តងទៀតទេ។`);
+                }, (lateMirrorErr) => {
+                    console.error('Late mirror update to scan history failed: ', lateMirrorErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(lateMirrorErr, { context: 'assignLockerToEntry late mirror update failed' });
+                    showToast(`⚠️ ទីតាំង ${targetLocker} បានកត់ត្រាទុកសម្រាប់ Scanner ប៉ុន្តែ Sync ទៅផ្នែកគ្រប់គ្រងមិនទាន់ចប់ — សូមប្រាប់ Admin ចុច "🔄 កំណត់ទិន្នន័យ Scanner Lookup ឡើងវិញ"`);
+                });
+            }, () => {});
+            throw lookupTimeoutErr;
+        }
 
         if (!result.committed || !matched) {
             playErrorFeedback();
@@ -1462,21 +1497,6 @@ async function assignLockerToEntry(code) {
         }
         if (currentUserEmail) entry.item.lockerUpdatedBy = currentUserEmail;
 
-        const mirrorUpdates = {};
-        if (matchedBarcodeIdx !== null) {
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/code`] = code;
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/locker`] = targetLocker;
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/barcodes/${matchedBarcodeIdx}/lockerUpdatedAt`] = ts;
-            if (singleBarcodeItem) {
-                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
-                mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
-            }
-        } else {
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/locker`] = targetLocker;
-            mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedAt`] = ts;
-        }
-        if (currentUserEmail) mirrorUpdates[`zoew_scan_history_cod_dod/${itemId}/lockerUpdatedBy`] = currentUserEmail;
-
         const phoneRaw = phoneForToast ? sanitizePhoneNumber(phoneForToast) : '';
         const who = phoneRaw ? ` (${phoneRaw})` : '';
         const successMsg = (previousLocker && previousLocker !== targetLocker && previousLocker !== 'N/A')
@@ -1484,7 +1504,7 @@ async function assignLockerToEntry(code) {
             : `✅ បានកំណត់ទីតាំង ${targetLocker}${who}`;
 
         try {
-            await retryAsync(() => withTimeout(window.firebaseSDK.update(window.firebaseSDK.ref(db), mirrorUpdates), 12000, 'Save timed out'), 3, 1500);
+            await writeLockerMirror();
         } catch (mirrorErr) {
             console.error('Mirror update to scan history failed: ', mirrorErr);
             if (window.ZoeErrors) ZoeErrors.capture(mirrorErr, { context: 'assignLockerToEntry mirror update failed' });

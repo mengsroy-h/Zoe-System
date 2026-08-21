@@ -424,6 +424,152 @@ function seedData() {
                 'pickedUpPhones=' + JSON.stringify(after.pick.pickedUpPhones) + ' (មុនស្កេន ' + JSON.stringify(pickClosed.pickedUpPhones) + ')');
         }
 
+        // --- ការស្តារពីធុងសំរាម ត្រូវធ្វើលើច្បាប់ចម្លងរបស់ server ---
+        {
+            const dk = seed._dateKey;
+            // ក. ឧបករណ៍ផ្សេងបិទ barcode និងដាក់ទីតាំង ខណៈយើងស្តារធាតុមួយ merge ចូលបញ្ជីដដែល
+            await page.evaluate((a) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_rs_live = {
+                    id: 'id_rs_live', phone: '0913000001', scanDate: a.dk, createdAt: now - 90000,
+                    cod: 11, dod: 0, price: 11, count: 1, barcode: 'RA1', time: '08:00', isClosed: false,
+                    barcodes: [{ code: 'RA1', time: '08:00', cod: 11, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 90000 }]
+                };
+                window.__fakeStore.zoew_recently_deleted_cod_dod.id_rs_trash = {
+                    id: 'id_rs_trash', phone: '0913000001', scanDate: a.dk, createdAt: now - 80000,
+                    cod: 12, dod: 0, price: 12, count: 1, barcode: 'RA2', time: '08:30', isClosed: false,
+                    deletedAt: now - 1000, isFromDeletion: false,
+                    barcodes: [{ code: 'RA2', time: '08:30', cod: 12, dod: 0, locker: 'N/A', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 80000 }]
+                };
+                window.__fireAll();
+            }, { dk: dk });
+            await page.waitForTimeout(300);
+            // ការប្រែប្រួលរបស់ឧបករណ៍ផ្សេងចុះនៅ server ក្រោយពេលច្បាប់ចម្លងក្នុងសតិត្រូវបានអានចុងក្រោយ
+            await page.evaluate(() => {
+                const orig = window.firebaseSDK.runTransaction;
+                let armed = true;
+                window.firebaseSDK.runTransaction = function (r, fn) {
+                    const out = orig.call(this, r, fn);
+                    if (armed && String(r.path).indexOf('zoew_monthly_revenue_cod_dod') === 0) {
+                        armed = false;
+                        window.firebaseSDK.runTransaction = orig;
+                        const it = window.__fakeStore.zoew_scan_history_cod_dod.id_rs_live;
+                        it.barcodes[0].isClosed = true;
+                        it.barcodes[0].locker = 'RZ9';
+                    }
+                    return out;
+                };
+            });
+            await page.evaluate(() => { window.promptRestoreDeletedItem('id_rs_trash'); window.executeRestoreItem(); });
+            await page.waitForTimeout(800);
+            const merged = await page.evaluate(() => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_rs_live;
+                const ra1 = it.barcodes.find((b) => b.code === 'RA1');
+                return { n: it.barcodes.length, ra1Closed: ra1 && ra1.isClosed, ra1Locker: ra1 && ra1.locker, hasRa2: it.barcodes.some((b) => b.code === 'RA2'), trashGone: !window.__fakeStore.zoew_recently_deleted_cod_dod.id_rs_trash };
+            });
+            check(merged.n === 2 && merged.hasRa2 === true && merged.trashGone === true,
+                app + ': ស្តារ merge ➜ កញ្ចប់ចូលបញ្ជីដដែល និងចេញពីធុងសំរាម', JSON.stringify(merged));
+            check(merged.ra1Closed === true && merged.ra1Locker === 'RZ9',
+                app + ': ស្តារ merge ➜ មិនលុបការបិទ និងទីតាំងរបស់ឧបករណ៍ផ្សេង', JSON.stringify(merged));
+
+            // ខ. ឧបករណ៍ផ្សេងស្តាររួច ➜ ការស្តារម្ដងទៀត មិនត្រូវបូកចំណូលស្ទួន
+            await page.evaluate((a) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_recently_deleted_cod_dod.id_rs_dup = {
+                    id: 'id_rs_dup', phone: '0913000002', scanDate: a.dk, createdAt: now - 70000,
+                    cod: 9, dod: 0, price: 9, count: 1, barcode: 'RB1', time: '09:00', isClosed: false,
+                    deletedAt: now - 1000, isFromDeletion: false,
+                    barcodes: [{ code: 'RB1', time: '09:00', cod: 9, dod: 0, locker: 'N/A', isClosed: false, isDeducted: true, isFromDeletion: false, createdAt: now - 70000 }]
+                };
+                window.__fireAll();
+            }, { dk: dk });
+            await page.waitForTimeout(300);
+            const revBefore = await page.evaluate((a) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk])), { dk: dk });
+            // ឧបករណ៍ផ្សេងស្តារវាសិន (ចំណូលបូកមកវិញរួច) ដោយ listener មិនទាន់មកដល់
+            await page.evaluate((a) => {
+                const t = window.__fakeStore.zoew_recently_deleted_cod_dod.id_rs_dup;
+                delete window.__fakeStore.zoew_recently_deleted_cod_dod.id_rs_dup;
+                t.barcodes[0].isDeducted = false;
+                delete t.deletedAt;
+                window.__fakeStore.zoew_scan_history_cod_dod.id_rs_dup = t;
+                const rev = window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk];
+                rev.codDollar = Math.round((rev.codDollar + 9) * 100) / 100;
+                rev.totalCount = rev.totalCount + 1;
+            }, { dk: dk });
+            const revAfterOther = await page.evaluate((a) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk])), { dk: dk });
+            await page.evaluate(() => { window.promptRestoreDeletedItem('id_rs_dup'); window.executeRestoreItem(); });
+            await page.waitForTimeout(800);
+            const revAfterMine = await page.evaluate((a) => JSON.parse(JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[a.dk])), { dk: dk });
+            check(revAfterMine.codDollar === revAfterOther.codDollar && revAfterMine.totalCount === revAfterOther.totalCount,
+                app + ': ស្តារធាតុដែលឧបករណ៍ផ្សេងស្តាររួច ➜ ចំណូលមិនបូកស្ទួន',
+                'មុន=' + JSON.stringify(revBefore) + ' ឧបករណ៍ផ្សេង=' + JSON.stringify(revAfterOther) + ' ក្រោយ=' + JSON.stringify(revAfterMine));
+        }
+
+        // --- ស្ថិតិ "អតិថិជនយក" ត្រូវត្រូវនឹងស្ថានភាពពិតរបស់ server ---
+        {
+            const seedPickupItem = async (id, phone, bcs) => {
+                await page.evaluate((a) => {
+                    const now = Date.now();
+                    const sum = a.bcs.reduce((s, b) => s + b.cod, 0);
+                    window.__fakeStore.zoew_scan_history_cod_dod[a.id] = {
+                        id: a.id, phone: a.phone, scanDate: a.dk, createdAt: now - 60000,
+                        cod: sum, dod: 0, price: sum, count: a.bcs.length,
+                        barcode: a.bcs[0].code, time: '12:00',
+                        isClosed: a.bcs.every((b) => b.isClosed),
+                        barcodes: a.bcs.map((b) => ({ code: b.code, time: '12:00', cod: b.cod, dod: 0, locker: 'N/A', isClosed: !!b.isClosed, isDeducted: false, isFromDeletion: false, createdAt: now - 60000 }))
+                    };
+                    window.__fireAll();
+                }, { id: id, phone: phone, bcs: bcs, dk: seed._dateKey });
+                await page.waitForTimeout(250);
+            };
+            const pickRef = (phoneKey) => page.evaluate((a) => {
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || {};
+                return (p.pickedUpPhones || {})[a.phoneKey] || 0;
+            }, { dk: seed._dateKey, phoneKey: phoneKey });
+
+            // ក. ឧបករណ៍ផ្សេងបិទបញ្ជីរួច ខណៈច្បាប់ចម្លងក្នុងសតិនៅបើក ➜ បិទម្ដងទៀត មិនត្រូវរាប់អតិថិជនស្ទួន
+            await seedPickupItem('id_pk_a', '0912000001', [{ code: 'PA1', cod: 3, isClosed: false }]);
+            await page.evaluate((a) => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_pk_a;
+                it.isClosed = true; it.closedAt = Date.now(); it.barcodes[0].isClosed = true;
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || { packagesPickedUp: 0, pickedUpPhones: {} };
+                p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
+                p.pickedUpPhones = p.pickedUpPhones || {};
+                p.pickedUpPhones['0912000001'] = 1;
+                window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
+            }, { dk: seed._dateKey });
+            await page.evaluate(() => window.toggleCloseStatus('id_pk_a'));
+            await page.waitForTimeout(600);
+            const refA = await pickRef('0912000001');
+            check(refA === 1, app + ': បិទបញ្ជីដែលឧបករណ៍ផ្សេងបិទរួច ➜ មិនរាប់អតិថិជនស្ទួន', 'refCount=' + refA + ' (រំពឹង 1)');
+
+            // ខ. បិទ barcode ចុងក្រោយ ខណៈ server បិទបងប្អូនរួច ➜ ត្រូវរាប់អតិថិជនថ្មី
+            await seedPickupItem('id_pk_b', '0912000002', [{ code: 'PB1', cod: 4, isClosed: false }, { code: 'PB2', cod: 5, isClosed: false }]);
+            await page.evaluate((a) => {
+                const it = window.__fakeStore.zoew_scan_history_cod_dod.id_pk_b;
+                it.barcodes[1].isClosed = true;
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || { packagesPickedUp: 0, pickedUpPhones: {} };
+                p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
+                window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
+            }, { dk: seed._dateKey });
+            await page.evaluate(() => window.toggleIndividualBarcodeClose('id_pk_b', 'PB1'));
+            await page.waitForTimeout(600);
+            const refB = await pickRef('0912000002');
+            const closedB = await page.evaluate(() => window.__fakeStore.zoew_scan_history_cod_dod.id_pk_b.isClosed);
+            check(closedB === true && refB === 1, app + ': បញ្ជីបិទគ្រប់នៅ server ➜ រាប់អតិថិជនត្រឹមត្រូវ', 'isClosed=' + closedB + ' refCount=' + refB + ' (រំពឹង 1)');
+
+            // គ. ឧបករណ៍ផ្សេងបើក barcode បងប្អូនវិញ ➜ មិនត្រូវទុកអតិថិជនខ្មោច
+            await seedPickupItem('id_pk_c', '0912000003', [{ code: 'PC1', cod: 6, isClosed: false }, { code: 'PC2', cod: 7, isClosed: true }]);
+            await page.evaluate(() => {
+                window.__fakeStore.zoew_scan_history_cod_dod.id_pk_c.barcodes[1].isClosed = false;
+            });
+            await page.evaluate(() => window.toggleIndividualBarcodeClose('id_pk_c', 'PC1'));
+            await page.waitForTimeout(600);
+            const refC = await pickRef('0912000003');
+            const closedC = await page.evaluate(() => window.__fakeStore.zoew_scan_history_cod_dod.id_pk_c.isClosed);
+            check(closedC === false && refC === 0, app + ': បញ្ជីមិនទាន់បិទគ្រប់នៅ server ➜ គ្មានអតិថិជនខ្មោច', 'isClosed=' + closedC + ' refCount=' + refC + ' (រំពឹង 0)');
+        }
+
         // --- ដក / លុប ត្រូវធ្វើការលើច្បាប់ចម្លងរបស់ server មិនមែនច្បាប់ចម្លងក្នុងសតិ ---
         if (app === 'ZoeAdmin') {
             const seedItem = async (id, phone, bcs) => {

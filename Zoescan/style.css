@@ -201,6 +201,7 @@ tr:last-child td { border-bottom: none; }
 .modal-content textarea { min-height: 90px; resize: vertical; font-family: monospace; font-size: 11px; }
 .remember-container { display: flex; align-items: flex-start; gap: 7px; font-size: 10.5px; color: var(--text-muted); margin-bottom: 12px; cursor: pointer; }
 .remember-container input { width: auto; margin: 2px 0 0; }
+.app-version-line { margin-top: 10px; text-align: center; font-size: 10.5px; color: var(--text-muted); font-weight: 600; }
 .modal-btns { display: flex; gap: 8px; }
 .modal-btns button, .modal-content button[type=submit] {
     flex: 1; padding: 11px; border-radius: var(--radius-md); font-weight: 700; font-size: 12.5px;

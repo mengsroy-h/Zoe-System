@@ -75,6 +75,12 @@ Key ត្រូវបានផលិតឡើងជាមួយ **ហត្ថ�
 - **`license_keys` (សាធារណៈ) vs `license_keys_meta` (Admin-only)**: `license_keys/{app}/{id}` អនុញ្ញាតឲ្យអានជាសាធារណៈដោយចេតនា ព្រោះ App ទាំង ៣ (ZoeAdmin/ZoeW/Zoescan) ត្រូវការត្រួតពិនិត្យ Key នេះមុនពេលមាន Auth — ប៉ុន្តែឥឡូវនេះមានតែ `expiresAt`/`revoked` ប៉ុណ្ណោះនៅទីនោះ។ `note`/`createdBy` (អ៊ីមែល Admin)/`issuedAt`/`scope`/`appPaths` ត្រូវផ្លាស់ទីទៅ `license_keys_meta` ដែលអាន/សរសេរបានតែ Admin ប៉ុណ្ណោះ។ **បើ Publish Rules ថ្មីនេះលើ Project ដែលធ្លាប់មាន Key រួចហើយ សូមចុចប៊ូតុង "🔒 Migrate PII ចាស់" ក្នុងផ្នែក "បញ្ជី Key ទាំងអស់" ម្តងគត់** ដើម្បីផ្លាស់ទីទិន្នន័យចាស់ចេញពី Path សាធារណៈ — Key ដែលបង្កើតថ្មីៗនឹងបំបែកដោយស្វ័យប្រវត្តិស្រាប់។
 - Logout លុបបញ្ជី Key និង Private Key ដែលទើបបង្កើត (បើមាន) ចេញពីអេក្រង់ភ្លាមៗ (មិនទុកសល់ឲ្យអ្នកប្រើបន្ទាប់ឃើញ ក្នុងករណីប្រើ Device រួម)
 
+## កំណែ App (Version)
+
+កំណែបង្ហាញនៅបាតប្រអប់ **ចូលប្រព័ន្ធ** ក្នុងទម្រង់ `កំណែប្រព័ន្ធ: X.Y.Z`។
+ប្រភពតែមួយគឺ `const APP_VERSION` នៅដើម `app.js` ហើយ `manifest.json` ត្រូវតាមវា —
+លម្អិត និងរបៀបប្តូរនៅផ្នែក "កំណែ App (Versioning)" ក្នុង [../README.md](../README.md)។
+
 ## អាជ្ញាប័ណ្ណ (License)
 
 គម្រោងនេះជាកម្មសិទ្ធិឯកជន (Private/Proprietary) — Powered By ZoeW

@@ -5335,32 +5335,54 @@
         const historySnapshot = scanHistory.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
 
-        const clearedItems = scanHistory.map(item => {
-            item.deletedAt = getServerNow();
-            item.isFromDeletion = true;
-            if (item.barcodes && Array.isArray(item.barcodes)) {
-                item.barcodes = item.barcodes.map(b => ({ ...b, isFromDeletion: true }));
-            }
-            return item;
-        });
-        clearedItems.forEach(item => deletedItems.unshift(item));
-        scanHistory = [];
-        refreshCurrentHistoryView();
-        updateRecentPhonesList();
-
+        let clearWriteOk = false;
+        let clearedKeys = [];
         try {
             const safeIdPattern = /^[a-zA-Z0-9_-]+$/;
+            clearedIds.forEach(id => {
+                if (!safeIdPattern.test(id)) throw new Error('Unsafe id during clearHistory');
+            });
+            if (!dbRefHistory) throw new Error('History ref not ready during clearHistory');
+            const historySnap = await fb.get(dbRefHistory);
+            const serverHistory = (historySnap && historySnap.val()) || {};
+            const clearedItems = [];
+            clearedIds.forEach(id => {
+                const serverItem = serverHistory[id];
+                if (!serverItem || typeof serverItem !== 'object') return;
+                if (!serverItem.id) serverItem.id = id;
+                normalizeBarcodesOf(serverItem);
+                serverItem.deletedAt = getServerNow();
+                serverItem.isFromDeletion = true;
+                if (Array.isArray(serverItem.barcodes)) {
+                    serverItem.barcodes = serverItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
+                }
+                clearedItems.push(serverItem);
+            });
+
+            if (clearedItems.length === 0) {
+                const goneIds = new Set(clearedIds);
+                scanHistory = scanHistory.filter(i => !goneIds.has(i.id));
+                refreshCurrentHistoryView();
+                updateRecentPhonesList();
+                showToast("⚠️ ទិន្នន័យទាំងនេះត្រូវបានលុបដោយឧបករណ៍ផ្សេងរួចហើយ!");
+                return;
+            }
+
+            clearedKeys = clearedItems.map(item => item.id);
+            const clearedSet = new Set(clearedKeys);
             const updates = {};
             clearedItems.forEach(item => {
-                if (!item.id || !safeIdPattern.test(item.id)) {
-                    throw new Error('Unsafe id during clearHistory');
-                }
                 updates[`zoew_scan_history_cod_dod/${item.id}`] = null;
                 updates[`zoew_recently_deleted_cod_dod/${item.id}`] = item;
             });
+
+            clearedItems.forEach(item => deletedItems.unshift(item));
+            scanHistory = scanHistory.filter(i => !clearedSet.has(i.id));
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+
             await fb.update(fb.ref(db), updates);
-            clearedIds.forEach(id => clearScannerLookupEntry(id));
-            showToast("បានលុបប្រវត្តិទាំងអស់!");
+            clearWriteOk = true;
         } catch (error) {
             console.error("Error clearing history: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error clearing history: " });
@@ -5369,5 +5391,9 @@
             refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("⚠️ លុបប្រវត្តិទាំងអស់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+        }
+        if (clearWriteOk) {
+            clearedKeys.forEach(id => clearScannerLookupEntry(id));
+            showToast("បានលុបប្រវត្តិទាំងអស់!");
         }
     }

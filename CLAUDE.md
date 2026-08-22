@@ -235,6 +235,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ទិន្នន័យអតិថិជនសល់ក្នុង DOM ក្រោយចាកចេញ | `dom-hygiene.js` |
 | អថេរ state សល់ក្រោយចាកចេញ | `state-hygiene.js` |
 | class គ្មានច្បាប់ CSS | `css-classes.js` |
+| ច្បាប់ក្នុង `@media` ដែលស្លាប់ដោយច្បាប់មូលដ្ឋានក្រោយវា | `css-media-override.js` |
 | comment / trailing whitespace | `comments.js` |
 | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
 | សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |

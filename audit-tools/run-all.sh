@@ -53,6 +53,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
 done
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
+run "css-media-override" node audit-tools/css-media-override.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
@@ -107,6 +108,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
     SWIPE_APP_DIR="$BASE" node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   swipe-pullup:    /'
     PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
+    CSSMEDIA_APP_DIR="$BASE" node audit-tools/css-media-override.js 2>&1 | tail -1 | sed 's/^/   css-media:       /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
 fi
 

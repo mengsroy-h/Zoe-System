@@ -138,6 +138,46 @@
         .page-side, .page-main { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
         #parcelPanel, #lockerPanel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
+        .drag-handle-bar {
+            width: 40px;
+            height: 4px;
+            background: #cbd5e1;
+            border-radius: 4px;
+            margin: 0 auto 2px auto;
+            display: none;
+            cursor: grab;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 991px) {
+            .drag-handle-bar { display: block; }
+            .page-side {
+                transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: max-height, opacity;
+            }
+            .page-side.collapsed {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+            }
+            .page-side > * {
+                transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .page-side.search-focus { gap: 0; }
+            .page-side.search-focus > *:not(:last-child) {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+                border-width: 0;
+            }
+            .page-side.collapsed + .page-main .table-responsive { max-height: 78vh; }
+            .app-pages.history-expanded { overscroll-behavior-y: contain; }
+        }
+
         .page-tabbar {
             position: fixed;
             left: 0; right: 0; bottom: 0;

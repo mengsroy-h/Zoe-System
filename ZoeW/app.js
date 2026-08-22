@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.0.0';
+    const APP_VERSION = '2.0.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -414,8 +414,44 @@
 
     let pinTargetAction = null;
 
-    function requestPinBeforeConfig(targetAction) {
+    const PIN_PROMPT_MESSAGES = {
+        config: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config ឬ Reconfig លើកក្រោយ'
+        },
+        lookupApi: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ API ស្វែងរកអតិថិជន',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ API ស្វែងរកអតិថិជន លើកក្រោយ'
+        },
+        locker: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ទូ Locker',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ទូ Locker លើកក្រោយ'
+        },
+        manualAdjust: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកែទឹកប្រាក់ ឬចំនួនកញ្ចប់',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកែទឹកប្រាក់ ឬចំនួនកញ្ចប់ លើកក្រោយ'
+        },
+        clearHistory: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបទិន្នន័យទាំងអស់',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការលុបទិន្នន័យទាំងអស់ លើកក្រោយ'
+        },
+        setupLink: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីអនុវត្ត Setup Link ចូល Config',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការអនុវត្ត Setup Link លើកក្រោយ'
+        }
+    };
+
+    function applyPinPromptText(promptKey) {
+        const texts = PIN_PROMPT_MESSAGES[promptKey] || PIN_PROMPT_MESSAGES.config;
+        const verifyDesc = document.getElementById('pinModalDesc');
+        if (verifyDesc) verifyDesc.textContent = texts.verify;
+        const setupDesc = document.getElementById('pinSetupModalDesc');
+        if (setupDesc) setupDesc.textContent = texts.setup;
+    }
+
+    function requestPinBeforeConfig(targetAction, promptKey) {
         pinTargetAction = targetAction || openConfigModal;
+        applyPinPromptText(promptKey);
         let savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
@@ -500,11 +536,12 @@
     function checkPinAndOpenConfig(isFirstTime = false) {
         if (isPinFlowPending()) return;
         pinTargetAction = null;
+        applyPinPromptText('config');
         let savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
         } else {
-            requestPinBeforeConfig();
+            requestPinBeforeConfig(null, 'config');
         }
     }
 
@@ -588,7 +625,7 @@
             const cfgInput = document.getElementById('firebaseConfigInput');
             if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
             showToast('✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
-        });
+        }, 'setupLink');
     }
 
     function cancelPinSetupFlow() {
@@ -1139,6 +1176,7 @@
 
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
+        setPhoneSearchPulledUp(false);
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -1975,6 +2013,7 @@
 
         setupHardwareScanner();
         switchAppPage('data');
+        setupSwipeGestures();
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();
@@ -2344,6 +2383,7 @@
         if (entryTab) entryTab.classList.toggle('active', target === 'entry');
 
         hidePhoneSuggestions();
+        setPhoneSearchPulledUp(false);
         const pages = document.getElementById('appPages');
         if (pages) pages.scrollTop = 0;
 
@@ -2382,6 +2422,92 @@
     function drawerAction(fn) {
         closeSideDrawer();
         if (typeof fn === 'function') fn();
+    }
+
+    function syncHistoryExpandedLock() {
+        const sidebar = document.getElementById('dataSideSection');
+        const pages = document.getElementById('appPages');
+        if (!sidebar || !pages) return;
+        pages.classList.toggle('history-expanded', sidebar.classList.contains('collapsed'));
+    }
+
+    function setupSwipeGestures() {
+        const sidebar = document.getElementById('dataSideSection');
+        const mainSection = document.getElementById('dataMainSection');
+        const tableResponsive = document.getElementById('tableResponsive');
+        if (!sidebar || !mainSection || !tableResponsive) return;
+
+        let startY = 0;
+        let currentY = 0;
+        let isDragging = false;
+
+        function phoneSearchIsActive() {
+            const box = document.getElementById('phoneSuggestBox');
+            if (box && box.classList.contains('show')) return true;
+            const input = document.getElementById('searchPhoneInput');
+            return !!(input && document.activeElement === input && input.value.trim());
+        }
+
+        tableResponsive.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+
+        tableResponsive.addEventListener('touchmove', (e) => {
+            currentY = e.touches[0].clientY;
+            const diffY = currentY - startY;
+            const scrollTop = tableResponsive.scrollTop;
+
+            if (scrollTop === 0 && diffY > 30 && window.innerWidth < 992) {
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                    syncHistoryExpandedLock();
+                }
+            }
+        }, { passive: true });
+
+        mainSection.addEventListener('touchstart', (e) => {
+            if (window.innerWidth >= 992) return;
+            startY = e.touches[0].clientY;
+            isDragging = true;
+        }, { passive: true });
+
+        mainSection.addEventListener('touchmove', (e) => {
+            if (!isDragging || window.innerWidth >= 992) return;
+            currentY = e.touches[0].clientY;
+            const diffY = currentY - startY;
+            const scrollTop = tableResponsive.scrollTop;
+
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !phoneSearchIsActive()) {
+                sidebar.classList.add('collapsed');
+                syncHistoryExpandedLock();
+                isDragging = false;
+            }
+            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                syncHistoryExpandedLock();
+                isDragging = false;
+            }
+            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
+                setPhoneSearchPulledUp(false);
+                isDragging = false;
+            }
+        }, { passive: true });
+
+        mainSection.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        const dragHandle = document.getElementById('dragHandle');
+        if (dragHandle) {
+            dragHandle.addEventListener('click', () => {
+                if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
+                setPhoneSearchPulledUp(false);
+                sidebar.classList.toggle('collapsed');
+                syncHistoryExpandedLock();
+            });
+        }
+
+        syncHistoryExpandedLock();
     }
 
     function setupIOSPullToRefresh() {
@@ -2461,7 +2587,7 @@
 
         container.innerHTML = `
             <button onclick="openExportDataModal(); document.getElementById('globalMoreMenu').classList.remove('show');">📤 Export Data</button>
-            <button onclick="requestPinBeforeConfig(openManualAdjustModal); document.getElementById('globalMoreMenu').classList.remove('show');">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
+            <button onclick="requestPinBeforeConfig(openManualAdjustModal, 'manualAdjust'); document.getElementById('globalMoreMenu').classList.remove('show');">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
             <button onclick="openExchangeRateModal(); document.getElementById('globalMoreMenu').classList.remove('show');">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
             <button class="delete-opt" onclick="requestPinBeforeClearHistory(); document.getElementById('globalMoreMenu').classList.remove('show');">❌ លុបទាំងអស់</button>
         `;
@@ -3414,18 +3540,34 @@
     }
 
 
+    function setPhoneSearchPulledUp(on) {
+        const sidebar = document.getElementById('dataSideSection');
+        if (!sidebar) return;
+        if (on && window.innerWidth >= 992) return;
+        const already = sidebar.classList.contains('search-focus');
+        if (already === !!on) return;
+        sidebar.classList.toggle('search-focus', !!on);
+        if (on) sidebar.classList.remove('collapsed');
+        syncHistoryExpandedLock();
+        positionPhoneSuggestBox();
+        setTimeout(positionPhoneSuggestBox, 180);
+        setTimeout(positionPhoneSuggestBox, 340);
+    }
+
     function setupPhoneSuggestions() {
         const phoneInput = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
         if (!phoneInput || !box) return;
         phoneInput.addEventListener('input', showPhoneSuggestions);
         phoneInput.addEventListener('focus', () => {
+            setPhoneSearchPulledUp(true);
             showPhoneSuggestions();
         });
         phoneInput.addEventListener('blur', () => {
             if (phoneSuggestHideTimer) clearTimeout(phoneSuggestHideTimer);
             phoneSuggestHideTimer = setTimeout(() => {
                 hidePhoneSuggestions();
+                if (!phoneInput.value.trim()) setPhoneSearchPulledUp(false);
             }, 150);
         });
         phoneInput.addEventListener('keydown', (e) => {
@@ -6116,7 +6258,7 @@
     }
 
     function requestPinBeforeClearHistory() {
-        requestPinBeforeConfig(clearHistory);
+        requestPinBeforeConfig(clearHistory, 'clearHistory');
     }
 
     async function clearHistory() {

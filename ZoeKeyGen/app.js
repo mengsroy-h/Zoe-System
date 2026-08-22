@@ -1,4 +1,4 @@
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {

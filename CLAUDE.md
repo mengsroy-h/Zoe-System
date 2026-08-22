@@ -88,6 +88,29 @@
 **របា Slide បិទត្រូវមាន `visibility: hidden`** — បើមិនដូច្នេះ `layout-check.js` រាយវាថាលើសអេក្រង់
 (វា `translateX(-100%)`) ហើយវាក៏អាច tab ចូលបានទៀតផង។
 
+**កាយវិការអូស លើទូរស័ព្ទ (<992px) — `setupSwipeGestures()`។** ទំព័រទិន្នន័យមាន
+`#dataSideSection` (`.page-side`) និង `#dataMainSection` (`.page-main`) បូកដងអូស `#dragHandle`៖
+
+- អូស/scroll **ឡើង** លើ `#dataMainSection` ➜ `#dataSideSection` ទទួល `.collapsed` ➜ ប្រវត្តិហូតឡើងពេញអេក្រង់
+- អូស **ចុះ** ពេលតារាងនៅកំពូល ➜ ដក `.collapsed` ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ
+- ចុច `#dragHandle` ➜ toggle ដោយចេតនាច្បាស់លាស់ (ដំណើរការទោះកំពុងស្វែងរក)
+- **ការអូសឡើង មិនត្រូវបិទផ្ទាំង ពេលអ្នកប្រើកំពុងស្វែងរកលេខទូរស័ព្ទទេ** (`phoneSearchIsActive()`)
+  — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
+
+**Auto pull up — `setPhoneSearchPulledUp()`។** ចុច (focus) ប្រអប់ស្វែងរកលេខទូរស័ព្ទ ➜
+`#dataSideSection` ទទួល `.search-focus` ដែលបង្រួមកាតខាងលើទាំងអស់ ទុកតែប្រអប់ស្វែងរក
+ហូតឡើងក្រោម navbar (CSS៖ `.page-side.search-focus > *:not(:last-child)`)។
+**ដូច្នេះកាតស្វែងរកត្រូវតែនៅជា child ចុងក្រោយរបស់ `.page-side`** — បើបន្ថែមកាតក្រោយវា មុខងារនេះខូច។
+blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូរទំព័រ ➜ ដោះវិញ។ លើ **≥992px វាមិនធ្វើអ្វីទេ**
+ព្រោះ layout ២ ជួរឃើញគ្រប់យ៉ាងស្រាប់។ Test៖ **`phone-search-swipe-test.js`**។
+
+**ប្រអប់ PIN បង្ហាញសារតាមប៊ូតុងដែលហៅ។** `requestPinBeforeConfig(targetAction, promptKey)` —
+`promptKey` ជាកូនសោក្នុង `PIN_PROMPT_MESSAGES` (`config`, `lookupApi`, `locker`, `manualAdjust`,
+`clearHistory`, `setupLink`) ហើយ `applyPinPromptText()` សរសេរវាចូល `#pinModalDesc` និង
+`#pinSetupModalDesc`។ **រាល់ការបន្ថែមប៊ូតុងដែលការពារដោយ PIN ត្រូវបន្ថែមធាតុថ្មីក្នុងតារាងនោះ
+ហើយបញ្ជូនកូនសោរបស់វា** — បើមិនដូច្នេះ អ្នកប្រើឃើញសារ «Config ឬ Reconfig» លើគ្រប់ប៊ូតុង។
+Test៖ **`pin-prompt-test.js`**។
+
 ## Core business rule: «លុប» (Delete) ទល់នឹង «ដក» (Remove) — READ BEFORE TOUCHING REVENUE CODE
 
 នេះជាគោលការណ៍អាជីវកម្មដោយចេតនា មិនមែនកំហុសទេ ហើយងាយត្រូវវិនិច្ឆ័យខុស៖
@@ -225,6 +248,8 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |
 | ដំណើរការនៅទិន្នន័យធំ | `perf-check.js` |
 | Setup Link៖ ZoeKeyGen encode ↔ App decode | `setup-link-roundtrip-test.js`, `setup-link-browser-test.js` |
+| កាយវិការអូស + auto pull up នៃប្រអប់ស្វែងរក | `phone-search-swipe-test.js` |
+| សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `pin-prompt-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។

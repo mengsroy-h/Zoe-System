@@ -60,7 +60,7 @@
 <div class="app-pages" id="appPages">
 
     <section class="app-page active" id="pageData">
-        <div class="page-side">
+        <div class="page-side" id="dataSideSection">
             <div class="app-card">
                 <div class="card-header">
                     <div class="card-title">
@@ -137,7 +137,8 @@
             </div>
 
         </div>
-        <div class="page-main">
+        <div class="page-main" id="dataMainSection">
+            <div class="drag-handle-bar" id="dragHandle" title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកប្រវត្តិ"></div>
             <div class="app-card history-section">
                 <div class="card-header">
                     <div class="card-title">
@@ -299,16 +300,16 @@
         <button type="button" class="drawer-close" onclick="closeSideDrawer()" title="បិទ" aria-label="បិទ">✖</button>
     </div>
     <div class="drawer-body">
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(); })">
+        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(null, 'config'); })">
             <span class="ico">⚙️</span><span>Config / Reconfig</span>
         </button>
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLookupApiConfigModal); })">
+        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLookupApiConfigModal, 'lookupApi'); })">
             <span class="ico">🔌</span><span>API ស្វែងរកអតិថិជន</span>
         </button>
         <button type="button" class="drawer-item" onclick="drawerAction(openCustomerDataTableModal)">
             <span class="ico">📊</span><span>តារាងអតិថិជន</span>
         </button>
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLockerSettingsModal); })">
+        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLockerSettingsModal, 'locker'); })">
             <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
         </button>
         <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" onclick="drawerAction(showLoginModalWithPrefill)">
@@ -320,7 +321,7 @@
 <div id="pinModal" class="modal" data-close="cancelPinEntryFlow">
     <div class="modal-content" style="max-width: 300px;">
         <h3>🔒 បញ្ចូល Security PIN</h3>
-        <p>សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
+        <p id="pinModalDesc">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
         <div class="modal-btns">
             <div class="modal-btns-row">
@@ -334,7 +335,7 @@
 <div id="pinSetupModal" class="modal" data-close="cancelPinSetupFlow">
     <div class="modal-content" style="max-width: 300px;">
         <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
-        <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
+        <p id="pinSetupModalDesc">សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
             <button class="btn-cancel" onclick="cancelPinSetupFlow()">បោះបង់</button>

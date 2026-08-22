@@ -32,7 +32,8 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
-         license-grace-test phone-suggest-test keygen-pin-flow-test \
+         license-grace-test phone-suggest-test phone-search-swipe-test \
+         pin-prompt-test keygen-pin-flow-test \
          keygen-session-security-test \
          barcode-shape-test setup-link-logout-test \
          raw-read-shape-test devtools-guard-test concurrent-scan-test \
@@ -104,6 +105,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
+    SWIPE_APP_DIR="$BASE" node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   swipe-pullup:    /'
+    PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
 fi
 

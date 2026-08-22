@@ -18,6 +18,8 @@ const ACCEPTED = {
     loginError: 'error text only',
     loginBtn: 'button label',
     pinModalMsg: 'status text only',
+    pinModalDesc: 'prompt sentence picked from the hard-coded PIN_PROMPT_MESSAGES table — never customer data',
+    pinSetupModalDesc: 'prompt sentence picked from the hard-coded PIN_PROMPT_MESSAGES table — never customer data',
     lockerPrefixInput: 'locker naming config, not customer data',
     lockerCountInput: 'locker naming config, not customer data',
     locationWarningTitle: "static heading, no customer data",

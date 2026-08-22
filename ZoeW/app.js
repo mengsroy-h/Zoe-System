@@ -248,6 +248,7 @@
         updateRecentPhonesList();
         buildLockerBarcodeIndex();
         renderLockerList();
+        renderEntryList();
     }, 120);
 
     function withTimeout(promise, ms, timeoutMsg) {
@@ -1156,7 +1157,8 @@
             'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
             'deletedTableBody', 'dailyStatsContainer', 'monthlyStatsContainer',
             'menuContentContainer', 'lockerListTableBody', 'lockerListSearchInput',
-            'locationWarningText', 'customLockerInput'
+            'locationWarningText', 'customLockerInput',
+            'entryListTableBody', 'entryListSearchInput', 'entryListCount'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -1419,12 +1421,16 @@
     function updateAuthButton(isLoggedIn) {
         const btn = document.getElementById('navAuthBtn');
         if (!btn) return;
+        const ico = btn.querySelector('.ico');
+        const label = btn.querySelector('.drawer-auth-label');
         if (isLoggedIn) {
-            btn.textContent = '🚪 ចាកចេញ';
-            btn.onclick = logoutApp;
+            if (ico) ico.textContent = '🚪';
+            if (label) label.textContent = 'ចាកចេញ';
+            btn.onclick = () => drawerAction(logoutApp);
         } else {
-            btn.textContent = '🔑 ចូល';
-            btn.onclick = showLoginModalWithPrefill;
+            if (ico) ico.textContent = '🔑';
+            if (label) label.textContent = 'ចូល';
+            btn.onclick = () => drawerAction(showLoginModalWithPrefill);
         }
     }
 
@@ -3575,6 +3581,7 @@
     const LOCKER_COUNT_KEY = 'zoe_locker_count';
     const ACTIVE_LOCKER_KEY = 'zoe_active_locker';
     const ENTRY_SCAN_MODE_KEY = 'zoe_entry_scan_mode';
+    const ENTRY_LIST_MAX_ROWS = 200;
 
     let activeLocker = localStorage.getItem(ACTIVE_LOCKER_KEY) || '';
     let entryScanMode = localStorage.getItem(ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
@@ -3745,6 +3752,9 @@
         if (lockerBtn) lockerBtn.classList.toggle('active', entryScanMode === 'locker');
         const lockerPanel = document.getElementById('lockerPanel');
         if (lockerPanel) lockerPanel.classList.toggle('hidden', entryScanMode !== 'locker');
+        const parcelPanel = document.getElementById('parcelPanel');
+        if (parcelPanel) parcelPanel.classList.toggle('hidden', entryScanMode !== 'parcel');
+        if (entryScanMode === 'parcel') renderEntryList();
         const hwInput = document.getElementById('hwScannerInput');
         if (hwInput) hwInput.placeholder = entryScanMode === 'locker' ? 'ស្កេន Barcode ដើម្បីកំណត់ទីតាំង...' : 'ស្កេន Barcode...';
         if (entryScanMode === 'locker') {
@@ -3936,6 +3946,63 @@
             }
             reportFailure(err);
         }
+    }
+
+    function renderEntryList() {
+        const tbody = document.getElementById('entryListTableBody');
+        const emptyState = document.getElementById('entryListEmptyState');
+        const countEl = document.getElementById('entryListCount');
+        if (!tbody) return;
+
+        const searchInput = document.getElementById('entryListSearchInput');
+        const search = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        const searchDigits = normalizePhoneDigits(search);
+        const todayStr = getFormattedDate(new Date(getServerNow()));
+
+        let rows = scanHistory.filter((it) => it && it.scanDate === todayStr);
+        if (search) {
+            rows = rows.filter((it) => {
+                const phone = sanitizePhoneNumber(it.phone || '');
+                if (searchDigits && normalizePhoneDigits(phone).indexOf(searchDigits) !== -1) return true;
+                const codes = Array.isArray(it.barcodes) && it.barcodes.length
+                    ? it.barcodes.map((b) => String((b && b.code) || ''))
+                    : [String(it.barcode || '')];
+                return codes.some((c) => c.toLowerCase().includes(search));
+            });
+        }
+        rows = rows.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        if (countEl) countEl.innerText = String(rows.length);
+
+        if (!rows.length) {
+            tbody.innerHTML = '';
+            if (emptyState) emptyState.classList.remove('hidden');
+            return;
+        }
+        if (emptyState) emptyState.classList.add('hidden');
+
+        let html = '';
+        rows.slice(0, ENTRY_LIST_MAX_ROWS).forEach((it, i) => {
+            const phoneRaw = sanitizePhoneNumber(it.phone || '');
+            const phoneCell = phoneRaw
+                ? `<span class="phone-cell">${sanitizeInput(phoneRaw)}</span>`
+                : '<span class="phone-empty">គ្មានលេខ</span>';
+            const codes = Array.isArray(it.barcodes) && it.barcodes.length
+                ? it.barcodes.map((b) => String((b && b.code) || ''))
+                : [String(it.barcode || '')];
+            const shown = codes.filter(Boolean);
+            const codeText = shown.length > 1
+                ? `${sanitizeInput(shown[0])} +${shown.length - 1}`
+                : sanitizeInput(shown[0] || '-');
+            const total = Math.round(((parseFloat(it.cod) || 0) + (parseFloat(it.dod) || 0)) * 100) / 100;
+            html += `<tr>
+                <td style="text-align:center;font-weight:700;color:var(--text-muted);">${i + 1}</td>
+                <td>${phoneCell}<div class="scan-time-tag">${sanitizeInput(it.time || '')}</div></td>
+                <td><span class="barcode-tag">${codeText}</span></td>
+                <td style="text-align:right;font-weight:700;">$${total.toFixed(2)}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
     }
 
     function getItemLockerSummary(item) {

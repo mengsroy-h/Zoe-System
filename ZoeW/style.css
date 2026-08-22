@@ -197,6 +197,8 @@
             text-align: left; cursor: pointer;
         }
         .drawer-item .ico { font-size: 15px; flex-shrink: 0; }
+        .drawer-auth { margin-top: 6px; border-top: 1px dashed var(--border-color); border-radius: var(--radius-md); }
+        .drawer-auth-label { font-weight: 700; }
         .drawer-item:active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
 
         .scan-mode-row {

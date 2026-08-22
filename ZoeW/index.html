@@ -53,7 +53,6 @@
         </div>
     </div>
     <div class="nav-right-actions">
-        <button class="security-btn" id="navAuthBtn" onclick="showLoginModalWithPrefill()">🔑 ចូល</button>
         <div class="credit-tag">Powered By ZoeW</div>
     </div>
 </header>
@@ -210,6 +209,34 @@
             </div>
         </div>
 
+        <div id="parcelPanel">
+            <div class="app-card">
+                <div class="card-header">
+                    <div class="card-title">📦 កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ (<span id="entryListCount">0</span>)</div>
+                </div>
+                <div class="filter-bar">
+                    <input type="text" id="entryListSearchInput" oninput="renderEntryList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:12%;text-align:center;">ល.រ</th>
+                                <th style="width:34%;">អតិថិជន</th>
+                                <th style="width:32%;">Barcode</th>
+                                <th style="width:22%;text-align:right;">តម្លៃ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entryListTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="entryListEmptyState" class="empty-state hidden">
+                    <span class="emoji">📭</span>
+                    មិនទាន់មានកញ្ចប់បញ្ចូលថ្ងៃនេះទេ
+                </div>
+            </div>
+        </div>
+
         <div id="lockerPanel" class="hidden">
             <div class="active-locker-bar">
                 <span>ទីតាំងបច្ចុប្បន្ន: <span class="loc-val" id="activeLockerLabel">-</span></span>
@@ -275,6 +302,9 @@
         </button>
         <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLockerSettingsModal); })">
             <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
+        </button>
+        <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" onclick="drawerAction(showLoginModalWithPrefill)">
+            <span class="ico">🔑</span><span class="drawer-auth-label">ចូល</span>
         </button>
     </div>
 </aside>

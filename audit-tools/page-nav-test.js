@@ -230,6 +230,24 @@ function seedData() {
     const rows = await page.evaluate(() => document.querySelectorAll('#historyTableBody tr').length);
     check(rows >= 1, 'តារាងប្រវត្តិបង្ហាញជួរពីទិន្នន័យ Firebase', 'rows=' + rows);
 
+    const entryList = await page.evaluate(() => {
+        if (window.switchAppPage) window.switchAppPage('entry');
+        if (window.setEntryScanMode) window.setEntryScanMode('parcel');
+        const panel = document.getElementById('parcelPanel');
+        const countEl = document.getElementById('entryListCount');
+        return {
+            visible: !!panel && getComputedStyle(panel).display !== 'none',
+            rows: document.querySelectorAll('#entryListTableBody tr').length,
+            count: countEl ? countEl.innerText : '',
+            text: (document.getElementById('entryListTableBody') || {}).textContent || ''
+        };
+    });
+    check(entryList.visible, 'របៀបបញ្ចូលកញ្ចប់បង្ហាញផ្ទាំងបញ្ជី', JSON.stringify(entryList));
+    check(entryList.rows === 1 && entryList.count === '1',
+        'បញ្ជីបញ្ចូលកញ្ចប់រាប់តែធាតុថ្ងៃនេះ', JSON.stringify(entryList));
+    check(entryList.text.indexOf('0968490421') !== -1,
+        'បញ្ជីបញ្ចូលកញ្ចប់បង្ហាញលេខទូរស័ព្ទ', entryList.text.slice(0, 120));
+
     await page.evaluate(() => { if (window.switchAppPage) window.switchAppPage('entry'); });
     await page.waitForTimeout(300);
     const afterSwitch = await page.evaluate(() => {
@@ -258,6 +276,11 @@ function seedData() {
     check(/Config \/ Reconfig/.test(joined), 'របា Slide មាន Config / Reconfig', joined);
     check(/API ស្វែងរកអតិថិជន/.test(joined), 'របា Slide មាន API ស្វែងរកអតិថិជន', joined);
     check(/តារាងអតិថិជន/.test(joined), 'របា Slide មាន តារាងអតិថិជន', joined);
+    const authPlace = await page.evaluate(() => ({
+        inDrawer: !!document.querySelector('#sideDrawer #navAuthBtn'),
+        inNavbar: !!document.querySelector('.app-navbar #navAuthBtn')
+    }));
+    check(authPlace.inDrawer && !authPlace.inNavbar, 'ប៊ូតុង ចូល/ចាកចេញ ស្ថិតក្នុងរបា Slide', JSON.stringify(authPlace));
 
     const moreMenu = await page.evaluate(() => {
         const btn = document.querySelector('.header-more-btn');
@@ -282,14 +305,17 @@ function seedData() {
     await page.waitForTimeout(400);
     const lockerMode = await page.evaluate(() => {
         const panel = document.getElementById('lockerPanel');
+        const parcel = document.getElementById('parcelPanel');
         const label = document.getElementById('activeLockerLabel');
         return {
+            parcelVisible: !!parcel && getComputedStyle(parcel).display !== 'none',
             panelVisible: !!panel && getComputedStyle(panel).display !== 'none',
             label: label ? label.innerText : '',
             indexed: Object.keys(typeof lockerBarcodeIndex !== 'undefined' ? lockerBarcodeIndex : {}).sort().join(',')
         };
     });
     check(lockerMode.panelVisible, 'របៀប Locker បង្ហាញផ្ទាំង Locker', JSON.stringify(lockerMode));
+    check(!lockerMode.parcelVisible, 'របៀប Locker លាក់ផ្ទាំងបញ្ចូលកញ្ចប់', JSON.stringify(lockerMode));
     check(lockerMode.indexed === 'BB1,BB2,CC1', 'index barcode សង់ចេញពីប្រវត្តិដោយផ្ទាល់', lockerMode.indexed);
     check(lockerMode.label === 'A5', 'ទីតាំងបច្ចុប្បន្នបង្ហាញត្រឹមត្រូវ', lockerMode.label);
 

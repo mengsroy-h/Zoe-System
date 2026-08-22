@@ -1,7 +1,10 @@
 // Policy harness: slices the REAL shipped code blocks out of ZoeW/app.js and
 // runs them against fake parcels, and asserts the លុប / ដក invariants.
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
+
+const ROOT = process.env.POLICY_APP_DIR ? path.resolve(process.env.POLICY_APP_DIR) : path.join(__dirname, '..');
 
 function slice(src, startMarker, endMarker, label) {
     const a = src.indexOf(startMarker);
@@ -85,7 +88,7 @@ function check(label, actual, expected) {
 
 for (const app of ['ZoeW']) {
     console.log(`\n================= ${app} =================`);
-    const ctx = buildRunner(`${app}/app.js`);
+    const ctx = buildRunner(path.join(ROOT, app, 'app.js'));
 
     // ---------- លុប (Delete): 2-hour auto-cleanup of a closed parcel ----------
     console.log('\n-- លុប: បិទ ➜ លុបស្វ័យប្រវត្តិ ២ម៉ោង ➜ ស្តារ ➜ លុប ➜ ស្តារ --');

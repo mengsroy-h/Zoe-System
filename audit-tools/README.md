@@ -6,7 +6,7 @@
 | File | អ្វី |
 |---|---|
 | `shared-fns.js` | diff helper ដែលចែករំលែករវាង **ZoeW ↔ ZoeKeyGen** រួចរាយតែអ្វីដែលបែកគ្នាដោយមិនរំពឹងទុក — **រត់នេះមុនគេ** រាល់ជុំ audit — ត្រូវការ `acorn` |
-| `policy-test.js` | ដក block ពិតរបស់ `claimAndCleanupItem` + `executeRestoreItem` ចេញពី `app.js` រួចផ្ទៀងផ្ទាត់គោលការណ៍ **លុប/ដក** (26 assertion) |
+| `policy-test.js` | ដក block ពិតរបស់ `claimAndCleanupItem` + `executeRestoreItem` ចេញពី `app.js` រួចផ្ទៀងផ្ទាត់គោលការណ៍ **លុប/ដក** (26 assertion) — `POLICY_APP_DIR=<dir>` ដើម្បីរត់លើ tree ផ្សេង |
 | `auth-recovery-test.js` | ដក `doLogin`/`verifyAdminRoleThenProceed`/`retryPendingRoleCheck` ពិត ចេញពី **ZoeKeyGen** (App តែមួយដែលនៅរក្សាតួនាទី) រួចផ្ទៀងផ្ទាត់ការស្ដារ session ពេលបណ្ដាញយឺត និងផ្លូវ REST ពេល socket ស្លាប់ (43 assertion) — `AUTH_APP_DIR=<dir>` ដើម្បីរត់លើ tree ផ្សេង — គំរូ `onAuthStateChanged` ធ្វើតាម `AuthImpl.notifyAuthListeners` ពិតរបស់ `@firebase/auth@1.13.4` |
 | `keylist-consistency-test.js` | ដក `refreshKeyList`/`renderKeyList` ពិតរបស់ ZoeKeyGen រួចផ្ទៀងផ្ទាត់ថា meta ចាស់/ថ្មីត្រូវបាន merge ត្រឹមត្រូវ ហើយ Key ដែលមិនទាន់ Migrate នៅតែបង្ហាញ note (15 assertion) |
 | `license-grace-test.js` | ដក `activate`/`getStatus`/`checkOnline` ពិតរបស់ `license-verify.js` រួចផ្ទៀងផ្ទាត់ថាការ paste Key ដដែលឡើងវិញពេលក្រៅបណ្ដាញ **មិន reset ការអនុគ្រោះ ៣ ថ្ងៃ** និងថា Key ដែល Revoke ត្រូវបានបដិសេធតាំងពី Activate (13 assertion) |

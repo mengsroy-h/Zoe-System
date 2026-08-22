@@ -15,12 +15,23 @@ function check(condition, label, detail) {
     }
 }
 
-function createRuntime(existing, key, encrypt) {
+function sliceFn(source, name) {
+    const start = source.indexOf('function ' + name + '(');
+    if (start === -1) throw new Error('not found: ' + name);
+    let depth = 0, started = false, i = source.indexOf('{', start);
+    for (; i < source.length; i++) {
+        if (source[i] === '{') { depth++; started = true; }
+        else if (source[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
+    }
+    return source.slice(start, i);
+}
+
+function createRuntime(existing, key, encrypt, failStorage) {
     const source = fs.readFileSync(path.join(__dirname, '..', 'ZoeW', 'app.js'), 'utf8');
     const start = source.indexOf('    function getLookupApiConfig() {');
     const end = source.indexOf('    async function testLookupApiConfig(', start);
     if (start === -1 || end === -1) throw new Error('lookup config functions not found');
-    const code = source.slice(start, end);
+    const code = sliceFn(source, 'safeStoreSet') + '\n' + sliceFn(source, 'safeStoreRemove') + '\n' + source.slice(start, end);
     const storage = new Map();
     storage.set('zoew_lookup_api_config', JSON.stringify(existing));
     const elements = {
@@ -38,7 +49,11 @@ function createRuntime(existing, key, encrypt) {
         document: { getElementById: (id) => elements[id] || null },
         localStorage: {
             getItem: (name) => storage.has(name) ? storage.get(name) : null,
-            setItem: (name, value) => storage.set(name, String(value))
+            setItem: (name, value) => {
+                if (failStorage) throw new Error('QuotaExceededError');
+                storage.set(name, String(value));
+            },
+            removeItem: (name) => { storage.delete(name); }
         },
         lookupSecretKey: key,
         encryptLookupSecret: encrypt,
@@ -70,6 +85,13 @@ function createRuntime(existing, key, encrypt) {
     const blocked = JSON.parse(typedNoKey.storage.get('zoew_lookup_api_config'));
     check(blocked.headerValue === 'legacy-secret' && typedNoKey.alerts.length === 1,
         'Lookup config: typed secret without PIN key is rejected without losing the existing legacy value', JSON.stringify({ blocked, alerts: typedNoKey.alerts }));
+
+    const quota = createRuntime(legacy, { key: true }, async (value) => `enc:${value}`, true);
+    let closed = false;
+    quota.context.closeModal = () => { closed = true; };
+    await quota.context.saveConfig();
+    check(quota.alerts.length === 1 && !closed,
+        'Lookup config: localStorage ដែលពេញ ➜ ប្រាប់អ្នកប្រើ ហើយមិនបិទប្រអប់ (មិន throw)', JSON.stringify({ alerts: quota.alerts, closed }));
 
     console.log('\n' + (fail ? 'FAIL ' + fail + '/' + (pass + fail) : 'PASS ' + pass + '/' + pass));
     process.exit(fail ? 1 : 0);

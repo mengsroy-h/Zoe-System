@@ -106,9 +106,11 @@ vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     const consts = src.match(/const PHONE_SUGGEST_MAX = \d+;/);
     const consts2 = src.match(/const RECENT_PHONES_MAX = \d+;/);
     const stateDecls = (src.match(/^ *let phoneSuggest\w+ = .*$/gm) || []).join('\n');
+    const recentSigDecl = (src.match(/^ *let recentPhonesSignature = .*$/m) || ['let recentPhonesSignature = null;'])[0];
     vm.runInContext((consts ? consts[0] : 'const PHONE_SUGGEST_MAX = 8;') + '\n' +
         (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') + '\n' +
-        (stateDecls || 'let phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;') +
+        (stateDecls || 'let phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;') + '\n' +
+        recentSigDecl +
         '\nlet isModalOpen = false;', ctx);
     vm.runInContext(slice(app + '/app.js', names.concat(present)), ctx);
     const maxRows = consts ? parseInt(consts[0].replace(/\D/g, ''), 10) : 8;
@@ -213,6 +215,15 @@ function itemsFixture() {
     h.ctx.updateRecentPhonesList();
     ok('លេខលើសពី ៣០ មិនត្រូវកាត់ចោល', h.datalistOptions.length === 43, h.datalistOptions.length);
     ok('លេខថ្មីជាងគេនៅដើមបញ្ជី', h.datalistOptions[0] === '012-345 678', h.datalistOptions[0]);
+
+    h.datalistOptions.length = 0;
+    h.ctx.updateRecentPhonesList();
+    ok('ហៅម្ដងទៀតដោយទិន្នន័យដដែល ➜ មិនសាង DOM ឡើងវិញ', h.datalistOptions.length === 0, h.datalistOptions.length);
+    h.ctx.scanHistory = h.ctx.scanHistory.concat([{ id: 'z9', phone: '0777000111', createdAt: 9900, barcodes: [{ code: 'Z9' }] }]);
+    h.ctx.updateRecentPhonesList();
+    ok('លេខថ្មីមកដល់ ➜ សាង DOM ឡើងវិញ', h.datalistOptions.length === 44 && h.datalistOptions[0] === '0777000111', h.datalistOptions.length);
+    h.ctx.scanHistory = itemsFixture();
+    h.ctx.updateRecentPhonesList();
     ok('"គ្មានលេខ" មិនចូល datalist', h.datalistOptions.indexOf('គ្មានលេខ') === -1);
 });
 

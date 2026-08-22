@@ -236,7 +236,8 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 
 ### ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
 ```bash
-npm i acorn playwright-core      # acorn៖ checker ស្តាទិច; playwright-core៖ តេស្ត browser
+npm i acorn playwright-core xlsx  # acorn៖ checker ស្តាទិច; playwright-core៖ តេស្ត browser
+                                 # xlsx៖ ត្រួតពិនិត្យ XML ដែល Export emit ចេញ
                                  # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
@@ -275,6 +276,10 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | កាយវិការអូស + auto pull up នៃប្រអប់ស្វែងរក | `phone-search-swipe-test.js` |
 | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `pin-prompt-test.js` |
 | ការដោះសោដោយក្រយៅដៃ/មុខ (WebAuthn) | `biometric-unlock-test.js` |
+| ការសរសេរទៅ localStorage/sessionStorage គ្មានការការពារ | `storage-guard.js` |
+| credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
+| pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
+| លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។

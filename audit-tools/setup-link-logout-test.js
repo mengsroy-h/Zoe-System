@@ -31,7 +31,7 @@ function fakeDom(pinOpen) {
     return {
         getElementById: (id) => els[id] || null,
         querySelectorAll: () => [els.pinModal, els.pinSetupModal, els.configModal],
-        body: { style: {} },
+        body: { style: {}, classList: { add() {}, remove() {}, contains: () => false } },
         addEventListener() {},
         _els: els
     };
@@ -55,6 +55,8 @@ for (const app of ['ZoeW']) {
         ctx.pendingRestoreId = null; ctx.pendingPermanentDeleteId = null;
         ctx.activeParentItemId = null; ctx.lookupSecretKey = 'secret';
         vm.createContext(ctx);
+        vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
+        vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
         if (helper) vm.runInContext(helper, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');

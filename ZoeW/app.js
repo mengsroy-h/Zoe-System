@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.1.1';
+    const APP_VERSION = '2.2.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -166,6 +166,7 @@
 
     function openModalHelper(modalId) {
         isModalOpen = true;
+        showAppChrome();
         hidePhoneSuggestions();
         document.body.style.overflow = 'hidden';
         const modalEl = document.getElementById(modalId);
@@ -1482,6 +1483,7 @@
         pendingLockerCode = null;
         lockerBarcodeIndex = {};
         recentPhonesSignature = null;
+        showAppChrome();
         const fieldsToBlank = [
             'securityPinInput', 'newSecurityPinInput', 'loginPasswordInput', 'activationKeyInput',
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
@@ -2320,6 +2322,7 @@
         switchAppPage('data');
         initBiometricUi();
         setupSwipeGestures();
+        setupChromeAutoHide();
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();
@@ -2611,7 +2614,7 @@
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
         } else {
             sortedKeys.forEach(dateStr => {
-                let data = dailyRevenueData[dateStr];
+                let data = dailyRevenueData[dateStr] || {};
                 let cod = parseFloat(data.codDollar) || 0;
                 let dod = parseFloat(data.dodDollar) || 0;
                 let totalD = Math.round((cod + dod) * 100) / 100;
@@ -2648,7 +2651,7 @@
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
         } else {
             sortedKeys.forEach(ym => {
-                let data = monthlyRevenueData[ym];
+                let data = monthlyRevenueData[ym] || {};
                 let cod = parseFloat(data.codDollar) || 0;
                 let dod = parseFloat(data.dodDollar) || 0;
                 let totalD = Math.round((cod + dod) * 100) / 100;
@@ -2690,6 +2693,7 @@
 
         hidePhoneSuggestions();
         setPhoneSearchPulledUp(false);
+        showAppChrome();
         const pages = document.getElementById('appPages');
         if (pages) pages.scrollTop = 0;
 
@@ -2707,6 +2711,7 @@
         const drawer = document.getElementById('sideDrawer');
         const backdrop = document.getElementById('drawerBackdrop');
         if (!drawer || !backdrop) return;
+        showAppChrome();
         hidePhoneSuggestions();
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
@@ -2818,71 +2823,206 @@
         syncHistoryExpandedLock();
     }
 
+    let chromeHidden = false;
+
+    function appChromeElements() {
+        return {
+            navbar: document.querySelector('.app-navbar'),
+            tabbar: document.getElementById('pageTabBar')
+        };
+    }
+
+    function measureChromeTop() {
+        const { navbar } = appChromeElements();
+        if (!navbar) return;
+        const height = navbar.offsetHeight;
+        if (height > 0) document.documentElement.style.setProperty('--chrome-top', height + 'px');
+    }
+
+    function showAppChrome() {
+        if (!chromeHidden) return;
+        chromeHidden = false;
+        document.body.classList.remove('chrome-hidden');
+    }
+
+    function hideAppChrome() {
+        if (chromeHidden) return;
+        if (window.innerWidth >= 992) return;
+        if (isModalOpen || isSideDrawerOpen()) return;
+        chromeHidden = true;
+        document.body.classList.add('chrome-hidden');
+    }
+
+    function scrollerOf(target) {
+        let node = (target && target.nodeType === 1) ? target : null;
+        while (node) {
+            if (node.scrollHeight - node.clientHeight > 1) {
+                const overflowY = window.getComputedStyle(node).overflowY;
+                if (overflowY === 'auto' || overflowY === 'scroll') return node;
+            }
+            node = node.parentElement;
+        }
+        return null;
+    }
+
+    function setupChromeAutoHide() {
+        const pages = document.getElementById('appPages');
+        const { navbar, tabbar } = appChromeElements();
+        if (!pages || !navbar || !tabbar) return;
+
+        const TOP_ZONE = 56;
+        const HIDE_AFTER = 30;
+        const SHOW_AFTER = 16;
+        const BOTTOM_ZONE = 24;
+
+        let activeScroller = null;
+        let lastScrollTop = 0;
+        let travel = 0;
+
+        const onScroll = (event) => {
+            if (window.innerWidth >= 992) { showAppChrome(); return; }
+            if (isModalOpen || isSideDrawerOpen()) { showAppChrome(); return; }
+            const el = (event.target && event.target.nodeType === 1) ? event.target : pages;
+            if (!el || typeof el.scrollTop !== 'number') return;
+            if (el !== activeScroller) {
+                activeScroller = el;
+                lastScrollTop = el.scrollTop;
+                travel = 0;
+                return;
+            }
+            const top = el.scrollTop;
+            const delta = top - lastScrollTop;
+            lastScrollTop = top;
+            if (!delta) return;
+            if (top <= TOP_ZONE) { travel = 0; showAppChrome(); return; }
+            if (el.scrollHeight - top - el.clientHeight <= BOTTOM_ZONE) { travel = 0; return; }
+            if ((delta > 0) !== (travel > 0)) travel = 0;
+            travel += delta;
+            if (travel > HIDE_AFTER) { travel = 0; hideAppChrome(); }
+            else if (travel < -SHOW_AFTER) { travel = 0; showAppChrome(); }
+        };
+
+        document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+        window.addEventListener('resize', () => {
+            measureChromeTop();
+            if (window.innerWidth >= 992) showAppChrome();
+        });
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', measureChromeTop);
+        measureChromeTop();
+        setTimeout(measureChromeTop, 300);
+    }
+
     function setupIOSPullToRefresh() {
         if (window.navigator.standalone !== true) return;
 
-        const appContainer = document.getElementById('appPages');
-        const tableResponsive = document.getElementById('tableResponsive');
-        if (!appContainer) return;
+        const pages = document.getElementById('appPages');
+        if (!pages) return;
 
         const indicator = document.createElement('div');
         indicator.className = 'ptr-indicator';
         indicator.innerHTML = '<div class="ptr-spinner"></div>';
         document.body.appendChild(indicator);
 
-        const threshold = 100;
-        const maxPull = 160;
+        const AXIS_SLOP = 18;
+        const TRIGGER_AT = 62;
+        const MAX_TRAVEL = 92;
+        const REST_Y = -46;
+
         let startY = 0;
-        let lastPull = 0;
-        let pulling = false;
+        let startX = 0;
+        let tracking = false;
+        let engaged = false;
+        let travel = 0;
         let refreshing = false;
 
-        function atTop() {
+        function dampen(raw) {
+            return MAX_TRAVEL * (1 - Math.exp(-raw / 110));
+        }
+
+        function paint(distance) {
+            const progress = Math.min(1, distance / TRIGGER_AT);
+            indicator.style.transform = 'translateY(' + (REST_Y + distance) + 'px) rotate(' + Math.round(progress * 270) + 'deg)';
+            indicator.style.opacity = String(Math.min(1, distance / (TRIGGER_AT * 0.55)));
+            indicator.classList.toggle('ready', progress >= 1);
+        }
+
+        function park() {
+            tracking = false;
+            engaged = false;
+            travel = 0;
+            indicator.classList.add('snapping');
+            indicator.classList.remove('ready');
+            indicator.classList.remove('spinning');
+            indicator.style.opacity = '0';
+            indicator.style.transform = 'translateY(' + REST_Y + 'px)';
+        }
+
+        function gestureMayPull(target) {
             if (isModalOpen || refreshing) return false;
-            if (appContainer.scrollTop > 0) return false;
-            if (tableResponsive && tableResponsive.scrollTop > 0) return false;
+            if (isSideDrawerOpen()) return false;
+            if (pages.scrollTop > 0) return false;
+            const scroller = scrollerOf(target);
+            if (scroller && scroller.scrollTop > 0) return false;
+            const historyScroller = document.getElementById('tableResponsive');
+            if (historyScroller && historyScroller.offsetParent !== null && historyScroller.scrollTop > 0) return false;
             return true;
         }
 
-        function reset() {
-            pulling = false;
-            lastPull = 0;
-            indicator.classList.add('snapping');
-            indicator.classList.remove('visible');
-            indicator.style.transform = 'translateY(-50px)';
-        }
-
         document.addEventListener('touchstart', (e) => {
-            if (!atTop()) { pulling = false; return; }
+            tracking = false;
+            engaged = false;
+            travel = 0;
+            if (refreshing || e.touches.length !== 1) return;
+            if (!gestureMayPull(e.target)) return;
             startY = e.touches[0].clientY;
-            lastPull = 0;
-            pulling = true;
+            startX = e.touches[0].clientX;
+            tracking = true;
             indicator.classList.remove('snapping');
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
-            if (!pulling) return;
-            if (!atTop()) { reset(); return; }
-            const diffY = e.touches[0].clientY - startY;
-            if (diffY <= 0) { reset(); return; }
-            e.preventDefault();
-            lastPull = Math.min(diffY, maxPull);
-            indicator.classList.add('visible');
-            indicator.style.transform = 'translateY(' + (lastPull - 50) + 'px)';
+            if (!tracking || refreshing) return;
+            const deltaY = e.touches[0].clientY - startY;
+            const deltaX = e.touches[0].clientX - startX;
+
+            if (!engaged) {
+                if (Math.abs(deltaY) < AXIS_SLOP && Math.abs(deltaX) < AXIS_SLOP) return;
+                if (deltaY <= 0 || Math.abs(deltaY) < Math.abs(deltaX) * 1.4) { tracking = false; return; }
+                if (!gestureMayPull(e.target)) { tracking = false; return; }
+                engaged = true;
+                startY = e.touches[0].clientY;
+            }
+
+            const raw = e.touches[0].clientY - startY;
+            if (e.cancelable) e.preventDefault();
+            travel = raw > 0 ? dampen(raw) : 0;
+            paint(travel);
         }, { passive: false });
 
         document.addEventListener('touchend', () => {
-            if (!pulling) return;
-            pulling = false;
-            if (lastPull >= threshold) {
+            if (!tracking && !engaged) return;
+            if (!engaged) { tracking = false; return; }
+            tracking = false;
+            engaged = false;
+            if (travel >= TRIGGER_AT) {
                 refreshing = true;
                 indicator.classList.add('snapping');
-                indicator.style.transform = 'translateY(16px)';
-                setTimeout(() => window.location.reload(), 200);
-            } else {
-                reset();
+                indicator.classList.add('spinning');
+                indicator.style.opacity = '1';
+                indicator.style.transform = 'translateY(' + (REST_Y + TRIGGER_AT) + 'px)';
+                setTimeout(() => window.location.reload(), 260);
+                return;
             }
+            park();
         }, { passive: true });
+
+        document.addEventListener('touchcancel', () => {
+            if (refreshing) return;
+            park();
+        }, { passive: true });
+
+        park();
+        indicator.classList.remove('snapping');
     }
 
     function toggleHeaderMoreDropdown(event) {
@@ -3855,7 +3995,7 @@
         const already = sidebar.classList.contains('search-focus');
         if (already === !!on) return;
         sidebar.classList.toggle('search-focus', !!on);
-        if (on) sidebar.classList.remove('collapsed');
+        if (on) { showAppChrome(); sidebar.classList.remove('collapsed'); }
         syncHistoryExpandedLock();
         positionPhoneSuggestBox();
         setTimeout(positionPhoneSuggestBox, 180);

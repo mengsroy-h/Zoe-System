@@ -41,7 +41,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          restore-race-test clear-history-claim-test google-sheets-cache-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
-         setup-link-roundtrip-test; do
+         setup-link-roundtrip-test export-cells-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -58,6 +58,7 @@ run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
+run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js

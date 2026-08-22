@@ -60,214 +60,222 @@
 <div class="app-pages" id="appPages">
 
     <section class="app-page active" id="pageData">
-        <div class="app-card">
-            <div class="card-header">
-                <div class="card-title">
-                    📦 គ្រប់គ្រងប្រចាំថ្ងៃ (<span id="selectedFilterTitle">ថ្ងៃនេះ</span>)
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card total-pkg">
-                    <span class="label">កញ្ចប់សរុប (នៅសល់)</span>
-                    <span class="value" id="grandTotalCount">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="label">ស្កេនតាមថ្ងៃ</span>
-                    <span class="value" id="todayTotalCount">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="label">អតិថិជនយក</span>
-                    <span class="value" id="todayClosedCount">0</span>
-                    <span class="sub-value">📦 <span id="todayPackagesPickedUpCount">0</span></span>
-                </div>
-            </div>
-
-            <div class="financial-summary-box">
-                <div class="financial-row">
-                    <span class="lbl">ទឹកប្រាក់ COD សរុប (នៅសល់)៖</span>
-                    <div>
-                        <span id="summaryCodDollar" class="val-cod">$0.00</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                        <span id="summaryCodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+        <div class="page-side">
+            <div class="app-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        📦 គ្រប់គ្រងប្រចាំថ្ងៃ (<span id="selectedFilterTitle">ថ្ងៃនេះ</span>)
                     </div>
                 </div>
-                <div class="financial-row">
-                    <span class="lbl">ទឹកប្រាក់ DOD សរុប (នៅសល់)៖</span>
-                    <div>
-                        <span id="summaryDodDollar" class="val-dod">$0.00</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                        <span id="summaryDodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+
+                <div class="stats-grid">
+                    <div class="stat-card total-pkg">
+                        <span class="label">កញ្ចប់សរុប (នៅសល់)</span>
+                        <span class="value" id="grandTotalCount">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">ស្កេនតាមថ្ងៃ</span>
+                        <span class="value" id="todayTotalCount">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="label">អតិថិជនយក</span>
+                        <span class="value" id="todayClosedCount">0</span>
+                        <span class="sub-value">📦 <span id="todayPackagesPickedUpCount">0</span></span>
                     </div>
                 </div>
-                <div class="financial-row" style="border-top: 1px dashed var(--border-color); padding-top: 4px; margin-top: 2px;">
-                    <span class="lbl">ទឹកប្រាក់សរុបរួម (COD+DOD នៅសល់)៖</span>
-                    <div>
-                        <span id="summaryTotalDollar" class="val-total">$0.00</span>
-                        <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                        <span id="summaryTotalRiel" style="font-size:10px; font-weight:700; color:var(--primary);">0 ៛</span>
+
+                <div class="financial-summary-box">
+                    <div class="financial-row">
+                        <span class="lbl">ទឹកប្រាក់ COD សរុប (នៅសល់)៖</span>
+                        <div>
+                            <span id="summaryCodDollar" class="val-cod">$0.00</span>
+                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryCodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+                        </div>
+                    </div>
+                    <div class="financial-row">
+                        <span class="lbl">ទឹកប្រាក់ DOD សរុប (នៅសល់)៖</span>
+                        <div>
+                            <span id="summaryDodDollar" class="val-dod">$0.00</span>
+                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryDodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+                        </div>
+                    </div>
+                    <div class="financial-row" style="border-top: 1px dashed var(--border-color); padding-top: 4px; margin-top: 2px;">
+                        <span class="lbl">ទឹកប្រាក់សរុបរួម (COD+DOD នៅសល់)៖</span>
+                        <div>
+                            <span id="summaryTotalDollar" class="val-total">$0.00</span>
+                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryTotalRiel" style="font-size:10px; font-weight:700; color:var(--primary);">0 ៛</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="date-filter-grid">
+                    <button class="date-filter-btn active" id="btnFilterToday" onclick="filterDataByDate('today')">ថ្ងៃនេះ</button>
+                    <button class="date-filter-btn" id="btnFilterYesterday" onclick="filterDataByDate('yesterday')">ម្សិលមិញ</button>
+                    <button class="date-filter-btn" id="btnFilterDayBefore" onclick="filterDataByDate('dayBefore')">ម្សិលម្ងៃ</button>
+                    <button class="date-filter-btn" id="btnFilterAll" onclick="filterDataByDate('all')">ទាំងអស់</button>
+                </div>
+
+                <div class="custom-date-row">
+                    <label for="customDateInput">📅 រើសថ្ងៃផ្សេងទៀត៖</label>
+                    <input type="date" id="customDateInput" onchange="filterDataByCustomDate()">
+                </div>
+            </div>
+
+            <div class="app-card">
+                <div class="card-header">
+                    <div class="card-title">🔍 ស្វែងរកលេខទូរស័ព្ទអតិថិជន</div>
+                </div>
+                <div class="search-and-actions">
+                    <div class="search-box">
+                        <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" autocomplete="off">
+                        <button onclick="searchByPhone()">🔍</button>
                     </div>
                 </div>
             </div>
 
-            <div class="date-filter-grid">
-                <button class="date-filter-btn active" id="btnFilterToday" onclick="filterDataByDate('today')">ថ្ងៃនេះ</button>
-                <button class="date-filter-btn" id="btnFilterYesterday" onclick="filterDataByDate('yesterday')">ម្សិលមិញ</button>
-                <button class="date-filter-btn" id="btnFilterDayBefore" onclick="filterDataByDate('dayBefore')">ម្សិលម្ងៃ</button>
-                <button class="date-filter-btn" id="btnFilterAll" onclick="filterDataByDate('all')">ទាំងអស់</button>
-            </div>
-
-            <div class="custom-date-row">
-                <label for="customDateInput">📅 រើសថ្ងៃផ្សេងទៀត៖</label>
-                <input type="date" id="customDateInput" onchange="filterDataByCustomDate()">
-            </div>
         </div>
-
-        <div class="app-card">
-            <div class="card-header">
-                <div class="card-title">🔍 ស្វែងរកលេខទូរស័ព្ទអតិថិជន</div>
-            </div>
-            <div class="search-and-actions">
-                <div class="search-box">
-                    <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" autocomplete="off">
-                    <button onclick="searchByPhone()">🔍</button>
+        <div class="page-main">
+            <div class="app-card history-section">
+                <div class="card-header">
+                    <div class="card-title">
+                        📋 ប្រវត្តិ (<span id="count">0</span> នាក់)
+                    </div>
+                    <div class="header-actions">
+                        <button class="daily-stats-btn" onclick="openDailyStatsModal()">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
+                        <button class="monthly-stats-btn" onclick="openMonthlyStatsModal()">📊 ស្ថិតិចំណូល</button>
+                        <button class="recently-deleted-btn" onclick="openRecentlyDeletedModal()">🗑️ ធុងសំរាម</button>
+                        <button class="header-more-btn" onclick="toggleHeaderMoreDropdown(event)">...</button>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="app-card history-section">
-            <div class="card-header">
-                <div class="card-title">
-                    📋 ប្រវត្តិ (<span id="count">0</span> នាក់)
+                <div class="call-mark-legend">
+                    <span class="row-num-no-answer">🔕 ខល អត់លើក</span>
+                    <span class="row-num-no-connect">📵 ខល អត់ចូល</span>
+                    <span class="row-num-wrong-number">❗ ខុសលេខ</span>
                 </div>
-                <div class="header-actions">
-                    <button class="daily-stats-btn" onclick="openDailyStatsModal()">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
-                    <button class="monthly-stats-btn" onclick="openMonthlyStatsModal()">📊 ស្ថិតិចំណូល</button>
-                    <button class="recently-deleted-btn" onclick="openRecentlyDeletedModal()">🗑️ ធុងសំរាម</button>
-                    <button class="header-more-btn" onclick="toggleHeaderMoreDropdown(event)">...</button>
+
+                <div class="table-responsive" id="tableResponsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 6%; text-align: center;">ល.រ</th>
+                                <th style="width: 26%;">អតិថិជន</th>
+                                <th style="width: 30%; text-align: left; padding-left: 6px;">តម្លៃ/ទីតាំង</th>
+                                <th style="width: 38%; text-align: right;">សកម្មភាព</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody"></tbody>
+                    </table>
                 </div>
-            </div>
-
-            <div class="call-mark-legend">
-                <span class="row-num-no-answer">🔕 ខល អត់លើក</span>
-                <span class="row-num-no-connect">📵 ខល អត់ចូល</span>
-                <span class="row-num-wrong-number">❗ ខុសលេខ</span>
-            </div>
-
-            <div class="table-responsive" id="tableResponsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 6%; text-align: center;">ល.រ</th>
-                            <th style="width: 26%;">អតិថិជន</th>
-                            <th style="width: 30%; text-align: left; padding-left: 6px;">តម្លៃ/ទីតាំង</th>
-                            <th style="width: 38%; text-align: right;">សកម្មភាព</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historyTableBody"></tbody>
-                </table>
             </div>
         </div>
     </section>
 
     <section class="app-page" id="pageEntry">
-        <div class="scan-mode-row">
-            <button type="button" class="mode-btn active" id="modeParcelBtn" onclick="setEntryScanMode('parcel')">📦 បញ្ចូលកញ្ចប់</button>
-            <button type="button" class="mode-btn" id="modeLockerBtn" onclick="setEntryScanMode('locker')">📍 កំណត់ទីតាំង Locker</button>
-        </div>
-
-        <div class="app-card scanner-section">
-            <div id="permission-box">
-                <p>🔒 កម្មវិធីទាមទារការអនុញ្ញាតប្រើប្រាស់កាមេរ៉ា</p>
-                <button onclick="requestCameraPermission()">🔓 បើកកាមេរ៉ា</button>
+        <div class="page-side">
+            <div class="scan-mode-row">
+                <button type="button" class="mode-btn active" id="modeParcelBtn" onclick="setEntryScanMode('parcel')">📦 បញ្ចូលកញ្ចប់</button>
+                <button type="button" class="mode-btn" id="modeLockerBtn" onclick="setEntryScanMode('locker')">📍 កំណត់ទីតាំង Locker</button>
             </div>
 
-            <div id="video-container">
-                <div class="scan-line"></div>
-                <video id="video" playsinline autoplay muted></video>
-                <button type="button" class="camera-close-btn" id="cameraCloseBtn" onclick="closeCameraManually()" title="បិទកាមេរ៉ា">✖</button>
-                <div class="video-controls-overlay" id="videoControlsOverlay">
-                    <div class="zoom-slider-wrap" id="zoomSliderWrap">
-                        <span>🔍</span>
-                        <input type="range" id="zoomSlider" min="1" max="1" step="0.1" value="1">
+            <div class="app-card scanner-section">
+                <div id="permission-box">
+                    <p>🔒 កម្មវិធីទាមទារការអនុញ្ញាតប្រើប្រាស់កាមេរ៉ា</p>
+                    <button onclick="requestCameraPermission()">🔓 បើកកាមេរ៉ា</button>
+                </div>
+
+                <div id="video-container">
+                    <div class="scan-line"></div>
+                    <video id="video" playsinline autoplay muted></video>
+                    <button type="button" class="camera-close-btn" id="cameraCloseBtn" onclick="closeCameraManually()" title="បិទកាមេរ៉ា">✖</button>
+                    <div class="video-controls-overlay" id="videoControlsOverlay">
+                        <div class="zoom-slider-wrap" id="zoomSliderWrap">
+                            <span>🔍</span>
+                            <input type="range" id="zoomSlider" min="1" max="1" step="0.1" value="1">
+                        </div>
+                        <button type="button" class="torch-toggle-btn" id="torchToggleBtn" onclick="toggleTorch()">💡</button>
                     </div>
-                    <button type="button" class="torch-toggle-btn" id="torchToggleBtn" onclick="toggleTorch()">💡</button>
                 </div>
             </div>
+
+            <div class="hardware-scanner-box" id="hardwareScannerBox">
+                <label for="hwScannerInput">ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ</label>
+                <div class="scanner-input-wrapper">
+                    <span class="icon">⚡</span>
+                    <input type="text" id="hwScannerInput" placeholder="ស្កេន Barcode..." autocomplete="off">
+                    <button type="button" class="btn-submit-barcode" onclick="submitManualBarcode()">បញ្ជូន</button>
+                </div>
+                <div class="upload-fallback-row">
+                    <label class="file-upload-btn" for="fileInput">📁 យក Barcode ពីរូបភាព</label>
+                    <input type="file" id="fileInput" accept="image/*" onchange="decodeImageFile(event)">
+                </div>
+            </div>
+
         </div>
-
-        <div class="hardware-scanner-box" id="hardwareScannerBox">
-            <label for="hwScannerInput">ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ</label>
-            <div class="scanner-input-wrapper">
-                <span class="icon">⚡</span>
-                <input type="text" id="hwScannerInput" placeholder="ស្កេន Barcode..." autocomplete="off">
-                <button type="button" class="btn-submit-barcode" onclick="submitManualBarcode()">បញ្ជូន</button>
-            </div>
-            <div class="upload-fallback-row">
-                <label class="file-upload-btn" for="fileInput">📁 យក Barcode ពីរូបភាព</label>
-                <input type="file" id="fileInput" accept="image/*" onchange="decodeImageFile(event)">
-            </div>
-        </div>
-
-        <div id="parcelPanel">
-            <div class="app-card">
-                <div class="card-header">
-                    <div class="card-title">📦 កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ (<span id="entryListCount">0</span>)</div>
-                </div>
-                <div class="filter-bar">
-                    <input type="text" id="entryListSearchInput" oninput="renderEntryList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
-                </div>
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width:12%;text-align:center;">ល.រ</th>
-                                <th style="width:34%;">អតិថិជន</th>
-                                <th style="width:32%;">Barcode</th>
-                                <th style="width:22%;text-align:right;">តម្លៃ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="entryListTableBody"></tbody>
-                    </table>
-                </div>
-                <div id="entryListEmptyState" class="empty-state hidden">
-                    <span class="emoji">📭</span>
-                    មិនទាន់មានកញ្ចប់បញ្ចូលថ្ងៃនេះទេ
+        <div class="page-main">
+            <div id="parcelPanel">
+                <div class="app-card">
+                    <div class="card-header">
+                        <div class="card-title">📦 កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ (<span id="entryListCount">0</span>)</div>
+                    </div>
+                    <div class="filter-bar">
+                        <input type="text" id="entryListSearchInput" oninput="renderEntryList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:12%;text-align:center;">ល.រ</th>
+                                    <th style="width:34%;">អតិថិជន</th>
+                                    <th style="width:32%;">Barcode</th>
+                                    <th style="width:22%;text-align:right;">តម្លៃ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entryListTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="entryListEmptyState" class="empty-state hidden">
+                        <span class="emoji">📭</span>
+                        មិនទាន់មានកញ្ចប់បញ្ចូលថ្ងៃនេះទេ
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div id="lockerPanel" class="hidden">
-            <div class="active-locker-bar">
-                <span>ទីតាំងបច្ចុប្បន្ន: <span class="loc-val" id="activeLockerLabel">-</span></span>
-                <button type="button" onclick="openLockerPicker()">🔁 ប្តូរទូ</button>
-            </div>
+            <div id="lockerPanel" class="hidden">
+                <div class="active-locker-bar">
+                    <span>ទីតាំងបច្ចុប្បន្ន: <span class="loc-val" id="activeLockerLabel">-</span></span>
+                    <button type="button" onclick="openLockerPicker()">🔁 ប្តូរទូ</button>
+                </div>
 
-            <div class="app-card">
-                <div class="card-header">
-                    <div class="card-title">📍 បញ្ជីទីតាំង Locker</div>
-                </div>
-                <div class="filter-bar">
-                    <input type="text" id="lockerListSearchInput" oninput="renderLockerList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." autocomplete="off">
-                    <select id="lockerListFilter" onchange="renderLockerList()">
-                        <option value="">ទីតាំងទាំងអស់</option>
-                    </select>
-                </div>
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width:14%;text-align:center;">ល.រ</th>
-                                <th style="width:46%;">លេខទូរស័ព្ទ</th>
-                                <th style="width:40%;">ទីតាំង Locker</th>
-                            </tr>
-                        </thead>
-                        <tbody id="lockerListTableBody"></tbody>
-                    </table>
-                </div>
-                <div id="lockerListEmptyState" class="empty-state hidden">
-                    <span class="emoji">📭</span>
-                    មិនទាន់មានទិន្នន័យកំណត់ទីតាំងនៅឡើយទេ
+                <div class="app-card">
+                    <div class="card-header">
+                        <div class="card-title">📍 បញ្ជីទីតាំង Locker</div>
+                    </div>
+                    <div class="filter-bar">
+                        <input type="text" id="lockerListSearchInput" oninput="renderLockerList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." autocomplete="off">
+                        <select id="lockerListFilter" onchange="renderLockerList()">
+                            <option value="">ទីតាំងទាំងអស់</option>
+                        </select>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:14%;text-align:center;">ល.រ</th>
+                                    <th style="width:46%;">លេខទូរស័ព្ទ</th>
+                                    <th style="width:40%;">ទីតាំង Locker</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lockerListTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="lockerListEmptyState" class="empty-state hidden">
+                        <span class="emoji">📭</span>
+                        មិនទាន់មានទិន្នន័យកំណត់ទីតាំងនៅឡើយទេ
+                    </div>
                 </div>
             </div>
         </div>

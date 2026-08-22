@@ -80,6 +80,11 @@
 **`entryScanMode`** (`'parcel'` ឬ `'locker'`) កំណត់ថា `triggerScanAction()` នាំ barcode ទៅណា។
 វាជាចំណុចបំបែកតែមួយ — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។
 
+**Layout៖ ទំព័រនីមួយៗមាន `.page-side` និង `.page-main`។** លើទូរស័ព្ទវាជា flex column ដាក់ជង់គ្នា;
+លើអេក្រង់ **≥992px** វាក្លាយជា grid ២ ជួរ (`380px` + សល់) ពេញកម្ពស់អេក្រង់ ហើយរបា Tab
+ផ្លាស់ពីក្រោមទៅជាបន្ទាត់នៅក្រោម navbar តាម `order`។ `layout-check.js` ត្រួតពិនិត្យទាំង
+320/360/412/768px និង **1280/1440px**។
+
 **របា Slide បិទត្រូវមាន `visibility: hidden`** — បើមិនដូច្នេះ `layout-check.js` រាយវាថាលើសអេក្រង់
 (វា `translateX(-100%)`) ហើយវាក៏អាច tab ចូលបានទៀតផង។
 

@@ -1,4 +1,6 @@
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
+
+const LICENSE_APP_CODE = 'ADM';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -853,8 +855,8 @@ function updateSigningKeyBadge() {
 
 async function validateSigningKeyAgainstShippedPublicKey(jwk) {
     if (!jwk || !jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
-    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: 'ADM', days: 1, note: '' });
-    const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, 'ADM');
+    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: LICENSE_APP_CODE, days: 1, note: '' });
+    const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, LICENSE_APP_CODE);
     if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
 }
 
@@ -975,7 +977,7 @@ async function generateLicenseKey() {
     if (!privateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
     if (!db || !operation) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
 
-    const appSelect = document.getElementById('genAppSelect').value;
+    const appSelect = LICENSE_APP_CODE;
     const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
     const note = document.getElementById('genNoteInput').value.trim();
 
@@ -1088,27 +1090,21 @@ function copyGeneratedKey() {
     navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
 }
 
-const SETUP_LINK_URL_KEYS = { ADM: 'zoekeygen_setup_url_ADM' };
+const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
 let lastGeneratedSetupLink = '';
 
-function onSetupLinkAppChange() {
-    const sel = document.getElementById('setupLinkAppSelect');
+function restoreSetupLinkBaseUrl() {
     const urlInput = document.getElementById('setupLinkUrlInput');
-    if (!sel || !urlInput) return;
-    const storageKey = SETUP_LINK_URL_KEYS[sel.value];
-    urlInput.value = storageKey ? (localStorage.getItem(storageKey) || '') : '';
+    if (!urlInput) return;
+    urlInput.value = localStorage.getItem(SETUP_LINK_URL_KEY) || '';
 }
 
 function generateSetupLink() {
-    const sel = document.getElementById('setupLinkAppSelect');
     const urlInput = document.getElementById('setupLinkUrlInput');
     const cfgInput = document.getElementById('setupLinkConfigInput');
     const resultBox = document.getElementById('setupLinkResultBox');
     const resultText = document.getElementById('setupLinkResultText');
-    if (!sel || !urlInput || !cfgInput) return;
-
-    const appCode = sel.value;
-    if (!appCode) { alert('សូមជ្រើសរើសកម្មវិធីគោលដៅ!'); return; }
+    if (!urlInput || !cfgInput) return;
 
     const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
     if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
@@ -1128,8 +1124,7 @@ function generateSetupLink() {
         return;
     }
 
-    const storageKey = SETUP_LINK_URL_KEYS[appCode];
-    if (storageKey) localStorage.setItem(storageKey, baseUrl);
+    localStorage.setItem(SETUP_LINK_URL_KEY, baseUrl);
 
     let b64;
     try {
@@ -1195,7 +1190,7 @@ async function refreshKeyList() {
         const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
 
         const byId = {};
-        ['ADM'].forEach((appCode) => {
+        [LICENSE_APP_CODE].forEach((appCode) => {
             const bucket = publicData[appCode] || {};
             Object.keys(bucket).forEach((id) => {
                 if (!byId[id]) byId[id] = { id: id, existsIn: [], perApp: {} };
@@ -1300,7 +1295,7 @@ async function migrateLegacyLicenseKeyMetadata() {
         let migratedCount = 0;
         const META_FIELDS = ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'];
 
-        ['ADM'].forEach((appCode) => {
+        [LICENSE_APP_CODE].forEach((appCode) => {
             const bucket = data[appCode] || {};
             Object.keys(bucket).forEach((id) => {
                 const rec = bucket[id] || {};
@@ -1461,6 +1456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
     initFirebase();
     updateSigningKeyBadge();
+    restoreSetupLinkBaseUrl();
     setupIOSPullToRefresh();
 
     document.addEventListener('visibilitychange', () => {

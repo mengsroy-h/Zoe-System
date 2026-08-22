@@ -32,7 +32,8 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
-         license-grace-test phone-suggest-test keygen-pin-flow-test \
+         license-grace-test phone-suggest-test phone-search-swipe-test \
+         pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
          keygen-session-security-test \
          barcode-shape-test setup-link-logout-test \
          raw-read-shape-test devtools-guard-test concurrent-scan-test \
@@ -52,6 +53,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
 done
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
+run "css-media-override" node audit-tools/css-media-override.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
@@ -104,6 +106,10 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
+    SWIPE_APP_DIR="$BASE" node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   swipe-pullup:    /'
+    PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
+    CSSMEDIA_APP_DIR="$BASE" node audit-tools/css-media-override.js 2>&1 | tail -1 | sed 's/^/   css-media:       /'
+    BIOMETRIC_APP_DIR="$BASE" node audit-tools/biometric-unlock-test.js 2>&1 | tail -1 | sed 's/^/   biometric:       /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
 fi
 

@@ -138,6 +138,47 @@
         .page-side, .page-main { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
         #parcelPanel, #lockerPanel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
+        .drag-handle-bar {
+            width: 40px;
+            height: 4px;
+            background: #cbd5e1;
+            border-radius: 4px;
+            margin: 0 auto 2px auto;
+            display: none;
+            cursor: grab;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 991px) {
+            .drag-handle-bar { display: block; }
+            .page-side {
+                transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                will-change: max-height, opacity;
+            }
+            .page-side.collapsed {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+            }
+            .page-side > * {
+                transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .page-side.search-focus { gap: 0; }
+            .page-side.search-focus > *:not(:last-child) {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+                border-width: 0;
+            }
+            .table-responsive { max-height: 62vh; }
+            .page-side.collapsed + .page-main .table-responsive { max-height: 78vh; }
+            .app-pages.history-expanded { overscroll-behavior-y: contain; }
+        }
+
         .page-tabbar {
             position: fixed;
             left: 0; right: 0; bottom: 0;
@@ -203,6 +244,30 @@
         .drawer-auth { margin-top: 6px; border-top: 1px dashed var(--border-color); border-radius: var(--radius-md); }
         .drawer-auth-label { font-weight: 700; }
         .drawer-item:active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+
+        .drawer-toggle .drawer-toggle-label { flex: 1; min-width: 0; }
+        .drawer-toggle-state {
+            flex-shrink: 0; font-size: 10.5px; font-weight: 700;
+            padding: 3px 8px; border-radius: 999px;
+            background: #e2e8f0; color: var(--text-muted);
+        }
+        .drawer-toggle.is-on { border-color: var(--success); background: var(--success-light); }
+        .drawer-toggle.is-on .drawer-toggle-state { background: var(--success); color: #ffffff; }
+        .drawer-toggle.is-unsupported { opacity: 0.65; }
+
+        .drawer-foot {
+            flex-shrink: 0; padding: 8px 10px 12px 10px;
+            border-top: 1px solid var(--border-color);
+        }
+        .drawer-foot .app-version-line { margin-top: 0; }
+
+        .btn-biometric {
+            width: 100%; margin-top: 10px; min-height: 44px;
+            padding: 10px 12px; border-radius: var(--radius-md);
+            background: var(--primary-light); border: 1px solid var(--primary);
+            color: var(--primary); font-size: 12.5px; font-weight: 700; cursor: pointer;
+        }
+        .btn-biometric:disabled { opacity: 0.6; cursor: progress; }
 
         .scan-mode-row {
             display: flex; gap: 6px; background: #f1f5f9; padding: 4px;
@@ -541,7 +606,6 @@
         .table-responsive {
             width: 100%;
             flex: 1;
-            max-height: 62vh;
             overflow-y: auto; 
             overflow-x: auto; 
             border: 1px solid var(--border-color); 

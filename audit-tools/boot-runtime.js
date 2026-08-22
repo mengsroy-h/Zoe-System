@@ -70,9 +70,10 @@ function serve(dir, port) {
             [...document.querySelectorAll('[data-app-version]')].map((el) => el.textContent));
         const declaredVersion = (fs.readFileSync(path.join(dir, 'app.js'), 'utf8')
             .match(/const APP_VERSION = '([^']+)'/) || [])[1];
-        const rendered = versionLabels.length === 1 && versionLabels[0] === 'កំណែប្រព័ន្ធ: ' + declaredVersion;
-        if (rendered) console.log('   ok    កំណែបង្ហាញពិតក្នុងប្រអប់ login: ' + JSON.stringify(versionLabels));
-        else { console.log('   FAIL  កំណែមិនបានបង្ហាញ: ' + JSON.stringify(versionLabels)); problems++; }
+        const expectedLabel = 'កំណែប្រព័ន្ធ: ' + declaredVersion;
+        const rendered = versionLabels.length >= 1 && versionLabels.every((t) => t === expectedLabel);
+        if (rendered) console.log('   ok    គ្រប់កន្លែងបង្ហាញកំណែពិត (' + versionLabels.length + '): ' + JSON.stringify(versionLabels));
+        else { console.log('   FAIL  កំណែមិនបានបង្ហាញ ឬមិនស៊ីគ្នា: ' + JSON.stringify(versionLabels)); problems++; }
 
         await ctx.close();
         server.close();

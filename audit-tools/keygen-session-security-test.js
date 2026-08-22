@@ -6,6 +6,12 @@ const root = path.resolve(__dirname, '..');
 const appRoot = process.env.KEYGEN_APP_DIR ? path.resolve(process.env.KEYGEN_APP_DIR) : root;
 const src = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen/app.js'), 'utf8');
 
+function realLicenseAppCodeDecl(source) {
+    const m = source.match(/^const LICENSE_APP_CODE = '[A-Z]+';$/m);
+    if (!m) throw new Error('not found: const LICENSE_APP_CODE ក្នុង ZoeKeyGen/app.js');
+    return m[0];
+}
+
 function slice(names) {
     return names.map((name) => {
         const plainStart = src.indexOf('function ' + name + '(');
@@ -123,6 +129,7 @@ function build(options) {
         __storage: storage
     };
     const ctx = vm.createContext(sandbox);
+    vm.runInContext(realLicenseAppCodeDecl(src), ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
         var authGeneration = 7;

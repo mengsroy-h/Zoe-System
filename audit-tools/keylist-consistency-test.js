@@ -5,6 +5,12 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..');
 const APP_FILE = process.env.KEYLIST_APP_JS || path.join(root, 'ZoeKeyGen/app.js');
 
+function realLicenseAppCodeDecl(source) {
+    const m = source.match(/^const LICENSE_APP_CODE = '[A-Z]+';$/m);
+    if (!m) throw new Error('not found: const LICENSE_APP_CODE ក្នុង ZoeKeyGen/app.js');
+    return m[0];
+}
+
 function sliceFns(src, names) {
     return names.map((name) => {
         let start = src.indexOf('function ' + name + '(');
@@ -44,6 +50,7 @@ async function build(publicData, metaData) {
         __log: log
     };
     const ctx = vm.createContext(sandbox);
+    vm.runInContext(realLicenseAppCodeDecl(src), ctx);
     vm.runInContext(`
         var keyListCache = [];
         var keyListSessionGeneration = 0;

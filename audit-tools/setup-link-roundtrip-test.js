@@ -34,9 +34,16 @@ const ctx = vm.createContext({
 
 // encoder ពិតរបស់ ZoeKeyGen (បន្ទាត់ដដែលក្នុង generateSetupLink)
 const keygenSrc = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
+const keygenHtml = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/index.html'), 'utf8');
 const genSrc = sliceFn(keygenSrc, 'generateSetupLink');
 const encLine = (genSrc.match(/b64 = ([^;]+);/) || [])[1];
 check(!!encLine, 'រកឃើញបន្ទាត់ encode ក្នុង generateSetupLink()', genSrc.slice(0, 120));
+check(genSrc.indexOf('setupLinkAppSelect') === -1,
+    'generateSetupLink() មិនអាស្រ័យលើប្រអប់ជ្រើសរើស App ទៀតទេ (App មានតែ ZoeW)');
+check(keygenSrc.indexOf("const LICENSE_APP_CODE = 'ADM';") !== -1,
+    "ZoeKeyGen រក្សា LICENSE_APP_CODE = 'ADM' (ការប្តូរធ្វើឲ្យ Key ដែលចេញរួចខូច)");
+check(keygenHtml.indexOf('<select') === -1,
+    'index.html របស់ ZoeKeyGen គ្មានប្រអប់ជ្រើសរើស App ទៀតទេ');
 const linkLine = (genSrc.match(/lastGeneratedSetupLink = ([^;]+);/) || [])[1];
 check(!!linkLine, 'រកឃើញបន្ទាត់សាង Link');
 

@@ -17,6 +17,8 @@ const ACCEPTED = {
     loginEmailInput: 'remembered email, prefilled on purpose',
     loginError: 'error text only',
     loginBtn: 'button label',
+    pinBiometricBtn: 'button label + hidden/shown flag — no customer data',
+    biometricToggleState: 'បើក/បិទ/មិនគាំទ្រ label for the device biometric setting — no customer data',
     pinModalMsg: 'status text only',
     pinModalDesc: 'prompt sentence picked from the hard-coded PIN_PROMPT_MESSAGES table — never customer data',
     pinSetupModalDesc: 'prompt sentence picked from the hard-coded PIN_PROMPT_MESSAGES table — never customer data',

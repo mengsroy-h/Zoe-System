@@ -73,16 +73,34 @@ for (const app of APPS) {
 }
 check(`${RENDER_FN}() byte-identical ទាំង ២`, new Set(APPS.map((a) => renderBody[a])).size, 1);
 
-console.log('\n-- កន្លែងបង្ហាញ: ប្រអប់ login ប៉ុណ្ណោះ --');
+// កន្លែងបង្ហាញកំណែត្រូវមានតែក្នុងកន្តុំដែលរាយខាងក្រោមប៉ុណ្ណោះ។ ការបន្ថែមកន្លែងថ្មី
+// ដោយចៃដន្យ (ឧ. ក្នុងតារាង ឬ modal ផ្សេង) ធ្វើឲ្យអ្នកប្រើឃើញកំណែច្រើនកន្លែងមិនស៊ីគ្នា។
+const VERSION_SLOTS = {
+    ZoeW: [
+        { label: 'ប្រអប់ login', open: '<div id="loginModal"', close: '</div>' },
+        { label: 'របា Slide (ការកំណត់)', open: '<aside class="side-drawer"', close: '</aside>' }
+    ],
+    ZoeKeyGen: [
+        { label: 'ប្រអប់ login', open: '<div id="loginModal"', close: '</div>' }
+    ]
+};
+
+console.log('\n-- កន្លែងបង្ហាញកំណែ --');
 for (const app of APPS) {
     const html = fs.readFileSync(path.join(root, app, 'index.html'), 'utf8');
     const lines = html.split('\n');
-    const placeholders = lines.filter((l) => l.includes('data-app-version'));
-    check(`${app} មានកន្លែងបង្ហាញកំណែ ១ ប៉ុណ្ណោះ`, placeholders.length, 1);
-    const start = lines.findIndex((l) => l.includes('<div id="loginModal"'));
-    const at = lines.findIndex((l) => l.includes('data-app-version'));
-    const closes = lines.findIndex((l, i) => i > start && l === '</div>');
-    check(`${app} កន្លែងនោះនៅក្នុង loginModal`, start !== -1 && at > start && at < closes, true);
+    const slots = VERSION_SLOTS[app];
+    const at = lines.map((l, i) => (l.includes('data-app-version') ? i : -1)).filter((i) => i !== -1);
+    check(`${app} មានកន្លែងបង្ហាញកំណែ ${slots.length} ប៉ុណ្ណោះ`, at.length, slots.length);
+    const covered = new Set();
+    slots.forEach((slot) => {
+        const start = lines.findIndex((l) => l.includes(slot.open));
+        const closes = lines.findIndex((l, i) => i > start && l === slot.close);
+        const hit = at.find((i) => start !== -1 && i > start && i < closes);
+        check(`${app} បង្ហាញកំណែក្នុង ${slot.label}`, hit !== undefined, true);
+        if (hit !== undefined) covered.add(hit);
+    });
+    check(`${app} គ្មានកន្លែងបង្ហាញកំណែក្រៅកន្តុំដែលរំពឹងទុក`, at.filter((i) => !covered.has(i)).length, 0);
 }
 
 console.log('');

@@ -312,9 +312,15 @@
         <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLockerSettingsModal, 'locker'); })">
             <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
         </button>
+        <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" onclick="drawerAction(toggleBiometricUnlock)">
+            <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>
+        </button>
         <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" onclick="drawerAction(showLoginModalWithPrefill)">
             <span class="ico">🔑</span><span class="drawer-auth-label">ចូល</span>
         </button>
+    </div>
+    <div class="drawer-foot">
+        <div class="app-version-line" data-app-version></div>
     </div>
 </aside>
 
@@ -323,6 +329,7 @@
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p id="pinModalDesc">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
+        <button type="button" class="btn-biometric" id="pinBiometricBtn" style="display:none;" onclick="runBiometricUnlock()">👆 ស្កេនក្រយៅដៃ ឬមុខ</button>
         <div class="modal-btns">
             <div class="modal-btns-row">
                 <button class="btn-confirm" id="pinConfirmBtn" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>

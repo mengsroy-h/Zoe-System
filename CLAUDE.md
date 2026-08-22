@@ -104,6 +104,25 @@
 blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូរទំព័រ ➜ ដោះវិញ។ លើ **≥992px វាមិនធ្វើអ្វីទេ**
 ព្រោះ layout ២ ជួរឃើញគ្រប់យ៉ាងស្រាប់។ Test៖ **`phone-search-swipe-test.js`**។
 
+**ចូលដោយក្រយៅដៃ ឬមុខ (WebAuthn) — ជាការ *ដោះសោ* PIN មិនមែនជំនួស PIN។**
+PIN មិនត្រឹមតែជា gate ទេ — `deriveLookupSecretKey(pin)` យកវាទៅបង្កើតកូនសោ AES
+ដែលឌិគ្រីប Secret របស់ Lookup API។ ដូច្នេះជីវមាត្រ **មិនអាចជំនួស PIN ជាប្រភពសម្ងាត់បានទេ**;
+វា​ត្រឹមតែរុំ PIN ទុក ហើយស្កេនដើម្បីស្រាយវាវិញ៖
+
+- បើក/បិទក្នុងរបា Slide (`#biometricToggleBtn`) — ការបើក **តម្រូវឲ្យវាយ PIN ពិតជាមុនជានិច្ច**
+  (`requestPinBeforeConfig(startBiometricEnrollment, 'biometric')`)
+- របៀប **`prf`** (WebAuthn PRF extension — iOS 18+/Chrome ថ្មី)៖ កូនសោរុំចេញពីឧបករណ៍
+  មិនរក្សាទុកកន្លែងណាទេ។ របៀប **`device`** (fallback)៖ កូនសោរុំរក្សាក្នុង localStorage
+  ➜ **ជាភាពងាយស្រួល មិនមែនការបន្ថែមសុវត្ថិភាពទេ** — ប្រអប់ប្រាប់អ្នកប្រើរួច
+- PIN ដែលស្រាយចេញ **ត្រូវផ្ទៀងផ្ទាត់នឹង `zoew_security_pin_hash` មុនទុកចិត្ត**;
+  មិនត្រូវគ្នា ➜ លុបការចងចោល។ ការជាប់សោ (lockout) នៅតែអនុវត្ត
+- ប្តូរ PIN (`saveNewSecurityPin`) ➜ លុបការចងចាស់ ព្រោះ PIN ដែលរុំទុកលែងត្រូវ
+- `completePinUnlock()` ជា **ផ្លូវជោគជ័យតែមួយ** សម្រាប់ទាំង PIN និងជីវមាត្រ ហើយវាបញ្ជូន
+  PIN ពិតចូល `pinTargetAction(pin)` — ការចងជីវមាត្រត្រូវការវា។ Test៖ **`biometric-unlock-test.js`**។
+
+**កំណែ App បង្ហាញ ២ កន្លែងក្នុង ZoeW**៖ ប្រអប់ login និងខាងក្រោមរបា Slide (`.drawer-foot`)។
+`version-check.js` អះអាងកន្លែងទាំងនោះឲ្យច្បាស់ — ការបន្ថែមកន្លែងទី ៣ នឹងធ្លាក់។
+
 **ប្រអប់ PIN បង្ហាញសារតាមប៊ូតុងដែលហៅ។** `requestPinBeforeConfig(targetAction, promptKey)` —
 `promptKey` ជាកូនសោក្នុង `PIN_PROMPT_MESSAGES` (`config`, `lookupApi`, `locker`, `manualAdjust`,
 `clearHistory`, `setupLink`) ហើយ `applyPinPromptText()` សរសេរវាចូល `#pinModalDesc` និង
@@ -251,6 +270,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | Setup Link៖ ZoeKeyGen encode ↔ App decode | `setup-link-roundtrip-test.js`, `setup-link-browser-test.js` |
 | កាយវិការអូស + auto pull up នៃប្រអប់ស្វែងរក | `phone-search-swipe-test.js` |
 | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `pin-prompt-test.js` |
+| ការដោះសោដោយក្រយៅដៃ/មុខ (WebAuthn) | `biometric-unlock-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។
@@ -317,6 +337,11 @@ bash audit-tools/emu/rules.sh
   ដែលបដិសេធវាលចម្លែក។ **កុំដកវាចេញ** — វាជាការការពារតែមួយប្រឆាំងទិន្នន័យខូច។
 - **claim/witness fence** លើ `zoew_restore_finalizations` និង `zoew_clear_history_finalizations`
   ដែលការពារ Restore/Clear All replay និង revenue ស្ទួន។ **កុំដកវាចេញ។**
+
+**ZoeKeyGen គ្មានប្រអប់ជ្រើសរើស App ទៀតទេ** — ប្រព័ន្ធមាន App តែមួយ (ZoeW) ដូច្នេះ
+`generateLicenseKey()` និង `generateSetupLink()` ប្រើ `LICENSE_APP_CODE = 'ADM'` ដោយផ្ទាល់។
+Base URL របស់ Setup Link ផ្ទុកឡើងវិញតាម `restoreSetupLinkBaseUrl()` ពេល boot
+(កូនសោ localStorage `zoekeygen_setup_url_ADM` នៅដដែល)។
 
 `ZoeKeyGen/firebase-database.rules.json` (License) នៅរក្សា `user_roles` និងតួនាទី `admin`
 ដោយចេតនា — វាជា Project ដាច់ដោយឡែក ហើយ ZoeKeyGen ជាឧបករណ៍អ្នកលក់។

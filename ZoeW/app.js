@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.0.2';
+    const APP_VERSION = '2.1.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -438,6 +438,10 @@
         setupLink: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីអនុវត្ត Setup Link ចូល Config',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការអនុវត្ត Setup Link លើកក្រោយ'
+        },
+        biometric: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបើកការចូលដោយក្រយៅដៃ ឬមុខ',
+            setup: 'សូមកំណត់លេខកូដ PIN សិន មុននឹងបើកការចូលដោយក្រយៅដៃ ឬមុខ'
         }
     };
 
@@ -459,6 +463,8 @@
             const pinIn = document.getElementById('securityPinInput');
             if(pinIn) pinIn.value = '';
             openModalHelper('pinModal');
+            refreshBiometricUi();
+            if (isBiometricEnabled()) runBiometricUnlock();
         }
     }
 
@@ -483,8 +489,10 @@
             if (newPinIn) newPinIn.value = '';
         }
         closeModal('pinSetupModal');
+        clearBiometricRecord();
+        refreshBiometricUi();
         showToast("បានកំណត់ Security PIN រួចរាល់!");
-        (pinTargetAction || openConfigModal)();
+        (pinTargetAction || openConfigModal)(pinVal);
     }
 
     let isVerifyingPin = false;
@@ -507,14 +515,7 @@
         isVerifyingPin = true;
         try {
             if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
-                if (!savedPin.startsWith('pbkdf2:')) {
-                    localStorage.setItem('zoew_security_pin_hash', await hashPin(enteredPin));
-                }
-                localStorage.removeItem('zoew_pin_fail_count');
-                localStorage.removeItem('zoew_pin_lockout_until');
-                lookupSecretKey = await deriveLookupSecretKey(enteredPin);
-                closeModal('pinModal');
-                (pinTargetAction || openConfigModal)();
+                await completePinUnlock(enteredPin);
             } else {
                 let failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
                 if (failCount >= 5) {
@@ -531,6 +532,289 @@
         } finally {
             isVerifyingPin = false;
         }
+    }
+
+    async function completePinUnlock(pin) {
+        const savedPin = localStorage.getItem('zoew_security_pin_hash');
+        if (savedPin && !savedPin.startsWith('pbkdf2:')) {
+            localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
+        }
+        localStorage.removeItem('zoew_pin_fail_count');
+        localStorage.removeItem('zoew_pin_lockout_until');
+        lookupSecretKey = await deriveLookupSecretKey(pin);
+        closeModal('pinModal');
+        (pinTargetAction || openConfigModal)(pin);
+    }
+
+    const BIOMETRIC_STORAGE_KEY = 'zoew_biometric_unlock_v1';
+    const BIOMETRIC_PRF_SALT = 'zoew-biometric-pin-wrap-v1';
+
+    let biometricUnlockInFlight = false;
+
+    function bytesToB64(buf) {
+        const bytes = new Uint8Array(buf);
+        let out = '';
+        for (let i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+        return btoa(out);
+    }
+
+    function b64ToBytes(b64) {
+        const raw = atob(b64);
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        return bytes;
+    }
+
+    function readBiometricRecord() {
+        try {
+            const raw = localStorage.getItem(BIOMETRIC_STORAGE_KEY);
+            if (!raw) return null;
+            const rec = JSON.parse(raw);
+            if (!rec || typeof rec.credentialId !== 'string' || !rec.credentialId) return null;
+            if (rec.mode !== 'prf' && rec.mode !== 'device') return null;
+            if (!rec.wrapped || typeof rec.wrapped.iv !== 'string' || typeof rec.wrapped.data !== 'string') return null;
+            if (rec.mode === 'device' && typeof rec.wrapKey !== 'string') return null;
+            return rec;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeBiometricRecord(rec) {
+        try {
+            localStorage.setItem(BIOMETRIC_STORAGE_KEY, JSON.stringify(rec));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function clearBiometricRecord() {
+        try {
+            localStorage.removeItem(BIOMETRIC_STORAGE_KEY);
+        } catch (e) {
+            return;
+        }
+    }
+
+    function isBiometricEnabled() {
+        return !!readBiometricRecord();
+    }
+
+    async function biometricPlatformAvailable() {
+        try {
+            if (!window.isSecureContext) return false;
+            if (!window.PublicKeyCredential || !navigator.credentials) return false;
+            if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') return false;
+            return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function wrapPinWithRawKey(pin, rawKey) {
+        const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt']);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(pin));
+        return { iv: bytesToB64(iv), data: bytesToB64(cipher) };
+    }
+
+    async function unwrapPinWithRawKey(wrapped, rawKey) {
+        try {
+            const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+            const plain = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: b64ToBytes(wrapped.iv) },
+                key,
+                b64ToBytes(wrapped.data)
+            );
+            return new TextDecoder().decode(plain);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async function biometricPrfBytes(credentialId) {
+        try {
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge: crypto.getRandomValues(new Uint8Array(32)),
+                    rpId: window.location.hostname,
+                    allowCredentials: [{ type: 'public-key', id: b64ToBytes(credentialId), transports: ['internal'] }],
+                    userVerification: 'required',
+                    timeout: 60000,
+                    extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
+                }
+            });
+            const results = assertion && assertion.getClientExtensionResults();
+            const first = results && results.prf && results.prf.results && results.prf.results.first;
+            return first ? new Uint8Array(first) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async function enrollBiometricRecord(pin) {
+        const credential = await navigator.credentials.create({
+            publicKey: {
+                challenge: crypto.getRandomValues(new Uint8Array(32)),
+                rp: { name: 'ZoeW', id: window.location.hostname },
+                user: {
+                    id: crypto.getRandomValues(new Uint8Array(16)),
+                    name: 'zoew-device',
+                    displayName: 'ZoeW'
+                },
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                authenticatorSelection: {
+                    authenticatorAttachment: 'platform',
+                    userVerification: 'required',
+                    residentKey: 'discouraged',
+                    requireResidentKey: false
+                },
+                timeout: 60000,
+                attestation: 'none',
+                extensions: { prf: { eval: { first: new TextEncoder().encode(BIOMETRIC_PRF_SALT) } } }
+            }
+        });
+        if (!credential) return null;
+        const credentialId = bytesToB64(credential.rawId);
+        let ext = {};
+        try {
+            ext = credential.getClientExtensionResults() || {};
+        } catch (e) {
+            ext = {};
+        }
+        if (ext.prf && ext.prf.enabled) {
+            const rawKey = await biometricPrfBytes(credentialId);
+            if (rawKey) return { mode: 'prf', credentialId, wrapped: await wrapPinWithRawKey(pin, rawKey) };
+        }
+        const deviceKey = crypto.getRandomValues(new Uint8Array(32));
+        return {
+            mode: 'device',
+            credentialId,
+            wrapKey: bytesToB64(deviceKey),
+            wrapped: await wrapPinWithRawKey(pin, deviceKey)
+        };
+    }
+
+    async function biometricUnlockPin() {
+        const rec = readBiometricRecord();
+        if (!rec) return '';
+        if (rec.mode === 'prf') {
+            const rawKey = await biometricPrfBytes(rec.credentialId);
+            if (!rawKey) return '';
+            return await unwrapPinWithRawKey(rec.wrapped, rawKey);
+        }
+        const assertion = await navigator.credentials.get({
+            publicKey: {
+                challenge: crypto.getRandomValues(new Uint8Array(32)),
+                rpId: window.location.hostname,
+                allowCredentials: [{ type: 'public-key', id: b64ToBytes(rec.credentialId), transports: ['internal'] }],
+                userVerification: 'required',
+                timeout: 60000
+            }
+        });
+        if (!assertion) return '';
+        return await unwrapPinWithRawKey(rec.wrapped, b64ToBytes(rec.wrapKey));
+    }
+
+    function setBiometricBusy(busy) {
+        const btn = document.getElementById('pinBiometricBtn');
+        if (!btn) return;
+        btn.disabled = !!busy;
+        btn.textContent = busy ? 'កំពុងស្កេន...' : '👆 ស្កេនក្រយៅដៃ ឬមុខ';
+    }
+
+    function refreshBiometricUi() {
+        const enabled = isBiometricEnabled();
+        const state = document.getElementById('biometricToggleState');
+        if (state) state.textContent = enabled ? 'បើក' : 'បិទ';
+        const toggle = document.getElementById('biometricToggleBtn');
+        if (toggle) toggle.classList.toggle('is-on', enabled);
+        const pinBtn = document.getElementById('pinBiometricBtn');
+        if (pinBtn) pinBtn.style.display = enabled ? '' : 'none';
+    }
+
+    async function runBiometricUnlock() {
+        if (biometricUnlockInFlight || isVerifyingPin) return false;
+        if (!isBiometricEnabled()) return false;
+        const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
+            return false;
+        }
+        biometricUnlockInFlight = true;
+        setBiometricBusy(true);
+        try {
+            const pin = await biometricUnlockPin();
+            if (!pin) return false;
+            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
+                clearBiometricRecord();
+                refreshBiometricUi();
+                showToast('⚠️ ការចងក្រយៅដៃ/មុខលែងត្រូវនឹង PIN បច្ចុប្បន្នទេ! សូមបើកវាឡើងវិញក្នុងម៉ឺនុយការកំណត់។');
+                return false;
+            }
+            await completePinUnlock(pin);
+            return true;
+        } catch (e) {
+            return false;
+        } finally {
+            biometricUnlockInFlight = false;
+            setBiometricBusy(false);
+        }
+    }
+
+    async function startBiometricEnrollment(verifiedPin) {
+        if (biometricUnlockInFlight) return;
+        if (!verifiedPin) {
+            alert('មិនអាចបើកបានទេ! សូមវាយលេខកូដ PIN ម្តងទៀត។');
+            return;
+        }
+        if (!(await biometricPlatformAvailable())) {
+            alert('ឧបករណ៍នេះមិនគាំទ្រការស្កេនក្រយៅដៃ ឬមុខទេ។ ត្រូវការ iPhone/iPad (Safari) ឬ Android (Chrome) ដែលបានបើក Face ID / Touch ID / ក្រយៅដៃរួច ហើយបើកគេហទំព័រតាម HTTPS។');
+            return;
+        }
+        biometricUnlockInFlight = true;
+        try {
+            const rec = await enrollBiometricRecord(verifiedPin);
+            if (!rec) {
+                showToast('❌ មិនអាចចងក្រយៅដៃ ឬមុខបានទេ!');
+                return;
+            }
+            if (!writeBiometricRecord(rec)) {
+                showToast('❌ អង្គចងចាំឧបករណ៍ពេញ! មិនអាចរក្សាទុកបានទេ។');
+                return;
+            }
+            refreshBiometricUi();
+            showToast(rec.mode === 'prf'
+                ? '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។'
+                : '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។ (ឧបករណ៍នេះមិនគាំទ្រការចាក់សោដោយជីវមាត្រពេញលេញទេ — PIN ត្រូវរក្សាទុកក្នុងឧបករណ៍)');
+        } catch (e) {
+            showToast('❌ បានបោះបង់ ឬមិនអាចចងក្រយៅដៃ ឬមុខបានទេ!');
+        } finally {
+            biometricUnlockInFlight = false;
+        }
+    }
+
+    function toggleBiometricUnlock() {
+        if (isBiometricEnabled()) {
+            if (!confirm('បិទការចូលដោយក្រយៅដៃ ឬមុខ? អ្នកនឹងត្រូវវាយលេខកូដ PIN ដូចមុនវិញ។')) return;
+            clearBiometricRecord();
+            refreshBiometricUi();
+            showToast('បានបិទការចូលដោយក្រយៅដៃ ឬមុខ។');
+            return;
+        }
+        requestPinBeforeConfig(startBiometricEnrollment, 'biometric');
+    }
+
+    async function initBiometricUi() {
+        refreshBiometricUi();
+        const supported = await biometricPlatformAvailable();
+        const toggle = document.getElementById('biometricToggleBtn');
+        if (toggle) toggle.classList.toggle('is-unsupported', !supported);
+        const state = document.getElementById('biometricToggleState');
+        if (state && !supported && !isBiometricEnabled()) state.textContent = 'មិនគាំទ្រ';
     }
 
     function checkPinAndOpenConfig(isFirstTime = false) {
@@ -2013,6 +2297,7 @@
 
         setupHardwareScanner();
         switchAppPage('data');
+        initBiometricUi();
         setupSwipeGestures();
         setupIOSPullToRefresh();
         setupVisibilityHandling();

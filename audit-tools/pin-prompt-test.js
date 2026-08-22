@@ -160,6 +160,14 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     stored.ls = {};
     const c2 = vm.createContext(sandbox);
     vm.runInContext('let pinTargetAction = null;', c2);
+    vm.runInContext(`
+        let __biometricEnabled = false;
+        function isBiometricEnabled() { return __biometricEnabled; }
+        function refreshBiometricUi() { __log_biometricUi = (__log_biometricUi || 0) + 1; }
+        function runBiometricUnlock() { __log_biometricTried = (__log_biometricTried || 0) + 1; }
+        var __log_biometricUi = 0;
+        var __log_biometricTried = 0;
+    `, c2);
     vm.runInContext(sliceConst(appJs, 'PIN_PROMPT_MESSAGES'), c2);
     vm.runInContext(sliceFn(appJs, 'applyPinPromptText'), c2);
     vm.runInContext(sliceFn(appJs, 'requestPinBeforeConfig'), c2);
@@ -188,6 +196,14 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     ok('គ្មាន PIN ទុកមុន ➜ បើកប្រអប់កំណត់ PIN ជាមួយសាររបស់សកម្មភាពនោះ',
         stored.modal === 'pinSetupModal' && setupDesc.textContent === MSG.clearHistory.setup,
         [stored.modal, setupDesc.textContent]);
+
+    stored.ls['zoew_security_pin_hash'] = 'pbkdf2:whatever';
+    vm.runInContext('__biometricEnabled = false; __log_biometricTried = 0;', c2);
+    sandbox.requestPinBeforeConfig(null, 'config');
+    ok('ជីវមាត្របិទ ➜ មិនសាកស្កេនទេ', vm.runInContext('__log_biometricTried', c2) === 0);
+    vm.runInContext('__biometricEnabled = true; __log_biometricTried = 0;', c2);
+    sandbox.requestPinBeforeConfig(null, 'config');
+    ok('ជីវមាត្របើក ➜ សាកស្កេនភ្លាមពេលបើកប្រអប់ PIN', vm.runInContext('__log_biometricTried', c2) === 1);
 }
 
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));

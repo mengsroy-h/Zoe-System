@@ -38,7 +38,7 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8660;
-    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+    for (const app of ['ZoeW', 'ZoeKeyGen']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = process.env.VERSION_APP_DIR || path.resolve(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const RENDER_FN = 'renderAppVersionLabels';
 
@@ -55,7 +55,7 @@ for (const app of APPS) {
     check(`${app} ប្រកាស APP_VERSION ជា semver`, SEMVER.test(String(declared[app])), true);
 }
 const versions = [...new Set(APPS.map((a) => declared[a]))];
-check('APP_VERSION ដូចគ្នាទាំង ៤ App', versions.length, 1);
+check('APP_VERSION ដូចគ្នាទាំង ២ App', versions.length, 1);
 const version = versions.length === 1 ? versions[0] : null;
 console.log(`   កំណែបច្ចុប្បន្ន: ${version}`);
 
@@ -71,7 +71,7 @@ for (const app of APPS) {
     check(`${app} ហៅ ${RENDER_FN}() យ៉ាងតិចម្ដង`, (called[app] || 0) >= 1, true);
     check(`${app} render យក APP_VERSION មិនមែនអក្សរដិត`, String(renderBody[app]).includes('APP_VERSION'), true);
 }
-check(`${RENDER_FN}() byte-identical ទាំង ៤`, new Set(APPS.map((a) => renderBody[a])).size, 1);
+check(`${RENDER_FN}() byte-identical ទាំង ២`, new Set(APPS.map((a) => renderBody[a])).size, 1);
 
 console.log('\n-- កន្លែងបង្ហាញ: ប្រអប់ login ប៉ុណ្ណោះ --');
 for (const app of APPS) {
@@ -90,4 +90,4 @@ if (failures) {
     console.log(`❌ ធ្លាក់ ${failures} — កំណែមិនស៊ីគ្នា។ ប្រភពតែមួយគឺ APP_VERSION ក្នុង app.js; manifest.json ត្រូវតាមវា។`);
     process.exit(1);
 }
-console.log('✅ កំណែ App ស៊ីគ្នាទាំង ៤ (app.js ↔ manifest.json ↔ index.html)');
+console.log('✅ កំណែ App ស៊ីគ្នាទាំង ២ (app.js ↔ manifest.json ↔ index.html)');

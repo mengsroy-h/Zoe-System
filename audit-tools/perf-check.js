@@ -100,7 +100,7 @@ function seedBig(n) {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    for (const app of ['ZoeAdmin', 'ZoeW']) {
+    for (const app of ['ZoeW']) {
         console.log('\n=== ' + app + ' (' + ORDERS + ' orders) ===');
         const server = await serve(path.join(ROOT, app));
         const port = server.address().port;

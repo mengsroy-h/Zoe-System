@@ -161,16 +161,6 @@ function seedData() {
         zoew_daily_revenue_cod_dod: { [d]: { codDollar: 35, dodDollar: 2, totalCount: 3 } },
         zoew_monthly_revenue_cod_dod: {},
         zoew_daily_pickup_cod_dod: {},
-        zoew_scanner_lookup: {
-            id_1000_aaa: {
-                phone: '0968490421', barcode: 'BB2', isClosed: false,
-                barcodes: [
-                    { code: 'BB1', cod: 10, dod: 0, locker: 'A1', isClosed: false },
-                    { code: 'BB2', cod: 20, dod: 0, locker: 'N/A', isClosed: false }
-                ]
-            },
-            id_1001_bbb: { phone: '0777123456', barcode: 'CC1', isClosed: false, barcodes: [{ code: 'CC1', cod: 5, dod: 2, locker: 'A1', isClosed: true }] }
-        },
         zoew_barcode_registry: {},
         zoew_settings: { exchange_rate: 4100 },
         _dateKey: d
@@ -179,7 +169,7 @@ function seedData() {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan']) {
+    for (const app of ['ZoeW']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir);
@@ -203,34 +193,6 @@ function seedData() {
         await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seed) + ');');
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
         await page.waitForTimeout(2500);
-
-        if (app === 'Zoescan') {
-            await page.waitForTimeout(800);
-            const zs = await page.evaluate(() => ({
-                listenerThrew: window.__listenerThrew || null,
-                indexed: Object.keys(typeof barcodeIndex !== 'undefined' ? barcodeIndex : {}).sort(),
-                openModals: [...document.querySelectorAll('.modal')].filter((m) => getComputedStyle(m).display !== 'none').map((m) => m.id)
-            }));
-            check(!zs.listenerThrew, 'Zoescan: listener មិន throw ពេល boot', zs.listenerThrew);
-            check(zs.indexed.join(',') === 'BB1,BB2,CC1', 'Zoescan: index barcode គ្រប់គ្រាន់ពី lookup', JSON.stringify(zs));
-
-            // ទីតាំង A1 មាន BB1 (បើក) និង CC1 (បិទរួច) ➜ CC1 មិនត្រូវរាប់ថាកាន់ទីតាំង
-            const occ = await page.evaluate(() => {
-                const f = window.findLockerOccupant('A1', 'BB2');
-                return f ? { code: f.code, itemId: f.itemId } : null;
-            });
-            check(occ && occ.code === 'BB1', 'Zoescan: ការព្រមានទីតាំង ➜ រំលងកញ្ចប់ដែលយកហើយ', JSON.stringify(occ));
-
-            const occSelf = await page.evaluate(() => {
-                const f = window.findLockerOccupant('A1', 'BB1');
-                return f ? { code: f.code } : null;
-            });
-            check(occSelf === null, 'Zoescan: មិនព្រមានលើ barcode របស់ខ្លួនឯង', JSON.stringify(occSelf));
-
-            const real0 = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
-            check(real0.length === 0, 'Zoescan: គ្មានកំហុស runtime ពេល boot', real0.slice(0, 3).join(' | '));
-            await ctx.close(); server.close(); continue;
-        }
 
         const booted = await page.evaluate(() => ({
             rows: document.querySelectorAll('#historyTableBody tr').length,
@@ -288,7 +250,7 @@ function seedData() {
         await page.waitForTimeout(300);
 
         // លុប ➜ ស្តារ ➜ លុប ➜ ស្តារ ត្រូវតែមិនផ្លាស់ចំណូលសោះ (គោលការណ៍ លុប)
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             const revBefore = await page.evaluate((dk) => JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[dk]), seed._dateKey);
             for (let cycle = 0; cycle < 2; cycle++) {
                 await page.evaluate(() => window.deleteSingleItem('id_3000_ddd'));
@@ -298,44 +260,44 @@ function seedData() {
                 await page.waitForTimeout(500);
             }
             const revAfter = await page.evaluate((dk) => JSON.stringify(window.__fakeStore.zoew_daily_revenue_cod_dod[dk]), seed._dateKey);
-            check(revBefore === revAfter, 'ZoeAdmin: លុប➜ស្តារ ២ ជុំ ➜ ចំណូលមិនប្រែសោះ', 'មុន ' + revBefore + ' ក្រោយ ' + revAfter);
+            check(revBefore === revAfter, 'ZoeW: លុប➜ស្តារ ២ ជុំ ➜ ចំណូលមិនប្រែសោះ', 'មុន ' + revBefore + ' ក្រោយ ' + revAfter);
             const restored = await page.evaluate(() => {
                 const it = window.__fakeStore.zoew_scan_history_cod_dod.id_3000_ddd;
                 return it ? { n: (it.barcodes || []).length, cod: it.cod, hasDeletedAt: 'deletedAt' in it, hasFromDel: 'isFromDeletion' in it } : null;
             });
-            check(restored && restored.n === 2 && restored.cod === 30, 'ZoeAdmin: លុប➜ស្តារ ➜ កញ្ចប់ត្រឡប់មកគ្រប់', JSON.stringify(restored));
-            check(restored && !restored.hasDeletedAt && !restored.hasFromDel, 'ZoeAdmin: ស្តារ ➜ លុប deletedAt/isFromDeletion ចេញ', JSON.stringify(restored));
+            check(restored && restored.n === 2 && restored.cod === 30, 'ZoeW: លុប➜ស្តារ ➜ កញ្ចប់ត្រឡប់មកគ្រប់', JSON.stringify(restored));
+            check(restored && !restored.hasDeletedAt && !restored.hasFromDel, 'ZoeW: ស្តារ ➜ លុប deletedAt/isFromDeletion ចេញ', JSON.stringify(restored));
         }
 
         // ដក ➜ ស្តារ ត្រូវដកលុយចេញ រួចបូកមកវិញឲ្យត្រូវបេះបិទ
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             const rev0 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
             await page.evaluate(() => window.removeSingleBarcode('id_3000_ddd', 'EE1'));
             await page.waitForTimeout(500);
             const rev1 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
             check(Math.round((rev0.codDollar - rev1.codDollar) * 100) / 100 === 10 && (rev0.totalCount - rev1.totalCount) === 1,
-                'ZoeAdmin: ដក ➜ ដកលុយ ១០ និងចំនួន ១ ចេញ', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev1));
+                'ZoeW: ដក ➜ ដកលុយ ១០ និងចំនួន ១ ចេញ', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev1));
             const trashState = await page.evaluate(() => {
                 const t = Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod)[0];
                 return t ? { isFromDeletion: t.isFromDeletion, bDeducted: t.barcodes[0].isDeducted, code: t.barcodes[0].code } : null;
             });
             check(trashState && trashState.isFromDeletion === false && trashState.bDeducted === true && trashState.code === 'EE1',
-                'ZoeAdmin: ដក ➜ ធុងសំរាមសម្គាល់ isDeducted និង isFromDeletion=false', JSON.stringify(trashState));
+                'ZoeW: ដក ➜ ធុងសំរាមសម្គាល់ isDeducted និង isFromDeletion=false', JSON.stringify(trashState));
             const tid = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod)[0]);
             await page.evaluate((t) => { window.promptRestoreDeletedItem(t); window.executeRestoreItem(); }, tid);
             await page.waitForTimeout(500);
             const rev2 = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
             check(rev2.codDollar === rev0.codDollar && rev2.dodDollar === rev0.dodDollar && rev2.totalCount === rev0.totalCount,
-                'ZoeAdmin: ដក ➜ ស្តារ ➜ លុយត្រឡប់មកគ្រប់', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev2));
+                'ZoeW: ដក ➜ ស្តារ ➜ លុយត្រឡប់មកគ្រប់', JSON.stringify(rev0) + ' ➜ ' + JSON.stringify(rev2));
             const back = await page.evaluate(() => {
                 const it = window.__fakeStore.zoew_scan_history_cod_dod.id_3000_ddd;
                 return it ? { n: it.barcodes.length, deducted: it.barcodes.map(b => b.isDeducted), cod: it.cod } : null;
             });
             check(back && back.n === 2 && back.deducted.every(d => d === false) && back.cod === 30,
-                'ZoeAdmin: ដក ➜ ស្តារ ➜ barcode ត្រឡប់មក isDeducted ត្រូវ clear', JSON.stringify(back));
+                'ZoeW: ដក ➜ ស្តារ ➜ barcode ត្រឡប់មក isDeducted ត្រូវ clear', JSON.stringify(back));
         }
 
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             // ការកែទឹកប្រាក់តាម barcode មិនត្រូវសរសេរជាន់ការផ្លាស់ប្តូររបស់ឧបករណ៍ផ្សេង
             await page.evaluate(() => {
                 window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc = {
@@ -351,7 +313,7 @@ function seedData() {
             await page.waitForTimeout(300);
             await page.evaluate(() => {
                 window.openEditBarcodePriceModal('id_2000_ccc', 'DD1');
-                // ឧបករណ៍ផ្សេង៖ Zoescan ដាក់ទីតាំង + ZoeW បិទ barcode មួយទៀត
+                // ឧបករណ៍ផ្សេង៖ ដាក់ទីតាំង + បិទ barcode មួយទៀត
                 const srv = window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc;
                 srv.barcodes[1].isClosed = true;
                 srv.barcodes[0].locker = 'Z9';
@@ -364,10 +326,10 @@ function seedData() {
                 const srv = window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc;
                 return { cod0: srv.barcodes[0].cod, closed1: srv.barcodes[1].isClosed, locker0: srv.barcodes[0].locker, itemCod: srv.cod };
             });
-            check(merged.cod0 === 15, 'ZoeAdmin: កែទឹកប្រាក់ ➜ តម្លៃថ្មីចុះពិត', JSON.stringify(merged));
-            check(merged.closed1 === true, 'ZoeAdmin: កែទឹកប្រាក់ ➜ មិនលុបការបិទរបស់ឧបករណ៍ផ្សេង', JSON.stringify(merged));
-            check(merged.locker0 === 'Z9', 'ZoeAdmin: កែទឹកប្រាក់ ➜ មិនលុបទីតាំងរបស់ Zoescan', JSON.stringify(merged));
-            check(merged.itemCod === 35, 'ZoeAdmin: កែទឹកប្រាក់ ➜ ផលបូក item ត្រូវ', JSON.stringify(merged));
+            check(merged.cod0 === 15, 'ZoeW: កែទឹកប្រាក់ ➜ តម្លៃថ្មីចុះពិត', JSON.stringify(merged));
+            check(merged.closed1 === true, 'ZoeW: កែទឹកប្រាក់ ➜ មិនលុបការបិទរបស់ឧបករណ៍ផ្សេង', JSON.stringify(merged));
+            check(merged.locker0 === 'Z9', 'ZoeW: កែទឹកប្រាក់ ➜ មិនលុបទីតាំងរបស់ឧបករណ៍ផ្សេង', JSON.stringify(merged));
+            check(merged.itemCod === 35, 'ZoeW: កែទឹកប្រាក់ ➜ ផលបូក item ត្រូវ', JSON.stringify(merged));
 
             // ឧបករណ៍ផ្សេងលុបកញ្ចប់នេះ ➜ ការកែទឹកប្រាក់មិនត្រូវធ្វើឲ្យវារស់ឡើងវិញ
             const revBeforeGhostEdit = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
@@ -385,20 +347,20 @@ function seedData() {
                 resurrected: !!window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc,
                 rev: { ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }
             }), seed._dateKey);
-            check(ghostEdit.resurrected === false, 'ZoeAdmin: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ មិនរស់ឡើងវិញ', JSON.stringify(ghostEdit));
+            check(ghostEdit.resurrected === false, 'ZoeW: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ មិនរស់ឡើងវិញ', JSON.stringify(ghostEdit));
             check(ghostEdit.rev.codDollar === revBeforeGhostEdit.codDollar && ghostEdit.rev.dodDollar === revBeforeGhostEdit.dodDollar,
-                'ZoeAdmin: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ ចំណូលមិនប្រែ',
+                'ZoeW: កែទឹកប្រាក់លើកញ្ចប់ដែលរលាយ ➜ ចំណូលមិនប្រែ',
                 JSON.stringify(revBeforeGhostEdit) + ' ➜ ' + JSON.stringify(ghostEdit.rev));
             const ghostToast = await page.evaluate(() => {
                 const tc = document.getElementById('toastContainer');
                 return tc ? tc.innerText : '';
             });
             check(ghostToast.indexOf('ជោគជ័យ') === -1,
-                'ZoeAdmin: កែទឹកប្រាក់ដែលបរាជ័យ ➜ មិនប្រាប់ថាជោគជ័យ', JSON.stringify(ghostToast));
+                'ZoeW: កែទឹកប្រាក់ដែលបរាជ័យ ➜ មិនប្រាប់ថាជោគជ័យ', JSON.stringify(ghostToast));
         }
 
         // ឧបករណ៍ផ្សេងបិទបញ្ជី ខណៈយើងស្កេនកញ្ចប់ថ្មីចូលបញ្ជីដដែល
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             await page.evaluate((dk) => {
                 window.__fakeStore.zoew_scan_history_cod_dod.id_5000_fff = {
                     id: 'id_5000_fff', phone: '0655444333', scanDate: dk, createdAt: Date.now() - 150,
@@ -426,9 +388,9 @@ function seedData() {
             }), seed._dateKey);
             const phoneKey = '0655444333';
             const stillCounted = after.pick.pickedUpPhones && after.pick.pickedUpPhones[phoneKey];
-            check(after.serverClosed === false && after.n === 2, 'ZoeAdmin: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
+            check(after.serverClosed === false && after.n === 2, 'ZoeW: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
             check(!stillCounted,
-                'ZoeAdmin: បញ្ជីបើកវិញដោយការស្កេន ➜ លែងរាប់ជាអតិថិជនយកហើយ',
+                'ZoeW: បញ្ជីបើកវិញដោយការស្កេន ➜ លែងរាប់ជាអតិថិជនយកហើយ',
                 'pickedUpPhones=' + JSON.stringify(after.pick.pickedUpPhones) + ' (មុនស្កេន ' + JSON.stringify(pickClosed.pickedUpPhones) + ')');
         }
 
@@ -636,7 +598,7 @@ function seedData() {
         }
 
         // --- ដក / លុប ត្រូវធ្វើការលើច្បាប់ចម្លងរបស់ server មិនមែនច្បាប់ចម្លងក្នុងសតិ ---
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             const seedItem = async (id, phone, bcs) => {
                 await page.evaluate((a) => {
                     const total = a.bcs.reduce((s, b) => s + b.cod + b.dod, 0);
@@ -660,7 +622,7 @@ function seedData() {
             const revNow = () => page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
             const trashCodes = () => page.evaluate(() => Object.values(window.__fakeStore.zoew_recently_deleted_cod_dod).map((t) => t.barcode));
 
-            // A. ឧបករណ៍ផ្សេងបិទ barcode បងប្អូន + Zoescan ដាក់ទីតាំង ➜ ការដកមិនត្រូវលុបវាចោល
+            // A. ឧបករណ៍ផ្សេងបិទ barcode បងប្អូន + ដាក់ទីតាំង ➜ ការដកមិនត្រូវលុបវាចោល
             await seedItem('id_6000_ggg', '0611000111', [
                 { code: 'GG1', cod: 10, dod: 0, locker: 'F1' },
                 { code: 'GG2', cod: 20, dod: 0, locker: 'F2' }
@@ -683,13 +645,13 @@ function seedData() {
             });
             const revA1 = await revNow();
             check(stateA && stateA.closed === true,
-                'ZoeAdmin: ដក ➜ មិនលុបការបិទរបស់ឧបករណ៍ផ្សេង', JSON.stringify(stateA));
+                'ZoeW: ដក ➜ មិនលុបការបិទរបស់ឧបករណ៍ផ្សេង', JSON.stringify(stateA));
             check(stateA && stateA.locker === 'Z7',
-                'ZoeAdmin: ដក ➜ មិនលុបទីតាំងរបស់ Zoescan', JSON.stringify(stateA));
+                'ZoeW: ដក ➜ មិនលុបទីតាំងរបស់ឧបករណ៍ផ្សេង', JSON.stringify(stateA));
             check(stateA && stateA.n === 1 && stateA.code === 'GG2' && stateA.itemCod === 20 && stateA.trashed,
-                'ZoeAdmin: ដក ➜ សល់កញ្ចប់ត្រូវ និងចូលធុងសំរាម', JSON.stringify(stateA));
+                'ZoeW: ដក ➜ សល់កញ្ចប់ត្រូវ និងចូលធុងសំរាម', JSON.stringify(stateA));
             check(Math.round((revA0.codDollar - revA1.codDollar) * 100) / 100 === 10 && (revA0.totalCount - revA1.totalCount) === 1,
-                'ZoeAdmin: ដក ➜ កាត់លុយត្រឹមតម្លៃពិតរបស់ server', JSON.stringify(revA0) + ' ➜ ' + JSON.stringify(revA1));
+                'ZoeW: ដក ➜ កាត់លុយត្រឹមតម្លៃពិតរបស់ server', JSON.stringify(revA0) + ' ➜ ' + JSON.stringify(revA1));
 
             // B. ឧបករណ៍ផ្សេងដក barcode នោះរួចហើយ ➜ មិនត្រូវកាត់លុយ ឬចូលធុងសំរាមម្តងទៀត
             await seedItem('id_6001_hhh', '0611000222', [
@@ -708,10 +670,10 @@ function seedData() {
             const revB1 = await revNow();
             const trashB1 = await trashCodes();
             check(revB1.codDollar === revB0.codDollar && revB1.totalCount === revB0.totalCount,
-                'ZoeAdmin: ដកកញ្ចប់ដែលឧបករណ៍ផ្សេងដករួច ➜ មិនកាត់លុយម្តងទៀត',
+                'ZoeW: ដកកញ្ចប់ដែលឧបករណ៍ផ្សេងដករួច ➜ មិនកាត់លុយម្តងទៀត',
                 JSON.stringify(revB0) + ' ➜ ' + JSON.stringify(revB1));
             check(trashB1.filter((c) => c === 'HH1').length === trashB0.filter((c) => c === 'HH1').length,
-                'ZoeAdmin: ដកកញ្ចប់ដែលដករួច ➜ គ្មានធាតុធុងសំរាមស្ទួន', JSON.stringify(trashB1));
+                'ZoeW: ដកកញ្ចប់ដែលដករួច ➜ គ្មានធាតុធុងសំរាមស្ទួន', JSON.stringify(trashB1));
 
             // C. ឧបករណ៍ផ្សេងលុប item ទាំងមូល ➜ ការដកមិនត្រូវធ្វើឲ្យវារស់ឡើងវិញ
             await seedItem('id_6002_iii', '0611000333', [
@@ -730,9 +692,9 @@ function seedData() {
             }));
             const revC1 = await revNow();
             check(stateC.resurrected === false && stateC.trashed === false,
-                'ZoeAdmin: ដកលើ item ដែលរលាយ ➜ មិនរស់ឡើងវិញ និងមិនចូលធុងសំរាម', JSON.stringify(stateC));
+                'ZoeW: ដកលើ item ដែលរលាយ ➜ មិនរស់ឡើងវិញ និងមិនចូលធុងសំរាម', JSON.stringify(stateC));
             check(revC1.codDollar === revC0.codDollar && revC1.dodDollar === revC0.dodDollar && revC1.totalCount === revC0.totalCount,
-                'ZoeAdmin: ដកលើ item ដែលរលាយ ➜ ចំណូលមិនប្រែ', JSON.stringify(revC0) + ' ➜ ' + JSON.stringify(revC1));
+                'ZoeW: ដកលើ item ដែលរលាយ ➜ ចំណូលមិនប្រែ', JSON.stringify(revC0) + ' ➜ ' + JSON.stringify(revC1));
 
             // D. លុប ➜ ធុងសំរាមត្រូវផ្ទុកស្ថានភាពរបស់ server មិនមែនច្បាប់ចម្លងចាស់ក្នុងសតិ
             await seedItem('id_7000_jjj', '0611000444', [{ code: 'JJ1', cod: 9, dod: 2, locker: 'I1' }]);
@@ -751,11 +713,11 @@ function seedData() {
             });
             const revD1 = await revNow();
             check(stateD && stateD.closed === true && stateD.locker === 'Z8',
-                'ZoeAdmin: លុប ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(stateD));
+                'ZoeW: លុប ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(stateD));
             check(stateD && stateD.fromDel === true && stateD.bFromDel === true,
-                'ZoeAdmin: លុប ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(stateD));
+                'ZoeW: លុប ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(stateD));
             check(revD1.codDollar === revD0.codDollar && revD1.dodDollar === revD0.dodDollar && revD1.totalCount === revD0.totalCount,
-                'ZoeAdmin: លុប ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)', JSON.stringify(revD0) + ' ➜ ' + JSON.stringify(revD1));
+                'ZoeW: លុប ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)', JSON.stringify(revD0) + ' ➜ ' + JSON.stringify(revD1));
 
             // E. ឧបករណ៍ផ្សេងលុបរួចហើយ ➜ មិនត្រូវបង្កើតធាតុធុងសំរាមខ្មោច
             await seedItem('id_7001_kkk', '0611000555', [{ code: 'KK1', cod: 3, dod: 0, locker: 'J1' }]);
@@ -769,7 +731,7 @@ function seedData() {
                 resurrected: !!window.__fakeStore.zoew_scan_history_cod_dod.id_7001_kkk
             }));
             check(stateE.inTrash === false && stateE.resurrected === false,
-                'ZoeAdmin: លុប item ដែលលុបរួច ➜ គ្មានធាតុធុងសំរាមខ្មោច', JSON.stringify(stateE));
+                'ZoeW: លុប item ដែលលុបរួច ➜ គ្មានធាតុធុងសំរាមខ្មោច', JSON.stringify(stateE));
         }
 
 
@@ -777,7 +739,7 @@ function seedData() {
 
 
         // --- ការសរសេរធុងសំរាមជោគជ័យ តែ handler ក្រោយនោះ throw ➜ មិនត្រូវរត់ការសង្គ្រោះ ---
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             await page.evaluate((dk) => {
                 const now = Date.now();
                 window.__fakeStore.zoew_scan_history_cod_dod.id_ph_x = {
@@ -813,11 +775,11 @@ function seedData() {
             await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
 
             check(phState.codes === 'PH2',
-                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ កញ្ចប់មិនត្រូវរស់ឡើងវិញ', JSON.stringify(phState.codes));
+                'ZoeW: handler ក្រោយជោគជ័យ throw ➜ កញ្ចប់មិនត្រូវរស់ឡើងវិញ', JSON.stringify(phState.codes));
             check(phState.inTrash === true,
-                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ ធាតុធុងសំរាមនៅដដែល', JSON.stringify(phState.inTrash));
+                'ZoeW: handler ក្រោយជោគជ័យ throw ➜ ធាតុធុងសំរាមនៅដដែល', JSON.stringify(phState.inTrash));
             check(Math.round((revPh0.codDollar - phState.rev.codDollar) * 100) / 100 === 9 && (revPh0.totalCount - phState.rev.totalCount) === 1,
-                'ZoeAdmin: handler ក្រោយជោគជ័យ throw ➜ លុយនៅតែកាត់ត្រឹមត្រូវ មិនបញ្ច្រាស',
+                'ZoeW: handler ក្រោយជោគជ័យ throw ➜ លុយនៅតែកាត់ត្រឹមត្រូវ មិនបញ្ច្រាស',
                 JSON.stringify(revPh0) + ' ➜ ' + JSON.stringify(phState.rev));
 
             await page.evaluate((dk) => {
@@ -848,9 +810,9 @@ function seedData() {
             }), seed._dateKey);
             await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
             check(pyState.serverCod === 25,
-                'ZoeAdmin: កែទឹកប្រាក់ ➜ handler ក្រោយជោគជ័យ throw ➜ តម្លៃថ្មីនៅដដែល', JSON.stringify(pyState.serverCod));
+                'ZoeW: កែទឹកប្រាក់ ➜ handler ក្រោយជោគជ័យ throw ➜ តម្លៃថ្មីនៅដដែល', JSON.stringify(pyState.serverCod));
             check(Math.round((pyState.rev.codDollar - revPy0.codDollar) * 100) / 100 === 15,
-                'ZoeAdmin: កែទឹកប្រាក់ ➜ handler throw ➜ ចំណូលមិនត្រូវបញ្ច្រាសខុស',
+                'ZoeW: កែទឹកប្រាក់ ➜ handler throw ➜ ចំណូលមិនត្រូវបញ្ច្រាសខុស',
                 JSON.stringify(revPy0) + ' ➜ ' + JSON.stringify(pyState.rev));
 
 
@@ -879,9 +841,9 @@ function seedData() {
             }), seed._dateKey);
             await page.evaluate(() => { window.syncScannerLookupEntry = window.__origSync; });
             check(pzState.live === true && pzState.stillTrash === false,
-                'ZoeAdmin: ស្តារ ➜ handler ក្រោយជោគជ័យ throw ➜ ការស្តារនៅជាប់', JSON.stringify(pzState));
+                'ZoeW: ស្តារ ➜ handler ក្រោយជោគជ័យ throw ➜ ការស្តារនៅជាប់', JSON.stringify(pzState));
             check(Math.round((pzState.rev.codDollar - revPz0.codDollar) * 100) / 100 === 14,
-                'ZoeAdmin: ស្តារ ➜ handler throw ➜ លុយមិនត្រូវបញ្ច្រាសខុស',
+                'ZoeW: ស្តារ ➜ handler throw ➜ លុយមិនត្រូវបញ្ច្រាសខុស',
                 JSON.stringify(revPz0) + ' ➜ ' + JSON.stringify(pzState.rev));
 
             for (let i = errors.length - 1; i >= 0; i--) {
@@ -889,7 +851,7 @@ function seedData() {
             }
         }
         // --- RTDB អាចរត់ update function ច្រើនដង ➜ ការរត់ទី ២ ត្រូវសម្រេចដោយខ្លួនឯង ---
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             const revRr = () => page.evaluate((k) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[k] }), seed._dateKey);
             await page.evaluate((dk) => {
                 const now = Date.now();
@@ -928,9 +890,9 @@ function seedData() {
             });
             const revRr1 = await revRr();
             check(rrKeep && rrKeep.n === 1 && rrKeep.code === 'RK2' && rrKeep.closed === true && rrKeep.cod === 20,
-                'ZoeAdmin: transaction រត់ម្តងទៀត ➜ យកលទ្ធផលនៃការរត់ចុងក្រោយ', JSON.stringify(rrKeep));
+                'ZoeW: transaction រត់ម្តងទៀត ➜ យកលទ្ធផលនៃការរត់ចុងក្រោយ', JSON.stringify(rrKeep));
             check(Math.round((revRr0.codDollar - revRr1.codDollar) * 100) / 100 === 10 && (revRr0.totalCount - revRr1.totalCount) === 1,
-                'ZoeAdmin: transaction រត់ម្តងទៀត ➜ កាត់លុយតែម្តង', JSON.stringify(revRr0) + ' ➜ ' + JSON.stringify(revRr1));
+                'ZoeW: transaction រត់ម្តងទៀត ➜ កាត់លុយតែម្តង', JSON.stringify(revRr0) + ' ➜ ' + JSON.stringify(revRr1));
 
             const revRr2 = await revRr();
             const trashRr0 = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).length);
@@ -949,14 +911,14 @@ function seedData() {
             const revRr3 = await revRr();
             const trashRr1 = await page.evaluate(() => Object.keys(window.__fakeStore.zoew_recently_deleted_cod_dod).length);
             check(revRr3.codDollar === revRr2.codDollar && revRr3.totalCount === revRr2.totalCount,
-                'ZoeAdmin: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ មិនកាត់លុយ (អថេរត្រូវ reset)',
+                'ZoeW: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ មិនកាត់លុយ (អថេរត្រូវ reset)',
                 JSON.stringify(revRr2) + ' ➜ ' + JSON.stringify(revRr3));
             check(trashRr1 === trashRr0,
-                'ZoeAdmin: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ គ្មានធាតុធុងសំរាម', trashRr0 + ' ➜ ' + trashRr1);
+                'ZoeW: ការរត់ទី ២ រកកញ្ចប់មិនឃើញ ➜ គ្មានធាតុធុងសំរាម', trashRr0 + ' ➜ ' + trashRr1);
             await page.evaluate(() => { window.__txnConflict = null; });
         }
         // --- transaction ជោគជ័យ តែការសរសេរធុងសំរាមបរាជ័យអស់ ៤ ដង ➜ ត្រូវស្តារកញ្ចប់មកវិញ ---
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             await page.evaluate((dk) => {
                 const now = Date.now();
                 window.__fakeStore.zoew_scan_history_cod_dod.id_tw_rem = {
@@ -1005,14 +967,14 @@ function seedData() {
                 };
             }, seed._dateKey);
             check(remState.codes && remState.codes.join(',') === 'TW1,TW2',
-                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ', JSON.stringify(remState.codes));
+                'ZoeW: ដក ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ', JSON.stringify(remState.codes));
             check(remState.deducted && remState.deducted.every((d) => d === false),
-                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ isDeducted ត្រូវ clear លើកញ្ចប់ដែលរស់វិញ', JSON.stringify(remState.deducted));
+                'ZoeW: ដក ➜ ធុងសំរាមបរាជ័យ ➜ isDeducted ត្រូវ clear លើកញ្ចប់ដែលរស់វិញ', JSON.stringify(remState.deducted));
             check(remState.rev.codDollar === revTw0.codDollar && remState.rev.totalCount === revTw0.totalCount,
-                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
+                'ZoeW: ដក ➜ ធុងសំរាមបរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
                 JSON.stringify(revTw0) + ' ➜ ' + JSON.stringify(remState.rev));
             check(remState.localTrash === false && remState.serverTrash === false,
-                'ZoeAdmin: ដក ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(remState));
+                'ZoeW: ដក ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(remState));
 
             await page.evaluate(() => window.deleteSingleItem('id_tw_del'));
             await page.waitForTimeout(14000);
@@ -1024,9 +986,9 @@ function seedData() {
                 serverTrash: !!window.__fakeStore.zoew_recently_deleted_cod_dod.id_tw_del
             }));
             check(delState.live && delState.codes && delState.codes.join(',') === 'TD1',
-                'ZoeAdmin: លុប ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ មិនបាត់', JSON.stringify(delState));
+                'ZoeW: លុប ➜ ធុងសំរាមបរាជ័យអស់ ➜ កញ្ចប់ត្រូវស្តារមកវិញ មិនបាត់', JSON.stringify(delState));
             check(delState.localTrash === false && delState.serverTrash === false,
-                'ZoeAdmin: លុប ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(delState));
+                'ZoeW: លុប ➜ ធុងសំរាមបរាជ័យ ➜ គ្មានធាតុធុងសំរាមឆក់សល់', JSON.stringify(delState));
 
             await page.evaluate(() => window.__unblockTrash());
             for (let i = errors.length - 1; i >= 0; i--) {
@@ -1115,7 +1077,7 @@ function seedData() {
                 app + ': ស្វ័យប្រវត្តិរត់ម្តងទៀត ➜ មិនកាត់លុយស្ទួន',
                 JSON.stringify(revAuto1) + ' ➜ ' + JSON.stringify(revAuto2));
 
-            if (app === 'ZoeAdmin') {
+            if (app === 'ZoeW') {
                 const tid = await page.evaluate(() => {
                     const T = window.__fakeStore.zoew_recently_deleted_cod_dod;
                     const e = Object.entries(T).find(([, t]) => (t.barcodes || []).some((b) => b.code === 'AA1'));
@@ -1125,14 +1087,14 @@ function seedData() {
                 await page.waitForTimeout(700);
                 const revAuto3 = await revAuto();
                 check(Math.round((revAuto3.codDollar - revAuto2.codDollar) * 100) / 100 === 30 && (revAuto3.totalCount - revAuto2.totalCount) === 2,
-                    'ZoeAdmin: ស្តារពី ដក ស្វ័យប្រវត្តិ ➜ លុយបូកមកវិញគ្រប់',
+                    'ZoeW: ស្តារពី ដក ស្វ័យប្រវត្តិ ➜ លុយបូកមកវិញគ្រប់',
                     JSON.stringify(revAuto2) + ' ➜ ' + JSON.stringify(revAuto3));
                 const backDeduct = await page.evaluate(() => {
                     const it = Object.values(window.__fakeStore.zoew_scan_history_cod_dod).find((i) => (i.barcodes || []).some((b) => b.code === 'AA1'));
                     return it ? it.barcodes.map((b) => b.isDeducted) : null;
                 });
                 check(backDeduct && backDeduct.every((d) => d === false),
-                    'ZoeAdmin: ស្តារពី ដក ស្វ័យប្រវត្តិ ➜ isDeducted ត្រូវ clear', JSON.stringify(backDeduct));
+                    'ZoeW: ស្តារពី ដក ស្វ័យប្រវត្តិ ➜ isDeducted ត្រូវ clear', JSON.stringify(backDeduct));
             }
         }
         // ផ្លូវបរាជ័យ៖ Firebase បដិសេធការសរសេរ ➜ ស្ថានភាព និងលុយត្រូវត្រឡប់មកដើមវិញ
@@ -1186,7 +1148,7 @@ function seedData() {
             check(afterFail.localClosed === false && afterFail.serverClosed === false,
                 app + ': បិទបញ្ជីបរាជ័យ ➜ ស្ថានភាពក្នុងសតិត្រឡប់មកបើកវិញ', JSON.stringify(afterFail));
 
-            if (app === 'ZoeAdmin') {
+            if (app === 'ZoeW') {
                 await page.evaluate(() => {
                     window.openEditBarcodePriceModal('id_4000_eee', 'FF1');
                     document.getElementById('editBcCodInput').value = '50';
@@ -1199,9 +1161,9 @@ function seedData() {
                     localCod: (typeof scanHistory !== 'undefined' ? scanHistory : []).filter((i) => i.id === 'id_4000_eee').map((i) => i.barcodes[0].cod)[0]
                 }), seed._dateKey);
                 check(afterPriceFail.rev.codDollar === before.rev.codDollar && afterPriceFail.rev.dodDollar === before.rev.dodDollar,
-                    'ZoeAdmin: កែទឹកប្រាក់បរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
+                    'ZoeW: កែទឹកប្រាក់បរាជ័យ ➜ ចំណូលត្រឡប់មកដើមវិញ',
                     JSON.stringify(before.rev) + ' ➜ ' + JSON.stringify(afterPriceFail.rev));
-                check(afterPriceFail.localCod === 12, 'ZoeAdmin: កែទឹកប្រាក់បរាជ័យ ➜ តម្លៃក្នុងសតិត្រឡប់មកដើម', String(afterPriceFail.localCod));
+                check(afterPriceFail.localCod === 12, 'ZoeW: កែទឹកប្រាក់បរាជ័យ ➜ តម្លៃក្នុងសតិត្រឡប់មកដើម', String(afterPriceFail.localCod));
 
                 await page.evaluate(() => window.deleteSingleItem('id_4000_eee'));
                 await page.waitForTimeout(700);
@@ -1212,7 +1174,7 @@ function seedData() {
                     localTrash: (typeof deletedItems !== 'undefined' ? deletedItems : []).some((i) => i.id === 'id_4000_eee')
                 }));
                 check(afterDelFail.stillLive && !afterDelFail.inTrash && afterDelFail.localHas && !afterDelFail.localTrash,
-                    'ZoeAdmin: លុបបរាជ័យ ➜ កញ្ចប់នៅដដែល មិនជាប់ក្នុងធុងសំរាមក្នុងសតិ', JSON.stringify(afterDelFail));
+                    'ZoeW: លុបបរាជ័យ ➜ កញ្ចប់នៅដដែល មិនជាប់ក្នុងធុងសំរាមក្នុងសតិ', JSON.stringify(afterDelFail));
             }
 
             await page.evaluate(() => window.__unblock());
@@ -1223,7 +1185,7 @@ function seedData() {
 
 
         // --- លុបប្រវត្តិទាំងអស់ ត្រូវយកច្បាប់ចម្លងរបស់ server មិនមែនរបស់សតិ ---
-        if (app === 'ZoeAdmin') {
+        if (app === 'ZoeW') {
             await page.evaluate(() => {
                 Object.keys(window.__fakeStore.zoew_scan_history_cod_dod).forEach((k) => {
                     delete window.__fakeStore.zoew_scan_history_cod_dod[k];
@@ -1280,17 +1242,17 @@ function seedData() {
             }, seed._dateKey);
 
             check(clState.trashA && clState.trashA.closed === true && clState.trashA.locker === 'Z5',
-                'ZoeAdmin: លុបទាំងអស់ ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(clState.trashA));
+                'ZoeW: លុបទាំងអស់ ➜ ធុងសំរាមផ្ទុកស្ថានភាពពិតរបស់ server', JSON.stringify(clState.trashA));
             check(clState.trashA && clState.trashA.fromDel === true && clState.trashA.bFromDel === true,
-                'ZoeAdmin: លុបទាំងអស់ ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(clState.trashA));
+                'ZoeW: លុបទាំងអស់ ➜ សម្គាល់ isFromDeletion គ្រប់កម្រិត', JSON.stringify(clState.trashA));
             check(clState.trashBGhost === false,
-                'ZoeAdmin: លុបទាំងអស់ ➜ គ្មានធាតុខ្មោចសម្រាប់អ្វីដែលឧបករណ៍ផ្សេងលុបរួច', JSON.stringify(clState));
+                'ZoeW: លុបទាំងអស់ ➜ គ្មានធាតុខ្មោចសម្រាប់អ្វីដែលឧបករណ៍ផ្សេងលុបរួច', JSON.stringify(clState));
             check(clState.trashC === true && clState.liveA === false && clState.liveC === false,
-                'ZoeAdmin: លុបទាំងអស់ ➜ អ្វីដែលនៅសល់ត្រូវលុបគ្រប់', JSON.stringify(clState));
+                'ZoeW: លុបទាំងអស់ ➜ អ្វីដែលនៅសល់ត្រូវលុបគ្រប់', JSON.stringify(clState));
             check(clState.newSurvived === true && clState.newInTrash === false,
-                'ZoeAdmin: លុបទាំងអស់ ➜ កញ្ចប់ដែលទើបស្កេនពីឧបករណ៍ផ្សេង រួចខ្លួន', JSON.stringify(clState));
+                'ZoeW: លុបទាំងអស់ ➜ កញ្ចប់ដែលទើបស្កេនពីឧបករណ៍ផ្សេង រួចខ្លួន', JSON.stringify(clState));
             check(clState.rev.codDollar === revCl0.codDollar && clState.rev.dodDollar === revCl0.dodDollar && clState.rev.totalCount === revCl0.totalCount,
-                'ZoeAdmin: លុបទាំងអស់ ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)',
+                'ZoeW: លុបទាំងអស់ ➜ ចំណូលមិនប្រែសោះ (គោលការណ៍ លុប)',
                 JSON.stringify(revCl0) + ' ➜ ' + JSON.stringify(clState.rev));
         }
 

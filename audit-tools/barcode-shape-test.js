@@ -57,7 +57,7 @@ const DENSE = () => ([{ code: 'AAA', cod: 5, dod: 1 }, { code: 'BBB', cod: 7, do
 const WITH_NULLS = () => ([{ code: 'AAA', cod: 5, dod: 1 }, null, { code: 'BBB', cod: 7, dod: 2 }]);
 const OBJECT_GAPS = () => ({ '0': { code: 'AAA', cod: 5, dod: 1 }, '2': { code: 'BBB', cod: 7, dod: 2 } });
 
-for (const app of ['ZoeAdmin', 'ZoeW']) {
+for (const app of ['ZoeW']) {
     console.log('\n=== ' + app + ' — history normalizer ===');
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     const ctx = makeCtx(src);
@@ -97,51 +97,6 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
 
     const emptyArr = tryNormalize({ id: 'i7', cod: 5, dod: 0, count: 2, barcodes: [] });
     ok(emptyArr.count === 2, 'an empty barcodes[] does NOT zero the count', emptyArr._threw || emptyArr.count);
-}
-
-console.log('\n=== ZoeAdmin and ZoeW derive the displayed package count identically ===');
-{
-    const a = fs.readFileSync(path.join(ROOT, 'ZoeAdmin', 'app.js'), 'utf8');
-    const w = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
-    const expr = /let totalPackageCount = item\.barcodes && Array\.isArray\(item\.barcodes\) \? item\.barcodes\.length : \(parseFloat\(item\.count\) \|\| 1\);/;
-    ok(expr.test(a), 'ZoeAdmin uses the shared totalPackageCount expression');
-    ok(expr.test(w), 'ZoeW uses the shared totalPackageCount expression');
-    ok(!/\$\{item\.count\}/.test(a), 'ZoeAdmin no longer prints item.count straight into the row');
-}
-
-console.log('\n=== Zoescan — buildBarcodeIndex ===');
-{
-    const src = fs.readFileSync(path.join(ROOT, 'Zoescan', 'app.js'), 'utf8');
-    const ctx = { console, historyData: {}, barcodeIndex: {} };
-    vm.createContext(ctx);
-    const helper = extractFn(src, 'barcodeEntriesOf');
-    if (helper) vm.runInContext(helper, ctx);
-    vm.runInContext(extractFn(src, 'buildBarcodeIndex'), ctx);
-
-    ctx.historyData = { p1: { id: 'p1', barcode: 'AAA', barcodes: DENSE() } };
-    ctx.buildBarcodeIndex();
-    ok(!!ctx.barcodeIndex.AAA && !!ctx.barcodeIndex.BBB, 'dense: both barcodes findable');
-    ok(ctx.barcodeIndex.BBB && ctx.barcodeIndex.BBB.barcodeIdx === 1, 'dense: BBB index is 1', ctx.barcodeIndex.BBB);
-
-    ctx.historyData = { p2: { id: 'p2', barcode: 'AAA', barcodes: OBJECT_GAPS() } };
-    ctx.buildBarcodeIndex();
-    ok(!!ctx.barcodeIndex.BBB, 'object-shaped: second barcode is findable (worker can assign a locker)', Object.keys(ctx.barcodeIndex));
-    ok(ctx.barcodeIndex.BBB && ctx.barcodeIndex.BBB.barcodeIdx === 2,
-        'object-shaped: index stays 2 — the mirror write must target the REAL Firebase slot, not a compacted one',
-        ctx.barcodeIndex.BBB);
-
-    ctx.historyData = { p3: { id: 'p3', barcode: 'AAA', barcodes: WITH_NULLS() } };
-    ctx.buildBarcodeIndex();
-    ok(!!ctx.barcodeIndex.BBB, 'array-with-null: second barcode findable', Object.keys(ctx.barcodeIndex));
-    ok(ctx.barcodeIndex.BBB && ctx.barcodeIndex.BBB.barcodeIdx === 2, 'array-with-null: index stays 2', ctx.barcodeIndex.BBB);
-
-    ctx.historyData = { p4: { id: 'p4', barcode: 'LEGACY' } };
-    ctx.buildBarcodeIndex();
-    ok(!!ctx.barcodeIndex.LEGACY && ctx.barcodeIndex.LEGACY.barcodeIdx === null, 'legacy single-barcode item still indexed', ctx.barcodeIndex.LEGACY);
-
-    ctx.historyData = { p5: { id: 'p5', barcode: 'LEG2', barcodes: [] } };
-    ctx.buildBarcodeIndex();
-    ok(!!ctx.barcodeIndex.LEG2, 'empty barcodes array still falls back to the legacy barcode', ctx.barcodeIndex);
 }
 
 console.log('\n' + (fail ? '❌ ' : '✅ ') + pass + '/' + (pass + fail));

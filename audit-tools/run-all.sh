@@ -31,14 +31,14 @@ run() {
 skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
-for t in policy-test lookup-closed-test auth-recovery-test keylist-consistency-test \
-         license-grace-test phone-suggest-test zoescan-list-test keygen-pin-flow-test \
+for t in policy-test auth-recovery-test keylist-consistency-test \
+         license-grace-test phone-suggest-test keygen-pin-flow-test \
          keygen-session-security-test \
-         barcode-shape-test setup-link-logout-test phone-search-swipe-test \
-         raw-read-shape-test devtools-guard-test concurrent-scan-test scanner-locker-race-test \
+         barcode-shape-test setup-link-logout-test \
+         raw-read-shape-test devtools-guard-test concurrent-scan-test \
          restore-finalization-fence-test \
          restore-race-test clear-history-claim-test google-sheets-cache-test \
-         scanner-lookup-merge-test lookup-config-secret-test \
+         lookup-config-secret-test \
          clear-history-finalization-fence-test \
          setup-link-roundtrip-test; do
     run "$t" node "audit-tools/$t.js"
@@ -46,7 +46,6 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-run "extract.js (ZoeAdmin vs ZoeW)" node audit-tools/extract.js /tmp/zoe-fns
 for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
@@ -56,6 +55,7 @@ run "css-classes" node audit-tools/css-classes.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
+run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
@@ -64,8 +64,8 @@ run "perf (browser ពិត)"       node audit-tools/perf-check.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
-printf '  %-32s ' "node --check លើ app.js ទាំង ៤"
-if for a in ZoeAdmin ZoeW Zoescan ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
+printf '  %-32s ' "node --check លើ app.js ទាំង ២"
+if for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 printf '  %-32s ' "rules JSON valid"
@@ -73,17 +73,17 @@ if python3 -c "import json;json.load(open('firebase-database.rules.json'));json.
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 for f in license-verify.js error-reporting.js; do
-    printf '  %-32s ' "$f byte-identical ×4"
-    if [ "$(md5sum ZoeAdmin/$f ZoeW/$f Zoescan/$f ZoeKeyGen/$f | awk '{print $1}' | sort -u | wc -l)" = "1" ]; then
+    printf '  %-32s ' "$f byte-identical ×2"
+    if [ "$(md5sum ZoeW/$f ZoeKeyGen/$f | awk '{print $1}' | sort -u | wc -l)" = "1" ]; then
         echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 done
 
 printf '  %-32s ' "គ្មាន trailing whitespace"
-if [ "$(cat ZoeAdmin/app.js ZoeW/app.js Zoescan/app.js ZoeKeyGen/app.js | grep -c '[[:space:]]$')" = "0" ]; then
+if [ "$(cat ZoeW/app.js ZoeKeyGen/app.js | grep -c '[[:space:]]$')" = "0" ]; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 printf '  %-32s ' "CACHE_VERSION"
-grep -h CACHE_VERSION ZoeAdmin/sw.js ZoeW/sw.js Zoescan/sw.js ZoeKeyGen/sw.js | grep -o "'[a-z]*-v[0-9]*'" | tr '\n' ' '; echo
+grep -h CACHE_VERSION ZoeW/sw.js ZoeKeyGen/sw.js | grep -o "'[a-z]*-v[0-9]*'" | tr '\n' ' '; echo
 
 if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     echo
@@ -103,7 +103,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     VERSION_APP_DIR="$BASE" node audit-tools/version-check.js 2>&1 | tail -1 | sed 's/^/   version-check:   /'
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
-    SWIPE_APP_DIR="$BASE"   node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   phone-swipe:     /'
+    PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
 fi
 
 echo

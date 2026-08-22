@@ -64,6 +64,11 @@ const BOOT = function (seed) {
             cur = cur[parts[i]];
         }
         const last = parts[parts.length - 1];
+        if (val && typeof val === 'object' && typeof val.__increment === 'number') {
+            const base = typeof cur[last] === 'number' ? cur[last] : 0;
+            cur[last] = Math.round((base + val.__increment + Number.EPSILON) * 100) / 100;
+            return;
+        }
         if (val === null) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(val));
     }
     function snapOf(p) {
@@ -139,6 +144,7 @@ const BOOT = function (seed) {
             return () => {};
         },
         off: () => {}, goOnline: () => {},
+        increment: (n) => ({ __increment: n }),
         get: (r) => Promise.resolve(snapOf(r.path)),
         set: (r, v) => { setPath(r.path, v); fireAll(); return Promise.resolve(); },
         update: (r, obj) => { Object.keys(obj).forEach((k) => setPath((r.path ? r.path + '/' : '') + k, obj[k])); fireAll(); return Promise.resolve(); },
@@ -245,7 +251,7 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    const APPS = (process.env.FUZZ_APPS || 'ZoeAdmin,ZoeW').split(',');
+    const APPS = (process.env.FUZZ_APPS || 'ZoeW').split(',');
     for (const app of APPS) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
@@ -269,7 +275,7 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
             await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
             await page.waitForTimeout(1800);
 
-            const r = rng(1000 + run * 7 + (app === 'ZoeW' ? 500 : 0));
+            const r = rng(1000 + run * 7);
             const trail = [];
             let broke = null;
             for (let i = 0; i < OPS && !broke; i++) {
@@ -328,7 +334,7 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                         }
                     } catch (e) { return 'threw:' + wanted + ':' + (e && e.message); }
                     return null;
-                }, { wanted, pick, amt, isAdmin: app === 'ZoeAdmin' });
+                }, { wanted, pick, amt, isAdmin: true });
                 await page.waitForTimeout(170);
                 const dbg = process.env.FUZZ_DEBUG === '1';
                 if (done) trail.push(done);

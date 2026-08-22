@@ -4,7 +4,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const source = fs.readFileSync(path.join(root, 'ZoeAdmin', 'google-sheets-api', 'Code.gs'), 'utf8');
+const source = fs.readFileSync(path.join(root, 'ZoeW', 'google-sheets-api', 'Code.gs'), 'utf8');
 
 function createApi(options) {
     const rows = options.rows.map((row) => row.slice(0, 4));

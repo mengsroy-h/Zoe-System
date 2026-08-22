@@ -3,7 +3,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const FILE = process.env.LICENSE_JS || path.join(root, 'ZoeAdmin/license-verify.js');
+const FILE = process.env.LICENSE_JS || path.join(root, 'ZoeW/license-verify.js');
 
 function sliceFns(src, names) {
     return names.map((name) => {

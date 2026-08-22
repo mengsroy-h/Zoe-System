@@ -16,7 +16,7 @@ function check(condition, label, detail) {
 }
 
 function createRuntime(existing, key, encrypt) {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'ZoeAdmin', 'app.js'), 'utf8');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'ZoeW', 'app.js'), 'utf8');
     const start = source.indexOf('    function getLookupApiConfig() {');
     const end = source.indexOf('    async function testLookupApiConfig(', start);
     if (start === -1 || end === -1) throw new Error('lookup config functions not found');

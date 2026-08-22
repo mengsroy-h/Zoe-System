@@ -1,5 +1,5 @@
-// Policy harness: slices the REAL shipped code blocks out of ZoeAdmin/app.js and
-// ZoeW/app.js, runs them against fake parcels, and asserts the លុប / ដក invariants.
+// Policy harness: slices the REAL shipped code blocks out of ZoeW/app.js and
+// runs them against fake parcels, and asserts the លុប / ដក invariants.
 const fs = require('fs');
 const vm = require('vm');
 
@@ -83,7 +83,7 @@ function check(label, actual, expected) {
     console.log(`   ${ok ? 'ok  ' : 'FAIL'}  ${label}: ${JSON.stringify(actual)}${ok ? '' : '  expected ' + JSON.stringify(expected)}`);
 }
 
-for (const app of ['ZoeAdmin', 'ZoeW']) {
+for (const app of ['ZoeW']) {
     console.log(`\n================= ${app} =================`);
     const ctx = buildRunner(`${app}/app.js`);
 

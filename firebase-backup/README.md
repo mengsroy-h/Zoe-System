@@ -1,9 +1,9 @@
 # Firebase Backup Tool
 
-Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime Database របស់ជំនួញនីមួយៗ (ZoeAdmin/ZoeW/Zoescan
-share គ្នា) ព្រមទាំង Project License របស់ ZoeKeyGen ទៅជា File JSON (Compress ជា `.gz`) ដាក់ក្នុងម៉ាស៊ីន
+Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime Database របស់ជំនួញនីមួយៗ (ZoeW)
+ព្រមទាំង Project License របស់ ZoeKeyGen ទៅជា File JSON (Compress ជា `.gz`) ដាក់ក្នុងម៉ាស៊ីន
 ក្នុងស្រុក ជាទៀងទាត់ដោយស្វ័យប្រវត្តិ (តាម Task Scheduler/Cron)។ នេះជា **Script ដាច់ដោយឡែក** ដំណើរការ
-ដោយអ្នកគ្រប់គ្រង (Vendor) ខ្លួនឯង — មិនមែនផ្នែកមួយនៃ App ទាំង ៤ ទេ។
+ដោយអ្នកគ្រប់គ្រង (Vendor) ខ្លួនឯង — មិនមែនផ្នែកមួយនៃ App ទាំង ២ ទេ។
 
 ## ហេតុអ្វីត្រូវការ
 

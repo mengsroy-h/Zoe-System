@@ -28,7 +28,7 @@ function clearWitnessAllowed(before, after, itemId) {
     const trash = after.zoew_recently_deleted_cod_dod[itemId];
     return !oldWitness && !!witness && !!clearClaim && clearClaim.token === witness.token &&
         !before.zoew_recently_deleted_cod_dod[itemId] && !after.zoew_scan_history_cod_dod[itemId] &&
-        !after.zoew_scanner_lookup[itemId] && !!trash && trash.id === itemId &&
+        !!trash && trash.id === itemId &&
         typeof trash.deletedAt === 'number' && trash.isFromDeletion === true && !trash.clearClaim;
 }
 
@@ -64,7 +64,6 @@ function finalFanout(before, itemId, token, trashPatch) {
         ...(trashPatch || {})
     };
     delete after.zoew_scan_history_cod_dod[itemId];
-    delete after.zoew_scanner_lookup[itemId];
     return after;
 }
 
@@ -72,9 +71,6 @@ const itemId = 'clear-item-1';
 const base = {
     zoew_scan_history_cod_dod: {
         [itemId]: { id: itemId, phone: '012', clearClaim: { token: 'clear-A', claimedAt: 100 } }
-    },
-    zoew_scanner_lookup: {
-        [itemId]: { id: itemId, barcode: 'BC1' }
     },
     zoew_recently_deleted_cod_dod: {},
     zoew_clear_history_finalizations: {}
@@ -104,7 +100,7 @@ ok('trash រក្សា legacy lockerRevision សម្រាប់ Restore/Cl
     trashItemRules.lockerRevision['.validate'].includes('newData.isNumber()') &&
     trashItemRules.lockerRevision['.validate'].includes('9007199254740990'));
 ok('witness bind prewrite live claim និង post-write move',
-    witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('clearClaim')") && witnessWrite.includes("!root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("!newData.parent().parent().child('zoew_scan_history_cod_dod')") && witnessWrite.includes("!newData.parent().parent().child('zoew_scanner_lookup')") && witnessWrite.includes("child('deletedAt').isNumber()") && witnessWrite.includes("child('isFromDeletion').val() === true") && witnessWrite.includes("newData.parent().parent().child('zoew_recently_deleted_cod_dod')"));
+    witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('clearClaim')") && witnessWrite.includes("!root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("!newData.parent().parent().child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('deletedAt').isNumber()") && witnessWrite.includes("child('isFromDeletion').val() === true") && witnessWrite.includes("newData.parent().parent().child('zoew_recently_deleted_cod_dod')"));
 ok('witness មិនអនុញ្ញាត overwrite និង cleanup ត្រូវ history អវត្តមាន',
     witnessWrite.includes("!data.exists()") && witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod')"));
 
@@ -132,9 +128,6 @@ const collisionFinal = finalFanout(collision, itemId, 'clear-B');
 ok('trash ដែលមានរួច មិនអាច overwrite', !clearWitnessAllowed(collision, collisionFinal, itemId));
 const unsanitized = finalFanout(takenOver, itemId, 'clear-B', { clearClaim: { token: 'clear-B', claimedAt: 200 } });
 ok('trash final មិនអនុញ្ញាត clearClaim លេចធ្លាយ', !clearWitnessAllowed(takenOver, unsanitized, itemId));
-const staleLookup = finalFanout(takenOver, itemId, 'clear-B');
-staleLookup.zoew_scanner_lookup[itemId] = { id: itemId, barcode: 'BC1' };
-ok('clear final ត្រូវលុប scanner lookup ក្នុង fanout ដដែល', !clearWitnessAllowed(takenOver, staleLookup, itemId));
 const malformedTrash = finalFanout(takenOver, itemId, 'clear-B', { isFromDeletion: false });
 ok('clear final ត្រូវទុក trash ដែលអាច recover បាន', !clearWitnessAllowed(takenOver, malformedTrash, itemId));
 const staleAfterFinal = finalFanout(finalB, itemId, 'clear-A');

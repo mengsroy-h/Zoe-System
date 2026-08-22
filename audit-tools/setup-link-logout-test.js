@@ -37,9 +37,9 @@ function fakeDom(pinOpen) {
     };
 }
 
-for (const app of ['ZoeAdmin', 'ZoeW']) {
+for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
-    const stateVar = app === 'ZoeAdmin' ? 'pinTargetAction' : 'pendingSetupLinkConfig';
+    const stateVar = 'pinTargetAction';
 
     for (const pinOpen of [false, true]) {
         console.log(`\n=== ${app} — logout while a Setup Link is armed (PIN modal ${pinOpen ? 'OPEN' : 'closed'}) ===`);
@@ -78,7 +78,7 @@ for (const app of ['ZoeAdmin', 'ZoeW']) {
 }
 
 console.log('\n=== isPinFlowPending behaves correctly in all four apps ===');
-for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     const fn = sliceFn(src, 'isPinFlowPending');
     ok(!!fn, `${app} defines isPinFlowPending`);
@@ -94,13 +94,6 @@ for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
         vm.runInContext(fn, ctx);
         ok(ctx.isPinFlowPending() === open, `${app}: reports ${open ? 'pending' : 'not pending'} correctly`, ctx.isPinFlowPending());
     }
-}
-
-console.log('\n=== Zoescan sign-out branch (lives inside initFirebase, asserted on real source) ===');
-{
-    const src = fs.readFileSync(path.join(ROOT, 'Zoescan', 'app.js'), 'utf8');
-    ok(/if \(!isPinFlowPending\(\)\) \{ pendingSetupLinkConfig = null; pinTargetAction = null; \}/.test(src),
-        'Zoescan clears the armed Setup Link on sign-out, guarded by isPinFlowPending()');
 }
 
 console.log('\n' + (fail ? '❌ ' : '✅ ') + pass + '/' + (pass + fail));

@@ -138,6 +138,7 @@ function makeEnv(opts) {
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_PRF_SALT'), ctx);
     vm.runInContext('let biometricUnlockInFlight = false;', ctx);
     [
+        'safeStoreSet', 'safeStoreRemove',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',

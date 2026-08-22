@@ -136,6 +136,37 @@ function seedBig(n) {
             };
         });
 
+        // ការ sync ពី Firebase មិនត្រូវសាងផ្ទាំងទំព័រ ២ ឡើងវិញ ខណៈអ្នកប្រើនៅទំព័រ ១
+        const hiddenPanelWork = await page.evaluate(async () => {
+            const spy = { locker: 0, entry: 0 };
+            const origLocker = window.renderLockerList;
+            const origEntry = window.renderEntryList;
+            window.renderLockerList = function () { spy.locker++; return origLocker.apply(this, arguments); };
+            window.renderEntryList = function () { spy.entry++; return origEntry.apply(this, arguments); };
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+            window.switchAppPage('data');
+            await wait(260);
+            spy.locker = 0; spy.entry = 0;
+            window.__fireHistory();
+            await wait(320);
+            const onDataPage = { locker: spy.locker, entry: spy.entry };
+
+            window.switchAppPage('entry');
+            await wait(60);
+            spy.locker = 0; spy.entry = 0;
+            window.__fireHistory();
+            await wait(320);
+            const onEntryPage = { locker: spy.locker, entry: spy.entry };
+            const mode = window.localStorage.getItem('zoe_entry_scan_mode') === 'locker' ? 'locker' : 'parcel';
+            const entryRows = document.querySelectorAll('#entryListTableBody tr').length;
+
+            window.renderLockerList = origLocker;
+            window.renderEntryList = origEntry;
+            window.switchAppPage('data');
+            return { onDataPage, onEntryPage, mode, entryRows };
+        });
+
         // ការវាយអក្សរពិតក្នុងប្រអប់ស្វែងរក (ផ្លូវពេញ៖ ច្រោះ + ដុំស្នើលេខ + render)
         const typeMs = await page.evaluate(() => {
             const el = document.getElementById('searchPhoneInput');
@@ -151,6 +182,8 @@ function seedBig(n) {
 
         console.log('    boot=' + bootMs + 'ms  renderCold=' + m.renderCold + 'ms  render=' + m.render + 'ms  listenerRepaint=' + m.listener +
                     'ms  suggest=' + m.suggest + 'ms  recentPhones=' + m.recent + 'ms  keystroke=' + typeMs + 'ms  rows=' + m.rows);
+        console.log('    ការសាងផ្ទាំងទំព័រ ២ ក្នុងមួយ sync៖ នៅទំព័រ ១ ' + JSON.stringify(hiddenPanelWork.onDataPage) +
+                    '  នៅទំព័រ ២ (' + hiddenPanelWork.mode + ') ' + JSON.stringify(hiddenPanelWork.onEntryPage));
 
         if (!REPORT) {
             check(m.renderCold < COLD_LIMIT, app + ': render តារាងទាំងស្រុង (cold) < ' + COLD_LIMIT + 'ms នៅ ' + ORDERS + ' order', 'renderCold=' + m.renderCold + 'ms');
@@ -158,6 +191,13 @@ function seedBig(n) {
             check(m.listener < 600, app + ': repaint ពី Firebase listener < 600ms', 'listener=' + m.listener + 'ms');
             check(m.suggest < 120, app + ': ស្វែងរកលេខ (collectPhoneSuggestions) < 120ms', 'suggest=' + m.suggest + 'ms');
             check(typeMs < 0 || typeMs < 300, app + ': វាយអក្សរ ១ តួក្នុងប្រអប់ស្វែងរក < 300ms', 'keystroke=' + typeMs + 'ms');
+            check(hiddenPanelWork.onDataPage.locker === 0 && hiddenPanelWork.onDataPage.entry === 0,
+                app + ': sync ខណៈនៅទំព័រ ១ មិនសាងផ្ទាំងទំព័រ ២ ឡើងវិញ', JSON.stringify(hiddenPanelWork.onDataPage));
+            const expectedPanel = hiddenPanelWork.mode === 'locker' ? hiddenPanelWork.onEntryPage.locker : hiddenPanelWork.onEntryPage.entry;
+            check(expectedPanel > 0,
+                app + ': sync ខណៈនៅទំព័រ ២ សាងផ្ទាំងដែលកំពុងបង្ហាញឡើងវិញពិត', JSON.stringify(hiddenPanelWork));
+            check(hiddenPanelWork.mode !== 'parcel' || hiddenPanelWork.entryRows > 0,
+                app + ': បញ្ជីកញ្ចប់ថ្ងៃនេះមានជួរដេកបន្ទាប់ពី sync', JSON.stringify(hiddenPanelWork));
         }
         await ctx.close(); server.close();
     }

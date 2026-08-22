@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.1.0';
+    const APP_VERSION = '2.1.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -156,6 +156,14 @@
         return trimmed;
     }
 
+    function safeStoreSet(store, key, value) {
+        try { store.setItem(key, String(value)); return true; } catch (e) { return false; }
+    }
+
+    function safeStoreRemove(store, key) {
+        try { store.removeItem(key); return true; } catch (e) { return false; }
+    }
+
     function openModalHelper(modalId) {
         isModalOpen = true;
         hidePhoneSuggestions();
@@ -246,9 +254,7 @@
         runAutomaticCleanupRules();
         refreshCurrentHistoryView();
         updateRecentPhonesList();
-        buildLockerBarcodeIndex();
-        renderLockerList();
-        renderEntryList();
+        refreshEntryPagePanels();
     }, 120);
 
     function withTimeout(promise, ms, timeoutMsg) {
@@ -537,10 +543,10 @@
     async function completePinUnlock(pin) {
         const savedPin = localStorage.getItem('zoew_security_pin_hash');
         if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-            localStorage.setItem('zoew_security_pin_hash', await hashPin(pin));
+            safeStoreSet(localStorage, 'zoew_security_pin_hash', await hashPin(pin));
         }
-        localStorage.removeItem('zoew_pin_fail_count');
-        localStorage.removeItem('zoew_pin_lockout_until');
+        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
+        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
         lookupSecretKey = await deriveLookupSecretKey(pin);
         closeModal('pinModal');
         (pinTargetAction || openConfigModal)(pin);
@@ -1098,7 +1104,10 @@
         };
         if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
 
-        localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+        if (!safeStoreSet(localStorage, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
+            alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
+            return;
+        }
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
         showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
@@ -1151,9 +1160,12 @@
     function buildCustomerListApiUrl(cfg) {
         if (!cfg || !cfg.url) return null;
         let url = cfg.url.trim();
-        if (/[?&]code=/.test(url)) {
+        if (/[?&][^=&]*=\{barcode\}/.test(url)) {
+            url = url.replace(/([?&])[^=&]*=\{barcode\}/, '$1list=1');
+        } else if (/[?&]code=/.test(url)) {
             url = url.replace(/([?&])code=[^&]*/, '$1list=1');
         } else {
+            url = url.replace('{barcode}', '');
             url += (url.indexOf('?') !== -1 ? '&' : '?') + 'list=1';
         }
         return url;
@@ -1413,7 +1425,7 @@
         if (val <= 0) val = 4100;
 
         exchangeRateRiel = val;
-        localStorage.setItem('zoew_exchange_rate', val);
+        safeStoreSet(localStorage, 'zoew_exchange_rate', val);
 
         if (dbRefExchangeRate) {
             fb.set(dbRefExchangeRate, val).catch(() => {
@@ -1431,8 +1443,8 @@
     const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
 
     function clearRememberedSession(keepEmail) {
-        localStorage.removeItem('zoew_login_time');
-        if (!keepEmail) localStorage.removeItem('remembered_email');
+        safeStoreRemove(localStorage, 'zoew_login_time');
+        if (!keepEmail) safeStoreRemove(localStorage, 'remembered_email');
     }
 
     async function isFirebaseSessionExpired(user) {
@@ -1469,7 +1481,9 @@
         lookupSecretKey = null;
         pendingLockerCode = null;
         lockerBarcodeIndex = {};
+        recentPhonesSignature = null;
         const fieldsToBlank = [
+            'securityPinInput', 'newSecurityPinInput', 'loginPasswordInput', 'activationKeyInput',
             'listModalPhoneText', 'barcodeListContainer', 'callMarkPhoneText',
             'editBcPcText', 'editBcCodInput', 'editBcDodInput', 'editPhoneInput',
             'searchPhoneInput', 'hwScannerInput', 'customerDataTableSearchInput',
@@ -1619,7 +1633,7 @@
             showLoginModalWithPrefill();
             return;
         }
-        sessionStorage.setItem(AUTH_STUCK_RECOVERY_FLAG, '1');
+        safeStoreSet(sessionStorage, AUTH_STUCK_RECOVERY_FLAG, '1');
         try {
             if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
                 const dbs = await indexedDB.databases();
@@ -1721,9 +1735,9 @@
                 autoLoginAttempted = false;
 
                 if (rememberMe) {
-                    localStorage.setItem('remembered_email', email);
+                    safeStoreSet(localStorage, 'remembered_email', email);
                 } else {
-                    localStorage.removeItem('remembered_email');
+                    safeStoreRemove(localStorage, 'remembered_email');
                 }
 
                 if (authGeneration === generationAtLogin && userCredential && userCredential.user) {
@@ -1889,12 +1903,19 @@
         isDatabaseInitialized = true;
     }
 
+    let recentPhonesSignature = null;
+
     function updateRecentPhonesList() {
         const datalist = document.getElementById('recentPhonesList');
         if (!datalist) return;
 
+        const entries = collectPhoneSuggestions('', RECENT_PHONES_MAX);
+        const signature = entries.map(entry => entry.phone).join('\u0001');
+        if (recentPhonesSignature !== null && signature === recentPhonesSignature) return;
+        recentPhonesSignature = signature;
+
         datalist.innerHTML = '';
-        collectPhoneSuggestions('', RECENT_PHONES_MAX).forEach(entry => {
+        entries.forEach(entry => {
             const option = document.createElement('option');
             option.value = entry.phone;
             datalist.appendChild(option);
@@ -2675,7 +2696,9 @@
         if (target === 'entry') {
             setEntryScanMode(entryScanMode);
         } else {
+            const cameraWasLive = isCameraScanning || isCameraStarting;
             stopCurrentStream();
+            if (cameraWasLive) showCameraClosedBox();
             closeConfigQrScanner();
         }
     }
@@ -3362,18 +3385,21 @@
         }
     }
 
-    function closeCameraManually() {
-        stopCurrentStream();
+    function showCameraClosedBox() {
         const permBox = document.getElementById('permission-box');
         const vidContainer = document.getElementById('video-container');
         if (vidContainer) vidContainer.style.display = 'none';
-        if (permBox) {
-            const msgEl = permBox.querySelector('p');
-            const btnEl = permBox.querySelector('button');
-            if (msgEl) msgEl.textContent = '📷 កាមេរ៉ាបានបិទ';
-            if (btnEl) btnEl.textContent = '🔓 បើកកាមេរ៉ាម្តងទៀត';
-            permBox.style.display = 'block';
-        }
+        if (!permBox) return;
+        const msgEl = permBox.querySelector('p');
+        const btnEl = permBox.querySelector('button');
+        if (msgEl) msgEl.textContent = '📷 កាមេរ៉ាបានបិទ';
+        if (btnEl) btnEl.textContent = '🔓 បើកកាមេរ៉ាម្តងទៀត';
+        permBox.style.display = 'block';
+    }
+
+    function closeCameraManually() {
+        stopCurrentStream();
+        showCameraClosedBox();
     }
 
     function setupVisibilityHandling() {
@@ -3381,10 +3407,7 @@
             if (document.hidden && configQrScanActive) closeConfigQrScanner();
             if (document.hidden && isCameraScanning) {
                 stopCurrentStream();
-                const permBox = document.getElementById('permission-box');
-                const vidContainer = document.getElementById('video-container');
-                if (vidContainer) vidContainer.style.display = 'none';
-                if (permBox) permBox.style.display = 'block';
+                showCameraClosedBox();
             }
         });
     }
@@ -4009,6 +4032,7 @@
     const ACTIVE_LOCKER_KEY = 'zoe_active_locker';
     const ENTRY_SCAN_MODE_KEY = 'zoe_entry_scan_mode';
     const ENTRY_LIST_MAX_ROWS = 200;
+    const LOCKER_LIST_MAX_ROWS = 200;
 
     let activeLocker = localStorage.getItem(ACTIVE_LOCKER_KEY) || '';
     let entryScanMode = localStorage.getItem(ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
@@ -4104,8 +4128,8 @@
         const countInput = document.getElementById('lockerCountInput');
         const prefix = (prefixInput ? prefixInput.value.trim() : '') || 'ទូ';
         const count = Math.min(200, Math.max(1, parseInt(countInput ? countInput.value : '', 10) || 24));
-        localStorage.setItem(LOCKER_PREFIX_KEY, prefix);
-        localStorage.setItem(LOCKER_COUNT_KEY, String(count));
+        safeStoreSet(localStorage, LOCKER_PREFIX_KEY, prefix);
+        safeStoreSet(localStorage, LOCKER_COUNT_KEY, String(count));
         closeModal('lockerSettingsModal');
         renderLockerGrid();
         showToast('✅ បានរក្សាទុកការកំណត់ទូ');
@@ -4133,7 +4157,7 @@
     function openLockerPicker() {
         if (!isValidLockerName(activeLocker)) {
             activeLocker = '';
-            localStorage.removeItem(ACTIVE_LOCKER_KEY);
+            safeStoreRemove(localStorage, ACTIVE_LOCKER_KEY);
         }
         renderLockerGrid();
         openModalHelper('lockerPickerModal');
@@ -4146,7 +4170,7 @@
             return;
         }
         activeLocker = locker;
-        localStorage.setItem(ACTIVE_LOCKER_KEY, locker);
+        safeStoreSet(localStorage, ACTIVE_LOCKER_KEY, locker);
         closeModal('lockerPickerModal');
         updateActiveLockerLabel();
         showToast(`📍 ទីតាំងបច្ចុប្បន្ន៖ ${locker}`);
@@ -4172,7 +4196,7 @@
 
     function setEntryScanMode(mode) {
         entryScanMode = mode === 'locker' ? 'locker' : 'parcel';
-        localStorage.setItem(ENTRY_SCAN_MODE_KEY, entryScanMode);
+        safeStoreSet(localStorage, ENTRY_SCAN_MODE_KEY, entryScanMode);
         const parcelBtn = document.getElementById('modeParcelBtn');
         const lockerBtn = document.getElementById('modeLockerBtn');
         if (parcelBtn) parcelBtn.classList.toggle('active', entryScanMode === 'parcel');
@@ -4375,6 +4399,21 @@
         }
     }
 
+    function entryPageIsVisible() {
+        const page = document.getElementById('pageEntry');
+        return !!(page && page.classList.contains('active'));
+    }
+
+    function refreshEntryPagePanels() {
+        if (currentAppPage !== 'entry' || !entryPageIsVisible()) return;
+        if (entryScanMode === 'locker') {
+            buildLockerBarcodeIndex();
+            renderLockerList();
+            return;
+        }
+        renderEntryList();
+    }
+
     function renderEntryList() {
         const tbody = document.getElementById('entryListTableBody');
         const emptyState = document.getElementById('entryListEmptyState');
@@ -4446,9 +4485,12 @@
 
     function getItemLatestLockerTs(item) {
         let ts = 0;
-        if (Array.isArray(item.barcodes)) item.barcodes.forEach((b) => { if (b && b.lockerUpdatedAt) ts = Math.max(ts, b.lockerUpdatedAt); });
-        if (item.lockerUpdatedAt) ts = Math.max(ts, item.lockerUpdatedAt);
-        return ts || item.createdAt || item.time || 0;
+        if (Array.isArray(item.barcodes)) item.barcodes.forEach((b) => { if (b && b.lockerUpdatedAt) ts = Math.max(ts, parseFloat(b.lockerUpdatedAt) || 0); });
+        if (item.lockerUpdatedAt) ts = Math.max(ts, parseFloat(item.lockerUpdatedAt) || 0);
+        if (ts) return ts;
+        const created = parseFloat(item.createdAt);
+        if (isFinite(created)) return created;
+        return parseTimestampFromId(item.id) || 0;
     }
 
     function renderLockerList() {
@@ -4460,10 +4502,16 @@
         const searchInput = document.getElementById('lockerListSearchInput');
         const search = (searchInput ? searchInput.value : '').trim().toLowerCase();
 
-        let assigned = scanHistory.filter((it) => it && getItemLockerSummary(it).length > 0);
-
         const allLockers = new Set();
-        assigned.forEach((it) => getItemLockerSummary(it).forEach((l) => allLockers.add(l)));
+        let assigned = [];
+        scanHistory.forEach((it) => {
+            if (!it) return;
+            const lockers = getItemLockerSummary(it);
+            if (!lockers.length) return;
+            lockers.forEach((l) => allLockers.add(l));
+            assigned.push({ item: it, lockers: lockers, ts: getItemLatestLockerTs(it) });
+        });
+
         const prevVal = filterSelect.value;
         let optHtml = '<option value="">ទីតាំងទាំងអស់</option>';
         Array.from(allLockers).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach((l) => {
@@ -4477,15 +4525,15 @@
 
         const searchDigits = normalizePhoneDigits(search);
         if (search) {
-            assigned = assigned.filter((it) => {
-                const phone = sanitizePhoneNumber(it.phone || '');
+            assigned = assigned.filter((row) => {
+                const phone = sanitizePhoneNumber(row.item.phone || '');
                 if (!searchDigits) return phone.toLowerCase().includes(search);
                 return normalizePhoneDigits(phone).indexOf(searchDigits) !== -1;
             });
         }
-        if (lockerFilter) assigned = assigned.filter((it) => getItemLockerSummary(it).includes(lockerFilter));
+        if (lockerFilter) assigned = assigned.filter((row) => row.lockers.indexOf(lockerFilter) !== -1);
 
-        assigned = assigned.slice().sort((a, b) => getItemLatestLockerTs(b) - getItemLatestLockerTs(a));
+        assigned.sort((a, b) => b.ts - a.ts);
 
         if (!assigned.length) {
             tbody.innerHTML = '';
@@ -4495,12 +4543,12 @@
         if (emptyState) emptyState.classList.add('hidden');
 
         let html = '';
-        assigned.forEach((it, i) => {
-            const phoneRaw = sanitizePhoneNumber(it.phone || '');
+        assigned.slice(0, LOCKER_LIST_MAX_ROWS).forEach((row, i) => {
+            const phoneRaw = sanitizePhoneNumber(row.item.phone || '');
             const phoneCell = phoneRaw
                 ? `<span class="phone-cell">${sanitizeInput(phoneRaw)}</span>`
                 : '<span class="phone-empty">គ្មានលេខ</span>';
-            const lockers = getItemLockerSummary(it);
+            const lockers = row.lockers;
             const lockerText = lockers.length > 1
                 ? `${sanitizeInput(lockers.join(', '))} (${lockers.length} កន្លែង)`
                 : sanitizeInput(lockers[0] || '');
@@ -4510,6 +4558,9 @@
                 <td><span class="locker-badge">${lockerText}</span></td>
             </tr>`;
         });
+        if (assigned.length > LOCKER_LIST_MAX_ROWS) {
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${assigned.length - LOCKER_LIST_MAX_ROWS} ជួរដេកទៀត (សូមស្វែងរក ឬច្រោះតាមទីតាំង)</td></tr>`;
+        }
         tbody.innerHTML = html;
     }
 
@@ -4588,7 +4639,7 @@
             locker = "N/A";
         } else {
             lastEnteredLocker = rawLocker;
-            localStorage.setItem('last_entered_locker', rawLocker);
+            safeStoreSet(localStorage, 'last_entered_locker', rawLocker);
         }
 
         const barcodeToSave = pendingBarcode;
@@ -5214,6 +5265,21 @@
                 }
 
                 serverApplied = false;
+                if (!db || !fb || !/^[a-zA-Z0-9_-]+$/.test(String(editedItemId || ''))) {
+                    if (revenueApplied) {
+                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
+                    }
+                    targetB.cod = oldCod;
+                    targetB.dod = oldDod;
+                    item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                    item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                    item.price = Math.round((item.cod + item.dod) * 100) / 100;
+                    refreshCurrentHistoryView();
+                    closeModal('editBarcodePriceModal');
+                    openViewListModal(item.id);
+                    showToast("⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ! ការកែទឹកប្រាក់មិនត្រូវបានរក្សាទុកទេ។");
+                    return;
+                }
                 fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
                     serverApplied = false;
                     if (!currentItem) return currentItem;

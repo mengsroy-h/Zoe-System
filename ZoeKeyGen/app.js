@@ -1,4 +1,4 @@
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 const LICENSE_APP_CODE = 'ADM';
 
@@ -192,6 +192,14 @@ function clearKeypairOutputs() {
     if (privateOut) privateOut.value = '';
     const publicOut = document.getElementById('newPublicKeyOutput');
     if (publicOut) publicOut.value = '';
+}
+
+function safeStoreSet(store, key, value) {
+    try { store.setItem(key, String(value)); return true; } catch (e) { return false; }
+}
+
+function safeStoreRemove(store, key) {
+    try { store.removeItem(key); return true; } catch (e) { return false; }
 }
 
 function openModalHelper(id) {
@@ -415,7 +423,7 @@ async function tryRestoreSigningKeyFromSession() {
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
         if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
-        sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+        safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
         const cb = document.getElementById('rememberSigningKeyCheckbox');
         if (cb) cb.checked = false;
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
@@ -601,6 +609,10 @@ function showLoginModalWithPrefill() {
     if (losingUncopiedKeypair) {
         alert('⚠️ Keypair ថ្មីដែលអ្នកទើបបង្កើត ត្រូវបានលុបចោល ព្រោះអ្នកបានចាកចេញពីប្រព័ន្ធ ហើយអ្នកមិនទាន់បានចម្លង Private Key ទុកទេ។ នេះជាការការពារ (Private Key មិនត្រូវនៅសល់លើឧបករណ៍បន្ទាប់ពី Logout)។ សូមចូលម្តងទៀត ហើយបង្កើត Keypair ថ្មី — កុំភ្លេចចម្លងវាភ្លាមៗ។');
     }
+    ['securityPinInput', 'newSecurityPinInput'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     const savedEmail = localStorage.getItem('remembered_email');
     const emailInput = document.getElementById('loginEmailInput');
     const passwordInput = document.getElementById('loginPasswordInput');
@@ -776,7 +788,7 @@ async function attemptAuthStorageRecovery() {
         showLoginModalWithPrefill();
         return;
     }
-    sessionStorage.setItem(AUTH_STUCK_RECOVERY_FLAG, '1');
+    safeStoreSet(sessionStorage, AUTH_STUCK_RECOVERY_FLAG, '1');
     try {
         if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
             const dbs = await indexedDB.databases();
@@ -898,7 +910,7 @@ function clearSigningKey(silent) {
     signingKeySessionKey = null;
     const input = document.getElementById('privateKeyInput');
     if (input) input.value = '';
-    sessionStorage.removeItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+    safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
     if (rememberCb) rememberCb.checked = false;
     isGeneratingKey = false;
@@ -1124,7 +1136,7 @@ function generateSetupLink() {
         return;
     }
 
-    localStorage.setItem(SETUP_LINK_URL_KEY, baseUrl);
+    safeStoreSet(localStorage, SETUP_LINK_URL_KEY, baseUrl);
 
     let b64;
     try {

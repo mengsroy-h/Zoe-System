@@ -143,6 +143,8 @@ function build(options) {
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
     vm.runInContext(slice([
+        'safeStoreSet',
+        'safeStoreRemove',
         'invalidateSensitiveSession',
         'captureSensitiveSession',
         'isSensitiveSessionCurrent',

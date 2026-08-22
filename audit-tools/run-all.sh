@@ -47,7 +47,7 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write version-check; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done

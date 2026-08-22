@@ -71,11 +71,14 @@ function buildEnv(src, opts) {
         positionPhoneSuggestBox() { calls.position++; },
         document: {
             getElementById: (id) => els[id] || null,
-            activeElement: o.searchActive ? els.searchPhoneInput : null
+            activeElement: o.searchActive ? els.searchPhoneInput : null,
+            body: { style: {}, classList: { add() {}, remove() {}, contains: () => false } }
         }
     };
     ctx.window.document = ctx.document;
     vm.createContext(ctx);
+    vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
+    vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
     vm.runInContext(sliceFn(src, 'syncHistoryExpandedLock'), ctx);
     vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);

@@ -75,7 +75,7 @@ function makeContext(app) {
                 if (id === 'recentPhonesList') return datalist;
                 return null;
             },
-            body: { style: {} },
+            body: { style: {}, classList: { add() {}, remove() {}, contains: () => false } },
             createElement: () => ({
                 className: '',
                 textContent: '',
@@ -99,7 +99,7 @@ function makeContext(app) {
     };
     const ctx = vm.createContext(sandbox);
 vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
-    const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper'];
+    const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper', 'showAppChrome'];
     const optional = ['normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');
     const present = optional.filter((n) => src.indexOf('function ' + n + '(') !== -1);
@@ -107,10 +107,11 @@ vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     const consts2 = src.match(/const RECENT_PHONES_MAX = \d+;/);
     const stateDecls = (src.match(/^ *let phoneSuggest\w+ = .*$/gm) || []).join('\n');
     const recentSigDecl = (src.match(/^ *let recentPhonesSignature = .*$/m) || ['let recentPhonesSignature = null;'])[0];
+    const chromeDecl = (src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0];
     vm.runInContext((consts ? consts[0] : 'const PHONE_SUGGEST_MAX = 8;') + '\n' +
         (consts2 ? consts2[0] : 'const RECENT_PHONES_MAX = 30;') + '\n' +
         (stateDecls || 'let phoneSuggestItems = []; let phoneSuggestActiveIndex = -1;') + '\n' +
-        recentSigDecl +
+        recentSigDecl + '\n' + chromeDecl +
         '\nlet isModalOpen = false;', ctx);
     vm.runInContext(slice(app + '/app.js', names.concat(present)), ctx);
     const maxRows = consts ? parseInt(consts[0].replace(/\D/g, ''), 10) : 8;

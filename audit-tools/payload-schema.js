@@ -29,7 +29,7 @@ const TRASH_VARS = new Set(['trashItem', 'removed', 'deletedItem']);
 const BARCODE_VARS = new Set(['b', 'bc', 'barcode', 'restoredBc', 'newBarcode', 'revertB']);
 
 let problems = 0;
-for (const app of ['ZoeAdmin', 'ZoeW']) {
+for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
 

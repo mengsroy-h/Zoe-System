@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '2.0.0';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -1000,7 +1000,7 @@ async function generateLicenseKey() {
         });
         if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
 
-        const targetPaths = appSelect === 'ALL' ? ['ADM', 'ZOW', 'SCN'] : [appSelect];
+        const targetPaths = [appSelect];
         const publicRecord = {
             expiresAt: getServerNow() + Math.round(days * 86400000),
             revoked: false
@@ -1088,7 +1088,7 @@ function copyGeneratedKey() {
     navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
 }
 
-const SETUP_LINK_URL_KEYS = { ADM: 'zoekeygen_setup_url_ADM', ZOW: 'zoekeygen_setup_url_ZOW', SCN: 'zoekeygen_setup_url_SCN' };
+const SETUP_LINK_URL_KEYS = { ADM: 'zoekeygen_setup_url_ADM' };
 let lastGeneratedSetupLink = '';
 
 function onSetupLinkAppChange() {
@@ -1168,7 +1168,7 @@ function copySetupLink() {
 let isSignedInUiActive = false;
 let keyListCache = [];
 let keyListSessionGeneration = 0;
-const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zoescan', ALL: 'ទាំង ៣' };
+const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
 
 function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1195,7 +1195,7 @@ async function refreshKeyList() {
         const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
 
         const byId = {};
-        ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {
+        ['ADM'].forEach((appCode) => {
             const bucket = publicData[appCode] || {};
             Object.keys(bucket).forEach((id) => {
                 if (!byId[id]) byId[id] = { id: id, existsIn: [], perApp: {} };
@@ -1267,7 +1267,7 @@ function renderKeyList() {
             statusHtml += ` <span class="badge badge-revoked" title="${escapeHtml('ស្ថានភាពមិនដូចគ្នារវាង App (ការធ្វើបច្ចុប្បន្នភាពមុនជោគជ័យមិនពេញលេញ)៖ ' + perAppText)}">⚠️ មិនត្រូវគ្នា</span>`;
         }
 
-        const isPartialAll = row.scope === 'ALL' && Array.isArray(row.paths) && row.paths.length > 0 && row.paths.length < 3;
+        const isPartialAll = false;
         const scopeLabel = escapeHtml(APP_LABELS[row.scope] || row.scope);
         const scopeHtml = isPartialAll
             ? `<span class="badge badge-scope" title="${escapeHtml('សកម្មតែលើ: ' + row.paths.map((p) => APP_LABELS[p] || p).join(', '))}">${scopeLabel} ⚠️</span>`
@@ -1300,7 +1300,7 @@ async function migrateLegacyLicenseKeyMetadata() {
         let migratedCount = 0;
         const META_FIELDS = ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'];
 
-        ['ADM', 'ZOW', 'SCN'].forEach((appCode) => {
+        ['ADM'].forEach((appCode) => {
             const bucket = data[appCode] || {};
             Object.keys(bucket).forEach((id) => {
                 const rec = bucket[id] || {};

@@ -7,7 +7,7 @@ try { acorn = require('acorn'); } catch (e) {
 }
 
 const ROOT = process.env.STALEWRITE_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan'];
+const APPS = ['ZoeW'];
 
 const MEMORY_ARRAYS = ['scanHistory', 'deletedItems'];
 

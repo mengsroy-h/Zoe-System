@@ -202,7 +202,7 @@ async function expectError(work) {
 }
 
 (async () => {
-    for (const app of ['ZoeAdmin', 'ZoeW']) {
+    for (const app of ['ZoeW']) {
         console.log('\n=== ' + app + ' restore claims ===');
         const shared = createSharedStore();
         const tabA = tabFor(app, shared, 'A');

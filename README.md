@@ -1,37 +1,46 @@
 # Zoe-System — ប្រព័ន្ធគ្រប់គ្រងកញ្ចប់ទំនិញ
 
-Zoe-System ជាសំណុំ PWA ចំនួន ៤ សម្រាប់គ្រប់គ្រងកញ្ចប់អតិថិជន៖ បញ្ចូល Barcode, កំណត់ Locker, ទទួលកញ្ចប់, គណនា COD/DOD និងគ្រប់គ្រង Activation Key។ ឯកសារនេះត្រូវបានរៀបចំសម្រាប់ដាក់នៅ **root របស់ repository** ដើម្បីឱ្យតំណភ្ជាប់ខាងក្រោមដំណើរការ។
+Zoe-System ជាសំណុំ PWA ចំនួន **២** សម្រាប់គ្រប់គ្រងកញ្ចប់អតិថិជន៖ បញ្ចូល Barcode, កំណត់ទីតាំង Locker, ទទួលកញ្ចប់, គណនា COD/DOD និងគ្រប់គ្រង Activation Key។ ឯកសារនេះត្រូវបានរៀបចំសម្រាប់ដាក់នៅ **root របស់ repository** ដើម្បីឱ្យតំណភ្ជាប់ខាងក្រោមដំណើរការ។
 
-កំណែ release បច្ចុប្បន្ន៖ **`1.0.4`**។
+កំណែ release បច្ចុប្បន្ន៖ **`2.0.0`**។
 
-## App ទាំង ៤
+## App ទាំង ២
 
-| App | តួនាទី | មុខងារសំខាន់ | ឯកសារលម្អិត |
+| App | អ្នកប្រើ | មុខងារសំខាន់ | ឯកសារលម្អិត |
 |---|---|---|---|
-| **ZoeAdmin** | `admin` | បង្កើត/កែសម្រួលកញ្ចប់, COD/DOD, របាយការណ៍, Export និង Scanner Lookup rebuild | [ZoeAdmin/README.md](ZoeAdmin/README.md) |
-| **ZoeW** | `admin`, `worker` | ស្វែងរក, ហៅអតិថិជន, បិទ/បើកកញ្ចប់ និងតាមដានប្រចាំថ្ងៃ | [ZoeW/README.md](ZoeW/README.md) |
-| **Zoescan** | `admin`, `worker`, `scanner` | ស្កេន Barcode ដែលមានស្រាប់ និងកំណត់ទីតាំង Locker ប៉ុណ្ណោះ | [Zoescan/README.md](Zoescan/README.md) |
-| **ZoeKeyGen** | `admin` ក្នុង License Firebase Project ដាច់ដោយឡែក | បង្កើត, Revoke, Extend Activation Key និង Setup Link/QR | [ZoeKeyGen/README.md](ZoeKeyGen/README.md) |
+| **ZoeW** | បុគ្គលិកដែលចូលប្រព័ន្ធបាន | បញ្ចូល/កែសម្រួលកញ្ចប់, COD/DOD, កំណត់ទីតាំង Locker, របាយការណ៍ និង Export | [ZoeW/README.md](ZoeW/README.md) |
+| **ZoeKeyGen** | អ្នកលក់ (Vendor) ប៉ុណ្ណោះ | បង្កើត, Revoke, Extend Activation Key និង Setup Link/QR | [ZoeKeyGen/README.md](ZoeKeyGen/README.md) |
 
 ## ស្ថាបត្យកម្ម និងប្រភពទិន្នន័យ
 
 - App ទាំងអស់ជា **Vanilla JavaScript PWA** គ្មាន framework និងគ្មាន build step។ Deploy ថត App នីមួយៗជា static site ដាច់ដោយឡែក។
-- **Business Firebase Project** ប្រើរួមដោយ ZoeAdmin, ZoeW និង Zoescan សម្រាប់ទិន្នន័យអាជីវកម្ម។
+- **Business Firebase Project** ប្រើដោយ ZoeW សម្រាប់ទិន្នន័យអាជីវកម្ម — មួយ Project ក្នុងមួយជំនួញ។
 - **License Firebase Project** របស់ ZoeKeyGen ត្រូវដាច់ពី Business Project ដើម្បីបំបែក signing key និងសិទ្ធិ License ចេញពីទិន្នន័យអតិថិជន។
-- `zoew_scan_history_cod_dod` ជាទិន្នន័យសំខាន់។ `zoew_scanner_lookup` ជា projection សង្ខេបសម្រាប់ Zoescan ហើយមិនផ្ទុក COD/DOD ទេ។
-- `license-verify.js` និង `error-reporting.js` ត្រូវដូចគ្នាបេះបិទនៅ App ទាំង ៤។ កុំកែតែ App មួយ។
+- `zoew_scan_history_cod_dod` ជាប្រភពទិន្នន័យសំខាន់តែមួយ។ App អានវាដោយផ្ទាល់ គ្មាន projection ជាន់ទីពីរទេ។
+- `license-verify.js` និង `error-reporting.js` ត្រូវដូចគ្នាបេះបិទនៅ App ទាំង ២។ កុំកែតែ App មួយ។
 
 ### Firebase paths សំខាន់
 
 | Path | គោលបំណង |
 |---|---|
-| `zoew_scan_history_cod_dod` | កញ្ចប់សកម្ម និង Barcode របស់វា |
-| `zoew_scanner_lookup` | ទិន្នន័យសង្ខេបសម្រាប់ស្វែងរក Barcode និង Locker |
+| `zoew_scan_history_cod_dod` | កញ្ចប់សកម្ម, Barcode និងទីតាំង Locker របស់វា |
 | `zoew_recently_deleted_cod_dod` | ធុងសំរាមសម្រាប់ស្តារ item/Barcode |
 | `zoew_daily_revenue_cod_dod`, `zoew_monthly_revenue_cod_dod` | ស្ថិតិ COD/DOD |
 | `zoew_daily_pickup_cod_dod` | ស្ថិតិអតិថិជន និងកញ្ចប់ដែលបានយក |
 | `zoew_restore_finalizations`, `zoew_clear_history_finalizations` | witness សម្រាប់ការពារ Restore/Clear All replay និង revenue ស្ទួន |
-| `user_roles/$uid` | តួនាទី `admin`, `worker`, ឬ `scanner` |
+| `zoew_barcode_registry` | ការពារ Barcode ស្ទួនឆ្លងឧបករណ៍ |
+| `zoew_settings/exchange_rate` | អត្រាប្តូរប្រាក់រៀល |
+
+## រចនាសម្ព័ន្ធ UI
+
+ZoeW បែងចែកជា **ទំព័រ ២** បូកនឹង **របា Slide (ម៉ឺនុយ)**៖
+
+| ផ្នែក | មាតិកា |
+|---|---|
+| **ទំព័រ ១ — ទិន្នន័យ** | តារាងគ្រប់គ្រងប្រចាំថ្ងៃ (ស្ថិតិ + ទឹកប្រាក់ + តម្រងថ្ងៃ), ប្រអប់ស្វែងរកលេខ, តារាងប្រវត្តិ |
+| **ទំព័រ ២ — បញ្ចូលទិន្នន័យ** | របៀបស្កេន ២ (បញ្ចូលកញ្ចប់ / កំណត់ទីតាំង Locker), កាមេរ៉ា, Barcode scanner, យក Barcode ពីរូបភាព, បញ្ជីកញ្ចប់ដែលបញ្ចូលថ្ងៃនេះ, ផ្ទាំង Locker និងបញ្ជីទីតាំង |
+| **របា Slide (☰)** | Config / Reconfig, API ស្វែងរកអតិថិជន, តារាងអតិថិជន, កំណត់ទូ Locker, ចូល/ចាកចេញ |
+| **ប៊ូតុង (...) លើតារាងប្រវត្តិ** | Export Data, កែទឹកប្រាក់/កញ្ចប់, អត្រាប្រាក់, លុបទាំងអស់ |
 
 ## ច្បាប់អាជីវកម្ម
 
@@ -44,34 +53,40 @@ Zoe-System ជាសំណុំ PWA ចំនួន ៤ សម្រាប់�
 
 Restore និង Clear All ប្រើ claim, token និង atomic multi-location update។ នេះការពារ tab/ឧបករណ៍ពីរមិនឱ្យស្តារ ឬបូក revenue ស្ទួនសម្រាប់ធាតុតែមួយ។ កុំកែ path ធុងសំរាម ឬស្ថិតិដោយដៃ ខណៈប្រតិបត្តិការទាំងនេះកំពុងដំណើរការ។
 
-### Scanner Locker protocol
+ការសម្អាតស្វ័យប្រវត្តិ៖ កញ្ចប់បិទលើស **២ ម៉ោង** ➜ «លុប», កញ្ចប់មិនទាន់បិទលើស **៨ ថ្ងៃ** ➜ «ដក», ធុងសំរាមលើស **១០ ថ្ងៃ** ➜ purge។
 
-Zoescan មិនអាចបង្កើត, លុប ឬកែ COD/DOD, Phone, Barcode និង `isClosed` បានទេ។ ការកំណត់ Locker ប្រើលំដាប់៖
+### លុបទាំងអស់ — តាមតម្រងថ្ងៃ
 
-1. Reserve Locker លើ Scanner Lookup ដោយ transaction;
-2. ផ្ទៀងផ្ទាត់ Barcode index/code, revision, Firebase UID និងអាយុកាល reservation;
-3. Commit lookup និង history ក្នុង atomic update តែមួយ។
+«លុបទាំងអស់» លុប **តែធាតុដែលកំពុងបង្ហាញតាមតម្រងថ្ងៃបច្ចុប្បន្ន** ប៉ុណ្ណោះ។ ឧ. ពេលឈរលើ «ថ្ងៃនេះ» វាមិនប៉ះទិន្នន័យថ្ងៃផ្សេងទេ។ វាទាមទារ **Security PIN** មុនដំណើរការ ដូច «កែទឹកប្រាក់/កញ្ចប់» ដែរ។
 
-ទិន្នន័យ lookup/history ចាស់ ឬមិនស៊ីគ្នា ត្រូវ fail-closed។ ប្រសិនបើ Zoescan មិនឃើញ ឬមិនអាចកំណត់ Locker សម្រាប់កញ្ចប់ចាស់ សូមប្រើ **Scanner Lookup rebuild** ក្នុង ZoeAdmin ជាមុន។
+### កំណត់ទីតាំង Locker
+
+នៅទំព័រ ២ ជ្រើសរើសរបៀប «📍 កំណត់ទីតាំង Locker» រួចជ្រើសទូបច្ចុប្បន្ន។ រាល់ Barcode ដែលស្កេនបន្ទាប់ពីនោះ៖
+
+- កញ្ចប់ដែល **មិនទាន់មានទីតាំង** ➜ ចុះទីតាំងភ្លាម **គ្មានប្រអប់សួរបញ្ជាក់**;
+- កញ្ចប់ដែល **មានទីតាំងរួច** ➜ សួរបញ្ជាក់ជាមុន («តើអ្នកចង់ផ្លាស់ទីកញ្ចប់នេះទៅ … មែនទេ?») ព្រមទាំងប្រាប់បើទីតាំងគោលដៅមានកញ្ចប់ផ្សេងស្ថិតនៅ;
+- កញ្ចប់ដែលស្ថិតនៅទីតាំងដដែលរួច ➜ គ្មានការសរសេរថ្មី។
+
+ការសរសេរធ្វើឡើងដោយ `runTransaction` ផ្ទាល់លើ `zoew_scan_history_cod_dod` ដោយផ្គូផ្គងតាម `code` (មិនមែនតាម index) ដូច្នេះការស្កេនស្របគ្នាពីឧបករណ៍ច្រើនមិនសរសេរជាន់គ្នាទេ។
 
 ## សុវត្ថិភាព
 
 - Firebase Realtime Database Rules ជាអ្នកសម្រេចសិទ្ធិពិត; UI មិនមែនជាការការពារតែមួយទេ។
-- តួនាទី `scanner` សរសេរបានតែ metadata ដែលត្រូវការសម្រាប់ Locker assignment លើ item ដែលមានស្រាប់។
+- Rules មិនបែងចែកតួនាទីទេ៖ **អ្នកប្រើដែលចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា**។ ការការពារពិតគឺ **schema validation** (ប្រភេទវាល, ជួរតម្លៃ, `$other: false`) និង **claim/witness fence** សម្រាប់ Restore/Clear All។
 - Setup Link/QR មិនរក្សាទុក Firebase Config ដោយស្វ័យប្រវត្តិទេ៖ អ្នកប្រើត្រូវបញ្ចូល Security PIN, ពិនិត្យ Config ហើយចុចរក្សាទុកដោយខ្លួនឯង។
-- ZoeKeyGen ប្រើ browser-session persistence។ Checkbox «ចងចាំអ៊ីមែល» រក្សាទុកតែអ៊ីមែល មិនរក្សា Firebase login session ទេ។
+- ZoeKeyGen ប្រើ browser-session persistence និងទាមទារតួនាទី `admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា។
 - Signing Key ដែលចងចាំសម្រាប់ session ត្រូវអ៊ិនគ្រីបដោយ PIN ហើយត្រូវផ្ទៀងផ្ទាត់ជាមួយ public key មុនប្រើវិញ។
 - Logout សម្អាតទិន្នន័យរសើបពី UI។ កុំទុក PIN, Private Key, API secret ឬ Export អតិថិជនលើឧបករណ៍ចែករំលែក។
 
 ## កំណែ និង Service Worker
 
-`APP_VERSION` ក្នុង `app.js` ទាំង ៤ និង `version` ក្នុង `manifest.json` ទាំង ៤ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ `1.0.4`។
+`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ `2.0.0` ហើយវាបង្ហាញ **តែក្នុងប្រអប់ login**។
 
 `CACHE_VERSION` ក្នុង `sw.js` មិនមែន App version ទេ។ វាត្រូវប្ដូររាល់ពេល asset របស់ App នោះផ្លាស់ប្តូរ ដើម្បីឱ្យ Service Worker ទាញឯកសារថ្មី។
 
 ពេល release៖
 
-1. ប្តូរ App version និង manifest ទាំង ៤ ប្រសិនបើមាន release ថ្មី;
+1. ប្តូរ App version និង manifest ទាំង ២ ប្រសិនបើមាន release ថ្មី;
 2. ប្តូរ cache version របស់ App ដែល asset ផ្លាស់ប្តូរ;
 3. រត់ validation;
 4. Deploy static App ដែលពាក់ព័ន្ធក្នុង maintenance window តែមួយ;
@@ -79,11 +94,12 @@ Zoescan មិនអាចបង្កើត, លុប ឬកែ COD/DOD, Phone
 
 ## Provisioning អតិថិជនថ្មី
 
-1. បង្កើត Business Firebase Project មួយសម្រាប់អតិថិជនម្នាក់ និងកំណត់ `user_roles/<UID>` តាមតួនាទី។
+1. បង្កើត Business Firebase Project មួយសម្រាប់អតិថិជនម្នាក់ ហើយបង្កើតគណនី Authentication សម្រាប់បុគ្គលិក។
 2. បង្កើត License Firebase Project ដាច់ដោយឡែកសម្រាប់ ZoeKeyGen។
-3. ក្នុង ZoeKeyGen បង្កើត Setup Link/QR ដោយប្រើ Firebase Config របស់ Business Project។
-4. លើឧបករណ៍គោលដៅ បើក Link ឬស្កេន QR, បញ្ចូល PIN, ពិនិត្យ JSON ហើយរក្សាទុកដោយចេតនា។
-5. Publish Rules ត្រឹមត្រូវសម្រាប់ Business Project និង License Project មុនចាប់ផ្តើមប្រើប្រាស់។
+3. Publish Rules សម្រាប់ Project ទាំងពីរ។
+4. ក្នុង ZoeKeyGen បង្កើត Setup Link/QR ដោយប្រើ Firebase Config របស់ Business Project។
+5. លើឧបករណ៍គោលដៅ បើក Link ឬស្កេន QR, បញ្ចូល PIN, ពិនិត្យ JSON ហើយរក្សាទុកដោយចេតនា។
+6. បង្កើត Activation Key ក្នុង ZoeKeyGen ហើយផ្ញើឱ្យអតិថិជនតាមផ្លូវឯកជន។
 
 ## Firebase Rules និង Deploy
 
@@ -91,34 +107,32 @@ Static hosting មិន deploy Firebase Rules ជំនួសអ្នកទេ
 
 1. Backup Rules ចាស់;
 2. Paste [firebase-database.rules.json](firebase-database.rules.json) ទៅ **Business Firebase Project**;
-3. សាកល្បង role `admin`, `worker` និង `scanner` ក្នុង Rules Simulator;
+3. សាកល្បងក្នុង Rules Simulator ដោយប្រើគណនីដែលចូលប្រព័ន្ធបាន និងគណនីមិនបានចូល;
 4. ចុច **Publish**;
 5. Paste [ZoeKeyGen/firebase-database.rules.json](ZoeKeyGen/firebase-database.rules.json) ទៅ **License Firebase Project** ហើយ Publish ដោយដៃដូចគ្នា។
 
-ត្រូវ deploy ZoeAdmin, ZoeW និង Zoescan ដែលត្រូវគ្នានឹង Rules ថ្មីជិតគ្នា។ Client ចាស់អាចត្រូវបានបដិសេធដោយ Rules ថ្មីជាចេតនា ដើម្បីការពារទិន្នន័យមិនស៊ីគ្នា។
+**Rules ត្រូវ Publish មុន ឬព្រមគ្នានឹងការ deploy App** ដើម្បីកុំឱ្យ client ថ្មីត្រូវបានបដិសេធដោយ Rules ចាស់។
 
 ## តេស្តមុន release
 
 រត់ពី root របស់ repository៖
 
 ```bash
-node --check ZoeAdmin/app.js
+npm i acorn playwright-core
 node --check ZoeW/app.js
-node --check Zoescan/app.js
 node --check ZoeKeyGen/app.js
 node audit-tools/version-check.js
 bash audit-tools/run-all.sh
 ```
 
-`audit-tools/run-all.sh` ពិនិត្យ syntax, schema/rules, version consistency, Restore/Clear All, Scanner race, KeyGen security និង browser regression។ មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
+`audit-tools/run-all.sh` ពិនិត្យ syntax, schema/rules, version consistency, Restore/Clear All, រចនាសម្ព័ន្ធទំព័រ/របា Slide, Locker, KeyGen security និង browser regression។ មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
 
 ## ឯកសារបន្ថែម
 
-- [ZoeAdmin README](ZoeAdmin/README.md)
 - [ZoeW README](ZoeW/README.md)
-- [Zoescan README](Zoescan/README.md)
 - [ZoeKeyGen README](ZoeKeyGen/README.md)
 - [Audit tools README](audit-tools/README.md)
+- [Firebase backup README](firebase-backup/README.md)
 
 ## អាជ្ញាប័ណ្ណ
 

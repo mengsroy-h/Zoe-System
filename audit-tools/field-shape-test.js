@@ -130,7 +130,7 @@ function seedData(extra) {
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8790;
-    for (const app of ['ZoeAdmin', 'ZoeW']) {
+    for (const app of ['ZoeW']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);

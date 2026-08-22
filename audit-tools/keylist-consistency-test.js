@@ -47,7 +47,7 @@ async function build(publicData, metaData) {
     vm.runInContext(`
         var keyListCache = [];
         var keyListSessionGeneration = 0;
-        const APP_LABELS = { ADM: 'ZoeAdmin', ZOW: 'ZoeW', SCN: 'Zoescan', ALL: 'ទាំង ៣' };
+        const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
         function withTimeout(p) { return p; }
         function getServerNow() { return 0; }
         function renderKeyListStub() { __log.rendered = keyListCache; }
@@ -61,19 +61,10 @@ async function build(publicData, metaData) {
 }
 
 const consistent = {
-    ADM: { K1: { expiresAt: 2000, revoked: true } },
-    ZOW: { K1: { expiresAt: 2000, revoked: true } },
-    SCN: { K1: { expiresAt: 2000, revoked: true } }
+    ADM: { K1: { expiresAt: 2000, revoked: true } }
 };
-const partialRevoke = {
-    ADM: { K1: { expiresAt: 2000, revoked: false } },
-    ZOW: { K1: { expiresAt: 2000, revoked: true } },
-    SCN: { K1: { expiresAt: 2000, revoked: true } }
-};
-const partialExtend = {
-    ADM: { K1: { expiresAt: 1000, revoked: false } },
-    ZOW: { K1: { expiresAt: 2000, revoked: false } },
-    SCN: { K1: { expiresAt: 2000, revoked: false } }
+const activeKey = {
+    ADM: { K1: { expiresAt: 2000, revoked: false } }
 };
 const singleApp = { ADM: { K2: { expiresAt: 3000, revoked: false } } };
 const meta = { ADM: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2: { issuedAt: 4, scope: 'ADM', note: 'ហាង B' } } };
@@ -88,23 +79,14 @@ const meta = { ADM: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2
     ok('expiresAt ត្រឹមត្រូវ', row.expiresAt === 2000, row.expiresAt);
     ok('meta នៅតែ merge (note/scope/issuedAt)',
         row.note === 'ហាង A' && row.scope === 'ALL' && row.issuedAt === 5, { n: row.note, s: row.scope, i: row.issuedAt });
-    ok('paths គ្រប់ ៣ App', JSON.stringify(row.paths) === '["ADM","SCN","ZOW"]', row.paths);
+    ok('paths មាន App តែមួយ', JSON.stringify(row.paths) === '["ADM"]', row.paths);
+    ok('រក្សាតម្លៃដើមតាម App', !!row.perApp && row.perApp.ADM.revoked === true,
+        row.perApp ? { adm: row.perApp.ADM.revoked } : 'perApp បាត់');
 
-    r = await build(partialRevoke, meta);
+    r = await build(activeKey, meta);
     row = r.rendered[0];
-    ok('Revoke មិនពេញលេញ ➜ រាយការណ៍ថាមិនត្រូវគ្នា', row.inconsistent === true, row.inconsistent);
-    ok('Revoke មិនពេញលេញ ➜ មិនរាប់ថា Revoked (ប៊ូតុងនៅតែបញ្ចប់ការងារបាន)',
-        row.revoked === false, row.revoked);
-    ok('រក្សាតម្លៃដើមតាម App', !!row.perApp && row.perApp.ADM.revoked === false && row.perApp.ZOW.revoked === true,
-        row.perApp ? { adm: row.perApp.ADM.revoked, zow: row.perApp.ZOW.revoked } : 'perApp បាត់');
-    ok('បង្ហាញផ្លាកព្រមានក្នុងតារាង', r.html.indexOf('មិនត្រូវគ្នា') !== -1);
-    ok('ផ្លាកព្រមានរាយតម្លៃតាម App', r.html.indexOf('ZoeAdmin = Active') !== -1);
-
-    r = await build(partialExtend, meta);
-    row = r.rendered[0];
-    ok('បន្ថែមសុពលភាពមិនពេញលេញ ➜ រាយការណ៍ថាមិនត្រូវគ្នា', row.inconsistent === true, row.inconsistent);
-    ok('បង្ហាញថ្ងៃផុតកំណត់ដែលមកមុនគេ (មិនលាក់ App ដែលមិនបានបន្ថែម)',
-        row.expiresAt === 1000, row.expiresAt);
+    ok('Key មិនទាន់ Revoke ➜ revoked = false', row.revoked === false, row.revoked);
+    ok('Key មិនទាន់ Revoke ➜ គ្មានផ្លាកព្រមាន', r.html.indexOf('មិនត្រូវគ្នា') === -1);
 
     // a key that predates the license_keys_meta split still carries its note in the
     // public node, and migrateLegacyLicenseKeyMetadata() only runs once the admin can

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 const EXPECTED_DIVERGENT = new Set([
     'applySetupLinkFromUrl', 'atTop', 'attemptAuthStorageRecovery', 'cancelPinEntryFlow',
@@ -44,7 +44,7 @@ for (const app of APPS) {
     });
 }
 
-const shared = Object.keys(fns).filter((n) => Object.keys(fns[n]).length >= 3).sort();
+const shared = Object.keys(fns).filter((n) => Object.keys(fns[n]).length >= 2).sort();
 const unexpected = [];
 let identical = 0;
 
@@ -56,7 +56,7 @@ for (const name of shared) {
     unexpected.push(name + '  (' + where.join(', ') + ')');
 }
 
-console.log('shared by >=3 apps: ' + shared.length +
+console.log('shared by >=2 apps: ' + shared.length +
     '   identical: ' + identical +
     '   expected-divergent: ' + (shared.length - identical - unexpected.length) +
     '   UNEXPECTED: ' + unexpected.length);
@@ -64,7 +64,7 @@ console.log('shared by >=3 apps: ' + shared.length +
 if (unexpected.length) {
     console.log('\nUNEXPECTED DRIFT (a shared helper that should be one implementation):');
     unexpected.forEach((line) => console.log('  - ' + line));
-    console.log('\nរត់ `node audit-tools/shared-fns.js --show <name>` ដើម្បីមើលកូដទាំង ៤ ជាប់គ្នា។');
+    console.log('\nរត់ `node audit-tools/shared-fns.js --show <name>` ដើម្បីមើលកូដទាំងអស់ជាប់គ្នា។');
     process.exitCode = 1;
 } else {
     console.log('\n✅ គ្មានការបែកគ្នាដែលមិនរំពឹងទុកទេ');

@@ -5,19 +5,17 @@ const acorn = require('acorn');
 const ROOT = path.join(__dirname, '..');
 
 const APPS = {
-    ZoeAdmin: { reset: ['showLoginModalWithPrefill', 'clearSensitiveModalFields'] },
     ZoeW: { reset: ['showLoginModalWithPrefill', 'clearSensitiveModalFields'] },
-    Zoescan: { reset: ['handleSignedOut', 'detachDatabaseListeners'] },
     ZoeKeyGen: { reset: ['showLoginModalWithPrefill', 'clearSigningKey'] }
 };
 
 const ACCEPTED = {
-    ZoeAdmin: {
+    ZoeW: {
         firebaseConfig: 'device provisioning, survives logout by design',
         fb: 'SDK handle, not user data',
         auth: 'SDK handle, reused by the next login',
         db: 'SDK handle, reused by the next login',
-        dbRefConnected: 'kept live so retryPendingRoleCheck can fire',
+        dbRefConnected: 'kept live so the next session reuses the connection listener',
         dbRefServerTimeOffset: 'kept live to keep getServerNow accurate',
         dbRefHistory: 'ref object, detached via fb.off; holds no data',
         dbRefDeleted: 'ref object, detached via fb.off; holds no data',
@@ -66,8 +64,6 @@ const ACCEPTED = {
         torchOn: 'reset by stopCurrentStream',
         autoLoginAttempted: 'dead variable, never read',
         isDatabaseConnected: 'live connection state, not user data',
-        lastRoleRestOutcome: 'diagnostic string sent to Sentry',
-        pendingRoleRecheck: 'reset in the sign-out branch itself',
         isDatabaseInitialized: 'reset in the sign-out branch itself',
         pdfExportOriginalTitle: 'reset by restoreAfterPdfExport',
         lastRecallSignature: 'only suppresses a redundant re-render; login always does a full render anyway',
@@ -80,25 +76,14 @@ const ACCEPTED = {
         deletedItems: 'cleared in the sign-out branch itself',
         dailyRevenueData: 'cleared in the sign-out branch itself',
         monthlyRevenueData: 'cleared in the sign-out branch itself',
-        dailyPickupData: 'cleared in the sign-out branch itself'
+        dailyPickupData: 'cleared in the sign-out branch itself',
+        activeLocker: 'operator convenience, persisted in localStorage by design',
+        entryScanMode: 'view preference, persisted in localStorage by design',
+        currentAppPage: 'view preference, no customer data',
+        lockerAssignGeneration: 'monotonic guard counter'
     }
 };
-ACCEPTED.ZoeW = ACCEPTED.ZoeAdmin;
-ACCEPTED.Zoescan = Object.assign({}, ACCEPTED.ZoeAdmin, {
-    app: 'SDK handle, not user data',
-    activeLocker: 'operator convenience, persisted in localStorage by design',
-    currentTab: 'view preference, no customer data',
-    listenersAttached: 'reset by detachDatabaseListeners',
-    loginGeneration: 'monotonic guard counter',
-    assignGeneration: 'monotonic guard counter',
-    imageDecodeCodeReader: 'scanner handle, torn down by cleanup',
-    cameraStoppedByVisibility: 'reset in the sign-out branch itself',
-    currentUserEmail: 'cleared in the sign-out branch itself',
-    historyData: 'cleared by detachDatabaseListeners',
-    barcodeIndex: 'cleared by detachDatabaseListeners',
-    pendingLocationCode: 'cleared in the sign-out branch itself'
-});
-ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeAdmin, {
+ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeW, {
     isGeneratingKey: 'reset by generateLicenseKey itself',
     generateAlreadyTimedOut: 'reset by generateLicenseKey itself',
     keyListSessionGeneration: 'monotonic guard counter',

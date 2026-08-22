@@ -90,7 +90,7 @@
             <div style="margin-top:10px;">
                 <div class="danger-box">
                     ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗទាំងអស់ (ដែល Verify ដោយ Public Key ចាស់) ប្រើលែងកើតទៀត លុះត្រាតែ
-                    អ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុងឯកសារ <code>license-verify.js</code> របស់ ZoeAdmin, ZoeW, Zoescan និង ZoeKeyGen ទាំងអស់ រួច Deploy ឡើងវិញ។
+                    អ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុងឯកសារ <code>license-verify.js</code> របស់ ZoeW និង ZoeKeyGen ទាំងពីរ រួច Deploy ឡើងវិញ។
                 </div>
                 <button class="btn-secondary" style="width:100%;" onclick="generateNewKeypair()">🆕 បង្កើត Keypair ថ្មី</button>
             </div>
@@ -106,10 +106,7 @@
             <div class="col-half">
                 <label for="genAppSelect">សម្រាប់កម្មវិធី</label>
                 <select id="genAppSelect">
-                    <option value="ADM">ZoeAdmin</option>
-                    <option value="ZOW">ZoeW</option>
-                    <option value="SCN">Zoescan</option>
-                    <option value="ALL">ទាំង ៣ កម្មវិធី (ALL)</option>
+                    <option value="ADM">ZoeW</option>
                 </select>
             </div>
             <div class="col-half">
@@ -145,9 +142,7 @@
                 <label for="setupLinkAppSelect">សម្រាប់កម្មវិធី</label>
                 <select id="setupLinkAppSelect" onchange="onSetupLinkAppChange()">
                     <option value="">-- ជ្រើសរើស --</option>
-                    <option value="ADM">ZoeAdmin</option>
-                    <option value="ZOW">ZoeW</option>
-                    <option value="SCN">Zoescan</option>
+                    <option value="ADM">ZoeW</option>
                 </select>
             </div>
             <div class="col-half">
@@ -156,7 +151,7 @@
             </div>
         </div>
 
-        <label for="setupLinkConfigInput">Firebase Config (JSON) របស់ជំនួញនេះ — ដូចគ្នាសម្រាប់ App ទាំង ៣</label>
+        <label for="setupLinkConfigInput">Firebase Config (JSON) របស់ជំនួញនេះ</label>
         <textarea id="setupLinkConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"..."}'></textarea>
 
         <button class="btn-primary" style="width:100%;" onclick="generateSetupLink()">🔗 បង្កើត Link</button>
@@ -224,7 +219,7 @@
 <div id="configModal" class="modal">
     <div class="modal-content" style="max-width: 380px;">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
-        <p>ត្រូវប្រើ Firebase Project <b>ដាច់ដោយឡែក</b> សម្រាប់ License (មិនមែន Project របស់ ZoeAdmin/ZoeW/Zoescan ទេ) — មើលជំហានបង្កើតក្នុង README.md។</p>
+        <p>ត្រូវប្រើ Firebase Project <b>ដាច់ដោយឡែក</b> សម្រាប់ License (មិនមែន Project របស់ ZoeW ទេ) — មើលជំហានបង្កើតក្នុង README.md។</p>
         <textarea id="firebaseConfigInput" placeholder='{
   "apiKey": "...",
   "authDomain": "...",
@@ -243,7 +238,7 @@
 <div id="loginModal" class="modal" data-nodismiss="true">
     <div class="modal-content">
         <h3>🔐 ចូលប្រើប្រាស់ ZoeKeyGen</h3>
-        <p>តម្រូវឲ្យប្រើគណនី Admin ដូចគ្នានឹង ZoeAdmin</p>
+        <p>តម្រូវឲ្យប្រើគណនី Admin របស់ License Project</p>
         <form id="loginForm" onsubmit="return false;">
             <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល" required autocomplete="username">
             <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">

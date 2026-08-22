@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
 // Add here only with a reason — an unexplained entry hides the next real leak.
 const ACCEPTED = {
     firebaseConfigInput: 'Firebase client config is deliberately not a secret in this project',
-    configInput: 'same, Zoescan name for it',
+    configInput: 'alternate id kept for the config textarea',
     sentryDsnInput: 'Sentry DSN is a write-only ingest key, shipped in the client anyway',
     customerDataTableStatus: 'clearCustomerDataTableCache() blanks it on the sign-out branch',
     customerDataTableBody: 'clearCustomerDataTableCache() blanks it on the sign-out branch',
@@ -20,8 +20,8 @@ const ACCEPTED = {
     pinModalMsg: 'status text only',
     lockerPrefixInput: 'locker naming config, not customer data',
     lockerCountInput: 'locker naming config, not customer data',
-    locationWarningTitle: "Zoescan blanks it in onAuthStateChanged's sign-out branch",
-    locationWarningText: "Zoescan blanks it in onAuthStateChanged's sign-out branch",
+    locationWarningTitle: "static heading, no customer data",
+    locationWarningText: "blanked by clearSensitiveModalFields()",
     newPrivateKeyOutput: "closeModal('keypairModal') wipes it on every dismiss path",
     newPublicKeyOutput: 'public half of the keypair, not a secret',
     setupLinkUrlInput: 'Base URL of the target site, deliberately remembered in localStorage',
@@ -50,7 +50,7 @@ function walk(n, cb) {
 }
 
 let totalGaps = 0;
-for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const src = fs.readFileSync(root + '/' + app + '/app.js', 'utf8');
     const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
 

@@ -6,7 +6,7 @@ try { acorn = require('acorn'); } catch (e) { console.log('SKIP — ត្រូ
 const fs = require('fs');
 const path = require('path');
 const ROOT = process.env.COMP_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // ការសង្គ្រោះ = ហៅ function ដែលបញ្ច្រាស/ដោះ/ស្តារ ស្ថានភាពដែលបានអនុវត្តជាមុន
 const RECOVERY = /^(revert|rollback|restore|release|undo)/i;

@@ -76,7 +76,7 @@ const OBJECT_GAPS = () => ({ '0': { code: 'AAA', cod: 5, dod: 1, isClosed: false
 
 const SHAPES = [['array ដែលមាន null', WITH_NULLS], ['object ដែលមាន gap', OBJECT_GAPS]];
 
-for (const app of ['ZoeAdmin', 'ZoeW']) {
+for (const app of ['ZoeW']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     const ctx = makeCtx(src);
 

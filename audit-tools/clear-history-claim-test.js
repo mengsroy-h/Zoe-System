@@ -29,7 +29,6 @@ function makeRuntime() {
             }
         },
         zoew_recently_deleted_cod_dod: {},
-        zoew_scanner_lookup: { id_clear: { id: 'id_clear', barcode: 'CLEAR1', locker: 'A1' } },
         zoew_clear_history_finalizations: {}
     };
     const shared = { store, now: 200000, db: {} };
@@ -124,7 +123,7 @@ async function rejected(work) {
 }
 
 (async () => {
-    for (const app of ['ZoeAdmin', 'ZoeW']) {
+    for (const app of ['ZoeW']) {
         console.log('\n=== ' + app + ' Clear All claims ===');
         const shared = makeRuntime();
         const tabA = makeTab(app, shared, 'A');
@@ -160,9 +159,9 @@ async function rejected(work) {
         const finalTrash = shared.getPath('zoew_recently_deleted_cod_dod/id_clear');
         const finalWitness = shared.getPath('zoew_clear_history_finalizations/id_clear');
         check(!shared.getPath('zoew_scan_history_cod_dod/id_clear') && finalTrash && !finalTrash.clearClaim &&
-            !finalTrash.restoreClaimId && !finalTrash.restoreClaimToken && !shared.getPath('zoew_scanner_lookup/id_clear') &&
+            !finalTrash.restoreClaimId && !finalTrash.restoreClaimToken &&
             finalWitness && finalWitness.token === 'clear-new' && finalTrash.barcodes[0].lockerUpdatedBy === 'scanner-uid' && finalTrash.barcodes[0].lockerRevision === 3,
-        app + ': Clear All current claim atomically moves sanitized data to trash and clears lookup', JSON.stringify({ finalTrash, finalWitness }));
+        app + ': Clear All current claim atomically moves sanitized data to trash', JSON.stringify({ finalTrash, finalWitness }));
 
         await tabB.clearClearHistoryFinalization('id_clear', 'clear-new');
         const staleAfterFinal = await rejected(() => tabA.finalizeClaimedHistoryClear('id_clear', 'clear-old', oldTrash));

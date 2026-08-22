@@ -26,7 +26,7 @@ function extractFn(src, name) {
         sliceBalanced(src, braceAt, '{', '}');
 }
 
-const src = fs.readFileSync(path.join(ROOT, 'ZoeAdmin', 'app.js'), 'utf8');
+const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 
 // ---- a Firebase stand-in whose runTransaction has the real retry-on-conflict semantics ----
 function makeFirebase(server) {
@@ -113,7 +113,7 @@ function seedOrder(server, codes) {
 }
 
 // ================= scenario 1: two devices scan into the same order at once =================
-console.log('\n=== ZoeAdmin — ឧបករណ៍ ២ ស្កេនចូល order ដដែលក្នុងពេលដំណាលគ្នា ===');
+console.log('\n=== ZoeW — ឧបករណ៍ ២ ស្កេនចូល order ដដែលក្នុងពេលដំណាលគ្នា ===');
 {
     const server = {};
     seedOrder(server, ['AAA']);

@@ -11,7 +11,7 @@ if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chr
 
 const ROOT = process.env.LAYOUT_APP_DIR || path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
-const SIZES = [{ w: 320, h: 568 }, { w: 360, h: 640 }, { w: 412, h: 780 }, { w: 768, h: 1024 }];
+const SIZES = [{ w: 320, h: 568 }, { w: 360, h: 640 }, { w: 412, h: 780 }, { w: 768, h: 1024 }, { w: 1280, h: 800 }, { w: 1440, h: 900 }];
 
 let pass = 0, fail = 0;
 const ok = (n) => { console.log('  ok    ' + n); pass++; };
@@ -38,7 +38,7 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8660;
-    for (const app of ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen']) {
+    for (const app of ['ZoeW', 'ZoeKeyGen']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);

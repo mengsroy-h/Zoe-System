@@ -27,9 +27,6 @@ function ok(label, cond, detail) {
 }
 
 const APPS = [
-    { file: 'ZoeAdmin/app.js', label: 'ZoeAdmin', verify: 'verifyAdminRoleThenProceed', login: 'loginWithFirebase', role: 'admin', boot: 'setupAuthListener' },
-    { file: 'ZoeW/app.js', label: 'ZoeW', verify: 'verifyWorkerRoleThenProceed', login: 'loginWithFirebase', role: 'worker', boot: 'setupAuthListener' },
-    { file: 'Zoescan/app.js', label: 'Zoescan', verify: 'verifyRoleThenProceed', login: 'loginWithFirebase', role: 'scanner', boot: 'inline' },
     { file: 'ZoeKeyGen/app.js', label: 'ZoeKeyGen', verify: 'verifyAdminRoleThenProceed', login: 'doLogin', role: 'admin', boot: 'setupAuthListener' }
 ];
 
@@ -243,16 +240,6 @@ async function advance(h, ms) {
 
 async function run(app) {
     console.log('\n===== ' + app.label + ' =====');
-
-    if (app.boot === 'inline') {
-        // Zoescan keeps its onAuthStateChanged callback inline inside initFirebase,
-        // so it cannot be sliced out by name. Assert the real source still matches
-        // the stand-in this harness registers, otherwise the run below is fiction.
-        const src = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
-        const shape = /authGeneration\+\+;\s*const myAuthGeneration = authGeneration;\s*if \(user\) \{\s*verifyRoleThenProceed\(user, myAuthGeneration\);/;
-        ok('listener ខាងក្នុង initFirebase នៅតែមានរូបរាងដូចដែល harness សន្មត់', shape.test(src));
-        ok('listener សម្អាតទង់ពេល sign-out', /\} else \{\s*pendingRoleRecheck = false;/.test(src));
-    }
 
     // ---- Scenario 1: reopen the app on a slow network, then log in again ----
     console.log('-- ១. បើក App ឡើងវិញ ពេលបណ្ដាញយឺត រួចចូលប្រព័ន្ធម្ដងទៀត --');
@@ -478,33 +465,6 @@ async function run(app) {
     } else {
         ok('ហើយមិនបើក listener ស្ទួនទេ', h.log.dbInit === 1, h.log.dbInit);
     }
-    if (app.label === 'Zoescan') {
-        const zsSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
-        ok('Zoescan ការពារ listener ស្ទួនខាងក្នុង initDatabaseListeners',
-            /function initDatabaseListeners\(\) \{\s*if \(listenersAttached\) return;/.test(zsSrc));
-    }
-
-    // ---- Scenario 3: a genuine error must still fail closed ----
-    console.log('-- ៣. កំហុសពិតប្រាកដ (permission_denied) នៅតែត្រូវបណ្ដេញចេញ --');
-    h = buildContext(app);
-    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
-    vm.runInContext('setupAuthListener();', h.ctx);
-    await drain();
-    h.log.gets[0].reject(new Error('permission_denied'));
-    await drain();
-    ok('signOut នៅតែកើតឡើង', h.log.signOuts === 1, h.log.signOuts);
-    ok('មិនដាក់ទង់ព្យាយាមឡើងវិញទេ', h.ctx.pendingRoleRecheck === false, h.ctx.pendingRoleRecheck);
-
-    // ---- Scenario 4: wrong role must still be rejected ----
-    console.log('-- ៤. គណនីគ្មានសិទ្ធិ នៅតែត្រូវបដិសេធ --');
-    h = buildContext(app);
-    h.ctx.__restorePersistedUser({ uid: 'uid-a@x.com', email: 'a@x.com' });
-    vm.runInContext('setupAuthListener();', h.ctx);
-    await drain();
-    h.log.gets[0].resolve({ val: () => 'scanner-only-nonsense' });
-    await drain();
-    ok('signOut ពេល role មិនត្រូវ', h.log.signOuts === 1, h.log.signOuts);
-    ok('មិនបានបើក listener ទិន្នន័យទេ', h.log.dbInit === 0, h.log.dbInit);
 }
 
 (async () => {

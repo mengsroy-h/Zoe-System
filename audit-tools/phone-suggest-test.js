@@ -128,7 +128,7 @@ function itemsFixture() {
     return items;
 }
 
-['ZoeAdmin', 'ZoeW'].forEach((app) => {
+['ZoeW'].forEach((app) => {
     console.log('\n=== ' + app + ' ===');
     const h = makeContext(app);
     h.ctx.scanHistory = itemsFixture();
@@ -219,7 +219,7 @@ function itemsFixture() {
 function blurRaceCheck() {
     return new Promise((resolve) => {
         console.log('\n=== blur ➜ focus ក្នុង ១៥០ms ===');
-        const h = makeContext('ZoeAdmin');
+        const h = makeContext('ZoeW');
         h.ctx.scanHistory = itemsFixture();
         if (!h.has('setupPhoneSuggestions')) { ok('មាន setupPhoneSuggestions', false); return resolve(); }
         h.ctx.setupPhoneSuggestions();

@@ -1,5 +1,5 @@
-// កិច្ចសន្យាឆ្លង App៖ ZoeKeyGen encode ➜ ZoeAdmin/ZoeW/Zoescan decode
-// ដកកូដ *ពិត* ចេញពី app.js ទាំង ៤ មករត់ក្នុង vm ជាមួយគ្នា។
+// កិច្ចសន្យាឆ្លង App៖ ZoeKeyGen encode ➜ ZoeW decode
+// ដកកូដ *ពិត* ចេញពី app.js មករត់ក្នុង vm ជាមួយគ្នា។
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -44,7 +44,7 @@ vm.runInContext('function encodeSetup(parsed) { let b64; b64 = ' + encLine + '; 
 vm.runInContext('function buildLink(baseUrl, b64) { let lastGeneratedSetupLink; lastGeneratedSetupLink = '
     + linkLine.replace(/\bb64\b/g, 'b64') + '; return lastGeneratedSetupLink; }', ctx);
 
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan'];
+const APPS = ['ZoeW'];
 APPS.forEach((app) => {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     vm.runInContext(sliceFn(src, 'decodeSetupPayload').replace('function decodeSetupPayload', 'function decode_' + app), ctx);

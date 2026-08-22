@@ -2,7 +2,7 @@ const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
-const APPS = ['ZoeAdmin', 'ZoeW', 'Zoescan', 'ZoeKeyGen'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 let issues = 0;
 function bad(app, kind, detail) { console.log('  ⚠ [' + app + '] ' + kind + ': ' + detail); issues++; }
@@ -78,12 +78,6 @@ for (const app of APPS) {
             bad(app, 'unguarded onValue', a0.name + ' near offset ' + n.start);
         }
     });
-
-    // --- 5. addEventListener backup for Zoescan inline handlers (no unsafe-inline) ---
-    if (app === 'Zoescan') {
-        const inlineCount = [...html.matchAll(/\son(?:click|change|submit)\s*=/g)].length;
-        console.log('  · Zoescan inline on*= in HTML: ' + inlineCount + ' (each needs an addEventListener backup)');
-    }
 }
 console.log(issues === 0 ? '\n✅ wiring clean' : '\n❌ ' + issues + ' wiring issue(s)');
 process.exit(issues === 0 ? 0 : 1);

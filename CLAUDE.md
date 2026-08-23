@@ -376,6 +376,12 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 - **ធនធានចាំបាច់ដែលមកពី origin ខាងក្រៅ ហើយ service worker មិន cache** ➜ App បើកបាន
   តែមុខងារនោះស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ។ រកឃើញលើ ZXing (ការស្កេន)។
   Test៖ **`offline-shell-test.js`** (បិទម៉ាស៊ីនបម្រើពិត រួចផ្ទុកឡើងវិញ)។
+- **`env(safe-area-inset-bottom)` ត្រូវរាប់ *ពីរដង*** ➜ កំហុសដែល **លេចតែលើ iPhone**។
+  កុំបូក inset ចូលកម្ពស់ `body` ឡើយ — របា Tab, toast និងរបា Slide កក់វាដោយខ្លួនឯង
+  រួចហើយ ហើយ `--chrome-bottom` វាស់ `offsetHeight` ពិត (រាប់ inset រួច)។ ការបូក
+  ម្ដងទៀតធ្វើឲ្យ body វែងជាងអេក្រង់ ➜ កាតលិចក្រោមរបា។ លើ Android inset = 0
+  ដូច្នេះកំហុសបែបនេះ **មើលមិនឃើញលើ Android** — ត្រូវវាស់ដោយធ្វើត្រាប់តាម inset។
+  Test៖ **`gesture-test.js`** (ផ្នែក «safe-area រាប់តែម្ដង»)។
 - **ការឌិកូដស៊ុមវីដេអូដដែលពីរដង** ➜ ជាន់ការពារ «២ ស៊ុមជាប់គ្នា» ក្លាយជា ១ ស៊ុម។
   `takeFreshVideoFrame()` ការពារ **ហើយ fail open** បើ `currentTime` មិនរត់ (browser ខ្លះ
   ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។

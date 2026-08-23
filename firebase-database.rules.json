@@ -1,0 +1,365 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "zoew_scan_history_cod_dod": {
+      ".read": "auth != null",
+      "$itemId": {
+        ".write": "auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))",
+        "id": {
+          ".validate": "newData.isString()"
+        },
+        "cod": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "dod": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "price": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "count": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "phone": {
+          ".validate": "newData.isString()"
+        },
+        "barcode": {
+          ".validate": "newData.isString()"
+        },
+        "locker": {
+          ".validate": "newData.isString()"
+        },
+        "isClosed": {
+          ".validate": "newData.isBoolean()"
+        },
+        "isCalled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "callMark": {
+          ".validate": "newData.isString()"
+        },
+        "callMarkTime": {
+          ".validate": "newData.isNumber()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "closedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "scanDate": {
+          ".validate": "newData.isString()"
+        },
+        "time": {
+          ".validate": "newData.isString()"
+        },
+        "lockerUpdatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "lockerUpdatedBy": {
+          ".validate": "newData.isString()"
+        },
+        "lockerRevision": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+        },
+        "barcodes": {
+          "$idx": {
+            "cod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "dod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "code": {
+              ".validate": "newData.isString()"
+            },
+            "locker": {
+              ".validate": "newData.isString()"
+            },
+            "isClosed": {
+              ".validate": "newData.isBoolean()"
+            },
+            "isDeducted": {
+              ".validate": "newData.isBoolean()"
+            },
+            "isFromDeletion": {
+              ".validate": "newData.isBoolean()"
+            },
+            "time": {
+              ".validate": "newData.isString()"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lockerUpdatedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lockerUpdatedBy": {
+              ".validate": "newData.isString()"
+            },
+            "lockerRevision": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "restoreClaimId": {
+          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimToken').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('token').val() === newData.parent().child('restoreClaimToken').val() && root.child('zoew_recently_deleted_cod_dod').child(newData.val()).child('restoreClaim').child('targetId').val() === $itemId"
+        },
+        "restoreClaimToken": {
+          ".validate": "newData.isString() && !newData.parent().child('clearClaim').exists() && newData.parent().child('restoreClaimId').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').isString() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('token').val() === newData.val() && root.child('zoew_recently_deleted_cod_dod').child(newData.parent().child('restoreClaimId').val()).child('restoreClaim').child('targetId').val() === $itemId"
+        },
+        "clearClaim": {
+          ".validate": "!newData.parent().child('restoreClaimId').exists() && !newData.parent().child('restoreClaimToken').exists() && newData.hasChildren(['token','claimedAt']) && newData.child('token').isString() && newData.child('claimedAt').isNumber()",
+          "token": {
+            ".validate": "newData.isString()"
+          },
+          "claimedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_recently_deleted_cod_dod": {
+      ".read": "auth != null",
+      "$itemId": {
+        ".write": "auth != null && (newData.exists() || !data.child('restoreClaim').exists() || (data.child('restoreClaim').child('token').isString() && data.child('restoreClaim').child('targetId').isString() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('token').val() === data.child('restoreClaim').child('token').val() && newData.parent().parent().child('zoew_restore_finalizations').child($itemId).child('targetId').val() === data.child('restoreClaim').child('targetId').val()))",
+        "id": {
+          ".validate": "newData.isString()"
+        },
+        "cod": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "dod": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "price": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "count": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "phone": {
+          ".validate": "newData.isString()"
+        },
+        "barcode": {
+          ".validate": "newData.isString()"
+        },
+        "locker": {
+          ".validate": "newData.isString()"
+        },
+        "isClosed": {
+          ".validate": "newData.isBoolean()"
+        },
+        "isCalled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "callMark": {
+          ".validate": "newData.isString()"
+        },
+        "callMarkTime": {
+          ".validate": "newData.isNumber()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "closedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "scanDate": {
+          ".validate": "newData.isString()"
+        },
+        "time": {
+          ".validate": "newData.isString()"
+        },
+        "lockerUpdatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "lockerUpdatedBy": {
+          ".validate": "newData.isString()"
+        },
+        "lockerRevision": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+        },
+        "deletedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "isFromDeletion": {
+          ".validate": "newData.isBoolean()"
+        },
+        "restoreClaim": {
+          ".validate": "newData.hasChildren(['token','claimedAt','targetId']) && newData.child('token').isString() && newData.child('claimedAt').isNumber() && newData.child('targetId').isString()",
+          "token": {
+            ".validate": "newData.isString()"
+          },
+          "claimedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "targetId": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "barcodes": {
+          "$idx": {
+            "cod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "dod": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "code": {
+              ".validate": "newData.isString()"
+            },
+            "locker": {
+              ".validate": "newData.isString()"
+            },
+            "isClosed": {
+              ".validate": "newData.isBoolean()"
+            },
+            "isDeducted": {
+              ".validate": "newData.isBoolean()"
+            },
+            "isFromDeletion": {
+              ".validate": "newData.isBoolean()"
+            },
+            "time": {
+              ".validate": "newData.isString()"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lockerUpdatedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lockerUpdatedBy": {
+              ".validate": "newData.isString()"
+            },
+            "lockerRevision": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9007199254740990 && newData.val() % 1 === 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_restore_finalizations": {
+      ".read": "auth != null",
+      "$sourceId": {
+        ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('token').val() === newData.child('token').val() && root.child('zoew_recently_deleted_cod_dod').child($sourceId).child('restoreClaim').child('targetId').val() === newData.child('targetId').val() && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').val() === $sourceId && root.child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').val() === newData.child('token').val() && !newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($sourceId).exists() && newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimId').exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child(newData.child('targetId').val()).child('restoreClaimToken').exists()) || (data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod').child($sourceId).exists()))",
+        ".validate": "newData.hasChildren(['token','targetId','finalizedAt']) && newData.child('token').isString() && newData.child('targetId').isString() && newData.child('finalizedAt').isNumber()",
+        "token": {
+          ".validate": "newData.isString()"
+        },
+        "targetId": {
+          ".validate": "newData.isString()"
+        },
+        "finalizedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_clear_history_finalizations": {
+      ".read": "auth != null",
+      "$itemId": {
+        ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('zoew_scan_history_cod_dod').child($itemId).child('clearClaim').child('token').val() === newData.child('token').val() && !root.child('zoew_recently_deleted_cod_dod').child($itemId).exists() && !newData.parent().parent().child('zoew_scan_history_cod_dod').child($itemId).exists() && newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).exists() && newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('id').val() === $itemId && newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('deletedAt').isNumber() && newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('isFromDeletion').val() === true && !newData.parent().parent().child('zoew_recently_deleted_cod_dod').child($itemId).child('clearClaim').exists()) || (data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod').child($itemId).exists()))",
+        ".validate": "newData.hasChildren(['token','finalizedAt']) && newData.child('token').isString() && newData.child('finalizedAt').isNumber()",
+        "token": {
+          ".validate": "newData.isString()"
+        },
+        "finalizedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_daily_revenue_cod_dod": {
+      ".read": "auth != null",
+      "$date": {
+        ".write": "auth != null",
+        "codDollar": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "dodDollar": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "totalCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_daily_pickup_cod_dod": {
+      ".read": "auth != null",
+      "$date": {
+        ".write": "auth != null",
+        "packagesPickedUp": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "pickedUpPhones": {
+          "$phoneKey": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_monthly_revenue_cod_dod": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$month": {
+        "codDollar": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "dodDollar": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "totalCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "zoew_settings": {
+      "exchange_rate": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.isNumber() && newData.val() > 0"
+      }
+    },
+    "zoew_barcode_registry": {
+      ".read": "auth != null",
+      "$barcodeKey": {
+        ".write": "auth != null",
+        ".validate": "newData.isBoolean() && newData.val() === true"
+      }
+    }
+  }
+}

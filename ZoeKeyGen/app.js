@@ -1,0 +1,1500 @@
+const APP_VERSION = '2.4.0';
+
+const LICENSE_APP_CODE = 'ADM';
+
+function renderAppVersionLabels() {
+    document.querySelectorAll('[data-app-version]').forEach((el) => {
+        el.textContent = 'កំណែប្រព័ន្ធ: ' + APP_VERSION;
+    });
+}
+
+renderAppVersionLabels();
+
+(function () {
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
+    }
+
+    function kickUserOut() {
+        window.location.replace("about:blank");
+    }
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    let devToolsHitCount = 0;
+
+    document.addEventListener('keydown', function (e) {
+        if (
+            e.key === 'F12' ||
+            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+            (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
+        ) {
+            e.preventDefault();
+            e.stopPropagation();
+            kickUserOut();
+            return false;
+        }
+    }, true);
+
+    document.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        return false;
+    }, true);
+
+    const baseWidthGap = window.outerWidth - window.innerWidth;
+    const baseHeightGap = window.outerHeight - window.innerHeight;
+
+    function checkDevTools() {
+        if (isMobile) return;
+        const widthGrew = (window.outerWidth - window.innerWidth) - baseWidthGap > 160;
+        const heightGrew = (window.outerHeight - window.innerHeight) - baseHeightGap > 160;
+        if (widthGrew !== heightGrew) {
+            devToolsHitCount++;
+            if (devToolsHitCount >= 2) kickUserOut();
+        } else {
+            devToolsHitCount = 0;
+        }
+    }
+    setInterval(checkDevTools, 1000);
+
+    function showUpdateAvailableBanner() {
+        if (document.getElementById('zoeUpdateBanner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'zoeUpdateBanner';
+        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        const label = document.createElement('span');
+        label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
+        const refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
+        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;';
+        refreshBtn.addEventListener('click', () => window.location.reload());
+        const dismissBtn = document.createElement('button');
+        dismissBtn.textContent = '✕';
+        dismissBtn.setAttribute('aria-label', 'បិទ');
+        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;';
+        dismissBtn.addEventListener('click', () => banner.remove());
+        banner.appendChild(label);
+        banner.appendChild(refreshBtn);
+        banner.appendChild(dismissBtn);
+        document.body.appendChild(banner);
+    }
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').then((reg) => {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                });
+                window.addEventListener('focus', () => reg.update().catch(() => {}));
+
+                setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+            }).catch(() => {});
+
+            const hadControllerAtLoad = !!navigator.serviceWorker.controller;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (hadControllerAtLoad) showUpdateAvailableBanner();
+            });
+        });
+    }
+})();
+
+let firebaseConfig = null;
+let fb = null;
+let auth = null;
+let db = null;
+let authUnsubscribe = null;
+let authGeneration = 0;
+let sensitiveSessionGeneration = 0;
+let pendingRoleRecheck = false;
+let isDatabaseConnected = false;
+let lastRoleRestOutcome = '';
+const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
+const SLOW_NETWORK_NOTICE_MS = 4000;
+let isInitializingFirebase = false;
+let dbRefConnected = null;
+let dbRefServerTimeOffset = null;
+let serverTimeOffsetMs = 0;
+let serverTimeSynced = false;
+let serverTimeSyncWaiters = [];
+
+function getServerNow() {
+    return Date.now() + serverTimeOffsetMs;
+}
+
+function waitForServerTimeSync(timeoutMs) {
+    if (serverTimeSynced) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (result) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(result);
+        };
+        const timer = setTimeout(() => finish(serverTimeSynced), timeoutMs);
+        serverTimeSyncWaiters.push(() => finish(true));
+
+        if (window.ZoeLicense) {
+            window.ZoeLicense.syncServerTime().then((ok) => {
+                if (settled || serverTimeSynced || !ok) return;
+                const offset = window.ZoeLicense.getServerTimeOffset();
+                if (typeof offset === 'number') {
+                    serverTimeOffsetMs = offset;
+                    serverTimeSynced = true;
+                    finish(true);
+                }
+            }).catch(() => {});
+        }
+    });
+}
+
+function showToast(msg) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    while (container.children.length >= 4) container.removeChild(container.firstChild);
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = msg;
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function invalidateSensitiveSession() {
+    sensitiveSessionGeneration++;
+}
+
+function captureSensitiveSession(requireAuthorizedUi) {
+    const user = auth && auth.currentUser ? auth.currentUser : null;
+    if (requireAuthorizedUi && (!user || !isSignedInUiActive)) return null;
+    return { sensitiveSessionGeneration, authGeneration, user };
+}
+
+function isSensitiveSessionCurrent(token, requireAuthorizedUi) {
+    if (!token || token.sensitiveSessionGeneration !== sensitiveSessionGeneration) return false;
+    if (!requireAuthorizedUi) return true;
+    return !!(auth && auth.currentUser === token.user && authGeneration === token.authGeneration && isSignedInUiActive);
+}
+
+function clearPinInputValues() {
+    const pinIn = document.getElementById('securityPinInput');
+    if (pinIn) pinIn.value = '';
+    const newPinIn = document.getElementById('newSecurityPinInput');
+    if (newPinIn) newPinIn.value = '';
+}
+
+function clearKeypairOutputs() {
+    keypairPrivateCopied = false;
+    const privateOut = document.getElementById('newPrivateKeyOutput');
+    if (privateOut) privateOut.value = '';
+    const publicOut = document.getElementById('newPublicKeyOutput');
+    if (publicOut) publicOut.value = '';
+}
+
+function safeStoreSet(store, key, value) {
+    try { store.setItem(key, String(value)); return true; } catch (e) { return false; }
+}
+
+function safeStoreRemove(store, key) {
+    try { store.removeItem(key); return true; } catch (e) { return false; }
+}
+
+function openModalHelper(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+    if (id === 'pinModal' || id === 'pinSetupModal') {
+        invalidateSensitiveSession();
+        clearPinInputValues();
+        pinTargetAction = null;
+    }
+    if (id === 'keypairModal') {
+        clearKeypairOutputs();
+    }
+}
+
+function withTimeout(promise, ms, timeoutMsg) {
+    const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let timer;
+    return Promise.race([
+        promise.finally(() => clearTimeout(timer)),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(timeoutErr), ms); })
+    ]);
+}
+
+function retryAsync(fn, attempts, delayMs) {
+    return fn().catch((err) => {
+        if (attempts <= 1) throw err;
+        return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
+    });
+}
+
+function waitForFirebaseSDK(timeoutMs = 15000) {
+    if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
+    return new Promise((resolve, reject) => {
+        const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
+        let timer = null;
+        const onReady = () => {
+            clearTimeout(timer);
+            resolve(window.firebaseSDK);
+        };
+        window.addEventListener('firebasesdkready', onReady, { once: true });
+        timer = setTimeout(() => {
+            window.removeEventListener('firebasesdkready', onReady);
+            if (window.firebaseSDK) resolve(window.firebaseSDK);
+            else reject(notReadyErr);
+        }, timeoutMs);
+    });
+}
+
+async function enforceSessionOnlyAuthPersistence() {
+    if (!fb || !auth || typeof fb.setPersistence !== 'function' || !fb.browserSessionPersistence) {
+        throw new Error('Firebase session persistence unavailable');
+    }
+    await fb.setPersistence(auth, fb.browserSessionPersistence);
+}
+
+async function initFirebase() {
+    const savedConfig = localStorage.getItem('zoew_firebase_config');
+    if (!savedConfig) {
+        checkPinAndOpenConfig();
+        return false;
+    }
+    if (isInitializingFirebase) return false;
+    isInitializingFirebase = true;
+    invalidateSensitiveSession();
+
+    try {
+        firebaseConfig = JSON.parse(savedConfig);
+        fb = await waitForFirebaseSDK();
+
+        const existingApps = fb.getApps();
+        if (existingApps.length) {
+            if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
+            if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+            if (typeof fb.deleteApp === 'function') {
+                await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
+            }
+            serverTimeSynced = false;
+            serverTimeOffsetMs = 0;
+        }
+
+        const firebaseApp = fb.getApps().length ? fb.getApps()[0] : fb.initializeApp(firebaseConfig);
+        auth = fb.getAuth(firebaseApp);
+        await enforceSessionOnlyAuthPersistence();
+        db = fb.getDatabase(firebaseApp);
+        try { fb.goOnline(db); } catch (e) {}
+
+        dbRefConnected = fb.ref(db, '.info/connected');
+        fb.onValue(dbRefConnected, (snap) => {
+            const dot = document.getElementById('statusDot');
+            const txt = document.getElementById('firebaseStatusText');
+            const online = snap.val() === true;
+            if (dot) dot.classList.toggle('online', online);
+            if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+            isDatabaseConnected = online;
+            if (online) retryPendingRoleCheck();
+        });
+
+        dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
+        fb.onValue(dbRefServerTimeOffset, (snap) => {
+            const val = snap.val();
+            if (typeof val === 'number') serverTimeOffsetMs = val;
+            serverTimeSynced = true;
+            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+            serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
+        });
+
+        setupAuthListener();
+        return true;
+    } catch (e) {
+        console.error("Invalid Saved Config", e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Invalid Saved Config" });
+        checkPinAndOpenConfig();
+        return false;
+    } finally {
+        isInitializingFirebase = false;
+    }
+}
+
+async function hashPin(pin) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt: enc.encode('zoekeygen_pin_verify_v1'), iterations: 150000, hash: 'SHA-256' },
+        keyMaterial,
+        256
+    );
+    return 'pbkdf2:' + Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifyStoredPin(enteredPin, savedHash) {
+    if (!savedHash) return false;
+    return (await hashPin(enteredPin)) === savedHash;
+}
+
+let pinTargetAction = null;
+
+function requestPinBeforeConfig(targetAction, message) {
+    pinTargetAction = targetAction || openConfigModal;
+    clearPinInputValues();
+    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    if (!savedPin) {
+        openModalHelper('pinSetupModal');
+    } else {
+        const msgEl = document.getElementById('pinModalMsg');
+        if (msgEl) msgEl.textContent = message || 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig';
+        openModalHelper('pinModal');
+    }
+}
+
+let signingKeySessionKey = null;
+
+async function deriveSigningKeySessionKey(pin) {
+    try {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']);
+        return await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: enc.encode('zoekeygen_signing_key_at_rest_v1'), iterations: 150000, hash: 'SHA-256' },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    } catch (e) {
+        return null;
+    }
+}
+
+const SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
+
+async function persistSigningKeyForSession() {
+    const operation = captureSensitiveSession(true);
+    const privateKeyJwk = signingPrivateKeyJwk;
+    const sessionKey = signingKeySessionKey;
+    if (!operation || !privateKeyJwk) return;
+    const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+    if (!sessionKey) {
+        if (rememberCb) rememberCb.checked = false;
+        showToast('⚠️ មិនអាចចងចាំ Signing Key បានទេ (បង្កើតសោពី PIN មិនបាន) — សូម Load Key ម្តងទៀតពេលត្រូវការ');
+        return;
+    }
+    try {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const cipherBuf = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv }, sessionKey, new TextEncoder().encode(JSON.stringify(privateKeyJwk))
+        );
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
+        sessionStorage.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
+        showToast('🔒 Signing Key ត្រូវបានចងចាំសម្រាប់ Session នេះ (Encrypted ដោយ PIN)');
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
+        if (rememberCb) rememberCb.checked = false;
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'persistSigningKeyForSession' });
+        showToast('⚠️ មិនអាចចងចាំ Signing Key សម្រាប់ Session នេះបានទេ — សូម Load Key ម្តងទៀតពេលត្រូវការ');
+    }
+}
+
+async function tryRestoreSigningKeyFromSession() {
+    const operation = captureSensitiveSession(true);
+    const sessionKey = signingKeySessionKey;
+    if (!operation || signingPrivateKeyJwk || !sessionKey) return;
+    const raw = sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+    if (!raw) return;
+    try {
+        const encObj = JSON.parse(raw);
+        const plainBuf = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: new Uint8Array(encObj.iv) }, sessionKey, new Uint8Array(encObj.data)
+        );
+        const restoredKeyJwk = JSON.parse(new TextDecoder().decode(plainBuf));
+        await validateSigningKeyAgainstShippedPublicKey(restoredKeyJwk);
+        if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
+        signingPrivateKeyJwk = restoredKeyJwk;
+        updateSigningKeyBadge();
+        const cb = document.getElementById('rememberSigningKeyCheckbox');
+        if (cb) cb.checked = true;
+        showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
+        safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
+        const cb = document.getElementById('rememberSigningKeyCheckbox');
+        if (cb) cb.checked = false;
+        showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
+    }
+}
+
+async function saveNewSecurityPin() {
+    const newPinIn = document.getElementById('newSecurityPinInput');
+    const pinVal = newPinIn ? newPinIn.value.trim() : '';
+    if (!pinVal || pinVal.length < 6) {
+        if (newPinIn) newPinIn.value = '';
+        alert("Security PIN ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ ដើម្បីសុវត្ថិភាព!");
+        return;
+    }
+    const pinGeneration = sensitiveSessionGeneration;
+    const targetAction = pinTargetAction || openConfigModal;
+    try {
+        const pinHash = await hashPin(pinVal);
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        const derivedKey = await deriveSigningKeySessionKey(pinVal);
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        localStorage.setItem('zoew_security_pin_hash', pinHash);
+        signingKeySessionKey = derivedKey;
+    } catch (e) {
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
+        return;
+    } finally {
+        if (newPinIn) newPinIn.value = '';
+    }
+    closeModal('pinSetupModal');
+    showToast("បានកំណត់ Security PIN រួចរាល់!");
+    targetAction();
+}
+
+let isVerifyingPin = false;
+
+async function verifySecurityPin() {
+    if (isVerifyingPin) return;
+    const pinIn = document.getElementById('securityPinInput');
+    const enteredPin = pinIn ? pinIn.value.trim() : '';
+    if (pinIn) pinIn.value = '';
+    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+
+    const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+        const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        alert(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
+        return;
+    }
+
+    const pinGeneration = sensitiveSessionGeneration;
+    isVerifyingPin = true;
+    try {
+        if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
+            if (pinGeneration !== sensitiveSessionGeneration) return;
+            localStorage.removeItem('zoew_pin_fail_count');
+            localStorage.removeItem('zoew_pin_lockout_until');
+            const derivedKey = await deriveSigningKeySessionKey(enteredPin);
+            if (pinGeneration !== sensitiveSessionGeneration) return;
+            signingKeySessionKey = derivedKey;
+            const targetAction = pinTargetAction || openConfigModal;
+            closeModal('pinModal');
+            targetAction();
+        } else {
+            if (pinGeneration !== sensitiveSessionGeneration) return;
+            const failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+            if (failCount >= 5) {
+                localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
+                localStorage.setItem('zoew_pin_fail_count', '0');
+                alert("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី។");
+            } else {
+                localStorage.setItem('zoew_pin_fail_count', failCount.toString());
+                alert("លេខ PIN មិនត្រឹមត្រូវទេ!");
+            }
+        }
+    } catch (e) {
+        if (pinGeneration !== sensitiveSessionGeneration) return;
+        alert("មិនអាចផ្ទៀងផ្ទាត់ PIN បានទេ!");
+    } finally {
+        isVerifyingPin = false;
+    }
+}
+
+function isPinFlowPending() {
+    const pinModal = document.getElementById('pinModal');
+    const pinSetupModal = document.getElementById('pinSetupModal');
+    return !!((pinModal && pinModal.classList.contains('active')) || (pinSetupModal && pinSetupModal.classList.contains('active')));
+}
+
+function requestSessionSigningKeyRestoreIfEligible() {
+    if (!isSignedInUiActive || !auth || !auth.currentUser || signingPrivateKeyJwk) return;
+    if (!sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY) || isPinFlowPending()) return;
+    requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
+}
+
+function checkPinAndOpenConfig() {
+    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    pinTargetAction = openConfigModal;
+    if (!savedPin) openModalHelper('pinSetupModal');
+    else requestPinBeforeConfig(openConfigModal);
+}
+
+function openConfigFlow() {
+    requestPinBeforeConfig(openConfigModal);
+}
+
+function openConfigModal() {
+    const savedConfig = localStorage.getItem('zoew_firebase_config');
+    if (savedConfig) {
+        const cfgInput = document.getElementById('firebaseConfigInput');
+        if (cfgInput) cfgInput.value = savedConfig;
+    }
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
+    openModalHelper('configModal');
+}
+
+function saveFirebaseConfig() {
+    const dsnInput = document.getElementById('sentryDsnInput');
+    if (dsnInput && window.ZoeErrors) {
+        ZoeErrors.setDsn(dsnInput.value);
+        ZoeErrors.init('zoekeygen');
+    }
+    const cfgInput = document.getElementById('firebaseConfigInput');
+    if (!cfgInput) return;
+    const raw = cfgInput.value.trim();
+    if (!raw) { alert("សូមបញ្ចូល Firebase Config!"); return; }
+    try {
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (strictErr) {
+            const cleanStr = raw
+                .replace(/([{,]\s*)(['"]?)([a-zA-Z0-9_]+)\2(\s*):/g, '$1"$3"$4:')
+                .replace(/'/g, '"')
+                .replace(/,(\s*[}\]])/g, '$1');
+            parsed = JSON.parse(cleanStr);
+        }
+        if (!parsed.apiKey || !parsed.databaseURL) throw new Error("Missing apiKey or databaseURL");
+
+        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
+        showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
+        closeModal('configModal');
+        initFirebase();
+    } catch (e) {
+        alert("ការកំណត់រចនាសម្ព័ន្ធមិនត្រឹមត្រូវទេ!");
+    }
+}
+
+function showLoginModalWithPrefill() {
+    invalidateSensitiveSession();
+    const losingUncopiedKeypair = hasUncopiedKeypair();
+    keypairPrivateCopied = false;
+    isGeneratingKey = false;
+    const genBtn = document.getElementById('genGenerateBtn');
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+    if (!isPinFlowPending()) pinTargetAction = null;
+    document.getElementById('appContainer').style.display = 'none';
+    isSignedInUiActive = false;
+    keyListSessionGeneration++;
+    keyListCache = [];
+    const keyListBody = document.getElementById('keyListBody');
+    if (keyListBody) keyListBody.innerHTML = '';
+    document.querySelectorAll('.modal').forEach((m) => {
+        if (m.id !== 'loginModal') closeModal(m.id);
+    });
+
+    clearGeneratedKeyResult();
+
+    lastGeneratedSetupLink = '';
+    const setupLinkConfigInput = document.getElementById('setupLinkConfigInput');
+    if (setupLinkConfigInput) setupLinkConfigInput.value = '';
+    const setupLinkResultText = document.getElementById('setupLinkResultText');
+    if (setupLinkResultText) setupLinkResultText.textContent = '';
+    const setupLinkResultBox = document.getElementById('setupLinkResultBox');
+    if (setupLinkResultBox) setupLinkResultBox.classList.add('hidden');
+    const setupLinkQrContainer = document.getElementById('setupLinkQrContainer');
+    if (setupLinkQrContainer) setupLinkQrContainer.innerHTML = '';
+
+    clearSigningKey(true);
+    openModalHelper('loginModal');
+    if (losingUncopiedKeypair) {
+        alert('⚠️ Keypair ថ្មីដែលអ្នកទើបបង្កើត ត្រូវបានលុបចោល ព្រោះអ្នកបានចាកចេញពីប្រព័ន្ធ ហើយអ្នកមិនទាន់បានចម្លង Private Key ទុកទេ។ នេះជាការការពារ (Private Key មិនត្រូវនៅសល់លើឧបករណ៍បន្ទាប់ពី Logout)។ សូមចូលម្តងទៀត ហើយបង្កើត Keypair ថ្មី — កុំភ្លេចចម្លងវាភ្លាមៗ។');
+    }
+    ['securityPinInput', 'newSecurityPinInput'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const savedEmail = localStorage.getItem('remembered_email');
+    const emailInput = document.getElementById('loginEmailInput');
+    const passwordInput = document.getElementById('loginPasswordInput');
+    const rememberCb = document.getElementById('rememberMeCheckbox');
+    if (emailInput) emailInput.value = savedEmail || '';
+    if (passwordInput) passwordInput.value = '';
+    if (rememberCb) rememberCb.checked = !!savedEmail;
+}
+
+async function doLogin() {
+    const emailIn = document.getElementById('loginEmailInput');
+    const passIn = document.getElementById('loginPasswordInput');
+    const rememberCb = document.getElementById('rememberMeCheckbox');
+    const email = emailIn ? emailIn.value.trim() : '';
+    const password = passIn ? passIn.value : '';
+    if (!email || !password) { alert("សូមបញ្ចូលអ៊ីមែល និងពាក្យសម្ងាត់!"); return; }
+
+    const loginBtn = document.getElementById('loginBtn');
+    const originalBtnText = loginBtn ? loginBtn.textContent : '';
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
+    try {
+        if (!fb || !auth) { fb = await waitForFirebaseSDK(); }
+        const generationAtLogin = authGeneration;
+        await enforceSessionOnlyAuthPersistence();
+        const cred = await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
+        if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
+        else localStorage.removeItem('remembered_email');
+        if (authGeneration === generationAtLogin && cred && cred.user) {
+            authGeneration++;
+            verifyAdminRoleThenProceed(cred.user, authGeneration);
+        }
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'doLogin' });
+        alert(e && e.message === 'Login timed out'
+            ? "អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។"
+            : "ចូលប្រព័ន្ធមិនបានទេ! សូមពិនិត្យអ៊ីមែល/ពាក្យសម្ងាត់ម្តងទៀត។");
+    } finally {
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = originalBtnText; }
+        if (passIn) passIn.value = '';
+    }
+}
+
+function readDatabaseUrlFromConfig() {
+    try {
+        const raw = localStorage.getItem('zoew_firebase_config');
+        if (!raw) return '';
+        const cfg = JSON.parse(raw);
+        const url = cfg && cfg.databaseURL ? String(cfg.databaseURL) : '';
+        return url.replace(/\/+$/, '');
+    } catch (e) {
+        return '';
+    }
+}
+
+function isFirebaseDatabaseHost(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host.endsWith('.firebaseio.com') || host.endsWith('.firebasedatabase.app');
+    } catch (e) {
+        return false;
+    }
+}
+
+async function readUserRoleViaRest(user) {
+    const base = readDatabaseUrlFromConfig();
+    if (base && !isFirebaseDatabaseHost(base)) {
+        lastRoleRestOutcome = 'blocked: non-firebase databaseURL';
+        throw new Error('REST role check unavailable');
+    }
+    if (!base || !user || !user.uid || typeof user.getIdToken !== 'function' || typeof fetch !== 'function') {
+        lastRoleRestOutcome = 'unavailable';
+        throw new Error('REST role check unavailable');
+    }
+    let res;
+    try {
+        const token = await user.getIdToken();
+        res = await fetch(base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token), { cache: 'no-store' });
+    } catch (e) {
+        lastRoleRestOutcome = 'blocked: ' + ((e && e.message) || 'unknown');
+        throw e;
+    }
+    if (!res.ok) {
+        lastRoleRestOutcome = 'http ' + res.status;
+        throw new Error('REST role check failed: ' + res.status);
+    }
+    const value = await res.json();
+    lastRoleRestOutcome = 'ok';
+    return value;
+}
+
+function readUserRole(user) {
+    const sdkRead = window.firebaseSDK.get(window.firebaseSDK.ref(db, `user_roles/${user.uid}`)).then((snap) => snap.val());
+    if (isDatabaseConnected) {
+        lastRoleRestOutcome = 'not needed';
+        return withTimeout(sdkRead, 15000, 'Role check timed out');
+    }
+    const timeoutErr = new Error('Role check timed out');
+    const restRead = readUserRoleViaRest(user);
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let outstanding = 2;
+        let sdkError = null;
+        let restError = null;
+        let timer = null;
+        let slowNoticeTimer = setTimeout(() => {
+            slowNoticeTimer = null;
+            if (!settled) showToast("⚠️ បណ្ដាញយឺត! កំពុងភ្ជាប់ Server... សូមរង់ចាំបន្តិច");
+        }, SLOW_NETWORK_NOTICE_MS);
+        const finish = (fn, value) => {
+            if (settled) return;
+            settled = true;
+            if (timer) clearTimeout(timer);
+            if (slowNoticeTimer) clearTimeout(slowNoticeTimer);
+            fn(value);
+        };
+        const onFailure = () => {
+            outstanding--;
+            if (outstanding === 0) finish(reject, sdkError || restError || timeoutErr);
+        };
+        timer = setTimeout(() => finish(reject, timeoutErr), ROLE_CHECK_CONNECT_WAIT_MS);
+        sdkRead.then((value) => finish(resolve, value), (err) => { sdkError = err; onFailure(); });
+        restRead.then((value) => finish(resolve, value), (err) => { restError = err; onFailure(); });
+    });
+}
+
+function retryPendingRoleCheck() {
+    if (!pendingRoleRecheck) return;
+    if (!auth || !auth.currentUser) return;
+    authGeneration++;
+    verifyAdminRoleThenProceed(auth.currentUser, authGeneration);
+}
+
+async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
+    pendingRoleRecheck = false;
+    try {
+        const role = await readUserRole(user);
+        if (myAuthGeneration !== authGeneration) return;
+        if (role !== 'admin') {
+            await fb.signOut(auth).catch(() => {});
+            showToast("⛔ គណនីនេះគ្មានសិទ្ធិចូល ZoeKeyGen ទេ! តម្រូវឲ្យជា Admin ប៉ុណ្ណោះ។");
+            return;
+        }
+    } catch (e) {
+        if (myAuthGeneration !== authGeneration) return;
+        console.error("Role verification failed:", e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Role verification failed:", connected: isDatabaseConnected, restRoleRead: lastRoleRestOutcome });
+        if (e && e.message === 'Role check timed out') {
+            pendingRoleRecheck = true;
+            showLoginModalWithPrefill();
+            showToast("⚠️ ការតភ្ជាប់អ៊ីនធឺណិតយឺត! មិនទាន់ផ្ទៀងផ្ទាត់សិទ្ធិបានទេ — ប្រព័ន្ធនឹងព្យាយាមម្ដងទៀតដោយស្វ័យប្រវត្តិ។");
+            return;
+        }
+        await fb.signOut(auth).catch(() => {});
+        showToast("⚠️ មិនអាចផ្ទៀងផ្ទាត់សិទ្ធិបានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងចូលម្តងទៀត។");
+        return;
+    }
+
+    closeModal('loginModal');
+    document.getElementById('appContainer').style.display = 'flex';
+    updateAuthButton(true);
+    if (!isSignedInUiActive) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    isSignedInUiActive = true;
+    requestSessionSigningKeyRestoreIfEligible();
+    refreshKeyList();
+}
+
+const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
+
+async function attemptAuthStorageRecovery() {
+    if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
+        showLoginModalWithPrefill();
+        return;
+    }
+    safeStoreSet(sessionStorage, AUTH_STUCK_RECOVERY_FLAG, '1');
+    try {
+        if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
+            const dbs = await indexedDB.databases();
+            await Promise.all(dbs
+                .filter((d) => d.name && /firebase/i.test(d.name))
+                .map((d) => new Promise((resolve) => {
+                    const req = indexedDB.deleteDatabase(d.name);
+                    req.onsuccess = () => resolve();
+                    req.onerror = () => resolve();
+                    req.onblocked = () => resolve();
+                }))
+            );
+        }
+    } catch (e) {}
+    window.location.reload();
+}
+
+function setupAuthListener() {
+    if (!auth) return;
+    if (authUnsubscribe) { try { authUnsubscribe(); } catch (e) {} authUnsubscribe = null; }
+
+    const initialAuthTimeout = setTimeout(() => { attemptAuthStorageRecovery(); }, 8000);
+    authUnsubscribe = fb.onAuthStateChanged(auth, (user) => {
+        clearTimeout(initialAuthTimeout);
+        authGeneration++;
+        const myAuthGeneration = authGeneration;
+        if (user) {
+            verifyAdminRoleThenProceed(user, myAuthGeneration);
+        } else {
+            pendingRoleRecheck = false;
+            updateAuthButton(false);
+            showLoginModalWithPrefill();
+        }
+    });
+}
+
+function logoutApp() {
+    if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key នៃ Keypair ថ្មីទេ! ការចាកចេញនឹងលុបវាជារៀងរហូត។ ចាកចេញមែនទេ?')) return;
+    authGeneration++;
+    pendingRoleRecheck = false;
+    updateAuthButton(false);
+    showLoginModalWithPrefill();
+    if (!fb || !auth) return;
+    fb.signOut(auth).catch(() => {
+        showToast('⚠️ មិនអាចចាកចេញពី Firebase បានភ្លាមៗទេ។ សូម Refresh ហើយចូលម្ដងទៀត។');
+    });
+}
+
+function updateAuthButton(isLoggedIn) {
+    const btn = document.getElementById('navAuthBtn');
+    if (!btn) return;
+    if (isLoggedIn) {
+        btn.textContent = '🚪 ចាកចេញ';
+        btn.onclick = logoutApp;
+    } else {
+        btn.textContent = '🔑 ចូល';
+        btn.onclick = showLoginModalWithPrefill;
+    }
+}
+
+let signingPrivateKeyJwk = null;
+
+function updateSigningKeyBadge() {
+    const badge = document.getElementById('signingKeyStatusBadge');
+    if (!badge) return;
+    if (signingPrivateKeyJwk) {
+        badge.textContent = 'Loaded ✓';
+        badge.style.background = 'var(--success-light)';
+        badge.style.color = '#067a55';
+    } else {
+        badge.textContent = 'មិនទាន់ Load';
+        badge.style.background = 'var(--danger-light)';
+        badge.style.color = '#a3123a';
+    }
+}
+
+async function validateSigningKeyAgainstShippedPublicKey(jwk) {
+    if (!jwk || !jwk.d || jwk.kty !== 'EC' || jwk.crv !== 'P-256') throw new Error('invalid key shape');
+    const { keyString } = await window.ZoeLicense.signNewKey(jwk, { appCode: LICENSE_APP_CODE, days: 1, note: '' });
+    const verifyResult = await window.ZoeLicense.verifyKeyString(keyString, LICENSE_APP_CODE);
+    if (!verifyResult.valid) throw new Error('private key does not pair with the shipped public key');
+}
+
+async function loadSigningKey() {
+    const input = document.getElementById('privateKeyInput');
+    const raw = input ? input.value.trim() : '';
+    if (!raw) { alert('សូមបិទភ្ជាប់ Private Key JWK សិន!'); return; }
+    const operation = captureSensitiveSession(true);
+    if (!operation) { alert('សូមចូលប្រព័ន្ធជាមុនសិន!'); return; }
+    try {
+        const jwk = JSON.parse(raw);
+        await validateSigningKeyAgainstShippedPublicKey(jwk);
+        if (!isSensitiveSessionCurrent(operation, true)) return;
+        signingPrivateKeyJwk = jwk;
+        if (input) input.value = '';
+        updateSigningKeyBadge();
+        showToast('Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
+
+        const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+        if (rememberCb && rememberCb.checked) {
+            if (signingKeySessionKey) {
+                await persistSigningKeyForSession();
+            } else {
+                requestPinBeforeConfig(persistSigningKeyForSession, 'បញ្ចូល PIN ដើម្បីចងចាំ Signing Key នេះសម្រាប់ Session នេះ');
+            }
+        }
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'loadSigningKey' });
+        alert(e && e.message === 'private key does not pair with the shipped public key'
+            ? 'Private Key នេះមិនផ្គូផ្គងនឹង Public Key ដែលមានក្នុង license-verify.js ទេ! Key ដែលចេញដោយវានឹងផ្ទៀងផ្ទាត់មិនកើតនៅគ្រប់ App។ សូមប្រើ Private Key ដែលត្រូវគ្នា ឬដាក់ Public Key ថ្មីទៅក្នុង App ទាំងអស់សិន។'
+            : 'Private Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យ JSON JWK (ECDSA P-256) ម្តងទៀត។');
+    }
+}
+
+function clearSigningKey(silent) {
+    invalidateSensitiveSession();
+    signingPrivateKeyJwk = null;
+    signingKeySessionKey = null;
+    const input = document.getElementById('privateKeyInput');
+    if (input) input.value = '';
+    safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
+    const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
+    if (rememberCb) rememberCb.checked = false;
+    isGeneratingKey = false;
+    const genBtn = document.getElementById('genGenerateBtn');
+    if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+    updateSigningKeyBadge();
+    if (!silent) showToast('បានសម្អាត Signing Key ចេញពីសតិ');
+}
+
+let keypairPrivateCopied = false;
+
+function hasUncopiedKeypair() {
+    if (keypairPrivateCopied) return false;
+    const modal = document.getElementById('keypairModal');
+    if (!modal || !modal.classList.contains('active')) return false;
+    const out = document.getElementById('newPrivateKeyOutput');
+    return !!(out && out.value);
+}
+
+function dismissKeypairModal() {
+    if (hasUncopiedKeypair() && !confirm('អ្នកមិនទាន់ចម្លង Private Key ទុកនៅឡើយទេ! បើបិទប្រអប់នេះ វានឹងបាត់បង់ជារៀងរហូត ហើយអ្នកត្រូវបង្កើត Keypair ថ្មីម្តងទៀត។ បិទមែនទេ?')) return;
+    closeModal('keypairModal');
+}
+
+async function generateNewKeypair() {
+    const operation = captureSensitiveSession(true);
+    if (!operation) { alert('សូមចូលប្រព័ន្ធជាមុនសិន!'); return; }
+    if (!confirm('ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗប្រើលែងកើត លុះត្រាតែអ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុង license-verify.js របស់គ្រប់ App ។ បន្តទេ?')) return;
+    try {
+        const { publicKeyJwk, privateKeyJwk } = await window.ZoeLicense.generateKeyPair();
+        if (!isSensitiveSessionCurrent(operation, true)) return;
+        keypairPrivateCopied = false;
+        document.getElementById('newPrivateKeyOutput').value = JSON.stringify(privateKeyJwk);
+        document.getElementById('newPublicKeyOutput').value = JSON.stringify(publicKeyJwk);
+        openModalHelper('keypairModal');
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
+        alert('មិនអាចបង្កើត Keypair បានទេ!');
+    }
+}
+
+function copyTextarea(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const operation = captureSensitiveSession(true);
+    if (!operation) return;
+    el.removeAttribute('readonly');
+    el.select();
+    el.setAttribute('readonly', 'true');
+    const markCopied = () => {
+        if (!isSensitiveSessionCurrent(operation, true)) return;
+        if (id === 'newPrivateKeyOutput') keypairPrivateCopied = true;
+        showToast('បានចម្លង!');
+    };
+    navigator.clipboard?.writeText(el.value).then(markCopied).catch(() => {
+        try { document.execCommand('copy'); markCopied(); } catch (e) {}
+    });
+}
+
+let lastGeneratedKey = '';
+
+function clearGeneratedKeyResult() {
+    lastGeneratedKey = '';
+    const genResultKey = document.getElementById('genResultKey');
+    if (genResultKey) genResultKey.textContent = '';
+    const genResultBox = document.getElementById('genResultBox');
+    if (genResultBox) genResultBox.classList.add('hidden');
+}
+
+let isGeneratingKey = false;
+
+async function generateLicenseKey() {
+    if (isGeneratingKey) return;
+    const operation = captureSensitiveSession(true);
+    const privateKeyJwk = signingPrivateKeyJwk;
+    if (!privateKeyJwk) { alert('សូម Load Signing Key សិន (មើលប្រអប់ខាងលើ)!'); return; }
+    if (!db || !operation) { alert('សូមចូលប្រព័ន្ធ និងភ្ជាប់ Firebase សិន!'); return; }
+
+    const appSelect = LICENSE_APP_CODE;
+    const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
+    const note = document.getElementById('genNoteInput').value.trim();
+
+    if (days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+
+    const genBtn = document.getElementById('genGenerateBtn');
+    isGeneratingKey = true;
+    if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'កំពុងផ្ទៀងផ្ទាត់ម៉ោង Server...'; }
+
+    const myGeneration = keyListSessionGeneration;
+    try {
+        const timeSynced = await waitForServerTimeSync(15000);
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!timeSynced) {
+            alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត (ដើម្បីកុំឲ្យថ្ងៃចេញ/ផុតកំណត់របស់ Key ខុសពីម៉ោងម៉ាស៊ីនរបស់អ្នក)។');
+            return;
+        }
+        if (genBtn) genBtn.textContent = 'កំពុងបង្កើត...';
+
+        const { keyString, payload } = await window.ZoeLicense.signNewKey(privateKeyJwk, {
+            appCode: appSelect, days: days, note: note
+        });
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+
+        const targetPaths = [appSelect];
+        const publicRecord = {
+            expiresAt: getServerNow() + Math.round(days * 86400000),
+            revoked: false
+        };
+        const metaRecord = {
+            issuedAt: getServerNow(),
+            scope: appSelect,
+            note: note || '',
+            createdBy: operation.user.email || operation.user.uid
+        };
+
+        let generateAlreadyTimedOut = false;
+        const writePromise = Promise.allSettled(targetPaths.map((p) => retryAsync(() => fb.update(fb.ref(db), {
+            [`license_keys/${p}/${payload.id}`]: publicRecord,
+            [`license_keys_meta/${p}/${payload.id}`]: metaRecord
+        }), 3, 1000)));
+        writePromise.then((bgResults) => {
+            if (!generateAlreadyTimedOut) return;
+            if (myGeneration !== keyListSessionGeneration || !isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            const bgSucceededPaths = targetPaths.filter((p, i) => bgResults[i].status !== 'rejected');
+            if (bgSucceededPaths.length > 0) {
+                showToast(`⏱️ Key ${payload.id} ដែលអស់ពេលមុន ត្រូវបានបង្កើតជោគជ័យទីបំផុតសម្រាប់: ${bgSucceededPaths.join(', ')} — សូមកុំបង្កើត Key ត្រួតគ្នា, ពិនិត្យ Key List ជាមុនសិន!`);
+                refreshKeyList();
+            }
+        });
+
+        let results;
+        try {
+            results = await withTimeout(writePromise, 25000, 'Generate key timed out');
+        } catch (timeoutErr) {
+            if (timeoutErr && timeoutErr.message === 'Generate key timed out') generateAlreadyTimedOut = true;
+            throw timeoutErr;
+        }
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        const failedPaths = targetPaths.filter((p, i) => results[i].status === 'rejected');
+        const succeededPaths = targetPaths.filter((p) => !failedPaths.includes(p));
+
+        if (succeededPaths.length === 0) {
+            throw (results.find((r) => r.status === 'rejected') || {}).reason || new Error('Generate key failed');
+        }
+
+        let appPathsTagFailed = false;
+        if (failedPaths.length > 0) {
+            const tagResults = await Promise.allSettled(succeededPaths.map((p) => retryAsync(() => fb.update(fb.ref(db, `license_keys_meta/${p}/${payload.id}`), { appPaths: succeededPaths }), 3, 1000)));
+            if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+            appPathsTagFailed = tagResults.some((r) => r.status === 'rejected');
+            if (appPathsTagFailed) {
+                const tagErr = (tagResults.find((r) => r.status === 'rejected') || {}).reason || new Error('appPaths tagging failed');
+                console.error('Failed to tag appPaths after partial key generation', tagErr);
+                if (window.ZoeErrors) ZoeErrors.capture(tagErr, { context: 'generateLicenseKey appPaths tagging failed after retries', keyId: payload.id, succeededPaths, failedPaths });
+            }
+        }
+
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        lastGeneratedKey = keyString;
+        document.getElementById('genResultKey').textContent = keyString;
+        document.getElementById('genResultBox').classList.remove('hidden');
+        document.getElementById('genNoteInput').value = '';
+
+        if (failedPaths.length === 0) {
+            showToast('Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
+        } else {
+            const extraWarning = appPathsTagFailed
+                ? '\n\n⚠️ បន្ថែមទៀត Key List នៅក្នុង App នេះប្រហែលជាមិនបង្ហាញត្រឹមត្រូវថា Key នេះ Active នៅ App ណាខ្លះទេ — សូមពិនិត្យផ្ទាល់នៅ Firebase Console (path license_keys) មុននឹង Revoke ឬបន្ថែមសុពលភាព Key នេះ។'
+                : '';
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key នេះកត់ត្រាទុកសម្រាប់តែ App: ${succeededPaths.join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — Key នេះនឹងមិនអាចប្រើប្រាស់នៅ App ដែលបរាជ័យទេ លុះត្រាតែបង្កើត Key ថ្មីដាច់ដោយឡែកសម្រាប់ App នោះ។${extraWarning}`);
+        }
+        refreshKeyList();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateLicenseKey' });
+        alert(e && e.message === 'Generate key timed out'
+            ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
+            : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
+    } finally {
+        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        isGeneratingKey = false;
+        if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
+    }
+}
+
+function copyGeneratedKey() {
+    if (!lastGeneratedKey) return;
+    navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
+}
+
+const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
+let lastGeneratedSetupLink = '';
+
+function restoreSetupLinkBaseUrl() {
+    const urlInput = document.getElementById('setupLinkUrlInput');
+    if (!urlInput) return;
+    urlInput.value = localStorage.getItem(SETUP_LINK_URL_KEY) || '';
+}
+
+function generateSetupLink() {
+    const urlInput = document.getElementById('setupLinkUrlInput');
+    const cfgInput = document.getElementById('setupLinkConfigInput');
+    const resultBox = document.getElementById('setupLinkResultBox');
+    const resultText = document.getElementById('setupLinkResultText');
+    if (!urlInput || !cfgInput) return;
+
+    const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
+    if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
+
+    const raw = cfgInput.value.trim();
+    if (!raw) { alert('សូមបញ្ចូល Firebase Config!'); return; }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (e) {
+        alert('Firebase Config JSON មិនត្រឹមត្រូវទេ!');
+        return;
+    }
+    if (!parsed.apiKey || !parsed.databaseURL) {
+        alert('Firebase Config ត្រូវមាន apiKey និង databaseURL!');
+        return;
+    }
+
+    safeStoreSet(localStorage, SETUP_LINK_URL_KEY, baseUrl);
+
+    let b64;
+    try {
+        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+    } catch (e) {
+        alert('មិនអាចបង្កើត Link បានទេ! សូមពិនិត្យ Config JSON');
+        return;
+    }
+
+    lastGeneratedSetupLink = baseUrl + '/?setup=' + encodeURIComponent(b64);
+    if (resultText) resultText.textContent = lastGeneratedSetupLink;
+    if (resultBox) resultBox.classList.remove('hidden');
+
+    const qrContainer = document.getElementById('setupLinkQrContainer');
+    if (qrContainer) {
+        qrContainer.innerHTML = '';
+        try {
+            if (window.qrcode) {
+                const qr = qrcode(0, 'M');
+                qr.addData(lastGeneratedSetupLink);
+                qr.make();
+                qrContainer.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8 });
+            }
+        } catch (e) {
+            qrContainer.innerHTML = '';
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'generateSetupLink QR render' });
+        }
+    }
+}
+
+function copySetupLink() {
+    if (!lastGeneratedSetupLink) return;
+    navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('បានចម្លង Link!')).catch(() => {});
+}
+
+let isSignedInUiActive = false;
+let keyListCache = [];
+let keyListSessionGeneration = 0;
+const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function refreshKeyList() {
+    const tbody = document.getElementById('keyListBody');
+    if (!tbody || !db) return;
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
+    const myGeneration = keyListSessionGeneration;
+    try {
+        const [publicResult, metaResult] = await withTimeout(Promise.allSettled([
+            fb.get(fb.ref(db, 'license_keys')),
+            fb.get(fb.ref(db, 'license_keys_meta'))
+        ]), 15000, 'Refresh timed out');
+        if (myGeneration !== keyListSessionGeneration) return;
+        if (publicResult.status === 'rejected') throw publicResult.reason;
+        const publicSnap = publicResult.value;
+        const publicData = publicSnap.exists() ? publicSnap.val() : {};
+        if (metaResult.status === 'rejected') {
+            console.error(metaResult.reason);
+            if (window.ZoeErrors) ZoeErrors.capture(metaResult.reason, { context: 'refreshKeyList metaSnap' });
+        }
+        const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
+
+        const byId = {};
+        [LICENSE_APP_CODE].forEach((appCode) => {
+            const bucket = publicData[appCode] || {};
+            Object.keys(bucket).forEach((id) => {
+                if (!byId[id]) byId[id] = { id: id, existsIn: [], perApp: {} };
+                byId[id].existsIn.push(appCode);
+                byId[id].perApp[appCode] = bucket[id] || {};
+            });
+        });
+
+        const rows = Object.keys(byId).map((id) => {
+            const entry = byId[id];
+            const metaAppCode = entry.existsIn.find((appCode) => metaData[appCode] && metaData[appCode][id]) || entry.existsIn[0];
+            const meta = (metaData[metaAppCode] && metaData[metaAppCode][id]) || {};
+            const paths = entry.existsIn.slice().sort();
+            const legacyMeta = {};
+            paths.forEach((p) => {
+                const rec = entry.perApp[p] || {};
+                ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'].forEach((f) => {
+                    if (rec[f] !== undefined) legacyMeta[f] = rec[f];
+                });
+            });
+            const scope = meta.scope || legacyMeta.scope || (paths.length > 1 ? 'ALL' : paths[0]);
+            const revokedFlags = paths.map((p) => !!entry.perApp[p].revoked);
+            const expiryValues = paths.map((p) => entry.perApp[p].expiresAt);
+            const revoked = revokedFlags.every((v) => v);
+            let expiresAt;
+            expiryValues.forEach((v) => {
+                if (typeof v !== 'number') return;
+                if (expiresAt === undefined || v < expiresAt) expiresAt = v;
+            });
+            const inconsistent = revokedFlags.some((v) => v !== revokedFlags[0])
+                || expiryValues.some((v) => v !== expiryValues[0]);
+            return Object.assign({ id: id }, legacyMeta, meta, {
+                scope: scope, paths: paths, perApp: entry.perApp,
+                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt
+            });
+        });
+
+        rows.sort((a, b) => (b.issuedAt || 0) - (a.issuedAt || 0));
+        keyListCache = rows;
+        renderKeyList();
+    } catch (e) {
+        if (myGeneration !== keyListSessionGeneration) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'refreshKeyList' });
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនអាចផ្ទុកទិន្នន័យបានទេ</td></tr>';
+    }
+}
+
+function renderKeyList() {
+    const tbody = document.getElementById('keyListBody');
+    if (!tbody) return;
+    if (!keyListCache.length) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">មិនទាន់មាន Key</td></tr>';
+        return;
+    }
+    const now = getServerNow();
+    tbody.innerHTML = keyListCache.map((row) => {
+        let statusHtml;
+        if (row.revoked) statusHtml = '<span class="badge badge-revoked">Revoked</span>';
+        else if (row.expiresAt && now > row.expiresAt) statusHtml = '<span class="badge badge-expired">ផុតកំណត់</span>';
+        else statusHtml = '<span class="badge badge-active">Active</span>';
+
+        const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
+
+        if (row.inconsistent) {
+            const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
+                + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
+                + (row.perApp[p].expiresAt ? new Date(row.perApp[p].expiresAt).toLocaleDateString('km-KH') : '-')).join(' · ');
+            statusHtml += ` <span class="badge badge-revoked" title="${escapeHtml('ស្ថានភាពមិនដូចគ្នារវាង App (ការធ្វើបច្ចុប្បន្នភាពមុនជោគជ័យមិនពេញលេញ)៖ ' + perAppText)}">⚠️ មិនត្រូវគ្នា</span>`;
+        }
+
+        const isPartialAll = false;
+        const scopeLabel = escapeHtml(APP_LABELS[row.scope] || row.scope);
+        const scopeHtml = isPartialAll
+            ? `<span class="badge badge-scope" title="${escapeHtml('សកម្មតែលើ: ' + row.paths.map((p) => APP_LABELS[p] || p).join(', '))}">${scopeLabel} ⚠️</span>`
+            : `<span class="badge badge-scope">${scopeLabel}</span>`;
+
+        return `<tr>
+            <td>${scopeHtml}</td>
+            <td>${escapeHtml(row.id)}</td>
+            <td class="note-cell">${escapeHtml(row.note || '-')}</td>
+            <td>${expStr}</td>
+            <td>${statusHtml}</td>
+            <td>
+                <div class="btn-row">
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function migrateLegacyLicenseKeyMetadata() {
+    if (!db || !auth || !auth.currentUser) { alert('សូមចូលប្រព័ន្ធសិន!'); return; }
+    if (!confirm('ដំណើរការនេះនឹងផ្លាស់ទី Note/Email/Scope/appPaths ចេញពី Key សាធារណៈ (license_keys) ទៅកន្លែងឯកជន (license_keys_meta)។\n\n⚠️ ត្រូវ Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) មិនដូច្នេះទេ ដំណើរការនេះនឹងបរាជ័យ។\n\nបន្តទេ?')) return;
+
+    try {
+        const snap = await withTimeout(fb.get(fb.ref(db, 'license_keys')), 15000, 'Migration read timed out');
+        const data = snap.exists() ? snap.val() : {};
+        const updates = {};
+        let migratedCount = 0;
+        const META_FIELDS = ['issuedAt', 'scope', 'note', 'createdBy', 'appPaths'];
+
+        [LICENSE_APP_CODE].forEach((appCode) => {
+            const bucket = data[appCode] || {};
+            Object.keys(bucket).forEach((id) => {
+                const rec = bucket[id] || {};
+                const hasLegacyFields = META_FIELDS.some((f) => rec[f] !== undefined);
+                if (!hasLegacyFields) return;
+                const meta = {};
+                META_FIELDS.forEach((f) => {
+                    if (rec[f] !== undefined) {
+                        meta[f] = rec[f];
+                        updates[`license_keys/${appCode}/${id}/${f}`] = null;
+                    }
+                });
+                updates[`license_keys_meta/${appCode}/${id}`] = meta;
+                migratedCount++;
+            });
+        });
+
+        if (migratedCount === 0) {
+            showToast('គ្មាន Key ចាស់ត្រូវការ Migrate ទេ — ស្អាតរួចហើយ!');
+            return;
+        }
+
+        await withTimeout(retryAsync(() => fb.update(fb.ref(db), updates), 3, 1500), 30000, 'Migration write timed out');
+        showToast(`✅ បាន Migrate Key ចំនួន ${migratedCount} ដោយជោគជ័យ!`);
+        refreshKeyList();
+    } catch (e) {
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'migrateLegacyLicenseKeyMetadata' });
+        alert('Migrate មិនជោគជ័យទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួចហើយ រួចសាកល្បងម្តងទៀត។');
+    }
+}
+
+async function toggleRevokeKey(id) {
+    const row = keyListCache.find((r) => r.id === id);
+    if (!row) return;
+    const newRevoked = !row.revoked;
+    if (!confirm(newRevoked ? 'តើអ្នកចង់ Revoke Key នេះមែនទេ? អ្នកប្រើប្រាស់នឹងលែងចូល App បានក្នុងពេលឆាប់ៗ។' : 'សង្គ្រោះ Key នេះមកវិញ?')) return;
+    try {
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
+        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+        if (failedPaths.length === 0) {
+            showToast(newRevoked ? 'Key ត្រូវបាន Revoke!' : 'Key ត្រូវបានសង្គ្រោះមកវិញ!');
+        } else if (failedPaths.length < row.paths.length) {
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key ត្រូវបាន${newRevoked ? ' Revoke' : 'សង្គ្រោះ'}សម្រាប់ App: ${row.paths.filter(p => !failedPaths.includes(p)).join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — សូមសាកល្បងម្តងទៀត ព្រោះ Key នេះនៅតែអាចប្រើបានលើ App ដែលបរាជ័យ!`);
+        } else {
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        }
+        refreshKeyList();
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
+        alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+    }
+}
+
+let extendTargetId = null;
+
+function openExtendModal(id) {
+    extendTargetId = id;
+    document.getElementById('extendDaysInput').value = 30;
+    openModalHelper('extendModal');
+}
+
+async function confirmExtendKey() {
+    const row = keyListCache.find((r) => r.id === extendTargetId);
+    if (!row) { closeModal('extendModal'); return; }
+    const days = parseFloat(document.getElementById('extendDaysInput').value);
+    if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
+    const timeSynced = await waitForServerTimeSync(15000);
+    if (!timeSynced) {
+        alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
+        return;
+    }
+    const newExpiresAt = getServerNow() + Math.round(days * 86400000);
+    try {
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
+        const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
+        if (failedPaths.length === 0) {
+            showToast('បានបន្ថែមសុពលភាពរួចរាល់!');
+        } else if (failedPaths.length < row.paths.length) {
+            alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
+        } else {
+            alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        }
+        closeModal('extendModal');
+        refreshKeyList();
+    } catch (e) {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
+        closeModal('extendModal');
+        alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+        refreshKeyList();
+    }
+}
+
+function setupIOSPullToRefresh() {
+    if (window.navigator.standalone !== true) return;
+
+    const indicator = document.createElement('div');
+    indicator.className = 'ptr-indicator';
+    indicator.innerHTML = '<div class="ptr-spinner"></div>';
+    document.body.appendChild(indicator);
+
+    const threshold = 100;
+    const maxPull = 160;
+    let startY = 0;
+    let lastPull = 0;
+    let pulling = false;
+    let refreshing = false;
+
+    function atTop() {
+        if (refreshing || isGeneratingKey || signingPrivateKeyJwk) return false;
+        if (document.querySelector('.modal.active')) return false;
+        return (document.scrollingElement || document.documentElement).scrollTop <= 0;
+    }
+
+    function reset() {
+        pulling = false;
+        lastPull = 0;
+        indicator.classList.add('snapping');
+        indicator.classList.remove('visible');
+        indicator.style.transform = 'translateY(-50px)';
+    }
+
+    document.addEventListener('touchstart', (e) => {
+        if (!atTop()) { pulling = false; return; }
+        startY = e.touches[0].clientY;
+        lastPull = 0;
+        pulling = true;
+        indicator.classList.remove('snapping');
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!pulling) return;
+        if (!atTop()) { reset(); return; }
+        const diffY = e.touches[0].clientY - startY;
+        if (diffY <= 0) { reset(); return; }
+        e.preventDefault();
+        lastPull = Math.min(diffY, maxPull);
+        indicator.classList.add('visible');
+        indicator.style.transform = 'translateY(' + (lastPull - 50) + 'px)';
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+        if (!pulling) return;
+        pulling = false;
+        if (lastPull >= threshold) {
+            refreshing = true;
+            indicator.classList.add('snapping');
+            indicator.style.transform = 'translateY(16px)';
+            setTimeout(() => window.location.reload(), 200);
+        } else {
+            reset();
+        }
+    }, { passive: true });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.ZoeErrors) ZoeErrors.init('zoekeygen');
+    if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
+    initFirebase();
+    updateSigningKeyBadge();
+    restoreSetupLinkBaseUrl();
+    setupIOSPullToRefresh();
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        retryPendingRoleCheck();
+    });
+
+    requestSessionSigningKeyRestoreIfEligible();
+
+    document.querySelectorAll('.modal').forEach((modal) => {
+        modal.addEventListener('mousedown', (e) => {
+            if (e.target !== modal || modal.dataset.nodismiss === 'true') return;
+            const fnName = modal.getAttribute('data-close');
+            if (fnName && typeof window[fnName] === 'function') window[fnName]();
+            else closeModal(modal.id);
+        });
+    });
+
+    const keyListBody = document.getElementById('keyListBody');
+    if (keyListBody) {
+        keyListBody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-key-id]');
+            if (!btn) return;
+            const id = btn.dataset.keyId;
+            if (btn.dataset.action === 'revoke') toggleRevokeKey(id);
+            else if (btn.dataset.action === 'extend') openExtendModal(id);
+        });
+    }
+});

@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# រត់ការត្រួតពិនិត្យ audit ទាំងអស់ដោយមិនចាំបាច់ប្រើ AI ។
+#   bash audit-tools/run-all.sh
+# ប្រៀបធៀបនឹង tree ផ្សេង (ឧ. មុនកែ) ដើម្បីបញ្ជាក់ថាតេស្តមិនទទេ៖
+#   bash audit-tools/run-all.sh /path/to/baseline
+cd "$(dirname "$0")/.." || exit 1
+BASE="$1"
+
+for d in node_modules audit-tools/node_modules "$HOME/node_modules" /tmp/claude-*/*/*/scratchpad/node_modules; do
+    [ -d "$d/acorn" ] && export NODE_PATH="$d" && break
+done
+if ! node -e "require('acorn')" 2>/dev/null; then
+    echo "⚠️  ត្រូវការ acorn — រត់៖  npm i acorn"
+    echo "   (ការត្រួតពិនិត្យ ៤ នឹងត្រូវរំលង)"
+    NO_ACORN=1
+fi
+
+pass=0; fail=0; skip=0
+run() {
+    local label="$1"; shift
+    printf '  %-32s ' "$label"
+    if out=$("$@" 2>&1); then
+        n=$(printf '%s' "$out" | grep -cE 'ok    ')
+        [ "$n" -gt 0 ] && echo "PASS  ($n)" || echo "PASS"
+        pass=$((pass+1))
+    else
+        echo "*** FAIL ***"; printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
+        fail=$((fail+1))
+    fi
+}
+skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
+
+echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
+for t in policy-test auth-recovery-test keylist-consistency-test \
+         license-grace-test phone-suggest-test phone-search-swipe-test \
+         pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
+         keygen-session-security-test \
+         barcode-shape-test setup-link-logout-test \
+         raw-read-shape-test devtools-guard-test concurrent-scan-test \
+         restore-finalization-fence-test \
+         restore-race-test clear-history-claim-test google-sheets-cache-test \
+         lookup-config-secret-test \
+         clear-history-finalization-fence-test \
+         setup-link-roundtrip-test export-cells-test camera-resume-test; do
+    run "$t" node "audit-tools/$t.js"
+done
+
+echo
+echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene version-check; do
+    [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
+    run "$t" node "audit-tools/$t.js"
+done
+run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
+run "css-classes" node audit-tools/css-classes.js
+run "css-media-override" node audit-tools/css-media-override.js
+run "animation-cost" node audit-tools/animation-cost.js
+run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
+run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
+run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
+run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
+run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
+run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
+run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
+run "layout (browser ពិត)"     node audit-tools/layout-check.js
+run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
+run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
+run "revenue-fuzz (browser ពិត)" node audit-tools/revenue-fuzz-test.js
+run "perf (browser ពិត)"       node audit-tools/perf-check.js
+
+echo
+echo "== ទម្លាប់គម្រោង =="
+printf '  %-32s ' "node --check លើ app.js ទាំង ២"
+if for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
+    echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
+
+printf '  %-32s ' "rules JSON valid"
+if python3 -c "import json;json.load(open('firebase-database.rules.json'));json.load(open('ZoeKeyGen/firebase-database.rules.json'))" 2>/dev/null; then
+    echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
+
+for f in license-verify.js error-reporting.js; do
+    printf '  %-32s ' "$f byte-identical ×2"
+    if [ "$(md5sum ZoeW/$f ZoeKeyGen/$f | awk '{print $1}' | sort -u | wc -l)" = "1" ]; then
+        echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
+done
+
+printf '  %-32s ' "គ្មាន trailing whitespace"
+if [ "$(cat ZoeW/app.js ZoeKeyGen/app.js | grep -c '[[:space:]]$')" = "0" ]; then
+    echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
+
+printf '  %-32s ' "CACHE_VERSION"
+grep -h CACHE_VERSION ZoeW/sw.js ZoeKeyGen/sw.js | grep -o "'[a-z]*-v[0-9]*'" | tr '\n' ' '; echo
+
+if [ -n "$BASE" ] && [ -d "$BASE" ]; then
+    echo
+    echo "== បញ្ជាក់ថាតេស្តមិនទទេ (រត់លើ $BASE) =="
+    echo "   ខាងក្រោមនេះ *គួរតែធ្លាក់* — បើវាជោគជ័យ នោះតេស្តមិនចាប់អ្វីទេ"
+    BARCODE_APP_DIR="$BASE" node audit-tools/barcode-shape-test.js 2>&1 | tail -1 | sed 's/^/   barcode-shape:   /'
+    RAWREAD_APP_DIR="$BASE" node audit-tools/raw-read-shape-test.js 2>&1 | tail -1 | sed 's/^/   raw-read-shape:  /'
+    DEVGUARD_APP_DIR="$BASE" node audit-tools/devtools-guard-test.js 2>&1 | tail -1 | sed 's/^/   devtools-guard:  /'
+    CONCSCAN_APP_DIR="$BASE" node audit-tools/concurrent-scan-test.js 2>&1 | tail -1 | sed 's/^/   concurrent-scan: /'
+    SETUPLINK_APP_DIR="$BASE" node audit-tools/setup-link-browser-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
+    UIFLOW_APP_DIR="$BASE" node audit-tools/ui-flow-test.js 2>&1 | tail -1 | sed 's/^/   ui-flow:         /'
+    LAYOUT_APP_DIR="$BASE" node audit-tools/layout-check.js 2>&1 | tail -1 | sed 's/^/   layout:          /'
+    FIELDSHAPE_APP_DIR="$BASE" node audit-tools/field-shape-test.js 2>&1 | tail -1 | sed 's/^/   field-shape:     /'
+    SLOWWRITE_APP_DIR="$BASE" node audit-tools/slow-write-test.js 2>&1 | tail -1 | sed 's/^/   slow-write:      /'
+    COMP_APP_DIR="$BASE" node audit-tools/compensation-order.js 2>&1 | tail -1 | sed 's/^/   compensation:    /'
+    STALEWRITE_APP_DIR="$BASE" node audit-tools/stale-write.js 2>&1 | tail -1 | sed 's/^/   stale-write:     /'
+    VERSION_APP_DIR="$BASE" node audit-tools/version-check.js 2>&1 | tail -1 | sed 's/^/   version-check:   /'
+    PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
+    SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
+    PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
+    SWIPE_APP_DIR="$BASE" node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   swipe-pullup:    /'
+    PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
+    CSSMEDIA_APP_DIR="$BASE" node audit-tools/css-media-override.js 2>&1 | tail -1 | sed 's/^/   css-media:       /'
+    ANIM_APP_DIR="$BASE"    node audit-tools/animation-cost.js 2>&1 | tail -1 | sed 's/^/   animation-cost:  /'
+    BIOMETRIC_APP_DIR="$BASE" node audit-tools/biometric-unlock-test.js 2>&1 | tail -1 | sed 's/^/   biometric:       /'
+    POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
+    GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
+    SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
+    CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
+    DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
+fi
+
+echo
+echo "==================================="
+if [ "$fail" -eq 0 ]; then
+    echo "✅ ជោគជ័យទាំងអស់  ($pass ការត្រួតពិនិត្យ, រំលង $skip)"
+else
+    echo "❌ ធ្លាក់ $fail  (ជោគជ័យ $pass, រំលង $skip)"
+fi
+exit "$fail"

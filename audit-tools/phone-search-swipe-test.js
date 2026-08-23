@@ -44,11 +44,16 @@ function makeClassList(initial) {
 function buildEnv(src, opts) {
     const o = opts || {};
     const handlers = {};
+    const OWNED = {
+        dataMainSection: ['tableResponsive'],
+        entryMainSection: ['entryTableResponsive', 'lockerTableResponsive']
+    };
     const mkEl = (id, extra) => Object.assign({
         id,
         classList: makeClassList(),
         scrollTop: 0,
         value: '',
+        contains: (el) => !!el && (OWNED[id] || []).indexOf(el.id) !== -1,
         addEventListener: (type, fn) => { (handlers[id] = handlers[id] || {})[type] = fn; }
     }, extra || {});
 
@@ -58,6 +63,13 @@ function buildEnv(src, opts) {
         tableResponsive: mkEl('tableResponsive'),
         appPages: mkEl('appPages'),
         pageData: mkEl('pageData', { classList: makeClassList(o.dataPageActive === false ? [] : ['active']) }),
+        pageEntry: mkEl('pageEntry', { classList: makeClassList(o.entryPageActive ? ['active'] : []) }),
+        entrySideSection: mkEl('entrySideSection', { classList: makeClassList(o.entrySideClasses || []) }),
+        entryMainSection: mkEl('entryMainSection'),
+        entryDragHandle: mkEl('entryDragHandle'),
+        entryTableResponsive: mkEl('entryTableResponsive'),
+        lockerTableResponsive: mkEl('lockerTableResponsive'),
+        lockerPanel: mkEl('lockerPanel', { classList: makeClassList(['hidden']) }),
         dragHandle: mkEl('dragHandle'),
         phoneSuggestBox: mkEl('phoneSuggestBox', { classList: makeClassList(o.suggestOpen ? ['show'] : []) }),
         searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchActive ? '012' : '' })
@@ -80,14 +92,25 @@ function buildEnv(src, opts) {
     vm.createContext(ctx);
     vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
     vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
+    vm.runInContext(sliceFn(src, 'entryScrollerInView'), ctx);
+    vm.runInContext(sliceFn(src, 'activePanelSections'), ctx);
     vm.runInContext(sliceFn(src, 'syncHistoryExpandedLock'), ctx);
     vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
+    vm.runInContext(sliceFn(src, 'phoneSearchIsActive'), ctx);
+    vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
     ctx.setupSwipeGestures();
     return { ctx, els, handlers, calls };
 }
 
 function swipe(handlers, el, fromY, toY) {
+    handlers[el].touchstart({ touches: [{ clientY: fromY }] });
+    handlers[el].touchmove({ touches: [{ clientY: toY }] });
+    if (handlers[el].touchend) handlers[el].touchend();
+}
+
+// អូសដោយ **មិនទាន់លើកម្រាមដៃ** — ប្រើដើម្បីវាស់ថាសោមិនអនុវត្តចំពេលកំពុងអូស
+function swipeHold(handlers, el, fromY, toY) {
     handlers[el].touchstart({ touches: [{ clientY: fromY }] });
     handlers[el].touchmove({ touches: [{ clientY: toY }] });
 }
@@ -107,6 +130,53 @@ console.log('\n=== សោប្រវត្តិពេញអេក្រង់�
     onEntry.ctx.syncHistoryExpandedLock();
     ok(!onEntry.els.appPages.classList.contains('history-expanded'),
         'ទំព័រទិន្នន័យមិនសកម្ម ➜ មិនដាក់ history-expanded (ទំព័រ ២ រមូរបាន)');
+}
+
+console.log('\n=== ទំព័រ ២ (បញ្ចូលទិន្នន័យ) ហូតឡើងចុះដូចប្រវត្តិដែរ ===');
+{
+    const { els, handlers } = buildEnv(src, { dataPageActive: false, entryPageActive: true });
+    ok(!!handlers.entryMainSection, 'ដងអូស/ការអូសត្រូវបានចង លើ #entryMainSection');
+    swipe(handlers, 'entryMainSection', 300, 200);
+    ok(els.entrySideSection.classList.contains('collapsed'),
+        'អូសឡើងលើទំព័រ ២ ➜ ផ្ទាំងកាមេរ៉ាបង្រួម');
+    ok(els.appPages.classList.contains('history-expanded'),
+        'ហើយបញ្ជីកញ្ចប់ថ្ងៃនេះហូតឡើងពេញអេក្រង់ (សោដូចប្រវត្តិ)');
+    swipe(handlers, 'entryMainSection', 200, 300);
+    ok(!els.entrySideSection.classList.contains('collapsed'),
+        'អូសចុះវិញ ➜ ផ្ទាំងកាមេរ៉ាត្រឡប់មក');
+    ok(!els.appPages.classList.contains('history-expanded'), 'ហើយសោត្រូវដោះ');
+
+    const byHandle = buildEnv(src, { dataPageActive: false, entryPageActive: true });
+    byHandle.handlers.entryDragHandle.click();
+    ok(byHandle.els.entrySideSection.classList.contains('collapsed'),
+        'ចុចដងអូសទំព័រ ២ ➜ បង្រួម');
+    ok(byHandle.els.appPages.classList.contains('history-expanded'), 'ហើយចាក់សោភ្លាម');
+
+    // ទំព័រ ២ មិនត្រូវប៉ះផ្ទាំងទំព័រ ១ ទេ
+    ok(!byHandle.els.dataSideSection.classList.contains('collapsed'),
+        'ការអូសលើទំព័រ ២ មិនប៉ះផ្ទាំងទំព័រ ១');
+}
+
+console.log('\n=== សោមិនអនុវត្តចំពេលម្រាមដៃនៅលើអេក្រង់ (កុំបង្អាក់ការរមូរ) ===');
+{
+    // ឫសគល់នៃការ «ទាក់»៖ ការដាក់ history-expanded ចំពេលអូស ប្តូរកម្ពស់
+    // កន្សោមរមូរភ្លាម ➜ ការរមូរដែលកំពុងដើរត្រូវកាត់ផ្តាច់។ ដូច្នេះផ្ទាំងបង្រួម
+    // ភ្លាម (ឃើញផល) តែ **សោអនុវត្តពេល touchend** ទើបការរមូរបន្តរលូន។
+    const { els, handlers } = buildEnv(src, {});
+    swipeHold(handlers, 'dataMainSection', 300, 200);
+    ok(els.dataSideSection.classList.contains('collapsed'),
+        'កំពុងអូស ➜ ផ្ទាំងបង្រួមភ្លាម (អ្នកប្រើឃើញផលភ្លាម)');
+    ok(!els.appPages.classList.contains('history-expanded'),
+        'កំពុងអូស ➜ **មិនទាន់** ចាក់សោកន្សោមរមូរ (ការរមូរមិនត្រូវកាត់ផ្តាច់)');
+    handlers.dataMainSection.touchend();
+    ok(els.appPages.classList.contains('history-expanded'),
+        'លើកម្រាមដៃ ➜ ទើបចាក់សោ ហើយបញ្ជីហូតឡើងពេញអេក្រង់');
+
+    const cancelled = buildEnv(src, {});
+    swipeHold(cancelled.handlers, 'dataMainSection', 300, 200);
+    cancelled.handlers.dataMainSection.touchcancel();
+    ok(cancelled.els.appPages.classList.contains('history-expanded'),
+        'touchcancel ក៏អនុវត្តសោដែរ (សោមិនជាប់គាំង)');
 }
 
 console.log('\n=== អូសឡើង/ចុះ ➜ ប្រវត្តិហូតឡើងចុះ ===');

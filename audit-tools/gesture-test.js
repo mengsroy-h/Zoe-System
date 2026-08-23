@@ -359,11 +359,24 @@ const GESTURE = function (steps) {
         return { shown: shown, away: away, expanded: pages.classList.contains('history-expanded') };
     });
     ok('នៅក្នុងរបៀបប្រវត្តិពេញអេក្រង់ពិត (លក្ខខណ្ឌចាំបាច់)', noReflow.expanded === true, noReflow);
-    ok('លាក់របា ➜ កម្ពស់ប្រអប់រមូរមិនប្តូរ (បញ្ជីលែងលោតរំលងលើ iOS)',
-        noReflow.shown.h === noReflow.away.h, noReflow);
-    ok('លាក់របា ➜ padding-bottom របស់ #appPages មិនប្តូរ (គ្មាន transition លើ layout)',
-        noReflow.shown.pad === noReflow.away.pad, noReflow);
-    ok('លាក់របា ➜ ទីតាំងកំពូលតារាងមិនប្តូរ', noReflow.shown.top === noReflow.away.top, noReflow);
+    // សំណើអ្នកប្រើ (ដូចកំណែ 2.2.0)៖ ពេលរបា Tab លាក់ខ្លួន កន្លែងរបស់វាត្រូវ
+    // **ប្រគល់មកកាតវិញ** ➜ គ្មានចន្លោះទទេនៅបាតអេក្រង់។
+    ok('លាក់របា ➜ កាតប្រវត្តិរីកចុះបំពេញកន្លែងរបា (គ្មានចន្លោះទទេ)',
+        noReflow.away.h > noReflow.shown.h, noReflow);
+    ok('លាក់របា ➜ ទីតាំង**កំពូល**តារាងមិនប្តូរ (រីកតែខាងក្រោម មិនរុញមាតិកា)',
+        noReflow.shown.top === noReflow.away.top, noReflow);
+    // ថ្នាក់កំហុស 2.2.1៖ padding នោះត្រូវបាន **ធ្វើចលនា** ➜ កម្ពស់កន្សោមរមូរ
+    // ប្តូររាល់ស៊ុមអស់ ០.២៦ វិនាទី ចំពេល momentum scroll ➜ បញ្ជីលោតរំលង។
+    // ការប្តូរភ្លាមមួយដងមិនស្ថិតក្នុងថ្នាក់នោះទេ — តែ transition ត្រូវហាមដាច់ខាត។
+    const padTransition = await page.evaluate(() => {
+        const cs = window.getComputedStyle(document.getElementById('appPages'));
+        return { prop: cs.transitionProperty, dur: cs.transitionDuration };
+    });
+    ok('#appPages គ្មាន transition លើ padding (ឫសគល់នៃការលោតរំលងក្នុង 2.2.1)',
+        !/padding|\ball\b/.test(padTransition.prop) || parseFloat(padTransition.dur) === 0, padTransition);
+    const cssNoPadAnim = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
+    ok('style.css គ្មានច្បាប់ណាធ្វើចលនាលើ padding របស់ .app-pages',
+        !/\.app-pages[^{]*\{[^}]*transition:[^;}]*padding/.test(cssNoPadAnim));
 
     // កាតប្រវត្តិត្រូវ **ឈប់ត្រង់ខាងលើរបា Tab** — មិនត្រូវរត់ចូលពីក្រោមវាទេ។
     // កំណែ 2.4.0 ទុកឲ្យកាតលាតដល់បាតអេក្រង់ រួចកក់កន្លែងដោយ ::after ខាងក្នុង
@@ -384,10 +397,22 @@ const GESTURE = function (steps) {
         };
     });
     ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
-    ok('គែមក្រោមតារាងប្រវត្តិឈរខាងលើរបា Tab (របាមិនបាំងជួរដេក)',
+    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមក្រោមតារាងឈរខាងលើវា (របាមិនបាំងជួរដេក)',
         bottomRoom.tableBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
-    ok('គែមក្រោមកាតប្រវត្តិទាំងមូលក៏ឈរខាងលើរបា Tab ដែរ',
+    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមក្រោមកាតទាំងមូលក៏ឈរខាងលើវាដែរ',
         bottomRoom.cardBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
+    const filled = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const card = document.querySelector('#dataMainSection .history-section');
+        document.body.classList.add('chrome-hidden');
+        await wait(60);
+        const bottom = Math.round(card.getBoundingClientRect().bottom);
+        document.body.classList.remove('chrome-hidden');
+        await wait(60);
+        return { bottom: bottom, viewport: window.innerHeight };
+    });
+    ok('ពេលរបា Tab លាក់ ➜ គែមក្រោមកាតចុះជិតបាតអេក្រង់ (គ្មានចន្លោះទទេ)',
+        filled.viewport - filled.bottom <= 16, filled);
 
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));

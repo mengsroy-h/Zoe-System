@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.6.1';
+    const APP_VERSION = '2.7.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2774,48 +2774,101 @@
         if (typeof fn === 'function') fn();
     }
 
-    function syncHistoryExpandedLock() {
-        const sidebar = document.getElementById('dataSideSection');
-        const pages = document.getElementById('appPages');
-        if (!sidebar || !pages) return;
+    function activePanelSections() {
+        const entryPage = document.getElementById('pageEntry');
+        if (entryPage && entryPage.classList.contains('active')) {
+            return {
+                side: document.getElementById('entrySideSection'),
+                main: document.getElementById('entryMainSection'),
+                scroller: entryScrollerInView()
+            };
+        }
         const dataPage = document.getElementById('pageData');
-        const dataPageActive = !!dataPage && dataPage.classList.contains('active');
-        pages.classList.toggle('history-expanded', dataPageActive && sidebar.classList.contains('collapsed'));
+        if (dataPage && dataPage.classList.contains('active')) {
+            return {
+                side: document.getElementById('dataSideSection'),
+                main: document.getElementById('dataMainSection'),
+                scroller: document.getElementById('tableResponsive')
+            };
+        }
+        return { side: null, main: null, scroller: null };
+    }
+
+    function entryScrollerInView() {
+        const lockerPanel = document.getElementById('lockerPanel');
+        const lockerVisible = !!lockerPanel && !lockerPanel.classList.contains('hidden');
+        return document.getElementById(lockerVisible ? 'lockerTableResponsive' : 'entryTableResponsive');
+    }
+
+    function syncHistoryExpandedLock() {
+        const pages = document.getElementById('appPages');
+        if (!pages) return;
+        const side = activePanelSections().side;
+        pages.classList.toggle('history-expanded', !!side && side.classList.contains('collapsed'));
     }
 
     function setupSwipeGestures() {
-        const sidebar = document.getElementById('dataSideSection');
-        const mainSection = document.getElementById('dataMainSection');
-        const tableResponsive = document.getElementById('tableResponsive');
-        if (!sidebar || !mainSection || !tableResponsive) return;
+        bindPanelSwipe({
+            sideId: 'dataSideSection',
+            mainId: 'dataMainSection',
+            handleId: 'dragHandle',
+            scroller: () => document.getElementById('tableResponsive'),
+            blockCollapse: phoneSearchIsActive
+        });
+        bindPanelSwipe({
+            sideId: 'entrySideSection',
+            mainId: 'entryMainSection',
+            handleId: 'entryDragHandle',
+            scroller: entryScrollerInView,
+            blockCollapse: () => false
+        });
+        syncHistoryExpandedLock();
+    }
+
+    function phoneSearchIsActive() {
+        const box = document.getElementById('phoneSuggestBox');
+        if (box && box.classList.contains('show')) return true;
+        const input = document.getElementById('searchPhoneInput');
+        return !!(input && document.activeElement === input && input.value.trim());
+    }
+
+    function bindPanelSwipe(config) {
+        const sidebar = document.getElementById(config.sideId);
+        const mainSection = document.getElementById(config.mainId);
+        if (!sidebar || !mainSection) return;
 
         let startY = 0;
-        let currentY = 0;
         let isDragging = false;
+        let pendingLock = false;
 
-        function phoneSearchIsActive() {
-            const box = document.getElementById('phoneSuggestBox');
-            if (box && box.classList.contains('show')) return true;
-            const input = document.getElementById('searchPhoneInput');
-            return !!(input && document.activeElement === input && input.value.trim());
+        function scrollTopOf() {
+            const el = config.scroller();
+            return el ? el.scrollTop : 0;
         }
 
-        tableResponsive.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-        }, { passive: true });
+        function applyPendingLock() {
+            isDragging = false;
+            if (!pendingLock) return;
+            pendingLock = false;
+            syncHistoryExpandedLock();
+        }
 
-        tableResponsive.addEventListener('touchmove', (e) => {
-            currentY = e.touches[0].clientY;
-            const diffY = currentY - startY;
-            const scrollTop = tableResponsive.scrollTop;
-
-            if (scrollTop === 0 && diffY > 30 && window.innerWidth < 992) {
+        const scrollerTouchStart = (e) => { startY = e.touches[0].clientY; };
+        const scrollerTouchMove = (e) => {
+            const diffY = e.touches[0].clientY - startY;
+            if (scrollTopOf() === 0 && diffY > 30 && window.innerWidth < 992) {
                 if (sidebar.classList.contains('collapsed')) {
                     sidebar.classList.remove('collapsed');
                     syncHistoryExpandedLock();
                 }
             }
-        }, { passive: true });
+        };
+        [document.getElementById('tableResponsive'), document.getElementById('entryTableResponsive'),
+         document.getElementById('lockerTableResponsive')].forEach((el) => {
+            if (!el || !mainSection.contains(el)) return;
+            el.addEventListener('touchstart', scrollerTouchStart, { passive: true });
+            el.addEventListener('touchmove', scrollerTouchMove, { passive: true });
+        });
 
         mainSection.addEventListener('touchstart', (e) => {
             if (window.innerWidth >= 992) return;
@@ -2825,18 +2878,17 @@
 
         mainSection.addEventListener('touchmove', (e) => {
             if (!isDragging || window.innerWidth >= 992) return;
-            currentY = e.touches[0].clientY;
-            const diffY = currentY - startY;
-            const scrollTop = tableResponsive.scrollTop;
+            const diffY = e.touches[0].clientY - startY;
+            const scrollTop = scrollTopOf();
 
-            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !phoneSearchIsActive()) {
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) {
                 sidebar.classList.add('collapsed');
-                syncHistoryExpandedLock();
+                pendingLock = true;
                 isDragging = false;
             }
             else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
                 sidebar.classList.remove('collapsed');
-                syncHistoryExpandedLock();
+                pendingLock = true;
                 isDragging = false;
             }
             else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
@@ -2845,11 +2897,10 @@
             }
         }, { passive: true });
 
-        mainSection.addEventListener('touchend', () => {
-            isDragging = false;
-        });
+        mainSection.addEventListener('touchend', applyPendingLock);
+        mainSection.addEventListener('touchcancel', applyPendingLock);
 
-        const dragHandle = document.getElementById('dragHandle');
+        const dragHandle = document.getElementById(config.handleId);
         if (dragHandle) {
             dragHandle.addEventListener('click', () => {
                 if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
@@ -2858,8 +2909,6 @@
                 syncHistoryExpandedLock();
             });
         }
-
-        syncHistoryExpandedLock();
     }
 
     let chromeHidden = false;

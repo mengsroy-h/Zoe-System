@@ -174,7 +174,7 @@
     </section>
 
     <section class="app-page" id="pageEntry">
-        <div class="page-side">
+        <div class="page-side" id="entrySideSection">
             <div class="scan-mode-row">
                 <button type="button" class="mode-btn active" id="modeParcelBtn" onclick="setEntryScanMode('parcel')">📦 បញ្ចូលកញ្ចប់</button>
                 <button type="button" class="mode-btn" id="modeLockerBtn" onclick="setEntryScanMode('locker')">📍 កំណត់ទីតាំង Locker</button>
@@ -214,16 +214,17 @@
             </div>
 
         </div>
-        <div class="page-main">
+        <div class="page-main" id="entryMainSection">
+            <div class="drag-handle-bar" id="entryDragHandle" title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកបញ្ជី"></div>
             <div id="parcelPanel">
-                <div class="app-card">
+                <div class="app-card panel-section">
                     <div class="card-header">
                         <div class="card-title">📦 កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ (<span id="entryListCount">0</span>)</div>
                     </div>
                     <div class="filter-bar">
                         <input type="text" id="entryListSearchInput" oninput="renderEntryList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
                     </div>
-                    <div class="table-responsive">
+                    <div class="table-responsive" id="entryTableResponsive">
                         <table>
                             <thead>
                                 <tr>
@@ -249,7 +250,7 @@
                     <button type="button" onclick="openLockerPicker()">🔁 ប្តូរទូ</button>
                 </div>
 
-                <div class="app-card">
+                <div class="app-card panel-section">
                     <div class="card-header">
                         <div class="card-title">📍 បញ្ជីទីតាំង Locker</div>
                     </div>
@@ -259,7 +260,7 @@
                             <option value="">ទីតាំងទាំងអស់</option>
                         </select>
                     </div>
-                    <div class="table-responsive">
+                    <div class="table-responsive" id="lockerTableResponsive">
                         <table>
                             <thead>
                                 <tr>

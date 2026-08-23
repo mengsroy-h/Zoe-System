@@ -60,6 +60,7 @@ run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
+run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js

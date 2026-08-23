@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.4.1';
+    const APP_VERSION = '2.5.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -125,6 +125,83 @@
     let serverTimeOffsetMs = 0;
     function getServerNow() {
         return Date.now() + serverTimeOffsetMs;
+    }
+
+    const FRAME_RATE_MIN_FPS = 10;
+    const FRAME_RATE_MAX_FPS = 120;
+    const FRAME_SAMPLE_COUNT = 12;
+    const FRAME_SAMPLE_MAX_TRIES = 90;
+    const SCROLL_QUIET_FRAMES = 6;
+    const SCROLL_QUIET_MIN_MS = 90;
+    const DEFERRED_WORK_MAX_WAIT_MS = 600;
+
+    let displayFrameIntervalMs = 1000 / 60;
+    let lastScrollAt = 0;
+
+    function displayFrameRate() {
+        return Math.round(1000 / displayFrameIntervalMs);
+    }
+
+    function measureDisplayFrameRate() {
+        if (typeof requestAnimationFrame !== 'function') return;
+        const samples = [];
+        let previous = 0;
+        let tries = 0;
+        const step = (timestamp) => {
+            tries++;
+            if (previous) {
+                const delta = timestamp - previous;
+                if (delta > 0 && delta < 250) samples.push(delta);
+            }
+            previous = timestamp;
+            if (samples.length < FRAME_SAMPLE_COUNT && tries < FRAME_SAMPLE_MAX_TRIES) {
+                requestAnimationFrame(step);
+                return;
+            }
+            if (!samples.length) return;
+            samples.sort((a, b) => a - b);
+            const median = samples[Math.floor(samples.length / 2)];
+            displayFrameIntervalMs = Math.min(1000 / FRAME_RATE_MIN_FPS, Math.max(1000 / FRAME_RATE_MAX_FPS, median));
+            try {
+                document.documentElement.style.setProperty('--frame-ms', Math.round(displayFrameIntervalMs * 100) / 100 + 'ms');
+            } catch (e) {}
+        };
+        requestAnimationFrame(step);
+    }
+
+    function scrollQuietWindowMs() {
+        return Math.max(SCROLL_QUIET_MIN_MS, Math.round(displayFrameIntervalMs * SCROLL_QUIET_FRAMES));
+    }
+
+    function scrollIsActive() {
+        return !!lastScrollAt && (Date.now() - lastScrollAt) < scrollQuietWindowMs();
+    }
+
+    function runAfterScrollSettles(fn) {
+        if (typeof fn !== 'function') return;
+        if (!scrollIsActive() || typeof requestAnimationFrame !== 'function') { fn(); return; }
+        let done = false;
+        const run = () => {
+            if (done) return;
+            done = true;
+            fn();
+        };
+        const tick = () => {
+            if (done) return;
+            if (!scrollIsActive()) { run(); return; }
+            requestAnimationFrame(tick);
+        };
+        setTimeout(run, DEFERRED_WORK_MAX_WAIT_MS);
+        requestAnimationFrame(tick);
+    }
+
+    function setupFrameBudget() {
+        document.addEventListener('scroll', () => { lastScrollAt = Date.now(); }, { capture: true, passive: true });
+        document.addEventListener('touchmove', () => { lastScrollAt = Date.now(); }, { capture: true, passive: true });
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) measureDisplayFrameRate();
+        });
+        measureDisplayFrameRate();
     }
 
     let nativeDetector = null;
@@ -282,10 +359,12 @@
     }
 
     const debouncedRenderAfterHistorySync = debounce(() => {
-        runAutomaticCleanupRules();
-        refreshCurrentHistoryView();
-        updateRecentPhonesList();
-        refreshEntryPagePanels();
+        runAfterScrollSettles(() => {
+            runAutomaticCleanupRules();
+            refreshCurrentHistoryView();
+            updateRecentPhonesList();
+            refreshEntryPagePanels();
+        });
     }, 120);
 
     function withTimeout(promise, ms, timeoutMsg) {
@@ -2346,6 +2425,7 @@
         }
 
         setupHardwareScanner();
+        setupFrameBudget();
         switchAppPage('data');
         initBiometricUi();
         setupSwipeGestures();
@@ -3750,8 +3830,12 @@
         const container = document.getElementById('video-container');
         let lastCheck = 0;
         let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
+        let lastFrameAt = 0;
+        let paceMultiplier = SCAN_PACE_MULTIPLIER_MIN;
         async function renderLoop(timestamp) {
             if (!currentStream || !isCameraScanning || !nativeLoopActive) return;
+            if (lastFrameAt) paceMultiplier = nextScanPaceMultiplier(paceMultiplier, timestamp - lastFrameAt);
+            lastFrameAt = timestamp;
             if (timestamp - lastCheck > nextDelay) {
                 if (!isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
                     lastCheck = timestamp;
@@ -3771,7 +3855,7 @@
                     } catch (e) {
                     } finally {
                         const now = (window.performance && performance.now) ? performance.now() : Date.now();
-                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round((now - startedAt) * 1.6)));
+                        nextDelay = nextScanDelayMs(now - startedAt, paceMultiplier);
                     }
                 }
             }
@@ -3791,6 +3875,31 @@
     const LIVE_SCAN_MAX_INTERVAL_MS = 220;
     const SCAN_CONFIRM_REPEATS = 2;
     const SCAN_CONFIRM_WINDOW_MS = 1500;
+    const SCAN_PACE_MULTIPLIER_MIN = 1.6;
+    const SCAN_PACE_MULTIPLIER_MAX = 3;
+    const SCAN_PACE_DROP_THRESHOLD = 1.8;
+
+    function liveScanMinIntervalMs() {
+        let cameraIntervalMs = 0;
+        if (currentVideoTrack && typeof currentVideoTrack.getSettings === 'function') {
+            try {
+                const fps = parseFloat(currentVideoTrack.getSettings().frameRate);
+                if (fps > 0) cameraIntervalMs = 1000 / fps;
+            } catch (e) {}
+        }
+        if (!cameraIntervalMs) cameraIntervalMs = displayFrameIntervalMs;
+        return Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(cameraIntervalMs));
+    }
+
+    function nextScanPaceMultiplier(current, frameGapMs) {
+        if (!(frameGapMs > 0)) return current;
+        const next = frameGapMs > displayFrameIntervalMs * SCAN_PACE_DROP_THRESHOLD ? current + 0.2 : current - 0.05;
+        return Math.min(SCAN_PACE_MULTIPLIER_MAX, Math.max(SCAN_PACE_MULTIPLIER_MIN, Math.round(next * 100) / 100));
+    }
+
+    function nextScanDelayMs(spentMs, multiplier) {
+        return Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(liveScanMinIntervalMs(), Math.round(spentMs * multiplier)));
+    }
 
     function buildScanReader(tryHarder) {
         const formats = SCAN_FORMAT_NAMES.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
@@ -3868,8 +3977,12 @@
 
         let lastCheck = 0;
         let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
+        let lastFrameAt = 0;
+        let paceMultiplier = SCAN_PACE_MULTIPLIER_MIN;
         function loop(timestamp) {
             if (!currentStream || !isCameraScanning || !zxingLoopActive) return;
+            if (lastFrameAt) paceMultiplier = nextScanPaceMultiplier(paceMultiplier, timestamp - lastFrameAt);
+            lastFrameAt = timestamp;
             if (timestamp - lastCheck > nextDelay) {
                 if (!isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
                     lastCheck = timestamp;
@@ -3892,8 +4005,7 @@
                     } catch (e) {
                     } finally {
                         const now = (window.performance && performance.now) ? performance.now() : Date.now();
-                        const spent = now - startedAt;
-                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(spent * 1.6)));
+                        nextDelay = nextScanDelayMs(now - startedAt, paceMultiplier);
                     }
                 }
             }

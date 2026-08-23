@@ -28,6 +28,8 @@ const ACCEPTED = {
         authGeneration: 'monotonic counter, resetting it would break generation guards',
         exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
         serverTimeOffsetMs: 'clock offset, not user data',
+        displayFrameIntervalMs: 'measured refresh rate of the screen; a device property, not user data',
+        lastScrollAt: 'timestamp of the last scroll event; no user data, and it only gates when deferred repaints run',
         isInitializingFirebase: 'init mutex, unrelated to session',
         lastEnteredLocker: 'operator convenience, persisted in localStorage by design',
         currentFilterMode: 'view preference, no customer data',

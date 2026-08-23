@@ -225,6 +225,9 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
   ឬទង់។ Checker៖ **`compensation-order.js`**។
 - **ការប្តូរ layout ចំពេល momentum scroll របស់ iOS** ➜ បញ្ជីលោតរំលង។ ការលាក់របា
   Tab ត្រូវជា `transform` សុទ្ធ។ Test៖ **`gesture-test.js`**។
+- **ការគូរឡើងវិញចំពេលអ្នកប្រើកំពុងរមូរ** ➜ ប្លុក main thread ➜ ខកខានស៊ុម។ ផ្លូវគូរ
+  ដែលកេះដោយ Firebase ត្រូវឆ្លងកាត់ `runAfterScrollSettles()` ដែលពន្យារវារហូតដល់
+  ការរមូរស្ងប់ (មានពិដានរឹង ៦០០ms ដូច្នេះទិន្នន័យមិនចាស់)។ Test៖ **`frame-budget-test.js`**។
 - **animation លើ property ដែលមិនអាច composite** — `top`/`height` ➜ layout រាល់ស៊ុម;
   `box-shadow`/`background-color` ដោយ `infinite` ➜ គូរឡើងវិញរាល់ស៊ុមជារៀងរហូត។
   ប្រើ `transform`/`opacity` ឬដាក់ធាតុនោះលើ layer ដោយឡែក។ Checker៖ **`animation-cost.js`**។
@@ -328,6 +331,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ការសរសេរទៅ localStorage/sessionStorage គ្មានការការពារ | `storage-guard.js` |
 | credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
 | pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
+| ការសម្របតាមអត្រាស៊ុមរបស់អេក្រង់ និងការពន្យារការគូរពេលរមូរ | `frame-budget-test.js` |
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
 | ល្បឿន **និងភាពត្រឹមត្រូវ** នៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |

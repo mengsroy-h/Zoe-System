@@ -34,8 +34,10 @@ function serve(dir) {
 
 const LICENSE_STUB = `window.ZoeLicense = { getStatus: () => Promise.resolve({ state: 'active' }), setServerTimeOffset(){}, syncServerTime: () => Promise.resolve(), activate: () => Promise.resolve({ ok: true }), verifyKeyString: () => Promise.resolve({ ok: true }), clearActivation(){} };`;
 
-const BOOT = function (seed) {
-    try { Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true }); } catch (e) {}
+const BOOT = function (seed, standalone) {
+    if (standalone !== false) {
+        try { Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true }); } catch (e) {}
+    }
     const store = JSON.parse(JSON.stringify(seed));
     const listeners = [];
     function getPath(p) {
@@ -93,26 +95,75 @@ function seed(n) {
 // បញ្ជូន touch event ពិតចូលទំព័រ ហើយរាយការណ៍ថាតើ touchmove ត្រូវបាន preventDefault ដែរឬទេ
 const GESTURE = function (steps) {
     return new Promise((resolve) => {
-        const target = document.elementFromPoint(steps.x, steps.startY) || document.body;
+        const target = steps.selector ? document.querySelector(steps.selector) : (document.elementFromPoint(steps.x, steps.startY) || document.body);
         let prevented = 0;
+        let maxIndicatorOpacity = 0;
+        let secondTouch = null;
+        const bounced = [];
         const spy = (e) => { if (e.defaultPrevented) prevented++; };
         document.addEventListener('touchmove', spy, { passive: true });
-        const mk = (type, x, y) => {
-            const touch = new Touch({ identifier: 1, target: target, clientX: x, clientY: y, pageX: x, pageY: y });
-            return new TouchEvent(type, { bubbles: true, cancelable: type !== 'touchcancel', touches: type === 'touchend' ? [] : [touch], targetTouches: type === 'touchend' ? [] : [touch], changedTouches: [touch] });
+        const touch = (id, x, y) => new Touch({ identifier: id, target: target, clientX: x, clientY: y, pageX: x, pageY: y });
+        const fire = (type, touches, changed) => {
+            target.dispatchEvent(new TouchEvent(type, {
+                bubbles: true,
+                cancelable: type !== 'touchcancel',
+                touches: touches,
+                targetTouches: touches,
+                changedTouches: changed
+            }));
         };
-        target.dispatchEvent(mk('touchstart', steps.x, steps.startY));
+        let primary = touch(1, steps.x, steps.startY);
+        fire('touchstart', [primary], [primary]);
+        if (steps.negativeBounce) {
+            const root = document.scrollingElement || document.documentElement;
+            const active = typeof activePanelSections === 'function' ? activePanelSections().scroller : null;
+            [root, document.body, document.getElementById('appPages'), active].forEach((el) => {
+                if (!el || bounced.indexOf(el) !== -1) return;
+                bounced.push(el);
+                Object.defineProperty(el, 'scrollTop', { configurable: true, writable: true, value: -12 });
+            });
+        }
         let i = 0;
         const tick = () => {
             if (i < steps.points.length) {
                 const pt = steps.points[i++];
-                target.dispatchEvent(mk('touchmove', steps.x + (pt.dx || 0), pt.y));
+                primary = touch(1, steps.x + (pt.dx || 0), pt.y);
+                if (pt.addFinger && !secondTouch) {
+                    secondTouch = touch(2, steps.x + 24, pt.y + 8);
+                    fire('touchstart', [primary, secondTouch], [secondTouch]);
+                }
+                if (secondTouch) {
+                    secondTouch = touch(2, steps.x + 24, pt.y + 8);
+                    fire('touchmove', [primary, secondTouch], [primary, secondTouch]);
+                } else {
+                    fire('touchmove', [primary], [primary]);
+                }
+                const indicator = document.querySelector('.ptr-indicator');
+                if (indicator) maxIndicatorOpacity = Math.max(maxIndicatorOpacity, parseFloat(indicator.style.opacity) || 0);
                 requestAnimationFrame(tick);
                 return;
             }
-            target.dispatchEvent(mk('touchend', steps.x, steps.points.length ? steps.points[steps.points.length - 1].y : steps.startY));
+            if (Number.isFinite(steps.endY)) {
+                primary = touch(1, steps.x + (steps.endDx || 0), steps.endY);
+            }
+            if (secondTouch) {
+                fire('touchend', [secondTouch], [primary]);
+                fire('touchend', [], [secondTouch]);
+            } else {
+                fire('touchend', [], [primary]);
+            }
+            if (steps.postEndPull && !secondTouch) {
+                setTimeout(() => {
+                    const nextStart = touch(3, steps.x, steps.startY);
+                    const nextEnd = touch(3, steps.x, steps.startY + 80);
+                    fire('touchstart', [nextStart], [nextStart]);
+                    fire('touchmove', [nextEnd], [nextEnd]);
+                    fire('touchend', [], [nextEnd]);
+                }, 60);
+            }
+            bounced.forEach((el) => { delete el.scrollTop; el.scrollTop = 0; });
             document.removeEventListener('touchmove', spy);
-            setTimeout(() => resolve({ prevented: prevented }), 420);
+            setTimeout(() => resolve({ prevented: prevented, maxIndicatorOpacity: maxIndicatorOpacity }), 420);
         };
         requestAnimationFrame(tick);
     });
@@ -122,19 +173,26 @@ const GESTURE = function (steps) {
     const browser = await chromium.launch({ executablePath: CHROME });
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const port = server.address().port;
-    const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, hasTouch: true, isMobile: true });
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, hasTouch: true, isMobile: true, serviceWorkers: 'block' });
     const page = await ctx.newPage();
+    const pageErrors = [];
+    page.on('pageerror', (e) => pageErrors.push(e.message));
     page.on('dialog', (d) => d.accept());
     let documentLoads = 0;
     let reloads = 0;
     let allowReload = false;
-    await page.route('**', (r) => {
+    let delayReloadCommit = false;
+    await page.route('**', async (r) => {
         const req = r.request();
         const u = req.url();
         if (req.resourceType() === 'document' && u.startsWith('http://127.0.0.1:' + port)) {
             documentLoads++;
             // ការផ្ទុកដំបូងឆ្លងកាត់; ការ reload ក្រោយៗរាប់ទុក រួចបោះបង់ ដើម្បីរក្សាបរិបទទំព័រ
-            if (documentLoads > 1) { reloads++; if (!allowReload) return r.abort(); }
+            if (documentLoads > 1) {
+                reloads++;
+                if (!allowReload) return r.abort();
+                if (delayReloadCommit) await new Promise((resolve) => setTimeout(resolve, 5200));
+            }
             return r.continue();
         }
         if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
@@ -145,6 +203,38 @@ const GESTURE = function (steps) {
     await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
     await page.addInitScript(() => {
         try { sessionStorage.setItem('__loads', String(parseInt(sessionStorage.getItem('__loads') || '0', 10) + 1)); } catch (e) {}
+    });
+    await page.addInitScript(() => {
+        window.addEventListener('load', () => {
+            try { if (sessionStorage.getItem('__simulate_ptr_restore') !== '1') return; } catch (e) { return; }
+            window.__ptrMarkerAtReloadBoot = sessionStorage.getItem('zoew_ptr_reload_pending');
+            window.__ptrRestorationMarkerAtReloadBoot = sessionStorage.getItem('zoew_ptr_scroll_restoration');
+            setTimeout(() => {
+                const target = document.body;
+                const touch = new Touch({ identifier: 99, target: target, clientX: 12, clientY: 12, pageX: 12, pageY: 12 });
+                target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [touch], targetTouches: [touch], changedTouches: [touch] }));
+                target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], targetTouches: [], changedTouches: [touch] }));
+                window.__ptrEarlyTap = true;
+            }, 100);
+            setTimeout(() => {
+                const pages = document.getElementById('appPages');
+                const table = document.getElementById('tableResponsive');
+                const side = document.getElementById('dataSideSection');
+                if (!pages || !table || !side) return;
+                side.classList.add('collapsed');
+                if (typeof syncHistoryExpandedLock === 'function') syncHistoryExpandedLock();
+                document.documentElement.style.minHeight = 'calc(100dvh + 34px)';
+                document.body.style.minHeight = 'calc(100dvh + 34px)';
+                document.documentElement.style.overflowY = 'auto';
+                document.body.style.overflowY = 'auto';
+                window.scrollTo(0, 34);
+                pages.scrollTop = 34;
+                table.scrollTop = 45;
+                window.__ptrRestoredScroll = { root: window.scrollY, pages: pages.scrollTop, table: table.scrollTop };
+                document.documentElement.style.overflowY = '';
+                document.body.style.overflowY = '';
+            }, 120);
+        }, { once: true });
     });
     await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seed(160)) + ');');
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -162,49 +252,152 @@ const GESTURE = function (steps) {
     const resetState = async () => {
         takeReloads();
         return page.evaluate(() => {
+        if (typeof resetIOSTouchArbiter === 'function') resetIOSTouchArbiter();
         const pages = document.getElementById('appPages');
         if (pages) pages.style.scrollBehavior = 'auto';
         if (pages) pages.scrollTop = 0;
         const tr = document.getElementById('tableResponsive');
         if (tr) tr.scrollTop = 0;
+        const side = document.getElementById('dataSideSection');
+        if (side) side.classList.remove('collapsed', 'search-focus');
+        if (typeof syncHistoryExpandedLock === 'function') syncHistoryExpandedLock();
+        const root = document.scrollingElement || document.documentElement;
+        if (root) root.scrollTop = 0;
+        document.body.scrollTop = 0;
+        window.scrollTo(0, 0);
         document.body.classList.remove('chrome-hidden');
         });
     };
+    const setCollapsed = async () => page.evaluate(() => {
+        const side = document.getElementById('dataSideSection');
+        const pages = document.getElementById('appPages');
+        const table = document.getElementById('tableResponsive');
+        if (!side || !pages || !table) return false;
+        side.classList.add('collapsed');
+        table.scrollTop = 0;
+        pages.scrollTop = 0;
+        syncHistoryExpandedLock();
+        return side.classList.contains('collapsed') && pages.classList.contains('history-expanded');
+    });
+    const panelState = async () => page.evaluate(() => ({
+        collapsed: document.getElementById('dataSideSection').classList.contains('collapsed'),
+        expandedLock: document.getElementById('appPages').classList.contains('history-expanded')
+    }));
 
     // ១) កំហុសដែលអ្នកប្រើរាយការណ៍៖ រមូរធម្មតាពីកំពូល មិនត្រូវក្លាយជា refresh
     await resetState();
-    const gentle = await runGesture({ x: 200, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
+    const gentle = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
     ok('អូសខ្លីៗពីកំពូល (14px) ➜ មិនរារាំងការរមូរ និងមិនកេះ refresh', gentle.prevented === 0 && !gentle.reloaded, gentle);
 
-    // អូសមធ្យម៖ អាចបង្ហាញ indicator តែមិនត្រូវ refresh (វាត្រូវរអិលត្រឡប់វិញ)
     await resetState();
-    const medium = await runGesture({ x: 200, startY: 300, points: [{ y: 320 }, { y: 342 }, { y: 358 }, { y: 366 }] });
+    const ordinary = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 312 }, { y: 326 }, { y: 338 }, { y: 348 }] });
+    ok('អូសធម្មតា 48px ➜ ចាប់អ័ក្សដើម្បីទប់ native refresh តែមិនកេះ refresh', ordinary.prevented > 0 && !ordinary.reloaded, ordinary);
+    ok('អូសធម្មតា 48px ➜ indicator PTR នៅលាក់ដដែល', ordinary.maxIndicatorOpacity === 0, ordinary);
+
+    // អូសមធ្យម៖ ចាប់កាយវិការ តែ indicator មិនត្រូវលេចពេញមុនជិតកម្រិត refresh
+    await resetState();
+    const medium = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 320 }, { y: 342 }, { y: 358 }, { y: 366 }] });
     ok('អូសមធ្យម (66px) ➜ រអិលត្រឡប់វិញ មិន refresh', medium.reloaded === false, medium);
     ok('អូសមធ្យម ➜ ចាប់យកកាយវិការ (preventDefault) ដើម្បីបង្ហាញ indicator', medium.prevented > 0, medium);
+    ok('អូសមធ្យម ➜ indicator មិនលេចពេញលឿនពេក', medium.maxIndicatorOpacity < 0.25, medium);
+
+    await resetState();
+    const bounce = await runGesture({ selector: '#appPages', negativeBounce: true, x: 200, startY: 300, points: [{ y: 324 }, { y: 360 }, { y: 390 }] });
+    ok('Safari rubber-band (scrollTop អវិជ្ជមាន) ➜ PTR នៅតែចាប់ gesture បានដោយស្ថេរភាព',
+        bounce.prevented > 0 && !bounce.reloaded, bounce);
 
     // ២) អូសផ្ដេក មិនត្រូវក្លាយជា pull
     await resetState();
-    const sideways = await runGesture({ x: 200, startY: 300, points: [{ y: 303, dx: 20 }, { y: 306, dx: 46 }, { y: 308, dx: 80 }] });
+    const sideways = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 303, dx: 20 }, { y: 306, dx: 46 }, { y: 308, dx: 80 }] });
     ok('អូសផ្ដេក ➜ មិនកេះ refresh', sideways.prevented === 0 && !sideways.reloaded, sideways);
 
     // ៣) អូសឡើងលើ (រមូរចុះ) មិនត្រូវក្លាយជា pull
     await resetState();
-    const upward = await runGesture({ x: 200, startY: 400, points: [{ y: 380 }, { y: 350 }, { y: 310 }, { y: 270 }] });
+    const upward = await runGesture({ selector: '#appPages', x: 200, startY: 400, points: [{ y: 380 }, { y: 350 }, { y: 310 }, { y: 270 }] });
     ok('អូសឡើងលើ ➜ មិនកេះ refresh', upward.prevented === 0 && !upward.reloaded, upward);
 
     // ៥) ពេលតារាងខាងក្នុងត្រូវបានរមូរចុះរួច ការទាញមិនត្រូវកេះ refresh
     await resetState();
     const nestedTop = await page.evaluate(() => { const tr = document.getElementById('tableResponsive'); if (!tr) return -1; tr.style.scrollBehavior = 'auto'; tr.scrollTop = 120; return tr.scrollTop; });
     ok('តារាងខាងក្នុងអាចរមូរបានពិត (ដូច្នេះតេស្តមិនទទេ)', nestedTop > 0, nestedTop);
-    const nested = await runGesture({ x: 200, startY: 500, points: [{ y: 540 }, { y: 590 }, { y: 650 }, { y: 700 }] });
-    ok('តារាងខាងក្នុងរមូរចុះរួច ➜ ការទាញមិនកេះ refresh', nested.reloaded === false, nested);
+    const nested = await runGesture({ selector: '#tableResponsive', x: 200, startY: 500, points: [{ y: 540 }, { y: 590 }, { y: 650 }, { y: 700 }] });
+    ok('តារាងខាងក្នុងរមូរចុះរួច ➜ PTR មិនដណ្ដើម gesture និងមិនកេះ refresh',
+        nested.prevented === 0 && nested.reloaded === false, nested);
 
     // ៦) ប្រអប់បើក ➜ គ្មាន pull
     await resetState();
     await page.evaluate(() => window.openExchangeRateModal());
     const inModal = await runGesture({ x: 200, startY: 160, points: [{ y: 220 }, { y: 300 }, { y: 400 }, { y: 500 }] });
-    ok('ប្រអប់បើក ➜ មិនកេះ refresh', inModal.reloaded === false, inModal);
+    ok('ប្រអប់បើក ➜ PTR មិនដណ្ដើម gesture និងមិនកេះ refresh',
+        inModal.prevented === 0 && inModal.reloaded === false, inModal);
     await page.evaluate(() => window.closeModal('exchangeRateModal'));
+
+    await resetState();
+    await page.evaluate(() => window.openSideDrawer());
+    const inDrawer = await runGesture({ selector: '#appPages', x: 200, startY: 160, points: [{ y: 220 }, { y: 300 }, { y: 400 }, { y: 500 }] });
+    ok('ម៉ឺនុយចំហៀងបើក ➜ PTR មិនដណ្ដើម gesture និងមិនកេះ refresh',
+        inDrawer.prevented === 0 && inDrawer.reloaded === false, inDrawer);
+    await page.evaluate(() => window.closeSideDrawer());
+
+    await resetState();
+    const onControl = await runGesture({ selector: '#btnFilterToday', x: 80, startY: 210, points: [{ y: 250 }, { y: 320 }, { y: 410 }, { y: 520 }] });
+    ok('អូសលើប៊ូតុង/វាលបញ្ចូល ➜ PTR មិនដណ្ដើម touch', onControl.prevented === 0 && !onControl.reloaded, onControl);
+
+    await resetState();
+    const rowControlShort = await runGesture({ selector: '#historyTableBody .close-btn', x: 330, startY: 300, points: [{ y: 303 }, { y: 307 }, { y: 311 }, { y: 314 }] });
+    ok('អូសខ្លី 14px ចាប់ពីប៊ូតុងក្នុងជួរតារាង ➜ ទុកជា tap/scroll ធម្មតា',
+        rowControlShort.prevented === 0 && !rowControlShort.reloaded, rowControlShort);
+
+    console.log('\n=== PTR និងកាយវិការបើកផ្ទាំង មិនប្រជែងគ្នា ===');
+    await resetState();
+    const collapsedReady = await setCollapsed();
+    ok('លក្ខខណ្ឌតេស្ត៖ ប្រវត្តិកំពុងពេញអេក្រង់', collapsedReady, collapsedReady);
+    const shortPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 232 }, { y: 244 }, { y: 256 }, { y: 268 }] });
+    const shortPanelAfter = await panelState();
+    ok('អូសខ្លី 48px លើតារាងពេញអេក្រង់ ➜ បើកផ្ទាំង មិន refresh',
+        !shortPanelPull.reloaded && !shortPanelAfter.collapsed && !shortPanelAfter.expandedLock,
+        { gesture: shortPanelPull, state: shortPanelAfter });
+
+    await resetState();
+    await setCollapsed();
+    const mediumPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 244 }, { y: 278 }, { y: 300 }] });
+    const mediumPanelAfter = await panelState();
+    ok('អូសមធ្យម 80px ➜ PTR កាន់ gesture ប៉ុន្តែមិន refresh និងមិនបើកផ្ទាំង',
+        mediumPanelPull.prevented > 0 && !mediumPanelPull.reloaded && mediumPanelAfter.collapsed && mediumPanelAfter.expandedLock,
+        { gesture: mediumPanelPull, state: mediumPanelAfter });
+
+    await resetState();
+    await setCollapsed();
+    const diagonalPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 250, dx: 50 }, { y: 260, dx: 80 }] });
+    const diagonalPanelAfter = await panelState();
+    ok('អូសផ្ដេក/ទ្រេតលើតារាងពេញអេក្រង់ ➜ មិនបើកផ្ទាំង និងមិនកេះ PTR',
+        diagonalPanelPull.prevented === 0 && !diagonalPanelPull.reloaded &&
+        diagonalPanelAfter.collapsed && diagonalPanelAfter.expandedLock,
+        { gesture: diagonalPanelPull, state: diagonalPanelAfter });
+
+    await resetState();
+    await setCollapsed();
+    const multiBeforePTR = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 244 }, { y: 270, addFinger: true }, { y: 300 }] });
+    const multiBeforeAfter = await panelState();
+    ok('បន្ថែមម្រាមដៃទី២ មុនកម្រិត PTR ➜ បោះបង់ទាំង refresh និងការបើកផ្ទាំង',
+        !multiBeforePTR.reloaded && multiBeforeAfter.collapsed && multiBeforeAfter.expandedLock,
+        { gesture: multiBeforePTR, state: multiBeforeAfter });
+
+    await resetState();
+    await setCollapsed();
+    const multiReady = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 280 }, { y: 360 }, { y: 445, addFinger: true }, { y: 500 }] });
+    const multiReadyAfter = await panelState();
+    ok('បន្ថែមម្រាមដៃទី២ ក្រោយ indicator ត្រៀម refresh ➜ បោះបង់ refresh និងមិនបើកផ្ទាំង',
+        !multiReady.reloaded && multiReadyAfter.collapsed && multiReadyAfter.expandedLock,
+        { gesture: multiReady, state: multiReadyAfter });
+
+    await resetState();
+    await setCollapsed();
+    const finalReversal = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 280 }, { y: 360 }, { y: 445 }], endY: 140 });
+    const finalReversalAfter = await panelState();
+    ok('ម្រាមដៃត្រឡប់ឡើងលឿននៅ touchend ➜ មិន commit refresh/action ចាស់ពី touchmove',
+        !finalReversal.reloaded && finalReversalAfter.collapsed && finalReversalAfter.expandedLock,
+        { gesture: finalReversal, state: finalReversalAfter });
 
     console.log('\n=== ផ្ទាំងប្រវត្តិពេញអេក្រង់ (ទាញឡើង) ===');
     await resetState();
@@ -478,14 +671,14 @@ const GESTURE = function (steps) {
         !!hzBand && hzBand[-5] === 10 && hzBand[0] === 10 && hzBand[9] === 10 &&
         hzBand[121] === 120 && hzBand[240] === 120, hzBand);
 
-    // === --chrome-bottom ត្រូវវាស់ជា *ចម្ងាយពីបាត body ដល់កំពូលរបា Tab* ===
-    // `.app-pages` កក់កន្លែងរបា Tab ជា padding គិតពី **បាត body**។ លើ Android
-    // បាត body = បាត viewport ➜ ចម្ងាយនោះ = `offsetHeight` របស់របា។ តែក្នុង
+    // === --chrome-bottom ត្រូវវាស់ជា *កម្ពស់របា + ផ្នែក body លើស viewport* ===
+    // `.app-pages` កក់កន្លែងរបា Tab ជា padding។ លើ Android body = viewport
+    // ➜ ចម្ងាយនោះ = `offsetHeight` របស់របា។ តែក្នុង
     // របៀប standalone លើ iOS, CSS ធ្វើឲ្យ body វែងជាង viewport តាម
     // `env(safe-area-inset-bottom)` (ដើម្បីគ្របអេក្រង់) ➜ ចម្ងាយនោះធំជាង
     // `offsetHeight` តាមចំនួន inset។ ការវាស់ជា `offsetHeight` ➜ កក់ខ្វះ ➜
     // **របា Tab បាំងគែមកាតលើ iPhone** (Android មិនប៉ះ ព្រោះ inset = 0)។
-    console.log('\n=== --chrome-bottom វាស់តាមបាត body (កំហុស iPhone) ===');
+    console.log('\n=== --chrome-bottom វាស់តាមកម្ពស់ body (កំហុស iPhone) ===');
     await resetState();
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
@@ -496,9 +689,13 @@ const GESTURE = function (steps) {
         const read = () => ({
             chromeBottom: Math.round(parseFloat(
                 getComputedStyle(document.documentElement).getPropertyValue('--chrome-bottom'))),
+            pageExtension: Math.round(parseFloat(
+                getComputedStyle(document.documentElement).getPropertyValue('--page-extension')) || 0),
             barH: Math.round(tabbar.offsetHeight),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
-            barTop: Math.round(tabbar.getBoundingClientRect().top)
+            tableBottom: Math.round(document.getElementById('tableResponsive').getBoundingClientRect().bottom),
+            barTop: Math.round(tabbar.getBoundingClientRect().top),
+            viewportH: Math.round(window.innerHeight)
         });
         window.measureAppChromeSize();
         await wait(120);
@@ -511,10 +708,31 @@ const GESTURE = function (steps) {
         window.measureAppChromeSize();
         await wait(160);
         const inset = read();
+        document.documentElement.style.overflowY = 'auto';
+        document.body.style.overflowY = 'auto';
+        window.scrollTo(0, 34);
+        await wait(120);
+        window.measureAppChromeSize();
+        await wait(120);
+        const scrolled = Object.assign({ windowY: Math.round(window.scrollY) }, read());
+        window.scrollTo(0, 0);
+        document.documentElement.style.overflowY = '';
+        document.body.style.overflowY = '';
+        await wait(120);
+        window.hideAppChrome();
+        await wait(340);
+        window.measureAppChromeSize();
+        await wait(120);
+        const hidden = read();
+        window.showAppChrome();
+        await wait(340);
+        window.measureAppChromeSize();
+        await wait(120);
+        const shown = read();
         st.remove();
         await wait(120);
         window.measureAppChromeSize();
-        return { flat: flat, inset: inset };
+        return { flat: flat, inset: inset, scrolled: scrolled, hidden: hidden, shown: shown };
     });
     console.log('    inset 0 (Android) ៖ --chrome-bottom ' + measure.flat.chromeBottom +
                 ' · កម្ពស់របា ' + measure.flat.barH);
@@ -524,12 +742,73 @@ const GESTURE = function (steps) {
         Math.abs(measure.flat.chromeBottom - measure.flat.barH) <= 1, measure.flat);
     ok('body វែងជាង viewport ៣៤px ➜ --chrome-bottom បូក inset ដោយស្វ័យប្រវត្តិ',
         measure.inset.chromeBottom >= measure.inset.barH + 33, measure.inset);
+    ok('root មាន offset ៣៤px ពេល WebKit កំពុង restore ➜ ការវាស់ safe-area មិនរួញ',
+        measure.scrolled.windowY > 0 && measure.scrolled.chromeBottom >= measure.scrolled.barH + 33,
+        measure.scrolled);
     ok('inset 0 ➜ គែមកាតឈរខាងលើរបា Tab',
         measure.flat.cardBottom <= measure.flat.barTop + 1, measure.flat);
     ok('**inset ៣៤px ➜ គែមកាតនៅតែឈរខាងលើរបា Tab** (កំហុស iPhone ត្រូវកែ)',
         measure.inset.cardBottom <= measure.inset.barTop + 1, measure.inset);
+    ok('វាស់ពេលរបា Tab លាក់ដោយ transform ➜ --chrome-bottom មិនរួញបាត់ safe-area',
+        measure.hidden.chromeBottom >= measure.hidden.barH + 33, measure.hidden);
+    ok('inset ៣៤px + របា Tab លាក់ ➜ គែមកាត/តារាងនៅក្នុង viewport និងជិតបាត',
+        measure.hidden.pageExtension >= 33 &&
+        measure.hidden.viewportH - measure.hidden.cardBottom >= 0 &&
+        measure.hidden.viewportH - measure.hidden.cardBottom <= 16 &&
+        measure.hidden.viewportH - measure.hidden.tableBottom >= 0 &&
+        measure.hidden.viewportH - measure.hidden.tableBottom <= 20, measure.hidden);
+    ok('បង្ហាញរបា Tab វិញ ➜ គែមកាតនៅតែឈរខាងលើរបា',
+        measure.shown.cardBottom <= measure.shown.barTop + 1, measure.shown);
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
+
+    const scrollPolicy = await page.evaluate(() => {
+        const pages = document.getElementById('appPages');
+        const htmlStyle = getComputedStyle(document.documentElement);
+        const bodyStyle = getComputedStyle(document.body);
+        const pagesStyle = getComputedStyle(pages);
+        return {
+            navigatorStandalone: window.navigator.standalone === true,
+            standaloneClass: document.documentElement.classList.contains('ios-standalone'),
+            htmlOverflowY: htmlStyle.overflowY,
+            bodyOverflowY: bodyStyle.overflowY,
+            htmlOverscrollY: htmlStyle.overscrollBehaviorY,
+            bodyOverscrollY: bodyStyle.overscrollBehaviorY,
+            pagesMinHeight: pagesStyle.minHeight,
+            pagesOverscrollY: pagesStyle.overscrollBehaviorY
+        };
+    });
+    ok('តេស្តប្រើផ្លូវរកឃើញ iOS standalone ដូច production',
+        scrollPolicy.navigatorStandalone && scrollPolicy.standaloneClass, scrollPolicy);
+    ok('iOS standalone ➜ root html/body មិនមែនជា scroller ទៀតទេ',
+        scrollPolicy.htmlOverflowY === 'hidden' && scrollPolicy.bodyOverflowY === 'hidden', scrollPolicy);
+    ok('iOS standalone ➜ បិទ overscroll លើ root ទាំងពីរ',
+        scrollPolicy.htmlOverscrollY === 'none' && scrollPolicy.bodyOverscrollY === 'none', scrollPolicy);
+    ok('#appPages ជា scroll owner តែមួយ (min-height:0 + contain)',
+        scrollPolicy.pagesMinHeight === '0px' && scrollPolicy.pagesOverscrollY === 'contain', scrollPolicy);
+
+    const lateChrome = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const navbar = document.querySelector('.app-navbar');
+        const pages = document.getElementById('appPages');
+        if (!navbar || !pages) return { missing: true };
+        measureAppChromeSize();
+        const originalHeight = navbar.style.height;
+        const beforeHeight = navbar.offsetHeight;
+        navbar.style.height = (beforeHeight + 34) + 'px';
+        await wait(180);
+        const afterHeight = navbar.offsetHeight;
+        const chromeTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--chrome-top'));
+        const contentTop = pages.getBoundingClientRect().top + parseFloat(getComputedStyle(pages).paddingTop);
+        const navbarBottom = navbar.getBoundingClientRect().bottom;
+        navbar.style.height = originalHeight;
+        await wait(180);
+        return { beforeHeight, afterHeight, chromeTop, contentTop, navbarBottom };
+    });
+    ok('safe-area/navbar ធំឡើងយឺត 34px ➜ --chrome-top វាស់ឡើងវិញដោយស្វ័យប្រវត្តិ',
+        !lateChrome.missing && Math.abs(lateChrome.chromeTop - lateChrome.afterHeight) <= 1, lateChrome);
+    ok('ក្រោយ navbar ប្តូរកម្ពស់យឺត ➜ content នៅតែចាប់ផ្តើមក្រោម navbar',
+        !lateChrome.missing && lateChrome.contentTop >= lateChrome.navbarBottom + 7, lateChrome);
 
     const cssSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
     ok('.table-responsive គ្មាន scroll-behavior: smooth (WebKit អនុវត្តវាលើ momentum ➜ លោតរំលង)',
@@ -546,16 +825,31 @@ const GESTURE = function (steps) {
     // ការទាញពិតប្រាកដ ត្រូវកេះ refresh — ដាក់ចុងក្រោយព្រោះវាបង្កើត navigation ពិត
     console.log('\n=== ការទាញពិតប្រាកដ ===');
     await resetState();
+    const longPullCollapsed = await setCollapsed();
+    ok('លក្ខខណ្ឌតេស្ត long pull៖ ប្រវត្តិកំពុងពេញអេក្រង់', longPullCollapsed, longPullCollapsed);
     const preTop = await page.evaluate(() => {
         const tr = document.getElementById('tableResponsive');
         const pages = document.getElementById('appPages');
-        return { tr: tr ? tr.scrollTop : -1, pages: pages ? pages.scrollTop : -1 };
+        const root = document.scrollingElement || document.documentElement;
+        return { tr: tr ? tr.scrollTop : -1, pages: pages ? pages.scrollTop : -1, root: root ? root.scrollTop : -1 };
     });
-    ok('មុនទាញ គ្រប់ scroller នៅកំពូល (លក្ខខណ្ឌចាំបាច់)', preTop.tr === 0 && preTop.pages === 0, preTop);
+    ok('មុនទាញ គ្រប់ scroller នៅកំពូល (លក្ខខណ្ឌចាំបាច់)', preTop.tr === 0 && preTop.pages === 0 && preTop.root === 0, preTop);
     const loadsBefore = await page.evaluate(() => parseInt(sessionStorage.getItem('__loads') || '0', 10));
+    await page.evaluate(() => {
+        sessionStorage.setItem('__simulate_ptr_restore', '1');
+        sessionStorage.setItem('__panel_opened_during_ptr', '0');
+        const side = document.getElementById('dataSideSection');
+        if (!side) return;
+        new MutationObserver(() => {
+            if (!side.classList.contains('collapsed')) sessionStorage.setItem('__panel_opened_during_ptr', '1');
+        }).observe(side, { attributes: true, attributeFilter: ['class'] });
+    });
     allowReload = true;
+    delayReloadCommit = true;
     try {
-        await runGesture({ x: 200, startY: 140, points: [{ y: 175 }, { y: 235 }, { y: 300 }, { y: 375 }, { y: 450 }, { y: 520 }, { y: 580 }] });
+        await runGesture({ selector: '#historyTableBody .close-btn', x: 200, startY: 220,
+            points: [{ y: 250 }, { y: 360, dx: 80 }, { y: 400, dx: 100 }],
+            endY: 445, endDx: 160, postEndPull: true });
     } catch (e) { /* បរិបទត្រូវបំផ្លាញដោយ navigation — នោះជាអ្វីដែលរំពឹងទុក */ }
     let loadsAfter = loadsBefore;
     for (let i = 0; i < 20; i++) {
@@ -566,12 +860,70 @@ const GESTURE = function (steps) {
         } catch (e) {}
         await new Promise((r) => setTimeout(r, 200));
     }
-    ok('ទាញវែងចុះក្រោម (>120px) ➜ កេះ refresh ពិត (ទំព័រផ្ទុកឡើងវិញ)', loadsAfter === loadsBefore + 1, { loadsBefore, loadsAfter });
+    ok('ចាប់អ័ក្សបញ្ឈរ រួច drift ទ្រេត និងលើកនៅ ≥213px ➜ indicator/commit កេះ refresh ស្របគ្នា',
+        loadsAfter === loadsBefore + 1, { loadsBefore, loadsAfter });
+
+    await page.waitForFunction(() => !!window.__ptrRestoredScroll, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(760);
+    const postRefresh = await page.evaluate((capturedErrors) => {
+        const pages = document.getElementById('appPages');
+        const table = document.getElementById('tableResponsive');
+        const navbar = document.querySelector('.app-navbar');
+        const card = document.querySelector('#dataMainSection .history-section');
+        const firstRow = document.querySelector('#historyTableBody tr');
+        const head = document.querySelector('#tableResponsive thead');
+        const root = document.scrollingElement || document.documentElement;
+        const out = {
+            injected: window.__ptrRestoredScroll,
+            reloadMarkerAtBoot: window.__ptrMarkerAtReloadBoot,
+            restorationMarkerAtBoot: window.__ptrRestorationMarkerAtReloadBoot,
+            earlyTap: window.__ptrEarlyTap === true,
+            reloadMarker: sessionStorage.getItem('zoew_ptr_reload_pending'),
+            restorationMarker: sessionStorage.getItem('zoew_ptr_scroll_restoration'),
+            panelOpenedDuringPull: sessionStorage.getItem('__panel_opened_during_ptr'),
+            rowCount: document.querySelectorAll('#historyTableBody tr').length,
+            readyState: document.readyState,
+            pageErrors: capturedErrors,
+            root: root ? root.scrollTop : -1,
+            windowY: window.scrollY,
+            pages: pages ? pages.scrollTop : -1,
+            table: table ? table.scrollTop : -1,
+            navbarBottom: navbar ? navbar.getBoundingClientRect().bottom : -1,
+            cardTop: card ? card.getBoundingClientRect().top : -1,
+            rowTop: firstRow ? firstRow.getBoundingClientRect().top : -1,
+            headBottom: head ? head.getBoundingClientRect().bottom : -1,
+            restoration: 'scrollRestoration' in history ? history.scrollRestoration : 'unsupported'
+        };
+        sessionStorage.removeItem('__simulate_ptr_restore');
+        sessionStorage.removeItem('__panel_opened_during_ptr');
+        return out;
+    }, pageErrors.slice());
+    ok('ក្រោយ PTR reload ➜ ទិន្នន័យប្រវត្តិបានផ្ទុកឡើងវិញ', postRefresh.rowCount > 5, postRefresh);
+    ok('reload response យឺត >5s ➜ watchdog មិនលុប recovery markers មុនទំព័រថ្មី boot',
+        postRefresh.reloadMarkerAtBoot === '1' &&
+        (postRefresh.restorationMarkerAtBoot === 'auto' || postRefresh.restorationMarkerAtBoot === 'manual'),
+        postRefresh);
+    ok('តេស្តបានចាក់ offset ស្ដារក្រោយ reload ពិត (មិនមែនតេស្តទទេ)',
+        !!postRefresh.injected && Math.max(postRefresh.injected.root, postRefresh.injected.pages, postRefresh.injected.table) > 0, postRefresh);
+    ok('ក្រោយ PTR reload ➜ root, appPages និងតារាងត្រឡប់ទៅ scrollTop 0 ទាំងអស់',
+        Math.abs(postRefresh.root) <= 1 && Math.abs(postRefresh.windowY) <= 1 &&
+        Math.abs(postRefresh.pages) <= 1 && Math.abs(postRefresh.table) <= 1, postRefresh);
+    ok('ក្រោយ PTR reload ➜ កាតប្រវត្តិនៅក្រោម navbar មិនរអិលឡើងពីក្រោយវា',
+        postRefresh.cardTop >= postRefresh.navbarBottom + 8, postRefresh);
+    ok('ក្រោយ PTR reload ➜ ជួរដំបូងមិនត្រូវ scroll សល់លាក់ក្រោយ sticky header',
+        postRefresh.rowTop >= postRefresh.headBottom - 1, postRefresh);
+    ok('settle ចប់ ➜ ស្ដារ scroll restoration ទៅរបៀប auto', postRefresh.restoration === 'auto', postRefresh);
+    ok('tap ធម្មតា 100ms ក្រោយ reload ➜ មិនលុប settle timers', postRefresh.earlyTap === true, postRefresh);
+    ok('settle បញ្ចប់ ➜ សម្អាត reload marker', postRefresh.reloadMarker === null, postRefresh);
+    ok('settle បញ្ចប់ ➜ សម្អាត restoration marker', postRefresh.restorationMarker === null, postRefresh);
+    ok('long PTR និង touch ថ្មីមុន navigation ➜ ផ្ទាំងខាងលើមិនបើកប្រជែង', postRefresh.panelOpenedDuringPull === '0', postRefresh);
+    ok('គ្មាន JavaScript page error ក្នុង regression ទាំងមូល', postRefresh.pageErrors.length === 0, postRefresh.pageErrors);
 
 
     // លើកុំព្យូទ័រ មិនត្រូវលាក់ទេ
     await ctx.close();
-    const wideCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const wideCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
     const wide = await wideCtx.newPage();
     wide.on('dialog', (d) => d.accept());
     await wide.route('**', (r) => {
@@ -581,7 +933,7 @@ const GESTURE = function (steps) {
         return r.abort();
     });
     await wide.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
-    await wide.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seed(160)) + ');');
+    await wide.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seed(160)) + ', false);');
     await wide.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await wide.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 30000 });
     const wideHidden = await wide.evaluate(() => {
@@ -592,6 +944,23 @@ const GESTURE = function (steps) {
     ok('លើកុំព្យូទ័រ (1280px) ➜ មិនលាក់របាទេ', wideHidden === false);
     const wideNav = await wide.evaluate(() => window.getComputedStyle(document.querySelector('.app-navbar')).position);
     ok('លើកុំព្យូទ័រ navbar នៅ sticky ដដែល', wideNav === 'sticky', wideNav);
+    const wideScrollPolicy = await wide.evaluate(() => {
+        const html = getComputedStyle(document.documentElement);
+        const body = getComputedStyle(document.body);
+        const pages = getComputedStyle(document.getElementById('appPages'));
+        return {
+            iosClass: document.documentElement.classList.contains('ios-standalone'),
+            htmlOverflowY: html.overflowY,
+            bodyOverflowY: body.overflowY,
+            htmlOverscrollY: html.overscrollBehaviorY,
+            bodyOverscrollY: body.overscrollBehaviorY,
+            pagesOverscrollY: pages.overscrollBehaviorY
+        };
+    });
+    ok('បរិបទមិនមែន iOS standalone ➜ មិនបិទ root overscroll និងមិនដាក់ contain លើ #appPages',
+        !wideScrollPolicy.iosClass && wideScrollPolicy.htmlOverscrollY !== 'none' &&
+        wideScrollPolicy.bodyOverscrollY !== 'none' && wideScrollPolicy.pagesOverscrollY !== 'contain',
+        wideScrollPolicy);
 
     await wideCtx.close();
     server.close();

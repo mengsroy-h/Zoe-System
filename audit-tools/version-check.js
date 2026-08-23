@@ -95,7 +95,7 @@ for (const app of APPS) {
     const covered = new Set();
     slots.forEach((slot) => {
         const start = lines.findIndex((l) => l.includes(slot.open));
-        const closes = lines.findIndex((l, i) => i > start && l === slot.close);
+        const closes = lines.findIndex((l, i) => i > start && l.trimEnd() === slot.close);
         const hit = at.find((i) => start !== -1 && i > start && i < closes);
         check(`${app} បង្ហាញកំណែក្នុង ${slot.label}`, hit !== undefined, true);
         if (hit !== undefined) covered.add(hit);

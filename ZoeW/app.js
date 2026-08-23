@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.1';
+    const APP_VERSION = '2.8.2';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2804,7 +2804,17 @@
         const pages = document.getElementById('appPages');
         if (!pages) return;
         const side = activePanelSections().side;
-        pages.classList.toggle('history-expanded', !!side && side.classList.contains('collapsed'));
+        const expanded = !!side && side.classList.contains('collapsed');
+        if (expanded) pages.scrollTop = 0;
+        pages.classList.toggle('history-expanded', expanded);
+        if (expanded) {
+            pages.scrollTop = 0;
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => {
+                    if (pages.classList.contains('history-expanded')) pages.scrollTop = 0;
+                });
+            }
+        }
     }
 
     function setupSwipeGestures() {
@@ -2832,73 +2842,163 @@
         return !!(input && document.activeElement === input && input.value.trim());
     }
 
+    const iosTouchArbiter = { id: null, phase: 'idle', blockPanel: false };
+
+    function beginIOSTouch(touch) {
+        iosTouchArbiter.id = touch.identifier;
+        iosTouchArbiter.phase = 'possible';
+        iosTouchArbiter.blockPanel = false;
+    }
+
+    function blockPanelForIOSTouch(phase) {
+        iosTouchArbiter.phase = phase;
+        iosTouchArbiter.blockPanel = true;
+    }
+
+    function resetIOSTouchArbiter() {
+        iosTouchArbiter.id = null;
+        iosTouchArbiter.phase = 'idle';
+        iosTouchArbiter.blockPanel = false;
+    }
+
+    function panelBlockedForTouch(identifier) {
+        if (iosTouchArbiter.phase === 'refreshing') return true;
+        return iosTouchArbiter.id === identifier && iosTouchArbiter.blockPanel;
+    }
+
+    function panelMayYieldToPTR(identifier) {
+        return iosTouchArbiter.id === identifier &&
+            (iosTouchArbiter.phase === 'tracking' || iosTouchArbiter.phase === 'held' || iosTouchArbiter.phase === 'ptr');
+    }
+
+    function touchByIdentifier(list, identifier) {
+        if (!list || identifier === null) return null;
+        for (let i = 0; i < list.length; i++) {
+            if (list[i].identifier === identifier) return list[i];
+        }
+        return null;
+    }
+
     function bindPanelSwipe(config) {
         const sidebar = document.getElementById(config.sideId);
         const mainSection = document.getElementById(config.mainId);
         if (!sidebar || !mainSection) return;
 
         let startY = 0;
+        let startX = 0;
         let isDragging = false;
-        let pendingLock = false;
+        let pendingAction = '';
+        let mainTouchId = null;
+        let scrollerStartY = 0;
+        let scrollerStartX = 0;
+        let scrollerPendingExpand = false;
+        let scrollerTouchId = null;
 
         function scrollTopOf() {
             const el = config.scroller();
             return el ? el.scrollTop : 0;
         }
 
-        function applyPendingLock() {
-            isDragging = false;
-            if (!pendingLock) return;
-            pendingLock = false;
-            syncHistoryExpandedLock();
+        function applyPanelAction(action) {
+            if (action === 'collapse') sidebar.classList.add('collapsed');
+            else if (action === 'expand') sidebar.classList.remove('collapsed');
+            else if (action === 'search') setPhoneSearchPulledUp(false);
+            if (action) syncHistoryExpandedLock();
         }
 
-        const scrollerTouchStart = (e) => { startY = e.touches[0].clientY; };
+        function actionForMainDiff(diffY, diffX) {
+            if (Math.abs(diffY) < Math.abs(diffX) * 1.6) return '';
+            const scrollTop = scrollTopOf();
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) return 'collapse';
+            if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) return 'expand';
+            if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) return 'search';
+            return '';
+        }
+
+        function finishMainSwipe(e, apply) {
+            const endedTouchId = mainTouchId;
+            const endedTouch = endedTouchId !== null && e.touches.length === 0 ?
+                touchByIdentifier(e.changedTouches, endedTouchId) : null;
+            const finalDiffY = endedTouch ? endedTouch.clientY - startY : 0;
+            const finalDiffX = endedTouch ? endedTouch.clientX - startX : 0;
+            if (endedTouch && finalDiffY >= 56 && panelMayYieldToPTR(endedTouchId)) blockPanelForIOSTouch('ptr');
+            pendingAction = endedTouch ? actionForMainDiff(finalDiffY, finalDiffX) : '';
+            isDragging = false;
+            mainTouchId = null;
+            const action = pendingAction;
+            pendingAction = '';
+            if (apply && endedTouch && !panelBlockedForTouch(endedTouchId)) applyPanelAction(action);
+        }
+
+        const scrollerTouchStart = (e) => {
+            scrollerPendingExpand = false;
+            scrollerTouchId = null;
+            if (e.touches.length !== 1) return;
+            scrollerTouchId = e.touches[0].identifier;
+            scrollerStartY = e.touches[0].clientY;
+            scrollerStartX = e.touches[0].clientX;
+        };
         const scrollerTouchMove = (e) => {
-            const diffY = e.touches[0].clientY - startY;
-            if (scrollTopOf() === 0 && diffY > 30 && window.innerWidth < 992) {
-                if (sidebar.classList.contains('collapsed')) {
-                    sidebar.classList.remove('collapsed');
-                    syncHistoryExpandedLock();
-                }
+            if (e.touches.length !== 1 || window.innerWidth >= 992) {
+                scrollerPendingExpand = false;
+                scrollerTouchId = null;
+                return;
             }
+            const touch = touchByIdentifier(e.touches, scrollerTouchId);
+            if (!touch) { scrollerPendingExpand = false; scrollerTouchId = null; return; }
+            const diffY = touch.clientY - scrollerStartY;
+            const diffX = touch.clientX - scrollerStartX;
+            scrollerPendingExpand = scrollTopOf() <= 0 && diffY > 30 &&
+                Math.abs(diffY) >= Math.abs(diffX) * 1.6 && sidebar.classList.contains('collapsed');
+        };
+        const finishScrollerSwipe = (e, apply) => {
+            const endedTouchId = scrollerTouchId;
+            const endedTouch = endedTouchId !== null && e.touches.length === 0 ?
+                touchByIdentifier(e.changedTouches, endedTouchId) : null;
+            const finalDiffY = endedTouch ? endedTouch.clientY - scrollerStartY : 0;
+            const finalDiffX = endedTouch ? endedTouch.clientX - scrollerStartX : 0;
+            if (endedTouch && finalDiffY >= 56 && panelMayYieldToPTR(endedTouchId)) blockPanelForIOSTouch('ptr');
+            scrollerPendingExpand = !!endedTouch && scrollTopOf() <= 0 && finalDiffY > 30 &&
+                Math.abs(finalDiffY) >= Math.abs(finalDiffX) * 1.6 && sidebar.classList.contains('collapsed');
+            const shouldExpand = scrollerPendingExpand;
+            scrollerPendingExpand = false;
+            scrollerTouchId = null;
+            if (apply && shouldExpand && !panelBlockedForTouch(endedTouchId)) applyPanelAction('expand');
         };
         [document.getElementById('tableResponsive'), document.getElementById('entryTableResponsive'),
          document.getElementById('lockerTableResponsive')].forEach((el) => {
             if (!el || !mainSection.contains(el)) return;
             el.addEventListener('touchstart', scrollerTouchStart, { passive: true });
             el.addEventListener('touchmove', scrollerTouchMove, { passive: true });
+            el.addEventListener('touchend', (e) => finishScrollerSwipe(e, true), { passive: true });
+            el.addEventListener('touchcancel', (e) => finishScrollerSwipe(e, false), { passive: true });
         });
 
         mainSection.addEventListener('touchstart', (e) => {
-            if (window.innerWidth >= 992) return;
+            pendingAction = '';
+            mainTouchId = null;
+            if (window.innerWidth >= 992 || e.touches.length !== 1) { isDragging = false; return; }
+            mainTouchId = e.touches[0].identifier;
             startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
             isDragging = true;
         }, { passive: true });
 
         mainSection.addEventListener('touchmove', (e) => {
-            if (!isDragging || window.innerWidth >= 992) return;
-            const diffY = e.touches[0].clientY - startY;
-            const scrollTop = scrollTopOf();
-
-            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) {
-                sidebar.classList.add('collapsed');
-                pendingLock = true;
+            if (window.innerWidth >= 992 || e.touches.length !== 1) {
                 isDragging = false;
+                pendingAction = '';
+                mainTouchId = null;
+                return;
             }
-            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
-                sidebar.classList.remove('collapsed');
-                pendingLock = true;
-                isDragging = false;
-            }
-            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
-                setPhoneSearchPulledUp(false);
-                isDragging = false;
-            }
+            if (!isDragging) return;
+            const touch = touchByIdentifier(e.touches, mainTouchId);
+            if (!touch) { isDragging = false; pendingAction = ''; mainTouchId = null; return; }
+            pendingAction = actionForMainDiff(touch.clientY - startY, touch.clientX - startX);
         }, { passive: true });
 
-        mainSection.addEventListener('touchend', applyPendingLock);
-        mainSection.addEventListener('touchcancel', applyPendingLock);
+        mainSection.addEventListener('touchend', (e) => finishMainSwipe(e, true));
+        mainSection.addEventListener('touchcancel', (e) => finishMainSwipe(e, false));
 
         const dragHandle = document.getElementById(config.handleId);
         if (dragHandle) {
@@ -2927,10 +3027,10 @@
             if (topHeight > 0) document.documentElement.style.setProperty('--chrome-top', topHeight + 'px');
         }
         if (tabbar) {
-            const barTop = tabbar.getBoundingClientRect().top;
-            const pageBottom = document.body.getBoundingClientRect().bottom;
-            const spanned = Math.round(pageBottom - barTop);
-            const bottomHeight = spanned > 0 ? spanned : tabbar.offsetHeight;
+            const pageHeight = document.body.getBoundingClientRect().height;
+            const pageExtension = Math.max(0, Math.round(pageHeight - window.innerHeight));
+            const bottomHeight = Math.round(tabbar.offsetHeight + pageExtension);
+            document.documentElement.style.setProperty('--page-extension', pageExtension + 'px');
             if (bottomHeight > 0) document.documentElement.style.setProperty('--chrome-bottom', bottomHeight + 'px');
         }
     }
@@ -3006,6 +3106,11 @@
             if (window.innerWidth >= 992) showAppChrome();
         });
         if (window.visualViewport) window.visualViewport.addEventListener('resize', measureAppChromeSize);
+        if (window.ResizeObserver) {
+            const chromeSizeObserver = new ResizeObserver(measureAppChromeSize);
+            chromeSizeObserver.observe(navbar);
+            chromeSizeObserver.observe(tabbar);
+        }
         measureAppChromeSize();
         setTimeout(measureAppChromeSize, 300);
     }
@@ -3094,105 +3199,339 @@
         const indicator = document.createElement('div');
         indicator.className = 'ptr-indicator';
         indicator.innerHTML = '<div class="ptr-spinner"></div>';
+        indicator.setAttribute('aria-hidden', 'true');
         document.body.appendChild(indicator);
 
-        const AXIS_SLOP = 18;
-        const TRIGGER_AT = 84;
-        const MAX_TRAVEL = 130;
+        const AXIS_SLOP = 22;
+        const ENGAGE_AT = 56;
+        const AXIS_RATIO = 1.6;
+        const INDICATOR_AT = 18;
+        const TRIGGER_AT = 96;
+        const MAX_TRAVEL = 140;
         const REST_Y = -46;
+        const RELOAD_KEY = 'zoew_ptr_reload_pending';
+        const RESTORATION_KEY = 'zoew_ptr_scroll_restoration';
 
         let startY = 0;
         let startX = 0;
+        let touchId = null;
         let tracking = false;
         let engaged = false;
         let travel = 0;
         let refreshing = false;
+        let startScroller = null;
+        let startActiveScroller = null;
+        let restoreTimers = [];
+        let restoreFrames = [];
+        let settlingScroll = false;
+        let reloadWatchdog = null;
 
         function dampen(raw) {
-            return MAX_TRAVEL * (1 - Math.exp(-raw / 150));
+            return MAX_TRAVEL * (1 - Math.exp(-raw / 135));
         }
 
         function paint(distance) {
             const progress = Math.min(1, distance / TRIGGER_AT);
+            const visible = Math.max(0, Math.min(1, (distance - INDICATOR_AT) / (TRIGGER_AT - INDICATOR_AT)));
             indicator.style.transform = 'translateY(' + (REST_Y + distance) + 'px) rotate(' + Math.round(progress * 270) + 'deg)';
-            indicator.style.opacity = String(Math.min(1, distance / (TRIGGER_AT * 0.55)));
+            indicator.style.opacity = String(visible);
             indicator.classList.toggle('ready', progress >= 1);
         }
 
-        function park() {
+        function park(resetArbiter) {
+            touchId = null;
             tracking = false;
             engaged = false;
             travel = 0;
+            startScroller = null;
+            startActiveScroller = null;
             indicator.classList.add('snapping');
             indicator.classList.remove('ready');
             indicator.classList.remove('spinning');
             indicator.style.opacity = '0';
             indicator.style.transform = 'translateY(' + REST_Y + 'px)';
+            if (resetArbiter !== false) resetIOSTouchArbiter();
         }
 
-        function gestureMayPull(target) {
-            if (isModalOpen || refreshing) return false;
-            if (isSideDrawerOpen()) return false;
-            if (pages.scrollTop > 0) return false;
+        function atStartTop(value) {
+            return Number.isFinite(value) && value <= 1;
+        }
+
+        function atPullTop(value) {
+            return Number.isFinite(value) && value <= 1;
+        }
+
+        function pullTargetBlocked(target) {
+            if (isModalOpen || refreshing) return true;
+            if (isSideDrawerOpen()) return true;
+            if (!target || !target.closest) return false;
+            if (target.closest('input, textarea, select, [contenteditable="true"], .app-navbar, .page-tabbar')) return true;
+            const action = target.closest('button, a');
+            return !!(action && !action.closest('.table-responsive'));
+        }
+
+        function capturePullContext(target) {
+            if (isModalOpen || refreshing || pullTargetBlocked(target)) return null;
+            const root = document.scrollingElement || document.documentElement;
+            if (!atStartTop(root ? root.scrollTop : 0) || !atStartTop(window.scrollY || 0)) return null;
+            if (!atStartTop(document.body.scrollTop || 0) || !atStartTop(pages.scrollTop)) return null;
             const scroller = scrollerOf(target);
-            if (scroller && scroller.scrollTop > 0) return false;
-            const historyScroller = document.getElementById('tableResponsive');
-            if (historyScroller && historyScroller.offsetParent !== null && historyScroller.scrollTop > 0) return false;
+            if (scroller && !atStartTop(scroller.scrollTop)) return null;
+            const activeScroller = activePanelSections().scroller;
+            if (activeScroller && activeScroller.offsetParent !== null && !atStartTop(activeScroller.scrollTop)) return null;
+            return { scroller: scroller, activeScroller: activeScroller };
+        }
+
+        function pullContextStillValid(target) {
+            if (isModalOpen || refreshing || pullTargetBlocked(target)) return false;
+            if (scrollerOf(target) !== startScroller) return false;
+            if (activePanelSections().scroller !== startActiveScroller) return false;
+            const root = document.scrollingElement || document.documentElement;
+            if (!atPullTop(root ? root.scrollTop : 0) || !atPullTop(window.scrollY || 0)) return false;
+            if (!atPullTop(document.body.scrollTop || 0) || !atPullTop(pages.scrollTop)) return false;
+            if (startScroller && !atPullTop(startScroller.scrollTop)) return false;
+            if (startActiveScroller && startActiveScroller.offsetParent !== null && !atPullTop(startActiveScroller.scrollTop)) return false;
             return true;
         }
 
+        function markReload() {
+            try { sessionStorage.setItem(RELOAD_KEY, '1'); } catch (e) {}
+        }
+
+        function hasReloadMarker() {
+            try {
+                return sessionStorage.getItem(RELOAD_KEY) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function clearReloadMarker() {
+            try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+        }
+
+        function rememberScrollRestoration() {
+            if (!('scrollRestoration' in history)) return;
+            try {
+                if (sessionStorage.getItem(RESTORATION_KEY) === null) {
+                    sessionStorage.setItem(RESTORATION_KEY, history.scrollRestoration);
+                }
+            } catch (e) {}
+            history.scrollRestoration = 'manual';
+        }
+
+        function restoreScrollRestoration() {
+            let mode = 'auto';
+            try {
+                const saved = sessionStorage.getItem(RESTORATION_KEY);
+                if (saved === 'manual') mode = 'manual';
+                sessionStorage.removeItem(RESTORATION_KEY);
+            } catch (e) {}
+            if ('scrollRestoration' in history) history.scrollRestoration = mode;
+        }
+
+        function resetScrollPosition() {
+            const root = document.scrollingElement || document.documentElement;
+            if (root) root.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+            pages.scrollTop = 0;
+            const activeScroller = activePanelSections().scroller;
+            if (activeScroller) activeScroller.scrollTop = 0;
+            window.scrollTo(0, 0);
+            showAppChrome();
+        }
+
+        function settleScrollPosition() {
+            cancelScrollSettling(false);
+            settlingScroll = true;
+            resetScrollPosition();
+            const firstFrame = requestAnimationFrame(() => {
+                resetScrollPosition();
+                const secondFrame = requestAnimationFrame(resetScrollPosition);
+                restoreFrames.push(secondFrame);
+            });
+            restoreFrames.push(firstFrame);
+            [80, 260, 620].forEach((delay, index) => {
+                const timer = setTimeout(() => {
+                    resetScrollPosition();
+                    if (index === 2) {
+                        settlingScroll = false;
+                        restoreTimers = [];
+                        restoreFrames = [];
+                        clearReloadMarker();
+                        restoreScrollRestoration();
+                    }
+                }, delay);
+                restoreTimers.push(timer);
+            });
+        }
+
+        function cancelScrollSettling(clearMarker) {
+            restoreTimers.forEach(clearTimeout);
+            restoreFrames.forEach(cancelAnimationFrame);
+            restoreTimers = [];
+            restoreFrames = [];
+            settlingScroll = false;
+            if (clearMarker !== false) {
+                clearReloadMarker();
+                restoreScrollRestoration();
+            }
+        }
+
+        const restoringAfterPull = hasReloadMarker();
+        if (restoringAfterPull) {
+            if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+            settleScrollPosition();
+            window.addEventListener('pageshow', () => {
+                if (settlingScroll) settleScrollPosition();
+            }, { once: true });
+        }
+
         document.addEventListener('touchstart', (e) => {
+            touchId = null;
             tracking = false;
             engaged = false;
             travel = 0;
-            if (refreshing || e.touches.length !== 1) return;
-            if (!gestureMayPull(e.target)) return;
-            startY = e.touches[0].clientY;
-            startX = e.touches[0].clientX;
+            startScroller = null;
+            startActiveScroller = null;
+            if (refreshing) return;
+            if (e.touches.length !== 1) {
+                if (iosTouchArbiter.id !== null) blockPanelForIOSTouch('cancelled');
+                park(false);
+                return;
+            }
+            const touch = e.touches[0];
+            beginIOSTouch(touch);
+            touchId = touch.identifier;
+            startY = touch.clientY;
+            startX = touch.clientX;
+            const context = capturePullContext(e.target);
+            if (!context) return;
+            startScroller = context.scroller;
+            startActiveScroller = context.activeScroller;
             tracking = true;
+            iosTouchArbiter.phase = 'tracking';
             indicator.classList.remove('snapping');
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
-            if (!tracking || refreshing) return;
-            const deltaY = e.touches[0].clientY - startY;
-            const deltaX = e.touches[0].clientX - startX;
+            if (refreshing) return;
+            if (e.touches.length !== 1) {
+                if (iosTouchArbiter.id !== null) blockPanelForIOSTouch('cancelled');
+                park(false);
+                return;
+            }
+            if (touchId === null) return;
+            const touch = touchByIdentifier(e.touches, touchId);
+            if (!touch) { blockPanelForIOSTouch('cancelled'); park(false); return; }
+            const deltaY = touch.clientY - startY;
+            const deltaX = touch.clientX - startX;
+
+            if (!tracking) {
+                if (settlingScroll && (Math.abs(deltaY) >= AXIS_SLOP || Math.abs(deltaX) >= AXIS_SLOP)) cancelScrollSettling();
+                return;
+            }
 
             if (!engaged) {
                 if (Math.abs(deltaY) < AXIS_SLOP && Math.abs(deltaX) < AXIS_SLOP) return;
-                if (deltaY <= 0 || Math.abs(deltaY) < Math.abs(deltaX) * 1.4) { tracking = false; return; }
-                if (!gestureMayPull(e.target)) { tracking = false; return; }
+                if (settlingScroll) cancelScrollSettling();
+                if (deltaY <= 0 || deltaY < Math.abs(deltaX) * AXIS_RATIO) {
+                    park();
+                    return;
+                }
+                if (!e.cancelable || !pullContextStillValid(e.target)) { park(); return; }
+                e.preventDefault();
+                if (!e.defaultPrevented) { park(); return; }
                 engaged = true;
-                startY = e.touches[0].clientY;
+                iosTouchArbiter.phase = 'held';
             }
 
-            const raw = e.touches[0].clientY - startY;
-            if (e.cancelable) e.preventDefault();
+            if (deltaY <= 0 || Math.abs(deltaX) > deltaY * 0.85 || !e.cancelable || !pullContextStillValid(e.target)) {
+                park(iosTouchArbiter.blockPanel ? false : true);
+                return;
+            }
+            e.preventDefault();
+            if (!e.defaultPrevented) { park(); return; }
+            if (deltaY >= ENGAGE_AT && !iosTouchArbiter.blockPanel) blockPanelForIOSTouch('ptr');
+            const raw = deltaY - ENGAGE_AT;
             travel = raw > 0 ? dampen(raw) : 0;
             paint(travel);
         }, { passive: false });
 
-        document.addEventListener('touchend', () => {
-            if (!tracking && !engaged) return;
-            if (!engaged) { tracking = false; return; }
+        document.addEventListener('touchend', (e) => {
+            const endedTouchId = touchId;
+            if (endedTouchId === null) {
+                if (e.touches.length === 0) resetIOSTouchArbiter();
+                return;
+            }
+            if (e.touches.length !== 0) {
+                blockPanelForIOSTouch('cancelled');
+                park(false);
+                return;
+            }
+            const endedTouch = touchByIdentifier(e.changedTouches, endedTouchId);
+            if (!endedTouch) { park(); return; }
+            if (!tracking && !engaged) { park(); return; }
+            const finalDeltaY = endedTouch.clientY - startY;
+            const finalDeltaX = endedTouch.clientX - startX;
+            const finalAxisValid = engaged ? Math.abs(finalDeltaX) <= finalDeltaY * 0.85 :
+                finalDeltaY >= Math.abs(finalDeltaX) * AXIS_RATIO;
+            if (finalDeltaY < AXIS_SLOP || !finalAxisValid ||
+                !pullContextStillValid(e.target)) { park(); return; }
+            if (finalDeltaY >= ENGAGE_AT && !iosTouchArbiter.blockPanel) blockPanelForIOSTouch('ptr');
+            const finalRaw = finalDeltaY - ENGAGE_AT;
+            travel = finalRaw > 0 ? dampen(finalRaw) : 0;
+            paint(travel);
             tracking = false;
             engaged = false;
             if (travel >= TRIGGER_AT) {
                 refreshing = true;
+                blockPanelForIOSTouch('refreshing');
+                touchId = null;
+                startScroller = null;
+                startActiveScroller = null;
+                rememberScrollRestoration();
+                markReload();
+                resetScrollPosition();
                 indicator.classList.add('snapping');
                 indicator.classList.add('spinning');
                 indicator.style.opacity = '1';
                 indicator.style.transform = 'translateY(' + (REST_Y + TRIGGER_AT) + 'px)';
-                setTimeout(() => window.location.reload(), 260);
+                setTimeout(() => window.location.reload(), 300);
+                reloadWatchdog = setTimeout(() => {
+                    refreshing = false;
+                    reloadWatchdog = null;
+                    clearReloadMarker();
+                    restoreScrollRestoration();
+                    park();
+                }, 5000);
                 return;
             }
             park();
         }, { passive: true });
 
-        document.addEventListener('touchcancel', () => {
+        document.addEventListener('touchcancel', (e) => {
             if (refreshing) return;
-            park();
+            blockPanelForIOSTouch('cancelled');
+            park(e.touches.length === 0);
         }, { passive: true });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && !refreshing) park();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!refreshing) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }, true);
+
+        window.addEventListener('beforeunload', () => {
+            if (!refreshing || reloadWatchdog === null) return;
+            clearTimeout(reloadWatchdog);
+            reloadWatchdog = null;
+        });
 
         park();
         indicator.classList.remove('snapping');

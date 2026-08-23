@@ -97,6 +97,10 @@ function buildEnv(src, opts) {
     vm.runInContext(sliceFn(src, 'syncHistoryExpandedLock'), ctx);
     vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
     vm.runInContext(sliceFn(src, 'phoneSearchIsActive'), ctx);
+    vm.runInContext((src.match(/^ *const iosTouchArbiter = .*$/m) || ["const iosTouchArbiter = { id: null, phase: 'idle', blockPanel: false };"])[0], ctx);
+    vm.runInContext(sliceFn(src, 'touchByIdentifier'), ctx);
+    vm.runInContext(sliceFn(src, 'panelBlockedForTouch'), ctx);
+    vm.runInContext(sliceFn(src, 'panelMayYieldToPTR'), ctx);
     vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
     ctx.setupSwipeGestures();
@@ -104,15 +108,19 @@ function buildEnv(src, opts) {
 }
 
 function swipe(handlers, el, fromY, toY) {
-    handlers[el].touchstart({ touches: [{ clientY: fromY }] });
-    handlers[el].touchmove({ touches: [{ clientY: toY }] });
-    if (handlers[el].touchend) handlers[el].touchend();
+    handlers[el].touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: fromY }] });
+    handlers[el].touchmove({ touches: [{ identifier: 1, clientX: 0, clientY: toY }] });
+    if (handlers[el].touchend) handlers[el].touchend(touchEndEvent(toY));
 }
 
 // អូសដោយ **មិនទាន់លើកម្រាមដៃ** — ប្រើដើម្បីវាស់ថាសោមិនអនុវត្តចំពេលកំពុងអូស
 function swipeHold(handlers, el, fromY, toY) {
-    handlers[el].touchstart({ touches: [{ clientY: fromY }] });
-    handlers[el].touchmove({ touches: [{ clientY: toY }] });
+    handlers[el].touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: fromY }] });
+    handlers[el].touchmove({ touches: [{ identifier: 1, clientX: 0, clientY: toY }] });
+}
+
+function touchEndEvent(clientY, clientX) {
+    return { touches: [], changedTouches: [{ identifier: 1, clientX: clientX || 0, clientY }] };
 }
 
 const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
@@ -121,9 +129,12 @@ console.log('\n=== សោប្រវត្តិពេញអេក្រង់�
 {
     const onData = buildEnv(src, {});
     onData.els.dataSideSection.classList.add('collapsed');
+    onData.els.appPages.scrollTop = 34;
     onData.ctx.syncHistoryExpandedLock();
     ok(onData.els.appPages.classList.contains('history-expanded'),
         'ទំព័រទិន្នន័យសកម្ម + ផ្ទាំងបង្រួម ➜ ដាក់ history-expanded');
+    ok(onData.els.appPages.scrollTop === 0,
+        'មុនចាក់សោ outer scroller ➜ លុប scrollTop ចាស់ (កាតមិនឡើងក្រោម navbar)');
 
     const onEntry = buildEnv(src, { dataPageActive: false });
     onEntry.els.dataSideSection.classList.add('collapsed');
@@ -157,26 +168,29 @@ console.log('\n=== ទំព័រ ២ (បញ្ចូលទិន្នន័�
         'ការអូសលើទំព័រ ២ មិនប៉ះផ្ទាំងទំព័រ ១');
 }
 
-console.log('\n=== សោមិនអនុវត្តចំពេលម្រាមដៃនៅលើអេក្រង់ (កុំបង្អាក់ការរមូរ) ===');
+console.log('\n=== layout មិនប្តូរចំពេលម្រាមដៃនៅលើអេក្រង់ ===');
 {
-    // ឫសគល់នៃការ «ទាក់»៖ ការដាក់ history-expanded ចំពេលអូស ប្តូរកម្ពស់
-    // កន្សោមរមូរភ្លាម ➜ ការរមូរដែលកំពុងដើរត្រូវកាត់ផ្តាច់។ ដូច្នេះផ្ទាំងបង្រួម
-    // ភ្លាម (ឃើញផល) តែ **សោអនុវត្តពេល touchend** ទើបការរមូរបន្តរលូន។
+    // iOS រក្សា scroll owner រហូតដល់ម្រាមដៃលែងពីអេក្រង់។ បើ class `collapsed`
+    // ឬ `history-expanded` ប្តូរនៅកណ្ដាល touch នោះកន្សោមរមូរប្តូរភ្លាម ហើយ offset
+    // អាចជាប់ក្រោម navbar។ ដូច្នេះ queue ចេតនា រួចអនុវត្តតែពេល touchend។
     const { els, handlers } = buildEnv(src, {});
     swipeHold(handlers, 'dataMainSection', 300, 200);
-    ok(els.dataSideSection.classList.contains('collapsed'),
-        'កំពុងអូស ➜ ផ្ទាំងបង្រួមភ្លាម (អ្នកប្រើឃើញផលភ្លាម)');
+    ok(!els.dataSideSection.classList.contains('collapsed'),
+        'កំពុងអូស ➜ ផ្ទាំងមិនទាន់ប្តូរ (scroll owner នៅដដែល)');
     ok(!els.appPages.classList.contains('history-expanded'),
         'កំពុងអូស ➜ **មិនទាន់** ចាក់សោកន្សោមរមូរ (ការរមូរមិនត្រូវកាត់ផ្តាច់)');
-    handlers.dataMainSection.touchend();
+    handlers.dataMainSection.touchend(touchEndEvent(200));
+    ok(els.dataSideSection.classList.contains('collapsed'),
+        'លើកម្រាមដៃ ➜ ទើបបង្រួមផ្ទាំង');
     ok(els.appPages.classList.contains('history-expanded'),
         'លើកម្រាមដៃ ➜ ទើបចាក់សោ ហើយបញ្ជីហូតឡើងពេញអេក្រង់');
 
     const cancelled = buildEnv(src, {});
     swipeHold(cancelled.handlers, 'dataMainSection', 300, 200);
-    cancelled.handlers.dataMainSection.touchcancel();
-    ok(cancelled.els.appPages.classList.contains('history-expanded'),
-        'touchcancel ក៏អនុវត្តសោដែរ (សោមិនជាប់គាំង)');
+    cancelled.handlers.dataMainSection.touchcancel(touchEndEvent(200));
+    ok(!cancelled.els.dataSideSection.classList.contains('collapsed') &&
+       !cancelled.els.appPages.classList.contains('history-expanded'),
+        'touchcancel ➜ បោះបង់ការប្តូរ layout ទាំងមូល');
 }
 
 console.log('\n=== អូសឡើង/ចុះ ➜ ប្រវត្តិហូតឡើងចុះ ===');

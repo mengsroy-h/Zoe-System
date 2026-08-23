@@ -11,18 +11,29 @@ for d in node_modules audit-tools/node_modules "$HOME/node_modules" /tmp/claude-
 done
 if ! node -e "require('acorn')" 2>/dev/null; then
     echo "⚠️  ត្រូវការ acorn — រត់៖  npm i acorn"
-    echo "   (ការត្រួតពិនិត្យ ៤ នឹងត្រូវរំលង)"
+    echo "   (ការត្រួតពិនិត្យ ១១ នឹងត្រូវរំលង)"
     NO_ACORN=1
 fi
 
-pass=0; fail=0; skip=0
+pass=0; fail=0; skip=0; partial=0
 run() {
     local label="$1"; shift
     printf '  %-32s ' "$label"
     if out=$("$@" 2>&1); then
-        n=$(printf '%s' "$out" | grep -cE 'ok    ')
-        [ "$n" -gt 0 ] && echo "PASS  ($n)" || echo "PASS"
-        pass=$((pass+1))
+        n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
+        skip_line=$(printf '%s\n' "$out" | grep -m1 '^SKIP' || true)
+        if [ -n "$skip_line" ]; then
+            if [ "$n" -gt 0 ]; then
+                echo "PARTIAL PASS ($n; $skip_line)"
+                partial=$((partial+1))
+            else
+                echo "SKIPPED (${skip_line#SKIP })"
+                skip=$((skip+1))
+            fi
+        else
+            [ "$n" -gt 0 ] && echo "PASS  ($n)" || echo "PASS"
+            pass=$((pass+1))
+        fi
     else
         echo "*** FAIL ***"; printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
         fail=$((fail+1))
@@ -76,7 +87,7 @@ if for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 printf '  %-32s ' "rules JSON valid"
-if python3 -c "import json;json.load(open('firebase-database.rules.json'));json.load(open('ZoeKeyGen/firebase-database.rules.json'))" 2>/dev/null; then
+if node -e "const fs=require('fs');JSON.parse(fs.readFileSync('firebase-database.rules.json','utf8'));JSON.parse(fs.readFileSync('ZoeKeyGen/firebase-database.rules.json','utf8'));" 2>/dev/null; then
     echo "PASS"; pass=$((pass+1)); else echo "*** FAIL ***"; fail=$((fail+1)); fi
 
 for f in license-verify.js error-reporting.js; do
@@ -127,8 +138,8 @@ fi
 echo
 echo "==================================="
 if [ "$fail" -eq 0 ]; then
-    echo "✅ ជោគជ័យទាំងអស់  ($pass ការត្រួតពិនិត្យ, រំលង $skip)"
+    echo "✅ ជោគជ័យទាំងអស់  ($pass ពេញលេញ, $partial មួយផ្នែក, រំលង $skip)"
 else
-    echo "❌ ធ្លាក់ $fail  (ជោគជ័យ $pass, រំលង $skip)"
+    echo "❌ ធ្លាក់ $fail  (ជោគជ័យ $pass, មួយផ្នែក $partial, រំលង $skip)"
 fi
 exit "$fail"

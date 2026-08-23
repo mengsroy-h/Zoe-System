@@ -24,6 +24,78 @@
 
 ---
 
+## [2.8.2] — 2026-08-24
+
+**Pull-to-refresh លើ iPhone មានស្ថេរភាព ហើយកាតប្រវត្តិមិនរអិលឡើងក្រោម navbar
+ក្រោយ refresh ទៀតទេ។**
+
+### កែកំហុស — តារាងប្រវត្តិលោតឡើងក្រោយ pull-to-refresh លើ iOS
+រូបថតមុន/ក្រោយ refresh បង្ហាញថាកាតទាំងមូលរអិលឡើងប្រហែល safe-area ខាងក្រោម
+របស់ iPhone ហើយតារាងខាងក្នុងនៅសល់ scroll offset មួយជាន់ទៀត។ មូលហេតុមាន ២ ជាន់៖
+
+- `html/body` នៅតែអាចក្លាយជា root scroller ព្រោះ standalone body វែងជាង viewport
+  តាម `env(safe-area-inset-bottom)`
+- `location.reload()` ទុកឲ្យ WebKit ស្តារ offset របស់ root, `#appPages` និងតារាង
+  ដោយស្វ័យប្រវត្តិក្រោយ layout ចាប់ផ្តើមរួច
+
+ឥឡូវ iOS standalone ត្រូវបានរកឃើញតាំងពី `<head>` ហើយដាក់ `html.ios-standalone`;
+`html/body` ត្រូវបានចាក់សោ `overflow-y:hidden` ហើយ `#appPages` ជា outer scroll owner
+តែមួយ ដោយមិនដាក់សោនេះលើ Android/browser ធម្មតា។ មុន refresh App កត់ marker,
+ប្តូរ `history.scrollRestoration` ទៅ `manual` និងលុប offset ទាំងអស់។ ក្រោយ reload វា
+លុបម្តងទៀតតាម `requestAnimationFrame` និង timer ដើម្បីទប់ WebKit restoration ដែលមកយឺត។
+marker ត្រូវបានរក្សារហូតដល់ settle ចប់ ហើយ tap ដែលមិនបានរមូរមិនលុប timer ទាំងនេះ។
+ក្រោយ settle App ស្ដារ `history.scrollRestoration` ទៅតម្លៃដើម និងសម្អាត marker;
+`ResizeObserver` ក៏វាស់ navbar/tabbar ឡើងវិញ បើ safe area ឬ font ធ្វើឲ្យកម្ពស់ប្រែយឺត;
+ការវាស់ប្រើ tabbar `offsetHeight` + body height ដូច្នេះ transform ពេលរបាលាក់ ឬ root offset
+ពេល WebKit restore មិនធ្វើឲ្យ safe-area រួញ។ `--page-extension` ក៏រក្សា bottom inset
+ពេលរបាលាក់ ដើម្បីកុំឲ្យគែមកាត/តារាងធ្លាក់ក្រោម viewport។
+
+### ផ្លាស់ប្តូរ — pull-to-refresh មិនដណ្ដើមការរមូរធម្មតា
+- បន្ថែម axis slop, ទិសបញ្ឈរច្បាស់ និង touch arbiter រួមជាមួយកាយវិការបើកផ្ទាំង៖
+  0–30px មិនធ្វើអ្វី, 31–55px បើកផ្ទាំងដែលបង្រួម, 56–212px PTR កាន់ gesture តែ
+  រអិលត្រឡប់វិញ ហើយត្រូវទាញដោយចេតនាប្រហែល ≥213px ទើប refresh។ Indicator នៅលាក់
+  រហូតដល់ 56px ហើយលេចឡើងបន្តិចម្តងៗ មិនពេញតាំងពីទាញខ្លី
+- PTR ដំណើរការតែពេល root, ទំព័រ និងតារាងសកម្មសុទ្ធតែនៅកំពូល; ការទាញផ្ដេក,
+  ទាញឡើង, modal/drawer, វាលបញ្ចូល និង control ក្រៅតារាង មិនត្រូវបានដណ្ដើម។ Tap/drag
+  ខ្លីលើ button/link ក្នុងជួរតារាងនៅតែធម្មតា តែ deliberate long pull មាន behavior ដូចផ្ទៃជួរ។ វាទទួល
+  `scrollTop` អវិជ្ជមានពី Safari rubber-band ហើយតាម `Touch.identifier`; បន្ថែមម្រាមដៃទី២
+  បោះបង់ទាំងការបើកផ្ទាំង និង refresh
+- Final `touchend` គណនាចម្ងាយពី `changedTouches` ឡើងវិញ ដូច្នេះការបញ្ច្រាសលឿនមិន
+  refresh/បើកផ្ទាំងតាម state ចាស់ ហើយក្រោយ vertical lock វាប្រើ hysteresis ដូច touchmove
+  ដើម្បីឲ្យ ready indicator និង refresh decision ស្របគ្នា។ Phase `refreshing` block touch/click ថ្មីទាំងអស់មុន
+  navigation និង watchdog 5s ដោះស្ថានភាព បើ reload មិនបានចាប់ផ្តើម; `beforeunload`
+  បិទ watchdog ដោយរក្សា markers ពេល navigation បានចាប់ផ្តើម ទោះ response យឺតក៏ដោយ
+- Panel swipe ឥឡូវទាមទារទិសបញ្ឈរច្បាស់ដូច PTR ដូច្នេះការអូសទ្រេត/ផ្ដេកមិនបើក
+  ឬបង្រួមផ្ទាំងដោយចៃដន្យ
+
+### កែកំហុស — កុំប្តូរ scroll owner កណ្តាល touch
+មុននេះ `.collapsed` ប្តូរចំពេលម្រាមដៃនៅលើអេក្រង់ ហើយ `history-expanded` ប្តូរពេល
+លើកម្រាមដៃ។ ស្ថានភាពពាក់កណ្តាលនោះធ្វើឲ្យ iOS ប្តូរ layout/scroll owner កណ្តាល
+កាយវិការ។ ឥឡូវ `touchmove` គ្រាន់តែ queue ចេតនា; `touchend` ទើបអនុវត្ត class និងសោ
+ជាមួយគ្នា។ `touchcancel` បោះបង់ទាំងមូល ហើយពេលចូលរបៀបពេញអេក្រង់
+`#appPages.scrollTop` ចាស់ត្រូវបានលុប។
+
+### ឧបករណ៍ audit
+- **`gesture-test.js` — 101 assertions**៖ គ្រប short/medium/long pull, negative bounce,
+  diagonal និង multitouch មុន/ក្រោយពិដាន, final reversal/crossing, modal/drawer/control exclusion,
+  table-row action ownership, panel-vs-PTR ownership, iOS-only standalone scroll policy,
+  root offset/tabbar ដែលលាក់ជាមួយ inset 34px, late navbar resize និង reload response យឺត >5s
+  ដែលចាក់ offset 34px/45px ក្រោយ early tap រួចអះអាងថា root/page/table ត្រឡប់ 0 កាតនៅ
+  ក្រោម navbar ជួរដំបូងនៅក្រោម sticky header marker ត្រូវសម្អាត និងគ្មាន page error។
+  តេស្ត regression ថ្មីធ្លាក់លើ 2.8.1 ដោយ indicator លេចលឿន និង reload ខុសកន្លែង។
+- **`phone-search-swipe-test.js` — 46 assertions**៖ ចាក់ `#appPages.scrollTop = 34`,
+  ផ្ទៀងផ្ទាត់ touchend-only layout, final coordinate និង touchcancel discard។ Baseline 2.8.1
+  ខ្វះ identifier arbiter ថ្មី ដូច្នេះតេស្តបដិសេធភ្លាម។
+- កែ `policy-test.js`/`version-check.js` ឲ្យទទួល CRLF, `boot-runtime.js` ឲ្យរក repo path
+  បានលើ Windows និង `run-all.sh` ឲ្យរាយ `SKIPPED`/`PARTIAL PASS` ដាច់ពី `PASS`។
+- `gesture-test.js` បិទ Service Worker ដើម្បីកុំឲ្យ cache រំលង license mock ពេល reload;
+  `offline-shell-test.js` នៅតែគ្រប Service Worker ពិតដោយឡែក។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- **គ្មាន។** មិនចាំបាច់ប៉ះ Firebase Console ឬប្តូរទិន្នន័យទេ។
+
+---
+
 ## [2.8.1] — 2026-08-23
 
 **ត្រឡប់ទៅឥរិយាបថ 2.7.0 វិញ រួចកែ iOS ដោយប្តូរតែ *របៀបវាស់* ប៉ុណ្ណោះ។**

@@ -24,6 +24,27 @@
 
 ---
 
+## [2.8.3] — 2026-08-24
+
+**ការរមូរប្រវត្តិលើ iOS រលូនឡើង ហើយ pull-to-refresh បិទទាំងស្រុងពេលបញ្ជីពេញអេក្រង់។**
+
+### ល្បឿន និងកែកំហុស
+- ដក document-level non-passive `touchmove` អចិន្ត្រៃយ៍ចេញ; PTR ដំឡើងវាតែពេល
+  touch ចាប់ផ្តើមពី state ដែលអនុញ្ញាត ហើយដកចេញភ្លាមក្រោយ gesture ចប់។
+- ពេលប្រវត្តិ/បញ្ជីសកម្មពេញអេក្រង់ ឬផ្ទាំងស្វែងរកហូតឡើង PTR មិនបង្ហាញ indicator,
+  មិនរារាំង native scroll និងមិន reload ទោះទាញវែងប៉ុនណា; ការទាញចុះបើកផ្ទាំងវិញ។
+- Scroll handler ត្រូវបាន coalesce តាម `requestAnimationFrame`; ការប្តូរ padding ដើម្បី
+  ប្រគល់/កក់កន្លែង Tab bar ពន្យាររហូត momentum ស្ងប់ 180ms ដើម្បីកុំឲ្យតារាងលោត។
+
+### ឧបករណ៍ audit
+- `gesture-test.js` មាន 106 assertions រួមទាំង long pull ពេល full-screen, lifecycle
+  non-passive listener និងការធានាថា scroll container មិនប្តូរកម្ពស់កណ្តាល momentum។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- សាកល្បង momentum scroll និងទាញចុះពីកំពូលលើ iPhone PWA ពិតម្តង មុន deploy production។
+
+---
+
 ## [2.8.2] — 2026-08-24
 
 **Pull-to-refresh លើ iPhone មានស្ថេរភាព ហើយកាតប្រវត្តិមិនរអិលឡើងក្រោម navbar

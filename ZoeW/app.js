@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.2';
+    const APP_VERSION = '2.8.3';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3012,6 +3012,16 @@
     }
 
     let chromeHidden = false;
+    let chromeLayoutTimer = null;
+    const CHROME_LAYOUT_IDLE_MS = 180;
+
+    function scheduleChromeLayoutSettle() {
+        if (chromeLayoutTimer !== null) clearTimeout(chromeLayoutTimer);
+        chromeLayoutTimer = setTimeout(() => {
+            chromeLayoutTimer = null;
+            document.body.classList.toggle('chrome-space-released', chromeHidden);
+        }, CHROME_LAYOUT_IDLE_MS);
+    }
 
     function appChromeElements() {
         return {
@@ -3036,9 +3046,11 @@
     }
 
     function showAppChrome() {
-        if (!chromeHidden) return;
-        chromeHidden = false;
-        document.body.classList.remove('chrome-hidden');
+        if (chromeHidden) {
+            chromeHidden = false;
+            document.body.classList.remove('chrome-hidden');
+        }
+        scheduleChromeLayoutSettle();
     }
 
     function hideAppChrome() {
@@ -3047,6 +3059,7 @@
         if (isModalOpen || isSideDrawerOpen()) return;
         chromeHidden = true;
         document.body.classList.add('chrome-hidden');
+        scheduleChromeLayoutSettle();
     }
 
     function scrollerOf(target) {
@@ -3075,11 +3088,16 @@
         let activeScroller = null;
         let lastScrollTop = 0;
         let travel = 0;
+        let pendingScroller = null;
+        let scrollFrame = null;
 
-        const onScroll = (event) => {
+        const processScroll = () => {
+            scrollFrame = null;
+            const el = pendingScroller;
+            pendingScroller = null;
+            scheduleChromeLayoutSettle();
             if (window.innerWidth >= 992) { showAppChrome(); return; }
             if (isModalOpen || isSideDrawerOpen()) { showAppChrome(); return; }
-            const el = (event.target && event.target.nodeType === 1) ? event.target : pages;
             if (!el || typeof el.scrollTop !== 'number') return;
             if (el !== activeScroller) {
                 activeScroller = el;
@@ -3092,12 +3110,18 @@
             lastScrollTop = top;
             if (!delta) return;
             if (top <= TOP_ZONE) { travel = 0; showAppChrome(); return; }
-            if (el.scrollHeight - top - el.clientHeight <= BOTTOM_ZONE) { travel = 0; return; }
             const step = Math.max(-MAX_STEP, Math.min(MAX_STEP, delta));
+            if (step > 0 && el.scrollHeight - top - el.clientHeight <= BOTTOM_ZONE) { travel = 0; return; }
             if ((step > 0) !== (travel > 0)) travel = 0;
             travel += step;
             if (travel > HIDE_AFTER) { travel = 0; hideAppChrome(); }
             else if (travel < -SHOW_AFTER) { travel = 0; showAppChrome(); }
+        };
+
+        const onScroll = (event) => {
+            pendingScroller = (event.target && event.target.nodeType === 1) ? event.target : pages;
+            if (scrollFrame !== null) return;
+            scrollFrame = requestAnimationFrame(processScroll);
         };
 
         document.addEventListener('scroll', onScroll, { capture: true, passive: true });
@@ -3225,6 +3249,7 @@
         let restoreFrames = [];
         let settlingScroll = false;
         let reloadWatchdog = null;
+        let pullMoveListening = false;
 
         function dampen(raw) {
             return MAX_TRAVEL * (1 - Math.exp(-raw / 135));
@@ -3239,6 +3264,7 @@
         }
 
         function park(resetArbiter) {
+            detachPullMoveListener();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -3270,8 +3296,14 @@
             return !!(action && !action.closest('.table-responsive'));
         }
 
+        function pullRefreshDisabledByPanelState() {
+            const side = activePanelSections().side;
+            return pages.classList.contains('history-expanded') || !!(side &&
+                (side.classList.contains('collapsed') || side.classList.contains('search-focus')));
+        }
+
         function capturePullContext(target) {
-            if (isModalOpen || refreshing || pullTargetBlocked(target)) return null;
+            if (isModalOpen || refreshing || pullRefreshDisabledByPanelState() || pullTargetBlocked(target)) return null;
             const root = document.scrollingElement || document.documentElement;
             if (!atStartTop(root ? root.scrollTop : 0) || !atStartTop(window.scrollY || 0)) return null;
             if (!atStartTop(document.body.scrollTop || 0) || !atStartTop(pages.scrollTop)) return null;
@@ -3283,7 +3315,7 @@
         }
 
         function pullContextStillValid(target) {
-            if (isModalOpen || refreshing || pullTargetBlocked(target)) return false;
+            if (isModalOpen || refreshing || pullRefreshDisabledByPanelState() || pullTargetBlocked(target)) return false;
             if (scrollerOf(target) !== startScroller) return false;
             if (activePanelSections().scroller !== startActiveScroller) return false;
             const root = document.scrollingElement || document.documentElement;
@@ -3292,6 +3324,18 @@
             if (startScroller && !atPullTop(startScroller.scrollTop)) return false;
             if (startActiveScroller && startActiveScroller.offsetParent !== null && !atPullTop(startActiveScroller.scrollTop)) return false;
             return true;
+        }
+
+        function attachPullMoveListener() {
+            if (pullMoveListening) return;
+            document.addEventListener('touchmove', onPullTouchMove, { passive: false });
+            pullMoveListening = true;
+        }
+
+        function detachPullMoveListener() {
+            if (!pullMoveListening) return;
+            document.removeEventListener('touchmove', onPullTouchMove);
+            pullMoveListening = false;
         }
 
         function markReload() {
@@ -3389,6 +3433,7 @@
         }
 
         document.addEventListener('touchstart', (e) => {
+            detachPullMoveListener();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -3413,9 +3458,10 @@
             tracking = true;
             iosTouchArbiter.phase = 'tracking';
             indicator.classList.remove('snapping');
+            attachPullMoveListener();
         }, { passive: true });
 
-        document.addEventListener('touchmove', (e) => {
+        function onPullTouchMove(e) {
             if (refreshing) return;
             if (e.touches.length !== 1) {
                 if (iosTouchArbiter.id !== null) blockPanelForIOSTouch('cancelled');
@@ -3457,12 +3503,15 @@
             const raw = deltaY - ENGAGE_AT;
             travel = raw > 0 ? dampen(raw) : 0;
             paint(travel);
-        }, { passive: false });
+        }
 
         document.addEventListener('touchend', (e) => {
             const endedTouchId = touchId;
             if (endedTouchId === null) {
-                if (e.touches.length === 0) resetIOSTouchArbiter();
+                if (e.touches.length === 0) {
+                    detachPullMoveListener();
+                    resetIOSTouchArbiter();
+                }
                 return;
             }
             if (e.touches.length !== 0) {
@@ -3488,6 +3537,7 @@
             if (travel >= TRIGGER_AT) {
                 refreshing = true;
                 blockPanelForIOSTouch('refreshing');
+                detachPullMoveListener();
                 touchId = null;
                 startScroller = null;
                 startActiveScroller = null;

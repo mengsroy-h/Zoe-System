@@ -35,6 +35,18 @@ function serve(dir) {
 const LICENSE_STUB = `window.ZoeLicense = { getStatus: () => Promise.resolve({ state: 'active' }), setServerTimeOffset(){}, syncServerTime: () => Promise.resolve(), activate: () => Promise.resolve({ ok: true }), verifyKeyString: () => Promise.resolve({ ok: true }), clearActivation(){} };`;
 
 const BOOT = function (seed, standalone) {
+    const nativeAddEventListener = EventTarget.prototype.addEventListener;
+    const nativeRemoveEventListener = EventTarget.prototype.removeEventListener;
+    const blockingTouchMoves = new Set();
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+        if (this === document && type === 'touchmove' && options && options.passive === false) blockingTouchMoves.add(listener);
+        return nativeAddEventListener.call(this, type, listener, options);
+    };
+    EventTarget.prototype.removeEventListener = function (type, listener, options) {
+        if (this === document && type === 'touchmove') blockingTouchMoves.delete(listener);
+        return nativeRemoveEventListener.call(this, type, listener, options);
+    };
+    window.__blockingTouchMoveCount = () => blockingTouchMoves.size;
     if (standalone !== false) {
         try { Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true }); } catch (e) {}
     }
@@ -99,21 +111,23 @@ const GESTURE = function (steps) {
         let prevented = 0;
         let maxIndicatorOpacity = 0;
         let secondTouch = null;
+        let blockingAfterStart = 0;
         const bounced = [];
-        const spy = (e) => { if (e.defaultPrevented) prevented++; };
-        document.addEventListener('touchmove', spy, { passive: true });
         const touch = (id, x, y) => new Touch({ identifier: id, target: target, clientX: x, clientY: y, pageX: x, pageY: y });
         const fire = (type, touches, changed) => {
-            target.dispatchEvent(new TouchEvent(type, {
+            const event = new TouchEvent(type, {
                 bubbles: true,
                 cancelable: type !== 'touchcancel',
                 touches: touches,
                 targetTouches: touches,
                 changedTouches: changed
-            }));
+            });
+            target.dispatchEvent(event);
+            if (type === 'touchmove' && event.defaultPrevented) prevented++;
         };
         let primary = touch(1, steps.x, steps.startY);
         fire('touchstart', [primary], [primary]);
+        blockingAfterStart = typeof window.__blockingTouchMoveCount === 'function' ? window.__blockingTouchMoveCount() : -1;
         if (steps.negativeBounce) {
             const root = document.scrollingElement || document.documentElement;
             const active = typeof activePanelSections === 'function' ? activePanelSections().scroller : null;
@@ -162,8 +176,9 @@ const GESTURE = function (steps) {
                 }, 60);
             }
             bounced.forEach((el) => { delete el.scrollTop; el.scrollTop = 0; });
-            document.removeEventListener('touchmove', spy);
-            setTimeout(() => resolve({ prevented: prevented, maxIndicatorOpacity: maxIndicatorOpacity }), 420);
+            setTimeout(() => resolve({ prevented: prevented, maxIndicatorOpacity: maxIndicatorOpacity,
+                blockingAfterStart: blockingAfterStart,
+                blockingAfterEnd: typeof window.__blockingTouchMoveCount === 'function' ? window.__blockingTouchMoveCount() : -1 }), 420);
         };
         requestAnimationFrame(tick);
     });
@@ -265,7 +280,8 @@ const GESTURE = function (steps) {
         if (root) root.scrollTop = 0;
         document.body.scrollTop = 0;
         window.scrollTo(0, 0);
-        document.body.classList.remove('chrome-hidden');
+        if (typeof showAppChrome === 'function') showAppChrome();
+        document.body.classList.remove('chrome-hidden', 'chrome-space-released');
         });
     };
     const setCollapsed = async () => page.evaluate(() => {
@@ -293,6 +309,8 @@ const GESTURE = function (steps) {
     const ordinary = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 312 }, { y: 326 }, { y: 338 }, { y: 348 }] });
     ok('អូសធម្មតា 48px ➜ ចាប់អ័ក្សដើម្បីទប់ native refresh តែមិនកេះ refresh', ordinary.prevented > 0 && !ordinary.reloaded, ordinary);
     ok('អូសធម្មតា 48px ➜ indicator PTR នៅលាក់ដដែល', ordinary.maxIndicatorOpacity === 0, ordinary);
+    ok('PTR ដំឡើង non-passive touchmove តែពេល gesture មានសិទ្ធិ ហើយដកចេញក្រោយ touchend',
+        ordinary.blockingAfterStart === 1 && ordinary.blockingAfterEnd === 0, ordinary);
 
     // អូសមធ្យម៖ ចាប់កាយវិការ តែ indicator មិនត្រូវលេចពេញមុនជិតកម្រិត refresh
     await resetState();
@@ -323,6 +341,8 @@ const GESTURE = function (steps) {
     const nested = await runGesture({ selector: '#tableResponsive', x: 200, startY: 500, points: [{ y: 540 }, { y: 590 }, { y: 650 }, { y: 700 }] });
     ok('តារាងខាងក្នុងរមូរចុះរួច ➜ PTR មិនដណ្ដើម gesture និងមិនកេះ refresh',
         nested.prevented === 0 && nested.reloaded === false, nested);
+    ok('ការរមូរតារាងធម្មតា ➜ គ្មាន non-passive document touchmove រារាំង compositor',
+        nested.blockingAfterStart === 0 && nested.blockingAfterEnd === 0, nested);
 
     // ៦) ប្រអប់បើក ➜ គ្មាន pull
     await resetState();
@@ -355,16 +375,29 @@ const GESTURE = function (steps) {
     const shortPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 232 }, { y: 244 }, { y: 256 }, { y: 268 }] });
     const shortPanelAfter = await panelState();
     ok('អូសខ្លី 48px លើតារាងពេញអេក្រង់ ➜ បើកផ្ទាំង មិន refresh',
-        !shortPanelPull.reloaded && !shortPanelAfter.collapsed && !shortPanelAfter.expandedLock,
+        shortPanelPull.prevented === 0 && shortPanelPull.maxIndicatorOpacity === 0 && !shortPanelPull.reloaded &&
+        !shortPanelAfter.collapsed && !shortPanelAfter.expandedLock,
         { gesture: shortPanelPull, state: shortPanelAfter });
 
     await resetState();
     await setCollapsed();
     const mediumPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 244 }, { y: 278 }, { y: 300 }] });
     const mediumPanelAfter = await panelState();
-    ok('អូសមធ្យម 80px ➜ PTR កាន់ gesture ប៉ុន្តែមិន refresh និងមិនបើកផ្ទាំង',
-        mediumPanelPull.prevented > 0 && !mediumPanelPull.reloaded && mediumPanelAfter.collapsed && mediumPanelAfter.expandedLock,
+    ok('អូសមធ្យម 80px លើតារាងពេញអេក្រង់ ➜ បិទ PTR ទាំងស្រុង ហើយបើកផ្ទាំង',
+        mediumPanelPull.prevented === 0 && mediumPanelPull.maxIndicatorOpacity === 0 && !mediumPanelPull.reloaded &&
+        !mediumPanelAfter.collapsed && !mediumPanelAfter.expandedLock,
         { gesture: mediumPanelPull, state: mediumPanelAfter });
+
+    await resetState();
+    await setCollapsed();
+    const longPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220,
+        points: [{ y: 280 }, { y: 360 }, { y: 445 }] });
+    const longPanelAfter = await panelState();
+    ok('អូសវែងដល់កម្រិត refresh លើតារាងពេញអេក្រង់ ➜ គ្មាន PTR/indicator ហើយបើកផ្ទាំងធម្មតា',
+        longPanelPull.prevented === 0 && longPanelPull.maxIndicatorOpacity === 0 && !longPanelPull.reloaded &&
+        longPanelPull.blockingAfterStart === 0 && longPanelPull.blockingAfterEnd === 0 &&
+        !longPanelAfter.collapsed && !longPanelAfter.expandedLock,
+        { gesture: longPanelPull, state: longPanelAfter });
 
     await resetState();
     await setCollapsed();
@@ -474,12 +507,13 @@ const GESTURE = function (steps) {
     await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
 
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
-    const scrollTo = (top) => page.evaluate((t) => {
+    const scrollTo = (top) => page.evaluate(async (t) => {
         const el = document.getElementById('tableResponsive') || document.getElementById('appPages');
         el.style.scrollBehavior = 'auto';
         el.scrollTop = t;
         if (el.scrollTop !== t) return -1;
         el.dispatchEvent(new Event('scroll', { bubbles: false }));
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         return el.scrollTop;
     }, top);
     const hidden = () => page.evaluate(() => document.body.classList.contains('chrome-hidden'));
@@ -539,23 +573,35 @@ const GESTURE = function (steps) {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const table = document.getElementById('tableResponsive');
         const pages = document.getElementById('appPages');
-        document.body.classList.remove('chrome-hidden');
-        await wait(340);
+        showAppChrome();
+        await wait(240);
         const shown = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
                         pad: window.getComputedStyle(pages).paddingBottom };
-        document.body.classList.add('chrome-hidden');
-        await wait(340);
+        hideAppChrome();
+        await wait(60);
+        const duringHide = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                             pad: window.getComputedStyle(pages).paddingBottom };
+        await wait(180);
         const away = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
                        pad: window.getComputedStyle(pages).paddingBottom };
-        document.body.classList.remove('chrome-hidden');
-        await wait(340);
-        return { shown: shown, away: away, expanded: pages.classList.contains('history-expanded') };
+        showAppChrome();
+        await wait(60);
+        const duringShow = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                             pad: window.getComputedStyle(pages).paddingBottom };
+        await wait(180);
+        const restored = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                           pad: window.getComputedStyle(pages).paddingBottom };
+        return { shown, duringHide, away, duringShow, restored, expanded: pages.classList.contains('history-expanded') };
     });
     ok('នៅក្នុងរបៀបប្រវត្តិពេញអេក្រង់ពិត (លក្ខខណ្ឌចាំបាច់)', noReflow.expanded === true, noReflow);
     // សំណើអ្នកប្រើ (ដូចកំណែ 2.2.0)៖ ពេលរបា Tab លាក់ខ្លួន កន្លែងរបស់វាត្រូវ
     // **ប្រគល់មកកាតវិញ** ➜ គ្មានចន្លោះទទេនៅបាតអេក្រង់។
     ok('លាក់របា ➜ កាតប្រវត្តិរីកចុះបំពេញកន្លែងរបា (គ្មានចន្លោះទទេ)',
         noReflow.away.h > noReflow.shown.h, noReflow);
+    ok('ពេល momentum កំពុងដើរ ➜ លាក់/បង្ហាញ Tab bar មិនប្តូរកម្ពស់ scroll container',
+        noReflow.duringHide.h === noReflow.shown.h && noReflow.duringShow.h === noReflow.away.h, noReflow);
+    ok('ពេល scroll ឈប់ ➜ layout settle ត្រឡប់ទំហំដើមតែមួយដង',
+        noReflow.restored.h === noReflow.shown.h && noReflow.restored.pad === noReflow.shown.pad, noReflow);
     ok('លាក់របា ➜ ទីតាំង**កំពូល**តារាងមិនប្តូរ (រីកតែខាងក្រោម មិនរុញមាតិកា)',
         noReflow.shown.top === noReflow.away.top, noReflow);
     // ថ្នាក់កំហុស 2.2.1៖ padding នោះត្រូវបាន **ធ្វើចលនា** ➜ កម្ពស់កន្សោមរមូរ
@@ -597,11 +643,11 @@ const GESTURE = function (steps) {
     const filled = await page.evaluate(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const card = document.querySelector('#dataMainSection .history-section');
-        document.body.classList.add('chrome-hidden');
-        await wait(60);
+        hideAppChrome();
+        await wait(240);
         const bottom = Math.round(card.getBoundingClientRect().bottom);
-        document.body.classList.remove('chrome-hidden');
-        await wait(60);
+        showAppChrome();
+        await wait(240);
         return { bottom: bottom, viewport: window.innerHeight };
     });
     ok('ពេលរបា Tab លាក់ ➜ គែមក្រោមកាតចុះជិតបាតអេក្រង់ (គ្មានចន្លោះទទេ)',
@@ -825,8 +871,12 @@ const GESTURE = function (steps) {
     // ការទាញពិតប្រាកដ ត្រូវកេះ refresh — ដាក់ចុងក្រោយព្រោះវាបង្កើត navigation ពិត
     console.log('\n=== ការទាញពិតប្រាកដ ===');
     await resetState();
-    const longPullCollapsed = await setCollapsed();
-    ok('លក្ខខណ្ឌតេស្ត long pull៖ ប្រវត្តិកំពុងពេញអេក្រង់', longPullCollapsed, longPullCollapsed);
+    const longPullNormal = await page.evaluate(() => {
+        const side = document.getElementById('dataSideSection');
+        const pages = document.getElementById('appPages');
+        return !!side && !side.classList.contains('collapsed') && !pages.classList.contains('history-expanded');
+    });
+    ok('លក្ខខណ្ឌតេស្ត long pull៖ ប្រវត្តិនៅរបៀបធម្មតា ដែលអនុញ្ញាត PTR', longPullNormal, longPullNormal);
     const preTop = await page.evaluate(() => {
         const tr = document.getElementById('tableResponsive');
         const pages = document.getElementById('appPages');
@@ -837,11 +887,11 @@ const GESTURE = function (steps) {
     const loadsBefore = await page.evaluate(() => parseInt(sessionStorage.getItem('__loads') || '0', 10));
     await page.evaluate(() => {
         sessionStorage.setItem('__simulate_ptr_restore', '1');
-        sessionStorage.setItem('__panel_opened_during_ptr', '0');
+        sessionStorage.setItem('__panel_changed_during_ptr', '0');
         const side = document.getElementById('dataSideSection');
         if (!side) return;
         new MutationObserver(() => {
-            if (!side.classList.contains('collapsed')) sessionStorage.setItem('__panel_opened_during_ptr', '1');
+            sessionStorage.setItem('__panel_changed_during_ptr', '1');
         }).observe(side, { attributes: true, attributeFilter: ['class'] });
     });
     allowReload = true;
@@ -881,7 +931,7 @@ const GESTURE = function (steps) {
             earlyTap: window.__ptrEarlyTap === true,
             reloadMarker: sessionStorage.getItem('zoew_ptr_reload_pending'),
             restorationMarker: sessionStorage.getItem('zoew_ptr_scroll_restoration'),
-            panelOpenedDuringPull: sessionStorage.getItem('__panel_opened_during_ptr'),
+            panelChangedDuringPull: sessionStorage.getItem('__panel_changed_during_ptr'),
             rowCount: document.querySelectorAll('#historyTableBody tr').length,
             readyState: document.readyState,
             pageErrors: capturedErrors,
@@ -896,7 +946,7 @@ const GESTURE = function (steps) {
             restoration: 'scrollRestoration' in history ? history.scrollRestoration : 'unsupported'
         };
         sessionStorage.removeItem('__simulate_ptr_restore');
-        sessionStorage.removeItem('__panel_opened_during_ptr');
+        sessionStorage.removeItem('__panel_changed_during_ptr');
         return out;
     }, pageErrors.slice());
     ok('ក្រោយ PTR reload ➜ ទិន្នន័យប្រវត្តិបានផ្ទុកឡើងវិញ', postRefresh.rowCount > 5, postRefresh);
@@ -917,7 +967,7 @@ const GESTURE = function (steps) {
     ok('tap ធម្មតា 100ms ក្រោយ reload ➜ មិនលុប settle timers', postRefresh.earlyTap === true, postRefresh);
     ok('settle បញ្ចប់ ➜ សម្អាត reload marker', postRefresh.reloadMarker === null, postRefresh);
     ok('settle បញ្ចប់ ➜ សម្អាត restoration marker', postRefresh.restorationMarker === null, postRefresh);
-    ok('long PTR និង touch ថ្មីមុន navigation ➜ ផ្ទាំងខាងលើមិនបើកប្រជែង', postRefresh.panelOpenedDuringPull === '0', postRefresh);
+    ok('long PTR និង touch ថ្មីមុន navigation ➜ ស្ថានភាពផ្ទាំងខាងលើមិនប្តូរប្រជែង', postRefresh.panelChangedDuringPull === '0', postRefresh);
     ok('គ្មាន JavaScript page error ក្នុង regression ទាំងមូល', postRefresh.pageErrors.length === 0, postRefresh.pageErrors);
 
 

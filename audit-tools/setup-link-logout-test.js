@@ -49,6 +49,7 @@ for (const app of ['ZoeW']) {
             localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
             hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {},
             setPhoneSearchPulledUp() {},
+            scheduleChromeLayoutSettle() {},
             closeModal() {}, openModalHelper() {}, openConfigModal() {}
         };
         ctx[stateVar] = { projectId: 'business-B' };

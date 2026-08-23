@@ -15,6 +15,7 @@
             --accent-purple: #7c3aed;
             --accent-purple-light: #ede9fe;
             --warning: #f59e0b;
+            --scan-box-h: clamp(170px, 46vw, 260px);
             --radius-xl: 16px;
             --radius-lg: 12px;
             --radius-md: 8px;
@@ -59,7 +60,6 @@
             flex-direction: column;
             overflow-x: hidden;
             font-size: 13px;
-            scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             touch-action: pan-y;
         }
@@ -72,9 +72,7 @@
         }
 
         .app-navbar {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            background: var(--card-bg);
             border-bottom: 1px solid var(--border-color);
             padding: 8px 12px;
             padding: calc(8px + env(safe-area-inset-top)) 12px 8px 12px;
@@ -101,9 +99,13 @@
         }
         .brand-info h1 { font-size: 14px; font-weight: 700; color: var(--text-main); line-height: 1.2; }
         .brand-info span { font-size: 10px; color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 4px; }
-        .status-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; box-shadow: 0 0 6px var(--success); animation: pulseDot 2s infinite; }
-        .status-dot.offline { background: #94a3b8; box-shadow: none; animation: none; }
-        @keyframes pulseDot { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); } 50% { box-shadow: 0 0 0 5px rgba(16,185,129,0); } }
+        /* ការធ្វើចលនាលើ box-shadow មិនអាច composite បានទេ ➜ របាខាងលើត្រូវ
+           គូរឡើងវិញរាល់ស៊ុម ជារៀងរហូត។ ប្តូរទៅ transform + opacity វិញ។ */
+        .status-dot { position: relative; width: 6px; height: 6px; background: var(--success); border-radius: 50%; flex-shrink: 0; }
+        .status-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--success); animation: pulseDot 2s infinite; will-change: transform, opacity; }
+        .status-dot.offline { background: #94a3b8; }
+        .status-dot.offline::after { display: none; }
+        @keyframes pulseDot { 0% { transform: scale(1); opacity: 0.5; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
 
         .nav-right-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
         .credit-tag {
@@ -153,7 +155,7 @@
             .drag-handle-bar { display: block; }
             .page-side {
                 transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: max-height, opacity;
+                will-change: opacity;
             }
             .page-side.collapsed {
                 max-height: 0;
@@ -185,6 +187,7 @@
                 display: flex;
                 flex-direction: column;
                 overflow-y: hidden;
+                padding-bottom: 8px;
             }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
@@ -195,10 +198,13 @@
                 flex: 1;
                 min-height: 0;
             }
-            /* ពេលរបា Tab លាក់ខ្លួន កន្លែងដែលវាកក់ទុកត្រូវប្រគល់មកតារាងវិញ */
-            body.chrome-hidden .app-pages.history-expanded {
-                padding-bottom: calc(8px + env(safe-area-inset-bottom));
-                transition: padding-bottom 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+            /* របា Tab អណ្ដែតលើតារាង — កន្លែងរបស់វាកក់ទុក *ខាងក្នុង* កន្សោមរមូរ
+               ដោយ ::after មិនមែនដោយ padding របស់ប្រអប់ទេ។ ដូច្នេះការលាក់/បង្ហាញ
+               របា Tab **មិនប្តូរ layout សោះ** ➜ លើ iOS បញ្ជីលែងលោតរំលងពេលរមូរ។ */
+            .app-pages.history-expanded .table-responsive::after {
+                content: '';
+                display: block;
+                height: var(--chrome-bottom, 62px);
             }
         }
 
@@ -219,7 +225,8 @@
             flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
             padding: 7px 6px; border-radius: var(--radius-md);
             font-size: 11.5px; font-weight: 700; color: var(--text-muted);
-            background: transparent; border: none; cursor: pointer; transition: all .15s ease;
+            background: transparent; border: none; cursor: pointer;
+            transition: background-color .15s ease, color .15s ease;
         }
         .page-tab .tab-ico { font-size: 17px; line-height: 1; }
         .page-tab.active { background: var(--primary-light); color: var(--primary); }
@@ -299,7 +306,8 @@
         .mode-btn {
             flex: 1; text-align: center; padding: 9px 6px; border-radius: var(--radius-md);
             font-size: 12px; font-weight: 700; color: var(--text-muted);
-            background: transparent; border: none; cursor: pointer; transition: all .15s ease;
+            background: transparent; border: none; cursor: pointer;
+            transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
         }
         .mode-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: var(--shadow-sm); }
 
@@ -320,7 +328,8 @@
         .locker-cell {
             aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
             background: #f8fafc; border: 1.5px solid var(--border-color); border-radius: var(--radius-md);
-            font-weight: 700; font-size: 12.5px; color: var(--text-main); transition: all .12s ease; cursor: pointer;
+            font-weight: 700; font-size: 12.5px; color: var(--text-main); cursor: pointer;
+            transition: transform .12s ease, background-color .12s ease, border-color .12s ease, color .12s ease;
         }
         .locker-cell:active { transform: scale(0.94); background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
         .locker-cell.current { background: var(--primary); border-color: var(--primary); color: #fff; }
@@ -408,28 +417,29 @@
         }
 
         @media (max-width: 991px) {
+            /* របាខាងលើ **មិនលាក់តាមការរមូរទេ** (សំណើអ្នកប្រើ) — មានតែរបា Tab
+               ខាងក្រោមប៉ុណ្ណោះដែលលាក់។ ដូច្នេះគ្មាន transform, គ្មាន transition
+               និងគ្មាន compositing layer អចិន្ត្រៃយ៍លើវាទេ។ */
             .app-navbar {
                 position: fixed;
                 top: 0;
                 left: 0;
                 right: 0;
                 width: 100%;
-                transform: translateY(0);
-                transition: transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
-                will-change: transform;
             }
             .app-pages { padding-top: calc(var(--chrome-top, 56px) + 8px); }
             .page-tabbar {
-                transform: translateY(0);
+                transform: translate3d(0, 0, 0);
                 transition: transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
                 will-change: transform;
+                backface-visibility: hidden;
+                -webkit-backface-visibility: hidden;
             }
-            body.chrome-hidden .app-navbar { transform: translateY(-100%); }
-            body.chrome-hidden .page-tabbar { transform: translateY(100%); }
+            body.chrome-hidden .page-tabbar { transform: translate3d(0, 100%, 0); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .app-navbar, .page-tabbar { transition: none; }
+            .page-tabbar { transition: none; }
         }
 
         .ptr-indicator {
@@ -478,7 +488,7 @@
         @media (prefers-reduced-motion: reduce) {
             .app-card, .modal, .modal-content { animation: none !important; }
             button, .btn-sm, .date-filter-btn { transition: none !important; }
-            .status-dot { animation: none !important; }
+            .status-dot::after, .scan-line, .call-btn-recall { animation: none !important; }
         }
 
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px; }
@@ -539,7 +549,8 @@
         .date-filter-btn {
             background: #fff; border: 1px solid var(--border-color); padding: 6px 2px;
             border-radius: var(--radius-md); font-size: 10px; font-weight: 600;
-            color: var(--text-main); cursor: pointer; transition: all 0.2s; text-align: center;
+            color: var(--text-main); cursor: pointer; text-align: center;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
             min-width: 0;
             white-space: nowrap;
             overflow: hidden;
@@ -613,10 +624,12 @@
 
         #permission-box { background: #fffbe3; color: #b45309; padding: 6px; border-radius: var(--radius-md); border: 1px solid #fef3c7; text-align: center; font-size: 10px; margin-bottom: 6px; }
         #permission-box button { background-color: var(--primary); color: white; border: none; padding: 4px 10px; font-size: 10px; border-radius: var(--radius-md); cursor: pointer; font-weight: 600; margin-top: 4px; }
-        #video-container { width: 100%; height: clamp(170px, 46vw, 260px); margin-bottom: 6px; border-radius: var(--radius-md); overflow: hidden; background: #000; position: relative; display: none; }
+        #video-container { width: 100%; height: var(--scan-box-h); margin-bottom: 6px; border-radius: var(--radius-md); overflow: hidden; background: #000; position: relative; display: none; }
         video { width: 100%; height: 100%; object-fit: cover; }
-        .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--primary); animation: scan 1.5s infinite linear; }
-        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+        /* ការធ្វើចលនាលើ `top` បង្កើត layout ឡើងវិញរាល់ស៊ុម — ចំពេលកាមេរ៉ាកំពុង
+           ឌិកូដ។ `transform` ដើរលើ GPU ទាំងស្រុង ➜ ស្កេនរលូនជាងមុនលើ iPhone។ */
+        .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--primary); animation: scan 1.5s infinite linear; will-change: transform; }
+        @keyframes scan { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(0, calc(var(--scan-box-h) - 2px), 0); } }
         .video-controls-overlay { position: absolute; bottom: 6px; left: 6px; right: 6px; display: none; align-items: center; gap: 8px; z-index: 2; }
         .zoom-slider-wrap { flex: 1; display: none; align-items: center; gap: 6px; background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 999px; }
         .zoom-slider-wrap span { color: #fff; font-size: 11px; }
@@ -669,7 +682,7 @@
             background: #fff; 
             -webkit-overflow-scrolling: touch; 
             position: relative;
-            scroll-behavior: smooth;
+            overscroll-behavior-y: contain;
         }
         
         table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; }
@@ -705,7 +718,7 @@
         .called-btn { background-color: #94a3b8; color: white; }
         .fix-phone-btn { background-color: #6d28d9; color: white; }
         .close-btn { background-color: var(--primary); color: white; }
-        .call-btn-recall { animation: callRecallBlink 1s ease-in-out infinite; }
+        .call-btn-recall { animation: callRecallBlink 1s ease-in-out infinite; transform: translateZ(0); }
         @keyframes callRecallBlink { 0%, 100% { background-color: var(--success); } 50% { background-color: #ef4444; } }
 
         .more-dropdown { position: relative; display: inline-block; }
@@ -741,7 +754,13 @@
         
         .header-more-btn { background-color: #f1f5f9; color: var(--text-main); font-size: 12px; padding: 2px 8px; border-radius: var(--radius-md); border: 1px solid var(--border-color); cursor: pointer; font-weight: bold; }
 
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; padding: 12px; animation: modalFadeIn 0.18s ease; }
+        /* គ្មាន backdrop blur លើទូរស័ព្ទ — iOS គណនា blur ឡើងវិញរាល់ស៊ុមនៃ
+           animation បើកប្រអប់ ហើយប្រអប់លេខទូរស័ព្ទបើករាល់ការស្កេន។
+           ផ្ទៃខ្មៅ ៦០% បំបែកប្រអប់ចេញគ្រប់គ្រាន់ស្រាប់។ */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(15, 23, 42, 0.6); justify-content: center; align-items: center; padding: 12px; animation: modalFadeIn 0.18s ease; }
+        @media (min-width: 992px) {
+            .modal { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        }
         .modal-content { background-color: white; padding: 16px; border-radius: var(--radius-lg); width: 100%; max-width: 340px; text-align: center; box-shadow: var(--shadow-lg); max-height: 85vh; overflow-y: auto; color: var(--text-main); animation: modalPopIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); }
         #phoneModal .modal-content { position: relative; }
         .modal-close-x { position: absolute; top: 8px; right: 8px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color); background: #f1f5f9; color: var(--text-muted); font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }

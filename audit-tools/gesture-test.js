@@ -295,7 +295,22 @@ const GESTURE = function (steps) {
     await scrollTo(0);
     const scrollWorks = await scrollTo(60);
     ok('ការកំណត់ scrollTop ក្នុងតេស្តដំណើរការពិត (មិនមែន smooth)', scrollWorks === 60, scrollWorks);
-    ok('រមូរចុះ ➜ លាក់របាទាំង ២', await hidden() === true);
+    ok('រមូរចុះ ➜ លាក់របា Tab', await hidden() === true);
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 340)));
+    const barsWhileHidden = await page.evaluate(() => {
+        const nav = document.querySelector('.app-navbar');
+        const tab = document.getElementById('pageTabBar');
+        return {
+            navBottom: Math.round(nav.getBoundingClientRect().bottom),
+            navTop: Math.round(nav.getBoundingClientRect().top),
+            tabTop: Math.round(tab.getBoundingClientRect().top),
+            viewportH: window.innerHeight
+        };
+    });
+    ok('របាខាងលើ **មិនលាក់ទេ** ពេលរមូរចុះ (សំណើអ្នកប្រើ)',
+        barsWhileHidden.navTop === 0 && barsWhileHidden.navBottom > 0, barsWhileHidden);
+    ok('របា Tab ខាងក្រោមរអិលចេញផុតអេក្រង់',
+        barsWhileHidden.tabTop >= barsWhileHidden.viewportH - 1, barsWhileHidden);
     await scrollTo(20);
     ok('រមូរឡើង ➜ បង្ហាញវិញ', await hidden() === false);
     await scrollTo(200); await scrollTo(400);
@@ -318,6 +333,85 @@ const GESTURE = function (steps) {
     const padTop = await page.evaluate(() => parseFloat(window.getComputedStyle(document.getElementById('appPages')).paddingTop));
     const navH = await page.evaluate(() => document.querySelector('.app-navbar').offsetHeight);
     ok('#appPages មាន padding-top ធំជាងកម្ពស់ navbar (មិនត្រូវជាន់គ្នា)', padTop >= navH, { padTop, navH });
+
+    // === iOS៖ ការលាក់របា មិនត្រូវប្តូរ layout របស់ប្រអប់រមូរទេ ===
+    // អ្នកប្រើរាយការណ៍ «រំលង list លឿនជ្រុល» លើ iOS។ ឫសគល់៖ ពេលរបា Tab លាក់
+    // កូដចាស់បង្រួម padding-bottom របស់ #appPages ដោយ transition ➜ កម្ពស់
+    // ប្រអប់រមូរប្តូរ *ចំពេល* momentum scroll របស់ WebKit កំពុងដើរ ➜ បញ្ជីលោត។
+    console.log('\n=== ការលាក់របា មិនប៉ះ layout (iOS) ===');
+    await resetState();
+    await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
+    const noReflow = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const table = document.getElementById('tableResponsive');
+        const pages = document.getElementById('appPages');
+        document.body.classList.remove('chrome-hidden');
+        await wait(340);
+        const shown = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                        pad: window.getComputedStyle(pages).paddingBottom };
+        document.body.classList.add('chrome-hidden');
+        await wait(340);
+        const away = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                       pad: window.getComputedStyle(pages).paddingBottom };
+        document.body.classList.remove('chrome-hidden');
+        await wait(340);
+        return { shown: shown, away: away, expanded: pages.classList.contains('history-expanded') };
+    });
+    ok('នៅក្នុងរបៀបប្រវត្តិពេញអេក្រង់ពិត (លក្ខខណ្ឌចាំបាច់)', noReflow.expanded === true, noReflow);
+    ok('លាក់របា ➜ កម្ពស់ប្រអប់រមូរមិនប្តូរ (បញ្ជីលែងលោតរំលងលើ iOS)',
+        noReflow.shown.h === noReflow.away.h, noReflow);
+    ok('លាក់របា ➜ padding-bottom របស់ #appPages មិនប្តូរ (គ្មាន transition លើ layout)',
+        noReflow.shown.pad === noReflow.away.pad, noReflow);
+    ok('លាក់របា ➜ ទីតាំងកំពូលតារាងមិនប្តូរ', noReflow.shown.top === noReflow.away.top, noReflow);
+
+    // កន្លែងរបស់របា Tab ត្រូវកក់ទុក *ខាងក្នុង* ប្រអប់រមូរ ដើម្បីឲ្យជួរចុងក្រោយ
+    // រមូរផុតពីរបាបាន — បើគ្មាន ជួរចុងក្រោយត្រូវរបា Tab បាំងជានិច្ច
+    const bottomRoom = await page.evaluate(() => {
+        const table = document.getElementById('tableResponsive');
+        const inner = table.querySelector('table');
+        const tabbar = document.getElementById('pageTabBar');
+        return {
+            spacer: Math.round(table.scrollHeight - inner.getBoundingClientRect().height),
+            tabbarH: Math.round(tabbar.getBoundingClientRect().height),
+            chromeBottom: window.getComputedStyle(document.documentElement).getPropertyValue('--chrome-bottom').trim()
+        };
+    });
+    ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
+    ok('ជួរចុងក្រោយរមូរផុតពីរបា Tab បាន (កន្លែងកក់ខាងក្នុងប្រអប់រមូរ)',
+        bottomRoom.spacer >= bottomRoom.tabbarH - 3, bottomRoom);
+
+    await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
+
+    // === ស្ថេរភាព៖ momentum របស់ iOS បញ្ចេញ delta ធំៗ និងបញ្ច្រាសទិសបន្តិចបន្តួច ===
+    // ពិដានបង្ហាញទាបពេក ➜ របាភ្លឹបភ្លែតឡើងចុះ ➜ «អត់ smooth ដូច android»
+    console.log('\n=== ស្ថេរភាពការលាក់របា (ប្រឆាំងការភ្លឹបភ្លែត) ===');
+    await resetState();
+    await page.evaluate(() => { window.hideAppChrome(); window.showAppChrome(); });
+    await scrollTo(0);
+    const at300 = await scrollTo(300);
+    const at600 = await scrollTo(600);
+    ok('អាចរមូរដល់ 600px ពិត (លក្ខខណ្ឌចាំបាច់)', at300 === 300 && at600 === 600, { at300, at600 });
+    ok('រមូរចុះឆ្ងាយ ➜ លាក់របា', await hidden() === true);
+    await scrollTo(580);
+    ok('រញ្ជួយឡើង 20px ➜ នៅតែលាក់ (មិនភ្លឹបភ្លែត)', await hidden() === true);
+    await scrollTo(570);
+    ok('រញ្ជួយឡើងបន្តទៀត (សរុប 30px) ➜ នៅតែលាក់', await hidden() === true);
+    await scrollTo(500);
+    ok('រមូរឡើងពិតប្រាកដ (>48px) ➜ បង្ហាញវិញ', await hidden() === false);
+
+    const cssSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
+    ok('.table-responsive គ្មាន scroll-behavior: smooth (WebKit អនុវត្តវាលើ momentum ➜ លោតរំលង)',
+        !/\.table-responsive\s*\{[^}]*scroll-behavior:\s*smooth/.test(cssSrc));
+    ok('body គ្មាន scroll-behavior: smooth',
+        !/\bbody\s*\{[^}]*scroll-behavior:\s*smooth/.test(cssSrc));
+    ok('.app-navbar គ្មាន backdrop-filter (iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល)',
+        !/\.app-navbar\s*\{[^}]*backdrop-filter/.test(cssSrc));
+    ok('របា Tab ប្រើ translate3d (បង្ខំឲ្យរំកិលលើ GPU)',
+        /body\.chrome-hidden \.page-tabbar \{ transform: translate3d\(0, 100%, 0\); \}/.test(cssSrc));
+    ok('គ្មានច្បាប់ណាលាក់របាខាងលើទេ (.app-navbar មិនត្រូវ translate)',
+        !/body\.chrome-hidden \.app-navbar/.test(cssSrc));
 
     // ការទាញពិតប្រាកដ ត្រូវកេះ refresh — ដាក់ចុងក្រោយព្រោះវាបង្កើត navigation ពិត
     console.log('\n=== ការទាញពិតប្រាកដ ===');

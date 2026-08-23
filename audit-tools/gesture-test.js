@@ -478,51 +478,60 @@ const GESTURE = function (steps) {
         !!hzBand && hzBand[-5] === 10 && hzBand[0] === 10 && hzBand[9] === 10 &&
         hzBand[121] === 120 && hzBand[240] === 120, hzBand);
 
-    // === safe-area ត្រូវរាប់ **តែម្ដង** (ថ្នាក់កំហុសដែលលេចតែលើ iPhone) ===
-    // របា Tab កក់ safe-area ដោយខ្លួនវា ហើយ `--chrome-bottom` វាស់ `offsetHeight`
-    // ពិត ➜ រាប់រួច។ បើ body ត្រូវធ្វើឲ្យវែងជាងអេក្រង់តាម inset ម្ដងទៀត នោះ
-    // បាតកាតធ្លាក់ក្រោមគែមអេក្រង់ ➜ កាតលិចចូលក្រោមរបា Tab។ លើ Android inset = 0
-    // ដូច្នេះកំហុសនេះ **មើលមិនឃើញលើ Android** — នេះជាមូលហេតុដែលវារត់រួច។
-    console.log('\n=== safe-area រាប់តែម្ដង (iPhone) ===');
+    // === --chrome-bottom ត្រូវវាស់ជា *ចម្ងាយពីបាត body ដល់កំពូលរបា Tab* ===
+    // `.app-pages` កក់កន្លែងរបា Tab ជា padding គិតពី **បាត body**។ លើ Android
+    // បាត body = បាត viewport ➜ ចម្ងាយនោះ = `offsetHeight` របស់របា។ តែក្នុង
+    // របៀប standalone លើ iOS, CSS ធ្វើឲ្យ body វែងជាង viewport តាម
+    // `env(safe-area-inset-bottom)` (ដើម្បីគ្របអេក្រង់) ➜ ចម្ងាយនោះធំជាង
+    // `offsetHeight` តាមចំនួន inset។ ការវាស់ជា `offsetHeight` ➜ កក់ខ្វះ ➜
+    // **របា Tab បាំងគែមកាតលើ iPhone** (Android មិនប៉ះ ព្រោះ inset = 0)។
+    console.log('\n=== --chrome-bottom វាស់តាមបាត body (កំហុស iPhone) ===');
     await resetState();
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
-    const insetProbe = await page.evaluate(async () => {
+    const measure = await page.evaluate(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        const card = document.querySelector('#dataMainSection .history-section');
         const tabbar = document.getElementById('pageTabBar');
+        const card = document.querySelector('#dataMainSection .history-section');
         const read = () => ({
+            chromeBottom: Math.round(parseFloat(
+                getComputedStyle(document.documentElement).getPropertyValue('--chrome-bottom'))),
+            barH: Math.round(tabbar.offsetHeight),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
-            tabbarTop: Math.round(tabbar.getBoundingClientRect().top)
+            barTop: Math.round(tabbar.getBoundingClientRect().top)
         });
-        const normal = read();
-        // ធ្វើត្រាប់តាម iPhone standalone៖ inset ក្រោម ៣៤px ត្រូវបូកចូលកម្ពស់ body
+        window.measureAppChromeSize();
+        await wait(120);
+        const flat = read();
+        // ធ្វើត្រាប់តាម iOS standalone៖ body វែងជាង viewport ៣៤px
         const st = document.createElement('style');
-        st.id = '__insetSim';
         st.textContent = 'html, body { min-height: calc(100dvh + 34px) !important; }';
         document.head.appendChild(st);
-        await wait(200);
-        const simulated = read();
+        await wait(120);
+        window.measureAppChromeSize();
+        await wait(160);
+        const inset = read();
         st.remove();
-        await wait(200);
-        return { normal: normal, simulated: simulated };
+        await wait(120);
+        window.measureAppChromeSize();
+        return { flat: flat, inset: inset };
     });
-    console.log('    ធម្មតា (Android, inset 0) ៖ គែមកាត ' + insetProbe.normal.cardBottom +
-                ' · កំពូលរបា ' + insetProbe.normal.tabbarTop);
-    console.log('    បូក inset ៣៤px ម្ដងទៀត   ៖ គែមកាត ' + insetProbe.simulated.cardBottom +
-                ' · កំពូលរបា ' + insetProbe.simulated.tabbarTop);
-    ok('inset 0 (Android) ➜ គែមកាតឈរខាងលើរបា Tab',
-        insetProbe.normal.cardBottom <= insetProbe.normal.tabbarTop + 1, insetProbe);
-    ok('ភស្តុតាងនៃយន្តការ៖ បូក inset ចូលកម្ពស់ body ម្ដងទៀត ➜ កាតលិចចូលក្រោមរបា',
-        insetProbe.simulated.cardBottom > insetProbe.simulated.tabbarTop + 1, insetProbe);
+    console.log('    inset 0 (Android) ៖ --chrome-bottom ' + measure.flat.chromeBottom +
+                ' · កម្ពស់របា ' + measure.flat.barH);
+    console.log('    inset ៣៤px (iPhone)៖ --chrome-bottom ' + measure.inset.chromeBottom +
+                ' · កម្ពស់របា ' + measure.inset.barH);
+    ok('inset 0 ➜ --chrome-bottom = កម្ពស់របា (Android មិនប្រែសោះ)',
+        Math.abs(measure.flat.chromeBottom - measure.flat.barH) <= 1, measure.flat);
+    ok('body វែងជាង viewport ៣៤px ➜ --chrome-bottom បូក inset ដោយស្វ័យប្រវត្តិ',
+        measure.inset.chromeBottom >= measure.inset.barH + 33, measure.inset);
+    ok('inset 0 ➜ គែមកាតឈរខាងលើរបា Tab',
+        measure.flat.cardBottom <= measure.flat.barTop + 1, measure.flat);
+    ok('**inset ៣៤px ➜ គែមកាតនៅតែឈរខាងលើរបា Tab** (កំហុស iPhone ត្រូវកែ)',
+        measure.inset.cardBottom <= measure.inset.barTop + 1, measure.inset);
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
 
     const cssSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
-    ok('style.css មិនបូក env(safe-area-inset-bottom) ចូលកម្ពស់ body ទេ (កំហុស iOS)',
-        !/(?:html,\s*body|body)\s*\{[^}]*min-height:\s*calc\([^)]*safe-area-inset-bottom/.test(cssSrc));
-    ok('គ្មានប្លុក @media (display-mode: standalone) ដែលពង្រីកកម្ពស់ body',
-        !/@media \(display-mode: standalone\)\s*\{\s*html, body \{[^}]*safe-area-inset-bottom/.test(cssSrc));
     ok('.table-responsive គ្មាន scroll-behavior: smooth (WebKit អនុវត្តវាលើ momentum ➜ លោតរំលង)',
         !/\.table-responsive\s*\{[^}]*scroll-behavior:\s*smooth/.test(cssSrc));
     ok('body គ្មាន scroll-behavior: smooth',

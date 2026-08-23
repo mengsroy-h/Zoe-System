@@ -258,6 +258,8 @@ const GESTURE = function (steps) {
 
     console.log('\n=== pull-to-refresh (ZoeW, iOS PWA) ===');
     ok('indicator ត្រូវបានបង្កើត', await page.evaluate(() => !!document.querySelector('.ptr-indicator')));
+    ok('របៀបធម្មតា ➜ non-passive listener ត្រៀមមុន touchstart ដើម្បីឲ្យ Safari អនុញ្ញាត PTR',
+        await page.evaluate(() => window.__blockingTouchMoveCount()) === 1);
 
     const runGesture = async (steps) => {
         const out = await page.evaluate('(' + GESTURE.toString() + ')(' + JSON.stringify(steps) + ')');
@@ -309,8 +311,8 @@ const GESTURE = function (steps) {
     const ordinary = await runGesture({ selector: '#appPages', x: 200, startY: 300, points: [{ y: 312 }, { y: 326 }, { y: 338 }, { y: 348 }] });
     ok('អូសធម្មតា 48px ➜ ចាប់អ័ក្សដើម្បីទប់ native refresh តែមិនកេះ refresh', ordinary.prevented > 0 && !ordinary.reloaded, ordinary);
     ok('អូសធម្មតា 48px ➜ indicator PTR នៅលាក់ដដែល', ordinary.maxIndicatorOpacity === 0, ordinary);
-    ok('PTR ដំឡើង non-passive touchmove តែពេល gesture មានសិទ្ធិ ហើយដកចេញក្រោយ touchend',
-        ordinary.blockingAfterStart === 1 && ordinary.blockingAfterEnd === 0, ordinary);
+    ok('PTR listener ត្រៀមមុន touchstart និងនៅត្រៀមសម្រាប់ gesture បន្ទាប់ក្នុងរបៀបធម្មតា',
+        ordinary.blockingAfterStart === 1 && ordinary.blockingAfterEnd === 1, ordinary);
 
     // អូសមធ្យម៖ ចាប់កាយវិការ តែ indicator មិនត្រូវលេចពេញមុនជិតកម្រិត refresh
     await resetState();
@@ -341,8 +343,8 @@ const GESTURE = function (steps) {
     const nested = await runGesture({ selector: '#tableResponsive', x: 200, startY: 500, points: [{ y: 540 }, { y: 590 }, { y: 650 }, { y: 700 }] });
     ok('តារាងខាងក្នុងរមូរចុះរួច ➜ PTR មិនដណ្ដើម gesture និងមិនកេះ refresh',
         nested.prevented === 0 && nested.reloaded === false, nested);
-    ok('ការរមូរតារាងធម្មតា ➜ គ្មាន non-passive document touchmove រារាំង compositor',
-        nested.blockingAfterStart === 0 && nested.blockingAfterEnd === 0, nested);
+    ok('តារាងមិននៅកំពូល ➜ PTR listener មិន preventDefault ហើយនៅត្រៀមសម្រាប់ Safari',
+        nested.prevented === 0 && nested.blockingAfterStart === 1 && nested.blockingAfterEnd === 1, nested);
 
     // ៦) ប្រអប់បើក ➜ គ្មាន pull
     await resetState();
@@ -395,7 +397,7 @@ const GESTURE = function (steps) {
     const longPanelAfter = await panelState();
     ok('អូសវែងដល់កម្រិត refresh លើតារាងពេញអេក្រង់ ➜ គ្មាន PTR/indicator ហើយបើកផ្ទាំងធម្មតា',
         longPanelPull.prevented === 0 && longPanelPull.maxIndicatorOpacity === 0 && !longPanelPull.reloaded &&
-        longPanelPull.blockingAfterStart === 0 && longPanelPull.blockingAfterEnd === 0 &&
+        longPanelPull.blockingAfterStart === 0 && longPanelPull.blockingAfterEnd === 1 &&
         !longPanelAfter.collapsed && !longPanelAfter.expandedLock,
         { gesture: longPanelPull, state: longPanelAfter });
 

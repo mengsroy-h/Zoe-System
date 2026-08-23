@@ -217,8 +217,9 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
 - ពេល active panel មាន `.collapsed`/`.search-focus` ឬ `#appPages.history-expanded`, PTR
   ត្រូវបិទទាំងស្រុង៖ គ្មាន indicator, `preventDefault`, reload ឬ document-level
   non-passive `touchmove`។ ការទាញចុះជាកម្មសិទ្ធិរបស់ panel ដើម្បីបើកផ្ទាំងវិញ។
-  Non-passive listener របស់ PTR ត្រូវដំឡើងតែក្រោយ touchstart ដែលមានសិទ្ធិ ហើយដកចេញ
-  គ្រប់ផ្លូវ touchend/cancel/multitouch/visibility/park ដើម្បីឲ្យ iOS scroll នៅ compositor។
+  Safari កំណត់ cancelability មុន `touchstart` ចប់ ដូច្នេះ non-passive listener របស់ PTR
+  ត្រូវត្រៀមជាមុននៅ state ធម្មតា ហើយដកចេញតាម `MutationObserver` ពេល panel ចូល
+  `.collapsed`/`.search-focus`/`history-expanded`; កុំដំឡើងវាក្រោយ touchstart។
 - `iosTouchArbiter` ត្រូវប្រើ `Touch.identifier` និងចែក ownership៖ 0–30px គ្មាន action;
   លើ full-screen/search state ការទាញចុះបញ្ឈរជា panel action គ្រប់ចម្ងាយ; លើ state ធម្មតា
   ប្រហែល 56–212px PTR spring back ហើយចាប់ពី ~213px ទើប refresh។ បន្ថែម

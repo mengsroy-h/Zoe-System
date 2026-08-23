@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.3';
+    const APP_VERSION = '2.8.4';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3264,7 +3264,6 @@
         }
 
         function park(resetArbiter) {
-            detachPullMoveListener();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -3336,6 +3335,11 @@
             if (!pullMoveListening) return;
             document.removeEventListener('touchmove', onPullTouchMove);
             pullMoveListening = false;
+        }
+
+        function syncPullMoveListener() {
+            if (pullRefreshDisabledByPanelState()) detachPullMoveListener();
+            else attachPullMoveListener();
         }
 
         function markReload() {
@@ -3433,7 +3437,6 @@
         }
 
         document.addEventListener('touchstart', (e) => {
-            detachPullMoveListener();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -3458,7 +3461,6 @@
             tracking = true;
             iosTouchArbiter.phase = 'tracking';
             indicator.classList.remove('snapping');
-            attachPullMoveListener();
         }, { passive: true });
 
         function onPullTouchMove(e) {
@@ -3508,10 +3510,7 @@
         document.addEventListener('touchend', (e) => {
             const endedTouchId = touchId;
             if (endedTouchId === null) {
-                if (e.touches.length === 0) {
-                    detachPullMoveListener();
-                    resetIOSTouchArbiter();
-                }
+                if (e.touches.length === 0) resetIOSTouchArbiter();
                 return;
             }
             if (e.touches.length !== 0) {
@@ -3537,7 +3536,6 @@
             if (travel >= TRIGGER_AT) {
                 refreshing = true;
                 blockPanelForIOSTouch('refreshing');
-                detachPullMoveListener();
                 touchId = null;
                 startScroller = null;
                 startActiveScroller = null;
@@ -3583,7 +3581,14 @@
             reloadWatchdog = null;
         });
 
+        const pullAvailabilityObserver = new MutationObserver(syncPullMoveListener);
+        [pages, document.getElementById('dataSideSection'), document.getElementById('entrySideSection'),
+         document.getElementById('pageData'), document.getElementById('pageEntry')].forEach((el) => {
+            if (el) pullAvailabilityObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
+        });
+
         park();
+        syncPullMoveListener();
         indicator.classList.remove('snapping');
     }
 

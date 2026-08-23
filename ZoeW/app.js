@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.2.1';
+    const APP_VERSION = '2.3.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -89,6 +89,9 @@
 
     let codeReader = null;
     let liveScanCodeReader = null;
+    let fastScanCodeReader = null;
+    let fastScanFormatName = '';
+    let lastDecodedFormatName = '';
     let currentStream = null;
     let isCameraScanning = false;
     let isCameraStarting = false;
@@ -2250,10 +2253,6 @@
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
-    function isIOSDevice() {
-        return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    }
-
     function safeFocusScanner() {
         if (!isModalOpen && !isMobileDevice()) {
             const activeEl = document.activeElement;
@@ -3598,12 +3597,9 @@
                 const beginScanning = () => {
                     if (!currentStream) return;
                     videoElement.play().catch(() => {});
-                    if (nativeDetector && isIOSDevice()) {
+                    if (nativeDetector) {
                         startFastNativeScan(videoElement);
-                        startZxingVideoScan(videoElement);
-                    } else if (nativeDetector) {
-                        startFastNativeScan(videoElement);
-                    } else if (codeReader) {
+                    } else if (fastScanCodeReader || liveScanCodeReader) {
                         startZxingVideoScan(videoElement);
                     }
                 };
@@ -3711,11 +3707,13 @@
         nativeLoopActive = true;
         const container = document.getElementById('video-container');
         let lastCheck = 0;
+        let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
         async function renderLoop(timestamp) {
             if (!currentStream || !isCameraScanning || !nativeLoopActive) return;
-            if (timestamp - lastCheck > 250) {
-                lastCheck = timestamp;
+            if (timestamp - lastCheck > nextDelay) {
                 if (!isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
+                    lastCheck = timestamp;
+                    const startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
                     try {
                         const crop = getCoverCropRect(videoElement, container);
                         const bitmap = await createImageBitmap(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight);
@@ -3727,7 +3725,11 @@
                         } finally {
                             bitmap.close();
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                    } finally {
+                        const now = (window.performance && performance.now) ? performance.now() : Date.now();
+                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round((now - startedAt) * 1.6)));
+                    }
                 }
             }
             if (currentStream && isCameraScanning && nativeLoopActive) {
@@ -3739,29 +3741,75 @@
 
     let ownCaptureCanvas = null;
     let ownCaptureCtx = null;
+    const ONE_D_FORMAT_NAMES = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
+    const DEFAULT_FAST_SCAN_FORMAT = 'CODE_128';
+    const LIVE_SCAN_MAX_DIM = 640;
+    const LIVE_SCAN_MIN_INTERVAL_MS = 60;
+    const LIVE_SCAN_MAX_INTERVAL_MS = 220;
+    const LIVE_FULL_SWEEP_EVERY = 4;
+
+    function buildOneDReader(formatNames, tryHarder) {
+        const formats = formatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
+        if (!formats.length) return null;
+        const hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        if (tryHarder) hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+        return new ZXing.BrowserBarcodeReader(500, hints);
+    }
+
     function initScanEngine() {
         try {
-            const oneDFormatNames = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
-            const possibleFormats = oneDFormatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
-            const hints = new Map();
-            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
-            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-            codeReader = new ZXing.BrowserBarcodeReader(500, hints);
-            const liveHints = new Map();
-            liveHints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, possibleFormats);
-            liveScanCodeReader = new ZXing.BrowserBarcodeReader(500, liveHints);
+            codeReader = buildOneDReader(ONE_D_FORMAT_NAMES, true);
+            liveScanCodeReader = buildOneDReader(ONE_D_FORMAT_NAMES, false);
+            fastScanFormatName = DEFAULT_FAST_SCAN_FORMAT;
+            fastScanCodeReader = buildOneDReader([fastScanFormatName], false);
         } catch (e) {
             console.error("ZXing Initialization error: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "ZXing Initialization error: " });
         }
     }
 
+    function syncFastScanFormat() {
+        if (!lastDecodedFormatName || lastDecodedFormatName === fastScanFormatName) return;
+        if (ONE_D_FORMAT_NAMES.indexOf(lastDecodedFormatName) === -1) return;
+        try {
+            const rebuilt = buildOneDReader([lastDecodedFormatName], false);
+            if (!rebuilt) return;
+            fastScanCodeReader = rebuilt;
+            fastScanFormatName = lastDecodedFormatName;
+        } catch (e) {}
+    }
+
     function decodeBarcodeFromCanvasManual(reader, canvas) {
         const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
         const binarizer = new ZXing.HybridBinarizer(luminanceSource);
         const bitmap = new ZXing.BinaryBitmap(binarizer);
-        const result = reader.decodeBitmap(bitmap);
-        return result && (result.text || (typeof result.getText === 'function' ? result.getText() : ''));
+        return readResultText(reader.decodeBitmap(bitmap));
+    }
+
+    function readResultText(result) {
+        if (!result) return '';
+        try {
+            const format = typeof result.getBarcodeFormat === 'function' ? result.getBarcodeFormat() : result.format;
+            const name = ZXing.BarcodeFormat[format];
+            if (typeof name === 'string') lastDecodedFormatName = name;
+        } catch (e) {}
+        return result.text || (typeof result.getText === 'function' ? result.getText() : '');
+    }
+
+    function decodeLiveFrame(canvas, includeFullSweep) {
+        const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+        const binarizer = new ZXing.HybridBinarizer(luminanceSource);
+        const bitmap = new ZXing.BinaryBitmap(binarizer);
+        const readers = includeFullSweep ? [fastScanCodeReader, liveScanCodeReader] : [fastScanCodeReader];
+        for (let i = 0; i < readers.length; i++) {
+            if (!readers[i]) continue;
+            try {
+                const text = readResultText(readers[i].decodeBitmap(bitmap));
+                if (text) return text;
+            } catch (e) {}
+        }
+        return '';
     }
 
     function startZxingVideoScan(videoElement) {
@@ -3774,27 +3822,35 @@
         }
 
         let lastCheck = 0;
-        let decoding = false;
+        let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
+        let sweepCounter = 0;
         function loop(timestamp) {
             if (!currentStream || !isCameraScanning || !zxingLoopActive) return;
-            if (!decoding && timestamp - lastCheck > 130) {
+            if (timestamp - lastCheck > nextDelay) {
                 if (!isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
                     lastCheck = timestamp;
-                    decoding = true;
+                    const startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
 
                     try {
                         const crop = getCoverCropRect(videoElement, container);
-                        const maxDim = 800;
-                        const scale = crop.sWidth > maxDim ? maxDim / crop.sWidth : 1;
-                        ownCaptureCanvas.width = Math.round(crop.sWidth * scale);
-                        ownCaptureCanvas.height = Math.round(crop.sHeight * scale);
-                        ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, ownCaptureCanvas.width, ownCaptureCanvas.height);
+                        const scale = crop.sWidth > LIVE_SCAN_MAX_DIM ? LIVE_SCAN_MAX_DIM / crop.sWidth : 1;
+                        const targetWidth = Math.max(1, Math.round(crop.sWidth * scale));
+                        const targetHeight = Math.max(1, Math.round(crop.sHeight * scale));
+                        if (ownCaptureCanvas.width !== targetWidth) ownCaptureCanvas.width = targetWidth;
+                        if (ownCaptureCanvas.height !== targetHeight) ownCaptureCanvas.height = targetHeight;
+                        ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, targetWidth, targetHeight);
 
-                        const text = liveScanCodeReader ? decodeBarcodeFromCanvasManual(liveScanCodeReader, ownCaptureCanvas) : '';
-                        if (text && !isModalOpen) processScannedCode(text);
+                        sweepCounter++;
+                        const text = decodeLiveFrame(ownCaptureCanvas, sweepCounter % LIVE_FULL_SWEEP_EVERY === 0);
+                        if (text && !isModalOpen) {
+                            syncFastScanFormat();
+                            processScannedCode(text);
+                        }
                     } catch (e) {
                     } finally {
-                        decoding = false;
+                        const now = (window.performance && performance.now) ? performance.now() : Date.now();
+                        const spent = now - startedAt;
+                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(spent * 1.6)));
                     }
                 }
             }

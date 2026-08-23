@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.0';
+    const APP_VERSION = '2.8.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2807,22 +2807,29 @@
         pages.classList.toggle('history-expanded', !!side && side.classList.contains('collapsed'));
     }
 
-    const HANDLE_DRAG_THRESHOLD = 24;
-
     function setupSwipeGestures() {
         bindPanelSwipe({
             sideId: 'dataSideSection',
             mainId: 'dataMainSection',
             handleId: 'dragHandle',
-            scroller: () => document.getElementById('tableResponsive')
+            scroller: () => document.getElementById('tableResponsive'),
+            blockCollapse: phoneSearchIsActive
         });
         bindPanelSwipe({
             sideId: 'entrySideSection',
             mainId: 'entryMainSection',
             handleId: 'entryDragHandle',
-            scroller: entryScrollerInView
+            scroller: entryScrollerInView,
+            blockCollapse: () => false
         });
         syncHistoryExpandedLock();
+    }
+
+    function phoneSearchIsActive() {
+        const box = document.getElementById('phoneSuggestBox');
+        if (box && box.classList.contains('show')) return true;
+        const input = document.getElementById('searchPhoneInput');
+        return !!(input && document.activeElement === input && input.value.trim());
     }
 
     function bindPanelSwipe(config) {
@@ -2830,65 +2837,78 @@
         const mainSection = document.getElementById(config.mainId);
         if (!sidebar || !mainSection) return;
 
-        function setCollapsed(next) {
-            if (sidebar.classList.contains('collapsed') === next) return;
-            if (next) hidePhoneSuggestions();
-            setPhoneSearchPulledUp(false);
-            sidebar.classList.toggle('collapsed', next);
+        let startY = 0;
+        let isDragging = false;
+        let pendingLock = false;
+
+        function scrollTopOf() {
+            const el = config.scroller();
+            return el ? el.scrollTop : 0;
+        }
+
+        function applyPendingLock() {
+            isDragging = false;
+            if (!pendingLock) return;
+            pendingLock = false;
             syncHistoryExpandedLock();
         }
 
-        let mainStartY = 0;
-        let pendingSearchRelease = false;
+        const scrollerTouchStart = (e) => { startY = e.touches[0].clientY; };
+        const scrollerTouchMove = (e) => {
+            const diffY = e.touches[0].clientY - startY;
+            if (scrollTopOf() === 0 && diffY > 30 && window.innerWidth < 992) {
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                    syncHistoryExpandedLock();
+                }
+            }
+        };
+        [document.getElementById('tableResponsive'), document.getElementById('entryTableResponsive'),
+         document.getElementById('lockerTableResponsive')].forEach((el) => {
+            if (!el || !mainSection.contains(el)) return;
+            el.addEventListener('touchstart', scrollerTouchStart, { passive: true });
+            el.addEventListener('touchmove', scrollerTouchMove, { passive: true });
+        });
 
         mainSection.addEventListener('touchstart', (e) => {
-            mainStartY = e.touches[0].clientY;
-            pendingSearchRelease = false;
+            if (window.innerWidth >= 992) return;
+            startY = e.touches[0].clientY;
+            isDragging = true;
         }, { passive: true });
 
         mainSection.addEventListener('touchmove', (e) => {
-            if (window.innerWidth >= 992) return;
-            const diffY = e.touches[0].clientY - mainStartY;
-            const el = config.scroller();
-            const scrollTop = el ? el.scrollTop : 0;
-            if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
-                pendingSearchRelease = true;
+            if (!isDragging || window.innerWidth >= 992) return;
+            const diffY = e.touches[0].clientY - startY;
+            const scrollTop = scrollTopOf();
+
+            if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) {
+                sidebar.classList.add('collapsed');
+                pendingLock = true;
+                isDragging = false;
+            }
+            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                pendingLock = true;
+                isDragging = false;
+            }
+            else if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) {
+                setPhoneSearchPulledUp(false);
+                isDragging = false;
             }
         }, { passive: true });
 
-        const applyMainEnd = () => {
-            if (!pendingSearchRelease) return;
-            pendingSearchRelease = false;
-            setPhoneSearchPulledUp(false);
-        };
-        mainSection.addEventListener('touchend', applyMainEnd);
-        mainSection.addEventListener('touchcancel', applyMainEnd);
+        mainSection.addEventListener('touchend', applyPendingLock);
+        mainSection.addEventListener('touchcancel', applyPendingLock);
 
         const dragHandle = document.getElementById(config.handleId);
-        if (!dragHandle) return;
-
-        let handleStartY = 0;
-        let handleDragging = false;
-
-        dragHandle.addEventListener('touchstart', (e) => {
-            handleStartY = e.touches[0].clientY;
-            handleDragging = true;
-        }, { passive: true });
-
-        dragHandle.addEventListener('touchmove', (e) => {
-            if (!handleDragging || window.innerWidth >= 992) return;
-            const diffY = e.touches[0].clientY - handleStartY;
-            if (diffY < -HANDLE_DRAG_THRESHOLD) { handleDragging = false; setCollapsed(true); }
-            else if (diffY > HANDLE_DRAG_THRESHOLD) { handleDragging = false; setCollapsed(false); }
-        }, { passive: true });
-
-        const endHandleDrag = () => { handleDragging = false; };
-        dragHandle.addEventListener('touchend', endHandleDrag);
-        dragHandle.addEventListener('touchcancel', endHandleDrag);
-
-        dragHandle.addEventListener('click', () => {
-            setCollapsed(!sidebar.classList.contains('collapsed'));
-        });
+        if (dragHandle) {
+            dragHandle.addEventListener('click', () => {
+                if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
+                setPhoneSearchPulledUp(false);
+                sidebar.classList.toggle('collapsed');
+                syncHistoryExpandedLock();
+            });
+        }
     }
 
     let chromeHidden = false;
@@ -2907,7 +2927,10 @@
             if (topHeight > 0) document.documentElement.style.setProperty('--chrome-top', topHeight + 'px');
         }
         if (tabbar) {
-            const bottomHeight = tabbar.offsetHeight;
+            const barTop = tabbar.getBoundingClientRect().top;
+            const pageBottom = document.body.getBoundingClientRect().bottom;
+            const spanned = Math.round(pageBottom - barTop);
+            const bottomHeight = spanned > 0 ? spanned : tabbar.offsetHeight;
             if (bottomHeight > 0) document.documentElement.style.setProperty('--chrome-bottom', bottomHeight + 'px');
         }
     }

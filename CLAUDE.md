@@ -67,22 +67,22 @@
 
 ## `--chrome-bottom` និង safe-area — READ BEFORE TOUCHING LAYOUT
 
-`.app-pages` កក់កន្លែងរបា Tab ជា `padding-bottom` គិតពី **បាត `body`**។
-ដូច្នេះ `--chrome-bottom` ត្រូវជា **ចម្ងាយពីបាត body ដល់កំពូលរបា Tab**៖
+`.app-pages` កក់កន្លែងរបា Tab ជា `padding-bottom`។ `--chrome-bottom` ត្រូវរួមបញ្ចូល
+កម្ពស់របា និងផ្នែក safe-area ដែលធ្វើឲ្យ iOS standalone body វែងជាង viewport៖
 
 ```js
-document.body.getBoundingClientRect().bottom - tabbar.getBoundingClientRect().top
+tabbar.offsetHeight + Math.max(0, document.body.getBoundingClientRect().height - window.innerHeight)
 ```
 
-**កុំវាស់ជា `tabbar.offsetHeight`។** លើ Android លេខ ២ នេះស្មើគ្នា ➜ កំហុស
-**មើលមិនឃើញ**។ តែក្នុងរបៀប standalone លើ iOS ច្បាប់
-`@media (display-mode: standalone)` ធ្វើឲ្យ `body` វែងជាង viewport តាម
-`env(safe-area-inset-bottom)` (ដោយចេតនា ដើម្បីគ្របអេក្រង់) ➜ `offsetHeight`
-ខ្វះតាមចំនួន inset ➜ **របា Tab បាំងគែមកាតលើ iPhone**។
+**កុំវាស់ជា `tabbar.offsetHeight` តែឯង** ព្រោះវាខ្វះ bottom inset លើ iPhone។ ក៏កុំ
+ប្រើ `body.getBoundingClientRect().bottom` ឬ transformed tabbar rect ដែរ៖ root scroll
+restoration និងការលាក់របាដោយ transform អាចធ្វើឲ្យលេខទាំងនេះរួញ។ `offsetHeight` របស់
+tabbar + `height` របស់ body គឺមិនប្រែតាម root scroll/transform។
 
-**កុំដកច្បាប់ `@media (display-mode: standalone)` ចេញ** ដើម្បីដោះបញ្ហានោះ —
-សាករួចក្នុង 2.7.1 ➜ body ខ្លីជាងអេក្រង់ ➜ **ចន្លោះទទេធំក្រោមរបា Tab**
-(អាក្រក់ជាងបញ្ហាដើម)។ ការកែត្រូវនៅត្រង់ **របៀបវាស់** មិនមែន layout ទេ។
+មានតែ `html.ios-standalone` ប៉ុណ្ណោះដែលពង្រីក body តាម bottom inset និងចាក់សោ root។
+**កុំដក iOS rule នេះចេញ** — body ខ្លីជាងអេក្រង់អាចបន្សល់ចន្លោះទទេក្រោមរបា Tab។
+ក៏កុំដាក់ generic `@media (display-mode: standalone)` មកវិញ ព្រោះវាអាចបង្កើត root
+scroll range លើ Android; Android ទទួល safe area តាម content/tabbar padding រួចហើយ។
 
 **បរិស្ថាន audit នៅទីនេះជា Chromium — `env(safe-area-*)` ត្រឡប់ 0 ជានិច្ច។**
 តេស្តត្រូវ **ធ្វើត្រាប់តាម** ដោយធ្វើឲ្យ body វែងជាង viewport
@@ -169,11 +169,13 @@ if (url.origin !== self.location.origin) return;
 **`.panel-section`** (ដូច `.history-section`) បើមិនដូច្នេះ `.table-responsive`
 ខាងក្នុង **flex មិនកើត** ➜ បញ្ជីមិនពេញអេក្រង់។
 
-**សោ `history-expanded` អនុវត្តពេល `touchend` មិនមែនចំពេលអូសទេ។** ផ្ទាំងបង្រួម
-ភ្លាម (អ្នកប្រើឃើញផលភ្លាម) តែសោដែលប្តូរ `overflow` និងកម្ពស់កន្សោមរមូរ ត្រូវ
-រង់ចាំម្រាមដៃលើក — បើមិនដូច្នេះកម្ពស់កន្សោមរមូរប្តូរកណ្តាលកាយវិការ ➜ **ការរមូរ
-ដែលកំពុងដើរត្រូវកាត់ផ្តាច់** (អ្នកប្រើរាយការណ៍ «បង្អាក់ការ scroll list»)។
-`touchcancel` ក៏អនុវត្តសោដែរ ដូច្នេះសោមិនជាប់គាំង។
+**ការប្តូរ `.collapsed`/`.search-focus` និងសោ `history-expanded` សុទ្ធតែអនុវត្តពេល
+`touchend` មិនមែនចំពេលអូសទេ។** iOS រក្សា scroll owner រហូតដល់ម្រាមដៃលើក;
+បើ class ណាមួយប្តូរកណ្តាលកាយវិការ នោះ scroll owner និងកម្ពស់កន្សោមរមូរប្តូរភ្លាម ➜
+**ការរមូរត្រូវកាត់ផ្តាច់ និង offset អាចជាប់ក្រោម navbar**។ ដូច្នេះ `touchmove` គ្រាន់តែ
+queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទាំង layout និងសោ។ `touchcancel` ត្រូវបោះបង់
+ចេតនាទាំងមូល។ ពេលចូល `history-expanded`, `syncHistoryExpandedLock()` ត្រូវលុប
+`#appPages.scrollTop` ចាស់មុន/ក្រោយប្តូរ class និងម្តងទៀតក្នុង `requestAnimationFrame`។
 
 ចំណុចរួមទាំង ២ ទំព័រ៖
 
@@ -195,6 +197,54 @@ if (url.origin !== self.location.origin) return;
 **ដូច្នេះកាតស្វែងរកត្រូវតែនៅជា child ចុងក្រោយរបស់ `.page-side`** — បើបន្ថែមកាតក្រោយវា មុខងារនេះខូច។
 blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូរទំព័រ ➜ ដោះវិញ។ លើ **≥992px វាមិនធ្វើអ្វីទេ**
 ព្រោះ layout ២ ជួរឃើញគ្រប់យ៉ាងស្រាប់។ Test៖ **`phone-search-swipe-test.js`**។
+
+**Pull-to-refresh លើ iOS PWA — `setupIOSPullToRefresh()`។** វាជាកាយវិការដាច់ពី
+`setupSwipeGestures()` ហើយត្រូវរក្សាច្បាប់ទាំងនេះ៖
+
+- `<head>` រក iOS standalone តាំងពីមុន stylesheet (`navigator.standalone === true`)
+  ហើយដាក់ `html.ios-standalone`។ ក្នុង iOS standalone,
+  `html/body` ត្រូវ `overflow-y:hidden` + `overscroll-behavior-y:none`; `#appPages`
+  (`min-height:0`, `overflow-y:auto`, `overscroll-behavior-y:contain`) ជា outer scroll owner តែមួយ។
+  កុំប្រើ generic `(display-mode: standalone)` ដើម្បីពង្រីក root; Android/browser ធម្មតា
+  ទទួល safe area តាម content/tabbar padding ហើយមិនត្រូវមាន root scroll range ឬ PTR នេះទេ។
+  **កុំដក safe-area ចេញពី `min-height`** — វាត្រូវបានរក្សាដោយចេតនា; ត្រូវបិទ root
+  scrolling មិនមែនបង្រួម body។
+- PTR ចាប់បានតែពេល root/window/body/`#appPages` និងកន្សោមរមូរសកម្មសុទ្ធតែនៅ
+  កំពូល (ទទួលគ្រប់តម្លៃ finite `scrollTop <= 1` រួមទាំង negative Safari rubber-band),
+  មាន touch មួយ និងទិសចុះបញ្ឈរច្បាស់។ Modal/drawer/input/editable/navbar/tabbar និង
+  button/link ក្រៅតារាងមិនមែនគោលដៅ PTR។ Tap/drag ខ្លីលើ action ក្នុងជួរតារាងនៅតែ
+  មិនត្រូវដណ្ដើម ប៉ុន្តែ deliberate long vertical pull អាចចូល PTR ដូចផ្ទៃទទេរបស់ជួរ។
+- `iosTouchArbiter` ត្រូវប្រើ `Touch.identifier` និងចែក ownership៖ 0–30px គ្មាន action;
+  31–55px លើ `.collapsed`/`.search-focus` queue ការបើកផ្ទាំង; ចាប់ពី 56px PTR ទប់
+  panel commit; ប្រហែល 56–212px spring back ហើយចាប់ពី ~213px ទើប refresh។ បន្ថែម
+  ម្រាមដៃទី២ត្រូវ cancel ទាំងពីរ។ Panel class/scroll owner ប្តូរតែ final `touchend`, មិនមែន
+  កណ្តាល touch; ត្រូវគណនាចម្ងាយឡើងវិញពី matching `changedTouches` នៅ final release
+  ដើម្បីកុំ commit state ចាស់ពេលម្រាមដៃបញ្ច្រាសលឿន។ Panel swipe ក៏ត្រូវទាមទារ
+  vertical-axis ratio 1.6 ដូច PTR ដើម្បីមិនប្តូរផ្ទាំងលើ diagonal/horizontal swipe;
+  បន្ទាប់ពី PTR បាន lock អ័ក្សបញ្ឈរ final release ត្រូវប្រើ hysteresis ដូច touchmove
+  (`|dx| <= dy × 0.85`) ដើម្បីឲ្យ ready indicator និង refresh decision ស្របគ្នា;
+  `touchcancel` បោះបង់ទាំងមូល។
+- មុន reload ត្រូវដាក់ marker `zoew_ptr_reload_pending`, កំណត់
+  `history.scrollRestoration='manual'` និងលុប root/page/table offset។ `<head>` ត្រូវ
+  ឃើញ marker ហើយបិទ auto restoration មុន parse; ក្រោយ boot ត្រូវ settle offset ម្តងហើយ
+  ម្តងទៀតតាម rAF/timer ដើម្បីឈ្នះ restoration យឺតរបស់ iOS។ រក្សា marker រហូតដល់
+  settle ចប់; tap គ្មានចលនាមិនត្រូវ cancel timers (cancel តែ user scroll ឆ្លង axis slop)។
+  ពេល settle/cancel ចប់ ត្រូវស្ដារ `history.scrollRestoration` ទៅតម្លៃមុន PTR និងសម្អាត
+  marker ទាំងពីរ។ ចន្លោះ 300ms មុន navigation phase `refreshing` ត្រូវ block panel/click
+  ទាំងអស់មិនថា touch ID ថ្មីណា ហើយ watchdog 5s ត្រូវដោះ spinner/marker បើ reload មិនកើត។
+  ពេល `beforeunload` បញ្ជាក់ថា navigation ចាប់ផ្តើម ត្រូវ cancel watchdog **ដោយមិនលុប
+  markers** ព្រោះ response យឺត >5s នៅតែត្រូវការវានៅទំព័រថ្មី។ **កុំជំនួសផ្លូវនេះដោយ
+  `location.reload()` ទទេ** — នោះធ្វើឲ្យកាតប្រវត្តិរអិលឡើងក្រោម navbar។
+- Indicator ត្រូវឡើង opacity តាមចម្ងាយជិតពិដាន refresh មិនមែនលេចពេញតាំងពីការទាញ
+  ធម្មតា។ `ResizeObserver` លើ navbar/tabbar ត្រូវវាស់ `--chrome-top`/`--chrome-bottom`
+  ឡើងវិញ ពេល safe area ឬ font ធ្វើឲ្យកម្ពស់មកយឺត។ វាស់ tabbar ដោយ `offsetHeight`
+  និង body `getBoundingClientRect().height` មិនមែន transformed/scroll-dependent bottom ដើម្បី
+  កុំឲ្យរបាលាក់ ឬ root offset បន្ថយ `--chrome-bottom`។ ត្រូវរក្សា extension នេះក្នុង
+  `--page-extension`; hidden expanded padding ត្រូវជា `--page-extension + 8px` ដើម្បី
+  កុំឲ្យគែមកាត/តារាងធ្លាក់ក្រោម locked viewport។
+
+Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
+**`phone-search-swipe-test.js`** (state machine/scroll lock)។
 
 **ការលាក់របាតាមទិសរមូរ — `setupChromeAutoHide()` — លាក់តែ *របា Tab ខាងក្រោម* ប៉ុណ្ណោះ។**
 **របា navbar ខាងលើមិនលាក់ទេ** (សំណើអ្នកប្រើ) — កុំបន្ថែមច្បាប់ `body.chrome-hidden .app-navbar`
@@ -365,8 +415,10 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 - **`promise.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ** ➜ JavaScript រត់ `B` ពេល **`A` throw**
   ដែរ ➜ ការសរសេរជោគជ័យ តែការសង្គ្រោះរត់ខុស ➜ លុយបាត់។ ប្រើ `.then(A, B)` ២ អាគុយម៉ង់
   ឬទង់។ Checker៖ **`compensation-order.js`**។
-- **ការប្តូរ layout ចំពេល momentum scroll របស់ iOS** ➜ បញ្ជីលោតរំលង។ ការលាក់របា
-  Tab ត្រូវជា `transform` សុទ្ធ។ Test៖ **`gesture-test.js`**។
+- **ការប្តូរ layout ចំពេល touch/momentum scroll របស់ iOS ឬទុក root scroll restoration
+  ក្រោយ PTR** ➜ បញ្ជីលោតរំលង/កាតរអិលក្រោម navbar។ ការប្តូរ panel ត្រូវរង់ចាំ
+  `touchend`, របា Tab ត្រូវជា `transform` សុទ្ធ ហើយ PTR reload ត្រូវ reset root/page/table។
+  Tests៖ **`gesture-test.js`**, **`phone-search-swipe-test.js`**។
 - **animation លើ property ដែលមិនអាច composite** — `top`/`height` ➜ layout រាល់ស៊ុម;
   `box-shadow`/`background-color` ដោយ `infinite` ➜ គូរឡើងវិញរាល់ស៊ុមជារៀងរហូត។
   ប្រើ `transform`/`opacity` ឬដាក់ធាតុនោះលើ layer ដោយឡែក។ Checker៖ **`animation-cost.js`**។
@@ -445,7 +497,7 @@ npm i acorn playwright-core xlsx @zxing/library@0.23.0
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
 **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថាកំហុសដែលបានដោះស្រាយរួច
-មិនបានត្រឡប់មកវិញទេ។ ការត្រួតពិនិត្យ ៨ ប្រើ **Chromium ពិត** — ត្រូវការ `playwright-core`។
+មិនបានត្រឡប់មកវិញទេ។ ការត្រួតពិនិត្យ ១៣ ប្រើ **Chromium ពិត** — ត្រូវការ `playwright-core`។
 
 ### ជំហានទី ១ — កុំចាប់ផ្តើមដោយអានកូដពីដើមដល់ចប់
 បទពិសោធន៍បង្ហាញច្បាស់៖ **កំហុសថ្មីស្ទើរតែមិនដែលរកឃើញដោយការអានកូដដដែលឡើងវិញទេ។** វារកឃើញដោយ៖

@@ -64,11 +64,11 @@
             touch-action: pan-y;
         }
 
-        @media (display-mode: standalone) {
-            html, body {
-                min-height: calc(100vh + env(safe-area-inset-bottom));
-                min-height: calc(100dvh + env(safe-area-inset-bottom));
-            }
+        html.ios-standalone, html.ios-standalone body {
+            min-height: calc(100vh + env(safe-area-inset-bottom));
+            min-height: calc(100dvh + env(safe-area-inset-bottom));
+            overflow-y: hidden;
+            overscroll-behavior-y: none;
         }
 
         .app-navbar {
@@ -128,12 +128,15 @@
         .app-pages {
             width: 100%;
             flex: 1;
+            min-height: 0;
             padding: 8px;
-            padding-bottom: calc(70px + env(safe-area-inset-bottom));
+            padding-bottom: calc(var(--chrome-bottom, calc(62px + env(safe-area-inset-bottom))) + 8px);
             box-sizing: border-box;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
         }
+
+        html.ios-standalone .app-pages { overscroll-behavior-y: contain; }
 
         .app-page { display: none; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; }
         .app-page.active { display: flex; }
@@ -193,7 +196,7 @@
                 overflow-y: hidden;
                 padding-bottom: calc(var(--chrome-bottom, 62px) + 8px);
             }
-            body.chrome-hidden .app-pages.history-expanded { padding-bottom: 8px; }
+            body.chrome-hidden .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
             .app-pages.history-expanded .page-main { flex: 1; min-height: 0; }

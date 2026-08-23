@@ -12,7 +12,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = process.env.BOOT_APP_DIR || '/home/user/Zoe-System';
+const ROOT = path.resolve(process.env.BOOT_APP_DIR || path.join(__dirname, '..'));
 const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json' };
 
 function serve(dir, port) {

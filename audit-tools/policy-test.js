@@ -15,7 +15,7 @@ function slice(src, startMarker, endMarker, label) {
 }
 
 function buildRunner(appFile) {
-    const src = fs.readFileSync(appFile, 'utf8');
+    const src = fs.readFileSync(appFile, 'utf8').replace(/\r\n?/g, '\n');
 
     // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
     const claimBlock = slice(src,

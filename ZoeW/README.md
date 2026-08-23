@@ -2,7 +2,7 @@
 
 ZoeW គឺជា PWA តែមួយសម្រាប់គ្រប់គ្រងកញ្ចប់ អតិថិជន ទីតាំង Locker និងស្ថិតិ COD/DOD ក្នុងប្រព័ន្ធ Zoe។
 
-កំណែបច្ចុប្បន្ន៖ **2.0.0**។
+កំណែបច្ចុប្បន្ន៖ **2.6.1** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
 
 ## តួនាទី និងព្រំដែន
 
@@ -52,6 +52,21 @@ ZoeW គឺជា PWA តែមួយសម្រាប់គ្រប់គ្�
 
 «លុបទាំងអស់» លុប **តែធាតុដែលកំពុងឈរតាមតម្រងថ្ងៃបច្ចុប្បន្ន** ប៉ុណ្ណោះ (ឧ. ឈរលើ «ថ្ងៃនេះ» ➜ លុបតែថ្ងៃនេះ)។ វាទាមទារ **Security PIN** មុនដំណើរការ ដូច «កែទឹកប្រាក់/កញ្ចប់» ដែរ ហើយប្រអប់បញ្ជាក់ប្រាប់ចំនួនធាតុពិតមុនលុប។
 
+## ការស្កេន Barcode
+
+- ទទួល **តែ `CODE_128`** ប៉ុណ្ណោះ (format ដែលកញ្ចប់អីវ៉ាន់ប្រើ)។ format ផ្សេងត្រូវបដិសេធដោយចេតនា ព្រោះពួកវាគ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ច ➜ អាចអានចេញជាលេខខុស។
+- លេខមួយត្រូវអានឃើញ **ដដែល ២ ស៊ុមជាប់គ្នា** ទើបទទួលយក។
+- ផ្លូវរូបភាព និង Barcode scanner (Bluetooth/USB) មានតែស៊ុមតែមួយ ដូច្នេះវាមិនឆ្លងកាត់ជាន់ ២ នេះទេ។
+- **ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ។**
+- iPhone យឺតជាង Android ដោយធម្មជាតិ។ គុណភាពឌិកូដលើ iPhone សម្របតាមល្បឿនឧបករណ៍ដោយស្វ័យប្រវត្តិ។
+
+### បើស្កេនមិនចេញ
+
+1. **កាន់ឲ្យ barcode ពេញទទឹងស៊ុមជាង** — ជួរអានកំណត់ដោយទទឹង barcode ក្នុងស៊ុម។
+2. ពិនិត្យថាស្លាកជា **CODE_128** មែន (format ផ្សេងត្រូវបដិសេធដោយចេតនា)។
+3. បើកភ្លើង (💡) ពេលពន្លឺតិច ហើយប្រើ zoom បើមាន។
+4. បើប្រអប់ native (`confirm`/`alert`) បើករួចកាមេរ៉ាកក ➜ បិទបើកកាមេរ៉ាឡើងវិញ។
+
 ## Lookup API និង Google Sheets
 
 ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint ខាងក្រៅពេលស្កេន Barcode។ កំណត់នៅ **របា Slide ➜ API ស្វែងរកអតិថិជន** ក្រោម Security PIN។
@@ -74,6 +89,8 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 
 App នេះជា static site គ្មាន build step។ Deploy ថត `ZoeW` ទៅ hosting របស់វា ហើយប្តូរ `CACHE_VERSION` រាល់ពេល asset ផ្លាស់ប្តូរ។ Service Worker ទាញកំណែថ្មីនៅផ្ទៃខាងក្រោយ ហើយប្រើវាពេលបើក App លើកក្រោយ។
 
+`vendor/zxing.min.js` ជាឯកសារ **ក្នុង repo** មិនមែន dependency ដែលត្រូវ build ទេ។ ដើម្បីឡើងកំណែវា៖ `npm i @zxing/library@<new>` រួច `cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js` រួចធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `audit-tools/offline-shell-test.js`។
+
 **ចាំបាច់៖** `firebase-database.rules.json` នៅ root មិន deploy តាម Netlify ឬ static hosting ទេ។ មុន release ដែលពាក់ព័ន្ធនឹង Firebase path/rules សូម backup Rules ចាស់, paste ឯកសារនេះទៅ Business Firebase Project ក្នុង Firebase Console, ពិនិត្យ Rules Simulator ហើយចុច **Publish** ដោយដៃ។
 
 ## តេស្តមុន release
@@ -81,6 +98,7 @@ App នេះជា static site គ្មាន build step។ Deploy ថត `Zoe
 ពី root របស់ repository រត់៖
 
 ```bash
+npm i acorn playwright-core xlsx @zxing/library@0.23.0
 node --check ZoeW/app.js
 node audit-tools/version-check.js
 bash audit-tools/run-all.sh

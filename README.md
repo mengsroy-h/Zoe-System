@@ -2,7 +2,7 @@
 
 Zoe-System ជាសំណុំ PWA ចំនួន **២** សម្រាប់គ្រប់គ្រងកញ្ចប់អតិថិជន៖ បញ្ចូល Barcode, កំណត់ទីតាំង Locker, ទទួលកញ្ចប់, គណនា COD/DOD និងគ្រប់គ្រង Activation Key។ ឯកសារនេះត្រូវបានរៀបចំសម្រាប់ដាក់នៅ **root របស់ repository** ដើម្បីឱ្យតំណភ្ជាប់ខាងក្រោមដំណើរការ។
 
-កំណែ release បច្ចុប្បន្ន៖ **`2.4.0`**។
+កំណែ release បច្ចុប្បន្ន៖ **`2.6.1`** — មើល [CHANGELOG.md](CHANGELOG.md) សម្រាប់អ្វីដែលប្រែក្នុងកំណែនីមួយៗ។
 
 ## App ទាំង ២
 
@@ -69,6 +69,18 @@ Restore និង Clear All ប្រើ claim, token និង atomic multi-loc
 
 ការសរសេរធ្វើឡើងដោយ `runTransaction` ផ្ទាល់លើ `zoew_scan_history_cod_dod` ដោយផ្គូផ្គងតាម `code` (មិនមែនតាម index) ដូច្នេះការស្កេនស្របគ្នាពីឧបករណ៍ច្រើនមិនសរសេរជាន់គ្នាទេ។
 
+## ការស្កេន Barcode
+
+- ទទួល **តែ `CODE_128`** ប៉ុណ្ណោះ (format ដែលកញ្ចប់អីវ៉ាន់ប្រើ)។ វាមានលេខផ្ទៀងផ្ទាត់ mod-103 ជាកាតព្វកិច្ច ➜ ការអានលេខខុសស្ទើរតែមិនអាចកើតឡើងបាន។
+- លេខមួយត្រូវអានឃើញ **ដដែល ២ ស៊ុមជាប់គ្នា** ទើបទទួលយក។
+- **ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ។**
+- Android លឿនជាង iPhone ដោយធម្មជាតិ (Android មានម៉ាស៊ីនអានដើមរបស់ប្រព័ន្ធ ចំណែក iPhone ប្រើ JavaScript)។ គុណភាពឌិកូដលើ iPhone សម្របតាមល្បឿនឧបករណ៍ដោយស្វ័យប្រវត្តិ។
+- ការស្កេន QR ពេល Config/Reconfig ជាម៉ាស៊ីនអានដាច់ដោយឡែក។
+
+## ល្បឿនសម្របតាមឧបករណ៍
+
+App វាស់ចង្វាក់ស៊ុមពិតរបស់ឧបករណ៍ (១០–១២០Hz) រួចសម្របការងាររបស់ខ្លួនតាមវា។ លើឧបករណ៍ដែលធ្លាក់ស៊ុម វាបិទចលនាដែលដើរជារៀងរហូត និងស្រមោលដែលថ្លៃ — **មិនប៉ះមុខងារអាជីវកម្មណាមួយឡើយ**។
+
 ## សុវត្ថិភាព
 
 - Firebase Realtime Database Rules ជាអ្នកសម្រេចសិទ្ធិពិត; UI មិនមែនជាការការពារតែមួយទេ។
@@ -80,9 +92,17 @@ Restore និង Clear All ប្រើ claim, token និង atomic multi-loc
 
 ## កំណែ និង Service Worker
 
-`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ `2.0.0` ហើយវាបង្ហាញ **តែក្នុងប្រអប់ login**។
+`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ **`2.6.1`**។ វាបង្ហាញ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ login និងខាងក្រោមរបា Slide) និង **១ កន្លែងក្នុង ZoeKeyGen** (ប្រអប់ login)។ `version-check.js` អះអាងចំនួនកន្លែងនោះឲ្យច្បាស់ — ការបន្ថែមកន្លែងទី ៣ នឹងធ្វើឲ្យវាធ្លាក់។
 
-`CACHE_VERSION` ក្នុង `sw.js` មិនមែន App version ទេ។ វាត្រូវប្ដូររាល់ពេល asset របស់ App នោះផ្លាស់ប្តូរ ដើម្បីឱ្យ Service Worker ទាញឯកសារថ្មី។
+`CACHE_VERSION` ក្នុង `sw.js` មិនមែន App version ទេ។ វាតាមលំនាំ `<app>-vN` ហើយត្រូវប្ដូររាល់ពេល asset របស់ App នោះផ្លាស់ប្តូរ ដើម្បីឱ្យ Service Worker ទាញឯកសារថ្មី។ បច្ចុប្បន្នគឺ `zoew-v74` និង `zoekeygen-v39`។
+
+### ធនធានក្រៅ និង cache
+
+Service Worker cache **តែឯកសាររបស់ App ខ្លួនឯង** (`APP_SHELL`)។ ZXing (ម៉ាស៊ីនស្កេន)
+ស្ថិតក្នុង repo `ZoeW/vendor/zxing.min.js` ដូច្នេះវាចូល cache ជាមួយគ្នា ➜
+**ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ**។
+
+Firebase SDK, ពុម្ពអក្សរ Google និង Sentry ទាញពីបណ្តាញរាល់ពេល។
 
 ពេល release៖
 
@@ -118,14 +138,25 @@ Static hosting មិន deploy Firebase Rules ជំនួសអ្នកទេ
 រត់ពី root របស់ repository៖
 
 ```bash
-npm i acorn playwright-core
+npm i acorn playwright-core xlsx @zxing/library@0.23.0
 node --check ZoeW/app.js
 node --check ZoeKeyGen/app.js
 node audit-tools/version-check.js
 bash audit-tools/run-all.sh
 ```
 
-`audit-tools/run-all.sh` ពិនិត្យ syntax, schema/rules, version consistency, Restore/Clear All, រចនាសម្ព័ន្ធទំព័រ/របា Slide, Locker, KeyGen security និង browser regression។ មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
+`audit-tools/run-all.sh` ពិនិត្យ syntax, schema/rules, version consistency, Restore/Clear All, រចនាសម្ព័ន្ធទំព័រ/របា Slide, Locker, KeyGen security, ល្បឿននិងភាពត្រឹមត្រូវនៃការស្កេន, ការដើរពេលបណ្តាញដាច់ និង browser regression។ បច្ចុប្បន្នមាន **៥៧ ការត្រួតពិនិត្យ**។ Dependency ដែលបាត់ធ្វើឲ្យឧបករណ៍ពាក់ព័ន្ធ **SKIP ដោយស្អាត** មិនធ្លាក់ទេ។
+
+ដើម្បីបញ្ជាក់ថាតេស្ត**មិនទទេ** ត្រូវរត់វាធៀបនឹង tree មុនកែ៖
+
+```bash
+git fetch origin main
+rm -rf /tmp/baseline && mkdir /tmp/baseline
+git archive origin/main | tar -x -C /tmp/baseline
+bash audit-tools/run-all.sh /tmp/baseline    # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
+```
+
+មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
 
 ## ឯកសារបន្ថែម
 

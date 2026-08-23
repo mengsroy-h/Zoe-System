@@ -60,6 +60,29 @@
 >   ដំណោះស្រាយជាក់ស្តែង៖ បើកមុខងារ «កាលបរិច្ឆេទ និងម៉ោងស្វ័យប្រវត្តិ» លើគ្រប់ឧបករណ៍។
 > - **`google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
 
+## ធនធានខាងក្រៅ និង service worker — READ BEFORE ADDING ANY CDN
+
+**ZXing ស្ថិតក្នុង repo (`ZoeW/vendor/zxing.min.js`) — កុំនាំវាត្រឡប់ទៅ CDN វិញ។**
+មុននេះវាមកពី unpkg.com ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល
+cache ទេ** ➜ ពេលបណ្តាញខ្សោយ ឬ CDN ដាច់ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App
+មើលទៅដូចដំណើរការធម្មតា។ ឯកសារក្នុង repo ជាកំណែ **0.23.0 ដដែល** នឹងអ្វីដែល CDN
+ធ្លាប់បម្រើ (sha384 = SRI ចាស់; `offline-shell-test.js` អះអាងរឿងនេះ)។
+**ដើម្បីឡើងកំណែ**៖ `npm i @zxing/library@<new>` រួច
+`cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js`
+រួច**ធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `offline-shell-test.js`** ហើយរត់
+`scan-engine-test.js` ឡើងវិញ។
+
+**`sw.js` cache តាមបញ្ជី allow — មិនមែន allow-all ទេ។** `CDN_HOSTS` មានតែ host
+ធនធានស្តាទិច (`www.gstatic.com`, `fonts.googleapis.com`, `fonts.gstatic.com`,
+`js.sentry-cdn.com`, `browser.sentry-cdn.com`)។ **កុំបន្ថែម host ទិន្នន័យផ្ទាល់
+ចូលបញ្ជីនោះជាដាច់ខាត** — `*.firebaseio.com`, `identitytoolkit.googleapis.com`,
+`securetoken.googleapis.com`, `script.google.com`។ ការ cache ពួកវាបម្រើទិន្នន័យ
+ចាស់ដល់អាជីវកម្មពិត។ `offline-shell-test.js` ចាក់សោច្បាប់នេះ។
+
+**`CDN_PRECACHE` ត្រូវត្រូវនឹង URL ក្នុង `firebase-loader.js`។** បើឡើងកំណែ
+Firebase SDK ក្នុង loader តែភ្លេច `sw.js` ទាំង ២ នោះ App **បើកមិនកើតពេលគ្មាន
+បណ្តាញ ដោយស្ងាត់ៗ**។ មាន checker រួចហើយ។
+
 ## ស្ថាបត្យកម្ម
 
 - `ZoeW/app.js` ជាឯកសារកូដតែមួយ (~6300 បន្ទាត់) សរសេរជា top-level script ដែល indent ៤ ចន្លោះ
@@ -317,6 +340,9 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
   បើត្រូវការការបង្រួមមានចលនាពិត ត្រូវប្រើ `transform`/`opacity` លើប្រអប់ដែលមានកម្ពស់ថេរ។
 - **class ដែលកំណត់ `overflow` លើកន្សោមរមូររួម ត្រូវជាប់តែទំព័រដែលត្រូវការវា** ➜ បើវាជាប់
   ឆ្លងទំព័រ ទំព័រផ្សេងរមូរមិនកើត។ Test៖ **`page-nav-test.js`** (`history-expanded`)។
+- **ធនធានចាំបាច់ដែលមកពី origin ខាងក្រៅ ហើយ service worker មិន cache** ➜ App បើកបាន
+  តែមុខងារនោះស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ។ រកឃើញលើ ZXing (ការស្កេន)។
+  Test៖ **`offline-shell-test.js`** (បិទម៉ាស៊ីនបម្រើពិត រួចផ្ទុកឡើងវិញ)។
 - **ការឌិកូដស៊ុមវីដេអូដដែលពីរដង** ➜ ជាន់ការពារ «២ ស៊ុមជាប់គ្នា» ក្លាយជា ១ ស៊ុម។
   `takeFreshVideoFrame()` ការពារ **ហើយ fail open** បើ `currentTime` មិនរត់ (browser ខ្លះ
   ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។
@@ -402,6 +428,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
 | ល្បឿន, **ជួរអាន** និងភាពត្រឹមត្រូវនៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
+| ការពឹងផ្អែកលើ CDN ដែលមិន cache ➜ ស្កេនមិនកើតពេលបណ្តាញដាច់ | `offline-shell-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 

@@ -214,9 +214,14 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
   មាន touch មួយ និងទិសចុះបញ្ឈរច្បាស់។ Modal/drawer/input/editable/navbar/tabbar និង
   button/link ក្រៅតារាងមិនមែនគោលដៅ PTR។ Tap/drag ខ្លីលើ action ក្នុងជួរតារាងនៅតែ
   មិនត្រូវដណ្ដើម ប៉ុន្តែ deliberate long vertical pull អាចចូល PTR ដូចផ្ទៃទទេរបស់ជួរ។
+- ពេល active panel មាន `.collapsed`/`.search-focus` ឬ `#appPages.history-expanded`, PTR
+  ត្រូវបិទទាំងស្រុង៖ គ្មាន indicator, `preventDefault`, reload ឬ document-level
+  non-passive `touchmove`។ ការទាញចុះជាកម្មសិទ្ធិរបស់ panel ដើម្បីបើកផ្ទាំងវិញ។
+  Non-passive listener របស់ PTR ត្រូវដំឡើងតែក្រោយ touchstart ដែលមានសិទ្ធិ ហើយដកចេញ
+  គ្រប់ផ្លូវ touchend/cancel/multitouch/visibility/park ដើម្បីឲ្យ iOS scroll នៅ compositor។
 - `iosTouchArbiter` ត្រូវប្រើ `Touch.identifier` និងចែក ownership៖ 0–30px គ្មាន action;
-  31–55px លើ `.collapsed`/`.search-focus` queue ការបើកផ្ទាំង; ចាប់ពី 56px PTR ទប់
-  panel commit; ប្រហែល 56–212px spring back ហើយចាប់ពី ~213px ទើប refresh។ បន្ថែម
+  លើ full-screen/search state ការទាញចុះបញ្ឈរជា panel action គ្រប់ចម្ងាយ; លើ state ធម្មតា
+  ប្រហែល 56–212px PTR spring back ហើយចាប់ពី ~213px ទើប refresh។ បន្ថែម
   ម្រាមដៃទី២ត្រូវ cancel ទាំងពីរ។ Panel class/scroll owner ប្តូរតែ final `touchend`, មិនមែន
   កណ្តាល touch; ត្រូវគណនាចម្ងាយឡើងវិញពី matching `changedTouches` នៅ final release
   ដើម្បីកុំ commit state ចាស់ពេលម្រាមដៃបញ្ច្រាសលឿន។ Panel swipe ក៏ត្រូវទាមទារ
@@ -240,7 +245,7 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
   ឡើងវិញ ពេល safe area ឬ font ធ្វើឲ្យកម្ពស់មកយឺត។ វាស់ tabbar ដោយ `offsetHeight`
   និង body `getBoundingClientRect().height` មិនមែន transformed/scroll-dependent bottom ដើម្បី
   កុំឲ្យរបាលាក់ ឬ root offset បន្ថយ `--chrome-bottom`។ ត្រូវរក្សា extension នេះក្នុង
-  `--page-extension`; hidden expanded padding ត្រូវជា `--page-extension + 8px` ដើម្បី
+  `--page-extension`; settled hidden expanded padding ត្រូវជា `--page-extension + 8px` ដើម្បី
   កុំឲ្យគែមកាត/តារាងធ្លាក់ក្រោម locked viewport។
 
 Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
@@ -248,22 +253,19 @@ Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
 
 **ការលាក់របាតាមទិសរមូរ — `setupChromeAutoHide()` — លាក់តែ *របា Tab ខាងក្រោម* ប៉ុណ្ណោះ។**
 **របា navbar ខាងលើមិនលាក់ទេ** (សំណើអ្នកប្រើ) — កុំបន្ថែមច្បាប់ `body.chrome-hidden .app-navbar`
-មកវិញ។ ហើយការលាក់/បង្ហាញរបា **មិនត្រូវប្តូរកម្ពស់ ឬ padding របស់កន្សោមរមូរណាមួយឡើយ**។
+មកវិញ។ អំឡុង momentum ការលាក់/បង្ហាញរបា **មិនត្រូវប្តូរកម្ពស់ ឬ padding របស់កន្សោមរមូរណាមួយឡើយ**។
 ការប្តូរ layout ចំពេល momentum scroll របស់ WebKit កំពុងដើរ ធ្វើឲ្យបញ្ជីលោតរំលង
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
 - កន្លែងរបស់របា Tab ក្នុងរបៀបពេញអេក្រង់ ត្រូវកក់ជា `padding-bottom` លើ
   `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
-  វាស់ពិត) ➜ **គែមក្រោមកាតឈរខាងលើរបា Tab**។ ពេលរបាលាក់ខ្លួន
-  `body.chrome-hidden` ទម្លាក់វាមកត្រឹម `8px` ➜ កាតរីកចុះបំពេញកន្លែងនោះ
-  (សំណើអ្នកប្រើ — ដូចកំណែ 2.2.0)។
-  **ច្បាប់ដែលមិនអាចរំលងបាន៖ ការប្តូរនោះត្រូវលោតភ្លាម — កុំដាក់ `transition`
-  លើ `padding` ដាច់ខាត។** កំណែ 2.2.1 ធ្វើ *ចលនា* លើវា ➜ កម្ពស់កន្សោមរមូរប្តូរ
-  រាល់ស៊ុមអស់ ០.២៦ វិនាទី ចំពេល momentum scroll ➜ **បញ្ជីលោតរំលង**។ ការប្តូរ
-  ភ្លាមមួយដងមិនស្ថិតក្នុងថ្នាក់នោះទេ ហើយ `BOTTOM_ZONE` ធានាថាការរីកមិនកើតឡើង
-  ពេលនៅជិតបាតបញ្ជី (ទីតាំងតែមួយដែល scrollTop ត្រូវ clamp)។ `gesture-test.js`
-  ចាក់សោទាំងឥរិយាបថ និងការហាម `transition`។
+  វាស់ពិត) ➜ **គែមក្រោមកាតឈរខាងលើរបា Tab**។ `body.chrome-hidden` ប្តូរតែ
+  transform របស់ Tab bar; ក្រោយ scroll ស្ងប់ 180ms ទើប `body.chrome-space-released`
+  ទម្លាក់ padding មក `--page-extension + 8px` ដើម្បីឲ្យកាតរីកបំពេញកន្លែងរបា។ ពេល
+  បង្ហាញវិញ ក៏ពន្យារការកក់កន្លែងរហូត scroll ស្ងប់ដូចគ្នា។ **កុំដាក់ transition លើ
+  padding និងកុំប្តូរ class នេះកណ្តាល momentum**។ Scroll handler ត្រូវ coalesce តាម
+  `requestAnimationFrame` មួយដងក្នុងមួយ frame។ `gesture-test.js` ចាក់សោឥរិយាបថនេះ។
   កំណែ 2.4.0 ធ្លាប់កក់វាដោយ `.table-responsive::after` *ខាងក្នុង* កន្សោមរមូរ —
   layout ស្ថិរដូចគ្នា តែជួរដេកលិចចូលពីក្រោមរបា ➜ **កុំនាំវិធីនោះត្រឡប់មកវិញ**
 - **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល

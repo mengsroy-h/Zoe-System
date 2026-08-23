@@ -80,6 +80,7 @@ function buildEnv(src, opts) {
         console,
         setTimeout: () => 0,
         window: { innerWidth: o.innerWidth || 400 },
+        scheduleChromeLayoutSettle() {},
         hidePhoneSuggestions() { calls.hideSuggest++; els.phoneSuggestBox.classList.remove('show'); },
         positionPhoneSuggestBox() { calls.position++; },
         document: {

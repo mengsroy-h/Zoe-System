@@ -196,7 +196,7 @@
                 overflow-y: hidden;
                 padding-bottom: calc(var(--chrome-bottom, 62px) + 8px);
             }
-            body.chrome-hidden .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
+            body.chrome-space-released .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
             .app-pages.history-expanded .page-main { flex: 1; min-height: 0; }

@@ -95,7 +95,8 @@ function makeContext(app) {
         parseTimestampFromId: () => 0,
         renderHistory: (rows) => { rendered.rows = rows; },
         updateDailyScheduleStats: () => {},
-        applyCurrentFilter: () => { rendered.filterCalls++; rendered.rows = null; }
+        applyCurrentFilter: () => { rendered.filterCalls++; rendered.rows = null; },
+        scheduleChromeLayoutSettle: () => {}
     };
     const ctx = vm.createContext(sandbox);
 vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);

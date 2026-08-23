@@ -381,6 +381,45 @@ const GESTURE = function (steps) {
     ok('ជួរចុងក្រោយរមូរផុតពីរបា Tab បាន (កន្លែងកក់ខាងក្នុងប្រអប់រមូរ)',
         bottomRoom.spacer >= bottomRoom.tabbarH - 3, bottomRoom);
 
+    // ស៊ុមខាងក្រោមនៃកាតប្រវត្តិត្រូវឈរនៅពីលើរបា Tab ឲ្យឃើញច្បាស់ ហើយត្រូវ
+    // រំកិលដោយ transform សុទ្ធ — មិនមែនដោយការបង្រួមប្រអប់រមូរទេ
+    const frameEdge = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const card = document.querySelector('.history-section');
+        const table = document.getElementById('tableResponsive');
+        const tabbar = document.getElementById('pageTabBar');
+        const read = () => {
+            const cs = window.getComputedStyle(card, '::after');
+            const h = parseFloat(cs.height) || 0;
+            let ty = 0;
+            const m = cs.transform && cs.transform.match(/matrix(?:3d)?\(([^)]+)\)/);
+            if (m) {
+                const parts = m[1].split(',').map((v) => parseFloat(v));
+                ty = parts.length === 16 ? parts[13] : parts[5];
+            }
+            return {
+                h: Math.round(h),
+                edgeTop: Math.round(card.getBoundingClientRect().bottom - 1 - h + ty),
+                tableH: table.clientHeight
+            };
+        };
+        document.body.classList.remove('chrome-hidden');
+        await wait(340);
+        const shown = read();
+        document.body.classList.add('chrome-hidden');
+        await wait(340);
+        const away = read();
+        document.body.classList.remove('chrome-hidden');
+        await wait(340);
+        return { shown: shown, away: away, tabbarTop: Math.round(tabbar.getBoundingClientRect().top), viewportH: window.innerHeight };
+    });
+    ok('កាតប្រវត្តិមានស៊ុមខាងក្រោមពិត (::after មានកម្ពស់)', frameEdge.shown.h > 0, frameEdge);
+    ok('របា Tab ឃើញ ➜ ស៊ុមកាតឈរនៅពីលើរបា Tab',
+        frameEdge.shown.edgeTop <= frameEdge.tabbarTop && frameEdge.shown.edgeTop >= frameEdge.tabbarTop - 20, frameEdge);
+    ok('របា Tab លាក់ ➜ ស៊ុមរអិលចុះតាមរបា', frameEdge.away.edgeTop > frameEdge.shown.edgeTop, frameEdge);
+    ok('ការរំកិលស៊ុមមិនប្តូរកម្ពស់ប្រអប់រមូរ (transform សុទ្ធ)',
+        frameEdge.shown.tableH === frameEdge.away.tableH, frameEdge);
+
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
 

@@ -187,7 +187,7 @@
                 display: flex;
                 flex-direction: column;
                 overflow-y: hidden;
-                padding-bottom: 8px;
+                padding-bottom: 0;
             }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
@@ -204,7 +204,32 @@
             .app-pages.history-expanded .table-responsive::after {
                 content: '';
                 display: block;
-                height: var(--chrome-bottom, 62px);
+                height: calc(var(--chrome-bottom, 62px) + 4px);
+            }
+            /* ស៊ុមខាងក្រោមនៃកាតប្រវត្តិ ត្រូវឈរនៅពីលើរបា Tab ឲ្យឃើញច្បាស់។
+               វាជាស្រទាប់គ្រប **ខាងលើ** តារាង មិនមែនជាការបង្រួមប្រអប់រមូរទេ
+               ដូច្នេះវារំកិលដោយ `transform` សុទ្ធ ➜ layout មិនប្រែ ➜ បញ្ជីមិនលោត។ */
+            .app-pages.history-expanded .history-section { position: relative; }
+            .app-pages.history-expanded .history-section::after {
+                content: '';
+                position: absolute;
+                left: -1px;
+                right: -1px;
+                bottom: -1px;
+                height: calc(var(--chrome-bottom, 62px) + 12px);
+                box-sizing: border-box;
+                background: var(--body-bg);
+                border: 1px solid var(--border-color);
+                border-top: none;
+                border-bottom-left-radius: var(--radius-lg);
+                border-bottom-right-radius: var(--radius-lg);
+                pointer-events: none;
+                z-index: 11;
+                transform: translate3d(0, 0, 0);
+                transition: transform 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+            }
+            body.chrome-hidden .app-pages.history-expanded .history-section::after {
+                transform: translate3d(0, var(--chrome-bottom, 62px), 0);
             }
         }
 
@@ -439,7 +464,8 @@
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .page-tabbar { transition: none; }
+            .page-tabbar,
+            .app-pages.history-expanded .history-section::after { transition: none; }
         }
 
         .ptr-indicator {

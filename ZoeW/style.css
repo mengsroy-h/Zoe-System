@@ -175,8 +175,31 @@
                 border-width: 0;
             }
             .table-responsive { max-height: 62vh; }
-            .page-side.collapsed + .page-main .table-responsive { max-height: 78vh; }
-            .app-pages.history-expanded { overscroll-behavior-y: contain; }
+
+            /* ពេលអ្នកប្រើទាញផ្ទាំងប្រវត្តិឡើង (history-expanded) តារាងត្រូវពេញអេក្រង់
+               ពិតប្រាកដ។ ការប្រើ vh ថេរ (62/78vh) មិនដែលត្រូវទេ ព្រោះវាមិនដឹង
+               កម្ពស់ navbar, ក្បាលកាត, របាច្រោះ, របា Tab និង safe-area។
+               ដូច្នេះប្រើខ្សែសង្វាក់ flex ដែលបំពេញកន្លែងដែលនៅសល់ពិត។ */
+            .app-pages.history-expanded {
+                overscroll-behavior-y: contain;
+                display: flex;
+                flex-direction: column;
+                overflow-y: hidden;
+            }
+            /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
+            .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
+            .app-pages.history-expanded .page-main { flex: 1; min-height: 0; }
+            .app-pages.history-expanded .history-section { flex: 1; min-height: 0; }
+            .app-pages.history-expanded .table-responsive {
+                max-height: none;
+                flex: 1;
+                min-height: 0;
+            }
+            /* ពេលរបា Tab លាក់ខ្លួន កន្លែងដែលវាកក់ទុកត្រូវប្រគល់មកតារាងវិញ */
+            body.chrome-hidden .app-pages.history-expanded {
+                padding-bottom: calc(8px + env(safe-area-inset-bottom));
+                transition: padding-bottom 0.26s cubic-bezier(0.22, 0.61, 0.36, 1);
+            }
         }
 
         .page-tabbar {

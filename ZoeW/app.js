@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.2.0';
+    const APP_VERSION = '2.2.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2924,8 +2924,8 @@
         document.body.appendChild(indicator);
 
         const AXIS_SLOP = 18;
-        const TRIGGER_AT = 62;
-        const MAX_TRAVEL = 92;
+        const TRIGGER_AT = 84;
+        const MAX_TRAVEL = 130;
         const REST_Y = -46;
 
         let startY = 0;
@@ -2936,7 +2936,7 @@
         let refreshing = false;
 
         function dampen(raw) {
-            return MAX_TRAVEL * (1 - Math.exp(-raw / 110));
+            return MAX_TRAVEL * (1 - Math.exp(-raw / 150));
         }
 
         function paint(distance) {
@@ -4173,6 +4173,7 @@
     const ENTRY_SCAN_MODE_KEY = 'zoe_entry_scan_mode';
     const ENTRY_LIST_MAX_ROWS = 200;
     const LOCKER_LIST_MAX_ROWS = 200;
+    const DELETED_LIST_MAX_ROWS = 200;
 
     let activeLocker = localStorage.getItem(ACTIVE_LOCKER_KEY) || '';
     let entryScanMode = localStorage.getItem(ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
@@ -5869,11 +5870,11 @@
             return;
         }
 
-        deletedItems.forEach((item) => {
+        let html = '';
+        deletedItems.slice(0, DELETED_LIST_MAX_ROWS).forEach((item) => {
             let deleteTypeLabel = item.isFromDeletion ? "លុបទាំងមូល" : "ដកកញ្ចប់";
             let displayCode = item.barcodes && item.barcodes.length > 0 ? item.barcodes[0].code : item.barcode;
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
+            html += `<tr>
                 <td><strong>${sanitizeInput(item.phone)}</strong><br><small style="color:var(--text-muted);">${deleteTypeLabel}</small></td>
                 <td><span class="barcode-tag">${sanitizeInput(displayCode)}</span></td>
                 <td style="text-align: center;">
@@ -5882,9 +5883,12 @@
                         <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
                     </div>
                 </td>
-            `;
-            tbody.appendChild(tr);
+            </tr>`;
         });
+        if (deletedItems.length > DELETED_LIST_MAX_ROWS) {
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${deletedItems.length - DELETED_LIST_MAX_ROWS} ធាតុទៀត (ធាតុចាស់ជាង ១០ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
+        }
+        tbody.innerHTML = html;
     }
 
     function promptRestoreDeletedItem(id) {

@@ -206,6 +206,80 @@ const GESTURE = function (steps) {
     ok('ប្រអប់បើក ➜ មិនកេះ refresh', inModal.reloaded === false, inModal);
     await page.evaluate(() => window.closeModal('exchangeRateModal'));
 
+    console.log('\n=== ផ្ទាំងប្រវត្តិពេញអេក្រង់ (ទាញឡើង) ===');
+    await resetState();
+    const fullscreen = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const pages = document.getElementById('appPages');
+        const table = document.getElementById('tableResponsive');
+        const handle = document.getElementById('dragHandle');
+        const side = document.getElementById('dataSideSection');
+        if (!pages || !table || !handle || !side) return { missing: true };
+
+        const before = { expanded: pages.classList.contains('history-expanded'), tableH: table.clientHeight };
+        handle.click();
+        await wait(450);
+
+        const pagesBox = pages.getBoundingClientRect();
+        const pagesStyle = window.getComputedStyle(pages);
+        const padTop = parseFloat(pagesStyle.paddingTop);
+        const padBottom = parseFloat(pagesStyle.paddingBottom);
+        const innerTop = pagesBox.top + padTop;
+        const innerBottom = pagesBox.bottom - padBottom;
+        const tableBox = table.getBoundingClientRect();
+        const card = table.closest('.history-section');
+        const cardBox = card ? card.getBoundingClientRect() : tableBox;
+        const handleBox = handle.getBoundingClientRect();
+
+        return {
+            expandedBefore: before.expanded,
+            expanded: pages.classList.contains('history-expanded'),
+            sideCollapsed: side.classList.contains('collapsed'),
+            tableHBefore: before.tableH,
+            tableH: table.clientHeight,
+            // ចន្លោះទទេនៅសល់ខាងលើ និងខាងក្រោមកាតប្រវត្តិ ក្នុងតំបន់មាតិកា
+            // ដងអូសជាឧបករណ៍ពិត មិនមែនចន្លោះទទេទេ — វាស់ចន្លោះខាងលើដងអូស
+            gapTop: Math.round(handleBox.top - innerTop),
+            handleToCard: Math.round(cardBox.top - handleBox.bottom),
+            gapBottom: Math.round(innerBottom - cardBox.bottom),
+            pagesScrolls: pages.scrollHeight > pages.clientHeight + 1,
+            viewportH: window.innerHeight
+        };
+    });
+    ok('ចុចដងអូស ➜ ចូលរបៀបប្រវត្តិពេញអេក្រង់', fullscreen.expanded === true && fullscreen.sideCollapsed === true, fullscreen);
+    ok('តារាងខ្ពស់ជាងមុនក្រោយទាញឡើង', fullscreen.tableH > fullscreen.tableHBefore, fullscreen);
+    ok('គ្មានចន្លោះទទេនៅសល់ខាងលើដងអូស (≤2px)', Math.abs(fullscreen.gapTop) <= 2, fullscreen);
+    ok('ដងអូសនៅជាប់កាតប្រវត្តិ (≤10px)', fullscreen.handleToCard <= 10, fullscreen);
+    ok('គ្មានចន្លោះទទេនៅសល់ខាងក្រោមកាតប្រវត្តិ (≤2px)', Math.abs(fullscreen.gapBottom) <= 2, fullscreen);
+    ok('របៀបពេញអេក្រង់ ➜ ទំព័រខាងក្រៅលែងរមូរ (តារាងទទួលការរមូរទាំងអស់)', fullscreen.pagesScrolls === false, fullscreen);
+
+    // ត្រូវសម្របតាមទំហំអេក្រង់ ដោយស្វ័យប្រវត្តិ — មិនមែនតួលេខ vh ថេរទេ
+    const adaptive = [];
+    for (const h of [640, 780, 900, 1024]) {
+        await page.setViewportSize({ width: 412, height: h });
+        await page.evaluate(() => new Promise((r) => setTimeout(r, 260)));
+        adaptive.push(await page.evaluate(() => {
+            const pages = document.getElementById('appPages');
+            const table = document.getElementById('tableResponsive');
+            const st = window.getComputedStyle(pages);
+            const innerH = pages.clientHeight - parseFloat(st.paddingTop) - parseFloat(st.paddingBottom);
+            const card = table.closest('.history-section');
+            const handle = document.getElementById('dragHandle');
+            const used = card.getBoundingClientRect().height + handle.getBoundingClientRect().height +
+                parseFloat(window.getComputedStyle(document.getElementById('dataMainSection')).rowGap || '0');
+            return { vh: window.innerHeight, tableH: table.clientHeight, gap: Math.round(innerH - used) };
+        }));
+    }
+    await page.setViewportSize({ width: 412, height: 780 });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 260)));
+    ok('កម្ពស់តារាងកើនតាមកម្ពស់អេក្រង់ (សម្របស្វ័យប្រវត្តិ)',
+        adaptive.every((a, i) => i === 0 || a.tableH > adaptive[i - 1].tableH), JSON.stringify(adaptive));
+    ok('គ្មានចន្លោះទទេនៅសល់លើគ្រប់ទំហំអេក្រង់ដែលសាកល្បង',
+        adaptive.every((a) => Math.abs(a.gap) <= 2), JSON.stringify(adaptive));
+
+    await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 400)));
+
     console.log('\n=== ការលាក់ navbar/tabbar តាមទិសរមូរ ===');
     const scrollTo = (top) => page.evaluate((t) => {
         const el = document.getElementById('tableResponsive') || document.getElementById('appPages');

@@ -57,6 +57,13 @@ for (const app of ['ZoeW']) {
         vm.createContext(ctx);
         vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
         vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
+        ['scanConfirmCode', 'scanConfirmCount', 'scanConfirmAt'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        const resetScanFn = sliceFn(src, 'resetScanConfirm');
+        if (resetScanFn) vm.runInContext(resetScanFn, ctx);
+        vm.runInContext('scanConfirmCode = "ZTO9999000111"; scanConfirmCount = 1; scanConfirmAt = 123;', ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
         if (helper) vm.runInContext(helper, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
@@ -66,6 +73,9 @@ for (const app of ['ZoeW']) {
         let threw = null;
         try { ctx.showLoginModalWithPrefill(); } catch (e) { threw = e; }
         ok(!threw, 'logout runs without throwing', threw && threw.message);
+        ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
+            'the barcode held for scan confirmation does not survive logout',
+            vm.runInContext('scanConfirmCode', ctx));
 
         if (!pinOpen) {
             ok(ctx[stateVar] === null,

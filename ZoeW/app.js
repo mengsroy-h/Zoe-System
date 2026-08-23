@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.3.1';
+    const APP_VERSION = '2.4.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -89,9 +89,10 @@
 
     let codeReader = null;
     let liveScanCodeReader = null;
-    let fastScanCodeReader = null;
-    let fastScanFormatName = '';
-    let lastDecodedFormatName = '';
+    let scanConfirmCode = '';
+    let scanConfirmCount = 0;
+    let scanConfirmAt = 0;
+    let scanVideoResumeTimer = null;
     let currentStream = null;
     let isCameraScanning = false;
     let isCameraStarting = false;
@@ -176,6 +177,27 @@
         if(modalEl) modalEl.style.display = 'flex';
     }
 
+    function resumeScanVideo() {
+        if (!currentStream || !isCameraScanning) return;
+        const videoElement = document.getElementById('video');
+        if (!videoElement) return;
+        try {
+            const playing = videoElement.play();
+            if (playing && typeof playing.catch === 'function') playing.catch(() => {});
+        } catch (e) {}
+    }
+
+    function onScanVideoPause() {
+        if (!currentStream || !isCameraScanning) return;
+        if (scanVideoResumeTimer) return;
+        scanVideoResumeTimer = setTimeout(() => {
+            scanVideoResumeTimer = null;
+            const videoElement = document.getElementById('video');
+            if (!videoElement || !videoElement.paused) return;
+            resumeScanVideo();
+        }, 150);
+    }
+
     function closeModal(modalId) {
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'none';
@@ -184,7 +206,10 @@
         editingItemId = null;
         markingItemId = null;
         isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
-        if (!isModalOpen) safeFocusScanner();
+        if (!isModalOpen) {
+            safeFocusScanner();
+            resumeScanVideo();
+        }
     }
 
     function dismissPhoneModal() {
@@ -193,7 +218,9 @@
         if (!modalEl || modalEl.style.display !== 'flex') return;
         phoneModalDismissPromptOpen = true;
         setTimeout(() => { phoneModalDismissPromptOpen = false; }, 0);
-        if (!confirm("តើអ្នកពិតជាចង់បោះបង់កញ្ចប់នេះមែនទេ? ព័ត៌មានដែលបានវាយបញ្ចូល (លេខទូរស័ព្ទ, Locker, COD, DOD) នឹងបាត់ ហើយកញ្ចប់នេះនឹងមិនត្រូវបានរក្សាទុកទេ។")) return;
+        const confirmed = confirm("តើអ្នកពិតជាចង់បោះបង់កញ្ចប់នេះមែនទេ? ព័ត៌មានដែលបានវាយបញ្ចូល (លេខទូរស័ព្ទ, Locker, COD, DOD) នឹងបាត់ ហើយកញ្ចប់នេះនឹងមិនត្រូវបានរក្សាទុកទេ។");
+        resumeScanVideo();
+        if (!confirmed) return;
         closeModal('phoneModal');
     }
 
@@ -1486,6 +1513,7 @@
         pendingLockerCode = null;
         lockerBarcodeIndex = {};
         recentPhonesSignature = null;
+        resetScanConfirm();
         showAppChrome();
         const fieldsToBlank = [
             'securityPinInput', 'newSecurityPinInput', 'loginPasswordInput', 'activationKeyInput',
@@ -2311,7 +2339,7 @@
 
         if ('BarcodeDetector' in window) {
             try {
-                nativeDetector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'] });
+                nativeDetector = new BarcodeDetector({ formats: NATIVE_SCAN_FORMAT_NAMES });
             } catch (e) {
                 nativeDetector = null;
             }
@@ -2831,11 +2859,16 @@
         };
     }
 
-    function measureChromeTop() {
-        const { navbar } = appChromeElements();
-        if (!navbar) return;
-        const height = navbar.offsetHeight;
-        if (height > 0) document.documentElement.style.setProperty('--chrome-top', height + 'px');
+    function measureAppChromeSize() {
+        const { navbar, tabbar } = appChromeElements();
+        if (navbar) {
+            const topHeight = navbar.offsetHeight;
+            if (topHeight > 0) document.documentElement.style.setProperty('--chrome-top', topHeight + 'px');
+        }
+        if (tabbar) {
+            const bottomHeight = tabbar.offsetHeight;
+            if (bottomHeight > 0) document.documentElement.style.setProperty('--chrome-bottom', bottomHeight + 'px');
+        }
     }
 
     function showAppChrome() {
@@ -2870,9 +2903,10 @@
         if (!pages || !navbar || !tabbar) return;
 
         const TOP_ZONE = 56;
-        const HIDE_AFTER = 30;
-        const SHOW_AFTER = 16;
+        const HIDE_AFTER = 36;
+        const SHOW_AFTER = 48;
         const BOTTOM_ZONE = 24;
+        const MAX_STEP = 120;
 
         let activeScroller = null;
         let lastScrollTop = 0;
@@ -2895,20 +2929,21 @@
             if (!delta) return;
             if (top <= TOP_ZONE) { travel = 0; showAppChrome(); return; }
             if (el.scrollHeight - top - el.clientHeight <= BOTTOM_ZONE) { travel = 0; return; }
-            if ((delta > 0) !== (travel > 0)) travel = 0;
-            travel += delta;
+            const step = Math.max(-MAX_STEP, Math.min(MAX_STEP, delta));
+            if ((step > 0) !== (travel > 0)) travel = 0;
+            travel += step;
             if (travel > HIDE_AFTER) { travel = 0; hideAppChrome(); }
             else if (travel < -SHOW_AFTER) { travel = 0; showAppChrome(); }
         };
 
         document.addEventListener('scroll', onScroll, { capture: true, passive: true });
         window.addEventListener('resize', () => {
-            measureChromeTop();
+            measureAppChromeSize();
             if (window.innerWidth >= 992) showAppChrome();
         });
-        if (window.visualViewport) window.visualViewport.addEventListener('resize', measureChromeTop);
-        measureChromeTop();
-        setTimeout(measureChromeTop, 300);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', measureAppChromeSize);
+        measureAppChromeSize();
+        setTimeout(measureAppChromeSize, 300);
     }
 
     function setupIOSPullToRefresh() {
@@ -3512,8 +3547,14 @@
         torchOn = false;
         const overlay = document.getElementById('videoControlsOverlay');
         if (overlay) overlay.style.display = 'none';
+        if (scanVideoResumeTimer) {
+            clearTimeout(scanVideoResumeTimer);
+            scanVideoResumeTimer = null;
+        }
+        resetScanConfirm();
         const videoElement = document.getElementById('video');
         if (videoElement) {
+            videoElement.removeEventListener('pause', onScanVideoPause);
             videoElement.pause();
             videoElement.srcObject = null;
         }
@@ -3596,10 +3637,11 @@
 
                 const beginScanning = () => {
                     if (!currentStream) return;
+                    videoElement.addEventListener('pause', onScanVideoPause);
                     videoElement.play().catch(() => {});
                     if (nativeDetector) {
                         startFastNativeScan(videoElement);
-                    } else if (fastScanCodeReader || liveScanCodeReader) {
+                    } else if (liveScanCodeReader) {
                         startZxingVideoScan(videoElement);
                     }
                 };
@@ -3719,8 +3761,9 @@
                         const bitmap = await createImageBitmap(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight);
                         try {
                             const barcodes = await nativeDetector.detect(bitmap);
-                            if (barcodes && barcodes.length > 0 && !isModalOpen && currentStream && isCameraScanning && nativeLoopActive) {
-                                processScannedCode(barcodes[0].rawValue);
+                            const confirmed = barcodes && barcodes.length > 0 ? confirmLiveScan(barcodes[0].rawValue) : '';
+                            if (confirmed && !isModalOpen && currentStream && isCameraScanning && nativeLoopActive) {
+                                processScannedCode(confirmed);
                             }
                         } finally {
                             bitmap.close();
@@ -3741,15 +3784,16 @@
 
     let ownCaptureCanvas = null;
     let ownCaptureCtx = null;
-    const ONE_D_FORMAT_NAMES = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
-    const DEFAULT_FAST_SCAN_FORMAT = 'CODE_128';
+    const SCAN_FORMAT_NAMES = ['CODE_128'];
+    const NATIVE_SCAN_FORMAT_NAMES = ['code_128'];
     const LIVE_SCAN_MAX_DIM = 640;
     const LIVE_SCAN_MIN_INTERVAL_MS = 60;
     const LIVE_SCAN_MAX_INTERVAL_MS = 220;
-    const LIVE_FULL_SWEEP_EVERY = 4;
+    const SCAN_CONFIRM_REPEATS = 2;
+    const SCAN_CONFIRM_WINDOW_MS = 1500;
 
-    function buildOneDReader(formatNames, tryHarder) {
-        const formats = formatNames.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
+    function buildScanReader(tryHarder) {
+        const formats = SCAN_FORMAT_NAMES.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
         if (!formats.length) return null;
         const hints = new Map();
         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
@@ -3759,25 +3803,35 @@
 
     function initScanEngine() {
         try {
-            codeReader = buildOneDReader(ONE_D_FORMAT_NAMES, true);
-            liveScanCodeReader = buildOneDReader(ONE_D_FORMAT_NAMES, false);
-            fastScanFormatName = DEFAULT_FAST_SCAN_FORMAT;
-            fastScanCodeReader = buildOneDReader([fastScanFormatName], false);
+            codeReader = buildScanReader(true);
+            liveScanCodeReader = buildScanReader(false);
         } catch (e) {
             console.error("ZXing Initialization error: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "ZXing Initialization error: " });
         }
     }
 
-    function syncFastScanFormat() {
-        if (!lastDecodedFormatName || lastDecodedFormatName === fastScanFormatName) return;
-        if (ONE_D_FORMAT_NAMES.indexOf(lastDecodedFormatName) === -1) return;
-        try {
-            const rebuilt = buildOneDReader([lastDecodedFormatName], false);
-            if (!rebuilt) return;
-            fastScanCodeReader = rebuilt;
-            fastScanFormatName = lastDecodedFormatName;
-        } catch (e) {}
+    function resetScanConfirm() {
+        scanConfirmCode = '';
+        scanConfirmCount = 0;
+        scanConfirmAt = 0;
+    }
+
+    function confirmLiveScan(code) {
+        const text = String(code || '').trim();
+        if (!text) return '';
+        const now = Date.now();
+        if (text !== scanConfirmCode || now - scanConfirmAt > SCAN_CONFIRM_WINDOW_MS) {
+            scanConfirmCode = text;
+            scanConfirmCount = 1;
+            scanConfirmAt = now;
+            return '';
+        }
+        scanConfirmAt = now;
+        scanConfirmCount++;
+        if (scanConfirmCount < SCAN_CONFIRM_REPEATS) return '';
+        resetScanConfirm();
+        return text;
     }
 
     function decodeBarcodeFromCanvasManual(reader, canvas) {
@@ -3789,26 +3843,17 @@
 
     function readResultText(result) {
         if (!result) return '';
-        try {
-            const format = typeof result.getBarcodeFormat === 'function' ? result.getBarcodeFormat() : result.format;
-            const name = ZXing.BarcodeFormat[format];
-            if (typeof name === 'string') lastDecodedFormatName = name;
-        } catch (e) {}
         return result.text || (typeof result.getText === 'function' ? result.getText() : '');
     }
 
-    function decodeLiveFrame(canvas, includeFullSweep) {
+    function decodeLiveFrame(canvas) {
+        if (!liveScanCodeReader) return '';
         const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
         const binarizer = new ZXing.HybridBinarizer(luminanceSource);
         const bitmap = new ZXing.BinaryBitmap(binarizer);
-        const readers = includeFullSweep ? [fastScanCodeReader, liveScanCodeReader] : [fastScanCodeReader];
-        for (let i = 0; i < readers.length; i++) {
-            if (!readers[i]) continue;
-            try {
-                const text = readResultText(readers[i].decodeBitmap(bitmap));
-                if (text) return text;
-            } catch (e) {}
-        }
+        try {
+            return readResultText(liveScanCodeReader.decodeBitmap(bitmap));
+        } catch (e) {}
         return '';
     }
 
@@ -3823,7 +3868,6 @@
 
         let lastCheck = 0;
         let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
-        let sweepCounter = 0;
         function loop(timestamp) {
             if (!currentStream || !isCameraScanning || !zxingLoopActive) return;
             if (timestamp - lastCheck > nextDelay) {
@@ -3840,11 +3884,10 @@
                         if (ownCaptureCanvas.height !== targetHeight) ownCaptureCanvas.height = targetHeight;
                         ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, targetWidth, targetHeight);
 
-                        sweepCounter++;
-                        const text = decodeLiveFrame(ownCaptureCanvas, sweepCounter % LIVE_FULL_SWEEP_EVERY === 0);
-                        if (text && !isModalOpen) {
-                            syncFastScanFormat();
-                            processScannedCode(text);
+                        const text = decodeLiveFrame(ownCaptureCanvas);
+                        const confirmed = confirmLiveScan(text);
+                        if (confirmed && !isModalOpen) {
+                            processScannedCode(confirmed);
                         }
                     } catch (e) {
                     } finally {

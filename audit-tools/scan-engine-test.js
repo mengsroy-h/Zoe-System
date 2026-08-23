@@ -1,10 +1,17 @@
-// ថ្នាក់៖ ល្បឿនម៉ាស៊ីនស្កេន Barcode ។ វាស់ផ្លូវឌិកូដ **ពិត** ចេញពី app.js
-// (decodeBarcodeFromCanvasManual + hints ពិតរបស់ initScanEngine) លើ CODE_128
-// ដែលបង្កើតដោយ encoder របស់ ZXing ខ្លួនឯង ក្នុង Chromium ពិត។
+// ថ្នាក់៖ ល្បឿន **និងភាពត្រឹមត្រូវ** នៃម៉ាស៊ីនស្កេន Barcode ។ វាស់ផ្លូវឌិកូដ
+// **ពិត** ចេញពី app.js (decodeBarcodeFromCanvasManual + hints ពិតរបស់
+// initScanEngine) លើ CODE_128 ដែលបង្កើតដោយ encoder ក្នុងតេស្តនេះ រួចបញ្ជាក់
+// ដោយ decoder ពិតរបស់ ZXing ក្នុង Chromium ពិត។
 //
 // ហេតុអ្វីវាសំខាន់៖ `BarcodeDetector` គឺជា API របស់ Chromium — **Safari/iOS
 // មិនមានវាទេ** ដូច្នេះលើ iPhone មានតែ ZXing (JavaScript សុទ្ធ) ដែលដំណើរការ
 // ចំណែក Android ប្រើ decoder ដើមរបស់ប្រព័ន្ធ។ នោះជាឫសគល់នៃគម្លាតល្បឿន។
+//
+// ថ្នាក់កំហុសទី ២ ដែលឯកសារនេះចាក់សោ៖ **ការអានលេខខុស (misread)**។ ITF, CODABAR
+// និង CODE_39 គ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ចទេ ➜ ពេលបញ្ជី format មានពួកវា
+// ស៊ុមមួយអាចឌិកូដចេញ **លេខផ្សេងទាំងស្រុង** ដោយជោគជ័យ។ CODE_128 មាន mod-103
+// ជាកាតព្វកិច្ច។ តេស្តនេះគូរ ITF ពិតមួយ រួចអះអាងថា reader បច្ចុប្បន្នរបស់ App
+// **បដិសេធវា** ចំណែក reader ១១ format **ទទួលយកវា** — នោះជាភស្តុតាងផ្ទាល់។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.log('SKIP — ត្រូវការ playwright-core'); process.exit(0); }
 const fs = require('fs'), http = require('http'), path = require('path');
@@ -63,32 +70,36 @@ function serve(files) {
     if (!decodeFn || !initFn) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }
 
     const liveMax = (src.match(/const LIVE_SCAN_MAX_DIM = (\d+);/) || [])[1];
-    const buildFn = sliceFn(src, 'buildOneDReader');
-    const syncFn = sliceFn(src, 'syncFastScanFormat');
+    const buildFn = sliceFn(src, 'buildScanReader');
+    const confirmFn = (sliceFn(src, 'resetScanConfirm') || '') + '\n' + (sliceFn(src, 'confirmLiveScan') || '');
     const tryFn = (sliceFn(src, 'readResultText') || '') + '\n' + (sliceFn(src, 'decodeLiveFrame') || '');
-    ok('រកឃើញ buildOneDReader() ក្នុង app.js', !!buildFn);
-    const constLines = ['ONE_D_FORMAT_NAMES', 'DEFAULT_FAST_SCAN_FORMAT', 'LIVE_SCAN_MAX_DIM',
-        'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS', 'LIVE_FULL_SWEEP_EVERY']
+    ok('រកឃើញ buildScanReader() ក្នុង app.js', !!buildFn);
+    ok('រកឃើញ confirmLiveScan() ក្នុង app.js', !!sliceFn(src, 'confirmLiveScan'));
+    if (!buildFn || !confirmFn.trim()) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }
+    const constLines = ['SCAN_FORMAT_NAMES', 'NATIVE_SCAN_FORMAT_NAMES', 'LIVE_SCAN_MAX_DIM',
+        'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS', 'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS']
         .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
 
     const page1 = `<!doctype html><meta charset="utf-8"><body>
 <script src="/zxing.js"></script>
 <script>
-let codeReader = null, liveScanCodeReader = null, fastScanCodeReader = null;
-let fastScanFormatName = '', lastDecodedFormatName = '';
+let codeReader = null, liveScanCodeReader = null;
+let scanConfirmCode = '', scanConfirmCount = 0, scanConfirmAt = 0;
 ${constLines}
 ${buildFn || ''}
 ${initFn}
 ${decodeFn}
 ${cropFn}
-${syncFn || ''}
+${confirmFn}
 ${tryFn || ''}
 window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect,
-                 syncFastScanFormat: typeof syncFastScanFormat === 'function' ? syncFastScanFormat : null,
                  decodeLiveFrame: typeof decodeLiveFrame === 'function' ? decodeLiveFrame : null,
-                 state: () => ({ fastScanFormatName, lastDecodedFormatName }),
-                 setFast: (r, n) => { fastScanCodeReader = r; fastScanFormatName = n; },
-                 readers: () => ({ codeReader, liveScanCodeReader, fastScanCodeReader }) };
+                 confirmLiveScan: typeof confirmLiveScan === 'function' ? confirmLiveScan : null,
+                 resetScanConfirm: typeof resetScanConfirm === 'function' ? resetScanConfirm : null,
+                 setLive: (r) => { liveScanCodeReader = r; },
+                 formats: () => SCAN_FORMAT_NAMES.slice(),
+                 nativeFormats: () => NATIVE_SCAN_FORMAT_NAMES.slice(),
+                 readers: () => ({ codeReader, liveScanCodeReader }) };
 </script></body>`;
 
     const server = await serve({
@@ -105,11 +116,15 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     const engineOk = await page.evaluate(() => {
         window.__api.initScanEngine();
         const r = window.__api.readers();
-        return !!(r.codeReader && r.liveScanCodeReader && r.fastScanCodeReader);
+        return !!(r.codeReader && r.liveScanCodeReader);
     });
-    ok('initScanEngine() សាង reader ទាំង ៣ បាន (ពេញ, live, លឿន)', engineOk);
-    ok('ជាន់លឿនចាប់ផ្តើមដោយ CODE_128',
-        (await page.evaluate(() => window.__api.state().fastScanFormatName)) === 'CODE_128');
+    ok('initScanEngine() សាង reader បានទាំង ២ (រូបភាព, live)', engineOk);
+    ok('បញ្ជី format របស់ ZXing មានតែ CODE_128',
+        JSON.stringify(await page.evaluate(() => window.__api.formats())) === '["CODE_128"]',
+        await page.evaluate(() => window.__api.formats()));
+    ok('បញ្ជី format របស់ BarcodeDetector (Android) មានតែ code_128',
+        JSON.stringify(await page.evaluate(() => window.__api.nativeFormats())) === '["code_128"]',
+        await page.evaluate(() => window.__api.nativeFormats()));
 
     // សាង CODE_128 ដោយ encoder របស់ ZXing ខ្លួនឯង រួចគូរជាស៊ុមវីដេអូក្លែងធម្មជាតិ
     const bench = await page.evaluate(() => {
@@ -236,18 +251,63 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
             out['FMT_' + label] = { ms: Math.round(((performance.now() - tf) / 12) * 100) / 100, hitRate: hits / 12, miss: miss };
         });
 
-        // តម្លៃមធ្យមក្នុងមួយស៊ុមតាមផ្លូវ ២ ជាន់ (fast lane រាល់ស៊ុម + full sweep រាល់ N ស៊ុម)
-        const SWEEP_N = 4;
+        // ផ្លូវ live ពិតរបស់ App (decodeLiveFrame ➜ liveScanCodeReader តែមួយ)
+        // ធៀបនឹងផ្លូវចាស់ដែលបោសគ្រប់ ១១ format រាល់ស៊ុម
         const emptyLive = paintEmpty(640, 397);
-        const fastReader = readerFor(['CODE_128']);
         const fullReader = readerFor(ALL);
-        window.__api.setFast(fastReader, 'CODE_128');
         let tLane = performance.now();
-        for (let i = 1; i <= 32; i++) window.__api.decodeLiveFrame(emptyLive, i % SWEEP_N === 0);
-        out.TWO_LANE_avg = { ms: Math.round(((performance.now() - tLane) / 32) * 100) / 100, hitRate: 0 };
+        for (let i = 0; i < 24; i++) window.__api.decodeLiveFrame(emptyLive);
+        out.LIVE_now = { ms: Math.round(((performance.now() - tLane) / 24) * 100) / 100, hitRate: 0 };
         tLane = performance.now();
         for (let i = 0; i < 16; i++) { try { window.__api.decodeBarcodeFromCanvasManual(fullReader, emptyLive); } catch (e) {} }
-        out.ONE_LANE_avg = { ms: Math.round(((performance.now() - tLane) / 16) * 100) / 100, hitRate: 0 };
+        out.LIVE_all11 = { ms: Math.round(((performance.now() - tLane) / 16) * 100) / 100, hitRate: 0 };
+
+        // === ការអានលេខខុសឆ្លង format ===
+        // ITF (Interleaved 2 of 5) គ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ចទេ ➜ ស៊ុមមួយ
+        // អាចឌិកូដចេញ **លេខផ្សេងទាំងស្រុង** ដោយជោគជ័យ។ គូរ ITF ពិតមួយ រួចមើល
+        // ថា reader មួយណាទទួល មួយណាបដិសេធ។
+        const ITF_DIGITS = { '0': 'NNWWN', '1': 'WNNNW', '2': 'NWNNW', '3': 'WWNNN', '4': 'NNWNW',
+                             '5': 'WNWNN', '6': 'NWWNN', '7': 'NNNWW', '8': 'WNNWN', '9': 'NWNWN' };
+        function paintITF(text, h, mw) {
+            const nb = mw, wb = mw * 3;
+            const runs = [];
+            runs.push([nb, 1], [nb, 0], [nb, 1], [nb, 0]);
+            for (let i = 0; i < text.length; i += 2) {
+                const a = ITF_DIGITS[text[i]], b = ITF_DIGITS[text[i + 1]];
+                for (let k = 0; k < 5; k++) {
+                    runs.push([a[k] === 'W' ? wb : nb, 1]);
+                    runs.push([b[k] === 'W' ? wb : nb, 0]);
+                }
+            }
+            runs.push([wb, 1], [nb, 0], [nb, 1]);
+            const bw = runs.reduce((acc, r) => acc + r[0], 0);
+            const quiet = mw * 30;
+            const w = bw + quiet * 2;
+            const bh = Math.round(h * 0.4);
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const g = c.getContext('2d', { willReadFrequently: true });
+            g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+            const oy = Math.round((h - bh) / 2);
+            let x = quiet;
+            runs.forEach(([width, isBar]) => {
+                if (isBar) { g.fillStyle = '#000000'; g.fillRect(x, oy, width, bh); }
+                x += width;
+            });
+            return c;
+        }
+        function tryDecode(reader, canvas) {
+            try { return window.__api.decodeBarcodeFromCanvasManual(reader, canvas) || ''; }
+            catch (e) { return ''; }
+        }
+        const ITF_TEXT = '17251234';
+        const itfFrame = paintITF(ITF_TEXT, 460, 3);
+        out.__misread = {
+            itfText: ITF_TEXT,
+            all11: tryDecode(readerFor(ALL), itfFrame),
+            app: tryDecode(readers.liveScanCodeReader, itfFrame),
+            appImage: tryDecode(window.__api.readers().codeReader, itfFrame)
+        };
 
         // តម្លៃដែលកូដកំពុងប្រើពិត (គូរឡើងវិញរាល់ស៊ុម ធៀបនឹងការប្រើ canvas ដដែល)
         const c = paintFrame(800, 496);
@@ -259,7 +319,7 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
 
     console.log('\n=== ល្បឿនឌិកូដ ZXing (ផ្លូវដែល iPhone ប្រើ) ===');
     console.log('    self-test decode: ' + bench.__selfTest);
-    Object.keys(bench).filter((k) => k !== 'canvasResize30x' && k !== '__selfTest').forEach((k) => {
+    Object.keys(bench).filter((k) => k !== 'canvasResize30x' && k[0] !== '_').forEach((k) => {
         const b = bench[k];
         console.log('    ' + k.padEnd(16) + ' ' + String(b.ms).padStart(7) + ' ms/ស៊ុម   រកឃើញ ' + Math.round(b.hitRate * 100) + '%' +
             (b.miss !== undefined ? '   ផ្លូវបរាជ័យ ' + b.miss + ' ms' : ''));
@@ -271,34 +331,63 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     ok('format តែមួយ លឿនជាង ១១ format យ៉ាងតិច ៣ ដង លើផ្លូវបរាជ័យ',
         bench.FMT_CODE128_only.miss * 3 <= bench.FMT_ALL_11.miss,
         { all11: bench.FMT_ALL_11.miss, one: bench.FMT_CODE128_only.miss });
-    ok('ផ្លូវ ២ ជាន់ លឿនជាងផ្លូវ ១ ជាន់ (១១ format រាល់ស៊ុម) យ៉ាងតិច ១.៨ ដង',
-        bench.TWO_LANE_avg.ms * 1.8 <= bench.ONE_LANE_avg.ms,
-        { twoLane: bench.TWO_LANE_avg.ms, oneLane: bench.ONE_LANE_avg.ms });
+    ok('ផ្លូវ live ពិតរបស់ App លឿនជាងការបោស ១១ format យ៉ាងតិច ៣ ដង',
+        bench.LIVE_now.ms * 3 <= bench.LIVE_all11.ms,
+        { now: bench.LIVE_now.ms, all11: bench.LIVE_all11.ms });
 
-    // ជាន់លឿនត្រូវប្ដូរខ្លួនតាម format ដែលរកឃើញពិត — កុំឲ្យអាជីវកម្មដែលប្រើ
-    // format ផ្សេង (ឧ. CODE_39) ធ្លាក់ចុះល្បឿនជាងមុន
-    const adaptive = await page.evaluate(() => {
-        const before = window.__api.state().fastScanFormatName;
-        window.__api.setFast(null, 'CODE_128');
-        // ធ្វើត្រាប់តាមការរកឃើញ CODE_39 ដោយការបោសពេញ
-        window.__api.decodeLiveFrame(document.createElement('canvas'), false);
-        const s0 = window.__api.state();
-        eval('lastDecodedFormatName = "CODE_39"');
-        window.__api.syncFastScanFormat();
-        const afterReal = window.__api.state().fastScanFormatName;
-        eval('lastDecodedFormatName = "NOT_A_REAL_FORMAT"');
-        window.__api.syncFastScanFormat();
-        const afterBogus = window.__api.state().fastScanFormatName;
-        return { before: before, afterReal: afterReal, afterBogus: afterBogus, s0: s0.fastScanFormatName };
+    console.log('\n=== ការអានលេខខុសឆ្លង format (ស៊ុម ITF ពិត) ===');
+    console.log('    ITF ដែលគូរ            ៖ ' + bench.__misread.itfText);
+    console.log('    reader ១១ format អានចេញ ៖ ' + (bench.__misread.all11 || '(បដិសេធ)'));
+    console.log('    reader បច្ចុប្បន្ន (live) ៖ ' + (bench.__misread.app || '(បដិសេធ)'));
+    console.log('    reader បច្ចុប្បន្ន (រូបភាព)៖ ' + (bench.__misread.appImage || '(បដិសេធ)'));
+    ok('ស៊ុម ITF ដែលគូរ ត្រូវបានឌិកូដដោយ reader ១១ format (តេស្តមិនទទេ)',
+        bench.__misread.all11 !== '', bench.__misread);
+    ok('ស៊ុម ITF ដដែល ➜ reader live របស់ App បដិសេធ (គ្មានលេខខុសទៀត)',
+        bench.__misread.app === '', bench.__misread);
+    ok('ស៊ុម ITF ដដែល ➜ reader រូបភាពរបស់ App បដិសេធផងដែរ',
+        bench.__misread.appImage === '', bench.__misread);
+
+    // ជាន់ការពារទី ២ ៖ ត្រូវអានបានលេខដដែល ២ ស៊ុមជាប់គ្នា ទើបទទួលយក
+    const confirmSeq = await page.evaluate(() => {
+        const api = window.__api;
+        if (!api.confirmLiveScan) return null;
+        api.resetScanConfirm();
+        const a = api.confirmLiveScan('ZTO7788123456');
+        const b = api.confirmLiveScan('ZTO7788123456');
+        api.resetScanConfirm();
+        const c = api.confirmLiveScan('ZTO7788123456');
+        const d = api.confirmLiveScan('ZTO0000000000');
+        const e = api.confirmLiveScan('ZTO0000000000');
+        api.resetScanConfirm();
+        const f = api.confirmLiveScan('');
+        const g = api.confirmLiveScan('  ZTO1111  ');
+        const h = api.confirmLiveScan('ZTO1111');
+        return { a: a, b: b, c: c, d: d, e: e, f: f, g: g, h: h };
     });
-    ok('រកឃើញ CODE_39 ➜ ជាន់លឿនប្ដូរទៅ CODE_39', adaptive.afterReal === 'CODE_39', adaptive);
-    ok('ឈ្មោះ format ក្លែងក្លាយ ➜ មិនប្ដូរជាន់លឿន (មិនធ្វើឲ្យស្កេនខូច)', adaptive.afterBogus === 'CODE_39', adaptive);
+    ok('confirmLiveScan() អាចហៅបានពី app.js ពិត', !!confirmSeq, confirmSeq);
+    if (confirmSeq) {
+        ok('ស៊ុមតែមួយ ➜ មិនទាន់ទទួលយក', confirmSeq.a === '', confirmSeq);
+        ok('ស៊ុម ២ ជាប់គ្នាដូចគ្នា ➜ ទទួលយក', confirmSeq.b === 'ZTO7788123456', confirmSeq);
+        ok('លេខផ្សេងកាត់ចូល ➜ រាប់ឡើងវិញ (ការអានខុសម្តងឯង ឆ្លងមិនរួច)',
+            confirmSeq.c === '' && confirmSeq.d === '' && confirmSeq.e === 'ZTO0000000000', confirmSeq);
+        ok('លេខទទេមិនចាប់ផ្តើមការរាប់', confirmSeq.f === '', confirmSeq);
+        ok('ចន្លោះខាងមុខ/ក្រោយត្រូវកាត់ចោលមុនប្រៀបធៀប', confirmSeq.h === 'ZTO1111', confirmSeq);
+    }
 
     if (!REPORT) {
         ok('app.js មាន LIVE_SCAN_MAX_DIM ≤ 640 (ទំហំឌិកូដសមរម្យ)', !!liveMax && Number(liveMax) <= 640, liveMax);
-        ok('app.js មាន fastScanCodeReader (ជាន់លឿន)', src.indexOf('fastScanCodeReader') !== -1);
-        ok('app.js មាន syncFastScanFormat() (ជាន់លឿនប្ដូរតាម format ដែលរកឃើញពិត)', !!sliceFn(src, 'syncFastScanFormat'));
-        ok('app.js មាន LIVE_FULL_SWEEP_EVERY (ការបោសពេញរាល់ N ស៊ុម)', /const LIVE_FULL_SWEEP_EVERY = \d+;/.test(src));
+        ok('app.js គ្មានបញ្ជី format ច្រើនទៀត (ONE_D_FORMAT_NAMES ត្រូវបានដករួច)',
+            src.indexOf('ONE_D_FORMAT_NAMES') === -1);
+        ok('app.js គ្មានជាន់ ២ ទៀត (fastScanCodeReader / syncFastScanFormat ត្រូវបានដករួច)',
+            src.indexOf('fastScanCodeReader') === -1 && src.indexOf('syncFastScanFormat') === -1);
+        ok('SCAN_FORMAT_NAMES ក្នុង app.js មានតែ CODE_128',
+            /const SCAN_FORMAT_NAMES = \['CODE_128'\];/.test(src));
+        ok('NATIVE_SCAN_FORMAT_NAMES ក្នុង app.js មានតែ code_128',
+            /const NATIVE_SCAN_FORMAT_NAMES = \['code_128'\];/.test(src));
+        ok('ការស្កេន QR ពេល Config/Reconfig នៅប្រើ BrowserQRCodeReader ដាច់ដោយឡែក (មិនរងផល)',
+            /configQrReader = new ZXing\.BrowserQRCodeReader\(/.test(src));
+        ok('ផ្លូវ live ទាំង ២ (ZXing និង BarcodeDetector) ឆ្លងកាត់ confirmLiveScan()',
+            (src.match(/confirmLiveScan\(/g) || []).length >= 3, (src.match(/confirmLiveScan\(/g) || []).length);
         ok('សាខាស្លាប់ `nativeDetector && isIOSDevice()` ត្រូវបានដករួច (Safari គ្មាន BarcodeDetector)',
             !/nativeDetector && isIOSDevice\(\)/.test(src));
     }

@@ -108,6 +108,24 @@
 blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូរទំព័រ ➜ ដោះវិញ។ លើ **≥992px វាមិនធ្វើអ្វីទេ**
 ព្រោះ layout ២ ជួរឃើញគ្រប់យ៉ាងស្រាប់។ Test៖ **`phone-search-swipe-test.js`**។
 
+**ការលាក់របាតាមទិសរមូរ — `setupChromeAutoHide()` — លាក់តែ *របា Tab ខាងក្រោម* ប៉ុណ្ណោះ។**
+**របា navbar ខាងលើមិនលាក់ទេ** (សំណើអ្នកប្រើ) — កុំបន្ថែមច្បាប់ `body.chrome-hidden .app-navbar`
+មកវិញ។ ហើយការលាក់/បង្ហាញរបា **មិនត្រូវប្តូរកម្ពស់ ឬ padding របស់កន្សោមរមូរណាមួយឡើយ**។
+ការប្តូរ layout ចំពេល momentum scroll របស់ WebKit កំពុងដើរ ធ្វើឲ្យបញ្ជីលោតរំលង
+(អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
+
+- របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
+- កន្លែងរបស់របា Tab ក្នុងរបៀបប្រវត្តិពេញអេក្រង់ ត្រូវកក់ទុក **ខាងក្នុងកន្សោមរមូរ**
+  ដោយ `.app-pages.history-expanded .table-responsive::after` (កម្ពស់ = `--chrome-bottom`
+  ដែល `measureAppChromeSize()` វាស់ពិត) — **មិនមែនដោយ padding របស់ `.app-pages` ទេ**
+- **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល
+- **គ្មាន `scroll-behavior: smooth`** លើ `body` ឬ `.table-responsive` — WebKit យកវាទៅ
+  អនុវត្តលើការរមូរតាមកម្លាំងផងដែរ
+- ពិដាន `SHOW_AFTER` (៤៨px) ខ្ពស់ជាង `HIDE_AFTER` (៣៦px) ដោយចេតនា — momentum របស់ iOS
+  បញ្ចេញចលនាបញ្ច្រាសទិសបន្តិចបន្តួច ហើយពិដានទាបធ្វើឲ្យរបាភ្លឹបភ្លែត
+
+Test៖ **`gesture-test.js`**។
+
 **ចូលដោយក្រយៅដៃ ឬមុខ (WebAuthn) — ជាការ *ដោះសោ* PIN មិនមែនជំនួស PIN។**
 PIN មិនត្រឹមតែជា gate ទេ — `deriveLookupSecretKey(pin)` យកវាទៅបង្កើតកូនសោ AES
 ដែលឌិគ្រីប Secret របស់ Lookup API។ ដូច្នេះជីវមាត្រ **មិនអាចជំនួស PIN ជាប្រភពសម្ងាត់បានទេ**;
@@ -133,6 +151,23 @@ PIN មិនត្រឹមតែជា gate ទេ — `deriveLookupSecretKey(
 `#pinSetupModalDesc`។ **រាល់ការបន្ថែមប៊ូតុងដែលការពារដោយ PIN ត្រូវបន្ថែមធាតុថ្មីក្នុងតារាងនោះ
 ហើយបញ្ជូនកូនសោរបស់វា** — បើមិនដូច្នេះ អ្នកប្រើឃើញសារ «Config ឬ Reconfig» លើគ្រប់ប៊ូតុង។
 Test៖ **`pin-prompt-test.js`**។
+
+### ម៉ាស៊ីនស្កេន Barcode
+
+**បញ្ជី format មានតែ `CODE_128` — កុំបន្ថែមវិញ។** `SCAN_FORMAT_NAMES` (ZXing) និង
+`NATIVE_SCAN_FORMAT_NAMES` (`BarcodeDetector` លើ Android) មានធាតុមួយគត់។ ITF, CODABAR
+និង CODE_39 **គ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ចទេ** ➜ ស្លាកមួយអាចត្រូវអានចេញជា
+**លេខផ្សេងទាំងស្រុង** ដោយ «ជោគជ័យ»។ `scan-engine-test.js` គូរស្លាក ITF ពិតមួយ រួច
+អះអាងថា reader បច្ចុប្បន្នបដិសេធវា ចំណែក reader ១១ format ទទួលយក។
+
+**`confirmLiveScan()` ជាជាន់ការពារទី ២** — លេខត្រូវអានឃើញដដែល `SCAN_CONFIRM_REPEATS`
+(២) ស៊ុមជាប់គ្នា ក្នុងបង្អួច `SCAN_CONFIRM_WINDOW_MS` ទើបទទួលយក។ ផ្លូវ live **ទាំង ២**
+(ZXing និង `BarcodeDetector`) ត្រូវឆ្លងកាត់វា។ ផ្លូវរូបភាព និង hardware scanner
+**មិនឆ្លងកាត់ទេ** ដោយចេតនា — ពួកវាមានតែស៊ុមតែមួយ។
+
+**ការស្កេន QR ពេល Config/Reconfig ជាម៉ាស៊ីនអានដាច់ដោយឡែក** — `configQrReader` ជា
+`ZXing.BrowserQRCodeReader` ដែល **មិនពាក់ព័ន្ធនឹង `SCAN_FORMAT_NAMES` សោះ**។ ការកែ
+បញ្ជី format 1D មិនអាចប៉ះពាល់ការស្កេន QR បានទេ។
 
 ## Core business rule: «លុប» (Delete) ទល់នឹង «ដក» (Remove) — READ BEFORE TOUCHING REVENUE CODE
 
@@ -188,6 +223,11 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 - **`promise.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ** ➜ JavaScript រត់ `B` ពេល **`A` throw**
   ដែរ ➜ ការសរសេរជោគជ័យ តែការសង្គ្រោះរត់ខុស ➜ លុយបាត់។ ប្រើ `.then(A, B)` ២ អាគុយម៉ង់
   ឬទង់។ Checker៖ **`compensation-order.js`**។
+- **ការប្តូរ layout ចំពេល momentum scroll របស់ iOS** ➜ បញ្ជីលោតរំលង។ ការលាក់របា
+  Tab ត្រូវជា `transform` សុទ្ធ។ Test៖ **`gesture-test.js`**។
+- **animation លើ property ដែលមិនអាច composite** — `top`/`height` ➜ layout រាល់ស៊ុម;
+  `box-shadow`/`background-color` ដោយ `infinite` ➜ គូរឡើងវិញរាល់ស៊ុមជារៀងរហូត។
+  ប្រើ `transform`/`opacity` ឬដាក់ធាតុនោះលើ layer ដោយឡែក។ Checker៖ **`animation-cost.js`**។
 - **ការសរសេរដែលចុះ *ក្រោយ* `withTimeout` បោះបង់រួច** ➜ បើ catch ដោះ claim ឬបញ្ច្រាសលុយភ្លាម
   នោះខុស។ ត្រូវចាប់ promise ទុក ហើយដាក់ handler លើវាពេល timeout។ Test៖ **`slow-write-test.js`**
   (បង្រួម timer ≥1s ចុះ ១០០ ដង)។
@@ -203,6 +243,12 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
   សម្លាប់ callback ➜ តារាងឈប់ update។ ត្រូវ try/catch។
 - **លុយចំណុចអណ្តែត** — គ្រប់ការបូកលុយឆ្លងកាត់ `Math.round(x * 100) / 100`។ ថ្នាក់នេះ
   ដោះស្រាយរួចហើយ — កុំរាយការណ៍ជាកំហុសថ្មី។
+- **ការអានលេខខុសឆ្លង format** — បញ្ជី format ធំធ្វើឲ្យស្លាកមួយអានចេញជាលេខផ្សេង
+  ដោយ «ជោគជ័យ»។ ដោះស្រាយដោយ `SCAN_FORMAT_NAMES = ['CODE_128']` បូក `confirmLiveScan()`។
+  Test៖ **`scan-engine-test.js`**។
+- **ប្រអប់ native (`confirm`/`alert`) ផ្អាក `<video>` លើ iOS ហើយមិនបន្តវិញ** ➜ កាមេរ៉ាកក។
+  គ្រប់ផ្លូវដែលបើកប្រអប់ native ខណៈកាមេរ៉ាកំពុងស្កេន ត្រូវហៅ `resumeScanVideo()` ក្រោយវា
+  (បូក listener `pause` ជាជាន់ទី ២)។ Test៖ **`camera-resume-test.js`**។
 
 ## Error patterns ដែលរំពឹងទុក — កុំ «កែ» ពួកវា
 
@@ -262,6 +308,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | អថេរ state សល់ក្រោយចាកចេញ | `state-hygiene.js` |
 | class គ្មានច្បាប់ CSS | `css-classes.js` |
 | ច្បាប់ក្នុង `@media` ដែលស្លាប់ដោយច្បាប់មូលដ្ឋានក្រោយវា | `css-media-override.js` |
+| animation ដែលបង្កើត layout/paint រាល់ស៊ុម និង `transition: all` | `animation-cost.js` |
 | comment / trailing whitespace | `comments.js` |
 | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
 | សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |
@@ -282,8 +329,9 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
 | pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
-| ល្បឿនម៉ាស៊ីនស្កេន Barcode (ផ្លូវ ZXing ដែល iPhone ប្រើ) | `scan-engine-test.js` |
+| ល្បឿន **និងភាពត្រឹមត្រូវ** នៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
+| កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។

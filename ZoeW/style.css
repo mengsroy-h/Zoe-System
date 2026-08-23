@@ -64,12 +64,15 @@
             touch-action: pan-y;
         }
 
-        @media (display-mode: standalone) {
-            html, body {
-                min-height: calc(100vh + env(safe-area-inset-bottom));
-                min-height: calc(100dvh + env(safe-area-inset-bottom));
-            }
-        }
+        /* កុំបូក `env(safe-area-inset-bottom)` ចូលកម្ពស់ body ឡើយ។
+           របា Tab កក់ safe-area ដោយខ្លួនវារួចហើយ (`padding-bottom: calc(6px +
+           env(safe-area-inset-bottom))`) ហើយ `measureAppChromeSize()` វាស់
+           `offsetHeight` ពិតរបស់វា ➜ `--chrome-bottom` **រាប់ safe-area រួច**។
+           ការបូកវាម្ដងទៀតត្រង់នេះធ្វើឲ្យ body **វែងជាងអេក្រង់** តាមចំនួន inset
+           ➜ បាតកាតធ្លាក់ក្រោមគែមអេក្រង់ ➜ **កាតលិចចូលក្រោមរបា Tab លើ iPhone**។
+           លើ Android inset = 0 ដូច្នេះកំហុសនេះលេចតែលើ iOS ប៉ុណ្ណោះ។
+           ធាតុនីមួយៗដែលត្រូវការ safe-area គ្រប់គ្រងវាដោយខ្លួនឯងរួចហើយ៖
+           របា Tab, toast (`bottom: calc(24px + env(...))`) និងរបា Slide។ */
 
         .app-navbar {
             background: var(--card-bg);
@@ -140,6 +143,9 @@
         .page-side, .page-main { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
         #parcelPanel, #lockerPanel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
+        /* ដងអូសជា **ផ្លូវតែមួយ** ដែលបិទ/បើកផ្ទាំងខាងលើ (ការអូសលើបញ្ជីជាការ
+           រមូរសុទ្ធ) ➜ តំបន់ប៉ះរបស់វាត្រូវធំល្មម។ `::before` ពង្រីកតំបន់ប៉ះ
+           ដោយ **មិនប្តូររូបរាង** — របាដែលមើលឃើញនៅ 40×4px ដដែល។ */
         .drag-handle-bar {
             width: 40px;
             height: 4px;
@@ -149,7 +155,17 @@
             display: none;
             cursor: grab;
             flex-shrink: 0;
+            position: relative;
         }
+        .drag-handle-bar::before {
+            content: '';
+            position: absolute;
+            left: -70px;
+            right: -70px;
+            top: -10px;
+            bottom: -10px;
+        }
+        .drag-handle-bar:active { background: #94a3b8; }
 
         @media (max-width: 991px) {
             .drag-handle-bar { display: block; }

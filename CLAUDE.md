@@ -60,6 +60,29 @@
 >   ដំណោះស្រាយជាក់ស្តែង៖ បើកមុខងារ «កាលបរិច្ឆេទ និងម៉ោងស្វ័យប្រវត្តិ» លើគ្រប់ឧបករណ៍។
 > - **`google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
 
+## ធនធានខាងក្រៅ និង service worker — READ BEFORE ADDING ANY CDN
+
+**ZXing ស្ថិតក្នុង repo (`ZoeW/vendor/zxing.min.js`) — កុំនាំវាត្រឡប់ទៅ CDN វិញ។**
+មុននេះវាមកពី unpkg.com ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល
+cache ទេ** ➜ ពេលបណ្តាញខ្សោយ ឬ CDN ដាច់ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App
+មើលទៅដូចដំណើរការធម្មតា។ ឯកសារក្នុង repo ជាកំណែ **0.23.0 ដដែល** នឹងអ្វីដែល CDN
+ធ្លាប់បម្រើ (sha384 = SRI ចាស់; `offline-shell-test.js` អះអាងរឿងនេះ)។
+**ដើម្បីឡើងកំណែ**៖ `npm i @zxing/library@<new>` រួច
+`cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js`
+រួច**ធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `offline-shell-test.js`** ហើយរត់
+`scan-engine-test.js` ឡើងវិញ។
+
+**`sw.js` cache តាមបញ្ជី allow — មិនមែន allow-all ទេ។** `CDN_HOSTS` មានតែ host
+ធនធានស្តាទិច (`www.gstatic.com`, `fonts.googleapis.com`, `fonts.gstatic.com`,
+`js.sentry-cdn.com`, `browser.sentry-cdn.com`)។ **កុំបន្ថែម host ទិន្នន័យផ្ទាល់
+ចូលបញ្ជីនោះជាដាច់ខាត** — `*.firebaseio.com`, `identitytoolkit.googleapis.com`,
+`securetoken.googleapis.com`, `script.google.com`។ ការ cache ពួកវាបម្រើទិន្នន័យ
+ចាស់ដល់អាជីវកម្មពិត។ `offline-shell-test.js` ចាក់សោច្បាប់នេះ។
+
+**`CDN_PRECACHE` ត្រូវត្រូវនឹង URL ក្នុង `firebase-loader.js`។** បើឡើងកំណែ
+Firebase SDK ក្នុង loader តែភ្លេច `sw.js` ទាំង ២ នោះ App **បើកមិនកើតពេលគ្មាន
+បណ្តាញ ដោយស្ងាត់ៗ**។ មាន checker រួចហើយ។
+
 ## ស្ថាបត្យកម្ម
 
 - `ZoeW/app.js` ជាឯកសារកូដតែមួយ (~6300 បន្ទាត់) សរសេរជា top-level script ដែល indent ៤ ចន្លោះ
@@ -84,6 +107,13 @@
 **`entryScanMode`** (`'parcel'` ឬ `'locker'`) កំណត់ថា `triggerScanAction()` នាំ barcode ទៅណា។
 វាជាចំណុចបំបែកតែមួយ — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។
 
+**`history-expanded` ជាប់តែទំព័រទិន្នន័យ។** `syncHistoryExpandedLock()` ដាក់ class នោះ
+លើ `#appPages` តែពេល `#pageData` មាន `.active` **និង** `#dataSideSection` មាន `.collapsed`
+ហើយ `switchAppPage()` ត្រូវហៅវារាល់ដង។ (វាអានពី DOM មិនមែនពី `currentAppPage` ទេ ដើម្បី
+កុំឲ្យវាឃ្លាតពីអ្វីដែលបង្ហាញពិត។) ហេតុផល៖ class នោះកំណត់ `overflow-y: hidden`
+លើ `#appPages` (ព្រោះការរមូរផ្ទេរទៅតារាងខាងក្នុងវិញ) — បើវាជាប់ទៅទំព័រ «បញ្ចូលទិន្នន័យ»
+ដែលគ្មានតារាងខាងក្នុងទទួល នោះទំព័រនោះ **រមូរមិនកើតទាល់តែសោះ**។ Test៖ `page-nav-test.js`។
+
 **Layout៖ ទំព័រនីមួយៗមាន `.page-side` និង `.page-main`។** លើទូរស័ព្ទវាជា flex column ដាក់ជង់គ្នា;
 លើអេក្រង់ **≥992px** វាក្លាយជា grid ២ ជួរ (`380px` + សល់) ពេញកម្ពស់អេក្រង់ ហើយរបា Tab
 ផ្លាស់ពីក្រោមទៅជាបន្ទាត់នៅក្រោម navbar តាម `order`។ `layout-check.js` ត្រួតពិនិត្យទាំង
@@ -98,6 +128,12 @@
 - អូស/scroll **ឡើង** លើ `#dataMainSection` ➜ `#dataSideSection` ទទួល `.collapsed` ➜ ប្រវត្តិហូតឡើងពេញអេក្រង់
 - អូស **ចុះ** ពេលតារាងនៅកំពូល ➜ ដក `.collapsed` ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ
 - ចុច `#dragHandle` ➜ toggle ដោយចេតនាច្បាស់លាស់ (ដំណើរការទោះកំពុងស្វែងរក)
+- **`.collapsed` និង `.search-focus` លោតភ្លាម — គ្មាន `transition` ទេ ហើយកុំបន្ថែមវិញ។**
+  `max-height` **មិនអាចធ្វើចលនាបានទេ** ពេលតម្លៃដើមជា `none` (វាលោតទៅ 0 ភ្លាម) ដូច្នេះ
+  `transition` ដែលធ្លាប់មាន សល់តែ `opacity` ដែលដេញលើប្រអប់កម្ពស់ 0 ដែលមើលមិនឃើញផង
+  ➜ ការគូរឡើងវិញ ០.៣ វិនាទីដោយឥតប្រយោជន៍ ចំពេលអ្នកប្រើកំពុងរមូរ (អ្នកប្រើរាយការណ៍
+  «scroll ទាក់អំឡុងពេលប្រអប់ប្រវត្តិហូតឡើង»)។ ផ្ទាំងដែលបង្រួមក៏ត្រូវមាន
+  `visibility: hidden` ដែរ ➜ លែង tab ចូលបាន និងលែងត្រូវ hit-test
 - **ការអូសឡើង មិនត្រូវបិទផ្ទាំង ពេលអ្នកប្រើកំពុងស្វែងរកលេខទូរស័ព្ទទេ** (`phoneSearchIsActive()`)
   — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
 
@@ -115,9 +151,14 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
-- កន្លែងរបស់របា Tab ក្នុងរបៀបប្រវត្តិពេញអេក្រង់ ត្រូវកក់ទុក **ខាងក្នុងកន្សោមរមូរ**
-  ដោយ `.app-pages.history-expanded .table-responsive::after` (កម្ពស់ = `--chrome-bottom`
-  ដែល `measureAppChromeSize()` វាស់ពិត) — **មិនមែនដោយ padding របស់ `.app-pages` ទេ**
+- កន្លែងរបស់របា Tab ក្នុងរបៀបប្រវត្តិពេញអេក្រង់ ត្រូវកក់ទុកជា **`padding-bottom` ថេរ**
+  លើ `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
+  វាស់ពិត) ដូច្នេះ **គែមក្រោមកាតប្រវត្តិឈរខាងលើរបា Tab** មិនរត់ចូលពីក្រោមវាទេ
+  (សំណើអ្នកប្រើ — ដូចកំណែ 2.2.0)។ ច្បាប់សំខាន់គឺ **តម្លៃនោះមិនត្រូវប្តូរតាមការលាក់/
+  បង្ហាញរបាឡើយ** (វាប្តូរតែពេលវាស់កម្ពស់របាឡើងវិញ) — កុំយកកន្លែងនោះមកឲ្យតារាងវិញ
+  ពេលរបាលាក់ ដូចកំណែ 2.2.1 ធ្វើ ព្រោះនោះជាឫសគល់នៃការលោតរំលងលើ iOS។
+  កំណែ 2.4.0 ធ្លាប់កក់វាដោយ `.table-responsive::after` *ខាងក្នុង* កន្សោមរមូរ —
+  layout ស្ថិរដូចគ្នា តែជួរដេកលិចចូលពីក្រោមរបា ➜ **កុំនាំវិធីនោះត្រឡប់មកវិញ**
 - **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល
 - **គ្មាន `scroll-behavior: smooth`** លើ `body` ឬ `.table-responsive` — WebKit យកវាទៅ
   អនុវត្តលើការរមូរតាមកម្លាំងផងដែរ
@@ -125,6 +166,28 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
   បញ្ចេញចលនាបញ្ច្រាសទិសបន្តិចបន្តួច ហើយពិដានទាបធ្វើឲ្យរបាភ្លឹបភ្លែត
 
 Test៖ **`gesture-test.js`**។
+
+**ចង្វាក់ស៊ុមសម្របតាមឧបករណ៍ ១០–១២០ fps — `measureDisplayHz()`។**
+**ទំព័រវែបមិនអាចដំឡើងល្បឿន refresh របស់អេក្រង់បានទេ** (វាជារបស់ OS/browser —
+Safari លើ iPhone ជាធម្មតាចាក់ rAF ត្រឹម ៦០Hz ទោះអេក្រង់ ProMotion ១២០Hz ក៏ដោយ)។
+អ្វីដែល App ធ្វើបានគឺ **វាស់ចង្វាក់ពិត** រួចយកវាធ្វើមូលដ្ឋាននៃការសម្រេចទាំងអស់៖
+
+- `measureDisplayHz()` យក **median** នៃចន្លោះ rAF ២៤ ស៊ុម (median ធន់នឹង ស៊ុមខូច
+  ១–២ ដែល mean មិនធន់) រួច clamp ចូល `[10, 120]`
+- `longFrameThresholdMs()` = `ថវិកាមួយស៊ុម × 1.6` (យ៉ាងតិច ១២ms) — **កុំយកលេខថេរ
+  មកវិញ**។ ២៦ms ថេរខុសទាំង ២ ទិស៖ លើ ១២០Hz វាធូរពេក (ស៊ុមវែងពិតគឺ >៨.៣ms)
+  ចំណែកលើឧបករណ៍ដែល browser ចាក់ត្រឹម ៣០Hz វាតឹងពេករហូតរាយអ្វីៗទាំងអស់ជាយឺត
+- ចន្លោះល្បឿនស្កេនក៏សរសេរជា fps ដែរ — `LIVE_SCAN_MIN_FPS = 10`,
+  `LIVE_SCAN_MAX_FPS = 120` ➜ ចន្លោះ ៨–១០០ms។ ពិដាន ៨ms មិនបង្អាក់ឧបករណ៍លឿន
+  (ការស្កេនពិតត្រូវកំណត់ដោយល្បឿនស៊ុមកាមេរ៉ា តាម `requestVideoFrameCallback`)
+  ចំណែក ១០០ms ជាការធានាថាឧបករណ៍យឺតនៅតែស្កេន ដោយថ្លៃត្រូវទប់ដោយជំហានទទឹង
+- Test៖ **`gesture-test.js`** (ចង្វាក់ + clamp) និង **`scan-engine-test.js`** (ចន្លោះ fps)
+
+**ទម្រង់ស្រាលស្វ័យប្រវត្តិ — `setupAdaptivePerformance()`។** វាស់ចង្វាក់ (ខាងលើ) រួច
+វាស់ការធ្លាក់ស៊ុម (`sampleFramePace()`) **២ ដង** — វិនាទីទី ១.៥ និងទី ១០ — ហើយដាក់
+`body.perf-lite` តែពេលធ្លាក់ស៊ុម **ទាំង ២ ដង**។ ការវាស់ ២ ដងជាចំណុចសំខាន់៖ ការវាស់
+តែម្តងនឹងច្រឡំភាពរវល់ពេល boot ជាឧបករណ៍យឺត។ `perf-lite` បិទចលនាដែលដើរជារៀងរហូត
+និងស្រមោលដែលថ្លៃ — **វាមិនប៉ះមុខងារអាជីវកម្មណាមួយឡើយ**។
 
 **ចូលដោយក្រយៅដៃ ឬមុខ (WebAuthn) — ជាការ *ដោះសោ* PIN មិនមែនជំនួស PIN។**
 PIN មិនត្រឹមតែជា gate ទេ — `deriveLookupSecretKey(pin)` យកវាទៅបង្កើតកូនសោ AES
@@ -164,6 +227,28 @@ Test៖ **`pin-prompt-test.js`**។
 (២) ស៊ុមជាប់គ្នា ក្នុងបង្អួច `SCAN_CONFIRM_WINDOW_MS` ទើបទទួលយក។ ផ្លូវ live **ទាំង ២**
 (ZXing និង `BarcodeDetector`) ត្រូវឆ្លងកាត់វា។ ផ្លូវរូបភាព និង hardware scanner
 **មិនឆ្លងកាត់ទេ** ដោយចេតនា — ពួកវាមានតែស៊ុមតែមួយ។
+
+**ទំហំស៊ុមឌិកូដ ជាព្រំដែននៃ *ជួរអាន* លើ iPhone។** Android ប្រើ `BarcodeDetector`
+ដើមរបស់ប្រព័ន្ធ ដែលឌិកូដលើ `ImageBitmap` **គុណភាពពេញ** ចំណែក Safari គ្មាន API នោះ
+➜ iPhone ឌិកូដលើ canvas ដែលបង្រួមរួច។ ទទឹង canvas នោះកំណត់ថា barcode តូចប៉ុនណា
+ដែលនៅតែអានចេញបាន (CODE_128 ១៣ តួ ≈ ២១១ module ➜ ត្រូវការ ~១.៦px/module)។
+ដូច្នេះ៖
+
+- `LIVE_SCAN_WIDTH_STEPS = [640, 800, 1024, 1280]` — ចាប់ផ្តើមពី **ជំហានខ្ពស់បំផុត**
+  រួច `noteLiveScanCost()` ទម្លាក់ចុះបើឌិកូដលើស `LIVE_SCAN_SLOW_MS` ហើយឡើងវិញបើក្រោម
+  `LIVE_SCAN_FAST_MS`។ **កុំចាក់ទទឹងឲ្យថេរ** — នោះជាការដកមុខងារសម្របតាមឧបករណ៍ចេញ
+- **កម្ពស់កាត់ត្រឹម `LIVE_SCAN_MAX_BAND_PX` (២៤០px) ដោយចេតនា** — barcode ជាបន្ទាត់
+  បញ្ឈរ ➜ គុណភាព **ផ្តេក** ទេដែលសំខាន់; ការបង្ហាប់បញ្ឈរមិនប៉ះការអានទេ (មានតេស្ត
+  អះអាង) តែវាកាត់ថ្លៃ `drawImage`/`getImageData` ចុះច្រើន
+- **ផ្លូវ live ប្រើ `makeRowLuminanceSource()` មិនមែន `HTMLCanvasElementLuminanceSource` ទេ។**
+  ZXing អានពិតតែប្រហែល ១៥ ជួរដេកជុំវិញកណ្តាល (`OneDReader.doDecode`) តែ source
+  ស្តង់ដារបម្លែង **គ្រប់ pixel** ជា grayscale មុនគេ។ source ថ្មីបម្លែងតែជួរដេកដែល
+  binarizer ស្នើ ➜ ៤.២៧ ➜ ២.៥១ ms/ស៊ុម លើស៊ុម 1280px។ **ផ្លូវរូបភាព (`codeReader`,
+  `tryHarder`) នៅប្រើ source ស្តង់ដារដដែល** ព្រោះវាត្រូវការ `rotateCounterClockwise()`
+- **`takeFreshVideoFrame()` ជាផ្នែកនៃជាន់ការពារ មិនមែនល្បឿនទេ។** បើស៊ុមវីដេអូតែមួយ
+  ត្រូវឌិកូដពីរដង នោះ `confirmLiveScan()` (ដែលទាមទារ ២ ស៊ុមជាប់គ្នា) ក្លាយជា
+  ១ ស៊ុមភ្លាម។ ផ្លូវ live **ទាំង ២** ត្រូវឆ្លងកាត់វា។ `scheduleScanFrame()` ប្រើ
+  `requestVideoFrameCallback` បើមាន (iOS 15.4+) បើអត់ ថយទៅ `requestAnimationFrame`
 
 **ការស្កេន QR ពេល Config/Reconfig ជាម៉ាស៊ីនអានដាច់ដោយឡែក** — `configQrReader` ជា
 `ZXing.BrowserQRCodeReader` ដែល **មិនពាក់ព័ន្ធនឹង `SCAN_FORMAT_NAMES` សោះ**។ ការកែ
@@ -249,6 +334,19 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 - **ប្រអប់ native (`confirm`/`alert`) ផ្អាក `<video>` លើ iOS ហើយមិនបន្តវិញ** ➜ កាមេរ៉ាកក។
   គ្រប់ផ្លូវដែលបើកប្រអប់ native ខណៈកាមេរ៉ាកំពុងស្កេន ត្រូវហៅ `resumeScanVideo()` ក្រោយវា
   (បូក listener `pause` ជាជាន់ទី ២)។ Test៖ **`camera-resume-test.js`**។
+- **`transition` លើ `max-height` ដែលតម្លៃដើមជា `none`** ➜ វា **មិនធ្វើចលនាទេ** (លោតទៅ 0
+  ភ្លាម) ដូច្នេះអ្វីដែលនៅសល់ជាការគូរឡើងវិញឥតប្រយោជន៍ ចំពេលអ្នកប្រើកំពុងរមូរ។ ការវាស់ពិត៖
+  `clientHeight` ធ្លាក់ដល់ 0 ក្នុងស៊ុមតែមួយ ខណៈ `opacity` នៅដេញ ០.៣ វិនាទីទៀត។
+  បើត្រូវការការបង្រួមមានចលនាពិត ត្រូវប្រើ `transform`/`opacity` លើប្រអប់ដែលមានកម្ពស់ថេរ។
+- **class ដែលកំណត់ `overflow` លើកន្សោមរមូររួម ត្រូវជាប់តែទំព័រដែលត្រូវការវា** ➜ បើវាជាប់
+  ឆ្លងទំព័រ ទំព័រផ្សេងរមូរមិនកើត។ Test៖ **`page-nav-test.js`** (`history-expanded`)។
+- **ធនធានចាំបាច់ដែលមកពី origin ខាងក្រៅ ហើយ service worker មិន cache** ➜ App បើកបាន
+  តែមុខងារនោះស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ។ រកឃើញលើ ZXing (ការស្កេន)។
+  Test៖ **`offline-shell-test.js`** (បិទម៉ាស៊ីនបម្រើពិត រួចផ្ទុកឡើងវិញ)។
+- **ការឌិកូដស៊ុមវីដេអូដដែលពីរដង** ➜ ជាន់ការពារ «២ ស៊ុមជាប់គ្នា» ក្លាយជា ១ ស៊ុម។
+  `takeFreshVideoFrame()` ការពារ **ហើយ fail open** បើ `currentTime` មិនរត់ (browser ខ្លះ
+  ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។
+  Test៖ **`scan-engine-test.js`**។
 
 ## Error patterns ដែលរំពឹងទុក — កុំ «កែ» ពួកវា
 
@@ -329,7 +427,8 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
 | pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
-| ល្បឿន **និងភាពត្រឹមត្រូវ** នៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
+| ល្បឿន, **ជួរអាន** និងភាពត្រឹមត្រូវនៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
+| ការពឹងផ្អែកលើ CDN ដែលមិន cache ➜ ស្កេនមិនកើតពេលបណ្តាញដាច់ | `offline-shell-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 

@@ -72,12 +72,24 @@ function serve(files) {
     const liveMax = (src.match(/const LIVE_SCAN_MAX_DIM = (\d+);/) || [])[1];
     const buildFn = sliceFn(src, 'buildScanReader');
     const confirmFn = (sliceFn(src, 'resetScanConfirm') || '') + '\n' + (sliceFn(src, 'confirmLiveScan') || '');
-    const tryFn = (sliceFn(src, 'readResultText') || '') + '\n' + (sliceFn(src, 'decodeLiveFrame') || '');
+    const tryFn = (sliceFn(src, 'readResultText') || '') + '\n' +
+                  (sliceFn(src, 'makeRowLuminanceSource') || '') + '\n' +
+                  (sliceFn(src, 'decodeLiveFrame') || '') + '\n' +
+                  (sliceFn(src, 'liveScanTargetWidth') || '') + '\n' +
+                  (sliceFn(src, 'noteLiveScanCost') || '') + '\n' +
+                  (sliceFn(src, 'resetLiveScanQuality') || '') + '\n' +
+                  (sliceFn(src, 'liveScanFrameSize') || '') + '\n' +
+                  (sliceFn(src, 'takeFreshVideoFrame') || '');
+    ok('រកឃើញ makeRowLuminanceSource() ក្នុង app.js', !!sliceFn(src, 'makeRowLuminanceSource'));
+    ok('រកឃើញ liveScanFrameSize() ក្នុង app.js', !!sliceFn(src, 'liveScanFrameSize'));
     ok('រកឃើញ buildScanReader() ក្នុង app.js', !!buildFn);
     ok('រកឃើញ confirmLiveScan() ក្នុង app.js', !!sliceFn(src, 'confirmLiveScan'));
     if (!buildFn || !confirmFn.trim()) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }
-    const constLines = ['SCAN_FORMAT_NAMES', 'NATIVE_SCAN_FORMAT_NAMES', 'LIVE_SCAN_MAX_DIM',
-        'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS', 'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS']
+    const constLines = ['SCAN_FORMAT_NAMES', 'NATIVE_SCAN_FORMAT_NAMES', 'LIVE_SCAN_WIDTH_STEPS', 'LIVE_SCAN_MAX_DIM',
+        'LIVE_SCAN_MAX_BAND_PX', 'LIVE_SCAN_MAX_FPS', 'LIVE_SCAN_MIN_FPS',
+        'LIVE_SCAN_MIN_INTERVAL_MS', 'LIVE_SCAN_MAX_INTERVAL_MS',
+        'LIVE_SCAN_BACKOFF', 'LIVE_SCAN_SLOW_MS', 'LIVE_SCAN_FAST_MS', 'FRESH_FRAME_GIVE_UP',
+        'SCAN_CONFIRM_REPEATS', 'SCAN_CONFIRM_WINDOW_MS']
         .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
 
     const page1 = `<!doctype html><meta charset="utf-8"><body>
@@ -85,6 +97,8 @@ function serve(files) {
 <script>
 let codeReader = null, liveScanCodeReader = null;
 let scanConfirmCode = '', scanConfirmCount = 0, scanConfirmAt = 0;
+let liveScanWidthIndex = -1, liveScanCostEma = 0, lastDecodedVideoTime = -1;
+let staleFrameStreak = 0, freshFrameGateUsable = true;
 ${constLines}
 ${buildFn || ''}
 ${initFn}
@@ -93,6 +107,17 @@ ${cropFn}
 ${confirmFn}
 ${tryFn || ''}
 window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect,
+                 makeRowLuminanceSource: typeof makeRowLuminanceSource === 'function' ? makeRowLuminanceSource : null,
+                 liveScanFrameSize: typeof liveScanFrameSize === 'function' ? liveScanFrameSize : null,
+                 resetLiveScanQuality: typeof resetLiveScanQuality === 'function' ? resetLiveScanQuality : null,
+                 noteLiveScanCost: typeof noteLiveScanCost === 'function' ? noteLiveScanCost : null,
+                 liveScanTargetWidth: typeof liveScanTargetWidth === 'function' ? liveScanTargetWidth : null,
+                 takeFreshVideoFrame: typeof takeFreshVideoFrame === 'function' ? takeFreshVideoFrame : null,
+                 giveUp: () => FRESH_FRAME_GIVE_UP,
+                 fpsBand: () => ({ min: LIVE_SCAN_MIN_FPS, max: LIVE_SCAN_MAX_FPS,
+                                   minMs: LIVE_SCAN_MIN_INTERVAL_MS, maxMs: LIVE_SCAN_MAX_INTERVAL_MS }),
+                 widthSteps: () => LIVE_SCAN_WIDTH_STEPS.slice(),
+                 bandCap: () => LIVE_SCAN_MAX_BAND_PX,
                  decodeLiveFrame: typeof decodeLiveFrame === 'function' ? decodeLiveFrame : null,
                  confirmLiveScan: typeof confirmLiveScan === 'function' ? confirmLiveScan : null,
                  resetScanConfirm: typeof resetScanConfirm === 'function' ? resetScanConfirm : null,
@@ -309,6 +334,101 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
             appImage: tryDecode(window.__api.readers().codeReader, itfFrame)
         };
 
+        // === ជួរអាន៖ barcode តូចប៉ុនណាដែលនៅតែអានចេញបាន ===
+        // Android ឌិកូដលើ ImageBitmap ពេញគុណភាព (~1920px) ចំណែក iPhone ឌិកូដលើ
+        // canvas ដែល downscale រួច។ ទទឹង canvas នោះហើយជា **ព្រំដែនជួរអាន**៖
+        // CODE_128 ១៣ តួ ≈ ២១១ module ➜ ត្រូវការ ~1.6px/module ➜ ~340px នៃ barcode។
+        // គូរស៊ុមប្រភព 1920×880 ដែល barcode កាន់កាប់ភាគរយផ្សេងៗ រួច downscale
+        // ទៅទទឹងនីមួយៗ ដូចផ្លូវពិត រួចរាប់ថាអានចេញបានប៉ុន្មាន។
+        function downscaled(srcCanvas, w, h) {
+            const c2 = document.createElement('canvas');
+            c2.width = w; c2.height = h;
+            c2.getContext('2d', { willReadFrequently: true })
+                .drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, w, h);
+            return c2;
+        }
+        function paintWideFrame(W, H, barPx, jitter) {
+            const values = code128Values(TEXT);
+            let modules = 0;
+            values.forEach((v) => { for (const d of CODE128[v]) modules += Number(d); });
+            const mw = barPx / modules;
+            const bw = modules * mw;
+            const bh = Math.round(H * 0.30);
+            const c2 = document.createElement('canvas');
+            c2.width = W; c2.height = H;
+            const g = c2.getContext('2d', { willReadFrequently: true });
+            g.fillStyle = '#9aa0a6'; g.fillRect(0, 0, W, H);
+            const ox = Math.round((W - bw) / 2) + jitter;
+            const oy = Math.round(H * 0.34) + jitter;
+            g.fillStyle = '#ffffff'; g.fillRect(ox - mw * 12, oy - 14, bw + mw * 24, bh + 28);
+            g.fillStyle = '#000000';
+            let x = ox;
+            values.forEach((v) => {
+                const pattern = CODE128[v];
+                for (let i = 0; i < pattern.length; i++) {
+                    const width = Number(pattern[i]) * mw;
+                    if (i % 2 === 0) g.fillRect(x, oy, width, bh);
+                    x += width;
+                }
+            });
+            return c2;
+        }
+        const SRC_W = 1920, SRC_H = 880;
+        const bandCap = window.__api.bandCap ? window.__api.bandCap() : 240;
+        function readRange(width) {
+            let good = 0, total = 0;
+            [0.50, 0.42, 0.36, 0.30].forEach((frac) => {
+                for (let k = 0; k < 3; k++) {
+                    const src = paintWideFrame(SRC_W, SRC_H, SRC_W * frac, (k * 7 % 13) - 6);
+                    const h = Math.min(Math.round(SRC_H * width / SRC_W), bandCap);
+                    total++;
+                    if (window.__api.decodeLiveFrame(downscaled(src, width, h)) === TEXT) good++;
+                }
+            });
+            return { good: good, total: total };
+        }
+        out.__range = {
+            steps: window.__api.widthSteps ? window.__api.widthSteps() : [],
+            at640: readRange(640),
+            atMax: readRange(window.__api.liveScanTargetWidth ? window.__api.liveScanTargetWidth() : 1280),
+            bandCap: bandCap
+        };
+
+        // ថ្លៃពិតក្នុងមួយស៊ុមលើផ្លូវបរាជ័យ ៖ luminance source ថ្មី (អានតែជួរដេក
+        // ដែល OneDReader ស្នើ) ធៀបនឹង HTMLCanvasElementLuminanceSource ចាស់
+        // (បម្លែងគ្រប់ pixel ជា grayscale មុនគេ)។
+        function oldPathDecode(canvas) {
+            const src2 = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+            const bm = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src2));
+            try { const r = readers.liveScanCodeReader.decodeBitmap(bm); return r ? (r.text || r.getText()) : ''; }
+            catch (e) { return ''; }
+        }
+        const missBig = paintEmpty(1280, bandCap);
+        let tt = performance.now();
+        for (let i = 0; i < 24; i++) window.__api.decodeLiveFrame(missBig);
+        out.LANE_rowSource = { ms: Math.round(((performance.now() - tt) / 24) * 100) / 100, hitRate: 0 };
+        tt = performance.now();
+        for (let i = 0; i < 24; i++) oldPathDecode(missBig);
+        out.LANE_fullGray = { ms: Math.round(((performance.now() - tt) / 24) * 100) / 100, hitRate: 0 };
+
+        // ការសម្របតាមឧបករណ៍៖ ថ្លៃខ្ពស់ ➜ ទម្លាក់ជំហានទទឹង; ថ្លៃទាប ➜ ឡើងវិញ
+        if (window.__api.resetLiveScanQuality && window.__api.noteLiveScanCost) {
+            window.__api.resetLiveScanQuality();
+            const top = window.__api.liveScanTargetWidth();
+            for (let i = 0; i < 12; i++) window.__api.noteLiveScanCost(80);
+            const slow = window.__api.liveScanTargetWidth();
+            for (let i = 0; i < 12; i++) window.__api.noteLiveScanCost(2);
+            const fast = window.__api.liveScanTargetWidth();
+            window.__api.resetLiveScanQuality();
+            out.__adaptive = { top: top, slow: slow, fast: fast };
+        }
+
+        // ទំហំស៊ុមឌិកូដ ត្រូវកាត់កម្ពស់ត្រឹមពិដាន មិនមែនតាមមាត្រដ្ឋានទេ
+        if (window.__api.liveScanFrameSize) {
+            window.__api.resetLiveScanQuality();
+            out.__frameSize = window.__api.liveScanFrameSize({ sx: 0, sy: 0, sWidth: 1920, sHeight: 880 });
+        }
+
         // តម្លៃដែលកូដកំពុងប្រើពិត (គូរឡើងវិញរាល់ស៊ុម ធៀបនឹងការប្រើ canvas ដដែល)
         const c = paintFrame(800, 496);
         const t0 = performance.now();
@@ -335,6 +455,37 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         bench.LIVE_now.ms * 3 <= bench.LIVE_all11.ms,
         { now: bench.LIVE_now.ms, all11: bench.LIVE_all11.ms });
 
+    console.log('\n=== ជួរអាន (barcode តូច/ឆ្ងាយ) ===');
+    console.log('    ជំហានទទឹងឌិកូដ      ៖ ' + JSON.stringify(bench.__range.steps) + '  ពិដានកម្ពស់ ' + bench.__range.bandCap + 'px');
+    console.log('    ទទឹង 640 (កំណែចាស់) ៖ អានបាន ' + bench.__range.at640.good + '/' + bench.__range.at640.total);
+    console.log('    ទទឹងអតិបរមាឥឡូវ     ៖ អានបាន ' + bench.__range.atMax.good + '/' + bench.__range.atMax.total);
+    ok('ទទឹងឌិកូដ 640 នៅតែអាន barcode ធំបាន (តេស្តមិនទទេ)', bench.__range.at640.good > 0, bench.__range.at640);
+    ok('ទទឹងឌិកូដអតិបរមាឥឡូវ អាន barcode តូចបានច្រើនជាង 640 យ៉ាងតិច ៥០%',
+        bench.__range.atMax.good >= bench.__range.at640.good + Math.ceil(bench.__range.at640.good * 0.5),
+        bench.__range);
+    ok('ទទឹងឌិកូដអតិបរមា អានបានគ្រប់ករណីដែល 640 អានបាន (គ្មានការថយក្រោយ)',
+        bench.__range.atMax.good >= bench.__range.at640.good, bench.__range);
+
+    console.log('\n=== ថ្លៃឌិកូដក្នុងមួយស៊ុម (ផ្លូវបរាជ័យ 1280px) ===');
+    console.log('    luminance តាមជួរដេក (ឥឡូវ) ៖ ' + bench.LANE_rowSource.ms + ' ms/ស៊ុម');
+    console.log('    grayscale ពេញស៊ុម (ចាស់)    ៖ ' + bench.LANE_fullGray.ms + ' ms/ស៊ុម');
+    ok('luminance តាមជួរដេក លឿនជាង grayscale ពេញស៊ុម',
+        bench.LANE_rowSource.ms < bench.LANE_fullGray.ms,
+        { row: bench.LANE_rowSource.ms, full: bench.LANE_fullGray.ms });
+
+    console.log('\n=== ការសម្របតាមឧបករណ៍ដោយស្វ័យប្រវត្តិ ===');
+    console.log('    ចាប់ផ្តើម ' + bench.__adaptive.top + 'px ➜ ថ្លៃខ្ពស់ ' + bench.__adaptive.slow +
+                'px ➜ ថ្លៃទាបវិញ ' + bench.__adaptive.fast + 'px');
+    ok('ថ្លៃឌិកូដខ្ពស់ ➜ ទម្លាក់ទទឹងឌិកូដចុះ (ឧបករណ៍ចាស់នៅតែរលូន)',
+        bench.__adaptive.slow < bench.__adaptive.top, bench.__adaptive);
+    ok('ថ្លៃឌិកូដទាបវិញ ➜ ឡើងទទឹងឌិកូដមកវិញ (ឧបករណ៍លឿនបានគុណភាពពេញ)',
+        bench.__adaptive.fast > bench.__adaptive.slow, bench.__adaptive);
+    console.log('    ស៊ុមឌិកូដពី crop 1920x880 ៖ ' + JSON.stringify(bench.__frameSize));
+    ok('កម្ពស់ស៊ុមឌិកូដត្រូវកាត់ត្រឹមពិដាន (មិនរីកតាមមាត្រដ្ឋាន)',
+        bench.__frameSize.height <= bench.__range.bandCap, bench.__frameSize);
+    ok('ទទឹងស៊ុមឌិកូដមិនហួសពិដាន',
+        bench.__frameSize.width <= bench.__range.steps[bench.__range.steps.length - 1], bench.__frameSize);
+
     console.log('\n=== ការអានលេខខុសឆ្លង format (ស៊ុម ITF ពិត) ===');
     console.log('    ITF ដែលគូរ            ៖ ' + bench.__misread.itfText);
     console.log('    reader ១១ format អានចេញ ៖ ' + (bench.__misread.all11 || '(បដិសេធ)'));
@@ -346,6 +497,46 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         bench.__misread.app === '', bench.__misread);
     ok('ស៊ុម ITF ដដែល ➜ reader រូបភាពរបស់ App បដិសេធផងដែរ',
         bench.__misread.appImage === '', bench.__misread);
+
+    // ស៊ុមវីដេអូដដែលមិនត្រូវរាប់ជាពីរ — បើរាប់ ជាន់បញ្ជាក់ ២ ស៊ុមក្លាយជា ១ ស៊ុមភ្លាម។
+    // តែបើ browser ណាទុក `currentTime` ថេរលើ MediaStream នោះ gate នេះនឹងបិទការ
+    // ស្កេនទាំងស្រុង ➜ វាត្រូវ **fail open** ក្រោយភស្តុតាងគ្រប់គ្រាន់។
+    const freshGate = await page.evaluate(() => {
+        const api = window.__api;
+        if (!api.takeFreshVideoFrame || !api.resetLiveScanQuality) return null;
+        api.resetLiveScanQuality();
+        const video = { currentTime: 1.5 };
+        const first = api.takeFreshVideoFrame(video);
+        const same = api.takeFreshVideoFrame(video);
+        video.currentTime = 1.533;
+        const moved = api.takeFreshVideoFrame(video);
+        api.resetLiveScanQuality();
+        const frozen = { currentTime: 4.2 };
+        api.takeFreshVideoFrame(frozen);
+        let openedAfter = -1;
+        for (let i = 1; i <= api.giveUp() + 4; i++) {
+            if (api.takeFreshVideoFrame(frozen)) { openedAfter = i; break; }
+        }
+        api.resetLiveScanQuality();
+        return { first: first, same: same, moved: moved, openedAfter: openedAfter, giveUp: api.giveUp() };
+    });
+    const fpsBand = await page.evaluate(() => window.__api.fpsBand ? window.__api.fpsBand() : null);
+    console.log('\n=== ចន្លោះល្បឿនស្កេន (fps) ===');
+    console.log('    ' + JSON.stringify(fpsBand));
+    ok('ចន្លោះស្កេនគាំទ្រដល់ ១២០ fps (មិនបង្អាក់ឧបករណ៍លឿន)',
+        !!fpsBand && fpsBand.max >= 120 && fpsBand.minMs <= 9, fpsBand);
+    ok('ចន្លោះស្កេនធ្លាក់ដល់ ១០ fps បាន (ឧបករណ៍យឺតមិនត្រូវបង្ខំ)',
+        !!fpsBand && fpsBand.min <= 10 && fpsBand.maxMs >= 100, fpsBand);
+
+    console.log('\n=== ស៊ុមវីដេអូថ្មី (ការពារការរាប់ស៊ុមដដែលពីរដង) ===');
+    ok('takeFreshVideoFrame() អាចហៅបានពី app.js ពិត', !!freshGate, freshGate);
+    if (freshGate) {
+        ok('ស៊ុមថ្មី ➜ ទទួលយកឲ្យឌិកូដ', freshGate.first === true, freshGate);
+        ok('ស៊ុមដដែល ➜ បដិសេធ (ជាន់បញ្ជាក់ ២ ស៊ុមនៅរឹងមាំ)', freshGate.same === false, freshGate);
+        ok('currentTime រំកិល ➜ ទទួលយកវិញ', freshGate.moved === true, freshGate);
+        ok('currentTime កក ➜ fail open ក្រោយភស្តុតាងគ្រប់គ្រាន់ (ការស្កេនមិនស្លាប់)',
+            freshGate.openedAfter > 0 && freshGate.openedAfter <= freshGate.giveUp, freshGate);
+    }
 
     // ជាន់ការពារទី ២ ៖ ត្រូវអានបានលេខដដែល ២ ស៊ុមជាប់គ្នា ទើបទទួលយក
     const confirmSeq = await page.evaluate(() => {
@@ -375,7 +566,15 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     }
 
     if (!REPORT) {
-        ok('app.js មាន LIVE_SCAN_MAX_DIM ≤ 640 (ទំហំឌិកូដសមរម្យ)', !!liveMax && Number(liveMax) <= 640, liveMax);
+        const bandMax = (src.match(/const LIVE_SCAN_MAX_BAND_PX = (\d+);/) || [])[1];
+        ok('app.js មាន LIVE_SCAN_MAX_DIM ≤ 1280 (ទទឹងឌិកូដមានពិដាន)', !!liveMax && Number(liveMax) <= 1280, liveMax);
+        ok('app.js មាន LIVE_SCAN_MAX_BAND_PX ≤ 320 (កម្ពស់ស៊ុមឌិកូដមានពិដាន)', !!bandMax && Number(bandMax) <= 320, bandMax);
+        ok('ថវិកា pixel ក្នុងមួយស៊ុមឌិកូដ ≤ 320,000 (ទប់ថ្លៃ drawImage/getImageData)',
+            !!liveMax && !!bandMax && Number(liveMax) * Number(bandMax) <= 320000, { liveMax, bandMax });
+        ok('ផ្លូវ live ប្រើ luminance source តាមជួរដេក (មិនបម្លែងគ្រប់ pixel មុនគេ)',
+            /makeRowLuminanceSource\(/.test(src) && !/decodeLiveFrame[\s\S]{0,400}HTMLCanvasElementLuminanceSource/.test(src));
+        ok('ស៊ុមវីដេអូដដែលមិនត្រូវឌិកូដពីរដង (takeFreshVideoFrame ការពារជាន់បញ្ជាក់ ២ ស៊ុម)',
+            /function takeFreshVideoFrame\(/.test(src) && (src.match(/takeFreshVideoFrame\(videoElement\)/g) || []).length >= 2);
         ok('app.js គ្មានបញ្ជី format ច្រើនទៀត (ONE_D_FORMAT_NAMES ត្រូវបានដករួច)',
             src.indexOf('ONE_D_FORMAT_NAMES') === -1);
         ok('app.js គ្មានជាន់ ២ ទៀត (fastScanCodeReader / syncFastScanFormat ត្រូវបានដករួច)',

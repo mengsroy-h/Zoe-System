@@ -57,6 +57,7 @@ function buildEnv(src, opts) {
         dataMainSection: mkEl('dataMainSection'),
         tableResponsive: mkEl('tableResponsive'),
         appPages: mkEl('appPages'),
+        pageData: mkEl('pageData', { classList: makeClassList(o.dataPageActive === false ? [] : ['active']) }),
         dragHandle: mkEl('dragHandle'),
         phoneSuggestBox: mkEl('phoneSuggestBox', { classList: makeClassList(o.suggestOpen ? ['show'] : []) }),
         searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchActive ? '012' : '' })
@@ -92,6 +93,21 @@ function swipe(handlers, el, fromY, toY) {
 }
 
 const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+
+console.log('\n=== សោប្រវត្តិពេញអេក្រង់ជាប់តែទំព័រទិន្នន័យ ===');
+{
+    const onData = buildEnv(src, {});
+    onData.els.dataSideSection.classList.add('collapsed');
+    onData.ctx.syncHistoryExpandedLock();
+    ok(onData.els.appPages.classList.contains('history-expanded'),
+        'ទំព័រទិន្នន័យសកម្ម + ផ្ទាំងបង្រួម ➜ ដាក់ history-expanded');
+
+    const onEntry = buildEnv(src, { dataPageActive: false });
+    onEntry.els.dataSideSection.classList.add('collapsed');
+    onEntry.ctx.syncHistoryExpandedLock();
+    ok(!onEntry.els.appPages.classList.contains('history-expanded'),
+        'ទំព័រទិន្នន័យមិនសកម្ម ➜ មិនដាក់ history-expanded (ទំព័រ ២ រមូរបាន)');
+}
 
 console.log('\n=== អូសឡើង/ចុះ ➜ ប្រវត្តិហូតឡើងចុះ ===');
 {

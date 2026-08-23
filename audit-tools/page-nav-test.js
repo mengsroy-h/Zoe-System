@@ -262,6 +262,58 @@ function seedData() {
     const backToData = await page.evaluate(() => { const el = document.getElementById('pageData'); return !!el && getComputedStyle(el).display !== 'none'; });
     check(backToData, 'ត្រឡប់មកទំព័រ ១ វិញដំណើរការ');
 
+    // របៀបប្រវត្តិពេញអេក្រង់ចាក់សោការរមូររបស់ #appPages (overflow-y: hidden)
+    // ព្រោះការរមូរផ្ទេរទៅតារាងខាងក្នុងវិញ។ បើសោនោះនៅជាប់ពេលប្តូរទៅទំព័រ
+    // «បញ្ចូលទិន្នន័យ» ➜ ទំព័រនោះ **រមូរមិនកើតទាល់តែសោះ** (អ្នកប្រើរាយការណ៍៖
+    // «ចុចប្តូរទៅ tap បញ្ចូលទិន្នន័យ គាំង scroll»)។ សោត្រូវជាប់តែទំព័រទិន្នន័យ។
+    const lockAcrossPages = await page.evaluate(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const pages = document.getElementById('appPages');
+        const handle = document.getElementById('dragHandle');
+        if (!pages || !handle || !window.switchAppPage) return null;
+        if (!document.getElementById('dataSideSection').classList.contains('collapsed')) handle.click();
+        await wait(120);
+        const onData = {
+            expanded: pages.classList.contains('history-expanded'),
+            overflow: getComputedStyle(pages).overflowY
+        };
+        window.switchAppPage('entry');
+        await wait(160);
+        // បន្ថែមកម្ពស់ក្លែងក្លាយ ដើម្បីវាស់ថា **កន្សោមរមូរ** ដើរឬអត់
+        // (មិនមែនវាស់ថាទិន្នន័យសាកល្បងវែងល្មមឬអត់ទេ)
+        const probe = document.createElement('div');
+        probe.style.height = '2000px';
+        document.getElementById('pageEntry').appendChild(probe);
+        pages.scrollTop = 400;
+        const onEntry = {
+            expanded: pages.classList.contains('history-expanded'),
+            overflow: getComputedStyle(pages).overflowY,
+            scrollable: pages.scrollHeight - pages.clientHeight > 8,
+            scrolled: pages.scrollTop
+        };
+        pages.scrollTop = 0;
+        probe.remove();
+        window.switchAppPage('data');
+        await wait(160);
+        const backOnData = {
+            expanded: pages.classList.contains('history-expanded'),
+            overflow: getComputedStyle(pages).overflowY
+        };
+        handle.click();
+        await wait(120);
+        return { onData, onEntry, backOnData };
+    });
+    check(!!lockAcrossPages && lockAcrossPages.onData.expanded && lockAcrossPages.onData.overflow === 'hidden',
+        'ទាញផ្ទាំងប្រវត្តិឡើង ➜ #appPages ចាក់សោការរមូរ (លក្ខខណ្ឌចាំបាច់)', JSON.stringify(lockAcrossPages));
+    check(!!lockAcrossPages && !lockAcrossPages.onEntry.expanded,
+        'ប្តូរទៅទំព័រ «បញ្ចូលទិន្នន័យ» ➜ សោ history-expanded ត្រូវដោះ', JSON.stringify(lockAcrossPages));
+    check(!!lockAcrossPages && lockAcrossPages.onEntry.overflow !== 'hidden',
+        'ទំព័រ «បញ្ចូលទិន្នន័យ» រមូរបាន (overflow មិនមែន hidden)', JSON.stringify(lockAcrossPages));
+    check(!!lockAcrossPages && lockAcrossPages.onEntry.scrollable && lockAcrossPages.onEntry.scrolled > 0,
+        'ទំព័រ «បញ្ចូលទិន្នន័យ» រមូរបានពិតប្រាកដ (scrollTop ផ្លាស់)', JSON.stringify(lockAcrossPages));
+    check(!!lockAcrossPages && lockAcrossPages.backOnData.expanded,
+        'ត្រឡប់មកទំព័រទិន្នន័យ ➜ របៀបប្រវត្តិពេញអេក្រង់ត្រឡប់មកវិញ', JSON.stringify(lockAcrossPages));
+
     const drawer = await page.evaluate(() => {
         if (!window.openSideDrawer || !document.getElementById('sideDrawer')) return { opened: false, closed: false, items: [] };
         window.openSideDrawer();

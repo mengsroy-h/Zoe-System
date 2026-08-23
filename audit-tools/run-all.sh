@@ -67,6 +67,7 @@ run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
 run "revenue-fuzz (browser ពិត)" node audit-tools/revenue-fuzz-test.js
 run "perf (browser ពិត)"       node audit-tools/perf-check.js
+run "offline-shell (browser ពិត)" node audit-tools/offline-shell-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -120,6 +121,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
+    OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
 fi
 
 echo

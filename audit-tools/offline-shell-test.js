@@ -1,9 +1,16 @@
-// ថ្នាក់៖ **ការពឹងផ្អែកលើ CDN ខាងក្រៅ ដែល service worker មិន cache**។
+// ថ្នាក់៖ **ការពឹងផ្អែកលើ CDN ខាងក្រៅសម្រាប់មុខងារស្នូល**។
 //
-// មុនកែ៖ `sw.js` បោះបង់រាល់សំណើឆ្លង origin (`url.origin !== self.location.origin`)
-// ដូច្នេះ ZXing (unpkg.com), Firebase SDK (gstatic), Google Fonts និង Sentry
+// មុនកែ៖ ZXing មកពី unpkg.com ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ដូច្នេះវា
 // **មិនដែលចូល cache ទេ**។ ផលវិបាកពិត៖ ពេលបណ្តាញខ្សោយ ឬ CDN ដាច់ — App បើកបាន
 // (សំបក app ក្នុង cache) តែ **ម៉ាស៊ីនស្កេនកាមេរ៉ាមិនដើរសោះ** ព្រោះ ZXing មិនមក។
+// ដំណោះស្រាយ៖ **យក ZXing ចូល repo** ➜ វាក្លាយជាធនធាន origin ដដែល ➜ ចូល APP_SHELL។
+//
+// ⚠️ កំណែ 2.6.0 ធ្លាប់ព្យាយាម cache **ធនធានឆ្លង origin** ផងដែរ (Firebase SDK,
+// ពុម្ពអក្សរ, Sentry) តាមបញ្ជី host។ វា **បណ្តាលឲ្យ App ខូចលើផលិតកម្ម** —
+// អ្នកប្រើឃើញ «ក្រៅបណ្តាញ» និងគ្មានទិន្នន័យ ខណៈបណ្តាញដើរធម្មតា។ វាត្រូវបាន
+// ថយក្រោយក្នុង 2.6.1។ **កុំនាំវាត្រឡប់មកវិញដោយគ្មានការផ្ទៀងផ្ទាត់លើ CDN ពិត**
+// — បរិស្ថាន CI នៅទីនេះឆ្លងកាត់ proxy ដូច្នេះវា **មិនអាចបង្កើតឥរិយាបថ CDN ពិត
+// ឡើងវិញបានទេ** ហើយការធ្វើតេស្តជាមួយ CDN ក្លែងក្លាយ **ជោគជ័យក្លែងក្លាយ**។
 //
 // តេស្តនេះមាន ២ ផ្នែក៖
 //   ១) ស្តាទិច — index.html មិនត្រូវផ្ទុក script ពី origin ខាងក្រៅទៀតទេ; គ្រប់ host
@@ -32,7 +39,6 @@ function ok(label, cond, detail) {
 const html = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
 const sw = fs.readFileSync(path.join(ROOT, 'ZoeW', 'sw.js'), 'utf8');
 const keygenSw = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'sw.js'), 'utf8');
-const loader = fs.readFileSync(path.join(ROOT, 'ZoeW', 'firebase-loader.js'), 'utf8');
 const netlify = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify.toml'), 'utf8');
 
 console.log('\n=== ការពឹងផ្អែកលើ CDN (ស្តាទិច) ===');
@@ -56,55 +62,28 @@ if (fs.existsSync(zxPath)) {
 
 ok('CSP លែងអនុញ្ញាត unpkg.com ទៀតទេ (តឹងជាងមុន)', netlify.indexOf('unpkg.com') === -1);
 
-// គ្រប់ host ខាងក្រៅដែលនៅសល់ក្នុង index.html ត្រូវស្គាល់ដោយ sw.js
-const swHosts = (sw.match(/const CDN_HOSTS = \[([\s\S]*?)\];/) || ['', ''])[1]
-    .split(',').map((s) => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
-ok('sw.js មានបញ្ជី CDN_HOSTS', swHosts.length > 0, swHosts);
+// service worker ត្រូវ **បោះបង់រាល់សំណើឆ្លង origin** — នេះជាឥរិយាបថដែល
+// ដំណើរការលើផលិតកម្មតាំងពីដើម។ ការព្យាយាម cache ធនធានឆ្លង origin ក្នុងកំណែ
+// 2.6.0 បានធ្វើឲ្យ App ខូច (មើលក្បាលឯកសារ) ➜ ច្បាប់នេះត្រូវចាក់សោទុក។
+ok('sw.js របស់ ZoeW បោះបង់សំណើឆ្លង origin (ឥរិយាបថដែលដំណើរការពិត)',
+    /if \(url\.origin !== self\.location\.origin\) return;/.test(sw));
+ok('sw.js របស់ ZoeKeyGen ក៏បោះបង់សំណើឆ្លង origin ដែរ',
+    /if \(url\.origin !== self\.location\.origin\) return;/.test(keygenSw));
+ok('គ្មានបញ្ជី CDN_HOSTS ត្រឡប់មកវិញក្នុង sw.js ទាំង ២ (ថ្នាក់កំហុស 2.6.0)',
+    sw.indexOf('CDN_HOSTS') === -1 && keygenSw.indexOf('CDN_HOSTS') === -1);
+ok('គ្មាន CDN_PRECACHE ត្រឡប់មកវិញក្នុង sw.js ទាំង ២',
+    sw.indexOf('CDN_PRECACHE') === -1 && keygenSw.indexOf('CDN_PRECACHE') === -1);
 
-// រាប់តែ tag ដែល **ផ្ទុកធនធានពិត** ប៉ុណ្ណោះ។ បីករណីដែលមិនរាប់៖
-//   `<a href>`            — ការនាំផ្លូវអ្នកប្រើ (តំណ Telegram)
-//   `rel="preconnect"`    — ត្រឹមតែជាការបើកបណ្តាញទុកជាមុន គ្មានធនធានទាញទេ
-//   `rel="dns-prefetch"`  — ដូចគ្នា
-// ចំណុចនេះសំខាន់៖ `identitytoolkit`/`securetoken` ជា preconnect សម្រាប់ **API
-// auth ផ្ទាល់** ដែល **មិនត្រូវ cache ដាច់ខាត** (មើលការអះអាង FORBIDDEN ខាងក្រោម)។
-const resourceTags = [...html.matchAll(/<(?:script|link)\b[^>]*>/g)].map((m) => m[0])
-    .filter((tag) => !/rel="(?:preconnect|dns-prefetch)"/.test(tag));
-const referencedHosts = [...new Set(
-    resourceTags.map((tag) => (tag.match(/\b(?:src|href)="https:\/\/([^/"]+)/) || [])[1]).filter(Boolean)
-)];
-const missing = referencedHosts.filter((h) => swHosts.indexOf(h) === -1);
-ok('គ្រប់ host ខាងក្រៅដែល index.html ផ្ទុកធនធានពី ស្ថិតក្នុង CDN_HOSTS',
-    missing.length === 0, { referencedHosts, swHosts, missing });
-ok('តំណ <a> ខាងក្រៅ (Telegram) មិនត្រូវរាប់ជាធនធានដែលត្រូវ cache',
-    referencedHosts.indexOf('t.me') === -1, referencedHosts);
-ok('preconnect ទៅ API auth មិនត្រូវក្លាយជាធនធានដែល cache',
-    referencedHosts.indexOf('identitytoolkit.googleapis.com') === -1 &&
-    referencedHosts.indexOf('securetoken.googleapis.com') === -1, referencedHosts);
-ok('ធនធានពិតដែលរាប់បាន មានលើសពី ១ (តេស្តមិនទទេ)', referencedHosts.length >= 3, referencedHosts);
+// មុខងារស្នូលមិនត្រូវពឹងលើ script ឆ្លង origin ណាមួយឡើយ។ Sentry (រាយការណ៍កំហុស)
+// និងពុម្ពអក្សរ Google ជាធនធាន **មិនស្នូល** — បើពួកវាមិនមក App នៅតែដំណើរការ។
+const CORE_HOSTS = ['unpkg.com'];
+const externalSrc = [...html.matchAll(/<script\b[^>]*\bsrc="https:\/\/([^/"]+)/g)].map((m) => m[1]);
+ok('គ្មាន script ស្នូលណាមួយមកពី origin ខាងក្រៅទៀតទេ',
+    CORE_HOSTS.every((h) => externalSrc.indexOf(h) === -1), externalSrc);
 
-// បញ្ជីនេះត្រូវជាបញ្ជី **allow** មិនមែន allow-all ទេ — ចរាចរណ៍ទិន្នន័យផ្ទាល់
-// (RTDB, auth token) មិនត្រូវចូល cache ដាច់ខាត បើមិនដូច្នេះទិន្នន័យចាស់ត្រូវបម្រើ
-const FORBIDDEN = ['firebaseio.com', 'firebasedatabase.app', 'identitytoolkit.googleapis.com',
-                   'securetoken.googleapis.com', 'script.google.com'];
-ok('CDN_HOSTS មិនមាន host ទិន្នន័យផ្ទាល់ណាមួយ (RTDB/auth មិនត្រូវ cache)',
-    FORBIDDEN.every((h) => !swHosts.some((s) => s.indexOf(h) !== -1)), swHosts);
-ok('sw.js នៅតែបោះបង់ host ខាងក្រៅដែលមិនស្គាល់ (មិនមែន cache គ្រប់យ៉ាង)',
-    /CDN_HOSTS\.indexOf\(url\.hostname\) !== -1/.test(sw) && /if \(!isCacheableRequest\(url\)\) return;/.test(sw));
-
-// ការឃ្លាតគ្នា៖ បើនរណាឡើងកំណែ Firebase SDK ក្នុង firebase-loader.js តែភ្លេច sw.js
-// នោះ App នឹងបើកមិនកើតពេលគ្មានបណ្តាញ ដោយស្ងាត់ៗ
-const loaderUrls = [...new Set([...loader.matchAll(/"(https:\/\/www\.gstatic\.com\/firebasejs\/[^"]+)"/g)].map((m) => m[1]))];
-const precache = (sw.match(/const CDN_PRECACHE = \[([\s\S]*?)\];/) || ['', ''])[1];
-ok('firebase-loader.js មាន URL របស់ Firebase SDK (លក្ខខណ្ឌចាំបាច់)', loaderUrls.length === 3, loaderUrls);
-ok('គ្រប់ URL របស់ Firebase SDK ស្ថិតក្នុង CDN_PRECACHE របស់ ZoeW (គ្មានការឃ្លាតកំណែ)',
-    loaderUrls.every((u) => precache.indexOf(u) !== -1), { loaderUrls, precache: precache.trim() });
-
-const keygenLoader = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'firebase-loader.js'), 'utf8');
-const keygenUrls = [...new Set([...keygenLoader.matchAll(/"(https:\/\/www\.gstatic\.com\/firebasejs\/[^"]+)"/g)].map((m) => m[1]))];
-const keygenPre = (keygenSw.match(/const CDN_PRECACHE = \[([\s\S]*?)\];/) || ['', ''])[1];
-ok('ZoeKeyGen ក៏ precache Firebase SDK ដែរ (គ្មានការឃ្លាតកំណែ)',
-    keygenUrls.length === 3 && keygenUrls.every((u) => keygenPre.indexOf(u) !== -1),
-    { keygenUrls, keygenPre: keygenPre.trim() });
+// ការឃ្លាតគ្នា៖ ZoeKeyGen មិនប្រើ ZXing ទេ — កុំយកវាចូល APP_SHELL របស់វា
+ok('ZoeKeyGen មិនដាក់ ZXing ចូល APP_SHELL (វាមិនស្កេន barcode ទេ)',
+    keygenSw.indexOf('zxing') === -1);
 
 // === ផ្នែកទី ២ — Browser ពិត ===
 let chromium;

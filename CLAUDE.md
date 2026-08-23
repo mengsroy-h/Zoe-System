@@ -116,10 +116,11 @@ if (url.origin !== self.location.origin) return;
 **`entryScanMode`** (`'parcel'` ឬ `'locker'`) កំណត់ថា `triggerScanAction()` នាំ barcode ទៅណា។
 វាជាចំណុចបំបែកតែមួយ — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។
 
-**`history-expanded` ជាប់តែទំព័រទិន្នន័យ។** `syncHistoryExpandedLock()` ដាក់ class នោះ
-លើ `#appPages` តែពេល `#pageData` មាន `.active` **និង** `#dataSideSection` មាន `.collapsed`
-ហើយ `switchAppPage()` ត្រូវហៅវារាល់ដង។ (វាអានពី DOM មិនមែនពី `currentAppPage` ទេ ដើម្បី
-កុំឲ្យវាឃ្លាតពីអ្វីដែលបង្ហាញពិត។) ហេតុផល៖ class នោះកំណត់ `overflow-y: hidden`
+**`history-expanded` តាមទំព័រដែលកំពុងសកម្ម។** `syncHistoryExpandedLock()` ដាក់ class
+នោះលើ `#appPages` តែពេល `.page-side` **របស់ទំព័រសកម្ម** មាន `.collapsed` —
+`activePanelSections()` ជាអ្នករកឲ្យ (អានពី DOM មិនមែនពី `currentAppPage` ទេ ដើម្បី
+កុំឲ្យវាឃ្លាតពីអ្វីដែលបង្ហាញពិត) ហើយ `switchAppPage()` ត្រូវហៅវារាល់ដង។
+បើសោនោះជាប់ឆ្លងទំព័រ នោះទំព័រម្ខាង **រមូរមិនកើតទាល់តែសោះ**។ ហេតុផល៖ class នោះកំណត់ `overflow-y: hidden`
 លើ `#appPages` (ព្រោះការរមូរផ្ទេរទៅតារាងខាងក្នុងវិញ) — បើវាជាប់ទៅទំព័រ «បញ្ចូលទិន្នន័យ»
 ដែលគ្មានតារាងខាងក្នុងទទួល នោះទំព័រនោះ **រមូរមិនកើតទាល់តែសោះ**។ Test៖ `page-nav-test.js`។
 
@@ -131,8 +132,26 @@ if (url.origin !== self.location.origin) return;
 **របា Slide បិទត្រូវមាន `visibility: hidden`** — បើមិនដូច្នេះ `layout-check.js` រាយវាថាលើសអេក្រង់
 (វា `translateX(-100%)`) ហើយវាក៏អាច tab ចូលបានទៀតផង។
 
-**កាយវិការអូស លើទូរស័ព្ទ (<992px) — `setupSwipeGestures()`។** ទំព័រទិន្នន័យមាន
-`#dataSideSection` (`.page-side`) និង `#dataMainSection` (`.page-main`) បូកដងអូស `#dragHandle`៖
+**កាយវិការអូស លើទូរស័ព្ទ (<992px) — `setupSwipeGestures()` ➜ `bindPanelSwipe()` ×២។**
+**ទំព័រទាំង ២ មានឥរិយាបថដូចគ្នា** — កុំកែតែទំព័រមួយ៖
+
+| ទំព័រ | `.page-side` | `.page-main` | ដងអូស | កន្សោមរមូរ |
+|---|---|---|---|---|
+| ទិន្នន័យ | `#dataSideSection` | `#dataMainSection` | `#dragHandle` | `#tableResponsive` |
+| បញ្ចូលទិន្នន័យ | `#entrySideSection` | `#entryMainSection` | `#entryDragHandle` | `#entryTableResponsive` ឬ `#lockerTableResponsive` |
+
+ទំព័រ ២ មានកន្សោមរមូរ **២** — `entryScrollerInView()` ជ្រើសយកតាមផ្ទាំងដែលកំពុង
+បង្ហាញ (`#lockerPanel.hidden` ជាអ្នកបែងចែក)។ កាតបញ្ជីទាំងនោះត្រូវមាន class
+**`.panel-section`** (ដូច `.history-section`) បើមិនដូច្នេះ `.table-responsive`
+ខាងក្នុង **flex មិនកើត** ➜ បញ្ជីមិនពេញអេក្រង់។
+
+**សោ `history-expanded` អនុវត្តពេល `touchend` មិនមែនចំពេលអូសទេ។** ផ្ទាំងបង្រួម
+ភ្លាម (អ្នកប្រើឃើញផលភ្លាម) តែសោដែលប្តូរ `overflow` និងកម្ពស់កន្សោមរមូរ ត្រូវ
+រង់ចាំម្រាមដៃលើក — បើមិនដូច្នេះកម្ពស់កន្សោមរមូរប្តូរកណ្តាលកាយវិការ ➜ **ការរមូរ
+ដែលកំពុងដើរត្រូវកាត់ផ្តាច់** (អ្នកប្រើរាយការណ៍ «បង្អាក់ការ scroll list»)។
+`touchcancel` ក៏អនុវត្តសោដែរ ដូច្នេះសោមិនជាប់គាំង។
+
+ចំណុចរួមទាំង ២ ទំព័រ៖
 
 - អូស/scroll **ឡើង** លើ `#dataMainSection` ➜ `#dataSideSection` ទទួល `.collapsed` ➜ ប្រវត្តិហូតឡើងពេញអេក្រង់
 - អូស **ចុះ** ពេលតារាងនៅកំពូល ➜ ដក `.collapsed` ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ
@@ -160,12 +179,17 @@ blur ដោយប្រអប់ទទេ ឬចាកចេញ ឬប្តូ�
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
-- កន្លែងរបស់របា Tab ក្នុងរបៀបប្រវត្តិពេញអេក្រង់ ត្រូវកក់ទុកជា **`padding-bottom` ថេរ**
-  លើ `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
-  វាស់ពិត) ដូច្នេះ **គែមក្រោមកាតប្រវត្តិឈរខាងលើរបា Tab** មិនរត់ចូលពីក្រោមវាទេ
-  (សំណើអ្នកប្រើ — ដូចកំណែ 2.2.0)។ ច្បាប់សំខាន់គឺ **តម្លៃនោះមិនត្រូវប្តូរតាមការលាក់/
-  បង្ហាញរបាឡើយ** (វាប្តូរតែពេលវាស់កម្ពស់របាឡើងវិញ) — កុំយកកន្លែងនោះមកឲ្យតារាងវិញ
-  ពេលរបាលាក់ ដូចកំណែ 2.2.1 ធ្វើ ព្រោះនោះជាឫសគល់នៃការលោតរំលងលើ iOS។
+- កន្លែងរបស់របា Tab ក្នុងរបៀបពេញអេក្រង់ ត្រូវកក់ជា `padding-bottom` លើ
+  `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
+  វាស់ពិត) ➜ **គែមក្រោមកាតឈរខាងលើរបា Tab**។ ពេលរបាលាក់ខ្លួន
+  `body.chrome-hidden` ទម្លាក់វាមកត្រឹម `8px` ➜ កាតរីកចុះបំពេញកន្លែងនោះ
+  (សំណើអ្នកប្រើ — ដូចកំណែ 2.2.0)។
+  **ច្បាប់ដែលមិនអាចរំលងបាន៖ ការប្តូរនោះត្រូវលោតភ្លាម — កុំដាក់ `transition`
+  លើ `padding` ដាច់ខាត។** កំណែ 2.2.1 ធ្វើ *ចលនា* លើវា ➜ កម្ពស់កន្សោមរមូរប្តូរ
+  រាល់ស៊ុមអស់ ០.២៦ វិនាទី ចំពេល momentum scroll ➜ **បញ្ជីលោតរំលង**។ ការប្តូរ
+  ភ្លាមមួយដងមិនស្ថិតក្នុងថ្នាក់នោះទេ ហើយ `BOTTOM_ZONE` ធានាថាការរីកមិនកើតឡើង
+  ពេលនៅជិតបាតបញ្ជី (ទីតាំងតែមួយដែល scrollTop ត្រូវ clamp)។ `gesture-test.js`
+  ចាក់សោទាំងឥរិយាបថ និងការហាម `transition`។
   កំណែ 2.4.0 ធ្លាប់កក់វាដោយ `.table-responsive::after` *ខាងក្នុង* កន្សោមរមូរ —
   layout ស្ថិរដូចគ្នា តែជួរដេកលិចចូលពីក្រោមរបា ➜ **កុំនាំវិធីនោះត្រឡប់មកវិញ**
 - **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល

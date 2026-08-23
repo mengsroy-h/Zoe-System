@@ -176,11 +176,16 @@
                ពិតប្រាកដ។ ការប្រើ vh ថេរ (62/78vh) មិនដែលត្រូវទេ ព្រោះវាមិនដឹង
                កម្ពស់ navbar, ក្បាលកាត, របាច្រោះ, របា Tab និង safe-area។
                ដូច្នេះប្រើខ្សែសង្វាក់ flex ដែលបំពេញកន្លែងដែលនៅសល់ពិត។ */
-            /* កន្លែងរបស់របា Tab ត្រូវកក់ទុក **ថេរ** ត្រង់នេះ ដូច្នេះកាតប្រវត្តិ
-               ឈប់ត្រង់ខាងលើរបា Tab (មិនរត់ចូលពីក្រោមវាទៀតទេ)។ តម្លៃនេះ
-               **មិនប្តូរតាមការលាក់/បង្ហាញរបា** — វាប្តូរតែពេល measureAppChromeSize()
-               វាស់កម្ពស់របាឡើងវិញ (boot/resize) — ដូច្នេះ layout នៅដដែល
-               ចំពេល momentum scroll របស់ iOS កំពុងដើរ ➜ បញ្ជីមិនលោតរំលង។ */
+            /* កន្លែងរបស់របា Tab ត្រូវកក់ទុកត្រង់នេះ ដូច្នេះកាតប្រវត្តិឈប់ត្រង់
+               ខាងលើរបា Tab (មិនរត់ចូលពីក្រោមវា)។ ពេលរបាលាក់ខ្លួន កន្លែងនោះ
+               ត្រូវប្រគល់មកកាតវិញ ➜ គ្មានចន្លោះទទេនៅបាតអេក្រង់ (សំណើអ្នកប្រើ,
+               ដូចកំណែ 2.2.0)។
+               **ការប្តូរនេះត្រូវលោតភ្លាម — កុំដាក់ `transition` លើ `padding` ឡើយ។**
+               កំណែ 2.2.1 ធ្វើចលនាលើ padding នេះ ➜ កម្ពស់ប្រអប់រមូរប្តូររាល់ស៊ុម
+               អស់ ០.២៦ វិនាទី ចំពេល momentum scroll របស់ iOS កំពុងដើរ ➜ បញ្ជី
+               លោតរំលង។ ការប្តូរភ្លាមមួយដង មិនស្ថិតក្នុងថ្នាក់កំហុសនោះទេ ហើយ
+               `setupChromeAutoHide()` មិនលាក់របាពេលនៅជិតបាតបញ្ជី (`BOTTOM_ZONE`)
+               ដូច្នេះការពង្រីកមិនកើតឡើងក្នុងទីតាំងដែល scrollTop ត្រូវ clamp។ */
             .app-pages.history-expanded {
                 overscroll-behavior-y: contain;
                 display: flex;
@@ -188,10 +193,14 @@
                 overflow-y: hidden;
                 padding-bottom: calc(var(--chrome-bottom, 62px) + 8px);
             }
+            body.chrome-hidden .app-pages.history-expanded { padding-bottom: 8px; }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
             .app-pages.history-expanded .page-main { flex: 1; min-height: 0; }
-            .app-pages.history-expanded .history-section { flex: 1; min-height: 0; }
+            .app-pages.history-expanded .history-section,
+            .app-pages.history-expanded .panel-section { flex: 1; min-height: 0; }
+            .app-pages.history-expanded #parcelPanel,
+            .app-pages.history-expanded #lockerPanel { flex: 1; min-height: 0; }
             .app-pages.history-expanded .table-responsive {
                 max-height: none;
                 flex: 1;
@@ -397,7 +406,7 @@
             .page-main { gap: 12px; height: 100%; min-height: 0; }
             .page-main > #parcelPanel, .page-main > #lockerPanel { flex: 1; min-height: 0; }
             .page-main > #parcelPanel > .app-card, .page-main > #lockerPanel > .app-card { flex: 1; min-height: 0; }
-            .history-section { flex: 1; min-height: 0; }
+            .history-section, .panel-section { flex: 1; min-height: 0; }
             .table-responsive { max-height: none; }
 
             .locker-grid { grid-template-columns: repeat(6, 1fr); }
@@ -665,7 +674,11 @@
         .file-upload-btn { background-color: var(--dark-bg); color: white; padding: 0 14px; min-height: 44px; font-size: 12px; border-radius: var(--radius-md); cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; }
         input[type="file"] { display: none; }
 
-        .history-section {
+        /* កាតដែលមានបញ្ជីរមូរនៅខាងក្នុង — ត្រូវជា flex column ដើម្បីឲ្យ
+           `.table-responsive` អាច `flex: 1` បំពេញកម្ពស់ដែលនៅសល់ពិត។
+           `.history-section` (ទំព័រទិន្នន័យ) និង `.panel-section`
+           (បញ្ជីកញ្ចប់ថ្ងៃនេះ + បញ្ជីទីតាំង Locker) ប្រើច្បាប់ដដែល។ */
+        .history-section, .panel-section {
             display: flex;
             flex-direction: column;
             min-height: 0;

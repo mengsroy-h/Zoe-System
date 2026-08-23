@@ -153,19 +153,13 @@
 
         @media (max-width: 991px) {
             .drag-handle-bar { display: block; }
-            .page-side {
-                transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                will-change: opacity;
-            }
             .page-side.collapsed {
                 max-height: 0;
                 opacity: 0;
                 overflow: hidden;
                 margin: 0;
                 padding: 0;
-            }
-            .page-side > * {
-                transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+                visibility: hidden;
             }
             .page-side.search-focus { gap: 0; }
             .page-side.search-focus > *:not(:last-child) {
@@ -182,12 +176,17 @@
                ពិតប្រាកដ។ ការប្រើ vh ថេរ (62/78vh) មិនដែលត្រូវទេ ព្រោះវាមិនដឹង
                កម្ពស់ navbar, ក្បាលកាត, របាច្រោះ, របា Tab និង safe-area។
                ដូច្នេះប្រើខ្សែសង្វាក់ flex ដែលបំពេញកន្លែងដែលនៅសល់ពិត។ */
+            /* កន្លែងរបស់របា Tab ត្រូវកក់ទុក **ថេរ** ត្រង់នេះ ដូច្នេះកាតប្រវត្តិ
+               ឈប់ត្រង់ខាងលើរបា Tab (មិនរត់ចូលពីក្រោមវាទៀតទេ)។ តម្លៃនេះ
+               **មិនប្តូរតាមការលាក់/បង្ហាញរបា** — វាប្តូរតែពេល measureAppChromeSize()
+               វាស់កម្ពស់របាឡើងវិញ (boot/resize) — ដូច្នេះ layout នៅដដែល
+               ចំពេល momentum scroll របស់ iOS កំពុងដើរ ➜ បញ្ជីមិនលោតរំលង។ */
             .app-pages.history-expanded {
                 overscroll-behavior-y: contain;
                 display: flex;
                 flex-direction: column;
                 overflow-y: hidden;
-                padding-bottom: 8px;
+                padding-bottom: calc(var(--chrome-bottom, 62px) + 8px);
             }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
@@ -197,14 +196,6 @@
                 max-height: none;
                 flex: 1;
                 min-height: 0;
-            }
-            /* របា Tab អណ្ដែតលើតារាង — កន្លែងរបស់វាកក់ទុក *ខាងក្នុង* កន្សោមរមូរ
-               ដោយ ::after មិនមែនដោយ padding របស់ប្រអប់ទេ។ ដូច្នេះការលាក់/បង្ហាញ
-               របា Tab **មិនប្តូរ layout សោះ** ➜ លើ iOS បញ្ជីលែងលោតរំលងពេលរមូរ។ */
-            .app-pages.history-expanded .table-responsive::after {
-                content: '';
-                display: block;
-                height: var(--chrome-bottom, 62px);
             }
         }
 
@@ -441,6 +432,15 @@
         @media (prefers-reduced-motion: reduce) {
             .page-tabbar { transition: none; }
         }
+
+        /* ទម្រង់ស្រាល — `setupAdaptivePerformance()` ដាក់ class នេះលើ body តែពេល
+           វាស់ឃើញថាឧបករណ៍ធ្លាក់ស៊ុមពិតប្រាកដ ២ ដងជាប់គ្នា។ វាដកចលនាដែលដើរ
+           ជារៀងរហូត និងស្រមោលដែលថ្លៃ ដើម្បីឲ្យការរមូរ និងការស្កេនរលូនវិញ។ */
+        body.perf-lite .scan-line { animation: none; opacity: 0.55; }
+        body.perf-lite .status-dot::after { animation: none; }
+        body.perf-lite .app-card { box-shadow: none; }
+        body.perf-lite .page-tabbar { transition-duration: 0.16s; box-shadow: none; }
+        body.perf-lite .toast { transition-duration: 0.14s; }
 
         .ptr-indicator {
             position: fixed;

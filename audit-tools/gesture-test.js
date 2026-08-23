@@ -365,21 +365,29 @@ const GESTURE = function (steps) {
         noReflow.shown.pad === noReflow.away.pad, noReflow);
     ok('លាក់របា ➜ ទីតាំងកំពូលតារាងមិនប្តូរ', noReflow.shown.top === noReflow.away.top, noReflow);
 
-    // កន្លែងរបស់របា Tab ត្រូវកក់ទុក *ខាងក្នុង* ប្រអប់រមូរ ដើម្បីឲ្យជួរចុងក្រោយ
-    // រមូរផុតពីរបាបាន — បើគ្មាន ជួរចុងក្រោយត្រូវរបា Tab បាំងជានិច្ច
+    // កាតប្រវត្តិត្រូវ **ឈប់ត្រង់ខាងលើរបា Tab** — មិនត្រូវរត់ចូលពីក្រោមវាទេ។
+    // កំណែ 2.4.0 ទុកឲ្យកាតលាតដល់បាតអេក្រង់ រួចកក់កន្លែងដោយ ::after ខាងក្នុង
+    // កន្សោមរមូរ ➜ ជួរដេកលិចចូលពីក្រោមរបា Tab ពេលរមូរ (អ្នកប្រើរាយការណ៍ថា
+    // «បាំងពីលើ អត់សូវស្អាត»)។ ឥឡូវកន្លែងកក់ជា padding ថេររបស់ #appPages
+    // ➜ គែមក្រោមកាតឈរខាងលើរបា ហើយ layout នៅតែមិនប្តូរពេលរបាលាក់/បង្ហាញ។
     const bottomRoom = await page.evaluate(() => {
         const table = document.getElementById('tableResponsive');
-        const inner = table.querySelector('table');
         const tabbar = document.getElementById('pageTabBar');
+        const card = document.querySelector('#dataMainSection .history-section') ||
+                     document.getElementById('dataMainSection');
         return {
-            spacer: Math.round(table.scrollHeight - inner.getBoundingClientRect().height),
+            tableBottom: Math.round(table.getBoundingClientRect().bottom),
+            cardBottom: Math.round(card.getBoundingClientRect().bottom),
+            tabbarTop: Math.round(tabbar.getBoundingClientRect().top),
             tabbarH: Math.round(tabbar.getBoundingClientRect().height),
             chromeBottom: window.getComputedStyle(document.documentElement).getPropertyValue('--chrome-bottom').trim()
         };
     });
     ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
-    ok('ជួរចុងក្រោយរមូរផុតពីរបា Tab បាន (កន្លែងកក់ខាងក្នុងប្រអប់រមូរ)',
-        bottomRoom.spacer >= bottomRoom.tabbarH - 3, bottomRoom);
+    ok('គែមក្រោមតារាងប្រវត្តិឈរខាងលើរបា Tab (របាមិនបាំងជួរដេក)',
+        bottomRoom.tableBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
+    ok('គែមក្រោមកាតប្រវត្តិទាំងមូលក៏ឈរខាងលើរបា Tab ដែរ',
+        bottomRoom.cardBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
 
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
@@ -400,6 +408,50 @@ const GESTURE = function (steps) {
     ok('រញ្ជួយឡើងបន្តទៀត (សរុប 30px) ➜ នៅតែលាក់', await hidden() === true);
     await scrollTo(500);
     ok('រមូរឡើងពិតប្រាកដ (>48px) ➜ បង្ហាញវិញ', await hidden() === false);
+
+    // === ចង្វាក់ស៊ុមសម្របតាមឧបករណ៍ (១០–១២០ fps) ===
+    // ទំព័រវែបមិនអាចដំឡើងល្បឿន refresh របស់អេក្រង់បានទេ — អ្វីដែលធ្វើបានគឺ
+    // **វាស់** ចង្វាក់ពិតរបស់ឧបករណ៍ រួចយកវាធ្វើមូលដ្ឋាននៃពិដាន «ស៊ុមវែង»។
+    // ពិដានថេរ ២៦ms ខុសទាំង ២ ទិស៖ លើអេក្រង់ ១២០Hz វាធូរពេក (ស៊ុមវែងពិត
+    // គឺ >8.3ms) ចំណែកលើឧបករណ៍ដែល browser ចាក់ត្រឹម ៣០Hz វាតឹងពេក។
+    console.log('\n=== ចង្វាក់ស៊ុមសម្របតាមឧបករណ៍ (១០–១២០ fps) ===');
+    const hz = await page.evaluate(async () => {
+        if (typeof window.measureDisplayHz !== 'function') return null;
+        const measured = await new Promise((r) => window.measureDisplayHz(r));
+        const atMeasured = window.longFrameThresholdMs();
+        const budget = window.displayFrameBudgetMs();
+        return {
+            measured: measured,
+            atMeasured: atMeasured,
+            budget: Math.round(budget * 100) / 100,
+            clampLow: window.clampDisplayHz(2),
+            clampHigh: window.clampDisplayHz(240),
+            clampNaN: window.clampDisplayHz(NaN)
+        };
+    });
+    ok('measureDisplayHz() មានក្នុង App ពិត', !!hz, hz);
+    if (hz) {
+        console.log('    វាស់បាន ' + hz.measured + ' Hz  ➜ ថវិកាមួយស៊ុម ' + hz.budget +
+                    'ms  ➜ ពិដានស៊ុមវែង ' + hz.atMeasured + 'ms');
+        ok('ចង្វាក់ដែលវាស់បាន ស្ថិតក្នុងចន្លោះ ១០–១២០ Hz',
+            hz.measured >= 10 && hz.measured <= 120, hz);
+        ok('ចង្វាក់លឿនហួសហេតុ ត្រូវកាត់ត្រឹម ១២០ Hz', hz.clampHigh === 120, hz);
+        ok('ចង្វាក់យឺតហួសហេតុ ត្រូវលើក ១០ Hz', hz.clampLow === 10, hz);
+        ok('តម្លៃវាស់មិនត្រឹមត្រូវ (NaN) មិនធ្វើឲ្យបែក', hz.clampNaN === 10, hz);
+        ok('ពិដានស៊ុមវែងចេញពីចង្វាក់ពិត មិនមែនលេខថេរទេ',
+            hz.atMeasured === Math.max(12, Math.round(hz.budget * 1.6)), hz);
+    }
+    const hzBand = await page.evaluate(() => {
+        if (typeof window.clampDisplayHz !== 'function') return null;
+        const out = {};
+        [-5, 0, 9, 10, 30, 60, 90, 120, 121, 240].forEach((v) => { out[v] = window.clampDisplayHz(v); });
+        return out;
+    });
+    ok('ចង្វាក់ក្នុងចន្លោះ ១០–១២០ ត្រូវរក្សាដដែល (គ្រប់តម្លៃ)',
+        !!hzBand && [10, 30, 60, 90, 120].every((v) => hzBand[v] === v), hzBand);
+    ok('ចង្វាក់ក្រៅចន្លោះត្រូវកាត់ចូលចន្លោះ (គ្មានតម្លៃឆ្កួតឆ្លងចេញ)',
+        !!hzBand && hzBand[-5] === 10 && hzBand[0] === 10 && hzBand[9] === 10 &&
+        hzBand[121] === 120 && hzBand[240] === 120, hzBand);
 
     const cssSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
     ok('.table-responsive គ្មាន scroll-behavior: smooth (WebKit អនុវត្តវាលើ momentum ➜ លោតរំលង)',

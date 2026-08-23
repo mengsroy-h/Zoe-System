@@ -143,6 +143,9 @@
         .page-side, .page-main { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; box-sizing: border-box; }
         #parcelPanel, #lockerPanel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 
+        /* ដងអូសជា **ផ្លូវតែមួយ** ដែលបិទ/បើកផ្ទាំងខាងលើ (ការអូសលើបញ្ជីជាការ
+           រមូរសុទ្ធ) ➜ តំបន់ប៉ះរបស់វាត្រូវធំល្មម។ `::before` ពង្រីកតំបន់ប៉ះ
+           ដោយ **មិនប្តូររូបរាង** — របាដែលមើលឃើញនៅ 40×4px ដដែល។ */
         .drag-handle-bar {
             width: 40px;
             height: 4px;
@@ -152,7 +155,17 @@
             display: none;
             cursor: grab;
             flex-shrink: 0;
+            position: relative;
         }
+        .drag-handle-bar::before {
+            content: '';
+            position: absolute;
+            left: -70px;
+            right: -70px;
+            top: -10px;
+            bottom: -10px;
+        }
+        .drag-handle-bar:active { background: #94a3b8; }
 
         @media (max-width: 991px) {
             .drag-handle-bar { display: block; }

@@ -91,16 +91,23 @@ function buildEnv(src, opts) {
     ctx.window.document = ctx.document;
     vm.createContext(ctx);
     vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
+    vm.runInContext((src.match(/^ *const HANDLE_DRAG_THRESHOLD = .*$/m) || [''])[0], ctx);
     vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
     vm.runInContext(sliceFn(src, 'entryScrollerInView'), ctx);
     vm.runInContext(sliceFn(src, 'activePanelSections'), ctx);
     vm.runInContext(sliceFn(src, 'syncHistoryExpandedLock'), ctx);
     vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
-    vm.runInContext(sliceFn(src, 'phoneSearchIsActive'), ctx);
     vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
     ctx.setupSwipeGestures();
     return { ctx, els, handlers, calls };
+}
+
+// អូសលើ **ដងអូស** — ផ្លូវតែមួយដែលបិទ/បើកផ្ទាំង
+function dragHandle(handlers, el, fromY, toY) {
+    handlers[el].touchstart({ touches: [{ clientY: fromY }] });
+    handlers[el].touchmove({ touches: [{ clientY: toY }] });
+    if (handlers[el].touchend) handlers[el].touchend();
 }
 
 function swipe(handlers, el, fromY, toY) {
@@ -132,80 +139,102 @@ console.log('\n=== សោប្រវត្តិពេញអេក្រង់�
         'ទំព័រទិន្នន័យមិនសកម្ម ➜ មិនដាក់ history-expanded (ទំព័រ ២ រមូរបាន)');
 }
 
-console.log('\n=== ទំព័រ ២ (បញ្ចូលទិន្នន័យ) ហូតឡើងចុះដូចប្រវត្តិដែរ ===');
+console.log('\n=== ការអូសលើបញ្ជីជាការរមូរសុទ្ធ (មិនប្តូរ layout) ===');
 {
-    const { els, handlers } = buildEnv(src, { dataPageActive: false, entryPageActive: true });
-    ok(!!handlers.entryMainSection, 'ដងអូស/ការអូសត្រូវបានចង លើ #entryMainSection');
-    swipe(handlers, 'entryMainSection', 300, 200);
-    ok(els.entrySideSection.classList.contains('collapsed'),
-        'អូសឡើងលើទំព័រ ២ ➜ ផ្ទាំងកាមេរ៉ាបង្រួម');
-    ok(els.appPages.classList.contains('history-expanded'),
-        'ហើយបញ្ជីកញ្ចប់ថ្ងៃនេះហូតឡើងពេញអេក្រង់ (សោដូចប្រវត្តិ)');
-    swipe(handlers, 'entryMainSection', 200, 300);
-    ok(!els.entrySideSection.classList.contains('collapsed'),
-        'អូសចុះវិញ ➜ ផ្ទាំងកាមេរ៉ាត្រឡប់មក');
-    ok(!els.appPages.classList.contains('history-expanded'), 'ហើយសោត្រូវដោះ');
-
-    const byHandle = buildEnv(src, { dataPageActive: false, entryPageActive: true });
-    byHandle.handlers.entryDragHandle.click();
-    ok(byHandle.els.entrySideSection.classList.contains('collapsed'),
-        'ចុចដងអូសទំព័រ ២ ➜ បង្រួម');
-    ok(byHandle.els.appPages.classList.contains('history-expanded'), 'ហើយចាក់សោភ្លាម');
-
-    // ទំព័រ ២ មិនត្រូវប៉ះផ្ទាំងទំព័រ ១ ទេ
-    ok(!byHandle.els.dataSideSection.classList.contains('collapsed'),
-        'ការអូសលើទំព័រ ២ មិនប៉ះផ្ទាំងទំព័រ ១');
-}
-
-console.log('\n=== សោមិនអនុវត្តចំពេលម្រាមដៃនៅលើអេក្រង់ (កុំបង្អាក់ការរមូរ) ===');
-{
-    // ឫសគល់នៃការ «ទាក់»៖ ការដាក់ history-expanded ចំពេលអូស ប្តូរកម្ពស់
-    // កន្សោមរមូរភ្លាម ➜ ការរមូរដែលកំពុងដើរត្រូវកាត់ផ្តាច់។ ដូច្នេះផ្ទាំងបង្រួម
-    // ភ្លាម (ឃើញផល) តែ **សោអនុវត្តពេល touchend** ទើបការរមូរបន្តរលូន។
-    const { els, handlers } = buildEnv(src, {});
-    swipeHold(handlers, 'dataMainSection', 300, 200);
-    ok(els.dataSideSection.classList.contains('collapsed'),
-        'កំពុងអូស ➜ ផ្ទាំងបង្រួមភ្លាម (អ្នកប្រើឃើញផលភ្លាម)');
-    ok(!els.appPages.classList.contains('history-expanded'),
-        'កំពុងអូស ➜ **មិនទាន់** ចាក់សោកន្សោមរមូរ (ការរមូរមិនត្រូវកាត់ផ្តាច់)');
-    handlers.dataMainSection.touchend();
-    ok(els.appPages.classList.contains('history-expanded'),
-        'លើកម្រាមដៃ ➜ ទើបចាក់សោ ហើយបញ្ជីហូតឡើងពេញអេក្រង់');
-
-    const cancelled = buildEnv(src, {});
-    swipeHold(cancelled.handlers, 'dataMainSection', 300, 200);
-    cancelled.handlers.dataMainSection.touchcancel();
-    ok(cancelled.els.appPages.classList.contains('history-expanded'),
-        'touchcancel ក៏អនុវត្តសោដែរ (សោមិនជាប់គាំង)');
-}
-
-console.log('\n=== អូសឡើង/ចុះ ➜ ប្រវត្តិហូតឡើងចុះ ===');
-{
+    // ឫសគល់នៃការ «បង្អាក់ scroll» ដែលវាស់បាន៖ ការបង្រួមផ្ទាំងខាងលើធ្វើឲ្យ
+    // កន្សោមរមូរខាងក្រៅ **រលាយបាត់** (រមូរបានទៀត 305px ➜ 0px) ➜ បើ browser
+    // កំពុងរមូរវា កាយវិការនោះស្លាប់ភ្លាម។ ដូច្នេះការអូសលើបញ្ជី **មិនត្រូវ
+    // ប្តូរ layout ឡើយ** — ការបិទ/បើកផ្លាស់ទៅដងអូសទាំងស្រុង។
     const { els, handlers } = buildEnv(src, {});
     swipe(handlers, 'dataMainSection', 300, 200);
+    ok(!els.dataSideSection.classList.contains('collapsed'),
+        'អូសឡើងលើបញ្ជី ➜ **មិនបង្រួម**ផ្ទាំង (ការរមូរមិនត្រូវកាត់ផ្តាច់)');
+    ok(!els.appPages.classList.contains('history-expanded'),
+        'ហើយមិនប្តូរកន្សោមរមូរដែរ');
+
+    const collapsed = buildEnv(src, { sideClasses: ['collapsed'] });
+    swipe(collapsed.handlers, 'dataMainSection', 200, 300);
+    ok(collapsed.els.dataSideSection.classList.contains('collapsed'),
+        'អូសចុះលើបញ្ជី ➜ ក៏មិនបើកផ្ទាំងវិញដែរ (ការរមូរនៅសុទ្ធ)');
+
+    // ភស្តុតាងខ្លាំងជាងគេ៖ **គ្មាន touch listener ណាមួយ**ចងលើកន្សោមរមូរទេ
+    // ➜ គ្មានកូដណាអាចប្តូរ layout ចំពេលអ្នកប្រើកំពុងរមូរបានឡើយ
+    const onTable = buildEnv(src, { sideClasses: ['collapsed'] });
+    ok(onTable.handlers.tableResponsive === undefined,
+        'គ្មាន touch listener ចងលើ #tableResponsive ទេ (ការរមូរមិនអាចត្រូវរំខាន)',
+        Object.keys(onTable.handlers));
+    ok(onTable.handlers.entryTableResponsive === undefined &&
+       onTable.handlers.lockerTableResponsive === undefined,
+        'គ្មាន touch listener លើកន្សោមរមូរទំព័រ ២ ដែរ');
+}
+
+console.log('\n=== ដងអូស ជាផ្លូវតែមួយ (ចុច ឬអូស) ===');
+{
+    const tap = buildEnv(src, {});
+    tap.handlers.dragHandle.click();
+    ok(tap.els.dataSideSection.classList.contains('collapsed'), 'ចុចដងអូស ➜ បង្រួម');
+    ok(tap.els.appPages.classList.contains('history-expanded'), 'ហើយចាក់សោភ្លាម');
+    tap.handlers.dragHandle.click();
+    ok(!tap.els.dataSideSection.classList.contains('collapsed'), 'ចុចម្តងទៀត ➜ បើកវិញ');
+
+    const up = buildEnv(src, {});
+    dragHandle(up.handlers, 'dragHandle', 300, 250);
+    ok(up.els.dataSideSection.classList.contains('collapsed'), 'អូសដងអូសឡើង ➜ បង្រួម');
+    dragHandle(up.handlers, 'dragHandle', 250, 300);
+    ok(!up.els.dataSideSection.classList.contains('collapsed'), 'អូសដងអូសចុះ ➜ បើកវិញ');
+
+    const tiny = buildEnv(src, {});
+    dragHandle(tiny.handlers, 'dragHandle', 300, 290);
+    ok(!tiny.els.dataSideSection.classList.contains('collapsed'),
+        'អូសខ្លីជាងកម្រិត ➜ មិនប្តូរ (ជៀសការកេះដោយចៃដន្យ)');
+}
+
+console.log('\n=== ទំព័រ ២ (បញ្ចូលទិន្នន័យ) ដើរដូចគ្នា ===');
+{
+    const entry = buildEnv(src, { dataPageActive: false, entryPageActive: true });
+    entry.handlers.entryDragHandle.click();
+    ok(entry.els.entrySideSection.classList.contains('collapsed'),
+        'ចុចដងអូសទំព័រ ២ ➜ ផ្ទាំងកាមេរ៉ាបង្រួម');
+    ok(entry.els.appPages.classList.contains('history-expanded'),
+        'ហើយបញ្ជីកញ្ចប់ថ្ងៃនេះហូតឡើងពេញអេក្រង់');
+    ok(!entry.els.dataSideSection.classList.contains('collapsed'),
+        'ការអូសលើទំព័រ ២ មិនប៉ះផ្ទាំងទំព័រ ១');
+
+    const entryDrag = buildEnv(src, { dataPageActive: false, entryPageActive: true });
+    dragHandle(entryDrag.handlers, 'entryDragHandle', 300, 250);
+    ok(entryDrag.els.entrySideSection.classList.contains('collapsed'),
+        'អូសដងអូសទំព័រ ២ ឡើង ➜ បង្រួម');
+
+    const entrySwipe = buildEnv(src, { dataPageActive: false, entryPageActive: true });
+    swipe(entrySwipe.handlers, 'entryMainSection', 300, 200);
+    ok(!entrySwipe.els.entrySideSection.classList.contains('collapsed'),
+        'អូសលើបញ្ជីទំព័រ ២ ➜ មិនប្តូរ layout (ការរមូរសុទ្ធ)');
+}
+
+console.log('\n=== ដងអូស ➜ ប្រវត្តិហូតឡើងចុះ + សោ overscroll ===');
+{
+    const { els, handlers } = buildEnv(src, {});
+    dragHandle(handlers, 'dragHandle', 300, 250);
     ok(els.dataSideSection.classList.contains('collapsed'),
-        'អូសឡើង ➜ ផ្ទាំងខាងលើបង្រួម ហើយប្រវត្តិឡើងពេញ');
+        'អូសដងអូសឡើង ➜ ផ្ទាំងខាងលើបង្រួម ហើយប្រវត្តិឡើងពេញ');
     ok(els.appPages.classList.contains('history-expanded'),
         'ពេលពង្រីកប្រវត្តិ ➜ ចាក់សោ overscroll លើ #appPages');
-    els.tableResponsive.scrollTop = 0;
-    swipe(handlers, 'dataMainSection', 200, 300);
+    dragHandle(handlers, 'dragHandle', 250, 300);
     ok(!els.dataSideSection.classList.contains('collapsed'),
-        'អូសចុះ ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ');
+        'អូសដងអូសចុះ ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ');
     ok(!els.appPages.classList.contains('history-expanded'),
         'ដោះសោ overscroll វិញ');
 }
 
-console.log('\n=== អូសចុះលើតារាងផ្ទាល់ (ពេលប្រវត្តិពេញអេក្រង់) ===');
+console.log('\n=== ដងអូសនៅដើរពេលប្រវត្តិពេញអេក្រង់ ===');
 {
     const { els, handlers } = buildEnv(src, { sideClasses: ['collapsed'] });
-    els.tableResponsive.scrollTop = 40;
-    swipe(handlers, 'tableResponsive', 200, 300);
-    ok(els.dataSideSection.classList.contains('collapsed'),
-        'តារាងកំពុង scroll នៅកណ្តាល ➜ មិនទាន់បើកវិញទេ');
-    els.tableResponsive.scrollTop = 0;
-    swipe(handlers, 'tableResponsive', 200, 300);
+    els.tableResponsive.scrollTop = 400;
+    dragHandle(handlers, 'dragHandle', 200, 300);
     ok(!els.dataSideSection.classList.contains('collapsed'),
-        'ដល់កំពូលតារាង រួចអូសចុះ ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ');
+        'អូសដងអូសចុះ ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ ទោះតារាងរមូរនៅកណ្តាល');
+    ok(els.tableResponsive.scrollTop === 400,
+        'ទីតាំងរមូររបស់តារាងមិនត្រូវប៉ះ');
 }
 
 console.log('\n=== កំពុងស្វែងរកលេខទូរស័ព្ទ — កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ ===');
@@ -280,6 +309,19 @@ console.log('\n=== លើអេក្រង់ធំ ការអូសមិន
     swipe(handlers, 'dataMainSection', 300, 200);
     ok(!els.dataSideSection.classList.contains('collapsed'),
         'អូសឡើងលើកុំព្យូទ័រ ➜ គ្មានផលប៉ះពាល់');
+}
+
+console.log('\n=== ភស្តុតាងលើ source ៖ គ្មានការចង listener លើកន្សោមរមូរ ===');
+{
+    const bind = sliceFn(src, 'bindPanelSwipe');
+    ok(bind.indexOf('tableResponsive') === -1,
+        'bindPanelSwipe() មិនយោងកន្សោមរមូរណាមួយឡើយ (គ្មានផ្លូវប្តូរ layout ពេលរមូរ)');
+    ok(bind.indexOf('lockerTableResponsive') === -1 && bind.indexOf('entryTableResponsive') === -1,
+        'ហើយមិនយោងកន្សោមរមូរទំព័រ ២ ដែរ');
+    const listenerTargets = (bind.match(/(\w+)\.addEventListener\(/g) || [])
+        .map((m) => m.replace('.addEventListener(', ''));
+    ok(listenerTargets.every((t) => t === 'mainSection' || t === 'dragHandle'),
+        'listener ចងតែលើ mainSection និង dragHandle ប៉ុណ្ណោះ', listenerTargets);
 }
 
 console.log('\n=== ការតភ្ជាប់ក្នុង index.html និង style.css ===');

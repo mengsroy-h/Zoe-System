@@ -24,6 +24,23 @@
 
 ---
 
+## [2.8.4] — 2026-08-24
+
+### កែកំហុស — PTR មិនចេញលើ Safari ពិត
+- Safari ត្រូវឃើញ non-passive listener មុន gesture ចាប់ផ្តើម; ការដំឡើងក្រោយ
+  `touchstart` ក្នុង 2.8.3 ធ្វើឲ្យ PTR មិនអាចកាន់ gesture បានលើ iPhone ពិត។
+- ឥឡូវ listener ត្រៀមជាមុនតែពេលផ្ទាំងធម្មតា ហើយដកចេញទាំងស្រុងពេលប្រវត្តិ
+  ពេញអេក្រង់/search-focus ដូច្នេះ PTR ដំណើរការវិញដោយមិនប៉ះ full-screen scroll។
+
+### ឧបករណ៍ audit
+- `gesture-test.js` 107 assertions៖ ចាក់សោថា listener មានមុន touchstart នៅ state ធម្មតា
+  និងមានចំនួនសូន្យពេលប្រវត្តិពេញអេក្រង់។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- សាកល្បង PTR និង full-screen momentum scroll លើ iPhone PWA ពិត។
+
+---
+
 ## [2.8.3] — 2026-08-24
 
 **ការរមូរប្រវត្តិលើ iOS រលូនឡើង ហើយ pull-to-refresh បិទទាំងស្រុងពេលបញ្ជីពេញអេក្រង់។**

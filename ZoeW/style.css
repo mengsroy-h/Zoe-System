@@ -280,6 +280,39 @@
             body.chrome-hidden .app-pages.history-expanded .table-responsive { padding-bottom: 0; }
         }
 
+        /* ===================== ផ្លូវ iOS ដាច់ដោយឡែក =====================
+           Android/Chromium ប្រើផ្លូវខាងលើ (កម្ពស់ថេរ + `clip-path`) ដែលអ្នកប្រើ
+           បញ្ជាក់ថាដំណើរការល្អ។ តែលើ **iOS ផ្លូវនោះមិនដើរទេ** — អ្នកប្រើឃើញកាត
+           «លែងធ្លាក់» ពេលរបា Tab លាក់ខ្លួន។ ដូច្នេះ iOS ត្រឡប់ទៅយន្តការដែល
+           **បានផ្ទៀងផ្ទាត់លើ iPhone ពិត**៖ កាតមានកម្ពស់ពិត ហើយ **រីកចុះមកបំពេញ**
+           កន្លែងរបា។ អ្វីដែលរក្សាទុកពីការកែថ្មី៖ ការប្រគល់កន្លែងកេះដោយ
+           `body.chrome-hidden` **ភ្លាមៗ** មិនមែនរង់ចាំ 180ms ➜ ធ្លាក់ស្របនឹងរបា។
+
+           `@supports (-webkit-touch-callout: none)` ជាការបែងចែក iOS WebKit ពិត៖
+           Chromium ត្រឡប់ `false` (ផ្ទៀងផ្ទាត់ដោយ `CSS.supports()`) ➜ Android
+           មិនរងផលឡើយ។ ការប្រើ `html.ios-standalone` តែម្យ៉ាងមិនគ្រប់ទេ ព្រោះវា
+           មិនគ្របដណ្តប់ Safari ធម្មតា។ */
+        @supports (-webkit-touch-callout: none) {
+            @media (max-width: 991px) {
+                .app-pages {
+                    padding-bottom: calc(var(--chrome-bottom, calc(62px + env(safe-area-inset-bottom))) + 8px);
+                }
+                .app-page.active > .page-main {
+                    height: calc(100vh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
+                    height: calc(100dvh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
+                    clip-path: none;
+                }
+                body.chrome-hidden .app-page.active > .page-main {
+                    height: calc(100vh - var(--chrome-top, 63px) - var(--page-extension, 0px) - 16px);
+                    height: calc(100dvh - var(--chrome-top, 63px) - var(--page-extension, 0px) - 16px);
+                }
+                .app-page.active > .page-main .table-responsive { padding-bottom: 0; }
+                .app-pages.history-expanded { padding-bottom: calc(var(--chrome-bottom, 62px) + 8px); }
+                body.chrome-hidden .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
+                .app-pages.history-expanded .table-responsive { padding-bottom: 0; }
+            }
+        }
+
         .page-tabbar {
             position: fixed;
             left: 0; right: 0; bottom: 0;

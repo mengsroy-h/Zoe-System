@@ -226,6 +226,73 @@ function seedBig(n) {
         ok(tag + ': គ្មានការហូរផ្តេក', r.hOverflow <= 0, 'overflow=' + r.hOverflow);
         await ctx.close();
     }
+    // ---- ផ្លូវ iOS ដាច់ដោយឡែក ----
+    // Chromium មិនអាចផ្គូផ្គង `@supports (-webkit-touch-callout: none)` បានទេ
+    // (វាត្រឡប់ false) ➜ ច្បាប់ក្នុងនោះ **មិនដែលត្រូវសាកសោះ** បើមិនចាក់វាដោយដៃ។
+    // ផ្លូវ iOS មិនប្រើ `clip-path` ទេ — កាតមានកម្ពស់ពិត ហើយ **រីកចុះមកបំពេញ**
+    // កន្លែងរបា។ បើផ្នែកនេះខូច អ្នកប្រើ iPhone ឃើញកាត «លែងធ្លាក់»។
+    {
+        const cssSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
+        const at = cssSrc.indexOf('@supports (-webkit-touch-callout: none) {');
+        const ctx2 = await browser.newContext({ viewport: { width: 412, height: 780 } });
+        const page2 = await ctx2.newPage();
+        page2.on('dialog', (d) => d.accept());
+        await page2.route('**', (r) => {
+            const u = r.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
+            return r.abort();
+        });
+        await page2.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await page2.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(120)) + ');');
+        await page2.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page2.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 30000 });
+        await page2.waitForTimeout(250);
+
+        ok('iOS: style.css មានប្លុក @supports (-webkit-touch-callout: none)', at !== -1);
+        if (at !== -1) {
+            let depth = 0, start = cssSrc.indexOf('{', at), end = start;
+            for (let k = start; k < cssSrc.length; k++) {
+                if (cssSrc[k] === '{') depth++;
+                else if (cssSrc[k] === '}') { depth--; if (!depth) { end = k; break; } }
+            }
+            await page2.addStyleTag({ content: cssSrc.slice(start + 1, end) });
+            await page2.waitForTimeout(200);
+            const r2 = await page2.evaluate(async () => {
+                const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+                const main = document.getElementById('dataMainSection');
+                const table = document.getElementById('tableResponsive');
+                document.getElementById('dataSideSection').classList.add('collapsed');
+                window.syncHistoryExpandedLock();
+                await wait(150);
+                document.body.classList.remove('chrome-hidden');
+                await wait(120);
+                const shown = { cardH: Math.round(main.getBoundingClientRect().height),
+                                cardBottom: Math.round(main.getBoundingClientRect().bottom),
+                                tableBottom: Math.round(table.getBoundingClientRect().bottom),
+                                barTop: Math.round(document.getElementById('pageTabBar').getBoundingClientRect().top),
+                                clip: getComputedStyle(main).clipPath };
+                document.body.classList.add('chrome-hidden');
+                await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+                const hidden = { cardH: Math.round(main.getBoundingClientRect().height),
+                                 cardBottom: Math.round(main.getBoundingClientRect().bottom),
+                                 tableBottom: Math.round(table.getBoundingClientRect().bottom) };
+                document.body.classList.remove('chrome-hidden');
+                return { shown, hidden, viewportH: window.innerHeight };
+            });
+            ok('iOS: មិនប្រើ clip-path (Safari មិនអាចពឹងលើវាបាន)',
+                r2.shown.clip === 'none', r2.shown.clip);
+            ok('iOS: គែមក្រោមកាតឈរខាងលើរបា Tab ពេលរបាឲ្យឃើញ',
+                r2.shown.cardBottom <= r2.shown.barTop + 1, r2.shown);
+            ok('iOS: លាក់របា ➜ កាត **រីកចុះពិត** មកបំពេញកន្លែងរបា (ក្នុង ២ ស៊ុម)',
+                r2.hidden.cardH - r2.shown.cardH >= 20, 'delta=' + (r2.hidden.cardH - r2.shown.cardH) + 'px');
+            ok('iOS: លាក់របា ➜ គែមក្រោមកាតចុះជិតបាតអេក្រង់ (គ្មានចន្លោះទទេ)',
+                r2.viewportH - r2.hidden.cardBottom >= 0 && r2.viewportH - r2.hidden.cardBottom <= 16,
+                { bottom: r2.hidden.cardBottom, viewportH: r2.viewportH });
+        }
+        await ctx2.close();
+    }
+
     server.close(); await browser.close();
     let bad = 0;
     results.forEach(([n, c, d]) => { if (!c) bad++; console.log((c ? '  ok    ' : '  FAIL  ') + n + (c ? '' : '   [' + d + ']')); });

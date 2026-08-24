@@ -343,7 +343,14 @@ Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
-- **កំណែ 2.11.0៖ កន្លែងរបា Tab កក់ *ខាងក្នុងកន្សោមរមូរ* មិនមែនលើ `.app-pages` ទេ។**
+- **ផ្លូវ Android និង iOS ដាច់ដោយឡែក (កំណែ 2.11.2)។** យន្តការ `clip-path`
+  ខាងក្រោម **មិនដើរលើ Safari** — អ្នកប្រើ iPhone ឃើញកាត «លែងធ្លាក់»។ ដូច្នេះ
+  `@supports (-webkit-touch-callout: none)` ផ្តល់ផ្លូវ iOS ដែលកាតមាន **កម្ពស់ពិត
+  ហើយរីកចុះមកបំពេញ** កន្លែងរបា (យន្តការដែលផ្ទៀងផ្ទាត់លើ iPhone ក្នុង 2.9.0)។
+  **Chromium ត្រឡប់ `false` សម្រាប់ `-webkit-touch-callout`** ➜ Android មិនរងផល
+  ហើយ **ច្បាប់ក្នុងប្លុកនោះមិនដែលត្រូវសាកក្នុង Chromium សោះ** — `panel-motion-test.js`
+  ស្រង់វាចេញរួចចាក់ចូលដោយដៃដើម្បីសាកវា។ កុំភ្លេចធ្វើដូចនោះពេលកែផ្នែកនេះ។
+- **កំណែ 2.11.0៖ កន្លែងរបា Tab កក់ *ខាងក្នុងកន្សោមរមូរ* មិនមែនលើ `.app-pages` ទេ (ផ្លូវ Android)។**
   `.table-responsive` មាន `padding-bottom: var(--tabbar-height)` (ជួរដេកចុងក្រោយ
   នៅតែរមូរឡើងដល់ខាងលើរបាបាន) ហើយ **`.page-main`** មាន
   `clip-path: inset(0 0 calc(var(--tabbar-height) - 8px) 0 round …)`

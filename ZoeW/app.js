@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.5';
+    const APP_VERSION = '2.9.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2817,6 +2817,28 @@
         }
     }
 
+    const PANEL_GLIDE_MS = 220;
+    const PANEL_GLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+    function panelMotionAllowed() {
+        if (window.innerWidth >= 992) return false;
+        if (typeof window.matchMedia !== 'function') return true;
+        return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function panelGlideFrom(el, beforeTop) {
+        if (!el || typeof el.animate !== 'function' || !isFinite(beforeTop)) return;
+        if (!panelMotionAllowed()) return;
+        const delta = beforeTop - el.getBoundingClientRect().top;
+        if (!isFinite(delta) || Math.abs(delta) < 2) return;
+        try {
+            el.animate([
+                { transform: 'translate3d(0,' + delta + 'px,0)' },
+                { transform: 'translate3d(0,0,0)' }
+            ], { duration: PANEL_GLIDE_MS, easing: PANEL_GLIDE_EASING });
+        } catch (e) {}
+    }
+
     function setupSwipeGestures() {
         bindPanelSwipe({
             sideId: 'dataSideSection',
@@ -2900,10 +2922,13 @@
         }
 
         function applyPanelAction(action) {
+            if (!action) return;
+            const beforeTop = mainSection.getBoundingClientRect().top;
             if (action === 'collapse') sidebar.classList.add('collapsed');
             else if (action === 'expand') sidebar.classList.remove('collapsed');
             else if (action === 'search') setPhoneSearchPulledUp(false);
-            if (action) syncHistoryExpandedLock();
+            syncHistoryExpandedLock();
+            panelGlideFrom(mainSection, beforeTop);
         }
 
         function actionForMainDiff(diffY, diffX) {
@@ -3005,8 +3030,10 @@
             dragHandle.addEventListener('click', () => {
                 if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
                 setPhoneSearchPulledUp(false);
+                const beforeTop = mainSection.getBoundingClientRect().top;
                 sidebar.classList.toggle('collapsed');
                 syncHistoryExpandedLock();
+                panelGlideFrom(mainSection, beforeTop);
             });
         }
     }
@@ -7259,12 +7286,7 @@
             let scanTimeDisplay = item.time ? `<span class="scan-time-tag">🕒 ${sanitizeInput(item.time)}</span>` : "";
 
             let totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
-            let viewListBtn = '';
-            if (totalPackageCount > 1) {
-                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${totalPackageCount})</button>`;
-            } else {
-                viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')" style="background:#fef08a; color:#854d0e; border-color:#fde047;">💵 កែ/ដកកញ្ចប់</button>`;
-            }
+            let viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${totalPackageCount})</button>`;
 
             let activeCod = 0;
             let activeDod = 0;

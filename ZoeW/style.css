@@ -175,6 +175,49 @@
             }
             .table-responsive { max-height: 62vh; }
 
+            /* កាតបញ្ជីត្រូវខ្ពស់ **ដូចគ្នាបេះបិទ** ទាំងរបៀបធម្មតា និងរបៀបពេញអេក្រង់។
+               កម្ពស់នោះ = ផ្ទៃខាងក្នុងរបស់ `.app-pages` (viewport ដក navbar, របា Tab
+               និង padding)។ ហេតុផល ២៖
+                 ១. ការរំកិលផ្ទាំងឡើង ១:១ ចុះចំកន្លែងបេះបិទ ➜ គ្មានការលោតពេលប្តូរ class
+                    (មុននេះកាតខ្ពស់ 588px ធម្មតា ទល់នឹង 642px ពេលពេញអេក្រង់ ➜ ខុស 56px)។
+                 ២. **កម្ពស់កន្សោមរមូរ (`.table-responsive`) លែងប្តូរ** រវាង ២ របៀប ➜
+                    ថ្នាក់កំហុស «ប្តូរកម្ពស់កន្សោមរមូរកណ្តាល momentum» ក្លាយជា
+                    មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ។
+               ការកំណត់នេះក៏ធ្វើឲ្យ `.app-pages` រមូរបានចម្ងាយស្មើនឹងកម្ពស់ផ្ទាំងខាងលើ
+               ដូច្នេះការរមូរ native (ពេលម្រាមដៃលើផ្ទាំងស្ថិតិ) ក្លាយជាការបង្រួម ១:១
+               ដែលរអិលតាមម្រាមដៃដោយស្វ័យប្រវត្តិ។
+               **ត្រូវប្រើ `height` មិនមែន `min-height`** — `min-height` មិនកំណត់ពិដាន
+               ទេ ➜ ខ្សែសង្វាក់ flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមមាតិកាតារាងទាំងមូល។ */
+            /* ការរមូរ native នៃ `.app-pages` ជាការបង្រួម ១:១ តាមម្រាមដៃ។ បើគ្មាន snap
+               វាអាចឈប់ **ពាក់កណ្តាលផ្លូវ** (ផ្ទាំងខាងលើលេចមួយចំហៀង)។ `proximity`
+               ធ្វើឲ្យវាចុះចំ ០ ឬចម្ងាយពេញ ដោយមិនបង្ខំដូច `mandatory`។
+               **`scroll-padding-top` ត្រូវស្មើនឹង `padding-top` របស់ `.app-pages`** —
+               បើអត់ ចំណុច snap «បើក» ធ្លាក់ត្រឹម scrollTop 71 ជំនួស 0 ➜ ផ្នែកខាងលើ
+               ផ្ទាំងត្រូវលាក់ ហើយ **PTR លែងកេះបាន** (វាទាមទារ `scrollTop <= 1`)។ */
+            .app-pages {
+                scroll-snap-type: y proximity;
+                scroll-padding-top: calc(var(--chrome-top, 56px) + 8px);
+            }
+            .app-page.active > .page-side,
+            .app-page.active > .page-main { scroll-snap-align: start; }
+
+            .app-page.active > .page-main {
+                height: calc(100vh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
+                height: calc(100dvh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
+                flex: none;
+            }
+            .app-page.active > .page-main > .history-section,
+            .app-page.active > .page-main > .panel-section { flex: 1; min-height: 0; }
+            .app-page.active > .page-main #parcelPanel,
+            .app-page.active > .page-main #lockerPanel { flex: 1; min-height: 0; }
+            /* scope ត្រឹម `.page-main` ដោយចេតនា ➜ `.table-responsive` ក្នុង modal
+               នៅរក្សាពិដាន 62vh ដដែល */
+            .app-page.active > .page-main .table-responsive {
+                max-height: none;
+                flex: 1;
+                min-height: 0;
+            }
+
             /* ពេលអ្នកប្រើទាញផ្ទាំងប្រវត្តិឡើង (history-expanded) តារាងត្រូវពេញអេក្រង់
                ពិតប្រាកដ។ ការប្រើ vh ថេរ (62/78vh) មិនដែលត្រូវទេ ព្រោះវាមិនដឹង
                កម្ពស់ navbar, ក្បាលកាត, របាច្រោះ, របា Tab និង safe-area។

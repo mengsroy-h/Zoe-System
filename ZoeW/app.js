@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.9.0';
+    const APP_VERSION = '2.11.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -974,6 +974,7 @@
     }
 
     let configQrReader = null;
+    let configQrStream = null;
     let configQrScanActive = false;
 
     function isInAppBrowser() {
@@ -992,10 +993,13 @@
 
     function closeConfigQrScanner() {
         configQrScanActive = false;
-        if (configQrReader) {
-            try { configQrReader.reset(); } catch (e) {}
-            configQrReader = null;
+        if (configQrStream) {
+            try { configQrStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+            configQrStream = null;
         }
+        const video = document.getElementById('configQrVideo');
+        if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
+        configQrReader = null;
         closeModal('configQrScanModal');
     }
 
@@ -1005,7 +1009,7 @@
             showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
             return;
         }
-        if (typeof ZXing === 'undefined') {
+        if (!scanEngineReady()) {
             showToast("❌ Camera Scanner មិនទាន់ផ្ទុករួចទេ! សូមរង់ចាំបន្តិចទៀត");
             return;
         }
@@ -1015,17 +1019,49 @@
         openModalHelper('configQrScanModal');
         configQrScanActive = true;
         try {
-            configQrReader = new ZXing.BrowserQRCodeReader(500);
-            await configQrReader.decodeFromVideoDevice(null, 'configQrVideo', (result) => {
-                if (!configQrScanActive || !result) return;
-                handleConfigQrResult(result.getText());
+            configQrReader = buildReaderOptions(false, CONFIG_QR_FORMAT_NAMES);
+            configQrStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }, audio: false
             });
+            const video = document.getElementById('configQrVideo');
+            if (!video) throw new Error('configQrVideo missing');
+            video.srcObject = configQrStream;
+            video.setAttribute('playsinline', 'true');
+            await video.play();
+            runConfigQrLoop(video);
         } catch (e) {
             console.error('Config QR scanner error:', e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'openConfigQrScanner' });
             showToast(describeCameraError(e));
             closeConfigQrScanner();
         }
+    }
+
+    function runConfigQrLoop(videoElement) {
+        let busy = false;
+        let canvas = null;
+        let ctx = null;
+        const loop = () => {
+            if (!configQrScanActive) return;
+            if (!busy && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
+                if (!canvas) {
+                    canvas = document.createElement('canvas');
+                    ctx = canvas.getContext('2d', { willReadFrequently: true });
+                }
+                const width = Math.min(CONFIG_QR_SCAN_WIDTH, videoElement.videoWidth);
+                const height = Math.round(videoElement.videoHeight * (width / videoElement.videoWidth));
+                if (canvas.width !== width) canvas.width = width;
+                if (canvas.height !== height) canvas.height = height;
+                ctx.drawImage(videoElement, 0, 0, width, height);
+                busy = true;
+                decodeBarcodeFromCanvasManual(configQrReader, canvas).then((text) => {
+                    busy = false;
+                    if (text && configQrScanActive) handleConfigQrResult(text);
+                }, () => { busy = false; });
+            }
+            if (configQrScanActive) scheduleScanFrame(videoElement, loop);
+        };
+        scheduleScanFrame(videoElement, loop);
     }
 
     function handleConfigQrResult(text) {
@@ -2337,7 +2373,7 @@
 
         (function waitForZXingThenInitScanEngine(deadline) {
             deadline = deadline || (Date.now() + 15000);
-            if (typeof ZXing !== 'undefined') { initScanEngine(); return; }
+            if (scanEngineReady()) { initScanEngine(); return; }
             if (Date.now() >= deadline) {
                 showToast('⚠️ មិនអាចផ្ទុកម៉ាស៊ីនស្កេន Barcode បានទេ! កាមេរ៉ាអាចនឹងប្រើការមិនកើត សូម Refresh ទំព័រ ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូលដោយដៃ');
                 return;
@@ -3039,17 +3075,6 @@
     }
 
     let chromeHidden = false;
-    let chromeLayoutTimer = null;
-    const CHROME_LAYOUT_IDLE_MS = 180;
-
-    function scheduleChromeLayoutSettle() {
-        if (chromeLayoutTimer !== null) clearTimeout(chromeLayoutTimer);
-        chromeLayoutTimer = setTimeout(() => {
-            chromeLayoutTimer = null;
-            document.body.classList.toggle('chrome-space-released', chromeHidden);
-        }, CHROME_LAYOUT_IDLE_MS);
-    }
-
     function appChromeElements() {
         return {
             navbar: document.querySelector('.app-navbar'),
@@ -3077,7 +3102,6 @@
             chromeHidden = false;
             document.body.classList.remove('chrome-hidden');
         }
-        scheduleChromeLayoutSettle();
     }
 
     function hideAppChrome() {
@@ -3086,7 +3110,6 @@
         if (isModalOpen || isSideDrawerOpen()) return;
         chromeHidden = true;
         document.body.classList.add('chrome-hidden');
-        scheduleChromeLayoutSettle();
     }
 
     function scrollerOf(target) {
@@ -3122,7 +3145,6 @@
             scrollFrame = null;
             const el = pendingScroller;
             pendingScroller = null;
-            scheduleChromeLayoutSettle();
             if (window.innerWidth >= 992) { showAppChrome(); return; }
             if (isModalOpen || isSideDrawerOpen()) { showAppChrome(); return; }
             if (!el || typeof el.scrollTop !== 'number') return;
@@ -4361,7 +4383,9 @@
 
     let ownCaptureCanvas = null;
     let ownCaptureCtx = null;
-    const SCAN_FORMAT_NAMES = ['CODE_128'];
+    const SCAN_FORMAT_NAMES = ['Code128'];
+    const CONFIG_QR_FORMAT_NAMES = ['QRCode'];
+    const CONFIG_QR_SCAN_WIDTH = 640;
     const NATIVE_SCAN_FORMAT_NAMES = ['code_128'];
     const LIVE_SCAN_WIDTH_STEPS = [640, 800, 1024, 1280];
     const LIVE_SCAN_MAX_DIM = 1280;
@@ -4437,22 +4461,35 @@
         requestAnimationFrame(fn);
     }
 
-    function buildScanReader(tryHarder) {
-        const formats = SCAN_FORMAT_NAMES.map(name => ZXing.BarcodeFormat[name]).filter(f => f !== undefined);
-        if (!formats.length) return null;
-        const hints = new Map();
-        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        if (tryHarder) hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-        return new ZXing.BrowserBarcodeReader(500, hints);
+    function scanEngineReady() {
+        return typeof ZXingWASM !== 'undefined' && typeof ZXingWASM.readBarcodes === 'function';
+    }
+
+    function buildReaderOptions(tryHarder, formats) {
+        return {
+            formats: formats || SCAN_FORMAT_NAMES,
+            tryHarder: !!tryHarder,
+            tryRotate: !!tryHarder,
+            tryInvert: !!tryHarder,
+            tryDownscale: !!tryHarder,
+            maxNumberOfSymbols: 1
+        };
     }
 
     function initScanEngine() {
+        if (!scanEngineReady()) return;
         try {
-            codeReader = buildScanReader(true);
-            liveScanCodeReader = buildScanReader(false);
+            ZXingWASM.prepareZXingModule({
+                overrides: {
+                    locateFile: (file, prefix) => (file.endsWith('.wasm') ? './vendor/' + file : prefix + file)
+                },
+                fireImmediately: true
+            });
+            codeReader = buildReaderOptions(true);
+            liveScanCodeReader = buildReaderOptions(false);
         } catch (e) {
-            console.error("ZXing Initialization error: ", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "ZXing Initialization error: " });
+            console.error("Scan engine initialization error: ", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Scan engine initialization error: " });
         }
     }
 
@@ -4479,61 +4516,29 @@
         return text;
     }
 
-    function decodeBarcodeFromCanvasManual(reader, canvas) {
-        const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-        const binarizer = new ZXing.HybridBinarizer(luminanceSource);
-        const bitmap = new ZXing.BinaryBitmap(binarizer);
-        return readResultText(reader.decodeBitmap(bitmap));
+    function decodeBarcodeFromCanvasManual(options, canvas) {
+        if (!scanEngineReady() || !options) return Promise.resolve('');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return Promise.resolve('');
+        let imageData;
+        try {
+            imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } catch (e) {
+            return Promise.resolve('');
+        }
+        return ZXingWASM.readBarcodes(imageData, options).then(readResultText, () => '');
     }
 
-    function readResultText(result) {
-        if (!result) return '';
-        return result.text || (typeof result.getText === 'function' ? result.getText() : '');
-    }
-
-    function makeRowLuminanceSource(ctx, width, height) {
-        let matrix = null;
-        return {
-            getWidth: function () { return width; },
-            getHeight: function () { return height; },
-            isCropSupported: function () { return false; },
-            isRotateSupported: function () { return false; },
-            crop: function () { return this; },
-            rotateCounterClockwise: function () { return this; },
-            rotateCounterClockwise45: function () { return this; },
-            invert: function () { return this; },
-            getRow: function (y, row) {
-                const line = ctx.getImageData(0, y, width, 1).data;
-                let out = row;
-                if (!out || out.length < width) out = new Uint8ClampedArray(width);
-                for (let x = 0, i = 0; x < width; x++, i += 4) {
-                    out[x] = (306 * line[i] + 601 * line[i + 1] + 117 * line[i + 2] + 0x200) >> 10;
-                }
-                return out;
-            },
-            getMatrix: function () {
-                if (matrix) return matrix;
-                const data = ctx.getImageData(0, 0, width, height).data;
-                matrix = new Uint8ClampedArray(width * height);
-                for (let j = 0, i = 0; j < matrix.length; j++, i += 4) {
-                    matrix[j] = (306 * data[i] + 601 * data[i + 1] + 117 * data[i + 2] + 0x200) >> 10;
-                }
-                return matrix;
-            }
-        };
+    function readResultText(results) {
+        if (!results || !results.length) return '';
+        const first = results[0];
+        if (!first || first.isValid === false) return '';
+        return String(first.text || '');
     }
 
     function decodeLiveFrame(canvas) {
-        if (!liveScanCodeReader) return '';
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return '';
-        const luminanceSource = makeRowLuminanceSource(ctx, canvas.width, canvas.height);
-        const binarizer = new ZXing.HybridBinarizer(luminanceSource);
-        const bitmap = new ZXing.BinaryBitmap(binarizer);
-        try {
-            return readResultText(liveScanCodeReader.decodeBitmap(bitmap));
-        } catch (e) {}
-        return '';
+        if (!liveScanCodeReader) return Promise.resolve('');
+        return decodeBarcodeFromCanvasManual(liveScanCodeReader, canvas);
     }
 
     function startZxingVideoScan(videoElement) {
@@ -4547,12 +4552,20 @@
 
         let lastCheck = 0;
         let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
+        let liveDecodeBusy = false;
         function loop(timestamp) {
             if (!currentStream || !isCameraScanning || !zxingLoopActive) return;
             if (timestamp - lastCheck > nextDelay) {
-                if (!isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0 && takeFreshVideoFrame(videoElement)) {
+                if (!liveDecodeBusy && !isModalOpen && videoElement && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0 && takeFreshVideoFrame(videoElement)) {
                     lastCheck = timestamp;
                     const startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
+                    const settleDecode = () => {
+                        liveDecodeBusy = false;
+                        const now = (window.performance && performance.now) ? performance.now() : Date.now();
+                        const spent = now - startedAt;
+                        noteLiveScanCost(spent);
+                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(spent * LIVE_SCAN_BACKOFF)));
+                    };
 
                     try {
                         const crop = getCoverCropRect(videoElement, container);
@@ -4561,17 +4574,16 @@
                         if (ownCaptureCanvas.height !== size.height) ownCaptureCanvas.height = size.height;
                         ownCaptureCtx.drawImage(videoElement, crop.sx, crop.sy, crop.sWidth, crop.sHeight, 0, 0, size.width, size.height);
 
-                        const text = decodeLiveFrame(ownCaptureCanvas);
-                        const confirmed = confirmLiveScan(text);
-                        if (confirmed && !isModalOpen) {
-                            processScannedCode(confirmed);
-                        }
+                        liveDecodeBusy = true;
+                        decodeLiveFrame(ownCaptureCanvas).then((text) => {
+                            settleDecode();
+                            const confirmed = confirmLiveScan(text);
+                            if (confirmed && !isModalOpen) {
+                                processScannedCode(confirmed);
+                            }
+                        }, settleDecode);
                     } catch (e) {
-                    } finally {
-                        const now = (window.performance && performance.now) ? performance.now() : Date.now();
-                        const spent = now - startedAt;
-                        noteLiveScanCost(spent);
-                        nextDelay = Math.min(LIVE_SCAN_MAX_INTERVAL_MS, Math.max(LIVE_SCAN_MIN_INTERVAL_MS, Math.round(spent * LIVE_SCAN_BACKOFF)));
+                        settleDecode();
                     }
                 }
             }
@@ -4876,7 +4888,7 @@
     function decodeBarcodeFromImageDataUrl(originalDataUrl) {
         if (!codeReader) return;
         const img = new Image();
-        img.onload = function () {
+        img.onload = async function () {
             const maxDim = 1600;
             const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
             const baseW = Math.round(img.naturalWidth * scale);
@@ -4889,10 +4901,13 @@
                     const swap = deg === 90 || deg === 270;
                     canvas.width = swap ? baseH : baseW;
                     canvas.height = swap ? baseW : baseH;
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.translate(canvas.width / 2, canvas.height / 2);
                     ctx.rotate(deg * Math.PI / 180);
                     ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
-                    const text = decodeBarcodeFromCanvasManual(codeReader, canvas);
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    const text = await decodeBarcodeFromCanvasManual(codeReader, canvas);
                     if (text) {
                         triggerScanAction(text);
                         return;

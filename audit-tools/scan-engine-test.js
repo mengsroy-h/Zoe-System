@@ -18,14 +18,12 @@ const fs = require('fs'), http = require('http'), path = require('path');
 const CHROME = process.env.SCAN_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
 
-let ZXING_PATH = null;
-for (const dir of [path.join(__dirname, '..', 'node_modules'), path.join(process.env.HOME || '/root', 'node_modules')]) {
-    const p = path.join(dir, '@zxing', 'library', 'umd', 'index.min.js');
-    if (fs.existsSync(p)) { ZXING_PATH = p; break; }
-}
-if (!ZXING_PATH) { console.log('SKIP — ត្រូវការ @zxing/library (npm i @zxing/library@0.23.0)'); process.exit(0); }
-
 const ROOT = process.env.SCAN_APP_DIR || path.join(__dirname, '..');
+
+// engine ស្កេនស្ថិតក្នុង repo ➜ តេស្តនេះលែងត្រូវការ npm dependency ណាមួយទៀតទេ
+if (!fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm'))) {
+    console.log('SKIP — រកមិនឃើញ ZoeW/vendor/zxing_reader.wasm'); process.exit(0);
+}
 const REPORT = process.env.SCAN_REPORT === '1';
 
 let pass = 0, fail = 0;
@@ -70,19 +68,17 @@ function serve(files) {
     if (!decodeFn || !initFn) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }
 
     const liveMax = (src.match(/const LIVE_SCAN_MAX_DIM = (\d+);/) || [])[1];
-    const buildFn = sliceFn(src, 'buildScanReader');
+    const buildFn = (sliceFn(src, 'scanEngineReady') || '') + '\n' + (sliceFn(src, 'buildReaderOptions') || '');
     const confirmFn = (sliceFn(src, 'resetScanConfirm') || '') + '\n' + (sliceFn(src, 'confirmLiveScan') || '');
     const tryFn = (sliceFn(src, 'readResultText') || '') + '\n' +
-                  (sliceFn(src, 'makeRowLuminanceSource') || '') + '\n' +
                   (sliceFn(src, 'decodeLiveFrame') || '') + '\n' +
                   (sliceFn(src, 'liveScanTargetWidth') || '') + '\n' +
                   (sliceFn(src, 'noteLiveScanCost') || '') + '\n' +
                   (sliceFn(src, 'resetLiveScanQuality') || '') + '\n' +
                   (sliceFn(src, 'liveScanFrameSize') || '') + '\n' +
                   (sliceFn(src, 'takeFreshVideoFrame') || '');
-    ok('រកឃើញ makeRowLuminanceSource() ក្នុង app.js', !!sliceFn(src, 'makeRowLuminanceSource'));
     ok('រកឃើញ liveScanFrameSize() ក្នុង app.js', !!sliceFn(src, 'liveScanFrameSize'));
-    ok('រកឃើញ buildScanReader() ក្នុង app.js', !!buildFn);
+    ok('រកឃើញ buildReaderOptions() ក្នុង app.js', !!sliceFn(src, 'buildReaderOptions'));
     ok('រកឃើញ confirmLiveScan() ក្នុង app.js', !!sliceFn(src, 'confirmLiveScan'));
     if (!buildFn || !confirmFn.trim()) { console.log('\n❌ ធ្លាក់ ' + (fail || 1)); process.exit(1); }
     const constLines = ['SCAN_FORMAT_NAMES', 'NATIVE_SCAN_FORMAT_NAMES', 'LIVE_SCAN_WIDTH_STEPS', 'LIVE_SCAN_MAX_DIM',
@@ -93,7 +89,7 @@ function serve(files) {
         .map((n) => (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [''])[0]).join('\n');
 
     const page1 = `<!doctype html><meta charset="utf-8"><body>
-<script src="/zxing.js"></script>
+<script src="/zxing-wasm.js"></script>
 <script>
 let codeReader = null, liveScanCodeReader = null;
 let scanConfirmCode = '', scanConfirmCount = 0, scanConfirmAt = 0;
@@ -129,7 +125,8 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
 
     const server = await serve({
         '/': { type: 'text/html', body: page1 },
-        '/zxing.js': { type: 'application/javascript', body: fs.readFileSync(ZXING_PATH) }
+        '/zxing-wasm.js': { type: 'application/javascript', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) },
+        '/vendor/zxing_reader.wasm': { type: 'application/wasm', body: fs.readFileSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')) }
     });
     const port = server.address().port;
 
@@ -144,15 +141,15 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         return !!(r.codeReader && r.liveScanCodeReader);
     });
     ok('initScanEngine() សាង reader បានទាំង ២ (រូបភាព, live)', engineOk);
-    ok('បញ្ជី format របស់ ZXing មានតែ CODE_128',
-        JSON.stringify(await page.evaluate(() => window.__api.formats())) === '["CODE_128"]',
+    ok('បញ្ជី format របស់ engine មានតែ Code128',
+        JSON.stringify(await page.evaluate(() => window.__api.formats())) === '["Code128"]',
         await page.evaluate(() => window.__api.formats()));
     ok('បញ្ជី format របស់ BarcodeDetector (Android) មានតែ code_128',
         JSON.stringify(await page.evaluate(() => window.__api.nativeFormats())) === '["code_128"]',
         await page.evaluate(() => window.__api.nativeFormats()));
 
     // សាង CODE_128 ដោយ encoder របស់ ZXing ខ្លួនឯង រួចគូរជាស៊ុមវីដេអូក្លែងធម្មជាតិ
-    const bench = await page.evaluate(() => {
+    const bench = await page.evaluate(async () => {
         const TEXT = 'ZTO7788123456';
         // build UMD នេះគ្មាន encoder 1D ទេ ➜ សរសេរ CODE_128 (Code B) ខ្លួនឯង។
         // ការឌិកូដដោយ ZXing ពិតជាអ្នកបញ្ជាក់ថាតារាងលំនាំត្រឹមត្រូវ (hitRate ត្រូវ = 1)។
@@ -257,34 +254,31 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
 
         // ចំនួន format ដែល reader ត្រូវសាកល្បង — MultiFormatOneDReader សាកម្នាក់ៗលើគ្រប់ជួរ
         function readerFor(names) {
-            const formats = names.map((n) => ZXing.BarcodeFormat[n]).filter((f) => f !== undefined);
-            const h = new Map();
-            h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-            return new ZXing.BrowserBarcodeReader(500, h);
+            return { formats: names.slice(), tryHarder: false, maxNumberOfSymbols: 1 };
         }
-        const ALL = ['CODE_128', 'CODE_39', 'CODE_93', 'CODABAR', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'ITF', 'RSS_14', 'RSS_EXPANDED'];
+        const ALL = ['Code128', 'Code39', 'Code93', 'Codabar', 'EANUPC', 'ITF', 'DataBar', 'DataBarLtd', 'Telepen'];
         const emptyRef = paintEmpty(640, 397);
         const hitRef = paintFrame(640, 397);
-        [['ALL_11', ALL], ['CODE128_only', ['CODE_128']], ['CODE128_39', ['CODE_128', 'CODE_39']]].forEach(([label, names]) => {
+        for (const [label, names] of [['ALL_11', ALL], ['CODE128_only', ['Code128']], ['CODE128_39', ['Code128', 'Code39']]]) {
             const r = readerFor(names);
             let tf = performance.now();
-            for (let i = 0; i < 8; i++) { try { window.__api.decodeBarcodeFromCanvasManual(r, emptyRef); } catch (e) {} }
+            for (let i = 0; i < 8; i++) { try { await window.__api.decodeBarcodeFromCanvasManual(r, emptyRef); } catch (e) {} }
             const miss = Math.round(((performance.now() - tf) / 8) * 100) / 100;
             tf = performance.now();
             let hits = 0;
-            for (let i = 0; i < 12; i++) { try { if (window.__api.decodeBarcodeFromCanvasManual(r, hitRef)) hits++; } catch (e) {} }
+            for (let i = 0; i < 12; i++) { try { if (await window.__api.decodeBarcodeFromCanvasManual(r, hitRef)) hits++; } catch (e) {} }
             out['FMT_' + label] = { ms: Math.round(((performance.now() - tf) / 12) * 100) / 100, hitRate: hits / 12, miss: miss };
-        });
+        }
 
         // ផ្លូវ live ពិតរបស់ App (decodeLiveFrame ➜ liveScanCodeReader តែមួយ)
         // ធៀបនឹងផ្លូវចាស់ដែលបោសគ្រប់ ១១ format រាល់ស៊ុម
         const emptyLive = paintEmpty(640, 397);
         const fullReader = readerFor(ALL);
         let tLane = performance.now();
-        for (let i = 0; i < 24; i++) window.__api.decodeLiveFrame(emptyLive);
+        for (let i = 0; i < 24; i++) await window.__api.decodeLiveFrame(emptyLive);
         out.LIVE_now = { ms: Math.round(((performance.now() - tLane) / 24) * 100) / 100, hitRate: 0 };
         tLane = performance.now();
-        for (let i = 0; i < 16; i++) { try { window.__api.decodeBarcodeFromCanvasManual(fullReader, emptyLive); } catch (e) {} }
+        for (let i = 0; i < 16; i++) { try { await window.__api.decodeBarcodeFromCanvasManual(fullReader, emptyLive); } catch (e) {} }
         out.LIVE_all11 = { ms: Math.round(((performance.now() - tLane) / 16) * 100) / 100, hitRate: 0 };
 
         // === ការអានលេខខុសឆ្លង format ===
@@ -321,17 +315,17 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
             });
             return c;
         }
-        function tryDecode(reader, canvas) {
-            try { return window.__api.decodeBarcodeFromCanvasManual(reader, canvas) || ''; }
+        async function tryDecode(reader, canvas) {
+            try { return (await window.__api.decodeBarcodeFromCanvasManual(reader, canvas)) || ''; }
             catch (e) { return ''; }
         }
         const ITF_TEXT = '17251234';
         const itfFrame = paintITF(ITF_TEXT, 460, 3);
         out.__misread = {
             itfText: ITF_TEXT,
-            all11: tryDecode(readerFor(ALL), itfFrame),
-            app: tryDecode(readers.liveScanCodeReader, itfFrame),
-            appImage: tryDecode(window.__api.readers().codeReader, itfFrame)
+            all11: await tryDecode(readerFor(ALL), itfFrame),
+            app: await tryDecode(readers.liveScanCodeReader, itfFrame),
+            appImage: await tryDecode(window.__api.readers().codeReader, itfFrame)
         };
 
         // === ជួរអាន៖ barcode តូចប៉ុនណាដែលនៅតែអានចេញបាន ===
@@ -375,41 +369,32 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         }
         const SRC_W = 1920, SRC_H = 880;
         const bandCap = window.__api.bandCap ? window.__api.bandCap() : 240;
-        function readRange(width) {
+        async function readRange(width) {
             let good = 0, total = 0;
-            [0.50, 0.42, 0.36, 0.30].forEach((frac) => {
+            for (const frac of [0.50, 0.42, 0.36, 0.30]) {
                 for (let k = 0; k < 3; k++) {
                     const src = paintWideFrame(SRC_W, SRC_H, SRC_W * frac, (k * 7 % 13) - 6);
                     const h = Math.min(Math.round(SRC_H * width / SRC_W), bandCap);
                     total++;
-                    if (window.__api.decodeLiveFrame(downscaled(src, width, h)) === TEXT) good++;
+                    if ((await window.__api.decodeLiveFrame(downscaled(src, width, h))) === TEXT) good++;
                 }
-            });
+            }
             return { good: good, total: total };
         }
         out.__range = {
             steps: window.__api.widthSteps ? window.__api.widthSteps() : [],
-            at640: readRange(640),
-            atMax: readRange(window.__api.liveScanTargetWidth ? window.__api.liveScanTargetWidth() : 1280),
+            at640: await readRange(640),
+            atMax: await readRange(window.__api.liveScanTargetWidth ? window.__api.liveScanTargetWidth() : 1280),
             bandCap: bandCap
         };
 
-        // ថ្លៃពិតក្នុងមួយស៊ុមលើផ្លូវបរាជ័យ ៖ luminance source ថ្មី (អានតែជួរដេក
-        // ដែល OneDReader ស្នើ) ធៀបនឹង HTMLCanvasElementLuminanceSource ចាស់
-        // (បម្លែងគ្រប់ pixel ជា grayscale មុនគេ)។
-        function oldPathDecode(canvas) {
-            const src2 = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-            const bm = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src2));
-            try { const r = readers.liveScanCodeReader.decodeBitmap(bm); return r ? (r.text || r.getText()) : ''; }
-            catch (e) { return ''; }
-        }
+        // ថ្លៃពិតក្នុងមួយស៊ុមលើផ្លូវបរាជ័យ នៅទំហំស៊ុមពេញ (1280×bandCap)។
+        // engine WASM ទទួល `ImageData` ផ្ទាល់ ដូច្នេះលែងមាន luminance source
+        // ជា JavaScript ទៀតទេ — ថ្លៃដែលនៅសល់គឺ `getImageData()` បូកការឌិកូដ។
         const missBig = paintEmpty(1280, bandCap);
         let tt = performance.now();
-        for (let i = 0; i < 24; i++) window.__api.decodeLiveFrame(missBig);
+        for (let i = 0; i < 24; i++) await window.__api.decodeLiveFrame(missBig);
         out.LANE_rowSource = { ms: Math.round(((performance.now() - tt) / 24) * 100) / 100, hitRate: 0 };
-        tt = performance.now();
-        for (let i = 0; i < 24; i++) oldPathDecode(missBig);
-        out.LANE_fullGray = { ms: Math.round(((performance.now() - tt) / 24) * 100) / 100, hitRate: 0 };
 
         // ការសម្របតាមឧបករណ៍៖ ថ្លៃខ្ពស់ ➜ ទម្លាក់ជំហានទទឹង; ថ្លៃទាប ➜ ឡើងវិញ
         if (window.__api.resetLiveScanQuality && window.__api.noteLiveScanCost) {
@@ -451,8 +436,12 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     ok('format តែមួយ លឿនជាង ១១ format យ៉ាងតិច ៣ ដង លើផ្លូវបរាជ័យ',
         bench.FMT_CODE128_only.miss * 3 <= bench.FMT_ALL_11.miss,
         { all11: bench.FMT_ALL_11.miss, one: bench.FMT_CODE128_only.miss });
-    ok('ផ្លូវ live ពិតរបស់ App លឿនជាងការបោស ១១ format យ៉ាងតិច ៣ ដង',
-        bench.LIVE_now.ms * 3 <= bench.LIVE_all11.ms,
+    // ក្រោយប្តូរទៅ engine WASM ការឌិកូដលែងជាថ្លៃលេចធ្លោទៀតទេ — ថ្លៃដែលនៅសល់
+    // គឺ `getImageData()` ដែលដូចគ្នាទាំង ២ ផ្លូវ ➜ ការប្រៀបធៀបសមាមាត្រលែងមានន័យ។
+    // អ្វីដែលការពារការថយក្រោយពិតគឺ **ថវិកាដាច់ខាត**៖ ZXing-JS ចាស់វាស់បាន
+    // ១៦.៦ ms/ស៊ុមលើផ្លូវនេះ ដូច្នេះពិដាន ៨ ms ចាប់ការត្រឡប់ទៅ engine JS វិញ។
+    ok('ផ្លូវ live លើផ្លូវបរាជ័យ ក្រោម ៨ ms/ស៊ុម (engine WASM)',
+        bench.LIVE_now.ms < 8,
         { now: bench.LIVE_now.ms, all11: bench.LIVE_all11.ms });
 
     console.log('\n=== ជួរអាន (barcode តូច/ឆ្ងាយ) ===');
@@ -467,11 +456,17 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         bench.__range.atMax.good >= bench.__range.at640.good, bench.__range);
 
     console.log('\n=== ថ្លៃឌិកូដក្នុងមួយស៊ុម (ផ្លូវបរាជ័យ 1280px) ===');
-    console.log('    luminance តាមជួរដេក (ឥឡូវ) ៖ ' + bench.LANE_rowSource.ms + ' ms/ស៊ុម');
-    console.log('    grayscale ពេញស៊ុម (ចាស់)    ៖ ' + bench.LANE_fullGray.ms + ' ms/ស៊ុម');
-    ok('luminance តាមជួរដេក លឿនជាង grayscale ពេញស៊ុម',
-        bench.LANE_rowSource.ms < bench.LANE_fullGray.ms,
-        { row: bench.LANE_rowSource.ms, full: bench.LANE_fullGray.ms });
+    console.log('    ស៊ុមពេញ 1280px ៖ ' + bench.LANE_rowSource.ms + ' ms/ស៊ុម  (ព័ត៌មានតែប៉ុណ្ណោះ)');
+    // ចំណាំ៖ លេខ 1280px ខាងលើ **មិនត្រូវអះអាង** ទេ — វាត្រូវបានគ្រប់គ្រងដោយ
+    // `getImageData()` ដែលប្រែប្រួលតាមបន្ទុក container (វាស់បាន ៣.២–៨.២ ms
+    // លើ tree ដដែល) ➜ ការដាក់ពិដានលើវានឹងក្លាយជាតេស្តភ្លឹបភ្លែត។
+    //
+    // អ្វីដែលបែងចែក engine បានច្បាស់គឺ **ផ្លូវបរាជ័យនៅទទឹង 800**៖
+    // ZXing-JS វាស់បាន ១៣.៩ ms/ស៊ុម ចំណែក WASM វាស់បាន ១.៦–២.២ ms ➜ គម្លាត ៦×
+    // ដែលធំជាងភាពប្រែប្រួលឆ្ងាយ។ ពិដាន ៨ ms ចាប់ការត្រឡប់ទៅ engine JS វិញ។
+    console.log('    ផ្លូវបរាជ័យ 800px ៖ ' + bench.MISS_full_800.ms + ' ms/ស៊ុម');
+    ok('ផ្លូវបរាជ័យនៅទទឹង 800 ក្រោម ៨ ms/ស៊ុម (engine WASM មិនត្រូវថយក្រោយទៅ JS)',
+        bench.MISS_full_800.ms < 8, { ms: bench.MISS_full_800.ms });
 
     console.log('\n=== ការសម្របតាមឧបករណ៍ដោយស្វ័យប្រវត្តិ ===');
     console.log('    ចាប់ផ្តើម ' + bench.__adaptive.top + 'px ➜ ថ្លៃខ្ពស់ ' + bench.__adaptive.slow +
@@ -571,20 +566,40 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         ok('app.js មាន LIVE_SCAN_MAX_BAND_PX ≤ 320 (កម្ពស់ស៊ុមឌិកូដមានពិដាន)', !!bandMax && Number(bandMax) <= 320, bandMax);
         ok('ថវិកា pixel ក្នុងមួយស៊ុមឌិកូដ ≤ 320,000 (ទប់ថ្លៃ drawImage/getImageData)',
             !!liveMax && !!bandMax && Number(liveMax) * Number(bandMax) <= 320000, { liveMax, bandMax });
-        ok('ផ្លូវ live ប្រើ luminance source តាមជួរដេក (មិនបម្លែងគ្រប់ pixel មុនគេ)',
-            /makeRowLuminanceSource\(/.test(src) && !/decodeLiveFrame[\s\S]{0,400}HTMLCanvasElementLuminanceSource/.test(src));
+        // engine WASM ទទួល `ImageData` ផ្ទាល់ ➜ លែងមាន luminance source ជា JavaScript។
+        // អ្វីដែលត្រូវចាក់សោវិញគឺ៖ ZXing-JS ត្រូវបានដកចេញទាំងស្រុង មិនមែនដេកស្ងៀមទេ។
+        ok('ផ្លូវ live ប្រើ engine WASM (ZXing-JS ត្រូវបានដកចេញទាំងស្រុង)',
+            /ZXingWASM\.readBarcodes\(/.test(src) && !/new ZXing\./.test(src) && !/ZXing\.BarcodeFormat/.test(src));
         ok('ស៊ុមវីដេអូដដែលមិនត្រូវឌិកូដពីរដង (takeFreshVideoFrame ការពារជាន់បញ្ជាក់ ២ ស៊ុម)',
             /function takeFreshVideoFrame\(/.test(src) && (src.match(/takeFreshVideoFrame\(videoElement\)/g) || []).length >= 2);
         ok('app.js គ្មានបញ្ជី format ច្រើនទៀត (ONE_D_FORMAT_NAMES ត្រូវបានដករួច)',
             src.indexOf('ONE_D_FORMAT_NAMES') === -1);
         ok('app.js គ្មានជាន់ ២ ទៀត (fastScanCodeReader / syncFastScanFormat ត្រូវបានដករួច)',
             src.indexOf('fastScanCodeReader') === -1 && src.indexOf('syncFastScanFormat') === -1);
-        ok('SCAN_FORMAT_NAMES ក្នុង app.js មានតែ CODE_128',
-            /const SCAN_FORMAT_NAMES = \['CODE_128'\];/.test(src));
+        ok('SCAN_FORMAT_NAMES ក្នុង app.js មានតែ Code128',
+            /const SCAN_FORMAT_NAMES = \['Code128'\];/.test(src));
         ok('NATIVE_SCAN_FORMAT_NAMES ក្នុង app.js មានតែ code_128',
             /const NATIVE_SCAN_FORMAT_NAMES = \['code_128'\];/.test(src));
-        ok('ការស្កេន QR ពេល Config/Reconfig នៅប្រើ BrowserQRCodeReader ដាច់ដោយឡែក (មិនរងផល)',
-            /configQrReader = new ZXing\.BrowserQRCodeReader\(/.test(src));
+
+        // ថ្នាក់កំហុសដែលចាប់បានពិត៖ CSP ដែលគ្មាន `'wasm-unsafe-eval'` ធ្វើឲ្យ browser
+        // **បដិសេធការចងក្រង WebAssembly** ➜ ការស្កេនស្លាប់ទាំងស្រុងលើផលិតកម្ម
+        // ខណៈតេស្តក្នុង repo (ដែលគ្មាន CSP) ជោគជ័យទាំងអស់។ ការវាស់ពិត៖
+        // "Refused to compile or instantiate WebAssembly module"។
+        const netlify = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify.toml'), 'utf8');
+        const cspLine = (netlify.match(/Content-Security-Policy = "([^"]+)"/) || [])[1] || '';
+        const scriptSrc = (cspLine.match(/script-src ([^;]+)/) || [])[1] || '';
+        ok('CSP អនុញ្ញាត WebAssembly (script-src មាន wasm-unsafe-eval)',
+            scriptSrc.indexOf("'wasm-unsafe-eval'") !== -1, scriptSrc);
+        ok('netlify.toml បម្រើ .wasm ជា application/wasm (បើអត់ ➜ ធ្លាក់ទៅផ្លូវយឺត)',
+            /for = "\/\*\.wasm"/.test(netlify) && /Content-Type = "application\/wasm"/.test(netlify));
+        ok('engine WASM ស្ថិតក្នុង repo (មិនមែន CDN)',
+            fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing-wasm.js')) &&
+            fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm')));
+        // ការស្កេន QR នៅតែជាបញ្ជី format **ដាច់ដោយឡែក** ➜ ការកែបញ្ជី 1D
+        // មិនអាចប៉ះការស្កេន QR បានទេ (និងផ្ទុយមកវិញ)។
+        ok('ការស្កេន QR ពេល Config/Reconfig ប្រើបញ្ជី format ដាច់ដោយឡែក (មិនរងផល)',
+            /const CONFIG_QR_FORMAT_NAMES = \['QRCode'\];/.test(src) &&
+            /configQrReader = buildReaderOptions\(false, CONFIG_QR_FORMAT_NAMES\)/.test(src));
         ok('ផ្លូវ live ទាំង ២ (ZXing និង BarcodeDetector) ឆ្លងកាត់ confirmLiveScan()',
             (src.match(/confirmLiveScan\(/g) || []).length >= 3, (src.match(/confirmLiveScan\(/g) || []).length);
         ok('សាខាស្លាប់ `nativeDetector && isIOSDevice()` ត្រូវបានដករួច (Safari គ្មាន BarcodeDetector)',

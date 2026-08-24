@@ -130,7 +130,7 @@
             flex: 1;
             min-height: 0;
             padding: 8px;
-            padding-bottom: calc(var(--chrome-bottom, calc(62px + env(safe-area-inset-bottom))) + 8px);
+            padding-bottom: calc(var(--page-extension, 0px) + 8px);
             box-sizing: border-box;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
@@ -202,8 +202,8 @@
             .app-page.active > .page-main { scroll-snap-align: start; }
 
             .app-page.active > .page-main {
-                height: calc(100vh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
-                height: calc(100dvh - var(--chrome-top, 63px) - var(--chrome-bottom, 62px) - 16px);
+                height: calc(100vh - var(--chrome-top, 63px) - 16px);
+                height: calc(100dvh - var(--chrome-top, 63px) - 16px);
                 flex: none;
             }
             .app-page.active > .page-main > .history-section,
@@ -216,6 +216,15 @@
                 max-height: none;
                 flex: 1;
                 min-height: 0;
+                padding-bottom: var(--chrome-bottom, 62px);
+                /* កាត់រូបភាពត្រឹមគែមខាងលើរបា Tab ➜ ជួរដេកមិនលិចក្រោមរបា
+                   (បញ្ហាកំណែ 2.4.0)។ `clip-path` ជា **paint** មិនមែន layout ➜
+                   វាមិនប្តូរកម្ពស់អ្វីទាំងអស់ ➜ សុវត្ថិភាពកណ្តាល momentum។ */
+                clip-path: inset(0 0 var(--chrome-bottom, 62px) 0);
+            }
+            body.chrome-hidden .app-page.active > .page-main .table-responsive {
+                padding-bottom: 0;
+                clip-path: none;
             }
 
             /* ពេលអ្នកប្រើទាញផ្ទាំងប្រវត្តិឡើង (history-expanded) តារាងត្រូវពេញអេក្រង់
@@ -232,14 +241,24 @@
                លោតរំលង។ ការប្តូរភ្លាមមួយដង មិនស្ថិតក្នុងថ្នាក់កំហុសនោះទេ ហើយ
                `setupChromeAutoHide()` មិនលាក់របាពេលនៅជិតបាតបញ្ជី (`BOTTOM_ZONE`)
                ដូច្នេះការពង្រីកមិនកើតឡើងក្នុងទីតាំងដែល scrollTop ត្រូវ clamp។ */
+            /* កំណែ 2.11.0៖ កន្លែងរបា Tab **លែងកក់នៅត្រង់នេះទៀតទេ**។
+               មុននេះវាកក់ជា `padding-bottom` លើ `.app-pages` ➜ ការប្រគល់កន្លែងនោះ
+               មកវិញ ជាការប្តូរ **layout** ដែលធ្វើឲ្យតារាងប្តូរកម្ពស់ ➜ ត្រូវពន្យារ
+               ១៨០ms រហូតរមូរស្ងប់ (បើមិនដូច្នេះបញ្ជីលោតកណ្តាល momentum)។
+               ផលរួម៖ របា Tab រអិលចេញភ្លាម (transform) តែកាតធ្លាក់មកបំពេញ ១៨០ms
+               ក្រោយមក ➜ **អ្នកប្រើឃើញចន្លោះទទេប្រផេះមួយភ្លែត ហើយជួរដេកចុងក្រោយ
+               ត្រូវកាត់ពាក់កណ្តាល** (បញ្ជាក់ដោយវីដេអូពីអ្នកប្រើ)។
+               ឥឡូវកម្ពស់កាតជា **ថេរ** ហើយកន្លែងរបាកក់ខាងក្នុងកន្សោមរមូរវិញ
+               (មើលច្បាប់ `.table-responsive` ខាងក្រោម) ➜ ការលាក់/បង្ហាញរបា
+               ប៉ះតែ `scrollHeight` មិនប៉ះ `clientHeight` ➜ គ្មានអ្វីត្រូវប្តូរកម្ពស់
+               ➜ ការប្រគល់កន្លែងកើតឡើង **ស្របគ្នានឹងរបា** ដោយសុវត្ថិភាព។ */
             .app-pages.history-expanded {
                 overscroll-behavior-y: contain;
                 display: flex;
                 flex-direction: column;
                 overflow-y: hidden;
-                padding-bottom: calc(var(--chrome-bottom, 62px) + 8px);
+                padding-bottom: calc(var(--page-extension, 0px) + 8px);
             }
-            body.chrome-space-released .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
             /* ផ្ទាំងខាងលើដែលបង្រួមមានកម្ពស់ 0 តែ flex gap នៅតែអនុវត្ត ➜ ចន្លោះទទេ */
             .app-pages.history-expanded > .app-page.active { flex: 1; min-height: 0; gap: 0; }
             .app-pages.history-expanded .page-main { flex: 1; min-height: 0; }
@@ -251,6 +270,15 @@
                 max-height: none;
                 flex: 1;
                 min-height: 0;
+                /* កក់កន្លែងរបា Tab **ខាងក្នុង** កន្សោមរមូរ ➜ ជួរដេកចុងក្រោយនៅតែ
+                   រមូរឡើងដល់ខាងលើរបាបាន។ ការប្តូរនេះប៉ះតែ `scrollHeight` ➜
+                   អាចធ្វើភ្លាមស្របនឹង transform របស់របា ដោយគ្មានការលោត។ */
+                padding-bottom: var(--chrome-bottom, 62px);
+                clip-path: inset(0 0 var(--chrome-bottom, 62px) 0);
+            }
+            body.chrome-hidden .app-pages.history-expanded .table-responsive {
+                padding-bottom: 0;
+                clip-path: none;
             }
         }
 

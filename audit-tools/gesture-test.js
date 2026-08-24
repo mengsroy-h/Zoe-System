@@ -10,7 +10,7 @@ const CHROME = process.env.GESTURE_CHROME || '/opt/pw-browsers/chromium-1194/chr
 const fs = require('fs'), http = require('http'), path = require('path');
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
 const ROOT = process.env.GESTURE_APP_DIR || path.join(__dirname, '..');
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -579,35 +579,43 @@ const GESTURE = function (steps) {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const table = document.getElementById('tableResponsive');
         const pages = document.getElementById('appPages');
+        // គែម **ដែលមើលឃើញ** = គែមប្រអប់ ដក clip inset។ ចាប់ពីកំណែ 2.11.0
+        // ប្រអប់មានកម្ពស់ថេរ ➜ អ្វីដែលប្រែគឺការកាត់រូបភាព មិនមែន layout ទេ។
+        const snap = () => {
+            const m = /inset\(([^)]*)\)/.exec(getComputedStyle(table).clipPath || '');
+            const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
+            return { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
+                     pad: window.getComputedStyle(pages).paddingBottom,
+                     vis: Math.round(table.getBoundingClientRect().bottom - ins) };
+        };
         showAppChrome();
         await wait(240);
-        const shown = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                        pad: window.getComputedStyle(pages).paddingBottom };
+        const shown = snap();
         hideAppChrome();
         await wait(60);
-        const duringHide = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                             pad: window.getComputedStyle(pages).paddingBottom };
+        const duringHide = snap();
         await wait(180);
-        const away = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                       pad: window.getComputedStyle(pages).paddingBottom };
+        const away = snap();
         showAppChrome();
         await wait(60);
-        const duringShow = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                             pad: window.getComputedStyle(pages).paddingBottom };
+        const duringShow = snap();
         await wait(180);
-        const restored = { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                           pad: window.getComputedStyle(pages).paddingBottom };
+        const restored = snap();
         return { shown, duringHide, away, duringShow, restored, expanded: pages.classList.contains('history-expanded') };
     });
     ok('នៅក្នុងរបៀបប្រវត្តិពេញអេក្រង់ពិត (លក្ខខណ្ឌចាំបាច់)', noReflow.expanded === true, noReflow);
     // សំណើអ្នកប្រើ (ដូចកំណែ 2.2.0)៖ ពេលរបា Tab លាក់ខ្លួន កន្លែងរបស់វាត្រូវ
     // **ប្រគល់មកកាតវិញ** ➜ គ្មានចន្លោះទទេនៅបាតអេក្រង់។
-    ok('លាក់របា ➜ កាតប្រវត្តិរីកចុះបំពេញកន្លែងរបា (គ្មានចន្លោះទទេ)',
-        noReflow.away.h > noReflow.shown.h, noReflow);
-    ok('ពេល momentum កំពុងដើរ ➜ លាក់/បង្ហាញ Tab bar មិនប្តូរកម្ពស់ scroll container',
-        noReflow.duringHide.h === noReflow.shown.h && noReflow.duringShow.h === noReflow.away.h, noReflow);
-    ok('ពេល scroll ឈប់ ➜ layout settle ត្រឡប់ទំហំដើមតែមួយដង',
-        noReflow.restored.h === noReflow.shown.h && noReflow.restored.pad === noReflow.shown.pad, noReflow);
+    ok('លាក់របា ➜ ផ្ទៃដែលមើលឃើញរីកចុះបំពេញកន្លែងរបា (គ្មានចន្លោះទទេ)',
+        noReflow.away.vis > noReflow.shown.vis, noReflow);
+    // កំណែ 2.11.0៖ កម្ពស់កន្សោមរមូរ **មិនប្តូរសោះ** ទៀតទេ — មិនត្រឹមតែពេល
+    // momentum ទេ។ នេះជាការធានាខ្លាំងជាងមុន ➜ ថ្នាក់កំហុស «បញ្ជីលោតរំលង»
+    // ក្លាយជាមិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ។
+    ok('លាក់/បង្ហាញរបា Tab ➜ កម្ពស់ scroll container មិនប្តូរសោះ (គ្រប់ដំណាក់កាល)',
+        noReflow.duringHide.h === noReflow.shown.h && noReflow.away.h === noReflow.shown.h &&
+        noReflow.duringShow.h === noReflow.shown.h && noReflow.restored.h === noReflow.shown.h, noReflow);
+    ok('បង្ហាញរបាវិញ ➜ ផ្ទៃដែលមើលឃើញត្រឡប់ដូចដើម',
+        noReflow.restored.vis === noReflow.shown.vis && noReflow.restored.pad === noReflow.shown.pad, noReflow);
     ok('លាក់របា ➜ ទីតាំង**កំពូល**តារាងមិនប្តូរ (រីកតែខាងក្រោម មិនរុញមាតិកា)',
         noReflow.shown.top === noReflow.away.top, noReflow);
     // ថ្នាក់កំហុស 2.2.1៖ padding នោះត្រូវបាន **ធ្វើចលនា** ➜ កម្ពស់កន្សោមរមូរ
@@ -633,8 +641,12 @@ const GESTURE = function (steps) {
         const tabbar = document.getElementById('pageTabBar');
         const card = document.querySelector('#dataMainSection .history-section') ||
                      document.getElementById('dataMainSection');
+        const m = /inset\(([^)]*)\)/.exec(getComputedStyle(table).clipPath || '');
+        const clipBottom = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
         return {
             tableBottom: Math.round(table.getBoundingClientRect().bottom),
+            tableVisibleBottom: Math.round(table.getBoundingClientRect().bottom - clipBottom),
+            clipBottom: Math.round(clipBottom),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
             tabbarTop: Math.round(tabbar.getBoundingClientRect().top),
             tabbarH: Math.round(tabbar.getBoundingClientRect().height),
@@ -642,10 +654,10 @@ const GESTURE = function (steps) {
         };
     });
     ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
-    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមក្រោមតារាងឈរខាងលើវា (របាមិនបាំងជួរដេក)',
-        bottomRoom.tableBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
-    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមក្រោមកាតទាំងមូលក៏ឈរខាងលើវាដែរ',
-        bottomRoom.cardBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
+    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមតារាង**ដែលមើលឃើញ**ឈរខាងលើវា (របាមិនបាំងជួរដេក)',
+        bottomRoom.tableVisibleBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
+    ok('ការកាត់រូបភាព (clip-path) ស្មើនឹងកម្ពស់របា ➜ ជួរដេកមិនលិចក្រោមរបា',
+        Math.abs(bottomRoom.clipBottom - bottomRoom.tabbarH) <= 1, bottomRoom);
     const filled = await page.evaluate(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const card = document.querySelector('#dataMainSection .history-section');
@@ -746,6 +758,12 @@ const GESTURE = function (steps) {
             barH: Math.round(tabbar.offsetHeight),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
             tableBottom: Math.round(document.getElementById('tableResponsive').getBoundingClientRect().bottom),
+            tableVisibleBottom: (() => {
+                const t = document.getElementById('tableResponsive');
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(t).clipPath || '');
+                const inset = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
+                return Math.round(t.getBoundingClientRect().bottom - inset);
+            })(),
             barTop: Math.round(tabbar.getBoundingClientRect().top),
             viewportH: Math.round(window.innerHeight)
         });
@@ -797,20 +815,21 @@ const GESTURE = function (steps) {
     ok('root មាន offset ៣៤px ពេល WebKit កំពុង restore ➜ ការវាស់ safe-area មិនរួញ',
         measure.scrolled.windowY > 0 && measure.scrolled.chromeBottom >= measure.scrolled.barH + 33,
         measure.scrolled);
-    ok('inset 0 ➜ គែមកាតឈរខាងលើរបា Tab',
-        measure.flat.cardBottom <= measure.flat.barTop + 1, measure.flat);
-    ok('**inset ៣៤px ➜ គែមកាតនៅតែឈរខាងលើរបា Tab** (កំហុស iPhone ត្រូវកែ)',
-        measure.inset.cardBottom <= measure.inset.barTop + 1, measure.inset);
+    // កំណែ 2.11.0៖ ប្រអប់កាតលាតដល់បាតអេក្រង់ដោយចេតនា (កម្ពស់ថេរ ➜ គ្មានការ
+    // ប្តូរ layout ពេលរបាលាក់)។ អ្វីដែលត្រូវអះអាងគឺគែម **ដែលមើលឃើញ** របស់
+    // តារាង ដែលកាត់ដោយ `clip-path` ➜ ជួរដេកមិនលិចក្រោមរបា។
+    ok('inset 0 ➜ គែមតារាងដែលមើលឃើញ ឈរខាងលើរបា Tab',
+        measure.flat.tableVisibleBottom <= measure.flat.barTop + 1, measure.flat);
+    ok('**inset ៣៤px ➜ គែមតារាងដែលមើលឃើញ នៅតែឈរខាងលើរបា Tab** (កំហុស iPhone ត្រូវកែ)',
+        measure.inset.tableVisibleBottom <= measure.inset.barTop + 1, measure.inset);
     ok('វាស់ពេលរបា Tab លាក់ដោយ transform ➜ --chrome-bottom មិនរួញបាត់ safe-area',
         measure.hidden.chromeBottom >= measure.hidden.barH + 33, measure.hidden);
-    ok('inset ៣៤px + របា Tab លាក់ ➜ គែមកាត/តារាងនៅក្នុង viewport និងជិតបាត',
+    ok('inset ៣៤px + របា Tab លាក់ ➜ គែមតារាងដែលមើលឃើញ ចុះដល់ជិតបាតអេក្រង់',
         measure.hidden.pageExtension >= 33 &&
-        measure.hidden.viewportH - measure.hidden.cardBottom >= 0 &&
-        measure.hidden.viewportH - measure.hidden.cardBottom <= 16 &&
-        measure.hidden.viewportH - measure.hidden.tableBottom >= 0 &&
-        measure.hidden.viewportH - measure.hidden.tableBottom <= 20, measure.hidden);
-    ok('បង្ហាញរបា Tab វិញ ➜ គែមកាតនៅតែឈរខាងលើរបា',
-        measure.shown.cardBottom <= measure.shown.barTop + 1, measure.shown);
+        measure.hidden.viewportH - measure.hidden.tableVisibleBottom >= 0 &&
+        measure.hidden.viewportH - measure.hidden.tableVisibleBottom <= 24, measure.hidden);
+    ok('បង្ហាញរបា Tab វិញ ➜ គែមតារាងដែលមើលឃើញ នៅតែឈរខាងលើរបា',
+        measure.shown.tableVisibleBottom <= measure.shown.barTop + 1, measure.shown);
     await page.evaluate(() => { const h = document.getElementById('dragHandle'); if (h) h.click(); });
     await page.evaluate(() => new Promise((r) => setTimeout(r, 420)));
 

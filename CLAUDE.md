@@ -91,15 +91,42 @@ scroll range លើ Android; Android ទទួល safe area តាម content/ta
 
 ## ធនធានខាងក្រៅ និង service worker — READ BEFORE ADDING ANY CDN
 
-**ZXing ស្ថិតក្នុង repo (`ZoeW/vendor/zxing.min.js`) — កុំនាំវាត្រឡប់ទៅ CDN វិញ។**
-មុននេះវាមកពី unpkg.com ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល
-cache ទេ** ➜ ពេលបណ្តាញខ្សោយ ឬ CDN ដាច់ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App
-មើលទៅដូចដំណើរការធម្មតា។ ឯកសារក្នុង repo ជាកំណែ **0.23.0 ដដែល** នឹងអ្វីដែល CDN
-ធ្លាប់បម្រើ (sha384 = SRI ចាស់; `offline-shell-test.js` អះអាងរឿងនេះ)។
-**ដើម្បីឡើងកំណែ**៖ `npm i @zxing/library@<new>` រួច
-`cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js`
-រួច**ធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `offline-shell-test.js`** ហើយរត់
-`scan-engine-test.js` ឡើងវិញ។
+**engine ស្កេនស្ថិតក្នុង repo — កុំនាំវាទៅ CDN។** មុននេះ ZXing មកពី unpkg.com
+ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល cache ទេ** ➜ ពេលបណ្តាញ
+ខ្សោយ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App មើលទៅដូចដំណើរការធម្មតា។
+
+**កំណែ 2.10.0 ប្តូរ engine ទៅ ZXing C++ ដែលចងក្រងជា WebAssembly** (`zxing-wasm`
+3.1.3)។ ឯកសារមាន **២** ហើយ **ទាំង ២ ត្រូវនៅក្នុង `APP_SHELL`**៖
+`ZoeW/vendor/zxing-wasm.js` (glue) និង `ZoeW/vendor/zxing_reader.wasm` (binary)។
+បាត់មួយណា ➜ ការស្កេនស្លាប់ពេលបណ្តាញដាច់ ខណៈ App នៅបើកបានធម្មតា។
+
+**ហេតុអ្វី៖** Safari គ្មាន `BarcodeDetector` ➜ iPhone ធ្លាក់ទៅ engine JavaScript។
+ការវាស់លើ input ដដែល៖ ផ្លូវ **រកមិនឃើញ** (ស៊ុមភាគច្រើនពេលតម្រង់កាមេរ៉ា)
+**១៣.៩ ms ➜ ១.៦–២.២ ms**។ ការឌិកូដលែងជាថ្លៃលេចធ្លោទៀតទេ — `getImageData()`
+ទើបជាថ្លៃដែលនៅសល់។
+
+> ⚠️ **CSP ត្រូវមាន `'wasm-unsafe-eval'` ក្នុង `script-src`។** បើគ្មាន browser
+> **បដិសេធការចងក្រង WebAssembly** ➜ ការស្កេនស្លាប់ទាំងស្រុងលើផលិតកម្ម ខណៈ
+> តេស្តក្នុង repo (ដែលរត់គ្មាន CSP) ជោគជ័យទាំងអស់។ ថ្នាក់កំហុសនេះត្រូវបាន
+> ចាប់បានពិតក្នុងជុំ 2.10.0។ `netlify.toml` ក៏ត្រូវបម្រើ `.wasm` ជា
+> `application/wasm` ដែរ បើអត់ browser ធ្លាក់ទៅផ្លូវ instantiate យឺត។
+> `scan-engine-test.js` ចាក់សោទាំង ២ ចំណុច។
+
+**ដើម្បីឡើងកំណែ**៖ `npm i zxing-wasm@<new>` រួច
+`cp node_modules/zxing-wasm/dist/iife/reader/index.js ZoeW/vendor/zxing-wasm.js`
+និង `cp node_modules/zxing-wasm/dist/reader/zxing_reader.wasm ZoeW/vendor/`
+រួចរត់ `scan-engine-test.js` និង `offline-shell-test.js` ឡើងវិញ។
+`offline-shell-test.js` ផ្ទៀងផ្ទាត់ថា binary ត្រូវនឹង sha256 ដែល glue រំពឹងទុក
+ដូច្នេះការចម្លងតែឯកសារមួយនឹងធ្លាក់ភ្លាម។
+
+**ឈ្មោះ format ប្តូរ**៖ `SCAN_FORMAT_NAMES = ['Code128']` (មិនមែន `'CODE_128'` ទេ)
+ព្រោះ zxing-wasm ប្រើឈ្មោះរបស់ ZXing C++។ ការស្កេន QR ប្រើ
+`CONFIG_QR_FORMAT_NAMES = ['QRCode']` ដាច់ដោយឡែកដដែល។
+
+**ការឌិកូដឥឡូវជា `Promise`។** ផ្លូវ live មាន guard `liveDecodeBusy` ដើម្បីកុំឲ្យ
+ការឌិកូដជាន់គ្នា; `takeFreshVideoFrame()` និង `confirmLiveScan()` (២ ស៊ុមជាប់គ្នា)
+នៅដំណើរការដដែល។ **កុំប្រើ `.then(A).catch(B)`** — ប្រើទម្រង់ ២ អាគុយម៉ង់
+(`.then(ok, fail)`) តាមច្បាប់គម្រោង។
 
 **`sw.js` ត្រូវបោះបង់រាល់សំណើឆ្លង origin — កុំប្តូរច្បាប់នេះ។**
 ```js
@@ -193,6 +220,11 @@ queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទា�
   — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
 
 **ចលនាតាមម្រាមដៃ (កំណែ 2.9.0) — READ BEFORE TOUCHING PANEL LAYOUT។**
+> ✅ **ផ្ទៀងផ្ទាត់លើ iPhone PWA ពិតរួចហើយ** (2026-08-24, កំណែ 2.9.0)។ អ្នកប្រើបញ្ជាក់ថា
+> ការទាញផ្ទាំង, snap, PTR និងការលាក់របា Tab ដំណើរការត្រឹមត្រូវលើឧបករណ៍ពិត។
+> ដូច្នេះ **កុំ «កែ» ផ្នែកនេះដោយផ្អែកលើការសង្ស័យ** — វាមិនមែនជាកូដដែលមិនទាន់សាកទេ។
+> បើចាំបាច់ត្រូវប៉ះ សូមអាន «របៀបស្តារវិញ» ខាងក្រោមផ្នែកនេះ។
+
 លក្ខខណ្ឌស្នូល៖ **កាតបញ្ជី (`.page-main`) ត្រូវខ្ពស់ដូចគ្នាបេះបិទទាំងរបៀបធម្មតា
 និងរបៀបពេញអេក្រង់** — `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)`
 បូក `flex: none` ក្នុង `@media (max-width: 991px)`។ ផលពីរ៖
@@ -223,6 +255,25 @@ flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមម
 `scroll-snap-type: y proximity` ធ្វើឲ្យការរមូរឈប់ត្រឹម 0 ឬចម្ងាយពេញ (លែងឈប់
 ពាក់កណ្តាល)។ បើភ្លេច `scroll-padding-top` នោះចំណុច snap «បើក» ធ្លាក់ត្រឹម
 `scrollTop 71` ជំនួស `0` ➜ **PTR លែងកេះបានទាំងស្រុង** ព្រោះវាទាមទារ `scrollTop <= 1`។
+
+**របៀបស្តារចលនា 2.9.0 វិញ បើជុំ audit ណាមួយកែប៉ះវា។** ចលនានេះអាស្រ័យលើ
+ចំណុច ៤ ដែលត្រូវមានគ្រប់ — បាត់មួយណាក៏ការលោតត្រឡប់មកវិញដែរ៖
+
+| # | អ្វី | នៅឯណា |
+|---|---|---|
+| ១ | `.page-main` មាន `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)` + `flex: none` | `style.css`, ក្នុង `@media (max-width: 991px)` |
+| ២ | ខ្សែសង្វាក់ flex ខាងក្នុង៖ `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` ជា `flex: 1; min-height: 0` និង `.table-responsive` ជា `max-height: none; flex: 1; min-height: 0` (scope ត្រឹម `.page-main` ➜ modal រក្សា 62vh) | ដដែល |
+| ៣ | `.app-pages` មាន `scroll-snap-type: y proximity` **បូក** `scroll-padding-top` ស្មើ `padding-top`; កូន ២ មាន `scroll-snap-align: start` | ដដែល |
+| ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` | `app.js` |
+
+លេខយោង (412×780, seed 120 order)៖ ចម្ងាយរំកិល **361px**; កាតខ្ពស់ **642px ទាំង ២ របៀប**;
+តារាងខ្ពស់ **538px ទាំង ២ របៀប**; `.app-pages` រមូរបាន **361px** ដែលស្មើចម្ងាយរំកិល។
+មុនកែ កាតខ្ពស់ 588 ធៀប 642 (ខុស **56px**) ➜ នោះជាមូលហេតុនៃការលោត។
+
+**ការផ្ទៀងផ្ទាត់៖** `node audit-tools/panel-motion-test.js` (33 assertions លើ 320/412/768px)។
+បើវាធ្លាក់ដោយ `cardHeightDelta`/`tableHeightDelta` នោះចំណុច ១ ឬ ២ បាត់; បើធ្លាក់ដោយ
+`snapRestNearTop` នោះចំណុច ៣ បាត់ (**ហើយ PTR ក៏ស្លាប់ដែរ**); បើធ្លាក់ដោយ
+`residualTransform` នោះចំណុច ៤ មានបញ្ហា។
 
 **Auto pull up — `setPhoneSearchPulledUp()`។** ចុច (focus) ប្រអប់ស្វែងរកលេខទូរស័ព្ទ ➜
 `#dataSideSection` ទទួល `.search-focus` ដែលបង្រួមកាតខាងលើទាំងអស់ ទុកតែប្រអប់ស្វែងរក
@@ -292,16 +343,19 @@ Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
-- កន្លែងរបស់របា Tab ក្នុងរបៀបពេញអេក្រង់ ត្រូវកក់ជា `padding-bottom` លើ
-  `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
-  វាស់ពិត) ➜ **គែមក្រោមកាតឈរខាងលើរបា Tab**។ `body.chrome-hidden` ប្តូរតែ
-  transform របស់ Tab bar; ក្រោយ scroll ស្ងប់ 180ms ទើប `body.chrome-space-released`
-  ទម្លាក់ padding មក `--page-extension + 8px` ដើម្បីឲ្យកាតរីកបំពេញកន្លែងរបា។ ពេល
-  បង្ហាញវិញ ក៏ពន្យារការកក់កន្លែងរហូត scroll ស្ងប់ដូចគ្នា។ **កុំដាក់ transition លើ
-  padding និងកុំប្តូរ class នេះកណ្តាល momentum**។ Scroll handler ត្រូវ coalesce តាម
-  `requestAnimationFrame` មួយដងក្នុងមួយ frame។ `gesture-test.js` ចាក់សោឥរិយាបថនេះ។
-  កំណែ 2.4.0 ធ្លាប់កក់វាដោយ `.table-responsive::after` *ខាងក្នុង* កន្សោមរមូរ —
-  layout ស្ថិរដូចគ្នា តែជួរដេកលិចចូលពីក្រោមរបា ➜ **កុំនាំវិធីនោះត្រឡប់មកវិញ**
+- **កំណែ 2.11.0៖ កន្លែងរបា Tab កក់ *ខាងក្នុងកន្សោមរមូរ* មិនមែនលើ `.app-pages` ទេ។**
+  `.table-responsive` មាន `padding-bottom: var(--chrome-bottom)` (ជួរដេកចុងក្រោយ
+  នៅតែរមូរឡើងដល់ខាងលើរបាបាន) បូក `clip-path: inset(0 0 var(--chrome-bottom) 0)`
+  (ជួរដេកមិនលិចក្រោមរបា — បញ្ហាកំណែ 2.4.0)។ `body.chrome-hidden` ដកទាំង ២ ចេញ។
+  **`clip-path` ជា paint មិនមែន layout** ➜ ប្តូរបានភ្លាមស្របនឹង transform របស់របា។
+- ដូច្នេះ **កម្ពស់កាត និងតារាងថេរទាំងស្រុង** ➜ ថ្នាក់កំហុស «ប្តូរកម្ពស់កណ្តាល
+  momentum» មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ។ យន្តការពន្យារ 180ms
+  (`scheduleChromeLayoutSettle`) និង `chrome-space-released` **ត្រូវដកចេញរួច** —
+  កុំនាំវាត្រឡប់មកវិញ។ មុននេះការពន្យារនោះធ្វើឲ្យរបារអិលចេញភ្លាម តែកាតធ្លាក់មក
+  បំពេញ 180ms ក្រោយ ➜ អ្នកប្រើឃើញចន្លោះទទេ និងជួរដេកកាត់ពាក់កណ្តាល។
+- Scroll handler ត្រូវ coalesce តាម `requestAnimationFrame` មួយដងក្នុងមួយ frame។
+  `gesture-test.js` និង `panel-motion-test.js` ចាក់សោឥរិយាបថនេះ — ការអះអាងវាស់
+  **គែមដែលមើលឃើញ** (គែមប្រអប់ ដក clip inset) មិនមែនគែមប្រអប់ទេ
 - **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល
 - **គ្មាន `scroll-behavior: smooth`** លើ `body` ឬ `.table-responsive` — WebKit យកវាទៅ
   អនុវត្តលើការរមូរតាមកម្លាំងផងដែរ
@@ -532,11 +586,10 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 
 ### ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
 ```bash
-npm i acorn playwright-core xlsx @zxing/library@0.23.0
+npm i acorn playwright-core xlsx
                                  # acorn៖ checker ស្តាទិច; playwright-core៖ តេស្ត browser
                                  # xlsx៖ ត្រួតពិនិត្យ XML ដែល Export emit ចេញ
-                                 # @zxing/library៖ វាស់ល្បឿនម៉ាស៊ីនស្កេន (កំណែដូច index.html)
-                                 # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
+                                                                  # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
 **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថាកំហុសដែលបានដោះស្រាយរួច

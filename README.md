@@ -2,7 +2,7 @@
 
 Zoe-System ជាសំណុំ PWA ចំនួន **២** សម្រាប់គ្រប់គ្រងកញ្ចប់អតិថិជន៖ បញ្ចូល Barcode, កំណត់ទីតាំង Locker, ទទួលកញ្ចប់, គណនា COD/DOD និងគ្រប់គ្រង Activation Key។ ឯកសារនេះត្រូវបានរៀបចំសម្រាប់ដាក់នៅ **root របស់ repository** ដើម្បីឱ្យតំណភ្ជាប់ខាងក្រោមដំណើរការ។
 
-កំណែ release បច្ចុប្បន្ន៖ **`2.9.0`** — មើល [CHANGELOG.md](CHANGELOG.md) សម្រាប់អ្វីដែលប្រែក្នុងកំណែនីមួយៗ។
+កំណែ release បច្ចុប្បន្ន៖ **`2.11.0`** — មើល [CHANGELOG.md](CHANGELOG.md) សម្រាប់អ្វីដែលប្រែក្នុងកំណែនីមួយៗ។
 
 ## App ទាំង ២
 
@@ -110,15 +110,16 @@ App វាស់ចង្វាក់ស៊ុមពិតរបស់ឧបក�
 
 ## កំណែ និង Service Worker
 
-`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ **`2.9.0`**។ វាបង្ហាញ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ login និងខាងក្រោមរបា Slide) និង **១ កន្លែងក្នុង ZoeKeyGen** (ប្រអប់ login)។ `version-check.js` អះអាងចំនួនកន្លែងនោះឲ្យច្បាស់ — ការបន្ថែមកន្លែងទី ៣ នឹងធ្វើឲ្យវាធ្លាក់។
+`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ **`2.11.0`**។ វាបង្ហាញ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ login និងខាងក្រោមរបា Slide) និង **១ កន្លែងក្នុង ZoeKeyGen** (ប្រអប់ login)។ `version-check.js` អះអាងចំនួនកន្លែងនោះឲ្យច្បាស់ — ការបន្ថែមកន្លែងទី ៣ នឹងធ្វើឲ្យវាធ្លាក់។
 
 `CACHE_VERSION` ក្នុង `sw.js` មិនមែន App version ទេ។ វាតាមលំនាំ `<app>-vN` ហើយត្រូវប្ដូររាល់ពេល asset របស់ App នោះផ្លាស់ប្តូរ ដើម្បីឱ្យ Service Worker ទាញឯកសារថ្មី។ បច្ចុប្បន្នគឺ `zoew-v81` និង `zoekeygen-v46`។
 
 ### ធនធានក្រៅ និង cache
 
-Service Worker cache **តែឯកសាររបស់ App ខ្លួនឯង** (`APP_SHELL`)។ ZXing (ម៉ាស៊ីនស្កេន)
-ស្ថិតក្នុង repo `ZoeW/vendor/zxing.min.js` ដូច្នេះវាចូល cache ជាមួយគ្នា ➜
-**ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ**។
+Service Worker cache **តែឯកសាររបស់ App ខ្លួនឯង** (`APP_SHELL`)។ engine ស្កេន
+(ZXing C++ ចងក្រងជា WebAssembly) ស្ថិតក្នុង repo ជា **២ ឯកសារ** —
+`ZoeW/vendor/zxing-wasm.js` និង `ZoeW/vendor/zxing_reader.wasm` — ដូច្នេះវាចូល
+cache ជាមួយគ្នា ➜ **ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ**។
 
 Firebase SDK, ពុម្ពអក្សរ Google និង Sentry ទាញពីបណ្តាញរាល់ពេល។
 
@@ -156,7 +157,7 @@ Static hosting មិន deploy Firebase Rules ជំនួសអ្នកទេ
 រត់ពី root របស់ repository៖
 
 ```bash
-npm i acorn playwright-core xlsx @zxing/library@0.23.0
+npm i acorn playwright-core xlsx
 node --check ZoeW/app.js
 node --check ZoeKeyGen/app.js
 node audit-tools/version-check.js

@@ -12,7 +12,7 @@ if (!fs.existsSync(CHROME)) {
     process.exit(0);
 }
 const ROOT = process.env.UIFLOW_APP_DIR || path.join(__dirname, '..');
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;
 function ok(name) { console.log('  ok    ' + name); pass++; }

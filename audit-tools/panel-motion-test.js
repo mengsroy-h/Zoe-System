@@ -22,7 +22,7 @@ const ROOT = process.env.PANELMOTION_APP_DIR || path.join(__dirname, '..');
 const ORDERS = parseInt(process.env.PANELMOTION_ORDERS || '1200', 10);
 // កម្រិតតាមបន្ទុក៖ ការវាស់ពិតគឺ ~120ms នៅ 1200 order ➜ ទុកចន្លោះ ~6x តែនៅតែចាប់ការថយចុះ 8x បាន
 const COLD_LIMIT = Math.max(300, Math.round(ORDERS * 0.6));
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 const REPORT = process.env.PERF_REPORT === '1';
 
 let pass = 0, fail = 0;
@@ -173,6 +173,26 @@ function seedBig(n) {
             if (handle) { handle.click(); await wait(400); handle.click(); await wait(400); }
             out.residualTransform = getComputedStyle(main).transform;
             out.sideAfterToggles = side.classList.contains('collapsed');
+            // ៥ខ — កន្លែងរបា Tab ត្រូវប្រគល់មកវិញ **ស្របគ្នានឹងរបា** មិនមែនពន្យារ
+            // ១៨០ms ក្រោយរមូរស្ងប់ទេ។ មុនកំណែ 2.11.0 អ្នកប្រើឃើញចន្លោះទទេប្រផេះ
+            // មួយភ្លែត ហើយជួរដេកចុងក្រោយត្រូវកាត់ពាក់កណ្តាល (វីដេអូពីអ្នកប្រើ)។
+            const visBottom = () => {
+                const t = document.getElementById('tableResponsive');
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(t).clipPath || '');
+                const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
+                return Math.round(t.getBoundingClientRect().bottom - ins);
+            };
+            side.classList.add('collapsed'); window.syncHistoryExpandedLock(); await wait(80);
+            document.body.classList.remove('chrome-hidden'); await wait(80);
+            const visShown = visBottom();
+            const hShown = table.clientHeight;
+            document.body.classList.add('chrome-hidden');
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            out.visReleasedImmediately = visBottom() - visShown;
+            out.heightStableOnHide = table.clientHeight === hShown;
+            document.body.classList.remove('chrome-hidden');
+            side.classList.remove('collapsed'); window.syncHistoryExpandedLock(); await wait(80);
+
             // ៦ — ទំព័រ ២ ដូចគ្នា
             window.switchAppPage('entry'); await wait(150);
             const em = document.getElementById('entryMainSection');
@@ -193,6 +213,9 @@ function seedBig(n) {
         ok(tag + ': snap ឈប់ត្រឹម 0 (PTR កេះបាន)', r.snapRestNearTop <= 1, 'scrollTop=' + r.snapRestNearTop);
         ok(tag + ': គ្មាន transform សេសសល់ក្រោយចលនា', r.residualTransform === 'none' || r.residualTransform === 'matrix(1, 0, 0, 1, 0, 0)', r.residualTransform);
         ok(tag + ': ចុចដងអូស ២ ដង ➜ ត្រឡប់ដើម', r.sideAfterToggles === false, String(r.sideAfterToggles));
+        ok(tag + ': កន្លែងរបា Tab ប្រគល់មកវិញក្នុង ២ ស៊ុម (ស្របនឹងរបា មិនពន្យារ)',
+            r.visReleasedImmediately >= 20, 'delta=' + r.visReleasedImmediately + 'px');
+        ok(tag + ': ការលាក់របាមិនប្តូរកម្ពស់កន្សោមរមូរ', r.heightStableOnHide === true, String(r.heightStableOnHide));
         ok(tag + ': ទំព័រ ២ កាតមានកម្ពស់ត្រឹមត្រូវ', r.entryCardH > 100, 'h=' + r.entryCardH);
         ok(tag + ': គ្មានការហូរផ្តេក', r.hOverflow <= 0, 'overflow=' + r.hOverflow);
         await ctx.close();

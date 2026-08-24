@@ -10,7 +10,7 @@ const path = require('path');
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
 
 const ROOT = process.env.FIELDSHAPE_APP_DIR || path.join(__dirname, '..');
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 let pass = 0, fail = 0;
 const ok = (n) => { console.log('  ok    ' + n); pass++; };
 const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')); fail++; };

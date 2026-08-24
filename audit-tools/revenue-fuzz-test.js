@@ -14,7 +14,7 @@ if (!fs.existsSync(CHROME)) {
 const ROOT = process.env.FUZZ_APP_DIR || path.join(__dirname, '..');
 const RUNS = parseInt(process.env.FUZZ_RUNS || '6', 10);
 const OPS = parseInt(process.env.FUZZ_OPS || '26', 10);
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;
 function ok(n) { console.log('  ok    ' + n); pass++; }

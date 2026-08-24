@@ -2,7 +2,7 @@
 
 ZoeW គឺជា PWA តែមួយសម្រាប់គ្រប់គ្រងកញ្ចប់ អតិថិជន ទីតាំង Locker និងស្ថិតិ COD/DOD ក្នុងប្រព័ន្ធ Zoe។
 
-កំណែបច្ចុប្បន្ន៖ **2.9.0** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
+កំណែបច្ចុប្បន្ន៖ **2.11.0** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
 
 ## តួនាទី និងព្រំដែន
 
@@ -112,7 +112,9 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 
 App នេះជា static site គ្មាន build step។ Deploy ថត `ZoeW` ទៅ hosting របស់វា ហើយប្តូរ `CACHE_VERSION` រាល់ពេល asset ផ្លាស់ប្តូរ។ Service Worker ទាញកំណែថ្មីនៅផ្ទៃខាងក្រោយ ហើយប្រើវាពេលបើក App លើកក្រោយ។
 
-`vendor/zxing.min.js` ជាឯកសារ **ក្នុង repo** មិនមែន dependency ដែលត្រូវ build ទេ។ ដើម្បីឡើងកំណែវា៖ `npm i @zxing/library@<new>` រួច `cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js` រួចធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `audit-tools/offline-shell-test.js`។
+engine ស្កេន (`vendor/zxing-wasm.js` + `vendor/zxing_reader.wasm`) ជាឯកសារ **ក្នុង repo** មិនមែន dependency ដែលត្រូវ build ទេ។ ដើម្បីឡើងកំណែវា៖ `npm i zxing-wasm@<new>` រួច `cp node_modules/zxing-wasm/dist/iife/reader/index.js ZoeW/vendor/zxing-wasm.js` និង `cp node_modules/zxing-wasm/dist/reader/zxing_reader.wasm ZoeW/vendor/` រួចរត់ `scan-engine-test.js` និង `offline-shell-test.js` ឡើងវិញ។ **ត្រូវចម្លងទាំង ២ ឯកសារ** — `offline-shell-test.js` ផ្ទៀងផ្ទាត់ថា binary ត្រូវនឹង sha256 ដែល glue រំពឹងទុក។
+
+**CSP ត្រូវមាន `'wasm-unsafe-eval'`** ក្នុង `script-src` របស់ `netlify.toml` បើអត់ browser បដិសេធការចងក្រង WebAssembly ➜ ការស្កេនស្លាប់លើផលិតកម្ម។
 
 **ចាំបាច់៖** `firebase-database.rules.json` នៅ root មិន deploy តាម Netlify ឬ static hosting ទេ។ មុន release ដែលពាក់ព័ន្ធនឹង Firebase path/rules សូម backup Rules ចាស់, paste ឯកសារនេះទៅ Business Firebase Project ក្នុង Firebase Console, ពិនិត្យ Rules Simulator ហើយចុច **Publish** ដោយដៃ។
 

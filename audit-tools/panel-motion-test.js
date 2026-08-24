@@ -22,7 +22,7 @@ const ROOT = process.env.PANELMOTION_APP_DIR || path.join(__dirname, '..');
 const ORDERS = parseInt(process.env.PANELMOTION_ORDERS || '1200', 10);
 // កម្រិតតាមបន្ទុក៖ ការវាស់ពិតគឺ ~120ms នៅ 1200 order ➜ ទុកចន្លោះ ~6x តែនៅតែចាប់ការថយចុះ 8x បាន
 const COLD_LIMIT = Math.max(300, Math.round(ORDERS * 0.6));
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 const REPORT = process.env.PERF_REPORT === '1';
 
 let pass = 0, fail = 0;

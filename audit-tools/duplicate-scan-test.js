@@ -12,7 +12,7 @@ const CHROME = process.env.DUP_CHROME || '/opt/pw-browsers/chromium-1194/chrome-
 const fs = require('fs'), http = require('http'), path = require('path');
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
 const ROOT = process.env.DUP_APP_DIR || path.join(__dirname, '..');
-const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {

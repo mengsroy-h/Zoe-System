@@ -91,15 +91,42 @@ scroll range លើ Android; Android ទទួល safe area តាម content/ta
 
 ## ធនធានខាងក្រៅ និង service worker — READ BEFORE ADDING ANY CDN
 
-**ZXing ស្ថិតក្នុង repo (`ZoeW/vendor/zxing.min.js`) — កុំនាំវាត្រឡប់ទៅ CDN វិញ។**
-មុននេះវាមកពី unpkg.com ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល
-cache ទេ** ➜ ពេលបណ្តាញខ្សោយ ឬ CDN ដាច់ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App
-មើលទៅដូចដំណើរការធម្មតា។ ឯកសារក្នុង repo ជាកំណែ **0.23.0 ដដែល** នឹងអ្វីដែល CDN
-ធ្លាប់បម្រើ (sha384 = SRI ចាស់; `offline-shell-test.js` អះអាងរឿងនេះ)។
-**ដើម្បីឡើងកំណែ**៖ `npm i @zxing/library@<new>` រួច
-`cp node_modules/@zxing/library/umd/index.min.js ZoeW/vendor/zxing.min.js`
-រួច**ធ្វើបច្ចុប្បន្នភាព sha384 ក្នុង `offline-shell-test.js`** ហើយរត់
-`scan-engine-test.js` ឡើងវិញ។
+**engine ស្កេនស្ថិតក្នុង repo — កុំនាំវាទៅ CDN។** មុននេះ ZXing មកពី unpkg.com
+ហើយ `sw.js` បោះបង់រាល់សំណើឆ្លង origin ➜ វា **មិនដែលចូល cache ទេ** ➜ ពេលបណ្តាញ
+ខ្សោយ **ការស្កេនកាមេរ៉ាមិនដើរសោះ** ខណៈ App មើលទៅដូចដំណើរការធម្មតា។
+
+**កំណែ 2.10.0 ប្តូរ engine ទៅ ZXing C++ ដែលចងក្រងជា WebAssembly** (`zxing-wasm`
+3.1.3)។ ឯកសារមាន **២** ហើយ **ទាំង ២ ត្រូវនៅក្នុង `APP_SHELL`**៖
+`ZoeW/vendor/zxing-wasm.js` (glue) និង `ZoeW/vendor/zxing_reader.wasm` (binary)។
+បាត់មួយណា ➜ ការស្កេនស្លាប់ពេលបណ្តាញដាច់ ខណៈ App នៅបើកបានធម្មតា។
+
+**ហេតុអ្វី៖** Safari គ្មាន `BarcodeDetector` ➜ iPhone ធ្លាក់ទៅ engine JavaScript។
+ការវាស់លើ input ដដែល៖ ផ្លូវ **រកមិនឃើញ** (ស៊ុមភាគច្រើនពេលតម្រង់កាមេរ៉ា)
+**១៣.៩ ms ➜ ១.៦–២.២ ms**។ ការឌិកូដលែងជាថ្លៃលេចធ្លោទៀតទេ — `getImageData()`
+ទើបជាថ្លៃដែលនៅសល់។
+
+> ⚠️ **CSP ត្រូវមាន `'wasm-unsafe-eval'` ក្នុង `script-src`។** បើគ្មាន browser
+> **បដិសេធការចងក្រង WebAssembly** ➜ ការស្កេនស្លាប់ទាំងស្រុងលើផលិតកម្ម ខណៈ
+> តេស្តក្នុង repo (ដែលរត់គ្មាន CSP) ជោគជ័យទាំងអស់។ ថ្នាក់កំហុសនេះត្រូវបាន
+> ចាប់បានពិតក្នុងជុំ 2.10.0។ `netlify.toml` ក៏ត្រូវបម្រើ `.wasm` ជា
+> `application/wasm` ដែរ បើអត់ browser ធ្លាក់ទៅផ្លូវ instantiate យឺត។
+> `scan-engine-test.js` ចាក់សោទាំង ២ ចំណុច។
+
+**ដើម្បីឡើងកំណែ**៖ `npm i zxing-wasm@<new>` រួច
+`cp node_modules/zxing-wasm/dist/iife/reader/index.js ZoeW/vendor/zxing-wasm.js`
+និង `cp node_modules/zxing-wasm/dist/reader/zxing_reader.wasm ZoeW/vendor/`
+រួចរត់ `scan-engine-test.js` និង `offline-shell-test.js` ឡើងវិញ។
+`offline-shell-test.js` ផ្ទៀងផ្ទាត់ថា binary ត្រូវនឹង sha256 ដែល glue រំពឹងទុក
+ដូច្នេះការចម្លងតែឯកសារមួយនឹងធ្លាក់ភ្លាម។
+
+**ឈ្មោះ format ប្តូរ**៖ `SCAN_FORMAT_NAMES = ['Code128']` (មិនមែន `'CODE_128'` ទេ)
+ព្រោះ zxing-wasm ប្រើឈ្មោះរបស់ ZXing C++។ ការស្កេន QR ប្រើ
+`CONFIG_QR_FORMAT_NAMES = ['QRCode']` ដាច់ដោយឡែកដដែល។
+
+**ការឌិកូដឥឡូវជា `Promise`។** ផ្លូវ live មាន guard `liveDecodeBusy` ដើម្បីកុំឲ្យ
+ការឌិកូដជាន់គ្នា; `takeFreshVideoFrame()` និង `confirmLiveScan()` (២ ស៊ុមជាប់គ្នា)
+នៅដំណើរការដដែល។ **កុំប្រើ `.then(A).catch(B)`** — ប្រើទម្រង់ ២ អាគុយម៉ង់
+(`.then(ok, fail)`) តាមច្បាប់គម្រោង។
 
 **`sw.js` ត្រូវបោះបង់រាល់សំណើឆ្លង origin — កុំប្តូរច្បាប់នេះ។**
 ```js
@@ -556,11 +583,10 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 
 ### ជំហានទី ០ — រៀបចំ (ម្តងក្នុងមួយ session)
 ```bash
-npm i acorn playwright-core xlsx @zxing/library@0.23.0
+npm i acorn playwright-core xlsx
                                  # acorn៖ checker ស្តាទិច; playwright-core៖ តេស្ត browser
                                  # xlsx៖ ត្រួតពិនិត្យ XML ដែល Export emit ចេញ
-                                 # @zxing/library៖ វាស់ល្បឿនម៉ាស៊ីនស្កេន (កំណែដូច index.html)
-                                 # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
+                                                                  # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
 **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថាកំហុសដែលបានដោះស្រាយរួច

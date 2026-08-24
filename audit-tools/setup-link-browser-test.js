@@ -13,7 +13,7 @@ function ok(cond, label, got) {
     else { fail++; console.log('   FAIL  ' + label + (got !== undefined ? '  ➜ ' + JSON.stringify(got) : '')); }
 }
 
-const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json' };
+const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
 function serve(dir, port) { return new Promise((res) => { const s = http.createServer((req, rsp) => {
     let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
     const f = path.join(dir, p);

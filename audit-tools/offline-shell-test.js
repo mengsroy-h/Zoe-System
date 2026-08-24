@@ -28,7 +28,7 @@ const crypto = require('crypto');
 
 const ROOT = process.env.OFFLINE_APP_DIR || path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
-                '.json': 'application/json', '.png': 'image/png' };
+                '.json': 'application/json', '.png': 'image/png', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -46,18 +46,25 @@ console.log('\n=== ការពឹងផ្អែកលើ CDN (ស្តាទ�
 const externalScripts = [...html.matchAll(/<script[^>]*\ssrc="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
 ok('index.html លែងផ្ទុក script ណាមួយពី origin ខាងក្រៅដែលចាំបាច់ដល់ការស្កេនទេ',
     externalScripts.every((u) => u.indexOf('unpkg.com') === -1), externalScripts);
-ok('index.html ផ្ទុក ZXing ពី repo ខ្លួនឯង', /<script[^>]*src="\.\/vendor\/zxing\.min\.js"/.test(html));
+ok('index.html ផ្ទុក engine ស្កេនពី repo ខ្លួនឯង', /<script[^>]*src="\.\/vendor\/zxing-wasm\.js"/.test(html));
 
-const zxPath = path.join(ROOT, 'ZoeW', 'vendor', 'zxing.min.js');
-ok('ZoeW/vendor/zxing.min.js មានក្នុង repo', fs.existsSync(zxPath));
-if (fs.existsSync(zxPath)) {
-    const digest = crypto.createHash('sha384').update(fs.readFileSync(zxPath)).digest('base64');
-    // sha384 ដដែលនឹង SRI ដែល index.html ធ្លាប់ដាក់លើ script របស់ unpkg —
-    // ភស្តុតាងថាឯកសារក្នុង repo ជាកំណែ **ដដែល** នឹងអ្វីដែលផលិតកម្មធ្លាប់ទាញ
-    ok('ZXing ក្នុង repo byte-identical នឹងកំណែ 0.23.0 ដែលធ្លាប់មកពី CDN (sha384)',
-        digest === '0ASr5PEWAMtTnWsn0PzKmioHVDA4+QqFiJr94io/0DCrGP6E1gRAmbO6O8y5WZW9', digest);
-    ok('ZXing ក្នុង repo ស្ថិតក្នុង APP_SHELL របស់ sw.js',
-        /'\.\/vendor\/zxing\.min\.js'/.test(sw));
+// engine មាន **២ ឯកសារ**៖ glue JS និង binary WASM។ បើភ្លេចយកមួយណាចូល
+// APP_SHELL នោះការស្កេននឹងស្លាប់ពេលបណ្តាញដាច់ ខណៈ App នៅបើកបានធម្មតា។
+const wasmGlue = path.join(ROOT, 'ZoeW', 'vendor', 'zxing-wasm.js');
+const wasmBin = path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm');
+ok('ZoeW/vendor/zxing-wasm.js មានក្នុង repo', fs.existsSync(wasmGlue));
+ok('ZoeW/vendor/zxing_reader.wasm មានក្នុង repo', fs.existsSync(wasmBin));
+ok('ZXing-JS ចាស់ត្រូវបានដកចេញពី repo (លែងផ្ទុក engine ២)',
+    !fs.existsSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing.min.js')));
+if (fs.existsSync(wasmBin)) {
+    // ឯកសារ .wasm ត្រូវជាកំណែដដែលនឹង glue JS — zxing-wasm បញ្ចូល sha256
+    // របស់ binary ដែលវារំពឹងទុក ដូច្នេះការមិនស៊ីគ្នាចាប់បានភ្លាម។
+    const digest = crypto.createHash('sha256').update(fs.readFileSync(wasmBin)).digest('hex');
+    const expected = (fs.readFileSync(wasmGlue, 'utf8').match(/ZXING_WASM_SHA256=`([0-9a-f]{64})`/) || [])[1];
+    ok('binary .wasm ត្រូវនឹង sha256 ដែល glue JS រំពឹងទុក (កំណែស៊ីគ្នា)',
+        !!expected && digest === expected, { digest: digest.slice(0, 16), expected: (expected || '').slice(0, 16) });
+    ok('engine WASM ទាំង ២ ឯកសារស្ថិតក្នុង APP_SHELL របស់ sw.js',
+        /'\.\/vendor\/zxing-wasm\.js'/.test(sw) && /'\.\/vendor\/zxing_reader\.wasm'/.test(sw));
 }
 
 ok('CSP លែងអនុញ្ញាត unpkg.com ទៀតទេ (តឹងជាងមុន)', netlify.indexOf('unpkg.com') === -1);
@@ -140,13 +147,13 @@ function serve(dir) {
             const keys = await caches.keys();
             for (const k of keys) {
                 const c = await caches.open(k);
-                if (await c.match('./vendor/zxing.min.js')) return 'ok:' + k;
+                if ((await c.match('./vendor/zxing-wasm.js')) && (await c.match('./vendor/zxing_reader.wasm'))) return 'ok:' + k;
             }
             await new Promise((r) => setTimeout(r, 250));
         }
         return 'មិនចូល cache';
     });
-    ok('service worker ចុះឈ្មោះ ហើយដាក់ ZXing ចូល cache', String(swReady).startsWith('ok:'), swReady);
+    ok('service worker ចុះឈ្មោះ ហើយដាក់ engine ស្កេន (ទាំង ២ ឯកសារ) ចូល cache', String(swReady).startsWith('ok:'), swReady);
 
     // ឥឡូវ **បិទម៉ាស៊ីនបម្រើទាំងស្រុង** ➜ គ្មានអ្វីមកពីបណ្តាញទៀតទេ។
     // អ្វីដែលនៅដើរបាន គឺមកពី cache របស់ service worker សុទ្ធសាធ។
@@ -160,13 +167,13 @@ function serve(dir) {
         title: document.title,
         hasShell: !!document.getElementById('appPages'),
         hasVideoBox: !!document.getElementById('video-container'),
-        zxing: typeof window.ZXing,
-        hasBarcodeReader: typeof window.ZXing !== 'undefined' && typeof window.ZXing.BrowserBarcodeReader === 'function',
+        zxing: typeof window.ZXingWASM,
+        hasBarcodeReader: typeof window.ZXingWASM !== 'undefined' && typeof window.ZXingWASM.readBarcodes === 'function',
         appJs: typeof window.initScanEngine === 'function'
     }));
     ok('ពេលបណ្តាញដាច់ទាំងស្រុង ➜ សំបក App នៅផ្ទុកបាន', offline.hasShell, offline);
     ok('ពេលបណ្តាញដាច់ទាំងស្រុង ➜ app.js នៅដើរ', offline.appJs, offline);
-    ok('ពេលបណ្តាញដាច់ទាំងស្រុង ➜ **ZXing នៅមក** (ការស្កេនកាមេរ៉ានៅដើរ)',
+    ok('ពេលបណ្តាញដាច់ទាំងស្រុង ➜ **engine ស្កេននៅមក** (ការស្កេនកាមេរ៉ានៅដើរ)',
         offline.zxing === 'object' && offline.hasBarcodeReader, offline);
 
     const engine = await page.evaluate(() => {

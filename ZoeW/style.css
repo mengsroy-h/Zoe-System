@@ -200,6 +200,17 @@
             }
             .app-page.active > .page-side,
             .app-page.active > .page-main { scroll-snap-align: start; }
+            /* កំណែ 2.11.4៖ ផ្អាក snap **តែក្នុងអំឡុងចលនា FLIP** ប៉ុណ្ណោះ។
+               `.page-main` ជា `scroll-snap-align` target ➜ ការធ្វើចលនា
+               `transform` លើវា ២២០ms ធ្វើឲ្យ WebKit ព្យាយាម snap outer
+               scroller ជាន់ចលនា ➜ កំណែ 2.11.3 បានបិទចលនាលើ iOS ទាំងស្រុង
+               ជំនួសវិញ ➜ ផ្ទាំងប្រវត្តិ **លោតភ្លាម** លើ iPhone ខណៈ Android
+               រអិល ➜ អ្នកប្រើឃើញ «ដូច App ២ ផ្សេងគ្នា»។
+               ការផ្អាកបណ្តោះអាសន្នដោះបញ្ហាដើមដោយមិនបាត់ចលនា។
+               **`panelGlideFrom()` ត្រូវដក class នេះចេញជានិច្ច** (finish +
+               timer សុវត្ថិភាព) ព្រោះបើវាជាប់ នោះចំណុច snap «បើក» ធ្លាក់
+               ត្រឹម scrollTop 71 ➜ **PTR លែងកេះបាន**។ */
+            .app-pages.panel-gliding { scroll-snap-type: none; }
 
             .app-page.active > .page-main {
                 height: calc(100vh - var(--chrome-top, 63px) - 16px);

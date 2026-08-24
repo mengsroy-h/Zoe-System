@@ -68,6 +68,7 @@ run "css-media-override" node audit-tools/css-media-override.js
 run "animation-cost" node audit-tools/animation-cost.js
 run "layout-thrash (browser ពិត)" node audit-tools/layout-thrash.js
 run "panel-motion (browser ពិត)" node audit-tools/panel-motion-test.js
+run "ios-panel-glide (browser ពិត)" node audit-tools/ios-panel-glide-test.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
@@ -81,6 +82,8 @@ run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
 run "revenue-fuzz (browser ពិត)" node audit-tools/revenue-fuzz-test.js
 run "perf (browser ពិត)"       node audit-tools/perf-check.js
 run "offline-shell (browser ពិត)" node audit-tools/offline-shell-test.js
+run "sw-install-integrity (browser ពិត)" node audit-tools/sw-install-integrity-test.js
+run "network-timeout (browser ពិត)" node audit-tools/network-timeout-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -137,6 +140,9 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
+    SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
+    IOSGLIDE_APP_DIR="$BASE" node audit-tools/ios-panel-glide-test.js 2>&1 | tail -1 | sed 's/^/   ios-panel-glide: /'
+    NETTIMEOUT_APP_DIR="$BASE" node audit-tools/network-timeout-test.js 2>&1 | tail -1 | sed 's/^/   network-timeout: /'
 fi
 
 echo

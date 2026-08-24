@@ -349,10 +349,26 @@ console.log('\n=== iOS ប្រគល់ gesture ពីតារាងទៅផ
     ok(!bubbled.els.dataSideSection.classList.contains('collapsed') &&
        !bubbled.els.appPages.classList.contains('history-expanded'),
         'iOS event ហូរពីតារាងទៅ parent ➜ ប្តូរស្ថានភាពតែម្តង មិនលោតត្រឡប់');
-    ok(/if \(!iosPanelHandoff \|\| action !== 'expand'\) panelGlideFrom\(mainSection, beforeTop\);/.test(src),
-        'iOS handoff ចុះ ➜ មិន animate snap target; Android នៅប្រើ FLIP ដដែល');
-    ok(/if \(!iosPanelHandoff \|\| sidebar\.classList\.contains\('collapsed'\)\) panelGlideFrom\(mainSection, beforeTop\);/.test(src),
-        'iOS ដោះផ្ទាំងតាម drag handle ➜ ក៏មិន animate snap target ដែរ');
+    // កំណែ 2.11.4៖ ការលើកលែង iOS ត្រូវ **ដកចេញ** — មុននេះ `expand` លើ iOS
+    // មិន animate សោះ ➜ ផ្ទាំងលោតភ្លាម ខណៈ Android រអិល ➜ អ្នកប្រើឃើញ
+    // «ដូច App ២ ផ្សេងគ្នា»។ ជំនួសវិញ `panelGlideFrom()` ផ្អាក snap
+    // បណ្តោះអាសន្នដើម្បីកុំឲ្យ WebKit snap ជាន់ចលនា។
+    ok(!/iosPanelHandoff \|\| action !== 'expand'/.test(src),
+        'ការលើកលែង iOS លើ expand ត្រូវដកចេញ (ផ្ទាំងលែងលោតលើ iPhone)');
+    ok(!/iosPanelHandoff \|\| sidebar\.classList\.contains\('collapsed'\)/.test(src),
+        'ការលើកលែង iOS លើ drag handle ត្រូវដកចេញដែរ');
+    ok((src.match(/panelGlideFrom\(mainSection, beforeTop\);/g) || []).length === 2 &&
+       !/\|\|[^\n]*panelGlideFrom\(mainSection, beforeTop\)/.test(src),
+        'panelGlideFrom ត្រូវហៅគ្មានលក្ខខណ្ឌទាំង ២ កន្លែង (iOS = Android)');
+    // **ចំណុចស្លាប់រស់**៖ បើ `panel-gliding` ជាប់ នោះចំណុច snap «បើក» ធ្លាក់
+    // ត្រឹម scrollTop 71 ➜ PTR លែងកេះបានទាំងស្រុង។ ត្រូវមានផ្លូវដកចេញទាំង
+    // ពេលចលនាចប់ (`finished`) និង timer សុវត្ថិភាព។
+    ok(/classList\.add\('panel-gliding'\)/.test(src) && /classList\.remove\('panel-gliding'\)/.test(src),
+        'panelGlideFrom ផ្អាក snap ហើយមានផ្លូវដកចេញវិញ');
+    ok(/anim\.finished\.then\(release, release\)/.test(src),
+        'ការដក snap pause ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង');
+    ok(/setTimeout\(endPanelGlideSnapPause, PANEL_GLIDE_MS \+ PANEL_GLIDE_SNAP_GRACE_MS\)/.test(src),
+        'មាន timer សុវត្ថិភាព ➜ snap ត្រឡប់មកវិញទោះចលនាត្រូវកាត់ផ្តាច់');
 }
 
 console.log('\n=== កំពុងស្វែងរកលេខទូរស័ព្ទ — កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ ===');

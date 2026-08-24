@@ -128,6 +128,41 @@ scroll range លើ Android; Android ទទួល safe area តាម content/ta
 នៅដំណើរការដដែល។ **កុំប្រើ `.then(A).catch(B)`** — ប្រើទម្រង់ ២ អាគុយម៉ង់
 (`.then(ok, fail)`) តាមច្បាប់គម្រោង។
 
+**`sw.js` ត្រូវដំឡើងធនធានស្នូលជា *ក្រុម* (កំណែ 2.11.4) — កុំត្រឡប់ទៅ
+`cache.add().catch(() => {})` លើគ្រប់ធនធានវិញ។** មុននេះរាល់ធនធានប្រើ
+`.catch(() => {})` ➜ ការបរាជ័យត្រូវលេប ➜ បើបណ្តាញដាច់កណ្តាល install នោះ SW
+**activate ហើយចាប់យក client** ខណៈ `zxing_reader.wasm` មិនចូល cache ➜
+**App បើកបានធម្មតា តែការស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ** — ជាថ្នាក់កំហុស
+ដដែលដែលការនាំ ZXing ចូល repo ដោះស្រាយ។ ឥឡូវ៖
+
+- `CORE_SHELL` ប្រើ `cache.addAll()` (atomic — ធ្លាក់មួយ ➜ ធ្លាក់ទាំងក្រុម)
+  ➜ install បរាជ័យ ➜ SW ចាស់នៅដដែល ➜ browser ព្យាយាមម្តងទៀត។
+- `OPTIONAL_SHELL` (icon, manifest) នៅតែអនុគ្រោះដដែល។
+- `self.skipWaiting()` ត្រូវហៅ **ក្នុងផ្លូវជោគជ័យ** មិនមែន synchronously ក្រៅ
+  `waitUntil` ទេ។
+- Navigate fallback ត្រូវជា `cache.match('./index.html').then((f) => f || Response.error())`
+  ព្រោះ `caches.match()` អាចត្រឡប់ `undefined` ➜ `respondWith(undefined)` បោះ
+  TypeError ➜ ទំព័រទទេជំនួសសំបកដែល cache ទុក។
+
+Test៖ **`sw-install-integrity-test.js`** (បដិសេធធនធានស្នូលដោយចេតនាកណ្តាល install)។
+
+**រាល់ `fetch()` ទៅ endpoint ខាងក្រៅត្រូវឆ្លងកាត់ `fetchWithTimeout()`។**
+`withTimeout(fetch(…))` **មិន abort សំណើទេ** — វាគ្រាន់តែឈប់រង់ចាំ។ ផល ២៖
+ជាមួយ `retryAsync` សំណើជាន់គ្នាស៊ី bandwidth; ហើយ timeout គ្របតែ **header**
+ដូច្នេះ `res.json()`/`res.text()` អាច **ព្យួររហូត** បើ server ផ្ញើ header រួច
+ឈប់ផ្ញើតួ។ `fetchWithTimeout()` ប្រើ `AbortController` ហើយ timer របស់វារស់
+រហូតដល់ **អានតួចប់** (ដូច `license-verify.js` ធ្វើរួចហើយ)។ វាត្រឡប់
+`{ res, body }` ដូច្នេះអ្នកហៅត្រូវអាន `out.res.ok` និង `out.body`។
+Test៖ **`network-timeout-test.js`**។
+
+**ស្ថានភាពការតភ្ជាប់ត្រូវរួមបញ្ចូល `navigator.onLine`។** `.info/connected`
+របស់ Firebase អាចនៅ `true` រហូតដល់ជាងមួយនាទីក្រោយឧបករណ៍បាត់ WiFi (រង់ចាំ
+TCP timeout) ➜ អ្នកប្រើឃើញចំណុចបៃតង «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានបណ្តាញ
+ពិត។ `connectionLooksOnline()` = `isDatabaseConnected && navigator.onLine !== false`
+ហើយ `renderConnectionStatus()` ជាកន្លែងសរសេរ UI **តែមួយ**។
+`setupConnectionRecovery()` ដាស់ `fb.goOnline(db)` ពេលត្រឡប់មក foreground និង
+ពេល `online` — ព្រោះក្រោយ iOS ផ្អាក App យូរ socket អាចស្លាប់ស្ងាត់ៗ។
+
 **`sw.js` ត្រូវបោះបង់រាល់សំណើឆ្លង origin — កុំប្តូរច្បាប់នេះ។**
 ```js
 if (url.origin !== self.location.origin) return;
@@ -235,13 +270,27 @@ scroller ហើយបង្កើតចន្លោះស rubber-band ជំន�
   0.5px ឬ stale 2px។ ប៉ុន្តែ final reversal/diagonal, multitouch និង `touchcancel`
   ត្រូវបោះបង់ដដែល។
 - ពេលដោះ `history-expanded`, `#appPages.scrollTop` ត្រូវជា 0 មុនប្តូរ class,
-  ភ្លាមក្រោយប្តូរ និងក្នុង rAF ពីរស៊ុមបន្ទាប់។ កុំ FLIP លើ iOS `expand` ព្រោះ
-  `.page-main` ជា `scroll-snap-align` target ដែរ; transform 220ms អាចធ្វើឲ្យ WebKit
-  snap outer scroller ឡើងវិញ។ ចាក់សោនេះតែពេល class ប្តូរពី expanded ទៅធម្មតា;
-  no-op sync មិនត្រូវ reset scroll។ Android `expand` នៅប្រើ FLIP ដដែល។
+  ភ្លាមក្រោយប្តូរ និងក្នុង rAF ពីរស៊ុមបន្ទាប់។ ចាក់សោនេះតែពេល class ប្តូរពី
+  expanded ទៅធម្មតា; no-op sync មិនត្រូវ reset scroll។
+- **កំណែ 2.11.4 បានប្រគល់ FLIP មកឲ្យ iOS វិញ — កុំដកវាចេញម្តងទៀត។**
+  កំណែ 2.11.3 បានបិទ `panelGlideFrom()` លើ iOS សម្រាប់ `expand` ព្រោះ
+  `.page-main` ជា `scroll-snap-align` target ដែរ ហើយ transform 220ms អាចធ្វើឲ្យ
+  WebKit snap outer scroller ឡើងវិញ។ តែការដកចលនាចេញ **ធ្វើឲ្យផ្ទាំងលោតភ្លាម
+  លើ iPhone** ខណៈ Android រអិល ➜ អ្នកប្រើរាយការណ៍ថា «មើលទៅដូច App ២ ផ្សេងគ្នា»
+  (វាស់បាន៖ iOS **0px** ធៀប Android **357px**)។
+  ដំណោះស្រាយត្រឹមត្រូវគឺ **ផ្អាក snap** មិនមែនដកចលនា៖ `panelGlideFrom()`
+  ដាក់ `panel-gliding` លើ `#appPages` (`scroll-snap-type: none`) មុនធ្វើចលនា
+  រួចដកវាចេញពេលចប់។ WebKit លែងមានអ្វី snap ជាន់ ➜ ចលនាដើរពេញលេញ។
+  **ការដក class នោះចេញត្រូវធានាដោយផ្លូវ ២** — `anim.finished.then(release, release)`
+  បូក `setTimeout(endPanelGlideSnapPause, PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS)`
+  — ព្រោះបើវាជាប់ នោះចំណុច snap «បើក» ធ្លាក់ត្រឹម `scrollTop 71` ➜ **PTR ស្លាប់**។
+  `clearSensitiveModalFields()` ក៏ហៅ `endPanelGlideSnapPause()` ដែរ ដូច្នេះការ
+  ចាកចេញកណ្តាលចលនាមិនបន្សល់សោនោះទេ។
 - ផ្ទាំងទាំង ២ និងតារាងទាំង ៣ ត្រូវឆ្លង `bindPanelSwipe()` ដដែល — កុំ hard-code
-  តែ `#tableResponsive`។ Tests៖ `phone-search-swipe-test.js` (63 assertions) និង
-  `gesture-test.js` (107 assertions; បញ្ជូន touch ពិតដោយបើក iOS JS gate ក្នុង Chromium)។
+  តែ `#tableResponsive`។ Tests៖ `phone-search-swipe-test.js` (67 assertions),
+  `gesture-test.js` (107 assertions; បញ្ជូន touch ពិតដោយបើក iOS JS gate ក្នុង Chromium)
+  និង **`ios-panel-glide-test.js`** (32 assertions; ប្រៀបធៀបចម្ងាយចលនា
+  **iOS ធៀប Android ដោយផ្ទាល់** — បើវាធ្លាក់ នោះ iPhone លែងដូច Android ទៀតហើយ)។
 
 **ចលនាតាមម្រាមដៃ (កំណែ 2.9.0) — READ BEFORE TOUCHING PANEL LAYOUT។**
 > ✅ **ផ្ទៀងផ្ទាត់លើ iPhone PWA ពិតរួចហើយ** (2026-08-24, កំណែ 2.9.0)។ អ្នកប្រើបញ្ជាក់ថា
@@ -288,7 +337,8 @@ flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមម
 | ១ | `.page-main` មាន `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)` + `flex: none` | `style.css`, ក្នុង `@media (max-width: 991px)` |
 | ២ | ខ្សែសង្វាក់ flex ខាងក្នុង៖ `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` ជា `flex: 1; min-height: 0` និង `.table-responsive` ជា `max-height: none; flex: 1; min-height: 0` (scope ត្រឹម `.page-main` ➜ modal រក្សា 62vh) | ដដែល |
 | ៣ | `.app-pages` មាន `scroll-snap-type: y proximity` **បូក** `scroll-padding-top` ស្មើ `padding-top`; កូន ២ មាន `scroll-snap-align: start` | ដដែល |
-| ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` | `app.js` |
+| ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅ **គ្មានលក្ខខណ្ឌ** ក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` — កុំដាក់ការលើកលែង iOS មកវិញ | `app.js` |
+| ៥ | `panelGlideFrom()` ត្រូវផ្អាក snap (`#appPages.panel-gliding` ➜ `scroll-snap-type: none`) អំឡុងចលនា ហើយ **ដកចេញវិញតាមផ្លូវ ២** (finish + timer) | `app.js` + `style.css` |
 
 លេខយោង (412×780, seed 120 order)៖ ចម្ងាយរំកិល **361px**; កាតខ្ពស់ **642px ទាំង ២ របៀប**;
 តារាងខ្ពស់ **538px ទាំង ២ របៀប**; `.app-pages` រមូរបាន **361px** ដែលស្មើចម្ងាយរំកិល។
@@ -673,6 +723,9 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
 | ល្បឿន, **ជួរអាន** និងភាពត្រឹមត្រូវនៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
 | ការពឹងផ្អែកលើ CDN ដែលមិន cache ➜ ស្កេនមិនកើតពេលបណ្តាញដាច់ | `offline-shell-test.js` |
+| SW activate ដោយ APP_SHELL មិនពេញ ➜ ស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ | `sw-install-integrity-test.js` |
+| timeout ដែលមិន abort សំណើ ➜ សំណើជាន់គ្នា និងការអានតួព្យួររហូត | `network-timeout-test.js` |
+| ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 

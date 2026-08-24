@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.3';
+    const APP_VERSION = '2.11.4';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -305,10 +305,81 @@
         ]);
     }
 
+    function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const opts = Object.assign({}, options || {});
+        if (controller) opts.signal = controller.signal;
+        const timeoutErr = new Error(timeoutMsg || 'Timed out');
+        let settled = false;
+        let timer = null;
+        return new Promise((resolve, reject) => {
+            timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                if (controller) { try { controller.abort(); } catch (e) {} }
+                reject(timeoutErr);
+            }, ms);
+            fetch(url, opts).then((res) => {
+                if (settled) return null;
+                if (!readBody) return { res: res, body: undefined };
+                return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));
+            }, (err) => {
+                if (settled) return null;
+                settled = true;
+                clearTimeout(timer);
+                reject(err);
+                return null;
+            }).then((out) => {
+                if (settled || !out) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(out);
+            }, (err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                reject(err);
+            });
+        });
+    }
+
     function retryAsync(fn, attempts, delayMs) {
         return fn().catch((err) => {
             if (attempts <= 1) throw err;
             return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
+        });
+    }
+
+    function connectionLooksOnline() {
+        return isDatabaseConnected && navigator.onLine !== false;
+    }
+
+    function renderConnectionStatus() {
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('firebaseStatusText');
+        const online = connectionLooksOnline();
+        if (statusDot) statusDot.classList.toggle('offline', !online);
+        if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+    }
+
+    function nudgeDatabaseConnection() {
+        if (!fb || !db || typeof fb.goOnline !== 'function') return;
+        try { fb.goOnline(db); } catch (e) {}
+    }
+
+    function setupConnectionRecovery() {
+        window.addEventListener('online', () => {
+            renderConnectionStatus();
+            nudgeDatabaseConnection();
+            if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
+                ZoeLicense.syncServerTime().catch(() => {});
+            }
+        });
+        window.addEventListener('offline', renderConnectionStatus);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) return;
+            renderConnectionStatus();
+            nudgeDatabaseConnection();
         });
     }
 
@@ -366,12 +437,8 @@
             dbRefConnected = fb.ref(db, '.info/connected');
 
             fb.onValue(dbRefConnected, (snap) => {
-                const statusDot = document.getElementById('statusDot');
-                const statusText = document.getElementById('firebaseStatusText');
-                const online = snap.val() === true;
-                if (statusDot) statusDot.classList.toggle('offline', !online);
-                if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
-                isDatabaseConnected = online;
+                isDatabaseConnected = snap.val() === true;
+                renderConnectionStatus();
             });
 
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -1213,9 +1280,8 @@
         showToast("កំពុងសាកល្បង API...");
         if (btnEl) btnEl.disabled = true;
         try {
-            const res = await withTimeout(fetch(testUrl, { headers }), 20000, 'Test API timed out');
-            const text = await res.text();
-            alert("ស្ថានភាព HTTP៖ " + res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + text.substring(0, 1500));
+            const out = await fetchWithTimeout(testUrl, { headers }, 20000, 'Test API timed out', (r) => r.text());
+            alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
         } catch (e) {
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'testLookupApiConfig' });
             alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (e && e.message === 'Test API timed out' ? "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត" : e.message));
@@ -1294,12 +1360,13 @@
                 } else if (cfg.headerName && cfg.headerValue) {
                     headers[cfg.headerName] = cfg.headerValue;
                 }
-                const res = await retryAsync(
-                    () => withTimeout(fetch(listUrl, { headers }), 20000, 'Customer table fetch timed out'),
+                const out = await retryAsync(
+                    () => fetchWithTimeout(listUrl, { headers }, 20000, 'Customer table fetch timed out',
+                        (r) => (r.ok ? r.json() : null)),
                     2, 2000
                 );
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
+                if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
+                const data = out.body;
                 if (data && data.error) throw new Error(data.error);
                 if (myGeneration !== customerDataTableSessionGeneration) return;
                 const rows = Array.isArray(data && data.rows) ? data.rows : [];
@@ -1467,12 +1534,13 @@
                 headers[cfg.headerName] = cfg.headerValue;
             }
 
-            const res = await retryAsync(
-                () => withTimeout(fetch(targetUrl, { headers }), 15000, 'Auto lookup timed out'),
+            const out = await retryAsync(
+                () => fetchWithTimeout(targetUrl, { headers }, 15000, 'Auto lookup timed out',
+                    (r) => (r.ok ? r.json() : null)),
                 2, 1500
             );
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
+            if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
+            const data = out.body;
             if (myGeneration !== customerDataTableSessionGeneration) return;
 
             const phoneVal = getNestedField(data, cfg.phoneField);
@@ -1558,6 +1626,7 @@
         lockerBarcodeIndex = {};
         recentPhonesSignature = null;
         resetScanConfirm();
+        endPanelGlideSnapPause();
         showAppChrome();
         const fieldsToBlank = [
             'securityPinInput', 'newSecurityPinInput', 'loginPasswordInput', 'activationKeyInput',
@@ -1652,9 +1721,8 @@
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
                 updateAuthButton(true);
-                if (!isDatabaseInitialized) {
-                    initDatabaseListeners();
-                    isDatabaseInitialized = true;
+                if (!isDatabaseInitialized && !initDatabaseListeners()) {
+                    showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
                 }
                 safeFocusScanner();
             } else {
@@ -1691,9 +1759,8 @@
         if (!wasAlreadySignedIn) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
         updateAuthButton(true);
 
-        if (!isDatabaseInitialized) {
-            initDatabaseListeners();
-            isDatabaseInitialized = true;
+        if (!isDatabaseInitialized && !initDatabaseListeners()) {
+            showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
         }
         prefetchCustomerDataTableRowsIfConfigured();
         safeFocusScanner();
@@ -1870,7 +1937,7 @@
     }
 
     function initDatabaseListeners() {
-        if (!db) return;
+        if (!db || !fb) return false;
 
         if (isDatabaseInitialized) {
             if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
@@ -1978,6 +2045,7 @@
         }
 
         isDatabaseInitialized = true;
+        return true;
     }
 
     let recentPhonesSignature = null;
@@ -2390,6 +2458,7 @@
         }
 
         setupHardwareScanner();
+        setupConnectionRecovery();
         switchAppPage('data');
         initBiometricUi();
         setupSwipeGestures();
@@ -2869,6 +2938,7 @@
 
     const PANEL_GLIDE_MS = 220;
     const PANEL_GLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const PANEL_GLIDE_SNAP_GRACE_MS = 260;
 
     function panelMotionAllowed() {
         if (window.innerWidth >= 992) return false;
@@ -2876,17 +2946,51 @@
         return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
+    let panelGlideTokens = 0;
+    let panelGlideRelease = null;
+
+    function beginPanelGlideSnapPause() {
+        const pages = document.getElementById('appPages');
+        if (!pages) return () => {};
+        panelGlideTokens++;
+        pages.classList.add('panel-gliding');
+        if (panelGlideRelease !== null) clearTimeout(panelGlideRelease);
+        panelGlideRelease = setTimeout(endPanelGlideSnapPause, PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS);
+        let done = false;
+        return () => {
+            if (done) return;
+            done = true;
+            panelGlideTokens--;
+            if (panelGlideTokens <= 0) endPanelGlideSnapPause();
+        };
+    }
+
+    function endPanelGlideSnapPause() {
+        panelGlideTokens = 0;
+        if (panelGlideRelease !== null) {
+            clearTimeout(panelGlideRelease);
+            panelGlideRelease = null;
+        }
+        const pages = document.getElementById('appPages');
+        if (pages) pages.classList.remove('panel-gliding');
+    }
+
     function panelGlideFrom(el, beforeTop) {
         if (!el || typeof el.animate !== 'function' || !isFinite(beforeTop)) return;
         if (!panelMotionAllowed()) return;
         const delta = beforeTop - el.getBoundingClientRect().top;
         if (!isFinite(delta) || Math.abs(delta) < 2) return;
+        const release = beginPanelGlideSnapPause();
         try {
-            el.animate([
+            const anim = el.animate([
                 { transform: 'translate3d(0,' + delta + 'px,0)' },
                 { transform: 'translate3d(0,0,0)' }
             ], { duration: PANEL_GLIDE_MS, easing: PANEL_GLIDE_EASING });
-        } catch (e) {}
+            if (anim && anim.finished && typeof anim.finished.then === 'function') anim.finished.then(release, release);
+            else if (anim) anim.onfinish = release;
+        } catch (e) {
+            release();
+        }
     }
 
     function setupSwipeGestures() {
@@ -2985,7 +3089,7 @@
             else if (action === 'expand') sidebar.classList.remove('collapsed');
             else if (action === 'search') setPhoneSearchPulledUp(false);
             syncHistoryExpandedLock();
-            if (!iosPanelHandoff || action !== 'expand') panelGlideFrom(mainSection, beforeTop);
+            panelGlideFrom(mainSection, beforeTop);
         }
 
         function actionForMainDiff(diffY, diffX) {
@@ -3117,7 +3221,7 @@
                 const beforeTop = mainSection.getBoundingClientRect().top;
                 sidebar.classList.toggle('collapsed');
                 syncHistoryExpandedLock();
-                if (!iosPanelHandoff || sidebar.classList.contains('collapsed')) panelGlideFrom(mainSection, beforeTop);
+                panelGlideFrom(mainSection, beforeTop);
             });
         }
     }
@@ -5695,10 +5799,17 @@
                     savePromise.then(() => {
                         showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
                         refreshCurrentHistoryView();
-                    }, rollbackFailedSave);
-                } else {
-                    rollbackFailedSave();
+                    }, (lateErr) => {
+                        rollbackFailedSave();
+                        showToast(`⚠️ រក្សាទុក (${barcodeToSave}) បរាជ័យ! សូមស្កេនម្ដងទៀត។`);
+                        if (window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'savePhoneAndSave late write' });
+                    });
+                    closeModal('phoneModal');
+                    showToast(`⏳ កំពុងរក្សាទុក (${barcodeToSave})… សូមកុំស្កេនម្ដងទៀត។`);
+                    safeFocusScanner();
+                    return;
                 }
+                rollbackFailedSave();
                 throw saveError;
             }
 

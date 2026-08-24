@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.2';
+    const APP_VERSION = '2.11.3';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -2836,18 +2836,32 @@
         return document.getElementById(lockerVisible ? 'lockerTableResponsive' : 'entryTableResponsive');
     }
 
+    function usesIOSPanelHandoff() {
+        return window.navigator && window.navigator.standalone === true &&
+            window.CSS && typeof window.CSS.supports === 'function' &&
+            window.CSS.supports('-webkit-touch-callout', 'none');
+    }
+
     function syncHistoryExpandedLock() {
         const pages = document.getElementById('appPages');
         if (!pages) return;
         const side = activePanelSections().side;
         const expanded = !!side && side.classList.contains('collapsed');
-        if (expanded) pages.scrollTop = 0;
+        const wasExpanded = pages.classList.contains('history-expanded');
+        const iosUnlock = wasExpanded && !expanded && usesIOSPanelHandoff();
+        if (expanded || iosUnlock) pages.scrollTop = 0;
         pages.classList.toggle('history-expanded', expanded);
-        if (expanded) {
+        if (expanded || iosUnlock) {
             pages.scrollTop = 0;
             if (typeof requestAnimationFrame === 'function') {
                 requestAnimationFrame(() => {
-                    if (pages.classList.contains('history-expanded')) pages.scrollTop = 0;
+                    if (pages.classList.contains('history-expanded') !== expanded) return;
+                    pages.scrollTop = 0;
+                    if (iosUnlock) {
+                        requestAnimationFrame(() => {
+                            if (!pages.classList.contains('history-expanded')) pages.scrollTop = 0;
+                        });
+                    }
                 });
             }
         }
@@ -2941,6 +2955,7 @@
         const sidebar = document.getElementById(config.sideId);
         const mainSection = document.getElementById(config.mainId);
         if (!sidebar || !mainSection) return;
+        const iosPanelHandoff = usesIOSPanelHandoff();
 
         let startY = 0;
         let startX = 0;
@@ -2951,10 +2966,16 @@
         let scrollerStartX = 0;
         let scrollerPendingExpand = false;
         let scrollerTouchId = null;
+        let scrollerLastDiffY = 0;
+        let scrollerLastDiffX = 0;
 
         function scrollTopOf() {
             const el = config.scroller();
             return el ? el.scrollTop : 0;
+        }
+
+        function scrollerAtTop() {
+            return scrollTopOf() <= (iosPanelHandoff ? 1 : 0);
         }
 
         function applyPanelAction(action) {
@@ -2964,15 +2985,14 @@
             else if (action === 'expand') sidebar.classList.remove('collapsed');
             else if (action === 'search') setPhoneSearchPulledUp(false);
             syncHistoryExpandedLock();
-            panelGlideFrom(mainSection, beforeTop);
+            if (!iosPanelHandoff || action !== 'expand') panelGlideFrom(mainSection, beforeTop);
         }
 
         function actionForMainDiff(diffY, diffX) {
             if (Math.abs(diffY) < Math.abs(diffX) * 1.6) return '';
-            const scrollTop = scrollTopOf();
             if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) return 'collapse';
-            if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('collapsed')) return 'expand';
-            if (diffY > 30 && scrollTop <= 0 && sidebar.classList.contains('search-focus')) return 'search';
+            if (diffY > 30 && scrollerAtTop() && sidebar.classList.contains('collapsed')) return 'expand';
+            if (diffY > 30 && scrollerAtTop() && sidebar.classList.contains('search-focus')) return 'search';
             return '';
         }
 
@@ -2994,6 +3014,8 @@
         const scrollerTouchStart = (e) => {
             scrollerPendingExpand = false;
             scrollerTouchId = null;
+            scrollerLastDiffY = 0;
+            scrollerLastDiffX = 0;
             if (e.touches.length !== 1) return;
             scrollerTouchId = e.touches[0].identifier;
             scrollerStartY = e.touches[0].clientY;
@@ -3003,14 +3025,36 @@
             if (e.touches.length !== 1 || window.innerWidth >= 992) {
                 scrollerPendingExpand = false;
                 scrollerTouchId = null;
+                scrollerLastDiffY = 0;
+                scrollerLastDiffX = 0;
                 return;
             }
             const touch = touchByIdentifier(e.touches, scrollerTouchId);
-            if (!touch) { scrollerPendingExpand = false; scrollerTouchId = null; return; }
+            if (!touch) {
+                scrollerPendingExpand = false;
+                scrollerTouchId = null;
+                scrollerLastDiffY = 0;
+                scrollerLastDiffX = 0;
+                return;
+            }
             const diffY = touch.clientY - scrollerStartY;
             const diffX = touch.clientX - scrollerStartX;
-            scrollerPendingExpand = scrollTopOf() <= 0 && diffY > 30 &&
-                Math.abs(diffY) >= Math.abs(diffX) * 1.6 && sidebar.classList.contains('collapsed');
+            scrollerLastDiffY = diffY;
+            scrollerLastDiffX = diffX;
+            const downward = diffY > 0 && Math.abs(diffY) >= Math.abs(diffX) * 1.6;
+            const reachedTop = scrollerAtTop();
+            if (iosPanelHandoff && reachedTop && diffY >= 8 && downward &&
+                sidebar.classList.contains('collapsed') && e.cancelable) {
+                e.preventDefault();
+            }
+            if (!downward) scrollerPendingExpand = false;
+            else if (reachedTop && diffY > 30 && sidebar.classList.contains('collapsed')) scrollerPendingExpand = true;
+        };
+        const scrollerScroll = () => {
+            const downward = scrollerLastDiffY > 30 &&
+                Math.abs(scrollerLastDiffY) >= Math.abs(scrollerLastDiffX) * 1.6;
+            if (scrollerTouchId !== null && downward && scrollerAtTop() &&
+                sidebar.classList.contains('collapsed')) scrollerPendingExpand = true;
         };
         const finishScrollerSwipe = (e, apply) => {
             const endedTouchId = scrollerTouchId;
@@ -3019,18 +3063,22 @@
             const finalDiffY = endedTouch ? endedTouch.clientY - scrollerStartY : 0;
             const finalDiffX = endedTouch ? endedTouch.clientX - scrollerStartX : 0;
             if (endedTouch && finalDiffY >= 56 && panelMayYieldToPTR(endedTouchId)) blockPanelForIOSTouch('ptr');
-            scrollerPendingExpand = !!endedTouch && scrollTopOf() <= 0 && finalDiffY > 30 &&
-                Math.abs(finalDiffY) >= Math.abs(finalDiffX) * 1.6 && sidebar.classList.contains('collapsed');
-            const shouldExpand = scrollerPendingExpand;
+            const finalDownward = !!endedTouch && finalDiffY > 30 &&
+                Math.abs(finalDiffY) >= Math.abs(finalDiffX) * 1.6;
+            const shouldExpand = finalDownward && sidebar.classList.contains('collapsed') &&
+                (iosPanelHandoff ? (scrollerPendingExpand || scrollerAtTop()) : scrollerAtTop());
             scrollerPendingExpand = false;
             scrollerTouchId = null;
+            scrollerLastDiffY = 0;
+            scrollerLastDiffX = 0;
             if (apply && shouldExpand && !panelBlockedForTouch(endedTouchId)) applyPanelAction('expand');
         };
         [document.getElementById('tableResponsive'), document.getElementById('entryTableResponsive'),
          document.getElementById('lockerTableResponsive')].forEach((el) => {
             if (!el || !mainSection.contains(el)) return;
             el.addEventListener('touchstart', scrollerTouchStart, { passive: true });
-            el.addEventListener('touchmove', scrollerTouchMove, { passive: true });
+            el.addEventListener('touchmove', scrollerTouchMove, { passive: !iosPanelHandoff });
+            if (iosPanelHandoff) el.addEventListener('scroll', scrollerScroll, { passive: true });
             el.addEventListener('touchend', (e) => finishScrollerSwipe(e, true), { passive: true });
             el.addEventListener('touchcancel', (e) => finishScrollerSwipe(e, false), { passive: true });
         });
@@ -3069,7 +3117,7 @@
                 const beforeTop = mainSection.getBoundingClientRect().top;
                 sidebar.classList.toggle('collapsed');
                 syncHistoryExpandedLock();
-                panelGlideFrom(mainSection, beforeTop);
+                if (!iosPanelHandoff || sidebar.classList.contains('collapsed')) panelGlideFrom(mainSection, beforeTop);
             });
         }
     }

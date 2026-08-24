@@ -24,6 +24,51 @@
 
 ---
 
+## [2.11.3] — 2026-08-24
+
+**កែ scroll handoff របស់បញ្ជីប្រវត្តិលើ iOS ដោយមិនប៉ះផ្លូវ Android។**
+
+### កែកំហុស (រាយការណ៍ដោយអ្នកប្រើ ជាមួយវីដេអូ)
+- ពេលប្រវត្តិពេញអេក្រង់ ហើយទាញចុះនៅកំពូលតារាង លើ iOS កាយវិការត្រូវជាប់ក្នុង
+  តារាងខាងក្នុង៖ Safari rubber-band បង្កើតចន្លោះសធំ តែផ្ទាំងខាងលើមិនត្រឡប់មកវិញ។
+- ពេលផ្ទាំងត្រឡប់មកបានម្តងម្កាល វាអាចភ្លាត់ឡើងវិញភ្លាម។ មូលហេតុគឺ
+  `touchend` អាន `scrollTop` ថ្មីដែល WebKit អាចផ្ញើជា fractional/stale value ហើយ
+  FLIP 220ms ធ្វើចលនាលើ `.page-main` ដែលជាគោលដៅ `scroll-snap` ផងដែរ។
+
+### ដំណោះស្រាយ — iOS PWA តែប៉ុណ្ណោះ
+- `usesIOSPanelHandoff()` បើកផ្លូវថ្មីតែពេល `navigator.standalone === true` និង
+  WebKit គាំទ្រ `-webkit-touch-callout`; Android មិនឆ្លងកាត់ផ្លូវនេះទេ។
+- លើ iOS, `touchmove` របស់តារាងត្រៀមជា non-passive ហើយទប់ native rubber-band
+  ក្រោយឆ្លង movement slop 8px ពេលទាញចុះបញ្ឈរនៅ `scrollTop <= 1`។ ចេតនា
+  «បានដល់កំពូល» ត្រូវចងចាំពី `touchmove` ឬ `scroll` event រហូតដល់ final
+  `touchend` ដូច្នេះការឆ្លងពី 18px ទៅ 0 ឬតម្លៃ 0.5px/stale 2px មិនធ្វើឲ្យ
+  បាត់ action ទៀត ហើយ finger jitter តូចមិនទប់ tap លើជួរតារាង។
+- ពេលដោះ `history-expanded`, `#appPages.scrollTop` ត្រូវចាក់សោ 0 មុន/ក្រោយប្តូរ
+  class និងពីរស៊ុមបន្ទាប់។ FLIP ត្រូវរំលងតែសម្រាប់ iOS expand ដើម្បីកុំឲ្យ
+  transformed snap target ទាញកាតឡើងវិញ។ CSS `overscroll-behavior-y: none`
+  ជាជាន់ការពារបន្ថែមក្នុងប្លុក iOS។ ការចាក់សោនេះដំណើរការតែ transition
+  `history-expanded` ➜ ធម្មតា ដូច្នេះ no-op sync មិន reset outer scroll ទេ។
+- Android រក្សា passive listener, ពិដាន `scrollTop <= 0`, FLIP និង CSS `contain`
+  ដូចមុនទាំងអស់។
+
+### ឧបករណ៍ audit
+- `phone-search-swipe-test.js` កើនពី 46 ទៅ **63 assertions**៖ គ្រប iOS fractional/stale
+  `scrollTop`, move ដែលទើបឆ្លងដល់កំពូល, jitter មិនទប់ tap, no-op sync មិន reset,
+  non-passive cancellation, event bubbling តែម្តង, double-rAF pin, final reversal,
+  `touchcancel`, គ្មាន FLIP លើ iOS expand និងបញ្ជាក់ថា Android នៅ passive/មិន
+  `preventDefault` ដដែល។
+- `gesture-test.js` (**107 assertions**) បើក iOS handoff gate ក្នុង Chromium ដោយចេតនា
+  ហើយបញ្ជូន synthetic touch event ដើម្បីបញ្ជាក់ listener/`defaultPrevented` និង
+  propagation ខណៈ diagonal/multitouch/final reversal នៅតែបោះបង់។ Native Safari
+  rubber-band ត្រូវបានទុកឲ្យការសាកលើ iPhone PWA ពិតខាងក្រោមផ្ទៀងផ្ទាត់។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- គ្មាន Firebase rules ត្រូវ publish ទេ។
+- សាកលើ iPhone PWA ពិត៖ ប្រវត្តិពេញអេក្រង់ ➜ រមូរតារាងទៅកំពូល ➜ ទាញចុះ
+  ជាប់ៗគ្នា; ផ្ទាំងខាងលើត្រូវត្រឡប់មករាល់ដង ដោយគ្មានចន្លោះស និងមិនភ្លាត់ឡើងវិញ។
+
+---
+
 ## [2.11.2] — 2026-08-24
 
 **iOS ត្រឡប់ទៅយន្តការដែលផ្ទៀងផ្ទាត់រួច — Android រក្សាយន្តការថ្មី។**

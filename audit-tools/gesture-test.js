@@ -49,6 +49,13 @@ const BOOT = function (seed, standalone) {
     window.__blockingTouchMoveCount = () => blockingTouchMoves.size;
     if (standalone !== false) {
         try { Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: true }); } catch (e) {}
+        try {
+            const nativeSupports = window.CSS.supports.bind(window.CSS);
+            Object.defineProperty(window.CSS, 'supports', {
+                configurable: true,
+                value: (property, value) => property === '-webkit-touch-callout' && value === 'none' ? true : nativeSupports(property, value)
+            });
+        } catch (e) {}
     }
     const store = JSON.parse(JSON.stringify(seed));
     const listeners = [];
@@ -258,6 +265,8 @@ const GESTURE = function (steps) {
 
     console.log('\n=== pull-to-refresh (ZoeW, iOS PWA) ===');
     ok('indicator ត្រូវបានបង្កើត', await page.evaluate(() => !!document.querySelector('.ptr-indicator')));
+    ok('តេស្ត browser បើកផ្លូវ iOS panel handoff ពិតក្នុង app.js',
+        await page.evaluate(() => typeof usesIOSPanelHandoff === 'function' && usesIOSPanelHandoff()));
     ok('របៀបធម្មតា ➜ non-passive listener ត្រៀមមុន touchstart ដើម្បីឲ្យ Safari អនុញ្ញាត PTR',
         await page.evaluate(() => window.__blockingTouchMoveCount()) === 1);
 
@@ -377,7 +386,7 @@ const GESTURE = function (steps) {
     const shortPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 232 }, { y: 244 }, { y: 256 }, { y: 268 }] });
     const shortPanelAfter = await panelState();
     ok('អូសខ្លី 48px លើតារាងពេញអេក្រង់ ➜ បើកផ្ទាំង មិន refresh',
-        shortPanelPull.prevented === 0 && shortPanelPull.maxIndicatorOpacity === 0 && !shortPanelPull.reloaded &&
+        shortPanelPull.prevented > 0 && shortPanelPull.maxIndicatorOpacity === 0 && !shortPanelPull.reloaded &&
         !shortPanelAfter.collapsed && !shortPanelAfter.expandedLock,
         { gesture: shortPanelPull, state: shortPanelAfter });
 
@@ -386,7 +395,7 @@ const GESTURE = function (steps) {
     const mediumPanelPull = await runGesture({ selector: '#tableResponsive', x: 200, startY: 220, points: [{ y: 244 }, { y: 278 }, { y: 300 }] });
     const mediumPanelAfter = await panelState();
     ok('អូសមធ្យម 80px លើតារាងពេញអេក្រង់ ➜ បិទ PTR ទាំងស្រុង ហើយបើកផ្ទាំង',
-        mediumPanelPull.prevented === 0 && mediumPanelPull.maxIndicatorOpacity === 0 && !mediumPanelPull.reloaded &&
+        mediumPanelPull.prevented > 0 && mediumPanelPull.maxIndicatorOpacity === 0 && !mediumPanelPull.reloaded &&
         !mediumPanelAfter.collapsed && !mediumPanelAfter.expandedLock,
         { gesture: mediumPanelPull, state: mediumPanelAfter });
 
@@ -396,7 +405,7 @@ const GESTURE = function (steps) {
         points: [{ y: 280 }, { y: 360 }, { y: 445 }] });
     const longPanelAfter = await panelState();
     ok('អូសវែងដល់កម្រិត refresh លើតារាងពេញអេក្រង់ ➜ គ្មាន PTR/indicator ហើយបើកផ្ទាំងធម្មតា',
-        longPanelPull.prevented === 0 && longPanelPull.maxIndicatorOpacity === 0 && !longPanelPull.reloaded &&
+        longPanelPull.prevented > 0 && longPanelPull.maxIndicatorOpacity === 0 && !longPanelPull.reloaded &&
         longPanelPull.blockingAfterStart === 0 && longPanelPull.blockingAfterEnd === 1 &&
         !longPanelAfter.collapsed && !longPanelAfter.expandedLock,
         { gesture: longPanelPull, state: longPanelAfter });

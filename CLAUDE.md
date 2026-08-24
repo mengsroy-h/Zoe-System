@@ -219,6 +219,30 @@ queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទា�
 - **ការអូសឡើង មិនត្រូវបិទផ្ទាំង ពេលអ្នកប្រើកំពុងស្វែងរកលេខទូរស័ព្ទទេ** (`phoneSearchIsActive()`)
   — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
 
+**iOS nested-scroll handoff (កំណែ 2.11.3) — Android មិនត្រូវប៉ះ។** វីដេអូពី
+iPhone PWA បញ្ជាក់ថា ពេលតារាងពេញអេក្រង់ដល់កំពូល Safari រក្សា touch នៅ child
+scroller ហើយបង្កើតចន្លោះស rubber-band ជំនួសការបើកផ្ទាំង។ `usesIOSPanelHandoff()`
+ត្រូវ gate ដោយ `navigator.standalone === true` បូក `CSS.supports('-webkit-touch-callout',
+'none')`; Android ត្រូវនៅ passive, ពិដាន `scrollTop <= 0`, CSS `contain` និង FLIP ដដែល។
+
+លើផ្លូវ iOS តែប៉ុណ្ណោះ៖
+
+- `touchmove` របស់តារាងត្រូវជា non-passive ហើយ `preventDefault()` តែពេលផ្ទាំង
+  `.collapsed`, ទិសចុះបញ្ឈរច្បាស់, ឆ្លង slop 8px និង `scrollTop <= 1`; CSS
+  `overscroll-behavior-y: none` ជាជាន់ការពារ ប៉ុន្តែមិនអាចជំនួស JS cancellation បានទេ។
+- ពេល move បានឈានដល់កំពូល ចេតនាត្រូវ latch ពី `touchmove` ឬ `scroll` event រហូតដល់
+  final `touchend`; កុំសរសេរជាន់វាដោយការអាន `scrollTop` ថ្មី ព្រោះ WebKit អាចផ្ញើ
+  0.5px ឬ stale 2px។ ប៉ុន្តែ final reversal/diagonal, multitouch និង `touchcancel`
+  ត្រូវបោះបង់ដដែល។
+- ពេលដោះ `history-expanded`, `#appPages.scrollTop` ត្រូវជា 0 មុនប្តូរ class,
+  ភ្លាមក្រោយប្តូរ និងក្នុង rAF ពីរស៊ុមបន្ទាប់។ កុំ FLIP លើ iOS `expand` ព្រោះ
+  `.page-main` ជា `scroll-snap-align` target ដែរ; transform 220ms អាចធ្វើឲ្យ WebKit
+  snap outer scroller ឡើងវិញ។ ចាក់សោនេះតែពេល class ប្តូរពី expanded ទៅធម្មតា;
+  no-op sync មិនត្រូវ reset scroll។ Android `expand` នៅប្រើ FLIP ដដែល។
+- ផ្ទាំងទាំង ២ និងតារាងទាំង ៣ ត្រូវឆ្លង `bindPanelSwipe()` ដដែល — កុំ hard-code
+  តែ `#tableResponsive`។ Tests៖ `phone-search-swipe-test.js` (63 assertions) និង
+  `gesture-test.js` (107 assertions; បញ្ជូន touch ពិតដោយបើក iOS JS gate ក្នុង Chromium)។
+
 **ចលនាតាមម្រាមដៃ (កំណែ 2.9.0) — READ BEFORE TOUCHING PANEL LAYOUT។**
 > ✅ **ផ្ទៀងផ្ទាត់លើ iPhone PWA ពិតរួចហើយ** (2026-08-24, កំណែ 2.9.0)។ អ្នកប្រើបញ្ជាក់ថា
 > ការទាញផ្ទាំង, snap, PTR និងការលាក់របា Tab ដំណើរការត្រឹមត្រូវលើឧបករណ៍ពិត។
@@ -270,7 +294,8 @@ flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមម
 តារាងខ្ពស់ **538px ទាំង ២ របៀប**; `.app-pages` រមូរបាន **361px** ដែលស្មើចម្ងាយរំកិល។
 មុនកែ កាតខ្ពស់ 588 ធៀប 642 (ខុស **56px**) ➜ នោះជាមូលហេតុនៃការលោត។
 
-**ការផ្ទៀងផ្ទាត់៖** `node audit-tools/panel-motion-test.js` (33 assertions លើ 320/412/768px)។
+**ការផ្ទៀងផ្ទាត់៖** `node audit-tools/panel-motion-test.js` (47 assertions លើ 320/412/768px
+បូកផ្លូវ CSS iOS ដែលចាក់ចូល Chromium ដោយដៃ)។
 បើវាធ្លាក់ដោយ `cardHeightDelta`/`tableHeightDelta` នោះចំណុច ១ ឬ ២ បាត់; បើធ្លាក់ដោយ
 `snapRestNearTop` នោះចំណុច ៣ បាត់ (**ហើយ PTR ក៏ស្លាប់ដែរ**); បើធ្លាក់ដោយ
 `residualTransform` នោះចំណុច ៤ មានបញ្ហា។

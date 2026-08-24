@@ -309,7 +309,10 @@
                 .app-page.active > .page-main .table-responsive { padding-bottom: 0; }
                 .app-pages.history-expanded { padding-bottom: calc(var(--chrome-bottom, 62px) + 8px); }
                 body.chrome-hidden .app-pages.history-expanded { padding-bottom: calc(var(--page-extension, 0px) + 8px); }
-                .app-pages.history-expanded .table-responsive { padding-bottom: 0; }
+                .app-pages.history-expanded .table-responsive {
+                    padding-bottom: 0;
+                    overscroll-behavior-y: none;
+                }
             }
         }
 

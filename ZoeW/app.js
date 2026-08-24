@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.8.4';
+    const APP_VERSION = '2.8.5';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3250,6 +3250,20 @@
         let settlingScroll = false;
         let reloadWatchdog = null;
         let pullMoveListening = false;
+        let scrollerMemoTarget = null;
+        let scrollerMemoValue = null;
+
+        function scrollerForPull(target) {
+            if (target === scrollerMemoTarget) return scrollerMemoValue;
+            scrollerMemoTarget = target;
+            scrollerMemoValue = scrollerOf(target);
+            return scrollerMemoValue;
+        }
+
+        function resetScrollerMemo() {
+            scrollerMemoTarget = null;
+            scrollerMemoValue = null;
+        }
 
         function dampen(raw) {
             return MAX_TRAVEL * (1 - Math.exp(-raw / 135));
@@ -3264,6 +3278,7 @@
         }
 
         function park(resetArbiter) {
+            resetScrollerMemo();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -3306,7 +3321,7 @@
             const root = document.scrollingElement || document.documentElement;
             if (!atStartTop(root ? root.scrollTop : 0) || !atStartTop(window.scrollY || 0)) return null;
             if (!atStartTop(document.body.scrollTop || 0) || !atStartTop(pages.scrollTop)) return null;
-            const scroller = scrollerOf(target);
+            const scroller = scrollerForPull(target);
             if (scroller && !atStartTop(scroller.scrollTop)) return null;
             const activeScroller = activePanelSections().scroller;
             if (activeScroller && activeScroller.offsetParent !== null && !atStartTop(activeScroller.scrollTop)) return null;
@@ -3315,7 +3330,7 @@
 
         function pullContextStillValid(target) {
             if (isModalOpen || refreshing || pullRefreshDisabledByPanelState() || pullTargetBlocked(target)) return false;
-            if (scrollerOf(target) !== startScroller) return false;
+            if (scrollerForPull(target) !== startScroller) return false;
             if (activePanelSections().scroller !== startActiveScroller) return false;
             const root = document.scrollingElement || document.documentElement;
             if (!atPullTop(root ? root.scrollTop : 0) || !atPullTop(window.scrollY || 0)) return false;
@@ -3437,6 +3452,7 @@
         }
 
         document.addEventListener('touchstart', (e) => {
+            resetScrollerMemo();
             touchId = null;
             tracking = false;
             engaged = false;
@@ -4651,6 +4667,10 @@
         });
     }
 
+    function cssPx(value) {
+        return (Math.round(value * 1000) / 1000) + 'px';
+    }
+
     function positionPhoneSuggestBox() {
         const phoneInput = document.getElementById('searchPhoneInput');
         const box = document.getElementById('phoneSuggestBox');
@@ -4660,15 +4680,15 @@
             hidePhoneSuggestions();
             return;
         }
-        box.style.width = rect.width + 'px';
-        box.style.left = rect.left + 'px';
+        const width = cssPx(rect.width);
+        if (box.style.width !== width) box.style.width = width;
+        const left = cssPx(rect.left);
+        if (box.style.left !== left) box.style.left = left;
         const boxHeight = box.offsetHeight;
         const spaceBelow = window.innerHeight - rect.bottom;
-        if (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) {
-            box.style.top = (rect.top - boxHeight - 4) + 'px';
-        } else {
-            box.style.top = (rect.bottom + 4) + 'px';
-        }
+        const top = (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) ?
+            cssPx(rect.top - boxHeight - 4) : cssPx(rect.bottom + 4);
+        if (box.style.top !== top) box.style.top = top;
     }
 
     function showPhoneSuggestions() {
@@ -4784,8 +4804,16 @@
             if (isNaN(index) || !phoneSuggestItems[index]) return;
             applyPhoneSuggestion(phoneSuggestItems[index].phone);
         });
-        window.addEventListener('scroll', positionPhoneSuggestBox, { capture: true, passive: true });
-        window.addEventListener('resize', positionPhoneSuggestBox);
+        let positionFrame = null;
+        const schedulePositionPhoneSuggestBox = () => {
+            if (positionFrame !== null) return;
+            positionFrame = requestAnimationFrame(() => {
+                positionFrame = null;
+                positionPhoneSuggestBox();
+            });
+        };
+        window.addEventListener('scroll', schedulePositionPhoneSuggestBox, { capture: true, passive: true });
+        window.addEventListener('resize', schedulePositionPhoneSuggestBox);
     }
 
     function searchByPhone() {

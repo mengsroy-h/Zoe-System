@@ -66,6 +66,7 @@ run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
 run "css-media-override" node audit-tools/css-media-override.js
 run "animation-cost" node audit-tools/animation-cost.js
+run "layout-thrash (browser ពិត)" node audit-tools/layout-thrash.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
@@ -126,6 +127,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
     CSSMEDIA_APP_DIR="$BASE" node audit-tools/css-media-override.js 2>&1 | tail -1 | sed 's/^/   css-media:       /'
     ANIM_APP_DIR="$BASE"    node audit-tools/animation-cost.js 2>&1 | tail -1 | sed 's/^/   animation-cost:  /'
+    THRASH_APP_DIR="$BASE"  node audit-tools/layout-thrash.js 2>&1 | tail -1 | sed 's/^/   layout-thrash:   /'
     BIOMETRIC_APP_DIR="$BASE" node audit-tools/biometric-unlock-test.js 2>&1 | tail -1 | sed 's/^/   biometric:       /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'

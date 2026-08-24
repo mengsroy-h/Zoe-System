@@ -422,6 +422,13 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
   ក្រោយ PTR** ➜ បញ្ជីលោតរំលង/កាតរអិលក្រោម navbar។ ការប្តូរ panel ត្រូវរង់ចាំ
   `touchend`, របា Tab ត្រូវជា `transform` សុទ្ធ ហើយ PTR reload ត្រូវ reset root/page/table។
   Tests៖ **`gesture-test.js`**, **`phone-search-swipe-test.js`**។
+- **ការសរសេរ style រួចអានធរណីមាត្រ ក្នុង handler របស់ touch/scroll** ➜ browser ត្រូវ
+  ទូទាត់ layout **ស្របគ្នា** ចំពេលម្រាមដៃកំពុងអូស។ ធ្ងន់បំផុតក្នុង `touchmove` ដែល
+  **non-passive** ព្រោះ iOS ត្រូវរង់ចាំវាចប់មុនអនុញ្ញាតឲ្យរមូរ។ ការដើរឡើងលើដើមឈើ
+  DOM ជាមួយ `getComputedStyle()` ក្នុងផ្លូវនោះត្រូវ **ចងចាំក្នុងមួយកាយវិការ**
+  (`scrollerForPull()`), ហើយ handler របស់ `scroll` ត្រូវ coalesce តាម
+  `requestAnimationFrame` ព្រមទាំងរំលងការសរសេរពេលតម្លៃមិនប្រែ។
+  Checker៖ **`layout-thrash.js`** (ស្តាទិច + វាស់ក្នុង Chromium ពិត)។
 - **animation លើ property ដែលមិនអាច composite** — `top`/`height` ➜ layout រាល់ស៊ុម;
   `box-shadow`/`background-color` ដោយ `infinite` ➜ គូរឡើងវិញរាល់ស៊ុមជារៀងរហូត។
   ប្រើ `transform`/`opacity` ឬដាក់ធាតុនោះលើ layer ដោយឡែក។ Checker៖ **`animation-cost.js`**។
@@ -519,6 +526,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | class គ្មានច្បាប់ CSS | `css-classes.js` |
 | ច្បាប់ក្នុង `@media` ដែលស្លាប់ដោយច្បាប់មូលដ្ឋានក្រោយវា | `css-media-override.js` |
 | animation ដែលបង្កើត layout/paint រាល់ស៊ុម និង `transition: all` | `animation-cost.js` |
+| ការបង្ខំ layout ឡើងវិញក្នុង handler របស់ touch/scroll/rAF | `layout-thrash.js` |
 | comment / trailing whitespace | `comments.js` |
 | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
 | សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |

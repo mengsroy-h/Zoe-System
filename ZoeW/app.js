@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.10.0';
+    const APP_VERSION = '2.11.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3075,17 +3075,6 @@
     }
 
     let chromeHidden = false;
-    let chromeLayoutTimer = null;
-    const CHROME_LAYOUT_IDLE_MS = 180;
-
-    function scheduleChromeLayoutSettle() {
-        if (chromeLayoutTimer !== null) clearTimeout(chromeLayoutTimer);
-        chromeLayoutTimer = setTimeout(() => {
-            chromeLayoutTimer = null;
-            document.body.classList.toggle('chrome-space-released', chromeHidden);
-        }, CHROME_LAYOUT_IDLE_MS);
-    }
-
     function appChromeElements() {
         return {
             navbar: document.querySelector('.app-navbar'),
@@ -3113,7 +3102,6 @@
             chromeHidden = false;
             document.body.classList.remove('chrome-hidden');
         }
-        scheduleChromeLayoutSettle();
     }
 
     function hideAppChrome() {
@@ -3122,7 +3110,6 @@
         if (isModalOpen || isSideDrawerOpen()) return;
         chromeHidden = true;
         document.body.classList.add('chrome-hidden');
-        scheduleChromeLayoutSettle();
     }
 
     function scrollerOf(target) {
@@ -3158,7 +3145,6 @@
             scrollFrame = null;
             const el = pendingScroller;
             pendingScroller = null;
-            scheduleChromeLayoutSettle();
             if (window.innerWidth >= 992) { showAppChrome(); return; }
             if (isModalOpen || isSideDrawerOpen()) { showAppChrome(); return; }
             if (!el || typeof el.scrollTop !== 'number') return;

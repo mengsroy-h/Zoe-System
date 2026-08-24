@@ -343,16 +343,19 @@ Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
 (អ្នកប្រើរាយការណ៍ថា «រំលង list លឿនជ្រុល»)។ ដូច្នេះ៖
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
-- កន្លែងរបស់របា Tab ក្នុងរបៀបពេញអេក្រង់ ត្រូវកក់ជា `padding-bottom` លើ
-  `.app-pages.history-expanded` (= `var(--chrome-bottom)` ដែល `measureAppChromeSize()`
-  វាស់ពិត) ➜ **គែមក្រោមកាតឈរខាងលើរបា Tab**។ `body.chrome-hidden` ប្តូរតែ
-  transform របស់ Tab bar; ក្រោយ scroll ស្ងប់ 180ms ទើប `body.chrome-space-released`
-  ទម្លាក់ padding មក `--page-extension + 8px` ដើម្បីឲ្យកាតរីកបំពេញកន្លែងរបា។ ពេល
-  បង្ហាញវិញ ក៏ពន្យារការកក់កន្លែងរហូត scroll ស្ងប់ដូចគ្នា។ **កុំដាក់ transition លើ
-  padding និងកុំប្តូរ class នេះកណ្តាល momentum**។ Scroll handler ត្រូវ coalesce តាម
-  `requestAnimationFrame` មួយដងក្នុងមួយ frame។ `gesture-test.js` ចាក់សោឥរិយាបថនេះ។
-  កំណែ 2.4.0 ធ្លាប់កក់វាដោយ `.table-responsive::after` *ខាងក្នុង* កន្សោមរមូរ —
-  layout ស្ថិរដូចគ្នា តែជួរដេកលិចចូលពីក្រោមរបា ➜ **កុំនាំវិធីនោះត្រឡប់មកវិញ**
+- **កំណែ 2.11.0៖ កន្លែងរបា Tab កក់ *ខាងក្នុងកន្សោមរមូរ* មិនមែនលើ `.app-pages` ទេ។**
+  `.table-responsive` មាន `padding-bottom: var(--chrome-bottom)` (ជួរដេកចុងក្រោយ
+  នៅតែរមូរឡើងដល់ខាងលើរបាបាន) បូក `clip-path: inset(0 0 var(--chrome-bottom) 0)`
+  (ជួរដេកមិនលិចក្រោមរបា — បញ្ហាកំណែ 2.4.0)។ `body.chrome-hidden` ដកទាំង ២ ចេញ។
+  **`clip-path` ជា paint មិនមែន layout** ➜ ប្តូរបានភ្លាមស្របនឹង transform របស់របា។
+- ដូច្នេះ **កម្ពស់កាត និងតារាងថេរទាំងស្រុង** ➜ ថ្នាក់កំហុស «ប្តូរកម្ពស់កណ្តាល
+  momentum» មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ។ យន្តការពន្យារ 180ms
+  (`scheduleChromeLayoutSettle`) និង `chrome-space-released` **ត្រូវដកចេញរួច** —
+  កុំនាំវាត្រឡប់មកវិញ។ មុននេះការពន្យារនោះធ្វើឲ្យរបារអិលចេញភ្លាម តែកាតធ្លាក់មក
+  បំពេញ 180ms ក្រោយ ➜ អ្នកប្រើឃើញចន្លោះទទេ និងជួរដេកកាត់ពាក់កណ្តាល។
+- Scroll handler ត្រូវ coalesce តាម `requestAnimationFrame` មួយដងក្នុងមួយ frame។
+  `gesture-test.js` និង `panel-motion-test.js` ចាក់សោឥរិយាបថនេះ — ការអះអាងវាស់
+  **គែមដែលមើលឃើញ** (គែមប្រអប់ ដក clip inset) មិនមែនគែមប្រអប់ទេ
 - **គ្មាន `backdrop-filter` លើ `.app-navbar`** — iOS គណនា blur ឡើងវិញរាល់ស៊ុមពេលរបារំកិល
 - **គ្មាន `scroll-behavior: smooth`** លើ `body` ឬ `.table-responsive` — WebKit យកវាទៅ
   អនុវត្តលើការរមូរតាមកម្លាំងផងដែរ

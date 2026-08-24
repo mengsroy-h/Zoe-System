@@ -1,4 +1,4 @@
-const APP_VERSION = '2.11.4';
+const APP_VERSION = '2.11.5';
 
 const LICENSE_APP_CODE = 'ADM';
 

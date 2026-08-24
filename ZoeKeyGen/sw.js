@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v54';
+const CACHE_VERSION = 'zoekeygen-v55';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច (ឧ. `qrcode.js` បាត់ ➜ QR របស់

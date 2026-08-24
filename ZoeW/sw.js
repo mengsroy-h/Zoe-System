@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v89';
+const CACHE_VERSION = 'zoew-v90';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច។ មុននេះគ្រប់ធនធានប្រើ

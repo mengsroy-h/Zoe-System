@@ -273,6 +273,9 @@ scroller ហើយបង្កើតចន្លោះស rubber-band ជំន�
   ភ្លាមក្រោយប្តូរ និងក្នុង rAF ពីរស៊ុមបន្ទាប់។ ចាក់សោនេះតែពេល class ប្តូរពី
   expanded ទៅធម្មតា; no-op sync មិនត្រូវ reset scroll។
 - **កំណែ 2.11.4 បានប្រគល់ FLIP មកឲ្យ iOS វិញ — កុំដកវាចេញម្តងទៀត។**
+  > ✅ **ផ្ទៀងផ្ទាត់លើ iPhone និង Android ពិតរួចហើយ** (2026-08-24)។ អ្នកប្រើបញ្ជាក់ថា
+  > ចលនាផ្ទាំង, snap និង PTR ដំណើរការត្រឹមត្រូវទាំង ២ ប្រព័ន្ធ។ ដូច្នេះ **កុំដក
+  > ចលនាចេញដោយផ្អែកលើការសង្ស័យអំពី `scroll-snap`** — 2.11.3 បានធ្វើដូចនោះរួចហើយ។
   កំណែ 2.11.3 បានបិទ `panelGlideFrom()` លើ iOS សម្រាប់ `expand` ព្រោះ
   `.page-main` ជា `scroll-snap-align` target ដែរ ហើយ transform 220ms អាចធ្វើឲ្យ
   WebKit snap outer scroller ឡើងវិញ។ តែការដកចលនាចេញ **ធ្វើឲ្យផ្ទាំងលោតភ្លាម
@@ -636,6 +639,19 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
 - **ធនធានចាំបាច់ដែលមកពី origin ខាងក្រៅ ហើយ service worker មិន cache** ➜ App បើកបាន
   តែមុខងារនោះស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ។ រកឃើញលើ ZXing (ការស្កេន)។
   Test៖ **`offline-shell-test.js`** (បិទម៉ាស៊ីនបម្រើពិត រួចផ្ទុកឡើងវិញ)។
+- **rollback ដែលស្តារ *array ទាំងមូល* ពី snapshot ដែលថតមុន `await`** ➜ វាលុប
+  ការងាររបស់ឧបករណ៍ផ្សេងចេញពីអេក្រង់។ នេះជាថ្នាក់ដដែលនឹង «សរសេរ item ទាំងមូល
+  ពីច្បាប់ចម្លងក្នុងសតិ» តែលើ **projection ក្នុងសតិ** ដូច្នេះ `stale-write.js`
+  (ដែលពិនិត្យការសរសេរទៅ Firebase) មិនចាប់។ ការសង្គ្រោះត្រូវធ្វើ **គោលដៅជាក់លាក់**
+  លើ array **បច្ចុប្បន្ន** (`dropOptimisticBarcode()`, ការដាក់ item ត្រឡប់ចូល
+  `deletedItems`) មិនមែន `x = xSnapshot` ទេ។ Test៖ **`slow-write-test.js`** (scenario D)។
+  ⚠️ **អន្ទាក់ harness**៖ fake SDK ដែលបាញ់ `fireAll()` លើគ្រប់ការសរសេរ ធ្វើឲ្យ
+  projection ស្តារខ្លួនភ្លាម ➜ **តេស្តជោគជ័យក្លែងក្លាយ**។ ត្រូវបាញ់ **តាម path**។
+- **Sentry ដែលមកយឺត ឬ DSN ដែលប្តូរ** ➜ `window.Sentry` មាន តែ `init()` មិនដែលហៅ
+  ➜ `capture()` មើលទៅដំណើរការ តែ event ធ្លាក់ចោល។ ត្រូវប្រើទង់ «ចាប់ផ្តើមរួច»
+  មិនមែនវត្តមានរបស់ `captureException` ទេ; ត្រូវទុកជួរ event មុន boot; ត្រូវផ្តាច់
+  client ពេលលុប DSN; និងត្រូវមាន generation guard លើ `init()` ស្របគ្នា។
+  Test៖ **`sentry-load-race-test.js`**។
 - **ការឌិកូដស៊ុមវីដេអូដដែលពីរដង** ➜ ជាន់ការពារ «២ ស៊ុមជាប់គ្នា» ក្លាយជា ១ ស៊ុម។
   `takeFreshVideoFrame()` ការពារ **ហើយ fail open** បើ `currentTime` មិនរត់ (browser ខ្លះ
   ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។
@@ -726,6 +742,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | SW activate ដោយ APP_SHELL មិនពេញ ➜ ស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ | `sw-install-integrity-test.js` |
 | timeout ដែលមិន abort សំណើ ➜ សំណើជាន់គ្នា និងការអានតួព្យួររហូត | `network-timeout-test.js` |
 | ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
+| Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ | `sentry-load-race-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 

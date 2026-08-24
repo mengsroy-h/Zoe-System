@@ -582,11 +582,13 @@ const GESTURE = function (steps) {
         // គែម **ដែលមើលឃើញ** = គែមប្រអប់ ដក clip inset។ ចាប់ពីកំណែ 2.11.0
         // ប្រអប់មានកម្ពស់ថេរ ➜ អ្វីដែលប្រែគឺការកាត់រូបភាព មិនមែន layout ទេ។
         const snap = () => {
-            const m = /inset\(([^)]*)\)/.exec(getComputedStyle(table).clipPath || '');
+            const main = table.closest('.page-main');
+            const m = /inset\(([^)]*)\)/.exec(getComputedStyle(main).clipPath || '');
             const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
+            const vis = Math.min(table.getBoundingClientRect().bottom,
+                                 main.getBoundingClientRect().bottom - ins);
             return { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
-                     pad: window.getComputedStyle(pages).paddingBottom,
-                     vis: Math.round(table.getBoundingClientRect().bottom - ins) };
+                     pad: window.getComputedStyle(pages).paddingBottom, vis: Math.round(vis) };
         };
         showAppChrome();
         await wait(240);
@@ -641,11 +643,13 @@ const GESTURE = function (steps) {
         const tabbar = document.getElementById('pageTabBar');
         const card = document.querySelector('#dataMainSection .history-section') ||
                      document.getElementById('dataMainSection');
-        const m = /inset\(([^)]*)\)/.exec(getComputedStyle(table).clipPath || '');
+        const main = table.closest('.page-main');
+        const m = /inset\(([^)]*)\)/.exec(getComputedStyle(main).clipPath || '');
         const clipBottom = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
         return {
             tableBottom: Math.round(table.getBoundingClientRect().bottom),
-            tableVisibleBottom: Math.round(table.getBoundingClientRect().bottom - clipBottom),
+            tableVisibleBottom: Math.round(Math.min(table.getBoundingClientRect().bottom,
+                                                    main.getBoundingClientRect().bottom - clipBottom)),
             clipBottom: Math.round(clipBottom),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
             tabbarTop: Math.round(tabbar.getBoundingClientRect().top),
@@ -654,10 +658,11 @@ const GESTURE = function (steps) {
         };
     });
     ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
-    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមតារាង**ដែលមើលឃើញ**ឈរខាងលើវា (របាមិនបាំងជួរដេក)',
-        bottomRoom.tableVisibleBottom <= bottomRoom.tabbarTop + 1, bottomRoom);
-    ok('ការកាត់រូបភាព (clip-path) ស្មើនឹងកម្ពស់របា ➜ ជួរដេកមិនលិចក្រោមរបា',
-        Math.abs(bottomRoom.clipBottom - bottomRoom.tabbarH) <= 1, bottomRoom);
+    // ការអះអាងត្រូវមាន **២ ខាង**៖ មិនលិចក្រោមរបា *និង* មិនឈប់ខ្ពស់ជាងរបា។
+    // កំណែ 2.11.0 ដំបូងអះអាងតែម្ខាង ➜ ចន្លោះទទេ 19–53px រអិលកាត់ ហើយអ្នកប្រើ
+    // រាយការណ៍ថា «បាំងក្រាស់ណាស់»។ ការកាត់ត្រូវចុះ **ចំគែមរបាពិត**។
+    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមតារាងដែលមើលឃើញ ចុះចំគែមខាងលើរបា (±4px)',
+        Math.abs(bottomRoom.tableVisibleBottom - bottomRoom.tabbarTop) <= 4, bottomRoom);
     const filled = await page.evaluate(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const card = document.querySelector('#dataMainSection .history-section');
@@ -760,9 +765,11 @@ const GESTURE = function (steps) {
             tableBottom: Math.round(document.getElementById('tableResponsive').getBoundingClientRect().bottom),
             tableVisibleBottom: (() => {
                 const t = document.getElementById('tableResponsive');
-                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(t).clipPath || '');
+                const mn = t.closest('.page-main');
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(mn).clipPath || '');
                 const inset = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
-                return Math.round(t.getBoundingClientRect().bottom - inset);
+                return Math.round(Math.min(t.getBoundingClientRect().bottom,
+                                           mn.getBoundingClientRect().bottom - inset));
             })(),
             barTop: Math.round(tabbar.getBoundingClientRect().top),
             viewportH: Math.round(window.innerHeight)

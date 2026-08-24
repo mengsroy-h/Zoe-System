@@ -44,6 +44,7 @@ function makeClassList(initial) {
 function buildEnv(src, opts) {
     const o = opts || {};
     const handlers = {};
+    const listenerOptions = {};
     const OWNED = {
         dataMainSection: ['tableResponsive'],
         entryMainSection: ['entryTableResponsive', 'lockerTableResponsive']
@@ -57,7 +58,10 @@ function buildEnv(src, opts) {
         // ធាតុ DOM ពិតតែងតែមាន — `panelGlideFrom()` អានវាដើម្បីគណនាចម្ងាយ FLIP
         getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }),
         animate: undefined,
-        addEventListener: (type, fn) => { (handlers[id] = handlers[id] || {})[type] = fn; }
+        addEventListener: (type, fn, options) => {
+            (handlers[id] = handlers[id] || {})[type] = fn;
+            (listenerOptions[id] = listenerOptions[id] || {})[type] = options;
+        }
     }, extra || {});
 
     const els = {
@@ -78,11 +82,16 @@ function buildEnv(src, opts) {
         searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchActive ? '012' : '' })
     };
 
-    const calls = { hideSuggest: 0, position: 0 };
+    const calls = { hideSuggest: 0, position: 0, frames: [], prevented: 0 };
     const ctx = {
         console,
         setTimeout: () => 0,
-        window: { innerWidth: o.innerWidth || 400 },
+        requestAnimationFrame(fn) { calls.frames.push(fn); return calls.frames.length; },
+        window: {
+            innerWidth: o.innerWidth || 400,
+            navigator: { standalone: !!o.iosWebKit },
+            CSS: { supports: (property, value) => !!o.iosWebKit && property === '-webkit-touch-callout' && value === 'none' }
+        },
         scheduleChromeLayoutSettle() {},
         hidePhoneSuggestions() { calls.hideSuggest++; els.phoneSuggestBox.classList.remove('show'); },
         positionPhoneSuggestBox() { calls.position++; },
@@ -93,11 +102,13 @@ function buildEnv(src, opts) {
         }
     };
     ctx.window.document = ctx.document;
+    ctx.CSS = ctx.window.CSS;
     vm.createContext(ctx);
     vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
     vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
     vm.runInContext(sliceFn(src, 'entryScrollerInView'), ctx);
     vm.runInContext(sliceFn(src, 'activePanelSections'), ctx);
+    vm.runInContext(sliceFn(src, 'usesIOSPanelHandoff'), ctx);
     vm.runInContext(sliceFn(src, 'syncHistoryExpandedLock'), ctx);
     vm.runInContext(sliceFn(src, 'setPhoneSearchPulledUp'), ctx);
     vm.runInContext(sliceFn(src, 'phoneSearchIsActive'), ctx);
@@ -110,7 +121,7 @@ function buildEnv(src, opts) {
     vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
     ctx.setupSwipeGestures();
-    return { ctx, els, handlers, calls };
+    return { ctx, els, handlers, listenerOptions, calls };
 }
 
 function swipe(handlers, el, fromY, toY) {
@@ -228,6 +239,122 @@ console.log('\n=== អូសចុះលើតារាងផ្ទាល់ (�
         'ដល់កំពូលតារាង រួចអូសចុះ ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ');
 }
 
+console.log('\n=== iOS ប្រគល់ gesture ពីតារាងទៅផ្ទាំង ដោយមិន rubber-band ===');
+{
+    const android = buildEnv(src, { sideClasses: ['collapsed'] });
+    ok(android.listenerOptions.tableResponsive.touchmove.passive === true,
+        'Android ➜ touchmove របស់តារាងនៅ passive ដដែល');
+    let androidPrevented = 0;
+    android.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    android.handlers.tableResponsive.touchmove({
+        touches: [{ identifier: 1, clientX: 0, clientY: 260 }], cancelable: true,
+        preventDefault() { androidPrevented++; }
+    });
+    ok(androidPrevented === 0, 'Android ➜ មិនមាន iOS preventDefault ឆ្លងមកប៉ះ');
+
+    const iosNormal = buildEnv(src, { iosWebKit: true });
+    iosNormal.calls.frames.length = 0;
+    iosNormal.els.appPages.scrollTop = 44;
+    iosNormal.ctx.syncHistoryExpandedLock();
+    ok(iosNormal.els.appPages.scrollTop === 44 && iosNormal.calls.frames.length === 0,
+        'iOS ស្ថានភាពធម្មតា ➜ no-op sync មិន reset outer scroll');
+
+    const jitter = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    jitter.els.tableResponsive.scrollTop = 0;
+    jitter.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    const jitterMove = {
+        touches: [{ identifier: 1, clientX: 0, clientY: 204 }], cancelable: true, defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; }
+    };
+    jitter.handlers.tableResponsive.touchmove(jitterMove);
+    jitter.handlers.tableResponsive.touchcancel(touchEndEvent(204));
+    ok(!jitterMove.defaultPrevented && jitter.els.dataSideSection.classList.contains('collapsed'),
+        'iOS jitter 4px លើជួរទីមួយ ➜ មិនទប់ tap និងមិនប្តូរផ្ទាំង');
+
+    const crossing = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    crossing.els.tableResponsive.scrollTop = 18;
+    crossing.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    crossing.handlers.tableResponsive.touchmove({
+        touches: [{ identifier: 1, clientX: 0, clientY: 270 }], cancelable: true, preventDefault() {}
+    });
+    crossing.els.tableResponsive.scrollTop = 0;
+    crossing.handlers.tableResponsive.scroll({});
+    crossing.els.tableResponsive.scrollTop = 2;
+    crossing.handlers.tableResponsive.touchend(touchEndEvent(270));
+    ok(!crossing.els.dataSideSection.classList.contains('collapsed'),
+        'iOS move ចុងក្រោយឆ្លងពី 18px ដល់កំពូល ហើយ touchend stale 2px ➜ បើកផ្ទាំងបាន');
+
+    const ios = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    ios.calls.frames.length = 0;
+    ios.els.tableResponsive.scrollTop = 0.5;
+    ok(ios.listenerOptions.tableResponsive.touchmove.passive === false,
+        'iOS ➜ touchmove របស់តារាងត្រៀម non-passive តាំងពី touchstart');
+    ios.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    const move = {
+        touches: [{ identifier: 1, clientX: 0, clientY: 270 }], cancelable: true, defaultPrevented: false,
+        preventDefault() { this.defaultPrevented = true; ios.calls.prevented++; }
+    };
+    ios.handlers.tableResponsive.touchmove(move);
+    ok(move.defaultPrevented && ios.calls.prevented === 1,
+        'iOS + តារាងនៅកំពូល ➜ ទប់ rubber-band មុន Safari ដណ្ដើម scroll owner');
+    ios.els.tableResponsive.scrollTop = 2;
+    ios.handlers.tableResponsive.touchend(touchEndEvent(270));
+    ok(!ios.els.dataSideSection.classList.contains('collapsed'),
+        'iOS ឈានដល់ 0.5px ហើយ touchend អាន 2px ➜ intent នៅតែបើកផ្ទាំងបាន');
+    ok(!ios.els.appPages.classList.contains('history-expanded'),
+        'iOS handoff ➜ ដោះសោ outer scroller តែម្តង');
+    ios.els.appPages.scrollTop = 72;
+    const firstPin = ios.calls.frames.shift();
+    if (firstPin) firstPin();
+    ok(ios.els.appPages.scrollTop === 0,
+        'iOS frame ទី១ ➜ scroll anchoring មិនអាចរុញកាតឡើងវិញ');
+    ios.els.appPages.scrollTop = 91;
+    const secondPin = ios.calls.frames.shift();
+    if (secondPin) secondPin();
+    ok(ios.els.appPages.scrollTop === 0,
+        'iOS frame ទី២ ➜ momentum/snap យឺតមិនអាចរុញកាតឡើងវិញ');
+
+    const reversed = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    reversed.els.tableResponsive.scrollTop = 0;
+    reversed.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    reversed.handlers.tableResponsive.touchmove({
+        touches: [{ identifier: 1, clientX: 0, clientY: 280 }], cancelable: true, preventDefault() {}
+    });
+    reversed.els.tableResponsive.scrollTop = 2;
+    reversed.handlers.tableResponsive.touchend(touchEndEvent(215));
+    ok(reversed.els.dataSideSection.classList.contains('collapsed'),
+        'iOS បញ្ច្រាសម្រាមដៃមុន touchend ➜ បោះបង់ intent ចាស់ មិនបើកផ្ទាំង');
+
+    const cancelled = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    cancelled.handlers.tableResponsive.touchstart({ touches: [{ identifier: 1, clientX: 0, clientY: 200 }] });
+    cancelled.handlers.tableResponsive.touchmove({
+        touches: [{ identifier: 1, clientX: 0, clientY: 280 }], cancelable: true, preventDefault() {}
+    });
+    cancelled.handlers.tableResponsive.touchcancel(touchEndEvent(280));
+    ok(cancelled.els.dataSideSection.classList.contains('collapsed'),
+        'iOS touchcancel ➜ នៅតែបោះបង់ gesture ទាំងមូល');
+
+    const bubbled = buildEnv(src, { iosWebKit: true, sideClasses: ['collapsed'] });
+    const start = { touches: [{ identifier: 1, clientX: 0, clientY: 200 }] };
+    const drag = {
+        touches: [{ identifier: 1, clientX: 0, clientY: 280 }], cancelable: true, preventDefault() {}
+    };
+    const end = touchEndEvent(280);
+    bubbled.handlers.tableResponsive.touchstart(start);
+    bubbled.handlers.dataMainSection.touchstart(start);
+    bubbled.handlers.tableResponsive.touchmove(drag);
+    bubbled.handlers.dataMainSection.touchmove(drag);
+    bubbled.handlers.tableResponsive.touchend(end);
+    bubbled.handlers.dataMainSection.touchend(end);
+    ok(!bubbled.els.dataSideSection.classList.contains('collapsed') &&
+       !bubbled.els.appPages.classList.contains('history-expanded'),
+        'iOS event ហូរពីតារាងទៅ parent ➜ ប្តូរស្ថានភាពតែម្តង មិនលោតត្រឡប់');
+    ok(/if \(!iosPanelHandoff \|\| action !== 'expand'\) panelGlideFrom\(mainSection, beforeTop\);/.test(src),
+        'iOS handoff ចុះ ➜ មិន animate snap target; Android នៅប្រើ FLIP ដដែល');
+    ok(/if \(!iosPanelHandoff \|\| sidebar\.classList\.contains\('collapsed'\)\) panelGlideFrom\(mainSection, beforeTop\);/.test(src),
+        'iOS ដោះផ្ទាំងតាម drag handle ➜ ក៏មិន animate snap target ដែរ');
+}
+
 console.log('\n=== កំពុងស្វែងរកលេខទូរស័ព្ទ — កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ ===');
 {
     const { els, handlers } = buildEnv(src, { searchActive: true, suggestOpen: true });
@@ -312,6 +439,8 @@ console.log('\n=== ការតភ្ជាប់ក្នុង index.html ន�
     ok(/\.page-side\.collapsed\s*\{/.test(css), 'style.css មានច្បាប់ .page-side.collapsed');
     ok(/\.page-side\.search-focus\s*\{/.test(css), 'style.css មានច្បាប់ .page-side.search-focus');
     ok(/\.drag-handle-bar\s*\{/.test(css), 'style.css មានច្បាប់ .drag-handle-bar');
+    ok(/@supports \(-webkit-touch-callout: none\)[\s\S]*?\.app-pages\.history-expanded \.table-responsive\s*\{[\s\S]*?overscroll-behavior-y:\s*none/.test(css),
+        'iOS full-screen list បិទ rubber-band ខាងក្នុង; Android CSS នៅក្រៅប្លុកនេះ');
     ok(src.indexOf('setupSwipeGestures();') !== -1, 'app.js ហៅ setupSwipeGestures() ពេលចាប់ផ្តើម');
     ok(/phoneInput\.addEventListener\('focus'[\s\S]{0,120}setPhoneSearchPulledUp\(true\)/.test(src),
         'focus លើប្រអប់ស្វែងរក ➜ ហៅ setPhoneSearchPulledUp(true)');

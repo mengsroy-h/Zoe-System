@@ -101,7 +101,7 @@ function makeContext(app) {
     const ctx = vm.createContext(sandbox);
 vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper', 'showAppChrome'];
-    const optional = ['normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
+    const optional = ['cssPx', 'normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');
     const present = optional.filter((n) => src.indexOf('function ' + n + '(') !== -1);
     const consts = src.match(/const PHONE_SUGGEST_MAX = \d+;/);

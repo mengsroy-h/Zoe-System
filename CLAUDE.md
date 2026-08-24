@@ -344,9 +344,14 @@ Tests៖ **`gesture-test.js`** (touch/reload/layout ពិត) និង
 
 - របា Tab ជា `position: fixed` ហើយរំកិលដោយ **`translate3d` តែប៉ុណ្ណោះ**
 - **កំណែ 2.11.0៖ កន្លែងរបា Tab កក់ *ខាងក្នុងកន្សោមរមូរ* មិនមែនលើ `.app-pages` ទេ។**
-  `.table-responsive` មាន `padding-bottom: var(--chrome-bottom)` (ជួរដេកចុងក្រោយ
-  នៅតែរមូរឡើងដល់ខាងលើរបាបាន) បូក `clip-path: inset(0 0 var(--chrome-bottom) 0)`
+  `.table-responsive` មាន `padding-bottom: var(--tabbar-height)` (ជួរដេកចុងក្រោយ
+  នៅតែរមូរឡើងដល់ខាងលើរបាបាន) ហើយ **`.page-main`** មាន
+  `clip-path: inset(0 0 calc(var(--tabbar-height) - 8px) 0 round …)`
   (ជួរដេកមិនលិចក្រោមរបា — បញ្ហាកំណែ 2.4.0)។ `body.chrome-hidden` ដកទាំង ២ ចេញ។
+  **ត្រូវប្រើ `--tabbar-height` មិនមែន `--chrome-bottom` ទេ** — `--chrome-bottom`
+  រួមបញ្ចូល safe-area ដែលនៅ *ក្រោម* viewport ➜ ការកាត់តាមវាឡើងខ្ពស់ជាងគែមរបា
+  ដល់ ៥៣px លើ iPhone (កំហុស 2.11.0)។ ការអះអាងត្រូវមាន **២ ខាង** — «មិនលិចក្រោមរបា»
+  តែម្យ៉ាងអនុញ្ញាតឲ្យចន្លោះទទេធំប៉ុនណាក៏បាន ដែលជាមូលហេតុដែលកំហុសនោះរអិលកាត់។
   **`clip-path` ជា paint មិនមែន layout** ➜ ប្តូរបានភ្លាមស្របនឹង transform របស់របា។
 - ដូច្នេះ **កម្ពស់កាត និងតារាងថេរទាំងស្រុង** ➜ ថ្នាក់កំហុស «ប្តូរកម្ពស់កណ្តាល
   momentum» មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ។ យន្តការពន្យារ 180ms

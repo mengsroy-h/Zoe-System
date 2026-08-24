@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.0';
+    const APP_VERSION = '2.11.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -3092,6 +3092,7 @@
             const pageHeight = document.body.getBoundingClientRect().height;
             const pageExtension = Math.max(0, Math.round(pageHeight - window.innerHeight));
             const bottomHeight = Math.round(tabbar.offsetHeight + pageExtension);
+            document.documentElement.style.setProperty('--tabbar-height', Math.round(tabbar.offsetHeight) + 'px');
             document.documentElement.style.setProperty('--page-extension', pageExtension + 'px');
             if (bottomHeight > 0) document.documentElement.style.setProperty('--chrome-bottom', bottomHeight + 'px');
         }

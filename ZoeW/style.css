@@ -205,7 +205,16 @@
                 height: calc(100vh - var(--chrome-top, 63px) - 16px);
                 height: calc(100dvh - var(--chrome-top, 63px) - 16px);
                 flex: none;
+                /* កាត់រូបភាពត្រឹមគែម **ខាងលើរបា Tab ពិត** ➜ ជួរដេកមិនលិចក្រោមរបា
+                   (បញ្ហាកំណែ 2.4.0)។ ត្រូវប្រើ `--tabbar-height` មិនមែន
+                   `--chrome-bottom` ទេ — `--chrome-bottom` រួមបញ្ចូល safe-area
+                   ដែលនៅ **ក្រោម** viewport ➜ ការកាត់តាមវាឡើងខ្ពស់ជាងគែមរបា
+                   ដល់ទៅ 53px លើ iPhone (អ្នកប្រើរាយការណ៍ថា «បាំងក្រាស់ណាស់»)។
+                   `clip-path` ជា **paint** មិនមែន layout ➜ មិនប្តូរកម្ពស់អ្វីទាំងអស់។ */
+                clip-path: inset(0 0 calc(var(--tabbar-height, 62px) - 8px) 0
+                                 round 0 0 var(--radius-lg) var(--radius-lg));
             }
+            body.chrome-hidden .app-page.active > .page-main { clip-path: none; }
             .app-page.active > .page-main > .history-section,
             .app-page.active > .page-main > .panel-section { flex: 1; min-height: 0; }
             .app-page.active > .page-main #parcelPanel,
@@ -216,16 +225,9 @@
                 max-height: none;
                 flex: 1;
                 min-height: 0;
-                padding-bottom: var(--chrome-bottom, 62px);
-                /* កាត់រូបភាពត្រឹមគែមខាងលើរបា Tab ➜ ជួរដេកមិនលិចក្រោមរបា
-                   (បញ្ហាកំណែ 2.4.0)។ `clip-path` ជា **paint** មិនមែន layout ➜
-                   វាមិនប្តូរកម្ពស់អ្វីទាំងអស់ ➜ សុវត្ថិភាពកណ្តាល momentum។ */
-                clip-path: inset(0 0 var(--chrome-bottom, 62px) 0);
+                padding-bottom: var(--tabbar-height, 62px);
             }
-            body.chrome-hidden .app-page.active > .page-main .table-responsive {
-                padding-bottom: 0;
-                clip-path: none;
-            }
+            body.chrome-hidden .app-page.active > .page-main .table-responsive { padding-bottom: 0; }
 
             /* ពេលអ្នកប្រើទាញផ្ទាំងប្រវត្តិឡើង (history-expanded) តារាងត្រូវពេញអេក្រង់
                ពិតប្រាកដ។ ការប្រើ vh ថេរ (62/78vh) មិនដែលត្រូវទេ ព្រោះវាមិនដឹង
@@ -273,13 +275,9 @@
                 /* កក់កន្លែងរបា Tab **ខាងក្នុង** កន្សោមរមូរ ➜ ជួរដេកចុងក្រោយនៅតែ
                    រមូរឡើងដល់ខាងលើរបាបាន។ ការប្តូរនេះប៉ះតែ `scrollHeight` ➜
                    អាចធ្វើភ្លាមស្របនឹង transform របស់របា ដោយគ្មានការលោត។ */
-                padding-bottom: var(--chrome-bottom, 62px);
-                clip-path: inset(0 0 var(--chrome-bottom, 62px) 0);
+                padding-bottom: var(--tabbar-height, 62px);
             }
-            body.chrome-hidden .app-pages.history-expanded .table-responsive {
-                padding-bottom: 0;
-                clip-path: none;
-            }
+            body.chrome-hidden .app-pages.history-expanded .table-responsive { padding-bottom: 0; }
         }
 
         .page-tabbar {

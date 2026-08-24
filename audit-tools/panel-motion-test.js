@@ -178,13 +178,17 @@ function seedBig(n) {
             // មួយភ្លែត ហើយជួរដេកចុងក្រោយត្រូវកាត់ពាក់កណ្តាល (វីដេអូពីអ្នកប្រើ)។
             const visBottom = () => {
                 const t = document.getElementById('tableResponsive');
-                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(t).clipPath || '');
+                const mn = t.closest('.page-main');
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(mn).clipPath || '');
                 const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
-                return Math.round(t.getBoundingClientRect().bottom - ins);
+                return Math.round(Math.min(t.getBoundingClientRect().bottom,
+                                           mn.getBoundingClientRect().bottom - ins));
             };
             side.classList.add('collapsed'); window.syncHistoryExpandedLock(); await wait(80);
             document.body.classList.remove('chrome-hidden'); await wait(80);
             const visShown = visBottom();
+            out.gapVisibleToBar = Math.round(
+                document.getElementById('pageTabBar').getBoundingClientRect().top - visShown);
             const hShown = table.clientHeight;
             document.body.classList.add('chrome-hidden');
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -213,6 +217,8 @@ function seedBig(n) {
         ok(tag + ': snap ឈប់ត្រឹម 0 (PTR កេះបាន)', r.snapRestNearTop <= 1, 'scrollTop=' + r.snapRestNearTop);
         ok(tag + ': គ្មាន transform សេសសល់ក្រោយចលនា', r.residualTransform === 'none' || r.residualTransform === 'matrix(1, 0, 0, 1, 0, 0)', r.residualTransform);
         ok(tag + ': ចុចដងអូស ២ ដង ➜ ត្រឡប់ដើម', r.sideAfterToggles === false, String(r.sideAfterToggles));
+        ok(tag + ': បញ្ជីដែលមើលឃើញចុះចំគែមរបា Tab (គ្មានចន្លោះទទេក្រាស់)',
+            Math.abs(r.gapVisibleToBar) <= 4, 'gap=' + r.gapVisibleToBar + 'px');
         ok(tag + ': កន្លែងរបា Tab ប្រគល់មកវិញក្នុង ២ ស៊ុម (ស្របនឹងរបា មិនពន្យារ)',
             r.visReleasedImmediately >= 20, 'delta=' + r.visReleasedImmediately + 'px');
         ok(tag + ': ការលាក់របាមិនប្តូរកម្ពស់កន្សោមរមូរ', r.heightStableOnHide === true, String(r.heightStableOnHide));

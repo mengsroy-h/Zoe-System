@@ -193,6 +193,11 @@ queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទា�
   — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
 
 **ចលនាតាមម្រាមដៃ (កំណែ 2.9.0) — READ BEFORE TOUCHING PANEL LAYOUT។**
+> ✅ **ផ្ទៀងផ្ទាត់លើ iPhone PWA ពិតរួចហើយ** (2026-08-24, កំណែ 2.9.0)។ អ្នកប្រើបញ្ជាក់ថា
+> ការទាញផ្ទាំង, snap, PTR និងការលាក់របា Tab ដំណើរការត្រឹមត្រូវលើឧបករណ៍ពិត។
+> ដូច្នេះ **កុំ «កែ» ផ្នែកនេះដោយផ្អែកលើការសង្ស័យ** — វាមិនមែនជាកូដដែលមិនទាន់សាកទេ។
+> បើចាំបាច់ត្រូវប៉ះ សូមអាន «របៀបស្តារវិញ» ខាងក្រោមផ្នែកនេះ។
+
 លក្ខខណ្ឌស្នូល៖ **កាតបញ្ជី (`.page-main`) ត្រូវខ្ពស់ដូចគ្នាបេះបិទទាំងរបៀបធម្មតា
 និងរបៀបពេញអេក្រង់** — `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)`
 បូក `flex: none` ក្នុង `@media (max-width: 991px)`។ ផលពីរ៖
@@ -223,6 +228,25 @@ flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមម
 `scroll-snap-type: y proximity` ធ្វើឲ្យការរមូរឈប់ត្រឹម 0 ឬចម្ងាយពេញ (លែងឈប់
 ពាក់កណ្តាល)។ បើភ្លេច `scroll-padding-top` នោះចំណុច snap «បើក» ធ្លាក់ត្រឹម
 `scrollTop 71` ជំនួស `0` ➜ **PTR លែងកេះបានទាំងស្រុង** ព្រោះវាទាមទារ `scrollTop <= 1`។
+
+**របៀបស្តារចលនា 2.9.0 វិញ បើជុំ audit ណាមួយកែប៉ះវា។** ចលនានេះអាស្រ័យលើ
+ចំណុច ៤ ដែលត្រូវមានគ្រប់ — បាត់មួយណាក៏ការលោតត្រឡប់មកវិញដែរ៖
+
+| # | អ្វី | នៅឯណា |
+|---|---|---|
+| ១ | `.page-main` មាន `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)` + `flex: none` | `style.css`, ក្នុង `@media (max-width: 991px)` |
+| ២ | ខ្សែសង្វាក់ flex ខាងក្នុង៖ `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` ជា `flex: 1; min-height: 0` និង `.table-responsive` ជា `max-height: none; flex: 1; min-height: 0` (scope ត្រឹម `.page-main` ➜ modal រក្សា 62vh) | ដដែល |
+| ៣ | `.app-pages` មាន `scroll-snap-type: y proximity` **បូក** `scroll-padding-top` ស្មើ `padding-top`; កូន ២ មាន `scroll-snap-align: start` | ដដែល |
+| ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` | `app.js` |
+
+លេខយោង (412×780, seed 120 order)៖ ចម្ងាយរំកិល **361px**; កាតខ្ពស់ **642px ទាំង ២ របៀប**;
+តារាងខ្ពស់ **538px ទាំង ២ របៀប**; `.app-pages` រមូរបាន **361px** ដែលស្មើចម្ងាយរំកិល។
+មុនកែ កាតខ្ពស់ 588 ធៀប 642 (ខុស **56px**) ➜ នោះជាមូលហេតុនៃការលោត។
+
+**ការផ្ទៀងផ្ទាត់៖** `node audit-tools/panel-motion-test.js` (33 assertions លើ 320/412/768px)។
+បើវាធ្លាក់ដោយ `cardHeightDelta`/`tableHeightDelta` នោះចំណុច ១ ឬ ២ បាត់; បើធ្លាក់ដោយ
+`snapRestNearTop` នោះចំណុច ៣ បាត់ (**ហើយ PTR ក៏ស្លាប់ដែរ**); បើធ្លាក់ដោយ
+`residualTransform` នោះចំណុច ៤ មានបញ្ហា។
 
 **Auto pull up — `setPhoneSearchPulledUp()`។** ចុច (focus) ប្រអប់ស្វែងរកលេខទូរស័ព្ទ ➜
 `#dataSideSection` ទទួល `.search-focus` ដែលបង្រួមកាតខាងលើទាំងអស់ ទុកតែប្រអប់ស្វែងរក

@@ -92,6 +92,18 @@ const BOOT = function (seed) {
         listeners.filter((l) => l.path === p).forEach((l) => { try { l.cb(snapOf(p)); } catch (e) { window.__listenerThrew = String(e && e.message); } });
     }
     function fireAll() { [...new Set(listeners.map((l) => l.path))].forEach(fire); }
+    // Firebase ពិតបាញ់តែ listener ដែល node របស់វា **ពាក់ព័ន្ធ** នឹង path ដែលប្រែ
+    // (ដូនតា ឬកូនចៅ)។ `fireAll()` ដែលបាញ់គ្រប់ listener ធ្វើឲ្យ projection
+    // ក្នុងសតិស្តារខ្លួនភ្លាមក្រោយការសរសេរ **ណាមួយ** ➜ តេស្តជោគជ័យក្លែងក្លាយ
+    // លើថ្នាក់កំហុស «rollback ស្តារ snapshot ចាស់»។
+    function fireFor(changedPath) {
+        const cp = String(changedPath || '');
+        if (!cp) return fireAll();
+        [...new Set(listeners.map((l) => l.path))].forEach((lp) => {
+            if (!lp) { fire(lp); return; }
+            if (cp === lp || cp.indexOf(lp + '/') === 0 || lp.indexOf(cp + '/') === 0) fire(lp);
+        });
+    }
     window.__setPathSilent = (p, v) => setPath(p, v);
 
     // delay in REAL ms, using the unscaled timer, so "lands after the app's timeout" is exact
@@ -99,11 +111,21 @@ const BOOT = function (seed) {
         const hit = window.__slow.find((s) => String(p).indexOf(s.match) === 0);
         return hit ? hit.landAfterMs : 0;
     }
+    function failFor(p) {
+        const hit = window.__slow.find((s) => String(p).indexOf(s.match) === 0 && s.failAfterMs);
+        return hit ? hit.failAfterMs : 0;
+    }
     function maybeDefer(p, apply) {
+        const f = failFor(p);
+        if (f) return new Promise((_, reject) => {
+            rawSetTimeout(() => reject(new Error('simulated write failure')), f);
+        });
         const d = slowFor(p);
         if (!d) return Promise.resolve(apply());
         return new Promise((resolve) => { rawSetTimeout(() => resolve(apply()), d); });
     }
+    // ការសរសេររបស់ **ឧបករណ៍ផ្សេង** ដែលមកដល់កណ្តាលការរង់ចាំរបស់យើង
+    window.__pushFromOtherDevice = (p, v) => { setPath(p, v); fireFor(p); };
 
     const user = { uid: 'admin-uid', email: 'a@b.c', getIdToken: () => Promise.resolve('tok'), metadata: { lastSignInTime: new Date().toISOString() } };
     window.firebaseSDK = {
@@ -126,17 +148,22 @@ const BOOT = function (seed) {
         },
         off: () => {},
         get: (r) => Promise.resolve(snapOf(r.path)),
-        set: (r, v) => maybeDefer(r.path, () => { setPath(r.path, v); fireAll(); }),
+        set: (r, v) => maybeDefer(r.path, () => { setPath(r.path, v); fireFor(r.path); }),
         update: (r, obj) => maybeDefer(r.path, () => {
-            Object.keys(obj).forEach((k) => setPath((r.path ? r.path + '/' : '') + k, obj[k]));
-            fireAll();
+            const touched = [];
+            Object.keys(obj).forEach((k) => {
+                const full = (r.path ? r.path + '/' : '') + k;
+                setPath(full, obj[k]);
+                touched.push(full);
+            });
+            touched.forEach(fireFor);
         }),
         goOnline: () => {},
         runTransaction: (r, fn) => maybeDefer(r.path, () => {
             const cur = getPath(r.path);
             const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
             if (next === undefined) return { committed: false, snapshot: snapOf(r.path) };
-            setPath(r.path, next); fireAll();
+            setPath(r.path, next); fireFor(r.path);
             return { committed: true, snapshot: snapOf(r.path) };
         })
     };
@@ -357,6 +384,71 @@ async function scanOnce(page, code) {
         }, dk);
         check(rev2.sum === rev2.revenue && rev2.n === rev2.count, 'C: ចំណូលនៅតែស្មើផលបូក barcode ពិត', JSON.stringify(rev2));
 
+        await ctx.close();
+    }
+
+    // === D — ការសរសេររបស់ឧបករណ៍ផ្សេងមកដល់កណ្តាលការរក្សាទុកដែលធ្លាក់ ===
+    // ថ្នាក់កំហុស៖ rollback ដែលស្តារ **array ទាំងមូល** ពី snapshot ដែលថត
+    // **មុន** await ➜ វាលុបការងាររបស់ឧបករណ៍ផ្សេងចេញពីអេក្រង់។ នេះជាថ្នាក់
+    // ដដែលនឹង «សរសេរ item ទាំងមូលពីច្បាប់ចម្លងក្នុងសតិ» តែលើ projection
+    // ក្នុងសតិ ដូច្នេះ `stale-write.js` (ដែលពិនិត្យការសរសេរទៅ Firebase) មិនចាប់។
+    {
+        const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
+        const page = await ctx.newPage();
+        page.on('dialog', (d) => d.accept());
+        await page.route('**', (r) => {
+            const u = r.request().url();
+            if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
+            if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
+            return r.abort();
+        });
+        await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
+        await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedData()) + ');');
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForFunction(() => typeof window.confirmPhone === 'function', null, { timeout: 30000 });
+        await page.waitForTimeout(400);
+
+        // `pendingBarcode` ជា module `let` ➜ **មិនស្ថិតលើ window**។ ត្រូវឆ្លងកាត់
+        // `triggerScanAction()` ដូចអ្នកប្រើពិត បើមិនដូច្នេះ `confirmPhone()`
+        // ចាកចេញមុនដោយ «សូមស្កេនម្ដងទៀត» ➜ តេស្តជោគជ័យក្លែងក្លាយ។
+        await page.evaluate((c) => window.triggerScanAction(c), 'RACE_D_0001');
+        await page.waitForTimeout(200);
+
+        const out = await page.evaluate(async () => {
+            const wait = (ms) => new Promise((x) => window.__rawSetTimeout(x, ms));
+            // ការរក្សាទុកទៅ history នឹង **ធ្លាក់** ក្រោយ 300ms
+            window.__slow = [{ match: 'zoew_scan_history_cod_dod', failAfterMs: 300 }];
+            const p = document.getElementById('modalPhoneInput'); if (p) p.value = '0777111222';
+            const c = document.getElementById('modalCodInput'); if (c) c.value = '9';
+            const d = document.getElementById('modalDodInput'); if (d) d.value = '0';
+            const settled = Promise.resolve(window.confirmPhone()).then(() => 'ok', (e) => 'err');
+            // កណ្តាលការរង់ចាំ ➜ ឧបករណ៍ផ្សេងបញ្ចូលកញ្ចប់ថ្មី
+            await wait(120);
+            window.__pushFromOtherDevice('zoew_scan_history_cod_dod/other_device_item', {
+                id: 'other_device_item', phone: '0999000111', scanDate: (window.__fakeStore._dateKey || ''),
+                createdAt: Date.now(), cod: 3, dod: 0, price: 3, count: 1, barcode: 'OTHERDEV1',
+                time: '11:11', isClosed: false,
+                barcodes: [{ code: 'OTHERDEV1', time: '11:11', cod: 3, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: Date.now() }]
+            });
+            const res = await settled;
+            await wait(250);
+            window.__slow = [];
+            const ids = (typeof scanHistory !== 'undefined' ? scanHistory : []).map((i) => i && i.id);
+            const codes = [];
+            (typeof scanHistory !== 'undefined' ? scanHistory : []).forEach((i) => {
+                (Array.isArray(i && i.barcodes) ? i.barcodes : []).forEach((b) => b && codes.push(b.code));
+            });
+            return { res, ids, codes, onServer: Object.keys(window.__fakeStore.zoew_scan_history_cod_dod || {}) };
+        });
+
+        check(out.ids.indexOf('other_device_item') !== -1,
+            'D: ការរក្សាទុកធ្លាក់ ➜ កញ្ចប់របស់ឧបករណ៍ផ្សេង **មិនត្រូវលុបចេញពីអេក្រង់**',
+            JSON.stringify(out));
+        check(out.codes.indexOf('RACE_D_0001') === -1,
+            'D: ការរក្សាទុកធ្លាក់ ➜ barcode ដែលធ្លាក់ត្រូវដកចេញពីអេក្រង់',
+            JSON.stringify(out.codes));
+        check(out.onServer.indexOf('other_device_item') !== -1,
+            'D: ទិន្នន័យលើ server របស់ឧបករណ៍ផ្សេងនៅដដែល', JSON.stringify(out.onServer));
         await ctx.close();
     }
 

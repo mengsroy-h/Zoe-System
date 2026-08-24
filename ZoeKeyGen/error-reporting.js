@@ -4,9 +4,14 @@
     const DSN_STORAGE_KEY = 'zoe_sentry_dsn';
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/7.120.3/bundle.min.js';
     const SDK_LOAD_TIMEOUT_MS = 10000;
+    const MAX_QUEUED_EVENTS = 20;
     const SECRET_PARAM_PATTERN = '(?:auth|access_token|id_token|key|apikey|api_key|token|secret|password|passwd|pwd|sig|signature|setup)';
 
     let loadPromise = null;
+    let sentryReady = false;
+    let initGeneration = 0;
+    let lateInitRequest = null;
+    const queuedEvents = [];
 
     function loadSentrySdk() {
         if (global.Sentry) return Promise.resolve(global.Sentry);
@@ -23,9 +28,9 @@
             script.src = SENTRY_SDK_URL;
             script.crossOrigin = 'anonymous';
             script.onload = () => {
-                if (settled) return;
-                settled = true;
                 clearTimeout(timer);
+                if (settled) { runLateInit(); return; }
+                settled = true;
                 resolve(global.Sentry);
             };
             script.onerror = () => {
@@ -103,31 +108,86 @@
         });
     }
 
-    async function init(appName, release) {
-        tagApp(appName, release);
+    function sendToSentry(err, extra) {
+        try { global.Sentry.captureException(err, extra ? { extra: extra } : undefined); } catch (e) {}
+    }
 
-        const dsn = getDsn();
-        if (!dsn) return !!global.Sentry;
+    function flushQueuedEvents() {
+        if (!sentryReady || !queuedEvents.length) return;
+        const pending = queuedEvents.splice(0, queuedEvents.length);
+        pending.forEach((item) => sendToSentry(item.err, item.extra));
+    }
+
+    function applySentryInit(appName, release, dsn) {
+        if (!global.Sentry || typeof global.Sentry.init !== 'function') return false;
         try {
-            const Sentry = await loadSentrySdk();
-            if (!Sentry || typeof Sentry.init !== 'function') return false;
             const options = guardedOptions(appName, release);
             options.dsn = dsn;
             options.sampleRate = 1.0;
             options.tracesSampleRate = 0;
-            Sentry.init(options);
-            if (typeof Sentry.setTag === 'function') Sentry.setTag('app', appName || 'unknown');
-            return true;
+            global.Sentry.init(options);
+            if (typeof global.Sentry.setTag === 'function') global.Sentry.setTag('app', appName || 'unknown');
         } catch (e) {
+            return false;
+        }
+        sentryReady = true;
+        lateInitRequest = null;
+        flushQueuedEvents();
+        return true;
+    }
+
+    function runLateInit() {
+        const request = lateInitRequest;
+        lateInitRequest = null;
+        if (!request || request.generation !== initGeneration) return;
+        applySentryInit(request.appName, request.release, request.dsn);
+    }
+
+    function detachSentry() {
+        sentryReady = false;
+        lateInitRequest = null;
+        queuedEvents.length = 0;
+        if (!global.Sentry) return;
+        try {
+            if (typeof global.Sentry.getCurrentHub === 'function') {
+                const hub = global.Sentry.getCurrentHub();
+                if (hub && typeof hub.bindClient === 'function') { hub.bindClient(undefined); return; }
+            }
+        } catch (e) {}
+        try {
+            if (typeof global.Sentry.close === 'function') global.Sentry.close();
+        } catch (e) {}
+    }
+
+    async function init(appName, release) {
+        const myGeneration = ++initGeneration;
+        tagApp(appName, release);
+
+        const dsn = getDsn();
+        if (!dsn) {
+            detachSentry();
+            return false;
+        }
+        try {
+            const Sentry = await loadSentrySdk();
+            if (myGeneration !== initGeneration) return false;
+            if (!Sentry || typeof Sentry.init !== 'function') return false;
+            return applySentryInit(appName, release, dsn);
+        } catch (e) {
+            if (myGeneration !== initGeneration) return false;
+            lateInitRequest = { appName: appName, release: release, dsn: dsn, generation: myGeneration };
             console.error('Sentry init failed:', e);
             return false;
         }
     }
 
     function capture(err, extra) {
-        if (global.Sentry && typeof global.Sentry.captureException === 'function') {
-            try { global.Sentry.captureException(err, extra ? { extra: extra } : undefined); } catch (e) {}
+        if (sentryReady && global.Sentry && typeof global.Sentry.captureException === 'function') {
+            sendToSentry(err, extra);
+            return;
         }
+        if (queuedEvents.length >= MAX_QUEUED_EVENTS) queuedEvents.shift();
+        queuedEvents.push({ err: err, extra: extra });
     }
 
     function setDsn(dsn) {

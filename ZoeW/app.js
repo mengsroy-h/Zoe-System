@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.4';
+    const APP_VERSION = '2.11.5';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -409,6 +409,8 @@
                 if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
                 if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
                 isDatabaseInitialized = false;
+                isDatabaseConnected = false;
+                renderConnectionStatus();
                 scanHistory = [];
                 deletedItems = [];
                 dailyRevenueData = {};
@@ -5715,6 +5717,23 @@
         }
     }
 
+    function dropOptimisticBarcode(code) {
+        if (!code) return;
+        for (let i = scanHistory.length - 1; i >= 0; i--) {
+            const item = scanHistory[i];
+            if (!item || !Array.isArray(item.barcodes)) continue;
+            const at = item.barcodes.findIndex((b) => b && b.code === code);
+            if (at === -1) continue;
+            item.barcodes.splice(at, 1);
+            if (!item.barcodes.length) { scanHistory.splice(i, 1); return; }
+            item.count = item.barcodes.length;
+            item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            item.price = Math.round((item.cod + item.dod) * 100) / 100;
+            return;
+        }
+    }
+
     async function confirmPhone(isSkip = false) {
         const phoneEl = document.getElementById('modalPhoneInput');
         const lockerEl = document.getElementById('modalLockerInput');
@@ -5783,11 +5802,9 @@
                 return;
             }
 
-            const historySnapshot = scanHistory.map(item => ({ ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes }));
-
             const rollbackFailedSave = () => {
                 if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
-                scanHistory = historySnapshot;
+                dropOptimisticBarcode(barcodeToSave);
                 refreshCurrentHistoryView();
             };
 
@@ -7213,7 +7230,6 @@
         const index = deletedItems.findIndex(i => i.id === id);
         if (index === -1) { openRecentlyDeletedModal(); return; }
 
-        const deletedSnapshot = deletedItems.map(i => ({ ...i, barcodes: Array.isArray(i.barcodes) ? i.barcodes.map(b => ({ ...b })) : i.barcodes }));
         const purgedItem = deletedItems.splice(index, 1)[0];
         renderRecentlyDeleted();
         openRecentlyDeletedModal();
@@ -7222,7 +7238,9 @@
             await deleteSingleDeletedItemFromFirebase(id);
             releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
         } catch (e) {
-            deletedItems = deletedSnapshot;
+            if (!deletedItems.some((i) => i && i.id === id)) {
+                deletedItems.splice(Math.min(index, deletedItems.length), 0, purgedItem);
+            }
             renderRecentlyDeleted();
             showToast("⚠️ លុបជាអចិន្ត្រៃយ៍មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }

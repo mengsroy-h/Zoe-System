@@ -182,7 +182,8 @@ queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទា�
 - អូស/scroll **ឡើង** លើ `#dataMainSection` ➜ `#dataSideSection` ទទួល `.collapsed` ➜ ប្រវត្តិហូតឡើងពេញអេក្រង់
 - អូស **ចុះ** ពេលតារាងនៅកំពូល ➜ ដក `.collapsed` ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ
 - ចុច `#dragHandle` ➜ toggle ដោយចេតនាច្បាស់លាស់ (ដំណើរការទោះកំពុងស្វែងរក)
-- **`.collapsed` និង `.search-focus` លោតភ្លាម — គ្មាន `transition` ទេ ហើយកុំបន្ថែមវិញ។**
+- **កុំដាក់ `transition` លើ `.collapsed`/`.search-focus` វិញ** (កំណែ 2.9.0 បន្ថែម
+  ចលនាតាមផ្លូវ **ផ្សេង** — មើលផ្នែក «ចលនាតាមម្រាមដៃ» ខាងក្រោម)។
   `max-height` **មិនអាចធ្វើចលនាបានទេ** ពេលតម្លៃដើមជា `none` (វាលោតទៅ 0 ភ្លាម) ដូច្នេះ
   `transition` ដែលធ្លាប់មាន សល់តែ `opacity` ដែលដេញលើប្រអប់កម្ពស់ 0 ដែលមើលមិនឃើញផង
   ➜ ការគូរឡើងវិញ ០.៣ វិនាទីដោយឥតប្រយោជន៍ ចំពេលអ្នកប្រើកំពុងរមូរ (អ្នកប្រើរាយការណ៍
@@ -190,6 +191,38 @@ queue ចេតនា ហើយ `touchend` ទើបអនុវត្តទា�
   `visibility: hidden` ដែរ ➜ លែង tab ចូលបាន និងលែងត្រូវ hit-test
 - **ការអូសឡើង មិនត្រូវបិទផ្ទាំង ពេលអ្នកប្រើកំពុងស្វែងរកលេខទូរស័ព្ទទេ** (`phoneSearchIsActive()`)
   — បើមិនដូច្នេះ អ្វីដែលគេកំពុងវាយបាត់ពីអេក្រង់
+
+**ចលនាតាមម្រាមដៃ (កំណែ 2.9.0) — READ BEFORE TOUCHING PANEL LAYOUT។**
+លក្ខខណ្ឌស្នូល៖ **កាតបញ្ជី (`.page-main`) ត្រូវខ្ពស់ដូចគ្នាបេះបិទទាំងរបៀបធម្មតា
+និងរបៀបពេញអេក្រង់** — `height: calc(100dvh - --chrome-top - --chrome-bottom - 16px)`
+បូក `flex: none` ក្នុង `@media (max-width: 991px)`។ ផលពីរ៖
+
+១. ការរំកិលផ្ទាំង **ចុះចំកន្លែងបេះបិទ** ➜ ការប្តូរ class មិនលោត។ មុន 2.9.0 កាតខ្ពស់
+   588px ធម្មតា ទល់នឹង 642px ពេញអេក្រង់ ➜ ខុស 56px ➜ **នោះជាមូលហេតុនៃការលោត**។
+២. **កម្ពស់ `.table-responsive` លែងប្តូរ** រវាង ២ របៀប ➜ ថ្នាក់កំហុស «ប្តូរកម្ពស់
+   កន្សោមរមូរកណ្តាល momentum» ក្លាយជា **មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ**។
+
+**ត្រូវប្រើ `height` មិនមែន `min-height`** — `min-height` មិនកំណត់ពិដានទេ ➜ ខ្សែសង្វាក់
+flex ខាងក្នុងធ្វើឲ្យកាតរីកតាមមាតិកាតារាងទាំងមូល (វាស់បាន 10,387px)។ ក្នុងរបៀប
+`history-expanded`, `flex: 1` (flex-basis 0) សរសេរជាន់ `height` ដោយចេតនា ➜ ការទទួល
+កន្លែងរបា Tab មកវិញ (`chrome-space-released`) នៅដំណើរការដដែល។
+
+ចលនាមាន ២ ផ្លូវ **ដោយចេតនា** ព្រោះម្រាមដៃលើតារាងជាកម្មសិទ្ធិរបស់តារាង៖
+
+| ម្រាមដៃនៅឯណា | ចលនា |
+|---|---|
+| ផ្ទាំងស្ថិតិ/ស្វែងរក | ការរមូរ native របស់ `.app-pages` = ១:១ ពិត + momentum |
+| តារាងបញ្ជី | តារាងរមូរធម្មតា រួច `panelGlideFrom()` រអិល 220ms ពេល `touchend` |
+
+`panelGlideFrom()` ជា **FLIP**៖ អានទីតាំង, ប្តូរ class, អានម្តងទៀត, រួចធ្វើចលនា
+`transform` តាម Web Animations។ វា **មិនមែន** CSS `transition` ទេ — `transition` លើ
+`max-height` នៅតែមិនដំណើរការ (មើលថ្នាក់កំហុសខាងក្រោម)។ វាគោរព
+`prefers-reduced-motion` និងបិទលើ ≥992px។
+
+**`scroll-padding-top` ត្រូវស្មើនឹង `padding-top` របស់ `.app-pages` ជានិច្ច។**
+`scroll-snap-type: y proximity` ធ្វើឲ្យការរមូរឈប់ត្រឹម 0 ឬចម្ងាយពេញ (លែងឈប់
+ពាក់កណ្តាល)។ បើភ្លេច `scroll-padding-top` នោះចំណុច snap «បើក» ធ្លាក់ត្រឹម
+`scrollTop 71` ជំនួស `0` ➜ **PTR លែងកេះបានទាំងស្រុង** ព្រោះវាទាមទារ `scrollTop <= 1`។
 
 **Auto pull up — `setPhoneSearchPulledUp()`។** ចុច (focus) ប្រអប់ស្វែងរកលេខទូរស័ព្ទ ➜
 `#dataSideSection` ទទួល `.search-focus` ដែលបង្រួមកាតខាងលើទាំងអស់ ទុកតែប្រអប់ស្វែងរក
@@ -527,6 +560,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ច្បាប់ក្នុង `@media` ដែលស្លាប់ដោយច្បាប់មូលដ្ឋានក្រោយវា | `css-media-override.js` |
 | animation ដែលបង្កើត layout/paint រាល់ស៊ុម និង `transition: all` | `animation-cost.js` |
 | ការបង្ខំ layout ឡើងវិញក្នុង handler របស់ touch/scroll/rAF | `layout-thrash.js` |
+| លក្ខខណ្ឌនៃចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើគ្នា, snap ↔ PTR) | `panel-motion-test.js` |
 | comment / trailing whitespace | `comments.js` |
 | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
 | សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |

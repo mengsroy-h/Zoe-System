@@ -57,7 +57,15 @@ const ACCEPTED = {
     // របស់ scroll ត្រូវ coalesce តាម rAF ➜ ១ ដងក្នុងមួយស៊ុម មិនមែន ១ ដងក្នុង
     // មួយព្រឹត្តិការណ៍រមូរទេ។ ចាក់សោដោយថវិកា SUGGEST_CALL_BUDGET ខាងក្រោម។
     'ZoeW:positionPhoneSuggestBox:offsetHeight':
-        'rAF coalesce ➜ ១ ដងក្នុងមួយស៊ុម — វាស់ក្នុងដំណាក់កាលទី ២'
+        'rAF coalesce ➜ ១ ដងក្នុងមួយស៊ុម — វាស់ក្នុងដំណាក់កាលទី ២',
+    // FLIP៖ ត្រូវអានទីតាំង **ក្រោយ** ប្តូរ class ដើម្បីដឹងចម្ងាយត្រូវធ្វើចលនា។
+    // ការអានមួយនេះកើត **១ ដងពេលលែងដៃ** មិនមែនរាល់ស៊ុមទេ ហើយ class ដែលប្តូរ
+    // បង្ខំ layout នៅស៊ុមបន្ទាប់យ៉ាងណាក៏ដោយ ➜ ការអានស្របគ្នាមិនបន្ថែមថ្លៃទេ។
+    // ចលនាខ្លួនវាជា `transform` សុទ្ធ (Web Animations) ➜ ដើរលើ compositor។
+    'ZoeW:finishMainSwipe ➜ applyPanelAction ➜ panelGlideFrom:getBoundingClientRect()':
+        'FLIP — អានម្តងពេល touchend មិនមែនរាល់ស៊ុម',
+    'ZoeW:finishScrollerSwipe ➜ applyPanelAction ➜ panelGlideFrom:getBoundingClientRect()':
+        'FLIP — អានម្តងពេល touchend មិនមែនរាល់ស៊ុម'
 };
 
 let problems = 0;

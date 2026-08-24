@@ -54,6 +54,9 @@ function buildEnv(src, opts) {
         scrollTop: 0,
         value: '',
         contains: (el) => !!el && (OWNED[id] || []).indexOf(el.id) !== -1,
+        // ធាតុ DOM ពិតតែងតែមាន — `panelGlideFrom()` អានវាដើម្បីគណនាចម្ងាយ FLIP
+        getBoundingClientRect: () => ({ top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 }),
+        animate: undefined,
         addEventListener: (type, fn) => { (handlers[id] = handlers[id] || {})[type] = fn; }
     }, extra || {});
 
@@ -102,6 +105,8 @@ function buildEnv(src, opts) {
     vm.runInContext(sliceFn(src, 'touchByIdentifier'), ctx);
     vm.runInContext(sliceFn(src, 'panelBlockedForTouch'), ctx);
     vm.runInContext(sliceFn(src, 'panelMayYieldToPTR'), ctx);
+    vm.runInContext(sliceFn(src, 'panelMotionAllowed'), ctx);
+    vm.runInContext(sliceFn(src, 'panelGlideFrom'), ctx);
     vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
     ctx.setupSwipeGestures();

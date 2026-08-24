@@ -475,7 +475,11 @@ const GESTURE = function (steps) {
         };
     });
     ok('ចុចដងអូស ➜ ចូលរបៀបប្រវត្តិពេញអេក្រង់', fullscreen.expanded === true && fullscreen.sideCollapsed === true, fullscreen);
-    ok('តារាងខ្ពស់ជាងមុនក្រោយទាញឡើង', fullscreen.tableH > fullscreen.tableHBefore, fullscreen);
+    // កំណែ 2.9.0៖ កាតបញ្ជីខ្ពស់ដូចគ្នាទាំង ២ របៀបដោយចេតនា ដូច្នេះកម្ពស់តារាង
+    // **មិនត្រូវប្រែ** ទៀតទេ។ នេះជាលក្ខខណ្ឌដែលធ្វើឲ្យការរំកិល ១:១ ចុះចំកន្លែង
+    // បេះបិទ ហើយវាក៏លុបថ្នាក់កំហុស «ប្តូរកម្ពស់កន្សោមរមូរកណ្តាល momentum» ចោល
+    // តាមរចនាសម្ព័ន្ធផងដែរ។ (មុននេះ៖ 482px ធម្មតា ➜ 538px ពេញអេក្រង់។)
+    ok('កម្ពស់តារាងមិនប្រែរវាង ២ របៀប (លក្ខខណ្ឌនៃការរំកិលរអិល)', fullscreen.tableH === fullscreen.tableHBefore, fullscreen);
     ok('គ្មានចន្លោះទទេនៅសល់ខាងលើដងអូស (≤2px)', Math.abs(fullscreen.gapTop) <= 2, fullscreen);
     ok('ដងអូសនៅជាប់កាតប្រវត្តិ (≤10px)', fullscreen.handleToCard <= 10, fullscreen);
     ok('គ្មានចន្លោះទទេនៅសល់ខាងក្រោមកាតប្រវត្តិ (≤2px)', Math.abs(fullscreen.gapBottom) <= 2, fullscreen);

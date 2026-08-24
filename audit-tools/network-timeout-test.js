@@ -1,0 +1,176 @@
+// ថ្នាក់កំហុស៖ **timeout ដែលមិន abort សំណើពិត**។
+//
+// `withTimeout(fetch(url), 20000)` គ្រាន់តែ race នឹង timer — `fetch` ខ្លួនវា
+// **នៅតែដំណើរការបន្ត**។ ផលពិត ២៖
+//   ១. ជាមួយ `retryAsync(fn, 2)` រាល់ការព្យាយាមបង្កើតសំណើថ្មី **ដោយមិន
+//      បោះបង់ការចាស់** ➜ លើបណ្តាញយឺត សំណើជាន់គ្នាស៊ី bandwidth ➜ Lookup
+//      កាន់តែយឺត ➜ អ្នកប្រើឃើញ App «ជាប់»។
+//   ២. timeout គ្របតែផ្នែក **header** ប៉ុណ្ណោះ។ បើ server ផ្ញើ header រួច
+//      **ឈប់ផ្ញើ body** នោះ `res.json()` / `res.text()` ខាងក្រោយ **ព្យួររហូត**
+//      ដោយគ្មាន timer ណាការពារ ➜ ប្រអប់ជាប់ជារៀងរហូត។
+//
+// ដំណោះស្រាយ៖ `fetchWithTimeout()` ដែលប្រើ `AbortController` ហើយ timer
+// របស់វារស់រហូតដល់ **អានតួចប់** (ដូច `license-verify.js` ធ្វើរួចហើយ)។
+const fs = require('fs'), http = require('http'), path = require('path');
+const ROOT = process.env.NETTIMEOUT_APP_DIR || path.join(__dirname, '..');
+
+let pass = 0, fail = 0;
+function ok(label, cond, detail) {
+    if (cond) { pass++; console.log('   ok    ' + label); }
+    else { fail++; console.log('   FAIL  ' + label + (detail !== undefined ? '\n         ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : '')); }
+}
+
+// === ផ្នែកទី ១ — ស្តាទិច ===
+const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
+
+ok('app.js មាន fetchWithTimeout ដែលប្រើ AbortController',
+    /function fetchWithTimeout\(/.test(src) && /new AbortController\(\)/.test(src));
+ok('គ្មាន `withTimeout(fetch(` នៅសល់ (timeout ដែល abort មិនកើត)',
+    !/withTimeout\(\s*fetch\(/.test(src),
+    (src.match(/withTimeout\(\s*fetch\([^\n]*/g) || []).join('\n         '));
+ok('រាល់ការហៅ fetch() ទៅ endpoint ខាងក្រៅឆ្លងកាត់ fetchWithTimeout',
+    (src.match(/(?<!function )\bfetch\(/g) || []).length ===
+    (src.match(/fetch\(url, opts\)/g) || []).length,
+    'fetch ឆៅ៖ ' + (src.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).join(' | '));
+ok('timer ត្រូវរស់រហូតដល់អានតួចប់ (readBody ស្ថិតក្នុងបង្អួច timeout)',
+    /readBody\(res\)/.test(src) && /clearTimeout\(timer\)/.test(src));
+ok('ការ abort ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង',
+    !/fetch\(url, opts\)\s*\.then\([^)]*\)\s*\.catch\(/.test(src));
+
+// === ផ្នែកទី ២ — ឥរិយាបថពិតក្នុង Chromium ===
+let chromium;
+try { chromium = require('playwright-core').chromium; } catch (e) {
+    console.log('\nSKIP ផ្នែក browser — ត្រូវការ playwright-core');
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+    process.exit(fail ? 1 : 0);
+}
+const CHROME = process.env.NETTIMEOUT_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+if (!fs.existsSync(CHROME)) {
+    console.log('\nSKIP ផ្នែក browser — រកមិនឃើញ Chromium');
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+    process.exit(fail ? 1 : 0);
+}
+
+// ស្រង់ `fetchWithTimeout` ពិតចេញពី app.js មករត់ — កុំសរសេរតេស្តលើកូដចម្លង
+function extractFn(name) {
+    const at = src.indexOf('function ' + name + '(');
+    if (at === -1) return null;
+    let depth = 0, start = src.indexOf('{', at), end = start;
+    for (let k = start; k < src.length; k++) {
+        if (src[k] === '{') depth++;
+        else if (src[k] === '}') { depth--; if (!depth) { end = k; break; } }
+    }
+    return src.slice(at, end + 1);
+}
+let summaryPrinted = false;
+const FN = extractFn('fetchWithTimeout');
+ok('ស្រង់ fetchWithTimeout ពិតចេញពី app.js បាន', !!FN);
+if (!FN) {
+    // គ្មាន helper ➜ ផ្នែក browser គ្មានអ្វីត្រូវរត់។ ចាកចេញយ៉ាងស្អាតជំនួស
+    // ការគាំងដោយ ReferenceError ដែលមើលទៅដូចកំហុស harness។
+    console.log('\n❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ') — រំលងផ្នែក browser ព្រោះគ្មាន fetchWithTimeout');
+    summaryPrinted = true;
+    process.exit(1);
+}
+
+// ម៉ាស៊ីនបម្រើដែលធ្វើត្រាប់តាមបណ្តាញឆ្កួត៖
+//   /hang       — មិនឆ្លើយអ្វីទាំងអស់
+//   /headers-only — ផ្ញើ header រួច **ឈប់** មិនផ្ញើ body និងមិនបិទ
+let openSockets = 0, abortedSockets = 0, hangHits = 0;
+function serve() {
+    return new Promise((res) => {
+        const s = http.createServer((req, rsp) => {
+            const p = req.url.split('?')[0];
+            openSockets++;
+            req.on('aborted', () => { abortedSockets++; });
+            rsp.on('close', () => {});
+            if (p === '/hang') { hangHits++; return; }
+            if (p === '/headers-only') {
+                rsp.writeHead(200, { 'Content-Type': 'application/json', 'Transfer-Encoding': 'chunked',
+                                     'Access-Control-Allow-Origin': '*' });
+                rsp.write(' ');
+                return;
+            }
+            rsp.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            rsp.end(JSON.stringify({ ok: true }));
+        });
+        s.listen(0, '127.0.0.1', () => res(s));
+    });
+}
+
+(async () => {
+    const server = await serve();
+    const port = server.address().port;
+    const base = 'http://127.0.0.1:' + port;
+
+    const browser = await chromium.launch({ executablePath: CHROME });
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(base + '/ping', { waitUntil: 'domcontentloaded' });
+    await page.evaluate('(function(){ ' + FN + '; window.fetchWithTimeout = fetchWithTimeout; })()');
+    const wired = await page.evaluate(() => typeof window.fetchWithTimeout === 'function');
+    ok('fetchWithTimeout ពិតត្រូវបានចាក់ចូល browser', wired === true, String(wired));
+
+    // ១ — សំណើដែលមិនឆ្លើយ ត្រូវ reject **ក្នុងពេលកំណត់** មិនមែនរង់ចាំរហូត
+    const hang = await page.evaluate(async (b) => {
+        const t0 = Date.now();
+        try {
+            await fetchWithTimeout(b + '/hang', {}, 700, 'X timed out', (r) => r.json());
+            return { rejected: false, ms: Date.now() - t0 };
+        } catch (e) {
+            return { rejected: true, ms: Date.now() - t0, msg: String(e && e.message) };
+        }
+    }, base);
+    ok('សំណើដែលមិនឆ្លើយ ➜ reject ក្នុងពេលកំណត់',
+        hang.rejected && hang.ms >= 600 && hang.ms < 2500, hang);
+    ok('សំណើឈានដល់ server ពិត (មិនធ្លាក់មុនចេញដំណើរ)', hangHits >= 1, { hangHits });
+    ok('សារ timeout ជាសាររបស់អ្នកហៅ (មិនត្រូវប្តូរជា AbortError)',
+        hang.msg === 'X timed out', hang);
+
+    // ២ — **ចំណុចសំខាន់**៖ សំណើត្រូវត្រូវបាន abort ពិត មិនមែនត្រឹមបោះបង់ promise
+    await page.waitForTimeout(400);
+    ok('សំណើត្រូវបាន abort ពិត (server ឃើញ connection ដាច់)',
+        abortedSockets >= 1, { hangHits, abortedSockets });
+
+    // ៣ — server ផ្ញើ header រួចឈប់ ➜ ការអានតួក៏ត្រូវឈប់ដែរ (កំហុសចាស់ព្យួររហូត)
+    const partial = await page.evaluate(async (b) => {
+        const t0 = Date.now();
+        try {
+            await fetchWithTimeout(b + '/headers-only', {}, 700, 'Y timed out', (r) => r.json());
+            return { rejected: false, ms: Date.now() - t0 };
+        } catch (e) {
+            return { rejected: true, ms: Date.now() - t0, msg: String(e && e.message) };
+        }
+    }, base);
+    ok('header មករួច តែតួមិនមក ➜ នៅតែ timeout (មិនព្យួររហូត)',
+        partial.rejected && partial.ms < 2500, partial);
+
+    // ៤ — ផ្លូវធម្មតាត្រូវនៅដំណើរការ ហើយ timer ត្រូវត្រូវបានសម្អាត
+    const good = await page.evaluate(async (b) => {
+        const out = await fetchWithTimeout(b + '/ok', {}, 5000, 'Z timed out', (r) => r.json());
+        return { status: out.res.status, body: out.body };
+    }, base);
+    ok('សំណើធម្មតា ➜ ត្រឡប់ res និង body ត្រឹមត្រូវ',
+        good.status === 200 && good.body && good.body.ok === true, good);
+
+    // ៥ — ការហៅជាបន្តបន្ទាប់ (ដូច retryAsync) មិនត្រូវបន្សល់សំណើរស់
+    const before = abortedSockets;
+    await page.evaluate(async (b) => {
+        for (let i = 0; i < 3; i++) {
+            try { await fetchWithTimeout(b + '/hang', {}, 400, 'R timed out', (r) => r.json()); } catch (e) {}
+        }
+    }, base);
+    await page.waitForTimeout(500);
+    ok('retry ៣ ដង ➜ សំណើចាស់ត្រូវ abort ទាំងអស់ (មិនជាន់គ្នា)',
+        abortedSockets - before >= 3, { before, after: abortedSockets });
+
+    await browser.close();
+    server.close();
+    process.exit(0);
+})().then(() => {}, (e) => { ok('ផ្នែក browser រត់ចប់ដោយគ្មានកំហុស harness', false, String(e && e.message || e)); process.exit(1); });
+
+process.on('exit', () => {
+    if (summaryPrinted) return;
+    summaryPrinted = true;
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
+});

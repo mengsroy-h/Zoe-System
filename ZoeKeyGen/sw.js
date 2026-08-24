@@ -1,6 +1,9 @@
-const CACHE_VERSION = 'zoekeygen-v53';
+const CACHE_VERSION = 'zoekeygen-v54';
 
-const APP_SHELL = [
+// ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
+// កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច (ឧ. `qrcode.js` បាត់ ➜ QR របស់
+// Setup Link គូរមិនចេញ ខណៈ App មើលទៅដំណើរការធម្មតា)។
+const CORE_SHELL = [
     './',
     './index.html',
     './style.css',
@@ -8,7 +11,11 @@ const APP_SHELL = [
     './firebase-loader.js',
     './license-verify.js',
     './error-reporting.js',
-    './qrcode.js',
+    './qrcode.js'
+];
+
+// ធនធានតុបតែង — បាត់ក៏ App នៅដំណើរការគ្រប់មុខងារដដែល
+const OPTIONAL_SHELL = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
@@ -17,11 +24,11 @@ const APP_SHELL = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => Promise.all(
-                APP_SHELL.map((url) => cache.add(url).catch(() => {}))
-            ))
+            .then((cache) => cache.addAll(CORE_SHELL).then(() => Promise.all(
+                OPTIONAL_SHELL.map((url) => cache.add(url).catch(() => {}))
+            )))
+            .then(() => self.skipWaiting())
     );
-    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -53,8 +60,8 @@ self.addEventListener('fetch', (event) => {
                 if (!cached) {
                     return networkFetch.then((response) => {
                         if (response) return response;
-                        if (request.mode === 'navigate') return caches.match('./index.html');
-                        return Response.error();
+                        if (request.mode !== 'navigate') return Response.error();
+                        return cache.match('./index.html').then((fallback) => fallback || Response.error());
                     });
                 }
 

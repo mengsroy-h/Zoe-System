@@ -214,6 +214,21 @@ body.boot-reveal .app-container { animation: bootFadeIn 420ms ease-out 70ms both
     .form-grid .col-half { grid-column: span 2; }
 }
 
+@media (min-width: 900px) {
+    :root { --fs-unit: 1.2px; }
+    .app-container {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+        gap: 16px;
+        max-width: 1180px;
+        padding: 18px 20px;
+    }
+    .app-container > .app-card { min-width: 0; }
+    .app-container > .card-wide { grid-column: 1 / -1; }
+    .app-card { padding: 20px; }
+}
+
 .key-output {
     background: var(--dark-bg); color: #a7f3d0; padding: 12px; border-radius: var(--radius-md);
     font-family: 'SFMono-Regular', Consolas, monospace; font-size: calc(11 * var(--fs-unit)); word-break: break-all;

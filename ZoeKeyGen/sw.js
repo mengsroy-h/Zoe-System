@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v61';
+const CACHE_VERSION = 'zoekeygen-v62';
 
 const CORE_SHELL = [
     './',

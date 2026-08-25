@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.15.0';
+    const APP_VERSION = '2.16.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -186,17 +186,17 @@
         if (document.getElementById('zoeUpdateBanner')) return;
         const banner = document.createElement('div');
         banner.id = 'zoeUpdateBanner';
-        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:calc(13 * var(--fs-unit));box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
         const label = document.createElement('span');
         label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
         const refreshBtn = document.createElement('button');
         refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
-        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;';
+        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:calc(13 * var(--fs-unit));cursor:pointer;';
         refreshBtn.addEventListener('click', () => window.location.reload());
         const dismissBtn = document.createElement('button');
         dismissBtn.textContent = '✕';
         dismissBtn.setAttribute('aria-label', 'បិទ');
-        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;';
+        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:calc(16 * var(--fs-unit));cursor:pointer;padding:0 4px;';
         dismissBtn.addEventListener('click', () => banner.remove());
         banner.appendChild(label);
         banner.appendChild(refreshBtn);
@@ -3263,7 +3263,7 @@
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
                         <span>COD: <strong style="color:var(--accent-blue);">$${cod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${dod.toFixed(2)}</strong></span>
                     </div>
-                    <div style="font-size: 10px; color: var(--text-muted); text-align: right; margin-top: 3px;">
+                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
                         សរុប៖ <strong style="color:var(--primary);">$${totalD.toFixed(2)}</strong> (${riel.toLocaleString()} ៛)
                     </div>
                 `;
@@ -3300,7 +3300,7 @@
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
                         <span>COD: <strong style="color:var(--accent-blue);">$${cod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${dod.toFixed(2)}</strong></span>
                     </div>
-                    <div style="font-size: 10px; color: var(--text-muted); text-align: right; margin-top: 3px;">
+                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
                         សរុប៖ <strong style="color:var(--primary);">$${totalD.toFixed(2)}</strong> (${riel.toLocaleString()} ៛)
                     </div>
                 `;
@@ -6495,13 +6495,13 @@
             let closeBtnClass = isBcClosed ? 'btn-toggle-bc-close closed' : 'btn-toggle-bc-close';
             let closeBtnText = isBcClosed ? 'យកហើយ' : '✅ យក';
 
-            let bcTimeDisplay = b.time ? `<div style="font-size:9px; color:var(--text-muted); margin-top:2px;">🕒 ${sanitizeInput(b.time)}</div>` : '';
+            let bcTimeDisplay = b.time ? `<div style="font-size:calc(9 * var(--fs-unit)); color:var(--text-muted); margin-top:2px;">🕒 ${sanitizeInput(b.time)}</div>` : '';
 
             div.innerHTML = `
                 <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 11px;"><strong>${idx + 1}.</strong> <span class="barcode-tag">🏷️ ${sanitizeInput(b.code)}</span> <span class="locker-badge" style="margin-left:4px;">ទីតាំង: ${sanitizeInput(itemLocker)}</span></div>
+                    <div style="font-size: calc(11 * var(--fs-unit));"><strong>${idx + 1}.</strong> <span class="barcode-tag">🏷️ ${sanitizeInput(b.code)}</span> <span class="locker-badge" style="margin-left:4px;">ទីតាំង: ${sanitizeInput(itemLocker)}</span></div>
                     ${bcTimeDisplay}
-                    <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">
+                    <div style="font-size:calc(9.5 * var(--fs-unit)); color:var(--text-muted); margin-top:2px;">
                         COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (សរុប: $${totalSub.toFixed(2)})
                     </div>
                 </div>
@@ -7979,8 +7979,8 @@
             `;
 
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ចាស់</span>`
-                : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:9px; font-weight:600; margin-left:4px;">ថ្មី</span>`;
+                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600; margin-left:4px;">ចាស់</span>`
+                : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600; margin-left:4px;">ថ្មី</span>`;
 
             let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;
             let calledBadge = item.isCalled ? `<span class="called-badge">ខល</span>` : "";
@@ -8014,24 +8014,24 @@
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div style="font-size: 10px;">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
-                    <div style="font-size: 10px; margin-top:2px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
+                    <div style="font-size: calc(10 * var(--fs-unit));">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
+                    <div style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
                 `;
             } else if (hasCod) {
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div style="font-size: 10.5px;">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong></div>
-                    <div style="font-size: 9.5px; color: var(--text-muted);">${codRiel.toLocaleString()} ៛</div>
+                    <div style="font-size: calc(10.5 * var(--fs-unit));">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong></div>
+                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted);">${codRiel.toLocaleString()} ៛</div>
                 `;
             } else if (hasDod) {
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div style="font-size: 10.5px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong></div>
-                    <div style="font-size: 9.5px; color: var(--text-muted);">${dodRiel.toLocaleString()} ៛</div>
+                    <div style="font-size: calc(10.5 * var(--fs-unit));">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong></div>
+                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted);">${dodRiel.toLocaleString()} ៛</div>
                 `;
             } else {
                 priceDisplayHtml = `
-                    <div style="font-size: 10.5px; color: var(--text-muted);">0.00 $ (0 ៛)</div>
+                    <div style="font-size: calc(10.5 * var(--fs-unit)); color: var(--text-muted);">0.00 $ (0 ៛)</div>
                 `;
             }
 

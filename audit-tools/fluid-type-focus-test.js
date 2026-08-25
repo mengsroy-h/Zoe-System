@@ -45,10 +45,11 @@ const PRINT_ONLY = /pdfExportPrintArea/;
 const GROWTH_MAX = 1.1;
 const FLOOR_WIDTH = 320;
 const CAP_WIDTH = 430;
+const DESKTOP_STEP = 1.2;
 
 const APPS = [
     {
-        name: 'ZoeW', port: 8760,
+        name: 'ZoeW', port: 8760, desktop: 992,
         real: [
             { sel: 'body', px: 13 },
             { sel: '.brand-info h1', px: 14 },
@@ -61,7 +62,7 @@ const APPS = [
         shadowRings: [{ id: 'securityPinInput' }, { id: 'hwScannerInput', tab: '#pageTabEntry' }]
     },
     {
-        name: 'ZoeKeyGen', port: 8762,
+        name: 'ZoeKeyGen', port: 8762, desktop: 900,
         real: [
             { sel: 'body', px: 13 },
             { sel: 'label', px: 11 },
@@ -70,6 +71,16 @@ const APPS = [
             { sel: '.brand-logo', px: 15 }
         ],
         shadowRings: [{ id: 'newSecurityPinInput' }]
+    },
+    {
+        name: 'ZoeImport', port: 8764, desktop: 900,
+        real: [
+            { sel: 'body', px: 14.5 },
+            { sel: '.brand', px: 14 },
+            { sel: '.gate-icon', px: 28 },
+            { sel: '.hint', px: 13 }
+        ],
+        shadowRings: [{ id: 'pinNewInput' }]
     }
 ];
 
@@ -83,12 +94,18 @@ function staticScan(app) {
         check(decl[1].trim() === '1px', app.name + '៖ ជាន់ទាបនៃ --fs-unit ជា 1px (គ្មានការតូចជាងមុននៅ 320px)', 'ឃើញ ' + decl[1].trim());
         check(decl[3].trim() === GROWTH_MAX + 'px', app.name + '៖ ពិដាននៃ --fs-unit ជា ' + GROWTH_MAX + 'px', 'ឃើញ ' + decl[3].trim());
     }
+    // ⛔ ការស្កេនតែ style.css ខកខានថ្នាក់កំហុសដដែល — `style="font-size:10px"` ក្នុង
+    // index.html និងក្នុង template string របស់ app.js នៅក្រៅមាត្រដ្ឋានទាំងស្រុង។
     const strays = [];
-    lines.forEach((line, i) => {
-        if (PRINT_ONLY.test(line)) return;
-        if (/font-size:\s*[0-9.]+px/.test(line)) strays.push((i + 1) + ': ' + line.trim().slice(0, 70));
-    });
-    check(strays.length === 0, app.name + '៖ គ្មាន `font-size` ថេរជា px សល់ក្រៅតំបន់បោះពុម្ព', strays.join('\n        '));
+    for (const rel of ['style.css', 'index.html', 'app.js']) {
+        const f2 = path.join(ROOT, app.name, rel);
+        if (!fs.existsSync(f2)) continue;
+        fs.readFileSync(f2, 'utf8').split('\n').forEach((line, i) => {
+            if (PRINT_ONLY.test(line)) return;
+            if (/font-size:\s*[0-9.]+px/.test(line)) strays.push(rel + ':' + (i + 1) + ': ' + line.trim().slice(0, 62));
+        });
+    }
+    check(strays.length === 0, app.name + '៖ គ្មាន `font-size` ថេរជា px ក្នុង style.css · index.html · app.js', strays.slice(0, 6).join('\n        '));
     const sizes = new Set();
     const re = /font-size:\s*calc\(([0-9.]+) \* var\(--fs-unit\)\)/g;
     let m;
@@ -194,13 +211,21 @@ async function tabSweep(page, steps) {
                 if (!el) return { missing: true };
                 const host = el.closest('.modal');
                 if (host) host.style.display = 'flex';
+                const unhidden = [];
+                for (let n = el; n && n !== document.body; n = n.parentElement) {
+                    if (n.classList.contains('hidden')) { n.classList.remove('hidden'); unhidden.push(n); }
+                }
                 el.focus();
                 const live = document.activeElement === el;
                 const cs = getComputedStyle(el);
+                // ⚠️ CSSStyleDeclaration ជា **live** — ត្រូវថតតម្លៃមុន blur
                 const shadow = cs.boxShadow && cs.boxShadow !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(cs.boxShadow);
+                const ring = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2;
+                const raw = 'outline=' + cs.outlineWidth + '/' + cs.outlineStyle + ' shadow=' + cs.boxShadow;
                 el.blur();
+                unhidden.forEach((n) => n.classList.add('hidden'));
                 if (host) host.style.display = '';
-                return { live: live, focused: cs.outlineStyle !== 'none' || shadow, raw: cs.boxShadow };
+                return { live: live, focused: ring || shadow, raw: raw };
             }, ring.id);
             check(!got.missing && got.live && got.focused,
                 app.name + '៖ #' + ring.id + ' បង្ហាញរង្វង់ផ្តោត', got.missing ? 'រកមិនឃើញធាតុ' : JSON.stringify(got));
@@ -232,16 +257,26 @@ async function tabSweep(page, steps) {
 
         // ច. ពិដាន — ចាប់ពី 430px ឡើងទៅ ទំហំត្រូវឈប់រីក
         const capped = [];
-        for (const w of [CAP_WIDTH, 768, 1280]) {
+        for (const w of [CAP_WIDTH, 768, 880]) {
             const c = await openApp(browser, app, w);
             capped.push(await probeAt(c.page, sizes));
             await c.ctx.close();
         }
         const capBad = sizes.filter((n) => !near(capped[0][n], n * GROWTH_MAX, 0.08) || !near(capped[1][n], capped[0][n]) || !near(capped[2][n], capped[0][n]));
-        check(capBad.length === 0, app.name + '៖ ទំហំឈប់រីកចាប់ពី ' + CAP_WIDTH + 'px (ដូចគ្នានៅ 768/1280)',
+        check(capBad.length === 0, app.name + '៖ ទំហំឈប់រីកចាប់ពី ' + CAP_WIDTH + 'px (ដូចគ្នានៅ 768/880)',
             capBad.map((n) => n + 'px ➜ ' + capped.map((c) => c[n]).join(' / ')).join(', '));
         const monotone = sizes.every((n) => floor[n] <= mid[n] + 0.01 && mid[n] <= capped[0][n] + 0.01);
         check(monotone, app.name + '៖ មាត្រដ្ឋានឡើងតាមលំដាប់ 320 ➜ 412 ➜ ' + CAP_WIDTH);
+
+        // ជំហានទី ២ — ពេល layout បត់ជាជួរឈរច្រើន អក្សរត្រូវឡើងមួយកម្រិតទៀត
+        const deskCtx = await openApp(browser, app, app.desktop, 900);
+        const desk = await probeAt(deskCtx.page, sizes);
+        await deskCtx.ctx.close();
+        const deskBad = sizes.filter((n) => !near(desk[n], n * DESKTOP_STEP, 0.08));
+        check(deskBad.length === 0, app.name + '៖ អក្សរឡើងជំហាន ×' + DESKTOP_STEP + ' នៅ ' + app.desktop + 'px (កន្លែងដែល layout បត់ជាជួរឈរច្រើន)',
+            deskBad.map((n) => n + 'px ➜ ' + desk[n]).join(', '));
+        check(sizes.every((n) => desk[n] > capped[0][n] + 0.01),
+            app.name + '៖ ជំហាន desktop ធំជាងពិដានទូរស័ព្ទពិត');
 
         server.close();
     }

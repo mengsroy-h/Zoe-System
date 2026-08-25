@@ -11,6 +11,7 @@
     --bad: #b3261e;
     --navbar-h: 56px;
     --gutter: clamp(12px, 3.2vw, 22px);
+    --fs-unit: clamp(1px, 0.7091px + 0.0909vw, 1.1px);
     --radius: 12px;
 }
 
@@ -31,7 +32,7 @@ body {
     background: var(--bg);
     color: var(--ink);
     font-family: "Khmer OS Battambang", "Noto Sans Khmer", "Kantumruy Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-size: clamp(14.5px, 0.3vw + 13.6px, 16px);
+    font-size: calc(14.5 * var(--fs-unit));
     line-height: 1.65;
 }
 
@@ -57,7 +58,7 @@ body {
     align-items: center;
     gap: 9px;
     min-width: 0;
-    font-size: clamp(14px, 3.6vw, 16px);
+    font-size: calc(14 * var(--fs-unit));
     font-weight: 600;
 }
 
@@ -91,14 +92,14 @@ body {
     border: 1px solid rgba(255, 255, 255, .26);
     border-radius: 999px;
     padding: 2px 9px;
-    font-size: 10px;
+    font-size: calc(10 * var(--fs-unit));
     font-weight: 700;
     letter-spacing: .2px;
     white-space: nowrap;
 }
 
 .credit-version {
-    font-size: 9.5px;
+    font-size: calc(9.5 * var(--fs-unit));
     color: rgba(255, 255, 255, .74);
     white-space: nowrap;
 }
@@ -107,7 +108,7 @@ body {
     border: 0;
     background: rgba(255, 255, 255, .16);
     color: #fff;
-    font-size: 17px;
+    font-size: calc(17 * var(--fs-unit));
     border-radius: 8px;
     padding: 7px 11px;
     cursor: pointer;
@@ -144,12 +145,12 @@ body {
     text-align: center;
 }
 
-.gate-icon { font-size: clamp(28px, 8vw, 34px); line-height: 1; margin-bottom: 8px; }
+.gate-icon { font-size: calc(28 * var(--fs-unit)); line-height: 1; margin-bottom: 8px; }
 
-.gate-card h1 { font-size: clamp(16px, 4.4vw, 18px); margin: 0 0 6px; color: var(--brand); }
+.gate-card h1 { font-size: calc(16 * var(--fs-unit)); margin: 0 0 6px; color: var(--brand); }
 
 .gate-note {
-    font-size: 13px;
+    font-size: calc(13 * var(--fs-unit));
     color: var(--muted);
     margin: 0 0 16px;
     text-align: left;
@@ -166,7 +167,7 @@ body {
 .card.danger { border-color: #f0c8c5; }
 
 .card h2 {
-    font-size: clamp(14px, 3.8vw, 16px);
+    font-size: calc(14 * var(--fs-unit));
     margin: 0 0 12px;
     display: flex;
     align-items: center;
@@ -182,15 +183,15 @@ body {
     border-radius: 50%;
     background: var(--brand);
     color: #fff;
-    font-size: 12px;
+    font-size: calc(12 * var(--fs-unit));
     flex: none;
 }
 
-.step.warn { background: transparent; font-size: 17px; }
+.step.warn { background: transparent; font-size: calc(17 * var(--fs-unit)); }
 
 label {
     display: block;
-    font-size: 13px;
+    font-size: calc(13 * var(--fs-unit));
     color: var(--muted);
     margin: 10px 0 4px;
 }
@@ -207,7 +208,7 @@ select {
     border: 1px solid var(--line);
     border-radius: 8px;
     font: inherit;
-    font-size: 15px;
+    font-size: calc(15 * var(--fs-unit));
     background: #fff;
     color: var(--ink);
 }
@@ -217,15 +218,15 @@ input:focus, select:focus {
     outline-offset: 1px;
 }
 
-.btn-main:focus-visible,
-.btn-ghost:focus-visible,
-.btn-danger:focus-visible,
-.btn-link:focus-visible,
-.icon-btn:focus-visible,
-.drop:focus-visible {
-    outline: 2px solid rgba(31, 78, 95, .55);
+button:focus-visible,
+a:focus-visible,
+input[type="checkbox"]:focus-visible,
+input[type="file"]:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--brand);
     outline-offset: 2px;
 }
+.tablewrap :focus-visible { outline-offset: 0; }
 
 .btn-row {
     display: flex;
@@ -262,7 +263,7 @@ input:focus, select:focus {
     border: 0;
     color: var(--muted);
     font: inherit;
-    font-size: 13px;
+    font-size: calc(13 * var(--fs-unit));
     text-decoration: underline;
     cursor: pointer;
     margin-top: 12px;
@@ -292,7 +293,7 @@ input:focus, select:focus {
 .drop strong {
     display: block;
     color: var(--ink);
-    font-size: clamp(15px, 4vw, 17px);
+    font-size: calc(15 * var(--fs-unit));
     margin-bottom: 4px;
 }
 
@@ -302,10 +303,10 @@ input:focus, select:focus {
     padding: 11px 13px;
 }
 
-.summary-line { font-size: 14px; word-break: break-all; }
-.summary-note { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.summary-line { font-size: calc(14 * var(--fs-unit)); word-break: break-all; }
+.summary-note { font-size: calc(12 * var(--fs-unit)); color: var(--muted); margin-top: 3px; }
 
-.hint { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.hint { font-size: calc(13 * var(--fs-unit)); color: var(--muted); margin: 0 0 14px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
@@ -313,7 +314,7 @@ input:focus, select:focus {
     background: #eef3f5;
     border-radius: 999px;
     padding: 4px 12px;
-    font-size: 13px;
+    font-size: calc(13 * var(--fs-unit));
 }
 
 .chip.ok { background: #e4f2ea; color: var(--ok); }
@@ -336,7 +337,7 @@ input:focus, select:focus {
     background-attachment: local, local, scroll, scroll;
 }
 
-table { border-collapse: collapse; width: 100%; min-width: 440px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; min-width: 440px; font-size: calc(13 * var(--fs-unit)); }
 
 th, td {
     padding: 7px 10px;
@@ -355,7 +356,7 @@ tr:last-child td { border-bottom: 0; }
     padding: 11px 14px;
     border-radius: 8px;
     margin-top: 12px;
-    font-size: 14px;
+    font-size: calc(14 * var(--fs-unit));
 }
 
 .msg.ok { background: #e4f2ea; color: var(--ok); }
@@ -364,7 +365,7 @@ tr:last-child td { border-bottom: 0; }
 
 .foot {
     color: var(--muted);
-    font-size: 12px;
+    font-size: calc(12 * var(--fs-unit));
     text-align: center;
     margin: 6px 0 0;
 }
@@ -390,8 +391,8 @@ tr:last-child td { border-bottom: 0; }
     overflow-y: auto;
 }
 
-.modal-box h3 { margin: 0 0 8px; font-size: 16px; color: var(--bad); }
-.modal-box p { margin: 0; font-size: 14px; color: var(--ink); }
+.modal-box h3 { margin: 0 0 8px; font-size: calc(16 * var(--fs-unit)); color: var(--bad); }
+.modal-box p { margin: 0; font-size: calc(14 * var(--fs-unit)); color: var(--ink); }
 
 .toast {
     position: fixed;
@@ -401,7 +402,7 @@ tr:last-child td { border-bottom: 0; }
     z-index: 60;
     padding: 11px 18px;
     border-radius: 999px;
-    font-size: 14px;
+    font-size: calc(14 * var(--fs-unit));
     color: #fff;
     background: var(--ok);
     box-shadow: 0 6px 18px rgba(16, 35, 43, .25);
@@ -445,7 +446,7 @@ tr:last-child td { border-bottom: 0; }
     box-shadow: 0 10px 22px rgba(31, 78, 95, .26);
 }
 
-.boot-splash-name { font-size: 12px; font-weight: 600; color: var(--muted); }
+.boot-splash-name { font-size: calc(12 * var(--fs-unit)); font-weight: 600; color: var(--muted); }
 
 .boot-splash-bar {
     position: relative;
@@ -478,6 +479,7 @@ body.boot-reveal .app-body { animation: bootFadeIn 420ms ease-out 70ms both; }
 @keyframes bootFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 @media (min-width: 900px) {
+    :root { --fs-unit: 1.2px; }
     .app-body { padding-top: 22px; }
 
     #appMain {
@@ -494,7 +496,7 @@ body.boot-reveal .app-body { animation: bootFadeIn 420ms ease-out 70ms both; }
 
 @media (max-height: 520px) {
     .gate-card { padding: 16px 18px; }
-    .gate-icon { font-size: 24px; margin-bottom: 4px; }
+    .gate-icon { font-size: calc(24 * var(--fs-unit)); margin-bottom: 4px; }
     .gate-note { margin-bottom: 12px; }
 }
 

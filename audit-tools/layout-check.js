@@ -35,6 +35,27 @@ function serve(dir, port) {
 // ធាតុដែលមានហេតុផលឲ្យលើសទទឹង (តារាង/ដុំកូដ ដែលមាន overflow-x ផ្ទាល់ខ្លួន)
 const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
 
+// ⛔ ការអះអាង «គ្មានធាតុលើសអេក្រង់» ជាការអះអាង **ម្ខាង** — App ដែលនៅជាជួរឈរ
+// ទទឹងទូរស័ព្ទលើកុំព្យូទ័រ ក៏ជាប់ដែរ។ ការត្រួតពិនិត្យខាងក្រោមជាខាងទីពីរ៖
+// លើអេក្រង់ធំ layout ត្រូវ **ប្រើកន្លែងពិត** និង **បត់ទៅជាជួរឈរច្រើន**។
+// (ZoeKeyGen ធ្លាប់នៅ 780px ជាមួយកាតជង់តែជួរតែមួយរហូតដល់កំណែ 2.16.0។)
+const DESKTOP_MIN_CONTAINER = 900;
+const DESKTOP = {
+    ZoeW: { container: '.app-pages', card: '.app-card', reveal: [], hide: [] },
+    ZoeKeyGen: { container: '.app-container', card: '.app-card', reveal: ['#appContainer'], hide: [] },
+    ZoeImport: { container: '#appMain', card: '.card', reveal: ['#appMain', '.card'], hide: ['#pinGate'] }
+};
+
+const cardRowsAt = (page, cfg) => page.evaluate((c) => {
+    document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+    c.reveal.forEach((sel) => document.querySelectorAll(sel).forEach((el) => el.classList.remove('hidden')));
+    c.hide.forEach((sel) => document.querySelectorAll(sel).forEach((el) => { el.style.display = 'none'; }));
+    const host = document.querySelector(c.container);
+    const cards = Array.from(document.querySelectorAll(c.card)).filter((el) => el.getBoundingClientRect().width > 0);
+    const tops = new Set(cards.map((el) => Math.round(el.getBoundingClientRect().top)));
+    return { width: host ? Math.round(host.getBoundingClientRect().width) : 0, cards: cards.length, rows: tops.size };
+}, cfg);
+
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8660;
@@ -42,6 +63,7 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);
+        const shape = {};
         for (const size of SIZES) {
             const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h } });
             const page = await ctx.newPage();
@@ -137,7 +159,23 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
 
+            if (DESKTOP[app] && (size.w === 412 || size.w === 1280 || size.w === 1440)) {
+                shape[size.w] = await cardRowsAt(page, DESKTOP[app]);
+            }
+
             await ctx.close();
+        }
+
+        if (DESKTOP[app] && shape[412]) {
+            for (const w of [1280, 1440]) {
+                const d = shape[w];
+                check(d && d.width >= DESKTOP_MIN_CONTAINER,
+                    app + ' @' + w + 'px: ខ្លឹមសារប្រើទទឹងយ៉ាងតិច ' + DESKTOP_MIN_CONTAINER + 'px',
+                    d ? 'ឃើញ ' + d.width + 'px — App នៅជាជួរឈរទទឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
+                check(d && shape[412].rows > 0 && d.rows < shape[412].rows,
+                    app + ' @' + w + 'px: កាតបត់ជាជួរឈរច្រើន (' + (shape[412] ? shape[412].rows : '?') + ' ➜ ' + (d ? d.rows : '?') + ' ជួរដេក)',
+                    d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' ដដែលនឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
+            }
         }
         server.close();
         port++;

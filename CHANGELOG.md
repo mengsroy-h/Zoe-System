@@ -24,6 +24,55 @@
 
 ---
 
+## [2.12.0] — 2026-08-25
+
+**បិទភ្ជាប់អ្វីដែល Firebase Console copy ឲ្យ ទាំងស្រុងបានតែម្តង។** មុននេះ
+ការរៀបចំជំនួញថ្មីទាមទារឲ្យអ្នកលក់កែ snippet របស់ Firebase ដោយដៃទៅជា JSON
+សុទ្ធជាមុនសិន — លុប `import`, លុប comment, លុប `const firebaseConfig =`,
+លុប `;` រួចដាក់ quote លើ key គ្រប់មួយ។ ភ្លេចមួយណា ➜ «Firebase Config JSON
+មិនត្រឹមត្រូវទេ!» ដោយមិនប្រាប់ថាខុសត្រង់ណា។
+
+### បន្ថែម — ស្គាល់ទម្រង់ដែល Firebase Console ផ្តល់ឲ្យ
+- ឥឡូវ **បិទភ្ជាប់ទាំងស្រុងបានតែម្តង** ទាំងក្នុង **ZoeKeyGen ➜ Setup Link**,
+  **ZoeKeyGen ➜ Config** និង **ZoeW ➜ Config** — រួមទាំង `import … from …`,
+  comment `//` និង `/* */`, `const firebaseConfig = { … };` និងបន្ទាត់
+  `initializeApp(firebaseConfig)` ខាងក្រោម។
+- ក៏ទទួល JSON ធម្មតា, key គ្មាន quote, single quote និង comma ចុងក្រោយដែរ។
+- ក្រោយអាន វាសរសេរ **JSON ស្អាតត្រឡប់ចូលប្រអប់វិញ** ដូច្នេះអ្នកឃើញច្បាស់ថា
+  អ្វីនឹងត្រូវរក្សាទុក ឬ encode ចូល Setup Link។
+- **រក្សាតែវាលរបស់ Firebase** (`apiKey`, `authDomain`, `databaseURL`,
+  `projectId`, `storageBucket`, `messagingSenderId`, `appId`,
+  `measurementId`) — វាលផ្សេងត្រូវទម្លាក់ ហើយ **រាយប្រាប់ជា toast** មិនលេប
+  ស្ងាត់ៗទេ។ នេះការពារកុំឲ្យសំរាមចូល Setup Link។
+
+### កែកំហុស — សារកំហុសដែលប្រាប់ថាខុសត្រង់ណា
+- ជំនួស «Firebase Config JSON មិនត្រឹមត្រូវទេ!» តែមួយ ដោយសារ ៥ បែបផ្សេងគ្នា។
+- សំខាន់បំផុត៖ ពេល **`databaseURL` បាត់** វាឥឡូវប្រាប់ថា *Firebase មិនដាក់វា
+  ក្នុង snippet ទេ បើមិនទាន់បង្កើត Realtime Database* — នេះជាមូលហេតុពិត
+  ស្ទើរតែគ្រប់ករណី ហើយមុននេះគ្មានអ្វីបង្ហាញផ្លូវទាល់តែសោះ។
+
+### សុវត្ថិភាព
+- ការលុប comment ធ្វើដោយ **scanner ដែលដឹងពី string** មិនមែន regex ទេ។ ការលុប
+  `//` ដោយ regex នឹង **កាត់ `databaseURL: "https://…"` ខូច** ➜ Config មើលទៅ
+  ត្រឹមត្រូវ តែ App ភ្ជាប់ Database ខុស។ ការរាប់វង់ក្រចកក៏ដឹងពី string ដែរ
+  ដូច្នេះ `}` ក្នុងតម្លៃមិនបំបែកការអានទេ។
+- ការសរសេរចូល localStorage ក្នុង ZoeW ឆ្លងកាត់ `safeStoreSet()` ➜ ពេលអង្គចងចាំ
+  ពេញ អ្នកប្រើឃើញសារ ជំនួសការបរាជ័យស្ងាត់ៗ។
+
+### ឧបករណ៍ audit
+- `firebase-config-paste-test.js` ថ្មី — ស្រង់ `normalizeFirebaseConfig()`
+  និងអ្នកជំនួយ **ពិត** ចេញពី `app.js` **ទាំង ២ App** មករត់ក្នុង `vm`។
+  **២៤ assertions** រួមទាំង `//` ក្នុង URL, `}` ក្នុង string, សារកំហុស
+  `databaseURL` និងការអះអាងថា App ទាំង ២ ឲ្យលទ្ធផលដូចគ្នា។
+  ផ្ទៀងផ្ទាត់ដោយ mutation ៨ ករណី — **ចាប់បាន ៨/៨**។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- **គ្មានការប្តូរ Firebase rules ទេ។**
+- Config ដែលរក្សាទុករួចលើឧបករណ៍ **មិនរងផលទេ** — ការប្តូរនេះប៉ះតែផ្លូវអានពេល
+  បញ្ចូលថ្មីប៉ុណ្ណោះ។
+
+---
+
 ## ឧបករណ៍ដាច់ដោយឡែក — `ZoeImport` + `zto-import` (2026-08-25)
 
 > **គ្មានការឡើងកំណែ `APP_VERSION` ទេ** — ជុំនេះ **មិនប៉ះ `ZoeW/` ឬ `ZoeKeyGen/`

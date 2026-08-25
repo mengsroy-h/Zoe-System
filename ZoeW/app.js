@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.6';
+    const APP_VERSION = '2.12.0';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -1030,6 +1030,177 @@
         openModalHelper('configModal');
     }
 
+    const FIREBASE_CONFIG_KEYS = ['apiKey', 'authDomain', 'databaseURL', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'];
+
+    function stripJsCommentsOutsideStrings(source) {
+        let out = '';
+        let quote = '';
+        let i = 0;
+        while (i < source.length) {
+            const ch = source[i];
+            const next = source[i + 1];
+            if (quote) {
+                out += ch;
+                if (ch === '\\') {
+                    if (next !== undefined) out += next;
+                    i += 2;
+                    continue;
+                }
+                if (ch === quote) quote = '';
+                i++;
+                continue;
+            }
+            if (ch === '"' || ch === "'" || ch === '`') {
+                quote = ch;
+                out += ch;
+                i++;
+                continue;
+            }
+            if (ch === '/' && next === '/') {
+                while (i < source.length && source[i] !== '\n') i++;
+                continue;
+            }
+            if (ch === '/' && next === '*') {
+                i += 2;
+                while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+                i += 2;
+                continue;
+            }
+            out += ch;
+            i++;
+        }
+        return out;
+    }
+
+    function matchingBraceIndex(source, start) {
+        let depth = 0;
+        let quote = '';
+        for (let i = start; i < source.length; i++) {
+            const ch = source[i];
+            if (quote) {
+                if (ch === '\\') {
+                    i++;
+                    continue;
+                }
+                if (ch === quote) quote = '';
+                continue;
+            }
+            if (ch === '"' || ch === "'" || ch === '`') {
+                quote = ch;
+                continue;
+            }
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    function extractFirebaseConfigObject(source) {
+        const marker = /firebaseConfig\s*=\s*\{/.exec(source);
+        if (marker) {
+            const open = source.indexOf('{', marker.index);
+            const close = matchingBraceIndex(source, open);
+            if (close !== -1) return source.slice(open, close + 1);
+        }
+        let from = source.indexOf('{');
+        while (from !== -1) {
+            const close = matchingBraceIndex(source, from);
+            if (close !== -1) {
+                const text = source.slice(from, close + 1);
+                if (text.indexOf('apiKey') !== -1) return text;
+            }
+            from = source.indexOf('{', from + 1);
+        }
+        return '';
+    }
+
+    function firebaseObjectTextToJson(text) {
+        let out = '';
+        let quote = '';
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (quote) {
+                if (ch === '\\') {
+                    out += ch + (text[i + 1] === undefined ? '' : text[i + 1]);
+                    i++;
+                    continue;
+                }
+                if (ch === quote) {
+                    out += '"';
+                    quote = '';
+                    continue;
+                }
+                if (ch === '"') {
+                    out += '\\"';
+                    continue;
+                }
+                out += ch;
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                quote = ch;
+                out += '"';
+                continue;
+            }
+            out += ch;
+        }
+        return out
+            .replace(/([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":')
+            .replace(/,(\s*[}\]])/g, '$1');
+    }
+
+    function normalizeFirebaseConfig(raw) {
+        const text = String(raw === null || raw === undefined ? '' : raw).trim();
+        if (!text) throw new Error('EMPTY');
+        let parsed = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch (strictErr) {
+            const objectText = extractFirebaseConfigObject(stripJsCommentsOutsideStrings(text));
+            if (!objectText) throw new Error('NO_OBJECT');
+            try {
+                parsed = JSON.parse(firebaseObjectTextToJson(objectText));
+            } catch (looseErr) {
+                throw new Error('BAD_SYNTAX');
+            }
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('NO_OBJECT');
+        const config = {};
+        const extras = [];
+        Object.keys(parsed).forEach((key) => {
+            const value = parsed[key];
+            if (FIREBASE_CONFIG_KEYS.indexOf(key) === -1) {
+                extras.push(key);
+                return;
+            }
+            if (value === null || value === undefined || value === '') return;
+            config[key] = String(value);
+        });
+        const missing = [];
+        if (!config.apiKey) missing.push('apiKey');
+        if (!config.databaseURL) missing.push('databaseURL');
+        if (missing.length) {
+            const err = new Error('MISSING');
+            err.missing = missing;
+            throw err;
+        }
+        return { config: config, extras: extras };
+    }
+
+    function firebaseConfigErrorMessage(err) {
+        const code = err && err.message ? err.message : '';
+        const missing = err && err.missing ? err.missing : [];
+        if (code === 'EMPTY') return 'សូមបញ្ចូល Firebase Config!';
+        if (code === 'NO_OBJECT') return 'រកមិនឃើញ Firebase Config ក្នុងអត្ថបទដែលបានបិទភ្ជាប់ទេ។ សូម copy ទាំងស្រុងពី Firebase Console ➜ Project settings ➜ Your apps។';
+        if (code === 'BAD_SYNTAX') return 'អានទម្រង់ Config មិនកើតទេ។ សូម copy ពី Firebase Console ម្តងទៀត ដោយកុំកែអ្វីសោះ។';
+        if (code === 'MISSING' && missing.indexOf('databaseURL') !== -1) return 'Config នេះគ្មាន databaseURL ទេ។ Firebase មិនដាក់វាក្នុង snippet ទេ បើមិនទាន់បង្កើត Realtime Database — សូមបើក Firebase Console ➜ Realtime Database ➜ Create Database រួច copy Config ម្តងទៀត។';
+        if (code === 'MISSING') return 'Config ត្រូវមាន apiKey និង databaseURL!';
+        return 'Firebase Config មិនត្រឹមត្រូវទេ!';
+    }
+
     async function saveFirebaseConfig() {
         const dsnInput = document.getElementById('sentryDsnInput');
         const dsnEntered = dsnInput ? dsnInput.value.trim() : '';
@@ -1047,29 +1218,24 @@
             alert("សូមបញ្ចូល Firebase Config!");
             return;
         }
+        let normalized;
         try {
-            let parsed = null;
-            try {
-                parsed = JSON.parse(raw);
-            } catch (strictErr) {
-                const cleanStr = raw
-                    .replace(/([{,]\s*)(['"]?)([a-zA-Z0-9_]+)\2(\s*):/g, '$1"$3"$4:')
-                    .replace(/'/g, '"')
-                    .replace(/,(\s*[}\]])/g, '$1');
-                parsed = JSON.parse(cleanStr);
-            }
-
-            if (!parsed.apiKey || !parsed.databaseURL) {
-                throw new Error("Missing apiKey or databaseURL");
-            }
-
-            localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-            showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
-            closeModal('configModal');
-            initFirebase();
+            normalized = normalizeFirebaseConfig(raw);
         } catch (e) {
-            alert("ការកំណត់រចនាសម្ព័ន្ធមិនត្រឹមត្រូវទេ! សូមពិនិត្យ Config JSON រួចសាកល្បងម្ដងទៀត។");
+            alert(firebaseConfigErrorMessage(e));
+            return;
         }
+        cfgInput.value = JSON.stringify(normalized.config, null, 2);
+        if (!safeStoreSet(localStorage, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
+            alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
+            return;
+        }
+        if (normalized.extras.length) {
+            showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+        }
+        showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
+        closeModal('configModal');
+        initFirebase();
     }
 
     function decodeSetupPayload(setupParam) {

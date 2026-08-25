@@ -138,8 +138,15 @@
             </div>
         </div>
 
-        <label for="setupLinkConfigInput">Firebase Config (JSON) របស់ជំនួញនេះ</label>
-        <textarea id="setupLinkConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"..."}'></textarea>
+        <label for="setupLinkConfigInput">Firebase Config របស់ជំនួញនេះ — បិទភ្ជាប់ពី Firebase Console ទាំងស្រុងបានតែម្តង</label>
+        <textarea id="setupLinkConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
+
+const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "..."
+};'></textarea>
 
         <button class="btn-primary" style="width:100%;" onclick="generateSetupLink()">🔗 បង្កើត Link</button>
 
@@ -207,12 +214,14 @@
     <div class="modal-content" style="max-width: 380px;">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>ត្រូវប្រើ Firebase Project <b>ដាច់ដោយឡែក</b> សម្រាប់ License (មិនមែន Project របស់ ZoeW ទេ) — មើលជំហានបង្កើតក្នុង README.md។</p>
-        <textarea id="firebaseConfigInput" placeholder='{
-  "apiKey": "...",
-  "authDomain": "...",
-  "databaseURL": "...",
-  "projectId": "..."
-}'></textarea>
+        <textarea id="firebaseConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
+
+const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "..."
+};'></textarea>
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">

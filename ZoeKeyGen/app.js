@@ -1,4 +1,4 @@
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.12.1';
 
 const LICENSE_APP_CODE = 'ADM';
 
@@ -812,18 +812,16 @@ function saveFirebaseConfig() {
         alert(firebaseConfigErrorMessage(e));
         return;
     }
-    try {
-        const parsed = normalized.config;
-        cfgInput.value = JSON.stringify(parsed, null, 2);
-        if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
-
-        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-        showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
-        closeModal('configModal');
-        initFirebase();
-    } catch (e) {
-        alert("ការកំណត់រចនាសម្ព័ន្ធមិនត្រឹមត្រូវទេ!");
+    const parsed = normalized.config;
+    cfgInput.value = JSON.stringify(parsed, null, 2);
+    if (!safeStoreSet(localStorage, 'zoew_firebase_config', JSON.stringify(parsed))) {
+        alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
+        return;
     }
+    if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+    showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
+    closeModal('configModal');
+    initFirebase();
 }
 
 function showLoginModalWithPrefill() {
@@ -919,6 +917,44 @@ function readDatabaseUrlFromConfig() {
     }
 }
 
+function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const opts = Object.assign({}, options || {});
+    if (controller) opts.signal = controller.signal;
+    const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let settled = false;
+    let timer = null;
+    return new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            reject(timeoutErr);
+        }, ms);
+        fetch(url, opts).then((res) => {
+            if (settled) return null;
+            if (!readBody) return { res: res, body: undefined };
+            return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));
+        }, (err) => {
+            if (settled) return null;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+            return null;
+        }).then((out) => {
+            if (settled || !out) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(out);
+        }, (err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+        });
+    });
+}
+
 function isFirebaseDatabaseHost(url) {
     try {
         const parsed = new URL(url);
@@ -940,21 +976,23 @@ async function readUserRoleViaRest(user) {
         lastRoleRestOutcome = 'unavailable';
         throw new Error('REST role check unavailable');
     }
-    let res;
+    let out;
     try {
         const token = await user.getIdToken();
-        res = await fetch(base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token), { cache: 'no-store' });
+        out = await fetchWithTimeout(
+            base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token),
+            { cache: 'no-store' }, ROLE_CHECK_CONNECT_WAIT_MS, 'REST role check timed out',
+            (r) => (r.ok ? r.json() : null));
     } catch (e) {
         lastRoleRestOutcome = 'blocked: ' + ((e && e.message) || 'unknown');
         throw e;
     }
-    if (!res.ok) {
-        lastRoleRestOutcome = 'http ' + res.status;
-        throw new Error('REST role check failed: ' + res.status);
+    if (!out.res.ok) {
+        lastRoleRestOutcome = 'http ' + out.res.status;
+        throw new Error('REST role check failed: ' + out.res.status);
     }
-    const value = await res.json();
     lastRoleRestOutcome = 'ok';
-    return value;
+    return out.body;
 }
 
 function readUserRole(user) {

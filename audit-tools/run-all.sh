@@ -88,6 +88,9 @@ run "sw-install-integrity (browser ពិត)" node audit-tools/sw-install-integ
 run "network-timeout (browser ពិត)" node audit-tools/network-timeout-test.js
 run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
+run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
+run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
+run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -150,6 +153,9 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWKEY_APP_DIR="$BASE"   node audit-tools/sw-cache-key-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-key:    /'
     CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
+    SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
+    NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'
+    INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
 fi
 
 echo

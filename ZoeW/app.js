@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.12.0';
+    const APP_VERSION = '2.12.1';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -1201,19 +1201,20 @@
         return 'Firebase Config មិនត្រឹមត្រូវទេ!';
     }
 
-    async function saveFirebaseConfig() {
+    function saveFirebaseConfig() {
+        const cfgInput = document.getElementById('firebaseConfigInput');
+        if(!cfgInput) return;
+        const raw = cfgInput.value.trim();
         const dsnInput = document.getElementById('sentryDsnInput');
         const dsnEntered = dsnInput ? dsnInput.value.trim() : '';
         if (dsnInput && window.ZoeErrors) {
             ZoeErrors.setDsn(dsnInput.value);
-            const sentryOk = await ZoeErrors.init('zoew');
-            if (dsnEntered && !sentryOk) {
-                showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
+            const sentryInit = ZoeErrors.init('zoew');
+            if (dsnEntered && sentryInit && typeof sentryInit.then === 'function') {
+                const warnSentry = () => showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
+                sentryInit.then((sentryOk) => { if (!sentryOk) warnSentry(); }, warnSentry);
             }
         }
-        const cfgInput = document.getElementById('firebaseConfigInput');
-        if(!cfgInput) return;
-        const raw = cfgInput.value.trim();
         if (!raw) {
             alert("សូមបញ្ចូល Firebase Config!");
             return;
@@ -1679,6 +1680,7 @@
         customerDataTableFetchPromise = null;
         customerDataTableLastFailedAt = 0;
         autoLookupLastFailedAt = 0;
+        autoLookupInFlight.clear();
         const body = document.getElementById('customerDataTableBody');
         if (body) body.innerHTML = '';
         const statusEl = document.getElementById('customerDataTableStatus');
@@ -1697,6 +1699,7 @@
 
     function prefetchCustomerDataTableRowsIfConfigured() {
         if (!auth || !auth.currentUser) return;
+        if (navigator.onLine === false) return;
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
             fetchCustomerDataTableRows(false);
@@ -1711,6 +1714,8 @@
     let lookupLockedNoticeShown = false;
     let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
+    const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
+    const autoLookupInFlight = new Set();
 
     function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
         if (pendingBarcode !== barcode || !isModalOpen) return;
@@ -1767,6 +1772,11 @@
             return;
         }
 
+        const lookupKey = String(barcode);
+        if (autoLookupInFlight.has(lookupKey)) return;
+        if (autoLookupInFlight.size >= AUTO_LOOKUP_MAX_IN_FLIGHT) return;
+        autoLookupInFlight.add(lookupKey);
+
         const myGeneration = customerDataTableSessionGeneration;
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
@@ -1797,6 +1807,8 @@
             autoLookupLastFailedAt = Date.now();
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
+        } finally {
+            autoLookupInFlight.delete(lookupKey);
         }
     }
 

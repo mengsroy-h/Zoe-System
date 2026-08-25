@@ -2,7 +2,7 @@
 
 ZoeW គឺជា PWA តែមួយសម្រាប់គ្រប់គ្រងកញ្ចប់ អតិថិជន ទីតាំង Locker និងស្ថិតិ COD/DOD ក្នុងប្រព័ន្ធ Zoe។
 
-កំណែបច្ចុប្បន្ន៖ **2.12.0** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
+កំណែបច្ចុប្បន្ន៖ **2.12.1** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
 
 ## តួនាទី និងព្រំដែន
 
@@ -104,6 +104,12 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 - Header secret ដែលកំណត់ថ្មីត្រូវបាន encrypt ដោយកូនសោពី PIN មុនរក្សាទុកក្នុង browser។
 - Google Apps Script ក្នុង [`../zto-import/google-sheets-api/`](../zto-import/google-sheets-api/README.md) គាំទ្រទាំង lookup មួយ Barcode និង `list=1`។ Cache គឺ best-effort ប៉ុណ្ណោះ; នៅពេល payload ធំពេក វាត្រូវ fallback ទៅការអាន Sheet ជំនួសការធ្វើឱ្យ API បរាជ័យ។
 
+- **ការស្វែងរកមានពិដានចំនួនស្របគ្នា** (កំណែ 2.12.1)៖ យ៉ាងច្រើន ២ សំណើ
+  ក្នុងពេលតែមួយ ហើយ Barcode ដដែលមិនបញ្ជូនស្ទួន។ បណ្ដាញ WiFi ដែលភ្ជាប់បាន
+  តែគ្មានអ៊ីនធឺណិត ធ្វើឲ្យសំណើ **ព្យួរ** មិនធ្លាក់ភ្លាម — បើគ្មានពិដាន ការស្កេន
+  ជាបន្តបន្ទាប់នឹងបំពេញកូតា connection របស់ browser ហើយ **គ្មានសំណើណាចេញបាន
+  ទៀតទេ**។ ការទាញតារាងអតិថិជនជាមុនក៏រំលងពេលក្រៅបណ្ដាញដែរ។
+
 បើប្តូរ host របស់ API ត្រូវកែ `connect-src` ក្នុង CSP របស់ deployment ផងដែរ។
 
 ## សុវត្ថិភាព និងភាពត្រឹមត្រូវ
@@ -128,7 +134,7 @@ engine ស្កេន (`vendor/zxing-wasm.js` + `vendor/zxing_reader.wasm`) ជ
 ពី root របស់ repository រត់៖
 
 ```bash
-npm i acorn playwright-core xlsx @zxing/library@0.23.0
+npm i acorn playwright-core xlsx
 node --check ZoeW/app.js
 node audit-tools/version-check.js
 bash audit-tools/run-all.sh

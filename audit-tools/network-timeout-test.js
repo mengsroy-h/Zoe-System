@@ -56,6 +56,29 @@ ok('license-verify.js អានតួ **ខាងក្នុង** បង្អ�
 ok('license-verify.js គ្មាន clearTimeout មុនអានតួ',
     !/finally\s*\{\s*clearTimeout\(timer\);\s*\}[\s\S]{0,1200}?await res\.(json|text)\(\)/.test(licSrc));
 
+// === ផ្នែកទី ១គ — ZoeKeyGen ត្រូវគោរពច្បាប់ដដែល ===
+// **ចន្លោះដែលធ្លាក់មុននេះ៖** តេស្តនេះស្កេនតែ `ZoeW/app.js` និង
+// `ZoeW/license-verify.js` ➜ `readUserRoleViaRest()` របស់ ZoeKeyGen ប្រើ
+// `fetch()` **ឆៅ គ្មាន AbortController គ្មាន timeout សោះ** ហើយអាន
+// `await res.json()` ក្រៅបង្អួចការពារណាមួយ។ `readUserRole()` មាន timer
+// ៤៥ វិ. តែវា reject **តែ promise ខាងក្រៅ** ប៉ុណ្ណោះ — សំណើនៅរស់។
+// ព្រោះ `retryPendingRoleCheck()` ត្រូវហៅរាល់ `visibilitychange`, `online`
+// និងរាល់ពេល `.info/connected` ត្រឡប់ជា true នោះការព្យួរនីមួយៗ **កកកុញ
+// មួយក្នុងមួយជុំ** ព្រមទាំង **យក ID token ជាប់ក្នុង URL** ទៅជាមួយ។
+const kgSrc = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'app.js'), 'utf8');
+
+ok('ZoeKeyGen/app.js មាន fetchWithTimeout ដែលប្រើ AbortController',
+    /function fetchWithTimeout\(/.test(kgSrc) && /new AbortController\(\)/.test(kgSrc));
+ok('ZoeKeyGen គ្មាន fetch() ឆៅក្រៅ helper (រួមទាំងការពិនិត្យតួនាទីតាម REST)',
+    (kgSrc.match(/(?<!function )\bfetch\(/g) || []).length ===
+    (kgSrc.match(/fetch\(url, opts\)/g) || []).length,
+    'fetch ឆៅ៖ ' + (kgSrc.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).map((l) => l.trim()).join(' | '));
+ok('ZoeKeyGen គ្មាន `withTimeout(fetch(` នៅសល់',
+    !/withTimeout\(\s*fetch\(/.test(kgSrc));
+ok('ZoeKeyGen អានតួឆ្លងកាត់ readBody ក្នុងបង្អួច timeout មិនមែន `await res.json()` ឆៅ',
+    !/await res\.json\(\)/.test(kgSrc),
+    (kgSrc.match(/^.*await res\.json\(\).*$/gm) || []).join(' | '));
+
 // === ផ្នែកទី ២ — ឥរិយាបថពិតក្នុង Chromium ===
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {

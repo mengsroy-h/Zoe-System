@@ -2,7 +2,7 @@
 
 ZoeKeyGen គឺជា PWA សម្រាប់ Admin បង្កើត, revoke និងបន្ថែមសុពលភាព Activation Key របស់ ZoeW។ វាត្រូវប្រើ Firebase Project **ដាច់ដោយឡែកពី Business Firebase Project** ដើម្បីបំបែកគណនី License និង private signing key ចេញពីទិន្នន័យ Parcel/COD/DOD។
 
-កំណែបច្ចុប្បន្ន៖ **2.12.0** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
+កំណែបច្ចុប្បន្ន៖ **2.12.1** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
 
 ## រចនាសម្ព័ន្ធ License
 
@@ -18,6 +18,12 @@ ZoeKeyGen គឺជា PWA សម្រាប់ Admin បង្កើត, revok
 - Checkbox «ចងចាំអ៊ីមែល» រក្សាទុកតែអ៊ីមែលសម្រាប់បំពេញ form ប៉ុណ្ណោះ; វាមិនរក្សា session ចូលប្រព័ន្ធទេ។
 - បើជ្រើសចងចាំ Signing Key សម្រាប់ session នោះ ciphertext ត្រូវ encrypt ដោយ PIN។ ការស្ដារវិញត្រូវការទាំង Admin session ដែលបានផ្ទៀងផ្ទាត់, PIN និងការត្រួតពិនិត្យថា private key ផ្គូផ្គងនឹង public key ដែលបាន deploy។ បរាជ័យម្តងណា ciphertext នោះត្រូវបោះចោល។
 - Logout, បោះបង់ PIN ឬបិទ modal សម្អាត PIN/private key/result ដែលរសើប និងរារាំង async operation ចាស់មិនឱ្យបញ្ចូលវាត្រឡប់ក្នុង DOM។
+
+**ការពិនិត្យសិទ្ធិ admin មានពេលកំណត់ពិត** (កំណែ 2.12.1)។ ពេល socket របស់
+Firebase មិនឡើង App ធ្លាក់ទៅអាន `user_roles` តាម REST។ សំណើនោះធ្លាប់ប្រើ
+`fetch()` ដែល **បោះបង់មិនកើត** ➜ ការព្យាយាមឡើងវិញរាល់ពេលត្រឡប់មក App
+បន្សល់សំណើរស់មួយក្នុងមួយជុំ (ព្រមទាំង ID token ក្នុង URL) រហូតដល់ Refresh។
+ឥឡូវវាឆ្លងកាត់ `fetchWithTimeout()` ដដែលនឹង ZoeW ដែល abort សំណើពិត។
 
 ## Setup លើកដំបូង
 

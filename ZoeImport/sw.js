@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeimport-v1';
+const CACHE_VERSION = 'zoeimport-v2';
 
 // ធនធាន **ស្នូល** — ប្រើ `addAll()` ដែលជា atomic៖ ធ្លាក់មួយ ➜ ធ្លាក់ទាំងក្រុម
 // ➜ install បរាជ័យ ➜ SW ចាស់នៅដដែល ហើយ browser ព្យាយាមម្តងទៀត។ បើប្រើ
@@ -20,6 +20,14 @@ const OPTIONAL_SHELL = [
     './icon-512.png'
 ];
 
+// សំណុំផ្លូវរបស់សំបក — ជាអ្នកកំណត់ **ទាំង** អ្វីដែលឆ្លើយតបពី cache មុន
+// **និង** អ្វីដែលអនុញ្ញាតឲ្យសរសេរចូល Cache Storage។ ការកំណត់ព្រំដែននេះ
+// ធ្វើឲ្យសំណើ same-origin ណាមួយក្រៅបញ្ជីនេះ (ឧ. endpoint ទិន្នន័យនៅថ្ងៃក្រោយ)
+// **មិនអាចធ្លាក់ចូល cache ដោយចៃដន្យ** ហើយរស់រានក្រោយចាកចេញបានទេ។
+const SHELL_PATHS = new Set(
+    CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
+);
+
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
@@ -34,15 +42,27 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
             Promise.all(keys.filter((key) => key.startsWith('zoeimport-') && key !== CACHE_VERSION).map((key) => caches.delete(key)))
-        )
+        ).then(() => self.clients.claim())
     );
-    self.clients.claim();
 });
 
 // សំណើ navigate ត្រូវប្រើ './index.html' ជាកូនសោ cache **ជានិច្ច** ដើម្បីកុំឲ្យ
 // query string ណាមួយចូល Cache Storage ហើយរស់រានក្រោយចាកចេញ។
 function cacheKeyFor(request) {
     return request.mode === 'navigate' ? './index.html' : request;
+}
+
+// ការធ្វើឲ្យស្រស់ខាងក្រោយ — **មិនត្រូវរង់ចាំវាមុនឆ្លើយតបឡើយ**។ សម្រាប់សំណើ
+// navigate យើងទាញ './index.html' ត្រង់ៗ ជំនួសការផ្ញើ URL ពេញ (ដែលអាចផ្ទុក
+// query string រសើប) ទៅម៉ាស៊ីនបម្រើម្តងទៀត។
+function revalidateShell(cache, request, cacheKey) {
+    if (navigator.onLine === false) return Promise.resolve();
+    const target = cacheKey === './index.html' ? './index.html' : request;
+    return fetch(target)
+        .then((response) => {
+            if (response && response.ok && !response.redirected) return cache.put(cacheKey, response.clone()).catch(() => {});
+        })
+        .catch(() => {});
 }
 
 self.addEventListener('fetch', (event) => {
@@ -53,14 +73,27 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== self.location.origin) return;
 
     const cacheKey = cacheKeyFor(request);
+    const isShell = cacheKey === './index.html' || SHELL_PATHS.has(url.pathname);
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>
             cache.match(cacheKey).then((cached) => {
+                // **សំបកដែល cache ទុក ត្រូវឆ្លើយតបភ្លាម។** មុននេះរាល់ធនធាន
+                // ប្រណាំងនឹងបណ្តាញ ៣ វិនាទី ➜ លើបណ្តាញខ្សោយ ការពន្យារនោះ
+                // **គុណតាមខ្សែសង្វាក់ផ្ទុក** (index.html ➜ script ➜ …) ➜ វាស់
+                // បាន **៩ វិនាទី** ដើម្បីបើក App ខណៈគ្រប់ឯកសារនៅក្នុង cache
+                // រួចស្រេច។ កំណែថ្មីរបស់សំបកមកតាមផ្លូវ `CACHE_VERSION` (install
+                // ទាញឡើងវិញទាំងអស់) មិនមែនតាមការប្រណាំងក្នុងមួយសំណើទេ។
+                if (cached && isShell) {
+                    try { event.waitUntil(revalidateShell(cache, request, cacheKey)); }
+                    catch (e) { revalidateShell(cache, request, cacheKey); }
+                    return cached;
+                }
+
                 const networkFetch = fetch(request)
                     .then((response) => {
                         // `redirected` មិនអាចដាក់ចូល cache បានទេ (បោះ TypeError)
-                        if (response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
+                        if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
                     })
                     .catch(() => null);

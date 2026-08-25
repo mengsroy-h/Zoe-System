@@ -50,6 +50,7 @@
 | `restore-race-test.js` | tab/ឧបករណ៍ ២ ស្តារធាតុតែមួយព្រមគ្នា ➜ តែម្តងទេដែលឆ្លង (8 assertion) |
 | `clear-history-claim-test.js` | claim របស់ «លុបទាំងអស់» ➜ ការរត់ស្របគ្នាមិនលុបលើសតម្រងថ្ងៃ (6 assertion) |
 | `clear-history-finalization-fence-test.js` | witness fence លើ `zoew_clear_history_finalizations` ➜ «លុបទាំងអស់» replay មិនប៉ះស្ថិតិស្ទួន (19 assertion) |
+| `firebase-config-paste-test.js` | **អ្វីដែល Firebase Console copy ឲ្យ មិនមែនជា JSON ទេ** — វាមាន `import`, comment និង `const firebaseConfig = {…};` ដោយ key គ្មាន quote។ តេស្តស្រង់ `normalizeFirebaseConfig()` និងអ្នកជំនួយ **ពិត** ចេញពី `app.js` **ទាំង ២ App** មករត់ក្នុង `vm` ៖ snippet ពេញរបស់ Console, `//` ក្នុង `databaseURL` ដែល**មិនត្រូវកាត់ចោល**, `}` ក្នុង string ដែលមិនត្រូវបំបែកការរាប់វង់ក្រចក, single quote, comma ចុងក្រោយ, `/* */`, ការទម្លាក់វាលដែលមិនមែនរបស់ Firebase, សារកំហុសជាក់លាក់ពេល `databaseURL` បាត់ (Realtime Database មិនទាន់បង្កើត) និងការអះអាងថា **App ទាំង ២ ឲ្យលទ្ធផលដូចគ្នា**។ ២៤ assertions |
 | `google-sheets-cache-test.js` | `Code.gs` **fail closed** ពេល ScriptProperty `API_KEY` មិនបានកំណត់ ហើយ cache ជា best-effort — payload ធំពេក ➜ fallback ទៅការអាន Sheet មិនមែនធ្វើឲ្យ API បរាជ័យ |
 | `lookup-config-secret-test.js` | Secret របស់ Lookup API ត្រូវ encrypt ដោយកូនសោដែល derive ពី PIN មុនចូល storage ហើយ salt PBKDF2 ត្រូវរក្សាដដែល (4 assertion) |
 | `keygen-session-security-test.js` | ZoeKeyGen ប្រើ browser-session persistence, តម្រូវតួនាទី `admin` ក្នុង License Project និងសម្អាត signing key ពេលចាកចេញ (8 assertion) |

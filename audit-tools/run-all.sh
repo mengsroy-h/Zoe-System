@@ -53,6 +53,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
          setup-link-roundtrip-test export-cells-test camera-resume-test \
+         firebase-config-paste-test \
          connection-recovery-test; do
     run "$t" node "audit-tools/$t.js"
 done

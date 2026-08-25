@@ -362,16 +362,18 @@
 <div id="configModal" class="modal">
     <div class="modal-content" style="max-width: 360px;">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
-        <p>សូមបិទភ្ជាប់ JSON ឬ JavaScript Object config របស់ Firebase នៅទីនេះ៖</p>
+        <p>បិទភ្ជាប់អ្វីដែល copy ពី <b>Firebase Console ➜ Project settings ➜ Your apps</b> ទាំងស្រុងបានតែម្តង — រួមទាំង <code>import</code>, comment និង <code>const firebaseConfig = …</code>។</p>
         <div class="modal-btns" style="margin-bottom:10px;">
             <button type="button" class="btn-skip" onclick="openConfigQrScanner()">📷 ស្កេន QR (Setup Link)</button>
         </div>
-        <textarea id="firebaseConfigInput" placeholder='{
-  "apiKey": "...",
-  "authDomain": "...",
-  "databaseURL": "...",
-  "projectId": "..."
-}'></textarea>
+        <textarea id="firebaseConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
+
+const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "..."
+};'></textarea>
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">

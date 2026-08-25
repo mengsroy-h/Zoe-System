@@ -965,6 +965,43 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 
 `Code.gs` **fail closed**៖ បើ ScriptProperty `API_KEY` មិនបានកំណត់ វាបដិសេធសំណើ។
 
+## ZoeImport និង zto-import — នាំចូល Excel ចូល Sheet
+
+ខ្សែសង្វាក់ជំនួសការ copy-paste ដោយដៃ៖
+**`ZoeImport` (PWA) ➜ `zto-import` (Apps Script) ➜ Sheet ➜ Lookup API ➜ ZoeW**។
+ទាំង ២ **មិនប៉ះ ZoeW/ZoeKeyGen និងមិនប៉ះ Firebase ឡើយ**។
+
+- `ZoeImport/` ជា PWA ដាច់ដោយឡែក (Netlify site ផ្ទាល់ខ្លួន, `CACHE_VERSION`
+  ជា `zoeimport-vN`)។ កំណែរបស់វា **ដាច់ពី `APP_VERSION`** —
+  `version-check.js` ពិនិត្យតែ ZoeW និង ZoeKeyGen។
+- `zto-import/` ជា Apps Script **standalone** (សរសេរចូល Sheet) ចំណែក
+  `zto-import/google-sheets-api/` ជា Apps Script **bound** (អានចេញ)។
+  ពួកវាជាគម្រោង ២ ដាច់ដោយឡែក ហើយ Deploy ដោយឡែក — កុំយកទៅច្រឡំគ្នា។
+- **Salt ត្រូវរក្សាដដែល**៖ `zoeimport_pin_verify_v1` (PIN hash) និង
+  `zoeimport_config_secret_v1` (កូនសោ AES សម្រាប់ URL + ពាក្យសម្ងាត់)។
+  ការប្តូរវាធ្វើឲ្យ PIN និងការតភ្ជាប់ដែលរក្សាទុករួចលើឧបករណ៍ទាំងអស់ខូច។
+- SheetJS ស្ថិត **ក្នុង repo** (`ZoeImport/vendor/xlsx.full.min.js`) មិនមែនមកពី
+  CDN ទេ — ច្បាប់ដដែលនឹង ZXing។ វាត្រូវនៅក្នុង `CORE_SHELL` របស់ `sw.js`។
+
+> ⚠️ **សំណើទៅ Apps Script ត្រូវជា *simple request* ជានិច្ច។**
+> `callApi()` ប្រើ `Content-Type: text/plain` ដោយចេតនា ហើយ **គ្មាន header
+> ផ្ទាល់ខ្លួន**។ ការបន្ថែម `Authorization`, `X-…` ឬការប្តូរទៅ
+> `application/json` ធ្វើឲ្យ browser បញ្ជូន preflight `OPTIONS` ➜ **Apps Script
+> មិនឆ្លើយ `OPTIONS`** ➜ ការនាំចូលស្លាប់ទាំងស្រុងលើផលិតកម្ម ខណៈ
+> `ZoeImport/test.js` (ដែល stub `fetch`) **ជោគជ័យទាំងអស់**។ ថ្នាក់កំហុសដដែល
+> នឹង CSP `'wasm-unsafe-eval'` ក្នុងកំណែ 2.10.0។
+
+> ✅ **ផ្ទៀងផ្ទាត់លើផលិតកម្មពិតរួចហើយ** (2026-08-25) — អ្នកប្រើរាយការណ៍ថា
+> ការនាំចូលដើរលើ deploy ពិត។ ដូច្នេះ **កុំ «កែ» ផ្លូវបណ្តាញនេះដោយផ្អែកលើ
+> ការសង្ស័យអំពី CORS** — វាមិនមែនជាកូដដែលមិនទាន់សាកទេ។
+> មិនទាន់មានរបាយការណ៍ដាច់ដោយឡែកសម្រាប់ Drive folder watcher (`Watch.gs`)
+> និងការដំឡើងជា App លើទូរស័ព្ទ។
+
+តេស្ត៖ **`node zto-import/test.js`** (៥០) និង **`node ZoeImport/test.js`** (៥៥)។
+ពួកវា **មិនស្ថិតក្នុង `run-all.sh`** ទេ ព្រោះមិនមែនជាផ្នែករបស់ App —
+រត់ដោយផ្ទាល់។ ការកែកូដ Apps Script ក្នុង repo **មិនប្តូរ script ដែល deploy រួច**
+— ត្រូវ copy-paste ចូល script.google.com ដោយដៃ រួច Deploy ជាកំណែថ្មី។
+
 ## Setup Link — ការ provision ឧបករណ៍
 
 ZoeKeyGen បង្កើត `https://<app-site>/?setup=<base64-config>` បូក QR។ នៅខាង App

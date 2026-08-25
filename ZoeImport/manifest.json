@@ -1,0 +1,29 @@
+{
+  "name": "ZoeImport — នាំចូល Excel ចូល Sheet",
+  "short_name": "ZoeImport",
+  "description": "នាំចូលឯកសារ Excel របស់ ZTO ចូល Google Sheet ដោយស្វ័យប្រវត្តិ",
+  "version": "1.0.0",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7f8",
+  "theme_color": "#1f4e5f",
+  "lang": "km",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

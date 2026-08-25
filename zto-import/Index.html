@@ -77,6 +77,8 @@ button {
 button:hover:not(:disabled) { background: var(--brand-dark); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 button.ghost { background: #fff; color: var(--brand); border: 1px solid var(--line); }
+button.danger { background: var(--bad); }
+button.danger:hover:not(:disabled) { background: #8f1e18; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
 .row > * { flex: 1 1 180px; min-width: 0; }
 .drop {
@@ -154,9 +156,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
             <div>
                 <label for="mode">របៀបនាំចូល</label>
                 <select id="mode">
-                    <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ (ណែនាំ)</option>
+                    <option value="replace">សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស (ប្រចាំថ្ងៃ)</option>
+                    <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ</option>
                     <option value="newOnly">បន្ថែមតែ Barcode ថ្មី — មិនប៉ះជួរចាស់</option>
-                    <option value="replace">លុបទាំងអស់ រួចដាក់ថ្មីជំនួស</option>
                 </select>
             </div>
         </div>
@@ -195,6 +197,13 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
             <button id="resetBtn" class="ghost" style="flex:0 0 auto;">ចាប់ផ្តើមឡើងវិញ</button>
         </div>
         <div id="goMsg"></div>
+    </div>
+
+    <div class="card hidden" id="clearCard">
+        <h2><span class="step">🗑️</span> សម្អាតទិន្នន័យចាស់</h2>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">លុប <strong>គ្រប់ជួរដេក</strong> ក្នុង Sheet ដោយទុកតែជួរ header។ ប្រើពេលចង់ចាប់ផ្តើមថ្ងៃថ្មីពីទទេ ដោយមិនទាន់នាំចូលឯកសារភ្លាម។</p>
+        <button id="clearBtn" class="danger">សម្អាតទិន្នន័យក្នុង Sheet</button>
+        <div id="clearMsg"></div>
     </div>
 
     <p class="foot" id="foot"></p>
@@ -247,6 +256,7 @@ function unlock() {
         storePassword(value);
         show('authCard', false);
         show('fileCard', true);
+        show('clearCard', true);
         $('foot').textContent = 'គោលដៅ៖ ' + status.spreadsheetName + ' ➜ tab «' + status.sheetName + '» · មាន ' + status.rowCount + ' ជួរដេករួចហើយ';
     }, function (err) {
         $('unlockBtn').disabled = false;
@@ -499,7 +509,27 @@ $('mode').addEventListener('change', renderPreview);
 Object.keys(FIELD_IDS).forEach(function (field) {
     $(FIELD_IDS[field]).addEventListener('change', renderPreview);
 });
+function runClear() {
+    if (!window.confirm('ជួរដេកទាំងអស់ក្នុង tab គោលដៅនឹងត្រូវលុប ដោយទុកតែជួរ header។ សកម្មភាពនេះមិនអាចដកវិញបានទេ។ ប្រាកដទេ?')) {
+        return;
+    }
+    $('clearBtn').disabled = true;
+    $('clearBtn').innerHTML = '<span class="spin"></span>កំពុងសម្អាត...';
+    setMsg('clearMsg', '');
+    callServer('clearRows', [state.password, 'CLEAR']).then(function (result) {
+        $('clearBtn').disabled = false;
+        $('clearBtn').textContent = 'សម្អាតទិន្នន័យក្នុង Sheet';
+        setMsg('clearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
+        $('foot').textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
+    }, function (err) {
+        $('clearBtn').disabled = false;
+        $('clearBtn').textContent = 'សម្អាតទិន្នន័យក្នុង Sheet';
+        setMsg('clearMsg', err && err.message ? err.message : 'សម្អាតមិនបាន', 'bad');
+    });
+}
+
 $('importBtn').addEventListener('click', runImport);
+$('clearBtn').addEventListener('click', runClear);
 $('resetBtn').addEventListener('click', resetAll);
 
 ['dragenter', 'dragover'].forEach(function (name) {

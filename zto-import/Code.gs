@@ -410,6 +410,63 @@ function writeToSheet_(rows, mode) {
     };
 }
 
+function clearRows(password, confirmToken) {
+    requirePassword_(password);
+    if (confirmToken !== 'CLEAR') {
+        throw new Error('ការសម្អាតត្រូវការការបញ្ជាក់ — គ្មាន token បញ្ជាក់ទេ');
+    }
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(LOCK_WAIT_MS)) {
+        throw new Error('មានប្រតិបត្តិការមួយផ្សេងកំពុងដំណើរការ — សូមព្យាយាមម្តងទៀតក្នុងមួយភ្លែត');
+    }
+    try {
+        var sheet = targetSheet_();
+        var lastRow = sheet.getLastRow();
+        var removed = Math.max(0, lastRow - 1);
+        if (removed > 0) {
+            sheet.getRange(2, 1, removed, 4).clearContent();
+            SpreadsheetApp.flush();
+        }
+        return {
+            ok: true,
+            sheetName: sheet.getName(),
+            removed: removed,
+            rowsAfter: Math.max(0, sheet.getLastRow() - 1)
+        };
+    } finally {
+        lock.releaseLock();
+    }
+}
+
+function doPost(e) {
+    var body;
+    try {
+        body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    } catch (err) {
+        return jsonOut_({ ok: false, error: 'អានទិន្នន័យសំណើមិនបាន' });
+    }
+    try {
+        return jsonOut_({ ok: true, data: runApiAction_(body) });
+    } catch (err) {
+        return jsonOut_({ ok: false, error: err && err.message ? err.message : String(err) });
+    }
+}
+
+function runApiAction_(body) {
+    var action = body && body.action;
+    var password = body && body.password;
+    if (action === 'status') return getStatus(password);
+    if (action === 'prepare') return prepare(password, body.headers);
+    if (action === 'import') return importRows(password, body.payload);
+    if (action === 'clear') return clearRows(password, body.confirm);
+    throw new Error('សកម្មភាពមិនស្គាល់');
+}
+
+function jsonOut_(payload) {
+    return ContentService.createTextOutput(JSON.stringify(payload))
+        .setMimeType(ContentService.MimeType.JSON);
+}
+
 function getStatus(password) {
     requirePassword_(password);
     var sheet = targetSheet_();

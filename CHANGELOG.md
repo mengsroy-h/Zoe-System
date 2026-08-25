@@ -24,7 +24,7 @@
 
 ---
 
-## ឧបករណ៍ដាច់ដោយឡែក — `zto-import` (2026-08-25)
+## ឧបករណ៍ដាច់ដោយឡែក — `ZoeImport` + `zto-import` (2026-08-25)
 
 > **គ្មានការឡើងកំណែ `APP_VERSION` ទេ** — ជុំនេះ **មិនប៉ះ `ZoeW/` ឬ `ZoeKeyGen/`
 > សូម្បី byte តែមួយ**។ វាបន្ថែមតែថតថ្មី `zto-import/` ដែលដើរជាគម្រោង Google
@@ -58,7 +58,28 @@
   ការប្រៀបធៀប Barcode មិនប្រកាន់តួអក្សរធំតូច។
 - **ជួរដេកដែលមិនពាក់ព័ន្ធមិនត្រូវប៉ះឡើយ** — ការសរសេរធ្វើតែលើជួរដេកដែលពិតជាប្រែ។
 
+### បន្ថែម — `ZoeImport` ជា PWA ដំឡើងបាន
+- ថតថ្មី `ZoeImport/` ជា **PWA ដាច់ដោយឡែក** (Netlify site ផ្ទាល់ខ្លួន) ដែល
+  **ដំឡើងលើទូរស័ព្ទបានដូច ZoeW និង ZoeKeyGen** — manifest, Service Worker,
+  icon និងការដើរក្រៅបណ្តាញ។
+- SheetJS ស្ថិត **ក្នុង repo** (`ZoeImport/vendor/xlsx.full.min.js`) មិនមែន
+  មកពី CDN ទេ — តាមច្បាប់ដដែលដែលនាំ ZXing ចូល repo។ សំបក App និងការអាន
+  Excel ដើរបានក្រៅបណ្តាញ; មានតែការសរសេរចូល Sheet ទេដែលត្រូវការបណ្តាញ។
+- **ប៊ូតុង «🗑️ សម្អាតទិន្នន័យក្នុង Sheet»** ថ្មី សម្រាប់លុបជួរដេកទាំងអស់
+  ដោយទុកតែជួរ header — ព្រោះទិន្នន័យបញ្ចូលរាល់ថ្ងៃ។ វាសួរបញ្ជាក់មុនជានិច្ច
+  ហើយត្រូវការ token បញ្ជាក់ខាង server ទើបដំណើរការ។
+- **របៀបលំនាំដើមប្តូរទៅ «សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស»** តាមលំហូរ
+  ការងារប្រចាំថ្ងៃ។
+
 ### សុវត្ថិភាព
+- **PIN តាមលំនាំដដែលនឹង ZoeW**៖ PBKDF2-SHA256 ១៥០,០០០ ជុំ (salt
+  `zoeimport_pin_verify_v1`) ➜ រក្សាទុកតែ hash។ វាយខុស ៥ ដង ➜ ចាក់សោ ១ នាទី។
+- **URL និងពាក្យសម្ងាត់របស់ Apps Script ត្រូវអ៊ិនគ្រីប AES-GCM 256** ដោយកូនសោ
+  ដែល derive ពី PIN (salt `zoeimport_config_secret_v1`) មុនចូល localStorage —
+  **គ្មានអ្វីស្ថិតជាអក្សរធម្មតាឡើយ**។ ប៊ូតុង 🔒 លុបកូនសោក្នុងសតិ និង secret
+  ចេញពី DOM។
+- ទទួលតែ URL ទម្រង់ `https://script.google.com/macros/s/…/exec` ➜ ពាក្យសម្ងាត់
+  មិនអាចផ្ញើទៅ host ផ្សេងបានទេ។ CSP ជា `default-src 'self'` គ្មាន CDN។
 - ឧបករណ៍ **fail closed**៖ បើ `IMPORT_PASSWORD` មិនបានកំណត់ក្នុង Script
   Properties វាបដិសេធរាល់សំណើ — ដូចលំនាំរបស់ `API_KEY` ក្នុង Lookup API ដែរ។
 - ការនាំចូល ២ មិនអាចជាន់គ្នាបានទេ (`LockService`)។
@@ -67,13 +88,26 @@
 - `zto-import/test.js` — ដកកូដពិតចេញពី `Code.gs` មករត់ក្នុង `vm` (មិនមែនកូដ
   ចម្លងទេ)។ **៥០ assertions** រួមទាំងការចាក់សោ header ខ្មែរពិតរបស់ ZTO។
   ផ្ទៀងផ្ទាត់ដោយ mutation — ការបង្ខូចកូដដែលមានន័យត្រូវចាប់បានទាំងអស់។
+- `ZoeImport/test.js` — បើក **Chromium ពិត** ហើយដើរលំហូរទាំងមូល៖ PIN, lockout,
+  ការបដិសេធ URL ក្រៅ `script.google.com`, ការអ៊ិនគ្រីប config, ការអាន Excel
+  ដែលមាន header ខ្មែរពិត, ការសួរបញ្ជាក់មុន replace, ការនាំចូល, ការសម្អាត
+  និងការលុប secret ចេញពី DOM ពេលចាក់សោ។ **៥៥ assertions**;
+  mutation ១០ ករណី — **ចាប់បាន ១០/១០**។
+- ឧបករណ៍ទាំង ២ **មិនស្ថិតក្នុង `run-all.sh`** ទេ ព្រោះវាមិនមែនជាផ្នែករបស់
+  ZoeW/ZoeKeyGen។ រត់ដោយផ្ទាល់៖ `node zto-import/test.js` និង
+  `node ZoeImport/test.js`។
   រត់៖ `node zto-import/test.js`។ វាមិនស្ថិតក្នុង `run-all.sh` ទេ ព្រោះវាមិនមែន
   ជាផ្នែករបស់ App។
 
 ### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 - **គ្មានការប្តូរ Firebase rules ទេ។**
-- ដើម្បីប្រើឧបករណ៍ថ្មីនេះ ត្រូវរៀបចំគម្រោង Apps Script ម្តង — មើលជំហានក្នុង
-  [`zto-import/README.md`](zto-import/README.md)។
+- ដើម្បីប្រើឧបករណ៍ថ្មីនេះ ត្រូវ (១) រៀបចំគម្រោង Apps Script ម្តង — មើល
+  [`zto-import/README.md`](zto-import/README.md) និង (២) Deploy ថត `ZoeImport`
+  ជា **Netlify site ដាច់ដោយឡែក** (Base directory: `ZoeImport`) — មើល
+  [`ZoeImport/README.md`](ZoeImport/README.md)។
+- **ការនាំចូលឆ្លង origin ត្រូវសាកលើ deploy ពិតជាមុន** — បរិស្ថានតេស្តក្នុង repo
+  មិនអាចបង្កើតឥរិយាបថ CORS ពិតឡើងវិញបានទេ។ បើមានបញ្ហា ទំព័រ Web ដែល Apps Script
+  បម្រើខ្លួនឯង (`zto-import/Index.html`) ជាផ្លូវបម្រុងដែលគ្មាន CORS ទាល់តែសោះ។
 - ចំណាំ៖ ក្រោយនាំចូល ZoeW អាចយឺតរហូតដល់ **៥ នាទី** ទើបឃើញទិន្នន័យថ្មី ព្រោះ
   Lookup API មាន `CACHE_TTL_SECONDS = 300` — នេះជាឥរិយាបថដែលមានស្រាប់ មិនមែន
   កំហុសថ្មីទេ។

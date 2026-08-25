@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeimport-v4';
+const CACHE_VERSION = 'zoeimport-v5';
 
 const CORE_SHELL = [
     './',

@@ -72,9 +72,9 @@
     </div>
 </header>
 
-<div class="app-container" id="appContainer" style="display:none;">
+<div class="app-container hidden" id="appContainer">
 
-    <div class="app-card">
+    <div class="app-card card-wide">
         <div class="card-header">
             <div class="card-title">🔑 Signing Key</div>
             <span class="badge" id="signingKeyStatusBadge" style="background:var(--danger-light); color:#a3123a;">មិនទាន់ Load</span>
@@ -87,7 +87,7 @@
 
         <label for="privateKeyInput">បិទភ្ជាប់ Private Key (JWK JSON)</label>
         <textarea id="privateKeyInput" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'></textarea>
-        <label style="display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600; margin:6px 0 10px; cursor:pointer;">
             <input type="checkbox" id="rememberSigningKeyCheckbox" style="width:auto; margin:0;">
             🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
         </label>
@@ -97,7 +97,7 @@
         </div>
 
         <details>
-            <summary style="cursor:pointer; font-size:11.5px; color:var(--text-muted); font-weight:600;">មិនទាន់មាន Signing Key? បង្កើត Keypair ថ្មី</summary>
+            <summary style="cursor:pointer; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); font-weight:600;">មិនទាន់មាន Signing Key? បង្កើត Keypair ថ្មី</summary>
             <div style="margin-top:10px;">
                 <div class="danger-box">
                     ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗទាំងអស់ (ដែល Verify ដោយ Public Key ចាស់) ប្រើលែងកើតទៀត លុះត្រាតែ
@@ -169,7 +169,7 @@ const firebaseConfig = {
         </div>
     </div>
 
-    <div class="app-card">
+    <div class="app-card card-wide">
         <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
             <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
@@ -286,7 +286,7 @@ const firebaseConfig = {
     <div class="modal-content" style="max-width: 320px;">
         <h3>⏳ បន្ថែមសុពលភាព</h3>
         <p>បញ្ចូលចំនួនថ្ងៃបន្ថែម គិតចាប់ពីពេលនេះ</p>
-        <p style="font-size:12px; color:#a3123a; text-align:left; line-height:1.5;">⚠️ ការបន្ថែមសុពលភាពធ្វើការតែលើគ្រឿងដែល Activate រួចហើយប៉ុណ្ណោះ។ បន្ទាប់ពីថ្ងៃផុតកំណត់ដើមរបស់ Key កន្លងផុត Key នេះ <strong>លែងអាច Activate លើគ្រឿងថ្មី ឬគ្រឿងដែល Reset រួច</strong>បានទៀតទេ — ករណីនោះត្រូវបង្កើត Key ថ្មីជំនួស។</p>
+        <p style="font-size:calc(12 * var(--fs-unit)); color:#a3123a; text-align:left; line-height:1.5;">⚠️ ការបន្ថែមសុពលភាពធ្វើការតែលើគ្រឿងដែល Activate រួចហើយប៉ុណ្ណោះ។ បន្ទាប់ពីថ្ងៃផុតកំណត់ដើមរបស់ Key កន្លងផុត Key នេះ <strong>លែងអាច Activate លើគ្រឿងថ្មី ឬគ្រឿងដែល Reset រួច</strong>បានទៀតទេ — ករណីនោះត្រូវបង្កើត Key ថ្មីជំនួស។</p>
         <input type="number" id="extendDaysInput" value="30" min="1" step="1">
         <div class="modal-btns">
             <button class="btn-confirm" data-act="confirmExtendKey">រក្សាទុក</button>

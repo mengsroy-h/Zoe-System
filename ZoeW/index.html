@@ -105,24 +105,24 @@
                         <span class="lbl">ទឹកប្រាក់ COD សរុប (នៅសល់)៖</span>
                         <div>
                             <span id="summaryCodDollar" class="val-cod">$0.00</span>
-                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryCodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+                            <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryCodRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:600; color:var(--text-muted);">0 ៛</span>
                         </div>
                     </div>
                     <div class="financial-row">
                         <span class="lbl">ទឹកប្រាក់ DOD សរុប (នៅសល់)៖</span>
                         <div>
                             <span id="summaryDodDollar" class="val-dod">$0.00</span>
-                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryDodRiel" style="font-size:10px; font-weight:600; color:var(--text-muted);">0 ៛</span>
+                            <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryDodRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:600; color:var(--text-muted);">0 ៛</span>
                         </div>
                     </div>
                     <div class="financial-row" style="border-top: 1px dashed var(--border-color); padding-top: 4px; margin-top: 2px;">
                         <span class="lbl">ទឹកប្រាក់សរុបរួម (COD+DOD នៅសល់)៖</span>
                         <div>
                             <span id="summaryTotalDollar" class="val-total">$0.00</span>
-                            <span style="font-size:10px; color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryTotalRiel" style="font-size:10px; font-weight:700; color:var(--primary);">0 ៛</span>
+                            <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
+                            <span id="summaryTotalRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:700; color:var(--primary);">0 ៛</span>
                         </div>
                     </div>
                 </div>
@@ -420,22 +420,22 @@ const firebaseConfig = {
             <span>រក្សាទុកភ្លាមៗពេលរកឃើញលេខទូរស័ព្ទ (មិនចាំចុច "យល់ព្រម")</span>
         </label>
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">URL API (ដាក់ {barcode} ជំនួសកន្លែងលេខបាកូដ):</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">URL API (ដាក់ {barcode} ជំនួសកន្លែងលេខបាកូដ):</label>
         <input type="text" id="lookupApiUrlInput" placeholder="https://your-api.com/lookup?code={barcode}">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Header (ជម្រើស, ឧ. X-API-Key):</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Header (ជម្រើស, ឧ. X-API-Key):</label>
         <input type="text" id="lookupApiHeaderNameInput" placeholder="ឧ. X-API-Key ឬ Authorization">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">តម្លៃ Header / API Key / Secret (ជម្រើស — ទុកទទេដើម្បីរក្សាតម្លៃចាស់):</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">តម្លៃ Header / API Key / Secret (ជម្រើស — ទុកទទេដើម្បីរក្សាតម្លៃចាស់):</label>
         <input type="password" autocomplete="off" id="lookupApiHeaderValueInput" placeholder="ឧ. Bearer xxxxx ឬ Secret Key">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field លេខទូរស័ព្ទក្នុង JSON:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field លេខទូរស័ព្ទក្នុង JSON:</label>
         <input type="text" id="lookupApiPhoneFieldInput" placeholder="ឧ. phone ឬ data.phone">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field COD ក្នុង JSON:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field COD ក្នុង JSON:</label>
         <input type="text" id="lookupApiCodFieldInput" placeholder="ឧ. cod ឬ data.cod">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field DOD ក្នុង JSON:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ឈ្មោះ Field DOD ក្នុង JSON:</label>
         <input type="text" id="lookupApiDodFieldInput" placeholder="ឧ. dod ឬ data.dod">
 
         <div class="modal-btns" style="margin-top: 6px;">
@@ -486,16 +486,16 @@ const firebaseConfig = {
         <h3>⚙️ កែប្រែ COD, DOD & កញ្ចប់ដោយដៃ</h3>
         <p>ជ្រើសរើសកាលបរិច្ឆេទ (YYYY-MM-DD) និងចំនួនដែលចង់កែប្រែ</p>
         
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">កាលបរិច្ឆេទ (YYYY-MM-DD):</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">កាលបរិច្ឆេទ (YYYY-MM-DD):</label>
         <input type="text" id="manualDateInput" placeholder="ឧ. 2026-06-05">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ទឹកប្រាក់ COD ($) [+ បន្ថែម, - ដកចេញ]:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ទឹកប្រាក់ COD ($) [+ បន្ថែម, - ដកចេញ]:</label>
         <input type="number" id="manualCodChangeInput" placeholder="ឧ. -5.00 ឬ 10.00" step="0.01">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ទឹកប្រាក់ DOD ($) [+ បន្ថែម, - ដកចេញ]:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ទឹកប្រាក់ DOD ($) [+ បន្ថែម, - ដកចេញ]:</label>
         <input type="number" id="manualDodChangeInput" placeholder="ឧ. -2.00 ឬ 5.00" step="0.01">
 
-        <label style="font-size: 10px; font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ចំនួនកញ្ចប់ [+ បន្ថែម, - ដកចេញ]:</label>
+        <label style="font-size: calc(10 * var(--fs-unit)); font-weight: 600; color: var(--text-muted); display: block; text-align: left; margin-bottom: 2px;">ចំនួនកញ្ចប់ [+ បន្ថែម, - ដកចេញ]:</label>
         <input type="number" id="manualCountChangeInput" placeholder="ឧ. -2 ឬ 1" step="1">
 
         <div class="modal-btns" style="margin-top: 6px;">
@@ -572,7 +572,7 @@ const firebaseConfig = {
 <div id="viewListModal" class="modal">
     <div class="modal-content" style="max-width: 440px;">
         <h3>📦 បញ្ជីអីវ៉ាន់ទាំងអស់</h3>
-        <p style="margin-bottom: 6px;">លេខទូរស័ព្ទ៖ <strong id="listModalPhoneText" style="color:var(--primary); font-size:12px;"></strong></p>
+        <p style="margin-bottom: 6px;">លេខទូរស័ព្ទ៖ <strong id="listModalPhoneText" style="color:var(--primary); font-size:calc(12 * var(--fs-unit));"></strong></p>
         <div class="table-responsive" style="max-height: 280px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
             <div id="barcodeListContainer"></div>
         </div>
@@ -612,7 +612,7 @@ const firebaseConfig = {
             <input type="text" id="customerDataTableSearchInput" data-act="filterCustomerDataTable" data-on="input" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." style="margin-bottom:0; text-align:left;" autocomplete="off">
             <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" data-act="fetchCustomerDataTableRows" data-args='[true]'>🔄</button>
         </div>
-        <p id="customerDataTableStatus" style="font-size:10.5px; color:var(--text-muted); margin-bottom:6px;"></p>
+        <p id="customerDataTableStatus" style="font-size:calc(10.5 * var(--fs-unit)); color:var(--text-muted); margin-bottom:6px;"></p>
         <div class="table-responsive" style="flex:1; min-height:0;">
             <table>
                 <thead>
@@ -702,12 +702,12 @@ const firebaseConfig = {
     <div class="modal-content" style="max-width: 380px;">
         <h3>🔑 ត្រូវការ Activation Key</h3>
         <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។</p>
-        <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: 11px;"></textarea>
+        <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: calc(11 * var(--fs-unit));"></textarea>
         <div class="modal-btns">
             <button class="btn-confirm" id="activationSubmitBtn" data-act="submitActivationKey">ដាក់ Active</button>
             <button class="btn-cancel" id="activationLogoutBtn" data-act="logoutApp">ចាកចេញ</button>
         </div>
-        <p style="margin-top:10px; font-size:11.5px; color:var(--text-muted); text-align:center;">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:600;">@mengsroyhun</a> តាម Telegram</p>
+        <p style="margin-top:10px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); text-align:center;">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:600;">@mengsroyhun</a> តាម Telegram</p>
     </div>
 </div>
 

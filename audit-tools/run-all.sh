@@ -94,6 +94,7 @@ run "sw-revalidate-pressure (browser ពិត)" node audit-tools/sw-revalidate-
 run "boot-animation (browser ពិត)" node audit-tools/boot-animation-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
+run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -163,6 +164,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
+    FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
 fi
 
 echo

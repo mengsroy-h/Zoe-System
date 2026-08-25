@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.16.0';
+    const APP_VERSION = '2.17.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -10,6 +10,7 @@
         "closeConfigQrScanner",
         "closeEditBarcodeModal",
         "closeModal",
+        "closeRecentlyDeletedModal",
         "closeSideDrawer",
         "confirmLocationChange",
         "confirmPhone",
@@ -31,6 +32,7 @@
         "filterCustomerDataTable",
         "filterDataByCustomDate",
         "filterDataByDate",
+        "filterRecentlyDeleted",
         "handleCallAction",
         "logoutApp",
         "moreMenuClearHistory",
@@ -39,6 +41,7 @@
         "moreMenuExchangeRate",
         "moreMenuExport",
         "moreMenuManualAdjust",
+        "moreMenuRecentlyDeleted",
         "moreMenuViewList",
         "openCallMarkModal",
         "openConfigQrScanner",
@@ -47,7 +50,6 @@
         "openEditModal",
         "openLockerPicker",
         "openMonthlyStatsModal",
-        "openRecentlyDeletedModal",
         "openSideDrawer",
         "openViewListModal",
         "promptPermanentDelete",
@@ -79,6 +81,7 @@
         "toggleIndividualBarcodeClose",
         "toggleMoreDropdown",
         "toggleTorch",
+        "toggleTrashGroup",
         "verifySecurityPin"
     ];
     function readActionArgs(el, event) {
@@ -2020,6 +2023,7 @@
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
     const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
+    const TRASH_RETENTION_MS = 15 * 24 * 60 * 60 * 1000;
 
     function clearRememberedSession(keepEmail) {
         safeStoreRemove(localStorage, 'zoew_login_time');
@@ -2056,6 +2060,8 @@
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
+        deletedSearchQuery = '';
+        expandedTrashGroups.clear();
         activeParentItemId = null;
         lookupSecretKey = null;
         pendingLockerCode = null;
@@ -2073,7 +2079,8 @@
             'manualDateInput', 'manualCodChangeInput', 'manualDodChangeInput', 'manualCountChangeInput',
             'editModalBarcodeText', 'lookupApiHeaderValueInput',
             'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
-            'deletedTableBody', 'dailyStatsContainer', 'monthlyStatsContainer',
+            'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
+            'dailyStatsContainer', 'monthlyStatsContainer',
             'menuContentContainer', 'lockerListTableBody', 'lockerListSearchInput',
             'locationWarningText', 'customLockerInput',
             'entryListTableBody', 'entryListSearchInput', 'entryListCount'
@@ -2712,6 +2719,7 @@
                 delete trashItem.closedAt;
                 trashItem.deletedAt = getServerNow();
                 trashItem.isFromDeletion = false;
+                trashItem.trashReason = 'expired';
                 revenueScanDate = trashItem.scanDate || getFormattedDate();
                 revenueCod = trashItem.cod;
                 revenueDod = trashItem.dod;
@@ -2724,6 +2732,7 @@
 
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
+                    trashItem.trashReason = 'expired';
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
                         trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
                     }
@@ -2735,6 +2744,7 @@
                     revenueDeducted = true;
                 } else {
                     trashItem.isFromDeletion = true;
+                    trashItem.trashReason = 'pickup';
                     if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
                         trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));
                     }
@@ -2771,14 +2781,13 @@
     async function runAutomaticDeletedCleanup() {
         if (deletedCleanupInFlight) return;
         const currentTime = getServerNow();
-        let tenDaysMs = 10 * 24 * 60 * 60 * 1000;
         let purgedBarcodes = [];
         let purgedIds = [];
 
         deletedItems.forEach(item => {
             if (!item || item.restoreClaim) return;
             let deletedTime = item.deletedAt || currentTime;
-            const expired = (currentTime - deletedTime > tenDaysMs);
+            const expired = (currentTime - deletedTime > TRASH_RETENTION_MS);
             if (expired) {
                 purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
                 if (item.id) purgedIds.push(item.id);
@@ -4314,6 +4323,8 @@
 
     function moreMenuExchangeRate() { openExchangeRateModal(); closeGlobalMoreMenu(); }
 
+    function moreMenuRecentlyDeleted() { openRecentlyDeletedModal(); closeGlobalMoreMenu(); }
+
     function moreMenuClearHistory() { requestPinBeforeClearHistory(); closeGlobalMoreMenu(); }
 
     function moreMenuViewList(id) { openViewListModal(id); closeGlobalMoreMenu(); }
@@ -4333,6 +4344,7 @@
             <button data-act="moreMenuExport">📤 Export Data</button>
             <button data-act="moreMenuManualAdjust">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
             <button data-act="moreMenuExchangeRate">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
+            <button data-act="moreMenuRecentlyDeleted">🗑️ ធុងសំរាម</button>
             <button class="delete-opt" data-act="moreMenuClearHistory">❌ លុបទាំងអស់</button>
         `;
 
@@ -5641,6 +5653,10 @@
     const ENTRY_LIST_MAX_ROWS = 200;
     const LOCKER_LIST_MAX_ROWS = 200;
     const DELETED_LIST_MAX_ROWS = 200;
+    const TRASH_CODES_PREVIEW = 2;
+
+    let deletedSearchQuery = '';
+    const expandedTrashGroups = new Set();
 
     let activeLocker = localStorage.getItem(ACTIVE_LOCKER_KEY) || '';
     let entryScanMode = localStorage.getItem(ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
@@ -6603,6 +6619,7 @@
             itemToTrash.id = generateUniqueId();
             itemToTrash.deletedAt = getServerNow();
             itemToTrash.isFromDeletion = false;
+            itemToTrash.trashReason = 'remove';
             itemToTrash.cod = parseFloat(removedBc.cod) || 0;
             itemToTrash.dod = parseFloat(removedBc.dod) || 0;
             itemToTrash.price = Math.round((itemToTrash.cod + itemToTrash.dod) * 100) / 100;
@@ -7299,6 +7316,7 @@
             const removed = { ...claimedWhole, id };
             removed.deletedAt = getServerNow();
             removed.isFromDeletion = true;
+            removed.trashReason = 'delete';
             if (Array.isArray(removed.barcodes)) {
                 removed.barcodes = removed.barcodes.map(b => ({ ...b, isFromDeletion: true }));
             }
@@ -7344,38 +7362,234 @@
         }
     }
 
+    const TRASH_REASON_META = {
+        remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
+        expired: { label: 'ផុតកំណត់', cls: 'trash-tag-expired', deducted: true },
+        pickup: { label: 'យករួច', cls: 'trash-tag-pickup', deducted: false },
+        delete: { label: 'លុប', cls: 'trash-tag-delete', deducted: false }
+    };
+
+    function trashReasonOf(item) {
+        if (!item) return 'delete';
+        if (typeof item.trashReason === 'string' && TRASH_REASON_META[item.trashReason]) return item.trashReason;
+        if (item.isFromDeletion) return item.isClosed ? 'pickup' : 'delete';
+        return 'remove';
+    }
+
+    function trashItemTotals(item) {
+        const entries = barcodeEntriesOf(item && item.barcodes);
+        if (entries.length) {
+            let cod = 0;
+            let dod = 0;
+            entries.forEach(({ barcode }) => {
+                cod += parseFloat(barcode && barcode.cod) || 0;
+                dod += parseFloat(barcode && barcode.dod) || 0;
+            });
+            return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count: entries.length };
+        }
+        const cod = parseFloat(item && item.cod) || 0;
+        const dod = parseFloat(item && item.dod) || 0;
+        const count = parseFloat(item && item.count) || 1;
+        return { cod: Math.round(cod * 100) / 100, dod: Math.round(dod * 100) / 100, count: count };
+    }
+
+    function trashItemCodes(item) {
+        const codes = [];
+        barcodeEntriesOf(item && item.barcodes).forEach(({ barcode }) => {
+            const code = barcode && barcode.code;
+            if (code && codes.indexOf(code) === -1) codes.push(code);
+        });
+        if (!codes.length && item && item.barcode) codes.push(item.barcode);
+        return codes;
+    }
+
+    function trashGroupKeyOf(item, reason) {
+        return [reason, item.phone || '', item.scanDate || '', item.time || ''].join('~');
+    }
+
+    function buildTrashGroups(items) {
+        const groups = [];
+        const byKey = new Map();
+        (Array.isArray(items) ? items : []).forEach((item) => {
+            if (!item || !item.id) return;
+            const reason = trashReasonOf(item);
+            const key = trashGroupKeyOf(item, reason);
+            let group = byKey.get(key);
+            if (!group) {
+                group = {
+                    key: key, reason: reason, phone: item.phone || 'គ្មានលេខ',
+                    scanDate: item.scanDate || '', time: item.time || '',
+                    items: [], codes: [], cod: 0, dod: 0, count: 0, total: 0, deletedAt: 0
+                };
+                byKey.set(key, group);
+                groups.push(group);
+            }
+            const totals = trashItemTotals(item);
+            group.items.push(item);
+            group.cod += totals.cod;
+            group.dod += totals.dod;
+            group.count += totals.count;
+            trashItemCodes(item).forEach((code) => { if (group.codes.indexOf(code) === -1) group.codes.push(code); });
+            const deletedAt = parseFloat(item.deletedAt) || 0;
+            if (deletedAt > group.deletedAt) group.deletedAt = deletedAt;
+        });
+        groups.forEach((group) => {
+            group.cod = Math.round(group.cod * 100) / 100;
+            group.dod = Math.round(group.dod * 100) / 100;
+            group.total = Math.round((group.cod + group.dod) * 100) / 100;
+        });
+        return groups;
+    }
+
+    function trashGroupMatchesQuery(group, query) {
+        if (!query) return true;
+        if (String(group.phone).toLowerCase().indexOf(query) !== -1) return true;
+        return group.codes.some((code) => String(code).toLowerCase().indexOf(query) !== -1);
+    }
+
+    function filterRecentlyDeleted() {
+        const input = document.getElementById('deletedSearchInput');
+        deletedSearchQuery = input ? input.value : '';
+        renderRecentlyDeleted();
+    }
+
+    function toggleTrashGroup(key) {
+        if (!key) return;
+        if (expandedTrashGroups.has(key)) expandedTrashGroups.delete(key);
+        else expandedTrashGroups.add(key);
+        renderRecentlyDeleted();
+    }
+
+    function closeRecentlyDeletedModal() {
+        deletedSearchQuery = '';
+        expandedTrashGroups.clear();
+        const input = document.getElementById('deletedSearchInput');
+        if (input) input.value = '';
+        closeModal('recentlyDeletedModal');
+    }
+
     function openRecentlyDeletedModal() {
+        const input = document.getElementById('deletedSearchInput');
+        if (input) input.value = deletedSearchQuery;
         renderRecentlyDeleted();
         openModalHelper('recentlyDeletedModal');
     }
 
+    function trashSummaryCardHtml(cls, head, note, bucket) {
+        const riel = Math.round(bucket.total * exchangeRateRiel);
+        return `<div class="trash-sum-card ${cls}">
+                    <div class="trash-sum-head">${head}</div>
+                    <div class="trash-sum-note">${note}</div>
+                    <div class="trash-sum-money">$${bucket.total.toFixed(2)}</div>
+                    <div class="trash-sum-riel">${riel.toLocaleString()} ៛</div>
+                    <div class="trash-sum-count">📦 ${bucket.count} កញ្ចប់</div>
+                </div>`;
+    }
+
+    function renderTrashSummary(groups, query) {
+        const box = document.getElementById('trashSummaryBox');
+        if (!box) return;
+        const deducted = { total: 0, count: 0 };
+        const kept = { total: 0, count: 0 };
+        groups.forEach((group) => {
+            const meta = TRASH_REASON_META[group.reason] || TRASH_REASON_META.delete;
+            const bucket = meta.deducted ? deducted : kept;
+            bucket.total += group.total;
+            bucket.count += group.count;
+        });
+        deducted.total = Math.round(deducted.total * 100) / 100;
+        kept.total = Math.round(kept.total * 100) / 100;
+        const grandTotal = Math.round((deducted.total + kept.total) * 100) / 100;
+        const grandCount = deducted.count + kept.count;
+        const scopeNote = query ? 'លទ្ធផលស្វែងរក' : 'ធុងសំរាមទាំងមូល';
+        box.innerHTML = `
+            <div class="trash-sum-grid">
+                ${trashSummaryCardHtml('trash-sum-deducted', '➖ ដក + ផុតកំណត់', 'ដកចេញពីស្ថិតិរួចហើយ', deducted)}
+                ${trashSummaryCardHtml('trash-sum-kept', '✅ យករួច + លុប', 'មិនប៉ះស្ថិតិចំណូល', kept)}
+            </div>
+            <div class="trash-sum-total">
+                <span>${scopeNote}</span>
+                <strong>សរុប $${grandTotal.toFixed(2)} · 📦 ${grandCount} កញ្ចប់ · ${groups.length} ជួរ</strong>
+            </div>
+        `;
+    }
+
+    function trashActionButtonsHtml(id) {
+        return `<div class="trash-row-actions">
+                    <button class="btn-sm trash-restore-btn" data-act="promptRestoreDeletedItem" data-a1="${sanitizeInput(id)}" title="ស្តារមកវិញ">🔄</button>
+                    <button class="btn-sm trash-purge-btn" data-act="promptPermanentDelete" data-a1="${sanitizeInput(id)}" title="លុបជាអចិន្ត្រៃយ៍">✖️</button>
+                </div>`;
+    }
+
+    function trashGroupRowHtml(group) {
+        const meta = TRASH_REASON_META[group.reason] || TRASH_REASON_META.delete;
+        const expanded = expandedTrashGroups.has(group.key);
+        const codeTags = group.codes.slice(0, TRASH_CODES_PREVIEW)
+            .map((code) => `<span class="barcode-tag">${sanitizeInput(code)}</span>`).join(' ');
+        const moreCodes = group.codes.length > TRASH_CODES_PREVIEW
+            ? `<span class="trash-more-codes">+${group.codes.length - TRASH_CODES_PREVIEW}</span>` : '';
+        const whenText = [group.scanDate, group.time].filter(Boolean).join(' ') || 'មិនស្គាល់ពេល';
+        const riel = Math.round(group.total * exchangeRateRiel);
+        const actions = group.items.length === 1
+            ? trashActionButtonsHtml(group.items[0].id)
+            : `<button class="btn-sm trash-expand-btn" data-act="toggleTrashGroup" data-a1="${sanitizeInput(group.key)}" title="បង្ហាញធាតុនីមួយៗ">${expanded ? '▲' : '▼'} ${group.items.length}</button>`;
+
+        let html = `<tr class="trash-group-row">
+                <td>
+                    <div class="trash-cust">
+                        <strong>${sanitizeInput(group.phone)}</strong>
+                        <span class="trash-tag ${meta.cls}">${meta.label}</span>
+                    </div>
+                    <div class="trash-when">🕒 ${sanitizeInput(whenText)}</div>
+                    <div class="trash-codes">${codeTags}${moreCodes}</div>
+                </td>
+                <td>
+                    <div><span class="count-badge">📦 ${group.count}</span></div>
+                    <div class="trash-money">$${group.total.toFixed(2)}</div>
+                    <div class="trash-riel">${riel.toLocaleString()} ៛</div>
+                </td>
+                <td style="text-align: center;">${actions}</td>
+            </tr>`;
+
+        if (expanded && group.items.length > 1) {
+            group.items.forEach((item) => {
+                const totals = trashItemTotals(item);
+                const itemTotal = Math.round((totals.cod + totals.dod) * 100) / 100;
+                const codes = trashItemCodes(item);
+                const codeHtml = codes.length
+                    ? codes.map((code) => `<span class="barcode-tag">${sanitizeInput(code)}</span>`).join(' ')
+                    : '<span class="trash-more-codes">គ្មាន Barcode</span>';
+                html += `<tr class="trash-sub-row">
+                        <td>${codeHtml}</td>
+                        <td><span class="count-badge">📦 ${totals.count}</span> <span class="trash-money">$${itemTotal.toFixed(2)}</span></td>
+                        <td style="text-align: center;">${trashActionButtonsHtml(item.id)}</td>
+                    </tr>`;
+            });
+        }
+        return html;
+    }
+
     function renderRecentlyDeleted() {
         const tbody = document.getElementById('deletedTableBody');
-        if(!tbody) return;
-        tbody.innerHTML = '';
+        if (!tbody) return;
 
-        if (deletedItems.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យដែលបានលុបទេ</td></tr>`;
+        const query = String(deletedSearchQuery || '').trim().toLowerCase();
+        const allGroups = buildTrashGroups(deletedItems);
+        const groups = query ? allGroups.filter((group) => trashGroupMatchesQuery(group, query)) : allGroups;
+        renderTrashSummary(groups, query);
+
+        const liveKeys = new Set(groups.map((group) => group.key));
+        Array.from(expandedTrashGroups).forEach((key) => { if (!liveKeys.has(key)) expandedTrashGroups.delete(key); });
+
+        if (groups.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #888; padding: 14px;">${query ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ' : 'គ្មានទិន្នន័យដែលបានលុបទេ'}</td></tr>`;
             return;
         }
 
         let html = '';
-        deletedItems.slice(0, DELETED_LIST_MAX_ROWS).forEach((item) => {
-            let deleteTypeLabel = item.isFromDeletion ? "លុបទាំងមូល" : "ដកកញ្ចប់";
-            let displayCode = item.barcodes && item.barcodes.length > 0 ? item.barcodes[0].code : item.barcode;
-            html += `<tr>
-                <td><strong>${sanitizeInput(item.phone)}</strong><br><small style="color:var(--text-muted);">${deleteTypeLabel}</small></td>
-                <td><span class="barcode-tag">${sanitizeInput(displayCode)}</span></td>
-                <td style="text-align: center;">
-                    <div style="display:flex; gap:4px; justify-content:center;">
-                        <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" data-act="promptRestoreDeletedItem" data-a1="${sanitizeInput(item.id)}">🔄</button>
-                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" data-act="promptPermanentDelete" data-a1="${sanitizeInput(item.id)}">✖️</button>
-                    </div>
-                </td>
-            </tr>`;
-        });
-        if (deletedItems.length > DELETED_LIST_MAX_ROWS) {
-            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${deletedItems.length - DELETED_LIST_MAX_ROWS} ធាតុទៀត (ធាតុចាស់ជាង ១០ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
+        groups.slice(0, DELETED_LIST_MAX_ROWS).forEach((group) => { html += trashGroupRowHtml(group); });
+        if (groups.length > DELETED_LIST_MAX_ROWS) {
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ធាតុចាស់ជាង ១៥ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
         }
         tbody.innerHTML = html;
     }
@@ -7616,6 +7830,7 @@
             const restoredWasRemoved = itemToRestore.isFromDeletion === false;
             delete itemToRestore.deletedAt;
             delete itemToRestore.isFromDeletion;
+            delete itemToRestore.trashReason;
             delete itemToRestore.restoreClaim;
             delete itemToRestore.restoreClaimId;
             delete itemToRestore.restoreClaimToken;
@@ -7973,8 +8188,8 @@
             let closeAction = `<button class="btn-sm close-btn btn-primary-action" data-act="toggleCloseStatus" data-a1="${sanitizeInput(item.id)}">${closeBtnText}</button>`;
 
             let moreDropdown = `
-                <div class="more-dropdown">
-                    <button class="more-btn" data-act="toggleMoreDropdown" data-self="1" data-evt="1" data-a1="${sanitizeInput(item.id)}">⋮</button>
+                <div class="more-dropdown row-more-corner">
+                    <button class="more-btn" data-act="toggleMoreDropdown" data-self="1" data-evt="1" data-a1="${sanitizeInput(item.id)}" title="ជម្រើសបន្ថែម">⋮</button>
                 </div>
             `;
 
@@ -8048,19 +8263,17 @@
                         ${scanTimeDisplay}
                     </div>
                 </td>
-                <td style="text-align: left; padding-left: 6px;">
-                    <div style="margin-bottom:3px;">
+                <td class="col-price">
+                    <div class="price-stack">
                         <span class="locker-badge">ទីតាំង: ${sanitizeInput(lockerLoc)}</span>
-                    </div>
-                    ${priceDisplayHtml}
-                    <div style="margin-top:3px;">
+                        <div class="price-figures">${priceDisplayHtml}</div>
                         <span class="count-badge">កញ្ចប់សរុប: ${activeCount}</span>
                     </div>
                 </td>
-                <td>
+                <td class="action-cell">
+                    ${moreDropdown}
                     <div class="action-group">
-                        ${callAction}
-                        ${closeAction}${moreDropdown}
+                        ${callAction}${closeAction}
                     </div>
                 </td>
             `;
@@ -8159,6 +8372,7 @@
         delete trashItem.restoreClaimToken;
         trashItem.deletedAt = getServerNow();
         trashItem.isFromDeletion = true;
+        trashItem.trashReason = 'delete';
         if (Array.isArray(trashItem.barcodes)) {
             trashItem.barcodes = trashItem.barcodes.map((barcode) => ({ ...barcode, isFromDeletion: true }));
         }

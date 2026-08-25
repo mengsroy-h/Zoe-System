@@ -156,6 +156,7 @@
         <div class="page-main" id="dataMainSection">
             <div class="drag-handle-bar" id="dragHandle" title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកប្រវត្តិ"></div>
             <div class="app-card history-section">
+                <button class="header-more-btn" data-act="toggleHeaderMoreDropdown" data-self="1" data-evt="1" title="ម៉ុនុយបន្ថែម">...</button>
                 <div class="card-header">
                     <div class="card-title">
                         📋 ប្រវត្តិ (<span id="count">0</span> នាក់)
@@ -163,8 +164,6 @@
                     <div class="header-actions">
                         <button class="daily-stats-btn" data-act="openDailyStatsModal">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
                         <button class="monthly-stats-btn" data-act="openMonthlyStatsModal">📊 ស្ថិតិចំណូល</button>
-                        <button class="recently-deleted-btn" data-act="openRecentlyDeletedModal">🗑️ ធុងសំរាម</button>
-                        <button class="header-more-btn" data-act="toggleHeaderMoreDropdown" data-self="1" data-evt="1">...</button>
                     </div>
                 </div>
 
@@ -175,13 +174,13 @@
                 </div>
 
                 <div class="table-responsive" id="tableResponsive">
-                    <table>
+                    <table class="history-table">
                         <thead>
                             <tr>
-                                <th style="width: 6%; text-align: center;">ល.រ</th>
-                                <th style="width: 26%;">អតិថិជន</th>
-                                <th style="width: 30%; text-align: left; padding-left: 6px;">តម្លៃ/ទីតាំង</th>
-                                <th style="width: 38%; text-align: right;">សកម្មភាព</th>
+                                <th class="col-num">ល.រ</th>
+                                <th class="col-cust">អតិថិជន</th>
+                                <th class="col-price">តម្លៃ/ទីតាំង</th>
+                                <th class="col-act">សកម្មភាព</th>
                             </tr>
                         </thead>
                         <tbody id="historyTableBody"></tbody>
@@ -633,23 +632,28 @@ const firebaseConfig = {
 </div>
 
 <div id="recentlyDeletedModal" class="modal">
-    <div class="modal-content" style="max-width: 400px;">
-        <h3>🗑️ ទិន្នន័យលុបបណ្តោះអាសន្ន</h3>
-        <p>លុបអចិន្ត្រៃយ៍បន្ទាប់ពី ១០ ថ្ងៃ</p>
-        <div class="table-responsive" style="max-height: 200px; margin-bottom: 8px;">
+    <div class="modal-content trash-modal-content">
+        <h3>🗑️ ធុងសំរាម</h3>
+        <p>លុបអចិន្ត្រៃយ៍បន្ទាប់ពី ១៥ ថ្ងៃ</p>
+        <div class="trash-search-box">
+            <span class="icon">🔍</span>
+            <input type="search" id="deletedSearchInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off" data-act="filterRecentlyDeleted" data-on="input">
+        </div>
+        <div class="trash-summary" id="trashSummaryBox"></div>
+        <div class="table-responsive trash-table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>ទូរស័ព្ទ</th>
-                        <th>Barcode</th>
-                        <th style="text-align: center;">សកម្មភាព</th>
+                        <th style="width: 42%;">អតិថិជន</th>
+                        <th style="width: 30%;">កញ្ចប់ / តម្លៃ</th>
+                        <th style="width: 28%; text-align: center;">សកម្មភាព</th>
                     </tr>
                 </thead>
                 <tbody id="deletedTableBody"></tbody>
             </table>
         </div>
         <div class="modal-btns">
-            <button class="btn-cancel" data-act="closeModal" data-args='["recentlyDeletedModal"]'>បិទ</button>
+            <button class="btn-cancel" data-act="closeRecentlyDeletedModal">បិទ</button>
         </div>
     </div>
 </div>

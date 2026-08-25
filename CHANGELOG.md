@@ -117,9 +117,11 @@
   [`zto-import/README.md`](zto-import/README.md) និង (២) Deploy ថត `ZoeImport`
   ជា **Netlify site ដាច់ដោយឡែក** (Base directory: `ZoeImport`) — មើល
   [`ZoeImport/README.md`](ZoeImport/README.md)។
-- **ការនាំចូលឆ្លង origin ត្រូវសាកលើ deploy ពិតជាមុន** — បរិស្ថានតេស្តក្នុង repo
-  មិនអាចបង្កើតឥរិយាបថ CORS ពិតឡើងវិញបានទេ។ បើមានបញ្ហា ទំព័រ Web ដែល Apps Script
-  បម្រើខ្លួនឯង (`zto-import/Index.html`) ជាផ្លូវបម្រុងដែលគ្មាន CORS ទាល់តែសោះ។
+- ✅ **ផ្ទៀងផ្ទាត់លើផលិតកម្មពិតរួចហើយ** (2026-08-25) — អ្នកប្រើរាយការណ៍ថា
+  ការនាំចូលដើរលើ deploy ពិត។ ផ្លូវ cross-origin POST ជាមួយ
+  `Content-Type: text/plain` លែងជាកូដដែលមិនទាន់សាកទេ។ **កុំប្តូរ header នោះ
+  ឬបន្ថែម header ផ្ទាល់ខ្លួន** — វាកេះ preflight `OPTIONS` ដែល Apps Script
+  មិនឆ្លើយ ➜ ការនាំចូលស្លាប់លើផលិតកម្ម ខណៈតេស្តក្នុង repo ជោគជ័យ។
 - ចំណាំ៖ ក្រោយនាំចូល ZoeW អាចយឺតរហូតដល់ **៥ នាទី** ទើបឃើញទិន្នន័យថ្មី ព្រោះ
   Lookup API មាន `CACHE_TTL_SECONDS = 300` — នេះជាឥរិយាបថដែលមានស្រាប់ មិនមែន
   កំហុសថ្មីទេ។

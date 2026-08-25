@@ -88,13 +88,20 @@ SheetJS ស្ថិត **ក្នុង repo** (`vendor/xlsx.full.min.js`) ម
 តាមច្បាប់គម្រោងដដែលដែលនាំ ZXing ចូល repo៖ ធនធានចាំបាច់ដែលមកពី origin ខាងក្រៅ
 មិនចូល cache របស់ Service Worker ➜ មុខងារស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ។
 
-> ⚠️ **ការនាំចូលឆ្លង origin ត្រូវសាកលើ deploy ពិតជាមុន។** សំណើទៅ Apps Script
-> ជា cross-origin POST។ វាប្រើ `Content-Type: text/plain` ដោយចេតនា ដើម្បីកុំឲ្យ
-> browser បញ្ជូន preflight (Apps Script មិនឆ្លើយ `OPTIONS` ទេ)។ បរិស្ថានតេស្ត
-> ក្នុង repo **មិនអាចបង្កើតឥរិយាបថ CDN/CORS ពិតឡើងវិញបានទេ** ដូច្នេះសូមសាក
-> «សាកល្បង និងរក្សាទុក» លើ site ពិតមុនប្រើប្រចាំថ្ងៃ។ បើវាមានបញ្ហា
-> ទំព័រ Web ដែល Apps Script បម្រើខ្លួនឯង (`zto-import/Index.html`) ជាផ្លូវបម្រុង
-> ដែលគ្មាន CORS ទាល់តែសោះ។
+> ✅ **ដំណើរការលើផលិតកម្មពិតរួចហើយ** (2026-08-25) — អ្នកប្រើបានរៀបចំ Apps Script
+> និង ZoeImport រួច រាយការណ៍ថាការនាំចូលដើរ។ ដូច្នេះផ្លូវ **cross-origin POST
+> ជាមួយ `Content-Type: text/plain` មិនមែនជាកូដដែលមិនទាន់សាកទេ**។
+>
+> **ច្បាប់ដែលត្រូវរក្សា៖** កុំប្តូរ `Content-Type` ចេញពី `text/plain` ហើយ
+> **កុំបន្ថែម header ផ្ទាល់ខ្លួន** (`Authorization`, `X-…`) លើសំណើនោះ។ ទាំង ២
+> ធ្វើឲ្យវាលែងជា *simple request* ➜ browser បញ្ជូន preflight `OPTIONS` ➜
+> Apps Script មិនឆ្លើយ `OPTIONS` ➜ **ការនាំចូលស្លាប់ទាំងស្រុងលើផលិតកម្ម ខណៈ
+> តេស្តក្នុង repo (ដែលប្រើ fetch stub) ជោគជ័យទាំងអស់** — ជាថ្នាក់កំហុសដដែល
+> នឹង CSP `'wasm-unsafe-eval'` ក្នុងកំណែ 2.10.0។
+>
+> មិនទាន់មានរបាយការណ៍ដាច់ដោយឡែកសម្រាប់៖ Drive folder watcher (`Watch.gs`)
+> និងការដំឡើងជា App លើទូរស័ព្ទ។ បើវាមានបញ្ហា ទំព័រ Web ដែល Apps Script
+> បម្រើខ្លួនឯង (`zto-import/Index.html`) ជាផ្លូវបម្រុងដែលគ្មាន CORS ទាល់តែសោះ។
 
 ## ការធ្វើតេស្ត
 

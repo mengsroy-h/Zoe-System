@@ -20,7 +20,7 @@ function buildRunner(appFile) {
     // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
     const claimBlock = slice(src,
         '            let trashItem;\n            let revenueDeducted = false;',
-        '                    trashItem.isFromDeletion = true;\n                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {\n                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                    }\n                }\n            }',
+        '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {\n                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                    }\n                }\n            }',
         'claim');
 
     // --- real block 2: executeRestoreItem's revenue + marker block ---

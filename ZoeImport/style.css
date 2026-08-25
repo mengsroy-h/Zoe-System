@@ -479,7 +479,7 @@ body.boot-reveal .app-body { animation: bootFadeIn 420ms ease-out 70ms both; }
 @keyframes bootFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 @media (min-width: 900px) {
-    :root { --fs-unit: 1.2px; }
+    :root { --fs-unit: clamp(1.2px, 0.975px + 0.025vw, 1.35px); }
     .app-body { padding-top: 22px; }
 
     #appMain {

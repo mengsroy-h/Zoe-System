@@ -74,6 +74,11 @@ for (const app of ['ZoeW']) {
         });
         const resetScanFn = sliceFn(src, 'resetScanConfirm');
         if (resetScanFn) vm.runInContext(resetScanFn, ctx);
+        // ស្ថានភាពធុងសំរាមដែល clearSensitiveModalFields ត្រូវ reset — ចាក់ការប្រកាស **ពិត**
+        ['deletedSearchQuery', 'expandedTrashGroups'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
         // ស្ថានភាពចលនាផ្ទាំង — ចាក់ **កូដពិត** មិនមែន stub ទទេ ដើម្បីឲ្យ
         // តេស្តពិតជាបញ្ជាក់ថាការចាកចេញដោះការផ្អាក snap។
         ['panelGlideTokens', 'panelGlideRelease'].forEach((n) => {

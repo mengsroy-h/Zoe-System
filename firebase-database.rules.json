@@ -196,6 +196,9 @@
         "isFromDeletion": {
           ".validate": "newData.isBoolean()"
         },
+        "trashReason": {
+          ".validate": "newData.isString() && (newData.val() === 'delete' || newData.val() === 'remove' || newData.val() === 'expired' || newData.val() === 'pickup')"
+        },
         "restoreClaim": {
           ".validate": "newData.hasChildren(['token','claimedAt','targetId']) && newData.child('token').isString() && newData.child('claimedAt').isNumber() && newData.child('targetId').isString()",
           "token": {

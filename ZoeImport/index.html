@@ -12,16 +12,31 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
+<script src="./boot-flags.js"></script>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+
+<div class="boot-splash" id="bootSplash" aria-hidden="true">
+    <div class="boot-splash-card">
+        <img class="boot-splash-logo" src="./icon-192.png" alt="" width="58" height="58">
+        <div class="boot-splash-name">ZoeImport</div>
+        <div class="boot-splash-bar"><span></span></div>
+    </div>
+</div>
 
 <header class="app-navbar">
     <div class="brand">
         <img src="./icon-192.png" alt="" width="26" height="26">
         <span>ZoeImport</span>
     </div>
-    <button type="button" id="lockBtn" class="icon-btn hidden" title="ចាក់សោ">🔒</button>
+    <div class="nav-right">
+        <div class="nav-credit">
+            <span class="credit-tag">Powered By ZoeW</span>
+            <span class="credit-version">កំណែ <span id="appVersionText"></span></span>
+        </div>
+        <button type="button" id="lockBtn" class="icon-btn hidden" title="ចាក់សោ" aria-label="ចាក់សោ">🔒</button>
+    </div>
 </header>
 
 <main class="app-body">
@@ -50,7 +65,6 @@
             </div>
 
             <div id="pinMsg" class="msg-host"></div>
-            <p class="gate-version">កំណែ <span id="appVersionText"></span></p>
         </div>
     </section>
 
@@ -117,7 +131,7 @@
             <div class="chips" id="chips"></div>
             <div class="tablewrap hidden" id="previewWrap">
                 <table>
-                    <thead><tr><th>Barcode</th><th>DOD($)</th><th>COD($)</th><th>Phone</th></tr></thead>
+                    <thead><tr><th>Barcode</th><th class="num">DOD($)</th><th class="num">COD($)</th><th>Phone</th></tr></thead>
                     <tbody id="previewBody"></tbody>
                 </table>
             </div>

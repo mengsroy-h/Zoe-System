@@ -1,223 +1,153 @@
 # Zoe-System — ប្រព័ន្ធគ្រប់គ្រងកញ្ចប់ទំនិញ
 
-Zoe-System ជាសំណុំ PWA ចំនួន **២** សម្រាប់គ្រប់គ្រងកញ្ចប់អតិថិជន៖ បញ្ចូល Barcode, កំណត់ទីតាំង Locker, ទទួលកញ្ចប់, គណនា COD/DOD និងគ្រប់គ្រង Activation Key។ ឯកសារនេះត្រូវបានរៀបចំសម្រាប់ដាក់នៅ **root របស់ repository** ដើម្បីឱ្យតំណភ្ជាប់ខាងក្រោមដំណើរការ។
+ប្រព័ន្ធ PWA សម្រាប់អាជីវកម្មដឹកជញ្ជូន — សរសេរជា vanilla JavaScript
+គ្មាន framework គ្មាន build step ហើយ deploy ជា Netlify site static។
 
-កំណែ release បច្ចុប្បន្ន៖ **`2.14.0`** — មើល [CHANGELOG.md](CHANGELOG.md) សម្រាប់អ្វីដែលប្រែក្នុងកំណែនីមួយៗ។
+ឯកសារនេះរៀបរាប់ **មុខងារ · កំណែ · ប្រព័ន្ធសុវត្ថិភាព** ប៉ុណ្ណោះ។
+របៀបប្រើប្រចាំថ្ងៃ សូមមើល README របស់ App នីមួយៗ។
 
-## App ទាំង ២
-
-| App | អ្នកប្រើ | មុខងារសំខាន់ | ឯកសារលម្អិត |
-|---|---|---|---|
-| **ZoeW** | បុគ្គលិកដែលចូលប្រព័ន្ធបាន | បញ្ចូល/កែសម្រួលកញ្ចប់, COD/DOD, កំណត់ទីតាំង Locker, របាយការណ៍ និង Export | [ZoeW/README.md](ZoeW/README.md) |
-| **ZoeKeyGen** | អ្នកលក់ (Vendor) ប៉ុណ្ណោះ | បង្កើត, Revoke, Extend Activation Key និង Setup Link/QR | [ZoeKeyGen/README.md](ZoeKeyGen/README.md) |
-
-## ស្ថាបត្យកម្ម និងប្រភពទិន្នន័យ
-
-- App ទាំងអស់ជា **Vanilla JavaScript PWA** គ្មាន framework និងគ្មាន build step។ Deploy ថត App នីមួយៗជា static site ដាច់ដោយឡែក។
-- **Business Firebase Project** ប្រើដោយ ZoeW សម្រាប់ទិន្នន័យអាជីវកម្ម — មួយ Project ក្នុងមួយជំនួញ។
-- **License Firebase Project** របស់ ZoeKeyGen ត្រូវដាច់ពី Business Project ដើម្បីបំបែក signing key និងសិទ្ធិ License ចេញពីទិន្នន័យអតិថិជន។
-- `zoew_scan_history_cod_dod` ជាប្រភពទិន្នន័យសំខាន់តែមួយ។ App អានវាដោយផ្ទាល់ គ្មាន projection ជាន់ទីពីរទេ។
-- `license-verify.js` និង `error-reporting.js` ត្រូវដូចគ្នាបេះបិទនៅ App ទាំង ២។ កុំកែតែ App មួយ។
-
-### Firebase paths សំខាន់
-
-| Path | គោលបំណង |
-|---|---|
-| `zoew_scan_history_cod_dod` | កញ្ចប់សកម្ម, Barcode និងទីតាំង Locker របស់វា |
-| `zoew_recently_deleted_cod_dod` | ធុងសំរាមសម្រាប់ស្តារ item/Barcode |
-| `zoew_daily_revenue_cod_dod`, `zoew_monthly_revenue_cod_dod` | ស្ថិតិ COD/DOD |
-| `zoew_daily_pickup_cod_dod` | ស្ថិតិអតិថិជន និងកញ្ចប់ដែលបានយក |
-| `zoew_restore_finalizations`, `zoew_clear_history_finalizations` | witness សម្រាប់ការពារ Restore/Clear All replay និង revenue ស្ទួន |
-| `zoew_barcode_registry` | ការពារ Barcode ស្ទួនឆ្លងឧបករណ៍ |
-| `zoew_settings/exchange_rate` | អត្រាប្តូរប្រាក់រៀល |
-
-## រចនាសម្ព័ន្ធ UI
-
-ZoeW បែងចែកជា **ទំព័រ ២** បូកនឹង **របា Slide (ម៉ឺនុយ)**៖
-
-| ផ្នែក | មាតិកា |
-|---|---|
-| **ទំព័រ ១ — ទិន្នន័យ** | តារាងគ្រប់គ្រងប្រចាំថ្ងៃ (ស្ថិតិ + ទឹកប្រាក់ + តម្រងថ្ងៃ), ប្រអប់ស្វែងរកលេខ, តារាងប្រវត្តិ |
-| **ទំព័រ ២ — បញ្ចូលទិន្នន័យ** | របៀបស្កេន ២ (បញ្ចូលកញ្ចប់ / កំណត់ទីតាំង Locker), កាមេរ៉ា, Barcode scanner, យក Barcode ពីរូបភាព, បញ្ជីកញ្ចប់ដែលបញ្ចូលថ្ងៃនេះ, ផ្ទាំង Locker និងបញ្ជីទីតាំង |
-| **របា Slide (☰)** | Config / Reconfig, API ស្វែងរកអតិថិជន, តារាងអតិថិជន, កំណត់ទូ Locker, ចូល/ចាកចេញ |
-| **ប៊ូតុង (...) លើតារាងប្រវត្តិ** | Export Data, កែទឹកប្រាក់/កញ្ចប់, អត្រាប្រាក់, លុបទាំងអស់ |
-
-## ច្បាប់អាជីវកម្ម
-
-### «លុប» និង «ដក» មិនដូចគ្នា
-
-| សកម្មភាព | ប៉ះ COD/DOD និងចំនួន? | ពេលស្តារ |
+| App | តួនាទី | កំណែ |
 |---|---|---|
-| **លុប** កញ្ចប់ទាំងមូល | មិនដកស្ថិតិ | ស្តារទិន្នន័យវិញដោយមិនបូកស្ថិតិបន្ថែម |
-| **ដក** Barcode ពីកញ្ចប់ច្រើន Barcode | ដកតម្លៃ និងចំនួនរបស់ Barcode នោះ | បូកត្រឡប់តែម្តង |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល និងគ្រប់គ្រងកញ្ចប់ | `2.14.0` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.14.0` |
+| **[ZoeImport](ZoeImport/README.md)** | នាំចូល Excel ចូល Google Sheet ជំនួស copy-paste | `1.1.0` |
 
-Restore និង Clear All ប្រើ claim, token និង atomic multi-location update។ នេះការពារ tab/ឧបករណ៍ពីរមិនឱ្យស្តារ ឬបូក revenue ស្ទួនសម្រាប់ធាតុតែមួយ។ កុំកែ path ធុងសំរាម ឬស្ថិតិដោយដៃ ខណៈប្រតិបត្តិការទាំងនេះកំពុងដំណើរការ។
+---
 
-ការសម្អាតស្វ័យប្រវត្តិ៖ កញ្ចប់បិទលើស **២ ម៉ោង** ➜ «លុប», កញ្ចប់មិនទាន់បិទលើស **៨ ថ្ងៃ** ➜ «ដក», ធុងសំរាមលើស **១០ ថ្ងៃ** ➜ purge។
+## មុខងារ
 
-### លុបទាំងអស់ — តាមតម្រងថ្ងៃ
+### ZoeW — App អាជីវកម្ម
 
-«លុបទាំងអស់» លុប **តែធាតុដែលកំពុងបង្ហាញតាមតម្រងថ្ងៃបច្ចុប្បន្ន** ប៉ុណ្ណោះ។ ឧ. ពេលឈរលើ «ថ្ងៃនេះ» វាមិនប៉ះទិន្នន័យថ្ងៃផ្សេងទេ។ វាទាមទារ **Security PIN** មុនដំណើរការ ដូច «កែទឹកប្រាក់/កញ្ចប់» ដែរ។
+- **ស្កេន Barcode ៣ ផ្លូវ** — កាមេរ៉ា (ZXing WebAssembly + `BarcodeDetector`),
+  ម៉ាស៊ីនស្កេន hardware និងរូបភាព។ ទទួលតែ **CODE-128** ដែលមានលេខផ្ទៀងផ្ទាត់
+  ជាកាតព្វកិច្ច ➜ គ្មានការអានលេខខុសឆ្លង format។
+- **COD / DOD** — កត់ត្រាទឹកប្រាក់ពីរប្រភេទក្នុងកញ្ចប់តែមួយ ព្រមទាំងលេខទូរស័ព្ទ
+  អតិថិជន និងទីតាំង Locker។
+- **ស្ថិតិប្រចាំថ្ងៃ និងប្រចាំខែ** — ចំណូល ចំនួនកញ្ចប់ និងចំនួនអតិថិជនយក។
+- **តម្រងតាមថ្ងៃ** និងការស្វែងរកតាមលេខទូរស័ព្ទ (ចាប់កន្ទុយលេខ ៣–៤ ខ្ទង់)។
+- **ធុងសំរាម និងការស្តារ** — កញ្ចប់ដែលលុបអាចស្តារមកវិញបាន។
+- **ការសម្អាតស្វ័យប្រវត្តិ** — កញ្ចប់បិទ ➜ ធុងសំរាមក្រោយ ២ ម៉ោង; មិនទាន់បិទ ➜
+  ក្រោយ ៨ ថ្ងៃ; អ្វីក្នុងធុងសំរាម ➜ លុបចោលក្រោយ ១០ ថ្ងៃ។
+- **Export** — Excel (`.xlsx`), CSV សម្រាប់ Google Sheets និង PDF។
+- **Lookup API** — ទាញលេខទូរស័ព្ទ/COD/DOD ពី Google Sheet ដោយស្វ័យប្រវត្តិពេលស្កេន។
+- **ដំណើរការក្រៅបណ្តាញ** — សំបក App និង engine ស្កេនស្ថិតក្នុង cache ទាំងស្រុង។
+- **ចលនាពេលបើក App** និងទម្រង់ស្រាលស្វ័យប្រវត្តិសម្រាប់ឧបករណ៍យឺត។
 
-### កំណត់ទីតាំង Locker
+### ZoeKeyGen — ឧបករណ៍អ្នកលក់
 
-នៅទំព័រ ២ ជ្រើសរើសរបៀប «📍 កំណត់ទីតាំង Locker» រួចជ្រើសទូបច្ចុប្បន្ន។ រាល់ Barcode ដែលស្កេនបន្ទាប់ពីនោះ៖
+- **បង្កើត Activation Key** ដែល sign ដោយ ECDSA P-256 ព្រមទាំងកំណត់សុពលភាព។
+- **Revoke និង Extend** Key ដែលចេញរួច។
+- **Setup Link និង QR** — provision ឧបករណ៍អតិថិជនថ្មីដោយមិនបាច់វាយ Config ដោយដៃ។
+- **តារាង Key** ជាមួយ note, ថ្ងៃចេញ និងស្ថានភាព។
 
-- កញ្ចប់ដែល **មិនទាន់មានទីតាំង** ➜ ចុះទីតាំងភ្លាម **គ្មានប្រអប់សួរបញ្ជាក់**;
-- កញ្ចប់ដែល **មានទីតាំងរួច** ➜ សួរបញ្ជាក់ជាមុន («តើអ្នកចង់ផ្លាស់ទីកញ្ចប់នេះទៅ … មែនទេ?») ព្រមទាំងប្រាប់បើទីតាំងគោលដៅមានកញ្ចប់ផ្សេងស្ថិតនៅ;
-- កញ្ចប់ដែលស្ថិតនៅទីតាំងដដែលរួច ➜ គ្មានការសរសេរថ្មី។
+### ZoeImport — នាំចូល Excel
 
-ការសរសេរធ្វើឡើងដោយ `runTransaction` ផ្ទាល់លើ `zoew_scan_history_cod_dod` ដោយផ្គូផ្គងតាម `code` (មិនមែនតាម index) ដូច្នេះការស្កេនស្របគ្នាពីឧបករណ៍ច្រើនមិនសរសេរជាន់គ្នាទេ។
+- អាន `.xlsx` · `.xls` · `.csv` **ក្នុងឧបករណ៍** រួចផ្ញើតែ ៤ column ទៅ Google Sheet។
+- ស្គាល់ header ខ្មែររបស់ ZTO ដោយស្វ័យប្រវត្តិ ហើយអនុញ្ញាតឲ្យផ្គូផ្គង column ដោយដៃ។
+- **របៀបនាំចូល ៣** — ជំនួសទាំងស្រុង · បន្ថែម+កែ · បន្ថែមតែថ្មី។
 
-## កាយវិការបញ្ជី (លើទូរស័ព្ទ)
+---
 
-បញ្ជីធំទាំង ៣ — **ប្រវត្តិ**, **កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ** និង **បញ្ជីទីតាំង
-Locker** — មានឥរិយាបថដូចគ្នាបេះបិទ៖
+## កំណែ
 
-- អូសឡើងលើបញ្ជី ➜ ផ្ទាំងខាងលើបង្រួម ➜ បញ្ជីហូតឡើងពេញអេក្រង់
-- អូសចុះពេលបញ្ជីនៅកំពូល ➜ ផ្ទាំងខាងលើត្រឡប់មកវិញ
-- ចុចដងអូស (`⎯`) ពីលើបញ្ជី ➜ បិទ/បើកដោយចេតនាច្បាស់លាស់
-- ការបង្រួម/ពង្រីក **មិនបង្អាក់ការរមូរដែលកំពុងដើរទេ** — App រង់ចាំដល់លើកម្រាមដៃ
-  ទើបប្តូរ layout និង scroll owner; បើកាយវិការត្រូវបាន cancel វាមិនប្តូរអ្វីឡើយ
-- ពេលរបា Tab ខាងក្រោមលាក់ខ្លួនតាមការរមូរ **កាតរីកចុះបំពេញកន្លែងរបា** ➜ គ្មាន
-  ចន្លោះទទេនៅបាតអេក្រង់
-- លើ iOS PWA ការទាញចុះពីកំពូលធម្មតា ឬការទាញបើកផ្ទាំង **មិនកេះ refresh ទេ**;
-  pull-to-refresh ចាប់តែការទាញចុះបញ្ឈរវែងដោយចេតនា ខណៈគ្រប់កន្សោមរមូរនៅកំពូល ហើយបិទទាំងស្រុងពេលប្រវត្តិពេញអេក្រង់។
-  ការទាញមធ្យមរអិលត្រឡប់វិញ ហើយការបន្ថែមម្រាមដៃទី២បោះបង់ gesture
-- លើ iOS PWA ពេលតារាងពេញអេក្រង់ដល់កំពូល App ទប់ rubber-band របស់ WebKit
-  ហើយប្រគល់ gesture ទៅផ្ទាំងដោយផ្ទាល់; ផ្ទាំងខាងលើមិនត្រូវខកខាន ឬភ្លាត់ឡើងវិញទេ។
-  ផ្លូវ Android នៅប្រើ native passive scroll និង FLIP ដូចមុន។
+- **`APP_VERSION`** ជាកំណែផលិតផលតាម semver ដែលប្រើ **រួមគ្នា** ទាំង ZoeW និង
+  ZoeKeyGen ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json`។ បច្ចុប្បន្ន **`2.14.0`**។
+- **ZoeImport មានកំណែដាច់ដោយឡែក** (បច្ចុប្បន្ន **`1.1.0`**) ព្រោះវាមិនប៉ះ
+  Firebase និងមិនពាក់ព័ន្ធនឹងវដ្តចេញផ្សាយរបស់ App ទាំង ២ នោះទេ។
+- **`CACHE_VERSION`** ក្នុង `sw.js` នៃ App នីមួយៗ (`<app>-vN`) ជាកូនសោ cache
+  ដែល bump រាល់ពេលឯកសារ static ណាមួយប្រែ — វា **មិនមែន** ជាកំណែផលិតផលទេ។
+- ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ៖ **[CHANGELOG.md](CHANGELOG.md)**។
 
-លើអេក្រង់ **≥992px** កាយវិការទាំងនេះមិនដំណើរការទេ ព្រោះ layout ២ ជួរឃើញគ្រប់យ៉ាងស្រាប់។
+កំណែបង្ហាញដល់អ្នកប្រើ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ចូល និងខាងក្រោមរបា Slide),
+**១ កន្លែងក្នុង ZoeKeyGen** និង **១ កន្លែងក្នុង ZoeImport** (ក្រោម Credit tag)។
 
-## ការស្កេន Barcode
+---
 
-- ទទួល **តែ `CODE_128`** ប៉ុណ្ណោះ (format ដែលកញ្ចប់អីវ៉ាន់ប្រើ)។ វាមានលេខផ្ទៀងផ្ទាត់ mod-103 ជាកាតព្វកិច្ច ➜ ការអានលេខខុសស្ទើរតែមិនអាចកើតឡើងបាន។
-- លេខមួយត្រូវអានឃើញ **ដដែល ២ ស៊ុមជាប់គ្នា** ទើបទទួលយក។
-- **ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ។**
-- Android លឿនជាង iPhone ដោយធម្មជាតិ (Android មានម៉ាស៊ីនអានដើមរបស់ប្រព័ន្ធ ចំណែក iPhone ប្រើ JavaScript)។ គុណភាពឌិកូដលើ iPhone សម្របតាមល្បឿនឧបករណ៍ដោយស្វ័យប្រវត្តិ។
-- ការស្កេន QR ពេល Config/Reconfig ជាម៉ាស៊ីនអានដាច់ដោយឡែក។
+## ប្រព័ន្ធសុវត្ថិភាព
 
-## ល្បឿនសម្របតាមឧបករណ៍
+### ស្រទាប់ទី ១ — Activation Key
 
-App វាស់ចង្វាក់ស៊ុមពិតរបស់ឧបករណ៍ (១០–១២០Hz) រួចសម្របការងាររបស់ខ្លួនតាមវា។ លើឧបករណ៍ដែលធ្លាក់ស៊ុម វាបិទចលនាដែលដើរជារៀងរហូត និងស្រមោលដែលថ្លៃ — **មិនប៉ះមុខងារអាជីវកម្មណាមួយឡើយ**។
+រាល់ការដំឡើង ZoeW ត្រូវការ Key ដែល **sign ដោយ ECDSA P-256**។ សោសាធារណៈ embed
+ក្នុង `license-verify.js` ដូច្នេះ Key ក្លែងក្លាយបង្កើតមិនកើត។ ការផ្ទៀងផ្ទាត់
+ធ្វើទាំង **ក្នុងឧបករណ៍** (signature + ថ្ងៃផុតកំណត់) និង **ខាង server**
+(`revoked` និងពិដានសុពលភាព)។ គ្មានបណ្តាញ ➜ អនុគ្រោះ **៣ ថ្ងៃ**។
 
-## សុវត្ថិភាព
+### ស្រទាប់ទី ២ — ការចូលប្រព័ន្ធ និង PIN
 
-- Firebase Realtime Database Rules ជាអ្នកសម្រេចសិទ្ធិពិត; UI មិនមែនជាការការពារតែមួយទេ។
-- Rules មិនបែងចែកតួនាទីទេ៖ **អ្នកប្រើដែលចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា**។ ការការពារពិតគឺ **schema validation** (ប្រភេទវាល, ជួរតម្លៃ, `$other: false`) និង **claim/witness fence** សម្រាប់ Restore/Clear All។
-- Setup Link/QR មិនរក្សាទុក Firebase Config ដោយស្វ័យប្រវត្តិទេ៖ អ្នកប្រើត្រូវបញ្ចូល Security PIN, ពិនិត្យ Config ហើយចុចរក្សាទុកដោយខ្លួនឯង។
-- ZoeKeyGen ប្រើ browser-session persistence និងទាមទារតួនាទី `admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា។
-- Signing Key ដែលចងចាំសម្រាប់ session ត្រូវអ៊ិនគ្រីបដោយ PIN ហើយត្រូវផ្ទៀងផ្ទាត់ជាមួយ public key មុនប្រើវិញ។
-- Logout សម្អាតទិន្នន័យរសើបពី UI។ កុំទុក PIN, Private Key, API secret ឬ Export អតិថិជនលើឧបករណ៍ចែករំលែក។
+- ការចូលធ្វើតាម **Firebase Authentication**។ Session ផុតកំណត់ក្រោយ ៤ ម៉ោង។
+- **Security PIN** ការពារសកម្មភាពរសើប (Config, Lookup API, កែទឹកប្រាក់,
+  លុបទាំងអស់, កំណត់ Locker, Setup Link)។ រក្សាទុកតែ hash **PBKDF2-SHA256
+  ១៥០,០០០ ជុំ** មិនមែន PIN ទេ។ វាយខុសច្រើនដង ➜ ចាក់សោបណ្តោះអាសន្ន។
+- **ចូលដោយក្រយៅដៃ ឬមុខ (WebAuthn)** ជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN ទេ —
+  ព្រោះ PIN ជាប្រភពនៃកូនសោ AES។ របៀប `prf` មិនរក្សាកូនសោលើឧបករណ៍សោះ។
 
-## កំណែ និង Service Worker
+### ស្រទាប់ទី ៣ — ការអ៊ិនគ្រីបទិន្នន័យរសើប
 
-`APP_VERSION` ក្នុង `app.js` ទាំង ២ និង `version` ក្នុង `manifest.json` ទាំង ២ ត្រូវដូចគ្នា។ បច្ចុប្បន្នគឺ **`2.14.0`**។ វាបង្ហាញ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ login និងខាងក្រោមរបា Slide) និង **១ កន្លែងក្នុង ZoeKeyGen** (ប្រអប់ login)។ `version-check.js` អះអាងចំនួនកន្លែងនោះឲ្យច្បាស់ — ការបន្ថែមកន្លែងទី ៣ នឹងធ្វើឲ្យវាធ្លាក់។
+Secret របស់ Lookup API និងការតភ្ជាប់របស់ ZoeImport ត្រូវអ៊ិនគ្រីបដោយ
+**AES-GCM 256** ជាមួយកូនសោដែល derive ពី PIN មុនចូល `localStorage`។
+កូនសោនោះរស់តែក្នុងសតិ ហើយត្រូវលុបចោលពេលចាកចេញ។
 
-`CACHE_VERSION` ក្នុង `sw.js` មិនមែន App version ទេ។ វាតាមលំនាំ `<app>-vN` ហើយត្រូវប្ដូររាល់ពេល asset របស់ App នោះផ្លាស់ប្តូរ ដើម្បីឱ្យ Service Worker ទាញឯកសារថ្មី។ បច្ចុប្បន្នគឺ `zoew-v94`, `zoekeygen-v59` និង `zoeimport-v2`។
+### ស្រទាប់ទី ៤ — Firebase Rules
 
-### ធនធានក្រៅ និង cache
+- Root **default-deny**; គ្រប់ node តម្រូវ `auth != null`។
+- **Schema validation** — ប្រភេទវាល ជួរតម្លៃ និង `$other: false` ដែលបដិសេធ
+  វាលចម្លែក។ នេះជាការការពារតែមួយប្រឆាំងទិន្នន័យខូច។
+- **Claim/witness fence** លើការស្តារ និងការលុបទាំងអស់ ➜ ការ replay និង
+  ការគិតលុយស្ទួនកើតមិនបាន។
+- Rules ក្នុង repo **មិន deploy ស្វ័យប្រវត្តិទេ** — ត្រូវ paste ចូល
+  Firebase Console រួច Publish ដោយដៃ។
 
-Service Worker cache **តែឯកសាររបស់ App ខ្លួនឯង** (`APP_SHELL`)។ engine ស្កេន
-(ZXing C++ ចងក្រងជា WebAssembly) ស្ថិតក្នុង repo ជា **២ ឯកសារ** —
-`ZoeW/vendor/zxing-wasm.js` និង `ZoeW/vendor/zxing_reader.wasm` — ដូច្នេះវាចូល
-cache ជាមួយគ្នា ➜ **ការស្កេនកាមេរ៉ាដើរបានទោះគ្មានបណ្តាញ**។
+### ស្រទាប់ទី ៥ — ការការពារខាង Browser
 
-Firebase SDK, ពុម្ពអក្សរ Google និង Sentry ទាញពីបណ្តាញរាល់ពេល។
+| ការការពារ | ស្ថានភាព |
+|---|---|
+| `script-src` គ្មាន `'unsafe-inline'` | ✅ ZoeW · ZoeKeyGen · ZoeImport |
+| គ្មាន `onclick=` ក្នុង HTML (ប្រើ `data-act` + បញ្ជីអនុញ្ញាត) | ✅ ទាំង ៣ |
+| គ្មាន `eval` · `new Function` · `document.write` · `outerHTML` | ✅ ទាំង ៣ |
+| រាល់ការបញ្ចូលចូល `innerHTML` ឆ្លង `sanitizeInput()` ឬជាលេខ | ✅ ទាំង ៣ |
+| `frame-ancestors 'none'` · `object-src 'none'` · `base-uri 'self'` | ✅ ទាំង ៣ |
+| HSTS · `X-Content-Type-Options` · `Referrer-Policy` | ✅ ទាំង ៣ |
+| Service Worker បោះបង់សំណើឆ្លង origin (គ្មានអ្វីលេចធ្លាយចូល cache) | ✅ ទាំង ៣ |
+| URL រសើប (Setup Link) មិនអាចជាប់ក្នុង Cache Storage | ✅ ZoeW |
+| ការលាក់ secret មុនផ្ញើទៅ Sentry | ✅ ZoeW · ZoeKeyGen |
+| ការរកឃើញ DevTools ➜ បណ្តេញចេញ | ✅ ZoeKeyGen ប៉ុណ្ណោះ (វាកាន់កូនសោ signing) |
 
-**សំបកដែល cache ទុករួច ឆ្លើយតបភ្លាម** (កំណែ 2.12.1)។ មុននេះរាល់ឯកសារប្រណាំង
-នឹងបណ្តាញ ៣ វិនាទី ➜ ព្រោះឯកសារផ្ទុកតៗគ្នា ការពន្យារនោះគុណតាមខ្សែសង្វាក់ ➜
-វាស់បាន **៩ វិនាទី** ដើម្បីបើក App លើបណ្តាញយឺត ខណៈគ្រប់ឯកសារនៅក្នុងឧបករណ៍
-រួចស្រេច។ ឥឡូវ **០,០៧ វិនាទី** ហើយការធ្វើឲ្យស្រស់ធ្វើខាងក្រោយ (រំលងទាំងស្រុង
-ពេលក្រៅបណ្តាញ)។ កំណែថ្មីនៅតែមកដល់តាមផ្លូវ `CACHE_VERSION` ដដែល។
+### អ្វីដែលទទួលយកដោយចេតនា
 
-**`script-src` លែងមាន `'unsafe-inline'`** (កំណែ 2.13.0)។ ការចាប់ព្រឹត្តិការណ៍
-ធ្វើតាម `data-act` + delegation ជំនួស `onclick=` ➜ browser ខ្លួនឯងក្លាយជាជាន់
-ការពារ XSS ទី ២ ដែលឯករាជ្យពីកូដ escape របស់យើង។ ការបន្ថែម `on*=` ត្រឡប់មកវិញ
-នឹង **ត្រូវបដិសេធស្ងាត់ៗលើផលិតកម្ម** — `csp-enforced-test.js` ចាក់សោវាទុក។
+ប្រព័ន្ធនេះ **គ្មាន backend ដែលទុកចិត្តបាន** (គ្មាន Cloud Functions) ដូច្នេះ៖
 
-**មានតែឯកសាររបស់សំបកទេដែលអាចចូល Cache Storage បាន** — `SHELL_PATHS` ក្នុង
-`sw.js` កំណត់ព្រំដែននោះ ដូច្នេះសំណើ same-origin ណាមួយក្រៅបញ្ជី (ឧ. endpoint
-ទិន្នន័យនៅថ្ងៃក្រោយ) មិនអាចធ្លាក់ចូល cache ដោយចៃដន្យ ហើយរស់រានក្រោយចាកចេញទេ។
+- អ្នកប្រើដែលចូលបាន **អាចសរសេរតួលេខចំណូលដោយផ្ទាល់** — គ្មាន rule ណាអាច
+  ផ្ទៀងផ្ទាត់ប្រវត្តិនៃ delta បានទេ។
+- **គ្មានការផ្ទៀងផ្ទាត់ aggregate** ដោយហេតុផលដដែល។
+- **ការលុប site data reset ការអនុគ្រោះ ៣ ថ្ងៃបាន** — គ្មានផ្លូវការពារខាង client។
+- Firebase Config ក្នុង `localStorage` **មិនមែនជាសម្ងាត់ទេ** តាមការរចនា —
+  អ្វីដែលការពារទិន្នន័យគឺ Rules មិនមែន Config។
 
-ពេល release៖
+---
 
-1. ប្តូរ App version និង manifest ទាំង ២ ប្រសិនបើមាន release ថ្មី;
-2. ប្តូរ cache version របស់ App ដែល asset ផ្លាស់ប្តូរ;
-3. រត់ validation;
-4. Deploy static App ដែលពាក់ព័ន្ធក្នុង maintenance window តែមួយ;
-5. បើមានការកែ Firebase Rules ត្រូវ Publish Rules ដោយដៃផងដែរ។
+## ការធានាគុណភាព
 
-## Provisioning អតិថិជនថ្មី
-
-1. បង្កើត Business Firebase Project មួយសម្រាប់អតិថិជនម្នាក់ ហើយបង្កើតគណនី Authentication សម្រាប់បុគ្គលិក។
-2. បង្កើត License Firebase Project ដាច់ដោយឡែកសម្រាប់ ZoeKeyGen។
-3. Publish Rules សម្រាប់ Project ទាំងពីរ។
-4. ក្នុង ZoeKeyGen បង្កើត Setup Link/QR ដោយប្រើ Firebase Config របស់ Business Project។
-5. លើឧបករណ៍គោលដៅ បើក Link ឬស្កេន QR, បញ្ចូល PIN, ពិនិត្យ JSON ហើយរក្សាទុកដោយចេតនា។
-6. បង្កើត Activation Key ក្នុង ZoeKeyGen ហើយផ្ញើឱ្យអតិថិជនតាមផ្លូវឯកជន។
-
-## Firebase Rules និង Deploy
-
-Static hosting មិន deploy Firebase Rules ជំនួសអ្នកទេ។ មុន publish៖
-
-1. Backup Rules ចាស់;
-2. Paste [firebase-database.rules.json](firebase-database.rules.json) ទៅ **Business Firebase Project**;
-3. សាកល្បងក្នុង Rules Simulator ដោយប្រើគណនីដែលចូលប្រព័ន្ធបាន និងគណនីមិនបានចូល;
-4. ចុច **Publish**;
-5. Paste [ZoeKeyGen/firebase-database.rules.json](ZoeKeyGen/firebase-database.rules.json) ទៅ **License Firebase Project** ហើយ Publish ដោយដៃដូចគ្នា។
-
-**Rules ត្រូវ Publish មុន ឬព្រមគ្នានឹងការ deploy App** ដើម្បីកុំឱ្យ client ថ្មីត្រូវបានបដិសេធដោយ Rules ចាស់។
-
-## តេស្តមុន release
-
-រត់ពី root របស់ repository៖
+`audit-tools/` មាន **checker និងតេស្តជាង ៧០** ដែលរត់ដោយគ្មាន AI៖
 
 ```bash
 npm i acorn playwright-core xlsx
-node --check ZoeW/app.js
-node --check ZoeKeyGen/app.js
-node audit-tools/version-check.js
 bash audit-tools/run-all.sh
 ```
 
-`audit-tools/run-all.sh` ពិនិត្យ syntax, schema/rules, version consistency, Restore/Clear All, រចនាសម្ព័ន្ធទំព័រ/របា Slide, Locker, KeyGen security, ល្បឿននិងភាពត្រឹមត្រូវនៃការស្កេន, ការដើរពេលបណ្តាញដាច់ និង browser regression។ បច្ចុប្បន្នមាន **៥៧ ការត្រួតពិនិត្យ**។ Dependency ដែលបាត់ធ្វើឲ្យឧបករណ៍ពាក់ព័ន្ធ **SKIP ដោយស្អាត** មិនធ្លាក់ទេ។
-
-ដើម្បីបញ្ជាក់ថាតេស្ត**មិនទទេ** ត្រូវរត់វាធៀបនឹង tree មុនកែ៖
-
-```bash
-git fetch origin main
-rm -rf /tmp/baseline && mkdir /tmp/baseline
-git archive origin/main | tar -x -C /tmp/baseline
-bash audit-tools/run-all.sh /tmp/baseline    # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
-```
-
-មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
-
-## ឧបករណ៍ជំនួយដាច់ដោយឡែក
-
-ឧបករណ៍ទាំងនេះ **មិនមែនជាផ្នែករបស់ App ទេ** — ពួកវាដើរដោយឡែក ហើយមិនប៉ះកូដ ZoeW/ZoeKeyGen ឡើយ។
-
-| ថត | ជាអ្វី | រត់នៅឯណា |
-|---|---|---|
-| [`ZoeImport/`](ZoeImport/README.md) | **PWA ដំឡើងបាន** សម្រាប់ទម្លាក់ឯកសារ Excel របស់ ZTO ចូល Sheet `Customers` — ការពារដោយ PIN និងអ៊ិនគ្រីប config | Netlify site ដាច់ដោយឡែក |
-| [`zto-import/`](zto-import/README.md) | ផ្នែក server របស់ ZoeImport — **សរសេរចូល** Sheet ព្រមទាំង Drive folder watcher និងទំព័រ Web បម្រុង | Google Apps Script ដាច់ដោយឡែក |
-| [`zto-import/google-sheets-api/`](zto-import/google-sheets-api/README.md) | **អានចេញពី** Sheet `Customers` ជា Lookup API សម្រាប់ ZoeW | Google Apps Script ភ្ជាប់នឹង Sheet |
-| [`firebase-backup/`](firebase-backup/README.md) | Backup ទិន្នន័យ Firebase ជា `.json.gz` | Node.js CLI លើម៉ាស៊ីនអ្នកលក់ |
-
-**ZoeImport ➜ zto-import ➜ Google Sheet ➜ Lookup API ➜ ZoeW** — ខ្សែសង្វាក់នេះជំនួសការ copy-paste ដោយដៃទាំងស្រុង។ គ្មានផ្នែកណាមួយក្នុងនោះប៉ះកូដ ZoeW ឬ ZoeKeyGen ឡើយ។
+ការត្រួតពិនិត្យ ២៦ បើក **Chromium ពិត** ហើយវាស់ឥរិយាបថពិត — ល្បឿនបើក App
+លើបណ្តាញខ្សោយ, ការស្កេន Barcode, កាយវិការអូស, ការការពារ XSS ក្រោម CSP ពិត,
+ស្ថេរភាពបណ្តាញ និងទម្រង់បង្ហាញលើអេក្រង់ ៦ ទំហំ។ មើល
+**[audit-tools/README.md](audit-tools/README.md)**។
 
 ## ឯកសារបន្ថែម
 
-- [ZoeW README](ZoeW/README.md)
-- [ZoeKeyGen README](ZoeKeyGen/README.md)
-- [Audit tools README](audit-tools/README.md)
-- [Firebase backup README](firebase-backup/README.md)
-- [Google Sheet Lookup API README](zto-import/google-sheets-api/README.md)
-- [ZoeImport PWA README](ZoeImport/README.md)
-- [ZTO import Apps Script README](zto-import/README.md)
+| ឯកសារ | ខ្លឹមសារ |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្ម និងថ្នាក់កំហុសដែលដោះស្រាយរួច (សម្រាប់អ្នកថែទាំ) |
+| [CHANGELOG.md](CHANGELOG.md) | ប្រវត្តិកំណែ |
+| [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
+| [firebase-backup/](firebase-backup/) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ## អាជ្ញាប័ណ្ណ
 
-គម្រោងនេះជាកម្មសិទ្ធិឯកជន — Powered by ZoeW.
+កម្មសិទ្ធិឯកជន — សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់ម្ចាស់ប៉ុណ្ណោះ។

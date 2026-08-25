@@ -1,4 +1,4 @@
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 const STORE_PIN_HASH = 'zoeimport_pin_hash';
 const STORE_PIN_FAILS = 'zoeimport_pin_fail_count';
@@ -834,6 +834,28 @@ function bindEvents() {
     });
 }
 
+const BOOT_SPLASH_MIN_MS = 380;
+const BOOT_REVEAL_CLEANUP_MS = 760;
+const bootSplashStartedAt = Date.now();
+
+function hideBootSplash() {
+    const splash = document.getElementById('bootSplash');
+    if (!splash || splash.classList.contains('boot-splash-out')) return;
+    splash.classList.add('boot-splash-out');
+    document.body.classList.add('boot-reveal');
+    setTimeout(() => {
+        splash.classList.add('boot-splash-gone');
+        document.body.classList.remove('boot-reveal');
+    }, BOOT_REVEAL_CLEANUP_MS);
+}
+
+function revealAppAfterBoot() {
+    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+    setTimeout(() => {
+        requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
+    }, wait);
+}
+
 function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     window.addEventListener('load', () => {
@@ -850,6 +872,7 @@ function boot() {
         setMsg('pinMsg', 'ត្រូវបើកតាម HTTPS ទើប PIN និងការអ៊ិនគ្រីបដំណើរការ', 'bad');
     }
     showPinBox();
+    revealAppAfterBoot();
 }
 
 boot();

@@ -1,8 +1,5 @@
 const CACHE_VERSION = 'zoekeygen-v60';
 
-// ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
-// កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច (ឧ. `qrcode.js` បាត់ ➜ QR របស់
-// Setup Link គូរមិនចេញ ខណៈ App មើលទៅដំណើរការធម្មតា)។
 const CORE_SHELL = [
     './',
     './index.html',
@@ -15,17 +12,12 @@ const CORE_SHELL = [
     './qrcode.js'
 ];
 
-// ធនធានតុបតែង — បាត់ក៏ App នៅដំណើរការគ្រប់មុខងារដដែល
 const OPTIONAL_SHELL = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png'
 ];
 
-// សំណុំផ្លូវរបស់សំបក — ជាអ្នកកំណត់ **ទាំង** អ្វីដែលឆ្លើយតបពី cache មុន
-// **និង** អ្វីដែលអនុញ្ញាតឲ្យសរសេរចូល Cache Storage។ ការកំណត់ព្រំដែននេះ
-// ធ្វើឲ្យសំណើ same-origin ណាមួយក្រៅបញ្ជីនេះ (ឧ. endpoint ទិន្នន័យនៅថ្ងៃក្រោយ)
-// **មិនអាចធ្លាក់ចូល cache ដោយចៃដន្យ** ហើយរស់រានក្រោយចាកចេញបានទេ។
 const SHELL_PATHS = new Set(
     CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
 );
@@ -48,28 +40,10 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// សំណើ navigate ត្រូវប្រើ './index.html' ជាកូនសោ cache **ជានិច្ច**។ បើទុក
-// `request` ជាកូនសោ នោះ URL ពេញ រួមទាំង `?setup=<config អាជីវកម្ម>` ចូល
-// Cache Storage ➜ វា **រស់រានក្រោយចាកចេញ** (ផ្ទុយនឹងច្បាប់ Setup Link) ហើយ
-// អានបានតាម DevTools ➜ Application ➜ Cache Storage។ ការឆ្លើយតបគឺ index.html
-// ដដែលសម្រាប់គ្រប់ផ្លូវ (Netlify rewrite) ដូច្នេះកូនសោតែមួយត្រឹមត្រូវ។
 function cacheKeyFor(request) {
     return request.mode === 'navigate' ? './index.html' : request;
 }
 
-// ការធ្វើឲ្យស្រស់ខាងក្រោយ — **មិនត្រូវរង់ចាំវាមុនឆ្លើយតបឡើយ**។ សម្រាប់សំណើ
-// navigate យើងទាញ './index.html' ត្រង់ៗ ជំនួសការផ្ញើ URL ពេញ (ដែលអាចផ្ទុក
-// query string រសើប) ទៅម៉ាស៊ីនបម្រើម្តងទៀត។
-// ⛔ **ការធ្វើឲ្យស្រស់ត្រូវមាន `AbortController` និងពិដានចំនួនស្របគ្នា។**
-// មុនកែ វាជា `fetch()` ឆៅ គ្មានពេលកំណត់។ លើបណ្តាញ «ភ្ជាប់តែស្លាប់» (WiFi
-// ដែលនៅតភ្ជាប់ ប៉ុន្តែគ្មានផ្លូវចេញ) សំណើទាំងនោះ **ព្យួររហូត** ហើយព្រោះ
-// រាល់ឯកសារនៃសំបកកេះមួយ នោះការបើកទំព័រតែម្តងបង្កើតសំណើព្យួរ ៨–១០។
-// វាស់បានលើ Chromium ពិត (server ទទួលការតភ្ជាប់ តែមិនឆ្លើយ)៖
-//     ការតភ្ជាប់ដែលត្រូវកាន់ទុក ៖ ៦  (ពិដាន same-origin របស់ browser)
-//     សំណើថ្មីក្រោយមក           ៖ **មិនដែលទៅដល់ server សោះ** (អស់ ១២ វិ.)
-// ដូច្នេះការធ្វើឲ្យស្រស់ខាងក្រោយ — ដែលជាការងារ **ស្រេចចិត្ត** — អាចធ្វើឲ្យ
-// សំណើ **ចាំបាច់** ទាំងអស់ស្លាប់។ ជាថ្នាក់កំហុស «សំណើកកកុញ ➜ ពេញកូតា
-// connection» ដដែល តែនៅក្នុង service worker ដែលគ្មានឧបករណ៍ណាមើលពីមុន។
 const REVALIDATE_TIMEOUT_MS = 6000;
 const REVALIDATE_MAX_IN_FLIGHT = 4;
 const revalidateInFlight = new Set();
@@ -110,12 +84,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>
             cache.match(cacheKey).then((cached) => {
-                // **សំបកដែល cache ទុក ត្រូវឆ្លើយតបភ្លាម។** មុននេះរាល់ធនធាន
-                // ប្រណាំងនឹងបណ្តាញ ៣ វិនាទី ➜ លើបណ្តាញខ្សោយ ការពន្យារនោះ
-                // **គុណតាមខ្សែសង្វាក់ផ្ទុក** (index.html ➜ script ➜ …) ➜ វាស់
-                // បាន **៩ វិនាទី** ដើម្បីបើក App ខណៈគ្រប់ឯកសារនៅក្នុង cache
-                // រួចស្រេច។ កំណែថ្មីរបស់សំបកមកតាមផ្លូវ `CACHE_VERSION` (install
-                // ទាញឡើងវិញទាំងអស់) មិនមែនតាមការប្រណាំងក្នុងមួយសំណើទេ។
                 if (cached && isShell) {
                     try { event.waitUntil(revalidateShell(cache, request, cacheKey)); }
                     catch (e) { revalidateShell(cache, request, cacheKey); }
@@ -124,8 +92,6 @@ self.addEventListener('fetch', (event) => {
 
                 const networkFetch = fetch(request)
                     .then((response) => {
-                        // `redirected` មិនអាចដាក់ចូល cache បានទេ (បោះ TypeError)
-                        // ហើយវាក៏មិនមែនជាសំបកត្រឹមត្រូវសម្រាប់កូនសោ navigate ដែរ។
                         if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
                     })

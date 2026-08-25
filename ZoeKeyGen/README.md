@@ -1,71 +1,118 @@
 # ZoeKeyGen — កម្មវិធីបង្កើត និងគ្រប់គ្រង Activation Key
 
-ZoeKeyGen គឺជា PWA សម្រាប់ Admin បង្កើត, revoke និងបន្ថែមសុពលភាព Activation Key របស់ ZoeW។ វាត្រូវប្រើ Firebase Project **ដាច់ដោយឡែកពី Business Firebase Project** ដើម្បីបំបែកគណនី License និង private signing key ចេញពីទិន្នន័យ Parcel/COD/DOD។
+ឧបករណ៍របស់ **អ្នកលក់** — មិនមែនរបស់អតិថិជនទេ។ វាបង្កើត Activation Key
+ដែល sign ដោយ ECDSA សម្រាប់ ZoeW ព្រមទាំង Setup Link/QR សម្រាប់ provision
+ឧបករណ៍ថ្មី។ វាប្រើ **Firebase Project ដាច់ដោយឡែក** ពី App អាជីវកម្ម។
 
-កំណែបច្ចុប្បន្ន៖ **2.14.0** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
+ឯកសារនេះរៀបរាប់ **មុខងារ · កំណែ · ប្រព័ន្ធសុវត្ថិភាព** ប៉ុណ្ណោះ។
 
-## រចនាសម្ព័ន្ធ License
+---
 
-- Key ប្រើហត្ថលេខា ECDSA P-256។ Private key ចុះហត្ថលេខា; public key ផ្ទៀងផ្ទាត់។
-- Private key មិនត្រូវដាក់ក្នុង source code, Firebase, ticket ឬ chat ទេ។ រក្សាវានៅ password manager ឬឧបករណ៍សុវត្ថិភាព។
-- `PUBLIC_KEYS_JWK` ក្នុង `license-verify.js` ត្រូវដូចគ្នាបេះបិទនៅ ZoeW និង ZoeKeyGen។ មុនចេញ Key ពី keypair ថ្មី ត្រូវ deploy public key ថ្មីទៅ App ទាំង ២ ជាមុន។
-- `license_keys/{app}/{id}` មានតែព័ត៌មានសាធារណៈដែល App ត្រូវការផ្ទៀងផ្ទាត់ (`expiresAt`, `revoked`)។ ព័ត៌មានគ្រប់គ្រងដូចជា note, issuer និង scope ស្ថិតក្នុង `license_keys_meta` ដែល Admin-only។
+## មុខងារ
 
-## ការចូល និងការរក្សាសម្ងាត់
+### Activation Key
 
-- ចូលបានតែ Firebase user ដែលមាន `user_roles/{uid} = "admin"` ក្នុង License Firebase Project។
-- Firebase Auth ប្រើ **browser session persistence** ជានិច្ច។ បិទ browser ហើយត្រូវចូលឡើងវិញ។
-- Checkbox «ចងចាំអ៊ីមែល» រក្សាទុកតែអ៊ីមែលសម្រាប់បំពេញ form ប៉ុណ្ណោះ; វាមិនរក្សា session ចូលប្រព័ន្ធទេ។
-- បើជ្រើសចងចាំ Signing Key សម្រាប់ session នោះ ciphertext ត្រូវ encrypt ដោយ PIN។ ការស្ដារវិញត្រូវការទាំង Admin session ដែលបានផ្ទៀងផ្ទាត់, PIN និងការត្រួតពិនិត្យថា private key ផ្គូផ្គងនឹង public key ដែលបាន deploy។ បរាជ័យម្តងណា ciphertext នោះត្រូវបោះចោល។
-- Logout, បោះបង់ PIN ឬបិទ modal សម្អាត PIN/private key/result ដែលរសើប និងរារាំង async operation ចាស់មិនឱ្យបញ្ចូលវាត្រឡប់ក្នុង DOM។
+- **បង្កើត Key** ដែល sign ដោយ **ECDSA P-256** ជាមួយសុពលភាពតាមចំនួនថ្ងៃ
+  និង note សម្គាល់អតិថិជន។
+- **Revoke** — ដកហូតសិទ្ធិ Key ភ្លាមៗពីខាង server។ ឧបករណ៍ដែលកំពុងប្រើ
+  នឹងបាត់សិទ្ធិនៅការពិនិត្យបន្ទាប់។
+- **Extend** — បន្ថែមសុពលភាពដោយផ្លាស់ **ពិដានខាង server**។
+  ⚠️ វា **មិនប្តូរ `exp` ដែល sign រួច** ទេ ដូច្នេះ Key ដែលបន្ថែមសុពលភាព
+  **activate លើឧបករណ៍ថ្មីមិនបាន** ក្រោយថ្ងៃ sign ដើម។ ប្រអប់ក្នុង App
+  ប្រាប់រឿងនេះរួចហើយ។
+- **តារាង Key** — បង្ហាញស្ថានភាព ថ្ងៃចេញ ថ្ងៃផុតកំណត់ និង note។
 
-**ការពិនិត្យសិទ្ធិ admin មានពេលកំណត់ពិត** (កំណែ 2.12.1)។ ពេល socket របស់
-Firebase មិនឡើង App ធ្លាក់ទៅអាន `user_roles` តាម REST។ សំណើនោះធ្លាប់ប្រើ
-`fetch()` ដែល **បោះបង់មិនកើត** ➜ ការព្យាយាមឡើងវិញរាល់ពេលត្រឡប់មក App
-បន្សល់សំណើរស់មួយក្នុងមួយជុំ (ព្រមទាំង ID token ក្នុង URL) រហូតដល់ Refresh។
-ឥឡូវវាឆ្លងកាត់ `fetchWithTimeout()` ដដែលនឹង ZoeW ដែល abort សំណើពិត។
+### Setup Link និង QR
 
-## Setup លើកដំបូង
+បង្កើត `https://<app-site>/?setup=<config>` ព្រមទាំង QR ដើម្បីឲ្យអតិថិជន
+មិនបាច់វាយ Firebase Config ដោយដៃ។ Base URL ចងចាំទុករវាងវគ្គ។
 
-1. បង្កើត Firebase Project សម្រាប់ License ដាច់ពី Project អាជីវកម្ម។ បើក Realtime Database និង Email/Password Authentication។
-2. បង្កើត Firebase Admin user ហើយកំណត់ `user_roles/<UID> = "admin"` តាម Firebase Console។
-3. Paste `ZoeKeyGen/firebase-database.rules.json` ទៅ License Project ហើយ **Publish ដោយដៃ**។
-4. Deploy ថត `ZoeKeyGen` ទៅ static hosting ហើយកំណត់ Firebase Config ក្រោម Security PIN។
-5. កំណត់ `LICENSE_DB_URL` តែមួយក្នុង `license-verify.js` ទាំង ២ ឱ្យទៅ License Project នេះ។ ផ្ទៀងផ្ទាត់ byte-identical មុន deploy។
-6. បង្កើត keypair ម្តង ហើយរក្សា Private Key ឱ្យសុវត្ថិភាព។ ដាក់ Public Key ទៅ `PUBLIC_KEYS_JWK` ទាំង ២ រួច deploy ទាំងអស់។
+នៅខាង ZoeW ការបើក Setup Link **មិនរក្សាទុកដោយស្វ័យប្រវត្តិទេ** — វាឆ្លង
+PIN gate ដដែលនឹងការកែ Config ដោយដៃ។
 
-## ការប្រើប្រាស់ប្រចាំថ្ងៃ
+### កូនសោ signing
 
-1. Load Private Signing Key ដែលផ្គូផ្គងនឹង public key ក្នុង App។
-2. ជ្រើស App គោលដៅ (`ADM`, `ZOW`, `SCN` ឬ `ALL`), ចំនួនថ្ងៃ និងចំណាំដែលមិនមានព័ត៌មានរសើប។
-3. Generate Key ហើយចម្លង Key ផ្ញើតាម channel សុវត្ថិភាព។ Result មិនគួរទុកនៅលើឧបករណ៍ចែករំលែក។
-4. ប្រើ Revoke ដើម្បីបិទសិទ្ធិ ឬ Extend ដើម្បីបន្ថែមថ្ងៃ។ សម្រាប់ Key `ALL` ដែលការសរសេរបរាជ័យមួយផ្នែក សូមពិនិត្យ badge ព្រមាន និងកែសម្រួល path ដែលបរាជ័យ មុនសន្មតថាវាដំណើរការគ្រប់ App។
+- **បង្កើតគូកូនសោថ្មី** (public/private) ក្នុង browser។
+- កូនសោឯកជនត្រូវ **ផ្ទុកចូលក្នុងវគ្គប៉ុណ្ណោះ** ដើម្បី sign — មិនរក្សាទុក
+  ជាអចិន្ត្រៃយ៍ក្នុង App ទេ។
 
-ការផ្ទៀងផ្ទាត់ online នៅ App គោលដៅធ្វើឡើងពេល login/refresh និងជាប្រចាំ; ពេលអ៊ីនធឺណិតមិនមាន វាអាចប្រើ offline grace បានរហូតដល់ ៣ ថ្ងៃបន្ទាប់ពីការផ្ទៀងផ្ទាត់ជោគជ័យចុងក្រោយ។
+### បទពិសោធន៍ប្រើប្រាស់
 
-## ការប្ដូរ/rotate Key
+- PWA ដំឡើងលើទូរស័ព្ទបាន · ដំណើរការក្រៅបណ្តាញសម្រាប់សំបក App។
+- **ចលនាពេលបើក App** ដូច ZoeW។
+- **ស្ថានភាពការតភ្ជាប់ ៤ ជំហាន** ដូច ZoeW ដែរ។
 
-ការបង្កើត keypair ថ្មីធ្វើឱ្យ private key ចាស់មិនផ្គូផ្គងនឹង public key ថ្មី។ មុនចែក Key ដែលចុះហត្ថលេខាថ្មី៖
+---
 
-1. backup Private Key ចាស់ និងកត់ត្រាថាតើ Key ចាស់ណានៅមានសុពលភាព;
-2. បន្ថែម public key ថ្មីទៅ `PUBLIC_KEYS_JWK` នៅ App ទាំង ២ (អាចរក្សា public key ចាស់សម្រាប់ transition);
-3. deploy App ទាំង ២ និងផ្ទៀងផ្ទាត់ `license-verify.js` byte-identical;
-4. ទើប Load private key ថ្មី និងចេញ Activation Key ថ្មី។
+## កំណែ
 
-កុំលុប public key ចាស់រហូតដល់គ្មាន Key ដែលចុះហត្ថលេខាដោយវានៅត្រូវ verify។
+កំណែបច្ចុប្បន្ន **`2.14.0`** — ប្រើរួមគ្នាជាមួយ ZoeW ហើយត្រូវស៊ីនឹង
+`version` ក្នុង `manifest.json`។ វាបង្ហាញ **១ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ។
 
-## Deploy និងតេស្ត
+`CACHE_VERSION` ក្នុង `sw.js` (`zoekeygen-vN`) ជាកូនសោ cache ដាច់ដោយឡែក។
 
-Deploy ជា static site និងប្តូរ Service Worker cache ពេលមាន asset ផ្លាស់ប្តូរ។ `APP_VERSION` និង `manifest.json` របស់ App ទាំង ២ ត្រូវដូចគ្នា។
+ប្រវត្តិពេញលេញ៖ **[CHANGELOG.md](../CHANGELOG.md)**។
 
-```bash
-node --check ZoeKeyGen/app.js
-node audit-tools/keygen-pin-flow-test.js
-node audit-tools/keygen-session-security-test.js
-node audit-tools/version-check.js
-bash audit-tools/run-all.sh
-```
+---
+
+## ប្រព័ន្ធសុវត្ថិភាព
+
+App នេះកាន់ **កូនសោ signing** ដូច្នេះវាតឹងរឹងជាង ZoeW។
+
+### ការចូលប្រើ
+
+| ស្រទាប់ | អ្វី |
+|---|---|
+| **Firebase Authentication** | អ៊ីមែល + ពាក្យសម្ងាត់ លើ **License Project ដាច់ដោយឡែក** |
+| **តួនាទី `admin`** | ក្រោយចូល App អានតួនាទីពី `user_roles`; មិនមែន admin ➜ ចាកចេញភ្លាម |
+| **ការពិនិត្យតួនាទីមានពេលកំណត់ពិត** | ពេល socket យឺត វាធ្លាក់ទៅផ្លូវ REST ដែលមាន `AbortController` ➜ មិនព្យួររហូត ហើយព្យាយាមឡើងវិញស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មក |
+| **Security PIN** | ការពារ Config; PBKDF2-SHA256 ១៥០,០០០ ជុំ |
+
+### កូនសោ signing
+
+- កូនសោឯកជន **មិនរក្សាទុកជាអចិន្ត្រៃយ៍ក្នុង App ទេ** — វាផ្ទុកចូលក្នុងវគ្គ
+  ដើម្បី sign រួចលុបចេញ។
+- ការចាកចេញ ឬការចាក់សោ **លុបកូនសោចេញពីសតិ និងចេញពី DOM**។
+- សោសាធារណៈ embed ក្នុង `license-verify.js` របស់ ZoeW ➜ Key ក្លែងក្លាយ
+  បង្កើតមិនកើត បើគ្មានកូនសោឯកជន។
+
+### ការរកឃើញ DevTools
+
+App នេះ **បណ្តេញអ្នកប្រើចេញ** ពេលរកឃើញថា DevTools ត្រូវបានបើក ព្រមទាំង
+ទប់ស្កាត់ `F12`, `Ctrl+Shift+I/J/C`, `Ctrl+U` និងម៉ឺនុយចុចខាងស្តាំ។
+ការរកឃើញផ្អែកលើ **ការប្រែប្រួលនៃចន្លោះ `outerWidth/Height` ធៀបនឹង
+`innerWidth/Height`** ដែលវាស់តាំងពី boot ➜ ការ zoom ធម្មតាមិនបណ្តេញខុសទេ
+ហើយវាបិទទាំងស្រុងលើទូរស័ព្ទ។
+
+> នេះជាការបង្កើនការលំបាក **មិនមែនព្រំដែនសុវត្ថិភាពពិតទេ** — អ្នកដែលកាន់
+> ឧបករណ៍អាចរំលងវាបាន។ ព្រំដែនពិតគឺ Firebase Rules និងកូនសោឯកជនដែល
+> មិនរស់នៅក្នុង App។
+
+### ទិន្នន័យ និង Rules
+
+- **`license_keys/$appCode/$keyId` អានបានជាសាធារណៈ** តែ `expiresAt` និង
+  `revoked` ប៉ុណ្ណោះ ព្រោះការពិនិត្យខាង ZoeW ជា REST គ្មាន auth។
+- **Metadata រសើប** (`note`, `createdBy`, `issuedAt`, `scope`) ស្ថិតក្នុង
+  `license_keys_meta` ដែល **អាន/សរសេរបានតែ admin**។
+- Rules ក្នុង repo **មិន deploy ស្វ័យប្រវត្តិទេ** — ត្រូវ paste ចូល
+  Firebase Console របស់ License Project រួច Publish ដោយដៃ។
+
+### ការការពារខាង Browser
+
+ដូច ZoeW៖ `script-src` គ្មាន `'unsafe-inline'`, គ្មាន `onclick=`,
+`data-act` បូកបញ្ជីអនុញ្ញាត, `frame-ancestors 'none'`, HSTS,
+Service Worker បោះបង់សំណើឆ្លង origin និងការលាក់ secret មុនផ្ញើទៅ Sentry។
+
+### ព្រំដែនដែលត្រូវដឹង
+
+- **កុំបើក App នេះលើឧបករណ៍សាធារណៈ** — វាកាន់សិទ្ធិចេញ Key។
+- `LICENSE_APP_CODE = 'ADM'` **ត្រូវរក្សាដដែល** — ការប្តូរវាធ្វើឲ្យ Key
+  ដែលចេញរួចទាំងអស់ខូច។
+- ការ rotate សោ signing តម្រូវឲ្យធ្វើបច្ចុប្បន្នភាព `license-verify.js`
+  ទាំង ២ App ព្រោះឯកសារនោះត្រូវ **byte-identical**។
+
+---
 
 ## អាជ្ញាប័ណ្ណ
 
-គម្រោងនេះជាកម្មសិទ្ធិឯកជន — Powered by ZoeW.
+កម្មសិទ្ធិឯកជន — សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់ម្ចាស់ប៉ុណ្ណោះ។

@@ -38,7 +38,7 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let port = 8660;
-    for (const app of ['ZoeW', 'ZoeKeyGen']) {
+    for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir, port);
@@ -97,8 +97,10 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
                 const r = await page.evaluate((id) => {
                     const m = document.getElementById(id);
                     if (!m) return null;
-                    const prevAll = [...document.querySelectorAll('.modal')].map((x) => [x, x.style.display]);
+                    const prevAll = [...document.querySelectorAll('.modal')].map((x) => [x, x.style.display, x.classList.contains('hidden')]);
                     prevAll.forEach(([x]) => { x.style.display = 'none'; });
+                    const wasHidden = m.classList.contains('hidden');
+                    if (wasHidden) m.classList.remove('hidden');
                     m.style.display = 'flex';
                     const vw = document.documentElement.clientWidth;
                     const vh = document.documentElement.clientHeight;
@@ -126,7 +128,8 @@ const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
                         if (bb.top < -1) boxIssue = 'ផ្នែកខាងលើចេញក្រៅអេក្រង់ top=' + Math.round(bb.top);
                         else if (bb.height > vh + 1 && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) boxIssue = 'ខ្ពស់ជាងអេក្រង់ តែរមូរមិនបាន h=' + Math.round(bb.height) + '/' + vh;
                     }
-                    prevAll.forEach(([x, d]) => { x.style.display = d; });
+                    prevAll.forEach(([x, d, h]) => { x.style.display = d; if (h) x.classList.add('hidden'); });
+                    if (wasHidden) m.classList.add('hidden');
                     return { over, boxIssue };
                 }, mid);
                 if (r && r.over) modalBad.push(mid + ' ➜ លើសទទឹង: ' + r.over);

@@ -41,8 +41,8 @@ function sliceKeyframes(css, name) {
     return css.slice(start, i);
 }
 
-const APPS = ['ZoeW', 'ZoeKeyGen'];
-const CHROME_SELECTORS = ['.app-navbar', '.app-pages', '.page-tabbar', '.app-container'];
+const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const CHROME_SELECTORS = ['.app-navbar', '.app-pages', '.page-tabbar', '.app-container', '.app-body'];
 
 // === ផ្នែកទី ១ — រចនាសម្ព័ន្ធ ===
 for (const app of APPS) {
@@ -116,6 +116,15 @@ for (const app of APPS) {
 // អេក្រង់ស ២០ វិនាទី ខណៈគ្រប់ឯកសាររបស់ App នៅក្នុង cache រួចស្រេច។
 for (const app of APPS) {
     const html = fs.readFileSync(path.join(ROOT, app, 'index.html'), 'utf8');
+    const flagsSrc = fs.readFileSync(path.join(ROOT, app, 'boot-flags.js'), 'utf8');
+
+    // App ដែលគ្មាន host ខាងក្រៅសោះ (ZoeImport) ➜ គ្មានអ្វីត្រូវធ្វើឲ្យ async
+    if (!/sentry-cdn\.com|fonts\.googleapis\.com/.test(html)) {
+        ok(app + ': គ្មានធនធានឆ្លង origin ក្នុង <head> សោះ (ល្អជាងគេ)', true);
+        ok(app + ': សំណាញ់សុវត្ថិភាពត្រូវ **រៀបចំពេល DOM រួចរាល់**',
+            /DOMContentLoaded/.test(flagsSrc));
+        continue;
+    }
 
     const sentryTags = html.match(/<script[^>]*sentry-cdn\.com[^>]*>/g) || [];
     ok(app + ': ⛔ script របស់ Sentry មិនទប់ parser (`async`)',
@@ -129,11 +138,10 @@ for (const app of APPS) {
     ok(app + ': ⛔ stylesheet របស់ពុម្ពអក្សរមិនទប់ការគូរ (`media="print"`)',
         fontTags.length > 0 && blocking.length === 0, blocking);
 
-    const flags = fs.readFileSync(path.join(ROOT, app, 'boot-flags.js'), 'utf8');
     ok(app + ': boot-flags.js ប្តូរពុម្ពអក្សរទៅ media="all" ពេល DOM រួចរាល់',
-        /webFontCss/.test(flags) && /media = 'all'/.test(flags));
+        /webFontCss/.test(flagsSrc) && /media = 'all'/.test(flagsSrc));
     ok(app + ': សំណាញ់សុវត្ថិភាពត្រូវ **រៀបចំពេល DOM រួចរាល់** (មិនមែនពេល parse ក្បាល)',
-        /DOMContentLoaded/.test(flags),
+        /DOMContentLoaded/.test(flagsSrc),
         'បើរៀបចំពេល parse ក្បាល នោះ #bootSplash មិនទាន់មាន ➜ សំណាញ់គ្មានប្រសិទ្ធភាព');
 }
 

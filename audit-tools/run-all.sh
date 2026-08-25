@@ -52,7 +52,8 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          restore-race-test clear-history-claim-test google-sheets-cache-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
-         setup-link-roundtrip-test export-cells-test camera-resume-test; do
+         setup-link-roundtrip-test export-cells-test camera-resume-test \
+         connection-recovery-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -84,6 +85,7 @@ run "perf (browser ពិត)"       node audit-tools/perf-check.js
 run "offline-shell (browser ពិត)" node audit-tools/offline-shell-test.js
 run "sw-install-integrity (browser ពិត)" node audit-tools/sw-install-integrity-test.js
 run "network-timeout (browser ពិត)" node audit-tools/network-timeout-test.js
+run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
 
 echo
@@ -144,6 +146,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
     IOSGLIDE_APP_DIR="$BASE" node audit-tools/ios-panel-glide-test.js 2>&1 | tail -1 | sed 's/^/   ios-panel-glide: /'
     NETTIMEOUT_APP_DIR="$BASE" node audit-tools/network-timeout-test.js 2>&1 | tail -1 | sed 's/^/   network-timeout: /'
+    SWKEY_APP_DIR="$BASE"   node audit-tools/sw-cache-key-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-key:    /'
+    CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
 fi
 

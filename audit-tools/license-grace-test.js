@@ -54,6 +54,7 @@ function build(serverRecord, opts) {
         var serverTimeOffsetMs = 0, serverTimeSynced = true;
         const OFFLINE_GRACE_MS = ${GRACE};
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
+        const NET_TIMEOUT_MS = 10000;
         function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {
@@ -62,7 +63,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'activate', 'getStatus']), ctx);
+    vm.runInContext(sliceFns(src, ['fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'activate', 'getStatus']), ctx);
     return { ctx, store, clock };
 }
 

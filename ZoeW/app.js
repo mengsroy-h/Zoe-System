@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.11.5';
+    const APP_VERSION = '2.11.6';
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -54,11 +54,21 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
+                const SW_UPDATE_MIN_GAP_MS = 15 * 60 * 1000;
+                let lastSwUpdateAt = Date.now();
+                const throttledSwUpdate = () => {
+                    if (navigator.onLine === false) return;
+                    const now = Date.now();
+                    if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
+                    lastSwUpdateAt = now;
+                    reg.update().catch(() => {});
+                };
                 document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                    if (document.visibilityState === 'visible') throttledSwUpdate();
                 });
-                window.addEventListener('focus', () => reg.update().catch(() => {}));
-                setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+                window.addEventListener('focus', throttledSwUpdate);
+                window.addEventListener('online', throttledSwUpdate);
+                setInterval(throttledSwUpdate, 30 * 60 * 1000);
             }).catch(() => {});
 
             const hadControllerAtLoad = !!navigator.serviceWorker.controller;
@@ -140,6 +150,14 @@
     let phoneModalDismissPromptOpen = false;
     let searchTimer = null;
     let isDatabaseInitialized = false;
+    let dbListenersFailed = false;
+    let dbListenerRecoveryTimer = null;
+    let dbListenerRecoveryAttempt = 0;
+    let dbListenerOutageNoticeShown = false;
+    const dbListenerPendingPaths = new Set();
+    let reconnectWatchdogTimer = null;
+    let reconnectWatchdogAttempt = 0;
+    let lastForcedReconnectAt = 0;
     let globalAudioCtx = null;
 
     let lastEnteredLocker = localStorage.getItem('last_entered_locker') || "";
@@ -350,8 +368,12 @@
         });
     }
 
+    const RECONNECT_FORCE_MIN_GAP_MS = 3000;
+    const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
+    const LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
+
     function connectionLooksOnline() {
-        return isDatabaseConnected && navigator.onLine !== false;
+        return isDatabaseConnected && navigator.onLine !== false && !dbListenersFailed;
     }
 
     function renderConnectionStatus() {
@@ -359,27 +381,74 @@
         const statusText = document.getElementById('firebaseStatusText');
         const online = connectionLooksOnline();
         if (statusDot) statusDot.classList.toggle('offline', !online);
-        if (statusText) statusText.innerText = online ? "ភ្ជាប់ Server រួចរាល់" : "ក្រៅបណ្ដាញ";
+        if (statusText) {
+            statusText.innerText = online
+                ? "ភ្ជាប់ Server រួចរាល់"
+                : (dbListenersFailed && isDatabaseConnected && navigator.onLine !== false
+                    ? "កំពុងភ្ជាប់ឡើងវិញ..."
+                    : "ក្រៅបណ្ដាញ");
+        }
+    }
+
+    function clearReconnectWatchdog() {
+        if (reconnectWatchdogTimer) {
+            clearTimeout(reconnectWatchdogTimer);
+            reconnectWatchdogTimer = null;
+        }
+        reconnectWatchdogAttempt = 0;
+    }
+
+    function forceDatabaseReconnect() {
+        if (!fb || !db || typeof fb.goOnline !== 'function') return false;
+        const now = Date.now();
+        if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
+        lastForcedReconnectAt = now;
+        try {
+            if (typeof fb.goOffline === 'function') fb.goOffline(db);
+        } catch (e) {}
+        try { fb.goOnline(db); } catch (e) { return false; }
+        return true;
+    }
+
+    function scheduleReconnectWatchdog() {
+        if (reconnectWatchdogTimer) return;
+        if (!fb || !db) return;
+        const step = RECONNECT_WATCHDOG_STEPS_MS[Math.min(reconnectWatchdogAttempt, RECONNECT_WATCHDOG_STEPS_MS.length - 1)];
+        reconnectWatchdogTimer = setTimeout(() => {
+            reconnectWatchdogTimer = null;
+            if (isDatabaseConnected || navigator.onLine === false) { clearReconnectWatchdog(); return; }
+            reconnectWatchdogAttempt++;
+            forceDatabaseReconnect();
+            scheduleReconnectWatchdog();
+        }, step);
     }
 
     function nudgeDatabaseConnection() {
         if (!fb || !db || typeof fb.goOnline !== 'function') return;
-        try { fb.goOnline(db); } catch (e) {}
+        if (isDatabaseConnected) { try { fb.goOnline(db); } catch (e) {} return; }
+        if (navigator.onLine === false) return;
+        forceDatabaseReconnect();
+        scheduleReconnectWatchdog();
     }
 
     function setupConnectionRecovery() {
         window.addEventListener('online', () => {
             renderConnectionStatus();
             nudgeDatabaseConnection();
+            retryFailedDbListenersNow();
             if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
                 ZoeLicense.syncServerTime().catch(() => {});
             }
         });
-        window.addEventListener('offline', renderConnectionStatus);
+        window.addEventListener('offline', () => {
+            clearReconnectWatchdog();
+            renderConnectionStatus();
+        });
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) return;
             renderConnectionStatus();
             nudgeDatabaseConnection();
+            retryFailedDbListenersNow();
         });
     }
 
@@ -410,6 +479,7 @@
                 if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
                 isDatabaseInitialized = false;
                 isDatabaseConnected = false;
+                resetDbListenerHealthState();
                 renderConnectionStatus();
                 scanHistory = [];
                 deletedItems = [];
@@ -440,6 +510,12 @@
 
             fb.onValue(dbRefConnected, (snap) => {
                 isDatabaseConnected = snap.val() === true;
+                if (isDatabaseConnected) {
+                    clearReconnectWatchdog();
+                    retryFailedDbListenersNow();
+                } else if (navigator.onLine !== false) {
+                    scheduleReconnectWatchdog();
+                }
                 renderConnectionStatus();
             });
 
@@ -1821,6 +1897,7 @@
                 proceedAfterLogin(user, myAuthGeneration);
             } else {
                 resetClearHistoryOperationState();
+                resetDbListenerHealthState();
                 if (isDatabaseInitialized) {
                     if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
                     if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
@@ -1932,26 +2009,83 @@
         }
     }
 
+    function detachDatabaseListeners() {
+        if (!fb) return;
+        [dbRefDailyRevenue, dbRefMonthlyRevenue, dbRefDailyPickup, dbRefHistory, dbRefDeleted, dbRefExchangeRate]
+            .forEach((ref) => { if (ref) { try { fb.off(ref); } catch (e) {} } });
+    }
+
+    function clearDbListenerRecovery() {
+        if (dbListenerRecoveryTimer) {
+            clearTimeout(dbListenerRecoveryTimer);
+            dbListenerRecoveryTimer = null;
+        }
+        dbListenerRecoveryAttempt = 0;
+    }
+
+    function noteDbListenerAlive(pathKey) {
+        dbListenerPendingPaths.delete(pathKey);
+        if (!dbListenersFailed || dbListenerPendingPaths.size) return;
+        dbListenersFailed = false;
+        dbListenerOutageNoticeShown = false;
+        clearDbListenerRecovery();
+        renderConnectionStatus();
+        showToast('✅ ទិន្នន័យភ្ជាប់មកវិញហើយ — តារាងទាន់សម័យវិញហើយ');
+    }
+
+    function attemptDbListenerRecovery() {
+        dbListenerRecoveryTimer = null;
+        if (!dbListenersFailed) return;
+        if (!db || !fb || !auth || !auth.currentUser) { scheduleDbListenerRecovery(); return; }
+        if (navigator.onLine === false) { scheduleDbListenerRecovery(); return; }
+        initDatabaseListeners();
+        scheduleDbListenerRecovery();
+    }
+
+    function scheduleDbListenerRecovery() {
+        if (dbListenerRecoveryTimer || !dbListenersFailed) return;
+        const step = LISTENER_RECOVERY_STEPS_MS[Math.min(dbListenerRecoveryAttempt, LISTENER_RECOVERY_STEPS_MS.length - 1)];
+        dbListenerRecoveryAttempt++;
+        dbListenerRecoveryTimer = setTimeout(attemptDbListenerRecovery, step);
+    }
+
+    function resetDbListenerHealthState() {
+        dbListenersFailed = false;
+        dbListenerOutageNoticeShown = false;
+        dbListenerPendingPaths.clear();
+        clearDbListenerRecovery();
+        clearReconnectWatchdog();
+    }
+
+    function retryFailedDbListenersNow() {
+        if (!dbListenersFailed) return;
+        clearDbListenerRecovery();
+        attemptDbListenerRecovery();
+    }
+
     function handleDbListenerError(err) {
         console.error('Firebase listener error:', err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
-        showToast('⚠️ បរាជ័យក្នុងការទាញយកទិន្នន័យ! សូមពិនិត្យការតភ្ជាប់ Firebase ឬសិទ្ធិចូលប្រើ ហើយ Refresh ទំព័រ');
+        dbListenersFailed = true;
+        renderConnectionStatus();
+        if (!dbListenerOutageNoticeShown) {
+            dbListenerOutageNoticeShown = true;
+            showToast('⚠️ ដាចការទាញយកទិន្នន័យពី Server — តារាងអាចមិនទាន់សម័យ។ កំពុងព្យាយាមភ្ជាប់ឡើងវិញ...');
+        }
+        scheduleDbListenerRecovery();
     }
 
     function initDatabaseListeners() {
         if (!db || !fb) return false;
 
-        if (isDatabaseInitialized) {
-            if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
-            if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
-            if (dbRefDailyPickup) fb.off(dbRefDailyPickup);
-            if (dbRefHistory) fb.off(dbRefHistory);
-            if (dbRefDeleted) fb.off(dbRefDeleted);
-            if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-        }
+        detachDatabaseListeners();
+        dbListenerPendingPaths.clear();
+        ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+            .forEach((key) => dbListenerPendingPaths.add(key));
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
+                noteDbListenerAlive('exchangeRate');
                 const val = snapshot.val();
                 if (val && !isNaN(val)) {
                     exchangeRateRiel = parseFloat(val);
@@ -1963,6 +2097,7 @@
 
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
+                noteDbListenerAlive('dailyRevenue');
                 dailyRevenueData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
             }, handleDbListenerError);
@@ -1970,12 +2105,14 @@
 
         if (dbRefMonthlyRevenue) {
             fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
+                noteDbListenerAlive('monthlyRevenue');
                 monthlyRevenueData = snapshot.val() || {};
             }, handleDbListenerError);
         }
 
         if (dbRefDailyPickup) {
             fb.onValue(dbRefDailyPickup, (snapshot) => {
+                noteDbListenerAlive('dailyPickup');
                 dailyPickupData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
             }, handleDbListenerError);
@@ -1983,6 +2120,7 @@
 
         if (dbRefHistory) {
         fb.onValue(dbRefHistory, (snapshot) => {
+            noteDbListenerAlive('history');
             const data = snapshot.val();
             if (!data) scanHistory = [];
             else if (Array.isArray(data)) scanHistory = data.filter(item => item !== null);
@@ -2030,6 +2168,7 @@
 
         if (dbRefDeleted) {
         fb.onValue(dbRefDeleted, (snapshot) => {
+            noteDbListenerAlive('deleted');
             const data = snapshot.val();
             if (!data) deletedItems = [];
             else if (Array.isArray(data)) deletedItems = data.filter(item => item !== null);
@@ -2296,7 +2435,7 @@
     }
 
     function runScheduledCleanup() {
-        if (!db || !isDatabaseInitialized) return;
+        if (!db || !isDatabaseInitialized || dbListenersFailed) return;
         runAutomaticCleanupRules();
         runAutomaticDeletedCleanup();
     }

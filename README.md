@@ -8,8 +8,8 @@
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល និងគ្រប់គ្រងកញ្ចប់ | `2.14.0` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.14.0` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល និងគ្រប់គ្រងកញ្ចប់ | `2.15.0` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.15.0` |
 | **[ZoeImport](ZoeImport/README.md)** | នាំចូល Excel ចូល Google Sheet ជំនួស copy-paste | `1.1.0` |
 
 ---
@@ -51,7 +51,7 @@
 ## កំណែ
 
 - **`APP_VERSION`** ជាកំណែផលិតផលតាម semver ដែលប្រើ **រួមគ្នា** ទាំង ZoeW និង
-  ZoeKeyGen ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json`។ បច្ចុប្បន្ន **`2.14.0`**។
+  ZoeKeyGen ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json`។ បច្ចុប្បន្ន **`2.15.0`**។
 - **ZoeImport មានកំណែដាច់ដោយឡែក** (បច្ចុប្បន្ន **`1.1.0`**) ព្រោះវាមិនប៉ះ
   Firebase និងមិនពាក់ព័ន្ធនឹងវដ្តចេញផ្សាយរបស់ App ទាំង ២ នោះទេ។
 - **`CACHE_VERSION`** ក្នុង `sw.js` នៃ App នីមួយៗ (`<app>-vN`) ជាកូនសោ cache
@@ -134,9 +134,9 @@ npm i acorn playwright-core xlsx
 bash audit-tools/run-all.sh
 ```
 
-ការត្រួតពិនិត្យ ២៦ បើក **Chromium ពិត** ហើយវាស់ឥរិយាបថពិត — ល្បឿនបើក App
+ការត្រួតពិនិត្យ ២៧ បើក **Chromium ពិត** ហើយវាស់ឥរិយាបថពិត — ល្បឿនបើក App
 លើបណ្តាញខ្សោយ, ការស្កេន Barcode, កាយវិការអូស, ការការពារ XSS ក្រោម CSP ពិត,
-ស្ថេរភាពបណ្តាញ និងទម្រង់បង្ហាញលើអេក្រង់ ៦ ទំហំ។ មើល
+ស្ថេរភាពបណ្តាញ, ទម្រង់បង្ហាញលើអេក្រង់ ៦ ទំហំ និងសញ្ញាផ្តោតតាមក្តារចុច។ មើល
 **[audit-tools/README.md](audit-tools/README.md)**។
 
 ## ឯកសារបន្ថែម

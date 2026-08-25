@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.14.0';
+    const APP_VERSION = '2.15.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",

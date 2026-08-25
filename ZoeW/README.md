@@ -102,7 +102,7 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 - URL ត្រូវមាន `{barcode}` ឬគាំទ្រផ្លូវដែលកម្មវិធីអាចបញ្ចូល Barcode បាន។
 - JSON អាចកំណត់ផ្លូវ `phone`, `cod`, និង `dod` បាន រួមទាំង nested field។
 - Header secret ដែលកំណត់ថ្មីត្រូវបាន encrypt ដោយកូនសោពី PIN មុនរក្សាទុកក្នុង browser។
-- Google Apps Script ក្នុង `google-sheets-api/` គាំទ្រទាំង lookup មួយ Barcode និង `list=1`។ Cache គឺ best-effort ប៉ុណ្ណោះ; នៅពេល payload ធំពេក វាត្រូវ fallback ទៅការអាន Sheet ជំនួសការធ្វើឱ្យ API បរាជ័យ។
+- Google Apps Script ក្នុង [`../zto-import/google-sheets-api/`](../zto-import/google-sheets-api/README.md) គាំទ្រទាំង lookup មួយ Barcode និង `list=1`។ Cache គឺ best-effort ប៉ុណ្ណោះ; នៅពេល payload ធំពេក វាត្រូវ fallback ទៅការអាន Sheet ជំនួសការធ្វើឱ្យ API បរាជ័យ។
 
 បើប្តូរ host របស់ API ត្រូវកែ `connect-src` ក្នុង CSP របស់ deployment ផងដែរ។
 

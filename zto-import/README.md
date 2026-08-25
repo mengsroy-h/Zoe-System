@@ -4,8 +4,26 @@
 ចូលទៅ Google Sheet `Customers` (ដែលដើរតួជា Lookup API របស់ ZoeW)។
 
 > **វាជាគម្រោង Apps Script ដាច់ដោយឡែកទាំងស្រុង។** វា **មិនប៉ះ** ZoeW,
-> មិនប៉ះ `ZoeW/google-sheets-api/Code.gs` (Lookup API ដែលកំពុងដើរ) និងមិនប៉ះ
+> មិនប៉ះ `google-sheets-api/Code.gs` (Lookup API ដែលកំពុងដើរ) និងមិនប៉ះ
 > Firebase ឡើយ។ វាគ្រាន់តែសរសេរជួរដេកចូល Sheet ដដែលដែលអ្នកបញ្ចូលដោយដៃសព្វថ្ងៃ។
+
+## រចនាសម្ព័ន្ធថត
+
+ថតនេះផ្ទុក **គម្រោង Apps Script ២** ដែលបម្រើ Google Sheet ដដែល — ពួកវាដាច់
+ដោយឡែកពីគ្នា ហើយ Deploy ដោយឡែកពីគ្នា៖
+
+| ថត | គម្រោង Apps Script | តួនាទី |
+|---|---|---|
+| ថតនេះ (`Code.gs`, `Watch.gs`, `Index.html`) | **standalone** — បង្កើតថ្មីនៅ script.google.com | **សរសេរចូល** Sheet៖ API សម្រាប់ PWA `ZoeImport`, folder watcher និងទំព័រ Web បម្រុង |
+| [`google-sheets-api/`](google-sheets-api/README.md) | **bound** — Extensions ➜ Apps Script ពីក្នុង Sheet | **អានចេញពី** Sheet៖ Lookup API ដែល ZoeW ហៅពេលស្កេន Barcode |
+
+> `google-sheets-api/` ធ្លាប់នៅក្នុង `ZoeW/`។ វាត្រូវផ្លាស់មកទីនេះព្រោះវា
+> **មិនមែនជាផ្នែករបស់ static site របស់ ZoeW ទេ** — Netlify បម្រើថត `ZoeW`
+> ទាំងមូល ដូច្នេះកូដ Apps Script និង `customer-template.csv` ត្រូវបានបង្ហោះ
+> ជាសាធារណៈដោយឥតប្រយោជន៍។ (គ្មានលេខសម្ងាត់ក្នុងនោះទេ — `API_KEY` ស្ថិតក្នុង
+> Script Properties — តែវាគ្មានហេតុផលត្រូវនៅទីនោះឡើយ។)
+
+---
 
 ## មានផ្លូវប្រើ ៣ — ជ្រើសយកមួយ ឬច្រើន
 
@@ -144,7 +162,7 @@ file — លើកក្រោយ file ZTO បែបដដែលនឹងផ្�
 ## អ្វីដែលត្រូវដឹង
 
 - **ZoeW អាចយឺតរហូតដល់ ៥ នាទី** ទើបឃើញទិន្នន័យថ្មី — មិនមែនកំហុសរបស់ឧបករណ៍នេះទេ។
-  Lookup API (`ZoeW/google-sheets-api/Code.gs`) មាន cache `CACHE_TTL_SECONDS = 300`។
+  Lookup API ([`google-sheets-api/Code.gs`](google-sheets-api/README.md)) មាន cache `CACHE_TTL_SECONDS = 300`។
   ចង់ឲ្យលឿនជាងនេះ ➜ បន្ថយតម្លៃនោះ (ឧ. `60`) នៅក្នុង script *នោះ* រួច Deploy វាឡើងវិញ។
 - ឧបករណ៍នេះ **មិនកែទម្រង់លេខទូរស័ព្ទ ឬ Barcode ទេ** — វាដាក់តម្លៃចូលដូចអ្នក
   paste ដោយដៃបេះបិទ។ តែវា **កំណត់ format ជា Text** សម្រាប់ column Barcode និង

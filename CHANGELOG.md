@@ -71,6 +71,18 @@
 - **របៀបលំនាំដើមប្តូរទៅ «សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស»** តាមលំហូរ
   ការងារប្រចាំថ្ងៃ។
 
+### ផ្លាស់ប្តូរ — ផ្លាស់ទី `google-sheets-api/`
+- `ZoeW/google-sheets-api/` ➜ **`zto-import/google-sheets-api/`**។ វា **មិនមែន
+  ជាផ្នែករបស់ static site របស់ ZoeW ទេ** — Netlify បម្រើថត `ZoeW` ទាំងមូល
+  ដូច្នេះ `Code.gs`, `README.md` និង `customer-template.csv` ត្រូវបានបង្ហោះជា
+  សាធារណៈលើ site របស់ ZoeW ដោយឥតប្រយោជន៍។ (គ្មានលេខសម្ងាត់ក្នុងនោះទេ —
+  `API_KEY` ស្ថិតក្នុង Script Properties។)
+- ឥឡូវគម្រោង Apps Script ទាំង ២ ដែលបម្រើ Sheet ដដែលនៅជាមួយគ្នា៖ ថត
+  `zto-import/` **សរសេរចូល** Sheet ចំណែក `zto-import/google-sheets-api/`
+  **អានចេញពី** វា។ **ខ្លឹមសារ `Code.gs` មិនប្រែសូម្បី byte តែមួយ** — ជាការ
+  ផ្លាស់ទីសុទ្ធសាធ ដូច្នេះ **មិនចាំបាច់ Deploy Apps Script នោះឡើងវិញទេ**។
+- `audit-tools/google-sheets-cache-test.js` ដើរតាមផ្លូវថ្មី។
+
 ### សុវត្ថិភាព
 - **PIN តាមលំនាំដដែលនឹង ZoeW**៖ PBKDF2-SHA256 ១៥០,០០០ ជុំ (salt
   `zoeimport_pin_verify_v1`) ➜ រក្សាទុកតែ hash។ វាយខុស ៥ ដង ➜ ចាក់សោ ១ នាទី។

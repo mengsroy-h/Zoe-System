@@ -83,10 +83,17 @@
 
 ### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- **ត្រូវ paste `firebase-database.rules.json` ចូល Firebase Console ➜ Publish។**
-  វាបន្ថែមវាល `trashReason` ក្នុង `zoew_recently_deleted_cod_dod/$itemId`។
-  បើមិន publish ទេ ៖ `$other: { ".validate": false }` នឹង **បដិសេធរាល់ការ
-  សរសេរទៅធុងសំរាម** ➜ លុប/ដកកញ្ចប់នឹងបរាជ័យ។ **ធ្វើមុន deploy កូដ។**
+- ✅ **ធ្វើរួចហើយ** — `firebase-database.rules.json` ត្រូវបាន paste ចូល
+  Firebase Console ➜ Publish **មុន** merge។ វាបន្ថែមវាល `trashReason` ក្នុង
+  `zoew_recently_deleted_cod_dod/$itemId`; បើមិន publish ទេ
+  `$other: { ".validate": false }` នឹងបដិសេធរាល់ការសរសេរទៅធុងសំរាម។
+
+### ស្ថានភាព
+
+> ✅ **ផ្ទៀងផ្ទាត់លើផលិតកម្មពិតរួចហើយ** (2026-08-25) — merge ចូល `main`
+> ជា `f33062d`។ អ្នកប្រើបញ្ជាក់ថា **«ដំណើរការល្អ»**៖ ស្លាកធុងសំរាមទាំង ៤ ·
+> តួលេខសរុប ២ ក្រុម · ការ merge · ការស្តារ និងលុប · **ទម្រង់ទូរស័ព្ទ
+> មិនប្តូរសោះ** · ថេប្លេត និងកុំព្យូទ័រអានងាយ។
 
 ---
 

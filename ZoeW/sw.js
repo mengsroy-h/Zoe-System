@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v98';
+const CACHE_VERSION = 'zoew-v99';
 
 const CORE_SHELL = [
     './',

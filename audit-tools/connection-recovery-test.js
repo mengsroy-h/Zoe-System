@@ -202,6 +202,10 @@ function buildContext() {
         'let reconnectWatchdogTimer = null;\n' +
         'let reconnectWatchdogAttempt = 0;\n' +
         'let lastForcedReconnectAt = 0;\n' +
+        // SDK មិនមក (ក្រៅបណ្តាញពេល boot) ➜ ស្ថានភាពត្រូវសរសេរ «ក្រៅបណ្ដាញ»
+        // ដោយស្មោះ មិនមែនជាប់ «កំពុងភ្ជាប់...» ជារៀងរហូតទេ។ scenario
+        // ក្នុងឯកសារនេះសុទ្ធតែផ្ទុក SDK បានរួច ➜ ចាប់ផ្តើមជា false។
+        'let firebaseSdkUnavailable = false;\n' +
         // ស្ថានភាពដែលកំណត់ថាតើវដ្ត goOffline()+goOnline() មានតម្លៃឬអត់៖
         // វា **កាត់ផ្តាច់ handshake ដែលកំពុងដំណើរការ** ដូច្នេះវាមានតម្លៃតែពេល
         // SDK ទំនងជាកំពុងអង្គុយក្នុងបង្អួច backoff ប៉ុណ្ណោះ។ scenario ភាគច្រើន

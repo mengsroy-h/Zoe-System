@@ -204,6 +204,18 @@ const ids = new Set();
 groups.forEach((g) => g.items.forEach((i) => ids.add(i.id)));
 ok(ids.size === items.length, 'ធាតុនីមួយៗលេចឡើងម្តងគត់ ➜ ប៊ូតុងស្តារ/លុបនៅតែសំដៅលើ id ពិត', ids.size);
 
+// ---- កូនសោក្រុមមិនត្រូវប៉ះទង្គិចគ្នា ----
+// ⛔ កំណែដំបូងប្រើ `.join('~')` ➜ ធាតុរបស់អតិថិជន ២ នាក់អាចធ្លាក់ចូលក្រុម
+// តែមួយបើវាលណាមួយមាន `~` (rules ផ្ទៀងផ្ទាត់តែ `isString()`) ➜ **តួលេខ
+// លុយដែលបង្ហាញខុស**។ ការ length-prefix ធ្វើឲ្យវាមិនអាចកើតឡើងតាមរចនាសម្ព័ន្ធ។
+const collide = ctx.buildTrashGroups([
+    mk('c1', 'a~b', 'c', 't', 'remove', [bc('X1', 1, 0)]),
+    mk('c2', 'a', 'b~c', 't', 'remove', [bc('X2', 2, 0)])
+]);
+ok(collide.length === 2, 'វាលដែលមាន `~` មិនធ្វើឲ្យក្រុមប៉ះទង្គិចគ្នា', collide.length);
+ok(collide.length === 2 && collide[0].key !== collide[1].key,
+    'កូនសោក្រុមខុសគ្នាពិត (length-prefix)', collide.map((g) => g.key));
+
 // ---- តួលេខសរុប ២ ក្រុម ----
 const bucket = (deducted) => groups.filter((g) => META[g.reason].deducted === deducted)
     .reduce((acc, g) => ({ total: Math.round((acc.total + g.total) * 100) / 100, count: acc.count + g.count }),
@@ -242,6 +254,14 @@ ok(ctx.trashGroupMatchesQuery(g077, ''), 'ស្វែងរកទទេ ➜ ប
 ok(ctx.trashGroupMatchesQuery(g077, '077'), 'ស្វែងរកតាមលេខទូរស័ព្ទ');
 ok(ctx.trashGroupMatchesQuery(g077, 'a2'), 'ស្វែងរកតាម Barcode (មិនប្រកាន់អក្សរតូចធំ)');
 ok(!ctx.trashGroupMatchesQuery(g077, 'zzz'), 'អត្ថបទដែលមិនត្រូវ ➜ មិនបង្ហាញ');
+
+// ---- ការកាត់កូនសោដែលផុតសម័យត្រូវធៀបនឹង **គ្រប់ក្រុម** មិនមែនក្រុមដែលត្រងរួច ----
+// បើធៀបនឹងក្រុមដែលត្រងរួច នោះការវាយក្នុងប្រអប់ស្វែងរក **លុបស្ថានភាព
+// ពង្រីក** របស់ក្រុមទាំងអស់ដែលមិនត្រូវនឹងការស្វែងរក។
+const renderFn = sliceFn(src, 'renderRecentlyDeleted');
+ok(/liveKeys = new Set\(allGroups\.map/.test(renderFn),
+    'renderRecentlyDeleted កាត់កូនសោធៀបនឹង allGroups (មិនមែនក្រុមដែលត្រងរួច)',
+    (renderFn.match(/liveKeys = .*/) || [])[0]);
 
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យទាំងអស់ (' + pass + ')' : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
 process.exit(fail === 0 ? 0 : 1);

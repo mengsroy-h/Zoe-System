@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v94';
+const CACHE_VERSION = 'zoew-v95';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច។ មុននេះគ្រប់ធនធានប្រើ
@@ -65,14 +65,41 @@ function cacheKeyFor(request) {
 // ការធ្វើឲ្យស្រស់ខាងក្រោយ — **មិនត្រូវរង់ចាំវាមុនឆ្លើយតបឡើយ**។ សម្រាប់សំណើ
 // navigate យើងទាញ './index.html' ត្រង់ៗ ជំនួសការផ្ញើ URL ពេញ (ដែលអាចផ្ទុក
 // `?setup=…`) ទៅម៉ាស៊ីនបម្រើម្តងទៀត។
+// ⛔ **ការធ្វើឲ្យស្រស់ត្រូវមាន `AbortController` និងពិដានចំនួនស្របគ្នា។**
+// មុនកែ វាជា `fetch()` ឆៅ គ្មានពេលកំណត់។ លើបណ្តាញ «ភ្ជាប់តែស្លាប់» (WiFi
+// ដែលនៅតភ្ជាប់ ប៉ុន្តែគ្មានផ្លូវចេញ) សំណើទាំងនោះ **ព្យួររហូត** ហើយព្រោះ
+// រាល់ឯកសារនៃសំបកកេះមួយ នោះការបើកទំព័រតែម្តងបង្កើតសំណើព្យួរ ៨–១០។
+// វាស់បានលើ Chromium ពិត (server ទទួលការតភ្ជាប់ តែមិនឆ្លើយ)៖
+//     ការតភ្ជាប់ដែលត្រូវកាន់ទុក ៖ ៦  (ពិដាន same-origin របស់ browser)
+//     សំណើថ្មីក្រោយមក           ៖ **មិនដែលទៅដល់ server សោះ** (អស់ ១២ វិ.)
+// ដូច្នេះការធ្វើឲ្យស្រស់ខាងក្រោយ — ដែលជាការងារ **ស្រេចចិត្ត** — អាចធ្វើឲ្យ
+// សំណើ **ចាំបាច់** ទាំងអស់ស្លាប់។ ជាថ្នាក់កំហុស «សំណើកកកុញ ➜ ពេញកូតា
+// connection» ដដែល តែនៅក្នុង service worker ដែលគ្មានឧបករណ៍ណាមើលពីមុន។
+const REVALIDATE_TIMEOUT_MS = 6000;
+const REVALIDATE_MAX_IN_FLIGHT = 4;
+const revalidateInFlight = new Set();
+
 function revalidateShell(cache, request, cacheKey) {
     if (navigator.onLine === false) return Promise.resolve();
+    const key = typeof cacheKey === 'string' ? cacheKey : request.url;
+    if (revalidateInFlight.has(key)) return Promise.resolve();
+    if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT) return Promise.resolve();
+    revalidateInFlight.add(key);
+
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => {
+        if (controller) { try { controller.abort(); } catch (e) {} }
+    }, REVALIDATE_TIMEOUT_MS);
+    const release = () => {
+        clearTimeout(timer);
+        revalidateInFlight.delete(key);
+    };
+
     const target = cacheKey === './index.html' ? './index.html' : request;
-    return fetch(target)
-        .then((response) => {
-            if (response && response.ok && !response.redirected) return cache.put(cacheKey, response.clone()).catch(() => {});
-        })
-        .catch(() => {});
+    return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
+        if (!response || !response.ok || response.redirected) { release(); return; }
+        return cache.put(cacheKey, response.clone()).then(release, release);
+    }, release);
 }
 
 self.addEventListener('fetch', (event) => {

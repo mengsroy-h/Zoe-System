@@ -78,7 +78,7 @@ function sliceConst(name) {
 }
 
 const REQUIRED_FNS = [
-    'connectionLooksOnline', 'renderConnectionStatus', 'nudgeDatabaseConnection',
+    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'nudgeDatabaseConnection',
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
@@ -93,7 +93,8 @@ if (missing.length) {
     process.exit(1);
 }
 
-const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS'];
+const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
 if (missingConsts.length) {
     console.log('  FAIL   ថេរមិនមាន: ' + missingConsts.join(', '));
@@ -196,6 +197,7 @@ function buildContext() {
         'let dbListenersFailed = false;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
         'let dbListenerRecoveryAttempt = 0;\n' +
+        'let lastDbListenerAttemptAt = 0;\n' +
         'let dbListenerOutageNoticeShown = false;\n' +
         'let reconnectWatchdogTimer = null;\n' +
         'let reconnectWatchdogAttempt = 0;\n' +
@@ -208,7 +210,7 @@ function buildContext() {
         'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
-        'reconnectWatchdogAttempt, pending: Array.from(dbListenerPendingPaths) });\n' +
+        'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths) });\n' +
         'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
         'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
@@ -444,6 +446,120 @@ function buildContext() {
         ok(name + ' ៖ ស្ថានភាពនោះត្រូវ reset ពេលសាង Firebase app ថ្មី',
             /hasEverConnectedToDatabase = false;[\s\S]{0,80}networkJustReturned = false;/.test(src));
     });
+}
+
+// ── ១០ខ. ការស្តារ listener ត្រូវមានពិដានល្បឿន ─────────────────────────
+// ថ្នាក់កំហុស៖ `retryFailedDbListenersNow()` ត្រូវហៅពី **ព្រឹត្តិការណ៍ខាងក្រៅ**
+// ៣ កន្លែង — `online`, `visibilitychange` និង `.info/connected` ➜ true។ មុនកែ
+// វា `clearDbListenerRecovery()` (reset ជណ្តើរ backoff មកសូន្យ) រួច
+// `attemptDbListenerRecovery()` **ភ្លាមៗ គ្មានពិដាន**។ ដូច្នេះពេលបណ្តាញរញ្ជួយ
+// ឬអ្នកប្រើប្តូរ App ចេញចូល នោះរាល់ព្រឹត្តិការណ៍បង្កើត **ការភ្ជាប់ listener
+// ទាំង ៦ ឡើងវិញ** — ដែលនីមួយៗជាការទាញ node ពេញពី RTDB។
+//
+// វាស់បានលើកូដមុនកែ (គំរូដដែលនេះ)៖
+//   ជណ្តើរតែឯង ៦០ វិ.                    ➜  ៤ ជុំ   (ត្រឹមត្រូវ៖ 2/5/10/20/30 វិ.)
+//   មានព្រឹត្តិការណ៍ខាងក្រៅរៀងរាល់ ២ វិ. ៦០ វិ.  ➜  ៦០ ជុំ = **៣៦០ onValue**
+//   ព្រឹត្តិការណ៍ ១០ ដងក្នុង ១ វិនាទី              ➜  ១០ ជុំ = **៦០ onValue**
+// នេះជាថ្នាក់កំហុស «សំណើកកកុញ ➜ ពេញកូតា connection» ដដែល តែនៅលើផ្លូវ listener។
+{
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    t.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const base = t.log.attached.length;
+
+    for (let i = 0; i < 10; i++) { t.advance(100); t.api.retryFailedDbListenersNow(); }
+    const burst = (t.log.attached.length - base) / 6;
+    ok('ព្រឹត្តិការណ៍ខាងក្រៅ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ជុំភ្ជាប់ឡើងវិញ',
+        burst <= 1, burst);
+
+    const t2 = buildContext();
+    t2.api.initDatabaseListeners();
+    t2.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const b2 = t2.log.attached.length;
+    for (let i = 0; i < 30; i++) { t2.advance(2000); t2.api.retryFailedDbListenersNow(); }
+    const sustained = (t2.log.attached.length - b2) / 6;
+    ok('ព្រឹត្តិការណ៍រៀងរាល់ ២ វិ. អស់ ៦០ វិ. ➜ មិនលើស ២១ ជុំ (មុនកែ ៦០)',
+        sustained <= 21, sustained);
+
+    // ជណ្តើរធម្មតា (គ្មានព្រឹត្តិការណ៍ខាងក្រៅ) មិនត្រូវយឺតជាងមុនទេ
+    const t3 = buildContext();
+    t3.api.initDatabaseListeners();
+    t3.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const b3 = t3.log.attached.length;
+    t3.advance(60000);
+    ok('ជណ្តើរ backoff ធម្មតានៅដដែល (៤ ជុំក្នុង ៦០ វិ.)',
+        (t3.log.attached.length - b3) / 6 === 4, (t3.log.attached.length - b3) / 6);
+
+    // ការស្តារនៅតែកើតឡើងពិត — ពិដានពន្យារវា មិនមែនលុបវាទេ
+    const t4 = buildContext();
+    t4.api.initDatabaseListeners();
+    t4.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const b4 = t4.log.attached.length;
+    t4.ctx.navigator.onLine = false;
+    t4.api.retryFailedDbListenersNow();
+    t4.advance(30000);
+    ok('គ្មានបណ្តាញ ➜ មិនព្យាយាម', t4.log.attached.length === b4, t4.log.attached.length - b4);
+    t4.ctx.navigator.onLine = true;
+    t4.api.retryFailedDbListenersNow();
+    ok('បណ្តាញត្រឡប់មក ➜ ស្តារភ្លាម (ពិដានមិនទប់ការព្យាយាមលើកដំបូង)',
+        t4.log.attached.length === b4 + 6, t4.log.attached.length - b4);
+
+    // ក្រោយចាកចេញ ត្រូវភ្លេចពេលព្យាយាមចុងក្រោយ
+    t4.api.resetDbListenerHealthState();
+    ok('ចាកចេញ ➜ ពេលព្យាយាមចុងក្រោយត្រូវ reset',
+        t4.probe().lastDbListenerAttemptAt === 0, t4.probe().lastDbListenerAttemptAt);
+}
+
+// ── ១០គ. ស្ថានភាព «កំពុងភ្ជាប់» — កុំកុហកអ្នកប្រើថាក្រៅបណ្តាញ ────────
+// ថ្នាក់កំហុស៖ **បង្ហាញស្ថានភាពខុស។** មុនកែ ស្ថានភាពមានតែ ២៖ ភ្ជាប់រួច ឬ
+// «ក្រៅបណ្ដាញ»។ ព្រោះ `.info/connected` បាញ់ `false` ភ្លាមៗពេល boot ហើយ
+// handshake របស់ RTDB ត្រូវការពេលខ្លះជាច្រើនវិនាទីលើ 2G/3G នោះ **រាល់ការ
+// បើក App** និង **រាល់ការភ្ជាប់ឡើងវិញ** បង្ហាញចំណុចក្រហម «ក្រៅបណ្ដាញ»
+// ខណៈឧបករណ៍មានបណ្តាញ ហើយ App កំពុងភ្ជាប់ធម្មតា។ អ្នកប្រើឃើញសារភ័យ
+// ដោយឥតហេតុផល ហើយអាចឈប់ស្កេនទាំងដែលមិនចាំបាច់។
+//
+// ស្ថានភាពត្រឹមត្រូវមាន ៤៖
+//   ភ្ជាប់រួច · កំពុងភ្ជាប់ (handshake ថ្មី) · កំពុងភ្ជាប់ឡើងវិញ (listener ធ្លាក់) · ក្រៅបណ្ដាញ
+{
+    const t = buildContext();
+    // boot ៖ បណ្តាញមាន តែ handshake មិនទាន់ចប់
+    t.ctx.isDatabaseConnected = false;
+    t.api.renderConnectionStatus();
+    ok('boot ដែល handshake មិនទាន់ចប់ ➜ «កំពុងភ្ជាប់» មិនមែន «ក្រៅបណ្ដាញ»',
+        t.statusText.innerText.indexOf('កំពុងភ្ជាប់') !== -1 &&
+        t.statusText.innerText.indexOf('ក្រៅបណ្ដាញ') === -1, t.statusText.innerText);
+    ok('ចំណុចស្ថានភាពមាន class connecting', t.statusDot.classes.connecting === true, t.statusDot.classes);
+
+    // គ្មានបណ្តាញពិត ➜ ត្រូវនិយាយថាក្រៅបណ្ដាញ
+    t.ctx.navigator.onLine = false;
+    t.api.renderConnectionStatus();
+    ok('គ្មានបណ្តាញពិត ➜ «ក្រៅបណ្ដាញ»',
+        t.statusText.innerText.indexOf('ក្រៅបណ្ដាញ') !== -1, t.statusText.innerText);
+    ok('ចំណុចលែងជា connecting ពេលក្រៅបណ្តាញ', !t.statusDot.classes.connecting, t.statusDot.classes);
+
+    // ព្យាយាមច្រើនដងហើយនៅតែមិនបាន ➜ ត្រូវទទួលស្គាល់ថាក្រៅបណ្ដាញ
+    t.ctx.navigator.onLine = true;
+    t.api.renderConnectionStatus();
+    ok('នៅដើមដំបូងនៅតែ «កំពុងភ្ជាប់»', t.statusText.innerText.indexOf('កំពុងភ្ជាប់') !== -1, t.statusText.innerText);
+    t.api.nudgeDatabaseConnection();
+    t.advance(120000);
+    ok('ព្យាយាមអស់ ២ នាទីនៅតែមិនបាន ➜ ទទួលស្គាល់ថា «ក្រៅបណ្ដាញ»',
+        t.statusText.innerText.indexOf('ក្រៅបណ្ដាញ') !== -1, t.statusText.innerText);
+
+    // ភ្ជាប់បាន ➜ ត្រឡប់ទៅស្ថានភាពធម្មតា ហើយ class ត្រូវសម្អាត
+    t.ctx.isDatabaseConnected = true;
+    t.api.clearReconnectWatchdog();
+    t.api.renderConnectionStatus();
+    ok('ភ្ជាប់បាន ➜ «ភ្ជាប់ Server រួចរាល់»', t.statusText.innerText.indexOf('រួចរាល់') !== -1, t.statusText.innerText);
+    ok('class connecting ត្រូវដកចេញ', !t.statusDot.classes.connecting, t.statusDot.classes);
+
+    // listener ធ្លាក់ ➜ សារ «កំពុងភ្ជាប់ឡើងវិញ» នៅដដែល (មិនត្រូវច្រឡំនឹង «កំពុងភ្ជាប់»)
+    const t2 = buildContext();
+    t2.api.initDatabaseListeners();
+    t2.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    t2.api.renderConnectionStatus();
+    ok('listener ធ្លាក់ ➜ «កំពុងភ្ជាប់ឡើងវិញ»',
+        t2.statusText.innerText.indexOf('ភ្ជាប់ឡើងវិញ') !== -1, t2.statusText.innerText);
 }
 
 // ── ១១. ZoeKeyGen ក៏ត្រូវមានយន្តការភ្ជាប់ឡើងវិញដដែល ─────────────────

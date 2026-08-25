@@ -22,13 +22,22 @@
     <link rel="dns-prefetch" href="https://www.gstatic.com">
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- media="print" ➜ stylesheet ឆ្លង origin នេះ **មិនទប់ការគូរទេ**។ `boot-flags.js`
+         ប្តូរវាទៅ `all` ពេល DOM រួចរាល់។ វាស់បាន៖ ពេល fonts.googleapis.com ព្យួរ
+         App គូរបាននៅ ១៨៩ ms ជំនួស ២០ វិនាទី (អេក្រង់ស)។ ការប្តូរនេះជា CSP-safe
+         (គ្មាន `onload=`) ហើយ `display=swap` ធ្វើឲ្យអក្សរ swap ស្រាប់ហើយ។ -->
+    <link id="webFontCss" media="print" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js" crossorigin>
 
-    <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
+    <!-- `async` ➜ CDN ខាងក្រៅនេះ **មិនទប់ parser ទេ**។ `sw.js` បោះបង់សំណើឆ្លង origin
+         ដោយចេតនា ដូច្នេះ script នេះ **មិនដែលចូល cache** ➜ លើបណ្តាញ «ភ្ជាប់តែស្លាប់»
+         វាព្យួរ ហើយ `<body>` មិនទាន់សាងឡើងសោះ។ វាស់បាន៖ ១៨៩ ms ➜ ២០ វិនាទី។
+         `error-reporting.js` មានផ្លូវផ្ទុកយឺតរួចហើយ (`sentry-load-race-test.js`)។ -->
+    <script async src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
     <script src="./boot-flags.js"></script>
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
@@ -38,6 +47,14 @@
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+
+<div class="boot-splash" id="bootSplash" aria-hidden="true">
+    <div class="boot-splash-card">
+        <div class="boot-splash-logo">Key</div>
+        <div class="boot-splash-name">ZoeKeyGen</div>
+        <div class="boot-splash-bar"><span></span></div>
+    </div>
+</div>
 
 <div class="toast-container" id="toastContainer"></div>
 

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.13.0';
+    const APP_VERSION = '2.14.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -160,6 +160,28 @@
 
     setupActionDelegation();
 
+    const BOOT_SPLASH_MIN_MS = 380;
+    const BOOT_REVEAL_CLEANUP_MS = 760;
+    const bootSplashStartedAt = Date.now();
+
+    function hideBootSplash() {
+        const splash = document.getElementById('bootSplash');
+        if (!splash || splash.classList.contains('boot-splash-out')) return;
+        splash.classList.add('boot-splash-out');
+        document.body.classList.add('boot-reveal');
+        setTimeout(() => {
+            splash.classList.add('boot-splash-gone');
+            document.body.classList.remove('boot-reveal');
+        }, BOOT_REVEAL_CLEANUP_MS);
+    }
+
+    function revealAppAfterBoot() {
+        const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+        setTimeout(() => {
+            requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
+        }, wait);
+    }
+
     function showUpdateAvailableBanner() {
         if (document.getElementById('zoeUpdateBanner')) return;
         const banner = document.createElement('div');
@@ -286,6 +308,7 @@
     let dbListenersFailed = false;
     let dbListenerRecoveryTimer = null;
     let dbListenerRecoveryAttempt = 0;
+    let lastDbListenerAttemptAt = 0;
     let dbListenerOutageNoticeShown = false;
     const dbListenerPendingPaths = new Set();
     let reconnectWatchdogTimer = null;
@@ -504,22 +527,34 @@
     const RECONNECT_FORCE_MIN_GAP_MS = 3000;
     const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
     const LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
+    const CONNECTING_GRACE_ATTEMPTS = 3;
+    const DB_LISTENER_RETRY_MIN_GAP_MS = 3000;
 
     function connectionLooksOnline() {
         return isDatabaseConnected && navigator.onLine !== false && !dbListenersFailed;
+    }
+
+    function connectionIsSettlingIn() {
+        if (isDatabaseConnected || navigator.onLine === false) return false;
+        return reconnectWatchdogAttempt < CONNECTING_GRACE_ATTEMPTS;
     }
 
     function renderConnectionStatus() {
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('firebaseStatusText');
         const online = connectionLooksOnline();
-        if (statusDot) statusDot.classList.toggle('offline', !online);
+        const reconnecting = !online && isDatabaseConnected && dbListenersFailed && navigator.onLine !== false;
+        const settling = !online && !reconnecting && connectionIsSettlingIn();
+        if (statusDot) {
+            statusDot.classList.toggle('offline', !online);
+            statusDot.classList.toggle('connecting', reconnecting || settling);
+        }
         if (statusText) {
             statusText.innerText = online
                 ? "ភ្ជាប់ Server រួចរាល់"
-                : (dbListenersFailed && isDatabaseConnected && navigator.onLine !== false
+                : (reconnecting
                     ? "កំពុងភ្ជាប់ឡើងវិញ..."
-                    : "ក្រៅបណ្ដាញ");
+                    : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
         }
     }
 
@@ -558,6 +593,7 @@
             reconnectWatchdogTimer = null;
             if (isDatabaseConnected || navigator.onLine === false) { clearReconnectWatchdog(); return; }
             reconnectWatchdogAttempt++;
+            renderConnectionStatus();
             forceDatabaseReconnect();
             scheduleReconnectWatchdog();
         }, step);
@@ -2360,6 +2396,12 @@
         if (!dbListenersFailed) return;
         if (!db || !fb || !auth || !auth.currentUser) { scheduleDbListenerRecovery(); return; }
         if (navigator.onLine === false) { scheduleDbListenerRecovery(); return; }
+        const sinceLastAttempt = Date.now() - lastDbListenerAttemptAt;
+        if (lastDbListenerAttemptAt && sinceLastAttempt < DB_LISTENER_RETRY_MIN_GAP_MS) {
+            dbListenerRecoveryTimer = setTimeout(attemptDbListenerRecovery, DB_LISTENER_RETRY_MIN_GAP_MS - sinceLastAttempt);
+            return;
+        }
+        lastDbListenerAttemptAt = Date.now();
         initDatabaseListeners();
         scheduleDbListenerRecovery();
     }
@@ -2375,6 +2417,7 @@
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
         dbListenerPendingPaths.clear();
+        lastDbListenerAttemptAt = 0;
         clearDbListenerRecovery();
         clearReconnectWatchdog();
     }
@@ -2939,6 +2982,8 @@
             if (openModalEl) { dismissModal(openModalEl); return; }
             if (isSideDrawerOpen()) closeSideDrawer();
         });
+
+        revealAppAfterBoot();
     });
 
     function topmostModal(openModals) {

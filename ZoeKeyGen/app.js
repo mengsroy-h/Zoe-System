@@ -1,4 +1,4 @@
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.14.0';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -71,6 +71,28 @@ function renderAppVersionLabels() {
 }
 
 renderAppVersionLabels();
+
+const BOOT_SPLASH_MIN_MS = 380;
+const BOOT_REVEAL_CLEANUP_MS = 760;
+const bootSplashStartedAt = Date.now();
+
+function hideBootSplash() {
+    const splash = document.getElementById('bootSplash');
+    if (!splash || splash.classList.contains('boot-splash-out')) return;
+    splash.classList.add('boot-splash-out');
+    document.body.classList.add('boot-reveal');
+    setTimeout(() => {
+        splash.classList.add('boot-splash-gone');
+        document.body.classList.remove('boot-reveal');
+    }, BOOT_REVEAL_CLEANUP_MS);
+}
+
+function revealAppAfterBoot() {
+    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+    setTimeout(() => {
+        requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
+    }, wait);
+}
 
 (function () {
 
@@ -196,17 +218,27 @@ let serverTimeSyncWaiters = [];
 
 const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
+const CONNECTING_GRACE_ATTEMPTS = 3;
 
 function connectionLooksOnline() {
     return isDatabaseConnected && navigator.onLine !== false;
+}
+
+function connectionIsSettlingIn() {
+    if (isDatabaseConnected || navigator.onLine === false) return false;
+    return reconnectWatchdogAttempt < CONNECTING_GRACE_ATTEMPTS;
 }
 
 function renderConnectionStatus() {
     const dot = document.getElementById('statusDot');
     const txt = document.getElementById('firebaseStatusText');
     const online = connectionLooksOnline();
-    if (dot) dot.classList.toggle('online', online);
-    if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+    const settling = !online && connectionIsSettlingIn();
+    if (dot) {
+        dot.classList.toggle('online', online);
+        dot.classList.toggle('connecting', settling);
+    }
+    if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : (settling ? 'កំពុងភ្ជាប់...' : 'ក្រៅបណ្ដាញ');
 }
 
 function clearReconnectWatchdog() {
@@ -244,6 +276,7 @@ function scheduleReconnectWatchdog() {
         reconnectWatchdogTimer = null;
         if (isDatabaseConnected || navigator.onLine === false) { clearReconnectWatchdog(); return; }
         reconnectWatchdogAttempt++;
+        renderConnectionStatus();
         forceDatabaseReconnect();
         scheduleReconnectWatchdog();
     }, step);
@@ -1867,4 +1900,6 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (btn.dataset.action === 'extend') openExtendModal(id);
         });
     }
+
+    revealAppAfterBoot();
 });

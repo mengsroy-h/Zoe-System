@@ -97,6 +97,67 @@ label { display: block; font-size: 11px; font-weight: 600; color: var(--text-mut
 .brand-info span { font-size: 10.5px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
 .status-dot.online { background: var(--success); }
+.status-dot.connecting { background: var(--warning); }
+/* ── ចលនាពេលបើក App (boot) ─────────────────────────────────────────
+   ផ្ទាំងគ្របការលោតរបស់ UI ទទេពេលបើក រួចរលាយចេញ។ វា `pointer-events: none`
+   ជានិច្ច — តុបតែងសុទ្ធសាធ ដូច្នេះវាមិនលេបការចុចរបស់អ្នកប្រើទេ។
+   ចលនាទាំងអស់ជា `transform`/`opacity` ➜ composite សុទ្ធ។ */
+.boot-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--body-bg);
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 320ms ease;
+}
+.boot-splash.boot-splash-out { opacity: 0; }
+.boot-splash.boot-splash-gone { display: none; }
+.boot-splash-card {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    animation: bootRise 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    will-change: transform, opacity;
+}
+.boot-splash-logo {
+    width: 58px; height: 58px; border-radius: 18px;
+    background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
+    box-shadow: var(--shadow-md);
+}
+.boot-splash-name { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.boot-splash-bar {
+    position: relative; width: 132px; height: 3px;
+    border-radius: 3px; background: var(--border-color); overflow: hidden;
+}
+/* ⛔ ការរំកិលត្រូវនៅ **ខាងក្នុងរបា** ជានិច្ច។ `translateX(-100%)` លើ
+   span ដែលពេញទទឹងរបា នាំគែមឆ្វេងទៅ **ក្រៅអេក្រង់** នៅ 320px
+   (`left = -38`) ➜ `layout-check.js` រាយវាជាធាតុលើសអេក្រង់ ហើយវាក៏
+   ជាការពិតដែរ — `overflow: hidden` លាក់ការគូរ តែមិនប្តូរធរណីមាត្រទេ។ */
+.boot-splash-bar > span {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+    border-radius: 3px;
+    background: var(--primary);
+    transform: translateX(0);
+    animation: bootSweep 1.15s ease-in-out infinite;
+    will-change: transform;
+}
+@keyframes bootRise { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+@keyframes bootSweep { 0% { transform: translateX(0); } 50% { transform: translateX(150%); } 100% { transform: translateX(0); } }
+
+body.boot-reveal .app-navbar { animation: bootFadeIn 380ms ease-out both; }
+body.boot-reveal .app-container { animation: bootFadeIn 420ms ease-out 70ms both; }
+@keyframes bootFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-splash-card, .boot-splash-bar > span { animation: none !important; }
+    .boot-splash { transition-duration: 1ms !important; }
+    body.boot-reveal .app-navbar, body.boot-reveal .app-container { animation: none !important; }
+}
+
 .nav-right-actions { display: flex; align-items: center; gap: 8px; }
 .security-btn {
     background: var(--body-bg); border: 1px solid var(--border-color);

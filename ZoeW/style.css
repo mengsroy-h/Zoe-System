@@ -105,7 +105,76 @@
         .status-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--success); animation: pulseDot 2s infinite; will-change: transform, opacity; }
         .status-dot.offline { background: #94a3b8; }
         .status-dot.offline::after { display: none; }
+        .status-dot.connecting { background: var(--warning); }
+        .status-dot.connecting::after { display: block; background: var(--warning); animation: pulseDot 1.1s infinite; }
         @keyframes pulseDot { 0% { transform: scale(1); opacity: 0.5; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+
+
+        /* ── ចលនាពេលបើក App (boot) ─────────────────────────────────────
+           សំបកដែល cache ទុកបង្ហាញភ្លាម ➜ អ្នកប្រើឃើញ UI ទទេលោតចេញមក
+           ដោយគ្មានការត្រៀម។ ផ្ទាំងនេះគ្របការលោតនោះ រួចរលាយចេញ។
+           **វា `pointer-events: none` ជានិច្ច** — វាតុបតែងសុទ្ធសាធ ដូច្នេះ
+           វាមិនអាចលេបការចុចរបស់អ្នកប្រើ ឬបំបែកតេស្ត browser បានទេ។
+           ចលនាទាំងអស់ជា `transform`/`opacity` ➜ composite សុទ្ធ។ */
+        .boot-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--body-bg);
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 320ms ease;
+        }
+        .boot-splash.boot-splash-out { opacity: 0; }
+        .boot-splash.boot-splash-gone { display: none; }
+        html.boot-instant .boot-splash { display: none; }
+        .boot-splash-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            animation: bootRise 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+            will-change: transform, opacity;
+        }
+        .boot-splash-logo {
+            width: 58px; height: 58px; border-radius: 18px;
+            background: var(--primary); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
+            box-shadow: 0 10px 22px rgba(227, 24, 55, 0.28);
+        }
+        .boot-splash-name { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+        .boot-splash-bar {
+            position: relative; width: 132px; height: 3px;
+            border-radius: 3px; background: var(--border-color); overflow: hidden;
+        }
+        /* ⛔ ការរំកិលត្រូវនៅ **ខាងក្នុងរបា** ជានិច្ច។ `translateX(-100%)` លើ
+           span ដែលពេញទទឹងរបា នាំគែមឆ្វេងទៅ **ក្រៅអេក្រង់** នៅ 320px
+           (`left = -38`) ➜ `layout-check.js` រាយវាជាធាតុលើសអេក្រង់ ហើយវាក៏
+           ជាការពិតដែរ — `overflow: hidden` លាក់ការគូរ តែមិនប្តូរធរណីមាត្រទេ។ */
+        .boot-splash-bar > span {
+            position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+            border-radius: 3px;
+            background: var(--primary);
+            transform: translateX(0);
+            animation: bootSweep 1.15s ease-in-out infinite;
+            will-change: transform;
+        }
+        @keyframes bootRise { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(0.96); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+        @keyframes bootSweep { 0% { transform: translateX(0); } 50% { transform: translateX(150%); } 100% { transform: translateX(0); } }
+
+        /* ការលេចមុខរបស់ App ខាងក្រោមផ្ទាំង — **`opacity` សុទ្ធសាធ**។
+           កុំដាក់ `transform` លើ `.app-navbar`/`.app-pages`/`.page-tabbar`
+           ព្រោះ `transform` បង្កើត containing block សម្រាប់កូន `position: fixed`
+           ហើយរបា Tab ពឹងលើ `translate3d` របស់ `setupChromeAutoHide()` រួចហើយ។
+           class `boot-reveal` ត្រូវដកចេញវិញក្រោយចលនាចប់ ➜ គ្មានអ្វីសល់។ */
+        body.boot-reveal .app-navbar { animation: bootFadeIn 380ms ease-out both; }
+        body.boot-reveal .app-pages { animation: bootFadeIn 420ms ease-out 70ms both; }
+        body.boot-reveal .page-tabbar { animation: bootFadeIn 420ms ease-out 130ms both; }
+        @keyframes bootFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .nav-right-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
         .credit-tag {
@@ -617,6 +686,9 @@
             .app-card, .modal, .modal-content { animation: none !important; }
             button, .btn-sm, .date-filter-btn { transition: none !important; }
             .status-dot::after, .scan-line, .call-btn-recall { animation: none !important; }
+            .boot-splash-card, .boot-splash-bar > span { animation: none !important; }
+            .boot-splash { transition-duration: 1ms !important; }
+            body.boot-reveal .app-navbar, body.boot-reveal .app-pages, body.boot-reveal .page-tabbar { animation: none !important; }
         }
 
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px; }

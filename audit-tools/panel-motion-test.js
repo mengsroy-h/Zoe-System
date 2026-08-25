@@ -148,7 +148,8 @@ function seedBig(n) {
             // ២ — ម៉ឺនុយ (...) នៅតែមានការកែ/ដក
             const firstId = document.querySelector('#historyTableBody tr') ? document.querySelector('#historyTableBody tr').dataset.id : null;
             if (firstId) {
-                window.toggleMoreDropdown({ stopPropagation() {}, currentTarget: document.querySelector('#historyTableBody .more-btn') || document.body }, firstId);
+                window.toggleMoreDropdown(document.querySelector('#historyTableBody .more-btn') || document.body,
+                    { stopPropagation() {} }, firstId);
                 out.menuHasEdit = document.getElementById('menuContentContainer').textContent.indexOf('កែ/ដកកញ្ចប់អីវ៉ាន់') !== -1;
                 document.getElementById('globalMoreMenu').classList.remove('show');
             }

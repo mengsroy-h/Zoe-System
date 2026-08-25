@@ -1,4 +1,150 @@
-    const APP_VERSION = '2.12.1';
+    const APP_VERSION = '2.13.0';
+
+    const ACTION_ALLOWLIST = [
+        "cancelLocationChange",
+        "cancelPermanentDelete",
+        "cancelPinEntryFlow",
+        "cancelPinSetupFlow",
+        "cancelRestoreItem",
+        "closeCameraManually",
+        "closeConfigQrScanner",
+        "closeEditBarcodeModal",
+        "closeModal",
+        "closeSideDrawer",
+        "confirmLocationChange",
+        "confirmPhone",
+        "debouncedSearchByPhone",
+        "decodeImageFile",
+        "dismissPhoneModal",
+        "drawerBiometricFlow",
+        "drawerConfigFlow",
+        "drawerCustomerTableFlow",
+        "drawerLockerSettingsFlow",
+        "drawerLoginFlow",
+        "drawerLookupApiFlow",
+        "executePermanentDelete",
+        "executeRestoreItem",
+        "exportDataAsCsvForSheets",
+        "exportDataAsExcel",
+        "exportDataAsPDF",
+        "fetchCustomerDataTableRows",
+        "filterCustomerDataTable",
+        "filterDataByCustomDate",
+        "filterDataByDate",
+        "handleCallAction",
+        "logoutApp",
+        "moreMenuClearHistory",
+        "moreMenuDelete",
+        "moreMenuEditPhone",
+        "moreMenuExchangeRate",
+        "moreMenuExport",
+        "moreMenuManualAdjust",
+        "moreMenuViewList",
+        "openCallMarkModal",
+        "openConfigQrScanner",
+        "openDailyStatsModal",
+        "openEditBarcodePriceModal",
+        "openEditModal",
+        "openLockerPicker",
+        "openMonthlyStatsModal",
+        "openRecentlyDeletedModal",
+        "openSideDrawer",
+        "openViewListModal",
+        "promptPermanentDelete",
+        "promptRestoreDeletedItem",
+        "removeSingleBarcode",
+        "renderEntryList",
+        "renderLockerList",
+        "requestCameraPermission",
+        "runBiometricUnlock",
+        "saveEditedBarcodePrice",
+        "saveEditedPhone",
+        "saveExchangeRate",
+        "saveFirebaseConfig",
+        "saveLockerSettings",
+        "saveLookupApiConfig",
+        "saveNewSecurityPin",
+        "searchByPhone",
+        "selectCustomLocker",
+        "setCallMark",
+        "setEntryScanMode",
+        "submitActivationKey",
+        "submitLoginForm",
+        "submitManualAdjustment",
+        "submitManualBarcode",
+        "switchAppPage",
+        "testLookupApiConfig",
+        "toggleCloseStatus",
+        "toggleHeaderMoreDropdown",
+        "toggleIndividualBarcodeClose",
+        "toggleMoreDropdown",
+        "toggleTorch",
+        "verifySecurityPin"
+    ];
+    function readActionArgs(el, event) {
+        const raw = el.getAttribute('data-args');
+        let args = [];
+        if (raw) {
+            try { args = JSON.parse(raw); } catch (e) { args = []; }
+            if (!Array.isArray(args)) args = [args];
+        } else {
+            const a1 = el.getAttribute('data-a1');
+            const a2 = el.getAttribute('data-a2');
+            if (a1 !== null) args.push(a1);
+            if (a2 !== null) args.push(a2);
+        }
+        if (el.getAttribute('data-evt')) args.unshift(event);
+        if (el.getAttribute('data-self')) args.unshift(el);
+        return args;
+    }
+
+    function runElementAction(el, event) {
+        const name = el.getAttribute('data-act');
+        if (!name || ACTION_ALLOWLIST.indexOf(name) === -1) return;
+        const fn = window[name];
+        if (typeof fn !== 'function') return;
+        fn.apply(null, readActionArgs(el, event));
+    }
+
+    function setupActionDelegation() {
+        ['click', 'change', 'input', 'submit'].forEach((type) => {
+            document.addEventListener(type, (event) => {
+                const el = event.target && event.target.closest ? event.target.closest('[data-act]') : null;
+                if (!el) return;
+                const want = el.getAttribute('data-on') || 'click';
+                if (want !== type) return;
+                runElementAction(el, event);
+            });
+        });
+    }
+    function submitLoginForm(event) {
+        if (event) event.preventDefault();
+        loginWithFirebase();
+    }
+
+    function drawerConfigFlow() {
+        drawerAction(function () { requestPinBeforeConfig(null, 'config'); });
+    }
+
+    function drawerLockerSettingsFlow() {
+        drawerAction(function () { requestPinBeforeConfig(openLockerSettingsModal, 'locker'); });
+    }
+
+    function drawerLookupApiFlow() {
+        drawerAction(function () { requestPinBeforeConfig(openLookupApiConfigModal, 'lookupApi'); });
+    }
+
+    function drawerCustomerTableFlow() {
+        drawerAction(openCustomerDataTableModal);
+    }
+
+    function drawerLoginFlow() {
+        drawerAction(showLoginModalWithPrefill);
+    }
+
+    function drawerBiometricFlow() {
+        drawerAction(toggleBiometricUnlock);
+    }
 
     function renderAppVersionLabels() {
         document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -12,22 +158,7 @@
         window.visualViewport.addEventListener('resize', () => { window.scrollTo(0, 0); });
     }
 
-    const activationSubmitBtnEl = document.getElementById('activationSubmitBtn');
-    if (activationSubmitBtnEl) activationSubmitBtnEl.addEventListener('click', submitActivationKey);
-
-    const bindClickBackup = (id, handler) => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('click', handler);
-    };
-    bindClickBackup('activationLogoutBtn', logoutApp);
-    bindClickBackup('pinConfirmBtn', verifySecurityPin);
-    bindClickBackup('pinSetupSaveBtn', saveNewSecurityPin);
-    bindClickBackup('configSaveBtn', saveFirebaseConfig);
-    bindClickBackup('editPhoneSaveBtn', saveEditedPhone);
-    bindClickBackup('restoreConfirmBtn', executeRestoreItem);
-    bindClickBackup('permanentDeleteConfirmBtn', executePermanentDelete);
-    bindClickBackup('phoneModalCancelBtn', () => closeModal('phoneModal'));
-    bindClickBackup('phoneModalCloseX', dismissPhoneModal);
+    setupActionDelegation();
 
     function showUpdateAvailableBanner() {
         if (document.getElementById('zoeUpdateBanner')) return;
@@ -94,6 +225,8 @@
     let authRecoveryTimeout = null;
     let authGeneration = 0;
     let isDatabaseConnected = false;
+    let hasEverConnectedToDatabase = false;
+    let networkJustReturned = false;
 
     let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
 
@@ -398,13 +531,20 @@
         reconnectWatchdogAttempt = 0;
     }
 
+    function canCycleDatabaseConnection() {
+        return hasEverConnectedToDatabase || networkJustReturned;
+    }
+
     function forceDatabaseReconnect() {
         if (!fb || !db || typeof fb.goOnline !== 'function') return false;
         const now = Date.now();
         if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
         lastForcedReconnectAt = now;
         try {
-            if (typeof fb.goOffline === 'function') fb.goOffline(db);
+            if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {
+                networkJustReturned = false;
+                fb.goOffline(db);
+            }
         } catch (e) {}
         try { fb.goOnline(db); } catch (e) { return false; }
         return true;
@@ -433,6 +573,7 @@
 
     function setupConnectionRecovery() {
         window.addEventListener('online', () => {
+            networkJustReturned = true;
             renderConnectionStatus();
             nudgeDatabaseConnection();
             retryFailedDbListenersNow();
@@ -479,6 +620,8 @@
                 if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
                 isDatabaseInitialized = false;
                 isDatabaseConnected = false;
+                hasEverConnectedToDatabase = false;
+                networkJustReturned = false;
                 resetDbListenerHealthState();
                 renderConnectionStatus();
                 scanHistory = [];
@@ -511,6 +654,7 @@
             fb.onValue(dbRefConnected, (snap) => {
                 isDatabaseConnected = snap.val() === true;
                 if (isDatabaseConnected) {
+                    hasEverConnectedToDatabase = true;
                     clearReconnectWatchdog();
                     retryFailedDbListenersNow();
                 } else if (navigator.onLine !== false) {
@@ -2671,21 +2815,6 @@
             .replace(/'/g, '&#039;');
     }
 
-    function escapeForInlineJsAttr(str) {
-        if (str === undefined || str === null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'")
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\r/g, '\\r')
-            .replace(/\n/g, '\\n')
-            .replace(/\u2028/g, '\\u2028')
-            .replace(/\u2029/g, '\\u2029');
-    }
-
     function showToast(msg) {
         const container = document.getElementById('toastContainer');
         if (!container) return;
@@ -4129,28 +4258,45 @@
         indicator.classList.remove('snapping');
     }
 
-    function toggleHeaderMoreDropdown(event) {
-        event.stopPropagation();
-        const btn = event.currentTarget;
+    function closeGlobalMoreMenu() {
+        const menu = document.getElementById('globalMoreMenu');
+        if (menu) menu.classList.remove('show');
+    }
+
+    function moreMenuExport() { openExportDataModal(); closeGlobalMoreMenu(); }
+
+    function moreMenuManualAdjust() { requestPinBeforeConfig(openManualAdjustModal, 'manualAdjust'); closeGlobalMoreMenu(); }
+
+    function moreMenuExchangeRate() { openExchangeRateModal(); closeGlobalMoreMenu(); }
+
+    function moreMenuClearHistory() { requestPinBeforeClearHistory(); closeGlobalMoreMenu(); }
+
+    function moreMenuViewList(id) { openViewListModal(id); closeGlobalMoreMenu(); }
+
+    function moreMenuEditPhone(id) { openEditModal(id); closeGlobalMoreMenu(); }
+
+    function moreMenuDelete(id) { deleteSingleItem(id); closeGlobalMoreMenu(); }
+
+    function toggleHeaderMoreDropdown(btn, event) {
+        if (event) event.stopPropagation();
         const rect = btn.getBoundingClientRect();
         const menu = document.getElementById('globalMoreMenu');
         const container = document.getElementById('menuContentContainer');
         if(!menu || !container) return;
 
         container.innerHTML = `
-            <button onclick="openExportDataModal(); document.getElementById('globalMoreMenu').classList.remove('show');">📤 Export Data</button>
-            <button onclick="requestPinBeforeConfig(openManualAdjustModal, 'manualAdjust'); document.getElementById('globalMoreMenu').classList.remove('show');">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
-            <button onclick="openExchangeRateModal(); document.getElementById('globalMoreMenu').classList.remove('show');">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
-            <button class="delete-opt" onclick="requestPinBeforeClearHistory(); document.getElementById('globalMoreMenu').classList.remove('show');">❌ លុបទាំងអស់</button>
+            <button data-act="moreMenuExport">📤 Export Data</button>
+            <button data-act="moreMenuManualAdjust">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
+            <button data-act="moreMenuExchangeRate">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
+            <button class="delete-opt" data-act="moreMenuClearHistory">❌ លុបទាំងអស់</button>
         `;
 
         menu.classList.add('show');
         positionMenuSafely(menu, rect);
     }
 
-    function toggleMoreDropdown(event, id) {
-        event.stopPropagation();
-        const btn = event.currentTarget;
+    function toggleMoreDropdown(btn, event, id) {
+        if (event) event.stopPropagation();
         const rect = btn.getBoundingClientRect();
         const menu = document.getElementById('globalMoreMenu');
         const container = document.getElementById('menuContentContainer');
@@ -4159,13 +4305,13 @@
         const item = scanHistory.find(i => i.id === id);
         let editMoneyHtml = '';
         if (item && item.barcodes && item.barcodes.length > 0) {
-            editMoneyHtml = `<button onclick="openViewListModal('${escapeForInlineJsAttr(id)}'); document.getElementById('globalMoreMenu').classList.remove('show');">💵 កែ/ដកកញ្ចប់អីវ៉ាន់</button>`;
+            editMoneyHtml = `<button data-act="moreMenuViewList" data-a1="${sanitizeInput(id)}">💵 កែ/ដកកញ្ចប់អីវ៉ាន់</button>`;
         }
 
         container.innerHTML = `
             ${editMoneyHtml}
-            <button onclick="openEditModal('${escapeForInlineJsAttr(id)}'); document.getElementById('globalMoreMenu').classList.remove('show');">✏️ កែលេខទូរស័ព្ទ</button>
-            <button class="delete-opt" onclick="deleteSingleItem('${escapeForInlineJsAttr(id)}'); document.getElementById('globalMoreMenu').classList.remove('show');">🗑️ លុប</button>
+            <button data-act="moreMenuEditPhone" data-a1="${sanitizeInput(id)}">✏️ កែលេខទូរស័ព្ទ</button>
+            <button class="delete-opt" data-act="moreMenuDelete" data-a1="${sanitizeInput(id)}">🗑️ លុប</button>
         `;
 
         menu.classList.add('show');
@@ -6315,9 +6461,9 @@
                     </div>
                 </div>
                 <div class="barcode-actions-group">
-                    <button class="${closeBtnClass}" onclick="toggleIndividualBarcodeClose('${escapeForInlineJsAttr(item.id)}', '${escapeForInlineJsAttr(b.code)}')">${closeBtnText}</button>
-                    <button class="btn-edit-item-price" onclick="openEditBarcodePriceModal('${escapeForInlineJsAttr(item.id)}', '${escapeForInlineJsAttr(b.code)}')">✏️ កែ</button>
-                    <button class="btn-delete-bc" onclick="removeSingleBarcode('${escapeForInlineJsAttr(item.id)}', '${escapeForInlineJsAttr(b.code)}')">🗑️ ដក</button>
+                    <button class="${closeBtnClass}" data-act="toggleIndividualBarcodeClose" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">${closeBtnText}</button>
+                    <button class="btn-edit-item-price" data-act="openEditBarcodePriceModal" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">✏️ កែ</button>
+                    <button class="btn-delete-bc" data-act="removeSingleBarcode" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">🗑️ ដក</button>
                 </div>
             `;
             container.appendChild(div);
@@ -7177,8 +7323,8 @@
                 <td><span class="barcode-tag">${sanitizeInput(displayCode)}</span></td>
                 <td style="text-align: center;">
                     <div style="display:flex; gap:4px; justify-content:center;">
-                        <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" onclick="promptRestoreDeletedItem('${escapeForInlineJsAttr(item.id)}')">🔄</button>
-                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" onclick="promptPermanentDelete('${escapeForInlineJsAttr(item.id)}')">✖️</button>
+                        <button class="btn-sm" style="background:#10b981; color:white; padding:4px 8px; min-height:26px;" data-act="promptRestoreDeletedItem" data-a1="${sanitizeInput(item.id)}">🔄</button>
+                        <button class="btn-sm" style="background:#ef4444; color:white; padding:4px 8px; min-height:26px;" data-act="promptPermanentDelete" data-a1="${sanitizeInput(item.id)}">✖️</button>
                     </div>
                 </td>
             </tr>`;
@@ -7742,7 +7888,7 @@
     }
 
     function buildHistoryRowHtml(item, rowNum, isOld, needsRecall) {
-            let phoneDisplay = item.phone === "គ្មានលេខ" ? `<span style="color:#ef4444; font-style:italic;">គ្មានលេខ</span>` : `<span class="phone-clickable" onclick="openCallMarkModal('${escapeForInlineJsAttr(item.id)}')" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`;
+            let phoneDisplay = item.phone === "គ្មានលេខ" ? `<span style="color:#ef4444; font-style:italic;">គ្មានលេខ</span>` : `<span class="phone-clickable" data-act="openCallMarkModal" data-a1="${sanitizeInput(item.id)}" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`;
 
             let rowNumClass = '';
             let rowNumLabel = '';
@@ -7769,21 +7915,21 @@
             let callAction = '';
             if (item.phone !== "គ្មានលេខ") {
                 if (item.callMark === 'wrong-number') {
-                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" onclick="openEditModal('${escapeForInlineJsAttr(item.id)}')" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
+                    callAction = `<button class="btn-sm fix-phone-btn btn-primary-action" data-act="openEditModal" data-a1="${sanitizeInput(item.id)}" title="លេខខុស — សូមកែលេខថ្មី">✏️ កែលេខ</button>`;
                 } else if (item.isCalled && !needsRecall) {
-                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
+                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" data-act="handleCallAction" data-a1="${sanitizeInput(item.id)}" class="btn-sm called-btn btn-primary-action">✔️ ខល</a>`;
                 } else {
                     let recallClass = needsRecall ? ' call-btn-recall' : '';
-                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" onclick="handleCallAction('${escapeForInlineJsAttr(item.id)}')" class="btn-sm call-btn btn-primary-action${recallClass}" title="${needsRecall ? 'សូមខលម្ដងទៀត' : ''}">📞 ខល</a>`;
+                    callAction = `<a href="tel:${sanitizeInput(item.phone)}" data-act="handleCallAction" data-a1="${sanitizeInput(item.id)}" class="btn-sm call-btn btn-primary-action${recallClass}" title="${needsRecall ? 'សូមខលម្ដងទៀត' : ''}">📞 ខល</a>`;
                 }
             }
 
             let closeBtnText = item.isClosed ? "❌ បើក" : "✅ បិទ";
-            let closeAction = `<button class="btn-sm close-btn btn-primary-action" onclick="toggleCloseStatus('${escapeForInlineJsAttr(item.id)}')">${closeBtnText}</button>`;
+            let closeAction = `<button class="btn-sm close-btn btn-primary-action" data-act="toggleCloseStatus" data-a1="${sanitizeInput(item.id)}">${closeBtnText}</button>`;
 
             let moreDropdown = `
                 <div class="more-dropdown">
-                    <button class="more-btn" onclick="toggleMoreDropdown(event, '${escapeForInlineJsAttr(item.id)}')">⋮</button>
+                    <button class="more-btn" data-act="toggleMoreDropdown" data-self="1" data-evt="1" data-a1="${sanitizeInput(item.id)}">⋮</button>
                 </div>
             `;
 
@@ -7796,7 +7942,7 @@
             let scanTimeDisplay = item.time ? `<span class="scan-time-tag">🕒 ${sanitizeInput(item.time)}</span>` : "";
 
             let totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
-            let viewListBtn = `<button class="btn-view-list" onclick="openViewListModal('${escapeForInlineJsAttr(item.id)}')">📦 បញ្ជី (${totalPackageCount})</button>`;
+            let viewListBtn = `<button class="btn-view-list" data-act="openViewListModal" data-a1="${sanitizeInput(item.id)}">📦 បញ្ជី (${totalPackageCount})</button>`;
 
             let activeCod = 0;
             let activeDod = 0;

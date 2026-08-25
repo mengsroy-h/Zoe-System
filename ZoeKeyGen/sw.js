@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v58';
+const CACHE_VERSION = 'zoekeygen-v59';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច (ឧ. `qrcode.js` បាត់ ➜ QR របស់
@@ -8,6 +8,7 @@ const CORE_SHELL = [
     './index.html',
     './style.css',
     './app.js',
+    './boot-flags.js',
     './firebase-loader.js',
     './license-verify.js',
     './error-reporting.js',

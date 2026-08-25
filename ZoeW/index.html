@@ -2,15 +2,7 @@
 <html lang="km">
 <head>
     <meta charset="UTF-8">
-    <script>
-        try {
-            const isIOSStandalone = window.navigator.standalone === true;
-            if (isIOSStandalone) document.documentElement.classList.add('ios-standalone');
-            if (isIOSStandalone && sessionStorage.getItem('zoew_ptr_reload_pending') === '1' && 'scrollRestoration' in history) {
-                history.scrollRestoration = 'manual';
-            }
-        } catch (e) {}
-    </script>
+    <script src="./boot-flags.js"></script>
     <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ZoeW - ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់</title>
@@ -51,7 +43,7 @@
 <datalist id="recentPhonesList"></datalist>
 
 <header class="app-navbar">
-    <button type="button" class="nav-menu-btn" id="navMenuBtn" onclick="openSideDrawer()" title="ម៉ឺនុយ" aria-label="ម៉ឺនុយ">☰</button>
+    <button type="button" class="nav-menu-btn" id="navMenuBtn" data-act="openSideDrawer" title="ម៉ឺនុយ" aria-label="ម៉ឺនុយ">☰</button>
     <div class="app-brand">
         <div class="brand-logo">Zoe</div>
         <div class="brand-info">
@@ -119,15 +111,15 @@
                 </div>
 
                 <div class="date-filter-grid">
-                    <button class="date-filter-btn active" id="btnFilterToday" onclick="filterDataByDate('today')">ថ្ងៃនេះ</button>
-                    <button class="date-filter-btn" id="btnFilterYesterday" onclick="filterDataByDate('yesterday')">ម្សិលមិញ</button>
-                    <button class="date-filter-btn" id="btnFilterDayBefore" onclick="filterDataByDate('dayBefore')">ម្សិលម្ងៃ</button>
-                    <button class="date-filter-btn" id="btnFilterAll" onclick="filterDataByDate('all')">ទាំងអស់</button>
+                    <button class="date-filter-btn active" id="btnFilterToday" data-act="filterDataByDate" data-args='["today"]'>ថ្ងៃនេះ</button>
+                    <button class="date-filter-btn" id="btnFilterYesterday" data-act="filterDataByDate" data-args='["yesterday"]'>ម្សិលមិញ</button>
+                    <button class="date-filter-btn" id="btnFilterDayBefore" data-act="filterDataByDate" data-args='["dayBefore"]'>ម្សិលម្ងៃ</button>
+                    <button class="date-filter-btn" id="btnFilterAll" data-act="filterDataByDate" data-args='["all"]'>ទាំងអស់</button>
                 </div>
 
                 <div class="custom-date-row">
                     <label for="customDateInput">📅 រើសថ្ងៃផ្សេងទៀត៖</label>
-                    <input type="date" id="customDateInput" onchange="filterDataByCustomDate()">
+                    <input type="date" id="customDateInput" data-act="filterDataByCustomDate" data-on="change">
                 </div>
             </div>
 
@@ -137,8 +129,8 @@
                 </div>
                 <div class="search-and-actions">
                     <div class="search-box">
-                        <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." oninput="debouncedSearchByPhone()" autocomplete="off">
-                        <button onclick="searchByPhone()">🔍</button>
+                        <input type="tel" id="searchPhoneInput" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." data-act="debouncedSearchByPhone" data-on="input" autocomplete="off">
+                        <button data-act="searchByPhone">🔍</button>
                     </div>
                 </div>
             </div>
@@ -152,10 +144,10 @@
                         📋 ប្រវត្តិ (<span id="count">0</span> នាក់)
                     </div>
                     <div class="header-actions">
-                        <button class="daily-stats-btn" onclick="openDailyStatsModal()">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
-                        <button class="monthly-stats-btn" onclick="openMonthlyStatsModal()">📊 ស្ថិតិចំណូល</button>
-                        <button class="recently-deleted-btn" onclick="openRecentlyDeletedModal()">🗑️ ធុងសំរាម</button>
-                        <button class="header-more-btn" onclick="toggleHeaderMoreDropdown(event)">...</button>
+                        <button class="daily-stats-btn" data-act="openDailyStatsModal">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
+                        <button class="monthly-stats-btn" data-act="openMonthlyStatsModal">📊 ស្ថិតិចំណូល</button>
+                        <button class="recently-deleted-btn" data-act="openRecentlyDeletedModal">🗑️ ធុងសំរាម</button>
+                        <button class="header-more-btn" data-act="toggleHeaderMoreDropdown" data-self="1" data-evt="1">...</button>
                     </div>
                 </div>
 
@@ -185,26 +177,26 @@
     <section class="app-page" id="pageEntry">
         <div class="page-side" id="entrySideSection">
             <div class="scan-mode-row">
-                <button type="button" class="mode-btn active" id="modeParcelBtn" onclick="setEntryScanMode('parcel')">📦 បញ្ចូលកញ្ចប់</button>
-                <button type="button" class="mode-btn" id="modeLockerBtn" onclick="setEntryScanMode('locker')">📍 កំណត់ទីតាំង Locker</button>
+                <button type="button" class="mode-btn active" id="modeParcelBtn" data-act="setEntryScanMode" data-args='["parcel"]'>📦 បញ្ចូលកញ្ចប់</button>
+                <button type="button" class="mode-btn" id="modeLockerBtn" data-act="setEntryScanMode" data-args='["locker"]'>📍 កំណត់ទីតាំង Locker</button>
             </div>
 
             <div class="app-card scanner-section">
                 <div id="permission-box">
                     <p>🔒 កម្មវិធីទាមទារការអនុញ្ញាតប្រើប្រាស់កាមេរ៉ា</p>
-                    <button onclick="requestCameraPermission()">🔓 បើកកាមេរ៉ា</button>
+                    <button data-act="requestCameraPermission">🔓 បើកកាមេរ៉ា</button>
                 </div>
 
                 <div id="video-container">
                     <div class="scan-line"></div>
                     <video id="video" playsinline autoplay muted></video>
-                    <button type="button" class="camera-close-btn" id="cameraCloseBtn" onclick="closeCameraManually()" title="បិទកាមេរ៉ា">✖</button>
+                    <button type="button" class="camera-close-btn" id="cameraCloseBtn" data-act="closeCameraManually" title="បិទកាមេរ៉ា">✖</button>
                     <div class="video-controls-overlay" id="videoControlsOverlay">
                         <div class="zoom-slider-wrap" id="zoomSliderWrap">
                             <span>🔍</span>
                             <input type="range" id="zoomSlider" min="1" max="1" step="0.1" value="1">
                         </div>
-                        <button type="button" class="torch-toggle-btn" id="torchToggleBtn" onclick="toggleTorch()">💡</button>
+                        <button type="button" class="torch-toggle-btn" id="torchToggleBtn" data-act="toggleTorch">💡</button>
                     </div>
                 </div>
             </div>
@@ -214,11 +206,11 @@
                 <div class="scanner-input-wrapper">
                     <span class="icon">⚡</span>
                     <input type="text" id="hwScannerInput" placeholder="ស្កេន Barcode..." autocomplete="off">
-                    <button type="button" class="btn-submit-barcode" onclick="submitManualBarcode()">បញ្ជូន</button>
+                    <button type="button" class="btn-submit-barcode" data-act="submitManualBarcode">បញ្ជូន</button>
                 </div>
                 <div class="upload-fallback-row">
                     <label class="file-upload-btn" for="fileInput">📁 យក Barcode ពីរូបភាព</label>
-                    <input type="file" id="fileInput" accept="image/*" onchange="decodeImageFile(event)">
+                    <input type="file" id="fileInput" accept="image/*" data-act="decodeImageFile" data-evt="1" data-on="change">
                 </div>
             </div>
 
@@ -231,7 +223,7 @@
                         <div class="card-title">📦 កញ្ចប់ដែលបានបញ្ចូលថ្ងៃនេះ (<span id="entryListCount">0</span>)</div>
                     </div>
                     <div class="filter-bar">
-                        <input type="text" id="entryListSearchInput" oninput="renderEntryList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
+                        <input type="text" id="entryListSearchInput" data-act="renderEntryList" data-on="input" placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..." autocomplete="off">
                     </div>
                     <div class="table-responsive" id="entryTableResponsive">
                         <table>
@@ -256,7 +248,7 @@
             <div id="lockerPanel" class="hidden">
                 <div class="active-locker-bar">
                     <span>ទីតាំងបច្ចុប្បន្ន: <span class="loc-val" id="activeLockerLabel">-</span></span>
-                    <button type="button" onclick="openLockerPicker()">🔁 ប្តូរទូ</button>
+                    <button type="button" data-act="openLockerPicker">🔁 ប្តូរទូ</button>
                 </div>
 
                 <div class="app-card panel-section">
@@ -264,8 +256,8 @@
                         <div class="card-title">📍 បញ្ជីទីតាំង Locker</div>
                     </div>
                     <div class="filter-bar">
-                        <input type="text" id="lockerListSearchInput" oninput="renderLockerList()" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." autocomplete="off">
-                        <select id="lockerListFilter" onchange="renderLockerList()">
+                        <input type="text" id="lockerListSearchInput" data-act="renderLockerList" data-on="input" placeholder="ស្វែងរកលេខទូរស័ព្ទ..." autocomplete="off">
+                        <select id="lockerListFilter" data-act="renderLockerList" data-on="change">
                             <option value="">ទីតាំងទាំងអស់</option>
                         </select>
                     </div>
@@ -293,37 +285,37 @@
 </div>
 
 <nav class="page-tabbar" id="pageTabBar">
-    <button type="button" class="page-tab active" id="pageTabData" onclick="switchAppPage('data')">
+    <button type="button" class="page-tab active" id="pageTabData" data-act="switchAppPage" data-args='["data"]'>
         <span class="tab-ico">📋</span><span>ទិន្នន័យ</span>
     </button>
-    <button type="button" class="page-tab" id="pageTabEntry" onclick="switchAppPage('entry')">
+    <button type="button" class="page-tab" id="pageTabEntry" data-act="switchAppPage" data-args='["entry"]'>
         <span class="tab-ico">📷</span><span>បញ្ចូលទិន្នន័យ</span>
     </button>
 </nav>
 
-<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeSideDrawer()"></div>
+<div class="drawer-backdrop" id="drawerBackdrop" data-act="closeSideDrawer"></div>
 <aside class="side-drawer" id="sideDrawer" aria-hidden="true">
     <div class="drawer-head">
         <div class="drawer-title">⚙️ ការកំណត់</div>
-        <button type="button" class="drawer-close" onclick="closeSideDrawer()" title="បិទ" aria-label="បិទ">✖</button>
+        <button type="button" class="drawer-close" data-act="closeSideDrawer" title="បិទ" aria-label="បិទ">✖</button>
     </div>
     <div class="drawer-body">
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(null, 'config'); })">
+        <button type="button" class="drawer-item" data-act="drawerConfigFlow">
             <span class="ico">⚙️</span><span>Config / Reconfig</span>
         </button>
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLookupApiConfigModal, 'lookupApi'); })">
+        <button type="button" class="drawer-item" data-act="drawerLookupApiFlow">
             <span class="ico">🔌</span><span>API ស្វែងរកអតិថិជន</span>
         </button>
-        <button type="button" class="drawer-item" onclick="drawerAction(openCustomerDataTableModal)">
+        <button type="button" class="drawer-item" data-act="drawerCustomerTableFlow">
             <span class="ico">📊</span><span>តារាងអតិថិជន</span>
         </button>
-        <button type="button" class="drawer-item" onclick="drawerAction(function(){ requestPinBeforeConfig(openLockerSettingsModal, 'locker'); })">
+        <button type="button" class="drawer-item" data-act="drawerLockerSettingsFlow">
             <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
         </button>
-        <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" onclick="drawerAction(toggleBiometricUnlock)">
+        <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" data-act="drawerBiometricFlow">
             <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>
         </button>
-        <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" onclick="drawerAction(showLoginModalWithPrefill)">
+        <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" data-act="drawerLoginFlow">
             <span class="ico">🔑</span><span class="drawer-auth-label">ចូល</span>
         </button>
     </div>
@@ -337,11 +329,11 @@
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p id="pinModalDesc">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
-        <button type="button" class="btn-biometric" id="pinBiometricBtn" style="display:none;" onclick="runBiometricUnlock()">👆 ស្កេនក្រយៅដៃ ឬមុខ</button>
+        <button type="button" class="btn-biometric" id="pinBiometricBtn" style="display:none;" data-act="runBiometricUnlock">👆 ស្កេនក្រយៅដៃ ឬមុខ</button>
         <div class="modal-btns">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="pinConfirmBtn" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
-                <button class="btn-cancel" onclick="cancelPinEntryFlow()">បោះបង់</button>
+                <button class="btn-confirm" id="pinConfirmBtn" data-act="verifySecurityPin">ផ្ទៀងផ្ទាត់</button>
+                <button class="btn-cancel" data-act="cancelPinEntryFlow">បោះបង់</button>
             </div>
         </div>
     </div>
@@ -353,8 +345,8 @@
         <p id="pinSetupModalDesc">សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="cancelPinSetupFlow()">បោះបង់</button>
-            <button class="btn-confirm" id="pinSetupSaveBtn" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
+            <button class="btn-cancel" data-act="cancelPinSetupFlow">បោះបង់</button>
+            <button class="btn-confirm" id="pinSetupSaveBtn" data-act="saveNewSecurityPin">រក្សាទុក PIN</button>
         </div>
     </div>
 </div>
@@ -364,7 +356,7 @@
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>បិទភ្ជាប់អ្វីដែល copy ពី <b>Firebase Console ➜ Project settings ➜ Your apps</b> ទាំងស្រុងបានតែម្តង — រួមទាំង <code>import</code>, comment និង <code>const firebaseConfig = …</code>។</p>
         <div class="modal-btns" style="margin-bottom:10px;">
-            <button type="button" class="btn-skip" onclick="openConfigQrScanner()">📷 ស្កេន QR (Setup Link)</button>
+            <button type="button" class="btn-skip" data-act="openConfigQrScanner">📷 ស្កេន QR (Setup Link)</button>
         </div>
         <textarea id="firebaseConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
 
@@ -377,8 +369,8 @@ const firebaseConfig = {
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
-            <button class="btn-confirm" id="configSaveBtn" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
-            <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+            <button class="btn-confirm" id="configSaveBtn" data-act="saveFirebaseConfig">រក្សាទុក និងភ្ជាប់</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["configModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -389,7 +381,7 @@ const firebaseConfig = {
         <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
         <video id="configQrVideo" style="width:100%; border-radius:8px; background:#000;" playsinline muted autoplay></video>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeConfigQrScanner()">បោះបង់</button>
+            <button class="btn-cancel" data-act="closeConfigQrScanner">បោះបង់</button>
         </div>
     </div>
 </div>
@@ -431,10 +423,10 @@ const firebaseConfig = {
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-skip" onclick="testLookupApiConfig(this)">🧪 សាកល្បង</button>
-                <button class="btn-confirm" onclick="saveLookupApiConfig()">រក្សាទុក</button>
+                <button class="btn-skip" data-act="testLookupApiConfig" data-self="1">🧪 សាកល្បង</button>
+                <button class="btn-confirm" data-act="saveLookupApiConfig">រក្សាទុក</button>
             </div>
-            <button class="btn-cancel" onclick="closeModal('lookupApiConfigModal')">បោះបង់</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["lookupApiConfigModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -445,8 +437,8 @@ const firebaseConfig = {
         <p>បញ្ចូលអត្រាប្តូរប្រាក់រៀលសម្រាប់ 1 ដុល្លារ (USD)</p>
         <input type="number" id="exchangeRateInput" placeholder="ឧ. 4100" min="1" step="1">
         <div class="modal-btns">
-            <button class="btn-confirm" onclick="saveExchangeRate()">រក្សាទុកអត្រាប្រាក់</button>
-            <button class="btn-cancel" onclick="closeModal('exchangeRateModal')">បោះបង់</button>
+            <button class="btn-confirm" data-act="saveExchangeRate">រក្សាទុកអត្រាប្រាក់</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["exchangeRateModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -455,7 +447,7 @@ const firebaseConfig = {
     <div class="modal-content">
         <h3>🔐 ចូលប្រើប្រាស់ប្រព័ន្ធ</h3>
         <p>សូមបញ្ចូល អ៊ីមែល/User ID និង ពាក្យសម្ងាត់</p>
-        <form onsubmit="event.preventDefault(); loginWithFirebase();">
+        <form data-act="submitLoginForm" data-evt="1" data-on="submit">
             <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល ឬ User ID" required autocomplete="username">
             <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
             
@@ -491,8 +483,8 @@ const firebaseConfig = {
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="manualAdjustSubmitBtn" onclick="submitManualAdjustment()">បញ្ជាក់ការកែប្រែ</button>
-                <button class="btn-cancel" onclick="closeModal('manualAdjustModal')">បោះបង់</button>
+                <button class="btn-confirm" id="manualAdjustSubmitBtn" data-act="submitManualAdjustment">បញ្ជាក់ការកែប្រែ</button>
+                <button class="btn-cancel" data-act="closeModal" data-args='["manualAdjustModal"]'>បោះបង់</button>
             </div>
         </div>
     </div>
@@ -500,7 +492,7 @@ const firebaseConfig = {
 
 <div id="phoneModal" class="modal" data-nodismiss="true">
     <div class="modal-content">
-        <button type="button" class="modal-close-x" id="phoneModalCloseX" onclick="dismissPhoneModal()" title="បិទ" aria-label="បិទ">✖</button>
+        <button type="button" class="modal-close-x" id="phoneModalCloseX" data-act="dismissPhoneModal" title="បិទ" aria-label="បិទ">✖</button>
         <h3>🎉 ស្កេនបានជោគជ័យ!</h3>
         <p>Barcode: <strong id="modalBarcodeText"></strong></p>
         <input type="tel" id="modalPhoneInput" placeholder="លេខទូរស័ព្ទអតិថិជន" list="recentPhonesList">
@@ -509,10 +501,10 @@ const firebaseConfig = {
         <input type="number" id="modalDodInput" placeholder="តម្លៃ DOD ($)" step="0.01" min="0" style="margin-top: 4px;">
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-skip" id="phoneModalSkipBtn" onclick="confirmPhone(true)">រំលង</button>
-                <button class="btn-confirm" id="phoneModalConfirmBtn" onclick="confirmPhone(false)">យល់ព្រម</button>
+                <button class="btn-skip" id="phoneModalSkipBtn" data-act="confirmPhone" data-args='[true]'>រំលង</button>
+                <button class="btn-confirm" id="phoneModalConfirmBtn" data-act="confirmPhone" data-args='[false]'>យល់ព្រម</button>
             </div>
-            <button class="btn-cancel" id="phoneModalCancelBtn" onclick="closeModal('phoneModal')">បោះបង់</button>
+            <button class="btn-cancel" id="phoneModalCancelBtn" data-act="closeModal" data-args='["phoneModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -524,8 +516,8 @@ const firebaseConfig = {
         <input type="tel" id="editPhoneInput" placeholder="លេខទូរស័ព្ទថ្មី" list="recentPhonesList">
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="editPhoneSaveBtn" onclick="saveEditedPhone()">រក្សាទុក</button>
-                <button class="btn-cancel" onclick="closeModal('editPhoneModal')">បោះបង់</button>
+                <button class="btn-confirm" id="editPhoneSaveBtn" data-act="saveEditedPhone">រក្សាទុក</button>
+                <button class="btn-cancel" data-act="closeModal" data-args='["editPhoneModal"]'>បោះបង់</button>
             </div>
         </div>
     </div>
@@ -536,11 +528,11 @@ const firebaseConfig = {
         <h3>📞 សម្គាល់ការខល</h3>
         <p>លេខទូរស័ព្ទ៖ <strong id="callMarkPhoneText" style="color:var(--primary);"></strong></p>
         <div class="modal-btns" style="margin-top: 6px;">
-            <button class="call-mark-opt call-mark-no-answer" onclick="setCallMark('no-answer')">🔕 ខល អត់លើក</button>
-            <button class="call-mark-opt call-mark-no-connect" onclick="setCallMark('no-connect')">📵 ខល អត់ចូល</button>
-            <button class="call-mark-opt call-mark-wrong-number" onclick="setCallMark('wrong-number')">❗ ខុសលេខ</button>
-            <button class="btn-cancel" onclick="setCallMark(null)">🔄 សម្អាតសម្គាល់</button>
-            <button class="btn-cancel" onclick="closeModal('callMarkModal')">បិទ</button>
+            <button class="call-mark-opt call-mark-no-answer" data-act="setCallMark" data-args='["no-answer"]'>🔕 ខល អត់លើក</button>
+            <button class="call-mark-opt call-mark-no-connect" data-act="setCallMark" data-args='["no-connect"]'>📵 ខល អត់ចូល</button>
+            <button class="call-mark-opt call-mark-wrong-number" data-act="setCallMark" data-args='["wrong-number"]'>❗ ខុសលេខ</button>
+            <button class="btn-cancel" data-act="setCallMark" data-args='[null]'>🔄 សម្អាតសម្គាល់</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["callMarkModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -553,8 +545,8 @@ const firebaseConfig = {
         <input type="number" id="editBcDodInput" placeholder="តម្លៃ DOD ថ្មី ($)" step="0.01" min="0" style="margin-top: 4px;">
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="saveEditedBarcodePrice()">រក្សាទុក</button>
-                <button class="btn-cancel" onclick="closeEditBarcodeModal()">បោះបង់</button>
+                <button class="btn-confirm" data-act="saveEditedBarcodePrice">រក្សាទុក</button>
+                <button class="btn-cancel" data-act="closeEditBarcodeModal">បោះបង់</button>
             </div>
         </div>
     </div>
@@ -568,7 +560,7 @@ const firebaseConfig = {
             <div id="barcodeListContainer"></div>
         </div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal('viewListModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["viewListModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -579,7 +571,7 @@ const firebaseConfig = {
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="dailyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal('dailyStatsModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["dailyStatsModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -590,7 +582,7 @@ const firebaseConfig = {
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="monthlyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal('monthlyStatsModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["monthlyStatsModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -600,8 +592,8 @@ const firebaseConfig = {
         <h3 style="text-align:center;">📊 តារាងអតិថិជន (Barcode / DOD / COD / Phone)</h3>
         <p style="text-align:center;">ទាញពី Google Sheet — Read-only, ស្វែងរកលឿនក្នុងឧបករណ៍ដោយផ្ទាល់</p>
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-            <input type="text" id="customerDataTableSearchInput" oninput="filterCustomerDataTable()" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." style="margin-bottom:0; text-align:left;" autocomplete="off">
-            <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" onclick="fetchCustomerDataTableRows(true)">🔄</button>
+            <input type="text" id="customerDataTableSearchInput" data-act="filterCustomerDataTable" data-on="input" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." style="margin-bottom:0; text-align:left;" autocomplete="off">
+            <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" data-act="fetchCustomerDataTableRows" data-args='[true]'>🔄</button>
         </div>
         <p id="customerDataTableStatus" style="font-size:10.5px; color:var(--text-muted); margin-bottom:6px;"></p>
         <div class="table-responsive" style="flex:1; min-height:0;">
@@ -618,7 +610,7 @@ const firebaseConfig = {
             </table>
         </div>
         <div class="modal-btns" style="margin-top:8px;">
-            <button class="btn-cancel" onclick="closeModal('customerDataTableModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["customerDataTableModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -640,7 +632,7 @@ const firebaseConfig = {
             </table>
         </div>
         <div class="modal-btns">
-            <button class="btn-cancel" onclick="closeModal('recentlyDeletedModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["recentlyDeletedModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -651,8 +643,8 @@ const firebaseConfig = {
         <p>តើអ្នកពិតជាចង់ស្តារទិន្នន័យកញ្ចប់អីវ៉ាន់នេះពីធុងសំរាមមែនទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="restoreConfirmBtn" onclick="executeRestoreItem()">យល់ព្រមស្តារ</button>
-                <button class="btn-cancel" onclick="cancelRestoreItem()">បោះបង់</button>
+                <button class="btn-confirm" id="restoreConfirmBtn" data-act="executeRestoreItem">យល់ព្រមស្តារ</button>
+                <button class="btn-cancel" data-act="cancelRestoreItem">បោះបង់</button>
             </div>
         </div>
     </div>
@@ -664,8 +656,8 @@ const firebaseConfig = {
         <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" style="background:#ef4444;" id="permanentDeleteConfirmBtn" onclick="executePermanentDelete()">លុបជាអចិន្ត្រៃយ៍</button>
-                <button class="btn-cancel" onclick="cancelPermanentDelete()">បោះបង់</button>
+                <button class="btn-confirm" style="background:#ef4444;" id="permanentDeleteConfirmBtn" data-act="executePermanentDelete">លុបជាអចិន្ត្រៃយ៍</button>
+                <button class="btn-cancel" data-act="cancelPermanentDelete">បោះបង់</button>
             </div>
         </div>
     </div>
@@ -676,10 +668,10 @@ const firebaseConfig = {
         <h3>📤 Export ទិន្នន័យ</h3>
         <p>Export ទិន្នន័យប្រវត្តិដែលកំពុងបង្ហាញ (តាមតម្រង «<span id="exportFilterLabel">ថ្ងៃនេះ</span>») ចេញជាឯកសារ</p>
         <div class="modal-btns" style="flex-direction: column; gap: 8px;">
-            <button class="btn-confirm" style="background:#1d6f42;" onclick="exportDataAsExcel()">📗 Excel (.xlsx)</button>
-            <button class="btn-confirm" style="background:#b91c1c;" onclick="exportDataAsPDF()">📕 PDF (.pdf)</button>
-            <button class="btn-confirm" style="background:#0f9d58;" onclick="exportDataAsCsvForSheets()">📊 Google Sheet (.csv)</button>
-            <button class="btn-cancel" onclick="closeModal('exportDataModal')">បោះបង់</button>
+            <button class="btn-confirm" style="background:#1d6f42;" data-act="exportDataAsExcel">📗 Excel (.xlsx)</button>
+            <button class="btn-confirm" style="background:#b91c1c;" data-act="exportDataAsPDF">📕 PDF (.pdf)</button>
+            <button class="btn-confirm" style="background:#0f9d58;" data-act="exportDataAsCsvForSheets">📊 Google Sheet (.csv)</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["exportDataModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -695,8 +687,8 @@ const firebaseConfig = {
         <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។</p>
         <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: 11px;"></textarea>
         <div class="modal-btns">
-            <button class="btn-confirm" id="activationSubmitBtn" onclick="submitActivationKey()">ដាក់ Active</button>
-            <button class="btn-cancel" id="activationLogoutBtn" onclick="logoutApp()">ចាកចេញ</button>
+            <button class="btn-confirm" id="activationSubmitBtn" data-act="submitActivationKey">ដាក់ Active</button>
+            <button class="btn-cancel" id="activationLogoutBtn" data-act="logoutApp">ចាកចេញ</button>
         </div>
         <p style="margin-top:10px; font-size:11.5px; color:var(--text-muted); text-align:center;">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:600;">@mengsroyhun</a> តាម Telegram</p>
     </div>
@@ -709,10 +701,10 @@ const firebaseConfig = {
         <div class="locker-grid" id="lockerGrid"></div>
         <div class="locker-custom-row">
             <input type="text" id="customLockerInput" placeholder="ទីតាំងផ្សេង (ឧ. A1, VIP...)" maxlength="24">
-            <button type="button" onclick="selectCustomLocker()">ជ្រើសរើស</button>
+            <button type="button" data-act="selectCustomLocker">ជ្រើសរើស</button>
         </div>
         <div class="modal-btns" style="margin-top: 10px;">
-            <button class="btn-cancel" onclick="closeModal('lockerPickerModal')">បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["lockerPickerModal"]'>បិទ</button>
         </div>
     </div>
 </div>
@@ -725,8 +717,8 @@ const firebaseConfig = {
         <input type="number" id="lockerCountInput" placeholder="ចំនួនទូ (ឧ. 24)" min="1" max="200" style="margin-top: 4px;">
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="lockerSettingsSaveBtn" onclick="saveLockerSettings()">រក្សាទុក</button>
-                <button class="btn-cancel" onclick="closeModal('lockerSettingsModal')">បោះបង់</button>
+                <button class="btn-confirm" id="lockerSettingsSaveBtn" data-act="saveLockerSettings">រក្សាទុក</button>
+                <button class="btn-cancel" data-act="closeModal" data-args='["lockerSettingsModal"]'>បោះបង់</button>
             </div>
         </div>
     </div>
@@ -738,8 +730,8 @@ const firebaseConfig = {
         <p id="locationWarningText"></p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="locationWarningConfirmBtn" onclick="confirmLocationChange()">យល់ព្រម ផ្លាស់ទី</button>
-                <button class="btn-cancel" onclick="cancelLocationChange()">បោះបង់</button>
+                <button class="btn-confirm" id="locationWarningConfirmBtn" data-act="confirmLocationChange">យល់ព្រម ផ្លាស់ទី</button>
+                <button class="btn-cancel" data-act="cancelLocationChange">បោះបង់</button>
             </div>
         </div>
     </div>

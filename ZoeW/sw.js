@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v93';
+const CACHE_VERSION = 'zoew-v94';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច។ មុននេះគ្រប់ធនធានប្រើ
@@ -12,6 +12,7 @@ const CORE_SHELL = [
     './index.html',
     './style.css',
     './app.js',
+    './boot-flags.js',
     './firebase-loader.js',
     './license-verify.js',
     './error-reporting.js',

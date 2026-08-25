@@ -1,21 +1,23 @@
-// ថ្នាក់កំហុស៖ **ខ្សែអក្សរដែលមកពី Firebase ធ្លាក់ចូល `onclick="fn('…')"`។**
+// ថ្នាក់កំហុស៖ **ខ្សែអក្សរដែលមកពី Firebase ធ្លាក់ចូល attribute របស់ handler។**
 //
 // Rules ផ្ទៀងផ្ទាត់តែ `newData.isString()` លើ `id`, `barcode`, `code`, `phone`,
 // `locker` — **គ្មានការកំណត់តួអក្សរទេ**។ ដូច្នេះឧបករណ៍ណាមួយដែលចូលប្រព័ន្ធបាន
 // (ឬកំហុសកូដ) អាចដាក់ `'`, `\`, `"`, `<`, `&#39;` ចូលវាលទាំងនោះ ហើយវាលទាំងនោះ
-// ត្រូវបានបញ្ចូលទៅក្នុង **attribute `onclick`** ដោយផ្ទាល់ក្នុង ៣ កន្លែង៖
-// តារាងប្រវត្តិ, ប្រអប់បញ្ជីកញ្ចប់ និងប្រអប់ធុងសំរាម។
+// ត្រូវបានបញ្ចូលទៅក្នុង HTML របស់ជួរដេកក្នុង ៣ កន្លែង៖ តារាងប្រវត្តិ,
+// ប្រអប់បញ្ជីកញ្ចប់ និងប្រអប់ធុងសំរាម។
 //
-// បរិបទនោះមាន **ស្រទាប់ escape ២ ជាន់ជាន់គ្នា** — browser ឌិកូដ HTML entity
-// **មុន** ហើយទើបប្រគល់លទ្ធផលទៅ JS parser។ ដូច្នេះ `&#39;` ដែលមិន escape ក្លាយ
-// ជា `'` ពិត ➜ បំបែកខ្សែអក្សរ JS បាន ទោះ `sanitizeInput()` មើលទៅគ្រប់គ្រាន់។
-// `escapeForInlineJsAttr()` ជាអ្នកគ្រប់គ្រងជាន់ទាំង ២ នេះ តែមុននេះ **គ្មាន
-// តេស្តណាចាក់សោវាទេ**។
+// **មុនកំណែ 2.13.0** តម្លៃទាំងនោះចូល `onclick="fn('…')"` ដែលមាន **escape ២
+// ជាន់ជាន់គ្នា** — browser ឌិកូដ HTML entity **មុន** ហើយទើបប្រគល់លទ្ធផលទៅ JS
+// parser ➜ `&#39;` ដែលមិន escape ក្លាយជា `'` ពិត ➜ បំបែកខ្សែអក្សរ JS បាន។
+// កំណែ 2.13.0 ដក `'unsafe-inline'` ចេញពី `script-src` ហើយប្តូរទៅ `data-act`
+// + `data-a1`/`data-a2` ➜ **គ្មាន JS parser ក្នុងផ្លូវនោះទៀតទេ** ➜ ថ្នាក់កំហុស
+// នោះ **មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ**។
 //
-// តេស្តនេះបើក App ពិតក្នុង Chromium ដោយ seed ទិន្នន័យសត្រូវ រួចអះអាង ២ ខាង៖
-//   ១. គ្មានកូដណារត់ (គ្មាន `window.__xss`, គ្មាន attribute event ថ្មី)
+// តេស្តនេះចាក់សោលទ្ធផលនោះ៖ វា seed ទិន្នន័យសត្រូវចូល App ពិតក្នុង Chromium
+// រួចអះអាង **២ ខាង**៖
+//   ១. គ្មានកូដណារត់ និងគ្មាន attribute event ថ្មីត្រូវ parse ចូល
 //   ២. **ការចុចប៊ូតុងនៅតែបញ្ជូនខ្សែអក្សរដើមបេះបិទ** — escape ដែលតឹងពេក
-//      (ឧ. encode ចោល) នឹងបំបែកមុខងារ ហើយតេស្តត្រូវចាប់វាដែរ។
+//      (ឬការភ្លេច escape) នឹងបំបែកមុខងារ ហើយតេស្តត្រូវចាប់វាដែរ។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {
     console.log('SKIP — ត្រូវការ playwright-core (npm i playwright-core)');
@@ -132,14 +134,16 @@ const FAKE_SDK = function (seed) {
     window.dispatchEvent(new Event('firebasesdkready'));
 };
 
-// រាយ **attribute ពិត** ដែល browser parse ចូលធាតុ — មិនមែនស្វែងរកអក្សរក្នុង
+// រាយ **attribute event ពិត** ដែល browser parse ចូលធាតុ។ ចាប់ពីកំណែ 2.13.0
+// គ្មាន attribute event ណាមួយត្រូវបានអនុញ្ញាតឡើយ (រួមទាំង `onclick`) ព្រោះ
+// CSP បដិសេធវា — ដូច្នេះការឃើញណាមួយ = ការចាក់បញ្ចូល។ មិនមែនស្វែងរកអក្សរក្នុង
 // `innerHTML` ទេ ព្រោះបន្ទុកសត្រូវដែល escape ត្រឹមត្រូវ **លេចជាអត្ថបទ**
 // (`&quot; onmouseover=&quot;…`) ហើយការស្វែងរកអក្សរនឹងរាយវាជាកំហុសក្លែងក្លាយ។
 const HANDLER_ATTRS = `(root) => {
     const found = [];
     root.querySelectorAll('*').forEach((el) => {
         for (const a of el.attributes) {
-            if (/^on/i.test(a.name) && a.name.toLowerCase() !== 'onclick') found.push(el.tagName + '[' + a.name + ']');
+            if (/^on/i.test(a.name)) found.push(el.tagName + '[' + a.name + ']');
         }
     });
     return found;
@@ -183,26 +187,30 @@ function buildSeed() {
     };
 }
 
-// === ផ្នែកទី ១ — ច្បាប់ស្តាទិច ៖ រាល់តម្លៃដែលចាក់ចូល `onclick=` ត្រូវ escape ===
+// === ផ្នែកទី ១ — ច្បាប់ស្តាទិច ៖ តម្លៃពី DB ក្នុង attribute ត្រូវ escape ===
 // នេះជាជាន់ការពារសម្រាប់ **កូដថ្មី** — តេស្ត runtime ខាងក្រោមគ្របតែ sink ដែល
 // មានស្រាប់ប៉ុណ្ណោះ។ ការបន្ថែមប៊ូតុងថ្មីដោយភ្លេច escape នឹងធ្លាក់ត្រង់នេះ។
 for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
-    const escaper = app === 'ZoeW' ? 'escapeForInlineJsAttr' : 'escapeHtml';
+    const escaper = app === 'ZoeW' ? 'sanitizeInput' : 'escapeHtml';
+
+    // ១ក. ផ្លូវ `onclick="fn('…')"` **មិនត្រូវត្រឡប់មកវិញ** — CSP បដិសេធវា
+    //     ស្ងាត់ៗ ហើយវានាំ escape ២ ជាន់ត្រឡប់មកជាមួយ។
+    const backAgain = (src.match(/\son(?:click|change|input|submit)\s*=\s*"/g) || []);
+    check(backAgain.length === 0, app + ': គ្មាន `on*=` ក្នុង HTML ដែលបង្កើតដោយ JS (escape ២ ជាន់លែងមាន)', backAgain.join(' '));
+    check(!/escapeForInlineJsAttr/.test(src),
+        app + ': `escapeForInlineJsAttr()` ត្រូវបានដកចេញ (លែងមានបរិបទដែលត្រូវការវា)');
+
+    // ១ខ. រាល់តម្លៃដែលចាក់ចូល `data-a1`/`data-a2` ត្រូវឆ្លងកាត់ escaper
     const offenders = [];
     src.split('\n').forEach((line, i) => {
-        if (line.indexOf('onclick=') === -1) return;
-        // ស្រង់តម្លៃពេញរបស់ attribute `onclick` រួចពិនិត្យ **រាល់** ការចាក់តម្លៃ
-        // ក្នុងវា — មិនមែនតែមួយដំបូងទេ (ជួរដេកបញ្ជីកញ្ចប់មាន ២ អាគុយម៉ង់)។
-        const attr = /onclick="([^"]*)"/.exec(line);
-        if (!attr) return;
-        const holes = attr[1].match(/\$\{[^}]*\}/g) || [];
-        holes.forEach((hole) => {
-            if (hole.indexOf(escaper) !== -1) return;
-            offenders.push((i + 1) + ' ' + hole + ': ' + line.trim().slice(0, 90));
-        });
+        for (const m of line.matchAll(/data-a[12]="(\$\{[^}]*\})"/g)) {
+            if (m[1].indexOf(escaper) !== -1) continue;
+            offenders.push((i + 1) + ' ' + m[1] + ': ' + line.trim().slice(0, 90));
+        }
     });
-    check(offenders.length === 0, app + ': រាល់តម្លៃក្នុង `onclick="…"` ឆ្លងកាត់ `' + escaper + '()`', offenders.join('\n        '));
+    check(offenders.length === 0, app + ': រាល់តម្លៃក្នុង `data-a1`/`data-a2` ឆ្លងកាត់ `' + escaper + '()`',
+        offenders.join('\n        '));
 }
 
 (async () => {
@@ -242,7 +250,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     }, HANDLER_ATTRS);
     check(table.rows === 20, 'តារាងប្រវត្តិបង្ហាញ item សត្រូវទាំង ២០', 'rows=' + table.rows);
     check(!table.xss, '**គ្មានកូដសត្រូវរត់ពេលបង្ហាញតារាងប្រវត្តិ**', 'window.__xss=' + table.xss);
-    check(table.handlers.length === 0, '**គ្មាន attribute event ក្រៅពី onclick ត្រូវបាន parse ចូលជួរដេក**', table.handlers);
+    check(table.handlers.length === 0, '**គ្មាន attribute event ណាមួយត្រូវបាន parse ចូលជួរដេក**', table.handlers);
     check(table.imgs === 0, 'គ្មាន `<img>` ត្រូវបានចាក់ចូលជួរដេក (tag មិន parse)', 'imgs=' + table.imgs);
 
     // ការចុចប៊ូតុងត្រូវបញ្ជូន id **ដើមបេះបិទ** — ការ escape ខុសនឹងបំបែកមុខងារ
@@ -264,8 +272,10 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
             const btn = tr.querySelector('.close-btn');
             if (!btn) return;
             let got = null;
+            const orig = window.toggleCloseStatus;
             window.toggleCloseStatus = (a) => { got = a; };
             btn.click();
+            window.toggleCloseStatus = orig;
             out[id] = got;
         });
         Object.keys(originals).forEach((fn) => { window[fn] = originals[fn]; });
@@ -329,7 +339,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         return { got, handlers, imgs: tbody ? tbody.querySelectorAll('img').length : -1, xss: !!window.__xss, rows: btns.length };
     }, HANDLER_ATTRS);
     check(trash.rows === 10, 'ធុងសំរាមបង្ហាញ item សត្រូវទាំង ១០', 'rows=' + trash.rows);
-    check(trash.handlers.length === 0, '**គ្មាន attribute event ក្រៅពី onclick ត្រូវចាក់ចូលធុងសំរាម**', trash.handlers);
+    check(trash.handlers.length === 0, '**គ្មាន attribute event ណាមួយត្រូវចាក់ចូលធុងសំរាម**', trash.handlers);
     check(trash.imgs === 0, 'គ្មាន `<img>` ត្រូវបានចាក់ចូលធុងសំរាម', 'imgs=' + trash.imgs);
     const trashMissing = Object.keys(payloads).filter((n) => trash.got.indexOf(payloads[n]) === -1);
     check(trashMissing.length === 0, '**ធុងសំរាម ៖ id សត្រូវធ្វើ round-trip ត្រឹមត្រូវ**', trashMissing);

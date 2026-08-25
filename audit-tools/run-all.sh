@@ -54,7 +54,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          clear-history-finalization-fence-test \
          setup-link-roundtrip-test export-cells-test camera-resume-test \
          firebase-config-paste-test \
-         connection-recovery-test; do
+         connection-recovery-test reconnect-ladder-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -91,6 +91,7 @@ run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-tes
 run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
 run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
+run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 
 echo
 echo "== ទម្លាប់គម្រោង =="
@@ -152,10 +153,12 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     NETTIMEOUT_APP_DIR="$BASE" node audit-tools/network-timeout-test.js 2>&1 | tail -1 | sed 's/^/   network-timeout: /'
     SWKEY_APP_DIR="$BASE"   node audit-tools/sw-cache-key-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-key:    /'
     CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'
+    LADDER_APP_DIR="$BASE" node audit-tools/reconnect-ladder-test.js 2>&1 | tail -1 | sed 's/^/   reconnect-ladder:/'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
     SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
     NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
+    CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
 fi
 
 echo

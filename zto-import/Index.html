@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+:root {
+    --ink: #10232b;
+    --brand: #1f4e5f;
+    --brand-dark: #163a47;
+    --line: #d8e2e6;
+    --muted: #5d7681;
+    --bg: #f4f7f8;
+    --ok: #1d6f42;
+    --warn: #9a6b00;
+    --bad: #b3261e;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Khmer OS Battambang", "Noto Sans Khmer", "Kantumruy Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+}
+.wrap { max-width: 940px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; color: var(--brand); }
+.sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+.card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+.card h2 {
+    font-size: 15px;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-size: 12px;
+    flex: none;
+}
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+input[type="text"], input[type="password"], input[type="number"], select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    background: #fff;
+    color: var(--ink);
+}
+button {
+    font: inherit;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 16px;
+    background: var(--brand);
+    color: #fff;
+    cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--brand-dark); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.ghost { background: #fff; color: var(--brand); border: 1px solid var(--line); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 180px; min-width: 0; }
+.drop {
+    border: 2px dashed var(--line);
+    border-radius: 12px;
+    padding: 30px 16px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.drop.hot { border-color: var(--brand); background: #eaf2f4; }
+.drop strong { display: block; color: var(--ink); font-size: 16px; margin-bottom: 4px; }
+.hidden { display: none !important; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+.chip {
+    background: #eef3f5;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 13px;
+}
+.chip.ok { background: #e4f2ea; color: var(--ok); }
+.chip.warn { background: #fbf1dc; color: var(--warn); }
+.chip.bad { background: #fbe6e5; color: var(--bad); }
+.tablewrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { background: var(--brand); color: #fff; font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.msg { padding: 11px 14px; border-radius: 8px; margin-top: 12px; font-size: 14px; }
+.msg.bad { background: #fbe6e5; color: var(--bad); }
+.msg.ok { background: #e4f2ea; color: var(--ok); }
+.msg.warn { background: #fbf1dc; color: var(--warn); }
+.foot { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 0 20px; }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>📥 នាំចូល Excel ➜ ZoeAdmin</h1>
+    <p class="sub">ទម្លាក់ឯកសារ Excel ដែល export ពី ZTO — ប្រព័ន្ធនឹងបញ្ចូលទៅ Sheet ដោយស្វ័យប្រវត្តិ។</p>
+
+    <div class="card" id="authCard">
+        <h2><span class="step">1</span> ពាក្យសម្ងាត់</h2>
+        <div class="row">
+            <input type="password" id="password" placeholder="ពាក្យសម្ងាត់នាំចូល" autocomplete="current-password">
+            <button id="unlockBtn" style="flex:0 0 auto;">ដោះសោ</button>
+        </div>
+        <div id="authMsg"></div>
+    </div>
+
+    <div class="card hidden" id="fileCard">
+        <h2><span class="step">2</span> ជ្រើសឯកសារ</h2>
+        <div class="drop" id="drop">
+            <strong>ទម្លាក់ឯកសារនៅទីនេះ</strong>
+            ឬចុចដើម្បីជ្រើស — គាំទ្រ .xlsx · .xls · .csv
+        </div>
+        <input type="file" id="file" class="hidden" accept=".xlsx,.xls,.csv,.tsv">
+        <div id="fileMsg"></div>
+    </div>
+
+    <div class="card hidden" id="mapCard">
+        <h2><span class="step">3</span> ការផ្គូផ្គង Column</h2>
+        <div class="row">
+            <div>
+                <label for="sheetSel">Tab ក្នុងឯកសារ</label>
+                <select id="sheetSel"></select>
+            </div>
+            <div>
+                <label for="headerRow">ជួរដេក header</label>
+                <input type="number" id="headerRow" min="1" value="1">
+            </div>
+            <div>
+                <label for="mode">របៀបនាំចូល</label>
+                <select id="mode">
+                    <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ (ណែនាំ)</option>
+                    <option value="newOnly">បន្ថែមតែ Barcode ថ្មី — មិនប៉ះជួរចាស់</option>
+                    <option value="replace">លុបទាំងអស់ រួចដាក់ថ្មីជំនួស</option>
+                </select>
+            </div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+            <div>
+                <label for="mapBarcode">A · Barcode</label>
+                <select id="mapBarcode"></select>
+            </div>
+            <div>
+                <label for="mapDod">B · DOD($)</label>
+                <select id="mapDod"></select>
+            </div>
+            <div>
+                <label for="mapCod">C · COD($)</label>
+                <select id="mapCod"></select>
+            </div>
+            <div>
+                <label for="mapPhone">D · Phone</label>
+                <select id="mapPhone"></select>
+            </div>
+        </div>
+        <div id="mapMsg"></div>
+        <div class="chips" id="chips"></div>
+        <div class="tablewrap hidden" id="previewWrap">
+            <table>
+                <thead><tr><th>Barcode</th><th>DOD($)</th><th>COD($)</th><th>Phone</th></tr></thead>
+                <tbody id="previewBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card hidden" id="goCard">
+        <h2><span class="step">4</span> នាំចូល</h2>
+        <div class="row">
+            <button id="importBtn" style="flex:0 0 auto;">នាំចូលទៅ Sheet</button>
+            <button id="resetBtn" class="ghost" style="flex:0 0 auto;">ចាប់ផ្តើមឡើងវិញ</button>
+        </div>
+        <div id="goMsg"></div>
+    </div>
+
+    <p class="foot" id="foot"></p>
+</div>
+
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"
+        integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+        crossorigin="anonymous"></script>
+<script>
+var STORAGE_KEY = 'zto_import_password';
+var FIELD_IDS = { barcode: 'mapBarcode', dod: 'mapDod', cod: 'mapCod', phone: 'mapPhone' };
+var state = { password: '', workbook: null, sheetNames: [], rows: [], headers: [], signature: '', prepared: null };
+
+function $(id) { return document.getElementById(id); }
+
+function show(id, on) { $(id).classList.toggle('hidden', !on); }
+
+function setMsg(id, text, kind) {
+    var host = $(id);
+    if (!text) { host.innerHTML = ''; return; }
+    var div = document.createElement('div');
+    div.className = 'msg ' + (kind || 'warn');
+    div.textContent = text;
+    host.innerHTML = '';
+    host.appendChild(div);
+}
+
+function callServer(fn, args) {
+    return new Promise(function (resolve, reject) {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn].apply(null, args || []);
+    });
+}
+
+function readStored() {
+    try { return localStorage.getItem(STORAGE_KEY) || ''; } catch (err) { return ''; }
+}
+
+function storePassword(value) {
+    try { localStorage.setItem(STORAGE_KEY, value); } catch (err) { }
+}
+
+function unlock() {
+    var value = $('password').value.trim();
+    if (!value) { setMsg('authMsg', 'សូមបញ្ចូលពាក្យសម្ងាត់', 'bad'); return; }
+    $('unlockBtn').disabled = true;
+    setMsg('authMsg', '');
+    callServer('getStatus', [value]).then(function (status) {
+        $('unlockBtn').disabled = false;
+        state.password = value;
+        storePassword(value);
+        show('authCard', false);
+        show('fileCard', true);
+        $('foot').textContent = 'គោលដៅ៖ ' + status.spreadsheetName + ' ➜ tab «' + status.sheetName + '» · មាន ' + status.rowCount + ' ជួរដេករួចហើយ';
+    }, function (err) {
+        $('unlockBtn').disabled = false;
+        setMsg('authMsg', err && err.message ? err.message : 'ដោះសោមិនបាន', 'bad');
+    });
+}
+
+function cellToText(value) {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date) return '';
+    if (typeof value === 'number') return isFinite(value) ? String(value) : '';
+    return String(value).trim();
+}
+
+function toMoney(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    var n = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.\-]/g, ''));
+    if (!isFinite(n)) return 0;
+    return Math.round(n * 100) / 100;
+}
+
+function handleFile(file) {
+    if (!file) return;
+    setMsg('fileMsg', '');
+    var reader = new FileReader();
+    reader.onload = function (evt) {
+        try {
+            state.workbook = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+            state.sheetNames = state.workbook.SheetNames || [];
+            if (!state.sheetNames.length) throw new Error('ឯកសារនេះគ្មាន tab ទេ');
+            var sel = $('sheetSel');
+            sel.innerHTML = '';
+            state.sheetNames.forEach(function (name) {
+                var opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                sel.appendChild(opt);
+            });
+            $('headerRow').value = 1;
+            setMsg('fileMsg', 'អានឯកសារ «' + file.name + '» រួចរាល់', 'ok');
+            show('mapCard', true);
+            show('goCard', true);
+            loadSheet();
+        } catch (err) {
+            setMsg('fileMsg', 'អានឯកសារមិនបាន៖ ' + (err && err.message ? err.message : err), 'bad');
+        }
+    };
+    reader.onerror = function () { setMsg('fileMsg', 'អានឯកសារមិនបាន', 'bad'); };
+    reader.readAsArrayBuffer(file);
+}
+
+function loadSheet() {
+    var ws = state.workbook.Sheets[$('sheetSel').value];
+    state.rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: false });
+    autoHeaderRow();
+    applyHeaderRow();
+}
+
+function autoHeaderRow() {
+    for (var i = 0; i < Math.min(state.rows.length, 12); i++) {
+        var filled = (state.rows[i] || []).filter(function (v) { return cellToText(v) !== ''; });
+        if (filled.length >= 2) { $('headerRow').value = i + 1; return; }
+    }
+    $('headerRow').value = 1;
+}
+
+function applyHeaderRow() {
+    var index = parseInt($('headerRow').value, 10) - 1;
+    if (isNaN(index) || index < 0) index = 0;
+    state.headers = (state.rows[index] || []).map(cellToText);
+    if (!state.headers.length) {
+        setMsg('mapMsg', 'ជួរដេកនេះទទេ — សូមប្តូរលេខជួរដេក header', 'bad');
+        return;
+    }
+    fillMappingSelects();
+    setMsg('mapMsg', 'កំពុងរកការផ្គូផ្គង...', 'warn');
+    callServer('prepare', [state.password, state.headers]).then(function (prepared) {
+        state.signature = prepared.signature;
+        state.prepared = prepared;
+        applyMapping(prepared.mapping);
+        $('mode').value = prepared.mode || 'upsert';
+        if (prepared.source === 'saved') {
+            setMsg('mapMsg', '✅ ប្រើការផ្គូផ្គងដែលបានរក្សាទុកពីលើកមុន — គ្រាន់តែចុច «នាំចូល» បាន', 'ok');
+        } else if (prepared.source === 'auto') {
+            setMsg('mapMsg', 'រកឃើញការផ្គូផ្គងដោយស្វ័យប្រវត្តិ — សូមពិនិត្យមុនចុចនាំចូល', 'ok');
+        } else {
+            setMsg('mapMsg', 'រកមិនឃើញ Column ដោយស្វ័យប្រវត្តិទេ — សូមជ្រើសដោយដៃខាងក្រោម', 'warn');
+        }
+        renderPreview();
+    }, function (err) {
+        setMsg('mapMsg', err && err.message ? err.message : 'រៀបចំមិនបាន', 'bad');
+    });
+}
+
+function fillMappingSelects() {
+    Object.keys(FIELD_IDS).forEach(function (field) {
+        var sel = $(FIELD_IDS[field]);
+        var previous = sel.value;
+        sel.innerHTML = '';
+        var none = document.createElement('option');
+        none.value = '-1';
+        none.textContent = '— មិនប្រើ —';
+        sel.appendChild(none);
+        state.headers.forEach(function (header, idx) {
+            var opt = document.createElement('option');
+            opt.value = String(idx);
+            opt.textContent = columnLetter(idx) + ' · ' + (header || '(ទទេ)');
+            sel.appendChild(opt);
+        });
+        if (previous) sel.value = previous;
+    });
+}
+
+function columnLetter(index) {
+    var letter = '';
+    var n = index;
+    while (n >= 0) {
+        letter = String.fromCharCode(65 + (n % 26)) + letter;
+        n = Math.floor(n / 26) - 1;
+    }
+    return letter;
+}
+
+function applyMapping(mapping) {
+    Object.keys(FIELD_IDS).forEach(function (field) {
+        var value = mapping && typeof mapping[field] === 'number' ? mapping[field] : -1;
+        $(FIELD_IDS[field]).value = String(value);
+    });
+}
+
+function currentMapping() {
+    var mapping = {};
+    Object.keys(FIELD_IDS).forEach(function (field) {
+        mapping[field] = parseInt($(FIELD_IDS[field]).value, 10);
+        if (isNaN(mapping[field])) mapping[field] = -1;
+    });
+    return mapping;
+}
+
+function mappedRows() {
+    var mapping = currentMapping();
+    var start = parseInt($('headerRow').value, 10);
+    if (isNaN(start) || start < 1) start = 1;
+    var out = [];
+    for (var i = start; i < state.rows.length; i++) {
+        var row = state.rows[i] || [];
+        out.push([
+            mapping.barcode >= 0 ? cellToText(row[mapping.barcode]) : '',
+            mapping.dod >= 0 ? toMoney(row[mapping.dod]) : 0,
+            mapping.cod >= 0 ? toMoney(row[mapping.cod]) : 0,
+            mapping.phone >= 0 ? cellToText(row[mapping.phone]) : ''
+        ]);
+    }
+    return out;
+}
+
+function renderPreview() {
+    var rows = mappedRows();
+    var usable = rows.filter(function (r) { return r[0] !== ''; });
+    var seen = {};
+    var duplicates = 0;
+    usable.forEach(function (r) {
+        var key = r[0].toUpperCase();
+        if (seen[key]) duplicates++;
+        seen[key] = true;
+    });
+    var chips = $('chips');
+    chips.innerHTML = '';
+    addChip(chips, 'ជួរដេកក្នុងឯកសារ ' + rows.length, '');
+    addChip(chips, 'មាន Barcode ' + usable.length, usable.length ? 'ok' : 'bad');
+    if (rows.length - usable.length > 0) addChip(chips, 'រំលង (គ្មាន Barcode) ' + (rows.length - usable.length), 'warn');
+    if (duplicates) addChip(chips, 'ស្ទួនក្នុងឯកសារ ' + duplicates, 'warn');
+
+    var body = $('previewBody');
+    body.innerHTML = '';
+    usable.slice(0, 8).forEach(function (r) {
+        var tr = document.createElement('tr');
+        [r[0], r[1].toFixed(2), r[2].toFixed(2), r[3]].forEach(function (value, idx) {
+            var td = document.createElement('td');
+            if (idx === 1 || idx === 2) td.className = 'num';
+            td.textContent = value;
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+    show('previewWrap', usable.length > 0);
+    $('importBtn').disabled = usable.length === 0;
+}
+
+function addChip(host, text, kind) {
+    var span = document.createElement('span');
+    span.className = 'chip ' + (kind || '');
+    span.textContent = text;
+    host.appendChild(span);
+}
+
+function runImport() {
+    var rows = mappedRows().filter(function (r) { return r[0] !== ''; });
+    if (!rows.length) { setMsg('goMsg', 'គ្មានជួរដេកត្រូវនាំចូលទេ', 'bad'); return; }
+    var mode = $('mode').value;
+    if (mode === 'replace' && !window.confirm('របៀប «លុបទាំងអស់ រួចដាក់ថ្មីជំនួស» នឹងលុបជួរដេកទាំងអស់ក្នុង Sheet មុន។ ប្រាកដទេ?')) {
+        return;
+    }
+    $('importBtn').disabled = true;
+    $('importBtn').innerHTML = '<span class="spin"></span>កំពុងនាំចូល...';
+    setMsg('goMsg', '');
+    callServer('importRows', [state.password, {
+        rows: rows,
+        mode: mode,
+        mapping: currentMapping(),
+        signature: state.signature
+    }]).then(function (result) {
+        $('importBtn').disabled = false;
+        $('importBtn').textContent = 'នាំចូលទៅ Sheet';
+        var parts = ['✅ រួចរាល់ — បន្ថែម ' + result.added, 'កែ ' + result.updated, 'ដដែល ' + result.unchanged];
+        if (result.skippedNoBarcode) parts.push('រំលង ' + result.skippedNoBarcode);
+        if (result.duplicatesInFile) parts.push('ស្ទួនក្នុងឯកសារ ' + result.duplicatesInFile);
+        parts.push('សរុបក្នុង Sheet ឥឡូវ ' + result.rowsAfter + ' ជួរដេក');
+        setMsg('goMsg', parts.join(' · '), 'ok');
+        $('foot').textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
+    }, function (err) {
+        $('importBtn').disabled = false;
+        $('importBtn').textContent = 'នាំចូលទៅ Sheet';
+        setMsg('goMsg', err && err.message ? err.message : 'នាំចូលមិនបាន', 'bad');
+    });
+}
+
+function resetAll() {
+    state.workbook = null;
+    state.rows = [];
+    state.headers = [];
+    state.signature = '';
+    $('file').value = '';
+    show('mapCard', false);
+    show('goCard', false);
+    show('previewWrap', false);
+    setMsg('fileMsg', '');
+    setMsg('mapMsg', '');
+    setMsg('goMsg', '');
+    $('chips').innerHTML = '';
+}
+
+$('unlockBtn').addEventListener('click', unlock);
+$('password').addEventListener('keydown', function (evt) { if (evt.key === 'Enter') unlock(); });
+$('drop').addEventListener('click', function () { $('file').click(); });
+$('file').addEventListener('change', function (evt) { handleFile(evt.target.files[0]); });
+$('sheetSel').addEventListener('change', loadSheet);
+$('headerRow').addEventListener('change', applyHeaderRow);
+$('mode').addEventListener('change', renderPreview);
+Object.keys(FIELD_IDS).forEach(function (field) {
+    $(FIELD_IDS[field]).addEventListener('change', renderPreview);
+});
+$('importBtn').addEventListener('click', runImport);
+$('resetBtn').addEventListener('click', resetAll);
+
+['dragenter', 'dragover'].forEach(function (name) {
+    $('drop').addEventListener(name, function (evt) {
+        evt.preventDefault();
+        $('drop').classList.add('hot');
+    });
+});
+['dragleave', 'drop'].forEach(function (name) {
+    $('drop').addEventListener(name, function (evt) {
+        evt.preventDefault();
+        $('drop').classList.remove('hot');
+    });
+});
+$('drop').addEventListener('drop', function (evt) {
+    if (evt.dataTransfer && evt.dataTransfer.files && evt.dataTransfer.files.length) {
+        handleFile(evt.dataTransfer.files[0]);
+    }
+});
+
+(function boot() {
+    var stored = readStored();
+    if (stored) {
+        $('password').value = stored;
+        unlock();
+    }
+})();
+</script>
+</body>
+</html>

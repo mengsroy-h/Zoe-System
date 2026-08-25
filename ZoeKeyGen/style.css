@@ -98,10 +98,6 @@ label { display: block; font-size: 11px; font-weight: 600; color: var(--text-mut
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
 .status-dot.online { background: var(--success); }
 .status-dot.connecting { background: var(--warning); }
-/* ── ចលនាពេលបើក App (boot) ─────────────────────────────────────────
-   ផ្ទាំងគ្របការលោតរបស់ UI ទទេពេលបើក រួចរលាយចេញ។ វា `pointer-events: none`
-   ជានិច្ច — តុបតែងសុទ្ធសាធ ដូច្នេះវាមិនលេបការចុចរបស់អ្នកប្រើទេ។
-   ចលនាទាំងអស់ជា `transform`/`opacity` ➜ composite សុទ្ធ។ */
 .boot-splash {
     position: fixed;
     inset: 0;
@@ -133,10 +129,6 @@ label { display: block; font-size: 11px; font-weight: 600; color: var(--text-mut
     position: relative; width: 132px; height: 3px;
     border-radius: 3px; background: var(--border-color); overflow: hidden;
 }
-/* ⛔ ការរំកិលត្រូវនៅ **ខាងក្នុងរបា** ជានិច្ច។ `translateX(-100%)` លើ
-   span ដែលពេញទទឹងរបា នាំគែមឆ្វេងទៅ **ក្រៅអេក្រង់** នៅ 320px
-   (`left = -38`) ➜ `layout-check.js` រាយវាជាធាតុលើសអេក្រង់ ហើយវាក៏
-   ជាការពិតដែរ — `overflow: hidden` លាក់ការគូរ តែមិនប្តូរធរណីមាត្រទេ។ */
 .boot-splash-bar > span {
     position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
     border-radius: 3px;

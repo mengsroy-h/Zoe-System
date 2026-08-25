@@ -45,6 +45,15 @@
 >    សរសេរជាភាសាខ្មែរ ដោយប្រាប់ថា *អ្នកប្រើឃើញអ្វីខុសពីមុន* មិនមែនត្រឹមតែឈ្មោះ
 >    function ដែលកែទេ ហើយត្រូវបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច
 >    (ជាធម្មតា Firebase rules — ឬ «គ្មាន»)។ មើលទម្រង់នៅក្បាល `CHANGELOG.md`។
+> ១២. **⛔ ពេលចប់រាល់ជុំ audit ឬការកែកូដ ត្រូវរត់ `node audit-tools/strip-comments.js`**
+>    ដើម្បីសម្អាត comment ចេញពី **កូដ App ដែល ship ទាំងអស់** (`ZoeW/` · `ZoeKeyGen/` ·
+>    `ZoeImport/` — ទាំង `.js` និង `.css`)។ ចំណេះដឹងត្រូវរស់នៅក្នុង **`CLAUDE.md`
+>    និង `README.md`** មិនមែនក្នុងកូដទេ។ ឧបករណ៍នេះផ្ទៀងផ្ទាត់ថាការសម្អាត
+>    **មិនប្តូរកូដ** (JS៖ diff token-for-token; CSS៖ diff declaration stream)
+>    ហើយបោះបង់ឯកសារណាដែលមិនប្រាកដ។ `comments.js` អះអាងលទ្ធផលនោះ។
+>    **លើកលែង** ៖ `audit-tools/` និង `*/test.js` (មិន ship ហើយ comment របស់ពួកវា
+>    ជាការពិពណ៌នាថ្នាក់កំហុសដែលឯកសារនេះយោងដល់) និង `vendor/`, `qrcode.js` (library ខាងក្រៅ)។
+>
 > ១១. **⛔ កុំប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ភាពរលូននៃការរមូរ ដោយគ្មានការស្នើច្បាស់លាស់។**
 >    នេះជា **តំបន់ថ្លៃបំផុតក្នុងគម្រោង** — អានផ្នែក «⛔ តំបន់ហាមចូល» ខាងក្រោមភ្លាម
 >    មុននឹងកែ `style.css` ឬ function ណាមួយដែលទាក់ទងនឹងកាយវិការ។
@@ -778,6 +787,46 @@ Test៖ **`pin-prompt-test.js`**។
 **ការស្កេន QR ពេល Config/Reconfig ជាម៉ាស៊ីនអានដាច់ដោយឡែក** — `configQrReader` ជា
 `ZXing.BrowserQRCodeReader` ដែល **មិនពាក់ព័ន្ធនឹង `SCAN_FORMAT_NAMES` សោះ**។ ការកែ
 បញ្ជី format 1D មិនអាចប៉ះពាល់ការស្កេន QR បានទេ។
+
+## CSS invariant ដែលចាក់សោ — ⛔ READ BEFORE EDITING style.css
+
+`style.css` **គ្មាន comment** តាមច្បាប់គម្រោង (មើលចំណុច ១២ ខាងលើ) ដូច្នេះ
+ហេតុផលរបស់ច្បាប់សំខាន់ៗរស់នៅត្រង់នេះ។ ការកែច្បាប់ទាំងនេះដោយមិនអានមុន
+នឹងធ្វើឲ្យថ្នាក់កំហុសដែលដោះស្រាយរួច ត្រឡប់មកវិញ។
+
+### ZoeW
+
+| Selector | ច្បាប់ | ហេតុអ្វី |
+|---|---|---|
+| `.status-dot::after` | ចលនាលើ `transform`/`opacity` មិនមែន `box-shadow` | `box-shadow` composite មិនបាន ➜ របាខាងលើគូរឡើងវិញរាល់ស៊ុមជារៀងរហូត |
+| `.app-navbar` | គ្មាន `backdrop-filter` · គ្មាន `transform` · គ្មាន `transition` | iOS គណនា blur ឡើងវិញរាល់ស៊ុម; របាខាងលើ **មិនលាក់តាមការរមូរទេ** (សំណើអ្នកប្រើ) |
+| `.modal` | ផ្ទៃខ្មៅធម្មតា គ្មាន `backdrop-filter` | ប្រអប់លេខទូរស័ព្ទបើករាល់ការស្កេន ➜ blur រាល់ស៊ុមនៃ animation បើក |
+| `.scan-line` | ចលនាលើ `transform` មិនមែន `top` | `top` បង្កើត layout រាល់ស៊ុម ចំពេលកាមេរ៉ាកំពុងឌិកូដ |
+| `.page-main` | `height` ថេរ + `flex: none` ក្នុង `@media (max-width: 991px)` | កាតត្រូវខ្ពស់ **ដូចគ្នាបេះបិទ** ទាំង ២ របៀប បើមិនដូច្នេះផ្ទាំងលោត (មើលផ្នែកចលនា 2.9.0) |
+| `.table-responsive` | `max-height: none; flex: 1` **scope ត្រឹម `.page-main`** | modal ត្រូវរក្សាពិដាន 62vh ដដែល |
+| `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` | បើភ្លេច `scroll-padding-top` ចំណុច snap ធ្លាក់ត្រឹម `scrollTop 71` ➜ **PTR ស្លាប់** |
+| `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា FLIP | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា ២២០ms |
+| `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា Tab **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` មិនមែន layout |
+| `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | `--chrome-bottom` រួម safe-area ដែលនៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ជាងគែមរបា ៥៣px លើ iPhone |
+| `@supports (-webkit-touch-callout: none)` | ផ្លូវ iOS ដាច់ដោយឡែក — កាតមានកម្ពស់ពិត រីកចុះមកបំពេញ | `clip-path` មិនដើរលើ Safari; Chromium ត្រឡប់ `false` ➜ Android មិនរងផល |
+| `body.perf-lite` | ដកចលនាដែលដើរជារៀងរហូត និងស្រមោលថ្លៃ | ដាក់ដោយ `setupAdaptivePerformance()` ក្រោយវាស់ការធ្លាក់ស៊ុម **២ ដង** |
+| `.history-section`/`.panel-section` | flex column ដើម្បីឲ្យ `.table-responsive` `flex: 1` បាន | បើអត់ បញ្ជីមិនពេញអេក្រង់ |
+| `.boot-splash` | `pointer-events: none` ជានិច្ច | ផ្ទាំងតុបតែងមិនត្រូវលេបការចុច |
+| `.boot-splash-bar > span` | រំកិល **ខាងក្នុងរបា** (`width: 40%`, `translateX(0 → 150%)`) | `translateX(-100%)` លើ span ពេញទទឹង នាំគែមឆ្វេងទៅ `left = -38` នៅ 320px ➜ `layout-check.js` ធ្លាក់ |
+
+### ZoeImport
+
+| Selector | ច្បាប់ | ហេតុអ្វី |
+|---|---|---|
+| `body` | flex column + `min-height: 100dvh`; `.app-body` ជា `flex: 1` | **កុំគណនា `100dvh - var(--navbar-h)` ដោយដៃ** — លេខនោះខុសរាល់ពេលកម្ពស់របាខាងលើប្រែ (safe-area · ពុម្ពអក្សរធំ · អក្សរ ២ ជួរ) |
+| `.gate-card` | `margin: auto` — **មិនមែន** `align-items: center` លើ `.gate` | ការតម្រឹមកណ្តាលក្នុង flex **កាត់ផ្នែកខាងលើចោល ហើយរមូរទៅមិនដល់** ពេលកាតខ្ពស់ជាងកន្លែងទំនេរ (ទូរស័ព្ទផ្តេក ឬក្តារចុចបើក) |
+| `.grid` | CSS Grid `auto-fit` `minmax(min(100%, 158px), 1fr)` | ១ ជួរឈរនៅ 320px · ២ នៅ ~412px · ៤ នៅ ≥768px ដោយគ្មានធាតុកំព្រានៅជួរចុងក្រោយ (បញ្ហារបស់ flex-wrap) |
+| `.btn-row > *` | `flex: 1 1 auto; min-width: 148px` | ប៊ូតុងលាតបំពេញជួរលើអេក្រង់តូច ➜ គោលដៅចុចធំ; ត្រឡប់ទៅទទឹងតាមអត្ថបទលើអេក្រង់ធំ |
+| `table` | `min-width: 440px` + `.tablewrap` រមូរផ្តេក + ស្រមោលគែម | ជួរឈរមិនត្រូវច្របាច់រហូតអានមិនចេញនៅ 320px; ស្រមោលជាសញ្ញាថារមូរបាន |
+| `#appMain` @≥900px | grid ២ ជួរឈរ; ជំហាន ១–៣ span ពេញ | ជំហាន ៤ និងកាតសម្អាតជា **សកម្មភាពឯករាជ្យ ២** ➜ ក្បែរគ្នាជំនួសចន្លោះទទេ |
+| `@media (max-height: 520px)` | បង្រួមកាតដោះសោ | ទូរស័ព្ទផ្តេក |
+
+`layout-check.js` គ្រប **ZoeW · ZoeKeyGen · ZoeImport** លើ 320/360/412/768/1280/1440px។
 
 ## CSP និង `data-act` — ⛔ កុំនាំ `onclick=` ត្រឡប់មកវិញ
 

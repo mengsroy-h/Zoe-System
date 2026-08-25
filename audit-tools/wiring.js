@@ -45,15 +45,26 @@ for (const app of APPS) {
         if (!htmlIds.has(id) && !genIds.has(id)) bad(app, 'getElementById with no HTML id', id);
     }
 
-    // --- 2. inline on*= handlers in HTML and in generated HTML strings ---
-    const calls = new Set();
+    // --- 2. data-act handlers in HTML and in generated HTML strings ---
+    // ចាប់ពីកំណែ 2.13.0 គ្មាន attribute `on*=` ទៀតទេ (CSP `script-src` លែងមាន
+    // `'unsafe-inline'`) — ការចាប់ព្រឹត្តិការណ៍ធ្វើតាម `data-act` + delegation។
+    // ច្បាប់ដដែលនៅដដែល៖ អ្វីដែល HTML យោង ត្រូវតែមានពិតក្នុង JS។
     const src = html + '\n' + js;
-    for (const m of src.matchAll(/\bon(?:click|change|input|submit|keyup|keydown|keypress|load|error)\s*=\s*(["'])(.*?)\1/gs)) {
-        for (const c of m[2].matchAll(/(^|[^.\w$])([A-Za-z_$][\w$]*)\s*\(/g)) calls.add(c[2]);
+    const acts = new Set([...src.matchAll(/data-act="([^"$]+)"/g)].map((m) => m[1]));
+    if (acts.size === 0) bad(app, 'no data-act handlers found', 'ការចាប់ព្រឹត្តិការណ៍បាត់ទាំងស្រុង?');
+    const allowBlock = (/const ACTION_ALLOWLIST = \[([\s\S]*?)\];/.exec(js) || [])[1];
+    if (allowBlock === undefined) bad(app, 'ACTION_ALLOWLIST missing', 'dispatcher គ្មានបញ្ជីអនុញ្ញាត');
+    const allowed = new Set([...(allowBlock || '').matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+    for (const a of acts) {
+        if (!globals.has(a)) bad(app, 'data-act with no such function', a);
+        if (!allowed.has(a)) bad(app, 'data-act not in ACTION_ALLOWLIST', a);
     }
-    const builtins = new Set(['if', 'return', 'this', 'event', 'Number', 'String', 'parseInt', 'parseFloat', 'alert', 'confirm', 'setTimeout', 'JSON', 'Boolean', 'Array', 'Object', 'Date', 'window', 'document']);
-    for (const c of calls) {
-        if (!builtins.has(c) && !globals.has(c)) bad(app, 'inline handler calls missing function', c);
+    for (const a of allowed) {
+        if (!acts.has(a)) bad(app, 'ACTION_ALLOWLIST entry never used', a);
+    }
+    // គ្មាន handler ខាងក្នុងណាមួយត្រូវត្រឡប់មកវិញ — CSP នឹងបដិសេធវាស្ងាត់ៗ
+    for (const m of src.matchAll(/\son(?:click|change|input|submit|keyup|keydown|keypress|load|error)\s*=\s*(["'])/g)) {
+        bad(app, 'inline on*= handler is back (CSP will block it)', m[0].trim());
     }
 
     // --- 3. data-close targets ---

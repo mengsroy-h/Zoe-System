@@ -29,13 +29,7 @@
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js" crossorigin>
 
     <script src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
-    <script>
-        if (window.Sentry && typeof window.Sentry.onLoad === 'function') {
-            window.Sentry.onLoad(function () {
-                try { window.Sentry.setTag('app', 'zoekeygen'); } catch (e) {}
-            });
-        }
-    </script>
+    <script src="./boot-flags.js"></script>
     <script type="module" src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
     <script src="./error-reporting.js"></script>
@@ -56,8 +50,8 @@
         </div>
     </div>
     <div class="nav-right-actions">
-        <button class="security-btn" onclick="openConfigFlow()">⚙️ Config</button>
-        <button class="security-btn" id="navAuthBtn" onclick="showLoginModalWithPrefill()">🔑 ចូល</button>
+        <button class="security-btn" data-act="openConfigFlow">⚙️ Config</button>
+        <button class="security-btn" id="navAuthBtn" data-act="showLoginModalWithPrefill">🔑 ចូល</button>
     </div>
 </header>
 
@@ -81,8 +75,8 @@
             🔒 ចងចាំ Key នេះសម្រាប់ Session នេះ (ត្រូវការ PIN ពេល Reload)
         </label>
         <div class="btn-row mb-8">
-            <button class="btn-primary" onclick="loadSigningKey()">📥 Load Key</button>
-            <button class="btn-secondary" onclick="clearSigningKey()">🗑️ សម្អាត</button>
+            <button class="btn-primary" data-act="loadSigningKey">📥 Load Key</button>
+            <button class="btn-secondary" data-act="clearSigningKey">🗑️ សម្អាត</button>
         </div>
 
         <details>
@@ -92,7 +86,7 @@
                     ការបង្កើត Keypair ថ្មីនឹងធ្វើឲ្យ Key ចាស់ៗទាំងអស់ (ដែល Verify ដោយ Public Key ចាស់) ប្រើលែងកើតទៀត លុះត្រាតែ
                     អ្នកយក Public Key ថ្មីទៅដាក់ជំនួសក្នុងឯកសារ <code>license-verify.js</code> របស់ ZoeW និង ZoeKeyGen ទាំងពីរ រួច Deploy ឡើងវិញ។
                 </div>
-                <button class="btn-secondary" style="width:100%;" onclick="generateNewKeypair()">🆕 បង្កើត Keypair ថ្មី</button>
+                <button class="btn-secondary" style="width:100%;" data-act="generateNewKeypair">🆕 បង្កើត Keypair ថ្មី</button>
             </div>
         </details>
     </div>
@@ -112,12 +106,12 @@
                 <input type="text" id="genNoteInput" placeholder="ឧ. ម៉ាស៊ីនស្កេនកន្លែងទី ១">
             </div>
         </div>
-        <button class="btn-primary" style="width:100%;" id="genGenerateBtn" onclick="generateLicenseKey()">🔐 Generate Key</button>
+        <button class="btn-primary" style="width:100%;" id="genGenerateBtn" data-act="generateLicenseKey">🔐 Generate Key</button>
 
         <div id="genResultBox" class="hidden" style="margin-top:12px;">
             <label>Key ដែលបានបង្កើត (ចម្លងផ្ញើឲ្យអ្នកប្រើប្រាស់)</label>
             <div class="key-output" id="genResultKey"></div>
-            <button class="btn-secondary" style="width:100%;" onclick="copyGeneratedKey()">📋 ចម្លង Key</button>
+            <button class="btn-secondary" style="width:100%;" data-act="copyGeneratedKey">📋 ចម្លង Key</button>
         </div>
     </div>
 
@@ -148,12 +142,12 @@ const firebaseConfig = {
   projectId: "..."
 };'></textarea>
 
-        <button class="btn-primary" style="width:100%;" onclick="generateSetupLink()">🔗 បង្កើត Link</button>
+        <button class="btn-primary" style="width:100%;" data-act="generateSetupLink">🔗 បង្កើត Link</button>
 
         <div id="setupLinkResultBox" class="hidden" style="margin-top:12px;">
             <label>Link (ចម្លងផ្ញើទៅឧបករណ៍គោលដៅ)</label>
             <div class="key-output" id="setupLinkResultText" style="word-break:break-all;"></div>
-            <button class="btn-secondary" style="width:100%;" onclick="copySetupLink()">📋 ចម្លង Link</button>
+            <button class="btn-secondary" style="width:100%;" data-act="copySetupLink">📋 ចម្លង Link</button>
             <div id="setupLinkQrContainer" style="margin-top:10px; text-align:center;"></div>
         </div>
     </div>
@@ -161,8 +155,8 @@ const firebaseConfig = {
     <div class="app-card">
         <div class="card-header">
             <div class="card-title">📋 បញ្ជី Key ទាំងអស់</div>
-            <button class="btn-mini" onclick="refreshKeyList()">🔄 Refresh</button>
-            <button class="btn-mini" onclick="migrateLegacyLicenseKeyMetadata()" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>
+            <button class="btn-mini" data-act="refreshKeyList">🔄 Refresh</button>
+            <button class="btn-mini" data-act="migrateLegacyLicenseKeyMetadata" title="ផ្លាស់ទី Note/Email ចេញពី Key សាធារណៈ — ត្រូវការ Publish Rules ថ្មីជាមុនសិន">🔒 Migrate PII ចាស់</button>
         </div>
         <div class="table-wrap">
             <table>
@@ -192,8 +186,8 @@ const firebaseConfig = {
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN" autocomplete="off">
         <div class="modal-btns">
             <div class="modal-btns-row">
-                <button class="btn-confirm" onclick="verifySecurityPin()">ផ្ទៀងផ្ទាត់</button>
-                <button class="btn-cancel" onclick="closeModal('pinModal')">បោះបង់</button>
+                <button class="btn-confirm" data-act="verifySecurityPin">ផ្ទៀងផ្ទាត់</button>
+                <button class="btn-cancel" data-act="closeModal" data-args='["pinModal"]'>បោះបង់</button>
             </div>
         </div>
     </div>
@@ -205,7 +199,7 @@ const firebaseConfig = {
         <p>សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ (យ៉ាងតិច ៦ តួអក្សរ)</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
         <div class="modal-btns">
-            <button class="btn-confirm" onclick="saveNewSecurityPin()">រក្សាទុក PIN</button>
+            <button class="btn-confirm" data-act="saveNewSecurityPin">រក្សាទុក PIN</button>
         </div>
     </div>
 </div>
@@ -225,8 +219,8 @@ const firebaseConfig = {
         <p style="margin-top:14px;">🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
         <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx">
         <div class="modal-btns">
-            <button class="btn-confirm" onclick="saveFirebaseConfig()">រក្សាទុក និងភ្ជាប់</button>
-            <button class="btn-cancel" onclick="closeModal('configModal')">បោះបង់</button>
+            <button class="btn-confirm" data-act="saveFirebaseConfig">រក្សាទុក និងភ្ជាប់</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["configModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>
@@ -235,7 +229,7 @@ const firebaseConfig = {
     <div class="modal-content">
         <h3>🔐 ចូលប្រើប្រាស់ ZoeKeyGen</h3>
         <p>តម្រូវឲ្យប្រើគណនី Admin របស់ License Project</p>
-        <form id="loginForm" onsubmit="return false;">
+        <form id="loginForm" data-act="blockFormSubmit" data-evt="1" data-on="submit">
             <input type="email" id="loginEmailInput" placeholder="អ៊ីមែល" required autocomplete="username">
             <input type="password" id="loginPasswordInput" placeholder="ពាក្យសម្ងាត់" required autocomplete="current-password">
             <label class="remember-container">
@@ -243,7 +237,7 @@ const firebaseConfig = {
                 <span>ចងចាំអ៊ីមែលតែប៉ុណ្ណោះ (មិនចងចាំការចូល)</span>
             </label>
             <div class="modal-btns">
-                <button type="submit" class="btn-confirm" id="loginBtn" onclick="doLogin()">ចូលប្រព័ន្ធ</button>
+                <button type="submit" class="btn-confirm" id="loginBtn" data-act="doLogin">ចូលប្រព័ន្ធ</button>
             </div>
         </form>
         <div class="app-version-line" data-app-version></div>
@@ -259,14 +253,14 @@ const firebaseConfig = {
         </div>
         <label style="text-align:left;">Private Key (សម្ងាត់ — កុំចែក)</label>
         <textarea id="newPrivateKeyOutput" readonly style="min-height:90px;"></textarea>
-        <button class="btn-secondary" style="width:100%; margin-bottom:12px;" onclick="copyTextarea('newPrivateKeyOutput')">📋 ចម្លង Private Key</button>
+        <button class="btn-secondary" style="width:100%; margin-bottom:12px;" data-act="copyTextarea" data-args='["newPrivateKeyOutput"]'>📋 ចម្លង Private Key</button>
 
         <label style="text-align:left;">Public Key (ដាក់ក្នុង license-verify.js គ្រប់ App)</label>
         <textarea id="newPublicKeyOutput" readonly style="min-height:70px;"></textarea>
-        <button class="btn-secondary" style="width:100%;" onclick="copyTextarea('newPublicKeyOutput')">📋 ចម្លង Public Key</button>
+        <button class="btn-secondary" style="width:100%;" data-act="copyTextarea" data-args='["newPublicKeyOutput"]'>📋 ចម្លង Public Key</button>
 
         <div class="modal-btns" style="margin-top:12px;">
-            <button class="btn-cancel" onclick="dismissKeypairModal()">បិទ</button>
+            <button class="btn-cancel" data-act="dismissKeypairModal">បិទ</button>
         </div>
     </div>
 </div>
@@ -278,8 +272,8 @@ const firebaseConfig = {
         <p style="font-size:12px; color:#a3123a; text-align:left; line-height:1.5;">⚠️ ការបន្ថែមសុពលភាពធ្វើការតែលើគ្រឿងដែល Activate រួចហើយប៉ុណ្ណោះ។ បន្ទាប់ពីថ្ងៃផុតកំណត់ដើមរបស់ Key កន្លងផុត Key នេះ <strong>លែងអាច Activate លើគ្រឿងថ្មី ឬគ្រឿងដែល Reset រួច</strong>បានទៀតទេ — ករណីនោះត្រូវបង្កើត Key ថ្មីជំនួស។</p>
         <input type="number" id="extendDaysInput" value="30" min="1" step="1">
         <div class="modal-btns">
-            <button class="btn-confirm" onclick="confirmExtendKey()">រក្សាទុក</button>
-            <button class="btn-cancel" onclick="closeModal('extendModal')">បោះបង់</button>
+            <button class="btn-confirm" data-act="confirmExtendKey">រក្សាទុក</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["extendModal"]'>បោះបង់</button>
         </div>
     </div>
 </div>

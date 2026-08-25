@@ -79,7 +79,7 @@ function sliceConst(name) {
 
 const REQUIRED_FNS = [
     'connectionLooksOnline', 'renderConnectionStatus', 'nudgeDatabaseConnection',
-    'forceDatabaseReconnect', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
+    'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
     'detachDatabaseListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
@@ -200,15 +200,24 @@ function buildContext() {
         'let reconnectWatchdogTimer = null;\n' +
         'let reconnectWatchdogAttempt = 0;\n' +
         'let lastForcedReconnectAt = 0;\n' +
+        // ស្ថានភាពដែលកំណត់ថាតើវដ្ត goOffline()+goOnline() មានតម្លៃឬអត់៖
+        // វា **កាត់ផ្តាច់ handshake ដែលកំពុងដំណើរការ** ដូច្នេះវាមានតម្លៃតែពេល
+        // SDK ទំនងជាកំពុងអង្គុយក្នុងបង្អួច backoff ប៉ុណ្ណោះ។ scenario ភាគច្រើន
+        // ក្នុងឯកសារនេះជា «ធ្លាប់ភ្ជាប់រួច ➜ ដាច់» ដូច្នេះវាចាប់ផ្តើមជា true។
+        'let hasEverConnectedToDatabase = true;\n' +
+        'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
         'reconnectWatchdogAttempt, pending: Array.from(dbListenerPendingPaths) });\n' +
+        'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
+        'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
         'handleDbListenerError, initDatabaseListeners, noteDbListenerAlive, retryFailedDbListenersNow, ' +
         'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog };\n';
 
     vm.runInContext(code, ctx);
-    return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe };
+    return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
+        setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory };
 }
 
 // ── ១. ការតភ្ជាប់ធម្មតា ─────────────────────────────────────────────
@@ -370,6 +379,71 @@ function buildContext() {
     const settled = t.log.goOffline;
     t.advance(120000);
     ok('watchdog ឈប់ពេលភ្ជាប់បាន', t.log.goOffline === settled, t.log.goOffline);
+}
+
+// ── ១០ខ. វដ្ត goOffline()+goOnline() មិនត្រូវកាត់ផ្តាច់ handshake ដំបូង ──
+// វាស់រួច (audit-tools/reconnect-ladder-test.js)៖ ពេល handshake ដំបូងយឺតជាង
+// ជំហានដំបូងរបស់ watchdog (៥ វិ.) ការ force-cycle **កាត់ផ្តាច់វា** ហើយចាប់
+// ផ្តើមឡើងវិញ ➜ បាត់ ៥–៣៥ វិនាទីលើបណ្តាញ 2G។ មុនការភ្ជាប់ជោគជ័យលើកដំបូង
+// backoff ខាងក្នុងរបស់ SDK នៅតូច ដូច្នេះការ reset វា **គ្មានអ្វីទទួលបានទេ**។
+// តែពេលបណ្តាញទើបត្រឡប់មកវិញ SDK ទំនងជាកំពុងអង្គុយក្នុងបង្អួច backoff ដែល
+// រីកធំ ➜ វដ្តនោះ **មានតម្លៃពិត** ➜ ត្រូវអនុញ្ញាត។
+{
+    const t = buildContext();
+    t.setConnHistory(false, false);
+    t.ctx.isDatabaseConnected = false;
+    t.api.nudgeDatabaseConnection();
+    ok('មិនទាន់ដែលភ្ជាប់ + បណ្តាញឡើងជាប់ ៖ **មិនកាត់ផ្តាច់ handshake**',
+        t.log.goOffline === 0 && t.log.goOnline === 1, [t.log.goOffline, t.log.goOnline]);
+
+    t.advance(5001);
+    ok('watchdog ក៏មិនកាត់ផ្តាច់វាដែរ', t.log.goOffline === 0, t.log.goOffline);
+    t.advance(30000);
+    ok('ទោះជុំក្រោយៗក៏មិនកាត់ផ្តាច់ដែរ', t.log.goOffline === 0, t.log.goOffline);
+}
+{
+    const t = buildContext();
+    t.setConnHistory(false, true);
+    t.ctx.isDatabaseConnected = false;
+    t.api.nudgeDatabaseConnection();
+    ok('បណ្តាញទើបត្រឡប់មក ៖ **វដ្តត្រូវអនុញ្ញាត** (reset backoff ដែលរីកធំ)',
+        t.log.goOffline === 1 && t.log.goOnline === 1, [t.log.goOffline, t.log.goOnline]);
+    ok('ទង់ «បណ្តាញទើបមក» ត្រូវប្រើតែម្តង', t.connHistory().networkJustReturned === false);
+
+    t.advance(5001);
+    ok('ជុំបន្ទាប់លែងកាត់ផ្តាច់ handshake ថ្មីទៀត', t.log.goOffline === 1, t.log.goOffline);
+}
+{
+    const t = buildContext();
+    t.setConnHistory(true, false);
+    t.ctx.isDatabaseConnected = false;
+    t.api.nudgeDatabaseConnection();
+    ok('ធ្លាប់ភ្ជាប់រួច ➜ ដាច់ ៖ វដ្តនៅដំណើរការដដែល (ឥរិយាបថចាស់)',
+        t.log.goOffline === 1 && t.log.goOnline === 1, [t.log.goOffline, t.log.goOnline]);
+}
+{
+    const t = buildContext();
+    t.setConnHistory(false, false);
+    ok('canCycleDatabaseConnection ៖ មិនដែលភ្ជាប់ + បណ្តាញមិនទើបមក ➜ false',
+        t.ctx.canCycleDatabaseConnection() === false);
+    t.setConnHistory(true, false);
+    ok('canCycleDatabaseConnection ៖ ធ្លាប់ភ្ជាប់ ➜ true', t.ctx.canCycleDatabaseConnection() === true);
+    t.setConnHistory(false, true);
+    ok('canCycleDatabaseConnection ៖ បណ្តាញទើបមក ➜ true', t.ctx.canCycleDatabaseConnection() === true);
+}
+
+// ── ១០គ. ទាំង ២ App ត្រូវផ្តល់សញ្ញាទាំង ២ ─────────────────────────
+{
+    const zw = fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8');
+    const kg = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+    [['ZoeW', zw], ['ZoeKeyGen', kg]].forEach(([name, src]) => {
+        ok(name + ' ៖ កត់ត្រាការភ្ជាប់ជោគជ័យលើកដំបូង',
+            /hasEverConnectedToDatabase = true;/.test(src));
+        ok(name + ' ៖ ព្រឹត្តិការណ៍ `online` លើកទង់ «បណ្តាញទើបមក»',
+            /addEventListener\('online', \(\) => \{\s*\n\s*networkJustReturned = true;/.test(src));
+        ok(name + ' ៖ ស្ថានភាពនោះត្រូវ reset ពេលសាង Firebase app ថ្មី',
+            /hasEverConnectedToDatabase = false;[\s\S]{0,80}networkJustReturned = false;/.test(src));
+    });
 }
 
 // ── ១១. ZoeKeyGen ក៏ត្រូវមានយន្តការភ្ជាប់ឡើងវិញដដែល ─────────────────

@@ -1,4 +1,66 @@
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.13.0';
+
+const ACTION_ALLOWLIST = [
+    "blockFormSubmit",
+    "clearSigningKey",
+    "closeModal",
+    "confirmExtendKey",
+    "copyGeneratedKey",
+    "copySetupLink",
+    "copyTextarea",
+    "dismissKeypairModal",
+    "doLogin",
+    "generateLicenseKey",
+    "generateNewKeypair",
+    "generateSetupLink",
+    "loadSigningKey",
+    "migrateLegacyLicenseKeyMetadata",
+    "openConfigFlow",
+    "refreshKeyList",
+    "saveFirebaseConfig",
+    "saveNewSecurityPin",
+    "showLoginModalWithPrefill",
+    "verifySecurityPin"
+];
+function readActionArgs(el, event) {
+    const raw = el.getAttribute('data-args');
+    let args = [];
+    if (raw) {
+        try { args = JSON.parse(raw); } catch (e) { args = []; }
+        if (!Array.isArray(args)) args = [args];
+    } else {
+        const a1 = el.getAttribute('data-a1');
+        const a2 = el.getAttribute('data-a2');
+        if (a1 !== null) args.push(a1);
+        if (a2 !== null) args.push(a2);
+    }
+    if (el.getAttribute('data-evt')) args.unshift(event);
+    if (el.getAttribute('data-self')) args.unshift(el);
+    return args;
+}
+
+function runElementAction(el, event) {
+    const name = el.getAttribute('data-act');
+    if (!name || ACTION_ALLOWLIST.indexOf(name) === -1) return;
+    const fn = window[name];
+    if (typeof fn !== 'function') return;
+    fn.apply(null, readActionArgs(el, event));
+}
+
+function setupActionDelegation() {
+    ['click', 'change', 'input', 'submit'].forEach((type) => {
+        document.addEventListener(type, (event) => {
+            const el = event.target && event.target.closest ? event.target.closest('[data-act]') : null;
+            if (!el) return;
+            const want = el.getAttribute('data-on') || 'click';
+            if (want !== type) return;
+            runElementAction(el, event);
+        });
+    });
+}
+function blockFormSubmit(event) {
+    if (event) event.preventDefault();
+}
 
 const LICENSE_APP_CODE = 'ADM';
 
@@ -117,6 +179,8 @@ let authGeneration = 0;
 let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
+let hasEverConnectedToDatabase = false;
+let networkJustReturned = false;
 let reconnectWatchdogTimer = null;
 let reconnectWatchdogAttempt = 0;
 let lastForcedReconnectAt = 0;
@@ -153,13 +217,20 @@ function clearReconnectWatchdog() {
     reconnectWatchdogAttempt = 0;
 }
 
+function canCycleDatabaseConnection() {
+    return hasEverConnectedToDatabase || networkJustReturned;
+}
+
 function forceDatabaseReconnect() {
     if (!fb || !db || typeof fb.goOnline !== 'function') return false;
     const now = Date.now();
     if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
     lastForcedReconnectAt = now;
     try {
-        if (typeof fb.goOffline === 'function') fb.goOffline(db);
+        if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {
+            networkJustReturned = false;
+            fb.goOffline(db);
+        }
     } catch (e) {}
     try { fb.goOnline(db); } catch (e) { return false; }
     return true;
@@ -188,6 +259,7 @@ function nudgeDatabaseConnection() {
 
 function setupConnectionRecovery() {
     window.addEventListener('online', () => {
+        networkJustReturned = true;
         renderConnectionStatus();
         nudgeDatabaseConnection();
         retryPendingRoleCheck();
@@ -368,6 +440,9 @@ async function initFirebase() {
             }
             serverTimeSynced = false;
             serverTimeOffsetMs = 0;
+            isDatabaseConnected = false;
+            hasEverConnectedToDatabase = false;
+            networkJustReturned = false;
         }
 
         const firebaseApp = fb.getApps().length ? fb.getApps()[0] : fb.initializeApp(firebaseConfig);
@@ -379,6 +454,7 @@ async function initFirebase() {
         dbRefConnected = fb.ref(db, '.info/connected');
         fb.onValue(dbRefConnected, (snap) => {
             isDatabaseConnected = snap.val() === true;
+            if (isDatabaseConnected) hasEverConnectedToDatabase = true;
             if (isDatabaseConnected) clearReconnectWatchdog();
             else if (navigator.onLine !== false) scheduleReconnectWatchdog();
             renderConnectionStatus();
@@ -812,18 +888,16 @@ function saveFirebaseConfig() {
         alert(firebaseConfigErrorMessage(e));
         return;
     }
-    try {
-        const parsed = normalized.config;
-        cfgInput.value = JSON.stringify(parsed, null, 2);
-        if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
-
-        localStorage.setItem('zoew_firebase_config', JSON.stringify(parsed));
-        showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
-        closeModal('configModal');
-        initFirebase();
-    } catch (e) {
-        alert("ការកំណត់រចនាសម្ព័ន្ធមិនត្រឹមត្រូវទេ!");
+    const parsed = normalized.config;
+    cfgInput.value = JSON.stringify(parsed, null, 2);
+    if (!safeStoreSet(localStorage, 'zoew_firebase_config', JSON.stringify(parsed))) {
+        alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
+        return;
     }
+    if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+    showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
+    closeModal('configModal');
+    initFirebase();
 }
 
 function showLoginModalWithPrefill() {
@@ -919,6 +993,44 @@ function readDatabaseUrlFromConfig() {
     }
 }
 
+function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const opts = Object.assign({}, options || {});
+    if (controller) opts.signal = controller.signal;
+    const timeoutErr = new Error(timeoutMsg || 'Timed out');
+    let settled = false;
+    let timer = null;
+    return new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            reject(timeoutErr);
+        }, ms);
+        fetch(url, opts).then((res) => {
+            if (settled) return null;
+            if (!readBody) return { res: res, body: undefined };
+            return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));
+        }, (err) => {
+            if (settled) return null;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+            return null;
+        }).then((out) => {
+            if (settled || !out) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(out);
+        }, (err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(err);
+        });
+    });
+}
+
 function isFirebaseDatabaseHost(url) {
     try {
         const parsed = new URL(url);
@@ -940,21 +1052,23 @@ async function readUserRoleViaRest(user) {
         lastRoleRestOutcome = 'unavailable';
         throw new Error('REST role check unavailable');
     }
-    let res;
+    let out;
     try {
         const token = await user.getIdToken();
-        res = await fetch(base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token), { cache: 'no-store' });
+        out = await fetchWithTimeout(
+            base + '/user_roles/' + encodeURIComponent(user.uid) + '.json?auth=' + encodeURIComponent(token),
+            { cache: 'no-store' }, ROLE_CHECK_CONNECT_WAIT_MS, 'REST role check timed out',
+            (r) => (r.ok ? r.json() : null));
     } catch (e) {
         lastRoleRestOutcome = 'blocked: ' + ((e && e.message) || 'unknown');
         throw e;
     }
-    if (!res.ok) {
-        lastRoleRestOutcome = 'http ' + res.status;
-        throw new Error('REST role check failed: ' + res.status);
+    if (!out.res.ok) {
+        lastRoleRestOutcome = 'http ' + out.res.status;
+        throw new Error('REST role check failed: ' + out.res.status);
     }
-    const value = await res.json();
     lastRoleRestOutcome = 'ok';
-    return value;
+    return out.body;
 }
 
 function readUserRole(user) {
@@ -1722,6 +1836,7 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreSetupLinkBaseUrl();
     setupIOSPullToRefresh();
 
+    setupActionDelegation();
     setupConnectionRecovery();
 
     document.addEventListener('visibilitychange', () => {

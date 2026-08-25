@@ -126,3 +126,9 @@ PIN ខ្លី/មិនត្រូវគ្នា, ការចាក់ស�
 រាល់ពេលឯកសារ static ណាមួយប្រែ ត្រូវ bump `CACHE_VERSION` ក្នុង `sw.js`
 (`zoeimport-vN`)។ កំណែរបស់ App នេះ **ដាច់ដោយឡែកពី `APP_VERSION` របស់
 ZoeW/ZoeKeyGen** — `audit-tools/version-check.js` ពិនិត្យតែ App ទាំង ២ នោះ។
+
+**`sw.js` ឆ្លើយតបសំបកដែល cache ទុករួច ភ្លាម** (`zoeimport-v2`) ជំនួសការប្រណាំង
+នឹងបណ្តាញ ៣ វិនាទីក្នុងមួយសំណើ ➜ App បើកភ្លាមទោះបណ្តាញខ្សោយ ហើយការធ្វើឲ្យ
+ស្រស់ធ្វើខាងក្រោយ (រំលងពេលក្រៅបណ្តាញ)។ `SHELL_PATHS` កំណត់ថា **មានតែឯកសារ
+របស់សំបកទេ** ដែលអាចចូល Cache Storage បាន។ ចាក់សោដោយ
+`audit-tools/sw-shell-latency-test.js` (ផ្នែកស្តាទិចគ្រប់ទាំង ៣ App)។

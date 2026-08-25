@@ -204,8 +204,16 @@ function buildContext(app) {
     vm.runInContext(preamble, ctx);
     const wanted = ['withTimeout', 'readDatabaseUrlFromConfig', 'readUserRoleViaRest', 'readUserRole',
         'retryPendingRoleCheck', app.verify, app.login];
-    if (fs.readFileSync(path.join(appRoot, app.file), 'utf8').indexOf('function isFirebaseDatabaseHost(') !== -1) {
+    const appSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
+    if (appSrc.indexOf('function isFirebaseDatabaseHost(') !== -1) {
         wanted.splice(2, 0, 'isFirebaseDatabaseHost');
+    }
+    // ចាប់ពីកំណែ 2.12.1 `readUserRoleViaRest()` ឆ្លងកាត់ `fetchWithTimeout()`
+    // ដែល **បោះបង់សំណើពិត** ជំនួស `fetch()` ឆៅ (មើល network-timeout-test.js)។
+    // ត្រូវដក helper នោះចេញមកជាមួយ បើមិនដូច្នេះការហៅ REST throw
+    // `fetchWithTimeout is not defined` ហើយ scenario REST ទាំងអស់ធ្លាក់។
+    if (appSrc.indexOf('function fetchWithTimeout(') !== -1) {
+        wanted.unshift('fetchWithTimeout');
     }
     if (app.boot === 'setupAuthListener') wanted.push('setupAuthListener');
     vm.runInContext(sliceFns(app.file, wanted), ctx);

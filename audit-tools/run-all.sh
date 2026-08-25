@@ -61,10 +61,11 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene version-check; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
+run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
 run "css-media-override" node audit-tools/css-media-override.js
@@ -73,6 +74,7 @@ run "layout-thrash (browser ពិត)" node audit-tools/layout-thrash.js
 run "panel-motion (browser ពិត)" node audit-tools/panel-motion-test.js
 run "ios-panel-glide (browser ពិត)" node audit-tools/ios-panel-glide-test.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
+run "sdk-offline-boot (browser ពិត)" node audit-tools/sdk-offline-boot-test.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js

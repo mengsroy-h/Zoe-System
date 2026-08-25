@@ -1,4 +1,4 @@
-const APP_VERSION = '2.17.0';
+const APP_VERSION = '2.17.1';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -226,7 +226,40 @@ function connectionLooksOnline() {
 
 function connectionIsSettlingIn() {
     if (isDatabaseConnected || navigator.onLine === false) return false;
+    if (firebaseSdkUnavailable) return false;
     return reconnectWatchdogAttempt < CONNECTING_GRACE_ATTEMPTS;
+}
+
+const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
+let firebaseSdkRetryTimer = null;
+let firebaseSdkRetryAttempt = 0;
+let firebaseSdkUnavailable = false;
+let sdkUnavailableNoticeShown = false;
+
+function clearFirebaseSdkRetry() {
+    if (firebaseSdkRetryTimer) {
+        clearTimeout(firebaseSdkRetryTimer);
+        firebaseSdkRetryTimer = null;
+    }
+    firebaseSdkRetryAttempt = 0;
+}
+
+function scheduleFirebaseSdkRetry() {
+    if (firebaseSdkRetryTimer || isDatabaseInitialized) return;
+    const step = FIREBASE_SDK_RETRY_STEPS_MS[Math.min(firebaseSdkRetryAttempt, FIREBASE_SDK_RETRY_STEPS_MS.length - 1)];
+    firebaseSdkRetryAttempt++;
+    firebaseSdkRetryTimer = setTimeout(() => {
+        firebaseSdkRetryTimer = null;
+        if (isDatabaseInitialized) { clearFirebaseSdkRetry(); return; }
+        initFirebase();
+    }, step);
+}
+
+function retryFirebaseSdkNow() {
+    if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
+    if (navigator.onLine === false) return;
+    clearFirebaseSdkRetry();
+    initFirebase();
 }
 
 function renderConnectionStatus() {
@@ -294,6 +327,7 @@ function setupConnectionRecovery() {
     window.addEventListener('online', () => {
         networkJustReturned = true;
         renderConnectionStatus();
+        retryFirebaseSdkNow();
         nudgeDatabaseConnection();
         retryPendingRoleCheck();
         if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
@@ -429,6 +463,7 @@ function waitForFirebaseSDK(timeoutMs = 15000) {
     if (window.firebaseSDK) return Promise.resolve(window.firebaseSDK);
     return new Promise((resolve, reject) => {
         const notReadyErr = new Error('Firebase SDK failed to load (network/CDN issue)');
+        notReadyErr.code = 'SDK_UNAVAILABLE';
         let timer = null;
         const onReady = () => {
             clearTimeout(timer);
@@ -463,6 +498,9 @@ async function initFirebase() {
     try {
         firebaseConfig = JSON.parse(savedConfig);
         fb = await waitForFirebaseSDK();
+        firebaseSdkUnavailable = false;
+        sdkUnavailableNoticeShown = false;
+        clearFirebaseSdkRetry();
 
         const existingApps = fb.getApps();
         if (existingApps.length) {
@@ -506,6 +544,16 @@ async function initFirebase() {
         setupAuthListener();
         return true;
     } catch (e) {
+        if (e && e.code === 'SDK_UNAVAILABLE') {
+            firebaseSdkUnavailable = true;
+            renderConnectionStatus();
+            if (!sdkUnavailableNoticeShown) {
+                sdkUnavailableNoticeShown = true;
+                showToast('⚠️ ភ្ជាប់ Server មិនបានទេ — សូមពិនិត្យបណ្តាញ។ កំពុងព្យាយាមម្តងទៀត...');
+            }
+            scheduleFirebaseSdkRetry();
+            return false;
+        }
         console.error("Invalid Saved Config", e);
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Invalid Saved Config" });
         checkPinAndOpenConfig();

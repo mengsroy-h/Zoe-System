@@ -84,6 +84,23 @@ equal('detect chinese headers',
     detectMapping_(['运单号', '收件人电话', '代收货款', '运费']),
     { barcode: 0, dod: 3, cod: 2, phone: 1 });
 
+const ZTO_REAL_HEADERS = [
+    'ស្កេនលេខបុងបញ្ញើ',
+    'ទឹកប្រាក់ដែលទូទាត់នៅពេលទំនិញដល់គោលដៅ',
+    'ប្រាក់ប្រមូលជំនួស',
+    'លេខទូរស័ព្ទអ្នកទទួលទំនិញ'
+];
+
+equal('detect real ZTO khmer export headers',
+    detectMapping_(ZTO_REAL_HEADERS),
+    { barcode: 0, dod: 1, cod: 2, phone: 3 });
+
+equal('khmer cod header does not steal the dod column',
+    detectMapping_(ZTO_REAL_HEADERS).dod, 1);
+
+equal('khmer receiver phone header wins over bare phone hint',
+    detectMapping_(ZTO_REAL_HEADERS).phone, 3);
+
 equal('detect zoeadmin own headers',
     detectMapping_(['Barcode', 'DOD($)', 'COD($)', 'Phone']),
     { barcode: 0, dod: 1, cod: 2, phone: 3 });
@@ -103,6 +120,13 @@ assertUniqueColumns('one header matching cod and dod is claimed once',
     detectMapping_(['Waybill', 'COD/DOD Amount', 'Phone']));
 assertUniqueColumns('one header matching phone and mobile is claimed once',
     detectMapping_(['Waybill No', 'Mobile Phone', 'COD']));
+assertUniqueColumns('real ZTO headers each claim one column',
+    detectMapping_(ZTO_REAL_HEADERS));
+
+equal('an exact header beats a merely-containing one',
+    detectMapping_(['Total COD Value', 'COD']).cod, 1);
+equal('an exact header beats a merely-containing one, order reversed',
+    detectMapping_(['COD', 'Total COD Value']).cod, 0);
 
 equal('cod beats dod on a cod header', detectMapping_(['Waybill', 'COD($)']).cod, 1);
 equal('dod not stolen by cod hint', detectMapping_(['Waybill', 'DOD($)']).dod, 1);

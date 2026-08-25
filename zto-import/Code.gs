@@ -19,15 +19,19 @@ var HEADER_HINTS = {
     barcode: ['barcode', 'bar code', 'waybill', 'waybillno', 'waybill no', 'waybillnumber', 'waybill number',
         'billcode', 'bill code', 'billno', 'tracking', 'trackingno', 'tracking no', 'trackingnumber',
         'tracking number', 'orderno', 'order no', 'ordernumber', 'expressno', 'express no',
-        '运单号', '运单编号', '快递单号', '单号', 'លេខកញ្ចប់', 'បាកូដ'],
+        '运单号', '运单编号', '快递单号', '单号',
+        'ស្កេនលេខបុងបញ្ញើ', 'លេខបុងបញ្ញើ', 'បុងបញ្ញើ', 'លេខកញ្ចប់', 'បាកូដ'],
     cod: ['cod', 'cod$', 'cod amount', 'codamount', 'cod fee', 'codfee', 'cash on delivery',
-        'collect on delivery', 'collection', 'collectamount', '代收货款', '代收金额', '代收'],
+        'collect on delivery', 'collection', 'collectamount', '代收货款', '代收金额', '代收',
+        'ប្រាក់ប្រមូលជំនួស', 'ប្រមូលជំនួស'],
     dod: ['dod', 'dod$', 'dod amount', 'dodamount', 'deliver on demand', 'delivery fee', 'deliveryfee',
-        'freight', 'freightfee', 'shipping fee', 'shippingfee', '运费', '派费'],
+        'freight', 'freightfee', 'shipping fee', 'shippingfee', '运费', '派费',
+        'ទឹកប្រាក់ដែលទូទាត់នៅពេលទំនិញដល់គោលដៅ', 'ទូទាត់នៅពេលទំនិញដល់គោលដៅ', 'ទំនិញដល់គោលដៅ'],
     phone: ['phone', 'phone number', 'phoneno', 'phone no', 'mobile', 'mobileno', 'mobile no',
         'mobile number', 'tel', 'telephone', 'receiver phone', 'receiverphone', 'receiver mobile',
         'consignee phone', 'consigneephone', 'contact', 'contactno', 'contact number',
-        '收件人电话', '收件人手机', '收件人联系电话', '电话', '手机', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ']
+        '收件人电话', '收件人手机', '收件人联系电话', '电话', '手机',
+        'លេខទូរស័ព្ទអ្នកទទួលទំនិញ', 'ទូរស័ព្ទអ្នកទទួល', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ']
 };
 
 function doGet() {

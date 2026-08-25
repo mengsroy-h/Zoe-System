@@ -10,7 +10,13 @@
 //      ដោយគ្មាន timer ណាការពារ ➜ ប្រអប់ជាប់ជារៀងរហូត។
 //
 // ដំណោះស្រាយ៖ `fetchWithTimeout()` ដែលប្រើ `AbortController` ហើយ timer
-// របស់វារស់រហូតដល់ **អានតួចប់** (ដូច `license-verify.js` ធ្វើរួចហើយ)។
+// របស់វារស់រហូតដល់ **អានតួចប់**។
+//
+// `license-verify.js` ធ្លាប់មានកំហុសដដែលនេះ ៖ វា `clearTimeout` ក្នុង
+// `finally` របស់ `fetch` ➜ timer ស្លាប់ភ្លាមពេល **header** មកដល់ ➜
+// `res.json()` ខាងក្រោយអាចព្យួររហូត។ ព្រោះ `checkOnline()` ត្រូវហៅតាម
+// កាលវិភាគ ការព្យួរនោះកកកុញសំណើរស់មួយក្នុងមួយជុំ រហូតដល់ Refresh។
+// ឥឡូវទាំង ២ ឯកសារឆ្លងកាត់ helper ដែល abort ពិត។
 const fs = require('fs'), http = require('http'), path = require('path');
 const ROOT = process.env.NETTIMEOUT_APP_DIR || path.join(__dirname, '..');
 
@@ -36,6 +42,19 @@ ok('timer ត្រូវរស់រហូតដល់អានតួចប់ 
     /readBody\(res\)/.test(src) && /clearTimeout\(timer\)/.test(src));
 ok('ការ abort ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង',
     !/fetch\(url, opts\)\s*\.then\([^)]*\)\s*\.catch\(/.test(src));
+
+// === ផ្នែកទី ១ខ — license-verify.js ត្រូវគោរពច្បាប់ដដែល ===
+const licSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'license-verify.js'), 'utf8');
+
+ok('license-verify.js មាន helper ដែល abort ពិត',
+    /async function fetchWithBodyTimeout\(/.test(licSrc) && /new AbortController\(\)/.test(licSrc));
+ok('license-verify.js គ្មាន fetch() ឆៅក្រៅ helper',
+    (licSrc.match(/(?<!function )\bfetch\(/g) || []).length === 1,
+    'fetch ឆៅ៖ ' + (licSrc.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).join(' | '));
+ok('license-verify.js អានតួ **ខាងក្នុង** បង្អួច timeout មិនមែនក្រោយវា',
+    /await fetch\([\s\S]{0,200}?await readBody\(res\)[\s\S]{0,120}?finally\s*\{\s*clearTimeout\(timer\);/.test(licSrc));
+ok('license-verify.js គ្មាន clearTimeout មុនអានតួ',
+    !/finally\s*\{\s*clearTimeout\(timer\);\s*\}[\s\S]{0,1200}?await res\.(json|text)\(\)/.test(licSrc));
 
 // === ផ្នែកទី ២ — ឥរិយាបថពិតក្នុង Chromium ===
 let chromium;
@@ -152,6 +171,38 @@ function serve() {
     }, base);
     ok('សំណើធម្មតា ➜ ត្រឡប់ res និង body ត្រឹមត្រូវ',
         good.status === 200 && good.body && good.body.ok === true, good);
+
+    // ៤ខ — helper ពិតរបស់ license-verify.js ក៏ត្រូវឈប់ដែរ ពេលតួមិនមក
+    const licFn = (function () {
+        const at = licSrc.indexOf('async function fetchWithBodyTimeout(');
+        if (at === -1) return null;
+        let depth = 0, start = licSrc.indexOf('{', at), end = start;
+        for (let k = start; k < licSrc.length; k++) {
+            if (licSrc[k] === '{') depth++;
+            else if (licSrc[k] === '}') { depth--; if (!depth) { end = k; break; } }
+        }
+        return licSrc.slice(at, end + 1);
+    })();
+    ok('ស្រង់ fetchWithBodyTimeout ពិតចេញពី license-verify.js បាន', !!licFn);
+    if (licFn) {
+        await page.evaluate('(function(){ const NET_TIMEOUT_MS = 700; ' + licFn +
+            '; window.fetchWithBodyTimeout = fetchWithBodyTimeout; })()');
+        const licBefore = abortedSockets;
+        const licPartial = await page.evaluate(async (b) => {
+            const t0 = Date.now();
+            try {
+                await fetchWithBodyTimeout(b + '/headers-only', (r) => r.json());
+                return { rejected: false, ms: Date.now() - t0 };
+            } catch (e) {
+                return { rejected: true, ms: Date.now() - t0, name: String(e && e.name) };
+            }
+        }, base);
+        ok('checkOnline៖ header មករួច តែតួមិនមក ➜ ឈប់ក្នុងពេលកំណត់ (មិនព្យួររហូត)',
+            licPartial.rejected && licPartial.ms < 2500, licPartial);
+        await page.waitForTimeout(400);
+        ok('checkOnline៖ សំណើដែលព្យួរត្រូវ abort ពិត (មិនកកកុញ)',
+            abortedSockets - licBefore >= 1, { licBefore, after: abortedSockets });
+    }
 
     // ៥ — ការហៅជាបន្តបន្ទាប់ (ដូច retryAsync) មិនត្រូវបន្សល់សំណើរស់
     const before = abortedSockets;

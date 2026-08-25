@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v90';
+const CACHE_VERSION = 'zoew-v91';
 
 // ធនធាន **ស្នូល** — បើមួយណាមិនចូល cache នោះ install ត្រូវ **ធ្លាក់** ដើម្បី
 // កុំឲ្យ SW ចាប់យក client ដោយសំបកខូច។ មុននេះគ្រប់ធនធានប្រើ
@@ -45,6 +45,15 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// សំណើ navigate ត្រូវប្រើ './index.html' ជាកូនសោ cache **ជានិច្ច**។ បើទុក
+// `request` ជាកូនសោ នោះ URL ពេញ រួមទាំង `?setup=<config អាជីវកម្ម>` ចូល
+// Cache Storage ➜ វា **រស់រានក្រោយចាកចេញ** (ផ្ទុយនឹងច្បាប់ Setup Link) ហើយ
+// អានបានតាម DevTools ➜ Application ➜ Cache Storage។ ការឆ្លើយតបគឺ index.html
+// ដដែលសម្រាប់គ្រប់ផ្លូវ (Netlify rewrite) ដូច្នេះកូនសោតែមួយត្រឹមត្រូវ។
+function cacheKeyFor(request) {
+    return request.mode === 'navigate' ? './index.html' : request;
+}
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;
@@ -52,12 +61,16 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
 
+    const cacheKey = cacheKeyFor(request);
+
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>
-            cache.match(request).then((cached) => {
+            cache.match(cacheKey).then((cached) => {
                 const networkFetch = fetch(request)
                     .then((response) => {
-                        if (response && response.ok) cache.put(request, response.clone()).catch(() => {});
+                        // `redirected` មិនអាចដាក់ចូល cache បានទេ (បោះ TypeError)
+                        // ហើយវាក៏មិនមែនជាសំបកត្រឹមត្រូវសម្រាប់កូនសោ navigate ដែរ។
+                        if (response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
                     })
                     .catch(() => null);

@@ -2,7 +2,7 @@
 
 ZoeKeyGen គឺជា PWA សម្រាប់ Admin បង្កើត, revoke និងបន្ថែមសុពលភាព Activation Key របស់ ZoeW។ វាត្រូវប្រើ Firebase Project **ដាច់ដោយឡែកពី Business Firebase Project** ដើម្បីបំបែកគណនី License និង private signing key ចេញពីទិន្នន័យ Parcel/COD/DOD។
 
-កំណែបច្ចុប្បន្ន៖ **2.11.5** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
+កំណែបច្ចុប្បន្ន៖ **2.11.6** (កំណែតែមួយប្រើរួមគ្នាទាំង ZoeW និង ZoeKeyGen — មើល [CHANGELOG.md](../CHANGELOG.md))។
 
 ## រចនាសម្ព័ន្ធ License
 

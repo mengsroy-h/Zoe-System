@@ -151,17 +151,86 @@ Test៖ **`sw-install-integrity-test.js`** (បដិសេធធនធានស
 ជាមួយ `retryAsync` សំណើជាន់គ្នាស៊ី bandwidth; ហើយ timeout គ្របតែ **header**
 ដូច្នេះ `res.json()`/`res.text()` អាច **ព្យួររហូត** បើ server ផ្ញើ header រួច
 ឈប់ផ្ញើតួ។ `fetchWithTimeout()` ប្រើ `AbortController` ហើយ timer របស់វារស់
-រហូតដល់ **អានតួចប់** (ដូច `license-verify.js` ធ្វើរួចហើយ)។ វាត្រឡប់
-`{ res, body }` ដូច្នេះអ្នកហៅត្រូវអាន `out.res.ok` និង `out.body`។
-Test៖ **`network-timeout-test.js`**។
+រហូតដល់ **អានតួចប់**។ វាត្រឡប់ `{ res, body }` ដូច្នេះអ្នកហៅត្រូវអាន
+`out.res.ok` និង `out.body`។
+
+> ⚠️ **`license-verify.js` ធ្លាប់មានកំហុសដដែលនេះរហូតដល់កំណែ 2.11.6** ទោះឯកសារ
+> នេះធ្លាប់សរសេរថាវា «ធ្វើរួចហើយ»។ វា `clearTimeout` ក្នុង `finally` របស់
+> `fetch` ➜ timer ស្លាប់ភ្លាមពេល **header** មកដល់ ➜ `res.json()` ខាងក្រោយ
+> គ្មានអ្វីការពារ។ ព្រោះ `checkOnline()` ដើរតាមកាលវិភាគ (`ensureAppActivated`
+> ជារង្វង់) សំណើព្យួរ **កកកុញមួយក្នុងមួយជុំ** រហូតដល់ Refresh។ ឥឡូវទាំង ២
+> ឯកសារឆ្លងកាត់ helper ដែល abort ពិត — `license-verify.js` មាន
+> `fetchWithBodyTimeout()` របស់វា (វាជា REST-only គ្មាន `app.js` ជុំវិញ)។
+> **មេរៀន៖ ការអះអាងក្នុងឯកសារនេះមិនមែនជាភស្តុតាងទេ — កូដទើបជាភស្តុតាង។**
+
+Test៖ **`network-timeout-test.js`** (គ្រប `app.js` **និង** `license-verify.js`)។
 
 **ស្ថានភាពការតភ្ជាប់ត្រូវរួមបញ្ចូល `navigator.onLine`។** `.info/connected`
 របស់ Firebase អាចនៅ `true` រហូតដល់ជាងមួយនាទីក្រោយឧបករណ៍បាត់ WiFi (រង់ចាំ
 TCP timeout) ➜ អ្នកប្រើឃើញចំណុចបៃតង «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានបណ្តាញ
-ពិត។ `connectionLooksOnline()` = `isDatabaseConnected && navigator.onLine !== false`
-ហើយ `renderConnectionStatus()` ជាកន្លែងសរសេរ UI **តែមួយ**។
-`setupConnectionRecovery()` ដាស់ `fb.goOnline(db)` ពេលត្រឡប់មក foreground និង
-ពេល `online` — ព្រោះក្រោយ iOS ផ្អាក App យូរ socket អាចស្លាប់ស្ងាត់ៗ។
+ពិត។ `connectionLooksOnline()` ត្រូវរួម `isDatabaseConnected`,
+`navigator.onLine !== false` **និង `!dbListenersFailed`** (ZoeW) ហើយ
+`renderConnectionStatus()` ជាកន្លែងសរសេរ UI **តែមួយ** — ក្នុង ZoeKeyGen ដែរ។
+
+**listener ដែល Firebase បោះបង់ មិនត្រឡប់មកវិញដោយខ្លួនឯងទេ (កំណែ 2.11.6)។**
+`onValue(ref, cb, errCb)` — ពេល `errCb` បាញ់ (ភាគច្រើន `permission_denied`
+ខណៈ token កំពុងធ្វើឡើងវិញ ឬក្រោយប្តូរ rules) នោះ **Firebase ដក listener នោះ
+ចេញ**។ មុន 2.11.6 App គ្រាន់តែបង្ហាញសារ «សូម Refresh» ១ ដង ➜ តារាង **កក
+ជារៀងរហូត** ខណៈចំណុចស្ថានភាពនៅបៃតង ➜ អ្នកប្រើបន្តស្កេនដោយគិតថាទាន់សម័យ។
+ច្បាប់ដែលត្រូវរក្សា៖
+
+- `handleDbListenerError()` លើក `dbListenersFailed`, សរសេរ UI ឡើងវិញ, បង្ហាញ
+  សារ **តែមួយ** ក្នុងមួយវគ្គដាច់ (`dbListenerOutageNoticeShown`) រួចកេះ
+  `scheduleDbListenerRecovery()` (២/៥/១០/២០/៣០ វិ.)។
+- `initDatabaseListeners()` ត្រូវហៅ `detachDatabaseListeners()` **គ្មានលក្ខខណ្ឌ**
+  មុនភ្ជាប់ — បើមិនដូច្នេះការស្តារបង្កើត **listener ស្ទួន** លើ ref ដែលមិនទាន់ស្លាប់។
+- `dbListenerPendingPaths` (Set នៃ path ទាំង ៦) ➜ ទង់រលត់តែពេល **គ្រប់ path**
+  ផ្ញើ snapshot មកវិញ (`noteDbListenerAlive`)។ ការរលត់ដោយ path តែមួយធ្វើឲ្យ
+  ការបដិសេធតែលើ `zoew_daily_revenue` (rules ខុសគ្នាតាម path) រអិលកាត់។
+- `runScheduledCleanup()` ត្រូវ **ឈប់** ខណៈ `dbListenersFailed` — កុំឲ្យការសម្អាត
+  ២ម៉ោង/៨ថ្ងៃ សម្រេចលើ snapshot កក។
+- ចាកចេញ ឬប្តូរ Config ➜ `resetDbListenerHealthState()`។
+
+**ការភ្ជាប់ឡើងវិញត្រូវ reset backoff របស់ Firebase។** `goOnline()` តែឯង
+**មិន reset ការរង់ចាំខាងក្នុងរបស់ SDK ទេ** ➜ ក្រោយបាត់ WiFi យូរ អ្នកប្រើអាច
+មើលចំណុចក្រហមរហូតដល់ជាងមួយនាទី ខណៈបណ្តាញដើរធម្មតាហើយ។ វដ្ត
+`goOffline()` + `goOnline()` **reset វា**។ ដូច្នេះ `nudgeDatabaseConnection()`៖
+
+- ភ្ជាប់ស្រាប់ ➜ `goOnline()` ធម្មតា (no-op)។
+- ដាច់ **ហើយ** `navigator.onLine !== false` ➜ `forceDatabaseReconnect()`
+  (វដ្តពេញ) បូក `scheduleReconnectWatchdog()` (៥/១០/២០/៤០/៦០ វិ.)។
+- គ្មានបណ្តាញ ➜ **មិនធ្វើអ្វីទេ** (កុំស៊ីថ្ម)។
+- `RECONNECT_FORCE_MIN_GAP_MS` (៣ វិ.) ត្រូវ **តូចជាង** ជំហានដំបូងរបស់ watchdog
+  បើមិនដូច្នេះ watchdog ត្រូវលេបដោយ rate limit ហើយមិនដែលព្យាយាមឡើងវិញ។
+  `lastForcedReconnectAt === 0` ត្រូវរាប់ថា «មិនដែល» — បើមិនដូច្នេះការភ្ជាប់
+  លើកដំបូងត្រូវទប់ ៣ វិនាទីដំបូងនៃអាយុ App។
+
+**ZoeKeyGen ទទួលយន្តការភ្ជាប់ឡើងវិញដដែល bytes ដដែល** — `forceDatabaseReconnect`,
+`scheduleReconnectWatchdog`, `clearReconnectWatchdog`, `nudgeDatabaseConnection`។
+មានតែ `connectionLooksOnline`, `renderConnectionStatus` និង `setupConnectionRecovery`
+ដែលបែកគ្នាដោយចេតនា (class/អត្ថបទ UI ផ្ទុយគ្នា; ZoeKeyGen គ្មាន listener ទិន្នន័យ)
+ហើយវាមានហេតុផលសរសេរជាប់ក្នុង `EXPECTED_DIVERGENT` របស់ `shared-fns.js`។
+
+Test៖ **`connection-recovery-test.js`**។
+
+**សំណើ navigate ត្រូវប្រើ `./index.html` ជាកូនសោ cache ជានិច្ច (កំណែ 2.11.6)។**
+មុននេះ `sw.js` ប្រើ `request` ឆៅជាកូនសោ ➜ ការបើក Setup Link
+`/?setup=<base64 config អាជីវកម្ម>` ដាក់ **URL ពេញ** ចូល Cache Storage។
+`history.replaceState()` លុបវាចេញពីរបា address តែ **មិនប៉ះ cache** ➜ payload
+**រស់រានក្រោយចាកចេញ** (ផ្ទុយនឹងច្បាប់ Setup Link) ហើយអានបានតាម DevTools ➜
+Application ➜ Cache Storage ដោយមិនចាំបាច់ដឹង PIN។ ការឆ្លើយតបគឺ `index.html`
+ដដែលសម្រាប់គ្រប់ផ្លូវ (Netlify rewrite `/* → /index.html 200`) ដូច្នេះកូនសោ
+តែមួយត្រឹមត្រូវ ហើយវាក៏ការពារ cache កុំឲ្យរីកតាមផ្លូវ SPA ដែរ។
+`cache.put()` ត្រូវរំលងការឆ្លើយតបដែល `redirected` (វាបោះ TypeError ហើយវាក៏
+មិនមែនជាសំបកត្រឹមត្រូវសម្រាប់កូនសោ navigate ដែរ)។
+Test៖ **`sw-cache-key-test.js`** (បើក Setup Link ពិត រួចអាន `caches` ដោយផ្ទាល់)។
+
+**ការពិនិត្យកំណែ Service Worker ត្រូវមាន throttle។** `reg.update()` ទាញ `sw.js`
+ពី network ជានិច្ច (header `no-cache`)។ មុន 2.11.6 វាត្រូវហៅរាល់
+`visibilitychange` **និង** រាល់ `focus` ➜ រាល់ការប្តូរ App លើទូរស័ព្ទបង្កើត
+សំណើថ្មី។ ឥឡូវយ៉ាងច្រើន **១ ដងក្នុង ១៥ នាទី**, រំលងទាំងស្រុងពេល
+`navigator.onLine === false`, ហើយបន្ថែម trigger `online` ដើម្បីកុំឲ្យកំណែថ្មី
+មកដល់យឺតជាងមុន។
 
 **`sw.js` ត្រូវបោះបង់រាល់សំណើឆ្លង origin — កុំប្តូរច្បាប់នេះ។**
 ```js
@@ -652,6 +721,14 @@ REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយកា�
   មិនមែនវត្តមានរបស់ `captureException` ទេ; ត្រូវទុកជួរ event មុន boot; ត្រូវផ្តាច់
   client ពេលលុប DSN; និងត្រូវមាន generation guard លើ `init()` ស្របគ្នា។
   Test៖ **`sentry-load-race-test.js`**។
+- **listener ដែល Firebase បោះបង់ ហើយគ្មានអ្នកភ្ជាប់វាឡើងវិញ** ➜ តារាងកក
+  ជារៀងរហូត ខណៈចំណុចស្ថានភាពនៅសរសេរ «ភ្ជាប់ Server រួចរាល់» ➜ អ្នកប្រើបន្ត
+  ធ្វើការលើទិន្នន័យចាស់។ ការសរសេរលុយនៅតែត្រឹមត្រូវ (វាដើរតាម `runTransaction`
+  លើ record របស់ server) — អ្វីដែលខុសគឺ **អ្វីដែលអ្នកប្រើឃើញ**។
+  Test៖ **`connection-recovery-test.js`**។
+- **URL ដែលមានទិន្នន័យរសើប ត្រូវយកជាកូនសោ cache** ➜ វារស់រានក្រោយចាកចេញ
+  ហើយអានបានតាម DevTools។ រកឃើញលើ Setup Link (`?setup=`)។
+  Test៖ **`sw-cache-key-test.js`**។
 - **ការឌិកូដស៊ុមវីដេអូដដែលពីរដង** ➜ ជាន់ការពារ «២ ស៊ុមជាប់គ្នា» ក្លាយជា ១ ស៊ុម។
   `takeFreshVideoFrame()` ការពារ **ហើយ fail open** បើ `currentTime` មិនរត់ (browser ខ្លះ
   ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។
@@ -743,6 +820,8 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | timeout ដែលមិន abort សំណើ ➜ សំណើជាន់គ្នា និងការអានតួព្យួររហូត | `network-timeout-test.js` |
 | ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
 | Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ | `sentry-load-race-test.js` |
+| listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
+| URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 

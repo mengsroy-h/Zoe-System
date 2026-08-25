@@ -21,7 +21,21 @@ const EXPECTED_DIVERGENT = new Set([
     'requestPinBeforeConfig', 'retryPendingRoleCheck', 'sanitizePhoneNumber', 'saveFirebaseConfig',
     'saveNewSecurityPin',
     'setupAuthListener', 'setupIOSPullToRefresh', 'showLoginModalWithPrefill',
-    'submitActivationKey', 'updateAuthButton', 'verifySecurityPin', 'verifyStoredPin'
+    'submitActivationKey', 'updateAuthButton', 'verifySecurityPin', 'verifyStoredPin',
+
+    // ស្ថានភាពការតភ្ជាប់៖ **យន្តការភ្ជាប់ឡើងវិញរួមគ្នា** (forceDatabaseReconnect,
+    // scheduleReconnectWatchdog, clearReconnectWatchdog, nudgeDatabaseConnection)
+    // ត្រូវនៅដូចគ្នាបេះបិទ — ហើយវាដូចគ្នាពិត។ បី function ខាងក្រោមប៉ុណ្ណោះ
+    // ដែលបែកគ្នាដោយចេតនា ព្រោះវាជាប់នឹង UI និងទិន្នន័យរបស់ App នីមួយៗ៖
+    //   connectionLooksOnline  — ZoeW រាប់បញ្ចូល `dbListenersFailed` ផងដែរ
+    //                            (វាមាន onValue លើទិន្នន័យអាជីវកម្ម; ZoeKeyGen
+    //                            អានតាម `fb.get` មួយដងៗ ដូច្នេះគ្មានទង់នោះទេ)
+    //   renderConnectionStatus — class និងអត្ថបទផ្ទុយគ្នា៖ ZoeW toggle `.offline`
+    //                            ជាមួយ «ភ្ជាប់ Server រួចរាល់» ចំណែក ZoeKeyGen
+    //                            toggle `.online` ជាមួយ «ភ្ជាប់បណ្ដាញ»
+    //   setupConnectionRecovery — ZoeW ស្តារ listener ទិន្នន័យ; ZoeKeyGen ស្តារ
+    //                            ការពិនិត្យតួនាទី admin (`retryPendingRoleCheck`)
+    'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery'
 ]);
 
 function walk(node, cb) {

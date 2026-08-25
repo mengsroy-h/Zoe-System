@@ -178,20 +178,28 @@
 
     const LICENSE_DB_URL = 'https://zoew-z1-default-rtdb.firebaseio.com';
 
+    const NET_TIMEOUT_MS = 10000;
+
+    async function fetchWithBodyTimeout(url, readBody) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), NET_TIMEOUT_MS);
+        try {
+            const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            const body = readBody ? await readBody(res) : undefined;
+            return { res: res, body: body };
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     async function checkOnline(appCode, keyId) {
         if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) {
             return { ok: null, reason: 'not-configured' };
         }
         try {
             const url = LICENSE_DB_URL.replace(/\/+$/, '') + '/license_keys/' + appCode + '/' + keyId + '.json';
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 10000);
-            let res;
-            try {
-                res = await fetch(url, { cache: 'no-store', signal: controller.signal });
-            } finally {
-                clearTimeout(timer);
-            }
+            const out = await fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null));
+            const res = out.res;
             const dateHeader = res.headers.get('Date');
             if (dateHeader) {
                 const serverMs = new Date(dateHeader).getTime();
@@ -201,7 +209,7 @@
                 }
             }
             if (!res.ok) return { ok: null, reason: 'network' };
-            const data = await res.json();
+            const data = out.body;
             if (data === null || data === undefined) return { ok: false, reason: 'not-found' };
             if (data.revoked === true) return { ok: false, reason: 'revoked' };
             if (typeof data.expiresAt === 'number' && getServerNow() > data.expiresAt) {
@@ -216,14 +224,8 @@
     async function syncServerTime() {
         if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return false;
         try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 10000);
-            let res;
-            try {
-                res = await fetch(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', { cache: 'no-store', signal: controller.signal });
-            } finally {
-                clearTimeout(timer);
-            }
+            const out = await fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', (r) => r.text());
+            const res = out.res;
             const dateHeader = res.headers.get('Date');
             if (!dateHeader) return false;
             const serverMs = new Date(dateHeader).getTime();

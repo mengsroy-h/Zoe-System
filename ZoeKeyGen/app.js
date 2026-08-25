@@ -1,4 +1,4 @@
-const APP_VERSION = '2.11.5';
+const APP_VERSION = '2.11.6';
 
 const LICENSE_APP_CODE = 'ADM';
 
@@ -82,12 +82,22 @@ renderAppVersionLabels();
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').then((reg) => {
+                const SW_UPDATE_MIN_GAP_MS = 15 * 60 * 1000;
+                let lastSwUpdateAt = Date.now();
+                const throttledSwUpdate = () => {
+                    if (navigator.onLine === false) return;
+                    const now = Date.now();
+                    if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
+                    lastSwUpdateAt = now;
+                    reg.update().catch(() => {});
+                };
                 document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') reg.update().catch(() => {});
+                    if (document.visibilityState === 'visible') throttledSwUpdate();
                 });
-                window.addEventListener('focus', () => reg.update().catch(() => {}));
+                window.addEventListener('focus', throttledSwUpdate);
+                window.addEventListener('online', throttledSwUpdate);
 
-                setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+                setInterval(throttledSwUpdate, 30 * 60 * 1000);
             }).catch(() => {});
 
             const hadControllerAtLoad = !!navigator.serviceWorker.controller;
@@ -107,6 +117,9 @@ let authGeneration = 0;
 let sensitiveSessionGeneration = 0;
 let pendingRoleRecheck = false;
 let isDatabaseConnected = false;
+let reconnectWatchdogTimer = null;
+let reconnectWatchdogAttempt = 0;
+let lastForcedReconnectAt = 0;
 let lastRoleRestOutcome = '';
 const ROLE_CHECK_CONNECT_WAIT_MS = 45000;
 const SLOW_NETWORK_NOTICE_MS = 4000;
@@ -116,6 +129,77 @@ let dbRefServerTimeOffset = null;
 let serverTimeOffsetMs = 0;
 let serverTimeSynced = false;
 let serverTimeSyncWaiters = [];
+
+const RECONNECT_FORCE_MIN_GAP_MS = 3000;
+const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
+
+function connectionLooksOnline() {
+    return isDatabaseConnected && navigator.onLine !== false;
+}
+
+function renderConnectionStatus() {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('firebaseStatusText');
+    const online = connectionLooksOnline();
+    if (dot) dot.classList.toggle('online', online);
+    if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
+}
+
+function clearReconnectWatchdog() {
+    if (reconnectWatchdogTimer) {
+        clearTimeout(reconnectWatchdogTimer);
+        reconnectWatchdogTimer = null;
+    }
+    reconnectWatchdogAttempt = 0;
+}
+
+function forceDatabaseReconnect() {
+    if (!fb || !db || typeof fb.goOnline !== 'function') return false;
+    const now = Date.now();
+    if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
+    lastForcedReconnectAt = now;
+    try {
+        if (typeof fb.goOffline === 'function') fb.goOffline(db);
+    } catch (e) {}
+    try { fb.goOnline(db); } catch (e) { return false; }
+    return true;
+}
+
+function scheduleReconnectWatchdog() {
+    if (reconnectWatchdogTimer) return;
+    if (!fb || !db) return;
+    const step = RECONNECT_WATCHDOG_STEPS_MS[Math.min(reconnectWatchdogAttempt, RECONNECT_WATCHDOG_STEPS_MS.length - 1)];
+    reconnectWatchdogTimer = setTimeout(() => {
+        reconnectWatchdogTimer = null;
+        if (isDatabaseConnected || navigator.onLine === false) { clearReconnectWatchdog(); return; }
+        reconnectWatchdogAttempt++;
+        forceDatabaseReconnect();
+        scheduleReconnectWatchdog();
+    }, step);
+}
+
+function nudgeDatabaseConnection() {
+    if (!fb || !db || typeof fb.goOnline !== 'function') return;
+    if (isDatabaseConnected) { try { fb.goOnline(db); } catch (e) {} return; }
+    if (navigator.onLine === false) return;
+    forceDatabaseReconnect();
+    scheduleReconnectWatchdog();
+}
+
+function setupConnectionRecovery() {
+    window.addEventListener('online', () => {
+        renderConnectionStatus();
+        nudgeDatabaseConnection();
+        retryPendingRoleCheck();
+        if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
+            ZoeLicense.syncServerTime().catch(() => {});
+        }
+    });
+    window.addEventListener('offline', () => {
+        clearReconnectWatchdog();
+        renderConnectionStatus();
+    });
+}
 
 function getServerNow() {
     return Date.now() + serverTimeOffsetMs;
@@ -294,13 +378,11 @@ async function initFirebase() {
 
         dbRefConnected = fb.ref(db, '.info/connected');
         fb.onValue(dbRefConnected, (snap) => {
-            const dot = document.getElementById('statusDot');
-            const txt = document.getElementById('firebaseStatusText');
-            const online = snap.val() === true;
-            if (dot) dot.classList.toggle('online', online);
-            if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : 'ក្រៅបណ្ដាញ';
-            isDatabaseConnected = online;
-            if (online) retryPendingRoleCheck();
+            isDatabaseConnected = snap.val() === true;
+            if (isDatabaseConnected) clearReconnectWatchdog();
+            else if (navigator.onLine !== false) scheduleReconnectWatchdog();
+            renderConnectionStatus();
+            if (isDatabaseConnected) retryPendingRoleCheck();
         });
 
         dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -1471,8 +1553,12 @@ document.addEventListener('DOMContentLoaded', () => {
     restoreSetupLinkBaseUrl();
     setupIOSPullToRefresh();
 
+    setupConnectionRecovery();
+
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
+        renderConnectionStatus();
+        nudgeDatabaseConnection();
         retryPendingRoleCheck();
     });
 

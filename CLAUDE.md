@@ -108,7 +108,8 @@
 > - **តំបន់ម៉ោងរបស់ឧបករណ៍កំណត់ថាចំណូលធ្លាក់ចូលថ្ងៃណា** (`getFormattedDate()` ប្រើប្រតិទិន
 >   តាមតំបន់ម៉ោងឧបករណ៍)។ បង្អួច 2h/8d/10d **មិនរងផលទេ** (គណនាតាម epoch)។
 >   ដំណោះស្រាយជាក់ស្តែង៖ បើកមុខងារ «កាលបរិច្ឆេទ និងម៉ោងស្វ័យប្រវត្តិ» លើគ្រប់ឧបករណ៍។
-> - **`google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
+> - **`zto-import/google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច។
+>   (ធ្លាប់នៅ `ZoeW/google-sheets-api/` — ផ្លាស់ចេញព្រោះវាមិនមែនជាផ្នែករបស់ static site របស់ ZoeW ទេ។)
 
 ## `--chrome-bottom` និង safe-area — READ BEFORE TOUCHING LAYOUT
 

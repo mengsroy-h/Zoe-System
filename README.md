@@ -180,12 +180,28 @@ bash audit-tools/run-all.sh /tmp/baseline    # ចំណុចដែល *គួ�
 
 មើល [audit-tools/README.md](audit-tools/README.md) សម្រាប់ការពន្យល់លម្អិត និងជម្រើស RTDB emulator។
 
+## ឧបករណ៍ជំនួយដាច់ដោយឡែក
+
+ឧបករណ៍ទាំងនេះ **មិនមែនជាផ្នែករបស់ App ទេ** — ពួកវាដើរដោយឡែក ហើយមិនប៉ះកូដ ZoeW/ZoeKeyGen ឡើយ។
+
+| ថត | ជាអ្វី | រត់នៅឯណា |
+|---|---|---|
+| [`ZoeImport/`](ZoeImport/README.md) | **PWA ដំឡើងបាន** សម្រាប់ទម្លាក់ឯកសារ Excel របស់ ZTO ចូល Sheet `Customers` — ការពារដោយ PIN និងអ៊ិនគ្រីប config | Netlify site ដាច់ដោយឡែក |
+| [`zto-import/`](zto-import/README.md) | ផ្នែក server របស់ ZoeImport — **សរសេរចូល** Sheet ព្រមទាំង Drive folder watcher និងទំព័រ Web បម្រុង | Google Apps Script ដាច់ដោយឡែក |
+| [`zto-import/google-sheets-api/`](zto-import/google-sheets-api/README.md) | **អានចេញពី** Sheet `Customers` ជា Lookup API សម្រាប់ ZoeW | Google Apps Script ភ្ជាប់នឹង Sheet |
+| [`firebase-backup/`](firebase-backup/README.md) | Backup ទិន្នន័យ Firebase ជា `.json.gz` | Node.js CLI លើម៉ាស៊ីនអ្នកលក់ |
+
+**ZoeImport ➜ zto-import ➜ Google Sheet ➜ Lookup API ➜ ZoeW** — ខ្សែសង្វាក់នេះជំនួសការ copy-paste ដោយដៃទាំងស្រុង។ គ្មានផ្នែកណាមួយក្នុងនោះប៉ះកូដ ZoeW ឬ ZoeKeyGen ឡើយ។
+
 ## ឯកសារបន្ថែម
 
 - [ZoeW README](ZoeW/README.md)
 - [ZoeKeyGen README](ZoeKeyGen/README.md)
 - [Audit tools README](audit-tools/README.md)
 - [Firebase backup README](firebase-backup/README.md)
+- [Google Sheet Lookup API README](zto-import/google-sheets-api/README.md)
+- [ZoeImport PWA README](ZoeImport/README.md)
+- [ZTO import Apps Script README](zto-import/README.md)
 
 ## អាជ្ញាប័ណ្ណ
 

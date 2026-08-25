@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZoeImport">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>ZoeImport — នាំចូល Excel</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<header class="app-navbar">
+    <div class="brand">
+        <img src="./icon-192.png" alt="" width="26" height="26">
+        <span>ZoeImport</span>
+    </div>
+    <button type="button" id="lockBtn" class="icon-btn hidden" title="ចាក់សោ">🔒</button>
+</header>
+
+<main class="app-body">
+
+    <section id="pinGate" class="gate">
+        <div class="gate-card">
+            <div class="gate-icon">🔐</div>
+
+            <div id="pinSetupBox" class="hidden">
+                <h1>កំណត់លេខកូដសុវត្ថិភាព</h1>
+                <p class="gate-note">PIN នេះជាកូនសោដែលប្រើ <strong>អ៊ិនគ្រីប</strong> URL និងពាក្យសម្ងាត់របស់ Apps Script។ បើភ្លេច PIN ត្រូវកំណត់ការតភ្ជាប់ឡើងវិញ។</p>
+                <label for="pinNewInput">លេខកូដថ្មី (យ៉ាងតិច ៤ ខ្ទង់)</label>
+                <input type="password" id="pinNewInput" inputmode="numeric" autocomplete="new-password" maxlength="12">
+                <label for="pinConfirmInput">វាយម្តងទៀត</label>
+                <input type="password" id="pinConfirmInput" inputmode="numeric" autocomplete="new-password" maxlength="12">
+                <button type="button" id="pinSetupBtn" class="btn-main">រក្សាទុក PIN</button>
+            </div>
+
+            <div id="pinVerifyBox" class="hidden">
+                <h1>វាយលេខកូដសុវត្ថិភាព</h1>
+                <p class="gate-note">ដើម្បីដោះសោការតភ្ជាប់ទៅ Google Sheet</p>
+                <label for="pinInput">លេខកូដ PIN</label>
+                <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" maxlength="12">
+                <button type="button" id="pinVerifyBtn" class="btn-main">ដោះសោ</button>
+                <button type="button" id="pinForgotBtn" class="btn-link">ភ្លេច PIN — កំណត់ឡើងវិញទាំងស្រុង</button>
+            </div>
+
+            <div id="pinMsg" class="msg-host"></div>
+            <p class="gate-version">កំណែ <span id="appVersionText"></span></p>
+        </div>
+    </section>
+
+    <section id="appMain" class="hidden">
+
+        <article class="card" id="configCard">
+            <h2><span class="step">1</span> ការតភ្ជាប់</h2>
+            <div id="configSummary" class="summary hidden"></div>
+            <div id="configForm">
+                <label for="apiUrlInput">Web app URL របស់ Apps Script</label>
+                <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
+                <label for="apiPasswordInput">ពាក្យសម្ងាត់នាំចូល (IMPORT_PASSWORD)</label>
+                <input type="password" id="apiPasswordInput" autocomplete="off">
+                <div class="btn-row">
+                    <button type="button" id="configSaveBtn" class="btn-main">សាកល្បង និងរក្សាទុក</button>
+                    <button type="button" id="configEditBtn" class="btn-ghost hidden">កែការតភ្ជាប់</button>
+                    <button type="button" id="pinChangeBtn" class="btn-ghost">ប្តូរ PIN</button>
+                </div>
+            </div>
+            <div id="configMsg" class="msg-host"></div>
+        </article>
+
+        <article class="card hidden" id="fileCard">
+            <h2><span class="step">2</span> ជ្រើសឯកសារ</h2>
+            <div class="drop" id="drop" role="button" tabindex="0">
+                <strong>ទម្លាក់ឯកសារនៅទីនេះ</strong>
+                ឬចុចដើម្បីជ្រើស — .xlsx · .xls · .csv
+            </div>
+            <input type="file" id="fileInput" class="hidden" accept=".xlsx,.xls,.csv,.tsv">
+            <div id="fileMsg" class="msg-host"></div>
+        </article>
+
+        <article class="card hidden" id="mapCard">
+            <h2><span class="step">3</span> ការផ្គូផ្គង Column</h2>
+            <div class="grid">
+                <div>
+                    <label for="sheetSel">Tab ក្នុងឯកសារ</label>
+                    <select id="sheetSel"></select>
+                </div>
+                <div>
+                    <label for="headerRowInput">ជួរដេក header</label>
+                    <input type="number" id="headerRowInput" min="1" value="1">
+                </div>
+            </div>
+            <div class="grid">
+                <div>
+                    <label for="mapBarcode">A · Barcode</label>
+                    <select id="mapBarcode"></select>
+                </div>
+                <div>
+                    <label for="mapDod">B · DOD($)</label>
+                    <select id="mapDod"></select>
+                </div>
+                <div>
+                    <label for="mapCod">C · COD($)</label>
+                    <select id="mapCod"></select>
+                </div>
+                <div>
+                    <label for="mapPhone">D · Phone</label>
+                    <select id="mapPhone"></select>
+                </div>
+            </div>
+            <div id="mapMsg" class="msg-host"></div>
+            <div class="chips" id="chips"></div>
+            <div class="tablewrap hidden" id="previewWrap">
+                <table>
+                    <thead><tr><th>Barcode</th><th>DOD($)</th><th>COD($)</th><th>Phone</th></tr></thead>
+                    <tbody id="previewBody"></tbody>
+                </table>
+            </div>
+        </article>
+
+        <article class="card hidden" id="actionCard">
+            <h2><span class="step">4</span> នាំចូល</h2>
+            <label for="modeSel">របៀបនាំចូល</label>
+            <select id="modeSel">
+                <option value="replace">សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស (សម្រាប់ប្រើប្រចាំថ្ងៃ)</option>
+                <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ</option>
+                <option value="newOnly">បន្ថែមតែ Barcode ថ្មី — មិនប៉ះជួរចាស់</option>
+            </select>
+            <div class="btn-row">
+                <button type="button" id="importBtn" class="btn-main">នាំចូលទៅ Sheet</button>
+                <button type="button" id="resetBtn" class="btn-ghost">ជ្រើសឯកសារផ្សេង</button>
+            </div>
+            <div id="actionMsg" class="msg-host"></div>
+        </article>
+
+        <article class="card danger hidden" id="clearCard">
+            <h2><span class="step warn">🗑️</span> សម្អាតទិន្នន័យចាស់</h2>
+            <p class="hint">លុប <strong>គ្រប់ជួរដេក</strong> ក្នុង Sheet ដោយទុកតែជួរ header។ ប្រើពេលចង់ចាប់ផ្តើមថ្ងៃថ្មីពីទទេ ដោយមិនទាន់នាំចូលឯកសារភ្លាម។</p>
+            <button type="button" id="clearBtn" class="btn-danger">សម្អាតទិន្នន័យក្នុង Sheet</button>
+            <div id="clearMsg" class="msg-host"></div>
+        </article>
+
+        <p class="foot" id="statusFoot"></p>
+    </section>
+
+</main>
+
+<div id="confirmModal" class="modal hidden">
+    <div class="modal-box">
+        <h3 id="confirmTitle"></h3>
+        <p id="confirmText"></p>
+        <div class="btn-row">
+            <button type="button" id="confirmYes" class="btn-danger">បាទ/ចាស ធ្វើតែម្តង</button>
+            <button type="button" id="confirmNo" class="btn-ghost">បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="./vendor/xlsx.full.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

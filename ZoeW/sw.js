@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v101';
+const CACHE_VERSION = 'zoew-v102';
 
 const CORE_SHELL = [
     './',
@@ -45,12 +45,21 @@ function cacheKeyFor(request) {
     return request.mode === 'navigate' ? './index.html' : request;
 }
 
+function linkIsFrugal() {
+    const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (!link) return false;
+    if (link.saveData === true) return true;
+    const type = String(link.effectiveType || '');
+    return type === 'slow-2g' || type === '2g';
+}
+
 const REVALIDATE_TIMEOUT_MS = 6000;
 const REVALIDATE_MAX_IN_FLIGHT = 4;
 const revalidateInFlight = new Set();
 
 function revalidateShell(cache, request, cacheKey) {
     if (navigator.onLine === false) return Promise.resolve();
+    if (linkIsFrugal()) return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
     if (revalidateInFlight.has(key)) return Promise.resolve();
     if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT) return Promise.resolve();

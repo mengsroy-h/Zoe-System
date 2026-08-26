@@ -24,6 +24,85 @@
 
 ---
 
+## [2.17.4] — 2026-08-26 · ស្ថេរភាពបណ្តាញ · ការលាក់ secret ជ្រៅ · សម្របតាមតំណ
+
+ជុំ deep audit ដែលផ្តោតលើ **បណ្តាញ និងសុវត្ថិភាព**។ កំហុសទាំង ៣ ខាងក្រោម
+**បង្ហាញភស្តុតាងដោយការវាស់ក្នុង Chromium ពិត មុនកែ** ហើយមានឧបករណ៍ចាក់សោ
+ឥឡូវនេះ។ តក្កវិជ្ជាអាជីវកម្ម (លុប/ដក · ធុងសំរាម · ការសម្អាត) **មិនប៉ះសោះ**
+ហើយ **ទម្រង់ · PTR · ចលនាផ្ទាំង · ការរមូរ ក៏មិនប៉ះដែរ**។
+
+### ល្បឿន និងស្ថេរភាពបណ្តាញ
+
+- **សំណើ License លែងធ្វើឲ្យសំណើផ្សេងជាប់គាំងទៀតទេ។** `license-verify.js`
+  គ្មានពិដានចំនួនសំណើស្របគ្នា និងគ្មាន guard ក្រៅបណ្តាញសោះ ខណៈ
+  `window.addEventListener('online', …)` ហៅ `ZoeLicense.syncServerTime()`
+  **គ្មានពិដានល្បឿន** (ការហៅ ៣ ផ្សេងទៀតក្នុង handler ដដែលទទួលពិដានក្នុង
+  2.14.0 រួចហើយ)។ WiFi ដែលភ្លឹបភ្លែត ➜ `online` បាញ់ច្រើនដង ➜ សំណើ license
+  ព្យួរស្របគ្នារហូតពេញកូតា connection របស់ browser។
+  វាស់លើ Chromium ពិត (server ទទួលការតភ្ជាប់ តែមិនឆ្លើយ)៖
+
+  | រង្វាស់ | មុនកែ | ក្រោយកែ |
+  |---|---|---|
+  | សំណើ **ចាំបាច់** លើ host ដដែល | **៩ ៦០៤ ms** | **៥ ms** |
+  | សំណើ license ដល់ server (ពី ១០ ការហៅ) | **៧** | **១** |
+  | ការហៅខណៈ `navigator.onLine === false` | **១០ ០០១ ms** | **០ ms** |
+
+  ⛔ ការរំលងត្រឡប់ `{ ok: null }` (មិនផ្ទៀងផ្ទាត់បាន) — **មិនមែន `{ ok: false }`**
+  ដែលនឹងលុប License ចោល។ ការអនុគ្រោះ ៣ ថ្ងៃនៅដដែលបេះបិទ
+  (`license-grace-test.js` ១៣ assertion បញ្ជាក់)។ `activate()` ដែលអ្នកប្រើ
+  ចុចផ្ទាល់ ឆ្លងកាត់ `{ priority: true }` ➜ **មិនត្រូវទប់ដោយពិដានឡើយ**។
+
+- **សម្របតាមគុណភាពតំណ (ថ្មី)។** មុននេះ App សម្របតាម **ឧបករណ៍** រួចហើយ
+  (ចង្វាក់ស៊ុម · `perf-lite` · ទទឹងស៊ុមស្កេន) តែ **មិនសម្របតាមតំណបណ្តាញទេ**។
+  ឥឡូវ `linkIsFrugal()` អាន `navigator.connection` ហើយ **ការងារស្រេចចិត្ត**
+  ឈប់ដោយខ្លួនឯងលើ **2G/slow-2G ឬពេលអ្នកប្រើបើក «Data Saver»**៖
+  ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយ (`revalidateShell()` — សំណើ ៨–១០ ក្នុងមួយការបើក
+  ទំព័រ) និងការទាញតារាងអតិថិជនជាមុន។ **កំណែថ្មីនៅតែមកតាមផ្លូវ `CACHE_VERSION`
+  ដដែល** ហើយទិន្នន័យអតិថិជននៅតែទាញតាមតម្រូវការដដែល — ដូច្នេះគ្មានមុខងារណាបាត់ទេ។
+  ⛔ វា **fail open**៖ browser ដែលគ្មាន NetworkInformation API (**Safari/iOS —
+  គ្មានទាល់តែសោះ**) ទទួលឥរិយាបថ **ដដែលនឹងមុនបេះបិទ**។
+
+### សុវត្ថិភាព
+
+- **បិទផ្លូវលេចធ្លាយ secret ទៅ Sentry ចំនួន ៥។** `redactEvent()` /
+  `redactBreadcrumb()` ធ្លាប់ប៉ះតែវាល **ដែលដាក់ឈ្មោះទុកជាមុន**
+  (`request.url` · `data.url` · `message` · `extra` ថ្នាក់ទី ១) ➜ វាលផ្សេងទៀត
+  ដែល Sentry SDK បំពេញ **រអិលកាត់ស្ងាត់ៗ**។ វាស់បាន៖
+  ១. **`crumb.data.arguments`** — Sentry 7 រក្សា argument **ឆៅ** របស់
+  `console.error(...)`; App ហៅ `console.error("Lookup API error:", e)`។
+  ២. **`request.headers.Referer`** — **Setup Link (`?setup=<config អាជីវកម្ម>`)
+  អាចចេញពីឧបករណ៍**។ ៣–៥. `extra` ជាន់ជ្រៅ · array ក្នុង `extra` · `contexts`។
+  ឥឡូវការលាក់ដើរលើ **គ្រប់ខ្សែអក្សរ** ជាមួយពិដានជម្រៅ ៦ · node ៥០០០ · និង
+  ការការពាររង្វិលជុំ។ បន្ថែម៖ លាក់ **userinfo ក្នុង URL**
+  (`https://user:pass@host`) និងឈ្មោះ param ថ្មី (`authorization` · `bearer` ·
+  `jwt` · `credential` · `refresh_token` · `session_token` · `passphrase`)។
+  ⚠️ `barcode=` និងលេខសម្គាល់ធាតុ **នៅតែមិនត្រូវលាក់** (ត្រូវការសម្រាប់ debug)។
+
+### ឧបករណ៍ audit
+
+- **`license-network-pressure-test.js` (ថ្មី, 14 assertion, browser ពិត)** —
+  `network-pressure-test.js` **ជំនួស `license-verify.js` ដោយ stub ទាំងស្រុង**
+  ➜ ផ្លូវបណ្តាញពិតរបស់ license **មិនដែលត្រូវវាស់សោះ**។ នេះជាមេរៀនដដែលនឹង
+  `network-timeout-test.js` (2.12.1) និង `fluid-type-focus-test.js` (2.16.0)៖
+  **ពេលសរសេរ checker ត្រូវសួរថា «វារត់/ស្កេនឯកសារ*ណា*ខ្លះ»។**
+- **`adaptive-link-test.js` (ថ្មី, 37 assertion)** — ស្រង់ `revalidateShell()`
+  និង `linkIsFrugal()` **ពិត** ចេញពី `sw.js` ដែល ship រួច (App ទាំង ៣) មករត់
+  ជាមួយ `navigator` ក្លែងក្លាយ ៦ ប្រភេទតំណ។ ចាក់សោទាំង **ការរំលងលើ 2G/Data
+  Saver** និង **ការ fail open លើ Safari**។
+- **`secret-hygiene.js` ៖ 24 ➜ 37 assertion។** វាធ្លាប់សាកតែ `redactUrl()`
+  ដែលជា function លើ **ខ្សែអក្សរតែមួយ** — **មិនដែលសាកការដើរលើ event ទេ**។
+  ឥឡូវវាចាប់ `beforeSend`/`beforeBreadcrumb` **ពិត** តាម `Sentry.onLoad` រួច
+  បញ្ជូន event ទម្រង់ Sentry 7 ពិតចូល។ ធ្លាក់ ៧ លើ tree មុនកែ។
+- `license-grace-test.js` ៖ បន្ថែម `networkLooksDown`/`sharedRequest` ក្នុង
+  បញ្ជីស្រង់ ➜ វានៅតែរត់កូដពិត។
+- `run-all.sh` ➜ **៨៣ ពេញលេញ** (ពី ៨១), ធ្លាក់ 0។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន។** Firebase rules **មិនប្រែទេ** — មិនបាច់ publish អ្វីទេ។
+
+---
+
 ## [ឧបករណ៍] — 2026-08-26 · នាឡិកា និងជម្រៅ fuzz
 
 **មិនប្តូរកូដ App ទេ** — `APP_VERSION` នៅ `2.17.3` ដដែល ហើយ `CACHE_VERSION`

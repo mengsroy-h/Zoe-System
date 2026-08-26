@@ -145,6 +145,80 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('រក្សាទុក៖ ' + label, out.indexOf(kept) !== -1, 'got: ' + out);
     });
 
+    // ⛔ **ចន្លោះដែលធ្លាក់មុននេះ៖** ផ្នែកខាងលើសាកតែ `redactUrl()` ដែលជា
+    // function លើ **ខ្សែអក្សរតែមួយ**។ អ្វីដែលសំខាន់ជាងគឺ **ការដើរលើ event**
+    // — `redactEvent()` / `redactBreadcrumb()` ធ្លាប់ប៉ះតែវាលមួយចំនួន
+    // ដែលដាក់ឈ្មោះទុកជាមុន (`request.url`, `data.url`, `message`, `extra` ថ្នាក់ទី ១)
+    // ➜ វាលផ្សេងទៀតដែល Sentry SDK បំពេញ **រអិលកាត់ស្ងាត់ៗ**។ វាស់បាន ៥ ផ្លូវ៖
+    //   ១. `crumb.data.arguments` — Sentry 7 រក្សា argument **ឆៅ** របស់
+    //      `console.error(...)`។ App ហៅ `console.error("Lookup API error:", e)`
+    //      ➜ URL ដែលមាន secret ចេញទៅក្រៅដោយមិនលាក់។
+    //   ២. `request.headers.Referer` — integration `HttpContext` បំពេញវា
+    //      ➜ **Setup Link (`?setup=<config អាជីវកម្ម>`) អាចចេញពីឧបករណ៍**។
+    //   ៣–៥. `extra` ជាន់ជ្រៅ, array ក្នុង `extra`, និង `contexts`។
+    // ដំណោះស្រាយ៖ ដើរ **គ្រប់ខ្សែអក្សរ** ជាមួយពិដានជម្រៅ/ចំនួន node និង
+    // ការការពាររង្វិលជុំ — មិនមែនបញ្ជីវាលដែលដាក់ឈ្មោះទុកជាមុនទេ។
+    (function deepRedaction() {
+        let captured = null;
+        const win = {
+            localStorage: { _d: { zoe_sentry_dsn: 'https://k@o.ingest.sentry.io/1' },
+                getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = v; }, removeItem(k) { delete this._d[k]; } },
+            document: { createElement: () => ({ set onload(v) {}, set onerror(v) {} }), head: { appendChild() {} } },
+            // `onLoad(cb)` ដែលហៅ cb ភ្លាម ➜ `tagApp()` ហៅ `Sentry.init(guardedOptions(…))`
+            // **ដោយសមកាលកម្ម** ➜ យើងចាប់ `beforeSend`/`beforeBreadcrumb` ពិតបាន
+            // ដោយមិនចាំបាច់រង់ចាំផ្លូវ async របស់ `init()` (ដែលធ្វើឲ្យតេស្តនេះ
+            // ត្រូវក្លាយជា async ទាំងឯកសារ)។
+            Sentry: { init: (o) => { captured = o; }, setTag() {}, captureException() {}, onLoad: (cb) => cb() },
+            console: console, setTimeout: setTimeout, clearTimeout: clearTimeout, Set: Set
+        };
+        win.window = win;
+        vm.createContext(win);
+        try { vm.runInContext(src, win); } catch (e) { ok('ផ្ទុក error-reporting.js ក្នុង sandbox បាន', false, String(e && e.message)); return; }
+        win.ZoeErrors.init('zoew', 'test');
+        if (!captured) { ok('ចាប់ options របស់ Sentry.init() បាន', false); return; }
+        ok('ចាប់ options របស់ Sentry.init() បាន', true);
+
+        const SECRET = 'https://api.example.com/lookup?apikey=SUPERSECRET123&id=5';
+        const SETUP = 'https://zoew.app/?setup=BASE64CONFIGPAYLOAD';
+        const crumb = captured.beforeBreadcrumb({
+            category: 'console', level: 'error', message: 'Lookup API error: ' + SECRET,
+            data: { arguments: ['Lookup API error:', SECRET], logger: 'console' }
+        });
+        const ev = captured.beforeSend({
+            request: { url: SETUP, headers: { Referer: SETUP, 'User-Agent': 'x' } },
+            extra: { nested: { url: SECRET }, list: [SECRET] },
+            contexts: { app: { detail: SECRET } },
+            exception: { values: [{ value: 'boom ' + SECRET }] }
+        });
+        const clean = (label, val, secret) => ok('លាក់ជ្រៅ៖ ' + label,
+            typeof val === 'string' && val.indexOf(secret) === -1, 'got: ' + val);
+
+        clean('crumb.message', crumb.message, 'SUPERSECRET123');
+        clean('crumb.data.arguments[] (console breadcrumb ឆៅ)', crumb.data.arguments[1], 'SUPERSECRET123');
+        clean('request.url', ev.request.url, 'BASE64CONFIGPAYLOAD');
+        clean('request.headers.Referer (Setup Link)', ev.request.headers.Referer, 'BASE64CONFIGPAYLOAD');
+        clean('extra ជាន់ជ្រៅ', ev.extra.nested.url, 'SUPERSECRET123');
+        clean('array ក្នុង extra', ev.extra.list[0], 'SUPERSECRET123');
+        clean('contexts', ev.contexts.app.detail, 'SUPERSECRET123');
+        clean('exception.values[].value', ev.exception.values[0].value, 'SUPERSECRET123');
+
+        // រង្វិលជុំមិនត្រូវធ្វើឲ្យ beforeSend គាំង (event ពិតអាចមាន reference ជុំ)
+        const cyc = { a: 'x?token=T1' };
+        cyc.self = cyc;
+        let survived = true;
+        try { captured.beforeSend(cyc); } catch (e) { survived = false; }
+        ok('event ដែលមាន reference ជុំ មិនធ្វើឲ្យ beforeSend គាំង', survived);
+        ok('event ដែលមាន reference ជុំ នៅតែត្រូវលាក់', survived && cyc.a.indexOf('T1') === -1, cyc.a);
+
+        // userinfo ក្នុង URL (https://user:pass@host)
+        ok('លាក់៖ userinfo ក្នុង URL',
+            win.ZoeErrors.redactUrl('https://user:hunter2@host/x').indexOf('hunter2') === -1);
+        // ⚠️ ការដើរជ្រៅមិនត្រូវលាក់អ្វីដែលត្រូវការសម្រាប់ debug
+        const keepEv = captured.beforeSend({ extra: { deep: { barcode: 'ZTO900', id: 'id_123_abc' } } });
+        ok('រក្សាទុក៖ barcode/id ក្នុងវាលជ្រៅ',
+            keepEv.extra.deep.barcode === 'ZTO900' && keepEv.extra.deep.id === 'id_123_abc');
+    })();
+
     ok('beforeSend ត្រូវបានភ្ជាប់ (មិនត្រឹមតែ beforeBreadcrumb)', /beforeSend:\s*redactEvent/.test(src));
     ok('Sentry loader script ក៏ទទួលការលាក់ដែរ (Sentry.onLoad ➜ Sentry.init)',
         /onLoad\(\(\) => \{[\s\S]*Sentry\.init\(guardedOptions/.test(src));

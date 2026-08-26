@@ -33,7 +33,7 @@ function build(serverRecord, opts) {
     const clock = { now: opts.now || 1000000 };
     const sandbox = {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
-        setTimeout, clearTimeout, Date, AbortController,
+        setTimeout, clearTimeout, Date, AbortController, Map, Set,
         localStorage: {
             getItem: (k) => (k in store ? store[k] : null),
             setItem: (k, v) => { store[k] = v; },
@@ -55,6 +55,8 @@ function build(serverRecord, opts) {
         const OFFLINE_GRACE_MS = ${GRACE};
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
         const NET_TIMEOUT_MS = 10000;
+        const NET_MAX_IN_FLIGHT = 2;
+        const netInFlight = new Map();
         function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {
@@ -63,7 +65,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'activate', 'getStatus']), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'activate', 'getStatus']), ctx);
     return { ctx, store, clock };
 }
 

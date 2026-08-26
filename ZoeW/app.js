@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.3';
+    const APP_VERSION = '2.17.4';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -526,6 +526,14 @@
             if (attempts <= 1) throw err;
             return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
         });
+    }
+
+    function linkIsFrugal() {
+        const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!link) return false;
+        if (link.saveData === true) return true;
+        const type = String(link.effectiveType || '');
+        return type === 'slow-2g' || type === '2g';
     }
 
     const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
@@ -1932,6 +1940,7 @@
     function prefetchCustomerDataTableRowsIfConfigured() {
         if (!auth || !auth.currentUser) return;
         if (navigator.onLine === false) return;
+        if (linkIsFrugal()) return;
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
             fetchCustomerDataTableRows(false);

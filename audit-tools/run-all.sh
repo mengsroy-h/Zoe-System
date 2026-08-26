@@ -61,7 +61,7 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene version-check; do
+for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -93,6 +93,7 @@ run "sw-cache-key (browser ពិត)" node audit-tools/sw-cache-key-test.js
 run "sentry-load-race (browser ពិត)" node audit-tools/sentry-load-race-test.js
 run "sw-shell-latency (browser ពិត)" node audit-tools/sw-shell-latency-test.js
 run "network-pressure (browser ពិត)" node audit-tools/network-pressure-test.js
+run "license-net-pressure (browser ពិត)" node audit-tools/license-network-pressure-test.js
 run "sw-revalidate-pressure (browser ពិត)" node audit-tools/sw-revalidate-pressure-test.js
 run "boot-animation (browser ពិត)" node audit-tools/boot-animation-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
@@ -165,6 +166,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
     SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
     NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'
+    LICPRESSURE_APP_DIR="$BASE" node audit-tools/license-network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   license-pressure:/'
+    ADAPTIVE_APP_DIR="$BASE" node audit-tools/adaptive-link-test.js 2>&1 | tail -1 | sed 's/^/   adaptive-link:   /'
     SWREVAL_APP_DIR="$BASE" node audit-tools/sw-revalidate-pressure-test.js 2>&1 | tail -1 | sed 's/^/   sw-revalidate:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'

@@ -151,7 +151,7 @@
         const result = await verifyKeyString(keyString, appCode);
         if (!result.valid) return result;
         const previous = loadLocalRecord(appCode);
-        const online = await checkOnline(appCode, result.payload.id);
+        const online = await checkOnline(appCode, result.payload.id, { priority: true });
         if (online.ok === false) {
             return { valid: false, reason: online.reason, payload: result.payload };
         }
@@ -179,6 +179,23 @@
     const LICENSE_DB_URL = 'https://zoew-z1-default-rtdb.firebaseio.com';
 
     const NET_TIMEOUT_MS = 10000;
+    const NET_MAX_IN_FLIGHT = 2;
+    const netInFlight = new Map();
+
+    function networkLooksDown() {
+        return typeof navigator !== 'undefined' && navigator.onLine === false;
+    }
+
+    function sharedRequest(key, priority, run) {
+        const existing = netInFlight.get(key);
+        if (existing) return existing;
+        if (!priority && netInFlight.size >= NET_MAX_IN_FLIGHT) return null;
+        const started = run();
+        netInFlight.set(key, started);
+        const release = () => { netInFlight.delete(key); };
+        started.then(release, release);
+        return started;
+    }
 
     async function fetchWithBodyTimeout(url, readBody) {
         const controller = new AbortController();
@@ -192,13 +209,18 @@
         }
     }
 
-    async function checkOnline(appCode, keyId) {
+    async function checkOnline(appCode, keyId, opts) {
         if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) {
             return { ok: null, reason: 'not-configured' };
         }
+        const priority = !!(opts && opts.priority);
+        if (!priority && networkLooksDown()) return { ok: null, reason: 'network' };
         try {
             const url = LICENSE_DB_URL.replace(/\/+$/, '') + '/license_keys/' + appCode + '/' + keyId + '.json';
-            const out = await fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null));
+            const pending = sharedRequest('key:' + appCode + '/' + keyId, priority,
+                () => fetchWithBodyTimeout(url, (r) => (r.ok ? r.json() : null)));
+            if (!pending) return { ok: null, reason: 'network' };
+            const out = await pending;
             const res = out.res;
             const dateHeader = res.headers.get('Date');
             if (dateHeader) {
@@ -221,10 +243,15 @@
         }
     }
 
-    async function syncServerTime() {
+    async function syncServerTime(opts) {
         if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return false;
+        const priority = !!(opts && opts.priority);
+        if (!priority && networkLooksDown()) return false;
         try {
-            const out = await fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', (r) => r.text());
+            const pending = sharedRequest('time', priority,
+                () => fetchWithBodyTimeout(LICENSE_DB_URL.replace(/\/+$/, '') + '/.json?shallow=true', (r) => r.text()));
+            if (!pending) return false;
+            const out = await pending;
             const res = out.res;
             const dateHeader = res.headers.get('Date');
             if (!dateHeader) return false;

@@ -99,6 +99,7 @@ run "boot-animation (browser ពិត)" node audit-tools/boot-animation-test.js
 run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss-test.js
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
+run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 
 echo
 echo
@@ -182,6 +183,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
     FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
+    TOAST_APP_DIR="$BASE" node audit-tools/toast-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-truth:     /'
 fi
 
 echo

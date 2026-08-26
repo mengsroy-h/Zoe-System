@@ -35,7 +35,12 @@ const EXPECTED_DIVERGENT = new Set([
     //                            toggle `.online` ជាមួយ «ភ្ជាប់បណ្ដាញ»
     //   setupConnectionRecovery — ZoeW ស្តារ listener ទិន្នន័យ; ZoeKeyGen ស្តារ
     //                            ការពិនិត្យតួនាទី admin (`retryPendingRoleCheck`)
-    'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery'
+    //   liveToastState         — សេចក្តីពិតដែល toast រស់ត្រូវរាយការណ៍ ខុសគ្នាតាម App៖
+    //                            ZoeW មាន listener ទិន្នន័យ (`dbListenerPendingPaths`,
+    //                            `dbListenersFailed`) ដូច្នេះវាបែងចែក «កំពុងទាញទិន្នន័យ»
+    //                            ចេញពី «ភ្ជាប់រួច»; ZoeKeyGen អានតាម `fb.get` មួយដងៗ
+    //                            ដូច្នេះវាមានតែស្ថានភាព socket ប៉ុណ្ណោះ។
+    'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery', 'liveToastState'
 ]);
 
 function walk(node, cb) {

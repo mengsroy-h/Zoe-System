@@ -1,4 +1,4 @@
-const APP_VERSION = '2.18.0';
+const APP_VERSION = '2.19.0';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -290,7 +290,13 @@ function renderConnectionStatus() {
         dot.classList.toggle('online', online);
         dot.classList.toggle('connecting', settling);
     }
-    if (txt) txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : (settling ? 'កំពុងភ្ជាប់...' : 'ក្រៅបណ្ដាញ');
+    if (txt) {
+        txt.classList.toggle('is-online', online);
+        txt.classList.toggle('is-connecting', !online && settling);
+        txt.classList.toggle('is-offline', !online && !settling);
+        txt.textContent = online ? 'ភ្ជាប់បណ្ដាញ' : (settling ? 'កំពុងភ្ជាប់...' : 'ក្រៅបណ្ដាញ');
+    }
+    refreshLiveToasts();
 }
 
 function clearReconnectWatchdog() {
@@ -390,19 +396,95 @@ function waitForServerTimeSync(timeoutMs) {
     });
 }
 
-function showToast(msg) {
+const TOAST_LIFETIME_MS = 3000;
+const TOAST_LIVE_LIMIT_MS = 20000;
+const TOAST_CLASSES = { info: 'toast-info', success: 'toast-success', warn: 'toast-warn', error: 'toast-error' };
+const TOAST_KIND_MARKS = [
+    ['error', ['❌', '⛔', '🚫']],
+    ['warn', ['⚠️', '⏱️']],
+    ['success', ['✅', '🎉', '🔓']]
+];
+
+function toastKindOf(msg) {
+    const text = String(msg === null || msg === undefined ? '' : msg).trim();
+    for (let i = 0; i < TOAST_KIND_MARKS.length; i++) {
+        const marks = TOAST_KIND_MARKS[i][1];
+        for (let j = 0; j < marks.length; j++) {
+            if (text.indexOf(marks[j]) === 0) return TOAST_KIND_MARKS[i][0];
+        }
+    }
+    return 'info';
+}
+
+function paintToast(el, msg, kind) {
+    const resolved = TOAST_CLASSES[kind] ? kind : toastKindOf(msg);
+    Object.keys(TOAST_CLASSES).forEach((name) => el.classList.toggle(TOAST_CLASSES[name], name === resolved));
+    el.textContent = msg;
+}
+
+function armToastDismiss(el, delay) {
+    if (el.dismissTimer) clearTimeout(el.dismissTimer);
+    el.dismissTimer = setTimeout(() => {
+        el.dismissTimer = null;
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+    }, delay);
+}
+
+function showToast(msg, kind) {
     const container = document.getElementById('toastContainer');
-    if (!container) return;
+    if (!container) return null;
     while (container.children.length >= 4) container.removeChild(container.firstChild);
     const toast = document.createElement('div');
     toast.className = 'toast';
-    toast.textContent = msg;
+    paintToast(toast, msg, kind);
     container.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('show'));
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    armToastDismiss(toast, TOAST_LIFETIME_MS);
+    return toast;
+}
+
+function settleLiveToast(el) {
+    delete el.dataset.liveToast;
+    armToastDismiss(el, TOAST_LIFETIME_MS);
+}
+
+function showLiveToast(key) {
+    const state = liveToastState(key);
+    if (!state) return null;
+    const toast = showToast(state.msg, state.kind);
+    if (!toast || state.settled) return toast;
+    toast.dataset.liveToast = key;
+    armToastDismiss(toast, TOAST_LIVE_LIMIT_MS);
+    return toast;
+}
+
+function refreshLiveToasts() {
+    const container = document.getElementById('toastContainer');
+    if (!container || typeof container.querySelectorAll !== 'function') return;
+    const live = container.querySelectorAll('[data-live-toast]');
+    for (let i = 0; i < live.length; i++) {
+        const el = live[i];
+        const state = liveToastState(el.dataset.liveToast);
+        if (!state) { settleLiveToast(el); continue; }
+        paintToast(el, state.msg, state.kind);
+        if (state.settled) settleLiveToast(el);
+    }
+}
+
+function liveToastState(key) {
+    if (key !== 'signin' && key !== 'config') return null;
+    if (navigator.onLine === false) {
+        return key === 'signin'
+            ? { msg: '⚠️ ចូលប្រព័ន្ធរួច តែឧបករណ៍ក្រៅបណ្ដាញ — បញ្ជី Key មិនទាន់សម័យ', kind: 'warn', settled: false }
+            : { msg: '⚠️ រក្សាទុក Config រួច តែឧបករណ៍ក្រៅបណ្ដាញ — មិនទាន់ភ្ជាប់ Server ទេ', kind: 'warn', settled: false };
+    }
+    if (!connectionLooksOnline()) {
+        return { msg: '🔄 កំពុងតភ្ជាប់ទៅ Server...', kind: 'info', settled: false };
+    }
+    return key === 'signin'
+        ? { msg: '✅ ចូលប្រព័ន្ធជោគជ័យ — ភ្ជាប់ Server រួចរាល់', kind: 'success', settled: true }
+        : { msg: '✅ ភ្ជាប់ Server រួចរាល់!', kind: 'success', settled: true };
 }
 
 function invalidateSensitiveSession() {
@@ -999,9 +1081,9 @@ function saveFirebaseConfig() {
         return;
     }
     if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
-    showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
     closeModal('configModal');
     initFirebase();
+    showLiveToast('config');
 }
 
 function showLoginModalWithPrefill() {
@@ -1245,7 +1327,7 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     closeModal('loginModal');
     document.getElementById('appContainer').classList.remove('hidden');
     updateAuthButton(true);
-    if (!isSignedInUiActive) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
+    if (!isSignedInUiActive) showLiveToast('signin');
     isSignedInUiActive = true;
     requestSessionSigningKeyRestoreIfEligible();
     refreshKeyList();

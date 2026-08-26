@@ -53,7 +53,9 @@ function makeCtx(src) {
     };
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
-    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState']) {
+    vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set();', ctx);
+    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
+                      'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }

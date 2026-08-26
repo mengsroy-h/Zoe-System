@@ -8,8 +8,8 @@
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល និងគ្រប់គ្រងកញ្ចប់ | `2.17.2` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.17.2` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល និងគ្រប់គ្រងកញ្ចប់ | `2.17.3` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.17.3` |
 | **[ZoeImport](ZoeImport/README.md)** | នាំចូល Excel ចូល Google Sheet ជំនួស copy-paste | `1.2.1` |
 
 ---
@@ -52,7 +52,7 @@
 ## កំណែ
 
 - **`APP_VERSION`** ជាកំណែផលិតផលតាម semver ដែលប្រើ **រួមគ្នា** ទាំង ZoeW និង
-  ZoeKeyGen ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json`។ បច្ចុប្បន្ន **`2.17.2`**។
+  ZoeKeyGen ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json`។ បច្ចុប្បន្ន **`2.17.3`**។
 - **ZoeImport មានកំណែដាច់ដោយឡែក** (បច្ចុប្បន្ន **`1.2.1`**) ព្រោះវាមិនប៉ះ
   Firebase និងមិនពាក់ព័ន្ធនឹងវដ្តចេញផ្សាយរបស់ App ទាំង ២ នោះទេ។
 - **`CACHE_VERSION`** ក្នុង `sw.js` នៃ App នីមួយៗ (`<app>-vN`) ជាកូនសោ cache

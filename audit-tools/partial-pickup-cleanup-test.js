@@ -59,6 +59,8 @@ const REAL_FNS = [
     'applyBarcodeCloseState',
     'barcodeCloseIsRipe',
     'normalizeBarcodeCloseStamps',
+    'itemHasRestoreMarkers',
+    'stripHistoryOnlyMarkers',
     'parseTimestampFromId',
     'generateUniqueId',
     'retryAsync',

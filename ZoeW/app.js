@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.2';
+    const APP_VERSION = '2.17.3';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -2631,7 +2631,33 @@
     }
 
     const cleanupInFlight = new Set();
+    const staleRestoreMarkerSweeps = new Set();
     let deletedCleanupInFlight = false;
+
+    function clearStaleRestoreMarkers(item) {
+        if (!db || !fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
+        if (staleRestoreMarkerSweeps.has(item.id)) return;
+        if (dbListenerPendingPaths.has('zoew_recently_deleted_cod_dod')) return;
+        const sourceId = item.restoreClaimId;
+        if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return;
+        const source = (typeof sourceId === 'string')
+            ? deletedItems.find((entry) => entry && entry.id === sourceId)
+            : null;
+        if (source && isActiveRestoreClaim(source.restoreClaim)) return;
+        staleRestoreMarkerSweeps.add(item.id);
+        const release = () => { staleRestoreMarkerSweeps.delete(item.id); };
+        fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+            if (!currentItem) return currentItem;
+            if (!itemHasRestoreMarkers(currentItem)) return;
+            delete currentItem.restoreClaimId;
+            delete currentItem.restoreClaimToken;
+            return currentItem;
+        }).then(release, (error) => {
+            release();
+            console.error('Failed to clear stale restore markers for', item.id, error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'clearStaleRestoreMarkers', itemId: item.id });
+        });
+    }
 
     function runAutomaticCleanupRules() {
         const currentTime = getServerNow();
@@ -2639,6 +2665,10 @@
         scanHistory.forEach(item => {
             if (!item.id) return;
             if (item.clearClaim) return;
+            if (itemHasRestoreMarkers(item)) {
+                clearStaleRestoreMarkers(item);
+                return;
+            }
             let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
             if (!item.isClosed && (currentTime - itemTimestamp > EIGHT_DAYS_MS)) {
@@ -2718,6 +2748,7 @@
                 updatedRemainder = null;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return currentItem;
+                if (itemHasRestoreMarkers(currentItem)) return;
                 normalizeBarcodesOf(currentItem);
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
@@ -2842,6 +2873,8 @@
                 }
             }
 
+            stripHistoryOnlyMarkers(trashItem);
+
             deletedItems.unshift(trashItem);
             await retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500).catch(async (trashErr) => {
                 if (revenueDeducted) {
@@ -2946,6 +2979,33 @@
         }
         item.barcodes = list;
         return item;
+    }
+
+    function stripHistoryOnlyMarkers(item) {
+        if (!item || typeof item !== 'object') return item;
+        delete item.clearClaim;
+        delete item.restoreClaim;
+        delete item.restoreClaimId;
+        delete item.restoreClaimToken;
+        return item;
+    }
+
+    function itemHasRestoreMarkers(item) {
+        return !!(item && (item.restoreClaimId !== undefined || item.restoreClaimToken !== undefined));
+    }
+
+    function dropStaleRestoreMarkers(currentItem) {
+        if (!itemHasRestoreMarkers(currentItem)) return false;
+        if (dbListenerPendingPaths.has('zoew_recently_deleted_cod_dod')) return false;
+        const sourceId = currentItem.restoreClaimId;
+        if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return false;
+        const source = (typeof sourceId === 'string')
+            ? deletedItems.find((entry) => entry && entry.id === sourceId)
+            : null;
+        if (source && isActiveRestoreClaim(source.restoreClaim)) return false;
+        delete currentItem.restoreClaimId;
+        delete currentItem.restoreClaimToken;
+        return true;
     }
 
     function applyBarcodeCloseState(barcode, closed, at) {
@@ -6681,6 +6741,7 @@
                 claimedWhole = null;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return currentItem;
+                dropStaleRestoreMarkers(currentItem);
                 normalizeBarcodesOf(currentItem);
                 if (!Array.isArray(currentItem.barcodes)) return currentItem;
                 const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
@@ -6736,7 +6797,7 @@
             }
 
             const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };
-            const itemToTrash = { ...claimedParent, barcodes: [removedBc], count: 1 };
+            const itemToTrash = stripHistoryOnlyMarkers({ ...claimedParent, barcodes: [removedBc], count: 1 });
             itemToTrash.id = generateUniqueId();
             itemToTrash.deletedAt = getServerNow();
             itemToTrash.isFromDeletion = false;
@@ -6869,6 +6930,7 @@
                 serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return;
+                dropStaleRestoreMarkers(currentItem);
                 normalizeBarcodesOf(currentItem);
                 if (!currentItem.barcodes || !Array.isArray(currentItem.barcodes)) {
                     currentItem.barcodes = [{
@@ -7332,6 +7394,7 @@
                 serverCustomerDelta = 0;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return;
+                dropStaleRestoreMarkers(currentItem);
                 normalizeBarcodesOf(currentItem);
                 const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
                 if (serverBarcodes) {
@@ -7442,7 +7505,7 @@
             const localIdx = scanHistory.findIndex(i => i.id === id);
             if (localIdx !== -1) scanHistory.splice(localIdx, 1);
 
-            const removed = { ...claimedWhole, id };
+            const removed = stripHistoryOnlyMarkers({ ...claimedWhole, id });
             removed.deletedAt = getServerNow();
             removed.isFromDeletion = true;
             removed.trashReason = 'delete';
@@ -8076,6 +8139,16 @@
         openRecentlyDeletedModal();
     }
 
+    async function releaseStaleRestoreClaimForPurge(id) {
+        if (!db || !fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+        await fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+            if (!currentItem || !currentItem.restoreClaim) return;
+            if (isActiveRestoreClaim(currentItem.restoreClaim)) return;
+            delete currentItem.restoreClaim;
+            return currentItem;
+        });
+    }
+
     async function executePermanentDelete() {
         const id = pendingPermanentDeleteId;
         pendingPermanentDeleteId = null;
@@ -8090,6 +8163,7 @@
         openRecentlyDeletedModal();
 
         try {
+            await releaseStaleRestoreClaimForPurge(id);
             await deleteSingleDeletedItemFromFirebase(id);
             releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
         } catch (e) {
@@ -8112,6 +8186,7 @@
         return fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
             if (currentItem && currentItem.clearClaim) return;
             if (!currentItem) return fallbackItem;
+            dropStaleRestoreMarkers(currentItem);
             return mergeFn(currentItem);
         }).then((result) => {
             if (!result || !result.committed) {
@@ -8498,10 +8573,7 @@
         const trashItem = cloneRestoreItem(item);
         if (!trashItem) return null;
         trashItem.id = id;
-        delete trashItem.clearClaim;
-        delete trashItem.restoreClaim;
-        delete trashItem.restoreClaimId;
-        delete trashItem.restoreClaimToken;
+        stripHistoryOnlyMarkers(trashItem);
         trashItem.deletedAt = getServerNow();
         trashItem.isFromDeletion = true;
         trashItem.trashReason = 'delete';

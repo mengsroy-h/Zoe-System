@@ -53,7 +53,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
          setup-link-roundtrip-test export-cells-test camera-resume-test \
-         trash-modal-test partial-pickup-cleanup-test \
+         trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test; do
     run "$t" node "audit-tools/$t.js"
@@ -150,6 +150,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     BIOMETRIC_APP_DIR="$BASE" node audit-tools/biometric-unlock-test.js 2>&1 | tail -1 | sed 's/^/   biometric:       /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
     PARTIAL_APP_DIR="$BASE" node audit-tools/partial-pickup-cleanup-test.js 2>&1 | tail -1 | sed 's/^/   partial-pickup:  /'
+    MARKER_APP_DIR="$BASE" node audit-tools/restore-marker-hygiene-test.js 2>&1 | tail -1 | sed 's/^/   marker-hygiene:  /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'

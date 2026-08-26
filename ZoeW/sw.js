@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v105';
+const CACHE_VERSION = 'zoew-v106';
 
 const CORE_SHELL = [
     './',
@@ -14,6 +14,7 @@ const CORE_SHELL = [
 ];
 
 const OPTIONAL_SHELL = [
+    './vendor/xlsx.full.min.js',
     './manifest.json',
     './icon-192.png',
     './icon-512.png'

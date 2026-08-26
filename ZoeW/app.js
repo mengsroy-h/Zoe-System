@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.19.0';
+    const APP_VERSION = '2.19.1';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -4805,9 +4805,19 @@
     }
 
     const EXPORT_LIBS = {
-        xlsx: { url: 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js', integrity: 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw' }
+        xlsx: { url: './vendor/xlsx.full.min.js' }
     };
     const loadedScriptPromises = {};
+
+    function exportFailureMessage(e) {
+        if (e && e.code === 'SCRIPT_LOAD_FAILED') {
+            return navigator.onLine === false
+                ? "❌ Export Excel បរាជ័យ! ឧបករណ៍ក្រៅបណ្ដាញ ហើយឯកសារ Excel មិនទាន់ចូល cache ទេ"
+                : "❌ Export Excel បរាជ័យ! ផ្ទុកឯកសារ Excel មិនបានទេ — សូម Refresh ទំព័រម្តង";
+        }
+        const detail = e && e.message ? e.message : String(e);
+        return "❌ Export Excel បរាជ័យ! " + detail;
+    }
 
     function loadScriptOnce(key) {
         if (loadedScriptPromises[key]) return loadedScriptPromises[key];
@@ -4815,10 +4825,17 @@
         loadedScriptPromises[key] = new Promise((resolve, reject) => {
             const script = document.createElement('script');
             script.src = lib.url;
-            script.integrity = lib.integrity;
-            script.crossOrigin = 'anonymous';
+            if (lib.integrity) {
+                script.integrity = lib.integrity;
+                script.crossOrigin = 'anonymous';
+            }
             script.onload = () => resolve();
-            script.onerror = () => { delete loadedScriptPromises[key]; reject(new Error('Failed to load ' + lib.url)); };
+            script.onerror = () => {
+                delete loadedScriptPromises[key];
+                const err = new Error('Failed to load ' + lib.url);
+                err.code = 'SCRIPT_LOAD_FAILED';
+                reject(err);
+            };
             document.head.appendChild(script);
         });
         return loadedScriptPromises[key];
@@ -4907,7 +4924,7 @@
         } catch (e) {
             console.error("Excel export failed:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Excel export failed:" });
-            showToast("❌ Export Excel បរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត");
+            showToast(exportFailureMessage(e));
         }
     }
 

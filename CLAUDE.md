@@ -470,6 +470,62 @@ Test៖ **`connection-recovery-test.js`**។
 > listener, វដ្ត `goOffline()`+`goOnline()` និងផ្លូវបណ្តាញថ្មីរបស់
 > `license-verify.js` ដំណើរការរលូនទាំង ២ ប្រព័ន្ធ។
 
+## ⛔ ធនធានដែលផ្ទុក **យឺត** ក៏ត្រូវឆ្លងកាត់ CSP ដែរ — កំណែ 2.19.1
+
+> 🔴 **កំហុសផលិតកម្មពិត។** អ្នកប្រើ៖ «export excel អត់ចេញ មិនមែនមកពី internet
+> ទេ internet ខ្ញុំដើរលឿនធម្មតា» ព្រមទាំងដាន Sentry ជាភស្តុតាង។ **អ្នកប្រើ
+> ត្រូវទាំងស្រុង។**
+
+ZoeW ទាញ SheetJS ពី `https://unpkg.com/xlsx@0.18.5/...` ខណៈ `script-src`
+ក្នុង `ZoeW/netlify.toml` **គ្មាន host នោះសោះ** ➜ browser **ទប់មុនចេញដំណើរ**
+➜ `script.onerror` ➜ catch ➜ toast «សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត»។
+
+ដាន Sentry ពីឧបករណ៍ពិត៖ សំណើឯទៀត **200 គ្រប់** (`zxing_reader.wasm` ·
+`identitytoolkit` · `license_keys` · Apps Script) ហើយមានតែ៖
+
+```
+Excel export failed: Error: Failed to load https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
+    at HTMLScriptElement.<anonymous> (https://zoew.netlify.app/app.js:4821:79)
+```
+
+វាស់ក្នុង Chromium ពិតជាមួយ header CSP ពិត ដោយ **បម្រើ unpkg ក្នុងមូលដ្ឋាន**
+ដើម្បីឲ្យ **តែ CSP** ជាអ្នកសម្រេច៖
+
+| រង្វាស់ | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| ការផ្ទុក library | `{ loaded: false, hasXLSX: false }` | `{ loaded: true, hasXLSX: true }` |
+| សំណើទៅដល់ CDN | **0** (ទប់មុនចេញដំណើរ) | **0** (លែងត្រូវការ) |
+| សរសេរ `.xlsx` | `XLSX is not defined` | ឯកសារចាប់ផ្តើមដោយ `PK` |
+
+**ដំណោះស្រាយ ៖ SheetJS ចូលមកក្នុង repo** (`ZoeW/vendor/xlsx.full.min.js`) —
+ច្បាប់ដដែលនឹង ZXing ក្នុង 2.10.0 ហើយ ZoeImport ធ្វើដូចនេះរួចហើយ។ ឯកសារនោះ
+**byte-identical** នឹងអ្វីដែល unpkg ធ្លាប់បម្រើ (sha384 ត្រូវនឹង SRI ដើម
+បេះបិទ)។ វាចូល `OPTIONAL_SHELL` ➜ Export ដើរក្រៅបណ្ដាញ ដោយមិនធ្វើឲ្យការ
+ដំឡើង SW ក្លាយជា atomic លើឯកសារ ៨៨១ kB ថែមទៀត។
+
+⛔ **កុំបន្ថែម `unpkg.com` (ឬ CDN ណាមួយ) ចូល `script-src` ជាដំណោះស្រាយ។**
+ដំណោះស្រាយគឺ **ដកការពឹងផ្អែកលើ CDN ចេញ** — `sw.js` បោះបង់រាល់សំណើឆ្លង
+origin ដោយចេតនា (ច្បាប់ចាក់សោតាំងពី 2.6.1) ដូច្នេះធនធាន CDN **មិនដែលចូល
+cache** ➜ មុខងារនោះនឹងស្លាប់ស្ងាត់ៗពេលបណ្តាញខ្សោយ ទោះ CSP អនុញ្ញាតក៏ដោយ។
+
+**ហេតុអ្វីវារស់រានយូរម្ល៉េះ ៖ គ្មាន checker ណាមួយសួរថា *browser យក library
+មកពីណា*។** `csp-enforced-test.js` វាស់តែធនធានដែលផ្ទុក **ពេល boot**; ចំណែក
+`export-cells-test.js` ប្រើ module `xlsx` **របស់ npm ក្នុង Node** ➜ វាវាស់
+តែ *ខ្លឹមសារ* របស់ឯកសារ មិនមែន *ផ្លូវទទួល* វាទេ។ នេះជាមេរៀនដដែលនឹង
+`network-timeout-test.js` (2.12.1) និង `fluid-type-focus-test.js` (2.16.0)។
+
+⛔ **`loadScriptOnce()` មិនត្រូវសរសេរ `script.integrity = undefined`** —
+attribute ក្លាយជាខ្សែអក្សរ `"undefined"` ➜ SRI ធ្លាក់។ ដាក់ `integrity`
+និង `crossOrigin` **តែពេល lib ប្រកាសវា**។
+
+**សារបរាជ័យត្រូវប្រាប់មូលហេតុពិត** — `exportFailureMessage()` បែងចែក
+ការផ្ទុកឯកសារធ្លាក់ខណៈបណ្តាញដើរ (➜ «សូម Refresh ទំព័រម្តង») ចេញពីការក្រៅ
+បណ្ដាញពិត ចេញពីកំហុសផ្សេង។ ការចោទបណ្តាញលើ **គ្រប់** កំហុស គឺជាថ្នាក់ដដែល
+នឹងជុំ 2.19.0 (toast មិននិយាយការពិត)។
+
+Test៖ **`csp-lazy-resource-test.js`** (25 assertion, App ទាំង ៣; ធ្លាក់ ១០
+លើ tree មុនកែ)។
+
 ## Toast និងស្លាកស្ថានភាព ត្រូវនិយាយការពិត — កំណែ 2.19.0
 
 > 🔴 **កំហុសផលិតកម្មពិត — មានរូបថតជាភស្តុតាង** (2026-08-26)។ អ្នកប្រើសរសេរថា
@@ -1749,7 +1805,18 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
-**៦ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+**៧ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+#### ០ឃ. កំណែ 2.19.1 — Export Excel ដើរវិញ
+
+**Firebase rules មិនប្រែសោះ។** ជុំនេះប៉ះតែផ្លូវ Export របស់ ZoeW។
+សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. **Export ➜ 📗 Excel (.xlsx)** ➜ ឯកសារត្រូវទាញយកបានពិត ហើយបើកក្នុង Excel
+   ឬ Google Sheets បាន។ **លេខទូរស័ព្ទ និង Barcode ត្រូវជា TEXT** (មិនបាត់លេខ 0
+   នាំមុខ)។
+2. **បិទ WiFi រួច Export ម្តងទៀត** ➜ នៅតែដើរដដែល (SheetJS ស្ថិតក្នុង cache)។
+3. បើមានកំហុសកើតឡើង សារត្រូវ **ប្រាប់មូលហេតុពិត** មិនមែនចោទអ៊ីនធឺណិតទេ។
 
 #### ០គ. កំណែ 2.19.0 — Toast និងស្លាកស្ថានភាពនិយាយការពិត realtime
 
@@ -2010,6 +2077,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ចលនា boot + **ធនធានឆ្លង origin ក្នុង `<head>` ដែលទប់ការគូរ** | `boot-animation-test.js` |
 | មាត្រដ្ឋានអក្សរបែកគ្នា + សញ្ញាផ្តោតតាមក្តារចុចដែលបាត់ | `fluid-type-focus-test.js` |
 | toast អះអាងជោគជ័យខណៈក្រៅបណ្ដាញ · ថ្នាក់ toast គ្មានពណ៌ខុសគ្នា · ស្លាកស្ថានភាពពណ៌ថេរ | `toast-truth-test.js` |
+| ធនធានផ្ទុក**យឺត** ដែល CSP ទប់ (Export Excel ស្លាប់លើផលិតកម្ម) | `csp-lazy-resource-test.js` |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
 សរសេរជាប់**។ **កុំបន្ថែមធាតុដោយគ្មានការតាមដានពិត** — ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។

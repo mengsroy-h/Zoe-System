@@ -54,7 +54,7 @@ function sliceConst(name) {
         core.ZoeErrors = core.window.ZoeErrors;
         vm.createContext(core);
         const extras = [
-            'renderConnectionStatus', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
+            'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners'
         ].map(sliceFn).filter(Boolean).join('\n\n');
         const src = 'let dbListenersFailed = false;\n' +
@@ -78,7 +78,8 @@ function sliceConst(name) {
 }
 
 const REQUIRED_FNS = [
-    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'nudgeDatabaseConnection',
+    'connectionLooksOnline', 'connectionIsSettlingIn', 'renderConnectionStatus', 'refreshLiveToasts',
+    'nudgeDatabaseConnection',
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
@@ -146,7 +147,7 @@ function buildContext() {
         .forEach((k) => { refs[k] = { __path: k }; });
 
     const statusDot = { classes: {}, classList: { toggle: (c, on) => { statusDot.classes[c] = !!on; } } };
-    const statusText = { innerText: '' };
+    const statusText = { innerText: '', classes: {}, classList: { toggle: (c, on) => { statusText.classes[c] = !!on; } } };
 
     const quietConsole = Object.assign({}, console, { error: () => {} });
     const ctx = {

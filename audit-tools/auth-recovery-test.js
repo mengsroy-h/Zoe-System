@@ -138,6 +138,7 @@ function buildContext(app) {
             setItem() {}, removeItem() {}
         },
         fetch: fakeFetch,
+        navigator: { onLine: true },
         encodeURIComponent,
         alert: (m) => log.alerts.push(m),
         fb, auth, db: {},
@@ -203,6 +204,7 @@ function buildContext(app) {
     `;
     vm.runInContext(preamble, ctx);
     const wanted = ['withTimeout', 'readDatabaseUrlFromConfig', 'readUserRoleViaRest', 'readUserRole',
+        'connectionLooksOnline', 'liveToastState', 'showLiveToast',
         'retryPendingRoleCheck', app.verify, app.login];
     const appSrc = fs.readFileSync(path.join(appRoot, app.file), 'utf8');
     if (appSrc.indexOf('function isFirebaseDatabaseHost(') !== -1) {

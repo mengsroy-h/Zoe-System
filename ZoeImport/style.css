@@ -70,6 +70,18 @@ body {
     white-space: nowrap;
 }
 
+.brand-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.2; min-width: 0; }
+.brand-name { font-size: calc(14 * var(--fs-unit)); font-weight: 600; }
+.brand-status { display: flex; align-items: center; gap: 5px; font-size: calc(10 * var(--fs-unit)); font-weight: 600; }
+.status-dot { display: block; width: 6px; height: 6px; border-radius: 50%; flex: none; background: rgba(255, 255, 255, 0.55); }
+.status-dot.is-online { background: #86efac; }
+.status-dot.is-busy { background: #fcd34d; }
+.status-dot.is-bad { background: #fca5a5; }
+.status-text { color: rgba(255, 255, 255, 0.72); }
+.status-text.is-online { color: #86efac; }
+.status-text.is-busy { color: #fcd34d; }
+.status-text.is-bad { color: #fca5a5; }
+
 .nav-right {
     display: flex;
     align-items: center;
@@ -412,6 +424,7 @@ tr:last-child td { border-bottom: 0; }
 
 .toast.bad { background: var(--bad); }
 .toast.warn { background: var(--warn); }
+.toast.info { background: var(--ink); }
 
 .boot-splash {
     position: fixed;

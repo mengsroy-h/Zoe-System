@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.18.0';
+    const APP_VERSION = '2.19.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -614,12 +614,16 @@
             statusDot.classList.toggle('connecting', reconnecting || settling);
         }
         if (statusText) {
+            statusText.classList.toggle('is-online', online);
+            statusText.classList.toggle('is-connecting', !online && (reconnecting || settling));
+            statusText.classList.toggle('is-offline', !online && !reconnecting && !settling);
             statusText.innerText = online
                 ? "ភ្ជាប់ Server រួចរាល់"
                 : (reconnecting
                     ? "កំពុងភ្ជាប់ឡើងវិញ..."
                     : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
         }
+        refreshLiveToasts();
     }
 
     function clearReconnectWatchdog() {
@@ -1497,9 +1501,9 @@
         if (normalized.extras.length) {
             showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
         }
-        showToast("ភ្ជាប់ Config រួចរាល់! កំពុង Re-initialize...");
         closeModal('configModal');
         initFirebase();
+        showLiveToast('config');
     }
 
     function decodeSetupPayload(setupParam) {
@@ -2280,12 +2284,12 @@
 
         closeModal('loginModal');
         const wasAlreadySignedIn = isDatabaseInitialized;
-        if (!wasAlreadySignedIn) showToast("ចូលប្រព័ន្ធជោគជ័យ!");
         updateAuthButton(true);
 
         if (!isDatabaseInitialized && !initDatabaseListeners()) {
             showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
         }
+        if (!wasAlreadySignedIn) showLiveToast('signin');
         prefetchCustomerDataTableRowsIfConfigured();
         safeFocusScanner();
 
@@ -2450,7 +2454,7 @@
                 resetClearHistoryOperationState();
                 clearRememberedSession(false);
                 showLoginModalWithPrefill();
-                showToast("បានចាកចេញពីប្រព័ន្ធ!");
+                showToast("⚠️ បានចាកចេញលើឧបករណ៍នេះ — តែមិនអាចប្រាប់ Server បានទេ");
             });
         }
     }
@@ -2470,7 +2474,8 @@
     }
 
     function noteDbListenerAlive(pathKey) {
-        dbListenerPendingPaths.delete(pathKey);
+        const wasPending = dbListenerPendingPaths.delete(pathKey);
+        if (wasPending && !dbListenerPendingPaths.size) refreshLiveToasts();
         if (!dbListenersFailed || dbListenerPendingPaths.size) return;
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
@@ -3122,19 +3127,102 @@
             .replace(/'/g, '&#039;');
     }
 
-    function showToast(msg) {
+    const TOAST_LIFETIME_MS = 3000;
+    const TOAST_LIVE_LIMIT_MS = 20000;
+    const TOAST_CLASSES = { info: 'toast-info', success: 'toast-success', warn: 'toast-warn', error: 'toast-error' };
+    const TOAST_KIND_MARKS = [
+        ['error', ['❌', '⛔', '🚫']],
+        ['warn', ['⚠️', '⏱️']],
+        ['success', ['✅', '🎉', '🔓']]
+    ];
+
+    function toastKindOf(msg) {
+        const text = String(msg === null || msg === undefined ? '' : msg).trim();
+        for (let i = 0; i < TOAST_KIND_MARKS.length; i++) {
+            const marks = TOAST_KIND_MARKS[i][1];
+            for (let j = 0; j < marks.length; j++) {
+                if (text.indexOf(marks[j]) === 0) return TOAST_KIND_MARKS[i][0];
+            }
+        }
+        return 'info';
+    }
+
+    function paintToast(el, msg, kind) {
+        const resolved = TOAST_CLASSES[kind] ? kind : toastKindOf(msg);
+        Object.keys(TOAST_CLASSES).forEach((name) => el.classList.toggle(TOAST_CLASSES[name], name === resolved));
+        el.textContent = msg;
+    }
+
+    function armToastDismiss(el, delay) {
+        if (el.dismissTimer) clearTimeout(el.dismissTimer);
+        el.dismissTimer = setTimeout(() => {
+            el.dismissTimer = null;
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 300);
+        }, delay);
+    }
+
+    function showToast(msg, kind) {
         const container = document.getElementById('toastContainer');
-        if (!container) return;
+        if (!container) return null;
         while (container.children.length >= 4) container.removeChild(container.firstChild);
         const toast = document.createElement('div');
         toast.className = 'toast';
-        toast.textContent = msg;
+        paintToast(toast, msg, kind);
         container.appendChild(toast);
         requestAnimationFrame(() => toast.classList.add('show'));
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        armToastDismiss(toast, TOAST_LIFETIME_MS);
+        return toast;
+    }
+
+    function settleLiveToast(el) {
+        delete el.dataset.liveToast;
+        armToastDismiss(el, TOAST_LIFETIME_MS);
+    }
+
+    function showLiveToast(key) {
+        const state = liveToastState(key);
+        if (!state) return null;
+        const toast = showToast(state.msg, state.kind);
+        if (!toast || state.settled) return toast;
+        toast.dataset.liveToast = key;
+        armToastDismiss(toast, TOAST_LIVE_LIMIT_MS);
+        return toast;
+    }
+
+    function refreshLiveToasts() {
+        const container = document.getElementById('toastContainer');
+        if (!container || typeof container.querySelectorAll !== 'function') return;
+        const live = container.querySelectorAll('[data-live-toast]');
+        for (let i = 0; i < live.length; i++) {
+            const el = live[i];
+            const state = liveToastState(el.dataset.liveToast);
+            if (!state) { settleLiveToast(el); continue; }
+            paintToast(el, state.msg, state.kind);
+            if (state.settled) settleLiveToast(el);
+        }
+    }
+
+    function liveToastState(key) {
+        if (key !== 'signin' && key !== 'config') return null;
+        if (navigator.onLine === false) {
+            return key === 'signin'
+                ? { msg: '⚠️ ចូលប្រព័ន្ធរួច តែឧបករណ៍ក្រៅបណ្ដាញ — លេខដែលអ្នកឃើញមិនទាន់សម័យ', kind: 'warn', settled: false }
+                : { msg: '⚠️ រក្សាទុក Config រួច តែឧបករណ៍ក្រៅបណ្ដាញ — មិនទាន់ភ្ជាប់ Server ទេ', kind: 'warn', settled: false };
+        }
+        if (!isDatabaseConnected) {
+            return { msg: '🔄 កំពុងតភ្ជាប់ទៅ Server...', kind: 'info', settled: false };
+        }
+        if (key === 'config') {
+            return { msg: '✅ ភ្ជាប់ Server រួចរាល់!', kind: 'success', settled: true };
+        }
+        if (dbListenersFailed) {
+            return { msg: '⚠️ ចូលប្រព័ន្ធរួច តែការទាញទិន្នន័យដាច់ — កំពុងព្យាយាមឡើងវិញ', kind: 'warn', settled: false };
+        }
+        if (dbListenerPendingPaths.size) {
+            return { msg: '🔄 ចូលប្រព័ន្ធរួច — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
+        }
+        return { msg: '✅ ចូលប្រព័ន្ធជោគជ័យ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
     }
 
     function getFormattedDate(d = new Date(getServerNow())) {

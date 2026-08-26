@@ -15,6 +15,7 @@
             --accent-purple: #7c3aed;
             --accent-purple-light: #ede9fe;
             --warning: #f59e0b;
+            --danger: #e11d48;
             --scan-box-h: clamp(170px, 46vw, 260px);
             --fs-unit: clamp(1px, 0.7091px + 0.0909vw, 1.1px);
             --radius-xl: 16px;
@@ -99,7 +100,10 @@
             box-shadow: 0 3px 8px rgba(227, 24, 55, 0.25);
         }
         .brand-info h1 { font-size: calc(14 * var(--fs-unit)); font-weight: 700; color: var(--text-main); line-height: 1.2; }
-        .brand-info span { font-size: calc(10 * var(--fs-unit)); color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        .brand-info span { font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        #firebaseStatusText.is-online { color: var(--success); }
+        #firebaseStatusText.is-connecting { color: #b45309; }
+        #firebaseStatusText.is-offline { color: var(--text-muted); }
         .status-dot { position: relative; width: 6px; height: 6px; background: var(--success); border-radius: 50%; flex-shrink: 0; }
         .status-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--success); animation: pulseDot 2s infinite; will-change: transform, opacity; }
         .status-dot.offline { background: #94a3b8; }
@@ -1068,6 +1072,10 @@
             opacity: 0; transform: translateY(10px); transition: opacity 0.25s ease, transform 0.25s ease;
         }
         .toast.show { opacity: 1; transform: translateY(0); }
+        .toast-info { background-color: #1e293b; color: #fff; }
+        .toast-success { background-color: var(--success); color: #ffffff; }
+        .toast-warn { background-color: #b45309; color: #ffffff; }
+        .toast-error { background-color: var(--danger); color: #ffffff; }
 
         .print-only { display: none; }
         #pdfExportPrintArea h2 { font-size: 14px; margin: 0 0 10px; }

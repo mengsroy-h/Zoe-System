@@ -1,4 +1,4 @@
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 
 const STORE_PIN_HASH = 'zoeimport_pin_hash';
 const STORE_PIN_FAILS = 'zoeimport_pin_fail_count';
@@ -77,13 +77,53 @@ function setMsg(hostId, text, kind) {
 
 let toastTimer = null;
 
+const TOAST_KIND_MARKS = [['bad', ['❌', '⛔', '🚫']], ['warn', ['⚠️', '⏱️']], ['ok', ['✅', '🎉']]];
+
+function toastKindOf(text) {
+    const body = String(text === null || text === undefined ? '' : text).trim();
+    for (let i = 0; i < TOAST_KIND_MARKS.length; i++) {
+        const marks = TOAST_KIND_MARKS[i][1];
+        for (let j = 0; j < marks.length; j++) {
+            if (body.indexOf(marks[j]) === 0) return TOAST_KIND_MARKS[i][0];
+        }
+    }
+    return 'info';
+}
+
 function toast(text, kind) {
     const el = $('toast');
     if (!el) return;
     el.textContent = text;
-    el.className = 'toast ' + (kind || 'ok');
+    el.className = 'toast ' + (kind || toastKindOf(text));
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.add('hidden'), 3600);
+}
+
+const LINK_STATES = {
+    offline: { text: 'ក្រៅបណ្ដាញ', cls: 'is-bad' },
+    idle: { text: 'មិនទាន់ភ្ជាប់', cls: 'is-idle' },
+    busy: { text: 'កំពុងទាក់ទង Sheet...', cls: 'is-busy' },
+    ok: { text: 'ភ្ជាប់ Sheet រួចរាល់', cls: 'is-online' },
+    bad: { text: 'ភ្ជាប់ Sheet មិនបាន', cls: 'is-bad' }
+};
+
+let linkState = 'idle';
+
+function renderLinkStatus() {
+    const name = navigator.onLine === false ? 'offline' : linkState;
+    const meta = LINK_STATES[name] || LINK_STATES.idle;
+    const dot = $('linkStatusDot');
+    const txt = $('linkStatusText');
+    if (dot) dot.className = 'status-dot ' + meta.cls;
+    if (txt) {
+        txt.className = 'status-text ' + meta.cls;
+        txt.textContent = meta.text;
+    }
+}
+
+function setLinkState(name) {
+    linkState = name;
+    renderLinkStatus();
 }
 
 function bytesToHex(buffer) {
@@ -214,6 +254,7 @@ function resetSessionState() {
     sheetHeaders = [];
     mappingSignature = '';
     clearSensitiveFields();
+    setLinkState('idle');
 }
 
 function lockApp() {
@@ -414,22 +455,33 @@ async function callApi(action, extra, url, password) {
     const target = url || apiUrl;
     const secret = password === undefined ? apiPassword : password;
     if (!target) throw new Error('មិនទាន់កំណត់ URL ទេ');
-    const payload = Object.assign({ action: action, password: secret }, extra || {});
-    const out = await fetchWithTimeout(target, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        redirect: 'follow'
-    }, REQUEST_TIMEOUT_MS, 'សំណើអស់ពេល — សូមពិនិត្យបណ្តាញ');
-    if (!out.res.ok) throw new Error('ម៉ាស៊ីនបម្រើឆ្លើយ ' + out.res.status);
-    let parsed;
-    try {
-        parsed = JSON.parse(out.body);
-    } catch (err) {
-        throw new Error('ចម្លើយមិនមែនជា JSON — សូមពិនិត្យថា Deploy ជា Web app ហើយ «Who has access» ជា Anyone');
+    if (navigator.onLine === false) {
+        setLinkState('offline');
+        throw new Error('ឧបករណ៍ក្រៅបណ្ដាញ — សូមភ្ជាប់អ៊ីនធឺណិតជាមុនសិន');
     }
-    if (!parsed.ok) throw new Error(parsed.error || 'សំណើបរាជ័យ');
-    return parsed.data;
+    const payload = Object.assign({ action: action, password: secret }, extra || {});
+    setLinkState('busy');
+    try {
+        const out = await fetchWithTimeout(target, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload),
+            redirect: 'follow'
+        }, REQUEST_TIMEOUT_MS, 'សំណើអស់ពេល — សូមពិនិត្យបណ្តាញ');
+        if (!out.res.ok) throw new Error('ម៉ាស៊ីនបម្រើឆ្លើយ ' + out.res.status);
+        let parsed;
+        try {
+            parsed = JSON.parse(out.body);
+        } catch (err) {
+            throw new Error('ចម្លើយមិនមែនជា JSON — សូមពិនិត្យថា Deploy ជា Web app ហើយ «Who has access» ជា Anyone');
+        }
+        if (!parsed.ok) throw new Error(parsed.error || 'សំណើបរាជ័យ');
+        setLinkState('ok');
+        return parsed.data;
+    } catch (err) {
+        setLinkState('bad');
+        throw err;
+    }
 }
 
 async function refreshStatus() {
@@ -484,7 +536,7 @@ async function saveConfig() {
             foot.textContent = 'គោលដៅ៖ ' + status.spreadsheetName + ' ➜ tab «' + status.sheetName +
                 '» · មាន ' + status.rowCount + ' ជួរដេក';
         }
-        toast('ការតភ្ជាប់ត្រឹមត្រូវ', 'ok');
+        toast('✅ ការតភ្ជាប់ត្រឹមត្រូវ');
     } catch (err) {
         setMsg('configMsg', err.message, 'bad');
     } finally {
@@ -729,7 +781,7 @@ async function runImport() {
         setMsg('actionMsg', parts.join(' · '), 'ok');
         const foot = $('statusFoot');
         if (foot) foot.textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
-        toast('នាំចូលរួចរាល់', 'ok');
+        toast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
     } catch (err) {
         setMsg('actionMsg', err.message, 'bad');
     } finally {
@@ -753,7 +805,7 @@ async function runClear() {
         setMsg('clearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
         const foot = $('statusFoot');
         if (foot) foot.textContent = 'គោលដៅ៖ tab «' + result.sheetName + '» · មាន ' + result.rowsAfter + ' ជួរដេក';
-        toast('សម្អាតរួចរាល់', 'ok');
+        toast('✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក');
     } catch (err) {
         setMsg('clearMsg', err.message, 'bad');
     } finally {
@@ -867,6 +919,9 @@ function boot() {
     const versionText = $('appVersionText');
     if (versionText) versionText.textContent = APP_VERSION;
     bindEvents();
+    window.addEventListener('online', renderLinkStatus);
+    window.addEventListener('offline', renderLinkStatus);
+    renderLinkStatus();
     registerServiceWorker();
     if (!window.isSecureContext) {
         setMsg('pinMsg', 'ត្រូវបើកតាម HTTPS ទើប PIN និងការអ៊ិនគ្រីបដំណើរការ', 'bad');

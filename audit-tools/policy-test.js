@@ -105,6 +105,8 @@ for (const app of ['ZoeW']) {
     check('ស្ថិតិក្រោយស្តារ (មិនបូកថែម)', ctx.stats, { cod: 100, dod: 50, count: 3 });
     check('marker ត្រូវសម្អាតពេលរស់វិញ', back.itemToRestore.barcodes.map(b => b.isFromDeletion), [false, false]);
     check('ស្ថានភាព បិទ/ខល នៅដដែល', [back.itemToRestore.isClosed, back.itemToRestore.isCalled, back.itemToRestore.callMark], [true, true, 'មិនទទួល']);
+    check('នាឡិកា ២ ម៉ោងរបស់ barcode ត្រូវចាប់ផ្តើមឡើងវិញពេលស្តារ (បើអត់ ➜ លោតចូលធុងសំរាមវិញភ្លាម)',
+        back.itemToRestore.barcodes.map(b => b.closedAt), [1000000, 1000000]);
 
     r = ctx.runClaim(back.itemToRestore, null, 'close', 'id_1');
     check('លុបម្ដងទៀត (មិនដកទៀត)', ctx.stats, { cod: 100, dod: 50, count: 3 });
@@ -125,6 +127,7 @@ for (const app of ['ZoeW']) {
     check('ស្ថិតិក្រោយស្តារ (បូកត្រឡប់ពេញ)', ctx.stats, { cod: 100, dod: 50, count: 3 });
     check('isDeducted ត្រូវ reset', back.itemToRestore.barcodes.map(b => b.isDeducted), [false, false]);
     check('marker ត្រូវសម្អាត', back.itemToRestore.barcodes.map(b => b.isFromDeletion), [false, false]);
+    check('barcode ដែលមិនទាន់យក មិនត្រូវមានត្រា closedAt', back.itemToRestore.barcodes.map(b => b.closedAt), [undefined, undefined]);
 
     r = ctx.runClaim(back.itemToRestore, null, 'abandon', 'id_2');
     check('ដកម្ដងទៀត (ដកម្ដងទៀត)', ctx.stats, { cod: 60, dod: 40, count: 1 });

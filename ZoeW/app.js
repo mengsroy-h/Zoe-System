@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.1';
+    const APP_VERSION = '2.17.2';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -2648,6 +2648,11 @@
 
             if (item.isClosed && item.closedAt && (currentTime - item.closedAt > TWO_HOURS_MS)) {
                 claimAndCleanupItem(item.id, 'close');
+                return;
+            }
+
+            if (Array.isArray(item.barcodes) && item.barcodes.some(b => b && b.isClosed && (typeof b.closedAt !== 'number' || barcodeCloseIsRipe(b, currentTime)))) {
+                claimAndCleanupItem(item.id, 'close');
             }
         });
     }
@@ -2745,6 +2750,34 @@
                     claimedWhole = currentItem;
                     return null;
                 } else {
+                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
+                        const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
+                        const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow()));
+                        if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
+
+                        const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow()));
+                        if (keptBarcodes.length === 0) {
+                            claimedWhole = currentItem;
+                            return null;
+                        }
+
+                        claimedPartial = { ...currentItem, barcodes: ripeClosed };
+                        const updated = { ...currentItem, barcodes: keptBarcodes };
+                        updated.count = keptBarcodes.length;
+                        updated.cod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                        updated.dod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                        updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                        updated.barcode = keptBarcodes[0].code;
+                        updated.isClosed = keptBarcodes.every(b => b.isClosed);
+                        if (updated.isClosed) {
+                            if (!updated.closedAt) updated.closedAt = getServerNow();
+                        } else {
+                            delete updated.closedAt;
+                        }
+                        updatedRemainder = updated;
+                        return updated;
+                    }
+
                     if (!currentItem.isClosed || !currentItem.closedAt || (getServerNow() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
                     claimedWhole = currentItem;
                     return null;
@@ -2758,24 +2791,32 @@
             let revenueScanDate = null;
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
+                const partialIsPickup = reason !== 'abandon';
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
-                trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
+                trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b, isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
                 trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
                 trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
                 trashItem.price = Math.round((trashItem.cod + trashItem.dod) * 100) / 100;
                 trashItem.barcode = trashItem.barcodes[0].code;
-                trashItem.isClosed = false;
-                delete trashItem.closedAt;
                 trashItem.deletedAt = getServerNow();
-                trashItem.isFromDeletion = false;
-                trashItem.trashReason = 'expired';
-                revenueScanDate = trashItem.scanDate || getFormattedDate();
-                revenueCod = trashItem.cod;
-                revenueDod = trashItem.dod;
-                revenueCount = trashItem.count;
-                addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
-                revenueDeducted = true;
+                if (partialIsPickup) {
+                    trashItem.isClosed = true;
+                    trashItem.closedAt = trashItem.barcodes.reduce((latest, b) => Math.max(latest, parseFloat(b.closedAt) || 0), 0) || getServerNow();
+                    trashItem.isFromDeletion = true;
+                    trashItem.trashReason = 'pickup';
+                } else {
+                    trashItem.isClosed = false;
+                    delete trashItem.closedAt;
+                    trashItem.isFromDeletion = false;
+                    trashItem.trashReason = 'expired';
+                    revenueScanDate = trashItem.scanDate || getFormattedDate();
+                    revenueCod = trashItem.cod;
+                    revenueDod = trashItem.dod;
+                    revenueCount = trashItem.count;
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+                    revenueDeducted = true;
+                }
             } else {
                 trashItem = { ...claimedWhole, id };
                 trashItem.deletedAt = getServerNow();
@@ -2905,6 +2946,36 @@
         }
         item.barcodes = list;
         return item;
+    }
+
+    function applyBarcodeCloseState(barcode, closed, at) {
+        if (!barcode || typeof barcode !== 'object') return barcode;
+        barcode.isClosed = !!closed;
+        if (closed) barcode.closedAt = at;
+        else delete barcode.closedAt;
+        return barcode;
+    }
+
+    function barcodeCloseIsRipe(barcode, now) {
+        return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
+    }
+
+    function normalizeBarcodeCloseStamps(item, now) {
+        if (!item || !Array.isArray(item.barcodes)) return false;
+        let changed = false;
+        item.barcodes.forEach((b) => {
+            if (!b || typeof b !== 'object') return;
+            if (b.isClosed) {
+                if (typeof b.closedAt !== 'number') {
+                    b.closedAt = (typeof item.closedAt === 'number') ? item.closedAt : now;
+                    changed = true;
+                }
+            } else if (b.closedAt !== undefined) {
+                delete b.closedAt;
+                changed = true;
+            }
+        });
+        return changed;
     }
 
     function sanitizeInput(str) {
@@ -6738,7 +6809,7 @@
         const freshItem = scanHistory.find(i => i.id === itemId);
         const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
         const previousState = freshItem && freshB
-            ? { isClosed: freshB.isClosed, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
+            ? { isClosed: freshB.isClosed, barcodeClosedAt: freshB.closedAt, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -6764,7 +6835,7 @@
             pickupPackageDelta = serverPackageDelta;
         };
         if (freshItem && freshB) {
-            freshB.isClosed = desiredClosed;
+            applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
             if (allClosedLocal) freshItem.closedAt = getServerNow(); else delete freshItem.closedAt;
@@ -6816,7 +6887,7 @@
                 if (!b) return currentItem;
                 const wasItemClosed = !!currentItem.isClosed;
                 serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
-                b.isClosed = desiredClosed;
+                applyBarcodeCloseState(b, desiredClosed, getServerNow());
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
                 serverCustomerDelta = (!wasItemClosed && allClosed) ? 1 : ((wasItemClosed && !allClosed) ? -1 : 0);
                 currentItem.isClosed = allClosed;
@@ -6844,6 +6915,8 @@
                 const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
                 if (revertItem && revertB) {
                     revertB.isClosed = previousState.isClosed;
+                    if (previousState.barcodeClosedAt !== undefined) revertB.closedAt = previousState.barcodeClosedAt;
+                    else delete revertB.closedAt;
                     revertItem.isClosed = previousState.itemIsClosed;
                     if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
                     else delete revertItem.closedAt;
@@ -7193,7 +7266,7 @@
 
         const freshItem = scanHistory.find(i => i.id === id);
         const previousState = freshItem
-            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null }
+            ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null, barcodeCloseStamps: freshItem.barcodes ? freshItem.barcodes.map(b => b.closedAt) : null }
             : null;
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
@@ -7224,10 +7297,10 @@
                 freshItem.closedAt = getServerNow();
                 delete freshItem.callMark;
                 delete freshItem.callMarkTime;
-                if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = true);
+                if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
             } else {
                 delete freshItem.closedAt;
-                if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => b.isClosed = false);
+                if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => applyBarcodeCloseState(b, false));
             }
 
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
@@ -7276,10 +7349,10 @@
                     currentItem.closedAt = getServerNow();
                     delete currentItem.callMark;
                     delete currentItem.callMarkTime;
-                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = true);
+                    if (serverBarcodes) serverBarcodes.forEach(b => applyBarcodeCloseState(b, true, getServerNow()));
                 } else {
                     delete currentItem.closedAt;
-                    if (serverBarcodes) serverBarcodes.forEach(b => b.isClosed = false);
+                    if (serverBarcodes) serverBarcodes.forEach(b => applyBarcodeCloseState(b, false));
                 }
                 serverApplied = true;
                 return currentItem;
@@ -7305,7 +7378,13 @@
                     if (previousState.callMarkTime !== undefined) revertItem.callMarkTime = previousState.callMarkTime;
                     else delete revertItem.callMarkTime;
                     if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
-                        revertItem.barcodes.forEach((b, i) => { if (previousState.barcodeStates[i] !== undefined) b.isClosed = previousState.barcodeStates[i]; });
+                        revertItem.barcodes.forEach((b, i) => {
+                            if (previousState.barcodeStates[i] === undefined) return;
+                            b.isClosed = previousState.barcodeStates[i];
+                            const stamp = previousState.barcodeCloseStamps ? previousState.barcodeCloseStamps[i] : undefined;
+                            if (stamp !== undefined) b.closedAt = stamp;
+                            else delete b.closedAt;
+                        });
                     }
                     refreshCurrentHistoryView();
                 }
@@ -7902,6 +7981,8 @@
                         restoredBc.isDeducted = false;
                     }
                     restoredBc.isFromDeletion = false;
+                    if (restoredBc.isClosed) restoredBc.closedAt = getServerNow();
+                    else delete restoredBc.closedAt;
                 });
             } else if (restoredWasRemoved) {
                 const legacyCod = parseFloat(itemToRestore.cod) || 0;

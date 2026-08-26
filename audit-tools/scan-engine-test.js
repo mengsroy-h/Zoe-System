@@ -20,9 +20,15 @@ if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chr
 
 const ROOT = process.env.SCAN_APP_DIR || path.join(__dirname, '..');
 
-// engine ស្កេនស្ថិតក្នុង repo ➜ តេស្តនេះលែងត្រូវការ npm dependency ណាមួយទៀតទេ
+// engine ស្កេនស្ថិតក្នុង repo ➜ តេស្តនេះលែងត្រូវការ npm dependency ណាមួយទៀតទេ។
+// ⛔ ដូច្នេះការបាត់ `zxing_reader.wasm` **មិនមែនជា SKIP បរិស្ថានទេ** — វាជា
+// **ការធ្លាក់**៖ ឯកសារនោះនៅក្នុង `CORE_SHELL` របស់ `sw.js` ហើយបើវាបាត់ នោះ
+// ការស្កេនស្លាប់លើផលិតកម្ម។ ការចេញជា SKIP (exit 0) នៅទីនេះជាការបៃតង
+// ក្លែងក្លាយ៖ ថត app ដែលទទេ ឬ override ដែលខុស នឹងធ្វើឲ្យ checker នេះ
+// «ជោគជ័យ» ដោយមិនបានពិនិត្យអ្វីសោះ។ មើល `checker-coverage.js`។
 if (!fs.existsSync(path.join(ROOT, 'ZoeW/vendor/zxing_reader.wasm'))) {
-    console.log('SKIP — រកមិនឃើញ ZoeW/vendor/zxing_reader.wasm'); process.exit(0);
+    console.log('❌ រកមិនឃើញ ZoeW/vendor/zxing_reader.wasm — engine ស្កេនត្រូវនៅក្នុង repo');
+    process.exit(1);
 }
 const REPORT = process.env.SCAN_REPORT === '1';
 

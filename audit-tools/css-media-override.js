@@ -76,11 +76,14 @@ function declsOf(body) {
 }
 
 let problems = 0;
+let scannedFiles = 0, scannedMediaRules = 0;
 for (const app of APPS) {
     const file = path.join(ROOT, app, 'style.css');
     if (!fs.existsSync(file)) continue;
     const rules = collectRules(stripComments(fs.readFileSync(file, 'utf8')));
     const inMedia = rules.filter((r) => r.media);
+    scannedFiles++;
+    scannedMediaRules += inMedia.length;
     const bare = rules.filter((r) => !r.media);
     const hits = [];
     for (const r of inMedia) {
@@ -99,6 +102,17 @@ for (const app of APPS) {
         console.log('       ត្រូវសរសេរជាន់ដោយច្បាប់ក្រៅ @media ដែលមកក្រោយ៖ ' + h.killer.prop + ': ' + h.killer.value);
     });
 }
+
+// ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»
+// ជាការអះអាង **អវត្តមាន** — វាពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ checker នេះ
+// ត្រូវអះអាងជាមុនសិនថា **វាពិតជាបានឃើញកូដ**។ មើល `checker-coverage.js`។
+const MIN_FILES = 2, MIN_MEDIA_RULES = 20;
+if (scannedFiles < MIN_FILES || scannedMediaRules < MIN_MEDIA_RULES) {
+    console.log('\n❌ ជាន់អប្បបរមា៖ រំពឹងឯកសារ >= ' + MIN_FILES + ' និងច្បាប់ក្នុង @media >= ' + MIN_MEDIA_RULES
+        + ' តែឃើញ ' + scannedFiles + ' / ' + scannedMediaRules + ' — checker នេះមិនបានឃើញ CSS ទេ');
+    process.exit(1);
+}
+console.log('\nជាន់អប្បបរមា៖ ស្កេន stylesheet ' + scannedFiles + ' · ច្បាប់ក្នុង @media ' + scannedMediaRules);
 
 if (problems) {
     console.log('\n❌ ' + problems + ' ច្បាប់ក្នុង @media គ្មានប្រសិទ្ធភាព — @media មិនបន្ថែម specificity ទេ ' +

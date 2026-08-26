@@ -18,6 +18,7 @@ const ACCEPTED = new Set([
 ]);
 
 let problems = [];
+let scannedFiles = 0, scannedChains = 0;
 function srcOf(code, node) { return code.slice(node.start, node.end); }
 
 for (const app of APPS) {
@@ -25,6 +26,8 @@ for (const app of APPS) {
     if (!fs.existsSync(file)) continue;
     const code = fs.readFileSync(file, 'utf8');
     const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
+    scannedFiles++;
+    scannedChains += (code.match(/\.then\(/g) || []).length;
 
     (function walk(node, parent) {
         if (!node || typeof node.type !== 'string') return;
@@ -77,6 +80,17 @@ for (const app of APPS) {
         }
     })(ast, null);
 }
+
+// ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»
+// ជាការអះអាង **អវត្តមាន** — វាពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ checker នេះ
+// ត្រូវអះអាងជាមុនសិនថា **វាពិតជាបានឃើញកូដ**។ មើល `checker-coverage.js`។
+const MIN_FILES = 2, MIN_CHAINS = 30;
+if (scannedFiles < MIN_FILES || scannedChains < MIN_CHAINS) {
+    console.log('❌ ជាន់អប្បបរមា៖ រំពឹងឯកសារ >= ' + MIN_FILES + ' និងខ្សែសង្វាក់ `.then(` >= ' + MIN_CHAINS
+        + ' តែឃើញ ' + scannedFiles + ' / ' + scannedChains + ' — checker នេះមិនបានឃើញកូដទេ');
+    process.exit(1);
+}
+console.log('ជាន់អប្បបរមា៖ ស្កេនឯកសារ ' + scannedFiles + ' · ខ្សែសង្វាក់ `.then(` ' + scannedChains);
 
 if (problems.length) {
     console.log('រកឃើញ ' + problems.length + ' កន្លែង៖');

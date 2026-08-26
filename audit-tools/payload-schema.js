@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
 
-const ROOT = path.join(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const ROOT = process.env.PAYLOAD_APP_DIR ? path.resolve(process.env.PAYLOAD_APP_DIR) : path.resolve(__dirname, '..');
 const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')).rules;
 
 function schemaFields(node) {

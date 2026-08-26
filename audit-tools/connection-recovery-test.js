@@ -68,6 +68,12 @@ const RESYNC_GUARD = sliceFn('dbListenerResyncIsProgressing') ||
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
             'const dbListenerPendingPaths = new Set();\n' +
+        'let infoListenersFailed = false;\n' +
+        'let infoListenerRecoveryTimer = null;\n' +
+        'let infoListenerRecoveryAttempt = 0;\n' +
+        'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
+        'let serverTimeOffsetMs = 0;\n' +
+        'const retryPendingRoleCheck = () => {};\n' +
             'let dbListenerPendingSeen = 0;\n' +
             'const LISTENER_RECOVERY_STEPS_MS = [2000];\n' +
             'let db = null, fb = null, auth = null;\n' +
@@ -91,24 +97,29 @@ const REQUIRED_FNS = [
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
     'detachDatabaseListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
-    'runScheduledCleanup'
+    'runScheduledCleanup',
+    'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
+    'handleInfoListenerError'
 ];
 
+// ⛔ **កុំបញ្ឈប់ខ្លួនត្រង់នេះ។** ការ `process.exit(1)` ដោយ «រកមុខងារមិនឃើញ»
+// **បិទបាំងការអះអាងឥរិយាបថទាំង ១០០ ខាងក្រោម** ➜ លើ tree មុនកែ អ្នកឃើញ
+// កំហុសតែ ១ បន្ទាត់ ជំនួសឲ្យការធ្លាក់ពិតដែលប្រាប់ថា *អ្វី* ខូច។ (ជុំ 2.19.3
+// ជួបវាដោយផ្ទាល់៖ ការបន្ថែម `dbListenerResyncIsProgressing` ចូល REQUIRED_FNS
+// ធ្វើឲ្យ tree មុនកែបង្ហាញ «0 ok, 1 FAIL» ជំនួស ១១ ការធ្លាក់ដែលមានន័យ។)
+// ជំនួសវិញ៖ រាយវាជាការធ្លាក់ រួច **stub** វា ដើម្បីឲ្យការអះអាងឥរិយាបថ
+// នៅតែរត់ ហើយធ្លាក់ដោយហេតុផលរបស់វាផ្ទាល់។ `checker-coverage.js` ចាក់សោនេះ។
 const missing = REQUIRED_FNS.filter((n) => !sliceFn(n));
-if (missing.length) {
-    console.log('  FAIL   មុខងារស្តារការតភ្ជាប់មិនមានក្នុង app.js: ' + missing.join(', '));
-    console.log('\nសរុប: 0 ok, 1 FAIL');
-    process.exit(1);
-}
+missing.forEach((n) => ok('មុខងារស្តារការតភ្ជាប់ `' + n + '` មានក្នុង app.js', false));
+const FN_STUBS = missing.map((n) => 'function ' + n + '() {}').join('\n');
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
-    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS'];
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
-if (missingConsts.length) {
-    console.log('  FAIL   ថេរមិនមាន: ' + missingConsts.join(', '));
-    console.log('\nសរុប: 0 ok, 1 FAIL');
-    process.exit(1);
-}
+missingConsts.forEach((n) => ok('ថេរ `' + n + '` មានក្នុង app.js', false));
+const CONST_STUBS = missingConsts
+    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : '1') + ';')
+    .join('\n');
 
 function buildContext() {
     const clock = { now: 1000, seq: 0, timers: [] };
@@ -200,8 +211,9 @@ function buildContext() {
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
 
-    const code = 'let dbListenerPendingSeen = 0;\n' + REQUIRED_CONSTS.map(sliceConst).join('\n') + '\n' +
-        REQUIRED_FNS.map(sliceFn).join('\n\n') + '\n' + RESYNC_GUARD + '\n' +
+    const code = 'let dbListenerPendingSeen = 0;\n' + CONST_STUBS + '\n'
+        + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
+        REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' +
         'let dbListenersFailed = false;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
         'let dbListenerRecoveryAttempt = 0;\n' +
@@ -221,13 +233,20 @@ function buildContext() {
         'let hasEverConnectedToDatabase = true;\n' +
         'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
+        'let infoListenersFailed = false;\n' +
+        'let infoListenerRecoveryTimer = null;\n' +
+        'let infoListenerRecoveryAttempt = 0;\n' +
+        'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
+        'let serverTimeOffsetMs = 0;\n' +
+        'const retryPendingRoleCheck = () => {};\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
         'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths) });\n' +
         'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
         'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
         'handleDbListenerError, initDatabaseListeners, noteDbListenerAlive, retryFailedDbListenersNow, ' +
-        'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog };\n';
+        'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
+        'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
     vm.runInContext(code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
@@ -583,6 +602,48 @@ function buildContext() {
     t3.api.resetDbListenerHealthState();
     ok('ចាកចេញ ➜ ការតាមដានវឌ្ឍនភាពត្រូវ reset',
         /dbListenerPendingSeen = 0;/.test(sliceFn('resetDbListenerHealthState') || ''));
+}
+
+// ── ១០ខ១គ. listener `.info/*` ដែលត្រូវបោះបង់ ក៏ត្រូវមានផ្លូវស្តារដែរ ────
+// 🔴 ចន្លោះពិត៖ កំណែ 2.11.6 បានឲ្យ listener ទិន្នន័យទាំង ៦ នូវ
+// `handleDbListenerError()` + ជណ្តើរស្តារ — តែ `.info/connected` និង
+// `.info/serverTimeOffset` **ត្រូវបានទុកចោល**។ callback កំហុសរបស់
+// `.info/connected` គ្រាន់តែសរសេរ UI រួច **មិនភ្ជាប់ខ្លួនវាឡើងវិញទេ**
+// ចំណែក `.info/serverTimeOffset` **គ្មាន callback កំហុសសោះ**។
+//
+// ព្រោះ Firebase **ដក listener ចេញ** ពេល errCb បាញ់ នោះផលគឺ៖
+//   · `isDatabaseConnected` កក `false` **ជារៀងរហូត** ➜ ស្លាកកុហកថា
+//     «ក្រៅបណ្ដាញ» ខណៈ socket ដើរធម្មតា (ថ្នាក់ 2.19.0 ដដែល)
+//   · watchdog វដ្ត `goOffline()`+`goOnline()` រៀងរាល់ ៦០ វិនាទី **អស់ថ្ម**
+//   · `serverTimeOffsetMs` កក ➜ `getServerNow()` ឃ្លាត ➜ ការសម្រេច
+//     retention ២ម៉ោង/៨ថ្ងៃ/៣០ថ្ងៃ ដើរលើនាឡិកាខុស
+// ហើយគ្មានអ្វីស្តារវាបានទេ ក្រៅពី **ការ Refresh ដោយដៃ**។
+{
+    const t = buildContext();
+    const infoRefs = { __path: 'info/connected' };
+    ok('មាន attachInfoListeners (ផ្លូវភ្ជាប់ `.info/*` តែមួយ)',
+        !!sliceFn('attachInfoListeners'));
+    ok('`.info/connected` មាន callback កំហុសដែលកេះការស្តារ',
+        /handleInfoListenerError/.test(SRC)
+        && /fb\.onValue\(dbRefConnected[\s\S]{0,900}?handleInfoListenerError\)/.test(SRC));
+    ok('⛔ `.info/serverTimeOffset` ក៏ត្រូវមាន callback កំហុសដែរ (មុនកែវាគ្មានសោះ)',
+        /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(SRC));
+    ok('ការស្តារនោះមានជណ្តើរ backoff មិនមែនរង្វិលជុំតឹង',
+        /INFO_LISTENER_RECOVERY_STEPS_MS/.test(SRC)
+        && /function scheduleInfoListenerRecovery\(/.test(SRC));
+    ok('ការភ្ជាប់ឡើងវិញ detach ជាមុន (គ្មាន listener ស្ទួន)',
+        /function attachInfoListeners\(\)[\s\S]{0,400}?fb\.off\(dbRefConnected\)[\s\S]{0,200}?fb\.off\(dbRefServerTimeOffset\)/.test(SRC));
+    ok('snapshot ដែលមកដល់ ➜ ទង់ស្តារត្រូវរលត់',
+        /clearInfoListenerRecovery\(\);[\s\S]{0,120}?isDatabaseConnected = snap\.val\(\) === true;/.test(SRC));
+    ok('ចាកចេញ ➜ ការស្តារ `.info/*` ត្រូវ reset',
+        /function resetDbListenerHealthState\(\)[\s\S]{0,200}?clearInfoListenerRecovery\(\);/.test(SRC));
+
+    // ⛔ ថ្នាក់ដដែលរស់នៅ App ផ្សេង — មេរៀន 2.12.1
+    const KG3 = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+    ok('ZoeKeyGen ៖ `.info/*` ក៏មានផ្លូវស្តារដដែល',
+        /function attachInfoListeners\(/.test(KG3)
+        && /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(KG3));
+    void t; void infoRefs;
 }
 
 // ── ១០ខ២. ការផ្ទុក SDK ឡើងវិញ ក៏ត្រូវមានពិដានល្បឿនដែរ ─────────────────

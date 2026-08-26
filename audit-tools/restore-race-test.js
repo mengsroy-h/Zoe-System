@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const APP_ROOT = process.env.RESTORERACE_APP_DIR ? path.resolve(process.env.RESTORERACE_APP_DIR) : path.resolve(__dirname, '..');
 const vm = require('vm');
 
 let pass = 0;
@@ -127,7 +130,7 @@ function createSharedStore() {
 }
 
 function tabFor(app, shared, suffix) {
-    const source = fs.readFileSync(path.join(__dirname, '..', app, 'app.js'), 'utf8');
+    const source = fs.readFileSync(path.join(APP_ROOT, app, 'app.js'), 'utf8');
     const start = source.indexOf('    const RESTORE_CLAIM_LEASE_MS =');
     const end = source.indexOf('    async function executeRestoreItem()', start);
     if (start === -1 || end === -1) throw new Error(app + ': restore helper block not found');

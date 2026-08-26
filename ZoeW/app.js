@@ -316,6 +316,9 @@
     let dbListenerOutageNoticeShown = false;
     const dbListenerPendingPaths = new Set();
     let dbListenerPendingSeen = 0;
+    let infoListenersFailed = false;
+    let infoListenerRecoveryTimer = null;
+    let infoListenerRecoveryAttempt = 0;
     let reconnectWatchdogTimer = null;
     let reconnectWatchdogAttempt = 0;
     let lastForcedReconnectAt = 0;
@@ -650,6 +653,7 @@
     const RECONNECT_FORCE_MIN_GAP_MS = 3000;
     const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
     const LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
+    const INFO_LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
     const CONNECTING_GRACE_ATTEMPTS = 3;
     const DB_LISTENER_RETRY_MIN_GAP_MS = 3000;
 
@@ -759,6 +763,63 @@
         });
     }
 
+    function scheduleInfoListenerRecovery() {
+        if (infoListenerRecoveryTimer) return;
+        const step = INFO_LISTENER_RECOVERY_STEPS_MS[Math.min(infoListenerRecoveryAttempt, INFO_LISTENER_RECOVERY_STEPS_MS.length - 1)];
+        infoListenerRecoveryAttempt++;
+        infoListenerRecoveryTimer = setTimeout(() => {
+            infoListenerRecoveryTimer = null;
+            if (!infoListenersFailed) return;
+            if (!db || !fb) { scheduleInfoListenerRecovery(); return; }
+            attachInfoListeners();
+            scheduleInfoListenerRecovery();
+        }, step);
+    }
+
+    function clearInfoListenerRecovery() {
+        if (infoListenerRecoveryTimer) {
+            clearTimeout(infoListenerRecoveryTimer);
+            infoListenerRecoveryTimer = null;
+        }
+        infoListenerRecoveryAttempt = 0;
+        infoListenersFailed = false;
+    }
+
+    function handleInfoListenerError() {
+        infoListenersFailed = true;
+        isDatabaseConnected = false;
+        renderConnectionStatus();
+        if (navigator.onLine !== false) scheduleReconnectWatchdog();
+        scheduleInfoListenerRecovery();
+    }
+
+    function attachInfoListeners() {
+        if (!db || !fb) return false;
+        if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
+        if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+
+        fb.onValue(dbRefConnected, (snap) => {
+            clearInfoListenerRecovery();
+            isDatabaseConnected = snap.val() === true;
+            if (isDatabaseConnected) {
+                hasEverConnectedToDatabase = true;
+                clearReconnectWatchdog();
+                retryFailedDbListenersNow();
+            } else if (navigator.onLine !== false) {
+                scheduleReconnectWatchdog();
+            }
+            renderConnectionStatus();
+        }, handleInfoListenerError);
+
+        fb.onValue(dbRefServerTimeOffset, (snap) => {
+            const val = snap.val();
+            if (typeof val === 'number') serverTimeOffsetMs = val;
+            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+        }, handleInfoListenerError);
+
+        return true;
+    }
+
     async function initFirebase() {
         const savedConfig = localStorage.getItem('zoew_firebase_config');
         if (!savedConfig) {
@@ -819,29 +880,8 @@
             dbRefDailyPickup = fb.ref(db, 'zoew_daily_pickup_cod_dod');
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
-
-            fb.onValue(dbRefConnected, (snap) => {
-                isDatabaseConnected = snap.val() === true;
-                if (isDatabaseConnected) {
-                    hasEverConnectedToDatabase = true;
-                    clearReconnectWatchdog();
-                    retryFailedDbListenersNow();
-                } else if (navigator.onLine !== false) {
-                    scheduleReconnectWatchdog();
-                }
-                renderConnectionStatus();
-            }, () => {
-                isDatabaseConnected = false;
-                renderConnectionStatus();
-                if (navigator.onLine !== false) scheduleReconnectWatchdog();
-            });
-
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
-            fb.onValue(dbRefServerTimeOffset, (snap) => {
-                const val = snap.val();
-                if (typeof val === 'number') serverTimeOffsetMs = val;
-                if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
-            });
+            attachInfoListeners();
 
             setupAuthListener();
             return true;
@@ -2585,6 +2625,7 @@
 
     function resetDbListenerHealthState() {
         sdkUnavailableNoticeShown = false;
+        clearInfoListenerRecovery();
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
         dbListenerPendingPaths.clear();

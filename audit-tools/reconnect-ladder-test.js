@@ -130,6 +130,9 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
 
     let code = [sliceConst('RECONNECT_FORCE_MIN_GAP_MS'), sliceConst('RECONNECT_WATCHDOG_STEPS_MS')].join('\n') +
         '\n' + FNS.map(sliceFn).join('\n\n') + '\n' + connectedCb + '\n' +
+        // callback របស់ `.info/connected` ឥឡូវរលត់ទង់ស្តារ `.info/*` (កំណែ 2.19.3)។
+        // តេស្តនេះវាស់ **ជណ្តើរភ្ជាប់ឡើងវិញ** ដូច្នេះ stub គ្រប់គ្រាន់។
+        'const clearInfoListenerRecovery = () => {};\n' +
         'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
         'let hasEverConnectedToDatabase = ' + (connectedFromStart ? 'true' : 'false') + ';\n' +
         'let networkJustReturned = false;\n' +

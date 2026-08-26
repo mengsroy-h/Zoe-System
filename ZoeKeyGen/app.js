@@ -218,6 +218,7 @@ let serverTimeSyncWaiters = [];
 
 const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
+const INFO_LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
 const CONNECTING_GRACE_ATTEMPTS = 3;
 
 function connectionLooksOnline() {
@@ -239,6 +240,9 @@ let firebaseSdkRetryTimer = null;
 let firebaseSdkRetryAttempt = 0;
 let lastFirebaseSdkAttemptAt = 0;
 let lastFirebaseSdkReloadAt = 0;
+let infoListenersFailed = false;
+let infoListenerRecoveryTimer = null;
+let infoListenerRecoveryAttempt = 0;
 let lateFirebaseSdkListenerArmed = false;
 let firebaseSdkUnavailable = false;
 let sdkUnavailableNoticeShown = false;
@@ -648,6 +652,62 @@ async function enforceSessionOnlyAuthPersistence() {
     await fb.setPersistence(auth, fb.browserSessionPersistence);
 }
 
+function scheduleInfoListenerRecovery() {
+    if (infoListenerRecoveryTimer) return;
+    const step = INFO_LISTENER_RECOVERY_STEPS_MS[Math.min(infoListenerRecoveryAttempt, INFO_LISTENER_RECOVERY_STEPS_MS.length - 1)];
+    infoListenerRecoveryAttempt++;
+    infoListenerRecoveryTimer = setTimeout(() => {
+        infoListenerRecoveryTimer = null;
+        if (!infoListenersFailed) return;
+        if (!db || !fb) { scheduleInfoListenerRecovery(); return; }
+        attachInfoListeners();
+        scheduleInfoListenerRecovery();
+    }, step);
+}
+
+function clearInfoListenerRecovery() {
+    if (infoListenerRecoveryTimer) {
+        clearTimeout(infoListenerRecoveryTimer);
+        infoListenerRecoveryTimer = null;
+    }
+    infoListenerRecoveryAttempt = 0;
+    infoListenersFailed = false;
+}
+
+function handleInfoListenerError() {
+    infoListenersFailed = true;
+    isDatabaseConnected = false;
+    renderConnectionStatus();
+    if (navigator.onLine !== false) scheduleReconnectWatchdog();
+    scheduleInfoListenerRecovery();
+}
+
+function attachInfoListeners() {
+    if (!db || !fb) return false;
+    if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
+    if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+
+    fb.onValue(dbRefConnected, (snap) => {
+        clearInfoListenerRecovery();
+        isDatabaseConnected = snap.val() === true;
+        if (isDatabaseConnected) hasEverConnectedToDatabase = true;
+        if (isDatabaseConnected) clearReconnectWatchdog();
+        else if (navigator.onLine !== false) scheduleReconnectWatchdog();
+        renderConnectionStatus();
+        if (isDatabaseConnected) retryPendingRoleCheck();
+    }, handleInfoListenerError);
+
+    fb.onValue(dbRefServerTimeOffset, (snap) => {
+        const val = snap.val();
+        if (typeof val === 'number') serverTimeOffsetMs = val;
+        serverTimeSynced = true;
+        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+        serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
+    }, handleInfoListenerError);
+
+    return true;
+}
+
 async function initFirebase() {
     const savedConfig = localStorage.getItem('zoew_firebase_config');
     if (!savedConfig) {
@@ -686,27 +746,8 @@ async function initFirebase() {
         try { fb.goOnline(db); } catch (e) {}
 
         dbRefConnected = fb.ref(db, '.info/connected');
-        fb.onValue(dbRefConnected, (snap) => {
-            isDatabaseConnected = snap.val() === true;
-            if (isDatabaseConnected) hasEverConnectedToDatabase = true;
-            if (isDatabaseConnected) clearReconnectWatchdog();
-            else if (navigator.onLine !== false) scheduleReconnectWatchdog();
-            renderConnectionStatus();
-            if (isDatabaseConnected) retryPendingRoleCheck();
-        }, () => {
-            isDatabaseConnected = false;
-            renderConnectionStatus();
-            if (navigator.onLine !== false) scheduleReconnectWatchdog();
-        });
-
         dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
-        fb.onValue(dbRefServerTimeOffset, (snap) => {
-            const val = snap.val();
-            if (typeof val === 'number') serverTimeOffsetMs = val;
-            serverTimeSynced = true;
-            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
-            serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
-        });
+        attachInfoListeners();
 
         setupAuthListener();
         return true;

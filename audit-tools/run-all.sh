@@ -65,6 +65,8 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
+# ⛔ meta-checker៖ តើ checker ខ្លួនវាពិតជាមើលកូដមែនទេ? (រត់វាមុនគេក្នុងក្រុមនេះ)
+run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
@@ -187,6 +189,37 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
     TOAST_APP_DIR="$BASE" node audit-tools/toast-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-truth:     /'
     CSPLAZY_APP_DIR="$BASE" node audit-tools/csp-lazy-resource-test.js 2>&1 | tail -1 | sed 's/^/   csp-lazy:        /'
+    AUTH_APP_DIR="$BASE" node audit-tools/auth-recovery-test.js 2>&1 | tail -1 | sed 's/^/   auth-recovery:   /'
+    BOOT_APP_DIR="$BASE" node audit-tools/boot-runtime.js 2>&1 | tail -1 | sed 's/^/   boot-runtime:    /'
+    CLEARCLAIM_APP_DIR="$BASE" node audit-tools/clear-history-claim-test.js 2>&1 | tail -1 | sed 's/^/   clear-history-claim:/'
+    CLEARFENCE_APP_DIR="$BASE" node audit-tools/clear-history-finalization-fence-test.js 2>&1 | tail -1 | sed 's/^/   clear-history-finalization-fence:/'
+    CLOCK_APP_DIR="$BASE" node audit-tools/clock-hygiene.js 2>&1 | tail -1 | sed 's/^/   clock-hygiene:   /'
+    COMMENTS_APP_DIR="$BASE" node audit-tools/comments.js 2>&1 | tail -1 | sed 's/^/   comments:        /'
+    CSSCLASS_APP_DIR="$BASE" node audit-tools/css-classes.js 2>&1 | tail -1 | sed 's/^/   css-classes:     /'
+    DOMHYG_APP_DIR="$BASE" node audit-tools/dom-hygiene.js 2>&1 | tail -1 | sed 's/^/   dom-hygiene:     /'
+    EXPORT_APP_DIR="$BASE" node audit-tools/export-cells-test.js 2>&1 | tail -1 | sed 's/^/   export-cells:    /'
+    CFGPASTE_APP_DIR="$BASE" node audit-tools/firebase-config-paste-test.js 2>&1 | tail -1 | sed 's/^/   firebase-config-paste:/'
+    SHEETCACHE_APP_DIR="$BASE" node audit-tools/google-sheets-cache-test.js 2>&1 | tail -1 | sed 's/^/   google-sheets-cache:/'
+    SINK_APP_DIR="$BASE" node audit-tools/html-sink-escaping.js 2>&1 | tail -1 | sed 's/^/   html-sink-escaping:/'
+    KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-pin-flow-test.js 2>&1 | tail -1 | sed 's/^/   keygen-pin-flow: /'
+    KEYLIST_APP_DIR="$BASE" node audit-tools/keylist-consistency-test.js 2>&1 | tail -1 | sed 's/^/   keylist-consistency:/'
+    LICGRACE_APP_DIR="$BASE" node audit-tools/license-grace-test.js 2>&1 | tail -1 | sed 's/^/   license-grace:   /'
+    LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
+    PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
+    PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'
+    RESTOREFENCE_APP_DIR="$BASE" node audit-tools/restore-finalization-fence-test.js 2>&1 | tail -1 | sed 's/^/   restore-finalization-fence:/'
+    RESTORERACE_APP_DIR="$BASE" node audit-tools/restore-race-test.js 2>&1 | tail -1 | sed 's/^/   restore-race:    /'
+    FUZZ_APP_DIR="$BASE" node audit-tools/revenue-fuzz-test.js 2>&1 | tail -1 | sed 's/^/   revenue-fuzz:    /'
+    RULESDUP_APP_DIR="$BASE" node audit-tools/rules-duplicate-keys.js 2>&1 | tail -1 | sed 's/^/   rules-duplicate-keys:/'
+    SDKBOOT_APP_DIR="$BASE" node audit-tools/sdk-offline-boot-test.js 2>&1 | tail -1 | sed 's/^/   sdk-offline-boot:/'
+    SDKSURFACE_APP_DIR="$BASE" node audit-tools/sdk-surface.js 2>&1 | tail -1 | sed 's/^/   sdk-surface:     /'
+    SECRET_APP_DIR="$BASE" node audit-tools/secret-hygiene.js 2>&1 | tail -1 | sed 's/^/   secret-hygiene:  /'
+    SETUPRT_APP_DIR="$BASE" node audit-tools/setup-link-roundtrip-test.js 2>&1 | tail -1 | sed 's/^/   setup-link-roundtrip:/'
+    SHAREDFNS_APP_DIR="$BASE" node audit-tools/shared-fns.js 2>&1 | tail -1 | sed 's/^/   shared-fns:      /'
+    STATEHYG_APP_DIR="$BASE" node audit-tools/state-hygiene.js 2>&1 | tail -1 | sed 's/^/   state-hygiene:   /'
+    STORAGE_APP_DIR="$BASE" node audit-tools/storage-guard.js 2>&1 | tail -1 | sed 's/^/   storage-guard:   /'
+    TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
+    WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
 fi
 
 echo

@@ -89,9 +89,30 @@ function seedBig(n) {
         hist[id] = { id, phone, scanDate: d, createdAt: now - i * 1000, cod: 5 * per, dod: 0, price: 5 * per, count: per, barcode: bcs[0].code, time: '10:00', isClosed: (i % 4 === 0), barcodes: bcs };
         if (hist[id].isClosed) hist[id].closedAt = now - i * 1000;
     }
+    // ធុងសំរាមរក្សាទុក ៣០ ថ្ងៃ ➜ វាអាចកាន់ធាតុច្រើនជាងតារាងប្រវត្តិទៅទៀត។
+    // មុនជុំនេះ seed នេះជា `{}` ➜ `buildTrashGroups()` · `trashItemTotals()` និង
+    // `renderRecentlyDeleted()` **មិនដែលត្រូវវាស់សោះ** — ចន្លោះដដែលនឹងមេរៀន
+    // «checker ស្កេនឯកសារណាខ្លះ» តែនៅលើទិន្នន័យ seed។
+    const trash = {};
+    const TRASH_REASONS = ['delete', 'remove', 'pickup', 'expired'];
+    for (let i = 0; i < n; i++) {
+        const id = 'trash_' + (now - i * 1000) + '_' + i;
+        const reason = TRASH_REASONS[i % 4];
+        const per = (i % 3) + 1;
+        const bcs = [];
+        for (let k = 0; k < per; k++) {
+            bcs.push({ code: 'TR' + i + '_' + k, time: '10:00', cod: 5, dod: 0, locker: 'A' + (i % 40),
+                isClosed: reason === 'pickup', isDeducted: (reason === 'remove' || reason === 'expired'),
+                isFromDeletion: (reason === 'delete' || reason === 'pickup'), createdAt: now - i * 1000 });
+        }
+        trash[id] = { id, phone: '09' + String(60000000 + (i % 400)).slice(0, 8), scanDate: d,
+            createdAt: now - i * 1000, deletedAt: now - i * 1000, cod: 5 * per, dod: 0, price: 5 * per,
+            count: per, barcode: bcs[0].code, time: '10:00', isClosed: reason === 'pickup',
+            trashReason: reason, isFromDeletion: (reason === 'delete' || reason === 'pickup'), barcodes: bcs };
+    }
     return {
         user_roles: { 'admin-uid': 'admin' },
-        zoew_scan_history_cod_dod: hist, zoew_recently_deleted_cod_dod: {},
+        zoew_scan_history_cod_dod: hist, zoew_recently_deleted_cod_dod: trash,
         zoew_daily_revenue_cod_dod: { [d]: { codDollar: cod, dodDollar: 0, totalCount: cnt } },
         zoew_monthly_revenue_cod_dod: {}, zoew_daily_pickup_cod_dod: {}, zoew_scanner_lookup: {},
         zoew_barcode_registry: {}, zoew_settings: { exchange_rate: 4100 }, _dateKey: d
@@ -129,9 +150,16 @@ function seedBig(n) {
             const listener = t(() => window.__fireHistory(), 5);
             const suggest = t(() => window.collectPhoneSuggestions('42', 12), 10);
             const recent = t(() => window.updateRecentPhonesList(), 5);
+            const trashRender = typeof window.renderRecentlyDeleted === 'function'
+                ? t(() => window.renderRecentlyDeleted(), 5) : -1;
+            const trashSearch = typeof window.filterRecentlyDeleted === 'function'
+                ? t(() => { const el = document.getElementById('deletedSearchInput');
+                    if (el) { el.value = '0960000042'; window.filterRecentlyDeleted(); el.value = ''; window.filterRecentlyDeleted(); } }, 5) : -1;
             return {
                 render: Math.round(render), renderCold: Math.round(renderCold), listener: Math.round(listener),
                 suggest: Math.round(suggest), recent: Math.round(recent),
+                trashRender: Math.round(trashRender), trashSearch: Math.round(trashSearch),
+                trashRows: document.querySelectorAll('#deletedTableBody tr').length,
                 rows: document.querySelectorAll('#historyTableBody tr').length
             };
         });
@@ -182,6 +210,7 @@ function seedBig(n) {
 
         console.log('    boot=' + bootMs + 'ms  renderCold=' + m.renderCold + 'ms  render=' + m.render + 'ms  listenerRepaint=' + m.listener +
                     'ms  suggest=' + m.suggest + 'ms  recentPhones=' + m.recent + 'ms  keystroke=' + typeMs + 'ms  rows=' + m.rows);
+        console.log('    ធុងសំរាម (' + ORDERS + ' ធាតុ)៖ render=' + m.trashRender + 'ms  ស្វែងរក=' + m.trashSearch + 'ms  rows=' + m.trashRows);
         console.log('    ការសាងផ្ទាំងទំព័រ ២ ក្នុងមួយ sync៖ នៅទំព័រ ១ ' + JSON.stringify(hiddenPanelWork.onDataPage) +
                     '  នៅទំព័រ ២ (' + hiddenPanelWork.mode + ') ' + JSON.stringify(hiddenPanelWork.onEntryPage));
 
@@ -198,6 +227,11 @@ function seedBig(n) {
                 app + ': sync ខណៈនៅទំព័រ ២ សាងផ្ទាំងដែលកំពុងបង្ហាញឡើងវិញពិត', JSON.stringify(hiddenPanelWork));
             check(hiddenPanelWork.mode !== 'parcel' || hiddenPanelWork.entryRows > 0,
                 app + ': បញ្ជីកញ្ចប់ថ្ងៃនេះមានជួរដេកបន្ទាប់ពី sync', JSON.stringify(hiddenPanelWork));
+            check(m.trashRender < 0 || m.trashRender < 600,
+                app + ': render ធុងសំរាម < 600ms នៅ ' + ORDERS + ' ធាតុ (រក្សាទុក ៣០ ថ្ងៃ)', 'trashRender=' + m.trashRender + 'ms');
+            check(m.trashSearch < 0 || m.trashSearch < 900,
+                app + ': ស្វែងរកក្នុងធុងសំរាម < 900ms នៅ ' + ORDERS + ' ធាតុ', 'trashSearch=' + m.trashSearch + 'ms');
+            check(m.trashRows > 0, app + ': ធុងសំរាមមានជួរដេកពិត (seed មិនទទេ)', 'trashRows=' + m.trashRows);
         }
         await ctx.close(); server.close();
     }

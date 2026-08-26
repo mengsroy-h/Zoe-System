@@ -78,11 +78,27 @@ ok(restoreBody.indexOf('delete itemToRestore.trashReason') !== -1,
     'executeRestoreItem លុប trashReason មុនសរសេរត្រឡប់ចូល scan_history');
 
 // រយៈពេលរក្សាទុក
+const RETENTION_DAYS = 30;
+const KHMER_DIGITS = '\u17E0\u17E1\u17E2\u17E3\u17E4\u17E5\u17E6\u17E7\u17E8\u17E9';
+const khmerNum = (n) => String(n).split('').map((d) => KHMER_DIGITS[Number(d)]).join('');
 const retention = /const TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
-ok(!!retention && Number(retention[1]) === 15,
-    'ធុងសំរាមរក្សាទុក ១៥ ថ្ងៃ (TRASH_RETENTION_MS)', retention && retention[1]);
+ok(!!retention && Number(retention[1]) === RETENTION_DAYS,
+    'ធុងសំរាមរក្សាទុក ' + khmerNum(RETENTION_DAYS) + ' ថ្ងៃ (TRASH_RETENTION_MS)', retention && retention[1]);
 ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('TRASH_RETENTION_MS') !== -1,
     'runAutomaticDeletedCleanup ប្រើ TRASH_RETENTION_MS មិនមែនលេខថេរក្នុងខ្លួន');
+
+// អត្ថបទដែលអ្នកប្រើអាន ត្រូវត្រូវនឹងលេខថេរ — បើឃ្លាតគ្នា អ្នកប្រើរង់ចាំខុសថ្ងៃ
+const retentionLabel = khmerNum(RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
+const indexHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
+const trashModalHtml = indexHtml.slice(indexHtml.indexOf('id="recentlyDeletedModal"'));
+ok(trashModalHtml.indexOf('\u179b\u17bb\u1794\u17a2\u1785\u17b7\u1793\u17d2\u178f\u17d2\u179a\u17c3\u1799\u17cd\u1794\u1793\u17d2\u1791\u17b6\u1794\u17cb\u1796\u17b8 ' + retentionLabel) !== -1,
+    'ចំណងជើងធុងសំរាមក្នុង index.html សរសេរ ' + retentionLabel);
+const trashRowsFn = sliceFn(src, 'renderRecentlyDeleted');
+ok(trashRowsFn.indexOf(retentionLabel) !== -1,
+    'សារ «ជួរទៀត» ក្នុង renderRecentlyDeleted សរសេរ ' + retentionLabel);
+const otherRetentionText = new RegExp('\u1792\u17b6\u178f\u17bb\u1785\u17b6\u179f\u17cb\u1787\u17b6\u1784 ([' + KHMER_DIGITS + ']+) \u1790\u17d2\u1784\u17c3').exec(trashRowsFn);
+ok(!!otherRetentionText && otherRetentionText[1] === khmerNum(RETENTION_DAYS),
+    'គ្មានលេខថ្ងៃចាស់សល់ក្នុងសារធុងសំរាម', otherRetentionText && otherRetentionText[1]);
 
 // rules ត្រូវទទួលវាលនេះ បើអត់ ការសរសេរទៅធុងសំរាមត្រូវបដិសេធទាំងស្រុង
 const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));

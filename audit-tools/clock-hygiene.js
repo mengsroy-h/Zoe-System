@@ -44,6 +44,8 @@ const LOCAL_CLOCK_OK = {
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
+        scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
+        retryFirebaseSdkNow: 'ពិដានល្បឿននៃការផ្ទុក SDK ឡើងវិញ — local (ដូច attemptDbListenerRecovery)',
         forceDatabaseReconnect: 'គម្លាតអប្បបរមារវាងវដ្តភ្ជាប់ឡើងវិញ — local',
         generateUniqueId: 'salt នៃ id — មិនមែនការសម្រេច retention',
         waitForZXingThenInitScanEngine: 'deadline ផ្ទុក script — local',
@@ -57,7 +59,9 @@ const LOCAL_CLOCK_OK = {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
         revealAppAfterBoot: 'រយៈពេលអប្បបរមារបស់ផ្ទាំង boot — cosmetic',
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា',
-        forceDatabaseReconnect: 'គម្លាតអប្បបរមារវាងវដ្តភ្ជាប់ឡើងវិញ — local'
+        forceDatabaseReconnect: 'គម្លាតអប្បបរមារវាងវដ្តភ្ជាប់ឡើងវិញ — local',
+        scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
+        retryFirebaseSdkNow: 'ពិដានល្បឿននៃការផ្ទុក SDK ឡើងវិញ — local'
     },
     'ZoeW/license-verify.js': {
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',

@@ -74,6 +74,11 @@ jobs:
           CRUD_FLOW_MIN_ASSERTS: '43'
         run: node audit-tools/emu/crud-rules-flow.js
 
+      - name: witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង)
+        env:
+          CRUD_FLOW_STRICT: '1'
+        run: node audit-tools/emu/restore-deadlock-test.js
+
       - name: rules ↔ schema (ស្តាទិច)
         run: |
           node audit-tools/payload-schema.js

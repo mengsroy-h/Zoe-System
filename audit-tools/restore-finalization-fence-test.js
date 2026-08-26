@@ -21,12 +21,11 @@ function clone(value) {
 }
 
 function finalizationWriteAllowed(before, after, sourceId) {
-    const oldWitness = before.zoew_restore_finalizations[sourceId];
     const witness = after.zoew_restore_finalizations[sourceId];
     const claim = before.zoew_recently_deleted_cod_dod[sourceId] && before.zoew_recently_deleted_cod_dod[sourceId].restoreClaim;
     const beforeTarget = claim && before.zoew_scan_history_cod_dod[claim.targetId];
     const target = witness && after.zoew_scan_history_cod_dod[witness.targetId];
-    return !oldWitness && !!witness && !!claim &&
+    return !!witness && !!claim &&
         claim.token === witness.token && claim.targetId === witness.targetId &&
         !!beforeTarget && beforeTarget.restoreClaimId === sourceId && beforeTarget.restoreClaimToken === claim.token &&
         !after.zoew_recently_deleted_cod_dod[sourceId] && !!target &&
@@ -74,7 +73,9 @@ const witnessWrite = witnessRules['.write'];
 ok('trash delete ពិនិត្យ witness post-write',
     trashWrite.includes("newData.parent().parent().child('zoew_restore_finalizations')") && trashWrite.includes("child('token')") && trashWrite.includes("child('targetId')"));
 ok('witness បង្កើតតែពី claim បច្ចុប្បន្ន និង final fanout',
-    witnessWrite.includes("!data.exists()") && witnessWrite.includes("root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("restoreClaimToken") && witnessWrite.includes("!newData.parent().parent().child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("restoreClaimId"));
+    witnessWrite.includes("root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("restoreClaimToken") && witnessWrite.includes("!newData.parent().parent().child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("restoreClaimId"));
+ok('⛔ witness ចាស់ដែលបន្សល់ មិនត្រូវចាក់សោ id ជារៀងរហូត (deadlock ៣ ខាង)',
+    !witnessWrite.includes("!data.exists() && newData.exists()"));
 ok('witness មិនអនុញ្ញាត overwrite ហើយ cleanup ត្រូវការធុងសំរាមលុបរួច',
     witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_recently_deleted_cod_dod')"));
 ok('witness schema តម្រូវ token/targetId/finalizedAt',
@@ -107,6 +108,24 @@ ok('មិនអាច cleanup witness មុន trash delete', !witnessCleanupA
 const cleanup = clone(finalB);
 delete cleanup.zoew_restore_finalizations[sourceId];
 ok('អាច cleanup witness ក្រោយ final success', witnessCleanupAllowed(finalB, cleanup, sourceId));
+
+console.log('-- witness ដែលបន្សល់ (cleanup បរាជ័យ) មិនត្រូវចាក់សោ id --');
+// `clearRestoreFinalization()` រត់ក្នុង `.catch(() => {})` ➜ បណ្តាញដាច់ភ្លាមក្រោយ
+// finalize ➜ witness នៅជាប់។ បើវាចាក់សោ id នោះការស្តារលើកក្រោយនៃ id ដដែល
+// ត្រូវបដិសេធ · witness លុបមិនចេញ (ទាមទារធុងសំរាមលែងមាន) · ធាតុធុងសំរាមលុប
+// មិនចេញ (ទាមទារ witness fence) = **DEADLOCK ៣ ខាង** — កំហុសផលិតកម្មពិត។
+const orphanWitness = clone(base);
+orphanWitness.zoew_restore_finalizations[sourceId] = { token: 'claim-OLD', targetId, finalizedAt: 1600000000000 };
+const restoreOverOrphan = finalFanout(orphanWitness, sourceId, 'claim-A', targetId);
+ok('⛔ ស្តារបានទោះមាន witness ចាស់បន្សល់', finalizationWriteAllowed(orphanWitness, restoreOverOrphan, sourceId));
+ok('⛔ replay ក្រោយនោះ នៅតែត្រូវបដិសេធ (លុយមិនបូកស្ទួន)',
+    !finalizationWriteAllowed(restoreOverOrphan, finalFanout(restoreOverOrphan, sourceId, 'claim-A', targetId), sourceId));
+const noClaimAtAll = clone(base);
+delete noClaimAtAll.zoew_recently_deleted_cod_dod[sourceId];
+noClaimAtAll.zoew_restore_finalizations[sourceId] = { token: 'claim-OLD', targetId, finalizedAt: 1600000000000 };
+const forged = clone(noClaimAtAll);
+forged.zoew_restore_finalizations[sourceId] = { token: 'claim-A', targetId, finalizedAt: 1700000000000 };
+ok('⛔ witness ក្លែងក្លាយដោយគ្មាន claim ត្រូវបដិសេធ', !finalizationWriteAllowed(noClaimAtAll, forged, sourceId));
 
 console.log('');
 if (fail) {

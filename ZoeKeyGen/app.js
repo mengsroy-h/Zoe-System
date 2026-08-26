@@ -1,4 +1,4 @@
-const APP_VERSION = '2.17.5';
+const APP_VERSION = '2.18.0';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -231,8 +231,10 @@ function connectionIsSettlingIn() {
 }
 
 const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
+const FIREBASE_SDK_RETRY_MIN_GAP_MS = 3000;
 let firebaseSdkRetryTimer = null;
 let firebaseSdkRetryAttempt = 0;
+let lastFirebaseSdkAttemptAt = 0;
 let firebaseSdkUnavailable = false;
 let sdkUnavailableNoticeShown = false;
 
@@ -244,6 +246,11 @@ function clearFirebaseSdkRetry() {
     firebaseSdkRetryAttempt = 0;
 }
 
+function resetFirebaseSdkRetryHealth() {
+    clearFirebaseSdkRetry();
+    lastFirebaseSdkAttemptAt = 0;
+}
+
 function scheduleFirebaseSdkRetry() {
     if (firebaseSdkRetryTimer || isDatabaseInitialized) return;
     const step = FIREBASE_SDK_RETRY_STEPS_MS[Math.min(firebaseSdkRetryAttempt, FIREBASE_SDK_RETRY_STEPS_MS.length - 1)];
@@ -251,6 +258,7 @@ function scheduleFirebaseSdkRetry() {
     firebaseSdkRetryTimer = setTimeout(() => {
         firebaseSdkRetryTimer = null;
         if (isDatabaseInitialized) { clearFirebaseSdkRetry(); return; }
+        lastFirebaseSdkAttemptAt = Date.now();
         initFirebase();
     }, step);
 }
@@ -258,7 +266,18 @@ function scheduleFirebaseSdkRetry() {
 function retryFirebaseSdkNow() {
     if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
     if (navigator.onLine === false) return;
+    const sinceLastAttempt = Date.now() - lastFirebaseSdkAttemptAt;
+    if (lastFirebaseSdkAttemptAt && sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
+        if (!firebaseSdkRetryTimer) {
+            firebaseSdkRetryTimer = setTimeout(() => {
+                firebaseSdkRetryTimer = null;
+                retryFirebaseSdkNow();
+            }, FIREBASE_SDK_RETRY_MIN_GAP_MS - sinceLastAttempt);
+        }
+        return;
+    }
     clearFirebaseSdkRetry();
+    lastFirebaseSdkAttemptAt = Date.now();
     initFirebase();
 }
 
@@ -500,7 +519,7 @@ async function initFirebase() {
         fb = await waitForFirebaseSDK();
         firebaseSdkUnavailable = false;
         sdkUnavailableNoticeShown = false;
-        clearFirebaseSdkRetry();
+        resetFirebaseSdkRetryHealth();
 
         const existingApps = fb.getApps();
         if (existingApps.length) {

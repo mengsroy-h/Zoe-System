@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.5';
+    const APP_VERSION = '2.18.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -537,8 +537,10 @@
     }
 
     const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
+    const FIREBASE_SDK_RETRY_MIN_GAP_MS = 3000;
     let firebaseSdkRetryTimer = null;
     let firebaseSdkRetryAttempt = 0;
+    let lastFirebaseSdkAttemptAt = 0;
     let firebaseSdkUnavailable = false;
     let sdkUnavailableNoticeShown = false;
 
@@ -550,6 +552,11 @@
         firebaseSdkRetryAttempt = 0;
     }
 
+    function resetFirebaseSdkRetryHealth() {
+        clearFirebaseSdkRetry();
+        lastFirebaseSdkAttemptAt = 0;
+    }
+
     function scheduleFirebaseSdkRetry() {
         if (firebaseSdkRetryTimer || isDatabaseInitialized) return;
         const step = FIREBASE_SDK_RETRY_STEPS_MS[Math.min(firebaseSdkRetryAttempt, FIREBASE_SDK_RETRY_STEPS_MS.length - 1)];
@@ -557,6 +564,7 @@
         firebaseSdkRetryTimer = setTimeout(() => {
             firebaseSdkRetryTimer = null;
             if (isDatabaseInitialized) { clearFirebaseSdkRetry(); return; }
+            lastFirebaseSdkAttemptAt = Date.now();
             initFirebase();
         }, step);
     }
@@ -564,7 +572,18 @@
     function retryFirebaseSdkNow() {
         if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
         if (navigator.onLine === false) return;
+        const sinceLastAttempt = Date.now() - lastFirebaseSdkAttemptAt;
+        if (lastFirebaseSdkAttemptAt && sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
+            if (!firebaseSdkRetryTimer) {
+                firebaseSdkRetryTimer = setTimeout(() => {
+                    firebaseSdkRetryTimer = null;
+                    retryFirebaseSdkNow();
+                }, FIREBASE_SDK_RETRY_MIN_GAP_MS - sinceLastAttempt);
+            }
+            return;
+        }
         clearFirebaseSdkRetry();
+        lastFirebaseSdkAttemptAt = Date.now();
         initFirebase();
     }
 
@@ -692,7 +711,7 @@
             fb = await waitForFirebaseSDK();
             firebaseSdkUnavailable = false;
             sdkUnavailableNoticeShown = false;
-            clearFirebaseSdkRetry();
+            resetFirebaseSdkRetryHealth();
 
             const existingApps = fb.getApps();
             if (existingApps.length) {
@@ -2085,7 +2104,7 @@
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
     const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
-    const TRASH_RETENTION_MS = 15 * 24 * 60 * 60 * 1000;
+    const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
     function clearRememberedSession(keepEmail) {
         safeStoreRemove(localStorage, 'zoew_login_time');
@@ -2918,30 +2937,72 @@
     async function runAutomaticDeletedCleanup() {
         if (deletedCleanupInFlight) return;
         const currentTime = getServerNow();
-        let purgedBarcodes = [];
-        let purgedIds = [];
+        const candidates = [];
 
         deletedItems.forEach(item => {
-            if (!item || item.restoreClaim) return;
-            let deletedTime = item.deletedAt || currentTime;
-            const expired = (currentTime - deletedTime > TRASH_RETENTION_MS);
-            if (expired) {
-                purgedBarcodes = purgedBarcodes.concat(collectItemBarcodes(item));
-                if (item.id) purgedIds.push(item.id);
+            if (!item || !item.id) return;
+            const deletedTime = item.deletedAt || currentTime;
+            if (currentTime - deletedTime <= TRASH_RETENTION_MS) return;
+            let staleClaim = false;
+            if (item.restoreClaim) {
+                if (isActiveRestoreClaim(item.restoreClaim)) return;
+                if (activeRestoreClaims.has(item.id)) return;
+                staleClaim = true;
             }
+            candidates.push({ id: item.id, barcodes: collectItemBarcodes(item), staleClaim });
         });
 
-        if (purgedIds.length > 0) {
-            deletedCleanupInFlight = true;
-            try {
-                await deleteMultipleDeletedItemsFromFirebase(purgedIds);
-                const purgedSet = new Set(purgedIds);
-                deletedItems = deletedItems.filter(item => !purgedSet.has(item.id));
-                await releaseBarcodesInRegistry(purgedBarcodes);
-            } catch (e) {
-            } finally {
-                deletedCleanupInFlight = false;
+        if (!candidates.length) return;
+
+        deletedCleanupInFlight = true;
+        try {
+            const purgeable = [];
+            for (const candidate of candidates) {
+                if (candidate.staleClaim) {
+                    try {
+                        await releaseStaleRestoreClaimForPurge(candidate.id);
+                    } catch (claimError) {
+                        console.error('Failed to release stale restore claim before purge for', candidate.id, claimError);
+                        if (window.ZoeErrors) ZoeErrors.capture(claimError, { context: 'runAutomaticDeletedCleanup stale claim release', itemId: candidate.id });
+                        continue;
+                    }
+                }
+                purgeable.push(candidate);
             }
+            if (!purgeable.length) return;
+
+            let purged = purgeable;
+            try {
+                await purgeDeletedItemsQuietly(purgeable.map((c) => c.id));
+            } catch (batchError) {
+                purged = [];
+                let lastError = batchError;
+                for (const candidate of purgeable) {
+                    try {
+                        await purgeDeletedItemsQuietly([candidate.id]);
+                        purged.push(candidate);
+                    } catch (singleError) {
+                        lastError = singleError;
+                    }
+                }
+                if (!purged.length) {
+                    console.error('Error purging deleted items: ', lastError);
+                    if (window.ZoeErrors) ZoeErrors.capture(lastError, { context: 'Error purging deleted items: ' });
+                    showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
+                    return;
+                }
+            }
+
+            const purgedSet = new Set(purged.map((c) => c.id));
+            deletedItems = deletedItems.filter(item => !purgedSet.has(item.id));
+            let purgedBarcodes = [];
+            purged.forEach((candidate) => { purgedBarcodes = purgedBarcodes.concat(candidate.barcodes); });
+            await releaseBarcodesInRegistry(purgedBarcodes);
+        } catch (e) {
+            console.error('Automatic trash purge failed', e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'runAutomaticDeletedCleanup' });
+        } finally {
+            deletedCleanupInFlight = false;
         }
     }
 
@@ -7795,7 +7856,7 @@
         let html = '';
         groups.slice(0, DELETED_LIST_MAX_ROWS).forEach((group) => { html += trashGroupRowHtml(group); });
         if (groups.length > DELETED_LIST_MAX_ROWS) {
-            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ធាតុចាស់ជាង ១៥ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ធាតុចាស់ជាង ៣០ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
         }
         tbody.innerHTML = html;
     }
@@ -8317,19 +8378,14 @@
         });
     }
 
-    function deleteMultipleDeletedItemsFromFirebase(ids) {
+    function purgeDeletedItemsQuietly(ids) {
         if (!dbRefDeleted || !ids || !ids.length) return Promise.resolve();
         const updates = {};
         ids.forEach(id => {
             if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
         });
         if (!Object.keys(updates).length) return Promise.resolve();
-        return fb.update(dbRefDeleted, updates).catch((error) => {
-            console.error("Error purging deleted items: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error purging deleted items: " });
-            showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
-            throw error;
-        });
+        return fb.update(dbRefDeleted, updates);
     }
 
     function playBeep() {

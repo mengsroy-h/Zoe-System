@@ -1102,6 +1102,57 @@ State ថ្មីកម្រិត module ៖ `deletedSearchQuery` និង `
 `claimAndCleanupItem()` **ផ្ទៀងផ្ទាត់បង្អួចម្តងទៀតខាងក្នុង transaction** ធៀបនឹងតម្លៃរបស់ server
 ដូច្នេះការកេះដោយស្ថានភាពចាស់ក្នុងសតិ មិនអាច claim ខុសបានទេ។
 
+### 📋 តារាងសេណារីយ៉ូពេញលេញ — លុប · ដក · បិទ/បើក · សម្អាតស្វ័យប្រវត្តិ
+
+> **អ្នកប្រើស្នើឲ្យកត់ត្រាទុក (2026-08-26)** ដើម្បីឲ្យជុំក្រោយកែវិញបានលឿន
+> បើមានអ្វីប៉ះ។ **នេះជាប្រភពការពិតតែមួយ** — កូដត្រូវផ្គូផ្គងតារាងនេះ។
+
+| # | សកម្មភាព | Function | ធុងសំរាម `trashReason` | `isFromDeletion` | `isDeducted` | **លុយ** | ត្រា `closedAt` |
+|---|---|---|---|---|---|---|---|
+| ១ | **បិទ «យក»** barcode ១ | `toggleIndividualBarcodeClose` | — | — | — | **មិនប៉ះ** | បោះលើ barcode នោះ |
+| ២ | **បិទ** កញ្ចប់ទាំងមូល | `toggleCloseStatus` | — | — | — | **មិនប៉ះ** | បោះលើ barcode គ្រប់ |
+| ៣ | **បើកវិញ** (ទាំង ២ ផ្លូវ) | ដដែល | — | — | — | **មិនប៉ះ** | **លុបត្រាចេញ** |
+| ៤ | **ដក** barcode ១ | `removeSingleBarcode` | `remove` | `false` | **`true`** | **ដកចេញ** | រក្សាតាម barcode |
+| ៥ | **លុប** កញ្ចប់ | `deleteSingleItem` | `delete` | `true` | មិនប៉ះ | **មិនប៉ះ** | រក្សា |
+| ៦ | **លុបទាំងអស់** | `buildClearHistoryTrashItem` | `delete` | `true` | មិនប៉ះ | **មិនប៉ះ** | រក្សា |
+| ៧ | **សម្អាត ២ ម៉ោង** (barcode បិទរួច) | `claimAndCleanupItem('close')` | `pickup` | `true` | មិនប៉ះ | **មិនប៉ះ** | ជាអ្នកសម្រេច |
+| ៨ | **សម្អាត ៨ ថ្ងៃ** (មិនទាន់យក) | `claimAndCleanupItem('abandon')` | `expired` | `false` | **`true`** | **ដកចេញ** | — |
+| ៩ | **ស្តារ** ពីធុងសំរាម | `executeRestoreItem` | លុបចោល | លុបចោល | **reset** | **បូកត្រឡប់** បើធ្លាប់ដក | **reset ជា «ឥឡូវ»** |
+| ១០ | **✖️ លុបជាអចិន្ត្រៃយ៍** | `executePermanentDelete` | — | — | — | **មិនប៉ះ** | — |
+
+**ច្បាប់មាស៖ `isDeducted` ជាវាល *តែមួយគត់* ដែលកំណត់លុយ។** `trashReason` ជា
+**ស្លាកបង្ហាញ** ប៉ុណ្ណោះ។ ជួរ ៤ និង ៨ ជាជួរ **តែ ២** ដែលប៉ះលុយ។
+
+**ការបែងចែកតាម barcode (ជួរ ៧ និង ៨)** — កញ្ចប់លាយ (A បិទ · B បើក)៖
+
+| ច្បាប់ | អ្វីចេញ | អ្វីនៅ | លុយ |
+|---|---|---|---|
+| ២ ម៉ោង | **A តែឯង** ជា `pickup` | B និងនាឡិកា ៨ ថ្ងៃរបស់វា | មិនប៉ះ |
+| ៨ ថ្ងៃ | **B តែឯង** ជា `expired` | A (បិទ) ➜ រង់ចាំច្បាប់ ២ ម៉ោង | ដកតែ B |
+
+**marker ដែលមិនត្រូវច្រឡំ** (បើច្រឡំ ➜ `permission_denied` ជារៀងរហូត)៖
+
+| Marker | ជាកម្មសិទ្ធិរបស់ | ត្រូវលុបមុនសរសេរទៅ |
+|---|---|---|
+| `restoreClaimId` · `restoreClaimToken` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** (`stripHistoryOnlyMarkers`) |
+| `clearClaim` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** |
+| `restoreClaim` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`dropStaleRestoreMarkers`) |
+| `trashReason` · `deletedAt` · `isFromDeletion` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`executeRestoreItem`) |
+
+**របៀបផ្ទៀងផ្ទាត់ក្នុងមួយពាក្យបញ្ជា** — បើជុំក្រោយប៉ះតំបន់នេះ៖
+
+```bash
+java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1 &
+node audit-tools/emu/crud-rules-flow.js     # payload ពិត ធៀបនឹង rules ពិត (43)
+node audit-tools/partial-pickup-cleanup-test.js   # ២ ម៉ោង / ៨ ថ្ងៃ តាម barcode (48)
+node audit-tools/restore-marker-hygiene-test.js   # marker ↔ schema (19)
+node audit-tools/policy-test.js                   # គោលការណ៍ លុប/ដក (28)
+node audit-tools/trash-modal-test.js              # ស្លាក និងតួលេខសរុប (53)
+```
+
+**GitHub Action `.github/workflows/audit.yml` រត់ ២ ជំហានដំបូងលើរាល់ PR ស្វ័យប្រវត្តិ**
+(`CRUD_FLOW_STRICT=1` ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — កុំឲ្យ CI បៃតងក្លែងក្លាយ)។
+
 ### ⛔ marker របស់ `scan_history` មិនត្រូវធ្លាក់ចូលធុងសំរាម (កំណែ 2.17.3)
 
 > 🔴 **កំហុសផលិតកម្មពិត** — ក្រោយ 2.17.2 ការស្តារបរាជ័យដោយ `PERMISSION_DENIED`

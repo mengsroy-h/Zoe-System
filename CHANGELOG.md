@@ -24,6 +24,30 @@
 
 ---
 
+## [ឧបករណ៍] — 2026-08-26 · CI ស្វ័យប្រវត្តិ
+
+**មិនប្តូរកូដ App ទេ** — `APP_VERSION` នៅ `2.17.3` ដដែល។
+
+### ឧបករណ៍ audit
+
+- **`.github/workflows/audit.yml`** — រត់លើ **រាល់ PR** និងរាល់ push ចូល `main`៖
+  - `firebase-rules` — បើក RTDB emulator ពិត រួចរត់ `emu/crud-rules-flow.js`
+    (payload ពិត ធៀបនឹង `firebase-database.rules.json` ពិត) បូក `payload-schema.js` ·
+    `rules-duplicate-keys.js` · `restore-marker-hygiene-test.js`
+  - `audit-suite` — `run-all.sh` ពេញ រួមតេស្ត browser (Chromium)
+- **`CRUD_FLOW_STRICT=1`** — ធ្វើឲ្យការ **SKIP ក្លាយជាការធ្លាក់**។ បើ emulator មិនឡើង
+  នោះ CI ត្រូវក្រហម — **កុំឲ្យបៃតងក្លែងក្លាយ** ដែលជាថ្នាក់កំហុសដដែលដែលធ្វើឲ្យ
+  កំហុស 2.17.2/2.17.3 ship បាន។
+- `emu/crud-rules-flow.js` បន្ថែមករណី **ការស្តារកំពុងដំណើរការ** (39 ➜ 43 assertion)
+  ដែលបំបែកការការពារ ២ ជាន់ចេញពីគ្នា — មុននេះ `dropStaleRestoreMarkers()` លាក់
+  ការធ្លាក់របស់ `stripHistoryOnlyMarkers()`។
+- `CLAUDE.md` បន្ថែម **តារាងសេណារីយ៉ូពេញលេញ** (លុប · ដក · បិទ/បើក · សម្អាត ·
+  ស្តារ · purge) ជាប្រភពការពិតតែមួយ តាមសំណើអ្នកប្រើ។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន។**
+
 ## [2.17.3] — 2026-08-26
 
 **កែកំហុសផលិតកម្មបន្ទាន់** — ក្រោយ 2.17.2 ការ **ស្តារ** ពីធុងសំរាមបរាជ័យដោយ

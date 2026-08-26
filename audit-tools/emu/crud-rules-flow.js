@@ -131,8 +131,20 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
 
 (async () => {
     console.log('crud-rules-flow — payload ពិត ធៀបនឹង firebase rules ពិត (RTDB emulator)\n');
-    const load = await asOwner('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
-    if (!/"status"\s*:\s*"ok"/.test(load.body)) { console.log('SKIP — emulator មិនដំណើរការ ឬ rules load មិនបាន'); process.exit(0); }
+    const strictMode = process.env.CRUD_FLOW_STRICT === '1';
+    let load;
+    try {
+        load = await asOwner('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));
+    } catch (connectError) {
+        console.log((strictMode ? 'FAIL' : 'SKIP') + ' — តភ្ជាប់ទៅ emulator មិនបាន (127.0.0.1:9000): ' + connectError.message);
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        process.exit(strictMode ? 1 : 0);
+    }
+    if (!/"status"\s*:\s*"ok"/.test(load.body)) {
+        console.log((strictMode ? 'FAIL' : 'SKIP') + ' — rules load មិនបាន: ' + load.body.slice(0, 160));
+        if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
+        process.exit(strictMode ? 1 : 0);
+    }
 
     // ---------- បិទ / បើក ----------
     console.log('=== ១. បិទ «យក» / បើកវិញ (barcode តែមួយ និងកញ្ចប់ទាំងមូល) ===');
@@ -163,14 +175,19 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
 
     // ---------- ដក ----------
     console.log('\n=== ២. ដក (removeSingleBarcode) ===');
-    for (const [label, extra] of [['កញ្ចប់ធម្មតា', {}], ['កញ្ចប់ដែលនៅសល់ marker ស្តារ (ជាប់គាំងពីមុន)', { restoreClaimId: 'ghost', restoreClaimToken: 'ghost_tok' }]]) {
-        const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, true, T0), bc('B2', 3.72, false)], extra) }, zoew_recently_deleted_cod_dod: {} };
+    for (const [label, extra, liveSource] of [
+        ['កញ្ចប់ធម្មតា', {}, false],
+        ['កញ្ចប់ដែលនៅសល់ marker ស្តារ (ជាប់គាំងពីមុន)', { restoreClaimId: 'ghost', restoreClaimToken: 'ghost_tok' }, false],
+        ['កញ្ចប់ដែលការស្តារ **កំពុងដំណើរការ** (marker នៅរស់)', { restoreClaimId: 'live_src', restoreClaimToken: 'live_tok' }, true]
+    ]) {
+        const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, true, T0), bc('B2', 3.72, false)], extra) },
+            zoew_recently_deleted_cod_dod: liveSource ? { live_src: { id: 'live_src', phone: '098798880', scanDate: '2026-08-26', deletedAt: T0, isFromDeletion: true, trashReason: 'delete', restoreClaim: { token: 'live_tok', targetId: 'id_x', claimedAt: T0 + 3600000 } } } : {} };
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
         await w.ctx.removeSingleBarcode('id_x', 'B1'); await w.drain();
         await seedServer(base);
         const ok = await replay('ដក — ' + label + ' ➜ rules ទទួល', w.writes);
-        const trash = Object.values(w.store.zoew_recently_deleted_cod_dod || {})[0];
+        const trash = Object.values(w.store.zoew_recently_deleted_cod_dod || {}).find((t) => t && t.trashReason === 'remove');
         check(!!trash && trash.trashReason === 'remove', 'ដក — ' + label + ' ➜ ស្លាក «ដក» (remove)', trash && trash.trashReason);
         check(!!trash && trash.barcodes.every((b) => b.isDeducted === true), 'ដក — ' + label + ' ➜ isDeducted = true (ដកលុយ)');
         check(!!trash && trash.restoreClaimId === undefined && trash.restoreClaimToken === undefined, 'ដក — ' + label + ' ➜ គ្មាន marker សល់ក្នុងធុងសំរាម');

@@ -1,0 +1,116 @@
+# ការត្រួតពិនិត្យស្វ័យប្រវត្តិលើរាល់ PR។
+#
+# ហេតុអ្វីមាន job ២៖
+#   · firebase-rules — សាកកូដពិត **ធៀបនឹង firebase-database.rules.json ពិត**
+#     លើ RTDB emulator។ នេះជាចន្លោះដែលធ្វើឲ្យកំហុស 2.17.2/2.17.3 ship បាន៖
+#     តេស្ត ៧៩ បៃតង ខណៈផលិតកម្មខូច ព្រោះគ្មានអ្វីសាកនឹង rules ពិត។
+#   · audit-suite — `run-all.sh` ពេញ (រួមតេស្ត browser)។
+#
+# ⛔ CRUD_FLOW_STRICT=1 ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — បើ emulator មិនឡើង
+#    នោះ CI ត្រូវក្រហម មិនមែនបៃតងក្លែងក្លាយទេ។
+name: Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-rules:
+    name: Firebase rules ↔ payload (RTDB emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: ដំឡើង dependency
+        run: npm install --no-save --no-audit --no-fund acorn firebase-tools
+
+      - name: Cache RTDB emulator jar
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: rtdb-emulator-${{ runner.os }}-v1
+
+      - name: ទាញ RTDB emulator
+        run: npx --yes firebase setup:emulators:database
+
+      - name: បើក emulator
+        run: |
+          set -euo pipefail
+          JAR=$(ls "$HOME"/.cache/firebase/emulators/firebase-database-emulator-*.jar | head -1)
+          echo "jar: $JAR"
+          nohup java -jar "$JAR" --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf --noproxy "*" -o /dev/null "http://127.0.0.1:9000/.json?ns=demo-zoe"; then
+              echo "emulator UP"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "❌ emulator មិនឡើងក្នុង ៦០ វិនាទី"
+          cat /tmp/emu.log
+          exit 1
+
+      - name: payload ពិត ធៀបនឹង rules ពិត
+        env:
+          CRUD_FLOW_STRICT: '1'
+        run: node audit-tools/emu/crud-rules-flow.js
+
+      - name: rules ↔ schema (ស្តាទិច)
+        run: |
+          node audit-tools/payload-schema.js
+          node audit-tools/rules-duplicate-keys.js
+          node audit-tools/restore-marker-hygiene-test.js
+
+      - name: log របស់ emulator ពេលធ្លាក់
+        if: failure()
+        run: cat /tmp/emu.log || true
+
+  audit-suite:
+    name: run-all.sh (រួមតេស្ត browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ដំឡើង dependency
+        run: npm install --no-save --no-audit --no-fund acorn playwright-core xlsx playwright
+
+      - name: ទាញ Chromium
+        run: npx --yes playwright install --with-deps chromium
+
+      # តេស្ត browser រកមើល Chromium នៅផ្លូវថេរមួយ (ដូចបរិស្ថាន audit ដើម)។
+      # ដូច្នេះ symlink វាទៅផ្លូវនោះ ជំនួសការកែឯកសារ ២០។
+      - name: ភ្ជាប់ Chromium ទៅផ្លូវដែលតេស្តរំពឹងទុក
+        run: |
+          set -euo pipefail
+          SRC=$(find "$HOME/.cache/ms-playwright" -name chrome -type f -path '*chrome-linux*' | head -1)
+          if [ -z "$SRC" ]; then echo "❌ រក Chromium មិនឃើញ"; exit 1; fi
+          echo "chromium: $SRC"
+          sudo mkdir -p /opt/pw-browsers/chromium-1194
+          sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
+          test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+
+      - name: run-all.sh
+        run: bash audit-tools/run-all.sh

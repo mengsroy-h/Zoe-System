@@ -1208,6 +1208,23 @@ scan debounce, deadline load script, TTL cache lookup) **នៅតែប្រ�
 REST-only (`fetch` សុទ្ធ គ្មាន Firebase SDK ដោយការរចនា)។ វាអាន header HTTP `Date` លើរាល់សំណើ
 ដែលវាធ្វើរួច (`checkOnline()`) ហើយ export `syncServerTime()` សម្រាប់អ្នកហៅដែលមិនកេះសំណើទាន់ពេល។
 
+**ច្បាប់នេះមាន checker តាំងពីជុំឧបករណ៍ 2026-08-26 — `clock-hygiene.js`។** មុននោះវាជា
+ច្បាប់ដែលរស់នៅតែក្នុងឯកសារនេះ ➜ គ្មានអ្វីទប់ជុំក្រោយពីសរសេរ `Date.now()` ក្នុងផ្លូវ
+retention ឡើយ។ វាស្កេនតាម **AST** មិនមែន regex ដូច្នេះវាចាប់ **ទាំង ២ ទម្រង់** តាមមេរៀន
+ខាងលើ ហើយវាស្កេន **App ទាំង ៣ បូក `license-verify.js`**។ វាអះអាង ៤ ទិស៖
+
+| ទិស | អ្វីដែលចាប់បាន |
+|---|---|
+| នាឡិកាឆៅត្រូវនៅតែក្នុង function ដែលមានហេតុផលសរសេរជាប់ | `Date.now()` ក្នុង function ថ្មី ឬក្នុង `barcodeCloseIsRipe()` |
+| គ្មានវាល `*At` សរសេរពីនាឡិកាឧបករណ៍ | `trashItem.deletedAt = Date.now()` |
+| គ្មានការប្រៀបធៀបបង្អួច retention នឹងវា | `(Date.now() - barcode.closedAt) > TWO_HOURS_MS` |
+| **បញ្ជីអនុញ្ញាតគ្មានធាតុងាប់** | ធាតុដែលលែងប្រើ ➜ វានឹងលាក់កំហុសបន្ទាប់ |
+
+បូកនឹងការអះអាងផ្ទាល់ថា `runAutomaticCleanupRules()` · `claimAndCleanupItem()` ·
+`barcodeCloseIsRipe()` · `normalizeBarcodeCloseStamps()` **មិនប៉ះនាឡិកាឧបករណ៍សោះ**។
+**ការបន្ថែម timer local ថ្មីត្រូវបន្ថែមឈ្មោះ function ក្នុង `LOCAL_CLOCK_OK` ជាមួយហេតុផល**
+— កុំបន្ថែមធាតុទទេ។
+
 ## ថ្នាក់កំហុសដែលបានដោះស្រាយរួច — កុំធ្វើឡើងវិញ
 
 ទាំងនេះជាមេរៀនដែលចំណាយពេលច្រើនដើម្បីរកឃើញ។ គ្រប់ថ្នាក់មាន checker ស្វ័យប្រវត្តិឥឡូវនេះ។
@@ -1374,6 +1391,11 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
 **៣ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+> ℹ️ **ជុំឧបករណ៍ 2026-08-26 (នាឡិកា + ជម្រៅ fuzz) មិនត្រូវការការផ្ទៀងផ្ទាត់ទេ**
+> — វាមិនប៉ះកូដ App សោះ (`APP_VERSION` និង `CACHE_VERSION` ដដែល)។ វាបន្ថែម
+> `clock-hygiene.js` និង op `sweepPickup` ក្នុង `revenue-fuzz-test.js`។
+> ការរត់ជម្រៅលើកូដពិត (៣៤ លំដាប់ × ៦០ ប្រតិបត្តិការ) **មិនរកឃើញកំហុសថ្មីទេ**។
 
 #### ០. កំណែ 2.17.3 — ជួសជុលការស្តារ និង marker ដែលជាប់គាំង
 
@@ -1555,6 +1577,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | barcode ដែលយករួច មិនចេញក្នុង ២ ម៉ោង ឬត្រូវដកលុយខុសពេលបងប្អូនផុតកំណត់ | `partial-pickup-cleanup-test.js` |
 | `fb.X` ដែល `firebase-loader.js` មិន export ➜ `undefined` លើផលិតកម្ម | `sdk-surface.js` |
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
+| នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |
 | `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |
 | ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយស៊ីកូតាការតភ្ជាប់អស់ ➜ សំណើចាំបាច់ចេញមិនបាន | `sw-revalidate-pressure-test.js` |
 | ចលនា boot + **ធនធានឆ្លង origin ក្នុង `<head>` ដែលទប់ការគូរ** | `boot-animation-test.js` |
@@ -1598,6 +1621,16 @@ bash audit-tools/run-all.sh
   ដែលមើលទៅដូចកំហុសកូដ។
 - **`renderHistory` មាន cache តាមជួរ** (`tr.dataset.sig`) — ការវាស់ដំណើរការត្រូវលុប `sig`
   ចោលមុន បើមិនដូច្នេះវាវាស់តែផ្លូវ cache។
+- **Fuzz ដែលកេះការសម្អាតត្រូវចាស់ត្រា *តាម barcode* មិនមែនតាមកញ្ចប់។** រហូតដល់
+  ជុំឧបករណ៍ 2026-08-26 ការសម្អាតក្នុង `revenue-fuzz-test.js` ប៉ះតែ
+  `zoew_scan_history_cod_dod/$id/closedAt` (កម្រិត **កញ្ចប់**) ➜ ផ្លូវ «កញ្ចប់លាយ»
+  របស់កំណែ 2.17.2 (A បិទ · B បើក ➜ `claimedPartial`) **មិនដែលត្រូវរត់សោះ**។
+  វាស់បាន៖ mutation ដែលប្តូរ `claimedPartial` ពី `ripeClosed` ➜ `keptBarcodes`
+  (ការជាន់អថេរ — ថ្នាក់កំហុសពិត) **រស់រានពេញ ២០ លំដាប់ × ៥៥ ប្រតិបត្តិការ**។
+  ក្រោយបន្ថែម op **`sweepPickup`** (ចាស់ត្រា `barcodes/$idx/closedAt` ដោយផ្ទាល់)
+  mutation ដដែលធ្លាក់ក្នុង **១២ លំដាប់ × ៤៥**។ **មេរៀន៖ ការគ្របតេស្តត្រូវតាមដាន
+  កម្រិតដែលកូដសម្រេច** — 2.17.2 បានបញ្ចុះការសម្រេចពីកម្រិតកញ្ចប់ទៅកម្រិត barcode
+  ប៉ុន្តែ fuzz នៅជាប់កម្រិតចាស់។
 
 ### Firebase RTDB emulator (សម្រាប់ការកែ rules តែប៉ុណ្ណោះ)
 ```bash

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.4';
+    const APP_VERSION = '2.17.5';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -747,6 +747,10 @@
                     scheduleReconnectWatchdog();
                 }
                 renderConnectionStatus();
+            }, () => {
+                isDatabaseConnected = false;
+                renderConnectionStatus();
+                if (navigator.onLine !== false) scheduleReconnectWatchdog();
             });
 
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');

@@ -101,6 +101,37 @@ for (const app of APPS) {
     ok(app + ': ក្រៅបណ្តាញ ➜ រំលងដដែល', offFetched === 0, 'fetched=' + offFetched);
 }
 
+// === ⛔ ផ្លូវ cache-miss របស់ sw.js ត្រូវនៅ **គ្មានពេលកំណត់** ===
+// ជុំ 2.17.5 បានពិចារណាបន្ថែម timeout លើ `fetch(request)` ក្នុងផ្លូវ cache-miss
+// (ដើម្បីកុំឲ្យទំព័រព្យួរលើបណ្តាញស្លាប់) រួច **បដិសេធវាដោយផ្អែកលើការវាស់**៖
+//   ១. `CORE_SHELL` ប្រើ `cache.addAll()` **atomic** ➜ ធនធានស្នូល **មិនអាច
+//      បាត់ពី cache បានទេ** ក្រោយ install ជោគជ័យ (បាត់មួយ ➜ install ធ្លាក់
+//      ➜ SW ចាស់នៅដដែល)។ មានតែ `OPTIONAL_SHELL` (manifest + icon ២) ដែល
+//      អាចបាត់ ហើយ **គ្មានមួយណាទប់ការគូរទេ**។
+//   ២. `zxing_reader.wasm` = **១ ០៦៨ kB** ➜ លើ 2G វាត្រូវការ **៣១ វិនាទី**
+//      និងលើ slow-2G **៥៣ វិនាទី** ដោយស្របច្បាប់។ timeout ១០ វិនាទីនឹង
+//      **បោះបង់ធនធានដែលធ្វើឲ្យការស្កេនដើរក្រៅបណ្តាញ** — ជាការថយក្រោយទៅ
+//      ថ្នាក់កំហុសដដែលដែលកំណែ 2.10.0 ដោះស្រាយដោយនាំ ZXing ចូល repo។
+// ដូច្នេះ **កុំបន្ថែម timeout ទីនោះ**។ ការការពារត្រឹមត្រូវគឺ cache-first
+// (មានស្រាប់) បូក `linkIsFrugal()` លើការងារ **ស្រេចចិត្ត** តែប៉ុណ្ណោះ។
+console.log('\n=== ផ្លូវ cache-miss ត្រូវនៅគ្មានពេលកំណត់ (ធនធានធំលើ 2G) ===');
+for (const app of APPS) {
+    const swPath = path.join(ROOT, app, 'sw.js');
+    if (!fs.existsSync(swPath)) continue;
+    const sw = fs.readFileSync(swPath, 'utf8');
+    ok(app + ': ធនធានស្នូលដំឡើងជា **ក្រុម** (atomic) ➜ cache-miss មិនកើតលើស្នូល',
+        /cache\.addAll\(CORE_SHELL\)/.test(sw));
+    const fetchHandler = sw.slice(sw.indexOf("addEventListener('fetch'"));
+    ok(app + ': គ្មាន timeout បោះបង់លើផ្លូវ cache-miss',
+        !/AbortController/.test(fetchHandler),
+        'ការបន្ថែម AbortController ទីនោះនឹងសម្លាប់ការទាញ wasm ១ MB លើ 2G');
+}
+if (fs.existsSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm'))) {
+    const kb = fs.statSync(path.join(ROOT, 'ZoeW', 'vendor', 'zxing_reader.wasm')).size / 1024;
+    ok('ZoeW: `zxing_reader.wasm` ធំល្មមឲ្យ timeout ថេរជាគ្រោះថ្នាក់ (> 500 kB)',
+        kb > 500, Math.round(kb) + ' kB ➜ ~' + Math.round(kb / 35) + 's លើ 2G');
+}
+
 // === ការទាញតារាងអតិថិជនជាមុន (ZoeW) ===
 console.log('\n=== ការទាញជាមុនត្រូវគោរព Data Saver / 2G ===');
 {

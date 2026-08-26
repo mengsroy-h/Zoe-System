@@ -136,6 +136,35 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('លាក់៖ ' + label, out.indexOf(secret) === -1, 'got: ' + out);
     });
 
+    // ⚠️ ជុំ 2.17.5 ៖ ការផ្គូផ្គងឈ្មោះ param ធ្លាប់ជា **ការប្រៀបធៀបពិតប្រាកដ**
+    // នៅព្រំដែន `?`/`&`/`#` ➜ ទម្រង់ camelCase និង hyphen រអិលកាត់ទាំងស្រុង។
+    // វាស់បាន ៖ `sessionToken=` · `clientSecret=` · `X-Api-Key=` · `pin=`
+    // **មិនត្រូវលាក់សោះ**។ ឥឡូវ `isSecretParamName()` បំបែកឈ្មោះនៅព្រំដែន
+    // camelCase និង `_ - .` រួចប្រៀបធៀបជា **សមាសភាគដាច់ដោយឡែក** ➜ វាចាប់
+    // ទម្រង់ទាំងនោះ ដោយ **មិនចាប់** `spinner=` (`s|pin|ner` — គ្មានព្រំដែន),
+    // `design=` (`de|sig|n`), `keyboard=` (`key|board`) ។ល។
+    const camelLeaks = [
+        ['https://a/?sessionToken=SEC', 'SEC', 'sessionToken (camelCase)'],
+        ['https://a/?clientSecret=SEC', 'SEC', 'clientSecret (camelCase)'],
+        ['https://a/?X-Api-Key=SEC', 'SEC', 'X-Api-Key (hyphen)'],
+        ['https://a/?authorization=SEC', 'SEC', 'authorization'],
+        ['https://a/?pin=SEC', 'SEC', 'pin'],
+        ['https://a/?jwt=SEC', 'SEC', 'jwt'],
+        ['https://a/?bearer=SEC', 'SEC', 'bearer'],
+        // Apps Script deployment ID ជា **capability URL** — អ្នកណាមានវា ហៅ API បាន
+        ['https://script.google.com/macros/s/DEPLOY_ID_SECRET/exec', 'DEPLOY_ID_SECRET', 'Apps Script deployment ID']
+    ];
+    camelLeaks.forEach(([input, secret, label]) => {
+        ok('លាក់៖ ' + label, redact(input).indexOf(secret) === -1, 'got: ' + redact(input));
+    });
+
+    // ⛔ ការពង្រីកខាងលើ **មិនត្រូវលាក់លើស** — ធាតុទាំងនេះត្រូវការសម្រាប់ debug
+    const noOverRedact = ['https://a/?spinner=fast', 'https://a/?design=blue', 'https://a/?mapping=x',
+        'https://a/?locker=A12', 'https://a/?phone=0974158508', 'https://a/?keyboard=on'];
+    noOverRedact.forEach((input) => {
+        ok('មិនលាក់លើស៖ ' + input.slice(input.indexOf('?')), redact(input) === input, 'got: ' + redact(input));
+    });
+
     const keep = [
         ['https://zoew.app/?list=1&barcode=ZTO900', 'ZTO900', 'barcode មិនត្រូវលាក់ (ត្រូវការសម្រាប់ debug)'],
         ['zoew_scan_history_cod_dod/id_123_abc timed out', 'id_123_abc', 'លេខសម្គាល់ធាតុនៅដដែល']

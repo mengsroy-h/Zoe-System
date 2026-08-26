@@ -101,6 +101,15 @@ run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 
 echo
+echo
+echo "== ខ្សែសង្វាក់នាំចូល (ZoeImport · zto-import) =="
+# ⚠️ ពួកវាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។
+# ហេតុផលនោះលែងស៊ីគ្នាហើយ ៖ ZoeImport ជា PWA ដែល ship ពិត ហើយ checker ១២
+# គ្របវារួចហើយ (layout · csp · clock · fluid-type · adaptive-link …)។
+# ការទុកវាក្រៅមានន័យថា assertion ១០៥ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
+run "ZoeImport/test.js" node ZoeImport/test.js
+run "zto-import/test.js" node zto-import/test.js
+
 echo "== ទម្លាប់គម្រោង =="
 printf '  %-32s ' "node --check លើ app.js ទាំង ២"
 if for a in ZoeW ZoeKeyGen; do node --check "$a/app.js" || exit 1; done; then

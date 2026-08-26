@@ -5,7 +5,7 @@
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/7.120.3/bundle.min.js';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
-    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|pwd|credential|bearer|jwt|sig|signature|setup)';
+    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup)';
     const REDACT_MAX_DEPTH = 6;
     const REDACT_MAX_NODES = 5000;
 
@@ -47,11 +47,30 @@
         return loadPromise;
     }
 
+    const SECRET_WORD_RE = new RegExp(
+        '(?:^|_)' + SECRET_PARAM_PATTERN + '(?:$|_)', 'i');
+
+    function isSecretParamName(name) {
+        if (!name) return false;
+        const split = String(name)
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[.-]/g, '_');
+        return SECRET_WORD_RE.test('_' + split + '_');
+    }
+
+    function redactPairs(text, leadClass) {
+        return text.replace(
+            new RegExp('(' + leadClass + ')([A-Za-z0-9_.\\-]{1,64})=([^&#\\s"\'<>]+)', 'g'),
+            (whole, lead, name) => (isSecretParamName(name) ? lead + name + '=[redacted]' : whole)
+        );
+    }
+
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
-        return url
-            .replace(new RegExp('([?&#]' + SECRET_PARAM_PATTERN + '=)[^&#\\s]+', 'gi'), '$1[redacted]')
-            .replace(new RegExp('(^|[\\s"\'])' + SECRET_PARAM_PATTERN + '=[^&#\\s"\']+', 'gi'), '$1[redacted]')
+        let out = redactPairs(url, '[?&#]');
+        out = redactPairs(out, '^|[\\s"\'([]');
+        return out
+            .replace(/(\/macros\/s\/)[^/\s"']+/g, '$1[redacted]')
             .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@');
     }
 

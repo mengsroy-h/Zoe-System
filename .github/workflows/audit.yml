@@ -71,6 +71,7 @@ jobs:
       - name: payload ពិត ធៀបនឹង rules ពិត
         env:
           CRUD_FLOW_STRICT: '1'
+          CRUD_FLOW_MIN_ASSERTS: '43'
         run: node audit-tools/emu/crud-rules-flow.js
 
       - name: rules ↔ schema (ស្តាទិច)

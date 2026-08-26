@@ -1150,8 +1150,10 @@ node audit-tools/policy-test.js                   # គោលការណ៍ ល
 node audit-tools/trash-modal-test.js              # ស្លាក និងតួលេខសរុប (53)
 ```
 
-**GitHub Action `.github/workflows/audit.yml` រត់ ២ ជំហានដំបូងលើរាល់ PR ស្វ័យប្រវត្តិ**
-(`CRUD_FLOW_STRICT=1` ធ្វើឲ្យការ SKIP ក្លាយជាការធ្លាក់ — កុំឲ្យ CI បៃតងក្លែងក្លាយ)។
+**GitHub Action `.github/workflows/audit.yml` រត់ ២ ជំហានដំបូងលើរាល់ PR ស្វ័យប្រវត្តិ។**
+សន្ទះការពារ «បៃតងក្លែងក្លាយ» ២៖ `CRUD_FLOW_STRICT=1` (SKIP ➜ ធ្លាក់) និង
+`CRUD_FLOW_MIN_ASSERTS=43` (assertion តិចជាងកម្រិត ➜ ធ្លាក់ ទោះគ្មាន `fail`)។
+**បើបន្ថែមតេស្តក្នុង `crud-rules-flow.js` ត្រូវតម្លើងលេខនោះក្នុង workflow ដែរ។**
 
 ### ⛔ marker របស់ `scan_history` មិនត្រូវធ្លាក់ចូលធុងសំរាម (កំណែ 2.17.3)
 

@@ -35,6 +35,9 @@
     (payload ពិត ធៀបនឹង `firebase-database.rules.json` ពិត) បូក `payload-schema.js` ·
     `rules-duplicate-keys.js` · `restore-marker-hygiene-test.js`
   - `audit-suite` — `run-all.sh` ពេញ រួមតេស្ត browser (Chromium)
+- **`CRUD_FLOW_MIN_ASSERTS=43`** — សន្ទះការពារ «បៃតងក្លែងក្លាយ» ទី ២៖ បើចំនួន
+  assertion ធ្លាក់ក្រោមកម្រិត នោះ CI ក្រហម **ទោះគ្មាន `fail`** ក៏ដោយ។ វាចាប់ករណី
+  ដែលតេស្តត្រូវកាត់ចេញ ឬរត់មិនពេញដោយអចេតនា។
 - **`CRUD_FLOW_STRICT=1`** — ធ្វើឲ្យការ **SKIP ក្លាយជាការធ្លាក់**។ បើ emulator មិនឡើង
   នោះ CI ត្រូវក្រហម — **កុំឲ្យបៃតងក្លែងក្លាយ** ដែលជាថ្នាក់កំហុសដដែលដែលធ្វើឲ្យ
   កំហុស 2.17.2/2.17.3 ship បាន។

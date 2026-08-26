@@ -230,5 +230,15 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
+
+    // ⛔ សន្ទះការពារ «បៃតងក្លែងក្លាយ»៖ បើចំនួន assertion ធ្លាក់ក្រោមកម្រិតអប្បបរមា
+    // នោះមានន័យថាតេស្តត្រូវបានកាត់ចេញ ឬរត់មិនពេញ — CI ត្រូវក្រហម ទោះគ្មាន fail។
+    const minAsserts = parseInt(process.env.CRUD_FLOW_MIN_ASSERTS || '0', 10);
+    if (minAsserts > 0 && pass < minAsserts) {
+        console.log('\n❌ assertion តិចជាងកម្រិតអប្បបរមា៖ ' + pass + ' < ' + minAsserts);
+        console.log('   តេស្តត្រូវបានកាត់ចេញ ឬរត់មិនពេញ ➜ រាប់ជាការធ្លាក់។');
+        console.log('   បើបន្ថែមតេស្តដោយចេតនា សូមតម្លើង CRUD_FLOW_MIN_ASSERTS ក្នុង .github/workflows/audit.yml');
+        process.exit(1);
+    }
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

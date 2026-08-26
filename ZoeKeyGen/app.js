@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.2';
+const APP_VERSION = '2.19.3';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -232,9 +232,14 @@ function connectionIsSettlingIn() {
 
 const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
 const FIREBASE_SDK_RETRY_MIN_GAP_MS = 3000;
+const FIREBASE_SDK_RELOAD_KEY = 'zoe_firebase_sdk_reload_count';
+const FIREBASE_SDK_RELOAD_MAX = 3;
+const FIREBASE_SDK_RELOAD_MIN_GAP_MS = 20000;
 let firebaseSdkRetryTimer = null;
 let firebaseSdkRetryAttempt = 0;
 let lastFirebaseSdkAttemptAt = 0;
+let lastFirebaseSdkReloadAt = 0;
+let lateFirebaseSdkListenerArmed = false;
 let firebaseSdkUnavailable = false;
 let sdkUnavailableNoticeShown = false;
 
@@ -249,6 +254,59 @@ function clearFirebaseSdkRetry() {
 function resetFirebaseSdkRetryHealth() {
     clearFirebaseSdkRetry();
     lastFirebaseSdkAttemptAt = 0;
+    lastFirebaseSdkReloadAt = 0;
+    safeStoreRemove(sessionStorage, FIREBASE_SDK_RELOAD_KEY);
+}
+
+function anyModalIsOpen() {
+    const modals = document.querySelectorAll('.modal');
+    for (let i = 0; i < modals.length; i++) {
+        const el = modals[i];
+        if (el.classList && el.classList.contains('active')) return true;
+        if (el.style && el.style.display === 'flex') return true;
+    }
+    return false;
+}
+
+function firebaseSdkReloadCount() {
+    try {
+        const raw = sessionStorage.getItem(FIREBASE_SDK_RELOAD_KEY);
+        return parseInt(raw, 10) || 0;
+    } catch (e) {
+        return FIREBASE_SDK_RELOAD_MAX;
+    }
+}
+
+function reloadForFirebaseSdk() {
+    if (!firebaseSdkUnavailable) return false;
+    if (typeof window.firebaseSDK !== 'undefined' && window.firebaseSDK) return false;
+    if (navigator.onLine === false) return false;
+    if (anyModalIsOpen()) return false;
+    const used = firebaseSdkReloadCount();
+    if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
+    const now = Date.now();
+    if (lastFirebaseSdkReloadAt && now - lastFirebaseSdkReloadAt < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
+    lastFirebaseSdkReloadAt = now;
+    safeStoreSet(sessionStorage, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
+    window.location.reload();
+    return true;
+}
+
+function armLateFirebaseSdkListener() {
+    if (lateFirebaseSdkListenerArmed) return;
+    lateFirebaseSdkListenerArmed = true;
+    window.addEventListener('firebasesdkready', () => {
+        lateFirebaseSdkListenerArmed = false;
+        if (isDatabaseInitialized || isInitializingFirebase) return;
+        clearFirebaseSdkRetry();
+        initFirebase();
+    }, { once: true });
+}
+
+function recoverFirebaseSdk() {
+    if (!firebaseSdkUnavailable) { clearFirebaseSdkRetry(); return; }
+    if (reloadForFirebaseSdk()) return;
+    initFirebase();
 }
 
 function scheduleFirebaseSdkRetry() {
@@ -259,7 +317,7 @@ function scheduleFirebaseSdkRetry() {
         firebaseSdkRetryTimer = null;
         if (isDatabaseInitialized) { clearFirebaseSdkRetry(); return; }
         lastFirebaseSdkAttemptAt = Date.now();
-        initFirebase();
+        recoverFirebaseSdk();
     }, step);
 }
 
@@ -278,7 +336,7 @@ function retryFirebaseSdkNow() {
     }
     clearFirebaseSdkRetry();
     lastFirebaseSdkAttemptAt = Date.now();
-    initFirebase();
+    recoverFirebaseSdk();
 }
 
 function renderConnectionStatus() {
@@ -655,6 +713,7 @@ async function initFirebase() {
     } catch (e) {
         if (e && e.code === 'SDK_UNAVAILABLE') {
             firebaseSdkUnavailable = true;
+            armLateFirebaseSdkListener();
             renderConnectionStatus();
             if (!sdkUnavailableNoticeShown) {
                 sdkUnavailableNoticeShown = true;
@@ -2034,6 +2093,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) return;
         renderConnectionStatus();
+        retryFirebaseSdkNow();
         nudgeDatabaseConnection();
         retryPendingRoleCheck();
     });

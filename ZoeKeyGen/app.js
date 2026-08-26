@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.1';
+const APP_VERSION = '2.19.2';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -399,6 +399,7 @@ function waitForServerTimeSync(timeoutMs) {
 const TOAST_LIFETIME_MS = 3000;
 const TOAST_LIVE_LIMIT_MS = 20000;
 const TOAST_CLASSES = { info: 'toast-info', success: 'toast-success', warn: 'toast-warn', error: 'toast-error' };
+const SESSION_SIGNED_OUT_TOAST = '⚠️ បានចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត';
 const TOAST_KIND_MARKS = [
     ['error', ['❌', '⛔', '🚫']],
     ['warn', ['⚠️', '⏱️']],
@@ -474,6 +475,9 @@ function refreshLiveToasts() {
 
 function liveToastState(key) {
     if (key !== 'signin' && key !== 'config') return null;
+    if (key === 'signin' && (!isSignedInUiActive || !auth || !auth.currentUser)) {
+        return { msg: SESSION_SIGNED_OUT_TOAST, kind: 'warn', settled: true };
+    }
     if (navigator.onLine === false) {
         return key === 'signin'
             ? { msg: '⚠️ ចូលប្រព័ន្ធរួច តែឧបករណ៍ក្រៅបណ្ដាញ — បញ្ជី Key មិនទាន់សម័យ', kind: 'warn', settled: false }
@@ -1096,6 +1100,7 @@ function showLoginModalWithPrefill() {
     if (!isPinFlowPending()) pinTargetAction = null;
     document.getElementById('appContainer').classList.add('hidden');
     isSignedInUiActive = false;
+    refreshLiveToasts();
     keyListSessionGeneration++;
     keyListCache = [];
     const keyListBody = document.getElementById('keyListBody');
@@ -1327,8 +1332,9 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
     closeModal('loginModal');
     document.getElementById('appContainer').classList.remove('hidden');
     updateAuthButton(true);
-    if (!isSignedInUiActive) showLiveToast('signin');
+    const wasAlreadySignedIn = isSignedInUiActive;
     isSignedInUiActive = true;
+    if (!wasAlreadySignedIn) showLiveToast('signin');
     requestSessionSigningKeyRestoreIfEligible();
     refreshKeyList();
 }

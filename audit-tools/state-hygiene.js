@@ -26,6 +26,7 @@ const ACCEPTED = {
         authUnsubscribe: 'the listener must survive logout to see the next login',
         authRecoveryTimeout: 'cleared in the auth callback itself',
         authGeneration: 'monotonic counter, resetting it would break generation guards',
+        sessionExpiryCheck: 'the 4-hour session verdict for the CURRENT user; forceExpireSession sets it to "expired" and showLoginModalWithPrefill runs inside that path, so resetting it there would erase the very fact the login toast must report. proceedAfterLogin re-arms it to "pending" on the next sign-in',
         exchangeRateRiel: 'business config, not user data; mirrored in localStorage',
         serverTimeOffsetMs: 'clock offset, not user data',
         isInitializingFirebase: 'init mutex, unrelated to session',

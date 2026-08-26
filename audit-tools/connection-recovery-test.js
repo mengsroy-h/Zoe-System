@@ -31,6 +31,12 @@ function sliceConst(name) {
     return m ? m[0] : null;
 }
 
+// tree ដែលគ្មានអ្នកទប់វឌ្ឍនភាព ត្រូវទទួលឥរិយាបថចាស់ (attach ឡើងវិញរាល់ជុំ)
+// ដូច្នេះការអះអាងឥរិយាបថខាងក្រោមធ្លាក់ដោយហេតុផលរបស់វាផ្ទាល់ មិនមែនដោយ
+// «រកឈ្មោះ function មិនឃើញ» ដែលបិទបាំងអ្វីៗទាំងអស់ទេ។
+const RESYNC_GUARD = sliceFn('dbListenerResyncIsProgressing') ||
+    'function dbListenerResyncIsProgressing() { return false; }';
+
 // ── ០. ការអះអាងឥរិយាបថស្នូល — រត់បានលើ tree មុនកែផងដែរ ─────────────
 // listener ដែល Firebase បោះបង់ (permission_denied ជាដើម) **មិនត្រូវត្រឡប់មក
 // វិញដោយខ្លួនឯងទេ**។ បើ App នៅអះអាងថា «ភ្ជាប់ Server រួចរាល់» ក្រោយពេលនោះ
@@ -56,12 +62,19 @@ function sliceConst(name) {
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners'
-        ].map(sliceFn).filter(Boolean).join('\n\n');
+        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD;
         const src = 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
             'const dbListenerPendingPaths = new Set();\n' +
+        'let infoListenersFailed = false;\n' +
+        'let infoListenerRecoveryTimer = null;\n' +
+        'let infoListenerRecoveryAttempt = 0;\n' +
+        'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
+        'let serverTimeOffsetMs = 0;\n' +
+        'const retryPendingRoleCheck = () => {};\n' +
+            'let dbListenerPendingSeen = 0;\n' +
             'const LISTENER_RECOVERY_STEPS_MS = [2000];\n' +
             'let db = null, fb = null, auth = null;\n' +
             errFn + '\n\n' + onlineFn + '\n\n' + extras + '\n' +
@@ -84,24 +97,29 @@ const REQUIRED_FNS = [
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
     'detachDatabaseListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
-    'runScheduledCleanup'
+    'runScheduledCleanup',
+    'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
+    'handleInfoListenerError'
 ];
 
+// ⛔ **កុំបញ្ឈប់ខ្លួនត្រង់នេះ។** ការ `process.exit(1)` ដោយ «រកមុខងារមិនឃើញ»
+// **បិទបាំងការអះអាងឥរិយាបថទាំង ១០០ ខាងក្រោម** ➜ លើ tree មុនកែ អ្នកឃើញ
+// កំហុសតែ ១ បន្ទាត់ ជំនួសឲ្យការធ្លាក់ពិតដែលប្រាប់ថា *អ្វី* ខូច។ (ជុំ 2.19.3
+// ជួបវាដោយផ្ទាល់៖ ការបន្ថែម `dbListenerResyncIsProgressing` ចូល REQUIRED_FNS
+// ធ្វើឲ្យ tree មុនកែបង្ហាញ «0 ok, 1 FAIL» ជំនួស ១១ ការធ្លាក់ដែលមានន័យ។)
+// ជំនួសវិញ៖ រាយវាជាការធ្លាក់ រួច **stub** វា ដើម្បីឲ្យការអះអាងឥរិយាបថ
+// នៅតែរត់ ហើយធ្លាក់ដោយហេតុផលរបស់វាផ្ទាល់។ `checker-coverage.js` ចាក់សោនេះ។
 const missing = REQUIRED_FNS.filter((n) => !sliceFn(n));
-if (missing.length) {
-    console.log('  FAIL   មុខងារស្តារការតភ្ជាប់មិនមានក្នុង app.js: ' + missing.join(', '));
-    console.log('\nសរុប: 0 ok, 1 FAIL');
-    process.exit(1);
-}
+missing.forEach((n) => ok('មុខងារស្តារការតភ្ជាប់ `' + n + '` មានក្នុង app.js', false));
+const FN_STUBS = missing.map((n) => 'function ' + n + '() {}').join('\n');
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
-    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS'];
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
-if (missingConsts.length) {
-    console.log('  FAIL   ថេរមិនមាន: ' + missingConsts.join(', '));
-    console.log('\nសរុប: 0 ok, 1 FAIL');
-    process.exit(1);
-}
+missingConsts.forEach((n) => ok('ថេរ `' + n + '` មានក្នុង app.js', false));
+const CONST_STUBS = missingConsts
+    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : '1') + ';')
+    .join('\n');
 
 function buildContext() {
     const clock = { now: 1000, seq: 0, timers: [] };
@@ -193,8 +211,9 @@ function buildContext() {
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
 
-    const code = REQUIRED_CONSTS.map(sliceConst).join('\n') + '\n' +
-        REQUIRED_FNS.map(sliceFn).join('\n\n') + '\n' +
+    const code = 'let dbListenerPendingSeen = 0;\n' + CONST_STUBS + '\n'
+        + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
+        REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' +
         'let dbListenersFailed = false;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
         'let dbListenerRecoveryAttempt = 0;\n' +
@@ -214,13 +233,20 @@ function buildContext() {
         'let hasEverConnectedToDatabase = true;\n' +
         'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
+        'let infoListenersFailed = false;\n' +
+        'let infoListenerRecoveryTimer = null;\n' +
+        'let infoListenerRecoveryAttempt = 0;\n' +
+        'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
+        'let serverTimeOffsetMs = 0;\n' +
+        'const retryPendingRoleCheck = () => {};\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
         'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths) });\n' +
         'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
         'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
         'handleDbListenerError, initDatabaseListeners, noteDbListenerAlive, retryFailedDbListenersNow, ' +
-        'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog };\n';
+        'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
+        'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
     vm.runInContext(code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
@@ -515,6 +541,111 @@ function buildContext() {
         t4.probe().lastDbListenerAttemptAt === 0, t4.probe().lastDbListenerAttemptAt);
 }
 
+// ── ១០ខ១ខ. ជណ្តើរស្តារ **មិនត្រូវកាត់ផ្តាច់ការ resync ដែលកំពុងដំណើរការ** ──
+// 🔴 ថ្នាក់កំហុស៖ `attemptDbListenerRecovery()` ហៅ `initDatabaseListeners()`
+// ដែល **detach រួច attach ទាំង ៦ path ឡើងវិញ** — ការនោះបោះបង់ snapshot ដែល
+// កំពុងទាញចុះមក។ លើតំណយឺត (2G ឬប្រវត្តិធំ) ការទាញលើកដំបូងអាចយូរជាងជំហាន
+// ជណ្តើរ (2/5/10/20/30 វិ. ➜ ពិដាន ៣០ វិ.) ➜ រាល់ ៣០ វិនាទីវាចាប់ផ្តើមសាជាថ្មី
+// ➜ **`dbListenerPendingPaths` មិនដែលអស់** ➜ តារាងកកជារៀងរហូត ខណៈស្ថានភាព
+// សរសេរ «កំពុងភ្ជាប់ឡើងវិញ...»។ នេះជាថ្នាក់ «App ជាប់» ដដែល តែនៅលើផ្លូវ
+// ដែលពិដានល្បឿន 2.14.0 មិនបានគ្រប (វាទប់តែព្រឹត្តិការណ៍ **ខាងក្រៅ**
+// មិនមែនជណ្តើរខ្លួនឯងទេ)។
+//
+// ការកែ៖ `dbListenerResyncIsProgressing()` — ខណៈចំនួន path ដែលនៅសល់
+// **កំពុងតូចទៅៗ** ជណ្តើរត្រូវរង់ចាំ មិនត្រូវ attach ឡើងវិញ។ បើវាឈប់តូច
+// (ជាប់មែន) នោះជុំបន្ទាប់ attach ឡើងវិញដូចមុន ➜ ការស្តារនៅតែកើតឡើងពិត។
+{
+    const PATHS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    t.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const base = t.log.attached.length;
+
+    // តំណយឺត៖ path មួយឆ្លើយរៀងរាល់ ១២ វិនាទី — យឺតជាងជំហានជណ្តើរដើម
+    PATHS.forEach((p) => {
+        t.advance(12000);
+        const cbs = t.listenerCallbacks[p];
+        if (cbs && cbs.cb) cbs.cb({ val: () => null });
+    });
+
+    const rounds = (t.log.attached.length - base) / 6;
+    ok('resync យឺត ➜ ជណ្តើរមិនកាត់ផ្តាច់វា (យ៉ាងច្រើន ៣ ជុំ attach ឡើងវិញ)',
+        rounds <= 3, rounds);
+    ok('⛔ resync យឺតត្រូវ **ចប់បាន** — មិនមែនចាប់ផ្តើមសាជាថ្មីរហូត',
+        t.probe().dbListenersFailed === false && t.probe().pending.length === 0,
+        JSON.stringify(t.probe().pending) + ' failed=' + t.probe().dbListenersFailed);
+
+    // ការឈប់ដំណើរការពិត (គ្មាន path ណាឆ្លើយ) នៅតែត្រូវ attach ឡើងវិញដដែល —
+    // ការកែនេះជាការ **ពន្យារ** មិនមែនការ **លុប** ការស្តារទេ។
+    const t2 = buildContext();
+    t2.api.initDatabaseListeners();
+    t2.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    const b2 = t2.log.attached.length;
+    t2.advance(60000);
+    ok('គ្មានវឌ្ឍនភាពសោះ ➜ ជណ្តើរនៅ attach ឡើងវិញដដែល (៤ ជុំក្នុង ៦០ វិ.)',
+        (t2.log.attached.length - b2) / 6 === 4, (t2.log.attached.length - b2) / 6);
+
+    // វឌ្ឍនភាពមួយផ្នែករួចជាប់ ➜ ជុំបន្ទាប់ត្រូវ attach ឡើងវិញ (ស្តារដោយខ្លួនឯង)
+    const t3 = buildContext();
+    t3.api.initDatabaseListeners();
+    t3.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    t3.advance(2000);
+    const b3 = t3.log.attached.length;
+    t3.listenerCallbacks.exchangeRate.cb({ val: () => null });
+    t3.advance(5000);
+    const afterProgress = t3.log.attached.length;
+    t3.advance(60000);
+    ok('វឌ្ឍនភាពជាប់ ➜ ជុំបន្ទាប់ attach ឡើងវិញ (ការពន្យារមិនក្លាយជាការឈប់)',
+        afterProgress === b3 && t3.log.attached.length > b3,
+        'skip=' + (afterProgress === b3) + ' later=' + (t3.log.attached.length - b3) / 6);
+
+    t3.api.resetDbListenerHealthState();
+    ok('ចាកចេញ ➜ ការតាមដានវឌ្ឍនភាពត្រូវ reset',
+        /dbListenerPendingSeen = 0;/.test(sliceFn('resetDbListenerHealthState') || ''));
+}
+
+// ── ១០ខ១គ. listener `.info/*` ដែលត្រូវបោះបង់ ក៏ត្រូវមានផ្លូវស្តារដែរ ────
+// 🔴 ចន្លោះពិត៖ កំណែ 2.11.6 បានឲ្យ listener ទិន្នន័យទាំង ៦ នូវ
+// `handleDbListenerError()` + ជណ្តើរស្តារ — តែ `.info/connected` និង
+// `.info/serverTimeOffset` **ត្រូវបានទុកចោល**។ callback កំហុសរបស់
+// `.info/connected` គ្រាន់តែសរសេរ UI រួច **មិនភ្ជាប់ខ្លួនវាឡើងវិញទេ**
+// ចំណែក `.info/serverTimeOffset` **គ្មាន callback កំហុសសោះ**។
+//
+// ព្រោះ Firebase **ដក listener ចេញ** ពេល errCb បាញ់ នោះផលគឺ៖
+//   · `isDatabaseConnected` កក `false` **ជារៀងរហូត** ➜ ស្លាកកុហកថា
+//     «ក្រៅបណ្ដាញ» ខណៈ socket ដើរធម្មតា (ថ្នាក់ 2.19.0 ដដែល)
+//   · watchdog វដ្ត `goOffline()`+`goOnline()` រៀងរាល់ ៦០ វិនាទី **អស់ថ្ម**
+//   · `serverTimeOffsetMs` កក ➜ `getServerNow()` ឃ្លាត ➜ ការសម្រេច
+//     retention ២ម៉ោង/៨ថ្ងៃ/៣០ថ្ងៃ ដើរលើនាឡិកាខុស
+// ហើយគ្មានអ្វីស្តារវាបានទេ ក្រៅពី **ការ Refresh ដោយដៃ**។
+{
+    const t = buildContext();
+    const infoRefs = { __path: 'info/connected' };
+    ok('មាន attachInfoListeners (ផ្លូវភ្ជាប់ `.info/*` តែមួយ)',
+        !!sliceFn('attachInfoListeners'));
+    ok('`.info/connected` មាន callback កំហុសដែលកេះការស្តារ',
+        /handleInfoListenerError/.test(SRC)
+        && /fb\.onValue\(dbRefConnected[\s\S]{0,900}?handleInfoListenerError\)/.test(SRC));
+    ok('⛔ `.info/serverTimeOffset` ក៏ត្រូវមាន callback កំហុសដែរ (មុនកែវាគ្មានសោះ)',
+        /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(SRC));
+    ok('ការស្តារនោះមានជណ្តើរ backoff មិនមែនរង្វិលជុំតឹង',
+        /INFO_LISTENER_RECOVERY_STEPS_MS/.test(SRC)
+        && /function scheduleInfoListenerRecovery\(/.test(SRC));
+    ok('ការភ្ជាប់ឡើងវិញ detach ជាមុន (គ្មាន listener ស្ទួន)',
+        /function attachInfoListeners\(\)[\s\S]{0,400}?fb\.off\(dbRefConnected\)[\s\S]{0,200}?fb\.off\(dbRefServerTimeOffset\)/.test(SRC));
+    ok('snapshot ដែលមកដល់ ➜ ទង់ស្តារត្រូវរលត់',
+        /clearInfoListenerRecovery\(\);[\s\S]{0,120}?isDatabaseConnected = snap\.val\(\) === true;/.test(SRC));
+    ok('ចាកចេញ ➜ ការស្តារ `.info/*` ត្រូវ reset',
+        /function resetDbListenerHealthState\(\)[\s\S]{0,200}?clearInfoListenerRecovery\(\);/.test(SRC));
+
+    // ⛔ ថ្នាក់ដដែលរស់នៅ App ផ្សេង — មេរៀន 2.12.1
+    const KG3 = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+    ok('ZoeKeyGen ៖ `.info/*` ក៏មានផ្លូវស្តារដដែល',
+        /function attachInfoListeners\(/.test(KG3)
+        && /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(KG3));
+    void t; void infoRefs;
+}
+
 // ── ១០ខ២. ការផ្ទុក SDK ឡើងវិញ ក៏ត្រូវមានពិដានល្បឿនដែរ ─────────────────
 // ថ្នាក់កំហុស **ដដែលនឹង ១០ខ** តែនៅលើផ្លូវផ្សេង — ដូច្នេះការកែ 2.14.0 (ដែល
 // ប៉ះតែ listener) **មិនបានគ្របវាទេ**។ `retryFirebaseSdkNow()` ត្រូវហៅពី
@@ -545,12 +676,24 @@ function buildContext() {
         let clock = 0;
         const timers = [];
         const calls = [];
+        const reloads = [];
+        const store = {};
         const ctx = vm.createContext({
             console, Math,
             Date: { now: () => clock },
             setTimeout: (fn, ms) => { const t = { at: clock + ms, fn, dead: false }; timers.push(t); return t; },
             clearTimeout: (t) => { if (t) t.dead = true; },
             navigator: { onLine: true },
+            // ⛔ ការផ្ទុក module ដែលធ្លាក់ **មិនអាចព្យាយាមឡើងវិញក្នុងទំព័រដដែលបានទេ**
+            // (module map របស់ browser cache ការបរាជ័យរហូតដល់ចាកចេញពីទំព័រ) ➜
+            // ផ្លូវស្តារពិតគឺការផ្ទុកទំព័រឡើងវិញ។ stub នេះរាប់វា។
+            window: { location: { reload: () => reloads.push(clock) } },
+            document: { querySelectorAll: () => [] },
+            sessionStorage: {
+                getItem: (k) => (k in store ? store[k] : null),
+                setItem: (k, v) => { store[k] = String(v); },
+                removeItem: (k) => { delete store[k]; }
+            },
             initFirebase: () => { calls.push(clock); return Promise.resolve(false); },
             firebaseSdkUnavailable: true, isDatabaseInitialized: false, isInitializingFirebase: false
         });
@@ -559,12 +702,19 @@ function buildContext() {
             konst('FIREBASE_SDK_RETRY_MIN_GAP_MS') || '',
             'let firebaseSdkRetryTimer = null;', 'let firebaseSdkRetryAttempt = 0;',
             /lastFirebaseSdkAttemptAt/.test(appSrc) ? 'let lastFirebaseSdkAttemptAt = 0;' : '',
+            konst('FIREBASE_SDK_RELOAD_KEY') || '',
+            konst('FIREBASE_SDK_RELOAD_MAX') || '',
+            konst('FIREBASE_SDK_RELOAD_MIN_GAP_MS') || '',
+            /lastFirebaseSdkReloadAt/.test(appSrc) ? 'let lastFirebaseSdkReloadAt = 0;' : '',
+            pick('safeStoreSet') || '', pick('safeStoreRemove') || '',
+            pick('anyModalIsOpen') || '', pick('firebaseSdkReloadCount') || '',
+            pick('reloadForFirebaseSdk') || '', pick('recoverFirebaseSdk') || '',
             pick('clearFirebaseSdkRetry'), pick('resetFirebaseSdkRetryHealth') || '',
             pick('scheduleFirebaseSdkRetry'), pick('retryFirebaseSdkNow'),
-            'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry };'
+            'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry, resetFirebaseSdkRetryHealth };'
         ].filter(Boolean).join('\n\n')).runInContext(ctx);
         return {
-            calls, ctx,
+            calls, ctx, reloads,
             advance(ms) {
                 const end = clock + ms;
                 for (;;) {
@@ -577,29 +727,124 @@ function buildContext() {
         };
     }
 
+    // ចំនួន «ការព្យាយាមស្តារ» = initFirebase() + ការផ្ទុកទំព័រឡើងវិញ។ ចាប់ពី
+    // ជុំ deep audit នេះ ផ្លូវស្តារពិតគឺការផ្ទុកទំព័រឡើងវិញ (មើលផ្នែក ១០ខ៣)
+    // ដូច្នេះការរាប់តែ `initFirebase()` នឹងរាយការណ៍ខុស។
+    const tries = (b) => b.calls.length + b.reloads.length;
+
     // ព្រឹត្តិការណ៍ `online` ១០ ដងក្នុង ១ វិនាទី
     const b1 = buildSdkRetry(SRC);
     for (let i = 0; i < 10; i++) { b1.advance(100); b1.ctx.api.retryFirebaseSdkNow(); }
     ok('online បាញ់ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ការផ្ទុក SDK ឡើងវិញ (មុនកែ ១០)',
-        b1.calls.length <= 1, b1.calls.length);
+        tries(b1) <= 1, tries(b1));
 
     // ការព្យាយាមលើកដំបូងមិនត្រូវទប់ — «បណ្តាញត្រឡប់មក ➜ ព្យាយាមភ្លាម»
     const b2 = buildSdkRetry(SRC);
     b2.ctx.api.retryFirebaseSdkNow();
     ok('បណ្តាញត្រឡប់មក ➜ ព្យាយាមភ្លាម (ពិដានមិនទប់ការព្យាយាមលើកដំបូង)',
-        b2.calls.length === 1, b2.calls.length);
+        tries(b2) === 1, tries(b2));
 
     // ការប្តូរ App រាល់ ១០ វិនាទី **មិនត្រូវ** ត្រូវទប់ (១០ វិ. > ពិដាន ៣ វិ.)
     const b3 = buildSdkRetry(SRC);
     for (let i = 0; i < 6; i++) { b3.advance(10000); b3.ctx.api.retryFirebaseSdkNow(); }
     ok('ការប្តូរ App រាល់ ១០ វិ. នៅតែព្យាយាមបានគ្រប់ដង (ពិដានមិនតឹងពេក)',
-        b3.calls.length === 6, b3.calls.length);
+        tries(b3) === 6, tries(b3));
 
     // គ្មានបណ្តាញ ➜ មិនព្យាយាម
     const b4 = buildSdkRetry(SRC);
     b4.ctx.navigator.onLine = false;
     b4.ctx.api.retryFirebaseSdkNow();
-    ok('គ្មានបណ្តាញ ➜ មិនផ្ទុក SDK ឡើងវិញ', b4.calls.length === 0, b4.calls.length);
+    ok('គ្មានបណ្តាញ ➜ មិនផ្ទុក SDK ឡើងវិញ', tries(b4) === 0, tries(b4));
+
+    // ── ១០ខ៣. ការស្តារ SDK ត្រូវ **ស្តារបានពិត** ────────────────────────
+    // 🔴 ចន្លោះដែលរស់រានពីជុំ 2.18.0៖ ជណ្តើរ 5/10/20/30/60 វិ. ហៅ
+    // `initFirebase()` ➜ `waitForFirebaseSDK()` ➜ រង់ចាំព្រឹត្តិការណ៍
+    // `firebasesdkready` ដែល **មិនអាចមកដល់បានទៀតទេ**។ វាស់ក្នុង Chromium ពិត
+    // (មើល sw-cache-failure-test.js សម្រាប់ទម្រង់ដដែល)៖ ពេល static import
+    // របស់ module ធ្លាក់ម្តង នោះ **module map របស់ browser cache ការបរាជ័យនោះ
+    // ពេញអាយុទំព័រ** — ការ import URL ដដែលឡើងវិញ ធ្លាក់ភ្លាមដោយមិនចេញបណ្តាញ
+    // ហើយសូម្បីតែការបន្ថែម query ទៅ URL កម្រិតលើ ក៏មិនជួយដែរ ព្រោះ
+    // dependency ខាងក្នុងនៅជា URL ដដែល។ មានតែ **ការផ្ទុកទំព័រឡើងវិញ**
+    // (ឬ graph ថ្មីទាំងស្រុង) ទេដែលស្តារបាន។
+    //
+    // ដូច្នេះមុនកែ ជណ្តើរនោះ **គ្មានប្រសិទ្ធភាពទាំងស្រុង**៖ រាល់ជុំចំណាយ timer
+    // ១៥ វិ. រួចធ្លាក់ដដែល ខណៈអ្នកប្រើឃើញ «ក្រៅបណ្ដាញ» លើបណ្តាញដែលដើរធម្មតា។
+    {
+        const r1 = buildSdkRetry(SRC);
+        r1.ctx.api.retryFirebaseSdkNow();
+        ok('SDK ផ្ទុកមិនចូល ➜ ការស្តារជាការផ្ទុកទំព័រឡើងវិញ មិនមែន initFirebase() ដែលមិនអាចជោគជ័យ',
+            r1.reloads.length === 1 && r1.calls.length === 0,
+            'reload=' + r1.reloads.length + ' initFirebase=' + r1.calls.length);
+
+        // ⛔ ការផ្ទុកឡើងវិញត្រូវមានពិដាន — បើអត់ បណ្តាញដែលទប់ gstatic ជាប់
+        // នឹងធ្វើឲ្យ App ផ្ទុកឡើងវិញជារង្វិលជុំមិនចេះចប់។
+        const r2 = buildSdkRetry(SRC);
+        for (let i = 0; i < 12; i++) { r2.advance(30000); r2.ctx.api.retryFirebaseSdkNow(); }
+        ok('⛔ ការផ្ទុកទំព័រឡើងវិញមានពិដានក្នុងមួយវគ្គ (គ្មានរង្វិលជុំផ្ទុកមិនចេះចប់)',
+            r2.reloads.length <= 3, r2.reloads.length);
+        ok('ក្រោយអស់ពិដាន ការស្តារត្រឡប់ទៅជណ្តើរចាស់ជំនួស ការឈប់ស្ងាត់',
+            r2.calls.length > 0, r2.calls.length);
+
+        // ⛔ កុំបំផ្លាញអ្វីដែលអ្នកប្រើកំពុងវាយ (PIN · Config)
+        const r3 = buildSdkRetry(SRC);
+        r3.ctx.document.querySelectorAll = () => [{ classList: { contains: () => true }, style: {} }];
+        r3.ctx.api.retryFirebaseSdkNow();
+        ok('⛔ មានប្រអប់បើកនៅ ➜ មិនផ្ទុកទំព័រឡើងវិញ (កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ)',
+            r3.reloads.length === 0, r3.reloads.length);
+
+        // SDK មកដល់យឺត (>15 វិ.) ➜ `window.firebaseSDK` មានហើយ ➜ initFirebase()
+        // ធ្វើការបានពិត ➜ **មិនត្រូវផ្ទុកទំព័រឡើងវិញ**។
+        const r4 = buildSdkRetry(SRC);
+        r4.ctx.window.firebaseSDK = { ref: () => {} };
+        r4.ctx.api.retryFirebaseSdkNow();
+        ok('SDK មកដល់យឺត ➜ ប្រើវាភ្លាម មិនផ្ទុកទំព័រឡើងវិញ',
+            r4.reloads.length === 0 && r4.calls.length === 1,
+            'reload=' + r4.reloads.length + ' initFirebase=' + r4.calls.length);
+
+        // ⛔ timer ជណ្តើរដែលនៅសល់ មិនត្រូវរុះរើ SDK ដែលកំពុងដំណើរការឡើងវិញ។
+        // ការប្រណាំង៖ SDK មកដល់នៅវិនាទីទី ១៩ ➜ `armLateFirebaseSdkListener()`
+        // ហៅ `initFirebase()` ➜ ជោគជ័យ។ ប៉ុន្តែ timer ជណ្តើរនៅតែបាញ់នៅ
+        // វិនាទីទី ២០ ➜ មុនកែវាហៅ `initFirebase()` ម្តងទៀត ➜ `deleteApp()` +
+        // ភ្ជាប់ listener ឡើងវិញ **ខណៈ App កំពុងដំណើរការធម្មតា**។
+        const r6 = buildSdkRetry(SRC);
+        r6.ctx.api.scheduleFirebaseSdkRetry();
+        r6.ctx.firebaseSdkUnavailable = false;
+        r6.ctx.window.firebaseSDK = { ref: () => {} };
+        r6.advance(60000);
+        ok('⛔ SDK ដំណើរការវិញ ➜ timer ជណ្តើរដែលនៅសល់ មិនរុះរើវាឡើងវិញ',
+            r6.calls.length === 0 && r6.reloads.length === 0,
+            'initFirebase=' + r6.calls.length + ' reload=' + r6.reloads.length);
+
+        // ការភ្ជាប់ជោគជ័យត្រូវសងពិដានមកវិញ
+        const r5 = buildSdkRetry(SRC);
+        r5.ctx.api.retryFirebaseSdkNow();
+        r5.ctx.api.resetFirebaseSdkRetryHealth();
+        r5.advance(60000);
+        r5.ctx.api.retryFirebaseSdkNow();
+        ok('ភ្ជាប់ជោគជ័យ ➜ ពិដានផ្ទុកឡើងវិញត្រូវសងមកវិញសម្រាប់ការដាច់លើកក្រោយ',
+            r5.reloads.length === 2, r5.reloads.length);
+    }
+
+    // ── ១០ខ៤. ព្រឹត្តិការណ៍ដែលដាស់ការស្តារ SDK ត្រូវដូចគ្នាទាំង ២ App ────
+    // 🔴 ចន្លោះពិត៖ ZoeW ហៅ `retryFirebaseSdkNow()` ពី **ទាំង** `online`
+    // និង `visibilitychange` ចំណែក ZoeKeyGen ហៅតែពី `online` ប៉ុណ្ណោះ។
+    // `shared-fns.js` មើលមិនឃើញ ព្រោះ handler ទាំងនោះមិនមែនជា
+    // FunctionDeclaration ដែលមានឈ្មោះដូចគ្នាទេ — ZoeW ដាក់វាក្នុង
+    // `setupConnectionRecovery()` (ដែលនៅក្នុង EXPECTED_DIVERGENT) ចំណែក
+    // ZoeKeyGen ដាក់វាត្រង់ៗក្នុង `DOMContentLoaded`។ ដូច្នេះត្រូវអះអាង
+    // **ព្រឹត្តិការណ៍** ដោយផ្ទាល់ មិនមែនអះអាង function។
+    {
+        const KG2 = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+        [['ZoeW', SRC], ['ZoeKeyGen', KG2]].forEach(([name, src]) => {
+            ok(name + ' ៖ `online` ដាស់ការស្តារ SDK',
+                /addEventListener\('online'[\s\S]{0,400}?retryFirebaseSdkNow\(\)/.test(src));
+            ok(name + ' ៖ ត្រឡប់មក foreground ក៏ដាស់ការស្តារ SDK ដែរ',
+                /visibilitychange[\s\S]{0,400}?retryFirebaseSdkNow\(\)/.test(src));
+            ok(name + ' ៖ SDK ដែលមកដល់យឺត ត្រូវមានអ្នកទទួល (មិនរង់ចាំជណ្តើរ ១៥ វិ.)',
+                /function armLateFirebaseSdkListener\(/.test(src) &&
+                /firebaseSdkUnavailable = true;\s*\n\s*armLateFirebaseSdkListener\(\);/.test(src));
+        });
+    }
 
     ok('ពិដាន SDK តូចជាងជំហានដំបូងនៃជណ្តើរ (បើអត់ ជណ្តើរត្រូវលេបដោយពិដាន)',
         /FIREBASE_SDK_RETRY_MIN_GAP_MS/.test(SRC) &&
@@ -615,11 +860,13 @@ function buildContext() {
     const kgBurst = buildSdkRetry(KG);
     for (let i = 0; i < 10; i++) { kgBurst.advance(100); kgBurst.ctx.api.retryFirebaseSdkNow(); }
     ok('ZoeKeyGen ៖ online បាញ់ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ការផ្ទុក SDK ឡើងវិញ',
-        kgBurst.calls.length <= 1, kgBurst.calls.length);
+        tries(kgBurst) <= 1, tries(kgBurst));
     const kgFirst = buildSdkRetry(KG);
     kgFirst.ctx.api.retryFirebaseSdkNow();
     ok('ZoeKeyGen ៖ ការព្យាយាមលើកដំបូងមិនត្រូវទប់',
-        kgFirst.calls.length === 1, kgFirst.calls.length);
+        tries(kgFirst) === 1, tries(kgFirst));
+    ok('ZoeKeyGen ៖ ការស្តារ SDK ក៏ជាការផ្ទុកទំព័រឡើងវិញដែរ (ថ្នាក់ដដែល App ផ្សេង)',
+        kgFirst.reloads.length === 1, kgFirst.reloads.length);
     ok('ZoeKeyGen ៖ ការ reset ជណ្តើរ មិនត្រូវ reset ពិដានល្បឿន',
         !/function clearFirebaseSdkRetry\(\)[\s\S]{0,220}lastFirebaseSdkAttemptAt = 0/.test(KG));
 }

@@ -9,7 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const root = path.resolve(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const root = process.env.CFGPASTE_APP_DIR ? path.resolve(process.env.CFGPASTE_APP_DIR) : path.resolve(__dirname, '..');
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 const WANTED_FNS = [
     'stripJsCommentsOutsideStrings',

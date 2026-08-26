@@ -74,6 +74,19 @@
             .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@');
     }
 
+    const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
+        + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
+        + 'credential|authorization|bearer|jwt|setup)';
+    const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
+
+    function isSecretKeyName(name) {
+        if (!name) return false;
+        const split = String(name)
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[.-]/g, '_');
+        return SECRET_KEY_RE.test('_' + split + '_');
+    }
+
     function redactDeep(value, depth, seen, budget) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
@@ -91,7 +104,13 @@
         const keys = Object.keys(value);
         for (let i = 0; i < keys.length; i++) {
             if (budget.n >= REDACT_MAX_NODES) break;
-            try { value[keys[i]] = redactDeep(value[keys[i]], depth + 1, seen, budget); } catch (e) {}
+            try {
+                if (isSecretKeyName(keys[i]) && typeof value[keys[i]] === 'string') {
+                    value[keys[i]] = '[redacted]';
+                    continue;
+                }
+                value[keys[i]] = redactDeep(value[keys[i]], depth + 1, seen, budget);
+            } catch (e) {}
         }
         return value;
     }
@@ -233,5 +252,5 @@
         }
     }
 
-    global.ZoeErrors = { init: init, capture: capture, setDsn: setDsn, getDsn: getDsn, redactUrl: redactUrl };
+    global.ZoeErrors = { init: init, capture: capture, setDsn: setDsn, getDsn: getDsn, redactUrl: redactUrl, redactEvent: redactEvent };
 })(window);

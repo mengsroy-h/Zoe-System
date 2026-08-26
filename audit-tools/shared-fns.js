@@ -8,7 +8,9 @@ try {
 const fs = require('fs');
 const path = require('path');
 
-const root = path.resolve(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const root = process.env.SHAREDFNS_APP_DIR ? path.resolve(process.env.SHAREDFNS_APP_DIR) : path.resolve(__dirname, '..');
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 const EXPECTED_DIVERGENT = new Set([
@@ -40,7 +42,15 @@ const EXPECTED_DIVERGENT = new Set([
     //                            `dbListenersFailed`) ដូច្នេះវាបែងចែក «កំពុងទាញទិន្នន័យ»
     //                            ចេញពី «ភ្ជាប់រួច»; ZoeKeyGen អានតាម `fb.get` មួយដងៗ
     //                            ដូច្នេះវាមានតែស្ថានភាព socket ប៉ុណ្ណោះ។
-    'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery', 'liveToastState'
+    //   attachInfoListeners     — callback របស់ `.info/connected` ខុសគ្នាដោយចេតនា៖
+    //                              ZoeW ស្តារ listener ទិន្នន័យ (`retryFailedDbListenersNow`)
+    //                              ចំណែក ZoeKeyGen ស្តារការពិនិត្យតួនាទី admin
+    //                              (`retryPendingRoleCheck`) ហើយដោះ `serverTimeSyncWaiters`។
+    //                              ⛔ helper ៣ ផ្សេងទៀត (`scheduleInfoListenerRecovery` ·
+    //                              `clearInfoListenerRecovery` · `handleInfoListenerError`)
+    //                              ត្រូវនៅ byte-identical ទាំង ២ App។
+    'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery', 'liveToastState',
+    'attachInfoListeners'
 ]);
 
 function walk(node, cb) {

@@ -209,11 +209,61 @@ for (const app of APPS) {
     }
 }
 
-ok('ស្កេន ' + scanned + ' ឯកសារ · រកឃើញ template HTML ' + sinkCount + ' កន្លែង');
+// ⚠️ **ចន្លោះដែលបិទក្នុងជុំ deep audit៖** ខាងលើស្កេនតែ `TemplateLiteral`។
+// កូដនេះក៏សាង HTML ដោយ **ការតភ្ជាប់ខ្សែអក្សរ** ដែរ (ឧ. `filterCustomerDataTable()`
+// សាងជួរដេកតារាងអតិថិជនដោយ `'<tr><td>' + ... + '</td>'`) ➜ ការដក
+// `sanitizeInput()` ចេញពីទីនោះ **រអិលកាត់ស្ងាត់ៗ** ព្រោះគ្មាន template literal
+// ណាពាក់ព័ន្ធសោះ។ នេះជាមេរៀនដដែលនឹង `network-timeout-test.js` (2.12.1) និង
+// `fluid-type-focus-test.js` (2.16.0)៖ **checker ត្រូវសួរថាវាស្កេន *ទម្រង់ណា*
+// ខ្លះ មិនមែនត្រឹមឯកសារណាខ្លះទេ។**
+function flattenPlus(node, out) {
+    if (node.type === 'BinaryExpression' && node.operator === '+') {
+        // សម្គាល់ថ្នាំងកណ្តាលទុក ដើម្បីកុំឲ្យខ្សែសង្វាក់តែមួយត្រូវរាយច្រើនដង
+        node.left.__seenAsChild = true;
+        node.right.__seenAsChild = true;
+        flattenPlus(node.left, out);
+        flattenPlus(node.right, out);
+        return out;
+    }
+    out.push(node);
+    return out;
+}
+
+let concatCount = 0;
+for (const app of APPS) {
+    const allow = BUILDER_ALLOW[app] || {};
+    const file = path.join(ROOT, app, 'app.js');
+    if (!fs.existsSync(file)) continue;
+    const code = fs.readFileSync(file, 'utf8');
+    const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
+    walk(ast, (n) => {
+        if (n.type !== 'BinaryExpression' || n.operator !== '+') return;
+        // យកតែខ្សែសង្វាក់ `+` ខាងក្រៅបំផុត ដើម្បីកុំរាយកន្លែងតែមួយច្រើនដង
+        if (n.__seenAsChild) return;
+        const parts = flattenPlus(n, []);
+        const isHtml = parts.some((c) => c.type === 'Literal' && typeof c.value === 'string' && HTML_TAG.test(c.value));
+        if (!isHtml) return;
+        concatCount++;
+        const unsafe = [];
+        parts.forEach((c) => {
+            if (c.type === 'Literal') return;
+            if (!isSafeExpr(c, allow)) unsafe.push(code.slice(c.start, c.end).replace(/\s+/g, ' ').slice(0, 72));
+        });
+        if (unsafe.length) {
+            offenders.push(app + '/app.js:' + n.loc.start.line + '  (concat)  '
+                + [...new Set(unsafe)].slice(0, 4).join(' | '));
+        }
+    });
+}
+
+ok('ស្កេន ' + scanned + ' ឯកសារ · រកឃើញ template HTML ' + sinkCount
+    + ' កន្លែង · HTML តាមការតភ្ជាប់ខ្សែអក្សរ ' + concatCount + ' កន្លែង');
+ok('ទម្រង់ HTML ទាំង ២ ត្រូវបានស្កេន (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)',
+    concatCount > 0);
 if (offenders.length === 0) {
     ok('គ្រប់ `${...}` ក្នុង sink ឆ្លងកាត់ sanitizeInput()/escapeHtml() ឬជាលេខ');
 } else {
-    bad('មាន ' + offenders.length + ' template HTML ដែលបញ្ចូល interpolation មិន escape',
+    bad('មាន ' + offenders.length + ' កន្លែងសាង HTML ដែលបញ្ចូលតម្លៃមិន escape',
         offenders.slice(0, 10).join('\n         '));
 }
 

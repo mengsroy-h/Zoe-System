@@ -166,7 +166,21 @@ APPS.forEach((app) => {
     });
 });
 
+// ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»
+// ជាការអះអាង **អវត្តមាន** — វាពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ ដូច្នេះ
+// checker នេះត្រូវអះអាងជាមុនសិនថា **វាពិតជាបានឃើញកូដ**។ បើមិនដូច្នេះ ការ
+// ប្តូរឈ្មោះឯកសារ · ការផ្លាស់កូដទៅឯកសារថ្មី · ឬ override ថត ដែលខុស នឹង
+// ធ្វើឲ្យវាបៃតង **ខណៈវាមិនបានពិនិត្យអ្វីសោះ**។
+// មើល `checker-coverage.js` — វាភ្ជាប់ថតទទេចូល checker នេះ រួចអះអាងថាវាធ្លាក់។
+const MIN_WRITE_SITES = 2;
+if (checked < MIN_WRITE_SITES) {
+    console.log('  FAIL  ជាន់អប្បបរមា៖ រំពឹង >= ' + MIN_WRITE_SITES + ' កន្លែងសរសេរ តែឃើញ ' + checked
+        + ' — checker នេះមិនបានឃើញកូដទេ (ឯកសារបាត់ ឬឈ្មោះ function ប្តូរ)');
+    process.exit(1);
+}
+
 if (problems === 0) {
+    console.log('  ok    ជាន់អប្បបរមា៖ ឃើញកន្លែងសរសេរ ' + checked + ' (>= ' + MIN_WRITE_SITES + ')');
     console.log('  ok    គ្មានការសរសេរ item ទាំងមូលពីច្បាប់ចម្លងក្នុងសតិ (ពិនិត្យ ' + checked + ' កន្លែងសរសេរ)');
     [...new Set(serverBacked)].forEach((k) => console.log('  ok    អានច្បាប់ចម្លង server មុនសរសេរ: ' + k));
     Object.keys(ACCEPTED).forEach((k) => console.log('  ok    ទទួលយក: ' + k + ' — ' + ACCEPTED[k]));

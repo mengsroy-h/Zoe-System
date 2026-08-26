@@ -253,6 +253,12 @@ function resetSessionState() {
     sheetRows = [];
     sheetHeaders = [];
     mappingSignature = '';
+    settleConfirm(false);
+    isBusy = false;
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+        toastTimer = null;
+    }
     clearSensitiveFields();
     setLinkState('idle');
 }

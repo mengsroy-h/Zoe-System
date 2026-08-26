@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const APP_ROOT = process.env.LOOKUPSEC_APP_DIR ? path.resolve(process.env.LOOKUPSEC_APP_DIR) : path.resolve(__dirname, '..');
 const vm = require('vm');
 
 let pass = 0;
@@ -27,7 +30,7 @@ function sliceFn(source, name) {
 }
 
 function createRuntime(existing, key, encrypt, failStorage) {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'ZoeW', 'app.js'), 'utf8');
+    const source = fs.readFileSync(path.join(APP_ROOT, 'ZoeW', 'app.js'), 'utf8');
     const start = source.indexOf('    function getLookupApiConfig() {');
     const end = source.indexOf('    async function testLookupApiConfig(', start);
     if (start === -1 || end === -1) throw new Error('lookup config functions not found');

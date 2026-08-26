@@ -1,7 +1,9 @@
 const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
-const root = path.resolve(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const root = process.env.WIRING_APP_DIR ? path.resolve(process.env.WIRING_APP_DIR) : path.resolve(__dirname, '..');
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 let issues = 0;

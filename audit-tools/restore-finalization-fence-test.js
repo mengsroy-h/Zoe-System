@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const root = path.resolve(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const root = process.env.RESTOREFENCE_APP_DIR ? path.resolve(process.env.RESTOREFENCE_APP_DIR) : path.resolve(__dirname, '..');
 const rules = JSON.parse(fs.readFileSync(path.join(root, 'firebase-database.rules.json'), 'utf8'));
 let pass = 0;
 let fail = 0;

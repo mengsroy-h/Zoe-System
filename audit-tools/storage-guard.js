@@ -15,7 +15,11 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.env.STORAGE_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen'];
+// ⚠️ ZoeImport ត្រូវរួមបញ្ចូលដែរ — វាកាន់ **ពាក្យសម្ងាត់នាំចូល**
+// (`apiPassword`) និង **កូនសោ AES** (`configKey`) ក្នុង state កម្រិត module
+// ព្រមទាំងវាល `apiPasswordInput` ក្នុង DOM។ ការទុកវាក្រៅបញ្ជីនេះជាថ្នាក់
+// «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
+const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
 const STORES = new Set(['localStorage', 'sessionStorage']);
 const WRITES = new Set(['setItem', 'removeItem', 'clear']);
 
@@ -71,6 +75,20 @@ for (const app of APPS) {
 }
 
 console.log(`\nការសរសេរក្នុង try/catch: ${guarded}   តាម safeStoreSet/safeStoreRemove: ${helperCalls}   គ្មានការការពារ: ${unguarded}`);
+
+// ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»
+// ជាការអះអាង **អវត្តមាន** — វាពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ ដូច្នេះ
+// checker នេះត្រូវអះអាងជាមុនសិនថា **វាពិតជាបានឃើញកូដ**។ បើមិនដូច្នេះ ការ
+// ប្តូរឈ្មោះឯកសារ · ការផ្លាស់កូដទៅឯកសារថ្មី · ឬ override ថត ដែលខុស នឹង
+// ធ្វើឲ្យវាបៃតង **ខណៈវាមិនបានពិនិត្យអ្វីសោះ**។
+// មើល `checker-coverage.js` — វាភ្ជាប់ថតទទេចូល checker នេះ រួចអះអាងថាវាធ្លាក់។
+const MIN_STORAGE_WRITES = 20;
+if (guarded + helperCalls + unguarded < MIN_STORAGE_WRITES) {
+    console.log('\n❌ ជាន់អប្បបរមា៖ រំពឹងការសរសេរទៅ storage >= ' + MIN_STORAGE_WRITES
+        + ' តែឃើញ ' + (guarded + helperCalls + unguarded)
+        + ' — checker នេះមិនបានឃើញកូដទេ');
+    process.exit(1);
+}
 if (unguarded) {
     console.log('\nដំណោះស្រាយ៖ ប្រើ safeStoreSet(localStorage, key, value) / safeStoreRemove(localStorage, key)');
     console.log('ឬរុំក្នុង try { ... } catch (e) {} បើការបរាជ័យអាចមិនអើពើបាន។');

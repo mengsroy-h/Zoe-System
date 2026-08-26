@@ -31,6 +31,7 @@ const LAYOUT = new Set([
     'grid-template-rows', 'order', 'position', 'display', 'float', 'vertical-align'
 ]);
 
+let scannedFiles = 0, scannedRules = 0;
 let failed = 0;
 function fail(app, msg) { console.log(`   ⚠️  ${msg}`); failed++; }
 
@@ -115,6 +116,8 @@ for (const app of APPS) {
     const css = stripComments(fs.readFileSync(file, 'utf8'));
     const frames = collectKeyframes(css);
     const rules = collectRules(css);
+    scannedFiles++;
+    scannedRules += rules.length;
 
     let animCount = 0, checked = 0;
     console.log(`--- ${app} --- @keyframes: ${frames.size}   ច្បាប់៖ ${rules.length}`);
@@ -148,6 +151,17 @@ for (const app of APPS) {
     }
     console.log(`    animation ដែលប្រើ៖ ${animCount}   ផ្គូផ្គងនឹង @keyframes៖ ${checked}`);
 }
+
+// ⛔ **ជាន់អប្បបរមា (positive floor)។** ការអះអាងបែប «គ្មានលំនាំអាក្រក់ទេ»
+// ជាការអះអាង **អវត្តមាន** — វាពិតដោយស្វ័យប្រវត្តិលើ input ទទេ។ checker នេះ
+// ត្រូវអះអាងជាមុនសិនថា **វាពិតជាបានឃើញកូដ**។ មើល `checker-coverage.js`។
+const MIN_FILES = 2, MIN_RULES = 200;
+if (scannedFiles < MIN_FILES || scannedRules < MIN_RULES) {
+    console.log(`\n❌ ជាន់អប្បបរមា៖ រំពឹងឯកសារ >= ${MIN_FILES} និងច្បាប់ CSS >= ${MIN_RULES}`
+        + ` តែឃើញ ${scannedFiles} / ${scannedRules} — checker នេះមិនបានឃើញ CSS ទេ`);
+    process.exit(1);
+}
+console.log(`\nជាន់អប្បបរមា៖ ស្កេន stylesheet ${scannedFiles} · ច្បាប់ ${scannedRules}`);
 
 if (failed) {
     console.log(`\n❌ ${failed} animation/transition ដែលបង្កើតការងាររាល់ស៊ុមដោយមិនចាំបាច់`);

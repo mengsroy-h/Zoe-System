@@ -1,7 +1,9 @@
 const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
-const root = path.resolve(__dirname, '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
+// `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
+const root = process.env.DOMHYG_APP_DIR ? path.resolve(process.env.DOMHYG_APP_DIR) : path.resolve(__dirname, '..');
 
 // ids that hold no customer data, or that a documented path already clears.
 // Add here only with a reason — an unexplained entry hides the next real leak.
@@ -54,7 +56,11 @@ function walk(n, cb) {
 }
 
 let totalGaps = 0;
-for (const app of ['ZoeW', 'ZoeKeyGen']) {
+// ⚠️ ZoeImport ត្រូវរួមបញ្ចូលដែរ — វាកាន់ **ពាក្យសម្ងាត់នាំចូល**
+// (`apiPassword`) និង **កូនសោ AES** (`configKey`) ក្នុង state កម្រិត module
+// ព្រមទាំងវាល `apiPasswordInput` ក្នុង DOM។ ការទុកវាក្រៅបញ្ជីនេះជាថ្នាក់
+// «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
+for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
     const src = fs.readFileSync(root + '/' + app + '/app.js', 'utf8');
     const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'script' });
 

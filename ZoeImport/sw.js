@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeimport-v8';
+const CACHE_VERSION = 'zoeimport-v9';
 
 const CORE_SHELL = [
     './',
@@ -77,6 +77,10 @@ function revalidateShell(cache, request, cacheKey) {
     }, release);
 }
 
+function networkOnly(request) {
+    return fetch(request).then((response) => response || Response.error(), () => Response.error());
+}
+
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     if (request.method !== 'GET') return;
@@ -107,7 +111,7 @@ self.addEventListener('fetch', (event) => {
                     return networkFetch.then((response) => {
                         if (response) return response;
                         if (request.mode !== 'navigate') return Response.error();
-                        return cache.match('./index.html').then((fallback) => fallback || Response.error());
+                        return cache.match('./index.html').then((fallback) => fallback || Response.error(), () => Response.error());
                     });
                 }
 
@@ -115,7 +119,7 @@ self.addEventListener('fetch', (event) => {
                     networkFetch.then((response) => response || cached),
                     new Promise((resolve) => setTimeout(() => resolve(cached), 3000))
                 ]);
-            })
-        )
+            }, () => networkOnly(request))
+        ).catch(() => networkOnly(request))
     );
 });

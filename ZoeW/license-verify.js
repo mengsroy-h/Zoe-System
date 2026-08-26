@@ -94,24 +94,25 @@
     }
 
     async function verifySignature(payloadB64, sigBytes) {
-        try {
-            const pubKeys = await getPublicKeys();
-            const data = new TextEncoder().encode(payloadB64);
-            for (const pubKey of pubKeys) {
-                if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data)) {
-                    return true;
-                }
+        const pubKeys = await getPublicKeys();
+        const data = new TextEncoder().encode(payloadB64);
+        for (const pubKey of pubKeys) {
+            if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, sigBytes, data)) {
+                return true;
             }
-            return false;
-        } catch (e) {
-            return false;
         }
+        return false;
     }
 
     async function verifySignatureAndScope(keyString, appCode) {
         const parsed = parseKeyString(keyString);
         if (!parsed) return { valid: false, reason: 'format' };
-        const sigOk = await verifySignature(parsed.payloadB64, parsed.sigBytes);
+        let sigOk;
+        try {
+            sigOk = await verifySignature(parsed.payloadB64, parsed.sigBytes);
+        } catch (e) {
+            return { valid: false, reason: 'verify-unavailable', unverified: true, payload: parsed.payload };
+        }
         if (!sigOk) return { valid: false, reason: 'signature' };
         if (parsed.payload.a !== appCode && parsed.payload.a !== 'ALL') {
             return { valid: false, reason: 'app-mismatch', payload: parsed.payload };
@@ -281,7 +282,7 @@
         if (!record) return { state: 'required' };
 
         const sigCheck = await verifySignatureAndScope(record.keyString, appCode);
-        if (!sigCheck.valid) {
+        if (!sigCheck.valid && !sigCheck.unverified) {
             clearLocalRecord(appCode);
             return { state: 'required', reason: sigCheck.reason };
         }

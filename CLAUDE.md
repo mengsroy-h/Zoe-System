@@ -264,6 +264,134 @@ Test៖ **`network-timeout-test.js`** (គ្រប `ZoeW/app.js`, `license-veri
 `AbortController` ហើយអាន `res.json()` ក្រៅបង្អួចការពារ ដោយរស់រានពីព្រោះ
 តេស្តមិនដែលស្កេនឯកសារនោះសោះ)។
 
+## `license-verify.js` ជាផ្លូវបណ្តាញ **ទី ៣** — READ BEFORE TOUCHING IT
+
+`license-verify.js` ជា REST-only (គ្មាន Firebase SDK ដោយការរចនា) ហើយវាមាន
+**helper បណ្តាញផ្ទាល់ខ្លួន** ដាច់ពី `app.js`។ ដូច្នេះរាល់ច្បាប់បណ្តាញរបស់
+គម្រោងនេះត្រូវអនុវត្តលើវា **ដោយឡែក** — ហើយវាធ្លាប់រអិលកាត់ ២ ដងហើយ៖
+
+| កំណែ | អ្វីដែលរអិលកាត់ |
+|---|---|
+| 2.11.6 | `clearTimeout` ក្នុង `finally` របស់ `fetch` ➜ ការអានតួគ្មានការការពារ |
+| 2.17.4 | គ្មានពិដានចំនួនស្របគ្នា និងគ្មាន guard ក្រៅបណ្តាញសោះ |
+
+**មូលហេតុដដែល៖ `network-pressure-test.js` ជំនួស `license-verify.js` ដោយ
+stub ទាំងស្រុង (`LICENSE_STUB`)** ➜ ផ្លូវបណ្តាញពិតរបស់វា **មិនដែលត្រូវវាស់សោះ**។
+នេះជាមេរៀនដដែលនឹង `network-timeout-test.js` (2.12.1) និង
+`fluid-type-focus-test.js` (2.16.0)៖ **ពេលសរសេរ checker ត្រូវសួរថា
+«វារត់/ស្កេនឯកសារ*ណា*ខ្លះ»។**
+
+ច្បាប់ដែលមិនអាចរំលងបាន៖
+
+- **រាល់សំណើឆ្លងកាត់ `sharedRequest(key, priority, run)`** — dedup តាមកូនសោ
+  (សំណើដដែលចែករំលែក promise តែមួយ) បូកពិដាន `NET_MAX_IN_FLIGHT` (២)។
+  ការដោះត្រូវធ្វើតាម `started.then(release, release)` — **ទាំង ២ ផ្លូវ**។
+- **`checkOnline()` និង `syncServerTime()` ត្រូវមាន `networkLooksDown()`។**
+- ⛔ **ការរំលងត្រូវត្រឡប់ `{ ok: null }` — មិនមែន `{ ok: false }` ទេ។**
+  `getStatus()` លុប record មូលដ្ឋាន **តែពេល `ok === false`**; `null` មានន័យថា
+  «ផ្ទៀងផ្ទាត់មិនបាន» ➜ ធ្លាក់ទៅការអនុគ្រោះ ៣ ថ្ងៃ។ ការប្តូរវាទៅ `false`
+  នឹងធ្វើឲ្យ **License របស់អតិថិជនត្រូវលុបចោលពេលបណ្តាញអន់** — កុំធ្វើ។
+- **`activate()` (អ្នកប្រើចុចផ្ទាល់) ត្រូវឆ្លងកាត់ `{ priority: true }`**
+  ដែលរំលងទាំងពិដាន និង guard ក្រៅបណ្តាញ។
+- `license-verify.js` **byte-identical ទាំង ២ App** ដដែល — `cp` + `md5sum`។
+- ⚠️ `license-grace-test.js` ស្រង់ function តាមឈ្មោះចូល `vm`។ **បន្ថែម helper
+  ថ្មី ➜ ត្រូវបន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់នោះ** បើមិនដូច្នេះវាធ្លាក់ដោយ
+  `ReferenceError` ដែលមើលទៅដូចកំហុសផលិតផល។
+
+លេខដែលវាស់បាន (Chromium ពិត; server ទទួលការតភ្ជាប់ តែមិនឆ្លើយ)៖
+
+| រង្វាស់ | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| សំណើ **ចាំបាច់** លើ host ដដែល | ៩ ៦០៤ ms | **៥ ms** |
+| សំណើ license ដល់ server (ពី ១០ ការហៅ) | ៧ | **១** |
+| ការហៅខណៈ `navigator.onLine === false` | ១០ ០០១ ms | **០ ms** |
+
+Tests៖ **`license-network-pressure-test.js`** និង **`license-grace-test.js`**។
+
+## សម្របតាមគុណភាពតំណ — `linkIsFrugal()` — កំណែ 2.17.4
+
+App សម្របតាម **ឧបករណ៍** តាំងពីមុន (`measureDisplayHz()` · `perf-lite` ·
+`LIVE_SCAN_WIDTH_STEPS`) ប៉ុន្តែវា **មិនសម្របតាមតំណបណ្តាញទេ**។ ឥឡូវ
+`linkIsFrugal()` អាន `navigator.connection` ហើយ **ការងារស្រេចចិត្ត** ឈប់
+ដោយខ្លួនឯងលើ **2G · slow-2G · ឬពេលអ្នកប្រើបើក «Data Saver»**៖
+
+| កន្លែង | អ្វីដែលរំលង | ហេតុអ្វីវាស្រេចចិត្ត |
+|---|---|---|
+| `revalidateShell()` (**sw.js ទាំង ៣**) | ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយ (សំណើ ៨–១០ ក្នុងមួយការបើកទំព័រ) | កំណែថ្មីមកតាមផ្លូវ `CACHE_VERSION` ស្រាប់ |
+| `prefetchCustomerDataTableRowsIfConfigured()` (ZoeW) | ការទាញតារាងអតិថិជនទាំងមូល រៀងរាល់ ១៥ នាទី | ទិន្នន័យទាញតាមតម្រូវការបានស្រាប់ |
+
+⛔ **វាត្រូវ fail open។** browser ដែលគ្មាន NetworkInformation API
+(**Safari/iOS — គ្មានទាល់តែសោះ**) ត្រូវទទួលឥរិយាបថ **ដដែលនឹងមុនបេះបិទ**។
+ការ fail closed នឹងបិទការធ្វើឲ្យស្រស់លើ iPhone ទាំងអស់ — ថ្នាក់កំហុសធ្ងន់
+ជាងបញ្ហាដើម។ ក៏ **កុំដក guard `navigator.onLine === false` ចេញ** —
+`sw-revalidate-pressure-test.js` អះអាងវា **ខាងក្នុងតួ `revalidateShell()`**។
+
+Test៖ **`adaptive-link-test.js`** (44 assertion, App ទាំង ៣)។
+
+### ⛔ ផ្លូវ cache-miss របស់ `sw.js` ត្រូវនៅ **គ្មានពេលកំណត់** — កំណែ 2.17.5
+
+ជុំ 2.17.5 បានពិចារណាបន្ថែម timeout លើ `fetch(request)` ក្នុងផ្លូវ cache-miss
+(ដើម្បីកុំឲ្យទំព័រព្យួរលើបណ្តាញស្លាប់) រួច **បដិសេធវាដោយផ្អែកលើការវាស់**៖
+
+១. `CORE_SHELL` ប្រើ `cache.addAll()` **atomic** ➜ ធនធានស្នូល **មិនអាចបាត់ពី
+   cache បានទេ** ក្រោយ install ជោគជ័យ។ មានតែ `OPTIONAL_SHELL` (manifest +
+   icon ២) ដែលអាចបាត់ ហើយ **គ្មានមួយណាទប់ការគូរទេ**។
+២. `zxing_reader.wasm` = **១ ០៦៨ kB** ➜ **៣១ វិនាទីលើ 2G · ៥៣ វិនាទីលើ
+   slow-2G** ដោយស្របច្បាប់។ timeout ១០ វិនាទីនឹង **បោះបង់ធនធានដែលធ្វើឲ្យ
+   ការស្កេនដើរក្រៅបណ្តាញ** — ថយក្រោយទៅថ្នាក់កំហុសដដែលដែលកំណែ 2.10.0
+   ដោះស្រាយដោយនាំ ZXing ចូល repo។
+
+ការការពារត្រឹមត្រូវគឺ cache-first (មានស្រាប់) បូក `linkIsFrugal()` លើការងារ
+**ស្រេចចិត្ត** តែប៉ុណ្ណោះ។ `adaptive-link-test.js` ចាក់សោការសម្រេចនេះ។
+
+### ⛔ ការការពារ «inspect element» ពង្រឹងមិនបានទេ — កុំព្យាយាម
+
+`checkDevTools()` របស់ ZoeKeyGen (វាស់ចម្ងាត់ទំហំបង្អួច ១៦០px) និងការទប់
+F12/Ctrl+Shift+I ➜ `about:blank` ជា **ការទប់ស្កាត់តាមទម្លាប់ មិនមែនសុវត្ថិភាព
+ទេ**។ វារំលងបានងាយ៖ DevTools ដាក់ដាច់បង្អួច · ម៉ឺនុយ Safari/Firefox ·
+remote debugging · `view-source:` · បិទ JS · ឬគ្រាន់តែអាន bundle ក្នុង
+Network tab។ **កូដដែលរត់ក្នុង browser របស់អ្នកប្រើ គឺជារបស់អ្នកប្រើ** —
+នេះមិនមែនកំហុសទេ ហើយវាកែមិនបានតាមរចនាសម្ព័ន្ធ។
+
+ការការពារពិតគឺអ្វីដែលមានស្រាប់៖ កូនសោ AES ដែល derive ពី PIN (Lookup secret) ·
+session-only auth persistence របស់ ZoeKeyGen · Firebase rules · និង
+**signing key មិនដែលនៅក្នុង ZoeW សោះ**។ កុំបន្ថែមការទប់ស្កាត់ថ្មីដោយគិតថា
+វាបន្ថែមសុវត្ថិភាព — វាបន្ថែមតែកូដ។
+
+## ការលាក់ secret មុនផ្ញើទៅ Sentry ត្រូវ **ដើរលើ event ទាំងមូល** — កំណែ 2.17.4
+
+`redactEvent()` / `redactBreadcrumb()` ធ្លាប់ប៉ះតែវាល **ដែលដាក់ឈ្មោះទុកជាមុន**
+(`request.url` · `data.url` · `data.to` · `data.from` · `message` · `extra`
+ថ្នាក់ទី ១) ➜ វាលផ្សេងទៀតដែល Sentry SDK បំពេញ **រអិលកាត់ស្ងាត់ៗ**។ វាស់បាន
+**៥ ផ្លូវលេចធ្លាយ**៖
+
+| ផ្លូវ | ហេតុអ្វីវាសំខាន់ |
+|---|---|
+| `crumb.data.arguments` | Sentry 7 រក្សា argument **ឆៅ** របស់ `console.*`; App ហៅ `console.error("Lookup API error:", e)` |
+| `request.headers.Referer` | **Setup Link (`?setup=<config អាជីវកម្ម>`) អាចចេញពីឧបករណ៍** |
+| `extra` ជាន់ជ្រៅ · array ក្នុង `extra` · `contexts` | អ្វីៗដែលមិនមែនជាខ្សែអក្សរថ្នាក់ទី ១ |
+
+ឥឡូវ `redactDeep()` ដើរលើ **គ្រប់ខ្សែអក្សរ** ជាមួយពិដានជម្រៅ
+`REDACT_MAX_DEPTH` (៦) · `REDACT_MAX_NODES` (៥០០០) និង `Set` ការពាររង្វិលជុំ
+(event ពិតអាចមាន reference ជុំ ➜ ការដើរដោយគ្មានវានឹងគាំង)។
+
+**ការផ្គូផ្គងឈ្មោះ param ត្រូវ «តាមសមាសភាគ» មិនមែន «ពិតប្រាកដ» (កំណែ 2.17.5)។**
+វាធ្លាប់ជាការប្រៀបធៀបពិតប្រាកដនៅព្រំដែន `?`/`&`/`#` ➜ **camelCase និង hyphen
+រអិលកាត់ទាំងស្រុង**៖ `?sessionToken=` · `?clientSecret=` · `?X-Api-Key=` ·
+`?pin=`។ ឥឡូវ `isSecretParamName()` បំបែកឈ្មោះនៅព្រំដែន camelCase និង
+`_ - .` រួចប្រៀបធៀបជា **សមាសភាគដាច់ដោយឡែក**។ ⛔ ច្បាប់នេះជាមូលហេតុដែល
+`?spinner=` (`s|pin|ner`), `?design=` (`de|sig|n`) និង `?keyboard=`
+(`key|board`) **មិនត្រូវលាក់** — កុំប្តូរវាទៅជាការផ្គូផ្គងបែប «មាននៅក្នុង»
+ព្រោះនោះនឹងលាក់អ្វីដែលត្រូវការសម្រាប់ debug។ ក៏លាក់ **Apps Script deployment
+ID** (`/macros/s/<ID>/`) ដែលជា **capability URL** ដែរ។
+
+⚠️ **កុំដក «keep case» ចេញ** — `barcode=` និងលេខសម្គាល់ធាតុ (`id_123_abc`)
+**មិនត្រូវលាក់ទេ**; គេត្រូវការវាដើម្បី debug។ ការដើរជ្រៅមិនប្តូរច្បាប់នោះ
+ព្រោះ `redactUrl()` ប្តូរតែអត្ថបទដែលត្រូវនឹង `secretword=value`។
+
+`error-reporting.js` **byte-identical ទាំង ២ App** ដដែល។
+Test៖ **`secret-hygiene.js`** (37 assertion)។
+
 **ស្ថានភាពការតភ្ជាប់ត្រូវរួមបញ្ចូល `navigator.onLine`។** `.info/connected`
 របស់ Firebase អាចនៅ `true` រហូតដល់ជាងមួយនាទីក្រោយឧបករណ៍បាត់ WiFi (រង់ចាំ
 TCP timeout) ➜ អ្នកប្រើឃើញចំណុចបៃតង «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានបណ្តាញ
@@ -1443,7 +1571,31 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
-**៣ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+**៤ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+#### ០ក. កំណែ 2.17.4 + 2.17.5 — ស្ថេរភាពបណ្តាញ · ការលាក់ secret · សម្របតាមតំណ
+
+> ℹ️ **កំណែ 2.17.5 ជាជុំតាមដាន** — វាបិទចន្លោះដែល 2.17.4 រកឃើញតែទុកចោល
+> (ការលាក់ឈ្មោះ param បែប camelCase/hyphen · Apps Script deployment ID ·
+> error callback របស់ `.info/connected` · `ZoeImport`/`zto-import` ចូល
+> `run-all.sh`)។ បញ្ជីផ្ទៀងផ្ទាត់ខាងក្រោម **គ្របទាំង ២ កំណែ**។
+
+**Firebase rules មិនប្រែទេ** — គ្រាន់តែ deploy។ ជុំនេះ **មិនប៉ះតក្កវិជ្ជា
+អាជីវកម្មសោះ** (លុប/ដក · ធុងសំរាម · ការសម្អាត) ហើយ **មិនប៉ះទម្រង់ · PTR ·
+ចលនាផ្ទាំង · ការរមូរ** ដែរ។ សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. **បិទ WiFi រួចបើកវិញច្រើនដងជាប់ៗគ្នា** (ធ្វើត្រាប់តាមតំបន់សេវាអន់)
+   ➜ App ត្រូវភ្ជាប់មកវិញ **លឿនដូចមុន ឬលឿនជាង** — មិនត្រូវយឺតជាងមុនទេ។
+2. **License នៅ active ដដែល** ក្រោយបណ្តាញអន់/ដាច់ — **មិនត្រូវលោតប្រអប់
+   សុំ Activation Key ទេ**។ (នេះជាចំណុចសំខាន់បំផុតនៃជុំនេះ។)
+3. **ការស្កេន និងការទាញលេខទូរស័ព្ទស្វ័យប្រវត្តិ** នៅដំណើរការដដែល។
+4. បើទូរស័ព្ទបើក **«Data Saver»** ៖ App នៅដំណើរការគ្រប់មុខងារដដែល
+   (តារាងអតិថិជនទាញពេលបើកមើល ជំនួសការទាញជាមុន)។ កំណែថ្មីនៅតែមកដល់ដដែល។
+
+> ℹ️ ចំណុច ២ ត្រូវបានចាក់សោដោយ `license-grace-test.js` (១៣) និង
+> `license-network-pressure-test.js` (១៤) — ការរំលងត្រឡប់ `{ ok: null }`
+> ដែល **មិនលុប** record មូលដ្ឋាន។ ប៉ុន្តែសូមផ្ទៀងផ្ទាត់លើផលិតកម្មពិតដដែល។
+
 
 > ℹ️ **ជុំឧបករណ៍ 2026-08-26 (នាឡិកា + ជម្រៅ fuzz) មិនត្រូវការការផ្ទៀងផ្ទាត់ទេ**
 > — វាមិនប៉ះកូដ App សោះ (`APP_VERSION` និង `CACHE_VERSION` ដដែល)។ វាបន្ថែម
@@ -1631,6 +1783,8 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | `fb.X` ដែល `firebase-loader.js` មិន export ➜ `undefined` លើផលិតកម្ម | `sdk-surface.js` |
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
 | នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |
+| សំណើ License កកកុញ ➜ សំណើចាំបាច់ជាប់គាំង (ផ្លូវបណ្តាញទី ៣) | `license-network-pressure-test.js` |
+| ការងារបណ្តាញស្រេចចិត្តមិនសម្របតាម 2G/Data Saver | `adaptive-link-test.js` |
 | `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |
 | ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយស៊ីកូតាការតភ្ជាប់អស់ ➜ សំណើចាំបាច់ចេញមិនបាន | `sw-revalidate-pressure-test.js` |
 | ចលនា boot + **ធនធានឆ្លង origin ក្នុង `<head>` ដែលទប់ការគូរ** | `boot-animation-test.js` |

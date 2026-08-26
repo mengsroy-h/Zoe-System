@@ -5,7 +5,9 @@
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/7.120.3/bundle.min.js';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
-    const SECRET_PARAM_PATTERN = '(?:auth|access_token|id_token|key|apikey|api_key|token|secret|password|passwd|pwd|sig|signature|setup)';
+    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup)';
+    const REDACT_MAX_DEPTH = 6;
+    const REDACT_MAX_NODES = 5000;
 
     let loadPromise = null;
     let sentryReady = false;
@@ -45,39 +47,64 @@
         return loadPromise;
     }
 
+    const SECRET_WORD_RE = new RegExp(
+        '(?:^|_)' + SECRET_PARAM_PATTERN + '(?:$|_)', 'i');
+
+    function isSecretParamName(name) {
+        if (!name) return false;
+        const split = String(name)
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[.-]/g, '_');
+        return SECRET_WORD_RE.test('_' + split + '_');
+    }
+
+    function redactPairs(text, leadClass) {
+        return text.replace(
+            new RegExp('(' + leadClass + ')([A-Za-z0-9_.\\-]{1,64})=([^&#\\s"\'<>]+)', 'g'),
+            (whole, lead, name) => (isSecretParamName(name) ? lead + name + '=[redacted]' : whole)
+        );
+    }
+
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
-        return url
-            .replace(new RegExp('([?&#]' + SECRET_PARAM_PATTERN + '=)[^&#\\s]+', 'gi'), '$1[redacted]')
-            .replace(new RegExp('(^|[\\s"\'])' + SECRET_PARAM_PATTERN + '=[^&#\\s"\']+', 'gi'), '$1[redacted]');
+        let out = redactPairs(url, '[?&#]');
+        out = redactPairs(out, '^|[\\s"\'([]');
+        return out
+            .replace(/(\/macros\/s\/)[^/\s"']+/g, '$1[redacted]')
+            .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@');
+    }
+
+    function redactDeep(value, depth, seen, budget) {
+        if (typeof value === 'string') return redactUrl(value);
+        if (!value || typeof value !== 'object') return value;
+        if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return value;
+        if (seen.has(value)) return value;
+        seen.add(value);
+        budget.n++;
+        if (Array.isArray(value)) {
+            for (let i = 0; i < value.length; i++) {
+                if (budget.n >= REDACT_MAX_NODES) break;
+                value[i] = redactDeep(value[i], depth + 1, seen, budget);
+            }
+            return value;
+        }
+        const keys = Object.keys(value);
+        for (let i = 0; i < keys.length; i++) {
+            if (budget.n >= REDACT_MAX_NODES) break;
+            try { value[keys[i]] = redactDeep(value[keys[i]], depth + 1, seen, budget); } catch (e) {}
+        }
+        return value;
     }
 
     function redactBreadcrumb(crumb) {
-        try {
-            if (crumb && crumb.data && typeof crumb.data.url === 'string') crumb.data.url = redactUrl(crumb.data.url);
-            if (crumb && crumb.data && typeof crumb.data.to === 'string') crumb.data.to = redactUrl(crumb.data.to);
-            if (crumb && crumb.data && typeof crumb.data.from === 'string') crumb.data.from = redactUrl(crumb.data.from);
-            if (crumb && typeof crumb.message === 'string') crumb.message = redactUrl(crumb.message);
-        } catch (e) {}
+        try { redactDeep(crumb, 0, new Set(), { n: 0 }); } catch (e) {}
         return crumb;
     }
 
     function redactEvent(event) {
         try {
             if (!event) return event;
-            if (event.request && typeof event.request.url === 'string') event.request.url = redactUrl(event.request.url);
-            if (typeof event.message === 'string') event.message = redactUrl(event.message);
-            if (event.exception && Array.isArray(event.exception.values)) {
-                event.exception.values.forEach((entry) => {
-                    if (entry && typeof entry.value === 'string') entry.value = redactUrl(entry.value);
-                });
-            }
-            if (Array.isArray(event.breadcrumbs)) event.breadcrumbs.forEach(redactBreadcrumb);
-            if (event.extra) {
-                Object.keys(event.extra).forEach((key) => {
-                    if (typeof event.extra[key] === 'string') event.extra[key] = redactUrl(event.extra[key]);
-                });
-            }
+            redactDeep(event, 0, new Set(), { n: 0 });
         } catch (e) {}
         return event;
     }

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.17.3';
+const APP_VERSION = '2.17.5';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -530,6 +530,10 @@ async function initFirebase() {
             else if (navigator.onLine !== false) scheduleReconnectWatchdog();
             renderConnectionStatus();
             if (isDatabaseConnected) retryPendingRoleCheck();
+        }, () => {
+            isDatabaseConnected = false;
+            renderConnectionStatus();
+            if (navigator.onLine !== false) scheduleReconnectWatchdog();
         });
 
         dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');

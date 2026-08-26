@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.17.3';
+    const APP_VERSION = '2.17.5';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -528,6 +528,14 @@
         });
     }
 
+    function linkIsFrugal() {
+        const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (!link) return false;
+        if (link.saveData === true) return true;
+        const type = String(link.effectiveType || '');
+        return type === 'slow-2g' || type === '2g';
+    }
+
     const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
     let firebaseSdkRetryTimer = null;
     let firebaseSdkRetryAttempt = 0;
@@ -739,6 +747,10 @@
                     scheduleReconnectWatchdog();
                 }
                 renderConnectionStatus();
+            }, () => {
+                isDatabaseConnected = false;
+                renderConnectionStatus();
+                if (navigator.onLine !== false) scheduleReconnectWatchdog();
             });
 
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -1932,6 +1944,7 @@
     function prefetchCustomerDataTableRowsIfConfigured() {
         if (!auth || !auth.currentUser) return;
         if (navigator.onLine === false) return;
+        if (linkIsFrugal()) return;
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
             fetchCustomerDataTableRows(false);

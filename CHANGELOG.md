@@ -24,6 +24,149 @@
 
 ---
 
+## [2.17.5] — 2026-08-26 · បិទចន្លោះដែលនៅសល់ពីជុំ 2.17.4
+
+ជុំតាមដាន៖ បិទ**គ្រប់ចំណុច**ដែលជុំមុនរកឃើញ តែទុកចោល។ គ្មានការកែតក្កវិជ្ជា
+អាជីវកម្មទេ ហើយ **ទម្រង់ · PTR · ចលនាផ្ទាំង · ការរមូរ មិនប៉ះសោះ**។
+
+### សុវត្ថិភាព
+
+- **ការលាក់ឈ្មោះ param ធ្លាប់ជាការប្រៀបធៀបពិតប្រាកដ ➜ ទម្រង់ camelCase និង
+  hyphen រអិលកាត់ទាំងស្រុង។** វាស់បាន៖ `?sessionToken=` · `?clientSecret=` ·
+  `?X-Api-Key=` · `?pin=` **មិនត្រូវលាក់សោះ**។ ឥឡូវ `isSecretParamName()`
+  បំបែកឈ្មោះនៅព្រំដែន camelCase និង `_ - .` រួចប្រៀបធៀបជា **សមាសភាគដាច់
+  ដោយឡែក**។ បន្ថែម `pin` និង `passcode` ក្នុងបញ្ជីពាក្យ។
+- **Apps Script deployment ID ត្រូវលាក់ហើយ។** `https://script.google.com/macros/s/<ID>/exec`
+  ជា **capability URL** — អ្នកណាមានវា ហៅ API បាន។ ឥឡូវ `/macros/s/[redacted]/`។
+- ⛔ **គ្មានការលាក់លើសទេ** — `?spinner=` (`s|pin|ner`) · `?design=` (`de|sig|n`) ·
+  `?keyboard=` (`key|board`) · `?barcode=` · `?phone=` · `?locker=` **នៅដដែល**
+  ព្រោះគេត្រូវការវាដើម្បី debug។ មាន assertion ចាក់សោទាំង ២ ទិស។
+
+### កែកំហុស
+
+- **`.info/connected` គ្មាន error callback ➜ ស្ថានភាពអាចកក «បៃតង» ជារៀងរហូត។**
+  បើ Firebase បោះបង់ listener នោះ `isDatabaseConnected` **កកនៅតម្លៃចុងក្រោយ**
+  ➜ អ្នកប្រើឃើញ «ភ្ជាប់ Server រួចរាល់» ខណៈគ្មានការតភ្ជាប់។ ឥឡូវទាំង ២ App
+  មាន error callback ដែលកំណត់ `isDatabaseConnected = false`, សរសេរ UI ឡើងវិញ
+  និងកេះ watchdog។ *(ឱកាសកើតឡើងទាប — `.info/*` ជា path ក្នុងស្រុកដែលមិនឆ្លង
+  កាត់ rules — ដូច្នេះវាជា guard អប្បបរមា **មិនមែនយន្តការស្តារ**; ការសាង
+  យន្តការស្តារសម្រាប់ callback ដែលមិនដែលបាញ់ គឺជាកូដងាប់។)*
+
+### ការសម្រេចដែលកត់ទុក — **កុំ «កែ» វានៅជុំក្រោយ**
+
+- ⛔ **ផ្លូវ cache-miss របស់ `sw.js` ត្រូវនៅគ្មានពេលកំណត់។** ជុំនេះបានពិចារណា
+  បន្ថែម timeout រួច **បដិសេធដោយផ្អែកលើការវាស់**៖ `CORE_SHELL` ប្រើ
+  `addAll()` **atomic** ➜ ធនធានស្នូលមិនអាចបាត់ពី cache បានទេ; ហើយ
+  `zxing_reader.wasm` = **១ ០៦៨ kB** ➜ **៣១ វិនាទីលើ 2G · ៥៣ វិនាទីលើ slow-2G**
+  ដោយស្របច្បាប់។ timeout នឹង **សម្លាប់ការទាញធនធានដែលធ្វើឲ្យការស្កេនដើរ
+  ក្រៅបណ្តាញ** — ថយក្រោយទៅថ្នាក់កំហុសដដែលដែល 2.10.0 ដោះស្រាយ។
+- ⛔ **ការការពារ «inspect element» របស់ ZoeKeyGen ពង្រឹងមិនបានទេ។**
+  `checkDevTools()` និងការទប់ F12 ជាការទប់ស្កាត់តាមទម្លាប់ — រំលងបានងាយ
+  (DevTools ដាច់បង្អួច · `view-source:` · បិទ JS · Network tab)។ កូដដែលរត់
+  ក្នុង browser របស់អ្នកប្រើ គឺជារបស់អ្នកប្រើ។ ការការពារពិតគឺអ្វីដែលមាន
+  ស្រាប់៖ AES ដែល derive ពី PIN · session-only persistence · Firebase rules ·
+  និង **signing key មិនដែលនៅក្នុង ZoeW សោះ**។
+
+### ឧបករណ៍ audit
+
+- **`ZoeImport/test.js` (៥៥) និង `zto-import/test.js` (៥០) ចូល `run-all.sh` ហើយ។**
+  ពួកវាធ្លាប់នៅក្រៅ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App» — **ហេតុផលនោះលែង
+  ស៊ីគ្នាហើយ** ព្រោះ ZoeImport ជា PWA ដែល ship ពិត ហើយ checker ១២ គ្របវារួច។
+  ការទុកក្រៅមានន័យថា assertion ១០៥ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
+  CI រត់ `run-all.sh` ➜ **គ្របស្វ័យប្រវត្តិឥឡូវនេះ**។
+- `secret-hygiene.js` ៖ 37 ➜ **51 assertion** (ទម្រង់ camelCase/hyphen ·
+  Apps Script ID · និង **ការមិនលាក់លើស ៦**)។ ធ្លាក់ ១៥ លើ tree មុនកែ។
+- `adaptive-link-test.js` ៖ 37 ➜ **44 assertion** — ចាក់សោច្បាប់ «គ្មាន timeout
+  លើផ្លូវ cache-miss» ជាមួយហេតុផលដែលវាស់បាន។
+- **រត់ RTDB emulator ពិត** (ជុំមុនមិនបានរត់)៖ `crud-rules-flow.js` **៤៣** ·
+  `emu/rules.sh` **២១** · `restore-marker-hygiene-test.js` **១៩** — បៃតងទាំងអស់។
+- `run-all.sh` ➜ **៨៥ ពេញលេញ** (ពី ៨៣), ធ្លាក់ 0។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន។** Firebase rules **មិនប្រែទេ** (ផ្ទៀងផ្ទាត់លើ emulator ពិតរួច)។
+
+---
+
+## [2.17.4] — 2026-08-26 · ស្ថេរភាពបណ្តាញ · ការលាក់ secret ជ្រៅ · សម្របតាមតំណ
+
+ជុំ deep audit ដែលផ្តោតលើ **បណ្តាញ និងសុវត្ថិភាព**។ កំហុសទាំង ៣ ខាងក្រោម
+**បង្ហាញភស្តុតាងដោយការវាស់ក្នុង Chromium ពិត មុនកែ** ហើយមានឧបករណ៍ចាក់សោ
+ឥឡូវនេះ។ តក្កវិជ្ជាអាជីវកម្ម (លុប/ដក · ធុងសំរាម · ការសម្អាត) **មិនប៉ះសោះ**
+ហើយ **ទម្រង់ · PTR · ចលនាផ្ទាំង · ការរមូរ ក៏មិនប៉ះដែរ**។
+
+### ល្បឿន និងស្ថេរភាពបណ្តាញ
+
+- **សំណើ License លែងធ្វើឲ្យសំណើផ្សេងជាប់គាំងទៀតទេ។** `license-verify.js`
+  គ្មានពិដានចំនួនសំណើស្របគ្នា និងគ្មាន guard ក្រៅបណ្តាញសោះ ខណៈ
+  `window.addEventListener('online', …)` ហៅ `ZoeLicense.syncServerTime()`
+  **គ្មានពិដានល្បឿន** (ការហៅ ៣ ផ្សេងទៀតក្នុង handler ដដែលទទួលពិដានក្នុង
+  2.14.0 រួចហើយ)។ WiFi ដែលភ្លឹបភ្លែត ➜ `online` បាញ់ច្រើនដង ➜ សំណើ license
+  ព្យួរស្របគ្នារហូតពេញកូតា connection របស់ browser។
+  វាស់លើ Chromium ពិត (server ទទួលការតភ្ជាប់ តែមិនឆ្លើយ)៖
+
+  | រង្វាស់ | មុនកែ | ក្រោយកែ |
+  |---|---|---|
+  | សំណើ **ចាំបាច់** លើ host ដដែល | **៩ ៦០៤ ms** | **៥ ms** |
+  | សំណើ license ដល់ server (ពី ១០ ការហៅ) | **៧** | **១** |
+  | ការហៅខណៈ `navigator.onLine === false` | **១០ ០០១ ms** | **០ ms** |
+
+  ⛔ ការរំលងត្រឡប់ `{ ok: null }` (មិនផ្ទៀងផ្ទាត់បាន) — **មិនមែន `{ ok: false }`**
+  ដែលនឹងលុប License ចោល។ ការអនុគ្រោះ ៣ ថ្ងៃនៅដដែលបេះបិទ
+  (`license-grace-test.js` ១៣ assertion បញ្ជាក់)។ `activate()` ដែលអ្នកប្រើ
+  ចុចផ្ទាល់ ឆ្លងកាត់ `{ priority: true }` ➜ **មិនត្រូវទប់ដោយពិដានឡើយ**។
+
+- **សម្របតាមគុណភាពតំណ (ថ្មី)។** មុននេះ App សម្របតាម **ឧបករណ៍** រួចហើយ
+  (ចង្វាក់ស៊ុម · `perf-lite` · ទទឹងស៊ុមស្កេន) តែ **មិនសម្របតាមតំណបណ្តាញទេ**។
+  ឥឡូវ `linkIsFrugal()` អាន `navigator.connection` ហើយ **ការងារស្រេចចិត្ត**
+  ឈប់ដោយខ្លួនឯងលើ **2G/slow-2G ឬពេលអ្នកប្រើបើក «Data Saver»**៖
+  ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយ (`revalidateShell()` — សំណើ ៨–១០ ក្នុងមួយការបើក
+  ទំព័រ) និងការទាញតារាងអតិថិជនជាមុន។ **កំណែថ្មីនៅតែមកតាមផ្លូវ `CACHE_VERSION`
+  ដដែល** ហើយទិន្នន័យអតិថិជននៅតែទាញតាមតម្រូវការដដែល — ដូច្នេះគ្មានមុខងារណាបាត់ទេ។
+  ⛔ វា **fail open**៖ browser ដែលគ្មាន NetworkInformation API (**Safari/iOS —
+  គ្មានទាល់តែសោះ**) ទទួលឥរិយាបថ **ដដែលនឹងមុនបេះបិទ**។
+
+### សុវត្ថិភាព
+
+- **បិទផ្លូវលេចធ្លាយ secret ទៅ Sentry ចំនួន ៥។** `redactEvent()` /
+  `redactBreadcrumb()` ធ្លាប់ប៉ះតែវាល **ដែលដាក់ឈ្មោះទុកជាមុន**
+  (`request.url` · `data.url` · `message` · `extra` ថ្នាក់ទី ១) ➜ វាលផ្សេងទៀត
+  ដែល Sentry SDK បំពេញ **រអិលកាត់ស្ងាត់ៗ**។ វាស់បាន៖
+  ១. **`crumb.data.arguments`** — Sentry 7 រក្សា argument **ឆៅ** របស់
+  `console.error(...)`; App ហៅ `console.error("Lookup API error:", e)`។
+  ២. **`request.headers.Referer`** — **Setup Link (`?setup=<config អាជីវកម្ម>`)
+  អាចចេញពីឧបករណ៍**។ ៣–៥. `extra` ជាន់ជ្រៅ · array ក្នុង `extra` · `contexts`។
+  ឥឡូវការលាក់ដើរលើ **គ្រប់ខ្សែអក្សរ** ជាមួយពិដានជម្រៅ ៦ · node ៥០០០ · និង
+  ការការពាររង្វិលជុំ។ បន្ថែម៖ លាក់ **userinfo ក្នុង URL**
+  (`https://user:pass@host`) និងឈ្មោះ param ថ្មី (`authorization` · `bearer` ·
+  `jwt` · `credential` · `refresh_token` · `session_token` · `passphrase`)។
+  ⚠️ `barcode=` និងលេខសម្គាល់ធាតុ **នៅតែមិនត្រូវលាក់** (ត្រូវការសម្រាប់ debug)។
+
+### ឧបករណ៍ audit
+
+- **`license-network-pressure-test.js` (ថ្មី, 14 assertion, browser ពិត)** —
+  `network-pressure-test.js` **ជំនួស `license-verify.js` ដោយ stub ទាំងស្រុង**
+  ➜ ផ្លូវបណ្តាញពិតរបស់ license **មិនដែលត្រូវវាស់សោះ**។ នេះជាមេរៀនដដែលនឹង
+  `network-timeout-test.js` (2.12.1) និង `fluid-type-focus-test.js` (2.16.0)៖
+  **ពេលសរសេរ checker ត្រូវសួរថា «វារត់/ស្កេនឯកសារ*ណា*ខ្លះ»។**
+- **`adaptive-link-test.js` (ថ្មី, 37 assertion)** — ស្រង់ `revalidateShell()`
+  និង `linkIsFrugal()` **ពិត** ចេញពី `sw.js` ដែល ship រួច (App ទាំង ៣) មករត់
+  ជាមួយ `navigator` ក្លែងក្លាយ ៦ ប្រភេទតំណ។ ចាក់សោទាំង **ការរំលងលើ 2G/Data
+  Saver** និង **ការ fail open លើ Safari**។
+- **`secret-hygiene.js` ៖ 24 ➜ 37 assertion។** វាធ្លាប់សាកតែ `redactUrl()`
+  ដែលជា function លើ **ខ្សែអក្សរតែមួយ** — **មិនដែលសាកការដើរលើ event ទេ**។
+  ឥឡូវវាចាប់ `beforeSend`/`beforeBreadcrumb` **ពិត** តាម `Sentry.onLoad` រួច
+  បញ្ជូន event ទម្រង់ Sentry 7 ពិតចូល។ ធ្លាក់ ៧ លើ tree មុនកែ។
+- `license-grace-test.js` ៖ បន្ថែម `networkLooksDown`/`sharedRequest` ក្នុង
+  បញ្ជីស្រង់ ➜ វានៅតែរត់កូដពិត។
+- `run-all.sh` ➜ **៨៣ ពេញលេញ** (ពី ៨១), ធ្លាក់ 0។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន។** Firebase rules **មិនប្រែទេ** — មិនបាច់ publish អ្វីទេ។
+
+---
+
 ## [ឧបករណ៍] — 2026-08-26 · នាឡិកា និងជម្រៅ fuzz
 
 **មិនប្តូរកូដ App ទេ** — `APP_VERSION` នៅ `2.17.3` ដដែល ហើយ `CACHE_VERSION`

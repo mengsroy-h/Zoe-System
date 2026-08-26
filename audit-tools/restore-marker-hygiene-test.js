@@ -28,6 +28,13 @@ function extractFn(src, name) {
     const brace = src.indexOf('{', src.indexOf('(', head));
     return (m[2] ? 'async ' : '') + src.slice(head, brace) + sliceBalanced(src, brace);
 }
+// ⚠️ អន្ទាក់៖ តេស្តដែលធ្លាក់ដោយ `ReferenceError` លើ tree មុនកែ **មិនបញ្ជាក់អ្វីទេ**
+// — វាមើលទៅដូចកំហុសផលិតផល។ ដូច្នេះ function ដែលមានតែក្នុងកំណែមួយ ត្រូវស្រង់
+// ដោយអត់ធ្មត់ ហើយ **ឥរិយាបថ** ទើបជាអ្វីដែលតេស្តអះអាង។
+function extractFnOptional(src, name) {
+    try { return extractFn(src, name); } catch (e) { return null; }
+}
+
 function extractConst(src, name) {
     const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(src);
     if (!m) throw new Error('const not found: ' + name);
@@ -40,10 +47,13 @@ const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
-    'releaseStaleRestoreClaimForPurge', 'claimAndCleanupItem', 'runAutomaticCleanupRules'];
+    'releaseStaleRestoreClaimForPurge', 'claimAndCleanupItem', 'runAutomaticCleanupRules',
+    'collectItemBarcodes', 'runAutomaticDeletedCleanup'];
+// មានតែក្នុងកំណែថ្មី (2.18.0) ឬកំណែចាស់ — ស្រង់អ្វីដែលមាន
+const OPTIONAL_FNS = ['purgeDeletedItemsQuietly', 'deleteMultipleDeletedItemsFromFirebase'];
 
 function buildWorld(store, now) {
-    const world = { store, now, revenueLog: [], commits: 0, writtenPaths: [] };
+    const world = { store, now, revenueLog: [], commits: 0, writtenPaths: [], deniedPaths: [], releasedBarcodes: [] };
     const getPath = (raw) => {
         const parts = String(raw || '').split('/').filter(Boolean);
         let cur = store;
@@ -72,8 +82,17 @@ function buildWorld(store, now) {
             return { committed: true, snapshot: { val: () => clone(getPath(ref.path)) } };
         }),
         update: (ref, updates) => Promise.resolve().then(() => {
-            Object.entries(updates).forEach(([k, v]) => {
-                const full = [ref.path, k].filter(Boolean).join('/');
+            const entries = Object.entries(updates).map(([k, v]) => [[ref.path, k].filter(Boolean).join('/'), v]);
+            const blocked = entries.find(([full, v]) => v === null
+                && /^zoew_recently_deleted_cod_dod\/[^/]+$/.test(full)
+                && getPath(full) && getPath(full).restoreClaim);
+            if (blocked) {
+                world.deniedPaths.push(blocked[0]);
+                const err = new Error('PERMISSION_DENIED');
+                err.code = 'PERMISSION_DENIED';
+                throw err;
+            }
+            entries.forEach(([full, v]) => {
                 world.commits++; world.writtenPaths.push(full);
                 setPath(full, v);
             });
@@ -88,13 +107,16 @@ function buildWorld(store, now) {
         getFormattedDate: () => '2026-08-26',
         addRevenueToDailyAndMonthlyRecord: (d, cod, dod, count) => world.revenueLog.push({ d, cod, dod, count }),
         showToast: () => {},
+        releaseBarcodesInRegistry: (codes) => { world.releasedBarcodes.push(...(codes || [])); return Promise.resolve(); },
         scanHistory: [], deletedItems: []
     });
     new vm.Script([
-        extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
+        extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', 'const activeRestoreClaims = new Map();',
+        'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
-        'globalThis.api = { runAutomaticCleanupRules, claimAndCleanupItem, clearStaleRestoreMarkers, releaseStaleRestoreClaimForPurge, stripHistoryOnlyMarkers, itemHasRestoreMarkers };'
+        ...OPTIONAL_FNS.map((n) => extractFnOptional(src, n)).filter(Boolean),
+        'globalThis.api = { runAutomaticCleanupRules, claimAndCleanupItem, clearStaleRestoreMarkers, releaseStaleRestoreClaimForPurge, stripHistoryOnlyMarkers, itemHasRestoreMarkers, runAutomaticDeletedCleanup };'
     ].join('\n\n')).runInContext(context);
     world.context = context;
     world.getPath = getPath;
@@ -232,6 +254,46 @@ async function scenarioPurgeReleasesDeadClaim() {
     check(world.commits === before, 'ធាតុគ្មាន claim ➜ មិនសរសេរអ្វីទេ');
 }
 
+async function scenarioAutoPurgeReleasesDeadClaim() {
+    console.log('\nសេណារីយ៉ូ ៥ — ការ purge ស្វ័យប្រវត្តិត្រូវដោះ claim ងាប់ មិនមែនរំលងវាជារៀងរហូត');
+    // ថ្នាក់កំហុស៖ `runAutomaticDeletedCleanup()` ធ្លាប់សរសេរ
+    // `if (!item || item.restoreClaim) return;` — រំលងធាតុណាដែលមាន `restoreClaim`
+    // **ដោយមិនពិនិត្យថាវានៅរស់ឬអត់**។ `clearRestoreFinalization()` និងផ្លូវស្តារ
+    // រត់ក្នុង `.catch(() => {})` ➜ បណ្តាញដាច់ ➜ claim នៅជាប់ ➜ ធាតុនោះ
+    // **មិនដែលចេញពី Firebase សោះ** ហើយ barcode របស់វា **កក់ក្នុង
+    // `zoew_barcode_registry` ជារៀងរហូត** ➜ barcode ដដែលស្កេនចូលមិនបានទៀត។
+    // ការរំលងខ្លួនវា *ចាំបាច់* ព្រោះ rules បដិសេធការលុបខណៈ claim ជាប់ —
+    // អ្វីដែលខ្វះគឺ **អ្នកដោះ claim ងាប់** ក្នុងផ្លូវស្វ័យប្រវត្តិ។
+    const OLD = T0 - 40 * 24 * HOUR;
+    const world = buildWorld({
+        zoew_scan_history_cod_dod: {},
+        zoew_recently_deleted_cod_dod: {
+            t_dead: { id: 't_dead', deletedAt: OLD, barcodes: [{ code: 'DEAD1', cod: 1, dod: 0 }],
+                restoreClaim: { token: 'x', targetId: 'y', claimedAt: OLD } },
+            t_live: { id: 't_live', deletedAt: OLD, barcodes: [{ code: 'LIVE1', cod: 1, dod: 0 }],
+                restoreClaim: { token: 'x', targetId: 'y', claimedAt: T0 - 30 * 1000 } },
+            t_clean: { id: 't_clean', deletedAt: OLD, barcodes: [{ code: 'CLEAN1', cod: 1, dod: 0 }] },
+            t_fresh: { id: 't_fresh', deletedAt: T0 - HOUR, barcodes: [{ code: 'FRESH1', cod: 1, dod: 0 }] }
+        }
+    }, T0);
+    world.sync();
+
+    await world.context.runAutomaticDeletedCleanup();
+    await world.drain();
+    const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
+
+    check(!trash.t_clean, 'ធាតុចាស់ស្អាត ➜ purge ចេញ');
+    check(!trash.t_dead, '⛔ ស្នូល៖ ធាតុចាស់ដែល claim ងាប់ ➜ ក៏ purge ចេញដែរ (មុនកែ ជាប់រហូត)');
+    check(!!trash.t_live, 'claim ដែលនៅរស់ ➜ **មិនត្រូវប៉ះ** (ឧបករណ៍ផ្សេងកំពុងស្តារ)');
+    check(!!trash.t_fresh, 'ធាតុដែលមិនទាន់ហួសរយៈពេលរក្សាទុក ➜ នៅដដែល');
+    check(world.releasedBarcodes.indexOf('DEAD1') !== -1,
+        '⛔ barcode របស់ធាតុនោះត្រូវដោះចេញពី registry (បើអត់ ➜ ស្កេនចូលមិនបានទៀត)');
+    check(world.releasedBarcodes.indexOf('LIVE1') === -1 && world.releasedBarcodes.indexOf('FRESH1') === -1,
+        'barcode របស់ធាតុដែលមិន purge ➜ មិនត្រូវដោះ');
+    check(world.deniedPaths.length === 0,
+        'គ្មានការសរសេរណាត្រូវ rules បដិសេធ (claim ដោះមុន purge)', world.deniedPaths);
+}
+
 (async () => {
     console.log('restore-marker-hygiene-test — marker ស្តារ ↔ schema ធុងសំរាម');
     console.log('App: ' + APP);
@@ -239,6 +301,7 @@ async function scenarioPurgeReleasesDeadClaim() {
     await scenarioStaleMarkerSweep();
     await scenarioTrashNeverCarriesMarkers();
     await scenarioPurgeReleasesDeadClaim();
+    await scenarioAutoPurgeReleasesDeadClaim();
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

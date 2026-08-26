@@ -21,12 +21,11 @@ function clone(value) {
 }
 
 function clearWitnessAllowed(before, after, itemId) {
-    const oldWitness = before.zoew_clear_history_finalizations[itemId];
     const witness = after.zoew_clear_history_finalizations[itemId];
     const live = before.zoew_scan_history_cod_dod[itemId];
     const clearClaim = live && live.clearClaim;
     const trash = after.zoew_recently_deleted_cod_dod[itemId];
-    return !oldWitness && !!witness && !!clearClaim && clearClaim.token === witness.token &&
+    return !!witness && !!clearClaim && clearClaim.token === witness.token &&
         !before.zoew_recently_deleted_cod_dod[itemId] && !after.zoew_scan_history_cod_dod[itemId] &&
         !!trash && trash.id === itemId &&
         typeof trash.deletedAt === 'number' && trash.isFromDeletion === true && !trash.clearClaim;
@@ -102,7 +101,9 @@ ok('trash រក្សា legacy lockerRevision សម្រាប់ Restore/Cl
 ok('witness bind prewrite live claim និង post-write move',
     witnessWrite.includes("root.child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('clearClaim')") && witnessWrite.includes("!root.child('zoew_recently_deleted_cod_dod')") && witnessWrite.includes("!newData.parent().parent().child('zoew_scan_history_cod_dod')") && witnessWrite.includes("child('deletedAt').isNumber()") && witnessWrite.includes("child('isFromDeletion').val() === true") && witnessWrite.includes("newData.parent().parent().child('zoew_recently_deleted_cod_dod')"));
 ok('witness មិនអនុញ្ញាត overwrite និង cleanup ត្រូវ history អវត្តមាន',
-    witnessWrite.includes("!data.exists()") && witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod')"));
+    witnessWrite.includes("data.exists() && !newData.exists() && !root.child('zoew_scan_history_cod_dod')"));
+ok('⛔ witness ចាស់ដែលបន្សល់ មិនត្រូវចាក់សោ id ជារៀងរហូត (deadlock ៣ ខាង)',
+    !witnessWrite.includes("!data.exists() && newData.exists()"));
 
 console.log('-- crash មុន final: claim នៅ live និងមិនបង្កើត trash --');
 ok('claim មួយគត់ មិនផ្លាស់ទី data មុន final',
@@ -140,6 +141,16 @@ ok('មិនអាច cleanup witness មុន history delete', !witnessCleanu
 const cleanup = clone(finalB);
 delete cleanup.zoew_clear_history_finalizations[itemId];
 ok('អាច cleanup witness ក្រោយ final success', witnessCleanupAllowed(finalB, cleanup, itemId));
+
+console.log('-- witness ដែលបន្សល់ (cleanup បរាជ័យ) មិនត្រូវចាក់សោ id --');
+// `clearClearHistoryFinalization()` រត់ក្នុង `.catch(() => {})` — ដូច្នេះ witness
+// អាចបន្សល់។ បើវាចាក់សោ id នោះ «លុបទាំងអស់» លើ id ដដែលស្លាប់ជារៀងរហូត។
+const orphanWitness = clone(base);
+orphanWitness.zoew_clear_history_finalizations[itemId] = { token: 'clear-OLD', finalizedAt: 1600000000000 };
+const clearOverOrphan = finalFanout(orphanWitness, itemId, 'clear-A');
+ok('⛔ លុបទាំងអស់បានទោះមាន witness ចាស់បន្សល់', clearWitnessAllowed(orphanWitness, clearOverOrphan, itemId));
+ok('⛔ replay ក្រោយនោះ នៅតែត្រូវបដិសេធ',
+    !clearWitnessAllowed(clearOverOrphan, finalFanout(clearOverOrphan, itemId, 'clear-A'), itemId));
 
 console.log('');
 if (fail) {

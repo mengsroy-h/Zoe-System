@@ -514,6 +514,115 @@ function buildContext() {
         t4.probe().lastDbListenerAttemptAt === 0, t4.probe().lastDbListenerAttemptAt);
 }
 
+// ── ១០ខ២. ការផ្ទុក SDK ឡើងវិញ ក៏ត្រូវមានពិដានល្បឿនដែរ ─────────────────
+// ថ្នាក់កំហុស **ដដែលនឹង ១០ខ** តែនៅលើផ្លូវផ្សេង — ដូច្នេះការកែ 2.14.0 (ដែល
+// ប៉ះតែ listener) **មិនបានគ្របវាទេ**។ `retryFirebaseSdkNow()` ត្រូវហៅពី
+// `online` និង `visibilitychange`; មុនកែវា `clearFirebaseSdkRetry()` ដែល
+// **reset ជណ្តើរ 5/10/20/30/60 វិ. មកសូន្យ** រួច `initFirebase()` ភ្លាមៗ
+// គ្មានពិដាន។ ដូច្នេះនៅតំបន់សេវាអន់ (SDK ផ្ទុកមិនចូល) ការប្តូរ App ចេញចូល
+// ធ្វើឲ្យជណ្តើរ **មិនដែលឡើងផុត ៥ វិនាទី** ➜ ស៊ីថ្ម និងបណ្តាញជារៀងរហូត។
+//
+// វាស់បានលើកូដមុនកែ (គំរូដដែលនេះ)៖ `online` បាញ់ ១០ ដងក្នុង ១ វិ. ➜
+// `initFirebase()` **១០ ដង**។ ក្រោយកែ ➜ **១ ដង**។
+{
+    function buildSdkRetry(appSrc) {
+        const pick = (name) => {
+            const m = new RegExp('\\n(\\s*)(async\\s+)?function ' + name + '\\s*\\(').exec(appSrc);
+            if (!m) return null;
+            const head = appSrc.indexOf('function ' + name, m.index);
+            let depth = 0, i = appSrc.indexOf('{', appSrc.indexOf('(', head)), started = false;
+            for (; i < appSrc.length; i++) {
+                if (appSrc[i] === '{') { depth++; started = true; }
+                else if (appSrc[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
+            }
+            return (m[2] ? 'async ' : '') + appSrc.slice(head, i);
+        };
+        const konst = (name) => {
+            const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(appSrc);
+            return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
+        };
+        let clock = 0;
+        const timers = [];
+        const calls = [];
+        const ctx = vm.createContext({
+            console, Math,
+            Date: { now: () => clock },
+            setTimeout: (fn, ms) => { const t = { at: clock + ms, fn, dead: false }; timers.push(t); return t; },
+            clearTimeout: (t) => { if (t) t.dead = true; },
+            navigator: { onLine: true },
+            initFirebase: () => { calls.push(clock); return Promise.resolve(false); },
+            firebaseSdkUnavailable: true, isDatabaseInitialized: false, isInitializingFirebase: false
+        });
+        new vm.Script([
+            konst('FIREBASE_SDK_RETRY_STEPS_MS'),
+            konst('FIREBASE_SDK_RETRY_MIN_GAP_MS') || '',
+            'let firebaseSdkRetryTimer = null;', 'let firebaseSdkRetryAttempt = 0;',
+            /lastFirebaseSdkAttemptAt/.test(appSrc) ? 'let lastFirebaseSdkAttemptAt = 0;' : '',
+            pick('clearFirebaseSdkRetry'), pick('resetFirebaseSdkRetryHealth') || '',
+            pick('scheduleFirebaseSdkRetry'), pick('retryFirebaseSdkNow'),
+            'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry };'
+        ].filter(Boolean).join('\n\n')).runInContext(ctx);
+        return {
+            calls, ctx,
+            advance(ms) {
+                const end = clock + ms;
+                for (;;) {
+                    const due = timers.filter((t) => !t.dead && t.at <= end).sort((a, b) => a.at - b.at)[0];
+                    if (!due) break;
+                    clock = due.at; due.dead = true; due.fn();
+                }
+                clock = end;
+            }
+        };
+    }
+
+    // ព្រឹត្តិការណ៍ `online` ១០ ដងក្នុង ១ វិនាទី
+    const b1 = buildSdkRetry(SRC);
+    for (let i = 0; i < 10; i++) { b1.advance(100); b1.ctx.api.retryFirebaseSdkNow(); }
+    ok('online បាញ់ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ការផ្ទុក SDK ឡើងវិញ (មុនកែ ១០)',
+        b1.calls.length <= 1, b1.calls.length);
+
+    // ការព្យាយាមលើកដំបូងមិនត្រូវទប់ — «បណ្តាញត្រឡប់មក ➜ ព្យាយាមភ្លាម»
+    const b2 = buildSdkRetry(SRC);
+    b2.ctx.api.retryFirebaseSdkNow();
+    ok('បណ្តាញត្រឡប់មក ➜ ព្យាយាមភ្លាម (ពិដានមិនទប់ការព្យាយាមលើកដំបូង)',
+        b2.calls.length === 1, b2.calls.length);
+
+    // ការប្តូរ App រាល់ ១០ វិនាទី **មិនត្រូវ** ត្រូវទប់ (១០ វិ. > ពិដាន ៣ វិ.)
+    const b3 = buildSdkRetry(SRC);
+    for (let i = 0; i < 6; i++) { b3.advance(10000); b3.ctx.api.retryFirebaseSdkNow(); }
+    ok('ការប្តូរ App រាល់ ១០ វិ. នៅតែព្យាយាមបានគ្រប់ដង (ពិដានមិនតឹងពេក)',
+        b3.calls.length === 6, b3.calls.length);
+
+    // គ្មានបណ្តាញ ➜ មិនព្យាយាម
+    const b4 = buildSdkRetry(SRC);
+    b4.ctx.navigator.onLine = false;
+    b4.ctx.api.retryFirebaseSdkNow();
+    ok('គ្មានបណ្តាញ ➜ មិនផ្ទុក SDK ឡើងវិញ', b4.calls.length === 0, b4.calls.length);
+
+    ok('ពិដាន SDK តូចជាងជំហានដំបូងនៃជណ្តើរ (បើអត់ ជណ្តើរត្រូវលេបដោយពិដាន)',
+        /FIREBASE_SDK_RETRY_MIN_GAP_MS/.test(SRC) &&
+        Number((/const FIREBASE_SDK_RETRY_MIN_GAP_MS = (\d+);/.exec(SRC) || [])[1]) <
+        Number((/const FIREBASE_SDK_RETRY_STEPS_MS = \[(\d+)/.exec(SRC) || [])[1]));
+
+    ok('⛔ ការ reset ជណ្តើរ មិនត្រូវ reset ពិដានល្បឿន (បើ reset ➜ ពិដានស្លាប់)',
+        !/function clearFirebaseSdkRetry\(\)[\s\S]{0,220}lastFirebaseSdkAttemptAt = 0/.test(SRC));
+
+    // ⚠️ មេរៀន 2.12.1៖ ថ្នាក់កំហុសដដែលរស់នៅ App ផ្សេង។ ZoeKeyGen មានផ្លូវ
+    // `retryFirebaseSdkNow()` ដដែលបេះបិទ ➜ checker ត្រូវស្កេនវាដែរ។
+    const KG = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+    const kgBurst = buildSdkRetry(KG);
+    for (let i = 0; i < 10; i++) { kgBurst.advance(100); kgBurst.ctx.api.retryFirebaseSdkNow(); }
+    ok('ZoeKeyGen ៖ online បាញ់ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ការផ្ទុក SDK ឡើងវិញ',
+        kgBurst.calls.length <= 1, kgBurst.calls.length);
+    const kgFirst = buildSdkRetry(KG);
+    kgFirst.ctx.api.retryFirebaseSdkNow();
+    ok('ZoeKeyGen ៖ ការព្យាយាមលើកដំបូងមិនត្រូវទប់',
+        kgFirst.calls.length === 1, kgFirst.calls.length);
+    ok('ZoeKeyGen ៖ ការ reset ជណ្តើរ មិនត្រូវ reset ពិដានល្បឿន',
+        !/function clearFirebaseSdkRetry\(\)[\s\S]{0,220}lastFirebaseSdkAttemptAt = 0/.test(KG));
+}
+
 // ── ១០គ. ស្ថានភាព «កំពុងភ្ជាប់» — កុំកុហកអ្នកប្រើថាក្រៅបណ្តាញ ────────
 // ថ្នាក់កំហុស៖ **បង្ហាញស្ថានភាពខុស។** មុនកែ ស្ថានភាពមានតែ ២៖ ភ្ជាប់រួច ឬ
 // «ក្រៅបណ្ដាញ»។ ព្រោះ `.info/connected` បាញ់ `false` ភ្លាមៗពេល boot ហើយ

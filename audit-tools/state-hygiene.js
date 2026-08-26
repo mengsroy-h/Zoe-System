@@ -6,9 +6,14 @@ const acorn = require('acorn');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const ROOT = process.env.STATEHYG_APP_DIR ? path.resolve(process.env.STATEHYG_APP_DIR) : path.resolve(__dirname, '..');
 
+// ⚠️ ZoeImport ត្រូវរួមបញ្ចូលដែរ — វាកាន់ **ពាក្យសម្ងាត់នាំចូល**
+// (`apiPassword`) និង **កូនសោ AES** (`configKey`) ក្នុង state កម្រិត module
+// ព្រមទាំងវាល `apiPasswordInput` ក្នុង DOM។ ការទុកវាក្រៅបញ្ជីនេះជាថ្នាក់
+// «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
 const APPS = {
     ZoeW: { reset: ['showLoginModalWithPrefill', 'clearSensitiveModalFields'] },
-    ZoeKeyGen: { reset: ['showLoginModalWithPrefill', 'clearSigningKey'] }
+    ZoeKeyGen: { reset: ['showLoginModalWithPrefill', 'clearSigningKey'] },
+    ZoeImport: { reset: ['lockApp', 'resetSessionState', 'clearSensitiveFields'] }
 };
 
 const ACCEPTED = {

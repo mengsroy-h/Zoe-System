@@ -54,6 +54,36 @@
 - **`connection-recovery-test`** លែងបញ្ឈប់ខ្លួន ➜ tree មុនកែឥឡូវបង្ហាញ
   **២៤ ការធ្លាក់ដែលមានន័យ** ជំនួស «0 ok, 1 FAIL» ដែលបិទបាំងអ្វីៗទាំងអស់។
 
+### កែកំហុសបន្ថែម (ជុំសួរ «មានអ្វីមិនទាន់កែទៀតទេ?»)
+
+- 🔴 **ការបរាជ័យ `crypto.subtle` បណ្តោះអាសន្ន លុប License របស់អតិថិជន។**
+  `verifySignature()` រុំ WebCrypto ក្នុង try/catch រួចត្រឡប់ `false` ➜
+  `getStatus()` បែងចែក «ហត្ថលេខាខុស» ចេញពី «ផ្ទៀងផ្ទាត់មិនបាន» មិនបាន ➜ វា
+  `clearLocalRecord()`។ ថ្នាក់ដដែលនឹងច្បាប់ `{ ok: null }` របស់បណ្តាញ
+  (ដែល `CLAUDE.md` ហាមដាច់ខាត) តែនៅលើអ័ក្ស **crypto** ដែលគ្មានអ្នកការពារ។
+  បង្កើតឡើងវិញបានក្នុង `vm`៖ record បាត់។ ឥឡូវ `verifySignatureAndScope()`
+  ត្រឡប់ `{ unverified: true }` ➜ `getStatus()` **មិនលុប**; ហត្ថលេខាខុសពិត
+  **នៅតែលុបដដែល**; `activate()` **បដិសេធ** អ្វីដែលផ្ទៀងផ្ទាត់មិនបាន។
+- 🔴 **`redactDeep()` មិនលាក់តម្លៃដែលអង្គុយក្រោមកូនសោសម្ងាត់។** វាលាក់តែ
+  លំនាំ `name=value` **ខាងក្នុងខ្សែអក្សរ** ➜ `{ pin: '1234' }` ·
+  `{ apiKey: 'sk-live-…' }` · `{ clientSecret: … }` ធ្លាក់ចូល Sentry ដោយ
+  មិនលាក់។ ឥឡូវលាក់តាមឈ្មោះកូនសោដែរ ដោយប្រើបញ្ជី **តូចជាង** ដើម្បីកុំឲ្យ
+  `keyId` · `barcode` · `itemId` ត្រូវលាក់ (ច្បាប់ «keep case»)។
+- **ZoeImport ៖ `confirmResolver` លេចធ្លាយ។** ការចាក់សោ App ខណៈប្រអប់បញ្ជាក់
+  បើកនៅ ➜ promise **មិនដែលដោះ** ➜ `isBusy` ជាប់ `true` ជារៀងរហូត ➜ ប៊ូតុង
+  នាំចូលស្លាប់រហូតដល់ Refresh។ `resetSessionState()` ឥឡូវដោះវា និង reset
+  `isBusy` + `toastTimer`។
+
+### ចន្លោះ checker ដែលបិទបន្ថែម
+
+- **`secret-hygiene` · `storage-guard` · `dom-hygiene` · `state-hygiene`
+  មិនស្កេន ZoeImport សោះ** — ខណៈវាកាន់ **ពាក្យសម្ងាត់នាំចូល** និង **កូនសោ
+  AES** ក្នុង state កម្រិត module។ ថ្នាក់ «checker ស្កេនឯកសារណាខ្លះ» ដដែល។
+  ក្រោយពង្រីក ➜ `state-hygiene` **រកឃើញ `confirmResolver` ភ្លាម**។
+- `license-grace-test` ៖ ១៣ ➜ ១៦ assertion (អះអាង **៣ ខាង**)។
+- `secret-hygiene` ៖ ៥១ ➜ ៦៦ assertion (អះអាង **២ ខាង** — លាក់ត្រូវ **និង**
+  រក្សា `keyId`/`barcode`/`itemId` ទុក)។
+
 ### កែកំហុសបន្ថែម
 
 - 🔴 **listener `.info/connected` និង `.info/serverTimeOffset` គ្មានផ្លូវស្តារ។**

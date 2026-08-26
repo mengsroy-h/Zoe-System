@@ -126,6 +126,67 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     ok('Paste Key ខូច ➜ មិនលុប Activation ដែលកំពុងដំណើរការ',
         h.store['zoe_license_activation_ADM'] === good, h.store['zoe_license_activation_ADM']);
 
+    // ── ⛔ ការបរាជ័យ **crypto** មិនត្រូវលុប License របស់អតិថិជន ──────────
+    // 🔴 ថ្នាក់ដដែលនឹងច្បាប់ `{ ok: null }` របស់បណ្តាញ តែនៅលើអ័ក្ស **crypto**
+    // ដែលគ្មានអ្នកការពារ។ `verifySignature()` ធ្លាប់រុំ `crypto.subtle` ក្នុង
+    // try/catch រួចត្រឡប់ `false` ➜ `getStatus()` បែងចែក «ហត្ថលេខាខុស» ចេញពី
+    // «ផ្ទៀងផ្ទាត់មិនបាន» មិនបាន ➜ វា `clearLocalRecord()` ➜ **License របស់
+    // អតិថិជនត្រូវលុប** ដោយសារការដួលបណ្តោះអាសន្នរបស់ WebCrypto។
+    // ⚠️ អះអាង **៣ ខាង** — «មិនលុប» តែម្យ៉ាងនឹងបៃតងទោះបើ fence ធ្លាយក៏ដោយ។
+    const LIC_SRC = fs.readFileSync(FILE, 'utf8');
+    function buildLic(verifyResult, importThrows) {
+        const store = {};
+        const ctx = {
+            window: {}, console, setTimeout, clearTimeout,
+            atob: (x) => Buffer.from(x, 'base64').toString('binary'),
+            btoa: (x) => Buffer.from(x, 'binary').toString('base64'),
+            TextEncoder, TextDecoder, AbortController,
+            fetch: () => Promise.reject(new Error('net')),
+            navigator: { onLine: true },
+            Date, Math, JSON, Promise, Uint8Array, isNaN, parseInt,
+            String, Object, Array, Set, Map, RegExp, Number,
+            localStorage: {
+                getItem: (k) => store[k] || null,
+                setItem: (k, v) => { store[k] = v; },
+                removeItem: (k) => { delete store[k]; }
+            },
+            crypto: {
+                getRandomValues: (a) => a,
+                subtle: {
+                    importKey: () => (importThrows
+                        ? Promise.reject(new Error('crypto down'))
+                        : Promise.resolve({})),
+                    verify: () => Promise.resolve(verifyResult)
+                }
+            }
+        };
+        ctx.global = ctx;
+        vm.createContext(ctx);
+        vm.runInContext(LIC_SRC, ctx);
+        const payload = Buffer.from(JSON.stringify({ a: 'ADM', id: 'K1', iat: 1, exp: 99999999999 })).toString('base64url');
+        store['zoe_license_activation_ADM'] = JSON.stringify({
+            keyString: 'ZOEKEY-' + payload + '.AAAA', id: 'K1', a: 'ADM', iat: 1,
+            exp: 99999999999, lastOnlineCheck: Date.now(), onlineExp: Date.now() + 86400000
+        });
+        return { L: ctx.window.ZoeLicense, store };
+    }
+    const licHas = (b) => !!b.store['zoe_license_activation_ADM'];
+
+    const lc1 = buildLic(true, true);
+    await lc1.L.getStatus('ADM');
+    ok('⛔ crypto ដួលបណ្តោះអាសន្ន ➜ License **មិនត្រូវលុប**', licHas(lc1));
+
+    const lc2 = buildLic(false, false);
+    const lcSt = await lc2.L.getStatus('ADM');
+    ok('ហត្ថលេខាខុសពិត ➜ License **ត្រូវលុប** (fence មិនធ្លាយ)',
+        !licHas(lc2) && lcSt.reason === 'signature', JSON.stringify(lcSt));
+
+    const lc3 = buildLic(true, true);
+    const lcKey = 'ZOEKEY-' + Buffer.from(JSON.stringify({ a: 'ADM', id: 'K2', iat: 1, exp: 99999999999 })).toString('base64url') + '.AAAA';
+    const lcAct = await lc3.L.activate(lcKey, 'ADM');
+    ok('activate ខណៈ crypto ដួល ➜ **បដិសេធ** (កុំផ្តល់សិទ្ធិលើអ្វីដែលផ្ទៀងផ្ទាត់មិនបាន)',
+        lcAct.valid === false && lcAct.reason === 'verify-unavailable', JSON.stringify(lcAct));
+
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));
     process.exit(fail === 0 ? 0 : 1);
 })();

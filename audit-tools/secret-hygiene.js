@@ -10,7 +10,11 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.env.SECRET_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen'];
+// ⚠️ ZoeImport ត្រូវរួមបញ្ចូលដែរ — វាកាន់ **ពាក្យសម្ងាត់នាំចូល**
+// (`apiPassword`) និង **កូនសោ AES** (`configKey`) ក្នុង state កម្រិត module
+// ព្រមទាំងវាល `apiPasswordInput` ក្នុង DOM។ ការទុកវាក្រៅបញ្ជីនេះជាថ្នាក់
+// «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
+const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
 
 // ធាតុនីមួយៗត្រូវមានហេតុផលសរសេរជាប់ — ធាតុគ្មានហេតុផលនឹងលាក់ការលេចធ្លាយបន្ទាប់។
 const ACCEPTED = {
@@ -35,7 +39,9 @@ function logoutClearedIds(src) {
     }
 
     // ២) ការសម្អាតដោយផ្ទាល់ក្នុង showLoginModalWithPrefill / clearSensitiveModalFields / clearSigningKey
-    ['showLoginModalWithPrefill', 'clearSensitiveModalFields', 'clearSigningKey'].forEach((fnName) => {
+    // ZoeImport ប្រើឈ្មោះផ្សេង៖ `lockApp()` ➜ `resetSessionState()` ➜ `clearSensitiveFields()`
+    ['showLoginModalWithPrefill', 'clearSensitiveModalFields', 'clearSigningKey',
+     'lockApp', 'resetSessionState', 'clearSensitiveFields'].forEach((fnName) => {
         const start = src.indexOf('function ' + fnName + '(');
         if (start === -1) return;
         let depth = 0, started = false, i = src.indexOf('{', start);
@@ -121,6 +127,35 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
     ok('ZoeErrors បង្ហាញ redactUrl សម្រាប់តេស្ត', !!(api && typeof api.redactUrl === 'function'));
     if (!api || typeof api.redactUrl !== 'function') return;
     const redact = api.redactUrl;
+
+    // ⛔ **ការលាក់តាមឈ្មោះកូនសោវត្ថុ។** `redactDeep()` ធ្លាប់លាក់តែលំនាំ
+    // `name=value` **ខាងក្នុងខ្សែអក្សរ** ➜ តម្លៃដែលអង្គុយក្រោមកូនសោសម្ងាត់
+    // (`{ pin: '1234' }`, `{ apiKey: '…' }`) **រអិលកាត់ទាំងស្រុង**។ វាស់បាន៖
+    // `redactUrl('1234')` ➜ `'1234'`។ ⚠️ អះអាង **២ ខាង** — ការលាក់ទូលាយពេក
+    // នឹងលុប `keyId` · `barcode` · `itemId` ដែល **ត្រូវការសម្រាប់ debug**
+    // (ច្បាប់ «keep case» ក្នុង CLAUDE.md)។
+    if (typeof api.redactEvent === 'function') {
+        const ev = {
+            extra: { pin: '1234', apiKey: 'sk-live-abc', sessionToken: 'ST', password: 'p',
+                     note: 'ok', keyId: 'K1', barcode: 'ABC123', itemId: 'id_123_abc' },
+            contexts: { nested: { clientSecret: 'CS' } }
+        };
+        api.redactEvent(ev);
+        [['pin', ev.extra.pin], ['apiKey', ev.extra.apiKey], ['sessionToken', ev.extra.sessionToken],
+         ['password', ev.extra.password], ['clientSecret (ជាន់ជ្រៅ)', ev.contexts.nested.clientSecret]
+        ].forEach(([label, val]) => {
+            ok('តម្លៃក្រោមកូនសោ `' + label + '` ត្រូវលាក់', val === '[redacted]', String(val));
+        });
+        [['note', ev.extra.note, 'ok'], ['keyId', ev.extra.keyId, 'K1'],
+         ['barcode', ev.extra.barcode, 'ABC123'], ['itemId', ev.extra.itemId, 'id_123_abc']
+        ].forEach(([label, val, want]) => {
+            ok('⛔ `' + label + '` ត្រូវ **រក្សាទុក** (ត្រូវការសម្រាប់ debug)', val === want, String(val));
+        });
+    } else {
+        ok('ZoeErrors បង្ហាញ `redactEvent` ➜ ការលាក់តាមឈ្មោះកូនសោវត្ថុត្រូវវាស់បាន',
+            false, 'គ្មាន `redactEvent` ➜ តម្លៃក្រោមកូនសោដូច `{ pin: … }` `{ apiKey: … }` '
+                + 'មិនត្រូវបានលាក់ ហើយ checker នេះក៏វាស់វាមិនបានដែរ');
+    }
 
     const leaks = [
         ['https://zoew.app/?setup=eyJhcGlLZXkiOiJBSXphU3lCIn0', 'eyJhcGlLZXkiOiJBSXphU3lCIn0', 'Setup Link (Firebase Config ទាំងមូល)'],

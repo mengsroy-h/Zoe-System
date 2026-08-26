@@ -1001,7 +1001,7 @@ publish)។ មុន 2.17.0 មានតែ `isFromDeletion` ដែល **មិ
 | ផ្លូវ | `trashReason` | ស្លាក UI | ស្ថិតិចំណូល |
 |---|---|---|---|
 | `deleteSingleItem` · `buildClearHistoryTrashItem` | `'delete'` | លុប | **មិនប៉ះ** |
-| `claimAndCleanupItem(reason='close')` — បិទរួច ២ ម៉ោង | `'pickup'` | យករួច | **មិនប៉ះ** |
+| `claimAndCleanupItem(reason='close')` — **barcode** បិទរួច ២ ម៉ោង (partial ឬ whole) | `'pickup'` | យករួច | **មិនប៉ះ** |
 | `claimAndCleanupItem(reason='abandon')` — ហួស ៨ ថ្ងៃ | `'expired'` | ផុតកំណត់ | **ដករួច** |
 | `removeSingleBarcode` | `'remove'` | ដក | **ដករួច** |
 
@@ -1090,16 +1090,72 @@ State ថ្មីកម្រិត module ៖ `deletedSearchQuery` និង `
 
 | ផ្លូវ | `isFromDeletion` | `isDeducted` |
 |---|---|---|
-| លុប (`deleteSingleItem`, `clearHistory`, សម្អាត 2h) | `true` | មិនប៉ះ (នៅ `false`) |
+| លុប (`deleteSingleItem`, `clearHistory`, សម្អាត 2h — រួមទាំង partial) | `true` | មិនប៉ះ (នៅ `false`) |
 | ដក (`removeSingleBarcode`, សម្អាត 8d) | `false` | `true` |
 | ស្តារ (`executeRestoreItem`) | លុបចោល | reset |
 
 **`isDeducted` នៅតែជាវាល *តែមួយគត់* ដែលកំណត់លុយ** — `isFromDeletion` ជាសញ្ញាសម្គាល់បន្ថែម។
 
-**ការសម្អាតស្វ័យប្រវត្តិ (កុំប្តូរដោយគ្មានការស្នើ)៖** កញ្ចប់បិទ ➜ ធុងសំរាមក្រោយ **២ ម៉ោង**;
+**ការសម្អាតស្វ័យប្រវត្តិ (កុំប្តូរដោយគ្មានការស្នើ)៖** **barcode** ដែលបិទ ➜ ធុងសំរាមក្រោយ **២ ម៉ោង**
+(តាម `barcode.closedAt` របស់វាផ្ទាល់ តាំងពីកំណែ 2.17.2 — មិនមែនរង់ចាំកញ្ចប់ទាំងមូលទៀតទេ);
 កញ្ចប់មិនទាន់បិទ ➜ ក្រោយ **៨ ថ្ងៃ**; អ្វីក្នុងធុងសំរាម ➜ purge ក្រោយ **១៥ ថ្ងៃ** (`TRASH_RETENTION_MS`, កំណែ 2.17.0)។
 `claimAndCleanupItem()` **ផ្ទៀងផ្ទាត់បង្អួចម្តងទៀតខាងក្នុង transaction** ធៀបនឹងតម្លៃរបស់ server
 ដូច្នេះការកេះដោយស្ថានភាពចាស់ក្នុងសតិ មិនអាច claim ខុសបានទេ។
+
+### កញ្ចប់ដែលយករួច «ខ្លះ» — ការបែងចែកតាម barcode (កំណែ 2.17.2)
+
+> 🔴 **កែតាមរបាយការណ៍ពិតពីអ្នកប្រើ (2026-08-26, មានរូបថតជាភស្តុតាង)។**
+> លេខ `0974158508` មាន barcode ២ — មួយបិទ «យករួច» តាំងពីម្សិលមិញ តែវា
+> **នៅក្នុងបញ្ជីដដែល** ព្រោះបងប្អូនរបស់វានៅបើក។
+
+មុន 2.17.2 ច្បាប់ ២ ម៉ោងដើរនៅ **កម្រិតកញ្ចប់ទាំងមូល** (`item.isClosed` =
+គ្រប់ barcode បិទ)។ ផលៈ លេខទូរស័ព្ទដែលមានអីវ៉ាន់ ២ ហើយអតិថិជនយកតែ ១ ➜
+កញ្ចប់ដែលយករួច **ជាប់ក្នុងបញ្ជីរហូតដល់ថ្ងៃទី ៨**។ ឥឡូវច្បាប់ ២ ម៉ោង
+**ដើរតាម barcode នីមួយៗ**៖
+
+| ច្បាប់ | អ្វីត្រូវបានវាស់ | ផលលើកញ្ចប់លាយ (A បិទ · B បើក) |
+|---|---|---|
+| ២ ម៉ោង (`reason='close'`) | **`barcode.closedAt` របស់ barcode នីមួយៗ** | A ចេញតែឯងជា `pickup` (**មិនប៉ះលុយ**); B និងនាឡិកា ៨ ថ្ងៃរបស់វា **នៅដដែល** |
+| ៨ ថ្ងៃ (`reason='abandon'`) | `item.createdAt` រួចបែងចែកតាម `barcode.isClosed` | B ចេញជា `expired` (**ដកលុយ**); A ដែលបិទរួច **មិនត្រូវដកលុយ** |
+
+**វាល `closedAt` ក្នុង barcode នីមួយៗ** (`barcodes/$idx/closedAt`) ជាមូលដ្ឋាន
+នៃទាំងអស់នេះ។ ច្បាប់៖
+
+- ការបិទ/បើកគ្រប់កន្លែងឆ្លងកាត់ **`applyBarcodeCloseState(barcode, closed, at)`**
+  — កុំសរសេរ `b.isClosed = x` ត្រង់ៗវិញ បើមិនដូច្នេះត្រានឹងឃ្លាតពីស្ថានភាព។
+  ផ្លូវទាំង ៤ ត្រូវប្រើវា៖ local + server នៃ `toggleIndividualBarcodeClose`
+  និង local + server នៃ `togglePackageStatus`; ផ្លូវ revert ត្រូវស្តារត្រាដែរ
+  (`previousState.barcodeClosedAt` និង `previousState.barcodeCloseStamps`)។
+- **`barcodeCloseIsRipe(b, now)`** ជាអ្នកសម្រេចតែមួយ — `isClosed` **និង**
+  `closedAt` ជាលេខ **និង** ហួស `TWO_HOURS_MS`។
+- **`normalizeBarcodeCloseStamps(item, now)`** គ្រប TIN ទិន្នន័យចាស់៖ barcode
+  ដែលបិទរួច តែគ្មាន `closedAt` ត្រូវ **បោះត្រា** (ពី `item.closedAt` បើមាន
+  បើអត់ពី «ឥឡូវ») ➜ វាចេញ ២ ម៉ោងក្រោយ។ **កុំប្តូរវាទៅជា «លុបភ្លាម»** —
+  ការធ្វើដូចនោះនឹងផ្លាស់កញ្ចប់ចាស់ទាំងអស់ចូលធុងសំរាមក្នុងវិនាទីតែមួយ។
+- ការសម្អាតដែលរកឃើញថា **គ្មានអ្វីត្រូវធ្វើ ហើយក៏គ្មានត្រាថ្មី** ត្រូវ
+  `return undefined` (បោះបង់ transaction) មិនមែន `return currentItem` ទេ —
+  បើមិនដូច្នេះរាល់ជុំ ៦០ វិនាទីសរសេរជាន់រាល់កញ្ចប់ដោយឥតប្រយោជន៍។
+- **`executeRestoreItem()` ត្រូវ reset `closedAt` របស់ barcode ដែលបិទ**
+  ទៅ `getServerNow()` — បើភ្លេច ការស្តារពីធុងសំរាមនឹង **លោតចូលធុងសំរាមវិញ
+  ក្នុងជុំសម្អាតបន្ទាប់** ព្រោះត្រាចាស់ហួស ២ ម៉ោងស្រាប់។ (ផ្លូវកម្រិត item
+  ធ្វើដូចនេះរួចហើយតាំងពីមុន។)
+
+⛔ **លុយនៅតែជាកម្មសិទ្ធិរបស់ `isDeducted` តែម្យ៉ាង។** ផ្លូវ ២ ម៉ោង —
+ទាំង partial និង whole — **មិនហៅ `addRevenueToDailyAndMonthlyRecord()` ទេ**។
+បើ `partialIsPickup` ត្រូវបានធ្វើឲ្យខុស នោះលុយរបស់អតិថិជនដែល **យកអីវ៉ាន់
+រួចហើយ** នឹងត្រូវដកចេញពីស្ថិតិ។
+
+**Firebase rules៖** `barcodes/$idx` មាន `$other: { ".validate": false }`
+ទាំង `zoew_scan_history_cod_dod` និង `zoew_recently_deleted_cod_dod` ➜
+`closedAt` ត្រូវមានក្នុង **ទាំង ២** បើមិនដូច្នេះ **រាល់ការបិទ barcode
+ត្រូវបដិសេធ (`permission_denied`)**។ បន្ថែមក្នុងកំណែ 2.17.2 —
+⚠️ **ត្រូវ publish ដោយដៃមុន deploy** (មើល `CHANGELOG.md`)។
+
+Test៖ **`partial-pickup-cleanup-test.js`** (48 assertion — រត់ពេលវេលាពេញលេញ
+លើកូដពិត)។ លេខ mutation ដែលវាស់បាន៖ ដក trigger ចេញ ➜ **១៥** ធ្លាក់;
+ធ្វើឲ្យផ្លូវ pickup ដកលុយ ➜ **៨**; ធ្វើឲ្យថ្ងៃទី ៨ ដក barcode ដែលយករួចដែរ
+➜ **៥**; ធ្វើឲ្យជុំទំនេរសរសេរជាន់ ➜ **១**។ ការ reset ត្រាពេលស្តារ
+ចាក់សោដោយ **`policy-test.js`**។
 
 ### នាឡិកា
 
@@ -1283,7 +1339,22 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 **៣ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
 
-#### ០. កំណែ 2.17.1 — ជុំ deep audit (កំហុសផលិតកម្ម ៣)
+#### ០. កំណែ 2.17.2 — barcode «យករួច» ចេញក្នុង ២ ម៉ោង ដោយឯករាជ្យ
+
+⛔ **ត្រូវ publish Firebase rules មុន deploy** (`closedAt` ក្នុង
+`barcodes/$idx` នៃ node ទាំង ២) — បើមិនដូច្នេះ **ការបិទ «យករួច»
+ត្រូវបដិសេធទាំងស្រុង**។ រួចសូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. **លេខទូរស័ព្ទដែលមាន barcode ២ ➜ បិទ «យក» តែ ១** ➜ ក្រោយ ២ ម៉ោង
+   barcode នោះ **ចេញពីបញ្ជី** ហើយចូលធុងសំរាមជាស្លាក **«យករួច»**
+   ចំណែក barcode មួយទៀត **នៅដដែល**។
+2. **ស្ថិតិចំណូលមិនប្រែសោះ** ពេលនោះ (មិនមែនការ «ដក» ទេ)។
+3. **កញ្ចប់ចាស់ដែលបិទរួចមុនកំណែនេះ** (ដូចលេខ `0974158508`) ➜ ចេញក្នុង
+   ~២ ម៉ោងក្រោយបើក App កំណែថ្មី មិនមែនភ្លាមៗទេ។
+4. **ស្តារពីធុងសំរាម** ➜ កញ្ចប់ត្រឡប់មកបញ្ជីវិញ ហើយ **មិនលោតចូល
+   ធុងសំរាមភ្លាម** (នាឡិកា ២ ម៉ោងចាប់ផ្តើមឡើងវិញ)។
+
+#### ១. កំណែ 2.17.1 — ជុំ deep audit (កំហុសផលិតកម្ម ៣)
 
 កំហុសទាំង ៣ **បង្ហាញភស្តុតាងក្នុង browser ពិត** មុនកែ ហើយមានឧបករណ៍ចាក់សោ
 ឥឡូវនេះ។ ប៉ុន្តែ ២ ក្នុងចំណោមនោះទាក់ទងនឹង **បណ្តាញពិត** ដែលបរិស្ថាន audit
@@ -1435,6 +1506,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | វដ្តភ្ជាប់ឡើងវិញកាត់ផ្តាច់ handshake ដែលកំពុងដំណើរការ | `reconnect-ladder-test.js` |
 | កាមេរ៉ាកកក្រោយប្រអប់ native (`confirm`/`alert`) | `camera-resume-test.js` |
 | ការចាត់ថ្នាក់/merge/សរុបលុយ របស់ធុងសំរាម និង `trashReason` ↔ rules | `trash-modal-test.js` |
+| barcode ដែលយករួច មិនចេញក្នុង ២ ម៉ោង ឬត្រូវដកលុយខុសពេលបងប្អូនផុតកំណត់ | `partial-pickup-cleanup-test.js` |
 | `fb.X` ដែល `firebase-loader.js` មិន export ➜ `undefined` លើផលិតកម្ម | `sdk-surface.js` |
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
 | `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |

@@ -92,6 +92,9 @@
             "createdAt": {
               ".validate": "newData.isNumber()"
             },
+            "closedAt": {
+              ".validate": "newData.isNumber()"
+            },
             "lockerUpdatedAt": {
               ".validate": "newData.isNumber()"
             },
@@ -241,6 +244,9 @@
               ".validate": "newData.isString()"
             },
             "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "closedAt": {
               ".validate": "newData.isNumber()"
             },
             "lockerUpdatedAt": {

@@ -53,7 +53,7 @@ function makeCtx(src) {
     };
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
-    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf']) {
+    for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState']) {
         const code = extractFn(src, fn);
         if (code) vm.runInContext(code, ctx);
     }

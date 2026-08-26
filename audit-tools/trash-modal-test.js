@@ -68,8 +68,9 @@ ok(!!claimBody, 'claimAndCleanupItem មានក្នុង app.js');
 const expiredHits = (claimBody.match(/trashReason = 'expired'/g) || []).length;
 ok(expiredHits === 2,
     "claimAndCleanupItem ដាក់ 'expired' ទាំងផ្លូវ partial និងផ្លូវ whole (៨ ថ្ងៃ)", expiredHits);
-ok((claimBody.match(/trashReason = 'pickup'/g) || []).length === 1,
-    "claimAndCleanupItem ដាក់ 'pickup' លើផ្លូវបិទរួច ២ ម៉ោង");
+const pickupHits = (claimBody.match(/trashReason = 'pickup'/g) || []).length;
+ok(pickupHits === 2,
+    "claimAndCleanupItem ដាក់ 'pickup' ទាំងផ្លូវ partial (barcode បិទរួច ២ ម៉ោង) និងផ្លូវ whole", pickupHits);
 
 // ផ្លូវស្តារត្រូវលុបវាលចេញ មុនសរសេរទៅ scan_history
 const restoreBody = sliceFn(src, 'executeRestoreItem');

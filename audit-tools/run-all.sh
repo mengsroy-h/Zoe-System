@@ -100,6 +100,7 @@ run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
+run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
 
 echo
 echo
@@ -184,6 +185,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
     FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
     TOAST_APP_DIR="$BASE" node audit-tools/toast-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-truth:     /'
+    CSPLAZY_APP_DIR="$BASE" node audit-tools/csp-lazy-resource-test.js 2>&1 | tail -1 | sed 's/^/   csp-lazy:        /'
 fi
 
 echo

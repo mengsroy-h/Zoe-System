@@ -24,6 +24,77 @@
 
 ---
 
+## [2.19.1] — 2026-08-26 · Export Excel ដើរវិញ — SheetJS ចូលមកក្នុង repo
+
+> 🔴 **កំហុសផលិតកម្មពិត។** អ្នកប្រើរាយការណ៍ថា **«export excel អត់ចេញ មិនមែន
+> មកពី internet ទេ internet ខ្ញុំដើរលឿនធម្មតា»** ព្រមទាំងផ្ញើដាន Sentry ពិត
+> មកជាមួយ។ **អ្នកប្រើត្រូវទាំងស្រុង** — បណ្តាញគ្មានពាក់ព័ន្ធអ្វីសោះ។
+
+### កែកំហុស
+
+- 🔴 **Export Excel ស្លាប់ទាំងស្រុងលើផលិតកម្ម — `script-src` ទប់ SheetJS។**
+  ZoeW ទាញ SheetJS ពី `https://unpkg.com/xlsx@0.18.5/...` ខណៈ header CSP ក្នុង
+  `ZoeW/netlify.toml` អនុញ្ញាតតែ `'self' 'wasm-unsafe-eval' www.gstatic.com
+  js.sentry-cdn.com browser.sentry-cdn.com *.firebaseio.com
+  *.firebasedatabase.app` ➜ **គ្មាន `unpkg.com` សោះ** ➜ browser **ទប់មុនចេញ
+  ដំណើរ**។
+
+  ដាន Sentry ពីឧបករណ៍ពិតបញ្ជាក់វា — សំណើឯទៀត **200 គ្រប់** (`zxing_reader.wasm`
+  · `identitytoolkit` · `license_keys` · Apps Script) ហើយមានតែបន្ទាត់នេះ៖
+
+  ```
+  Excel export failed: Error: Failed to load https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
+      at HTMLScriptElement.<anonymous> (https://zoew.netlify.app/app.js:4821:79)
+  ```
+
+  បង្កើតឡើងវិញក្នុង Chromium ពិតជាមួយ header CSP ពិត ដោយ **បម្រើ unpkg ក្នុង
+  មូលដ្ឋាន** ដើម្បីឲ្យ **តែ CSP** ជាអ្នកសម្រេច៖
+
+  | រង្វាស់ | មុនកែ | ក្រោយកែ |
+  |---|---|---|
+  | ការផ្ទុក library | `{ loaded: false, hasXLSX: false }` | `{ loaded: true, hasXLSX: true }` |
+  | សំណើទៅដល់ CDN | **0** (ទប់មុនចេញដំណើរ) | **0** (លែងត្រូវការ) |
+  | ការរំលោភ CSP | `Refused to load the script …` | គ្មាន |
+  | សរសេរ `.xlsx` ពិត | `XLSX is not defined` | ឯកសារចាប់ផ្តើមដោយ `PK` |
+
+  **ដំណោះស្រាយ៖ SheetJS ចូលមកក្នុង repo** (`ZoeW/vendor/xlsx.full.min.js`) —
+  ច្បាប់ដដែលនឹង ZXing ក្នុងកំណែ 2.10.0 និងដដែលនឹង ZoeImport ដែលធ្វើរួចហើយ។
+  ឯកសារនោះជាឯកសារ **byte-identical** នឹងអ្វីដែល unpkg ធ្លាប់បម្រើ —
+  ផ្ទៀងផ្ទាត់ដោយ sha384 ត្រូវនឹង SRI ដើមរបស់ ZoeW បេះបិទ។ វាក៏ចូល
+  `OPTIONAL_SHELL` របស់ `sw.js` ដែរ ➜ **Export ដើរពេលក្រៅបណ្ដាញ** ដោយមិន
+  ធ្វើឲ្យការដំឡើង SW ក្លាយជា atomic លើឯកសារ ៨៨១ kB ថែមទៀត។
+
+- **សារបរាជ័យចោទបណ្តាញខុស។** «❌ Export Excel បរាជ័យ! សូមពិនិត្យការតភ្ជាប់
+  អ៊ីនធឺណិត» ចេញលើ **គ្រប់** កំហុស រួមទាំងកំហុសដែលបណ្តាញគ្មានពាក់ព័ន្ធ។
+  ឥឡូវ `exportFailureMessage()` បែងចែក៖ ការផ្ទុកឯកសារធ្លាក់ខណៈ **បណ្តាញដើរ**
+  ➜ «ផ្ទុកឯកសារ Excel មិនបានទេ — សូម Refresh ទំព័រម្តង»; ក្រៅបណ្ដាញពិត ➜
+  ទើបនិយាយពីបណ្តាញ; កំហុសផ្សេង ➜ បង្ហាញមូលហេតុពិត។ (បន្តស្មារតីជុំ 2.19.0។)
+
+- **`loadScriptOnce()` សរសេរ `script.integrity = undefined`** ពេល lib គ្មាន
+  hash ➜ attribute ក្លាយជាខ្សែអក្សរ `"undefined"` ➜ SRI ធ្លាក់។ ឥឡូវវាដាក់
+  `integrity` និង `crossOrigin` **តែពេល lib ប្រកាសវា**។
+
+### ឧបករណ៍ audit
+
+- **`csp-lazy-resource-test.js` ថ្មី (២៥ assertion, App ទាំង ៣)។**
+  ថ្នាក់កំហុសនេះរស់រានយូរព្រោះ **គ្មាន checker ណាមួយសួរថា browser យក library
+  មកពីណា**៖ `csp-enforced-test.js` វាស់តែធនធានដែលផ្ទុក **ពេល boot** ចំណែក
+  `export-cells-test.js` ប្រើ module `xlsx` **របស់ npm ក្នុង Node**។ មេរៀន
+  ដដែលនឹង `network-timeout-test.js` (2.12.1) និង `fluid-type-focus-test.js`
+  (2.16.0)។ ឥឡូវវាគ្រប **ធនធានដែលផ្ទុកយឺត** — អ្វីដែលលេចឡើងតែពេលអ្នកប្រើចុច៖
+  រាល់ URL ដែលបញ្ចប់ដោយ `.js` ក្នុងកូដត្រូវឆ្លងកាត់ `script-src` ពិត ·
+  SheetJS ក្នុង repo ត្រូវនឹង sha384 · វានៅក្នុងសំបក SW · សារបរាជ័យមិនចោទ
+  បណ្តាញខុស · ហើយ **ផ្លូវផ្ទុកពិតត្រូវរត់ក្នុង Chromium ក្រោម header CSP ពិត
+  រួចសរសេរ `.xlsx` ចេញមកមែន**។ លើ tree មុនកែ វាធ្លាក់ **១០ assertion**
+  ដោយបង្ហាញសារដដែលនឹងដាន Sentry របស់អ្នកប្រើបេះបិទ។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន។** Firebase rules មិនប្រែសោះ។ CSP **មិនត្រូវបន្ថែម `unpkg.com` ទេ**
+  — ដំណោះស្រាយគឺដកការពឹងផ្អែកលើ CDN ចេញ មិនមែនបើកទ្វារឲ្យវា។
+
+---
+
 ## [2.19.0] — 2026-08-26 · Toast និងស្លាកស្ថានភាព ត្រូវនិយាយការពិត realtime
 
 សំណើអ្នកប្រើ (មានរូបថតជាភស្តុតាង)៖ **«toast អត់ពិត អត់តាមស្ថានភាពជាក់ស្ដែងសោះ

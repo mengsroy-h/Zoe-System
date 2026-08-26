@@ -109,7 +109,7 @@ function makeTab(app, shared, suffix) {
         cloneRestoreItem: (item) => clone(item),
         setTimeout: (fn) => { fn(); return 0; }
     });
-    new vm.Script(`${helpers}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
+    new vm.Script(`function stripHistoryOnlyMarkers(item) { if (!item || typeof item !== 'object') return item; delete item.clearClaim; delete item.restoreClaim; delete item.restoreClaimId; delete item.restoreClaimToken; return item; }\n${helpers}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
     return context.clearHelpers;
 }
 

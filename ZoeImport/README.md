@@ -309,7 +309,7 @@ PIN ខ្លី/មិនត្រូវគ្នា, ការចាក់ស�
 
 App នេះក៏ស្ថិតក្នុង `audit-tools/run-all.sh` ដែរ តាមរយៈ `layout-check.js`
 (៦ ទំហំអេក្រង់), `boot-animation-test.js`, `sw-shell-latency-test.js`,
-`sw-revalidate-pressure-test.js` និង `comments.js`។
+`sw-revalidate-pressure-test.js`, `clock-hygiene.js` និង `comments.js`។
 
 ### ការឡើងកំណែ
 

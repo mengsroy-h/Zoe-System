@@ -247,7 +247,7 @@ function seedData() {
 // deterministic PRNG so any failure reproduces from its seed
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
-const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep'];
+const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteItem', 'restore', 'editPrice', 'sweep', 'sweepPickup'];
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
@@ -331,6 +331,24 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                                 for (let k = 0; k < bcs.length; k++) window.__setPath('zoew_scan_history_cod_dod/' + id + '/barcodes/' + k + '/createdAt', old);
                             }
                             window.runAutomaticCleanupRules(); return 'sweep';
+                        }
+                        if (wanted === 'sweepPickup') {
+                            const s = window.__fakeStore.zoew_scan_history_cod_dod || {};
+                            const ids = Object.keys(s); if (!ids.length) return null;
+                            const id = ids[Math.floor(pick * ids.length) % ids.length];
+                            const ripe = Date.now() - 3 * 3600 * 1000;
+                            const bag = (s[id] && s[id].barcodes) || {};
+                            const keys = Array.isArray(bag) ? bag.map((x, i) => String(i)) : Object.keys(bag);
+                            let aged = 0;
+                            for (const k of keys) {
+                                if (bag[k] && bag[k].isClosed === true) {
+                                    window.__setPath('zoew_scan_history_cod_dod/' + id + '/barcodes/' + k + '/closedAt', ripe);
+                                    aged++;
+                                }
+                            }
+                            if (!aged) return null;
+                            if (s[id].isClosed) window.__setPath('zoew_scan_history_cod_dod/' + id + '/closedAt', ripe);
+                            window.runAutomaticCleanupRules(); return 'sweepPickup';
                         }
                     } catch (e) { return 'threw:' + wanted + ':' + (e && e.message); }
                     return null;

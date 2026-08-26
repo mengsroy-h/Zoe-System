@@ -2,7 +2,7 @@
   "name": "ZoeKeyGen - ប្រព័ន្ធបង្កើត Activation Key",
   "short_name": "ZoeKeyGen",
   "description": "កម្មវិធីគ្រប់គ្រង/បង្កើត Key សម្រាប់ Active ZoeW",
-  "version": "2.19.1",
+  "version": "2.19.2",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

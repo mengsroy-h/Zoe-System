@@ -150,6 +150,79 @@ console.log('\n-- ៤. ZoeW ៖ «ភ្ជាប់រួច» មិនដូ�
         toastAt !== -1 && listenersAt !== -1 && toastAt > listenersAt, { toastAt, listenersAt });
 }
 
+// ── ៤ខ. វគ្គដែលបានបញ្ចប់ មិនត្រូវនៅតែប្រកាសជោគជ័យ ─────────────────
+// កំហុសផលិតកម្មពិត (2026-08-26)៖ ក្រោយពិដាន ៤ ម៉ោង App បើកប្រអប់ login
+// ឡើងវិញ **ខណៈ toast ដដែលនោះនៅ «រស់»** ➜ ការគូរស្ថានភាពការតភ្ជាប់បន្ទាប់
+// សរសេរជាន់វាទៅជា «✅ ចូលប្រព័ន្ធជោគជ័យ — ទិន្នន័យទាន់សម័យ» ចំពេលអ្នកប្រើ
+// ត្រូវបានស្នើឲ្យវាយពាក្យសម្ងាត់ម្ដងទៀត។
+//
+// មូលហេតុ៖ `liveToastState()` អានតែស្ថានភាព **បណ្តាញ** — វាមិនដែលសួរថា
+// «តើគេនៅចូលប្រព័ន្ធទេ?» សោះ។ ដូច្នេះការអះអាងទាំងពីរខាងត្រូវការ៖ វាត្រូវ
+// បដិសេធការប្រកាសពេលវគ្គស្លាប់ **ហើយនៅតែប្រកាសពេលវគ្គរស់** — បើមិនដូច្នេះ
+// «កុំប្រកាសសោះ» ក៏ជាប់តេស្តដែរ។
+console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ toast ត្រូវនិយាយការពិត --');
+{
+    const js = read('ZoeW/app.js');
+    const state = sliceFn(js, 'liveToastState') || '';
+    const proceed = sliceFn(js, 'proceedAfterLogin') || '';
+    const expire = sliceFn(js, 'forceExpireSession') || '';
+    const prefill = sliceFn(js, 'showLoginModalWithPrefill') || '';
+    const refresh = sliceFn(js, 'refreshLiveToasts') || '';
+
+    ok('ZoeW ៖ liveToastState សួររកអ្នកប្រើដែលនៅចូលប្រព័ន្ធពិត',
+        /auth\.currentUser/.test(state));
+    ok('ZoeW ៖ និងដឹងថាពិដាន ៤ ម៉ោងបានផុតកំណត់',
+        /sessionExpiryCheck === 'expired'/.test(state));
+    ok('ZoeW ៖ មិនអះអាងជោគជ័យខណៈការផ្ទៀងផ្ទាត់វគ្គមិនទាន់ចប់',
+        /sessionExpiryCheck === 'pending'/.test(state));
+
+    const armAt = proceed.indexOf("sessionExpiryCheck = 'pending'");
+    const announceAt = proceed.indexOf("showLiveToast('signin')");
+    ok('ZoeW ៖ proceedAfterLogin ដាក់ទង់ «មិនទាន់ដឹង» មុនប្រកាស',
+        armAt !== -1 && announceAt !== -1 && armAt < announceAt, { armAt, announceAt });
+
+    const markAt = expire.indexOf("sessionExpiryCheck = 'expired'");
+    const signOutAt = expire.indexOf('fb.signOut');
+    ok('ZoeW ៖ forceExpireSession សម្គាល់វគ្គថាស្លាប់ **មុន** ការចាកចេញ async',
+        markAt !== -1 && signOutAt !== -1 && markAt < signOutAt, { markAt, signOutAt });
+    ok('ZoeW ៖ ហើយកែ toast ដែលរស់ភ្លាម (មិនរង់ចាំព្រឹត្តិការណ៍បណ្តាញបន្ទាប់)',
+        /refreshLiveToasts\(\)/.test(expire));
+    ok('ZoeW ៖ សារផុតកំណត់ជាថេរតែមួយ ចែករំលែករវាង toast រស់ និង toast ថ្មី',
+        /SESSION_EXPIRED_TOAST/.test(expire) && /SESSION_EXPIRED_TOAST/.test(state));
+    ok('ZoeW ៖ សារផុតកំណត់លេចជាក់ស្តែងតែ **១** (មិនប្រកាសស្ទួន មិនបាត់)',
+        /reannounceOrShowToast\(SESSION_EXPIRED_TOAST\)/.test(expire));
+    const reannounce = sliceFn(js, 'reannounceOrShowToast') || '';
+    ok('ZoeW ៖ បើ toast នោះនៅលើអេក្រង់ ➜ រស់វិញពេញ ៣ វិ. ជំនួសការបន្ថែមថ្មី',
+        /classList\.add\('show'\)/.test(reannounce) &&
+        /armToastDismiss\(items\[i\], TOAST_LIFETIME_MS\)/.test(reannounce) &&
+        /return showToast\(msg\);/.test(reannounce));
+    ok('ZoeW ៖ ប្រអប់ login បើក ➜ អានសេចក្តីពិតឡើងវិញ',
+        /refreshLiveToasts\(\)/.test(prefill));
+    ok('ZoeW ៖ refreshLiveToasts នៅត្រឡប់ចេញភ្លាមពេលគ្មាន toastContainer (តេស្ត vm)',
+        /return;/.test(refresh) && refresh.indexOf('return;') < refresh.indexOf('querySelectorAll('));
+    const expireRefreshAt = expire.indexOf('refreshLiveToasts()');
+    ok('ZoeW ៖ ហើយការកែនោះកើតមុន fb.signOut (async) មិនមែនក្រោយ',
+        expireRefreshAt !== -1 && signOutAt !== -1 && expireRefreshAt < signOutAt,
+        { expireRefreshAt, signOutAt });
+}
+{
+    const js = read('ZoeKeyGen/app.js');
+    const state = sliceFn(js, 'liveToastState') || '';
+    const proceed = sliceFn(js, 'verifyAdminRoleThenProceed') || '';
+    const prefill = sliceFn(js, 'showLoginModalWithPrefill') || '';
+
+    ok('ZoeKeyGen ៖ liveToastState សួររកអ្នកប្រើដែលនៅចូលប្រព័ន្ធពិត',
+        /auth\.currentUser/.test(state) && /isSignedInUiActive/.test(state));
+    const flagAt = proceed.indexOf('isSignedInUiActive = true');
+    const announceAt = proceed.indexOf("showLiveToast('signin')");
+    ok('ZoeKeyGen ៖ លើកទង់ចូលប្រព័ន្ធ **មុន** ប្រកាស (បើក្រោយ ➜ វាប្រកាសការចាកចេញរបស់ខ្លួន)',
+        flagAt !== -1 && announceAt !== -1 && flagAt < announceAt, { flagAt, announceAt });
+    const clearAt = prefill.indexOf('isSignedInUiActive = false');
+    const refreshAt = prefill.indexOf('refreshLiveToasts()');
+    ok('ZoeKeyGen ៖ ប្រអប់ login បើក ➜ អានសេចក្តីពិតឡើងវិញក្រោយបន្ទាបទង់',
+        clearAt !== -1 && refreshAt !== -1 && clearAt < refreshAt, { clearAt, refreshAt });
+}
+
 // ── ៥. ZoeImport ៖ សូចនាករតំណ ត្រូវតាមការពិតរាល់ការហៅ ─────────────
 console.log('\n-- ៥. ZoeImport ៖ ស្ថានភាពតំណត្រូវប្តូរតាមលទ្ធផលពិត --');
 {
@@ -176,11 +249,17 @@ const PROBE_FNS = ['toastKindOf', 'paintToast', 'armToastDismiss', 'showToast', 
     'showLiveToast', 'refreshLiveToasts', 'liveToastState', 'connectionLooksOnline',
     'connectionIsSettlingIn', 'renderConnectionStatus'];
 const PROBE_CONSTS = ['TOAST_LIFETIME_MS', 'TOAST_LIVE_LIMIT_MS', 'TOAST_CLASSES', 'TOAST_KIND_MARKS'];
+// ថេររបស់វគ្គចូលប្រព័ន្ធ៖ ZoeW មានពិដាន ៤ ម៉ោង ដូច្នេះវាមានសារផុតកំណត់
+// ដាច់ដោយឡែក; ZoeKeyGen គ្មានពិដាននោះទេ — វាមានតែស្ថានភាព «ចាកចេញ»។
+const PROBE_CONSTS_EXTRA = {
+    ZoeW: ['SESSION_EXPIRED_TOAST', 'SESSION_SIGNED_OUT_TOAST'],
+    ZoeKeyGen: ['SESSION_SIGNED_OUT_TOAST']
+};
 
 function buildProbe(app) {
     const js = read(app + '/app.js');
     const parts = [];
-    for (const name of PROBE_CONSTS) {
+    for (const name of PROBE_CONSTS.concat(PROBE_CONSTS_EXTRA[app] || [])) {
         const c = sliceConst(js, name);
         if (!c) return null;
         parts.push(c);
@@ -196,6 +275,9 @@ function buildProbe(app) {
         'let isDatabaseInitialized = true;\n' +
         'let firebaseSdkUnavailable = false;\n' +
         'let reconnectWatchdogAttempt = 0;\n' +
+        'let sessionExpiryCheck = \'live\';\n' +
+        'let isSignedInUiActive = true;\n' +
+        'let auth = { currentUser: { uid: \'probe\' } };\n' +
         'const CONNECTING_GRACE_ATTEMPTS = 3;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
         parts.join('\n') + '\n' +
@@ -206,9 +288,14 @@ function buildProbe(app) {
         '    reconnectWatchdogAttempt = s.watchdog || 0;\n' +
         '    dbListenerPendingPaths.clear();\n' +
         '    (s.pending || []).forEach((p) => dbListenerPendingPaths.add(p));\n' +
+        '    const session = s.session || \'live\';\n' +
+        '    sessionExpiryCheck = session;\n' +
+        '    isSignedInUiActive = session !== \'out\';\n' +
+        '    auth = { currentUser: session === \'out\' ? null : { uid: \'probe\' } };\n' +
         '  },\n' +
         '  render: renderConnectionStatus,\n' +
         '  signin: () => showLiveToast(\'signin\'),\n' +
+        '  clear: () => { document.getElementById(\'toastContainer\').innerHTML = \'\'; },\n' +
         '  liveCount: () => document.querySelectorAll(\'#toastContainer [data-live-toast]\').length\n' +
         '};\n' +
         '})();';
@@ -355,6 +442,46 @@ function readToast(page) {
                 ok(app + ' ៖ ហើយវាឈប់ «រស់» ទៀត (លែងសរសេរជាន់)',
                     !!settled && settled.live === null &&
                     (await page.evaluate(() => window.__toastProbe.liveCount())) === 0, settled);
+
+                // វគ្គដែលបានបញ្ចប់ ៖ ២ ខាង — បដិសេធពេលស្លាប់ ហើយនៅតែប្រកាសពេលរស់
+                const warnBg = await page.evaluate(() => {
+                    const probe = document.createElement('div');
+                    probe.className = 'toast toast-warn';
+                    document.getElementById('toastContainer').appendChild(probe);
+                    const bg = getComputedStyle(probe).backgroundColor;
+                    probe.remove();
+                    return bg;
+                });
+                const deadSession = app === 'ZoeW' ? 'expired' : 'out';
+                await page.evaluate((session) => {
+                    window.__toastProbe.clear();
+                    window.__toastProbe.set({ connected: false, session: 'live' });
+                    window.__toastProbe.signin();
+                    window.__toastProbe.set({ connected: true, pending: [], session: session });
+                    window.__toastProbe.render();
+                }, deadSession);
+                const dead = await readToast(page);
+                ok(app + ' ៖ វគ្គបានបញ្ចប់ ➜ toast ដដែលឈប់អះអាងជោគជ័យ',
+                    !!dead && dead.text.indexOf('ជោគជ័យ') === -1, dead);
+                ok(app + ' ៖ ហើយវាប្រាប់ថាត្រូវចូលប្រព័ន្ធម្ដងទៀត',
+                    !!dead && dead.text.indexOf('ចូលប្រព័ន្ធម្ដងទៀត') !== -1, dead);
+                ok(app + ' ៖ ជាមួយពណ៌ព្រមាន មិនមែនពណ៌ជោគជ័យ',
+                    !!dead && dead.bg === warnBg && dead.bg !== successBg,
+                    { toast: dead && dead.bg, warn: warnBg, success: successBg });
+                ok(app + ' ៖ ហើយវាឈប់ «រស់» (មិនអាចត្រូវសរសេរជាន់ជាជោគជ័យទៀតទេ)',
+                    !!dead && dead.live === null &&
+                    (await page.evaluate(() => window.__toastProbe.liveCount())) === 0, dead);
+
+                await page.evaluate(() => {
+                    window.__toastProbe.clear();
+                    window.__toastProbe.set({ connected: false, session: 'live' });
+                    window.__toastProbe.signin();
+                    window.__toastProbe.set({ connected: true, pending: [], session: 'live' });
+                    window.__toastProbe.render();
+                });
+                const alive = await readToast(page);
+                ok(app + ' ៖ ខាងទីពីរ ៖ វគ្គនៅរស់ ➜ វានៅតែប្រកាសជោគជ័យដដែល',
+                    !!alive && alive.text.indexOf('ជោគជ័យ') !== -1 && alive.bg === successBg, alive);
             }
         } catch (e) {
             ok(app + ' ៖ ការវាស់ក្នុង browser រត់បាន', false, String(e && e.message));

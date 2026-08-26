@@ -94,6 +94,10 @@ for (const app of ['ZoeW']) {
         if (helper) vm.runInContext(helper, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
+        // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜
+        // ចាក់ **កូដពិត** ចូល sandbox។ វាត្រឡប់នៅបន្ទាត់ដំបូងព្រោះ fake DOM
+        // គ្មាន `toastContainer` — ដូច្នេះវាមិនត្រូវការ `liveToastState` ទេ។
+        vm.runInContext(sliceFn(src, 'refreshLiveToasts'), ctx);
         vm.runInContext(sliceFn(src, 'showLoginModalWithPrefill'), ctx);
 
         let threw = null;

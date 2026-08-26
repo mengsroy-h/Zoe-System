@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.19.1';
+    const APP_VERSION = '2.19.2';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -249,6 +249,7 @@
     let authUnsubscribe = null;
     let authRecoveryTimeout = null;
     let authGeneration = 0;
+    let sessionExpiryCheck = 'pending';
     let isDatabaseConnected = false;
     let hasEverConnectedToDatabase = false;
     let networkJustReturned = false;
@@ -2126,16 +2127,18 @@
         }
     }
 
+    const SESSION_EXPIRED_TOAST = '⏱️ ផុតកំណត់ ៤ ម៉ោងហើយ! សូមវាយពាក្យសម្ងាត់ និងចុចចូលប្រព័ន្ធម្ដងទៀត។';
+    const SESSION_SIGNED_OUT_TOAST = '⚠️ បានចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត';
+
     function forceExpireSession() {
-        fb.signOut(auth).then(() => {
+        sessionExpiryCheck = 'expired';
+        refreshLiveToasts();
+        const finish = () => {
             clearRememberedSession(true);
             showLoginModalWithPrefill();
-            showToast("ផុតកំណត់ ៤ ម៉ោងហើយ! សូមវាយពាក្យសម្ងាត់ និងចុចចូលប្រព័ន្ធម្ដងទៀត។");
-        }).catch(() => {
-            clearRememberedSession(true);
-            showLoginModalWithPrefill();
-            showToast("ផុតកំណត់ ៤ ម៉ោងហើយ! សូមវាយពាក្យសម្ងាត់ និងចុចចូលប្រព័ន្ធម្ដងទៀត។");
-        });
+            reannounceOrShowToast(SESSION_EXPIRED_TOAST);
+        };
+        fb.signOut(auth).then(finish, finish);
     }
 
     function clearSensitiveModalFields() {
@@ -2182,6 +2185,7 @@
 
     function showLoginModalWithPrefill() {
         clearSensitiveModalFields();
+        refreshLiveToasts();
         closeConfigQrScanner();
         document.querySelectorAll('.modal').forEach((m) => {
             if (m.id !== 'loginModal') closeModal(m.id);
@@ -2286,16 +2290,21 @@
         const wasAlreadySignedIn = isDatabaseInitialized;
         updateAuthButton(true);
 
+        sessionExpiryCheck = 'pending';
+        const settleSessionExpiryCheck = (expired) => {
+            if (myAuthGeneration !== authGeneration) return;
+            sessionExpiryCheck = expired ? 'expired' : 'live';
+            if (expired) forceExpireSession();
+            else refreshLiveToasts();
+        };
+        isFirebaseSessionExpired(user).then(settleSessionExpiryCheck, () => settleSessionExpiryCheck(false));
+
         if (!isDatabaseInitialized && !initDatabaseListeners()) {
             showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
         }
         if (!wasAlreadySignedIn) showLiveToast('signin');
         prefetchCustomerDataTableRowsIfConfigured();
         safeFocusScanner();
-
-        isFirebaseSessionExpired(user).then((expired) => {
-            if (expired) forceExpireSession();
-        });
     }
 
     const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
@@ -3180,6 +3189,20 @@
         armToastDismiss(el, TOAST_LIFETIME_MS);
     }
 
+    function reannounceOrShowToast(msg) {
+        const container = document.getElementById('toastContainer');
+        const items = container && typeof container.querySelectorAll === 'function'
+            ? container.querySelectorAll('.toast')
+            : [];
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].textContent !== msg) continue;
+            items[i].classList.add('show');
+            armToastDismiss(items[i], TOAST_LIFETIME_MS);
+            return items[i];
+        }
+        return showToast(msg);
+    }
+
     function showLiveToast(key) {
         const state = liveToastState(key);
         if (!state) return null;
@@ -3205,6 +3228,11 @@
 
     function liveToastState(key) {
         if (key !== 'signin' && key !== 'config') return null;
+        if (key === 'signin' && (sessionExpiryCheck === 'expired' || !auth || !auth.currentUser)) {
+            return sessionExpiryCheck === 'expired'
+                ? { msg: SESSION_EXPIRED_TOAST, kind: 'warn', settled: true }
+                : { msg: SESSION_SIGNED_OUT_TOAST, kind: 'warn', settled: true };
+        }
         if (navigator.onLine === false) {
             return key === 'signin'
                 ? { msg: '⚠️ ចូលប្រព័ន្ធរួច តែឧបករណ៍ក្រៅបណ្ដាញ — លេខដែលអ្នកឃើញមិនទាន់សម័យ', kind: 'warn', settled: false }
@@ -3221,6 +3249,9 @@
         }
         if (dbListenerPendingPaths.size) {
             return { msg: '🔄 ចូលប្រព័ន្ធរួច — កំពុងទាញទិន្នន័យ...', kind: 'info', settled: false };
+        }
+        if (sessionExpiryCheck === 'pending') {
+            return { msg: '🔄 ចូលប្រព័ន្ធរួច — កំពុងផ្ទៀងផ្ទាត់វគ្គ...', kind: 'info', settled: false };
         }
         return { msg: '✅ ចូលប្រព័ន្ធជោគជ័យ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
     }

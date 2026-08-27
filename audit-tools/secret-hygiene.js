@@ -354,12 +354,47 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
             JSON.stringify(deepEv).slice(0, 120));
 
         // ហើយអ្វីដែលហួសពិដានពិត ត្រូវ **កាត់** មិនមែនប្រគល់ subtree ឆៅ
+        //
+        // ⛔ ពិដានត្រូវអានចេញពីកូដពិត មិនមែនសរសេរជាលេខថេរទេ (មេរៀនកំណែ 2.20.3
+        // ចំណុច ៦)៖ លេខថេរដែល **តូចជាងពិដាន** ជាការអះអាងដែលមិនអះអាងអ្វីសោះ —
+        // វានឹងបៃតងលើ tree ដែលដកការកាត់ចេញទាំងស្រុង។
+        const maxDepth = parseInt((src.match(/REDACT_MAX_DEPTH\s*=\s*(\d+)/) || [])[1], 10);
+        const maxNodes = parseInt((src.match(/REDACT_MAX_NODES\s*=\s*(\d+)/) || [])[1], 10);
+        ok('ជាន់អប្បបរមា ៖ អានពិដាន redaction ចេញពីកូដពិតបាន',
+            maxDepth > 0 && maxNodes > 0, { maxDepth: maxDepth, maxNodes: maxNodes });
+
         let tooDeep = { pin: 'SUPERSECRET123' };
-        for (let i = 0; i < 40; i++) tooDeep = { nest: tooDeep };
+        for (let i = 0; i < maxDepth + 8; i++) tooDeep = { nest: tooDeep };
         const cutEv = captured.beforeSend({ extra: { deep: tooDeep } });
         ok('⛔ ហួសពិដានជម្រៅ ➜ កាត់ចោល (មិនប្រគល់ subtree ដែលមិនទាន់ស្កេន)',
             JSON.stringify(cutEv).indexOf('SUPERSECRET123') === -1,
             JSON.stringify(cutEv).slice(0, 120));
+
+        // ⛔ **ពិដានចំនួន node ជាទ្វារដដែល ដែលធ្លាប់ត្រូវបានភ្លេច។** ជម្រៅត្រូវ
+        // បិទក្នុង 2.20.3 តែរង្វិលជុំខាងក្នុងនៅ `break` ➜ កូនសោដែលនៅសល់
+        // **រក្សាតម្លៃឆៅ** ➜ secret ដែលអង្គុយហួស node ទី N ហោះទៅ Sentry ដោយ
+        // មិនត្រូវពិនិត្យសោះ។ ត្រូវសាកដោយ event ធំជាង `REDACT_MAX_NODES` ពិត។
+        const wide = {};
+        for (let i = 0; i < maxNodes; i++) wide['pad' + i] = { a: { b: 1 } };
+        wide.zzTail = { password: 'SUPERSECRET123', url: 'https://x/y?token=SUPERSECRET123' };
+        const wideEv = captured.beforeSend({ extra: wide });
+        ok('⛔ ហួសពិដានចំនួន node ➜ secret ដែលនៅសល់ក៏ត្រូវកាត់ដែរ',
+            JSON.stringify(wideEv).indexOf('SUPERSECRET123') === -1,
+            JSON.stringify(wideEv.extra.zzTail).slice(0, 160));
+
+        const wideArr = [];
+        for (let i = 0; i < maxNodes; i++) wideArr.push({ a: { b: 1 } });
+        wideArr.push({ pin: 4321 });
+        const arrEv = captured.beforeSend({ extra: { list: wideArr } });
+        ok('⛔ ហួសពិដានចំនួន node ក្នុង array ➜ ក៏ត្រូវកាត់ដែរ',
+            JSON.stringify(arrEv.extra.list[arrEv.extra.list.length - 1]).indexOf('4321') === -1,
+            arrEv.extra.list[arrEv.extra.list.length - 1]);
+
+        // ទិសផ្ទុយ ៖ event ធម្មតា (តូចជាងពិដាន) មិនត្រូវត្រូវកាត់ចោលឡើយ —
+        // បើអត់ការអះអាងនេះ ការ «កាត់គ្រប់ពេល» នឹងបៃតង ហើយ Sentry លែងមានតម្លៃ
+        const smallEv = captured.beforeSend({ extra: { barcode: 'ZTO900', count: 3, note: 'ok' } });
+        ok('⛔ ទិសផ្ទុយ ៖ event ធម្មតាមិនត្រូវកាត់ (barcode/count នៅមើលឃើញ)',
+            smallEv.extra.barcode === 'ZTO900' && smallEv.extra.count === 3, smallEv.extra);
     })();
 
     ok('beforeSend ត្រូវបានភ្ជាប់ (មិនត្រឹមតែ beforeBreadcrumb)', /beforeSend:\s*redactEvent/.test(src));

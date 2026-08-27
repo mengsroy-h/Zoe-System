@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.3';
+    const APP_VERSION = '2.20.4';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -309,6 +309,10 @@
     let serverTimeOffsetMs = 0;
     function getServerNow() {
         return Date.now() + serverTimeOffsetMs;
+    }
+
+    function serverClockOffsetIsFromServer(offsetMs) {
+        return offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase;
     }
 
     let nativeDetector = null;
@@ -827,8 +831,10 @@
 
         fb.onValue(dbRefServerTimeOffset, (snap) => {
             const val = snap.val();
-            if (typeof val === 'number') serverTimeOffsetMs = val;
-            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+            if (typeof val !== 'number') return;
+            serverTimeOffsetMs = val;
+            if (!serverClockOffsetIsFromServer(val)) return;
+            if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
         }, handleInfoListenerError);
 
         return true;
@@ -917,6 +923,9 @@
             return false;
         } finally {
             isInitializingFirebase = false;
+            let currentConfig = savedConfig;
+            try { currentConfig = localStorage.getItem('zoew_firebase_config'); } catch (e) {}
+            if (currentConfig !== savedConfig) initFirebase();
         }
     }
 

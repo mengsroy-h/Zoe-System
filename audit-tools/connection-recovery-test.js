@@ -1059,5 +1059,92 @@ function buildContext() {
         /function noteDbListenerAlive\([\s\S]*?dbListenerProgressAt = Date\.now\(\);/.test(SRC));
 }
 
-console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
-process.exit(fail ? 1 : 0);
+// ── ១៥. Config ថ្មីដែលមកដល់ **កណ្តាលការផ្ទុក SDK** មិនត្រូវបាត់ ────────
+// ⛔ `initFirebase()` អាន `zoew_firebase_config` **មុន** `await
+// waitForFirebaseSDK()` (ពិដាន ១៥ វិ.) ហើយច្រានការហៅដដែលៗចេញដោយ
+// `if (isInitializingFirebase) return false;`។ ដូច្នេះការ Reconfig ខណៈ SDK
+// កំពុងមកយឺត ៖
+//   • `saveFirebaseConfig()` សរសេរ config ថ្មីចូល localStorage
+//   • វាហៅ `initFirebase()` ➜ **ត្រឡប់ភ្លាមដោយមិនធ្វើអ្វី**
+//   • ការហៅដែលកំពុងដំណើរការបញ្ចប់ដោយប្រើ config **ចាស់** ដែលវាចាប់ទុកមុន await
+//   ➜ អ្នកប្រើឃើញ «✅ ភ្ជាប់ Server រួចរាល់!» ខណៈ App នៅភ្ជាប់ទៅ Project ចាស់
+//     រហូតដល់ Refresh ដោយដៃ។
+//
+// ការអះអាងជា **២ ខាង** ៖ config ដែល **មិនប្រែ** មិនត្រូវបង្កជុំទី ២ ឡើយ
+// (បើអត់ ការហៅឡើងវិញនោះនឹងក្លាយជារង្វិលជុំដែលស៊ីបណ្តាញ)។
+{
+    const initSrc = sliceFn('initFirebase');
+    ok('ស្រង់ initFirebase() បាន', !!initSrc);
+
+    function runInit(changeConfigMidFlight) {
+        const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
+        const log = { inits: [], toasts: [] };
+        let releaseSdk = null;
+        const ctx = {
+            console, Promise, JSON, Object, Array, Error, Set, Map, Date,
+            setTimeout, clearTimeout, isNaN, String, Number,
+            navigator: { onLine: true },
+            localStorage: {
+                getItem: (k) => (k in store ? store[k] : null),
+                setItem: (k, v) => { store[k] = v; },
+                removeItem: (k) => { delete store[k]; }
+            },
+            document: { getElementById: () => null, querySelectorAll: () => [] },
+            __log: log,
+            __store: store,
+            __releaseSdk: (fn) => { releaseSdk = fn; }
+        };
+        ctx.window = ctx;
+        vm.createContext(ctx);
+        vm.runInContext([
+            'let firebaseConfig = null, fb = null, auth = null, db = null;',
+            'let dbRefHistory = null, dbRefDeleted = null, dbRefDailyRevenue = null, dbRefMonthlyRevenue = null;',
+            'let dbRefDailyPickup = null, dbRefExchangeRate = null, dbRefConnected = null, dbRefServerTimeOffset = null;',
+            'let isDatabaseInitialized = false, isDatabaseConnected = false, isInitializingFirebase = false;',
+            'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
+            'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
+            'let scanHistory = [], deletedItems = [], dailyRevenueData = {}, monthlyRevenueData = {};',
+            'let dailyPickupData = {}, lockerBarcodeIndex = {};',
+            'const FAKE_SDK = { getApps: () => [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => Promise.resolve(),',
+            '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
+            '  onAuthStateChanged: () => (() => {}) };',
+            'let __sdkGate = null;',
+            'function waitForFirebaseSDK() { return new Promise((res) => { __sdkGate = () => res(FAKE_SDK); __releaseSdk(__sdkGate); }); }',
+            'function preconnectToDatabaseHost() {}',
+            'function resetFirebaseSdkRetryHealth() {}',
+            'function resetDbListenerHealthState() {}',
+            'function renderConnectionStatus() {}',
+            'function attachInfoListeners() { return true; }',
+            'function setupAuthListener() {}',
+            'function armLateFirebaseSdkListener() {}',
+            'function scheduleFirebaseSdkRetry() {}',
+            'function checkPinAndOpenConfig() {}',
+            'function showToast(m) { __log.toasts.push(m); }',
+            initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
+                'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
+            'globalThis.__start = () => initFirebase();'
+        ].join('\n'), ctx);
+
+        ctx.__start();
+        if (changeConfigMidFlight) {
+            store.zoew_firebase_config = JSON.stringify({ apiKey: 'B', databaseURL: 'https://new.example' });
+        }
+        if (releaseSdk) releaseSdk();
+        return { log, ctx, release: () => { if (releaseSdk) releaseSdk(); } };
+    }
+
+    (async () => {
+        const changed = runInit(true);
+        for (let i = 0; i < 8; i++) { await Promise.resolve(); changed.release(); }
+        ok('⛔ Config ថ្មីដែលរក្សាទុកកណ្តាលការផ្ទុក SDK ➜ ត្រូវយកមកប្រើ មិនត្រូវបាត់',
+            changed.log.inits.indexOf('https://new.example') !== -1, changed.log.inits);
+
+        const same = runInit(false);
+        for (let i = 0; i < 8; i++) { await Promise.resolve(); same.release(); }
+        ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
+            same.log.inits.length === 1, same.log.inits);
+
+        console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
+        process.exit(fail ? 1 : 0);
+    })();
+}

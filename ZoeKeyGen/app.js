@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.5';
+const APP_VERSION = '2.19.6';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -215,6 +215,10 @@ let dbRefServerTimeOffset = null;
 let serverTimeOffsetMs = 0;
 let serverTimeSynced = false;
 let serverTimeSyncWaiters = [];
+
+function serverClockOffsetIsFromServer(offsetMs) {
+    return offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase;
+}
 
 const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
@@ -713,9 +717,11 @@ function attachInfoListeners() {
 
     fb.onValue(dbRefServerTimeOffset, (snap) => {
         const val = snap.val();
-        if (typeof val === 'number') serverTimeOffsetMs = val;
+        if (typeof val !== 'number') return;
+        serverTimeOffsetMs = val;
+        if (!serverClockOffsetIsFromServer(val)) return;
         serverTimeSynced = true;
-        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(serverTimeOffsetMs);
+        if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
         serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
     }, handleInfoListenerError);
 

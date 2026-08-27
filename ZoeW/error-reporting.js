@@ -87,6 +87,12 @@
         return SECRET_KEY_RE.test('_' + split + '_');
     }
 
+    function redactOverBudget(value) {
+        if (typeof value === 'string') return redactUrl(value);
+        if (value && typeof value === 'object') return '[truncated]';
+        return value;
+    }
+
     function redactDeep(value, depth, seen, budget) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
@@ -96,20 +102,20 @@
         budget.n++;
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length; i++) {
-                if (budget.n >= REDACT_MAX_NODES) break;
+                if (budget.n >= REDACT_MAX_NODES) { value[i] = redactOverBudget(value[i]); continue; }
                 value[i] = redactDeep(value[i], depth + 1, seen, budget);
             }
             return value;
         }
         const keys = Object.keys(value);
         for (let i = 0; i < keys.length; i++) {
-            if (budget.n >= REDACT_MAX_NODES) break;
             try {
                 if (isSecretKeyName(keys[i]) && value[keys[i]] !== null && value[keys[i]] !== undefined
                     && typeof value[keys[i]] !== 'function') {
                     value[keys[i]] = '[redacted]';
                     continue;
                 }
+                if (budget.n >= REDACT_MAX_NODES) { value[keys[i]] = redactOverBudget(value[keys[i]]); continue; }
                 value[keys[i]] = redactDeep(value[keys[i]], depth + 1, seen, budget);
             } catch (e) {}
         }

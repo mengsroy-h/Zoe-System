@@ -44,6 +44,8 @@ const LOCAL_CLOCK_OK = {
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
+        noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',
+        dbListenerResyncIsProgressing: 'អានត្រានោះឡើងវិញ — ចន្លោះពេល local ដូច attemptDbListenerRecovery',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
         retryFirebaseSdkNow: 'ពិដានល្បឿននៃការផ្ទុក SDK ឡើងវិញ — local (ដូច attemptDbListenerRecovery)',
         reloadForFirebaseSdk: 'គម្លាតអប្បបរមារវាងការផ្ទុកទំព័រឡើងវិញ — local សុទ្ធសាធ (server មិនស្គាល់វា ហើយវាមិនប៉ះ retention/revenue សោះ)',

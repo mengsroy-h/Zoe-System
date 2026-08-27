@@ -112,7 +112,10 @@ function buildWorld(store, now) {
     });
     new vm.Script([
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
+        // ⛔ កូនសោដែលការការពារ marker សួរ — ត្រូវជាកូនសោ **ដដែល** ដែល
+        // `initDatabaseListeners()` ដាក់ចូល Set (មើល `listener-pending-key-test.js`)។
+        "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         ...OPTIONAL_FNS.map((n) => extractFnOptional(src, n)).filter(Boolean),

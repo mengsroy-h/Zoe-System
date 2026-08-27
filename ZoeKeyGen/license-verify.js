@@ -149,6 +149,7 @@
     }
 
     async function activate(keyString, appCode) {
+        if (!serverTimeSynced) await syncServerTime({ priority: true });
         const result = await verifyKeyString(keyString, appCode);
         if (!result.valid) return result;
         const previous = loadLocalRecord(appCode);
@@ -301,8 +302,11 @@
         const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
 
         if (now > ceiling) {
-            clearLocalRecord(appCode);
-            return { state: 'required', reason: 'expired' };
+            if (serverTimeSynced) {
+                clearLocalRecord(appCode);
+                return { state: 'required', reason: 'expired' };
+            }
+            return { state: 'offline-grace-exceeded', exp: ceiling, note: record.note };
         }
 
         if (now - (record.lastOnlineCheck || 0) > OFFLINE_GRACE_MS) {

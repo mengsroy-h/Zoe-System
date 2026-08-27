@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.3';
+const APP_VERSION = '2.19.4';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -494,10 +494,24 @@ function armToastDismiss(el, delay) {
     }, delay);
 }
 
+function dropOldestToast(container) {
+    const children = container.children;
+    let victim = null;
+    for (let i = 0; i < children.length; i++) {
+        if (children[i].dataset && children[i].dataset.liveToast !== undefined) continue;
+        victim = children[i];
+        break;
+    }
+    if (!victim) victim = container.firstChild;
+    if (!victim) return;
+    if (victim.dismissTimer) { clearTimeout(victim.dismissTimer); victim.dismissTimer = null; }
+    container.removeChild(victim);
+}
+
 function showToast(msg, kind) {
     const container = document.getElementById('toastContainer');
     if (!container) return null;
-    while (container.children.length >= 4) container.removeChild(container.firstChild);
+    while (container.children.length >= 4) dropOldestToast(container);
     const toast = document.createElement('div');
     toast.className = 'toast';
     paintToast(toast, msg, kind);

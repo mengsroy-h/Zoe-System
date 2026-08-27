@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.0';
+    const APP_VERSION = '2.20.1';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -317,8 +317,11 @@
     let dbListenerRecoveryAttempt = 0;
     let lastDbListenerAttemptAt = 0;
     let dbListenerOutageNoticeShown = false;
+    const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
+    const DB_LISTENER_KEY_DELETED = 'deleted';
     const dbListenerPendingPaths = new Set();
     let dbListenerPendingSeen = 0;
+    let dbListenerProgressAt = 0;
     let pickupLedgerRepairDone = false;
     let pickupLedgerRepairRunning = false;
     let infoListenersFailed = false;
@@ -661,6 +664,7 @@
     const INFO_LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
     const CONNECTING_GRACE_ATTEMPTS = 3;
     const DB_LISTENER_RETRY_MIN_GAP_MS = 3000;
+    const DB_LISTENER_PROGRESS_GRACE_MS = 20000;
 
     function connectionLooksOnline() {
         return isDatabaseConnected && navigator.onLine !== false && !dbListenersFailed;
@@ -2351,7 +2355,7 @@
             const input = document.getElementById('activationKeyInput');
             const keyStr = input ? input.value.trim() : '';
             if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
-            const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 20000, 'Activation timed out');
+            const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 30000, 'Activation timed out');
             if (!result.valid) {
                 if (input) input.value = '';
                 showToast(licenseFailureMessage(result.reason));
@@ -2593,6 +2597,10 @@
 
     function noteDbListenerAlive(pathKey) {
         const wasPending = dbListenerPendingPaths.delete(pathKey);
+        if (wasPending) {
+            dbListenerProgressAt = Date.now();
+            dbListenerPendingSeen = dbListenerPendingPaths.size;
+        }
         if (wasPending && !dbListenerPendingPaths.size) refreshLiveToasts();
         if (!dbListenersFailed || dbListenerPendingPaths.size) return;
         dbListenersFailed = false;
@@ -2603,10 +2611,9 @@
     }
 
     function dbListenerResyncIsProgressing() {
-        if (!dbListenerPendingSeen) return false;
-        if (dbListenerPendingPaths.size >= dbListenerPendingSeen) return false;
-        dbListenerPendingSeen = dbListenerPendingPaths.size;
-        return true;
+        if (!dbListenerPendingPaths.size) return false;
+        if (!dbListenerProgressAt) return false;
+        return (Date.now() - dbListenerProgressAt) < DB_LISTENER_PROGRESS_GRACE_MS;
     }
 
     function attemptDbListenerRecovery() {
@@ -2641,6 +2648,7 @@
         dbListenerOutageNoticeShown = false;
         dbListenerPendingPaths.clear();
         dbListenerPendingSeen = 0;
+        dbListenerProgressAt = 0;
         lastDbListenerAttemptAt = 0;
         clearDbListenerRecovery();
         clearReconnectWatchdog();
@@ -2669,9 +2677,9 @@
 
         detachDatabaseListeners();
         dbListenerPendingPaths.clear();
-        ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
-            .forEach((key) => dbListenerPendingPaths.add(key));
+        DB_LISTENER_KEYS.forEach((key) => dbListenerPendingPaths.add(key));
         dbListenerPendingSeen = dbListenerPendingPaths.size;
+        dbListenerProgressAt = 0;
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
@@ -2805,7 +2813,7 @@
     function clearStaleRestoreMarkers(item) {
         if (!db || !fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
         if (staleRestoreMarkerSweeps.has(item.id)) return;
-        if (dbListenerPendingPaths.has('zoew_recently_deleted_cod_dod')) return;
+        if (dbListenerPendingPaths.has(DB_LISTENER_KEY_DELETED)) return;
         const sourceId = item.restoreClaimId;
         if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return;
         const source = (typeof sourceId === 'string')
@@ -3207,7 +3215,7 @@
 
     function dropStaleRestoreMarkers(currentItem) {
         if (!itemHasRestoreMarkers(currentItem)) return false;
-        if (dbListenerPendingPaths.has('zoew_recently_deleted_cod_dod')) return false;
+        if (dbListenerPendingPaths.has(DB_LISTENER_KEY_DELETED)) return false;
         const sourceId = currentItem.restoreClaimId;
         if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return false;
         const source = (typeof sourceId === 'string')
@@ -3294,10 +3302,24 @@
         }, delay);
     }
 
+    function dropOldestToast(container) {
+        const children = container.children;
+        let victim = null;
+        for (let i = 0; i < children.length; i++) {
+            if (children[i].dataset && children[i].dataset.liveToast !== undefined) continue;
+            victim = children[i];
+            break;
+        }
+        if (!victim) victim = container.firstChild;
+        if (!victim) return;
+        if (victim.dismissTimer) { clearTimeout(victim.dismissTimer); victim.dismissTimer = null; }
+        container.removeChild(victim);
+    }
+
     function showToast(msg, kind) {
         const container = document.getElementById('toastContainer');
         if (!container) return null;
-        while (container.children.length >= 4) container.removeChild(container.firstChild);
+        while (container.children.length >= 4) dropOldestToast(container);
         const toast = document.createElement('div');
         toast.className = 'toast';
         paintToast(toast, msg, kind);

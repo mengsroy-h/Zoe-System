@@ -105,7 +105,8 @@
         for (let i = 0; i < keys.length; i++) {
             if (budget.n >= REDACT_MAX_NODES) break;
             try {
-                if (isSecretKeyName(keys[i]) && typeof value[keys[i]] === 'string') {
+                if (isSecretKeyName(keys[i]) && value[keys[i]] !== null && value[keys[i]] !== undefined
+                    && typeof value[keys[i]] !== 'function') {
                     value[keys[i]] = '[redacted]';
                     continue;
                 }

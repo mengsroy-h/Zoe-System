@@ -90,9 +90,26 @@ for (const app of present) {
         f.startsWith(app + '/') && SHIPPED.test(f) && !NOT_SHIPPED.test(f) && f !== app + '/sw.js');
     const swBumped = cacheVersionOf(BASE, app) !== cacheVersionOf(null, app);
 
+    // ⛔ `sw.js` **ជាកូដដែល ship ដែរ** — វាត្រូវដកចេញពី `shipped` ខាងលើ
+    // តែម្យ៉ាងព្រោះ `CACHE_VERSION` រស់នៅក្នុងវា ➜ ការឡើងកំណែខ្លួនវាធ្វើឲ្យ
+    // ឯកសារនោះប្រែ ➜ រង្វិលជុំ។ ប៉ុន្តែការដករាល់ការប្រែរបស់វាចោលបង្កើត
+    // ចន្លោះផ្ទុយ៖ ការកែ **តក្កវិជ្ជាពិត** ក្នុង `sw.js` (ការសម្អាត cache,
+    // ការដោះ slot, ផ្លូវធ្លាក់ចុះ) ត្រូវអានថា «គ្មានការកែពិត» ➜ checker
+    // **ហាមឡើង cache** ➜ អ្នកប្រើជាប់នឹង service worker ចាស់ជារៀងរហូត។
+    // ដំណោះស្រាយដដែលនឹង `app.js`៖ រាប់វា លុះត្រាតែការប្រែ **លើសពី**
+    // បន្ទាត់ `CACHE_VERSION`។
+    const swFile = app + '/sw.js';
+    let swLogicChanged = false;
+    if (changed.indexOf(swFile) !== -1) {
+        const swDiff = git(['diff', '-U0', BASE, '--', swFile])
+            .split('\n')
+            .filter((l) => /^[+-]/.test(l) && !/^[+-][+-]/.test(l));
+        swLogicChanged = swDiff.some((l) => !/CACHE_VERSION\s*=/.test(l));
+    }
+
     // ការប្រែក្នុង app.js ក្រៅពីបន្ទាត់ APP_VERSION
-    let realCodeChange = shipped.length > 0;
-    if (shipped.length === 1 && shipped[0] === app + '/app.js') {
+    let realCodeChange = shipped.length > 0 || swLogicChanged;
+    if (!swLogicChanged && shipped.length === 1 && shipped[0] === app + '/app.js') {
         const diff = git(['diff', '-U0', BASE, '--', app + '/app.js'])
             .split('\n')
             .filter((l) => /^[+-]/.test(l) && !/^[+-][+-]/.test(l));
@@ -104,7 +121,7 @@ for (const app of present) {
 
     if (realCodeChange) {
         ok(app + ' ៖ កូដដែល ship ប្រែ ➜ `CACHE_VERSION` ត្រូវឡើង',
-            swBumped, 'ឯកសារប្រែ៖ ' + shipped.join(', ') + ' តែ CACHE_VERSION នៅ '
+            swBumped, 'ឯកសារប្រែ៖ ' + shipped.concat(swLogicChanged ? [swFile] : []).join(', ') + ' តែ CACHE_VERSION នៅ '
                 + cacheVersionOf(null, app));
         const av = appVersionOf(null, app), avBase = appVersionOf(BASE, app);
         if (av && avBase) {

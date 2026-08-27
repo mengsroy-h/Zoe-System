@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 const STORE_PIN_HASH = 'zoeimport_pin_hash';
 const STORE_PIN_FAILS = 'zoeimport_pin_fail_count';

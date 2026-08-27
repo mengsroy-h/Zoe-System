@@ -205,6 +205,7 @@ function buildContext() {
         normalizeBarcodesOf: () => {},
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
+        repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         ZoeErrors: { capture: (e) => log.captures.push(e) }
     };

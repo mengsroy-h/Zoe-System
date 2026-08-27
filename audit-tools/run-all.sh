@@ -56,7 +56,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
-         pickup-ledger-test; do
+         pickup-ledger-test pickup-repair-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -186,6 +186,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWREVAL_APP_DIR="$BASE" node audit-tools/sw-revalidate-pressure-test.js 2>&1 | tail -1 | sed 's/^/   sw-revalidate:   /'
     SWFAIL_APP_DIR="$BASE"  node audit-tools/sw-cache-failure-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-failure:/'
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
+    PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'

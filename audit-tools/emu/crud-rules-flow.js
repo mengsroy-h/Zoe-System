@@ -8,7 +8,9 @@ const path = require('path');
 const vm = require('vm');
 const http = require('http');
 
-const ROOT = path.join(__dirname, '..', '..');
+// ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` បញ្ជាក់បានថា
+// ឯកសារនេះពិតជាអានកូដមែន (ច្បាប់ដដែលនឹង checker ទាំងអស់ក្នុងគម្រោង)។
+const ROOT = process.env.CRUDFLOW_APP_DIR ? path.resolve(process.env.CRUDFLOW_APP_DIR) : path.join(__dirname, '..', '..');
 const APP = path.join(ROOT, 'ZoeW', 'app.js');
 const BASE = { host: '127.0.0.1', port: 9000 };
 const NS = 'ns=demo-zoe';
@@ -95,7 +97,7 @@ function makeSandbox(store, now) {
     });
     new vm.Script([
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'

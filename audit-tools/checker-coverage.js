@@ -92,6 +92,56 @@ if (notWired.length) bad('checker ' + notWired.length + ' មិនត្រូ�
     notWired.join(', '));
 else ok('រាល់ checker ក្នុង run-all ត្រូវបានហៅក្នុងផ្នែក baseline ដែរ');
 
+console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ ===');
+// ⛔ ថ្នាក់កំហុស៖ **checker ដែលរស់តែក្នុង CI**។ `run-all.sh` ជាការត្រួតពិនិត្យ
+// ដែលអ្នកអភិវឌ្ឍន៍រត់មុន push — បើ CI រត់អ្វីមួយបន្ថែម នោះការប្តូរដែលធ្វើឲ្យ
+// checker នោះខូច **បង្ហាញជាបៃតងនៅមូលដ្ឋាន រួចក្រហមនៅ CI ក្រោយ push**។
+//
+// 🔴 កើតឡើងពិតក្នុងកំណែ 2.20.1៖ `emu/crud-rules-flow.js` រត់តែក្នុង CI ➜
+// ការបន្ថែមថេរថ្មីក្នុង `app.js` ធ្វើឲ្យ sandbox របស់វាបោះ `ReferenceError`
+// ➜ `33 ok, 10 fail` នៅ CI ខណៈ `run-all.sh` នៅមូលដ្ឋាន **បៃតងទាំង ៩៥**។
+//
+// ការជួសជុលមិនមែនត្រឹមតែការកែ sandbox នោះទេ — វាជាការធានាថា **អ្វីដែល CI
+// រត់ ត្រូវរត់នៅមូលដ្ឋានដែរ** (គ្មាន emulator ➜ SKIP ស្អាត; CI ដាក់
+// `CRUD_FLOW_STRICT=1` ដែលធ្វើឲ្យ SKIP នោះក្លាយជាការធ្លាក់)។
+{
+    const wf = path.join(TOOLS, '..', '.github', 'workflows', 'audit.yml');
+    if (!fs.existsSync(wf)) {
+        bad('រកឃើញ .github/workflows/audit.yml', 'គ្មានឯកសារ ➜ បញ្ជាក់មិនបានថា CI និងមូលដ្ឋានស៊ីគ្នា');
+    } else {
+        const ciText = fs.readFileSync(wf, 'utf8');
+        const ciCheckers = new Set();
+        for (const m of ciText.matchAll(/node\s+audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) ciCheckers.add(m[1]);
+        // ជាន់អប្បបរមា — CI ដែលមិនរត់អ្វីសោះ មិនត្រូវបៃតងស្ងាត់ៗ
+        if (ciCheckers.size < 3) {
+            bad('ជាន់អប្បបរមា៖ CI រត់ checker >= ៣', 'រកឃើញ ' + ciCheckers.size);
+        } else {
+            ok('ជាន់អប្បបរមា៖ CI រត់ checker ' + ciCheckers.size);
+        }
+        // ⛔ ពិនិត្យតែ **ផ្នែករត់ធម្មតា** — ផ្នែក baseline (`if [ -n "$BASE" ]`)
+        // រត់តែពេលមាន argument ដូច្នេះការលេចត្រឹមទីនោះ **មិនធានាថា checker
+        // នោះរត់ក្នុងការហៅធម្មតាទេ** ➜ ចន្លោះនៅដដែល។
+        const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
+        const mainSection = baselineAt === -1 ? runall : runall.slice(0, baselineAt);
+        // ⛔ ត្រូវអាន **ទាំង ២ ទម្រង់** ដូច `runNames` ខាងលើ — រង្វិលជុំ
+        // `for t in …; do` និងបន្ទាត់ `node audit-tools/x.js` ដាច់ដោយឡែក។
+        // ការអានតែទម្រង់ទី ២ ធ្វើឲ្យ checker ភាគច្រើន (ដែលហៅតាមរង្វិលជុំ)
+        // ត្រូវរាយខុសថា «រត់តែក្នុង CI»។
+        const mainNames = new Set();
+        for (const m of mainSection.matchAll(/for t in ([\s\S]*?); do/g)) {
+            m[1].split(/\s+/).filter(Boolean).forEach((n) => mainNames.add(n.replace(/\\$/, '')));
+        }
+        for (const m of mainSection.matchAll(/audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) mainNames.add(m[1]);
+        const ciOnly = [...ciCheckers].filter((name) => {
+            if (/run-all\.sh/.test(name)) return false;
+            return !mainNames.has(name);
+        });
+        if (ciOnly.length) bad('⛔ checker ' + ciOnly.length + ' រត់តែក្នុង CI ➜ ការខូចមិនលេចនៅមូលដ្ឋាន',
+            ciOnly.join(', '));
+        else ok('រាល់ checker ដែល CI រត់ ត្រូវបានហៅក្នុង run-all.sh ដែរ');
+    }
+}
+
 console.log('\n=== ៣. checker មិនត្រូវបញ្ឈប់ខ្លួនពេលរកឈ្មោះ function មិនឃើញ ===');
 // ការបញ្ឈប់បែបនោះបិទបាំងការអះអាងឥរិយាបថទាំងអស់ខាងក្រោម ➜ tree មុនកែ
 // បង្ហាញកំហុសតែ ១ ជំនួសឲ្យការធ្លាក់ពិតដែលប្រាប់ថា *អ្វី* ខូច។

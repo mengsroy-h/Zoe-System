@@ -89,7 +89,15 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
         if (!navigator.serviceWorker) return 'គ្មាន serviceWorker';
         const reg = await navigator.serviceWorker.register('./sw.js').catch((e) => String(e));
         if (typeof reg === 'string') return reg;
-        await navigator.serviceWorker.ready;
+        // ⛔ `.ready` **គ្មានទីបញ្ចប់** បើ SW ជាប់ 'installing' ឬក្លាយជា
+        // 'redundant' ដោយគ្មានអ្នកជំនួស។ `page.evaluate()` ក៏គ្មាន timeout ដែរ
+        // ➜ CI ត្រូវ cancel នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ
+        // (កើតឡើងពិត៖ `main` a465af9 · PR #96)។ រង្វិលជុំខាងក្រោមមានពិដាន
+        // ស្រាប់ ➜ ការផុតកំណត់ក្លាយជាការធ្លាក់ដែលអានបាន មិនមែនការព្យួរ។
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((r) => setTimeout(r, 20000))
+        ]);
         for (let i = 0; i < 60; i++) {
             if (navigator.serviceWorker.controller) return 'ok';
             await new Promise((r) => setTimeout(r, 250));
@@ -123,7 +131,12 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     ok('សំបក index.html នៅតែស្ថិតក្នុង cache (ក្រៅបណ្តាញនៅដើរ)', cacheState.hasIndex, cacheState.keys);
 
     // ក្រៅបណ្តាញ៖ ការបើក Setup Link ត្រូវនៅតែផ្តល់សំបក App មិនមែនទំព័រទទេ
-    await new Promise((r) => server.close(r));
+    // ⛔ `server.close(cb)` ហៅ cb តែពេល **គ្រប់ការតភ្ជាប់បិទអស់** — Chromium
+    // រក្សា socket keep-alive ➜ ការរង់ចាំនេះអាចមិនចេះចប់។ បិទវាដោយបង្ខំ។
+    await new Promise((r) => {
+        server.close(r);
+        if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    });
     await page.goto(origin + '/?setup=' + encodeURIComponent(SETUP_B64), { waitUntil: 'load', timeout: 30000 })
         .catch(() => {});
     const offlineShell = await page.evaluate(() => ({

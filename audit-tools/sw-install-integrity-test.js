@@ -124,7 +124,15 @@ function serve(dir, blocked) {
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 });
     const healthy = await page.evaluate(async () => {
         const reg = await navigator.serviceWorker.register('./sw.js');
-        await navigator.serviceWorker.ready;
+        // ⛔ `.ready` **គ្មានទីបញ្ចប់** បើ SW ជាប់ 'installing' ឬក្លាយជា
+        // 'redundant' ដោយគ្មានអ្នកជំនួស។ `page.evaluate()` ក៏គ្មាន timeout ដែរ
+        // ➜ CI ត្រូវ cancel នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ
+        // (កើតឡើងពិត៖ `main` a465af9 · PR #96)។ រង្វិលជុំខាងក្រោមមានពិដាន
+        // ស្រាប់ ➜ ការផុតកំណត់ក្លាយជាការធ្លាក់ដែលអានបាន មិនមែនការព្យួរ។
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((r) => setTimeout(r, 20000))
+        ]);
         for (let i = 0; i < 60; i++) {
             const keys = await caches.keys();
             for (const k of keys) {
@@ -140,7 +148,12 @@ function serve(dir, blocked) {
         healthy.ok === true, healthy);
 
     // ជុំទី ៣ — បិទម៉ាស៊ីនបម្រើ ➜ ការស្កេនត្រូវនៅដើរពីក្នុង cache
-    await new Promise((r) => server.close(r));
+    // ⛔ `server.close(cb)` ហៅ cb តែពេល **គ្រប់ការតភ្ជាប់បិទអស់** — Chromium
+    // រក្សា socket keep-alive ➜ ការរង់ចាំនេះអាចមិនចេះចប់។ បិទវាដោយបង្ខំ។
+    await new Promise((r) => {
+        server.close(r);
+        if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    });
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 }).catch(() => {});
     const offline = await page.evaluate(() => ({
         hasShell: !!document.getElementById('appPages'),

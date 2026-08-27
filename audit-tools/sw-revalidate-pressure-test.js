@@ -127,7 +127,12 @@ const CANARY_BUDGET_MS = 9000;
 
         // ១) ការបើកលើកដំបូង — SW ដំឡើង និង cache សំបក
         await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
-        await page.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise((r) => setTimeout(r, 1500))));
+        // ⛔ `.ready` គ្មានទីបញ្ចប់បើ SW ជាប់ 'installing' ➜ ព្យួររហូត
+        // (ថ្នាក់ដដែលដែលធ្វើឲ្យ CI ដួល ២ ដង — មើល `hang-guard.js`)។
+        await page.evaluate(() => Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((r) => setTimeout(r, 20000))
+        ]).then(() => new Promise((r) => setTimeout(r, 1500))));
 
         // ២) បណ្តាញក្លាយជា «ភ្ជាប់តែស្លាប់» — ទទួលការតភ្ជាប់ តែមិនឆ្លើយសោះ
         hangMode = true;

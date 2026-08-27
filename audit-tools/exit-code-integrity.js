@@ -134,14 +134,24 @@ const POISON = [
 
 function poisonSource(src) {
     for (const [re, rep] of POISON) if (re.test(src)) return src.replace(re, rep);
-    // ថយក្រោយ ៖ បង្កើនអថេររាប់ការធ្លាក់ដែល `process.exit(<ident>...)` យោងដល់
+    // ថយក្រោយ ៖ បង្កើនអថេររាប់ការធ្លាក់ដែល `process.exit(<ident>...)` យោងដល់។
+    // ⛔ ២ ច្បាប់ដែលធ្វើឲ្យការថយក្រោយនេះ **ស្មោះ**៖
+    //   ១. កុំពុល `const` — `x++` លើ `const` បោះ TypeError ➜ exit != 0 ➜
+    //      ការគាំង **មើលទៅដូចការធ្លាក់ត្រឹមត្រូវ** ➜ បៃតងក្លែងក្លាយថ្នាក់ថ្មី។
+    //   ២. ជ្រើសឈ្មោះដែល **មើលទៅដូចអថេររាប់ការធ្លាក់** ជាមុន; បើគ្មាន
+    //      នោះយើងពុលមិនបាន ➜ ត្រឡប់ `null` ហើយវារាយក្នុង `unpoisonable`
+    //      (មើលឃើញ) ជំនួសការពុលអថេរខុសដោយស្ងាត់។
+    const FAILISH = /^(fail|fails|failed|failures|problem|problems|gap|gaps|offend|offenders|bad|errors?|miss|missing|dirty|totalGaps)$/i;
     const exits = [...src.matchAll(/process\.exit\(([^)]*)\)/g)];
+    const ids = [];
     for (let i = exits.length - 1; i >= 0; i--) {
         const expr = exits[i][1];
         if (/^\s*\d+\s*$/.test(expr)) continue;
-        const id = (expr.match(/\b([A-Za-z_$][\w$]*)\b/) || [])[1];
-        if (!id) continue;
-        const decl = new RegExp('((?:let|var|const)[^;\\n]*?\\b' + id + '\\s*=\\s*[^;,\\n]*)([;,])');
+        for (const m of expr.matchAll(/\b([A-Za-z_$][\w$]*)\b/g)) ids.push(m[1]);
+    }
+    const ordered = ids.filter((n) => FAILISH.test(n)).concat(ids.filter((n) => !FAILISH.test(n)));
+    for (const id of ordered) {
+        const decl = new RegExp('((?:let|var)[^;\\n]*?\\b' + id + '\\s*=\\s*[^;,\\n]*)([;,])');
         if (decl.test(src)) return src.replace(decl, '$1$2 ' + id + '++;');
     }
     return null;
@@ -170,7 +180,7 @@ process.on('exit', restoreAll);
     process.on(sig, () => { restoreAll(); process.exit(1); });
 });
 
-let poisoned = 0, unpoisonable = [], fakeGreen = [];
+let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [];
 try {
     for (const rel of runnable) {
         const file = path.join(TOOLS, rel);
@@ -179,17 +189,29 @@ try {
         if (!bad) { unpoisonable.push(rel); continue; }
         originals.set(file, src);
         fs.writeFileSync(file, bad);
-        let rc = 0;
+        let rc = 0, out = '';
         try {
-            cp.execFileSync(process.execPath, [file], {
-                cwd: ROOT, timeout: BUDGET_MS, stdio: 'ignore',
+            out = String(cp.execFileSync(process.execPath, [file], {
+                cwd: ROOT, timeout: BUDGET_MS, stdio: ['ignore', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' })
-            });
-        } catch (e) { rc = (e.status === undefined || e.status === null) ? 'timeout/crash' : e.status; }
+            }) || '');
+        } catch (e) {
+            rc = (e.status === undefined || e.status === null) ? 'timeout/crash' : e.status;
+            out = String((e.stdout || '') + (e.stderr || ''));
+        }
         fs.writeFileSync(file, src);
         originals.delete(file);
         poisoned++;
-        if (rc === 0) fakeGreen.push(rel);
+        if (rc !== 0) continue;
+        // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
+        // នោះ **មិនបានអះអាងអ្វីសោះ** ហើយ `run-all.sh` រាយវាជា SKIPPED មិនមែន
+        // PASS។ ការពុលមិនអាចវាស់អ្វីបានទេ ពេលគ្មានការអះអាងណារត់។
+        // ឧ. `emu/*` ពេលគ្មាន RTDB emulator (CI ដាក់ `CRUD_FLOW_STRICT=1`
+        // ដែលបង្វែរ SKIP នោះទៅជាការធ្លាក់រួចហើយ) និង checker browser ពេល
+        // គ្មាន Chromium។ ⚠️ ការលើកលែងនេះត្រូវ **រាយឲ្យឃើញ** មិនស្ងាត់ —
+        // បើវាធំពេក នោះការវាស់មិនគ្របអ្វីទេ (មេរៀន «SKIP ធំពេក»)។
+        if (/^SKIP\b/m.test(out)) { skippedInPoison.push(rel); continue; }
+        fakeGreen.push(rel);
     }
 } finally {
     restoreAll();
@@ -200,6 +222,23 @@ ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិន
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });
 ok('គ្មាន checker ណាចេញ exit 0 ខណៈការអះអាងទាំងអស់ធ្លាក់',
     fakeGreen.length === 0, fakeGreen);
+
+// ⛔ ការលើកលែង SKIP ត្រូវនៅ **តូច**។ បើ checker ភាគច្រើន SKIP នោះការវាស់
+// ឥរិយាបថនេះមិនគ្របអ្វីទេ ➜ បៃតងក្លែងក្លាយថ្នាក់ថ្មី (មេរៀន ៣គ)។
+const verdicts = poisoned - skippedInPoison.length;
+const MIN_VERDICTS = 20;
+ok('ការពុលទទួលសាលក្រមពិត >= ' + MIN_VERDICTS + ' (SKIP មិនរាប់; SKIP=' + skippedInPoison.length + ')',
+    verdicts >= MIN_VERDICTS, { verdicts: verdicts, skipped: skippedInPoison });
+if (skippedInPoison.length) {
+    console.log('   (SKIP ខណៈពុល — គ្មានការអះអាងណារត់ ➜ វាស់មិនបាន: ' + skippedInPoison.join(', ') + ')');
+}
+// ⛔ checker ដែល **ពុលមិនបាន** ត្រូវមើលឃើញដែរ — ការលាក់វាធ្វើឲ្យការគ្រប
+// មើលទៅធំជាងការពិត (មេរៀន «SKIP ធំពេក ជាបៃតងក្លែងក្លាយដែលមើលទៅដូចភាព
+// ស្មោះត្រង់»)។ ពួកវាការពារដោយការវាស់ AST ក្នុងជំហានទី ១ ជំនួសវិញ។
+if (unpoisonable.length) {
+    console.log('   (ពុលមិនបាន ' + unpoisonable.length + ' ➜ ការពារដោយជំហាន AST តែម្យ៉ាង: '
+        + unpoisonable.slice(0, 8).join(', ') + (unpoisonable.length > 8 ? ' …' : '') + ')');
+}
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

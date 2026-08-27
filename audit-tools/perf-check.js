@@ -4,6 +4,24 @@ let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.log('SKIP — ត្រូវការ playwright-core'); process.exit(0); }
 const CHROME = process.env.PERF_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const fs = require('fs'), http = require('http'), path = require('path');
+
+// ⛔ ថ្ងៃដែល seed ត្រូវគណនាតាម **ប្រតិទិនកម្ពុជា** ដូច App (កំណែ 2.20.5)។
+// មុននេះវាប្រើប្រតិទិន **ឧបករណ៍** ➜ ក្នុងបង្អួច ៧ ម៉ោងរៀងរាល់យប់
+// (00:00–07:00 ម៉ោងកម្ពុជា = 17:00–23:59 UTC) runner ដែលកំណត់ជា UTC
+// នៅថ្ងៃមុន ខណៈ App នៅថ្ងៃបន្ទាប់ ➜ ជួរដេកដែល seed មិនត្រូវនឹងតម្រង
+// «ថ្ងៃនេះ» ➜ គ្មានជួរដេកបង្ហាញ ➜ waitForFunction timeout។
+const APP_ZONE = 'Asia/Phnom_Penh';
+function zoneDateKey(ms, dayOffset) {
+    const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: APP_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(ms).split('-');
+    const base = Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    const s = new Date(base + (dayOffset || 0) * 86400000);
+    return s.getUTCFullYear() + '-'
+        + String(s.getUTCMonth() + 1).padStart(2, '0') + '-'
+        + String(s.getUTCDate()).padStart(2, '0');
+}
+
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium'); process.exit(0); }
 const ROOT = process.env.PERF_APP_DIR || path.join(__dirname, '..');
 const ORDERS = parseInt(process.env.PERF_ORDERS || '1200', 10);
@@ -73,7 +91,7 @@ const BOOT = function (seed) {
 
 function seedBig(n) {
     const t = new Date();
-    const d = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    const d = zoneDateKey(Date.now(), 0);
     const now = Date.now();
     const hist = {};
     let cod = 0, cnt = 0;

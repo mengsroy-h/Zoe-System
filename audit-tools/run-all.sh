@@ -86,7 +86,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
-         pickup-ledger-test pickup-repair-test; do
+         pickup-ledger-test pickup-repair-test pickup-reset-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -218,6 +218,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWFAIL_APP_DIR="$BASE"  node audit-tools/sw-cache-failure-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-failure:/'
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
     PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
+    PICKUPRESET_APP_DIR="$BASE" node audit-tools/pickup-reset-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset:    /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'

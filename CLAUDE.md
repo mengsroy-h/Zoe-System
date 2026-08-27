@@ -161,6 +161,7 @@
 | លុប ទល់នឹង ដក | `isDeducted` ជាវាល **តែមួយ** ដែលកំណត់លុយ | `policy-test` · `revenue-fuzz` |
 | ធុងសំរាម · `trashReason` | ស្លាកបង្ហាញ ≠ ការសម្រេចលុយ | `trash-modal-test` · `restore-marker-hygiene-test` |
 | **ស្ថិតិយក** ៖ អតិថិជន ↔ កញ្ចប់ | រាប់លើ **មូលដ្ឋានតែមួយ** (barcode បិទ) | `pickup-ledger-test` |
+| **Reset ស្ថិតិយក** តាមតម្រង | node ត្រូវ **នៅមាន** ជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `pickup-reset-test` |
 | សម្អាត ២ម៉ោង/៨ថ្ងៃ | ដើរតាម **barcode** មិនមែនកញ្ចប់ | `partial-pickup-cleanup-test` |
 | Rules fence · deadlock | witness មិនត្រូវចាក់សោ id | `emu/restore-deadlock-test` |
 | នាឡិកា | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `clock-hygiene` |
@@ -217,6 +218,47 @@ item លែងបិទពេញ **ដោយមិនបញ្ចេញ delta** 
 ត្រូវអះអាង **ការផ្តល់តម្លៃ** និង **ឥរិយាបថ** ជំនួស។
 
 Test៖ **`pickup-ledger-test.js`** (13 assertion, ធ្លាក់ ៦ លើ tree មុនកែ)។
+
+### ⛔ Reset ស្ថិតិ «យក» ៖ node ត្រូវ **នៅមាន** ជាមួយ `0` — កំណែ 2.20.0
+
+ប៊ូតុង «♻️ Reset ចំនួនយករួច» ក្នុងម៉ឺនុយ (...) Reset លេខ **អតិថិជនយក** និង
+**កញ្ចប់យក** ត្រឹម **តម្រងថ្ងៃដែលកំពុងឈរលើ** (ការពារដោយ PIN, គ្រាប់ចុច
+`resetPickup`)។
+
+⛔ **អន្ទាក់ដែលមើលមិនឃើញពីការអានផ្លូវសរសេរ។** `updateDailyScheduleStats()`
+អានលេខយករួចពី `dailyPickupData[targetDateKey]` **តែពេល node នោះមាន**៖
+
+```js
+if (!isSearchScoped && targetDateKey && dailyPickupData[targetDateKey]) { … }
+else { selectedClosedCount = new Set(filteredList.filter(i => i.isClosed)…).size; }
+```
+
+ដូច្នេះ Reset ដែល **លុប node ចោល** (`return null` ក្នុង transaction) ➜ ការ
+បង្ហាញ **ធ្លាក់ទៅរាប់ពីប្រវត្តិវិញ** ➜ លេខ **លោតត្រឡប់មកវិញភ្លាមៗ** ព្រោះ
+barcode នៅតែបិទ។ ត្រូវសរសេរ **`{ packagesPickedUp: 0 }`** — node ដែល *មាន*
+តម្លៃ 0។
+
+ច្បាប់៖
+
+- **`getFilterTargetDateKey()` ជាមូលដ្ឋានថ្ងៃ *តែមួយ*** — ទាំងការបង្ហាញ
+  (`updateDailyScheduleStats`) និងការ Reset (`getPickupResetTargetDates`)
+  ត្រូវអានពីវា។ ⛔ កុំគណនាថ្ងៃឡើងវិញក្នុងផ្លូវណាមួយ (គ្មាន `setDate` ស្ទួន)
+  — នោះជាថ្នាក់កំហុសដដែលនឹង 2.19.4៖ លេខដែលឃើញ និងថ្ងៃដែល Reset ឃ្លាតគ្នា។
+- ⛔ **លុយមិនត្រូវប៉ះ។** `isDeducted` នៅតែជាវាល *តែមួយគត់* ដែលកំណត់លុយ។
+  ការ Reset សរសេរតែក្រោម `zoew_daily_pickup_cod_dod/` — គ្មានការសរសេរទៅ
+  `zoew_daily_revenue_cod_dod` / `zoew_monthly_revenue_cod_dod` ឡើយ ហើយ
+  barcode ដែលបិទ **នៅតែបិទ** (បញ្ជី ប្រវត្តិ និងធុងសំរាមមិនប្រែ)។
+- **អថេរ `sum(pickedUpPhones) === packagesPickedUp` ត្រូវនៅតែកាន់** (0 === 0)។
+- ការបរាជ័យ **មិនត្រូវអះអាងជោគជ័យ** — ថ្ងៃដែល transaction បរាជ័យ មិនត្រូវ
+  សម្អាតក្នុងសតិ; toast ត្រូវជា ❌/⚠️។ `pickupResetInFlight` ត្រូវដោះក្នុង
+  `resetClearHistoryOperationState()` ➜ ការចាកចេញកណ្តាលផ្លូវមិនបន្សល់សោជាប់។
+- `planPickupLedgerRepair()` **មិនដកការ Reset វិញទេ** — វាជួសជុលតែពេល
+  `bucket.total === recordedPackages`; ក្រោយ Reset លេខនោះជា 0 ខណៈ barcode
+  បិទនៅមាន ➜ វារំលង។ ការកែ helper នោះត្រូវរក្សាលក្ខណៈនេះ។
+- **Firebase rules មិនប្រែទេ** — `packagesPickedUp: 0` ស៊ីនឹង schema ដែលមាន
+  ស្រាប់ (`newData.isNumber() && newData.val() >= 0`)។
+
+Test៖ **`pickup-reset-test.js`** (49 assertion, ធ្លាក់ **២៨** លើ tree មុនកែ)។
 
 ### ⛔ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស» — ច្បាប់ដែលអនុវត្តលើ **គ្រប់អ័ក្ស**
 
@@ -391,7 +433,7 @@ Test៖ **`boot-animation-test.js`** (វាស់ការគូរខណៈ ho
 | ទំព័រ ២ — បញ្ចូលទិន្នន័យ | `pageEntry` | របៀបស្កេន ២, កាមេរ៉ា, hardware scanner, រូបភាព, `parcelPanel` (បញ្ជីថ្ងៃនេះ), `lockerPanel` |
 | របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | Config/Reconfig, API ស្វែងរកអតិថិជន, តារាងអតិថិជន, កំណត់ទូ Locker, ចូល/ចាកចេញ (`navAuthBtn`) |
-| ប៊ូតុង (...) | `globalMoreMenu` | Export, កែទឹកប្រាក់/កញ្ចប់ (PIN), អត្រាប្រាក់, លុបទាំងអស់ (PIN) |
+| ប៊ូតុង (...) | `globalMoreMenu` | Export, កែទឹកប្រាក់/កញ្ចប់ (PIN), អត្រាប្រាក់, ធុងសំរាម, **Reset ចំនួនយករួច (PIN)**, លុបទាំងអស់ (PIN) |
 
 **`entryScanMode`** (`'parcel'` ឬ `'locker'`) កំណត់ថា `triggerScanAction()` នាំ barcode ទៅណា។
 វាជាចំណុចបំបែកតែមួយ — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។
@@ -691,7 +733,7 @@ PIN មិនត្រឹមតែជា gate ទេ — `deriveLookupSecretKey(
 
 **ប្រអប់ PIN បង្ហាញសារតាមប៊ូតុងដែលហៅ។** `requestPinBeforeConfig(targetAction, promptKey)` —
 `promptKey` ជាកូនសោក្នុង `PIN_PROMPT_MESSAGES` (`config`, `lookupApi`, `locker`, `manualAdjust`,
-`clearHistory`, `setupLink`) ហើយ `applyPinPromptText()` សរសេរវាចូល `#pinModalDesc` និង
+`resetPickup`, `clearHistory`, `setupLink`) ហើយ `applyPinPromptText()` សរសេរវាចូល `#pinModalDesc` និង
 `#pinSetupModalDesc`។ **រាល់ការបន្ថែមប៊ូតុងដែលការពារដោយ PIN ត្រូវបន្ថែមធាតុថ្មីក្នុងតារាងនោះ
 ហើយបញ្ជូនកូនសោរបស់វា** — បើមិនដូច្នេះ អ្នកប្រើឃើញសារ «Config ឬ Reconfig» លើគ្រប់ប៊ូតុង។
 Test៖ **`pin-prompt-test.js`**។
@@ -1409,7 +1451,29 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
-**៩ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+**១០ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+#### ០ឆ. កំណែ 2.20.0 — ប៊ូតុង Reset ចំនួន «យករួច» តាមតម្រងថ្ងៃ
+
+**Firebase rules មិនប្រែសោះ** — គ្រាន់តែ deploy។ ជុំនេះប៉ះតែ **ZoeW**
+(ZoeKeyGen និង ZoeImport មិនប្រែ) ហើយ **មិនប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ ·
+ការរមូរ · ទម្រង់បង្ហាញ** ក៏ **មិនប៉ះគោលការណ៍ «លុប» ទល់នឹង «ដក»** ដែរ។
+សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. **ឈរលើតម្រង «ម្សិលមិញ»** ➜ ចុច (...) ➜ ត្រូវឃើញប៊ូតុង
+   **«♻️ Reset ចំនួនយករួច (ម្សិលមិញ)»** នៅ **ខាងលើ** «❌ លុបទាំងអស់»។
+   ស្លាកត្រូវប្តូរតាមតម្រង (ថ្ងៃនេះ · ម្សិលមិញ · ម្សិលម្ងៃ · ថ្ងៃផ្សេង · ទាំងអស់)។
+2. **ចុចវា ➜ ត្រូវសុំ PIN** ជាមុនជានិច្ច ហើយសារក្នុងប្រអប់ត្រូវសរសេរអំពី
+   **ការ Reset** មិនមែន «Config ឬ Reconfig» ទេ។
+3. **ក្រោយវាយ PIN ➜ ប្រអប់បញ្ជាក់** បង្ហាញលេខបច្ចុប្បន្នទាំង ២ ➜ យល់ព្រម ➜
+   **អតិថិជនយក និងកញ្ចប់យក របស់ «ម្សិលមិញ» ក្លាយជា 0**។
+4. ⛔ **ប្តូរទៅ «ថ្ងៃនេះ» ➜ លេខត្រូវនៅដដែល** (មិនប៉ះពាល់)។
+5. ⛔ **ទឹកប្រាក់ COD/DOD ស្ថិតិចំណូល និងបញ្ជីកញ្ចប់ មិនត្រូវប្តូរសោះ** —
+   barcode ដែលបិទ «យក» នៅតែបិទ ហើយធុងសំរាមមិនប្រែ។
+6. **Refresh ទំព័រ ➜ លេខនៅតែ 0** (មិនលោតត្រឡប់មកវិញ)។ បន្ទាប់មក **បិទ «យក»
+   barcode ថ្មីមួយ** ➜ លេខឡើងពី 0 ធម្មតា។
+7. **បិទ WiFi រួចចុច Reset** ➜ ត្រូវឃើញសារបរាជ័យ **មិនមែនសារជោគជ័យទេ**
+   ហើយលេខមិនត្រូវក្លាយជា 0 ក្លែងក្លាយ។
 
 #### ✅ កំណែ 2.19.4 — ស្ថិតិ «យក» ៖ អតិថិជន ↔ កញ្ចប់ — **ចប់រួច**
 
@@ -1726,6 +1790,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | marker ស្តារធ្លាក់ចូលធុងសំរាម ➜ «ដក»/«លុប» ស្លាប់ជារៀងរហូត · ការសម្អាតលួចដណ្តើមធាតុដែលកំពុងស្តារ | `restore-marker-hygiene-test.js` |
 | witness ដែលបន្សល់ ➜ **ស្តារមិនបាន · លុបមិនបាន ជារៀងរហូត** (rules ពិតលើ emulator ពិត) | `emu/restore-deadlock-test.js` |
 | barcode ដែលយករួច មិនចេញក្នុង ២ ម៉ោង ឬត្រូវដកលុយខុសពេលបងប្អូនផុតកំណត់ | `partial-pickup-cleanup-test.js` |
+| ប៊ូតុង Reset ស្ថិតិយក ៖ លុប node ចោល ➜ លេខលោតត្រឡប់មកវិញ · មិនគោរពតម្រង · ប៉ះលុយ | `pickup-reset-test.js` |
 | `fb.X` ដែល `firebase-loader.js` មិន export ➜ `undefined` លើផលិតកម្ម | `sdk-surface.js` |
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
 | នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |

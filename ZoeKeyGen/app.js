@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.6';
+const APP_VERSION = '2.19.7';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",

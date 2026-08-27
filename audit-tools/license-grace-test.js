@@ -67,7 +67,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'syncServerTime', 'activate', 'getStatus']), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'checkOnline', 'syncServerTime', 'activate', 'getStatus']), ctx);
     return { ctx, store, clock };
 }
 
@@ -76,34 +76,48 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
 (async () => {
     console.log('===== license offline grace =====');
 
-    // 1. first activation with no network still works
+    // ── កំណែ 2.20.6 ៖ ការ Activate ត្រូវការសាលក្រម server ពិត ─────────
+    // 🔴 មុននេះ `activate()` ទទួលយក `online.ok === null` (ផ្ទៀងផ្ទាត់មិនបាន)
+    // ➜ «បិទបណ្តាញ + បង្វិលនាឡិកាថយក្រោយ» ធ្វើឲ្យ **Key ដែលផុតកំណត់ពិត
+    // រស់ឡើងវិញ** ហើយការអនុគ្រោះ ៣ ថ្ងៃ **reset បានគ្មានដែនកំណត់**។
+    // វាស់បានលើកូដមុនកែ ៖ `license-clock-rollback-test.js` ធ្លាក់ ១៦។
+    // ច្បាប់ «unverified ➜ រក្សាទុក តែកុំផ្តល់សិទ្ធិថ្មី» ឥឡូវអនុវត្តពិត។
     let h = build('offline');
     let r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
-    ok('Activate ក្រៅបណ្ដាញលើកដំបូង ➜ ជោគជ័យ', r.valid === true, r);
-    let rec = JSON.parse(h.store['zoe_license_activation_ADM']);
-    ok('ហើយចាប់ផ្ដើមរាប់ការអនុគ្រោះពីពេលនោះ', rec.lastOnlineCheck === 1000000, rec.lastOnlineCheck);
+    ok('Activate ក្រៅបណ្ដាញ ➜ **បដិសេធ** (មិនផ្តល់សិទ្ធិលើអ្វីដែលផ្ទៀងផ្ទាត់មិនបាន)',
+        r.valid === false && r.reason === 'network', r);
+    ok('ហើយមិនរក្សាទុក record ទេ', !h.store['zoe_license_activation_ADM']);
 
+    // ⛔ ទិសផ្ទុយ ៖ ការបដិសេធនោះមិនត្រូវប៉ះ Activation ដែលកំពុងដំណើរការ
+    const live = JSON.stringify({
+        keyString: 'KEY1', id: 'KEY1', a: 'ADM', iat: 1,
+        exp: Math.floor((1000000 + 30 * 86400000) / 1000),
+        lastOnlineCheck: 1000000, onlineExp: 1000000 + 30 * 86400000, seenMax: 1000000
+    });
+    h = build('offline', { store: { zoe_license_activation_ADM: live } });
     let st = await vm.runInContext("getStatus('ADM')", h.ctx);
-    ok('ក្នុងអំឡុងអនុគ្រោះ ➜ active', st.state === 'active', st.state);
+    ok('ក្រៅបណ្ដាញក្នុងអំឡុងអនុគ្រោះ ➜ នៅតែ active', st.state === 'active', st.state);
 
-    // 2. past the grace, offline
     h.clock.now = 1000000 + GRACE + 60000;
     st = await vm.runInContext("getStatus('ADM')", h.ctx);
     ok('ហួសអនុគ្រោះ ➜ offline-grace-exceeded', st.state === 'offline-grace-exceeded', st.state);
 
-    // 3. THE HOLE: re-pasting the same key offline must not reset the clock
     r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
-    ok('Paste Key ដដែលឡើងវិញ ➜ នៅតែទទួលយក', r.valid === true, r);
-    rec = JSON.parse(h.store['zoe_license_activation_ADM']);
-    ok('តែ lastOnlineCheck មិនត្រូវរំកិលទេ', rec.lastOnlineCheck === 1000000, rec.lastOnlineCheck);
+    ok('Paste Key ដដែលឡើងវិញ ក្រៅបណ្ដាញ ➜ បដិសេធ', r.valid === false, r);
+    ok('ហើយ Activation ចាស់មិនត្រូវលុប',
+        !!h.store['zoe_license_activation_ADM'] &&
+        JSON.parse(h.store['zoe_license_activation_ADM']).id === 'KEY1' &&
+        JSON.parse(h.store['zoe_license_activation_ADM']).lastOnlineCheck === 1000000,
+        h.store['zoe_license_activation_ADM']);
     st = await vm.runInContext("getStatus('ADM')", h.ctx);
     ok('ដូច្នេះនៅតែហួសអនុគ្រោះ (រន្ធត្រូវបានបិទ)',
         st.state === 'offline-grace-exceeded', st.state);
 
-    // 4. a genuinely new key offline is a legitimate fresh activation
-    r = await vm.runInContext("activate('KEY2', 'ADM')", h.ctx);
-    rec = JSON.parse(h.store['zoe_license_activation_ADM']);
-    ok('Key ថ្មីពិត ➜ ចាប់ផ្ដើមអនុគ្រោះថ្មី', rec.lastOnlineCheck === h.clock.now, rec.lastOnlineCheck);
+    // ⛔ បង្វិលនាឡិកាថយក្រោយ ➜ ការអនុគ្រោះមិនត្រូវ reset (floor `seenMax`)
+    h.clock.now = 1000000 + 60000;
+    st = await vm.runInContext("getStatus('ADM')", h.ctx);
+    ok('បង្វិលនាឡិកាថយក្រោយ ➜ នៅតែហួសអនុគ្រោះ',
+        st.state === 'offline-grace-exceeded', st.state);
 
     // 5. with network, the clock does move
     h = build(LIVE, { store: { zoe_license_activation_ADM: JSON.stringify({ id: 'KEY1', lastOnlineCheck: 1 }) } });
@@ -224,13 +238,18 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         ok('⛔ ហើយក៏ **មិនត្រូវផ្តល់សិទ្ធិ** ដែរ (មិនមែន active)',
             badSt.state !== 'active', JSON.stringify(badSt));
 
-        // ខ. ទិសផ្ទុយ ៖ នាឡិកា sync រួច ➜ ការផុតកំណត់ពិត **ត្រូវលុប**
-        //    បើអត់ការអះអាងនេះ ការ «រក្សាទុកគ្រប់ពេល» នឹងបៃតងដោយខុស
-        //    ហើយ Key ដែលផុតកំណត់ពិតនឹងរស់ជារៀងរហូត។
+        // ខ. កំណែ 2.20.6 ៖ ក្រៅបណ្តាញ **គ្មានផ្លូវលុប** ទោះ `serverTimeSynced`
+        //    ជា `true`។ ហេតុផល ៖ ទង់នោះនៅ `true` បន្តក្រោយចាកចេញពីបណ្តាញ
+        //    ហើយ offset ក្លាយជាចាស់ ➜ `getServerNow()` រំកិលតាមនាឡិកាឧបករណ៍
+        //    ម្តងទៀត ➜ ការប្តូរថ្ងៃទូរស័ព្ទ **លុប Key របស់អតិថិជន**។
+        //    ⛔ ការអះអាងនៅតែ **២ ខាង** ៖ មិនផ្តល់សិទ្ធិ **និង** មិនលុប។
+        //    ការលុបនៅតែកើតឡើងលើសាលក្រម server ពិត — ជួរ «ឃ» ខាងក្រោម។
         const good = build('offline', { store: JSON.parse(JSON.stringify(store)), now: signedExp + 365 * 86400000, serverTimeSynced: true });
         const goodSt = await vm.runInContext("getStatus('ADM')", good.ctx);
-        ok('⛔ ទិសផ្ទុយ ៖ នាឡិកាទុកចិត្តបាន + ផុតកំណត់ពិត ➜ record **ត្រូវលុប**',
-            !good.store['zoe_license_activation_ADM'] && goodSt.reason === 'expired', JSON.stringify(goodSt));
+        ok('⛔ នាឡិកា sync + ក្រៅបណ្តាញ + ហួសពិដាន ➜ **មិនផ្តល់សិទ្ធិ**',
+            goodSt.state === 'offline-grace-exceeded', JSON.stringify(goodSt));
+        ok('⛔ តែក៏ **មិនលុប** ដែរ (ការលុបទាមទារសាលក្រម server ពិត)',
+            !!good.store['zoe_license_activation_ADM'], Object.keys(good.store));
 
         // គ. នាឡិកាមិន sync តែ Key **មិនទាន់** ផុតកំណត់ ➜ នៅ active ធម្មតា
         const fresh = build('offline', { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });

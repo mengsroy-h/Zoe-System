@@ -104,7 +104,14 @@ const FAKE_SDK = function (seed) {
         ref: (d, p) => ({ path: p === undefined ? '' : String(p) }),
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
-            setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else cb(snapOf(r.path)); }, 0);
+            // ⛔ `.info/serverTimeOffset` ត្រូវផ្តល់ **លេខ** — ការសម្អាតមាន
+            // ច្រកទ្វារនាឡិកា (2.20.5) ដែលបើកតែដោយតម្លៃពី server ពិត។
+            // `.info/connected` បាញ់មុន ➜ offset 0 ត្រូវទទួលយក។
+            setTimeout(() => {
+                if (r.path === '.info/connected') cb({ val: () => true });
+                else if (r.path === '.info/serverTimeOffset') cb({ val: () => 0 });
+                else cb(snapOf(r.path));
+            }, 0);
             return () => {};
         },
         off: () => {},

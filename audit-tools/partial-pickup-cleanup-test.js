@@ -147,6 +147,12 @@ function buildWorld(historySeed, startNow) {
     const code = [
         extractConst(src, 'TWO_HOURS_MS'),
         extractConst(src, 'EIGHT_DAYS_MS'),
+        // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ sandbox
+        // ត្រូវផ្ទុក **function ពិត** បូក `serverClockTrusted = true` ដែលជា
+        // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ
+        // នឹងលាក់ការដកច្រកទ្វារនោះចេញ ➜ បៃតងក្លែងក្លាយ។
+        'let serverClockTrusted = true;',
+        extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();',
         ...REAL_FNS.map((name) => extractFn(src, name)),
         'globalThis.runAutomaticCleanupRules = runAutomaticCleanupRules;',

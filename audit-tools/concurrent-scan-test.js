@@ -80,6 +80,8 @@ function makeCtx(server, fbSet) {
         scanHistory,
         getServerNow: () => 1755000000000,
         getFormattedDate: () => '2026-08-20',
+        // ⛔ `addOrUpdateEntry()` បោះត្រាម៉ោងតាមប្រតិទិនកម្ពុជា (2.20.5)
+        getFormattedClockTime: () => '10:30:00',
         generateUniqueId: () => 'id_new_' + Math.random().toString(36).slice(2, 8),
         addRevenueToDailyAndMonthlyRecord: (d, c, dd, n) => { revenue.cod += c; revenue.dod += dd; revenue.count += n; },
         addPickupToDailyRecord: (d, key, cust, pkg) => { pickup.push({ d, key, cust, pkg }); },

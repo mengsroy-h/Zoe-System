@@ -73,7 +73,14 @@ vm.createContext(sandbox);
     ok('រកឃើញ ' + (line || '').split(' ')[1] + ' ក្នុង app.js', !!line);
     if (line) vm.runInContext(line, sandbox);
 });
-['getFormattedDate', 'getFilteredDataByDate', 'buildExportRows', 'forceExportTextCells'].forEach((name) => {
+// ⛔ `getFilteredDataByDate()` គណនាថ្ងៃតាមប្រតិទិនកម្ពុជា (2.20.5) ➜ ត្រូវ
+// ផ្ទុក helper តំបន់ម៉ោងពិត បើមិនដូច្នេះវាធ្លាក់ដោយ ReferenceError។
+['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'].forEach((name) => {
+    const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(src);
+    if (m) vm.runInContext('const ' + name + ' = ' + m[1] + ';', sandbox);
+});
+['appZoneParts', 'getZoneDateKey', 'getFormattedClockTime',
+ 'getFormattedDate', 'getFilteredDataByDate', 'buildExportRows', 'forceExportTextCells'].forEach((name) => {
     const fn = sliceFn(src, name);
     ok('រកឃើញ ' + name + '() ក្នុង app.js', !!fn);
     if (fn) vm.runInContext(fn, sandbox);

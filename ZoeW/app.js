@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.19.4';
+    const APP_VERSION = '2.19.5';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -316,6 +316,8 @@
     let dbListenerOutageNoticeShown = false;
     const dbListenerPendingPaths = new Set();
     let dbListenerPendingSeen = 0;
+    let pickupLedgerRepairDone = false;
+    let pickupLedgerRepairRunning = false;
     let infoListenersFailed = false;
     let infoListenerRecoveryTimer = null;
     let infoListenerRecoveryAttempt = 0;
@@ -2625,6 +2627,8 @@
 
     function resetDbListenerHealthState() {
         sdkUnavailableNoticeShown = false;
+        pickupLedgerRepairDone = false;
+        pickupLedgerRepairRunning = false;
         clearInfoListenerRecovery();
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
@@ -3135,6 +3139,7 @@
         if (!db || !isDatabaseInitialized || dbListenersFailed) return;
         runAutomaticCleanupRules();
         runAutomaticDeletedCleanup();
+        repairPickupLedgerOnce();
     }
 
     function parseTimestampFromId(idStr) {
@@ -3620,6 +3625,70 @@
 
     function countPickedUpCustomers(record) {
         return record && record.pickedUpPhones ? Object.keys(record.pickedUpPhones).length : 0;
+    }
+
+    function planPickupLedgerRepair(ledger, historyItems, trashItems) {
+        const plans = [];
+        if (!ledger) return plans;
+        const byDate = {};
+        const collect = (list) => {
+            (list || []).forEach((item) => {
+                if (!item || !item.scanDate) return;
+                const closed = closedBarcodeCount(item);
+                if (!closed) return;
+                const key = getPickupPhoneKey(item);
+                const bucket = byDate[item.scanDate] || (byDate[item.scanDate] = { phones: {}, total: 0 });
+                bucket.phones[key] = (bucket.phones[key] || 0) + closed;
+                bucket.total += closed;
+            });
+        };
+        collect(historyItems);
+        collect(trashItems);
+
+        Object.keys(ledger).forEach((date) => {
+            const record = ledger[date];
+            if (!record || typeof record !== 'object') return;
+            const recordedPackages = parseFloat(record.packagesPickedUp) || 0;
+            const bucket = byDate[date] || { phones: {}, total: 0 };
+            if (bucket.total !== recordedPackages) return;
+            const current = record.pickedUpPhones || {};
+            const nextKeys = Object.keys(bucket.phones);
+            const sameSize = nextKeys.length === Object.keys(current).length;
+            const sameValues = nextKeys.every((k) => (parseFloat(current[k]) || 0) === bucket.phones[k]);
+            if (sameSize && sameValues) return;
+            plans.push({ date: date, pickedUpPhones: bucket.phones });
+        });
+        return plans;
+    }
+
+    async function repairPickupLedgerOnce() {
+        if (pickupLedgerRepairDone || pickupLedgerRepairRunning) return;
+        if (!db || !fb || !auth || !auth.currentUser) return;
+        if (dbListenerPendingPaths.size || dbListenersFailed) return;
+        pickupLedgerRepairRunning = true;
+        try {
+            const plans = planPickupLedgerRepair(dailyPickupData, scanHistory, deletedItems);
+            for (const plan of plans) {
+                if (!/^[0-9-]+$/.test(plan.date)) continue;
+                const dayRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${plan.date}`);
+                await fb.runTransaction(dayRef, (record) => {
+                    if (!record) return record;
+                    const recorded = parseFloat(record.packagesPickedUp) || 0;
+                    const nextSum = Object.keys(plan.pickedUpPhones)
+                        .reduce((sum, k) => sum + plan.pickedUpPhones[k], 0);
+                    if (nextSum !== recorded) return record;
+                    record.pickedUpPhones = Object.keys(plan.pickedUpPhones).length
+                        ? { ...plan.pickedUpPhones }
+                        : null;
+                    return record;
+                }).catch(() => {});
+            }
+            pickupLedgerRepairDone = true;
+        } catch (e) {
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'repairPickupLedgerOnce' });
+        } finally {
+            pickupLedgerRepairRunning = false;
+        }
     }
 
     function addPickupToDailyRecord(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {

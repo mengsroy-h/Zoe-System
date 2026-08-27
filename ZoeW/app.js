@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.2';
+    const APP_VERSION = '2.20.3';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -8806,19 +8806,32 @@
             historyPatchFlushInFlight = false;
             scheduleHistoryViewRefresh();
         };
+        const noteAttempt = (itemId, attempts) => {
+            const requeued = pendingHistoryPatches.get(itemId);
+            if (requeued) requeued.attempts = attempts;
+        };
         entries.forEach((pair) => {
             const itemId = pair[0];
             const entry = pair[1];
             const attempts = entry.attempts + 1;
             const target = scanHistory.find(i => i.id === itemId) || { id: itemId };
-            patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
-                { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX }).then((saved) => {
-                    if (!saved) {
-                        const requeued = pendingHistoryPatches.get(itemId);
-                        if (requeued) requeued.attempts = attempts;
-                    }
-                    done();
-                }, done);
+            let started = null;
+            try {
+                started = patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
+                    { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX });
+            } catch (e) {
+                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'flushPendingHistoryPatches' });
+                if (attempts < HISTORY_PATCH_RETRY_MAX) {
+                    queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields);
+                    noteAttempt(itemId, attempts);
+                }
+                done();
+                return;
+            }
+            Promise.resolve(started).then((saved) => {
+                if (!saved) noteAttempt(itemId, attempts);
+                done();
+            }, done);
         });
     }
 

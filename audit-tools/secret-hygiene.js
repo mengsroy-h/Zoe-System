@@ -314,6 +314,52 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         const keepEv = captured.beforeSend({ extra: { deep: { barcode: 'ZTO900', id: 'id_123_abc' } } });
         ok('រក្សាទុក៖ barcode/id ក្នុងវាលជ្រៅ',
             keepEv.extra.deep.barcode === 'ZTO900' && keepEv.extra.deep.id === 'id_123_abc');
+
+        // ⛔ ចន្លោះពិត ៣ ដែលវាស់បានក្នុងជុំ 2.20.3 (កូដមុនកែលេច secret ពិត)៖
+        //
+        // ១. **អ្នកបំបែកក្រៅពី `?&#` និងចន្លោះ។** លំនាំ `name=value` ដែលមក
+        //    ក្រោយ `,` ឬ `;` ឬ `{` **មិនត្រូវលាក់** — ហើយ breadcrumb របស់
+        //    console (ដែល Sentry ចាប់ដោយស្វ័យប្រវត្តិ) ជាទម្រង់នោះជាញឹកញាប់។
+        // ២. **គូដែលមិនសម្ងាត់លេបគូដែលសម្ងាត់។** តម្លៃរបស់ `a=` ធ្លាប់អាច
+        //    ត្រួតលើ `;` ➜ `a=1;secret=X` ផ្គូផ្គងជា name=`a`
+        //    value=`1;secret=X` ➜ `isSecretParamName('a')` មិនពិត ➜ **រក្សា
+        //    ទាំងមូល** ➜ `secret=X` មិនដែលត្រូវពិនិត្យសោះ។
+        // ៣. **ការឈានដល់ពិដានជម្រៅ ត្រឡប់ subtree ឆៅ។** `REDACT_MAX_DEPTH`
+        //    ធ្លាប់ជា ៦ ហើយពេលដល់ពិដាន វា `return value` ➜ អ្វីៗខាងក្រោម
+        //    **មិនដែលត្រូវស្កេន**។ event ពិតរបស់ Sentry ជ្រៅជាង ៦ ជាធម្មតា
+        //    (`exception.values[].stacktrace.frames[].vars.…`)។
+        const sepEv = captured.beforeSend({ extra: {
+            comma: 'config loaded,pin=4321,done',
+            semi: 'a=1;secret=SUPERSECRET123',
+            brace: '{token=SUPERSECRET123}',
+            pipe: 'x|password=SUPERSECRET123'
+        } });
+        ok('⛔ លាក់៖ គូដែលមកក្រោយ `,` (breadcrumb របស់ console)',
+            sepEv.extra.comma.indexOf('4321') === -1, sepEv.extra.comma);
+        ok('⛔ លាក់៖ គូសម្ងាត់ដែលឈរក្រោយគូមិនសម្ងាត់ (`a=1;secret=…`)',
+            sepEv.extra.semi.indexOf('SUPERSECRET123') === -1, sepEv.extra.semi);
+        ok('⛔ លាក់៖ គូក្នុងវង់ក្រចក `{token=…}`',
+            sepEv.extra.brace.indexOf('SUPERSECRET123') === -1, sepEv.extra.brace);
+        ok('⛔ លាក់៖ គូក្រោយ `|`',
+            sepEv.extra.pipe.indexOf('SUPERSECRET123') === -1, sepEv.extra.pipe);
+        ok('ការលាក់មិនលេបអត្ថបទដែលនៅសល់ (`,done` ត្រូវនៅ)',
+            sepEv.extra.comma.indexOf('done') !== -1, sepEv.extra.comma);
+
+        // ជម្រៅ ៖ secret ដែលអង្គុយជ្រៅជាងពិដានចាស់ (៦) ត្រូវលាក់ដដែល
+        let deep = { pin: 'SUPERSECRET123' };
+        for (let i = 0; i < 9; i++) deep = { nest: deep };
+        const deepEv = captured.beforeSend({ extra: { deep: deep } });
+        ok('⛔ លាក់៖ secret ដែលជ្រៅជាងពិដានចាស់ (៦ ជាន់)',
+            JSON.stringify(deepEv).indexOf('SUPERSECRET123') === -1,
+            JSON.stringify(deepEv).slice(0, 120));
+
+        // ហើយអ្វីដែលហួសពិដានពិត ត្រូវ **កាត់** មិនមែនប្រគល់ subtree ឆៅ
+        let tooDeep = { pin: 'SUPERSECRET123' };
+        for (let i = 0; i < 40; i++) tooDeep = { nest: tooDeep };
+        const cutEv = captured.beforeSend({ extra: { deep: tooDeep } });
+        ok('⛔ ហួសពិដានជម្រៅ ➜ កាត់ចោល (មិនប្រគល់ subtree ដែលមិនទាន់ស្កេន)',
+            JSON.stringify(cutEv).indexOf('SUPERSECRET123') === -1,
+            JSON.stringify(cutEv).slice(0, 120));
     })();
 
     ok('beforeSend ត្រូវបានភ្ជាប់ (មិនត្រឹមតែ beforeBreadcrumb)', /beforeSend:\s*redactEvent/.test(src));

@@ -6,7 +6,7 @@
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
     const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup)';
-    const REDACT_MAX_DEPTH = 6;
+    const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
 
     let loadPromise = null;
@@ -58,17 +58,17 @@
         return SECRET_WORD_RE.test('_' + split + '_');
     }
 
-    function redactPairs(text, leadClass) {
+    function redactPairs(text, leadClass, valueClass) {
         return text.replace(
-            new RegExp('(' + leadClass + ')([A-Za-z0-9_.\\-]{1,64})=([^&#\\s"\'<>]+)', 'g'),
+            new RegExp('(' + leadClass + ')([A-Za-z0-9_.\\-]{1,64})=(' + valueClass + '+)', 'g'),
             (whole, lead, name) => (isSecretParamName(name) ? lead + name + '=[redacted]' : whole)
         );
     }
 
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
-        let out = redactPairs(url, '[?&#]');
-        out = redactPairs(out, '^|[\\s"\'([]');
+        let out = redactPairs(url, '[?&#]', '[^&#\\s"\'<>]');
+        out = redactPairs(out, '^|[\\s"\'([,;{|]', '[^&#\\s"\'<>,;)\\]}|]');
         return out
             .replace(/(\/macros\/s\/)[^/\s"']+/g, '$1[redacted]')
             .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@');
@@ -90,7 +90,7 @@
     function redactDeep(value, depth, seen, budget) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
-        if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return value;
+        if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return '[truncated]';
         if (seen.has(value)) return value;
         seen.add(value);
         budget.n++;

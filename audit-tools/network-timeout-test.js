@@ -278,7 +278,7 @@ function serve() {
 
     await browser.close();
     server.close();
-    process.exit(0);
+    process.exit(fail ? 1 : 0);
 })().then(() => {}, (e) => { ok('ផ្នែក browser រត់ចប់ដោយគ្មានកំហុស harness', false, String(e && e.message || e)); process.exit(1); });
 
 process.on('exit', () => {

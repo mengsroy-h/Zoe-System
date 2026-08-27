@@ -76,7 +76,8 @@ const LOCAL_CLOCK_OK = {
         '<top>': 'ថេរពេល boot splash — cosmetic',
         revealAppAfterBoot: 'រយៈពេលអប្បបរមារបស់ផ្ទាំង boot — cosmetic',
         lockoutSecondsLeft: 'ការជាប់សោ PIN — local ដោយចេតនា',
-        registerPinFailure: 'ការជាប់សោ PIN ដដែល'
+        registerPinFailure: 'ការជាប់សោ PIN ដដែល',
+        registerServiceWorker: 'throttle `reg.update()` — cosmetic/local (ZoeW និង ZoeKeyGen មានវាក្រោម `<top>` ព្រោះកូដចុះឈ្មោះរបស់ពួកវាមិននៅក្នុង function ដែលមានឈ្មោះ)'
     }
 };
 

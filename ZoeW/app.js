@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.4';
+    const APP_VERSION = '2.20.5';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -311,8 +311,14 @@
         return Date.now() + serverTimeOffsetMs;
     }
 
+    let serverClockTrusted = false;
+
     function serverClockOffsetIsFromServer(offsetMs) {
         return offsetMs !== 0 || isDatabaseConnected || hasEverConnectedToDatabase;
+    }
+
+    function cleanupClockIsTrustworthy() {
+        return serverClockTrusted;
     }
 
     let nativeDetector = null;
@@ -834,6 +840,7 @@
             if (typeof val !== 'number') return;
             serverTimeOffsetMs = val;
             if (!serverClockOffsetIsFromServer(val)) return;
+            serverClockTrusted = true;
             if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
         }, handleInfoListenerError);
 
@@ -2073,7 +2080,7 @@
     function renderCustomerDataTableStatus(rows) {
         const statusEl = document.getElementById('customerDataTableStatus');
         if (!statusEl) return;
-        const ts = customerDataTableFetchedAt ? new Date(customerDataTableFetchedAt).toLocaleTimeString('km-KH') : '';
+        const ts = customerDataTableFetchedAt ? getFormattedClockTime(customerDataTableFetchedAt) : '';
         statusEl.textContent = rows.length + ' ជួរដេក' + (ts ? (' — ទាញយកចុងក្រោយ ' + ts) : '');
     }
 
@@ -2908,6 +2915,7 @@
     }
 
     function runAutomaticCleanupRules() {
+        if (!cleanupClockIsTrustworthy()) return;
         const currentTime = getServerNow();
 
         scanHistory.forEach(item => {
@@ -3152,6 +3160,7 @@
 
     async function runAutomaticDeletedCleanup() {
         if (deletedCleanupInFlight) return;
+        if (!cleanupClockIsTrustworthy()) return;
         const currentTime = getServerNow();
         const candidates = [];
 
@@ -3473,11 +3482,50 @@
         return { msg: '✅ ចូលប្រព័ន្ធជោគជ័យ — ទិន្នន័យទាន់សម័យ', kind: 'success', settled: true };
     }
 
+    const APP_TIME_ZONE = 'Asia/Phnom_Penh';
+    const APP_TIME_ZONE_OFFSET_MINUTES = 420;
+
+    function appZoneParts(ms) {
+        const at = typeof ms === 'number' ? ms : Number(ms);
+        try {
+            const parts = {};
+            new Intl.DateTimeFormat('en-GB', {
+                timeZone: APP_TIME_ZONE, hour12: false,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }).formatToParts(at).forEach((p) => { if (p.type !== 'literal') parts[p.type] = p.value; });
+            if (parts.year && parts.month && parts.day) {
+                if (parts.hour === '24') parts.hour = '00';
+                return parts;
+            }
+        } catch (e) {}
+        const shifted = new Date(at + APP_TIME_ZONE_OFFSET_MINUTES * 60000);
+        return {
+            year: String(shifted.getUTCFullYear()),
+            month: String(shifted.getUTCMonth() + 1).padStart(2, '0'),
+            day: String(shifted.getUTCDate()).padStart(2, '0'),
+            hour: String(shifted.getUTCHours()).padStart(2, '0'),
+            minute: String(shifted.getUTCMinutes()).padStart(2, '0'),
+            second: String(shifted.getUTCSeconds()).padStart(2, '0')
+        };
+    }
+
+    function getZoneDateKey(ms, dayOffset) {
+        const parts = appZoneParts(ms);
+        const base = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+        const shifted = new Date(base + (dayOffset || 0) * 86400000);
+        return shifted.getUTCFullYear() + '-'
+            + String(shifted.getUTCMonth() + 1).padStart(2, '0') + '-'
+            + String(shifted.getUTCDate()).padStart(2, '0');
+    }
+
+    function getFormattedClockTime(ms) {
+        const parts = appZoneParts(ms);
+        return parts.hour + ':' + parts.minute + ':' + parts.second;
+    }
+
     function getFormattedDate(d = new Date(getServerNow())) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return getZoneDateKey(d instanceof Date ? d.getTime() : Number(d), 0);
     }
 
     function isMobileDevice() {
@@ -5161,13 +5209,10 @@
     }
 
     function getFilteredDataByDate() {
-        const today = new Date(getServerNow());
-        const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-        const dayBefore = new Date(today); dayBefore.setDate(today.getDate() - 2);
-
-        const todayStr = getFormattedDate(today);
-        const yesterdayStr = getFormattedDate(yesterday);
-        const dayBeforeStr = getFormattedDate(dayBefore);
+        const now = getServerNow();
+        const todayStr = getZoneDateKey(now, 0);
+        const yesterdayStr = getZoneDateKey(now, -1);
+        const dayBeforeStr = getZoneDateKey(now, -2);
 
         if (currentFilterMode === 'today') {
             return scanHistory.filter(item => item.scanDate === todayStr);
@@ -5220,16 +5265,10 @@
     }
 
     function getFilterTargetDateKey() {
-        const today = new Date(getServerNow());
-        if (currentFilterMode === 'today') return getFormattedDate(today);
-        if (currentFilterMode === 'yesterday') {
-            const d = new Date(today); d.setDate(today.getDate() - 1);
-            return getFormattedDate(d);
-        }
-        if (currentFilterMode === 'dayBefore') {
-            const d = new Date(today); d.setDate(today.getDate() - 2);
-            return getFormattedDate(d);
-        }
+        const now = getServerNow();
+        if (currentFilterMode === 'today') return getZoneDateKey(now, 0);
+        if (currentFilterMode === 'yesterday') return getZoneDateKey(now, -1);
+        if (currentFilterMode === 'dayBefore') return getZoneDateKey(now, -2);
         if (currentFilterMode === 'custom') return customFilterDate;
         return "";
     }
@@ -5380,7 +5419,7 @@
                     </tr>
                 </tbody>
             </table>
-            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(new Date(getServerNow()).toLocaleString('km-KH'))}</p>
+            <p class="export-footer">នាំចេញនៅ ${sanitizeInput(getZoneDateKey(getServerNow(), 0) + ' ' + getFormattedClockTime(getServerNow()))}</p>
         `;
 
         if (pdfExportOriginalTitle === null) pdfExportOriginalTitle = document.title;
@@ -7121,7 +7160,7 @@
         const dateString = getFormattedDate(now);
         const currentTimeMillis = now.getTime();
 
-        const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeFormatted = getFormattedClockTime(currentTimeMillis);
         const timeString = `${timeFormatted} (${dateString})`;
 
         let existingIndex = -1;

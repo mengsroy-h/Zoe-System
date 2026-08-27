@@ -74,6 +74,7 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
          license-grace-test license-clock-trust-test \
+         cleanup-clock-guard-test khmer-timezone-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
          keygen-session-security-test \
@@ -220,6 +221,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'
     LADDER_APP_DIR="$BASE" node audit-tools/reconnect-ladder-test.js 2>&1 | tail -1 | sed 's/^/   reconnect-ladder:/'
     LICENSECLOCK_APP_DIR="$BASE" node audit-tools/license-clock-trust-test.js 2>&1 | tail -1 | sed 's/^/   license-clock:   /'
+    CLEANUPCLOCK_APP_DIR="$BASE" node audit-tools/cleanup-clock-guard-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-clock:   /'
+    KHMERTZ_APP_DIR="$BASE" node audit-tools/khmer-timezone-test.js 2>&1 | tail -1 | sed 's/^/   khmer-tz:        /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
     SWLATENCY_APP_DIR="$BASE" node audit-tools/sw-shell-latency-test.js 2>&1 | tail -1 | sed 's/^/   sw-shell-latency:/'
     NETPRESSURE_APP_DIR="$BASE" node audit-tools/network-pressure-test.js 2>&1 | tail -1 | sed 's/^/   network-pressure:/'

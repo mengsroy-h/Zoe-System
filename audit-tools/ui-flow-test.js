@@ -7,6 +7,24 @@ const CHROME = process.env.UIFLOW_CHROME || '/opt/pw-browsers/chromium-1194/chro
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+
+// ⛔ ថ្ងៃដែល seed ត្រូវគណនាតាម **ប្រតិទិនកម្ពុជា** ដូច App (កំណែ 2.20.5)។
+// មុននេះវាប្រើប្រតិទិន **ឧបករណ៍** ➜ ក្នុងបង្អួច ៧ ម៉ោងរៀងរាល់យប់
+// (00:00–07:00 ម៉ោងកម្ពុជា = 17:00–23:59 UTC) runner ដែលកំណត់ជា UTC
+// នៅថ្ងៃមុន ខណៈ App នៅថ្ងៃបន្ទាប់ ➜ ជួរដេកដែល seed មិនត្រូវនឹងតម្រង
+// «ថ្ងៃនេះ» ➜ គ្មានជួរដេកបង្ហាញ ➜ waitForFunction timeout។
+const APP_ZONE = 'Asia/Phnom_Penh';
+function zoneDateKey(ms, dayOffset) {
+    const p = new Intl.DateTimeFormat('en-CA', {
+        timeZone: APP_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(ms).split('-');
+    const base = Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    const s = new Date(base + (dayOffset || 0) * 86400000);
+    return s.getUTCFullYear() + '-'
+        + String(s.getUTCMonth() + 1).padStart(2, '0') + '-'
+        + String(s.getUTCDate()).padStart(2, '0');
+}
+
 if (!fs.existsSync(CHROME)) {
     console.log('SKIP — រកមិនឃើញ Chromium នៅ ' + CHROME);
     process.exit(0);
@@ -104,7 +122,14 @@ const FAKE_SDK = function (seed) {
         ref: (d, p) => ({ path: p === undefined ? '' : String(p) }),
         onValue: (r, cb) => {
             listeners.push({ path: r.path, cb });
-            setTimeout(() => { if (r.path === '.info/connected') cb({ val: () => true }); else cb(snapOf(r.path)); }, 0);
+            // ⛔ `.info/serverTimeOffset` ត្រូវផ្តល់ **លេខ** — ការសម្អាតមាន
+            // ច្រកទ្វារនាឡិកា (2.20.5) ដែលបើកតែដោយតម្លៃពី server ពិត។
+            // `.info/connected` បាញ់មុន ➜ offset 0 ត្រូវទទួលយក។
+            setTimeout(() => {
+                if (r.path === '.info/connected') cb({ val: () => true });
+                else if (r.path === '.info/serverTimeOffset') cb({ val: () => 0 });
+                else cb(snapOf(r.path));
+            }, 0);
             return () => {};
         },
         off: () => {},
@@ -139,7 +164,7 @@ const FAKE_SDK = function (seed) {
 
 function seedData() {
     const today = new Date();
-    const d = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    const d = zoneDateKey(Date.now(), 0);
     return {
         user_roles: { 'admin-uid': 'admin' },
         zoew_scan_history_cod_dod: {

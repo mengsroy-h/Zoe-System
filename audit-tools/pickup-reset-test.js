@@ -69,6 +69,12 @@ const REQUIRED_FNS = [
     'moreMenuResetPickup', 'planPickupLedgerRepair', 'closedBarcodeCount',
     'getPickupPhoneKey', 'updateDailyScheduleStats'
 ];
+function sliceConstDecl(name) {
+    const m = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);').exec(SRC);
+    if (!m) throw new Error('const not found: ' + name);
+    return 'const ' + name + ' = ' + m[1] + ';';
+}
+
 const fnSrc = {};
 const missingFns = [];
 for (const n of REQUIRED_FNS) {
@@ -159,6 +165,13 @@ function makeCtx(opts) {
     vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.mode || 'today') + ';', ctx);
     vm.runInContext('let customFilterDate = ' + JSON.stringify(opts.customDate || '') + ';', ctx);
     vm.runInContext('let dailyPickupData = ' + JSON.stringify(opts.ledger || {}) + ';', ctx);
+    // ⛔ `getFilterTargetDateKey()` គណនាថ្ងៃតាមប្រតិទិនកម្ពុជា ➜ sandbox
+    // ត្រូវផ្ទុក helper តំបន់ម៉ោងពិត បើមិនដូច្នេះវាធ្លាក់ដោយ ReferenceError
+    // ដែលបិទបាំងការអះអាងឥរិយាបថទាំងអស់ (មេរៀន checker-coverage ចំណុច ៣)។
+    vm.runInContext(sliceConstDecl('APP_TIME_ZONE'), ctx);
+    vm.runInContext(sliceConstDecl('APP_TIME_ZONE_OFFSET_MINUTES'), ctx);
+    vm.runInContext(sliceFn('appZoneParts'), ctx);
+    vm.runInContext(sliceFn('getZoneDateKey'), ctx);
     vm.runInContext(sliceFn('getFormattedDate'), ctx);
     ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
      'countPickedUpCustomers', 'resetPickupStats'].forEach((n) => vm.runInContext(fnSrc[n], ctx));

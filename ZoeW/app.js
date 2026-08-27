@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.1';
+    const APP_VERSION = '2.20.2';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -301,6 +301,10 @@
     let activeEditingBarcode = null;
     let activeParentItemId = null;
     let pendingRestoreId = null;
+    const pendingHistoryPatches = new Map();
+    const HISTORY_PATCH_RETRY_MAX = 5;
+    const HISTORY_PATCH_QUEUE_MAX = 50;
+    let historyPatchFlushInFlight = false;
 
     let serverTimeOffsetMs = 0;
     function getServerNow() {
@@ -814,6 +818,7 @@
                 hasEverConnectedToDatabase = true;
                 clearReconnectWatchdog();
                 retryFailedDbListenersNow();
+                flushPendingHistoryPatches();
             } else if (navigator.onLine !== false) {
                 scheduleReconnectWatchdog();
             }
@@ -1921,8 +1926,46 @@
     let customerDataTableFetchPromise = null;
     let customerDataTableSessionGeneration = 0;
     let customerDataTableLastFailedAt = 0;
-    const CUSTOMER_TABLE_CACHE_MS = 15 * 60 * 1000;
+    const CUSTOMER_TABLE_CACHE_MS = 5 * 60 * 1000;
     const CUSTOMER_TABLE_FAIL_COOLDOWN_MS = 60 * 1000;
+    const CUSTOMER_TABLE_RETRY_STEPS_MS = [65 * 1000, 2 * 60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
+    const CUSTOMER_TABLE_RETRY_BUSY_MS = 20 * 1000;
+    let customerTableRetryTimer = null;
+    let customerTableFailStreak = 0;
+
+    function customerTablePrefetchAllowed() {
+        if (!auth || !auth.currentUser) return false;
+        if (navigator.onLine === false) return false;
+        if (linkIsFrugal()) return false;
+        if (isModalOpen) return false;
+        if (autoLookupInFlight.size > 0) return false;
+        return true;
+    }
+
+    function clearCustomerTableRetry() {
+        if (customerTableRetryTimer) {
+            clearTimeout(customerTableRetryTimer);
+            customerTableRetryTimer = null;
+        }
+        customerTableFailStreak = 0;
+    }
+
+    function scheduleCustomerTableRetry() {
+        if (customerTableRetryTimer) return;
+        const idx = Math.min(customerTableFailStreak, CUSTOMER_TABLE_RETRY_STEPS_MS.length - 1);
+        customerTableFailStreak++;
+        customerTableRetryTimer = setTimeout(runCustomerTableRetry, CUSTOMER_TABLE_RETRY_STEPS_MS[idx]);
+    }
+
+    function runCustomerTableRetry() {
+        customerTableRetryTimer = null;
+        if (!customerTablePrefetchAllowed()) {
+            customerTableRetryTimer = setTimeout(runCustomerTableRetry, CUSTOMER_TABLE_RETRY_BUSY_MS);
+            return;
+        }
+        const cfg = getLookupApiConfig();
+        if (cfg && cfg.url) fetchCustomerDataTableRows(true);
+    }
 
     function buildCustomerListApiUrl(cfg) {
         if (!cfg || !cfg.url) return null;
@@ -1999,11 +2042,13 @@
                 customerDataTableRows = rows;
                 customerDataTableFetchedAt = Date.now();
                 customerDataTableLastFailedAt = 0;
+                clearCustomerTableRetry();
                 renderCustomerDataTableStatus(rows);
                 filterCustomerDataTable();
             } catch (e) {
                 if (myGeneration !== customerDataTableSessionGeneration) return;
                 customerDataTableLastFailedAt = Date.now();
+                scheduleCustomerTableRetry();
                 if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
                 const curStatusEl = document.getElementById('customerDataTableStatus');
                 if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
@@ -2055,6 +2100,7 @@
     }
 
     function clearCustomerDataTableCache() {
+        clearCustomerTableRetry();
         customerDataTableSessionGeneration++;
         customerDataTableRows = null;
         customerDataTableFetchedAt = 0;
@@ -2079,9 +2125,7 @@
     }
 
     function prefetchCustomerDataTableRowsIfConfigured() {
-        if (!auth || !auth.currentUser) return;
-        if (navigator.onLine === false) return;
-        if (linkIsFrugal()) return;
+        if (!customerTablePrefetchAllowed()) return;
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
             fetchCustomerDataTableRows(false);
@@ -2096,6 +2140,7 @@
     let lookupLockedNoticeShown = false;
     let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
+    const LOOKUP_FOCUS_GRACE_MS = 600;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const autoLookupInFlight = new Set();
 
@@ -2130,6 +2175,22 @@
         } else if (filledAny) {
             showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
         }
+    }
+
+    function armLookupFocus(phoneInput, barcode, lookupPromise) {
+        let focusDone = false;
+        const focusIfEmpty = () => {
+            if (focusDone) return;
+            if (!isModalOpen || pendingBarcode !== barcode) return;
+            if (!phoneInput || phoneInput.value) return;
+            focusDone = true;
+            phoneInput.focus();
+        };
+        const graceTimer = setTimeout(focusIfEmpty, LOOKUP_FOCUS_GRACE_MS);
+        return lookupPromise.finally(() => {
+            clearTimeout(graceTimer);
+            focusIfEmpty();
+        });
     }
 
     async function attemptAutoLookup(barcode) {
@@ -2261,6 +2322,8 @@
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
         pendingPermanentDeleteId = null;
+        pendingHistoryPatches.clear();
+        historyPatchFlushInFlight = false;
         deletedSearchQuery = '';
         expandedTrashGroups.clear();
         activeParentItemId = null;
@@ -6914,11 +6977,7 @@
                 if(modalPhoneInput) modalPhoneInput.focus();
             }, 150);
         } else {
-            lookupPromise.finally(() => {
-                if (isModalOpen && pendingBarcode === cleanBarcode && modalPhoneInput && !modalPhoneInput.value) {
-                    modalPhoneInput.focus();
-                }
-            });
+            armLookupFocus(modalPhoneInput, cleanBarcode, lookupPromise);
         }
     }
 
@@ -7680,7 +7739,7 @@
                 patchFields.callMarkTime = item.callMarkTime;
             }
             item.isCalled = true;
-            patchHistoryItemFields(item, patchFields, previousFields);
+            patchHistoryItemFields(item, patchFields, previousFields, null, { retryOnDisconnect: true });
             scheduleHistoryViewRefresh();
         }
     }
@@ -7704,11 +7763,11 @@
             if (mark) {
                 item.callMark = mark;
                 item.callMarkTime = getServerNow();
-                patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
+                patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true });
             } else {
                 delete item.callMark;
                 delete item.callMarkTime;
-                patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime });
+                patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true });
             }
             refreshCurrentHistoryView();
             showToast(mark ? "បានសម្គាល់រួចរាល់!" : "បានសម្អាតការសម្គាល់!");
@@ -8710,7 +8769,60 @@
         });
     }
 
-    function patchHistoryItemFields(item, fields, previousFields, onServerItem) {
+    function historyPatchErrorIsDisconnect(error) {
+        if (!error) return false;
+        const text = String((error && (error.message || error.code)) || error);
+        return /disconnect/i.test(text);
+    }
+
+    function queueHistoryPatchRetry(itemId, fields, previousFields) {
+        if (!itemId || !fields) return false;
+        const existing = pendingHistoryPatches.get(itemId);
+        if (existing) {
+            if (existing.attempts >= HISTORY_PATCH_RETRY_MAX) return false;
+            Object.assign(existing.fields, fields);
+            return true;
+        }
+        if (pendingHistoryPatches.size >= HISTORY_PATCH_QUEUE_MAX) return false;
+        pendingHistoryPatches.set(itemId, {
+            fields: Object.assign({}, fields),
+            previousFields: previousFields ? Object.assign({}, previousFields) : null,
+            attempts: 0
+        });
+        return true;
+    }
+
+    function flushPendingHistoryPatches() {
+        if (historyPatchFlushInFlight) return;
+        if (!pendingHistoryPatches.size) return;
+        if (!dbRefHistory || !db || !fb) return;
+        const entries = Array.from(pendingHistoryPatches.entries());
+        pendingHistoryPatches.clear();
+        historyPatchFlushInFlight = true;
+        let settled = 0;
+        const done = () => {
+            settled++;
+            if (settled < entries.length) return;
+            historyPatchFlushInFlight = false;
+            scheduleHistoryViewRefresh();
+        };
+        entries.forEach((pair) => {
+            const itemId = pair[0];
+            const entry = pair[1];
+            const attempts = entry.attempts + 1;
+            const target = scanHistory.find(i => i.id === itemId) || { id: itemId };
+            patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
+                { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX }).then((saved) => {
+                    if (!saved) {
+                        const requeued = pendingHistoryPatches.get(itemId);
+                        if (requeued) requeued.attempts = attempts;
+                    }
+                    done();
+                }, done);
+        });
+    }
+
+    function patchHistoryItemFields(item, fields, previousFields, onServerItem, opts) {
         if (!dbRefHistory || !db || !fb) return Promise.resolve(false);
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to patch history item with missing/unsafe id');
@@ -8752,6 +8864,10 @@
             if (committedItem && !committedItem.id) committedItem.id = item.id;
             return committedItem || true;
         }, (error) => {
+            if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(error)
+                && queueHistoryPatchRetry(item.id, fields, previousFields)) {
+                return false;
+            }
             console.error("Error patching history item: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");

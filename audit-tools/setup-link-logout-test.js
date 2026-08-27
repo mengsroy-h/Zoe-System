@@ -75,7 +75,7 @@ for (const app of ['ZoeW']) {
         const resetScanFn = sliceFn(src, 'resetScanConfirm');
         if (resetScanFn) vm.runInContext(resetScanFn, ctx);
         // ស្ថានភាពធុងសំរាមដែល clearSensitiveModalFields ត្រូវ reset — ចាក់ការប្រកាស **ពិត**
-        ['deletedSearchQuery', 'expandedTrashGroups'].forEach((n) => {
+        ['deletedSearchQuery', 'expandedTrashGroups', 'pendingHistoryPatches', 'historyPatchFlushInFlight'].forEach((n) => {
             const decl = (src.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
         });

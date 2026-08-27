@@ -40,8 +40,15 @@ function ok(label, cond, detail) {
     ok('ZoeW: ការស្វែងរកតាមដាន barcode ដែលកំពុងដំណើរការ', /autoLookupInFlight/.test(app));
     ok('ZoeW: ការតាមដាននោះត្រូវដោះក្នុង `finally` (មិនលេចធ្លាយពេលមានកំហុស)',
         /finally \{\s*\n\s*autoLookupInFlight\.delete\(lookupKey\);/.test(app));
+    // ⛔ ការការពារនេះអាចរស់នៅ **ក្នុង helper** — ការអះអាងតាមឈ្មោះ function
+    // តែម្យ៉ាងជាថ្នាក់ «checker ស្កេនអ្វី» ដដែលនឹង 2.19.3។ ដូច្នេះវាដើរតាម
+    // ការបញ្ជូនបន្ត ១ ជាន់ ហើយ `lookup-prefetch-test.js` អះអាង **ឥរិយាបថ**
+    // ពិតក្នុង `vm` ជាជាន់ទី ២។
+    const prefetchBody = (/function prefetchCustomerDataTableRowsIfConfigured\(\)[\s\S]*?\n    \}/.exec(app) || [''])[0];
+    const allowBody = (/function customerTablePrefetchAllowed\(\)[\s\S]*?\n    \}/.exec(app) || [''])[0];
     ok('ZoeW: ការទាញជាមុនរំលងពេលក្រៅបណ្តាញ (មិនដាស់វិទ្យុឥតបានការ)',
-        /function prefetchCustomerDataTableRowsIfConfigured\(\)[\s\S]{0,160}navigator\.onLine === false/.test(app));
+        /navigator\.onLine === false/.test(prefetchBody) ||
+        (/customerTablePrefetchAllowed\(\)/.test(prefetchBody) && /navigator\.onLine === false/.test(allowBody)));
 
     // **អានប្រអប់មុន `await` ដំបូង។** `ZoeErrors.init()` អាចចំណាយដល់ ១០ វិនាទី
     // (ពិដានផ្ទុក SDK) ➜ បើអានតម្លៃក្រោយវា នោះអ្វីដែលអ្នកប្រើវាយអំឡុងនោះអាច

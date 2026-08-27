@@ -102,7 +102,15 @@ function serve(dir) {
         if (!navigator.serviceWorker) return 'គ្មាន serviceWorker';
         const reg = await navigator.serviceWorker.register('./sw.js').catch((e) => String(e));
         if (typeof reg === 'string') return reg;
-        await navigator.serviceWorker.ready;
+        // ⛔ `.ready` **គ្មានទីបញ្ចប់** បើ SW ជាប់ 'installing' ឬក្លាយជា
+        // 'redundant' ដោយគ្មានអ្នកជំនួស។ `page.evaluate()` ក៏គ្មាន timeout ដែរ
+        // ➜ CI ត្រូវ cancel នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ
+        // (កើតឡើងពិត៖ `main` a465af9 · PR #96)។ រង្វិលជុំខាងក្រោមមានពិដាន
+        // ស្រាប់ ➜ ការផុតកំណត់ក្លាយជាការធ្លាក់ដែលអានបាន មិនមែនការព្យួរ។
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((r) => setTimeout(r, 20000))
+        ]);
         for (let i = 0; i < 100; i++) {
             const keys = await caches.keys();
             for (const k of keys) { const c = await caches.open(k); if (await c.match('./app.js')) return 'ok:' + k; }

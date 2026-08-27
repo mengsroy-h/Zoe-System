@@ -142,7 +142,15 @@ function serve(dir) {
         if (!navigator.serviceWorker) return 'គ្មាន serviceWorker';
         const reg = await navigator.serviceWorker.register('./sw.js').catch((e) => String(e));
         if (typeof reg === 'string') return reg;
-        await navigator.serviceWorker.ready;
+        // ⛔ `.ready` **គ្មានទីបញ្ចប់** បើ SW ជាប់ 'installing' ឬក្លាយជា
+        // 'redundant' ដោយគ្មានអ្នកជំនួស។ `page.evaluate()` ក៏គ្មាន timeout ដែរ
+        // ➜ CI ត្រូវ cancel នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ
+        // (កើតឡើងពិត៖ `main` a465af9 · PR #96)។ រង្វិលជុំខាងក្រោមមានពិដាន
+        // ស្រាប់ ➜ ការផុតកំណត់ក្លាយជាការធ្លាក់ដែលអានបាន មិនមែនការព្យួរ។
+        await Promise.race([
+            navigator.serviceWorker.ready,
+            new Promise((r) => setTimeout(r, 20000))
+        ]);
         for (let i = 0; i < 60; i++) {
             const keys = await caches.keys();
             for (const k of keys) {
@@ -157,7 +165,12 @@ function serve(dir) {
 
     // ឥឡូវ **បិទម៉ាស៊ីនបម្រើទាំងស្រុង** ➜ គ្មានអ្វីមកពីបណ្តាញទៀតទេ។
     // អ្វីដែលនៅដើរបាន គឺមកពី cache របស់ service worker សុទ្ធសាធ។
-    await new Promise((r) => server.close(r));
+    // ⛔ `server.close(cb)` ហៅ cb តែពេល **គ្រប់ការតភ្ជាប់បិទអស់** — Chromium
+    // រក្សា socket keep-alive ➜ ការរង់ចាំនេះអាចមិនចេះចប់។ បិទវាដោយបង្ខំ។
+    await new Promise((r) => {
+        server.close(r);
+        if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    });
 
     let bootError = null;
     page.on('pageerror', (e) => { if (!bootError) bootError = String(e && e.message || e); });

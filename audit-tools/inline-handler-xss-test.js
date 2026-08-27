@@ -353,7 +353,12 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
 
     await ctx.close();
     await browser.close();
-    await new Promise((r) => server.close(r));
+    // ⛔ `server.close(cb)` ហៅ cb តែពេល **គ្រប់ការតភ្ជាប់បិទអស់** — Chromium
+    // រក្សា socket keep-alive ➜ ការរង់ចាំនេះអាចមិនចេះចប់។ បិទវាដោយបង្ខំ។
+    await new Promise((r) => {
+        server.close(r);
+        if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    });
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e && e.stack || e); process.exit(1); });

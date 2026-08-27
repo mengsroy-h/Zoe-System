@@ -16,10 +16,40 @@ if ! node -e "require('acorn')" 2>/dev/null; then
 fi
 
 pass=0; fail=0; skip=0; partial=0
+
+# ⛔ ពិដានពេលវេលាក្នុងមួយ checker។
+# មូលហេតុ៖ checker ដែល **ព្យួរ** មិនធ្វើឲ្យ CI ក្រហមដែលអានបានទេ — វាធ្វើឲ្យ
+# GitHub **cancel job ទាំងមូល** នៅនាទីទី ៣០ ដោយបន្សល់ log ដែលឈប់ត្រឹមកណ្តាល
+# គ្មានឈ្មោះ checker ដែលខូចសោះ។ វាកើតឡើងពិត ២ ដង៖ `main` (`a465af9`,
+# 2026-08-26) និង PR #96 (2026-08-27) — ទាំង ២ ដងឈប់ត្រង់កន្លែងតែមួយ
+# (`sw-install-integrity-test.js`) ដោយ `await navigator.serviceWorker.ready`
+# គ្មានពិដាន។ ការស្តារនៅកម្រិត checker នីមួយៗមិនគ្រប់គ្រាន់ទេ — ថ្នាក់នេះ
+# ត្រូវបិទ **តាមរចនាសម្ព័ន្ធ** ត្រង់នេះ ដើម្បីឲ្យការព្យួរថ្មីណាមួយក្នុង
+# អនាគត ក្លាយជា «*** FAIL *** (ព្យួរ)» ដែលមានឈ្មោះ ជំនួសការស្ងាត់។
+CHECKER_TIMEOUT="${CHECKER_TIMEOUT:-300}"
+if command -v timeout >/dev/null 2>&1; then
+    HAS_TIMEOUT=1
+else
+    HAS_TIMEOUT=0
+    echo "⚠️  គ្មាន \`timeout\` — checker ដែលព្យួរនឹងព្យួររហូត"
+fi
+
 run() {
     local label="$1"; shift
     printf '  %-32s ' "$label"
-    if out=$("$@" 2>&1); then
+    local rc=0
+    if [ "$HAS_TIMEOUT" = 1 ]; then
+        out=$(timeout -k 10 "$CHECKER_TIMEOUT" "$@" 2>&1) || rc=$?
+    else
+        out=$("$@" 2>&1) || rc=$?
+    fi
+    if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        echo "*** FAIL *** (ព្យួរ — លើសពិដាន ${CHECKER_TIMEOUT}s)"
+        printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
+        fail=$((fail+1))
+        return
+    fi
+    if [ "$rc" -eq 0 ]; then
         n=$(printf '%s\n' "$out" | grep -cE 'ok    ')
         skip_line=$(printf '%s\n' "$out" | grep -m1 '^SKIP' || true)
         if [ -n "$skip_line" ]; then
@@ -68,6 +98,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
 done
 # ⛔ meta-checker៖ តើ checker ខ្លួនវាពិតជាមើលកូដមែនទេ? (រត់វាមុនគេក្នុងក្រុមនេះ)
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
+run "hang-guard (meta)" node audit-tools/hang-guard.js
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
@@ -186,6 +217,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SWREVAL_APP_DIR="$BASE" node audit-tools/sw-revalidate-pressure-test.js 2>&1 | tail -1 | sed 's/^/   sw-revalidate:   /'
     SWFAIL_APP_DIR="$BASE"  node audit-tools/sw-cache-failure-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-failure:/'
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
+    HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'

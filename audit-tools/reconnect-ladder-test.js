@@ -124,7 +124,8 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         navigator: { get onLine() { return networkUp(); } },
         window: {}, document: { getElementById: () => null },
         fb, db: {}, isDatabaseConnected: !!connectedFromStart, dbListenersFailed: false,
-        retryFailedDbListenersNow: () => {}, renderConnectionStatus: () => {}, showToast: () => {}
+        retryFailedDbListenersNow: () => {}, renderConnectionStatus: () => {}, showToast: () => {},
+        flushPendingHistoryPatches: () => {}
     };
     vm.createContext(ctx);
 

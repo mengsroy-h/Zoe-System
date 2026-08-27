@@ -139,8 +139,16 @@ console.log('\n=== ការទាញជាមុនត្រូវគោរព 
     const fn = sliceFn(appSrc, 'prefetchCustomerDataTableRowsIfConfigured');
     ok('ZoeW: រកឃើញ prefetchCustomerDataTableRowsIfConfigured()', !!fn);
     ok('ZoeW: មាន linkIsFrugal() ក្នុង app.js', !!sliceFn(appSrc, 'linkIsFrugal'));
-    ok('ZoeW: ការទាញជាមុនរំលងលើតំណសន្សំទិន្នន័យ', !!fn && /linkIsFrugal\(\)/.test(fn));
-    ok('ZoeW: ការទាញជាមុននៅតែរំលងពេលក្រៅបណ្តាញ', !!fn && /navigator\.onLine === false/.test(fn));
+    // ⛔ ការការពារអាចរស់នៅ **ក្នុង helper** (`customerTablePrefetchAllowed()`
+    // តាំងពី 2.20.2) — ការអះអាងលើតួ function តែម្យ៉ាងជាថ្នាក់ «checker ស្កេនអ្វី»
+    // ដដែលនឹង 2.19.3។ ដូច្នេះវាដើរតាមការបញ្ជូនបន្ត ១ ជាន់ ហើយ
+    // `lookup-prefetch-test.js` អះអាង **ឥរិយាបថ** ពិតក្នុង `vm` ជាជាន់ទី ២។
+    const gateFn = sliceFn(appSrc, 'customerTablePrefetchAllowed') || '';
+    const viaGate = !!fn && /customerTablePrefetchAllowed\(\)/.test(fn);
+    ok('ZoeW: ការទាញជាមុនរំលងលើតំណសន្សំទិន្នន័យ',
+        (!!fn && /linkIsFrugal\(\)/.test(fn)) || (viaGate && /linkIsFrugal\(\)/.test(gateFn)));
+    ok('ZoeW: ការទាញជាមុននៅតែរំលងពេលក្រៅបណ្តាញ',
+        (!!fn && /navigator\.onLine === false/.test(fn)) || (viaGate && /navigator\.onLine === false/.test(gateFn)));
 
     // `linkIsFrugal()` ពិតរបស់ app.js ត្រូវសម្រេចដូច sw.js បេះបិទ
     const appFrugal = sliceFn(appSrc, 'linkIsFrugal');

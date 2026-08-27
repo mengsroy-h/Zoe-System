@@ -55,7 +55,8 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          setup-link-roundtrip-test export-cells-test camera-resume-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
-         connection-recovery-test reconnect-ladder-test sw-cache-failure-test; do
+         connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
+         pickup-ledger-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -67,6 +68,7 @@ for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema com
 done
 # ⛔ meta-checker៖ តើ checker ខ្លួនវាពិតជាមើលកូដមែនទេ? (រត់វាមុនគេក្នុងក្រុមនេះ)
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
+run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "css-classes" node audit-tools/css-classes.js
@@ -183,6 +185,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ADAPTIVE_APP_DIR="$BASE" node audit-tools/adaptive-link-test.js 2>&1 | tail -1 | sed 's/^/   adaptive-link:   /'
     SWREVAL_APP_DIR="$BASE" node audit-tools/sw-revalidate-pressure-test.js 2>&1 | tail -1 | sed 's/^/   sw-revalidate:   /'
     SWFAIL_APP_DIR="$BASE"  node audit-tools/sw-cache-failure-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-failure:/'
+    PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
+    VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'

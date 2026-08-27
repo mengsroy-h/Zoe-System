@@ -54,15 +54,18 @@ console.log('\n-- ប្រភពតែមួយនៃការពិត: APP_VE
 for (const app of APPS) {
     check(`${app} ប្រកាស APP_VERSION ជា semver`, SEMVER.test(String(declared[app])), true);
 }
-const versions = [...new Set(APPS.map((a) => declared[a]))];
-check('APP_VERSION ដូចគ្នាទាំង ២ App', versions.length, 1);
-const version = versions.length === 1 ? versions[0] : null;
-console.log(`   កំណែបច្ចុប្បន្ន: ${version}`);
+// ⛔ **កំណែជារបស់ App នីមួយៗ (កំណែ 2.19.4)។** មុននេះ ZoeW និង ZoeKeyGen
+// ត្រូវបង្ខំឲ្យមានកំណែដូចគ្នា ➜ ជុំដែលកែតែ App មួយ នៅតែបង្ខំឲ្យ App មួយទៀត
+// ឡើងកំណែ + ឡើង `CACHE_VERSION` ➜ **អ្នកប្រើទាំងអស់របស់ App នោះទាញសំបក
+// ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** ហើយ Netlify redeploy ដោយគ្មានការប្រែពិត។
+// ឥឡូវអ្វីដែលត្រូវអះអាងគឺ **ភាពស៊ីគ្នាខាងក្នុង App នីមួយៗ** ៖
+// `app.js` ↔ `manifest.json` ↔ `index.html`។ (ZoeImport មានកំណែឯករាជ្យស្រាប់។)
+APPS.forEach((a) => console.log(`   កំណែ ${a}: ${declared[a]}`));
 
-console.log('\n-- manifest.json ត្រូវនឹង APP_VERSION --');
+console.log('\n-- manifest.json ត្រូវនឹង APP_VERSION **របស់ App ដដែល** --');
 for (const app of APPS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, app, 'manifest.json'), 'utf8'));
-    check(`${app}/manifest.json version`, manifest.version, version);
+    check(`${app}/manifest.json version`, manifest.version, declared[app]);
 }
 
 console.log(`\n-- ${RENDER_FN}() មានក្នុងគ្រប់ App និងត្រូវបានហៅ --`);

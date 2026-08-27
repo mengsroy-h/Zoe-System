@@ -28,7 +28,13 @@
 >    ប្រើ `cp` + `md5sum` កុំកែម្តងមួយ App។
 > ៥. **កុំសរសេរការអះអាងអំពី git/branch/merge ដោយមិនផ្ទៀងផ្ទាត់** — ប្រើ
 >    `git rev-list --count origin/main..origin/<branch>`។ **ឯកសារនេះមិនមែនជាភស្តុតាងទេ — git ទើបជាភស្តុតាង។**
-> ៦. **កំណែ App (`APP_VERSION`) ត្រូវដូចគ្នាទាំង ២ និងត្រូវនឹង `manifest.json`។** វា **មិនមែន**
+> ៦. **កំណែ App (`APP_VERSION`) ជារបស់ App នីមួយៗ — ⛔ ឡើងតែ App ដែលកែពិត។**
+>    មុនកំណែ 2.19.4 ZoeW និង ZoeKeyGen ត្រូវបង្ខំឲ្យមានកំណែដូចគ្នា ➜ ជុំដែលកែតែ
+>    App មួយ បង្ខំ App មួយទៀតឲ្យឡើង `CACHE_VERSION` ➜ **អ្នកប្រើទាំងអស់របស់
+>    App នោះទាញសំបកទាំងមូលឡើងវិញ** និង Netlify redeploy ដោយឥតប្រយោជន៍។
+>    ឥឡូវអ្វីដែលត្រូវស៊ីគ្នាគឺ **ខាងក្នុង App នីមួយៗ**៖ `app.js` ↔
+>    `manifest.json` ↔ `index.html`។ `version-bump-scope.js` ចាក់សោវា៖ កូដ
+>    ship ប្រែ ➜ **ត្រូវ** ឡើង; គ្មានការកែពិត ➜ **មិនត្រូវ** ឡើង។ វា **មិនមែន**
 >    ជា `CACHE_VERSION` ទេ — `CACHE_VERSION` ជាកូនសោ Cache (`<app>-vN`) ដែល bump រាល់ការប្តូរ
 >    ឯកសារ ចំណែក `APP_VERSION` ជាកំណែផលិតផលតាម semver ដែលបង្ហាញ **តែក្នុងប្រអប់ login**។
 >    ក្រោយកែកំណែ រត់ `node audit-tools/version-check.js`។
@@ -153,6 +159,7 @@
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង | `checker-coverage.js` |
 | លុប ទល់នឹង ដក | `isDeducted` ជាវាល **តែមួយ** ដែលកំណត់លុយ | `policy-test` · `revenue-fuzz` |
 | ធុងសំរាម · `trashReason` | ស្លាកបង្ហាញ ≠ ការសម្រេចលុយ | `trash-modal-test` · `restore-marker-hygiene-test` |
+| **ស្ថិតិយក** ៖ អតិថិជន ↔ កញ្ចប់ | រាប់លើ **មូលដ្ឋានតែមួយ** (barcode បិទ) | `pickup-ledger-test` |
 | សម្អាត ២ម៉ោង/៨ថ្ងៃ | ដើរតាម **barcode** មិនមែនកញ្ចប់ | `partial-pickup-cleanup-test` |
 | Rules fence · deadlock | witness មិនត្រូវចាក់សោ id | `emu/restore-deadlock-test` |
 | នាឡិកា | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `clock-hygiene` |
@@ -170,12 +177,45 @@
 | Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ» | `toast-truth-test` |
 | helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
 | `fb.X` ដែល loader មិន export | `undefined` ស្ងាត់លើផលិតកម្ម | `sdk-surface` |
-| កំណែ App | `app.js` ↔ `manifest.json` ↔ `index.html` | `version-check` |
+| កំណែ App | `app.js` ↔ `manifest.json` ↔ `index.html` **ក្នុង App នីមួយៗ** | `version-check` |
+| **វិសាលភាពនៃការឡើងកំណែ** | ⛔ ឡើងតែ App ដែលកែពិត (កុំបង្ខំអ្នកប្រើទាញឡើងវិញ) | `version-bump-scope` |
 | License ↔ crypto | ⛔ «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record | `license-grace-test` |
 | ការការពារ inspect element | ⛔ ពង្រឹងមិនបានទេ — កុំព្យាយាម | 📝 (រចនាសម្ព័ន្ធ) |
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **តំបន់ម៉ោងឧបករណ៍កំណត់ថ្ងៃចំណូល** | ទទួលយកដោយចេតនា | 📝 |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
+
+### ⛔ ស្ថិតិ «យក» ៖ អតិថិជន និងកញ្ចប់ ត្រូវរាប់លើ **មូលដ្ឋានតែមួយ** — កំណែ 2.19.4
+
+> 🔴 **កំហុសផលិតកម្មពិត។** បើកកញ្ចប់ដែលយករួច ➜ កញ្ចប់ត្រឡប់ 0 ត្រឹមត្រូវ
+> តែ **ចំនួនអតិថិជនជាប់គាំង**។
+
+មុន 2.19.4 លេខទាំង ២ រាប់លើមូលដ្ឋានពីរខុសគ្នា៖
+
+| លេខ | មូលដ្ឋាន | រស់រានឆ្លងកាត់ការ merge? |
+|---|---|---|
+| កញ្ចប់យក | **barcode** ដែលបិទ | ✅ បាទ |
+| អតិថិជនយក | ស្ថានភាព **«item បិទពេញ»** | ❌ ទេ — ការ merge បំផ្លាញវា |
+
+`applyRestoreMergeInto()` (ការស្តារពីធុងសំរាម) merge កញ្ចប់តាមលេខទូរស័ព្ទ ➜
+item លែងបិទពេញ **ដោយមិនបញ្ចេញ delta** ➜ `+1` ដើមគ្មាន `-1` ផ្គូផ្គង។
+
+**ច្បាប់ (សម្រេចដោយអ្នកប្រើ)**៖
+- **អតិថិជន = លេខទូរស័ព្ទផ្សេងៗគ្នាដែលមាន barcode បិទ >= ១**។ លេខ ១ ស្មើ
+  អតិថិជន ១ ទោះមានកញ្ចប់ ១០។
+- **កញ្ចប់ = ចំនួន barcode បិទ**។
+- ដូច្នេះ `pickedUpPhones[key]` រាប់ **barcode បិទ** ហើយ **delta អតិថិជន
+  ត្រូវចម្លងចេញពី delta កញ្ចប់** គ្រប់កន្លែង (`pickupCustomerDelta =
+  pickupPackageDelta;` និង `serverCustomerDelta = serverPackageDelta;`)។
+- ⛔ **អថេរ**៖ `sum(pickedUpPhones) === packagesPickedUp`។
+- ការប្តូរលេខទូរស័ព្ទផ្លាស់ ref តាម `closedBarcodeCount(item)` **មិនមែន ±1**។
+- ការ merge ស្កេន **មិនបញ្ចេញ delta** — វាមិនប្តូរ barcode ណាមួយទេ។
+
+⚠️ **មេរៀនអំពីឧបករណ៍**៖ ការប្រៀបធៀបអាគុយម៉ង់តាម **ឈ្មោះ** មិនគ្រប់គ្រាន់ទេ
+(`-pickupCustomerDelta` ធៀប `-pickupPackageDelta` ជាឈ្មោះខុស តម្លៃដូច)។
+ត្រូវអះអាង **ការផ្តល់តម្លៃ** និង **ឥរិយាបថ** ជំនួស។
+
+Test៖ **`pickup-ledger-test.js`** (13 assertion, ធ្លាក់ ៦ លើ tree មុនកែ)។
 
 ### ⛔ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស» — ច្បាប់ដែលអនុវត្តលើ **គ្រប់អ័ក្ស**
 

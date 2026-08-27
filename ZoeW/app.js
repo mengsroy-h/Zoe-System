@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.5';
+    const APP_VERSION = '2.20.6';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -2403,6 +2403,10 @@
             case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
             case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
             case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';
+            case 'network':
+            case 'not-configured':
+            case 'clock-unverified': return 'ភ្ជាប់ Server មិនបានទេ! សូមបើកអ៊ីនធឺណិត រួចសាកម្តងទៀត។';
+            case 'verify-unavailable': return 'ផ្ទៀងផ្ទាត់ Key មិនបានទេ! សូមបិទបើក App ម្តងទៀត។';
             default: return 'Key មិនត្រឹមត្រូវទេ! សូមពិនិត្យម្តងទៀត។';
         }
     }

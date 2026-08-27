@@ -149,17 +149,21 @@
     }
 
     async function activate(keyString, appCode) {
-        if (!serverTimeSynced) await syncServerTime({ priority: true });
-        const result = await verifyKeyString(keyString, appCode);
+        const result = await verifySignatureAndScope(keyString, appCode);
         if (!result.valid) return result;
-        const previous = loadLocalRecord(appCode);
         const online = await checkOnline(appCode, result.payload.id, { priority: true });
-        if (online.ok === false) {
-            return { valid: false, reason: online.reason, payload: result.payload };
+        if (online.ok !== true) {
+            return { valid: false, reason: online.reason || 'network', payload: result.payload };
+        }
+        if (!serverTimeSynced) await syncServerTime({ priority: true });
+        if (!serverTimeSynced) {
+            return { valid: false, reason: 'clock-unverified', payload: result.payload };
         }
         const now = getServerNow();
-        const reactivatingSameKey = !!(previous && previous.id === result.payload.id &&
-            typeof previous.lastOnlineCheck === 'number');
+        const ceiling = typeof online.expiresAt === 'number' ? online.expiresAt : result.payload.exp * 1000;
+        if (now > ceiling) {
+            return { valid: false, reason: 'expired', payload: result.payload };
+        }
         const record = {
             keyString: keyString.trim(),
             id: result.payload.id,
@@ -167,12 +171,9 @@
             iat: result.payload.iat,
             exp: result.payload.exp,
             note: result.payload.note || '',
-            lastOnlineCheck: online.ok === true
-                ? now
-                : (reactivatingSameKey ? previous.lastOnlineCheck : now),
-            onlineExp: (online.ok === true && typeof online.expiresAt === 'number')
-                ? online.expiresAt
-                : result.payload.exp * 1000
+            lastOnlineCheck: now,
+            onlineExp: ceiling,
+            seenMax: now
         };
         saveLocalRecord(appCode, record);
         return { valid: true, payload: result.payload };
@@ -278,6 +279,17 @@
         return serverTimeSynced ? serverTimeOffsetMs : null;
     }
 
+    function recordSeenMark(record) {
+        return (record && typeof record.seenMax === 'number' && record.seenMax > 0) ? record.seenMax : 0;
+    }
+
+    function monotonicNow(record) {
+        const raw = getServerNow();
+        const mark = recordSeenMark(record);
+        return raw > mark ? raw : mark;
+    }
+
+
     async function getStatus(appCode) {
         const record = loadLocalRecord(appCode);
         if (!record) return { state: 'required' };
@@ -289,20 +301,29 @@
         }
 
         const online = await checkOnline(appCode, record.id);
-        const now = getServerNow();
+        if (online.ok === false) {
+            clearLocalRecord(appCode);
+            return { state: 'required', reason: online.reason };
+        }
+
+        let now = monotonicNow(record);
         if (online.ok === true) {
+            if (serverTimeSynced) {
+                now = getServerNow();
+                record.seenMax = now;
+            }
             record.lastOnlineCheck = now;
             record.onlineExp = online.expiresAt;
             saveLocalRecord(appCode, record);
-        } else if (online.ok === false) {
-            clearLocalRecord(appCode);
-            return { state: 'required', reason: online.reason };
+        } else if (now > recordSeenMark(record)) {
+            record.seenMax = now;
+            saveLocalRecord(appCode, record);
         }
 
         const ceiling = typeof record.onlineExp === 'number' ? record.onlineExp : record.exp * 1000;
 
         if (now > ceiling) {
-            if (serverTimeSynced) {
+            if (online.ok === true) {
                 clearLocalRecord(appCode);
                 return { state: 'required', reason: 'expired' };
             }

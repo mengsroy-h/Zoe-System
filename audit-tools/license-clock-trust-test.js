@@ -330,9 +330,19 @@ const recordOf = () => JSON.stringify({
         env.sandbox.__drive(true, 365 * 86400000);
         const st = await env.ctx.ZoeLicense.getStatus(APP_CODE);
         scenarios++;
-        ok('⛔ ទិសផ្ទុយ ៖ ម៉ោង server ពិតបញ្ជាក់ថាហួស ➜ ការលុប **ត្រូវនៅតែកើតឡើង**',
-            !env.store['zoe_license_activation_' + APP_CODE] && st.state === 'required',
-            { left: Object.keys(env.store), st: st });
+        ok('⛔ ទិសផ្ទុយ ៖ ម៉ោង server ពិតបញ្ជាក់ថាហួស ➜ **មិនត្រូវផ្តល់សិទ្ធិ**',
+            st.state !== 'active', st);
+        scenarios++;
+        // កំណែ 2.20.6 ៖ ការលុបត្រូវរង់ចាំសាលក្រម `checkOnline()` ពិត។
+        // ហេតុផល ៖ `serverTimeSynced` នៅ `true` បន្តទោះក្រោយចាកចេញពីបណ្តាញ
+        // ហើយ offset ក្លាយជាចាស់ ➜ `getServerNow()` រំកិលតាម **នាឡិកាឧបករណ៍**
+        // ម្តងទៀត។ ការលុបតាមសញ្ញានោះ ធ្វើឲ្យការប្តូរថ្ងៃទូរស័ព្ទ **លុប Key
+        // របស់អតិថិជន**។ ការមិនផ្តល់សិទ្ធិ (`offline-grace-exceeded`) បិទ
+        // ការចូលប្រើរួចហើយ ➜ ការលុបមិនបន្ថែមសុវត្ថិភាពទេ។ សាលក្រម server
+        // ពិត (`expired-server`) នៅតែលុបដដែល — ចាក់សោដោយ
+        // `license-grace-test.js` និង `license-clock-rollback-test.js` ច.៤។
+        ok('   តែ record ត្រូវរក្សាទុក ៖ ការលុបទាមទារសាលក្រម checkOnline ពិត',
+            !!env.store['zoe_license_activation_' + APP_CODE], Object.keys(env.store));
     }
 
     ok('ជាន់អប្បបរមា ៖ សេណារីយ៉ូដែលរត់ពិត >= ១៤', scenarios >= 14, scenarios);

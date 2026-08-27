@@ -134,6 +134,38 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
 (async () => {
     console.log('crud-rules-flow — payload ពិត ធៀបនឹង firebase rules ពិត (RTDB emulator)\n');
     const strictMode = process.env.CRUD_FLOW_STRICT === '1';
+
+    // ⛔ **ការសាង sandbox ជាការងារ local — វា *មិន* ត្រូវការ emulator ទេ។**
+    // មុនកំណែ 2.20.1 ការពិនិត្យ emulator មកមុនគេ ➜ គ្មាន emulator ➜ SKIP
+    // **ទាំងស្រុង** ➜ ការខូចនៃ sandbox (ថេរដែលបាត់ · function ដែលប្តូរឈ្មោះ ·
+    // syntax ដែលបែក) **មើលមិនឃើញនៅមូលដ្ឋានទាល់តែសោះ** ➜ វាលេចតែក្នុង CI។
+    //
+    // នោះជាអ្វីដែលកើតឡើងពិត៖ ការបន្ថែម `DB_LISTENER_KEY_DELETED` ចូល
+    // `app.js` ធ្វើឲ្យ `dropStaleRestoreMarkers()` បោះ `ReferenceError`
+    // ក្នុង vm ➜ `run-all.sh` នៅមូលដ្ឋាន **បៃតងទាំង ៩៥** ➜ CI ក្រហម។
+    //
+    // ច្បាប់ (ដដែលនឹង `scan-engine-test.js` ក្នុង CLAUDE.md)៖ **SKIP ត្រូវ
+    // រក្សាទុកសម្រាប់ dependency របស់បរិស្ថានតែប៉ុណ្ណោះ** — ហើយការរត់កូដ
+    // របស់ repo ខ្លួនឯងក្នុង `vm` មិនមែនជា dependency បរិស្ថានទេ។
+    // ដូច្នេះការស្រង់ + ការសាង + ការហៅ smoke រត់ **មុន** ច្រកទ្វារ emulator
+    // ហើយការបរាជ័យរបស់វាជា **ការធ្លាក់ ទោះគ្មាន emulator ក៏ដោយ**។
+    try {
+        const smoke = makeSandbox({}, Date.now());
+        const marked = { id: 'smoke_1', restoreClaimId: 'trash_smoke', restoreClaimToken: 'tok_smoke' };
+        smoke.ctx.api.dropStaleRestoreMarkers(marked);
+        smoke.ctx.api.itemHasRestoreMarkers(marked);
+        smoke.ctx.api.normalizeBarcodesOf({ id: 'smoke_1', barcodes: [{ code: 'A', cod: 1, dod: 0 }] });
+        smoke.ctx.api.stripHistoryOnlyMarkers({ id: 'smoke_1', restoreClaimId: 'x' });
+        smoke.ctx.api.runAutomaticCleanupRules();
+        check(true, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator');
+    } catch (sandboxError) {
+        check(false, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator',
+            String(sandboxError && sandboxError.message || sandboxError));
+        console.log('\n❌ sandbox ខូច ➜ ការធ្លាក់ **ទោះគ្មាន emulator** (កុំឲ្យវាលេចតែក្នុង CI)');
+        console.log('   ជាធម្មតា៖ `app.js` បន្ថែមថេរ/មុខងារថ្មី តែ sandbox នៅទីនេះមិនប្រកាសវា។');
+        process.exit(1);
+    }
+
     let load;
     try {
         load = await asOwner('PUT', '/.settings/rules.json', JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8')));

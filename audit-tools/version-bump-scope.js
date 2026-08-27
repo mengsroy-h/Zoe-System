@@ -53,11 +53,27 @@ if (present.length < 2) {
 
 // SKIP ត្រូវរក្សាទុកសម្រាប់ **បរិស្ថាន** តែប៉ុណ្ណោះ (គ្មាន git ឬគ្មាន base)
 // ក្រោយពេលបានបញ្ជាក់រួចថាកូដ App មានពិត។
+//
+// ⛔ **តែ SKIP នោះជាបៃតងក្លែងក្លាយក្នុង CI។** `actions/checkout@v4` ទាញ
+// តែ **១ commit** ដោយលំនាំដើម (`fetch-depth: 1`) ➜ គ្មាន `origin/main` ➜
+// ឯកសារនេះ **SKIP រាល់ការរត់ CI តាំងពីវាត្រូវបានសរសេរ** ➜ ការការពារ
+// «កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ» និង «ការឡើងកំណែទទេ» **មិនដែលអនុវត្ត
+// លើ PR ណាមួយសោះ**។ វាដំណើរការតែពេលអ្នកអភិវឌ្ឍន៍រត់នៅមូលដ្ឋាន។
+//
+// ការកែ ២ ជាន់៖ `audit.yml` ដាក់ `fetch-depth: 0` ហើយ
+// `VERSIONSCOPE_STRICT=1` ធ្វើឲ្យ SKIP នោះក្លាយជាការធ្លាក់ ➜ បើ base
+// បាត់ម្តងទៀត នោះ CI ក្រហម មិនមែនស្ងាត់ទេ។ (ថ្នាក់ដដែលនឹង
+// `CRUD_FLOW_STRICT` — មើល `.github/workflows/audit.yml`។)
+const strictMode = process.env.VERSIONSCOPE_STRICT === '1';
 try {
     git(['rev-parse', '--verify', BASE]);
 } catch (e) {
-    console.log('SKIP — រកមិនឃើញ base `' + BASE + '` (ត្រូវការ git និង origin/main)');
-    process.exit(0);
+    console.log((strictMode ? 'FAIL' : 'SKIP') + ' — រកមិនឃើញ base `' + BASE + '` (ត្រូវការ git និង origin/main)');
+    if (strictMode) {
+        console.log('        VERSIONSCOPE_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់');
+        console.log('        ជាធម្មតា៖ `actions/checkout` ត្រូវការ `fetch-depth: 0`');
+    }
+    process.exit(strictMode ? 1 : 0);
 }
 
 const changed = git(['diff', '--name-only', BASE]).split('\n').filter(Boolean);

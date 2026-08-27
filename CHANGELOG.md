@@ -116,6 +116,23 @@
   នៅមូលដ្ឋាន រួច CI ក្រហមក្រោយ push**។ ឥឡូវ `run-all.sh` រត់ emu tests
   ដែរ (គ្មាន emulator ➜ SKIP ស្អាត; CI ដាក់ `CRUD_FLOW_STRICT=1` ដែល
   ធ្វើឲ្យ SKIP នោះក្លាយជាការធ្លាក់)។ សរុប **៩៧ checker**។
+- **⛔ SKIP មិនត្រូវរំលងអ្វីៗទាំងអស់ ៖ ការសាង sandbox ជាការងារ *local*។**
+  ការបន្ថែម emu tests ចូល `run-all.sh` **មិនគ្រប់គ្រាន់ទេ** — គ្មាន
+  emulator ➜ ពួកវា SKIP **ទាំងស្រុង** ➜ ការខូចនៃ sandbox នៅតែមើលមិនឃើញ
+  នៅមូលដ្ឋាន។ តែ `ReferenceError` នោះកើតឡើងពេល **រត់កូដក្នុង `vm`** ដែល
+  **មិនត្រូវការ emulator សោះ**; emulator ត្រូវការតែសម្រាប់ **rules**។
+  ឥឡូវ `crud-rules-flow.js` សាង sandbox ហើយហៅ function ពិត ៥
+  («smoke check») **មុន** ច្រកទ្វារ emulator ➜ ការខូចជា **ការធ្លាក់ ទោះ
+  គ្មាន emulator**។ វាស់បាន ២ ខាង៖ sandbox ល្អ ➜ `ok` រួច SKIP (exit 0);
+  sandbox ខូច ➜ `FAIL` (exit 1)។ *(`restore-deadlock-test.js` មិនប្រើ `vm`
+  សោះ ➜ SKIP របស់វាត្រឹមត្រូវ។)*
+- **⛔ `version-bump-scope.js` **មិនដែលរត់ក្នុង CI សោះ** តាំងពីវាត្រូវបាន
+  សរសេរ។** `actions/checkout@v4` ទាញតែ **១ commit** ដោយលំនាំដើម ➜ គ្មាន
+  `origin/main` ➜ SKIP រាល់ការរត់ ➜ ការការពារ «កូដ ship ប្រែ ➜ ត្រូវឡើង
+  កំណែ» និង «ការឡើងកំណែទទេ» **មិនដែលអនុវត្តលើ PR ណាមួយ**។ ការកែ ២ ជាន់៖
+  `fetch-depth: 0` បូក `git fetch origin main` ក្នុង `audit.yml` ហើយ
+  `VERSIONSCOPE_STRICT=1` ធ្វើឲ្យការបាត់ base ក្លាយជា **ការធ្លាក់**
+  មិនមែនការស្ងាត់ (ថ្នាក់ដដែលនឹង `CRUD_FLOW_STRICT`)។
 
 ### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

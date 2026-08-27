@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.19.5';
+    const APP_VERSION = '2.20.0';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -42,6 +42,7 @@
         "moreMenuExport",
         "moreMenuManualAdjust",
         "moreMenuRecentlyDeleted",
+        "moreMenuResetPickup",
         "moreMenuViewList",
         "openCallMarkModal",
         "openConfigQrScanner",
@@ -287,6 +288,8 @@
     let dailyRevenueData = {};
     let monthlyRevenueData = {};
     let dailyPickupData = {};
+    let pickupResetInFlight = false;
+    const PICKUP_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
     let currentFilterMode = 'today';
     let customFilterDate = '';
     let pendingBarcode = "";
@@ -990,6 +993,10 @@
         manualAdjust: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកែទឹកប្រាក់ ឬចំនួនកញ្ចប់',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកែទឹកប្រាក់ ឬចំនួនកញ្ចប់ លើកក្រោយ'
+        },
+        resetPickup: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច លើកក្រោយ'
         },
         clearHistory: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបទិន្នន័យទាំងអស់',
@@ -3712,6 +3719,61 @@
         commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd);
     }
 
+    function requestPinBeforeResetPickup() {
+        requestPinBeforeConfig(resetPickupStats, 'resetPickup');
+    }
+
+    async function resetPickupStats() {
+        if (pickupResetInFlight) return;
+        const filterLabel = getCurrentFilterLabel();
+        const targetDates = getPickupResetTargetDates();
+        if (!targetDates.length) {
+            showToast(`⚠️ គ្មានទិន្នន័យ «យករួច» ក្នុងតម្រង «${filterLabel}» ដើម្បី Reset ទេ។`);
+            return;
+        }
+        const currentCustomers = targetDates.reduce((sum, d) => sum + countPickedUpCustomers(dailyPickupData[d]), 0);
+        const currentPackages = targetDates.reduce((sum, d) => sum + (parseFloat((dailyPickupData[d] || {}).packagesPickedUp) || 0), 0);
+        if (!currentCustomers && !currentPackages) {
+            showToast(`⚠️ តម្រង «${filterLabel}» មានចំនួនយករួច 0 រួចជាស្រេច — គ្មានអ្វីត្រូវ Reset ទេ។`);
+            return;
+        }
+        const scopeNote = currentFilterMode === 'all'
+            ? `ទិន្នន័យ ${targetDates.length} ថ្ងៃ`
+            : `ថ្ងៃផ្សេងមិនប៉ះពាល់ទេ`;
+        if (!confirm(`តើអ្នកពិតជាចង់ Reset ចំនួនអតិថិជនយក (${currentCustomers}) និងចំនួនកញ្ចប់យក (${currentPackages}) ក្នុងតម្រង «${filterLabel}» ទៅ 0 មែនទេ?\n\n· ${scopeNote}\n· ទឹកប្រាក់ COD/DOD និងបញ្ជីកញ្ចប់ មិនប្តូរទេ`)) return;
+        if (!dbRefDailyPickup || !db || !fb) {
+            showToast("⚠️ មិនអាច Reset បានទេ! សូមពិនិត្យការតភ្ជាប់ Firebase ហើយសាកល្បងម្តងទៀត។");
+            return;
+        }
+
+        pickupResetInFlight = true;
+        let doneCount = 0;
+        let failedCount = 0;
+        try {
+            for (const dateKey of targetDates) {
+                try {
+                    await fb.runTransaction(fb.ref(db, `zoew_daily_pickup_cod_dod/${dateKey}`), () => ({ packagesPickedUp: 0 }));
+                    dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {} };
+                    doneCount++;
+                } catch (e) {
+                    failedCount++;
+                    if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'resetPickupStats', date: dateKey });
+                }
+            }
+        } finally {
+            pickupResetInFlight = false;
+        }
+
+        refreshCurrentHistoryView();
+        if (failedCount && !doneCount) {
+            showToast("❌ Reset បរាជ័យទាំងស្រុង! សូមពិនិត្យការតភ្ជាប់ ហើយសាកល្បងម្តងទៀត។");
+        } else if (failedCount) {
+            showToast(`⚠️ Reset បានតែ ${doneCount} ថ្ងៃ — ${failedCount} ថ្ងៃបរាជ័យ។ សូមសាកល្បងម្តងទៀត។`);
+        } else {
+            showToast(`✅ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច ក្នុងតម្រង «${filterLabel}» ជោគជ័យ!`);
+        }
+    }
+
     function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
         if (!dbRefDailyPickup) return;
         const recordRef = dailyPickupData[scanDateStr];
@@ -4887,6 +4949,8 @@
 
     function moreMenuRecentlyDeleted() { openRecentlyDeletedModal(); closeGlobalMoreMenu(); }
 
+    function moreMenuResetPickup() { requestPinBeforeResetPickup(); closeGlobalMoreMenu(); }
+
     function moreMenuClearHistory() { requestPinBeforeClearHistory(); closeGlobalMoreMenu(); }
 
     function moreMenuViewList(id) { openViewListModal(id); closeGlobalMoreMenu(); }
@@ -4907,6 +4971,7 @@
             <button data-act="moreMenuManualAdjust">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
             <button data-act="moreMenuExchangeRate">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
             <button data-act="moreMenuRecentlyDeleted">🗑️ ធុងសំរាម</button>
+            <button data-act="moreMenuResetPickup">♻️ Reset ចំនួនយករួច (${sanitizeInput(getCurrentFilterLabel())})</button>
             <button class="delete-opt" data-act="moreMenuClearHistory">❌ លុបទាំងអស់</button>
         `;
 
@@ -5058,6 +5123,29 @@
             document.head.appendChild(script);
         });
         return loadedScriptPromises[key];
+    }
+
+    function getFilterTargetDateKey() {
+        const today = new Date(getServerNow());
+        if (currentFilterMode === 'today') return getFormattedDate(today);
+        if (currentFilterMode === 'yesterday') {
+            const d = new Date(today); d.setDate(today.getDate() - 1);
+            return getFormattedDate(d);
+        }
+        if (currentFilterMode === 'dayBefore') {
+            const d = new Date(today); d.setDate(today.getDate() - 2);
+            return getFormattedDate(d);
+        }
+        if (currentFilterMode === 'custom') return customFilterDate;
+        return "";
+    }
+
+    function getPickupResetTargetDates() {
+        if (currentFilterMode === 'all') {
+            return Object.keys(dailyPickupData).filter((d) => PICKUP_DATE_KEY_PATTERN.test(d)).sort();
+        }
+        const key = getFilterTargetDateKey();
+        return PICKUP_DATE_KEY_PATTERN.test(key) ? [key] : [];
     }
 
     function getCurrentFilterLabel() {
@@ -5261,15 +5349,7 @@
         let codTotal = 0;
         let dodTotal = 0;
 
-        let targetDateKey = "";
-        const today = new Date(getServerNow());
-        const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-        const dayBefore = new Date(today); dayBefore.setDate(today.getDate() - 2);
-
-        if (currentFilterMode === 'today') targetDateKey = getFormattedDate(today);
-        if (currentFilterMode === 'yesterday') targetDateKey = getFormattedDate(yesterday);
-        if (currentFilterMode === 'dayBefore') targetDateKey = getFormattedDate(dayBefore);
-        if (currentFilterMode === 'custom') targetDateKey = customFilterDate;
+        const targetDateKey = getFilterTargetDateKey();
 
         if (!isSearchScoped && targetDateKey && dailyRevenueData[targetDateKey]) {
             selectedAllPackages = parseFloat(dailyRevenueData[targetDateKey].totalCount) || 0;
@@ -8938,6 +9018,7 @@
 
     function resetClearHistoryOperationState() {
         clearHistoryInFlight = false;
+        pickupResetInFlight = false;
         activeRestoreClaims.clear();
         activeClearHistoryClaims.clear();
     }

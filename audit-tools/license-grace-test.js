@@ -53,7 +53,7 @@ function build(serverRecord, opts) {
     const ctx = vm.createContext(sandbox);
     const src = fs.readFileSync(FILE, 'utf8');
     vm.runInContext(`
-        var serverTimeOffsetMs = 0, serverTimeSynced = true;
+        var serverTimeOffsetMs = 0, serverTimeSynced = ${opts.serverTimeSynced === false ? 'false' : 'true'};
         const OFFLINE_GRACE_MS = ${GRACE};
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
         const NET_TIMEOUT_MS = 10000;
@@ -67,7 +67,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'activate', 'getStatus']), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'checkOnline', 'syncServerTime', 'activate', 'getStatus']), ctx);
     return { ctx, store, clock };
 }
 
@@ -186,6 +186,64 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     const lcAct = await lc3.L.activate(lcKey, 'ADM');
     ok('activate ខណៈ crypto ដួល ➜ **បដិសេធ** (កុំផ្តល់សិទ្ធិលើអ្វីដែលផ្ទៀងផ្ទាត់មិនបាន)',
         lcAct.valid === false && lcAct.reason === 'verify-unavailable', JSON.stringify(lcAct));
+
+    // ── ⛔ អ័ក្ស **នាឡិកា** ៖ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ផុតកំណត់» ──────────
+    // ច្បាប់ «៣ លទ្ធផល មិនមែន ២» ត្រូវបានអនុវត្តលើអ័ក្ស **បណ្តាញ** (2.17.4)
+    // និងអ័ក្ស **crypto** រួចហើយ — តែអ័ក្ស **នាឡិកា** នៅបើកចំហរហូតដល់
+    // កំណែ 2.20.1៖ `getStatus()` ប្រៀបធៀប `getServerNow()` នឹង `ceiling`
+    // រួច **លុប record របស់អតិថិជន** ដោយផ្អែកលើលទ្ធផលនោះ។ ប៉ុន្តែពេល
+    // `checkOnline()` មិនអាចទៅដល់ server (ក្រៅបណ្តាញ) `serverTimeOffsetMs`
+    // នៅ `0` ➜ `getServerNow()` គឺជា **នាឡិកាឧបករណ៍ឆៅ** ដែលមិនអាចទុកចិត្តបាន។
+    //
+    // ទូរស័ព្ទដែលអស់ថ្មរួច boot ឡើងវិញ (ឬអ្នកប្រើប្តូរកាលបរិច្ឆេទដោយដៃ)
+    // ជាញឹកញាប់ក្រឡុកទៅថ្ងៃខុសទាំងស្រុង ➜ License ដែលនៅមានសុពលភាព
+    // **ត្រូវលុបចោលជាអចិន្ត្រៃយ៍** ➜ អ្នកប្រើឃើញប្រអប់សុំ Activation Key
+    // ខណៈគ្មានអ្វីខុសនឹង Key របស់គាត់សោះ។ ការ recheck រៀងរាល់ ១៥ នាទី
+    // (`LICENSE_RECHECK_INTERVAL_MS`) ធ្វើឲ្យវាកើតឡើងកណ្តាលការងារ។
+    //
+    // ច្បាប់៖ ការលុបដែលមិនអាចត្រឡប់វិញបាន ត្រូវទាមទារនាឡិកា **ដែលទុកចិត្តបាន**
+    // (`serverTimeSynced`) ឬសាលក្រមរបស់ server (`online.ok === false` ដែល
+    // ត្រូវបានដោះស្រាយខាងលើរួច)។ បើអត់ ➜ រក្សា record តែ **កុំផ្តល់សិទ្ធិ**។
+    console.log('\n===== អ័ក្សនាឡិកា ៖ ផ្ទៀងផ្ទាត់មិនបាន ≠ ផុតកំណត់ =====');
+    {
+        const signedExp = 2000000;
+        const store = {
+            zoe_license_activation_ADM: JSON.stringify({
+                keyString: 'K1', id: 'K1', a: 'ADM', iat: 1,
+                exp: Math.floor(signedExp / 1000),
+                lastOnlineCheck: 1000000,
+                onlineExp: signedExp
+            })
+        };
+
+        // ក. នាឡិកាឧបករណ៍ខុស (លោតទៅមុខ ១ ឆ្នាំ) ខណៈក្រៅបណ្តាញ
+        const bad = build('offline', { store: JSON.parse(JSON.stringify(store)), now: signedExp + 365 * 86400000, serverTimeSynced: false });
+        const badSt = await vm.runInContext("getStatus('ADM')", bad.ctx);
+        ok('⛔ នាឡិកាមិនទាន់ sync + ក្រៅបណ្តាញ ➜ record **មិនត្រូវលុប**',
+            !!bad.store['zoe_license_activation_ADM'], JSON.stringify(badSt));
+        ok('⛔ ហើយក៏ **មិនត្រូវផ្តល់សិទ្ធិ** ដែរ (មិនមែន active)',
+            badSt.state !== 'active', JSON.stringify(badSt));
+
+        // ខ. ទិសផ្ទុយ ៖ នាឡិកា sync រួច ➜ ការផុតកំណត់ពិត **ត្រូវលុប**
+        //    បើអត់ការអះអាងនេះ ការ «រក្សាទុកគ្រប់ពេល» នឹងបៃតងដោយខុស
+        //    ហើយ Key ដែលផុតកំណត់ពិតនឹងរស់ជារៀងរហូត។
+        const good = build('offline', { store: JSON.parse(JSON.stringify(store)), now: signedExp + 365 * 86400000, serverTimeSynced: true });
+        const goodSt = await vm.runInContext("getStatus('ADM')", good.ctx);
+        ok('⛔ ទិសផ្ទុយ ៖ នាឡិកាទុកចិត្តបាន + ផុតកំណត់ពិត ➜ record **ត្រូវលុប**',
+            !good.store['zoe_license_activation_ADM'] && goodSt.reason === 'expired', JSON.stringify(goodSt));
+
+        // គ. នាឡិកាមិន sync តែ Key **មិនទាន់** ផុតកំណត់ ➜ នៅ active ធម្មតា
+        const fresh = build('offline', { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
+        const freshSt = await vm.runInContext("getStatus('ADM')", fresh.ctx);
+        ok('នាឡិកាមិន sync តែមិនទាន់ផុតកំណត់ ➜ នៅតែ active',
+            freshSt.state === 'active' && !!fresh.store['zoe_license_activation_ADM'], JSON.stringify(freshSt));
+
+        // ឃ. server និយាយថាផុតកំណត់ ➜ សាលក្រមអាជ្ញាធរ ➜ ត្រូវលុប ទោះនាឡិកាមិន sync
+        const served = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
+        const servedSt = await vm.runInContext("getStatus('ADM')", served.ctx);
+        ok('សាលក្រម server (expired-server) ➜ ត្រូវលុបដដែល',
+            !served.store['zoe_license_activation_ADM'], JSON.stringify(servedSt));
+    }
 
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));
     process.exit(fail === 0 ? 0 : 1);

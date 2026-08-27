@@ -151,6 +151,39 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ].forEach(([label, val, want]) => {
             ok('⛔ `' + label + '` ត្រូវ **រក្សាទុក** (ត្រូវការសម្រាប់ debug)', val === want, String(val));
         });
+
+        // ⛔ ចន្លោះទី ២ ៖ ការលាក់ធ្វើតែពេលតម្លៃជា **string**
+        // (`typeof value[k] === 'string'`) ➜ secret ដែលមិនមែនជាខ្សែអក្សរ
+        // រអិលកាត់ទាំងស្រុង៖
+        //   `{ pin: 1234 }`            ➜ PIN ជា **លេខ** — ទម្រង់ធម្មជាតិបំផុត
+        //   `{ credentials: [u, p] }`  ➜ array
+        //   `{ auth: { password: … } }`➜ ត្រូវដើរជ្រៅ មិនមែនរក្សាទុកទាំងស្រុង
+        // Sentry ចាប់ breadcrumb ដោយស្វ័យប្រវត្តិ (console · fetch) ដូច្នេះ
+        // តម្លៃទាំងនោះអាចមកពីកូដដែលអ្នកសរសេរមិនបានគ្រោងទុក។
+        const ev2 = {
+            extra: {
+                pin: 1234,
+                passcode: 987654,
+                apiKey: ['sk-live-1', 'sk-live-2'],
+                credential: { user: 'u', password: 'p' },
+                keyId: 42,
+                count: 7,
+                closedAt: 1756200000000
+            }
+        };
+        api.redactEvent(ev2);
+        ok('⛔ PIN ជា **លេខ** ក្រោមកូនសោ `pin` ត្រូវលាក់',
+            ev2.extra.pin === '[redacted]', JSON.stringify(ev2.extra.pin));
+        ok('⛔ លេខក្រោមកូនសោ `passcode` ត្រូវលាក់',
+            ev2.extra.passcode === '[redacted]', JSON.stringify(ev2.extra.passcode));
+        ok('⛔ array ក្រោមកូនសោ `apiKey` ត្រូវលាក់',
+            ev2.extra.apiKey === '[redacted]', JSON.stringify(ev2.extra.apiKey));
+        ok('⛔ វត្ថុក្រោមកូនសោ `credential` ត្រូវលាក់',
+            ev2.extra.credential === '[redacted]', JSON.stringify(ev2.extra.credential));
+        // ២ ខាង ៖ លេខដែល **មិនមែន** secret ត្រូវរក្សាទុកសម្រាប់ debug
+        ok('⛔ `keyId` ជាលេខ ត្រូវ **រក្សាទុក**', ev2.extra.keyId === 42, JSON.stringify(ev2.extra.keyId));
+        ok('⛔ `count` ត្រូវ **រក្សាទុក**', ev2.extra.count === 7, JSON.stringify(ev2.extra.count));
+        ok('⛔ `closedAt` ត្រូវ **រក្សាទុក**', ev2.extra.closedAt === 1756200000000, JSON.stringify(ev2.extra.closedAt));
     } else {
         ok('ZoeErrors បង្ហាញ `redactEvent` ➜ ការលាក់តាមឈ្មោះកូនសោវត្ថុត្រូវវាស់បាន',
             false, 'គ្មាន `redactEvent` ➜ តម្លៃក្រោមកូនសោដូច `{ pin: … }` `{ apiKey: … }` '

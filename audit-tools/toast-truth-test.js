@@ -296,6 +296,8 @@ function buildProbe(app) {
         '  render: renderConnectionStatus,\n' +
         '  signin: () => showLiveToast(\'signin\'),\n' +
         '  clear: () => { document.getElementById(\'toastContainer\').innerHTML = \'\'; },\n' +
+        '  flood: (n) => { for (let i = 0; i < n; i++) showToast(\'ស្កេនរួច \' + i); },\n' +
+        '  count: () => document.querySelectorAll(\'#toastContainer .toast\').length,\n' +
         '  liveCount: () => document.querySelectorAll(\'#toastContainer [data-live-toast]\').length\n' +
         '};\n' +
         '})();';
@@ -442,6 +444,44 @@ function readToast(page) {
                 ok(app + ' ៖ ហើយវាឈប់ «រស់» ទៀត (លែងសរសេរជាន់)',
                     !!settled && settled.live === null &&
                     (await page.evaluate(() => window.__toastProbe.liveCount())) === 0, settled);
+
+                // ⛔ toast ដែល «រស់» មិនត្រូវត្រូវបានច្រានចេញដោយសារសារធម្មតា។
+                // `showToast()` កាត់ប្រអប់ត្រឹម ៤ ដោយ `removeChild(firstChild)` —
+                // ហើយ toast ដែលរស់ជាធាតុ **ចាស់ជាងគេ** ជានិច្ច (វាកើតពេលចូល
+                // ប្រព័ន្ធ) ➜ ការស្កេនត្រឹម ៤ ដង **លុបវាចោល** ➜ អ្នកប្រើលែងឃើញ
+                // ការប្តូរទៅ «ជោគជ័យ» ឬ «ដាច់ការទាញទិន្នន័យ» ទៀត។ ស្ថានភាព
+                // នៅជាប់នឹងអ្វីដែលគេឃើញចុងក្រោយ ➜ **បង្ហាញស្ថានភាពខុស**
+                // ដែលជាថ្នាក់ដដែលនឹងកំណែ 2.19.0។
+                await page.evaluate(() => {
+                    window.__toastProbe.clear();
+                    window.__toastProbe.set({ connected: false, session: 'live' });
+                    window.__toastProbe.signin();
+                    const el = document.querySelector('#toastContainer [data-live-toast]');
+                    if (el) el.__floodStamp = 'live';
+                    window.__toastProbe.flood(6);
+                });
+                const survived = await page.evaluate(() => ({
+                    live: window.__toastProbe.liveCount(),
+                    total: window.__toastProbe.count()
+                }));
+                ok(app + ' ៖ ⛔ សារធម្មតា ៦ ដង មិនត្រូវច្រាន toast ស្ថានភាពដែលរស់ចេញ',
+                    survived.live === 1, survived);
+                ok(app + ' ៖ ហើយប្រអប់នៅតែមានពិដាន (មិនកកកុញ)',
+                    survived.total <= 4, survived);
+                // ២ ខាង ៖ សេចក្តីពិតបន្ទាប់ត្រូវទៅដល់ធាតុដែលរស់នោះពិត
+                await page.evaluate(() => {
+                    window.__toastProbe.set({ connected: true, pending: [] });
+                    window.__toastProbe.render();
+                });
+                const afterFlood = await page.evaluate(() => {
+                    const all = document.querySelectorAll('#toastContainer .toast');
+                    for (let i = 0; i < all.length; i++) {
+                        if (all[i].__floodStamp === 'live') return all[i].textContent;
+                    }
+                    return null;
+                });
+                ok(app + ' ៖ ហើយសេចក្តីពិតបន្ទាប់ទៅដល់វា (ប្រកាសជោគជ័យ)',
+                    !!afterFlood && afterFlood.indexOf('ជោគជ័យ') !== -1, afterFlood);
 
                 // វគ្គដែលបានបញ្ចប់ ៖ ២ ខាង — បដិសេធពេលស្លាប់ ហើយនៅតែប្រកាសពេលរស់
                 const warnBg = await page.evaluate(() => {

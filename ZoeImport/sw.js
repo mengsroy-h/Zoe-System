@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoeimport-v9';
+const CACHE_VERSION = 'zoeimport-v10';
 
 const CORE_SHELL = [
     './',
@@ -62,13 +62,17 @@ function revalidateShell(cache, request, cacheKey) {
     revalidateInFlight.add(key);
 
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = setTimeout(() => {
-        if (controller) { try { controller.abort(); } catch (e) {} }
-    }, REVALIDATE_TIMEOUT_MS);
+    let released = false;
     const release = () => {
+        if (released) return;
+        released = true;
         clearTimeout(timer);
         revalidateInFlight.delete(key);
     };
+    const timer = setTimeout(() => {
+        if (controller) { try { controller.abort(); } catch (e) {} }
+        release();
+    }, REVALIDATE_TIMEOUT_MS);
 
     const target = cacheKey === './index.html' ? './index.html' : request;
     return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {

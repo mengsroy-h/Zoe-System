@@ -22,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
-const ROOT = path.join(__dirname, '..', '..');
+// ថត app អាច override បាន — មើលហេតុផលក្នុង `crud-rules-flow.js`។
+const ROOT = process.env.DEADLOCK_APP_DIR ? path.resolve(process.env.DEADLOCK_APP_DIR) : path.join(__dirname, '..', '..');
 const BASE = { host: '127.0.0.1', port: 9000 };
 const NS = 'ns=demo-zoe';
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));

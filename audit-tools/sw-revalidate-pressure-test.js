@@ -68,6 +68,25 @@ for (const app of APPS) {
     ok(app + ': នៅតែរំលងពេលក្រៅបណ្តាញ',
         /navigator\.onLine === false/.test(fn));
 
+    // ⛔ ថ្នាក់កំហុស ៖ **slot ដែលលេចធ្លាយ** ➜ ការធ្វើឲ្យសំបកស្រស់ស្លាប់ស្ងាត់ៗ។
+    // `release` ជាប់នឹង `fetch(...).then(release, release)` តែម្យ៉ាង។ បើ fetch
+    // នោះ **មិនដែល settle** — `AbortController` គ្មាន (`typeof` ត្រឡប់ null),
+    // ឬ abort មិនធ្វើឲ្យ promise settle លើ engine មួយចំនួន — នោះកូនសោជាប់ក្នុង
+    // `revalidateInFlight` **ជារៀងរហូត**។ ក្រោយ REVALIDATE_MAX_IN_FLIGHT កូនសោ
+    // ជាប់ ការធ្វើឲ្យស្រស់ **ឈប់ទាំងស្រុងពេញអាយុ service worker** ➜ អ្នកប្រើ
+    // ជាប់នឹង `app.js`/`style.css` ចាស់ក្នុង cache ដោយគ្មានសញ្ញាណាមួយ។
+    //
+    // ច្បាប់៖ ការដោះ slot ត្រូវធានាដោយ **ផ្លូវ ២** — ការ settle របស់ fetch
+    // **និង** timer — ដូចយន្តការ `panelGlideFrom()` (finish + timer) ក្នុង
+    // `app.js`។ ការដោះត្រូវ idempotent ដើម្បីកុំឲ្យការ settle យឺតរបស់ជុំចាស់
+    // ដោះ slot របស់ជុំ **ថ្មី** ➜ ការធ្វើឲ្យស្រស់ស្ទួន។
+    ok(app + ': ⛔ slot ត្រូវដោះតាម **timer** ដែរ មិនត្រឹមតែពេល fetch settle',
+        /setTimeout\([\s\S]{0,400}?release\(\)/.test(fn),
+        'timer មិនហៅ release() ➜ fetch ដែលមិន settle ចាក់សោ slot ជារៀងរហូត');
+    ok(app + ': ⛔ ការដោះ slot ជា idempotent (ជុំចាស់មិនដោះ slot ជុំថ្មី)',
+        /let released = false;/.test(fn) && /if \(released\) return;/.test(fn),
+        'គ្មានទង់ការពារការដោះស្ទួន');
+
     const timeout = Number((sw.match(/const REVALIDATE_TIMEOUT_MS = (\d+);/) || [])[1] || 0);
     ok(app + ': ពេលកំណត់សមហេតុផល (១–១៥ វិ.)', timeout >= 1000 && timeout <= 15000, timeout);
     const cap = Number((sw.match(/const REVALIDATE_MAX_IN_FLIGHT = (\d+);/) || [])[1] || 0);

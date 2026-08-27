@@ -53,11 +53,27 @@ if (present.length < 2) {
 
 // SKIP ត្រូវរក្សាទុកសម្រាប់ **បរិស្ថាន** តែប៉ុណ្ណោះ (គ្មាន git ឬគ្មាន base)
 // ក្រោយពេលបានបញ្ជាក់រួចថាកូដ App មានពិត។
+//
+// ⛔ **តែ SKIP នោះជាបៃតងក្លែងក្លាយក្នុង CI។** `actions/checkout@v4` ទាញ
+// តែ **១ commit** ដោយលំនាំដើម (`fetch-depth: 1`) ➜ គ្មាន `origin/main` ➜
+// ឯកសារនេះ **SKIP រាល់ការរត់ CI តាំងពីវាត្រូវបានសរសេរ** ➜ ការការពារ
+// «កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ» និង «ការឡើងកំណែទទេ» **មិនដែលអនុវត្ត
+// លើ PR ណាមួយសោះ**។ វាដំណើរការតែពេលអ្នកអភិវឌ្ឍន៍រត់នៅមូលដ្ឋាន។
+//
+// ការកែ ២ ជាន់៖ `audit.yml` ដាក់ `fetch-depth: 0` ហើយ
+// `VERSIONSCOPE_STRICT=1` ធ្វើឲ្យ SKIP នោះក្លាយជាការធ្លាក់ ➜ បើ base
+// បាត់ម្តងទៀត នោះ CI ក្រហម មិនមែនស្ងាត់ទេ។ (ថ្នាក់ដដែលនឹង
+// `CRUD_FLOW_STRICT` — មើល `.github/workflows/audit.yml`។)
+const strictMode = process.env.VERSIONSCOPE_STRICT === '1';
 try {
     git(['rev-parse', '--verify', BASE]);
 } catch (e) {
-    console.log('SKIP — រកមិនឃើញ base `' + BASE + '` (ត្រូវការ git និង origin/main)');
-    process.exit(0);
+    console.log((strictMode ? 'FAIL' : 'SKIP') + ' — រកមិនឃើញ base `' + BASE + '` (ត្រូវការ git និង origin/main)');
+    if (strictMode) {
+        console.log('        VERSIONSCOPE_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់');
+        console.log('        ជាធម្មតា៖ `actions/checkout` ត្រូវការ `fetch-depth: 0`');
+    }
+    process.exit(strictMode ? 1 : 0);
 }
 
 const changed = git(['diff', '--name-only', BASE]).split('\n').filter(Boolean);
@@ -90,9 +106,26 @@ for (const app of present) {
         f.startsWith(app + '/') && SHIPPED.test(f) && !NOT_SHIPPED.test(f) && f !== app + '/sw.js');
     const swBumped = cacheVersionOf(BASE, app) !== cacheVersionOf(null, app);
 
+    // ⛔ `sw.js` **ជាកូដដែល ship ដែរ** — វាត្រូវដកចេញពី `shipped` ខាងលើ
+    // តែម្យ៉ាងព្រោះ `CACHE_VERSION` រស់នៅក្នុងវា ➜ ការឡើងកំណែខ្លួនវាធ្វើឲ្យ
+    // ឯកសារនោះប្រែ ➜ រង្វិលជុំ។ ប៉ុន្តែការដករាល់ការប្រែរបស់វាចោលបង្កើត
+    // ចន្លោះផ្ទុយ៖ ការកែ **តក្កវិជ្ជាពិត** ក្នុង `sw.js` (ការសម្អាត cache,
+    // ការដោះ slot, ផ្លូវធ្លាក់ចុះ) ត្រូវអានថា «គ្មានការកែពិត» ➜ checker
+    // **ហាមឡើង cache** ➜ អ្នកប្រើជាប់នឹង service worker ចាស់ជារៀងរហូត។
+    // ដំណោះស្រាយដដែលនឹង `app.js`៖ រាប់វា លុះត្រាតែការប្រែ **លើសពី**
+    // បន្ទាត់ `CACHE_VERSION`។
+    const swFile = app + '/sw.js';
+    let swLogicChanged = false;
+    if (changed.indexOf(swFile) !== -1) {
+        const swDiff = git(['diff', '-U0', BASE, '--', swFile])
+            .split('\n')
+            .filter((l) => /^[+-]/.test(l) && !/^[+-][+-]/.test(l));
+        swLogicChanged = swDiff.some((l) => !/CACHE_VERSION\s*=/.test(l));
+    }
+
     // ការប្រែក្នុង app.js ក្រៅពីបន្ទាត់ APP_VERSION
-    let realCodeChange = shipped.length > 0;
-    if (shipped.length === 1 && shipped[0] === app + '/app.js') {
+    let realCodeChange = shipped.length > 0 || swLogicChanged;
+    if (!swLogicChanged && shipped.length === 1 && shipped[0] === app + '/app.js') {
         const diff = git(['diff', '-U0', BASE, '--', app + '/app.js'])
             .split('\n')
             .filter((l) => /^[+-]/.test(l) && !/^[+-][+-]/.test(l));
@@ -104,7 +137,7 @@ for (const app of present) {
 
     if (realCodeChange) {
         ok(app + ' ៖ កូដដែល ship ប្រែ ➜ `CACHE_VERSION` ត្រូវឡើង',
-            swBumped, 'ឯកសារប្រែ៖ ' + shipped.join(', ') + ' តែ CACHE_VERSION នៅ '
+            swBumped, 'ឯកសារប្រែ៖ ' + shipped.concat(swLogicChanged ? [swFile] : []).join(', ') + ' តែ CACHE_VERSION នៅ '
                 + cacheVersionOf(null, app));
         const av = appVersionOf(null, app), avBase = appVersionOf(BASE, app);
         if (av && avBase) {

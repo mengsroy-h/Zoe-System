@@ -94,7 +94,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      # ⛔ `fetch-depth: 0` ចាំបាច់។ លំនាំដើម (`1`) ទាញតែ commit តែមួយ ➜
+      # គ្មាន `origin/main` ➜ `version-bump-scope.js` **SKIP រាល់ការរត់**
+      # ➜ ការការពារ «កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ» និង «ការឡើងកំណែទទេ»
+      # មិនដែលអនុវត្តលើ PR ណាមួយសោះ។ `VERSIONSCOPE_STRICT=1` ខាងក្រោម
+      # ធ្វើឲ្យការបាត់នោះក្លាយជា **ការធ្លាក់** មិនមែនការស្ងាត់ទេ។
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -118,5 +125,10 @@ jobs:
           sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 
+      - name: ត្រៀម base សម្រាប់ version-bump-scope
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
       - name: run-all.sh
+        env:
+          VERSIONSCOPE_STRICT: '1'
         run: bash audit-tools/run-all.sh

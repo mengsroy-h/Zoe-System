@@ -114,11 +114,11 @@ missing.forEach((n) => ok('មុខងារស្តារការតភ្�
 const FN_STUBS = missing.map((n) => 'function ' + n + '() {}').join('\n');
 
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
-    'DB_LISTENER_RETRY_MIN_GAP_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
+    'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
 missingConsts.forEach((n) => ok('ថេរ `' + n + '` មានក្នុង app.js', false));
 const CONST_STUBS = missingConsts
-    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : '1') + ';')
+    .map((n) => 'const ' + n + ' = ' + (/_STEPS_MS$/.test(n) ? '[1000]' : (/_GRACE_MS$/.test(n) ? '0' : '1')) + ';')
     .join('\n');
 
 function buildContext() {
@@ -212,9 +212,11 @@ function buildContext() {
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
 
-    const code = 'let dbListenerPendingSeen = 0;\n' + CONST_STUBS + '\n'
+    const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
         REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' +
+        "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
+        "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
         'let dbListenersFailed = false;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
         'let dbListenerRecoveryAttempt = 0;\n' +
@@ -603,6 +605,77 @@ function buildContext() {
     t3.api.resetDbListenerHealthState();
     ok('ចាកចេញ ➜ ការតាមដានវឌ្ឍនភាពត្រូវ reset',
         /dbListenerPendingSeen = 0;/.test(sliceFn('resetDbListenerHealthState') || ''));
+}
+
+// ── ១០ខ១ខ២. ⛔ អ្នកតាមដានវឌ្ឍនភាព **មិនត្រូវលេបភស្តុតាងរបស់ខ្លួន** ─────
+// 🔴 កំហុសពិត (កំណែ 2.20.1)៖ `dbListenerResyncIsProgressing()` ធ្លាប់សរសេរ
+// ជាន់ `dbListenerPendingSeen` **ខាងក្នុងការសួរ** ➜ ភស្តុតាងនៃវឌ្ឍនភាព
+// ក្លាយជា **ប្រើបានតែម្តង**៖
+//     ការសួរទី ១ ➜ true  (seen 6 ➜ 3)
+//     ការសួរទី ២ ➜ false (3 >= 3)  ⟵ ខណៈ resync ដដែលនៅដំណើរការ
+//
+// នោះមិនមែនជាករណីទ្រឹស្តីទេ។ `setupConnectionRecovery()` ចុះឈ្មោះ
+// `retryFailedDbListenersNow()` លើ **ព្រឹត្តិការណ៍ ២** — `online` និង
+// `visibilitychange` — ហើយការដោះសោទូរស័ព្ទដែល WiFi ទើបត្រឡប់មកវិញ បាញ់
+// **ទាំង ២ ក្នុង tick ដដែល**។ ការសួរទី ២ ឃើញ «គ្មានវឌ្ឍនភាព» ➜ ធ្លាក់ទៅ
+// ការពិនិត្យ `DB_LISTENER_RETRY_MIN_GAP_MS` ➜ ក្នុងការ resync យឺត (ដែល
+// `lastDbListenerAttemptAt` ចាស់ជាង ៣ វិ. ស្រាប់) វា **attach ឡើងវិញ** ➜
+// បោះបង់ snapshot ដែលកំពុងទាញចុះមក។ នេះជាថ្នាក់កំហុស 2.19.4 ដដែលបេះបិទ
+// ដែលវិលមកតាមទ្វារផ្សេង។
+//
+// ការកែ៖ កត់ត្រាវឌ្ឍនភាព **នៅកន្លែងដែលវាកើតឡើងពិត** (`noteDbListenerAlive`)
+// ជាត្រាពេលវេលា ➜ ការសួរក្លាយជា idempotent។
+{
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    t.listenerCallbacks.history.errCb(new Error('permission_denied'));
+
+    // ជុំជណ្តើរទី ១ រត់ (attach ឡើងវិញ) ➜ `lastDbListenerAttemptAt` ត្រូវកំណត់
+    t.advance(2000);
+    // រួចរង់ចាំរហូតដល់ការព្យាយាមចុងក្រោយ **ចាស់ជាង** ពិដាន ៣ វិ. ដោយមិនឲ្យ
+    // ជំហានជណ្តើរបន្ទាប់ (៥ វិ.) បាញ់ — បើមិនដូច្នេះ ពិដានល្បឿននឹងលាក់
+    // ថ្នាក់កំហុសនេះ ហើយតេស្តបៃតងក្លែងក្លាយលើ tree មុនកែ។
+    t.advance(4000);
+    // resync កំពុងដើរ ៖ ៣ path ក្នុងចំណោម ៦ មកដល់ហើយ
+    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue'].forEach((p) => {
+        t.listenerCallbacks[p].cb({ val: () => null });
+    });
+    const before = t.log.attached.length;
+
+    // ការដោះសោទូរស័ព្ទ ៖ `online` រួច `visibilitychange` ក្នុង tick ដដែល
+    t.api.retryFailedDbListenersNow();
+    const afterFirst = t.log.attached.length;
+    t.api.retryFailedDbListenersNow();
+    const afterSecond = t.log.attached.length;
+
+    ok('ព្រឹត្តិការណ៍ទី ១ (online) ➜ រង់ចាំ resync ដែលកំពុងដើរ',
+        afterFirst === before, afterFirst - before);
+    ok('⛔ ព្រឹត្តិការណ៍ទី ២ (visibilitychange) ក្នុង tick ដដែល ➜ ក៏ត្រូវរង់ចាំដែរ',
+        afterSecond === before, afterSecond - before);
+
+    // ការសួរច្រើនដងជាប់ៗគ្នា (ឧ. `.info/connected` បាញ់ផង) ក៏មិនត្រូវលេបវាដែរ
+    for (let i = 0; i < 8; i++) t.api.retryFailedDbListenersNow();
+    ok('⛔ ការសួរ ១០ ដងជាប់ៗគ្នា ➜ នៅតែរង់ចាំ (ភស្តុតាងមិនត្រូវលេប)',
+        t.log.attached.length === before, t.log.attached.length - before);
+
+    // resync ដដែលត្រូវ **ចប់បាន** — ការកែនេះជាការរង់ចាំ មិនមែនការទប់ទេ
+    ['dailyPickup', 'history', 'deleted'].forEach((p) => {
+        t.listenerCallbacks[p].cb({ val: () => null });
+    });
+    ok('resync ចប់ ➜ ទង់បរាជ័យរលត់',
+        t.probe().dbListenersFailed === false && t.probe().pending.length === 0,
+        JSON.stringify(t.probe().pending));
+
+    // ⛔ ទិសផ្ទុយ ៖ ការរង់ចាំត្រូវ **ផុតកំណត់** បើ resync ស្លាប់ពិត
+    const t2 = buildContext();
+    t2.api.initDatabaseListeners();
+    t2.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    t2.advance(1000);
+    t2.listenerCallbacks.exchangeRate.cb({ val: () => null });
+    const b2 = t2.log.attached.length;
+    t2.advance(120000);
+    ok('⛔ resync ស្លាប់ពិត ➜ ការរង់ចាំផុតកំណត់ ហើយជណ្តើរ attach ឡើងវិញ',
+        t2.log.attached.length > b2, (t2.log.attached.length - b2) / 6);
 }
 
 // ── ១០ខ១គ. listener `.info/*` ដែលត្រូវបោះបង់ ក៏ត្រូវមានផ្លូវស្តារដែរ ────

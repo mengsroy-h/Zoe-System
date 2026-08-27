@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 
 const STORE_PIN_HASH = 'zoeimport_pin_hash';
 const STORE_PIN_FAILS = 'zoeimport_pin_fail_count';
@@ -13,6 +13,8 @@ const PIN_MAX_FAILS = 5;
 const PIN_LOCKOUT_MS = 60000;
 
 const REQUEST_TIMEOUT_MS = 30000;
+const SW_UPDATE_MIN_GAP_MS = 15 * 60 * 1000;
+const SW_UPDATE_POLL_MS = 30 * 60 * 1000;
 const MAX_IMPORT_ROWS = 20000;
 const PREVIEW_ROWS = 8;
 const HEADER_SCAN_ROWS = 12;
@@ -917,7 +919,23 @@ function revealAppAfterBoot() {
 function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then(() => {}, () => {});
+        navigator.serviceWorker.register('./sw.js').then((reg) => {
+            if (!reg || typeof reg.update !== 'function') return;
+            let lastSwUpdateAt = Date.now();
+            const throttledSwUpdate = () => {
+                if (navigator.onLine === false) return;
+                const now = Date.now();
+                if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
+                lastSwUpdateAt = now;
+                reg.update().catch(() => {});
+            };
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') throttledSwUpdate();
+            });
+            window.addEventListener('focus', throttledSwUpdate);
+            window.addEventListener('online', throttledSwUpdate);
+            setInterval(throttledSwUpdate, SW_UPDATE_POLL_MS);
+        }, () => {});
     });
 }
 
@@ -927,6 +945,10 @@ function boot() {
     bindEvents();
     window.addEventListener('online', renderLinkStatus);
     window.addEventListener('offline', renderLinkStatus);
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        renderLinkStatus();
+    });
     renderLinkStatus();
     registerServiceWorker();
     if (!window.isSecureContext) {

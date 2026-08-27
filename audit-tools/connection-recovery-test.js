@@ -1013,5 +1013,51 @@ function buildContext() {
         /visibilitychange[\s\S]{0,220}nudgeDatabaseConnection\(\)/.test(kg));
 }
 
+// ── ១៣. ការត្រឡប់មក foreground ត្រូវដាស់ **listener** ដែលធ្លាក់ ផងដែរ ────
+// 🔴 ចន្លោះពិត (វាស់បានដោយ mutation ក្នុងជុំ 2.20.3)៖ ការដក
+// `retryFailedDbListenersNow()` ចេញពី handler `visibilitychange` របស់ ZoeW
+// **ឆ្លងកាត់ checker ទាំង ៩៩ ដោយបៃតងទាំងអស់**។ ការអះអាងដែលមានស្រាប់
+// ពិនិត្យតែ `retryFirebaseSdkNow()` និង `nudgeDatabaseConnection()` ប៉ុណ្ណោះ។
+//
+// ⛔ ហេតុអ្វីវាសំខាន់៖ លើទូរស័ព្ទ បណ្តាញដែលត្រឡប់មកវិញ **ជាញឹកញាប់មិនបាញ់
+// `online`** សោះ (`navigator.onLine` នៅ `true` ពេញការដាច់) ➜ ការដោះសោ
+// អេក្រង់ជា **សញ្ញាស្តារដ៏សំខាន់បំផុត**។ បើ handler នោះមិនហៅ
+// `retryFailedDbListenersNow()` ទេ នោះតារាងជាប់ «កំពុងភ្ជាប់ឡើងវិញ...»
+// រហូតដល់ជំហានជណ្តើរបន្ទាប់ (យ៉ាងយូរ ៣០ វិ.)។ នេះជាសេណារីយ៉ូផ្ទៀងផ្ទាត់
+// ទី ១ របស់កំណែ 2.20.1 ក្នុង CLAUDE.md ដោយផ្ទាល់។
+{
+    ok('⛔ ZoeW ៖ `visibilitychange` ដាស់ **listener** ដែលធ្លាក់ (មិនត្រឹមតែ SDK)',
+        /visibilitychange[\s\S]{0,400}?retryFailedDbListenersNow\(\)/.test(SRC),
+        'handler `visibilitychange` មិនហៅ retryFailedDbListenersNow() ➜ ការដោះសោទូរស័ព្ទ '
+        + 'ខណៈ WiFi ត្រឡប់មកវិញ មិនស្តារតារាងទេ');
+    ok('⛔ ZoeW ៖ `online` ក៏ដាស់ listener ដែលធ្លាក់ដែរ',
+        /addEventListener\('online'[\s\S]{0,400}?retryFailedDbListenersNow\(\)/.test(SRC));
+    ok('សញ្ញាស្តារទាំង ២ ត្រូវមានគ្រប់ (online **និង** visibilitychange)',
+        (SRC.match(/retryFailedDbListenersNow\(\);/g) || []).length >= 3,
+        'រំពឹងយ៉ាងតិច ៣ កន្លែងហៅ ៖ .info/connected + online + visibilitychange');
+}
+
+// ── ១៤. ភស្តុតាងវឌ្ឍនភាពត្រូវ reset ពេល attach ជុំថ្មី ────────────────
+// ⛔ CLAUDE.md ចែងច្បាស់៖ «`dbListenerProgressAt` ត្រូវ reset ជា `0` ក្នុង
+// `initDatabaseListeners()` (វឌ្ឍនភាពរបស់ជុំមុន មិនមែនភស្តុតាងអំពីជុំថ្មី)»។
+// ជុំ 2.20.3 វាស់ឃើញថាការដកបន្ទាត់នោះចេញ **ឆ្លងកាត់ checker ទាំង ៩៩** —
+// ច្បាប់នោះរស់នៅតែក្នុងឯកសារ គ្មានឧបករណ៍ចាក់សោទេ។
+//
+// ផលបើភ្លេច៖ ត្រាពេលវេលារបស់ជុំមុនធ្វើឲ្យ `dbListenerResyncIsProgressing()`
+// ត្រឡប់ `true` រហូតដល់ ២០ វិនាទី **ខណៈជុំថ្មីមិនទាន់ទទួលអ្វីសោះ** ➜
+// ជណ្តើរស្តាររង់ចាំដោយផ្អែកលើភស្តុតាងក្លែងក្លាយ។
+{
+    const init = /function initDatabaseListeners\(\)[\s\S]*?if \(dbRefExchangeRate\)/.exec(SRC);
+    const initHead = init ? init[0] : '';
+    ok('ស្រង់ក្បាល initDatabaseListeners() បាន', !!initHead);
+    ok('⛔ `initDatabaseListeners()` reset `dbListenerProgressAt = 0`',
+        /dbListenerProgressAt\s*=\s*0\s*;/.test(initHead),
+        'ភស្តុតាងវឌ្ឍនភាពរបស់ជុំមុនរស់រានចូលជុំថ្មី ➜ ជណ្តើររង់ចាំដោយឥតហេតុផល');
+    ok('⛔ `resetDbListenerHealthState()` ក៏ reset `dbListenerProgressAt` ដែរ',
+        /function resetDbListenerHealthState\(\)[\s\S]*?dbListenerProgressAt\s*=\s*0\s*;/.test(SRC));
+    ok('`dbListenerProgressAt` ត្រូវសរសេរនៅ **កន្លែងដែលវឌ្ឍនភាពកើតឡើង** (noteDbListenerAlive)',
+        /function noteDbListenerAlive\([\s\S]*?dbListenerProgressAt = Date\.now\(\);/.test(SRC));
+}
+
 console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);

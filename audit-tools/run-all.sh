@@ -100,6 +100,7 @@ done
 # ⛔ meta-checker៖ តើ checker ខ្លួនវាពិតជាមើលកូដមែនទេ? (រត់វាមុនគេក្នុងក្រុមនេះ)
 run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "hang-guard (meta)" node audit-tools/hang-guard.js
+run "exit-code-integrity (meta)" node audit-tools/exit-code-integrity.js
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
@@ -233,6 +234,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
+    EXITCODE_APP_DIR="$BASE" node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
     VERSIONSCOPE_APP_DIR="$BASE" node audit-tools/version-bump-scope.js 2>&1 | tail -1 | sed 's/^/   version-scope:   /'
     BOOTANIM_APP_DIR="$BASE" node audit-tools/boot-animation-test.js 2>&1 | tail -1 | sed 's/^/   boot-animation:  /'
     INLINEXSS_APP_DIR="$BASE" node audit-tools/inline-handler-xss-test.js 2>&1 | tail -1 | sed 's/^/   inline-xss:      /'

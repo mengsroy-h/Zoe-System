@@ -98,7 +98,13 @@ function build(mode, opts) {
         __mode: { value: mode }
     };
     ctx.fb = {
-        ref: (d, p) => ({ path: p }),
+        // mode 'throw' ៖ ធ្វើត្រាប់តាម `fb.ref()` ដែលបោះ **ដោយ synchronous**
+        // (ឧ. `Firebase App named [DEFAULT] already deleted` ក្រោយ deleteApp()
+        // ក្នុងផ្លូវស្តារ SDK)។ នេះជាផ្លូវដែលមិនឆ្លងកាត់ `.then(ok, fail)` ទេ។
+        ref: (d, p) => {
+            if (ctx.__mode.value === 'throw') throw new Error('Firebase App named [DEFAULT] already deleted');
+            return { path: p };
+        },
         runTransaction: (ref, updater) => {
             const m = ctx.__mode.value;
             if (m === 'disconnect') return Promise.reject(new Error('disconnect'));
@@ -220,6 +226,74 @@ async function scenario(label, fn) {
         }
         ok('ការដាច់បណ្តាញមិនចេះចប់ ➜ ជួរមិនរីកគ្មានពិដាន',
             vm.runInContext('pendingHistoryPatches.size', ctx) <= 1);
+    });
+
+    // ⛔ ពិដាន **ចំនួនធាតុ** ក្នុងជួរ — ដាច់ដោយឡែកពីពិដានចំនួនព្យាយាម។
+    // ចន្លោះពិត (វាស់ក្នុងជុំ 2.20.3)៖ `HISTORY_PATCH_QUEUE_MAX` ត្រូវបានស្រង់
+    // ចូល sandbox តែ **គ្មានការអះអាងឥរិយាបថណាមួយ** ➜ ការដកការពិនិត្យពិដាន
+    // ចេញពី `queueHistoryPatchRetry()` **ឆ្លងកាត់ checker ទាំងអស់**។
+    // ផលបើបាត់៖ ការដាច់បណ្តាញយូរ + ការសម្គាល់កញ្ចប់ច្រើន ➜ ជួររីកគ្មានពិដាន
+    // ក្នុងសតិ ហើយរាល់ការភ្ជាប់មកវិញបាញ់ transaction ស្របគ្នាតាមទំហំជួរនោះ។
+    // ⚠️ ចំនួនធាតុត្រូវគណនា **ធៀបនឹងពិដានពិត** — ចំនួនថេរដែលតូចជាងពិដាន
+    // នឹងមិនប៉ះវាសោះ ➜ បៃតងក្លែងក្លាយ (កំហុសដែលជុំនេះជួបផ្ទាល់)។
+    await scenario('ពិដានចំនួនធាតុក្នុងជួរ', async () => {
+        const probe = build('disconnect', { server: {}, scanHistory: [] });
+        const cap = vm.runInContext('HISTORY_PATCH_QUEUE_MAX', probe);
+        ok('HISTORY_PATCH_QUEUE_MAX ជាលេខមានពិដានសមហេតុផល',
+            typeof cap === 'number' && cap >= 1 && cap <= 500, cap);
+        const total = cap + 25;
+        const server = {};
+        const scanHistory = [];
+        for (let i = 0; i < total; i++) {
+            server['id' + i] = { id: 'id' + i };
+            scanHistory.push({ id: 'id' + i });
+        }
+        const ctx = build('disconnect', { server: server, scanHistory: scanHistory });
+        for (let i = 0; i < total; i++) {
+            vm.runInContext('markingItemId = "id' + i + '"; setCallMark("no-answer");', ctx);
+            await tick();
+        }
+        const size = vm.runInContext('pendingHistoryPatches.size', ctx);
+        ok('⛔ ធាតុ ' + total + ' ដែលដាច់បណ្តាញ ➜ ជួរឈប់ត្រឹមពិដាន (មិនរីកគ្មានព្រំដែន)',
+            size <= cap, { size: size, cap: cap, total: total });
+        ok('ជួរនៅតែទទួលយកធាតុពិត (ពិដានមិនធ្វើឲ្យវាទទេ)', size > 0, size);
+    });
+
+    // ⛔ ការបោះ **ដោយ synchronous** មិនត្រូវសម្លាប់ជួររហូតដល់ចប់វគ្គ។
+    // 🔴 វាស់បានក្នុងជុំ 2.20.3 លើកូដមុនកែ៖ បើ `patchHistoryItemFields()` បោះ
+    // ដោយ synchronous (ឧ. `fb.ref()` លើ app ដែល `deleteApp()` រួច — ផ្លូវស្តារ
+    // SDK ធ្វើដូចនោះពិត) នោះ៖
+    //   ១. ការបោះនោះឡើងផុតពី `entries.forEach` ➜ `done()` **មិនដែលរត់**
+    //   ២. `historyPatchFlushInFlight` ជាប់ `true` **រហូត** ➜ រាល់ការ flush
+    //      ក្រោយៗទៀតត្រូវបដិសេធនៅបន្ទាត់ទី ១ ➜ ការសម្គាល់ការខល **លែងសម្កាល់
+    //      ទៅ server បានទៀត ពេញវគ្គ** — ជាកំហុសដដែលដែល 2.20.2 សរសេរដើម្បីកែ
+    //   ៣. ធាតុដែលដកចេញពី Map រួច (មុនការព្យាយាម) **បាត់ទាំងស្រុង**
+    // ⚠️ ការអះអាងត្រូវមាន **៣ ខាង** — «មិនបោះ» តែម្យ៉ាងអនុញ្ញាតឲ្យធាតុបាត់។
+    await scenario('ការបោះដោយ synchronous មិនសម្លាប់ជួរ', async () => {
+        const item = { id: 'id1', callMark: 'no-answer' };
+        const ctx = build('throw', { server: { id1: { id: 'id1' } }, scanHistory: [item] });
+        vm.runInContext('pendingHistoryPatches.set("id1", { fields: { isCalled: true }, previousFields: { isCalled: false }, attempts: 0 });', ctx);
+        let escaped = null;
+        try { vm.runInContext('flushPendingHistoryPatches();', ctx); }
+        catch (e) { escaped = (e && e.message) || String(e); }
+        await tick(); await tick();
+        ok('⛔ ការបោះមិនឡើងផុតពី flushPendingHistoryPatches()', escaped === null, escaped);
+        ok('⛔ សោ flush ត្រូវដោះវិញ (មិនជាប់ true រហូត)',
+            vm.runInContext('historyPatchFlushInFlight', ctx) === false);
+        ok('⛔ ធាតុមិនត្រូវបាត់ — ត្រូវត្រឡប់ចូលជួរវិញ',
+            vm.runInContext('pendingHistoryPatches.size', ctx) === 1,
+            vm.runInContext('pendingHistoryPatches.size', ctx));
+        ok('ចំនួនព្យាយាមត្រូវកើនឡើង (មិនរង្វិលជុំគ្មានទីបញ្ចប់)',
+            vm.runInContext('pendingHistoryPatches.get("id1").attempts', ctx) === 1,
+            vm.runInContext('pendingHistoryPatches.get("id1") && pendingHistoryPatches.get("id1").attempts', ctx));
+
+        // ជាន់ទី ២ ៖ ក្រោយបណ្តាញ/SDK ល្អវិញ ការ flush ត្រូវដើរបានពិត
+        ctx.__mode.value = 'ok';
+        vm.runInContext('flushPendingHistoryPatches();', ctx);
+        await tick(); await tick();
+        ok('⛔ ក្រោយ SDK ល្អវិញ ➜ ការ flush ដើរបានពិត (ជួរមិនស្លាប់)',
+            vm.runInContext('pendingHistoryPatches.size', ctx) === 0 && ctx.__server.id1.isCalled === true,
+            { size: vm.runInContext('pendingHistoryPatches.size', ctx), server: ctx.__server.id1 });
     });
 
     // ការអះអាងស្តាទិច ៖ ខ្សែសង្វាក់ត្រូវភ្ជាប់ពិត

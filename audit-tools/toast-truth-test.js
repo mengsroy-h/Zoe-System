@@ -242,6 +242,26 @@ console.log('\n-- ៥. ZoeImport ៖ ស្ថានភាពតំណត្រ�
     ok('ZoeImport ៖ ចាក់សោវិញ ➜ សូចនាករត្រឡប់ទៅ «មិនទាន់ភ្ជាប់»',
         /setLinkState\('idle'\)/.test(sliceFn(js, 'resetSessionState') || ''));
     ok('ZoeImport ៖ toast ចាត់ថ្នាក់តាមសញ្ញាក្នុងសារ', /function toastKindOf\(/.test(js));
+
+    // ⛔ ចន្លោះពិត (វាស់ក្នុងជុំ 2.20.3)៖ ZoeImport គូរសូចនាករឡើងវិញតែពេល
+    // `online`/`offline` បាញ់ប៉ុណ្ណោះ។ ប៉ុន្តែលើទូរស័ព្ទ បណ្តាញដែលត្រឡប់មកវិញ
+    // **ជាញឹកញាប់មិនបាញ់ `online`** សោះ (`navigator.onLine` នៅ `true` ពេញ
+    // ការដាច់) ➜ ការត្រឡប់មក App វិញបង្ហាញ «ក្រៅបណ្ដាញ» ខុស រហូតដល់អ្នកប្រើ
+    // Refresh ដោយដៃ។ ZoeW និង ZoeKeyGen បិទចន្លោះនេះតាំងពី 2.19.3 —
+    // ZoeImport ត្រូវបានទុកចោល។ នេះជាមេរៀនដដែល៖ **ត្រូវអះអាងព្រឹត្តិការណ៍
+    // ដោយផ្ទាល់ លើ App ទាំង ៣ មិនមែនតែ App ដែលកំពុងកែ**។
+    ok('⛔ ZoeImport ៖ ការត្រឡប់មក foreground គូរសូចនាករឡើងវិញ (`online` អាចមិនបាញ់)',
+        /visibilitychange[\s\S]{0,200}?renderLinkStatus\(\)/.test(js),
+        'គ្មាន handler `visibilitychange` ➜ ស្ថានភាពតំណជាប់ខុសរហូតដល់ Refresh');
+
+    // ⛔ ZoeW និង ZoeKeyGen ពិនិត្យកំណែថ្មីតាម `reg.update()` ដែលមានពិដាន;
+    // ZoeImport ចុះឈ្មោះ service worker រួច **មិនពិនិត្យបច្ចុប្បន្នភាពសោះ** ➜
+    // PWA ដែលដំឡើងរួច អាចជាប់នៅកំណែចាស់ដោយគ្មានទីបញ្ចប់។
+    ok('⛔ ZoeImport ៖ ពិនិត្យកំណែថ្មីរបស់ service worker (មានពិដាន)',
+        /reg\.update\(\)/.test(js) && /SW_UPDATE_MIN_GAP_MS/.test(js),
+        'registerServiceWorker() មិនហៅ reg.update() ➜ អ្នកប្រើជាប់នៅកំណែចាស់');
+    ok('ZoeImport ៖ ការពិនិត្យកំណែមិនបាញ់ខណៈក្រៅបណ្ដាញ',
+        /const throttledSwUpdate = \(\) => \{\s*\n\s*if \(navigator\.onLine === false\) return;/.test(js));
 }
 
 // ── ៦. ក្នុង browser ពិត ៖ CSS ពិត + កូដពិត ─────────────────────────

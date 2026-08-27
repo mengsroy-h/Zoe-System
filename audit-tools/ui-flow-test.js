@@ -389,9 +389,18 @@ function seedData() {
             const phoneKey = '0655444333';
             const stillCounted = after.pick.pickedUpPhones && after.pick.pickedUpPhones[phoneKey];
             check(after.serverClosed === false && after.n === 2, 'ZoeW: ស្កេនកញ្ចប់ថ្មី ➜ បញ្ជីបើកវិញ និងមាន ២ កញ្ចប់', JSON.stringify(after));
-            check(!stillCounted,
-                'ZoeW: បញ្ជីបើកវិញដោយការស្កេន ➜ លែងរាប់ជាអតិថិជនយកហើយ',
+            // ⛔ **ប្តូរដោយចេតនាក្នុងកំណែ 2.19.4។** ការ merge ស្កេនបើក item តែ
+            // **មិនប្តូរស្ថានភាព barcode ណាមួយ** — GG1 នៅបិទដដែល។ តាមមូលដ្ឋាន
+            // តែមួយ (barcode បិទ) អតិថិជននោះ **នៅតែជាអតិថិជនដែលយករួច** ព្រោះ
+            // `packagesPickedUp` ក៏នៅរាប់ GG1 ដដែល។ អះអាងចាស់ដកអតិថិជនចេញ
+            // ដោយ**មិនដកកញ្ចប់** ➜ វាចាក់សោការឃ្លាតគ្នាទុកជាឥរិយាបថត្រឹមត្រូវ។
+            const netSum = Object.values(after.pick.pickedUpPhones || {}).reduce((a, b) => a + (parseFloat(b) || 0), 0);
+            check(!!stillCounted,
+                'ZoeW: ការ merge ស្កេនមិនប្តូរ barcode ➜ អតិថិជននៅរាប់ដដែល',
                 'pickedUpPhones=' + JSON.stringify(after.pick.pickedUpPhones) + ' (មុនស្កេន ' + JSON.stringify(pickClosed.pickedUpPhones) + ')');
+            check(netSum === (parseFloat(after.pick.packagesPickedUp) || 0),
+                '⛔ ZoeW: អថេរ ➜ ផលបូក ref === ចំនួនកញ្ចប់ (គ្មានការឃ្លាតគ្នា)',
+                'refSum=' + netSum + ' packages=' + after.pick.packagesPickedUp);
         }
 
         // --- ការកែលេខទូរស័ព្ទ ត្រូវពឹងលើស្ថានភាពពិតរបស់ server ---
@@ -576,14 +585,27 @@ function seedData() {
                 const it = window.__fakeStore.zoew_scan_history_cod_dod.id_pk_b;
                 it.barcodes[1].isClosed = true;
                 const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || { packagesPickedUp: 0, pickedUpPhones: {} };
+                // ⛔ កំណែ 2.19.4៖ ការបិទ barcode ដោយឧបករណ៍ផ្សេង បង្កើន **ទាំង ២**
+                // (មូលដ្ឋានតែមួយ)។ seed ដែលបង្កើនតែកញ្ចប់ ធ្វើឲ្យទិន្នន័យចាប់ផ្តើម
+                // រំលោភអថេរ `sum(refs) === packages` តាំងពីមុនកូដ App រត់ផង។
                 p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
+                p.pickedUpPhones = p.pickedUpPhones || {};
+                p.pickedUpPhones['0912000002'] = (p.pickedUpPhones['0912000002'] || 0) + 1;
                 window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
             }, { dk: seed._dateKey });
             await page.evaluate(() => window.toggleIndividualBarcodeClose('id_pk_b', 'PB1'));
             await page.waitForTimeout(600);
             const refB = await pickRef('0912000002');
             const closedB = await page.evaluate(() => window.__fakeStore.zoew_scan_history_cod_dod.id_pk_b.isClosed);
-            check(closedB === true && refB === 1, app + ': បញ្ជីបិទគ្រប់នៅ server ➜ រាប់អតិថិជនត្រឹមត្រូវ', 'isClosed=' + closedB + ' refCount=' + refB + ' (រំពឹង 1)');
+            // ref រាប់ **barcode បិទ** (PB1 + PB2 = 2) ចំណែក **ចំនួនអតិថិជន** គឺជា
+            // ចំនួនកូនសោ = 1 ព្រោះលេខទូរស័ព្ទតែមួយ។ នេះជាច្បាប់របស់អ្នកប្រើ៖
+            // «លេខ ១ ស្មើអតិថិជន ១ ទោះមានកញ្ចប់ ១០»។
+            const custB = await page.evaluate((a) => Object.keys(
+                (window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || {}).pickedUpPhones || {}
+            ).filter((k) => k === '0912000002').length, { dk: seed._dateKey });
+            check(closedB === true && refB === 2 && custB === 1,
+                app + ': បញ្ជីបិទគ្រប់នៅ server ➜ barcode បិទ ២ តែអតិថិជន ១',
+                'isClosed=' + closedB + ' refCount=' + refB + ' (រំពឹង 2) អតិថិជន=' + custB + ' (រំពឹង 1)');
 
             // គ. ឧបករណ៍ផ្សេងបើក barcode បងប្អូនវិញ ➜ មិនត្រូវទុកអតិថិជនខ្មោច
             await seedPickupItem('id_pk_c', '0912000003', [{ code: 'PC1', cod: 6, isClosed: false }, { code: 'PC2', cod: 7, isClosed: true }]);
@@ -594,7 +616,17 @@ function seedData() {
             await page.waitForTimeout(600);
             const refC = await pickRef('0912000003');
             const closedC = await page.evaluate(() => window.__fakeStore.zoew_scan_history_cod_dod.id_pk_c.isClosed);
-            check(closedC === false && refC === 0, app + ': បញ្ជីមិនទាន់បិទគ្រប់នៅ server ➜ គ្មានអតិថិជនខ្មោច', 'isClosed=' + closedC + ' refCount=' + refC + ' (រំពឹង 0)');
+            // ⛔ **ប្តូរដោយចេតនាក្នុងកំណែ 2.19.4។** PC1 ត្រូវបានបិទពិត ➜ តាមច្បាប់
+            // «អតិថិជន = លេខទូរស័ព្ទដែលមាន barcode បិទ >= ១» លេខនោះ **ជាអតិថិជន
+            // ដែលយករួច** ទោះកញ្ចប់មិនទាន់បិទគ្រប់ក៏ដោយ (`packagesPickedUp` ក៏ +1)។
+            // អ្នកការពារ «អតិថិជនខ្មោច» ពិតគឺ **អថេរ** ខាងក្រោម មិនមែនលេខថេរទេ។
+            const pickCsum = await page.evaluate((a) => {
+                const p = window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] || {};
+                const refs = Object.values(p.pickedUpPhones || {}).reduce((x, y) => x + (parseFloat(y) || 0), 0);
+                return { refs: refs, pkgs: parseFloat(p.packagesPickedUp) || 0 };
+            }, { dk: seed._dateKey });
+            check(closedC === false && refC === 1, app + ': បិទ barcode មួយ ខណៈបងប្អូនបើក ➜ នៅជាអតិថិជនយក', 'isClosed=' + closedC + ' refCount=' + refC + ' (រំពឹង 1)');
+            check(pickCsum.refs === pickCsum.pkgs, app + ': ⛔ អថេរ ➜ ផលបូក ref === ចំនួនកញ្ចប់ (គ្មានអតិថិជនខ្មោច)', JSON.stringify(pickCsum));
         }
 
         // --- ដក / លុប ត្រូវធ្វើការលើច្បាប់ចម្លងរបស់ server មិនមែនច្បាប់ចម្លងក្នុងសតិ ---

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.19.3';
+    const APP_VERSION = '2.19.4';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -3610,6 +3610,14 @@
         return safePhone || ('__item_' + (item && item.id));
     }
 
+    function closedBarcodeCount(item) {
+        if (!item) return 0;
+        if (item.barcodes && Array.isArray(item.barcodes)) {
+            return item.barcodes.filter(b => b && b.isClosed).length;
+        }
+        return item.isClosed ? (parseFloat(item.count) || 1) : 0;
+    }
+
     function countPickedUpCustomers(record) {
         return record && record.pickedUpPhones ? Object.keys(record.pickedUpPhones).length : 0;
     }
@@ -6891,16 +6899,10 @@
         if (existingIndex !== -1) {
             let item = scanHistory[existingIndex];
             const itemSnapshot = { ...item, barcodes: Array.isArray(item.barcodes) ? item.barcodes.map(b => ({ ...b })) : item.barcodes };
-            let reopenedFromClosed = false;
-            let reopenedScanDate = dateString;
-            let reopenedPhoneKey = null;
             let mergeAddedBarcode = false;
 
             const mergeScannedBarcodeInto = (target) => {
                 mergeAddedBarcode = false;
-                reopenedFromClosed = target.isClosed === true;
-                reopenedScanDate = target.scanDate || dateString;
-                reopenedPhoneKey = getPickupPhoneKey(target);
                 normalizeBarcodesOf(target);
                 if (!target.barcodes || !Array.isArray(target.barcodes)) {
                     let oldCod = parseFloat(target.cod !== undefined ? target.cod : target.price) || 0;
@@ -6949,9 +6951,6 @@
                     if (!mergeAddedBarcode) {
                         addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
                         showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
-                    }
-                    if (reopenedFromClosed && reopenedPhoneKey) {
-                        addPickupToDailyRecord(reopenedScanDate, reopenedPhoneKey, -1, 0);
                     }
                 }, (err) => {
                     const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
@@ -7229,11 +7228,7 @@
             const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
-            if (!previousState.itemIsClosed && allClosedLocal) {
-                pickupCustomerDelta = 1;
-            } else if (previousState.itemIsClosed && !allClosedLocal) {
-                pickupCustomerDelta = -1;
-            }
+            pickupCustomerDelta = pickupPackageDelta;
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             openViewListModal(itemId);
@@ -7268,11 +7263,10 @@
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
                 if (!b) return currentItem;
-                const wasItemClosed = !!currentItem.isClosed;
                 serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
+                serverCustomerDelta = serverPackageDelta;
                 applyBarcodeCloseState(b, desiredClosed, getServerNow());
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
-                serverCustomerDelta = (!wasItemClosed && allClosed) ? 1 : ((wasItemClosed && !allClosed) ? -1 : 0);
                 currentItem.isClosed = allClosed;
                 if (allClosed) currentItem.closedAt = getServerNow();
                 else delete currentItem.closedAt;
@@ -7596,30 +7590,34 @@
             const nextPickupKey = getPickupPhoneKey(item);
             const pickupDate = item.scanDate || getFormattedDate();
             let pickupRefMoved = false;
-            if (item.isClosed && prevPickupKey !== nextPickupKey) {
-                addPickupToDailyRecord(pickupDate, prevPickupKey, -1, 0);
-                addPickupToDailyRecord(pickupDate, nextPickupKey, 1, 0);
+            let movedPickupRefs = closedBarcodeCount(item);
+            if (movedPickupRefs > 0 && prevPickupKey !== nextPickupKey) {
+                addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
+                addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
                 pickupRefMoved = true;
             }
             const revertPickupRefMove = () => {
                 if (!pickupRefMoved) return;
                 pickupRefMoved = false;
-                addPickupToDailyRecord(pickupDate, nextPickupKey, -1, 0);
-                addPickupToDailyRecord(pickupDate, prevPickupKey, 1, 0);
+                addPickupToDailyRecord(pickupDate, nextPickupKey, -movedPickupRefs, 0);
+                addPickupToDailyRecord(pickupDate, prevPickupKey, movedPickupRefs, 0);
             };
             let serverWasClosed = null;
+            let serverPickupRefs = 0;
             const reconcilePickupRefWithServer = () => {
                 if (serverWasClosed === null || prevPickupKey === nextPickupKey) return;
-                if (serverWasClosed && !pickupRefMoved) {
-                    addPickupToDailyRecord(pickupDate, prevPickupKey, -1, 0);
-                    addPickupToDailyRecord(pickupDate, nextPickupKey, 1, 0);
+                if (serverPickupRefs > 0 && !pickupRefMoved) {
+                    movedPickupRefs = serverPickupRefs;
+                    addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
+                    addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
                     pickupRefMoved = true;
-                } else if (!serverWasClosed && pickupRefMoved) {
+                } else if (serverPickupRefs <= 0 && pickupRefMoved) {
                     revertPickupRefMove();
                 }
             };
             patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
                 serverWasClosed = !!serverItem.isClosed;
+                serverPickupRefs = closedBarcodeCount(serverItem);
             }).then((saved) => {
                 if (saved) {
                     reconcilePickupRefWithServer();
@@ -7698,7 +7696,7 @@
                 const pickupPackages = parseFloat(freshItem.count) || 1;
                 pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
             }
-            pickupCustomerDelta = alreadyInDesiredState ? 0 : (desiredClosed ? 1 : -1);
+            pickupCustomerDelta = pickupPackageDelta;
             addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             refreshCurrentHistoryView();
@@ -7727,7 +7725,7 @@
                     const serverPackages = parseFloat(currentItem.count) || 1;
                     serverPackageDelta = desiredClosed ? serverPackages : -serverPackages;
                 }
-                serverCustomerDelta = (!!currentItem.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
+                serverCustomerDelta = serverPackageDelta;
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();

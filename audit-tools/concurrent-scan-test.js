@@ -192,10 +192,18 @@ function runScenario2b() {
         const it = server['ord1'];
         ok(it.isClosed === false && it.closedAt === undefined, 'order ត្រូវបានបើកវិញលើ server');
         ok(it.barcodes.length === 2, 'barcode ថ្មីត្រូវបានបន្ថែម', it.barcodes.map((b) => b.code));
-        ok(ctx.pickup.length === 1, 'មានការកែស្ថិតិយកកញ្ចប់តែមួយ', JSON.stringify(ctx.pickup));
-        const p = ctx.pickup[0] || {};
-        ok(p.cust === -1 && p.pkg === 0, 'ដកអតិថិជន ១ ចេញ តែមិនប៉ះចំនួនកញ្ចប់', JSON.stringify(p));
-        ok(p.key === '0977173546', 'ដកចេញពី bucket លេខទូរស័ព្ទត្រឹមត្រូវ', p.key);
+        // ⛔ **ប្តូរដោយចេតនាក្នុងកំណែ 2.19.4។** មុននេះផ្លូវនេះបញ្ចេញ `(-1, 0)` —
+        // ដកអតិថិជន ១ ដោយ **មិនដកកញ្ចប់** ➜ លេខទាំង ២ ឃ្លាតពីគ្នា។ ការ merge
+        // ស្កេនបើក item តែ **មិនប្តូរស្ថានភាព barcode ណាមួយ** ដូច្នេះតាមការ
+        // រាប់តាម barcode (មូលដ្ឋានតែមួយ) ledger **មិនត្រូវប្រែសោះ**។
+        // អះអាងចាស់ចាក់សោការឃ្លាតគ្នាទុកជាឥរិយាបថត្រឹមត្រូវ — វាខុស។
+        ok(ctx.pickup.every((e) => e.cust === e.pkg),
+            '⛔ រាល់ការកែស្ថិតិយក ៖ delta អតិថិជន === delta កញ្ចប់ (មូលដ្ឋានតែមួយ)',
+            JSON.stringify(ctx.pickup));
+        const pickupNet = ctx.pickup.reduce((a, e) => ({ cust: a.cust + e.cust, pkg: a.pkg + e.pkg }), { cust: 0, pkg: 0 });
+        ok(pickupNet.cust === 0 && pickupNet.pkg === 0,
+            'ការ merge ស្កេនមិនប្តូរ barcode ណាមួយ ➜ ស្ថិតិយកមិនប្រែ',
+            JSON.stringify(pickupNet));
         ok(it.barcodes[0].isClosed === true, 'barcode ដែលយកហើយ នៅតែបិទដដែល');
         runScenario3();
     });

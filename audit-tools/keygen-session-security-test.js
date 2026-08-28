@@ -129,6 +129,11 @@ function build(options) {
         __storage: storage
     };
     const ctx = vm.createContext(sandbox);
+    // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+    // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
+    // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
+    vm.runInContext('var appLocalStore = typeof localStorage !== "undefined" ? localStorage : null;'
+        + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', ctx);
     vm.runInContext(realLicenseAppCodeDecl(src), ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
@@ -143,7 +148,7 @@ function build(options) {
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
     vm.runInContext(slice([
-        'safeStoreSet',
+        'safeStoreSet', 'safeStoreGet', 'safeStoreRemove',
         'safeStoreRemove',
         'invalidateSensitiveSession',
         'captureSensitiveSession',

@@ -1,4 +1,7 @@
-const APP_VERSION = '2.19.10';
+const APP_VERSION = '2.19.11';
+
+const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
+const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -270,7 +273,7 @@ function resetFirebaseSdkRetryHealth() {
     clearFirebaseSdkRetry();
     lastFirebaseSdkAttemptAt = 0;
     lastFirebaseSdkReloadAt = 0;
-    safeStoreRemove(sessionStorage, FIREBASE_SDK_RELOAD_KEY);
+    safeStoreRemove(appSessionStore, FIREBASE_SDK_RELOAD_KEY);
 }
 
 function anyModalIsOpen() {
@@ -285,7 +288,7 @@ function anyModalIsOpen() {
 
 function firebaseSdkReloadCount() {
     try {
-        const raw = sessionStorage.getItem(FIREBASE_SDK_RELOAD_KEY);
+        const raw = appSessionStore.getItem(FIREBASE_SDK_RELOAD_KEY);
         return parseInt(raw, 10) || 0;
     } catch (e) {
         return FIREBASE_SDK_RELOAD_MAX;
@@ -301,7 +304,7 @@ function reloadForFirebaseSdk() {
     if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
     if (elapsedSince(lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
     lastFirebaseSdkReloadAt = Date.now();
-    safeStoreSet(sessionStorage, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
+    safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
     window.location.reload();
     return true;
 }
@@ -607,12 +610,16 @@ function clearKeypairOutputs() {
     if (publicOut) publicOut.value = '';
 }
 
+function safeStoreGet(store, key) {
+    try { return store ? store.getItem(key) : null; } catch (e) { return null; }
+}
+
 function safeStoreSet(store, key, value) {
-    try { store.setItem(key, String(value)); return true; } catch (e) { return false; }
+    try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; }
 }
 
 function safeStoreRemove(store, key) {
-    try { store.removeItem(key); return true; } catch (e) { return false; }
+    try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; }
 }
 
 function openModalHelper(id) {
@@ -734,7 +741,7 @@ function attachInfoListeners() {
 }
 
 async function initFirebase() {
-    const savedConfig = localStorage.getItem('zoew_firebase_config');
+    const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     if (!savedConfig) {
         checkPinAndOpenConfig();
         return false;
@@ -818,7 +825,7 @@ let pinTargetAction = null;
 function requestPinBeforeConfig(targetAction, message) {
     pinTargetAction = targetAction || openConfigModal;
     clearPinInputValues();
-    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     if (!savedPin) {
         openModalHelper('pinSetupModal');
     } else {
@@ -865,7 +872,7 @@ async function persistSigningKeyForSession() {
             { name: 'AES-GCM', iv }, sessionKey, new TextEncoder().encode(JSON.stringify(privateKeyJwk))
         );
         if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
-        sessionStorage.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
+        appSessionStore.setItem(SIGNING_KEY_SESSION_STORAGE_KEY, JSON.stringify({ iv: Array.from(iv), data: Array.from(new Uint8Array(cipherBuf)) }));
         showToast('🔒 Signing Key ត្រូវបានចងចាំសម្រាប់ Session នេះ (Encrypted ដោយ PIN)');
     } catch (e) {
         if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk || signingKeySessionKey !== sessionKey) return;
@@ -879,7 +886,7 @@ async function tryRestoreSigningKeyFromSession() {
     const operation = captureSensitiveSession(true);
     const sessionKey = signingKeySessionKey;
     if (!operation || signingPrivateKeyJwk || !sessionKey) return;
-    const raw = sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY);
+    const raw = safeStoreGet(appSessionStore, SIGNING_KEY_SESSION_STORAGE_KEY);
     if (!raw) return;
     try {
         const encObj = JSON.parse(raw);
@@ -896,7 +903,7 @@ async function tryRestoreSigningKeyFromSession() {
         showToast('🔓 Signing Key ត្រូវបានស្ដារមកវិញ!');
     } catch (e) {
         if (!isSensitiveSessionCurrent(operation, true) || signingKeySessionKey !== sessionKey) return;
-        safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
+        safeStoreRemove(appSessionStore, SIGNING_KEY_SESSION_STORAGE_KEY);
         const cb = document.getElementById('rememberSigningKeyCheckbox');
         if (cb) cb.checked = false;
         showToast('⚠️ មិនអាចដោះសោ Signing Key ដែលបានចងចាំបានទេ — សូម Load Key ម្តងទៀត');
@@ -918,7 +925,7 @@ async function saveNewSecurityPin() {
         if (pinGeneration !== sensitiveSessionGeneration) return;
         const derivedKey = await deriveSigningKeySessionKey(pinVal);
         if (pinGeneration !== sensitiveSessionGeneration) return;
-        localStorage.setItem('zoew_security_pin_hash', pinHash);
+        appLocalStore.setItem('zoew_security_pin_hash', pinHash);
         signingKeySessionKey = derivedKey;
     } catch (e) {
         if (pinGeneration !== sensitiveSessionGeneration) return;
@@ -939,9 +946,9 @@ async function verifySecurityPin() {
     const pinIn = document.getElementById('securityPinInput');
     const enteredPin = pinIn ? pinIn.value.trim() : '';
     if (pinIn) pinIn.value = '';
-    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
 
-    const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+    const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
     if (lockoutUntil && Date.now() < lockoutUntil) {
         const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
         alert(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
@@ -953,8 +960,8 @@ async function verifySecurityPin() {
     try {
         if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
             if (pinGeneration !== sensitiveSessionGeneration) return;
-            localStorage.removeItem('zoew_pin_fail_count');
-            localStorage.removeItem('zoew_pin_lockout_until');
+            appLocalStore.removeItem('zoew_pin_fail_count');
+            appLocalStore.removeItem('zoew_pin_lockout_until');
             const derivedKey = await deriveSigningKeySessionKey(enteredPin);
             if (pinGeneration !== sensitiveSessionGeneration) return;
             signingKeySessionKey = derivedKey;
@@ -963,13 +970,13 @@ async function verifySecurityPin() {
             targetAction();
         } else {
             if (pinGeneration !== sensitiveSessionGeneration) return;
-            const failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+            const failCount = (parseInt(appLocalStore.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
             if (failCount >= 5) {
-                localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
-                localStorage.setItem('zoew_pin_fail_count', '0');
+                appLocalStore.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
+                appLocalStore.setItem('zoew_pin_fail_count', '0');
                 alert("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី។");
             } else {
-                localStorage.setItem('zoew_pin_fail_count', failCount.toString());
+                appLocalStore.setItem('zoew_pin_fail_count', failCount.toString());
                 alert("លេខ PIN មិនត្រឹមត្រូវទេ!");
             }
         }
@@ -989,12 +996,12 @@ function isPinFlowPending() {
 
 function requestSessionSigningKeyRestoreIfEligible() {
     if (!isSignedInUiActive || !auth || !auth.currentUser || signingPrivateKeyJwk) return;
-    if (!sessionStorage.getItem(SIGNING_KEY_SESSION_STORAGE_KEY) || isPinFlowPending()) return;
+    if (!safeStoreGet(appSessionStore, SIGNING_KEY_SESSION_STORAGE_KEY) || isPinFlowPending()) return;
     requestPinBeforeConfig(tryRestoreSigningKeyFromSession, 'បញ្ចូល PIN ដើម្បីស្ដារ Signing Key ដែលបានចងចាំពីមុន');
 }
 
 function checkPinAndOpenConfig() {
-    const savedPin = localStorage.getItem('zoew_security_pin_hash');
+    const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
     pinTargetAction = openConfigModal;
     if (!savedPin) openModalHelper('pinSetupModal');
     else requestPinBeforeConfig(openConfigModal);
@@ -1005,7 +1012,7 @@ function openConfigFlow() {
 }
 
 function openConfigModal() {
-    const savedConfig = localStorage.getItem('zoew_firebase_config');
+    const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     if (savedConfig) {
         const cfgInput = document.getElementById('firebaseConfigInput');
         if (cfgInput) cfgInput.value = savedConfig;
@@ -1205,7 +1212,7 @@ function saveFirebaseConfig() {
     }
     const parsed = normalized.config;
     cfgInput.value = JSON.stringify(parsed, null, 2);
-    if (!safeStoreSet(localStorage, 'zoew_firebase_config', JSON.stringify(parsed))) {
+    if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(parsed))) {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
         return;
     }
@@ -1255,7 +1262,7 @@ function showLoginModalWithPrefill() {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    const savedEmail = localStorage.getItem('remembered_email');
+    const savedEmail = safeStoreGet(appLocalStore, 'remembered_email');
     const emailInput = document.getElementById('loginEmailInput');
     const passwordInput = document.getElementById('loginPasswordInput');
     const rememberCb = document.getElementById('rememberMeCheckbox');
@@ -1280,8 +1287,8 @@ async function doLogin() {
         const generationAtLogin = authGeneration;
         await enforceSessionOnlyAuthPersistence();
         const cred = await withTimeout(fb.signInWithEmailAndPassword(auth, email, password), 15000, 'Login timed out');
-        if (rememberCb && rememberCb.checked) localStorage.setItem('remembered_email', email);
-        else localStorage.removeItem('remembered_email');
+        if (rememberCb && rememberCb.checked) appLocalStore.setItem('remembered_email', email);
+        else appLocalStore.removeItem('remembered_email');
         if (authGeneration === generationAtLogin && cred && cred.user) {
             authGeneration++;
             verifyAdminRoleThenProceed(cred.user, authGeneration);
@@ -1299,7 +1306,7 @@ async function doLogin() {
 
 function readDatabaseUrlFromConfig() {
     try {
-        const raw = localStorage.getItem('zoew_firebase_config');
+        const raw = appLocalStore.getItem('zoew_firebase_config');
         if (!raw) return '';
         const cfg = JSON.parse(raw);
         const url = cfg && cfg.databaseURL ? String(cfg.databaseURL) : '';
@@ -1467,11 +1474,11 @@ async function verifyAdminRoleThenProceed(user, myAuthGeneration) {
 const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
 async function attemptAuthStorageRecovery() {
-    if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
+    if (safeStoreGet(appSessionStore, AUTH_STUCK_RECOVERY_FLAG)) {
         showLoginModalWithPrefill();
         return;
     }
-    safeStoreSet(sessionStorage, AUTH_STUCK_RECOVERY_FLAG, '1');
+    safeStoreSet(appSessionStore, AUTH_STUCK_RECOVERY_FLAG, '1');
     try {
         if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
             const dbs = await indexedDB.databases();
@@ -1593,7 +1600,7 @@ function clearSigningKey(silent) {
     signingKeySessionKey = null;
     const input = document.getElementById('privateKeyInput');
     if (input) input.value = '';
-    safeStoreRemove(sessionStorage, SIGNING_KEY_SESSION_STORAGE_KEY);
+    safeStoreRemove(appSessionStore, SIGNING_KEY_SESSION_STORAGE_KEY);
     const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
     if (rememberCb) rememberCb.checked = false;
     isGeneratingKey = false;
@@ -1791,7 +1798,7 @@ let lastGeneratedSetupLink = '';
 function restoreSetupLinkBaseUrl() {
     const urlInput = document.getElementById('setupLinkUrlInput');
     if (!urlInput) return;
-    urlInput.value = localStorage.getItem(SETUP_LINK_URL_KEY) || '';
+    urlInput.value = safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || '';
 }
 
 function generateSetupLink() {
@@ -1818,7 +1825,7 @@ function generateSetupLink() {
     cfgInput.value = JSON.stringify(parsed, null, 2);
     if (normalized.extras.length) showToast('រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
-    safeStoreSet(localStorage, SETUP_LINK_URL_KEY, baseUrl);
+    safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);
 
     let b64;
     try {

@@ -151,6 +151,7 @@ run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
 run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
 run "app-lock (browser ពិត)" node audit-tools/app-lock-test.js
+run "storage-blocked-boot (browser ពិត)" node audit-tools/storage-blocked-boot-test.js
 
 echo
 echo
@@ -287,6 +288,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
     STALLGUARD_APP_DIR="$BASE" node audit-tools/stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   stall-guard:     /'
+    STORAGEBOOT_APP_DIR="$BASE" node audit-tools/storage-blocked-boot-test.js 2>&1 | tail -1 | sed 's/^/   storage-boot:    /'
 fi
 
 echo

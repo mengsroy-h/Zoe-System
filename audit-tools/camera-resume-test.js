@@ -34,7 +34,7 @@ function sliceFn(src, name) {
 
 const src = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 
-const NEEDED = ['resumeScanVideo', 'onScanVideoPause', 'closeModal', 'dismissPhoneModal'];
+const NEEDED = ['resumeScanVideo', 'onScanVideoPause', 'closeModal', 'dismissPhoneModal', 'requestCameraPermission'];
 NEEDED.forEach((n) => ok('រកឃើញ ' + n + '() ក្នុង app.js', !!sliceFn(src, n)));
 if (NEEDED.some((n) => !sliceFn(src, n))) {
     console.log('\n❌ ធ្លាក់ ' + (fail || 1));
@@ -86,11 +86,82 @@ function buildContext(opts) {
     });
     vm.runInContext('currentStream = ' + (opts.stream === false ? 'null' : '{}') + ';', ctx);
     vm.runInContext('isCameraScanning = ' + (opts.scanning === false ? 'false' : 'true') + ';', ctx);
-    NEEDED.forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
+    NEEDED.filter((n) => n !== 'requestCameraPermission').forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
     return ctx;
 }
 
 const flush = (ctx) => ctx.timers.forEach((t, i) => { if (t) { ctx.timers[i] = null; t.fn(); } });
+
+// ⛔ ថ្នាក់កំហុស៖ **`navigator.mediaDevices` អវត្តមាន ➜ កាមេរ៉ាលែងបើកបាន
+// ពេញវគ្គ ដោយស្ងាត់។**
+//
+// `requestCameraPermission()` ដាក់ `isCameraStarting = true` **មុន** ហៅ
+// `navigator.mediaDevices.getUserMedia(...)`។ ពេល `mediaDevices` ជា
+// `undefined` (បរិបទមិន secure · WKWebView ក្នុង app ខ្លះ · browser ចាស់)
+// នោះ **`TypeError` បោះ *synchronously*** — មុន promise ត្រូវបង្កើតផង។
+// ⛔ `.catch(err => { isCameraStarting = false; … })` នៅចុង chain
+// **ចាប់តែ promise rejection** ➜ វា **មិនចាប់ TypeError នោះទេ** ➜
+// `isCameraStarting` ជាប់ `true` ជារៀងរហូត ➜ ការចុចប៊ូតុងកាមេរ៉ាលើកក្រោយ
+// ត្រូវ `if (isCameraStarting) return;` ច្រានចេញ **ដោយស្ងាត់** ➜
+// អ្នកប្រើឃើញប៊ូតុងមិនឆ្លើយតប គ្មានសារ គ្មានហេតុផល រហូតបិទបើក App។
+//
+// នេះជាថ្នាក់ «សំណួរទី ៩» ៖ dependency អាចបរាជ័យក្នុង **របៀបផ្សេងគ្នា** —
+// ការបដិសេធសិទ្ធិ (promise reject — គ្របរួច) ធៀបនឹង **អវត្តមានទាំងស្រុង**
+// (synchronous throw — មិនទាន់គ្រប)។
+console.log('\n=== ⛔ `navigator.mediaDevices` អវត្តមាន (បរិបទមិន secure) ===');
+{
+    const camSrc = sliceFn(src, 'requestCameraPermission');
+    ok('រកឃើញ requestCameraPermission() ក្នុង app.js', !!camSrc);
+    if (camSrc) {
+        function buildCam(opts) {
+            const toasts = [];
+            const ctx = {
+                console: { error: () => {}, log: () => {} },
+                Promise: Promise, Error: Error, Object: Object, String: String, Math: Math,
+                setTimeout: () => 1, clearTimeout: () => {},
+                navigator: opts.noMediaDevices ? {} : {
+                    mediaDevices: { getUserMedia: () => Promise.reject(Object.assign(new Error('denied'), { name: 'NotAllowedError' })) }
+                },
+                document: { getElementById: () => null, querySelectorAll: () => [] },
+                window: {},
+                noteAppLockExcuse: () => {},
+                stopCurrentStream: () => {},
+                showToast: (m) => toasts.push(String(m)),
+                setupTrackCapabilities: () => {},
+                showCameraClosedBox: () => {},
+                startFastNativeScan: () => {}, startZxingVideoScan: () => {},
+                alert: (m) => toasts.push(String(m)),
+                __toasts: toasts
+            };
+            ctx.globalThis = ctx;
+            vm.createContext(ctx);
+            ['isCameraStarting', 'cameraRequestId', 'currentStream', 'isCameraScanning',
+             'nativeDetector', 'liveScanCodeReader', 'pendingLoadedMetadataHandler'].forEach((n) => {
+                const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+                vm.runInContext(decl || ('let ' + n + ';'), ctx);
+            });
+            vm.runInContext(camSrc, ctx);
+            return ctx;
+        }
+
+        // ⛔ ខាងអវិជ្ជមាន ៖ mediaDevices អវត្តមាន
+        const gone = buildCam({ noMediaDevices: true });
+        let threw = null;
+        try { vm.runInContext('requestCameraPermission();', gone); } catch (e) { threw = e && e.message; }
+        ok('⛔ `mediaDevices` អវត្តមាន ➜ **មិនបោះចេញក្រៅ**', threw === null, threw);
+        ok('⛔ ហើយ `isCameraStarting` ត្រូវដោះវិញ (បើអត់ ➜ កាមេរ៉ាលែងបើកបានពេញវគ្គ)',
+            vm.runInContext('isCameraStarting', gone) === false,
+            'isCameraStarting=' + vm.runInContext('isCameraStarting', gone));
+        ok('⛔ ហើយអ្នកប្រើត្រូវឃើញមូលហេតុពិត (មិនស្ងាត់)',
+            gone.__toasts.length >= 1, gone.__toasts);
+
+        // ⛔ ទិសផ្ទុយ ៖ mediaDevices មាន តែសិទ្ធិត្រូវបដិសេធ ➜ ផ្លូវចាស់ត្រូវនៅដដែល
+        const denied = buildCam({});
+        let threw2 = null;
+        try { vm.runInContext('requestCameraPermission();', denied); } catch (e) { threw2 = e && e.message; }
+        ok('⛔ ទិសផ្ទុយ ៖ mediaDevices មាន ➜ ផ្លូវសំណើដើរធម្មតា (មិនបោះ)', threw2 === null, threw2);
+    }
+}
 
 console.log('\n=== ✖ លើប្រអប់លេខទូរស័ព្ទ (iOS ផ្អាកវីដេអូដោយសារ confirm()) ===');
 

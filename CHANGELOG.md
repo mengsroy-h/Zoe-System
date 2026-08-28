@@ -25,6 +25,103 @@
 
 ---
 
+## [2.22.5] — 2026-08-28 · ជុំ deep audit ៖ storage ដែលត្រូវបិទ · កាមេរ៉ាដែលអវត្តមាន
+
+**ZoeW** (`2.22.4` ➜ `2.22.5`, `zoew-v125` ➜ `zoew-v126`)។
+**ZoeKeyGen** (`2.19.10` ➜ `2.19.11`, `zoekeygen-v80` ➜ `zoekeygen-v81`) —
+វាមានផ្លូវ storage ដដែល។
+
+⛔ **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មសោះ** (លុប/ដក · ធុងសំរាម · ការសម្អាត ·
+ស្ថិតិយក · `isDeducted`) និង **មិនប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ ·
+ទម្រង់បង្ហាញ**។
+
+### កែកំហុស — App ដាច់ទាំងស្រុងពេល browser បិទ site data
+
+**រន្ធធ្ងន់បំផុតនៃជុំនេះ។** ពេលអ្នកប្រើ (ឬ policy) បិទ site data ទាំងស្រុង —
+Chrome «Block all cookies» · Firefox strict · policy សហគ្រាស — នោះការប៉ះ
+`window.localStorage` **ខ្លួនវា** បោះ `SecurityError`។ ហើយ `app.js` អានវា
+**កម្រិត top-level** ៖
+
+```js
+let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
+```
+
+កូដ top-level ដែលបោះ **បញ្ឈប់ការវាយតម្លៃឯកសារទាំងមូល** ➜ អ្វីៗខាងក្រោមវា
+មិនរត់សោះ ៖ `initAppLock()` · `window.addEventListener('load')` ដែលហៅ
+`initFirebase()` · `revealAppAfterBoot()`។
+
+**វាស់បានក្នុង Chromium ពិត** ៖
+
+| | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| ផ្ទាំង boot | **ជាប់រហូត** | ✅ បាត់ធម្មតា |
+| កំហុស runtime | **១** | ✅ **០** |
+| ខ្លឹមសារលើអេក្រង់ (ZoeW) | ~១០០ តួ (navbar តែម្យ៉ាង) | ✅ **៦២៨ តួ** |
+| ខ្លឹមសារ (ZoeKeyGen) | ៥៥ តួ | ✅ **១៥៣ តួ** |
+
+⚠️ **អន្ទាក់នៃការវិនិច្ឆ័យ** ៖ **function declaration ត្រូវ hoist** ➜
+`typeof sanitizeInput === 'function'` ត្រឡប់ `true` ទោះឯកសារធ្លាក់ត្រង់
+បន្ទាត់ដំបូង ➜ ការសួរ «តើ function មានទេ?» **បង្ហាញថាធម្មតា** ខណៈ App ស្លាប់។
+
+**ការកែ** ៖ shim `appLocalStore` / `appSessionStore` ដែលអាន
+`window.localStorage` **ក្នុង `try` តែម្តង** នៅដើមឯកសារ បូក `safeStoreGet()`
+ថ្មី ហើយ helper ទាំង ៣ ឥឡូវ **ទ្រាំនឹង `null` store**។ ការហៅ storage
+**ទាំង ១០៥ កន្លែង** (ZoeW 75 · ZoeKeyGen 30) ឆ្លងកាត់ helper។
+
+⛔ **ហេតុអ្វី `safeStoreSet(localStorage, …)` ដែលមានស្រាប់មិនគ្រប់គ្រាន់** ៖
+argument វាយតម្លៃ **មុន** ចូល function ➜ បើ getter ជាអ្នកបោះ នោះការហៅ
+បោះ **នៅកន្លែងហៅ** មិនមែនក្នុង `try` របស់ helper ទេ។ វាស់បានពិត។
+
+### កែកំហុស — កាមេរ៉ាលែងបើកបានពេញវគ្គដោយស្ងាត់
+
+`requestCameraPermission()` ដាក់ `isCameraStarting = true` **មុន** ហៅ
+`navigator.mediaDevices.getUserMedia(...)`។ ពេល `mediaDevices` ជា
+`undefined` (បរិបទមិន secure · WKWebView ក្នុង app ខ្លះ) នោះ **`TypeError`
+បោះ *synchronously*** — មុន promise ត្រូវបង្កើតផង ➜
+`.catch(err => { isCameraStarting = false; … })` **មិនចាប់វាទេ** ➜ ទង់ជាប់
+`true` ជារៀងរហូត ➜ ការចុចប៊ូតុងកាមេរ៉ាលើកក្រោយត្រូវច្រានចេញ **ដោយស្ងាត់**។
+
+ឥឡូវមានការពិនិត្យវត្តមានជាមុន ហើយសារប្រាប់មូលហេតុពិត ៖ «កម្មវិធីរុករកនេះ
+មិនអនុញ្ញាតឲ្យប្រើកាមេរ៉ាទេ — សូមបើកតាម HTTPS ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូល
+ដោយដៃ»។ ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ ការបដិសេធសិទ្ធិ (promise reject)
+នៅដើរតាមផ្លូវចាស់ដដែល។
+
+### ឧបករណ៍ audit — ជួសជុលឲ្យសុក្រឹត្យ
+
+**`storage-guard.js` មានចន្លោះ ៤ ដែលបិទក្នុងជុំនេះ** ៖
+
+| ចន្លោះ | អ្វីដែលរអិលកាត់ |
+|---|---|
+| គ្រប **តែការសរសេរ** | `getItem` ក៏បោះដែរ — ហើយធ្ងន់ជាង (top-level ➜ App ដាច់) |
+| ស្កេន **តែ `app.js`** | `boot-flags.js` (script **ដំបូងគេក្នុង `<head>`**) · `license-verify.js` · `error-reporting.js` · `sw.js` មិនដែលពិនិត្យ |
+| ចាប់ **តែ Identifier** | `window.localStorage.x()` ជា MemberExpression ➜ **មើលមិនឃើញ** |
+| ចាប់ **តែការហៅ method** | ⛔ **ការប៉ះ `window.localStorage` ខ្លួនវាក៏បោះដែរ** (វាជា getter) ➜ `const s = window.localStorage;` ក្រៅ try រអិលកាត់ |
+| **parse error ➜ រំលងស្ងាត់** | ឯកសារ ship ដែល parse មិនបាន (កូដខូចពិត) ➜ checker រាយ ✅ |
+
+បូក **ជាន់អប្បបរមាទី ២** ៖ ចំនួន **ឯកសារ** ដែលស្កេន (>= ៦)។ ជាន់ដែលរាប់តែ
+«ចំនួនការហៅ» មិនគ្រប់គ្រាន់ទេ — វាស់បាន ៖ ការជំនួសឈ្មោះ ៧៥ កន្លែងធ្វើឲ្យ
+checker រាយ `0` ខណៈការហៅផ្ទាល់ **៣០ នៅដដែល**។
+
+**`storage-blocked-boot-test.js` ថ្មី** (១៨ assertion) — checker **ឥរិយាបថ**
+ដែលបិទ storage ពិតក្នុង Chromium រួចវាស់ថា App boot បានទេ។ វាគ្រប **របៀប
+បរាជ័យ ២** ៖ getter បោះ (browser ទំនើប) និង method បោះ (Private Mode ចាស់)
+បូក **ទិសផ្ទុយ** (storage ធម្មតា)។ **ធ្លាក់ ៩ លើ `origin/main`**។
+
+**`camera-resume-test.js`** — បន្ថែម ៤ assertion សម្រាប់ `mediaDevices`
+អវត្តមាន (មិនបោះ · ទង់ត្រូវដោះ · អ្នកប្រើឃើញមូលហេតុ · ទិសផ្ទុយ)។
+
+**sandbox របស់ checker ១១ ត្រូវធ្វើបច្ចុប្បន្នភាព** — ការប្តូរផ្លូវចូលប្រើ
+storage ធ្វើឲ្យពួកវាធ្លាក់ភ្លាមដោយ `ReferenceError`។ ⛔ **នោះជាសញ្ញាល្អ** ៖
+វាបញ្ជាក់ថា checker ទាំងនោះ **ពិតជារត់កូដ ship ពិត** មិនមែនច្បាប់ចម្លងទេ។
+ការចាក់ shim ប្រើ `typeof … === 'undefined'` ➜ **កូដពិតដែលស្រង់ចូលក្រោយ
+ឈ្នះជានិច្ច** (shim មិនលាក់កំហុសពិត)។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មាន** — Firebase rules មិនប្រែសោះ ហើយ CSP ក៏មិនប្រែដែរ។
+
+---
+
 ## [2.22.4] — 2026-08-28 · ជុំ deep audit ៖ ការរង់ចាំគ្មានពិដាន · មាត្រដ្ឋានថេប្លេត
 
 **ZoeW** (`2.22.3` ➜ `2.22.4`, `zoew-v124` ➜ `zoew-v125`)។

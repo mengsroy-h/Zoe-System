@@ -133,13 +133,18 @@ function makeEnv(opts) {
     };
 
     const ctx = vm.createContext(sandbox);
+    // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+    // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
+    // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
+    vm.runInContext('var appLocalStore = typeof localStorage !== "undefined" ? localStorage : null;'
+        + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', ctx);
     vm.runInContext('let lookupSecretKey = null; let pinTargetAction = null; let isVerifyingPin = false;', ctx);
     vm.runInContext('let appLockExcuseAt = 0;', ctx);
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_STORAGE_KEY'), ctx);
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_PRF_SALT'), ctx);
     vm.runInContext('let biometricUnlockInFlight = false;', ctx);
     [
-        'safeStoreSet', 'safeStoreRemove',
+        'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricLabel', 'setBiometricBusy',

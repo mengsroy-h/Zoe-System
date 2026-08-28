@@ -148,6 +148,7 @@ run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
+run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
 
 echo
 echo
@@ -281,6 +282,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     STORAGE_APP_DIR="$BASE" node audit-tools/storage-guard.js 2>&1 | tail -1 | sed 's/^/   storage-guard:   /'
     TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
+    SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
 fi
 
 echo

@@ -206,6 +206,7 @@
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
+| **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
 ### ⛔ ស្ថិតិ «យក» ៖ អតិថិជន និងកញ្ចប់ ត្រូវរាប់លើ **មូលដ្ឋានតែមួយ** — កំណែ 2.19.4
@@ -239,6 +240,65 @@ item លែងបិទពេញ **ដោយមិនបញ្ចេញ delta** 
 ត្រូវអះអាង **ការផ្តល់តម្លៃ** និង **ឥរិយាបថ** ជំនួស។
 
 Test៖ **`pickup-ledger-test.js`** (13 assertion, ធ្លាក់ ៦ លើ tree មុនកែ)។
+
+### ⛔ «នាំចូល Excel ទៅ Sheet» ក្នុង ZoeW — កំណែ 2.21.0
+
+> **សំណើអ្នកប្រើ (2026-08-28)**៖ *«ខ្ចិលប្រើ app ២ ចង់អោយវាមានតែ ១ ដោយមុខងារ
+> Imports to sheet នោះដាក់ក្នុង menu Setting ហើយពេលប្រើមុខងារហ្នឹងត្រូវដាក់ pin»*។
+
+ខ្សែសង្វាក់នាំចូលរបស់ `ZoeImport` ត្រូវបានចម្លងចូល **ZoeW ផ្ទាល់** ជាប្រអប់
+`sheetImportModal` ដែលបើកពីរបា Slide ⚙️ ➜ «📥 នាំចូល Excel ទៅ Sheet»។
+⛔ **App `ZoeImport` នៅដដែល មិនត្រូវបានលុបទេ** — វានៅ deploy ហើយនៅដំណើរការ។
+
+**ច្បាប់ដែលមិនអាចរំលងបាន៖**
+
+- **ផ្លូវតែមួយទៅប្រអប់គឺ PIN** — `drawerSheetImportFlow()` ➜
+  `requestPinBeforeConfig(openSheetImportModal, 'sheetImport')`។
+  ⛔ **`openSheetImportModal` មិនត្រូវដាក់ក្នុង `ACTION_ALLOWLIST` ឡើយ** —
+  បើដាក់ នោះ `data-act` ណាមួយអាចបើកការសរសេរចូល Google Sheet របស់អាជីវកម្ម
+  ដោយរំលង PIN។ `sheet-import-test.js` អះអាងទាំង ២ ខាង។
+- ⛔ **សំណើត្រូវជា *simple request* ជានិច្ច** — `callSheetImportApi()` ប្រើ
+  `Content-Type: text/plain;charset=utf-8` ហើយ **គ្មាន header ផ្ទាល់ខ្លួន**។
+  នេះជាថ្នាក់កំហុសដដែលនឹងផ្នែក «ZoeImport និង zto-import» ខាងក្រោម ៖
+  Apps Script **មិនឆ្លើយ `OPTIONS`** ➜ `Authorization` · `X-…` ឬ
+  `application/json` កេះ preflight ➜ **ការនាំចូលស្លាប់ទាំងស្រុងលើផលិតកម្ម
+  ខណៈតេស្តដែល stub `fetch` ជោគជ័យទាំងអស់**។ `sheet-import-test.js` វាស់
+  **header ពិតដែល browser ពិតផ្ញើ** មិនមែនអានកូដទេ។
+- **រាល់សំណើឆ្លងកាត់ `fetchWithTimeout()`** (ពិដាន ៣០ វិ. ជាមួយ
+  `AbortController` ពិត) ហើយ `navigator.onLine === false` ➜ **មិនបាញ់សំណើសោះ**។
+- **ការតភ្ជាប់អ៊ិនគ្រីបដោយ Security PIN របស់ ZoeW** — កូនសោ AES-GCM derive
+  ដោយ PBKDF2 (salt **`zoew_sheet_import_secret_v1`**, ១៥០,០០០ ជុំ) ហើយ
+  រក្សាទុកក្រោមកូនសោ **`zoew_sheet_import_config`**។ ⛔ **Salt ទាំង ២ ត្រូវ
+  រក្សាដដែល** — ការប្តូរវាធ្វើឲ្យការតភ្ជាប់ដែលរក្សាទុករួចលើឧបករណ៍ទាំងអស់ខូច។
+  ⛔ វាជា **កូនសោដាច់ដោយឡែក** ពី `lookupSecretKey`
+  (`zoeadmin_lookup_api_secret_v1`) — កុំយកទៅច្រឡំគ្នា។
+- ⛔ **«ស្រាយមិនបាន» ≠ «ខុស»** (មេរៀន 2.17.4 អនុវត្តលើអ័ក្សនេះដែរ) ៖ PIN ខុស
+  ➜ ស្រាយមិនបាន ➜ បង្ហាញទម្រង់កំណត់ការតភ្ជាប់វិញ **តែ *មិនលុប* record**។
+  `openSheetImportModal()` ត្រូវគ្មាន `removeItem`/`safeStoreRemove` សោះ។
+- **ចាកចេញ ➜ គ្មានអ្វីសល់** — `clearSensitiveModalFields()` ត្រូវហៅ
+  `clearSheetImportSession()` ដែលលុបកូនសោ AES · URL · ពាក្យសម្ងាត់ ·
+  workbook · តារាងមើលជាមុន · គោលដៅ Sheet។ ⛔ **ការតភ្ជាប់ដែលអ៊ិនគ្រីបនៅដដែល**
+  (ចូលវិញមិនបាច់កំណត់ថ្មី) — តេស្តអះអាង **២ ខាង**។
+- **ក្រោយនាំចូល ឬសម្អាតចប់ ➜ `clearCustomerDataTableCache()`** ព្រោះ Sheet
+  ដដែលនោះជាប្រភពរបស់ Lookup API ➜ បើមិនសម្អាត cache នោះការស្កេនបន្ទាប់
+  បំពេញតម្លៃ **ចាស់** រហូតដល់ ៥ នាទី។
+- **XLSX ផ្ទុកយឺតតាម `loadScriptOnce('xlsx')`** ដដែលនឹងផ្លូវ Export —
+  វាស្ថិតក្នុង `OPTIONAL_SHELL` របស់ `sw.js` រួចហើយ ហើយ CSP `script-src 'self'`
+  គ្របវា។ ⛔ កុំបន្ថែម CDN។
+- **CSP និង Firebase rules មិនប្រែសោះ** — `connect-src` មាន
+  `https://script.google.com` រួចស្រាប់សម្រាប់ Lookup API។
+- ⛔ **ការតភ្ជាប់របស់ `ZoeImport` មិនផ្ទេរមកទេ** — វាអ៊ិនគ្រីបដោយ PIN ផ្សេង
+  (`zoeimport_pin_verify_v1` ≠ `zoeadmin_pin_verify_v2`)។ អ្នកប្រើត្រូវវាយ
+  URL និងពាក្យសម្ងាត់ម្តងក្នុង ZoeW។ នេះជាការទទួលយកដោយចេតនា។
+
+⚠️ **មេរៀនអំពីឧបករណ៍**៖ `sheet-import-test.js` រុំ **ជំហាននីមួយៗ** ដោយ
+`group()` ផ្ទាល់ខ្លួន។ ជំនាន់ដំបូងប្រើ `try` តែមួយគ្របទាំងអស់ ➜ លើ
+`origin/main` ការ click ដំបូងផុតកំណត់ ➜ **ការអះអាង ២៥ ក្រោយវាមិនដែលរត់សោះ**
+➜ របាយការណ៍បង្ហាញ «browser បោះកំហុស» តែមួយជំនួសឲ្យ **៣៤ ការធ្លាក់ដែលមានឈ្មោះ**។
+នោះជាថ្នាក់ដដែលនឹងផ្នែក ៣ របស់ `checker-coverage.js` («កុំបញ្ឈប់ checker ➜
+ត្រូវ stub ជំនួស»)។
+
+Test៖ **`sheet-import-test.js`** (៧៣ assertion; ធ្លាក់ **៣៤** លើ `origin/main`)។
 
 ### ⛔ Reset ស្ថិតិ «យក» ៖ node ត្រូវ **នៅមាន** ជាមួយ `0` — កំណែ 2.20.0
 
@@ -2815,6 +2875,7 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 | ការងារបណ្តាញស្រេចចិត្តមិនសម្របតាម 2G/Data Saver | `adaptive-link-test.js` |
 | ការសម្គាល់ការខលបាត់ ព្រោះតំណ `tel:` ផ្អាក App កណ្តាល transaction | `history-patch-retry-test.js` |
 | ការទាញតារាងអតិថិជនធ្លាក់ ➜ រាល់ការស្កេនឆ្លងបណ្តាញ ១៥ នាទី · ការព្យាយាមវិញជាន់ការស្កេន | `lookup-prefetch-test.js` |
+| **នាំចូល Excel ➜ Sheet** ៖ រំលង PIN · preflight `OPTIONS` សម្លាប់ការនាំចូល · secret ជាអក្សរធម្មតា · toast កុហក | `sheet-import-test.js` |
 | `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |
 | ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយស៊ីកូតាការតភ្ជាប់អស់ ➜ សំណើចាំបាច់ចេញមិនបាន | `sw-revalidate-pressure-test.js` |
 | ចលនា boot + **ធនធានឆ្លង origin ក្នុង `<head>` ដែលទប់ការគូរ** | `boot-animation-test.js` |

@@ -59,14 +59,18 @@ function sliceFn(name) {
 }
 
 const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry',
-    'flushPendingHistoryPatches', 'handleCallAction', 'setCallMark'];
+    'flushPendingHistoryPatches', 'handleCallAction', 'setCallMark',
+    // «📞 ខល» ជាការចាកចេញពី App ដោយចេតនា ➜ វាលើកលែងការចាក់សោ (កំណែ 2.22.1)។
+    // ⛔ ចាក់ **កូដពិត** មិនមែន stub ទទេ — បើ stub នោះស្នាមភ្ជាប់នេះគ្មានតេស្តសោះ។
+    'noteAppLockExcuse'];
 const src = {};
 FNS.forEach((n) => {
     src[n] = sliceFn(n);
     ok('រកឃើញ function ' + n + '()', !!src[n]);
 });
 
-const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight'];
+const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
+    'appLockExcuseAt'];
 const decls = [];
 DECLS.forEach((n) => {
     const m = SRC.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm'));

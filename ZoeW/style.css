@@ -815,8 +815,14 @@
         .price-stack { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
         .price-figures { min-width: 0; }
         .phone-title { font-size: calc(11 * var(--fs-unit)); font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .cust-badge-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+        .price-sum-line { font-size: calc(10 * var(--fs-unit)); font-weight: 700; color: var(--text-main); margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--border-color); }
+        .bc-head-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font-size: calc(11 * var(--fs-unit)); }
+        .bc-time-line { font-size: calc(9 * var(--fs-unit)); color: var(--text-muted); margin-top: 4px; }
+        .bc-money-line { font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); margin-top: 2px; }
+        .bc-sum-line { font-size: calc(9.5 * var(--fs-unit)); font-weight: 700; color: var(--text-main); margin-top: 3px; padding-top: 3px; border-top: 1px dashed var(--border-color); }
         .barcode-tag { display: inline-block; background: var(--accent-blue-light); color: var(--accent-blue); padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: calc(9 * var(--fs-unit)); width: fit-content; }
-        .scan-time-tag { font-size: calc(9 * var(--fs-unit)); color: var(--text-muted); font-weight: 500; }
+        .scan-time-tag { font-size: calc(8.5 * var(--fs-unit)); color: var(--text-muted); font-weight: 500; }
         .count-badge { background: var(--primary-light); color: var(--primary); padding: 2px 6px; border-radius: 6px; font-weight: 700; font-size: calc(9.5 * var(--fs-unit)); display: inline-block; text-align: center; width: fit-content; }
         .locker-badge { background: #ede9fe; color: #7c3aed; padding: 2px 6px; border-radius: 6px; font-weight: 700; font-size: calc(9.5 * var(--fs-unit)); display: inline-block; text-align: center; width: fit-content; border: 1px solid #ddd6fe; }
         .btn-view-list { background: #e0f2fe; color: #0288d1; border: 1px solid #7dd3fc; padding: 2px 6px; border-radius: 4px; font-size: calc(9 * var(--fs-unit)); font-weight: 700; cursor: pointer; margin-top: 2px; display: inline-flex; align-items: center; gap: 3px; width: fit-content; }

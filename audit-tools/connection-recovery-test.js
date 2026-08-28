@@ -37,6 +37,13 @@ function sliceConst(name) {
 const RESYNC_GUARD = sliceFn('dbListenerResyncIsProgressing') ||
     'function dbListenerResyncIsProgressing() { return false; }';
 
+// ⛔ `elapsedSince()` ជាមូលដ្ឋាននៃរាល់ពិដានល្បឿន (កំណែ 2.20.7) ➜ sandbox
+// ត្រូវផ្ទុក **helper ពិត** ដើម្បីវាស់ឥរិយាបថពិត។ tree ដែលមិនទាន់មានវា
+// ទទួល stub ដែលរក្សាឥរិយាបថចាស់ (ដក ត្រង់ៗ) ➜ ការអះអាងធ្លាក់ដោយ
+// ហេតុផលរបស់វា មិនមែនដោយ ReferenceError។
+const ELAPSED_HELPER = sliceFn('elapsedSince') ||
+    'function elapsedSince(mark) { return Date.now() - mark; }';
+
 // ── ០. ការអះអាងឥរិយាបថស្នូល — រត់បានលើ tree មុនកែផងដែរ ─────────────
 // listener ដែល Firebase បោះបង់ (permission_denied ជាដើម) **មិនត្រូវត្រឡប់មក
 // វិញដោយខ្លួនឯងទេ**។ បើ App នៅអះអាងថា «ភ្ជាប់ Server រួចរាល់» ក្រោយពេលនោះ
@@ -62,7 +69,7 @@ const RESYNC_GUARD = sliceFn('dbListenerResyncIsProgressing') ||
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners'
-        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD;
+        ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         const src = 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
             'let dbListenerRecoveryAttempt = 0;\n' +
@@ -214,7 +221,7 @@ function buildContext() {
 
     const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
-        REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' +
+        REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' + ELAPSED_HELPER + '\n' +
         "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
         "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
         'let dbListenersFailed = false;\n' +
@@ -783,6 +790,8 @@ function buildContext() {
             pick('safeStoreSet') || '', pick('safeStoreRemove') || '',
             pick('anyModalIsOpen') || '', pick('firebaseSdkReloadCount') || '',
             pick('reloadForFirebaseSdk') || '', pick('recoverFirebaseSdk') || '',
+            // ពិដានល្បឿនឥឡូវឆ្លងកាត់ `elapsedSince()` (2.20.7) — ត្រូវផ្ទុក helper ពិត
+            pick('elapsedSince') || 'function elapsedSince(mark) { return Date.now() - mark; }',
             pick('clearFirebaseSdkRetry'), pick('resetFirebaseSdkRetryHealth') || '',
             pick('scheduleFirebaseSdkRetry'), pick('retryFirebaseSdkNow'),
             'globalThis.api = { retryFirebaseSdkNow, scheduleFirebaseSdkRetry, resetFirebaseSdkRetryHealth };'

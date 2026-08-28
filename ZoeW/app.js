@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.6';
+    const APP_VERSION = '2.20.7';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -164,6 +164,12 @@
 
     setupActionDelegation();
 
+    function elapsedSince(mark) {
+        if (!mark) return Infinity;
+        const delta = Date.now() - mark;
+        return delta >= 0 ? delta : Infinity;
+    }
+
     const BOOT_SPLASH_MIN_MS = 380;
     const BOOT_REVEAL_CLEANUP_MS = 760;
     const bootSplashStartedAt = Date.now();
@@ -180,7 +186,7 @@
     }
 
     function revealAppAfterBoot() {
-        const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+        const wait = Math.max(0, BOOT_SPLASH_MIN_MS - elapsedSince(bootSplashStartedAt));
         setTimeout(() => {
             requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
         }, wait);
@@ -215,9 +221,8 @@
                 let lastSwUpdateAt = Date.now();
                 const throttledSwUpdate = () => {
                     if (navigator.onLine === false) return;
-                    const now = Date.now();
-                    if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
-                    lastSwUpdateAt = now;
+                    if (elapsedSince(lastSwUpdateAt) < SW_UPDATE_MIN_GAP_MS) return;
+                    lastSwUpdateAt = Date.now();
                     reg.update().catch(() => {});
                 };
                 document.addEventListener('visibilitychange', () => {
@@ -318,7 +323,7 @@
     }
 
     function cleanupClockIsTrustworthy() {
-        return serverClockTrusted;
+        return serverClockTrusted && isDatabaseConnected;
     }
 
     let nativeDetector = null;
@@ -617,9 +622,8 @@
         if (anyModalIsOpen()) return false;
         const used = firebaseSdkReloadCount();
         if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
-        const now = Date.now();
-        if (lastFirebaseSdkReloadAt && now - lastFirebaseSdkReloadAt < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
-        lastFirebaseSdkReloadAt = now;
+        if (elapsedSince(lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
+        lastFirebaseSdkReloadAt = Date.now();
         safeStoreSet(sessionStorage, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
         window.location.reload();
         return true;
@@ -657,8 +661,8 @@
     function retryFirebaseSdkNow() {
         if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
         if (navigator.onLine === false) return;
-        const sinceLastAttempt = Date.now() - lastFirebaseSdkAttemptAt;
-        if (lastFirebaseSdkAttemptAt && sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
+        const sinceLastAttempt = elapsedSince(lastFirebaseSdkAttemptAt);
+        if (sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
             if (!firebaseSdkRetryTimer) {
                 firebaseSdkRetryTimer = setTimeout(() => {
                     firebaseSdkRetryTimer = null;
@@ -727,9 +731,8 @@
 
     function forceDatabaseReconnect() {
         if (!fb || !db || typeof fb.goOnline !== 'function') return false;
-        const now = Date.now();
-        if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
-        lastForcedReconnectAt = now;
+        if (elapsedSince(lastForcedReconnectAt) < RECONNECT_FORCE_MIN_GAP_MS) return false;
+        lastForcedReconnectAt = Date.now();
         try {
             if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {
                 networkJustReturned = false;
@@ -2014,7 +2017,7 @@
         const statusEl = document.getElementById('customerDataTableStatus');
         if (!cfg || !cfg.url) return;
 
-        const isFresh = customerDataTableRows && (Date.now() - customerDataTableFetchedAt < CUSTOMER_TABLE_CACHE_MS);
+        const isFresh = customerDataTableRows && (elapsedSince(customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS);
         if (!force && isFresh) {
             renderCustomerDataTableStatus(customerDataTableRows);
             filterCustomerDataTable();
@@ -2026,7 +2029,7 @@
             return customerDataTableFetchPromise;
         }
 
-        if (!force && customerDataTableLastFailedAt && (Date.now() - customerDataTableLastFailedAt < CUSTOMER_TABLE_FAIL_COOLDOWN_MS)) {
+        if (!force && elapsedSince(customerDataTableLastFailedAt) < CUSTOMER_TABLE_FAIL_COOLDOWN_MS) {
             return;
         }
 
@@ -2227,7 +2230,7 @@
             return;
         }
 
-        if (autoLookupLastFailedAt && (Date.now() - autoLookupLastFailedAt < AUTO_LOOKUP_FAIL_COOLDOWN_MS)) {
+        if (elapsedSince(autoLookupLastFailedAt) < AUTO_LOOKUP_FAIL_COOLDOWN_MS) {
             return;
         }
 
@@ -2695,8 +2698,7 @@
 
     function dbListenerResyncIsProgressing() {
         if (!dbListenerPendingPaths.size) return false;
-        if (!dbListenerProgressAt) return false;
-        return (Date.now() - dbListenerProgressAt) < DB_LISTENER_PROGRESS_GRACE_MS;
+        return elapsedSince(dbListenerProgressAt) < DB_LISTENER_PROGRESS_GRACE_MS;
     }
 
     function attemptDbListenerRecovery() {
@@ -2705,8 +2707,8 @@
         if (!db || !fb || !auth || !auth.currentUser) { scheduleDbListenerRecovery(); return; }
         if (navigator.onLine === false) { scheduleDbListenerRecovery(); return; }
         if (dbListenerResyncIsProgressing()) { scheduleDbListenerRecovery(); return; }
-        const sinceLastAttempt = Date.now() - lastDbListenerAttemptAt;
-        if (lastDbListenerAttemptAt && sinceLastAttempt < DB_LISTENER_RETRY_MIN_GAP_MS) {
+        const sinceLastAttempt = elapsedSince(lastDbListenerAttemptAt);
+        if (sinceLastAttempt < DB_LISTENER_RETRY_MIN_GAP_MS) {
             dbListenerRecoveryTimer = setTimeout(attemptDbListenerRecovery, DB_LISTENER_RETRY_MIN_GAP_MS - sinceLastAttempt);
             return;
         }
@@ -5974,7 +5976,7 @@
         const text = String(code || '').trim();
         if (!text) return '';
         const now = Date.now();
-        if (text !== scanConfirmCode || now - scanConfirmAt > SCAN_CONFIRM_WINDOW_MS) {
+        if (text !== scanConfirmCode || elapsedSince(scanConfirmAt) > SCAN_CONFIRM_WINDOW_MS) {
             scanConfirmCode = text;
             scanConfirmCount = 1;
             scanConfirmAt = now;
@@ -6067,8 +6069,8 @@
 
     function processScannedCode(code) {
         if (isModalOpen || !code) return;
-        let currentTime = new Date().getTime();
-        if (code !== lastScannedCode || (currentTime - lastScanTime > 2500)) {
+        let currentTime = Date.now();
+        if (code !== lastScannedCode || elapsedSince(lastScanTime) > 2500) {
             lastScannedCode = code;
             lastScanTime = currentTime;
             triggerScanAction(code);

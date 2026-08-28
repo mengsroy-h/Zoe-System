@@ -114,7 +114,7 @@ function buildWorld(store, now) {
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ ផ្ទុក
         // function ពិត បូក `serverClockTrusted = true` (ស្ថានភាព App ភ្ជាប់រួច)។
-        'let serverClockTrusted = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
+        'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
         // ⛔ កូនសោដែលការការពារ marker សួរ — ត្រូវជាកូនសោ **ដដែល** ដែល
         // `initDatabaseListeners()` ដាក់ចូល Set (មើល `listener-pending-key-test.js`)។

@@ -242,6 +242,48 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('រក្សាទុក៖ ' + label, out.indexOf(kept) !== -1, 'got: ' + out);
     });
 
+    // ⛔ **ចន្លោះទម្រង់ ៖ អ្នកបំបែកមានតែ `=`។** អ្នកបំបែកពិតប្រាកដក្នុង
+    // breadcrumb និងសារ error ជាញឹកញាប់គឺ **`:`** មិនមែន `=` ទេ៖
+    //   `console.log('pin:', v)`      ➜ `"pin: 1234"`
+    //   `JSON.stringify(cfg)`         ➜ `{"apiKey":"AIza…"}`
+    //   header dump ក្នុងសារ error    ➜ `X-Api-Key: sk_live_…`
+    //   `Authorization: Bearer eyJ…`  ➜ token ទាំងមូល
+    // Sentry ចាប់ breadcrumb របស់ console **ដោយស្វ័យប្រវត្តិ** ដូច្នេះអត្ថបទ
+    // ដែលអ្នកមិនបានគ្រោងទុកឆ្លងកាត់ redaction។ វាស់បានមុនកែ ៖ ទម្រង់ទាំង ៤
+    // នេះ **មិនលាក់សោះ**។
+    const JWT_SAMPLE = 'eyJhbGciOiJSUzI1NiIsImtpZCI6ImFiYyJ9'
+        + '.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuIiwidWlkIjoieDEifQ'
+        + '.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const colonLeaks = [
+        ['lookup failed pin: 4321', '4321', '`pin: …` (អ្នកបំបែក `:`)'],
+        ['pin:1234', '1234', '`pin:…` គ្មានចន្លោះ'],
+        ['{"pin":"4321","barcode":"ZTO1"}', '4321', 'JSON ក្នុងខ្សែអក្សរ'],
+        ['{"cfg":{"apiKey":"AIzaSyZZ","projectId":"biz-a"}}', 'AIzaSyZZ', 'JSON ជាន់ជ្រៅក្នុងខ្សែអក្សរ'],
+        ['X-Api-Key: sk_live_abc123', 'sk_live_abc123', 'header dump (hyphen + `:`)'],
+        ['Authorization: Bearer ' + JWT_SAMPLE, JWT_SAMPLE, '`Bearer <token>`'],
+        ['request failed with token ' + JWT_SAMPLE, JWT_SAMPLE, 'JWT ឆៅក្នុងអត្ថបទសេរី'],
+        ['apiKey: "AIzaSyD-XYZ", projectId: "biz-a"', 'AIzaSyD-XYZ', 'Firebase config ជាអត្ថបទ']
+    ];
+    colonLeaks.forEach(([input, secret, label]) => {
+        const out = redact(input);
+        ok('លាក់៖ ' + label, out.indexOf(secret) === -1, 'got: ' + out);
+    });
+
+    // ⛔ ២ ខាង ៖ អ្នកបំបែក `:` **មិនត្រូវលាក់លើស** — ម៉ោង · ID · URL ·
+    //    សារ error ត្រូវការសម្រាប់ debug ហើយពួកវាសុទ្ធតែមាន `:`។
+    const colonKeep = [
+        ['scan time: 14:30:05 barcode: ZTO9', 'ZTO9', 'barcode ក្រោយ `:`'],
+        ['item id: id_1780000000_abc', 'id_1780000000_abc', 'លេខសម្គាល់ធាតុក្រោយ `:`'],
+        ['locker: A12 count: 2', 'A12', 'ឈ្មោះទូ Locker'],
+        ['GET https://a.firebaseio.com/zoew_scan_history_cod_dod.json', 'a.firebaseio.com', 'host ក្នុង URL'],
+        ['TypeError: Failed to fetch', 'Failed to fetch', 'សារ error ធម្មតា'],
+        ['created 2026-08-28T10:00:00Z count: 3', '2026-08-28T10:00:00Z', 'ត្រាពេលវេលា ISO']
+    ];
+    colonKeep.forEach(([input, kept, label]) => {
+        const out = redact(input);
+        ok('មិនលាក់លើស៖ ' + label, out.indexOf(kept) !== -1, 'got: ' + out);
+    });
+
     // ⛔ **ចន្លោះដែលធ្លាក់មុននេះ៖** ផ្នែកខាងលើសាកតែ `redactUrl()` ដែលជា
     // function លើ **ខ្សែអក្សរតែមួយ**។ អ្វីដែលសំខាន់ជាងគឺ **ការដើរលើ event**
     // — `redactEvent()` / `redactBreadcrumb()` ធ្លាប់ប៉ះតែវាលមួយចំនួន

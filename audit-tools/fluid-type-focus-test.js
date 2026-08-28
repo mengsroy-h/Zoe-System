@@ -26,7 +26,7 @@ const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')
 const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 const near = (a, b, tol) => Math.abs(a - b) <= (tol === undefined ? 0.06 : tol);
 
-function serve(dir, port) {
+function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -36,7 +36,7 @@ function serve(dir, port) {
             rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' });
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
@@ -49,7 +49,7 @@ const DESKTOP_STEP = 1.2;
 
 const APPS = [
     {
-        name: 'ZoeW', port: 8760, desktop: 992,
+        name: 'ZoeW', desktop: 992,
         real: [
             { sel: 'body', px: 13 },
             { sel: '.brand-info h1', px: 14 },
@@ -62,7 +62,7 @@ const APPS = [
         shadowRings: [{ id: 'securityPinInput' }, { id: 'hwScannerInput', tab: '#pageTabEntry' }]
     },
     {
-        name: 'ZoeKeyGen', port: 8762, desktop: 900,
+        name: 'ZoeKeyGen', desktop: 900,
         real: [
             { sel: 'body', px: 13 },
             { sel: 'label', px: 11 },
@@ -73,7 +73,7 @@ const APPS = [
         shadowRings: [{ id: 'newSecurityPinInput' }]
     },
     {
-        name: 'ZoeImport', port: 8764, desktop: 900,
+        name: 'ZoeImport', desktop: 900,
         real: [
             { sel: 'body', px: 14.5 },
             { sel: '.brand', px: 14 },
@@ -171,7 +171,8 @@ async function tabSweep(page, steps) {
     for (const app of APPS) {
         console.log('\n=== ' + app.name + ' ===');
         const sizes = staticScan(app);
-        const server = await serve(path.join(ROOT, app.name), app.port);
+        const server = await serve(path.join(ROOT, app.name));
+        app.port = server.address().port;
 
         // ក. ជាន់ទាប — 320px ត្រូវដូចមុនកែបេះបិទ (គ្មានការថយក្រោយ)
         let s = await openApp(browser, app, FLOOR_WIDTH, 568);

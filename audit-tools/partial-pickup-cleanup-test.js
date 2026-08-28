@@ -151,7 +151,7 @@ function buildWorld(historySeed, startNow) {
         // ត្រូវផ្ទុក **function ពិត** បូក `serverClockTrusted = true` ដែលជា
         // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ
         // នឹងលាក់ការដកច្រកទ្វារនោះចេញ ➜ បៃតងក្លែងក្លាយ។
-        'let serverClockTrusted = true;',
+        'let serverClockTrusted = true, isDatabaseConnected = true;',
         extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();',
         ...REAL_FNS.map((name) => extractFn(src, name)),

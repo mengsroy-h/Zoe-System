@@ -107,7 +107,7 @@ const CLOCK_GATE = extractFn(src, 'cleanupClockIsTrustworthy')
     || 'function cleanupClockIsTrustworthy() { return true; }';
 
 function buildWorld(opts) {
-    const deviceNow = opts.deviceNow;
+    let deviceNow = opts.deviceNow;
     const RealDate = Date;
     function FakeDate(...args) {
         if (!(this instanceof FakeDate)) return new RealDate(...args).toString();
@@ -171,12 +171,19 @@ function buildWorld(opts) {
         '    fb = { off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? true : offset) }); } };',
         '    attachInfoListeners();',
         '};',
+        // ⛔ WiFi ដាច់ ៖ `.info/connected` បាញ់ `false` ខណៈ offset **នៅដដែល**
+        //    (RTDB មិនផ្ញើ offset ថ្មីពេលដាច់ទេ) — នេះជាស្ថានភាពពិត
+        //    ដែលអ្នកប្រើប្តូរនាឡិកាទូរស័ព្ទក្នុងវា។
+        'globalThis.__disconnect = (offset) => {',
+        '    fb = { off() {}, onValue(ref, cb) { cb({ val: () => (ref === "connected" ? false : offset) }); } };',
+        '    attachInfoListeners();',
+        '};',
         'globalThis.__run = async () => { runAutomaticCleanupRules(); await runAutomaticDeletedCleanup(); };',
         'globalThis.__serverNow = () => getServerNow();'
     ].filter(Boolean).join('\n\n');
 
     new vm.Script(code).runInContext(ctx);
-    return { ctx, log };
+    return { ctx, log, setDeviceNow: (ms) => { deviceNow = ms; } };
 }
 
 // ធាតុពិត ៖ កញ្ចប់បើកថ្មីៗ · barcode ដែលទើបបិទ · ធុងសំរាមថ្មីៗ
@@ -261,6 +268,45 @@ function freshSeed() {
         await w.ctx.__run();
         ok('   ក្រោយភ្ជាប់មកវិញ ➜ ការសម្អាតដដែល **រត់វិញ** (ការពន្យារមិនបាត់ការងារ)',
             w.log.claims.length >= 1 && w.log.purges.length === 1,
+            { claims: w.log.claims, purges: w.log.purges });
+    }
+
+    // ── ៦. ⛔ ការភ្ជាប់ដាច់ **ក្រោយ** handshake ➜ នាឡិកាឧបករណ៍លោត ─────────────
+    //     នេះជាចន្លោះដែលកំណែ 2.20.5 ទុកចោល ៖ `serverClockTrusted` ត្រូវសរសេរ
+    //     **តែម្តង** ហើយ **មិនដែលត្រឡប់ជា false វិញ**។ ដូច្នេះលំដាប់ពិត
+    //     «បើក App ➜ ភ្ជាប់ ➜ បិទ WiFi ➜ ប្តូរថ្ងៃទូរស័ព្ទ» ធ្វើឲ្យ
+    //     `getServerNow()` រំកិលតាមនាឡិកាឧបករណ៍ម្តងទៀត ខណៈច្រកទ្វារនៅបើក ➜
+    //     ការសម្អាតបំផ្លាញរត់ដោយម៉ោងខុស។ (ថ្នាក់ដដែលនឹងមេរៀន 2.20.6 អំពី
+    //     License ៖ «ទង់នៅ true បន្តក្រោយចាកចេញពីបណ្តាញ ហើយ offset ក្លាយជាចាស់»។)
+    {
+        const w = buildWorld({ deviceNow: REAL_NOW, online: true });
+        w.ctx.__handshake(0);
+        const seed = freshSeed();
+        w.ctx.__seed(seed.history, seed.trash);
+        await w.ctx.__run();
+        ok('   handshake ពិត + គ្មានអ្វីដល់ពេល ➜ គ្មានការសម្អាត (ចំណុចចាប់ផ្តើម)',
+            w.log.claims.length === 0 && w.log.purges.length === 0,
+            { claims: w.log.claims, purges: w.log.purges });
+
+        w.ctx.__disconnect(0);
+        w.setDeviceNow(REAL_NOW + YEAR_MS);
+        await w.ctx.__run();
+        ok('⛔ ដាច់បណ្តាញក្រោយ handshake + នាឡិកាលោត ១ ឆ្នាំ ➜ **គ្មានកញ្ចប់ត្រូវសម្អាត**',
+            w.log.claims.length === 0, w.log.claims);
+        ok('⛔ ដាច់បណ្តាញក្រោយ handshake + នាឡិកាលោត ១ ឆ្នាំ ➜ **ធុងសំរាមមិនត្រូវ purge**',
+            w.log.purges.length === 0, w.log.purges);
+
+        // ទិសផ្ទុយ ៖ ភ្ជាប់មកវិញ (server ប្រាប់ម៉ោងពិត) ➜ ការងារដដែលត្រូវរត់
+        const ripe = freshSeed();
+        ripe.history[0].createdAt = REAL_NOW - 9 * 24 * 60 * 60 * 1000;
+        ripe.history[1].closedAt = REAL_NOW - 3 * 60 * 60 * 1000;
+        ripe.history[1].barcodes[0].closedAt = REAL_NOW - 3 * 60 * 60 * 1000;
+        ripe.trash[0].deletedAt = REAL_NOW - 31 * 24 * 60 * 60 * 1000;
+        w.ctx.__seed(ripe.history, ripe.trash);
+        w.ctx.__handshake(-YEAR_MS);
+        await w.ctx.__run();
+        ok('   ភ្ជាប់មកវិញដោយម៉ោង server ពិត ➜ ការសម្អាត **រត់វិញ** (ការពន្យារមិនបាត់ការងារ)',
+            w.log.claims.length >= 2 && w.log.purges.length === 1,
             { claims: w.log.claims, purges: w.log.purges });
     }
 

@@ -2,7 +2,7 @@
   "name": "ZoeImport — នាំចូល Excel ចូល Sheet",
   "short_name": "ZoeImport",
   "description": "នាំចូលឯកសារ Excel របស់ ZTO ចូល Google Sheet ដោយស្វ័យប្រវត្តិ",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

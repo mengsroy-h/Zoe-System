@@ -95,6 +95,12 @@ const FAKE_SDK = function (seed) {
         }
     }
     function snapOf(p) {
+        // ⛔ `.info/*` ជាថ្នាំង **របស់ SDK** មិនមែនរបស់ store ទេ ➜ វាត្រូវ
+        //    ឆ្លើយដដែលរាល់ការបាញ់ឡើងវិញ។ បើទុកឲ្យ `fireAll()` អានពី store
+        //    នោះ `.info/connected` ក្លាយជា `null` ក្រោយការសរសេរដំបូង ➜ App
+        //    គិតថាដាច់បណ្តាញ ➜ ច្រកទ្វារនាឡិកា (2.20.7) បិទការសម្អាត។
+        if (p === '.info/connected') return { val: () => true, exists: () => true };
+        if (p === '.info/serverTimeOffset') return { val: () => 0, exists: () => true };
         const v = getPath(p);
         const copy = () => (v === undefined || v === null) ? null : (typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
         return { val: copy, exists: () => v !== null && v !== undefined };
@@ -125,11 +131,7 @@ const FAKE_SDK = function (seed) {
             // ⛔ `.info/serverTimeOffset` ត្រូវផ្តល់ **លេខ** — ការសម្អាតមាន
             // ច្រកទ្វារនាឡិកា (2.20.5) ដែលបើកតែដោយតម្លៃពី server ពិត។
             // `.info/connected` បាញ់មុន ➜ offset 0 ត្រូវទទួលយក។
-            setTimeout(() => {
-                if (r.path === '.info/connected') cb({ val: () => true });
-                else if (r.path === '.info/serverTimeOffset') cb({ val: () => 0 });
-                else cb(snapOf(r.path));
-            }, 0);
+            setTimeout(() => { cb(snapOf(r.path)); }, 0);
             return () => {};
         },
         off: () => {},

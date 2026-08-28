@@ -37,15 +37,14 @@ const SERVER_TIME_FIELDS = new Set([
 const LOCAL_CLOCK_OK = {
     'ZoeW/app.js': {
         '<top>': 'ថេរពេល boot splash និង throttle `reg.update()` — cosmetic/local',
+        elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
-        revealAppAfterBoot: 'រយៈពេលអប្បបរមារបស់ផ្ទាំង boot — cosmetic',
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា (server មិនស្គាល់វា)',
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល',
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',
         noteDbListenerAlive: 'ត្រាពេលនៃវឌ្ឍនភាព resync — វាស់ចន្លោះពេលក្នុងវគ្គដដែល មិនមែនការសម្រេច retention/revenue',
-        dbListenerResyncIsProgressing: 'អានត្រានោះឡើងវិញ — ចន្លោះពេល local ដូច attemptDbListenerRecovery',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
         retryFirebaseSdkNow: 'ពិដានល្បឿននៃការផ្ទុក SDK ឡើងវិញ — local (ដូច attemptDbListenerRecovery)',
         reloadForFirebaseSdk: 'គម្លាតអប្បបរមារវាងការផ្ទុកទំព័រឡើងវិញ — local សុទ្ធសាធ (server មិនស្គាល់វា ហើយវាមិនប៉ះ retention/revenue សោះ)',
@@ -59,8 +58,8 @@ const LOCAL_CLOCK_OK = {
     },
     'ZoeKeyGen/app.js': {
         '<top>': 'ថេរពេល boot splash និង throttle `reg.update()` — cosmetic/local',
+        elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
-        revealAppAfterBoot: 'រយៈពេលអប្បបរមារបស់ផ្ទាំង boot — cosmetic',
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា',
         forceDatabaseReconnect: 'គម្លាតអប្បបរមារវាងវដ្តភ្ជាប់ឡើងវិញ — local',
         scheduleFirebaseSdkRetry: 'កត់ត្រាពេលព្យាយាមផ្ទុក SDK — ចូលរួមក្នុងពិដានល្បឿន local',
@@ -74,7 +73,7 @@ const LOCAL_CLOCK_OK = {
     },
     'ZoeImport/app.js': {
         '<top>': 'ថេរពេល boot splash — cosmetic',
-        revealAppAfterBoot: 'រយៈពេលអប្បបរមារបស់ផ្ទាំង boot — cosmetic',
+        elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         lockoutSecondsLeft: 'ការជាប់សោ PIN — local ដោយចេតនា',
         registerPinFailure: 'ការជាប់សោ PIN ដដែល',
         registerServiceWorker: 'throttle `reg.update()` — cosmetic/local (ZoeW និង ZoeKeyGen មានវាក្រោម `<top>` ព្រោះកូដចុះឈ្មោះរបស់ពួកវាមិននៅក្នុង function ដែលមានឈ្មោះ)'

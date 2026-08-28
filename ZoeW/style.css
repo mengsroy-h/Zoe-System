@@ -393,6 +393,8 @@
             padding: 10px 12px; border-radius: var(--radius-md);
             background: var(--primary-light); border: 1px solid var(--primary);
             color: var(--primary); font-size: calc(12.5 * var(--fs-unit)); font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            text-align: center; line-height: 1.4;
         }
         .btn-biometric:disabled { opacity: 0.6; cursor: progress; }
 
@@ -1246,7 +1248,11 @@
         body.app-locked .app-pages,
         body.app-locked .page-tabbar,
         body.app-locked .side-drawer,
-        body.app-locked .drawer-backdrop { visibility: hidden; }
+        body.app-locked .drawer-backdrop,
+        body.app-locked .modal,
+        body.app-locked .more-menu,
+        body.app-locked .phone-suggest,
+        body.app-locked .toast-container { visibility: hidden; }
         .app-lock-card {
             width: 100%;
             max-width: 330px;
@@ -1313,7 +1319,8 @@
             border: 1px solid #fecaca;
             font-size: calc(10.5 * var(--fs-unit));
             font-weight: 600;
-            text-align: left;
+            text-align: center;
+            line-height: 1.5;
         }
         .app-lock-forgot {
             display: block;

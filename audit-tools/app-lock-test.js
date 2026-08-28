@@ -26,6 +26,25 @@
 //
 // ៥. **ការជាប់សោត្រូវពិត** — ៥ ដងខុស ➜ ១ នាទី ហើយ **PIN ត្រឹមត្រូវក៏ត្រូវ
 //    បដិសេធដែរ** ក្នុងអំឡុងនោះ។ សោដែលរាប់ខុសមិនមែនជាសោទេ។
+//
+// ៦. ⛔ **សោដែលចាក់តែពេល «បើក App ថ្មី»** (កំណែ 2.22.1) — របាយការណ៍ពិតពី
+//    អ្នកប្រើ ៖ *«ចេញពី app តែអត់ទាន់ clear task ចូល app វិញ អត់លោតអោយវាយ
+//    pin ទៀតសោះ»*។ ការចាកចេញទៅ App ផ្សេងមិនបំផ្លាញវគ្គទេ ➜ ទង់ក្នុង
+//    `sessionStorage` នៅដដែល ➜ សោមិនដែលចាក់វិញ។ ដូច្នេះឥឡូវការចាក់សោ
+//    កើតឡើងតាម **ព្រឹត្តិការណ៍ `visibilitychange`** ដែរ។
+//
+//    ⛔ **តែថ្នាក់កំហុស ៣ ខាងលើមិនត្រូវបើកឡើងវិញឡើយ** — ការចាក់សោនោះ
+//    ត្រូវរស់ជាមួយការពិត ៣ ៖
+//    ក. **PTR និង `reloadForFirebaseSdk()` បាញ់ `hidden` មុន unload** ➜ ការ
+//       លុបទង់វគ្គត្រង់នោះនឹងធ្វើឲ្យ **រាល់ការទាញចុះត្រូវវាយ PIN**។ ដូច្នេះ
+//       ការបាំង (veil) ពេល `hidden` **មិនប៉ះទង់វគ្គ**; ការលុបទង់កើតឡើងតែ
+//       ពេល **ត្រឡប់មកវិញពិត** (`visible`)។ តេស្តវាស់ **ទាំង ២ ខាង**។
+//    ខ. **ប៊ូតុង «📞 ខល» ជា `<a href="tel:">`** ➜ រាល់ការខល **ចាកចេញពី App**។
+//       សោដែលចាក់ក្រោយការខល = លំហូរការងារស្លាប់។ ដូច្នេះសកម្មភាពដែលនាំ
+//       អ្នកប្រើចេញ **ដោយចេតនា** (ខល · រើសឯកសារ · ស្កេនជីវមាត្រ · Print)
+//       ត្រូវលើកលែង **តែជុំនោះមួយ** — ការចាកចេញលើកក្រោយចាក់សោដដែល។
+//    គ. **ការបាំងត្រូវកើតពេល `hidden` មិនមែនពេល `visible`** — បើមិនដូច្នេះ
+//       រូបភាពក្នុង **task switcher** នៃទូរស័ព្ទបង្ហាញលេខអតិថិជនទាំងស្រុង។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {
     console.log('SKIP — ត្រូវការ playwright-core (npm i playwright-core)');
@@ -117,6 +136,47 @@ check(/if \(appIsLocked\) return;/.test(focusFn),
 check(/function pullTargetBlocked\(target\) \{\s*\n\s*if \(appIsLocked \|\|/.test(appJs),
     '⛔ ខណៈចាក់សោ ➜ PTR មិនកេះ (កុំឲ្យទាញចុះក្រោមសោ)');
 
+const awayFn = sliceFn(appJs, 'noteAppLockAway');
+const backFn = sliceFn(appJs, 'relockAppAfterAway');
+const guardFn = sliceFn(appJs, 'setupAppLockAwayGuard');
+const showFn = sliceFn(appJs, 'showAppLockScreen');
+const excuseFn = sliceFn(appJs, 'noteAppLockExcuse');
+
+check(awayFn !== '' && backFn !== '' && guardFn !== '',
+    'មានផ្លូវចាក់សោពេលចាកចេញ/ត្រឡប់មក (noteAppLockAway · relockAppAfterAway · setupAppLockAwayGuard)');
+check(/visibilitychange/.test(guardFn),
+    'ការចាកចេញត្រូវរកឃើញតាម `visibilitychange`', guardFn);
+check(!/addEventListener\('(blur|focus|pagehide)'/.test(guardFn),
+    "⛔ **មិនប្រើ `blur`/`focus`** — ពួកវាបាញ់ពេលបើកប្រអប់ native ➜ សោក្លែងក្លាយ", guardFn);
+check(/setupAppLockAwayGuard\(\)/.test(initFn),
+    'ការចុះឈ្មោះកើតឡើងក្នុង initAppLock() ➜ ដំណើរការទោះគ្មាន PIN (ការកំណត់ PIN ពាក់កណ្តាលវគ្គក៏គ្រប)', initFn);
+
+check(/elapsedSince\(appLockExcuseAt\)/.test(awayFn),
+    '⛔ បង្អួចលើកលែងវាស់តាម `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ Infinity ➜ **ចាក់សោ** (fail-safe)', awayFn);
+check(/showAppLockScreen\(true\)/.test(awayFn),
+    '⛔ ការបាំងពេល `hidden` ត្រូវ **រក្សាទង់វគ្គ** (បើអត់ ➜ PTR reload ត្រូវវាយ PIN)', awayFn);
+check(/appLockPinIsSet\(\)/.test(awayFn),
+    'គ្មាន PIN ➜ មិនបាំង (ទិសផ្ទុយ — App ដើរដូចមុន)', awayFn);
+check(/showAppLockScreen\(\)/.test(backFn) && !/showAppLockScreen\(true\)/.test(backFn),
+    '⛔ ការត្រឡប់មកវិញទើបចាក់សោពិត (លុបទង់វគ្គ ➜ Refresh មិនមែនផ្លូវរំលង)', backFn);
+check(/keepSessionFlag !== true\) clearAppUnlockedForSession\(\)/.test(showFn),
+    'ការលុបទង់វគ្គជាជម្រើសដែលអ្នកហៅសម្រេច មិនមែនផលរំលងទេ', showFn);
+check(/blur\(\)/.test(showFn) && /appLockPinInput/.test(showFn),
+    '⛔ ការចាក់សោដក focus ពី App ➜ barcode របស់ម៉ាស៊ីនស្កេនមិនធ្លាក់ចូលវាល App ក្រោមសោ', showFn);
+
+check(/appLockExcuseAt = Date\.now\(\)/.test(excuseFn), 'noteAppLockExcuse() ដាក់ត្រាពេល', excuseFn);
+const callFn = sliceFn(appJs, 'handleCallAction');
+check(/noteAppLockExcuse\(\)/.test(callFn),
+    '⛔ «📞 ខល» (`<a href="tel:">`) ត្រូវលើកលែង — បើអត់ ➜ **រាល់ការខលត្រូវវាយ PIN**', callFn);
+check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'biometricUnlockPin')),
+    'ការស្កេនជីវមាត្រត្រូវលើកលែង (ប្រអប់ system បាំង App)');
+check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'requestCameraPermission')),
+    'ការសុំសិទ្ធិកាមេរ៉ាត្រូវលើកលែង');
+check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'exportDataAsPDF')),
+    'ការបោះពុម្ព (Export PDF) ត្រូវលើកលែង');
+check(/input\[type="file"\]/.test(appJs) && /a\[href\^="tel:"\]/.test(appJs),
+    'បញ្ជីលើកលែងគ្របការរើសឯកសារ និងតំណ tel: តាម DOM ផ្ទាល់');
+
 const completeFn = sliceFn(appJs, 'completeAppUnlock');
 check(/markAppUnlockedForSession\(\)/.test(completeFn) && /hideAppLockScreen\(\)/.test(completeFn),
     'ការដោះសោសម្គាល់វគ្គ ហើយបិទអេក្រង់', completeFn);
@@ -132,8 +192,14 @@ check(/appLockLockoutSecondsLeft\(\)/.test(verifyFn), 'ការជាប់ស�
 
 check(/\.app-lock\s*\{[^}]*display:\s*none/.test(css), 'CSS ៖ អេក្រង់ចាក់សោលាក់តាមលំនាំដើម');
 check(/\.app-lock\.is-open\s*\{[^}]*display:\s*flex/.test(css), 'CSS ៖ បង្ហាញ/លាក់តាម **class** មិនមែន style.display');
-check(/body\.app-locked[\s\S]{0,220}?visibility:\s*hidden/.test(css),
+check(/body\.app-locked[\s\S]{0,320}?visibility:\s*hidden/.test(css),
     'CSS ៖ ខណៈចាក់សោ ➜ navbar · ទំព័រ · របា Tab ត្រូវលាក់ពិត');
+check(/body\.app-locked \.modal,/.test(css),
+    '⛔ CSS ៖ ប្រអប់ដែលបើកនៅ ក៏ត្រូវលាក់ដែរ — ការចាក់សោកណ្តាលការងារកើតឡើងពិត');
+check(/\.app-lock-msg \{[^}]*text-align:\s*center/.test(css),
+    'CSS ៖ សាររបស់អេក្រង់ចាក់សោឈរចំកណ្តាល ដូចធាតុដទៃលើកាត');
+check(/\.btn-biometric \{[^}]*justify-content:\s*center/.test(css),
+    'CSS ៖ ប៊ូតុងស្កេនជីវមាត្រ ៖ រូប + អក្សរឈរចំកណ្តាលជាក្រុមតែមួយ');
 
 function serve(dir) {
     return new Promise((res) => {
@@ -216,6 +282,10 @@ async function withTimeout(promise, ms, label) {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 880 } });
     const page = await ctx.newPage();
     page.on('dialog', (d) => d.accept().catch(() => {}));
+    // ⛔ ការធ្លាក់ត្រូវមានឈ្មោះ ៖ កំហុស runtime ក្នុងទំព័រ ធ្វើឲ្យជំហានបន្ទាប់
+    // ធ្លាក់ដោយហេតុផលមើលទៅមិនពាក់ព័ន្ធ។ ត្រូវរាយវាជាមួយការធ្លាក់នោះ។
+    const pageErrors = [];
+    page.on('pageerror', (e) => pageErrors.push(String(e && e.message ? e.message : e).split('\n')[0]));
     await page.route('**', (route) => {
         const u = route.request().url();
         if (u.indexOf('/license-verify.js') !== -1) return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });
@@ -244,6 +314,8 @@ async function withTimeout(promise, ms, label) {
             loginTime: localStorage.getItem('zoew_login_time'),
             email: localStorage.getItem('remembered_email'),
             signOuts: window.__signOutCalls,
+            submitDisabled: !!(document.getElementById('appLockSubmitBtn') || {}).disabled,
+            pinValue: ((document.getElementById('appLockPinInput') || {}).value || '').length,
             msg: (document.getElementById('appLockMsg') || {}).textContent || ''
         };
     });
@@ -253,10 +325,64 @@ async function withTimeout(promise, ms, label) {
         const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode('zoeadmin_pin_verify_v2'), iterations: 150000, hash: 'SHA-256' }, km, 256);
         return 'pbkdf2:' + Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
     }, pin);
+    let pinHash = '';
+    // ⚠️ អន្ទាក់ **harness** ដែលវាស់បានក្នុងជុំនេះ (មិនមែនកំហុស App)៖ ក្រោយ
+    // វដ្ត «ចាកចេញ ➜ ត្រឡប់មក» បូកការ navigate ច្រើនដង Chromium headless
+    // **ឈប់បញ្ជូន input ពិត** ចូលឯកសារនោះ — `page.click` និង `page.press`
+    // ត្រឡប់ដោយជោគជ័យ តែ **គ្មាន event ណាមកដល់ `document` សោះ** (វាស់ដោយ
+    // listener capture; `page.bringToFront()` មិនជួយ)។ ដូច្នេះមានផ្លូវបម្រុង
+    // ដែលហៅ `.click()` ក្នុងទំព័រ — វា **នៅតែឆ្លងកាត់ delegation ពិត ➜
+    // submitAppLockForm ➜ verifyAppLockPin** គ្រាន់តែមិនឆ្លងបំពង់ input របស់
+    // ឧបករណ៍។ ⛔ មុនធ្លាក់ទៅផ្លូវនោះ តេស្ត **អះអាងធរណីមាត្រពិត** របស់ប៊ូតុង
+    // — បើមិនដូច្នេះ ការបម្រុងនឹងលាក់ការធ្លាក់ពិត (ប៊ូតុងដែលចុចមិនកើត)។
     const typePin = async (pin) => {
         await page.fill('#appLockPinInput', pin, { timeout: 6000 });
         await page.click('#appLockSubmitBtn', { timeout: 6000 });
         await page.waitForTimeout(900);
+        const untouched = await page.evaluate(() => ((document.getElementById('appLockPinInput') || {}).value || '') !== '');
+        if (!untouched) return;
+        const box = await page.locator('#appLockSubmitBtn').boundingBox().catch(() => null);
+        const vp = page.viewportSize();
+        check(!!box && box.width > 0 && box.height > 0 && box.y >= 0 && box.y + box.height <= vp.height + 1,
+            'ប៊ូតុង «ដោះសោ» មើលឃើញពិត និងឈរក្នុងអេក្រង់ (មុនប្រើផ្លូវបម្រុងរបស់ harness)', { box: box, vp: vp });
+        await page.evaluate(() => { const b = document.getElementById('appLockSubmitBtn'); if (b) b.click(); });
+        await page.waitForTimeout(900);
+    };
+
+    // ⚠️ Chromium headless **មិនប្តូរ `visibilityState` ទេ** ទោះប្តូរ tab
+    // (វាស់បានក្នុងជុំនេះ ៖ `bringToFront` និង CDP `Page.setWebLifecycleState`
+    // ទាំង ២ ទុក `visible` ដដែល)។ ដូច្នេះតេស្តជំនួស getter រួចបាញ់
+    // ព្រឹត្តិការណ៍ពិត — **កូដដែលរត់គឺកូដពិតរបស់ App** ក្នុង DOM ពិត ជាមួយ
+    // CSS ពិត និង storage ពិត; មានតែ **ប្រភពនៃព្រឹត្តិការណ៍** ទេដែលក្លែង។
+    const setVisibility = (v) => page.evaluate((next) => {
+        if (!window.__visPatched) {
+            window.__visPatched = true;
+            window.__visState = 'visible';
+            Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__visState });
+            Object.defineProperty(document, 'hidden', { configurable: true, get: () => window.__visState === 'hidden' });
+        }
+        window.__visState = next;
+        document.dispatchEvent(new Event('visibilitychange'));
+    }, v);
+    const leaveApp = async () => { await setVisibility('hidden'); await page.waitForTimeout(400); };
+    const returnToApp = async () => { await setVisibility('visible'); await page.waitForTimeout(700); };
+    const unlockFresh = async () => {
+        await page.evaluate((h) => {
+            localStorage.removeItem('zoew_biometric_unlock_v1');
+            localStorage.removeItem('zoew_pin_fail_count');
+            localStorage.removeItem('zoew_pin_lockout_until');
+            localStorage.setItem('zoew_security_pin_hash', h);
+            localStorage.setItem('zoew_login_time', '1700000000000');
+            localStorage.setItem('remembered_email', 'a@b.c');
+            sessionStorage.clear();
+        }, pinHash);
+        await withTimeout(load(), 30000, 'reload-before-unlock');
+        await settle();
+        await typePin(PIN);
+        const s = await state();
+        check(!s.bodyLocked && s.unlockedFlag === '1', 'ចាប់ផ្តើមពីស្ថានភាពដោះសោរួច',
+            Object.assign({ pageErrors: pageErrors.slice(-3) }, s));
+        return s;
     };
 
     async function group(title, fn) {
@@ -278,9 +404,9 @@ async function withTimeout(promise, ms, label) {
             check(s.unlockedFlag === '1', 'គ្មាន PIN ➜ សម្គាល់វគ្គថាដោះសោរួច (មិនរង់ចាំសោដែលមិនមាន)', s);
         });
 
-        let hash = '';
         await group('៣. មាន PIN + វគ្គថ្មី ➜ **ចាក់សោ** ហើយទិន្នន័យលាក់ពិត', async () => {
-            hash = await hashPinIn(PIN);
+            pinHash = await hashPinIn(PIN);
+            const hash = pinHash;
             await page.evaluate((h) => {
                 localStorage.setItem('zoew_security_pin_hash', h);
                 localStorage.setItem('zoew_login_time', '1700000000000');
@@ -418,6 +544,124 @@ async function withTimeout(promise, ms, label) {
             check(box.top === null || box.top >= -1, '⛔ កាតមិនចេញក្រៅផ្នែកខាងលើ', box);
             check(box.scrollable === 'auto' || box.scrollable === 'scroll', 'អេក្រង់ចាក់សោរមូរបាន (ក្តារចុចបើក ➜ នៅឈានដល់)', box);
             await page.setViewportSize({ width: 412, height: 880 });
+        });
+
+        await group('១៣. ⛔ ចេញពី App (មិន clear task) ➜ ត្រឡប់មក ➜ **ចាក់សោម្តងទៀត**', async () => {
+            await unlockFresh();
+            await leaveApp();
+            const away = await state();
+            check(away.bodyLocked && away.pages === 'hidden',
+                '⛔ ពេលចាកចេញ ➜ បាំងភ្លាម (រូបក្នុង task switcher មិនលេចលេខអតិថិជន)', away);
+            check(away.unlockedFlag === '1',
+                '⛔ ការបាំង **មិនប៉ះទង់វគ្គ** — `hidden` បាញ់ពេល PTR reload ដែរ', away);
+
+            await returnToApp();
+            const s = await state();
+            check(s.bodyLocked && s.lockShown, '⛔ ត្រឡប់ចូល App វិញ ➜ ត្រូវវាយ PIN ម្តងទៀត', s);
+            check(s.pages === 'hidden' && s.navbar === 'hidden' && s.tabbar === 'hidden',
+                '⛔ ទិន្នន័យលាក់ពិតក្រោយត្រឡប់មក', s);
+            check(s.unlockedFlag === null, '⛔ ការត្រឡប់មកទើបលុបទង់វគ្គ ➜ Refresh មិនមែនផ្លូវរំលងសោ', s);
+            check(s.loginTime === '1700000000000' && s.signOuts === 0,
+                '⛔ session ៤ ម៉ោង **មិនរងផល** — ដោះសោ ➜ ចូលដល់ App ភ្លាម', s);
+            const focused = await page.evaluate(() => (document.activeElement || {}).id || '');
+            check(focused === 'appLockPinInput',
+                '⛔ focus ផ្លាស់ទៅប្រអប់ PIN ➜ barcode មិនធ្លាក់ចូលវាល App ក្រោមសោ', focused);
+        });
+
+        await group('១៤. Refresh ខណៈចាក់សោ ➜ **នៅតែចាក់សោ** (មិនមែនផ្លូវរំលង)', async () => {
+            await withTimeout(load(), 30000, 'reload-while-locked');
+            await settle();
+            const s = await state();
+            check(s.bodyLocked && s.pages === 'hidden', '⛔ ការផ្ទុកឡើងវិញខណៈចាក់សោ ➜ នៅចាក់សោដដែល', s);
+        });
+
+        await group('១៥. ⛔ ការទាញចុះ Refresh (PTR) ក្រោយបាំង ➜ **មិនចាក់សោ**', async () => {
+            await unlockFresh();
+            await leaveApp();
+            const away = await state();
+            check(away.bodyLocked && away.unlockedFlag === '1', 'បាំងរួច ហើយទង់វគ្គនៅដដែល', away);
+            await withTimeout(load(), 30000, 'ptr-reload-after-veil');
+            await settle();
+            const s = await state();
+            check(!s.bodyLocked && s.pages === 'visible',
+                '⛔ PTR/reload ក្រោយព្រឹត្តិការណ៍ `hidden` ➜ **មិនសុំ PIN** (បើអត់ ➜ រាល់ការទាញចុះក្លាយជាទោស)', s);
+        });
+
+        await group('១៦. ⛔ «📞 ខល» (`tel:`) ➜ ចាកចេញ ➜ ត្រឡប់មក ➜ **មិនចាក់សោ**', async () => {
+            await unlockFresh();
+            await page.evaluate(() => {
+                const a = document.createElement('a');
+                a.href = 'tel:012345678';
+                a.id = 'testCallLink';
+                a.textContent = 'call';
+                document.body.appendChild(a);
+                a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            });
+            await page.waitForTimeout(150);
+            await leaveApp();
+            const away = await state();
+            check(!away.bodyLocked, '⛔ ការចាកចេញដើម្បីខល ➜ **មិនបាំង**', away);
+            await returnToApp();
+            const s = await state();
+            check(!s.bodyLocked && s.pages === 'visible' && s.unlockedFlag === '1',
+                '⛔ ត្រឡប់មកក្រោយខល ➜ **មិនសុំ PIN** (លំហូរការងារនៅរស់)', s);
+
+            await leaveApp();
+            await returnToApp();
+            const again = await state();
+            check(again.bodyLocked && again.unlockedFlag === null,
+                '⛔ ទិសផ្ទុយ ៖ ការចាកចេញ **លើកក្រោយ** (គ្មានការខល) ➜ ចាក់សោដដែល — ការលើកលែងប្រើតែម្តង', again);
+            await page.evaluate(() => { const a = document.getElementById('testCallLink'); if (a) a.remove(); });
+        });
+
+        await group('១៧. ⛔ ការរើសឯកសារ (label ➜ input[type=file]) ➜ **មិនចាក់សោ**', async () => {
+            await unlockFresh();
+            const clicked = await page.evaluate(() => {
+                const label = document.querySelector('label[for="fileInput"]');
+                if (!label) return false;
+                label.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                return true;
+            });
+            check(clicked, 'រកឃើញប៊ូតុង «យក Barcode ពីរូបភាព» ពិតក្នុង App', clicked);
+            await leaveApp();
+            await returnToApp();
+            const s = await state();
+            check(!s.bodyLocked, '⛔ ត្រឡប់មកក្រោយរើសរូបភាព ➜ មិនសុំ PIN', s);
+        });
+
+        await group('១៨. ⛔ គ្មាន PIN ➜ ចាកចេញ/ត្រឡប់មក ➜ **មិនចាក់សោសោះ** (ទិសផ្ទុយ)', async () => {
+            await page.evaluate(() => { localStorage.removeItem('zoew_security_pin_hash'); sessionStorage.clear(); });
+            await withTimeout(load(), 30000, 'reload-no-pin');
+            await settle();
+            await leaveApp();
+            const away = await state();
+            check(!away.bodyLocked, '⛔ គ្មាន PIN ➜ ការចាកចេញមិនបាំង', away);
+            await returnToApp();
+            const s = await state();
+            check(!s.bodyLocked && s.pages === 'visible', '⛔ គ្មាន PIN ➜ ត្រឡប់មកមិនចាក់សោ', s);
+            await page.evaluate((h) => localStorage.setItem('zoew_security_pin_hash', h), pinHash);
+        });
+
+        await group('១៩. ⛔ ចាក់សោកណ្តាលការងារ ➜ ប្រអប់ដែលបើកនៅ ត្រូវលាក់ដែរ', async () => {
+            await unlockFresh();
+            const opened = await page.evaluate(() => {
+                if (typeof window.openModalHelper !== 'function') return false;
+                window.openModalHelper('exportDataModal');
+                const m = document.getElementById('exportDataModal');
+                return !!m && getComputedStyle(m).display !== 'none' && getComputedStyle(m).visibility === 'visible';
+            });
+            check(opened, 'ប្រអប់សាកល្បងបើកមើលឃើញមុនចាក់សោ', opened);
+            await leaveApp();
+            await returnToApp();
+            const s = await page.evaluate(() => {
+                const m = document.getElementById('exportDataModal');
+                return {
+                    locked: document.body.classList.contains('app-locked'),
+                    modal: m ? getComputedStyle(m).visibility : 'missing'
+                };
+            });
+            check(s.locked && s.modal === 'hidden',
+                '⛔ ការចាក់សោគ្របប្រអប់ដែលបើកនៅ — បើអត់ ➜ លេខអតិថិជនអានឃើញពីក្រោយសោ', s);
         });
     } catch (e) {
         bad('ផ្នែក browser បោះកំហុស', String(e && e.message ? e.message : e));

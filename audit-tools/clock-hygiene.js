@@ -42,6 +42,7 @@ const LOCAL_CLOCK_OK = {
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា (server មិនស្គាល់វា)',
         appLockLockoutSecondsLeft: 'ការអានវិនាទីដែលនៅសល់នៃការជាប់សោ PIN — local ដោយចេតនា (ការប្រៀបធៀបថ្ងៃឈប់ មិនស្ថិតក្នុងច្បាប់ `elapsedSince`)',
         registerAppLockFailure: 'ការជាប់សោ PIN នៃអេក្រង់ចាក់សោ App — local ដោយចេតនា ដូច `verifySecurityPin`; ការថយក្រោយធ្វើឲ្យ lockout **យូរជាង** ដែលជាទិសសុវត្ថិភាព',
+        noteAppLockExcuse: 'ត្រាពេលនៃសកម្មភាពដែលនាំអ្នកប្រើចេញពី App ដោយចេតនា (ខល · រើសឯកសារ · ស្កេនជីវមាត្រ) — local សុទ្ធសាធ ហើយអ្នកអានវា (`noteAppLockAway`) ឆ្លងកាត់ `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ Infinity ➜ **ចាក់សោ** ដែលជាទិសសុវត្ថិភាព',
         runBiometricUnlock: 'ការជាប់សោ PIN ដដែល',
         fetchCustomerDataTableRows: 'TTL cache និង cooldown ក្រោយបរាជ័យ — local',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',

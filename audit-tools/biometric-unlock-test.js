@@ -134,6 +134,7 @@ function makeEnv(opts) {
 
     const ctx = vm.createContext(sandbox);
     vm.runInContext('let lookupSecretKey = null; let pinTargetAction = null; let isVerifyingPin = false;', ctx);
+    vm.runInContext('let appLockExcuseAt = 0;', ctx);
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_STORAGE_KEY'), ctx);
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_PRF_SALT'), ctx);
     vm.runInContext('let biometricUnlockInFlight = false;', ctx);
@@ -143,7 +144,8 @@ function makeEnv(opts) {
         'isBiometricEnabled', 'biometricPlatformAvailable', 'wrapPinWithRawKey', 'unwrapPinWithRawKey',
         'biometricPrfBytes', 'enrollBiometricRecord', 'biometricUnlockPin', 'setBiometricBusy',
         'refreshBiometricUi', 'runBiometricUnlock', 'startBiometricEnrollment', 'toggleBiometricUnlock',
-        'initBiometricUi', 'completePinUnlock'
+        'initBiometricUi', 'completePinUnlock',
+        'noteAppLockExcuse'
     ].forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
     return { ctx, sandbox, log, els, store, prfKey };
 }

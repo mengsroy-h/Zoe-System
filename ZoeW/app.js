@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.22.0';
+    const APP_VERSION = '2.22.1';
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -1319,6 +1319,7 @@
     }
 
     async function biometricUnlockPin() {
+        noteAppLockExcuse();
         const rec = readBiometricRecord();
         if (!rec) return '';
         if (rec.mode === 'prf') {
@@ -1343,7 +1344,7 @@
         const btn = document.getElementById('pinBiometricBtn');
         if (!btn) return;
         btn.disabled = !!busy;
-        btn.textContent = busy ? 'កំពុងស្កេន...' : '👆 ស្កេនក្រយៅដៃ ឬមុខ';
+        btn.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
     }
 
     function refreshBiometricUi() {
@@ -1388,6 +1389,7 @@
     }
 
     async function startBiometricEnrollment(verifiedPin) {
+        noteAppLockExcuse();
         if (biometricUnlockInFlight) return;
         if (!verifiedPin) {
             alert('មិនអាចបើកបានទេ! សូមវាយលេខកូដ PIN ម្តងទៀត។');
@@ -1443,9 +1445,13 @@
     const APP_LOCK_SESSION_KEY = 'zoew_app_unlocked';
     const APP_LOCK_MAX_FAILS = 5;
     const APP_LOCK_LOCKOUT_MS = 60000;
+    const APP_LOCK_EXCUSE_WINDOW_MS = 60000;
+    const APP_LOCK_EXCUSE_SELECTOR = 'a[href^="tel:"], a[href^="mailto:"], a[download], a[target="_blank"], input[type="file"]';
 
     let appIsLocked = false;
     let appLockBusy = false;
+    let appLockExcuseAt = 0;
+    let appLockVeiled = false;
 
     function appLockPinIsSet() {
         try {
@@ -1475,6 +1481,44 @@
         return appLockPinIsSet() && !appLockUnlockedThisSession();
     }
 
+    function noteAppLockExcuse() {
+        appLockExcuseAt = Date.now();
+    }
+
+    function appLockClickIsExcusable(target) {
+        if (!target || typeof target.closest !== 'function') return false;
+        if (target.closest(APP_LOCK_EXCUSE_SELECTOR)) return true;
+        const label = target.closest('label[for]');
+        if (!label) return false;
+        const bound = document.getElementById(label.htmlFor);
+        return !!bound && bound.tagName === 'INPUT' && bound.type === 'file';
+    }
+
+    function noteAppLockAway() {
+        const excused = elapsedSince(appLockExcuseAt) < APP_LOCK_EXCUSE_WINDOW_MS;
+        appLockExcuseAt = 0;
+        if (appIsLocked || excused || !appLockPinIsSet()) return;
+        appLockVeiled = true;
+        showAppLockScreen(true);
+    }
+
+    function relockAppAfterAway() {
+        if (!appLockVeiled) return;
+        appLockVeiled = false;
+        showAppLockScreen();
+        if (isBiometricEnabled()) runAppLockBiometric(true);
+    }
+
+    function setupAppLockAwayGuard() {
+        document.addEventListener('click', (e) => {
+            if (appLockClickIsExcusable(e.target)) noteAppLockExcuse();
+        }, true);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) noteAppLockAway();
+            else relockAppAfterAway();
+        });
+    }
+
     function setAppLockMsg(text) {
         const host = document.getElementById('appLockMsg');
         if (host) host.textContent = text || '';
@@ -1487,7 +1531,7 @@
         const bio = document.getElementById('appLockBiometricBtn');
         if (bio) {
             bio.disabled = !!busy;
-            bio.textContent = busy ? 'កំពុងស្កេន...' : '👆 ស្កេនក្រយៅដៃ ឬមុខ';
+            bio.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
         }
     }
 
@@ -1500,8 +1544,9 @@
         if (bio) bio.classList.toggle('hidden', !isBiometricEnabled());
     }
 
-    function showAppLockScreen() {
+    function showAppLockScreen(keepSessionFlag) {
         appIsLocked = true;
+        if (keepSessionFlag !== true) clearAppUnlockedForSession();
         document.body.classList.add('app-locked');
         const screen = document.getElementById('appLockScreen');
         if (screen) {
@@ -1513,10 +1558,18 @@
         refreshAppLockUi();
         const input = document.getElementById('appLockPinInput');
         if (input) input.value = '';
+        const active = document.activeElement;
+        if (active && active !== input && typeof active.blur === 'function') {
+            try { active.blur(); } catch (e) { setAppLockMsg(''); }
+        }
+        if (input) {
+            try { input.focus(); } catch (e) { setAppLockMsg(''); }
+        }
     }
 
     function hideAppLockScreen() {
         appIsLocked = false;
+        appLockVeiled = false;
         document.body.classList.remove('app-locked');
         const screen = document.getElementById('appLockScreen');
         if (screen) {
@@ -1669,15 +1722,12 @@
 
     function initAppLock() {
         refreshAppLockUi();
+        setupAppLockAwayGuard();
         if (!appLockShouldArm()) {
             markAppUnlockedForSession();
             return;
         }
         showAppLockScreen();
-        const input = document.getElementById('appLockPinInput');
-        if (input) {
-            try { input.focus(); } catch (e) { setAppLockMsg(''); }
-        }
         if (isBiometricEnabled()) runAppLockBiometric(true);
     }
 
@@ -3231,6 +3281,8 @@
         pendingPermanentDeleteId = null;
         pendingHistoryPatches.clear();
         historyPatchFlushInFlight = false;
+        appLockExcuseAt = 0;
+        appLockVeiled = false;
         deletedSearchQuery = '';
         expandedTrashGroups.clear();
         activeParentItemId = null;
@@ -6336,6 +6388,7 @@
         if (pdfExportOriginalTitle === null) pdfExportOriginalTitle = document.title;
         document.title = getExportFilenameBase();
         window.addEventListener('afterprint', restoreAfterPdfExport);
+        noteAppLockExcuse();
         window.print();
     }
 
@@ -6570,6 +6623,7 @@
     }
 
     function requestCameraPermission() {
+        noteAppLockExcuse();
         if (isCameraStarting) return;
         isCameraStarting = true;
 
@@ -8688,6 +8742,7 @@
     }
 
     function handleCallAction(id) {
+        noteAppLockExcuse();
         const item = scanHistory.find(i => i.id === id);
         if (item) {
             const patchFields = { isCalled: true };

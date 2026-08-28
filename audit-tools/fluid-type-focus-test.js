@@ -71,16 +71,6 @@ const APPS = [
             { sel: '.brand-logo', px: 15 }
         ],
         shadowRings: [{ id: 'newSecurityPinInput' }]
-    },
-    {
-        name: 'ZoeImport', desktop: 900,
-        real: [
-            { sel: 'body', px: 14.5 },
-            { sel: '.brand', px: 14 },
-            { sel: '.gate-icon', px: 28 },
-            { sel: '.hint', px: 13 }
-        ],
-        shadowRings: [{ id: 'pinNewInput' }]
     }
 ];
 

@@ -90,6 +90,24 @@ for (const app of ['ZoeW']) {
         if (glidePauseFn) vm.runInContext(glidePauseFn, ctx);
         vm.runInContext('panelGlideTokens = 2; panelGlideRelease = 99;', ctx);
         vm.runInContext('scanConfirmCode = "ZTO9999000111"; scanConfirmCount = 1; scanConfirmAt = 123;', ctx);
+        // ស្ថានភាពនាំចូល Excel (កំណែ 2.21.0) — ចាក់ **កូដពិត** មិនមែន stub ទទេ
+        // ដូច្នេះតេស្តពិតជាបញ្ជាក់ថាការចាកចេញលុបកូនសោ AES · URL · ពាក្យសម្ងាត់
+        // នាំចូល។ ⛔ ការ stub វានឹងធ្វើឲ្យការធានានោះក្លាយជាការការពារដែលងាប់។
+        ['SHEET_IMPORT_FIELD_SELECT_IDS', 'SHEET_IMPORT_MSG_CLASSES'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *const ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        ['sheetImportKey', 'sheetImportUrl', 'sheetImportPassword', 'sheetImportWorkbook',
+         'sheetImportSheetRows', 'sheetImportHeaders', 'sheetImportSignature', 'sheetImportBusy'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        ['setSheetImportMsg', 'showSheetImportPart', 'clearSheetImportSession'].forEach((n) => {
+            const fn = sliceFn(src, n);
+            if (fn) vm.runInContext(fn, ctx);
+        });
+        vm.runInContext("sheetImportKey = { fake: 'aes-key' }; sheetImportUrl = 'https://script.google.com/macros/s/SECRET/exec';"
+            + " sheetImportPassword = 'import-pw'; sheetImportSignature = 'sig'; sheetImportBusy = true;", ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
         if (helper) vm.runInContext(helper, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
@@ -115,6 +133,12 @@ for (const app of ['ZoeW']) {
         ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
             'the barcode held for scan confirmation does not survive logout',
             vm.runInContext('scanConfirmCode', ctx));
+        const sheetImport = vm.runInContext(
+            "({ key: sheetImportKey, url: sheetImportUrl, pw: sheetImportPassword, sig: sheetImportSignature, busy: sheetImportBusy })", ctx);
+        ok(sheetImport.key === null && sheetImport.url === '' && sheetImport.pw === '',
+            'ចាកចេញ ➜ កូនសោ AES · URL · ពាក្យសម្ងាត់នាំចូល Excel មិនរស់រានទេ', sheetImport);
+        ok(sheetImport.sig === '' && sheetImport.busy === false,
+            'ចាកចេញ ➜ សម័យនាំចូល Excel ត្រូវ reset អស់ (គ្មានសោជាប់)', sheetImport);
 
         if (!pinOpen) {
             ok(ctx[stateVar] === null,

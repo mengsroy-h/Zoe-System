@@ -43,7 +43,6 @@ const ROOT = process.env.MONOGATE_APP_DIR
 const FILES = [
     'ZoeW/app.js',
     'ZoeKeyGen/app.js',
-    'ZoeImport/app.js',
     'ZoeW/license-verify.js'
 ];
 
@@ -158,7 +157,13 @@ for (const rel of FILES) {
 }
 
 ok('ជាន់អប្បបរមា ៖ ស្កេនឯកសារ App យ៉ាងតិច ៣ (រកឃើញ ' + filesScanned + ')', filesScanned >= 3);
-ok('ជាន់អប្បបរមា ៖ `elapsedSince()` មានក្នុង App យ៉ាងតិច ៣ (រកឃើញ ' + helperFiles + ')', helperFiles >= 3);
+// ⛔ ជាន់អប្បបរមា **២** មិនមែន ៣ ៖ `elapsedSince()` ជា helper ចែករំលែក
+// រវាង `ZoeW/app.js` និង `ZoeKeyGen/app.js` ប៉ុណ្ណោះ។ `license-verify.js`
+// មិនដែលមានវាទេ (វាជា REST-only ដែលមាន helper បណ្តាញផ្ទាល់ខ្លួន) ហើយ
+// App ទី ៣ (`ZoeImport`) ត្រូវលុបចេញពី repo ក្នុងកំណែ 2.21.0 ព្រោះមុខងារ
+// របស់វាផ្លាស់ចូល ZoeW។ ⛔ កុំបន្ថយវាទាបជាង ២ — ២ ជាចំនួន App ដែល
+// `shared-fns.js` ចាក់សោថា helper នេះត្រូវ byte-identical។
+ok('ជាន់អប្បបរមា ៖ `elapsedSince()` មានក្នុង App យ៉ាងតិច ២ (រកឃើញ ' + helperFiles + ')', helperFiles >= 2);
 ok('ជាន់អប្បបរមា ៖ រកឃើញកន្លែងហៅ `elapsedSince()` យ៉ាងតិច ១០ (រកឃើញ ' + callSites + ')', callSites >= 10);
 ok('គ្មានការដកនាឡិកាឆៅក្រៅ `elapsedSince()`', offenders.length === 0, offenders.slice(0, 8));
 

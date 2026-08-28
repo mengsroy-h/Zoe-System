@@ -223,47 +223,6 @@ console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ t
         clearAt !== -1 && refreshAt !== -1 && clearAt < refreshAt, { clearAt, refreshAt });
 }
 
-// ── ៥. ZoeImport ៖ សូចនាករតំណ ត្រូវតាមការពិតរាល់ការហៅ ─────────────
-console.log('\n-- ៥. ZoeImport ៖ ស្ថានភាពតំណត្រូវប្តូរតាមលទ្ធផលពិត --');
-{
-    const js = read('ZoeImport/app.js');
-    const html = read('ZoeImport/index.html');
-    const call = sliceFn(js, 'callApi') || '';
-    ok('ZoeImport ៖ មានសូចនាករក្នុងរបាខាងលើ',
-        /id="linkStatusDot"/.test(html) && /id="linkStatusText"/.test(html));
-    ok('ZoeImport ៖ callApi បដិសេធមុនចេញដំណើរ ពេលឧបករណ៍ក្រៅបណ្ដាញ',
-        /navigator\.onLine === false/.test(call) && /setLinkState\('offline'\)/.test(call));
-    ok('ZoeImport ៖ callApi កត់ត្រាជោគជ័យពិត', /setLinkState\('ok'\)/.test(call));
-    ok('ZoeImport ៖ callApi កត់ត្រាការបរាជ័យពិត (មិនទុកសូចនាករបៃតងចោល)',
-        /setLinkState\('bad'\)/.test(call));
-    ok('ZoeImport ៖ ព្រឹត្តិការណ៍បណ្តាញគូរសូចនាករឡើងវិញ',
-        /addEventListener\('online', renderLinkStatus\)/.test(js) &&
-        /addEventListener\('offline', renderLinkStatus\)/.test(js));
-    ok('ZoeImport ៖ ចាក់សោវិញ ➜ សូចនាករត្រឡប់ទៅ «មិនទាន់ភ្ជាប់»',
-        /setLinkState\('idle'\)/.test(sliceFn(js, 'resetSessionState') || ''));
-    ok('ZoeImport ៖ toast ចាត់ថ្នាក់តាមសញ្ញាក្នុងសារ', /function toastKindOf\(/.test(js));
-
-    // ⛔ ចន្លោះពិត (វាស់ក្នុងជុំ 2.20.3)៖ ZoeImport គូរសូចនាករឡើងវិញតែពេល
-    // `online`/`offline` បាញ់ប៉ុណ្ណោះ។ ប៉ុន្តែលើទូរស័ព្ទ បណ្តាញដែលត្រឡប់មកវិញ
-    // **ជាញឹកញាប់មិនបាញ់ `online`** សោះ (`navigator.onLine` នៅ `true` ពេញ
-    // ការដាច់) ➜ ការត្រឡប់មក App វិញបង្ហាញ «ក្រៅបណ្ដាញ» ខុស រហូតដល់អ្នកប្រើ
-    // Refresh ដោយដៃ។ ZoeW និង ZoeKeyGen បិទចន្លោះនេះតាំងពី 2.19.3 —
-    // ZoeImport ត្រូវបានទុកចោល។ នេះជាមេរៀនដដែល៖ **ត្រូវអះអាងព្រឹត្តិការណ៍
-    // ដោយផ្ទាល់ លើ App ទាំង ៣ មិនមែនតែ App ដែលកំពុងកែ**។
-    ok('⛔ ZoeImport ៖ ការត្រឡប់មក foreground គូរសូចនាករឡើងវិញ (`online` អាចមិនបាញ់)',
-        /visibilitychange[\s\S]{0,200}?renderLinkStatus\(\)/.test(js),
-        'គ្មាន handler `visibilitychange` ➜ ស្ថានភាពតំណជាប់ខុសរហូតដល់ Refresh');
-
-    // ⛔ ZoeW និង ZoeKeyGen ពិនិត្យកំណែថ្មីតាម `reg.update()` ដែលមានពិដាន;
-    // ZoeImport ចុះឈ្មោះ service worker រួច **មិនពិនិត្យបច្ចុប្បន្នភាពសោះ** ➜
-    // PWA ដែលដំឡើងរួច អាចជាប់នៅកំណែចាស់ដោយគ្មានទីបញ្ចប់។
-    ok('⛔ ZoeImport ៖ ពិនិត្យកំណែថ្មីរបស់ service worker (មានពិដាន)',
-        /reg\.update\(\)/.test(js) && /SW_UPDATE_MIN_GAP_MS/.test(js),
-        'registerServiceWorker() មិនហៅ reg.update() ➜ អ្នកប្រើជាប់នៅកំណែចាស់');
-    ok('ZoeImport ៖ ការពិនិត្យកំណែមិនបាញ់ខណៈក្រៅបណ្ដាញ',
-        /const throttledSwUpdate = \(\) => \{\s*\n\s*if \(navigator\.onLine === false\) return;/.test(js));
-}
-
 // ── ៦. ក្នុង browser ពិត ៖ CSS ពិត + កូដពិត ─────────────────────────
 const PROBE_FNS = ['toastKindOf', 'paintToast', 'armToastDismiss', 'showToast', 'settleLiveToast',
     'showLiveToast', 'refreshLiveToasts', 'liveToastState', 'connectionLooksOnline',
@@ -545,47 +504,6 @@ function readToast(page) {
             }
         } catch (e) {
             ok(app + ' ៖ ការវាស់ក្នុង browser រត់បាន', false, String(e && e.message));
-        }
-        await ctx.close();
-        server.close();
-    }
-
-    // ZoeImport ៖ ការបាត់បណ្តាញពិត ត្រូវផ្លាស់សូចនាករដោយគ្មានការ Refresh
-    {
-        const dir = path.join(ROOT, 'ZoeImport');
-        const server = await serve(dir);
-        const port = server.address().port;
-        const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
-        const page = await ctx.newPage();
-        await page.route('**', (route) => {
-            const u = route.request().url();
-            if (u.startsWith('http://127.0.0.1:' + port)) return route.continue();
-            return route.abort();
-        });
-        try {
-            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-            await page.waitForTimeout(1200);
-            const before = await page.evaluate(() => {
-                const t = document.getElementById('linkStatusText');
-                return { text: t.textContent, colour: getComputedStyle(t).color, cls: t.className };
-            });
-            await ctx.setOffline(true);
-            await page.waitForTimeout(300);
-            const after = await page.evaluate(() => {
-                const t = document.getElementById('linkStatusText');
-                return { text: t.textContent, colour: getComputedStyle(t).color, cls: t.className };
-            });
-            await ctx.setOffline(false);
-            await page.waitForTimeout(300);
-            const back = await page.evaluate(() => document.getElementById('linkStatusText').textContent);
-            ok('ZoeImport ៖ បណ្តាញដាច់ ➜ សូចនាករប្តូរភ្លាមដោយគ្មាន Refresh',
-                after.text !== before.text && after.text.indexOf('ក្រៅបណ្ដាញ') !== -1, { before, after });
-            ok('ZoeImport ៖ ហើយប្តូរពណ៌ដែរ មិនត្រឹមតែអត្ថបទ',
-                after.colour !== before.colour, { before, after });
-            ok('ZoeImport ៖ បណ្តាញមកវិញ ➜ ត្រឡប់ទៅស្ថានភាពពិតវិញ',
-                back === before.text, { back, before: before.text });
-        } catch (e) {
-            ok('ZoeImport ៖ ការវាស់ក្នុង browser រត់បាន', false, String(e && e.message));
         }
         await ctx.close();
         server.close();

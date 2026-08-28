@@ -28,7 +28,7 @@ function readCsp(app) {
 }
 
 // === ផ្នែកទី ១ — ស្តាទិច ===
-for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
+for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const dir = path.join(appRoot, app);
     if (!fs.existsSync(dir)) continue;
     const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');

@@ -328,6 +328,9 @@
         <button type="button" class="drawer-item" data-act="drawerLockerSettingsFlow">
             <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
         </button>
+        <button type="button" class="drawer-item" data-act="drawerSheetImportFlow">
+            <span class="ico">📥</span><span>នាំចូល Excel ទៅ Sheet</span>
+        </button>
         <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" data-act="drawerBiometricFlow">
             <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>
         </button>
@@ -443,6 +446,119 @@ const firebaseConfig = {
                 <button class="btn-confirm" data-act="saveLookupApiConfig">រក្សាទុក</button>
             </div>
             <button class="btn-cancel" data-act="closeModal" data-args='["lookupApiConfigModal"]'>បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="sheetImportModal" class="modal" data-close="closeSheetImportModal">
+    <div class="modal-content si-modal-content">
+        <h3>📥 នាំចូល Excel ទៅ Sheet</h3>
+        <p>អាន .xlsx · .xls · .csv ពីឧបករណ៍ រួចសរសេរចូល Google Sheet ដដែលដែល «API ស្វែងរកអតិថិជន» ទាញយក។</p>
+        <div class="si-scroll">
+
+            <section class="si-card" id="siConfigCard">
+                <h4 class="si-card-title"><span class="si-step">1</span> ការតភ្ជាប់</h4>
+                <div id="siConfigSummary" class="si-summary hidden"></div>
+                <div id="siConfigForm">
+                    <label class="si-label" for="siApiUrlInput">Web app URL របស់ Apps Script</label>
+                    <input type="url" id="siApiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
+                    <label class="si-label" for="siApiPasswordInput">ពាក្យសម្ងាត់នាំចូល (IMPORT_PASSWORD)</label>
+                    <input type="password" id="siApiPasswordInput" autocomplete="off">
+                    <div class="modal-btns">
+                        <button type="button" class="btn-confirm" id="siConfigSaveBtn" data-act="saveSheetImportConfig">សាកល្បង និងរក្សាទុក</button>
+                    </div>
+                </div>
+                <div class="modal-btns hidden" id="siConfigEditRow">
+                    <button type="button" class="btn-cancel" data-act="editSheetImportConfig">កែការតភ្ជាប់</button>
+                </div>
+                <div id="siConfigMsg" class="si-msg-host"></div>
+            </section>
+
+            <section class="si-card hidden" id="siFileCard">
+                <h4 class="si-card-title"><span class="si-step">2</span> ជ្រើសឯកសារ</h4>
+                <button type="button" class="si-drop" id="siDrop" data-act="pickSheetImportFile">
+                    <strong>ចុចដើម្បីជ្រើសឯកសារ</strong>
+                    <span>ឬទម្លាក់ឯកសារនៅទីនេះ — .xlsx · .xls · .csv</span>
+                </button>
+                <input type="file" id="siFileInput" class="hidden" accept=".xlsx,.xls,.csv,.tsv" data-act="handleSheetImportFileInput" data-on="change" data-self="1">
+                <div id="siFileMsg" class="si-msg-host"></div>
+            </section>
+
+            <section class="si-card hidden" id="siMapCard">
+                <h4 class="si-card-title"><span class="si-step">3</span> ការផ្គូផ្គង Column</h4>
+                <div class="si-grid">
+                    <div class="si-field">
+                        <label class="si-label" for="siSheetSel">Tab ក្នុងឯកសារ</label>
+                        <select id="siSheetSel" data-act="loadSheetImportSelectedSheet" data-on="change"></select>
+                    </div>
+                    <div class="si-field">
+                        <label class="si-label" for="siHeaderRowInput">ជួរដេក header</label>
+                        <input type="number" id="siHeaderRowInput" min="1" value="1" data-act="applySheetImportHeaderRow" data-on="change">
+                    </div>
+                    <div class="si-field">
+                        <label class="si-label" for="siMapBarcode">A · Barcode</label>
+                        <select id="siMapBarcode" data-act="renderSheetImportPreview" data-on="change"></select>
+                    </div>
+                    <div class="si-field">
+                        <label class="si-label" for="siMapDod">B · DOD($)</label>
+                        <select id="siMapDod" data-act="renderSheetImportPreview" data-on="change"></select>
+                    </div>
+                    <div class="si-field">
+                        <label class="si-label" for="siMapCod">C · COD($)</label>
+                        <select id="siMapCod" data-act="renderSheetImportPreview" data-on="change"></select>
+                    </div>
+                    <div class="si-field">
+                        <label class="si-label" for="siMapPhone">D · Phone</label>
+                        <select id="siMapPhone" data-act="renderSheetImportPreview" data-on="change"></select>
+                    </div>
+                </div>
+                <div id="siMapMsg" class="si-msg-host"></div>
+                <div class="si-chips" id="siChips"></div>
+                <div class="table-responsive si-preview hidden" id="siPreviewWrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Barcode</th>
+                                <th>DOD($)</th>
+                                <th>COD($)</th>
+                                <th>Phone</th>
+                            </tr>
+                        </thead>
+                        <tbody id="siPreviewBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="si-card hidden" id="siActionCard">
+                <h4 class="si-card-title"><span class="si-step">4</span> នាំចូល</h4>
+                <label class="si-label" for="siModeSel">របៀបនាំចូល</label>
+                <select id="siModeSel">
+                    <option value="replace">សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស (សម្រាប់ប្រើប្រចាំថ្ងៃ)</option>
+                    <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ</option>
+                    <option value="newOnly">បន្ថែមតែ Barcode ថ្មី — មិនប៉ះជួរចាស់</option>
+                </select>
+                <div class="modal-btns">
+                    <div class="modal-btns-row">
+                        <button type="button" class="btn-confirm" id="siImportBtn" data-act="runSheetImport">នាំចូលទៅ Sheet</button>
+                        <button type="button" class="btn-cancel" data-act="resetSheetImportFileSelection">ជ្រើសឯកសារផ្សេង</button>
+                    </div>
+                </div>
+                <div id="siActionMsg" class="si-msg-host"></div>
+            </section>
+
+            <section class="si-card si-card-danger hidden" id="siClearCard">
+                <h4 class="si-card-title"><span class="si-step si-step-warn">🗑️</span> សម្អាតទិន្នន័យចាស់</h4>
+                <p class="si-hint">លុប <strong>គ្រប់ជួរដេក</strong> ក្នុង Sheet ដោយទុកតែជួរ header។ ប្រើពេលចង់ចាប់ផ្តើមថ្ងៃថ្មីពីទទេ ដោយមិនទាន់នាំចូលឯកសារភ្លាម។</p>
+                <div class="modal-btns">
+                    <button type="button" class="si-btn-danger" id="siClearBtn" data-act="runSheetImportClear">សម្អាតទិន្នន័យក្នុង Sheet</button>
+                </div>
+                <div id="siClearMsg" class="si-msg-host"></div>
+            </section>
+
+            <p class="si-foot" id="siStatusFoot"></p>
+        </div>
+        <div class="modal-btns">
+            <button type="button" class="btn-cancel" data-act="closeSheetImportModal">បិទ</button>
         </div>
     </div>
 </div>

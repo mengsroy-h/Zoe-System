@@ -41,7 +41,7 @@ function sliceKeyframes(css, name) {
     return css.slice(start, i);
 }
 
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 const CHROME_SELECTORS = ['.app-navbar', '.app-pages', '.page-tabbar', '.app-container', '.app-body'];
 
 // === ផ្នែកទី ១ — រចនាសម្ព័ន្ធ ===
@@ -118,7 +118,7 @@ for (const app of APPS) {
     const html = fs.readFileSync(path.join(ROOT, app, 'index.html'), 'utf8');
     const flagsSrc = fs.readFileSync(path.join(ROOT, app, 'boot-flags.js'), 'utf8');
 
-    // App ដែលគ្មាន host ខាងក្រៅសោះ (ZoeImport) ➜ គ្មានអ្វីត្រូវធ្វើឲ្យ async
+    // App ដែលគ្មាន host ខាងក្រៅសោះ ➜ គ្មានអ្វីត្រូវធ្វើឲ្យ async
     if (!/sentry-cdn\.com|fonts\.googleapis\.com/.test(html)) {
         ok(app + ': គ្មានធនធានឆ្លង origin ក្នុង <head> សោះ (ល្អជាងគេ)', true);
         ok(app + ': សំណាញ់សុវត្ថិភាពត្រូវ **រៀបចំពេល DOM រួចរាល់**',

@@ -25,7 +25,7 @@ const ROOT = process.env.VERSIONSCOPE_APP_DIR
     ? path.resolve(process.env.VERSIONSCOPE_APP_DIR)
     : path.resolve(__dirname, '..');
 const BASE = process.env.VERSIONSCOPE_BASE || 'origin/main';
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // ឯកសារដែលបម្រើដល់អ្នកប្រើពិត — README/manifest មិនប៉ះឥរិយាបថ runtime
 const SHIPPED = /\.(js|css|html|wasm|json)$/;

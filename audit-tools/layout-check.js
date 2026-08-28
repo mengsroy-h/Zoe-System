@@ -43,7 +43,6 @@ const DESKTOP_MIN_CONTAINER = 900;
 const DESKTOP = {
     ZoeW: { container: '.app-pages', card: '.app-card', reveal: [], hide: [] },
     ZoeKeyGen: { container: '.app-container', card: '.app-card', reveal: ['#appContainer'], hide: [] },
-    ZoeImport: { container: '#appMain', card: '.card', reveal: ['#appMain', '.card'], hide: ['#pinGate'] }
 };
 
 const cardRowsAt = (page, cfg) => page.evaluate((c) => {
@@ -58,7 +57,7 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
+    for (const app of ['ZoeW', 'ZoeKeyGen']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
         const server = await serve(dir);

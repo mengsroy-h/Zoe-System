@@ -7,7 +7,7 @@ const path = require('path');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const APP_ROOT = process.env.COMMENTS_APP_DIR ? path.resolve(process.env.COMMENTS_APP_DIR) : path.resolve(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 const EXTERNAL = new Set(['qrcode.js', 'test.js']);
 const files = [];
 for (const app of APPS) {

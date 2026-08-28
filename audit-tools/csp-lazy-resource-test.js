@@ -35,7 +35,7 @@ const ROOT = path.resolve(process.env.CSPLAZY_APP_DIR || path.join(__dirname, '.
 // SheetJS 0.18.5 ដូចដែល unpkg ធ្លាប់បម្រើ — SRI ដើមរបស់ ZoeW ជាភស្តុតាង
 const XLSX_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
 
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -131,7 +131,7 @@ for (const app of APPS) {
 
 // ── ២. SheetJS ត្រូវនៅក្នុង repo — កុំនាំវាទៅ CDN ────────────────────
 console.log('\n-- ២. SheetJS ស្ថិតក្នុង repo (ច្បាប់ដដែលនឹង ZXing) --');
-for (const app of ['ZoeW', 'ZoeImport']) {
+for (const app of ['ZoeW']) {
     const rel = app + '/vendor/xlsx.full.min.js';
     ok(app + ' ៖ មានឯកសារ vendor', exists(rel));
     if (!exists(rel)) continue;
@@ -153,7 +153,7 @@ for (const app of ['ZoeW', 'ZoeImport']) {
 
 // ── ៣. ធនធាននោះត្រូវនៅក្នុងសំបក ➜ Export ដើរពេលក្រៅបណ្ដាញដែរ ────────
 console.log('\n-- ៣. ធនធានផ្ទុកយឺត ត្រូវនៅក្នុងសំបករបស់ service worker --');
-for (const app of ['ZoeW', 'ZoeImport']) {
+for (const app of ['ZoeW']) {
     const sw = read(app + '/sw.js');
     const inShell = /['"]\.\/vendor\/xlsx\.full\.min\.js['"]/.test(sw);
     ok(app + ' ៖ `./vendor/xlsx.full.min.js` នៅក្នុង CORE_SHELL ឬ OPTIONAL_SHELL', inShell);

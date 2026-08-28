@@ -79,44 +79,6 @@ ok('ZoeKeyGen អានតួឆ្លងកាត់ readBody ក្នុង�
     !/await res\.json\(\)/.test(kgSrc),
     (kgSrc.match(/^.*await res\.json\(\).*$/gm) || []).join(' | '));
 
-// === ផ្នែកទី ១ឃ — ZoeImport ត្រូវគោរពច្បាប់ដដែល ===
-// **ចន្លោះដែលបិទក្នុងជុំ deep audit៖** ផ្នែកខាងលើកត់ត្រាមេរៀនថា «ពេលសរសេរ
-// checker ត្រូវសួរថា វាស្កេនឯកសារ*ណា*ខ្លះ» — តែឯកសារនេះខ្លួនវាផ្ទាល់
-// **នៅតែមិនស្កេន `ZoeImport/app.js`** ដដែល។ `callApi()` របស់ ZoeImport
-// ជាផ្លូវបណ្តាញ **តែមួយ** នៃ App នោះ (ទៅ Apps Script) ហើយវាដើរលើបណ្តាញ
-// ទូរស័ព្ទដដែល។ កូដបច្ចុប្បន្នត្រឹមត្រូវ — ការអះអាងទាំងនេះការពារកុំឲ្យវា
-// ធ្លាក់ចូលថ្នាក់កំហុសដដែលនឹង `license-verify.js` និង ZoeKeyGen។
-const ziPath = path.join(ROOT, 'ZoeImport', 'app.js');
-if (fs.existsSync(ziPath)) {
-    const ziSrc = fs.readFileSync(ziPath, 'utf8');
-    ok('ZoeImport/app.js មាន fetchWithTimeout ដែលប្រើ AbortController',
-        /function fetchWithTimeout\(/.test(ziSrc) && /new AbortController\(\)/.test(ziSrc));
-    ok('ZoeImport គ្មាន fetch() ឆៅក្រៅ helper',
-        (ziSrc.match(/(?<!function )\bfetch\(/g) || []).length ===
-        (ziSrc.match(/await fetch\(url, Object\.assign/g) || []).length,
-        'fetch ឆៅ៖ ' + (ziSrc.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).map((l) => l.trim()).join(' | '));
-    ok('ZoeImport គ្មាន `withTimeout(fetch(` នៅសល់',
-        !/withTimeout\(\s*fetch\(/.test(ziSrc));
-    // ⛔ ចំណុចសំខាន់៖ តួត្រូវអានក្នុងបង្អួច timeout។ បើ `clearTimeout` រត់
-    // មុន `res.text()` នោះ server ដែលផ្ញើ header រួចឈប់ផ្ញើតួ នឹងធ្វើឲ្យ
-    // ការនាំចូល **ព្យួររហូត** ដោយគ្មានអ្វីបញ្ឈប់វា។
-    const ziFn = /async function fetchWithTimeout\([\s\S]*?\n}/.exec(ziSrc);
-    ok('ស្រង់ fetchWithTimeout ពិតចេញពី ZoeImport បាន', !!ziFn);
-    if (ziFn) {
-        const body = ziFn[0];
-        const readIdx = body.indexOf('res.text()');
-        const clearIdx = body.indexOf('clearTimeout');
-        ok('ZoeImport អានតួ **មុន** clearTimeout (តួស្ថិតក្នុងបង្អួចការពារ)',
-            readIdx !== -1 && clearIdx !== -1 && readIdx < clearIdx,
-            'read@' + readIdx + ' clear@' + clearIdx);
-        ok('ZoeImport clearTimeout ក្នុង finally (មិនលេចធ្លាយ timer លើផ្លូវបរាជ័យ)',
-            /finally\s*\{[\s\S]*?clearTimeout/.test(body));
-    }
-    // សំណើទៅ Apps Script ត្រូវនៅជា **simple request** — មើល CLAUDE.md
-    ok('ZoeImport រក្សា Content-Type: text/plain (គ្មាន preflight OPTIONS)',
-        /text\/plain/.test(ziSrc) && !/'Authorization'/.test(ziSrc));
-}
-
 // === ផ្នែកទី ២ — ឥរិយាបថពិតក្នុង Chromium ===
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) {

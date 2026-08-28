@@ -10,11 +10,13 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = process.env.SECRET_APP_DIR || path.join(__dirname, '..');
-// ⚠️ ZoeImport ត្រូវរួមបញ្ចូលដែរ — វាកាន់ **ពាក្យសម្ងាត់នាំចូល**
-// (`apiPassword`) និង **កូនសោ AES** (`configKey`) ក្នុង state កម្រិត module
-// ព្រមទាំងវាល `apiPasswordInput` ក្នុង DOM។ ការទុកវាក្រៅបញ្ជីនេះជាថ្នាក់
+// ⚠️ App `ZoeImport` ត្រូវលុបចេញពី repo ក្នុងកំណែ 2.21.0 — មុខងារនាំចូល
+// របស់វាផ្លាស់ចូល **ZoeW ផ្ទាល់**។ ដូច្នេះ **ពាក្យសម្ងាត់នាំចូល**
+// (`sheetImportPassword`) និង **កូនសោ AES** (`sheetImportKey`) ព្រមទាំងវាល
+// `siApiPasswordInput` ក្នុង DOM ឥឡូវរស់នៅក្នុង `ZoeW/app.js` ➜ ការស្កេន
+// ZoeW គ្របពួកវារួចហើយ។ ⛔ កុំបន្ថយវិសាលភាពនៃឯកសារដែលស្កេន — នោះជាថ្នាក់
 // «checker ស្កេនឯកសារណាខ្លះ» ដដែលនឹង 2.12.1 · 2.16.0 · 2.19.1។
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // ធាតុនីមួយៗត្រូវមានហេតុផលសរសេរជាប់ — ធាតុគ្មានហេតុផលនឹងលាក់ការលេចធ្លាយបន្ទាប់។
 const ACCEPTED = {
@@ -39,7 +41,6 @@ function logoutClearedIds(src) {
     }
 
     // ២) ការសម្អាតដោយផ្ទាល់ក្នុង showLoginModalWithPrefill / clearSensitiveModalFields / clearSigningKey
-    // ZoeImport ប្រើឈ្មោះផ្សេង៖ `lockApp()` ➜ `resetSessionState()` ➜ `clearSensitiveFields()`
     ['showLoginModalWithPrefill', 'clearSensitiveModalFields', 'clearSigningKey',
      'lockApp', 'resetSessionState', 'clearSensitiveFields'].forEach((fnName) => {
         const start = src.indexOf('function ' + fnName + '(');

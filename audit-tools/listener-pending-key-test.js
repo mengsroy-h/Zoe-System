@@ -43,7 +43,7 @@ try { acorn = require('acorn'); } catch (e) {
 }
 
 const ROOT = process.env.PENDINGKEY_APP_DIR ? path.resolve(process.env.PENDINGKEY_APP_DIR) : path.resolve(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {

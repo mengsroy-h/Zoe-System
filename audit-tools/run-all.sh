@@ -148,15 +148,16 @@ run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
+run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
 
 echo
 echo
-echo "== ខ្សែសង្វាក់នាំចូល (ZoeImport · zto-import) =="
-# ⚠️ ពួកវាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។
-# ហេតុផលនោះលែងស៊ីគ្នាហើយ ៖ ZoeImport ជា PWA ដែល ship ពិត ហើយ checker ១២
-# គ្របវារួចហើយ (layout · csp · clock · fluid-type · adaptive-link …)។
-# ការទុកវាក្រៅមានន័យថា assertion ១០៥ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
-run "ZoeImport/test.js" node ZoeImport/test.js
+echo "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
+# ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។
+# ការទុកវាក្រៅមានន័យថា assertion ៥០ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
+# ⛔ ចំណាំ ៖ `zto-import` ជាខាង **server** នៃមុខងារ «នាំចូល Excel ទៅ Sheet»
+# ដែលរស់នៅក្នុង ZoeW តាំងពីកំណែ 2.21.0 (App `ZoeImport` ត្រូវលុបចេញហើយ) ➜
+# វាកាន់តែសំខាន់ជាងមុន។ ខាង client ចាក់សោដោយ `sheet-import-test.js`។
 run "zto-import/test.js" node zto-import/test.js
 
 echo "== ទម្លាប់គម្រោង =="
@@ -281,6 +282,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     STORAGE_APP_DIR="$BASE" node audit-tools/storage-guard.js 2>&1 | tail -1 | sed 's/^/   storage-guard:   /'
     TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
+    SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
 fi
 
 echo

@@ -75,6 +75,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             'let dbListenerRecoveryAttempt = 0;\n' +
             'let dbListenerOutageNoticeShown = false;\n' +
             'const dbListenerPendingPaths = new Set();\n' +
+            'const dbListenerFailedPaths = new Set();\n' +
         'let infoListenersFailed = false;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
@@ -243,6 +244,7 @@ function buildContext() {
         'let hasEverConnectedToDatabase = true;\n' +
         'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
+        'const dbListenerFailedPaths = new Set();\n' +
         'let infoListenersFailed = false;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
@@ -250,7 +252,8 @@ function buildContext() {
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
-        'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths) });\n' +
+        'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths), ' +
+        'failed: Array.from(dbListenerFailedPaths) });\n' +
         'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
         'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
@@ -335,6 +338,139 @@ function buildContext() {
     const back = t.log.toasts.filter((m) => m.indexOf('ភ្ជាប់មកវិញ') !== -1);
     ok('សារជូនដំណឹងថាភ្ជាប់មកវិញ ១ ដង', back.length === 1, t.log.toasts);
     ok('កាលវិភាគស្តារត្រូវលុប', t.probe().dbListenerRecoveryTimer === null);
+}
+
+// ── ៥ខ. ⛔ listener ដែលងាប់ **តែឯង** មិនត្រូវត្រូវប្រកាសថាជាសះស្បើយ
+//        ដោយ snapshot របស់ **បងប្អូន** ─────────────────────────────────
+//
+// 🔴 ចន្លោះពិត។ scenario ៤ និង ៥ ខាងលើបាញ់ `errCb` **ភ្លាមក្រោយ
+// `initDatabaseListeners()`** ➜ path ទាំង ៦ នៅ **pending** ➜ ល័ក្ខខ័ណ្ឌ
+// `dbListenerPendingPaths.size` ក្នុង `noteDbListenerAlive()` ការពារទង់ជាប់
+// ដោយចៃដន្យ។ ស្ថានភាពពិតរបស់អ្នកប្រើគឺ **ផ្ទុយពីនោះ**៖ App ដំណើរការមួយ
+// សន្ទុះ ➜ path ទាំង ៦ **មកដល់គ្រប់** (pending ទទេ) ➜ **ក្រោយមក** path
+// មួយទើបងាប់ (`permission_denied` លើ node តែមួយ · rules ប្តូរ · listener
+// ត្រូវ server cancel)។
+//
+// ក្នុងស្ថានភាពនោះ snapshot បន្ទាប់ពី path **ណាមួយផ្សេង** (ប្រវត្តិប្តូរ
+// រាល់ការស្កេន) ធ្វើឲ្យ `noteDbListenerAlive()` ឃើញ `pending.size === 0`
+// ➜ លុបទង់បរាជ័យ · លុបកាលវិភាគស្តារ · បោះ toast «ភ្ជាប់មកវិញហើយ» ➜
+// **listener ដែលងាប់មិនដែលត្រូវ attach ឡើងវិញទេ ពេញវគ្គ**។
+//
+// ផលដែលវាស់បាន ៖ ចំណុចស្ថានភាព **បៃតង** ខណៈទិន្នន័យកក។ ហើយបើ path
+// ដែលងាប់ជា `deleted` នោះវាធ្ងន់ជាង៖ `deletedItems` នៅកក ខណៈច្រកទ្វារ
+// `dbListenerPendingPaths.has('deleted')` ក្នុង `clearStaleRestoreMarkers()`
+// និង `dropStaleRestoreMarkers()` **បើកចំហ** (កូនសោនោះលែង pending) ➜
+// marker របស់ឧបករណ៍ *ផ្សេង* ដែលកំពុងស្តារត្រូវលុប ➜ `permission_denied`
+// ➜ «ដក»/«លុប» ស្លាប់ជារៀងរហូត (ថ្នាក់ដដែលនឹង 2.20.1 និង 2.17.3)។
+//
+// ⛔ មេរៀនអំពីឧបករណ៍ ៖ សំណួរមិនមែនត្រឹម «checker អះអាងអ្វី» ទេ — ត្រូវសួរ
+// **«វាដាក់ប្រព័ន្ធក្នុង *ស្ថានភាព* ណា មុនអះអាង?»**។ ការអះអាងត្រឹមត្រូវ
+// ក្នុងស្ថានភាពដែលកំហុសមិនអាចកើត គឺជាបៃតងក្លែងក្លាយ។
+{
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    const snap = (v) => ({ val: () => v });
+
+    // ១. App ដំណើរការធម្មតា ៖ path ទាំង ៦ មកដល់គ្រប់ ➜ pending ទទេ
+    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+        .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
+    ok('រៀបចំ ៖ path ទាំង ៦ មកដល់គ្រប់ ➜ គ្មាន pending',
+        t.probe().pending.length === 0 && t.probe().dbListenersFailed === false, t.probe());
+
+    const attachedBefore = t.log.attached.length;
+
+    // ២. **ក្រោយមក** path `deleted` ងាប់តែឯង
+    t.listenerCallbacks.deleted.errCb(new Error('permission_denied'));
+    ok('listener `deleted` ងាប់ ➜ ទង់បរាជ័យត្រូវលើក',
+        t.probe().dbListenersFailed === true);
+
+    // ៣. snapshot របស់ **បងប្អូន** មកដល់ (ប្រវត្តិប្តូររាល់ការស្កេន)
+    t.listenerCallbacks.history.cb(snap(null));
+    ok('⛔ snapshot របស់ path ផ្សេង **មិនត្រូវ** លុបទង់បរាជ័យ',
+        t.probe().dbListenersFailed === true, t.probe());
+    ok('⛔ ស្ថានភាពមិនត្រូវប្រកាសថាភ្ជាប់រួចរាល់',
+        t.api.connectionLooksOnline() === false);
+    const falseBack = t.log.toasts.filter((m) => m.indexOf('ភ្ជាប់មកវិញ') !== -1);
+    ok('⛔ គ្មានសារ «ភ្ជាប់មកវិញហើយ» ក្លែងក្លាយ', falseBack.length === 0, t.log.toasts);
+    ok('⛔ កាលវិភាគស្តារត្រូវនៅរស់', t.probe().dbListenerRecoveryTimer !== null);
+
+    // ៤. ជណ្តើរស្តារត្រូវ attach ឡើងវិញពិត
+    t.advance(3000);
+    ok('⛔ listener ដែលងាប់ត្រូវ attach ឡើងវិញពិត',
+        t.log.attached.length === attachedBefore + 6, t.log.attached.length);
+
+    // ៥. ⛔ ទិសផ្ទុយ ៖ ក្រោយ attach ឡើងវិញ ការមកដល់គ្រប់ path ត្រូវ
+    //    លុបទង់ដដែល — ការកែមិនត្រូវធ្វើឲ្យទង់ជាប់ជារៀងរហូត។
+    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+        .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
+    ok('⛔ ទិសផ្ទុយ ៖ ការជាសះស្បើយពិត នៅតែលុបទង់បរាជ័យដដែល',
+        t.probe().dbListenersFailed === false, t.probe());
+    ok('⛔ ទិសផ្ទុយ ៖ សារ «ភ្ជាប់មកវិញហើយ» ចេញ ១ ដងក្រោយការជាសះស្បើយពិត',
+        t.log.toasts.filter((m) => m.indexOf('ភ្ជាប់មកវិញ') !== -1).length === 1, t.log.toasts);
+}
+
+// ── ៥ខ២. ⛔ ទិសផ្ទុយ ៖ ច្រកទ្វារថ្មីមិនត្រូវ **ជាប់** ជារៀងរហូត ─────────
+//
+// ការតាមដានតាម path បិទរន្ធ «បៃតងក្លែងក្លាយ» — តែវាបើករន្ធផ្ទុយ៖ បើកូនសោ
+// ដែលងាប់មិនត្រូវលុបចេញពេល path នោះ **ដឹងខ្លួនវិញ** នោះ App ជាប់
+// «កំពុងភ្ជាប់ឡើងវិញ...» ជារៀងរហូត ហើយច្រកទ្វារ marker បិទជាប់ ➜
+// ការសម្អាត marker ងាប់ក៏ស្លាប់ដែរ។ ការអះអាងត្រូវមាន **២ ខាង** ជានិច្ច។
+{
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    const snap = (v) => ({ val: () => v });
+    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+        .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
+
+    t.listenerCallbacks.deleted.errCb(new Error('permission_denied'));
+    ok('រៀបចំ ៖ `deleted` ត្រូវកត់ថាងាប់', t.probe().failed.indexOf('deleted') !== -1, t.probe());
+
+    // path ដដែលនោះដឹងខ្លួនវិញ (RTDB អាចបញ្ជូន snapshot មកវិញដោយខ្លួនឯង)
+    t.listenerCallbacks.deleted.cb(snap(null));
+    ok('⛔ path ដែលងាប់ដឹងខ្លួនវិញ ➜ កូនសោត្រូវលុបចេញ',
+        t.probe().failed.length === 0, t.probe());
+    ok('⛔ ទង់បរាជ័យត្រូវរលត់ (ច្រកទ្វារមិនជាប់ជារៀងរហូត)',
+        t.probe().dbListenersFailed === false, t.probe());
+    ok('⛔ ស្ថានភាពត្រឡប់មកបៃតងវិញ', t.api.connectionLooksOnline() === true);
+}
+
+// ── ៥គ. ច្រកទ្វារ «ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត» ត្រូវរាប់ការងាប់ ──
+//
+// ច្រកទ្វារនៃ marker (2.20.1) សួរតែ `dbListenerPendingPaths.has('deleted')`។
+// កូនសោនោះត្រូវ **លុបចេញ** ពេល snapshot ដំបូងមកដល់ ➜ listener ដែលងាប់
+// **ក្រោយមក** មិនធ្វើឲ្យវាត្រឡប់មកវិញទេ ➜ ច្រកទ្វារបើកចំហលើទិន្នន័យកក។
+// ⛔ ត្រូវមានមូលដ្ឋាន **តែមួយ** ដែលរាប់ទាំង «មិនទាន់មកដល់» និង «ងាប់»។
+{
+    const guardFn = sliceFn('dbListenerViewIsStale');
+    ok('មានមូលដ្ឋានតែមួយ `dbListenerViewIsStale()` សម្រាប់ «ទិដ្ឋភាពមិនគួរទុកចិត្ត»',
+        !!guardFn, guardFn);
+    if (guardFn) {
+        ok('`dbListenerViewIsStale()` រាប់ទាំង pending និង failed',
+            /dbListenerPendingPaths\.has/.test(guardFn) && /dbListenerFailedPaths\.has/.test(guardFn), guardFn);
+    }
+    const marker = (sliceFn('clearStaleRestoreMarkers') || '') + '\n' + (sliceFn('dropStaleRestoreMarkers') || '');
+    ok('ច្រកទ្វារ marker ទាំង ២ ប្រើមូលដ្ឋាននោះ',
+        (marker.match(/dbListenerViewIsStale\(DB_LISTENER_KEY_DELETED\)/g) || []).length === 2, marker.slice(0, 300));
+    // ⛔ ការសួរដោយផ្ទាល់ត្រូវរស់នៅ **ក្នុង helper តែមួយ** — គ្រប់កន្លែងផ្សេង
+    // ត្រូវហៅ helper នោះ។ ការរាប់ត្រូវធ្វើ **ក្រៅតួ helper** ដើម្បីកុំឲ្យ
+    // ការអះអាងក្លាយជាការលើកលែងដែលងាប់។
+    const outsideHelper = guardFn ? SRC.split(guardFn).join('') : SRC;
+    ok('⛔ គ្មានច្រកទ្វារណានៅសួរ `dbListenerPendingPaths.has()` ដោយផ្ទាល់ទៀតទេ',
+        !/dbListenerPendingPaths\.has\(/.test(outsideHelper), 'នៅមានការសួរដោយផ្ទាល់');
+}
+
+// ── ៥ឃ. រាល់ `onValue` ត្រូវប្រាប់ **ថា path ណា** ដែលងាប់ ────────────
+//
+// `handleDbListenerError` ដែលបញ្ជូនទទេ មិនអាចដឹងថា path ណាងាប់ទេ ➜
+// ការតាមដានតាម path ក្លាយជា **ការការពារដែលងាប់** (ថ្នាក់ដដែលនឹង 2.20.1)។
+{
+    const initFn = sliceFn('initDatabaseListeners') || '';
+    const bare = (initFn.match(/,\s*handleDbListenerError\s*\)/g) || []).length;
+    ok('⛔ គ្មាន `onValue(..., handleDbListenerError)` ទទេ (ត្រូវបញ្ជូនកូនសោ path)',
+        bare === 0, bare);
+    const keyed = (initFn.match(/handleDbListenerError\(\s*\w+\s*,/g) || []).length;
+    ok('រាល់ listener ទាំង ៦ បញ្ជូនកូនសោ path ចូល handleDbListenerError',
+        keyed === 6, keyed);
 }
 
 // ── ៦. ការសម្អាតស្វ័យប្រវត្តិមិនត្រូវរត់លើទិន្នន័យកក ─────────────────

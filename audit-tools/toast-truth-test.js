@@ -325,7 +325,7 @@ function buildProbe(app) {
 
 const http = require('http');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png' };
-function serve(dir, port) {
+function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -335,7 +335,7 @@ function serve(dir, port) {
             rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' });
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
@@ -356,11 +356,11 @@ function readToast(page) {
     }
     console.log('\n-- ៦. browser ពិត ៖ CSS ពិត + កូដពិត --');
     const browser = await chromium.launch({ executablePath: CHROME });
-    let port = 8560;
     for (const app of APPS) {
         const probe = buildProbe(app);
         const dir = path.join(ROOT, app);
-        const server = await serve(dir, port);
+        const server = await serve(dir);
+        const port = server.address().port;
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         await page.route('**', (route) => {
@@ -548,13 +548,13 @@ function readToast(page) {
         }
         await ctx.close();
         server.close();
-        port++;
     }
 
     // ZoeImport ៖ ការបាត់បណ្តាញពិត ត្រូវផ្លាស់សូចនាករដោយគ្មានការ Refresh
     {
         const dir = path.join(ROOT, 'ZoeImport');
-        const server = await serve(dir, port);
+        const server = await serve(dir);
+        const port = server.address().port;
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         await page.route('**', (route) => {

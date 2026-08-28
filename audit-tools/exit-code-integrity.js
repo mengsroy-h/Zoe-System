@@ -163,22 +163,50 @@ const runnable = checkers.filter((rel) => {
     return !/playwright-core/.test(src);       // browser checkers ៖ ថ្លៃពេក សម្រាប់ការពុល
 });
 
-// ⛔ ឧបករណ៍នេះកែឯកសារ checker **នៅនឹងកន្លែង** មួយៗ រួចស្តារវិញ។ បើវាត្រូវ
-// សម្លាប់កណ្តាលផ្លូវ (`timeout` របស់ `run-all.sh` ផ្ញើ SIGTERM មុន SIGKILL
-// ១០ វិនាទី) នោះឯកសារនោះនឹងនៅ **ពុល** ក្នុង repo ➜ ការ commit បន្ទាប់
-// នឹងបញ្ចូល checker ដែលបាក់។ ដូច្នេះការស្តារត្រូវធានាដោយ ៣ ផ្លូវ៖
-// `finally` · `process.on('exit')` · និង handler របស់ signal។
-const originals = new Map();
-function restoreAll() {
-    for (const [file, src] of originals) {
-        try { fs.writeFileSync(file, src); } catch (e) {}
+// ⛔⛔ **ឯកសារដើមរបស់ checker មិនត្រូវត្រូវសរសេរជាន់ឡើយ។**
+//
+// 🔴 ជំនាន់មុនរបស់ឯកសារនេះពុល checker **នៅនឹងកន្លែង** រួចស្តារវិញតាម ៣ ផ្លូវ
+// (`finally` · `process.on('exit')` · handler របស់ signal)។ ការការពារនោះ
+// **មិនអាចដំណើរការបានទេ** ៖ រង្វិលជុំពុលហៅ `execFileSync` ដែល **ទប់ event
+// loop** ➜ handler របស់ SIGTERM ជា callback JS ដែល **រត់មិនបាន** ខណៈការហៅ
+// នោះកំពុងទប់។ `run-all.sh` ប្រើ `timeout -k 10 300` ➜ SIGTERM (រត់មិនបាន)
+// រួច **SIGKILL** ១០ វិនាទីក្រោយ ដែល **គ្មាន handler ណាចាប់បានសោះ**។
+//
+// វាស់បាន ៖ ការពុល ៥៣ checker × ពិដាន ៦០ វិ. ក្នុងមួយ ➜ គ្រាន់តែ checker
+// **៤** ដែលឈានដល់ពិដាន ក៏លើស ៣០០ វិ. ដែរ (ការរត់ធម្មតា ៧២ វិ.)។ ផលនៃ
+// ការសម្លាប់ ៖ `audit-tools/<checker>.js` នៅ **ពុល** ក្នុង working tree ➜
+// `git commit -a` បន្ទាប់ ship checker ដែល `cond = false` ជាប់ជាប់ ➜
+// **ឧបករណ៍ audit ខ្លួនវាបាក់ដោយស្ងាត់** — ជាថ្នាក់អាក្រក់ជាងបៃតងក្លែងក្លាយ។
+//
+// ការកែ ៖ ពុលចូល **ឯកសារស្រមោលក្បែរឯកសារដើម** (ថតដដែល ➜ `__dirname`,
+// `require` ទាក់ទង និង `__filename` នៅដំណើរការដូចដើម) រួចលុបវាចោល។
+// ឯកសារដើម **មិនដែលត្រូវបើកសរសេរសោះ** ➜ ការសម្លាប់នៅចំណុចណាក៏ដោយ
+// (រួមទាំង SIGKILL) **មិនអាចធ្វើឲ្យ repo ខូចបានទេ**។ សំណល់ដែលនៅសល់ជា
+// ឯកសារ `.tmp-poison-*` ដែលគ្មានគ្រោះថ្នាក់ ហើយត្រូវបោសចោលពេលចាប់ផ្តើម។
+const POISON_PREFIX = '.tmp-poison-';
+const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu')];
+
+function sweepPoisonLeftovers() {
+    for (const dir of POISON_DIRS) {
+        let names = [];
+        try { names = fs.readdirSync(dir); } catch (e) { continue; }
+        for (const n of names) {
+            if (!n.startsWith(POISON_PREFIX)) continue;
+            try { fs.unlinkSync(path.join(dir, n)); } catch (e) {}
+        }
     }
-    originals.clear();
 }
-process.on('exit', restoreAll);
+
+const shadows = new Set();
+function dropShadows() {
+    for (const f of shadows) { try { fs.unlinkSync(f); } catch (e) {} }
+    shadows.clear();
+}
+process.on('exit', dropShadows);
 ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((sig) => {
-    process.on(sig, () => { restoreAll(); process.exit(1); });
+    process.on(sig, () => { dropShadows(); process.exit(1); });
 });
+sweepPoisonLeftovers();
 
 let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [];
 try {
@@ -187,11 +215,14 @@ try {
         const src = fs.readFileSync(file, 'utf8');
         const bad = poisonSource(src);
         if (!bad) { unpoisonable.push(rel); continue; }
-        originals.set(file, src);
-        fs.writeFileSync(file, bad);
+        // ⛔ ស្រមោល **ក្បែរ** ឯកសារដើម — ថតដដែល ➜ `__dirname` ·
+        // `require('./x')` · `__filename` នៅដំណើរការដូចដើម។
+        const shadow = path.join(path.dirname(file), POISON_PREFIX + process.pid + '-' + path.basename(file));
+        shadows.add(shadow);
+        fs.writeFileSync(shadow, bad);
         let rc = 0, out = '';
         try {
-            out = String(cp.execFileSync(process.execPath, [file], {
+            out = String(cp.execFileSync(process.execPath, [shadow], {
                 cwd: ROOT, timeout: BUDGET_MS, stdio: ['ignore', 'pipe', 'pipe'],
                 env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' })
             }) || '');
@@ -199,8 +230,8 @@ try {
             rc = (e.status === undefined || e.status === null) ? 'timeout/crash' : e.status;
             out = String((e.stdout || '') + (e.stderr || ''));
         }
-        fs.writeFileSync(file, src);
-        originals.delete(file);
+        try { fs.unlinkSync(shadow); } catch (e) {}
+        shadows.delete(shadow);
         poisoned++;
         if (rc !== 0) continue;
         // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
@@ -214,7 +245,8 @@ try {
         fakeGreen.push(rel);
     }
 } finally {
-    restoreAll();
+    dropShadows();
+    sweepPoisonLeftovers();
 }
 
 const MIN_POISONED = 25;

@@ -26,3 +26,7 @@ audit-tools/emu/real.rules.json
 # files and would try to npm install a package.json it finds there.
 /package.json
 /package-lock.json
+
+# ឯកសារស្រមោលបណ្តោះអាសន្នរបស់ audit-tools/exit-code-integrity.js
+# (ការរត់ដែលត្រូវសម្លាប់អាចបន្សល់វា — វាមិនត្រូវចូល repo ឡើយ)
+audit-tools/.tmp-poison-*

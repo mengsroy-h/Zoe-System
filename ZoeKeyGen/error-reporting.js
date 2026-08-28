@@ -106,44 +106,68 @@
         return value;
     }
 
+    function shallowCopy(value) {
+        if (Array.isArray(value)) return value.slice();
+        const out = {};
+        const keys = Object.keys(value);
+        for (let i = 0; i < keys.length; i++) {
+            try { out[keys[i]] = value[keys[i]]; } catch (e) {}
+        }
+        return out;
+    }
+
     function redactDeep(value, depth, seen, budget) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
         if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return '[truncated]';
-        if (seen.has(value)) return value;
-        seen.add(value);
+        if (seen.has(value)) return seen.get(value);
+        seen.set(value, value);
         budget.n++;
+
+        let target = value;
+        const put = (key, next) => {
+            if (target === value) {
+                try {
+                    target[key] = next;
+                    if (target[key] === next) return;
+                } catch (e) {}
+                target = shallowCopy(value);
+                seen.set(value, target);
+            }
+            try { target[key] = next; } catch (e) {}
+        };
+
         if (Array.isArray(value)) {
             for (let i = 0; i < value.length; i++) {
-                if (budget.n >= REDACT_MAX_NODES) { value[i] = redactOverBudget(value[i]); continue; }
-                value[i] = redactDeep(value[i], depth + 1, seen, budget);
+                if (budget.n >= REDACT_MAX_NODES) { put(i, redactOverBudget(value[i])); continue; }
+                put(i, redactDeep(value[i], depth + 1, seen, budget));
             }
-            return value;
+            return target;
         }
         const keys = Object.keys(value);
         for (let i = 0; i < keys.length; i++) {
             try {
                 if (isSecretKeyName(keys[i]) && value[keys[i]] !== null && value[keys[i]] !== undefined
                     && typeof value[keys[i]] !== 'function') {
-                    value[keys[i]] = '[redacted]';
+                    put(keys[i], '[redacted]');
                     continue;
                 }
-                if (budget.n >= REDACT_MAX_NODES) { value[keys[i]] = redactOverBudget(value[keys[i]]); continue; }
-                value[keys[i]] = redactDeep(value[keys[i]], depth + 1, seen, budget);
+                if (budget.n >= REDACT_MAX_NODES) { put(keys[i], redactOverBudget(value[keys[i]])); continue; }
+                put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget));
             } catch (e) {}
         }
-        return value;
+        return target;
     }
 
     function redactBreadcrumb(crumb) {
-        try { redactDeep(crumb, 0, new Set(), { n: 0 }); } catch (e) {}
+        try { return redactDeep(crumb, 0, new Map(), { n: 0 }); } catch (e) {}
         return crumb;
     }
 
     function redactEvent(event) {
         try {
             if (!event) return event;
-            redactDeep(event, 0, new Set(), { n: 0 });
+            return redactDeep(event, 0, new Map(), { n: 0 });
         } catch (e) {}
         return event;
     }

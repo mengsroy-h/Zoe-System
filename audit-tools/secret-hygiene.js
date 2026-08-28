@@ -184,6 +184,76 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('⛔ `keyId` ជាលេខ ត្រូវ **រក្សាទុក**', ev2.extra.keyId === 42, JSON.stringify(ev2.extra.keyId));
         ok('⛔ `count` ត្រូវ **រក្សាទុក**', ev2.extra.count === 7, JSON.stringify(ev2.extra.count));
         ok('⛔ `closedAt` ត្រូវ **រក្សាទុក**', ev2.extra.closedAt === 1756200000000, JSON.stringify(ev2.extra.closedAt));
+
+        // ⛔⛔ ចន្លោះទី ៣ ៖ **វត្ថុដែលសរសេរជាន់មិនបាន** (កំណែ 2.20.8)
+        //
+        // 🔴 វាស់បានលើកូដពិត ៖ `redactDeep()` កែ **នៅនឹងកន្លែង**
+        // (`value[k] = '[redacted]'`)។ ក្នុង `'use strict'` ការសរសេរទៅលើ
+        // property ដែល frozen · `writable: false` · ឬមាន getter តែម្យ៉ាង
+        // **បោះ TypeError** ➜ `try/catch` ដែលរុំវា **លេបកំហុសនោះ** ➜
+        // **តម្លៃដើមរស់រានចូល payload របស់ Sentry**។
+        //
+        // វាធ្ងន់ជាងការបាត់កូនសោមួយ ៖ ពេលវត្ថុមួយ frozen នោះ **រាល់ខ្សែអក្សរ
+        // ខាងក្នុងវា** ក៏សរសេរជាន់មិនបានដែរ ➜ URL ដែលមាន `token=` ·
+        // header `Bearer` · JWT · deployment ID របស់ Apps Script
+        // **ឆ្លងកាត់ដោយមិនត្រូវលាក់សោះ** ➜ ស្រទាប់ការពារទាំងមូល **រំលង
+        // ដោយស្ងាត់** សម្រាប់ subtree នោះ។ (ថ្នាក់ «ការការពារដែលងាប់»។)
+        //
+        // ⛔ ការអះអាងត្រូវអាន **តម្លៃដែលត្រឡប់មកវិញ** មិនមែនវត្ថុដើម —
+        // ការកែត្រូវអនុញ្ញាតឲ្យ redactor ត្រឡប់ **ច្បាប់ចម្លងដែលលាក់រួច**
+        // ពេលការកែនៅនឹងកន្លែងធ្វើមិនបាន។
+        {
+            const frozen = { extra: Object.freeze({ pin: '1234', barcode: 'B1' }) };
+            const outF = api.redactEvent(frozen);
+            ok('⛔ វត្ថុ frozen ៖ `pin` ត្រូវលាក់',
+                outF && outF.extra && outF.extra.pin === '[redacted]', JSON.stringify(outF && outF.extra));
+            ok('⛔ វត្ថុ frozen ៖ `barcode` នៅតែរក្សាទុក (២ ខាង)',
+                outF && outF.extra && outF.extra.barcode === 'B1', JSON.stringify(outF && outF.extra));
+
+            const frozenUrl = Object.freeze({ url: 'https://x/y?token=SECRET123' });
+            const outU = api.redactEvent(frozenUrl);
+            ok('⛔ វត្ថុ frozen ៖ ខ្សែអក្សរខាងក្នុងក៏ត្រូវលាក់ដែរ',
+                outU && typeof outU.url === 'string' && outU.url.indexOf('SECRET123') === -1,
+                JSON.stringify(outU));
+
+            const ro = { extra: {} };
+            Object.defineProperty(ro.extra, 'password',
+                { value: 'p@ss', enumerable: true, writable: false, configurable: false });
+            const outR = api.redactEvent(ro);
+            ok('⛔ property `writable: false` ៖ `password` ត្រូវលាក់',
+                outR && outR.extra && outR.extra.password === '[redacted]', JSON.stringify(outR && outR.extra));
+
+            const getterOnly = { extra: {} };
+            Object.defineProperty(getterOnly.extra, 'secret',
+                { get: () => 'S3CRET', enumerable: true, configurable: true });
+            const outG = api.redactEvent(getterOnly);
+            ok('⛔ property ដែលមាន getter តែម្យ៉ាង ៖ `secret` ត្រូវលាក់',
+                outG && outG.extra && outG.extra.secret === '[redacted]', JSON.stringify(outG && outG.extra));
+
+            // ⛔ ការសរសេរដែល **បរាជ័យស្ងាត់ៗ** (setter ដែលមិនធ្វើអ្វី) — វា
+            // **មិនបោះកំហុសទេ** ➜ `try/catch` តែម្យ៉ាងចាប់មិនបាន។ ត្រូវ
+            // **ផ្ទៀងផ្ទាត់ថាការសរសេរជាប់ពិត** មុនជឿថាការលាក់សម្រេច។
+            const noopSetter = { extra: {} };
+            Object.defineProperty(noopSetter.extra, 'token',
+                { get: () => 'T0KEN', set: () => {}, enumerable: true, configurable: true });
+            const outN = api.redactEvent(noopSetter);
+            ok('⛔ setter ដែលមិនធ្វើអ្វី ៖ `token` ត្រូវលាក់ពិត (មិនត្រឹមតែសរសេរចោល)',
+                outN && outN.extra && outN.extra.token === '[redacted]', JSON.stringify(outN && outN.extra));
+
+            const frozenArr = { extra: Object.freeze([{ pin: '99' }]) };
+            const outA = api.redactEvent(frozenArr);
+            ok('⛔ array ដែល frozen ៖ ធាតុខាងក្នុងក៏ត្រូវលាក់ដែរ',
+                outA && outA.extra && outA.extra[0] && outA.extra[0].pin === '[redacted]',
+                JSON.stringify(outA && outA.extra));
+
+            // ⛔ ២ ខាង ៖ វត្ថុធម្មតាត្រូវ **កែនៅនឹងកន្លែងដដែល** — ការត្រឡប់
+            // ច្បាប់ចម្លងជានិច្ចនឹងបំបែកអ្នកហៅដែលពឹងលើអត្តសញ្ញាណវត្ថុ។
+            const plain = { extra: { pin: 'x', note: 'keep' } };
+            const outP = api.redactEvent(plain);
+            ok('⛔ ២ ខាង ៖ វត្ថុធម្មតានៅតែត្រូវកែនៅនឹងកន្លែង (មិនចម្លងឥតប្រយោជន៍)',
+                outP === plain && plain.extra.pin === '[redacted]' && plain.extra.note === 'keep',
+                JSON.stringify(plain));
+        }
     } else {
         ok('ZoeErrors បង្ហាញ `redactEvent` ➜ ការលាក់តាមឈ្មោះកូនសោវត្ថុត្រូវវាស់បាន',
             false, 'គ្មាន `redactEvent` ➜ តម្លៃក្រោមកូនសោដូច `{ pin: … }` `{ apiKey: … }` '

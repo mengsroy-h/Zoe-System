@@ -135,7 +135,12 @@ check(/appLockPinIsSet\(\)\s*&&\s*!appLockUnlockedThisSession\(\)/.test(armFn),
     'សោចាក់តែពេល **មាន PIN** ហើយ **មិនទាន់ដោះក្នុងវគ្គនេះ**', armFn);
 
 const sessionFn = sliceFn(appJs, 'appLockUnlockedThisSession');
-check(/sessionStorage\.getItem\(APP_LOCK_SESSION_KEY\)/.test(sessionFn),
+// ⛔ កំណែ 2.22.5 ៖ storage ចូលប្រើតាម shim `appSessionStore` (getter ខ្លួនវា
+// បោះពេល browser បិទ site data) ➜ លំនាំត្រូវទទួល **ទាំង ២** ឈ្មោះ។
+// ⚠️ អ្វីដែលការអះអាងនេះការពារពិតគឺ **`sessionStorage` ធៀបនឹង `localStorage`**
+// (វគ្គ ធៀបនឹងអចិន្ត្រៃយ៍) — មិនមែនផ្លូវចូលប្រើទេ។
+check(/(?:appSessionStore|sessionStorage)[^)]*APP_LOCK_SESSION_KEY/.test(sessionFn)
+        && !/appLocalStore|localStorage/.test(sessionFn),
     '⛔ ទង់ដោះសោរស់នៅ sessionStorage (ការផ្ទុកឡើងវិញ ➜ មិនចាក់សោ; បិទបើក App ➜ ចាក់សោ)', sessionFn);
 
 const logoutFn = sliceFn(appJs, 'logoutApp');

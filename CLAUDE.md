@@ -188,6 +188,8 @@
 | សម្ពាធបណ្តាញ | ពិដានចំនួនស្របគ្នា | `network-pressure` · `license-network-pressure` |
 | Service worker | cache-first; Cache API បរាជ័យ ≠ App ដាច់ | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` |
 | **ការរង់ចាំគ្មានពិដាន** | ⛔ បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `stall-guard-test` |
+| **storage ដែលត្រូវបិទ** | ⛔ `window.localStorage` **getter ខ្លួនវា** បោះ | `storage-guard` · `storage-blocked-boot-test` |
+| **dependency អវត្តមាន** | ⛔ `TypeError` synchronous រំលង `.catch()` | `camera-resume-test` |
 | CSP | គ្មាន `on*=`; ធនធានផ្ទុកយឺតត្រូវឆ្លង CSP | `csp-enforced-test` · `csp-lazy-resource-test` |
 | XSS | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `html-sink-escaping` · `inline-handler-xss-test` |
 | ការលេចធ្លាយ secret | redaction ដើរលើ event ទាំងមូល | `secret-hygiene` |
@@ -1240,6 +1242,149 @@ element (រចនាសម្ព័ន្ធ — ពង្រឹងមិនប
 (គ្មាន backend) · `zto-import` Apps Script (ការកែក្នុង repo មិនប្តូរ script
 ដែល deploy រួច)។ **ទាំង ៣ ជាការទទួលយកដោយចេតនា មិនមែនចន្លោះទេ** — កុំសាង
 ឧបករណ៍សម្រាប់ពួកវាដោយគ្មានការស្នើ។
+
+### ⛔ storage ដែលត្រូវបិទ ➜ App ដាច់ទាំងស្រុង (កំណែ 2.22.5)
+
+> 🔴 **រន្ធធ្ងន់បំផុតដែលរកឃើញរហូតមក** តាមផលប៉ះពាល់ ៖ App **មិនដំណើរការសោះ**
+> ហើយអ្នកប្រើ **ដោះមិនរួច** (ផ្ទាំង boot ជាប់រហូត គ្មានសារកំហុស)។
+
+ពេលអ្នកប្រើ (ឬ policy) បិទ site data ទាំងស្រុង — Chrome «Block all cookies» ·
+Firefox strict · policy សហគ្រាស — នោះការប៉ះ `window.localStorage` **ខ្លួនវា**
+បោះ `SecurityError`។ ⛔ **វាមិនមែនត្រឹមការសរសេរទេ** ៖ `storage-guard.js`
+ធ្លាប់គ្របតែ `setItem`/`removeItem`/`clear` ដោយផ្អែកលើហេតុផល
+«QuotaExceededError»។
+
+ហើយ `app.js` អានវា **កម្រិត top-level** ៖
+
+```js
+let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
+```
+
+កូដ top-level ដែលបោះ **បញ្ឈប់ការវាយតម្លៃឯកសារទាំងមូល** ➜ អ្វីៗខាងក្រោមវា
+មិនរត់សោះ ៖ `initAppLock()` · `window.addEventListener('load')` ដែលហៅ
+`initFirebase()` · `revealAppAfterBoot()`។ វាស់បានក្នុង Chromium ពិត ៖
+
+| | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| ផ្ទាំង boot | **ជាប់រហូត** | បាត់ធម្មតា |
+| កំហុស runtime | **១** | **០** |
+| ខ្លឹមសារលើអេក្រង់ (ZoeW) | ~១០០ តួ | **៦២៨ តួ** |
+
+ច្បាប់៖
+
+- **`appLocalStore` / `appSessionStore` ជាផ្លូវតែមួយទៅ storage** — ពួកវាអាន
+  `window.localStorage` **ក្នុង `try` តែម្តង** នៅដើមឯកសារ ហើយអាចជា `null`។
+- **`safeStoreGet()` · `safeStoreSet()` · `safeStoreRemove()` ត្រូវទ្រាំនឹង
+  `null` store** (`store ? … : null`) — មិនត្រឹមរុំ `try` ទេ។
+- ⛔ **ហេតុអ្វី `safeStoreSet(localStorage, …)` ដែលមានស្រាប់មិនគ្រប់គ្រាន់** ៖
+  argument វាយតម្លៃ **មុន** ចូល function ➜ បើ **getter** ជាអ្នកបោះ នោះការហៅ
+  បោះ **នៅកន្លែងហៅ** មិនមែនក្នុង `try` របស់ helper ទេ។ **វាស់បានពិត** ៖
+  `safeStoreSet(localStorage, 'a', '1')` ➜ 🔴 បោះ `SecurityError`។
+- ⛔ **កុំវិនិច្ឆ័យដោយ `typeof <fn> === 'function'`** — function declaration
+  ត្រូវ **hoist** ➜ វាត្រឡប់ `true` ទោះឯកសារធ្លាក់ត្រង់បន្ទាត់ដំបូង។ សញ្ញាពិត ៖
+  **ផ្ទាំង boot ជាប់** និង **កំហុស runtime**។
+- ✅ **`boot-flags.js` · `license-verify.js` · `error-reporting.js` រុំ `try`
+  រួចហើយ** — កុំ «កែ» ពួកវា។
+
+Test៖ **`storage-guard.js`** (ស្តាទិច) និង **`storage-blocked-boot-test.js`**
+(ឥរិយាបថ ១៨ assertion; ធ្លាក់ **៩** លើ `origin/main`)។
+Mutation ៖ **៦ ➜ ចាប់បាន ៥** (`window.localStorage` · `globalThis.X` ·
+`window['X']` · `boot-flags.js` ក្រៅ try · ដក `try` ចេញពី shim) ហើយ **១ ជា
+equivalent mutant** — `safeStoreGet` ដែលមិនពិនិត្យ `null` ៖ `store.getItem()`
+លើ `null` បោះ `TypeError` ដែល `try` ចាប់រួច ➜ **លទ្ធផលដដែល**។
+⛔ ការសរសេរ `store ? … : null` ច្បាស់ជាង តែ **មិនចាំបាច់តាមមុខងារ** —
+កុំរាប់វាជាការការពារដែលបាត់។
+
+### ⛔⛔ checker ស្តាទិចអាចងងឹតភ្នែក — checker ឥរិយាបថមិនអាចទេ (កំណែ 2.22.5)
+
+> 🔴 **អ្នកប្រើសួរត្រង់ៗ (2026-08-28)** ៖ *«ហេតុអ្វីធ្វើអោយ checker ងងឹតងងុល?
+> ចុះជុំក្រោយៗដែលពឹងលើ checker?»* — សំណួរនេះត្រូវឆ្លើយដោយការវាស់។
+
+**ជុំនេះបង្កើតបៃតងក្លែងក្លាយដោយខ្លួនឯង រួចចាប់វាបាន។** លំដាប់ ៖
+
+១. ជំនួស `localStorage` ➜ `appLocalStore` ទាំង **៧៥ កន្លែង**
+២. `storage-guard.js` រាយ **«គ្មានការការពារ: 0» ➜ ✅ បៃតង**
+៣. តែការហៅផ្ទាល់ **៣០ នៅដដែល** — គ្រាន់តែប្តូរឈ្មោះ
+៤. ហើយ **កាន់តែអាក្រក់** ៖ shim អាចជា `null` ➜ ការហៅផ្ទាល់បោះ `TypeError`
+   ជំនួស `SecurityError`
+
+⛔ **ជាន់អប្បបរមាចាស់មិនបានចាប់វាទេ** ព្រោះវារាប់ `helperCalls` (៣៨) ចូល
+ផលបូក ➜ លើសកម្រិត ២០ ➜ ឆ្លងកាត់។ **ការសង្ស័យរបស់មនុស្សទើបចាប់បាន**
+(«ហេតុអ្វី `0` ភ្លាមៗ?»)។
+
+**ការវាស់ដែលឆ្លើយសំណួរ** — ចាក់កំហុសពិតចូល ដោយសរសេរជា
+`window.localStorage.getItem(...)` (MemberExpression មិនមែន Identifier)៖
+
+| checker | លទ្ធផល |
+|---|---|
+| `storage-guard` (**ស្តាទិច**) | 🔴 **បៃតងក្លែងក្លាយ — មើលមិនឃើញ** |
+| `storage-blocked-boot-test` (**ឥរិយាបថ**) | ✅ **ចាប់បាន** |
+
+**ច្បាប់ ៖ checker ស្តាទិចចាក់សោ *ឈ្មោះ*; checker ឥរិយាបថចាក់សោ *លទ្ធផល*។**
+ការប្តូរឈ្មោះ · refactor · ផ្លាស់កូដទៅឯកសារថ្មី **បញ្ឆោតបានតែប្រភេទទី ១**។
+ដូច្នេះរាល់ថ្នាក់កំហុសដែល **វាស់បានក្នុង browser** គួរមាន checker ឥរិយាបថ —
+ការស្កេនស្តាទិចជា **ជាន់ទី ២ ដែលលឿន** មិនមែនជាការការពារតែមួយទេ។
+
+**ការធ្វើឲ្យ checker ស្តាទិចសុក្រឹត្យ (៤ ចន្លោះដែលបិទ)**៖
+
+| ចន្លោះ | ការកែ |
+|---|---|
+| គ្របតែ **ការសរសេរ** | គ្រប `getItem`/`key` ដែរ |
+| ស្កេនតែ **`app.js`** | ស្កេនឯកសារ ship **ទាំង ៥** ក្នុង App នីមួយៗ |
+| ចាប់តែ **Identifier** | បូក `window.X` · `globalThis.X` · `self.X` · `window['X']` |
+| ចាប់តែ **ការហៅ method** | ⛔ **ការប៉ះ storage ខ្លួនវាក៏បោះដែរ** — វាជា **getter** ➜ `const s = window.localStorage;` ក្រៅ try រអិលកាត់។ វាស់បាន ៖ mutation ដែលដក `try` ចេញពី shim **រស់រាន** មុនកែ |
+| **parse error ➜ រំលងស្ងាត់** | parse error ជា **ការធ្លាក់** (ឯកសារ ship ខូច) |
+
+បូក **ជាន់អប្បបរមាទី ២ ៖ ចំនួន *ឯកសារ* ដែលស្កេន** — ជាន់ដែលរាប់តែ «ចំនួន
+ការហៅ» ត្រូវបញ្ឆោតបានដោយ refactor ដែលរក្សាផលបូក។
+
+### ⛔ ការ refactor ផ្លូវចូលប្រើ ➜ sandbox ១១ បាក់ក្នុងពេលតែមួយ (កំណែ 2.22.5)
+
+ការប្តូរផ្លូវចូលប្រើ storage (`localStorage` ➜ `appLocalStore` បូក
+`safeStoreGet()` ថ្មី) ធ្វើឲ្យ **checker ១១ ធ្លាក់ភ្លាមៗ** ៖
+`pin-prompt` · `biometric-unlock` · `keygen-pin-flow` ·
+`keygen-session-security` · `setup-link-logout` · `lookup-config-secret` ·
+`connection-recovery` · `auth-recovery` · `sheet-import` · `app-lock` ·
+`network-pressure`។
+
+មូលហេតុ ២ ដាច់ដោយឡែក ៖
+
+| ថ្នាក់ | អ្វីបាក់ | ការកែ |
+|---|---|---|
+| **sandbox `vm`** | `ReferenceError: safeStoreGet is not defined` · `appLocalStore is not defined` | ចាក់ shim + helper ចូល ctx **ក្រោយ `vm.createContext()`** ដោយ `typeof … === 'undefined'` ➜ កូដពិតដែលស្រង់ចូលក្រោយ **ឈ្នះជានិច្ច** |
+| **ការអះអាងស្តាទិច** | `/safeStoreSet\(localStorage, …/` លែងត្រូវ | ប្តូរលំនាំទៅឈ្មោះ shim |
+
+**មេរៀន៖ sandbox របស់ checker *ចម្លងរចនាសម្ព័ន្ធ* របស់ `app.js` — ដូច្នេះ
+រាល់ការប្តូររចនាសម្ព័ន្ធ (មិនមែនត្រឹមឥរិយាបថ) បង់ថ្លៃនៅទីនោះ។**
+CLAUDE.md ចែងរួចអំពី `license-grace-test.js` («បន្ថែម helper ថ្មី ➜ ត្រូវ
+បន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់») — ជុំនេះបង្ហាញថាថ្នាក់នោះ **ធំជាង checker មួយ**។
+
+⛔ **ការធ្លាក់ទាំងនោះជាសញ្ញាល្អ មិនមែនអាក្រក់ទេ** ៖ វាបញ្ជាក់ថា checker
+ទាំង ១១ **ពិតជារត់កូដ ship ពិត** មិនមែនច្បាប់ចម្លងទេ។ ⚠️ បើការ refactor
+បែបនេះ **មិន**ធ្វើឲ្យ checker ណាមួយធ្លាក់សោះ នោះជាសញ្ញាថាពួកវាមិនប៉ះកូដពិត។
+
+### ⛔ dependency អវត្តមាន ៖ `TypeError` synchronous រំលង `.catch()` (កំណែ 2.22.5)
+
+`requestCameraPermission()` ដាក់ `isCameraStarting = true` **មុន** ហៅ
+`navigator.mediaDevices.getUserMedia(...)`។ ពេល `mediaDevices` ជា `undefined`
+(បរិបទមិន secure · WKWebView ក្នុង app ខ្លះ) នោះ **`TypeError` បោះ
+*synchronously*** — មុន promise ត្រូវបង្កើតផង ➜
+`.catch(err => { isCameraStarting = false; … })` **ចាប់តែ promise rejection**
+➜ វា**មិនចាប់វាទេ** ➜ ទង់ជាប់ `true` ➜ ការចុចប៊ូតុងកាមេរ៉ាលើកក្រោយត្រូវ
+`if (isCameraStarting) return;` ច្រានចេញ **ដោយស្ងាត់** រហូតបិទបើក App។
+
+**ច្បាប់ ៖ dependency អាចបរាជ័យក្នុងរបៀប ២ ដាច់ដោយឡែក** — **ការបដិសេធ**
+(promise reject) និង **អវត្តមាន** (synchronous throw)។ `.catch()` គ្របតែ
+ទី ១។ រាល់ការហៅ API របស់ browser ដែលអាចអវត្តមាន ត្រូវមាន **ការពិនិត្យវត្តមាន**
+ជាមុន បូក **សារដែលប្រាប់មូលហេតុពិត**។
+⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ ការបដិសេធសិទ្ធិនៅដើរតាមផ្លូវចាស់ដដែល។
+
+⚠️ **ការស្កេនរបស់ជុំនេះក៏ផ្តល់ false positive ដែរ** — `ResizeObserver`
+(`if (window.ResizeObserver)` មានរួច) និង `navigator.credentials`
+(`biometricPlatformAvailable()` បូក `try` មានរួច) **មិនមែនកំហុសទេ**។
+⛔ **កុំ «កែ» ពួកវា។** `crypto.subtle` ក៏ទុកចោលដោយចេតនាដែរ ៖ វាអវត្តមាន
+តែលើ non-secure context ដែល App **មិនអាចដំណើរការបានសោះ** (HSTS preload
+បង្ខំ HTTPS រួច) ➜ ការការពារនឹងលាក់បញ្ហាធំជាង។
 
 ### ⛔ សំណួរ ៩ មុនជឿថា checker ថ្មីមួយដំណើរការ
 
@@ -2594,7 +2739,37 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
-**២០ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+**២១ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+#### ០ឨ. កំណែ 2.22.5 — storage ដែលត្រូវបិទ · កាមេរ៉ាដែលអវត្តមាន
+
+**Firebase rules មិនប្រែសោះ** ហើយ **CSP ក៏មិនប្រែដែរ** — គ្រាន់តែ deploy។
+ជុំនេះកែ **ZoeW** (`zoew-v125` ➜ `zoew-v126`) និង **ZoeKeyGen**
+(`zoekeygen-v80` ➜ `zoekeygen-v81`)។ វា **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មសោះ**
+និង **មិនប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ · ទម្រង់បង្ហាញ**។
+
+⚠️ **ការកែភាគច្រើនជាសំណាញ់សុវត្ថិភាព** ដែលអ្នកប្រើ **មិនគួរឃើញ** ក្នុងការ
+ប្រើប្រាស់ធម្មតា។ ការផ្ទៀងផ្ទាត់សំខាន់បំផុតគឺថា **គ្មានអ្វីប្រែសោះ**។
+
+សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. ⛔ **ការប្រើប្រាស់ធម្មតាមិនត្រូវប្រែសោះ** — ស្កេន · បិទ «យក» · តម្រងថ្ងៃ ·
+   Export · ធុងសំរាម · Locker · នាំចូល Excel · ចាក់សោ PIN · ជីវមាត្រ
+   ដំណើរការដដែលបេះបិទ។ **នេះជាការវាស់សំខាន់បំផុតនៃជុំនេះ** ព្រោះការកែប៉ះ
+   **ការហៅ storage ទាំង ១០៥ កន្លែង**។
+2. ⛔ **ការចងចាំត្រូវនៅដដែល** ៖ អត្រាប្រាក់ · ទូ Locker ចុងក្រោយ · PIN ·
+   ការចងជីវមាត្រ · Config Firebase · ការតភ្ជាប់ Lookup API និងនាំចូល Excel
+   **ត្រូវនៅគ្រប់** ក្រោយ deploy។ បើមួយណាបាត់ សូមប្រាប់ភ្លាម។
+3. **ចាកចេញ ➜ ចូលវិញ ➜ បិទបើក App** ➜ អ្វីៗត្រូវនៅដដែល។
+4. **កាមេរ៉ា** ៖ ចុចប៊ូតុងស្កេន ➜ កាមេរ៉ាបើកធម្មតា។ បដិសេធសិទ្ធិកាមេរ៉ា ➜
+   ត្រូវឃើញសារពន្យល់ដដែលនឹងមុន (ឥរិយាបថនោះ **មិនប្រែទេ**)។
+5. **កំណែថ្មីត្រូវមកដល់** — Refresh ➜ `2.22.5` (ZoeW) · `2.19.11` (ZoeKeyGen)។
+
+> ℹ️ **រន្ធដែលបិទក្នុងជុំនេះ ត្រូវការលក្ខខណ្ឌកម្រ** ៖ browser ដែលបិទ site
+> data ទាំងស្រុង (Chrome «Block all cookies») និងបរិបទដែលគ្មាន
+> `navigator.mediaDevices`។ អ្នកមិនចាំបាច់សាកលក្ខខណ្ឌទាំងនោះទេ — ពួកវា
+> ត្រូវបានវាស់ក្នុង Chromium ពិតរួចហើយ។ អ្វីដែលត្រូវការពីអ្នកគឺ **ការបញ្ជាក់
+> ថាការប្រើប្រាស់ធម្មតាមិនប្រែសោះ** (ចំណុច ១ និង ២)។
 
 #### ០ឧ. កំណែ 2.22.4 — ការរង់ចាំគ្មានពិដាន · មាត្រដ្ឋានថេប្លេត
 

@@ -65,7 +65,7 @@ function ok(label, cond, detail) {
 {
     const kg = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen', 'app.js'), 'utf8');
     ok('ZoeKeyGen: ការរក្សាទុក Config ប្រើ `safeStoreSet` (សារត្រូវនឹងបញ្ហាពិត)',
-        /safeStoreSet\(localStorage, 'zoew_firebase_config'/.test(kg));
+        /safeStoreSet\(appLocalStore, 'zoew_firebase_config'/.test(kg));
     ok('ZoeKeyGen: លែងរាយកំហុសផ្ទុកថា «Config មិនត្រឹមត្រូវ» ទៀតទេ',
         !/catch \(e\) \{\s*\n\s*alert\("ការកំណត់រចនាសម្ព័ន្ធមិនត្រឹមត្រូវទេ!"\);/.test(kg));
 }

@@ -94,6 +94,12 @@ ok('index.html មាន id="pinModalDesc"', html.indexOf('id="pinModalDesc"') !
 ok('index.html មាន id="pinSetupModalDesc"', html.indexOf('id="pinSetupModalDesc"') !== -1);
 
 const ctx = vm.createContext({ console, document: { getElementById: () => null } });
+// ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+// `appSessionStore` បូក `safeStoreGet()` ថ្មី។ sandbox ត្រូវផ្តល់ពួកវា
+// បើមិនដូច្នេះ function ដែលស្រង់ចូល vm បោះ ReferenceError។
+// ⚠️ ការចាក់ប្រើ `typeof … === 'undefined'` ➜ កូដពិតដែលស្រង់ចូលក្រោយ
+// **ឈ្នះ** shim នេះជានិច្ច។
+vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
 vm.runInContext(sliceConst(appJs, 'PIN_PROMPT_MESSAGES'), ctx);
 const MSG = vm.runInContext('PIN_PROMPT_MESSAGES', ctx);
 const keys = Object.keys(MSG);
@@ -159,6 +165,7 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     };
     stored.ls = {};
     const c2 = vm.createContext(sandbox);
+    vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', c2);
     vm.runInContext('let pinTargetAction = null;', c2);
     vm.runInContext(`
         let __biometricEnabled = false;

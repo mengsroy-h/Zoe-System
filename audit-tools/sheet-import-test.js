@@ -126,7 +126,7 @@ const saveFn = sliceFn(appJs, 'saveSheetImportConfig');
 check(saveFn !== '', 'មាន saveSheetImportConfig() ក្នុង app.js');
 check(/encryptSheetImportSecret\(url\)/.test(saveFn) && /encryptSheetImportSecret\(password\)/.test(saveFn),
     'URL និងពាក្យសម្ងាត់ត្រូវអ៊ិនគ្រីបទាំង ២ មុនរក្សាទុក', saveFn);
-check(/safeStoreSet\(localStorage, SHEET_IMPORT_STORE_KEY, JSON\.stringify\(stored\)\)/.test(saveFn),
+check(/safeStoreSet\(appLocalStore, SHEET_IMPORT_STORE_KEY, JSON\.stringify\(stored\)\)/.test(saveFn),
     'ការសរសេរទៅ localStorage ឆ្លងកាត់ safeStoreSet (Private Mode មិនបំបែក App)');
 
 const openFn = sliceFn(appJs, 'openSheetImportModal');

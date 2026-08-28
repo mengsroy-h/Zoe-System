@@ -66,6 +66,18 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         };
         core.ZoeErrors = core.window.ZoeErrors;
         vm.createContext(core);
+        // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+        // `appSessionStore` បូក `safeStoreGet()` ថ្មី។ sandbox ត្រូវផ្តល់ពួកវា
+        // បើមិនដូច្នេះ function ដែលស្រង់ចូល vm បោះ ReferenceError។
+        // ⚠️ ការចាក់ប្រើ `typeof … === 'undefined'` ➜ កូដពិតដែលស្រង់ចូលក្រោយ
+        // **ឈ្នះ** shim នេះជានិច្ច។
+        vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', core);
+        // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+        // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
+        // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។ sandbox ត្រូវផ្តល់
+        // alias ទាំង ២ បើមិនដូច្នេះ function ដែលស្រង់ចូល vm បោះ ReferenceError។
+        if (core.appLocalStore === undefined) core.appLocalStore = core.localStorage || null;
+        if (core.appSessionStore === undefined) core.appSessionStore = core.sessionStorage || null;
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
             'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners'
@@ -219,6 +231,9 @@ function buildContext() {
     };
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
+    vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
+    if (ctx.appLocalStore === undefined) ctx.appLocalStore = ctx.localStorage || null;
+    if (ctx.appSessionStore === undefined) ctx.appSessionStore = ctx.sessionStorage || null;
 
     const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
@@ -914,6 +929,11 @@ function buildContext() {
             initFirebase: () => { calls.push(clock); return Promise.resolve(false); },
             firebaseSdkUnavailable: true, isDatabaseInitialized: false, isInitializingFirebase: false
         });
+        // ⛔ កំណែ 2.22.5 ៖ `reloadForFirebaseSdk()` ចូលប្រើ storage តាម shim
+        // `appSessionStore` ជំនួស `sessionStorage` ដោយផ្ទាល់ (getter បោះពេល
+        // browser បិទ site data) ➜ sandbox ត្រូវផ្តល់ alias នោះ។
+        ctx.appSessionStore = ctx.sessionStorage;
+        ctx.appLocalStore = ctx.localStorage || null;
         new vm.Script([
             konst('FIREBASE_SDK_RETRY_STEPS_MS'),
             konst('FIREBASE_SDK_RETRY_MIN_GAP_MS') || '',
@@ -923,7 +943,7 @@ function buildContext() {
             konst('FIREBASE_SDK_RELOAD_MAX') || '',
             konst('FIREBASE_SDK_RELOAD_MIN_GAP_MS') || '',
             /lastFirebaseSdkReloadAt/.test(appSrc) ? 'let lastFirebaseSdkReloadAt = 0;' : '',
-            pick('safeStoreSet') || '', pick('safeStoreRemove') || '',
+            pick('safeStoreSet') || '', pick('safeStoreRemove') || '', pick('safeStoreGet') || '',
             pick('anyModalIsOpen') || '', pick('firebaseSdkReloadCount') || '',
             pick('reloadForFirebaseSdk') || '', pick('recoverFirebaseSdk') || '',
             // ពិដានល្បឿនឥឡូវឆ្លងកាត់ `elapsedSince()` (2.20.7) — ត្រូវផ្ទុក helper ពិត
@@ -1241,6 +1261,9 @@ function buildContext() {
         };
         ctx.window = ctx;
         vm.createContext(ctx);
+        vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
+        if (ctx.appLocalStore === undefined) ctx.appLocalStore = ctx.localStorage || null;
+        if (ctx.appSessionStore === undefined) ctx.appSessionStore = ctx.sessionStorage || null;
         vm.runInContext([
             'let firebaseConfig = null, fb = null, auth = null, db = null;',
             'let dbRefHistory = null, dbRefDeleted = null, dbRefDailyRevenue = null, dbRefMonthlyRevenue = null;',

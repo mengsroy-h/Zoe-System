@@ -34,7 +34,8 @@ function createRuntime(existing, key, encrypt, failStorage) {
     const start = source.indexOf('    function getLookupApiConfig() {');
     const end = source.indexOf('    async function testLookupApiConfig(', start);
     if (start === -1 || end === -1) throw new Error('lookup config functions not found');
-    const code = sliceFn(source, 'safeStoreSet') + '\n' + sliceFn(source, 'safeStoreRemove') + '\n' + source.slice(start, end);
+    const code = sliceFn(source, 'safeStoreSet') + '\n' + sliceFn(source, 'safeStoreRemove') + '\n'
+        + sliceFn(source, 'safeStoreGet') + '\n' + source.slice(start, end);
     const storage = new Map();
     storage.set('zoew_lookup_api_config', JSON.stringify(existing));
     const elements = {
@@ -64,6 +65,11 @@ function createRuntime(existing, key, encrypt, failStorage) {
         showToast: () => {},
         alert: (message) => alerts.push(String(message))
     });
+    // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
+    // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
+    // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
+    vm.runInContext('var appLocalStore = typeof localStorage !== "undefined" ? localStorage : null;'
+        + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', context);
     new vm.Script(`${code}\nglobalThis.saveConfig = saveLookupApiConfig;`).runInContext(context);
     return { context, storage, elements, alerts };
 }

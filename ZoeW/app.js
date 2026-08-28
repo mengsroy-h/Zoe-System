@@ -1,4 +1,7 @@
-    const APP_VERSION = '2.22.4';
+    const APP_VERSION = '2.22.5';
+
+    const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
+    const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -278,7 +281,7 @@
     let hasEverConnectedToDatabase = false;
     let networkJustReturned = false;
 
-    let exchangeRateRiel = parseFloat(localStorage.getItem('zoew_exchange_rate')) || 4100;
+    let exchangeRateRiel = parseFloat(safeStoreGet(appLocalStore, 'zoew_exchange_rate')) || 4100;
 
     let codeReader = null;
     let liveScanCodeReader = null;
@@ -370,7 +373,7 @@
     let lastForcedReconnectAt = 0;
     let globalAudioCtx = null;
 
-    let lastEnteredLocker = localStorage.getItem('last_entered_locker') || "";
+    let lastEnteredLocker = safeStoreGet(appLocalStore, 'last_entered_locker') || "";
 
     function sanitizePhoneNumber(phoneStr) {
         if (!phoneStr) return '';
@@ -396,12 +399,16 @@
         return trimmed;
     }
 
+    function safeStoreGet(store, key) {
+        try { return store ? store.getItem(key) : null; } catch (e) { return null; }
+    }
+
     function safeStoreSet(store, key, value) {
-        try { store.setItem(key, String(value)); return true; } catch (e) { return false; }
+        try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; }
     }
 
     function safeStoreRemove(store, key) {
-        try { store.removeItem(key); return true; } catch (e) { return false; }
+        try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; }
     }
 
     function openModalHelper(modalId) {
@@ -635,7 +642,7 @@
         clearFirebaseSdkRetry();
         lastFirebaseSdkAttemptAt = 0;
         lastFirebaseSdkReloadAt = 0;
-        safeStoreRemove(sessionStorage, FIREBASE_SDK_RELOAD_KEY);
+        safeStoreRemove(appSessionStore, FIREBASE_SDK_RELOAD_KEY);
     }
 
     function anyModalIsOpen() {
@@ -650,7 +657,7 @@
 
     function firebaseSdkReloadCount() {
         try {
-            const raw = sessionStorage.getItem(FIREBASE_SDK_RELOAD_KEY);
+            const raw = appSessionStore.getItem(FIREBASE_SDK_RELOAD_KEY);
             return parseInt(raw, 10) || 0;
         } catch (e) {
             return FIREBASE_SDK_RELOAD_MAX;
@@ -666,7 +673,7 @@
         if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
         if (elapsedSince(lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
         lastFirebaseSdkReloadAt = Date.now();
-        safeStoreSet(sessionStorage, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
+        safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
         window.location.reload();
         return true;
     }
@@ -893,7 +900,7 @@
     }
 
     async function initFirebase() {
-        const savedConfig = localStorage.getItem('zoew_firebase_config');
+        const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
         if (!savedConfig) {
             checkPinAndOpenConfig(true);
             return false;
@@ -976,7 +983,7 @@
         } finally {
             isInitializingFirebase = false;
             let currentConfig = savedConfig;
-            try { currentConfig = localStorage.getItem('zoew_firebase_config'); } catch (e) {}
+            try { currentConfig = appLocalStore.getItem('zoew_firebase_config'); } catch (e) {}
             if (currentConfig !== savedConfig) initFirebase();
         }
     }
@@ -1101,7 +1108,7 @@
     function requestPinBeforeConfig(targetAction, promptKey) {
         pinTargetAction = targetAction || openConfigModal;
         applyPinPromptText(promptKey);
-        let savedPin = localStorage.getItem('zoew_security_pin_hash');
+        let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
         } else {
@@ -1125,7 +1132,7 @@
             return;
         }
         try {
-            localStorage.setItem('zoew_security_pin_hash', await hashPin(pinVal));
+            appLocalStore.setItem('zoew_security_pin_hash', await hashPin(pinVal));
             lookupSecretKey = await deriveLookupSecretKey(pinVal);
         } catch (e) {
             alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
@@ -1150,9 +1157,9 @@
         const pinIn = document.getElementById('securityPinInput');
         let enteredPin = pinIn ? pinIn.value.trim() : '';
         if (pinIn) pinIn.value = '';
-        let savedPin = localStorage.getItem('zoew_security_pin_hash');
+        let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
 
-        const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+        const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
         if (lockoutUntil && Date.now() < lockoutUntil) {
             const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
             alert(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី មុននឹងសាកល្បងម្តងទៀត។`);
@@ -1164,13 +1171,13 @@
             if (savedPin && (await verifyStoredPin(enteredPin, savedPin))) {
                 await completePinUnlock(enteredPin);
             } else {
-                let failCount = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+                let failCount = (parseInt(appLocalStore.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
                 if (failCount >= 5) {
-                    localStorage.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
-                    localStorage.setItem('zoew_pin_fail_count', '0');
+                    appLocalStore.setItem('zoew_pin_lockout_until', (Date.now() + 60000).toString());
+                    appLocalStore.setItem('zoew_pin_fail_count', '0');
                     alert("បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ១ នាទី មុននឹងសាកល្បងម្តងទៀត។");
                 } else {
-                    localStorage.setItem('zoew_pin_fail_count', failCount.toString());
+                    appLocalStore.setItem('zoew_pin_fail_count', failCount.toString());
                     alert("លេខ PIN មិនត្រឹមត្រូវទេ!");
                 }
             }
@@ -1182,12 +1189,12 @@
     }
 
     async function completePinUnlock(pin) {
-        const savedPin = localStorage.getItem('zoew_security_pin_hash');
+        const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
         if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-            safeStoreSet(localStorage, 'zoew_security_pin_hash', await hashPin(pin));
+            safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
         }
-        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
-        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
+        safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
+        safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         lookupSecretKey = await deriveLookupSecretKey(pin);
         closeModal('pinModal');
         (pinTargetAction || openConfigModal)(pin);
@@ -1214,7 +1221,7 @@
 
     function readBiometricRecord() {
         try {
-            const raw = localStorage.getItem(BIOMETRIC_STORAGE_KEY);
+            const raw = appLocalStore.getItem(BIOMETRIC_STORAGE_KEY);
             if (!raw) return null;
             const rec = JSON.parse(raw);
             if (!rec || typeof rec.credentialId !== 'string' || !rec.credentialId) return null;
@@ -1229,7 +1236,7 @@
 
     function writeBiometricRecord(rec) {
         try {
-            localStorage.setItem(BIOMETRIC_STORAGE_KEY, JSON.stringify(rec));
+            appLocalStore.setItem(BIOMETRIC_STORAGE_KEY, JSON.stringify(rec));
             return true;
         } catch (e) {
             return false;
@@ -1238,7 +1245,7 @@
 
     function clearBiometricRecord() {
         try {
-            localStorage.removeItem(BIOMETRIC_STORAGE_KEY);
+            appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
         } catch (e) {
             return;
         }
@@ -1392,7 +1399,7 @@
     async function runBiometricUnlock() {
         if (biometricUnlockInFlight || isVerifyingPin) return false;
         if (!isBiometricEnabled()) return false;
-        const lockoutUntil = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+        const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
         if (lockoutUntil && Date.now() < lockoutUntil) {
             const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
             showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
@@ -1403,7 +1410,7 @@
         try {
             const pin = await biometricUnlockPin();
             if (!pin) return false;
-            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
             if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
                 clearBiometricRecord();
                 refreshBiometricUi();
@@ -1487,7 +1494,7 @@
 
     function appLockPinIsSet() {
         try {
-            return !!localStorage.getItem('zoew_security_pin_hash');
+            return !!appLocalStore.getItem('zoew_security_pin_hash');
         } catch (e) {
             return false;
         }
@@ -1495,18 +1502,18 @@
 
     function appLockUnlockedThisSession() {
         try {
-            return sessionStorage.getItem(APP_LOCK_SESSION_KEY) === '1';
+            return appSessionStore.getItem(APP_LOCK_SESSION_KEY) === '1';
         } catch (e) {
             return false;
         }
     }
 
     function markAppUnlockedForSession() {
-        safeStoreSet(sessionStorage, APP_LOCK_SESSION_KEY, '1');
+        safeStoreSet(appSessionStore, APP_LOCK_SESSION_KEY, '1');
     }
 
     function clearAppUnlockedForSession() {
-        safeStoreRemove(sessionStorage, APP_LOCK_SESSION_KEY);
+        safeStoreRemove(appSessionStore, APP_LOCK_SESSION_KEY);
     }
 
     function appLockShouldArm() {
@@ -1615,29 +1622,29 @@
     }
 
     function appLockLockoutSecondsLeft() {
-        const until = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+        const until = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
         if (!until || Date.now() >= until) return 0;
         return Math.ceil((until - Date.now()) / 1000);
     }
 
     function registerAppLockFailure() {
-        const fails = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+        const fails = (parseInt(safeStoreGet(appLocalStore, 'zoew_pin_fail_count') || '0') || 0) + 1;
         if (fails >= APP_LOCK_MAX_FAILS) {
-            safeStoreSet(localStorage, 'zoew_pin_lockout_until', String(Date.now() + APP_LOCK_LOCKOUT_MS));
-            safeStoreSet(localStorage, 'zoew_pin_fail_count', '0');
+            safeStoreSet(appLocalStore, 'zoew_pin_lockout_until', String(Date.now() + APP_LOCK_LOCKOUT_MS));
+            safeStoreSet(appLocalStore, 'zoew_pin_fail_count', '0');
             return 0;
         }
-        safeStoreSet(localStorage, 'zoew_pin_fail_count', String(fails));
+        safeStoreSet(appLocalStore, 'zoew_pin_fail_count', String(fails));
         return APP_LOCK_MAX_FAILS - fails;
     }
 
     async function completeAppUnlock(pin) {
-        const savedPin = localStorage.getItem('zoew_security_pin_hash');
+        const savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
         if (savedPin && !savedPin.startsWith('pbkdf2:')) {
-            safeStoreSet(localStorage, 'zoew_security_pin_hash', await hashPin(pin));
+            safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
         }
-        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
-        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
+        safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
+        safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         markAppUnlockedForSession();
         hideAppLockScreen();
         safeFocusScanner();
@@ -1659,7 +1666,7 @@
         }
         setAppLockBusy(true);
         try {
-            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
             if (savedPin && (await verifyStoredPin(entered, savedPin))) {
                 await completeAppUnlock(entered);
                 return true;
@@ -1698,7 +1705,7 @@
                 if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
                 return false;
             }
-            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            const savedPin = appLocalStore.getItem('zoew_security_pin_hash');
             if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
                 clearBiometricRecord();
                 refreshBiometricUi();
@@ -1719,9 +1726,9 @@
 
     function forgetAppLockPin() {
         if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
-        safeStoreRemove(localStorage, 'zoew_security_pin_hash');
-        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
-        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
+        safeStoreRemove(appLocalStore, 'zoew_security_pin_hash');
+        safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
+        safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         clearBiometricRecord();
         clearAppUnlockedForSession();
         clearRememberedSession(false);
@@ -1769,7 +1776,7 @@
         if (isPinFlowPending()) return;
         pinTargetAction = null;
         applyPinPromptText('config');
-        let savedPin = localStorage.getItem('zoew_security_pin_hash');
+        let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
         if (!savedPin) {
             openModalHelper('pinSetupModal');
         } else {
@@ -1778,7 +1785,7 @@
     }
 
     function openConfigModal() {
-        const savedConfig = localStorage.getItem('zoew_firebase_config');
+        const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
         if (savedConfig) {
             const cfgInput = document.getElementById('firebaseConfigInput');
             if(cfgInput) cfgInput.value = savedConfig;
@@ -1985,7 +1992,7 @@
             return;
         }
         cfgInput.value = JSON.stringify(normalized.config, null, 2);
-        if (!safeStoreSet(localStorage, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
+        if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
             alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
             return;
         }
@@ -2163,7 +2170,7 @@
 
     function getLookupApiConfig() {
         try {
-            const raw = localStorage.getItem('zoew_lookup_api_config');
+            const raw = appLocalStore.getItem('zoew_lookup_api_config');
             return raw ? JSON.parse(raw) : null;
         } catch (e) {
             return null;
@@ -2249,7 +2256,7 @@
         };
         if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
 
-        if (!safeStoreSet(localStorage, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
+        if (!safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(cfg))) {
             alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
             return;
         }
@@ -2352,7 +2359,7 @@
 
     function readSheetImportStoredConfig() {
         try {
-            const raw = localStorage.getItem(SHEET_IMPORT_STORE_KEY);
+            const raw = appLocalStore.getItem(SHEET_IMPORT_STORE_KEY);
             if (!raw) return null;
             const parsed = JSON.parse(raw);
             return parsed && parsed.u && parsed.p ? parsed : null;
@@ -2569,7 +2576,7 @@
         try {
             const status = await callSheetImportApi('status', {}, url, password);
             const stored = { v: 1, u: await encryptSheetImportSecret(url), p: await encryptSheetImportSecret(password) };
-            if (!stored.u || !stored.p || !safeStoreSet(localStorage, SHEET_IMPORT_STORE_KEY, JSON.stringify(stored))) {
+            if (!stored.u || !stored.p || !safeStoreSet(appLocalStore, SHEET_IMPORT_STORE_KEY, JSON.stringify(stored))) {
                 setSheetImportMsg('siConfigMsg', 'រក្សាទុកមិនបានទេ — សូមពិនិត្យទំហំផ្ទុករបស់ browser', 'bad');
                 return;
             }
@@ -3262,7 +3269,7 @@
         if (val <= 0) val = 4100;
 
         exchangeRateRiel = val;
-        safeStoreSet(localStorage, 'zoew_exchange_rate', val);
+        safeStoreSet(appLocalStore, 'zoew_exchange_rate', val);
 
         if (dbRefExchangeRate) {
             fb.set(dbRefExchangeRate, val).catch(() => {
@@ -3281,8 +3288,8 @@
     const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
     function clearRememberedSession(keepEmail) {
-        safeStoreRemove(localStorage, 'zoew_login_time');
-        if (!keepEmail) safeStoreRemove(localStorage, 'remembered_email');
+        safeStoreRemove(appLocalStore, 'zoew_login_time');
+        if (!keepEmail) safeStoreRemove(appLocalStore, 'remembered_email');
     }
 
     async function isFirebaseSessionExpired(user) {
@@ -3370,7 +3377,7 @@
             if (m.id !== 'loginModal') closeModal(m.id);
         });
         openModalHelper('loginModal');
-        const savedEmail = localStorage.getItem('remembered_email');
+        const savedEmail = safeStoreGet(appLocalStore, 'remembered_email');
         const emailInput = document.getElementById('loginEmailInput');
         const rememberCb = document.getElementById('rememberMeCheckbox');
         if (savedEmail && emailInput) {
@@ -3493,11 +3500,11 @@
     const AUTH_STUCK_RECOVERY_FLAG = 'zoe_auth_recovery_attempted';
 
     async function attemptAuthStorageRecovery() {
-        if (sessionStorage.getItem(AUTH_STUCK_RECOVERY_FLAG)) {
+        if (safeStoreGet(appSessionStore, AUTH_STUCK_RECOVERY_FLAG)) {
             showLoginModalWithPrefill();
             return;
         }
-        safeStoreSet(sessionStorage, AUTH_STUCK_RECOVERY_FLAG, '1');
+        safeStoreSet(appSessionStore, AUTH_STUCK_RECOVERY_FLAG, '1');
         try {
             if ('indexedDB' in window && typeof indexedDB.databases === 'function') {
                 const dbs = await indexedDB.databases();
@@ -3600,9 +3607,9 @@
                 autoLoginAttempted = false;
 
                 if (rememberMe) {
-                    safeStoreSet(localStorage, 'remembered_email', email);
+                    safeStoreSet(appLocalStore, 'remembered_email', email);
                 } else {
-                    safeStoreRemove(localStorage, 'remembered_email');
+                    safeStoreRemove(appLocalStore, 'remembered_email');
                 }
 
                 if (authGeneration === generationAtLogin && userCredential && userCredential.user) {
@@ -3765,7 +3772,7 @@
                 const val = snapshot.val();
                 if (val && !isNaN(val)) {
                     exchangeRateRiel = parseFloat(val);
-                    try { localStorage.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
+                    try { appLocalStore.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
                     debouncedRenderAfterHistorySync();
                 }
             }, (err) => handleDbListenerError(err, 'exchangeRate'));
@@ -5837,26 +5844,26 @@
         }
 
         function markReload() {
-            try { sessionStorage.setItem(RELOAD_KEY, '1'); } catch (e) {}
+            try { appSessionStore.setItem(RELOAD_KEY, '1'); } catch (e) {}
         }
 
         function hasReloadMarker() {
             try {
-                return sessionStorage.getItem(RELOAD_KEY) === '1';
+                return appSessionStore.getItem(RELOAD_KEY) === '1';
             } catch (e) {
                 return false;
             }
         }
 
         function clearReloadMarker() {
-            try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+            try { appSessionStore.removeItem(RELOAD_KEY); } catch (e) {}
         }
 
         function rememberScrollRestoration() {
             if (!('scrollRestoration' in history)) return;
             try {
-                if (sessionStorage.getItem(RESTORATION_KEY) === null) {
-                    sessionStorage.setItem(RESTORATION_KEY, history.scrollRestoration);
+                if (appSessionStore.getItem(RESTORATION_KEY) === null) {
+                    appSessionStore.setItem(RESTORATION_KEY, history.scrollRestoration);
                 }
             } catch (e) {}
             history.scrollRestoration = 'manual';
@@ -5865,9 +5872,9 @@
         function restoreScrollRestoration() {
             let mode = 'auto';
             try {
-                const saved = sessionStorage.getItem(RESTORATION_KEY);
+                const saved = appSessionStore.getItem(RESTORATION_KEY);
                 if (saved === 'manual') mode = 'manual';
-                sessionStorage.removeItem(RESTORATION_KEY);
+                appSessionStore.removeItem(RESTORATION_KEY);
             } catch (e) {}
             if ('scrollRestoration' in history) history.scrollRestoration = mode;
         }
@@ -6693,6 +6700,11 @@
     function requestCameraPermission() {
         noteAppLockExcuse();
         if (isCameraStarting) return;
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            showToast('⚠️ កម្មវិធីរុករកនេះមិនអនុញ្ញាតឲ្យប្រើកាមេរ៉ាទេ — សូមបើកតាម HTTPS ឬប្រើម៉ាស៊ីនស្កេន/វាយបញ្ចូលដោយដៃ');
+            showCameraClosedBox();
+            return;
+        }
         isCameraStarting = true;
 
         stopCurrentStream();
@@ -7483,8 +7495,8 @@
     let deletedSearchQuery = '';
     const expandedTrashGroups = new Set();
 
-    let activeLocker = localStorage.getItem(ACTIVE_LOCKER_KEY) || '';
-    let entryScanMode = localStorage.getItem(ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
+    let activeLocker = safeStoreGet(appLocalStore, ACTIVE_LOCKER_KEY) || '';
+    let entryScanMode = safeStoreGet(appLocalStore, ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel';
     let lockerBarcodeIndex = {};
     let pendingLockerCode = null;
     let lockerAssignGeneration = 0;
@@ -7494,11 +7506,11 @@
     }
 
     function getLockerPrefix() {
-        return localStorage.getItem(LOCKER_PREFIX_KEY) || 'ទូ';
+        return safeStoreGet(appLocalStore, LOCKER_PREFIX_KEY) || 'ទូ';
     }
 
     function getLockerCount() {
-        return parseInt(localStorage.getItem(LOCKER_COUNT_KEY) || '24') || 24;
+        return parseInt(safeStoreGet(appLocalStore, LOCKER_COUNT_KEY) || '24') || 24;
     }
 
     function isValidLockerName(value) {
@@ -7577,8 +7589,8 @@
         const countInput = document.getElementById('lockerCountInput');
         const prefix = (prefixInput ? prefixInput.value.trim() : '') || 'ទូ';
         const count = Math.min(200, Math.max(1, parseInt(countInput ? countInput.value : '', 10) || 24));
-        safeStoreSet(localStorage, LOCKER_PREFIX_KEY, prefix);
-        safeStoreSet(localStorage, LOCKER_COUNT_KEY, String(count));
+        safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, prefix);
+        safeStoreSet(appLocalStore, LOCKER_COUNT_KEY, String(count));
         closeModal('lockerSettingsModal');
         renderLockerGrid();
         showToast('✅ បានរក្សាទុកការកំណត់ទូ');
@@ -7606,7 +7618,7 @@
     function openLockerPicker() {
         if (!isValidLockerName(activeLocker)) {
             activeLocker = '';
-            safeStoreRemove(localStorage, ACTIVE_LOCKER_KEY);
+            safeStoreRemove(appLocalStore, ACTIVE_LOCKER_KEY);
         }
         renderLockerGrid();
         openModalHelper('lockerPickerModal');
@@ -7619,7 +7631,7 @@
             return;
         }
         activeLocker = locker;
-        safeStoreSet(localStorage, ACTIVE_LOCKER_KEY, locker);
+        safeStoreSet(appLocalStore, ACTIVE_LOCKER_KEY, locker);
         closeModal('lockerPickerModal');
         updateActiveLockerLabel();
         showToast(`📍 ទីតាំងបច្ចុប្បន្ន៖ ${locker}`);
@@ -7645,7 +7657,7 @@
 
     function setEntryScanMode(mode) {
         entryScanMode = mode === 'locker' ? 'locker' : 'parcel';
-        safeStoreSet(localStorage, ENTRY_SCAN_MODE_KEY, entryScanMode);
+        safeStoreSet(appLocalStore, ENTRY_SCAN_MODE_KEY, entryScanMode);
         const parcelBtn = document.getElementById('modeParcelBtn');
         const lockerBtn = document.getElementById('modeLockerBtn');
         if (parcelBtn) parcelBtn.classList.toggle('active', entryScanMode === 'parcel');
@@ -8101,7 +8113,7 @@
             locker = "N/A";
         } else {
             lastEnteredLocker = rawLocker;
-            safeStoreSet(localStorage, 'last_entered_locker', rawLocker);
+            safeStoreSet(appLocalStore, 'last_entered_locker', rawLocker);
         }
 
         const barcodeToSave = pendingBarcode;

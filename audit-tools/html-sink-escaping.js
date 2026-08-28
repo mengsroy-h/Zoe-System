@@ -87,6 +87,7 @@ const BUILDER_ALLOW = {
         viewListBtn: 'HTML សាងខាងលើ; item.id ឆ្លង sanitizeInput(), ចំនួនជាលេខ',
         scanTimeDisplay: 'HTML សាងខាងលើ; item.time ឆ្លង sanitizeInput()',
         priceDisplayHtml: 'HTML សាងខាងលើ; មានតែ toFixed() និង toLocaleString()',
+        bcMoneyHtml: 'HTML សាងខាងលើក្នុង function ដដែល; មានតែ toFixed() និង toLocaleString() លើលេខ',
         activeCount: 'លេខ — ចំនួន barcode ដែលមិនទាន់បិទ',
         moreDropdown: 'HTML សាងខាងលើ; item.id ឆ្លង sanitizeInput()',
         callAction: 'HTML សាងខាងលើ; item.phone និង item.id ឆ្លង sanitizeInput()',

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.22.2';
+    const APP_VERSION = '2.22.3';
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -4492,6 +4492,14 @@
         return parts.hour + ':' + parts.minute + ':' + parts.second;
     }
 
+    function formatScanStamp(raw) {
+        const text = String(raw === undefined || raw === null ? '' : raw).trim();
+        if (!text) return '';
+        const parts = text.match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s*\((\d{4}-\d{2}-\d{2})\)$/);
+        if (!parts) return text;
+        return parts[2] + ' ' + parts[1];
+    }
+
     function getFormattedDate(d = new Date(getServerNow())) {
         return getZoneDateKey(d instanceof Date ? d.getTime() : Number(d), 0);
     }
@@ -8262,15 +8270,30 @@
             let closeBtnClass = isBcClosed ? 'btn-toggle-bc-close closed' : 'btn-toggle-bc-close';
             let closeBtnText = isBcClosed ? 'យកហើយ' : '✅ យក';
 
-            let bcTimeDisplay = b.time ? `<div style="font-size:calc(9 * var(--fs-unit)); color:var(--text-muted); margin-top:2px;">🕒 ${sanitizeInput(b.time)}</div>` : '';
+            let bcTimeDisplay = b.time ? `<div class="bc-time-line">${sanitizeInput(formatScanStamp(b.time))}</div>` : '';
+
+            let bcHasCod = itemCod > 0;
+            let bcHasDod = itemDod > 0;
+            let bcCodRiel = Math.round(itemCod * exchangeRateRiel);
+            let bcDodRiel = Math.round(itemDod * exchangeRateRiel);
+            let bcMoneyHtml = '';
+            if (bcHasCod && bcHasDod) {
+                bcMoneyHtml = `
+                    <div class="bc-money-line">COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-money-line">DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-sum-line">សរុប: <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
+                `;
+            } else if (bcHasDod) {
+                bcMoneyHtml = `<div class="bc-money-line">DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
+            } else {
+                bcMoneyHtml = `<div class="bc-money-line">COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
+            }
 
             div.innerHTML = `
                 <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: calc(11 * var(--fs-unit));"><strong>${idx + 1}.</strong> <span class="barcode-tag">🏷️ ${sanitizeInput(b.code)}</span> <span class="locker-badge" style="margin-left:4px;">ទីតាំង: ${sanitizeInput(itemLocker)}</span></div>
+                    <div class="bc-head-line"><strong>${idx + 1}.</strong> <span class="barcode-tag">🏷️ ${sanitizeInput(b.code)}</span> <span class="locker-badge">ទីតាំង: ${sanitizeInput(itemLocker)}</span></div>
                     ${bcTimeDisplay}
-                    <div style="font-size:calc(9.5 * var(--fs-unit)); color:var(--text-muted); margin-top:2px;">
-                        COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (សរុប: $${totalSub.toFixed(2)})
-                    </div>
+                    ${bcMoneyHtml}
                 </div>
                 <div class="barcode-actions-group">
                     <button class="${closeBtnClass}" data-act="toggleIndividualBarcodeClose" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">${closeBtnText}</button>
@@ -10036,12 +10059,12 @@
             `;
 
             let ageBadge = isOld
-                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600; margin-left:4px;">ចាស់</span>`
-                : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600; margin-left:4px;">ថ្មី</span>`;
+                ? `<span style="background:#fef3c7; color:#b45309; padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600;">ចាស់</span>`
+                : `<span style="background:var(--success-light); color:var(--success); padding:2px 5px; border-radius:4px; font-size:calc(9 * var(--fs-unit)); font-weight:600;">ថ្មី</span>`;
 
             let statusBadge = item.isClosed ? `<span class="closed-badge">យកហើយ</span>` : ageBadge;
             let calledBadge = item.isCalled ? `<span class="called-badge">ខល</span>` : "";
-            let scanTimeDisplay = item.time ? `<span class="scan-time-tag">🕒 ${sanitizeInput(item.time)}</span>` : "";
+            let scanTimeDisplay = item.time ? `<span class="scan-time-tag">${sanitizeInput(formatScanStamp(item.time))}</span>` : "";
 
             let totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
             let viewListBtn = `<button class="btn-view-list" data-act="openViewListModal" data-a1="${sanitizeInput(item.id)}">📦 បញ្ជី (${totalPackageCount})</button>`;
@@ -10070,9 +10093,12 @@
             if (hasCod && hasDod) {
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
+                let bothTotal = Math.round((activeCod + activeDod) * 100) / 100;
+                let bothRiel = codRiel + dodRiel;
                 priceDisplayHtml = `
                     <div style="font-size: calc(10 * var(--fs-unit));">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
                     <div style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
+                    <div class="price-sum-line">សរុប: <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
                 `;
             } else if (hasCod) {
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
@@ -10096,8 +10122,11 @@
                 <td style="text-align: center;">${rowNumClass ? `<span class="row-num-mark ${rowNumClass}" title="${rowNumLabel}">${rowNum}</span>` : rowNum}</td>
                 <td>
                     <div class="customer-info-stack">
+                        <div class="cust-badge-line">
+                            ${calledBadge}${statusBadge}
+                        </div>
                         <div class="phone-title">
-                            📱 ${phoneDisplay} ${calledBadge}${statusBadge}
+                            ${phoneDisplay}
                         </div>
                         <div>
                             ${viewListBtn}

@@ -57,6 +57,21 @@
     </div>
 </div>
 
+<div class="app-lock" id="appLockScreen" aria-hidden="true">
+    <div class="app-lock-card">
+        <div class="app-lock-icon">🔒</div>
+        <h2 class="app-lock-title">ZoeW ត្រូវបានចាក់សោ</h2>
+        <p class="app-lock-note">សូមវាយលេខកូដ PIN ឬស្កេនក្រយៅដៃ/មុខ ដើម្បីបន្តប្រើប្រាស់។ ការចងចាំការចូលប្រព័ន្ធ ៤ ម៉ោង នៅដដែល។</p>
+        <form data-act="submitAppLockForm" data-evt="1" data-on="submit">
+            <input type="password" id="appLockPinInput" inputmode="numeric" autocomplete="current-password" placeholder="លេខកូដ PIN" aria-label="លេខកូដ PIN">
+            <button type="submit" class="app-lock-submit" id="appLockSubmitBtn">ដោះសោ</button>
+        </form>
+        <button type="button" class="btn-biometric app-lock-biometric hidden" id="appLockBiometricBtn" data-act="runAppLockBiometric">👆 ស្កេនក្រយៅដៃ ឬមុខ</button>
+        <div class="app-lock-msg" id="appLockMsg"></div>
+        <button type="button" class="app-lock-forgot" data-act="forgetAppLockPin">ភ្លេច PIN? — ចាកចេញ រួចចូលប្រព័ន្ធសាជាថ្មី</button>
+    </div>
+</div>
+
 <datalist id="recentPhonesList"></datalist>
 
 <header class="app-navbar">
@@ -330,6 +345,9 @@
         </button>
         <button type="button" class="drawer-item" data-act="drawerSheetImportFlow">
             <span class="ico">📥</span><span>នាំចូល Excel ទៅ Sheet</span>
+        </button>
+        <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
+            <span class="ico">🔒</span><span class="drawer-toggle-label">ចាក់សោពេលបើក App</span><span class="drawer-toggle-state" id="appLockToggleState">បិទ</span>
         </button>
         <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" data-act="drawerBiometricFlow">
             <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>

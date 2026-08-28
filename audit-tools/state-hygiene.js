@@ -98,7 +98,9 @@ const ACCEPTED = {
         activeLocker: 'operator convenience, persisted in localStorage by design',
         entryScanMode: 'view preference, persisted in localStorage by design',
         currentAppPage: 'view preference, no customer data',
-        lockerAssignGeneration: 'monotonic guard counter'
+        lockerAssignGeneration: 'monotonic guard counter',
+        appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
+        appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path'
     }
 };
 ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeW, {

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.21.0';
+    const APP_VERSION = '2.22.0';
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -19,6 +19,7 @@
         "debouncedSearchByPhone",
         "decodeImageFile",
         "dismissPhoneModal",
+        "drawerAppLockFlow",
         "drawerBiometricFlow",
         "drawerConfigFlow",
         "drawerCustomerTableFlow",
@@ -37,6 +38,7 @@
         "filterDataByCustomDate",
         "filterDataByDate",
         "filterRecentlyDeleted",
+        "forgetAppLockPin",
         "handleCallAction",
         "handleSheetImportFileInput",
         "loadSheetImportSelectedSheet",
@@ -68,6 +70,7 @@
         "renderSheetImportPreview",
         "requestCameraPermission",
         "resetSheetImportFileSelection",
+        "runAppLockBiometric",
         "runBiometricUnlock",
         "runSheetImport",
         "runSheetImportClear",
@@ -84,6 +87,7 @@
         "setCallMark",
         "setEntryScanMode",
         "submitActivationKey",
+        "submitAppLockForm",
         "submitLoginForm",
         "submitManualAdjustment",
         "submitManualBarcode",
@@ -1043,6 +1047,10 @@
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីលុបទិន្នន័យទាំងអស់',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការលុបទិន្នន័យទាំងអស់ លើកក្រោយ'
         },
+        appLock: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបើកការចាក់សោពេលបើក App',
+            setup: 'សូមកំណត់លេខកូដ PIN ដែលនឹងប្រើដោះសោ App រាល់ពេលបើក'
+        },
         sheetImport: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីនាំចូល Excel ទៅ Google Sheet',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការនាំចូល Excel ទៅ Google Sheet លើកក្រោយ'
@@ -1103,6 +1111,8 @@
         closeModal('pinSetupModal');
         clearBiometricRecord();
         refreshBiometricUi();
+        markAppUnlockedForSession();
+        refreshAppLockUi();
         showToast("បានកំណត់ Security PIN រួចរាល់!");
         (pinTargetAction || openConfigModal)(pinVal);
     }
@@ -1428,6 +1438,250 @@
         const state = document.getElementById('biometricToggleState');
         if (state && !supported && !isBiometricEnabled()) state.textContent = 'មិនគាំទ្រ';
     }
+
+
+    const APP_LOCK_SESSION_KEY = 'zoew_app_unlocked';
+    const APP_LOCK_MAX_FAILS = 5;
+    const APP_LOCK_LOCKOUT_MS = 60000;
+
+    let appIsLocked = false;
+    let appLockBusy = false;
+
+    function appLockPinIsSet() {
+        try {
+            return !!localStorage.getItem('zoew_security_pin_hash');
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function appLockUnlockedThisSession() {
+        try {
+            return sessionStorage.getItem(APP_LOCK_SESSION_KEY) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function markAppUnlockedForSession() {
+        safeStoreSet(sessionStorage, APP_LOCK_SESSION_KEY, '1');
+    }
+
+    function clearAppUnlockedForSession() {
+        safeStoreRemove(sessionStorage, APP_LOCK_SESSION_KEY);
+    }
+
+    function appLockShouldArm() {
+        return appLockPinIsSet() && !appLockUnlockedThisSession();
+    }
+
+    function setAppLockMsg(text) {
+        const host = document.getElementById('appLockMsg');
+        if (host) host.textContent = text || '';
+    }
+
+    function setAppLockBusy(busy) {
+        appLockBusy = !!busy;
+        const submit = document.getElementById('appLockSubmitBtn');
+        if (submit) submit.disabled = !!busy;
+        const bio = document.getElementById('appLockBiometricBtn');
+        if (bio) {
+            bio.disabled = !!busy;
+            bio.textContent = busy ? 'កំពុងស្កេន...' : '👆 ស្កេនក្រយៅដៃ ឬមុខ';
+        }
+    }
+
+    function refreshAppLockUi() {
+        const state = document.getElementById('appLockToggleState');
+        if (state) state.textContent = appLockPinIsSet() ? 'បើក' : 'ត្រូវកំណត់ PIN';
+        const toggle = document.getElementById('appLockToggleBtn');
+        if (toggle) toggle.classList.toggle('is-on', appLockPinIsSet());
+        const bio = document.getElementById('appLockBiometricBtn');
+        if (bio) bio.classList.toggle('hidden', !isBiometricEnabled());
+    }
+
+    function showAppLockScreen() {
+        appIsLocked = true;
+        document.body.classList.add('app-locked');
+        const screen = document.getElementById('appLockScreen');
+        if (screen) {
+            screen.classList.add('is-open');
+            screen.setAttribute('aria-hidden', 'false');
+        }
+        setAppLockMsg('');
+        setAppLockBusy(false);
+        refreshAppLockUi();
+        const input = document.getElementById('appLockPinInput');
+        if (input) input.value = '';
+    }
+
+    function hideAppLockScreen() {
+        appIsLocked = false;
+        document.body.classList.remove('app-locked');
+        const screen = document.getElementById('appLockScreen');
+        if (screen) {
+            screen.classList.remove('is-open');
+            screen.setAttribute('aria-hidden', 'true');
+        }
+        const input = document.getElementById('appLockPinInput');
+        if (input) input.value = '';
+        setAppLockMsg('');
+        setAppLockBusy(false);
+    }
+
+    function appLockLockoutSecondsLeft() {
+        const until = parseInt(localStorage.getItem('zoew_pin_lockout_until') || '0');
+        if (!until || Date.now() >= until) return 0;
+        return Math.ceil((until - Date.now()) / 1000);
+    }
+
+    function registerAppLockFailure() {
+        const fails = (parseInt(localStorage.getItem('zoew_pin_fail_count') || '0') || 0) + 1;
+        if (fails >= APP_LOCK_MAX_FAILS) {
+            safeStoreSet(localStorage, 'zoew_pin_lockout_until', String(Date.now() + APP_LOCK_LOCKOUT_MS));
+            safeStoreSet(localStorage, 'zoew_pin_fail_count', '0');
+            return 0;
+        }
+        safeStoreSet(localStorage, 'zoew_pin_fail_count', String(fails));
+        return APP_LOCK_MAX_FAILS - fails;
+    }
+
+    async function completeAppUnlock(pin) {
+        const savedPin = localStorage.getItem('zoew_security_pin_hash');
+        if (savedPin && !savedPin.startsWith('pbkdf2:')) {
+            safeStoreSet(localStorage, 'zoew_security_pin_hash', await hashPin(pin));
+        }
+        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
+        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
+        markAppUnlockedForSession();
+        hideAppLockScreen();
+        safeFocusScanner();
+    }
+
+    async function verifyAppLockPin() {
+        if (appLockBusy) return false;
+        const input = document.getElementById('appLockPinInput');
+        const entered = input ? input.value.trim() : '';
+        if (input) input.value = '';
+        const waitLeft = appLockLockoutSecondsLeft();
+        if (waitLeft > 0) {
+            setAppLockMsg('បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ' + waitLeft + ' វិនាទី។');
+            return false;
+        }
+        if (!entered) {
+            setAppLockMsg('សូមវាយលេខកូដ PIN');
+            return false;
+        }
+        setAppLockBusy(true);
+        try {
+            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            if (savedPin && (await verifyStoredPin(entered, savedPin))) {
+                await completeAppUnlock(entered);
+                return true;
+            }
+            const left = registerAppLockFailure();
+            setAppLockMsg(left > 0
+                ? 'លេខ PIN មិនត្រឹមត្រូវទេ! សល់ ' + left + ' ដងទៀត។'
+                : 'បញ្ចូល PIN ខុសច្រើនដងពេក! ត្រូវរង់ចាំ ១ នាទី។');
+            return false;
+        } catch (e) {
+            setAppLockMsg('ផ្ទៀងផ្ទាត់ PIN មិនបានទេ! សូមប្រើ HTTPS រួចសាកល្បងម្តងទៀត។');
+            return false;
+        } finally {
+            setAppLockBusy(false);
+        }
+    }
+
+    function submitAppLockForm(event) {
+        if (event) event.preventDefault();
+        verifyAppLockPin();
+    }
+
+    async function runAppLockBiometric(silent) {
+        if (appLockBusy || biometricUnlockInFlight) return false;
+        if (!isBiometricEnabled()) return false;
+        const waitLeft = appLockLockoutSecondsLeft();
+        if (waitLeft > 0) {
+            setAppLockMsg('បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ' + waitLeft + ' វិនាទី។');
+            return false;
+        }
+        biometricUnlockInFlight = true;
+        setAppLockBusy(true);
+        try {
+            const pin = await biometricUnlockPin();
+            if (!pin) {
+                if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
+                return false;
+            }
+            const savedPin = localStorage.getItem('zoew_security_pin_hash');
+            if (!savedPin || !(await verifyStoredPin(pin, savedPin))) {
+                clearBiometricRecord();
+                refreshBiometricUi();
+                refreshAppLockUi();
+                setAppLockMsg('ការចងក្រយៅដៃ/មុខលែងត្រូវនឹង PIN បច្ចុប្បន្នទេ! សូមវាយ PIN ជំនួស។');
+                return false;
+            }
+            await completeAppUnlock(pin);
+            return true;
+        } catch (e) {
+            if (silent !== true) setAppLockMsg('ស្កេនមិនបានទេ — សូមវាយលេខកូដ PIN ជំនួស។');
+            return false;
+        } finally {
+            biometricUnlockInFlight = false;
+            setAppLockBusy(false);
+        }
+    }
+
+    function forgetAppLockPin() {
+        if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
+        safeStoreRemove(localStorage, 'zoew_security_pin_hash');
+        safeStoreRemove(localStorage, 'zoew_pin_fail_count');
+        safeStoreRemove(localStorage, 'zoew_pin_lockout_until');
+        clearBiometricRecord();
+        clearAppUnlockedForSession();
+        clearRememberedSession(false);
+        hideAppLockScreen();
+        refreshBiometricUi();
+        refreshAppLockUi();
+        const finish = () => {
+            showLoginModalWithPrefill();
+            reannounceOrShowToast('⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត');
+        };
+        if (auth) fb.signOut(auth).then(finish, finish);
+        else finish();
+    }
+
+    function drawerAppLockFlow() {
+        drawerAction(function () {
+            if (appLockPinIsSet()) {
+                showToast('🔒 ការចាក់សោពេលបើក App កំពុងដំណើរការ។ ដើម្បីប្តូរលេខកូដ សូមប្រើ «ភ្លេច PIN?» នៅលើអេក្រង់ចាក់សោ។');
+                return;
+            }
+            requestPinBeforeConfig(armAppLockAfterPinSetup, 'appLock');
+        });
+    }
+
+    function armAppLockAfterPinSetup() {
+        markAppUnlockedForSession();
+        refreshAppLockUi();
+        showToast('✅ បានបើកការចាក់សោ! លើកក្រោយបើក App ត្រូវវាយ PIN ឬស្កេនក្រយៅដៃ/មុខ។');
+    }
+
+    function initAppLock() {
+        refreshAppLockUi();
+        if (!appLockShouldArm()) {
+            markAppUnlockedForSession();
+            return;
+        }
+        showAppLockScreen();
+        const input = document.getElementById('appLockPinInput');
+        if (input) {
+            try { input.focus(); } catch (e) { setAppLockMsg(''); }
+        }
+        if (isBiometricEnabled()) runAppLockBiometric(true);
+    }
+
+    initAppLock();
 
     function checkPinAndOpenConfig(isFirstTime = false) {
         if (isPinFlowPending()) return;
@@ -3005,7 +3259,8 @@
             'siApiUrlInput', 'siApiPasswordInput', 'siFileInput', 'siHeaderRowInput', 'siModeSel',
             'siConfigSummary', 'siConfigMsg', 'siFileMsg', 'siMapMsg', 'siActionMsg', 'siClearMsg',
             'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
-            'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone'
+            'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
+            'appLockPinInput', 'appLockMsg'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -3291,6 +3546,7 @@
     }
 
     function logoutApp() {
+        clearAppUnlockedForSession();
         if (auth) {
             fb.signOut(auth).then(() => {
                 resetClearHistoryOperationState();
@@ -4186,6 +4442,7 @@
     }
 
     function safeFocusScanner() {
+        if (appIsLocked) return;
         if (!isModalOpen && !isMobileDevice()) {
             const activeEl = document.activeElement;
             if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
@@ -5426,7 +5683,7 @@
         }
 
         function pullTargetBlocked(target) {
-            if (isModalOpen || refreshing) return true;
+            if (appIsLocked || isModalOpen || refreshing) return true;
             if (isSideDrawerOpen()) return true;
             if (!target || !target.closest) return false;
             if (target.closest('input, textarea, select, [contenteditable="true"], .app-navbar, .page-tabbar')) return true;

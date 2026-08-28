@@ -42,7 +42,9 @@ const ACCEPTED = {
     count: 'row count',
     historyTableBody: 'renderHistory([]) replaces it with the empty-state row on logout',
     listTableBody: 'detachDatabaseListeners() clears historyData, then renderList() repaints empty',
-    activationSubmitBtn: 'button label only ("កំពុងពិនិត្យ...") — no customer data'
+    activationSubmitBtn: 'button label only ("កំពុងពិនិត្យ...") — no customer data',
+    appLockBiometricBtn: 'button label + hidden/shown flag on the app-lock screen — no customer data',
+    appLockToggleState: 'បើក / ត្រូវកំណត់ PIN label for the app-lock drawer row — no customer data'
 };
 
 function walk(n, cb) {

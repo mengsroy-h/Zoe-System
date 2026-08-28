@@ -149,6 +149,7 @@ run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-tes
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
 run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
+run "app-lock (browser ពិត)" node audit-tools/app-lock-test.js
 
 echo
 echo
@@ -283,6 +284,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
+    APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
 fi
 
 echo

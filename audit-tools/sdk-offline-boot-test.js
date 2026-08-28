@@ -95,6 +95,11 @@ const LICENSE_STUB = `window.ZoeLicense = {
     // Config និង PIN មានស្រាប់ ➜ ផ្លូវ «អ្នកប្រើដែលរៀបចំរួច បើកក្រៅបណ្តាញ»
     await page.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
     await page.addInitScript("window.localStorage.setItem('zoew_security_pin_hash', 'pbkdf2:deadbeef');");
+    // ⛔ តាំងពីកំណែ 2.22.0 ការមាន PIN មានន័យថា **អេក្រង់ចាក់សោ App** លេចឡើងពេល
+    // បើក។ ឯកសារនេះវាស់ការបើក **ក្រៅបណ្តាញ** មិនមែនការចាក់សោទេ ➜ ចាក់ទង់
+    // «ដោះសោក្នុងវគ្គនេះរួច» ដូចការ Refresh ក្នុងវគ្គដដែល។ ការចាក់សោមាន
+    // ឧបករណ៍ផ្ទាល់ខ្លួន ៖ `app-lock-test.js`។
+    await page.addInitScript("window.sessionStorage.setItem('zoew_app_unlocked', '1');");
     // បង្រួមការរង់ចាំ SDK ពី ១៥ វិ. មក ១ វិ. ដើម្បីឲ្យតេស្តរត់លឿន —
     // តក្កវិជ្ជាដដែល ផ្លូវដដែល គ្រាន់តែ timeout ខ្លីជាង
     await page.addInitScript(`

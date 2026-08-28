@@ -27,7 +27,7 @@ function ok(label, cond, detail) {
 }
 
 // === ផ្នែកទី ១ — រចនាសម្ព័ន្ធ sw.js ទាំង ៣ App ===
-for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
+for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const swPath = path.join(ROOT, app, 'sw.js');
     if (!fs.existsSync(swPath)) continue;
     const sw = fs.readFileSync(swPath, 'utf8');

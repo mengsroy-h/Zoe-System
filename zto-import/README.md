@@ -14,7 +14,7 @@
 
 | ថត | គម្រោង Apps Script | តួនាទី |
 |---|---|---|
-| ថតនេះ (`Code.gs`, `Watch.gs`, `Index.html`) | **standalone** — បង្កើតថ្មីនៅ script.google.com | **សរសេរចូល** Sheet៖ API សម្រាប់ PWA `ZoeImport`, folder watcher និងទំព័រ Web បម្រុង |
+| ថតនេះ (`Code.gs`, `Watch.gs`, `Index.html`) | **standalone** — បង្កើតថ្មីនៅ script.google.com | **សរសេរចូល** Sheet៖ API សម្រាប់ **«📥 នាំចូល Excel ទៅ Sheet» ក្នុង ZoeW**, folder watcher និងទំព័រ Web បម្រុង |
 | [`google-sheets-api/`](google-sheets-api/README.md) | **bound** — Extensions ➜ Apps Script ពីក្នុង Sheet | **អានចេញពី** Sheet៖ Lookup API ដែល ZoeW ហៅពេលស្កេន Barcode |
 
 > `google-sheets-api/` ធ្លាប់នៅក្នុង `ZoeW/`។ វាត្រូវផ្លាស់មកទីនេះព្រោះវា
@@ -29,12 +29,17 @@
 
 | ផ្លូវ | របៀបប្រើ | ល្អត្រង់ណា |
 |---|---|---|
-| **ក. PWA `ZoeImport`** ⭐ | ដំឡើងជា App លើទូរស័ព្ទ ➜ វាយ PIN ➜ ទម្លាក់ file ➜ ចុច «នាំចូល» | **ផ្លូវសំខាន់** — ការពារដោយ PIN, អ៊ិនគ្រីប config, ដំឡើងបានដូច ZoeW |
+| **ក. ZoeW ➜ ⚙️ ➜ «📥 នាំចូល Excel ទៅ Sheet»** ⭐ | បើក ZoeW ➜ របា Slide ⚙️ ➜ វាយ Security PIN ➜ ជ្រើស file ➜ ចុច «នាំចូល» | **ផ្លូវសំខាន់** — ការពារដោយ PIN, អ៊ិនគ្រីប config, នៅក្នុង App ដដែលដែលអ្នកប្រើប្រើរាល់ថ្ងៃ |
 | **ខ. ទំព័រ Web របស់ Apps Script** | បើក `…/exec` ➜ វាយពាក្យសម្ងាត់ ➜ ទម្លាក់ file | ផ្លូវបម្រុង — **គ្មាន CORS ទាល់តែសោះ** ព្រោះ Apps Script បម្រើទំព័រខ្លួនឯង |
 | **គ. Folder ស្វ័យប្រវត្តិ** | ទម្លាក់ file ចូល folder `ZTO-Inbox` ក្នុង Drive ➜ **រួច** | គ្មានប៊ូតុងត្រូវចុចសោះ; file ផ្លាស់ទៅ `ZTO-Done` ដោយខ្លួនឯង |
 
-សម្រាប់ផ្លូវ **ក** សូមមើល [`../ZoeImport/README.md`](../ZoeImport/README.md)។
-ថតនេះជា **ផ្នែក server** របស់វា — ត្រូវរៀបចំជាមុនសិនគ្រប់ករណី។
+សម្រាប់ផ្លូវ **ក** សូមមើល [`../ZoeW/README.md`](../ZoeW/README.md) ផ្នែក
+«នាំចូល Excel ទៅ Google Sheet»។ ថតនេះជា **ផ្នែក server** របស់វា — ត្រូវរៀបចំ
+ជាមុនសិនគ្រប់ករណី។
+
+> ℹ️ មុនកំណែ ZoeW `2.21.0` ផ្លូវ **ក** ជា App ដាច់ដោយឡែកឈ្មោះ `ZoeImport`។
+> មុខងារនោះផ្លាស់ចូល ZoeW ហើយ App នោះត្រូវលុបចេញពី repo។ **ខាង server
+> (ថតនេះ) មិនប្រែសោះ** — URL និងពាក្យសម្ងាត់ដដែលនៅតែប្រើបាន។
 
 ផ្លូវ **គ** ត្រូវការឲ្យផ្លូវ **ក** ឬ **ខ** ដំណើរការម្តងជាមុនសិន (ដើម្បីចងចាំ
 ការផ្គូផ្គង Column របស់ file ZTO) — លើកក្រោយវាចាំបាន ហើយធ្វើដោយខ្លួនឯងរហូត។

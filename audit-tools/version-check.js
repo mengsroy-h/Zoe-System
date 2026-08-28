@@ -59,7 +59,7 @@ for (const app of APPS) {
 // ឡើងកំណែ + ឡើង `CACHE_VERSION` ➜ **អ្នកប្រើទាំងអស់របស់ App នោះទាញសំបក
 // ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** ហើយ Netlify redeploy ដោយគ្មានការប្រែពិត។
 // ឥឡូវអ្វីដែលត្រូវអះអាងគឺ **ភាពស៊ីគ្នាខាងក្នុង App នីមួយៗ** ៖
-// `app.js` ↔ `manifest.json` ↔ `index.html`។ (ZoeImport មានកំណែឯករាជ្យស្រាប់។)
+// `app.js` ↔ `manifest.json` ↔ `index.html`។
 APPS.forEach((a) => console.log(`   កំណែ ${a}: ${declared[a]}`));
 
 console.log('\n-- manifest.json ត្រូវនឹង APP_VERSION **របស់ App ដដែល** --');

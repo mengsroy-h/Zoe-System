@@ -152,12 +152,12 @@ run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
 
 echo
 echo
-echo "== ខ្សែសង្វាក់នាំចូល (ZoeImport · zto-import) =="
-# ⚠️ ពួកវាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។
-# ហេតុផលនោះលែងស៊ីគ្នាហើយ ៖ ZoeImport ជា PWA ដែល ship ពិត ហើយ checker ១២
-# គ្របវារួចហើយ (layout · csp · clock · fluid-type · adaptive-link …)។
-# ការទុកវាក្រៅមានន័យថា assertion ១០៥ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
-run "ZoeImport/test.js" node ZoeImport/test.js
+echo "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
+# ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។
+# ការទុកវាក្រៅមានន័យថា assertion ៥០ រត់តែពេលមាននរណាម្នាក់ចាំវាយដោយដៃ។
+# ⛔ ចំណាំ ៖ `zto-import` ជាខាង **server** នៃមុខងារ «នាំចូល Excel ទៅ Sheet»
+# ដែលរស់នៅក្នុង ZoeW តាំងពីកំណែ 2.21.0 (App `ZoeImport` ត្រូវលុបចេញហើយ) ➜
+# វាកាន់តែសំខាន់ជាងមុន។ ខាង client ចាក់សោដោយ `sheet-import-test.js`។
 run "zto-import/test.js" node zto-import/test.js
 
 echo "== ទម្លាប់គម្រោង =="

@@ -24,7 +24,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = process.env.ADAPTIVE_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
     if (cond) { pass++; console.log('  ok    ' + label); }

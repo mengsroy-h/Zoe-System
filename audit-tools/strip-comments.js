@@ -30,7 +30,7 @@ try { acorn = require('acorn'); } catch (e) {
 }
 
 const ROOT = process.env.STRIP_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 const VENDOR = /(^|\/)(vendor|node_modules)\//;
 const EXTERNAL_LIB = new Set(['qrcode.js']);

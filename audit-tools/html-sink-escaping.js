@@ -34,7 +34,7 @@ try { acorn = require('acorn'); } catch (e) {
 }
 
 const ROOT = process.env.SINK_APP_DIR || path.join(__dirname, '..');
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // `<div`, `</td`, `<span ` … — ស្លាក HTML ពិត មិនមែន `a < b` ទេ
 const HTML_TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*[\s/>]/;
@@ -98,7 +98,6 @@ const BUILDER_ALLOW = {
         scopeLabel: 'លទ្ធផលផ្ទាល់នៃ escapeHtml()',
         expStr: "toLocaleDateString('km-KH') ឬ '-'"
     },
-    ZoeImport: {}
 };
 
 let pass = 0, fail = 0;

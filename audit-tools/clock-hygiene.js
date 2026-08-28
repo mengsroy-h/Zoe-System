@@ -18,7 +18,7 @@
 //
 // មេរៀនទី ២ (`network-timeout-test.js` 2.12.1 · `fluid-type-focus-test.js` 2.16.0 ·
 // `payload-schema.js` 2.17.3)៖ **ពេលសរសេរ checker ត្រូវសួរថា វាស្កេនឯកសារណាខ្លះ។**
-// ដូច្នេះវាស្កេន App ទាំង ៣ បូក `license-verify.js` — មិនមែនតែ ZoeW ទេ។
+// ដូច្នេះវាស្កេន App ទាំង ២ បូក `license-verify.js` — មិនមែនតែ ZoeW ទេ។
 let acorn;
 try { acorn = require('acorn'); } catch (e) { console.log('SKIP — ត្រូវការ acorn (npm i acorn)'); process.exit(0); }
 const fs = require('fs');
@@ -71,13 +71,6 @@ const LOCAL_CLOCK_OK = {
         checkOnline: 'គណនា offset ពី header HTTP `Date` — ត្រូវការនាឡិកាឧបករណ៍ជាមូលដ្ឋាន',
         syncServerTime: 'ដដែល — គណនា offset'
     },
-    'ZoeImport/app.js': {
-        '<top>': 'ថេរពេល boot splash — cosmetic',
-        elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
-        lockoutSecondsLeft: 'ការជាប់សោ PIN — local ដោយចេតនា',
-        registerPinFailure: 'ការជាប់សោ PIN ដដែល',
-        registerServiceWorker: 'throttle `reg.update()` — cosmetic/local (ZoeW និង ZoeKeyGen មានវាក្រោម `<top>` ព្រោះកូដចុះឈ្មោះរបស់ពួកវាមិននៅក្នុង function ដែលមានឈ្មោះ)'
-    }
 };
 
 // ឯកសារដែលមាននាឡិកា server ផ្ទាល់ខ្លួន ➜ ត្រូវមាន getServerNow() និងផ្លូវធ្វើឲ្យ offset ស្រស់

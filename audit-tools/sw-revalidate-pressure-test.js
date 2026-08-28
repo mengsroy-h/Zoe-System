@@ -45,7 +45,7 @@ function sliceFn(src, name) {
 }
 
 // === ផ្នែកទី ១ — រចនាសម្ព័ន្ធ sw.js ទាំង ៣ App ===
-const APPS = ['ZoeW', 'ZoeKeyGen', 'ZoeImport'];
+const APPS = ['ZoeW', 'ZoeKeyGen'];
 for (const app of APPS) {
     const swPath = path.join(ROOT, app, 'sw.js');
     if (!fs.existsSync(swPath)) continue;

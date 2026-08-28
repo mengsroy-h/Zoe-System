@@ -28,8 +28,8 @@
 ## [2.21.0] — 2026-08-28 · បញ្ចូល ZoeImport ចូល ZoeW ៖ «នាំចូល Excel ទៅ Sheet» ក្នុងម៉ឺនុយការកំណត់
 
 **ZoeW** (`2.20.8` ➜ `2.21.0`, `zoew-v119` ➜ `zoew-v120`)។
-**ZoeKeyGen មិនប្រែទេ** (`2.19.9`, `zoekeygen-v79`) និង
-**ZoeImport ក៏មិនប្រែដែរ** (`1.3.3`, `zoeimport-v12`) — គ្មានឯកសាររបស់ពួកវាប្រែសោះ។
+**ZoeKeyGen មិនប្រែទេ** (`2.19.9`, `zoekeygen-v79`) — គ្មានឯកសាររបស់វាប្រែសោះ។
+**App `ZoeImport` ត្រូវលុបចេញពី repo ក្នុងជុំដដែល** (មើលផ្នែក «ដកចេញ» ខាងក្រោម)។
 
 ⛔ **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មសោះ** (លុប/ដក · ធុងសំរាម · ការសម្អាតស្វ័យប្រវត្តិ ·
 ស្ថិតិយក · ការបែងចែកតាម barcode) ហើយ **មិនប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ ·
@@ -91,15 +91,33 @@ Excel ចូល Google Sheet ត្រូវបើក **App ដាច់ដោ�
 - ភ្ជាប់ចូល `run-all.sh` ទាំងផ្នែករត់ធម្មតា និងផ្នែក baseline
   (`SHEETIMPORT_APP_DIR`)។
 
+### ដកចេញ — App `ZoeImport`
+
+តាមសំណើអ្នកប្រើ (*«ហើយលុប ZoeImport ចេញពី repo»*) ថត `ZoeImport/` ត្រូវបាន
+លុបចេញទាំងស្រុង ព្រោះមុខងាររបស់វាផ្លាស់ចូល ZoeW រួចហើយ។
+
+- ⛔ **ថត `zto-import/` នៅដដែល** — វាជាខាង **server** (Apps Script) ដែល ZoeW
+  ហៅ។ URL និងពាក្យសម្ងាត់នាំចូល **ដដែល** នៅតែប្រើបាន គ្មានអ្វីត្រូវ redeploy ទេ។
+- ឧបករណ៍ audit ដែលធ្លាប់ស្កេន App ទាំង ៣ ឥឡូវស្កេន **ទាំង ២** ហើយផ្នែក
+  ZoeImport ក្នុង `network-timeout-test.js` · `toast-truth-test.js` ·
+  `layout-check.js` · `fluid-type-focus-test.js` · `clock-hygiene.js`
+  ត្រូវដកចេញ។ `run-all.sh` លែងរត់ `ZoeImport/test.js`។
+- ⛔ **ជាន់អប្បបរមារបស់ `monotonic-gate-test.js` ធ្លាក់ពី ៣ ➜ ២** —
+  `elapsedSince()` ជា helper ចែករំលែករវាង ZoeW និង ZoeKeyGen ប៉ុណ្ណោះ។
+  កុំបន្ថយវាទាបជាង ២។
+- ℹ️ `docs/BUG-HISTORY.md` **រក្សាធាតុ ZoeImport ទុកដដែល** — វាជាកំណត់ត្រា
+  ប្រវត្តិសាស្ត្រ ហើយការកែវាធ្វើឲ្យបាត់មេរៀន។
+
 ### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- **គ្មាន** — Firebase rules មិនប្រែ ហើយ CSP ក៏មិនប្រែដែរ
-  (`connect-src` មាន `https://script.google.com` រួចស្រាប់សម្រាប់ Lookup API)។
+- ⚠️ **បិទ ឬលុប Netlify site របស់ `ZoeImport`** — ថតរបស់វាលែងមានក្នុង repo
+  ➜ ការ deploy លើកក្រោយនឹងបរាជ័យ។ ⛔ **កុំបិទ Apps Script (`zto-import`)**។
 - ⚠️ **លើកដំបូងត្រូវវាយ URL និងពាក្យសម្ងាត់នាំចូលម្តង** ក្នុង ZoeW —
-  ការតភ្ជាប់ដែលរក្សាទុកក្នុង **ZoeImport មិនផ្ទេរមកទេ** ព្រោះវាអ៊ិនគ្រីប
-  ដោយ PIN ផ្សេង (PIN របស់ ZoeImport ≠ Security PIN របស់ ZoeW)។
-- ℹ️ **App `ZoeImport` នៅដដែល ហើយនៅដំណើរការធម្មតា** — មិនត្រូវបានលុបទេ។
-  ក្រោយផ្ទៀងផ្ទាត់ថាមុខងារក្នុង ZoeW ដើរល្អ អាចឈប់ប្រើវាបាន។
+  ការតភ្ជាប់ដែលរក្សាទុកក្នុង ZoeImport មិនផ្ទេរមកទេ ព្រោះវាអ៊ិនគ្រីប
+  ដោយ PIN ផ្សេង (PIN របស់ ZoeImport ≠ Security PIN របស់ ZoeW) ហើយ storage
+  របស់វារស់នៅលើ origin ផ្សេង។
+- **Firebase rules មិនប្រែ ហើយ CSP ក៏មិនប្រែដែរ**
+  (`connect-src` មាន `https://script.google.com` រួចស្រាប់សម្រាប់ Lookup API)។
 
 ---
 

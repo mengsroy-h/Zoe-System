@@ -459,8 +459,11 @@
 
         .hidden { display: none !important; }
 
-        @media (min-width: 992px) {
+        @media (min-width: 700px) {
             :root { --fs-unit: clamp(1.2px, 0.9553px + 0.0247vw, 1.35px); }
+        }
+
+        @media (min-width: 992px) {
             html, body { overflow: hidden; }
             .app-navbar { padding: 12px 24px; order: 1; }
             .brand-logo { width: 40px; height: 40px; font-size: calc(16 * var(--fs-unit)); }
@@ -1237,6 +1240,45 @@
         }
         .si-btn-danger { background-color: var(--danger); color: #fff; }
 
+        .app-update-banner {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 990;
+            background: #1f2937;
+            color: #ffffff;
+            padding: 10px 14px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: calc(13 * var(--fs-unit));
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.2);
+        }
+        .app-update-banner button {
+            font-size: calc(13 * var(--fs-unit));
+            cursor: pointer;
+        }
+        .app-update-refresh {
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            min-height: 36px;
+        }
+        .app-update-dismiss {
+            background: transparent;
+            color: #ffffff;
+            border: none;
+            font-size: calc(16 * var(--fs-unit));
+            padding: 4px 8px;
+            min-height: 36px;
+            min-width: 36px;
+        }
         .app-lock {
             display: none;
             position: fixed;
@@ -1261,7 +1303,8 @@
         body.app-locked .modal,
         body.app-locked .more-menu,
         body.app-locked .phone-suggest,
-        body.app-locked .toast-container { visibility: hidden; }
+        body.app-locked .toast-container,
+        body.app-locked .app-update-banner { visibility: hidden; }
         .app-lock-card {
             width: 100%;
             max-width: 330px;

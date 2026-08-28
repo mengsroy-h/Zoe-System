@@ -263,6 +263,45 @@ td.note-cell { white-space: normal; max-width: 140px; }
 .remember-container input { width: auto; margin: 0; }
 .app-version-line { margin-top: 10px; text-align: center; font-size: calc(10.5 * var(--fs-unit)); color: var(--text-muted); font-weight: 600; }
 
+.app-update-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 990;
+    background: #1f2937;
+    color: #ffffff;
+    padding: 10px 14px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: calc(13 * var(--fs-unit));
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.2);
+}
+.app-update-banner button {
+    font-size: calc(13 * var(--fs-unit));
+    cursor: pointer;
+}
+.app-update-refresh {
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    min-height: 36px;
+}
+.app-update-dismiss {
+    background: transparent;
+    color: #ffffff;
+    border: none;
+    font-size: calc(16 * var(--fs-unit));
+    padding: 4px 8px;
+    min-height: 36px;
+    min-width: 36px;
+}
 .toast-container { position: fixed; bottom: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; padding: 0 16px; pointer-events: none; }
 .toast { background: var(--dark-bg); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: calc(12 * var(--fs-unit)); font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(10px); transition: opacity 0.25s ease, transform 0.25s ease; max-width: 90%; text-align: center; }
 .toast.show { opacity: 1; transform: translateY(0); }

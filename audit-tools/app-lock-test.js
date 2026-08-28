@@ -110,6 +110,19 @@ console.log('\n=== ១. រចនាសម្ព័ន្ធ ៖ សោត្រ
 check(html.indexOf('id="appLockScreen"') !== -1, 'index.html មានអេក្រង់ចាក់សោ');
 check(/data-act="submitAppLockForm"/.test(html), 'ទម្រង់ដោះសោភ្ជាប់ទៅ submitAppLockForm (Enter ដំណើរការ)');
 check(/data-act="runAppLockBiometric"/.test(html), 'មានប៊ូតុងស្កេនក្រយៅដៃ/មុខលើអេក្រង់ចាក់សោ');
+// ⛔ វាល PIN មិនត្រូវប្រកាសខ្លួនជា `current-password` ទេ ៖
+//   ក. password manager ស្នើរក្សា PIN ➜ PIN ចេញពី vault ដែល sync ឆ្លងឧបករណ៍
+//      ➜ សោ«ឧបករណ៍»លែងជាកត្តាដាច់ដោយឡែក ហើយ PIN នោះជាកូនសោដែល derive
+//      `lookupSecretKey` និង `zoew_sheet_import_config` (AES ពិត)។
+//   ខ. browser autofill **ពាក្យសម្ងាត់គណនី** ចូលវាល PIN ➜ ខុស ៥ ដង
+//      ➜ ជាប់សោ ១ នាទី ដោយអ្នកប្រើមិនបានធ្វើអ្វីខុសសោះ។
+// វាល PIN ដទៃទាំង ២ (`securityPinInput` · `newSecurityPinInput`) ប្រើ
+// `autocomplete="off"` រួចហើយ — វាលនេះត្រូវស៊ីគ្នា។
+const pinInputs = (html.match(/<input[^>]*id="(appLockPinInput|securityPinInput|newSecurityPinInput)"[^>]*>/g) || []);
+check(pinInputs.length === 3, 'រកឃើញវាល PIN ទាំង ៣ ក្នុង index.html', pinInputs.length);
+check(pinInputs.every((t) => /autocomplete="off"/.test(t)),
+    '⛔ គ្រប់វាល PIN ប្រកាស `autocomplete="off"` (កុំឲ្យ password manager យក PIN)',
+    pinInputs.filter((t) => !/autocomplete="off"/.test(t)).join(' | '));
 check(/data-act="forgetAppLockPin"/.test(html), 'មានផ្លូវចេញ «ភ្លេច PIN?» — សោមិនត្រូវក្លាយជាអន្ទាក់');
 
 const initFn = sliceFn(appJs, 'initAppLock');
@@ -196,6 +209,14 @@ check(/body\.app-locked[\s\S]{0,320}?visibility:\s*hidden/.test(css),
     'CSS ៖ ខណៈចាក់សោ ➜ navbar · ទំព័រ · របា Tab ត្រូវលាក់ពិត');
 check(/body\.app-locked \.modal,/.test(css),
     '⛔ CSS ៖ ប្រអប់ដែលបើកនៅ ក៏ត្រូវលាក់ដែរ — ការចាក់សោកណ្តាលការងារកើតឡើងពិត');
+// ⛔ របា «មានកំណែថ្មី» សាងដោយ JS ក្រោយ boot ➜ វាមិនស្ថិតក្នុង index.html
+// ដូច្នេះការស្កេន markup មិនឃើញវាទេ។ វាធ្លាប់ជា inline `z-index:99999`
+// ដែល **ខ្ពស់ជាងអេក្រង់ចាក់សោ (2000)** ➜ វាគូរពីលើសោ ហើយប៊ូតុង
+// «Refresh ឥឡូវនេះ» ចុចបានខណៈ App ជាប់សោ។
+check(/body\.app-locked \.app-update-banner/.test(css),
+    '⛔ CSS ៖ របាកំណែថ្មីក៏ត្រូវលាក់ក្រោមសោដែរ');
+check(!/zoeUpdateBanner[\s\S]{0,400}?z-index:\s*9{4,}/.test(appJs),
+    '⛔ របាកំណែថ្មីមិនប្រកាស z-index យក្សតាម inline style');
 check(/\.app-lock-msg \{[^}]*text-align:\s*center/.test(css),
     'CSS ៖ សាររបស់អេក្រង់ចាក់សោឈរចំកណ្តាល ដូចធាតុដទៃលើកាត');
 check(/\.btn-biometric \{[^}]*justify-content:\s*center/.test(css),
@@ -422,6 +443,63 @@ async function withTimeout(promise, ms, label) {
             check(s.unlockedFlag === null, 'មិនទាន់ដោះសោ ➜ គ្មានទង់ក្នុងវគ្គ', s);
             const focused = await page.evaluate(() => (document.activeElement || {}).id || '');
             check(focused !== 'hwScannerInput', '⛔ ម៉ាស៊ីនស្កេន hardware មិនដណ្តើម focus ខណៈចាក់សោ', focused);
+        });
+
+        await group('៣ខ. ⛔ គ្មានស្រទាប់ណាគូរ *ពីលើ* អេក្រង់ចាក់សោ', async () => {
+            // វាស់ **អ្វីដែលនៅលើគេពិត** តាម `elementFromPoint` — មិនមែនអាន CSS។
+            // របាកំណែថ្មីជាស្រទាប់ដែល JS សាងក្រោយ boot ដូច្នេះការស្កេន markup
+            // មើលមិនឃើញវា; មានតែ hit-test ពិតទេដែលចាប់បាន។
+            const top = await page.evaluate(() => {
+                if (typeof showUpdateAvailableBanner === 'function') showUpdateAvailableBanner();
+                const lock = document.getElementById('appLockScreen');
+                const w = window.innerWidth, h = window.innerHeight;
+                const pts = [[w / 2, h - 6], [w / 2, h - 24], [w / 2, h / 2], [w / 2, 8], [6, h - 12]];
+                const out = pts.map(([x, y]) => {
+                    const el = document.elementFromPoint(x, y);
+                    if (!el) return 'none';
+                    if (lock && (el === lock || lock.contains(el))) return 'lock';
+                    return el.tagName + '.' + String(el.className || '').slice(0, 40);
+                });
+                const banner = document.getElementById('zoeUpdateBanner');
+                return {
+                    hits: out,
+                    bannerExists: !!banner,
+                    bannerVisibility: banner ? getComputedStyle(banner).visibility : 'missing'
+                };
+            });
+            check(top.bannerExists, 'របាកំណែថ្មីត្រូវសាងបានពិត (បើអត់ ការវាស់នេះទទេ)', top);
+            check(top.bannerVisibility === 'hidden', '⛔ របាកំណែថ្មី **លាក់ពិត** ខណៈចាក់សោ', top);
+            check(top.hits.every((h) => h === 'lock'), '⛔ គ្រប់ចំណុចនៃអេក្រង់ ➜ អ្វីដែលនៅលើគេជាអេក្រង់ចាក់សោ', top);
+
+            // ⛔ ជាន់ទី ២ ៖ ទោះគ្មានសោ របានេះក៏មិនត្រូវគ្របប្រអប់ដែរ។
+            // `visibility: hidden` គ្របលើ z-index ➜ ការវាស់ខាងលើ **មិនអាច**
+            // បែងចែក z-index បានទេ។ ការវាស់នេះទើបចាក់សោលំដាប់ជង់ពិត ៖
+            // របាដែលឈរលើប្រអប់ បាំងវាល PIN ដែលអ្នកប្រើកំពុងវាយ។
+            const overModal = await page.evaluate(() => {
+                document.body.classList.remove('app-locked');
+                const lock = document.getElementById('appLockScreen');
+                if (lock) lock.classList.remove('is-open');
+                const modal = document.getElementById('pinModal') || document.querySelector('.modal');
+                if (!modal) return { missing: true };
+                modal.style.display = 'flex';
+                const w = window.innerWidth, h = window.innerHeight;
+                const el = document.elementFromPoint(w / 2, h - 6);
+                const banner = document.getElementById('zoeUpdateBanner');
+                const inBanner = !!(banner && el && (el === banner || banner.contains(el)));
+                const inModal = !!(el && el.closest && el.closest('.modal'));
+                modal.style.display = '';
+                return { inBanner: inBanner, inModal: inModal, tag: el ? el.tagName + '.' + String(el.className || '').slice(0, 40) : 'none' };
+            });
+            check(!overModal.missing && overModal.inModal && !overModal.inBanner,
+                '⛔ របាកំណែថ្មីឈរ **ក្រោម** ប្រអប់ — វាមិនត្រូវបាំងវាល PIN ដែលកំពុងវាយ', overModal);
+
+            await page.evaluate(() => {
+                const b = document.getElementById('zoeUpdateBanner');
+                if (b) b.remove();
+                document.body.classList.add('app-locked');
+                const lock = document.getElementById('appLockScreen');
+                if (lock) lock.classList.add('is-open');
+            });
         });
 
         await group('៤. session ៤ ម៉ោង **មិនរងផល** ដោយការចាក់សោ', async () => {

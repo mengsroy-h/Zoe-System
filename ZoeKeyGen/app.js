@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.9';
+const APP_VERSION = '2.19.10';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -151,17 +151,19 @@ function revealAppAfterBoot() {
         if (document.getElementById('zoeUpdateBanner')) return;
         const banner = document.createElement('div');
         banner.id = 'zoeUpdateBanner';
-        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:calc(13 * var(--fs-unit));box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        banner.className = 'app-update-banner';
         const label = document.createElement('span');
         label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
         const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.className = 'app-update-refresh';
         refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
-        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:calc(13 * var(--fs-unit));cursor:pointer;';
         refreshBtn.addEventListener('click', () => window.location.reload());
         const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'app-update-dismiss';
         dismissBtn.textContent = '✕';
         dismissBtn.setAttribute('aria-label', 'បិទ');
-        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:calc(16 * var(--fs-unit));cursor:pointer;padding:0 4px;';
         dismissBtn.addEventListener('click', () => banner.remove());
         banner.appendChild(label);
         banner.appendChild(refreshBtn);

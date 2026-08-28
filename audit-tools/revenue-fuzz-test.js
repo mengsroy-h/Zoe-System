@@ -12,8 +12,16 @@ if (!fs.existsSync(CHROME)) {
     process.exit(0);
 }
 const ROOT = process.env.FUZZ_APP_DIR || path.join(__dirname, '..');
-const RUNS = parseInt(process.env.FUZZ_RUNS || '6', 10);
-const OPS = parseInt(process.env.FUZZ_OPS || '26', 10);
+// ⛔ លំនាំដើមត្រូវឈានដល់កម្រិតដែល **វាស់រួច** ថាចាំបាច់។
+// CLAUDE.md កត់ត្រាថា mutation `claimedPartial` (ការជាន់អថេរ — ថ្នាក់កំហុសពិត)
+// **រស់រានពេញ ២០ លំដាប់ × ៥៥** មុនបន្ថែម op `sweepPickup` ហើយធ្លាក់ក្នុង
+// **១២ លំដាប់ × ៤៥** ក្រោយបន្ថែម។ ប៉ុន្តែលំនាំដើមនៅត្រឹម **៦ × ២៦** —
+// **តូចជាងកម្រិតដែលឯកសារខ្លួនវាចែងថាចាំបាច់** ➜ ការរត់ធម្មតាមិនដែល
+// ឈានដល់ជម្រៅដែលចាប់កំហុសនោះទេ។ នោះជាបៃតងក្លែងក្លាយប្រភេទ
+// «ការគ្របតូចពេក» ៖ វារាយការណ៍ PASS ដោយមិនបានទៅដល់កន្លែងដែលកំហុសរស់នៅ។
+// វាស់បាន ៖ ៦×២៦ ➜ ៤១ វិ.; ១២×៤៥ ➜ ១២២ វិ. (ក្រោមពិដាន ៣០០ វិ. របស់ run-all)។
+const RUNS = parseInt(process.env.FUZZ_RUNS || '12', 10);
+const OPS = parseInt(process.env.FUZZ_OPS || '45', 10);
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 
 let pass = 0, fail = 0;

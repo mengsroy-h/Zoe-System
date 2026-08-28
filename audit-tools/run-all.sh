@@ -89,6 +89,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
+         stall-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test; do
     run "$t" node "audit-tools/$t.js"
@@ -285,6 +286,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
+    STALLGUARD_APP_DIR="$BASE" node audit-tools/stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   stall-guard:     /'
 fi
 
 echo

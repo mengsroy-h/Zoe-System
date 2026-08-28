@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.22.3';
+    const APP_VERSION = '2.22.4';
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -212,17 +212,19 @@
         if (document.getElementById('zoeUpdateBanner')) return;
         const banner = document.createElement('div');
         banner.id = 'zoeUpdateBanner';
-        banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#1f2937;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:calc(13 * var(--fs-unit));box-shadow:0 -2px 8px rgba(0,0,0,0.2);flex-wrap:wrap;';
+        banner.className = 'app-update-banner';
         const label = document.createElement('span');
         label.textContent = '🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល';
         const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.className = 'app-update-refresh';
         refreshBtn.textContent = 'Refresh ឥឡូវនេះ';
-        refreshBtn.style.cssText = 'background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:calc(13 * var(--fs-unit));cursor:pointer;';
         refreshBtn.addEventListener('click', () => window.location.reload());
         const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'app-update-dismiss';
         dismissBtn.textContent = '✕';
         dismissBtn.setAttribute('aria-label', 'បិទ');
-        dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:calc(16 * var(--fs-unit));cursor:pointer;padding:0 4px;';
         dismissBtn.addEventListener('click', () => banner.remove());
         banner.appendChild(label);
         banner.appendChild(refreshBtn);
@@ -473,6 +475,29 @@
         }
     }
     window.addEventListener('beforeunload', cleanupResources);
+
+    function preconnectToOrigin(rawUrl) {
+        try {
+            if (!rawUrl) return;
+            const parsed = new URL(rawUrl);
+            if (!/^https?:$/.test(parsed.protocol)) return;
+            const origin = parsed.origin;
+            const already = Array.from(document.querySelectorAll('link[rel="preconnect"], link[rel="dns-prefetch"]'))
+                .some(l => l.href.replace(/\/$/, '') === origin);
+            if (already) return;
+            const preconnect = document.createElement('link');
+            preconnect.rel = 'preconnect';
+            preconnect.href = origin;
+            preconnect.crossOrigin = 'anonymous';
+            document.head.appendChild(preconnect);
+        } catch (e) {}
+    }
+
+    function preconnectToLookupHost() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.url) return;
+        preconnectToOrigin(cfg.url);
+    }
 
     function preconnectToDatabaseHost(cfg) {
         try {
@@ -2584,6 +2609,9 @@
     }
 
     function sheetImportLibFailureMessage(e) {
+        if (e && e.code === 'SCRIPT_LOAD_TIMEOUT') {
+            return 'ផ្ទុកឯកសារអាន Excel យូរពេក (បណ្តាញឆ្លើយមិនចេញ) — សូមសាកម្តងទៀត';
+        }
         if (e && e.code === 'SCRIPT_LOAD_FAILED') {
             return navigator.onLine === false
                 ? 'ឧបករណ៍ក្រៅបណ្ដាញ ហើយឯកសារអាន Excel មិនទាន់ចូល cache ទេ'
@@ -3089,6 +3117,7 @@
     }
 
     function prefetchCustomerDataTableRowsIfConfigured() {
+        preconnectToLookupHost();
         if (!customerTablePrefetchAllowed()) return;
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
@@ -3174,6 +3203,8 @@
             }
             return;
         }
+
+        if (navigator.onLine === false) return;
 
         if (elapsedSince(autoLookupLastFailedAt) < AUTO_LOOKUP_FAIL_COOLDOWN_MS) {
             return;
@@ -6211,6 +6242,9 @@
     const loadedScriptPromises = {};
 
     function exportFailureMessage(e) {
+        if (e && e.code === 'SCRIPT_LOAD_TIMEOUT') {
+            return "❌ Export Excel បរាជ័យ! ផ្ទុកឯកសារ Excel យូរពេក (បណ្តាញឆ្លើយមិនចេញ) — សូមសាកម្តងទៀត";
+        }
         if (e && e.code === 'SCRIPT_LOAD_FAILED') {
             return navigator.onLine === false
                 ? "❌ Export Excel បរាជ័យ! ឧបករណ៍ក្រៅបណ្ដាញ ហើយឯកសារ Excel មិនទាន់ចូល cache ទេ"
@@ -6223,23 +6257,42 @@
     function loadScriptOnce(key) {
         if (loadedScriptPromises[key]) return loadedScriptPromises[key];
         const lib = EXPORT_LIBS[key];
-        loadedScriptPromises[key] = new Promise((resolve, reject) => {
+        const SCRIPT_LOAD_TIMEOUT_MS = 25000;
+        const pending = new Promise((resolve, reject) => {
             const script = document.createElement('script');
+            let settled = false;
+            let timer = null;
+            const stop = () => {
+                if (timer === null) return;
+                clearTimeout(timer);
+                timer = null;
+            };
+            const failWith = (code, message) => {
+                if (settled) return;
+                settled = true;
+                stop();
+                if (loadedScriptPromises[key] === pending) delete loadedScriptPromises[key];
+                const err = new Error(message);
+                err.code = code;
+                reject(err);
+            };
             script.src = lib.url;
             if (lib.integrity) {
                 script.integrity = lib.integrity;
                 script.crossOrigin = 'anonymous';
             }
-            script.onload = () => resolve();
-            script.onerror = () => {
-                delete loadedScriptPromises[key];
-                const err = new Error('Failed to load ' + lib.url);
-                err.code = 'SCRIPT_LOAD_FAILED';
-                reject(err);
+            script.onload = () => {
+                if (settled) return;
+                settled = true;
+                stop();
+                resolve();
             };
+            script.onerror = () => failWith('SCRIPT_LOAD_FAILED', 'Failed to load ' + lib.url);
+            timer = setTimeout(() => failWith('SCRIPT_LOAD_TIMEOUT', 'Script load timed out: ' + lib.url), SCRIPT_LOAD_TIMEOUT_MS);
             document.head.appendChild(script);
         });
-        return loadedScriptPromises[key];
+        loadedScriptPromises[key] = pending;
+        return pending;
     }
 
     function getFilterTargetDateKey() {

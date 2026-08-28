@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.22.1';
+    const APP_VERSION = '2.22.2';
 
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
@@ -1340,11 +1340,18 @@
         return await unwrapPinWithRawKey(rec.wrapped, b64ToBytes(rec.wrapKey));
     }
 
+    function setBiometricLabel(btn, busy) {
+        if (!btn) return;
+        const label = typeof btn.querySelector === 'function' ? btn.querySelector('.bio-label') : null;
+        if (label) label.textContent = busy ? 'កំពុងស្កេន...' : 'ស្កេនក្រយៅដៃ ឬមុខ';
+        else btn.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
+    }
+
     function setBiometricBusy(busy) {
         const btn = document.getElementById('pinBiometricBtn');
         if (!btn) return;
         btn.disabled = !!busy;
-        btn.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
+        setBiometricLabel(btn, busy);
     }
 
     function refreshBiometricUi() {
@@ -1531,7 +1538,7 @@
         const bio = document.getElementById('appLockBiometricBtn');
         if (bio) {
             bio.disabled = !!busy;
-            bio.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
+            setBiometricLabel(bio, busy);
         }
     }
 

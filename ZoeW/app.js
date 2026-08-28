@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.20.7';
+    const APP_VERSION = '2.20.8';
 
     const ACTION_ALLOWLIST = [
         "cancelLocationChange",
@@ -339,6 +339,7 @@
     const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
     const DB_LISTENER_KEY_DELETED = 'deleted';
     const dbListenerPendingPaths = new Set();
+    const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
     let dbListenerProgressAt = 0;
     let pickupLedgerRepairDone = false;
@@ -2681,14 +2682,19 @@
         dbListenerRecoveryAttempt = 0;
     }
 
+    function dbListenerViewIsStale(pathKey) {
+        return dbListenerPendingPaths.has(pathKey) || dbListenerFailedPaths.has(pathKey);
+    }
+
     function noteDbListenerAlive(pathKey) {
         const wasPending = dbListenerPendingPaths.delete(pathKey);
+        dbListenerFailedPaths.delete(pathKey);
         if (wasPending) {
             dbListenerProgressAt = Date.now();
             dbListenerPendingSeen = dbListenerPendingPaths.size;
         }
         if (wasPending && !dbListenerPendingPaths.size) refreshLiveToasts();
-        if (!dbListenersFailed || dbListenerPendingPaths.size) return;
+        if (!dbListenersFailed || dbListenerPendingPaths.size || dbListenerFailedPaths.size) return;
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
         clearDbListenerRecovery();
@@ -2732,6 +2738,7 @@
         dbListenersFailed = false;
         dbListenerOutageNoticeShown = false;
         dbListenerPendingPaths.clear();
+        dbListenerFailedPaths.clear();
         dbListenerPendingSeen = 0;
         dbListenerProgressAt = 0;
         lastDbListenerAttemptAt = 0;
@@ -2745,9 +2752,10 @@
         attemptDbListenerRecovery();
     }
 
-    function handleDbListenerError(err) {
+    function handleDbListenerError(err, pathKey) {
         console.error('Firebase listener error:', err);
         if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
+        if (pathKey) dbListenerFailedPaths.add(pathKey);
         dbListenersFailed = true;
         renderConnectionStatus();
         if (!dbListenerOutageNoticeShown) {
@@ -2762,6 +2770,7 @@
 
         detachDatabaseListeners();
         dbListenerPendingPaths.clear();
+        dbListenerFailedPaths.clear();
         DB_LISTENER_KEYS.forEach((key) => dbListenerPendingPaths.add(key));
         dbListenerPendingSeen = dbListenerPendingPaths.size;
         dbListenerProgressAt = 0;
@@ -2775,7 +2784,7 @@
                     try { localStorage.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
                     debouncedRenderAfterHistorySync();
                 }
-            }, handleDbListenerError);
+            }, (err) => handleDbListenerError(err, 'exchangeRate'));
         }
 
         if (dbRefDailyRevenue) {
@@ -2783,14 +2792,14 @@
                 noteDbListenerAlive('dailyRevenue');
                 dailyRevenueData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
-            }, handleDbListenerError);
+            }, (err) => handleDbListenerError(err, 'dailyRevenue'));
         }
 
         if (dbRefMonthlyRevenue) {
             fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
                 noteDbListenerAlive('monthlyRevenue');
                 monthlyRevenueData = snapshot.val() || {};
-            }, handleDbListenerError);
+            }, (err) => handleDbListenerError(err, 'monthlyRevenue'));
         }
 
         if (dbRefDailyPickup) {
@@ -2798,7 +2807,7 @@
                 noteDbListenerAlive('dailyPickup');
                 dailyPickupData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
-            }, handleDbListenerError);
+            }, (err) => handleDbListenerError(err, 'dailyPickup'));
         }
 
         if (dbRefHistory) {
@@ -2846,7 +2855,7 @@
             });
 
             debouncedRenderAfterHistorySync();
-        }, handleDbListenerError);
+        }, (err) => handleDbListenerError(err, 'history'));
         }
 
         if (dbRefDeleted) {
@@ -2865,7 +2874,7 @@
                 normalizeBarcodesOf(item);
             });
             runAutomaticDeletedCleanup();
-        }, handleDbListenerError);
+        }, (err) => handleDbListenerError(err, 'deleted'));
         }
 
         isDatabaseInitialized = true;
@@ -2898,7 +2907,7 @@
     function clearStaleRestoreMarkers(item) {
         if (!db || !fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
         if (staleRestoreMarkerSweeps.has(item.id)) return;
-        if (dbListenerPendingPaths.has(DB_LISTENER_KEY_DELETED)) return;
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return;
         const sourceId = item.restoreClaimId;
         if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return;
         const source = (typeof sourceId === 'string')
@@ -3302,7 +3311,7 @@
 
     function dropStaleRestoreMarkers(currentItem) {
         if (!itemHasRestoreMarkers(currentItem)) return false;
-        if (dbListenerPendingPaths.has(DB_LISTENER_KEY_DELETED)) return false;
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return false;
         const sourceId = currentItem.restoreClaimId;
         if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return false;
         const source = (typeof sourceId === 'string')

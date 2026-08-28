@@ -116,6 +116,11 @@ function buildWorld(store, now) {
         // function ពិត បូក `serverClockTrusted = true` (ស្ថានភាព App ភ្ជាប់រួច)។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();',
+        // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ** «listener
+        // ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវផ្ទុក **helper ពិត** បូក Set ទាំង ២។
+        'const dbListenerFailedPaths = new Set();',
+        extractFnOptional(src, 'dbListenerViewIsStale')
+            || 'function dbListenerViewIsStale(k) { return dbListenerPendingPaths.has(k); }',
         // ⛔ កូនសោដែលការការពារ marker សួរ — ត្រូវជាកូនសោ **ដដែល** ដែល
         // `initDatabaseListeners()` ដាក់ចូល Set (មើល `listener-pending-key-test.js`)។
         "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',

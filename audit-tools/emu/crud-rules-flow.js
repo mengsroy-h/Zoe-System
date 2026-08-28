@@ -46,7 +46,7 @@ function extractFn(src, name) {
 const extractConst = (src, n) => { const m = new RegExp('\\n\\s*const ' + n + ' = ([^;]+);').exec(src); if (!m) throw new Error('missing const ' + n); return `const ${n} = ${m[1]};`; };
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
-const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
+const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
@@ -100,7 +100,7 @@ function makeSandbox(store, now) {
         // ⛔ ច្រកទ្វារនាឡិការបស់ការសម្អាត (2.20.5) ➜ ផ្ទុក function ពិត បូក
         // `serverClockTrusted = true` ដែលជាស្ថានភាព App ដែលភ្ជាប់រួច។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'

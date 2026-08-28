@@ -77,6 +77,7 @@ APPS.forEach((app) => {
     const added = {};
     const dynamic = new Set();
     const queried = [];
+    const guardQueries = [];
 
     function noteAdd(owner, arg, resolveParams) {
         if (arg && arg.type === 'Literal' && typeof arg.value === 'string') {
@@ -150,6 +151,46 @@ APPS.forEach((app) => {
         }
     });
 
+    // ⛔ **ការសួរដែលរស់នៅក្រោយ helper ចែករំលែក** (កំណែ 2.20.8)។
+    // ការកែត្រឹមត្រូវនៃថ្នាក់កំហុសនេះគឺការប្រមូលការសួរទៅក្នុង helper **តែមួយ**
+    // (`dbListenerViewIsStale(key)`) ➜ កន្លែងហៅលែងជា `<set>.has(<literal>)`
+    // ទៀតទេ។ ការរាប់តែទម្រង់ចាស់នឹងធ្វើឲ្យជាន់អប្បបរមាធ្លាក់ **ដោយសារការកែ**
+    // ហើយបង្ខំឲ្យជុំក្រោយបន្ធូរវាចោល — នោះជាការធ្វើឲ្យការការពារងាប់។
+    // ដូច្នេះ៖ រកឈ្មោះ function ណាដែល **តួរបស់វាសួរ `.has()` លើ Set ដែល
+    // ស្គាល់កូនសោ** រួចរាប់ **កន្លែងហៅវា** ជាការសួរដែរ ហើយពិនិត្យកូនសោ
+    // (ថេរ `const X = '…'`) ដូចគ្នា។
+    const constStrings = {};
+    walk(ast, (node) => {
+        if (node.type !== 'VariableDeclarator' || !node.id || node.id.type !== 'Identifier') return;
+        if (node.init && node.init.type === 'Literal' && typeof node.init.value === 'string') {
+            constStrings[node.id.name] = node.init.value;
+        }
+    });
+    const guardFns = new Set();
+    walk(ast, (node) => {
+        if (node.type !== 'FunctionDeclaration' || !node.id) return;
+        let delegates = false;
+        walk(node.body, (inner) => {
+            if (inner.type !== 'CallExpression') return;
+            const c = inner.callee;
+            if (c.type !== 'MemberExpression' || c.computed) return;
+            if (c.property.name !== 'has' || c.object.type !== 'Identifier') return;
+            if (!added[c.object.name] || !added[c.object.name].size) return;
+            delegates = true;
+        });
+        if (delegates) guardFns.add(node.id.name);
+    });
+    walk(ast, (node) => {
+        if (node.type !== 'CallExpression') return;
+        if (node.callee.type !== 'Identifier' || !guardFns.has(node.callee.name)) return;
+        const arg = node.arguments[0];
+        let key = null;
+        if (arg && arg.type === 'Literal' && typeof arg.value === 'string') key = arg.value;
+        else if (arg && arg.type === 'Identifier' && constStrings[arg.name] !== undefined) key = constStrings[arg.name];
+        else return;                       // អាគុយម៉ង់ថាមវន្ត ➜ រំលង (កុំចោទខុស)
+        guardQueries.push({ key, line: node.loc.start.line, via: node.callee.name });
+    });
+
     queried.forEach((q) => {
         const known = added[q.owner];
         if (!known || !known.size) return;
@@ -161,6 +202,21 @@ APPS.forEach((app) => {
                 + JSON.stringify([...known]));
         }
     });
+
+    // កូនសោដែលហៅតាម helper ត្រូវជាសមាជិកនៃ Set **ណាមួយ** ដែល helper នោះសួរ
+    const allKnown = new Set();
+    Object.keys(added).forEach((owner) => {
+        if (dynamic.has(owner)) return;
+        added[owner].forEach((k) => allKnown.add(k));
+    });
+    guardQueries.forEach((q) => {
+        if (!allKnown.size) return;
+        hasCalls++;
+        if (!allKnown.has(q.key)) {
+            orphans.push(app + '/app.js:' + q.line + '  ' + q.via + "('" + q.key + "')  ⟶ កូនសោដែលដាក់ចូលពិត៖ "
+                + JSON.stringify([...allKnown]));
+        }
+    });
 });
 
 ok('ស្កេនឯកសារ App យ៉ាងតិច ១ (ជាន់អប្បបរមា — ថតទទេត្រូវធ្លាក់)', scannedFiles >= 1, scannedFiles);
@@ -168,7 +224,7 @@ ok('ស្កេនឯកសារ App យ៉ាងតិច ១ (ជាន់�
 // តែទម្រង់ literal ទេ។ ហេតុផល៖ ការកែត្រឹមត្រូវនៃថ្នាក់កំហុសនេះគឺការប្តូរ
 // literal ទៅជាថេរដែលចែករំលែក ➜ ជាន់អប្បបរមាដែលរាប់តែ literal នឹងធ្លាក់
 // **ដោយសារការកែ** ហើយបង្ខំឲ្យជុំក្រោយបន្ធូរវាចោល។
-ok('រកឃើញការសួរ `<set>.has(...)` យ៉ាងតិច ២ កន្លែង (ជាន់អប្បបរមា)', hasCalls >= 2, hasCalls);
+ok('រកឃើញការសួរកូនសោ (`<set>.has(...)` ឬតាម helper) យ៉ាងតិច ២ កន្លែង (ជាន់អប្បបរមា)', hasCalls >= 2, hasCalls);
 ok('គ្មានកូនសោកំព្រា — រាល់ `.has(k)` ប្រើកូនសោដែល `.add(k)` ដាក់ចូលពិត',
     orphans.length === 0, orphans);
 
@@ -205,6 +261,9 @@ function runDrop(opts) {
     const sandbox = {
         console, Set, Date, JSON, Object, Array, String, Number, Boolean,
         dbListenerPendingPaths: new Set(opts.pending),
+        // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ**
+        // «listener ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវមាន Set ទាំង ២។
+        dbListenerFailedPaths: new Set(opts.failed || []),
         deletedItems: opts.deletedItems,
         activeRestoreClaims: new Set(opts.activeClaims || []),
         isActiveRestoreClaim: (claim) => !!(claim && claim.token && (Date.now() - claim.at) < 120000)
@@ -214,6 +273,10 @@ function runDrop(opts) {
     // ទោះ `app.js` សរសេរកូនសោខុសក៏ដោយ (នោះជាបញ្ហាដែលឯកសារនេះដេញតាម)។
     vm.runInContext('const DB_LISTENER_KEY_DELETED = ' + JSON.stringify(DELETED_KEY_IN_CODE) + ';', ctx);
     vm.runInContext(hasMarkersFn || 'function itemHasRestoreMarkers(i){return !!(i&&(i.restoreClaimId!==undefined||i.restoreClaimToken!==undefined));}', ctx);
+    // helper **ពិត** ពី app.js បើមាន; បើអត់ ➜ stub ដែលរក្សាឥរិយាបថចាស់
+    // ➜ ការអះអាងធ្លាក់ដោយហេតុផលរបស់វា មិនមែនដោយ ReferenceError។
+    vm.runInContext(sliceFn('dbListenerViewIsStale')
+        || 'function dbListenerViewIsStale(k) { return dbListenerPendingPaths.has(k); }', ctx);
     vm.runInContext(dropFn || 'function dropStaleRestoreMarkers(){ return false; }', ctx);
     sandbox.__item = opts.item;
     const dropped = vm.runInContext('dropStaleRestoreMarkers(__item)', ctx);
@@ -269,6 +332,36 @@ const TRASH_KEY = DELETED_KEY_IN_CODE;
         item: { id: 'id_1', restoreClaimId: 'trash_gone', restoreClaimToken: 'tok_old' }
     });
     ok('path ផ្សេងរង់ចាំ តែធុងសំរាមមកដល់ ➜ marker ងាប់នៅតែត្រូវលុប',
+        r.dropped === true, r.item);
+}
+
+// ២ង. ⛔ **listener `deleted` ងាប់** ➜ ទិដ្ឋភាពកក ➜ marker មិនត្រូវលុប
+//
+// 🔴 នេះជាចន្លោះដែលកំណែ 2.20.8 បិទ។ កូនសោ `deleted` ត្រូវលុបចេញពី
+// `dbListenerPendingPaths` តាំងពី snapshot **ដំបូង** ➜ ពេល listener នោះ
+// ងាប់ **ក្រោយមក** នោះ pending នៅតែទទេ ➜ ច្រកទ្វារចាស់ **បើកចំហលើ
+// `deletedItems` ដែលកក** ➜ marker របស់ឧបករណ៍ **ផ្សេង** ដែលកំពុងស្តារ
+// ត្រូវលុប ➜ `permission_denied` ➜ «ដក»/«លុប» ស្លាប់ជារៀងរហូត។
+{
+    const r = runDrop({
+        pending: [],
+        failed: [TRASH_KEY],
+        deletedItems: [],
+        item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' }
+    });
+    ok('⛔ listener `deleted` ងាប់ (pending ទទេ) ➜ marker **មិនត្រូវលុប**',
+        r.dropped === false && r.item.restoreClaimId === 'trash_1', r.item);
+}
+
+// ⛔ ទិសផ្ទុយ ៖ គ្មាន pending ហើយក៏គ្មានការងាប់ ➜ marker ងាប់ត្រូវលុបដដែល
+{
+    const r = runDrop({
+        pending: [],
+        failed: [],
+        deletedItems: [],
+        item: { id: 'id_1', restoreClaimId: 'trash_gone', restoreClaimToken: 'tok_old' }
+    });
+    ok('⛔ ទិសផ្ទុយ ៖ listener ទាំងអស់រស់ ➜ marker ងាប់នៅតែត្រូវលុប',
         r.dropped === true, r.item);
 }
 

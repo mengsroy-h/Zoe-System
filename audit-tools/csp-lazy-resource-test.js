@@ -192,7 +192,7 @@ console.log('\n-- ៤. សារបរាជ័យត្រូវប្រាប
 
 // ── ៥. ក្នុង browser ពិត ក្រោម header CSP ពិត ────────────────────────
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.wasm': 'application/wasm' };
-function serve(dir, port, csp) {
+function serve(dir, csp) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -204,7 +204,7 @@ function serve(dir, port, csp) {
             rsp.writeHead(200, headers);
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
@@ -216,10 +216,10 @@ function serve(dir, port, csp) {
     }
     console.log('\n-- ៥. Chromium ពិត ក្រោម header CSP ពិត ៖ ផ្លូវ Export ត្រូវដើរ --');
     const browser = await chromium.launch({ executablePath: CHROME });
-    const port = 8620;
     const dir = path.join(ROOT, 'ZoeW');
     const csp = cspOf('ZoeW');
-    const server = await serve(dir, port, csp);
+    const server = await serve(dir, csp);
+    const port = server.address().port;
     const ctx = await browser.newContext({ viewport: { width: 412, height: 800 } });
     const page = await ctx.newPage();
     const violations = [];

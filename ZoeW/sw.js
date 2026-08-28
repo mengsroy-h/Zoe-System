@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v124';
+const CACHE_VERSION = 'zoew-v125';
 
 const CORE_SHELL = [
     './',
@@ -86,8 +86,44 @@ function revalidateShell(cache, request, cacheKey) {
     }, release);
 }
 
+const NETWORK_TIMEOUT_MS = 20000;
+
+function timedFetch(request, options) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const opts = controller ? Object.assign({}, options || {}, { signal: controller.signal }) : options;
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        let timer = null;
+        const stop = () => {
+            if (timer === null) return;
+            clearTimeout(timer);
+            timer = null;
+        };
+        timer = setTimeout(() => {
+            timer = null;
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            const err = new Error('Network timed out');
+            err.name = 'AbortError';
+            reject(err);
+        }, NETWORK_TIMEOUT_MS);
+        fetch(request, opts).then((response) => {
+            if (settled) return;
+            settled = true;
+            stop();
+            resolve(response);
+        }, (err) => {
+            if (settled) return;
+            settled = true;
+            stop();
+            reject(err);
+        });
+    });
+}
+
 function networkOnly(request) {
-    return fetch(request).then((response) => response || Response.error(), () => Response.error());
+    return timedFetch(request).then((response) => response || Response.error(), () => Response.error());
 }
 
 self.addEventListener('fetch', (event) => {
@@ -109,7 +145,7 @@ self.addEventListener('fetch', (event) => {
                     return cached;
                 }
 
-                const networkFetch = fetch(request)
+                const networkFetch = timedFetch(request)
                     .then((response) => {
                         if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;

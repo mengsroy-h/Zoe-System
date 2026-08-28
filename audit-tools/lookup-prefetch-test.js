@@ -46,7 +46,8 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const FNS = ['linkIsFrugal', 'customerTablePrefetchAllowed', 'prefetchCustomerDataTableRowsIfConfigured',
+const FNS = ['linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
+    'prefetchCustomerDataTableRowsIfConfigured',
     'clearCustomerTableRetry', 'scheduleCustomerTableRetry', 'runCustomerTableRetry', 'armLookupFocus'];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
@@ -96,6 +97,8 @@ function build(opts) {
         isModalOpen: !!o.isModalOpen,
         pendingBarcode: o.pendingBarcode === undefined ? 'BC1' : o.pendingBarcode,
         getLookupApiConfig: () => (o.noCfg ? null : { url: 'https://x/exec?code={barcode}&key=k', enabled: true }),
+        URL: URL, Array: Array,
+        document: { querySelectorAll: () => [], createElement: () => ({}), head: { appendChild: () => {} } },
         fetchCustomerDataTableRows: (force) => { calls.push(!!force); return Promise.resolve(); },
         __calls: calls, __clock: clock
     };
@@ -106,8 +109,17 @@ function build(opts) {
     return ctx;
 }
 
+// ⛔ scenario ដែលត្រឡប់ promise ត្រូវ **រង់ចាំ** — បើអត់ ការអះអាងខាងក្នុង
+// មិនដែលរត់ ហើយឯកសារចេញ exit 0 ➜ បៃតងក្លែងក្លាយ (ថ្នាក់ដដែលនឹងមេរៀន
+// `sheet-import-test.js` ដែល try តែមួយគ្របទាំងអស់)។
+const pendingScenarios = [];
 function scenario(label, fn) {
-    try { fn(); } catch (e) { ok(label + ' (គាំង)', false, e && e.message); }
+    try {
+        const out = fn();
+        if (out && typeof out.then === 'function') {
+            pendingScenarios.push(out.catch((e) => ok(label + ' (គាំង)', false, e && e.message)));
+        }
+    } catch (e) { ok(label + ' (គាំង)', false, e && e.message); }
 }
 
 // === ច្រកទ្វារ — អះអាង ២ ខាង ===
@@ -128,6 +140,144 @@ scenario('ច្រកទ្វារទាញជាមុន', () => {
         const ctx = build(c[1]);
         vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', ctx);
         ok('រវល់៖ ' + c[0] + ' ➜ មិនទាញជាមុន', ctx.__calls.length === 0, ctx.__calls);
+    });
+});
+
+// === ⛔ ការត្រៀមតំណទៅ Lookup API ===
+// Lookup API ត្រូវហៅ **រាល់ការស្កេន** ហើយ CLAUDE.md វាស់រួចថាល្បឿនរបស់វា
+// កំណត់ចង្វាក់ការងារអ្នកប្រើដោយផ្ទាល់។ សំណើដំបូងក្នុងវគ្គមួយត្រូវបង់ថ្លៃ
+// **DNS + TCP + TLS** ទាំងស្រុង (២០០–៦០០ms លើ 4G អន់) — ថ្លៃនោះកាត់បាន
+// ដោយ `<link rel="preconnect">` ។ `index.html` ធ្វើវារួចសម្រាប់ gstatic ·
+// fonts · identitytoolkit · securetoken តែ **មិនធ្វើសម្រាប់ host នៃ
+// Lookup API** ដែលជា host ដែលប៉ះលំហូរការងារខ្លាំងជាងគេ។
+// ⛔ វាត្រូវធ្វើ **តាមលក្ខខណ្ឌ** ៖ អ្នកប្រើដែលមិនកំណត់ Lookup API មិនត្រូវ
+// បង់ថ្លៃ handshake ឥតប្រយោជន៍ទេ (ថ្នាក់ដដែលនឹង `linkIsFrugal()`)។
+scenario('ការត្រៀមតំណទៅ Lookup API', () => {
+    const fnSrc = sliceFn('preconnectToLookupHost');
+    ok('រកឃើញ function preconnectToLookupHost()', !!fnSrc);
+    if (!fnSrc) return;
+
+    function buildPre(o) {
+        const added = [];
+        const ctx = {
+            console: { error: () => {}, log: () => {} },
+            URL: URL, Array: Array, String: String, Object: Object,
+            getLookupApiConfig: () => o.cfg,
+            document: {
+                querySelectorAll: () => o.existing || [],
+                createElement: () => ({}),
+                head: { appendChild: (el) => added.push(el) }
+            },
+            __added: added
+        };
+        vm.createContext(ctx);
+        vm.runInContext(sliceFn('preconnectToOrigin'), ctx);
+        vm.runInContext(fnSrc, ctx);
+        return ctx;
+    }
+
+    const withCfg = buildPre({ cfg: { url: 'https://script.google.com/macros/s/AKfy/exec?code={barcode}' } });
+    vm.runInContext('preconnectToLookupHost();', withCfg);
+    ok('មាន Config ➜ បន្ថែម <link rel=preconnect> ១',
+        withCfg.__added.length === 1, withCfg.__added.length);
+    ok('ហើយវាចង្អុលទៅ **origin** មិនមែន URL ពេញ (គ្មាន path ឬ query)',
+        withCfg.__added[0] && withCfg.__added[0].href === 'https://script.google.com',
+        withCfg.__added[0] && withCfg.__added[0].href);
+    ok('⛔ ហើយវាមិនបញ្ចេញ deployment ID ចេញក្រៅតាម attribute ណាមួយ',
+        JSON.stringify(withCfg.__added[0] || {}).indexOf('AKfy') === -1, withCfg.__added[0]);
+
+    const noCfg = buildPre({ cfg: null });
+    vm.runInContext('preconnectToLookupHost();', noCfg);
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មាន Config ➜ **មិនបង់ថ្លៃ handshake** សោះ',
+        noCfg.__added.length === 0, noCfg.__added.length);
+
+    const badUrl = buildPre({ cfg: { url: 'មិនមែន URL' } });
+    vm.runInContext('preconnectToLookupHost();', badUrl);
+    ok('⛔ URL មិនត្រឹមត្រូវ ➜ មិនគាំង និងមិនបន្ថែមអ្វី',
+        badUrl.__added.length === 0, badUrl.__added.length);
+
+    const dup = buildPre({ cfg: { url: 'https://script.google.com/macros/s/x/exec' },
+                           existing: [{ href: 'https://script.google.com' }] });
+    vm.runInContext('preconnectToLookupHost();', dup);
+    ok('⛔ មានរួចហើយ ➜ មិនបន្ថែមស្ទួន', dup.__added.length === 0, dup.__added.length);
+});
+
+// === ⛔ ការស្វែងរកស្វ័យប្រវត្តិ ខណៈក្រៅបណ្តាញ ===
+// ថ្នាក់កំហុស ៖ រាល់ផ្លូវបណ្តាញផ្សេងទៀតរបស់ App មានច្រកទ្វារ
+// `navigator.onLine === false` (`customerTablePrefetchAllowed()` ·
+// `callSheetImportApi()` · `networkLooksDown()` ក្នុង license-verify) —
+// **តែ `attemptAutoLookup()` គ្មានទេ**។ ផល ៖ រាល់ការស្កេនខណៈក្រៅបណ្តាញ
+// បាញ់សំណើដែលដឹងស្រាប់ថាធ្លាក់ រួច **រាយការណ៍ទៅ Sentry** ជារៀងរាល់ដង។
+// ការស្កេនក្រៅបណ្តាញជាករណីធម្មតារបស់អាជីវកម្មនេះ ➜ សំឡេងរំខានក្នុង Sentry
+// បាំងកំហុសពិត ហើយការស្កេនក៏យឺតដោយឥតប្រយោជន៍ដែរ។
+scenario('ការស្វែងរកស្វ័យប្រវត្តិ ខណៈក្រៅបណ្តាញ', () => {
+    const autoSrc = sliceFn('attemptAutoLookup');
+    ok('រកឃើញ function attemptAutoLookup()', !!autoSrc);
+    if (!autoSrc) return;
+
+    function buildAuto(o) {
+        const fetches = [];
+        const captures = [];
+        const filled = [];
+        const ctx = {
+            console: { error: () => {}, log: () => {} },
+            Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String,
+            Math: Math, Date: Date, Error: Error, encodeURIComponent: encodeURIComponent,
+            setTimeout: setTimeout, clearTimeout: clearTimeout,
+            navigator: { onLine: o.onLine === undefined ? true : o.onLine },
+            AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
+            AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
+            autoLookupInFlight: new Set(),
+            autoLookupLastFailedAt: 0,
+            lookupLockedNoticeShown: false,
+            lookupSecretKey: null,
+            customerDataTableSessionGeneration: 0,
+            elapsedSince: (m) => (m ? Date.now() - m : Infinity),
+            getLookupApiConfig: () => ({ url: 'https://x/exec?code={barcode}', enabled: true,
+                                         phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
+            findCustomerDataTableRow: (bc) => (o.cached ? { phone: '012', cod: 1, dod: 2 } : null),
+            applyLookupFillToModal: (bc, p2) => filled.push(p2),
+            getNestedField: (d, k) => (d ? d[k] : null),
+            showToast: () => {},
+            decryptLookupSecret: () => Promise.resolve(''),
+            retryAsync: (fn) => fn(),
+            fetchWithTimeout: (url) => {
+                fetches.push(url);
+                return Promise.reject(new TypeError('Failed to fetch'));
+            },
+            ZoeErrors: { capture: (e, c) => captures.push(c && c.context) },
+            __fetches: fetches, __captures: captures, __filled: filled
+        };
+        ctx.window = ctx;
+        vm.createContext(ctx);
+        vm.runInContext(autoSrc, ctx);
+        return ctx;
+    }
+
+    // ខាងវិជ្ជមាន — មានបណ្តាញ ➜ សំណើត្រូវចេញធម្មតា
+    const online = buildAuto({});
+    return vm.runInContext('attemptAutoLookup("BC1")', online).then(() => {
+        ok('⛔ ទិសផ្ទុយ ៖ មានបណ្តាញ ➜ សំណើស្វែងរកចេញធម្មតា',
+            online.__fetches.length === 1, online.__fetches);
+
+        // ខាងអវិជ្ជមាន — ក្រៅបណ្តាញ ➜ មិនបាញ់សំណើ និងមិនរាយការណ៍ទៅ Sentry
+        const offline = buildAuto({ onLine: false });
+        return vm.runInContext('attemptAutoLookup("BC1")', offline).then(() => {
+            ok('⛔ ក្រៅបណ្តាញ ➜ **មិនបាញ់សំណើស្វែងរកសោះ**',
+                offline.__fetches.length === 0, offline.__fetches);
+            ok('⛔ ក្រៅបណ្តាញ ➜ មិនរាយការណ៍កំហុសទៅ Sentry (សំឡេងរំខានបាំងកំហុសពិត)',
+                offline.__captures.length === 0, offline.__captures);
+            ok('⛔ ក្រៅបណ្តាញ ➜ សោស្វែងរកមិនជាប់ (មិនបន្សល់ធាតុក្នុង autoLookupInFlight)',
+                offline.autoLookupInFlight.size === 0, offline.autoLookupInFlight.size);
+
+            // ⛔ ទិសផ្ទុយទី ២ ៖ cache ក្នុងសតិត្រូវនៅតែបំពេញ **ទោះក្រៅបណ្តាញ**
+            // (ការកែមិនត្រូវបិទផ្លូវដែលមិនត្រូវការបណ្តាញសោះ)
+            const cachedOffline = buildAuto({ onLine: false, cached: true });
+            return vm.runInContext('attemptAutoLookup("BC1")', cachedOffline).then(() => {
+                ok('⛔ ទិសផ្ទុយ ៖ ក្រៅបណ្តាញ តែមានក្នុង cache ➜ **នៅតែបំពេញភ្លាម**',
+                    cachedOffline.__filled.length === 1, cachedOffline.__filled);
+            });
+        });
     });
 });
 
@@ -237,7 +387,7 @@ ok('ផ្លូវស្កេនប្រើ armLookupFocus()', scanFn !== -1)
 const cacheClear = sliceFn('clearCustomerDataTableCache') || '';
 ok('ការចាកចេញ/ប្តូរ Config ➜ លុបម៉ោងព្យាយាមវិញ', cacheClear.indexOf('clearCustomerTableRetry()') !== -1);
 
-setTimeout(() => {
+Promise.all(pendingScenarios).then(() => new Promise((r) => setTimeout(r, 10))).then(() => {
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exit(fail ? 1 : 0);
-}, 10);
+});

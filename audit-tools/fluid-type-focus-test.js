@@ -46,10 +46,18 @@ const GROWTH_MAX = 1.1;
 const FLOOR_WIDTH = 320;
 const CAP_WIDTH = 430;
 const DESKTOP_STEP = 1.2;
+// ⛔ ការវាស់ «ឈប់រីក» ត្រូវធ្វើក្នុង **តំបន់ទូរស័ព្ទសុទ្ធ** (< 700px)។
+// ជំនាន់មុនវាស់វានៅ 768/880 ➜ វា **ចាក់សោតំបន់ស្លាប់ ៤៣០–៩៩១px ទុក**៖
+// ថេប្លេត 768px គូរអក្សរទំហំដូចទូរស័ព្ទ 430px បេះបិទ ខណៈអេក្រង់ធំជាង ៧៨%។
+// នោះជាការអះអាងដែល **ចាក់សោកំហុស** មិនមែនការការពារ (មេរៀន 2.20.6)។
+// អ្វីដែលវាការពារពិតគឺ «អក្សរមិនរីកគ្មានទីបញ្ចប់» — ការពារនោះនៅដដែល
+// តាមរយៈ cap ក្នុងជំហាននីមួយៗ។
+const PHONE_CAP_WIDTHS = [CAP_WIDTH, 560, 699];
+const TABLET_WIDTHS = [768, 880];
 
 const APPS = [
     {
-        name: 'ZoeW', desktop: 992,
+        name: 'ZoeW', desktop: 992, tabletStep: 1.2,
         real: [
             { sel: 'body', px: 13 },
             { sel: '.brand-info h1', px: 14 },
@@ -62,7 +70,7 @@ const APPS = [
         shadowRings: [{ id: 'securityPinInput' }, { id: 'hwScannerInput', tab: '#pageTabEntry' }]
     },
     {
-        name: 'ZoeKeyGen', desktop: 900,
+        name: 'ZoeKeyGen', desktop: 900, tabletStep: null,
         real: [
             { sel: 'body', px: 13 },
             { sel: 'label', px: 11 },
@@ -246,16 +254,40 @@ async function tabSweep(page, steps) {
             app.name + '៖ ការចុចដោយម៉ៅស៍មិនបន្សល់រង្វង់ផ្តោត', JSON.stringify(pointerRing));
         await s.ctx.close();
 
-        // ច. ពិដាន — ចាប់ពី 430px ឡើងទៅ ទំហំត្រូវឈប់រីក
+        // ច. ពិដានទូរស័ព្ទ — ចាប់ពី 430px ដល់ 699px ទំហំត្រូវឈប់រីក
+        //    ⛔ តំបន់ `< 700px` ជា **តំបន់ហាមចូល** តាម CLAUDE.md — វាត្រូវ
+        //    នៅដដែលបេះបិទ។ ការវាស់នេះទើបជាការការពារពិត។
         const capped = [];
-        for (const w of [CAP_WIDTH, 768, 880]) {
+        for (const w of PHONE_CAP_WIDTHS) {
             const c = await openApp(browser, app, w);
             capped.push(await probeAt(c.page, sizes));
             await c.ctx.close();
         }
-        const capBad = sizes.filter((n) => !near(capped[0][n], n * GROWTH_MAX, 0.08) || !near(capped[1][n], capped[0][n]) || !near(capped[2][n], capped[0][n]));
-        check(capBad.length === 0, app.name + '៖ ទំហំឈប់រីកចាប់ពី ' + CAP_WIDTH + 'px (ដូចគ្នានៅ 768/880)',
+        const capBad = sizes.filter((n) => !near(capped[0][n], n * GROWTH_MAX, 0.08)
+            || !near(capped[1][n], capped[0][n]) || !near(capped[2][n], capped[0][n]));
+        check(capBad.length === 0, app.name + '៖ ទំហំឈប់រីកក្នុងតំបន់ទូរស័ព្ទ ' + PHONE_CAP_WIDTHS.join('/') + 'px',
             capBad.map((n) => n + 'px ➜ ' + capped.map((c) => c[n]).join(' / ')).join(', '));
+
+        // ចខ. ជំហានថេប្លេត — 700–991px ត្រូវធំជាងទូរស័ព្ទ តែឈប់រីកក្នុងជំហាននោះ
+        const tablet = [];
+        for (const w of TABLET_WIDTHS) {
+            const c = await openApp(browser, app, w, 1024);
+            tablet.push(await probeAt(c.page, sizes));
+            await c.ctx.close();
+        }
+        if (app.tabletStep) {
+            const tabBad = sizes.filter((n) => !near(tablet[0][n], n * app.tabletStep, 0.08) || !near(tablet[1][n], tablet[0][n]));
+            check(tabBad.length === 0,
+                app.name + '៖ អក្សរឡើងជំហាន ×' + app.tabletStep + ' នៅ ' + TABLET_WIDTHS.join('/') + 'px (ថេប្លេត) ហើយឈប់រីកក្នុងជំហាននោះ',
+                tabBad.map((n) => n + 'px ➜ ' + tablet.map((t) => t[n]).join(' / ')).join(', '));
+            check(sizes.every((n) => tablet[0][n] > capped[0][n] + 0.01),
+                app.name + '៖ ⛔ ថេប្លេតធំជាងទូរស័ព្ទពិត (តំបន់ ' + CAP_WIDTH + '–991px លែងស្លាប់)');
+        } else {
+            const tabBad = sizes.filter((n) => !near(tablet[0][n], capped[0][n]) || !near(tablet[1][n], capped[0][n]));
+            check(tabBad.length === 0,
+                app.name + '៖ គ្មានជំហានថេប្លេត ➜ ' + TABLET_WIDTHS.join('/') + 'px ដូចទូរស័ព្ទដដែល',
+                tabBad.map((n) => n + 'px ➜ ' + tablet.map((t) => t[n]).join(' / ')).join(', '));
+        }
         const monotone = sizes.every((n) => floor[n] <= mid[n] + 0.01 && mid[n] <= capped[0][n] + 0.01);
         check(monotone, app.name + '៖ មាត្រដ្ឋានឡើងតាមលំដាប់ 320 ➜ 412 ➜ ' + CAP_WIDTH);
 
@@ -268,6 +300,10 @@ async function tabSweep(page, steps) {
             deskBad.map((n) => n + 'px ➜ ' + desk[n]).join(', '));
         check(sizes.every((n) => desk[n] > capped[0][n] + 0.01),
             app.name + '៖ ជំហាន desktop ធំជាងពិដានទូរស័ព្ទពិត');
+        // ⛔ ការឆ្លងកាត់ព្រំដែនមិនត្រូវ **តូចវិញ** — មាត្រដ្ឋានត្រូវឡើងតាមលំដាប់
+        check(sizes.every((n) => desk[n] >= tablet[0][n] - 0.01),
+            app.name + '៖ មាត្រដ្ឋានឡើងតាមលំដាប់ ទូរស័ព្ទ ➜ ថេប្លេត ➜ desktop',
+            sizes.filter((n) => desk[n] < tablet[0][n] - 0.01).map((n) => n + ': ' + tablet[0][n] + ' ➜ ' + desk[n]).join(', '));
 
         server.close();
     }

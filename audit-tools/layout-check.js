@@ -18,7 +18,7 @@ const ok = (n) => { console.log('  ok    ' + n); pass++; };
 const bad = (n, d) => { console.log('  FAIL  ' + n + (d ? '\n        ' + d : '')); fail++; };
 const check = (c, n, d) => (c ? ok(n) : bad(n, d));
 
-function serve(dir, port) {
+function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -28,7 +28,7 @@ function serve(dir, port) {
             rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' });
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
@@ -58,11 +58,11 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    let port = 8660;
     for (const app of ['ZoeW', 'ZoeKeyGen', 'ZoeImport']) {
         console.log('\n=== ' + app + ' ===');
         const dir = path.join(ROOT, app);
-        const server = await serve(dir, port);
+        const server = await serve(dir);
+        const port = server.address().port;
         const shape = {};
         for (const size of SIZES) {
             const ctx = await browser.newContext({ viewport: { width: size.w, height: size.h } });
@@ -178,7 +178,6 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
             }
         }
         server.close();
-        port++;
     }
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));

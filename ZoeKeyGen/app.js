@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.7';
+const APP_VERSION = '2.19.8';
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -72,6 +72,12 @@ function renderAppVersionLabels() {
 
 renderAppVersionLabels();
 
+function elapsedSince(mark) {
+    if (!mark) return Infinity;
+    const delta = Date.now() - mark;
+    return delta >= 0 ? delta : Infinity;
+}
+
 const BOOT_SPLASH_MIN_MS = 380;
 const BOOT_REVEAL_CLEANUP_MS = 760;
 const bootSplashStartedAt = Date.now();
@@ -88,7 +94,7 @@ function hideBootSplash() {
 }
 
 function revealAppAfterBoot() {
-    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - elapsedSince(bootSplashStartedAt));
     setTimeout(() => {
         requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
     }, wait);
@@ -170,9 +176,8 @@ function revealAppAfterBoot() {
                 let lastSwUpdateAt = Date.now();
                 const throttledSwUpdate = () => {
                     if (navigator.onLine === false) return;
-                    const now = Date.now();
-                    if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
-                    lastSwUpdateAt = now;
+                    if (elapsedSince(lastSwUpdateAt) < SW_UPDATE_MIN_GAP_MS) return;
+                    lastSwUpdateAt = Date.now();
                     reg.update().catch(() => {});
                 };
                 document.addEventListener('visibilitychange', () => {
@@ -292,9 +297,8 @@ function reloadForFirebaseSdk() {
     if (anyModalIsOpen()) return false;
     const used = firebaseSdkReloadCount();
     if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
-    const now = Date.now();
-    if (lastFirebaseSdkReloadAt && now - lastFirebaseSdkReloadAt < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
-    lastFirebaseSdkReloadAt = now;
+    if (elapsedSince(lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
+    lastFirebaseSdkReloadAt = Date.now();
     safeStoreSet(sessionStorage, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
     window.location.reload();
     return true;
@@ -332,8 +336,8 @@ function scheduleFirebaseSdkRetry() {
 function retryFirebaseSdkNow() {
     if (!firebaseSdkUnavailable || isDatabaseInitialized || isInitializingFirebase) return;
     if (navigator.onLine === false) return;
-    const sinceLastAttempt = Date.now() - lastFirebaseSdkAttemptAt;
-    if (lastFirebaseSdkAttemptAt && sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
+    const sinceLastAttempt = elapsedSince(lastFirebaseSdkAttemptAt);
+    if (sinceLastAttempt < FIREBASE_SDK_RETRY_MIN_GAP_MS) {
         if (!firebaseSdkRetryTimer) {
             firebaseSdkRetryTimer = setTimeout(() => {
                 firebaseSdkRetryTimer = null;
@@ -379,9 +383,8 @@ function canCycleDatabaseConnection() {
 
 function forceDatabaseReconnect() {
     if (!fb || !db || typeof fb.goOnline !== 'function') return false;
-    const now = Date.now();
-    if (lastForcedReconnectAt && now - lastForcedReconnectAt < RECONNECT_FORCE_MIN_GAP_MS) return false;
-    lastForcedReconnectAt = now;
+    if (elapsedSince(lastForcedReconnectAt) < RECONNECT_FORCE_MIN_GAP_MS) return false;
+    lastForcedReconnectAt = Date.now();
     try {
         if (canCycleDatabaseConnection() && typeof fb.goOffline === 'function') {
             networkJustReturned = false;

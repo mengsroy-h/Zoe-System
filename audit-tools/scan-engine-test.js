@@ -75,7 +75,11 @@ function serve(files) {
 
     const liveMax = (src.match(/const LIVE_SCAN_MAX_DIM = (\d+);/) || [])[1];
     const buildFn = (sliceFn(src, 'scanEngineReady') || '') + '\n' + (sliceFn(src, 'buildReaderOptions') || '');
-    const confirmFn = (sliceFn(src, 'resetScanConfirm') || '') + '\n' + (sliceFn(src, 'confirmLiveScan') || '');
+    // ⛔ `confirmLiveScan()` ឥឡូវវាស់បង្អួចតាម `elapsedSince()` (2.20.7)
+    //    ➜ ត្រូវចាក់ helper **ពិត** ចូលទំព័រ បើមិនដូច្នេះវាបោះ ReferenceError។
+    const confirmFn = (sliceFn(src, 'elapsedSince')
+            || 'function elapsedSince(mark) { return Date.now() - mark; }') + '\n'
+        + (sliceFn(src, 'resetScanConfirm') || '') + '\n' + (sliceFn(src, 'confirmLiveScan') || '');
     const tryFn = (sliceFn(src, 'readResultText') || '') + '\n' +
                   (sliceFn(src, 'decodeLiveFrame') || '') + '\n' +
                   (sliceFn(src, 'liveScanTargetWidth') || '') + '\n' +

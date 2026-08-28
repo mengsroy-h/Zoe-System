@@ -65,13 +65,26 @@
         );
     }
 
+    const COLON_PAIR_RE = new RegExp(
+        '(^|[\\s"\'([,;{|])("?)([A-Za-z0-9_.\\-]{1,64})("?)(\\s*:\\s*)("?)[^\\s"\'<>,;)\\]}|]+', 'g');
+
+    function redactColonPairs(text) {
+        return text.replace(COLON_PAIR_RE, (whole, lead, openQuote, name, closeQuote, sep, valueQuote) =>
+            (isSecretParamName(name)
+                ? lead + openQuote + name + closeQuote + sep + valueQuote + '[redacted]'
+                : whole));
+    }
+
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
         let out = redactPairs(url, '[?&#]', '[^&#\\s"\'<>]');
         out = redactPairs(out, '^|[\\s"\'([,;{|]', '[^&#\\s"\'<>,;)\\]}|]');
+        out = redactColonPairs(out);
         return out
             .replace(/(\/macros\/s\/)[^/\s"']+/g, '$1[redacted]')
-            .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@');
+            .replace(/(\b[a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@')
+            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
+            .replace(/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}/g, '[redacted]');
     }
 
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'

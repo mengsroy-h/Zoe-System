@@ -14,12 +14,12 @@ function ok(cond, label, got) {
 }
 
 const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
-function serve(dir, port) { return new Promise((res) => { const s = http.createServer((req, rsp) => {
+function serve(dir) { return new Promise((res) => { const s = http.createServer((req, rsp) => {
     let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
     const f = path.join(dir, p);
     if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
     rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' }); rsp.end(fs.readFileSync(f));
-}); s.listen(port, () => res(s)); }); }
+}); s.listen(0, '127.0.0.1', () => res(s)); }); }
 
 const CONFIG = { apiKey: 'AIzaFAKE', authDomain: 'biz-a.firebaseapp.com',
     databaseURL: 'https://biz-a-default-rtdb.firebaseio.com', projectId: 'biz-a',
@@ -32,10 +32,10 @@ const SEL = {
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
-    let port = 8810;
     for (const app of ['ZoeW']) {
         const sel = SEL[app];
-        const server = await serve(path.join(ROOT, app), port);
+        const server = await serve(path.join(ROOT, app));
+        const port = server.address().port;
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         const errs = [];
@@ -71,7 +71,7 @@ const SEL = {
         ok(!saved, 'មិនរក្សាទុករហូតដល់មនុស្សចុច Save');
         ok(errs.length === 0, 'គ្មានកំហុស runtime កំឡុងផ្លូវនេះ', errs.slice(0, 2));
 
-        await ctx.close(); server.close(); port++;
+        await ctx.close(); server.close();
     }
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' : 'PASS ') + pass + '/' + (pass + fail));

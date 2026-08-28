@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.2';
+const APP_VERSION = '1.3.3';
 
 const STORE_PIN_HASH = 'zoeimport_pin_hash';
 const STORE_PIN_FAILS = 'zoeimport_pin_fail_count';
@@ -894,6 +894,12 @@ function bindEvents() {
     });
 }
 
+function elapsedSince(mark) {
+    if (!mark) return Infinity;
+    const delta = Date.now() - mark;
+    return delta >= 0 ? delta : Infinity;
+}
+
 const BOOT_SPLASH_MIN_MS = 380;
 const BOOT_REVEAL_CLEANUP_MS = 760;
 const bootSplashStartedAt = Date.now();
@@ -910,7 +916,7 @@ function hideBootSplash() {
 }
 
 function revealAppAfterBoot() {
-    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - (Date.now() - bootSplashStartedAt));
+    const wait = Math.max(0, BOOT_SPLASH_MIN_MS - elapsedSince(bootSplashStartedAt));
     setTimeout(() => {
         requestAnimationFrame(() => requestAnimationFrame(hideBootSplash));
     }, wait);
@@ -924,9 +930,8 @@ function registerServiceWorker() {
             let lastSwUpdateAt = Date.now();
             const throttledSwUpdate = () => {
                 if (navigator.onLine === false) return;
-                const now = Date.now();
-                if (now - lastSwUpdateAt < SW_UPDATE_MIN_GAP_MS) return;
-                lastSwUpdateAt = now;
+                if (elapsedSince(lastSwUpdateAt) < SW_UPDATE_MIN_GAP_MS) return;
+                lastSwUpdateAt = Date.now();
                 reg.update().catch(() => {});
             };
             document.addEventListener('visibilitychange', () => {

@@ -15,7 +15,7 @@ const path = require('path');
 const ROOT = path.resolve(process.env.BOOT_APP_DIR || path.join(__dirname, '..'));
 const TYPES = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
 
-function serve(dir, port) {
+function serve(dir) {
     return new Promise((res) => {
         const s = http.createServer((req, rsp) => {
             let p = decodeURIComponent(req.url.split('?')[0]);
@@ -25,17 +25,17 @@ function serve(dir, port) {
             rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain' });
             rsp.end(fs.readFileSync(f));
         });
-        s.listen(port, () => res(s));
+        s.listen(0, '127.0.0.1', () => res(s));
     });
 }
 
 (async () => {
     const browser = await chromium.launch({ executablePath: CHROME });
     let problems = 0;
-    let port = 8410;
     for (const app of ['ZoeW', 'ZoeKeyGen']) {
         const dir = path.join(ROOT, app);
-        const server = await serve(dir, port);
+        const server = await serve(dir);
+        const port = server.address().port;
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
         const page = await ctx.newPage();
         const errors = [];
@@ -77,7 +77,6 @@ function serve(dir, port) {
 
         await ctx.close();
         server.close();
-        port++;
     }
     await browser.close();
     console.log('\n' + (problems ? 'FAIL ' + problems : 'PASS') + ' — boot runtime check');

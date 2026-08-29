@@ -14,6 +14,24 @@ function slice(src, startMarker, endMarker, label) {
     return src.slice(a, b + endMarker.length);
 }
 
+function fnBody(src, signature, label) {
+    const start = src.indexOf(signature);
+    if (start === -1) throw new Error('function not found: ' + label);
+    let depth = 0;
+    let quote = null;
+    let escaped = false;
+    for (let i = start + signature.length - 1; i < src.length; i++) {
+        const c = src[i];
+        if (escaped) { escaped = false; continue; }
+        if (c === '\\') { escaped = true; continue; }
+        if (quote) { if (c === quote) quote = null; continue; }
+        if (c === '"' || c === "'" || c === '`') { quote = c; continue; }
+        if (c === '{') depth++;
+        else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    }
+    throw new Error('unbalanced function body: ' + label);
+}
+
 function buildRunner(appFile) {
     const src = fs.readFileSync(appFile, 'utf8').replace(/\r\n?/g, '\n');
 
@@ -28,6 +46,12 @@ function buildRunner(appFile) {
         '            const appliedRevenueDeltas = [];\n            const revenueScanDate = itemToRestore.scanDate || getFormattedDate();',
         "                appliedRevenueDeltas.push({ scanDate: revenueScanDate, cod: legacyCod, dod: legacyDod, count: legacyCount });\n            }",
         'restore');
+
+    // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
+    const removeBlock = slice(src,
+        '            let deductedCod = 0;\n            let deductedDod = 0;',
+        '            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };',
+        'remove');
 
     const prelude = `
         var NOW = 1000000;
@@ -49,6 +73,10 @@ function buildRunner(appFile) {
         function runClaim(claimedWhole, claimedPartial, reason, id) {
 ${claimBlock}
             return { trashItem, revenueDeducted };
+        }
+        function runRemoveBarcode(claimedParent, claimedBarcode) {
+${removeBlock}
+            return { removedBc, deductionApplied, deductedCod, deductedDod };
         }
         function runRestore(itemToRestore) {
             const restoredWasRemoved = itemToRestore.isFromDeletion === false;
@@ -88,7 +116,9 @@ function check(label, actual, expected) {
 
 for (const app of ['ZoeW']) {
     console.log(`\n================= ${app} =================`);
-    const ctx = buildRunner(path.join(ROOT, app, 'app.js'));
+    const appFile = path.join(ROOT, app, 'app.js');
+    const ctx = buildRunner(appFile);
+    const appSrc = fs.readFileSync(appFile, 'utf8').replace(/\r\n?/g, '\n');
 
     // ---------- លុប (Delete): 2-hour auto-cleanup of a closed parcel ----------
     console.log('\n-- លុប: បិទ ➜ លុបស្វ័យប្រវត្តិ ២ម៉ោង ➜ ស្តារ ➜ លុប ➜ ស្តារ --');
@@ -144,6 +174,40 @@ for (const app of ['ZoeW']) {
     check('marker barcode ដែលដក', r.trashItem.barcodes.map(b => [b.code, b.isFromDeletion, b.isDeducted]), [['F', false, true]]);
     back = ctx.runRestore(r.trashItem);
     check('ស្តារត្រឡប់វិញពេញ', ctx.stats, { cod: 100, dod: 50, count: 3 });
+
+    // ---------- ⛔ ប៊ូតុងលុបដោយដៃ ៖ មិនត្រូវប៉ះលុយសោះ (រចនាសម្ព័ន្ធ) ----------
+    console.log('\n-- ⛔ លុបដោយដៃ / លុបទាំងអស់ ៖ គ្មានការសរសេរលុយក្នុង function ទាំងមូល --');
+    const REVENUE_SINKS = [
+        'addRevenueToDailyAndMonthlyRecord',
+        'appendRestoreRevenueIncrements',
+        'zoew_daily_revenue_cod_dod',
+        'zoew_monthly_revenue_cod_dod'
+    ];
+    [
+        ['deleteSingleItem', 'async function deleteSingleItem(id) {'],
+        ['buildClearHistoryTrashItem', 'function buildClearHistoryTrashItem(item, id) {']
+    ].forEach(([name, sig]) => {
+        const body = fnBody(appSrc, sig, name);
+        check(`ជាន់អប្បបរមា៖ តួ ${name} >= 200 តួអក្សរ`, body.length >= 200, true);
+        check(`ស្រង់ត្រូវកន្លែង៖ ${name} សរសេរ trashReason 'delete'`, /trashReason\s*=\s*'delete'/.test(body), true);
+        REVENUE_SINKS.forEach((sink) => {
+            check(`⛔ ${name} មិនប៉ះ ${sink}`, body.indexOf(sink) === -1, true);
+        });
+    });
+
+    // ---------- ⛔ ដក barcode ដោយដៃ ៖ ដកលុយ ១ ដងគត់ ----------
+    console.log('\n-- ⛔ ដក barcode ដោយដៃ (removeSingleBarcode) ៖ ដកលុយ ១ ដងគត់ --');
+    ctx.stats.cod = 100; ctx.stats.dod = 50; ctx.stats.count = 3;
+    const removeParent = parcel([bc('I', 12, 8, false), bc('J', 5, 5, false)]);
+    let rm = ctx.runRemoveBarcode(removeParent, removeParent.barcodes[0]);
+    check('ដកលើកទី ១ ➜ ដកលុយពីស្ថិតិ', ctx.stats, { cod: 88, dod: 42, count: 2 });
+    check('deductionApplied = true', rm.deductionApplied, true);
+    check('barcode ដែលដក ➜ isDeducted true · isFromDeletion false',
+        [rm.removedBc.isDeducted, rm.removedBc.isFromDeletion], [true, false]);
+
+    rm = ctx.runRemoveBarcode(removeParent, rm.removedBc);
+    check('⛔ ដក barcode ដដែលម្តងទៀត ➜ លុយមិនប្រែ (ច្រកទ្វារ isDeducted)', ctx.stats, { cod: 88, dod: 42, count: 2 });
+    check('deductionApplied = false', rm.deductionApplied, false);
 
     // ---------- legacy parcel with no barcodes[] ----------
     console.log('-- legacy (គ្មាន barcodes[]) : ដក ➜ ស្តារ --');

@@ -181,6 +181,74 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                     d ? 'កាត ' + d.cards + ' នៅជួរដេក ' + d.rows + ' ដដែលនឹងទូរស័ព្ទ' : 'វាស់មិនបាន');
             }
         }
+        // ⛔ ការគ្រប់គ្រងក្នុងប្រអប់ ៖ `min-height: 46px` របស់កំណែ 2.22.2 ត្រូវ
+        // អនុវត្តលើ **ប្រអប់វាយអត្ថបទ** ប៉ុណ្ណោះ។ `.remember-container
+        // input[type=checkbox]` ប្រកាស `height: 16px` តែ **មិនប្រកាស
+        // `min-height`** ➜ `min-height: 46px` ឈ្នះ ➜ checkbox លាតជា
+        // **១៦ × ៤៦px** ➜ ជួរឃ្លាតគ្នាឆ្ងាយ (របាយការណ៍អ្នកប្រើ 2026-08-29)។
+        // ហើយ `.trash-search-box input` ធ្លាប់ឈរ **មុន** `.modal-content input`
+        // ➜ specificity ដូចគ្នា តែលំដាប់ចាញ់ ➜ ច្បាប់ទាំងអស់ស្លាប់ ➜
+        // input រក្សា background + border-radius ➜ **ប្រអប់ក្នុងប្រអប់**។
+        if (app === 'ZoeW') {
+            const ctx = await browser.newContext({ viewport: { width: 412, height: 900 } });
+            const page = await ctx.newPage();
+            await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(600);
+            const ui = await page.evaluate(() => {
+                const out = {};
+                const cb = document.getElementById('lookupApiEnabledCheckbox');
+                if (cb) {
+                    const m = cb.closest('.modal');
+                    if (m) { m.style.display = 'flex'; m.classList.add('active'); }
+                    const r = cb.getBoundingClientRect();
+                    out.cbW = r.width; out.cbH = r.height;
+                    out.cbMinH = getComputedStyle(cb).minHeight;
+                    if (m) { m.classList.remove('active'); m.style.display = ''; }
+                }
+                const box = document.querySelector('.trash-search-box');
+                const inp = document.getElementById('deletedSearchInput');
+                if (box && inp) {
+                    const m = box.closest('.modal');
+                    if (m) { m.style.display = 'flex'; m.classList.add('active'); }
+                    const bs = getComputedStyle(box), is = getComputedStyle(inp);
+                    out.inpBg = is.backgroundColor;
+                    out.boxBg = bs.backgroundColor;
+                    out.inpRadius = parseFloat(is.borderTopLeftRadius) || 0;
+                    out.inpBorder = parseFloat(is.borderTopWidth) || 0;
+                    out.inpAlign = is.textAlign;
+                    out.boxMinH = parseFloat(bs.minHeight) || 0;
+                    if (m) { m.classList.remove('active'); m.style.display = ''; }
+                }
+                return out;
+            });
+            await ctx.close();
+            check(ui.cbH !== undefined, 'ZoeW: រកឃើញ checkbox ក្នុងប្រអប់ API', 'រកមិនឃើញ ➜ តេស្តនេះមិនបានពិនិត្យអ្វីសោះ');
+            if (ui.cbH !== undefined) {
+                // ⛔ ការវាស់ធ្វើក្រោមចលនាបើកប្រអប់ (scale .95) ➜ ប្រើអនុបាត
+                check(Math.abs(ui.cbH - ui.cbW) <= 3,
+                    'ZoeW: checkbox ជាការេ (មិនត្រូវលាតដោយ min-height ៤៦px)',
+                    'ទំហំ ' + Math.round(ui.cbW) + '×' + Math.round(ui.cbH) + 'px · min-height=' + ui.cbMinH);
+                check(ui.cbH <= 24,
+                    'ZoeW: កម្ពស់ checkbox <= 24px',
+                    'ឃើញ ' + Math.round(ui.cbH) + 'px ➜ ជួរឃ្លាតគ្នាឆ្ងាយពេក');
+            }
+            check(ui.inpBg !== undefined, 'ZoeW: រកឃើញប្រអប់ស្វែងរកធុងសំរាម');
+            if (ui.inpBg !== undefined) {
+                check(ui.inpBg === 'rgba(0, 0, 0, 0)' || ui.inpBg === 'transparent',
+                    '⛔ ZoeW: input ស្វែងរកធុងសំរាមត្រូវថ្លា (គ្មានប្រអប់ក្នុងប្រអប់)',
+                    'background=' + ui.inpBg + ' ធៀបនឹងស្រោម ' + ui.boxBg);
+                check(ui.inpRadius === 0 && ui.inpBorder === 0,
+                    '⛔ ZoeW: input នោះគ្មានគែម និងគ្មានជ្រុងមូលផ្ទាល់ខ្លួន',
+                    'radius=' + ui.inpRadius + ' border=' + ui.inpBorder);
+                check(ui.inpAlign === 'left',
+                    'ZoeW: អត្ថបទស្វែងរកតម្រឹមឆ្វេង (ច្បាប់ចាស់ត្រូវបានស្លាប់ដោយលំដាប់)',
+                    'text-align=' + ui.inpAlign);
+                check(ui.boxMinH >= 44,
+                    'ZoeW: ស្រោមស្វែងរករក្សាគោលដៅប៉ះ >= 44px (ច្បាប់ 2.22.2)',
+                    'min-height=' + ui.boxMinH);
+            }
+        }
+
         server.close();
     }
     await browser.close();

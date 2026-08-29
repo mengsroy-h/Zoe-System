@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.11';
+const APP_VERSION = '2.19.12';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -233,6 +233,9 @@ function serverClockOffsetIsFromServer(offsetMs) {
 const RECONNECT_FORCE_MIN_GAP_MS = 3000;
 const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
 const INFO_LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
+const INFO_LISTENER_KEY_CONNECTED = 'connected';
+const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
+const infoListenerFailedPaths = new Set();
 const CONNECTING_GRACE_ATTEMPTS = 3;
 
 function connectionLooksOnline() {
@@ -702,11 +705,19 @@ function clearInfoListenerRecovery() {
     }
     infoListenerRecoveryAttempt = 0;
     infoListenersFailed = false;
+    infoListenerFailedPaths.clear();
 }
 
-function handleInfoListenerError() {
+function noteInfoListenerAlive(pathKey) {
+    if (pathKey) infoListenerFailedPaths.delete(pathKey);
+    if (infoListenerFailedPaths.size) return;
+    clearInfoListenerRecovery();
+}
+
+function handleInfoListenerError(err, pathKey) {
+    if (pathKey) infoListenerFailedPaths.add(pathKey);
     infoListenersFailed = true;
-    isDatabaseConnected = false;
+    if (!pathKey || pathKey === INFO_LISTENER_KEY_CONNECTED) isDatabaseConnected = false;
     renderConnectionStatus();
     if (navigator.onLine !== false) scheduleReconnectWatchdog();
     scheduleInfoListenerRecovery();
@@ -716,18 +727,20 @@ function attachInfoListeners() {
     if (!db || !fb) return false;
     if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
     if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+    infoListenerFailedPaths.clear();
 
     fb.onValue(dbRefConnected, (snap) => {
-        clearInfoListenerRecovery();
+        noteInfoListenerAlive(INFO_LISTENER_KEY_CONNECTED);
         isDatabaseConnected = snap.val() === true;
         if (isDatabaseConnected) hasEverConnectedToDatabase = true;
         if (isDatabaseConnected) clearReconnectWatchdog();
         else if (navigator.onLine !== false) scheduleReconnectWatchdog();
         renderConnectionStatus();
         if (isDatabaseConnected) retryPendingRoleCheck();
-    }, handleInfoListenerError);
+    }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED));
 
     fb.onValue(dbRefServerTimeOffset, (snap) => {
+        noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
         const val = snap.val();
         if (typeof val !== 'number') return;
         serverTimeOffsetMs = val;
@@ -735,7 +748,7 @@ function attachInfoListeners() {
         serverTimeSynced = true;
         if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
         serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
-    }, handleInfoListenerError);
+    }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET));
 
     return true;
 }

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.23.0';
+    const APP_VERSION = '2.23.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -564,6 +564,16 @@
         ]);
     }
 
+    const DB_OP_TIMEOUT_MS = 15000;
+
+    function dbOp(promise, timeoutMsg) {
+        return withTimeout(promise, DB_OP_TIMEOUT_MS, timeoutMsg || 'Database operation stalled');
+    }
+
+    function dbOpStalled(error) {
+        return !!(error && /stalled/i.test(String(error.message || error)));
+    }
+
     function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
         const controller = typeof AbortController === 'function' ? new AbortController() : null;
         const opts = Object.assign({}, options || {});
@@ -729,6 +739,9 @@
     const RECONNECT_WATCHDOG_STEPS_MS = [5000, 10000, 20000, 40000, 60000];
     const LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
     const INFO_LISTENER_RECOVERY_STEPS_MS = [2000, 5000, 10000, 20000, 30000];
+    const INFO_LISTENER_KEY_CONNECTED = 'connected';
+    const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
+    const infoListenerFailedPaths = new Set();
     const CONNECTING_GRACE_ATTEMPTS = 3;
     const DB_LISTENER_RETRY_MIN_GAP_MS = 3000;
     const DB_LISTENER_PROGRESS_GRACE_MS = 20000;
@@ -858,11 +871,19 @@
         }
         infoListenerRecoveryAttempt = 0;
         infoListenersFailed = false;
+        infoListenerFailedPaths.clear();
     }
 
-    function handleInfoListenerError() {
+    function noteInfoListenerAlive(pathKey) {
+        if (pathKey) infoListenerFailedPaths.delete(pathKey);
+        if (infoListenerFailedPaths.size) return;
+        clearInfoListenerRecovery();
+    }
+
+    function handleInfoListenerError(err, pathKey) {
+        if (pathKey) infoListenerFailedPaths.add(pathKey);
         infoListenersFailed = true;
-        isDatabaseConnected = false;
+        if (!pathKey || pathKey === INFO_LISTENER_KEY_CONNECTED) isDatabaseConnected = false;
         renderConnectionStatus();
         if (navigator.onLine !== false) scheduleReconnectWatchdog();
         scheduleInfoListenerRecovery();
@@ -872,9 +893,10 @@
         if (!db || !fb) return false;
         if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
         if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+        infoListenerFailedPaths.clear();
 
         fb.onValue(dbRefConnected, (snap) => {
-            clearInfoListenerRecovery();
+            noteInfoListenerAlive(INFO_LISTENER_KEY_CONNECTED);
             isDatabaseConnected = snap.val() === true;
             if (isDatabaseConnected) {
                 hasEverConnectedToDatabase = true;
@@ -885,16 +907,17 @@
                 scheduleReconnectWatchdog();
             }
             renderConnectionStatus();
-        }, handleInfoListenerError);
+        }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED));
 
         fb.onValue(dbRefServerTimeOffset, (snap) => {
+            noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
             const val = snap.val();
             if (typeof val !== 'number') return;
             serverTimeOffsetMs = val;
             if (!serverClockOffsetIsFromServer(val)) return;
             serverClockTrusted = true;
             if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
-        }, handleInfoListenerError);
+        }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET));
 
         return true;
     }
@@ -4146,7 +4169,7 @@
         let updatedRemainder = null;
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-            const result = await fb.runTransaction(itemRef, (currentItem) => {
+            const result = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
                 claimedWhole = null;
                 claimedPartial = null;
                 updatedRemainder = null;
@@ -4217,7 +4240,7 @@
                     claimedWhole = currentItem;
                     return null;
                 }
-            });
+            }));
 
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
@@ -4978,7 +5001,7 @@
             for (const plan of plans) {
                 if (!/^[0-9-]+$/.test(plan.date)) continue;
                 const dayRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${plan.date}`);
-                await fb.runTransaction(dayRef, (record) => {
+                await dbOp(fb.runTransaction(dayRef, (record) => {
                     if (!record) return record;
                     const recorded = parseFloat(record.packagesPickedUp) || 0;
                     const nextSum = Object.keys(plan.pickedUpPhones)
@@ -4988,7 +5011,7 @@
                         ? { ...plan.pickedUpPhones }
                         : null;
                     return record;
-                }).catch(() => {});
+                })).catch(() => {});
             }
             pickupLedgerRepairDone = true;
         } catch (e) {
@@ -5049,15 +5072,17 @@
         pickupResetInFlight = true;
         let doneCount = 0;
         let failedCount = 0;
+        let stalled = false;
         try {
             for (const dateKey of targetDates) {
                 try {
-                    await fb.runTransaction(fb.ref(db, `zoew_daily_pickup_cod_dod/${dateKey}`), () => ({ packagesPickedUp: 0 }));
+                    await dbOp(fb.runTransaction(fb.ref(db, `zoew_daily_pickup_cod_dod/${dateKey}`), () => ({ packagesPickedUp: 0 })));
                     dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {} };
                     doneCount++;
                 } catch (e) {
                     failedCount++;
                     if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'resetPickupStats', date: dateKey });
+                    if (dbOpStalled(e)) { stalled = true; break; }
                 }
             }
         } finally {
@@ -5065,7 +5090,11 @@
         }
 
         refreshCurrentHistoryView();
-        if (failedCount && !doneCount) {
+        if (stalled) {
+            showToast(doneCount
+                ? `⚠️ បណ្តាញឆ្លើយមិនចេញ — Reset បានតែ ${doneCount} ថ្ងៃ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។`
+                : "⚠️ បណ្តាញឆ្លើយមិនចេញ — Reset មិនបានទេ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។");
+        } else if (failedCount && !doneCount) {
             showToast("❌ Reset បរាជ័យទាំងស្រុង! សូមពិនិត្យការតភ្ជាប់ ហើយសាកល្បងម្តងទៀត។");
         } else if (failedCount) {
             showToast(`⚠️ Reset បានតែ ${doneCount} ថ្ងៃ — ${failedCount} ថ្ងៃបរាជ័យ។ សូមសាកល្បងម្តងទៀត។`);
@@ -6623,9 +6652,13 @@
             const s = String(val === undefined || val === null ? '' : val);
             return s === '' ? '' : '="' + s.replace(/"/g, '""') + '"';
         };
+        const csvSafeText = (val) => {
+            const s = String(val === undefined || val === null ? '' : val);
+            return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+        };
         const lines = [EXPORT_HEADERS.map(csvEscape).join(',')];
         rows.forEach(r => {
-            lines.push([r.no, sheetsText(r.phone), sheetsText(r.barcode), r.locker, r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), r.status, r.scanDate, r.time].map(csvEscape).join(','));
+            lines.push([r.no, sheetsText(r.phone), sheetsText(r.barcode), csvSafeText(r.locker), r.cod.toFixed(2), r.dod.toFixed(2), r.total.toFixed(2), csvSafeText(r.status), r.scanDate, r.time].map(csvEscape).join(','));
         });
 
         const csvContent = '\uFEFF' + lines.join('\r\n');
@@ -8535,7 +8568,7 @@
         let claimedBarcode = null;
         let claimedWhole = null;
         try {
-            const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
+            const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
                 claimedParent = null;
                 claimedBarcode = null;
                 claimedWhole = null;
@@ -8566,7 +8599,7 @@
                     delete updated.closedAt;
                 }
                 return updated;
-            });
+            }));
 
             if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
 
@@ -8720,7 +8753,7 @@
 
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
-            const barcodeCloseResult = await fb.runTransaction(itemRef, (currentItem) => {
+            const barcodeCloseResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
@@ -8756,7 +8789,7 @@
                 }
                 serverApplied = true;
                 return currentItem;
-            });
+            }));
             const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
                 revertPickupDeltaAfterNoOp();
@@ -9188,7 +9221,7 @@
 
         try {
             const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-            const closeResult = await fb.runTransaction(itemRef, (currentItem) => {
+            const closeResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
@@ -9219,7 +9252,7 @@
                 }
                 serverApplied = true;
                 return currentItem;
-            });
+            }));
             const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
             if (!serverApplied || !(closeResult && closeResult.committed)) {
                 revertPickupDeltaAfterNoOp();
@@ -9276,7 +9309,7 @@
         let claimedWhole = null;
         let clearClaimBlocked = false;
         try {
-            const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+            const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
                 claimedWhole = null;
                 clearClaimBlocked = false;
                 if (!currentItem) return currentItem;
@@ -9287,7 +9320,7 @@
                 normalizeBarcodesOf(currentItem);
                 claimedWhole = currentItem;
                 return null;
-            });
+            }));
 
             if (!result || !result.committed) throw new Error('Delete item transaction was not committed');
 
@@ -9617,7 +9650,7 @@
     async function findRestoreTargetId(itemToRestore) {
         if (!itemToRestore || !itemToRestore.id || !dbRefHistory || !fb) return itemToRestore && itemToRestore.id;
         try {
-            const historySnap = await fb.get(dbRefHistory);
+            const historySnap = await dbOp(fb.get(dbRefHistory));
             const history = historySnap && historySnap.val();
             if (!history || typeof history !== 'object') return itemToRestore.id;
             const matchingId = Object.keys(history).find((id) => {
@@ -9645,7 +9678,7 @@
         let replacedClaim = null;
         let claimStatus = 'ALREADY_RESTORED';
         const trashRef = fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`);
-        const result = await fb.runTransaction(trashRef, (currentItem) => {
+        const result = await dbOp(fb.runTransaction(trashRef, (currentItem) => {
             claimedItem = null;
             replacedClaim = null;
             claimStatus = 'ALREADY_RESTORED';
@@ -9666,45 +9699,45 @@
             currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
             claimStatus = 'CLAIMED';
             return currentItem;
-        });
+        }));
         if (!result || !result.committed || !claimedItem) throw new Error(claimStatus);
         return { item: claimedItem, replacedClaim };
     }
 
     async function bindRestoreClaimTarget(id, token, targetId) {
         let bound = false;
-        const result = await fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+        const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
             bound = false;
             if (!currentItem || !currentItem.restoreClaim || currentItem.restoreClaim.token !== token) return;
             currentItem.restoreClaim = { token, claimedAt: getServerNow(), targetId };
             bound = true;
             return currentItem;
-        });
+        }));
         if (!bound || !result || !result.committed) throw new Error('RESTORE_CLAIM_LOST');
     }
 
     async function clearRestoreHistoryMarker(targetId, sourceId, token) {
         if (!targetId || !sourceId || !token) return;
-        await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
+        await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
             if (!currentItem || currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== token) return;
             delete currentItem.restoreClaimId;
             delete currentItem.restoreClaimToken;
             return currentItem;
-        });
+        }));
     }
 
     async function clearRestoreFinalization(sourceId, token) {
         if (!sourceId || !token) return;
-        await fb.runTransaction(fb.ref(db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
+        await dbOp(fb.runTransaction(fb.ref(db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
             if (!currentFinalization || currentFinalization.token !== token) return;
             return null;
-        });
+        }));
     }
 
     async function applyClaimedRestoreToHistory(targetId, sourceId, token, itemToRestore, applyRestoreMergeInto) {
         let targetChanged = false;
         let committedItem = null;
-        const result = await fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
+        const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
             targetChanged = false;
             committedItem = null;
             if (currentItem) normalizeBarcodesOf(currentItem);
@@ -9723,7 +9756,7 @@
             target.restoreClaimToken = token;
             committedItem = target;
             return target;
-        });
+        }));
         if (targetChanged) return { targetChanged: true, item: null };
         if (!result || !result.committed || !committedItem) throw new Error('RESTORE_HISTORY_WRITE_FAILED');
         const snapshotItem = result.snapshot ? cloneRestoreItem(result.snapshot.val()) : committedItem;
@@ -9773,13 +9806,13 @@
         let lastError = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                await fb.update(fb.ref(db), updates);
+                await dbOp(fb.update(fb.ref(db), updates));
                 return;
             } catch (error) {
                 lastError = error;
                 let trashSnapshot;
                 try {
-                    trashSnapshot = await fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${sourceId}`));
+                    trashSnapshot = await dbOp(fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${sourceId}`)));
                 } catch (readError) {
                     throw error;
                 }
@@ -9807,7 +9840,7 @@
             const token = existingClaim ? existingClaim.token : generateRestoreClaimToken();
             let targetId = existingClaim ? existingClaim.targetId : null;
             if (!targetId) {
-                const previewSnap = await fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${restoredId}`));
+                const previewSnap = await dbOp(fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${restoredId}`)));
                 if (!previewSnap.exists()) throw new Error('ALREADY_RESTORED');
                 const previewItem = cloneRestoreItem(previewSnap.val());
                 if (!previewItem) throw new Error('ALREADY_RESTORED');
@@ -9891,7 +9924,7 @@
             await finalizeClaimedRestore(restoredId, token, targetId, appliedRevenueDeltas);
             activeRestoreClaims.delete(restoredId);
             await clearRestoreFinalization(restoredId, token).catch(() => {});
-            const finalSnap = await fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`));
+            const finalSnap = await dbOp(fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`)));
             const resultingLiveItem = finalSnap.exists() ? cloneRestoreItem(finalSnap.val()) : prepared.item;
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
@@ -9905,7 +9938,7 @@
                 if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
             }
             try {
-                const [histSnap, delSnap] = await Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]);
+                const [histSnap, delSnap] = await dbOp(Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]));
                 const histData = histSnap.val();
                 scanHistory = histData ? Object.keys(histData).map(k => { const v = histData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
                 const delData = delSnap.val();
@@ -9941,12 +9974,12 @@
 
     async function releaseStaleRestoreClaimForPurge(id) {
         if (!db || !fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
-        await fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
+        await dbOp(fb.runTransaction(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`), (currentItem) => {
             if (!currentItem || !currentItem.restoreClaim) return;
             if (isActiveRestoreClaim(currentItem.restoreClaim)) return;
             delete currentItem.restoreClaim;
             return currentItem;
-        });
+        }));
     }
 
     async function executePermanentDelete() {
@@ -10106,7 +10139,7 @@
             refreshCurrentHistoryView();
         };
         let serverItemExisted = false;
-        return fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        return dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
             serverItemExisted = false;
             if (!currentItem) return currentItem;
             normalizeBarcodesOf(currentItem);
@@ -10118,7 +10151,7 @@
             });
             serverItemExisted = true;
             return currentItem;
-        }).then((result) => {
+        })).then((result) => {
             if (!serverItemExisted || !(result && result.committed)) {
                 revertLocalFields();
                 showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
@@ -10459,7 +10492,7 @@
         let claimedItem = null;
         let status = 'CLEAR_HISTORY_MISSING';
         const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-        const result = await fb.runTransaction(itemRef, (currentItem) => {
+        const result = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
             claimedItem = null;
             status = 'CLEAR_HISTORY_MISSING';
             if (!currentItem || typeof currentItem !== 'object') return;
@@ -10478,16 +10511,16 @@
             currentItem.clearClaim = { token, claimedAt: getServerNow() };
             status = 'CLEAR_HISTORY_CLAIMED';
             return currentItem;
-        });
+        }));
         if (!result || !result.committed || !claimedItem) throw new Error(status);
         return claimedItem;
     }
 
     async function clearClearHistoryFinalization(id, token) {
-        await fb.runTransaction(fb.ref(db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
+        await dbOp(fb.runTransaction(fb.ref(db, `zoew_clear_history_finalizations/${id}`), (currentFinalization) => {
             if (!currentFinalization || currentFinalization.token !== token) return;
             return null;
-        });
+        }));
     }
 
     async function finalizeClaimedHistoryClear(id, token, trashItem) {
@@ -10499,7 +10532,7 @@
         let lastError = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                await fb.update(fb.ref(db), updates);
+                await dbOp(fb.update(fb.ref(db), updates));
                 return;
             } catch (error) {
                 lastError = error;
@@ -10507,11 +10540,11 @@
                 let trashSnapshot;
                 let finalizationSnapshot;
                 try {
-                    [historySnapshot, trashSnapshot, finalizationSnapshot] = await Promise.all([
+                    [historySnapshot, trashSnapshot, finalizationSnapshot] = await dbOp(Promise.all([
                         fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${id}`)),
                         fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${id}`)),
                         fb.get(fb.ref(db, `zoew_clear_history_finalizations/${id}`))
-                    ]);
+                    ]));
                 } catch (readError) {
                     throw error;
                 }
@@ -10550,6 +10583,7 @@
         let clearedCount = 0;
         let blockedCount = 0;
         let failedCount = 0;
+        let stalled = false;
         try {
             for (const id of clearedIds) {
                 const previous = activeClearHistoryClaims.get(id);
@@ -10571,12 +10605,17 @@
                         failedCount++;
                         console.error('Error clearing history item:', id, error);
                         if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing history item', itemId: id });
+                        if (dbOpStalled(error)) { stalled = true; break; }
                     }
                 }
             }
             refreshCurrentHistoryView();
             updateRecentPhonesList();
-            if (clearedCount && !blockedCount && !failedCount) {
+            if (stalled) {
+                showToast(clearedCount
+                    ? `⚠️ បណ្តាញឆ្លើយមិនចេញ — លុបបានតែ ${clearedCount} ធាតុ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។`
+                    : "⚠️ បណ្តាញឆ្លើយមិនចេញ — លុបមិនបានទេ។ ទិន្នន័យនៅរក្សាទុកដោយសុវត្ថិភាព។");
+            } else if (clearedCount && !blockedCount && !failedCount) {
                 showToast(`បានលុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedCount} ធាតុ!`);
             } else if (clearedCount) {
                 showToast(`⚠️ បានលុប ${clearedCount} ធាតុ។ ធាតុខ្លះកំពុងត្រូវបានកែពីឧបករណ៍ផ្សេង ឬអាចសាកល្បងម្ដងទៀតបាន។`);

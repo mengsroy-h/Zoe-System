@@ -112,6 +112,8 @@ function buildWorld(store, now) {
     });
     new vm.Script([
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
+        // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
+        extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ ផ្ទុក
         // function ពិត បូក `serverClockTrusted = true` (ស្ថានភាព App ភ្ជាប់រួច)។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),

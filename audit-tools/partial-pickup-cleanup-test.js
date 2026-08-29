@@ -147,6 +147,12 @@ function buildWorld(historySeed, startNow) {
     const code = [
         extractConst(src, 'TWO_HOURS_MS'),
         extractConst(src, 'EIGHT_DAYS_MS'),
+        // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜
+        // sandbox ត្រូវផ្ទុក **function ពិត** ដូចគ្នានឹងច្រកទ្វារនាឡិកាខាងក្រោម។
+        extractConst(src, 'DB_OP_TIMEOUT_MS'),
+        extractFn(src, 'withTimeout'),
+        extractFn(src, 'dbOp'),
+        extractFn(src, 'dbOpStalled'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ sandbox
         // ត្រូវផ្ទុក **function ពិត** បូក `serverClockTrusted = true` ដែលជា
         // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ

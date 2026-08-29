@@ -217,6 +217,10 @@ const GESTURE = function (steps) {
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(e.message));
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     page.on('dialog', (d) => d.accept());
     let documentLoads = 0;
     let reloads = 0;

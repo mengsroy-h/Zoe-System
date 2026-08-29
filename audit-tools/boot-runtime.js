@@ -40,6 +40,10 @@ function serve(dir) {
         const page = await ctx.newPage();
         const errors = [];
         page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+        await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+                    var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+                    setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+                });`);
         page.on('console', (m) => { if (m.type() === 'error') errors.push('console.error: ' + m.text().slice(0, 200)); });
         // block outbound so gstatic/sentry can't hang the run; app must survive it
         await page.route('**', (route) => {

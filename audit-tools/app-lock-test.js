@@ -312,6 +312,10 @@ async function withTimeout(promise, ms, label) {
     // ធ្លាក់ដោយហេតុផលមើលទៅមិនពាក់ព័ន្ធ។ ត្រូវរាយវាជាមួយការធ្លាក់នោះ។
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e && e.message ? e.message : e).split('\n')[0]));
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     await page.route('**', (route) => {
         const u = route.request().url();
         if (u.indexOf('/license-verify.js') !== -1) return route.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });

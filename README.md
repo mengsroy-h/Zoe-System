@@ -149,7 +149,7 @@ Secret របស់ Lookup API និងការតភ្ជាប់នាំ�
 
 ## ការធានាគុណភាព
 
-`audit-tools/` មាន **checker និងតេស្តជាង ៨០** ដែលរត់ដោយគ្មាន AI៖
+`audit-tools/` មាន **checker និងតេស្តជាង ១០០** ដែលរត់ដោយគ្មាន AI៖
 
 ```bash
 npm i acorn playwright-core xlsx

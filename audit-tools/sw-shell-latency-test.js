@@ -166,6 +166,10 @@ function serve(dir) {
     });
     let bootError = null;
     page.on('pageerror', (e) => { if (!bootError) bootError = String(e && e.message || e); });
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 60000 }).catch((e) => { bootError = String(e); });
     const offline = await page.evaluate(() => ({
         hasShell: !!document.getElementById('appPages'),

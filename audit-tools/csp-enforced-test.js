@@ -166,6 +166,10 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
     const violations = [];
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e && e.message || e)));
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     page.on('dialog', (d) => d.accept());
     await page.addInitScript(() => {
         window.__cspViolations = [];

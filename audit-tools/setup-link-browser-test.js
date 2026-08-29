@@ -40,6 +40,10 @@ const SEL = {
         const page = await ctx.newPage();
         const errs = [];
         page.on('pageerror', (e) => errs.push(e.message));
+        await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+                    var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+                    setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+                });`);
         await page.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
 
         console.log('\n=== ' + app + ' — Setup Link លើឧបករណ៍ថ្មី ===');

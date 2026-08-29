@@ -141,6 +141,10 @@ function seedBig(n) {
         const page = await ctx.newPage();
         page.on('dialog', (d) => d.accept());
         page.on('pageerror', (e) => ok('vp' + vp.w + ': គ្មាន pageerror', false, e.message));
+        await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+                    var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+                    setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+                });`);
         await page.route('**', (r) => {
             const u = r.request().url();
             if (u.indexOf('/license-verify.js') !== -1) return r.fulfill({ status: 200, contentType: 'application/javascript', body: LICENSE_STUB });

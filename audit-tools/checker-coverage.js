@@ -396,5 +396,48 @@ console.log('\n=== ៧. គ្មាន checker ណានៅផ្ទុកស�
     }
 }
 
+// ⛔ ផ្នែក ៨ ៖ `pageerror` របស់ Playwright ចាប់តែ **ការបោះ synchronous**។
+// កូដ App នេះស្ទើរតែទាំងអស់ជា `async`/`.then()` ➜ **ការបដិសេធ promise
+// ដែលគ្មានអ្នកចាប់** (unhandledrejection) គឺ **មើលមិនឃើញ** សម្រាប់ checker
+// ទាំងអស់។ នោះមានន័យថាផ្លូវដែលស្លាប់កណ្តាលទី (spinner ជាប់ · សោមិនដោះ ·
+// ស្ថានភាពចាស់) អាចរអិលកាត់ ខណៈ checker រាយ «គ្មានកំហុស runtime»។
+//
+// ដូច្នេះរាល់ checker browser ដែលអះអាងលើ `pageerror` ត្រូវដំឡើង
+// **អ្នកបម្លែង** តាម `addInitScript` ដែលបង្វែរ `unhandledrejection`
+// ទៅជាការបោះ ➜ ការអះអាងដដែលគ្របទាំង ២ ថ្នាក់។
+//
+// ⛔ ហើយវាត្រូវឈរ **មុន** `page.goto` ដំបូង — `addInitScript` ក្រោយ
+// ការ navigate មិនអនុវត្តលើទំព័រដែលកំពុងបើកទេ ➜ **ការការពារដែលងាប់**។
+console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវមើល unhandledrejection ដែរ ===');
+{
+    const dir = __dirname;
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { names = []; }
+    const missing = [];
+    const lateInstall = [];
+    let watched = 0;
+    for (const n of names) {
+        if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+        let raw = '';
+        try { raw = fs.readFileSync(path.join(dir, n), 'utf8'); } catch (e) { continue; }
+        if (raw.indexOf("page.on('pageerror'") === -1 && raw.indexOf('page.on("pageerror"') === -1) continue;
+        watched++;
+        const at = raw.indexOf('unhandledrejection');
+        if (at === -1) { missing.push(n); continue; }
+        // ⛔ ច្បាប់ត្រឹមត្រូវគឺ «មាន `.goto()` **ក្រោយ** ការដំឡើង» មិនមែន
+        // «ការដំឡើងមកមុន `.goto()` ដំបូង» ទេ — checker ខ្លះបើកទំព័រកម្តៅ
+        // សំបកជាមុន រួចទើបចាប់ផ្តើមវាស់លើ navigate បន្ទាប់។ ការប្រៀបធៀប
+        // នឹង `.goto()` ដំបូងផ្តល់ false positive ២ (វាស់បានក្នុងជុំនេះ)។
+        if (raw.indexOf('.goto', at) === -1) lateInstall.push(n);
+    }
+    const MIN_WATCHERS = 10;
+    if (watched < MIN_WATCHERS) bad('ជាន់អប្បបរមា៖ checker ដែលមើល pageerror >= ' + MIN_WATCHERS, watched);
+    else ok('ជាន់អប្បបរមា៖ checker ដែលមើល pageerror មាន ' + watched);
+    if (missing.length) bad('⛔ checker ' + missing.length + ' មើល pageerror តែមិនមើល unhandledrejection', missing.join(', '));
+    else ok('រាល់ checker ដែលមើល pageerror ក៏មើល unhandledrejection ដែរ');
+    if (lateInstall.length) bad('⛔ អ្នកបម្លែងដំឡើង **ក្រោយ** page.goto ➜ ការការពារដែលងាប់', lateInstall.join(', '));
+    else ok('អ្នកបម្លែងដំឡើងមុន page.goto គ្រប់កន្លែង');
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

@@ -222,6 +222,10 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     page.on('dialog', (d) => d.accept());
     await page.route('**', (route) => {
         const u = route.request().url();

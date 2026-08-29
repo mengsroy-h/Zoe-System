@@ -191,6 +191,10 @@ function serve(dir) {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
         const page = await ctx.newPage();
         page.on('pageerror', () => {});
+        await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+                    var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+                    setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+                });`);
         await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
 
         // ផ្ទាំងត្រូវគ្របពេញអេក្រង់ភ្លាមៗ — ការលោតរបស់ UI ទទេត្រូវលាក់

@@ -143,6 +143,10 @@ const CANARY_BUDGET_MS = 9000;
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
         page.on('pageerror', () => {});
+        await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+                    var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+                    setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+                });`);
 
         // ១) ការបើកលើកដំបូង — SW ដំឡើង និង cache សំបក
         await page.goto(base + '/', { waitUntil: 'domcontentloaded' });

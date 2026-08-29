@@ -79,6 +79,10 @@ async function boot(browser, port, mode) {
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e && e.message).slice(0, 140)));
+    await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
+            var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
+            setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
+        });`);
     page.on('dialog', (d) => d.dismiss().catch(() => {}));
     const s = blockScript(mode);
     if (s) await page.addInitScript(s);

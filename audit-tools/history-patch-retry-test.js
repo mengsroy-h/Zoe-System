@@ -62,7 +62,11 @@ const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHi
     'flushPendingHistoryPatches', 'handleCallAction', 'setCallMark',
     // «📞 ខល» ជាការចាកចេញពី App ដោយចេតនា ➜ វាលើកលែងការចាក់សោ (កំណែ 2.22.1)។
     // ⛔ ចាក់ **កូដពិត** មិនមែន stub ទទេ — បើ stub នោះស្នាមភ្ជាប់នេះគ្មានតេស្តសោះ។
-    'noteAppLockExcuse'];
+    'noteAppLockExcuse',
+    // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ៖ ការព្យួរ **មិនបោះកំហុស** ➜
+    // បើគ្មានវា `historyPatchErrorIsDisconnect()` មិនដែលត្រូវហៅសោះ ➜
+    // ការសម្គាល់ការខលបាត់ស្ងាត់ៗ (ថ្នាក់ដដែលនឹង 2.20.2 តាមទ្វារផ្សេង)។
+    'withTimeout', 'dbOp', 'dbOpStalled'];
 const src = {};
 FNS.forEach((n) => {
     src[n] = sliceFn(n);
@@ -70,7 +74,7 @@ FNS.forEach((n) => {
 });
 
 const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
-    'appLockExcuseAt'];
+    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS'];
 const decls = [];
 DECLS.forEach((n) => {
     const m = SRC.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm'));

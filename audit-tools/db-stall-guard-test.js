@@ -1,0 +1,408 @@
+// ⛔ ថ្នាក់កំហុស៖ **ការហៅ Firebase ដែល *ព្យួរ* (មិនឆ្លើយ មិនបដិសេធ) ធ្វើឲ្យ
+// សោ in-flight ជាប់ជារៀងរហូត ➜ មុខងារងាប់ស្ងាត់ៗរហូតដល់បិទបើក App។**
+//
+// នេះជា **មេរៀន 2.22.4 (សំណួរទី ៩ — «តើ checker ដាក់ dependency ក្នុង
+// *របៀបបរាជ័យ* ណា?») ដែលអនុវត្តលើ Firebase SDK ជំនួស `fetch`**។
+//
+// RTDB **មិនបដិសេធការសរសេរពេលក្រៅបណ្តាញទេ** — វាចាក់ជួរក្នុងឧបករណ៍ ហើយ
+// promise ដោះ **តែពេល server ឆ្លើយតប**។ ដូច្នេះលើតំណ «ភ្ជាប់តែស្លាប់»
+// (WiFi សាធារណៈមុន login · តំបន់សេវាអន់ · proxy ដែលទទួល TCP រួចស្ងាត់)
+// រាល់ `await fb.runTransaction(...)` ដែលគ្មានពិដាន **ព្យួរអស់កល្ប**។
+//
+// វាស់បានលើ tree មុនកែ (stub ដែលព្យួរ)៖
+//   · `resetPickupStats`        ➜ `pickupResetInFlight` ជាប់ `true` · **គ្មាន toast**
+//     ➜ ប៊ូតុង «♻️ Reset ចំនួនយករួច» **ងាប់ស្ងាត់ៗ** រហូតដល់បិទបើក App
+//   · `clearHistory`            ➜ `clearHistoryInFlight` ជាប់ដដែល
+//   · `flushPendingHistoryPatches` ➜ `historyPatchFlushInFlight` ជាប់ ➜
+//     **ជួរព្យាយាមវិញនៃការសម្គាល់ការខល (2.20.2) ងាប់ទាំងស្រុង**
+//   · `repairPickupLedgerOnce`  ➜ `pickupLedgerRepairRunning` ជាប់
+//   · `patchHistoryItemFields`  ➜ ព្យួរ ➜ **ការសម្គាល់ការខលបាត់ស្ងាត់ៗ**
+//     (ថ្នាក់ដដែលនឹង 2.20.2 ដែលវិលមកតាមទ្វារផ្សេង ៖ ការព្យួរ **មិនបោះ
+//     កំហុស** ➜ `historyPatchErrorIsDisconnect()` មិនដែលត្រូវហៅ ➜ មិនចូលជួរ)
+//
+// ⛔ **គ្មាន checker ណាក្នុងចំណោម ២៥ ដែល stub `runTransaction` ដាក់វាក្នុង
+// របៀបព្យួរសោះ** — ទាំងអស់ធ្វើឲ្យវា **ឆ្លើយ ឬបដិសេធ** ➜ ថ្នាក់នេះមើលមិនឃើញ។
+// (`slow-write-test.js` ពន្យារការសរសេរ តែលើ **ផ្លូវស្កេន** ដែលការពារ
+// ដោយ `withTimeout` រួចស្រាប់ — មិនមែនផ្លូវ admin ទេ។)
+//
+// ⚠️ **ZoeKeyGen ដោះស្រាយថ្នាក់នេះរួចហើយ** (`withTimeout` លើ `fb.get`/`fb.update`
+// ក្នុង `refreshKeyList` · `revokeKey` · `extendKey` · migration) ➜ ការកែ
+// ត្រឹមតែនាំ ZoeW មកតាមទម្លាប់ដដែលរបស់គម្រោង។
+//
+// ច្បាប់ដែលឯកសារនេះចាក់សោ៖
+//   ១. **គ្មាន `await fb.<dataOp>(…)` ដោយផ្ទាល់** — ត្រូវឆ្លងកាត់ពិដាន។
+//   ២. ការព្យួរត្រូវ **ដោះសោ** ក្នុងពេលកំណត់ (មិនមែនរង់ចាំអស់កល្ប)។
+//   ៣. ការព្យួរត្រូវ **ប្រាប់ការពិត** — ⛔ មិនត្រូវអះអាងជោគជ័យ។
+//   ៤. ⛔ **ទិសផ្ទុយត្រូវរក្សា** — បណ្តាញធម្មតា ➜ ជោគជ័យដដែល, សោដោះ,
+//      ការសរសេរត្រឹមត្រូវ។ («ធ្វើឲ្យវាធ្លាក់ជានិច្ច» ក៏ដោះសោបានដែរ។)
+//   ៥. ពិដានត្រូវស្ថិតក្នុងជួរសមហេតុផល (៥–៦០ វិ.) — ១ms ក៏បំផ្លាញការប្រើពិត។
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+let acorn;
+try { acorn = require('acorn'); } catch (e) {
+    console.log('SKIP — ត្រូវការ acorn (npm i acorn)');
+    process.exit(0);
+}
+
+const ROOT = process.env.DBSTALL_APP_DIR || path.join(__dirname, '..');
+
+let pass = 0, fail = 0;
+function ok(label) { pass++; console.log('   ok    ' + label); }
+function bad(label, detail) {
+    fail++;
+    console.log('  FAIL   ' + label + (detail !== undefined
+        ? '\n         ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : ''));
+}
+function check(cond, label, detail) { cond ? ok(label) : bad(label, detail); }
+
+const DATA_OPS = ['runTransaction', 'update', 'get', 'set', 'remove'];
+const GUARD_NAMES = ['withTimeout', 'dbOp'];
+
+// ⛔ បញ្ជីលើកលែង — **រាល់ធាតុត្រូវមានហេតុផលសរសេរជាប់** (ទម្លាប់គម្រោង)។
+// ធាតុទាំងនេះជាកម្មសិទ្ធិរបស់ **ផ្លូវស្កេន-រក្សាទុក** ដែលមានការរចនា
+// ពិដានពេញលេញរួចហើយនៅ **កន្លែងហៅ** ៖
+//     const claimPromise = claimBarcodeInRegistry(...);
+//     claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
+//     catch: claimPromise.then((lateClaim) => { … releaseBarcodesInRegistry(…) });
+// ⛔ **ការដាក់ពិដានខាងក្នុងនឹងបំផ្លាញការរាយការណ៍យឺតនោះ** ៖ promise នឹង
+// **បដិសេធ** នៅ ១៥ វិ. ជំនួសការដោះយឺតជា `'claimed'` ➜ barcode ដែល claim
+// ជោគជ័យយឺត **មិនដែលត្រូវដោះចេញពី `zoew_barcode_registry`** ➜ barcode នោះ
+// **ស្កេនចូលមិនបានទៀតជារៀងរហូត** (ថ្នាក់ដដែលនឹងមេរៀន «claim ងាប់» 2.18.0)។
+const STALL_GUARD_EXEMPT = {
+    ZoeW: ['claimBarcodeInRegistry']
+};
+
+function readApp(name) {
+    try { return fs.readFileSync(path.join(ROOT, name, 'app.js'), 'utf8'); }
+    catch (e) { return null; }
+}
+
+// ── ១. ស្តាទិច ៖ គ្មាន `await fb.<dataOp>(…)` ដែលគ្មានពិដាន ────────────────
+function unwrappedAwaits(src, label) {
+    let ast;
+    try { ast = acorn.parse(src, { ecmaVersion: 2022, locations: true }); }
+    catch (e) { return { parseError: e.message, hits: [], total: 0 }; }
+
+    const hits = [];
+    let total = 0;
+
+    // ដោះខ្សែសង្វាក់ `.then(…)` / `.catch(…)` ចេញ ដើម្បីរកការហៅ **ខាងក្នុងបំផុត**
+    function unchain(node) {
+        while (node && node.type === 'CallExpression'
+            && node.callee.type === 'MemberExpression'
+            && !node.callee.computed
+            && ['then', 'catch', 'finally'].indexOf(node.callee.property.name) !== -1) {
+            node = node.callee.object;
+        }
+        return node;
+    }
+    function isFbDataCall(node) {
+        return node && node.type === 'CallExpression'
+            && node.callee.type === 'MemberExpression'
+            && !node.callee.computed
+            && node.callee.object.type === 'Identifier'
+            && node.callee.object.name === 'fb'
+            && DATA_OPS.indexOf(node.callee.property.name) !== -1;
+    }
+    function isGuardCall(node) {
+        return node && node.type === 'CallExpression'
+            && node.callee.type === 'Identifier'
+            && GUARD_NAMES.indexOf(node.callee.name) !== -1;
+    }
+
+    const exempt = STALL_GUARD_EXEMPT[label] || [];
+    const exemptSeen = new Set();
+
+    (function walk(node, fnName) {
+        if (!node || typeof node.type !== 'string') return;
+        if (node.type === 'FunctionDeclaration' && node.id) fnName = node.id.name;
+        if (node.type === 'CallExpression' && isFbDataCall(node)) total++;
+        if (node.type === 'AwaitExpression') {
+            const inner = unchain(node.argument);
+            if (isFbDataCall(inner)) {
+                if (exempt.indexOf(fnName) !== -1) exemptSeen.add(fnName);
+                else hits.push({ op: inner.callee.property.name, line: node.loc.start.line, fn: fnName });
+            }
+        }
+        for (const key of Object.keys(node)) {
+            if (key === 'loc' || key === 'start' || key === 'end') continue;
+            const v = node[key];
+            if (Array.isArray(v)) v.forEach((c) => walk(c, fnName));
+            else if (v && typeof v.type === 'string') walk(v, fnName);
+        }
+    })(ast, '<top>');
+
+    const deadExempt = exempt.filter((n) => !exemptSeen.has(n));
+    return { parseError: null, hits, total, deadExempt };
+}
+
+console.log('== ១. ស្តាទិច ៖ រាល់ `await fb.<dataOp>(…)` ត្រូវមានពិដាន ==');
+
+let totalFbCalls = 0;
+let scannedApps = 0;
+for (const app of ['ZoeW', 'ZoeKeyGen']) {
+    const src = readApp(app);
+    if (src === null) { bad(`${app}/app.js អានបាន`, 'ឯកសារបាត់ពី tree ដែលពិនិត្យ'); continue; }
+    scannedApps++;
+    const res = unwrappedAwaits(src, app);
+    if (res.parseError) { bad(`${app}/app.js parse បាន`, res.parseError); continue; }
+    totalFbCalls += res.total;
+    check(res.hits.length === 0,
+        `${app} ៖ គ្មាន await លើ fb.<dataOp> ដែលគ្មានពិដាន`,
+        res.hits.length ? `ធ្លាក់ ${res.hits.length} កន្លែង ➜ `
+            + res.hits.slice(0, 12).map(h => `${h.line} ${h.fn}(fb.${h.op})`).join(', ')
+            + (res.hits.length > 12 ? ' …' : '') : undefined);
+    // ⛔ បញ្ជីលើកលែងគ្មានធាតុងាប់ — ធាតុដែលលែងប្រើនឹងលាក់កំហុសបន្ទាប់
+    check(res.deadExempt.length === 0, `${app} ៖ បញ្ជីលើកលែងគ្មានធាតុងាប់`,
+        res.deadExempt.length ? 'ធាតុដែលលែងត្រូវនឹងកូដ ៖ ' + res.deadExempt.join(', ') : undefined);
+}
+
+// ជាន់អប្បបរមា ៖ ថតទទេ ឬការប្តូរឈ្មោះមិនត្រូវឆ្លងកាត់ស្ងាត់ៗ
+check(scannedApps === 2, 'ជាន់អប្បបរមា ៖ ស្កេន App ទាំង ២', `ស្កេនបាន ${scannedApps}`);
+check(totalFbCalls >= 20, 'ជាន់អប្បបរមា ៖ រកឃើញការហៅ fb.<dataOp> >= 20',
+    `រកឃើញត្រឹម ${totalFbCalls} ➜ checker នេះប្រហែលមិនបានឃើញកូដពិត`);
+
+// ── ២. ពិដានត្រូវសមហេតុផល ───────────────────────────────────────────────
+console.log('\n== ២. ពិដានស្ថិតក្នុងជួរសមហេតុផល ==');
+const zoewSrc = readApp('ZoeW') || '';
+const capMatch = zoewSrc.match(/const\s+DB_OP_TIMEOUT_MS\s*=\s*(\d+)\s*;/);
+check(!!capMatch, 'ZoeW ប្រកាស DB_OP_TIMEOUT_MS',
+    capMatch ? undefined : 'រកមិនឃើញ ➜ គ្មានពិដានរួមសម្រាប់ការហៅ Firebase');
+if (capMatch) {
+    const ms = parseInt(capMatch[1], 10);
+    check(ms >= 5000 && ms <= 60000, `DB_OP_TIMEOUT_MS (${ms}ms) ស្ថិតក្នុង ៥–៦០ វិ.`,
+        'ពិដានតូចពេកបំផ្លាញការប្រើពិត; ធំពេកស្មើនឹងការព្យួរ');
+}
+
+// ── ៣. ឥរិយាបថ ៖ រត់កូដពិតជាមួយ stub ដែល **ព្យួរ** ─────────────────────
+function sliceFrom(src, name) {
+    const at = src.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
+    if (at === -1) return null;
+    let depth = 0;
+    const start = src.indexOf('{', src.indexOf(')', at));
+    for (let k = start; k < src.length; k++) {
+        if (src[k] === '{') depth++;
+        else if (src[k] === '}') { depth--; if (!depth) return src.slice(at, k + 1); }
+    }
+    return null;
+}
+function sliceConst(src, name) {
+    const m = src.match(new RegExp('const\\s+' + name + '\\s*=\\s*[^;]+;'));
+    return m ? m[0] : '';
+}
+
+// នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ~៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
+const TIME_SCALE = 50;
+function scaledTimers() {
+    const timers = new Set();
+    return {
+        setTimeout: (fn, ms, ...a) => {
+            const t = setTimeout(fn, Math.max(0, Math.round((ms || 0) / TIME_SCALE)), ...a);
+            timers.add(t);
+            return t;
+        },
+        clearTimeout: (t) => { timers.delete(t); return clearTimeout(t); },
+        dispose: () => { timers.forEach(clearTimeout); timers.clear(); }
+    };
+}
+
+function baseSandbox(extra) {
+    const timers = scaledTimers();
+    const box = Object.assign({
+        console, Date, JSON, Math, Object, Set, Map, Array, String, Number, Boolean,
+        parseFloat, parseInt, isNaN, Promise, RegExp, Intl, Error,
+        setTimeout: timers.setTimeout,
+        clearTimeout: timers.clearTimeout,
+        __timers: timers,
+        window: {},
+        ZoeErrors: null
+    }, extra || {});
+    return box;
+}
+
+function loadCommon(ctx, src) {
+    vm.runInContext(sliceConst(src, 'APP_TIME_ZONE'), ctx);
+    vm.runInContext(sliceConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'), ctx);
+    for (const fn of ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled']) {
+        const s = sliceFrom(src, fn);
+        if (s) vm.runInContext(s, ctx);
+    }
+    const cap = sliceConst(src, 'DB_OP_TIMEOUT_MS');
+    if (cap) vm.runInContext(cap, ctx);
+}
+
+// ---- ៣ក. resetPickupStats ------------------------------------------------
+function runResetPickup(mode, opts) {
+    opts = opts || {};
+    const toasts = [];
+    const writes = [];
+    const hang = mode === 'hang';
+    const box = baseSandbox({
+        confirm: () => true,
+        showToast: (m) => toasts.push(String(m)),
+        refreshCurrentHistoryView: () => {},
+        getCurrentFilterLabel: () => 'ថ្ងៃនេះ',
+        countPickedUpCustomers: (b) => (b && b.pickedUpPhones) ? Object.keys(b.pickedUpPhones).length : 0,
+        getServerNow: () => Date.now(),
+        db: {}, dbRefDailyPickup: {},
+        fb: {
+            ref: (_db, p) => ({ path: p }),
+            runTransaction: (ref, fn) => {
+                const value = fn(null);
+                writes.push({ path: ref.path, value });
+                if (hang) return new Promise(() => {});
+                return Promise.resolve({ committed: true });
+            }
+        }
+    });
+    const ctx = vm.createContext(box);
+    loadCommon(ctx, zoewSrc);
+    vm.runInContext(sliceConst(zoewSrc, 'PICKUP_DATE_KEY_PATTERN')
+        || 'const PICKUP_DATE_KEY_PATTERN=/^\\d{4}-\\d{2}-\\d{2}$/;', ctx);
+    vm.runInContext('let pickupResetInFlight = false;', ctx);
+    vm.runInContext('let currentFilterMode = ' + JSON.stringify(opts.filterMode || 'today') + ';', ctx);
+    vm.runInContext("let customFilterDate = '';", ctx);
+    for (const fn of ['getFilterTargetDateKey', 'getPickupResetTargetDates', 'resetPickupStats']) {
+        const s = sliceFrom(zoewSrc, fn);
+        if (!s) return { missing: fn };
+        vm.runInContext(s, ctx);
+    }
+    const day = vm.runInContext('getFilterTargetDateKey()', ctx);
+    let ledger = { [day]: { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 } } };
+    if (opts.days && opts.days > 1) {
+        ledger = {};
+        for (let i = 0; i < opts.days; i++) {
+            const d = vm.runInContext('getZoneDateKey(' + Date.now() + ', ' + (-i) + ')', ctx);
+            ledger[d] = { packagesPickedUp: 2, pickedUpPhones: { '0974158508': 2 } };
+        }
+    }
+    vm.runInContext('let dailyPickupData = ' + JSON.stringify(ledger) + ';', ctx);
+    vm.runInContext('resetPickupStats();', ctx);
+
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const locked = vm.runInContext('pickupResetInFlight', ctx);
+            box.__timers.dispose();
+            resolve({ locked, toasts, writes, day });
+        }, 1200);
+    });
+}
+
+// ---- ៣ខ. patchHistoryItemFields -----------------------------------------
+function runPatch(mode) {
+    const toasts = [];
+    const hang = mode === 'hang';
+    const item = { id: 'id_abc', callMark: 'called' };
+    const box = baseSandbox({
+        showToast: (m) => toasts.push(String(m)),
+        refreshCurrentHistoryView: () => {},
+        normalizeBarcodesOf: (o) => o,
+        getServerNow: () => Date.now(),
+        db: {}, dbRefHistory: {},
+        fb: {
+            ref: (_db, p) => ({ path: p }),
+            runTransaction: (ref, fn) => {
+                if (hang) return new Promise(() => {});
+                const cur = { id: 'id_abc', barcodes: [] };
+                const out = fn(cur);
+                return Promise.resolve({ committed: true, snapshot: { val: () => out } });
+            }
+        }
+    });
+    const ctx = vm.createContext(box);
+    loadCommon(ctx, zoewSrc);
+    vm.runInContext(sliceConst(zoewSrc, 'HISTORY_PATCH_RETRY_MAX') || 'const HISTORY_PATCH_RETRY_MAX = 5;', ctx);
+    vm.runInContext(sliceConst(zoewSrc, 'HISTORY_PATCH_QUEUE_MAX') || 'const HISTORY_PATCH_QUEUE_MAX = 50;', ctx);
+    vm.runInContext('const pendingHistoryPatches = new Map();', ctx);
+    vm.runInContext('let scanHistory = [' + JSON.stringify(item) + '];', ctx);
+    for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'patchHistoryItemFields']) {
+        const s = sliceFrom(zoewSrc, fn);
+        if (!s) return Promise.resolve({ missing: fn });
+        vm.runInContext(s, ctx);
+    }
+    box.__settled = null;
+    vm.runInContext(
+        'patchHistoryItemFields(scanHistory[0], { callMark: "noanswer" }, { callMark: "called" }, null, {})'
+        + '.then((v) => { __settled = { ok: true, value: v }; }, (e) => { __settled = { ok: false, err: String(e && e.message || e) }; });',
+        ctx);
+
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const settled = vm.runInContext('__settled', ctx);
+            const reverted = vm.runInContext('scanHistory[0].callMark', ctx);
+            box.__timers.dispose();
+            resolve({ settled, reverted, toasts });
+        }, 1200);
+    });
+}
+
+(async () => {
+    console.log('\n== ៣. ឥរិយាបថ ៖ `resetPickupStats` លើតំណដែលព្យួរ ==');
+    const hung = await runResetPickup('hang');
+    if (hung.missing) {
+        bad('រក function ' + hung.missing + ' ឃើញ', 'checker មិនអាចវាស់ឥរិយាបថបានទេ');
+    } else {
+        check(hung.writes.length >= 1, 'ការសរសេរត្រូវបានព្យាយាមពិត (stub ត្រូវបានហៅ)',
+            'ការវាស់មិនបានឈានដល់ផ្លូវសរសេរសោះ ➜ លទ្ធផលមិនមានន័យ');
+        check(hung.locked === false, '⛔ ការព្យួរ ➜ `pickupResetInFlight` ត្រូវដោះវិញ',
+            'សោជាប់ `true` ➜ ប៊ូតុង «♻️ Reset ចំនួនយករួច» ងាប់រហូតដល់បិទបើក App');
+        const said = hung.toasts.join(' | ');
+        check(hung.toasts.length >= 1, '⛔ ការព្យួរ ➜ ត្រូវប្រាប់អ្នកប្រើ',
+            'គ្មានសារសោះ ➜ អ្នកប្រើមិនដឹងថាមានអ្វីកើតឡើង');
+        check(!/បានលុប|ជោគជ័យ|✅/.test(said) , '⛔ ការព្យួរ ➜ មិនត្រូវអះអាងជោគជ័យ', said);
+    }
+
+    console.log('\n== ៤. ទិសផ្ទុយ ៖ បណ្តាញធម្មតាមិនត្រូវប្រែ ==');
+    const fine = await runResetPickup('fast');
+    if (!fine.missing) {
+        check(fine.locked === false, 'បណ្តាញធម្មតា ➜ សោដោះ');
+        check(fine.writes.length === 1 && fine.writes[0].value
+            && fine.writes[0].value.packagesPickedUp === 0,
+            'បណ្តាញធម្មតា ➜ សរសេរ `{ packagesPickedUp: 0 }` ដដែល', fine.writes);
+        check(/Reset/i.test(fine.toasts.join(' | ')) || fine.toasts.length >= 1,
+            'បណ្តាញធម្មតា ➜ មានសាររបាយការណ៍', fine.toasts);
+    }
+
+    console.log('\n== ៤ខ. រង្វិលជុំត្រូវបោះបង់ភ្លាមពេលតំណស្លាប់ ==');
+    // ⛔ បើគ្មានការបោះបង់ ការ Reset «ទាំងអស់» លើ ៥ ថ្ងៃ = ៥ × ១៥ វិ. = ៧៥ វិ.
+    // ដែលសោជាប់ពេញរយៈពេលនោះ ➜ អ្នកប្រើគិតថា App គាំង។
+    const many = await runResetPickup('hang', { filterMode: 'all', days: 5 });
+    if (!many.missing) {
+        check(many.writes.length >= 1, 'ការវាស់ឈានដល់ផ្លូវសរសេរពិត', many.writes.length);
+        check(many.writes.length === 1,
+            '⛔ តំណស្លាប់ ➜ បោះបង់ក្រោយការព្យួរ **ដំបូង** (មិនមែន N × ពិដាន)',
+            `ព្យាយាមសរសេរ ${many.writes.length} ដង ➜ សោជាប់ ${many.writes.length} × ១៥ វិ.`);
+        check(many.locked === false, 'តំណស្លាប់ ➜ សោដោះវិញ (ពហុថ្ងៃ)');
+        check(/បណ្តាញ|ឆ្លើយមិនចេញ/.test(many.toasts.join(' | ')),
+            'តំណស្លាប់ ➜ សារប្រាប់មូលហេតុពិត (បណ្តាញ)', many.toasts);
+    }
+    const manyFine = await runResetPickup('fast', { filterMode: 'all', days: 5 });
+    if (!manyFine.missing) {
+        check(manyFine.writes.length === 5,
+            '⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ Reset គ្រប់ ៥ ថ្ងៃដដែល',
+            `សរសេរ ${manyFine.writes.length}/៥ ➜ ការបោះបង់មិនត្រូវប៉ះការរត់ធម្មតា`);
+    }
+
+    console.log('\n== ៥. ឥរិយាបថ ៖ `patchHistoryItemFields` (ការសម្គាល់ការខល) ==');
+    const p = await runPatch('hang');
+    if (p.missing) {
+        bad('រក function ' + p.missing + ' ឃើញ');
+    } else {
+        check(p.settled !== null && p.settled !== undefined,
+            '⛔ ការព្យួរ ➜ promise ត្រូវដោះ (មិនរង់ចាំអស់កល្ប)',
+            'promise មិនដែលដោះ ➜ អ្នកហៅ (`flushPendingHistoryPatches`) ជាប់សោជារៀងរហូត');
+        check(p.toasts.length >= 1, '⛔ ការព្យួរ ➜ ត្រូវប្រាប់អ្នកប្រើ', p.toasts);
+    }
+    const p2 = await runPatch('fast');
+    if (!p2.missing) {
+        check(p2.settled && p2.settled.ok, 'ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ ការសម្គាល់ជោគជ័យដដែល', p2.settled);
+    }
+
+    console.log('\n' + (fail ? `❌ ធ្លាក់ ${fail} (ok ${pass})` : `✅ ជោគជ័យទាំងអស់ (${pass})`));
+    process.exit(fail ? 1 : 0);
+})().catch((e) => {
+    console.log('  FAIL   checker បោះកំហុស ➜ ' + (e && e.stack || e));
+    process.exit(1);
+});

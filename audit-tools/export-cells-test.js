@@ -162,5 +162,42 @@ ok('EXPORT_TEXT_COLUMN_INDEXES ចង្អុលទៅ «លេខទូរស�
     headers[idx[0]] === 'លេខទូរស័ព្ទ' && headers[idx[1]] === 'Barcode',
     JSON.stringify({ idx, at: idx.map((i) => headers[i]) }));
 
+// ⛔ CSV formula injection — «ទីតាំង Locker» ជាអត្ថបទសេរីរបស់អ្នកប្រើ
+// (`lockerEl.value.trim()`; rules ផ្ទៀងផ្ទាត់ត្រឹម `newData.isString()`) ➜
+// ឈ្មោះទូដែលចាប់ផ្តើមដោយ `= + - @` ក្លាយជា **រូបមន្តរស់** ពេលបើកឯកសារ CSV
+// ក្នុង Excel/Sheets (ឧ. `=HYPERLINK(…)` · `=cmd|'/c calc'!A0` ➜ DDE)។
+// ⛔ **កុំដាក់ការណេយ្យកម្មនេះលើ `csvEscape` ទាំងមូល** — លទ្ធផលរបស់
+// `sheetsText()` ចាប់ផ្តើមដោយ `=` **ដោយចេតនា** (ការបង្ខំជា TEXT) ➜ ការដាក់
+// `'` ពីមុខវានឹងបំផ្លាញលេខទូរស័ព្ទ និង Barcode។ ដូច្នេះការណេយ្យកម្មត្រូវ
+// ដាក់លើ **វាលអត្ថបទឆៅ** តែប៉ុណ្ណោះ។ តេស្តអះអាង **២ ខាង**។
+const csvSrc = sliceFn(src, 'exportDataAsCsvForSheets') || '';
+ok('រក `exportDataAsCsvForSheets` ឃើញ', csvSrc.length > 0,
+    'បាត់ពី tree ➜ តេស្តនេះមិនបានពិនិត្យអ្វីសោះ');
+if (csvSrc) {
+    const csvCtx = { out: null };
+    vm.createContext(csvCtx);
+    const helper = csvSrc.slice(csvSrc.indexOf('const csvSafeText'), csvSrc.indexOf('const lines'));
+    ok('`csvSafeText` មានវត្តមាន', helper.indexOf('csvSafeText') !== -1,
+        'គ្មានការណេយ្យកម្មរូបមន្ត ➜ ឈ្មោះទូអាចក្លាយជារូបមន្តរស់');
+    if (helper.indexOf('csvSafeText') !== -1) {
+        vm.runInContext(helper + '\nout = { f: csvSafeText };', csvCtx);
+        const f = csvCtx.out.f;
+        ok('⛔ `=HYPERLINK(...)` ត្រូវបានណេយ្យកម្ម', f('=HYPERLINK("http://x","y")')[0] === "'", f('=HYPERLINK("h","y")'));
+        ok('⛔ `+`, `-`, `@`, TAB, CR ក៏ត្រូវណេយ្យកម្មដែរ',
+            ['+1', '-1', '@x', '\tx', '\rx'].every((v) => f(v)[0] === "'"),
+            JSON.stringify(['+1', '-1', '@x'].map(f)));
+        ok('⛔ ទិសផ្ទុយ ៖ អត្ថបទធម្មតាមិនត្រូវប្រែសោះ',
+            f('A1') === 'A1' && f('ទូ ០១') === 'ទូ ០១' && f('N/A') === 'N/A' && f('') === '',
+            JSON.stringify([f('A1'), f('ទូ ០១'), f('N/A')]));
+    }
+    // ការណេយ្យកម្មត្រូវអនុវត្តលើ locker ពិត មិនមែនត្រឹមប្រកាសទុក
+    ok('⛔ `locker` ឆ្លងកាត់ `csvSafeText` ក្នុងជួរដេកពិត',
+        /csvSafeText\(r\.locker\)/.test(csvSrc),
+        'ប្រកាស helper តែមិនប្រើ = ការការពារដែលងាប់');
+    ok('⛔ ទិសផ្ទុយ ៖ `sheetsText` នៅតែប្រើលើលេខទូរស័ព្ទ និង Barcode',
+        /sheetsText\(r\.phone\)/.test(csvSrc) && /sheetsText\(r\.barcode\)/.test(csvSrc),
+        'ការបង្ខំជា TEXT ត្រូវរក្សា — បើអត់ 0 នាំមុខបាត់');
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

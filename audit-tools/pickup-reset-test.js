@@ -139,6 +139,9 @@ function makeCtx(opts) {
     const sandbox = {
         console,
         window: {},
+        // ⛔ `withTimeout()` ពិត ត្រូវការនាឡិកា host — vm context ទទេគ្មានវាទេ
+        setTimeout,
+        clearTimeout,
         confirm: () => (opts.confirmResult !== false),
         showToast: (m) => toasts.push(m),
         refreshCurrentHistoryView: () => { sandbox.__refreshed = (sandbox.__refreshed || 0) + 1; },
@@ -168,6 +171,11 @@ function makeCtx(opts) {
     // ⛔ `getFilterTargetDateKey()` គណនាថ្ងៃតាមប្រតិទិនកម្ពុជា ➜ sandbox
     // ត្រូវផ្ទុក helper តំបន់ម៉ោងពិត បើមិនដូច្នេះវាធ្លាក់ដោយ ReferenceError
     // ដែលបិទបាំងការអះអាងឥរិយាបថទាំងអស់ (មេរៀន checker-coverage ចំណុច ៣)។
+    // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ➜ ត្រូវផ្ទុក function ពិត
+    vm.runInContext(sliceConstDecl('DB_OP_TIMEOUT_MS'), ctx);
+    vm.runInContext(sliceFn('withTimeout'), ctx);
+    vm.runInContext(sliceFn('dbOp'), ctx);
+    vm.runInContext(sliceFn('dbOpStalled'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE'), ctx);
     vm.runInContext(sliceConstDecl('APP_TIME_ZONE_OFFSET_MINUTES'), ctx);
     vm.runInContext(sliceFn('appZoneParts'), ctx);

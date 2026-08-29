@@ -129,12 +129,32 @@ function createSharedStore() {
     return shared;
 }
 
+function extractFn(src, name) {
+    const at = src.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
+    if (at === -1) return '';
+    let depth = 0;
+    const open = src.indexOf('{', src.indexOf(')', at));
+    for (let k = open; k < src.length; k++) {
+        if (src[k] === '{') depth++;
+        else if (src[k] === '}') { depth--; if (!depth) return src.slice(at, k + 1); }
+    }
+    return '';
+}
+
 function tabFor(app, shared, suffix) {
     const source = fs.readFileSync(path.join(APP_ROOT, app, 'app.js'), 'utf8');
     const start = source.indexOf('    const RESTORE_CLAIM_LEASE_MS =');
     const end = source.indexOf('    async function executeRestoreItem()', start);
     if (start === -1 || end === -1) throw new Error(app + ': restore helper block not found');
-    const restoreHelpers = source.slice(start, end);
+    // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ស្ថិត **ក្រៅ** ប្លុកនេះ ➜
+    // ត្រូវស្រង់បន្ថែម បើមិនដូច្នេះ sandbox ធ្លាក់ដោយ `dbOp is not defined`។
+    const guardBlock = [
+        (source.match(/^ *const DB_OP_TIMEOUT_MS = .*$/m) || [''])[0],
+        extractFn(source, 'withTimeout'),
+        extractFn(source, 'dbOp'),
+        extractFn(source, 'dbOpStalled')
+    ].filter(Boolean).join('\n');
+    const restoreHelpers = guardBlock + '\n' + source.slice(start, end);
     let seq = 0;
     const context = vm.createContext({
         console,
@@ -145,7 +165,11 @@ function tabFor(app, shared, suffix) {
         getFormattedDate: () => '2026-08-19',
         generateUniqueId: () => `${suffix}_${++seq}`,
         normalizeBarcodesOf: (item) => item,
-        setTimeout: (fn) => { fn(); return 0; }
+        // ⛔ ការពន្យារ backoff ខ្លី ត្រូវបង្រួមឲ្យលឿន តែ **ពិដាន ១៥ វិ. របស់
+        // `withTimeout()` ត្រូវនៅជាតួរម៉ោងពិត** — បើបាញ់ភ្លាម រាល់ការហៅ
+        // Firebase នឹង «ផុតកំណត់» ភ្លាមៗ ➜ តេស្តវាស់អ្វីមួយផ្សេងទាំងស្រុង។
+        setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
+        clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
     new vm.Script(`${restoreHelpers}\nglobalThis.restoreHelpers = { claimDeletedItemForRestore, findRestoreTargetId, applyClaimedRestoreToHistory, finalizeClaimedRestore, clearRestoreFinalization, RESTORE_CLAIM_LEASE_MS };`).runInContext(context);
     return context.restoreHelpers;

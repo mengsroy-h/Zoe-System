@@ -95,12 +95,31 @@ function makeRuntime() {
     return shared;
 }
 
+function extractFn(src, name) {
+    const at = src.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
+    if (at === -1) return '';
+    let depth = 0;
+    const open = src.indexOf('{', src.indexOf(')', at));
+    for (let k = open; k < src.length; k++) {
+        if (src[k] === '{') depth++;
+        else if (src[k] === '}') { depth--; if (!depth) return src.slice(at, k + 1); }
+    }
+    return '';
+}
+
 function makeTab(app, shared, suffix) {
     const source = fs.readFileSync(path.join(APP_ROOT, app, 'app.js'), 'utf8');
     const start = source.indexOf('    const CLEAR_HISTORY_CLAIM_LEASE_MS =');
     const end = source.indexOf('    async function clearHistory()', start);
     if (start === -1 || end === -1) throw new Error('clear history helper block not found');
-    const helpers = source.slice(start, end);
+    // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ស្ថិត **ក្រៅ** ប្លុកនេះ
+    const guardBlock = [
+        (source.match(/^ *const DB_OP_TIMEOUT_MS = .*$/m) || [''])[0],
+        extractFn(source, 'withTimeout'),
+        extractFn(source, 'dbOp'),
+        extractFn(source, 'dbOpStalled')
+    ].filter(Boolean).join('\n');
+    const helpers = guardBlock + '\n' + source.slice(start, end);
     let sequence = 0;
     const context = vm.createContext({
         console,
@@ -110,7 +129,9 @@ function makeTab(app, shared, suffix) {
         generateUniqueId: () => `${suffix}_${++sequence}`,
         normalizeBarcodesOf: (item) => item,
         cloneRestoreItem: (item) => clone(item),
-        setTimeout: (fn) => { fn(); return 0; }
+        // ⛔ backoff ខ្លីបង្រួម; ពិដាន ១៥ វិ. ត្រូវនៅជាតួរម៉ោងពិត
+        setTimeout: (fn, ms) => (ms >= 10000 ? setTimeout(fn, ms) : (fn(), 0)),
+        clearTimeout: (t) => { if (t) clearTimeout(t); }
     });
     new vm.Script(`function stripHistoryOnlyMarkers(item) { if (!item || typeof item !== 'object') return item; delete item.clearClaim; delete item.restoreClaim; delete item.restoreClaimId; delete item.restoreClaimToken; return item; }\n${helpers}\nglobalThis.clearHelpers = { claimHistoryItemForClear, buildClearHistoryTrashItem, finalizeClaimedHistoryClear, clearClearHistoryFinalization, CLEAR_HISTORY_CLAIM_LEASE_MS };`).runInContext(context);
     return context.clearHelpers;

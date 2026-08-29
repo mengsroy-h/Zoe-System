@@ -2467,7 +2467,7 @@ java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 90
 node audit-tools/emu/crud-rules-flow.js     # payload ពិត ធៀបនឹង rules ពិត (43)
 node audit-tools/partial-pickup-cleanup-test.js   # ២ ម៉ោង / ៨ ថ្ងៃ តាម barcode (48)
 node audit-tools/restore-marker-hygiene-test.js   # marker ↔ schema (19)
-node audit-tools/policy-test.js                   # គោលការណ៍ លុប/ដក (28)
+node audit-tools/policy-test.js                   # គោលការណ៍ លុប/ដក (45)
 node audit-tools/trash-modal-test.js              # ស្លាក និងតួលេខសរុប (53)
 ```
 

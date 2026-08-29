@@ -743,7 +743,7 @@ const firebaseConfig = {
         <p style="text-align:center;">ទាញពី Google Sheet — Read-only, ស្វែងរកលឿនក្នុងឧបករណ៍ដោយផ្ទាល់</p>
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
             <input type="text" id="customerDataTableSearchInput" data-act="filterCustomerDataTable" data-on="input" placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..." style="margin-bottom:0; text-align:left;" autocomplete="off">
-            <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" data-act="fetchCustomerDataTableRows" data-args='[true]'>🔄</button>
+            <button class="btn-cancel" style="width:auto; white-space:nowrap; padding:8px 10px;" data-act="fetchCustomerDataTableRows" data-args='[true, true]'>🔄</button>
         </div>
         <p id="customerDataTableStatus" style="font-size:calc(10.5 * var(--fs-unit)); color:var(--text-muted); margin-bottom:6px;"></p>
         <div class="table-responsive" style="flex:1; min-height:0;">

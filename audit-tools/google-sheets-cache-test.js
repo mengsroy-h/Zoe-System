@@ -83,7 +83,7 @@ function testMalformedCachedRowsRefreshes() {
         cod: 34,
         phone: '012345678'
     });
-    assert.deepStrictEqual(api.calls.remove, ['customer_rows']);
+    assert.deepStrictEqual(api.calls.remove, ['customer_rows_v2_2']);
     assert.strictEqual(api.calls.ranges, 1);
     assert.strictEqual(api.calls.put.length, 1);
 }
@@ -129,7 +129,7 @@ function testSmallRowsAreCached() {
         ]
     });
     assert.strictEqual(api.calls.put.length, 1);
-    assert.strictEqual(api.calls.put[0].key, 'customer_rows');
+    assert.strictEqual(api.calls.put[0].key, 'customer_rows_v2_3');
     assert.strictEqual(api.calls.put[0].ttl, 300);
     assert.deepStrictEqual(JSON.parse(api.calls.put[0].value), rows);
 }

@@ -338,6 +338,88 @@ function runPatch(mode) {
     });
 }
 
+
+// ---- ៣គ. ⛔ លុយ ៖ ការសម្អាតស្វ័យប្រវត្តិ ៨ ថ្ងៃ (ផ្លូវតែមួយក្នុងការសម្អាត
+//        ដែលប៉ះលុយ) មិនត្រូវកាត់លុយពេលតំណស្លាប់ ------------------------
+// ⛔ សំណួរដែលអ្នកប្រើសួរដោយផ្ទាល់ ៖ «តើពិដានថ្មីធ្វើឲ្យលុយកាត់ខុសទេ?»
+// ចម្លើយត្រូវជា **ការវាស់** មិនមែនការអះអាង ៖ ការកាត់លុយកើតឡើង **ក្រោយ**
+// transaction ដោះ ➜ ការព្យួរ ➜ គ្មានការកាត់សោះ ➜ លុយមិនប្រែ។
+const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
+    'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
+    'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
+    'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
+    'claimAndCleanupItem'];
+
+function runAbandonCleanup(mode) {
+    const revenueLog = [];
+    const writes = [];
+    const store = {};
+    const hang = mode === 'hang';
+    const NOW = Date.UTC(2026, 7, 29, 6, 0, 0);
+    const fb = {
+        ref: (_d, p) => ({ path: p }),
+        runTransaction: (ref, fn) => {
+            const cur = store[ref.path] ? JSON.parse(JSON.stringify(store[ref.path])) : null;
+            const out = fn(cur);
+            if (hang) return new Promise(() => {});
+            if (out === undefined) return Promise.resolve({ committed: false, snapshot: { val: () => cur } });
+            store[ref.path] = out;
+            writes.push(ref.path);
+            return Promise.resolve({ committed: true, snapshot: { val: () => out } });
+        },
+        update: (ref, upd) => {
+            if (hang) return new Promise(() => {});
+            Object.keys(upd).forEach((k) => writes.push((ref.path ? ref.path + '/' : '') + k));
+            return Promise.resolve();
+        },
+        get: () => (hang ? new Promise(() => {}) : Promise.resolve({ exists: () => false, val: () => null }))
+    };
+    const box = baseSandbox({
+        db: {}, fb,
+        dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
+        dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
+        getServerNow: () => NOW,
+        getFormattedDate: () => '2026-08-21',
+        addRevenueToDailyAndMonthlyRecord: (d, cod, dod, c) => revenueLog.push({ d, cod, dod, c }),
+        showToast: () => {},
+        releaseBarcodesInRegistry: () => Promise.resolve(),
+        scanHistory: [], deletedItems: []
+    });
+    const ctx = vm.createContext(box);
+    loadCommon(ctx, zoewSrc);
+    const parts = [
+        sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'EIGHT_DAYS_MS'),
+        'let serverClockTrusted = true, isDatabaseConnected = true;',
+        sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
+        'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();'
+    ];
+    for (const fn of CLEANUP_FNS) {
+        const body = sliceFrom(zoewSrc, fn);
+        if (!body) return Promise.resolve({ missing: fn });
+        parts.push(body);
+    }
+    parts.push('globalThis.__inflight = () => cleanupInFlight.size;');
+    vm.runInContext(parts.join('\n\n'), ctx);
+
+    // កញ្ចប់ហួស ៨ ថ្ងៃ ហើយ **មិនទាន់យក** ➜ ផ្លូវ `abandon` = ដកលុយ
+    const item = {
+        id: 'id_abandon', phone: '0974158508', scanDate: '2026-08-21', isClosed: false,
+        createdAt: NOW - 9 * 24 * 3600 * 1000,
+        barcodes: [{ code: 'BC1', cod: 5, dod: 2, isClosed: false, isDeducted: false, isFromDeletion: false }]
+    };
+    store['zoew_scan_history_cod_dod/id_abandon'] = JSON.parse(JSON.stringify(item));
+    box.scanHistory.push(JSON.parse(JSON.stringify(item)));
+    vm.runInContext("claimAndCleanupItem('id_abandon', 'abandon');", ctx);
+
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const inflight = vm.runInContext('__inflight()', ctx);
+            box.__timers.dispose();
+            resolve({ revenueLog, writes, inflight });
+        }, 1200);
+    });
+}
+
 (async () => {
     console.log('\n== ៣. ឥរិយាបថ ៖ `resetPickupStats` លើតំណដែលព្យួរ ==');
     const hung = await runResetPickup('hang');
@@ -383,6 +465,27 @@ function runPatch(mode) {
         check(manyFine.writes.length === 5,
             '⛔ ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ Reset គ្រប់ ៥ ថ្ងៃដដែល',
             `សរសេរ ${manyFine.writes.length}/៥ ➜ ការបោះបង់មិនត្រូវប៉ះការរត់ធម្មតា`);
+    }
+
+    console.log('\n== ៤គ. ⛔ លុយ ៖ ការសម្អាត ៨ ថ្ងៃ លើតំណដែលព្យួរ ==');
+    const abHang = await runAbandonCleanup('hang');
+    const abFine = await runAbandonCleanup('ok');
+    if (abHang.missing || abFine.missing) {
+        bad('រក function ' + (abHang.missing || abFine.missing) + ' ឃើញ',
+            'checker មិនអាចវាស់ផ្លូវលុយបានទេ');
+    } else {
+        check(abFine.revenueLog.length === 1,
+            'ជាន់អប្បបរមា ៖ បណ្តាញធម្មតា ➜ ផ្លូវ `abandon` ពិតជាកាត់លុយ ១ ដង',
+            'បើ 0 នោះការវាស់មិនបានឈានដល់ផ្លូវលុយសោះ ➜ លទ្ធផលគ្មានន័យ');
+        check(abHang.revenueLog.length === 0,
+            '⛔ តំណព្យួរ ➜ **មិនកាត់លុយសោះ** (`isDeducted` មិនត្រូវប៉ះ)',
+            JSON.stringify(abHang.revenueLog));
+        check(abHang.writes.length === 0,
+            '⛔ តំណព្យួរ ➜ គ្មានការសរសេរទៅធុងសំរាម',
+            JSON.stringify(abHang.writes));
+        check(abHang.inflight === 0,
+            '⛔ តំណព្យួរ ➜ `cleanupInFlight` ត្រូវដោះវិញ',
+            'សោជាប់ ➜ កញ្ចប់នោះលែងត្រូវសម្អាតពេញវគ្គ');
     }
 
     console.log('\n== ៥. ឥរិយាបថ ៖ `patchHistoryItemFields` (ការសម្គាល់ការខល) ==');

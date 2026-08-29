@@ -169,6 +169,10 @@ function buildEnv(app, opts) {
         function scheduleReconnectWatchdog() {}
         function renderConnectionStatus() {}
         function handleInfoListenerError() {}
+        function noteInfoListenerAlive() {}
+        const infoListenerFailedPaths = new Set();
+        const INFO_LISTENER_KEY_CONNECTED = 'connected';
+        const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';
         function retryPendingRoleCheck() {}
         ${collectHelpers(appSrc, body)}
         ${body}

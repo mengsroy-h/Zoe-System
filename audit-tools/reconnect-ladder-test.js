@@ -136,6 +136,10 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         // callback របស់ `.info/connected` ឥឡូវរលត់ទង់ស្តារ `.info/*` (កំណែ 2.19.3)។
         // តេស្តនេះវាស់ **ជណ្តើរភ្ជាប់ឡើងវិញ** ដូច្នេះ stub គ្រប់គ្រាន់។
         'const clearInfoListenerRecovery = () => {};\n' +
+        'const noteInfoListenerAlive = () => {};\n' +
+        'const infoListenerFailedPaths = new Set();\n' +
+        "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
+        "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
         'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
         'let hasEverConnectedToDatabase = ' + (connectedFromStart ? 'true' : 'false') + ';\n' +
         'let networkJustReturned = false;\n' +

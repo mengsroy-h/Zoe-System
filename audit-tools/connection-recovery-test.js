@@ -91,9 +91,15 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         'let infoListenersFailed = false;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
+        'const infoListenerFailedPaths = new Set();\n' +
+        "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
+        "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
         'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
+        'const flushPendingHistoryPatches = () => {};\n' +
+        'const serverClockOffsetIsFromServer = () => true;\n' +
+        'let serverClockTrusted = false;\n' +
             'let dbListenerPendingSeen = 0;\n' +
             'const LISTENER_RECOVERY_STEPS_MS = [2000];\n' +
             'let db = null, fb = null, auth = null;\n' +
@@ -119,7 +125,7 @@ const REQUIRED_FNS = [
     'detachDatabaseListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
     'runScheduledCleanup',
     'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
-    'handleInfoListenerError'
+    'handleInfoListenerError', 'noteInfoListenerAlive'
 ];
 
 // ⛔ **កុំបញ្ឈប់ខ្លួនត្រង់នេះ។** ការ `process.exit(1)` ដោយ «រកមុខងារមិនឃើញ»
@@ -263,14 +269,23 @@ function buildContext() {
         'let infoListenersFailed = false;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
+        'const infoListenerFailedPaths = new Set();\n' +
+        "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
+        "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
         'let dbRefConnected = null, dbRefServerTimeOffset = null;\n' +
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
+        'const flushPendingHistoryPatches = () => {};\n' +
+        'const serverClockOffsetIsFromServer = () => true;\n' +
+        'let serverClockTrusted = false;\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +
         'reconnectWatchdogAttempt, lastDbListenerAttemptAt, pending: Array.from(dbListenerPendingPaths), ' +
         'failed: Array.from(dbListenerFailedPaths) });\n' +
         'this.__setConnHistory = (ever, back) => { hasEverConnectedToDatabase = ever; networkJustReturned = back; };\n' +
         'this.__connHistory = () => ({ hasEverConnectedToDatabase, networkJustReturned });\n' +
+        'this.__setInfoRefs = (a, b) => { dbRefConnected = a; dbRefServerTimeOffset = b; };\n' +
+        'this.__infoProbe = () => ({ infoListenersFailed, infoListenerRecoveryTimer, ' +
+        'isDatabaseConnected, serverTimeOffsetMs });\n' +
         'this.__api = { connectionLooksOnline, renderConnectionStatus, nudgeDatabaseConnection, ' +
         'handleDbListenerError, initDatabaseListeners, noteDbListenerAlive, retryFailedDbListenersNow, ' +
         'resetDbListenerHealthState, runScheduledCleanup, clearReconnectWatchdog, ' +
@@ -278,7 +293,8 @@ function buildContext() {
 
     vm.runInContext(code, ctx);
     return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
-        setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory };
+        setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
+        setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };
 }
 
 // ── ១. ការតភ្ជាប់ធម្មតា ─────────────────────────────────────────────
@@ -855,26 +871,41 @@ function buildContext() {
     const infoRefs = { __path: 'info/connected' };
     ok('មាន attachInfoListeners (ផ្លូវភ្ជាប់ `.info/*` តែមួយ)',
         !!sliceFn('attachInfoListeners'));
-    ok('`.info/connected` មាន callback កំហុសដែលកេះការស្តារ',
+    // ⛔ តាំងពី 2.23.1 callback កំហុសត្រូវបញ្ជូន **កូនសោ path** ជានិច្ច
+    // (ច្បាប់ 2.20.8) ➜ លំនាំគឺ `(err) => handleInfoListenerError(err, KEY)`
+    // មិនមែនឈ្មោះទទេទេ។ ការអះអាងត្រូវទាមទារកូនសោ ជំនួសការទាមទារឈ្មោះទទេ។
+    ok('`.info/connected` មាន callback កំហុសដែលកេះការស្តារ (ជាមួយកូនសោ path)',
         /handleInfoListenerError/.test(SRC)
-        && /fb\.onValue\(dbRefConnected[\s\S]{0,900}?handleInfoListenerError\)/.test(SRC));
-    ok('⛔ `.info/serverTimeOffset` ក៏ត្រូវមាន callback កំហុសដែរ (មុនកែវាគ្មានសោះ)',
-        /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(SRC));
+        && /fb\.onValue\(dbRefConnected[\s\S]{0,900}?handleInfoListenerError\(err, INFO_LISTENER_KEY_CONNECTED\)/.test(SRC));
+    ok('⛔ `.info/serverTimeOffset` ក៏ត្រូវមាន callback កំហុសដែរ (ជាមួយកូនសោ path)',
+        /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\(err, INFO_LISTENER_KEY_OFFSET\)/.test(SRC));
     ok('ការស្តារនោះមានជណ្តើរ backoff មិនមែនរង្វិលជុំតឹង',
         /INFO_LISTENER_RECOVERY_STEPS_MS/.test(SRC)
         && /function scheduleInfoListenerRecovery\(/.test(SRC));
     ok('ការភ្ជាប់ឡើងវិញ detach ជាមុន (គ្មាន listener ស្ទួន)',
         /function attachInfoListeners\(\)[\s\S]{0,400}?fb\.off\(dbRefConnected\)[\s\S]{0,200}?fb\.off\(dbRefServerTimeOffset\)/.test(SRC));
-    ok('snapshot ដែលមកដល់ ➜ ទង់ស្តារត្រូវរលត់',
-        /clearInfoListenerRecovery\(\);[\s\S]{0,120}?isDatabaseConnected = snap\.val\(\) === true;/.test(SRC));
+    // ⛔ តាំងពី 2.23.1 ការរលត់ធ្វើតាម `noteInfoListenerAlive(<key>)` ដែល
+    // **រលត់តែពេលគ្មាន path ណានៅងាប់** — ការហៅ `clearInfoListenerRecovery()`
+    // ដោយផ្ទាល់ក្នុង callback ជោគជ័យ ជា **បងប្អូនប្រកាសជំនួស** (ថ្នាក់ 2.20.8)។
+    ok('snapshot ដែលមកដល់ ➜ ទង់ស្តារត្រូវរលត់ (តាមកូនសោ path)',
+        /noteInfoListenerAlive\(INFO_LISTENER_KEY_CONNECTED\);[\s\S]{0,120}?isDatabaseConnected = snap\.val\(\) === true;/.test(SRC));
+    ok('⛔ ការរលត់ត្រូវពិនិត្យថាគ្មាន path ណានៅងាប់',
+        /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size[\s\S]{0,80}?clearInfoListenerRecovery\(\)/.test(SRC),
+        'បើរលត់ដោយមិនពិនិត្យ Set នោះ listener ដែលងាប់តែឯង មិនដែល attach ឡើងវិញ');
     ok('ចាកចេញ ➜ ការស្តារ `.info/*` ត្រូវ reset',
         /function resetDbListenerHealthState\(\)[\s\S]{0,200}?clearInfoListenerRecovery\(\);/.test(SRC));
 
     // ⛔ ថ្នាក់ដដែលរស់នៅ App ផ្សេង — មេរៀន 2.12.1
     const KG3 = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
-    ok('ZoeKeyGen ៖ `.info/*` ក៏មានផ្លូវស្តារដដែល',
+    // ⛔ ថ្នាក់ 2.20.8 ត្រូវអនុវត្តលើ App **ទាំង ២** — `shared-fns.js` ទាមទារ
+    // ថា `handleInfoListenerError` និង `clearInfoListenerRecovery` ជា
+    // **ការអនុវត្តតែមួយ** ដូច្នេះការកែម្ខាងតែម្នាក់ឯងនឹងធ្លាក់នៅទីនោះ។
+    ok('ZoeKeyGen ៖ `.info/*` ក៏មានផ្លូវស្តារដដែល (ជាមួយកូនសោ path)',
         /function attachInfoListeners\(/.test(KG3)
-        && /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\)/.test(KG3));
+        && /fb\.onValue\(dbRefServerTimeOffset[\s\S]{0,700}?handleInfoListenerError\(err, INFO_LISTENER_KEY_OFFSET\)/.test(KG3));
+    ok('⛔ ZoeKeyGen ៖ ការរលត់ក៏ត្រូវពិនិត្យ Set ដែរ',
+        /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size/.test(KG3),
+        'ZoeKeyGen ៖ `serverTimeSynced` ជាច្រកទ្វារនៃការចេញ Key ➜ offset ដែលកក ធ្ងន់ជាង');
     void t; void infoRefs;
 }
 
@@ -1311,6 +1342,88 @@ function buildContext() {
         for (let i = 0; i < 8; i++) { await Promise.resolve(); same.release(); }
         ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
             same.log.inits.length === 1, same.log.inits);
+
+        // ── listener `.info/*` ដែលងាប់ **តែឯង** ─────────────────────────
+        // ⛔ ថ្នាក់ដដែលនឹង 2.20.8 (បងប្អូនប្រកាសជាសះស្បើយជំនួស) — តែ
+        // ច្បាប់នោះត្រូវអនុវត្តលើ listener ទិន្នន័យ **៦** ប៉ុណ្ណោះ; listener
+        // `.info/*` **២** នៅតែបញ្ជូន `handleInfoListenerError` **ទទេ**
+        // (គ្មានកូនសោ path) ➜ ការតាមដានក្លាយជា **ការការពារដែលងាប់**។
+        //
+        // លំដាប់ដែលវាស់បាន ៖ `.info/serverTimeOffset` ងាប់តែឯង ➜ ការស្តារ
+        // តាំងម៉ោង ២ វិ.; តែ `.info/connected` បាញ់ក្នុងចន្លោះនោះ (តំណញ័រ)
+        // ➜ `clearInfoListenerRecovery()` **លុបកាលវិភាគចោល** ➜ listener
+        // ដែលងាប់ **មិនដែល attach ឡើងវិញពេញវគ្គ** ➜ `serverTimeOffsetMs`
+        // កក ➜ `getServerNow()` រំកិលតាមនាឡិកាឧបករណ៍ស្ងាត់ៗ។
+        {
+            const t = buildContext();
+            const cRef = { __path: 'info/connected' };
+            const oRef = { __path: 'info/offset' };
+            t.setInfoRefs(cRef, oRef);
+            t.api.attachInfoListeners();
+            ok('ភ្ជាប់ listener `.info/*` ទាំង ២',
+                !!(t.listenerCallbacks['info/connected'] && t.listenerCallbacks['info/offset']));
+
+            // handshake ធម្មតា
+            t.listenerCallbacks['info/connected'].cb({ val: () => true });
+            t.listenerCallbacks['info/offset'].cb({ val: () => 1234 });
+            ok('handshake ➜ offset ត្រូវបានទទួល', t.infoProbe().serverTimeOffsetMs === 1234,
+                t.infoProbe());
+
+            // `.info/serverTimeOffset` ងាប់ **តែឯង**
+            t.listenerCallbacks['info/offset'].errCb(new Error('permission_denied'), 'serverTimeOffset');
+            ok('offset ងាប់ ➜ ទង់បរាជ័យត្រូវឡើង', t.infoProbe().infoListenersFailed === true);
+            ok('offset ងាប់ ➜ ការស្តារត្រូវតាំងម៉ោង',
+                t.infoProbe().infoListenerRecoveryTimer !== null, t.infoProbe());
+
+            // ⛔ បងប្អូន (`.info/connected`) បាញ់ក្នុងចន្លោះ — មិនត្រូវប្រកាសជំនួស
+            t.listenerCallbacks['info/connected'].cb({ val: () => true });
+            ok('⛔ បងប្អូនបាញ់ ➜ ការស្តាររបស់ offset ដែលងាប់ **មិនត្រូវលុប**',
+                t.infoProbe().infoListenerRecoveryTimer !== null,
+                'កាលវិភាគត្រូវលុប ➜ listener ដែលងាប់មិនដែល attach ឡើងវិញពេញវគ្គ');
+            ok('⛔ បងប្អូនបាញ់ ➜ ទង់បរាជ័យ **មិនត្រូវរលត់**',
+                t.infoProbe().infoListenersFailed === true, t.infoProbe());
+
+            // ការស្តារពិត ➜ ទង់ត្រូវរលត់ (ទិសផ្ទុយ)
+            t.listenerCallbacks['info/offset'].cb({ val: () => 5678 });
+            ok('⛔ ទិសផ្ទុយ ៖ offset ដឹងខ្លួនវិញ ➜ ទង់រលត់',
+                t.infoProbe().infoListenersFailed === false, t.infoProbe());
+            ok('⛔ ទិសផ្ទុយ ៖ offset ដឹងខ្លួនវិញ ➜ កាលវិភាគស្តារត្រូវលុប',
+                t.infoProbe().infoListenerRecoveryTimer === null, t.infoProbe());
+            ok('⛔ ទិសផ្ទុយ ៖ offset ថ្មីត្រូវទទួលយក',
+                t.infoProbe().serverTimeOffsetMs === 5678, t.infoProbe());
+        }
+
+        // ការងាប់របស់ `.info/connected` ៖ ស្ថានភាពការតភ្ជាប់ត្រូវក្លាយជាមិនស្គាល់
+        {
+            const t = buildContext();
+            t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+            t.api.attachInfoListeners();
+            t.listenerCallbacks['info/connected'].cb({ val: () => true });
+            t.listenerCallbacks['info/offset'].cb({ val: () => 1 });
+            t.listenerCallbacks['info/connected'].errCb(new Error('cancelled'), 'connected');
+            ok('`.info/connected` ងាប់ ➜ លែងអះអាងថាភ្ជាប់',
+                t.infoProbe().isDatabaseConnected === false, t.infoProbe());
+        }
+
+        // ⛔ ការងាប់របស់ offset **តែម្នាក់ឯង** មិនត្រូវកុហកថាដាច់បណ្តាញ
+        {
+            const t = buildContext();
+            t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+            t.api.attachInfoListeners();
+            t.listenerCallbacks['info/connected'].cb({ val: () => true });
+            t.listenerCallbacks['info/offset'].cb({ val: () => 1 });
+            t.listenerCallbacks['info/offset'].errCb(new Error('cancelled'), 'serverTimeOffset');
+            ok('⛔ offset ងាប់តែឯង ➜ **មិនត្រូវ** ប្រកាសថាដាច់បណ្តាញ',
+                t.infoProbe().isDatabaseConnected === true,
+                'ការភ្ជាប់ពិតនៅរស់ ➜ ការសរសេរ false បង្ហាញស្ថានភាពខុស និងកេះ watchdog ឥតប្រយោជន៍');
+        }
+
+        // ស្តាទិច ៖ error callback ត្រូវបញ្ជូន **កូនសោ path** ជានិច្ច (2.20.8)
+        {
+            const bare = /,\s*handleInfoListenerError\s*\)/.test(SRC);
+            ok('⛔ `handleInfoListenerError` មិនត្រូវបញ្ជូនទទេជា error callback',
+                !bare, 'គ្មានកូនសោ path ➜ ការតាមដានក្លាយជាការការពារដែលងាប់ (ច្បាប់ 2.20.8)');
+        }
 
         console.log('\nសរុប: ' + pass + ' ok, ' + fail + ' FAIL');
         process.exit(fail ? 1 : 0);

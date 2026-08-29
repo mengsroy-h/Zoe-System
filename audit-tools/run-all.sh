@@ -91,7 +91,8 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
          stall-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
-         listener-pending-key-test history-patch-retry-test lookup-prefetch-test; do
+         listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
+         lookup-freshness-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -243,6 +244,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PENDINGKEY_APP_DIR="$BASE" node audit-tools/listener-pending-key-test.js 2>&1 | tail -1 | sed 's/^/   pending-key:     /'
     HISTPATCH_APP_DIR="$BASE" node audit-tools/history-patch-retry-test.js 2>&1 | tail -1 | sed 's/^/   history-patch:   /'
     LOOKUPPREFETCH_APP_DIR="$BASE" node audit-tools/lookup-prefetch-test.js 2>&1 | tail -1 | sed 's/^/   lookup-prefetch: /'
+    LOOKUPFRESH_APP_DIR="$BASE" node audit-tools/lookup-freshness-test.js 2>&1 | tail -1 | sed 's/^/   lookup-freshness:/'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'

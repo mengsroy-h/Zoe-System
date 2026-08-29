@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.22.5';
+    const APP_VERSION = '2.23.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2841,7 +2841,8 @@
             parts.push('សរុបក្នុង Sheet ' + result.rowsAfter + ' ជួរដេក');
             setSheetImportMsg('siActionMsg', parts.join(' · '), 'ok');
             setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
-            clearCustomerDataTableCache();
+            if (!seedCustomerTableFromImport(rows, mode, result.rowsAfter)) clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
             showToast('✅ នាំចូលរួចរាល់ — ' + result.rowsAfter + ' ជួរដេកក្នុង Sheet');
         } catch (e) {
             setSheetImportMsg('siActionMsg', e.message, 'bad');
@@ -2870,6 +2871,7 @@
             setSheetImportMsg('siClearMsg', '✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក', 'ok');
             setSheetImportFoot(sheetImportStatusText('', result.sheetName, result.rowsAfter));
             clearCustomerDataTableCache();
+            scheduleCustomerTableSoonRefresh(true);
             showToast('✅ សម្អាតរួចរាល់ — លុប ' + result.removed + ' ជួរដេក');
         } catch (e) {
             setSheetImportMsg('siClearMsg', e.message, 'bad');
@@ -2929,8 +2931,14 @@
     const CUSTOMER_TABLE_FAIL_COOLDOWN_MS = 60 * 1000;
     const CUSTOMER_TABLE_RETRY_STEPS_MS = [65 * 1000, 2 * 60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
     const CUSTOMER_TABLE_RETRY_BUSY_MS = 20 * 1000;
+    const CUSTOMER_TABLE_SOON_MS = 1200;
+    const CUSTOMER_TABLE_SOON_BUSY_MS = 3000;
+    const CUSTOMER_TABLE_SOON_MAX_WAIT_MS = 90 * 1000;
     let customerTableRetryTimer = null;
     let customerTableFailStreak = 0;
+    let customerTableSoonTimer = null;
+    let customerTableSoonArmedAt = 0;
+    let customerTableIsPartial = false;
 
     function customerTablePrefetchAllowed() {
         if (!auth || !auth.currentUser) return false;
@@ -2966,7 +2974,46 @@
         if (cfg && cfg.url) fetchCustomerDataTableRows(true);
     }
 
-    function buildCustomerListApiUrl(cfg) {
+    function customerTableNeedsRefresh() {
+        if (!Array.isArray(customerDataTableRows)) return true;
+        if (customerTableIsPartial) return true;
+        return elapsedSince(customerDataTableFetchedAt) >= CUSTOMER_TABLE_CACHE_MS;
+    }
+
+    function clearCustomerTableSoonRefresh() {
+        if (customerTableSoonTimer) {
+            clearTimeout(customerTableSoonTimer);
+            customerTableSoonTimer = null;
+        }
+        customerTableSoonArmedAt = 0;
+    }
+
+    function scheduleCustomerTableSoonRefresh(force) {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.url) return;
+        if (customerTableSoonTimer) return;
+        if (!force && !customerTableNeedsRefresh()) return;
+        customerTableSoonArmedAt = Date.now();
+        customerTableSoonTimer = setTimeout(runCustomerTableSoonRefresh, CUSTOMER_TABLE_SOON_MS);
+    }
+
+    function runCustomerTableSoonRefresh() {
+        customerTableSoonTimer = null;
+        if (elapsedSince(customerTableSoonArmedAt) >= CUSTOMER_TABLE_SOON_MAX_WAIT_MS) {
+            customerTableSoonArmedAt = 0;
+            return;
+        }
+        if (!customerTablePrefetchAllowed()) {
+            customerTableSoonTimer = setTimeout(runCustomerTableSoonRefresh, CUSTOMER_TABLE_SOON_BUSY_MS);
+            return;
+        }
+        customerTableSoonArmedAt = 0;
+        if (elapsedSince(customerDataTableLastFailedAt) < CUSTOMER_TABLE_FAIL_COOLDOWN_MS) return;
+        const cfg = getLookupApiConfig();
+        if (cfg && cfg.url) fetchCustomerDataTableRows(true, true);
+    }
+
+    function buildCustomerListApiUrl(cfg, wantFresh) {
         if (!cfg || !cfg.url) return null;
         let url = cfg.url.trim();
         if (/[?&][^=&]*=\{barcode\}/.test(url)) {
@@ -2977,6 +3024,7 @@
             url = url.replace('{barcode}', '');
             url += (url.indexOf('?') !== -1 ? '&' : '?') + 'list=1';
         }
+        if (wantFresh) url += (url.indexOf('?') !== -1 ? '&' : '?') + 'fresh=1';
         return url;
     }
 
@@ -2992,7 +3040,7 @@
         fetchCustomerDataTableRows(false);
     }
 
-    async function fetchCustomerDataTableRows(force) {
+    async function fetchCustomerDataTableRows(force, wantFresh) {
         const cfg = getLookupApiConfig();
         const statusEl = document.getElementById('customerDataTableStatus');
         if (!cfg || !cfg.url) return;
@@ -3013,7 +3061,7 @@
             return;
         }
 
-        const listUrl = buildCustomerListApiUrl(cfg);
+        const listUrl = buildCustomerListApiUrl(cfg, wantFresh);
         if (!listUrl) return;
 
         if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
@@ -3041,7 +3089,9 @@
                 customerDataTableRows = rows;
                 customerDataTableFetchedAt = Date.now();
                 customerDataTableLastFailedAt = 0;
+                customerTableIsPartial = false;
                 clearCustomerTableRetry();
+                clearCustomerTableSoonRefresh();
                 renderCustomerDataTableStatus(rows);
                 filterCustomerDataTable();
             } catch (e) {
@@ -3100,6 +3150,8 @@
 
     function clearCustomerDataTableCache() {
         clearCustomerTableRetry();
+        clearCustomerTableSoonRefresh();
+        customerTableIsPartial = false;
         customerDataTableSessionGeneration++;
         customerDataTableRows = null;
         customerDataTableFetchedAt = 0;
@@ -3123,9 +3175,96 @@
         return null;
     }
 
+    function normalizeImportedCustomerRows(rows) {
+        const out = [];
+        const seen = Object.create(null);
+        const list = Array.isArray(rows) ? rows : [];
+        for (let i = 0; i < list.length; i++) {
+            const row = list[i] || [];
+            const barcode = sheetImportCellToText(row[0]);
+            if (!barcode) continue;
+            const record = {
+                barcode: barcode,
+                dod: sheetImportToMoney(row[1]),
+                cod: sheetImportToMoney(row[2]),
+                phone: sheetImportCellToText(row[3])
+            };
+            const key = barcode.toUpperCase();
+            if (seen[key] !== undefined) out[seen[key]] = record;
+            else {
+                seen[key] = out.length;
+                out.push(record);
+            }
+        }
+        return out;
+    }
+
+    function seedCustomerTableFromImport(rows, mode, rowsAfter) {
+        const records = normalizeImportedCustomerRows(rows);
+        if (!records.length) return false;
+        const base = (mode === 'replace' || !Array.isArray(customerDataTableRows)) ? [] : customerDataTableRows;
+        const merged = [];
+        const index = Object.create(null);
+        for (let i = 0; i < base.length; i++) {
+            const row = base[i];
+            const key = String((row && row.barcode) || '').trim().toUpperCase();
+            if (!key || index[key] !== undefined) continue;
+            index[key] = merged.length;
+            merged.push({ barcode: row.barcode, dod: Number(row.dod) || 0, cod: Number(row.cod) || 0, phone: row.phone || '' });
+        }
+        for (let j = 0; j < records.length; j++) {
+            const record = records[j];
+            const key = record.barcode.toUpperCase();
+            if (index[key] !== undefined) {
+                if (mode !== 'newOnly') merged[index[key]] = record;
+            } else {
+                index[key] = merged.length;
+                merged.push(record);
+            }
+        }
+        customerDataTableSessionGeneration++;
+        customerDataTableFetchPromise = null;
+        customerDataTableRows = merged;
+        customerDataTableFetchedAt = Date.now();
+        customerDataTableLastFailedAt = 0;
+        autoLookupLastFailedAt = 0;
+        customerTableIsPartial = merged.length !== Number(rowsAfter);
+        clearCustomerTableRetry();
+        renderCustomerDataTableStatus(merged);
+        filterCustomerDataTable();
+        return true;
+    }
+
+    function rememberCustomerTableRow(barcode, phone, cod, dod) {
+        if (!Array.isArray(customerDataTableRows)) return;
+        const key = String(barcode || '').trim().toUpperCase();
+        if (!key) return;
+        const hasPhone = phone !== null && phone !== undefined && String(phone) !== '';
+        const hasCod = cod !== null && cod !== undefined && !isNaN(parseFloat(cod));
+        const hasDod = dod !== null && dod !== undefined && !isNaN(parseFloat(dod));
+        if (!hasPhone && !hasCod && !hasDod) return;
+        const row = {
+            barcode: String(barcode),
+            dod: hasDod ? parseFloat(dod) : 0,
+            cod: hasCod ? parseFloat(cod) : 0,
+            phone: hasPhone ? String(phone) : ''
+        };
+        for (let i = 0; i < customerDataTableRows.length; i++) {
+            const current = customerDataTableRows[i];
+            if (String((current && current.barcode) || '').trim().toUpperCase() === key) {
+                customerDataTableRows[i] = row;
+                return;
+            }
+        }
+        customerDataTableRows.push(row);
+    }
+
     function prefetchCustomerDataTableRowsIfConfigured() {
         preconnectToLookupHost();
-        if (!customerTablePrefetchAllowed()) return;
+        if (!customerTablePrefetchAllowed()) {
+            scheduleCustomerTableSoonRefresh();
+            return;
+        }
         const cfg = getLookupApiConfig();
         if (cfg && cfg.url) {
             fetchCustomerDataTableRows(false);
@@ -3203,6 +3342,8 @@
             return;
         }
 
+        scheduleCustomerTableSoonRefresh();
+
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
             if (!lookupLockedNoticeShown) {
                 lookupLockedNoticeShown = true;
@@ -3246,6 +3387,7 @@
             const codVal = getNestedField(data, cfg.codField);
             const dodVal = getNestedField(data, cfg.dodField);
             autoLookupLastFailedAt = 0;
+            rememberCustomerTableRow(barcode, phoneVal, codVal, dodVal);
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
             if (myGeneration !== customerDataTableSessionGeneration) return;

@@ -46,14 +46,19 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const FNS = ['linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
+const FNS = ['elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
     'prefetchCustomerDataTableRowsIfConfigured',
+    'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
+    'scheduleCustomerTableSoonRefresh', 'runCustomerTableSoonRefresh',
     'clearCustomerTableRetry', 'scheduleCustomerTableRetry', 'runCustomerTableRetry', 'armLookupFocus'];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
 
 const DECLS = ['CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS', 'CUSTOMER_TABLE_RETRY_STEPS_MS',
     'CUSTOMER_TABLE_RETRY_BUSY_MS', 'customerTableRetryTimer', 'customerTableFailStreak',
+    'CUSTOMER_TABLE_SOON_MS', 'CUSTOMER_TABLE_SOON_BUSY_MS', 'CUSTOMER_TABLE_SOON_MAX_WAIT_MS',
+    'customerTableSoonTimer', 'customerTableSoonArmedAt', 'customerTableIsPartial',
+    'customerDataTableRows', 'customerDataTableFetchedAt',
     'LOOKUP_FOCUS_GRACE_MS', 'autoLookupInFlight'];
 const decls = [];
 DECLS.forEach((n) => {
@@ -91,6 +96,7 @@ function build(opts) {
     const ctx = {
         console: { error: () => {}, log: () => {} },
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Math: Math,
+        Date: Date, Infinity: Infinity,
         setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
         navigator: { onLine: o.onLine === undefined ? true : o.onLine, connection: o.connection || null },
         auth: o.noAuth ? null : { currentUser: { uid: 'u1' } },
@@ -236,6 +242,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             getLookupApiConfig: () => ({ url: 'https://x/exec?code={barcode}', enabled: true,
                                          phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
             findCustomerDataTableRow: (bc) => (o.cached ? { phone: '012', cod: 1, dod: 2 } : null),
+            scheduleCustomerTableSoonRefresh: () => {},
+            rememberCustomerTableRow: () => {},
             applyLookupFillToModal: (bc, p2) => filled.push(p2),
             getNestedField: (d, k) => (d ? d[k] : null),
             showToast: () => {},

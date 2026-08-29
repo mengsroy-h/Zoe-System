@@ -1,4 +1,5 @@
 var CACHE_TTL_SECONDS = 300;
+var CACHE_KEY_PREFIX = 'customer_rows_v2_';
 
 function doGet(e) {
   var props = PropertiesService.getScriptProperties();
@@ -15,6 +16,7 @@ function doGet(e) {
   }
 
   var isList = params.list === '1' || params.list === 'true';
+  var wantsFresh = params.fresh === '1' || params.fresh === 'true';
 
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Customers');
   if (!sheet || (!code && !isList)) {
@@ -27,8 +29,8 @@ function doGet(e) {
   }
 
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'customer_rows';
-  var cached = cache.get(cacheKey);
+  var cacheKey = CACHE_KEY_PREFIX + lastRow;
+  var cached = wantsFresh ? null : cache.get(cacheKey);
   var rows;
   if (cached) {
     try {

@@ -63,7 +63,12 @@ exports.handler = async function handler(event) {
 
     const headers = Object.assign({
         Accept: 'application/json',
-        'Content-Type': 'application/json;charset=UTF-8'
+        'Content-Type': 'application/json;charset=UTF-8',
+        Origin: 'https://argus.ztoglobal.com',
+        Referer: 'https://argus.ztoglobal.com/',
+        'Accept-Language': 'km',
+        'User-Language': 'km',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
     }, parseExtraHeaders(process.env.ZTO_REQUEST_HEADERS_JSON));
 
     if (process.env.ZTO_AUTHORIZATION) headers.Authorization = process.env.ZTO_AUTHORIZATION;
@@ -78,14 +83,20 @@ exports.handler = async function handler(event) {
             method: 'POST',
             headers,
             body: JSON.stringify({ billCode: barcode, countryCode: 'KH' }),
-            signal: controller.signal
+            signal: controller.signal,
+            redirect: 'manual'
         });
 
         let upstream;
         try {
             upstream = await response.json();
         } catch (_) {
-            return json(502, { error: 'ZTO returned a non-JSON response' });
+            const contentType = response.headers && response.headers.get
+                ? (response.headers.get('content-type') || 'unknown')
+                : 'unknown';
+            return json(502, {
+                error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + contentType.split(';')[0] + ')'
+            });
         }
 
         if (!response.ok || !upstream || upstream.success === false || !upstream.data) {

@@ -45,6 +45,10 @@ variables ចូល `Deploys` → `Trigger deploy` → `Deploy site`។
 | Field COD | `cod` |
 | Field DOD | `dod` |
 
+ធីក `⚡ Fast Mode` ដើម្បីឱ្យ barcode ដែលបានរកឃើញរួចក្នុងរយៈពេល ១០ នាទី
+បំពេញភ្លាមនៅពេលស្កេនម្តងទៀត។ Fast Mode រក្សាតែក្នុង memory មិនរក្សាទិន្នន័យ
+ZTO ក្នុង Service Worker cache ទេ ហើយមានពិដាន ៣០០ barcode។
+
 ចុច `សាកល្បង` ហើយបញ្ចូល barcode។ Function នឹងផ្ញើទៅ ZTO ជា៖
 
 ```json

@@ -2210,6 +2210,9 @@
         const autoSubmitCb = document.getElementById('lookupApiAutoSubmitCheckbox');
         if (autoSubmitCb) autoSubmitCb.checked = !!cfg.autoSubmit;
 
+        const fastModeCb = document.getElementById('lookupApiFastModeCheckbox');
+        if (fastModeCb) fastModeCb.checked = !!cfg.fastMode;
+
         setVal('lookupApiUrlInput', cfg.url);
         setVal('lookupApiHeaderNameInput', cfg.headerName);
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
@@ -2227,6 +2230,7 @@
     async function saveLookupApiConfig() {
         const enabledCb = document.getElementById('lookupApiEnabledCheckbox');
         const autoSubmitCb = document.getElementById('lookupApiAutoSubmitCheckbox');
+        const fastModeCb = document.getElementById('lookupApiFastModeCheckbox');
         const urlIn = document.getElementById('lookupApiUrlInput');
         const headerNameIn = document.getElementById('lookupApiHeaderNameInput');
         const headerValueIn = document.getElementById('lookupApiHeaderValueInput');
@@ -2270,6 +2274,7 @@
         const cfg = {
             enabled: enabled,
             autoSubmit: autoSubmitCb ? autoSubmitCb.checked : false,
+            fastMode: fastModeCb ? fastModeCb.checked : false,
             url: url,
             headerName: headerNameIn ? headerNameIn.value.trim() : '',
             headerValueEnc: headerValueEnc,
@@ -2283,6 +2288,7 @@
             alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
             return;
         }
+        if (typeof lookupFastCache !== 'undefined') lookupFastCache.clear();
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
         showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
@@ -3182,6 +3188,7 @@
         customerDataTableLastFailedAt = 0;
         autoLookupLastFailedAt = 0;
         autoLookupInFlight.clear();
+        lookupFastCache.clear();
         const body = document.getElementById('customerDataTableBody');
         if (body) body.innerHTML = '';
         const statusEl = document.getElementById('customerDataTableStatus');
@@ -3304,7 +3311,38 @@
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
     const LOOKUP_FOCUS_GRACE_MS = 600;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
+    const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
+    const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Set();
+    const lookupFastCache = new Map();
+
+    function getFastLookupRow(barcode, cfg) {
+        if (!cfg.fastMode) return null;
+        const key = String(barcode || '').trim().toUpperCase();
+        const entry = lookupFastCache.get(key);
+        if (!entry) return null;
+        if (elapsedSince(entry.storedAt) >= LOOKUP_FAST_CACHE_TTL_MS) {
+            lookupFastCache.delete(key);
+            return null;
+        }
+        lookupFastCache.delete(key);
+        lookupFastCache.set(key, entry);
+        return entry.row;
+    }
+
+    function setFastLookupRow(barcode, phone, cod, dod, cfg) {
+        if (!cfg.fastMode) return;
+        const key = String(barcode || '').trim().toUpperCase();
+        if (!key) return;
+        lookupFastCache.delete(key);
+        lookupFastCache.set(key, {
+            storedAt: Date.now(),
+            row: { phone: phone, cod: cod, dod: dod }
+        });
+        while (lookupFastCache.size > LOOKUP_FAST_CACHE_MAX) {
+            lookupFastCache.delete(lookupFastCache.keys().next().value);
+        }
+    }
 
     function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
         if (pendingBarcode !== barcode || !isModalOpen) return;
@@ -3359,6 +3397,12 @@
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
 
+        const fastCachedRow = getFastLookupRow(barcode, cfg);
+        if (fastCachedRow) {
+            applyLookupFillToModal(barcode, fastCachedRow.phone, fastCachedRow.cod, fastCachedRow.dod, cfg);
+            return;
+        }
+
         const cachedRow = findCustomerDataTableRow(barcode);
         if (cachedRow) {
             applyLookupFillToModal(barcode, cachedRow.phone, cachedRow.cod, cachedRow.dod, cfg);
@@ -3410,6 +3454,7 @@
             const codVal = getNestedField(data, cfg.codField);
             const dodVal = getNestedField(data, cfg.dodField);
             autoLookupLastFailedAt = 0;
+            setFastLookupRow(barcode, phoneVal, codVal, dodVal, cfg);
             rememberCustomerTableRow(barcode, phoneVal, codVal, dodVal);
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {

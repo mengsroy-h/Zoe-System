@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v130';
+const CACHE_VERSION = 'zoew-v131';
 
 const CORE_SHELL = [
     './',
@@ -133,8 +133,6 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
 
-    // Customer lookup responses can contain personal and payment data. Keep all
-    // serverless-function traffic out of Cache Storage, including the ZTO proxy.
     if (url.pathname.startsWith('/.netlify/functions/')) {
         event.respondWith(networkOnly(request));
         return;

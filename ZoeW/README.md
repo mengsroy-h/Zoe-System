@@ -84,6 +84,10 @@ ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់
 | Field COD | `cod` |
 | Field DOD | `dod` |
 
+បើក `⚡ Fast Mode` ដើម្បីចងចាំលទ្ធផល barcode ដែលបានរកឃើញរយៈពេល ១០ នាទី
+ក្នុង memory។ ការស្កេន barcode ដដែលម្តងទៀតបំពេញភ្លាមដោយមិនហៅ ZTO។ Cache
+មានពិដាន ៣០០ barcode និងត្រូវបានលុបពេល session/customer cache ត្រូវសម្អាត។
+
 ⛔ កុំដាក់ ZTO Cookie ក្នុង ZoeW, GitHub ឬ screenshot។ Cookie ផុតកំណត់ពេល
 ZTO session ចប់/Logout; ពេលនោះ Login ថ្មី ចម្លង `BOS-MAN-SESSION=...` ថ្មីទៅ
 `ZTO_COOKIE` ហើយ Trigger deploy ម្តងទៀត។ សេចក្តីណែនាំពេញនៅ

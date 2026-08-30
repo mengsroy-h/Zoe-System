@@ -239,6 +239,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             lookupSecretKey: null,
             customerDataTableSessionGeneration: 0,
             elapsedSince: (m) => (m ? Date.now() - m : Infinity),
+            getFastLookupRow: () => null,
+            setFastLookupRow: () => {},
             getLookupApiConfig: () => ({ url: 'https://x/exec?code={barcode}', enabled: true,
                                          phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
             findCustomerDataTableRow: (bc) => (o.cached ? { phone: '012', cod: 1, dod: 2 } : null),

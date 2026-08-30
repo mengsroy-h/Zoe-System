@@ -75,6 +75,7 @@ const FNS = [
     'runCustomerTableSoonRefresh', 'clearCustomerTableRetry',
     'clearCustomerDataTableCache', 'getNestedField',
     'getFastLookupRow', 'setFastLookupRow',
+    'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
     'attemptAutoLookup', 'runSheetImport'
 ];
@@ -105,6 +106,9 @@ ok('Fast Mode cache ត្រូវបានអានមុន customer table', 
 ok('Fast Mode cache ត្រូវបានសម្អាតជាមួយ customer cache', src.clearCustomerDataTableCache && src.clearCustomerDataTableCache.includes('lookupFastCache.clear()'));
 ok('Fast Mode cache មាន TTL', src.getFastLookupRow && src.getFastLookupRow.includes('LOOKUP_FAST_CACHE_TTL_MS'));
 ok('Fast Mode cache មានពិដាន', src.setFastLookupRow && src.setFastLookupRow.includes('LOOKUP_FAST_CACHE_MAX'));
+ok('ការដោះសោ App ដោះសោ Lookup Secret ផង', src.completeAppUnlock && src.completeAppUnlock.includes('lookupSecretKey = await deriveLookupSecretKey(pin)'));
+ok('Lookup ដែលរង់ចាំត្រូវបានសាកល្បងឡើងវិញក្រោយវាយ PIN', src.retryPendingLookupAfterUnlock && src.retryPendingLookupAfterUnlock.includes('attemptAutoLookup(barcode)'));
+ok('ស្កេនដំបូងបើក PIN ដោយស្វ័យប្រវត្តិពេល Secret នៅជាប់សោ', src.attemptAutoLookup && src.attemptAutoLookup.includes("requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi')"));
 
 function makeClock() {
     let now = 1000000, seq = 0;

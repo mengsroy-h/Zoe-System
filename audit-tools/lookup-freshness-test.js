@@ -74,6 +74,7 @@ const FNS = [
     'clearCustomerTableSoonRefresh', 'scheduleCustomerTableSoonRefresh',
     'runCustomerTableSoonRefresh', 'clearCustomerTableRetry',
     'clearCustomerDataTableCache', 'getNestedField',
+    'getFastLookupRow', 'setFastLookupRow',
     'prefetchCustomerDataTableRowsIfConfigured',
     'attemptAutoLookup', 'runSheetImport'
 ];
@@ -88,6 +89,7 @@ const DECLS = [
     'customerDataTableSessionGeneration', 'customerDataTableLastFailedAt',
     'customerTableRetryTimer', 'customerTableFailStreak',
     'autoLookupLastFailedAt', 'AUTO_LOOKUP_FAIL_COOLDOWN_MS', 'AUTO_LOOKUP_MAX_IN_FLIGHT',
+    'LOOKUP_FAST_CACHE_TTL_MS', 'LOOKUP_FAST_CACHE_MAX', 'lookupFastCache',
     'autoLookupInFlight', 'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
     'sheetImportSignature'
 ];
@@ -97,6 +99,12 @@ DECLS.forEach((n) => {
     ok('រកឃើញការប្រកាស ' + n, !!m);
     if (m) decls.push(m[0]);
 });
+ok('Fast Mode checkbox មានក្នុង API modal', HTML.includes('id="lookupApiFastModeCheckbox"'));
+ok('Fast Mode ត្រូវបានរក្សាទុកក្នុង config', SRC.includes('fastMode: fastModeCb ? fastModeCb.checked : false'));
+ok('Fast Mode cache ត្រូវបានអានមុន customer table', src.attemptAutoLookup && src.attemptAutoLookup.indexOf('getFastLookupRow') < src.attemptAutoLookup.indexOf('findCustomerDataTableRow'));
+ok('Fast Mode cache ត្រូវបានសម្អាតជាមួយ customer cache', src.clearCustomerDataTableCache && src.clearCustomerDataTableCache.includes('lookupFastCache.clear()'));
+ok('Fast Mode cache មាន TTL', src.getFastLookupRow && src.getFastLookupRow.includes('LOOKUP_FAST_CACHE_TTL_MS'));
+ok('Fast Mode cache មានពិដាន', src.setFastLookupRow && src.setFastLookupRow.includes('LOOKUP_FAST_CACHE_MAX'));
 
 function makeClock() {
     let now = 1000000, seq = 0;

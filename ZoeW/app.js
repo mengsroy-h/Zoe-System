@@ -3311,7 +3311,7 @@
     let pendingLookupUnlockBarcode = '';
     let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
-    const LOOKUP_FOCUS_GRACE_MS = 600;
+    const LOOKUP_FOCUS_GRACE_MS = 250;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
@@ -3388,18 +3388,13 @@
     }
 
     function armLookupFocus(phoneInput, barcode, lookupPromise) {
-        let focusDone = false;
         const focusIfEmpty = () => {
-            if (focusDone) return;
             if (!isModalOpen || pendingBarcode !== barcode) return;
             if (!phoneInput || phoneInput.value) return;
-            focusDone = true;
             phoneInput.focus();
         };
-        const graceTimer = setTimeout(focusIfEmpty, LOOKUP_FOCUS_GRACE_MS);
         return lookupPromise.finally(() => {
-            clearTimeout(graceTimer);
-            focusIfEmpty();
+            setTimeout(focusIfEmpty, LOOKUP_FOCUS_GRACE_MS);
         });
     }
 

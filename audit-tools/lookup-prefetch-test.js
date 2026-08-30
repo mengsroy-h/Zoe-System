@@ -357,12 +357,16 @@ function focusCase(label, opts, expectFocused) {
         ctx.__promise = new Promise((r) => { settle = r; });
         vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
         const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
-        ctx.__clock.advance(grace + 1);
-        ok(label, (focused > 0) === expectFocused, focused);
+        ctx.__clock.advance(grace + 10000);
+        ok('Lookup មិនទាន់ចប់ ➜ Keyboard មិនលោត', focused === 0, focused);
         settle();
+        return Promise.resolve().then(() => {
+            ctx.__clock.advance(grace + 1);
+            ok(label, (focused > 0) === expectFocused, focused);
+        });
     });
 }
-focusCase('lookup យឺត + ប្រអប់ទទេ ➜ focus ក្រោយ grace', {}, true);
+focusCase('Lookup ចប់ហើយគ្មានទិន្នន័យ ➜ ទើប focus', {}, true);
 focusCase('អ្នកប្រើវាយរួច ➜ **មិន** focus (មិនរំខានការវាយ)', { typed: '012345678' }, false);
 focusCase('ប្រអប់បិទរួច ➜ **មិន** focus', { modalClosed: true }, false);
 focusCase('ស្កេនកញ្ចប់បន្ទាប់រួច ➜ **មិន** focus លើកញ្ចប់ចាស់', { otherBarcode: true }, false);
@@ -375,10 +379,11 @@ scenario('focus តែម្តង', () => {
     ctx.__promise = new Promise((r) => { settle = r; });
     vm.runInContext('isModalOpen = true;', ctx);
     vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
-    ctx.__clock.advance(vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx) + 1);
     settle();
     return Promise.resolve().then(() => {
-        ok('grace + finally ➜ focus តែម្តងគត់', focused === 1, focused);
+        ctx.__clock.advance(vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx) + 1);
+        ctx.__clock.advance(vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx) + 1);
+        ok('Lookup ចប់ ➜ focus តែម្តងគត់', focused === 1, focused);
     });
 });
 

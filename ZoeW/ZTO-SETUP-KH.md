@@ -1,40 +1,38 @@
-# កំណត់ ZTO Lookup សម្រាប់ ZoeW
+# កំណត់ ZTO Lookup សម្រាប់ ZoeW (វិធីងាយ)
 
-## ១. Deploy ZoeW ទៅ Netlify
+Setup របស់ ZTO Argus នេះត្រូវការ **តែ Cookie មួយ** សម្រាប់ចូល ZTO និង
+**Proxy Key មួយ** សម្រាប់ការពារ Function របស់ ZoeW។ មិនត្រូវការ Google
+Analytics `api_secret`, `measurement_id` ឬ `session_id` ទេ។
 
-Deploy ថត `ZoeW` ដូចធម្មតា។ `netlify.toml` បានកំណត់ថត Function រួចហើយ។
+## ១. យក Cookie ថ្មីពី ZTO
 
-## ២. បង្កើត Proxy Key
+1. Login ទៅ `https://argus.ztoglobal.com`។
+2. ចុច `F12` → `Network`។
+3. Filter ពាក្យ `order/detail` ហើយស្កេន/ស្វែងរក barcode មួយ។
+4. ចុច request `scan/get/order/detail` → `Headers` → `Request Headers`។
+5. ចម្លងតម្លៃ Cookie **ទាំងមូល** ដែលចាប់ផ្តើម៖
 
-បង្កើតអក្សរចៃដន្យវែងយ៉ាងតិច 32 តួ ហើយបន្ថែមក្នុង Netlify:
-
-`Site configuration → Environment variables`
-
-| Variable | តម្លៃ |
-| --- | --- |
-| `ZTO_PROXY_KEY` | អក្សរចៃដន្យវែង 32 តួឡើងទៅ |
-
-## ៣. កំណត់ ZTO authentication នៅ server
-
-ប្រើ API credential ផ្លូវការរបស់ ZTO ប្រសិនបើមាន។ បន្ថែម variable ដែលត្រូវនឹង credential:
-
-| Variable | ប្រើនៅពេល |
-| --- | --- |
-| `ZTO_AUTHORIZATION` | ZTO ប្រើ header `Authorization` |
-| `ZTO_TOKEN` | ZTO ប្រើ token header ផ្សេង |
-| `ZTO_TOKEN_HEADER` | ឈ្មោះ header សម្រាប់ `ZTO_TOKEN` (លំនាំដើម `X-Access-Token`) |
-| `ZTO_COOKIE` | ប្រើបណ្ដោះអាសន្នតែពេល ZTO មាន browser session ប៉ុណ្ណោះ |
-| `ZTO_REQUEST_HEADERS_JSON` | headers បន្ថែមជាទម្រង់ JSON object |
-
-ឧទាហរណ៍ headers បន្ថែម៖
-
-```json
-{"X-Company-Code":"...","X-Language":"km-KH"}
+```text
+BOS-MAN-SESSION=...
 ```
 
-កុំដាក់ ZTO credential ក្នុង `app.js`, ក្នុង GitHub ឬក្នុងប្រអប់ config របស់ ZoeW។ Browser cookie អាចផុតកំណត់ ហើយត្រូវជំនួសនៅ Netlify ពេល ZTO បញ្ចប់ session។
+កុំផ្ញើ Cookie ក្នុង chat, screenshot ឬ commit ទៅ GitHub។ បើ Cookie ធ្លាប់
+បង្ហាញសាធារណៈ សូម Logout រួច Login ថ្មីមុនចម្លង។
 
-## ៤. កំណត់ក្នុង ZoeW
+## ២. ដាក់ Environment Variables ក្នុង Netlify
+
+ចូល `Netlify → ZoeW site → Site configuration → Environment variables` ហើយ
+បន្ថែមតែ ២៖
+
+| Key | Value |
+|---|---|
+| `ZTO_COOKIE` | `BOS-MAN-SESSION=...` ទាំងមូលពី Request Headers |
+| `ZTO_PROXY_KEY` | ពាក្យសម្ងាត់ចៃដន្យដែលអ្នកបង្កើត 32–64 តួ |
+
+`ZTO_PROXY_KEY` មិនមែនបានពី ZTO ទេ—អ្នកបង្កើតវាដោយខ្លួនឯង។ ក្រោយ Save
+variables ចូល `Deploys` → `Trigger deploy` → `Deploy site`។
+
+## ៣. បំពេញក្នុង ZoeW
 
 ចូល `API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ` ហើយដាក់៖
 
@@ -60,3 +58,14 @@ Deploy ថត `ZoeW` ដូចធម្មតា។ `netlify.toml` បានក�
 - `dod` ← `data.arrivalServiceCharge`
 
 បើ DOD របស់អាជីវកម្មអ្នកមិនមែន `arrivalServiceCharge` សូមកែ mapping ក្នុង `netlify/functions/zto-order-detail.js` មុន deploy។
+
+## ពេលវាឈប់ដំណើរការ
+
+Cookie របស់ ZTO អាចផុតកំណត់ពេល session ចប់ ឬអ្នក Logout។ ពេល lookup បង្ហាញ
+ថា ZTO បដិសេធ request៖ Login ZTO ថ្មី → យក `BOS-MAN-SESSION=...` ថ្មី →
+Replace `ZTO_COOKIE` ក្នុង Netlify → Trigger deploy ម្តងទៀត។
+
+### សម្រាប់អនាគតប៉ុណ្ណោះ
+
+បើ ZTO ផ្តល់ API credential ផ្លូវការ អាចប្រើ `ZTO_AUTHORIZATION` ឬ
+`ZTO_TOKEN` ជំនួស Cookie។ Setup បច្ចុប្បន្នរបស់អ្នកមិនត្រូវការវាទេ។

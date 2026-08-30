@@ -299,3 +299,29 @@ Lookup API។ ដូច្នេះជីវមាត្រមិនអាចជ
 ## អាជ្ញាប័ណ្ណ
 
 កម្មសិទ្ធិឯកជន — សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់ម្ចាស់ប៉ុណ្ណោះ។
+# ZTO order lookup through Netlify
+
+ZoeW can look up a Cambodia ZTO order without calling the ZTO browser API
+directly. The bundled Netlify Function keeps ZTO credentials on the server and
+converts the response to ZoeW's existing `phone`, `cod`, and `dod` fields.
+
+Configure these environment variables in Netlify before deploying:
+
+- `ZTO_PROXY_KEY` (required): a long random value used by ZoeW to access the function.
+- `ZTO_AUTHORIZATION` (optional): the complete Authorization header value required by ZTO.
+- `ZTO_COOKIE` (optional): the ZTO session cookie, if the account has no stable API credential.
+- `ZTO_TOKEN` and `ZTO_TOKEN_HEADER` (optional): a token and its header name.
+- `ZTO_REQUEST_HEADERS_JSON` (optional): additional ZTO request headers as a JSON object.
+
+In ZoeW's customer lookup configuration use:
+
+- URL: `/.netlify/functions/zto-order-detail?barcode={barcode}`
+- Header name: `X-Zoe-Proxy-Key`
+- Header value: the same value as `ZTO_PROXY_KEY`
+- Phone field: `phone`
+- COD field: `cod`
+- DOD field: `dod`
+
+Do not put a ZTO cookie, token, or Authorization value in ZoeW's browser
+configuration. Browser session cookies expire; prefer an official ZTO API
+credential when one is available.

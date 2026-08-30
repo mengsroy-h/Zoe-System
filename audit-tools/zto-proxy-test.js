@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
 const path = require('path');
 const appDir = process.env.ZTOPROXY_APP_DIR || path.join(__dirname, '..');
 const proxy = require(path.join(appDir, 'ZoeW/netlify/functions/zto-order-detail.js'));
@@ -57,6 +58,29 @@ async function run() {
         assert.deepStrictEqual(JSON.parse(captured.options.body), {
             billCode: '77130527210012', countryCode: 'KH'
         });
+
+        global.fetch = async () => ({
+            ok: true,
+            status: 200,
+            headers: { get: () => 'application/json' },
+            json: async () => ({ success: false, error: 'session expired', data: null })
+        });
+        const rejected = await proxy.handler({
+            httpMethod: 'GET',
+            headers: { 'x-zoe-proxy-key': 'test-proxy-key' },
+            queryStringParameters: { barcode: '77130527210012' }
+        });
+        assert.strictEqual(rejected.statusCode, 502);
+        assert.strictEqual(JSON.parse(rejected.body).error, 'session expired');
+
+        assert.deepStrictEqual(Object.keys(body).sort(), ['barcode', 'cod', 'dod', 'phone', 'success']);
+
+        const proxySource = fs.readFileSync(path.join(appDir, 'ZoeW/netlify/functions/zto-order-detail.js'), 'utf8');
+        const appSource = fs.readFileSync(path.join(appDir, 'ZoeW/app.js'), 'utf8');
+        const upstreamTimeout = /const ZTO_UPSTREAM_TIMEOUT_MS = (\d+);/.exec(proxySource);
+        const clientTimeout = /const AUTO_LOOKUP_TIMEOUT_MS = (\d+);/.exec(appSource);
+        assert.ok(upstreamTimeout && clientTimeout);
+        assert.ok(Number(clientTimeout[1]) >= Number(upstreamTimeout[1]) + 3000);
 
         const invalid = await proxy.handler({
             httpMethod: 'GET',

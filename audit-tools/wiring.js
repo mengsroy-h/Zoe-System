@@ -83,9 +83,10 @@ for (const app of APPS) {
         if (!isOnValue || !n.arguments.length) return;
         const a0 = n.arguments[0];
         if (a0.type !== 'Identifier' || !/^dbRef/.test(a0.name)) return;
-        const before = js.slice(Math.max(0, n.start - 800), n.start);
+        const before = js.slice(Math.max(0, n.start - 1600), n.start);
         const guarded = new RegExp('if\\s*\\(\\s*' + a0.name + '\\s*\\)').test(before)
             || new RegExp('if\\s*\\(\\s*!\\s*' + a0.name + '\\s*\\)\\s*return').test(before)
+            || new RegExp('if\\s*\\([^)]*!\\s*' + a0.name + '[^)]*\\)\\s*return').test(before)
             || new RegExp(a0.name + '\\s*=\\s*(fb|sdk|window\\.firebaseSDK)\\.ref\\(').test(before);
         if (!guarded) {
             bad(app, 'unguarded onValue', a0.name + ' near offset ' + n.start);

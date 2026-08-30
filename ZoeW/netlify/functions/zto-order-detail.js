@@ -2,6 +2,8 @@
 
 const ZTO_ENDPOINT = 'https://aargus-api.ztoglobal.com/scan/get/order/detail';
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
+const ZTO_UPSTREAM_TIMEOUT_MS = 12000;
+const FORBIDDEN_FORWARD_HEADER_RE = /^(?:authorization|connection|content-length|cookie|host|origin|referer|transfer-encoding)$/i;
 
 function json(statusCode, body) {
     return {
@@ -29,7 +31,7 @@ function parseExtraHeaders(raw) {
         if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') return {};
         const safe = {};
         Object.keys(parsed).forEach((name) => {
-            if (/^[A-Za-z0-9-]{1,80}$/.test(name) && typeof parsed[name] === 'string') {
+            if (/^[A-Za-z0-9-]{1,80}$/.test(name) && !FORBIDDEN_FORWARD_HEADER_RE.test(name) && typeof parsed[name] === 'string') {
                 safe[name] = parsed[name];
             }
         });
@@ -73,10 +75,15 @@ exports.handler = async function handler(event) {
 
     if (process.env.ZTO_AUTHORIZATION) headers.Authorization = process.env.ZTO_AUTHORIZATION;
     if (process.env.ZTO_COOKIE) headers.Cookie = process.env.ZTO_COOKIE;
-    if (process.env.ZTO_TOKEN) headers[process.env.ZTO_TOKEN_HEADER || 'X-Access-Token'] = process.env.ZTO_TOKEN;
+    if (process.env.ZTO_TOKEN) {
+        const tokenHeader = process.env.ZTO_TOKEN_HEADER || 'X-Access-Token';
+        if (/^[A-Za-z0-9-]{1,80}$/.test(tokenHeader) && !FORBIDDEN_FORWARD_HEADER_RE.test(tokenHeader)) {
+            headers[tokenHeader] = process.env.ZTO_TOKEN;
+        }
+    }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), ZTO_UPSTREAM_TIMEOUT_MS);
 
     try {
         const response = await fetch(ZTO_ENDPOINT, {
@@ -103,7 +110,7 @@ exports.handler = async function handler(event) {
             const message = upstream && upstream.error
                 ? (typeof upstream.error === 'string' ? upstream.error : 'ZTO rejected the request')
                 : ('ZTO HTTP ' + response.status);
-            return json(response.status === 401 || response.status === 403 ? 502 : response.status, { error: message });
+            return json(502, { error: message });
         }
 
         const order = upstream.data;
@@ -112,8 +119,6 @@ exports.handler = async function handler(event) {
             cod: Number(order.agentAmount) || 0,
             dod: Number(order.arrivalServiceCharge) || 0,
             barcode: order.billCode || barcode,
-            customerName: order.consigneeName || '',
-            destination: order.destinationSite || '',
             success: true
         });
     } catch (error) {

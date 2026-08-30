@@ -66,7 +66,11 @@ PIN gate ដដែលនឹងការកែ Config ដោយដៃ។
 > ឈរ **ក្រោម** ប្រអប់ជំនួស `z-index: 99999` ដែលបាំងវាល PIN។
 > ⛔ មុខងារបង្កើត Key · Revoke · Extend · Setup Link/QR **មិនប្រែសោះ**។
 
-កំណែបច្ចុប្បន្ន **`2.19.12`** — ប្រើរួមគ្នាជាមួយ ZoeW ហើយត្រូវស៊ីនឹង
+> **កំណែ 2.19.13** ៖ helper បណ្តាញ និង Service Worker គោរព caller abort ដូច
+> ZoeW ដើម្បីកុំបន្សល់សំណើ zombie ក្រោយ timeout។ មុខងារបង្កើត/Revoke/Extend
+> Key និង Setup Link/QR មិនប្រែទេ។
+
+កំណែបច្ចុប្បន្ន **`2.19.13`** — ប្រើរួមគ្នាជាមួយ ZoeW ហើយត្រូវស៊ីនឹង
 `version` ក្នុង `manifest.json`។ វាបង្ហាញ **១ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ។
 
 `CACHE_VERSION` ក្នុង `sw.js` (`zoekeygen-vN`) ជាកូនសោ cache ដាច់ដោយឡែក។

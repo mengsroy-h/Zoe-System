@@ -161,6 +161,7 @@ function buildEnv(app, opts) {
         let dbRefConnected = 'connected';
         let dbRefServerTimeOffset = 'offset';
         let db = {}, fb = null;
+        let infoListenerGeneration = 0;
         let __waitersReleased = 0;
         function clearInfoListenerRecovery() {}
         function clearReconnectWatchdog() {}

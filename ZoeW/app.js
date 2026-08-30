@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.23.2';
+    const APP_VERSION = '2.23.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -363,11 +363,13 @@
     const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
     let dbListenerProgressAt = 0;
+    let dbListenerGeneration = 0;
     let pickupLedgerRepairDone = false;
     let pickupLedgerRepairRunning = false;
     let infoListenersFailed = false;
     let infoListenerRecoveryTimer = null;
     let infoListenerRecoveryAttempt = 0;
+    let infoListenerGeneration = 0;
     let reconnectWatchdogTimer = null;
     let reconnectWatchdogAttempt = 0;
     let lastForcedReconnectAt = 0;
@@ -577,15 +579,42 @@
     function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
         const controller = typeof AbortController === 'function' ? new AbortController() : null;
         const opts = Object.assign({}, options || {});
+        const sourceSignal = opts.signal || null;
         if (controller) opts.signal = controller.signal;
         const timeoutErr = new Error(timeoutMsg || 'Timed out');
         let settled = false;
         let timer = null;
         return new Promise((resolve, reject) => {
+            const cleanup = () => {
+                if (timer !== null) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                if (sourceSignal && typeof sourceSignal.removeEventListener === 'function') {
+                    sourceSignal.removeEventListener('abort', abortFromSource);
+                }
+            };
+            const abortFromSource = () => {
+                if (settled) return;
+                settled = true;
+                if (controller) { try { controller.abort(); } catch (e) {} }
+                cleanup();
+                const error = new Error('Aborted');
+                error.name = 'AbortError';
+                reject(error);
+            };
+            if (sourceSignal && typeof sourceSignal.addEventListener === 'function') {
+                if (sourceSignal.aborted) {
+                    abortFromSource();
+                    return;
+                }
+                sourceSignal.addEventListener('abort', abortFromSource, { once: true });
+            }
             timer = setTimeout(() => {
                 if (settled) return;
                 settled = true;
                 if (controller) { try { controller.abort(); } catch (e) {} }
+                cleanup();
                 reject(timeoutErr);
             }, ms);
             fetch(url, opts).then((res) => {
@@ -595,18 +624,18 @@
             }, (err) => {
                 if (settled) return null;
                 settled = true;
-                clearTimeout(timer);
+                cleanup();
                 reject(err);
                 return null;
             }).then((out) => {
                 if (settled || !out) return;
                 settled = true;
-                clearTimeout(timer);
+                cleanup();
                 resolve(out);
             }, (err) => {
                 if (settled) return;
                 settled = true;
-                clearTimeout(timer);
+                cleanup();
                 reject(err);
             });
         });
@@ -889,13 +918,21 @@
         scheduleInfoListenerRecovery();
     }
 
-    function attachInfoListeners() {
-        if (!db || !fb) return false;
+    function detachInfoListeners() {
+        infoListenerGeneration++;
+        if (!fb) return;
         if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
         if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+    }
+
+    function attachInfoListeners() {
+        detachInfoListeners();
+        if (!db || !fb || !dbRefConnected || !dbRefServerTimeOffset) return false;
+        const listenerGeneration = ++infoListenerGeneration;
         infoListenerFailedPaths.clear();
 
         fb.onValue(dbRefConnected, (snap) => {
+            if (listenerGeneration !== infoListenerGeneration) return;
             noteInfoListenerAlive(INFO_LISTENER_KEY_CONNECTED);
             isDatabaseConnected = snap.val() === true;
             if (isDatabaseConnected) {
@@ -907,9 +944,13 @@
                 scheduleReconnectWatchdog();
             }
             renderConnectionStatus();
-        }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED));
+        }, (err) => {
+            if (listenerGeneration !== infoListenerGeneration) return;
+            handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED);
+        });
 
         fb.onValue(dbRefServerTimeOffset, (snap) => {
+            if (listenerGeneration !== infoListenerGeneration) return;
             noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
             const val = snap.val();
             if (typeof val !== 'number') return;
@@ -917,7 +958,10 @@
             if (!serverClockOffsetIsFromServer(val)) return;
             serverClockTrusted = true;
             if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
-        }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET));
+        }, (err) => {
+            if (listenerGeneration !== infoListenerGeneration) return;
+            handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);
+        });
 
         return true;
     }
@@ -942,14 +986,8 @@
 
             const existingApps = fb.getApps();
             if (existingApps.length) {
-                if (dbRefHistory) { try { fb.off(dbRefHistory); } catch (e) {} }
-                if (dbRefDeleted) { try { fb.off(dbRefDeleted); } catch (e) {} }
-                if (dbRefDailyRevenue) { try { fb.off(dbRefDailyRevenue); } catch (e) {} }
-                if (dbRefMonthlyRevenue) { try { fb.off(dbRefMonthlyRevenue); } catch (e) {} }
-                if (dbRefDailyPickup) { try { fb.off(dbRefDailyPickup); } catch (e) {} }
-                if (dbRefExchangeRate) { try { fb.off(dbRefExchangeRate); } catch (e) {} }
-                if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
-                if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+                detachDatabaseListeners();
+                detachInfoListeners();
                 isDatabaseInitialized = false;
                 isDatabaseConnected = false;
                 hasEverConnectedToDatabase = false;
@@ -1157,6 +1195,7 @@
         try {
             appLocalStore.setItem('zoew_security_pin_hash', await hashPin(pinVal));
             lookupSecretKey = await deriveLookupSecretKey(pinVal);
+            await migrateLookupSecretIfNeeded();
         } catch (e) {
             alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
             return;
@@ -1219,6 +1258,7 @@
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         lookupSecretKey = await deriveLookupSecretKey(pin);
+        await migrateLookupSecretIfNeeded();
         closeModal('pinModal');
         (pinTargetAction || openConfigModal)(pin);
     }
@@ -1667,6 +1707,7 @@
             safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
         }
         lookupSecretKey = await deriveLookupSecretKey(pin);
+        await migrateLookupSecretIfNeeded();
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         markAppUnlockedForSession();
@@ -2059,11 +2100,13 @@
     }
 
     function cancelPinSetupFlow() {
+        cancelPendingLookupUnlock();
         pinTargetAction = null;
         closeModal('pinSetupModal');
     }
 
     function cancelPinEntryFlow() {
+        cancelPendingLookupUnlock();
         pinTargetAction = null;
         closeModal('pinModal');
     }
@@ -2199,6 +2242,16 @@
         } catch (e) {
             return null;
         }
+    }
+
+    async function migrateLookupSecretIfNeeded() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.headerValue || cfg.headerValueEnc || !lookupSecretKey) return false;
+        const encrypted = await encryptLookupSecret(cfg.headerValue);
+        if (!encrypted) return false;
+        const migrated = Object.assign({}, cfg, { headerValueEnc: encrypted });
+        delete migrated.headerValue;
+        return safeStoreSet(appLocalStore, 'zoew_lookup_api_config', JSON.stringify(migrated));
     }
 
     function openLookupApiConfigModal() {
@@ -3309,10 +3362,12 @@
 
     let lookupLockedNoticeShown = false;
     let pendingLookupUnlockBarcode = '';
+    let pendingLookupUnlockResolve = null;
     let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
     const LOOKUP_FOCUS_GRACE_MS = 250;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
+    const AUTO_LOOKUP_TIMEOUT_MS = 16000;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Set();
@@ -3381,10 +3436,23 @@
 
     function retryPendingLookupAfterUnlock() {
         const barcode = pendingLookupUnlockBarcode;
+        const resolve = pendingLookupUnlockResolve;
         pendingLookupUnlockBarcode = '';
+        pendingLookupUnlockResolve = null;
         lookupLockedNoticeShown = false;
-        if (!barcode || pendingBarcode !== barcode) return;
-        attemptAutoLookup(barcode);
+        if (!barcode || pendingBarcode !== barcode) {
+            if (resolve) resolve();
+            return;
+        }
+        Promise.resolve(attemptAutoLookup(barcode)).then(resolve, resolve);
+    }
+
+    function cancelPendingLookupUnlock() {
+        const resolve = pendingLookupUnlockResolve;
+        pendingLookupUnlockBarcode = '';
+        pendingLookupUnlockResolve = null;
+        lookupLockedNoticeShown = false;
+        if (resolve) resolve();
     }
 
     function armLookupFocus(phoneInput, barcode, lookupPromise) {
@@ -3417,13 +3485,16 @@
         scheduleCustomerTableSoonRefresh();
 
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            if (pendingLookupUnlockResolve) pendingLookupUnlockResolve();
             pendingLookupUnlockBarcode = String(barcode || '');
-            if (!lookupLockedNoticeShown) {
-                lookupLockedNoticeShown = true;
-                showToast("🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការស្វែងរកអតិថិជន");
-            }
-            if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi');
-            return;
+            return new Promise((resolve) => {
+                pendingLookupUnlockResolve = resolve;
+                if (!lookupLockedNoticeShown) {
+                    lookupLockedNoticeShown = true;
+                    showToast("🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការស្វែងរកអតិថិជន");
+                }
+                if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi');
+            });
         }
 
         if (navigator.onLine === false) return;
@@ -3449,7 +3520,7 @@
             }
 
             const out = await retryAsync(
-                () => fetchWithTimeout(targetUrl, { headers }, 15000, 'Auto lookup timed out',
+                () => fetchWithTimeout(targetUrl, { headers }, AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
                     (r) => (r.ok ? r.json() : null)),
                 2, 1500
             );
@@ -3503,6 +3574,7 @@
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
     const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
     const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+    let sessionExpiryCheckInFlight = false;
 
     function clearRememberedSession(keepEmail) {
         safeStoreRemove(appLocalStore, 'zoew_login_time');
@@ -3511,7 +3583,7 @@
 
     async function isFirebaseSessionExpired(user) {
         try {
-            const tokenResult = await fb.getIdTokenResult(user);
+            const tokenResult = await withTimeout(fb.getIdTokenResult(user), DB_OP_TIMEOUT_MS, 'Session check stalled');
             const authTimeMs = new Date(tokenResult.authTime).getTime();
             if (isNaN(authTimeMs)) return false;
             return (getServerNow() - authTimeMs) > FOUR_HOURS_MS;
@@ -3534,6 +3606,19 @@
         fb.signOut(auth).then(finish, finish);
     }
 
+    function runSessionExpiryCheck() {
+        if (sessionExpiryCheckInFlight || sessionExpiryCheck === 'pending' || sessionExpiryCheck === 'expired') return Promise.resolve(false);
+        if (!auth || !auth.currentUser) return Promise.resolve(false);
+        sessionExpiryCheckInFlight = true;
+        const user = auth.currentUser;
+        return isFirebaseSessionExpired(user).then((expired) => {
+            if (expired && auth && auth.currentUser === user) forceExpireSession();
+            return expired;
+        }, () => false).finally(() => {
+            sessionExpiryCheckInFlight = false;
+        });
+    }
+
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
         setPhoneSearchPulledUp(false);
@@ -3549,7 +3634,7 @@
         expandedTrashGroups.clear();
         activeParentItemId = null;
         lookupSecretKey = null;
-        pendingLookupUnlockBarcode = '';
+        cancelPendingLookupUnlock();
         clearSheetImportSession();
         pendingLockerCode = null;
         lockerBarcodeIndex = {};
@@ -3606,6 +3691,7 @@
 
     const LICENSE_APP_CODE = 'ADM';
     const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
+    let licenseRecheckInFlight = false;
 
     function licenseFailureMessage(reason) {
         switch (reason) {
@@ -3639,6 +3725,17 @@
         const keyInput = document.getElementById('activationKeyInput');
         if (keyInput) keyInput.focus();
         return false;
+    }
+
+    function runPeriodicLicenseCheck() {
+        if (licenseRecheckInFlight || !auth || !auth.currentUser || !isDatabaseInitialized || isModalOpen) return Promise.resolve(false);
+        licenseRecheckInFlight = true;
+        return withTimeout(ensureAppActivated(), 20000, 'Periodic activation check timed out').then((result) => result, (error) => {
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'periodic ensureAppActivated' });
+            return false;
+        }).finally(() => {
+            licenseRecheckInFlight = false;
+        });
     }
 
     async function submitActivationKey() {
@@ -3765,15 +3862,8 @@
             } else {
                 resetClearHistoryOperationState();
                 resetDbListenerHealthState();
-                if (isDatabaseInitialized) {
-                    if (dbRefDailyRevenue) fb.off(dbRefDailyRevenue);
-                    if (dbRefMonthlyRevenue) fb.off(dbRefMonthlyRevenue);
-                    if (dbRefDailyPickup) fb.off(dbRefDailyPickup);
-                    if (dbRefHistory) fb.off(dbRefHistory);
-                    if (dbRefDeleted) fb.off(dbRefDeleted);
-                    if (dbRefExchangeRate) fb.off(dbRefExchangeRate);
-                    isDatabaseInitialized = false;
-                }
+                detachDatabaseListeners();
+                isDatabaseInitialized = false;
                 scanHistory = [];
                 deletedItems = [];
                 dailyRevenueData = {};
@@ -3878,6 +3968,7 @@
     }
 
     function detachDatabaseListeners() {
+        dbListenerGeneration++;
         if (!fb) return;
         [dbRefDailyRevenue, dbRefMonthlyRevenue, dbRefDailyPickup, dbRefHistory, dbRefDeleted, dbRefExchangeRate]
             .forEach((ref) => { if (ref) { try { fb.off(ref); } catch (e) {} } });
@@ -3978,6 +4069,7 @@
         if (!db || !fb) return false;
 
         detachDatabaseListeners();
+        const listenerGeneration = ++dbListenerGeneration;
         dbListenerPendingPaths.clear();
         dbListenerFailedPaths.clear();
         DB_LISTENER_KEYS.forEach((key) => dbListenerPendingPaths.add(key));
@@ -3986,6 +4078,7 @@
 
         if (dbRefExchangeRate) {
             fb.onValue(dbRefExchangeRate, (snapshot) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
                 noteDbListenerAlive('exchangeRate');
                 const val = snapshot.val();
                 if (val && !isNaN(val)) {
@@ -3993,34 +4086,50 @@
                     try { appLocalStore.setItem('zoew_exchange_rate', exchangeRateRiel); } catch (e) {}
                     debouncedRenderAfterHistorySync();
                 }
-            }, (err) => handleDbListenerError(err, 'exchangeRate'));
+            }, (err) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                handleDbListenerError(err, 'exchangeRate');
+            });
         }
 
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
                 noteDbListenerAlive('dailyRevenue');
                 dailyRevenueData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
-            }, (err) => handleDbListenerError(err, 'dailyRevenue'));
+            }, (err) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                handleDbListenerError(err, 'dailyRevenue');
+            });
         }
 
         if (dbRefMonthlyRevenue) {
             fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
                 noteDbListenerAlive('monthlyRevenue');
                 monthlyRevenueData = snapshot.val() || {};
-            }, (err) => handleDbListenerError(err, 'monthlyRevenue'));
+            }, (err) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                handleDbListenerError(err, 'monthlyRevenue');
+            });
         }
 
         if (dbRefDailyPickup) {
             fb.onValue(dbRefDailyPickup, (snapshot) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
                 noteDbListenerAlive('dailyPickup');
                 dailyPickupData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
-            }, (err) => handleDbListenerError(err, 'dailyPickup'));
+            }, (err) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                handleDbListenerError(err, 'dailyPickup');
+            });
         }
 
         if (dbRefHistory) {
         fb.onValue(dbRefHistory, (snapshot) => {
+            if (listenerGeneration !== dbListenerGeneration) return;
             noteDbListenerAlive('history');
             const data = snapshot.val();
             if (!data) scanHistory = [];
@@ -4064,11 +4173,15 @@
             });
 
             debouncedRenderAfterHistorySync();
-        }, (err) => handleDbListenerError(err, 'history'));
+        }, (err) => {
+            if (listenerGeneration !== dbListenerGeneration) return;
+            handleDbListenerError(err, 'history');
+        });
         }
 
         if (dbRefDeleted) {
         fb.onValue(dbRefDeleted, (snapshot) => {
+            if (listenerGeneration !== dbListenerGeneration) return;
             noteDbListenerAlive('deleted');
             const data = snapshot.val();
             if (!data) deletedItems = [];
@@ -4083,7 +4196,10 @@
                 normalizeBarcodesOf(item);
             });
             runAutomaticDeletedCleanup();
-        }, (err) => handleDbListenerError(err, 'deleted'));
+        }, (err) => {
+            if (listenerGeneration !== dbListenerGeneration) return;
+            handleDbListenerError(err, 'deleted');
+        });
         }
 
         isDatabaseInitialized = true;
@@ -4789,19 +4905,9 @@
             prefetchCustomerDataTableRowsIfConfigured();
         }, CUSTOMER_TABLE_CACHE_MS);
 
-        setInterval(async () => {
-            if (auth && auth.currentUser) {
-                if (await isFirebaseSessionExpired(auth.currentUser)) {
-                    forceExpireSession();
-                }
-            }
-        }, 60000);
+        setInterval(runSessionExpiryCheck, 60000);
 
-        setInterval(() => {
-            if (auth && auth.currentUser && isDatabaseInitialized && !isModalOpen) {
-                ensureAppActivated().catch((e) => { if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'periodic ensureAppActivated' }); });
-            }
-        }, LICENSE_RECHECK_INTERVAL_MS);
+        setInterval(runPeriodicLicenseCheck, LICENSE_RECHECK_INTERVAL_MS);
 
         setInterval(sweepRecallHighlights, 60000);
         setInterval(runScheduledCleanup, 60000);

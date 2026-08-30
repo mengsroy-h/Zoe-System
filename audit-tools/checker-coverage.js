@@ -163,18 +163,21 @@ for (const f of checkers) {
     if (!env) continue;
     probed++;
     let code = 1;
+    let output = '';
     try {
-        execFileSync(process.execPath, [path.join(TOOLS, f)], {
+        output = execFileSync(process.execPath, [path.join(TOOLS, f)], {
             env: Object.assign({}, process.env, { [env]: empty }),
-            stdio: 'ignore',
+            stdio: ['ignore', 'pipe', 'pipe'],
+            encoding: 'utf8',
             timeout: SLOW.has(f) ? 180000 : 90000
         });
         code = 0;
     } catch (e) {
         // ការធ្លាក់ · ការគាំង · timeout — សុទ្ធតែ «មិនបៃតង» ដែលជាអ្វីដែលត្រូវការ
         code = typeof e.status === 'number' ? e.status : 1;
+        output = String((e && e.stdout) || '') + '\n' + String((e && e.stderr) || '');
     }
-    if (code === 0) greenOnEmpty.push(f);
+    if (code === 0 && !/(^|\n)\s*SKIP\b/.test(output)) greenOnEmpty.push(f);
 }
 try { fs.rmSync(empty, { recursive: true, force: true }); } catch (e) {}
 

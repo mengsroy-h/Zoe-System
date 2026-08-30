@@ -216,6 +216,7 @@ scenario('ការត្រៀមតំណទៅ Lookup API', () => {
 // បាញ់សំណើដែលដឹងស្រាប់ថាធ្លាក់ រួច **រាយការណ៍ទៅ Sentry** ជារៀងរាល់ដង។
 // ការស្កេនក្រៅបណ្តាញជាករណីធម្មតារបស់អាជីវកម្មនេះ ➜ សំឡេងរំខានក្នុង Sentry
 // បាំងកំហុសពិត ហើយការស្កេនក៏យឺតដោយឥតប្រយោជន៍ដែរ។
+let buildAutoRuntime = null;
 scenario('ការស្វែងរកស្វ័យប្រវត្តិ ខណៈក្រៅបណ្តាញ', () => {
     const autoSrc = sliceFn('attemptAutoLookup');
     ok('រកឃើញ function attemptAutoLookup()', !!autoSrc);
@@ -225,6 +226,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         const fetches = [];
         const captures = [];
         const filled = [];
+        const unlockActions = [];
         const ctx = {
             console: { error: () => {}, log: () => {} },
             Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String,
@@ -233,15 +235,21 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             navigator: { onLine: o.onLine === undefined ? true : o.onLine },
             AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
             AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
+            AUTO_LOOKUP_TIMEOUT_MS: 16000,
             autoLookupInFlight: new Set(),
             autoLookupLastFailedAt: 0,
             lookupLockedNoticeShown: false,
             lookupSecretKey: null,
+            pendingLookupUnlockBarcode: '',
+            pendingLookupUnlockResolve: null,
+            pendingBarcode: 'BC1',
             customerDataTableSessionGeneration: 0,
             elapsedSince: (m) => (m ? Date.now() - m : Infinity),
             getFastLookupRow: () => null,
             setFastLookupRow: () => {},
             getLookupApiConfig: () => ({ url: 'https://x/exec?code={barcode}', enabled: true,
+                                         headerName: o.locked ? 'X-Zoe-Proxy-Key' : '',
+                                         headerValueEnc: o.locked ? { iv: [1], data: [2] } : null,
                                          phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
             findCustomerDataTableRow: (bc) => (o.cached ? { phone: '012', cod: 1, dod: 2 } : null),
             scheduleCustomerTableSoonRefresh: () => {},
@@ -250,19 +258,24 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             getNestedField: (d, k) => (d ? d[k] : null),
             showToast: () => {},
             decryptLookupSecret: () => Promise.resolve(''),
+            isPinFlowPending: () => false,
+            requestPinBeforeConfig: (action) => unlockActions.push(action),
             retryAsync: (fn) => fn(),
             fetchWithTimeout: (url) => {
                 fetches.push(url);
+                if (o.fetchSuccess) return Promise.resolve({ res: { ok: true }, body: { phone: '012', cod: 1, dod: 2 } });
                 return Promise.reject(new TypeError('Failed to fetch'));
             },
             ZoeErrors: { capture: (e, c) => captures.push(c && c.context) },
-            __fetches: fetches, __captures: captures, __filled: filled
+            __fetches: fetches, __captures: captures, __filled: filled, __unlockActions: unlockActions
         };
         ctx.window = ctx;
         vm.createContext(ctx);
+        vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);
         vm.runInContext(autoSrc, ctx);
         return ctx;
     }
+    buildAutoRuntime = buildAuto;
 
     // ខាងវិជ្ជមាន — មានបណ្តាញ ➜ សំណើត្រូវចេញធម្មតា
     const online = buildAuto({});
@@ -287,6 +300,22 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
                 ok('⛔ ទិសផ្ទុយ ៖ ក្រៅបណ្តាញ តែមានក្នុង cache ➜ **នៅតែបំពេញភ្លាម**',
                     cachedOffline.__filled.length === 1, cachedOffline.__filled);
             });
+        });
+    });
+});
+
+scenario('PIN និង Lookup មិនប្រជែង Keyboard', () => {
+    const locked = buildAutoRuntime({ locked: true, fetchSuccess: true });
+    let settled = false;
+    const lookup = vm.runInContext('attemptAutoLookup("BC1")', locked).then(() => { settled = true; });
+    return Promise.resolve().then(() => {
+        ok('Secret នៅជាប់សោ ➜ Lookup Promise នៅរង់ចាំ PIN', settled === false, settled);
+        ok('ស្នើ PIN តែម្តង', locked.__unlockActions.length === 1, locked.__unlockActions.length);
+        locked.lookupSecretKey = { unlocked: true };
+        locked.__unlockActions[0]();
+        return lookup.then(() => {
+            ok('វាយ PIN រួច ➜ បន្ត ZTO Lookup ដដែល', locked.__fetches.length === 1, locked.__fetches);
+            ok('ZTO ចប់រួច ➜ ទើប Lookup Promise ចប់', settled === true, settled);
         });
     });
 });

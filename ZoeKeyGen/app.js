@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.12';
+const APP_VERSION = '2.19.13';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1332,15 +1332,42 @@ function readDatabaseUrlFromConfig() {
 function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const opts = Object.assign({}, options || {});
+    const sourceSignal = opts.signal || null;
     if (controller) opts.signal = controller.signal;
     const timeoutErr = new Error(timeoutMsg || 'Timed out');
     let settled = false;
     let timer = null;
     return new Promise((resolve, reject) => {
+        const cleanup = () => {
+            if (timer !== null) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            if (sourceSignal && typeof sourceSignal.removeEventListener === 'function') {
+                sourceSignal.removeEventListener('abort', abortFromSource);
+            }
+        };
+        const abortFromSource = () => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            cleanup();
+            const error = new Error('Aborted');
+            error.name = 'AbortError';
+            reject(error);
+        };
+        if (sourceSignal && typeof sourceSignal.addEventListener === 'function') {
+            if (sourceSignal.aborted) {
+                abortFromSource();
+                return;
+            }
+            sourceSignal.addEventListener('abort', abortFromSource, { once: true });
+        }
         timer = setTimeout(() => {
             if (settled) return;
             settled = true;
             if (controller) { try { controller.abort(); } catch (e) {} }
+            cleanup();
             reject(timeoutErr);
         }, ms);
         fetch(url, opts).then((res) => {
@@ -1350,18 +1377,18 @@ function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
         }, (err) => {
             if (settled) return null;
             settled = true;
-            clearTimeout(timer);
+            cleanup();
             reject(err);
             return null;
         }).then((out) => {
             if (settled || !out) return;
             settled = true;
-            clearTimeout(timer);
+            cleanup();
             resolve(out);
         }, (err) => {
             if (settled) return;
             settled = true;
-            clearTimeout(timer);
+            cleanup();
             reject(err);
         });
     });

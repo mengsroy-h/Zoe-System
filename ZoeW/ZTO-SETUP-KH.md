@@ -1,8 +1,7 @@
 # កំណត់ ZTO Lookup សម្រាប់ ZoeW (វិធីងាយ)
 
 Setup របស់ ZTO Argus នេះត្រូវការ **តែ Cookie មួយ** សម្រាប់ចូល ZTO និង
-**Proxy Key មួយ** សម្រាប់ការពារ Function របស់ ZoeW។ មិនត្រូវការ Google
-Analytics `api_secret`, `measurement_id` ឬ `session_id` ទេ។
+**Proxy Key មួយ** សម្រាប់ការពារ Function របស់ ZoeW។
 
 ## ១. យក Cookie ថ្មីពី ZTO
 
@@ -45,9 +44,13 @@ variables ចូល `Deploys` → `Trigger deploy` → `Deploy site`។
 | Field COD | `cod` |
 | Field DOD | `dod` |
 
-ធីក `⚡ Fast Mode` ដើម្បីឱ្យ barcode ដែលបានរកឃើញរួចក្នុងរយៈពេល ១០ នាទី
+ធីក `Fast Mode សម្រាប់ ZTO Lookup` ដើម្បីឱ្យ barcode ដែលបានរកឃើញរួចក្នុងរយៈពេល ១០ នាទី
 បំពេញភ្លាមនៅពេលស្កេនម្តងទៀត។ Fast Mode រក្សាតែក្នុង memory មិនរក្សាទិន្នន័យ
 ZTO ក្នុង Service Worker cache ទេ ហើយមានពិដាន ៣០០ barcode។
+
+Proxy រង់ចាំ ZTO អតិបរមា ១២ វិនាទី ហើយ ZoeW រង់ចាំ proxy ១៦ វិនាទី មុន
+retry។ Response ទៅ browser មានតែ `phone`, `cod`, `dod`, `barcode`, `success`;
+វាមិនបញ្ជូនឈ្មោះ និងអាសយដ្ឋានអតិថិជនដែល UI មិនប្រើទេ។
 
 ចុច `សាកល្បង` ហើយបញ្ចូល barcode។ Function នឹងផ្ញើទៅ ZTO ជា៖
 

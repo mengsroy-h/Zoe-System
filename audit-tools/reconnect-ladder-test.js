@@ -140,6 +140,7 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         'const infoListenerFailedPaths = new Set();\n' +
         "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
         "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
+        'const listenerGeneration = 1;\nlet infoListenerGeneration = 1;\n' +
         'let reconnectWatchdogTimer = null;\nlet reconnectWatchdogAttempt = 0;\nlet lastForcedReconnectAt = 0;\n' +
         'let hasEverConnectedToDatabase = ' + (connectedFromStart ? 'true' : 'false') + ';\n' +
         'let networkJustReturned = false;\n' +

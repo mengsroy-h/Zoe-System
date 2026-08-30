@@ -78,6 +78,12 @@ for (const app of ['ZoeW']) {
             const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
         });
+        ['pendingLookupUnlockBarcode', 'pendingLookupUnlockResolve', 'lookupLockedNoticeShown'].forEach((n) => {
+            const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
+            if (decl) vm.runInContext(decl, ctx);
+        });
+        const cancelLookupFn = sliceFn(src, 'cancelPendingLookupUnlock');
+        if (cancelLookupFn) vm.runInContext(cancelLookupFn, ctx);
         const resetScanFn = sliceFn(src, 'resetScanConfirm');
         if (resetScanFn) vm.runInContext(resetScanFn, ctx);
         // ស្ថានភាពធុងសំរាមដែល clearSensitiveModalFields ត្រូវ reset — ចាក់ការប្រកាស **ពិត**

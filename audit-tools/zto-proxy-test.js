@@ -17,6 +17,7 @@ async function run() {
             return {
                 ok: true,
                 status: 200,
+                headers: { get: () => 'application/json' },
                 json: async () => ({
                     success: true,
                     data: {
@@ -50,6 +51,9 @@ async function run() {
         });
         assert.strictEqual(captured.url, 'https://aargus-api.ztoglobal.com/scan/get/order/detail');
         assert.strictEqual(captured.options.method, 'POST');
+        assert.strictEqual(captured.options.headers.Origin, 'https://argus.ztoglobal.com');
+        assert.strictEqual(captured.options.headers.Referer, 'https://argus.ztoglobal.com/');
+        assert.strictEqual(captured.options.redirect, 'manual');
         assert.deepStrictEqual(JSON.parse(captured.options.body), {
             billCode: '77130527210012', countryCode: 'KH'
         });

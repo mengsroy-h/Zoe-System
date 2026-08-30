@@ -1666,6 +1666,7 @@
         if (savedPin && !savedPin.startsWith('pbkdf2:')) {
             safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
         }
+        lookupSecretKey = await deriveLookupSecretKey(pin);
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         markAppUnlockedForSession();
@@ -3307,6 +3308,7 @@
     }
 
     let lookupLockedNoticeShown = false;
+    let pendingLookupUnlockBarcode = '';
     let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
     const LOOKUP_FOCUS_GRACE_MS = 600;
@@ -3377,6 +3379,14 @@
         }
     }
 
+    function retryPendingLookupAfterUnlock() {
+        const barcode = pendingLookupUnlockBarcode;
+        pendingLookupUnlockBarcode = '';
+        lookupLockedNoticeShown = false;
+        if (!barcode || pendingBarcode !== barcode) return;
+        attemptAutoLookup(barcode);
+    }
+
     function armLookupFocus(phoneInput, barcode, lookupPromise) {
         let focusDone = false;
         const focusIfEmpty = () => {
@@ -3412,10 +3422,12 @@
         scheduleCustomerTableSoonRefresh();
 
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            pendingLookupUnlockBarcode = String(barcode || '');
             if (!lookupLockedNoticeShown) {
                 lookupLockedNoticeShown = true;
-                showToast("🔒 ស្វែងរកអតិថិជនស្វ័យប្រវត្តិត្រូវការ Config PIN — សូមបើក ⚙️ Config ១ដងដើម្បីដោះសោសម្រាប់វគ្គនេះ");
+                showToast("🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការស្វែងរកអតិថិជន");
             }
+            if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi');
             return;
         }
 
@@ -3542,6 +3554,7 @@
         expandedTrashGroups.clear();
         activeParentItemId = null;
         lookupSecretKey = null;
+        pendingLookupUnlockBarcode = '';
         clearSheetImportSession();
         pendingLockerCode = null;
         lockerBarcodeIndex = {};

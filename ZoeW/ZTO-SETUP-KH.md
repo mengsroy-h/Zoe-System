@@ -1,8 +1,7 @@
 # កំណត់ ZTO Lookup សម្រាប់ ZoeW (វិធីងាយ)
 
 Setup របស់ ZTO Argus នេះត្រូវការ **តែ Cookie មួយ** សម្រាប់ចូល ZTO និង
-**Proxy Key មួយ** សម្រាប់ការពារ Function របស់ ZoeW។ មិនត្រូវការ Google
-Analytics `api_secret`, `measurement_id` ឬ `session_id` ទេ។
+**Proxy Key មួយ** សម្រាប់ការពារ Function របស់ ZoeW។
 
 ## ១. យក Cookie ថ្មីពី ZTO
 

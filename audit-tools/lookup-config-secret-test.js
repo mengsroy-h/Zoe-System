@@ -19,14 +19,19 @@ function check(condition, label, detail) {
 }
 
 function sliceFn(source, name) {
-    const start = source.indexOf('function ' + name + '(');
+    let start = source.indexOf('function ' + name + '(');
     if (start === -1) throw new Error('not found: ' + name);
+    if (source.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
     let depth = 0, started = false, i = source.indexOf('{', start);
     for (; i < source.length; i++) {
         if (source[i] === '{') { depth++; started = true; }
         else if (source[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
     }
     return source.slice(start, i);
+}
+
+function sliceFnOptional(source, name) {
+    try { return sliceFn(source, name); } catch (e) { return ''; }
 }
 
 function createRuntime(existing, key, encrypt, failStorage) {
@@ -75,6 +80,37 @@ function createRuntime(existing, key, encrypt, failStorage) {
 }
 
 (async () => {
+    const appSource = fs.readFileSync(path.join(APP_ROOT, 'ZoeW', 'app.js'), 'utf8');
+    const migrateSource = sliceFnOptional(appSource, 'migrateLookupSecretIfNeeded');
+    check(!!migrateSource, 'Lookup config: មាន helper បម្លែង Secret ចាស់ដោយស្វ័យប្រវត្តិ');
+    const unlockSources = ['saveNewSecurityPin', 'completePinUnlock', 'completeAppUnlock']
+        .map((name) => sliceFnOptional(appSource, name)).join('\n');
+    check((unlockSources.match(/migrateLookupSecretIfNeeded\(/g) || []).length === 3,
+        'Lookup config: រាល់ផ្លូវដោះសោ PIN បម្លែង plaintext Secret ភ្លាមៗ');
+
+    if (migrateSource) {
+        const storage = new Map([['zoew_lookup_api_config', JSON.stringify({
+            enabled: true,
+            headerName: 'X-Zoe-Proxy-Key',
+            headerValue: 'legacy-secret'
+        })]]);
+        const context = vm.createContext({
+            appLocalStore: {
+                getItem: (name) => storage.get(name) || null,
+                setItem: (name, value) => storage.set(name, String(value))
+            },
+            lookupSecretKey: { key: true },
+            encryptLookupSecret: async (value) => ({ sealed: value })
+        });
+        const runtimeCode = sliceFn(appSource, 'safeStoreSet') + '\n' + sliceFn(appSource, 'getLookupApiConfig')
+            + '\n' + migrateSource + '\nthis.runMigration = migrateLookupSecretIfNeeded;';
+        vm.runInContext(runtimeCode, context);
+        const changed = await context.runMigration();
+        const stored = JSON.parse(storage.get('zoew_lookup_api_config'));
+        check(changed === true && stored.headerValueEnc && !Object.prototype.hasOwnProperty.call(stored, 'headerValue'),
+            'Lookup config: ដោះសោ PIN ម្តង ➜ plaintext Secret ត្រូវបានលុបចេញពី storage', JSON.stringify(stored));
+    }
+
     const legacy = { enabled: false, autoSubmit: false, url: '', headerName: 'Authorization', headerValue: 'legacy-secret', phoneField: 'phone', codField: 'cod', dodField: 'dod' };
     const noKey = createRuntime(legacy, null, async () => { throw new Error('should not encrypt'); });
     await noKey.context.saveConfig();

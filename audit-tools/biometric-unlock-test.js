@@ -96,6 +96,7 @@ function makeEnv(opts) {
         openConfigModal: () => log.target.push('openConfigModal'),
         hashPin: async (pin) => 'pbkdf2:' + crypto.createHash('sha256').update('v2' + pin).digest('hex'),
         deriveLookupSecretKey: async (pin) => ({ derivedFrom: pin }),
+        migrateLookupSecretIfNeeded: async () => false,
         verifyStoredPin: async (pin, saved) => saved === 'pbkdf2:' + crypto.createHash('sha256').update('v2' + pin).digest('hex'),
         requestPinBeforeConfig: (fn, key) => { log.target.push('requestPin:' + key); log.pendingTarget = fn; },
         __log: log,

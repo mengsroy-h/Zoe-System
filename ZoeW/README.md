@@ -84,9 +84,14 @@ ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់
 | Field COD | `cod` |
 | Field DOD | `dod` |
 
-បើក `⚡ Fast Mode` ដើម្បីចងចាំលទ្ធផល barcode ដែលបានរកឃើញរយៈពេល ១០ នាទី
+បើក `Fast Mode សម្រាប់ ZTO Lookup` ដើម្បីចងចាំលទ្ធផល barcode ដែលបានរកឃើញរយៈពេល ១០ នាទី
 ក្នុង memory។ ការស្កេន barcode ដដែលម្តងទៀតបំពេញភ្លាមដោយមិនហៅ ZTO។ Cache
 មានពិដាន ៣០០ barcode និងត្រូវបានលុបពេល session/customer cache ត្រូវសម្អាត។
+
+កំណែ 2.23.3 ធ្វើឲ្យការស្កេនដំបូងរង់ចាំ PIN និង ZTO Lookup ចប់សិន មុនបើក
+Keyboard; callback Firebase ចាស់ក្រោយ Logout/Reconnect ត្រូវបានរំលង; និង ZTO
+timeout ត្រូវរៀប ១២ វិនាទីនៅ proxy / ១៦ វិនាទីនៅ App ដើម្បីកុំឲ្យ retry ជាន់គ្នា។
+Secret ចាស់ដែលនៅ plaintext ត្រូវបម្លែងទៅ AES-GCM ដោយស្វ័យប្រវត្តិពេលដោះសោ PIN។
 
 ⛔ កុំដាក់ ZTO Cookie ក្នុង ZoeW, GitHub ឬ screenshot។ Cookie ផុតកំណត់ពេល
 ZTO session ចប់/Logout; ពេលនោះ Login ថ្មី ចម្លង `BOS-MAN-SESSION=...` ថ្មីទៅ
@@ -252,7 +257,7 @@ Barcode ដែល **មិនមានក្នុងតារាង** ធ្ល
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.23.2`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.23.3`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។ វាបង្ហាញ **២ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ
 និងខាងក្រោមរបា Slide។
 

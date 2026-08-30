@@ -122,7 +122,7 @@ const REQUIRED_FNS = [
     'forceDatabaseReconnect', 'canCycleDatabaseConnection', 'scheduleReconnectWatchdog', 'clearReconnectWatchdog',
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
-    'detachDatabaseListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
+    'detachDatabaseListeners', 'detachInfoListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
     'runScheduledCleanup',
     'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
     'handleInfoListenerError', 'noteInfoListenerAlive'
@@ -175,12 +175,15 @@ function buildContext() {
     };
 
     const listenerCallbacks = {};
+    const listenerHistory = {};
     const fb = {
         off: (ref) => { log.off.push(ref && ref.__path); },
         onValue: (ref, cb, errCb) => {
             const p = ref && ref.__path;
             log.attached.push(p);
             listenerCallbacks[p] = { cb, errCb };
+            if (!listenerHistory[p]) listenerHistory[p] = [];
+            listenerHistory[p].push({ cb, errCb });
         },
         goOffline: () => { log.goOffline++; },
         goOnline: () => { log.goOnline++; }
@@ -247,6 +250,7 @@ function buildContext() {
         "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
         "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
         'let dbListenersFailed = false;\n' +
+        'let dbListenerGeneration = 0;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
         'let dbListenerRecoveryAttempt = 0;\n' +
         'let lastDbListenerAttemptAt = 0;\n' +
@@ -267,6 +271,7 @@ function buildContext() {
         'const dbListenerPendingPaths = new Set();\n' +
         'const dbListenerFailedPaths = new Set();\n' +
         'let infoListenersFailed = false;\n' +
+        'let infoListenerGeneration = 0;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
         'const infoListenerFailedPaths = new Set();\n' +
@@ -292,7 +297,7 @@ function buildContext() {
         'attachInfoListeners, handleInfoListenerError, clearInfoListenerRecovery };\n';
 
     vm.runInContext(code, ctx);
-    return { ctx, log, clock, advance, listenerCallbacks, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
+    return { ctx, log, clock, advance, listenerCallbacks, listenerHistory, statusDot, statusText, api: ctx.__api, probe: ctx.__probe,
         setConnHistory: ctx.__setConnHistory, connHistory: ctx.__connHistory,
         setInfoRefs: ctx.__setInfoRefs, infoProbe: ctx.__infoProbe };
 }
@@ -306,6 +311,27 @@ function buildContext() {
     ok('ស្ថានភាព = online ពេលធម្មតា', t.api.connectionLooksOnline() === true);
     t.api.renderConnectionStatus();
     ok('អត្ថបទ = ភ្ជាប់ Server រួចរាល់', t.statusText.innerText.indexOf('រួចរាល់') !== -1, t.statusText.innerText);
+}
+
+{
+    const t = buildContext();
+    const snap = (v) => ({ val: () => v });
+    t.api.initDatabaseListeners();
+    const staleHistory = t.listenerHistory.history[0].cb;
+    t.api.initDatabaseListeners();
+    t.listenerCallbacks.history.cb(snap([{ id: 'fresh', cod: 1, dod: 0 }]));
+    staleHistory(snap([{ id: 'stale', cod: 9, dod: 0 }]));
+    ok('⛔ callback របស់ listener ចាស់មិនត្រូវសរសេរជាន់ snapshot ថ្មី',
+        t.ctx.scanHistory.length === 1 && t.ctx.scanHistory[0].id === 'fresh', t.ctx.scanHistory);
+
+    t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+    t.api.attachInfoListeners();
+    const staleConnected = t.listenerHistory['info/connected'][0].cb;
+    t.api.attachInfoListeners();
+    t.listenerCallbacks['info/connected'].cb(snap(true));
+    staleConnected(snap(false));
+    ok('⛔ callback `.info/connected` ចាស់មិនត្រូវបង្ហាញ Offline ក្លែងក្លាយ',
+        t.infoProbe().isDatabaseConnected === true, t.infoProbe());
 }
 
 // ── ២. listener ត្រូវ cancel ➜ មិនត្រូវអះអាងថាភ្ជាប់ ─────────────────
@@ -883,7 +909,8 @@ function buildContext() {
         /INFO_LISTENER_RECOVERY_STEPS_MS/.test(SRC)
         && /function scheduleInfoListenerRecovery\(/.test(SRC));
     ok('ការភ្ជាប់ឡើងវិញ detach ជាមុន (គ្មាន listener ស្ទួន)',
-        /function attachInfoListeners\(\)[\s\S]{0,400}?fb\.off\(dbRefConnected\)[\s\S]{0,200}?fb\.off\(dbRefServerTimeOffset\)/.test(SRC));
+        /function attachInfoListeners\(\)[\s\S]{0,120}?detachInfoListeners\(\)/.test(SRC)
+        && /function detachInfoListeners\(\)[\s\S]{0,300}?fb\.off\(dbRefConnected\)[\s\S]{0,200}?fb\.off\(dbRefServerTimeOffset\)/.test(SRC));
     // ⛔ តាំងពី 2.23.1 ការរលត់ធ្វើតាម `noteInfoListenerAlive(<key>)` ដែល
     // **រលត់តែពេលគ្មាន path ណានៅងាប់** — ការហៅ `clearInfoListenerRecovery()`
     // ដោយផ្ទាល់ក្នុង callback ជោគជ័យ ជា **បងប្អូនប្រកាសជំនួស** (ថ្នាក់ 2.20.8)។

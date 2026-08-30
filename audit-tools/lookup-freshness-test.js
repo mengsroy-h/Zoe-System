@@ -90,6 +90,7 @@ const DECLS = [
     'customerDataTableSessionGeneration', 'customerDataTableLastFailedAt',
     'customerTableRetryTimer', 'customerTableFailStreak',
     'autoLookupLastFailedAt', 'AUTO_LOOKUP_FAIL_COOLDOWN_MS', 'AUTO_LOOKUP_MAX_IN_FLIGHT',
+    'AUTO_LOOKUP_TIMEOUT_MS',
     'LOOKUP_FAST_CACHE_TTL_MS', 'LOOKUP_FAST_CACHE_MAX', 'lookupFastCache',
     'autoLookupInFlight', 'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
     'sheetImportSignature'

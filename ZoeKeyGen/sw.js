@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v82';
+const CACHE_VERSION = 'zoekeygen-v83';
 
 const CORE_SHELL = [
     './',
@@ -88,20 +88,42 @@ const NETWORK_TIMEOUT_MS = 20000;
 
 function timedFetch(request, options) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const sourceSignal = (options && options.signal) || (request && request.signal) || null;
     const opts = controller ? Object.assign({}, options || {}, { signal: controller.signal }) : options;
     return new Promise((resolve, reject) => {
         let settled = false;
         let timer = null;
         const stop = () => {
-            if (timer === null) return;
-            clearTimeout(timer);
-            timer = null;
+            if (timer !== null) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            if (sourceSignal && typeof sourceSignal.removeEventListener === 'function') {
+                sourceSignal.removeEventListener('abort', abortFromSource);
+            }
         };
+        const abortFromSource = () => {
+            if (settled) return;
+            settled = true;
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            stop();
+            const err = new Error('Aborted');
+            err.name = 'AbortError';
+            reject(err);
+        };
+        if (sourceSignal && typeof sourceSignal.addEventListener === 'function') {
+            if (sourceSignal.aborted) {
+                abortFromSource();
+                return;
+            }
+            sourceSignal.addEventListener('abort', abortFromSource, { once: true });
+        }
         timer = setTimeout(() => {
             timer = null;
             if (settled) return;
             settled = true;
             if (controller) { try { controller.abort(); } catch (e) {} }
+            stop();
             const err = new Error('Network timed out');
             err.name = 'AbortError';
             reject(err);

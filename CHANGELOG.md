@@ -25,6 +25,59 @@
 
 ---
 
+## [ZoeW 2.23.3 · ZoeKeyGen 2.19.13] — 2026-08-30 · Deep Audit បណ្តាញ · Race · Secret · Service Worker
+
+ជុំនេះកែ **ZoeW** (`zoew-v134` ➜ `zoew-v135`) និង helper បណ្តាញដែលចែករំលែក
+ជាមួយ **ZoeKeyGen** (`zoekeygen-v82` ➜ `zoekeygen-v83`)។ មិនប៉ះតក្កវិជ្ជាលុយ
+ការលុប/ស្តារ PTR កាយវិការ ឬរូបរាង UI ទេ។
+
+### កែកំហុស និង Race
+
+- ការស្កេន ZTO លើកដំបូងខណៈ Secret នៅជាប់សោ ឥឡូវ Promise រង់ចាំការវាយ PIN
+  និង ZTO response ពិត។ Keyboard មិនលោតមុន Lookup ចប់ ហើយការស្កេនដើមបន្ត
+  ដោយស្វ័យប្រវត្តិ ក្រោយដោះសោ។ ការបិទប្រអប់ PIN ដោះ Promise ដោយស្អាត។
+- Firebase data listener និង `.info/*` listener មាន generation fence។ callback
+  ដែលត្រូវ queue មុន Logout, Reconfig ឬ Reconnect មិនអាចសរសេរជាន់ snapshot
+  ថ្មី ឬបង្ហាញ Online/Offline ក្លែងក្លាយបានទៀត។
+- ការពិនិត្យ Session និង License តាម `setInterval` មាន in-flight guard។ timer
+  ពីរដែលជាន់គ្នាបាញ់ Server តែមួយសំណើ ហើយការអាន Firebase token មានពិដាន
+  ១៥ វិនាទី។
+
+### បណ្តាញ និង Service Worker
+
+- `fetchWithTimeout()` និង Service Worker របស់ App ទាំង ២ បញ្ជូន caller abort
+  ទៅសំណើពិត។ ពេល App timeout ឬអ្នកប្រើបោះបង់ request វាមិនបន្សល់សំណើ zombie
+  ក្នុង Service Worker ដែលទៅជាន់នឹង retry ថ្មីទៀត។
+- ZTO proxy កំណត់ពិដាន upstream ១២ វិនាទី ខណៈ client រង់ចាំ ១៦ វិនាទី ដើម្បី
+  ឲ្យ proxy មានពេលបិទសំណើ និងឆ្លើយ error មុន client retry។
+- ZTO ដែលឆ្លើយ HTTP 200 ប៉ុន្តែ `success:false` ឥឡូវក្លាយជា HTTP 502 ត្រឹមត្រូវ;
+  ZoeW មិន cache ជួរទទេថាជាជោគជ័យទៀត។
+
+### សុវត្ថិភាព
+
+- ក្រោយដោះសោ PIN Secret Lookup ចាស់ដែលធ្លាប់នៅ plaintext ត្រូវបម្លែងទៅ
+  AES-GCM និងលុប plaintext ចេញពី storage ដោយស្វ័យប្រវត្តិ។
+- ZTO proxy បញ្ជូនតែ `phone`, `cod`, `dod`, `barcode`, `success`; ឈ្មោះអតិថិជន
+  និងគោលដៅដែល UI មិនប្រើត្រូវបានដកចេញ។ Extra header មិនអាចសរសេរជាន់
+  `Host`, `Cookie`, `Authorization`, `Origin`, `Referer` ឬ hop-by-hop header។
+- Static secret scan ១០២ assertion និង HTML sink/XSS escaping ៩ assertion ឆ្លងកាត់។
+
+### ឧបករណ៍ audit
+
+- បន្ថែម `sw-abort-propagation-test.js` និង `periodic-network-guard-test.js`;
+  ពង្រីក `lookup-prefetch-test.js`, `lookup-config-secret-test.js`,
+  `connection-recovery-test.js` និង `zto-proxy-test.js` សម្រាប់ regression ថ្មី។
+- `checker-coverage.js` លែងរាប់ checker ដែលរាយ `SKIP` ថាជា «បៃតងលើថតទទេ»។
+  Meta-audit ឥឡូវបញ្ជាក់ថា checker ទាំង ១០៥ មិនអាច pass លើ tree ទទេ។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy Netlify កំណែថ្មី។ មិនត្រូវប្តូរ Firebase rules ឬ Environment Variables
+  ដែលមានស្រាប់ទេ។ បើ ZTO Cookie ផុតកំណត់ ត្រូវ Login ZTO ម្តងទៀត ប្តូរ
+  `ZTO_COOKIE` ហើយ Trigger deploy ដូចធម្មតា។
+
+---
+
 ## [ZoeW 2.23.2 · ZoeKeyGen 2.19.12] — 2026-08-29 · listener `.info/*` ដែលងាប់តែឯង · រូបរាងប្រអប់
 
 ជុំនេះកែ **ZoeW** (`zoew-v128` ➜ `zoew-v129`) និង **ZoeKeyGen**

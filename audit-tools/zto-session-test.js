@@ -452,19 +452,79 @@ async function run() {
         assert.deepStrictEqual(loginReasons, ['host:sso.zto.com', 'scheme:http', 'url:unparsable'],
             'a blocked IDaaS redirect must name the host so it can be reviewed and allow-listed');
 
+        const idpUrl = 'https://iam-web.zto.com/oauth2/authorize?lang=km';
+        const handleStub = () => ({ evaluate: async () => true, click: async () => {}, type: async () => {} });
+
+        let emptyTicks = 0;
         try {
-            await api.performArgusLogin(config, {
-                now: Date.now,
+            await withTimeout(api.performArgusLogin(config, {
+                now: () => 1700000000000 + (emptyTicks += 500),
                 sleep: async () => {},
                 logger: () => {},
-                launchBrowser: async () => fakeBrowser('https://iam-web.zto.com/oauth2/authorize?region=km')
-            });
+                launchBrowser: async () => fakeBrowser(idpUrl)
+            }), 8000, '⛔ ការរង់ចាំទម្រង់ login មិនចេញ');
             assert.fail('an empty login form must not pass');
         } catch (error) {
             assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
-            assert.strictEqual(error.reason, 'form:username-0',
-                'a changed ZTO login form must say which control went missing');
+            assert.strictEqual(error.reason, 'login:wait-password@iam-web.zto.com:TimeoutError',
+                'ទំព័រដែលគ្មានទម្រង់សោះ ➜ រង់ចាំរួចផុតកំណត់ ដោយប្រាប់ជំហាន និង host');
         }
+
+        const noUsernamePage = fakePage(idpUrl);
+        noUsernamePage.$$ = async (selector) => (/password/.test(selector) ? [handleStub()] : []);
+        let noUserTicks = 0;
+        try {
+            await withTimeout(api.performArgusLogin(config, {
+                now: () => 1700000000000 + (noUserTicks += 500),
+                sleep: async () => {},
+                logger: () => {},
+                launchBrowser: async () => ({
+                    newPage: async () => noUsernamePage,
+                    pages: async () => [noUsernamePage],
+                    close: async () => {}
+                })
+            }), 8000, 'form-scan hang');
+            assert.fail('a form without a username box must not pass');
+        } catch (error) {
+            assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
+            assert.strictEqual(error.reason, 'form:username-0',
+                'ទម្រង់ដែលរកឃើញ តែខ្វះប្រអប់ ➜ ត្រូវប្រាប់ថាធាតុណាបាត់');
+        }
+
+        const shellPage = fakePage(idpUrl);
+        shellPage.$$ = async () => [];
+        let submitted = false;
+        const innerFrame = {
+            $$: async (selector) => {
+                if (/password/.test(selector)) return [handleStub()];
+                if (selector === 'button') {
+                    return [{
+                        evaluate: async (fn) => (String(fn).indexOf('textContent') !== -1 ? 'login' : true),
+                        click: async () => { submitted = true; }
+                    }];
+                }
+                return [handleStub()];
+            }
+        };
+        shellPage.frames = () => [shellPage, innerFrame];
+        shellPage.browserContext = () => ({
+            cookies: async () => (submitted ? [{ name: 'BOS-MAN-SESSION', value: 'after-login' }] : [])
+        });
+        let framePicked = null;
+        let frameTicks = 0;
+        const frameSession = await withTimeout(api.performArgusLogin(config, {
+            now: () => 1700000000000 + (frameTicks += 400),
+            sleep: async () => {},
+            logger: () => {},
+            launchBrowser: async () => ({
+                newPage: async () => { framePicked = shellPage; return shellPage; },
+                pages: async () => [shellPage],
+                close: async () => {}
+            })
+        }), 8000, '⛔ ទម្រង់ក្នុង iframe ➜ ការស្វែងរកព្យួរ');
+        assert.ok(framePicked, 'browser ត្រូវបានបើក');
+        assert.strictEqual(frameSession.cookie, 'BOS-MAN-SESSION=after-login',
+            '⛔ ទម្រង់ login ក្នុង **iframe** ត្រូវរកឃើញ — `page.waitForSelector` មើលតែ frame មេ');
 
         const timeoutPage = fakePage('https://iam-web.zto.com/oauth2/authorize?region=km');
         timeoutPage.waitForSelector = async () => {

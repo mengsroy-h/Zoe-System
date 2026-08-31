@@ -17,6 +17,9 @@ const LOGIN_LOCK_KEY = 'argus-login-lock';
 const LOGIN_FAILURE_KEY = 'argus-login-failure';
 const SESSION_AAD = Buffer.from('zoew:zto-session:v1');
 const LOGIN_LOCK_MS = 50 * 1000;
+const LOGIN_FORM_WAIT_MAX_MS = 20 * 1000;
+const LOGIN_FORM_WAIT_MIN_MS = 12 * 1000;
+const LOGIN_POLL_RESERVE_MS = 10 * 1000;
 const LOGIN_WAIT_MS = 35 * 1000;
 const COOKIE_EXPIRY_SKEW_MS = 30 * 1000;
 const COOKIE_TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
@@ -252,7 +255,24 @@ function hostSuffix(host) {
     return host && host !== 'unknown' ? '@' + host : '';
 }
 
-function logLoginProblem(deps, step, host, elapsedMs, view, error) {
+async function loginFrameSummary(page) {
+    const parts = [];
+    for (const frame of loginFrames(page)) {
+        let inputs = -1;
+        let passwords = -1;
+        try {
+            inputs = (await frame.$$('input')).length;
+            passwords = (await frame.$$('input[type="password"]')).length;
+        } catch (_) {}
+        let host = '';
+        try { host = safeHostLabel(new URL(frame.url()).hostname); } catch (_) {}
+        parts.push((host || '?') + ':' + inputs + '/' + passwords);
+        if (parts.length >= 6) break;
+    }
+    return parts.join(' ');
+}
+
+function logLoginProblem(deps, step, host, elapsedMs, view, frameView, error) {
     const log = (deps && deps.logger) || console.warn;
     if (typeof log !== 'function') return;
     const shape = loginViewIsUsable(view)
@@ -260,9 +280,10 @@ function logLoginProblem(deps, step, host, elapsedMs, view, error) {
             + ' frames=' + view.frames + ' text=' + view.chars + ' ready=' + view.ready
             + ' params=[' + String(view.params || '') + ']'
         : ' (ទំព័រអានមិនបាន)';
+    const frames = frameView ? ' frames=[' + frameView + ']' : '';
     try {
         log(LOG_PREFIX + 'ZTO login failed at ' + step + (host ? ' on ' + host : '')
-            + ' after ' + Math.round(elapsedMs) + 'ms: ' + safeReasonText(error) + shape);
+            + ' after ' + Math.round(elapsedMs) + 'ms: ' + safeReasonText(error) + shape + frames);
     } catch (_) {}
 }
 
@@ -332,6 +353,38 @@ async function visibleHandles(page, selector) {
     return visible;
 }
 
+function loginFrames(page) {
+    try {
+        const frames = typeof page.frames === 'function' ? page.frames() : null;
+        if (Array.isArray(frames) && frames.length) return frames;
+    } catch (_) {}
+    return [page];
+}
+
+async function frameHasLoginForm(frame) {
+    try {
+        return (await visibleHandles(frame, 'input[type="password"]')).length > 0;
+    } catch (_) {
+        return false;
+    }
+}
+
+async function waitForLoginFrame(page, deps, deadlineAt) {
+    const now = deps.now || Date.now;
+    const sleep = deps.sleep || delay;
+    for (;;) {
+        for (const frame of loginFrames(page)) {
+            if (await frameHasLoginForm(frame)) return frame;
+        }
+        if (now() >= deadlineAt) {
+            const error = new Error('login form not found');
+            error.name = 'TimeoutError';
+            throw error;
+        }
+        await sleep(Math.min(250, Math.max(1, deadlineAt - now())));
+    }
+}
+
 async function findUsernameInput(page) {
     const preferred = await visibleHandles(page, 'input[placeholder="Username"]');
     if (preferred.length === 1) return preferred[0];
@@ -365,6 +418,16 @@ async function findLoginButton(page) {
 }
 
 async function inspectLoginState(page) {
+    const merged = { challenge: false, rejected: false };
+    for (const frame of loginFrames(page)) {
+        const state = await inspectFrameLoginState(frame);
+        if (state.challenge) merged.challenge = true;
+        if (state.rejected) merged.rejected = true;
+    }
+    return merged;
+}
+
+async function inspectFrameLoginState(page) {
     try {
         return await page.evaluate(() => {
             const visible = (element) => {
@@ -464,15 +527,17 @@ async function performArgusLogin(config, dependencies) {
         }
         assertAllowedLoginUrl(page.url());
         step = navigated ? 'wait-password' : 'wait-password-nonav';
-        await page.waitForSelector('input[type="password"]', {
-            visible: true,
-            timeout: Math.min(12000, remaining())
-        });
+        const formWaitMs = Math.max(1, Math.min(
+            Math.max(LOGIN_FORM_WAIT_MIN_MS, remaining() - LOGIN_POLL_RESERVE_MS),
+            LOGIN_FORM_WAIT_MAX_MS,
+            remaining()
+        ));
+        const formFrame = await waitForLoginFrame(page, deps, now() + formWaitMs);
 
         step = 'find-form';
-        const usernameInput = await findUsernameInput(page);
-        const passwordInput = await findPasswordInput(page);
-        const loginButton = await findLoginButton(page);
+        const usernameInput = await findUsernameInput(formFrame);
+        const passwordInput = await findPasswordInput(formFrame);
+        const loginButton = await findLoginButton(formFrame);
         step = 'fill';
         await fillCredential(usernameInput, config.username, page);
         await fillCredential(passwordInput, config.password, page);
@@ -520,7 +585,8 @@ async function performArgusLogin(config, dependencies) {
         const host = page ? hostNow() : '';
         if (page) {
             const view = await loginDiagnostics(page);
-            logLoginProblem(deps, step, host, now() - started, view, error);
+            const frameView = await loginFrameSummary(page);
+            logLoginProblem(deps, step, host, now() - started, view, frameView, error);
         }
         if (error instanceof ZtoSessionError) throw error;
         throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502,

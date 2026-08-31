@@ -151,7 +151,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
 
     // what clearSensitiveModalFields / showLoginModalWithPrefill actually blanks
     const cleared = new Set();
-    const clearFns = ['clearSensitiveModalFields', 'showLoginModalWithPrefill', 'clearGeneratedKeyResult'];
+    const clearFns = ['clearSensitiveModalFields', 'clearLookupStatus', 'showLoginModalWithPrefill', 'clearGeneratedKeyResult'];
     for (const fn of clearFns) {
         const i = src.indexOf('function ' + fn + '(');
         if (i === -1) continue;

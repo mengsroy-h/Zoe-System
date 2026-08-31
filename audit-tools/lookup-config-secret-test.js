@@ -66,6 +66,8 @@ function createRuntime(existing, key, encrypt, failStorage) {
         },
         lookupSecretKey: key,
         encryptLookupSecret: encrypt,
+        clearCustomerDataTableCache: () => {},
+        prefetchCustomerDataTableRowsIfConfigured: () => {},
         closeModal: () => {},
         showToast: () => {},
         alert: (message) => alerts.push(String(message))

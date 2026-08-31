@@ -87,6 +87,8 @@ function buildContext(opts) {
     vm.runInContext('currentStream = ' + (opts.stream === false ? 'null' : '{}') + ';', ctx);
     vm.runInContext('isCameraScanning = ' + (opts.scanning === false ? 'false' : 'true') + ';', ctx);
     NEEDED.filter((n) => n !== 'requestCameraPermission').forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
+    const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
+    if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
     return ctx;
 }
 

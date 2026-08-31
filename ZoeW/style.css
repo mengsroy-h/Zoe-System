@@ -918,6 +918,13 @@
         }
         .modal-content { background-color: white; padding: 20px 18px 18px; border-radius: var(--radius-xl); width: 100%; max-width: 340px; text-align: center; box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(15, 23, 42, 0.05); max-height: 85vh; overflow-y: auto; color: var(--text-main); animation: modalPopIn 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
         #phoneModal .modal-content { position: relative; }
+        .lookup-status { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; color: var(--text-muted); font-size: calc(10.5 * var(--fs-unit)); font-weight: 600; line-height: 1.45; text-align: left; overflow-wrap: anywhere; }
+        .lookup-status-loading { background: var(--accent-blue-light); border-color: #bae6fd; color: #075985; }
+        .lookup-status-success { background: var(--success-light); border-color: #a7f3d0; color: #047857; }
+        .lookup-status-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .lookup-status-error { background: var(--primary-light); border-color: #fecdd3; color: #be123c; }
+        .lookup-status-offline { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
+        .lookup-status-cache { background: var(--accent-purple-light); border-color: #ddd6fe; color: #6d28d9; }
         .modal-close-x { position: absolute; top: 8px; right: 8px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color); background: #f1f5f9; color: var(--text-muted); font-size: calc(12 * var(--fs-unit)); font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
         .modal-close-x:disabled { opacity: 0.45; cursor: not-allowed; }
         #phoneModal .modal-content h3 { padding: 0 32px; }

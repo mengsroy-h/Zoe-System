@@ -25,6 +25,30 @@
 
 ---
 
+## [ZoeW 2.23.6] — 2026-08-31 · បំពេញស្ថានភាព ZTO និងធ្វើឱ្យ Audit ត្រូវនឹងកូដពិត
+
+ជុំកែបន្ទាន់នេះកែតែ **ZoeW** (`zoew-v137` ➜ `zoew-v138`)។ ZoeKeyGen,
+Firebase Rules, Environment Variables, Fast Mode, manual auto-fallback និងច្បាប់
+Barcode/ស្ថិតិមិនបានប្តូរ។
+
+### កែកំហុស
+
+- បន្ថែមតំបន់ `lookupStatus` ដែល commit 2.23.5 ភ្លេចដាក់ក្នុងប្រអប់លេខទូរស័ព្ទ។
+  ស្ថានភាព ZTO/API «កំពុងស្វែងរក · cache · រកឃើញ · ព្រមាន · offline · error»
+  ឥឡូវបង្ហាញពិតជាមួយពណ៌ដាច់ពីគ្នា និង `aria-live="polite"` សម្រាប់ screen reader។
+- កែ test sandbox ៣ ដែលមិនបានផ្ទុក helper ថ្មី `clearLookupStatus()` និងមិនបាន
+  ផ្តល់ dependency របស់ `saveLookupApiConfig()`។ កំហុស `ReferenceError` ទាំងនេះ
+  ជាកំហុស checker មិនមែនការខូច camera, logout ឬការរក្សាទុក Secret ក្នុង App ពិត។
+- ឱ្យ `dom-hygiene` ស្គាល់ផ្លូវសម្អាត `lookupStatus` ពិត និងកត់ហេតុផលអនុញ្ញាត
+  នាឡិកា local របស់ ZTO warm-up ក្នុង `clock-hygiene`។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy static files របស់ ZoeW។ មិនត្រូវ Publish Firebase Rules ឬប្តូរ
+  Environment Variables ទេ។
+
+---
+
 ## [ZoeW 2.23.5 · ZoeKeyGen 2.19.15] — 2026-08-31 · Retry ZTO ពិត · race fence · SheetJS security
 
 ជុំ Deep Audit ទី ២ កែ **ZoeW** (`zoew-v136` ➜ `zoew-v137`) និង

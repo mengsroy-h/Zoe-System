@@ -123,6 +123,8 @@ for (const app of ['ZoeW']) {
             + " sheetImportPassword = 'import-pw'; sheetImportSignature = 'sig'; sheetImportBusy = true;", ctx);
         const helper = sliceFn(src, 'isPinFlowPending');
         if (helper) vm.runInContext(helper, ctx);
+        const clearLookupStatusFn = sliceFn(src, 'clearLookupStatus');
+        if (clearLookupStatusFn) vm.runInContext(clearLookupStatusFn, ctx);
         const clearFn = sliceFn(src, 'clearSensitiveModalFields');
         if (clearFn) vm.runInContext(clearFn, ctx);
         // ការចាកចេញត្រូវអានសេចក្តីពិតរបស់ toast ដែលរស់ឡើងវិញ (កំណែ 2.19.2) ➜

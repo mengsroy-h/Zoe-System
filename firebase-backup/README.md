@@ -11,12 +11,11 @@ Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime D
 បើ Project មានបញ្ហា (លុបខុសទាំង Database, Account ត្រូវបានលុប, Billing issue) គ្មានវិធីសង្គ្រោះទិន្នន័យ
 មកវិញបានទេ លុះត្រាតែមាន Backup ដាច់ដោយឡែក។
 
-## ជំហានទី ១ — ដំឡើង
+## ជំហានទី ១ — តម្រូវការ
 
-```
-cd firebase-backup
-npm install
-```
+ប្រើ **Node.js 18 ឬថ្មីជាងនេះ**។ Script ប្រើតែ API ដែលមានស្រាប់ក្នុង Node
+(`fetch`, `AbortController`, `crypto`) និង **គ្មាន third-party runtime dependency** ទេ —
+មិនចាំបាច់ `npm install`។
 
 ## ជំហានទី ២ — យក Service Account Key (សម្រាប់ជំនួញនីមួយៗ)
 
@@ -41,6 +40,10 @@ cp config.example.json config.json
 {
   "backupDir": "./backups",
   "keepCount": 30,
+  "requestTimeoutMs": 120000,
+  "retryCount": 2,
+  "retryDelayMs": 1000,
+  "lockStaleMs": 43200000,
   "businesses": [
     {
       "name": "ឈ្មោះជំនួញ-សម្រាប់កំណត់ត្រា",
@@ -55,8 +58,14 @@ cp config.example.json config.json
   ដើម្បីកុំឲ្យ Disk ពេញ។ បើ Run ជារៀងរាល់ថ្ងៃ 30 មានន័យថារក្សាទុកបាន ១ខែ។ ត្រូវជាចំនួនគត់ចាប់ពី 1 ឡើងទៅ —
   បើដាក់តម្លៃមិនត្រឹមត្រូវ (0, អវិជ្ជមាន, ឬមិនមែនលេខ) Script បញ្ឈប់ភ្លាមដោយបង្ហាញកំហុស ជាជាងលុបទិន្នន័យខុស។
 - `name` — ប្រើជាឈ្មោះថតលទ្ធផលផងដែរ ដូច្នេះអនុញ្ញាតតែ អក្សរឡាតាំង/លេខ/`.`/`-`/`_` ប៉ុណ្ណោះ។
+- `requestTimeoutMs` — ពិដានពេលក្នុង request នីមួយៗ (លំនាំដើម 120 វិនាទី)។
+- `retryCount` និង `retryDelayMs` — retry សម្រាប់ timeout, 408/429/5xx ដោយ exponential backoff;
+  កំហុស 401/403 មិន retry ទេ។
+- `lockStaleMs` — ទប់ backup ពីររត់ជាន់គ្នា; lock ដែលសល់ពី process ដួលអាចសង្គ្រោះក្រោយ 12 ម៉ោង។
 
 Backup ត្រូវសរសេរចូល File បណ្ដោះអាសន្ន `.partial` សិន រួចទើប Rename — ដូច្នេះបើដាច់ចរន្ត ឬបញ្ឈប់កណ្ដាលទី នឹងគ្មាន File Backup ខូចទុកសល់ (ហើយវាក៏មិនរាប់ចូល `keepCount` ដែលអាចរុញ Backup ល្អចេញនោះដែរ)។
+OAuth access token មានអាយុខ្លីត្រូវបានបង្កើតពី service-account key ក្នុង memory ហើយបញ្ជូនទៅ
+Firebase តាម `Authorization: Bearer` — token/private key មិនត្រូវដាក់ក្នុង URL ឬ output log ទេ។
 
 `config.json` ក៏មិនត្រូវបាន Commit ចូល Git ដែរ (មាន Path ទៅ Secret Files) ។
 
@@ -104,22 +113,7 @@ Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោ�
 ទិន្នន័យផ្ទាល់ដែលកំពុងប្រើ) ។ បើត្រូវការស្តារជាក់ស្តែង៖
 
 1. Unzip File Backup ដែលចង់ស្តារ (`gunzip -k backup-file.json.gz` ឬប្រើ 7-Zip លើ Windows)
-2. ប្រើ Script តូចមួយ (ជាមួយ Service Account ដដែល)៖
+2. ចូល Firebase Console → Realtime Database → ⋮ → **Import JSON** ហើយជ្រើស file ដែលបានបើក។
 
-```js
-const admin = require('firebase-admin');
-const fs = require('fs');
-const serviceAccount = require('./secrets/xxx-service-account.json');
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: 'https://xxx-default-rtdb.firebaseio.com'
-});
-const data = JSON.parse(fs.readFileSync('./backup-file.json', 'utf8'));
-admin.database().ref('/').set(data).then(() => {
-    console.log('Restored!');
-    process.exit(0);
-});
-```
-
-**សូមប្រុងប្រយ័ត្នខ្លាំង** — `.set('/')` សរសេរជាន់ពីលើទិន្នន័យបច្ចុប្បន្នទាំងអស់។ សូមប្រាកដថាចង់ធ្វើដូច្នេះ
-មែន (ឧ. ក្នុងករណីទិន្នន័យខូច/បាត់) មុននឹង Run។
+**សូមប្រុងប្រយ័ត្នខ្លាំង** — Import នៅ root អាចសរសេរជាន់/លុបទិន្នន័យបច្ចុប្បន្ន។ សាកល្បងលើ
+Firebase project បណ្ដោះអាសន្នសិន ហើយបិទការសរសេររបស់ App មុន restore production។

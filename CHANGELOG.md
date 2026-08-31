@@ -25,6 +25,53 @@
 
 ---
 
+## [ZoeW 2.24.0] — 2026-08-31 · expired ២ថ្ងៃ · ZTO auth status · Deep Audit
+
+ជុំនេះកែតែ **ZoeW** (`zoew-v138` ➜ `zoew-v139`)។ ZoeKeyGen និង Firebase
+Rules មិនបានប្តូរ។
+
+### បន្ថែម · កែកំហុស
+
+- កញ្ចប់ដែលចូលធុងសំរាមដោយច្បាប់ផុតកំណត់ ៨ថ្ងៃ (`trashReason: expired`)
+  ឥឡូវលុបអចិន្ត្រៃយ៍ក្រោយនៅក្នុងធុងសំរាមលើស ២ថ្ងៃ។ `delete`, `remove` និង
+  `pickup` នៅតែរក្សា ៣០ថ្ងៃដដែល។ ទិន្នន័យ legacy ដែលគ្មាន `trashReason`
+  មិនត្រូវសន្មត់ថា expired ទេ ដើម្បីជៀសវាងលុបខុស។
+- កែ off-by-one នៃគោលការណ៍ «លើស ៧ថ្ងៃ ➜ ដកនៅថ្ងៃទី ៨»៖ កូដចាស់រង់ចាំ
+  លើស ៨×២៤ ម៉ោង (យឺតមួយថ្ងៃ)។ ឥឡូវនៅ ៧×២៤ ម៉ោងគត់មិនទាន់ដក តែពេល
+  លើស ៧ថ្ងៃទើបដកតែ barcode ដែលមិនទាន់យក។
+- ច្បាប់ purge ថ្មីនៅតែទាមទារនាឡិកា Firebase ដែលបាន sync និងការភ្ជាប់ពិត;
+  restore claim ដែលនៅរស់អាចទប់ purge ហើយ claim ងាប់ត្រូវដោះមុនលុប។
+- ZTO proxy បែងចែក session/token ផុតកំណត់, rate limit, timeout និងការខ្វះ auth
+  config ជា status/code ដាច់ពីគ្នា។ App បង្ហាញសារ ZTO session ផុតកំណត់ច្បាស់
+  ហើយ 401/403 មិនត្រូវ retry ដូច 5xx ទៀត។
+- ZTO login redirect និង HTML login page (ករណី Cookie ផុតកំណត់ដែលមិនឆ្លើយ JSON)
+  ត្រូវបានចាប់ជា `ZTO_AUTH_EXPIRED` ដែរ មិនបង្ហាញជា network error មិនច្បាស់ទៀត។
+- `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` ឈ្នះ `ZTO_COOKIE` ដោយច្បាស់ ដូច្នេះអាច
+  ប្តូរទៅ credential ផ្លូវការបានដោយមិនឱ្យ Cookie ចាស់រំខាន request។
+
+### សុវត្ថិភាព · ឧបករណ៍ audit
+
+- Proxy មិនបញ្ជូន upstream error វែង/តួ control ទៅ browser, បន្ថែម response
+  hardening headers និងបដិសេធដំណើរការបើគ្មាន ZTO auth server-side។
+- បន្ថែម `expired-trash-retention-test.js` ដែលរត់កូដពិត និងចាក់សោព្រំដែន ២ថ្ងៃ,
+  retention ៣០ថ្ងៃ, restore race និង barcode registry release។ Test ZTO ត្រូវបាន
+  ពង្រីកសម្រាប់ auth មិនបានកំណត់, session expired, 429 និង official token precedence។
+- ដក `firebase-admin` និង dependency tree ដែលមាន security advisory ចេញពីឧបករណ៍
+  backup។ វាប្រើ native OAuth/REST, `Authorization: Bearer`, timeout + retry,
+  file permission 0600 និង run lock; `npm audit` ឥឡូវ 0 vulnerability។
+- បន្ថែម `firebase-backup-test.js` ចាក់សោ OAuth signature/scope, SSRF URL guard,
+  retry policy, atomic gzip, retention, file permission និង concurrent-run race។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy static files និង Netlify Function របស់ ZoeW។ មិនត្រូវ Publish Firebase
+  Rules ទេ។ បើ ZTO ផ្តល់ token ផ្លូវការ សូមប្រើ `ZTO_AUTHORIZATION` ឬ
+  `ZTO_TOKEN`; បើមិនទាន់មាន សូមរក្សា `ZTO_COOKIE` ដដែល។
+- ម៉ាស៊ីនដែលរត់ `firebase-backup` ត្រូវប្រើ Node.js 18 ឬថ្មីជាងនេះ; `npm install`
+  លែងចាំបាច់។
+
+---
+
 ## [ZoeW 2.23.6] — 2026-08-31 · បំពេញស្ថានភាព ZTO និងធ្វើឱ្យ Audit ត្រូវនឹងកូដពិត
 
 ជុំកែបន្ទាន់នេះកែតែ **ZoeW** (`zoew-v137` ➜ `zoew-v138`)។ ZoeKeyGen,

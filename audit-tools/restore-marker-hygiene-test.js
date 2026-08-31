@@ -48,7 +48,7 @@ const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
     'releaseStaleRestoreClaimForPurge', 'claimAndCleanupItem', 'runAutomaticCleanupRules',
-    'collectItemBarcodes', 'runAutomaticDeletedCleanup'];
+    'collectItemBarcodes', 'trashRetentionMs', 'runAutomaticDeletedCleanup'];
 // មានតែក្នុងកំណែថ្មី (2.18.0) ឬកំណែចាស់ — ស្រង់អ្វីដែលមាន
 const OPTIONAL_FNS = ['purgeDeletedItemsQuietly', 'deleteMultipleDeletedItemsFromFirebase'];
 
@@ -111,7 +111,7 @@ function buildWorld(store, now) {
         scanHistory: [], deletedItems: []
     });
     new vm.Script([
-        extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
+        extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'EIGHT_DAYS_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'EXPIRED_TRASH_RETENTION_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ ផ្ទុក

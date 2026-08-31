@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.23.6';
+    const APP_VERSION = '2.24.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3650,11 +3650,15 @@
 
             const out = await retryAsync(
                 () => fetchWithTimeout(targetUrl, { headers }, AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
-                    (r) => (r.ok ? r.json() : null)).then(retryTransientLookupResponse),
+                    (r) => r.json().catch(() => null)).then(retryTransientLookupResponse),
                 2, isZtoLookup ? 350 : 1500
             );
-            if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
             const data = out.body;
+            if (!out.res.ok) {
+                const lookupError = new Error('HTTP ' + out.res.status);
+                lookupError.lookupCode = data && data.code ? String(data.code) : '';
+                throw lookupError;
+            }
             if (myGeneration !== customerDataTableSessionGeneration) return;
             if (data && data.error) throw new Error('Lookup rejected');
 
@@ -3686,6 +3690,10 @@
                 setLookupStatus(barcode, 'offline', '📴 បណ្ដាញបានដាច់ — សូមភ្ជាប់ ហើយស្កេនម្ដងទៀត');
             } else if (e && e.message === 'Auto lookup timed out') {
                 setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
+            } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
+                setLookupStatus(barcode, 'error', '🔒 ZTO session ផុតកំណត់ — សូមប្តូរ Cookie/Token នៅ Netlify');
+            } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
+                setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie/Token សម្រាប់ ZTO');
             } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {
                 setLookupStatus(barcode, 'error', '🔒 ' + lookupSource + ' Secret មិនត្រឹមត្រូវ ឬផុតកំណត់');
             } else {
@@ -3727,7 +3735,8 @@
 
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
+    const EIGHT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
     const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
     let sessionExpiryCheckInFlight = false;
 
@@ -4385,6 +4394,10 @@
     const staleRestoreMarkerSweeps = new Set();
     let deletedCleanupInFlight = false;
 
+    function trashRetentionMs(item) {
+        return item && item.trashReason === 'expired' ? EXPIRED_TRASH_RETENTION_MS : TRASH_RETENTION_MS;
+    }
+
     function clearStaleRestoreMarkers(item) {
         if (!db || !fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
         if (staleRestoreMarkerSweeps.has(item.id)) return;
@@ -4663,7 +4676,7 @@
         deletedItems.forEach(item => {
             if (!item || !item.id) return;
             const deletedTime = item.deletedAt || currentTime;
-            if (currentTime - deletedTime <= TRASH_RETENTION_MS) return;
+            if (currentTime - deletedTime <= trashRetentionMs(item)) return;
             let staleClaim = false;
             if (item.restoreClaim) {
                 if (isActiveRestoreClaim(item.restoreClaim)) return;
@@ -9926,7 +9939,7 @@
         let html = '';
         groups.slice(0, DELETED_LIST_MAX_ROWS).forEach((group) => { html += trashGroupRowHtml(group); });
         if (groups.length > DELETED_LIST_MAX_ROWS) {
-            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ធាតុចាស់ជាង ៣០ ថ្ងៃលុបចោលដោយស្វ័យប្រវត្តិ)</td></tr>`;
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)</td></tr>`;
         }
         tbody.innerHTML = html;
     }

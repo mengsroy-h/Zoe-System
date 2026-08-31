@@ -78,27 +78,39 @@ ok(restoreBody.indexOf('delete itemToRestore.trashReason') !== -1,
     'executeRestoreItem លុប trashReason មុនសរសេរត្រឡប់ចូល scan_history');
 
 // រយៈពេលរក្សាទុក
+const EXPIRED_RETENTION_DAYS = 2;
 const RETENTION_DAYS = 30;
 const KHMER_DIGITS = '\u17E0\u17E1\u17E2\u17E3\u17E4\u17E5\u17E6\u17E7\u17E8\u17E9';
 const khmerNum = (n) => String(n).split('').map((d) => KHMER_DIGITS[Number(d)]).join('');
 const retention = /const TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
 ok(!!retention && Number(retention[1]) === RETENTION_DAYS,
     'ធុងសំរាមរក្សាទុក ' + khmerNum(RETENTION_DAYS) + ' ថ្ងៃ (TRASH_RETENTION_MS)', retention && retention[1]);
-ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('TRASH_RETENTION_MS') !== -1,
-    'runAutomaticDeletedCleanup ប្រើ TRASH_RETENTION_MS មិនមែនលេខថេរក្នុងខ្លួន');
+const expiredRetention = /const EXPIRED_TRASH_RETENTION_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
+ok(!!expiredRetention && Number(expiredRetention[1]) === EXPIRED_RETENTION_DAYS,
+    'expired រក្សាទុក ' + khmerNum(EXPIRED_RETENTION_DAYS) + ' ថ្ងៃ', expiredRetention && expiredRetention[1]);
+const retentionFn = sliceFn(src, 'trashRetentionMs');
+ok(retentionFn.indexOf("trashReason === 'expired'") !== -1 &&
+    retentionFn.indexOf('EXPIRED_TRASH_RETENTION_MS') !== -1 &&
+    retentionFn.indexOf('TRASH_RETENTION_MS') !== -1,
+    'trashRetentionMs បែងចែក expired ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
+ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('trashRetentionMs(item)') !== -1,
+    'runAutomaticDeletedCleanup ប្រើ retention តាមប្រភេទ');
 
 // អត្ថបទដែលអ្នកប្រើអាន ត្រូវត្រូវនឹងលេខថេរ — បើឃ្លាតគ្នា អ្នកប្រើរង់ចាំខុសថ្ងៃ
 const retentionLabel = khmerNum(RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
+const expiredRetentionLabel = khmerNum(EXPIRED_RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
 const indexHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
 const trashModalHtml = indexHtml.slice(indexHtml.indexOf('id="recentlyDeletedModal"'));
-ok(trashModalHtml.indexOf('\u179b\u17bb\u1794\u17a2\u1785\u17b7\u1793\u17d2\u178f\u17d2\u179a\u17c3\u1799\u17cd\u1794\u1793\u17d2\u1791\u17b6\u1794\u17cb\u1796\u17b8 ' + retentionLabel) !== -1,
-    'ចំណងជើងធុងសំរាមក្នុង index.html សរសេរ ' + retentionLabel);
+ok(trashModalHtml.indexOf('\u1795\u17bb\u178f\u1780\u17c6\u178e\u178f\u17cb \u17e8\u1790\u17d2\u1784\u17c3\u17d6 ' + expiredRetentionLabel) !== -1 &&
+    trashModalHtml.indexOf('\u1794\u17d2\u179a\u1797\u17c1\u1791\u1795\u17d2\u179f\u17c1\u1784\u17d6 ' + retentionLabel) !== -1,
+    'ចំណងជើងធុងសំរាមបង្ហាញ expired ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
 const trashRowsFn = sliceFn(src, 'renderRecentlyDeleted');
-ok(trashRowsFn.indexOf(retentionLabel) !== -1,
-    'សារ «ជួរទៀត» ក្នុង renderRecentlyDeleted សរសេរ ' + retentionLabel);
-const otherRetentionText = new RegExp('\u1792\u17b6\u178f\u17bb\u1785\u17b6\u179f\u17cb\u1787\u17b6\u1784 ([' + KHMER_DIGITS + ']+) \u1790\u17d2\u1784\u17c3').exec(trashRowsFn);
-ok(!!otherRetentionText && otherRetentionText[1] === khmerNum(RETENTION_DAYS),
-    'គ្មានលេខថ្ងៃចាស់សល់ក្នុងសារធុងសំរាម', otherRetentionText && otherRetentionText[1]);
+ok(trashRowsFn.indexOf(expiredRetentionLabel) !== -1 && trashRowsFn.indexOf(retentionLabel) !== -1,
+    'សារ «ជួរទៀត» បង្ហាញ retention ទាំង ២ និង ៣០ថ្ងៃ');
+const displayedRetentionDays = Array.from(trashRowsFn.matchAll(new RegExp('([' + KHMER_DIGITS + ']+) \\u1790\\u17d2\\u1784\\u17c3', 'g')))
+    .map((match) => match[1]);
+ok(JSON.stringify(displayedRetentionDays.sort()) === JSON.stringify([expiredRetentionLabel.split(' ')[0], retentionLabel.split(' ')[0]].sort()),
+    'គ្មានលេខថ្ងៃចាស់សល់ក្នុងសារធុងសំរាម', displayedRetentionDays);
 
 // rules ត្រូវទទួលវាលនេះ បើអត់ ការសរសេរទៅធុងសំរាមត្រូវបដិសេធទាំងស្រុង
 const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));

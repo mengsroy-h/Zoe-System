@@ -1,6 +1,10 @@
 {
   "backupDir": "./backups",
   "keepCount": 30,
+  "requestTimeoutMs": 120000,
+  "retryCount": 2,
+  "retryDelayMs": 1000,
+  "lockStaleMs": 43200000,
   "businesses": [
     {
       "name": "example-business-1",

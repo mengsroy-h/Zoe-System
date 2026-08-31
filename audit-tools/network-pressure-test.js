@@ -39,7 +39,7 @@ function ok(label, cond, detail) {
     ok('ZoeW: មានពិដានចំនួនការស្វែងរកស្របគ្នា', /AUTO_LOOKUP_MAX_IN_FLIGHT/.test(app));
     ok('ZoeW: ការស្វែងរកតាមដាន barcode ដែលកំពុងដំណើរការ', /autoLookupInFlight/.test(app));
     ok('ZoeW: ការតាមដាននោះត្រូវដោះក្នុង `finally` (មិនលេចធ្លាយពេលមានកំហុស)',
-        /finally \{\s*\n\s*autoLookupInFlight\.delete\(lookupKey\);/.test(app));
+        /finally \{[\s\S]{0,180}?autoLookupInFlight\.get\(lookupKey\) === lookupRunToken[\s\S]{0,120}?autoLookupInFlight\.delete\(lookupKey\);/.test(app));
     // ⛔ ការការពារនេះអាចរស់នៅ **ក្នុង helper** — ការអះអាងតាមឈ្មោះ function
     // តែម្យ៉ាងជាថ្នាក់ «checker ស្កេនអ្វី» ដដែលនឹង 2.19.3។ ដូច្នេះវាដើរតាម
     // ការបញ្ជូនបន្ត ១ ជាន់ ហើយ `lookup-prefetch-test.js` អះអាង **ឥរិយាបថ**

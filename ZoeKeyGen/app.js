@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.13';
+const APP_VERSION = '2.19.15';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -222,6 +222,7 @@ const SLOW_NETWORK_NOTICE_MS = 4000;
 let isInitializingFirebase = false;
 let dbRefConnected = null;
 let dbRefServerTimeOffset = null;
+let infoListenerGeneration = 0;
 let serverTimeOffsetMs = 0;
 let serverTimeSynced = false;
 let serverTimeSyncWaiters = [];
@@ -723,13 +724,23 @@ function handleInfoListenerError(err, pathKey) {
     scheduleInfoListenerRecovery();
 }
 
-function attachInfoListeners() {
-    if (!db || !fb) return false;
+function detachInfoListeners() {
+    infoListenerGeneration++;
+    if (!fb) return;
     if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
     if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+}
+
+function attachInfoListeners() {
+    detachInfoListeners();
+    if (!db || !fb || !dbRefConnected || !dbRefServerTimeOffset) return false;
+    const listenerGeneration = ++infoListenerGeneration;
     infoListenerFailedPaths.clear();
+    infoListenerFailedPaths.add(INFO_LISTENER_KEY_CONNECTED);
+    infoListenerFailedPaths.add(INFO_LISTENER_KEY_OFFSET);
 
     fb.onValue(dbRefConnected, (snap) => {
+        if (listenerGeneration !== infoListenerGeneration) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_CONNECTED);
         isDatabaseConnected = snap.val() === true;
         if (isDatabaseConnected) hasEverConnectedToDatabase = true;
@@ -737,9 +748,13 @@ function attachInfoListeners() {
         else if (navigator.onLine !== false) scheduleReconnectWatchdog();
         renderConnectionStatus();
         if (isDatabaseConnected) retryPendingRoleCheck();
-    }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED));
+    }, (err) => {
+        if (listenerGeneration !== infoListenerGeneration) return;
+        handleInfoListenerError(err, INFO_LISTENER_KEY_CONNECTED);
+    });
 
     fb.onValue(dbRefServerTimeOffset, (snap) => {
+        if (listenerGeneration !== infoListenerGeneration) return;
         noteInfoListenerAlive(INFO_LISTENER_KEY_OFFSET);
         const val = snap.val();
         if (typeof val !== 'number') return;
@@ -748,7 +763,10 @@ function attachInfoListeners() {
         serverTimeSynced = true;
         if (window.ZoeLicense) window.ZoeLicense.setServerTimeOffset(val);
         serverTimeSyncWaiters.splice(0).forEach((fn) => fn());
-    }, (err) => handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET));
+    }, (err) => {
+        if (listenerGeneration !== infoListenerGeneration) return;
+        handleInfoListenerError(err, INFO_LISTENER_KEY_OFFSET);
+    });
 
     return true;
 }
@@ -772,8 +790,7 @@ async function initFirebase() {
 
         const existingApps = fb.getApps();
         if (existingApps.length) {
-            if (dbRefConnected) { try { fb.off(dbRefConnected); } catch (e) {} }
-            if (dbRefServerTimeOffset) { try { fb.off(dbRefServerTimeOffset); } catch (e) {} }
+            detachInfoListeners();
             if (typeof fb.deleteApp === 'function') {
                 await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
             }

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.23.3';
+    const APP_VERSION = '2.23.5';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -446,6 +446,7 @@
     function closeModal(modalId) {
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'none';
+        if (modalId === 'phoneModal') clearLookupStatus();
         document.body.style.overflow = '';
         pendingBarcode = "";
         editingItemId = null;
@@ -504,7 +505,7 @@
 
     function preconnectToLookupHost() {
         const cfg = getLookupApiConfig();
-        if (!cfg || !cfg.url) return;
+        if (!cfg || !cfg.enabled || !cfg.url) return;
         preconnectToOrigin(cfg.url);
     }
 
@@ -646,6 +647,14 @@
             if (attempts <= 1) throw err;
             return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
         });
+    }
+
+    function retryTransientLookupResponse(out) {
+        const status = Number(out && out.res && out.res.status);
+        if (status === 408 || status === 425 || status === 429 || (status >= 500 && status <= 599)) {
+            throw new Error('HTTP ' + status);
+        }
+        return out;
     }
 
     function linkIsFrugal() {
@@ -930,6 +939,8 @@
         if (!db || !fb || !dbRefConnected || !dbRefServerTimeOffset) return false;
         const listenerGeneration = ++infoListenerGeneration;
         infoListenerFailedPaths.clear();
+        infoListenerFailedPaths.add(INFO_LISTENER_KEY_CONNECTED);
+        infoListenerFailedPaths.add(INFO_LISTENER_KEY_OFFSET);
 
         fb.onValue(dbRefConnected, (snap) => {
             if (listenerGeneration !== infoListenerGeneration) return;
@@ -2342,9 +2353,10 @@
             alert("មិនអាចរក្សាទុក Config បានទេ! ទំហំផ្ទុករបស់ browser ពេញ ឬត្រូវបានបិទ (ឧ. Private Mode)។");
             return;
         }
-        if (typeof lookupFastCache !== 'undefined') lookupFastCache.clear();
+        clearCustomerDataTableCache();
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
+        prefetchCustomerDataTableRowsIfConfigured();
         showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
     }
 
@@ -3017,11 +3029,14 @@
     const CUSTOMER_TABLE_SOON_MS = 1200;
     const CUSTOMER_TABLE_SOON_BUSY_MS = 3000;
     const CUSTOMER_TABLE_SOON_MAX_WAIT_MS = 90 * 1000;
+    const ZTO_WARMUP_COOLDOWN_MS = 10 * 60 * 1000;
     let customerTableRetryTimer = null;
     let customerTableFailStreak = 0;
     let customerTableSoonTimer = null;
     let customerTableSoonArmedAt = 0;
     let customerTableIsPartial = false;
+    let ztoWarmupAt = 0;
+    let ztoWarmupInFlight = false;
 
     function customerTablePrefetchAllowed() {
         if (!auth || !auth.currentUser) return false;
@@ -3054,7 +3069,11 @@
             return;
         }
         const cfg = getLookupApiConfig();
-        if (cfg && cfg.url) fetchCustomerDataTableRows(true);
+        if (!lookupApiSupportsList(cfg)) {
+            clearCustomerTableRetry();
+            return;
+        }
+        fetchCustomerDataTableRows(true);
     }
 
     function customerTableNeedsRefresh() {
@@ -3073,7 +3092,10 @@
 
     function scheduleCustomerTableSoonRefresh(force) {
         const cfg = getLookupApiConfig();
-        if (!cfg || !cfg.url) return;
+        if (!lookupApiSupportsList(cfg)) {
+            clearCustomerTableSoonRefresh();
+            return;
+        }
         if (customerTableSoonTimer) return;
         if (!force && !customerTableNeedsRefresh()) return;
         customerTableSoonArmedAt = Date.now();
@@ -3093,11 +3115,34 @@
         customerTableSoonArmedAt = 0;
         if (elapsedSince(customerDataTableLastFailedAt) < CUSTOMER_TABLE_FAIL_COOLDOWN_MS) return;
         const cfg = getLookupApiConfig();
-        if (cfg && cfg.url) fetchCustomerDataTableRows(true, true);
+        if (lookupApiSupportsList(cfg)) fetchCustomerDataTableRows(true, true);
+    }
+
+    function lookupApiIsZto(cfg) {
+        if (!cfg || !cfg.url) return false;
+        return /(?:^|\/)\.netlify\/functions\/zto-order-detail\/?(?:[?#]|$)/i.test(String(cfg.url).trim());
+    }
+
+    function warmZtoLookupProxyIfConfigured(cfg) {
+        if (!cfg || !cfg.enabled || !lookupApiIsZto(cfg) || ztoWarmupInFlight || elapsedSince(ztoWarmupAt) < ZTO_WARMUP_COOLDOWN_MS) return false;
+        const raw = String(cfg.url).trim();
+        const marker = '/.netlify/functions/zto-order-detail';
+        const markerAt = raw.toLowerCase().indexOf(marker);
+        const target = markerAt === -1 ? marker : raw.slice(0, markerAt) + marker;
+        ztoWarmupAt = Date.now();
+        ztoWarmupInFlight = true;
+        fetchWithTimeout(target, { method: 'OPTIONS', cache: 'no-store', credentials: 'same-origin' }, 3000, 'ZTO warmup timed out')
+            .catch(() => {})
+            .finally(() => { ztoWarmupInFlight = false; });
+        return true;
+    }
+
+    function lookupApiSupportsList(cfg) {
+        return !!(cfg && cfg.url && !lookupApiIsZto(cfg));
     }
 
     function buildCustomerListApiUrl(cfg, wantFresh) {
-        if (!cfg || !cfg.url) return null;
+        if (!lookupApiSupportsList(cfg)) return null;
         let url = cfg.url.trim();
         if (/[?&][^=&]*=\{barcode\}/.test(url)) {
             url = url.replace(/([?&])[^=&]*=\{barcode\}/, '$1list=1');
@@ -3117,6 +3162,10 @@
             alert("សូមកំណត់ Config API ស្វែងរកអតិថិជនជាមុនសិន (⋯ ➜ 🔌 API ស្វែងរកអតិថិជន) មុននឹងបើកតារាងនេះ។");
             return;
         }
+        if (!lookupApiSupportsList(cfg)) {
+            alert("ZTO Lookup មិនមានតារាងទិន្នន័យទាំងមូលទេ។ សូមស្កេន Barcode ដើម្បីស្វែងរកផ្ទាល់ពី ZTO។");
+            return;
+        }
         const searchInput = document.getElementById('customerDataTableSearchInput');
         if (searchInput) searchInput.value = '';
         openModalHelper('customerDataTableModal');
@@ -3126,7 +3175,7 @@
     async function fetchCustomerDataTableRows(force, wantFresh) {
         const cfg = getLookupApiConfig();
         const statusEl = document.getElementById('customerDataTableStatus');
-        if (!cfg || !cfg.url) return;
+        if (!lookupApiSupportsList(cfg)) return;
 
         const isFresh = customerDataTableRows && (elapsedSince(customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS);
         if (!force && isFresh) {
@@ -3161,7 +3210,7 @@
                 }
                 const out = await retryAsync(
                     () => fetchWithTimeout(listUrl, { headers }, 20000, 'Customer table fetch timed out',
-                        (r) => (r.ok ? r.json() : null)),
+                        (r) => (r.ok ? r.json() : null)).then(retryTransientLookupResponse),
                     2, 2000
                 );
                 if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
@@ -3240,7 +3289,7 @@
         customerDataTableFetchedAt = 0;
         customerDataTableFetchPromise = null;
         customerDataTableLastFailedAt = 0;
-        autoLookupLastFailedAt = 0;
+        autoLookupFailureAt.clear();
         autoLookupInFlight.clear();
         lookupFastCache.clear();
         const body = document.getElementById('customerDataTableBody');
@@ -3311,7 +3360,7 @@
         customerDataTableRows = merged;
         customerDataTableFetchedAt = Date.now();
         customerDataTableLastFailedAt = 0;
-        autoLookupLastFailedAt = 0;
+        autoLookupFailureAt.clear();
         customerTableIsPartial = merged.length !== Number(rowsAfter);
         clearCustomerTableRetry();
         renderCustomerDataTableStatus(merged);
@@ -3344,15 +3393,24 @@
     }
 
     function prefetchCustomerDataTableRowsIfConfigured() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !cfg.url) {
+            clearCustomerTableRetry();
+            clearCustomerTableSoonRefresh();
+            return;
+        }
         preconnectToLookupHost();
+        if (!lookupApiSupportsList(cfg)) {
+            clearCustomerTableRetry();
+            clearCustomerTableSoonRefresh();
+            if (customerTablePrefetchAllowed()) warmZtoLookupProxyIfConfigured(cfg);
+            return;
+        }
         if (!customerTablePrefetchAllowed()) {
             scheduleCustomerTableSoonRefresh();
             return;
         }
-        const cfg = getLookupApiConfig();
-        if (cfg && cfg.url) {
-            fetchCustomerDataTableRows(false);
-        }
+        fetchCustomerDataTableRows(false);
     }
 
     function getNestedField(obj, path) {
@@ -3363,15 +3421,42 @@
     let lookupLockedNoticeShown = false;
     let pendingLookupUnlockBarcode = '';
     let pendingLookupUnlockResolve = null;
-    let autoLookupLastFailedAt = 0;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
+    const AUTO_LOOKUP_FAILURE_MAX = 100;
     const LOOKUP_FOCUS_GRACE_MS = 250;
+    const LOOKUP_MANUAL_FALLBACK_MS = 1800;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const AUTO_LOOKUP_TIMEOUT_MS = 16000;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
-    const autoLookupInFlight = new Set();
+    const autoLookupInFlight = new Map();
+    const autoLookupFailureAt = new Map();
     const lookupFastCache = new Map();
+
+    function clearLookupStatus() {
+        const el = document.getElementById('lookupStatus');
+        if (!el) return;
+        el.className = 'lookup-status';
+        el.textContent = '';
+        el.hidden = true;
+    }
+
+    function setLookupStatus(barcode, kind, text) {
+        const el = document.getElementById('lookupStatus');
+        if (!el || (barcode && (pendingBarcode !== barcode || !isModalOpen))) return false;
+        const classes = {
+            loading: 'lookup-status-loading',
+            success: 'lookup-status-success',
+            warn: 'lookup-status-warn',
+            error: 'lookup-status-error',
+            offline: 'lookup-status-offline',
+            cache: 'lookup-status-cache'
+        };
+        el.className = 'lookup-status ' + (classes[kind] || classes.warn);
+        el.textContent = String(text || '');
+        el.hidden = !text;
+        return true;
+    }
 
     function getFastLookupRow(barcode, cfg) {
         if (!cfg.fastMode) return null;
@@ -3402,7 +3487,7 @@
     }
 
     function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
-        if (pendingBarcode !== barcode || !isModalOpen) return;
+        if (pendingBarcode !== barcode || !isModalOpen) return false;
 
         let filledAny = false;
         let phoneWasAutoFilled = false;
@@ -3432,6 +3517,7 @@
         } else if (filledAny) {
             showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
         }
+        return filledAny;
     }
 
     function retryPendingLookupAfterUnlock() {
@@ -3456,12 +3542,34 @@
     }
 
     function armLookupFocus(phoneInput, barcode, lookupPromise) {
+        let focused = false;
+        let fallbackTimer = null;
+        let waitingForPin = false;
         const focusIfEmpty = () => {
+            if (focused || isPinFlowPending()) return;
             if (!isModalOpen || pendingBarcode !== barcode) return;
             if (!phoneInput || phoneInput.value) return;
+            focused = true;
             phoneInput.focus();
         };
-        return lookupPromise.finally(() => {
+        const runFallback = () => {
+            fallbackTimer = null;
+            if (focused) return;
+            if (isPinFlowPending()) {
+                waitingForPin = true;
+                fallbackTimer = setTimeout(runFallback, LOOKUP_FOCUS_GRACE_MS);
+                return;
+            }
+            if (waitingForPin) {
+                waitingForPin = false;
+                fallbackTimer = setTimeout(runFallback, LOOKUP_MANUAL_FALLBACK_MS);
+                return;
+            }
+            focusIfEmpty();
+        };
+        fallbackTimer = setTimeout(runFallback, isPinFlowPending() ? LOOKUP_FOCUS_GRACE_MS : LOOKUP_MANUAL_FALLBACK_MS);
+        return Promise.resolve(lookupPromise).finally(() => {
+            if (fallbackTimer !== null) clearTimeout(fallbackTimer);
             setTimeout(focusIfEmpty, LOOKUP_FOCUS_GRACE_MS);
         });
     }
@@ -3469,15 +3577,19 @@
     async function attemptAutoLookup(barcode) {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) return;
+        const isZtoLookup = lookupApiIsZto(cfg);
+        const lookupSource = isZtoLookup ? 'ZTO' : 'API';
 
         const fastCachedRow = getFastLookupRow(barcode, cfg);
         if (fastCachedRow) {
+            setLookupStatus(barcode, 'cache', '⚡ រកឃើញភ្លាមពី cache ក្នុងឧបករណ៍');
             applyLookupFillToModal(barcode, fastCachedRow.phone, fastCachedRow.cod, fastCachedRow.dod, cfg);
             return;
         }
 
         const cachedRow = findCustomerDataTableRow(barcode);
         if (cachedRow) {
+            setLookupStatus(barcode, 'cache', '⚡ រកឃើញភ្លាមពីតារាងអតិថិជន');
             applyLookupFillToModal(barcode, cachedRow.phone, cachedRow.cod, cachedRow.dod, cfg);
             return;
         }
@@ -3485,6 +3597,7 @@
         scheduleCustomerTableSoonRefresh();
 
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            setLookupStatus(barcode, 'warn', '🔒 សូមវាយ PIN ដើម្បីដោះសោ ' + lookupSource + ' Lookup');
             if (pendingLookupUnlockResolve) pendingLookupUnlockResolve();
             pendingLookupUnlockBarcode = String(barcode || '');
             return new Promise((resolve) => {
@@ -3497,18 +3610,34 @@
             });
         }
 
-        if (navigator.onLine === false) return;
-
-        if (elapsedSince(autoLookupLastFailedAt) < AUTO_LOOKUP_FAIL_COOLDOWN_MS) {
+        if (navigator.onLine === false) {
+            setLookupStatus(barcode, 'offline', '📴 ក្រៅបណ្ដាញ — សូមភ្ជាប់បណ្ដាញ ហើយស្កេនម្ដងទៀត');
             return;
         }
 
-        const lookupKey = String(barcode);
-        if (autoLookupInFlight.has(lookupKey)) return;
-        if (autoLookupInFlight.size >= AUTO_LOOKUP_MAX_IN_FLIGHT) return;
-        autoLookupInFlight.add(lookupKey);
+        const lookupKey = String(barcode || '').trim().toUpperCase();
+        const failedAt = autoLookupFailureAt.get(lookupKey) || 0;
+        const failedElapsed = elapsedSince(failedAt);
+        if (failedElapsed < AUTO_LOOKUP_FAIL_COOLDOWN_MS) {
+            const waitSeconds = Math.max(1, Math.ceil((AUTO_LOOKUP_FAIL_COOLDOWN_MS - failedElapsed) / 1000));
+            setLookupStatus(barcode, 'warn', '⏳ ' + lookupSource + ' ទើបខកខាន — សូមស្កេនម្ដងទៀតក្រោយ ' + waitSeconds + ' វិ.');
+            return;
+        }
+
+        if (autoLookupInFlight.has(lookupKey)) {
+            setLookupStatus(barcode, 'loading', '🔎 កំពុងស្វែងរកពី ' + lookupSource + '...');
+            return;
+        }
+        if (autoLookupInFlight.size >= AUTO_LOOKUP_MAX_IN_FLIGHT) {
+            setLookupStatus(barcode, 'warn', '⏳ Lookup កំពុងរវល់ — កំពុងរង់ចាំ ZTO');
+            return;
+        }
+        const lookupRunToken = {};
+        autoLookupInFlight.set(lookupKey, lookupRunToken);
 
         const myGeneration = customerDataTableSessionGeneration;
+        const startedAt = Date.now();
+        setLookupStatus(barcode, 'loading', isZtoLookup ? '🔎 កំពុងស្វែងរកពី ZTO...' : '🔎 កំពុងស្វែងរកព័ត៌មានអតិថិជន...');
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
@@ -3521,27 +3650,53 @@
 
             const out = await retryAsync(
                 () => fetchWithTimeout(targetUrl, { headers }, AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
-                    (r) => (r.ok ? r.json() : null)),
-                2, 1500
+                    (r) => (r.ok ? r.json() : null)).then(retryTransientLookupResponse),
+                2, isZtoLookup ? 350 : 1500
             );
             if (!out.res.ok) throw new Error('HTTP ' + out.res.status);
             const data = out.body;
             if (myGeneration !== customerDataTableSessionGeneration) return;
+            if (data && data.error) throw new Error('Lookup rejected');
 
             const phoneVal = getNestedField(data, cfg.phoneField);
             const codVal = getNestedField(data, cfg.codField);
             const dodVal = getNestedField(data, cfg.dodField);
-            autoLookupLastFailedAt = 0;
+            const hasPhone = phoneVal !== null && phoneVal !== undefined && String(phoneVal) !== '';
+            const hasCod = codVal !== null && codVal !== undefined && !isNaN(parseFloat(codVal));
+            const hasDod = dodVal !== null && dodVal !== undefined && !isNaN(parseFloat(dodVal));
+            const found = !!(data && (data.success === true || data.found === true)) || hasPhone || hasCod || hasDod;
+            autoLookupFailureAt.delete(lookupKey);
+            if (!found) {
+                setLookupStatus(barcode, 'warn', '⚠️ ' + lookupSource + ' មិនឃើញទិន្នន័យសម្រាប់ Barcode នេះ');
+                return;
+            }
+            const elapsedSeconds = Math.max(0.1, elapsedSince(startedAt) / 1000).toFixed(1);
+            setLookupStatus(barcode, 'success', '✅ រកឃើញពី ' + (isZtoLookup ? 'ZTO' : 'API') + ' (' + elapsedSeconds + ' វិ.)');
             setFastLookupRow(barcode, phoneVal, codVal, dodVal, cfg);
             rememberCustomerTableRow(barcode, phoneVal, codVal, dodVal);
             applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg);
         } catch (e) {
             if (myGeneration !== customerDataTableSessionGeneration) return;
-            autoLookupLastFailedAt = Date.now();
+            autoLookupFailureAt.delete(lookupKey);
+            autoLookupFailureAt.set(lookupKey, Date.now());
+            while (autoLookupFailureAt.size > AUTO_LOOKUP_FAILURE_MAX) {
+                autoLookupFailureAt.delete(autoLookupFailureAt.keys().next().value);
+            }
+            if (navigator.onLine === false) {
+                setLookupStatus(barcode, 'offline', '📴 បណ្ដាញបានដាច់ — សូមភ្ជាប់ ហើយស្កេនម្ដងទៀត');
+            } else if (e && e.message === 'Auto lookup timed out') {
+                setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
+            } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {
+                setLookupStatus(barcode, 'error', '🔒 ' + lookupSource + ' Secret មិនត្រឹមត្រូវ ឬផុតកំណត់');
+            } else {
+                setLookupStatus(barcode, 'error', '⚠️ មិនអាចភ្ជាប់ ' + lookupSource + ' បាន — សូមស្កេនម្ដងទៀត');
+            }
             console.error("Lookup API error:", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
         } finally {
-            autoLookupInFlight.delete(lookupKey);
+            if (autoLookupInFlight.get(lookupKey) === lookupRunToken) {
+                autoLookupInFlight.delete(lookupKey);
+            }
         }
     }
 
@@ -3635,6 +3790,7 @@
         activeParentItemId = null;
         lookupSecretKey = null;
         cancelPendingLookupUnlock();
+        clearLookupStatus();
         clearSheetImportSession();
         pendingLockerCode = null;
         lockerBarcodeIndex = {};
@@ -4993,11 +5149,6 @@
         } else {
             closeModal(modalEl.id);
         }
-    }
-
-    function closeGlobalMoreMenu() {
-        const globalMenu = document.getElementById('globalMoreMenu');
-        if (globalMenu) globalMenu.classList.remove('show');
     }
 
     function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
@@ -8395,6 +8546,7 @@
         const modalDodInput = document.getElementById('modalDodInput');
         if(modalDodInput) modalDodInput.value = "";
 
+        clearLookupStatus();
         openModalHelper('phoneModal');
         const lookupPromise = attemptAutoLookup(cleanBarcode);
 

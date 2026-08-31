@@ -4082,6 +4082,20 @@ ZoeW អាចយកលេខទូរស័ព្ទ/COD/DOD ពី endpoint �
 
 `Code.gs` **fail closed**៖ បើ ScriptProperty `API_KEY` មិនបានកំណត់ វាបដិសេធសំណើ។
 
+> ⛔ **មេរៀន 2.23.5 — `fetch()` មិន reject លើ HTTP error ទេ។** បើ retry wrapper
+> គ្របតែ Promise rejection នោះ 429/5xx ដែល resolve ជា `Response` នឹងត្រូវបោះ
+> **ក្រៅ** wrapper ហើយមិន retry។ ផ្លូវ lookup ត្រូវបម្លែងតែ 408/425/429/5xx
+> ទៅ rejection **ខាងក្នុង** callback របស់ `retryAsync()`; 401/403 ត្រូវនៅក្រៅ
+> ដើម្បីកុំបាញ់ Secret ខុសស្ទួន។ សោ in-flight ត្រូវមាន token ម្ចាស់ — `clear()`
+> រួចសំណើចាស់ចប់ មិនត្រូវ `delete(key)` របស់សំណើថ្មី។
+
+> ⛔ **មេរៀន function surface 2.23.5 — JavaScript អនុញ្ញាត declaration ឈ្មោះ
+> ស្ទួន ហើយ function ក្រោយសរសេរជាន់មុនដោយស្ងាត់។** Syntax, boot និង UI test
+> អាចបៃតងទាំងអស់ បើ body ទាំងពីរនៅធ្វើដូចគ្នា; តែពេលកែតែមួយ body វានឹងក្លាយ
+> ជា drift ដែលពិបាកឃើញ។ `function-surface-test.js` ត្រូវរាប់ function/callback
+> ទាំងមូល, ទប់ top-level duplicate និងបញ្ជាក់ថារាល់ named function មាន
+> static reference ឬ dispatcher route។
+
 
 ## zto-import — ខាង server នៃការនាំចូល Excel ចូល Sheet
 
@@ -4100,8 +4114,15 @@ server ដែល ZoeW ហៅ។
 - **Salt ខាង client ត្រូវរក្សាដដែល**៖ `zoew_sheet_import_secret_v1` (កូនសោ AES
   សម្រាប់ URL + ពាក្យសម្ងាត់នាំចូល) ដែល derive ពី **Security PIN របស់ ZoeW**។
   ការប្តូរវាធ្វើឲ្យការតភ្ជាប់ដែលរក្សាទុករួចលើឧបករណ៍ទាំងអស់ខូច។
-- SheetJS ស្ថិត **ក្នុង repo** (`ZoeW/vendor/xlsx.full.min.js`) មិនមែនមកពី CDN ទេ
-  — ច្បាប់ដដែលនឹង ZXing។ វាត្រូវនៅក្នុងសំបករបស់ `sw.js`។
+- SheetJS **0.20.3** ស្ថិត **ក្នុង repo** (`ZoeW/vendor/xlsx.full.min.js`) មិនមែន
+  មកពី CDN ទេ — ច្បាប់ដដែលនឹង ZXing។ វាត្រូវនៅក្នុងសំបករបស់ `sw.js` និងត្រូវ
+  នឹង hash ក្នុង `dependency-security-test.js`។ ទំព័រ Web បម្រុង
+  `zto-import/Index.html` ប្រើ CDN ផ្លូវការ 0.20.3 ជាមួយ SRI; កុំត្រឡប់ទៅ
+  unpkg 0.18.5 ដែលមាន Prototype Pollution/ReDoS។
+- ⛔ **កុំរក្សា `IMPORT_PASSWORD` plaintext ក្នុង Web Storage**។ ទំព័រ Web
+  បម្រុងរក្សាវាតែក្នុង memory ខណៈបើកទំព័រ, លុប legacy key
+  `zto_import_password` ពេល boot និងប្រើ `autocomplete="current-password"`
+  សម្រាប់ password manager។ កុំដាក់ auto-unlock ពី `localStorage` វិញ។
 
 > ⚠️ **សំណើទៅ Apps Script ត្រូវជា *simple request* ជានិច្ច។**
 > `callSheetImportApi()` ប្រើ `Content-Type: text/plain` ដោយចេតនា ហើយ
@@ -4144,4 +4165,3 @@ Setup Link ដែលបើកចោល **មិនត្រូវរស់រា
 
 Backup សរសេរទៅ `.partial` រួច `rename()` ចូលកន្លែង ដូច្នេះការរត់ដែលដាច់ពាក់កណ្តាល
 មិនបន្សល់ `.json.gz` កាត់ខ្លីដែលមើលទៅដូច backup ល្អទេ។
-

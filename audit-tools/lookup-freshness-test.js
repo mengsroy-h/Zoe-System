@@ -67,12 +67,15 @@ function sliceFn(name) {
 
 const FNS = [
     'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed',
+    'lookupApiIsZto', 'lookupApiSupportsList', 'setLookupStatus',
     'sheetImportCellToText', 'sheetImportToMoney',
     'normalizeImportedCustomerRows', 'seedCustomerTableFromImport',
     'rememberCustomerTableRow', 'findCustomerDataTableRow',
     'buildCustomerListApiUrl', 'customerTableNeedsRefresh',
     'clearCustomerTableSoonRefresh', 'scheduleCustomerTableSoonRefresh',
     'runCustomerTableSoonRefresh', 'clearCustomerTableRetry',
+    'scheduleCustomerTableRetry', 'runCustomerTableRetry',
+    'retryTransientLookupResponse',
     'clearCustomerDataTableCache', 'getNestedField',
     'getFastLookupRow', 'setFastLookupRow',
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
@@ -84,12 +87,13 @@ FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '
 
 const DECLS = [
     'CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS',
+    'CUSTOMER_TABLE_RETRY_STEPS_MS', 'CUSTOMER_TABLE_RETRY_BUSY_MS',
     'CUSTOMER_TABLE_SOON_MS', 'CUSTOMER_TABLE_SOON_BUSY_MS', 'CUSTOMER_TABLE_SOON_MAX_WAIT_MS',
     'customerTableSoonTimer', 'customerTableSoonArmedAt', 'customerTableIsPartial',
     'customerDataTableRows', 'customerDataTableFetchedAt', 'customerDataTableFetchPromise',
     'customerDataTableSessionGeneration', 'customerDataTableLastFailedAt',
     'customerTableRetryTimer', 'customerTableFailStreak',
-    'autoLookupLastFailedAt', 'AUTO_LOOKUP_FAIL_COOLDOWN_MS', 'AUTO_LOOKUP_MAX_IN_FLIGHT',
+    'autoLookupFailureAt', 'AUTO_LOOKUP_FAIL_COOLDOWN_MS', 'AUTO_LOOKUP_FAILURE_MAX', 'AUTO_LOOKUP_MAX_IN_FLIGHT',
     'AUTO_LOOKUP_TIMEOUT_MS',
     'LOOKUP_FAST_CACHE_TTL_MS', 'LOOKUP_FAST_CACHE_MAX', 'lookupFastCache',
     'autoLookupInFlight', 'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
@@ -153,7 +157,7 @@ function build(opts) {
         console: { error: () => {}, log: () => {}, warn: () => {} },
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String,
         Number: Number, Math: Math, isNaN: isNaN, parseFloat: parseFloat, Infinity: Infinity,
-        encodeURIComponent: encodeURIComponent, URL: URL, Set: Set, Error: Error,
+        encodeURIComponent: encodeURIComponent, URL: URL, Set: Set, Map: Map, Error: Error,
         Date: makeFakeDate(clock),
         setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
         navigator: { onLine: o.onLine === undefined ? true : o.onLine, connection: null },
@@ -166,7 +170,7 @@ function build(opts) {
         confirm: () => true,
         alert: () => {},
         showToast: () => {},
-        getLookupApiConfig: () => ({ url: CFG_URL, enabled: true, phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
+        getLookupApiConfig: () => ({ url: CFG_URL, enabled: true, fastMode: !!o.fastMode, phoneField: 'phone', codField: 'cod', dodField: 'dod' }),
         renderCustomerDataTableStatus: () => {},
         filterCustomerDataTable: () => {},
         applyLookupFillToModal: () => {},
@@ -400,6 +404,19 @@ scenario('ការទាញជាមុនខណៈរវល់ ➜ តាំ�
     const soon = vm.runInContext('CUSTOMER_TABLE_SOON_MS', ctx);
     const cache = vm.runInContext('CUSTOMER_TABLE_CACHE_MS', ctx);
     ok('ចន្លោះទាញឡើងវិញខ្លីជាង TTL ៥ នាទីច្រើន', soon < cache / 10, { soon: soon, cache: cache });
+});
+
+scenario('Fast Mode មិន cache លទ្ធផលរកមិនឃើញ', async () => {
+    const miss = build({ fastMode: true, lookupBody: { found: false } });
+    await vm.runInContext('attemptAutoLookup("BC-MISS")', miss);
+    await vm.runInContext('attemptAutoLookup("BC-MISS")', miss);
+    ok('រកមិនឃើញលើកទី១ ➜ លើកទី២នៅតែសួរ Server', miss.__net.lookups === 2, miss.__net);
+    ok('គ្មាន negative cache ដែលបាំងទិន្នន័យថ្មី', vm.runInContext('lookupFastCache.size === 0', miss));
+
+    const hit = build({ fastMode: true, lookupBody: { found: true, phone: '012', cod: 1, dod: 2 } });
+    await vm.runInContext('attemptAutoLookup("BC-HIT")', hit);
+    await vm.runInContext('attemptAutoLookup("BC-HIT")', hit);
+    ok('ទិសផ្ទុយ៖ រកឃើញពិត ➜ Fast cache ទប់សំណើទី២', hit.__net.lookups === 1, hit.__net);
 });
 
 // === ឆ. ខាង server — Apps Script ===

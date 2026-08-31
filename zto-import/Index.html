@@ -209,11 +209,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <p class="foot" id="foot"></p>
 </div>
 
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"
-        integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+        integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT"
         crossorigin="anonymous"></script>
 <script>
-var STORAGE_KEY = 'zto_import_password';
 var FIELD_IDS = { barcode: 'mapBarcode', dod: 'mapDod', cod: 'mapCod', phone: 'mapPhone' };
 var state = { password: '', workbook: null, sheetNames: [], rows: [], headers: [], signature: '', prepared: null };
 
@@ -237,12 +236,8 @@ function callServer(fn, args) {
     });
 }
 
-function readStored() {
-    try { return localStorage.getItem(STORAGE_KEY) || ''; } catch (err) { return ''; }
-}
-
-function storePassword(value) {
-    try { localStorage.setItem(STORAGE_KEY, value); } catch (err) { }
+function clearLegacyStoredPassword() {
+    try { localStorage.removeItem('zto_import_password'); } catch (err) { }
 }
 
 function unlock() {
@@ -253,7 +248,7 @@ function unlock() {
     callServer('getStatus', [value]).then(function (status) {
         $('unlockBtn').disabled = false;
         state.password = value;
-        storePassword(value);
+        $('password').value = '';
         show('authCard', false);
         show('fileCard', true);
         show('clearCard', true);
@@ -551,11 +546,7 @@ $('drop').addEventListener('drop', function (evt) {
 });
 
 (function boot() {
-    var stored = readStored();
-    if (stored) {
-        $('password').value = stored;
-        unlock();
-    }
+    clearLegacyStoredPassword();
 })();
 </script>
 </body>

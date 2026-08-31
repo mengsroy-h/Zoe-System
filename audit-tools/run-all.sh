@@ -85,7 +85,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          restore-race-test clear-history-claim-test google-sheets-cache-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
-         setup-link-roundtrip-test export-cells-test camera-resume-test \
+         setup-link-roundtrip-test export-cells-test dependency-security-test camera-resume-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
@@ -100,7 +100,7 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
+for t in shared-fns wiring function-surface-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -251,6 +251,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LOOKUPPREFETCH_APP_DIR="$BASE" node audit-tools/lookup-prefetch-test.js 2>&1 | tail -1 | sed 's/^/   lookup-prefetch: /'
     LOOKUPFRESH_APP_DIR="$BASE" node audit-tools/lookup-freshness-test.js 2>&1 | tail -1 | sed 's/^/   lookup-freshness:/'
     ZTOPROXY_APP_DIR="$BASE" node audit-tools/zto-proxy-test.js 2>&1 | tail -1 | sed 's/^/   zto-proxy:       /'
+    DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
@@ -294,6 +295,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     STORAGE_APP_DIR="$BASE" node audit-tools/storage-guard.js 2>&1 | tail -1 | sed 's/^/   storage-guard:   /'
     TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
+    FNSURFACE_APP_DIR="$BASE" node audit-tools/function-surface-test.js 2>&1 | tail -1 | sed 's/^/   function-surface: /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
     LEAK_APP_DIR="$BASE" node audit-tools/listener-leak-test.js 2>&1 | tail -1 | sed 's/^/   listener-leak:   /'

@@ -32,8 +32,8 @@ try { chromium = require('playwright-core').chromium; } catch (e) { chromium = n
 const CHROME = process.env.CSPLAZY_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ROOT = path.resolve(process.env.CSPLAZY_APP_DIR || path.join(__dirname, '..'));
 
-// SheetJS 0.18.5 ដូចដែល unpkg ធ្លាប់បម្រើ — SRI ដើមរបស់ ZoeW ជាភស្តុតាង
-const XLSX_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
+// SheetJS 0.20.3 ផ្លូវការដែល vendor ក្នុង repo — digest ចាក់សោកុំឲ្យឯកសារប្រែស្ងាត់ៗ
+const XLSX_SRI = 'sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT';
 
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 
@@ -137,7 +137,7 @@ for (const app of ['ZoeW']) {
     if (!exists(rel)) continue;
     const digest = 'sha384-' + crypto.createHash('sha384')
         .update(fs.readFileSync(path.join(ROOT, rel))).digest('base64');
-    ok(app + ' ៖ ត្រូវនឹង SheetJS 0.18.5 ដែល unpkg ធ្លាប់បម្រើ (sha384)',
+    ok(app + ' ៖ ត្រូវនឹង SheetJS 0.20.3 ផ្លូវការដែលបានផ្ទៀងផ្ទាត់ (sha384)',
         digest === XLSX_SRI, digest);
 }
 {

@@ -70,7 +70,17 @@ PIN gate ដដែលនឹងការកែ Config ដោយដៃ។
 > ZoeW ដើម្បីកុំបន្សល់សំណើ zombie ក្រោយ timeout។ មុខងារបង្កើត/Revoke/Extend
 > Key និង Setup Link/QR មិនប្រែទេ។
 
-កំណែបច្ចុប្បន្ន **`2.19.13`** — ប្រើរួមគ្នាជាមួយ ZoeW ហើយត្រូវស៊ីនឹង
+> **កំណែ 2.19.14** ៖ ពេល attach listener `.info/connected` និង
+> `.info/serverTimeOffset` ឡើងវិញ App កត់ថា listener ទាំង ២ កំពុងរង់ចាំ។
+> callback របស់មួយមិនអាចប្រកាសថាទាំងពីរជាសះស្បើយមុនពេលទៀតបានទេ។ មុខងារ
+> បង្កើត/Revoke/Extend Key និង Setup Link/QR មិនប្រែទេ។
+
+> **កំណែ 2.19.15** ៖ បន្ថែម generation fence លើ callback `.info/*`។ callback
+> របស់ listener ចាស់ដែលមកយឺតក្រោយ reattach មិនអាចលុប recovery state ថ្មី,
+> បង្ហាញ connected ក្លែងក្លាយ ឬទុកចិត្ត server-time offset ចាស់បានទេ។ មុខងារ
+> បង្កើត/Revoke/Extend Key និង Setup Link/QR មិនប្រែទេ។
+
+កំណែបច្ចុប្បន្ន **`2.19.15`** — ប្រើរួមគ្នាជាមួយ ZoeW ហើយត្រូវស៊ីនឹង
 `version` ក្នុង `manifest.json`។ វាបង្ហាញ **១ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ។
 
 `CACHE_VERSION` ក្នុង `sw.js` (`zoekeygen-vN`) ជាកូនសោ cache ដាច់ដោយឡែក។

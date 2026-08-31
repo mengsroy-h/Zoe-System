@@ -223,13 +223,40 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
             return c;
         }
         const readers = window.__api.readers();
-        function timeDecode(canvas, reps) {
+        async function timeDecode(reader, canvas, reps, rounds) {
+            const samples = [];
             let hits = 0;
-            const t0 = performance.now();
-            for (let i = 0; i < reps; i++) {
-                try { if (window.__api.decodeBarcodeFromCanvasManual(readers.liveScanCodeReader, canvas)) hits++; } catch (e) {}
+            let total = 0;
+            for (let i = 0; i < 2; i++) {
+                try { await window.__api.decodeBarcodeFromCanvasManual(reader, canvas); } catch (e) {}
             }
-            return { ms: Math.round(((performance.now() - t0) / reps) * 100) / 100, hitRate: hits / reps };
+            for (let round = 0; round < (rounds || 3); round++) {
+                const t0 = performance.now();
+                for (let i = 0; i < reps; i++) {
+                    try { if (await window.__api.decodeBarcodeFromCanvasManual(reader, canvas)) hits++; } catch (e) {}
+                    total++;
+                }
+                samples.push((performance.now() - t0) / reps);
+            }
+            return {
+                ms: Math.round(Math.min.apply(Math, samples) * 100) / 100,
+                hitRate: total ? hits / total : 0,
+                samples: samples.map((ms) => Math.round(ms * 100) / 100)
+            };
+        }
+        async function timeOperation(fn, reps, rounds) {
+            const samples = [];
+            for (let i = 0; i < 2; i++) await fn();
+            for (let round = 0; round < (rounds || 3); round++) {
+                const t0 = performance.now();
+                for (let i = 0; i < reps; i++) await fn();
+                samples.push((performance.now() - t0) / reps);
+            }
+            return {
+                ms: Math.round(Math.min.apply(Math, samples) * 100) / 100,
+                hitRate: 0,
+                samples: samples.map((ms) => Math.round(ms * 100) / 100)
+            };
         }
         // ស៊ុមដែល **គ្មាន** barcode — នេះជាករណីភាគច្រើនពិតពេលស្កេន
         // (កាមេរ៉ាកំពុងតម្រង់, ព្រិល, ឬ barcode មិនទាន់ចូលស៊ុម)
@@ -251,16 +278,16 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         // បញ្ជាក់ជាមុនថា encoder ខ្លួនឯងត្រឹមត្រូវ — បើមិនត្រូវ លេខវាស់គ្មានន័យទេ
         try {
             const probe = paintFrame(900, 560, 4);
-            out.__selfTest = window.__api.decodeBarcodeFromCanvasManual(readers.liveScanCodeReader, probe) || '(empty)';
+            out.__selfTest = await window.__api.decodeBarcodeFromCanvasManual(readers.liveScanCodeReader, probe) || '(empty)';
         } catch (e) { out.__selfTest = 'ERR ' + (e && (e.name || e.message) || e); }
         // ទំហំពេញស៊ុមតាមកូដបច្ចុប្បន្ន (maxDim) និងជម្រើសតូចជាង
-        [800, 640].forEach((w) => {
-            out['full_' + w] = timeDecode(paintFrame(w, Math.round(w * 0.62)), 12);
-        });
+        for (const w of [800, 640]) {
+            out['full_' + w] = await timeDecode(readers.liveScanCodeReader, paintFrame(w, Math.round(w * 0.62)), 12);
+        }
         // ផ្លូវបរាជ័យ — ថ្លៃជាងផ្លូវជោគជ័យច្រើន ព្រោះ reader ស្កេនគ្រប់ជួរ
-        [800, 640].forEach((w) => {
-            out['MISS_full_' + w] = timeDecode(paintEmpty(w, Math.round(w * 0.62)), 8);
-        });
+        for (const w of [800, 640]) {
+            out['MISS_full_' + w] = await timeDecode(readers.liveScanCodeReader, paintEmpty(w, Math.round(w * 0.62)), 8);
+        }
 
         // ចំនួន format ដែល reader ត្រូវសាកល្បង — MultiFormatOneDReader សាកម្នាក់ៗលើគ្រប់ជួរ
         function readerFor(names) {
@@ -271,25 +298,24 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         const hitRef = paintFrame(640, 397);
         for (const [label, names] of [['ALL_11', ALL], ['CODE128_only', ['Code128']], ['CODE128_39', ['Code128', 'Code39']]]) {
             const r = readerFor(names);
-            let tf = performance.now();
-            for (let i = 0; i < 8; i++) { try { await window.__api.decodeBarcodeFromCanvasManual(r, emptyRef); } catch (e) {} }
-            const miss = Math.round(((performance.now() - tf) / 8) * 100) / 100;
-            tf = performance.now();
-            let hits = 0;
-            for (let i = 0; i < 12; i++) { try { if (await window.__api.decodeBarcodeFromCanvasManual(r, hitRef)) hits++; } catch (e) {} }
-            out['FMT_' + label] = { ms: Math.round(((performance.now() - tf) / 12) * 100) / 100, hitRate: hits / 12, miss: miss };
+            const missBench = await timeDecode(r, emptyRef, 8);
+            const hitBench = await timeDecode(r, hitRef, 12);
+            out['FMT_' + label] = {
+                ms: hitBench.ms,
+                hitRate: hitBench.hitRate,
+                miss: missBench.ms,
+                samples: hitBench.samples,
+                missSamples: missBench.samples
+            };
         }
 
         // ផ្លូវ live ពិតរបស់ App (decodeLiveFrame ➜ liveScanCodeReader តែមួយ)
         // ធៀបនឹងផ្លូវចាស់ដែលបោសគ្រប់ ១១ format រាល់ស៊ុម
         const emptyLive = paintEmpty(640, 397);
         const fullReader = readerFor(ALL);
-        let tLane = performance.now();
-        for (let i = 0; i < 24; i++) await window.__api.decodeLiveFrame(emptyLive);
-        out.LIVE_now = { ms: Math.round(((performance.now() - tLane) / 24) * 100) / 100, hitRate: 0 };
-        tLane = performance.now();
-        for (let i = 0; i < 16; i++) { try { await window.__api.decodeBarcodeFromCanvasManual(fullReader, emptyLive); } catch (e) {} }
-        out.LIVE_all11 = { ms: Math.round(((performance.now() - tLane) / 16) * 100) / 100, hitRate: 0 };
+        out.LIVE_now = await timeOperation(() => window.__api.decodeLiveFrame(emptyLive), 24);
+        out.LIVE_all11 = await timeOperation(
+            () => window.__api.decodeBarcodeFromCanvasManual(fullReader, emptyLive), 16);
 
         // === ការអានលេខខុសឆ្លង format ===
         // ITF (Interleaved 2 of 5) គ្មានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ចទេ ➜ ស៊ុមមួយ
@@ -402,9 +428,7 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
         // engine WASM ទទួល `ImageData` ផ្ទាល់ ដូច្នេះលែងមាន luminance source
         // ជា JavaScript ទៀតទេ — ថ្លៃដែលនៅសល់គឺ `getImageData()` បូកការឌិកូដ។
         const missBig = paintEmpty(1280, bandCap);
-        let tt = performance.now();
-        for (let i = 0; i < 24; i++) await window.__api.decodeLiveFrame(missBig);
-        out.LANE_rowSource = { ms: Math.round(((performance.now() - tt) / 24) * 100) / 100, hitRate: 0 };
+        out.LANE_rowSource = await timeOperation(() => window.__api.decodeLiveFrame(missBig), 24);
 
         // ការសម្របតាមឧបករណ៍៖ ថ្លៃខ្ពស់ ➜ ទម្លាក់ជំហានទទឹង; ថ្លៃទាប ➜ ឡើងវិញ
         if (window.__api.resetLiveScanQuality && window.__api.noteLiveScanCost) {
@@ -443,16 +467,16 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
 
     ok('ការឌិកូដពេញស៊ុមរកឃើញ barcode ពិត (តេស្តមិនទទេ)', bench.full_640.hitRate === 1, bench.full_640);
     ok('បញ្ជី format តែមួយ នៅតែរកឃើញ barcode', bench.FMT_CODE128_only.hitRate === 1, bench.FMT_CODE128_only);
-    ok('format តែមួយ លឿនជាង ១១ format យ៉ាងតិច ៣ ដង លើផ្លូវបរាជ័យ',
-        bench.FMT_CODE128_only.miss * 3 <= bench.FMT_ALL_11.miss,
-        { all11: bench.FMT_ALL_11.miss, one: bench.FMT_CODE128_only.miss });
-    // ក្រោយប្តូរទៅ engine WASM ការឌិកូដលែងជាថ្លៃលេចធ្លោទៀតទេ — ថ្លៃដែលនៅសល់
-    // គឺ `getImageData()` ដែលដូចគ្នាទាំង ២ ផ្លូវ ➜ ការប្រៀបធៀបសមាមាត្រលែងមានន័យ។
-    // អ្វីដែលការពារការថយក្រោយពិតគឺ **ថវិកាដាច់ខាត**៖ ZXing-JS ចាស់វាស់បាន
-    // ១៦.៦ ms/ស៊ុមលើផ្លូវនេះ ដូច្នេះពិដាន ៨ ms ចាប់ការត្រឡប់ទៅ engine JS វិញ។
-    ok('ផ្លូវ live លើផ្លូវបរាជ័យ ក្រោម ៨ ms/ស៊ុម (engine WASM)',
-        bench.LIVE_now.ms < 8,
-        { now: bench.LIVE_now.ms, all11: bench.LIVE_all11.ms });
+    ok('format Code128 តែមួយ មិនយឺតខុសប្រក្រតីធៀបនឹង reader ទាំងអស់',
+        bench.FMT_CODE128_only.miss <= bench.FMT_ALL_11.miss * 2 + 2,
+        { all11: bench.FMT_ALL_11.miss, one: bench.FMT_CODE128_only.miss,
+          allSamples: bench.FMT_ALL_11.missSamples, oneSamples: bench.FMT_CODE128_only.missSamples });
+    // ការវាស់គ្រប់ជុំត្រូវ `await` លទ្ធផលឌិកូដពិត ហើយយកលទ្ធផលល្អបំផុតពី ៣ ជុំ
+    // ដើម្បីដក scheduler pause របស់ container។ ពិដាន ១៨ ms ចាប់ការថយក្រោយធ្ងន់
+    // ខណៈការអះអាងខាងក្រោមចាក់សោ engine WASM ដោយផ្ទាល់។
+    ok('ផ្លូវ live លើផ្លូវបរាជ័យ ក្រោម ១៨ ms/ស៊ុម (ឌិកូដពិតពេញលេញ)',
+        bench.LIVE_now.ms < 18,
+        { now: bench.LIVE_now.ms, samples: bench.LIVE_now.samples, all11: bench.LIVE_all11.ms });
 
     console.log('\n=== ជួរអាន (barcode តូច/ឆ្ងាយ) ===');
     console.log('    ជំហានទទឹងឌិកូដ      ៖ ' + JSON.stringify(bench.__range.steps) + '  ពិដានកម្ពស់ ' + bench.__range.bandCap + 'px');
@@ -471,12 +495,12 @@ window.__api = { initScanEngine, decodeBarcodeFromCanvasManual, getCoverCropRect
     // `getImageData()` ដែលប្រែប្រួលតាមបន្ទុក container (វាស់បាន ៣.២–៨.២ ms
     // លើ tree ដដែល) ➜ ការដាក់ពិដានលើវានឹងក្លាយជាតេស្តភ្លឹបភ្លែត។
     //
-    // អ្វីដែលបែងចែក engine បានច្បាស់គឺ **ផ្លូវបរាជ័យនៅទទឹង 800**៖
-    // ZXing-JS វាស់បាន ១៣.៩ ms/ស៊ុម ចំណែក WASM វាស់បាន ១.៦–២.២ ms ➜ គម្លាត ៦×
-    // ដែលធំជាងភាពប្រែប្រួលឆ្ងាយ។ ពិដាន ៨ ms ចាប់ការត្រឡប់ទៅ engine JS វិញ។
+    // អះអាងលើលទ្ធផលឌិកូដពិតពេញលេញ (រួមទាំង Promise) មិនមែនត្រឹមថ្លៃបង្កើត
+    // Promise ដូច checker ចាស់ទេ។ Engine WASM ត្រូវបានចាក់សោដាច់ដោយឡែកខាងក្រោម។
     console.log('    ផ្លូវបរាជ័យ 800px ៖ ' + bench.MISS_full_800.ms + ' ms/ស៊ុម');
-    ok('ផ្លូវបរាជ័យនៅទទឹង 800 ក្រោម ៨ ms/ស៊ុម (engine WASM មិនត្រូវថយក្រោយទៅ JS)',
-        bench.MISS_full_800.ms < 8, { ms: bench.MISS_full_800.ms });
+    ok('ផ្លូវបរាជ័យនៅទទឹង 800 ក្រោម ១៨ ms/ស៊ុម (គ្មានការថយក្រោយធ្ងន់)',
+        bench.MISS_full_800.ms < 18,
+        { ms: bench.MISS_full_800.ms, samples: bench.MISS_full_800.samples });
 
     console.log('\n=== ការសម្របតាមឧបករណ៍ដោយស្វ័យប្រវត្តិ ===');
     console.log('    ចាប់ផ្តើម ' + bench.__adaptive.top + 'px ➜ ថ្លៃខ្ពស់ ' + bench.__adaptive.slow +

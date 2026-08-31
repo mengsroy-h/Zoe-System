@@ -13,16 +13,20 @@ function ok(label, cond, detail) {
 
 const SRC = fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8');
 
-function sliceFn(name) {
-    let start = SRC.indexOf('function ' + name + '(');
+function sliceFnFrom(source, name) {
+    let start = source.indexOf('function ' + name + '(');
     if (start === -1) return null;
-    if (SRC.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
-    let depth = 0, i = SRC.indexOf('{', start), started = false;
-    for (; i < SRC.length; i++) {
-        if (SRC[i] === '{') { depth++; started = true; }
-        else if (SRC[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
+    if (source.slice(Math.max(0, start - 6), start) === 'async ') start -= 6;
+    let depth = 0, i = source.indexOf('{', start), started = false;
+    for (; i < source.length; i++) {
+        if (source[i] === '{') { depth++; started = true; }
+        else if (source[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
     }
-    return SRC.slice(start, i);
+    return source.slice(start, i);
+}
+
+function sliceFn(name) {
+    return sliceFnFrom(SRC, name);
 }
 
 function sliceConst(name) {
@@ -919,6 +923,9 @@ function buildContext() {
     ok('⛔ ការរលត់ត្រូវពិនិត្យថាគ្មាន path ណានៅងាប់',
         /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size[\s\S]{0,80}?clearInfoListenerRecovery\(\)/.test(SRC),
         'បើរលត់ដោយមិនពិនិត្យ Set នោះ listener ដែលងាប់តែឯង មិនដែល attach ឡើងវិញ');
+    ok('⛔ reattach ត្រូវរង់ចាំ snapshot `.info/*` ទាំង ២ មុនប្រកាសថាស្តាររួច',
+        /function attachInfoListeners\(\)[\s\S]{0,700}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_CONNECTED\)[\s\S]{0,160}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_OFFSET\)/.test(SRC),
+        'Set ទទេក្រោយ reattach ➜ connected មកមុនអាចលុប recovery ខណៈ serverTimeOffset នៅងាប់');
     ok('ចាកចេញ ➜ ការស្តារ `.info/*` ត្រូវ reset',
         /function resetDbListenerHealthState\(\)[\s\S]{0,200}?clearInfoListenerRecovery\(\);/.test(SRC));
 
@@ -933,7 +940,92 @@ function buildContext() {
     ok('⛔ ZoeKeyGen ៖ ការរលត់ក៏ត្រូវពិនិត្យ Set ដែរ',
         /function noteInfoListenerAlive\([\s\S]{0,300}?infoListenerFailedPaths\.size/.test(KG3),
         'ZoeKeyGen ៖ `serverTimeSynced` ជាច្រកទ្វារនៃការចេញ Key ➜ offset ដែលកក ធ្ងន់ជាង');
+    ok('⛔ ZoeKeyGen ៖ reattach ក៏ត្រូវរង់ចាំ snapshot `.info/*` ទាំង ២',
+        /function attachInfoListeners\(\)[\s\S]{0,700}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_CONNECTED\)[\s\S]{0,160}?infoListenerFailedPaths\.add\(INFO_LISTENER_KEY_OFFSET\)/.test(KG3),
+        'connected មកមុនមិនមែនភស្តុតាងថា serverTimeOffset ស្តាររួចទេ');
     void t; void infoRefs;
+}
+
+{
+    const kg = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+    ok('ZoeKeyGen ៖ មាន generation fence សម្រាប់ callback `.info/*` ចាស់',
+        /let infoListenerGeneration = 0;/.test(kg));
+    const history = { connected: [], offset: [] };
+    const refs = { connected: { path: 'connected' }, offset: { path: 'offset' } };
+    const ctx = {
+        console: { error: () => {} }, Set, Math,
+        navigator: { onLine: true }, window: {},
+        setTimeout: () => 1, clearTimeout: () => {},
+        db: {}, dbRefConnected: refs.connected, dbRefServerTimeOffset: refs.offset,
+        renderConnectionStatus: () => {}, scheduleReconnectWatchdog: () => {},
+        clearReconnectWatchdog: () => {}, retryPendingRoleCheck: () => {},
+        serverClockOffsetIsFromServer: () => true,
+        fb: {
+            off: () => {},
+            onValue: (ref, cb, errCb) => history[ref.path].push({ cb, errCb })
+        }
+    };
+    vm.createContext(ctx);
+    const code =
+        'let infoListenersFailed = true;\n' +
+        'let infoListenerGeneration = 0;\n' +
+        'let infoListenerRecoveryTimer = 1;\n' +
+        'let infoListenerRecoveryAttempt = 2;\n' +
+        'const infoListenerFailedPaths = new Set();\n' +
+        "const INFO_LISTENER_KEY_CONNECTED = 'connected';\n" +
+        "const INFO_LISTENER_KEY_OFFSET = 'serverTimeOffset';\n" +
+        'let isDatabaseConnected = false, hasEverConnectedToDatabase = false;\n' +
+        'let serverTimeOffsetMs = 0, serverTimeSynced = false;\n' +
+        'const serverTimeSyncWaiters = [];\n' +
+        sliceFnFrom(kg, 'clearInfoListenerRecovery') + '\n' +
+        sliceFnFrom(kg, 'noteInfoListenerAlive') + '\n' +
+        sliceFnFrom(kg, 'detachInfoListeners') + '\n' +
+        sliceFnFrom(kg, 'attachInfoListeners') + '\n' +
+        'this.__probe = () => ({ failed: infoListenersFailed, timer: infoListenerRecoveryTimer, pending: Array.from(infoListenerFailedPaths), connected: isDatabaseConnected, offset: serverTimeOffsetMs, synced: serverTimeSynced });\n';
+    try {
+        vm.runInContext(code, ctx);
+        vm.runInContext('attachInfoListeners()', ctx);
+        const staleConnected = history.connected[0].cb;
+        const staleOffset = history.offset[0].cb;
+        vm.runInContext('attachInfoListeners()', ctx);
+        staleConnected({ val: () => true });
+        staleOffset({ val: () => 9999 });
+        const staleProbe = ctx.__probe();
+        ok('⛔ ZoeKeyGen ៖ callback ចាស់មិនត្រូវលុប pending របស់ generation ថ្មី',
+            staleProbe.failed === true && staleProbe.timer === 1 && staleProbe.pending.length === 2,
+            staleProbe);
+        ok('⛔ ZoeKeyGen ៖ callback ចាស់មិនត្រូវទុកចិត្ត offset ឬបង្ហាញ connected ក្លែងក្លាយ',
+            staleProbe.connected === false && staleProbe.offset === 0 && staleProbe.synced === false,
+            staleProbe);
+        history.connected[1].cb({ val: () => true });
+        history.offset[1].cb({ val: () => 1234 });
+        const freshProbe = ctx.__probe();
+        ok('ZoeKeyGen ៖ callback generation ថ្មីទាំង ២ ទើបអាចប្រកាសថាស្តាររួច',
+            freshProbe.failed === false && freshProbe.pending.length === 0 && freshProbe.connected === true && freshProbe.offset === 1234 && freshProbe.synced === true,
+            freshProbe);
+    } catch (e) {
+        ok('ZoeKeyGen stale-callback scenario រត់បាន', false, e && e.message);
+    }
+}
+
+{
+    const t = buildContext();
+    const snap = (value) => ({ val: () => value });
+    t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
+    t.api.attachInfoListeners();
+    t.listenerCallbacks['info/connected'].cb(snap(true));
+    t.listenerCallbacks['info/offset'].cb(snap(1234));
+    t.listenerCallbacks['info/offset'].errCb(new Error('permission_denied'));
+    t.advance(2000);
+    t.listenerCallbacks['info/connected'].cb(snap(true));
+    ok('⛔ reattach ក្រោយ offset ងាប់ ៖ connected មកតែម្នាក់ឯង មិនត្រូវរលត់ទង់ recovery',
+        t.infoProbe().infoListenersFailed === true, t.infoProbe());
+    ok('⛔ reattach ក្រោយ offset ងាប់ ៖ កាលវិភាគត្រូវនៅរស់រហូតដល់ offset មកដល់',
+        t.infoProbe().infoListenerRecoveryTimer !== null, t.infoProbe());
+    t.listenerCallbacks['info/offset'].cb(snap(5678));
+    ok('offset ពិតប្រាកដមកដល់ក្រោយ reattach ➜ ទង់ recovery រលត់',
+        t.infoProbe().infoListenersFailed === false && t.infoProbe().infoListenerRecoveryTimer === null,
+        t.infoProbe());
 }
 
 // ── ១០ខ២. ការផ្ទុក SDK ឡើងវិញ ក៏ត្រូវមានពិដានល្បឿនដែរ ─────────────────

@@ -25,6 +25,114 @@
 
 ---
 
+## [ZoeW 2.23.5 · ZoeKeyGen 2.19.15] — 2026-08-31 · Retry ZTO ពិត · race fence · SheetJS security
+
+ជុំ Deep Audit ទី ២ កែ **ZoeW** (`zoew-v136` ➜ `zoew-v137`) និង
+**ZoeKeyGen** (`zoekeygen-v84` ➜ `zoekeygen-v85`)។ ច្បាប់ Barcode/ស្ថិតិ,
+Firebase Rules, Fast Mode និង manual auto-fallback មិនត្រូវបានដក ឬប្តូរ។
+
+### ZTO lookup និង network
+
+- HTTP 408/425/429 និង 5xx ឥឡូវបង្កឱ្យ retry ពិតក្នុង `retryAsync()`។ មុនកែ
+  `fetch()` resolve ជាធម្មតាសម្រាប់ HTTP error ដូច្នេះ 429/503 ត្រូវបានបោះ
+  **ក្រៅ** retry wrapper ហើយសំណើទី ២ មិនដែលចេញ។ 401/403 នៅតែមិន retry។
+- URL `/.netlify/functions/zto-order-detail/` ដែលមាន slash ខាងចុង ត្រូវបាន
+  សម្គាល់ជា ZTO ត្រឹមត្រូវ; វាមិនអាចធ្លាក់ទៅផ្លូវ API តារាង និងបាញ់ `list=1`។
+- `autoLookupInFlight` ប្រើ token តាម generation។ សំណើចាស់ដែលចប់ក្រោយប្តូរ
+  Config មិនអាចដោះសោរបស់សំណើថ្មី ហើយបើកឱ្យសំណើទី ៣ ស្ទួនបានទៀត។
+- Fast Mode ១០ នាទី និង manual auto-fallback ១.៨ វិនាទីនៅដដែលពេញលេញ។
+
+### Firebase reconnect
+
+- ZoeKeyGen បន្ថែម generation fence ដូច ZoeW លើ callback
+  `.info/connected` និង `.info/serverTimeOffset`។ callback ចាស់ក្រោយ detach/
+  reattach មិនអាចលុប pending state ថ្មី, បង្ហាញ connected ក្លែងក្លាយ ឬទុកចិត្ត
+  server-time offset ចាស់បានទេ។ `off()` នៅតែរត់មុន attach ការពារ listener ស្ទួន។
+
+### សុវត្ថិភាព dependency និង checker
+
+- ZoeW vendor SheetJS `0.18.5` ត្រូវបានជំនួសដោយ release ផ្លូវការ `0.20.3`
+  ដែលបានផ្ទៀងផ្ទាត់ SHA-256/SHA-384។ Import/export, Barcode និងលេខទូរស័ព្ទដែល
+  មាន 0 នាំមុខត្រូវបានសាកល្បងលើឯកសារ `.xlsx` ពិត។
+- ទំព័រ Web បម្រុង `zto-import/Index.html` ក៏ប្តូរពី unpkg 0.18.5 ទៅ
+  `cdn.sheetjs.com` 0.20.3 ជាមួយ SRI ដែរ។
+- ទំព័រ Web បម្រុងលែងរក្សា `IMPORT_PASSWORD` plaintext ក្នុង `localStorage`
+  ឬ auto-unlock ពី secret នោះ។ ពេល boot វាលុប key ចាស់
+  `zto_import_password`; secret ថ្មីរស់តែក្នុង memory ខណៈទំព័របើក ហើយ browser
+  password manager នៅតែអាចបំពេញវាល `current-password` ដោយសុវត្ថិភាព។
+- បន្ថែម `dependency-security-test.js` ១១ assertions និងបញ្ចូលក្នុង
+  `run-all.sh`។ កែ `scan-engine-test.js` ឱ្យ `await` ការឌិកូដពិត មិនមែនវាស់តែ
+  ការបង្កើត Promise; warm-up និងយក sample ល្អបំផុតពី ៣ ជុំដើម្បីដក scheduler
+  pause ខណៈការអះអាង CODE-128/WASM/ITF នៅតឹងដដែល។
+- ពង្រីក sandbox របស់ `lookup-freshness-test.js` ឱ្យរត់ helper HTTP retry និង
+  retry scheduler ពិតដែល `fetchCustomerDataTableRows()` ពឹងផ្អែក; ឥឡូវឆ្លង
+  ១៣១/១៣១ ជំនួសការធ្លាក់ដោយ `ReferenceError` របស់ checker ខ្លួនឯង។
+- បន្ថែម `function-surface-test.js` ដើម្បី inventory function/callback ទាំង
+  App និង helper/server ដែល ship។ វារកឃើញ `closeGlobalMoreMenu()` ប្រកាសស្ទួន
+  ២ ដងក្នុង ZoeW; ដក declaration ចាស់ដែលត្រូវ declaration ក្រោយសរសេរជាន់។
+  កូដទាំងពីរធ្វើដូចគ្នា ដូច្នេះ behavior មិនប្រែ តែបិទហានិភ័យ drift ស្ងាត់ៗ។
+
+### ច្បាប់អាជីវកម្ម
+
+- Function សំខាន់ ១៣ ដែលគ្រប Delete/Remove/Restore/cleanup/revenue ត្រូវបាន
+  ប្រៀបធៀបនឹង baseline 2.23.4; body ដូចគ្នា ១៣/១៣។ Firebase Rules ទាំងពីរ
+  មិនមាន diff។ ច្បាប់ ២ ម៉ោង/៨ ថ្ងៃ/៣០ ថ្ងៃ និង `isDeducted` នៅដដែល។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy static files របស់ ZoeW និង ZoeKeyGen។
+- បើប្រើទំព័រ Web បម្រុងរបស់ zto-import៖ copy `Index.html` ទៅ Apps Script
+  ហើយ Deploy ជាកំណែថ្មី។ **មិនត្រូវ Publish Firebase Rules**។
+
+---
+
+## [ZoeW 2.23.4 · ZoeKeyGen 2.19.14] — 2026-08-30 · ZTO លឿន · ស្ថានភាព Lookup · `.info/*` attach race
+
+ជុំនេះកែ **ZoeW** (`zoew-v135` ➜ `zoew-v136`) និង race ក្នុង helper Firebase
+ដែលមាននៅ **App ទាំង ២** (`zoekeygen-v83` ➜ `zoekeygen-v84`)។ តក្កវិជ្ជា
+Barcode/ស្ថិតិ និង Firebase Rules មិនបានប្តូរ។
+
+### ល្បឿន និងស្ថានភាព ZTO
+
+- ZoeW លែងបម្លែង ZTO URL ទៅ `?list=1` ដែល Netlify Function មិនគាំទ្រ។ Request
+  បញ្ជីដែលតែងតែ HTTP 400 មិនប្រជែង bandwidth/connection ជាមួយការស្កេនទៀត។
+- App warm-up `/.netlify/functions/zto-order-detail` ជាមុនដោយ `OPTIONS` ម្តងក្នុង
+  ១០ នាទី។ វាមិនផ្ញើ Barcode, Cookie ឬ Proxy Key ហើយមិនរត់ពេល Offline,
+  Data Saver/2G, មិនទាន់ចូលប្រព័ន្ធ ឬ Lookup ត្រូវបានបិទ។
+- ពេល request ទី ១ បរាជ័យបណ្តោះអាសន្ន ZTO retry ទី ២ ចាប់ផ្តើមក្រោយ
+  **៣៥០ms** ជំនួស **១.៥ វិនាទី**។ ជោគជ័យលើកទី ១ មិនមាន delay បន្ថែម។
+- Cooldown ក្រោយបរាជ័យក្លាយជាតាម Barcode មួយៗ។ Barcode មួយដែលខូចមិនរាំង
+  Barcode បន្ទាប់ ៣០ វិនាទីទៀត។ Map មានពិដាន ១០០ ដើម្បីកុំឲ្យ memory រីក។
+- Fast Mode លែង cache `{found:false}` ជាលទ្ធផលអវិជ្ជមាន ១០ នាទី។ Barcode ដែល
+  ទើបមាននៅ ZTO អាចរកឃើញលើការស្កេនបន្ទាប់។
+- ប្រអប់លេខទូរស័ព្ទបង្ហាញស្ថានភាព «កំពុងស្វែងរក · cache · រកឃើញ · offline ·
+  រកមិនឃើញ · error» ដោយ `textContent` និង `aria-live`; response ចាស់របស់ Barcode
+  មុនមិនអាចសរសេរជាន់ស្ថានភាព Barcode ថ្មី។
+- **Manual auto-fallback រក្សាទុកពេញលេញ**៖ បើ ZTO យឺតជាង ១.៨ វិនាទី វាល
+  លេខទូរស័ព្ទទទួល focus ខណៈ request នៅតែបន្ត។ វាមិនលេចពីក្រោយ PIN,
+  មិនរំខានពេលបានវាយរួច, មិនចាប់ Barcode ចាស់ និង focus តែម្តង។
+
+### Firebase reconnect race
+
+- ពេល attach `.info/connected` និង `.info/serverTimeOffset` ឡើងវិញ App ទាំង ២
+  កត់ listener ទាំងពីរជា pending មុន callback មកដល់។ callback របស់មួយមិនអាច
+  លុប recovery state មុន listener មួយទៀតបញ្ជាក់ថារស់បានទៀត។
+
+### ច្បាប់អាជីវកម្ម និងសុវត្ថិភាព
+
+- មិនប្តូរច្បាប់៖ Delete កញ្ចប់មិនដកចំណូល; Remove Barcode/ផុត ៨ ថ្ងៃដកចំណូល;
+  Restore បូកតែបើ `isDeducted=true`; cleanup «យករួច» ២ ម៉ោងមិនប៉ះចំណូល;
+  ធុងសំរាម purge ៣០ ថ្ងៃ។ Emulator ផ្ទៀងផ្ទាត់ replay fence និង rules ពិត។
+- ស្ថានភាព Lookup សរសេរដោយ `textContent`; warm-up មិនផ្ញើ secret; Service Worker
+  នៅតែ network-only សម្រាប់ Netlify Functions និងមិន cache ទិន្នន័យ ZTO។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy static files របស់ ZoeW និង ZoeKeyGen។ **មិនត្រូវ Publish Firebase Rules**
+  ព្រោះ rules មិនបានប្តូរ ហើយមិនត្រូវប្តូរ Environment Variables ដែលមានស្រាប់។
+
+---
+
 ## [ZoeW 2.23.3 · ZoeKeyGen 2.19.13] — 2026-08-30 · Deep Audit បណ្តាញ · Race · Secret · Service Worker
 
 ជុំនេះកែ **ZoeW** (`zoew-v134` ➜ `zoew-v135`) និង helper បណ្តាញដែលចែករំលែក

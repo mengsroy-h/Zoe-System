@@ -216,6 +216,7 @@
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
+| **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
 | **ZTO auto-login ↔ Netlify Blobs** | ⛔ Lambda-signature function ត្រូវហៅ `connectLambda(event)` មុន `getStore()` | `zto-session-test` |
 | **Blobs ដាច់** | ⛔ store ដាច់ ≠ lookup ស្លាប់ (ធ្លាក់ចុះទៅសតិ) | `zto-session-test` |
@@ -1705,6 +1706,54 @@ checker រាយ «✅ គ្មានកំហុស runtime»។
 
 លទ្ធផលលើកូដបច្ចុប្បន្ន ៖ **០ unhandled rejection** ឆ្លងកាត់ការអះអាងជាង ៥០០
 ក្នុង checker ១៦។ Test៖ **`checker-coverage.js` ផ្នែក ៨**។
+
+### ⛔ នាំចូល CSV ៖ SheetJS បំបាត់លេខ 0 នាំមុខ (កំណែ 2.24.3)
+
+> 🔴 **កំហុសទិន្នន័យពិត។** វាលឯកសារទទួល `.csv` និង `.tsv` រួចហើយ
+> (`accept=".xlsx,.xls,.csv,.tsv"`) ➜ លេខទូរស័ព្ទកម្ពុជាដែលចាប់ផ្តើមដោយ `0`
+> ត្រូវសរសេរចូល Google Sheet **ខុស** ➜ ហូរត្រឡប់មក ZoeW តាម Lookup API ➜
+> **បំពេញលេខអតិថិជនខុស**។
+
+វាស់លើ SheetJS ដែល ship (`vendor/xlsx.full.min.js`)៖
+
+| ការអាន | លទ្ធផលពិត |
+|---|---|
+| `read(bytes, { type: 'array' })` | `["ZTO0001", 1.5, 12, 974158508]` 🔴 |
+| `read(bytes, { type: 'array', raw: true })` | `["ZTO0001", "1.5", "12", "0974158508"]` ✅ |
+| `read(bytes, { type: 'array', cellText: true })` | `974158508` 🔴 |
+
+⛔ **ការដាក់សញ្ញា `"…"` ក្នុង CSV មិនជួយទេ** — វាស់រួច។ SheetJS បម្លែងវា
+ទៅជាលេខដដែល ➜ លេខ 0 បាត់តាំងពី **ដំណាក់កាល parse** ➜ គ្មាន helper ណា
+ខាងក្រោម (`sheetImportCellToText`) អាចសង្គ្រោះវាបានទេ។
+
+ច្បាប់៖
+
+- **`sheetImportReadOptions(bytes)` ជាអ្នកសម្រេចតែមួយ** — `raw: true` **តែពេល
+  ឯកសារមិនមែនជា container** (ZIP `50 4b` សម្រាប់ `.xlsx`/`.ods` · OLE
+  `d0 cf 11 e0` សម្រាប់ `.xls`)។ ⛔ សម្គាល់តាម **byte** មិនមែនតាមឈ្មោះឯកសារ —
+  SheetJS ខ្លួនវាក៏សម្គាល់តាមខ្លឹមសារដែរ ➜ CSV ដែលប្តូរឈ្មោះជា `.xlsx`
+  នៅតែត្រូវអានជាអត្ថបទ។
+- ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ `.xlsx` **មិនត្រូវ** ទទួល `raw` ឡើយ — កោសិកា
+  កាលបរិច្ឆេទនឹងក្លាយជា **លេខ serial** ជំនួស `Date` ➜ `sheetImportCellToText()`
+  ដែលពិនិត្យ `value instanceof Date` នឹងបញ្ចេញ `'45000'` ជំនួស `''`។
+- តម្លៃលុយមិនរងផលទេ ៖ `sheetImportToMoney()` ទទួលទាំងលេខ និងខ្សែអក្សរស្រាប់។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ (សំខាន់បំផុតនៃជុំនេះ) ៖ ការគ្របដែលអាស្រ័យលើ *បរិស្ថាន*
+គឺជាការគ្របដោយចៃដន្យ។** `sheet-import-test.js` សាងឯកសារគំរូជា `.xlsx` **ពេល
+package `xlsx` ដំឡើងរួច** ហើយធ្លាក់ទៅ **CSV តែពេលវាមិនបានដំឡើង**។ ដូច្នេះ៖
+
+| បរិស្ថាន | លទ្ធផលលើកូដដែលមានកំហុស |
+|---|---|
+| គ្មាន `xlsx` | ✅ ចាប់បាន (ធ្លាក់ ១) |
+| មាន `xlsx` | 🔴 **បៃតង ៨១/៨១ — mutation រស់រាន** |
+
+នេះជាទម្រង់ថ្មីនៃ **សំណួរទី ១** («វាស្កេន/រត់ឯកសារណា?») ៖ ចម្លើយប្រែតាម
+ម៉ាស៊ីន។ ការកែ ៖ ផ្នែក **១៦** សរសេរ CSV **ដោយចេតនាជានិច្ច** (មិនអាស្រ័យលើ
+`xlsx`) បូកការអះអាងលើ `sheetImportReadOptions()` ដោយផ្ទាល់ ➜ **ទាំង ២ ខាង**
+ត្រូវបានចាក់សោ។
+
+Test៖ **`sheet-import-test.js`** (៨១ assertion; ធ្លាក់ **៥** លើ `origin/main`;
+mutation ៣ ➜ ចាប់បានទាំង ៣)។
 
 ### ⛔ Netlify Blobs ៖ Lambda-signature function ត្រូវហៅ `connectLambda(event)` (កំណែ 2.24.2)
 

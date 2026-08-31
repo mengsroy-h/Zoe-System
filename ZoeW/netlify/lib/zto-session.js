@@ -9,7 +9,6 @@ const ALLOWED_LOGIN_HOSTS = new Set([
     'argus.ztoglobal.com',
     'aargus-api.ztoglobal.com',
     'iam-web.zto.com/oauth2?app_id=zt_Fh4PydiUoqS9a3ipJshcQ&redirect_url=https%3A%2F%2Faargus-api.ztoglobal.com%2Flogin%3FredirectFrontURI%3DaHR0cHM6Ly9hcmd1cy56dG9nbG9iYWwuY29tLw%3D%3D&response_type=code&state=vtTmt1AcZ8435dr73ay958w63foaa6J4c741I&lang=km'
-    'gate.ztoglobal.com'
 ]);
 const DEFAULT_COOKIE_NAME = 'BOS-MAN-SESSION';
 const STORE_NAME = 'zoew-zto-private-session-v1';

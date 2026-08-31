@@ -222,6 +222,7 @@
 | **ZTO ៖ cookie ≠ ការចូល** | ⛔ `BOS-MAN-SESSION` មានតាំងពីមុនចូល — ត្រូវការភស្តុតាង | `zto-session-test` |
 | **ZTO ៖ វដ្តរង់ចាំ** | ⛔ `Math.max(1, …) > 0` ពិតជានិច្ច ➜ វដ្តគ្មានផ្លូវចេញ | `zto-session-test` |
 | **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
+| **ZTO ៖ ទម្រង់ login** | ⛔ ស្កេន **គ្រប់ frame** — IdP ដាក់ទម្រង់ក្នុង iframe | `zto-session-test` |
 | **Blobs ដាច់** | ⛔ store ដាច់ ≠ lookup ស្លាប់ (ធ្លាក់ចុះទៅសតិ) | `zto-session-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
@@ -1757,6 +1758,39 @@ package `xlsx` ដំឡើងរួច** ហើយធ្លាក់ទៅ **CS
 
 Test៖ **`sheet-import-test.js`** (៨១ assertion; ធ្លាក់ **៥** លើ `origin/main`;
 mutation ៣ ➜ ចាប់បានទាំង ៣)។
+
+### ⛔ ZTO login ៖ ទម្រង់អាចនៅក្នុង iframe (កំណែ 2.24.5)
+
+> 🔴 **វាស់ពីផលិតកម្មពិត** ៖ `reason: login:wait-password@iam-web.zto.com:TimeoutError`។
+
+ស្លាកនោះប្រាប់ ៤ យ៉ាងក្នុងខ្សែអក្សរតែមួយ ៖ Chromium បើកបាន · `goto` ជោគជ័យ
+(គ្មានបច្ច័យ `-nonav`) · **ឈានដល់ IdP របស់ ZTO រួច** ➜ **redirect chain ដើរបាន
+ពី server របស់ Netlify ដូច្នេះតំបន់មិនទប់ទេ** · តែទម្រង់ login រកមិនឃើញ។
+
+⛔ `page.waitForSelector()` មើល **តែ frame មេ**។ IdP ជាច្រើនដាក់ទម្រង់ login
+ក្នុង **iframe** ➜ ការរង់ចាំនោះមិនអាចជោគជ័យបានឡើយ ទោះទម្រង់នៅទីនោះ។
+
+ច្បាប់៖
+
+- **`waitForLoginFrame()` ស្កេនគ្រប់ frame** (`page.frames()`) រកប្រអប់ពាក្យ
+  សម្ងាត់ដែល **មើលឃើញ** រួចប្រគល់ **frame នោះ** ទៅឲ្យអ្នករកទម្រង់ទាំង ៣។
+  ⛔ `findUsernameInput()` · `findPasswordInput()` · `findLoginButton()` ត្រូវ
+  ទទួល **frame** មិនមែន `page` — បើអត់ វារកក្នុង frame មេវិញ។
+- **`inspectLoginState()` ក៏ស្កេនគ្រប់ frame ដែរ** — អត្ថបទ CAPTCHA ឬការ
+  បដិសេធ password អាចនៅក្នុង iframe ដដែល។
+- **ពេលរង់ចាំកើនតាមថវិកា** ៖ `max(១២វិ., remaining − ១០វិ.)` ពិដាន ២០ វិនាទី។
+  ⛔ **ការបម្រុង ១០ វិនាទីត្រូវរក្សា** សម្រាប់ការបំពេញ · ចុច · និងវដ្តរង់ចាំ
+  cookie — បើអត់ Netlify សម្លាប់ Function មុនវដ្តនោះចប់ ➜ គ្មាន JSON គ្មាន
+  backoff (ថ្នាក់ដដែលនឹងវដ្តគ្មានផ្លូវចេញ 2.24.4)។
+- **log ផ្ទុក `frames=[host:inputs/passwords …]`** ➜ បែងចែក «ទម្រង់ក្នុង
+  iframe» ពី «ទំព័រទទេ» ពី «ផ្ទុកមិនទាន់ចប់» ដោយមិនបាច់ទាយ។
+
+⚠️ **មេរៀន ៖ `reason` ដែលមានជំហាន និង host បានបង្វែរការទាយទៅជាការវាស់។**
+ជុំ 2.24.2 ➜ 2.24.5 ជាខ្សែសង្វាក់ ៖ រាល់ការកែបញ្ចេញកំហុសបន្ទាប់ដែលកំហុសមុន
+បាំងទុក ហើយ **ស្លាកជំហានប្រាប់ជាក់លាក់ថាត្រូវមើលកន្លែងណាបន្ត** — គ្មានជុំណា
+ត្រូវទាយឡើយ។
+
+Test៖ **`zto-session-test.js`** (៨១ assertion; mutation ៣ ➜ ចាប់បានទាំង ៣)។
 
 ### ⛔ ZTO login ៖ cookie មិនមែនជាភស្តុតាងនៃការចូល (កំណែ 2.24.4)
 

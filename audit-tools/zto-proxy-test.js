@@ -165,9 +165,18 @@ async function run() {
         delete process.env.ZTO_COOKIE;
         process.env.ZTO_AUTO_LOGIN = 'true';
         let autoSessionCalls = 0;
+        const blobsEvent = {
+            httpMethod: 'GET',
+            headers: { 'x-zoe-proxy-key': 'test-proxy-key', 'x-nf-site-id': 'site-1' },
+            blobs: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuaW52YWxpZCIsInRva2VuIjoidCJ9',
+            queryStringParameters: { barcode: '77130527210012' }
+        };
         ztoSession.getAutoSessionCookie = async (options) => {
             autoSessionCalls += 1;
-            assert.strictEqual(options, undefined);
+            assert.ok(options && typeof options === 'object',
+                'auto login must receive options carrying the Lambda event');
+            assert.strictEqual(options.lambdaEvent, blobsEvent,
+                'the Netlify Blobs context lives on the Lambda event — passing it is what lets connectLambda() run');
             return 'BOS-MAN-SESSION=auto-session';
         };
         global.fetch = async (url, options) => {
@@ -179,11 +188,7 @@ async function run() {
                 json: async () => ({ success: true, data: { billCode: '77130527210012' } })
             };
         };
-        const autoSessionResult = await proxy.handler({
-            httpMethod: 'GET',
-            headers: { 'x-zoe-proxy-key': 'test-proxy-key' },
-            queryStringParameters: { barcode: '77130527210012' }
-        });
+        const autoSessionResult = await proxy.handler(blobsEvent);
         assert.strictEqual(autoSessionResult.statusCode, 200);
         assert.strictEqual(autoSessionCalls, 1);
         assert.strictEqual(captured.options.headers.Cookie, 'BOS-MAN-SESSION=auto-session');
@@ -191,11 +196,18 @@ async function run() {
         process.env.ZTO_COOKIE = 'BOS-MAN-SESSION=expired-static';
         autoSessionCalls = 0;
         let refreshFetchCalls = 0;
+        const refreshEvent = {
+            httpMethod: 'GET',
+            headers: { 'x-zoe-proxy-key': 'test-proxy-key', 'x-nf-site-id': 'site-1' },
+            blobs: 'eyJ1cmwiOiJodHRwczovL2V4YW1wbGUuaW52YWxpZCIsInRva2VuIjoidCJ9',
+            queryStringParameters: { barcode: '77130527210012' }
+        };
         ztoSession.getAutoSessionCookie = async (options) => {
             autoSessionCalls += 1;
             assert.deepStrictEqual(options, {
                 forceRefresh: true,
-                rejectedCookie: 'BOS-MAN-SESSION=expired-static'
+                rejectedCookie: 'BOS-MAN-SESSION=expired-static',
+                lambdaEvent: refreshEvent
             });
             return 'BOS-MAN-SESSION=refreshed-auto';
         };
@@ -217,11 +229,7 @@ async function run() {
                 json: async () => ({ success: true, data: { billCode: '77130527210012' } })
             };
         };
-        const refreshedResult = await proxy.handler({
-            httpMethod: 'GET',
-            headers: { 'x-zoe-proxy-key': 'test-proxy-key' },
-            queryStringParameters: { barcode: '77130527210012' }
-        });
+        const refreshedResult = await proxy.handler(refreshEvent);
         assert.strictEqual(refreshedResult.statusCode, 200);
         assert.strictEqual(refreshFetchCalls, 2);
         assert.strictEqual(autoSessionCalls, 1, 'expired cookie must trigger exactly one refresh');

@@ -124,5 +124,38 @@ Auto-login **មិនដោះ ឬ bypass CAPTCHA/MFA/security verification** �
 - `ZTO session នៅតែមិនត្រឹមត្រូវ` — login បាន cookie ថ្មី ប៉ុន្តែ ZTO នៅតែ
   បដិសេធ; ពិនិត្យឈ្មោះ cookie/សិទ្ធិគណនី ឬប្រើ official token។
 
+## ៦. អាន `reason` ក្នុងសារកំហុស (តាំងពីកំណែ 2.24.2)
+
+រាល់សារ 503/502 របស់ auto-login ភ្ជាប់មកជាមួយវាល **`reason`** ដែលប្រាប់ថា
+**ជាប់ត្រង់ណា** — មិនមែនត្រឹមកូដទូទៅទេ។ ការធ្លាក់ដដែលក៏ត្រូវសរសេរចូល
+**Netlify Function log** ជាមួយបុព្វបទ `[zto-session] `។
+
+### `ZTO_SESSION_STORE_UNAVAILABLE` — Netlify Blobs
+
+| `reason` | មានន័យ | ត្រូវធ្វើអ្វី |
+| --- | --- | --- |
+| `getstore:MissingBlobsEnvironmentError` | Function រកព័ត៌មានតភ្ជាប់ Blobs មិនឃើញ | ត្រូវ deploy កំណែ 2.24.2 ឡើងទៅ (វាហៅ `connectLambda(event)`); បើនៅតែឃើញ សូមពិនិត្យថា Netlify **Base directory = `ZoeW`** និង deploy តាម Git/CLI មិនមែន drag-and-drop |
+| `import:ERR_MODULE_NOT_FOUND` | `@netlify/blobs` មិនត្រូវបាន bundle ចូល Function | ពិនិត្យ `package.json` + `package-lock.json` និង build log |
+| `read:…` · `write:…` · `lock:…` | Blobs ឆ្លើយជាកំហុស | មើល Function log; ជាធម្មតាបណ្ដោះអាសន្ន |
+
+⛔ **ចាប់ពី 2.24.2 ការដាច់ Blobs លែងធ្វើឲ្យ lookup ស្លាប់ទាំងស្រុងទេ** —
+Function ធ្លាក់ចុះទៅ session **ក្នុងសតិ** របស់ container នោះ។ វានៅតែដើរ
+តែ login ញឹកញាប់ជាង ➜ សូមកែ Blobs ឲ្យដើរវិញដដែល។
+
+### `ZTO_LOGIN_UNAVAILABLE` — ផ្លូវ login / IDaaS OAuth2
+
+| `reason` | មានន័យ | ត្រូវធ្វើអ្វី |
+| --- | --- | --- |
+| `host:<hostname>` | IDaaS redirect ទៅ host ដែល **មិនស្ថិតក្នុងបញ្ជីអនុញ្ញាត** | ពិនិត្យថា host នោះជារបស់ ZTO ពិត រួចបន្ថែមវាចូល `ALLOWED_LOGIN_HOSTS` ក្នុង `netlify/lib/zto-session.js` |
+| `scheme:http` | Redirect ចេញពី HTTPS | ⛔ កុំបន្ថូរ — ជាសញ្ញាមិនល្អ |
+| `form:username-N` · `form:password-N` · `form:button-N` | ZTO ប្តូរទម្រង់ login (រកឃើញ `N` ធាតុជំនួស ១) | ត្រូវកែ selector ក្នុង `findUsernameInput()` / `findPasswordInput()` / `findLoginButton()` |
+| `login:<ErrorName>` | កំហុសផ្សេងក្នុង Chromium | មើល Function log |
+
+> **អំពី OAuth2 របស់ ZTO** ៖ បញ្ជីអនុញ្ញាតពិនិត្យតែ **hostname** —
+> path និង query ដែលវែង និងប្រែរាល់ដង (រួមទាំង `=km`) **មិនមានបញ្ហាទេ**។
+> ការបើក `iam-web.zto.com` ដោយផ្ទាល់មិនចូល ជារឿង **ធម្មតា** ៖ IdP ត្រូវការ
+> OAuth2 parameter ដែល `argus.ztoglobal.com` ជាអ្នកផ្តល់។ ដូច្នេះ Function
+> ចាប់ផ្តើមពី `argus.ztoglobal.com` ជានិច្ច រួចដើរតាម redirect។
+
 Login UI របស់ ZTO អាចប្រែដោយ ZTO ដោយគ្មានការជូនដំណឹង។ កូដនេះផ្ទៀងផ្ទាត់
 តែ HTTPS host ដែលបានកំណត់ និងឈប់ដោយសុវត្ថិភាពបើ form/redirect មិនដូចការរំពឹង។

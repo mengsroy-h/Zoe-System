@@ -25,6 +25,63 @@
 
 ---
 
+## [ZoeW 2.24.2] — 2026-08-31 · ជួសជុល ZTO Auto-login ៖ HTTP 503 «ZTO session store is unavailable»
+
+ជុំនេះកែតែ **ZoeW** (`zoew-v140` ➜ `zoew-v141`)។ ZoeKeyGen និង Firebase rules
+**មិនប្រែសោះ**។ វា **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មទេ** (លុប/ដក · ធុងសំរាម ·
+ការសម្អាត · ស្ថិតិយក · លុយ) ហើយ **មិនប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ ·
+ការរមូរ · ទម្រង់បង្ហាញ** ដែរ។ ការកែទាំងអស់ស្ថិតក្នុង Netlify Function។
+
+### កែកំហុស
+- **ZTO Auto-login ធ្លាក់ជា HTTP 503 `ZTO_SESSION_STORE_UNAVAILABLE` រាល់ដង។**
+  មូលហេតុឫសគល់ ៖ Function សរសេរតាម **Lambda-compatible signature**
+  (`exports.handler = (event) => …`)។ សម្រាប់ signature នោះ Netlify **មិនដាក់**
+  ព័ត៌មានតភ្ជាប់ Blobs ក្នុង `process.env` ទេ — វាដាក់ក្នុង **`event` ខ្លួនវា**
+  (`event.blobs` បូក header `x-nf-site-id` និង `x-nf-deploy-id`) ហើយ
+  `@netlify/blobs` ទាមទារឲ្យហៅ **`connectLambda(event)`** ជាមុន។ កូដហៅ
+  `getStore()` ត្រង់ៗ ➜ library បោះ `MissingBlobsEnvironmentError` ➜
+  `catch (_)` លេបវា ➜ អ្នកប្រើឃើញតែ 503។ ឥឡូវ `event` ត្រូវបញ្ជូនចូល
+  `getAutoSessionCookie()` ហើយ `connectLambda(event)` រត់មុន `getStore()`។
+- **ការស្កេនលែងស្លាប់ទាំងស្រុងពេល Blobs ដាច់។** មុននេះ Blobs ជា
+  **ចំណុចដាច់តែមួយ** ៖ store មិនបើក ➜ គ្មាន lookup សោះ ទោះ login ដើរបានក៏ដោយ។
+  ឥឡូវវាធ្លាក់ចុះទៅ **session ក្នុងសតិ** របស់ container នោះ (login ម្តង រួច
+  ប្រើឡើងវិញ) ព្រមទាំងរក្សា backoff ដដែល ➜ គ្មានរង្វិលជុំបើក Chromium។
+  នេះជាច្បាប់ដដែលនឹង «Cache Storage បរាជ័យ ≠ App ដាច់» ខាង Service Worker។
+- **ការសរសេរ session ចូល Blobs ដែលធ្លាក់ លែងបោះចោល session ដែល login ជោគជ័យ។**
+  មុននេះ login ដើរបាន តែការរក្សាទុកធ្លាក់ ➜ ទាំងអស់ត្រូវបោះចោល ➜ login ថ្មីទៀត។
+
+### កែលម្អ ៖ សារបរាជ័យប្រាប់ការពិត
+- 503 ឥឡូវភ្ជាប់មកជាមួយ **`reason`** ដែលប្រាប់ **ដំណាក់កាល** និង **កំហុសពិត** ៖
+  `import:ERR_MODULE_NOT_FOUND` · `getstore:MissingBlobsEnvironmentError` ·
+  `read:…` · `write:…` · `lock:…`។ មុននេះកន្លែងធ្លាក់ **៥** ផ្សេងគ្នា
+  ចេញជាកូដតែមួយដែលមិនប្រាប់អ្វីសោះ។
+- `ZTO_LOGIN_UNAVAILABLE` ក៏មាន `reason` ដែរ ៖ `host:<hostname>` (ពេល IDaaS
+  redirect ទៅ host ដែលមិនស្ថិតក្នុងបញ្ជីអនុញ្ញាត) · `scheme:http` ·
+  `url:unparsable` · `form:username-N` / `form:password-N` / `form:button-N`
+  (ពេល ZTO ប្តូរទម្រង់ login) · `login:<ErrorName>`។ ⛔ វាបញ្ចេញតែ
+  **ឈ្មោះ host និងឈ្មោះកំហុស** — គ្មាន URL ពេញ គ្មាន token គ្មានពាក្យសម្ងាត់។
+- រាល់ការធ្លាក់របស់ store ត្រូវសរសេរចូល **Netlify Function log** ជាមួយបុព្វបទ
+  `[zto-session] `។
+
+### ឧបករណ៍ audit
+- **`zto-session-test.js`** ៖ ៣១ ➜ **៦២ assertion**។ វាឥឡូវរត់
+  **`defaultOpenStore()` ពិត** ជាមួយម៉ូឌុល `@netlify/blobs` ក្លែង ➜
+  **ស្នាមភ្ជាប់** រវាង Function និង library ត្រូវបានចាក់សោ។ មុននេះ
+  **គ្រប់តេស្តចាក់ `openStore` ក្លែងចូល** ➜ កូដដែលធ្លាក់លើផលិតកម្ម
+  **មិនដែលត្រូវរត់សោះ** (សំណួរទី ៧ — «តើមានឧបករណ៍ណាឃើញស្នាមភ្ជាប់?»)។
+  ការធ្លាក់ត្រូវរាយ **ជាឈ្មោះ** មិនមែនគាំងតែមួយ (ច្បាប់ «កុំបញ្ឈប់ checker —
+  ត្រូវ stub ជំនួស»)។
+- **`zto-proxy-test.js`** ៖ ការអះអាង `assert.strictEqual(options, undefined)`
+  ចាស់ **ចាក់សោកំហុសទុក** — វាទាមទារឲ្យ Function **កុំ** បញ្ជូន `event`
+  ដែលជាកំហុសពិត។ ឥឡូវវាអះអាងថា `lambdaEvent` ត្រូវជា event ពិត។
+- ធ្លាក់ **១០** លើ `origin/main`; mutation ៤ ➜ ចាប់បានទាំង ៤។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- **គ្មាន** — Firebase rules មិនប្រែ, CSP មិនប្រែ, Environment Variables មិនប្រែ។
+  គ្រាន់តែ deploy ZoeW ម្តង។
+
+---
+
 ## [ZoeW 2.24.1] — 2026-08-31 · ZTO Argus Auto-login
 
 ជុំនេះកែតែ **ZoeW** (`zoew-v139` ➜ `zoew-v140`)។ ZoeKeyGen និង Firebase

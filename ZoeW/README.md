@@ -80,6 +80,14 @@ ZTO_SESSION_ENCRYPTION_KEY=<លទ្ធផល openssl rand -base64 32>
 
 `ZTO_COOKIE` លែងចាំបាច់សម្រាប់ setup auto-login ប៉ុន្តែនៅតែអាចប្រើជា manual
 fallback។ Official `ZTO_AUTHORIZATION`/`ZTO_TOKEN` នៅតែមានអាទិភាពខ្ពស់បំផុត។
+
+តាំងពីកំណែ **2.24.2** សារកំហុសរបស់ auto-login ភ្ជាប់មកជាមួយវាល **`reason`**
+ដែលប្រាប់ថាជាប់ត្រង់ណា (`getstore:MissingBlobsEnvironmentError` ·
+`host:<hostname>` · `form:username-N` …) ហើយការដាច់របស់ Netlify Blobs
+**លែងធ្វើឲ្យការស្កេនស្លាប់ទាំងស្រុងទេ** — Function ធ្លាក់ចុះទៅ session
+ក្នុងសតិរបស់ container នោះ។ តារាងអត្ថន័យពេញលេញនៅក្នុង
+[`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៦។
+
 Session ថ្មីត្រូវ encrypt ដោយ AES-256-GCM ក្នុង Netlify Blobs; Username,
 Password និង Cookie មិនត្រូវបានបញ្ជូនទៅ ZoeW browser ទេ។ ក្នុងប្រអប់
 «API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» ដាក់៖
@@ -283,7 +291,7 @@ Barcode ដែល **មិនមានក្នុងតារាង** ធ្ល
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.1`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.24.2`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។ វាបង្ហាញ **២ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ
 និងខាងក្រោមរបា Slide។
 

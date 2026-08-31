@@ -27,16 +27,21 @@ const SAFE_FAILURE_CODES = new Set([
     'ZTO_LOGIN_UNAVAILABLE',
     'ZTO_LOGIN_NO_SESSION'
 ]);
+const STORE_STAGE_RE = /^[a-z]{3,16}$/;
+const STORE_REASON_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+const LOG_PREFIX = '[zto-session] ';
 
 let memorySession = null;
+let memoryFailure = null;
 let activeRefresh = null;
 
 class ZtoSessionError extends Error {
-    constructor(code, statusCode) {
+    constructor(code, statusCode, reason) {
         super(code);
         this.name = 'ZtoSessionError';
         this.code = code;
         this.statusCode = Number(statusCode) || 503;
+        if (reason) this.reason = String(reason);
     }
 }
 
@@ -232,13 +237,21 @@ function withTimeout(promise, ms, code) {
     });
 }
 
+function safeHostLabel(hostname) {
+    const host = String(hostname || '').toLowerCase();
+    return /^[a-z0-9.-]{1,60}$/.test(host) ? host : 'unknown';
+}
+
 function assertAllowedLoginUrl(raw) {
     let parsed;
     try { parsed = new URL(String(raw || '')); } catch (_) {
-        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'url:unparsable');
     }
-    if (parsed.protocol !== 'https:' || !ALLOWED_LOGIN_HOSTS.has(parsed.hostname)) {
-        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+    if (parsed.protocol !== 'https:') {
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'scheme:' + parsed.protocol.replace(':', ''));
+    }
+    if (!ALLOWED_LOGIN_HOSTS.has(parsed.hostname)) {
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'host:' + safeHostLabel(parsed.hostname));
     }
     return parsed;
 }
@@ -295,13 +308,17 @@ async function findUsernameInput(page) {
     if (preferred.length === 1) return preferred[0];
     const candidates = await visibleHandles(page,
         'input[type="text"], input[type="email"], input[autocomplete="username"]');
-    if (candidates.length !== 1) throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+    if (candidates.length !== 1) {
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'form:username-' + candidates.length);
+    }
     return candidates[0];
 }
 
 async function findPasswordInput(page) {
     const candidates = await visibleHandles(page, 'input[type="password"]');
-    if (candidates.length !== 1) throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+    if (candidates.length !== 1) {
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'form:password-' + candidates.length);
+    }
     return candidates[0];
 }
 
@@ -315,7 +332,7 @@ async function findLoginButton(page) {
     }
     if (preferred.length === 1) return preferred[0];
     if (buttons.length === 1) return buttons[0];
-    throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+    throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'form:button-' + buttons.length);
 }
 
 async function inspectLoginState(page) {
@@ -425,35 +442,90 @@ async function performArgusLogin(config, dependencies) {
         throw new ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504);
     } catch (error) {
         if (error instanceof ZtoSessionError) throw error;
-        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'login:' + safeReasonText(error));
     } finally {
         await closeBrowserQuietly(browser, sleep);
     }
 }
 
-async function defaultOpenStore() {
+function safeReasonText(error) {
+    if (!error) return 'UnknownError';
+    const code = String(error.code || '').trim();
+    if (/^[A-Z][A-Z0-9_]{2,63}$/.test(code)) return code;
+    const name = String(error.name || '').trim();
+    return STORE_REASON_RE.test(name) ? name : 'UnknownError';
+}
+
+function logStoreProblem(deps, stage, error) {
+    const log = (deps && deps.logger) || console.warn;
+    if (typeof log !== 'function') return;
+    const detail = String((error && error.message) || '')
+        .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+        .replace(/\?[^\s]*/g, '?[redacted]')
+        .replace(/[A-Za-z0-9_-]{24,}/g, '[redacted]')
+        .trim()
+        .slice(0, 200);
     try {
-        const blobs = await import('@netlify/blobs');
-        if (!blobs || typeof blobs.getStore !== 'function') throw new Error('missing getStore');
-        return blobs.getStore({ name: STORE_NAME, consistency: 'strong' });
+        log(LOG_PREFIX + 'Netlify Blobs ' + stage + ' failed: ' + safeReasonText(error) + (detail ? ' — ' + detail : ''));
+    } catch (_) {}
+}
+
+function storeUnavailable(deps, stage, error) {
+    if (error instanceof ZtoSessionError) return error;
+    logStoreProblem(deps, stage, error);
+    const label = STORE_STAGE_RE.test(stage) ? stage : 'store';
+    return new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503, label + ':' + safeReasonText(error));
+}
+
+function connectLambdaBlobs(blobs, lambdaEvent) {
+    if (!blobs || typeof blobs.connectLambda !== 'function') return false;
+    if (!lambdaEvent || typeof lambdaEvent !== 'object') return false;
+    if (typeof lambdaEvent.blobs !== 'string' || !lambdaEvent.blobs) return false;
+    if (!lambdaEvent.headers || typeof lambdaEvent.headers !== 'object') return false;
+    try {
+        blobs.connectLambda(lambdaEvent);
+        return true;
     } catch (_) {
-        throw new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503);
+        return false;
     }
 }
 
-async function openStore(deps) {
+async function defaultOpenStore(context) {
+    const ctx = context || {};
+    const importBlobs = ctx.importBlobs || (() => import('@netlify/blobs'));
+    let blobs;
     try {
-        return await (deps.openStore || defaultOpenStore)();
+        blobs = await importBlobs();
     } catch (error) {
-        if (error instanceof ZtoSessionError) throw error;
-        throw new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503);
+        throw storeUnavailable(ctx, 'import', error);
+    }
+    if (!blobs || typeof blobs.getStore !== 'function') {
+        throw storeUnavailable(ctx, 'export', new Error('missing getStore'));
+    }
+    connectLambdaBlobs(blobs, ctx.lambdaEvent);
+    try {
+        return blobs.getStore({ name: STORE_NAME, consistency: 'strong' });
+    } catch (error) {
+        throw storeUnavailable(ctx, 'getstore', error);
     }
 }
 
-async function loadStoredSession(store, config, now) {
+async function openStore(deps, context) {
+    const ctx = Object.assign({}, context, {
+        importBlobs: deps.importBlobs || (context && context.importBlobs),
+        logger: deps.logger
+    });
+    try {
+        return await (deps.openStore || defaultOpenStore)(ctx);
+    } catch (error) {
+        throw storeUnavailable(deps, 'open', error);
+    }
+}
+
+async function loadStoredSession(store, config, now, deps) {
     let raw;
-    try { raw = await store.get(SESSION_KEY, { type: 'text' }); } catch (_) {
-        throw new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503);
+    try { raw = await store.get(SESSION_KEY, { type: 'text' }); } catch (error) {
+        throw storeUnavailable(deps, 'read', error);
     }
     if (!raw) return null;
     try {
@@ -464,7 +536,7 @@ async function loadStoredSession(store, config, now) {
     }
 }
 
-async function saveStoredSession(store, config, session) {
+async function saveStoredSession(store, config, session, deps) {
     try {
         await store.set(SESSION_KEY, encryptSession(session, config.encryptionKey), {
             metadata: {
@@ -473,8 +545,10 @@ async function saveStoredSession(store, config, session) {
                 encrypted: true
             }
         });
-    } catch (_) {
-        throw new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503);
+        return true;
+    } catch (error) {
+        logStoreProblem(deps, 'write', error);
+        return false;
     }
 }
 
@@ -514,7 +588,7 @@ async function clearFailure(store) {
     try { await store.delete(LOGIN_FAILURE_KEY); } catch (_) {}
 }
 
-async function acquireLoginLock(store, nonce, now) {
+async function acquireLoginLock(store, nonce, now, deps) {
     try {
         const current = await store.getWithMetadata(LOGIN_LOCK_KEY, { type: 'text' });
         if (current && Number(current.metadata && current.metadata.expiresAt) > now) return false;
@@ -525,8 +599,8 @@ async function acquireLoginLock(store, nonce, now) {
             metadata: { expiresAt: now + LOGIN_LOCK_MS }
         }, conditions));
         return !!(result && result.modified);
-    } catch (_) {
-        throw new ZtoSessionError('ZTO_SESSION_STORE_UNAVAILABLE', 503);
+    } catch (error) {
+        throw storeUnavailable(deps, 'lock', error);
     }
 }
 
@@ -548,7 +622,7 @@ async function waitForPeerRefresh(store, config, rejectedCookie, deps) {
     const deadline = now() + Math.min(LOGIN_WAIT_MS, config.loginTimeoutMs + 5000);
     while (now() < deadline) {
         await sleep(Math.min(400, Math.max(1, deadline - now())));
-        const session = await loadStoredSession(store, config, now());
+        const session = await loadStoredSession(store, config, now(), deps);
         if (session && (!rejectedCookie || session.cookie !== rejectedCookie)) return session;
         const failure = await loadFailure(store, config, now());
         if (failure) throw new ZtoSessionError(failure.code, failure.statusCode);
@@ -559,12 +633,31 @@ async function waitForPeerRefresh(store, config, rejectedCookie, deps) {
     throw new ZtoSessionError('ZTO_LOGIN_BUSY', 503);
 }
 
-async function refreshSession(config, options, deps) {
+function noteMemoryFailure(config, error, now) {
+    if (!error || !SAFE_FAILURE_CODES.has(error.code)) {
+        memoryFailure = null;
+        return;
+    }
+    memoryFailure = {
+        code: error.code,
+        statusCode: error.statusCode,
+        reason: error.reason || '',
+        retryAfter: now + backoffMs(error.code),
+        identityId: config.identityId
+    };
+}
+
+function readMemoryFailure(config, now) {
+    if (!memoryFailure || memoryFailure.identityId !== config.identityId) return null;
+    if (!(memoryFailure.retryAfter > now)) return null;
+    return memoryFailure;
+}
+
+async function refreshWithStore(store, config, options, deps) {
     const now = deps.now || Date.now;
-    const store = await openStore(deps);
     let rejectedCookie = String(options.rejectedCookie || '');
 
-    const existing = await loadStoredSession(store, config, now());
+    const existing = await loadStoredSession(store, config, now(), deps);
     if (options.forceRefresh && !rejectedCookie && existing) rejectedCookie = existing.cookie;
     if (existing && (!options.forceRefresh || existing.cookie !== rejectedCookie)) {
         memorySession = existing;
@@ -575,11 +668,11 @@ async function refreshSession(config, options, deps) {
     if (failure) throw new ZtoSessionError(failure.code, failure.statusCode);
 
     const nonce = crypto.randomUUID();
-    const ownsLock = await acquireLoginLock(store, nonce, now());
+    const ownsLock = await acquireLoginLock(store, nonce, now(), deps);
     if (!ownsLock) return waitForPeerRefresh(store, config, rejectedCookie, deps);
 
     try {
-        const afterLock = await loadStoredSession(store, config, now());
+        const afterLock = await loadStoredSession(store, config, now(), deps);
         if (afterLock && (!options.forceRefresh || afterLock.cookie !== rejectedCookie)) {
             memorySession = afterLock;
             return afterLock;
@@ -601,12 +694,71 @@ async function refreshSession(config, options, deps) {
             await saveFailure(store, config, error, now());
             throw error;
         }
-        await saveStoredSession(store, config, session);
+        await saveStoredSession(store, config, session, deps);
         await clearFailure(store);
+        memoryFailure = null;
         memorySession = session;
         return session;
     } finally {
         await releaseLoginLock(store, nonce);
+    }
+}
+
+async function refreshWithoutStore(config, options, deps, storeError) {
+    const now = deps.now || Date.now;
+    const log = deps.logger || console.warn;
+    if (typeof log === 'function') {
+        try {
+            log(LOG_PREFIX + 'session store unavailable ('
+                + ((storeError && storeError.reason) || 'unknown')
+                + ') — serving this container from memory only');
+        } catch (_) {}
+    }
+
+    const rejectedCookie = String(options.rejectedCookie || '');
+    if (memorySession && sessionIsFresh(memorySession, config, now())
+        && (!options.forceRefresh || memorySession.cookie !== rejectedCookie)) {
+        return memorySession;
+    }
+
+    const failure = readMemoryFailure(config, now());
+    if (failure) throw new ZtoSessionError(failure.code, failure.statusCode, failure.reason);
+
+    const login = deps.login || performArgusLogin;
+    let session;
+    try {
+        session = await login(config, deps);
+    } catch (error) {
+        const safeError = error instanceof ZtoSessionError
+            ? error
+            : new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502);
+        noteMemoryFailure(config, safeError, now());
+        throw safeError;
+    }
+    if (!sessionIsFresh(session, config, now())) {
+        const error = new ZtoSessionError('ZTO_LOGIN_NO_SESSION', 502);
+        noteMemoryFailure(config, error, now());
+        throw error;
+    }
+    memoryFailure = null;
+    memorySession = session;
+    return session;
+}
+
+async function refreshSession(config, options, deps) {
+    let store = null;
+    try {
+        store = await openStore(deps, { lambdaEvent: options.lambdaEvent });
+    } catch (error) {
+        return refreshWithoutStore(config, options, deps, storeUnavailable(deps, 'open', error));
+    }
+    try {
+        return await refreshWithStore(store, config, options, deps);
+    } catch (error) {
+        if (error instanceof ZtoSessionError && error.code === 'ZTO_SESSION_STORE_UNAVAILABLE') {
+            return refreshWithoutStore(config, options, deps, error);
+        }
+        throw error;
     }
 }
 
@@ -640,6 +792,7 @@ async function getAutoSessionCookie(options) {
 
 function resetStateForTests() {
     memorySession = null;
+    memoryFailure = null;
     activeRefresh = null;
 }
 
@@ -649,7 +802,9 @@ module.exports = {
     isAutoLoginEnabled,
     getAutoSessionCookie,
     _test: {
+        connectLambdaBlobs,
         cookieHeaderFromBrowser,
+        defaultOpenStore,
         decodeEncryptionKey,
         decryptSession,
         encryptSession,

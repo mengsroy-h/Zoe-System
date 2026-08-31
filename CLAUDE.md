@@ -216,7 +216,10 @@
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
+| **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
+| **ZTO auto-login ↔ Netlify Blobs** | ⛔ Lambda-signature function ត្រូវហៅ `connectLambda(event)` មុន `getStore()` | `zto-session-test` |
+| **Blobs ដាច់** | ⛔ store ដាច់ ≠ lookup ស្លាប់ (ធ្លាក់ចុះទៅសតិ) | `zto-session-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
 ### ⛔ ស្ថិតិ «យក» ៖ អតិថិជន និងកញ្ចប់ ត្រូវរាប់លើ **មូលដ្ឋានតែមួយ** — កំណែ 2.19.4
@@ -1703,6 +1706,117 @@ checker រាយ «✅ គ្មានកំហុស runtime»។
 
 លទ្ធផលលើកូដបច្ចុប្បន្ន ៖ **០ unhandled rejection** ឆ្លងកាត់ការអះអាងជាង ៥០០
 ក្នុង checker ១៦។ Test៖ **`checker-coverage.js` ផ្នែក ៨**។
+
+### ⛔ នាំចូល CSV ៖ SheetJS បំបាត់លេខ 0 នាំមុខ (កំណែ 2.24.3)
+
+> 🔴 **កំហុសទិន្នន័យពិត។** វាលឯកសារទទួល `.csv` និង `.tsv` រួចហើយ
+> (`accept=".xlsx,.xls,.csv,.tsv"`) ➜ លេខទូរស័ព្ទកម្ពុជាដែលចាប់ផ្តើមដោយ `0`
+> ត្រូវសរសេរចូល Google Sheet **ខុស** ➜ ហូរត្រឡប់មក ZoeW តាម Lookup API ➜
+> **បំពេញលេខអតិថិជនខុស**។
+
+វាស់លើ SheetJS ដែល ship (`vendor/xlsx.full.min.js`)៖
+
+| ការអាន | លទ្ធផលពិត |
+|---|---|
+| `read(bytes, { type: 'array' })` | `["ZTO0001", 1.5, 12, 974158508]` 🔴 |
+| `read(bytes, { type: 'array', raw: true })` | `["ZTO0001", "1.5", "12", "0974158508"]` ✅ |
+| `read(bytes, { type: 'array', cellText: true })` | `974158508` 🔴 |
+
+⛔ **ការដាក់សញ្ញា `"…"` ក្នុង CSV មិនជួយទេ** — វាស់រួច។ SheetJS បម្លែងវា
+ទៅជាលេខដដែល ➜ លេខ 0 បាត់តាំងពី **ដំណាក់កាល parse** ➜ គ្មាន helper ណា
+ខាងក្រោម (`sheetImportCellToText`) អាចសង្គ្រោះវាបានទេ។
+
+ច្បាប់៖
+
+- **`sheetImportReadOptions(bytes)` ជាអ្នកសម្រេចតែមួយ** — `raw: true` **តែពេល
+  ឯកសារមិនមែនជា container** (ZIP `50 4b` សម្រាប់ `.xlsx`/`.ods` · OLE
+  `d0 cf 11 e0` សម្រាប់ `.xls`)។ ⛔ សម្គាល់តាម **byte** មិនមែនតាមឈ្មោះឯកសារ —
+  SheetJS ខ្លួនវាក៏សម្គាល់តាមខ្លឹមសារដែរ ➜ CSV ដែលប្តូរឈ្មោះជា `.xlsx`
+  នៅតែត្រូវអានជាអត្ថបទ។
+- ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ `.xlsx` **មិនត្រូវ** ទទួល `raw` ឡើយ — កោសិកា
+  កាលបរិច្ឆេទនឹងក្លាយជា **លេខ serial** ជំនួស `Date` ➜ `sheetImportCellToText()`
+  ដែលពិនិត្យ `value instanceof Date` នឹងបញ្ចេញ `'45000'` ជំនួស `''`។
+- តម្លៃលុយមិនរងផលទេ ៖ `sheetImportToMoney()` ទទួលទាំងលេខ និងខ្សែអក្សរស្រាប់។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ (សំខាន់បំផុតនៃជុំនេះ) ៖ ការគ្របដែលអាស្រ័យលើ *បរិស្ថាន*
+គឺជាការគ្របដោយចៃដន្យ។** `sheet-import-test.js` សាងឯកសារគំរូជា `.xlsx` **ពេល
+package `xlsx` ដំឡើងរួច** ហើយធ្លាក់ទៅ **CSV តែពេលវាមិនបានដំឡើង**។ ដូច្នេះ៖
+
+| បរិស្ថាន | លទ្ធផលលើកូដដែលមានកំហុស |
+|---|---|
+| គ្មាន `xlsx` | ✅ ចាប់បាន (ធ្លាក់ ១) |
+| មាន `xlsx` | 🔴 **បៃតង ៨១/៨១ — mutation រស់រាន** |
+
+នេះជាទម្រង់ថ្មីនៃ **សំណួរទី ១** («វាស្កេន/រត់ឯកសារណា?») ៖ ចម្លើយប្រែតាម
+ម៉ាស៊ីន។ ការកែ ៖ ផ្នែក **១៦** សរសេរ CSV **ដោយចេតនាជានិច្ច** (មិនអាស្រ័យលើ
+`xlsx`) បូកការអះអាងលើ `sheetImportReadOptions()` ដោយផ្ទាល់ ➜ **ទាំង ២ ខាង**
+ត្រូវបានចាក់សោ។
+
+Test៖ **`sheet-import-test.js`** (៨១ assertion; ធ្លាក់ **៥** លើ `origin/main`;
+mutation ៣ ➜ ចាប់បានទាំង ៣)។
+
+### ⛔ Netlify Blobs ៖ Lambda-signature function ត្រូវហៅ `connectLambda(event)` (កំណែ 2.24.2)
+
+> 🔴 **កំហុសផលិតកម្មពិត។** អ្នកប្រើឃើញ **HTTP 503 `ZTO_SESSION_STORE_UNAVAILABLE`**
+> រាល់ដងក្រោយបើក ZTO auto-login ហើយសង្ស័យថាមកពី OAuth2 របស់ ZTO IDaaS។
+> **វាមិនមែនទេ** — វាធ្លាក់ **មុនពេល Chromium បើកផង**។
+
+`zto-order-detail.js` សរសេរតាម **Lambda-compatible signature**
+(`exports.handler = async function handler(event)`). សម្រាប់ signature នោះ
+Netlify **មិនដាក់** ព័ត៌មានតភ្ជាប់ Blobs ក្នុង `process.env.NETLIFY_BLOBS_CONTEXT`
+ទេ — វាដាក់ក្នុង **`event` ខ្លួនវា** ៖ `event.blobs` (base64 នៃ `{url, token}`)
+បូក header `x-nf-site-id` និង `x-nf-deploy-id`។ ដូច្នេះ `@netlify/blobs`
+ទាមទារឲ្យហៅ **`connectLambda(event)`** ជាមុនសិន (វាហៅ `setEnvironmentContext()`
+ខាងក្នុង)។ កូដហៅ `getStore()` ត្រង់ៗ ➜ library បោះ
+`MissingBlobsEnvironmentError` ➜ `catch (_)` លេបវា ➜ 503។
+
+**វាស់បានពិត** (`@netlify/blobs` 11.0.2 ដំឡើងពិត)៖
+
+| ការហៅ | លទ្ធផល |
+|---|---|
+| `getStore({ name, consistency })` ដោយគ្មាន context | 🔴 បោះ `MissingBlobsEnvironmentError` |
+| `connectLambda(event)` រួច `getStore(...)` | ✅ ដំណើរការ |
+
+ច្បាប់៖
+
+- **`connectLambda(event)` ត្រូវរត់មុន `getStore()` រាល់ invocation** — token
+  ក្នុង `event.blobs` ជារបស់ **សំណើនោះ** ➜ វាមិនអាចយកទៅប្រើឡើងវិញឆ្លងសំណើទេ។
+  ដូច្នេះ `event` ត្រូវហូរពី handler ចូល `getAutoSessionCookie({ lambdaEvent })`។
+- ⛔ **វាត្រូវ *ស្ងាត់* ពេលគ្មាន `event.blobs`** — function signature ថ្មី និង
+  `netlify dev` ប្រើ `process.env` ជំនួស ➜ ការហៅ `connectLambda` ដោយ payload
+  ទទេនឹងបោះ ➜ ត្រូវពិនិត្យ `typeof event.blobs === 'string'` ជាមុន។
+- ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ** — នេះជាថ្នាក់ដដែលនឹង «⛔ Service
+  worker មិនត្រូវធ្វើឲ្យ Cache Storage ក្លាយជាចំណុចដាច់តែមួយ» (2.19.3)
+  ដែលវិលមកខាង **server**។ store ដាច់ ➜ ធ្លាក់ចុះទៅ session **ក្នុងសតិ**
+  របស់ container នោះ ដោយ **រក្សា backoff** (បើអត់ ➜ រង្វិលជុំបើក Chromium
+  2GB)។ ⛔ ទិសផ្ទុយត្រូវរក្សា ៖ ពេល store ដើរ lock ឆ្លង invocation នៅតែ
+  ទប់ការ login ស្ទួនដដែល។
+- ⛔ **ការសរសេរចូល store ដែលធ្លាក់ មិនត្រូវបោះចោល session ដែល login ជោគជ័យ**
+  — `saveStoredSession()` ជា best-effort។ បើវាបោះ នោះ login ដែលទើបជោគជ័យ
+  ត្រូវបោះចោល ➜ login ម្តងទៀត ➜ ថ្លៃពីរដង។
+- **រាល់ការធ្លាក់ត្រូវប្រាប់ *ដំណាក់កាល* និង *កំហុសពិត*** —
+  `import:` · `export:` · `getstore:` · `read:` · `write:` · `lock:` · `open:`។
+  មុនកែ កន្លែងធ្លាក់ **៥** ចេញជាកូដតែមួយ ➜ គ្មានផ្លូវដឹងថាមកពីអ្វី។
+  ⛔ `reason` បញ្ចេញតែ **ឈ្មោះកំហុស ឬ Node error code** — **គ្មាន message,
+  គ្មាន URL, គ្មាន token**។ ការណែនាំដដែលអនុវត្តលើផ្លូវ login ៖ `host:<hostname>` ·
+  `form:username-N` · `login:<ErrorName>`។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ (សំខាន់បំផុតនៃជុំនេះ)៖ ស្នាមភ្ជាប់ត្រូវបាន stub ក្នុង
+គ្រប់តេស្ត ➜ ស្នាមភ្ជាប់នោះគ្មានតេស្តសោះ។** `zto-session-test.js` មាន
+assertion ៣១ ហើយ **បៃតងទាំងអស់** លើកូដដែលធ្លាក់ ១០០% លើផលិតកម្ម។ មូលហេតុ ៖
+សេណារីយ៉ូ **ទាំងអស់** ចាក់ `openStore: async () => new FakeStore()` ចូល ➜
+**`defaultOpenStore()` — កូដដែលពិតជាធ្លាក់ — មិនដែលត្រូវរត់សោះ**។ នេះជា
+**សំណួរទី ៧** ក្នុងទម្រង់ថ្មី (2.20.4 ជាលើកមុន)។ ឥឡូវតេស្តរត់
+`defaultOpenStore()` ពិត ជាមួយម៉ូឌុល `@netlify/blobs` ក្លែងដែលចាក់តាម
+`importBlobs` ➜ លំដាប់ `connectLambda` ➜ `getStore` ត្រូវបានវាស់ពិត។
+
+⚠️ **មេរៀនទី ២ ៖ ការអះអាងដែលចាក់សោកំហុស។** `zto-proxy-test.js` អះអាងថា
+`assert.strictEqual(options, undefined)` — មានន័យថាវា **ទាមទារ** ឲ្យ Function
+**កុំ** បញ្ជូន `event` ចូល auto-login ដែលជា **កំហុសពិត**។ សំណួរ 2.20.6
+អនុវត្តម្តងទៀត ៖ «តើការអះអាងដែលធ្លាក់នេះ ការពារអ្វី ឬ**ចាក់សោ**អ្វី?»។
+
+Test៖ **`zto-session-test.js`** (៦២ assertion; ធ្លាក់ **១០** លើ `origin/main`;
+mutation ៤ ➜ ចាប់បានទាំង ៤) និង **`zto-proxy-test.js`**។
 
 ### ⛔ សំណួរ ១១ មុនជឿថា checker ថ្មីមួយដំណើរការ
 

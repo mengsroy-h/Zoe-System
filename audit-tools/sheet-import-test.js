@@ -219,10 +219,23 @@ const SAMPLE = [
     ['', 0, 0, '']
 ];
 
+function writeCsvSample(dir) {
+    const file = path.join(dir, 'zoe-sheet-import-sample-text.csv');
+    const cell = (v) => {
+        const text = String(v);
+        return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    };
+    fs.writeFileSync(file, SAMPLE.map((r) => r.map(cell).join(',')).join('\n'), 'utf8');
+    return file;
+}
+
+let sampleIsRealWorkbook = false;
+
 function writeSample(dir) {
     let XLSX = null;
     try { XLSX = require('xlsx'); } catch (e) { XLSX = null; }
     if (XLSX) {
+        sampleIsRealWorkbook = true;
         const file = path.join(dir, 'zoe-sheet-import-sample.xlsx');
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(SAMPLE), 'Data');
@@ -257,6 +270,15 @@ async function withTimeout(promise, ms, label) {
 
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'zoe-si-'));
     const samplePath = writeSample(tmpDir);
+    const csvSamplePath = writeCsvSample(tmpDir);
+    if (sampleIsRealWorkbook) {
+        console.log('   ចំណាំ ៖ ផ្នែក ១០–១៣ រត់លើ .xlsx ពិត (package `xlsx` ដំឡើងរួច)។');
+    } else {
+        console.log('   ⚠️  ចំណាំ ៖ គ្មាន package `xlsx` ➜ ផ្នែក ១០–១៣ ធ្លាក់ទៅ **CSV**');
+        console.log('       ➜ ផ្លូវ .xlsx ពិត **មិនត្រូវបានវាស់** ក្នុងការរត់នេះទេ។');
+        console.log('       ➜ រត់ `npm i xlsx` ដើម្បីគ្របវា (CI ដំឡើងវារួចស្រាប់)។');
+        console.log('       ផ្នែក ១៦ (CSV ➜ លេខ 0 នាំមុខ) រត់ជានិច្ច មិនអាស្រ័យលើវាទេ។');
+    }
     const server = await serve(APP);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });
@@ -471,6 +493,42 @@ async function withTimeout(promise, ms, label) {
             check(leftovers.mapCard === true && leftovers.fileCard === true, 'ចាកចេញ ➜ ជំហានទាំងអស់បិទវិញ', leftovers);
             check(!!(await page.evaluate(() => localStorage.getItem('zoew_sheet_import_config'))),
                 'ចាកចេញ ➜ ការតភ្ជាប់ដែលអ៊ិនគ្រីបនៅដដែល (ចូលវិញមិនបាច់កំណត់ថ្មី)');
+    });
+
+    await group('១៦. CSV/TSV ➜ លេខ 0 នាំមុខរបស់លេខទូរស័ព្ទមិនត្រូវបាត់', async () => {
+            await withTimeout(boot(), 30000, 'reboot-csv');
+            await page.evaluate(() => window.openSheetImportModal('123456'));
+            await page.waitForTimeout(1200);
+            replyFor = {
+                status: reply,
+                prepare: { ok: true, data: { signature: 'sig-csv', source: 'auto', mapping: { barcode: 0, dod: 1, cod: 2, phone: 3 } } },
+                import: { ok: true, data: { added: 0, updated: 0, unchanged: 4, skippedNoBarcode: 1, duplicatesInFile: 1, rowsAfter: 131, sheetName: 'Data' } }
+            };
+            await page.setInputFiles('#siFileInput', csvSamplePath, { timeout: 6000 });
+            await page.waitForTimeout(2000);
+            check(await shown('siMapCard'), 'CSV ➜ បើកជំហានផ្គូផ្គង');
+            const csvPreview = await page.evaluate(() => [...document.querySelectorAll('#siPreviewBody tr')].map((tr) => [...tr.children].map((td) => td.textContent).join('|')));
+            check(csvPreview[0] === 'ZTO0001|1.50|12.00|0974158508',
+                '⛔ CSV ➜ លេខ 0 នាំមុខនៅដដែល (មើលជាមុន និង payload មកពី sheetImportMappedRows() តែមួយ)', csvPreview[0]);
+            check(csvPreview[1] === 'ZTO0002|0.00|7.25|0965551234',
+                '⛔ ទិសផ្ទុយ ៖ តម្លៃលុយនៅតែជាលេខត្រឹមត្រូវ (មិនប្រែជាអក្សរឆៅ)', csvPreview[1]);
+            check(csvPreview.length === 4, 'CSV ➜ មើលជាមុនបង្ហាញតែជួរដែលមាន Barcode', csvPreview.length);
+
+            const readOpts = await page.evaluate(() => {
+                if (typeof sheetImportReadOptions !== 'function') return null;
+                const of = (bytes) => sheetImportReadOptions(new Uint8Array(bytes));
+                return {
+                    zip: of([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]).raw === true,
+                    ole: of([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).raw === true,
+                    text: of([0x42, 0x61, 0x72, 0x63, 0x6f, 0x64, 0x65, 0x2c]).raw === true,
+                    tiny: of([0x50, 0x4b]).raw === true
+                };
+            });
+            check(!!readOpts, 'sheetImportReadOptions() ត្រូវជា function global', readOpts);
+            check(!!readOpts && readOpts.text === true, 'CSV/TSV ➜ អានជាអត្ថបទឆៅ (រក្សា 0 នាំមុខ)', readOpts);
+            check(!!readOpts && readOpts.zip === false && readOpts.ole === false,
+                '⛔ ទិសផ្ទុយ ៖ .xlsx (ZIP) និង .xls (OLE) **មិនត្រូវ** អានជាអត្ថបទឆៅ — បើអត់ កោសិកាកាលបរិច្ឆេទក្លាយជាលេខ serial', readOpts);
+            check(!!readOpts && readOpts.tiny === true, 'ឯកសារខ្លីពេកមិនមែនជា container ➜ ចាត់ជាអត្ថបទ', readOpts);
     });
 
     await browser.close();

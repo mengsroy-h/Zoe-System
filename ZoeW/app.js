@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.24.1';
+    const APP_VERSION = '2.24.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2494,6 +2494,19 @@
         if (el) el.classList.toggle('hidden', !on);
     }
 
+    function sheetImportIsBinaryWorkbook(bytes) {
+        if (!bytes || bytes.length < 8) return false;
+        if (bytes[0] === 0x50 && bytes[1] === 0x4b) return true;
+        if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) return true;
+        return false;
+    }
+
+    function sheetImportReadOptions(bytes) {
+        const options = { type: 'array' };
+        if (!sheetImportIsBinaryWorkbook(bytes)) options.raw = true;
+        return options;
+    }
+
     function sheetImportCellToText(value) {
         if (value === null || value === undefined) return '';
         if (value instanceof Date) return '';
@@ -2737,7 +2750,8 @@
             return;
         }
         try {
-            sheetImportWorkbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+            const sheetImportBytes = new Uint8Array(buffer);
+            sheetImportWorkbook = XLSX.read(sheetImportBytes, sheetImportReadOptions(sheetImportBytes));
             const names = sheetImportWorkbook.SheetNames || [];
             if (!names.length) throw new Error('ឯកសារនេះគ្មាន tab ទេ');
             const sel = document.getElementById('siSheetSel');

@@ -75,6 +75,8 @@ const SAFE_AUTO_LOGIN_CODES = new Set([
     'ZTO_LOGIN_BUSY'
 ]);
 
+const SAFE_REASON_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
+
 function autoLoginErrorResponse(error) {
     const code = error instanceof ztoSession.ZtoSessionError && SAFE_AUTO_LOGIN_CODES.has(error.code)
         ? error.code
@@ -94,7 +96,10 @@ function autoLoginErrorResponse(error) {
         ZTO_LOGIN_NO_SESSION: 'ZTO login did not create a session',
         ZTO_LOGIN_BUSY: 'Another ZTO login is still running'
     };
-    return json(statusCode, { error: messages[code], code });
+    const body = { error: messages[code], code };
+    const reason = error instanceof ztoSession.ZtoSessionError ? String(error.reason || '') : '';
+    if (reason && SAFE_REASON_RE.test(reason)) body.reason = reason;
+    return json(statusCode, body);
 }
 
 function upstreamMessage(upstream, fallback) {
@@ -229,7 +234,7 @@ exports.handler = async function handler(event) {
     let authenticationKind = applyStaticZtoAuthentication(headers);
     if (!authenticationKind && autoLoginEnabled) {
         try {
-            headers.Cookie = await ztoSession.getAutoSessionCookie();
+            headers.Cookie = await ztoSession.getAutoSessionCookie({ lambdaEvent: event });
             authenticationKind = 'auto-cookie';
         } catch (error) {
             return autoLoginErrorResponse(error);
@@ -253,7 +258,8 @@ exports.handler = async function handler(event) {
         const rejectedCookie = String(headers.Cookie || '');
         headers.Cookie = await ztoSession.getAutoSessionCookie({
             forceRefresh: true,
-            rejectedCookie
+            rejectedCookie,
+            lambdaEvent: event
         });
     } catch (error) {
         return autoLoginErrorResponse(error);

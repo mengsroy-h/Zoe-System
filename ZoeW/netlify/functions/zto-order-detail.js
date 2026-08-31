@@ -75,7 +75,7 @@ const SAFE_AUTO_LOGIN_CODES = new Set([
     'ZTO_LOGIN_BUSY'
 ]);
 
-const SAFE_REASON_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
+const SAFE_REASON_RE = /^[A-Za-z0-9_.:@-]{1,80}$/;
 
 function autoLoginErrorResponse(error) {
     const code = error instanceof ztoSession.ZtoSessionError && SAFE_AUTO_LOGIN_CODES.has(error.code)
@@ -109,11 +109,15 @@ function upstreamMessage(upstream, fallback) {
     return safe || fallback;
 }
 
+const LOGIN_REDIRECT_RE = /https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[.\/]|iam[-.])/i;
+
 function ztoAuthRejected(response, upstream) {
     if (response && (response.status === 401 || response.status === 403)) return true;
     const code = String(upstream && (upstream.code || upstream.errorCode) || '').toLowerCase();
-    const message = upstreamMessage(upstream, '').toLowerCase();
+    const raw = upstreamMessage(upstream, '');
+    const message = raw.toLowerCase();
     if (/^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(code)) return true;
+    if (LOGIN_REDIRECT_RE.test(raw)) return true;
     return /(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/.test(message);
 }
 

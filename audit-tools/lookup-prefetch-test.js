@@ -353,6 +353,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         ctx.window = ctx;
         vm.createContext(ctx);
         vm.runInContext(sliceFn('lookupApiIsZto'), ctx);
+        vm.runInContext(sliceFn('safeLookupReason'), ctx);
         vm.runInContext(sliceFn('setLookupStatus'), ctx);
         vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);
         vm.runInContext(sliceFn('retryTransientLookupResponse'), ctx);

@@ -57,6 +57,14 @@ function loginSession(config, cookie, now) {
     };
 }
 
+function withTimeout(promise, ms, label) {
+    let timer = null;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); })
+    ]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
 async function assertRejectsCode(promise, code) {
     await assert.rejects(promise, (error) => error instanceof sessionModule.ZtoSessionError && error.code === code);
 }
@@ -432,6 +440,7 @@ async function run() {
                 await api.performArgusLogin(config, {
                     now: Date.now,
                     sleep: async () => {},
+                    logger: () => {},
                     launchBrowser: async () => fakeBrowser(url)
                 });
                 loginReasons.push('no-throw');
@@ -447,6 +456,7 @@ async function run() {
             await api.performArgusLogin(config, {
                 now: Date.now,
                 sleep: async () => {},
+                logger: () => {},
                 launchBrowser: async () => fakeBrowser('https://iam-web.zto.com/oauth2/authorize?region=km')
             });
             assert.fail('an empty login form must not pass');
@@ -454,6 +464,75 @@ async function run() {
             assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
             assert.strictEqual(error.reason, 'form:username-0',
                 'a changed ZTO login form must say which control went missing');
+        }
+
+        const timeoutPage = fakePage('https://iam-web.zto.com/oauth2/authorize?region=km');
+        timeoutPage.waitForSelector = async () => {
+            const error = new Error('Waiting for selector failed');
+            error.name = 'TimeoutError';
+            throw error;
+        };
+        const loginLogs = [];
+        try {
+            await api.performArgusLogin(config, {
+                now: Date.now,
+                sleep: async () => {},
+                logger: (line) => loginLogs.push(String(line)),
+                launchBrowser: async () => ({
+                    newPage: async () => timeoutPage,
+                    pages: async () => [timeoutPage],
+                    close: async () => {}
+                })
+            });
+            assert.fail('a login form that never appears must not pass');
+        } catch (error) {
+            assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
+            assert.strictEqual(error.reason, 'login:wait-password@iam-web.zto.com:TimeoutError',
+                '⛔ ការផុតកំណត់ត្រូវប្រាប់ *ជំហាន* និង *host* — «TimeoutError» ទទេមិនប្រាប់អ្វីទេ');
+        }
+        assert.strictEqual(loginLogs.length, 1, 'ការធ្លាក់នៃ login ត្រូវឡើងដល់ Netlify Function log');
+        assert.ok(loginLogs[0].indexOf('wait-password') !== -1 && loginLogs[0].indexOf('iam-web.zto.com') !== -1,
+            'log ត្រូវផ្ទុកជំហាន និង host', loginLogs[0]);
+        assert.ok(!loginLogs.join(' ').includes(env.ZTO_PASSWORD), 'log មិនត្រូវផ្ទុកពាក្យសម្ងាត់');
+
+        const idp = 'https://iam-web.zto.com/oauth2?app_id=zt_X&lang=km';
+        const back = 'https://argus.ztoglobal.com/';
+        const cookieAt = (value) => [{ name: 'BOS-MAN-SESSION', value: value }];
+        assert.strictEqual(api.loginIsConfirmed(cookieAt('pre-auth'), 'BOS-MAN-SESSION', 'pre-auth', idp, idp), false,
+            '⛔ cookie សម័យ servlet ដែលមានស្រាប់ **មុន** ចូល មិនមែនជាភស្តុតាងនៃការចូលទេ');
+        assert.strictEqual(api.loginIsConfirmed(cookieAt('pre-auth'), 'BOS-MAN-SESSION', 'pre-auth', idp, back), true,
+            'ការ redirect ត្រឡប់មក Argus ជាភស្តុតាងនៃ OAuth2 callback');
+        assert.strictEqual(api.loginIsConfirmed(cookieAt('rotated'), 'BOS-MAN-SESSION', 'pre-auth', idp, idp), true,
+            'session id ដែលប្តូរក្រោយចុច ជាភស្តុតាងទី ២');
+        assert.strictEqual(api.loginIsConfirmed(cookieAt('fresh'), 'BOS-MAN-SESSION', '', idp, idp), true,
+            '⛔ ទិសផ្ទុយ ៖ គ្មាន cookie មុនចុច ➜ cookie ថ្មីជាភស្តុតាង (កុំទប់ការចូលដែលត្រឹមត្រូវ)');
+        assert.strictEqual(api.loginIsConfirmed([], 'BOS-MAN-SESSION', '', idp, idp), false,
+            'គ្មាន cookie សោះ ➜ មិនទាន់ចូល');
+
+        const stuckPage = fakePage(idp);
+        stuckPage.browserContext = () => ({ cookies: async () => cookieAt('pre-auth') });
+        stuckPage.$$ = async (selector) => {
+            if (/password/.test(selector)) return [{ evaluate: async () => true, click: async () => {}, type: async () => {} }];
+            if (selector === 'button') return [{ evaluate: async (fn) => (String(fn).indexOf('textContent') !== -1 ? 'login' : true), click: async () => {} }];
+            return [{ evaluate: async () => true, click: async () => {}, type: async () => {} }];
+        };
+        let ticks = 0;
+        try {
+            await withTimeout(api.performArgusLogin(config, {
+                now: () => 1700000000000 + (ticks += 400),
+                sleep: async () => {},
+                logger: () => {},
+                launchBrowser: async () => ({
+                    newPage: async () => stuckPage,
+                    pages: async () => [stuckPage],
+                    close: async () => {}
+                })
+            }), 8000, '⛔ វដ្តរង់ចាំ cookie មិនចេញ — `remaining()` clamp ដល់ 1 ➜ `while` មិនដែលបញ្ចប់');
+            assert.fail('⛔ cookie មុនចូល មិនត្រូវក្លាយជា session ដែលរក្សាទុក');
+        } catch (error) {
+            assert.strictEqual(error.code, 'ZTO_LOGIN_NO_SESSION');
+            assert.strictEqual(error.reason, 'login:cookie-unconfirmed@iam-web.zto.com',
+                'ការធ្លាក់ត្រូវប្រាប់ថា cookie មាន តែការចូលមិនបានបញ្ជាក់');
         }
     });
 

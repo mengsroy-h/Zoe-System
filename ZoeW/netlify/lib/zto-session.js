@@ -213,6 +213,17 @@ function cookieHeaderFromBrowser(cookies, requiredName, nowMs) {
     };
 }
 
+function requiredCookieValue(cookies, requiredName) {
+    const found = (Array.isArray(cookies) ? cookies : []).find((cookie) => cookie && cookie.name === requiredName);
+    return found ? String(found.value || '') : '';
+}
+
+function loginIsConfirmed(cookies, requiredName, priorValue, urlAtSubmit, urlNow) {
+    if (String(urlNow || '') !== String(urlAtSubmit || '')) return true;
+    const current = requiredCookieValue(cookies, requiredName);
+    return !!current && current !== String(priorValue || '');
+}
+
 function capSessionExpiry(session, config) {
     if (!config.maxAgeMs) return session;
     const cap = session.createdAt + config.maxAgeMs;
@@ -235,6 +246,24 @@ function withTimeout(promise, ms, code) {
     ]).finally(() => {
         if (timer) clearTimeout(timer);
     });
+}
+
+function hostSuffix(host) {
+    return host && host !== 'unknown' ? '@' + host : '';
+}
+
+function logLoginProblem(deps, step, host, elapsedMs, view, error) {
+    const log = (deps && deps.logger) || console.warn;
+    if (typeof log !== 'function') return;
+    const shape = loginViewIsUsable(view)
+        ? ' inputs=' + view.inputs + ' password=' + view.passwords + ' buttons=' + view.buttons
+            + ' frames=' + view.frames + ' text=' + view.chars + ' ready=' + view.ready
+            + ' params=[' + String(view.params || '') + ']'
+        : ' (ទំព័រអានមិនបាន)';
+    try {
+        log(LOG_PREFIX + 'ZTO login failed at ' + step + (host ? ' on ' + host : '')
+            + ' after ' + Math.round(elapsedMs) + 'ms: ' + safeReasonText(error) + shape);
+    } catch (_) {}
 }
 
 function safeHostLabel(hostname) {
@@ -377,45 +406,85 @@ async function closeBrowserQuietly(browser, sleep) {
     } catch (_) {}
 }
 
+async function loginDiagnostics(page) {
+    try {
+        return await page.evaluate(() => ({
+            title: String(document.title || '').slice(0, 80),
+            ready: String(document.readyState || ''),
+            inputs: document.querySelectorAll('input').length,
+            passwords: document.querySelectorAll('input[type="password"]').length,
+            buttons: document.querySelectorAll('button').length,
+            frames: window.frames.length,
+            chars: String(document.body && document.body.innerText || '').trim().length,
+            params: Array.from(new URLSearchParams(location.search).keys()).sort().slice(0, 12).join(',')
+        }));
+    } catch (_) {
+        return null;
+    }
+}
+
+function loginViewIsUsable(view) {
+    return !!view && typeof view.inputs === 'number' && typeof view.passwords === 'number';
+}
+
 async function performArgusLogin(config, dependencies) {
     const deps = dependencies || {};
     const now = deps.now || Date.now;
     const sleep = deps.sleep || delay;
     const launchBrowser = deps.launchBrowser || defaultLaunchBrowser;
     const deadline = now() + config.loginTimeoutMs;
+    const started = now();
     let browser = null;
+    let page = null;
+    let step = 'launch';
+    let navigated = true;
 
-    const remaining = () => Math.max(1, deadline - now());
+    const remainingRaw = () => deadline - now();
+    const remaining = () => Math.max(1, remainingRaw());
+    const hostNow = () => {
+        try { return safeHostLabel(new URL(page.url()).hostname); } catch (_) { return ''; }
+    };
     try {
         browser = await withTimeout(Promise.resolve().then(() => launchBrowser()), remaining(), 'ZTO_LOGIN_TIMEOUT');
-        const page = await browser.newPage();
+        step = 'newpage';
+        page = await browser.newPage();
         await page.setUserAgent({ userAgent: ZTO_USER_AGENT, platform: 'Linux x86_64' });
         page.setDefaultTimeout(Math.min(15000, remaining()));
         page.setDefaultNavigationTimeout(Math.min(20000, remaining()));
 
+        step = 'goto';
         try {
             await page.goto(ARGUS_LOGIN_URL, {
                 waitUntil: 'domcontentloaded',
                 timeout: Math.min(20000, remaining())
             });
         } catch (_) {
+            navigated = false;
             assertAllowedLoginUrl(page.url());
         }
         assertAllowedLoginUrl(page.url());
+        step = navigated ? 'wait-password' : 'wait-password-nonav';
         await page.waitForSelector('input[type="password"]', {
             visible: true,
             timeout: Math.min(12000, remaining())
         });
 
+        step = 'find-form';
         const usernameInput = await findUsernameInput(page);
         const passwordInput = await findPasswordInput(page);
         const loginButton = await findLoginButton(page);
+        step = 'fill';
         await fillCredential(usernameInput, config.username, page);
         await fillCredential(passwordInput, config.password, page);
+        step = 'submit';
+        const priorCookie = requiredCookieValue(await page.browserContext().cookies(), config.cookieName);
+        const urlAtSubmit = page.url();
         await loginButton.click();
 
+        step = 'poll';
         let lastCookieCheckAt = 0;
-        while (remaining() > 0) {
+        let sawCookieOnly = false;
+        while (remainingRaw() > 0) {
             await sleep(Math.min(300, remaining()));
             assertAllowedLoginUrl(page.url());
 
@@ -424,12 +493,16 @@ async function performArgusLogin(config, dependencies) {
                 const cookies = await page.browserContext().cookies();
                 try {
                     const session = cookieHeaderFromBrowser(cookies, config.cookieName, now());
-                    return capSessionExpiry({
-                        cookie: session.cookie,
-                        createdAt: now(),
-                        expiresAt: session.expiresAt,
-                        identityId: config.identityId
-                    }, config);
+                    if (loginIsConfirmed(cookies, config.cookieName, priorCookie, urlAtSubmit, page.url())) {
+                        return capSessionExpiry({
+                            cookie: session.cookie,
+                            createdAt: now(),
+                            expiresAt: session.expiresAt,
+                            identityId: config.identityId
+                        }, config);
+                    }
+                    sawCookieOnly = true;
+                    step = 'poll-unconfirmed';
                 } catch (error) {
                     if (!(error instanceof ZtoSessionError) || error.code !== 'ZTO_LOGIN_NO_SESSION') throw error;
                 }
@@ -439,10 +512,19 @@ async function performArgusLogin(config, dependencies) {
             if (state.challenge) throw new ZtoSessionError('ZTO_LOGIN_CHALLENGE', 409);
             if (state.rejected) throw new ZtoSessionError('ZTO_LOGIN_REJECTED', 401);
         }
-        throw new ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504);
+        if (sawCookieOnly) {
+            throw new ZtoSessionError('ZTO_LOGIN_NO_SESSION', 502, 'login:cookie-unconfirmed' + hostSuffix(hostNow()));
+        }
+        throw new ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504, 'login:' + step + hostSuffix(hostNow()));
     } catch (error) {
+        const host = page ? hostNow() : '';
+        if (page) {
+            const view = await loginDiagnostics(page);
+            logLoginProblem(deps, step, host, now() - started, view, error);
+        }
         if (error instanceof ZtoSessionError) throw error;
-        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502, 'login:' + safeReasonText(error));
+        throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502,
+            'login:' + step + hostSuffix(host) + ':' + safeReasonText(error));
     } finally {
         await closeBrowserQuietly(browser, sleep);
     }
@@ -803,6 +885,7 @@ module.exports = {
     getAutoSessionCookie,
     _test: {
         connectLambdaBlobs,
+        loginIsConfirmed,
         cookieHeaderFromBrowser,
         defaultOpenStore,
         decodeEncryptionKey,

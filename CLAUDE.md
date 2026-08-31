@@ -219,6 +219,9 @@
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
 | **ZTO auto-login ↔ Netlify Blobs** | ⛔ Lambda-signature function ត្រូវហៅ `connectLambda(event)` មុន `getStore()` | `zto-session-test` |
+| **ZTO ៖ cookie ≠ ការចូល** | ⛔ `BOS-MAN-SESSION` មានតាំងពីមុនចូល — ត្រូវការភស្តុតាង | `zto-session-test` |
+| **ZTO ៖ វដ្តរង់ចាំ** | ⛔ `Math.max(1, …) > 0` ពិតជានិច្ច ➜ វដ្តគ្មានផ្លូវចេញ | `zto-session-test` |
+| **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
 | **Blobs ដាច់** | ⛔ store ដាច់ ≠ lookup ស្លាប់ (ធ្លាក់ចុះទៅសតិ) | `zto-session-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
@@ -1754,6 +1757,61 @@ package `xlsx` ដំឡើងរួច** ហើយធ្លាក់ទៅ **CS
 
 Test៖ **`sheet-import-test.js`** (៨១ assertion; ធ្លាក់ **៥** លើ `origin/main`;
 mutation ៣ ➜ ចាប់បានទាំង ៣)។
+
+### ⛔ ZTO login ៖ cookie មិនមែនជាភស្តុតាងនៃការចូល (កំណែ 2.24.4)
+
+> 🔴 **កំហុសពិត ៣ ដែលរកឃើញក្រោយបិទរន្ធ Blobs** — ការកែនីមួយៗបើកទ្វារឲ្យឃើញ
+> កំហុសបន្ទាប់។ ទាំង ៣ ត្រូវបានវាស់ពីផលិតកម្មពិត មិនមែនអានកូដទេ។
+
+**១. ZTO ប្រាប់ «មិនទាន់ចូល» ដោយឆ្លើយ URL របស់ OAuth2 IdP។** វាឆ្លើយ HTTP 200
+ជាមួយ `{"error":"https://iam-web.zto.com/oauth2?app_id=…&redirect_url=…"}`។
+`ztoAuthRejected()` រក **ពាក្យ** (`login…expired|invalid|required`) ➜ វារកមិន
+ឃើញ ➜ ក្លាយជា `ZTO_UPSTREAM_REJECTED` ➜ ⛔ ការ login ឡើងវិញ **មិនដែលកេះ**
+ហើយ URL របស់ IdP ហូរទៅ browser។ ច្បាប់ ៖ **ការឆ្លើយដែលជា URL ចូល/OAuth/SSO/IAM
+គឺជាការបដិសេធ auth** មិនមែនកំហុស upstream ទេ។
+
+⚠️ **ការប្រៀបធៀបដែលឆ្លើយសំណួរ** (URL ពី browser របស់អ្នកប្រើ ធៀបនឹង URL ដែល
+API ឆ្លើយ)៖
+
+| | parameter |
+|---|---|
+| browser ពិត | `app_id`, `redirect_url`, **`response_type`**, **`state`**, **`lang`** |
+| API ឆ្លើយមក | `app_id`, `redirect_url` |
+
+➜ URL ដែល API ឆ្លើយ **មិនមែនជា URL សម្រាប់ចូលទេ** (គ្មាន `response_type`
+និង `state`) — វាជា **ទ្រនិចចង្អុល** ដែល SPA របស់ Argus ត្រូវបំពេញបន្ថែម។
+⛔ ហើយ **`=km` គឺ `lang=km` (ភាសាបង្ហាញ) មិនមែន region ទេ** — ការសង្ស័យថា
+IdP ទប់តាមតំបន់ **មិនត្រូវបានបញ្ជាក់** ដោយភស្តុតាងនេះ។
+
+**២. `BOS-MAN-SESSION` មានតាំងពីមុនចូល។** វាជា session cookie បែប servlet
+ដែល server ដាក់ឲ្យតាំងពីពេលបើកទំព័រ។ វដ្តរង់ចាំចាស់ត្រឡប់ភ្លាមៗពេល cookie
+នោះមាន ➜ **cookie មុនចូល** ត្រូវរក្សាទុកជា «session ត្រឹមត្រូវ» ➜ រាល់ការ
+ស្កេនបន្ទាប់ប្រើវា ➜ ZTO បដិសេធ។ ច្បាប់ ៖ **`loginIsConfirmed()` ទាមទារ
+ភស្តុតាង** — ទំព័រ **navigate** ក្រោយចុច (OAuth2 callback ជានិច្ចធ្វើ) **ឬ**
+តម្លៃ cookie **ប្តូរ**។ ⛔ ទិសផ្ទុយ ៖ គ្មាន cookie មុនចុច ➜ cookie ថ្មីនៅតែ
+ជាភស្តុតាង — កុំទប់ការចូលដែលត្រឹមត្រូវ។
+
+**៣. វដ្តរង់ចាំ cookie គ្មានផ្លូវចេញ។**
+
+```js
+const remaining = () => Math.max(1, deadline - now());
+while (remaining() > 0) { … }          // ⟵ ពិត **ជានិច្ច**
+throw new ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504);   // ⟵ ឈានមិនដល់
+```
+
+⛔ ការ clamp ដល់ `1` ធ្វើឲ្យលក្ខខណ្ឌវដ្តក្លាយជា `1 > 0` ជានិច្ច ➜ Function
+បង្វិលរាល់ ៣០០ms រហូតដល់ Netlify សម្លាប់វា ➜ អ្នកប្រើឃើញកំហុស gateway ឆៅ
+(គ្មាន JSON គ្មាន `reason`) ហើយ **failure backoff មិនត្រូវកត់ត្រា** ➜ ការស្កេន
+បន្ទាប់បើក Chromium 2GB ម្តងទៀត។ ច្បាប់ ៖ **តម្លៃដែល clamp សម្រាប់ជា argument
+នៃ timeout មិនត្រូវយកទៅធ្វើជាលក្ខខណ្ឌវដ្តទេ** — ត្រូវមាន `remainingRaw()` ដាច់។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ ៖ ការព្យួរមិនមែនជាការធ្លាក់ទេ។** កំហុសទី ៣ ត្រូវបាន
+រកឃើញដោយ **តេស្តដែលព្យួរ** មិនមែនដោយការអានកូដ។ ដូច្នេះតេស្តនោះរុំការហៅ
+ដោយ `withTimeout()` ➜ ការថយក្រោយក្លាយជា **ការធ្លាក់ដែលមានឈ្មោះ** មិនមែន
+ការព្យួរដែលធ្វើឲ្យ CI ត្រូវ cancel (ច្បាប់ `hang-guard` អនុវត្តលើកូដ App ដែរ)។
+
+Test៖ **`zto-session-test.js`** (៧៦ assertion) និង **`zto-proxy-test.js`**;
+mutation ៣ ➜ ចាប់បានទាំង ៣។
 
 ### ⛔ Netlify Blobs ៖ Lambda-signature function ត្រូវហៅ `connectLambda(event)` (កំណែ 2.24.2)
 

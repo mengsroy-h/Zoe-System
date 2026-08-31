@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.24.0';
+    const APP_VERSION = '2.24.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -651,6 +651,9 @@
 
     function retryTransientLookupResponse(out) {
         const status = Number(out && out.res && out.res.status);
+        const code = String(out && out.body && out.body.code || '');
+        if (code === 'ZTO_AUTH_NOT_CONFIGURED'
+            || /^(?:ZTO_AUTO_LOGIN_|ZTO_LOGIN_|ZTO_SESSION_)/.test(code)) return out;
         if (status === 408 || status === 425 || status === 429 || (status >= 500 && status <= 599)) {
             throw new Error('HTTP ' + status);
         }
@@ -3427,6 +3430,7 @@
     const LOOKUP_MANUAL_FALLBACK_MS = 1800;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const AUTO_LOOKUP_TIMEOUT_MS = 16000;
+    const ZTO_AUTO_LOOKUP_TIMEOUT_MS = 58000;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Map();
@@ -3649,7 +3653,7 @@
             }
 
             const out = await retryAsync(
-                () => fetchWithTimeout(targetUrl, { headers }, AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
+                () => fetchWithTimeout(targetUrl, { headers }, isZtoLookup ? ZTO_AUTO_LOOKUP_TIMEOUT_MS : AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
                     (r) => r.json().catch(() => null)).then(retryTransientLookupResponse),
                 2, isZtoLookup ? 350 : 1500
             );
@@ -3691,9 +3695,17 @@
             } else if (e && e.message === 'Auto lookup timed out') {
                 setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
             } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-                setLookupStatus(barcode, 'error', '🔒 ZTO session ផុតកំណត់ — សូមប្តូរ Cookie/Token នៅ Netlify');
+                setLookupStatus(barcode, 'error', '🔒 ZTO session នៅតែមិនត្រឹមត្រូវ — ពិនិត្យ Auto-login/Cookie/Token នៅ Netlify');
             } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
-                setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie/Token សម្រាប់ ZTO');
+                setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Auto-login, Cookie ឬ Token សម្រាប់ ZTO');
+            } else if (e && e.lookupCode === 'ZTO_LOGIN_CHALLENGE') {
+                setLookupStatus(barcode, 'error', '🛡️ ZTO ទាមទារ CAPTCHA/MFA — ត្រូវចូលដោយដៃនៅ Argus ម្តង');
+            } else if (e && e.lookupCode === 'ZTO_LOGIN_REJECTED') {
+                setLookupStatus(barcode, 'error', '🔑 ZTO បដិសេធ Username/Password — សូមពិនិត្យ Netlify Secrets');
+            } else if (e && (e.lookupCode === 'ZTO_AUTO_LOGIN_NOT_CONFIGURED' || e.lookupCode === 'ZTO_SESSION_KEY_INVALID')) {
+                setLookupStatus(barcode, 'error', '⚙️ ZTO Auto-login មិនទាន់កំណត់ពេញលេញនៅ Netlify');
+            } else if (e && /^(?:ZTO_LOGIN_|ZTO_SESSION_)/.test(e.lookupCode || '')) {
+                setLookupStatus(barcode, 'error', '⚠️ ZTO Auto-login មិនអាចបង្កើត session បាន — សូមពិនិត្យ Netlify logs');
             } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {
                 setLookupStatus(barcode, 'error', '🔒 ' + lookupSource + ' Secret មិនត្រឹមត្រូវ ឬផុតកំណត់');
             } else {

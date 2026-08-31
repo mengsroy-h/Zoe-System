@@ -67,16 +67,22 @@ PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្�
 
 #### ប្រើ ZTO Cambodia (សង្ខេប)
 
-ZTO Argus របស់ setup នេះ authenticate ដោយ browser cookie `BOS-MAN-SESSION`។
-Netlify ត្រូវមាន Environment Variables តែ ២៖
+ZTO Argus អាច login ស្វ័យប្រវត្តិពី Netlify Function។ កំណត់ Secret Environment
+Variables ខាងក្រោម ហើយ Trigger deploy ម្តង៖
 
 ```text
-ZTO_COOKIE=BOS-MAN-SESSION=...  (ចម្លងពី ZTO Request Headers)
 ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់អ្នក 32 តួឡើងទៅ
+ZTO_AUTO_LOGIN=true
+ZTO_USERNAME=<Argus username>
+ZTO_PASSWORD=<Argus password>
+ZTO_SESSION_ENCRYPTION_KEY=<លទ្ធផល openssl rand -base64 32>
 ```
 
-ក្រោយ Save variables ត្រូវ **Trigger deploy**។ ក្នុងប្រអប់ «API ស្វែងរក
-អតិថិជនស្វ័យប្រវត្តិ» របស់ ZoeW ដាក់៖
+`ZTO_COOKIE` លែងចាំបាច់សម្រាប់ setup auto-login ប៉ុន្តែនៅតែអាចប្រើជា manual
+fallback។ Official `ZTO_AUTHORIZATION`/`ZTO_TOKEN` នៅតែមានអាទិភាពខ្ពស់បំផុត។
+Session ថ្មីត្រូវ encrypt ដោយ AES-256-GCM ក្នុង Netlify Blobs; Username,
+Password និង Cookie មិនត្រូវបានបញ្ជូនទៅ ZoeW browser ទេ។ ក្នុងប្រអប់
+«API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» ដាក់៖
 
 | វាល | តម្លៃ |
 |---|---|
@@ -90,9 +96,6 @@ ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់
 បើក `Fast Mode សម្រាប់ ZTO Lookup` ដើម្បីចងចាំលទ្ធផល barcode ដែលបានរកឃើញរយៈពេល ១០ នាទី
 ក្នុង memory។ ការស្កេន barcode ដដែលម្តងទៀតបំពេញភ្លាមដោយមិនហៅ ZTO។ Cache
 មានពិដាន ៣០០ barcode និងត្រូវបានលុបពេល session/customer cache ត្រូវសម្អាត។
-Fast Mode មិនមែនជាដំណោះស្រាយល្បឿនចម្បងក្នុងលំហូរធម្មតាទេ ព្រោះ duplicate
-registry របស់ ZoeW ទប់ Barcode ដែលកំពុងមានរួច។ ការកែ 2.23.4–2.23.6 ខាងក្រោមកាត់
-latency លើ **Barcode ថ្មីរាល់មួយ** ដោយផ្ទាល់។
 
 កំណែ 2.23.4 កាត់ latency របស់ ZTO ដោយមិនប្តូរលទ្ធផល Lookup៖ App មិនទាញ
 `list=1` ដែល ZTO proxy មិនគាំទ្រ និងមិនឲ្យ request នោះប្រជែងនឹងការស្កេនទៀត;
@@ -115,14 +118,10 @@ Manual auto-fallback នៅដដែល៖ បើ ZTO មិនទាន់ឆ�
 បំពេញលទ្ធផលពេលមកដល់ ប្រសិនបើវាលនៅទទេ។ វាមិនលេចពីក្រោយ PIN, មិនរំខាន
 ពេលអ្នកបានវាយរួច, មិនចាប់ Barcode ចាស់ និងមិន focus ស្ទួន។
 
-កំណែ 2.23.3 ធ្វើឲ្យការស្កេនដំបូងរង់ចាំការដោះសោ PIN និង ZTO response ត្រឹមត្រូវ;
-callback Firebase ចាស់ក្រោយ Logout/Reconnect ត្រូវបានរំលង; និង ZTO timeout ត្រូវ
-រៀប ១២ វិនាទីនៅ proxy / ១៦ វិនាទីនៅ App។ Secret plaintext ចាស់ត្រូវបម្លែង
-ទៅ AES-GCM ដោយស្វ័យប្រវត្តិពេលដោះសោ PIN។
-
-⛔ កុំដាក់ ZTO Cookie ក្នុង ZoeW, GitHub ឬ screenshot។ Cookie ផុតកំណត់ពេល
-ZTO session ចប់/Logout; ពេលនោះ Login ថ្មី ចម្លង `BOS-MAN-SESSION=...` ថ្មីទៅ
-`ZTO_COOKIE` ហើយ Trigger deploy ម្តងទៀត។ សេចក្តីណែនាំពេញនៅ
+Lookup ដំបូងដែលគ្មាន session អាចចំណាយប្រហែល 30–45វិនាទី ព្រោះ Chromium ត្រូវ
+login ZTO IDaaS។ Lookup ក្រោយៗប្រើ session ដែលបាន encrypt ទុក។ បើ ZTO បង្ហាញ
+CAPTCHA/MFA កូដនឹងឈប់ដោយសុវត្ថិភាព មិន bypass ទេ ហើយអ្នកអាចប្រើ Cookie ដោយដៃ
+ឬ official token ជា fallback។ សេចក្តីណែនាំពេញនៅ
 [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md)។
 
 ទាញលេខទូរស័ព្ទ/COD/DOD ពី endpoint ខាងក្រៅ (ជាទូទៅ Google Sheet តាម Apps Script)
@@ -284,7 +283,7 @@ Barcode ដែល **មិនមានក្នុងតារាង** ធ្ល
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.24.0`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.24.1`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។ វាបង្ហាញ **២ កន្លែង**៖ ប្រអប់ចូលប្រព័ន្ធ
 និងខាងក្រោមរបា Slide។
 

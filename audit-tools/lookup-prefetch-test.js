@@ -293,6 +293,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             AUTO_LOOKUP_FAILURE_MAX: 100,
             AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
             AUTO_LOOKUP_TIMEOUT_MS: 16000,
+            ZTO_AUTO_LOOKUP_TIMEOUT_MS: 58000,
             autoLookupInFlight: /const autoLookupInFlight = new Map\(\)/.test(SRC) ? new Map() : new Set(),
             autoLookupFailureAt: new Map(),
             lookupFastCache: new Map(),

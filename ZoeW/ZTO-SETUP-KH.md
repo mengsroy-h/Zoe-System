@@ -1,50 +1,72 @@
-# កំណត់ ZTO Lookup សម្រាប់ ZoeW
+# កំណត់ ZTO Auto-login សម្រាប់ ZoeW
 
-ZoeW ហៅ ZTO តាម Netlify Function ដើម្បីកុំឱ្យ Cookie/Token របស់ ZTO ចូលក្នុង
-កូដ static ឬ browser។ ត្រូវមាន `ZTO_PROXY_KEY` មួយ និងជ្រើស **auth របស់ ZTO
-តែមួយប្រភេទ** ខាងក្រោម។
+ZoeW ហៅ ZTO តាម Netlify Function។ Username, Password, Cookie និង Token ស្ថិតតែ
+server-side ក្នុង Netlify មិនចូលក្នុងកូដ static ឬ browser របស់អ្នកប្រើទេ។ ពេល
+session ផុតកំណត់ Function បើក Chromium ចូល `argus.ztoglobal.com` តាម ZTO IDaaS,
+យក session ថ្មី រក្សាទុកដោយ AES-256-GCM ក្នុង Netlify Blobs ហើយសាក lookup ម្តងទៀត។
 
-## ១. ជ្រើសរើស auth របស់ ZTO
+> ប្រើតែគណនីដែលអ្នកមានសិទ្ធិ និងដែល ZTO/ក្រុមហ៊ុនរបស់អ្នកអនុញ្ញាតឱ្យ automation។
+> បើមាន official API token ឬ service account សូមប្រើវាជម្រើសដំបូង ព្រោះវាមាន
+> ស្ថេរភាពជាង web login។
 
-លំដាប់ណែនាំ៖
+## ១. ដាក់ Environment Variables ក្នុង Netlify
 
-1. `ZTO_AUTHORIZATION` — ប្រើបើ ZTO ផ្តល់តម្លៃ Authorization ផ្លូវការ។
-2. `ZTO_TOKEN` — ប្រើបើ ZTO ផ្តល់ API token និងឈ្មោះ header ផ្លូវការ។
-3. `ZTO_COOKIE` — fallback បច្ចុប្បន្ន បើគណនីមានតែ Argus web login។
+ចូល `Netlify → ZoeW site → Project configuration → Environment variables` ហើយដាក់៖
 
-Proxy ប្រើតែមួយតាមលំដាប់ខាងលើ ដូច្នេះ Cookie ចាស់មិនរំខាន official token ទេ។
+| Key | ត្រូវការ | Value |
+| --- | --- | --- |
+| `ZTO_PROXY_KEY` | ចាំបាច់ | តម្លៃចៃដន្យ 32–64 តួ សម្រាប់ការពារ Function |
+| `ZTO_AUTO_LOGIN` | ចាំបាច់សម្រាប់ auto-login | `true` |
+| `ZTO_USERNAME` | ចាំបាច់សម្រាប់ auto-login | Username ដែលអ្នកប្រើចូល Argus |
+| `ZTO_PASSWORD` | ចាំបាច់សម្រាប់ auto-login | Password របស់គណនី Argus |
+| `ZTO_SESSION_ENCRYPTION_KEY` | ចាំបាច់សម្រាប់ auto-login | សោ base64 32-byte ឬ hex 64 តួ |
 
-### វិធីយក Cookie បើមិនទាន់មាន official token
+បង្កើត encryption key ថ្មីនៅម៉ាស៊ីនរបស់អ្នក៖
 
-1. Login ទៅ `https://argus.ztoglobal.com`។
-2. ចុច `F12` → `Network`។
-3. Filter ពាក្យ `order/detail` ហើយស្កេន/ស្វែងរក barcode មួយ។
-4. ចុច request `scan/get/order/detail` → `Headers` → `Request Headers`។
-5. ចម្លង Cookie **ទាំងមូល** ដែលចាប់ផ្តើមដូចជា៖
-
-```text
-BOS-MAN-SESSION=...
+```bash
+openssl rand -base64 32
 ```
 
-កុំផ្ញើ Cookie/Token/Authorization ក្នុង chat, screenshot ឬ commit ទៅ GitHub។
-បើវាធ្លាប់លេចធ្លាយ សូម revoke ឬ Logout រួច Login ថ្មីភ្លាម។
+សម្គាល់ `ZTO_PROXY_KEY`, `ZTO_USERNAME`, `ZTO_PASSWORD` និង
+`ZTO_SESSION_ENCRYPTION_KEY` ជា **Contains secret values**; scope ឱ្យ Functions
+និង production context ដែលត្រូវប្រើ។ កុំដាក់តម្លៃទាំងនេះក្នុង `netlify.toml`,
+GitHub, chat ឬ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្តង។
 
-## ២. ដាក់ Environment Variables ក្នុង Netlify
+បើ repository របស់អ្នកមានថត `ZoeW/` ដូច ZIP នេះ សូមកំណត់ Netlify
+**Base directory = `ZoeW`** ដើម្បីឱ្យវាអាន `package.json`, `package-lock.json`
+និង `netlify.toml` របស់ App។ ប្រើ Git/CLI deploy ដែលមាន build Functions;
+កុំ drag-and-drop តែ static files ព្រោះ Chromium dependencies ត្រូវ bundle។
+`netlify.toml` កំណត់ memory 2GB សម្រាប់ Chromium ដែលអាចបង្កើន function billing។
 
-ចូល `Netlify → ZoeW site → Site configuration → Environment variables`។ ដាក់
-`ZTO_PROXY_KEY` ជានិច្ច និងដាក់ auth របស់ ZTO តែមួយប្រភេទ៖
+Netlify Blobs ត្រូវបានបង្កើតដោយ Function ដោយស្វ័យប្រវត្តិ; មិនចាំបាច់បង្កើត
+database ឬដាក់ access token បន្ថែមទេ។ បើប្តូរ encryption key session ចាស់នឹង
+ត្រូវបានរំលង ហើយ Function នឹង login ថ្មី។
 
-| Key | ពេលណាប្រើ | Value |
+### ជម្រើសបន្ថែម
+
+| Key | Default | ន័យ |
 | --- | --- | --- |
-| `ZTO_PROXY_KEY` | ត្រូវមានជានិច្ច | តម្លៃចៃដន្យ 32–64 តួ |
-| `ZTO_AUTHORIZATION` | ជម្រើសទី ១ | ឧ. `Bearer ...` តាមឯកសារ ZTO |
-| `ZTO_TOKEN` | ជម្រើសទី ២ | API token ផ្លូវការ |
-| `ZTO_TOKEN_HEADER` | ជាមួយ `ZTO_TOKEN` បើ ZTO បញ្ជាក់ | ឧ. `X-Access-Token` |
-| `ZTO_COOKIE` | ជម្រើសទី ៣ | Cookie ពេញពី Argus request |
+| `ZTO_COOKIE` | ទទេ | Cookie ដោយដៃ/បណ្ដោះអាសន្ន; បើផុតកំណត់ auto-login នឹង refresh |
+| `ZTO_SESSION_COOKIE_NAME` | `BOS-MAN-SESSION` | ប្តូរតែបើ ZTO ប្តូរឈ្មោះ session cookie |
+| `ZTO_LOGIN_TIMEOUT_MS` | `30000` | ពិដាន login 15,000–35,000 ms |
+| `ZTO_SESSION_MAX_AGE_MINUTES` | `0` | `0` = គោរព cookie expiry/refresh ពេល ZTO បដិសេធ; អាចកំណត់អាយុខ្លីជាងនេះ |
 
-សម្គាល់តម្លៃ auth និង `ZTO_PROXY_KEY` ជា **Contains secret values**, កំណត់ scope
-សម្រាប់ **Functions** និង production context តែប៉ុណ្ណោះ។ កុំដាក់ secret ក្នុង
-`netlify.toml`។ ក្រោយ Save សូម deploy ZoeW/Function ឡើងវិញ។
+## ២. លំដាប់ auth និង fallback
+
+Proxy ប្រើ auth តាមលំដាប់នេះ៖
+
+1. `ZTO_AUTHORIZATION` — official Authorization ពី ZTO។
+2. `ZTO_TOKEN` (+ `ZTO_TOKEN_HEADER` បើ ZTO បញ្ជាក់) — official API token។
+3. `ZTO_COOKIE` — Cookie ដោយដៃ បើបានកំណត់។
+4. Session ដែល auto-login បង្កើត — ពេលមិនមាន auth ខាងលើ។
+
+បើ `ZTO_COOKIE` ឬ auto session ត្រូវ ZTO បដិសេធ ហើយ `ZTO_AUTO_LOGIN=true`,
+Function login ថ្មី **តែម្តង** រួចសាក order lookup **តែម្តង**។ វាមិនធ្វើ login
+loop ទេ។ Official Authorization/Token ដែលត្រូវបដិសេធមិនត្រូវបានជំនួសដោយ
+password login ដោយស្ងាត់ទេ។
+
+អ្នកអាចលុប `ZTO_COOKIE` ទាំងស្រុងក្រោយកំណត់ auto-login រួច។ កុំលុប
+`ZTO_PROXY_KEY` ព្រោះវាជាសោរវាង ZoeW និង Function។
 
 ## ៣. បំពេញក្នុង ZoeW
 
@@ -60,14 +82,21 @@ BOS-MAN-SESSION=...
 | Field DOD | `dod` |
 
 ធីក `Fast Mode សម្រាប់ ZTO Lookup` ដើម្បីឱ្យ barcode ដែលរកឃើញរួចក្នុង ១០នាទី
-បំពេញភ្លាម។ Fast Mode រក្សាតែក្នុង memory, មិនរក្សាទិន្នន័យ ZTO ក្នុង Service
-Worker cache និងមានពិដាន ៣០០ barcode។ Manual fallback បើកក្រោយ ១.៨វិនាទី
-ដដែល ខណៈ request ZTO នៅតែបន្ត។
+បំពេញភ្លាម។ Fast Mode រក្សាតែក្នុង memory និងមានពិដាន ៣០០ barcode។
 
-Proxy រង់ចាំ ZTO អតិបរមា ១២វិនាទី ហើយ ZoeW រង់ចាំ proxy ១៦វិនាទីក្នុងមួយ
-attempt។ 401/403 មិន retry ទេ; 408/425/429/5xx ទើប retry។ Response ជោគជ័យទៅ
-browser មានតែ `phone`, `cod`, `dod`, `barcode`, `success`; ឈ្មោះ និងអាសយដ្ឋាន
-អតិថិជនដែល UI មិនប្រើ មិនត្រូវបញ្ជូនចេញ។
+Manual fallback ១.៨វិនាទីនៅដដែល៖ ពេល login/lookup កំពុងបន្ត វាលលេខទូរស័ព្ទ
+ទទួល focus ឱ្យវាយដោយដៃបាន។ Request មិនត្រូវបានបោះបង់ ហើយលទ្ធផលនឹងបំពេញ
+ពេលមកដល់ ប្រសិនបើវាលនៅទទេ។ Lookup ដំបូងដែលមិនទាន់មាន session អាចចំណាយ
+ពេលរហូតដល់ប្រហែល 30–45វិនាទី; lookup បន្ទាប់ប្រើ session ដែល encrypt ទុក ហើយលឿនជាង។
+
+## ៤. អ្វីដែល Function រក្សា និងបញ្ជូន
+
+- Netlify Secret Environment Variables រក្សា Username/Password/encryption key។
+- Netlify Blobs រក្សាតែ session envelope ដែល encrypt ដោយ AES-256-GCM។
+- Login lock ទប់ invocation ច្រើនកុំឱ្យបើក Chromium/login ស្ទួនក្នុងពេលតែមួយ។
+- Failure backoff ទប់ password ខុស, CAPTCHA ឬ MFA កុំឱ្យបាញ់ login ជារង្វិលជុំ។
+- Browser ទទួលតែ `phone`, `cod`, `dod`, `barcode`, `success`; មិនទទួល Cookie,
+  Username, Password, ឈ្មោះ ឬអាសយដ្ឋានអតិថិជនទេ។
 
 Function ផ្ញើទៅ ZTO ជា៖
 
@@ -75,31 +104,25 @@ Function ផ្ញើទៅ ZTO ជា៖
 {"billCode":"លេខ barcode","countryCode":"KH"}
 ```
 
-## ការគណនា field
+Field mapping៖
 
 - `phone` ← `data.consigneePhone` ឬ `data.consigneeMobile`
 - `cod` ← `data.agentAmount`
 - `dod` ← `data.arrivalServiceCharge`
 
-បើ DOD របស់អាជីវកម្មអ្នកមិនមែន `arrivalServiceCharge` សូមកែ mapping ក្នុង
-`netlify/functions/zto-order-detail.js` មុន deploy។
+## ៥. CAPTCHA, MFA និងកំហុស
 
-## ពេលវាឈប់ដំណើរការ
+Auto-login **មិនដោះ ឬ bypass CAPTCHA/MFA/security verification** ទេ៖
 
-- `ZTO session ផុតកំណត់` — Cookie/Token ត្រូវបាន ZTO បដិសេធ។ បើប្រើ Cookie៖
-  Login Argus ថ្មី → replace `ZTO_COOKIE` → deploy Function ឡើងវិញ។
-- `Netlify មិនទាន់មាន Cookie/Token` — មិនមាន auth variable ដែល proxy អាចប្រើ។
-- `ZTO ឆ្លើយតបយឺតពេក` — upstream timeout; កុំប្តូរ Cookie មុនសាកល្បងម្ដងទៀត។
-- `Lookup កំពុងរវល់` — មាន request ដល់ពិដាន; manual fallback នៅតែប្រើបាន។
+- `ZTO ទាមទារ CAPTCHA/MFA` — ចូល Argus ដោយដៃ ហើយបើចាំបាច់ដាក់
+  `ZTO_COOKIE` ជា fallback; ឬស្នើ ZTO ឱ្យផ្តល់ API token/service account។
+- `ZTO បដិសេធ Username/Password` — កែ Netlify Secrets; កុំ retry ច្រើនដង។
+- `Auto-login មិនទាន់កំណត់ពេញលេញ` — ពិនិត្យ variables ចាំបាច់ទាំង ៥ និង
+  encryption key។
+- `Auto-login មិនអាចបង្កើត session` — មើល Netlify Function logs; secret value
+  មិនត្រូវបានដាក់ក្នុង response ទេ។
+- `ZTO session នៅតែមិនត្រឹមត្រូវ` — login បាន cookie ថ្មី ប៉ុន្តែ ZTO នៅតែ
+  បដិសេធ; ពិនិត្យឈ្មោះ cookie/សិទ្ធិគណនី ឬប្រើ official token។
 
-## ហេតុអ្វីមិនឱ្យ Netlify login Argus ជំនួសដោយស្វ័យប្រវត្តិ?
-
-Login page របស់ `argus.ztoglobal.com` និង ZoeW នៅ domain ខុសគ្នា។ Browser មិន
-អនុញ្ញាតឱ្យ ZoeW/Netlify page អាន ឬផ្ទេរ session cookie របស់ Argus ដោយផ្ទាល់ទេ។
-ការធ្វើ server-side password automation ត្រូវរក្សាទុក password/MFA និងពឹងលើ
-login endpoint ដែលមិនបានឯកសារផ្លូវការ; វាងាយខូចពេល captcha, MFA ឬ flow ប្រែ
-ហើយបង្កើនហានិភ័យបាត់គណនី។ ដូច្នេះកូដនេះមិនធ្វើ password-bot ទេ។
-
-ដំណោះស្រាយដែលមានស្ថេរភាពគឺស្នើ ZTO ឱ្យផ្តល់ API credential/service account
-ផ្លូវការ រួចប្រើ `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN`។ រហូតដល់ ZTO ផ្តល់វា
-`ZTO_COOKIE` នៅតែជាវិធី fallback ដែលត្រូវ refresh ពេល session ចប់។
+Login UI របស់ ZTO អាចប្រែដោយ ZTO ដោយគ្មានការជូនដំណឹង។ កូដនេះផ្ទៀងផ្ទាត់
+តែ HTTPS host ដែលបានកំណត់ និងឈប់ដោយសុវត្ថិភាពបើ form/redirect មិនដូចការរំពឹង។

@@ -25,6 +25,51 @@
 
 ---
 
+## [ZoeW 2.24.1] — 2026-08-31 · ZTO Argus Auto-login
+
+ជុំនេះកែតែ **ZoeW** (`zoew-v139` ➜ `zoew-v140`)។ ZoeKeyGen និង Firebase
+Rules មិនបានប្តូរ។
+
+### បន្ថែម · ផ្លាស់ប្តូរ
+
+- Netlify Function អាចបើក headless Chromium ចូល `argus.ztoglobal.com` តាម
+  ZTO IDaaS ដោយ `ZTO_USERNAME`/`ZTO_PASSWORD`, ទាញ `BOS-MAN-SESSION` និង
+  lookup លេខទូរស័ព្ទ/COD/DOD ដោយមិនចាំបាច់ copy Cookie រាល់ពេលផុតកំណត់។
+- Session ត្រូវ encrypt ដោយ AES-256-GCM ជាមួយ `ZTO_SESSION_ENCRYPTION_KEY`
+  មុនរក្សាទុកក្នុង Netlify Blobs strong-consistency។ Login lock ទប់ Function
+  ច្រើនកុំឱ្យ login ស្ទួន ហើយ session ត្រូវភ្ជាប់នឹង credential ដើម្បីកុំឱ្យ
+  password/username ថ្មីប្រើ session របស់គណនីចាស់។
+- ពេល Cookie/auto session ត្រូវ ZTO បដិសេធ Proxy refresh តែម្តង និង retry
+  order detail តែម្តង។ `ZTO_AUTHORIZATION`/`ZTO_TOKEN` នៅតែឈ្នះ និងមិនត្រូវ
+  downgrade ទៅ password login ដោយស្ងាត់; `ZTO_COOKIE` នៅតែជា manual fallback។
+- ZoeW រង់ចាំ ZTO auto-login ក្នុងមួយ request ដល់ ៥៨វិនាទី ប៉ុន្តែ manual
+  auto-fallback ១.៨វិនាទី និង Fast Mode ១០នាទីនៅដដែលពេញលេញ។
+
+### សុវត្ថិភាព · កែកំហុស · ឧបករណ៍ audit
+
+- Auto-login អនុញ្ញាតតែ HTTPS host Argus/API/IDaaS ដែលបានចាក់សោ។ CAPTCHA,
+  MFA, security verification, password ខុស ឬ login flow មិនស្គាល់ត្រូវឈប់
+  ដោយសុវត្ថិភាព; គ្មានការដោះ/bypass challenge និងគ្មាន login loop។
+- Response ទៅ browser មានតែ safe error code; Username, Password, Cookie,
+  encryption key និង internal error មិនត្រូវបានបញ្ជូន ឬកត់ក្នុង UI។
+- ចាក់សោកំណែ `@netlify/blobs` 11.0.2, `@sparticuz/chromium` 149.0.0 និង
+  `puppeteer-core` 25.1.0 ក្នុង `package-lock.json`; Function ប្រើ esbuild និង
+  memory 2GB សម្រាប់ Chromium។
+- បន្ថែម `zto-session-test.js` សម្រាប់ encryption/tamper, cookie scope,
+  session reuse, concurrent-login lock, credential rotation និង CAPTCHA backoff;
+  ពង្រីក `zto-proxy-test.js` សម្រាប់ auto session, expired-cookie refresh ម្តង,
+  official-token precedence និង safe challenge response។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ក្នុង Netlify ដាក់ `ZTO_AUTO_LOGIN=true`, `ZTO_USERNAME`, `ZTO_PASSWORD`,
+  `ZTO_SESSION_ENCRYPTION_KEY` និង `ZTO_PROXY_KEY` ជា Secret/Functions variables
+  រួច Trigger deploy។ បង្កើត key ដោយ `openssl rand -base64 32`។
+- អាចលុប `ZTO_COOKIE` ក្រោយ auto-login ដំណើរការ។ បើ ZTO ទាមទារ CAPTCHA/MFA
+  សូមប្រើ Cookie ដោយដៃ ឬស្នើ official API token/service account; App មិន bypass ទេ។
+
+---
+
 ## [ZoeW 2.24.0] — 2026-08-31 · expired ២ថ្ងៃ · ZTO auth status · Deep Audit
 
 ជុំនេះកែតែ **ZoeW** (`zoew-v138` ➜ `zoew-v139`)។ ZoeKeyGen និង Firebase

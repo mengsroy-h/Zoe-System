@@ -94,7 +94,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          periodic-network-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
-         lookup-freshness-test zto-proxy-test; do
+         lookup-freshness-test zto-session-test zto-proxy-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -251,6 +251,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     HISTPATCH_APP_DIR="$BASE" node audit-tools/history-patch-retry-test.js 2>&1 | tail -1 | sed 's/^/   history-patch:   /'
     LOOKUPPREFETCH_APP_DIR="$BASE" node audit-tools/lookup-prefetch-test.js 2>&1 | tail -1 | sed 's/^/   lookup-prefetch: /'
     LOOKUPFRESH_APP_DIR="$BASE" node audit-tools/lookup-freshness-test.js 2>&1 | tail -1 | sed 's/^/   lookup-freshness:/'
+    ZTOSESSION_APP_DIR="$BASE" node audit-tools/zto-session-test.js 2>&1 | tail -1 | sed 's/^/   zto-session:     /'
     ZTOPROXY_APP_DIR="$BASE" node audit-tools/zto-proxy-test.js 2>&1 | tail -1 | sed 's/^/   zto-proxy:       /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'

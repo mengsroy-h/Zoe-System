@@ -1,5 +1,7 @@
 'use strict';
 
+const ztoSession = require('../lib/zto-session.js');
+
 const ZTO_ENDPOINT = 'https://aargus-api.ztoglobal.com/scan/get/order/detail';
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const ZTO_UPSTREAM_TIMEOUT_MS = 12000;
@@ -43,7 +45,7 @@ function parseExtraHeaders(raw) {
     }
 }
 
-function applyZtoAuthentication(headers) {
+function applyStaticZtoAuthentication(headers) {
     if (process.env.ZTO_AUTHORIZATION) {
         headers.Authorization = process.env.ZTO_AUTHORIZATION;
         return 'authorization';
@@ -59,6 +61,40 @@ function applyZtoAuthentication(headers) {
         return 'cookie';
     }
     return '';
+}
+
+const SAFE_AUTO_LOGIN_CODES = new Set([
+    'ZTO_AUTO_LOGIN_NOT_CONFIGURED',
+    'ZTO_SESSION_KEY_INVALID',
+    'ZTO_SESSION_STORE_UNAVAILABLE',
+    'ZTO_LOGIN_CHALLENGE',
+    'ZTO_LOGIN_REJECTED',
+    'ZTO_LOGIN_TIMEOUT',
+    'ZTO_LOGIN_UNAVAILABLE',
+    'ZTO_LOGIN_NO_SESSION',
+    'ZTO_LOGIN_BUSY'
+]);
+
+function autoLoginErrorResponse(error) {
+    const code = error instanceof ztoSession.ZtoSessionError && SAFE_AUTO_LOGIN_CODES.has(error.code)
+        ? error.code
+        : 'ZTO_LOGIN_UNAVAILABLE';
+    const statusCode = error instanceof ztoSession.ZtoSessionError
+        && [401, 409, 502, 503, 504].includes(Number(error.statusCode))
+        ? Number(error.statusCode)
+        : 503;
+    const messages = {
+        ZTO_AUTO_LOGIN_NOT_CONFIGURED: 'ZTO auto login is not configured',
+        ZTO_SESSION_KEY_INVALID: 'ZTO session encryption key is invalid',
+        ZTO_SESSION_STORE_UNAVAILABLE: 'ZTO session store is unavailable',
+        ZTO_LOGIN_CHALLENGE: 'ZTO requires CAPTCHA or additional verification',
+        ZTO_LOGIN_REJECTED: 'ZTO rejected the login credentials',
+        ZTO_LOGIN_TIMEOUT: 'ZTO login timed out',
+        ZTO_LOGIN_UNAVAILABLE: 'Unable to complete ZTO login',
+        ZTO_LOGIN_NO_SESSION: 'ZTO login did not create a session',
+        ZTO_LOGIN_BUSY: 'Another ZTO login is still running'
+    };
+    return json(statusCode, { error: messages[code], code });
 }
 
 function upstreamMessage(upstream, fallback) {
@@ -81,6 +117,80 @@ function authExpiredResponse() {
         error: 'ZTO session or token expired',
         code: 'ZTO_AUTH_EXPIRED'
     });
+}
+
+async function requestZtoOrder(headers, barcode) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ZTO_UPSTREAM_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(ZTO_ENDPOINT, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ billCode: barcode, countryCode: 'KH' }),
+            signal: controller.signal,
+            redirect: 'manual'
+        });
+
+        const contentType = response.headers && response.headers.get
+            ? (response.headers.get('content-type') || '')
+            : '';
+        if (response.status === 401 || response.status === 403
+            || (response.status >= 300 && response.status < 400)
+            || (response.ok && /^text\/html\b/i.test(contentType))) {
+            return { authRejected: true };
+        }
+
+        let upstream;
+        try {
+            upstream = await response.json();
+        } catch (_) {
+            return {
+                response: json(502, {
+                    error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + (contentType || 'unknown').split(';')[0] + ')',
+                    code: 'ZTO_INVALID_RESPONSE'
+                })
+            };
+        }
+
+        if (ztoAuthRejected(response, upstream)) return { authRejected: true };
+
+        if (response.status === 429) {
+            return {
+                response: json(429, {
+                    error: 'ZTO rate limit reached',
+                    code: 'ZTO_RATE_LIMITED'
+                })
+            };
+        }
+
+        if (!response.ok || !upstream || upstream.success === false || !upstream.data) {
+            return {
+                response: json(502, {
+                    error: upstreamMessage(upstream, 'ZTO HTTP ' + response.status),
+                    code: 'ZTO_UPSTREAM_REJECTED'
+                })
+            };
+        }
+
+        const order = upstream.data;
+        return {
+            response: json(200, {
+                phone: order.consigneePhone || order.consigneeMobile || '',
+                cod: Number(order.agentAmount) || 0,
+                dod: Number(order.arrivalServiceCharge) || 0,
+                barcode: order.billCode || barcode,
+                success: true
+            })
+        };
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            return { response: json(504, { error: 'ZTO request timed out', code: 'ZTO_TIMEOUT' }) };
+        }
+        return { response: json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' }) };
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 exports.handler = async function handler(event) {
@@ -112,79 +222,43 @@ exports.handler = async function handler(event) {
         Referer: 'https://argus.ztoglobal.com/',
         'Accept-Language': 'km',
         'User-Language': 'km',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
+        'User-Agent': ztoSession.ZTO_USER_AGENT
     }, parseExtraHeaders(process.env.ZTO_REQUEST_HEADERS_JSON));
 
-    if (!applyZtoAuthentication(headers)) {
+    const autoLoginEnabled = ztoSession.isAutoLoginEnabled(process.env);
+    let authenticationKind = applyStaticZtoAuthentication(headers);
+    if (!authenticationKind && autoLoginEnabled) {
+        try {
+            headers.Cookie = await ztoSession.getAutoSessionCookie();
+            authenticationKind = 'auto-cookie';
+        } catch (error) {
+            return autoLoginErrorResponse(error);
+        }
+    }
+
+    if (!authenticationKind) {
         return json(503, {
             error: 'ZTO authentication is not configured',
             code: 'ZTO_AUTH_NOT_CONFIGURED'
         });
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), ZTO_UPSTREAM_TIMEOUT_MS);
+    let lookup = await requestZtoOrder(headers, barcode);
+    if (!lookup.authRejected) return lookup.response;
+
+    const officialCredential = authenticationKind === 'authorization' || authenticationKind === 'token';
+    if (!autoLoginEnabled || officialCredential) return authExpiredResponse();
 
     try {
-        const response = await fetch(ZTO_ENDPOINT, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ billCode: barcode, countryCode: 'KH' }),
-            signal: controller.signal,
-            redirect: 'manual'
-        });
-
-        const contentType = response.headers && response.headers.get
-            ? (response.headers.get('content-type') || '')
-            : '';
-        if (response.status === 401 || response.status === 403
-            || (response.status >= 300 && response.status < 400)
-            || (response.ok && /^text\/html\b/i.test(contentType))) {
-            return authExpiredResponse();
-        }
-
-        let upstream;
-        try {
-            upstream = await response.json();
-        } catch (_) {
-            return json(502, {
-                error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + (contentType || 'unknown').split(';')[0] + ')',
-                code: 'ZTO_INVALID_RESPONSE'
-            });
-        }
-
-        if (ztoAuthRejected(response, upstream)) {
-            return authExpiredResponse();
-        }
-
-        if (response.status === 429) {
-            return json(429, {
-                error: 'ZTO rate limit reached',
-                code: 'ZTO_RATE_LIMITED'
-            });
-        }
-
-        if (!response.ok || !upstream || upstream.success === false || !upstream.data) {
-            return json(502, {
-                error: upstreamMessage(upstream, 'ZTO HTTP ' + response.status),
-                code: 'ZTO_UPSTREAM_REJECTED'
-            });
-        }
-
-        const order = upstream.data;
-        return json(200, {
-            phone: order.consigneePhone || order.consigneeMobile || '',
-            cod: Number(order.agentAmount) || 0,
-            dod: Number(order.arrivalServiceCharge) || 0,
-            barcode: order.billCode || barcode,
-            success: true
+        const rejectedCookie = String(headers.Cookie || '');
+        headers.Cookie = await ztoSession.getAutoSessionCookie({
+            forceRefresh: true,
+            rejectedCookie
         });
     } catch (error) {
-        if (error && error.name === 'AbortError') {
-            return json(504, { error: 'ZTO request timed out', code: 'ZTO_TIMEOUT' });
-        }
-        return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
-    } finally {
-        clearTimeout(timer);
+        return autoLoginErrorResponse(error);
     }
+
+    lookup = await requestZtoOrder(headers, barcode);
+    return lookup.authRejected ? authExpiredResponse() : lookup.response;
 };

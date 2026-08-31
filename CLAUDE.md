@@ -4159,9 +4159,10 @@ Setup Link ដែលបើកចោល **មិនត្រូវរស់រា
 
 ## Firebase Backup Tool
 
-`firebase-backup/` ជា Node.js CLI ដាច់ដោយឡែក (មិនមែនផ្នែកនៃ App) ដែលអ្នកលក់រត់ខ្លួនឯង
-ដោយប្រើ `firebase-admin` និង service-account key ក្នុងមួយជំនួញ។ `config.json`, `secrets/`
+`firebase-backup/` ជា Node.js 18+ CLI ដាច់ដោយឡែក (មិនមែនផ្នែកនៃ App) ដែលអ្នកលក់រត់ខ្លួនឯង
+ដោយប្រើ native HTTPS/OAuth REST និង service-account key ក្នុងមួយជំនួញ (គ្មាន third-party dependency)។ `config.json`, `secrets/`
 និង `backups/` ស្ថិតក្នុង `.gitignore` — **service-account key ជា credential ពិត កុំ commit វា**។
 
 Backup សរសេរទៅ `.partial` រួច `rename()` ចូលកន្លែង ដូច្នេះការរត់ដែលដាច់ពាក់កណ្តាល
 មិនបន្សល់ `.json.gz` កាត់ខ្លីដែលមើលទៅដូច backup ល្អទេ។
+វាមាន timeout/retry សម្រាប់ transient network និង lock ការពារ process ពីររត់ជាន់គ្នា។

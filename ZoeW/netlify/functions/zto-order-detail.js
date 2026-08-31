@@ -11,7 +11,9 @@ function json(statusCode, body) {
         headers: {
             'Content-Type': 'application/json; charset=utf-8',
             'Cache-Control': 'no-store',
-            'X-Content-Type-Options': 'nosniff'
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'Referrer-Policy': 'no-referrer'
         },
         body: JSON.stringify(body)
     };
@@ -39,6 +41,46 @@ function parseExtraHeaders(raw) {
     } catch (_) {
         return {};
     }
+}
+
+function applyZtoAuthentication(headers) {
+    if (process.env.ZTO_AUTHORIZATION) {
+        headers.Authorization = process.env.ZTO_AUTHORIZATION;
+        return 'authorization';
+    }
+    if (process.env.ZTO_TOKEN) {
+        const tokenHeader = process.env.ZTO_TOKEN_HEADER || 'X-Access-Token';
+        if (!/^[A-Za-z0-9-]{1,80}$/.test(tokenHeader) || FORBIDDEN_FORWARD_HEADER_RE.test(tokenHeader)) return '';
+        headers[tokenHeader] = process.env.ZTO_TOKEN;
+        return 'token';
+    }
+    if (process.env.ZTO_COOKIE) {
+        headers.Cookie = process.env.ZTO_COOKIE;
+        return 'cookie';
+    }
+    return '';
+}
+
+function upstreamMessage(upstream, fallback) {
+    const raw = upstream && (upstream.error || upstream.message || upstream.msg);
+    if (typeof raw !== 'string') return fallback;
+    const safe = raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 180);
+    return safe || fallback;
+}
+
+function ztoAuthRejected(response, upstream) {
+    if (response && (response.status === 401 || response.status === 403)) return true;
+    const code = String(upstream && (upstream.code || upstream.errorCode) || '').toLowerCase();
+    const message = upstreamMessage(upstream, '').toLowerCase();
+    if (/^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(code)) return true;
+    return /(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/.test(message);
+}
+
+function authExpiredResponse() {
+    return json(401, {
+        error: 'ZTO session or token expired',
+        code: 'ZTO_AUTH_EXPIRED'
+    });
 }
 
 exports.handler = async function handler(event) {
@@ -73,13 +115,11 @@ exports.handler = async function handler(event) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
     }, parseExtraHeaders(process.env.ZTO_REQUEST_HEADERS_JSON));
 
-    if (process.env.ZTO_AUTHORIZATION) headers.Authorization = process.env.ZTO_AUTHORIZATION;
-    if (process.env.ZTO_COOKIE) headers.Cookie = process.env.ZTO_COOKIE;
-    if (process.env.ZTO_TOKEN) {
-        const tokenHeader = process.env.ZTO_TOKEN_HEADER || 'X-Access-Token';
-        if (/^[A-Za-z0-9-]{1,80}$/.test(tokenHeader) && !FORBIDDEN_FORWARD_HEADER_RE.test(tokenHeader)) {
-            headers[tokenHeader] = process.env.ZTO_TOKEN;
-        }
+    if (!applyZtoAuthentication(headers)) {
+        return json(503, {
+            error: 'ZTO authentication is not configured',
+            code: 'ZTO_AUTH_NOT_CONFIGURED'
+        });
     }
 
     const controller = new AbortController();
@@ -94,23 +134,41 @@ exports.handler = async function handler(event) {
             redirect: 'manual'
         });
 
+        const contentType = response.headers && response.headers.get
+            ? (response.headers.get('content-type') || '')
+            : '';
+        if (response.status === 401 || response.status === 403
+            || (response.status >= 300 && response.status < 400)
+            || (response.ok && /^text\/html\b/i.test(contentType))) {
+            return authExpiredResponse();
+        }
+
         let upstream;
         try {
             upstream = await response.json();
         } catch (_) {
-            const contentType = response.headers && response.headers.get
-                ? (response.headers.get('content-type') || 'unknown')
-                : 'unknown';
             return json(502, {
-                error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + contentType.split(';')[0] + ')'
+                error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + (contentType || 'unknown').split(';')[0] + ')',
+                code: 'ZTO_INVALID_RESPONSE'
+            });
+        }
+
+        if (ztoAuthRejected(response, upstream)) {
+            return authExpiredResponse();
+        }
+
+        if (response.status === 429) {
+            return json(429, {
+                error: 'ZTO rate limit reached',
+                code: 'ZTO_RATE_LIMITED'
             });
         }
 
         if (!response.ok || !upstream || upstream.success === false || !upstream.data) {
-            const message = upstream && upstream.error
-                ? (typeof upstream.error === 'string' ? upstream.error : 'ZTO rejected the request')
-                : ('ZTO HTTP ' + response.status);
-            return json(502, { error: message });
+            return json(502, {
+                error: upstreamMessage(upstream, 'ZTO HTTP ' + response.status),
+                code: 'ZTO_UPSTREAM_REJECTED'
+            });
         }
 
         const order = upstream.data;
@@ -122,7 +180,10 @@ exports.handler = async function handler(event) {
             success: true
         });
     } catch (error) {
-        return json(502, { error: error && error.name === 'AbortError' ? 'ZTO request timed out' : 'Unable to reach ZTO' });
+        if (error && error.name === 'AbortError') {
+            return json(504, { error: 'ZTO request timed out', code: 'ZTO_TIMEOUT' });
+        }
+        return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     } finally {
         clearTimeout(timer);
     }

@@ -75,7 +75,7 @@ echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេ
 for t in policy-test auth-recovery-test keylist-consistency-test \
          license-grace-test license-clock-trust-test \
          license-clock-rollback-test \
-         cleanup-clock-guard-test khmer-timezone-test monotonic-gate-test \
+         cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
          keygen-session-security-test \
@@ -85,7 +85,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          restore-race-test clear-history-claim-test google-sheets-cache-test \
          lookup-config-secret-test \
          clear-history-finalization-fence-test \
-         setup-link-roundtrip-test export-cells-test dependency-security-test camera-resume-test \
+         setup-link-roundtrip-test export-cells-test dependency-security-test firebase-backup-test camera-resume-test \
          trash-modal-test partial-pickup-cleanup-test restore-marker-hygiene-test \
          firebase-config-paste-test \
          connection-recovery-test reconnect-ladder-test sw-cache-failure-test \
@@ -232,6 +232,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LADDER_APP_DIR="$BASE" node audit-tools/reconnect-ladder-test.js 2>&1 | tail -1 | sed 's/^/   reconnect-ladder:/'
     LICENSECLOCK_APP_DIR="$BASE" node audit-tools/license-clock-trust-test.js 2>&1 | tail -1 | sed 's/^/   license-clock:   /'
     CLEANUPCLOCK_APP_DIR="$BASE" node audit-tools/cleanup-clock-guard-test.js 2>&1 | tail -1 | sed 's/^/   cleanup-clock:   /'
+    EXPIREDTRASH_APP_DIR="$BASE" node audit-tools/expired-trash-retention-test.js 2>&1 | tail -1 | sed 's/^/   expired-trash:   /'
     MONOGATE_APP_DIR="$BASE" node audit-tools/monotonic-gate-test.js 2>&1 | tail -1 | sed 's/^/   monotonic-gate:  /'
     KHMERTZ_APP_DIR="$BASE" node audit-tools/khmer-timezone-test.js 2>&1 | tail -1 | sed 's/^/   khmer-tz:        /'
     SENTRYRACE_APP_DIR="$BASE" node audit-tools/sentry-load-race-test.js 2>&1 | tail -1 | sed 's/^/   sentry-race:     /'
@@ -252,6 +253,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LOOKUPFRESH_APP_DIR="$BASE" node audit-tools/lookup-freshness-test.js 2>&1 | tail -1 | sed 's/^/   lookup-freshness:/'
     ZTOPROXY_APP_DIR="$BASE" node audit-tools/zto-proxy-test.js 2>&1 | tail -1 | sed 's/^/   zto-proxy:       /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
+    FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'

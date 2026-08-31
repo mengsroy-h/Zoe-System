@@ -255,7 +255,7 @@ async function scenarioMixedParcel() {
     check(!!live && live.cod === 0 && live.dod === 25 && live.count === 1, 'តម្លៃកញ្ចប់ដែលនៅសល់គិតតែ B', JSON.stringify(live && { cod: live.cod, dod: live.dod, count: live.count }));
     check(!!live && live.createdAt === T0, 'នាឡិកា ៨ ថ្ងៃរបស់ B មិនត្រូវ reset');
 
-    await world.tick(T0 + 8 * DAY + 60000);
+    await world.tick(T0 + 7 * DAY + 60000);
     live = world.getPath('zoew_scan_history_cod_dod/id_mix');
     trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
     const expiredItem = trash.id_mix;
@@ -297,7 +297,12 @@ async function scenarioAllOpen() {
     console.log('\nសេណារីយ៉ូ ២ — កញ្ចប់ barcode ២ ដែល **គ្មាន** មួយណាយករួច (ការគ្រប់គ្រង)');
     const seed = { id_open: parcel('id_open', [bc('OPEN1', 10, 0, false), bc('OPEN2', 0, 25, false)], { isClosed: false }) };
     const world = buildWorld(seed, T0);
-    await world.tick(T0 + 8 * DAY + 60000);
+    await world.tick(T0 + 7 * DAY);
+    check(!!world.getPath('zoew_scan_history_cod_dod/id_open'),
+        'ព្រំដែន៖ គ្រប់ ៧×២៤ ម៉ោងពេញ មិនទាន់លើស ៧ថ្ងៃ ➜ មិនដក');
+    check(Object.keys(world.getPath('zoew_recently_deleted_cod_dod') || {}).length === 0,
+        'ព្រំដែន៖ នៅ ៧ថ្ងៃគត់ ធុងសំរាមនៅទទេ');
+    await world.tick(T0 + 7 * DAY + 60000);
 
     const live = world.getPath('zoew_scan_history_cod_dod/id_open');
     const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
@@ -329,7 +334,7 @@ async function scenarioLatePickup() {
     console.log('\nសេណារីយ៉ូ ៤ — យក barcode មួយ **ក្រោយ** ថ្ងៃទី ៨ (ការគ្រប់គ្រង)');
     const seed = { id_late: parcel('id_late', [bc('LATE1', 10, 0, false), bc('LATE2', 0, 25, false)], { isClosed: false }) };
     const world = buildWorld(seed, T0);
-    await world.tick(T0 + 8 * DAY + 60000);
+    await world.tick(T0 + 7 * DAY + 60000);
     const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
     check(!!trash.id_late && trash.id_late.barcodes.length === 2,
         'ការមិនទាន់យកទាល់តែសោះ ➜ ទាំង ២ ផុតកំណត់ (គោលការណ៍ ៨ ថ្ងៃ)');
@@ -376,11 +381,11 @@ async function scenarioReopenAndIdle() {
 async function scenarioFreshPickupAtDeadline() {
     console.log('\nសេណារីយ៉ូ ៧ — យក barcode មួយ **មុនថ្ងៃទី ៨ បន្តិច** (មិនទាន់គ្រប់ ២ ម៉ោង)');
 
-    const A = Object.assign(bc('DL111', 10, 0, true), { closedAt: T0 + 8 * DAY - HOUR });
+    const A = Object.assign(bc('DL111', 10, 0, true), { closedAt: T0 + 7 * DAY - HOUR });
     const seed = { id_dl: parcel('id_dl', [A, bc('DL222', 0, 25, false)], { isClosed: false }) };
     const world = buildWorld(seed, T0);
 
-    await world.tick(T0 + 8 * DAY + 60000);
+    await world.tick(T0 + 7 * DAY + 60000);
     const live = world.getPath('zoew_scan_history_cod_dod/id_dl');
     const trash = world.getPath('zoew_recently_deleted_cod_dod') || {};
     const ids = Object.keys(trash);
@@ -397,7 +402,7 @@ async function scenarioFreshPickupAtDeadline() {
     check(total.cod === 0 && total.dod === -25 && total.count === -1,
         '⛔ ស្នូល៖ ដកតែតម្លៃ DL222 — លុយរបស់ DL111 នៅគ្រប់', JSON.stringify(total));
 
-    await world.tick(T0 + 8 * DAY + HOUR + 2 * HOUR);
+    await world.tick(T0 + 7 * DAY + HOUR + 2 * HOUR);
     const after = world.getPath('zoew_scan_history_cod_dod/id_dl');
     const trashAfter = world.getPath('zoew_recently_deleted_cod_dod') || {};
     check(!after, 'DL111 ចេញ ២ ម៉ោងក្រោយម៉ោងបិទរបស់វា');

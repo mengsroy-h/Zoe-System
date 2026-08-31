@@ -48,7 +48,7 @@ function makeCtx(src) {
         getServerNow: () => 1700000000000,
         parseTimestampFromId: () => 1700000000000,
         generateUniqueId: () => 'id_generated',
-        EIGHT_DAYS_MS: 8 * 24 * 60 * 60 * 1000,
+        EIGHT_DAYS_MS: 7 * 24 * 60 * 60 * 1000,
         TWO_HOURS_MS: 2 * 60 * 60 * 1000
     };
     vm.createContext(ctx);

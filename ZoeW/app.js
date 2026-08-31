@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.24.3';
+    const APP_VERSION = '2.24.4';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2385,15 +2385,26 @@
         const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
         if (hName && hValue) headers[hName] = hValue;
 
-        showToast("កំពុងសាកល្បង API...");
+        const testIsZto = lookupApiIsZto({ url: url });
+        const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;
+        showToast(testIsZto ? "កំពុងសាកល្បង ZTO... (លើកដំបូងយឺត ~២០ វិ.)" : "កំពុងសាកល្បង API...");
         if (btnEl) btnEl.disabled = true;
+        const progressTimers = testIsZto ? [
+            setTimeout(() => showToast("⏳ ZTO កំពុងចូល... (បើក Chromium)", 'warn'), 7000),
+            setTimeout(() => showToast("⏳ នៅរង់ចាំ ZTO... បើលើសនេះទៀត វានឹងបញ្ឈប់", 'warn'), 18000)
+        ] : [];
         try {
-            const out = await fetchWithTimeout(testUrl, { headers }, 20000, 'Test API timed out', (r) => r.text());
+            const out = await fetchWithTimeout(testUrl, { headers }, testTimeoutMs, 'Test API timed out', (r) => r.text());
             alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
         } catch (e) {
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'testLookupApiConfig' });
-            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (e && e.message === 'Test API timed out' ? "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត" : e.message));
+            const timedOut = e && e.message === 'Test API timed out';
+            const slowNote = testIsZto
+                ? "អស់ពេល (Timeout) — ការចូល ZTO លើកដំបូងយឺត (បើក Chromium និង OAuth2)។ សូមសាកល្បងម្តងទៀត; លើកទី ២ ប្រើ session ដែលរក្សាទុករួច ហើយលឿនជាង"
+                : "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត";
+            alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (timedOut ? slowNote : e.message));
         } finally {
+            progressTimers.forEach((timer) => clearTimeout(timer));
             if (btnEl) btnEl.disabled = false;
         }
     }
@@ -3135,6 +3146,11 @@
         if (lookupApiSupportsList(cfg)) fetchCustomerDataTableRows(true, true);
     }
 
+    function safeLookupReason(raw) {
+        const text = String(raw === null || raw === undefined ? '' : raw).trim();
+        return /^[A-Za-z0-9_.:@-]{1,80}$/.test(text) ? text : '';
+    }
+
     function lookupApiIsZto(cfg) {
         if (!cfg || !cfg.url) return false;
         return /(?:^|\/)\.netlify\/functions\/zto-order-detail\/?(?:[?#]|$)/i.test(String(cfg.url).trim());
@@ -3445,6 +3461,8 @@
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const AUTO_LOOKUP_TIMEOUT_MS = 16000;
     const ZTO_AUTO_LOOKUP_TIMEOUT_MS = 58000;
+    const LOOKUP_TEST_TIMEOUT_MS = 20000;
+    const ZTO_TEST_TIMEOUT_MS = 30000;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Map();
@@ -3675,6 +3693,7 @@
             if (!out.res.ok) {
                 const lookupError = new Error('HTTP ' + out.res.status);
                 lookupError.lookupCode = data && data.code ? String(data.code) : '';
+                lookupError.lookupReason = safeLookupReason(data && data.reason);
                 throw lookupError;
             }
             if (myGeneration !== customerDataTableSessionGeneration) return;
@@ -3719,7 +3738,8 @@
             } else if (e && (e.lookupCode === 'ZTO_AUTO_LOGIN_NOT_CONFIGURED' || e.lookupCode === 'ZTO_SESSION_KEY_INVALID')) {
                 setLookupStatus(barcode, 'error', '⚙️ ZTO Auto-login មិនទាន់កំណត់ពេញលេញនៅ Netlify');
             } else if (e && /^(?:ZTO_LOGIN_|ZTO_SESSION_)/.test(e.lookupCode || '')) {
-                setLookupStatus(barcode, 'error', '⚠️ ZTO Auto-login មិនអាចបង្កើត session បាន — សូមពិនិត្យ Netlify logs');
+                setLookupStatus(barcode, 'error', '⚠️ ZTO Auto-login មិនបានសម្រេច'
+                    + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : ' — សូមពិនិត្យ Netlify logs'));
             } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {
                 setLookupStatus(barcode, 'error', '🔒 ' + lookupSource + ' Secret មិនត្រឹមត្រូវ ឬផុតកំណត់');
             } else {

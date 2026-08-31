@@ -25,6 +25,97 @@
 
 ---
 
+## [ZoeW 2.24.4] — 2026-08-31 · ZTO login ៖ សារកំហុសប្រាប់ជំហាន · ប៊ូតុងសាកល្បង
+
+ជុំនេះកែតែ **ZoeW** (`zoew-v142` ➜ `zoew-v143`)។ Firebase rules · CSP ·
+Environment Variables **មិនប្រែសោះ**។ វា **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មទេ**
+និង **មិនប៉ះ PTR · ចលនាផ្ទាំង · ការរមូរ · ទម្រង់បង្ហាញ** ដែរ។
+
+### កែលម្អ ៖ សារកំហុសរបស់ ZTO login ប្រាប់ថាជាប់ជំហានណា
+- កំណែ 2.24.2 បិទរន្ធ Netlify Blobs ➜ ការ login ដំណើរការដល់ Chromium ពិត
+  ហើយកំហុសថ្មីលេចជា `ZTO_LOGIN_UNAVAILABLE` ជាមួយ `reason: "login:TimeoutError"`។
+  ⛔ ស្លាកនោះ **មិនប្រាប់ថាជាប់ត្រង់ណា** — `goto` · ការរង់ចាំទម្រង់ login ·
+  ការចុច · ឬវដ្តរង់ចាំ cookie សុទ្ធតែចេញជាឈ្មោះតែមួយ។
+- ឥឡូវ `reason` ផ្ទុក **ជំហាន** និង **host** ៖
+  `login:wait-password@iam-web.zto.com:TimeoutError` ➜ ដឹងភ្លាមថាវាឈានដល់
+  IDaaS រួច តែទម្រង់ login មិនលេច។ ជំហាន ៖ `launch` · `newpage` · `goto` ·
+  `wait-password` (ឬ `wait-password-nonav` ពេល navigate ធ្លាក់) · `find-form` ·
+  `fill` · `submit` · `poll`។
+- **Netlify Function log** ផ្ទុករូបភាពទំព័រពេលធ្លាក់ ៖ `inputs=` · `password=` ·
+  `buttons=` · `frames=` · `text=` · `ready=` បូករយៈពេលកន្លងផុត ➜ បែងចែក
+  «ទម្រង់ក្នុង iframe» ពី «ទំព័រទទេ/ត្រូវទប់» ពី «ផ្ទុកយឺត»។
+  ⛔ វាបញ្ចេញតែ **ឈ្មោះ host និងលេខរាប់** — គ្មាន URL ពេញ គ្មាន token។
+
+### កែកំហុស ៖ ZTO ប្រាប់ «មិនទាន់ចូល» ដោយឆ្លើយ URL របស់ OAuth2 IdP
+- 🔴 **វាស់ពីផលិតកម្មពិត** ៖ ZTO ឆ្លើយ HTTP 200 ជាមួយ
+  `{"error":"https://iam-web.zto.com/oauth2?app_id=…&redirect_url=…"}`។
+  នោះជាការនិយាយថា **«អ្នកមិនទាន់ចូល»** — តែ `ztoAuthRejected()` រកមិនឃើញ
+  (regex ចាស់រក `login…expired/invalid/required` ជាដើម) ➜ វាក្លាយជា
+  **502 `ZTO_UPSTREAM_REJECTED`** ➜ ⛔ **ការ login ឡើងវិញមិនដែលកេះ** ហើយ
+  **URL របស់ IdP (មាន `app_id`) ហូរទៅ browser របស់អ្នកប្រើ**។
+- ឥឡូវការឆ្លើយដែលជា **URL ចូល/OAuth/SSO/IAM** ត្រូវចាត់ជា auth rejection ➜
+  កេះការ login ឡើងវិញ **១ ដង** ដូចការរចនា រួចឆ្លើយ `ZTO_AUTH_EXPIRED` ដែល
+  ប្រាប់ការពិត។ ⛔ ទិសផ្ទុយត្រូវរក្សា ៖ ការឆ្លើយធម្មតាមិនត្រូវច្រឡំ។
+
+### កែកំហុស ៖ cookie មុនចូល ត្រូវបានរក្សាទុកជា session
+- 🔴 `BOS-MAN-SESSION` ជា **session cookie បែប servlet** ដែល server ដាក់ឲ្យ
+  **តាំងពីពេលបើកទំព័រ** — មុនចូលផង។ វដ្តរង់ចាំចាស់ត្រឡប់ភ្លាមៗពេល cookie
+  នោះមាន ➜ **cookie មុនចូល** ត្រូវអ៊ិនគ្រីបរក្សាទុកក្នុង Blobs ជា «session
+  ត្រឹមត្រូវ» ➜ រាល់ការស្កេនបន្ទាប់ប្រើវា ➜ ZTO បដិសេធ។
+- ឥឡូវការទទួលយកទាមទារ **ភស្តុតាងនៃការចូល** ៖ ទំព័រ **navigate** ក្រោយចុច
+  (OAuth2 callback) **ឬ** តម្លៃ cookie **ប្តូរ**។ បើអត់ ➜
+  `ZTO_LOGIN_NO_SESSION` ជាមួយ `reason: login:cookie-unconfirmed@<host>`។
+  ⛔ ទិសផ្ទុយ ៖ គ្មាន cookie មុនចុច ➜ cookie ថ្មីនៅតែជាភស្តុតាង (មិនទប់
+  ការចូលដែលត្រឹមត្រូវ)។
+
+### កែកំហុស ៖ វដ្តរង់ចាំ cookie គ្មានផ្លូវចេញ
+- 🔴 `const remaining = () => Math.max(1, deadline - now())` ➜
+  `while (remaining() > 0)` គឺ **ពិត ជានិច្ច** ➜ វដ្តនោះ **មិនដែលបញ្ចប់** ➜
+  `ZTO_LOGIN_TIMEOUT` (504) **មិនដែលអាចបោះបាន** ➜ Function បង្វិលរាល់ ៣០០ms
+  រហូតដល់ Netlify សម្លាប់វា ➜ អ្នកប្រើឃើញកំហុស gateway ឆៅ (គ្មាន JSON) ហើយ
+  **failure backoff មិនត្រូវកត់ត្រា** ➜ ការស្កេនបន្ទាប់បើក Chromium 2GB ម្តងទៀត។
+- ឥឡូវលក្ខខណ្ឌវដ្តប្រើ `remainingRaw()` ដែល **មិន clamp**; `remaining()`
+  នៅ clamp ដដែលសម្រាប់ជា argument នៃ timeout។
+
+### កែកំហុស ៖ ផ្លូវស្កេនបោះបង់ `reason` ចោល
+- សារ «⚠️ ZTO Auto-login មិនអាចបង្កើត session បាន — សូមពិនិត្យ Netlify logs»
+  ជា **catch-all** សម្រាប់គ្រប់កូដ `ZTO_LOGIN_*`/`ZTO_SESSION_*` ➜ វា
+  **បោះបង់វាល `reason`** ដែល proxy ផ្ញើមក ➜ អ្នកប្រើត្រូវបានរុញទៅអាន
+  Netlify log ខណៈមូលហេតុនៅក្នុងដៃស្រាប់។ ⛔ លើទូរស័ព្ទ ការអាន Netlify log
+  ស្ទើរតែមិនអាចធ្វើបាន។
+- ឥឡូវវាបង្ហាញ ៖ «⚠️ ZTO Auto-login មិនបានសម្រេច — ជាប់ត្រង់
+  `login:wait-password@iam-web.zto.com:TimeoutError`»។
+- ⛔ `reason` មកពី **server** ➜ វាឆ្លងកាត់ `safeLookupReason()` មុនចូល DOM
+  (អនុញ្ញាតតែ `[A-Za-z0-9_.:@-]` និងវែងមិនលើស ៨០) — ថ្នាក់ការពារ XSS ដដែល។
+
+### កែកំហុស ៖ ប៊ូតុង «🧪 សាកល្បង»
+- វាធ្លាប់ប្រើពិដាន **២០ វិនាទីថេរ** ខណៈ server ត្រូវការ **~១៨ វិនាទី** លើក
+  ដំបូង (វាស់ពី Sentry របស់អ្នកប្រើ) ➜ វាបោះបង់ **មុន** server ឆ្លើយ ➜
+  ការតភ្ជាប់ដែលដំណើរការមើលទៅដូចខូច ហើយសំណើដែលបោះបង់នោះ **នៅតែបន្ត
+  ស៊ី Chromium មួយជុំ** នៅខាង server។
+- ⛔ **ផ្លូវ Google Sheet/Apps Script មិនប្រែសោះ** — នៅ **២០ វិនាទី** ដដែល,
+  toast ដដែល, សារបរាជ័យដដែល។ វាស់ក្នុង `vm` មិនមែនអះអាងទទេ។
+- ផ្លូវ ZTO ➜ **៣០ វិនាទី** (មិនមែន ៥៨ វិ. ដូចផ្លូវស្កេន ព្រោះប៊ូតុងសាកល្បង
+  គ្មាន manual fallback ➜ ការរង់ចាំយូរពេកគ្រាន់តែធ្វើឲ្យធុញ) បូក **toast
+  វឌ្ឍនភាព** នៅវិនាទីទី ៧ និង ១៨ ➜ លែងមើលទៅដូចជាប់។
+- សារបរាជ័យប្រាប់ការពិត ៖ ផ្លូវ ZTO លែងចោទ «Google Apps Script cold start»។
+
+### ឧបករណ៍ audit
+- `zto-session-test.js` ៖ ៦២ ➜ **៧៦ assertion** — ចាក់សោ `reason` ដែលមាន
+  ជំហាន និង host, ខ្លឹមសារ log, ច្បាប់ `loginIsConfirmed()` **៥ ករណី**, និង
+  ការវាស់ថាវដ្តរង់ចាំ cookie **ពិតជាបញ្ចប់** (ការធ្លាក់មានឈ្មោះ មិនមែនការព្យួរ)។
+  ⛔ តេស្តនោះជាអ្នករកឃើញវដ្តគ្មានផ្លូវចេញ — ការអានកូដមិនបានឃើញវាទេ។
+- `zto-proxy-test.js` ៖ រត់ `testLookupApiConfig()` **ពិតក្នុង `vm`** ដោយ URL
+  ២ បែប ➜ អះអាង **២ ខាង** ៖ Sheet នៅ ២០,០០០ms · ZTO នៅ ៣០,០០០ms · toast
+  របស់ Sheet នៅដដែល។ បូក `safeLookupReason()` ក្នុង `vm` (តម្លៃត្រឹមត្រូវ
+  ឆ្លងកាត់ · HTML/ចន្លោះ/វែងពេក ត្រូវច្រោះ)។ mutation ៤ ➜ ចាប់បានទាំង ៤។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- **គ្មាន** — គ្រាន់តែ deploy។ ក្រោយ deploy បើ ZTO login នៅធ្លាក់ សូមផ្ញើ
+  តម្លៃ `reason` ថ្មី — វានឹងប្រាប់ជំហាន និង host ដែលជាប់។
+
+---
+
 ## [ZoeW 2.24.3] — 2026-08-31 · នាំចូល CSV ៖ លេខ 0 នាំមុខរបស់លេខទូរស័ព្ទលែងបាត់
 
 ជុំនេះកែតែ **ZoeW** (`zoew-v141` ➜ `zoew-v142`)។ ZoeKeyGen និង Firebase rules

@@ -229,10 +229,13 @@ function writeCsvSample(dir) {
     return file;
 }
 
+let sampleIsRealWorkbook = false;
+
 function writeSample(dir) {
     let XLSX = null;
     try { XLSX = require('xlsx'); } catch (e) { XLSX = null; }
     if (XLSX) {
+        sampleIsRealWorkbook = true;
         const file = path.join(dir, 'zoe-sheet-import-sample.xlsx');
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(SAMPLE), 'Data');
@@ -268,6 +271,14 @@ async function withTimeout(promise, ms, label) {
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'zoe-si-'));
     const samplePath = writeSample(tmpDir);
     const csvSamplePath = writeCsvSample(tmpDir);
+    if (sampleIsRealWorkbook) {
+        console.log('   ចំណាំ ៖ ផ្នែក ១០–១៣ រត់លើ .xlsx ពិត (package `xlsx` ដំឡើងរួច)។');
+    } else {
+        console.log('   ⚠️  ចំណាំ ៖ គ្មាន package `xlsx` ➜ ផ្នែក ១០–១៣ ធ្លាក់ទៅ **CSV**');
+        console.log('       ➜ ផ្លូវ .xlsx ពិត **មិនត្រូវបានវាស់** ក្នុងការរត់នេះទេ។');
+        console.log('       ➜ រត់ `npm i xlsx` ដើម្បីគ្របវា (CI ដំឡើងវារួចស្រាប់)។');
+        console.log('       ផ្នែក ១៦ (CSV ➜ លេខ 0 នាំមុខ) រត់ជានិច្ច មិនអាស្រ័យលើវាទេ។');
+    }
     const server = await serve(APP);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });

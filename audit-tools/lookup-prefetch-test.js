@@ -290,6 +290,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             setTimeout: setTimeout, clearTimeout: clearTimeout,
             navigator: { onLine: o.onLine === undefined ? true : o.onLine },
             AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
+            AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: 6000,
             AUTO_LOOKUP_FAILURE_MAX: 100,
             AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
             AUTO_LOOKUP_TIMEOUT_MS: 16000,
@@ -356,6 +357,10 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
         vm.runInContext(sliceFn('setLookupStatus'), ctx);
         vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);
+        vm.runInContext(sliceFn('lookupResponseError'), ctx);
+        vm.runInContext(sliceFn('markLookupTimeoutNoRetry'), ctx);
+        vm.runInContext(sliceFn('lookupFailureCooldownMs'), ctx);
+        vm.runInContext(sliceFn('lookupFailureIsDefinitive'), ctx);
         vm.runInContext(sliceFn('retryTransientLookupResponse'), ctx);
         if (o.realRetry) vm.runInContext(sliceFn('retryAsync'), ctx);
         if (o.loadClear) vm.runInContext(sliceFn('clearCustomerDataTableCache'), ctx);

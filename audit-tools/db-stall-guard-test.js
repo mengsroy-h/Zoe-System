@@ -388,7 +388,7 @@ function runAbandonCleanup(mode) {
     const ctx = vm.createContext(box);
     loadCommon(ctx, zoewSrc);
     const parts = [
-        sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'EIGHT_DAYS_MS'),
+        sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();'

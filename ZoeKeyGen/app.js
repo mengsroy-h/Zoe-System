@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.15';
+const APP_VERSION = '2.19.16';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -655,7 +655,7 @@ function withTimeout(promise, ms, timeoutMsg) {
 
 function retryAsync(fn, attempts, delayMs) {
     return fn().catch((err) => {
-        if (attempts <= 1) throw err;
+        if (attempts <= 1 || (err && err.noRetry)) throw err;
         return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
     });
 }

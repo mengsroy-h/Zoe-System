@@ -99,18 +99,34 @@ ok(sliceFn(src, 'runAutomaticDeletedCleanup').indexOf('trashRetentionMs(item)') 
 // អត្ថបទដែលអ្នកប្រើអាន ត្រូវត្រូវនឹងលេខថេរ — បើឃ្លាតគ្នា អ្នកប្រើរង់ចាំខុសថ្ងៃ
 const retentionLabel = khmerNum(RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
 const expiredRetentionLabel = khmerNum(EXPIRED_RETENTION_DAYS) + ' \u1790\u17d2\u1784\u17c3';
+// ⛔ ចំនួនថ្ងៃនៃច្បាប់ «បោះបង់» ត្រូវ **អានចេញពីថេរ** មិនមែនសរសេរដៃ។
+//    ជំនាន់មុនចាក់លេខ ៨ ទុកជា literal ➜ ពេលថេរប្តូរទៅ ៧ ថ្ងៃ (2026-08-31)
+//    ស្លាកនៅ ៨ថ្ងៃ ហើយ checker នេះ **បៃតងលើអត្ថបទដែលកុហក**។
+const abandonConst = /const ABANDON_AGE_MS = (\d+) \* 24 \* 60 \* 60 \* 1000;/.exec(src);
+ok(!!abandonConst, 'រកឃើញថេរ ABANDON_AGE_MS');
+const ABANDON_DAYS = abandonConst ? Number(abandonConst[1]) : 0;
+ok(ABANDON_DAYS > 0 && ABANDON_DAYS < 60, 'ច្បាប់បោះបង់ក្នុងជួរសមហេតុផល', ABANDON_DAYS);
+const abandonLabel = '\u1795\u17bb\u178f\u1780\u17c6\u178e\u178f\u17cb ' + khmerNum(ABANDON_DAYS) + '\u1790\u17d2\u1784\u17c3\u17d6 ';
 const indexHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
 const trashModalHtml = indexHtml.slice(indexHtml.indexOf('id="recentlyDeletedModal"'));
-ok(trashModalHtml.indexOf('\u1795\u17bb\u178f\u1780\u17c6\u178e\u178f\u17cb \u17e8\u1790\u17d2\u1784\u17c3\u17d6 ' + expiredRetentionLabel) !== -1 &&
+ok(trashModalHtml.indexOf(abandonLabel + expiredRetentionLabel) !== -1 &&
     trashModalHtml.indexOf('\u1794\u17d2\u179a\u1797\u17c1\u1791\u1795\u17d2\u179f\u17c1\u1784\u17d6 ' + retentionLabel) !== -1,
-    'ចំណងជើងធុងសំរាមបង្ហាញ expired ២ថ្ងៃ និងប្រភេទផ្សេង ៣០ថ្ងៃ');
+    'ចំណងជើងធុងសំរាមបង្ហាញចំនួនថ្ងៃដូចថេរពិត', { ABANDON_DAYS: ABANDON_DAYS });
 const trashRowsFn = sliceFn(src, 'renderRecentlyDeleted');
 ok(trashRowsFn.indexOf(expiredRetentionLabel) !== -1 && trashRowsFn.indexOf(retentionLabel) !== -1,
     'សារ «ជួរទៀត» បង្ហាញ retention ទាំង ២ និង ៣០ថ្ងៃ');
-const displayedRetentionDays = Array.from(trashRowsFn.matchAll(new RegExp('([' + KHMER_DIGITS + ']+) \\u1790\\u17d2\\u1784\\u17c3', 'g')))
-    .map((match) => match[1]);
-ok(JSON.stringify(displayedRetentionDays.sort()) === JSON.stringify([expiredRetentionLabel.split(' ')[0], retentionLabel.split(' ')[0]].sort()),
-    'គ្មានលេខថ្ងៃចាស់សល់ក្នុងសារធុងសំរាម', displayedRetentionDays);
+ok(trashRowsFn.indexOf(abandonLabel) !== -1,
+    '⛔ សារ «ជួរទៀត» ប្រើចំនួនថ្ងៃដូចថេរ ABANDON_AGE_MS', { ABANDON_DAYS: ABANDON_DAYS });
+// ⛔ គ្មានចំនួនថ្ងៃ **ចាស់** សល់ក្នុងអត្ថបទដែលអ្នកប្រើអាន — ស្កេនទាំង ២ ទម្រង់
+//    (មានចន្លោះ «៨ ថ្ងៃ» និងគ្មានចន្លោះ «៨ថ្ងៃ»)។ ជំនាន់មុនស្កេនតែទម្រង់ដែល
+//    មានចន្លោះ ➜ «៨ថ្ងៃ» រអិលកាត់ទាំងស្រុង។
+[['index.html', trashModalHtml], ['renderRecentlyDeleted', trashRowsFn]].forEach(([where, text]) => {
+    const days = Array.from(text.matchAll(new RegExp('([' + KHMER_DIGITS + ']+)\\s*\\u1790\\u17d2\\u1784\\u17c3', 'g')))
+        .map((m) => m[1]);
+    const allowed = [khmerNum(ABANDON_DAYS), khmerNum(EXPIRED_RETENTION_DAYS), khmerNum(RETENTION_DAYS)];
+    ok(days.length > 0 && days.every((d) => allowed.indexOf(d) !== -1),
+        '⛔ គ្មានចំនួនថ្ងៃចាស់សល់ក្នុង ' + where, days);
+});
 
 // rules ត្រូវទទួលវាលនេះ បើអត់ ការសរសេរទៅធុងសំរាមត្រូវបដិសេធទាំងស្រុង
 const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));

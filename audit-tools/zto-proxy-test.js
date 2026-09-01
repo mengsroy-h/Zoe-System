@@ -526,8 +526,17 @@ queue.then(() => {
     const lookupStart = APP_SRC.indexOf('async function attemptAutoLookup(');
     const lookupEnd = APP_SRC.indexOf('\n    function openExchangeRateModal(', lookupStart);
     const lookupSource = lookupStart === -1 ? '' : APP_SRC.slice(lookupStart, lookupEnd);
-    ok('ផ្លូវស្កេនយក `code` ពី proxy', lookupSource.indexOf('lookupError.lookupCode = data && data.code') !== -1);
-    ok('ផ្លូវស្កេនយក `reason` ពី proxy', lookupSource.indexOf('lookupError.lookupReason = safeLookupReason(data && data.reason)') !== -1);
+    // ⛔ `lookupResponseError()` ជាអ្នកសាងកំហុស lookup **តែមួយ** — វាភ្ជាប់
+    //    `lookupCode`/`lookupReason` ទាំងផ្លូវដែលឆ្លងកាត់ `retryAsync()` និង
+    //    ផ្លូវឆ្លើយតបមិន ok។ ⚠️ ការអះអាងខាងក្រោមជា **ការវាស់ឈ្មោះ** ប៉ុណ្ណោះ;
+    //    ការវាស់ថាសាខាសារ **ឈានដល់បានពិត** នៅក្នុង
+    //    `lookup-failure-identity-test.js` (រត់កូដពិត)។
+    const errorBuilder = APP_SRC.indexOf('function lookupResponseError(') === -1 ? ''
+        : APP_SRC.slice(APP_SRC.indexOf('function lookupResponseError('), APP_SRC.indexOf('function lookupResponseError(') + 400);
+    ok('ផ្លូវស្កេនយក `code` ពី proxy', errorBuilder.indexOf('error.lookupCode = body && body.code') !== -1);
+    ok('ផ្លូវស្កេនយក `reason` ពី proxy', errorBuilder.indexOf('error.lookupReason = safeLookupReason(body && body.reason)') !== -1);
+    ok('⛔ ការឆ្លើយតបមិន ok ប្រើអ្នកសាងកំហុសដដែល (អត្តសញ្ញាណមិនបាត់)',
+        lookupSource.indexOf('throw lookupResponseError(out.res.status, data, false)') !== -1);
     ok('សារ ZTO_AUTH_EXPIRED ប្រាប់ឲ្យយក Cookie ថ្មី',
         lookupSource.indexOf("e.lookupCode === 'ZTO_AUTH_EXPIRED'") !== -1 && lookupSource.indexOf('Cookie ZTO ផុតកំណត់') !== -1);
     ok('សារ ZTO_CONFIG_INVALID មាន', lookupSource.indexOf("e.lookupCode === 'ZTO_CONFIG_INVALID'") !== -1);

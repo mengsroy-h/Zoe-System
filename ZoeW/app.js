@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.0';
+    const APP_VERSION = '2.25.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -644,9 +644,33 @@
 
     function retryAsync(fn, attempts, delayMs) {
         return fn().catch((err) => {
-            if (attempts <= 1) throw err;
+            if (attempts <= 1 || (err && err.noRetry)) throw err;
             return new Promise((resolve) => setTimeout(resolve, delayMs)).then(() => retryAsync(fn, attempts - 1, delayMs * 2));
         });
+    }
+
+    function lookupResponseError(status, body, retryable) {
+        const error = new Error('HTTP ' + status);
+        error.lookupCode = body && body.code ? String(body.code) : '';
+        error.lookupReason = safeLookupReason(body && body.reason);
+        if (!retryable) error.noRetry = true;
+        return error;
+    }
+
+    function markLookupTimeoutNoRetry(error) {
+        if (error && error.message === 'Auto lookup timed out') error.noRetry = true;
+        throw error;
+    }
+
+    function lookupFailureCooldownMs(kind) {
+        return kind === 'transient' ? AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS : AUTO_LOOKUP_FAIL_COOLDOWN_MS;
+    }
+
+    function lookupFailureIsDefinitive(error) {
+        const code = String(error && error.lookupCode || '');
+        if (code === 'ZTO_AUTH_EXPIRED' || code === 'ZTO_AUTH_NOT_CONFIGURED'
+            || code === 'ZTO_CONFIG_INVALID' || code === 'ZTO_PROXY_NOT_CONFIGURED') return true;
+        return /^HTTP (401|403)$/.test(error && error.message || '');
     }
 
     function retryTransientLookupResponse(out) {
@@ -654,8 +678,11 @@
         const code = String(out && out.body && out.body.code || '');
         if (code === 'ZTO_AUTH_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID'
             || code === 'ZTO_PROXY_NOT_CONFIGURED') return out;
+        if (code === 'ZTO_TIMEOUT') {
+            throw lookupResponseError(status, out && out.body, false);
+        }
         if (status === 408 || status === 425 || status === 429 || (status >= 500 && status <= 599)) {
-            throw new Error('HTTP ' + status);
+            throw lookupResponseError(status, out && out.body, true);
         }
         return out;
     }
@@ -3454,6 +3481,7 @@
     let pendingLookupUnlockBarcode = '';
     let pendingLookupUnlockResolve = null;
     const AUTO_LOOKUP_FAIL_COOLDOWN_MS = 30 * 1000;
+    const AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS = 6 * 1000;
     const AUTO_LOOKUP_FAILURE_MAX = 100;
     const LOOKUP_FOCUS_GRACE_MS = 250;
     const LOOKUP_MANUAL_FALLBACK_MS = 1800;
@@ -3651,10 +3679,13 @@
         }
 
         const lookupKey = String(barcode || '').trim().toUpperCase();
-        const failedAt = autoLookupFailureAt.get(lookupKey) || 0;
+        const failureRecord = autoLookupFailureAt.get(lookupKey);
+        const failedAt = (failureRecord && typeof failureRecord === 'object' ? failureRecord.at : failureRecord) || 0;
+        const failureCooldownMs = (failureRecord && typeof failureRecord === 'object' && failureRecord.ms)
+            || AUTO_LOOKUP_FAIL_COOLDOWN_MS;
         const failedElapsed = elapsedSince(failedAt);
-        if (failedElapsed < AUTO_LOOKUP_FAIL_COOLDOWN_MS) {
-            const waitSeconds = Math.max(1, Math.ceil((AUTO_LOOKUP_FAIL_COOLDOWN_MS - failedElapsed) / 1000));
+        if (failedElapsed < failureCooldownMs) {
+            const waitSeconds = Math.max(1, Math.ceil((failureCooldownMs - failedElapsed) / 1000));
             setLookupStatus(barcode, 'warn', '⏳ ' + lookupSource + ' ទើបខកខាន — សូមស្កេនម្ដងទៀតក្រោយ ' + waitSeconds + ' វិ.');
             return;
         }
@@ -3685,16 +3716,13 @@
 
             const out = await retryAsync(
                 () => fetchWithTimeout(targetUrl, { headers }, isZtoLookup ? ZTO_AUTO_LOOKUP_TIMEOUT_MS : AUTO_LOOKUP_TIMEOUT_MS, 'Auto lookup timed out',
-                    (r) => r.json().catch(() => null)).then(retryTransientLookupResponse),
+                    (r) => r.json().catch(() => null))
+                    .catch(markLookupTimeoutNoRetry)
+                    .then(retryTransientLookupResponse),
                 2, isZtoLookup ? 350 : 1500
             );
             const data = out.body;
-            if (!out.res.ok) {
-                const lookupError = new Error('HTTP ' + out.res.status);
-                lookupError.lookupCode = data && data.code ? String(data.code) : '';
-                lookupError.lookupReason = safeLookupReason(data && data.reason);
-                throw lookupError;
-            }
+            if (!out.res.ok) throw lookupResponseError(out.res.status, data, false);
             if (myGeneration !== customerDataTableSessionGeneration) return;
             if (data && data.error) throw new Error('Lookup rejected');
 
@@ -3718,7 +3746,10 @@
         } catch (e) {
             if (myGeneration !== customerDataTableSessionGeneration) return;
             autoLookupFailureAt.delete(lookupKey);
-            autoLookupFailureAt.set(lookupKey, Date.now());
+            autoLookupFailureAt.set(lookupKey, {
+                at: Date.now(),
+                ms: lookupFailureCooldownMs(lookupFailureIsDefinitive(e) ? 'definitive' : 'transient')
+            });
             while (autoLookupFailureAt.size > AUTO_LOOKUP_FAILURE_MAX) {
                 autoLookupFailureAt.delete(autoLookupFailureAt.keys().next().value);
             }
@@ -3735,8 +3766,10 @@
                     + (e.lookupReason ? ' — ជាប់ត្រង់ ' + e.lookupReason : ''));
             } else if (e && e.lookupCode === 'ZTO_RATE_LIMITED') {
                 setLookupStatus(barcode, 'error', '🚦 ZTO កំណត់ល្បឿន — សូមរង់ចាំបន្តិច ហើយស្កេនម្ដងទៀត');
-            } else if (e && (e.lookupCode === 'ZTO_TIMEOUT' || e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE')) {
+            } else if (e && e.lookupCode === 'ZTO_TIMEOUT') {
                 setLookupStatus(barcode, 'error', '⏱️ ZTO ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
+            } else if (e && e.lookupCode === 'ZTO_UPSTREAM_UNAVAILABLE') {
+                setLookupStatus(barcode, 'error', '📡 ZTO ឆ្លើយមិនចេញ — សូមស្កេនម្ដងទៀត');
             } else if (e && /^HTTP (401|403)$/.test(e.message || '')) {
                 setLookupStatus(barcode, 'error', '🔒 ' + lookupSource + ' Secret មិនត្រឹមត្រូវ ឬផុតកំណត់');
             } else {
@@ -3778,7 +3811,7 @@
 
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
     const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
-    const EIGHT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const ABANDON_AGE_MS = 7 * 24 * 60 * 60 * 1000;
     const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
     const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
     let sessionExpiryCheckInFlight = false;
@@ -4479,7 +4512,7 @@
             }
             let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
-            if (!item.isClosed && (currentTime - itemTimestamp > EIGHT_DAYS_MS)) {
+            if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS)) {
                 claimAndCleanupItem(item.id, 'abandon');
                 return;
             }
@@ -4561,7 +4594,7 @@
                 const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
                 if (reason === 'abandon') {
-                    if (currentItem.isClosed || (getServerNow() - ts) <= EIGHT_DAYS_MS) return currentItem;
+                    if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
 
                     if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
                         const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
@@ -9982,7 +10015,7 @@
         let html = '';
         groups.slice(0, DELETED_LIST_MAX_ROWS).forEach((group) => { html += trashGroupRowHtml(group); });
         if (groups.length > DELETED_LIST_MAX_ROWS) {
-            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)</td></tr>`;
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ផុតកំណត់ ៧ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)</td></tr>`;
         }
         tbody.innerHTML = html;
     }

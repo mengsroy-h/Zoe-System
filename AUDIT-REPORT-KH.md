@@ -1,177 +1,179 @@
 # របាយការណ៍ Deep Audit — Zoe System
 
-កាលបរិច្ឆេទ៖ 2026-08-31  
-កំណែ ZoeW៖ **2.24.0** (`zoew-v139`)  
-វិសាលភាព៖ ZoeW, ZoeKeyGen, Firebase rules, Netlify Function, Service Worker,
-ZTO lookup, Firebase backup និង audit-tools ទាំងមូល។
+កាលបរិច្ឆេទ៖ 2026-09-01
+កំណែ៖ **ZoeW 2.25.1** (`zoew-v148`) · **ZoeKeyGen 2.19.16** (`zoekeygen-v86`)
+វិសាលភាព៖ ZoeW · ZoeKeyGen · Firebase rules · Netlify Function (ZTO) ·
+Service Worker · ច្បាប់លុប/ដក · ច្បាប់សម្អាតស្វ័យប្រវត្តិ · បណ្តាញ ·
+សុវត្ថិភាព · និង audit-tools ទាំងមូល។
 
-## សេចក្តីសន្និដ្ឋាន
+---
 
-- កែ bug អាជីវកម្ម **off-by-one មួយថ្ងៃ**៖ «ថ្ងៃទី ៨» តាមន័យ
-  **លើស ៧×២៤ ម៉ោង**។ កូដមុនរង់ចាំលើស ៨×២៤ ម៉ោង។ ឥឡូវនៅ ៧ថ្ងៃគត់
-  មិនទាន់ដក; លើស ៧ថ្ងៃទើបដក។
-- បន្ថែមច្បាប់ថ្មី៖ ធាតុ `trashReason: expired` លុបអចិន្ត្រៃយ៍ក្រោយ
-  **នៅក្នុងធុងសំរាមលើស ២ថ្ងៃ**; `delete`, `remove`, `pickup` និង legacy
-  នៅតែ **៣០ថ្ងៃ**។
-- កែ ZTO proxy ឱ្យស្គាល់ Cookie/token ផុតកំណត់ ទាំង JSON error, HTTP
-  401/403, redirect ទៅ login និង HTML login page; បែងចែក timeout, rate-limit,
-  auth មិនបានកំណត់ និង upstream error។
-- ដក dependency tree `firebase-admin` ដែលមាន security advisories ចេញពី
-  backup tool។ Backup ឥឡូវប្រើ Node 18 native OAuth/REST, timeout/retry,
-  atomic file, permission 0600 និង run lock។ `npm audit` = **0 vulnerability**។
-- `audit-tools/run-all.sh` ចប់ដោយ exit code 0៖ **83 full pass · 12 partial pass ·
-  23 skipped · 0 fail**។ ចំណុចដែលរំលងមានពន្យល់ក្នុងផ្នែកកម្រិតតេស្តខាងក្រោម។
+## សេចក្តីសន្និដ្ឋានខ្លី
 
-## ច្បាប់ Barcode និងស្ថិតិដែលបានផ្ទៀងផ្ទាត់
+សំណុំ audit ចាប់ផ្តើមជុំនេះដោយ **បៃតងទាំង ១១៦** — ហើយកំហុសពិត **២ ថ្នាក់**
+រស់នៅក្នុងចន្លោះដែលឧបករណ៍មិនមើល។ នេះជាភស្តុតាងផ្ទាល់នៃច្បាប់ទី ១៣
+(«ការកត់ត្រាមិនមែនជាការអនុវត្ត») ៖ **បៃតងមិនមែនជាភស្តុតាងនៃភាពត្រឹមត្រូវទេ —
+វាជាភស្តុតាងថាអ្វីដែលឧបករណ៍មើល នៅត្រឹមត្រូវ។**
 
-| ផ្លូវ | ពេលចូលធុងសំរាម | ស្លាក | ប៉ះស្ថិតិពេលចេញ? | ពេលស្តារ | Retention |
-|---|---:|---|---|---|---:|
-| លុបកញ្ចប់ដោយដៃ / លុបទាំងអស់ | ភ្លាម | `delete` | **មិនដក** | **មិនបូក** | 30ថ្ងៃ |
-| Barcode ដែលអតិថិជនយករួច | លើស 2ម៉ោងពី `closedAt` | `pickup` | **មិនដក** | **មិនបូក** | 30ថ្ងៃ |
-| ដក Barcode ដោយដៃ | ភ្លាម | `remove` | **ដក 1ដង** | បូកត្រឡប់ **1ដង** | 30ថ្ងៃ |
-| Barcode មិនទាន់យក ចូលថ្ងៃទី8 | លើស 7×24ម៉ោងពី `createdAt` | `expired` | **ដក 1ដង** | បូកត្រឡប់ **1ដង** | **2ថ្ងៃ** |
+| | មុនជុំនេះ | ក្រោយជុំនេះ |
+|---|---|---|
+| checker បៃតងពេញលេញ | 116 | **119** |
+| មួយផ្នែក / រំលង | 1 / 1 | **0 / 0** |
+| កំហុសដែលឃើញដោយអ្នកប្រើ | **២** | 0 |
+| បៃតងក្លែងក្លាយដែលបានបិទ | — | **២** |
 
-ច្រកទ្វារលុយគឺ `barcode.isDeducted`៖
+---
 
-- `delete` និង `pickup` មិនកំណត់វាជា `true` ដូច្នេះ restore មិនបូកស្ទួន។
-- `remove` និង `expired` កំណត់វាជា `true` បន្ទាប់ពីដក; restore បូកតែ
-  barcode ដែលមានត្រានេះ រួច reset ទៅ `false`។
-- កញ្ចប់លាយ barcode បិទ/មិនបិទ៖ ច្បាប់ 2ម៉ោងយកតែ barcode បិទ;
-  ច្បាប់ថ្ងៃទី8 ដកតែ barcode មិនទាន់បិទ។ តម្លៃ COD/DOD/count ត្រូវគណនាឡើងវិញ
-  ក្នុង transaction មិនយក state ចាស់ក្នុង memory ទៅសរសេរជាន់។
-- Restore barcode `expired` ដែលនៅក្នុងបង្អួច 2ថ្ងៃ reset `createdAt` ទៅម៉ោង
-  server ដូច្នេះវាមិនលោតចូលធុងសំរាមវិញភ្លាម។
-- បើការសរសេរធុងសំរាមបរាជ័យក្រោយដកស្ថិតិ កូដ compensation បូកស្ថិតិវិញ
-  ហើយព្យាយាមស្តារធាតុទៅប្រវត្តិ។
+## ១. ⛔ ស្លាកធុងសំរាមកុហកអំពីច្បាប់ ៧ ថ្ងៃ (កំហុសដែលអ្នកប្រើឃើញ)
 
-## ព្រំដែន Cleanup
+**អ្វីដែលរកឃើញ** — កំណែ 2.24.0 ប្តូរច្បាប់ «បោះបង់» ពី ៨ ➜ **៧ ថ្ងៃ**
+(`const EIGHT_DAYS_MS = 7 * 24 * 60 * 60 * 1000;`) តែ **ស្លាកមិនបានប្តូរតាម**៖
 
-| ព្រំដែន | លទ្ធផលដែលបានចាក់សោដោយតេស្ត |
+| កន្លែង | អត្ថបទមុនកែ | ច្បាប់ពិត |
+|---|---|---|
+| `index.html` ចំណងជើងធុងសំរាម | «ផុតកំណត់ **៨ថ្ងៃ**៖ ២ ថ្ងៃ» | ៧ ថ្ងៃ |
+| `renderRecentlyDeleted()` សារ «ជួរទៀត» | «ផុតកំណត់ **៨ថ្ងៃ**៖ ២ ថ្ងៃ» | ៧ ថ្ងៃ |
+
+**ហេតុអ្វី checker មិនចាប់** — `trash-modal-test.js` ចាក់តួអក្សរ `៨` ជា
+**literal** ក្នុងការអះអាង ➜ វា **ចាក់សោអត្ថបទដែលកុហក**។ ហើយការស្កេន
+«គ្មានលេខថ្ងៃចាស់សល់» ប្រើ regex ដែលទាមទារ **ចន្លោះ** (`៨ ថ្ងៃ`) ➜
+«៨ថ្ងៃ» (គ្មានចន្លោះ) **រអិលកាត់ទាំងស្រុង**។
+
+**ការកែ** — ស្លាកទាំង ២ ➜ «ផុតកំណត់ **៧ថ្ងៃ**៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ»;
+ថេរ `EIGHT_DAYS_MS` (ដែលផ្ទុក ៧ ថ្ងៃ) ➜ ប្តូរឈ្មោះជា **`ABANDON_AGE_MS`**;
+`trash-modal-test.js` ឥឡូវ **អានចំនួនថ្ងៃចេញពីថេរ** ហើយស្កេនទម្រង់ **ទាំង ២**។
+
+> ℹ️ **សំណួរសម្រាប់អ្នកប្រើ** ៖ របាយការណ៍ជុំមុនហៅច្បាប់នេះថា «ថ្ងៃទី ៨»
+> (មានន័យថា *លើស* ៧×២៤ ម៉ោង) ចំណែកសំណើជុំនេះហៅវាថា «៧ ថ្ងៃ»។ ខ្ញុំបានជ្រើស
+> **«៧ថ្ងៃ»** ព្រោះវាត្រូវនឹងថេរ និងត្រូវនឹងពាក្យរបស់អ្នក។ បើអ្នកចង់បាន
+> ពាក្យ «៨ថ្ងៃ» វិញ សូមប្រាប់ — ត្រូវប្តូរ **ស្លាក និងការរំពឹងទុករបស់ checker
+> ជាមួយគ្នា** (ឥឡូវវាចងភ្ជាប់គ្នារួចហើយ)។
+
+---
+
+## ២. ⛔ សារបរាជ័យរបស់ ZTO Lookup មិននិយាយការពិត (បៃតងក្លែងក្លាយពិត)
+
+**អ្វីដែលរកឃើញ** — `retryTransientLookupResponse()` បោះ
+`new Error('HTTP ' + status)` **ទទេ** ➜ `lookupCode` របស់ proxy បាត់ក្នុង
+`retryAsync()` ➜ សាខាសារ **៣** ក្លាយជា **កូដងាប់ដែលមិនអាចឈានដល់បាន**។
+
+វាស់បានលើកូដពិត (`origin/main`)៖
+
+| ចម្លើយពី proxy | អ្វីអ្នកប្រើឃើញមុនកែ | ក្រោយកែ |
+|---|---|---|
+| 429 `ZTO_RATE_LIMITED` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | **🚦 ZTO កំណត់ល្បឿន** |
+| 504 `ZTO_TIMEOUT` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | **⏱️ ZTO ឆ្លើយតបយឺតពេក** |
+| 502 `ZTO_UPSTREAM_UNAVAILABLE` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | **📡 ZTO ឆ្លើយមិនចេញ** |
+
+**ហេតុអ្វី checker មិនចាប់** — `zto-proxy-test.js` (assertion **១៣០**,
+បៃតងទាំងអស់) អះអាងត្រឹម
+`lookupSource.indexOf("e.lookupCode === 'ZTO_RATE_LIMITED'") !== -1` ➜
+ការវាស់ថា **អក្សរមានក្នុងឯកសារ** មិនមែនថា **សាខានោះរត់**។
+នេះជាមេរៀន «ស្តាទិចចាក់សោ *ឈ្មោះ*; ឥរិយាបថចាក់សោ *លទ្ធផល*» ក្នុងទម្រង់ថ្មី។
+
+**ឧបករណ៍ថ្មី** — **`lookup-failure-identity-test.js`** (៣១ assertion;
+ធ្លាក់ **១១** លើ `origin/main`) រត់ `attemptAutoLookup()` **ពិត** ក្នុង `vm`
+រួច **អានអត្ថបទស្ថានភាពដែលអ្នកប្រើឃើញ**។
+
+---
+
+## ៣. ល្បឿន ៖ ការស្កេនលែងជាប់ ៤០ វិនាទីលើតំណដែលព្យួរ
+
+ការផុតកំណត់ ២០ វិនាទីរបស់ App ត្រូវ **ព្យាយាមឡើងវិញ** ➜ សរុប **~៤០ វិនាទី**
+ខណៈសោ `autoLookupInFlight` ជាប់។ ពិដានស្លុតមាន **២** ➜ កញ្ចប់ ២ ដែលព្យួរ
+**បិទការស្វែងរកទាំងអស់** អស់រយៈពេលនោះ។ ការព្យាយាមនោះក៏គ្មានប្រយោជន៍ដែរ —
+proxy មានថវិកាពេល និងការព្យាយាមខាងក្នុងរបស់វារួចហើយ។
+
+| រង្វាស់ | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| តំណព្យួរ ➜ ការរង់ចាំអាក្រក់បំផុត | **~៤០ វិ.** | **~២០ វិ.** |
+| cooldown ក្រោយបញ្ហាបណ្តោះអាសន្ន | ៣០ វិ. | **៦ វិ.** |
+| cooldown ក្រោយ Cookie ផុត / Config ខុស | ៣០ វិ. | **៣០ វិ. (ដដែល)** |
+
+⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ បណ្តាញញ័រពិត · **429** · 5xx · 504 ទទេ
+**នៅតែព្យាយាមឡើងវិញដដែល**។ ការ retry លើ 429 ជា **សេចក្តីសម្រេចដោយចេតនា
+ពីជុំមុន** ហើយ `lookup-prefetch-test.js` ចាក់សោវា — ជុំនេះ **មិនដកវាវិញទេ**
+ព្រោះគ្មានការវាស់ពី ZTO ពិតដែលបញ្ជាក់ថាការមិន retry ល្អជាង។
+
+---
+
+## ៤. ✅ ច្បាប់លុប/ដក និងច្បាប់សម្អាត — ផ្ទៀងផ្ទាត់រួច គ្មានការឃ្លាត
+
+ច្បាប់ដែលកូដអនុវត្តពិត **ត្រូវនឹងអ្វីដែលអ្នកប្រើសរសេរបេះបិទ**៖
+
+| ច្បាប់ | ថេរ | តម្លៃ |
+|---|---|---|
+| barcode បិទ «យក» ➜ ធុងសំរាម | `TWO_HOURS_MS` | **២ ម៉ោង** |
+| មិនទាន់យក ➜ `expired` (**ដកលុយ**) | `ABANDON_AGE_MS` | **៧ ថ្ងៃ** |
+| `expired` ក្នុងធុងសំរាម ➜ purge | `EXPIRED_TRASH_RETENTION_MS` | **២ ថ្ងៃ** |
+| ប្រភេទផ្សេងក្នុងធុងសំរាម ➜ purge | `TRASH_RETENTION_MS` | **៣០ ថ្ងៃ** |
+
+**ការផ្ទៀងផ្ទាត់ចំពោះលុយ** — រត់ rules **ពិត** លើ **RTDB emulator ពិត**៖
+
+- `emu/crud-rules-flow.js` — **៤៤ ok, ០ fail** ៖ «ដក» ➜ `isDeducted: true`
+  (ដកលុយ); «លុប» ➜ **មិនដកលុយ**; ការស្តារ ➜ បូកត្រឡប់។
+- `emu/restore-deadlock-test.js` — **១២ ok, ០ fail** ៖ fence ប្រឆាំង replay
+  នៅដដែល ➜ **លុយមិនបូកស្ទួន**។
+
+**Mutation testing លើតំបន់លុយ ៧ ដង ➜ ចាប់បានទាំង ៧** (គ្មានបៃតងក្លែងក្លាយ)៖
+
+| Mutation | អ្នកចាប់ |
 |---|---|
-| 2ម៉ោងគត់ | មិនទាន់ផ្លាស់; **លើស** 2ម៉ោងទើប `pickup` |
-| 7×24ម៉ោងគត់ | មិនទាន់ដក; **លើស** 7ថ្ងៃទើបចូលថ្ងៃទី8 និង `expired` |
-| `expired` 2ថ្ងៃគត់ក្នុងធុង | មិនទាន់ purge; **លើស** 2ថ្ងៃទើប purge |
-| ប្រភេទផ្សេង 30ថ្ងៃគត់ | មិនទាន់ purge; **លើស** 30ថ្ងៃទើប purge |
+| `expired` រក្សា ៣០ ថ្ងៃ (មិនគោរព ២ ថ្ងៃ) | `trash-modal-test` · `expired-trash-retention-test` |
+| «ដក» មិនដកលុយ | `policy-test` |
+| ការស្តារមិន reset `isDeducted` | `policy-test` |
+| «លុប» ដកលុយ | `policy-test` |
+| ផ្លូវ ២ ម៉ោង (យករួច) ដកលុយ | `partial-pickup-cleanup-test` |
+| ច្បាប់ ៧ ថ្ងៃប៉ះកញ្ចប់ដែលបិទរួច | `partial-pickup-cleanup-test` |
+| ច្បាប់ ៧ ➜ ៨ ថ្ងៃស្ងាត់ៗ | `trash-modal-test` · `partial-pickup-cleanup-test` |
 
-Cleanup ដែលបំផ្លាញទិន្នន័យមិនរត់តាម `Date.now()` របស់ទូរស័ព្ទទេ។ វាទាមទារ
-Firebase `.info/connected` និង server-time offset ដែលបាន handshake។ ពេល offline
-ឬនាឡិកាមិនទាន់ទុកចិត្តបាន វាពន្យារ; ពេល reconnect វារត់វិញ។ Active restore
-claim ទប់ purge ហើយ stale claim ត្រូវដោះមុន purge/ដោះ barcode registry។
+⚠️ **ព្រំដែននៃការគ្រប** ៖ mutation នីមួយៗត្រូវចាប់ដោយ checker **១ ឬ ២**
+ប៉ុណ្ណោះ — មិនមែនដោយសំណុំទាំងមូលទេ។ ដូច្នេះការលុប checker ណាមួយក្នុងតារាង
+នេះ = ការបើករន្ធ។
 
-## Network, Firebase និង Service Worker
+---
 
-បានពិនិត្យ/តេស្តផ្លូវខាងក្រោម៖
+## ៥. ✅ បណ្តាញ · ការតភ្ជាប់ឡើងវិញ · Service Worker — គ្មានចន្លោះថ្មី
 
-- online ↔ offline transition និង toast មិនប្រកាសថា sync រួចមុន listener
-  សំខាន់ៗមកដល់។
-- Firebase SDK load retry ladder, reconnect watchdog, listener generation fence,
-  failed-listener retry និង pending-key consistency។ Listener ចាស់មិនអាចសរសេរ
-  state ក្រោយ config/session ថ្មី។
-- DB operation ដែល Firebase ទុក pending ពេល offline មាន timeout; in-flight lock
-  ត្រូវបានដោះ ដើម្បីកុំឱ្យ App ជាប់រហូត។
-- history patch ដែលដាច់ពេលចេញទៅ phone app ចូល retry queue; permission-denied
-  នៅតែ rollback មិន retry ឥតកំណត់។
-- Service Worker cache version បាន bump ទៅ `zoew-v139`; Netlify Functions នៅ
-  network-only, abort signal ត្រូវបន្ត, Cache API ខូចមិនធ្វើឱ្យ App មិនអាចបើក,
-  និង static shell អាចប្រើ offline។
-- Lookup មាន in-flight cap, failure cooldown, timeout + abort, transient retry,
-  preconnect/warm-up និង memory cache; request ចាស់មិនអាចបំពេញ modal របស់
-  barcode ថ្មី។
+| តំបន់ | ការវាស់ |
+|---|---|
+| listener ស្ទួន | `initDatabaseListeners()` និង `attachInfoListeners()` **detach មុន** បូក generation fence; setup function នីមួយៗហៅ **តែម្តង** |
+| listener ដែលងាប់តែឯង | `dbListenerFailedPaths` · `infoListenerFailedPaths` ដំណើរការ (`connection-recovery-test` ១៧១) |
+| ការភ្ជាប់ឡើងវិញ | `forceDatabaseReconnect()` មានពិដានឆ្លងកាត់ `elapsedSince()` (រស់រានពីនាឡិកាថយក្រោយ) |
+| បណ្តាញ «ភ្ជាប់តែស្លាប់» | `timedFetch()` ក្នុង `sw.js` · `fetchWithTimeout()` ក្នុង App (`stall-guard-test` ១៩) |
+| Cache API បរាជ័យ | `networkOnly()` ភ្ជាប់ **៣ កន្លែង** (`sw-cache-failure-test` ២១) |
+| `/.netlify/functions/` | `networkOnly` — ⛔ ការស្វែងរក ZTO **មិនដែលចូល cache របស់ SW** |
 
-## ZTO Lookup និងជម្រើសក្រៅ Cookie
+---
 
-Proxy គាំទ្រ credential តាមលំដាប់អាទិភាព៖
+## ៦. ✅ សុវត្ថិភាព — គ្មានការលេចធ្លាយថ្មី
 
-1. `ZTO_AUTHORIZATION` — header ពេញ (ឧ. `Bearer …`)។ ជម្រើសល្អបំផុតបើ
-   ZTO ផ្តល់ API token/OAuth ជាផ្លូវការ។
-2. `ZTO_TOKEN` + `ZTO_TOKEN_HEADER` — សម្រាប់ token/header ផ្លូវការរបស់ ZTO។
-3. `ZTO_COOKIE` — fallback បច្ចុប្បន្ន ដែលអស់សុពលភាពតាម session។
+| តំបន់ | ការវាស់ |
+|---|---|
+| ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene` **១០២ assertion** បៃតង |
+| XSS ក្នុង HTML sink | `html-sink-escaping` · `inline-handler-xss` · `csp-enforced` បៃតង |
+| ស្ថានភាព Lookup | `setLookupStatus()` ប្រើ **`textContent`** — មិនមែន `innerHTML` |
+| `reason` ពី proxy | ឆ្លងកាត់ `safeLookupReason()` (allowlist `[A-Za-z0-9_.:@-]{1,80}`) |
+| ការបំពេញលេខ/COD/DOD | សរសេរចូល `input.value` — គ្មានផ្លូវចូល HTML |
+| `?diag=1` របស់ proxy | ឆ្លើយ **ឈ្មោះ** header ប៉ុណ្ណោះ — **គ្មានតម្លៃសម្ងាត់** |
+| Proxy key | ប្រៀបធៀបដោយ `crypto.timingSafeEqual` |
 
-`ZTO_PROXY_KEY` នៅតែជាច្រកការពាររវាង ZoeW និង Netlify Function។ Credential
-ទាំងនេះត្រូវដាក់ក្នុង Netlify environment variables ហើយសម្គាល់ជា secret;
-កុំដាក់ក្នុង repository ឬ JavaScript ខាង browser។ Netlify បញ្ជាក់ថា Functions
-អាចអាន secret environment variables ខាង server និង Secrets Controller អាចធ្វើ
-ឱ្យវា write-only/កំណត់ scope៖
+---
 
-- https://docs.netlify.com/build/functions/environment-variables/
-- https://docs.netlify.com/build/environment-variables/secrets-controller/
+## ៧. សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-### តើ Netlify អាច login `argus.ztoglobal.com` ជំនួស Cookie បានទេ?
+**គ្មាន។** Firebase rules មិនប្រែ · CSP មិនប្រែ · environment variable មិនប្រែ។
+គ្រាន់តែ deploy។
 
-**មិនគួរប្រើជាផ្លូវ production។** ZoeW/Netlify domain មិនអាចអាន Cookie
-HttpOnly/secure របស់ `argus.ztoglobal.com` ពី browser របស់ភ្នាក់ងារបានទេ ព្រោះ
-same-origin boundary។ អាចសរសេរ headless-browser bot ខាង server ឱ្យវាយ username/
-password ប៉ុន្តែវា៖
+---
 
-- ត្រូវរក្សាពាក្យសម្ងាត់ ZTO និងអាចជាប់ CAPTCHA/MFA/device verification;
-- ពឹងលើ DOM/login flow មិនបានចងក្រងជាសាធារណៈ ហើយអាចខូចពេល ZTO កែ UI;
-- អាចផ្ទុយនឹងគោលការណ៍ប្រើប្រាស់ ZTO និងនៅតែបង្កើត session ដែលផុតកំណត់។
+## ៨. អ្វីដែលនៅត្រូវការការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
-ដំណោះស្រាយរឹងមាំគឺស្នើ ZTO សម្រាប់ **official API token, OAuth client,
-service account ឬ partner API**។ កូដកំណែនេះត្រៀមទទួល Authorization/token រួច។
-បើ ZTO មិនផ្តល់វិធីនោះ ត្រូវរក្សា Cookie rotation ជា fallback។
-
-## Security Audit
-
-- Secret scan 102 assertions pass; មិនរកឃើញ service-account key, `.env`,
-  private key ឬ credential ពិតក្នុង archive។ `config.json`, `secrets/`, backup
-  output និង logs ស្ថិតក្នុង `.gitignore`។
-- XSS sinks ប្រើ `sanitizeInput()` ឬ `textContent`; inline-handler/XSS guards,
-  HTML sink escaping និង CSP structure pass។ CSP បិទ object/embed, base hijack,
-  cross-origin frame និងកំណត់ connect origins។
-- Netlify proxy ផ្ទៀងផ្ទាត់ proxy key ដោយ timing-safe compare, validate barcode,
-  មិន forward header គ្រោះថ្នាក់, មិនបញ្ចេញ upstream payload និងមាន
-  `no-store`, `nosniff`, `DENY`, `no-referrer`។
-- Firebase backup កំណត់ OAuth token endpoint ទៅ Google HTTPS host និង Database
-  URL ទៅ Firebase RTDB root ដើម្បីទប់ credential exfiltration/SSRF។ Private key
-  ចុះហត្ថលេខា JWT ក្នុង memory; access token បញ្ជូនតាម Authorization header
-  មិននៅក្នុង URL/log។ Firebase ពន្យល់ OAuth service-account REST flow ផ្លូវការ៖
-  https://firebase.google.com/docs/database/rest/auth
-- Runtime dependency audit របស់ backup tool៖ **0 info · 0 low · 0 moderate ·
-  0 high · 0 critical**។
-
-### ហានិភ័យស្ថាបត្យកម្មដែលមិនគួរកែស្ងាត់ៗ
-
-Operational Firebase rules អនុញ្ញាត read/write ដល់ `auth != null` លើ data nodes។
-វាសុវត្ថិភាពតែបើ **មួយ Firebase project ក្នុងមួយអាជីវកម្ម** និង Admin គ្រប់គ្រង
-account issuance យ៉ាងតឹង។ បើមានអាជីវកម្មច្រើនក្នុង project តែមួយ ឬអ្នកណាក៏អាច
-បង្កើត Firebase Auth account បាន នោះ authenticated user ម្នាក់អាចឃើញ/កែ data
-រួម។ ការកែត្រឹមត្រូវត្រូវការជម្រើស deployment មួយ៖ UID allowlist, custom claims/
-tenant path ឬ trusted backend។ Rules មិនត្រូវបានប្តូរក្នុងជុំនេះ ដើម្បីកុំ lock
-អ្នកប្រើ production ដោយគ្មានបញ្ជី UID/role ដែលបានបញ្ជាក់។
-
-## ភស្តុតាងតេស្ត
-
-- Function inventory៖ ZoeW **519 top-level + 32 named nested + 1,149
-  function/callback nodes + 99 routes**; ZoeKeyGen **114 + 5 + 265 + 20 routes**;
-  helper/server **286 nodes ក្នុង 14 files**។ គ្មាន function declaration ស្ទួន
-  ឬ UI action ដែលចង្អុលទៅ function អវត្តមាន។
-- Business rules៖ `policy-test`, `partial-pickup-cleanup-test` (50),
-  `expired-trash-retention-test` (11), `trash-modal-test` (58), restore/clear
-  races និង revenue fuzz pass។
-- Network៖ connection recovery (171), reconnect ladder (21), lookup prefetch
-  (141), lookup freshness (131), stall/timeout/SW/listener suites pass។
-- Security៖ secret hygiene (102), HTML sinks (9), dependency security (11),
-  Firebase backup (28), schema/rules/static CSP suites pass។
-- Meta-audit៖ checker coverage **16/16**; checker ទាំង 109 អាចចង្អុលទៅ tree
-  ផ្សេង និងធ្លាក់លើ tree ទទេ ដូច្នេះ “បៃតង” មិនមែន checker ទទេ។
-- Test ថ្មីទាំងពីរធ្លាក់លើ baseline មុនកែ៖ baseline គ្មាន retention 2ថ្ងៃ និង
-  នៅតែពឹង `firebase-admin` ចាស់។
-
-### កម្រិតនៃបរិស្ថានតេស្តនេះ
-
-ម៉ាស៊ីន audit មិនមាន Chromium binary និង Firebase RTDB emulator កំពុងរត់។ ដូច្នេះ
-23 browser/emulator checks រំលង និង 12 checks រត់ផ្នែក static/VM តែប៉ុណ្ណោះ។
-CI ដែលមាន Chromium + emulator ត្រូវរត់ម្តងទៀតមុន production deploy; ក្នុង CI
-`CRUD_FLOW_STRICT=1` ធ្វើឱ្យ emulator skip ក្លាយជា fail។ កុំបកស្រាយ exit 0 នៃ
-ម៉ាស៊ីននេះថាបានធ្វើ real-device iPhone/Android និង live Firebase test រួច។
-
-## សកម្មភាព Deploy
-
-1. Deploy `ZoeW` static files និង Netlify Function ថ្មី។
-2. នៅ Netlify កំណត់ `ZTO_PROXY_KEY` និង auth មួយក្នុងចំណោម
-   `ZTO_AUTHORIZATION` / `ZTO_TOKEN` / `ZTO_COOKIE` ជា secret; redeploy ក្រោយកែ env។
-3. មិនត្រូវ Publish Firebase rules សម្រាប់ជុំនេះទេ — rules មិនបានប្តូរ។
-4. ម៉ាស៊ីន `firebase-backup` ត្រូវ Node.js 18+; `npm install` លែងចាំបាច់។
-5. មុន production សាក staging៖ barcode បិទ >2h, barcode open នៅ 7ថ្ងៃគត់,
-   open >7ថ្ងៃ, restore ម្តង និង expiry-trash >2ថ្ងៃ ដោយប្រើ Firebase server time។
+1. **ស្កេនកញ្ចប់ ១០–១៥ ជាប់ៗគ្នា** ➜ ល្បឿនត្រូវដដែល ឬលឿនជាង។
+2. ⛔ **ស្កេនលើ WiFi ដែល «ភ្ជាប់តែគ្មានអ៊ីនធឺណិត»** ➜ សារបរាជ័យត្រូវមក
+   ក្នុង **~២០ វិនាទី** (មិនមែន ~៤០) ហើយ **ការស្កេនម្ដងទៀតបានក្នុង ៦ វិនាទី**។
+3. **បើក «🗑️ ធុងសំរាម»** ➜ ចំណងជើងត្រូវសរសេរ «ផុតកំណត់ **៧ថ្ងៃ**៖ ២ ថ្ងៃ ·
+   ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ»។
+4. ⛔ **ច្បាប់លុប/ដក និងស្ថិតិមិនត្រូវប្រែសោះ** — «ដក» ➜ លុយថយ; ស្តារ ➜
+   លុយបូកមកវិញ **១ ដងគត់**; «លុប» ➜ លុយមិនប្រែ។
+5. **Refresh** ➜ ត្រូវឃើញ `2.25.1` (ZoeW) និង `2.19.16` (ZoeKeyGen)។

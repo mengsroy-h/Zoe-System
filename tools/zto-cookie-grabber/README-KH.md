@@ -55,6 +55,29 @@ extension។
 | `!` ទឹកក្រូច | Cookie ចូលរួច តែ **deploy មិនបានចាប់ផ្តើម** (ឧ. `ZTO_COOKIE_TRIGGER_DEPLOY=0`) |
 | `X` ក្រហម | ធ្លាក់ — យកកណ្តុរដាក់លើរូប ដើម្បីអានមូលហេតុពិត |
 
+### ⛔ `No cookie access for ztoglobal.com`
+
+Chrome/Edge អាច **ទប់ (withhold) សិទ្ធិ host ដែលប្រកាសក្នុង manifest** ហើយ
+`chrome.cookies.getAll()` ត្រឡប់ **បញ្ជីទទេជំនួសកំហុស** ➜ ការធ្លាក់ស្ងាត់។
+វាស់បានលើ Edge ពិត (2026-09-01) ៖ ទំព័រ Argus មាន `BOS-MAN-SESSION` ក្នុង
+DevTools ➜ Application ➜ Cookies ខណៈ extension ឃើញ **សូន្យទាំង ៣ ការសួរ**។
+
+ដូច្នេះ `options.js` សុំសិទ្ធិ **`argus.ztoglobal.com` និង `aargus-api.ztoglobal.com`
+ដោយច្បាស់លាស់** ពេលចុច Save (កន្លែងដែលមាន user gesture) បន្ថែមលើ host របស់
+Netlify site។ ➜ **ដំណោះស្រាយ ៖ បើក Options ➜ ចុច Save ➜ Allow**។
+
+⛔ **កុំដក `chrome.permissions.request` នោះចេញ** ដោយយល់ថា manifest គ្រប់គ្រាន់ —
+manifest **មិនធានាថាសិទ្ធិត្រូវបានផ្តល់ទេ**។
+
+### មូលហេតុផ្សេងទៀតដែល `background.js` បែងចែកឥឡូវនេះ
+
+| សារ | មូលហេតុពិត |
+|---|---|
+| `No cookie access for ztoglobal.com` | សិទ្ធិត្រូវទប់ ➜ Options ➜ Save ➜ Allow |
+| `No Argus cookie in this browser profile (N cookie stores)` | Argus បើកក្នុង profile ផ្សេង ➜ បើកវាក្នុង profile ដដែល |
+| `No Argus cookie found` | សិទ្ធិគ្រប់ · profile ត្រូវ ➜ ពិតជាមិនទាន់ login |
+| `... [https://... -> <error>]` | `chrome.cookies` បោះកំហុសពិត — អត្ថបទរបស់វាភ្ជាប់មកជាមួយ |
+
 ⚠️ **Deploy ត្រូវការពេល ១–២ នាទី** ទំរាំ Cookie ថ្មីមានប្រសិទ្ធភាពលើ site។
 
 ---

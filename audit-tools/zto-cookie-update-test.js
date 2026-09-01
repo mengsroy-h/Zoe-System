@@ -362,6 +362,17 @@ scenario('Chrome extension ៖ សិទ្ធិតូចបំផុត និ
         !/ZTO_COOKIE_UPDATE_KEY\s*=\s*['"][^'"]+['"]/.test(bg) && /chrome\.storage\.local/.test(bg));
     ok('ប្រើ text/plain ➜ គ្មាន preflight',
         /text\/plain/.test(bg) && !/Authorization:/.test(bg));
+
+    // Chrome can withhold a manifest host permission; chrome.cookies then
+    // returns [] instead of throwing, so the extension must ask for it where a
+    // user gesture exists, and must not blame "not logged in" when it is absent.
+    const opts = fs.readFileSync(path.join(EXT_DIR, 'options.js'), 'utf8');
+    ok('⛔ Options សុំសិទ្ធិ cookie របស់ ZTO ដោយច្បាស់លាស់',
+        /permissions\.request/.test(opts)
+        && /aargus-api\.ztoglobal\.com\/\*/.test(opts)
+        && /https:\/\/argus\.ztoglobal\.com\/\*/.test(opts));
+    ok('⛔ ការធ្លាក់បែងចែក «គ្មានសិទ្ធិ» ចេញពី «មិនទាន់ login»',
+        /permissions\.contains/.test(bg) && /getAllCookieStores/.test(bg));
 });
 
 (async () => {

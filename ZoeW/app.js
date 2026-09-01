@@ -10015,7 +10015,7 @@
         let html = '';
         groups.slice(0, DELETED_LIST_MAX_ROWS).forEach((group) => { html += trashGroupRowHtml(group); });
         if (groups.length > DELETED_LIST_MAX_ROWS) {
-            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ផុតកំណត់ ៧ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)</td></tr>`;
+            html += `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:8px;">... និងមាន ${groups.length - DELETED_LIST_MAX_ROWS} ជួរទៀត (ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ)</td></tr>`;
         }
         tbody.innerHTML = html;
     }

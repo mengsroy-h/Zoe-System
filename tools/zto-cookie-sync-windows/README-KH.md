@@ -136,6 +136,7 @@ sync-zto-cookie.cmd
 
 | សារ | ត្រូវធ្វើអ្វី |
 |---|---|
+| `'orlevel'` / `'utionPolicy' is not recognized` | អ្នកកំពុងប្រើ `.cmd` UTF-8 ចាស់។ ទាញកំណែថ្មីដែលជា ASCII + CRLF រួចជំនួស `setup.cmd` និង `sync-zto-cookie.cmd` ទាំង ២ |
 | មិនទាន់ Setup/config/token | បើក `setup.cmd` |
 | Browser launch failed | បិទបង្អួច ZTO Cookie Sync ចាស់ទាំងអស់ រួចសាកវិញ |
 | មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |

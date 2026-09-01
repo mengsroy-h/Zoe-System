@@ -32,6 +32,12 @@
 ចូល `Netlify → ZoeW site → Project configuration → Environment variables`
 រួចចុច **Add a variable**។ បង្កើត variable ២ ដាច់ដោយឡែកដូចតារាងនេះ៖
 
+អ្នកអាចរត់ `setup.cmd` **មុន ឬក្រោយ** ផ្នែកនេះក៏បាន៖ `setup.cmd` មិនត្រូវការ
+env ទាំង ២ និងមិនបង្កើតវាទេ; វាផ្ទៀងផ្ទាត់តែ Site ID + PAT។ ប៉ុន្តែ
+`ZTO_COOKIE` ត្រូវមានរួច **មុនរត់ `sync-zto-cookie.cmd`** ព្រោះ helper update
+តម្លៃរបស់ key ដែលមានស្រាប់។ `ZTO_PROXY_KEY` ត្រូវការសម្រាប់ ZoeW ហៅ Function
+មិនមែនសម្រាប់ `setup.cmd` ទេ។
+
 | Key | Value ពេលបង្កើតដំបូង | Contains secret values | Scope | Deploy context |
 |---|---|---|---|---|
 | `ZTO_PROXY_KEY` | សោចៃដន្យ ៣២ bytes (វិធីបង្កើតនៅខាងក្រោម) | ✅ Yes | **Functions** | **Production** |
@@ -66,15 +72,14 @@ $rng.Dispose()
 ឬ `ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង Personal Access Token
 ត្រូវបញ្ចូលតែក្នុង `setup.cmd` ហើយរក្សាទុកតែលើ Windows របស់អ្នក។
 
-## មុន Setup
+## Site ID + PAT សម្រាប់ `setup.cmd`
 
-1. ពិនិត្យថា variable ទាំង ២ ខាងលើមានរួច និងបានកំណត់ metadata តាមតារាង។
-2. ចូល `Netlify → User settings → Applications → Personal access tokens`
+1. ចូល `Netlify → User settings → Applications → Personal access tokens`
    ហើយបង្កើត token មួយសម្រាប់ឧបករណ៍នេះ។ ជ្រើសថ្ងៃផុតកំណត់ ហើយបើ team ប្រើ
    SSO ត្រូវអនុញ្ញាត token ឲ្យចូល team នោះ។ មើល
    [ការណែនាំផ្លូវការរបស់ Netlify](https://docs.netlify.com/api-and-cli-guides/api-guides/get-started-with-api/#authentication)។
    ចម្លងវាទុកបណ្តោះអាសន្ន ព្រោះ Netlify មិនបង្ហាញតម្លៃម្តងទៀតទេ។
-3. យក ZoeW **Site ID** ពី
+2. យក ZoeW **Site ID** ពី
    `Project configuration → General → Project details`។
 
 Personal Access Token មានសិទ្ធិតាម account របស់អ្នក។ កុំផ្ញើវាតាម chat,

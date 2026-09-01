@@ -50,26 +50,6 @@ openssl rand -base64 32
 > និង `netlify/functions/`។ តាំងពី 2.25.0 Function **គ្មាន dependency npm សោះ**
 > ➜ bundle តូចជាង 20 KB ➜ **cold start លឿនជាងមុនច្រើន**។
 
-### ស្រេចចិត្ត — សម្រាប់ «ប្តូរ Cookie ដោយចុច ១ ដង» (ផ្នែក ២ខ)
-
-ត្រូវការតែពេលអ្នកចង់ប្រើ Chrome extension ជំនួសការចម្លងដោយដៃ។
-
-| Key | Value |
-| --- | --- |
-| `ZTO_COOKIE_UPDATE_KEY` | តម្លៃចៃដន្យ 32–64 តួ — សោរវាង extension និង Function |
-| `NETLIFY_AUTH_TOKEN` | Personal Access Token (`User settings ➜ Applications`) |
-| `NETLIFY_ACCOUNT_ID` | Account slug/ID របស់គណនី |
-| `NETLIFY_SITE_ID` | Site ID របស់ ZoeW (`Site configuration ➜ General`) |
-
-ស្រេចចិត្តបន្ថែម ៖ `ZTO_COOKIE_TARGET_KEY` (លំនាំដើម `ZTO_COOKIE`) ·
-`ZTO_COOKIE_TRIGGER_DEPLOY=0` (សរសេរ env តែ **មិន** deploy) ·
-`ZTO_COOKIE_API_TIMEOUT_MS` · `ZTO_COOKIE_BUDGET_MS`។
-
-> ⛔ **`NETLIFY_AUTH_TOKEN` ជា credential ខ្លាំង** (សិទ្ធិពេញលើគណនី)។ វាត្រូវ
-> រស់នៅ **តែក្នុង env របស់ Function** — កុំដាក់វាក្នុង extension, ក្នុង client
-> ឬក្នុង repo។ Extension ស្គាល់តែ `ZTO_COOKIE_UPDATE_KEY` ដែលជាកូនសោ
-> **ដាច់ដោយឡែក** ពី `ZTO_PROXY_KEY` ហើយធ្វើបានតែរឿងមួយ ៖ ប្តូរ cookie។
-
 ---
 
 ## ២. យក Cookie ពី Argus (ផ្លូវទី ២)
@@ -88,37 +68,28 @@ openssl rand -base64 32
 
 ---
 
-## ២ខ. ប្តូរ Cookie **ដោយចុច ១ ដង** (ណែនាំ)
+## ២ខ. ⛔ ហេតុអ្វី **គ្មានផ្លូវស្វ័យប្រវត្តិ** សម្រាប់ការប្តូរ Cookie
 
-ជំហាន ១–៥ ខាងលើត្រូវធ្វើឡើងវិញរាល់ពេល Cookie ផុត។ Chrome extension
-`tools/zto-cookie-grabber/` កាត់វាឲ្យនៅត្រឹម **ចុចរូប ១ ដង**៖
+ជំហាន ១–៥ ខាងលើត្រូវធ្វើឡើងវិញរាល់ពេល Cookie ផុត។ យើងបានសាកផ្លូវស្វ័យប្រវត្តិ
+**២** — ហើយ **ទាំង ២ បរាជ័យលើឧបករណ៍ពិត**៖
 
-```
-ចុចរូប extension  ➜  zto-cookie-update (Function)  ➜  Netlify API
-                                                      ├─ setEnvVarValue  (ZTO_COOKIE)
-                                                      └─ createSiteBuild (deploy)
-```
+| ផ្លូវ | លទ្ធផលដែលវាស់បាន (2026-09-01) |
+|---|---|
+| **Auto-login** (Chromium ក្នុង Netlify Function) | ❌ ជុំ **៦** (2.24.2 ➜ 2.24.7) បរាជ័យទាំងអស់ — IdP របស់ ZTO មិនបើកឲ្យ IP របស់ Netlify (មើលផ្នែក ៧) |
+| **Chrome extension** (`chrome.cookies` API) | ❌ `permissions.contains` = `true` · profile ដដែល · store ១ តែ `chrome.cookies.getAll({})` ត្រឡប់ **០** ខណៈ DevTools បង្ហាញ cookie **៥** ➜ ដកចេញទាំងស្រុង |
 
-**ដំឡើង** ៖ `chrome://extensions` ➜ Developer mode ➜ **Load unpacked** ➜ ថត
-`tools/zto-cookie-grabber/` ➜ Details ➜ Extension options ➜ បំពេញ Endpoint URL
-(`https://<site>/.netlify/functions/zto-cookie-update`) និង update key ➜ Save។
+**ការវាស់ដែលនៅតែជាការពិត — កុំវាស់ឡើងវិញ**៖
 
-**ប្រើ** ៖ បើក Argus (login រួច) ➜ ចុចរូប extension ➜ badge **`OK` បៃតង**។
-
-ឯកសារពេញលេញ (សិទ្ធិ · សារធ្លាក់ · តារាង `code`) ៖
-[`tools/zto-cookie-grabber/README-KH.md`](../tools/zto-cookie-grabber/README-KH.md)។
-
-### ⛔ ការវាស់ ២ ដែលធ្វើរួច — កុំវាស់ឡើងវិញ
-
-| សំណួរ | ចម្លើយពិត (2026-09-01) |
+| សំណួរ | ចម្លើយ |
 |---|---|
 | `document.cookie` លើ Argus ផ្តល់អ្វី? | `__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN=1` · `perf_dv6Tr4n=1` · `sidebarStatus=0` — **គ្មាន credential ពិត** |
-| ដូច្នេះ cookie ពិតនៅឯណា? | វាជា **`HttpOnly`** ➜ JS អានមិនឃើញ |
+| Cookie session ពិតនៅឯណា? | **`BOS-MAN-SESSION`** លើ `aargus-api.ztoglobal.com` — **`HttpOnly`** ➜ JS អានមិនឃើញ |
 
-⛔ **ដូច្នេះ bookmarklet ដើរមិនកើតទេ** — មានតែ `chrome.cookies` API (ដែលមាន
-តែក្នុង extension) ទេដែលអាន cookie `HttpOnly` បាន។ **កុំត្រឡប់ទៅ bookmarklet
-វិញ។** ដូចគ្នាដែរ ⛔ **កុំនាំ auto-login មកវិញ** — កំណែ 2.24.2 ➜ 2.24.7 ជាជុំ
-**៦** ដែលបរាជ័យទាំងអស់ (មើលផ្នែក ៧)។
+⛔ **ដូច្នេះ bookmarklet ដើរមិនកើតទេ** ហើយ **extension ក៏មិនបានដែរ**។
+⛔ **កុំនាំ auto-login មកវិញ** និង ⛔ **កុំសាងសង់ extension ឡើងវិញ** ដោយគ្មាន
+ភស្តុតាងថម្មីច្បាស់លាស់ថាបញ្ហាខាងលើត្រូវបានដោះស្រាយ។
+
+**ផ្លូវដែលដំណើរការគឺជំហាន ១–៥ ខាងលើ** — ប្រហែល ២ នាទីក្នុងមួយដង។
 
 ---
 

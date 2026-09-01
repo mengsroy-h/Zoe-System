@@ -147,8 +147,10 @@ Manual auto-fallback នៅដដែល៖ បើ ZTO មិនទាន់ឆ�
 ⛔ **ការ login ស្វ័យប្រវត្តិ (Chromium ➜ ZTO IDaaS) ត្រូវបានដកចេញក្នុងកំណែ
 2.25.0** ព្រោះ IdP មិនបើកឲ្យ IP របស់ Netlify — កុំនាំវាមកវិញ។ ការផ្ទៀងផ្ទាត់
 ធ្វើតាម **Cookie** (`ZTO_COOKIE`) ឬ **API ផ្លូវការ** (`ZTO_AUTHORIZATION` /
-`ZTO_TOKEN`) ដែលកំណត់ក្នុង Netlify env vars។ ការប្តូរ Cookie ធ្វើដោយចុច
-extension ១ ដង (`tools/`)។ សេចក្តីណែនាំពេញនៅ
+`ZTO_TOKEN`) ដែលកំណត់ក្នុង Netlify env vars។ ការប្តូរ Cookie លើ Windows ប្រើ helper
+`tools/zto-cookie-sync-windows/` ដែលចាប់ Request Header ពិតពី Edge/Chrome
+ហើយហៅ Netlify API ផ្ទាល់ដោយ PAT ដែល Windows DPAPI អ៊ិនគ្រីប — **មិនមែន
+extension**។ សេចក្តីណែនាំពេញនៅ
 [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md)។
 
 ទាញលេខទូរស័ព្ទ/COD/DOD ពី endpoint ខាងក្រៅ (ជាទូទៅ Google Sheet តាម Apps Script)

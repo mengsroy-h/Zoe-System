@@ -44,9 +44,11 @@
   0.20.3 ស្ថិតក្នុង repo** មិនមែនមកពី CDN ទេ ➜ Export ដើរទាំងក្រៅបណ្ដាញ
   ហើយកំណែដែលមាន Prototype Pollution/ReDoS ត្រូវបានដកចេញ។
 - **Lookup API** — ទាញលេខទូរស័ព្ទ/COD/DOD ពី Google Sheet ឬ ZTO តាម Netlify proxy
-  ដោយស្វ័យប្រវត្តិពេលស្កេន។ ZTO ប្រើ **Cookie ដោយដៃ ឬ API token ផ្លូវការ**
-  (auto-login ត្រូវដកចេញក្នុង 2.25.0 — មើល `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៧)។
-  ពេល Cookie ផុតកំណត់ ត្រូវប្តូរវា **ដោយដៃ** ក្នុង Netlify env រួច Trigger deploy។
+  ដោយស្វ័យប្រវត្តិពេលស្កេន។ ZTO ប្រើ **Cookie (Windows helper ឬដោយដៃ) ឬ API token ផ្លូវការ**
+  (auto-login ក្នុង Netlify ត្រូវដកចេញក្នុង 2.25.0 — ប្រវត្តិនៅ `docs/BUG-HISTORY.md`)។
+  ពេល Cookie ផុតកំណត់ Windows helper `tools/zto-cookie-sync-windows/` ចាប់
+  Request Header ពិតពី Edge/Chrome លើកុំព្យូទ័រ រួច update Netlify secret និង
+  Trigger deploy ដោយស្វ័យប្រវត្តិ — មិនបាច់ប្រើ DevTools។
   Proxy មាន **cache ៦០ វិនាទី · single-flight · retry លើ 5xx** ហើយ
   **ឆ្លើយជា JSON ជានិច្ច** ក្នុងថវិកាពេលរបស់ Netlify។ Fast Mode ចងចាំ barcode
   ដែលរកឃើញ ១០ នាទីក្នុង memory។ បើ ZTO យឺត ការវាយដោយដៃបើកជាផ្លូវ fallback
@@ -166,7 +168,7 @@ npm i acorn playwright-core xlsx
 bash audit-tools/run-all.sh
 ```
 
-ពាក្យបញ្ជានោះរត់ការត្រួតពិនិត្យ **១១៨**។ ក្នុងនោះ **៣៥** បើក **Chromium ពិត**
+ពាក្យបញ្ជានោះរត់ការត្រួតពិនិត្យ **១១៩**។ ក្នុងនោះ **៣៥** បើក **Chromium ពិត**
 ហើយវាស់ឥរិយាបថពិត — ល្បឿនបើក App លើបណ្តាញខ្សោយ, ការស្កេន Barcode, កាយវិការអូស,
 ការការពារ XSS ក្រោម CSP ពិត, ស្ថេរភាពបណ្តាញ, ទម្រង់បង្ហាញលើអេក្រង់ ៦ ទំហំ,
 សញ្ញាផ្តោតតាមក្តារចុច និង **ភាពស្មោះត្រង់នៃសារ (Toast) ធៀបនឹងស្ថានភាពពិត**។ មើល **[audit-tools/README.md](audit-tools/README.md)**។
@@ -178,6 +180,7 @@ bash audit-tools/run-all.sh
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្ម និងថ្នាក់កំហុសដែលដោះស្រាយរួច (សម្រាប់អ្នកថែទាំ) |
 | [CHANGELOG.md](CHANGELOG.md) | ប្រវត្តិកំណែ |
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
+| [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper ៖ ចាប់ Cookie ពី Argus request ពិត ➜ update Netlify secret ➜ trigger deploy |
 | [firebase-backup/](firebase-backup/) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ## អាជ្ញាប័ណ្ណ

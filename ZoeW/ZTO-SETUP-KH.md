@@ -17,31 +17,49 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 
 ចូល `Netlify → ZoeW site → Project configuration → Environment variables`។
 
-### ចាំបាច់
+### បើប្រើ Windows Cookie helper — ដាក់តែ ២ Key
 
-| Key | Value |
-| --- | --- |
-| `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ 32–64 តួ — សោរវាង ZoeW និង Function |
+ចុច **Add a variable** ហើយបង្កើត variable ២ ដាច់ដោយឡែក៖
 
-បង្កើតវា៖
+| Key | Value ពេលបង្កើតដំបូង | Secret | Scope | Context |
+| --- | --- | --- | --- | --- |
+| `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ ៣២ bytes — សោរវាង ZoeW និង Function | ✅ | **Functions** | **Production** |
+| `ZTO_COOKIE` | Cookie ពេញ ឬ `BOS-MAN-SESSION=setup-pending` សិន | ✅ | **Functions** | **Production** |
 
-```bash
-openssl rand -base64 32
+`BOS-MAN-SESSION=setup-pending` គ្រាន់តែអនុញ្ញាតឲ្យបង្កើត key ដោយមិនបើក
+DevTools។ វាមិនមែន Cookie ពិតទេ៖ ក្រោយ Save ត្រូវរត់
+`sync-zto-cookie.cmd` ដើម្បីឲ្យ helper ជំនួសវាដោយ Cookie ពេញ និង trigger
+deploy។
+
+បង្កើត `ZTO_PROXY_KEY` លើ Windows PowerShell៖
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+[Convert]::ToBase64String($bytes)
 ```
 
-### បូកនឹង **មួយ** ក្នុងចំណោមនេះ
+⛔ កុំដាក់ `NETLIFY_AUTH_TOKEN`, `NETLIFY_ACCOUNT_ID`, `NETLIFY_SITE_ID` ឬ
+`ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង PAT របស់ helper រស់តែ
+លើ Windows។ សម្រាប់ផ្លូវ Cookie ក៏មិនចាំបាច់បង្កើត `ZTO_API_URL` ឬ
+`ZTO_REQUEST_*` ដែរ។ បើមាន `ZTO_AUTHORIZATION`/`ZTO_TOKEN` ចាស់ សូមលុបវា
+ព្រោះវាមានអាទិភាពលើ Cookie។
+
+### បើប្រើ API ផ្លូវការ — `ZTO_PROXY_KEY` បូក **មួយ** ក្នុងចំណោមនេះ
 
 | Key | ប្រើសម្រាប់ |
 | --- | --- |
 | `ZTO_AUTHORIZATION` | តម្លៃពេញរបស់ header `Authorization` ពី ZTO (ឧ. `Bearer eyJ...`) |
 | `ZTO_TOKEN` + `ZTO_TOKEN_HEADER` | Token ដែល ZTO ដាក់ក្នុង header ផ្សេង (លំនាំដើម `X-Access-Token`) |
-| `ZTO_COOKIE` | Cookie ពេញដែលចម្លងពី browser (ឧ. `BOS-MAN-SESSION=...`) |
+| `ZTO_COOKIE` | ផ្លូវ fallback ប៉ុណ្ណោះ; Windows helper គឺជាផ្លូវណែនាំខាងលើ |
 
 លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ `ZTO_COOKIE`**។
 
-សម្គាល់តម្លៃទាំងអស់នេះជា **Contains secret values** ហើយ scope ឲ្យ Functions។
-កុំដាក់វាក្នុង `netlify.toml`, GitHub, chat ឬ screenshot។ ក្រោយ Save ត្រូវ
-**Trigger deploy** ម្តង។
+សម្គាល់តម្លៃទាំងអស់នេះជា **Contains secret values**, scope **Functions** និង
+context **Production**។ កុំដាក់វាក្នុង `netlify.toml`, GitHub, chat ឬ
+screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្តង។
 
 > ℹ️ **Netlify Base directory ត្រូវជា `ZoeW`** ដើម្បីឲ្យវាឃើញ `netlify.toml`
 > និង `netlify/functions/`។ តាំងពី 2.25.0 Function **គ្មាន dependency npm សោះ**

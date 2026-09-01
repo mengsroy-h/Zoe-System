@@ -1,5 +1,13 @@
 'use strict';
 
+// Chrome can withhold a declared host permission, and chrome.cookies then
+// returns an empty list instead of an error. Ask for it here, where a user
+// gesture exists, so the failure cannot be silent.
+const COOKIE_ORIGINS = [
+    'https://aargus-api.ztoglobal.com/*',
+    'https://argus.ztoglobal.com/*'
+];
+
 const endpointEl = document.getElementById('endpoint');
 const keyEl = document.getElementById('updateKey');
 const msgEl = document.getElementById('msg');
@@ -32,10 +40,11 @@ document.getElementById('save').addEventListener('click', async () => {
         return;
     }
 
-    // Least privilege: ask for access to this one site only, at save time.
-    const granted = await chrome.permissions.request({ origins: [origin] }).catch(() => false);
+    // Least privilege: the ZoeW site plus the two ZTO hosts we read cookies from.
+    const wanted = [origin].concat(COOKIE_ORIGINS);
+    const granted = await chrome.permissions.request({ origins: wanted }).catch(() => false);
     if (!granted) {
-        say('❌ ត្រូវអនុញ្ញាតសិទ្ធិចូល ' + origin + ' ដើម្បីផ្ញើ cookie', 'err');
+        say('❌ ត្រូវអនុញ្ញាតសិទ្ធិចូល ' + wanted.join(' · ') + ' ដើម្បីអាន និងផ្ញើ cookie', 'err');
         return;
     }
 

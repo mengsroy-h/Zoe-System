@@ -79,6 +79,8 @@ const FNS = [
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'safeLookupReason',
     'clearCustomerDataTableCache', 'getNestedField',
     'getFastLookupRow', 'setFastLookupRow',
+    'dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
+    'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'completeAppUnlock', 'retryPendingLookupAfterUnlock',
     'prefetchCustomerDataTableRowsIfConfigured',
     'attemptAutoLookup', 'runSheetImport'
@@ -98,7 +100,9 @@ const DECLS = [
     'AUTO_LOOKUP_FAILURE_MAX', 'AUTO_LOOKUP_MAX_IN_FLIGHT',
     'AUTO_LOOKUP_TIMEOUT_MS',
     'LOOKUP_FAST_CACHE_TTL_MS', 'LOOKUP_FAST_CACHE_MAX', 'lookupFastCache',
-    'autoLookupInFlight', 'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
+    'autoLookupInFlight', 'autoLookupQueueRetries',
+    'AUTO_LOOKUP_QUEUE_RETRY_MS', 'AUTO_LOOKUP_QUEUE_MAX_WAIT_MS',
+    'lookupLockedNoticeShown', 'SHEET_IMPORT_MAX_ROWS', 'sheetImportBusy',
     'sheetImportSignature'
 ];
 const decls = [];

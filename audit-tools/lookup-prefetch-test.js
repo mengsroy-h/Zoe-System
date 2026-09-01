@@ -49,7 +49,9 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const FNS = ['elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
+const FNS = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
+    'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
+    'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
     'lookupApiIsZto', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'buildCustomerListApiUrl',
     'prefetchCustomerDataTableRowsIfConfigured',
     'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
@@ -297,6 +299,9 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             ZTO_AUTO_LOOKUP_TIMEOUT_MS: 58000,
             autoLookupInFlight: /const autoLookupInFlight = new Map\(\)/.test(SRC) ? new Map() : new Set(),
             autoLookupFailureAt: new Map(),
+            autoLookupQueueRetries: new Map(),
+            AUTO_LOOKUP_QUEUE_RETRY_MS: 400,
+            AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: 20000,
             lookupFastCache: new Map(),
             lookupLockedNoticeShown: false,
             lookupSecretKey: null,
@@ -362,6 +367,10 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('lookupFailureCooldownMs'), ctx);
         vm.runInContext(sliceFn('lookupFailureIsDefinitive'), ctx);
         vm.runInContext(sliceFn('retryTransientLookupResponse'), ctx);
+        vm.runInContext(sliceFn('dropAutoLookupQueueEntry'), ctx);
+        vm.runInContext(sliceFn('scheduleAutoLookupQueueRetry'), ctx);
+        vm.runInContext(sliceFn('pumpAutoLookupQueue'), ctx);
+        vm.runInContext(sliceFn('clearAutoLookupQueueRetries'), ctx);
         if (o.realRetry) vm.runInContext(sliceFn('retryAsync'), ctx);
         if (o.loadClear) vm.runInContext(sliceFn('clearCustomerDataTableCache'), ctx);
         vm.runInContext(autoSrc, ctx);

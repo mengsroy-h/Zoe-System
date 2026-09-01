@@ -1,193 +1,247 @@
-# កំណត់ ZTO Auto-login សម្រាប់ ZoeW
+# កំណត់ ZTO Lookup សម្រាប់ ZoeW
 
-ZoeW ហៅ ZTO តាម Netlify Function។ Username, Password, Cookie និង Token ស្ថិតតែ
-server-side ក្នុង Netlify មិនចូលក្នុងកូដ static ឬ browser របស់អ្នកប្រើទេ។ ពេល
-session ផុតកំណត់ Function បើក Chromium ចូល `argus.ztoglobal.com` តាម ZTO IDaaS,
-យក session ថ្មី រក្សាទុកដោយ AES-256-GCM ក្នុង Netlify Blobs ហើយសាក lookup ម្តងទៀត។
+ZoeW ស្កេន Barcode រួចទាញ **លេខទូរស័ព្ទ · COD · DOD** ពី ZTO តាម Netlify
+Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង Token ស្ថិត
+**តែខាង server** ក្នុង Netlify — មិនចូលក្នុងកូដ static ឬ browser របស់អ្នកប្រើទេ។
 
-> ប្រើតែគណនីដែលអ្នកមានសិទ្ធិ និងដែល ZTO/ក្រុមហ៊ុនរបស់អ្នកអនុញ្ញាតឱ្យ automation។
-> បើមាន official API token ឬ service account សូមប្រើវាជម្រើសដំបូង ព្រោះវាមាន
-> ស្ថេរភាពជាង web login។
+មានផ្លូវ auth **២** ប៉ុណ្ណោះ (តាំងពីកំណែ 2.25.0)៖
 
-## ១. ដាក់ Environment Variables ក្នុង Netlify
-
-ចូល `Netlify → ZoeW site → Project configuration → Environment variables` ហើយដាក់៖
-
-| Key | ត្រូវការ | Value |
+| # | ផ្លូវ | ប្រើពេលណា |
 | --- | --- | --- |
-| `ZTO_PROXY_KEY` | ចាំបាច់ | តម្លៃចៃដន្យ 32–64 តួ សម្រាប់ការពារ Function |
-| `ZTO_AUTO_LOGIN` | ចាំបាច់សម្រាប់ auto-login | `true` |
-| `ZTO_USERNAME` | ចាំបាច់សម្រាប់ auto-login | Username ដែលអ្នកប្រើចូល Argus |
-| `ZTO_PASSWORD` | ចាំបាច់សម្រាប់ auto-login | Password របស់គណនី Argus |
-| `ZTO_SESSION_ENCRYPTION_KEY` | ចាំបាច់សម្រាប់ auto-login | សោ base64 32-byte ឬ hex 64 តួ |
+| ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
+| ២ | **Cookie ដោយដៃ** — `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — យក Cookie ពី Argus web |
 
-បង្កើត encryption key ថ្មីនៅម៉ាស៊ីនរបស់អ្នក៖
+> ⛔ **Auto-login (Chromium ចូល Argus ដោយស្វ័យប្រវត្តិ) ត្រូវបានដកចេញទាំងស្រុង
+> ក្នុងកំណែ 2.25.0។** មូលហេតុ និងភស្តុតាងនៅផ្នែក **៧** ខាងក្រោម។
+
+---
+
+## ១. Environment Variables ក្នុង Netlify
+
+ចូល `Netlify → ZoeW site → Project configuration → Environment variables`។
+
+### ចាំបាច់
+
+| Key | Value |
+| --- | --- |
+| `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ 32–64 តួ — សោរវាង ZoeW និង Function |
+
+បង្កើតវា៖
 
 ```bash
 openssl rand -base64 32
 ```
 
-សម្គាល់ `ZTO_PROXY_KEY`, `ZTO_USERNAME`, `ZTO_PASSWORD` និង
-`ZTO_SESSION_ENCRYPTION_KEY` ជា **Contains secret values**; scope ឱ្យ Functions
-និង production context ដែលត្រូវប្រើ។ កុំដាក់តម្លៃទាំងនេះក្នុង `netlify.toml`,
-GitHub, chat ឬ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្តង។
+### បូកនឹង **មួយ** ក្នុងចំណោមនេះ
 
-បើ repository របស់អ្នកមានថត `ZoeW/` ដូច ZIP នេះ សូមកំណត់ Netlify
-**Base directory = `ZoeW`** ដើម្បីឱ្យវាអាន `package.json`, `package-lock.json`
-និង `netlify.toml` របស់ App។ ប្រើ Git/CLI deploy ដែលមាន build Functions;
-កុំ drag-and-drop តែ static files ព្រោះ Chromium dependencies ត្រូវ bundle។
-`netlify.toml` កំណត់ memory 2GB សម្រាប់ Chromium ដែលអាចបង្កើន function billing។
+| Key | ប្រើសម្រាប់ |
+| --- | --- |
+| `ZTO_AUTHORIZATION` | តម្លៃពេញរបស់ header `Authorization` ពី ZTO (ឧ. `Bearer eyJ...`) |
+| `ZTO_TOKEN` + `ZTO_TOKEN_HEADER` | Token ដែល ZTO ដាក់ក្នុង header ផ្សេង (លំនាំដើម `X-Access-Token`) |
+| `ZTO_COOKIE` | Cookie ពេញដែលចម្លងពី browser (ឧ. `BOS-MAN-SESSION=...`) |
 
-Netlify Blobs ត្រូវបានបង្កើតដោយ Function ដោយស្វ័យប្រវត្តិ; មិនចាំបាច់បង្កើត
-database ឬដាក់ access token បន្ថែមទេ។ បើប្តូរ encryption key session ចាស់នឹង
-ត្រូវបានរំលង ហើយ Function នឹង login ថ្មី។
+លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ `ZTO_COOKIE`**។
 
-### ជម្រើសបន្ថែម
+សម្គាល់តម្លៃទាំងអស់នេះជា **Contains secret values** ហើយ scope ឲ្យ Functions។
+កុំដាក់វាក្នុង `netlify.toml`, GitHub, chat ឬ screenshot។ ក្រោយ Save ត្រូវ
+**Trigger deploy** ម្តង។
 
-| Key | Default | ន័យ |
-| --- | --- | --- |
-| `ZTO_COOKIE` | ទទេ | Cookie ដោយដៃ/បណ្ដោះអាសន្ន; បើផុតកំណត់ auto-login នឹង refresh |
-| `ZTO_SESSION_COOKIE_NAME` | `BOS-MAN-SESSION` | ប្តូរតែបើ ZTO ប្តូរឈ្មោះ session cookie |
-| `ZTO_LOGIN_TIMEOUT_MS` | `30000` | ពិដាន login 15,000–35,000 ms |
-| `ZTO_LOGIN_FORM_WAIT_MS` | `12000` | ពេលរង់ចាំទម្រង់ login លេច 5,000–20,000 ms |
-| `ZTO_LOGIN_BUDGET_MS` | `20000` | ពិដានពេលសរុបនៃ auto-login ក្នុង Function 5,000–60,000 ms |
-| `ZTO_LOGIN_PROXY` | ទទេ | Proxy សម្រាប់ **browser ចូល ZTO** ឧ. `http://host:8080` · `socks5://host:1080` |
-| `ZTO_LOGIN_PROXY_USERNAME` | ទទេ | ឈ្មោះអ្នកប្រើរបស់ proxy (បើត្រូវការ) |
-| `ZTO_LOGIN_PROXY_PASSWORD` | ទទេ | ពាក្យសម្ងាត់របស់ proxy — សម្គាល់ជា **secret** |
-| `ZTO_SESSION_MAX_AGE_MINUTES` | `0` | `0` = គោរព cookie expiry/refresh ពេល ZTO បដិសេធ; អាចកំណត់អាយុខ្លីជាងនេះ |
+> ℹ️ **Netlify Base directory ត្រូវជា `ZoeW`** ដើម្បីឲ្យវាឃើញ `netlify.toml`
+> និង `netlify/functions/`។ តាំងពី 2.25.0 Function **គ្មាន dependency npm សោះ**
+> ➜ bundle តូចជាង 20 KB ➜ **cold start លឿនជាងមុនច្រើន**។
 
-> ⚠️ **Netlify មានពិដានពេលដំណើរការ Function ផ្ទាល់ខ្លួន** (ជាធម្មតា ១០ វិនាទី
-> លំនាំដើម ហើយអាចតម្លើងបាន)។ ការតម្លើង `ZTO_LOGIN_FORM_WAIT_MS` ឬ
-> `ZTO_LOGIN_BUDGET_MS` **លើសពិដាននោះ** ធ្វើឲ្យ Netlify សម្លាប់ Function មុនវា
-> ឆ្លើយ ➜ browser បង្ហាញ **`Failed to fetch`** ដែលមិនប្រាប់អ្វីសោះ។ បើឃើញសារ
-> នោះ សូម **បន្ថយ** តម្លៃទាំងនេះវិញ។
+---
 
-### ការចូលតាម Proxy (ឧ. IP កម្ពុជា)
+## ២. យក Cookie ពី Argus (ផ្លូវទី ២)
 
-បើ ZTO IdP ប្រព្រឹត្តខុសគ្នាតាម IP អ្នកអាចបញ្ជូន **browser ចូល** តាម proxy៖
+១. បើក `https://argus.ztoglobal.com` ក្នុង Chrome លើកុំព្យូទ័រ រួច **ចូល
+   ប្រព័ន្ធជាធម្មតា**។
+២. ចុច `F12` ➜ ផ្ទាំង **Network** ➜ ស្កេន ឬបើកកញ្ចប់ណាមួយ ដើម្បីឲ្យមានសំណើចេញ។
+៣. ចុចលើសំណើទៅ `aargus-api.ztoglobal.com` ➜ ផ្ទាំង **Headers** ➜ ផ្នែក
+   **Request Headers** ➜ រកជួរ **`Cookie:`**។
+៤. ចម្លង **តម្លៃទាំងមូល** (អាចវែង និងមានច្រើនផ្នែកបំបែកដោយ `; `)។
+៥. ដាក់វាចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ **Trigger deploy**។
 
-```
-ZTO_LOGIN_PROXY=http://<host>:<port>
-ZTO_LOGIN_PROXY_USERNAME=<បើត្រូវការ>
-ZTO_LOGIN_PROXY_PASSWORD=<បើត្រូវការ>
-```
+> ⚠️ Cookie នេះ **ផុតកំណត់** តាមរយៈពេលដែល ZTO កំណត់។ ពេលវាផុត ZoeW បង្ហាញ
+> **«🔒 Cookie ZTO ផុតកំណត់ — សូមចូល Argus យក Cookie ថ្មី»** ➜ ធ្វើជំហាន ១–៥
+> ម្តងទៀត។ គ្មានអ្វីខូចទេ ទិន្នន័យទាំងអស់នៅដដែល។
 
-⛔ **Netlify មិនអាចផ្តល់ IP កម្ពុជាដោយខ្លួនវាទេ** — អ្នកត្រូវមាន proxy endpoint
-ផ្ទាល់ខ្លួន (VPS នៅកម្ពុជា ឬសេវា proxy) រួចដាក់ URL របស់វាទីនេះ។
-
-⚠️ **វាអនុវត្តលើ browser ចូលតែប៉ុណ្ណោះ** — សំណើ `scan/get/order/detail`
-ក្រោយចូល នៅតែចេញពី IP របស់ Netlify ដដែល។ បើ ZTO ទប់ **API** តាម IP ដែរ
-នោះ proxy នេះមិនគ្រប់គ្រាន់ទេ។
-
-ក្រោយកំណត់ រកបន្ទាត់ `[zto-session]` ក្នុង Function log — វាត្រូវផ្ទុក
-`proxy=<host>` ជាភស្តុតាងថា proxy កំពុងប្រើពិត។ ⛔ ពាក្យសម្ងាត់ proxy
-**មិនចូល log ទេ**។
-
-## ២. លំដាប់ auth និង fallback
-
-Proxy ប្រើ auth តាមលំដាប់នេះ៖
-
-1. `ZTO_AUTHORIZATION` — official Authorization ពី ZTO។
-2. `ZTO_TOKEN` (+ `ZTO_TOKEN_HEADER` បើ ZTO បញ្ជាក់) — official API token។
-3. `ZTO_COOKIE` — Cookie ដោយដៃ បើបានកំណត់។
-4. Session ដែល auto-login បង្កើត — ពេលមិនមាន auth ខាងលើ។
-
-បើ `ZTO_COOKIE` ឬ auto session ត្រូវ ZTO បដិសេធ ហើយ `ZTO_AUTO_LOGIN=true`,
-Function login ថ្មី **តែម្តង** រួចសាក order lookup **តែម្តង**។ វាមិនធ្វើ login
-loop ទេ។ Official Authorization/Token ដែលត្រូវបដិសេធមិនត្រូវបានជំនួសដោយ
-password login ដោយស្ងាត់ទេ។
-
-អ្នកអាចលុប `ZTO_COOKIE` ទាំងស្រុងក្រោយកំណត់ auto-login រួច។ កុំលុប
-`ZTO_PROXY_KEY` ព្រោះវាជាសោរវាង ZoeW និង Function។
+---
 
 ## ៣. បំពេញក្នុង ZoeW
 
-ចូល `API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ` ហើយដាក់៖
+របា Slide ⚙️ ➜ **🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ**៖
 
 | វាល | តម្លៃ |
 | --- | --- |
 | URL API | `/.netlify/functions/zto-order-detail?barcode={barcode}` |
 | ឈ្មោះ Header | `X-Zoe-Proxy-Key` |
-| តម្លៃ Header | តម្លៃដូច `ZTO_PROXY_KEY` |
+| តម្លៃ Header | តម្លៃដូច `ZTO_PROXY_KEY` ក្នុង Netlify |
 | Field លេខទូរស័ព្ទ | `phone` |
 | Field COD | `cod` |
 | Field DOD | `dod` |
 
-ធីក `Fast Mode សម្រាប់ ZTO Lookup` ដើម្បីឱ្យ barcode ដែលរកឃើញរួចក្នុង ១០នាទី
-បំពេញភ្លាម។ Fast Mode រក្សាតែក្នុង memory និងមានពិដាន ៣០០ barcode។
+ធីក **`Fast Mode សម្រាប់ ZTO Lookup`** ដើម្បីឲ្យ barcode ដែលរកឃើញរួចក្នុង
+១០ នាទី បំពេញ **ភ្លាមៗ ០ ms**។ វារក្សាតែក្នុងសតិ និងមានពិដាន ៣០០ barcode។
 
-Manual fallback ១.៨វិនាទីនៅដដែល៖ ពេល login/lookup កំពុងបន្ត វាលលេខទូរស័ព្ទ
-ទទួល focus ឱ្យវាយដោយដៃបាន។ Request មិនត្រូវបានបោះបង់ ហើយលទ្ធផលនឹងបំពេញ
-ពេលមកដល់ ប្រសិនបើវាលនៅទទេ។ Lookup ដំបូងដែលមិនទាន់មាន session អាចចំណាយ
-ពេលរហូតដល់ប្រហែល 30–45វិនាទី; lookup បន្ទាប់ប្រើ session ដែល encrypt ទុក ហើយលឿនជាង។
+Manual fallback **១.៨ វិនាទី** នៅដដែល៖ ខណៈ lookup កំពុងដំណើរការ វាលលេខ
+ទូរស័ព្ទទទួល focus ឲ្យវាយដោយដៃបាន។ សំណើមិនត្រូវបោះបង់ទេ ហើយលទ្ធផលនឹងបំពេញ
+ពេលមកដល់ **ប្រសិនបើវាលនៅទទេ**។
 
-## ៤. អ្វីដែល Function រក្សា និងបញ្ជូន
+---
 
-- Netlify Secret Environment Variables រក្សា Username/Password/encryption key។
-- Netlify Blobs រក្សាតែ session envelope ដែល encrypt ដោយ AES-256-GCM។
-- Login lock ទប់ invocation ច្រើនកុំឱ្យបើក Chromium/login ស្ទួនក្នុងពេលតែមួយ។
-- Failure backoff ទប់ password ខុស, CAPTCHA ឬ MFA កុំឱ្យបាញ់ login ជារង្វិលជុំ។
-- Browser ទទួលតែ `phone`, `cod`, `dod`, `barcode`, `success`; មិនទទួល Cookie,
-  Username, Password, ឈ្មោះ ឬអាសយដ្ឋានអតិថិជនទេ។
+## ៤. ពេល ZTO ផ្តល់ **API ផ្លូវការ**
 
-Function ផ្ញើទៅ ZTO ជា៖
+Function ត្រូវបានសរសេរឲ្យ **សម្របទៅនឹងទម្រង់ API ណាក៏បាន** ដោយ
+**មិនចាំបាច់កែកូដ** — គ្រប់យ៉ាងកំណត់តាម Environment Variables។
 
-```json
-{"billCode":"លេខ barcode","countryCode":"KH"}
+| Key | Default | ន័យ |
+| --- | --- | --- |
+| `ZTO_API_URL` | `https://aargus-api.ztoglobal.com/scan/get/order/detail` | Endpoint ពិត (ត្រូវជា **https**) |
+| `ZTO_API_METHOD` | `POST` | `POST` ឬ `GET` |
+| `ZTO_REQUEST_BODY_JSON` | `{"billCode":"{barcode}","countryCode":"KH"}` | តួសំណើ (POST) — `{barcode}` ត្រូវជំនួសដោយលេខពិត |
+| `ZTO_REQUEST_QUERY_PARAM` | `billCode` | ឈ្មោះ query param (GET) |
+| `ZTO_REQUEST_HEADERS_JSON` | ទទេ | Header បន្ថែម ឧ. `{"X-App-Key":"...","X-Sign":"..."}` |
+| `ZTO_FIELD_PHONE` | បញ្ជីលំនាំដើម | ផ្លូវ field លេខទូរស័ព្ទ បំបែកដោយ `,` (ឧ. `data.receiverMobile`) |
+| `ZTO_FIELD_COD` | បញ្ជីលំនាំដើម | ផ្លូវ field COD |
+| `ZTO_FIELD_DOD` | បញ្ជីលំនាំដើម | ផ្លូវ field DOD |
+| `ZTO_FIELD_BARCODE` | បញ្ជីលំនាំដើម | ផ្លូវ field លេខបាកូដ |
+| `ZTO_SEND_BROWSER_HEADERS` | ស្វ័យប្រវត្តិ | `false` = កុំផ្ញើ `Origin`/`Referer` របស់ Argus |
+
+### អ្វីដែល Function ធ្វើដោយខ្លួនឯង
+
+- **ស្គាល់ទម្រង់ចម្លើយច្រើនបែប** ៖ វារកទិន្នន័យក្នុង `data` · `result` ·
+  `data.data` · `result.data` · `body` · `rows` · ឬ **root ផ្ទាល់** ហើយបើ
+  មួយក្នុងចំណោមនោះជា **array** វាយកធាតុទី ១។
+- **ស្គាល់សញ្ញាជោគជ័យច្រើនបែប** ៖ `success:true` · `result:true` ·
+  `status:true` · `code` ជា `0` / `000000` / `200` / `success` / `ok` ·
+  ឬ **គ្មាន `code` សោះ**។
+- **ស្គាល់ឈ្មោះ field ច្រើនបែប** (មុនអ្នកកំណត់អ្វីទាល់តែសោះ)៖
+
+  | | ឈ្មោះដែលសាកតាមលំដាប់ |
+  | --- | --- |
+  | ទូរស័ព្ទ | `consigneePhone` · `consigneeMobile` · `consigneeTel` · `receiverPhone` · `receiverMobile` · `recipientPhone` · `recipientMobile` · `phone` · `mobile` |
+  | COD | `agentAmount` · `codAmount` · `collectionAmount` · `codFee` · `cod` |
+  | DOD | `arrivalServiceCharge` · `dodAmount` · `arrivalCharge` · `serviceCharge` · `dod` |
+  | Barcode | `billCode` · `waybillNo` · `waybillCode` · `mailNo` · `barcode` |
+
+  ឈ្មោះដែល **អ្នកកំណត់** តាម `ZTO_FIELD_*` ត្រូវសាក **មុន** បញ្ជីលំនាំដើម
+  ➜ ការកំណត់ខុសក៏មិនធ្វើឲ្យ lookup ស្លាប់ដែរ។
+- ⛔ **ពេលប្រើ Token/Authorization វា *មិន* ផ្ញើ `Origin`, `Referer` និង
+  `User-Language` របស់ Argus ទេ** — header ក្លែងបែបនោះអាចធ្វើឲ្យ WAF ឬ CORS
+  របស់ API ផ្លូវការបដិសេធសំណើ។ ការផ្ញើវាកើតតែពេលប្រើ **Cookie** ប៉ុណ្ណោះ
+  (ឬពេលអ្នកបង្ខំដោយ `ZTO_SEND_BROWSER_HEADERS=true`)។
+
+### ផ្ទៀងផ្ទាត់ថាវាដំណើរការ ១០០% — `?diag=1`
+
+បើក URL នេះក្នុង browser (ត្រូវការ header `X-Zoe-Proxy-Key`, ឬប្រើ `curl`)៖
+
+```bash
+curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
+  "https://<site>.netlify.app/.netlify/functions/zto-order-detail?diag=1"
 ```
 
-Field mapping៖
+វាឆ្លើយ **ការកំណត់ពិតដែល Function កំពុងប្រើ** ដោយ **គ្មានតម្លៃសម្ងាត់សោះ**៖
 
-- `phone` ← `data.consigneePhone` ឬ `data.consigneeMobile`
-- `cod` ← `data.agentAmount`
-- `dod` ← `data.arrivalServiceCharge`
+```json
+{
+  "ok": true, "code": "ZTO_DIAG",
+  "auth": "authorization",
+  "endpoint": { "host": "...", "path": "...", "method": "POST" },
+  "requestHeaders": ["Accept", "Authorization", "..."],
+  "browserHeaders": false,
+  "fields": { "phone": [...], "cod": [...], "dod": [...], "barcode": [...] },
+  "timing": { "upstreamTimeoutMs": 8000, "budgetMs": 14000, "retries": 1, "cacheTtlMs": 60000 },
+  "cacheEntries": 0
+}
+```
 
-## ៥. CAPTCHA, MFA និងកំហុស
+⛔ `auth` ត្រូវជា **`authorization`** ឬ **`token`** ពេលប្រើ API ផ្លូវការ។
+បើវាឡើង `cookie` ឬ `none` នោះមានន័យថា Netlify មិនទាន់ឃើញ variable ថ្មីទេ
+(ភ្លេច Trigger deploy)។ `requestHeaders` ជា **ឈ្មោះ header ប៉ុណ្ណោះ** —
+តម្លៃមិនដែលចេញទេ។
 
-Auto-login **មិនដោះ ឬ bypass CAPTCHA/MFA/security verification** ទេ៖
+---
 
-- `ZTO ទាមទារ CAPTCHA/MFA` — ចូល Argus ដោយដៃ ហើយបើចាំបាច់ដាក់
-  `ZTO_COOKIE` ជា fallback; ឬស្នើ ZTO ឱ្យផ្តល់ API token/service account។
-- `ZTO បដិសេធ Username/Password` — កែ Netlify Secrets; កុំ retry ច្រើនដង។
-- `Auto-login មិនទាន់កំណត់ពេញលេញ` — ពិនិត្យ variables ចាំបាច់ទាំង ៥ និង
-  encryption key។
-- `Auto-login មិនអាចបង្កើត session` — មើល Netlify Function logs; secret value
-  មិនត្រូវបានដាក់ក្នុង response ទេ។
-- `ZTO session នៅតែមិនត្រឹមត្រូវ` — login បាន cookie ថ្មី ប៉ុន្តែ ZTO នៅតែ
-  បដិសេធ; ពិនិត្យឈ្មោះ cookie/សិទ្ធិគណនី ឬប្រើ official token។
+## ៥. ល្បឿន និងស្ថេរភាព
 
-## ៦. អាន `reason` ក្នុងសារកំហុស (តាំងពីកំណែ 2.24.2)
-
-រាល់សារ 503/502 របស់ auto-login ភ្ជាប់មកជាមួយវាល **`reason`** ដែលប្រាប់ថា
-**ជាប់ត្រង់ណា** — មិនមែនត្រឹមកូដទូទៅទេ។ ការធ្លាក់ដដែលក៏ត្រូវសរសេរចូល
-**Netlify Function log** ជាមួយបុព្វបទ `[zto-session] `។
-
-### `ZTO_SESSION_STORE_UNAVAILABLE` — Netlify Blobs
-
-| `reason` | មានន័យ | ត្រូវធ្វើអ្វី |
+| Key | Default | ន័យ |
 | --- | --- | --- |
-| `getstore:MissingBlobsEnvironmentError` | Function រកព័ត៌មានតភ្ជាប់ Blobs មិនឃើញ | ត្រូវ deploy កំណែ 2.24.2 ឡើងទៅ (វាហៅ `connectLambda(event)`); បើនៅតែឃើញ សូមពិនិត្យថា Netlify **Base directory = `ZoeW`** និង deploy តាម Git/CLI មិនមែន drag-and-drop |
-| `import:ERR_MODULE_NOT_FOUND` | `@netlify/blobs` មិនត្រូវបាន bundle ចូល Function | ពិនិត្យ `package.json` + `package-lock.json` និង build log |
-| `read:…` · `write:…` · `lock:…` | Blobs ឆ្លើយជាកំហុស | មើល Function log; ជាធម្មតាបណ្ដោះអាសន្ន |
+| `ZTO_UPSTREAM_TIMEOUT_MS` | `8000` | ពិដានពេលក្នុងមួយសំណើទៅ ZTO (2,000–20,000) |
+| `ZTO_REQUEST_BUDGET_MS` | `14000` | ថវិកាពេលសរុបរបស់ Function (4,000–24,000) |
+| `ZTO_UPSTREAM_RETRIES` | `1` | ចំនួនព្យាយាមឡើងវិញពេលបណ្តាញដាច់/5xx (0–3) |
+| `ZTO_CACHE_TTL_MS` | `60000` | Cache លទ្ធផលខាង server (0 = បិទ; អតិបរមា ១០ នាទី) |
 
-⛔ **ចាប់ពី 2.24.2 ការដាច់ Blobs លែងធ្វើឲ្យ lookup ស្លាប់ទាំងស្រុងទេ** —
-Function ធ្លាក់ចុះទៅ session **ក្នុងសតិ** របស់ container នោះ។ វានៅតែដើរ
-តែ login ញឹកញាប់ជាង ➜ សូមកែ Blobs ឲ្យដើរវិញដដែល។
+អ្វីដែលធ្វើឲ្យវាលឿនតាំងពី 2.25.0៖
 
-### `ZTO_LOGIN_UNAVAILABLE` — ផ្លូវ login / IDaaS OAuth2
+- **គ្មាន Chromium · គ្មាន Netlify Blobs · គ្មាន npm dependency** ➜ bundle
+  តូច ➜ cold start លឿន។
+- **Cache ខាង server ៦០ វិនាទី** ➜ ស្កេន barcode ដដែលម្តងទៀត (ឬឧបករណ៍ ២
+  គ្រឿងស្កេនកញ្ចប់ដដែល) ឆ្លើយ **ដោយមិនប៉ះ ZTO សោះ**។
+- **Single-flight** ➜ សំណើស្របគ្នាលើ barcode ដដែល **ចែក upstream call តែមួយ**។
+- **ព្យាយាមឡើងវិញដោយស្វ័យប្រវត្តិ** លើការដាច់បណ្តាញ និង HTTP 5xx —
+  ក្នុងថវិកាពេលដែលធានាថា Function **ឆ្លើយជា JSON ជានិច្ច** មុន Netlify
+  សម្លាប់វា ➜ **លែងឃើញ `Failed to fetch`**។
+- **ពិដានខាង client ធ្លាក់ពី ៥៨ វិ. ➜ ២០ វិ.** (ស្កេន) និង **៣០ វិ. ➜ ១៨ វិ.**
+  (ប៊ូតុងសាកល្បង) ព្រោះលែងមានការរង់ចាំ Chromium ទៀត។
+- **Barcode ដែល ZTO មិនស្គាល់ ឆ្លើយ HTTP 200 `found:false`** មិនមែនកំហុសទេ
+  ➜ វា **មិនកេះ cooldown ៣០ វិនាទី** ➜ ស្កេនកញ្ចប់បន្ទាប់បានភ្លាម។
 
-| `reason` | មានន័យ | ត្រូវធ្វើអ្វី |
+---
+
+## ៦. សារកំហុស និងអ្វីត្រូវធ្វើ
+
+| `code` | អ្វីអ្នកឃើញក្នុង ZoeW | ត្រូវធ្វើអ្វី |
 | --- | --- | --- |
-| `host:<hostname>` | IDaaS redirect ទៅ host ដែល **មិនស្ថិតក្នុងបញ្ជីអនុញ្ញាត** | ពិនិត្យថា host នោះជារបស់ ZTO ពិត រួចបន្ថែមវាចូល `ALLOWED_LOGIN_HOSTS` ក្នុង `netlify/lib/zto-session.js` |
-| `scheme:http` | Redirect ចេញពី HTTPS | ⛔ កុំបន្ថូរ — ជាសញ្ញាមិនល្អ |
-| `form:username-N` · `form:password-N` · `form:button-N` | ZTO ប្តូរទម្រង់ login (រកឃើញ `N` ធាតុជំនួស ១) | ត្រូវកែ selector ក្នុង `findUsernameInput()` / `findPasswordInput()` / `findLoginButton()` |
-| `login:<ErrorName>` | កំហុសផ្សេងក្នុង Chromium | មើល Function log |
+| `ZTO_AUTH_EXPIRED` | 🔒 Cookie ZTO ផុតកំណត់ | យក Cookie ថ្មី (ផ្នែក ២) ឬពិនិត្យ Token |
+| `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | ដាក់ `ZTO_COOKIE` ឬ `ZTO_AUTHORIZATION` |
+| `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
+| `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` |
+| `ZTO_NOT_FOUND` | ⚠️ ZTO មិនឃើញទិន្នន័យ | Barcode នោះមិនមានក្នុង ZTO ពិត — វាយដោយដៃ |
+| `ZTO_RATE_LIMITED` | 🚦 ZTO កំណត់ល្បឿន | រង់ចាំបន្តិច; បន្ថយល្បឿនស្កេន |
+| `ZTO_TIMEOUT` · `ZTO_UPSTREAM_UNAVAILABLE` | ⏱️ ZTO ឆ្លើយតបយឺតពេក | បណ្តាញ ឬ ZTO យឺត — ស្កេនម្តងទៀត |
+| `ZTO_UPSTREAM_REJECTED` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | សារពិតរបស់ ZTO នៅក្នុងវាល `error` |
+| `ZTO_INVALID_RESPONSE` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | ZTO ឆ្លើយមិនមែន JSON — ជាធម្មតា Cookie ផុត |
 
-> **អំពី OAuth2 របស់ ZTO** ៖ បញ្ជីអនុញ្ញាតពិនិត្យតែ **hostname** —
-> path និង query ដែលវែង និងប្រែរាល់ដង (រួមទាំង `=km`) **មិនមានបញ្ហាទេ**។
-> ការបើក `iam-web.zto.com` ដោយផ្ទាល់មិនចូល ជារឿង **ធម្មតា** ៖ IdP ត្រូវការ
-> OAuth2 parameter ដែល `argus.ztoglobal.com` ជាអ្នកផ្តល់។ ដូច្នេះ Function
-> ចាប់ផ្តើមពី `argus.ztoglobal.com` ជានិច្ច រួចដើរតាម redirect។
+---
 
-Login UI របស់ ZTO អាចប្រែដោយ ZTO ដោយគ្មានការជូនដំណឹង។ កូដនេះផ្ទៀងផ្ទាត់
-តែ HTTPS host ដែលបានកំណត់ និងឈប់ដោយសុវត្ថិភាពបើ form/redirect មិនដូចការរំពឹង។
+## ៧. ⛔ ហេតុអ្វី Auto-login ត្រូវដកចេញ (កំណែ 2.25.0)
+
+មុន 2.25.0 Function បើក **Chromium** ក្នុង Netlify ដើម្បីចូល
+`argus.ztoglobal.com` ដោយស្វ័យប្រវត្តិ។ វា **មិនដែលដំណើរការសោះ**។ ភស្តុតាង
+ដែលវាស់បានពីផលិតកម្មពិត (របាយការណ៍អ្នកប្រើ 2026-09-01)៖
+
+| កំហុសដែលឃើញ | អត្ថន័យ |
+| --- | --- |
+| `ZTO_SESSION_STORE_UNAVAILABLE` | Netlify Blobs ដាច់ |
+| `login:TimeoutError` | Chromium បើកទំព័រមិនចប់ |
+| **`login:wait-password@argus.ztoglobal.com:TimeoutError`** | **ប្រអប់ពាក្យសម្ងាត់មិនដែលលេចឡើងសោះ** |
+| `Failed to fetch` | Netlify សម្លាប់ Function មុនវាឆ្លើយ |
+
+⛔ **ជួរទី ៣ ជាភស្តុតាងសម្រេច** ៖ `@argus.ztoglobal.com` មានន័យថា browser
+**មិនត្រូវបានបញ្ជូនទៅ `iam-web.zto.com` ផង** — IDaaS OAuth2 របស់ ZTO មិនបើក
+ឲ្យ IP របស់ Netlify (សហរដ្ឋអាមេរិក)។ ការសង្កេតរបស់អ្នកប្រើត្រូវគ្នា ៖
+ការបើក `iam-web.zto.com` ដោយផ្ទាល់ក៏ចូលមិនបានដែរ។
+
+តម្លៃដែលបានចំណាយដោយឥតប្រយោជន៍៖ **memory 2 GB** ក្នុងមួយ invocation,
+dependency **៣** (`@sparticuz/chromium` · `puppeteer-core` · `@netlify/blobs`),
+កូដ **995 បន្ទាត់**, និងការរង់ចាំរបស់អ្នកប្រើ **រហូតដល់ ៥៨ វិនាទី** ក្នុងមួយ
+ការស្កេន។ ⛔ **កុំនាំវាត្រឡប់មកវិញ** ដោយគ្មានភស្តុតាងថា ZTO IdP បើកឲ្យ
+server ក្រៅប្រទេស។
+
+**ជម្រើសដែលនៅសល់ បើអ្នកចង់ឈប់ចម្លង Cookie ដោយដៃ** ៖ ស្នើ ZTO Cambodia ឲ្យ
+ផ្តល់ **API token ផ្លូវការ** រួចដាក់វាក្នុង `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` —
+ផ្នែក ៤ ខាងលើគ្របទម្រង់ API ណាក៏បាន ដោយមិនចាំបាច់កែកូដ។
+
+---
+
+## ៨. អ្វីដែល Function បញ្ជូនទៅ browser
+
+**តែប៉ុណ្ណេះ**៖
+
+```json
+{ "success": true, "found": true, "barcode": "...", "phone": "...", "cod": 0, "dod": 0, "cached": false }
+```
+
+⛔ Cookie, Token, ឈ្មោះអតិថិជន និងអាសយដ្ឋាន **មិនដែលចេញទៅ browser ទេ**។
+វាល `reason` របស់សារកំហុសត្រូវច្រោះទាំង ២ ខាង (server និង client) មុនចូល DOM។

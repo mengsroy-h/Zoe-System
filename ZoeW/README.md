@@ -67,30 +67,41 @@ PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្�
 
 #### ប្រើ ZTO Cambodia (សង្ខេប)
 
-ZTO Argus អាច login ស្វ័យប្រវត្តិពី Netlify Function។ កំណត់ Secret Environment
-Variables ខាងក្រោម ហើយ Trigger deploy ម្តង៖
+ZoeW ហៅ ZTO តាម Netlify Function មួយ។ មានផ្លូវ auth **២** ប៉ុណ្ណោះ
+(តាំងពីកំណែ **2.25.0**)៖
 
 ```text
 ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់អ្នក 32 តួឡើងទៅ
-ZTO_AUTO_LOGIN=true
-ZTO_USERNAME=<Argus username>
-ZTO_PASSWORD=<Argus password>
-ZTO_SESSION_ENCRYPTION_KEY=<លទ្ធផល openssl rand -base64 32>
+
+# រួចជ្រើស **មួយ** ៖
+ZTO_AUTHORIZATION=<header Authorization ពេញ ពី API ផ្លូវការ>   # ល្អបំផុត
+ZTO_TOKEN=<token ផ្លូវការ>  (+ ZTO_TOKEN_HEADER បើ ZTO បញ្ជាក់)
+ZTO_COOKIE=<Cookie ពេញ ចម្លងពី browser របស់ Argus>
 ```
 
-`ZTO_COOKIE` លែងចាំបាច់សម្រាប់ setup auto-login ប៉ុន្តែនៅតែអាចប្រើជា manual
-fallback។ Official `ZTO_AUTHORIZATION`/`ZTO_TOKEN` នៅតែមានអាទិភាពខ្ពស់បំផុត។
+លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ `ZTO_COOKIE`**។
 
-តាំងពីកំណែ **2.24.2** សារកំហុសរបស់ auto-login ភ្ជាប់មកជាមួយវាល **`reason`**
-ដែលប្រាប់ថាជាប់ត្រង់ណា (`getstore:MissingBlobsEnvironmentError` ·
-`host:<hostname>` · `form:username-N` …) ហើយការដាច់របស់ Netlify Blobs
-**លែងធ្វើឲ្យការស្កេនស្លាប់ទាំងស្រុងទេ** — Function ធ្លាក់ចុះទៅ session
-ក្នុងសតិរបស់ container នោះ។ តារាងអត្ថន័យពេញលេញនៅក្នុង
-[`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៦។
+> ⛔ **Auto-login (Chromium ចូល Argus ដោយស្វ័យប្រវត្តិ) ត្រូវបានដកចេញទាំងស្រុង
+> ក្នុងកំណែ 2.25.0** ព្រោះ IDaaS OAuth2 របស់ ZTO មិនបើកឲ្យ IP របស់ Netlify —
+> វាស់បានពីផលិតកម្មពិត (`login:wait-password@argus.ztoglobal.com:TimeoutError`
+> ៖ ប្រអប់ពាក្យសម្ងាត់មិនដែលលេចឡើងសោះ)។ ការដកនោះក៏ដកចេញនូវ dependency ៣
+> (`@sparticuz/chromium` · `puppeteer-core` · `@netlify/blobs`) និង memory
+> 2 GB ➜ **cold start លឿនជាងមុនច្រើន**។ ភស្តុតាងពេញលេញនៅ
+> [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៧។
 
-Session ថ្មីត្រូវ encrypt ដោយ AES-256-GCM ក្នុង Netlify Blobs; Username,
-Password និង Cookie មិនត្រូវបានបញ្ជូនទៅ ZoeW browser ទេ។ ក្នុងប្រអប់
-«API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» ដាក់៖
+**ពេល ZTO ផ្តល់ API ផ្លូវការ វាដំណើរការដោយមិនកែកូដ** — endpoint · method ·
+តួសំណើ · header · និងឈ្មោះ field កំណត់តាម env (`ZTO_API_URL` ·
+`ZTO_API_METHOD` · `ZTO_REQUEST_BODY_JSON` · `ZTO_REQUEST_HEADERS_JSON` ·
+`ZTO_FIELD_PHONE`/`_COD`/`_DOD`)។ Function ស្គាល់ទម្រង់ចម្លើយច្រើនបែប
+(`data` · `result` · `data.data` · array · root ផ្ទាល់) និងឈ្មោះ field
+ច្រើនបែបស្រាប់។ ⛔ ពេលប្រើ Token/Authorization វា **មិនផ្ញើ `Origin`/`Referer`
+ក្លែងរបស់ Argus ទេ** ព្រោះ WAF/CORS របស់ API ផ្លូវការអាចបដិសេធសំណើ។
+
+ផ្ទៀងផ្ទាត់ការតភ្ជាប់ដោយ **`?diag=1`** (ត្រូវការ `X-Zoe-Proxy-Key`) — វាឆ្លើយ
+auth kind · host · ឈ្មោះ header · ថវិកាពេល ដោយ **គ្មានតម្លៃសម្ងាត់សោះ**។
+មើល [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៤។
+
+ក្នុងប្រអប់ «API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ» ដាក់៖
 
 | វាល | តម្លៃ |
 |---|---|

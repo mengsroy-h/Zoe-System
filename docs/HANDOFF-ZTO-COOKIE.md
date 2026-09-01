@@ -69,60 +69,60 @@ Auth:  Authorization: Bearer <NETLIFY_AUTH_TOKEN>
 
 ---
 
-## ៣. អ្វីដែល **នៅសល់** — ចាប់ផ្តើមត្រង់នេះ
+## ៣. ផ្នែក ៣ — ✅ **ចប់រួច** (2026-09-01)
 
-### ក. ⛔ ផ្ទៀងផ្ទាត់ថា checker ធ្លាក់លើ `origin/main` (ចាំបាច់ · មិនទាន់ធ្វើ)
+គ្រប់ចំណុច ក–ច ខាងក្រោមធ្វើរួច។ **គ្រប់ជួរជាការវាស់ មិនមែនការអាន។**
 
-ជុំនេះអស់ពេលមុនធ្វើ។ ច្បាប់គម្រោង៖ checker ដែលមិនធ្លាក់លើ tree មុនកែ = មិនចាប់អ្វីទេ។
+### ក. ✅ checker ធ្លាក់លើ `origin/main` — វាស់រួច
 
-```bash
-git fetch origin main
-rm -rf /tmp/baseline && mkdir /tmp/baseline
-git archive origin/main | tar -x -C /tmp/baseline
-ZTOCOOKIE_APP_DIR=/tmp/baseline node audit-tools/zto-cookie-update-test.js
-```
-**រំពឹង**៖ exit 1 ដោយ «ជាន់អប្បបរមា៖ រកមិនឃើញ … zto-cookie-update.js»។
-បើវាចេញ exit 0 ➜ checker ខូច ➜ កែវាមុនបន្ត។
+| tree | exit | អ្វីដែលឃើញ |
+|---|---|---|
+| `origin/main` | **1** | `ជាន់អប្បបរមា៖ រកមិនឃើញ … zto-cookie-update.js` |
+| ថតទទេ | **1** | ដដែល |
+| tree បច្ចុប្បន្ន | **0** | `✅ 62 ok` |
 
-### ខ. បន្ថែមចូល `audit-tools/run-all.sh`
+### ខ. ✅ បន្ថែមចូល `run-all.sh` — **ផ្នែក ២** (រត់ធម្មតា និង baseline)
 
-បន្ថែម `zto-cookie-update-test.js` ចូល **ផ្នែករត់ធម្មតា** (មិនមែនផ្នែក baseline
-តែម្យ៉ាង) បើមិនដូច្នេះ `checker-coverage.js` ផ្នែក ២ខ ធ្លាក់។
+`checker-coverage.js` ផ្នែក ២ខ បៃតង; checker សរុបឡើងទៅ **111**។
 
-### គ. ⛔ កែ `audit-tools/version-bump-scope.js` — ចន្លោះពិត
+### គ. ✅ `version-bump-scope.js` — ចន្លោះពិតត្រូវបិទ
 
-`SHIPPED = /\.(js|css|html|wasm|json)$/` ចាប់ **`ZoeW/netlify/functions/*.js`**
-➜ ការកែ Function ខាង server បង្ខំ `CACHE_VERSION` ឲ្យឡើង ➜ **អ្នកប្រើទាំងអស់
-ទាញសំបក PWA ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** — ជាកំហុសដដែលនឹងច្បាប់ទី ៦។
+**វាស់បាន** ៖ មុនកែ ➜ ❌ **ធ្លាក់ ២** (`ZoeW/netlify/functions/*.js` ត្រូវរាប់ជា
+កូដ ship ➜ ទាមទារ `CACHE_VERSION` **និង** `APP_VERSION` ឡើង); ក្រោយកែ ➜
+✅ «គ្មាន App ណាប្រែធៀបនឹង origin/main»។
 
-**ការកែដែលស្នើ**៖ បន្ថែម `netlify\/functions\/` ចូល `NOT_SHIPPED` ព្រោះ Function
-រត់លើ server ហើយ **មិនដែលនៅក្នុង `CORE_SHELL`/`OPTIONAL_SHELL` របស់ `sw.js`**
-➜ វាមិនអាចធ្វើឲ្យសំបកដែល cache ចាស់បានទេ។
+ការកែ ២ ផ្នែក **ដោយចេតនា** ៖
+1. `netlify\/functions\/` ចូល `NOT_SHIPPED` — Function រត់លើ server ហើយ
+   `sw.js` បញ្ជូន `/.netlify/functions/` ទៅ **`networkOnly()`** ➜ វាមិនដែល
+   ចូល cache ➜ មិនអាចធ្វើឲ្យសំបកចាស់បានឡើយ។
+2. ⛔ **ការចាក់សោការលើកលែងនោះ** — assertion ថាបញ្ជីសំបករបស់ `sw.js`
+   **គ្មានផ្លូវក្រោម `netlify/` ឬ `tools/`** បូកជាន់អប្បបរមា ២ (បញ្ជីសំបក ២ ·
+   ធាតុ >= ៨)។ ការបន្ធូរ checker ដោយគ្មានការចាក់សោ = បៃតងក្លែងក្លាយសម្រាប់
+   ជុំក្រោយ។
 
-⛔ **កុំគ្រាន់តែបន្ធូរ checker។** ត្រូវបិទរន្ធជាមួយ៖ បន្ថែម assertion ថា
-បញ្ជីសំបកក្នុង `sw.js` **គ្មានផ្លូវណាក្រោម `netlify/` ឬ `tools/`** ➜ បើថ្ងៃណា
-មានឯកសារសំបកចូលទីនោះ វានឹងធ្លាក់។
+**Mutation ៤ ➜ ចាប់បានទាំង ៤** ៖ ផ្លូវសំបកក្រោម `netlify/` · `OPTIONAL_SHELL`
+ប្តូរឈ្មោះ · បញ្ជីសំបកត្រូវកាត់ · **ទិសផ្ទុយ** (កែ `app.js` ពិត ➜ នៅតែទាមទារ
+ការឡើងកំណែ ២ ដដែល)។
 
-### ឃ. កំណែ — **កុំឡើង** (គិតរួច)
+### ឃ. ✅ កំណែ — **មិនឡើង** (ត្រឹមត្រូវ)
 
-ជុំនេះ **មិនប៉ះ** `ZoeW/app.js` · `index.html` · `style.css` · `sw.js` ទេ។
-ក្រោយកែចំណុច គ ➜ គ្មានឯកសារ ship ណាប្រែ ➜ **`APP_VERSION` និង `CACHE_VERSION`
-មិនត្រូវឡើង** (ច្បាប់ទី ៦ · `version-bump-scope` ច្បាប់ ២ និង ៤)។
-`ZoeKeyGen` មិនប៉ះសោះ។
+ឯកសារ ship (`app.js` · `index.html` · `style.css` · `sw.js` · `manifest.json`)
+**មិនប្រែសោះ** ➜ `APP_VERSION` នៅ `2.25.1` · `CACHE_VERSION` នៅ `zoew-v148`។
+ZoeKeyGen មិនប៉ះ។
 
-### ង. ឯកសារ
+### ង. ✅ ឯកសារ
 
-- `ZoeW/ZTO-SETUP-KH.md` — បន្ថែមផ្នែកថ្មី «ប្តូរ Cookie ដោយចុច ១ ដង» + env vars ថ្មី
-- `tools/zto-cookie-grabber/README-KH.md` — **មិនទាន់សរសេរ** (របៀបដំឡើង extension)
-- `CHANGELOG.md` · `CLAUDE.md` · `README.md` · `audit-tools/README.md` (បន្ថែមជួរតារាង checker)
+`tools/zto-cookie-grabber/README-KH.md` (ថ្មី) · `ZoeW/ZTO-SETUP-KH.md`
+(ផ្នែក ២ខ + env vars) · `CHANGELOG.md` · `CLAUDE.md` (តារាងច្បាប់ ➜ ឧបករណ៍ +
+ផ្នែកចំណេះដឹង) · `README.md` · `audit-tools/README.md`។
 
-### ច. រត់ `run-all.sh` ពេញ រួច commit + push
+### ច. ✅ រកឃើញបន្ថែម ៖ `process.exit(0)` ដែលគ្មានច្រកទ្វារ
 
-```bash
-bash audit-tools/run-all.sh
-node audit-tools/strip-comments.js
-node audit-tools/version-check.js
-```
+`exit-code-integrity.js` ចាប់បាន `zto-cookie-update-test.js:386` —
+`process.exit(0)` ឈរក្រោយការអះអាង។ វា **មិនមែនបៃតងក្លែងក្លាយរស់** ទេ (ផ្លូវ
+`if (fail) … exit(1)` ការពារវា) តែវាជា **ទម្រង់ផុយ** ៖ ការអះអាងណាដែលបន្ថែម
+**ក្រោម** ច្រកទ្វារនោះ នឹងត្រូវរំលងស្ងាត់ៗ។ កែទៅជា `process.exit(fail ? 1 : 0)`
+តាមទម្លាប់គម្រោង (៦៧ checker ប្រើទម្រង់នេះ)។
 
 ---
 

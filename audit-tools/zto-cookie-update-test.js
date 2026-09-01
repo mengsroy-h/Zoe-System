@@ -378,12 +378,10 @@ scenario('Chrome extension ៖ សិទ្ធិតូចបំផុត និ
     console.log('');
     ok('ជាន់អប្បបរមា៖ ការអះអាងសរុប >= ' + MIN_ASSERTS, pass + fail >= MIN_ASSERTS, 'បាន ' + (pass + fail));
 
-    if (fail) {
-        console.log('\n❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')');
-        process.exit(1);
-    }
-    console.log('\n✅ ' + pass + ' ok');
-    process.exit(0);
+    console.log(fail
+        ? '\n❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'
+        : '\n✅ ' + pass + ' ok');
+    process.exit(fail ? 1 : 0);
 })().then(() => {}, (e) => {
     console.log('\n❌ checker បោះកំហុស៖ ' + (e && e.stack ? e.stack : e));
     process.exit(1);

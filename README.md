@@ -46,6 +46,9 @@
 - **Lookup API** — ទាញលេខទូរស័ព្ទ/COD/DOD ពី Google Sheet ឬ ZTO តាម Netlify proxy
   ដោយស្វ័យប្រវត្តិពេលស្កេន។ ZTO ប្រើ **Cookie ដោយដៃ ឬ API token ផ្លូវការ**
   (auto-login ត្រូវដកចេញក្នុង 2.25.0 — មើល `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ៧)។
+  ពេល Cookie ផុតកំណត់ Chrome extension `tools/zto-cookie-grabber/` ប្តូរវា
+  **ដោយចុច ១ ដង** (extension ➜ Netlify Function ➜ env var + deploy) ជំនួស
+  ការចម្លងតាម DevTools។
   Proxy មាន **cache ៦០ វិនាទី · single-flight · retry លើ 5xx** ហើយ
   **ឆ្លើយជា JSON ជានិច្ច** ក្នុងថវិកាពេលរបស់ Netlify។ Fast Mode ចងចាំ barcode
   ដែលរកឃើញ ១០ នាទីក្នុង memory។ បើ ZTO យឺត ការវាយដោយដៃបើកជាផ្លូវ fallback
@@ -177,6 +180,7 @@ bash audit-tools/run-all.sh
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្ម និងថ្នាក់កំហុសដែលដោះស្រាយរួច (សម្រាប់អ្នកថែទាំ) |
 | [CHANGELOG.md](CHANGELOG.md) | ប្រវត្តិកំណែ |
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
+| [tools/zto-cookie-grabber/](tools/zto-cookie-grabber/README-KH.md) | Chrome extension ៖ ប្តូរ Cookie ZTO ដោយចុច ១ ដង |
 | [firebase-backup/](firebase-backup/) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ## អាជ្ញាប័ណ្ណ

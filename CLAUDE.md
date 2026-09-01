@@ -226,6 +226,9 @@
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
 | **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
+| **ZTO ៖ ប្តូរ Cookie ១ ដង** | ⛔ cookie ជា `HttpOnly` ➜ **extension** មិនមែន bookmarklet | `zto-cookie-update-test` |
+| **ZTO ៖ កូនសោសរសេរ env** | ⛔ `ZTO_COOKIE_UPDATE_KEY` ≠ `ZTO_PROXY_KEY` | `zto-cookie-update-test` |
+| **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
 ### ⛔ ស្ថិតិ «យក» ៖ អតិថិជន និងកញ្ចប់ ត្រូវរាប់លើ **មូលដ្ឋានតែមួយ** — កំណែ 2.19.4
@@ -1853,6 +1856,75 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
 > [`docs/BUG-HISTORY.md`](docs/BUG-HISTORY.md) — អានវាតែពេលចង់ដឹង *ហេតុអ្វី*
 > ការសម្រេចនេះកើតឡើង។
 
+
+### ⛔ ZTO Cookie ចុច ១ ដង · និង **កូដខាង server មិនមែនសំបក PWA** (2026-09-01)
+
+> **សំណើអ្នកប្រើ** ៖ *«តើមានវីធីណាដែលអាចយក cookie ពី argus.ztoglobal.com ស្រួល
+> ជាងចូលយកដោយដៃតាម devtool បានទេ … រាល់ពេលដែរ cookie អស់សុពលភាព ខ្ញុំត្រូវចូល
+> ទៅយក … មក trigger deploy ក្នុង netlify»*។
+
+ខ្សែសង្វាក់ ៖ **extension ➜ Function `zto-cookie-update` ➜ Netlify API**
+(`setEnvVarValue` + `createSiteBuild`) ➜ នៅសល់ត្រឹមចុចរូប ១ ដង។
+
+#### ⛔ ការវាស់ ២ ដែលធ្វើរួច — កុំវាស់ឡើងវិញ
+
+| សំណួរ | ចម្លើយពិត |
+|---|---|
+| `document.cookie` លើ Argus? | `__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN=1` · `perf_dv6Tr4n=1` · `sidebarStatus=0` — **គ្មាន credential ពិត** |
+| ដូច្នេះ cookie ពិត? | **`HttpOnly`** — អ្នកប្រើយកវាពី Response Headers ➜ `Set-Cookie` |
+
+⛔ **bookmarklet ដើរមិនកើតតាមរចនាសម្ព័ន្ធ** — JS អានមិនឃើញ។ មានតែ
+`chrome.cookies` (extension) ទេដែលអាន `HttpOnly` បាន។ **កុំត្រឡប់ទៅ
+bookmarklet វិញ។** ⛔ **កុំនាំ auto-login មកវិញ** ដែរ (2.24.2 ➜ 2.24.7 ៖ ជុំ ៦
+បរាជ័យទាំងអស់)។
+
+ច្បាប់៖
+
+- **កូនសោដាច់ដោយឡែក** ៖ `ZTO_COOKIE_UPDATE_KEY` **≠** `ZTO_PROXY_KEY`។ កូនសោ
+  ក្រោយរស់នៅក្នុង **client app** ចំណែកកូនសោមុនផ្តល់សិទ្ធិ **សរសេរ** លើ env ➜
+  ការចែករំលែកវានឹងឲ្យ client ណាមួយប្តូរ env របស់ site បាន។
+- ⛔ **`NETLIFY_AUTH_TOKEN` រស់នៅ *តែក្នុង env របស់ Function*** — សិទ្ធិពេញលើ
+  គណនី។ កុំដាក់វាក្នុង extension ឬ client ណាមួយ។
+- **Header injection** ៖ cookie ដែលមាន `CR`/`LF`/`NUL` ត្រូវបដិសេធ។
+- **ការ settle ធានាដោយ *រចនាសម្ព័ន្ធ*** ៖ `timedFetch()` ប្រណាំង timer **ពិត**
+  បន្ថែមលើ `AbortController` — មេរៀន `stall-guard` (2.22.4) អនុវត្តខាង server ៖
+  បណ្តាញ «ភ្ជាប់តែស្លាប់» អាច **មិនគោរព signal សោះ**។
+- ⛔ **env សរសេរធ្លាក់ ➜ មិន trigger deploy ហើយមិនអះអាង `ok: true`**
+  (មេរៀន `toast-truth`) — បើអត់ អ្នកប្រើឃើញបៃតង ខណៈ cookie ចាស់នៅដដែល។
+- **extension ដាក់ក្រោម `tools/` កម្រិត root ដោយចេតនា** ព្រោះ
+  `ZoeW/netlify.toml` មាន `publish = "."` ➜ អ្វីក្រោម `ZoeW/` ត្រូវ publish
+  ឡើង site ➜ ការដាក់វាក្នុង `ZoeW/` នឹងបញ្ចេញ extension ជាសាធារណៈ។
+
+#### ⛔ ចន្លោះពិតរបស់ `version-bump-scope.js` ដែលបិទក្នុងជុំនេះ
+
+`SHIPPED = /\.(js|css|html|wasm|json)$/` ចាប់ **`ZoeW/netlify/functions/*.js`**
+➜ ការកែ Function **ខាង server** បង្ខំ `CACHE_VERSION` ឲ្យឡើង ➜ **អ្នកប្រើ
+ទាំងអស់ទាញសំបក PWA ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** — ថ្នាក់ដដែលនឹងច្បាប់ទី ៦។
+
+**វាស់បាន** (មិនមែនអានកូដ)៖
+
+| tree | លទ្ធផល |
+|---|---|
+| មុនកែ (Function ថ្មី + កែ ១) | ❌ **ធ្លាក់ ២** — ទាមទារ `CACHE_VERSION` **និង** `APP_VERSION` ឡើង |
+| ក្រោយកែ | ✅ «គ្មាន App ណាប្រែធៀបនឹង origin/main» |
+
+មូលហេតុដែលការលើកលែងសុវត្ថិភាព ៖ `sw.js` បញ្ជូន `/.netlify/functions/` ទៅ
+**`networkOnly()`** ដោយផ្ទាល់ ➜ Function **មិនដែលចូល cache** ➜ វាមិនអាចធ្វើឲ្យ
+សំបកចាស់បានឡើយ។
+
+⛔ **តែការបន្ធូរ checker ដោយគ្មានការចាក់សោ គឺជាការបង្កើតបៃតងក្លែងក្លាយសម្រាប់
+ជុំក្រោយ** (មេរៀន «ការការពារដែលងាប់»)។ ការលើកលែងឈរលើការពិត **តែមួយ** ៖ បញ្ជី
+សំបករបស់ `sw.js` គ្មានផ្លូវក្រោម `netlify/` ឬ `tools/`។ ដូច្នេះ checker
+**អះអាងការពិតនោះដោយផ្ទាល់** បូកជាន់អប្បបរមា ២ (បញ្ជីសំបក ២ · ធាតុ >= ៨) ➜
+បើថ្ងៃណាឯកសារសំបកពិតចូលទីនោះ វាធ្លាក់ **មុន** ការកែនោះ ship។
+
+**Mutation ៤ ➜ ចាប់បានទាំង ៤** ៖ ផ្លូវសំបកក្រោម `netlify/` · `OPTIONAL_SHELL`
+ប្តូរឈ្មោះ · បញ្ជីសំបកត្រូវកាត់ · និង **ទិសផ្ទុយ** (កែ `app.js` ពិត ➜ **នៅតែ**
+ទាមទារការឡើងកំណែ ២ ដដែល)។
+
+Test៖ **`zto-cookie-update-test.js`** (៦២ assertion; ធ្លាក់ **១** លើ
+`origin/main` ដោយជាន់អប្បបរមា ព្រោះឯកសារមិនទាន់មាន) និង
+**`version-bump-scope.js`** (៧ assertion)។
 
 ### ⛔ ស្លាក ↔ ថេរ ត្រូវចងភ្ជាប់គ្នា — និង **ថ្ងៃលំដាប់ ≠ រយៈពេល** (កំណែ 2.25.1)
 

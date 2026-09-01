@@ -11,9 +11,6 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 | ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
 | ២ | **Cookie ដោយដៃ** — `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — យក Cookie ពី Argus web |
 
-> ⛔ **Auto-login (Chromium ចូល Argus ដោយស្វ័យប្រវត្តិ) ត្រូវបានដកចេញទាំងស្រុង
-> ក្នុងកំណែ 2.25.0។** មូលហេតុ និងភស្តុតាងនៅផ្នែក **៧** ខាងក្រោម។
-
 ---
 
 ## ១. Environment Variables ក្នុង Netlify
@@ -67,27 +64,6 @@ openssl rand -base64 32
 > ម្តងទៀត។ គ្មានអ្វីខូចទេ ទិន្នន័យទាំងអស់នៅដដែល។
 
 ---
-
-## ២ខ. ⛔ ហេតុអ្វី **គ្មានផ្លូវស្វ័យប្រវត្តិ** សម្រាប់ការប្តូរ Cookie
-
-ជំហាន ១–៥ ខាងលើត្រូវធ្វើឡើងវិញរាល់ពេល Cookie ផុត។ យើងបានសាកផ្លូវស្វ័យប្រវត្តិ
-**២** — ហើយ **ទាំង ២ បរាជ័យលើឧបករណ៍ពិត**៖
-
-| ផ្លូវ | លទ្ធផលដែលវាស់បាន (2026-09-01) |
-|---|---|
-| **Auto-login** (Chromium ក្នុង Netlify Function) | ❌ ជុំ **៦** (2.24.2 ➜ 2.24.7) បរាជ័យទាំងអស់ — IdP របស់ ZTO មិនបើកឲ្យ IP របស់ Netlify (មើលផ្នែក ៧) |
-| **Chrome extension** (`chrome.cookies` API) | ❌ `permissions.contains` = `true` · profile ដដែល · store ១ តែ `chrome.cookies.getAll({})` ត្រឡប់ **០** ខណៈ DevTools បង្ហាញ cookie **៥** ➜ ដកចេញទាំងស្រុង |
-
-**ការវាស់ដែលនៅតែជាការពិត — កុំវាស់ឡើងវិញ**៖
-
-| សំណួរ | ចម្លើយ |
-|---|---|
-| `document.cookie` លើ Argus ផ្តល់អ្វី? | `__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN=1` · `perf_dv6Tr4n=1` · `sidebarStatus=0` — **គ្មាន credential ពិត** |
-| Cookie session ពិតនៅឯណា? | **`BOS-MAN-SESSION`** លើ `aargus-api.ztoglobal.com` — **`HttpOnly`** ➜ JS អានមិនឃើញ |
-
-⛔ **ដូច្នេះ bookmarklet ដើរមិនកើតទេ** ហើយ **extension ក៏មិនបានដែរ**។
-⛔ **កុំនាំ auto-login មកវិញ** និង ⛔ **កុំសាងសង់ extension ឡើងវិញ** ដោយគ្មាន
-ភស្តុតាងថម្មីច្បាស់លាស់ថាបញ្ហាខាងលើត្រូវបានដោះស្រាយ។
 
 **ផ្លូវដែលដំណើរការគឺជំហាន ១–៥ ខាងលើ** — ប្រហែល ២ នាទីក្នុងមួយដង។
 
@@ -230,37 +206,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 
 ---
 
-## ៧. ⛔ ហេតុអ្វី Auto-login ត្រូវដកចេញ (កំណែ 2.25.0)
-
-មុន 2.25.0 Function បើក **Chromium** ក្នុង Netlify ដើម្បីចូល
-`argus.ztoglobal.com` ដោយស្វ័យប្រវត្តិ។ វា **មិនដែលដំណើរការសោះ**។ ភស្តុតាង
-ដែលវាស់បានពីផលិតកម្មពិត (របាយការណ៍អ្នកប្រើ 2026-09-01)៖
-
-| កំហុសដែលឃើញ | អត្ថន័យ |
-| --- | --- |
-| `ZTO_SESSION_STORE_UNAVAILABLE` | Netlify Blobs ដាច់ |
-| `login:TimeoutError` | Chromium បើកទំព័រមិនចប់ |
-| **`login:wait-password@argus.ztoglobal.com:TimeoutError`** | **ប្រអប់ពាក្យសម្ងាត់មិនដែលលេចឡើងសោះ** |
-| `Failed to fetch` | Netlify សម្លាប់ Function មុនវាឆ្លើយ |
-
-⛔ **ជួរទី ៣ ជាភស្តុតាងសម្រេច** ៖ `@argus.ztoglobal.com` មានន័យថា browser
-**មិនត្រូវបានបញ្ជូនទៅ `iam-web.zto.com` ផង** — IDaaS OAuth2 របស់ ZTO មិនបើក
-ឲ្យ IP របស់ Netlify (សហរដ្ឋអាមេរិក)។ ការសង្កេតរបស់អ្នកប្រើត្រូវគ្នា ៖
-ការបើក `iam-web.zto.com` ដោយផ្ទាល់ក៏ចូលមិនបានដែរ។
-
-តម្លៃដែលបានចំណាយដោយឥតប្រយោជន៍៖ **memory 2 GB** ក្នុងមួយ invocation,
-dependency **៣** (`@sparticuz/chromium` · `puppeteer-core` · `@netlify/blobs`),
-កូដ **995 បន្ទាត់**, និងការរង់ចាំរបស់អ្នកប្រើ **រហូតដល់ ៥៨ វិនាទី** ក្នុងមួយ
-ការស្កេន។ ⛔ **កុំនាំវាត្រឡប់មកវិញ** ដោយគ្មានភស្តុតាងថា ZTO IdP បើកឲ្យ
-server ក្រៅប្រទេស។
-
-**ជម្រើសដែលនៅសល់ បើអ្នកចង់ឈប់ចម្លង Cookie ដោយដៃ** ៖ ស្នើ ZTO Cambodia ឲ្យ
-ផ្តល់ **API token ផ្លូវការ** រួចដាក់វាក្នុង `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` —
-ផ្នែក ៤ ខាងលើគ្របទម្រង់ API ណាក៏បាន ដោយមិនចាំបាច់កែកូដ។
-
----
-
-## ៨. អ្វីដែល Function បញ្ជូនទៅ browser
+## ៧. អ្វីដែល Function បញ្ជូនទៅ browser
 
 **តែប៉ុណ្ណេះ**៖
 

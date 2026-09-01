@@ -27,10 +27,48 @@
 - សិទ្ធិចូល ZoeW site ក្នុង Netlify
 - Netlify Personal Access Token មួយ (បញ្ចូលតែម្តង)
 
+## Netlify Environment Variables — ដាក់តែ ២ Key
+
+ចូល `Netlify → ZoeW site → Project configuration → Environment variables`
+រួចចុច **Add a variable**។ បង្កើត variable ២ ដាច់ដោយឡែកដូចតារាងនេះ៖
+
+| Key | Value ពេលបង្កើតដំបូង | Contains secret values | Scope | Deploy context |
+|---|---|---|---|---|
+| `ZTO_PROXY_KEY` | សោចៃដន្យ ៣២ bytes (វិធីបង្កើតនៅខាងក្រោម) | ✅ Yes | **Functions** | **Production** |
+| `ZTO_COOKIE` | Cookie ពេញ ឬ `BOS-MAN-SESSION=setup-pending` ជាបណ្តោះអាសន្ន | ✅ Yes | **Functions** | **Production** |
+
+បើមិនចង់ចូល DevTools សូម្បីតែលើកដំបូង សូមដាក់
+`BOS-MAN-SESSION=setup-pending` ក្នុង `ZTO_COOKIE` សិន។ តម្លៃនេះ **មិនមែនជា
+Cookie ពិត** ទេ ហើយ lookup មិនទាន់ដើររហូតដល់អ្នករត់ `sync-zto-cookie.cmd`។
+Helper នឹងជំនួសវាដោយ Cookie ពេញដែលចាប់បាន រួច trigger deploy ដោយខ្លួនឯង។
+
+បង្កើត `ZTO_PROXY_KEY` លើ Windows៖ បើក **PowerShell** រួចរត់បន្ទាត់ទាំងនេះ
+ហើយចម្លង output ចូល Netlify៖
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+[Convert]::ToBase64String($bytes)
+```
+
+តម្លៃ `ZTO_PROXY_KEY` ដដែលនេះត្រូវដាក់ក្នុង ZoeW នៅ
+`⚙️ → 🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ → តម្លៃ Header` ដោយប្រើឈ្មោះ Header
+`X-Zoe-Proxy-Key`។ កុំយក `ZTO_COOKIE` ទៅដាក់ក្នុង ZoeW/browser។
+
+សម្រាប់ផ្លូវ Cookie នេះ **មិនចាំបាច់** បង្កើត `ZTO_API_URL`,
+`ZTO_API_METHOD` ឬ `ZTO_REQUEST_*` ទេ ព្រោះ Function មានលំនាំដើមរួច។ បើមាន
+`ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` ចាស់ សូមលុបវា ព្រោះវាមានអាទិភាពលើ
+`ZTO_COOKIE`។
+
+⛔ **កុំដាក់** `NETLIFY_AUTH_TOKEN`, `NETLIFY_ACCOUNT_ID`, `NETLIFY_SITE_ID`
+ឬ `ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង Personal Access Token
+ត្រូវបញ្ចូលតែក្នុង `setup.cmd` ហើយរក្សាទុកតែលើ Windows របស់អ្នក។
+
 ## មុន Setup
 
-1. ក្នុង Netlify សូមប្រាកដថា `ZTO_COOKIE` មានរួច ហើយកំណត់ជា
-   **Contains secret values** · scope **Functions** · context **Production**។
+1. ពិនិត្យថា variable ទាំង ២ ខាងលើមានរួច និងបានកំណត់ metadata តាមតារាង។
 2. ចូល `Netlify → User settings → Applications → Personal access tokens`
    ហើយបង្កើត token មួយសម្រាប់ឧបករណ៍នេះ។ ជ្រើសថ្ងៃផុតកំណត់ ហើយបើ team ប្រើ
    SSO ត្រូវអនុញ្ញាត token ឲ្យចូល team នោះ។ មើល

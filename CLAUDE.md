@@ -227,8 +227,6 @@
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
 | **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
-| **ZTO ៖ ប្តូរ Cookie ១ ដង** | ⛔ cookie ជា `HttpOnly` ➜ **extension** មិនមែន bookmarklet | `zto-cookie-update-test` |
-| **ZTO ៖ កូនសោសរសេរ env** | ⛔ `ZTO_COOKIE_UPDATE_KEY` ≠ `ZTO_PROXY_KEY` | `zto-cookie-update-test` |
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
@@ -1858,45 +1856,36 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
 > ការសម្រេចនេះកើតឡើង។
 
 
-### ⛔ ZTO Cookie ចុច ១ ដង · និង **កូដខាង server មិនមែនសំបក PWA** (2026-09-01)
+### ⛔ Cookie ZTO ត្រូវប្តូរ **ដោយដៃ** — ខ្សែសង្វាក់ «ចុច ១ ដង» ត្រូវដកចេញ (2026-09-01)
 
-> **សំណើអ្នកប្រើ** ៖ *«តើមានវីធីណាដែលអាចយក cookie ពី argus.ztoglobal.com ស្រួល
-> ជាងចូលយកដោយដៃតាម devtool បានទេ … រាល់ពេលដែរ cookie អស់សុពលភាព ខ្ញុំត្រូវចូល
-> ទៅយក … មក trigger deploy ក្នុង netlify»*។
+> **សំណើអ្នកប្រើ** ៖ *«សូមដកអ្វីដែលពាក់ព័ន្ធជាមួយ extension ចេញពីកូដឲ្យស្អាត»*។
 
-ខ្សែសង្វាក់ ៖ **extension ➜ Function `zto-cookie-update` ➜ Netlify API**
-(`setEnvVarValue` + `createSiteBuild`) ➜ នៅសល់ត្រឹមចុចរូប ១ ដង។
+ធ្លាប់មានខ្សែសង្វាក់ **Chrome extension ➜ Function `zto-cookie-update` ➜
+Netlify API** ដែលធ្វើឲ្យការប្តូរ Cookie នៅសល់ត្រឹមចុច ១ ដង។ **វាត្រូវដកចេញ
+ទាំងស្រុង** ៖ `tools/zto-cookie-grabber/` · `ZoeW/netlify/functions/zto-cookie-update.js` ·
+`audit-tools/zto-cookie-update-test.js`។
 
-#### ⛔ ការវាស់ ២ ដែលធ្វើរួច — កុំវាស់ឡើងវិញ
+#### ⛔ ការវាស់ដែលធ្វើរួច — កុំវាស់ឡើងវិញ
 
 | សំណួរ | ចម្លើយពិត |
 |---|---|
 | `document.cookie` លើ Argus? | `__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN=1` · `perf_dv6Tr4n=1` · `sidebarStatus=0` — **គ្មាន credential ពិត** |
-| ដូច្នេះ cookie ពិត? | **`HttpOnly`** — អ្នកប្រើយកវាពី Response Headers ➜ `Set-Cookie` |
+| Cookie session ពិត? | **`BOS-MAN-SESSION` លើ `aargus-api.ztoglobal.com`** ជា **`HttpOnly`** ➜ យកបានតែពី Response Headers ➜ `Set-Cookie` ឬពី Request Header `Cookie:` |
+| `chrome.cookies` អានវាបានទេ? | 🔴 **អត់ទេ លើ Edge របស់អ្នកប្រើ** — វាស់បាន ៖ `permissions.contains` = `true` · `getAllCookieStores` = ១ · tab Argus នៅ profile ដដែល (`argusTabs=1`) តែ `getAll({})` = **០** ខណៈ DevTools ➜ Application ➜ Cookies បង្ហាញ **៥** |
 
-⛔ **bookmarklet ដើរមិនកើតតាមរចនាសម្ព័ន្ធ** — JS អានមិនឃើញ។ មានតែ
-`chrome.cookies` (extension) ទេដែលអាន `HttpOnly` បាន។ **កុំត្រឡប់ទៅ
-bookmarklet វិញ។** ⛔ **កុំនាំ auto-login មកវិញ** ដែរ (2.24.2 ➜ 2.24.7 ៖ ជុំ ៦
-បរាជ័យទាំងអស់)។
+⛔ **bookmarklet ដើរមិនកើតតាមរចនាសម្ព័ន្ធ** (JS អានមិនឃើញ `HttpOnly`) ហើយ
+**extension ក៏ដើរមិនកើតលើឧបករណ៍ពិតដែរ** តាមការវាស់ខាងលើ។ ⛔ **កុំនាំ
+auto-login មកវិញ** ដែរ (2.24.2 ➜ 2.24.7 ៖ ជុំ ៦ បរាជ័យទាំងអស់)។
 
-ច្បាប់៖
+**ដូច្នេះផ្លូវតែមួយគឺដោយដៃ** ៖ ចម្លងបន្ទាត់ `Cookie:` ពី DevTools ➜ Network ➜
+ដាក់ចូល env `ZTO_COOKIE` ➜ Trigger deploy។ មើល `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ២។
 
-- **កូនសោដាច់ដោយឡែក** ៖ `ZTO_COOKIE_UPDATE_KEY` **≠** `ZTO_PROXY_KEY`។ កូនសោ
-  ក្រោយរស់នៅក្នុង **client app** ចំណែកកូនសោមុនផ្តល់សិទ្ធិ **សរសេរ** លើ env ➜
-  ការចែករំលែកវានឹងឲ្យ client ណាមួយប្តូរ env របស់ site បាន។
-- ⛔ **`NETLIFY_AUTH_TOKEN` រស់នៅ *តែក្នុង env របស់ Function*** — សិទ្ធិពេញលើ
-  គណនី។ កុំដាក់វាក្នុង extension ឬ client ណាមួយ។
-- **Header injection** ៖ cookie ដែលមាន `CR`/`LF`/`NUL` ត្រូវបដិសេធ។
-- **ការ settle ធានាដោយ *រចនាសម្ព័ន្ធ*** ៖ `timedFetch()` ប្រណាំង timer **ពិត**
-  បន្ថែមលើ `AbortController` — មេរៀន `stall-guard` (2.22.4) អនុវត្តខាង server ៖
-  បណ្តាញ «ភ្ជាប់តែស្លាប់» អាច **មិនគោរព signal សោះ**។
-- ⛔ **env សរសេរធ្លាក់ ➜ មិន trigger deploy ហើយមិនអះអាង `ok: true`**
-  (មេរៀន `toast-truth`) — បើអត់ អ្នកប្រើឃើញបៃតង ខណៈ cookie ចាស់នៅដដែល។
-- **extension ដាក់ក្រោម `tools/` កម្រិត root ដោយចេតនា** ព្រោះ
-  `ZoeW/netlify.toml` មាន `publish = "."` ➜ អ្វីក្រោម `ZoeW/` ត្រូវ publish
-  ឡើង site ➜ ការដាក់វាក្នុង `ZoeW/` នឹងបញ្ចេញ extension ជាសាធារណៈ។
+⛔ **env ដែលលែងប្រើ ត្រូវលុបចេញពី Netlify** ៖ `ZTO_COOKIE_UPDATE_KEY` ·
+`NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` · `NETLIFY_SITE_ID`។ ជាពិសេស
+`NETLIFY_AUTH_TOKEN` មាន **សិទ្ធិពេញលើគណនី** — ការទុកវាក្នុង env ខណៈគ្មាន
+អ្នកប្រើ ជាការលាតត្រដាងសុទ្ធសាធ។
 
-#### ⛔ ចន្លោះពិតរបស់ `version-bump-scope.js` ដែលបិទក្នុងជុំនេះ
+#### ⛔ ចន្លោះពិតរបស់ `version-bump-scope.js` (នៅតែជាធរមាន)
 
 `SHIPPED = /\.(js|css|html|wasm|json)$/` ចាប់ **`ZoeW/netlify/functions/*.js`**
 ➜ ការកែ Function **ខាង server** បង្ខំ `CACHE_VERSION` ឲ្យឡើង ➜ **អ្នកប្រើ
@@ -1923,9 +1912,9 @@ bookmarklet វិញ។** ⛔ **កុំនាំ auto-login មកវិញ**
 ប្តូរឈ្មោះ · បញ្ជីសំបកត្រូវកាត់ · និង **ទិសផ្ទុយ** (កែ `app.js` ពិត ➜ **នៅតែ**
 ទាមទារការឡើងកំណែ ២ ដដែល)។
 
-Test៖ **`zto-cookie-update-test.js`** (៦២ assertion; ធ្លាក់ **១** លើ
-`origin/main` ដោយជាន់អប្បបរមា ព្រោះឯកសារមិនទាន់មាន) និង
-**`version-bump-scope.js`** (៧ assertion)។
+Test៖ **`version-bump-scope.js`** (៧ assertion)។ ⛔ ការលើកលែងនៅតែគ្រប
+`netlify/` និង `tools/` ទាំង ២ ទោះ `tools/` លែងមានឯកសារ — ការរឹតវាឥឡូវនេះ
+គ្មានតម្លៃបន្ថែម ហើយបើថ្ងៃណាមានឧបករណ៍ថ្មីក្រោម `tools/` វាការពារស្រាប់។
 
 ### ⛔ ស្លាក ↔ ថេរ ត្រូវចងភ្ជាប់គ្នា — និង **ថ្ងៃលំដាប់ ≠ រយៈពេល** (កំណែ 2.25.1)
 

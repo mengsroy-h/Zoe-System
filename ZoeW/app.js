@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.1';
+    const APP_VERSION = '2.25.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3350,6 +3350,7 @@
         customerDataTableLastFailedAt = 0;
         autoLookupFailureAt.clear();
         autoLookupInFlight.clear();
+        clearAutoLookupQueueRetries();
         lookupFastCache.clear();
         const body = document.getElementById('customerDataTableBody');
         if (body) body.innerHTML = '';
@@ -3486,6 +3487,8 @@
     const LOOKUP_FOCUS_GRACE_MS = 250;
     const LOOKUP_MANUAL_FALLBACK_MS = 1800;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
+    const AUTO_LOOKUP_QUEUE_RETRY_MS = 400;
+    const AUTO_LOOKUP_QUEUE_MAX_WAIT_MS = 20000;
     const AUTO_LOOKUP_TIMEOUT_MS = 16000;
     const ZTO_AUTO_LOOKUP_TIMEOUT_MS = 20000;
     const LOOKUP_TEST_TIMEOUT_MS = 20000;
@@ -3494,7 +3497,61 @@
     const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Map();
     const autoLookupFailureAt = new Map();
+    const autoLookupQueueRetries = new Map();
     const lookupFastCache = new Map();
+
+    function clearAutoLookupQueueRetries() {
+        autoLookupQueueRetries.forEach((queued) => {
+            if (queued && queued.timer) clearTimeout(queued.timer);
+        });
+        autoLookupQueueRetries.clear();
+    }
+
+    function dropAutoLookupQueueEntry(key) {
+        const queued = autoLookupQueueRetries.get(key);
+        if (!queued) return;
+        if (queued.timer) clearTimeout(queued.timer);
+        autoLookupQueueRetries.delete(key);
+    }
+
+    function scheduleAutoLookupQueueRetry(barcode) {
+        const key = String(barcode || '').trim().toUpperCase();
+        if (!key) return false;
+        const existing = autoLookupQueueRetries.get(key);
+        const armedAt = (existing && existing.armedAt) || Date.now();
+        if (elapsedSince(armedAt) >= AUTO_LOOKUP_QUEUE_MAX_WAIT_MS) {
+            dropAutoLookupQueueEntry(key);
+            return false;
+        }
+        if (existing && existing.timer) return true;
+        const timer = setTimeout(() => {
+            const queued = autoLookupQueueRetries.get(key);
+            if (queued) queued.timer = null;
+            if (pendingBarcode !== barcode || !isModalOpen) {
+                dropAutoLookupQueueEntry(key);
+                return;
+            }
+            if (elapsedSince(armedAt) >= AUTO_LOOKUP_QUEUE_MAX_WAIT_MS) {
+                dropAutoLookupQueueEntry(key);
+                setLookupStatus(barcode, 'warn', '⏳ Lookup រវល់យូរពេក — សូមស្កេនម្ដងទៀត');
+                return;
+            }
+            attemptAutoLookup(barcode);
+        }, AUTO_LOOKUP_QUEUE_RETRY_MS);
+        autoLookupQueueRetries.set(key, { timer, armedAt });
+        return true;
+    }
+
+    function pumpAutoLookupQueue() {
+        if (!autoLookupQueueRetries.size) return;
+        if (autoLookupInFlight.size >= AUTO_LOOKUP_MAX_IN_FLIGHT) return;
+        if (!isModalOpen || !pendingBarcode) return;
+        const key = String(pendingBarcode).trim().toUpperCase();
+        if (!autoLookupQueueRetries.has(key)) return;
+        const barcode = pendingBarcode;
+        dropAutoLookupQueueEntry(key);
+        attemptAutoLookup(barcode);
+    }
 
     function clearLookupStatus() {
         const el = document.getElementById('lookupStatus');
@@ -3695,11 +3752,16 @@
             return;
         }
         if (autoLookupInFlight.size >= AUTO_LOOKUP_MAX_IN_FLIGHT) {
-            setLookupStatus(barcode, 'warn', '⏳ Lookup កំពុងរវល់ — កំពុងរង់ចាំ ZTO');
+            if (scheduleAutoLookupQueueRetry(barcode)) {
+                setLookupStatus(barcode, 'loading', '🔎 កំពុងរង់ចាំជួរ ' + lookupSource + '...');
+            } else {
+                setLookupStatus(barcode, 'warn', '⏳ Lookup រវល់យូរពេក — សូមស្កេនម្ដងទៀត');
+            }
             return;
         }
         const lookupRunToken = {};
         autoLookupInFlight.set(lookupKey, lookupRunToken);
+        dropAutoLookupQueueEntry(lookupKey);
 
         const myGeneration = customerDataTableSessionGeneration;
         const startedAt = Date.now();
@@ -3781,6 +3843,7 @@
             if (autoLookupInFlight.get(lookupKey) === lookupRunToken) {
                 autoLookupInFlight.delete(lookupKey);
             }
+            pumpAutoLookupQueue();
         }
     }
 

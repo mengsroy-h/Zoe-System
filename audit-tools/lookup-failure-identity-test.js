@@ -52,7 +52,9 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const NEEDED = ['retryAsync', 'retryTransientLookupResponse', 'attemptAutoLookup', 'setLookupStatus',
+const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
+    'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
+    'retryAsync', 'retryTransientLookupResponse', 'attemptAutoLookup', 'setLookupStatus',
     'safeLookupReason', 'lookupApiIsZto', 'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
     'lookupFailureIsDefinitive'];
@@ -83,6 +85,9 @@ function buildRuntime(plan) {
         AUTO_LOOKUP_TIMEOUT_MS: 16000,
         ZTO_AUTO_LOOKUP_TIMEOUT_MS: 20000,
         autoLookupInFlight: new Map(),
+        autoLookupQueueRetries: new Map(),
+        AUTO_LOOKUP_QUEUE_RETRY_MS: 400,
+        AUTO_LOOKUP_QUEUE_MAX_WAIT_MS: 20000,
         autoLookupFailureAt: new Map(),
         lookupFastCache: new Map(),
         lookupLockedNoticeShown: false,
@@ -133,7 +138,9 @@ function buildRuntime(plan) {
     ['elapsedSince', 'lookupApiIsZto', 'safeLookupReason', 'setLookupStatus',
      'retryPendingLookupAfterUnlock', 'lookupResponseError', 'markLookupTimeoutNoRetry',
      'retryTransientLookupResponse', 'retryAsync', 'lookupFailureCooldownMs',
-     'lookupFailureIsDefinitive'].forEach((n) => {
+     'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
+     'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
+     'clearAutoLookupQueueRetries'].forEach((n) => {
         if (src[n]) vm.runInContext(src[n].replace(/^\s{4}/gm, ''), ctx);
     });
     // ជាន់ការពារ ៖ បើ helper ថ្មីមិនទាន់មាន ត្រូវ stub ដើម្បីកុំឲ្យ

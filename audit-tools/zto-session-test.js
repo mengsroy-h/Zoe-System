@@ -491,6 +491,33 @@ async function run() {
                 'ទម្រង់ដែលរកឃើញ តែខ្វះប្រអប់ ➜ ត្រូវប្រាប់ថាធាតុណាបាត់');
         }
 
+        const tightEnv = testEnv({ ZTO_LOGIN_TIMEOUT_MS: '15000' });
+        const tightConfig = api.readConfig(tightEnv);
+        const slowPage = fakePage(idpUrl);
+        slowPage.$$ = async () => [];
+        let tightClock = 1700000000000;
+        const tightStart = tightClock;
+        let tightEnd = 0;
+        try {
+            await withTimeout(api.performArgusLogin(tightConfig, {
+                now: () => (tightClock += 200),
+                sleep: async () => {},
+                logger: () => {},
+                launchBrowser: async () => ({
+                    newPage: async () => slowPage,
+                    pages: async () => [slowPage],
+                    close: async () => {}
+                })
+            }), 8000, 'tight-budget hang');
+            assert.fail('គ្មានទម្រង់ ➜ មិនត្រូវសម្រេច');
+        } catch (error) {
+            tightEnd = tightClock;
+            assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
+        }
+        assert.ok(tightEnd - tightStart <= 10000,
+            '⛔ ការរង់ចាំទម្រង់ត្រូវទុកការបម្រុងឲ្យវដ្តរង់ចាំ cookie — បើវាស៊ីថវិកាទាំងមូល Netlify សម្លាប់ Function មុនយើងឆ្លើយ',
+            tightEnd - tightStart);
+
         const shellPage = fakePage(idpUrl);
         shellPage.$$ = async () => [];
         let submitted = false;

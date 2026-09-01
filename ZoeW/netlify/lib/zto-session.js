@@ -17,9 +17,8 @@ const LOGIN_LOCK_KEY = 'argus-login-lock';
 const LOGIN_FAILURE_KEY = 'argus-login-failure';
 const SESSION_AAD = Buffer.from('zoew:zto-session:v1');
 const LOGIN_LOCK_MS = 50 * 1000;
-const LOGIN_FORM_WAIT_MAX_MS = 20 * 1000;
-const LOGIN_FORM_WAIT_MIN_MS = 12 * 1000;
-const LOGIN_POLL_RESERVE_MS = 10 * 1000;
+const LOGIN_FORM_WAIT_DEFAULT_MS = 12 * 1000;
+const LOGIN_POLL_RESERVE_MS = 8 * 1000;
 const LOGIN_WAIT_MS = 35 * 1000;
 const COOKIE_EXPIRY_SKEW_MS = 30 * 1000;
 const COOKIE_TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
@@ -113,6 +112,7 @@ function readConfig(env) {
         identityId,
         cookieName,
         loginTimeoutMs: boundedInteger(source.ZTO_LOGIN_TIMEOUT_MS, 30000, 15000, 35000),
+        formWaitMs: boundedInteger(source.ZTO_LOGIN_FORM_WAIT_MS, LOGIN_FORM_WAIT_DEFAULT_MS, 5000, 20000),
         maxAgeMs: maxAgeMinutes > 0 ? maxAgeMinutes * 60 * 1000 : 0
     };
 }
@@ -527,11 +527,7 @@ async function performArgusLogin(config, dependencies) {
         }
         assertAllowedLoginUrl(page.url());
         step = navigated ? 'wait-password' : 'wait-password-nonav';
-        const formWaitMs = Math.max(1, Math.min(
-            Math.max(LOGIN_FORM_WAIT_MIN_MS, remaining() - LOGIN_POLL_RESERVE_MS),
-            LOGIN_FORM_WAIT_MAX_MS,
-            remaining()
-        ));
+        const formWaitMs = Math.max(1, Math.min(config.formWaitMs, remaining() - LOGIN_POLL_RESERVE_MS, remaining()));
         const formFrame = await waitForLoginFrame(page, deps, now() + formWaitMs);
 
         step = 'find-form';

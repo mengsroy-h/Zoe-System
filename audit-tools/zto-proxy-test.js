@@ -415,6 +415,37 @@ async function run() {
         assert.ok(Number(ztoClientTimeout[1]) > 30000,
             'ផ្លូវស្កេនពិតត្រូវអត់ធ្មត់ជាងប៊ូតុងសាកល្បង (វាមាន manual fallback ១.៨ វិ.)');
 
+        process.env.ZTO_AUTO_LOGIN = 'true';
+        process.env.ZTO_USERNAME = 'test-user@example.invalid';
+        process.env.ZTO_PASSWORD = 'test-password-never-deploy';
+        process.env.ZTO_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+        delete process.env.ZTO_COOKIE;
+        process.env.ZTO_LOGIN_BUDGET_MS = '5000';
+        ztoSession.getAutoSessionCookie = () => new Promise(() => {});
+        const budgetStart = Date.now();
+        const budgetGuard = (promise, ms, label) => {
+            let timer = null;
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); })
+            ]).finally(() => { if (timer) clearTimeout(timer); });
+        };
+        const budgetCapped = await budgetGuard(proxy.handler({
+            httpMethod: 'GET',
+            headers: { 'x-zoe-proxy-key': 'test-proxy-key' },
+            queryStringParameters: { barcode: '77130527210012' }
+        }), 15000, '⛔ ការ login ដែលព្យួរមិនត្រូវបានកាត់ ➜ Netlify សម្លាប់ Function ➜ «Failed to fetch»');
+        const budgetElapsed = Date.now() - budgetStart;
+        assert.strictEqual(budgetCapped.statusCode, 504,
+            '⛔ ការ login ដែលព្យួរត្រូវឆ្លើយជា JSON — បើអត់ Netlify សម្លាប់ Function ➜ browser ឃើញ «Failed to fetch»');
+        const budgetBody = JSON.parse(budgetCapped.body);
+        assert.strictEqual(budgetBody.code, 'ZTO_LOGIN_TIMEOUT');
+        assert.strictEqual(budgetBody.reason, 'budget-exceeded',
+            'ការធ្លាក់ត្រូវប្រាប់ថាវាឈានដល់ពិដានពេលវេលារបស់ Function');
+        assert.ok(budgetElapsed < 15000, 'ច្រកទ្វារត្រូវបញ្ឈប់តាមថវិកា មិនរង់ចាំគ្មានទីបញ្ចប់', budgetElapsed);
+        delete process.env.ZTO_LOGIN_BUDGET_MS;
+        ztoSession.getAutoSessionCookie = oldGetAutoSessionCookie;
+
         console.log('zto-proxy-test: ok');
     } finally {
         global.fetch = oldFetch;

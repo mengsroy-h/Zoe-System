@@ -5,6 +5,26 @@ const ztoSession = require('../lib/zto-session.js');
 const ZTO_ENDPOINT = 'https://aargus-api.ztoglobal.com/scan/get/order/detail';
 const BARCODE_RE = /^[A-Za-z0-9_-]{6,64}$/;
 const ZTO_UPSTREAM_TIMEOUT_MS = 12000;
+const ZTO_LOGIN_BUDGET_DEFAULT_MS = 20000;
+
+function loginBudgetMs() {
+    const parsed = Number(process.env.ZTO_LOGIN_BUDGET_MS);
+    if (!Number.isFinite(parsed)) return ZTO_LOGIN_BUDGET_DEFAULT_MS;
+    return Math.max(5000, Math.min(60000, Math.round(parsed)));
+}
+
+function withLoginBudget(promise) {
+    let timer = null;
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                const error = new ztoSession.ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504, 'budget-exceeded');
+                reject(error);
+            }, loginBudgetMs());
+        })
+    ]).finally(() => { if (timer) clearTimeout(timer); });
+}
 const FORBIDDEN_FORWARD_HEADER_RE = /^(?:authorization|connection|content-length|cookie|host|origin|referer|transfer-encoding)$/i;
 
 function json(statusCode, body) {
@@ -238,7 +258,7 @@ exports.handler = async function handler(event) {
     let authenticationKind = applyStaticZtoAuthentication(headers);
     if (!authenticationKind && autoLoginEnabled) {
         try {
-            headers.Cookie = await ztoSession.getAutoSessionCookie({ lambdaEvent: event });
+            headers.Cookie = await withLoginBudget(ztoSession.getAutoSessionCookie({ lambdaEvent: event }));
             authenticationKind = 'auto-cookie';
         } catch (error) {
             return autoLoginErrorResponse(error);
@@ -260,11 +280,11 @@ exports.handler = async function handler(event) {
 
     try {
         const rejectedCookie = String(headers.Cookie || '');
-        headers.Cookie = await ztoSession.getAutoSessionCookie({
+        headers.Cookie = await withLoginBudget(ztoSession.getAutoSessionCookie({
             forceRefresh: true,
             rejectedCookie,
             lambdaEvent: event
-        });
+        }));
     } catch (error) {
         return autoLoginErrorResponse(error);
     }

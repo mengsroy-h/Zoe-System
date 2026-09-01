@@ -4,10 +4,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["@netlify/blobs", "@sparticuz/chromium", "puppeteer-core"]
-
-[functions.zto-order-detail]
-  memory = "2gb"
 
 [[headers]]
   for = "/sw.js"

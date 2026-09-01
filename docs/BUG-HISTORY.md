@@ -906,3 +906,204 @@ ZoeKeyGen រស់នៅ 780px រហូតដល់ 2.16.0។ ដូច្ន�
   ទុកវាថេរលើ MediaStream) — ការ fail closed នឹងបិទការស្កេនទាំងស្រុង។
   Test៖ **`scan-engine-test.js`**។
 
+---
+
+## ⛔ ប្រវត្តិ ZTO Auto-login (កំណែ 2.24.2 ➜ 2.24.7) — **ដកចេញរួចក្នុង 2.25.0**
+
+> មុខងារនេះ **មិនដែលដំណើរការលើផលិតកម្មទេ** ហើយត្រូវបានដកចេញទាំងស្រុង
+> ក្នុងកំណែ ZoeW 2.25.0។ ផ្នែកខាងក្រោមរក្សាទុកជា **កំណត់ត្រា** ដើម្បីកុំឲ្យ
+> session ក្រោយសាកសង់វាឡើងវិញ។ មូលហេតុសម្រេច ៖ IDaaS OAuth2 របស់ ZTO
+> មិនបើកឲ្យ IP របស់ Netlify — វាស់បានដោយ
+> `login:wait-password@argus.ztoglobal.com:TimeoutError` (browser មិនត្រូវ
+> បានបញ្ជូនទៅ `iam-web.zto.com` ផង)។ មើល CLAUDE.md ផ្នែក «ZTO Lookup»។
+
+### ⛔ ការ login មិនត្រូវលើសពិដានពេលរបស់ Netlify (កំណែ 2.24.6)
+
+> 🔴 **ការថយក្រោយដែលជុំ 2.24.5 បង្កដោយខ្លួនឯង** — ហើយសារកំហុសមិនមែនជារបស់ App ទេ។
+
+អ្នកប្រើរាយការណ៍ `❌ បរាជ័យក្នុងការភ្ជាប់៖ Failed to fetch`។ ⛔ **នោះមិនមែនជា
+timeout របស់ App** — `fetchWithTimeout()` បញ្ចេញ `Test API timed out`។
+`Failed to fetch` ជា `TypeError` ថ្នាក់បណ្តាញរបស់ browser ➜ **គ្មាន response
+មកដល់សោះ** ➜ **Netlify សម្លាប់ Function** មុនវាឆ្លើយ។
+
+ការគណនាដែលបញ្ជាក់៖
+
+| កំណែ | ការរង់ចាំទម្រង់ | ការឆ្លើយវាស់បាន |
+|---|---|---|
+| ≤ 2.24.4 | ១២ វិ. ថេរ | **~១៨ វិ.** ➜ ក្នុងពិដាន ✅ |
+| 2.24.5 | រហូតដល់ **២០ វិ.** | លើសពិដាន ➜ **ត្រូវសម្លាប់** 🔴 |
+
+ច្បាប់៖
+
+- **ថវិកាត្រូវគិតធៀបនឹងពិដានរបស់ *វេទិកា* មិនមែនធៀបនឹងថវិកាផ្ទាល់ខ្លួន។**
+  សរុប = ការបើក Chromium (~៦ វិ.) + ការ login + សំណើ upstream (ពិដាន ១២ វិ.)។
+- **ការរង់ចាំទម្រង់ត្រឡប់ទៅ ១២ វិនាទី** ហើយកំណត់បានតាម
+  `ZTO_LOGIN_FORM_WAIT_MS`; ការបម្រុងវដ្តរង់ចាំ cookie ថយទៅ **៨ វិនាទី**។
+- ⛔ **ការស្កេនគ្រប់ frame របស់ 2.24.5 ត្រូវរក្សា** — វាជាការកែសមត្ថភាពពិត
+  ហើយ **មិនចំណាយពេលបន្ថែមទេ**។ អ្វីដែលបង្កបញ្ហាគឺការរង់ចាំវែង។
+- **`withLoginBudget()` ជាច្រកទ្វារចុងក្រោយ** — ពេលឈានដល់
+  `ZTO_LOGIN_BUDGET_MS` (លំនាំដើម ២០ វិ.) Function ឆ្លើយ **JSON ពិត**
+  (`ZTO_LOGIN_TIMEOUT` · `reason: budget-exceeded`) ជំនួសការទុកឲ្យវេទិកា
+  សម្លាប់។ ⛔ ថ្នាក់ដដែលនឹងវដ្តគ្មានផ្លូវចេញ (2.24.4) ៖ **ការព្យួរត្រូវក្លាយ
+  ជាការធ្លាក់ដែលមានឈ្មោះ**។
+
+⚠️ **មេរៀន ៖ សារកំហុសដែលមិនមែនរបស់អ្នក ជាព័ត៌មានដ៏មានតម្លៃ។** `Failed to
+fetch` មិនស្ថិតក្នុងសារណាមួយដែល App សរសេរ ➜ នោះជាភស្តុតាងភ្លាមថាបញ្ហានៅ
+**ក្រៅ** App (វេទិកា/បណ្តាញ) មិនមែនក្នុងតក្កវិជ្ជា។ ការស្គាល់សារផ្ទាល់ខ្លួន
+របស់ App គ្រប់សារ ធ្វើឲ្យការបែងចែកនេះលឿន។
+
+Test៖ **`zto-proxy-test.js`** (auto-login ព្យួរ ➜ 504 `budget-exceeded` ក្នុងពេល
+កំណត់) និង **`zto-session-test.js`** (ថវិកាតឹង ➜ ការរង់ចាំទម្រង់ទុកការបម្រុង);
+mutation ២ ➜ ចាប់បានទាំង ២។
+
+### ⛔ ZTO login ៖ ទម្រង់អាចនៅក្នុង iframe (កំណែ 2.24.5)
+
+> 🔴 **វាស់ពីផលិតកម្មពិត** ៖ `reason: login:wait-password@iam-web.zto.com:TimeoutError`។
+
+ស្លាកនោះប្រាប់ ៤ យ៉ាងក្នុងខ្សែអក្សរតែមួយ ៖ Chromium បើកបាន · `goto` ជោគជ័យ
+(គ្មានបច្ច័យ `-nonav`) · **ឈានដល់ IdP របស់ ZTO រួច** ➜ **redirect chain ដើរបាន
+ពី server របស់ Netlify ដូច្នេះតំបន់មិនទប់ទេ** · តែទម្រង់ login រកមិនឃើញ។
+
+⛔ `page.waitForSelector()` មើល **តែ frame មេ**។ IdP ជាច្រើនដាក់ទម្រង់ login
+ក្នុង **iframe** ➜ ការរង់ចាំនោះមិនអាចជោគជ័យបានឡើយ ទោះទម្រង់នៅទីនោះ។
+
+ច្បាប់៖
+
+- **`waitForLoginFrame()` ស្កេនគ្រប់ frame** (`page.frames()`) រកប្រអប់ពាក្យ
+  សម្ងាត់ដែល **មើលឃើញ** រួចប្រគល់ **frame នោះ** ទៅឲ្យអ្នករកទម្រង់ទាំង ៣។
+  ⛔ `findUsernameInput()` · `findPasswordInput()` · `findLoginButton()` ត្រូវ
+  ទទួល **frame** មិនមែន `page` — បើអត់ វារកក្នុង frame មេវិញ។
+- **`inspectLoginState()` ក៏ស្កេនគ្រប់ frame ដែរ** — អត្ថបទ CAPTCHA ឬការ
+  បដិសេធ password អាចនៅក្នុង iframe ដដែល។
+- **ពេលរង់ចាំកើនតាមថវិកា** ៖ `max(១២វិ., remaining − ១០វិ.)` ពិដាន ២០ វិនាទី។
+  ⛔ **ការបម្រុង ១០ វិនាទីត្រូវរក្សា** សម្រាប់ការបំពេញ · ចុច · និងវដ្តរង់ចាំ
+  cookie — បើអត់ Netlify សម្លាប់ Function មុនវដ្តនោះចប់ ➜ គ្មាន JSON គ្មាន
+  backoff (ថ្នាក់ដដែលនឹងវដ្តគ្មានផ្លូវចេញ 2.24.4)។
+- **log ផ្ទុក `frames=[host:inputs/passwords …]`** ➜ បែងចែក «ទម្រង់ក្នុង
+  iframe» ពី «ទំព័រទទេ» ពី «ផ្ទុកមិនទាន់ចប់» ដោយមិនបាច់ទាយ។
+
+⚠️ **មេរៀន ៖ `reason` ដែលមានជំហាន និង host បានបង្វែរការទាយទៅជាការវាស់។**
+ជុំ 2.24.2 ➜ 2.24.5 ជាខ្សែសង្វាក់ ៖ រាល់ការកែបញ្ចេញកំហុសបន្ទាប់ដែលកំហុសមុន
+បាំងទុក ហើយ **ស្លាកជំហានប្រាប់ជាក់លាក់ថាត្រូវមើលកន្លែងណាបន្ត** — គ្មានជុំណា
+ត្រូវទាយឡើយ។
+
+Test៖ **`zto-session-test.js`** (៨១ assertion; mutation ៣ ➜ ចាប់បានទាំង ៣)។
+
+### ⛔ ZTO login ៖ cookie មិនមែនជាភស្តុតាងនៃការចូល (កំណែ 2.24.4)
+
+> 🔴 **កំហុសពិត ៣ ដែលរកឃើញក្រោយបិទរន្ធ Blobs** — ការកែនីមួយៗបើកទ្វារឲ្យឃើញ
+> កំហុសបន្ទាប់។ ទាំង ៣ ត្រូវបានវាស់ពីផលិតកម្មពិត មិនមែនអានកូដទេ។
+
+**១. ZTO ប្រាប់ «មិនទាន់ចូល» ដោយឆ្លើយ URL របស់ OAuth2 IdP។** វាឆ្លើយ HTTP 200
+ជាមួយ `{"error":"https://iam-web.zto.com/oauth2?app_id=…&redirect_url=…"}`។
+`ztoAuthRejected()` រក **ពាក្យ** (`login…expired|invalid|required`) ➜ វារកមិន
+ឃើញ ➜ ក្លាយជា `ZTO_UPSTREAM_REJECTED` ➜ ⛔ ការ login ឡើងវិញ **មិនដែលកេះ**
+ហើយ URL របស់ IdP ហូរទៅ browser។ ច្បាប់ ៖ **ការឆ្លើយដែលជា URL ចូល/OAuth/SSO/IAM
+គឺជាការបដិសេធ auth** មិនមែនកំហុស upstream ទេ។
+
+⚠️ **ការប្រៀបធៀបដែលឆ្លើយសំណួរ** (URL ពី browser របស់អ្នកប្រើ ធៀបនឹង URL ដែល
+API ឆ្លើយ)៖
+
+| | parameter |
+|---|---|
+| browser ពិត | `app_id`, `redirect_url`, **`response_type`**, **`state`**, **`lang`** |
+| API ឆ្លើយមក | `app_id`, `redirect_url` |
+
+➜ URL ដែល API ឆ្លើយ **មិនមែនជា URL សម្រាប់ចូលទេ** (គ្មាន `response_type`
+និង `state`) — វាជា **ទ្រនិចចង្អុល** ដែល SPA របស់ Argus ត្រូវបំពេញបន្ថែម។
+⛔ ហើយ **`=km` គឺ `lang=km` (ភាសាបង្ហាញ) មិនមែន region ទេ** — ការសង្ស័យថា
+IdP ទប់តាមតំបន់ **មិនត្រូវបានបញ្ជាក់** ដោយភស្តុតាងនេះ។
+
+**២. `BOS-MAN-SESSION` មានតាំងពីមុនចូល។** វាជា session cookie បែប servlet
+ដែល server ដាក់ឲ្យតាំងពីពេលបើកទំព័រ។ វដ្តរង់ចាំចាស់ត្រឡប់ភ្លាមៗពេល cookie
+នោះមាន ➜ **cookie មុនចូល** ត្រូវរក្សាទុកជា «session ត្រឹមត្រូវ» ➜ រាល់ការ
+ស្កេនបន្ទាប់ប្រើវា ➜ ZTO បដិសេធ។ ច្បាប់ ៖ **`loginIsConfirmed()` ទាមទារ
+ភស្តុតាង** — ទំព័រ **navigate** ក្រោយចុច (OAuth2 callback ជានិច្ចធ្វើ) **ឬ**
+តម្លៃ cookie **ប្តូរ**។ ⛔ ទិសផ្ទុយ ៖ គ្មាន cookie មុនចុច ➜ cookie ថ្មីនៅតែ
+ជាភស្តុតាង — កុំទប់ការចូលដែលត្រឹមត្រូវ។
+
+**៣. វដ្តរង់ចាំ cookie គ្មានផ្លូវចេញ។**
+
+```js
+const remaining = () => Math.max(1, deadline - now());
+while (remaining() > 0) { … }          // ⟵ ពិត **ជានិច្ច**
+throw new ZtoSessionError('ZTO_LOGIN_TIMEOUT', 504);   // ⟵ ឈានមិនដល់
+```
+
+⛔ ការ clamp ដល់ `1` ធ្វើឲ្យលក្ខខណ្ឌវដ្តក្លាយជា `1 > 0` ជានិច្ច ➜ Function
+បង្វិលរាល់ ៣០០ms រហូតដល់ Netlify សម្លាប់វា ➜ អ្នកប្រើឃើញកំហុស gateway ឆៅ
+(គ្មាន JSON គ្មាន `reason`) ហើយ **failure backoff មិនត្រូវកត់ត្រា** ➜ ការស្កេន
+បន្ទាប់បើក Chromium 2GB ម្តងទៀត។ ច្បាប់ ៖ **តម្លៃដែល clamp សម្រាប់ជា argument
+នៃ timeout មិនត្រូវយកទៅធ្វើជាលក្ខខណ្ឌវដ្តទេ** — ត្រូវមាន `remainingRaw()` ដាច់។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ ៖ ការព្យួរមិនមែនជាការធ្លាក់ទេ។** កំហុសទី ៣ ត្រូវបាន
+រកឃើញដោយ **តេស្តដែលព្យួរ** មិនមែនដោយការអានកូដ។ ដូច្នេះតេស្តនោះរុំការហៅ
+ដោយ `withTimeout()` ➜ ការថយក្រោយក្លាយជា **ការធ្លាក់ដែលមានឈ្មោះ** មិនមែន
+ការព្យួរដែលធ្វើឲ្យ CI ត្រូវ cancel (ច្បាប់ `hang-guard` អនុវត្តលើកូដ App ដែរ)។
+
+Test៖ **`zto-session-test.js`** (៧៦ assertion) និង **`zto-proxy-test.js`**;
+mutation ៣ ➜ ចាប់បានទាំង ៣។
+
+### ⛔ Netlify Blobs ៖ Lambda-signature function ត្រូវហៅ `connectLambda(event)` (កំណែ 2.24.2)
+
+> 🔴 **កំហុសផលិតកម្មពិត។** អ្នកប្រើឃើញ **HTTP 503 `ZTO_SESSION_STORE_UNAVAILABLE`**
+> រាល់ដងក្រោយបើក ZTO auto-login ហើយសង្ស័យថាមកពី OAuth2 របស់ ZTO IDaaS។
+> **វាមិនមែនទេ** — វាធ្លាក់ **មុនពេល Chromium បើកផង**។
+
+`zto-order-detail.js` សរសេរតាម **Lambda-compatible signature**
+(`exports.handler = async function handler(event)`). សម្រាប់ signature នោះ
+Netlify **មិនដាក់** ព័ត៌មានតភ្ជាប់ Blobs ក្នុង `process.env.NETLIFY_BLOBS_CONTEXT`
+ទេ — វាដាក់ក្នុង **`event` ខ្លួនវា** ៖ `event.blobs` (base64 នៃ `{url, token}`)
+បូក header `x-nf-site-id` និង `x-nf-deploy-id`។ ដូច្នេះ `@netlify/blobs`
+ទាមទារឲ្យហៅ **`connectLambda(event)`** ជាមុនសិន (វាហៅ `setEnvironmentContext()`
+ខាងក្នុង)។ កូដហៅ `getStore()` ត្រង់ៗ ➜ library បោះ
+`MissingBlobsEnvironmentError` ➜ `catch (_)` លេបវា ➜ 503។
+
+**វាស់បានពិត** (`@netlify/blobs` 11.0.2 ដំឡើងពិត)៖
+
+| ការហៅ | លទ្ធផល |
+|---|---|
+| `getStore({ name, consistency })` ដោយគ្មាន context | 🔴 បោះ `MissingBlobsEnvironmentError` |
+| `connectLambda(event)` រួច `getStore(...)` | ✅ ដំណើរការ |
+
+ច្បាប់៖
+
+- **`connectLambda(event)` ត្រូវរត់មុន `getStore()` រាល់ invocation** — token
+  ក្នុង `event.blobs` ជារបស់ **សំណើនោះ** ➜ វាមិនអាចយកទៅប្រើឡើងវិញឆ្លងសំណើទេ។
+  ដូច្នេះ `event` ត្រូវហូរពី handler ចូល `getAutoSessionCookie({ lambdaEvent })`។
+- ⛔ **វាត្រូវ *ស្ងាត់* ពេលគ្មាន `event.blobs`** — function signature ថ្មី និង
+  `netlify dev` ប្រើ `process.env` ជំនួស ➜ ការហៅ `connectLambda` ដោយ payload
+  ទទេនឹងបោះ ➜ ត្រូវពិនិត្យ `typeof event.blobs === 'string'` ជាមុន។
+- ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ** — នេះជាថ្នាក់ដដែលនឹង «⛔ Service
+  worker មិនត្រូវធ្វើឲ្យ Cache Storage ក្លាយជាចំណុចដាច់តែមួយ» (2.19.3)
+  ដែលវិលមកខាង **server**។ store ដាច់ ➜ ធ្លាក់ចុះទៅ session **ក្នុងសតិ**
+  របស់ container នោះ ដោយ **រក្សា backoff** (បើអត់ ➜ រង្វិលជុំបើក Chromium
+  2GB)។ ⛔ ទិសផ្ទុយត្រូវរក្សា ៖ ពេល store ដើរ lock ឆ្លង invocation នៅតែ
+  ទប់ការ login ស្ទួនដដែល។
+- ⛔ **ការសរសេរចូល store ដែលធ្លាក់ មិនត្រូវបោះចោល session ដែល login ជោគជ័យ**
+  — `saveStoredSession()` ជា best-effort។ បើវាបោះ នោះ login ដែលទើបជោគជ័យ
+  ត្រូវបោះចោល ➜ login ម្តងទៀត ➜ ថ្លៃពីរដង។
+- **រាល់ការធ្លាក់ត្រូវប្រាប់ *ដំណាក់កាល* និង *កំហុសពិត*** —
+  `import:` · `export:` · `getstore:` · `read:` · `write:` · `lock:` · `open:`។
+  មុនកែ កន្លែងធ្លាក់ **៥** ចេញជាកូដតែមួយ ➜ គ្មានផ្លូវដឹងថាមកពីអ្វី។
+  ⛔ `reason` បញ្ចេញតែ **ឈ្មោះកំហុស ឬ Node error code** — **គ្មាន message,
+  គ្មាន URL, គ្មាន token**។ ការណែនាំដដែលអនុវត្តលើផ្លូវ login ៖ `host:<hostname>` ·
+  `form:username-N` · `login:<ErrorName>`។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ (សំខាន់បំផុតនៃជុំនេះ)៖ ស្នាមភ្ជាប់ត្រូវបាន stub ក្នុង
+គ្រប់តេស្ត ➜ ស្នាមភ្ជាប់នោះគ្មានតេស្តសោះ។** `zto-session-test.js` មាន
+assertion ៣១ ហើយ **បៃតងទាំងអស់** លើកូដដែលធ្លាក់ ១០០% លើផលិតកម្ម។ មូលហេតុ ៖
+សេណារីយ៉ូ **ទាំងអស់** ចាក់ `openStore: async () => new FakeStore()` ចូល ➜
+**`defaultOpenStore()` — កូដដែលពិតជាធ្លាក់ — មិនដែលត្រូវរត់សោះ**។ នេះជា
+**សំណួរទី ៧** ក្នុងទម្រង់ថ្មី (2.20.4 ជាលើកមុន)។ ឥឡូវតេស្តរត់
+`defaultOpenStore()` ពិត ជាមួយម៉ូឌុល `@netlify/blobs` ក្លែងដែលចាក់តាម
+`importBlobs` ➜ លំដាប់ `connectLambda` ➜ `getStore` ត្រូវបានវាស់ពិត។
+
+⚠️ **មេរៀនទី ២ ៖ ការអះអាងដែលចាក់សោកំហុស។** `zto-proxy-test.js` អះអាងថា
+`assert.strictEqual(options, undefined)` — មានន័យថាវា **ទាមទារ** ឲ្យ Function
+**កុំ** បញ្ជូន `event` ចូល auto-login ដែលជា **កំហុសពិត**។ សំណួរ 2.20.6
+អនុវត្តម្តងទៀត ៖ «តើការអះអាងដែលធ្លាក់នេះ ការពារអ្វី ឬ**ចាក់សោ**អ្វី?»។
+
+Test៖ **`zto-session-test.js`** (៦២ assertion; ធ្លាក់ **១០** លើ `origin/main`;
+mutation ៤ ➜ ចាប់បានទាំង ៤) និង **`zto-proxy-test.js`**។
+

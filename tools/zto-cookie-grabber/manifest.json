@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "ZTO Cookie -> ZoeW",
+  "version": "1.0.0",
+  "description": "Send the live Argus session cookie to ZoeW and trigger a Netlify deploy in one click.",
+  "permissions": ["cookies", "storage"],
+  "host_permissions": ["https://*.ztoglobal.com/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Send ZTO cookie to ZoeW"
+  },
+  "options_page": "options.html"
+}

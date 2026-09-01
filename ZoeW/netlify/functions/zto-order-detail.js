@@ -29,6 +29,29 @@ const CACHE_MAX = 200;
 const resultCache = new Map();
 const inFlight = new Map();
 
+const COOKIE_NAME_RE = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]{1,128}$/;
+const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
+
+function noteUpstreamSetCookie(response) {
+    try {
+        const headers = response && response.headers;
+        if (!headers) return;
+        let lines = [];
+        if (typeof headers.getSetCookie === 'function') {
+            lines = headers.getSetCookie() || [];
+        } else if (typeof headers.get === 'function') {
+            const single = headers.get('set-cookie');
+            if (single) lines = [single];
+        }
+        upstreamCookieSignal.seenAt = Date.now();
+        upstreamCookieSignal.setCookie = lines.length > 0;
+        upstreamCookieSignal.names = lines
+            .map((line) => String(line).split('=')[0].trim())
+            .filter((name) => COOKIE_NAME_RE.test(name))
+            .slice(0, 12);
+    } catch (_) {}
+}
+
 class ZtoConfigError extends Error {
     constructor(reason) {
         super('ZTO_CONFIG_INVALID');
@@ -376,6 +399,7 @@ async function requestOnce(config, headers, barcode, timeoutMs) {
         }
 
         const response = await fetch(target.href, init);
+        noteUpstreamSetCookie(response);
         const contentType = response.headers && response.headers.get
             ? (response.headers.get('content-type') || '')
             : '';
@@ -541,7 +565,13 @@ function diagnosticsBody(config, headers, authKind) {
             retries: config.retries,
             cacheTtlMs: config.cacheTtlMs
         },
-        cacheEntries: resultCache.size
+        cacheEntries: resultCache.size,
+        sessionRenewal: {
+            observed: upstreamCookieSignal.seenAt > 0,
+            setCookie: upstreamCookieSignal.setCookie,
+            names: upstreamCookieSignal.names,
+            ageMs: upstreamCookieSignal.seenAt ? elapsedSince(upstreamCookieSignal.seenAt) : null
+        }
     };
 }
 

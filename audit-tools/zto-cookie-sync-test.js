@@ -40,6 +40,12 @@ function read(file) {
     try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; }
 }
 
+function isWindowsCmdSafe(text) {
+    return /^[\x00-\x7f]*$/.test(text)
+        && text.includes('\r\n')
+        && !text.replace(/\r\n/g, '').includes('\n');
+}
+
 function fakeResponse(status, data, counters) {
     const stats = counters || {};
     return {
@@ -80,8 +86,10 @@ async function run() {
     console.log('=== ១. ជាន់អប្បបរមា និងរចនាសម្ព័ន្ធ ===');
     ok('ឃើញ sync-zto-cookie.js', source.length > 14000, source.length);
     ok('ឃើញ package.json', Object.keys(pkg).length > 0);
-    ok('ឃើញ setup.cmd', setup.length > 700, setup.length);
-    ok('ឃើញ sync-zto-cookie.cmd', runner.length > 500, runner.length);
+    ok('ឃើញ setup.cmd ជា ASCII + CRLF សម្រាប់ cmd.exe',
+        setup.length > 700 && isWindowsCmdSafe(setup), setup.length);
+    ok('ឃើញ sync-zto-cookie.cmd ជា ASCII + CRLF សម្រាប់ cmd.exe',
+        runner.length > 500 && isWindowsCmdSafe(runner), runner.length);
     ok('ឃើញ configure.ps1', configure.length > 1300, configure.length);
     ok('ឃើញ read-token.ps1', tokenReader.length > 600, tokenReader.length);
     ok('ឃើញ README-KH.md', readme.length > 3000, readme.length);

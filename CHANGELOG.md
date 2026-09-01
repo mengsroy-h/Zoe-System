@@ -39,6 +39,13 @@
 - ផ្លូវនេះ **មិនមែន extension ដែលបានដកចេញ**៖ វាមិនប្រើ `chrome.cookies`
   ដែលត្រឡប់ ០ លើ Edge និងមិនបង្កើត Function ដែលកាន់ Netlify PAT។
 
+### កែកំហុសលើ Windows ពិត
+
+- `cmd.exe` បំបែក UTF-8 Khmer/emoji ក្នុង `.cmd` ជាពាក្យបញ្ជាកណ្តាលពាក្យ
+  (`errorlevel` ➜ `orlevel`, `ExecutionPolicy` ➜ `utionPolicy`) ➜
+  `setup.cmd` បិទមុនបង្ហាញ prompt។ `.cmd` ទាំង ២ ឥឡូវជា **ASCII សុទ្ធ +
+  CRLF**; អត្ថបទខ្មែរនៅតែបង្ហាញពី PowerShell/Node ដែលគាំទ្រ Unicode។
+
 ### សុវត្ថិភាព
 
 - Cookie មិនបង្ហាញ/មិនសរសេរចូល file; Netlify response body ដែលអាចមាន secret
@@ -57,7 +64,7 @@
 - **`zto-cookie-sync-test.js` ថ្មី (៦០ assertion)** — ធ្លាក់ ៥៧ លើថតទទេ;
   វាស់ exact request · Cookie validation · DPAPI/BSTR cleanup · `shell:false` ·
   exact Netlify API calls · response body boundary · timeout settle · env មុន
-  deploy · Windows profile ក្រៅ repo។
+  deploy · Windows profile ក្រៅ repo · និង `.cmd` ជា ASCII + CRLF។
 
 ### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

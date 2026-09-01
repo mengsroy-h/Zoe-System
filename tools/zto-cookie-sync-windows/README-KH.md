@@ -27,16 +27,59 @@
 - សិទ្ធិចូល ZoeW site ក្នុង Netlify
 - Netlify Personal Access Token មួយ (បញ្ចូលតែម្តង)
 
-## មុន Setup
+## Netlify Environment Variables — ដាក់តែ ២ Key
 
-1. ក្នុង Netlify សូមប្រាកដថា `ZTO_COOKIE` មានរួច ហើយកំណត់ជា
-   **Contains secret values** · scope **Functions** · context **Production**។
-2. ចូល `Netlify → User settings → Applications → Personal access tokens`
+ចូល `Netlify → ZoeW site → Project configuration → Environment variables`
+រួចចុច **Add a variable**។ បង្កើត variable ២ ដាច់ដោយឡែកដូចតារាងនេះ៖
+
+អ្នកអាចរត់ `setup.cmd` **មុន ឬក្រោយ** ផ្នែកនេះក៏បាន៖ `setup.cmd` មិនត្រូវការ
+env ទាំង ២ និងមិនបង្កើតវាទេ; វាផ្ទៀងផ្ទាត់តែ Site ID + PAT។ ប៉ុន្តែ
+`ZTO_COOKIE` ត្រូវមានរួច **មុនរត់ `sync-zto-cookie.cmd`** ព្រោះ helper update
+តម្លៃរបស់ key ដែលមានស្រាប់។ `ZTO_PROXY_KEY` ត្រូវការសម្រាប់ ZoeW ហៅ Function
+មិនមែនសម្រាប់ `setup.cmd` ទេ។
+
+| Key | Value ពេលបង្កើតដំបូង | Contains secret values | Scope | Deploy context |
+|---|---|---|---|---|
+| `ZTO_PROXY_KEY` | សោចៃដន្យ ៣២ bytes (វិធីបង្កើតនៅខាងក្រោម) | ✅ Yes | **Functions** | **Production** |
+| `ZTO_COOKIE` | Cookie ពេញ ឬ `BOS-MAN-SESSION=setup-pending` ជាបណ្តោះអាសន្ន | ✅ Yes | **Functions** | **Production** |
+
+បើមិនចង់ចូល DevTools សូម្បីតែលើកដំបូង សូមដាក់
+`BOS-MAN-SESSION=setup-pending` ក្នុង `ZTO_COOKIE` សិន។ តម្លៃនេះ **មិនមែនជា
+Cookie ពិត** ទេ ហើយ lookup មិនទាន់ដើររហូតដល់អ្នករត់ `sync-zto-cookie.cmd`។
+Helper នឹងជំនួសវាដោយ Cookie ពេញដែលចាប់បាន រួច trigger deploy ដោយខ្លួនឯង។
+
+បង្កើត `ZTO_PROXY_KEY` លើ Windows៖ បើក **PowerShell** រួចរត់បន្ទាត់ទាំងនេះ
+ហើយចម្លង output ចូល Netlify៖
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+[Convert]::ToBase64String($bytes)
+```
+
+តម្លៃ `ZTO_PROXY_KEY` ដដែលនេះត្រូវដាក់ក្នុង ZoeW នៅ
+`⚙️ → 🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ → តម្លៃ Header` ដោយប្រើឈ្មោះ Header
+`X-Zoe-Proxy-Key`។ កុំយក `ZTO_COOKIE` ទៅដាក់ក្នុង ZoeW/browser។
+
+សម្រាប់ផ្លូវ Cookie នេះ **មិនចាំបាច់** បង្កើត `ZTO_API_URL`,
+`ZTO_API_METHOD` ឬ `ZTO_REQUEST_*` ទេ ព្រោះ Function មានលំនាំដើមរួច។ បើមាន
+`ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` ចាស់ សូមលុបវា ព្រោះវាមានអាទិភាពលើ
+`ZTO_COOKIE`។
+
+⛔ **កុំដាក់** `NETLIFY_AUTH_TOKEN`, `NETLIFY_ACCOUNT_ID`, `NETLIFY_SITE_ID`
+ឬ `ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង Personal Access Token
+ត្រូវបញ្ចូលតែក្នុង `setup.cmd` ហើយរក្សាទុកតែលើ Windows របស់អ្នក។
+
+## Site ID + PAT សម្រាប់ `setup.cmd`
+
+1. ចូល `Netlify → User settings → Applications → Personal access tokens`
    ហើយបង្កើត token មួយសម្រាប់ឧបករណ៍នេះ។ ជ្រើសថ្ងៃផុតកំណត់ ហើយបើ team ប្រើ
    SSO ត្រូវអនុញ្ញាត token ឲ្យចូល team នោះ។ មើល
    [ការណែនាំផ្លូវការរបស់ Netlify](https://docs.netlify.com/api-and-cli-guides/api-guides/get-started-with-api/#authentication)។
    ចម្លងវាទុកបណ្តោះអាសន្ន ព្រោះ Netlify មិនបង្ហាញតម្លៃម្តងទៀតទេ។
-3. យក ZoeW **Site ID** ពី
+2. យក ZoeW **Site ID** ពី
    `Project configuration → General → Project details`។
 
 Personal Access Token មានសិទ្ធិតាម account របស់អ្នក។ កុំផ្ញើវាតាម chat,
@@ -93,6 +136,7 @@ sync-zto-cookie.cmd
 
 | សារ | ត្រូវធ្វើអ្វី |
 |---|---|
+| `'orlevel'` / `'utionPolicy' is not recognized` | អ្នកកំពុងប្រើ `.cmd` UTF-8 ចាស់។ ទាញកំណែថ្មីដែលជា ASCII + CRLF រួចជំនួស `setup.cmd` និង `sync-zto-cookie.cmd` ទាំង ២ |
 | មិនទាន់ Setup/config/token | បើក `setup.cmd` |
 | Browser launch failed | បិទបង្អួច ZTO Cookie Sync ចាស់ទាំងអស់ រួចសាកវិញ |
 | មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |

@@ -1894,6 +1894,10 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
   Function/env ឬ endpoint សរសេរ env ពី internet។
 - Helper នៅក្រោម `tools/` root; មិនចូល ZoeW publish/bundle និងមិនបង្ខំ
   `APP_VERSION` ឬ `CACHE_VERSION` ឲ្យឡើង។
+- ⛔ **ឯកសារ `.cmd` ទាំងអស់របស់ helper ត្រូវជា ASCII សុទ្ធ + CRLF**។
+  រូបភាពពី Windows ពិតបង្ហាញថា `cmd.exe` បំបែក UTF-8 Khmer/emoji កណ្តាលពាក្យ
+  (`errorlevel` ➜ `orlevel`, `ExecutionPolicy` ➜ `utionPolicy`) ហើយបិទមុន
+  prompt។ អត្ថបទ Unicode ត្រូវនៅក្នុង PowerShell/Node មិនមែន batch source។
 
 ⛔ **server env ដែល extension ចាស់ធ្លាប់ប្រើ ត្រូវនៅតែលុប**៖
 `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
@@ -1935,7 +1939,7 @@ Test៖ **`zto-cookie-sync-test.js`** (៦០ assertion; ធ្លាក់ ៥�
 ចាក់សោ exact host/path · HTTPS · request headers ពិត · header injection ·
 DPAPI/BSTR cleanup · `shell:false` · exact Netlify API method/path/body · timeout
 ដែល settle · លំដាប់ env ➜ deploy · profile ក្រៅ repo · និងការមិនវិលទៅ
-extension/server token។
+extension/server token · បូក ASCII + CRLF របស់ `.cmd`។
 
 ⏳ **ត្រូវការការផ្ទៀងផ្ទាត់លើ Windows ពិតមុន merge**៖ `setup.cmd` ➜
 បញ្ចូល Site ID + PAT ➜ Login Argus ក្នុង profile ពិសេស ➜ បើកកញ្ចប់មួយ ➜ ត្រូវឃើញ

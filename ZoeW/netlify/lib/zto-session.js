@@ -18,6 +18,7 @@ const LOGIN_FAILURE_KEY = 'argus-login-failure';
 const SESSION_AAD = Buffer.from('zoew:zto-session:v1');
 const LOGIN_LOCK_MS = 50 * 1000;
 const LOGIN_FORM_WAIT_DEFAULT_MS = 12 * 1000;
+const PROXY_URL_RE = /^(?:https?|socks4|socks5):\/\/[A-Za-z0-9.-]{1,253}(?::\d{1,5})?$/;
 const LOGIN_POLL_RESERVE_MS = 8 * 1000;
 const LOGIN_WAIT_MS = 35 * 1000;
 const COOKIE_EXPIRY_SKEW_MS = 30 * 1000;
@@ -113,8 +114,22 @@ function readConfig(env) {
         cookieName,
         loginTimeoutMs: boundedInteger(source.ZTO_LOGIN_TIMEOUT_MS, 30000, 15000, 35000),
         formWaitMs: boundedInteger(source.ZTO_LOGIN_FORM_WAIT_MS, LOGIN_FORM_WAIT_DEFAULT_MS, 5000, 20000),
+        proxyServer: readProxyServer(source.ZTO_LOGIN_PROXY),
+        proxyUsername: String(source.ZTO_LOGIN_PROXY_USERNAME || ''),
+        proxyPassword: String(source.ZTO_LOGIN_PROXY_PASSWORD || ''),
         maxAgeMs: maxAgeMinutes > 0 ? maxAgeMinutes * 60 * 1000 : 0
     };
+}
+
+function readProxyServer(raw) {
+    const value = String(raw || '').trim().replace(/\/+$/, '');
+    if (!value) return '';
+    if (!PROXY_URL_RE.test(value)) throw new ZtoSessionError('ZTO_AUTO_LOGIN_NOT_CONFIGURED', 503, 'proxy:invalid');
+    return value;
+}
+
+function proxyHostLabel(proxyServer) {
+    try { return safeHostLabel(new URL(proxyServer).hostname); } catch (_) { return 'unknown'; }
 }
 
 function base64Url(buffer) {
@@ -272,7 +287,7 @@ async function loginFrameSummary(page) {
     return parts.join(' ');
 }
 
-function logLoginProblem(deps, step, host, elapsedMs, view, frameView, error) {
+function logLoginProblem(deps, step, host, elapsedMs, view, frameView, error, proxyHost) {
     const log = (deps && deps.logger) || console.warn;
     if (typeof log !== 'function') return;
     const shape = loginViewIsUsable(view)
@@ -281,9 +296,10 @@ function logLoginProblem(deps, step, host, elapsedMs, view, frameView, error) {
             + ' params=[' + String(view.params || '') + ']'
         : ' (ទំព័រអានមិនបាន)';
     const frames = frameView ? ' frames=[' + frameView + ']' : '';
+    const proxy = proxyHost ? ' proxy=' + proxyHost : '';
     try {
         log(LOG_PREFIX + 'ZTO login failed at ' + step + (host ? ' on ' + host : '')
-            + ' after ' + Math.round(elapsedMs) + 'ms: ' + safeReasonText(error) + shape + frames);
+            + ' after ' + Math.round(elapsedMs) + 'ms: ' + safeReasonText(error) + shape + frames + proxy);
     } catch (_) {}
 }
 
@@ -306,7 +322,15 @@ function assertAllowedLoginUrl(raw) {
     return parsed;
 }
 
-async function defaultLaunchBrowser() {
+function launchArgsWithProxy(baseArgs, proxyServer) {
+    const args = Array.isArray(baseArgs) ? baseArgs.slice() : [];
+    if (!proxyServer) return args;
+    const filtered = args.filter((arg) => !/^--proxy-server=/.test(String(arg)));
+    filtered.push('--proxy-server=' + proxyServer);
+    return filtered;
+}
+
+async function defaultLaunchBrowser(config) {
     const [puppeteerModule, chromiumModule] = await Promise.all([
         import('puppeteer-core'),
         import('@sparticuz/chromium')
@@ -316,7 +340,10 @@ async function defaultLaunchBrowser() {
     chromium.setGraphicsMode = false;
     const headlessType = 'shell';
     return puppeteer.launch({
-        args: await puppeteer.defaultArgs({ args: chromium.args, headless: headlessType }),
+        args: launchArgsWithProxy(
+            await puppeteer.defaultArgs({ args: chromium.args, headless: headlessType }),
+            config && config.proxyServer
+        ),
         defaultViewport: {
             deviceScaleFactor: 1,
             hasTouch: false,
@@ -508,9 +535,12 @@ async function performArgusLogin(config, dependencies) {
         try { return safeHostLabel(new URL(page.url()).hostname); } catch (_) { return ''; }
     };
     try {
-        browser = await withTimeout(Promise.resolve().then(() => launchBrowser()), remaining(), 'ZTO_LOGIN_TIMEOUT');
+        browser = await withTimeout(Promise.resolve().then(() => launchBrowser(config)), remaining(), 'ZTO_LOGIN_TIMEOUT');
         step = 'newpage';
         page = await browser.newPage();
+        if (config.proxyServer && config.proxyUsername && typeof page.authenticate === 'function') {
+            await page.authenticate({ username: config.proxyUsername, password: config.proxyPassword });
+        }
         await page.setUserAgent({ userAgent: ZTO_USER_AGENT, platform: 'Linux x86_64' });
         page.setDefaultTimeout(Math.min(15000, remaining()));
         page.setDefaultNavigationTimeout(Math.min(20000, remaining()));
@@ -582,7 +612,8 @@ async function performArgusLogin(config, dependencies) {
         if (page) {
             const view = await loginDiagnostics(page);
             const frameView = await loginFrameSummary(page);
-            logLoginProblem(deps, step, host, now() - started, view, frameView, error);
+            logLoginProblem(deps, step, host, now() - started, view, frameView, error,
+                config.proxyServer ? proxyHostLabel(config.proxyServer) : '');
         }
         if (error instanceof ZtoSessionError) throw error;
         throw new ZtoSessionError('ZTO_LOGIN_UNAVAILABLE', 502,
@@ -947,6 +978,9 @@ module.exports = {
     getAutoSessionCookie,
     _test: {
         connectLambdaBlobs,
+        launchArgsWithProxy,
+        proxyHostLabel,
+        readProxyServer,
         loginIsConfirmed,
         cookieHeaderFromBrowser,
         defaultOpenStore,

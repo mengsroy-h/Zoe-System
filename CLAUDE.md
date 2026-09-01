@@ -224,6 +224,7 @@
 | **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
 | **ZTO ៖ ទម្រង់ login** | ⛔ ស្កេន **គ្រប់ frame** — IdP ដាក់ទម្រង់ក្នុង iframe | `zto-session-test` |
 | **ZTO ៖ ពិដានពេលរបស់ Netlify** | ⛔ Function ត្រូវឆ្លើយ JSON មុនត្រូវសម្លាប់ | `zto-proxy-test` |
+| **ZTO ៖ Proxy ចូល** | ⛔ តម្លៃហូរចូល argv របស់ Chromium — ត្រូវផ្ទៀងផ្ទាត់ទម្រង់ | `zto-session-test` |
 | **Blobs ដាច់** | ⛔ store ដាច់ ≠ lookup ស្លាប់ (ធ្លាក់ចុះទៅសតិ) | `zto-session-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 

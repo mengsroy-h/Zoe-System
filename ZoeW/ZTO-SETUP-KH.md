@@ -21,6 +21,11 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 
 ចុច **Add a variable** ហើយបង្កើត variable ២ ដាច់ដោយឡែក៖
 
+`setup.cmd` អាចរត់មុន ឬក្រោយការបង្កើត env ទាំងនេះ៖ វាត្រូវការតែ Site ID +
+PAT។ តែ `ZTO_COOKIE` ត្រូវមានរួចមុនរត់ `sync-zto-cookie.cmd` ព្រោះ helper update
+key ដែលមានស្រាប់។ `ZTO_PROXY_KEY` គឺសម្រាប់ ZoeW ហៅ Function មិនមែនសម្រាប់
+`setup.cmd` ទេ។
+
 | Key | Value ពេលបង្កើតដំបូង | Secret | Scope | Context |
 | --- | --- | --- | --- | --- |
 | `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ ៣២ bytes — សោរវាង ZoeW និង Function | ✅ | **Functions** | **Production** |

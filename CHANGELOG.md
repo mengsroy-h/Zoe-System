@@ -25,6 +25,43 @@
 
 ---
 
+## [ZoeW 2.24.7] — 2026-09-01 · ការចូល ZTO តាម Proxy (ឧ. IP កម្ពុជា)
+
+ជុំនេះកែតែ **ZoeW** (`zoew-v145` ➜ `zoew-v146`)។ Firebase rules · CSP
+**មិនប្រែសោះ**។ វា **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មទេ**។
+
+### បន្ថែម ៖ ច្រក Proxy សម្រាប់ browser ចូល ZTO
+> **សំណើអ្នកប្រើ** ៖ *«អោយ netlify ប្រើ ip khmer សម្រាប់ login ទៅ ក្រែងដើរ»* —
+> បន្ទាប់ពីគាត់រាយការណ៍ថា **ការចូលក្នុង Chromium នៅម៉ាស៊ីនរបស់គាត់ដើរ**
+> (ដូច្នេះ ZTO **មិនទប់ Chromium ជា browser** ទេ)។
+
+- `ZTO_LOGIN_PROXY` (`http://` · `https://` · `socks4://` · `socks5://`) បូក
+  `ZTO_LOGIN_PROXY_USERNAME` / `ZTO_LOGIN_PROXY_PASSWORD` ស្រេចចិត្ត។
+- ⛔ តម្លៃត្រូវឆ្លងកាត់ `readProxyServer()` ដែលអនុញ្ញាតតែ **scheme + host +
+  port** — បើមិនត្រូវទម្រង់ វាបដិសេធជាមួយ `reason: proxy:invalid`។
+  ហេតុផល ៖ តម្លៃនោះហូរចូល **argv របស់ Chromium** ➜ ខ្សែអក្សរសេរីអាចចាក់
+  flag បន្ថែម។ តេស្តអះអាងករណីអាក្រក់ ៤។
+- `--proxy-server=` ដែលមានស្រាប់ត្រូវ **ជំនួស** មិនមែនបន្ថែមស្ទួន។
+- log ផ្ទុក `proxy=<host>` ជាភស្តុតាងថាវាកំពុងប្រើពិត។ ⛔ **ពាក្យសម្ងាត់
+  proxy មិនចូល log ទេ** — តេស្តអះអាង។
+- ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ គ្មាន `ZTO_LOGIN_PROXY` ➜ argv **មិនប្រែសោះ**
+  និងគ្មានការហៅ `authenticate()`។
+
+⚠️ **ព្រំដែនដែលត្រូវដឹង** ៖ proxy អនុវត្តលើ **browser ចូល** តែប៉ុណ្ណោះ។
+សំណើ `scan/get/order/detail` ក្រោយចូល នៅតែចេញពី IP របស់ Netlify ដដែល
+(Node `fetch` មិនគោរព `--proxy-server`)។ ហើយ **Netlify មិនអាចផ្តល់ IP កម្ពុជា
+ដោយខ្លួនវាទេ** — ត្រូវមាន proxy endpoint ផ្ទាល់ខ្លួន។
+
+### ឧបករណ៍ audit
+- `zto-session-test.js` ៖ ៨១ ➜ **៩៨ assertion**។ mutation ៣ ➜ ចាប់បានទាំង ៣
+  (មិនបញ្ជូន config ចូល `launchBrowser` · ដកការផ្ទៀងផ្ទាត់ proxy · proxy ស្ទួន)។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+- **គ្មាន** បើមិនប្រើ proxy។ បើប្រើ ៖ ដាក់ env vars ខាងលើក្នុង Netlify
+  (សម្គាល់ password ជា **secret**) រួច **Trigger deploy** ម្តង។
+
+---
+
 ## [ZoeW 2.24.6] — 2026-08-31 · ការ login មិនត្រូវលើសពិដានពេលរបស់ Netlify
 
 ជុំនេះកែតែ **ZoeW** (`zoew-v144` ➜ `zoew-v145`)។ Firebase rules · CSP

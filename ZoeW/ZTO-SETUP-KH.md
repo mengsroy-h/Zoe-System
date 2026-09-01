@@ -51,6 +51,9 @@ database ឬដាក់ access token បន្ថែមទេ។ បើប្�
 | `ZTO_LOGIN_TIMEOUT_MS` | `30000` | ពិដាន login 15,000–35,000 ms |
 | `ZTO_LOGIN_FORM_WAIT_MS` | `12000` | ពេលរង់ចាំទម្រង់ login លេច 5,000–20,000 ms |
 | `ZTO_LOGIN_BUDGET_MS` | `20000` | ពិដានពេលសរុបនៃ auto-login ក្នុង Function 5,000–60,000 ms |
+| `ZTO_LOGIN_PROXY` | ទទេ | Proxy សម្រាប់ **browser ចូល ZTO** ឧ. `http://host:8080` · `socks5://host:1080` |
+| `ZTO_LOGIN_PROXY_USERNAME` | ទទេ | ឈ្មោះអ្នកប្រើរបស់ proxy (បើត្រូវការ) |
+| `ZTO_LOGIN_PROXY_PASSWORD` | ទទេ | ពាក្យសម្ងាត់របស់ proxy — សម្គាល់ជា **secret** |
 | `ZTO_SESSION_MAX_AGE_MINUTES` | `0` | `0` = គោរព cookie expiry/refresh ពេល ZTO បដិសេធ; អាចកំណត់អាយុខ្លីជាងនេះ |
 
 > ⚠️ **Netlify មានពិដានពេលដំណើរការ Function ផ្ទាល់ខ្លួន** (ជាធម្មតា ១០ វិនាទី
@@ -58,6 +61,27 @@ database ឬដាក់ access token បន្ថែមទេ។ បើប្�
 > `ZTO_LOGIN_BUDGET_MS` **លើសពិដាននោះ** ធ្វើឲ្យ Netlify សម្លាប់ Function មុនវា
 > ឆ្លើយ ➜ browser បង្ហាញ **`Failed to fetch`** ដែលមិនប្រាប់អ្វីសោះ។ បើឃើញសារ
 > នោះ សូម **បន្ថយ** តម្លៃទាំងនេះវិញ។
+
+### ការចូលតាម Proxy (ឧ. IP កម្ពុជា)
+
+បើ ZTO IdP ប្រព្រឹត្តខុសគ្នាតាម IP អ្នកអាចបញ្ជូន **browser ចូល** តាម proxy៖
+
+```
+ZTO_LOGIN_PROXY=http://<host>:<port>
+ZTO_LOGIN_PROXY_USERNAME=<បើត្រូវការ>
+ZTO_LOGIN_PROXY_PASSWORD=<បើត្រូវការ>
+```
+
+⛔ **Netlify មិនអាចផ្តល់ IP កម្ពុជាដោយខ្លួនវាទេ** — អ្នកត្រូវមាន proxy endpoint
+ផ្ទាល់ខ្លួន (VPS នៅកម្ពុជា ឬសេវា proxy) រួចដាក់ URL របស់វាទីនេះ។
+
+⚠️ **វាអនុវត្តលើ browser ចូលតែប៉ុណ្ណោះ** — សំណើ `scan/get/order/detail`
+ក្រោយចូល នៅតែចេញពី IP របស់ Netlify ដដែល។ បើ ZTO ទប់ **API** តាម IP ដែរ
+នោះ proxy នេះមិនគ្រប់គ្រាន់ទេ។
+
+ក្រោយកំណត់ រកបន្ទាត់ `[zto-session]` ក្នុង Function log — វាត្រូវផ្ទុក
+`proxy=<host>` ជាភស្តុតាងថា proxy កំពុងប្រើពិត។ ⛔ ពាក្យសម្ងាត់ proxy
+**មិនចូល log ទេ**។
 
 ## ២. លំដាប់ auth និង fallback
 

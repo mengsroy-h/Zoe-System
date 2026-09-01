@@ -623,6 +623,73 @@ async function run() {
         }
     });
 
+    await seamCheck('ច្រក proxy សម្រាប់ការ login', async () => {
+        assert.strictEqual(api.readProxyServer(''), '', 'គ្មាន proxy ➜ ទទេ');
+        assert.strictEqual(api.readProxyServer('http://proxy.example:8080'), 'http://proxy.example:8080');
+        assert.strictEqual(api.readProxyServer('socks5://10.0.0.1:1080/'), 'socks5://10.0.0.1:1080',
+            'សញ្ញា / ចុងក្រោយត្រូវកាត់ចេញ');
+        for (const bad of ['proxy.example:8080', 'ftp://p:1', 'http://p:8080 --disable-web-security', 'javascript:alert(1)']) {
+            assert.throws(() => api.readProxyServer(bad), (error) => error.reason === 'proxy:invalid',
+                '⛔ តម្លៃ proxy ដែលមិនត្រឹមត្រូវ ត្រូវបដិសេធ មិនមែនហូរចូល argv របស់ Chromium ៖ ' + bad);
+        }
+
+        assert.deepStrictEqual(api.launchArgsWithProxy(['--a', '--b'], ''), ['--a', '--b'],
+            '⛔ ទិសផ្ទុយ ៖ គ្មាន proxy ➜ argv មិនប្រែសោះ');
+        assert.deepStrictEqual(api.launchArgsWithProxy(['--a'], 'http://p:8080'), ['--a', '--proxy-server=http://p:8080']);
+        assert.deepStrictEqual(
+            api.launchArgsWithProxy(['--a', '--proxy-server=http://old:1'], 'http://p:8080'),
+            ['--a', '--proxy-server=http://p:8080'],
+            'proxy ចាស់ត្រូវជំនួស មិនមែនបន្ថែមស្ទួន');
+        assert.strictEqual(api.proxyHostLabel('http://proxy.example:8080'), 'proxy.example');
+
+        const proxyEnv = testEnv({
+            ZTO_LOGIN_PROXY: 'http://kh-proxy.example:8080',
+            ZTO_LOGIN_PROXY_USERNAME: 'pu',
+            ZTO_LOGIN_PROXY_PASSWORD: 'pp-secret'
+        });
+        const proxyConfig = api.readConfig(proxyEnv);
+        let seenArgs = null;
+        let seenAuth = null;
+        const proxyLogs = [];
+        const proxyPage = {
+            setUserAgent: async () => {},
+            setDefaultTimeout: () => {},
+            setDefaultNavigationTimeout: () => {},
+            goto: async () => {},
+            url: () => 'https://iam-web.zto.com/oauth2?lang=km',
+            waitForSelector: async () => {},
+            $$: async () => [],
+            evaluate: async () => ({ challenge: false, rejected: false }),
+            browserContext: () => ({ cookies: async () => [] }),
+            keyboard: { press: async () => {} },
+            close: async () => {},
+            authenticate: async (creds) => { seenAuth = creds; }
+        };
+        let proxyTicks = 0;
+        try {
+            await withTimeout(api.performArgusLogin(proxyConfig, {
+                now: () => 1700000000000 + (proxyTicks += 500),
+                sleep: async () => {},
+                logger: (line) => proxyLogs.push(String(line)),
+                launchBrowser: async (cfg) => {
+                    seenArgs = api.launchArgsWithProxy(['--base'], cfg && cfg.proxyServer);
+                    return { newPage: async () => proxyPage, pages: async () => [proxyPage], close: async () => {} };
+                }
+            }), 8000, 'proxy login hang');
+            assert.fail('គ្មានទម្រង់ ➜ មិនត្រូវសម្រេច');
+        } catch (error) {
+            assert.strictEqual(error.code, 'ZTO_LOGIN_UNAVAILABLE');
+        }
+        assert.deepStrictEqual(seenArgs, ['--base', '--proxy-server=http://kh-proxy.example:8080'],
+            '⛔ `launchBrowser` ត្រូវទទួល config ➜ បើអត់ proxy មិនដែលឡើងដល់ Chromium');
+        assert.deepStrictEqual(seenAuth, { username: 'pu', password: 'pp-secret' },
+            'proxy ដែលមានពាក្យសម្ងាត់ ➜ ត្រូវ authenticate');
+        assert.ok(proxyLogs.some((line) => line.indexOf('proxy=kh-proxy.example') !== -1),
+            'log ត្រូវបញ្ជាក់ថា proxy កំពុងប្រើពិត', proxyLogs);
+        assert.ok(!proxyLogs.join(' ').includes('pp-secret'),
+            '⛔ ពាក្យសម្ងាត់ proxy មិនត្រូវចូល log');
+    });
+
     api.resetStateForTests();
     assert.deepStrictEqual(seamProblems, [],
         'ស្នាមភ្ជាប់ @netlify/blobs ៖\n  - ' + seamProblems.join('\n  - '));

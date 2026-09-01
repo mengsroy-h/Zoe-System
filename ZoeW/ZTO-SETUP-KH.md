@@ -9,7 +9,7 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 | # | ផ្លូវ | ប្រើពេលណា |
 | --- | --- | --- |
 | ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
-| ២ | **Cookie ដោយដៃ** — `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — យក Cookie ពី Argus web |
+| ២ | **Cookie** — `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
 
 ---
 
@@ -49,23 +49,67 @@ openssl rand -base64 32
 
 ---
 
-## ២. យក Cookie ពី Argus (ផ្លូវទី ២)
+## ២. Windows — ប្តូរ Cookie ដោយមិនប្រើ DevTools (**ណែនាំ**)
 
-១. បើក `https://argus.ztoglobal.com` ក្នុង Chrome លើកុំព្យូទ័រ រួច **ចូល
-   ប្រព័ន្ធជាធម្មតា**។
-២. ចុច `F12` ➜ ផ្ទាំង **Network** ➜ ស្កេន ឬបើកកញ្ចប់ណាមួយ ដើម្បីឲ្យមានសំណើចេញ។
-៣. ចុចលើសំណើទៅ `aargus-api.ztoglobal.com` ➜ ផ្ទាំង **Headers** ➜ ផ្នែក
-   **Request Headers** ➜ រកជួរ **`Cookie:`**។
-៤. ចម្លង **តម្លៃទាំងមូល** (អាចវែង និងមានច្រើនផ្នែកបំបែកដោយ `; `)។
-៥. ដាក់វាចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ **Trigger deploy**។
+ឧបករណ៍ `tools/zto-cookie-sync-windows/` បើក Edge/Chrome profile ដាច់ដោយឡែក
+លើកុំព្យូទ័ររបស់អ្នក ហើយចាប់បន្ទាត់ `Cookie:` ពី **Order Detail request ពិត**
+ទៅ `aargus-api.ztoglobal.com`។ បន្ទាប់មកវា update `ZTO_COOKIE` ជា Netlify
+secret និង trigger deploy ដោយស្វ័យប្រវត្តិ។
 
-> ⚠️ Cookie នេះ **ផុតកំណត់** តាមរយៈពេលដែល ZTO កំណត់។ ពេលវាផុត ZoeW បង្ហាញ
-> **«🔒 Cookie ZTO ផុតកំណត់ — សូមចូល Argus យក Cookie ថ្មី»** ➜ ធ្វើជំហាន ១–៥
-> ម្តងទៀត។ គ្មានអ្វីខូចទេ ទិន្នន័យទាំងអស់នៅដដែល។
+វា **មិនប្រើ** `document.cookie`, `chrome.cookies` extension API ឬ Chromium
+ក្នុង Netlify Function ទេ។
+
+### Setup ម្តងដំបូង
+
+១. ត្រូវមាន **Windows 10/11 · Edge ឬ Chrome · Node.js 22.17.0+**។
+២. បង្កើត **Netlify Personal Access Token** នៅ
+   `User settings → Applications → Personal access tokens` ហើយយក ZoeW
+   **Site ID** ពី `Project configuration → General → Project details`។
+៣. Download/Clone repo រួចបើកថត `tools/zto-cookie-sync-windows/`។
+៤. Double-click **`setup.cmd`** ➜ បញ្ចូល Site ID និង PAT ក្នុង prompt លាក់អក្សរ។
+៥. ឃើញ `✅ Setup រួចរាល់` គឺចប់។
+
+### រាល់ពេល Cookie ផុត
+
+១. Double-click **`sync-zto-cookie.cmd`**។
+២. បើ ZTO សុំ សូម Login ក្នុង Edge/Chrome ដែលវាបើក។
+៣. បើក ឬស្វែងរកកញ្ចប់ណាមួយក្នុង Argus ដើម្បីបង្កើត Order Detail request។
+៤. ឧបករណ៍បិទ browser ➜ update secret ➜ trigger deploy ដោយខ្លួនឯង។
+
+Cookie មិនបង្ហាញក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell
+history ទេ។ PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
+`%LOCALAPPDATA%` — មិនដាក់ក្នុង command line, repo, extension ឬ Netlify
+Function។ សេចក្តីណែនាំពេញ និងព្រំដែនសិទ្ធិរបស់ PAT៖
+[`tools/zto-cookie-sync-windows/README-KH.md`](../tools/zto-cookie-sync-windows/README-KH.md)។
+
+> ⚠️ បើ ZTO SSO ផុតទាំងស្រុង អ្នកនៅតែត្រូវ Login ម្តងក្នុង browser profile
+> ពិសេស។ អ្វីដែលត្រូវដកចេញគឺ F12 · Copy/Paste · Netlify UI និង Trigger deploy
+> ដោយដៃ មិនមែនការផ្ទៀងផ្ទាត់អត្តសញ្ញាណរបស់ ZTO ទេ។
 
 ---
 
-**ផ្លូវដែលដំណើរការគឺជំហាន ១–៥ ខាងលើ** — ប្រហែល ២ នាទីក្នុងមួយដង។
+## ២ខ. ផ្លូវដោយដៃ (fallback)
+
+បើ Windows helper មានបញ្ហា៖
+
+១. បើក `https://argus.ztoglobal.com` ក្នុង browser រួចចូលប្រព័ន្ធ។
+២. `F12` ➜ **Network** ➜ បើក/ស្វែងរកកញ្ចប់មួយ។
+៣. ជ្រើសសំណើទៅ `aargus-api.ztoglobal.com/scan/get/order/detail` ➜
+   **Request Headers** ➜ ចម្លងតម្លៃពេញរបស់ `Cookie:`។
+៤. ដាក់ចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ Trigger deploy។
+
+---
+
+## ២គ. ផ្លូវដែលបានសាកហើយ — កុំនាំត្រឡប់មកវិញ
+
+| ផ្លូវ | លទ្ធផលលើឧបករណ៍/ផលិតកម្មពិត |
+|---|---|
+| Chromium auto-login ក្នុង Netlify | ❌ ZTO IDaaS មិនបើកឲ្យ IP របស់ Netlify |
+| Chrome/Edge extension `chrome.cookies` | ❌ លើ Edge របស់អ្នក `getAll({})` ត្រឡប់ ០ ខណៈ DevTools ឃើញ Cookie ៥ |
+| Windows helper ថ្មី | ចាប់ **Request Header ពិតតាម Playwright/CDP** ក្នុង browser ដែលវាបើកផ្ទាល់ — មិនឆ្លង `chrome.cookies` API |
+
+⛔ កុំសាង extension ចាស់ ឬ server-side auto-login ឡើងវិញ។ Windows helper
+ត្រូវនៅក្រោម `tools/` កម្រិត root ដើម្បីកុំឲ្យវាចូល bundle/publish របស់ ZoeW។
 
 ---
 
@@ -194,7 +238,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 
 | `code` | អ្វីអ្នកឃើញក្នុង ZoeW | ត្រូវធ្វើអ្វី |
 | --- | --- | --- |
-| `ZTO_AUTH_EXPIRED` | 🔒 Cookie ZTO ផុតកំណត់ | យក Cookie ថ្មី (ផ្នែក ២) ឬពិនិត្យ Token |
+| `ZTO_AUTH_EXPIRED` | 🔒 Cookie ZTO ផុតកំណត់ | រត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
 | `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | ដាក់ `ZTO_COOKIE` ឬ `ZTO_AUTHORIZATION` |
 | `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
 | `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` |

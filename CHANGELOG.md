@@ -25,6 +25,48 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-01 · Windows helper ប្តូរ Cookie ZTO ដោយមិនប្រើ DevTools
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែដោយចេតនា** — ជុំនេះបន្ថែម
+តែ `tools/` · `audit-tools/` និងឯកសារ; កូដ PWA/Function ដែល ship នៅដដែល។
+
+### បន្ថែម
+
+- **`tools/zto-cookie-sync-windows/`** ៖ double-click ➜ បើក Edge/Chrome
+  profile ពិសេស ➜ Login Argus បើចាំបាច់ ➜ បើកកញ្ចប់មួយ។ Helper ចាប់
+  `Cookie:` ពី Order Detail request ពិត, update `ZTO_COOKIE` ជា Netlify
+  secret និង trigger remote deploy ដោយខ្លួនឯង។
+- ផ្លូវនេះ **មិនមែន extension ដែលបានដកចេញ**៖ វាមិនប្រើ `chrome.cookies`
+  ដែលត្រឡប់ ០ លើ Edge និងមិនបង្កើត Function ដែលកាន់ Netlify PAT។
+
+### សុវត្ថិភាព
+
+- Cookie មិនបង្ហាញ/មិនសរសេរចូល file; Netlify response body ដែលអាចមាន secret
+  ត្រូវបោះចោលដោយមិនបង្ហាញ។
+- Header injection CR/LF/NUL, ទម្រង់ខូច និង request ដែលគ្មាន
+  `BOS-MAN-SESSION` ពិតត្រូវបដិសេធ។
+- Netlify PAT ត្រូវ prompt ដោយលាក់អក្សរ និងអ៊ិនគ្រីបតាម Windows
+  **DPAPI / CurrentUser** ក្រៅ repo; គ្មាន PAT ក្នុង command line,
+  `NETLIFY_AUTH_TOKEN` server env ឬ endpoint update-cookie ក្នុង production។
+- ដក dependency `netlify-cli` ដែល audit ជួប high-severity transitive
+  vulnerabilities ចេញ; នៅសល់តែ `playwright-core@1.62.1` ហើយ `npm audit`
+  រាយការណ៍ **០ vulnerability**។
+
+### ឧបករណ៍ audit
+
+- **`zto-cookie-sync-test.js` ថ្មី (៦០ assertion)** — ធ្លាក់ ៥៧ លើថតទទេ;
+  វាស់ exact request · Cookie validation · DPAPI/BSTR cleanup · `shell:false` ·
+  exact Netlify API calls · response body boundary · timeout settle · env មុន
+  deploy · Windows profile ក្រៅ repo។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- មុន merge ត្រូវសាកលើ Windows ពិត៖ រត់ `setup.cmd` ម្តង ហើយរត់
+  `sync-zto-cookie.cmd` ជាមួយ Argus session ពិត។
+- Firebase rules · CSP · Netlify env schema **មិនប្រែ**។
+
+---
+
 ## [2.25.2] — 2026-09-01 · ការស្កេនលឿនលែងបាត់ការបំពេញស្វ័យប្រវត្តិ
 
 ជុំនេះកែ **ZoeW** តែមួយ (`zoew-v148` ➜ `zoew-v149`); **ZoeKeyGen មិនប្រែ**

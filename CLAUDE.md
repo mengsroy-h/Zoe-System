@@ -1856,34 +1856,49 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
 > ការសម្រេចនេះកើតឡើង។
 
 
-### ⛔ Cookie ZTO ត្រូវប្តូរ **ដោយដៃ** — ខ្សែសង្វាក់ «ចុច ១ ដង» ត្រូវដកចេញ (2026-09-01)
+### ZTO Cookie Sync លើ Windows — ចាប់ Request Header ពិតក្នុង browser មូលដ្ឋាន (2026-09-01)
 
-> **សំណើអ្នកប្រើ** ៖ *«សូមដកអ្វីដែលពាក់ព័ន្ធជាមួយ extension ចេញពីកូដឲ្យស្អាត»*។
+> **សំណើអ្នកប្រើ** ៖ *«តើមានវិធីយក Cookie ពី Argus ស្រួលជាង DevTools ទេ?»*
+> ក្រោយ Chrome/Edge extension ត្រូវដកចេញ អ្នកប្រើជ្រើស **Windows** សម្រាប់
+> helper មូលដ្ឋាន។
 
-ធ្លាប់មានខ្សែសង្វាក់ **Chrome extension ➜ Function `zto-cookie-update` ➜
-Netlify API** ដែលធ្វើឲ្យការប្តូរ Cookie នៅសល់ត្រឹមចុច ១ ដង។ **វាត្រូវដកចេញ
-ទាំងស្រុង** ៖ `tools/zto-cookie-grabber/` · `ZoeW/netlify/functions/zto-cookie-update.js` ·
-`audit-tools/zto-cookie-update-test.js`។
+#### អ្វីដែលបានវាស់រួច និងនៅតែជាធរមាន
 
-#### ⛔ ការវាស់ដែលធ្វើរួច — កុំវាស់ឡើងវិញ
-
-| សំណួរ | ចម្លើយពិត |
+| ផ្លូវ | សាលក្រម |
 |---|---|
-| `document.cookie` លើ Argus? | `__zcat_uuid__` · `ZTO_INTL_BOS_MAN_TOKEN=1` · `perf_dv6Tr4n=1` · `sidebarStatus=0` — **គ្មាន credential ពិត** |
-| Cookie session ពិត? | **`BOS-MAN-SESSION` លើ `aargus-api.ztoglobal.com`** ជា **`HttpOnly`** ➜ យកបានតែពី Response Headers ➜ `Set-Cookie` ឬពី Request Header `Cookie:` |
-| `chrome.cookies` អានវាបានទេ? | 🔴 **អត់ទេ លើ Edge របស់អ្នកប្រើ** — វាស់បាន ៖ `permissions.contains` = `true` · `getAllCookieStores` = ១ · tab Argus នៅ profile ដដែល (`argusTabs=1`) តែ `getAll({})` = **០** ខណៈ DevTools ➜ Application ➜ Cookies បង្ហាញ **៥** |
+| `document.cookie` / bookmarklet | ❌ Cookie session `BOS-MAN-SESSION` ជា `HttpOnly` |
+| Extension `chrome.cookies` | ❌ Edge ពិត៖ permission មាន · store ១ · profile ត្រូវ តែ `getAll({})` = ០ ខណៈ DevTools ឃើញ ៥ |
+| Auto-login ក្នុង Netlify | ❌ ZTO IDaaS មិនបើកឲ្យ IP របស់ Netlify |
+| **Windows helper ថ្មី** | ចាប់ `Cookie:` ពី **Order Detail request ពិត** តាម Playwright `request.allHeaders()` ក្នុង Edge/Chrome ដែល helper បើកផ្ទាល់ |
 
-⛔ **bookmarklet ដើរមិនកើតតាមរចនាសម្ព័ន្ធ** (JS អានមិនឃើញ `HttpOnly`) ហើយ
-**extension ក៏ដើរមិនកើតលើឧបករណ៍ពិតដែរ** តាមការវាស់ខាងលើ។ ⛔ **កុំនាំ
-auto-login មកវិញ** ដែរ (2.24.2 ➜ 2.24.7 ៖ ជុំ ៦ បរាជ័យទាំងអស់)។
+⛔ **កុំនាំ extension ចាស់ ឬ auto-login ក្នុង server ត្រឡប់មកវិញ។** Helper
+ថ្មីមិនមែនជាការសាកពួកវាឡើងវិញទេ៖ browser រត់លើ Windows + បណ្តាញរបស់
+អ្នកប្រើ, ប្រើ profile ដាច់ក្នុង `%LOCALAPPDATA%`, ហើយអាន **request header
+ពិត** មិនមែន `chrome.cookies` API។
 
-**ដូច្នេះផ្លូវតែមួយគឺដោយដៃ** ៖ ចម្លងបន្ទាត់ `Cookie:` ពី DevTools ➜ Network ➜
-ដាក់ចូល env `ZTO_COOKIE` ➜ Trigger deploy។ មើល `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ២។
+ខ្សែសង្វាក់៖
 
-⛔ **env ដែលលែងប្រើ ត្រូវលុបចេញពី Netlify** ៖ `ZTO_COOKIE_UPDATE_KEY` ·
-`NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` · `NETLIFY_SITE_ID`។ ជាពិសេស
-`NETLIFY_AUTH_TOKEN` មាន **សិទ្ធិពេញលើគណនី** — ការទុកវាក្នុង env ខណៈគ្មាន
-អ្នកប្រើ ជាការលាតត្រដាងសុទ្ធសាធ។
+`sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify API PATCH ZTO_COOKIE ➜ POST build`
+
+ច្បាប់សុវត្ថិភាព៖
+
+- Cookie រស់ក្នុងសតិ; មិនសរសេរចូល file/config/env របស់ process និងមិនបង្ហាញ។
+- Header ត្រូវមាន `BOS-MAN-SESSION` ពិត · អះអាងទម្រង់ · ពិដាន ៨ KiB/៦៤ គូ ·
+  បដិសេធ CR/LF/NUL។
+- Netlify API response body ដែលអាចមាន secret ត្រូវបោះចោលដោយមិនបង្ហាញ;
+  Authorization redirect ត្រូវបដិសេធ ហើយ fetch ត្រូវ settle ដោយ timer ពិត។
+- Update env ត្រូវជោគជ័យ **មុន** trigger deploy; បរាជ័យមិនអះអាងថារួច។
+- Netlify PAT ត្រូវ prompt ដោយ `Read-Host -AsSecureString`, រក្សាជា Windows
+  **DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` និងដោះសោតែទៅ stdout pipe
+  ដែល Node ទទួលដោយមិនបង្ហាញ តាម child ដែល `shell:false`។ ⛔ គ្មាន PAT ក្នុង command line,
+  Function/env ឬ endpoint សរសេរ env ពី internet។
+- Helper នៅក្រោម `tools/` root; មិនចូល ZoeW publish/bundle និងមិនបង្ខំ
+  `APP_VERSION` ឬ `CACHE_VERSION` ឲ្យឡើង។
+
+⛔ **server env ដែល extension ចាស់ធ្លាប់ប្រើ ត្រូវនៅតែលុប**៖
+`ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
+`NETLIFY_SITE_ID`។ PAT របស់ helper ថ្មីរស់តែក្នុង DPAPI លើ Windows មូលដ្ឋាន;
+កុំយកវាទៅដាក់ក្នុង Netlify env វិញ។
 
 #### ⛔ ចន្លោះពិតរបស់ `version-bump-scope.js` (នៅតែជាធរមាន)
 
@@ -1913,8 +1928,19 @@ auto-login មកវិញ** ដែរ (2.24.2 ➜ 2.24.7 ៖ ជុំ ៦ ប�
 ទាមទារការឡើងកំណែ ២ ដដែល)។
 
 Test៖ **`version-bump-scope.js`** (៧ assertion)។ ⛔ ការលើកលែងនៅតែគ្រប
-`netlify/` និង `tools/` ទាំង ២ ទោះ `tools/` លែងមានឯកសារ — ការរឹតវាឥឡូវនេះ
-គ្មានតម្លៃបន្ថែម ហើយបើថ្ងៃណាមានឧបករណ៍ថ្មីក្រោម `tools/` វាការពារស្រាប់។
+`netlify/` និង `tools/` ទាំង ២; helper ថ្មីស្ថិតក្រោម `tools/` ហើយមិនចូល
+បញ្ជីសំបក PWA ➜ ជុំនេះជាភស្តុតាងថាការលើកលែងនោះនៅតែចាំបាច់។
+
+Test៖ **`zto-cookie-sync-test.js`** (៦០ assertion; ធ្លាក់ ៥៧ លើថតទទេ) —
+ចាក់សោ exact host/path · HTTPS · request headers ពិត · header injection ·
+DPAPI/BSTR cleanup · `shell:false` · exact Netlify API method/path/body · timeout
+ដែល settle · លំដាប់ env ➜ deploy · profile ក្រៅ repo · និងការមិនវិលទៅ
+extension/server token។
+
+⏳ **ត្រូវការការផ្ទៀងផ្ទាត់លើ Windows ពិតមុន merge**៖ `setup.cmd` ➜
+បញ្ចូល Site ID + PAT ➜ Login Argus ក្នុង profile ពិសេស ➜ បើកកញ្ចប់មួយ ➜ ត្រូវឃើញ
+env update និង deploy trigger។ បើ Playwright/Edge មិនបញ្ចេញ Cookie ក្នុង
+`request.allHeaders()` លើឧបករណ៍ពិត ត្រូវទុក PR ជា draft និងកុំសន្មត់ថាដើរ។
 
 ### ⛔ ស្លាក ↔ ថេរ ត្រូវចងភ្ជាប់គ្នា — និង **ថ្ងៃលំដាប់ ≠ រយៈពេល** (កំណែ 2.25.1)
 

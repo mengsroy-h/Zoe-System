@@ -29,7 +29,15 @@ const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // ឯកសារដែលបម្រើដល់អ្នកប្រើពិត — README/manifest មិនប៉ះឥរិយាបថ runtime
 const SHIPPED = /\.(js|css|html|wasm|json)$/;
-const NOT_SHIPPED = /(README|netlify\.toml|firebase-database\.rules\.json|\/test\.js$)/;
+// ⛔ `netlify/functions/` រត់លើ **server** — វាមិនដែលចូលសំបករបស់ `sw.js` ទេ
+// (`sw.js` បញ្ជូន `/.netlify/functions/` ទៅ `networkOnly()` ដោយផ្ទាល់) ➜ ការកែ
+// Function មិនអាចធ្វើឲ្យសំបកដែល cache ចាស់បានឡើយ។ បើរាប់វាជាកូដ ship នោះ
+// ការកែខាង server បង្ខំ `CACHE_VERSION` ឲ្យឡើង ➜ **អ្នកប្រើទាំងអស់ទាញសំបក
+// PWA ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** — ជាកំហុសដដែលនឹងច្បាប់ទី ៦។
+// ⛔ ការលើកលែងនេះមិនឈរតែឯងទេ — ការអះអាង «សំបកគ្មានផ្លូវ server» ខាងក្រោម
+// ចាក់សោវា ៖ បើថ្ងៃណាឯកសារសំបកពិតចូល `netlify/` ឬ `tools/` នោះវាធ្លាក់។
+const NOT_SHIPPED = /(README|netlify\.toml|netlify\/functions\/|firebase-database\.rules\.json|\/test\.js$)/;
+const SERVER_ONLY_DIRS = /(^|\/)(netlify|tools)\//;
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -98,6 +106,30 @@ function appVersionOf(ref, app) {
     } catch (e) { return null; }
     const m = src.match(/APP_VERSION\s*=\s*'([^']+)'/);
     return m ? m[1] : null;
+}
+
+// ⛔ ការបិទរន្ធនៃការលើកលែង `netlify/functions/` ខាងលើ។
+// ការ **បន្ធូរ checker** ដោយគ្មានការចាក់សោ គឺជាការបង្កើតបៃតងក្លែងក្លាយសម្រាប់
+// ជុំក្រោយ (មេរៀន «ការការពារដែលងាប់»)។ ការលើកលែងនោះឈរលើការពិត **តែមួយ** ៖
+// បញ្ជីសំបករបស់ `sw.js` គ្មានផ្លូវណាក្រោម `netlify/` ឬ `tools/` ទេ។ ដូច្នេះ
+// ត្រូវអះអាងការពិតនោះដោយផ្ទាល់ — បើថ្ងៃណាវាលែងពិត នោះការលើកលែងក្លាយជា
+// គ្រោះថ្នាក់ ហើយ checker នេះត្រូវធ្លាក់ **មុន** ការកែនោះ ship។
+for (const app of present) {
+    let sw;
+    try { sw = fs.readFileSync(path.join(ROOT, app, 'sw.js'), 'utf8'); } catch (e) { sw = ''; }
+    const lists = sw.match(/(?:CORE_SHELL|OPTIONAL_SHELL)\s*=\s*\[([^\]]*)\]/g) || [];
+    ok(app + ' ៖ ជាន់អប្បបរមា៖ ឃើញបញ្ជីសំបក ២ (CORE + OPTIONAL)',
+        lists.length === 2, 'ឃើញ ' + lists.length + ' — ការស្កេនសំបកមិនអាចទុកចិត្តបាន');
+    const entries = [];
+    for (const l of lists) {
+        for (const m of l.matchAll(/['"]([^'"]+)['"]/g)) entries.push(m[1]);
+    }
+    ok(app + ' ៖ ជាន់អប្បបរមា៖ ធាតុសំបក >= 8', entries.length >= 8, 'ឃើញ ' + entries.length);
+    const leaked = entries.filter((e) => SERVER_ONLY_DIRS.test(e));
+    ok('⛔ ' + app + ' ៖ សំបកគ្មានផ្លូវក្រោម `netlify/` ឬ `tools/`',
+        leaked.length === 0,
+        'ឃើញ ' + leaked.join(', ') + ' ➜ ការលើកលែង `netlify/functions/` ក្នុង '
+            + 'NOT_SHIPPED លែងសុវត្ថិភាព ➜ ការកែឯកសារនោះនឹងទុកអ្នកប្រើនឹងសំបកចាស់');
 }
 
 let anyChecked = 0;

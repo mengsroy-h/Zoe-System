@@ -25,6 +25,80 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-01 · ប្តូរ Cookie ZTO ដោយចុច ១ ដង
+
+⛔ **ជុំនេះ *មិន* ឡើងកំណែដោយចេតនា** — វាមិនប៉ះឯកសារ ship ណាមួយសោះ
+(`app.js` · `index.html` · `style.css` · `sw.js` · `manifest.json` **នៅដដែល
+បេះបិទ**)។ វាកែតែ **Netlify Function** (រត់លើ server) · **extension** ·
+**ឧបករណ៍ audit** និង **ឯកសារ**។ ដូច្នេះ `APP_VERSION` នៅ `2.25.1` និង
+`CACHE_VERSION` នៅ `zoew-v148` ➜ **អ្នកប្រើមិនត្រូវទាញសំបក PWA ឡើងវិញទេ**
+(ច្បាប់ទី ៦)។ ZoeKeyGen **មិនប៉ះសោះ**។
+
+### បន្ថែម
+
+- **ប្តូរ Cookie ZTO ដោយចុច ១ ដង។** មុននេះពេល Cookie ផុតកំណត់ អ្នកប្រើត្រូវ
+  ចូល Argus ➜ F12 ➜ Network ➜ ចម្លងជួរ `Cookie:` ➜ Netlify env var ➜ Save ➜
+  Trigger deploy។ ឥឡូវ ៖ បើក Argus (login រួច) ➜ **ចុចរូប extension ១ ដង** ➜
+  badge បៃតង `OK`។ ខ្សែសង្វាក់ ៖ extension ➜ Function ថ្មី
+  `zto-cookie-update` ➜ Netlify API (`setEnvVarValue` + `createSiteBuild`)។
+- **`?diag=1` បង្ហាញវាល `sessionRenewal` ថ្មី** — វាប្រាប់ថា Argus ផ្ញើ
+  `Set-Cookie` មកវិញឬអត់ និង **ឈ្មោះ** cookie ណាខ្លះ។ វាជាឧបករណ៍វាស់សម្រាប់
+  ជុំក្រោយ (ការបន្តអាយុ cookie ស្វ័យប្រវត្តិ) ⛔ **តម្លៃមិនចេញទេ**។
+
+### សុវត្ថិភាព
+
+- **Header injection ត្រូវបិទ** — cookie ដែលមាន `CR`/`LF`/`NUL` ត្រូវបដិសេធ។
+- **Secret មិនលេច** — ចម្លើយផ្តល់តែ **ឈ្មោះ** cookie; តម្លៃ និង
+  `NETLIFY_AUTH_TOKEN` មិនចេញក្នុងចម្លើយ ឬ log ឡើយ។
+- **កូនសោដាច់ដោយឡែក** — `ZTO_COOKIE_UPDATE_KEY` **≠** `ZTO_PROXY_KEY`។
+  កូនសោក្រោយរស់នៅក្នុង client app ចំណែកកូនសោមុនផ្តល់សិទ្ធិ **សរសេរ** លើ env
+  ➜ វាត្រូវខ្លាំងជាង និងដាច់ដោយឡែក។
+- **សិទ្ធិ extension តូចបំផុត** — `cookies` + `storage` · host ត្រឹម
+  `ztoglobal.com` · សិទ្ធិលើ Netlify site សុំតែពេលចុច Save។
+  ⛔ `NETLIFY_AUTH_TOKEN` **មិនដែលនៅក្នុង extension ទេ**។
+
+### ស្ថេរភាព
+
+- **ការ settle ធានាដោយរចនាសម្ព័ន្ធ** — `timedFetch()` ប្រណាំង timer **ពិត**
+  បន្ថែមលើ `AbortController` ➜ បណ្តាញ «ភ្ជាប់តែស្លាប់» ដែល **មិនគោរព signal**
+  មិនអាចធ្វើឲ្យ Function ព្យួរបានទេ (មេរៀន `stall-guard` 2.22.4 អនុវត្តខាង server)។
+- **env សរសេរធ្លាក់ ➜ មិន trigger deploy** ហើយ **មិនអះអាង `ok: true`**
+  (មេរៀន `toast-truth` ៖ សារត្រូវនិយាយការពិត)។
+
+### ឧបករណ៍ audit
+
+- **`zto-cookie-update-test.js` ថ្មី (៦២ assertion)** — ធ្លាក់លើ `origin/main`
+  ដោយជាន់អប្បបរមា (ឯកសារមិនទាន់មាន) ➜ បញ្ជាក់ថាវាមិនទទេ។
+- ⛔ **`version-bump-scope.js` ៖ បិទចន្លោះពិត។** `SHIPPED` ចាប់
+  `ZoeW/netlify/functions/*.js` ➜ ការកែ Function **ខាង server** បង្ខំ
+  `CACHE_VERSION` ឲ្យឡើង ➜ **អ្នកប្រើទាំងអស់ទាញសំបក PWA ទាំងមូលឡើងវិញដោយ
+  ឥតប្រយោជន៍** — កំហុសដដែលនឹងច្បាប់ទី ៦។ **វាស់បាន** ៖ មុនកែ ➜ ធ្លាក់ ២
+  (ទាមទារ `CACHE_VERSION` និង `APP_VERSION` ឡើង); ក្រោយកែ ➜ «គ្មាន App ណាប្រែ»។
+  Function រត់លើ server ហើយ `sw.js` បញ្ជូន `/.netlify/functions/` ទៅ
+  `networkOnly()` ➜ វាមិនអាចធ្វើឲ្យសំបកចាស់បានឡើយ។
+- ⛔ **ការបន្ធូរនោះមិនឈរតែឯង** — ការបន្ធូរ checker ដោយគ្មានការចាក់សោ គឺជាការ
+  បង្កើតបៃតងក្លែងក្លាយសម្រាប់ជុំក្រោយ។ បន្ថែម assertion ថាបញ្ជីសំបករបស់
+  `sw.js` **គ្មានផ្លូវក្រោម `netlify/` ឬ `tools/`** បូកជាន់អប្បបរមា ២ (បញ្ជី
+  សំបក ២ · ធាតុ >= ៨)។ **Mutation ៤ ➜ ចាប់បានទាំង ៤** ៖ ផ្លូវសំបកក្រោម
+  `netlify/` · `OPTIONAL_SHELL` ប្តូរឈ្មោះ · បញ្ជីសំបកត្រូវកាត់ · និង
+  **ទិសផ្ទុយ** (ការកែ `app.js` ពិត **នៅតែ** ទាមទារការឡើងកំណែដដែល)។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **Firebase rules ៖ គ្មាន** — មិនប្រែសោះ។ **CSP ៖ គ្មាន** — មិនប្រែសោះ។
+- **Netlify env vars ថ្មី ៤** (ត្រូវការតែពេលចង់ប្រើការចុច ១ ដង) ៖
+  `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
+  `NETLIFY_SITE_ID`។ មើល `ZoeW/ZTO-SETUP-KH.md` ផ្នែក ១។
+  ⛔ **`NETLIFY_AUTH_TOKEN` ជា credential ខ្លាំង** — កុំដាក់វាក្នុង extension
+  ឬ client ណាមួយ។
+- **ដំឡើង extension** ៖ `chrome://extensions` ➜ Developer mode ➜ Load unpacked
+  ➜ ថត `tools/zto-cookie-grabber/` ➜ Extension options ➜ បំពេញ Endpoint URL
+  និង update key ➜ Save។ មើល `tools/zto-cookie-grabber/README-KH.md`។
+- **ការចម្លង Cookie ដោយដៃនៅតែដើរដដែល** — extension ជាផ្លូវ **បន្ថែម**
+  មិនមែនជាការជំនួសទេ។
+
+---
+
 ## [ZoeW 2.25.1 · ZoeKeyGen 2.19.16] — 2026-09-01 · ជុំ Deep Audit ៖ អត្តសញ្ញាណកំហុស ZTO បាត់ · ការចងភ្ជាប់ស្លាកច្បាប់សម្អាត
 
 ជុំនេះកែ **ZoeW** (`zoew-v147` ➜ `zoew-v148`) និង **ZoeKeyGen**

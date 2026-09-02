@@ -64,7 +64,7 @@ function sliceFn(src, name) {
 // ឈ្មោះដែល sandbox ផ្តល់ជា stub រួចហើយ — អ្វីដែលនៅសល់ត្រូវដកចេញពី app.js ពិត
 const STUBBED = new Set([
     'clearInfoListenerRecovery', 'clearReconnectWatchdog', 'retryFailedDbListenersNow',
-    'flushPendingHistoryPatches', 'scheduleReconnectWatchdog', 'renderConnectionStatus',
+    'flushPendingHistoryPatches', 'flushPendingRegistryReleases', 'scheduleReconnectWatchdog', 'renderConnectionStatus',
     'handleInfoListenerError', 'retryPendingRoleCheck', 'onValue', 'off', 'val',
     'setServerTimeOffset', 'splice', 'forEach', 'catch', 'then', 'get'
 ]);
@@ -167,6 +167,9 @@ function buildEnv(app, opts) {
         function clearReconnectWatchdog() {}
         function retryFailedDbListenersNow() {}
         function flushPendingHistoryPatches() {}
+        function flushPendingRegistryReleases() {}
+        let pendingRegistryReleases = new Map();
+        let registryReleaseFlushInFlight = false;
         function scheduleReconnectWatchdog() {}
         function renderConnectionStatus() {}
         function handleInfoListenerError() {}

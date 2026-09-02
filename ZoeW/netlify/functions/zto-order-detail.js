@@ -193,17 +193,18 @@ function settleWithin(run, timeoutMs, label) {
     });
 }
 
-async function resolveCookieCredential(netlifyEvent, env) {
+async function resolveCookieCredential(netlifyEvent, env, options) {
     if (env.ZTO_AUTHORIZATION || env.ZTO_TOKEN) {
         return { cookie: '', source: '', store: null, renewal: '' };
     }
+    const skipCache = !!(options && options.fresh);
     const opened = openCookieStore(netlifyEvent);
     // ⛔ មូលហេតុត្រូវរស់រានពី cache ។ ការសរសេរ `storeReason = opened.reason`
     // (ជា `''` ពេល store បើកបាន) មុនការពិនិត្យ cache លុបមូលហេតុនៃការអាន
     // ដែលធ្លាក់ ៖ វាស់បានលើ Windows ពិត (2026-09-02) — helper សួរ
     // `?diag=1` ១៤ ដង ហើយមើលឃើញ `source: env` ដោយ **គ្មានមូលហេតុ**។
     if (opened.reason) cookieState.storeReason = opened.reason;
-    if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
+    if (!skipCache && cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }
     if (opened.store) {
@@ -850,6 +851,7 @@ exports.handler = async function handler(event) {
 
     const query = event.queryStringParameters || {};
     const wantsDiagnostics = String(query.diag || '') === '1';
+    const wantsFreshCookie = wantsDiagnostics && String(query.fresh || '') === '1';
     const barcode = String(query.barcode || '').trim();
     if (!wantsDiagnostics && !BARCODE_RE.test(barcode)) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
@@ -859,7 +861,7 @@ exports.handler = async function handler(event) {
     let headers;
     let authKind;
     try {
-        session = await resolveCookieCredential(event, process.env);
+        session = await resolveCookieCredential(event, process.env, { fresh: wantsFreshCookie });
         const built = buildHeaders(config, process.env, session.cookie);
         headers = built.headers;
         authKind = built.authKind;
@@ -868,7 +870,7 @@ exports.handler = async function handler(event) {
     }
 
     if (wantsDiagnostics) {
-        return json(200, diagnosticsBody(config, headers, authKind, session));
+        return json(200, Object.assign(diagnosticsBody(config, headers, authKind, session), { fresh: wantsFreshCookie }));
     }
 
     if (!authKind) {

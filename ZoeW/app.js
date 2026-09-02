@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.4';
+    const APP_VERSION = '2.25.5';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -331,6 +331,10 @@
     const HISTORY_PATCH_RETRY_MAX = 5;
     const HISTORY_PATCH_QUEUE_MAX = 50;
     let historyPatchFlushInFlight = false;
+    const pendingRegistryReleases = new Map();
+    const REGISTRY_RELEASE_RETRY_MAX = 6;
+    const REGISTRY_RELEASE_QUEUE_MAX = 500;
+    let registryReleaseFlushInFlight = false;
 
     let serverTimeOffsetMs = 0;
     function getServerNow() {
@@ -982,6 +986,7 @@
                 clearReconnectWatchdog();
                 retryFailedDbListenersNow();
                 flushPendingHistoryPatches();
+                flushPendingRegistryReleases();
             } else if (navigator.onLine !== false) {
                 scheduleReconnectWatchdog();
             }
@@ -3939,6 +3944,8 @@
         pendingPermanentDeleteId = null;
         pendingHistoryPatches.clear();
         historyPatchFlushInFlight = false;
+        pendingRegistryReleases.clear();
+        registryReleaseFlushInFlight = false;
         appLockExcuseAt = 0;
         appLockVeiled = false;
         deletedSearchQuery = '';
@@ -5311,12 +5318,27 @@
         }
     }
 
+    function ledgerNumber(value) {
+        const n = parseFloat(value);
+        return isFinite(n) ? n : 0;
+    }
+
+    function ledgerAppliedDelta(before, after) {
+        return {
+            cod: Math.round((ledgerNumber(after.codDollar) - ledgerNumber(before.codDollar)) * 100) / 100,
+            dod: Math.round((ledgerNumber(after.dodDollar) - ledgerNumber(before.dodDollar)) * 100) / 100,
+            count: ledgerNumber(after.totalCount) - ledgerNumber(before.totalCount)
+        };
+    }
+
     function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
         if (!scanDateStr) scanDateStr = getFormattedDate();
 
         if (!dailyRevenueData[scanDateStr]) {
             dailyRevenueData[scanDateStr] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
         }
+
+        const beforeDaily = { ...dailyRevenueData[scanDateStr] };
 
         dailyRevenueData[scanDateStr].codDollar = Math.round(((parseFloat(dailyRevenueData[scanDateStr].codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
         dailyRevenueData[scanDateStr].dodDollar = Math.round(((parseFloat(dailyRevenueData[scanDateStr].dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
@@ -5326,12 +5348,15 @@
         if (dailyRevenueData[scanDateStr].dodDollar < 0) dailyRevenueData[scanDateStr].dodDollar = 0;
         if (dailyRevenueData[scanDateStr].totalCount < 0) dailyRevenueData[scanDateStr].totalCount = 0;
 
-        commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd);
+        commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd,
+            ledgerAppliedDelta(beforeDaily, dailyRevenueData[scanDateStr]));
 
         let ymKey = scanDateStr.substring(0, 7);
         if (!monthlyRevenueData[ymKey]) {
             monthlyRevenueData[ymKey] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
         }
+
+        const beforeMonthly = { ...monthlyRevenueData[ymKey] };
 
         monthlyRevenueData[ymKey].codDollar = Math.round(((parseFloat(monthlyRevenueData[ymKey].codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
         monthlyRevenueData[ymKey].dodDollar = Math.round(((parseFloat(monthlyRevenueData[ymKey].dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
@@ -5341,11 +5366,13 @@
         if (monthlyRevenueData[ymKey].dodDollar < 0) monthlyRevenueData[ymKey].dodDollar = 0;
         if (monthlyRevenueData[ymKey].totalCount < 0) monthlyRevenueData[ymKey].totalCount = 0;
 
-        commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd);
+        commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
+            ledgerAppliedDelta(beforeMonthly, monthlyRevenueData[ymKey]));
     }
 
-    function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd) {
+    function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta) {
         if (!dbRefDailyRevenue) return;
+        const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
         const recordRef = dailyRevenueData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
         fb.runTransaction(dateRef, (current) => {
@@ -5355,12 +5382,15 @@
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
             }
+            if (codDollar < 0) codDollar = 0;
+            if (dodDollar < 0) dodDollar = 0;
+            if (totalCount < 0) totalCount = 0;
             return { codDollar, dodDollar, totalCount };
         }).catch(() => {
             if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
-                recordRef.codDollar = Math.round(((parseFloat(recordRef.codDollar) || 0) - (parseFloat(codToAdd) || 0)) * 100) / 100;
-                recordRef.dodDollar = Math.round(((parseFloat(recordRef.dodDollar) || 0) - (parseFloat(dodToAdd) || 0)) * 100) / 100;
-                recordRef.totalCount = (parseFloat(recordRef.totalCount) || 0) - (parseFloat(countToAdd) || 0);
+                recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
+                recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
+                recordRef.totalCount = ledgerNumber(recordRef.totalCount) - applied.count;
                 if (recordRef.codDollar < 0) recordRef.codDollar = 0;
                 if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
                 if (recordRef.totalCount < 0) recordRef.totalCount = 0;
@@ -5370,8 +5400,9 @@
         });
     }
 
-    function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd) {
+    function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta) {
         if (!dbRefMonthlyRevenue) return;
+        const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
         const recordRef = monthlyRevenueData[ymKey];
         fb.runTransaction(dbRefMonthlyRevenue, (current) => {
             const months = (current && typeof current === 'object') ? current : {};
@@ -5394,9 +5425,9 @@
             return latestThreeMonths;
         }).catch(() => {
             if (recordRef && monthlyRevenueData[ymKey] === recordRef) {
-                recordRef.codDollar = Math.round(((parseFloat(recordRef.codDollar) || 0) - (parseFloat(codToAdd) || 0)) * 100) / 100;
-                recordRef.dodDollar = Math.round(((parseFloat(recordRef.dodDollar) || 0) - (parseFloat(dodToAdd) || 0)) * 100) / 100;
-                recordRef.totalCount = (parseFloat(recordRef.totalCount) || 0) - (parseFloat(countToAdd) || 0);
+                recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
+                recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
+                recordRef.totalCount = ledgerNumber(recordRef.totalCount) - applied.count;
                 if (recordRef.codDollar < 0) recordRef.codDollar = 0;
                 if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
                 if (recordRef.totalCount < 0) recordRef.totalCount = 0;
@@ -5497,16 +5528,24 @@
         const record = dailyPickupData[scanDateStr];
         if (!record.pickedUpPhones) record.pickedUpPhones = {};
 
-        record.packagesPickedUp = (parseFloat(record.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+        const beforePackages = ledgerNumber(record.packagesPickedUp);
+        const beforeRefCount = phoneKey ? ledgerNumber(record.pickedUpPhones[phoneKey]) : 0;
+
+        record.packagesPickedUp = beforePackages + ledgerNumber(packagesToAdd);
         if (record.packagesPickedUp < 0) record.packagesPickedUp = 0;
 
         if (phoneKey && customerRefDelta) {
-            const refCount = (parseFloat(record.pickedUpPhones[phoneKey]) || 0) + customerRefDelta;
+            const refCount = beforeRefCount + customerRefDelta;
             if (refCount <= 0) delete record.pickedUpPhones[phoneKey];
             else record.pickedUpPhones[phoneKey] = refCount;
         }
 
-        commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd);
+        const applied = {
+            packages: record.packagesPickedUp - beforePackages,
+            customer: phoneKey ? (ledgerNumber(record.pickedUpPhones[phoneKey]) - beforeRefCount) : 0
+        };
+
+        commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, applied);
     }
 
     function requestPinBeforeResetPickup() {
@@ -5570,8 +5609,9 @@
         }
     }
 
-    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
+    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, appliedDelta) {
         if (!dbRefDailyPickup) return;
+        const applied = appliedDelta || { packages: ledgerNumber(packagesToAdd), customer: ledgerNumber(customerRefDelta) };
         const recordRef = dailyPickupData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
         fb.runTransaction(dateRef, (current) => {
@@ -5590,11 +5630,11 @@
             return { packagesPickedUp, pickedUpPhones };
         }).catch(() => {
             if (recordRef && dailyPickupData[scanDateStr] === recordRef) {
-                recordRef.packagesPickedUp = (parseFloat(recordRef.packagesPickedUp) || 0) - (parseFloat(packagesToAdd) || 0);
+                recordRef.packagesPickedUp = ledgerNumber(recordRef.packagesPickedUp) - applied.packages;
                 if (recordRef.packagesPickedUp < 0) recordRef.packagesPickedUp = 0;
-                if (phoneKey && customerRefDelta) {
+                if (phoneKey && applied.customer) {
                     if (!recordRef.pickedUpPhones) recordRef.pickedUpPhones = {};
-                    const refCount = (parseFloat(recordRef.pickedUpPhones[phoneKey]) || 0) - customerRefDelta;
+                    const refCount = ledgerNumber(recordRef.pickedUpPhones[phoneKey]) - applied.customer;
                     if (refCount <= 0) delete recordRef.pickedUpPhones[phoneKey];
                     else recordRef.pickedUpPhones[phoneKey] = refCount;
                 }
@@ -8114,15 +8154,71 @@
         return item.barcode ? [item.barcode] : [];
     }
 
+    function queueRegistryReleaseRetry(keys, attempts) {
+        keys.forEach((key) => {
+            const existing = pendingRegistryReleases.get(key);
+            const nextAttempts = Math.max(attempts, existing ? existing.attempts : 0);
+            if (nextAttempts >= REGISTRY_RELEASE_RETRY_MAX) return;
+            if (!existing && pendingRegistryReleases.size >= REGISTRY_RELEASE_QUEUE_MAX) return;
+            pendingRegistryReleases.set(key, { attempts: nextAttempts });
+        });
+    }
+
+    function releaseRegistryKeys(keys) {
+        if (!db || !fb || !keys.length) return Promise.resolve(true);
+        const updates = {};
+        keys.forEach((key) => { updates[key] = null; });
+        return dbOp(fb.update(fb.ref(db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
+    }
+
     function releaseBarcodesInRegistry(codes) {
         if (!db || !fb || !codes || !codes.length) return Promise.resolve();
-        const updates = {};
+        const keys = [];
         codes.forEach((code) => {
             const key = barcodeRegistryKey(code);
-            if (key) updates[key] = null;
+            if (key && keys.indexOf(key) === -1) keys.push(key);
         });
-        if (!Object.keys(updates).length) return Promise.resolve();
-        return fb.update(fb.ref(db, 'zoew_barcode_registry'), updates).catch(() => {});
+        if (!keys.length) return Promise.resolve();
+        return retryAsync(() => releaseRegistryKeys(keys).then((done) => {
+            if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
+            return true;
+        }), 3, 1200).then(() => {
+            keys.forEach((key) => pendingRegistryReleases.delete(key));
+        }, () => {
+            queueRegistryReleaseRetry(keys, 1);
+        });
+    }
+
+    function registryKeyIsOwned(key) {
+        const owns = (item) => collectItemBarcodes(item).some((code) => barcodeRegistryKey(code) === key);
+        return scanHistory.some(owns) || deletedItems.some(owns);
+    }
+
+    function registryReleaseVerdict(key) {
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return 'defer';
+        return registryKeyIsOwned(key) ? 'owned' : 'release';
+    }
+
+    function flushPendingRegistryReleases() {
+        if (registryReleaseFlushInFlight) return;
+        if (!pendingRegistryReleases.size) return;
+        if (!db || !fb) return;
+        const entries = Array.from(pendingRegistryReleases.entries());
+        pendingRegistryReleases.clear();
+        const releasable = [];
+        entries.forEach((pair) => {
+            const verdict = registryReleaseVerdict(pair[0]);
+            if (verdict === 'release') releasable.push(pair);
+            else if (verdict === 'defer') pendingRegistryReleases.set(pair[0], { attempts: pair[1].attempts });
+        });
+        if (!releasable.length) return;
+        registryReleaseFlushInFlight = true;
+        const keys = releasable.map((pair) => pair[0]);
+        releaseRegistryKeys(keys).then((done) => {
+            if (!done) releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
+        }, () => {
+            releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
+        }).then(() => { registryReleaseFlushInFlight = false; });
     }
 
     const LOCKER_PREFIX_KEY = 'zoe_locker_prefix';

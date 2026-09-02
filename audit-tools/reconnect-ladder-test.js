@@ -125,7 +125,8 @@ function run({ handshakeMs, networkUpAt, connectedFromStart, ladder, budgetMs })
         window: {}, document: { getElementById: () => null },
         fb, db: {}, isDatabaseConnected: !!connectedFromStart, dbListenersFailed: false,
         retryFailedDbListenersNow: () => {}, renderConnectionStatus: () => {}, showToast: () => {},
-        flushPendingHistoryPatches: () => {}
+        flushPendingHistoryPatches: () => {},
+        flushPendingRegistryReleases: () => {}
     };
     vm.createContext(ctx);
 

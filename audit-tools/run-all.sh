@@ -93,6 +93,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          stall-guard-test \
          periodic-network-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
+         revenue-rules-clamp-test registry-release-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
          lookup-burst-test; do
@@ -250,6 +251,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
     PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
     PICKUPRESET_APP_DIR="$BASE" node audit-tools/pickup-reset-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset:    /'
+    REVCLAMP_APP_DIR="$BASE" node audit-tools/revenue-rules-clamp-test.js 2>&1 | tail -1 | sed 's/^/   revenue-clamp:   /'
+    REGISTRY_APP_DIR="$BASE" node audit-tools/registry-release-test.js 2>&1 | tail -1 | sed 's/^/   registry-rel:    /'
     PENDINGKEY_APP_DIR="$BASE" node audit-tools/listener-pending-key-test.js 2>&1 | tail -1 | sed 's/^/   pending-key:     /'
     HISTPATCH_APP_DIR="$BASE" node audit-tools/history-patch-retry-test.js 2>&1 | tail -1 | sed 's/^/   history-patch:   /'
     LOOKUPPREFETCH_APP_DIR="$BASE" node audit-tools/lookup-prefetch-test.js 2>&1 | tail -1 | sed 's/^/   lookup-prefetch: /'

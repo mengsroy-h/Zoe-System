@@ -102,6 +102,9 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
+        'const flushPendingRegistryReleases = () => {};\n' +
+        'const pendingRegistryReleases = new Map();\n' +
+        'let registryReleaseFlushInFlight = false;\n' +
         'const serverClockOffsetIsFromServer = () => true;\n' +
         'let serverClockTrusted = false;\n' +
             'let dbListenerPendingSeen = 0;\n' +
@@ -286,6 +289,9 @@ function buildContext() {
         'let serverTimeOffsetMs = 0;\n' +
         'const retryPendingRoleCheck = () => {};\n' +
         'const flushPendingHistoryPatches = () => {};\n' +
+        'const flushPendingRegistryReleases = () => {};\n' +
+        'const pendingRegistryReleases = new Map();\n' +
+        'let registryReleaseFlushInFlight = false;\n' +
         'const serverClockOffsetIsFromServer = () => true;\n' +
         'let serverClockTrusted = false;\n' +
         'this.__probe = () => ({ dbListenersFailed, dbListenerRecoveryTimer, reconnectWatchdogTimer, ' +

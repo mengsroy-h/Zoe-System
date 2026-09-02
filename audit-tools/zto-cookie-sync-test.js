@@ -333,10 +333,18 @@ async function run() {
             JSON.stringify(verified));
         ok('diag ហៅ path ត្រឹមត្រូវជាមួយ header សោ',
             diagCalls[0]
-            && diagCalls[0].url === SITE_URL + '/.netlify/functions/zto-order-detail?diag=1'
+            && diagCalls[0].url.indexOf(SITE_URL + '/.netlify/functions/zto-order-detail?diag=1') === 0
             && diagCalls[0].options.headers['X-Zoe-Proxy-Key'] === PROXY_KEY
             && diagCalls[0].options.method === 'GET',
             diagCalls[0] && diagCalls[0].url);
+        // ⛔ ការផ្ទៀងផ្ទាត់ត្រូវរំលង cache ៦០ វិ. របស់ Function បើមិនដូច្នេះ
+        // អ្នកប្រើរង់ចាំរហូតដល់ ៧៥ វិនាទីក្រោយយក Cookie ថ្មីរាល់ដង (វាស់រួច)។
+        ok('⛔ diag ផ្ទុក `fresh=1` ➜ អាន blob ពិត មិនរង់ចាំ cache ផុតកំណត់',
+            /[?&]fresh=1(?:&|$)/.test(diagCalls[0] ? diagCalls[0].url : ''),
+            diagCalls[0] && diagCalls[0].url);
+        ok('⛔ ទិសផ្ទុយ ៖ `fresh=1` ភ្ជាប់ជាមួយ `diag=1` ជានិច្ច (មិនមែនផ្លូវ lookup)',
+            !diagCalls.some((c) => /fresh=1/.test(c.url) && !/[?&]diag=1(?:&|$)/.test(c.url)),
+            diagCalls.map((c) => c.url));
         ok('⛔ សោមិនចូល URL សោះ', diagCalls.every((call) => call.url.indexOf(PROXY_KEY) === -1));
 
         let polls = 0;

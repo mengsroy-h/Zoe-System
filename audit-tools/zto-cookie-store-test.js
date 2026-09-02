@@ -346,6 +346,43 @@ async function run() {
     ok('⛔ ការសរសេរធ្លាក់ ➜ lookup នៅជោគជ័យ (best-effort)',
         res.statusCode === 200 && JSON.parse(res.body).found === true, res.body);
 
+    // ── ៤ខ. jar ពិតរបស់ Argus ➜ ស្នាមភ្ជាប់នឹង helper (វាស់ 2026-09-02) ──────
+    console.log('\n== ៤ខ. jar ដែលមានគូចម្លែក មិនត្រូវទម្លាក់ Cookie ថ្មី ==');
+    // 🔴 helper រំលងគូខូចរួចសរសេរ jar ស្អាត។ តែ Cookie ដែលសរសេរដោយជំនាន់ចាស់
+    // (ឬដោយដៃ) អាចមានគូចម្លែក ➜ sanitizeStoredCookie ត្រឡប់ '' ➜ ធ្លាក់ទៅ env
+    // **ស្ងាត់** ➜ អ្នកប្រើយក Cookie ថ្មីរួច តែការស្កេននៅប្រើតម្លៃចាស់។
+    const ODD_SESSION = 'BOS-MAN-SESSION=blob-cookie-value-9876';
+    for (const [label, jar, expectDrop] of [
+        ['តម្លៃមានចន្លោះ', ODD_SESSION + '; _ga_ref=Mozilla 5.0', '_ga_ref'],
+        ['flag គ្មាន =', ODD_SESSION + '; justaflag', 'justaflag'],
+        ['៨០ គូ', ODD_SESSION + '; ' + Array.from({ length: 80 },
+            (_, i) => 'c' + i + '=v').join('; '), 'c79']
+    ]) {
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        useBlobs({ value: jar });
+        const oddNet = upstream();
+        const oddRes = await call({ barcode: BARCODE });
+        const sent = sentCookie(oddNet);
+        ok('jar ' + label + ' ➜ នៅតែប្រើ Cookie ពី blob',
+            oddRes.statusCode === 200 && typeof sent === 'string'
+            && sent.indexOf(ODD_SESSION) === 0, sent);
+        ok('jar ' + label + ' ➜ ⛔ គូខូចមិនត្រូវផ្ញើទៅ ZTO',
+            typeof sent === 'string' && sent.indexOf(expectDrop) === -1, sent);
+    }
+    // ⛔ ទិសផ្ទុយ ៖ ការការពារពិតនៅដដែល
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs({ value: 'a=1; b=2' });
+    const noSessNet = upstream();
+    await call({ barcode: BARCODE });
+    ok('⛔ blob គ្មាន BOS-MAN-SESSION ➜ ធ្លាក់ទៅ env ដដែល',
+        sentCookie(noSessNet) === ENV_COOKIE, sentCookie(noSessNet));
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs({ value: ODD_SESSION + '; x=a\r\nSet-Cookie: evil=1' });
+    const injNet = upstream();
+    await call({ barcode: BARCODE });
+    ok('⛔ blob មាន CR/LF ➜ បដិសេធទាំងស្រុង ធ្លាក់ទៅ env',
+        sentCookie(injNet) === ENV_COOKIE, sentCookie(injNet));
+
     // ── ៥. ការវិនិច្ឆ័យ ?diag=1 ────────────────────────────────────────────
     console.log('\n== ៥. ?diag=1 ប្រាប់ប្រភពពិត ==');
     resetEnv({ ZTO_COOKIE: ENV_COOKIE });

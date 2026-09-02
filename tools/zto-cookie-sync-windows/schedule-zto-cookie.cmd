@@ -15,9 +15,10 @@ if not exist "%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\config.json" (
     exit /b 1
 )
 
-if not exist "%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\proxy-key.dpapi" (
-    echo ERROR: --auto needs the ZoeW Site URL and ZTO_PROXY_KEY.
-    echo Run setup.cmd again and fill in both optional prompts, then retry.
+REM The gate asks the tool itself, so a key that exists but cannot be
+REM unlocked is reported instead of registering a task that dies silently.
+node sync-zto-cookie.js --auto-ready
+if errorlevel 1 (
     pause
     exit /b 1
 )

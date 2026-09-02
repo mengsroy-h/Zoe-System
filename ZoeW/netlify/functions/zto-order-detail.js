@@ -63,16 +63,16 @@ function parseCookieHeader(raw) {
     if (!text || text.length > COOKIE_MAX_LENGTH) return null;
     if (CONTROL_CHAR_TEST_RE.test(text)) return null;
     const parts = text.split(';');
-    if (parts.length > COOKIE_MAX_PAIRS) return null;
     const pairs = [];
     for (let i = 0; i < parts.length; i++) {
         const pair = parts[i].trim();
         if (!pair) continue;
+        if (pairs.length >= COOKIE_MAX_PAIRS) break;
         const at = pair.indexOf('=');
-        if (at < 1) return null;
+        if (at < 1) continue;
         const name = pair.slice(0, at).trim();
         const value = pair.slice(at + 1);
-        if (!COOKIE_NAME_RE.test(name) || !COOKIE_VALUE_RE.test(value)) return null;
+        if (!COOKIE_NAME_RE.test(name) || !COOKIE_VALUE_RE.test(value)) continue;
         pairs.push({ name: name, value: value });
     }
     return pairs.length ? pairs : null;
@@ -121,8 +121,9 @@ function mergeRenewedCookie(current, lines) {
         byName.set(name, value);
         changed = true;
     }
-    if (!changed || order.length > COOKIE_MAX_PAIRS) return '';
-    const merged = order.map((name) => ({ name: name, value: byName.get(name) }));
+    if (!changed) return '';
+    const merged = order.slice(0, COOKIE_MAX_PAIRS)
+        .map((name) => ({ name: name, value: byName.get(name) }));
     if (!hasSessionCookie(merged)) return '';
     const text = serializeCookiePairs(merged);
     return text.length > COOKIE_MAX_LENGTH ? '' : text;

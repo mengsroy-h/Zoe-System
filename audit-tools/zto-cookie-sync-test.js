@@ -7,6 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
+let acorn = null;
+try { acorn = require('acorn'); } catch (_) { acorn = null; }
 
 const ROOT = process.env.ZTO_SYNC_APP_DIR
     ? path.resolve(process.env.ZTO_SYNC_APP_DIR)
@@ -128,19 +130,24 @@ async function run() {
             ['CR/LF', 'SESSION=abc\r\nX-Evil=yes', 'COOKIE_CONTROL_CHAR'],
             ['CR/LF នៅគែម', '\r\nSESSION=abc', 'COOKIE_CONTROL_CHAR'],
             ['NUL', 'SESSION=abc\0evil', 'COOKIE_CONTROL_CHAR'],
-            ['គ្មាន =', 'this-is-not-a-pair', 'COOKIE_PAIR_SHAPE'],
-            ['ឈ្មោះខូច', 'bad name=value', 'COOKIE_NAME_SHAPE'],
-            ['តម្លៃមានចន្លោះ', 'BOS-MAN-SESSION=has space', 'COOKIE_VALUE_SHAPE'],
+            // ⛔ តាំងពី 2026-09-02 គូខូចត្រូវ **រំលង** ជំនួសការបោះ ដូច្នេះ jar
+            // ដែលគ្មាន session ត្រឹមត្រូវសល់ ធ្លាក់ចូល COOKIE_SESSION_MISSING។
+            // អ្វីដែលការអះអាងនេះការពារនៅដដែល ៖ **គ្មាន jar ណាមួយឡើងដល់ upload**។
+            ['គ្មាន =', 'this-is-not-a-pair', 'COOKIE_SESSION_MISSING'],
+            ['ឈ្មោះខូច', 'bad name=value', 'COOKIE_SESSION_MISSING'],
+            ['session តម្លៃមានចន្លោះ', 'BOS-MAN-SESSION=has space', 'COOKIE_SESSION_MISSING'],
             ['គ្មាន session credential', 'sidebarStatus=0', 'COOKIE_SESSION_MISSING']
         ]) {
             let got = '';
             try { api.validateCookieHeader(value); } catch (error) { got = error.code; }
             ok(label + ' ➜ បដិសេធដោយមាន code', got === code, got);
+            ok(label + ' ➜ ⛔ មិនត្រឡប់តម្លៃណាមួយសោះ', got !== '', got);
         }
         const many = Array.from({ length: 65 }, (_, i) => 'k' + i + '=v').join('; ');
         let manyCode = '';
         try { api.validateCookieHeader(many); } catch (error) { manyCode = error.code; }
-        ok('គូច្រើនលើស ៦៤ ➜ បដិសេធ', manyCode === 'COOKIE_TOO_MANY_PAIRS', manyCode);
+        ok('គូច្រើនលើស ៦៤ គ្មាន session ➜ បដិសេធ',
+            manyCode === 'COOKIE_SESSION_MISSING', manyCode);
     } else {
         for (let i = 0; i < 9; i++) ok('Cookie validation #' + (i + 1), false);
     }
@@ -422,8 +429,49 @@ async function run() {
         schedule.length);
     ok('sync-zto-cookie.cmd បញ្ជូន argument ទៅ node',
         /node sync-zto-cookie\.js %\*/.test(runner), runner.length);
-    ok('⛔ proxy key មិនត្រូវបោះពុម្ព',
-        !/console\.(log|error)\([^\r\n]*(proxyKey|PROXY_KEY)/.test(source));
+    // ⛔ ជំនាន់ regex ចាប់ **ឈ្មោះ** ➜ វារាយការណ៍ខុសលើសារដែលបង្ហាញ *ឈ្មោះ*
+    // env var (ដែលអ្នកប្រើត្រូវការដើម្បីដឹងថាត្រូវកំណត់អ្វី) ហើយ **មិនចាប់**
+    // `console.log(x)` ដែល x ជា alias នៃសោ។ AST សួរសំណួរពិត ៖ តើ **តម្លៃ**
+    // អាចឡើងដល់ output ទេ? ខ្សែអក្សរដែលមានឈ្មោះ env var មិនមែនតម្លៃទេ។
+    const SECRET_IDS = ['proxyKey', 'PROXY_KEY', 'token', 'secureProxyKey', 'cookieHeader'];
+    let secretPrints = [];
+    if (acorn) {
+        const tree = acorn.parse(source, { ecmaVersion: 2022, locations: true });
+        const consoleCalls = [];
+        (function walk(node) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.type === 'CallExpression'
+                && node.callee && node.callee.type === 'MemberExpression'
+                && node.callee.object && node.callee.object.name === 'console') {
+                consoleCalls.push(node);
+            }
+            for (const key of Object.keys(node)) {
+                if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+                walk(node[key]);
+            }
+        })(tree);
+        consoleCalls.forEach((call) => {
+            (function scan(node) {
+                if (!node || typeof node !== 'object') return;
+                if (Array.isArray(node)) { node.forEach(scan); return; }
+                if (node.type === 'Identifier' && SECRET_IDS.indexOf(node.name) !== -1) {
+                    secretPrints.push(node.name + '@' + node.loc.start.line);
+                }
+                for (const key of Object.keys(node)) {
+                    if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+                    scan(node[key]);
+                }
+            })(call.arguments);
+        });
+        ok('ជាន់អប្បបរមា ៖ ឃើញការហៅ console ពិត (កុំឲ្យការស្កេនទទេជាបៃតង)',
+            consoleCalls.length >= 15, consoleCalls.length);
+    } else {
+        ok('ជាន់អប្បបរមា ៖ ឃើញការហៅ console ពិត (កុំឲ្យការស្កេនទទេជាបៃតង)',
+            false, 'គ្មាន acorn');
+    }
+    ok('⛔ តម្លៃសោ/token/Cookie មិនត្រូវឡើងដល់ console (AST មិនមែនឈ្មោះ)',
+        acorn && secretPrints.length === 0, secretPrints.join(', '));
     ok('configure.ps1 អ៊ិនគ្រីប proxy key ដោយ DPAPI ដដែល',
         /proxy-key\.dpapi/.test(configure) && /AsSecureString/.test(configure)
         && (configure.match(/ConvertFrom-SecureString/g) || []).length >= 2,
@@ -583,6 +631,111 @@ async function run() {
     } else {
         for (let i = 0; i < 12; i++) ok('Netlify API behavior #' + (i + 1), false);
     }
+
+    console.log('\n=== ៧ខ. jar ពិតរបស់ Argus មិនត្រូវសម្លាប់ការចាប់ (វាស់ 2026-09-02) ===');
+    // 🔴 វាស់បាន ៖ cookie **តែមួយ** ដែលមិនពាក់ព័ន្ធ (analytics តម្លៃមានចន្លោះ ·
+    // flag គ្មាន `=` · jar លើស ៦៤ គូ) ធ្វើឲ្យ `validateCookieHeader()` បោះ ➜
+    // `waitForOrderCookie()` **finish(error)** ➜ helper ស្លាប់ទាំងស្រុង ខណៈ
+    // `BOS-MAN-SESSION` នៅទីនោះត្រឹមត្រូវ។ អ្នកប្រើឃើញ «Cookie ខូចទម្រង់»
+    // ដែល **គាត់កែមិនបាន** ព្រោះ cookie នោះមិនមែនរបស់គាត់។
+    const SESSION = 'BOS-MAN-SESSION=abcdef1234567890';
+    if (api) {
+        const keepsSession = (jar) => {
+            try { return api.validateCookieHeader(jar); } catch (e) { return 'THROW:' + e.code; }
+        };
+        const spaced = keepsSession(SESSION + '; _ga_ref=Mozilla 5.0');
+        ok('cookie តម្លៃមានចន្លោះ ➜ រំលងគូនោះ តែរក្សា session',
+            spaced.indexOf(SESSION) === 0 && spaced.indexOf('_ga_ref') === -1, spaced);
+        const flag = keepsSession(SESSION + '; justaflag');
+        ok('cookie គ្មាន `=` ➜ រំលងគូនោះ តែរក្សា session',
+            flag.indexOf(SESSION) === 0 && flag.indexOf('justaflag') === -1, flag);
+        const big = keepsSession(SESSION + '; ' + Array.from({ length: 80 },
+            (_, i) => 'c' + i + '=v').join('; '));
+        ok('jar លើសពិដានគូ ➜ កាត់ត្រឹមពិដាន តែរក្សា session',
+            typeof big === 'string' && big.indexOf(SESSION) === 0
+            && big.split(';').length <= 64, String(big).slice(0, 60));
+
+        // ⛔ ទិសផ្ទុយ ៖ ការការពារពិតត្រូវនៅដដែល
+        ok('⛔ CR/LF ➜ បដិសេធទាំងស្រុង (header injection)',
+            keepsSession(SESSION + '; x=a\r\nSet-Cookie: evil=1') === 'THROW:COOKIE_CONTROL_CHAR');
+        ok('⛔ គ្មាន BOS-MAN-SESSION ➜ បដិសេធដដែល',
+            keepsSession('sidebarStatus=0; other=1') === 'THROW:COOKIE_SESSION_MISSING');
+        ok('⛔ BOS-MAN-SESSION ខ្លីពេក ➜ បដិសេធដដែល',
+            keepsSession('BOS-MAN-SESSION=abc; sidebarStatus=0') === 'THROW:COOKIE_SESSION_MISSING');
+        ok('⛔ session ខ្លួនវាតម្លៃខូច ➜ បដិសេធ មិនមែនរំលង',
+            keepsSession('BOS-MAN-SESSION=has space here; sidebarStatus=0')
+            === 'THROW:COOKIE_SESSION_MISSING');
+
+        // ⛔ ទម្រង់ពិតរបស់ Argus (បញ្ជាក់ដោយអ្នកប្រើ 2026-09-02) ៖ តម្លៃជា
+        // **base64 នៃ UUID** ➜ ៤៨ តួ អក្សរ+លេខ (និងអាចមាន `=` ជា padding)។
+        // ⛔ តម្លៃខាងក្រោមជាតម្លៃ **ក្លែង** ដែលមានរចនាសម្ព័ន្ធដូចគ្នា។
+        const REAL_SHAPE = 'BOS-MAN-SESSION='
+            + Buffer.from('11111111-2222-4333-8444-555555555555').toString('base64');
+        const realJar = keepsSession(REAL_SHAPE + '; sidebarStatus=0; lang=en_US');
+        ok('ទម្រង់ពិត (base64 UUID) ➜ ទទួល និងរក្សា byte ដដែល',
+            realJar.indexOf(REAL_SHAPE) === 0, realJar);
+        const padded = 'BOS-MAN-SESSION=' + Buffer.from('abcdefgh').toString('base64');
+        ok('⛔ base64 padding `=` ក្នុងតម្លៃ ➜ ទទួល (កុំកាត់ចោល)',
+            keepsSession(padded + '; x=1').indexOf(padded) === 0, keepsSession(padded + '; x=1'));
+
+        const ctx2 = new EventEmitter();
+        const waiting2 = api.waitForOrderCookie(ctx2, 400);
+        ctx2.emit('request', {
+            url: () => 'https://aargus-api.ztoglobal.com/scan/get/order/detail',
+            allHeaders: async () => ({ cookie: SESSION + '; _ga_ref=Mozilla 5.0' })
+        });
+        let captured;
+        try { captured = await waiting2; } catch (e) { captured = 'THROW:' + e.code; }
+        ok('⛔ jar ចម្លែក ➜ capture នៅតែជោគជ័យ មិនស្លាប់',
+            captured === SESSION, captured);
+    } else {
+        for (let i = 0; i < 8; i++) ok('jar behavior #' + (i + 1), false, 'គ្មាន api');
+    }
+
+    console.log('\n=== ៨. ផ្លូវ setup ត្រូវរត់ឡើងវិញបាន (កំហុស --auto 2026-09-02) ===');
+    // 🔴 អ្នកប្រើដាក់ Site ID + PAT រួច តែ schedule-zto-cookie.cmd នៅតែធ្លាក់
+    // ដោយ «--auto needs the ZoeW Site URL and ZTO_PROXY_KEY»។ មូលហេតុ ៣ ៖
+    //   ក. prompt សោ Proxy លាក់ក្រោយ Site URL ➜ អ្នកដែលចុច Enter រំលង Site URL
+    //      មិនដែលឃើញ prompt ទី ២ សោះ តែសារកំហុសនិយាយថា «both optional prompts»។
+    //   ខ. សោដែលខ្លីជាងពិដាន ត្រូវទម្លាក់ **ស្ងាត់** ➜ អ្នកប្រើវាយរួច តែនៅតែធ្លាក់។
+    //   គ. ការបំពេញ ២ តម្លៃនោះទាមទាររត់ setup.cmd ទាំងមូល ➜ ត្រូវវាយ PAT ថ្មី
+    //      ខណៈ Netlify បង្ហាញ PAT **តែម្តងគត់** ➜ ផ្លូវងាប់ពិត។
+    const cfgHasReuse = /existingSiteId|\$existing/.test(configure);
+    ok('configure.ps1 អាចរត់ឡើងវិញដោយរក្សា Site ID ចាស់ (Enter ➜ រក្សា)',
+        cfgHasReuse && /keepToken|KeepExisting|existingToken/i.test(configure),
+        configure.length);
+    ok('⛔ configure.ps1 មិនបង្ខំវាយ PAT ថ្មីពេលមាន token រួច',
+        /netlify-token\.dpapi/.test(configure)
+        && /Test-Path[^\r\n]*tokenPath|\$hasToken/.test(configure),
+        'PAT ត្រូវរក្សាបាន — Netlify បង្ហាញវាតែម្តងគត់');
+    ok('⛔ សោ Proxy ខ្លីពេក ត្រូវប្រាប់អ្នកប្រើ មិនមែនទម្លាក់ស្ងាត់',
+        /PROXY_KEY_MIN|សោ Proxy ខ្លីពេក|ខ្លីជាង/.test(configure), configure.length);
+    ok('⛔ Site URL ទទេ ➜ លុប proxy-key.dpapi ចាស់ចោល (កុំទុកសោកំព្រា)',
+        /Remove-Item[^\r\n]*proxyKeyPath|Remove-Item[^\r\n]*\$proxyKeyPath/.test(configure),
+        'សោកំព្រា ➜ schedule ជោគជ័យ តែ --auto ងាប់ស្ងាត់រាល់ការចូល Windows');
+
+    if (api && typeof api.autoReadiness === 'function') {
+        const ready = api.autoReadiness({ siteUrl: SITE_URL, proxyKey: PROXY_KEY });
+        ok('autoReadiness ៖ គ្រប់គ្រាន់ ➜ ready', ready && ready.ready === true, JSON.stringify(ready));
+        const noUrl = api.autoReadiness({ siteUrl: '', proxyKey: PROXY_KEY });
+        ok('⛔ autoReadiness ដាក់ឈ្មោះអ្វីដែលខ្វះ ៖ Site URL',
+            noUrl && noUrl.ready === false && noUrl.missing.indexOf('siteUrl') !== -1,
+            JSON.stringify(noUrl));
+        const noKey = api.autoReadiness({ siteUrl: SITE_URL, proxyKey: '' });
+        ok('⛔ autoReadiness ដាក់ឈ្មោះអ្វីដែលខ្វះ ៖ ZTO_PROXY_KEY',
+            noKey && noKey.ready === false && noKey.missing.indexOf('proxyKey') !== -1,
+            JSON.stringify(noKey));
+        const neither = api.autoReadiness({ siteUrl: '', proxyKey: '' });
+        ok('⛔ ខ្វះទាំង ២ ➜ រាយទាំង ២ (សារកុំកុហកថាខ្វះតែមួយ)',
+            neither && neither.missing.length === 2, JSON.stringify(neither));
+    } else {
+        for (let i = 0; i < 4; i++) ok('autoReadiness #' + (i + 1), false, 'មិន export');
+    }
+
+    ok('schedule-zto-cookie.cmd ពិនិត្យតាម --auto-ready មិនមែនតាមវត្តមានឯកសារ',
+        /--auto-ready/.test(schedule), schedule.length);
+    ok('⛔ sync-zto-cookie.js គាំទ្រ --auto-ready',
+        /--auto-ready/.test(source), 'ច្រកទ្វារត្រូវវាស់តម្លៃពិត មិនមែនវត្តមានឯកសារ');
 
     console.log('\n' + (fail
         ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'

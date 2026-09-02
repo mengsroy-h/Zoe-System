@@ -198,7 +198,11 @@ async function resolveCookieCredential(netlifyEvent, env) {
         return { cookie: '', source: '', store: null, renewal: '' };
     }
     const opened = openCookieStore(netlifyEvent);
-    cookieState.storeReason = opened.reason;
+    // ⛔ មូលហេតុត្រូវរស់រានពី cache ។ ការសរសេរ `storeReason = opened.reason`
+    // (ជា `''` ពេល store បើកបាន) មុនការពិនិត្យ cache លុបមូលហេតុនៃការអាន
+    // ដែលធ្លាក់ ៖ វាស់បានលើ Windows ពិត (2026-09-02) — helper សួរ
+    // `?diag=1` ១៤ ដង ហើយមើលឃើញ `source: env` ដោយ **គ្មានមូលហេតុ**។
+    if (opened.reason) cookieState.storeReason = opened.reason;
     if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }

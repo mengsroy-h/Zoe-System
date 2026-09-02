@@ -908,6 +908,42 @@ ZoeKeyGen រស់នៅ 780px រហូតដល់ 2.16.0។ ដូច្ន�
 
 ---
 
+## ⛔ Cookie ចូល Blobs តែគ្មាននរណាអាន — បច្ច័យ `site:` (2026-09-02ច)
+
+**រោគសញ្ញាដែលអ្នកប្រើថតរូបបាន** ៖ helper រាយ «Cookie ថ្មីចូល Netlify Blobs
+រួចរាល់» ➜ រួច «Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ១៤ ដង) — Function
+កំពុងអាន ZTO_COOKIE (env) មិនមែន blob» **ដោយគ្មានមូលហេតុភ្ជាប់**។
+
+**ការវាស់** (អានកូដ SDK ពិត `@netlify/blobs@11.0.2` `dist/main.cjs`) ៖
+
+| បន្ទាត់ | អ្វីវាបញ្ជាក់ |
+|---|---|
+| `var SITE_STORE_PREFIX = "site:"` | បច្ច័យមានពិត |
+| `this.name = SITE_STORE_PREFIX + options.name` | `getStore('zto-auth')` ➜ `site:zto-auth` |
+| `urlPath += '/' + storeName` រួច `new URL('/api/v1/blobs' + urlPath, apiURL)` | ផ្លូវ API ប្រើឈ្មោះ **ខាងក្នុង** ដដែល |
+| `LEGACY_STORE_INTERNAL_PREFIX = 'netlify-internal/legacy-namespace/'` | ឈ្មោះឥតបច្ច័យ = namespace ចាស់ |
+
+➜ helper សរសេរទៅ `/api/v1/blobs/<site>/**zto-auth**/cookie` (legacy) ចំណែក
+Function អាន `site:zto-auth` ➜ **ការសរសេរជោគជ័យ តែគ្មាននរណាអាន**។
+
+**មូលហេតុដែលឧបករណ៍ទាំង ១២១ បៃតង** ៖ `zto-cookie-sync-test.js` ប្រៀបធៀប URL
+នឹង **literal ដែលសរសេរក្នុង checker ខ្លួនឯង** (`'/zto-auth/cookie'`) ➜ វា
+ចាក់សោ **កំហុស** មិនមែនការការពារ (ថ្នាក់ដដែលនឹងមេរៀន 2.20.6)។ ការកែ ៖
+checker អានឈ្មោះ store ចេញពី **`zto-order-detail.js` ពិត** រួចទាមទារ
+`site:<store>` ក្នុង URL ដែល helper បាញ់ចេញ (វាស់តាម `fetchImpl` ក្លែង)។
+
+**កំហុសទី ២ ៖ `?diag=1` លាក់មូលហេតុ។** `cookieState.storeReason` ត្រូវសរសេរ
+ជាន់ដោយ `opened.reason` (ជា `''` ពេល store បើកបាន) **មុន** ការពិនិត្យ cache
+➜ ការអាន blob ដែលទទេ កំណត់ `'empty'` លើការហៅទី ១ ប៉ុណ្ណោះ រួច env ចូល
+cache ៦០ វិ. ➜ ការសួរបន្ទាប់ទាំង ១៣ ដងឆ្លើយ **គ្មានមូលហេតុ**។ ដូច្នេះ
+របាយការណ៍ពិតរបស់អ្នកប្រើមិនអាចចង្អុលទៅ store បានឡើយ។
+
+**លេខ** ៖ `zto-cookie-sync-test.js` ១៣០ ➜ **១៣៨** (ធ្លាក់ **៦** លើ tree មុនកែ);
+`zto-cookie-store-test.js` ៤៨ ➜ **៥២** (ធ្លាក់ **២**)។ Mutation ៣ ➜ ចាប់បាន
+ទាំង ៣ (វិលទៅ legacy namespace · ឈប់បង្ហាញ Cookie · សារខ្មែរវិលមកវិញ)។
+
+---
+
 ## ⛔ ប្រវត្តិ ZTO Auto-login (កំណែ 2.24.2 ➜ 2.24.7) — **ដកចេញរួចក្នុង 2.25.0**
 
 > មុខងារនេះ **មិនដែលដំណើរការលើផលិតកម្មទេ** ហើយត្រូវបានដកចេញទាំងស្រុង

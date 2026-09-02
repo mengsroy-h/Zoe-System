@@ -9,7 +9,7 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 | # | ផ្លូវ | ប្រើពេលណា |
 | --- | --- | --- |
 | ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
-| ២ | **Cookie** — Netlify Blobs (`zto-auth/cookie`) ឬ `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
+| ២ | **Cookie** — Netlify Blobs (`site:zto-auth/cookie`) ឬ `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
 
 > ⚡ **តាំងពី 2026-09-02 ការប្តូរ Cookie លែងត្រូវការ redeploy** — helper
 > សរសេរវាចូល **Netlify Blobs** ដែល Function អានពេលមានសំណើ។ `ZTO_COOKIE`
@@ -79,7 +79,8 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 ឧបករណ៍ `tools/zto-cookie-sync-windows/` បើក Edge/Chrome profile ដាច់ដោយឡែក
 លើកុំព្យូទ័ររបស់អ្នក ហើយចាប់បន្ទាត់ `Cookie:` ពី **Order Detail request ពិត**
 ទៅ `aargus-api.ztoglobal.com`។ បន្ទាប់មកវាសរសេរ Cookie ចូល **Netlify Blobs**
-(store `zto-auth`, key `cookie`) ➜ ⛔ **គ្មាន deploy ថ្មី**។
+(store `site:zto-auth`, key `cookie` — បច្ច័យ `site:` ជាឈ្មោះខាងក្នុងរបស់
+`@netlify/blobs`) ➜ ⛔ **គ្មាន deploy ថ្មី**។
 
 វា **មិនប្រើ** `document.cookie`, `chrome.cookies` extension API ឬ Chromium
 ក្នុង Netlify Function ទេ។
@@ -92,7 +93,8 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
    **Site ID** ពី `Project configuration → General → Project details`។
 ៣. Download/Clone repo រួចបើកថត `tools/zto-cookie-sync-windows/`។
 ៤. Double-click **`setup.cmd`** ➜ បញ្ចូល Site ID និង PAT ក្នុង prompt លាក់អក្សរ។
-៥. ឃើញ `✅ Setup រួចរាល់` គឺចប់។
+៥. ឃើញ `OK: setup is complete` គឺចប់។ ⛔ សារក្នុង cmd ជាភាសាអង់គ្លេស
+   ទាំងអស់ (សំណើអ្នកប្រើ 2026-09-02) ព្រោះ `cmd.exe` បង្ហាញខ្មែរបែកបាក់។
 
 ### រាល់ពេល Cookie ផុត
 
@@ -115,10 +117,12 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 | `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` រាល់ពេលចូល Windows |
 
 ក្រោយយក Cookie រួច helper **ផ្ទៀងផ្ទាត់ខ្លួនឯង** តាម `?diag=1` ដោយប្រៀបធៀប
-fingerprint ➜ `✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី`។
+fingerprint ➜ `OK: verified - the Function is using the new cookie (source: blob, …)`។
 
-Cookie មិនបង្ហាញក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell
-history ទេ។ PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
+Cookie **បង្ហាញក្នុង console ដោយចេតនា** (សំណើអ្នកប្រើ 2026-09-02 — ងាយ
+ស្រួល paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង) តែវាមិនសរសេរចូល file/config
+និងមិនចូល shell history ទេ។ ⛔ **PAT និង `ZTO_PROXY_KEY` មិនបង្ហាញសោះ។**
+PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
 `%LOCALAPPDATA%` — មិនដាក់ក្នុង command line, repo, extension ឬ Netlify
 Function។ សេចក្តីណែនាំពេញ និងព្រំដែនសិទ្ធិរបស់ PAT៖
 [`tools/zto-cookie-sync-windows/README-KH.md`](../tools/zto-cookie-sync-windows/README-KH.md)។

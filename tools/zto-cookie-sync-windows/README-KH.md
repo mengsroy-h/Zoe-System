@@ -32,10 +32,16 @@
 ដែលគ្មាន `BOS-MAN-SESSION` ត្រឹមត្រូវ ត្រូវរង់ចាំសំណើបន្ទាប់។
 
 បន្ទាប់មកវាហៅ Netlify API ដោយផ្ទាល់ ដើម្បីសរសេរ Cookie ចូល
-**Netlify Blobs** (store `zto-auth`, key `cookie`)៖
+**Netlify Blobs** (store `zto-auth` ➜ ឈ្មោះខាងក្នុង `site:zto-auth`,
+key `cookie`)៖
 
-1. ស្នើ signed URL ពី `/api/v1/blobs/<site-id>/zto-auth/cookie`;
+1. ស្នើ signed URL ពី `/api/v1/blobs/<site-id>/site:zto-auth/cookie`;
 2. upload Cookie ទៅផ្លូវនោះ។
+
+⛔ **បច្ច័យ `site:` ចាំបាច់** — `@netlify/blobs` ដែល Function ប្រើ ដាក់វាចូល
+ឈ្មោះ store ខាងក្នុងដោយស្វ័យប្រវត្តិ (`getStore('zto-auth')` ➜
+`site:zto-auth`)។ ការសរសេរទៅឈ្មោះឥតបច្ច័យ ធ្លាក់ចូល namespace ចាស់ ➜
+Netlify ឆ្លើយជោគជ័យ តែ Function អានមិនឃើញ។
 
 ⛔ **វាលែង trigger deploy ទៀតទេ** — តាំងពី 2026-09-02 ZoeW Function អាន
 Cookie ចេញពី Blobs **ពេលមានសំណើ** ដូច្នេះការប្តូរមានប្រសិទ្ធភាព
@@ -120,7 +126,10 @@ screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke �
    ⛔ **prompt នេះលេចឡើងតែក្រោយបំពេញ Site URL ខាងលើ** — បើរំលង Site URL
    នោះវាមិនសួរសោះ ហើយ `--auto` ប្រើមិនបាន។
 7. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
-   `✅ Setup រួចរាល់` គឺចប់។
+   `OK: setup is complete` គឺចប់។
+
+⛔ **សារទាំងអស់ក្នុង cmd ជាភាសាអង់គ្លេស** (សំណើអ្នកប្រើ 2026-09-02) ព្រោះ
+`cmd.exe` បង្ហាញអក្សរខ្មែរបែកបាក់ពិបាកអាន។ ឯកសារនេះនៅជាខ្មែរដដែល។
 
 **រត់ `setup.cmd` ឡើងវិញបានគ្រប់ពេល ដោយមិនបាត់អ្វី។** វាបង្ហាញតម្លៃចាស់
 ហើយ **ចុច Enter = រក្សាដដែល** ៖
@@ -166,7 +175,18 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
    ⛔ **មិនចាំបាច់ redeploy ទេ** — ការស្កេនថ្មីប្រើ Cookie នេះក្នុងមួយនាទី។
 5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា
    **ផ្ទៀងផ្ទាត់ដោយខ្លួនឯង** ថា Function ឃើញ Cookie ថ្មីពិត ៖
-   `✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី (blob · a1b2c3d4)`
+   `OK: verified - the Function is using the new cookie (source: blob, a1b2c3d4)`
+
+⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** (សំណើអ្នកប្រើ 2026-09-02) ៖
+
+```text
+--- Cookie captured from Argus (paste into ZTO_COOKIE if you ever need a fallback) ---
+BOS-MAN-SESSION=...; sidebarStatus=0
+--- end of cookie ---
+```
+
+វាមានប្រយោជន៍ពេលចង់ paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង។ ⛔ **Netlify PAT
+និង `ZTO_PROXY_KEY` នៅតែមិនបង្ហាញដាច់ខាត** — កុំចែករំលែករូបថតអេក្រង់នេះ។
 
 ### របៀបផ្សេងទៀត
 
@@ -186,16 +206,16 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 តម្លៃដែលខ្វះ** ៖
 
 ```text
-❌ របៀប --auto ត្រូវការតម្លៃដែលនៅខ្វះ ៖
-   • ZoeW Site URL (ឧ. https://zoew.netlify.app)
-   • ZTO_PROXY_KEY (តម្លៃដដែលនឹងក្នុង Netlify)
+ERROR: --auto mode needs these missing values:
+   - ZoeW Site URL (for example https://zoew.netlify.app)
+   - ZTO_PROXY_KEY (the same value as in Netlify)
 ```
 
 ដំណោះស្រាយ ៖ រត់ `setup.cmd` ម្តងទៀត ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច
 រួចបំពេញតែ ២ នោះ។
 
-Cookie មិនត្រូវបានបង្ហាញក្នុង console, មិនសរសេរចូល config/file និងមិនចូល
-shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល
+Cookie ត្រូវបានបង្ហាញក្នុង console **ដោយចេតនា** (សំណើអ្នកប្រើ) តែវា
+**មិនសរសេរចូល config/file** និងមិនចូល shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល
 ដោយមិនបង្ហាញ body។ Chrome/Edge profile ពិសេសនៅតែផ្ទុក session ដោយការអ៊ិនគ្រីប
 របស់ browser ដូច profile ធម្មតា — កុំចែករំលែកថត
 `%LOCALAPPDATA%\Zoe-System`។
@@ -219,6 +239,7 @@ sync-zto-cookie.cmd
 | មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |
 | Netlify បដិសេធ Site ID ឬ Token | រត់ `setup.cmd` ហើយបញ្ចូលថ្មី |
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
+| `It is still reading ZTO_COOKIE (env), not the blob` | ពិនិត្យថា deploy ចុងក្រោយរួចរាល់; សារនោះបន្ថែម `store reason: …` ដែលប្រាប់ថាជាប់ត្រង់ណា (`empty` · `no-context` · `read:…`) |
 | ការសរសេរចូល Blobs បរាជ័យ | សាកម្តងទៀត; បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
 
 ---
@@ -233,7 +254,7 @@ sync-zto-cookie.cmd
   Windows និងបណ្តាញរបស់អ្នក។
 - វាមិនបង្កើត endpoint សរសេរ Cookie ក្នុង ZoeW Function និងមិនដាក់
   `NETLIFY_AUTH_TOKEN` ក្នុង Netlify env ឡើយ។
-- វាសរសេរតែ key **តែមួយ** (`zto-auth/cookie`) ក្នុង Netlify Blobs; វាមិនអាន
+- វាសរសេរតែ key **តែមួយ** (`site:zto-auth/cookie`) ក្នុង Netlify Blobs; វាមិនអាន
   មិនលុប និងមិនប៉ះ key ណាផ្សេងទេ។
 - Cookie ដែលសរសេរចូល Blobs អាចត្រូវការរហូតដល់ **៦០ វិនាទី** ទើបឡើងដល់គ្រប់
   សំណើ (edge cache របស់ Netlify)។ ការឆ្លើយ 401 ពី ZTO កាត់ការរង់ចាំនោះភ្លាម។
@@ -242,7 +263,7 @@ sync-zto-cookie.cmd
 
 | អ្វី | របៀបការពារ |
 |---|---|
-| **Cookie ZTO** | រស់ក្នុងសតិប៉ុណ្ណោះ — **មិនត្រូវបានបង្ហាញ** ក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell history |
+| **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់តាមសំណើអ្នកប្រើ** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
 | **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
 | **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
 | **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout ដែល settle ដោយ timer ពិត · response body បោះចោលដោយមិនបង្ហាញ |

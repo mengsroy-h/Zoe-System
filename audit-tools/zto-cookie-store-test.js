@@ -194,6 +194,8 @@ async function run() {
             'ពិដានល្បឿននៃការសរសេរឡើងវិញ', 'Set-Cookie ដដែល ➜ មិនសរសេរ',
             'Set-Cookie ដែលលុប session ➜ មិនសរសេរ', 'ការសរសេរធ្លាក់ ➜ lookup នៅជោគជ័យ',
             'diag ប្រាប់ប្រភព', 'diag មិនបញ្ចេញតម្លៃ Cookie',
+            'blob ទទេ ➜ diag ប្រាប់មូលហេតុ', 'មូលហេតុមិនបាត់ក្រោយ cache',
+            'ការអានធ្លាក់ ➜ មូលហេតុនៅមើលឃើញ', 'blob ដើរធម្មតា ➜ គ្មានមូលហេតុសល់',
             'diag ប្រាប់ថា Cookie ត្រូវ ZTO បដិសេធពេលណា'
         ];
         labels.forEach((label) => ok(label, false, 'Function មិនគាំទ្រ Blobs (' + loadError + ')'));
@@ -404,6 +406,47 @@ async function run() {
         diag.cookie && diag.cookie.source === 'env', diag.cookie);
     ok('diag ប្រាប់មូលហេតុរបស់ store ដែលដាច់',
         !!(diag.cookie && diag.cookie.storeReason), diag.cookie);
+
+    // ⛔ **មូលហេតុត្រូវរស់រានពី cache។** `resolveCookieCredential()` សរសេរ
+    // `storeReason = opened.reason` (ជា `''` ពេល store បើកបាន) **មុន** ការ
+    // ពិនិត្យ cache ➜ ការអានដែលធ្លាក់/ទទេ កំណត់មូលហេតុលើការហៅ **ទី ១**
+    // ប៉ុណ្ណោះ រួច env ត្រូវ cache ៦០ វិ. ➜ ការហៅបន្ទាប់លុបមូលហេតុនោះចោល។
+    // វាស់បានលើ Windows ពិត (2026-09-02) ៖ helper សួរ `?diag=1` **១៤ ដង**
+    // ហើយឃើញ `source: env` ដោយ **គ្មានមូលហេតុ** ➜ អ្នកប្រើកែមិនបាន។
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs({ value: '' });
+    upstream();
+    const emptyFirst = JSON.parse((await call({ diag: '1' })).body);
+    const emptySecond = JSON.parse((await call({ diag: '1' })).body);
+    ok('blob ទទេ ➜ diag ប្រាប់មូលហេតុភ្លាម',
+        emptyFirst.cookie && emptyFirst.cookie.source === 'env'
+        && emptyFirst.cookie.storeReason === 'empty',
+        JSON.stringify(emptyFirst.cookie));
+    ok('⛔ មូលហេតុមិនត្រូវបាត់ក្រោយ env ចូល cache (helper សួរច្រើនដង)',
+        emptySecond.cookie && emptySecond.cookie.storeReason === 'empty',
+        JSON.stringify(emptySecond.cookie));
+
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs({ readThrows: true });
+    upstream();
+    await call({ diag: '1' });
+    const readFailSecond = JSON.parse((await call({ diag: '1' })).body);
+    ok('⛔ ការអានធ្លាក់ ➜ មូលហេតុនៅមើលឃើញលើការសួរបន្ទាប់',
+        !!(readFailSecond.cookie && /^read:/.test(String(readFailSecond.cookie.storeReason))),
+        JSON.stringify(readFailSecond.cookie));
+
+    // ⛔ **ទិសផ្ទុយ** ៖ ការចងចាំមូលហេតុមិនត្រូវក្លាយជាមូលហេតុ **ចាស់ដែល
+    // មិនរលត់** — store ដែលដើរធម្មតាត្រូវឆ្លើយ `storeReason: null`។
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs();
+    upstream();
+    const healthyFirst = JSON.parse((await call({ diag: '1' })).body);
+    const healthySecond = JSON.parse((await call({ diag: '1' })).body);
+    ok('⛔ ទិសផ្ទុយ ៖ blob ដើរធម្មតា ➜ គ្មានមូលហេតុសល់',
+        healthyFirst.cookie && healthyFirst.cookie.source === 'blob'
+        && healthyFirst.cookie.storeReason === null
+        && healthySecond.cookie.storeReason === null,
+        JSON.stringify(healthySecond.cookie));
 
     // ── ៦. សញ្ញាសុខភាព ៖ តើ Cookie ត្រូវ ZTO បដិសេធថ្មីៗឬទេ? ──────────────
     // ⛔ វាជាមូលដ្ឋានរបស់របៀប --auto លើ Windows ៖ បើគ្មានការបដិសេធថ្មីៗ

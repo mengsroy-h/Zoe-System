@@ -224,6 +224,7 @@
 | **ZTO ៖ auto-login** | ⛔ **ដកចេញរួច (2.25.0)** — IdP មិនបើកឲ្យ IP របស់ Netlify; កុំនាំវាមកវិញ | `zto-proxy-test` |
 | **ZTO ៖ Cookie store** | ⛔ Blobs ដាច់/ព្យួរ ➜ ត្រូវធ្លាក់ចុះទៅ env មិនមែនធ្លាក់ lookup | `zto-cookie-store-test` |
 | **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; មានពិដានល្បឿន | `zto-cookie-store-test` |
+| **ZTO ៖ របៀបស្វ័យប្រវត្តិ** | ⛔ មិនបើក browser ដោយមិនដឹងស្ថានភាព | `zto-cookie-sync-test` |
 | **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
 | **ZTO ៖ ពិដានពេលរបស់ Netlify** | ⛔ Function ត្រូវឆ្លើយ JSON មុនត្រូវសម្លាប់ | `zto-proxy-test` |
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
@@ -1990,8 +1991,37 @@ PAT ក្នុង Netlify env ដែល **ហាមដាច់ខាត**។ 
   អះអាងថាបញ្ជី dependency មាន **តែមួយនោះ** ហើយកំណែត្រូវចាក់សោ ➜
   `puppeteer-core`/`@sparticuz/chromium` វិលមកមិនបានដដែល។
 
-Test៖ **`zto-cookie-store-test.js`** (៣៧ assertion; ធ្លាក់ **២២** លើ tree
-មុនកែ)។ វារត់ `handler` ពិតជាមួយម៉ូឌុល `@netlify/blobs` **ក្លែង** ដែលចាក់តាម
+### ⛔ ចុចតិចជាង · ផ្ទៀងផ្ទាត់ខ្លួនឯង · របៀបស្វ័យប្រវត្តិ (2026-09-02ខ)
+
+ច្បាប់៖
+
+- **ការចាប់ Cookie ដើរតាម *host* មិនមែន *path*** — Cookie ជារបស់ domain ➜
+  សំណើណាមួយទៅ `aargus-api.ztoglobal.com` ក៏ផ្ទុក `BOS-MAN-SESSION` ដដែល ➜
+  អ្នកប្រើលែងត្រូវចុចបើកកញ្ចប់។ ⛔ **ការការពារពិតគឺ `validateCookieHeader()`**
+  ដែលទាមទារ session ពិត — មិនមែន path ទេ។ សំណើមុន Login នៅតែត្រូវរង់ចាំ។
+- **`cookieFingerprint()` ត្រូវដូចគ្នា ២ ខាង** — helper និង Function គណនា
+  `sha256(cookie).hex.slice(0, 8)` លើ **Cookie ដែល normalize រួច**
+  (`name=value; name=value`)។ ⛔ ការប្តូរ normalization ខាងណាមួយ ធ្វើឲ្យការ
+  ផ្ទៀងផ្ទាត់ **រាយការណ៍ខុសជានិច្ច** ➜ ថ្នាក់ «ការធ្លាក់ក្លែងក្លាយ»។
+- **ការផ្ទៀងផ្ទាត់ត្រូវព្យាយាមវិញ មិនមែនសម្រេចភ្លាម** — cache សតិ ៦០ វិ.
+  បូក edge drift ៦០ វិ. ➜ `?diag=1` អាចនៅបង្ហាញ Cookie ចាស់ **ដោយត្រឹមត្រូវ**។
+  ពិដាន ៧៥ វិ. / ៣២ ដង ហើយ **បញ្ចប់ភ្លាមពេលត្រូវគ្នា**។
+- ⛔ **`mismatch` មិនមែន `error` ទេ** — Cookie ត្រូវសរសេររួច; សារត្រូវប្រាប់
+  ថាសូមសាកស្កេនក្នុងមួយនាទី មិនមែនអះអាងថាបរាជ័យ។
+- ⛔ **`--auto` បើក browser តែពេលមានសាលក្រមច្បាស់** (`status === 'ok' &&
+  healthy === false`)។ `unconfigured` ឬ `unreachable` ➜ **មិនបើក** — Task
+  ដែលបើកបង្អួចរាល់ការចូល Windows ជាការរំខាន ហើយការសរសេរខណៈគ្មានបណ្តាញ
+  ក៏ធ្លាក់ដែរ។ `shouldRefreshInAuto()` ជាការសម្រេចតែមួយ ហើយវាត្រូវ export
+  ដើម្បីវាស់បាន (កុំសាកតាម CLI)។
+- **`authRejectedAgeMs` ត្រូវលុបវិញពេលការស្កេនជោគជ័យ** (`ok` ឬ `notFound`)
+  — បើអត់ `--auto` នឹងយក Cookie ថ្មីជារៀងរហូតក្រោយ 401 តែមួយ។
+- ⛔ **`ZTO_PROXY_KEY` របស់ helper រស់ក្នុង DPAPI ដដែលនឹង PAT** — មិនចូល URL ·
+  មិនចូល command line · មិនបោះពុម្ព។ វាជា **ស្រេចចិត្ត** ៖ គ្មានវា ➜ ការសរសេរ
+  Cookie នៅតែដើរ តែគ្មានការផ្ទៀងផ្ទាត់ និងគ្មាន `--check`/`--auto`។
+
+Test៖ **`zto-cookie-store-test.js`** (៤០ assertion; ធ្លាក់ **២២** លើ tree
+មុនកែ Blobs និង **៣** លើ tree មុនសញ្ញាសុខភាព) និង
+**`zto-cookie-sync-test.js`** (៩៣ assertion; ធ្លាក់ **២៥** លើ tree មុនជុំនេះ)។ វារត់ `handler` ពិតជាមួយម៉ូឌុល `@netlify/blobs` **ក្លែង** ដែលចាក់តាម
 `setBlobsModuleForTests()` ➜ លំដាប់ `connectLambda` ➜ `getStore` ត្រូវបាន
 វាស់ពិត (មេរៀនសំណួរទី ៧ — កុំ stub ស្នាមភ្ជាប់ក្នុងគ្រប់តេស្ត)។
 
@@ -3566,6 +3596,18 @@ server** (`ZoeW/netlify/functions/`) · `tools/` · `audit-tools/` និងឯ�
    អ្នកនឹងលែងត្រូវរត់ helper ញឹកញាប់។ សូមប្រាប់ខ្ញុំលេខនោះ។
 8. ⛔ **ផ្លូវ Google Sheet/Apps Script មិនត្រូវប្រែសោះ** — អ្នកប្រើ Lookup API
    តាម Apps Script មិនរងផលអ្វីទាំងអស់។
+9. **ចុចតិចជាង** ៖ រត់ helper ➜ បើ session Argus នៅរស់ វាគួរចាប់ Cookie បាន
+   **ដោយអ្នកមិនបាច់ចុចបើកកញ្ចប់សោះ**។ បើវានៅតែរង់ចាំ សូមប្រាប់ខ្ញុំ —
+   មានន័យថា Cookie នោះ set ដោយ `Path=` ចង្អៀត។
+10. **បើចង់បើកការផ្ទៀងផ្ទាត់ស្វ័យប្រវត្តិ** ៖ រត់ `setup.cmd` ម្តងទៀត រួច
+   បញ្ចូល **Site URL** និង **`ZTO_PROXY_KEY`** (ទាំង ២ ស្រេចចិត្ត) ➜ ក្រោយ
+   យក Cookie វានឹងបញ្ជាក់ខ្លួនឯង ៖ `✅ ផ្ទៀងផ្ទាត់រួច … (blob · a1b2c3d4)`។
+11. **`sync-zto-cookie.cmd --check`** ➜ ប្រាប់សុខភាព Cookie **ដោយមិនបើក
+   browser**។ សូមសាកវាម្តង។
+12. **`schedule-zto-cookie.cmd`** ➜ ដំឡើង Task ឲ្យរត់ `--auto` រាល់ពេលចូល
+   Windows។ ⛔ សូមផ្ទៀងផ្ទាត់ថាពេល Cookie នៅដំណើរការ វា **មិនបើក browser
+   សោះ** (គ្រាន់តែបង្ហាញសារខ្លីរួចបិទ)។ បើវាបើកបង្អួចរាល់ដង សូមប្រាប់ភ្លាម។
+13. **លុប Task វិញ** ៖ `schedule-zto-cookie.cmd remove`។
 
 #### ០ក១. កំណែ 2.25.1 / 2.19.16 — ស្លាកច្បាប់សម្អាត · អត្តសញ្ញាណកំហុស ZTO
 

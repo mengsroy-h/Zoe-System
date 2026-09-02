@@ -193,7 +193,8 @@ async function run() {
             'Set-Cookie ➜ សរសេរតម្លៃថ្មីចូល store', 'តម្លៃដែលសរសេររក្សា session',
             'ពិដានល្បឿននៃការសរសេរឡើងវិញ', 'Set-Cookie ដដែល ➜ មិនសរសេរ',
             'Set-Cookie ដែលលុប session ➜ មិនសរសេរ', 'ការសរសេរធ្លាក់ ➜ lookup នៅជោគជ័យ',
-            'diag ប្រាប់ប្រភព', 'diag មិនបញ្ចេញតម្លៃ Cookie'
+            'diag ប្រាប់ប្រភព', 'diag មិនបញ្ចេញតម្លៃ Cookie',
+            'diag ប្រាប់ថា Cookie ត្រូវ ZTO បដិសេធពេលណា'
         ];
         labels.forEach((label) => ok(label, false, 'Function មិនគាំទ្រ Blobs (' + loadError + ')'));
         return;
@@ -366,6 +367,32 @@ async function run() {
         diag.cookie && diag.cookie.source === 'env', diag.cookie);
     ok('diag ប្រាប់មូលហេតុរបស់ store ដែលដាច់',
         !!(diag.cookie && diag.cookie.storeReason), diag.cookie);
+
+    // ── ៦. សញ្ញាសុខភាព ៖ តើ Cookie ត្រូវ ZTO បដិសេធថ្មីៗឬទេ? ──────────────
+    // ⛔ វាជាមូលដ្ឋានរបស់របៀប --auto លើ Windows ៖ បើគ្មានការបដិសេធថ្មីៗ
+    // នោះការបើក browser ដើម្បីយក Cookie ថ្មី គឺជាការខ្ជះខ្ជាយ។
+    console.log('\n== ៦. សញ្ញាសុខភាព authRejectedAgeMs ==');
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    useBlobs();
+    upstream();
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('ដំបូង ➜ គ្មានការបដិសេធ (null)',
+        diag.cookie && diag.cookie.authRejectedAgeMs === null, diag.cookie);
+
+    unauthorizedUpstream();
+    await call({ barcode: BARCODE });
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('ក្រោយ 401 ➜ diag ប្រាប់អាយុនៃការបដិសេធ',
+        !!(diag.cookie && typeof diag.cookie.authRejectedAgeMs === 'number'
+            && diag.cookie.authRejectedAgeMs >= 0),
+        diag.cookie);
+
+    upstream();
+    const recovered = await call({ barcode: BARCODE });
+    diag = JSON.parse((await call({ diag: '1' })).body);
+    ok('ការស្វែងរកជោគជ័យ ➜ សញ្ញាបដិសេធត្រូវលុប',
+        recovered.statusCode === 200 && diag.cookie && diag.cookie.authRejectedAgeMs === null,
+        diag.cookie);
 }
 
 run().then(() => {

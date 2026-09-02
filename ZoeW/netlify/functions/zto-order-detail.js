@@ -42,7 +42,9 @@ const COOKIE_STORE_TIMEOUT_MS = 3000;
 const COOKIE_RENEW_MIN_GAP_MS = 60000;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
-const cookieState = { value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0 };
+const cookieState = {
+    value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0
+};
 let blobsModuleForTests = null;
 
 function setCookieLines(response) {
@@ -228,6 +230,14 @@ async function resolveCookieCredential(netlifyEvent, env) {
 
 function invalidateCookieCache() {
     cookieState.at = 0;
+}
+
+function noteCookieRejected() {
+    cookieState.authRejectedAt = Date.now();
+}
+
+function noteCookieAccepted() {
+    cookieState.authRejectedAt = 0;
 }
 
 function noteCookieRenewal(session, response) {
@@ -775,7 +785,10 @@ function diagnosticsBody(config, headers, authKind, credential) {
             fingerprint: cookieFingerprint(credential && credential.cookie) || null,
             ageMs: cookieState.at ? elapsedSince(cookieState.at) : null,
             storeReason: cookieState.storeReason || null,
-            renewals: cookieState.renewals
+            renewals: cookieState.renewals,
+            authRejectedAgeMs: cookieState.authRejectedAt
+                ? elapsedSince(cookieState.authRejectedAt)
+                : null
         },
         endpoint: {
             host: config.endpoint.hostname,
@@ -874,8 +887,11 @@ exports.handler = async function handler(event) {
     if (outcome.kind === 'authRejected') {
         session.renewal = '';
         invalidateCookieCache();
+        noteCookieRejected();
         return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
     }
+
+    if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted();
 
     await flushCookieRenewal(session);
 
@@ -898,6 +914,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.storeReason = '';
     cookieState.renewAt = 0;
     cookieState.renewals = 0;
+    cookieState.authRejectedAt = 0;
 };
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {

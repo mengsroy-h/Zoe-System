@@ -103,6 +103,20 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
    ⛔ **មិនចាំបាច់ redeploy** — ការស្កេនថ្មីប្រើវាក្នុងរយៈពេលមួយនាទី
    (ការឆ្លើយ 401 ពី ZTO កាត់ការរង់ចាំនោះភ្លាម)។
 
+⚡ **តាំងពី 2026-09-02ខ ៖ ជាញឹកញាប់មិនបាច់ចុចអ្វីសោះ** — ការចាប់ដើរតាម
+**host** មិនមែន path ➜ ត្រឹមតែបើក Argus គឺវាចាប់បាន។
+
+**របៀបផ្សេងទៀត** (ត្រូវការ Site URL + `ZTO_PROXY_KEY` ក្នុង `setup.cmd`)៖
+
+| ពាក្យបញ្ជា | ធ្វើអ្វី |
+| --- | --- |
+| `sync-zto-cookie.cmd --check` | ប្រាប់សុខភាព Cookie **ដោយមិនបើក browser** |
+| `sync-zto-cookie.cmd --auto` | បើ Cookie នៅដំណើរការ ➜ **មិនបើក browser សោះ** |
+| `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` រាល់ពេលចូល Windows |
+
+ក្រោយយក Cookie រួច helper **ផ្ទៀងផ្ទាត់ខ្លួនឯង** តាម `?diag=1` ដោយប្រៀបធៀប
+fingerprint ➜ `✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី`។
+
 Cookie មិនបង្ហាញក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell
 history ទេ។ PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
 `%LOCALAPPDATA%` — មិនដាក់ក្នុង command line, repo, extension ឬ Netlify
@@ -249,6 +263,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | `ageMs` | រយៈពេលដែលតម្លៃនេះនៅក្នុង cache សតិ (ពិដាន ៦០ វិនាទី) |
 | `storeReason` | មូលហេតុពេលអានចេញពី Blobs មិនបាន (`no-context` · `getstore` · `read:timeout` · `invalid` · `empty` …) |
 | `renewals` | ចំនួនដងដែល Cookie ត្រូវបានបន្តអាយុដោយស្វ័យប្រវត្តិពី `Set-Cookie` របស់ Argus |
+| `authRejectedAgeMs` | ZTO ទើបបដិសេធ Cookie នេះនៅប៉ុន្មាន ms មុន (`null` = មិនដែលបដិសេធ ឬការស្កេនក្រោយនោះជោគជ័យ) — ជាមូលដ្ឋានរបស់របៀប `--auto` |
 
 ⛔ **ក្រោយរត់ `sync-zto-cookie.cmd` ថ្មី ៖ `source` ត្រូវជា `blob`។** បើវានៅ
 `env` សូមមើល `storeReason` ➜ វាប្រាប់ថាធ្លាក់ត្រង់ណា។

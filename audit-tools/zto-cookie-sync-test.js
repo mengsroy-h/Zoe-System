@@ -16,6 +16,7 @@ const SOURCE_PATH = path.join(TOOL_DIR, 'sync-zto-cookie.js');
 const PACKAGE_PATH = path.join(TOOL_DIR, 'package.json');
 const SETUP_PATH = path.join(TOOL_DIR, 'setup.cmd');
 const RUN_PATH = path.join(TOOL_DIR, 'sync-zto-cookie.cmd');
+const SCHEDULE_PATH = path.join(TOOL_DIR, 'schedule-zto-cookie.cmd');
 const CONFIGURE_PATH = path.join(TOOL_DIR, 'configure.ps1');
 const TOKEN_READER_PATH = path.join(TOOL_DIR, 'read-token.ps1');
 const README_PATH = path.join(TOOL_DIR, 'README-KH.md');
@@ -23,6 +24,8 @@ const README_PATH = path.join(TOOL_DIR, 'README-KH.md');
 const COOKIE = 'BOS-MAN-SESSION=s3cr3t987; sidebarStatus=0';
 const TOKEN = 'test-only-token-for-mocked-netlify-api-0123456789';
 const SITE_ID = 'zoew-site-123';
+const SITE_URL = 'https://zoew.netlify.app';
+const PROXY_KEY = 'proxy-key-for-tests-0123456789ab';
 const ACCOUNT_ID = 'account-456';
 let pass = 0;
 let fail = 0;
@@ -67,6 +70,7 @@ function fakeResponse(status, data, counters) {
 const source = read(SOURCE_PATH);
 const setup = read(SETUP_PATH);
 const runner = read(RUN_PATH);
+const schedule = read(SCHEDULE_PATH);
 const configure = read(CONFIGURE_PATH);
 const tokenReader = read(TOKEN_READER_PATH);
 const readme = read(README_PATH);
@@ -91,6 +95,8 @@ async function run() {
         setup.length > 700 && isWindowsCmdSafe(setup), setup.length);
     ok('ឃើញ sync-zto-cookie.cmd ជា ASCII + CRLF សម្រាប់ cmd.exe',
         runner.length > 500 && isWindowsCmdSafe(runner), runner.length);
+    ok('ឃើញ schedule-zto-cookie.cmd ជា ASCII + CRLF សម្រាប់ cmd.exe',
+        schedule.length > 400 && isWindowsCmdSafe(schedule), schedule.length);
     ok('ឃើញ configure.ps1', configure.length > 1300, configure.length);
     ok('ឃើញ read-token.ps1', tokenReader.length > 600, tokenReader.length);
     ok('ឃើញ README-KH.md', readme.length > 3000, readme.length);
@@ -100,11 +106,17 @@ async function run() {
         && typeof api.timedFetch === 'function');
 
     console.log('\n=== ២. ចាប់ request ពិត — មិនត្រឡប់ទៅ extension ===');
-    ok('target ត្រូវជា HTTPS API host + Order Detail path',
+    ok('target ត្រូវជា HTTPS API host',
         api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ HTTP', api && !api.isTargetApiUrl('http://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ host បន្លំ', api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com.evil.test/scan/get/order/detail'));
-    ok('បដិសេធ path ផ្សេង', api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other'));
+    // ⛔ Cookie ជារបស់ **domain** មិនមែន path ➜ សំណើណាមួយទៅ host នោះក៏ផ្ទុក
+    // BOS-MAN-SESSION ដដែល ➜ អ្នកប្រើលែងត្រូវចុចបើកកញ្ចប់រាល់ដង។
+    // ការការពារពិតគឺ validateCookieHeader() ដែលទាមទារ session ពិត។
+    ok('ទទួល path ណាមួយលើ host ដដែល (លែងត្រូវចុចបើកកញ្ចប់)',
+        api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other'));
+    ok('បដិសេធ host ផ្សេងទាំងស្រុង',
+        api && !api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'));
     ok('ប្រើ request.allHeaders() ពិត', /await request\.allHeaders\(\)/.test(source));
     ok('មិនប្រើ chrome.cookies/context.cookies/document.cookie',
         !/chrome\.cookies|context\.cookies|document\.cookie/.test(source));
@@ -232,6 +244,190 @@ async function run() {
         ok('request ផ្សេង ➜ ទទេ', false);
         ok('request គ្មាន session ➜ រង់ចាំ', false);
     }
+
+    console.log('\n=== ៦ខ. ការផ្ទៀងផ្ទាត់ចុងក្រោយ និងរបៀបសុខភាព ===');
+    ok('statePaths មានផ្លូវ proxy key ក្រៅ repo',
+        api && /Zoe-System/.test(api.statePaths().proxyKey)
+        && /\.dpapi$/.test(api.statePaths().proxyKey),
+        api && api.statePaths().proxyKey);
+    // ⛔ កុំបញ្ឈប់ checker ពេលរក function មិនឃើញ — រាយវាជាការធ្លាក់ដែលមានឈ្មោះ
+    // រួច stub ជំនួស (ច្បាប់ផ្នែក ៣ របស់ `checker-coverage.js`)។
+    const hasVerifyApi = !!(api
+        && typeof api.validateSiteUrl === 'function'
+        && typeof api.cookieFingerprint === 'function'
+        && typeof api.verifyCookieLive === 'function'
+        && typeof api.checkCookieHealth === 'function');
+    ok('export ផ្លូវផ្ទៀងផ្ទាត់ និងសុខភាព', hasVerifyApi);
+    ok('validateSiteUrl ទទួល HTTPS origin',
+        hasVerifyApi && api.validateSiteUrl('https://zoew.netlify.app/') === SITE_URL);
+    ok('⛔ validateSiteUrl បដិសេធ HTTP',
+        hasVerifyApi && (() => { try { api.validateSiteUrl('http://zoew.netlify.app'); return false; } catch (e) { return e.code === 'SITE_URL_INVALID'; } })());
+    ok('validateSiteUrl ទទេ ➜ ទទេ (ស្រេចចិត្ត)', hasVerifyApi && api.validateSiteUrl('') === '');
+    ok('cookieFingerprint ជា ៨ តួ hex និងមិនមែន Cookie',
+        hasVerifyApi && /^[0-9a-f]{8}$/.test(api.cookieFingerprint(COOKIE))
+        && api.cookieFingerprint(COOKIE).indexOf('s3cr3t') === -1,
+        hasVerifyApi && api.cookieFingerprint(COOKIE));
+
+    if (hasVerifyApi) {
+        const diagCalls = [];
+        const diagResponder = (body) => async (url, options) => {
+            diagCalls.push({ url, options });
+            return fakeResponse(200, body);
+        };
+        const goodFingerprint = api.cookieFingerprint(COOKIE);
+
+        const verified = await api.verifyCookieLive(COOKIE, {
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            gapMs: 1,
+            deadlineMs: 5000,
+            sleepImpl: async () => {},
+            fetchImpl: diagResponder({ cookie: { source: 'blob', fingerprint: goodFingerprint } })
+        });
+        ok('ការផ្ទៀងផ្ទាត់ ➜ ត្រូវគ្នាភ្លាម',
+            verified.status === 'match' && verified.attempts === 1 && verified.source === 'blob',
+            JSON.stringify(verified));
+        ok('diag ហៅ path ត្រឹមត្រូវជាមួយ header សោ',
+            diagCalls[0]
+            && diagCalls[0].url === SITE_URL + '/.netlify/functions/zto-order-detail?diag=1'
+            && diagCalls[0].options.headers['X-Zoe-Proxy-Key'] === PROXY_KEY
+            && diagCalls[0].options.method === 'GET',
+            diagCalls[0] && diagCalls[0].url);
+        ok('⛔ សោមិនចូល URL សោះ', diagCalls.every((call) => call.url.indexOf(PROXY_KEY) === -1));
+
+        let polls = 0;
+        const slowVerified = await api.verifyCookieLive(COOKIE, {
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            gapMs: 1,
+            deadlineMs: 5000,
+            sleepImpl: async () => {},
+            fetchImpl: async () => {
+                polls++;
+                return fakeResponse(200, {
+                    cookie: {
+                        source: 'blob',
+                        fingerprint: polls >= 3 ? goodFingerprint : 'deadbeef'
+                    }
+                });
+            }
+        });
+        ok('Cookie ចាស់នៅក្នុង cache ➜ ព្យាយាមវិញរហូតត្រូវគ្នា',
+            slowVerified.status === 'match' && slowVerified.attempts === 3,
+            JSON.stringify(slowVerified));
+
+        const stale = await api.verifyCookieLive(COOKIE, {
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            gapMs: 1,
+            deadlineMs: 30,
+            sleepImpl: async () => {},
+            fetchImpl: diagResponder({ cookie: { source: 'env', fingerprint: 'deadbeef' } })
+        });
+        ok('មិនត្រូវគ្នារហូតដល់ផុតកំណត់ ➜ mismatch (មិនបោះ)',
+            stale.status === 'mismatch' && stale.attempts >= 1, JSON.stringify(stale));
+
+        const unreachable = await api.verifyCookieLive(COOKIE, {
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 10,
+            gapMs: 1,
+            deadlineMs: 30,
+            sleepImpl: async () => {},
+            fetchImpl: async () => { throw new Error('boom'); }
+        });
+        ok('Function មិនឆ្លើយ ➜ unreachable (មិនបោះ មិនអះអាងជោគជ័យ)',
+            unreachable.status === 'unreachable', JSON.stringify(unreachable));
+
+        let threw = false;
+        let badCookie = null;
+        try {
+            badCookie = await api.verifyCookieLive('not-a-cookie', {
+                siteUrl: SITE_URL,
+                proxyKey: PROXY_KEY,
+                timeoutMs: 10,
+                gapMs: 1,
+                deadlineMs: 10,
+                sleepImpl: async () => {},
+                fetchImpl: async () => { throw new Error('must not run'); }
+            });
+        } catch (_) {
+            threw = true;
+        }
+        ok('⛔ ការផ្ទៀងផ្ទាត់មិនប្រែការសរសេរជោគជ័យទៅជាការធ្លាក់',
+            !threw && badCookie && badCookie.status === 'unverifiable',
+            threw ? 'threw' : JSON.stringify(badCookie));
+
+        const unconfigured = await api.verifyCookieLive(COOKIE, {
+            siteUrl: '',
+            proxyKey: '',
+            fetchImpl: async () => { throw new Error('must not run'); }
+        });
+        ok('⛔ មិនទាន់កំណត់ ➜ unconfigured ដោយមិនហៅបណ្តាញ',
+            unconfigured.status === 'unconfigured', JSON.stringify(unconfigured));
+
+        const healthy = await api.checkCookieHealth({
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            fetchImpl: diagResponder({
+                cookie: { source: 'blob', fingerprint: goodFingerprint, ageMs: 10, renewals: 2, authRejectedAgeMs: null }
+            })
+        });
+        ok('សុខភាព ៖ គ្មានការបដិសេធ ➜ healthy',
+            healthy.status === 'ok' && healthy.healthy === true && healthy.renewals === 2,
+            JSON.stringify(healthy));
+
+        const rejected = await api.checkCookieHealth({
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            fetchImpl: diagResponder({
+                cookie: { source: 'blob', fingerprint: goodFingerprint, authRejectedAgeMs: 5000 }
+            })
+        });
+        ok('សុខភាព ៖ ZTO ទើបបដិសេធ ➜ មិន healthy (ត្រូវយក Cookie ថ្មី)',
+            rejected.status === 'ok' && rejected.healthy === false, JSON.stringify(rejected));
+
+        const noAuth = await api.checkCookieHealth({
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            timeoutMs: 100,
+            fetchImpl: diagResponder({ cookie: { source: 'none', fingerprint: null, authRejectedAgeMs: null } })
+        });
+        ok('សុខភាព ៖ គ្មាន Cookie សោះ ➜ មិន healthy',
+            noAuth.healthy === false, JSON.stringify(noAuth));
+    } else {
+        for (let i = 0; i < 13; i++) ok('verify/health behavior #' + (i + 1), false);
+    }
+
+    ok('របៀប --check និង --auto មានក្នុងកូដ',
+        /--check/.test(source) && /--auto/.test(source));
+    // ⛔ --auto រត់ដោយគ្មានមនុស្ស ➜ វាមិនត្រូវបើក browser ដោយមិនដឹងស្ថានភាព
+    const autoCases = api && typeof api.shouldRefreshInAuto === 'function';
+    ok('export ការសម្រេចរបស់ --auto', autoCases);
+    ok('--auto ៖ Cookie ស្លាប់ ➜ យកថ្មី',
+        autoCases && api.shouldRefreshInAuto({ status: 'ok', healthy: false }) === true);
+    ok('--auto ៖ Cookie នៅដំណើរការ ➜ មិនបើក browser',
+        autoCases && api.shouldRefreshInAuto({ status: 'ok', healthy: true }) === false);
+    ok('⛔ --auto ៖ មិនទាន់កំណត់ ➜ មិនបើក browser រាល់ការចូល Windows',
+        autoCases && api.shouldRefreshInAuto({ status: 'unconfigured', healthy: false }) === false);
+    ok('⛔ --auto ៖ ភ្ជាប់ Function មិនបាន ➜ មិនបើក browser (ការសរសេរក៏ធ្លាក់ដែរ)',
+        autoCases && api.shouldRefreshInAuto({ status: 'unreachable', healthy: false }) === false);
+    ok('schedule-zto-cookie.cmd ប្រើ schtasks ជាមួយ --auto និងមានផ្លូវលុប',
+        /schtasks/i.test(schedule) && /--auto/.test(schedule) && /\/Delete/i.test(schedule),
+        schedule.length);
+    ok('sync-zto-cookie.cmd បញ្ជូន argument ទៅ node',
+        /node sync-zto-cookie\.js %\*/.test(runner), runner.length);
+    ok('⛔ proxy key មិនត្រូវបោះពុម្ព',
+        !/console\.(log|error)\([^\r\n]*(proxyKey|PROXY_KEY)/.test(source));
+    ok('configure.ps1 អ៊ិនគ្រីប proxy key ដោយ DPAPI ដដែល',
+        /proxy-key\.dpapi/.test(configure) && /AsSecureString/.test(configure)
+        && (configure.match(/ConvertFrom-SecureString/g) || []).length >= 2,
+        configure.length);
 
     console.log('\n=== ៧. Netlify API behavior (mock មិនប៉ះ production) ===');
     if (api) {

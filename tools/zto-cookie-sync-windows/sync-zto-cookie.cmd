@@ -21,7 +21,9 @@ if not exist "%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\netlify-token.dpapi" (
     exit /b 1
 )
 
-node sync-zto-cookie.js
+set "ZTOARGS=%*"
+node sync-zto-cookie.js %*
 set "RESULT=%ERRORLEVEL%"
-pause
+echo %ZTOARGS% | find "--auto" >nul
+if errorlevel 1 pause
 exit /b %RESULT%

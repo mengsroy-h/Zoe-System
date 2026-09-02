@@ -10,9 +10,14 @@
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
 `%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ហើយចាប់បន្ទាត់ `Cookie:` ពី
-**Order Detail request ពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវា
-មិនប្រើ `document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថា
-ត្រឡប់បញ្ជីទទេលើ Edge របស់អ្នកទេ។
+**សំណើពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
+`document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថាត្រឡប់
+បញ្ជីទទេលើ Edge របស់អ្នកទេ។
+
+⚡ **តាំងពី 2026-09-02 វាទទួល path ណាមួយលើ host នោះ** មិនត្រឹម Order Detail
+ទេ — Cookie ជារបស់ **domain** មិនមែន path ➜ ជាញឹកញាប់ត្រឹមតែ **បើក Argus
+ចប់ គឺវាចាប់បានហើយ ដោយមិនបាច់ចុចបើកកញ្ចប់**។ ការការពារពិតនៅដដែល ៖ សំណើ
+ដែលគ្មាន `BOS-MAN-SESSION` ត្រឹមត្រូវ ត្រូវរង់ចាំសំណើបន្ទាប់។
 
 បន្ទាប់មកវាហៅ Netlify API ដោយផ្ទាល់ ដើម្បីសរសេរ Cookie ចូល
 **Netlify Blobs** (store `zto-auth`, key `cookie`)៖
@@ -92,8 +97,11 @@ screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke �
 1. Double-click **`setup.cmd`**។
 2. វាដំឡើងតែ `playwright-core` ដែលបាន pin ក្នុង `package.json`។
 3. បញ្ចូល ZoeW Site ID។
-4. បញ្ចូល Netlify Personal Access Token ក្នុង prompt ដែលលាក់អក្សរ។
-5. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
+4. បញ្ចូល **ZoeW Site URL** (ស្រេចចិត្ត — ឧ. `https://zoew.netlify.app`)។
+   បើបញ្ចូល ឧបករណ៍នឹងផ្ទៀងផ្ទាត់ខ្លួនឯង និងបើករបៀប `--check`/`--auto`។
+5. បញ្ចូល Netlify Personal Access Token ក្នុង prompt ដែលលាក់អក្សរ។
+6. បញ្ចូល **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត — តម្លៃដដែលនឹងក្នុង Netlify)។
+7. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
    `✅ Setup រួចរាល់` គឺចប់។
 
 Site ID រក្សាក្នុង `config.json` ក្រៅ repo។ Token ត្រូវបានអ៊ិនគ្រីបដោយ
@@ -106,7 +114,11 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ```text
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\config.json
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\netlify-token.dpapi
+%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\proxy-key.dpapi
 ```
+
+`proxy-key.dpapi` អ៊ិនគ្រីបដោយ **DPAPI ដដែល** នឹង PAT ➜ គ្មានថ្នាក់ហានិភ័យ
+ថ្មី។ វាប្រើតែសម្រាប់ការផ្ទៀងផ្ទាត់ និងរបៀប `--check`/`--auto` ប៉ុណ្ណោះ។
 
 បើប្តូរ Windows user · Site ID · token ឬ revoke token ចាស់ សូមរត់
 `setup.cmd` ឡើងវិញ។
@@ -115,10 +127,26 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 
 1. Double-click **`sync-zto-cookie.cmd`**។
 2. Edge/Chrome profile ពិសេសបើក Argus។
-3. បើ ZTO សុំ សូម Login ជាធម្មតា។
-4. បើក ឬស្វែងរកកញ្ចប់ណាមួយ ដើម្បីឲ្យមាន Order Detail request។
-5. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
+3. បើ ZTO សុំ សូម Login ជាធម្មតា។ បើ session នៅរស់ **គ្មានអ្វីត្រូវចុចទេ**។
+4. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
    ⛔ **មិនចាំបាច់ redeploy ទេ** — ការស្កេនថ្មីប្រើ Cookie នេះក្នុងមួយនាទី។
+5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា
+   **ផ្ទៀងផ្ទាត់ដោយខ្លួនឯង** ថា Function ឃើញ Cookie ថ្មីពិត ៖
+   `✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី (blob · a1b2c3d4)`
+
+## របៀបផ្សេងទៀត
+
+| ពាក្យបញ្ជា | ធ្វើអ្វី |
+|---|---|
+| `sync-zto-cookie.cmd` | យក Cookie ថ្មី (ធម្មតា) |
+| `sync-zto-cookie.cmd --check` | **មិនបើក browser** — ត្រឹមប្រាប់ថា Cookie នៅដំណើរការឬអត់ (ប្រភព · ចំនួនបន្តអាយុ · ZTO បដិសេធពេលណា) |
+| `sync-zto-cookie.cmd --auto` | ពិនិត្យជាមុន ➜ បើ Cookie នៅដំណើរការ **មិនបើក browser សោះ**; បើស្លាប់ ទើបយកថ្មី |
+| `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` **រាល់ពេលចូល Windows** |
+| `schedule-zto-cookie.cmd remove` | លុប Task នោះវិញ |
+
+⛔ **`--check` និង `--auto` ត្រូវការ Site URL + `ZTO_PROXY_KEY`** ក្នុង
+`setup.cmd`។ បើគ្មាន `--auto` នឹង **មិនបើក browser ទេ** ហើយប្រាប់មូលហេតុ —
+ការបើក browser រាល់ការចូល Windows ដោយមិនដឹងស្ថានភាព គឺជាការរំខាន។
 
 Cookie មិនត្រូវបានបង្ហាញក្នុង console, មិនសរសេរចូល config/file និងមិនចូល
 shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល

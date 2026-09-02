@@ -25,6 +25,60 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-02ខ · Cookie ZTO ៖ ចុចតិចជាង · ផ្ទៀងផ្ទាត់ខ្លួនឯង · តាំងម៉ោង
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — កែតែ
+`ZoeW/netlify/functions/` · `tools/` · `audit-tools/` និងឯកសារ។
+
+### បន្ថែម
+
+- **ចាប់ Cookie ដោយចុចតិចជាង** ៖ helper ទទួល **path ណាមួយ** លើ
+  `aargus-api.ztoglobal.com` មិនត្រឹម Order Detail ទេ។ Cookie ជារបស់
+  **domain** មិនមែន path ➜ ជាញឹកញាប់ត្រឹមតែ **បើក Argus** គឺចាប់បានហើយ
+  ដោយមិនបាច់ចុចបើកកញ្ចប់។ ⛔ ការការពារនៅដដែល ៖ សំណើដែលគ្មាន
+  `BOS-MAN-SESSION` ត្រឹមត្រូវ នៅតែត្រូវរង់ចាំសំណើបន្ទាប់។
+- **ការផ្ទៀងផ្ទាត់ចុងក្រោយដោយខ្លួនឯង** ៖ ក្រោយសរសេរ blob រួច helper ហៅ
+  `?diag=1` ហើយប្រៀបធៀប **fingerprint** ➜ បញ្ជាក់ថា Function ឃើញ Cookie
+  ថ្មីពិត។ វាព្យាយាមរហូតដល់ ៧៥ វិនាទី (cache សតិ ៦០ វិ. + edge drift) រួច
+  បញ្ចប់ភ្លាមពេលត្រូវគ្នា។ ⛔ វាជា **ការស្រេចចិត្ត** — គ្មាន Site URL /
+  `ZTO_PROXY_KEY` ➜ ការសរសេរនៅតែជោគជ័យដដែល។
+- **របៀប `--check`** ៖ ប្រាប់សុខភាព Cookie **ដោយមិនបើក browser**។
+- **របៀប `--auto` និង `schedule-zto-cookie.cmd`** ៖ Windows Task រត់រាល់ពេល
+  ចូល Windows ➜ ពិនិត្យជាមុន ➜ បើ Cookie នៅដំណើរការ **មិនបើក browser សោះ**។
+- **`?diag=1` បន្ថែម `cookie.authRejectedAgeMs`** — សញ្ញាថា ZTO ទើបបដិសេធ
+  Cookie ពេលណា។ វាជាមូលដ្ឋានរបស់ `--auto` ហើយត្រូវ **លុបវិញ** ពេលការស្កេន
+  ជោគជ័យ ➜ របៀបស្វ័យប្រវត្តិមិនយក Cookie ថ្មីដោយឥតប្រយោជន៍។
+
+### សុវត្ថិភាព
+
+- `ZTO_PROXY_KEY` រក្សាដោយ **DPAPI ដដែល** នឹង PAT (`proxy-key.dpapi`) ➜
+  គ្មានថ្នាក់ហានិភ័យថ្មី។ ⛔ វាមិនចូល URL · មិនចូល command line · មិនបោះពុម្ព។
+- ⛔ **`--auto` មិនបើក browser ដោយមិនដឹងស្ថានភាព** (`unconfigured` ឬ
+  `unreachable`) — Task ដែលបើកបង្អួចរាល់ការចូល Windows គឺជាការរំខាន ហើយ
+  ការសរសេរខណៈគ្មានបណ្តាញក៏ធ្លាក់ដែរ។
+
+### ឧបករណ៍ audit
+
+- `zto-cookie-store-test.js` ៖ ៣៧ ➜ **៤០ assertion** (សញ្ញា
+  `authRejectedAgeMs` ៣ ទិស ៖ ដំបូង null · ក្រោយ 401 ជាលេខ · ក្រោយជោគជ័យ
+  ត្រឡប់ជា null)។
+- `zto-cookie-sync-test.js` ៖ ៦៥ ➜ **៩៣ assertion** — ចាក់សោការចាប់តាម host ·
+  `validateSiteUrl` · fingerprint · ផ្លូវ `?diag=1` និង header សោ · ការព្យាយាម
+  វិញរហូតត្រូវគ្នា · `mismatch`/`unreachable`/`unconfigured` មិនបោះកំហុស ·
+  សុខភាព ៣ ករណី · ការសម្រេចរបស់ `--auto` ៤ ករណី · `schedule-zto-cookie.cmd`
+  ជា ASCII + CRLF។ **ធ្លាក់ ២៥ លើ tree មុនកែ។**
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Deploy ១ ដង** (ដូចជុំមុន — កូដ Function ប្រែ)។
+2. រត់ `setup.cmd` ម្តងទៀត **បើចង់បើក** ការផ្ទៀងផ្ទាត់ និង `--check`/`--auto` ៖
+   វាសួរបន្ថែម **Site URL** និង **`ZTO_PROXY_KEY`** (ទាំង ២ ស្រេចចិត្ត)។
+   បើមិនចង់ ការប្រើប្រាស់ធម្មតានៅដដែលបេះបិទ។
+3. ចង់ឲ្យវាធ្វើដោយខ្លួនឯង ➜ រត់ `schedule-zto-cookie.cmd` ម្តង។
+4. Firebase rules និង CSP **មិនប្រែ**។
+
+---
+
 ## [គ្មានការឡើងកំណែ] — 2026-09-02 · ប្តូរ Cookie ZTO ដោយ **គ្មាន redeploy** (Netlify Blobs)
 
 ⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែដោយចេតនា** — ជុំនេះកែតែ

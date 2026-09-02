@@ -36,7 +36,12 @@ const SHIPPED = /\.(js|css|html|wasm|json)$/;
 // PWA ទាំងមូលឡើងវិញដោយឥតប្រយោជន៍** — ជាកំហុសដដែលនឹងច្បាប់ទី ៦។
 // ⛔ ការលើកលែងនេះមិនឈរតែឯងទេ — ការអះអាង «សំបកគ្មានផ្លូវ server» ខាងក្រោម
 // ចាក់សោវា ៖ បើថ្ងៃណាឯកសារសំបកពិតចូល `netlify/` ឬ `tools/` នោះវាធ្លាក់។
-const NOT_SHIPPED = /(README|netlify\.toml|netlify\/functions\/|firebase-database\.rules\.json|\/test\.js$)/;
+// ⛔ `package.json` / `package-lock.json` ជា manifest នៃការ **build** របស់
+// Netlify — វាមិនដែលចូលសំបករបស់ `sw.js` ទេ ➜ ការបន្ថែម dependency ខាង server
+// មិនត្រូវបង្ខំអ្នកប្រើទាញសំបក PWA ទាំងមូលឡើងវិញឡើយ (ច្បាប់ទី ៦ ដដែល)។
+// ការលើកលែងនេះក៏ត្រូវចាក់សោដោយការអះអាងលើបញ្ជីសំបកខាងក្រោមដែរ។
+const NOT_SHIPPED = /(README|netlify\.toml|netlify\/functions\/|firebase-database\.rules\.json|\/test\.js$|\/package(-lock)?\.json$)/;
+const BUILD_MANIFEST = /package(-lock)?\.json$/;
 const SERVER_ONLY_DIRS = /(^|\/)(netlify|tools)\//;
 
 let pass = 0, fail = 0;
@@ -130,6 +135,11 @@ for (const app of present) {
         leaked.length === 0,
         'ឃើញ ' + leaked.join(', ') + ' ➜ ការលើកលែង `netlify/functions/` ក្នុង '
             + 'NOT_SHIPPED លែងសុវត្ថិភាព ➜ ការកែឯកសារនោះនឹងទុកអ្នកប្រើនឹងសំបកចាស់');
+    const manifests = entries.filter((e) => BUILD_MANIFEST.test(e));
+    ok('⛔ ' + app + ' ៖ សំបកគ្មាន `package.json` / `package-lock.json`',
+        manifests.length === 0,
+        'ឃើញ ' + manifests.join(', ') + ' ➜ ការលើកលែង manifest ក្នុង NOT_SHIPPED '
+            + 'លែងសុវត្ថិភាព ➜ ការកែឯកសារនោះនឹងទុកអ្នកប្រើនឹងសំបកចាស់');
 }
 
 let anyChecked = 0;

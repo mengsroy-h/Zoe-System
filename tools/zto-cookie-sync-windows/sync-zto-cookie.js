@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -8,11 +9,20 @@ const { spawn } = require('child_process');
 const TOOL_DIR = __dirname;
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
 const API_HOST = 'aargus-api.ztoglobal.com';
-const ORDER_DETAIL_PATH = '/scan/get/order/detail';
 const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const NETLIFY_API_ORIGIN = 'https://api.netlify.com';
-const NETLIFY_ENV_KEY = 'ZTO_COOKIE';
+const BLOB_STORE_NAME = 'zto-auth';
+const BLOB_KEY = 'cookie';
+const SIGNED_URL_ACCEPT = 'application/json;type=signed-url';
+const SIGNED_URL_MAX_LENGTH = 4096;
+const DIAG_PATH = '/.netlify/functions/zto-order-detail?diag=1';
+const PROXY_KEY_HEADER = 'X-Zoe-Proxy-Key';
+const VERIFY_TIMEOUT_MS = 10 * 1000;
+const VERIFY_DEADLINE_MS = 75 * 1000;
+const VERIFY_GAP_MS = 5 * 1000;
+const VERIFY_MAX_ATTEMPTS = 32;
+const SITE_URL_MAX_LENGTH = 512;
 const NETLIFY_TIMEOUT_MS = 30 * 1000;
 const NETLIFY_RESPONSE_MAX_BYTES = 1024 * 1024;
 
@@ -34,9 +44,7 @@ function codedError(code) {
 function isTargetApiUrl(raw) {
     try {
         const url = new URL(String(raw || ''));
-        return url.protocol === 'https:'
-            && url.hostname === API_HOST
-            && (url.pathname === ORDER_DETAIL_PATH || url.pathname.startsWith(ORDER_DETAIL_PATH + '/'));
+        return url.protocol === 'https:' && url.hostname === API_HOST;
     } catch (_) {
         return false;
     }
@@ -93,8 +101,29 @@ function statePaths() {
     return {
         root,
         config: path.join(root, 'config.json'),
-        token: path.join(root, 'netlify-token.dpapi')
+        token: path.join(root, 'netlify-token.dpapi'),
+        proxyKey: path.join(root, 'proxy-key.dpapi')
     };
+}
+
+function validateSiteUrl(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (text.length > SITE_URL_MAX_LENGTH) throw codedError('SITE_URL_INVALID');
+    let url;
+    try {
+        url = new URL(text);
+    } catch (_) {
+        throw codedError('SITE_URL_INVALID');
+    }
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) {
+        throw codedError('SITE_URL_INVALID');
+    }
+    return url.origin;
+}
+
+function cookieFingerprint(cookie) {
+    return crypto.createHash('sha256').update(String(cookie || '')).digest('hex').slice(0, 8);
 }
 
 function profileRoot(channel) {
@@ -122,7 +151,13 @@ function loadConfig(configPath) {
     } catch (_) {
         throw codedError('NETLIFY_CONFIG_MISSING');
     }
-    return { siteId: validateSiteId(parsed && parsed.siteId) };
+    let siteUrl = '';
+    try {
+        siteUrl = validateSiteUrl(parsed && parsed.siteUrl);
+    } catch (_) {
+        siteUrl = '';
+    }
+    return { siteId: validateSiteId(parsed && parsed.siteId), siteUrl };
 }
 
 function readTokenViaPowerShell(options) {
@@ -225,9 +260,8 @@ function timedFetch(url, options, controls) {
 
         let pending;
         try {
-            pending = fetchImpl(url, Object.assign({}, options, {
-                signal: controller.signal,
-                redirect: 'error'
+            pending = fetchImpl(url, Object.assign({ redirect: 'error' }, options, {
+                signal: controller.signal
             }));
         } catch (_) {
             finish(codedError('NETLIFY_NETWORK'));
@@ -244,13 +278,11 @@ function netlifyApiUrl(pathname) {
     return NETLIFY_API_ORIGIN + pathname;
 }
 
-function netlifyHeaders(token, hasJsonBody) {
-    const headers = {
+function netlifyHeaders(token) {
+    return {
         Accept: 'application/json',
         Authorization: 'Bearer ' + validateToken(token)
     };
-    if (hasJsonBody) headers['Content-Type'] = 'application/json';
-    return headers;
 }
 
 async function discardResponse(response) {
@@ -261,28 +293,42 @@ async function discardResponse(response) {
     } catch (_) {}
 }
 
-async function readSmallJson(response) {
+async function readSmallJson(response, errorCode) {
+    const code = errorCode || 'NETLIFY_SITE_INVALID_RESPONSE';
     let text;
     try {
         text = await response.text();
     } catch (_) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
     if (Buffer.byteLength(text, 'utf8') > NETLIFY_RESPONSE_MAX_BYTES) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
     try {
         return JSON.parse(text);
     } catch (_) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
+}
+
+function validateSignedUrl(raw) {
+    const text = String(raw || '');
+    if (!text || text.length > SIGNED_URL_MAX_LENGTH) throw codedError('NETLIFY_BLOB_URL_INVALID');
+    let signed;
+    try {
+        signed = new URL(text);
+    } catch (_) {
+        throw codedError('NETLIFY_BLOB_URL_INVALID');
+    }
+    if (signed.protocol !== 'https:') throw codedError('NETLIFY_BLOB_URL_INVALID');
+    return signed.href;
 }
 
 async function getNetlifySite(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
     const response = await timedFetch(
         netlifyApiUrl('/api/v1/sites/' + encodeURIComponent(cleanSiteId)),
-        { method: 'GET', headers: netlifyHeaders(token, false) },
+        { method: 'GET', headers: netlifyHeaders(token) },
         controls
     );
     if (!response || !response.ok) {
@@ -294,38 +340,40 @@ async function getNetlifySite(siteId, token, controls) {
     return { accountId };
 }
 
-async function updateNetlifyCookie(accountId, siteId, token, cookieHeader, controls) {
-    const cleanAccountId = validateSiteId(accountId, 'NETLIFY_SITE_INVALID_RESPONSE');
+async function requestBlobUploadUrl(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
-    const cleanCookie = validateCookieHeader(cookieHeader);
-    const pathname = '/api/v1/accounts/' + encodeURIComponent(cleanAccountId)
-        + '/env/' + NETLIFY_ENV_KEY
-        + '?site_id=' + encodeURIComponent(cleanSiteId);
+    const pathname = '/api/v1/blobs/' + encodeURIComponent(cleanSiteId)
+        + '/' + BLOB_STORE_NAME + '/' + BLOB_KEY;
     const response = await timedFetch(netlifyApiUrl(pathname), {
-        method: 'PATCH',
-        headers: netlifyHeaders(token, true),
-        body: JSON.stringify({ context: 'production', value: cleanCookie })
+        method: 'PUT',
+        headers: {
+            accept: SIGNED_URL_ACCEPT,
+            Authorization: 'Bearer ' + validateToken(token)
+        }
     }, controls);
     if (!response || !response.ok) {
         await discardResponse(response);
-        throw codedError('NETLIFY_ENV_UPDATE_FAILED');
+        throw codedError('NETLIFY_BLOB_URL_FAILED');
     }
-    await discardResponse(response);
+    const payload = await readSmallJson(response, 'NETLIFY_BLOB_URL_INVALID');
+    return validateSignedUrl(payload && payload.url);
 }
 
-async function triggerNetlifyBuild(siteId, token, controls) {
-    const cleanSiteId = validateSiteId(siteId);
-    const response = await timedFetch(
-        netlifyApiUrl('/api/v1/sites/' + encodeURIComponent(cleanSiteId) + '/builds'),
-        {
-            method: 'POST',
-            headers: netlifyHeaders(token, false)
-        },
-        controls
-    );
+async function uploadCookieToBlob(signedUrl, cookieHeader, controls) {
+    const cleanCookie = validateCookieHeader(cookieHeader);
+    const response = await timedFetch(signedUrl, {
+        method: 'PUT',
+        redirect: 'manual',
+        headers: { 'cache-control': 'max-age=0, stale-while-revalidate=60' },
+        body: cleanCookie
+    }, controls);
+    if (response && response.status >= 300 && response.status < 400) {
+        await discardResponse(response);
+        throw codedError('NETLIFY_BLOB_REDIRECT');
+    }
     if (!response || !response.ok) {
         await discardResponse(response);
-        throw codedError('NETLIFY_BUILD_TRIGGER_FAILED');
+        throw codedError('NETLIFY_BLOB_UPLOAD_FAILED');
     }
     await discardResponse(response);
 }
@@ -341,6 +389,122 @@ async function resolveCredentials(options) {
     return { siteId: loaded.siteId, token };
 }
 
+async function readDiagnostics(siteUrl, proxyKey, controls) {
+    const origin = validateSiteUrl(siteUrl);
+    if (!origin) throw codedError('SITE_URL_INVALID');
+    const headers = { Accept: 'application/json' };
+    headers[PROXY_KEY_HEADER] = String(proxyKey || '');
+    const response = await timedFetch(origin + DIAG_PATH, {
+        method: 'GET',
+        headers
+    }, Object.assign({ timeoutMs: VERIFY_TIMEOUT_MS }, controls));
+    if (!response || !response.ok) {
+        await discardResponse(response);
+        throw codedError('DIAG_REJECTED');
+    }
+    return readSmallJson(response, 'DIAG_INVALID');
+}
+
+function diagnosticsCookie(payload) {
+    const info = (payload && payload.cookie) || {};
+    return {
+        source: typeof info.source === 'string' ? info.source : '',
+        fingerprint: typeof info.fingerprint === 'string' ? info.fingerprint : '',
+        ageMs: typeof info.ageMs === 'number' ? info.ageMs : null,
+        renewals: typeof info.renewals === 'number' ? info.renewals : 0,
+        authRejectedAgeMs: typeof info.authRejectedAgeMs === 'number' ? info.authRejectedAgeMs : null
+    };
+}
+
+async function verifyCookieLive(cookieHeader, options) {
+    const config = options || {};
+    const siteUrl = String(config.siteUrl || '');
+    const proxyKey = String(config.proxyKey || '');
+    if (!siteUrl || !proxyKey) {
+        return { status: 'unconfigured', attempts: 0, source: '', fingerprint: '' };
+    }
+    // ⛔ ការផ្ទៀងផ្ទាត់មិនត្រូវប្រែការសរសេរដែលជោគជ័យ ទៅជាការធ្លាក់ឡើយ។
+    let wanted;
+    try {
+        wanted = cookieFingerprint(validateCookieHeader(cookieHeader));
+    } catch (_) {
+        return { status: 'unverifiable', attempts: 0, source: '', fingerprint: '' };
+    }
+    const deadlineMs = Number.isFinite(config.deadlineMs) ? config.deadlineMs : VERIFY_DEADLINE_MS;
+    const gapMs = Number.isFinite(config.gapMs) ? config.gapMs : VERIFY_GAP_MS;
+    const maxAttempts = Number.isFinite(config.maxAttempts) ? config.maxAttempts : VERIFY_MAX_ATTEMPTS;
+    const sleepImpl = config.sleepImpl
+        || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    const startedAt = Date.now();
+    let attempts = 0;
+    let last = { status: 'unreachable', source: '', fingerprint: '' };
+
+    for (;;) {
+        attempts++;
+        try {
+            const info = diagnosticsCookie(await readDiagnostics(siteUrl, proxyKey, config));
+            if (info.fingerprint && info.fingerprint === wanted) {
+                return {
+                    status: 'match',
+                    attempts,
+                    source: info.source,
+                    fingerprint: info.fingerprint
+                };
+            }
+            last = { status: 'mismatch', source: info.source, fingerprint: info.fingerprint };
+        } catch (_) {
+            last = { status: 'unreachable', source: '', fingerprint: '' };
+        }
+        if (attempts >= maxAttempts) break;
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < 0 || elapsed >= deadlineMs) break;
+        await sleepImpl(gapMs);
+    }
+    return Object.assign({ attempts }, last);
+}
+
+async function checkCookieHealth(options) {
+    const config = options || {};
+    const siteUrl = String(config.siteUrl || '');
+    const proxyKey = String(config.proxyKey || '');
+    if (!siteUrl || !proxyKey) return { status: 'unconfigured', healthy: false };
+    let payload;
+    try {
+        payload = await readDiagnostics(siteUrl, proxyKey, config);
+    } catch (_) {
+        return { status: 'unreachable', healthy: false };
+    }
+    const info = diagnosticsCookie(payload);
+    const usable = info.source === 'blob' || info.source === 'env';
+    return Object.assign({
+        status: 'ok',
+        healthy: usable && info.authRejectedAgeMs === null
+    }, info);
+}
+
+async function resolveVerification(options) {
+    const config = options || {};
+    if (config.siteUrl !== undefined || config.proxyKey !== undefined) {
+        return { siteUrl: String(config.siteUrl || ''), proxyKey: String(config.proxyKey || '') };
+    }
+    let siteUrl = '';
+    try {
+        siteUrl = loadConfig(config.configPath).siteUrl;
+    } catch (_) {
+        siteUrl = '';
+    }
+    if (!siteUrl) return { siteUrl: '', proxyKey: '' };
+    let proxyKey = '';
+    try {
+        proxyKey = await readTokenViaPowerShell(
+            Object.assign({}, config, { tokenPath: statePaths().proxyKey })
+        );
+    } catch (_) {
+        proxyKey = '';
+    }
+    return { siteUrl, proxyKey };
+}
+
 async function verifyNetlifySetup(options) {
     const credentials = await resolveCredentials(options);
     try {
@@ -354,19 +518,8 @@ async function syncNetlifyCookie(cookieHeader, options) {
     let cleanCookie = validateCookieHeader(cookieHeader);
     const credentials = await resolveCredentials(options);
     try {
-        const site = await getNetlifySite(credentials.siteId, credentials.token, options);
-        await updateNetlifyCookie(
-            site.accountId,
-            credentials.siteId,
-            credentials.token,
-            cleanCookie,
-            options
-        );
-        try {
-            await triggerNetlifyBuild(credentials.siteId, credentials.token, options);
-        } catch (_) {
-            throw codedError('NETLIFY_ENV_UPDATED_BUILD_FAILED');
-        }
+        const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options);
+        await uploadCookieToBlob(signedUrl, cleanCookie, options);
     } finally {
         cleanCookie = '';
         credentials.token = '';
@@ -467,9 +620,13 @@ function safeFailureMessage(code) {
         NETLIFY_TIMEOUT: 'Netlify API ឆ្លើយយឺតលើស ៣០ វិនាទី។ សូមសាកម្តងទៀត។',
         NETLIFY_SITE_REJECTED: 'Netlify បដិសេធ Site ID ឬ Token។ សូមបើក setup.cmd ហើយបញ្ចូលថ្មី។',
         NETLIFY_SITE_INVALID_RESPONSE: 'Netlify ឆ្លើយទម្រង់មិនត្រឹមត្រូវ។ មិនបានប្តូរ Cookie ទេ។',
-        NETLIFY_ENV_UPDATE_FAILED: 'Netlify មិនអាច update ZTO_COOKIE បាន។ Deploy មិនត្រូវបាន trigger ទេ។',
-        NETLIFY_BUILD_TRIGGER_FAILED: 'Netlify មិនអាច trigger deploy បាន។',
-        NETLIFY_ENV_UPDATED_BUILD_FAILED: 'ZTO_COOKIE ត្រូវបាន update រួច ប៉ុន្តែ trigger deploy បរាជ័យ។ សូម Trigger deploy ក្នុង Netlify ម្តង។',
+        NETLIFY_BLOB_URL_FAILED: 'Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store បានទេ។ សូមពិនិត្យ Site ID និងសិទ្ធិរបស់ PAT។',
+        NETLIFY_BLOB_URL_INVALID: 'Netlify ឆ្លើយផ្លូវ upload មិនត្រឹមត្រូវ។ Cookie មិនត្រូវបានផ្ញើទេ។',
+        NETLIFY_BLOB_UPLOAD_FAILED: 'ការសរសេរ Cookie ចូល Netlify Blobs បរាជ័យ។ សូមសាកម្តងទៀត។',
+        NETLIFY_BLOB_REDIRECT: 'Netlify បញ្ជូនផ្លូវ upload ទៅ host ផ្សេង។ Cookie មិនត្រូវបានផ្ញើទេ ដើម្បីសុវត្ថិភាព។',
+        SITE_URL_INVALID: 'Site URL ខូចទម្រង់ (ត្រូវជា https)។ សូមបើក setup.cmd ឡើងវិញ។',
+        DIAG_REJECTED: 'Function បដិសេធការផ្ទៀងផ្ទាត់។ សូមពិនិត្យ ZTO_PROXY_KEY ក្នុង setup.cmd និង Netlify។',
+        DIAG_INVALID: 'Function ឆ្លើយទម្រង់មិនត្រឹមត្រូវពេលផ្ទៀងផ្ទាត់។',
         COOKIE_TOO_SHORT: 'Cookie ដែលចាប់បានខ្លីពេក។ សូម Login Argus ឡើងវិញ។',
         COOKIE_TOO_LONG: 'Cookie ដែលចាប់បានវែងលើសពិដានសុវត្ថិភាព។',
         COOKIE_CONTROL_CHAR: 'Cookie ដែលចាប់បានមានតួអក្សរគ្រប់គ្រង — បានបដិសេធដើម្បីទប់ header injection។',
@@ -482,7 +639,79 @@ function safeFailureMessage(code) {
     return messages[code] || 'មានកំហុសដែលមិនស្គាល់។';
 }
 
+// ⛔ របៀប --auto រត់ **ដោយគ្មានមនុស្ស** ➜ ការបើក browser ដោយមិនដឹងស្ថានភាព
+// ពិត គឺជាការរំខានរាល់ការចូល Windows។ ដូច្នេះវាបើកតែពេលមានសាលក្រមច្បាស់ថា
+// Cookie ស្លាប់ប៉ុណ្ណោះ។
+function shouldRefreshInAuto(health) {
+    return !!health && health.status === 'ok' && health.healthy === false;
+}
+
+function describeHealth(health) {
+    if (health.status === 'unconfigured') {
+        return 'ℹ️ មិនបានពិនិត្យ — Site URL និងសោ Proxy មិនទាន់កំណត់ក្នុង setup.cmd។';
+    }
+    if (health.status === 'unreachable') {
+        return '⚠️ ភ្ជាប់ Function មិនបាន។ សូមពិនិត្យអ៊ីនធឺណិត ឬ Site URL។';
+    }
+    const parts = [
+        'ប្រភព: ' + (health.source || 'none'),
+        'បន្តអាយុ: ' + health.renewals + ' ដង'
+    ];
+    if (health.authRejectedAgeMs !== null) {
+        parts.push('ZTO បដិសេធនៅ ' + Math.round(health.authRejectedAgeMs / 1000) + ' វិ. មុន');
+    }
+    return (health.healthy ? '✅ Cookie នៅដំណើរការ។ ' : '⚠️ ត្រូវយក Cookie ថ្មី។ ') + parts.join(' · ');
+}
+
+async function reportVerification(cookieHeader) {
+    let verification;
+    try {
+        verification = await resolveVerification();
+    } catch (_) {
+        verification = { siteUrl: '', proxyKey: '' };
+    }
+    if (!verification.siteUrl || !verification.proxyKey) {
+        console.log('   ℹ️ មិនបានផ្ទៀងផ្ទាត់ចុងក្រោយ — សូមបញ្ចូល Site URL និងសោ Proxy ក្នុង setup.cmd។');
+        console.log('   ការស្កេនថ្មីនឹងប្រើ Cookie នេះក្នុងរយៈពេលមួយនាទី។');
+        return;
+    }
+    console.log('   🔎 កំពុងផ្ទៀងផ្ទាត់ថា Function ឃើញ Cookie ថ្មី...');
+    let result;
+    try {
+        result = await verifyCookieLive(cookieHeader, verification);
+    } catch (_) {
+        result = { status: 'unverifiable', attempts: 0 };
+    }
+    if (result.status === 'match') {
+        console.log('   ✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី (ប្រភព: '
+            + (result.source || 'blob') + ' · ' + result.fingerprint + ')។');
+        return;
+    }
+    if (result.status === 'unreachable') {
+        console.log('   ⚠️ ភ្ជាប់ Function មិនបាន។ Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
+        return;
+    }
+    console.log('   ⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ' + result.attempts + ' ដង)។');
+    console.log('      Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
+}
+
 async function main() {
+    if (process.argv.includes('--check')) {
+        console.log('🔎 កំពុងពិនិត្យសុខភាព Cookie ZTO...');
+        console.log(describeHealth(await checkCookieHealth(await resolveVerification())));
+        return;
+    }
+
+    if (process.argv.includes('--auto')) {
+        const health = await checkCookieHealth(await resolveVerification());
+        console.log(describeHealth(health));
+        if (!shouldRefreshInAuto(health)) {
+            console.log('⛔ មិនបើក browser ទេ។');
+            return;
+        }
+        console.log('➜ កំពុងយក Cookie ថ្មី...');
+    }
+
     if (process.argv.includes('--verify-setup')) {
         console.log('🔎 កំពុងផ្ទៀងផ្ទាត់ Netlify Site ID និង token...');
         await verifyNetlifySetup();
@@ -494,9 +723,10 @@ async function main() {
     let cookieHeader = await captureCookieHeader();
     console.log('✅ ចាប់ Cookie បាន។ តម្លៃមិនត្រូវបានបង្ហាញ ឬសរសេរចូលឯកសារទេ។');
     try {
-        console.log('🔐 កំពុង update ZTO_COOKIE ជា Netlify secret ហើយ trigger deploy...');
+        console.log('🔐 កំពុងសរសេរ Cookie ចូល Netlify Blobs...');
         await syncNetlifyCookie(cookieHeader);
-        console.log('\n✅ Cookie ថ្មីចូល Netlify ហើយ deploy ត្រូវបាន trigger រួចរាល់។');
+        console.log('\n✅ Cookie ថ្មីចូល Netlify Blobs រួចរាល់ — ⛔ មិនចាំបាច់ redeploy ទេ។');
+        await reportVerification(cookieHeader);
     } finally {
         cookieHeader = '';
     }
@@ -510,6 +740,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+    checkCookieHealth,
+    cookieFingerprint,
     cookieHeaderFromHeaders,
     cookieHeaderFromRequest,
     getNetlifySite,
@@ -518,15 +750,21 @@ module.exports = {
     localStateRoot,
     netlifyApiUrl,
     profileRoot,
+    readDiagnostics,
     readTokenViaPowerShell,
+    requestBlobUploadUrl,
+    resolveVerification,
+    shouldRefreshInAuto,
     safeFailureMessage,
     statePaths,
     syncNetlifyCookie,
     timedFetch,
-    triggerNetlifyBuild,
-    updateNetlifyCookie,
+    uploadCookieToBlob,
     validateCookieHeader,
+    validateSignedUrl,
     validateSiteId,
+    validateSiteUrl,
+    verifyCookieLive,
     validateToken,
     verifyNetlifySetup,
     waitForOrderCookie

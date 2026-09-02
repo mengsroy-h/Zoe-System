@@ -94,7 +94,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          periodic-network-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
-         lookup-freshness-test zto-proxy-test zto-cookie-sync-test lookup-failure-identity-test \
+         lookup-freshness-test zto-proxy-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
          lookup-burst-test; do
     run "$t" node "audit-tools/$t.js"
 done
@@ -256,6 +256,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LOOKUPBURST_APP_DIR="$BASE" node audit-tools/lookup-burst-test.js 2>&1 | tail -1 | sed 's/^/   lookup-burst:  /'
     ZTOPROXY_APP_DIR="$BASE" node audit-tools/zto-proxy-test.js 2>&1 | tail -1 | sed 's/^/   zto-proxy:       /'
     ZTO_SYNC_APP_DIR="$BASE" node audit-tools/zto-cookie-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-sync: /'
+    ZTOSTORE_APP_DIR="$BASE" node audit-tools/zto-cookie-store-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-store:/'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'

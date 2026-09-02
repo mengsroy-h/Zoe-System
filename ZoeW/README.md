@@ -76,10 +76,16 @@ ZTO_PROXY_KEY=ពាក្យសម្ងាត់ចៃដន្យរបស់
 # រួចជ្រើស **មួយ** ៖
 ZTO_AUTHORIZATION=<header Authorization ពេញ ពី API ផ្លូវការ>   # ល្អបំផុត
 ZTO_TOKEN=<token ផ្លូវការ>  (+ ZTO_TOKEN_HEADER បើ ZTO បញ្ជាក់)
-ZTO_COOKIE=<Cookie ពេញ ចម្លងពី browser របស់ Argus>
+ZTO_COOKIE=<ស្រេចចិត្ត — ផ្លូវបម្រុងពេល Netlify Blobs ដាច់>
 ```
 
-លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ `ZTO_COOKIE`**។
+លំដាប់អាទិភាព ៖ **`ZTO_AUTHORIZATION` ➜ `ZTO_TOKEN` ➜ Cookie**។ Cookie ខ្លួនវា
+មានលំដាប់ ៖ **Netlify Blobs (`zto-auth/cookie`) ➜ `ZTO_COOKIE` env**។
+
+> ⚡ **ការប្តូរ Cookie លែងត្រូវការ redeploy (2026-09-02)** — Windows helper
+> សរសេរវាចូល **Netlify Blobs** ដែល Function អានពេលមានសំណើ (cache ក្នុងសតិ
+> ៦០ វិនាទី)។ ការឆ្លើយ 401 ពី ZTO លុប cache នោះភ្លាម។ ⛔ Blobs ដាច់ ព្យួរ
+> ឬតម្លៃខូច ➜ ធ្លាក់ចុះទៅ `ZTO_COOKIE` env ដដែល — lookup មិនស្លាប់ទេ។
 
 > ⛔ **Auto-login (Chromium ចូល Argus ដោយស្វ័យប្រវត្តិ) ត្រូវបានដកចេញទាំងស្រុង
 > ក្នុងកំណែ 2.25.0** ព្រោះ IDaaS OAuth2 របស់ ZTO មិនបើកឲ្យ IP របស់ Netlify —
@@ -88,6 +94,11 @@ ZTO_COOKIE=<Cookie ពេញ ចម្លងពី browser របស់ Argus>
 > (`@sparticuz/chromium` · `puppeteer-core` · `@netlify/blobs`) និង memory
 > 2 GB ➜ **cold start លឿនជាងមុនច្រើន**។ ភស្តុតាងពេញលេញនៅ
 > [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md) ផ្នែក ៧។
+>
+> ℹ️ `@netlify/blobs` ត្រូវបាននាំមកវិញនៅ 2026-09-02 — **តែសម្រាប់ Cookie
+> store ប៉ុណ្ណោះ** មិនមែនសម្រាប់ auto-login ទេ។ វាស់បាន ៖ bundle ៣៧.៦ KB
+> (Function ទាំងមូល ៦៧.៧ KB) ផ្ទុកក្នុង ~២.៣ ms ➜ cold start នៅតែលឿន។
+> `zto-proxy-test.js` អះអាងថា dependency មាន **តែមួយនោះ**។
 
 **ពេល ZTO ផ្តល់ API ផ្លូវការ វាដំណើរការដោយមិនកែកូដ** — endpoint · method ·
 តួសំណើ · header · និងឈ្មោះ field កំណត់តាម env (`ZTO_API_URL` ·
@@ -149,8 +160,8 @@ Manual auto-fallback នៅដដែល៖ បើ ZTO មិនទាន់ឆ�
 ធ្វើតាម **Cookie** (`ZTO_COOKIE`) ឬ **API ផ្លូវការ** (`ZTO_AUTHORIZATION` /
 `ZTO_TOKEN`) ដែលកំណត់ក្នុង Netlify env vars។ ការប្តូរ Cookie លើ Windows ប្រើ helper
 `tools/zto-cookie-sync-windows/` ដែលចាប់ Request Header ពិតពី Edge/Chrome
-ហើយហៅ Netlify API ផ្ទាល់ដោយ PAT ដែល Windows DPAPI អ៊ិនគ្រីប — **មិនមែន
-extension**។ សេចក្តីណែនាំពេញនៅ
+ហើយសរសេរវាចូល **Netlify Blobs** ដោយ PAT ដែល Windows DPAPI អ៊ិនគ្រីប —
+**មិនមែន extension** និង **គ្មាន redeploy**។ សេចក្តីណែនាំពេញនៅ
 [`ZTO-SETUP-KH.md`](ZTO-SETUP-KH.md)។
 
 ទាញលេខទូរស័ព្ទ/COD/DOD ពី endpoint ខាងក្រៅ (ជាទូទៅ Google Sheet តាម Apps Script)

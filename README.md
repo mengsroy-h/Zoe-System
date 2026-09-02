@@ -47,8 +47,8 @@
   ដោយស្វ័យប្រវត្តិពេលស្កេន។ ZTO ប្រើ **Cookie (Windows helper ឬដោយដៃ) ឬ API token ផ្លូវការ**
   (auto-login ក្នុង Netlify ត្រូវដកចេញក្នុង 2.25.0 — ប្រវត្តិនៅ `docs/BUG-HISTORY.md`)។
   ពេល Cookie ផុតកំណត់ Windows helper `tools/zto-cookie-sync-windows/` ចាប់
-  Request Header ពិតពី Edge/Chrome លើកុំព្យូទ័រ រួច update Netlify secret និង
-  Trigger deploy ដោយស្វ័យប្រវត្តិ — មិនបាច់ប្រើ DevTools។
+  Request Header ពិតពី Edge/Chrome លើកុំព្យូទ័រ រួចសរសេរវាចូល **Netlify Blobs**
+  — មិនបាច់ប្រើ DevTools និង **មិនបាច់ redeploy** (តាំងពី 2026-09-02)។
   Proxy មាន **cache ៦០ វិនាទី · single-flight · retry លើ 5xx** ហើយ
   **ឆ្លើយជា JSON ជានិច្ច** ក្នុងថវិកាពេលរបស់ Netlify។ Fast Mode ចងចាំ barcode
   ដែលរកឃើញ ១០ នាទីក្នុង memory។ បើ ZTO យឺត ការវាយដោយដៃបើកជាផ្លូវ fallback
@@ -180,7 +180,7 @@ bash audit-tools/run-all.sh
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្ម និងថ្នាក់កំហុសដែលដោះស្រាយរួច (សម្រាប់អ្នកថែទាំ) |
 | [CHANGELOG.md](CHANGELOG.md) | ប្រវត្តិកំណែ |
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
-| [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper ៖ ចាប់ Cookie ពី Argus request ពិត ➜ update Netlify secret ➜ trigger deploy |
+| [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper ៖ ចាប់ Cookie ពី Argus request ពិត ➜ សរសេរចូល Netlify Blobs (**គ្មាន redeploy**) |
 | [firebase-backup/](firebase-backup/) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ## អាជ្ញាប័ណ្ណ

@@ -63,7 +63,7 @@ ok('⛔ `netlify/lib/zto-session.js` លែងមាន', !fs.existsSync(LEGACY_
 ok('⛔ Function មិន require ម៉ូឌុល session', FUNCTION_SRC.indexOf('zto-session') === -1);
 
 const FORBIDDEN_IN_FUNCTION = [
-    'puppeteer', 'chromium', '@netlify/blobs', 'connectLambda', 'getStore',
+    'puppeteer', 'chromium',
     'ZTO_AUTO_LOGIN', 'ZTO_USERNAME', 'ZTO_PASSWORD', 'ZTO_SESSION_ENCRYPTION_KEY',
     'ZTO_LOGIN_PROXY', 'lambdaEvent'
 ];
@@ -74,8 +74,17 @@ FORBIDDEN_IN_FUNCTION.forEach((needle) => {
 let packageJson = null;
 try { packageJson = JSON.parse(PACKAGE_SRC); } catch (_) { packageJson = null; }
 ok('package.json ជា JSON ត្រឹមត្រូវ', !!packageJson);
-ok('⛔ Function គ្មាន npm dependency សោះ (cold start លឿន)',
-    !!packageJson && !packageJson.dependencies,
+// ⛔ dependency តែមួយដែលអនុញ្ញាត ៖ `@netlify/blobs` សម្រាប់ Cookie store។
+// បញ្ជីនេះជាការចាក់សោ ៖ `puppeteer-core`/`@sparticuz/chromium` (2GB cold
+// start) មិនអាចវិលមកតាមទ្វារ package.json បានទេ។
+const ALLOWED_DEPENDENCIES = ['@netlify/blobs'];
+const declaredDependencies = Object.keys((packageJson && packageJson.dependencies) || {}).sort();
+ok('⛔ Function មាន dependency តែ «@netlify/blobs» (cold start លឿន)',
+    JSON.stringify(declaredDependencies) === JSON.stringify(ALLOWED_DEPENDENCIES),
+    declaredDependencies);
+ok('⛔ ម៉ូឌុល Blobs ត្រូវចាក់សោកំណែច្បាស់លាស់',
+    !!(packageJson && packageJson.dependencies
+        && /^\d+\.\d+\.\d+$/.test(String(packageJson.dependencies['@netlify/blobs']))),
     packageJson && packageJson.dependencies);
 ok('⛔ netlify.toml គ្មាន `external_node_modules`', TOML_SRC.indexOf('external_node_modules') === -1);
 ok('⛔ netlify.toml គ្មាន memory 2gb សម្រាប់ Chromium', TOML_SRC.indexOf('2gb') === -1);

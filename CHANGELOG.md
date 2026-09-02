@@ -25,6 +25,86 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-02 · ប្តូរ Cookie ZTO ដោយ **គ្មាន redeploy** (Netlify Blobs)
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែដោយចេតនា** — ជុំនេះកែតែ
+`ZoeW/netlify/functions/` (ខាង server) · `tools/` · `audit-tools/` និងឯកសារ។
+កូដ PWA ដែល ship នៅដដែលបេះបិទ ➜ អ្នកប្រើ **មិនត្រូវទាញសំបកឡើងវិញ** ទេ
+(ច្បាប់ទី ៦ · `version-bump-scope.js` លើកលែង `netlify/` និង `tools/`)។
+
+### ផ្លាស់ប្តូរ
+
+- **Cookie ZTO រស់នៅក្នុង Netlify Blobs ជំនួស Netlify env** ➜ ការប្តូរ
+  Cookie **លែងត្រូវការ deploy ថ្មី**។ មុននេះ env var ឡើងដល់ Function
+  **តែក្រោយ deploy** ➜ រាល់ការប្តូរ Cookie ចំណាយ ១–២ នាទី; ឥឡូវការសរសេរ
+  ចំណាយ ~១–២ វិនាទី ហើយការស្កេនថ្មីប្រើវាក្នុងរយៈពេលមួយនាទី។
+- `sync-zto-cookie.cmd` លែងហៅ `PATCH env` និង `POST builds` ទៀតទេ —
+  វាស្នើ signed URL ពី `/api/v1/blobs/<site>/zto-auth/cookie` រួច upload
+  Cookie ទៅផ្លូវនោះ (សំណើ **២** ជំនួស **៣**)។
+
+### បន្ថែម
+
+- **ការបន្តអាយុ Cookie ដោយស្វ័យប្រវត្តិ** ៖ ពេល Argus ឆ្លើយ `Set-Cookie`
+  ថ្មី Function បញ្ចូលវាទៅក្នុង Cookie ដែលកំពុងប្រើ រួចសរសេរត្រឡប់ចូល
+  store (ពិដាន ១ ដង/៦០ វិនាទី) ➜ session អាចរស់យូរជាងមុនដោយមិនបាច់រត់
+  helper រាល់ថ្ងៃ។ ⛔ វាមិនដែលសរសេរតម្លៃដែលបាត់ `BOS-MAN-SESSION` ឡើយ។
+- `?diag=1` បន្ថែមប្លុក `cookie` ៖ **ប្រភព** (`blob` / `env` / `none`) ·
+  អាយុ · មូលហេតុរបស់ store ដែលដាច់ · ចំនួនការបន្តអាយុ · និង
+  **fingerprint ៨ តួ** សម្រាប់ផ្ទៀងផ្ទាត់ថា Cookie ដែល helper សរសេរ
+  ពិតជាដល់ Function។ ⛔ តម្លៃ Cookie មិនចេញសោះ។
+
+### សុវត្ថិភាព
+
+- **គំរូសិទ្ធិមិនប្រែ** ៖ Netlify PAT នៅរស់តែក្នុង Windows DPAPI ហើយ
+  **គ្មាន endpoint សរសេរ Cookie ពី internet** ត្រូវបានបង្កើតឡើយ
+  (`ZTO_COOKIE_UPDATE_KEY` នៅតែត្រូវលុបដដែល)។
+- ⛔ **PAT មិនហូរទៅ host របស់ signed URL** — សំណើ upload គ្មាន
+  `Authorization` សោះ ហើយ signed URL ត្រូវជា **HTTPS** មុនផ្ញើ Cookie។
+- តម្លៃក្នុង store ត្រូវឆ្លងការផ្ទៀងផ្ទាត់ទម្រង់ពេញលេញមុនចូល header ➜
+  blob ដែលមាន CR/LF មិនអាចចាក់ header បន្ថែមបានទេ។
+- **Blobs មិនមែនជាចំណុចដាច់តែមួយ** — store ដាច់ · ព្យួរ · ឬតម្លៃខូច ➜
+  ធ្លាក់ចុះទៅ `ZTO_COOKIE` env ដដែល ហើយ lookup នៅដំណើរការ។
+
+### ល្បឿន
+
+- Cookie cache ក្នុងសតិ ៦០ វិនាទី ➜ ការស្កេនធម្មតា **មិនបន្ថែមសំណើ**
+  ទៅ store ទេ។ ការអានចេញពី store កើតតែជុំដំបូង ឬក្រោយ Cookie ផុតកំណត់។
+- ការឆ្លើយ 401 ពី ZTO លុប cache នោះភ្លាម ➜ Cookie ថ្មីដែល helper ទើប
+  សរសេរ ត្រូវយកមកប្រើ **ដោយមិនរង់ចាំ ៦០ វិនាទី**។
+- ថ្លៃ cold start ដែលវាស់បាន ៖ bundle `@netlify/blobs` = **៣៧.៦ KB**
+  (Function ទាំងមូល ៦៧.៧ KB) ហើយផ្ទុកក្នុង **~២.៣ ms**។
+
+### ឧបករណ៍ audit
+
+- **`zto-cookie-store-test.js` ថ្មី (៣៧ assertion; ធ្លាក់ ២២ លើ tree មុនកែ)**
+  — រត់ `handler` ពិតជាមួយម៉ូឌុល `@netlify/blobs` ក្លែង ➜ វាស់លំដាប់
+  `connectLambda(event)` ➜ `getStore()` ពិត។
+- `zto-proxy-test.js` ៖ បញ្ជីហាមលែងរាប់ `@netlify/blobs` តែឥឡូវអះអាងថា
+  **dependency មានតែមួយ ហើយចាក់សោកំណែច្បាស់លាស់** ➜ `puppeteer-core` /
+  `@sparticuz/chromium` នៅតែវិលមកមិនបានដដែល។
+- `zto-cookie-sync-test.js` ៖ ចាក់សោផ្លូវ blob ថ្មី និងអះអាងថា
+  **គ្មាន `/builds` និងគ្មានការសរសេរ env** ក្នុង helper ទៀតទេ។
+- `version-bump-scope.js` ៖ `package.json` / `package-lock.json` ត្រូវលើកលែង
+  ដូច `netlify/` និង `tools/` ដែរ — ⛔ ការបន្ថែម dependency **ខាង server**
+  មិនត្រូវបង្ខំអ្នកប្រើទាញសំបក PWA ទាំងមូលឡើងវិញឡើយ (ច្បាប់ទី ៦)។
+  ការលើកលែងនោះ **ត្រូវចាក់សោភ្លាម** ដោយការអះអាងថាបញ្ជីសំបករបស់ `sw.js`
+  គ្មាន manifest ទាំងនោះ; mutation (ដាក់ `./package.json` ចូល `CORE_SHELL`)
+  ➜ ធ្លាក់ភ្លាម។
+- `npm audit` លើ dependency ថ្មី ៖ **០ vulnerability**។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Deploy ១ ដង** ដើម្បីឲ្យកូដ Function ថ្មីរស់ (បន្ទាប់ពីនេះ ការប្តូរ
+   Cookie លែងត្រូវការ deploy)។
+2. ទាញថត `tools/zto-cookie-sync-windows/` ថ្មីមក Windows រួចរត់
+   `npm install` ក្នុងថតនោះ (បើធ្លាប់រត់រួច) — `setup.cmd` **មិនបាច់**
+   រត់ឡើងវិញទេ ព្រោះ Site ID និង PAT ដដែលនៅប្រើបាន។
+3. **កុំលុប `ZTO_COOKIE` ចេញពី Netlify env** — វាក្លាយជា **ផ្លូវបម្រុង**
+   ពេល Blobs ដាច់។ ទុកតម្លៃចាស់ក៏បាន។
+4. Firebase rules **មិនប្រែ** ហើយ CSP ក៏មិនប្រែដែរ។
+
+---
+
 ## [គ្មានការឡើងកំណែ] — 2026-09-01 · Windows helper ប្តូរ Cookie ZTO ដោយមិនប្រើ DevTools
 
 ⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែដោយចេតនា** — ជុំនេះបន្ថែម

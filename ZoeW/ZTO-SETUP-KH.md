@@ -9,7 +9,11 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 | # | ផ្លូវ | ប្រើពេលណា |
 | --- | --- | --- |
 | ១ | **API ផ្លូវការ** — `ZTO_AUTHORIZATION` ឬ `ZTO_TOKEN` | ពេល ZTO ផ្តល់ API ឲ្យអ្នក (**ល្អបំផុត**) |
-| ២ | **Cookie** — `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
+| ២ | **Cookie** — Netlify Blobs (`zto-auth/cookie`) ឬ `ZTO_COOKIE` | ពេលនៅមិនទាន់មាន API — Windows helper (ណែនាំ) ឬ DevTools fallback |
+
+> ⚡ **តាំងពី 2026-09-02 ការប្តូរ Cookie លែងត្រូវការ redeploy** — helper
+> សរសេរវាចូល **Netlify Blobs** ដែល Function អានពេលមានសំណើ។ `ZTO_COOKIE`
+> ក្លាយជា **ផ្លូវបម្រុង** ពេលអានចេញពី Blobs មិនបាន។
 
 ---
 
@@ -22,19 +26,16 @@ Function មួយ (`/.netlify/functions/zto-order-detail`)។ Cookie និង 
 ចុច **Add a variable** ហើយបង្កើត variable ២ ដាច់ដោយឡែក៖
 
 `setup.cmd` អាចរត់មុន ឬក្រោយការបង្កើត env ទាំងនេះ៖ វាត្រូវការតែ Site ID +
-PAT។ តែ `ZTO_COOKIE` ត្រូវមានរួចមុនរត់ `sync-zto-cookie.cmd` ព្រោះ helper update
-key ដែលមានស្រាប់។ `ZTO_PROXY_KEY` គឺសម្រាប់ ZoeW ហៅ Function មិនមែនសម្រាប់
-`setup.cmd` ទេ។
+PAT។ `ZTO_PROXY_KEY` គឺសម្រាប់ ZoeW ហៅ Function មិនមែនសម្រាប់ `setup.cmd` ទេ។
 
-| Key | Value ពេលបង្កើតដំបូង | Secret | Scope | Context |
+| Key | Value | Secret | Scope | Context |
 | --- | --- | --- | --- | --- |
 | `ZTO_PROXY_KEY` | តម្លៃចៃដន្យ ៣២ bytes — សោរវាង ZoeW និង Function | ✅ | **Functions** | **Production** |
-| `ZTO_COOKIE` | Cookie ពេញ ឬ `BOS-MAN-SESSION=setup-pending` សិន | ✅ | **Functions** | **Production** |
+| `ZTO_COOKIE` | **ស្រេចចិត្ត** — ផ្លូវបម្រុងពេល Blobs ដាច់ | ✅ | **Functions** | **Production** |
 
-`BOS-MAN-SESSION=setup-pending` គ្រាន់តែអនុញ្ញាតឲ្យបង្កើត key ដោយមិនបើក
-DevTools។ វាមិនមែន Cookie ពិតទេ៖ ក្រោយ Save ត្រូវរត់
-`sync-zto-cookie.cmd` ដើម្បីឲ្យ helper ជំនួសវាដោយ Cookie ពេញ និង trigger
-deploy។
+⛔ **កុំលុប `ZTO_COOKIE` ដែលមានស្រាប់ចេញ** — Function ប្រើវាពេលអានចេញពី
+Blobs មិនបាន។ បើវាមិនទាន់មាន ក៏មិនចាំបាច់បង្កើតដែរ ៖ helper សរសេរចូល Blobs
+ដោយផ្ទាល់ ហើយ lookup ដើរភ្លាមក្រោយការសរសេរនោះ។
 
 បង្កើត `ZTO_PROXY_KEY` លើ Windows PowerShell៖
 
@@ -67,8 +68,9 @@ context **Production**។ កុំដាក់វាក្នុង `netlify.to
 screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្តង។
 
 > ℹ️ **Netlify Base directory ត្រូវជា `ZoeW`** ដើម្បីឲ្យវាឃើញ `netlify.toml`
-> និង `netlify/functions/`។ តាំងពី 2.25.0 Function **គ្មាន dependency npm សោះ**
-> ➜ bundle តូចជាង 20 KB ➜ **cold start លឿនជាងមុនច្រើន**។
+> និង `netlify/functions/`។ Function មាន dependency **តែមួយ**
+> (`@netlify/blobs` — វាស់បាន bundle ៣៧.៦ KB, ផ្ទុក ~២.៣ ms) ➜ Function
+> ទាំងមូល **៦៧.៧ KB** ➜ cold start នៅតែលឿន។
 
 ---
 
@@ -76,8 +78,8 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 
 ឧបករណ៍ `tools/zto-cookie-sync-windows/` បើក Edge/Chrome profile ដាច់ដោយឡែក
 លើកុំព្យូទ័ររបស់អ្នក ហើយចាប់បន្ទាត់ `Cookie:` ពី **Order Detail request ពិត**
-ទៅ `aargus-api.ztoglobal.com`។ បន្ទាប់មកវា update `ZTO_COOKIE` ជា Netlify
-secret និង trigger deploy ដោយស្វ័យប្រវត្តិ។
+ទៅ `aargus-api.ztoglobal.com`។ បន្ទាប់មកវាសរសេរ Cookie ចូល **Netlify Blobs**
+(store `zto-auth`, key `cookie`) ➜ ⛔ **គ្មាន deploy ថ្មី**។
 
 វា **មិនប្រើ** `document.cookie`, `chrome.cookies` extension API ឬ Chromium
 ក្នុង Netlify Function ទេ។
@@ -97,7 +99,9 @@ secret និង trigger deploy ដោយស្វ័យប្រវត្តិ
 ១. Double-click **`sync-zto-cookie.cmd`**។
 ២. បើ ZTO សុំ សូម Login ក្នុង Edge/Chrome ដែលវាបើក។
 ៣. បើក ឬស្វែងរកកញ្ចប់ណាមួយក្នុង Argus ដើម្បីបង្កើត Order Detail request។
-៤. ឧបករណ៍បិទ browser ➜ update secret ➜ trigger deploy ដោយខ្លួនឯង។
+៤. ឧបករណ៍បិទ browser ➜ សរសេរ Cookie ចូល Netlify Blobs ➜ ចប់។
+   ⛔ **មិនចាំបាច់ redeploy** — ការស្កេនថ្មីប្រើវាក្នុងរយៈពេលមួយនាទី
+   (ការឆ្លើយ 401 ពី ZTO កាត់ការរង់ចាំនោះភ្លាម)។
 
 Cookie មិនបង្ហាញក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell
 history ទេ។ PAT ត្រូវអ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង
@@ -119,7 +123,8 @@ Function។ សេចក្តីណែនាំពេញ និងព្រំ�
 ២. `F12` ➜ **Network** ➜ បើក/ស្វែងរកកញ្ចប់មួយ។
 ៣. ជ្រើសសំណើទៅ `aargus-api.ztoglobal.com/scan/get/order/detail` ➜
    **Request Headers** ➜ ចម្លងតម្លៃពេញរបស់ `Cookie:`។
-៤. ដាក់ចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ Trigger deploy។
+៤. ដាក់ចូល `ZTO_COOKIE` ក្នុង Netlify ➜ Save ➜ **Trigger deploy**
+   (ផ្លូវ env នេះនៅតែត្រូវការ deploy — មានតែផ្លូវ Blobs ទេដែលមិនត្រូវការ)។
 
 ---
 
@@ -214,10 +219,17 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 ```json
 {
   "ok": true, "code": "ZTO_DIAG",
-  "auth": "authorization",
+  "auth": "cookie",
+  "cookie": {
+    "source": "blob",
+    "fingerprint": "a1b2c3d4",
+    "ageMs": 12345,
+    "storeReason": null,
+    "renewals": 0
+  },
   "endpoint": { "host": "...", "path": "...", "method": "POST" },
-  "requestHeaders": ["Accept", "Authorization", "..."],
-  "browserHeaders": false,
+  "requestHeaders": ["Accept", "Cookie", "..."],
+  "browserHeaders": true,
   "fields": { "phone": [...], "cod": [...], "dod": [...], "barcode": [...] },
   "timing": { "upstreamTimeoutMs": 8000, "budgetMs": 14000, "retries": 1, "cacheTtlMs": 60000 },
   "cacheEntries": 0
@@ -225,9 +237,21 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 ```
 
 ⛔ `auth` ត្រូវជា **`authorization`** ឬ **`token`** ពេលប្រើ API ផ្លូវការ។
-បើវាឡើង `cookie` ឬ `none` នោះមានន័យថា Netlify មិនទាន់ឃើញ variable ថ្មីទេ
-(ភ្លេច Trigger deploy)។ `requestHeaders` ជា **ឈ្មោះ header ប៉ុណ្ណោះ** —
-តម្លៃមិនដែលចេញទេ។
+បើវាឡើង `none` នោះមានន័យថា Function រកមិនឃើញ Cookie ឬ Token សោះ។
+`requestHeaders` ជា **ឈ្មោះ header ប៉ុណ្ណោះ** — តម្លៃមិនដែលចេញទេ។
+
+**ប្លុក `cookie` ជាឧបករណ៍ផ្ទៀងផ្ទាត់ផ្លូវ Blobs**៖
+
+| វាល | អត្ថន័យ |
+| --- | --- |
+| `source` | `blob` = អានពី Netlify Blobs (helper ដើរត្រឹមត្រូវ) · `env` = ធ្លាក់ចុះទៅ `ZTO_COOKIE` · `none` = គ្មានសោះ |
+| `fingerprint` | ៨ តួនៃ SHA-256 របស់ Cookie — ⛔ **មិនមែនតម្លៃ Cookie** ទេ; ប្រើដើម្បីមើលថាតម្លៃប្រែឬអត់ |
+| `ageMs` | រយៈពេលដែលតម្លៃនេះនៅក្នុង cache សតិ (ពិដាន ៦០ វិនាទី) |
+| `storeReason` | មូលហេតុពេលអានចេញពី Blobs មិនបាន (`no-context` · `getstore` · `read:timeout` · `invalid` · `empty` …) |
+| `renewals` | ចំនួនដងដែល Cookie ត្រូវបានបន្តអាយុដោយស្វ័យប្រវត្តិពី `Set-Cookie` របស់ Argus |
+
+⛔ **ក្រោយរត់ `sync-zto-cookie.cmd` ថ្មី ៖ `source` ត្រូវជា `blob`។** បើវានៅ
+`env` សូមមើល `storeReason` ➜ វាប្រាប់ថាធ្លាក់ត្រង់ណា។
 
 ---
 
@@ -262,7 +286,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | `code` | អ្វីអ្នកឃើញក្នុង ZoeW | ត្រូវធ្វើអ្វី |
 | --- | --- | --- |
 | `ZTO_AUTH_EXPIRED` | 🔒 Cookie ZTO ផុតកំណត់ | រត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
-| `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | ដាក់ `ZTO_COOKIE` ឬ `ZTO_AUTHORIZATION` |
+| `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | រត់ `sync-zto-cookie.cmd` ឬដាក់ `ZTO_COOKIE`/`ZTO_AUTHORIZATION` |
 | `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
 | `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` |
 | `ZTO_NOT_FOUND` | ⚠️ ZTO មិនឃើញទិន្នន័យ | Barcode នោះមិនមានក្នុង ZTO ពិត — វាយដោយដៃ |

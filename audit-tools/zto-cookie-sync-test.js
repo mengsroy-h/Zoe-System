@@ -1,6 +1,7 @@
 // ⛔ ចាក់សោ Windows helper ដែលកាន់ credential ២ ក្នុងសតិ៖ ZTO Cookie និង
 // Netlify PAT។ វាផ្ទៀងផ្ទាត់ថាឧបករណ៍ចាប់ Request Header ពិត, អ៊ិនគ្រីប PAT
-// ដោយ Windows DPAPI, update env មុន trigger deploy និង settle ពេលបណ្តាញព្យួរ។
+// ដោយ Windows DPAPI, សរសេរ Cookie ចូល Netlify Blobs **ដោយគ្មាន redeploy**
+// និង settle ពេលបណ្តាញព្យួរ។
 'use strict';
 
 const fs = require('fs');
@@ -175,11 +176,14 @@ async function run() {
         /const NETLIFY_API_ORIGIN = 'https:\/\/api\.netlify\.com'/.test(source));
     ok('site lookup ទាញ account_id មិនទាមទារឲ្យអ្នកបញ្ចូល',
         /site\.account_id/.test(source) && !/NETLIFY_ACCOUNT_ID/.test(source));
-    ok('PATCH env value សម្រាប់ production',
-        /method:\s*'PATCH'/.test(source)
-        && /JSON\.stringify\(\{ context: 'production', value: cleanCookie \}\)/.test(source));
-    ok('POST builds ដើម្បី trigger deploy',
-        /method:\s*'POST'/.test(source) && /encodeURIComponent\(cleanSiteId\) \+ '\/builds'/.test(source));
+    ok('សរសេរ Cookie ចូល Netlify Blobs (ផ្លូវ /api/v1/blobs)',
+        /'\/api\/v1\/blobs\/'/.test(source) && /BLOB_STORE_NAME = 'zto-auth'/.test(source));
+    ok('ស្នើ signed URL ដោយ accept header ផ្លូវការ',
+        /application\/json;type=signed-url/.test(source));
+    ok('⛔ លែងសរសេរ env និងលែង trigger deploy ទៀត (គ្មានការរង់ចាំ)',
+        !/\/builds/.test(source) && !/env\/ZTO_COOKIE|NETLIFY_ENV_KEY/.test(source));
+    ok('⛔ signed URL ត្រូវជា HTTPS មុនផ្ញើ Cookie',
+        /signed\.protocol !== 'https:'/.test(source));
     ok('redirect ត្រូវបដិសេធ ដើម្បីកុំឲ្យ Authorization ហូរទៅ host ផ្សេង',
         /redirect:\s*'error'/.test(source));
     ok('timeout settle ដោយ timer ពិត បន្ថែមលើ AbortController',
@@ -231,11 +235,13 @@ async function run() {
 
     console.log('\n=== ៧. Netlify API behavior (mock មិនប៉ះ production) ===');
     if (api) {
+        const SIGNED_URL = 'https://blob-upload.netlify.test/signed-path?sig=abc123';
+        const BLOB_URL = 'https://api.netlify.com/api/v1/blobs/' + SITE_ID + '/zto-auth/cookie';
         const calls = [];
         const fetchImpl = async (url, options) => {
             calls.push({ url, options });
-            if (calls.length === 1) return fakeResponse(200, { account_id: ACCOUNT_ID });
-            return fakeResponse(201, {});
+            if (calls.length === 1) return fakeResponse(200, { url: SIGNED_URL });
+            return fakeResponse(200, {});
         };
         await api.syncNetlifyCookie(COOKIE, {
             siteId: SITE_ID,
@@ -244,30 +250,34 @@ async function run() {
             timeoutMs: 100
         });
 
-        ok('ហៅ API ៣ ដងតាមលំដាប់ site ➜ env ➜ build', calls.length === 3, calls.length);
-        ok('GET site ត្រឹមត្រូវ',
-            calls[0] && calls[0].options.method === 'GET'
-            && calls[0].url === 'https://api.netlify.com/api/v1/sites/' + SITE_ID);
-        ok('PATCH ZTO_COOKIE ត្រឹម account + site',
-            calls[1] && calls[1].options.method === 'PATCH'
-            && calls[1].url === 'https://api.netlify.com/api/v1/accounts/' + ACCOUNT_ID
-                + '/env/ZTO_COOKIE?site_id=' + SITE_ID);
-        ok('PATCH body មាន production + Cookie ពេញ',
-            calls[1] && calls[1].options.body === JSON.stringify({ context: 'production', value: COOKIE }));
-        ok('POST build កើតក្រោយ PATCH ជោគជ័យ និងគ្មាន body ក្លែងជា JSON',
-            calls[2] && calls[2].options.method === 'POST'
-            && calls[2].url === 'https://api.netlify.com/api/v1/sites/' + SITE_ID + '/builds'
-            && calls[2].options.body === undefined
-            && calls[2].options.headers['Content-Type'] === undefined);
-        ok('គ្រប់សំណើប្រើ Bearer token និង redirect:error',
-            calls.every((call) => call.options.headers.Authorization === 'Bearer ' + TOKEN
-                && call.options.redirect === 'error'));
-        ok('Cookie មិនចូល URL/GET/POST body',
-            calls.every((call, index) => !call.url.includes(COOKIE)
-                && (index === 1 || !String(call.options.body || '').includes(COOKIE))));
+        ok('ហៅ API ២ ដងតែប៉ុណ្ណោះ ៖ signed URL ➜ upload (គ្មាន build)',
+            calls.length === 2, calls.length);
+        ok('ស្នើ signed URL តាមផ្លូវ blob ត្រឹមត្រូវ',
+            calls[0] && calls[0].options.method === 'PUT' && calls[0].url === BLOB_URL,
+            calls[0] && calls[0].url);
+        ok('សំណើ signed URL មាន accept header ផ្លូវការ និងគ្មាន body',
+            calls[0] && calls[0].options.headers.accept === 'application/json;type=signed-url'
+            && calls[0].options.body === undefined,
+            calls[0] && JSON.stringify(calls[0].options.headers));
+        ok('upload ផ្ញើ Cookie ទៅ signed URL ដដែល',
+            calls[1] && calls[1].options.method === 'PUT'
+            && calls[1].url === SIGNED_URL
+            && calls[1].options.body === COOKIE,
+            calls[1] && calls[1].url);
+        ok('⛔ PAT មិនហូរទៅ host របស់ signed URL សោះ',
+            calls[1] && calls[1].options.headers.Authorization === undefined
+            && JSON.stringify(calls[1].options.headers).indexOf(TOKEN) === -1,
+            calls[1] && JSON.stringify(calls[1].options.headers));
+        ok('សំណើ Netlify API ប្រើ Bearer token',
+            calls[0].options.headers.Authorization === 'Bearer ' + TOKEN);
+        ok('⛔ គ្មានសំណើណាដើរតាម redirect (error ឬ manual)',
+            calls.every((call) => call.options.redirect === 'error' || call.options.redirect === 'manual'),
+            calls.map((call) => call.options.redirect).join(','));
+        ok('Cookie មិនចូល URL សោះ',
+            calls.every((call) => !call.url.includes(COOKIE)));
 
-        const envFailureCalls = [];
-        let envFailureCode = '';
+        const urlFailureCalls = [];
+        let urlFailureCode = '';
         const bodyStats = {};
         try {
             await api.syncNetlifyCookie(COOKIE, {
@@ -275,41 +285,78 @@ async function run() {
                 token: TOKEN,
                 timeoutMs: 100,
                 fetchImpl: async (url, options) => {
-                    envFailureCalls.push({ url, options });
-                    if (envFailureCalls.length === 1) return fakeResponse(200, { account_id: ACCOUNT_ID });
+                    urlFailureCalls.push({ url, options });
                     return fakeResponse(422, { secret: COOKIE }, bodyStats);
                 }
             });
         } catch (error) {
-            envFailureCode = error.code;
+            urlFailureCode = error.code;
         }
-        ok('env update ធ្លាក់ ➜ មិន trigger build',
-            envFailureCode === 'NETLIFY_ENV_UPDATE_FAILED' && envFailureCalls.length === 2,
-            envFailureCode + '/' + envFailureCalls.length);
-        ok('env error response body មិនត្រូវបានអាន',
+        ok('signed URL ធ្លាក់ ➜ មិន upload Cookie',
+            urlFailureCode === 'NETLIFY_BLOB_URL_FAILED' && urlFailureCalls.length === 1,
+            urlFailureCode + '/' + urlFailureCalls.length);
+        ok('error response body មិនត្រូវបានអាន',
             !bodyStats.reads && bodyStats.cancels === 1,
             JSON.stringify(bodyStats));
 
-        const buildFailureCalls = [];
-        let buildFailureCode = '';
+        const insecureCalls = [];
+        let insecureCode = '';
         try {
             await api.syncNetlifyCookie(COOKIE, {
                 siteId: SITE_ID,
                 token: TOKEN,
                 timeoutMs: 100,
-                fetchImpl: async () => {
-                    buildFailureCalls.push(true);
-                    if (buildFailureCalls.length === 1) return fakeResponse(200, { account_id: ACCOUNT_ID });
-                    if (buildFailureCalls.length === 2) return fakeResponse(201, {});
+                fetchImpl: async (url, options) => {
+                    insecureCalls.push({ url, options });
+                    return fakeResponse(200, { url: 'http://blob-upload.netlify.test/signed' });
+                }
+            });
+        } catch (error) {
+            insecureCode = error.code;
+        }
+        ok('⛔ signed URL មិនមែន HTTPS ➜ បដិសេធមុនផ្ញើ Cookie',
+            insecureCode === 'NETLIFY_BLOB_URL_INVALID' && insecureCalls.length === 1,
+            insecureCode + '/' + insecureCalls.length);
+
+        const redirectCalls = [];
+        let redirectCode = '';
+        try {
+            await api.syncNetlifyCookie(COOKIE, {
+                siteId: SITE_ID,
+                token: TOKEN,
+                timeoutMs: 100,
+                fetchImpl: async (url, options) => {
+                    redirectCalls.push({ url, options });
+                    if (redirectCalls.length === 1) return fakeResponse(200, { url: SIGNED_URL });
+                    return fakeResponse(307, {});
+                }
+            });
+        } catch (error) {
+            redirectCode = error.code;
+        }
+        ok('⛔ upload ត្រូវ redirect ➜ បដិសេធដោយឈ្មោះ មិនមែនសារបណ្តាញ',
+            redirectCode === 'NETLIFY_BLOB_REDIRECT' && redirectCalls.length === 2,
+            redirectCode + '/' + redirectCalls.length);
+
+        const uploadFailureCalls = [];
+        let uploadFailureCode = '';
+        try {
+            await api.syncNetlifyCookie(COOKIE, {
+                siteId: SITE_ID,
+                token: TOKEN,
+                timeoutMs: 100,
+                fetchImpl: async (url, options) => {
+                    uploadFailureCalls.push({ url, options });
+                    if (uploadFailureCalls.length === 1) return fakeResponse(200, { url: SIGNED_URL });
                     return fakeResponse(500, { secret: COOKIE });
                 }
             });
         } catch (error) {
-            buildFailureCode = error.code;
+            uploadFailureCode = error.code;
         }
-        ok('env ជោគជ័យ + build ធ្លាក់ ➜ សារមិនកុហក',
-            buildFailureCode === 'NETLIFY_ENV_UPDATED_BUILD_FAILED' && buildFailureCalls.length === 3,
-            buildFailureCode);
+        ok('upload ធ្លាក់ ➜ សារមិនកុហក',
+            uploadFailureCode === 'NETLIFY_BLOB_UPLOAD_FAILED' && uploadFailureCalls.length === 2,
+            uploadFailureCode);
 
         const started = Date.now();
         let timeoutCode = '';

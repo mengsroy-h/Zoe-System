@@ -12,7 +12,10 @@ const ORDER_DETAIL_PATH = '/scan/get/order/detail';
 const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const NETLIFY_API_ORIGIN = 'https://api.netlify.com';
-const NETLIFY_ENV_KEY = 'ZTO_COOKIE';
+const BLOB_STORE_NAME = 'zto-auth';
+const BLOB_KEY = 'cookie';
+const SIGNED_URL_ACCEPT = 'application/json;type=signed-url';
+const SIGNED_URL_MAX_LENGTH = 4096;
 const NETLIFY_TIMEOUT_MS = 30 * 1000;
 const NETLIFY_RESPONSE_MAX_BYTES = 1024 * 1024;
 
@@ -225,9 +228,8 @@ function timedFetch(url, options, controls) {
 
         let pending;
         try {
-            pending = fetchImpl(url, Object.assign({}, options, {
-                signal: controller.signal,
-                redirect: 'error'
+            pending = fetchImpl(url, Object.assign({ redirect: 'error' }, options, {
+                signal: controller.signal
             }));
         } catch (_) {
             finish(codedError('NETLIFY_NETWORK'));
@@ -244,13 +246,11 @@ function netlifyApiUrl(pathname) {
     return NETLIFY_API_ORIGIN + pathname;
 }
 
-function netlifyHeaders(token, hasJsonBody) {
-    const headers = {
+function netlifyHeaders(token) {
+    return {
         Accept: 'application/json',
         Authorization: 'Bearer ' + validateToken(token)
     };
-    if (hasJsonBody) headers['Content-Type'] = 'application/json';
-    return headers;
 }
 
 async function discardResponse(response) {
@@ -261,28 +261,42 @@ async function discardResponse(response) {
     } catch (_) {}
 }
 
-async function readSmallJson(response) {
+async function readSmallJson(response, errorCode) {
+    const code = errorCode || 'NETLIFY_SITE_INVALID_RESPONSE';
     let text;
     try {
         text = await response.text();
     } catch (_) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
     if (Buffer.byteLength(text, 'utf8') > NETLIFY_RESPONSE_MAX_BYTES) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
     try {
         return JSON.parse(text);
     } catch (_) {
-        throw codedError('NETLIFY_SITE_INVALID_RESPONSE');
+        throw codedError(code);
     }
+}
+
+function validateSignedUrl(raw) {
+    const text = String(raw || '');
+    if (!text || text.length > SIGNED_URL_MAX_LENGTH) throw codedError('NETLIFY_BLOB_URL_INVALID');
+    let signed;
+    try {
+        signed = new URL(text);
+    } catch (_) {
+        throw codedError('NETLIFY_BLOB_URL_INVALID');
+    }
+    if (signed.protocol !== 'https:') throw codedError('NETLIFY_BLOB_URL_INVALID');
+    return signed.href;
 }
 
 async function getNetlifySite(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
     const response = await timedFetch(
         netlifyApiUrl('/api/v1/sites/' + encodeURIComponent(cleanSiteId)),
-        { method: 'GET', headers: netlifyHeaders(token, false) },
+        { method: 'GET', headers: netlifyHeaders(token) },
         controls
     );
     if (!response || !response.ok) {
@@ -294,38 +308,40 @@ async function getNetlifySite(siteId, token, controls) {
     return { accountId };
 }
 
-async function updateNetlifyCookie(accountId, siteId, token, cookieHeader, controls) {
-    const cleanAccountId = validateSiteId(accountId, 'NETLIFY_SITE_INVALID_RESPONSE');
+async function requestBlobUploadUrl(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
-    const cleanCookie = validateCookieHeader(cookieHeader);
-    const pathname = '/api/v1/accounts/' + encodeURIComponent(cleanAccountId)
-        + '/env/' + NETLIFY_ENV_KEY
-        + '?site_id=' + encodeURIComponent(cleanSiteId);
+    const pathname = '/api/v1/blobs/' + encodeURIComponent(cleanSiteId)
+        + '/' + BLOB_STORE_NAME + '/' + BLOB_KEY;
     const response = await timedFetch(netlifyApiUrl(pathname), {
-        method: 'PATCH',
-        headers: netlifyHeaders(token, true),
-        body: JSON.stringify({ context: 'production', value: cleanCookie })
+        method: 'PUT',
+        headers: {
+            accept: SIGNED_URL_ACCEPT,
+            Authorization: 'Bearer ' + validateToken(token)
+        }
     }, controls);
     if (!response || !response.ok) {
         await discardResponse(response);
-        throw codedError('NETLIFY_ENV_UPDATE_FAILED');
+        throw codedError('NETLIFY_BLOB_URL_FAILED');
     }
-    await discardResponse(response);
+    const payload = await readSmallJson(response, 'NETLIFY_BLOB_URL_INVALID');
+    return validateSignedUrl(payload && payload.url);
 }
 
-async function triggerNetlifyBuild(siteId, token, controls) {
-    const cleanSiteId = validateSiteId(siteId);
-    const response = await timedFetch(
-        netlifyApiUrl('/api/v1/sites/' + encodeURIComponent(cleanSiteId) + '/builds'),
-        {
-            method: 'POST',
-            headers: netlifyHeaders(token, false)
-        },
-        controls
-    );
+async function uploadCookieToBlob(signedUrl, cookieHeader, controls) {
+    const cleanCookie = validateCookieHeader(cookieHeader);
+    const response = await timedFetch(signedUrl, {
+        method: 'PUT',
+        redirect: 'manual',
+        headers: { 'cache-control': 'max-age=0, stale-while-revalidate=60' },
+        body: cleanCookie
+    }, controls);
+    if (response && response.status >= 300 && response.status < 400) {
+        await discardResponse(response);
+        throw codedError('NETLIFY_BLOB_REDIRECT');
+    }
     if (!response || !response.ok) {
         await discardResponse(response);
-        throw codedError('NETLIFY_BUILD_TRIGGER_FAILED');
+        throw codedError('NETLIFY_BLOB_UPLOAD_FAILED');
     }
     await discardResponse(response);
 }
@@ -354,19 +370,8 @@ async function syncNetlifyCookie(cookieHeader, options) {
     let cleanCookie = validateCookieHeader(cookieHeader);
     const credentials = await resolveCredentials(options);
     try {
-        const site = await getNetlifySite(credentials.siteId, credentials.token, options);
-        await updateNetlifyCookie(
-            site.accountId,
-            credentials.siteId,
-            credentials.token,
-            cleanCookie,
-            options
-        );
-        try {
-            await triggerNetlifyBuild(credentials.siteId, credentials.token, options);
-        } catch (_) {
-            throw codedError('NETLIFY_ENV_UPDATED_BUILD_FAILED');
-        }
+        const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options);
+        await uploadCookieToBlob(signedUrl, cleanCookie, options);
     } finally {
         cleanCookie = '';
         credentials.token = '';
@@ -467,9 +472,10 @@ function safeFailureMessage(code) {
         NETLIFY_TIMEOUT: 'Netlify API ឆ្លើយយឺតលើស ៣០ វិនាទី។ សូមសាកម្តងទៀត។',
         NETLIFY_SITE_REJECTED: 'Netlify បដិសេធ Site ID ឬ Token។ សូមបើក setup.cmd ហើយបញ្ចូលថ្មី។',
         NETLIFY_SITE_INVALID_RESPONSE: 'Netlify ឆ្លើយទម្រង់មិនត្រឹមត្រូវ។ មិនបានប្តូរ Cookie ទេ។',
-        NETLIFY_ENV_UPDATE_FAILED: 'Netlify មិនអាច update ZTO_COOKIE បាន។ Deploy មិនត្រូវបាន trigger ទេ។',
-        NETLIFY_BUILD_TRIGGER_FAILED: 'Netlify មិនអាច trigger deploy បាន។',
-        NETLIFY_ENV_UPDATED_BUILD_FAILED: 'ZTO_COOKIE ត្រូវបាន update រួច ប៉ុន្តែ trigger deploy បរាជ័យ។ សូម Trigger deploy ក្នុង Netlify ម្តង។',
+        NETLIFY_BLOB_URL_FAILED: 'Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store បានទេ។ សូមពិនិត្យ Site ID និងសិទ្ធិរបស់ PAT។',
+        NETLIFY_BLOB_URL_INVALID: 'Netlify ឆ្លើយផ្លូវ upload មិនត្រឹមត្រូវ។ Cookie មិនត្រូវបានផ្ញើទេ។',
+        NETLIFY_BLOB_UPLOAD_FAILED: 'ការសរសេរ Cookie ចូល Netlify Blobs បរាជ័យ។ សូមសាកម្តងទៀត។',
+        NETLIFY_BLOB_REDIRECT: 'Netlify បញ្ជូនផ្លូវ upload ទៅ host ផ្សេង។ Cookie មិនត្រូវបានផ្ញើទេ ដើម្បីសុវត្ថិភាព។',
         COOKIE_TOO_SHORT: 'Cookie ដែលចាប់បានខ្លីពេក។ សូម Login Argus ឡើងវិញ។',
         COOKIE_TOO_LONG: 'Cookie ដែលចាប់បានវែងលើសពិដានសុវត្ថិភាព។',
         COOKIE_CONTROL_CHAR: 'Cookie ដែលចាប់បានមានតួអក្សរគ្រប់គ្រង — បានបដិសេធដើម្បីទប់ header injection។',
@@ -494,9 +500,10 @@ async function main() {
     let cookieHeader = await captureCookieHeader();
     console.log('✅ ចាប់ Cookie បាន។ តម្លៃមិនត្រូវបានបង្ហាញ ឬសរសេរចូលឯកសារទេ។');
     try {
-        console.log('🔐 កំពុង update ZTO_COOKIE ជា Netlify secret ហើយ trigger deploy...');
+        console.log('🔐 កំពុងសរសេរ Cookie ចូល Netlify Blobs...');
         await syncNetlifyCookie(cookieHeader);
-        console.log('\n✅ Cookie ថ្មីចូល Netlify ហើយ deploy ត្រូវបាន trigger រួចរាល់។');
+        console.log('\n✅ Cookie ថ្មីចូល Netlify Blobs រួចរាល់ — ⛔ មិនចាំបាច់ redeploy ទេ។');
+        console.log('   ការស្កេនថ្មីនឹងប្រើ Cookie នេះក្នុងរយៈពេលមួយនាទី។');
     } finally {
         cookieHeader = '';
     }
@@ -519,13 +526,14 @@ module.exports = {
     netlifyApiUrl,
     profileRoot,
     readTokenViaPowerShell,
+    requestBlobUploadUrl,
     safeFailureMessage,
     statePaths,
     syncNetlifyCookie,
     timedFetch,
-    triggerNetlifyBuild,
-    updateNetlifyCookie,
+    uploadCookieToBlob,
     validateCookieHeader,
+    validateSignedUrl,
     validateSiteId,
     validateToken,
     verifyNetlifySetup,

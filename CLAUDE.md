@@ -222,6 +222,8 @@
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
 | **ZTO ៖ auto-login** | ⛔ **ដកចេញរួច (2.25.0)** — IdP មិនបើកឲ្យ IP របស់ Netlify; កុំនាំវាមកវិញ | `zto-proxy-test` |
+| **ZTO ៖ Cookie store** | ⛔ Blobs ដាច់/ព្យួរ ➜ ត្រូវធ្លាក់ចុះទៅ env មិនមែនធ្លាក់ lookup | `zto-cookie-store-test` |
+| **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; មានពិដានល្បឿន | `zto-cookie-store-test` |
 | **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
 | **ZTO ៖ ពិដានពេលរបស់ Netlify** | ⛔ Function ត្រូវឆ្លើយ JSON មុនត្រូវសម្លាប់ | `zto-proxy-test` |
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
@@ -1876,9 +1878,9 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
 អ្នកប្រើ, ប្រើ profile ដាច់ក្នុង `%LOCALAPPDATA%`, ហើយអាន **request header
 ពិត** មិនមែន `chrome.cookies` API។
 
-ខ្សែសង្វាក់៖
+ខ្សែសង្វាក់ (តាំងពី 2026-09-02 — **គ្មាន redeploy**)៖
 
-`sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify API PATCH ZTO_COOKIE ➜ POST build`
+`sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify Blobs (store zto-auth, key cookie)`
 
 ច្បាប់សុវត្ថិភាព៖
 
@@ -1887,7 +1889,9 @@ Test៖ **`zto-proxy-test.js`** (**១៣០ assertion**; ធ្លាក់ **�
   បដិសេធ CR/LF/NUL។
 - Netlify API response body ដែលអាចមាន secret ត្រូវបោះចោលដោយមិនបង្ហាញ;
   Authorization redirect ត្រូវបដិសេធ ហើយ fetch ត្រូវ settle ដោយ timer ពិត។
-- Update env ត្រូវជោគជ័យ **មុន** trigger deploy; បរាជ័យមិនអះអាងថារួច។
+- ការសរសេរ blob ត្រូវជោគជ័យពិត មុនអះអាងថារួច។ ⛔ **PAT មិនហូរទៅ host
+  របស់ signed URL** (សំណើ upload គ្មាន `Authorization` សោះ) ហើយ signed URL
+  ត្រូវជា **HTTPS** មុនផ្ញើ Cookie។
 - Netlify PAT ត្រូវ prompt ដោយ `Read-Host -AsSecureString`, រក្សាជា Windows
   **DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` និងដោះសោតែទៅ stdout pipe
   ដែល Node ទទួលដោយមិនបង្ហាញ តាម child ដែល `shell:false`។ ⛔ គ្មាន PAT ក្នុង command line,
@@ -1935,16 +1939,67 @@ Test៖ **`version-bump-scope.js`** (៧ assertion)។ ⛔ ការលើកល
 `netlify/` និង `tools/` ទាំង ២; helper ថ្មីស្ថិតក្រោម `tools/` ហើយមិនចូល
 បញ្ជីសំបក PWA ➜ ជុំនេះជាភស្តុតាងថាការលើកលែងនោះនៅតែចាំបាច់។
 
-Test៖ **`zto-cookie-sync-test.js`** (៦០ assertion; ធ្លាក់ ៥៧ លើថតទទេ) —
+Test៖ **`zto-cookie-sync-test.js`** (៦៣ assertion; ធ្លាក់ ៥៧ លើថតទទេ) —
 ចាក់សោ exact host/path · HTTPS · request headers ពិត · header injection ·
 DPAPI/BSTR cleanup · `shell:false` · exact Netlify API method/path/body · timeout
-ដែល settle · លំដាប់ env ➜ deploy · profile ក្រៅ repo · និងការមិនវិលទៅ
-extension/server token · បូក ASCII + CRLF របស់ `.cmd`។
+ដែល settle · profile ក្រៅ repo · និងការមិនវិលទៅ extension/server token ·
+បូក ASCII + CRLF របស់ `.cmd`។
 
-⏳ **ត្រូវការការផ្ទៀងផ្ទាត់លើ Windows ពិតមុន merge**៖ `setup.cmd` ➜
-បញ្ចូល Site ID + PAT ➜ Login Argus ក្នុង profile ពិសេស ➜ បើកកញ្ចប់មួយ ➜ ត្រូវឃើញ
-env update និង deploy trigger។ បើ Playwright/Edge មិនបញ្ចេញ Cookie ក្នុង
-`request.allHeaders()` លើឧបករណ៍ពិត ត្រូវទុក PR ជា draft និងកុំសន្មត់ថាដើរ។
+### ⛔ Cookie ZTO រស់នៅ Netlify Blobs — ការប្តូរលែងត្រូវការ redeploy (2026-09-02)
+
+> **សំណើអ្នកប្រើ** ៖ *«តើមានវិធីណាដែលអាចប្តូរ cookie ហើយមិនបាច់ redeploy ទេ?
+> ដូចជា blob netlify …»* — បាទ ហើយវាត្រូវបានវាស់រួច។
+
+**មូលហេតុដែល env ត្រូវការ deploy** ៖ Netlify inject env var ចូល Function តាម
+**snapshot របស់ deploy** ➜ ការប្តូរតម្លៃមិនឡើងដល់ Function ដែលកំពុងរត់ទេ។
+ដូច្នេះជុំមុនចំណាយ ១–២ នាទីក្នុងមួយ Cookie។ Blobs ជា store **runtime** ➜
+ការសរសេរមានប្រសិទ្ធភាពភ្លាមៗ។
+
+⛔ **ព្រំដែនដែលវាស់ក្នុងកូដ SDK ពិត (`@netlify/blobs@11.0.2`)** ៖
+`connectLambda(event)` កំណត់តែ **`edgeURL`** — វា **មិនកំណត់ `uncachedEdgeURL`**
+ទេ ➜ ការអានដោយ `consistency: 'strong'` នឹងបោះ `BlobsConsistencyError`។
+ដូច្នេះ Function (ដែលជា **Lambda signature**) អានបានតែតាម **edge** ដែលជា
+eventual consistency (drift រហូតដល់ ៦០ វិនាទី)។ ការអានបែប strong ត្រូវការ
+PAT ក្នុង Netlify env ដែល **ហាមដាច់ខាត**។ ⛔ កុំ «កែ» វាដោយបន្ថែម PAT។
+
+ច្បាប់៖
+
+- **`resolveCookieCredential()` ជាអ្នកសម្រេចប្រភពតែមួយ** ៖
+  `ZTO_AUTHORIZATION` / `ZTO_TOKEN` ➜ **មិនប៉ះ store សោះ** (លឿនជាង);
+  បើអត់ ➜ blob ➜ `ZTO_COOKIE` env។
+- ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ** (ច្បាប់ 2.24.2 ដដែល) — `import` ធ្លាក់ ·
+  `connectLambda` បោះ · `getStore` បោះ · ការអានធ្លាក់ · **ការអានព្យួរ** ·
+  តម្លៃខូច ➜ ធ្លាក់ចុះទៅ env ហើយ lookup នៅដំណើរការ។ តេស្តអះអាង **គ្រប់ ៧ ករណី**។
+- ⛔ **រាល់ការហៅ store ត្រូវ settle ដោយរចនាសម្ព័ន្ធ** — `settleWithin()` ជា
+  timer ពិត (៣ វិ.) ប្រណាំងនឹង promise (ច្បាប់ `stall-guard` អនុវត្តលើ Blobs ដែរ)។
+- **cache ក្នុងសតិ ៦០ វិនាទី** វាស់ដោយ `elapsedSince()` (ច្បាប់
+  `monotonic-gate-test`) ➜ ការស្កេនធម្មតាមិនបន្ថែមសំណើទៅ store។
+- ⛔ **401 ពី ZTO ត្រូវលុប cache នោះភ្លាម** (`invalidateCookieCache()`) —
+  បើអត់ Cookie ថ្មីដែល helper ទើបសរសេរ ត្រូវរង់ចាំដល់ ៦០ វិនាទី។
+- **តម្លៃពី store ត្រូវឆ្លង `sanitizeStoredCookie()` ដែលតឹងជាង env** ៖ ត្រូវមាន
+  `BOS-MAN-SESSION` ពិត · គ្មាន CR/LF · ពិដាន ៨ KiB/៦៤ គូ។ ⛔ ផ្លូវ env នៅតែ
+  **ធូរជាង** ដោយចេតនា (វាជា admin-controlled ហើយតម្លៃចាស់ត្រូវនៅតែដើរ)។
+- **ការបន្តអាយុ** ៖ `noteCookieRenewal()` ជា **synchronous** ក្នុងផ្លូវសំណើ
+  (គ្រាន់តែចងចាំ) ហើយ `flushCookieRenewal()` សរសេរ **ក្រោយ** outcome ចេញ។
+  ⛔ កុំ `await` ការសរសេរ **ខាងក្នុង** `attempt()` — ពិដាន ៨ វិ. របស់ upstream
+  នឹងរាប់ពេលសរសេរនោះ ➜ lookup ជោគជ័យអាចក្លាយជា `ZTO_TIMEOUT`។
+- ⛔ **ការបន្តអាយុមិនត្រូវសរសេរតម្លៃដែលបាត់ `BOS-MAN-SESSION`** និងមាន
+  ពិដាន ១ ដង/៦០ វិនាទី; `Set-Cookie` លើការឆ្លើយ **401** ត្រូវបោះចោល។
+- ✅ **អនុញ្ញាត dependency តែ `@netlify/blobs`** — វាស់បាន ៖ bundle **៣៧.៦ KB**
+  (Function ទាំងមូល ៦៧.៧ KB) ផ្ទុកក្នុង **~២.៣ ms**។ `zto-proxy-test.js`
+  អះអាងថាបញ្ជី dependency មាន **តែមួយនោះ** ហើយកំណែត្រូវចាក់សោ ➜
+  `puppeteer-core`/`@sparticuz/chromium` វិលមកមិនបានដដែល។
+
+Test៖ **`zto-cookie-store-test.js`** (៣៧ assertion; ធ្លាក់ **២២** លើ tree
+មុនកែ)។ វារត់ `handler` ពិតជាមួយម៉ូឌុល `@netlify/blobs` **ក្លែង** ដែលចាក់តាម
+`setBlobsModuleForTests()` ➜ លំដាប់ `connectLambda` ➜ `getStore` ត្រូវបាន
+វាស់ពិត (មេរៀនសំណួរទី ៧ — កុំ stub ស្នាមភ្ជាប់ក្នុងគ្រប់តេស្ត)។
+
+⏳ **ត្រូវការការផ្ទៀងផ្ទាត់លើ Windows ពិត និងលើ Netlify ពិត**៖ deploy ១ ដង ➜
+រត់ `sync-zto-cookie.cmd` ➜ បើកកញ្ចប់មួយក្នុង Argus ➜ ត្រូវឃើញ «Cookie ថ្មីចូល
+Netlify Blobs រួចរាល់» ➜ រួច `?diag=1` ត្រូវឆ្លើយ `cookie.source = "blob"`។
+បើ Blobs មិនបើកសម្រាប់ site នោះ helper ធ្លាក់ដោយឈ្មោះ (`NETLIFY_BLOB_URL_FAILED`)
+ហើយ Function នៅតែអាន `ZTO_COOKIE` env ដដែល — ⛔ កុំសន្មត់ថាដើរដោយមិនវាស់។
 
 ### ⛔ ស្លាក ↔ ថេរ ត្រូវចងភ្ជាប់គ្នា — និង **ថ្ងៃលំដាប់ ≠ រយៈពេល** (កំណែ 2.25.1)
 
@@ -3470,7 +3525,47 @@ bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិ
 
 ### 📌 ការងារដែលនៅសល់ — ចាប់ផ្តើមជុំក្រោយត្រង់នេះ
 
-**២៤ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+**២៥ ចំណុច — ត្រូវការការផ្ទៀងផ្ទាត់ពីអ្នកប្រើ មិនមែនកូដទេ។**
+
+#### ០ក០. 2026-09-02 — ប្តូរ Cookie ZTO ដោយ **គ្មាន redeploy** (Netlify Blobs)
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — ជុំនេះកែតែកូដ **ខាង
+server** (`ZoeW/netlify/functions/`) · `tools/` · `audit-tools/` និងឯកសារ។
+កូដ PWA ដែល ship នៅដដែលបេះបិទ ➜ **អ្នកប្រើមិនត្រូវទាញសំបកឡើងវិញ** ទេ។
+វា **មិនប៉ះតក្កវិជ្ជាអាជីវកម្មសោះ** (លុប/ដក · ធុងសំរាម · ការសម្អាត ·
+ស្ថិតិយក · លុយ) និង **មិនប៉ះ PTR · ចលនាផ្ទាំង · ការរមូរ · ទម្រង់បង្ហាញ**។
+
+⛔ **សកម្មភាពដែលត្រូវធ្វើដោយដៃ**៖
+
+១. **Trigger deploy ១ ដង** ដើម្បីឲ្យកូដ Function ថ្មីរស់។ (ក្រោយពីនេះ ការ
+   ប្តូរ Cookie លែងត្រូវការ deploy ទៀតទេ។)
+២. ⛔ **កុំលុប `ZTO_COOKIE` ចេញពី Netlify env** — វាក្លាយជាផ្លូវបម្រុង។
+៣. ទាញថត `tools/zto-cookie-sync-windows/` ថ្មីមក Windows។ `setup.cmd`
+   **មិនបាច់រត់ឡើងវិញ** — Site ID និង PAT ដដែលនៅប្រើបាន។
+
+សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត៖
+
+1. ⛔ **តេស្តសំខាន់បំផុតនៃជុំនេះ** ៖ រត់ `sync-zto-cookie.cmd` ➜ បើកកញ្ចប់មួយ
+   ក្នុង Argus ➜ ត្រូវឃើញ **«✅ Cookie ថ្មីចូល Netlify Blobs រួចរាល់ — មិន
+   ចាំបាច់ redeploy ទេ»** ⛔ លែងឃើញសារអំពី «trigger deploy» ទៀតទេ ហើយ
+   **Netlify មិនត្រូវចាប់ផ្តើម deploy ថ្មីសោះ** (មើលក្នុង Netlify → Deploys)។
+2. **ស្កេនកញ្ចប់ភ្លាមក្រោយនោះ** ➜ លេខទូរស័ព្ទ/COD/DOD ត្រូវបំពេញធម្មតា
+   ក្នុងរយៈពេលមួយនាទី ⛔ ដោយមិនបាច់រង់ចាំ deploy។
+3. **ផ្ទៀងផ្ទាត់ប្រភពដោយ `?diag=1`** ៖
+   `curl -H "X-Zoe-Proxy-Key: <key>" "https://<site>/.netlify/functions/zto-order-detail?diag=1"`
+   ➜ `cookie.source` ត្រូវជា **`"blob"`** ⛔ មិនមែន `"env"` ទេ។ បើវាជា `env`
+   សូមមើលវាល `cookie.storeReason` ហើយប្រាប់ខ្ញុំ។
+4. ⛔ **តម្លៃ Cookie មិនត្រូវចេញក្នុង `?diag=1` សោះ** — មានតែ `fingerprint`
+   ៨ តួប៉ុណ្ណោះ។ បើឃើញតម្លៃពិត សូមប្រាប់ភ្លាម។
+5. **ការស្កេនធម្មតាមិនត្រូវយឺតជាងមុន** — ស្កេន ១០–១៥ កញ្ចប់ជាប់ៗគ្នា ➜
+   ត្រូវលឿនដូចមុនបេះបិទ (Cookie cache ក្នុងសតិ ៦០ វិនាទី)។
+6. **ពេល Cookie ផុតកំណត់** ➜ សារ «🔒 Cookie ZTO ផុតកំណត់» នៅដដែល ➜ រត់
+   helper ➜ ⛔ ការស្កេនបន្ទាប់ត្រូវដើរវិញ **ដោយមិន redeploy**។
+7. **បន្ទាប់ពីប្រើមួយសប្តាហ៍** ៖ ពិនិត្យ `?diag=1` ម្តងទៀត ➜ បើ
+   `cookie.renewals` > 0 នោះមានន័យថា Argus បន្តអាយុ session ដោយខ្លួនឯង ➜
+   អ្នកនឹងលែងត្រូវរត់ helper ញឹកញាប់។ សូមប្រាប់ខ្ញុំលេខនោះ។
+8. ⛔ **ផ្លូវ Google Sheet/Apps Script មិនត្រូវប្រែសោះ** — អ្នកប្រើ Lookup API
+   តាម Apps Script មិនរងផលអ្វីទាំងអស់។
 
 #### ០ក១. កំណែ 2.25.1 / 2.19.16 — ស្លាកច្បាប់សម្អាត · អត្តសញ្ញាណកំហុស ZTO
 

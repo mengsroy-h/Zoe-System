@@ -30,19 +30,241 @@ const resultCache = new Map();
 const inFlight = new Map();
 
 const COOKIE_NAME_RE = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]{1,128}$/;
+const COOKIE_VALUE_RE = /^[\u0021-\u003a\u003c-\u007e]*$/;
+const CONTROL_CHAR_TEST_RE = /[\u0000-\u001f\u007f]/;
+const COOKIE_MAX_LENGTH = 8192;
+const COOKIE_MAX_PAIRS = 64;
+const SESSION_COOKIE_NAME = 'BOS-MAN-SESSION';
+const COOKIE_STORE_NAME = 'zto-auth';
+const COOKIE_STORE_KEY = 'cookie';
+const COOKIE_CACHE_TTL_MS = 60000;
+const COOKIE_STORE_TIMEOUT_MS = 3000;
+const COOKIE_RENEW_MIN_GAP_MS = 60000;
+
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
+const cookieState = { value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0 };
+let blobsModuleForTests = null;
+
+function setCookieLines(response) {
+    const headers = response && response.headers;
+    if (!headers) return [];
+    if (typeof headers.getSetCookie === 'function') return headers.getSetCookie() || [];
+    if (typeof headers.get === 'function') {
+        const single = headers.get('set-cookie');
+        if (single) return [single];
+    }
+    return [];
+}
+
+function parseCookieHeader(raw) {
+    const text = String(raw || '').trim();
+    if (!text || text.length > COOKIE_MAX_LENGTH) return null;
+    if (CONTROL_CHAR_TEST_RE.test(text)) return null;
+    const parts = text.split(';');
+    if (parts.length > COOKIE_MAX_PAIRS) return null;
+    const pairs = [];
+    for (let i = 0; i < parts.length; i++) {
+        const pair = parts[i].trim();
+        if (!pair) continue;
+        const at = pair.indexOf('=');
+        if (at < 1) return null;
+        const name = pair.slice(0, at).trim();
+        const value = pair.slice(at + 1);
+        if (!COOKIE_NAME_RE.test(name) || !COOKIE_VALUE_RE.test(value)) return null;
+        pairs.push({ name: name, value: value });
+    }
+    return pairs.length ? pairs : null;
+}
+
+function serializeCookiePairs(pairs) {
+    return pairs.map((pair) => pair.name + '=' + pair.value).join('; ');
+}
+
+function hasSessionCookie(pairs) {
+    return pairs.some((pair) => pair.name === SESSION_COOKIE_NAME && pair.value.length >= 8);
+}
+
+function sanitizeStoredCookie(raw) {
+    const pairs = parseCookieHeader(raw);
+    if (!pairs || !hasSessionCookie(pairs)) return '';
+    return serializeCookiePairs(pairs);
+}
+
+function sanitizeEnvCookie(raw) {
+    const text = String(raw || '').trim();
+    if (!text || text.length > COOKIE_MAX_LENGTH) return '';
+    if (CONTROL_CHAR_TEST_RE.test(text)) return '';
+    return text;
+}
+
+function mergeRenewedCookie(current, lines) {
+    const base = parseCookieHeader(current);
+    if (!base) return '';
+    const order = [];
+    const byName = new Map();
+    base.forEach((pair) => {
+        if (!byName.has(pair.name)) order.push(pair.name);
+        byName.set(pair.name, pair.value);
+    });
+    let changed = false;
+    for (let i = 0; i < lines.length; i++) {
+        const head = String(lines[i]).split(';')[0];
+        const at = head.indexOf('=');
+        if (at < 1) continue;
+        const name = head.slice(0, at).trim();
+        const value = head.slice(at + 1).trim();
+        if (!value || !COOKIE_NAME_RE.test(name) || !COOKIE_VALUE_RE.test(value)) continue;
+        if (byName.get(name) === value) continue;
+        if (!byName.has(name)) order.push(name);
+        byName.set(name, value);
+        changed = true;
+    }
+    if (!changed || order.length > COOKIE_MAX_PAIRS) return '';
+    const merged = order.map((name) => ({ name: name, value: byName.get(name) }));
+    if (!hasSessionCookie(merged)) return '';
+    const text = serializeCookiePairs(merged);
+    return text.length > COOKIE_MAX_LENGTH ? '' : text;
+}
+
+function cookieFingerprint(cookie) {
+    if (!cookie) return '';
+    return crypto.createHash('sha256').update(cookie).digest('hex').slice(0, 8);
+}
+
+function loadBlobsModule() {
+    if (blobsModuleForTests) return blobsModuleForTests;
+    return require('@netlify/blobs');
+}
+
+function openCookieStore(netlifyEvent) {
+    if (!netlifyEvent || typeof netlifyEvent.blobs !== 'string' || !netlifyEvent.blobs) {
+        return { store: null, reason: 'no-context' };
+    }
+    let blobs;
+    try {
+        blobs = loadBlobsModule();
+    } catch (_) {
+        return { store: null, reason: 'import' };
+    }
+    if (!blobs || typeof blobs.connectLambda !== 'function' || typeof blobs.getStore !== 'function') {
+        return { store: null, reason: 'export' };
+    }
+    try {
+        blobs.connectLambda(netlifyEvent);
+    } catch (_) {
+        return { store: null, reason: 'connect' };
+    }
+    try {
+        return { store: blobs.getStore(COOKIE_STORE_NAME), reason: '' };
+    } catch (_) {
+        return { store: null, reason: 'getstore' };
+    }
+}
+
+function settleWithin(run, timeoutMs, label) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(value);
+        };
+        const timer = setTimeout(() => finish({ ok: false, reason: label + ':timeout' }), timeoutMs);
+        let pending;
+        try {
+            pending = run();
+        } catch (_) {
+            finish({ ok: false, reason: label + ':throw' });
+            return;
+        }
+        Promise.resolve(pending).then(
+            (value) => finish({ ok: true, value: value }),
+            (error) => {
+                const name = error && typeof error.name === 'string' && /^[A-Za-z]{1,40}$/.test(error.name)
+                    ? error.name
+                    : 'error';
+                finish({ ok: false, reason: label + ':' + name });
+            }
+        );
+    });
+}
+
+async function resolveCookieCredential(netlifyEvent, env) {
+    if (env.ZTO_AUTHORIZATION || env.ZTO_TOKEN) {
+        return { cookie: '', source: '', store: null, renewal: '' };
+    }
+    const opened = openCookieStore(netlifyEvent);
+    cookieState.storeReason = opened.reason;
+    if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
+        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+    }
+    if (opened.store) {
+        const read = await settleWithin(
+            () => opened.store.get(COOKIE_STORE_KEY, { type: 'text' }),
+            COOKIE_STORE_TIMEOUT_MS,
+            'read'
+        );
+        if (read.ok) {
+            const stored = sanitizeStoredCookie(read.value);
+            if (stored) {
+                cookieState.value = stored;
+                cookieState.source = 'blob';
+                cookieState.at = Date.now();
+                cookieState.storeReason = '';
+                return { cookie: stored, source: 'blob', store: opened.store, renewal: '' };
+            }
+            cookieState.storeReason = read.value ? 'invalid' : 'empty';
+        } else {
+            cookieState.storeReason = read.reason;
+        }
+    }
+    const envCookie = sanitizeEnvCookie(env.ZTO_COOKIE);
+    cookieState.value = envCookie;
+    cookieState.source = envCookie ? 'env' : '';
+    cookieState.at = envCookie ? Date.now() : 0;
+    return { cookie: envCookie, source: cookieState.source, store: opened.store, renewal: '' };
+}
+
+function invalidateCookieCache() {
+    cookieState.at = 0;
+}
+
+function noteCookieRenewal(session, response) {
+    if (!session || !session.store || !session.cookie) return;
+    const lines = setCookieLines(response);
+    if (!lines.length) return;
+    const merged = mergeRenewedCookie(session.cookie, lines);
+    if (!merged || merged === session.cookie) return;
+    session.renewal = merged;
+}
+
+async function flushCookieRenewal(session) {
+    if (!session || !session.store || !session.renewal) return;
+    const merged = session.renewal;
+    session.renewal = '';
+    if (elapsedSince(cookieState.renewAt) < COOKIE_RENEW_MIN_GAP_MS) return;
+    cookieState.renewAt = Date.now();
+    const write = await settleWithin(
+        () => session.store.set(COOKIE_STORE_KEY, merged),
+        COOKIE_STORE_TIMEOUT_MS,
+        'write'
+    );
+    if (!write.ok) {
+        cookieState.storeReason = write.reason;
+        return;
+    }
+    session.cookie = merged;
+    cookieState.value = merged;
+    cookieState.source = 'blob';
+    cookieState.at = Date.now();
+    cookieState.storeReason = '';
+    cookieState.renewals += 1;
+}
 
 function noteUpstreamSetCookie(response) {
     try {
-        const headers = response && response.headers;
-        if (!headers) return;
-        let lines = [];
-        if (typeof headers.getSetCookie === 'function') {
-            lines = headers.getSetCookie() || [];
-        } else if (typeof headers.get === 'function') {
-            const single = headers.get('set-cookie');
-            if (single) lines = [single];
-        }
+        const lines = setCookieLines(response);
         upstreamCookieSignal.seenAt = Date.now();
         upstreamCookieSignal.setCookie = lines.length > 0;
         upstreamCookieSignal.names = lines
@@ -224,7 +446,7 @@ function readConfig(env) {
     return config;
 }
 
-function applyAuthentication(headers, env) {
+function applyAuthentication(headers, env, cookie) {
     if (env.ZTO_AUTHORIZATION) {
         headers.Authorization = env.ZTO_AUTHORIZATION;
         return 'authorization';
@@ -237,16 +459,17 @@ function applyAuthentication(headers, env) {
         headers[tokenHeader] = env.ZTO_TOKEN;
         return 'token';
     }
-    if (env.ZTO_COOKIE) {
-        headers.Cookie = env.ZTO_COOKIE;
+    const effectiveCookie = cookie || sanitizeEnvCookie(env.ZTO_COOKIE);
+    if (effectiveCookie) {
+        headers.Cookie = effectiveCookie;
         return 'cookie';
     }
     return '';
 }
 
-function buildHeaders(config, env) {
+function buildHeaders(config, env, cookie) {
     const credential = {};
-    const authKind = applyAuthentication(credential, env);
+    const authKind = applyAuthentication(credential, env, cookie);
     const headers = {
         Accept: 'application/json',
         'Accept-Language': config.acceptLanguage,
@@ -373,7 +596,7 @@ function abortError() {
     return error;
 }
 
-async function requestOnce(config, headers, barcode, timeoutMs) {
+async function requestOnce(config, headers, barcode, timeoutMs, session) {
     const controller = new AbortController();
     let timer = null;
     const settleGuard = new Promise((_, reject) => {
@@ -400,6 +623,7 @@ async function requestOnce(config, headers, barcode, timeoutMs) {
 
         const response = await fetch(target.href, init);
         noteUpstreamSetCookie(response);
+        noteCookieRenewal(session, response);
         const contentType = response.headers && response.headers.get
             ? (response.headers.get('content-type') || '')
             : '';
@@ -481,7 +705,7 @@ async function requestOnce(config, headers, barcode, timeoutMs) {
     }
 }
 
-async function fetchOrder(config, headers, barcode, deadlineAt) {
+async function fetchOrder(config, headers, barcode, deadlineAt, session) {
     let attempt = 0;
     let lastTransient = null;
     for (;;) {
@@ -493,7 +717,7 @@ async function fetchOrder(config, headers, barcode, deadlineAt) {
             };
         }
         const timeoutMs = Math.max(1000, Math.min(config.upstreamTimeoutMs, remaining - 200));
-        const outcome = await requestOnce(config, headers, barcode, timeoutMs);
+        const outcome = await requestOnce(config, headers, barcode, timeoutMs, session);
         if (outcome.kind !== 'transient') return outcome;
         lastTransient = { kind: 'fatal', response: outcome.response };
         attempt += 1;
@@ -523,10 +747,10 @@ function readCachedBody(key, ttlMs) {
     return hit.body;
 }
 
-function runSharedLookup(key, config, headers, barcode) {
+function runSharedLookup(key, config, headers, barcode, session) {
     const existing = inFlight.get(key);
     if (existing) return existing;
-    const run = fetchOrder(config, headers, barcode, Date.now() + config.budgetMs);
+    const run = fetchOrder(config, headers, barcode, Date.now() + config.budgetMs, session);
     inFlight.set(key, run);
     run.then(() => {}, () => {}).then(() => {
         if (inFlight.get(key) === run) inFlight.delete(key);
@@ -541,11 +765,18 @@ function configErrorResponse(error) {
     return json(503, body);
 }
 
-function diagnosticsBody(config, headers, authKind) {
+function diagnosticsBody(config, headers, authKind, credential) {
     return {
         ok: true,
         code: 'ZTO_DIAG',
         auth: authKind || 'none',
+        cookie: {
+            source: (credential && credential.source) || 'none',
+            fingerprint: cookieFingerprint(credential && credential.cookie) || null,
+            ageMs: cookieState.at ? elapsedSince(cookieState.at) : null,
+            storeReason: cookieState.storeReason || null,
+            renewals: cookieState.renewals
+        },
         endpoint: {
             host: config.endpoint.hostname,
             path: config.endpoint.pathname,
@@ -593,20 +824,33 @@ exports.handler = async function handler(event) {
     }
 
     let config;
+    try {
+        config = readConfig(process.env);
+    } catch (error) {
+        return configErrorResponse(error);
+    }
+
+    const query = event.queryStringParameters || {};
+    const wantsDiagnostics = String(query.diag || '') === '1';
+    const barcode = String(query.barcode || '').trim();
+    if (!wantsDiagnostics && !BARCODE_RE.test(barcode)) {
+        return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
+    }
+
+    let session;
     let headers;
     let authKind;
     try {
-        config = readConfig(process.env);
-        const built = buildHeaders(config, process.env);
+        session = await resolveCookieCredential(event, process.env);
+        const built = buildHeaders(config, process.env, session.cookie);
         headers = built.headers;
         authKind = built.authKind;
     } catch (error) {
         return configErrorResponse(error);
     }
 
-    const query = event.queryStringParameters || {};
-    if (String(query.diag || '') === '1') {
-        return json(200, diagnosticsBody(config, headers, authKind));
+    if (wantsDiagnostics) {
+        return json(200, diagnosticsBody(config, headers, authKind, session));
     }
 
     if (!authKind) {
@@ -616,21 +860,24 @@ exports.handler = async function handler(event) {
         });
     }
 
-    const barcode = String(query.barcode || '').trim();
-    if (!BARCODE_RE.test(barcode)) {
-        return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
-    }
-
-    const cacheKey = config.fingerprint + '|' + barcode.toUpperCase();
+    const cacheKey = config.fingerprint + '|' + (cookieFingerprint(session.cookie) || '-') + '|' + barcode.toUpperCase();
     const cached = readCachedBody(cacheKey, config.cacheTtlMs);
     if (cached) return json(200, Object.assign({}, cached, { cached: true }));
 
     let outcome;
     try {
-        outcome = await runSharedLookup(cacheKey, config, headers, barcode);
+        outcome = await runSharedLookup(cacheKey, config, headers, barcode, session);
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     }
+
+    if (outcome.kind === 'authRejected') {
+        session.renewal = '';
+        invalidateCookieCache();
+        return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+    }
+
+    await flushCookieRenewal(session);
 
     if (outcome.kind === 'ok') {
         if (config.cacheTtlMs > 0) storeCachedBody(cacheKey, outcome.body);
@@ -639,13 +886,20 @@ exports.handler = async function handler(event) {
     if (outcome.kind === 'notFound') {
         return json(200, { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' });
     }
-    if (outcome.kind === 'authRejected') {
-        return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
-    }
     return outcome.response;
 };
 
 exports.resetCachesForTests = function resetCachesForTests() {
     resultCache.clear();
     inFlight.clear();
+    cookieState.value = '';
+    cookieState.source = '';
+    cookieState.at = 0;
+    cookieState.storeReason = '';
+    cookieState.renewAt = 0;
+    cookieState.renewals = 0;
+};
+
+exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {
+    blobsModuleForTests = blobsModule || null;
 };

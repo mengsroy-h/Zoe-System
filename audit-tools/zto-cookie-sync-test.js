@@ -22,6 +22,7 @@ const SCHEDULE_PATH = path.join(TOOL_DIR, 'schedule-zto-cookie.cmd');
 const CONFIGURE_PATH = path.join(TOOL_DIR, 'configure.ps1');
 const TOKEN_READER_PATH = path.join(TOOL_DIR, 'read-token.ps1');
 const README_PATH = path.join(TOOL_DIR, 'README-KH.md');
+const FUNCTION_PATH = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
 
 const COOKIE = 'BOS-MAN-SESSION=s3cr3t987; sidebarStatus=0';
 const TOKEN = 'test-only-token-for-mocked-netlify-api-0123456789';
@@ -29,6 +30,12 @@ const SITE_ID = 'zoew-site-123';
 const SITE_URL = 'https://zoew.netlify.app';
 const PROXY_KEY = 'proxy-key-for-tests-0123456789ab';
 const ACCOUNT_ID = 'account-456';
+const SITE_STORE_PREFIX = 'site:';
+
+function constOf(src, name) {
+    const match = new RegExp('const ' + name + " = '([^']*)'").exec(src);
+    return match ? match[1] : '';
+}
 let pass = 0;
 let fail = 0;
 
@@ -76,6 +83,9 @@ const schedule = read(SCHEDULE_PATH);
 const configure = read(CONFIGURE_PATH);
 const tokenReader = read(TOKEN_READER_PATH);
 const readme = read(README_PATH);
+const functionSource = read(FUNCTION_PATH);
+const FN_STORE_NAME = constOf(functionSource, 'COOKIE_STORE_NAME');
+const FN_STORE_KEY = constOf(functionSource, 'COOKIE_STORE_KEY');
 let pkg = {};
 try { pkg = JSON.parse(read(PACKAGE_PATH)); } catch (_) {}
 
@@ -196,7 +206,24 @@ async function run() {
     ok('site lookup ទាញ account_id មិនទាមទារឲ្យអ្នកបញ្ចូល',
         /site\.account_id/.test(source) && !/NETLIFY_ACCOUNT_ID/.test(source));
     ok('សរសេរ Cookie ចូល Netlify Blobs (ផ្លូវ /api/v1/blobs)',
-        /'\/api\/v1\/blobs\/'/.test(source) && /BLOB_STORE_NAME = 'zto-auth'/.test(source));
+        /'\/api\/v1\/blobs\/'/.test(source) && !!constOf(source, 'BLOB_STORE_NAME'));
+    // ⛔ **ស្នាមភ្ជាប់ (សំណួរទី ៧)** ៖ helper សរសេរតាម Netlify API ចំណែក
+    // Function អានតាម edge របស់ `@netlify/blobs`។ SDK v11 ដាក់បច្ច័យ
+    // `site:` ចូលឈ្មោះ store ខាងក្នុង (`getStore('x')` ➜ `site:x`) ដូច្នេះ
+    // ការសរសេរទៅឈ្មោះ **ឥតបច្ច័យ** ធ្លាក់ចូល legacy namespace ➜ ការសរសេរ
+    // ជោគជ័យ តែ Function អានមិនឃើញជារៀងរហូត (វាស់បាន 2026-09-02)។
+    ok('ជាន់អប្បបរមា ៖ អាន Function ដែលអាន store បាន',
+        functionSource.length > 8000 && !!FN_STORE_NAME && !!FN_STORE_KEY,
+        functionSource.length + '/' + FN_STORE_NAME + '/' + FN_STORE_KEY);
+    ok('helper និង Function ចែកឈ្មោះ store និងកូនសោដដែល',
+        constOf(source, 'BLOB_STORE_NAME') === FN_STORE_NAME
+        && constOf(source, 'BLOB_KEY') === FN_STORE_KEY,
+        constOf(source, 'BLOB_STORE_NAME') + '/' + constOf(source, 'BLOB_KEY'));
+    ok('⛔ ផ្លូវ API ប្រើឈ្មោះខាងក្នុង site:<store> ដូច SDK',
+        /BLOB_STORE_PATH = SITE_STORE_PREFIX \+ BLOB_STORE_NAME/.test(source)
+        && /const SITE_STORE_PREFIX = 'site:'/.test(source)
+        && /\+ BLOB_STORE_PATH \+/.test(source),
+        constOf(source, 'SITE_STORE_PREFIX'));
     ok('ស្នើ signed URL ដោយ accept header ផ្លូវការ',
         /application\/json;type=signed-url/.test(source));
     ok('⛔ លែងសរសេរ env និងលែង trigger deploy ទៀត (គ្មានការរង់ចាំ)',
@@ -433,7 +460,11 @@ async function run() {
     // env var (ដែលអ្នកប្រើត្រូវការដើម្បីដឹងថាត្រូវកំណត់អ្វី) ហើយ **មិនចាប់**
     // `console.log(x)` ដែល x ជា alias នៃសោ។ AST សួរសំណួរពិត ៖ តើ **តម្លៃ**
     // អាចឡើងដល់ output ទេ? ខ្សែអក្សរដែលមានឈ្មោះ env var មិនមែនតម្លៃទេ។
-    const SECRET_IDS = ['proxyKey', 'PROXY_KEY', 'token', 'secureProxyKey', 'cookieHeader'];
+    // ⛔ **សំណើអ្នកប្រើ (2026-09-02)** ៖ *«សូមអោយបង្ហាញ cookie ដែលយកបានពី
+    // argus ក្នុង cmd ផង»* ➜ `cookieHeader` ត្រូវដកចេញពីបញ្ជីនេះដោយចេតនា។
+    // ⛔ **Netlify PAT និង ZTO_PROXY_KEY នៅតែហាមដាច់ខាត** — ពួកវាជាសិទ្ធិលើ
+    // គណនី Netlify ចំណែក Cookie ជា session ZTO ដែលអ្នកប្រើកាន់ស្រាប់។
+    const SECRET_IDS = ['proxyKey', 'PROXY_KEY', 'token', 'secureProxyKey'];
     let secretPrints = [];
     if (acorn) {
         const tree = acorn.parse(source, { ecmaVersion: 2022, locations: true });
@@ -466,12 +497,55 @@ async function run() {
         });
         ok('ជាន់អប្បបរមា ៖ ឃើញការហៅ console ពិត (កុំឲ្យការស្កេនទទេជាបៃតង)',
             consoleCalls.length >= 15, consoleCalls.length);
+
+        // ⛔ **សំណើអ្នកប្រើ (2026-09-02)** ៖ *«កែ cmd អោយទៅជាអក្សរអង់គ្លេស
+        // ព្រោះអក្សរខ្មែរក្នុង cmd ពិបាកអាន»*។ រូបភាពពី Windows ពិតបញ្ជាក់វា ៖
+        // `cmd.exe` បំបែក UTF-8 Khmer កណ្តាលពាក្យ។ ច្បាប់ `.cmd` ASCII មាន
+        // ស្រាប់ តែ **ខ្សែអក្សរក្នុង Node** រអិលកាត់ ➜ ចាក់សោវាត្រង់នេះ ៖
+        // រាល់ខ្សែអក្សរក្នុង helper ត្រូវជា ASCII (comment ខ្មែរនៅដដែល)។
+        const nonAsciiStrings = [];
+        let stringLiterals = 0;
+        (function scanText(node) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(scanText); return; }
+            if (node.type === 'Literal' && typeof node.value === 'string') {
+                stringLiterals++;
+                if (!/^[\x00-\x7f]*$/.test(node.value)) {
+                    nonAsciiStrings.push('L' + node.loc.start.line);
+                }
+            }
+            if (node.type === 'TemplateElement' && node.value && typeof node.value.raw === 'string') {
+                stringLiterals++;
+                if (!/^[\x00-\x7f]*$/.test(node.value.raw)) {
+                    nonAsciiStrings.push('L' + node.loc.start.line);
+                }
+            }
+            for (const key of Object.keys(node)) {
+                if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+                scanText(node[key]);
+            }
+        })(tree);
+        ok('ជាន់អប្បបរមា ៖ ឃើញខ្សែអក្សរពិត', stringLiterals >= 80, stringLiterals);
+        ok('⛔ គ្រប់ខ្សែអក្សរក្នុង helper ជា ASCII (cmd.exe អានខ្មែរមិនកើត)',
+            nonAsciiStrings.length === 0,
+            nonAsciiStrings.slice(0, 8).join(','));
     } else {
         ok('ជាន់អប្បបរមា ៖ ឃើញការហៅ console ពិត (កុំឲ្យការស្កេនទទេជាបៃតង)',
             false, 'គ្មាន acorn');
     }
-    ok('⛔ តម្លៃសោ/token/Cookie មិនត្រូវឡើងដល់ console (AST មិនមែនឈ្មោះ)',
+    ok('⛔ តម្លៃសោ/token មិនត្រូវឡើងដល់ console (AST មិនមែនឈ្មោះ)',
         acorn && secretPrints.length === 0, secretPrints.join(', '));
+    // ⛔ ការបង្ហាញ Cookie ជា **សំណើអ្នកប្រើ** — ចាក់សោវាទុក ដើម្បីកុំឲ្យជុំ
+    // ក្រោយ «រឹង» វាវិញដោយផ្អែកលើច្បាប់ចាស់ «Cookie មិនត្រូវបង្ហាញ»។
+    ok('បង្ហាញ Cookie ដែលចាប់បានក្នុង cmd (សំណើអ្នកប្រើ)',
+        !!(api && typeof api.describeCapturedCookie === 'function')
+        && api.describeCapturedCookie(COOKIE).indexOf(COOKIE) !== -1
+        && /console\.log\(describeCapturedCookie\(/.test(source),
+        api && typeof api.describeCapturedCookie);
+    ok('⛔ configure.ps1 និង read-token.ps1 ជា ASCII (បង្ហាញក្នុង cmd បាន)',
+        /^[\x00-\x7f]*$/.test(configure) && /^[\x00-\x7f]*$/.test(tokenReader)
+        && configure.length > 2000,
+        configure.length + '/' + tokenReader.length);
     ok('configure.ps1 អ៊ិនគ្រីប proxy key ដោយ DPAPI ដដែល',
         /proxy-key\.dpapi/.test(configure) && /AsSecureString/.test(configure)
         && (configure.match(/ConvertFrom-SecureString/g) || []).length >= 2,
@@ -480,7 +554,10 @@ async function run() {
     console.log('\n=== ៧. Netlify API behavior (mock មិនប៉ះ production) ===');
     if (api) {
         const SIGNED_URL = 'https://blob-upload.netlify.test/signed-path?sig=abc123';
-        const BLOB_URL = 'https://api.netlify.com/api/v1/blobs/' + SITE_ID + '/zto-auth/cookie';
+        const BLOB_URL = 'https://api.netlify.com/api/v1/blobs/' + SITE_ID
+            + '/' + SITE_STORE_PREFIX + FN_STORE_NAME + '/' + FN_STORE_KEY;
+        const LEGACY_URL = 'https://api.netlify.com/api/v1/blobs/' + SITE_ID
+            + '/' + FN_STORE_NAME + '/' + FN_STORE_KEY;
         const calls = [];
         const fetchImpl = async (url, options) => {
             calls.push({ url, options });
@@ -498,6 +575,9 @@ async function run() {
             calls.length === 2, calls.length);
         ok('ស្នើ signed URL តាមផ្លូវ blob ត្រឹមត្រូវ',
             calls[0] && calls[0].options.method === 'PUT' && calls[0].url === BLOB_URL,
+            calls[0] && calls[0].url);
+        ok('⛔ មិនសរសេរចូល legacy namespace (Function អានមិនឃើញ)',
+            calls[0] && calls[0].url !== LEGACY_URL,
             calls[0] && calls[0].url);
         ok('សំណើ signed URL មាន accept header ផ្លូវការ និងគ្មាន body',
             calls[0] && calls[0].options.headers.accept === 'application/json;type=signed-url'

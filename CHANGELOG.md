@@ -25,6 +25,59 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-02ច · Cookie ចូល Blobs **ដែល Function អានឃើញ**
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — កែតែកូដ **ខាង server**
+(`ZoeW/netlify/functions/`) · `tools/` · `audit-tools/` និងឯកសារ។ កូដ PWA
+ដែល ship នៅដដែលបេះបិទ ➜ អ្នកប្រើ **មិនត្រូវទាញសំបកឡើងវិញ** ទេ។
+
+### កែកំហុស
+
+- 🔴 **កំហុសពិត ដែលរូបភាពរបស់អ្នកប្រើបង្ហាញ** ៖ helper រាយ «Cookie ថ្មីចូល
+  Netlify Blobs រួចរាល់» រួច Function **នៅតែអាន `ZTO_COOKIE` (env)** ពេញ
+  ការរង់ចាំ ១៤ ដង។ មូលហេតុឫសគល់ជា **ស្នាមភ្ជាប់ឈ្មោះ store** ៖
+  `@netlify/blobs` v11 ដាក់បច្ច័យ **`site:`** ចូលឈ្មោះ store ខាងក្នុង
+  (`getStore('zto-auth')` ➜ **`site:zto-auth`**) ចំណែក helper សរសេរទៅ
+  `/api/v1/blobs/<site>/**zto-auth**/cookie` ដែលជា **legacy namespace** ➜
+  Netlify ឆ្លើយ **ជោគជ័យ** តែ Function អាន store មួយផ្សេង ➜ ការសរសេរនោះ
+  **គ្មាននរណាអានជារៀងរហូត**។ ឥឡូវ helper សរសេរទៅ `site:zto-auth`។
+- 🔴 **`?diag=1` លាក់មូលហេតុ** ៖ `resolveCookieCredential()` សរសេរ
+  `storeReason = opened.reason` (ជា `''` ពេល store បើកបាន) **មុន** ការពិនិត្យ
+  cache ➜ ការអានដែលទទេ/ធ្លាក់ កំណត់មូលហេតុលើការហៅ **ទី ១** ប៉ុណ្ណោះ រួច
+  env ចូល cache ៦០ វិ. ➜ ការសួរបន្ទាប់ទាំង ១៣ ដង ឆ្លើយ **គ្មានមូលហេតុ** ➜
+  អ្នកប្រើកែមិនបាន។ ឥឡូវមូលហេតុ **រស់រានពី cache** ហើយរលត់តែពេលការអាន blob
+  ជោគជ័យពិត (អះអាង **២ ខាង**)។
+
+### ផ្លាស់ប្តូរ (សំណើអ្នកប្រើ)
+
+- **សារទាំងអស់ក្នុង cmd ក្លាយជាភាសាអង់គ្លេស** — *«កែ cmd អោយទៅជាអក្សរ
+  អង់គ្លេស ព្រោះអក្សរខ្មែរក្នុង cmd ពិបាកអាន»*។ `sync-zto-cookie.js` ·
+  `configure.ps1` · `read-token.ps1` ជា ASCII ទាំងស្រុងឥឡូវ (ដូច `.cmd`
+  ដែលជា ASCII រួច)។ ⛔ ចម្លើយក្នុងការសន្ទនា · ឯកសារ · CHANGELOG **នៅជាខ្មែរ**។
+- **Cookie ដែលចាប់បានពី Argus ត្រូវបង្ហាញក្នុង cmd** — *«សូមអោយបង្ហាញ cookie
+  ដែលយកបានពី argus ក្នុង cmd ផង»*។ វាងាយស្រួលពេលចង់ paste ចូល `ZTO_COOKIE`
+  ជាផ្លូវបម្រុង។ ⛔ **Netlify PAT និង `ZTO_PROXY_KEY` នៅតែហាមបង្ហាញដាច់ខាត**
+  ហើយ checker ចាក់សោ **២ ខាង**។
+
+### ឧបករណ៍ audit
+
+- **`zto-cookie-sync-test.js`** ៖ ១៣០ ➜ **១៣៨ assertion** (ធ្លាក់ **៦** លើ tree
+  មុនកែ)។ វាឥឡូវអានឈ្មោះ store ចេញពី **Function ពិត** រួចអះអាងថា URL ដែល
+  helper បាញ់ចេញ គឺ `site:<store>` — ⛔ ការអះអាងចាស់ចាក់លេខ `zto-auth` ជា
+  **literal** ដែលជាការចាក់សោ **កំហុស** មិនមែនការការពារ។ Mutation ៣ ➜ ចាប់
+  បានទាំង ៣ (វិលទៅ legacy namespace · ឈប់បង្ហាញ Cookie · សារខ្មែរវិលមកវិញ)។
+- **`zto-cookie-store-test.js`** ៖ ៤៨ ➜ **៥២ assertion** (ធ្លាក់ **២** លើ tree
+  មុនកែ) — មូលហេតុត្រូវរស់រានពី cache ៦០ វិនាទី ហើយ **រលត់ពេលអ្វីៗដើរធម្មតា**។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Trigger deploy ១ ដង** (កូដ Function ប្រែ)។
+2. ទាញថត `tools/zto-cookie-sync-windows/` ថ្មីមក Windows រួចរត់
+   `sync-zto-cookie.cmd`។ ⛔ `setup.cmd` **មិនបាច់រត់ឡើងវិញ**។
+3. ⛔ **កុំលុប `ZTO_COOKIE` ចេញពី Netlify env** — វានៅជាផ្លូវបម្រុង។
+
+---
+
 ## [គ្មានការឡើងកំណែ] — 2026-09-02ង · ការផ្ទៀងផ្ទាត់ Cookie ត្រូវប្រាប់មូលហេតុពិត
 
 ⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — កែតែ `tools/` ·

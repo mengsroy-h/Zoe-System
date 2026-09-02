@@ -14,6 +14,12 @@ const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
 const NETLIFY_API_ORIGIN = 'https://api.netlify.com';
 const BLOB_STORE_NAME = 'zto-auth';
 const BLOB_KEY = 'cookie';
+// ⛔ `@netlify/blobs` v11 ដាក់បច្ច័យ `site:` ចូលឈ្មោះ store ខាងក្នុង ៖
+// `getStore('zto-auth')` ➜ `site:zto-auth` ទាំងផ្លូវ edge (Function អាន)
+// ទាំងផ្លូវ API (helper សរសេរ)។ ការសរសេរទៅឈ្មោះ **ឥតបច្ច័យ** ធ្លាក់ចូល
+// legacy namespace ➜ Netlify ឆ្លើយ 200 តែ Function អានមិនឃើញជារៀងរហូត។
+const SITE_STORE_PREFIX = 'site:';
+const BLOB_STORE_PATH = SITE_STORE_PREFIX + BLOB_STORE_NAME;
 const SIGNED_URL_ACCEPT = 'application/json;type=signed-url';
 const SIGNED_URL_MAX_LENGTH = 4096;
 const DIAG_PATH = '/.netlify/functions/zto-order-detail?diag=1';
@@ -84,7 +90,7 @@ function validateCookieHeader(raw) {
             && COOKIE_NAME_RE.test(name)
             && COOKIE_VALUE_RE.test(value);
         if (!shaped) {
-            dropped.push(COOKIE_NAME_RE.test(name) ? name : '(ឈ្មោះខូច)');
+            dropped.push(COOKIE_NAME_RE.test(name) ? name : '(malformed name)');
             continue;
         }
         if (pairs.length >= COOKIE_MAX_PAIRS) {
@@ -366,7 +372,7 @@ async function getNetlifySite(siteId, token, controls) {
 async function requestBlobUploadUrl(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
     const pathname = '/api/v1/blobs/' + encodeURIComponent(cleanSiteId)
-        + '/' + BLOB_STORE_NAME + '/' + BLOB_KEY;
+        + '/' + BLOB_STORE_PATH + '/' + BLOB_KEY;
     const response = await timedFetch(netlifyApiUrl(pathname), {
         method: 'PUT',
         headers: {
@@ -642,15 +648,15 @@ async function captureCookieHeader() {
         waiter.catch(() => {});
         const pages = context.pages();
         const page = pages[0] || await context.newPage();
-        console.log('🌐 បើក Argus ក្នុង ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + ' រួចរាល់។');
-        console.log('   ១. Login (បើ ZTO សុំ)។');
-        console.log('   ២. ចូល Scan Management ➜ Arrival Scan។');
-        console.log('   ៣. វាយ ឬស្កេន Waybill មួយ ➜ សំណើ Order Detail នឹងលោតមក។');
-        console.log('   ឧបករណ៍នឹងបន្តដោយខ្លួនឯងភ្លាមពេលឃើញសំណើនោះ។');
+        console.log('Argus is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
+        console.log('   1. Log in to Argus (if ZTO asks for it).');
+        console.log('   2. Open Scan Management -> Arrival Scan.');
+        console.log('   3. Type or scan one Waybill -> the Order Detail request fires.');
+        console.log('   This tool continues by itself as soon as it sees that request.');
         try {
             await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
-            console.log('⚠️ Argus មិនទាន់ឆ្លើយ — ទំព័រនៅបើកឲ្យអ្នកសាក Login/Refresh។');
+            console.log('WARNING: Argus did not answer yet. The page stays open, so log in or refresh.');
         }
         return await waiter;
     } finally {
@@ -660,37 +666,37 @@ async function captureCookieHeader() {
 
 function safeFailureMessage(code) {
     const messages = {
-        CAPTURE_TIMEOUT: 'រង់ចាំ ១០ នាទីហើយមិនឃើញ Order Detail request។ សូម Login Argus ហើយបើកកញ្ចប់មួយ។',
-        BROWSER_CLOSED: 'Browser ត្រូវបានបិទមុនចាប់ Cookie។ សូមសាកម្តងទៀត។',
-        BROWSER_LAUNCH_FAILED: 'បើក Edge/Chrome មិនបាន។ សូមបិទបង្អួច ZTO Cookie Sync ចាស់ ឬដំឡើង Edge/Chrome។',
-        BROWSER_NOT_FOUND: 'រកមិនឃើញ Microsoft Edge ឬ Google Chrome។',
-        NETLIFY_CONFIG_MISSING: 'មិនទាន់មាន Netlify config។ សូមបើក setup.cmd។',
-        NETLIFY_CONFIG_INVALID: 'Netlify Site ID ខូចទម្រង់។ សូមបើក setup.cmd ឡើងវិញ។',
-        NETLIFY_TOKEN_MISSING: 'មិនទាន់មាន Netlify token។ សូមបើក setup.cmd។',
-        NETLIFY_TOKEN_READER_MISSING: 'បាត់ read-token.ps1។ សូមទាញថតឧបករណ៍ឡើងវិញ។',
-        NETLIFY_TOKEN_READ_FAILED: 'Windows មិនអាចដោះសោ Netlify token បាន។ សូមបើក setup.cmd ឡើងវិញក្នុង Windows user ដដែល។',
-        NETLIFY_TOKEN_INVALID: 'Netlify token ខូចទម្រង់។ សូមបើក setup.cmd ឡើងវិញ។',
-        NETLIFY_NETWORK: 'មិនអាចភ្ជាប់ Netlify API បាន។ សូមពិនិត្យអ៊ីនធឺណិត។',
-        NETLIFY_TIMEOUT: 'Netlify API ឆ្លើយយឺតលើស ៣០ វិនាទី។ សូមសាកម្តងទៀត។',
-        NETLIFY_SITE_REJECTED: 'Netlify បដិសេធ Site ID ឬ Token។ សូមបើក setup.cmd ហើយបញ្ចូលថ្មី។',
-        NETLIFY_SITE_INVALID_RESPONSE: 'Netlify ឆ្លើយទម្រង់មិនត្រឹមត្រូវ។ មិនបានប្តូរ Cookie ទេ។',
-        NETLIFY_BLOB_URL_FAILED: 'Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store បានទេ។ សូមពិនិត្យ Site ID និងសិទ្ធិរបស់ PAT។',
-        NETLIFY_BLOB_URL_INVALID: 'Netlify ឆ្លើយផ្លូវ upload មិនត្រឹមត្រូវ។ Cookie មិនត្រូវបានផ្ញើទេ។',
-        NETLIFY_BLOB_UPLOAD_FAILED: 'ការសរសេរ Cookie ចូល Netlify Blobs បរាជ័យ។ សូមសាកម្តងទៀត។',
-        NETLIFY_BLOB_REDIRECT: 'Netlify បញ្ជូនផ្លូវ upload ទៅ host ផ្សេង។ Cookie មិនត្រូវបានផ្ញើទេ ដើម្បីសុវត្ថិភាព។',
-        SITE_URL_INVALID: 'Site URL ខូចទម្រង់ (ត្រូវជា https)។ សូមបើក setup.cmd ឡើងវិញ។',
-        DIAG_REJECTED: 'Function បដិសេធការផ្ទៀងផ្ទាត់។ សូមពិនិត្យ ZTO_PROXY_KEY ក្នុង setup.cmd និង Netlify។',
-        DIAG_INVALID: 'Function ឆ្លើយទម្រង់មិនត្រឹមត្រូវពេលផ្ទៀងផ្ទាត់។',
-        COOKIE_TOO_SHORT: 'Cookie ដែលចាប់បានខ្លីពេក។ សូម Login Argus ឡើងវិញ។',
-        COOKIE_TOO_LONG: 'Cookie ដែលចាប់បានវែងលើសពិដានសុវត្ថិភាព។',
-        COOKIE_CONTROL_CHAR: 'Cookie ដែលចាប់បានមានតួអក្សរគ្រប់គ្រង — បានបដិសេធដើម្បីទប់ header injection។',
-        COOKIE_TOO_MANY_PAIRS: 'Cookie ដែលចាប់បានមានផ្នែកច្រើនលើសពិដាន។',
-        COOKIE_SESSION_MISSING: 'Request មិនមាន BOS-MAN-SESSION ដែលត្រឹមត្រូវ។ សូម Login Argus ឡើងវិញ។',
-        COOKIE_PAIR_SHAPE: 'Cookie ដែលចាប់បានខូចទម្រង់។',
-        COOKIE_NAME_SHAPE: 'ឈ្មោះ Cookie ដែលចាប់បានខូចទម្រង់។',
-        COOKIE_VALUE_SHAPE: 'តម្លៃ Cookie ដែលចាប់បានខូចទម្រង់។'
+        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no Order Detail request. Log in to Argus and open one parcel.',
+        BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
+        BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
+        BROWSER_NOT_FOUND: 'Microsoft Edge or Google Chrome was not found.',
+        NETLIFY_CONFIG_MISSING: 'No Netlify configuration yet. Run setup.cmd.',
+        NETLIFY_CONFIG_INVALID: 'The Netlify Site ID has a bad shape. Run setup.cmd again.',
+        NETLIFY_TOKEN_MISSING: 'No Netlify token yet. Run setup.cmd.',
+        NETLIFY_TOKEN_READER_MISSING: 'read-token.ps1 is missing. Download the tool folder again.',
+        NETLIFY_TOKEN_READ_FAILED: 'Windows could not unlock the Netlify token. Run setup.cmd again as the same Windows user.',
+        NETLIFY_TOKEN_INVALID: 'The Netlify token has a bad shape. Run setup.cmd again.',
+        NETLIFY_NETWORK: 'Could not reach the Netlify API. Check your internet connection.',
+        NETLIFY_TIMEOUT: 'The Netlify API took longer than 30 seconds. Please try again.',
+        NETLIFY_SITE_REJECTED: 'Netlify rejected the Site ID or token. Run setup.cmd and enter them again.',
+        NETLIFY_SITE_INVALID_RESPONSE: 'Netlify answered in an unexpected shape. The cookie was not changed.',
+        NETLIFY_BLOB_URL_FAILED: 'Netlify refused to write the cookie store. Check the Site ID and the PAT scope.',
+        NETLIFY_BLOB_URL_INVALID: 'Netlify returned a bad upload path. The cookie was not sent.',
+        NETLIFY_BLOB_UPLOAD_FAILED: 'Writing the cookie into Netlify Blobs failed. Please try again.',
+        NETLIFY_BLOB_REDIRECT: 'Netlify redirected the upload to another host. The cookie was not sent, for safety.',
+        SITE_URL_INVALID: 'The Site URL has a bad shape (https is required). Run setup.cmd again.',
+        DIAG_REJECTED: 'The Function refused the check. Verify ZTO_PROXY_KEY in setup.cmd and in Netlify.',
+        DIAG_INVALID: 'The Function answered in an unexpected shape during the check.',
+        COOKIE_TOO_SHORT: 'The captured cookie is too short. Log in to Argus again.',
+        COOKIE_TOO_LONG: 'The captured cookie is longer than the safety limit.',
+        COOKIE_CONTROL_CHAR: 'The captured cookie contains control characters. Rejected to block header injection.',
+        COOKIE_TOO_MANY_PAIRS: 'The captured cookie has more pairs than the safety limit.',
+        COOKIE_SESSION_MISSING: 'The request carries no valid BOS-MAN-SESSION. Log in to Argus again.',
+        COOKIE_PAIR_SHAPE: 'The captured cookie has a bad shape.',
+        COOKIE_NAME_SHAPE: 'A captured cookie name has a bad shape.',
+        COOKIE_VALUE_SHAPE: 'A captured cookie value has a bad shape.'
     };
-    return messages[code] || 'មានកំហុសដែលមិនស្គាល់។';
+    return messages[code] || 'Unknown error.';
 }
 
 // ⛔ ច្រកទ្វារ --auto ត្រូវវាស់ **តម្លៃដែលដោះសោបាន** មិនមែនវត្តមានឯកសារ។
@@ -709,19 +715,19 @@ function autoReadiness(verification) {
 function describeAutoReadiness(readiness) {
     const missing = (readiness && readiness.missing) || [];
     const labels = {
-        siteUrl: 'ZoeW Site URL (ឧ. https://zoew.netlify.app)',
-        proxyKey: 'ZTO_PROXY_KEY (តម្លៃដដែលនឹងក្នុង Netlify)'
+        siteUrl: 'ZoeW Site URL (for example https://zoew.netlify.app)',
+        proxyKey: 'ZTO_PROXY_KEY (the same value as in Netlify)'
     };
     if (!missing.length) {
-        return '✅ Site URL និងសោ Proxy រួចរាល់សម្រាប់របៀប --auto។';
+        return 'OK: Site URL and proxy key are ready for --auto mode.';
     }
-    const lines = ['❌ របៀប --auto ត្រូវការតម្លៃដែលនៅខ្វះ ៖'];
-    missing.forEach((key) => lines.push('   • ' + (labels[key] || key)));
+    const lines = ['ERROR: --auto mode needs these missing values:'];
+    missing.forEach((key) => lines.push('   - ' + (labels[key] || key)));
     lines.push('');
-    lines.push('សូមរត់ setup.cmd ម្តងទៀត។ វារក្សា Site ID និង Netlify token ចាស់ទុក —');
-    lines.push('ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច រួចបំពេញតែ ២ ខាងលើ។');
+    lines.push('Run setup.cmd again. It keeps the old Site ID and Netlify token:');
+    lines.push('press Enter to skip every prompt that already has a value.');
     if (missing.indexOf('siteUrl') !== -1) {
-        lines.push('⛔ prompt ZTO_PROXY_KEY លេចឡើង **តែក្រោយ** បំពេញ Site URL។');
+        lines.push('NOTE: the ZTO_PROXY_KEY prompt appears only AFTER the Site URL.');
     }
     return lines.join('\n');
 }
@@ -735,19 +741,21 @@ function shouldRefreshInAuto(health) {
 
 function describeHealth(health) {
     if (health.status === 'unconfigured') {
-        return 'ℹ️ មិនបានពិនិត្យ — Site URL និងសោ Proxy មិនទាន់កំណត់ក្នុង setup.cmd។';
+        return 'INFO: not checked - Site URL and proxy key are not set in setup.cmd yet.';
     }
     if (health.status === 'unreachable') {
-        return '⚠️ ភ្ជាប់ Function មិនបាន។ សូមពិនិត្យអ៊ីនធឺណិត ឬ Site URL។';
+        return 'WARNING: could not reach the Function. Check your internet or the Site URL.';
     }
     const parts = [
-        'ប្រភព: ' + (health.source || 'none'),
-        'បន្តអាយុ: ' + health.renewals + ' ដង'
+        'source: ' + (health.source || 'none'),
+        'renewals: ' + health.renewals
     ];
+    if (health.storeReason) parts.push('store: ' + health.storeReason);
     if (health.authRejectedAgeMs !== null) {
-        parts.push('ZTO បដិសេធនៅ ' + Math.round(health.authRejectedAgeMs / 1000) + ' វិ. មុន');
+        parts.push('ZTO rejected it ' + Math.round(health.authRejectedAgeMs / 1000) + 's ago');
     }
-    return (health.healthy ? '✅ Cookie នៅដំណើរការ។ ' : '⚠️ ត្រូវយក Cookie ថ្មី។ ') + parts.join(' · ');
+    return (health.healthy ? 'OK: the cookie still works. ' : 'WARNING: a new cookie is needed. ')
+        + parts.join(' | ');
 }
 
 async function reportVerification(cookieHeader) {
@@ -758,11 +766,11 @@ async function reportVerification(cookieHeader) {
         verification = { siteUrl: '', proxyKey: '' };
     }
     if (!verification.siteUrl || !verification.proxyKey) {
-        console.log('   ℹ️ មិនបានផ្ទៀងផ្ទាត់ចុងក្រោយ — សូមបញ្ចូល Site URL និងសោ Proxy ក្នុង setup.cmd។');
-        console.log('   ការស្កេនថ្មីនឹងប្រើ Cookie នេះក្នុងរយៈពេលមួយនាទី។');
+        console.log('   INFO: final check skipped - add the Site URL and proxy key in setup.cmd.');
+        console.log('   New scans will use this cookie within about a minute.');
         return;
     }
-    console.log('   🔎 កំពុងផ្ទៀងផ្ទាត់ថា Function ឃើញ Cookie ថ្មី...');
+    console.log('   Checking that the Function can see the new cookie...');
     let result;
     try {
         result = await verifyCookieLive(cookieHeader, verification);
@@ -770,33 +778,51 @@ async function reportVerification(cookieHeader) {
         result = { status: 'unverifiable', attempts: 0 };
     }
     if (result.status === 'match') {
-        console.log('   ✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី (ប្រភព: '
-            + (result.source || 'blob') + ' · ' + result.fingerprint + ')។');
+        console.log('   OK: verified - the Function is using the new cookie (source: '
+            + (result.source || 'blob') + ', ' + result.fingerprint + ').');
         return;
     }
     if (result.status === 'unreachable') {
-        console.log('   ⚠️ ភ្ជាប់ Function មិនបាន។ Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
+        console.log('   WARNING: could not reach the Function. The cookie is written - try a scan in a minute.');
         return;
     }
     if (result.status === 'auth-override') {
-        console.log('   ⛔ Netlify env មាន ZTO_AUTHORIZATION ឬ ZTO_TOKEN ➜ Function ប្រើ');
-        console.log('      Token នោះ ហើយ **មិនអាន Cookie store សោះ**។ Cookie ថ្មីត្រូវ');
-        console.log('      សរសេររួច តែវានឹងមិនត្រូវប្រើទេ ទាល់តែលុប env ទាំងនោះចេញ។');
+        console.log('   STOP: Netlify env has ZTO_AUTHORIZATION or ZTO_TOKEN, so the Function');
+        console.log('         uses that token and NEVER reads the cookie store. The cookie was');
+        console.log('         written, but it stays unused until you delete those env values.');
         return;
     }
-    console.log('   ⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ' + result.attempts + ' ដង)។');
+    console.log('   WARNING: the Function does not see the new cookie yet (checked '
+        + result.attempts + ' times).');
     // ⛔ សារត្រូវប្រាប់ **អ្វីដែលឃើញពិត** — បើអត់ អ្នកប្រើកែមិនបាន។
     if (result.source === 'env') {
-        console.log('      Function កំពុងអាន ZTO_COOKIE (env) មិនមែន blob'
-            + (result.storeReason ? ' — ជាប់ត្រង់ ' + result.storeReason : '') + '។');
-        console.log('      បើវានៅដដែលក្រោយ ១ នាទី ៖ ពិនិត្យថា deploy ថ្មីរួចហើយ');
-        console.log('      និងថា Netlify Blobs បើកសម្រាប់ site នេះ។');
+        console.log('      It is still reading ZTO_COOKIE (env), not the blob'
+            + (result.storeReason ? ' - store reason: ' + result.storeReason : '') + '.');
+        console.log('      If this stays the same after a minute: check that the newest deploy is');
+        console.log('      live and that Netlify Blobs is enabled for this site.');
     } else if (result.source === 'blob') {
-        console.log('      Function អាន blob រួច តែតម្លៃនៅចាស់ (cache ៦០ វិ. + edge)។');
+        console.log('      It reads the blob, but the value is still the old one (60s cache + edge).');
     } else if (result.storeReason) {
-        console.log('      Cookie store ជាប់ត្រង់ ៖ ' + result.storeReason + '។');
+        console.log('      Cookie store is stuck at: ' + result.storeReason + '.');
     }
-    console.log('      Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
+    console.log('      The cookie is written - try a scan in a minute.');
+}
+
+// ⛔ **សំណើអ្នកប្រើ (2026-09-02)** ៖ *«សូមអោយបង្ហាញ cookie ដែលយកបានពី argus
+// ក្នុង cmd ផង»*។ តម្លៃនេះជា session ZTO របស់អ្នកប្រើផ្ទាល់ ដែលគាត់កាន់ស្រាប់
+// ក្នុង browser ➜ ការបង្ហាញវាលើអេក្រង់របស់គាត់មិនបន្ថែមអ្នកកាន់ថ្មីទេ ហើយវា
+// ចាំបាច់ពេលត្រូវ paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង។
+// ⛔ **Netlify PAT និង ZTO_PROXY_KEY នៅតែហាមបង្ហាញដាច់ខាត** — `zto-cookie-sync-test.js`
+// ចាក់សោទាំង ២ ទិស ៖ Cookie ត្រូវបង្ហាញ · សោមិនត្រូវបង្ហាញ។
+function describeCapturedCookie(cookieHeader) {
+    const lines = [
+        '',
+        '--- Cookie captured from Argus (paste into ZTO_COOKIE if you ever need a fallback) ---',
+        String(cookieHeader || ''),
+        '--- end of cookie ---',
+        ''
+    ];
+    return lines.join('\n');
 }
 
 async function main() {
@@ -808,7 +834,7 @@ async function main() {
     }
 
     if (process.argv.includes('--check')) {
-        console.log('🔎 កំពុងពិនិត្យសុខភាព Cookie ZTO...');
+        console.log('Checking the health of the ZTO cookie...');
         console.log(describeHealth(await checkCookieHealth(await resolveVerification())));
         return;
     }
@@ -817,33 +843,34 @@ async function main() {
         const health = await checkCookieHealth(await resolveVerification());
         console.log(describeHealth(health));
         if (!shouldRefreshInAuto(health)) {
-            console.log('⛔ មិនបើក browser ទេ។');
+            console.log('No browser needed. Nothing to do.');
             return;
         }
-        console.log('➜ កំពុងយក Cookie ថ្មី...');
+        console.log('Getting a new cookie...');
     }
 
     if (process.argv.includes('--verify-setup')) {
-        console.log('🔎 កំពុងផ្ទៀងផ្ទាត់ Netlify Site ID និង token...');
+        console.log('Checking the Netlify Site ID and token...');
         await verifyNetlifySetup();
-        console.log('✅ Setup រួចរាល់។ ចាប់ពីពេលនេះ double-click sync-zto-cookie.cmd ពេល Cookie ផុត។');
+        console.log('OK: setup is complete. From now on, double-click sync-zto-cookie.cmd when the cookie expires.');
         return;
     }
 
-    console.log('🔎 កំពុងចាប់ Cookie ពី Request Header ពិត — មិនប្រើ DevTools និងមិនប្រើ extension...');
+    console.log('Capturing the cookie from a real request header - no DevTools, no extension...');
     let cookieHeader = await captureCookieHeader();
-    console.log('✅ ចាប់ Cookie បាន។ តម្លៃមិនត្រូវបានបង្ហាញ ឬសរសេរចូលឯកសារទេ។');
+    console.log('OK: cookie captured.');
+    console.log(describeCapturedCookie(cookieHeader));
     // ⛔ ការរំលងគូត្រូវ **មើលឃើញ** — ការរំលងស្ងាត់ធ្វើឲ្យបញ្ហាថ្ងៃក្រោយ
     // វិនិច្ឆ័យមិនបាន។ បោះពុម្ព **ឈ្មោះ** ប៉ុណ្ណោះ មិនដែលបោះតម្លៃឡើយ។
     const skipped = droppedCookieNames();
     if (skipped.length) {
-        console.log('   ℹ️ រំលងគូ cookie ដែលមិនស៊ីទម្រង់ ' + skipped.length + ' ៖ '
-            + skipped.join(', ') + ' (BOS-MAN-SESSION នៅគ្រប់)។');
+        console.log('   INFO: skipped ' + skipped.length + ' cookie pair(s) with an odd shape: '
+            + skipped.join(', ') + ' (BOS-MAN-SESSION is still there).');
     }
     try {
-        console.log('🔐 កំពុងសរសេរ Cookie ចូល Netlify Blobs...');
+        console.log('Writing the cookie into Netlify Blobs...');
         await syncNetlifyCookie(cookieHeader);
-        console.log('\n✅ Cookie ថ្មីចូល Netlify Blobs រួចរាល់ — ⛔ មិនចាំបាច់ redeploy ទេ។');
+        console.log('\nOK: the new cookie is in Netlify Blobs - no redeploy needed.');
         await reportVerification(cookieHeader);
     } finally {
         cookieHeader = '';
@@ -852,13 +879,14 @@ async function main() {
 
 if (require.main === module) {
     main().catch((error) => {
-        console.error('\n❌ ' + safeFailureMessage(error && error.code));
+        console.error('\nERROR: ' + safeFailureMessage(error && error.code));
         process.exitCode = 1;
     });
 }
 
 module.exports = {
     autoReadiness,
+    describeCapturedCookie,
     diagnosticsCookie,
     droppedCookieNames,
     checkCookieHealth,

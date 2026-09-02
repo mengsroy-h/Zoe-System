@@ -720,11 +720,11 @@ async function requestOnce(config, headers, barcode, timeoutMs, session) {
     }
 }
 
-async function fetchOrder(config, headers, barcode, deadlineAt, session) {
+async function fetchOrder(config, headers, barcode, startedAt, session) {
     let attempt = 0;
     let lastTransient = null;
     for (;;) {
-        const remaining = deadlineAt - Date.now();
+        const remaining = config.budgetMs - elapsedSince(startedAt);
         if (remaining <= 1200) {
             return lastTransient || {
                 kind: 'fatal',
@@ -738,7 +738,7 @@ async function fetchOrder(config, headers, barcode, deadlineAt, session) {
         attempt += 1;
         if (attempt > config.retries) return lastTransient;
         const backoffMs = 250 * attempt;
-        if (deadlineAt - Date.now() <= backoffMs + 1500) return lastTransient;
+        if (config.budgetMs - elapsedSince(startedAt) <= backoffMs + 1500) return lastTransient;
         await delay(backoffMs);
     }
 }
@@ -765,7 +765,7 @@ function readCachedBody(key, ttlMs) {
 function runSharedLookup(key, config, headers, barcode, session) {
     const existing = inFlight.get(key);
     if (existing) return existing;
-    const run = fetchOrder(config, headers, barcode, Date.now() + config.budgetMs, session);
+    const run = fetchOrder(config, headers, barcode, Date.now(), session);
     inFlight.set(key, run);
     run.then(() => {}, () => {}).then(() => {
         if (inFlight.get(key) === run) inFlight.delete(key);

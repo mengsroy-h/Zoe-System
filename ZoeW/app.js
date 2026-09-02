@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.2';
+    const APP_VERSION = '2.25.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3518,15 +3518,16 @@
         const key = String(barcode || '').trim().toUpperCase();
         if (!key) return false;
         const existing = autoLookupQueueRetries.get(key);
-        const armedAt = (existing && existing.armedAt) || Date.now();
-        if (elapsedSince(armedAt) >= AUTO_LOOKUP_QUEUE_MAX_WAIT_MS) {
+        const waiting = !!(existing && (existing.timer || existing.pending));
+        const armedAt = (waiting && existing.armedAt) || Date.now();
+        if (waiting && elapsedSince(armedAt) >= AUTO_LOOKUP_QUEUE_MAX_WAIT_MS) {
             dropAutoLookupQueueEntry(key);
             return false;
         }
         if (existing && existing.timer) return true;
         const timer = setTimeout(() => {
             const queued = autoLookupQueueRetries.get(key);
-            if (queued) queued.timer = null;
+            if (queued) { queued.timer = null; queued.pending = true; }
             if (pendingBarcode !== barcode || !isModalOpen) {
                 dropAutoLookupQueueEntry(key);
                 return;
@@ -3695,13 +3696,15 @@
     }
 
     async function attemptAutoLookup(barcode) {
+        const lookupKey = String(barcode || '').trim().toUpperCase();
         const cfg = getLookupApiConfig();
-        if (!cfg || !cfg.enabled || !cfg.url) return;
+        if (!cfg || !cfg.enabled || !cfg.url) { dropAutoLookupQueueEntry(lookupKey); return; }
         const isZtoLookup = lookupApiIsZto(cfg);
         const lookupSource = isZtoLookup ? 'ZTO' : 'API';
 
         const fastCachedRow = getFastLookupRow(barcode, cfg);
         if (fastCachedRow) {
+            dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'cache', '⚡ រកឃើញភ្លាមពី cache ក្នុងឧបករណ៍');
             applyLookupFillToModal(barcode, fastCachedRow.phone, fastCachedRow.cod, fastCachedRow.dod, cfg);
             return;
@@ -3709,6 +3712,7 @@
 
         const cachedRow = findCustomerDataTableRow(barcode);
         if (cachedRow) {
+            dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'cache', '⚡ រកឃើញភ្លាមពីតារាងអតិថិជន');
             applyLookupFillToModal(barcode, cachedRow.phone, cachedRow.cod, cachedRow.dod, cfg);
             return;
@@ -3717,6 +3721,7 @@
         scheduleCustomerTableSoonRefresh();
 
         if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+            dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'warn', '🔒 សូមវាយ PIN ដើម្បីដោះសោ ' + lookupSource + ' Lookup');
             if (pendingLookupUnlockResolve) pendingLookupUnlockResolve();
             pendingLookupUnlockBarcode = String(barcode || '');
@@ -3731,23 +3736,25 @@
         }
 
         if (navigator.onLine === false) {
+            dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'offline', '📴 ក្រៅបណ្ដាញ — សូមភ្ជាប់បណ្ដាញ ហើយស្កេនម្ដងទៀត');
             return;
         }
 
-        const lookupKey = String(barcode || '').trim().toUpperCase();
         const failureRecord = autoLookupFailureAt.get(lookupKey);
         const failedAt = (failureRecord && typeof failureRecord === 'object' ? failureRecord.at : failureRecord) || 0;
         const failureCooldownMs = (failureRecord && typeof failureRecord === 'object' && failureRecord.ms)
             || AUTO_LOOKUP_FAIL_COOLDOWN_MS;
         const failedElapsed = elapsedSince(failedAt);
         if (failedElapsed < failureCooldownMs) {
+            dropAutoLookupQueueEntry(lookupKey);
             const waitSeconds = Math.max(1, Math.ceil((failureCooldownMs - failedElapsed) / 1000));
             setLookupStatus(barcode, 'warn', '⏳ ' + lookupSource + ' ទើបខកខាន — សូមស្កេនម្ដងទៀតក្រោយ ' + waitSeconds + ' វិ.');
             return;
         }
 
         if (autoLookupInFlight.has(lookupKey)) {
+            dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'loading', '🔎 កំពុងស្វែងរកពី ' + lookupSource + '...');
             return;
         }

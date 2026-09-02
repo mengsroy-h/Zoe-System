@@ -491,6 +491,56 @@ group('ស្ថេរភាព ៖ បណ្តាញព្យួរ', async ()
         badJson.statusCode === 502 && JSON.parse(badJson.body).code === 'ZTO_INVALID_RESPONSE', badJson.body);
 });
 
+// ⛔ **ថវិកាពេលត្រូវរស់រានពីនាឡិកាដែលថយក្រោយ។** ច្បាប់ `monotonic-gate-test`
+//   (2.20.7) អនុវត្តខាង server ដែរ ៖ `deadlineAt - Date.now()` ក្លាយជា **ធំជាង**
+//   ពេលនាឡិកាថយក្រោយ (NTP កែធំ · ការផ្លាស់ host) ➔ ច្រកទ្វារថវិកា **បើកចំហ**
+//   ➔ ការព្យាយាមឡើងវិញបន្តរហូតលើសពិដាន ➔ **Netlify សម្លាប់ Function មុនវាឆ្លើយ**
+//   ➔ អ្នកប្រើឃើញ `Failed to fetch` ជំនួស JSON ដែលមានឈ្មោះ។
+//   ការវាស់ត្រូវជា **ឥរិយាបថ** (រាប់ការហៅ upstream ពិត) មិនមែនការអានកូដ។
+group('ថវិកាពេល ៖ នាឡិកាថយក្រោយ', async () => {
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=abcdefgh12345678', ZTO_UPSTREAM_RETRIES: '3' });
+    const realNow = Date.now;
+    let calls = 0;
+    global.fetch = async () => {
+        calls++;
+        // រាល់ការហៅបន្ទាប់ ➔ នាឡិកាលោតថយក្រោយ ១ ម៉ោង
+        if (calls === 1) Date.now = () => realNow.call(Date) - 3600000;
+        return {
+            ok: false, status: 503,
+            headers: { get: () => 'application/json' },
+            json: async () => ({ message: 'upstream down' })
+        };
+    };
+    let res;
+    try {
+        res = await call({ barcode: 'ZTOCLK0001' });
+    } finally {
+        Date.now = realNow;
+    }
+    // ⛔ នាឡិកាថយក្រោយ ➔ `elapsedSince()` ត្រឡប់ Infinity ➔ ថវិកាអស់ភ្លាម
+    //   ➔ បោះបង់ឆាប់ (fail-open ក្នុងទិសសុវត្ថិភាព ៖ ឆ្លើយមុនត្រូវសម្លាប់)។
+    ok('⛔ នាឡិកាថយក្រោយ មិនត្រូវពន្លាថវិកា (ការហៅ upstream ត្រូវទប់)',
+        calls <= 2, { upstreamCalls: calls, retriesConfigured: 3 });
+    ok('⛔ នៅតែឆ្លើយជា JSON ដែលមានឈ្មោះ មិនមែនព្យួរ',
+        !!res && res.statusCode >= 500 && /ZTO_/.test(String(res.body)),
+        res && { status: res.statusCode, body: String(res.body).slice(0, 120) });
+
+    // ទិសផ្ទុយ ៖ នាឡិកាធម្មតា ➔ ការព្យាយាមឡើងវិញនៅតែដើរដដែល
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=abcdefgh12345678', ZTO_UPSTREAM_RETRIES: '3' });
+    let normalCalls = 0;
+    global.fetch = async () => {
+        normalCalls++;
+        return {
+            ok: false, status: 503,
+            headers: { get: () => 'application/json' },
+            json: async () => ({ message: 'upstream down' })
+        };
+    };
+    await call({ barcode: 'ZTOCLK0002' });
+    ok('⛔ ទិសផ្ទុយ ៖ នាឡិកាធម្មតា ➔ នៅតែព្យាយាមឡើងវិញដដែល',
+        normalCalls >= 3, { upstreamCalls: normalCalls });
+});
+
 group('ការវិនិច្ឆ័យ ?diag=1', async () => {
     console.log('\n== ១០. ការវិនិច្ឆ័យ ?diag=1 (បញ្ជាក់ថា API ផ្លូវការភ្ជាប់រួច) ==');
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer super-secret-official-token', ZTO_API_URL: 'https://openapi.zto.com/v1/x' });

@@ -314,6 +314,97 @@ scenario('⛔ ស្តាទិច ៖ ការសម្អាត cache ត្
         !!cleaner && cleaner.indexOf('lookupFastCache.clear()') !== -1);
 });
 
+// ── ៨. ⛔ ធាតុជួរកំព្រា មិនត្រូវបំពុលការស្កេនម្តងក្រោយ ───────
+// 🔴 **កំហុសពិត** (វាស់បាន 2026-09-02) ៖ `attemptAutoLookup()` ចេញមុនពេល
+//   មានកន្លែង (cache ហិត · តារាងអតិថិជន · PIN · ក្រៅបណ្តាញ · cooldown)
+//   ក្រោយពីធាតុចូជួររួច ➔ ធាតុនោះ **មិនត្រូវបានលុបចេញ** ៖
+//   វានៅក្នុង Map ជាមួយ `armedAt` ចាស់ជានិច្ច។
+//   ➔ ការស្កេន barcode ដដែលម្តងក្រោយ (នាទីឬម៉ោងក្រោយ) ឃើញ `elapsedSince(armedAt)`
+//   លើសពិដាន ➔ **បដិសេធភ្លាម។** អ្នកប្រើឃើញ «⏳ Lookup រវល់យូរពេក»
+//   ខណៈពុំមានការរង់ចាំណាមួយកើតឡើង ➔ **កញ្ចប់មិនបំពេញស្វ័យប្រវត្តិ ១ ដង**។
+//
+// ⛔ ការអៈអាងមាន **២ ខាង** ៖ ធាតុកំព្រាមិនបំពុល (ខាងនេះ) **និង**
+//   ពិដានពេលនៅតែទប់លើការរង់ចាំពិត (សេណារីយ៉ូ៦ ខាងលើ)។
+scenario('⛔ ធាតុជួរកំព្រា មិនត្រូវបំពុលការស្កេនម្តងក្រោយ', async () => {
+    const ctx = buildRuntime({ netDelayMs: 1200 });
+    ctx.AUTO_LOOKUP_QUEUE_MAX_WAIT_MS = 300;
+    ctx.AUTO_LOOKUP_QUEUE_RETRY_MS = 60;
+    const X = 'ZTOH0001';
+    let tableRow = null;
+    ctx.findCustomerDataTableRow = (bc) => (tableRow && tableRow.code === bc ? tableRow : null);
+
+    for (const c of ['ZTOH9001', 'ZTOH9002']) {
+        ctx.pendingBarcode = c;
+        vm.runInContext('attemptAutoLookup(' + JSON.stringify(c) + ')', ctx);
+    }
+    ctx.pendingBarcode = X;
+    vm.runInContext('attemptAutoLookup(' + JSON.stringify(X) + ')', ctx);
+    await sleep(20);
+    ok('កញ្ចប់ទី ៣ ចូលជួរដូចគ្នា', ctx.autoLookupQueueRetries.has(X));
+
+    tableRow = { code: X, phone: '0974158508', cod: 1, dod: 0 };
+    await sleep(160);
+    ok('⛔ cache ហិត ➔ ធាតុជួរត្រូវលុបចេញ (កុំទុកកំព្រា)',
+        !ctx.autoLookupQueueRetries.has(X), [...ctx.autoLookupQueueRetries.keys()]);
+
+    await sleep(400);
+    tableRow = null;
+    ctx.autoLookupInFlight.clear();
+    ctx.__statuses.length = 0;
+    for (const c of ['ZTOH9101', 'ZTOH9102']) {
+        ctx.pendingBarcode = c;
+        vm.runInContext('attemptAutoLookup(' + JSON.stringify(c) + ')', ctx);
+    }
+    ctx.pendingBarcode = X;
+    vm.runInContext('attemptAutoLookup(' + JSON.stringify(X) + ')', ctx);
+    await sleep(30);
+    const mine = ctx.__statuses.filter((st) => st.bc === X);
+    ok('⛔ ការស្កេនថ្មីមិនត្រូវបដិសេធដោយ armedAt ចាស់',
+        mine.some((st) => /រង់ចាំជួរ/.test(st.text))
+        && !mine.some((st) => /រវល់យូរពេក/.test(st.text)),
+        mine.map((st) => st.text));
+});
+
+// ── ៩. ⛔ ទូទៅ ៖ **រាល់** ផ្លូវចេញមុន ត្រូវដោះធាតុជួរ ─────────────
+// ⛔ សេណារីយ៉ូ ៨ វាស់តែផ្លូវ «cache ហិត» ។ វាស់រួច (mutation) ៖ ការដក
+//   `dropAutoLookupQueueEntry()` ចេញពីផ្លូវ **ក្រៅបណ្តាញ** ឬ **cooldown**
+//   **រស់រាន** ➔ ចន្លោះក្នុងឧបករណ៍ខ្លួនវា។ ដូច្នេះការអៈអាងត្រូវជា
+//   **លក្ខណៈទូទៅ** ៖ ក្រោយផ្លូវចេញមុនណាមួយ ធាតុជួរត្រូវលែងមាន។
+const EARLY_EXITS = [
+    { name: 'ក្រៅបណ្តាញ', arm: (ctx) => { ctx.navigator.onLine = false; } },
+    { name: 'cooldown ក្រោយបរាជ័យ', arm: (ctx, code) => {
+        ctx.autoLookupFailureAt.set(code.toUpperCase(), { at: Date.now(), ms: 30000 });
+    } },
+    { name: 'Config បិទ', arm: (ctx) => {
+        ctx.getLookupApiConfig = () => ({ enabled: false, url: '' });
+    } },
+    { name: 'cache លឿនក្នុងឧបករណ៍', arm: (ctx, code) => {
+        vm.runInContext('setFastLookupRow(' + JSON.stringify(code)
+            + ', "0974158508", 5, 0, getLookupApiConfig())', ctx);
+    } }
+];
+EARLY_EXITS.forEach((exit, i) => {
+    scenario('⛔ ផ្លូវចេញមុន «' + exit.name + '» ត្រូវដោះធាតុជួរ', async () => {
+        const ctx = buildRuntime({ netDelayMs: 1500 });
+        ctx.AUTO_LOOKUP_QUEUE_MAX_WAIT_MS = 400;
+        ctx.AUTO_LOOKUP_QUEUE_RETRY_MS = 50;
+        const X = 'ZTOJ' + String(1000 + i);
+        for (const c of ['ZTOJ90' + i + '1', 'ZTOJ90' + i + '2']) {
+            ctx.pendingBarcode = c;
+            vm.runInContext('attemptAutoLookup(' + JSON.stringify(c) + ')', ctx);
+        }
+        ctx.pendingBarcode = X;
+        vm.runInContext('attemptAutoLookup(' + JSON.stringify(X) + ')', ctx);
+        await sleep(15);
+        ok('ធាតុចូជួររួច (មុនវាស់)', ctx.autoLookupQueueRetries.has(X));
+
+        exit.arm(ctx, X);
+        await sleep(140);
+        ok('⛔ ក្រោយផ្លូវចេញមុន ➔ ធាតុជួរលែងមាន',
+            !ctx.autoLookupQueueRetries.has(X), [...ctx.autoLookupQueueRetries.keys()]);
+    });
+});
+
 (async () => {
     for (const s of scenarios) {
         console.log('\n-- ' + s.label + ' --');

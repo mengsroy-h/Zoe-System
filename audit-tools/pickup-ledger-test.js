@@ -103,6 +103,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 vm.runInContext([
+    sliceFn('ledgerNumber'),
     sliceFn('getPickupPhoneKey'),
     sliceFn('countPickedUpCustomers'),
     sliceFn('addPickupToDailyRecord'),

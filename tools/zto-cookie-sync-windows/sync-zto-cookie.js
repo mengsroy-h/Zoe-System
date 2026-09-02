@@ -23,6 +23,11 @@ const BLOB_STORE_PATH = SITE_STORE_PREFIX + BLOB_STORE_NAME;
 const SIGNED_URL_ACCEPT = 'application/json;type=signed-url';
 const SIGNED_URL_MAX_LENGTH = 4096;
 const DIAG_PATH = '/.netlify/functions/zto-order-detail?diag=1';
+// ⛔ `fresh=1` រំលង cache ៦០ វិនាទីរបស់ Function ➜ ការផ្ទៀងផ្ទាត់អាន blob
+// ពិតភ្លាម ជំនួសការរង់ចាំ cache ផុតកំណត់។ វាត្រូវបានទទួលស្គាល់តែជាមួយ
+// `diag=1` (ដែលការពារដោយ proxy key) ➜ ផ្លូវ lookup មិនអាចត្រូវបង្ខំឲ្យ
+// អាន blob រាល់ការស្កេនបានឡើយ។
+const DIAG_FRESH_PATH = DIAG_PATH + '&fresh=1';
 const PROXY_KEY_HEADER = 'X-Zoe-Proxy-Key';
 const VERIFY_TIMEOUT_MS = 10 * 1000;
 const VERIFY_DEADLINE_MS = 75 * 1000;
@@ -423,7 +428,8 @@ async function readDiagnostics(siteUrl, proxyKey, controls) {
     if (!origin) throw codedError('SITE_URL_INVALID');
     const headers = { Accept: 'application/json' };
     headers[PROXY_KEY_HEADER] = String(proxyKey || '');
-    const response = await timedFetch(origin + DIAG_PATH, {
+    const path = (controls && controls.fresh === false) ? DIAG_PATH : DIAG_FRESH_PATH;
+    const response = await timedFetch(origin + path, {
         method: 'GET',
         headers
     }, Object.assign({ timeoutMs: VERIFY_TIMEOUT_MS }, controls));

@@ -407,6 +407,34 @@ async function run() {
     ok('diag ប្រាប់មូលហេតុរបស់ store ដែលដាច់',
         !!(diag.cookie && diag.cookie.storeReason), diag.cookie);
 
+    // ⛔ **`?diag=1&fresh=1` ត្រូវរំលង cache ៦០ វិនាទី។** បើមិនដូច្នេះ helper
+    // ដែលទើបសរសេរ Cookie ថ្មី ត្រូវរង់ចាំរហូតដល់ cache ផុតកំណត់មុនឃើញវា ➜
+    // ការផ្ទៀងផ្ទាត់អូសបន្លាយដល់ ៧៥ វិនាទី (វាស់រួច 2026-09-02)។
+    // ⛔ វាទទួលស្គាល់តែជាមួយ `diag=1` — ផ្លូវ lookup មិនអាចត្រូវបង្ខំឲ្យអាន
+    //    blob រាល់ការស្កេនបានឡើយ (នោះនឹងបន្ថែមពេលទៅរាល់កញ្ចប់)។
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    const freshStore = useBlobs();
+    upstream();
+    const beforeFresh = JSON.parse((await call({ diag: '1' })).body);
+    const readsAfterFirst = freshStore.calls.filter((c) => c.fn === 'get').length;
+    const cachedAgain = JSON.parse((await call({ diag: '1' })).body);
+    ok('diag ធម្មតាទី ២ ➜ ប្រើ cache (គ្មានការអាន blob ថ្មី)',
+        freshStore.calls.filter((c) => c.fn === 'get').length === readsAfterFirst, { reads: freshStore.calls.filter((c) => c.fn === 'get').length, readsAfterFirst });
+    const freshDiag = JSON.parse((await call({ diag: '1', fresh: '1' })).body);
+    ok('⛔ `fresh=1` ➜ អាន blob ថ្មីពិត (រំលង cache)',
+        freshStore.calls.filter((c) => c.fn === 'get').length > readsAfterFirst, { reads: freshStore.calls.filter((c) => c.fn === 'get').length, readsAfterFirst });
+    ok('`fresh=1` ឆ្លើយ fingerprint ដដែល (មិនប្តូរអត្ថន័យ)',
+        freshDiag.cookie && freshDiag.cookie.fingerprint === beforeFresh.cookie.fingerprint,
+        { fresh: freshDiag.cookie, before: beforeFresh.cookie });
+    ok('`fresh=1` ត្រូវរាយក្នុងចម្លើយ ➜ helper ដឹងថា Function គាំទ្រវា',
+        freshDiag.fresh === true && cachedAgain.fresh === false,
+        { fresh: freshDiag.fresh, cached: cachedAgain.fresh });
+    const beforeLookupReads = freshStore.calls.filter((c) => c.fn === 'get').length;
+    await call({ barcode: 'ZTO900111', fresh: '1' });
+    await call({ barcode: 'ZTO900222', fresh: '1' });
+    ok('⛔ ទិសផ្ទុយ ៖ `fresh=1` លើផ្លូវ lookup ត្រូវ **មិនអើពើ** (cache នៅដដែល)',
+        freshStore.calls.filter((c) => c.fn === 'get').length === beforeLookupReads, { reads: freshStore.calls.filter((c) => c.fn === 'get').length, beforeLookupReads });
+
     // ⛔ **មូលហេតុត្រូវរស់រានពី cache។** `resolveCookieCredential()` សរសេរ
     // `storeReason = opened.reason` (ជា `''` ពេល store បើកបាន) **មុន** ការ
     // ពិនិត្យ cache ➜ ការអានដែលធ្លាក់/ទទេ កំណត់មូលហេតុលើការហៅ **ទី ១**

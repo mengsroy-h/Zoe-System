@@ -5,19 +5,35 @@ Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime D
 ក្នុងស្រុក ជាទៀងទាត់ដោយស្វ័យប្រវត្តិ (តាម Task Scheduler/Cron)។ នេះជា **Script ដាច់ដោយឡែក** ដំណើរការ
 ដោយអ្នកគ្រប់គ្រង (Vendor) ខ្លួនឯង — មិនមែនផ្នែកមួយនៃ App ទាំង ២ ទេ។
 
-## ហេតុអ្វីត្រូវការ
+> 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
+> អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស ស្ថិតក្នុង
+> **[docs/BUG-HISTORY.md](../docs/BUG-HISTORY.md)**។
+
+## កំណែ
+
+CLI ដាច់ដោយឡែក — **មិន deploy ទេ** ហើយវា **មិនប៉ះ `APP_VERSION` ឬ
+`CACHE_VERSION`** របស់ App ណាមួយឡើយ។ វាប្រើ Node.js 18+ ជាមួយ native
+HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
+
+## មុខងារ
+
+### ហេតុអ្វីត្រូវការ
 
 ទិន្នន័យអាជីវកម្ម (Parcel/Revenue/COD/DOD) ទាំងអស់ស្ថិតនៅតែក្នុង Firebase តែមួយកន្លែងក្នុងមួយជំនួញ។
 បើ Project មានបញ្ហា (លុបខុសទាំង Database, Account ត្រូវបានលុប, Billing issue) គ្មានវិធីសង្គ្រោះទិន្នន័យ
 មកវិញបានទេ លុះត្រាតែមាន Backup ដាច់ដោយឡែក។
 
-## ជំហានទី ១ — តម្រូវការ
+---
+
+## របៀបប្រើប្រាស់
+
+### ជំហានទី ១ — តម្រូវការ
 
 ប្រើ **Node.js 18 ឬថ្មីជាងនេះ**។ Script ប្រើតែ API ដែលមានស្រាប់ក្នុង Node
 (`fetch`, `AbortController`, `crypto`) និង **គ្មាន third-party runtime dependency** ទេ —
 មិនចាំបាច់ `npm install`។
 
-## ជំហានទី ២ — យក Service Account Key (សម្រាប់ជំនួញនីមួយៗ)
+### ជំហានទី ២ — យក Service Account Key (សម្រាប់ជំនួញនីមួយៗ)
 
 សម្រាប់ Firebase Project នីមួយៗដែលចង់ Backup (ជំនួញនីមួយៗ + Project License របស់ ZoeKeyGen)៖
 
@@ -28,7 +44,7 @@ Script សម្រាប់ Backup ទិន្នន័យ Firebase Realtime D
    ដោយសារ `.gitignore` — សូមកុំផ្លាស់ប្តូរ `.gitignore` ដើម្បីអនុញ្ញាតវា Key ទាំងនេះជា Credential ពិត
    មិនមែន Firebase Config ធម្មតាទេ — បើលេចធ្លាយ អាចអានសរសេរទិន្នន័យទាំងអស់បាន)
 
-## ជំហានទី ៣ — កំណត់រចនាសម្ព័ន្ធ
+### ជំហានទី ៣ — កំណត់រចនាសម្ព័ន្ធ
 
 ```
 cp config.example.json config.json
@@ -69,7 +85,7 @@ Firebase តាម `Authorization: Bearer` — token/private key មិនត្
 
 `config.json` ក៏មិនត្រូវបាន Commit ចូល Git ដែរ (មាន Path ទៅ Secret Files) ។
 
-## ជំហានទី ៤ — Run ដោយដៃម្តងសាកល្បង
+### ជំហានទី ៤ — Run ដោយដៃម្តងសាកល្បង
 
 ```
 npm run backup
@@ -86,7 +102,7 @@ All 2 backup(s) completed.
 បើជំនួញណាមួយបរាជ័យ Script នៅតែបន្តទៅជំនួញបន្ទាប់ (មិនឈប់ទាំងស្រុង) ហើយចប់ដោយ Exit code មិនមែន 0
 ដើម្បីឲ្យ Task Scheduler/Cron ដឹងថាមានបញ្ហា។
 
-## ជំហានទី ៥ — កំណត់ឲ្យ Run ស្វ័យប្រវត្តិជាប្រចាំ
+### ជំហានទី ៥ — កំណត់ឲ្យ Run ស្វ័យប្រវត្តិជាប្រចាំ
 
 ### Windows (Task Scheduler)
 
@@ -107,7 +123,7 @@ crontab -e
 0 2 * * * cd /path/to/firebase-backup && /usr/bin/node backup.js >> backup.log 2>&1
 ```
 
-## ការស្តារទិន្នន័យមកវិញ (Restore) — ធ្វើដោយដៃ
+### ការស្តារទិន្នន័យមកវិញ (Restore) — ធ្វើដោយដៃ
 
 Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោយចេតនា (Restore គឺជាសកម្មភាពគ្រោះថ្នាក់ — អាចសរសេរជាន់ពីលើ
 ទិន្នន័យផ្ទាល់ដែលកំពុងប្រើ) ។ បើត្រូវការស្តារជាក់ស្តែង៖
@@ -117,3 +133,24 @@ Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោ�
 
 **សូមប្រុងប្រយ័ត្នខ្លាំង** — Import នៅ root អាចសរសេរជាន់/លុបទិន្នន័យបច្ចុប្បន្ន។ សាកល្បងលើ
 Firebase project បណ្ដោះអាសន្នសិន ហើយបិទការសរសេររបស់ App មុន restore production។
+
+---
+
+## ប្រព័ន្ធសុវត្ថិភាព
+
+- **Service-account key ជា credential ពិត** — `config.json` · `secrets/` និង
+  `backups/` ស្ថិតក្នុង `.gitignore`។ ⛔ កុំ commit វា។
+- **ការសរសេរជា atomic** — សរសេរទៅ `.partial` រួច `rename()` ចូលកន្លែង ➜
+  ការរត់ដែលដាច់ពាក់កណ្តាល **មិនបន្សល់ `.json.gz` កាត់ខ្លី** ដែលមើលទៅដូច
+  backup ល្អទេ។
+- **Timeout និង retry** សម្រាប់បណ្តាញដែលដាច់បណ្តោះអាសន្ន។
+- **Lock** ការពារ process ពីររត់ជាន់គ្នា។
+- **គ្មាន third-party dependency** ➜ ផ្ទៃវាយប្រហារតូចបំផុត។
+
+---
+
+## អាជ្ញាប័ណ្ណ
+
+**កម្មសិទ្ធិឯកជន** — ផ្នែកមួយនៃ Zoe-System សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់
+ម្ចាស់ប៉ុណ្ណោះ។ ឧបករណ៍នេះមិនត្រូវការ Activation Key ទេ ព្រោះវាមិនមែនជា
+App របស់អតិថិជន។

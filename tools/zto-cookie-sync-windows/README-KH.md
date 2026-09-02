@@ -1,5 +1,17 @@
 # ZTO Cookie Sync សម្រាប់ Windows
 
+> 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
+> អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស ស្ថិតក្នុង
+> **[docs/BUG-HISTORY.md](../../docs/BUG-HISTORY.md)**។
+
+## កំណែ
+
+ឧបករណ៍មូលដ្ឋាន — **មិន deploy ទេ** ហើយវា **មិនប៉ះ `APP_VERSION` ឬ
+`CACHE_VERSION` របស់ PWA ណាមួយឡើយ**។ វាពឹងលើ `playwright-core` ដែលចាក់សោ
+កំណែក្នុង `package.json` របស់ថតនេះ។
+
+## មុខងារ
+
 ឧបករណ៍នេះកាត់ផ្លូវប្រចាំថ្ងៃពី៖
 
 `F12 ➜ Network ➜ Copy Cookie ➜ Netlify env ➜ Save ➜ Trigger deploy`
@@ -29,7 +41,11 @@
 Cookie ចេញពី Blobs **ពេលមានសំណើ** ដូច្នេះការប្តូរមានប្រសិទ្ធភាព
 **ក្នុងរយៈពេលមួយនាទី ដោយគ្មានការ redeploy**។
 
-## តម្រូវការ
+---
+
+## របៀបប្រើប្រាស់
+
+### តម្រូវការ
 
 - Windows 10/11
 - Microsoft Edge ឬ Google Chrome
@@ -37,7 +53,7 @@ Cookie ចេញពី Blobs **ពេលមានសំណើ** ដូច្ន�
 - សិទ្ធិចូល ZoeW site ក្នុង Netlify
 - Netlify Personal Access Token មួយ (បញ្ចូលតែម្តង)
 
-## Netlify Environment Variables — ដាក់តែ ២ Key
+### Netlify Environment Variables — ដាក់តែ ២ Key
 
 ចូល `Netlify → ZoeW site → Project configuration → Environment variables`
 រួចចុច **Add a variable**។ បង្កើត variable ២ ដាច់ដោយឡែកដូចតារាងនេះ៖
@@ -79,7 +95,7 @@ $rng.Dispose()
 ឬ `ZTO_COOKIE_UPDATE_KEY` ក្នុង Netlify env។ Site ID និង Personal Access Token
 ត្រូវបញ្ចូលតែក្នុង `setup.cmd` ហើយរក្សាទុកតែលើ Windows របស់អ្នក។
 
-## Site ID + PAT សម្រាប់ `setup.cmd`
+### Site ID + PAT សម្រាប់ `setup.cmd`
 
 1. ចូល `Netlify → User settings → Applications → Personal access tokens`
    ហើយបង្កើត token មួយសម្រាប់ឧបករណ៍នេះ។ ជ្រើសថ្ងៃផុតកំណត់ ហើយបើ team ប្រើ
@@ -92,7 +108,7 @@ $rng.Dispose()
 Personal Access Token មានសិទ្ធិតាម account របស់អ្នក។ កុំផ្ញើវាតាម chat,
 screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke វាពី Netlify គ្រប់ពេល។
 
-## Setup ម្តងដំបូង
+### Setup ម្តងដំបូង
 
 1. Double-click **`setup.cmd`**។
 2. វាដំឡើងតែ `playwright-core` ដែលបាន pin ក្នុង `package.json`។
@@ -123,7 +139,7 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 បើប្តូរ Windows user · Site ID · token ឬ revoke token ចាស់ សូមរត់
 `setup.cmd` ឡើងវិញ។
 
-## ប្រើរាល់ពេល Cookie ផុត
+### ប្រើរាល់ពេល Cookie ផុត
 
 1. Double-click **`sync-zto-cookie.cmd`**។
 2. Edge/Chrome profile ពិសេសបើក Argus។
@@ -134,7 +150,7 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
    **ផ្ទៀងផ្ទាត់ដោយខ្លួនឯង** ថា Function ឃើញ Cookie ថ្មីពិត ៖
    `✅ ផ្ទៀងផ្ទាត់រួច — Function កំពុងប្រើ Cookie ថ្មី (blob · a1b2c3d4)`
 
-## របៀបផ្សេងទៀត
+### របៀបផ្សេងទៀត
 
 | ពាក្យបញ្ជា | ធ្វើអ្វី |
 |---|---|
@@ -154,7 +170,7 @@ shell history ទេ។ Netlify API response ដែលអាចពាក់ព�
 របស់ browser ដូច profile ធម្មតា — កុំចែករំលែកថត
 `%LOCALAPPDATA%\Zoe-System`។
 
-## ជ្រើស Chrome ជាមុន Edge
+### ជ្រើស Chrome ជាមុន Edge
 
 លំនាំដើមសាក Microsoft Edge មុន។ បើចង់សាក Chrome មុន៖
 
@@ -163,7 +179,7 @@ set ZTO_SYNC_BROWSER=chrome
 sync-zto-cookie.cmd
 ```
 
-## ពេលមានបញ្ហា
+### ពេលមានបញ្ហា
 
 | សារ | ត្រូវធ្វើអ្វី |
 |---|---|
@@ -175,7 +191,11 @@ sync-zto-cookie.cmd
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
 | ការសរសេរចូល Blobs បរាជ័យ | សាកម្តងទៀត; បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
 
-## ព្រំដែន
+---
+
+## ប្រព័ន្ធសុវត្ថិភាព
+
+### ព្រំដែន
 
 - វាមិនស្មាន ឬបញ្ចូល ZTO password ដោយស្វ័យប្រវត្តិទេ។ បើ SSO ផុត អ្នកត្រូវ
   Login ម្តងក្នុង browser profile ពិសេស។
@@ -187,3 +207,23 @@ sync-zto-cookie.cmd
   មិនលុប និងមិនប៉ះ key ណាផ្សេងទេ។
 - Cookie ដែលសរសេរចូល Blobs អាចត្រូវការរហូតដល់ **៦០ វិនាទី** ទើបឡើងដល់គ្រប់
   សំណើ (edge cache របស់ Netlify)។ ការឆ្លើយ 401 ពី ZTO កាត់ការរង់ចាំនោះភ្លាម។
+
+### សេចក្តីសង្ខេបនៃការការពារ
+
+| អ្វី | របៀបការពារ |
+|---|---|
+| **Cookie ZTO** | រស់ក្នុងសតិប៉ុណ្ណោះ — **មិនត្រូវបានបង្ហាញ** ក្នុង console, មិនសរសេរចូល file/config និងមិនចូល shell history |
+| **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
+| **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
+| **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout ដែល settle ដោយ timer ពិត · response body បោះចោលដោយមិនបង្ហាញ |
+| **ការ upload** | signed URL ត្រូវជា **HTTPS** មុនផ្ញើ Cookie ហើយ ⛔ **PAT មិនហូរទៅ host នោះសោះ**; redirect ត្រូវបដិសេធដោយឈ្មោះ |
+| **ទម្រង់ Cookie** | ត្រូវមាន `BOS-MAN-SESSION` ពិត · បដិសេធ CR/LF/NUL · ពិដាន ៨ KiB និង ៦៤ គូ ➜ header injection កើតមិនបាន |
+| **⛔ អ្វីដែលមិនធ្វើ** | មិនបង្កើត endpoint សរសេរ Cookie ពី internet · មិនដាក់ `NETLIFY_AUTH_TOKEN` ក្នុង Netlify env · មិនប្រើ browser extension |
+
+---
+
+## អាជ្ញាប័ណ្ណ
+
+**កម្មសិទ្ធិឯកជន** — ផ្នែកមួយនៃ Zoe-System សម្រាប់ប្រើក្នុងអាជីវកម្មរបស់
+ម្ចាស់ប៉ុណ្ណោះ។ ឧបករណ៍នេះមិនត្រូវការ Activation Key ទេ ព្រោះវាមិនមែនជា
+App របស់អតិថិជន — វាជាឧបករណ៍ថែទាំដែលរត់លើកុំព្យូទ័ររបស់ម្ចាស់។

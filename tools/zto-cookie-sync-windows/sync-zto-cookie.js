@@ -35,6 +35,13 @@ const REQUIRED_COOKIE_NAME = 'BOS-MAN-SESSION';
 const SITE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/;
 const TOKEN_RE = /^[\x21-\x7e]{16,4096}$/;
 
+// ⛔ ឈ្មោះប៉ុណ្ណោះ — តម្លៃ cookie មិនត្រូវរក្សា ឬបោះពុម្ពឡើយ។
+let lastDroppedCookieNames = [];
+
+function droppedCookieNames() {
+    return lastDroppedCookieNames.slice();
+}
+
 function codedError(code) {
     const error = new Error(code);
     error.code = code;
@@ -57,22 +64,38 @@ function validateCookieHeader(raw) {
     if (text.length < COOKIE_MIN_LENGTH) throw codedError('COOKIE_TOO_SHORT');
     if (text.length > COOKIE_MAX_LENGTH) throw codedError('COOKIE_TOO_LONG');
 
+    // ⛔ គូ **តែមួយ** ដែលមិនពាក់ព័ន្ធ (analytics តម្លៃមានចន្លោះ · flag គ្មាន
+    // `=` · jar ធំ) មិនត្រូវសម្លាប់ការចាប់ទាំងមូល — វាស់បាន 2026-09-02 ៖
+    // `BOS-MAN-SESSION` នៅត្រឹមត្រូវ តែ helper ស្លាប់ដោយសារ cookie របស់អ្នកដទៃ
+    // ដែលអ្នកប្រើកែមិនបាន។ ដូច្នេះគូដែលផ្ទៀងផ្ទាត់មិនបាន ត្រូវ **រំលង**
+    // (កុំផ្ញើ byte ដែលមិនបានផ្ទៀងផ្ទាត់) ចំណែកការការពារពិតនៅដដែល ៖
+    // control char ➜ បដិសេធទាំងស្រុងខាងលើ; អវត្តមាន session ➜ បដិសេធខាងក្រោម។
     const rawPairs = text.split(';');
-    if (rawPairs.length > COOKIE_MAX_PAIRS) throw codedError('COOKIE_TOO_MANY_PAIRS');
     const pairs = [];
+    const dropped = [];
     let hasSession = false;
     for (const rawPair of rawPairs) {
         const pair = rawPair.trim();
+        if (!pair) continue;
         const equalsAt = pair.indexOf('=');
-        if (equalsAt < 1) throw codedError('COOKIE_PAIR_SHAPE');
-        const name = pair.slice(0, equalsAt).trim();
-        const value = pair.slice(equalsAt + 1);
-        if (!COOKIE_NAME_RE.test(name)) throw codedError('COOKIE_NAME_SHAPE');
-        if (!COOKIE_VALUE_RE.test(value)) throw codedError('COOKIE_VALUE_SHAPE');
+        const name = equalsAt < 1 ? pair : pair.slice(0, equalsAt).trim();
+        const value = equalsAt < 1 ? null : pair.slice(equalsAt + 1);
+        const shaped = value !== null
+            && COOKIE_NAME_RE.test(name)
+            && COOKIE_VALUE_RE.test(value);
+        if (!shaped) {
+            dropped.push(COOKIE_NAME_RE.test(name) ? name : '(ឈ្មោះខូច)');
+            continue;
+        }
+        if (pairs.length >= COOKIE_MAX_PAIRS) {
+            dropped.push(name);
+            continue;
+        }
         if (name === REQUIRED_COOKIE_NAME && value.length >= 8) hasSession = true;
         pairs.push(name + '=' + value);
     }
     if (!hasSession) throw codedError('COOKIE_SESSION_MISSING');
+    if (dropped.length) lastDroppedCookieNames = dropped.slice(0, 12);
     return pairs.join('; ');
 }
 
@@ -639,6 +662,39 @@ function safeFailureMessage(code) {
     return messages[code] || 'មានកំហុសដែលមិនស្គាល់។';
 }
 
+// ⛔ ច្រកទ្វារ --auto ត្រូវវាស់ **តម្លៃដែលដោះសោបាន** មិនមែនវត្តមានឯកសារ។
+// សោដែលនៅលើថាសតែដោះមិនចេញ (ប្តូរ Windows user · DPAPI ខូច) ធ្វើឲ្យការពិនិត្យ
+// តាមឯកសារជា **ការការពារដែលងាប់** ៖ schtasks ចុះឈ្មោះជោគជ័យ រួច --auto
+// ស្ងាត់រាល់ការចូល Windows។ ហើយសារត្រូវ **ដាក់ឈ្មោះអ្វីដែលខ្វះ** ព្រោះ
+// «ខ្វះទាំង ២» និង «ខ្វះតែសោ» ជាការកែ ២ ផ្សេងគ្នាសម្រាប់អ្នកប្រើ។
+function autoReadiness(verification) {
+    const source = verification || {};
+    const missing = [];
+    if (!String(source.siteUrl || '')) missing.push('siteUrl');
+    if (!String(source.proxyKey || '')) missing.push('proxyKey');
+    return { ready: missing.length === 0, missing };
+}
+
+function describeAutoReadiness(readiness) {
+    const missing = (readiness && readiness.missing) || [];
+    const labels = {
+        siteUrl: 'ZoeW Site URL (ឧ. https://zoew.netlify.app)',
+        proxyKey: 'ZTO_PROXY_KEY (តម្លៃដដែលនឹងក្នុង Netlify)'
+    };
+    if (!missing.length) {
+        return '✅ Site URL និងសោ Proxy រួចរាល់សម្រាប់របៀប --auto។';
+    }
+    const lines = ['❌ របៀប --auto ត្រូវការតម្លៃដែលនៅខ្វះ ៖'];
+    missing.forEach((key) => lines.push('   • ' + (labels[key] || key)));
+    lines.push('');
+    lines.push('សូមរត់ setup.cmd ម្តងទៀត។ វារក្សា Site ID និង Netlify token ចាស់ទុក —');
+    lines.push('ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច រួចបំពេញតែ ២ ខាងលើ។');
+    if (missing.indexOf('siteUrl') !== -1) {
+        lines.push('⛔ prompt ZTO_PROXY_KEY លេចឡើង **តែក្រោយ** បំពេញ Site URL។');
+    }
+    return lines.join('\n');
+}
+
 // ⛔ របៀប --auto រត់ **ដោយគ្មានមនុស្ស** ➜ ការបើក browser ដោយមិនដឹងស្ថានភាព
 // ពិត គឺជាការរំខានរាល់ការចូល Windows។ ដូច្នេះវាបើកតែពេលមានសាលក្រមច្បាស់ថា
 // Cookie ស្លាប់ប៉ុណ្ណោះ។
@@ -696,6 +752,13 @@ async function reportVerification(cookieHeader) {
 }
 
 async function main() {
+    if (process.argv.includes('--auto-ready')) {
+        const readiness = autoReadiness(await resolveVerification());
+        console.log(describeAutoReadiness(readiness));
+        if (!readiness.ready) process.exitCode = 1;
+        return;
+    }
+
     if (process.argv.includes('--check')) {
         console.log('🔎 កំពុងពិនិត្យសុខភាព Cookie ZTO...');
         console.log(describeHealth(await checkCookieHealth(await resolveVerification())));
@@ -722,6 +785,13 @@ async function main() {
     console.log('🔎 កំពុងចាប់ Cookie ពី Request Header ពិត — មិនប្រើ DevTools និងមិនប្រើ extension...');
     let cookieHeader = await captureCookieHeader();
     console.log('✅ ចាប់ Cookie បាន។ តម្លៃមិនត្រូវបានបង្ហាញ ឬសរសេរចូលឯកសារទេ។');
+    // ⛔ ការរំលងគូត្រូវ **មើលឃើញ** — ការរំលងស្ងាត់ធ្វើឲ្យបញ្ហាថ្ងៃក្រោយ
+    // វិនិច្ឆ័យមិនបាន។ បោះពុម្ព **ឈ្មោះ** ប៉ុណ្ណោះ មិនដែលបោះតម្លៃឡើយ។
+    const skipped = droppedCookieNames();
+    if (skipped.length) {
+        console.log('   ℹ️ រំលងគូ cookie ដែលមិនស៊ីទម្រង់ ' + skipped.length + ' ៖ '
+            + skipped.join(', ') + ' (BOS-MAN-SESSION នៅគ្រប់)។');
+    }
     try {
         console.log('🔐 កំពុងសរសេរ Cookie ចូល Netlify Blobs...');
         await syncNetlifyCookie(cookieHeader);
@@ -740,6 +810,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+    autoReadiness,
+    droppedCookieNames,
     checkCookieHealth,
     cookieFingerprint,
     cookieHeaderFromHeaders,

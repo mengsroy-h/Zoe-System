@@ -113,12 +113,27 @@ screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke �
 1. Double-click **`setup.cmd`**។
 2. វាដំឡើងតែ `playwright-core` ដែលបាន pin ក្នុង `package.json`។
 3. បញ្ចូល ZoeW Site ID។
-4. បញ្ចូល **ZoeW Site URL** (ស្រេចចិត្ត — ឧ. `https://zoew.netlify.app`)។
-   បើបញ្ចូល ឧបករណ៍នឹងផ្ទៀងផ្ទាត់ខ្លួនឯង និងបើករបៀប `--check`/`--auto`។
+4. បញ្ចូល **ZoeW Site URL** (ឧ. `https://zoew.netlify.app`)។
+   វាចាំបាច់សម្រាប់របៀប `--check` និង `--auto`។ ចុច Enter ដើម្បីរំលង។
 5. បញ្ចូល Netlify Personal Access Token ក្នុង prompt ដែលលាក់អក្សរ។
-6. បញ្ចូល **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត — តម្លៃដដែលនឹងក្នុង Netlify)។
+6. បញ្ចូល **`ZTO_PROXY_KEY`** (តម្លៃដដែលនឹងក្នុង Netlify)។
+   ⛔ **prompt នេះលេចឡើងតែក្រោយបំពេញ Site URL ខាងលើ** — បើរំលង Site URL
+   នោះវាមិនសួរសោះ ហើយ `--auto` ប្រើមិនបាន។
 7. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
    `✅ Setup រួចរាល់` គឺចប់។
+
+**រត់ `setup.cmd` ឡើងវិញបានគ្រប់ពេល ដោយមិនបាត់អ្វី។** វាបង្ហាញតម្លៃចាស់
+ហើយ **ចុច Enter = រក្សាដដែល** ៖
+
+| prompt | ចុច Enter ➜ |
+|---|---|
+| Site ID | រក្សាតម្លៃចាស់ |
+| Site URL | រក្សាតម្លៃចាស់ (វាយ `-` ដើម្បីលុបចេញ) |
+| Netlify PAT | **រក្សា token ចាស់** — ⛔ មិនបាច់វាយថ្មី |
+| `ZTO_PROXY_KEY` | រក្សាសោចាស់ |
+
+⛔ នេះសំខាន់ព្រោះ **Netlify បង្ហាញ PAT តែម្តងគត់** — ការបំពេញតម្លៃ
+ស្រេចចិត្ត ២ ខាងលើ មិនត្រូវបង្ខំឲ្យបង្កើត PAT ថ្មីឡើយ។
 
 Site ID រក្សាក្នុង `config.json` ក្រៅ repo។ Token ត្រូវបានអ៊ិនគ្រីបដោយ
 **Windows DPAPI / CurrentUser** ក្នុង `netlify-token.dpapi` — Windows user ផ្សេង
@@ -163,6 +178,18 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ⛔ **`--check` និង `--auto` ត្រូវការ Site URL + `ZTO_PROXY_KEY`** ក្នុង
 `setup.cmd`។ បើគ្មាន `--auto` នឹង **មិនបើក browser ទេ** ហើយប្រាប់មូលហេតុ —
 ការបើក browser រាល់ការចូល Windows ដោយមិនដឹងស្ថានភាព គឺជាការរំខាន។
+
+`schedule-zto-cookie.cmd` ពិនិត្យរឿងនោះជាមុន ហើយបើខ្វះ វា **ដាក់ឈ្មោះ
+តម្លៃដែលខ្វះ** ៖
+
+```text
+❌ របៀប --auto ត្រូវការតម្លៃដែលនៅខ្វះ ៖
+   • ZoeW Site URL (ឧ. https://zoew.netlify.app)
+   • ZTO_PROXY_KEY (តម្លៃដដែលនឹងក្នុង Netlify)
+```
+
+ដំណោះស្រាយ ៖ រត់ `setup.cmd` ម្តងទៀត ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច
+រួចបំពេញតែ ២ នោះ។
 
 Cookie មិនត្រូវបានបង្ហាញក្នុង console, មិនសរសេរចូល config/file និងមិនចូល
 shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល

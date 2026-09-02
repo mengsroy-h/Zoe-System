@@ -158,7 +158,10 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 
 1. Double-click **`sync-zto-cookie.cmd`**។
 2. Edge/Chrome profile ពិសេសបើក Argus។
-3. បើ ZTO សុំ សូម Login ជាធម្មតា។ បើ session នៅរស់ **គ្មានអ្វីត្រូវចុចទេ**។
+3. បើ ZTO សុំ សូម Login ជាធម្មតា រួច **ចូល Scan Management ➜ Arrival Scan**
+   ហើយ **វាយ ឬស្កេន Waybill មួយ**។ ⛔ វាស់រួច (2026-09-02) ៖ Cookie
+   `BOS-MAN-SESSION` លេចឡើង **តែពេលសំណើ Order Detail បាញ់** — ការ Login
+   តែម្យ៉ាង ឬការបើកទំព័រទទេ **មិនគ្រប់គ្រាន់ទេ**។
 4. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
    ⛔ **មិនចាំបាច់ redeploy ទេ** — ការស្កេនថ្មីប្រើ Cookie នេះក្នុងមួយនាទី។
 5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា

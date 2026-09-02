@@ -2093,10 +2093,19 @@ Mutation ៥ ➜ ចាប់បានទាំង ៥។
 
 ច្បាប់៖
 
-- **ការចាប់ Cookie ដើរតាម *host* មិនមែន *path*** — Cookie ជារបស់ domain ➜
-  សំណើណាមួយទៅ `aargus-api.ztoglobal.com` ក៏ផ្ទុក `BOS-MAN-SESSION` ដដែល ➜
-  អ្នកប្រើលែងត្រូវចុចបើកកញ្ចប់។ ⛔ **ការការពារពិតគឺ `validateCookieHeader()`**
-  ដែលទាមទារ session ពិត — មិនមែន path ទេ។ សំណើមុន Login នៅតែត្រូវរង់ចាំ។
+- **ការចាប់ Cookie ដើរតាម *host* មិនមែន *path*** — ការត្រងតាម path តែមួយ
+  នឹងខកខានសំណើដទៃទៀតដែលផ្ទុក session ដដែល។ ⛔ **ការការពារពិតគឺ
+  `validateCookieHeader()`** ដែលទាមទារ session ពិត — មិនមែន path ទេ។
+  ⚠️ **ការវាស់ពិត (អ្នកប្រើ + DevTools, 2026-09-02) កែការអះអាងចាស់** ៖ ធ្លាប់
+  សរសេរថា «អ្នកប្រើលែងត្រូវចុចបើកកញ្ចប់» — **មិនពិតទេ**។ ផ្លូវពិតគឺ ៖
+  **Login ➜ Scan Management ➜ Arrival Scan ➜ វាយ Waybill** ➜ ទើប
+  `POST https://aargus-api.ztoglobal.com/scan/get/order/detail` បាញ់ ហើយ
+  **ទើប** `BOS-MAN-SESSION` លេចក្នុង request header។ សារ console និង
+  README ត្រូវប្រាប់ជំហានទាំង ៣ នោះ មិនមែនត្រឹម «បើកកញ្ចប់ណាមួយ»។
+- **កិច្ចសន្យា API ដែលវាស់ពី DevTools ពិត** ៖ method **POST** ·
+  `Content-Type: application/json` · body `{"billCode":"…","countryCode":"KH"}`
+  ➜ **៤៨ byte** សម្រាប់ barcode ១៤ តួ (ត្រូវនឹង `Content-Length: 48` ពិត)។
+  `zto-proxy-test.js` ចាក់សោទាំង ៣។
 - **`cookieFingerprint()` ត្រូវដូចគ្នា ២ ខាង** — helper និង Function គណនា
   `sha256(cookie).hex.slice(0, 8)` លើ **Cookie ដែល normalize រួច**
   (`name=value; name=value`)។ ⛔ ការប្តូរ normalization ខាងណាមួយ ធ្វើឲ្យការ

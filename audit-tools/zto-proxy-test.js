@@ -215,6 +215,18 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
         jsonResponder.last.options.body);
     ok('URL លំនាំដើមនៅដដែល',
         jsonResponder.last.url === 'https://aargus-api.ztoglobal.com/scan/get/order/detail', jsonResponder.last.url);
+    // ⛔ វាស់ពី DevTools លើ Argus ពិត (2026-09-02) ៖ Request Method **POST** ·
+    // Content-Type `application/json` · Content-Length **៤៨** សម្រាប់ barcode
+    // ១៤ តួ។ ការប្តូរ method ឬ template ដោយស្ងាត់ ធ្វើឲ្យ lookup ស្លាប់លើ
+    // ផលិតកម្ម ខណៈ stub ក្នុងតេស្តជោគជ័យទាំងអស់។
+    ok('POST ➜ method ពិតជា POST (វាស់ពី Argus)',
+        jsonResponder.last.options.method === 'POST', jsonResponder.last.options.method);
+    ok('POST ➜ Content-Type ជា application/json (វាស់ពី Argus)',
+        /^application\/json/.test(String(jsonResponder.last.options.headers['Content-Type'] || '')),
+        jsonResponder.last.options.headers['Content-Type']);
+    ok('POST ➜ តួសំណើ ៤៨ byte សម្រាប់ barcode ១៤ តួ (ត្រូវនឹង Content-Length ពិត)',
+        Buffer.byteLength(String(jsonResponder.last.options.body)) === 48,
+        Buffer.byteLength(String(jsonResponder.last.options.body)));
     ok('redirect: manual (login redirect ជាការបដិសេធ auth)', jsonResponder.last.options.redirect === 'manual');
 
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer official-token' });

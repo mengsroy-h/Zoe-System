@@ -632,6 +632,75 @@ async function run() {
         for (let i = 0; i < 12; i++) ok('Netlify API behavior #' + (i + 1), false);
     }
 
+    console.log('\n=== ៦គ. ការផ្ទៀងផ្ទាត់ត្រូវប្រាប់មូលហេតុពិត (វាស់ 2026-09-02) ===');
+    // 🔴 របាយការណ៍អ្នកប្រើ ៖ «⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ១៥ ដង)»
+    // ក្រោយការសរសេរ **ជោគជ័យ**។ `resolveCookieCredential()` ចេញភ្លាមពេលមាន
+    // ZTO_AUTHORIZATION/ZTO_TOKEN ➜ **មិនប៉ះ store សោះ** ➜ ការរង់ចាំ ៧៥ វិ.
+    // គឺជាការរង់ចាំរឿងដែល **មិនអាចកើតឡើងបាន**។ ហើយ `diagnosticsCookie()`
+    // បោះចោល `storeReason` និង `auth` — ២ វាលដែលពន្យល់មូលហេតុ។
+    if (api) {
+        // ⛔ កុំបញ្ឈប់ checker ពេលរកឈ្មោះមិនឃើញ — stub រួចរាយជាការធ្លាក់ដែលមានឈ្មោះ
+        const hasDiag = typeof api.diagnosticsCookie === 'function';
+        const diagInfo = hasDiag ? api.diagnosticsCookie({
+            auth: 'token',
+            cookie: { source: 'none', fingerprint: null, storeReason: 'unavailable' }
+        }) : {};
+        ok('export `diagnosticsCookie` ដើម្បីវាស់បាន', hasDiag);
+        ok('diagnosticsCookie រក្សាវាល `storeReason`',
+            diagInfo.storeReason === 'unavailable', JSON.stringify(diagInfo));
+        ok('diagnosticsCookie រក្សាវាល `auth`',
+            diagInfo.auth === 'token', JSON.stringify(diagInfo));
+
+        const call = (payload, opts) => api.verifyCookieLive(COOKIE, Object.assign({
+            siteUrl: SITE_URL,
+            proxyKey: PROXY_KEY,
+            gapMs: 1,
+            deadlineMs: 200,
+            sleepImpl: () => Promise.resolve(),
+            fetchImpl: async () => fakeResponse(200, payload)
+        }, opts || {}));
+
+        // ⛔ ផ្លូវ token/authorization ➜ store មិនដែលត្រូវអាន ➜ ឈប់ភ្លាម
+        const overridden = await call({
+            ok: true, auth: 'token',
+            cookie: { source: 'none', fingerprint: null, storeReason: null }
+        });
+        ok('⛔ ZTO_TOKEN/AUTHORIZATION ➜ ឈប់ភ្លាម មិនរង់ចាំ ១៥ ដង',
+            overridden.status === 'auth-override' && overridden.attempts === 1,
+            JSON.stringify(overridden));
+
+        // ⛔ ទិសផ្ទុយ ៖ ការផ្សព្វផ្សាយពិត ➜ នៅតែព្យាយាមឡើងវិញដដែល
+        const propagating = await call({
+            ok: true, auth: 'cookie',
+            cookie: { source: 'blob', fingerprint: 'deadbeef', storeReason: null }
+        });
+        ok('⛔ blob ដែលកំពុងផ្សព្វផ្សាយ ➜ នៅតែព្យាយាមឡើងវិញ',
+            propagating.status === 'mismatch' && propagating.attempts > 1,
+            JSON.stringify(propagating));
+
+        // ការត្រូវគ្នាពិតនៅតែជោគជ័យដដែល
+        const wanted = api.cookieFingerprint(api.validateCookieHeader(COOKIE));
+        const matched = await call({
+            ok: true, auth: 'cookie',
+            cookie: { source: 'blob', fingerprint: wanted, storeReason: null }
+        });
+        ok('⛔ ទិសផ្ទុយ ៖ fingerprint ត្រូវគ្នា ➜ match ដដែល',
+            matched.status === 'match' && matched.source === 'blob',
+            JSON.stringify(matched));
+
+        // លទ្ធផលត្រូវផ្ទុកអ្វីដែលឃើញ ដើម្បីឲ្យសារប្រាប់ការពិតបាន
+        const envSeen = await call({
+            ok: true, auth: 'cookie',
+            cookie: { source: 'env', fingerprint: 'aabbccdd', storeReason: 'unavailable' }
+        });
+        ok('លទ្ធផលផ្ទុក source ដែលឃើញពិត',
+            envSeen.source === 'env', JSON.stringify(envSeen));
+        ok('លទ្ធផលផ្ទុក storeReason ដែលឃើញពិត',
+            envSeen.storeReason === 'unavailable', JSON.stringify(envSeen));
+    } else {
+        for (let i = 0; i < 8; i++) ok('ការផ្ទៀងផ្ទាត់ #' + (i + 1), false, 'គ្មាន api');
+    }
+
     console.log('\n=== ៧ខ. jar ពិតរបស់ Argus មិនត្រូវសម្លាប់ការចាប់ (វាស់ 2026-09-02) ===');
     // 🔴 វាស់បាន ៖ cookie **តែមួយ** ដែលមិនពាក់ព័ន្ធ (analytics តម្លៃមានចន្លោះ ·
     // flag គ្មាន `=` · jar លើស ៦៤ គូ) ធ្វើឲ្យ `validateCookieHeader()` បោះ ➜

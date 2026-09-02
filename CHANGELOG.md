@@ -25,6 +25,52 @@
 
 ---
 
+## [គ្មានការឡើងកំណែ] — 2026-09-02ង · ការផ្ទៀងផ្ទាត់ Cookie ត្រូវប្រាប់មូលហេតុពិត
+
+⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — កែតែ `tools/` ·
+`audit-tools/` និងឯកសារ។ កូដ PWA និងកូដ server **មិនប្រែ**។
+
+### កែកំហុស
+
+- 🔴 **របាយការណ៍អ្នកប្រើ ជាមួយរូបភាព** ៖ ក្រោយសរសេរ Cookie **ជោគជ័យ** helper
+  បង្ហាញ «⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ១៥ ដង)» ដោយ
+  **មិនប្រាប់មូលហេតុ**។ វាស់បាន ៖ ពេល Netlify env មាន `ZTO_AUTHORIZATION`
+  ឬ `ZTO_TOKEN` នោះ `resolveCookieCredential()` **ចេញភ្លាម មិនប៉ះ store សោះ**
+  ➜ fingerprint នៃ blob **មិនអាចត្រូវគ្នាបានជារៀងរហូត** ➜ helper រង់ចាំ
+  **៣២ ដង** (វាស់រួច) លើរឿងដែល **មិនអាចកើតឡើងបាន**។ ឥឡូវវា **ឈប់ភ្លាម**
+  ហើយប្រាប់ថាត្រូវលុប env ទាំងនោះចេញ។
+- 🔴 **`diagnosticsCookie()` បោះចោល `auth` និង `storeReason`** — ២ វាលដែល
+  **ពន្យល់មូលហេតុ**។ ឥឡូវវារក្សាទុក ហើយសារចុងក្រោយប្រាប់ **អ្វីដែលឃើញពិត** ៖
+  `source: env` ➜ «Function អាន ZTO_COOKIE មិនមែន blob (+ ជាប់ត្រង់ …)»;
+  `source: blob` ➜ «អាន blob រួច តែតម្លៃនៅចាស់ (cache ៦០ វិ. + edge)»។
+- 🔴 **ឯកសារសរសេរខុសពីការវាស់** ៖ README ចែងថា «បើ session នៅរស់ **គ្មានអ្វី
+  ត្រូវចុចទេ**» — **មិនពិតទេ**។ អ្នកប្រើ និង DevTools បញ្ជាក់ ៖ Cookie
+  `BOS-MAN-SESSION` លេចឡើង **តែពេលសំណើ Order Detail បាញ់** ➜ ត្រូវ
+  **Login ➜ Scan Management ➜ Arrival Scan ➜ វាយ Waybill**។ សារ console
+  និង README ប្រាប់ជំហានទាំង ៣ នោះឥឡូវ។
+
+### ឧបករណ៍ audit
+
+- **`zto-cookie-sync-test.js`** ៖ ១២២ ➜ **១៣០ assertion** (ធ្លាក់ **៥** លើ tree
+  មុនកែ)។ Mutation ៣ ➜ ចាប់បានទាំង ៣ (ដកការឈប់ភ្លាម · ឈប់ភ្លាមលើគ្រប់ករណី ·
+  ទម្លាក់ `storeReason`)។ ⛔ ការអះអាង **២ ខាង** ៖ ការផ្សព្វផ្សាយពិត
+  **នៅតែព្យាយាមឡើងវិញដដែល**។
+- **`zto-proxy-test.js`** ៖ ១២៩ ➜ **១៣២** — ចាក់សោ **កិច្ចសន្យា API ដែលវាស់
+  ពី DevTools ពិត** ៖ method **POST** · `Content-Type: application/json` ·
+  តួសំណើ **៤៨ byte** សម្រាប់ barcode ១៤ តួ (ត្រូវនឹង `Content-Length: 48` ពិត)។
+
+### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **ទាញថត `tools/zto-cookie-sync-windows/` ថ្មីមក Windows** (កូដ server មិនប្រែ)។
+2. បើ helper ធ្លាប់បង្ហាញ «⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី» ៖ រត់
+   `curl -H "X-Zoe-Proxy-Key: <key>" "https://<site>/.netlify/functions/zto-order-detail?diag=1"`
+   រួចមើល `auth` និង `cookie.source` ៖ `auth` ជា `token`/`authorization` ➜
+   លុប `ZTO_AUTHORIZATION`/`ZTO_TOKEN` ចេញពី Netlify env; `cookie.source`
+   ជា `env` ➜ ពិនិត្យថា deploy ថ្មីរួច និង Blobs បើកសម្រាប់ site នេះ។
+3. ⛔ **Firebase rules មិនប្រែ** · **CSP មិនប្រែ**។
+
+---
+
 ## [គ្មានការឡើងកំណែ] — 2026-09-02ឃ · កែផ្លូវងាប់របស់ `--auto` និង jar Cookie ពិត
 
 ⛔ **`APP_VERSION` និង `CACHE_VERSION` មិនប្រែសោះ** — ជុំនេះកែតែកូដ **ខាង

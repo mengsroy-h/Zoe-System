@@ -430,13 +430,26 @@ async function readDiagnostics(siteUrl, proxyKey, controls) {
 
 function diagnosticsCookie(payload) {
     const info = (payload && payload.cookie) || {};
+    // ⛔ `auth` និង `storeReason` ជា ២ វាលដែល **ពន្យល់មូលហេតុ** នៃការមិន
+    // ត្រូវគ្នា។ ជំនាន់មុនបោះចោលពួកវា ➜ សារចុងក្រោយប្រាប់តែ «មិនទាន់ឃើញ»
+    // ដែលអ្នកប្រើកែមិនបាន (វាស់រួច 2026-09-02)។
     return {
+        auth: typeof (payload && payload.auth) === 'string' ? payload.auth : '',
         source: typeof info.source === 'string' ? info.source : '',
         fingerprint: typeof info.fingerprint === 'string' ? info.fingerprint : '',
+        storeReason: typeof info.storeReason === 'string' ? info.storeReason : '',
         ageMs: typeof info.ageMs === 'number' ? info.ageMs : null,
         renewals: typeof info.renewals === 'number' ? info.renewals : 0,
         authRejectedAgeMs: typeof info.authRejectedAgeMs === 'number' ? info.authRejectedAgeMs : null
     };
+}
+
+// ⛔ `resolveCookieCredential()` ចេញ **ភ្លាម** ពេលមាន ZTO_AUTHORIZATION ឬ
+// ZTO_TOKEN ➜ store មិនដែលត្រូវអានសោះ ➜ fingerprint នៃ blob **មិនអាច
+// ត្រូវគ្នាបានជារៀងរហូត**។ ការរង់ចាំ ៧៥ វិ. លើករណីនោះ ជាការរង់ចាំរឿង
+// ដែលមិនអាចកើតឡើងបាន — ត្រូវឈប់ភ្លាម ហើយប្រាប់មូលហេតុពិត។
+function verificationIsImpossible(info) {
+    return info.auth === 'token' || info.auth === 'authorization';
 }
 
 async function verifyCookieLive(cookieHeader, options) {
@@ -460,7 +473,7 @@ async function verifyCookieLive(cookieHeader, options) {
         || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     const startedAt = Date.now();
     let attempts = 0;
-    let last = { status: 'unreachable', source: '', fingerprint: '' };
+    let last = { status: 'unreachable', source: '', fingerprint: '', storeReason: '' };
 
     for (;;) {
         attempts++;
@@ -471,12 +484,28 @@ async function verifyCookieLive(cookieHeader, options) {
                     status: 'match',
                     attempts,
                     source: info.source,
-                    fingerprint: info.fingerprint
+                    fingerprint: info.fingerprint,
+                    storeReason: info.storeReason
                 };
             }
-            last = { status: 'mismatch', source: info.source, fingerprint: info.fingerprint };
+            if (verificationIsImpossible(info)) {
+                return {
+                    status: 'auth-override',
+                    attempts,
+                    source: info.source,
+                    fingerprint: info.fingerprint,
+                    storeReason: info.storeReason,
+                    auth: info.auth
+                };
+            }
+            last = {
+                status: 'mismatch',
+                source: info.source,
+                fingerprint: info.fingerprint,
+                storeReason: info.storeReason
+            };
         } catch (_) {
-            last = { status: 'unreachable', source: '', fingerprint: '' };
+            last = { status: 'unreachable', source: '', fingerprint: '', storeReason: '' };
         }
         if (attempts >= maxAttempts) break;
         const elapsed = Date.now() - startedAt;
@@ -614,8 +643,10 @@ async function captureCookieHeader() {
         const pages = context.pages();
         const page = pages[0] || await context.newPage();
         console.log('🌐 បើក Argus ក្នុង ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + ' រួចរាល់។');
-        console.log('   បើត្រូវការ សូម Login ហើយបើក/ស្វែងរកកញ្ចប់ណាមួយក្នុង Argus។');
-        console.log('   ឧបករណ៍នឹងបន្តដោយខ្លួនឯងពេលឃើញសំណើ Order Detail។');
+        console.log('   ១. Login (បើ ZTO សុំ)។');
+        console.log('   ២. ចូល Scan Management ➜ Arrival Scan។');
+        console.log('   ៣. វាយ ឬស្កេន Waybill មួយ ➜ សំណើ Order Detail នឹងលោតមក។');
+        console.log('   ឧបករណ៍នឹងបន្តដោយខ្លួនឯងភ្លាមពេលឃើញសំណើនោះ។');
         try {
             await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
@@ -747,7 +778,24 @@ async function reportVerification(cookieHeader) {
         console.log('   ⚠️ ភ្ជាប់ Function មិនបាន។ Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
         return;
     }
+    if (result.status === 'auth-override') {
+        console.log('   ⛔ Netlify env មាន ZTO_AUTHORIZATION ឬ ZTO_TOKEN ➜ Function ប្រើ');
+        console.log('      Token នោះ ហើយ **មិនអាន Cookie store សោះ**។ Cookie ថ្មីត្រូវ');
+        console.log('      សរសេររួច តែវានឹងមិនត្រូវប្រើទេ ទាល់តែលុប env ទាំងនោះចេញ។');
+        return;
+    }
     console.log('   ⚠️ Function នៅមិនទាន់ឃើញ Cookie ថ្មី (រង់ចាំ ' + result.attempts + ' ដង)។');
+    // ⛔ សារត្រូវប្រាប់ **អ្វីដែលឃើញពិត** — បើអត់ អ្នកប្រើកែមិនបាន។
+    if (result.source === 'env') {
+        console.log('      Function កំពុងអាន ZTO_COOKIE (env) មិនមែន blob'
+            + (result.storeReason ? ' — ជាប់ត្រង់ ' + result.storeReason : '') + '។');
+        console.log('      បើវានៅដដែលក្រោយ ១ នាទី ៖ ពិនិត្យថា deploy ថ្មីរួចហើយ');
+        console.log('      និងថា Netlify Blobs បើកសម្រាប់ site នេះ។');
+    } else if (result.source === 'blob') {
+        console.log('      Function អាន blob រួច តែតម្លៃនៅចាស់ (cache ៦០ វិ. + edge)។');
+    } else if (result.storeReason) {
+        console.log('      Cookie store ជាប់ត្រង់ ៖ ' + result.storeReason + '។');
+    }
     console.log('      Cookie ត្រូវសរសេររួច — សូមសាកស្កេនក្នុងមួយនាទី។');
 }
 
@@ -811,6 +859,7 @@ if (require.main === module) {
 
 module.exports = {
     autoReadiness,
+    diagnosticsCookie,
     droppedCookieNames,
     checkCookieHealth,
     cookieFingerprint,

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.3';
+    const APP_VERSION = '2.25.4';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -359,6 +359,7 @@
     let dbListenerOutageNoticeShown = false;
     const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
     const DB_LISTENER_KEY_DELETED = 'deleted';
+    const DB_LISTENER_KEY_HISTORY = 'history';
     const dbListenerPendingPaths = new Set();
     const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
@@ -4486,7 +4487,7 @@
             debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== dbListenerGeneration) return;
-            handleDbListenerError(err, 'history');
+            handleDbListenerError(err, DB_LISTENER_KEY_HISTORY);
         });
         }
 
@@ -4509,7 +4510,7 @@
             runAutomaticDeletedCleanup();
         }, (err) => {
             if (listenerGeneration !== dbListenerGeneration) return;
-            handleDbListenerError(err, 'deleted');
+            handleDbListenerError(err, DB_LISTENER_KEY_DELETED);
         });
         }
 
@@ -5354,9 +5355,6 @@
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
             }
-            if (codDollar < 0) codDollar = 0;
-            if (dodDollar < 0) dodDollar = 0;
-            if (totalCount < 0) totalCount = 0;
             return { codDollar, dodDollar, totalCount };
         }).catch(() => {
             if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
@@ -8799,6 +8797,14 @@
             if (claim === 'taken') {
                 closeModal('phoneModal');
                 showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
+                if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+                safeFocusScanner();
+                return;
+            }
+
+            if (claim !== 'claimed') {
+                closeModal('phoneModal');
+                showToast(`⚠️ មិនអាចផ្ទៀងផ្ទាត់ថា (${barcodeToSave}) ស្ទួនឬអត់ទេ (ទិន្នន័យមិនទាន់មកដល់) — សូមរង់ចាំបន្តិច ហើយស្កេនម្ដងទៀត។`);
                 if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
                 safeFocusScanner();
                 return;

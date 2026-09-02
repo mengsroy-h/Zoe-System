@@ -253,6 +253,7 @@ function buildContext() {
         REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' + ELAPSED_HELPER + '\n' +
         "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
         "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
+        "const DB_LISTENER_KEY_HISTORY = 'history';\n" +
         'let dbListenersFailed = false;\n' +
         'let dbListenerGeneration = 0;\n' +
         'let dbListenerRecoveryTimer = null;\n' +

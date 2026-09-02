@@ -196,9 +196,18 @@ async function run() {
         && /LOCALAPPDATA/.test(configure));
     ok('support Edge មុន Chrome និងអាច override',
         /\['msedge', 'chrome'\]/.test(source) && /ZTO_SYNC_BROWSER/.test(source));
+    // ⛔ កំហុស៖ ជំនាន់មុនអៈអាងលើ **ឆ្លាក់ពាក្យណាមួយ** (`មិនត្រូវបានបង្ហាញ`) ➔ ការរៀបចំឯកសារឡើងវិញ
+    // នៃជុំ 2026-09-02 (ពាក្យដដែលប្ដូរទៅ «មិនបង្ហាញដាច់ខាត») ធ្វើឲ្យ checker ធ្លាក់
+    // ខណៈវិធានសុវត្ថិភាពពិត **មិនប្រែសោះ** ➔ **ការធ្លាក់ក្លែងក្លាយ** (សំណួរទី ១១)។
+    // ច្បាប់ត្រឹមត្រូវ ៖ អៈអាងលើ **ការពិត** (ហេតុអ្វី secret មិនលេច)
+    // ដោយយកឡើងមកពីការអានឯកសារពិត — មិនមែនលើប្រយោគតែមួយទេ។
+    const readmeSecretRule = /(?:\u200b|[^\n])*(?:មិនបង្ហាញ|មិនត្រូវបានបង្ហាញ|មិនបោះពុម្ព)/;
+    const readmeMentionsPatSecrecy = readme
+        .split('\n')
+        .some((line) => /PAT|Personal Access Token|ZTO_PROXY_KEY/.test(line) && readmeSecretRule.test(line));
     ok('README ពន្យល់ DPAPI/PAT និងការមិនបង្ហាញ secret',
-        /DPAPI/.test(readme) && /Personal Access Token/.test(readme)
-        && /មិនត្រូវបានបង្ហាញ/.test(readme));
+        /DPAPI/.test(readme) && /Personal Access Token/.test(readme) && readmeMentionsPatSecrecy,
+        { dpapi: /DPAPI/.test(readme), pat: /Personal Access Token/.test(readme), secrecy: readmeMentionsPatSecrecy });
 
     console.log('\n=== ៥. Netlify API និង secret boundary ===');
     ok('ប្រើ Netlify API origin ថេរ HTTPS',

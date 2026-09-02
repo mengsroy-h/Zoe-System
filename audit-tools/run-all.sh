@@ -133,6 +133,7 @@ run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
 run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
+run "duplicate-money (browser ពិត)" node audit-tools/duplicate-money-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
@@ -224,6 +225,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
+    DUPMONEY_APP_DIR="$BASE" node audit-tools/duplicate-money-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-money: /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
     IOSGLIDE_APP_DIR="$BASE" node audit-tools/ios-panel-glide-test.js 2>&1 | tail -1 | sed 's/^/   ios-panel-glide: /'

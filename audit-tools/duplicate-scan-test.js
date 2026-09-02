@@ -6,6 +6,14 @@
 //   ៣. confirmPhone()        ➜ isBarcodeAlreadyUsed() ម្តងទៀត (ក្រោយបើកប្រអប់)
 //   ៤. claimBarcodeInRegistry() ➜ transaction លើ server (ការពារឆ្លងឧបករណ៍ — ជាន់ពិត)
 //   ៥. addOrUpdateEntry()    ➜ mergeAddedBarcode=false ➜ បញ្ច្រាសលុយវិញ
+//
+// ⛔ **កុំអានជាន់ទី ៥ ថាជាការការពារពេញលេញ** (វាស់ 2026-09-02) ៖ វាបញ្ច្រាស
+//   លុយវិញ **តែពេល merge ចូលកញ្ចប់ដែលបើក · លេខទូរស័ព្ទដដែល · ថ្ងៃដដែល**។
+//   លេខទូរស័ព្ទផ្សេង ឬកញ្ចប់ដើមបិទ ➜ សាងកញ្ចប់ថ្មី ➜ **លុយបូកម្តងទៀត**។
+//   ⛔ ហើយជាន់ ១–៣ អាន **សតិរបស់ទូរស័ព្ទនេះ** ➜ ពួកវាមើលមិនឃើញអ្វីដែល
+//   ឧបករណ៍ផ្សេងទើបធ្វើ។ ដូច្នេះការការពារឆ្លងឧបករណ៍ពឹងលើ **ជាន់ទី ៤ តែម្នាក់ឯង**។
+//   ឯកសារនេះវាស់ជាន់ ១–៤ ខណៈ **ទិដ្ឋភាពមូលដ្ឋានស្រស់ជានិច្ច** ➜ វាមិនអាច
+//   ឃើញថ្នាក់នោះទេ។ អ្នកវាស់វាគឺ **`duplicate-money-test.js`**។
 let chromium;
 try { chromium = require('playwright-core').chromium; } catch (e) { console.log('SKIP — ត្រូវការ playwright-core'); process.exit(0); }
 const CHROME = process.env.DUP_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';

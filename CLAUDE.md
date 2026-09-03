@@ -182,6 +182,7 @@
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ | `hang-guard.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ | `checker-coverage.js` |
+| **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ឈ្មោះដែល sandbox *ហៅ* ត្រូវមានក្នុង sandbox — `ReferenceError` មិនត្រូវលេចតែក្នុង CI | `emu/crud-rules-flow.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ | `exit-code-integrity.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ `pageerror` មិនឃើញការបដិសេធ promise — ត្រូវមើល `unhandledrejection` ដែរ | `checker-coverage.js` ផ្នែក ៨ |
 | **listener ដែលកកកុញ** | ⛔ វដ្តពិត N ជុំ ➜ ចំនួន listener និង node មិនត្រូវកើន | `listener-leak-test.js` |
@@ -2820,7 +2821,7 @@ handler ពិត តែអះអាងលើ `app.js` ត្រឹម **អត�
 Test៖ **`lookup-failure-identity-test.js`** (៣១ assertion; ធ្លាក់ **១១** លើ
 `origin/main`)។
 
-### ⛔ សំណួរ ១២ មុនជឿថា checker ថ្មីមួយដំណើរការ
+### ⛔ សំណួរ ១៣ មុនជឿថា checker ថ្មីមួយដំណើរការ
 
 ១. វាស្កេន **ឯកសារណា**ខ្លះ? (2.12.1 · 2.16.0 · 2.19.1)
 ២. វាស្កេន **ទម្រង់វេយ្យាករណ៍ណា**ខ្លះ? (2.19.3 — template literal ធៀបនឹងការតភ្ជាប់ខ្សែអក្សរ)
@@ -2855,6 +2856,11 @@ Test៖ **`lookup-failure-identity-test.js`** (៣១ assertion; ធ្លាក
 ១១. **តើការធ្លាក់របស់វា ជាការធ្លាក់ពិត ឬសំណល់នៃការវាស់?** (2026-08-29 —
    ការធ្លាក់ក្លែងក្លាយបញ្ជូនជុំក្រោយទៅ «កែ» អ្វីដែលមិនខូច ដូចមេរៀន
    2.11.3 ➜ 2.11.4) ➜ ត្រូវមាន probe ទិសផ្ទុយ **និង** ជាន់អប្បបរមា
+១៣. **តើលទ្ធផលដែលអ្នកអានជា `PASS` ឬ `SKIP`?** (2.25.8 — ជុំនោះរាប់
+   `SKIP` របស់ `emu/crud-rules-flow.js` (គ្មាន emulator ក្នុង session) ជាការ
+   ឆ្លងកាត់ ➜ push ➜ **CI ក្រហមដោយ `ReferenceError`**។ ⛔ **`SKIP` មានន័យថា
+   «វាស់មិនបាន» មិនមែន «ត្រឹមត្រូវ»** ➜ ត្រូវ **បំបាត់ SKIP ចោល** មុនអះអាងថា
+   tree បៃតង។ មើលផ្នែក «៣ង. `SKIP` ដែលអ្នកវាស់រាប់ជា `PASS`»។)
 ១២. **តើ *អ្នកវាស់* ខ្លួនឯងចង្អុលទៅ tree ត្រឹមត្រូវទេ?** (2026-09-03 —
    ជុំនេះរត់ mutation ៥ ដោយ **ឈ្មោះ `*_APP_DIR` ខុស** (`HTMLSINK_APP_DIR`
    ជំនួស `SINK_APP_DIR`; `CONNREC_APP_DIR` ជំនួស `CONNRECOVERY_APP_DIR`;
@@ -3917,6 +3923,47 @@ positive **៨/៨** លើតេស្តដែលបៃតងពិត ព្�
 សម្រាប់ ៨ ធាតុនោះនឹងធ្វើឲ្យវាក្លាយជា **ការការពារដែលងាប់** — ថ្នាក់ដដែល
 នឹងអ្វីដែលជុំនេះទើបកែ។ **កុំសាងវាឡើងវិញដោយគ្មានការវិភាគ dataflow ពិត។**
 
+#### ៣ង. ⛔⛔ **`SKIP` ដែលអ្នកវាស់រាប់ជា `PASS`** — កំណែ 2.25.8
+
+> 🔴 **កើតឡើងពិតក្នុងជុំនេះ ហើយវាទៅដល់ CI។** ជុំនេះបន្ថែម helper ថ្មី
+> (`notifyIfSlow`) ចូល `app.js` ➜ sandbox របស់ `emu/crud-rules-flow.js`
+> មិនប្រកាសវា ➜ `ReferenceError` ក្នុងផ្លូវ «ដក»។ ការរត់មូលដ្ឋានបង្ហាញ
+> **`SKIP`** (គ្មាន emulator ក្នុង session) ហើយ **អ្នកវាស់រាប់វាជាការឆ្លងកាត់**
+> ➜ push ➜ **CI ក្រហម**។
+
+ផ្នែក ៣ខ និង ៣គ ចែងរួចថា SKIP ធំពេកជាបៃតងក្លែងក្លាយ — តែច្បាប់នោះនិយាយអំពី
+**checker**។ ជុំនេះបង្ហាញថាថ្នាក់ដដែលអនុវត្តលើ **មនុស្ស/ភ្នាក់ងារដែលអានលទ្ធផល**៖
+
+⛔ **`SKIP` មិនមែន `PASS` ទេ — វាមានន័យថា «វាស់មិនបាន»។** មុនអះអាងថា tree
+បៃតង ត្រូវ **បំបាត់ SKIP ចោល** មិនមែនរាប់វាទេ ៖
+
+```bash
+npm i firebase-tools
+npx --no-install firebase setup:emulators:database
+setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
+    --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
+cp firebase-database.rules.json audit-tools/emu/real.rules.json
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 bash audit-tools/run-all.sh   # ដូច CI
+```
+
+⚠️ **អន្ទាក់ ៖ `pkill -f firebase-database-emulator` (និង `pgrep`/`kill $(pgrep …)`)
+ត្រូវនឹង command line របស់ shell ខ្លួនឯង ➜ សម្លាប់ session។** ជុំនេះជួបវា **២ ដង**
+(exit 144)។ ត្រូវបើក emulator ដោយ `setsid` ហើយកុំបិទវាកណ្តាល session។
+
+**ការកែតាមរចនាសម្ព័ន្ធ (មិនមែនតាមវិន័យ)** ៖ `emu/crud-rules-flow.js` ឥឡូវ
+**parse កូដដែលផ្គុំចូល sandbox** រួចអះអាងថា **រាល់ឈ្មោះដែលកូដនោះ *ហៅ*
+មានក្នុង sandbox** — មុនច្រកទ្វារ emulator។ ដូច្នេះ helper ថ្មីដែលភ្លេច
+ចាក់ចូល ក្លាយជា **ការធ្លាក់មូលដ្ឋានដែលមានឈ្មោះ** មិនមែន `ReferenceError`
+ដែលលេចតែក្នុង CI ទេ។
+
+⛔ **មូលហេតុដែលការហៅ smoke មិនគ្រប់គ្រាន់** ៖ វាហៅតែ **៥** ក្នុងចំណោម
+function ដែលស្រង់ **២៩** — helper ថ្មីរស់នៅក្នុងផ្លូវ «ដក/លុប/សម្អាត»
+ដែលទៅដល់តែពេលមាន emulator។ នេះជាមេរៀន **«ការគ្របតាមសេណារីយ៉ូ មិនអាចជំនួស
+ការគ្របតាមរចនាសម្ព័ន្ធបានទេ»** (ផ្នែក ៣ខ) ក្នុងទម្រង់ថ្មី។
+**វាស់បាន** ៖ ការត្រួតពិនិត្យថ្មីរកឃើញឈ្មោះដែលខ្វះ **៣** —
+`notifyIfSlow` (កំហុសពិត) បូក `armLateCommit` និង `viewListModalShowing`
+ដែល **ខ្វះតាំងពីមុន** តែមិនដែលបង្ហាញខ្លួន ព្រោះសេណារីយ៉ូមិនប៉ះផ្លូវព្យួរ។
+
 #### ៤. ការវាស់ដ៏សំខាន់បំផុត៖ **ថតទទេ ➜ គ្មាន checker ណាមួយអាចជោគជ័យបានទេ**
 
 `checker-coverage.js` **រត់ checker នីមួយៗពិត** ដោយចង្អុល `*_APP_DIR` ទៅថត
@@ -4185,6 +4232,22 @@ npm i acorn playwright-core xlsx
                                                                   # បើគ្មាន ពួកវា SKIP ដោយស្អាត មិនធ្លាក់ទេ
 bash audit-tools/run-all.sh      # រត់ការត្រួតពិនិត្យទាំងអស់ក្នុងពាក្យបញ្ជាតែមួយ
 ```
+
+⛔ **បើគ្មាន RTDB emulator នោះ checker ២ (`emu/*`) នឹង `SKIP` — ហើយ `SKIP`
+មិនមែន `PASS` ទេ។** ជុំ 2.25.8 រាប់ SKIP នោះជាការឆ្លងកាត់ ➜ CI ក្រហម។
+ដូច្នេះ **មុនអះអាងថា tree បៃតង ត្រូវបើក emulator ហើយរត់ដូច CI**៖
+
+```bash
+npm i firebase-tools
+npx --no-install firebase setup:emulators:database
+setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
+    --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
+cp firebase-database.rules.json audit-tools/emu/real.rules.json
+CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 bash audit-tools/run-all.sh
+```
+
+⚠️ **កុំបិទ emulator ដោយ `pkill -f firebase-database-emulator`** — លំនាំនោះ
+ត្រូវនឹង command line របស់ shell ខ្លួនឯង ➜ **សម្លាប់ session** (វាស់បាន ២ ដង)។
 **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថាកំហុសដែលបានដោះស្រាយរួច
 មិនបានត្រឡប់មកវិញទេ។ ការត្រួតពិនិត្យ ១៣ ប្រើ **Chromium ពិត** — ត្រូវការ `playwright-core`។
 

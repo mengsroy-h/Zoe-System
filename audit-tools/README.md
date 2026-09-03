@@ -140,6 +140,7 @@ bash audit-tools/emu/rules.sh
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |
 | `pickup-repair-test.js` | ការជួសជុលស្ថិតិយកស្វ័យប្រវត្តិ | `PICKUPREPAIR_APP_DIR` |
 | `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `FUZZ_APP_DIR` |
+| `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |
 | `payload-schema.js` | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules (**២ ទិស**) | — |
@@ -200,6 +201,7 @@ bash audit-tools/emu/rules.sh
 | `sheet-import-test.js` | នាំចូល Excel ៖ PIN ជាច្រកទ្វារ · *simple request* · secret អ៊ិនគ្រីប · លេខ ០ នាំមុខ | `SHEETIMPORT_APP_DIR` |
 | `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret | `ZTOPROXY_APP_DIR` |
 | `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ | `ZTOSTORE_APP_DIR` |
+| `zto-budget-test.js` | ⛔ ថវិកាពេលត្រូវគ្របដណ្តប់ handler ទាំងមូល (អាន Cookie + upstream + ការបន្តអាយុ) · 401 ដោយ Cookie ចាស់ក្នុង cache ➜ អានឡើងវិញ ១ ដង | `ZTOBUDGET_APP_DIR` |
 | `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` | `ZTO_SYNC_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក

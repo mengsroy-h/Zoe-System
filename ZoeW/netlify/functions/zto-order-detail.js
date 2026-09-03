@@ -26,6 +26,11 @@ const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcod
 
 const FIELD_SEPARATOR = '|';
 const CACHE_MAX = 200;
+// សាលក្រម «រកមិនឃើញ» មានអាយុខ្លីជាងលទ្ធផលពិតដោយចេតនា ៖ កញ្ចប់ដែល ZTO
+// មិនទាន់បញ្ចូល អាចលេចឡើងក្នុងប៉ុន្មាននាទីក្រោយ Arrival Scan ➜ TTL វែង
+// នឹងក្លាយជាការបដិសេធដែលកុហក។ ១៥ វិ. គ្រប់គ្រាន់ដើម្បីលេបការស្កេនម្តងទៀត
+// របស់អ្នកប្រើ ដោយមិនបាំងការត្រួតពិនិត្យឡើងវិញដែលស្មោះត្រង់។
+const NOT_FOUND_CACHE_TTL_DEFAULT_MS = 15000;
 const resultCache = new Map();
 const inFlight = new Map();
 
@@ -456,6 +461,12 @@ function readConfig(env) {
         cacheTtlMs: boundedInteger(env.ZTO_CACHE_TTL_MS, 60000, 0, 600000)
     };
 
+    // ⛔ TTL អវិជ្ជមានត្រូវ **មិនលើស** cache សរុប ➜ `ZTO_CACHE_TTL_MS=0`
+    // បិទទាំង ២ ផ្លូវក្នុងកន្លែងតែមួយ។
+    config.notFoundCacheTtlMs = Math.min(
+        boundedInteger(env.ZTO_NOT_FOUND_CACHE_TTL_MS, NOT_FOUND_CACHE_TTL_DEFAULT_MS, 0, 120000),
+        config.cacheTtlMs);
+
     config.budgetMs = Math.min(24000, Math.max(config.budgetMs, config.upstreamTimeoutMs + 1500));
     config.upstreamTimeoutMs = Math.min(config.upstreamTimeoutMs, config.budgetMs - 1000);
 
@@ -806,19 +817,27 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     return { outcome: outcome, session: fresh };
 }
 
-function storeCachedBody(key, body) {
+function storeCachedBody(key, body, negative) {
     resultCache.delete(key);
-    resultCache.set(key, { at: Date.now(), body });
+    resultCache.set(key, { at: Date.now(), body, negative: !!negative });
     while (resultCache.size > CACHE_MAX) {
         resultCache.delete(resultCache.keys().next().value);
     }
 }
 
-function readCachedBody(key, ttlMs) {
-    if (ttlMs <= 0) return null;
+// ⛔ សាលក្រម ២ ប្រភេទចែក cache តែមួយ តែ **អាយុខុសគ្នា** ៖ លទ្ធផលពិត
+// រស់តាម `ttlMs`; «រកមិនឃើញ» រស់តាម `negativeTtlMs` ដែលខ្លីជាង។ ការវាស់
+// អាយុឆ្លងកាត់ `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ `Infinity` ➜ ធាតុផុត
+// ភ្លាម (fail-open ក្នុងទិសសុវត្ថិភាព — ច្បាប់ `monotonic-gate-test`)។
+function readCachedBody(key, ttlMs, negativeTtlMs) {
     const hit = resultCache.get(key);
     if (!hit) return null;
-    if (elapsedSince(hit.at) >= ttlMs) {
+    const limit = hit.negative ? (negativeTtlMs || 0) : ttlMs;
+    if (limit <= 0) {
+        resultCache.delete(key);
+        return null;
+    }
+    if (elapsedSince(hit.at) >= limit) {
         resultCache.delete(key);
         return null;
     }
@@ -882,7 +901,8 @@ function diagnosticsBody(config, headers, authKind, credential) {
             upstreamTimeoutMs: config.upstreamTimeoutMs,
             budgetMs: config.budgetMs,
             retries: config.retries,
-            cacheTtlMs: config.cacheTtlMs
+            cacheTtlMs: config.cacheTtlMs,
+            notFoundCacheTtlMs: config.notFoundCacheTtlMs
         },
         cacheEntries: resultCache.size,
         sessionRenewal: {
@@ -936,7 +956,7 @@ exports.handler = async function handler(event) {
     // ផលដែលវាស់បាន ៖ ការស្កេនដដែលក្នុង TTL ឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs**។
     const cacheKey = config.fingerprint + '|' + barcode.toUpperCase();
     if (!wantsDiagnostics) {
-        const early = readCachedBody(cacheKey, config.cacheTtlMs);
+        const early = readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
         if (early) return json(200, Object.assign({}, early, { cached: true }));
     }
 
@@ -1009,7 +1029,12 @@ exports.handler = async function handler(event) {
         return json(200, Object.assign({}, outcome.body, { cached: false }));
     }
     if (outcome.kind === 'notFound') {
-        return json(200, { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' });
+        // ⛔ រូបរាងត្រូវនៅដដែល ៖ `found:false` **គ្មានវាល `error`** — បើដាក់
+        // `error` ចូល នោះ client បោះ «Lookup rejected» ➜ cooldown ៣០ វិ.
+        // (មេរៀន 2.25.0)។ ការ cache ប៉ះតែ *ចំនួនសំណើ* មិនប៉ះរូបរាងទេ។
+        const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
+        if (config.notFoundCacheTtlMs > 0) storeCachedBody(cacheKey, notFoundBody, true);
+        return json(200, Object.assign({}, notFoundBody, { cached: false }));
     }
     return outcome.response;
 };

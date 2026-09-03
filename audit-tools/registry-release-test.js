@@ -246,6 +246,117 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
             ctx.__calls.length === 1, ctx.__calls);
     }
 
+    // ═══ ⛔⛔ ស្នាមភ្ជាប់ ៖ **អ្នកណាដោះជួរ ក្រោយការពន្យារ?** ═══════════════
+    //
+    // 🔴 សេណារីយ៉ូខាងលើហៅ `flushPendingRegistryReleases()` **ដោយដៃ** ក្រោយ
+    // សម្អាត `staleKeys` ➜ វាចាក់សោ *យន្តការ* នៃជួរ តែ **មិនដែលសួរថា
+    // នៅក្នុង App ពិត អ្នកណាហៅវាឡើងវិញទេ**។ នេះជា **សំណួរទី ៧** ៖
+    // ខាងជួរត្រូវបានចាក់សោ ខាងច្រកទ្វារត្រូវបានចាក់សោ តែ **ស្នាមភ្ជាប់
+    // រវាងវា មិនត្រូវបានចាក់សោ**។
+    //
+    // **វាស់បានលើ tree មុនកែ** ៖ ការហៅតែមួយគត់ស្ថិតក្នុង handler របស់
+    // `.info/connected === true` ហើយ **បន្ទាត់មុនវា** គឺ
+    // `retryFailedDbListenersNow()` ដែល re-attach listener ➜ path ទាំង ៦
+    // ចូល `dbListenerPendingPaths` ➜ `dbListenerViewIsStale('history')`
+    // ពិត ➜ ការ flush ដែលឈរបន្ទាប់ **ពន្យារជានិច្ច** ➜ ហើយពេល snapshot
+    // មកដល់ `.info/connected` នៅ `true` ដដែល ➜ **គ្មានអ្វីហៅវាម្តងទៀត**
+    // ➜ កូនសោកំព្រាជាប់ **ពេញវគ្គ** ➜ barcode នោះស្កេនចូលមិនបានទៀត។
+    {
+        const connectedHandlerAt = SRC.indexOf('flushPendingRegistryReleases();');
+        ok('ជាន់អប្បបរមា៖ រកការហៅ flushPendingRegistryReleases ក្នុង app.js',
+            connectedHandlerAt !== -1);
+        const callSites = (SRC.match(/(?<!function )flushPendingRegistryReleases\(\)/g) || []).length;
+        // ⛔ ការហៅតែ **១** មានន័យថាជួរមានច្រកចេញតែមួយ ➜ ការពន្យារណាមួយ
+        // ក្លាយជាការជាប់ស្ថាពរ។ ត្រូវការយ៉ាងតិច ២ ៖ ពេលភ្ជាប់ឡើងវិញ
+        // **និង** ពេលលក្ខខណ្ឌនៃការពន្យារ (ទិដ្ឋភាពមិនស្រស់) រលាយ។
+        ok('⛔ ជួរដោះមានច្រកចេញយ៉ាងតិច ២ (មិនមែនតែពេល .info/connected)',
+            callSites >= 2, { callSites });
+        ok('⛔ ការដោះត្រូវត្រូវកេះពេលទិដ្ឋភាព listener មកដល់វិញ',
+            /function noteDbListenerAlive\([\s\S]{0,900}?flushPendingRegistryReleases\(\)/.test(SRC));
+    }
+    {
+        // ការវាស់ **ឥរិយាបថ** នៃស្នាមភ្ជាប់ដដែល ៖ រត់ `noteDbListenerAlive()`
+        // ពិត ហើយសួរថាតើជួរដោះខ្លួនឯងឬអត់ — ដោយ **មិនហៅ flush ដោយដៃ**។
+        const ctx = makeCtx(() => Promise.resolve());
+        let aliveSrc = '';
+        try { aliveSrc = sliceFn('noteDbListenerAlive'); } catch (_) { aliveSrc = ''; }
+        ok('ជាន់អប្បបរមា៖ ស្រង់ noteDbListenerAlive ចេញពី app.js បាន', !!aliveSrc);
+        let staleSrc = '';
+        try { staleSrc = sliceFn('dbListenerViewIsStale'); } catch (_) { staleSrc = ''; }
+        ok('ជាន់អប្បបរមា៖ ស្រង់ dbListenerViewIsStale ចេញពី app.js បាន', !!staleSrc);
+        if (aliveSrc && staleSrc) {
+            // ⛔ ត្រង់នេះ **មិនប្រើ stub `staleKeys` ទេ** — យើងចាក់
+            // `dbListenerViewIsStale` **ពិត** ដែលអានពី `dbListenerPendingPaths`
+            // និង `dbListenerFailedPaths` ពិត។ បើ stub វា នោះ **លំដាប់** នៃ
+            // ការហៅក្នុង `noteDbListenerAlive()` លែងសំខាន់ ➜ ការដោះដែលឈរ
+            // **មុន** ការលុបចេញពី Set នឹងឆ្លងកាត់ដោយចៃដន្យ (វាស់រួច ៖
+            // mutation នោះរស់រានលើជំនាន់ដែល stub)។ នេះជាមេរៀន «ការ stub
+            // ស្នាមភ្ជាប់ = ស្នាមភ្ជាប់នោះគ្មានតេស្ត» អនុវត្តលើខ្លួនឯង។
+            vm.runInContext([
+                'let dbListenersFailed = true;',
+                'let dbListenerProgressAt = 0;',
+                'let dbListenerPendingSeen = 0;',
+                'let dbListenerOutageNoticeShown = false;',
+                'const dbListenerPendingPaths = new Set(["history", "deleted"]);',
+                'const dbListenerFailedPaths = new Set();',
+                'function refreshLiveToasts() {}',
+                'function clearDbListenerRecovery() {}',
+                'function renderConnectionStatus() {}',
+                'function showToast() {}',
+                staleSrc,
+                aliveSrc
+            ].join('\n'), ctx);
+
+            // ១. ការភ្ជាប់ត្រឡប់មកវិញ ➜ flush ដំបូង **ពន្យារ** (ទិដ្ឋភាពមិនស្រស់)
+            vm.runInContext('queueRegistryReleaseRetry(["ZTO900333"], 1);'
+                + 'flushPendingRegistryReleases();', ctx);
+            await tick(30);
+            ok('ស្នាមភ្ជាប់៖ ការ flush ពេលភ្ជាប់ឡើងវិញ ➜ ពន្យារ (ទិដ្ឋភាពមិនស្រស់)',
+                ctx.__calls.length === 0 && ctx.pendingRegistryReleases.has('ZTO900333'), ctx.__calls);
+
+            // ២. snapshot ដំបូងមកដល់ — មួយទៀតនៅមិនទាន់ ➜ **នៅតែពន្យារ**
+            vm.runInContext('noteDbListenerAlive("history");', ctx);
+            await tick(30);
+            ok('⛔ ទិសផ្ទុយ ៖ snapshot មួយមកដល់ តែមួយទៀតមិនទាន់ ➜ នៅតែពន្យារ',
+                ctx.__calls.length === 0 && ctx.pendingRegistryReleases.has('ZTO900333'), ctx.__calls);
+
+            // ៣. snapshot ចុងក្រោយមកដល់ ➜ ជួរត្រូវដោះ **ដោយខ្លួនឯង**។
+            //    ⛔ ការដោះត្រូវឈរ **ក្រោយ** ការលុបចេញពី Set — បើវាឈរមុន
+            //    នោះការហៅនេះនៅឃើញ `deleted` ជា stale ➜ ពន្យារម្តងទៀត។
+            vm.runInContext('noteDbListenerAlive("deleted");', ctx);
+            await tick(30);
+            ok('⛔ ស្នាមភ្ជាប់៖ snapshot ចុងក្រោយមកដល់ ➜ ជួរដោះខ្លួនឯង (គ្មានការហៅដោយដៃ)',
+                ctx.__calls.length === 1, { calls: ctx.__calls, queue: Array.from(ctx.pendingRegistryReleases.keys()) });
+            ok('⛔ កូនសោលែងកំព្រា ➜ barcode ស្កេនចូលបានវិញ',
+                ctx.pendingRegistryReleases.size === 0, Array.from(ctx.pendingRegistryReleases.keys()));
+        }
+    }
+    {
+        // ⛔ ទិសផ្ទុយ ៖ ជួរទទេ ➜ snapshot មិនត្រូវបង្កើតការសរសេរឥតប្រយោជន៍។
+        const ctx = makeCtx(() => Promise.resolve());
+        let aliveSrc = '';
+        try { aliveSrc = sliceFn('noteDbListenerAlive'); } catch (_) { aliveSrc = ''; }
+        if (aliveSrc) {
+            vm.runInContext([
+                'let dbListenersFailed = false;',
+                'let dbListenerProgressAt = 0;',
+                'let dbListenerPendingSeen = 0;',
+                'let dbListenerOutageNoticeShown = false;',
+                'const dbListenerPendingPaths = new Set(["history"]);',
+                'const dbListenerFailedPaths = new Set();',
+                'function refreshLiveToasts() {}',
+                'function clearDbListenerRecovery() {}',
+                'function renderConnectionStatus() {}',
+                'function showToast() {}',
+                aliveSrc
+            ].join('\n'), ctx);
+            vm.runInContext('noteDbListenerAlive("history");', ctx);
+            await tick(30);
+            ok('⛔ ទិសផ្ទុយ ៖ ជួរទទេ ➜ snapshot មិនសរសេរអ្វីទេ',
+                ctx.__calls.length === 0, ctx.__calls);
+        }
+    }
+
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);
     process.exit(fail ? 1 : 0);
 })().catch((e) => {

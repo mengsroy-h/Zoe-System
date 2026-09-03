@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.8';
+    const APP_VERSION = '2.25.9';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4361,6 +4361,7 @@
     function noteDbListenerAlive(pathKey) {
         const wasPending = dbListenerPendingPaths.delete(pathKey);
         dbListenerFailedPaths.delete(pathKey);
+        flushPendingRegistryReleases();
         if (wasPending) {
             dbListenerProgressAt = Date.now();
             dbListenerPendingSeen = dbListenerPendingPaths.size;
@@ -4983,6 +4984,7 @@
 
     function runScheduledCleanup() {
         if (!db || !isDatabaseInitialized || dbListenersFailed) return;
+        flushPendingRegistryReleases();
         runAutomaticCleanupRules();
         runAutomaticDeletedCleanup();
         repairPickupLedgerOnce();

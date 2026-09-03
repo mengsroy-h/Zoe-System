@@ -203,6 +203,7 @@ bash audit-tools/emu/rules.sh
 | `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret | `ZTOPROXY_APP_DIR` |
 | `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ | `ZTOSTORE_APP_DIR` |
 | `zto-budget-test.js` | ⛔ ថវិកាពេលត្រូវគ្របដណ្តប់ handler ទាំងមូល (អាន Cookie + upstream + ការបន្តអាយុ) · 401 ដោយ Cookie ចាស់ក្នុង cache ➜ អានឡើងវិញ ១ ដង | `ZTOBUDGET_APP_DIR` |
+| `zto-negative-cache-test.js` | ⛔ សាលក្រម «រកមិនឃើញ» ត្រូវចូល cache (TTL ខ្លី) ដោយ **ការបរាជ័យបណ្តោះអាសន្នមិនចូល** · ស្នាមភ្ជាប់ ៖ លេខលំនាំដើមក្នុង `ZTO-SETUP-KH.md` ត្រូវស៊ីនឹងកូដ | `ZTONEG_APP_DIR` |
 | `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` | `ZTO_SYNC_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក

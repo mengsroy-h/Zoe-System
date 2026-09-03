@@ -304,6 +304,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
+| **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
+| **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
 ---
@@ -419,6 +421,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | SheetJS ដែល ship មានកំណែ/hash រង CVE | `dependency-security-test.js` |
 | ការណែនាំលេខទូរស័ព្ទ (`collectPhoneSuggestions`) | `phone-suggest-test.js` |
 | ជាន់ការពារ devtools (⚠️ **ជាឧបសគ្គ មិនមែនការការពារ** — មើលច្បាប់ 📝) | `devtools-guard-test.js` |
+| config Netlify ៖ root file ដែលបង្វែរ build · CSP ឃ្លាតពីតម្រូវការ App · config ដែលគ្មាន checker អាន | `netlify-config-scope-test.js` |
 | ឧបករណ៍ Backup ៖ `.partial` ➜ `rename()` · lock · retry · គ្មាន credential ក្នុង output | `firebase-backup-test.js` |
 | comment និង trailing whitespace ក្នុងកូដ ship | `comments.js` (សម្អាតដោយ `strip-comments.js`; `trimws.js` ជា helper) |
 
@@ -1337,6 +1340,43 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `license_keys_meta` ដែលអាន/សរសេរបានតែ admin។
 - `ZoeKeyGen/firebase-database.rules.json` នៅរក្សា `user_roles` និងតួនាទី
   `admin` **ដោយចេតនា** — វាជា Project ដាច់ដោយឡែក។
+
+## ⛔⛔ config របស់ Netlify ៖ site ២ ពីថតតែមួយ — កុំបន្ថែម root `netlify.toml`
+
+> 🔴 **រកឃើញពិត (2026-09-03, PR #150)** ៖ agent របស់ Netlify បើក PR ដែល
+> **បន្ថែម `netlify.toml` នៅ root** ដោយអះអាងថា «`base` setting ក្នុង
+> netlify.toml របស់អ្នកខុស — វាចង្អុលទៅ `/opt/build`»។ **ការអះអាងនោះមិនពិត** ៖
+> គ្មានពាក្យ `base` ក្នុងឯកសារណាមួយ ហើយក៏គ្មាន root file ដែរ។
+
+Repo នេះ deploy ជា Netlify site **២** (`zoew` · `zoekeygen`) ពីថតតែមួយ។
+**Base directory ជារបស់ Netlify UI ក្នុងមួយ site** — មិនមែនក្នុង repo ទេ។
+
+ច្បាប់ ៖
+
+- ⛔ **គ្មាន `netlify.toml` នៅ root ដាច់ខាត** — Netlify អានវាសម្រាប់ site
+  **ទាំង ២** ហើយ `netlify.toml` ឈ្នះលើការកំណត់ក្នុង UI ➜ `base` នៅទីនោះ
+  បង្វែរ build របស់ App មួយទៀតទៅថតខុស។
+- ⛔ **គ្មានពាក្យ `base` ក្នុង config របស់ App ណាមួយ** ដែរ។
+- **config ត្រូវស៊ីនឹងអ្វីដែល App *ពិតជា ship*** (ដេរីវេ មិនមែន literal) ៖
+  ship `.wasm` ➜ CSP ត្រូវមាន `'wasm-unsafe-eval'` **និង** header
+  `Content-Type = "application/wasm"`; មាន `netlify/functions/*.js` ➜ toml
+  ត្រូវមាន `functions = ` ដែលចង្អុលទៅថតដែលមានពិត; `index.html` សុំ URL
+  `script.google.com` ➜ `connect-src` ត្រូវអនុញ្ញាត host នោះ។
+  ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ App ដែលគ្មាន wasm/Function មិនត្រូវបង្ខំ។
+- ⛔ **រាល់ config ដែលផលិតកម្មអាន ត្រូវមាន checker យ៉ាងតិច ១ អានវា** —
+  នេះជាចន្លោះពិតដែល PR #150 បង្ហាញ ៖ checker ដែលអាន netlify.toml
+  (`csp-enforced` · `csp-lazy-resource` · `scan-engine` · `offline-shell` ·
+  `sheet-import` · `zto-proxy`) សុទ្ធតែបើក **ផ្លូវផ្ទាល់** របស់ App ➜ root
+  file អាចបម្រើ CSP ខុសលើផលិតកម្ម ខណៈសំណុំ audit **បៃតងទាំងអស់**។
+
+⚠️ **មេរៀន ៖ ការកែដែល bot ស្នើ ក៏ត្រូវឆ្លងកាត់វិន័យដដែល។** ជុំនេះ bot ស្មាន
+មូលហេតុមួយដែលមិនមាន រួច «កែ» វាដោយបន្ថែមឯកសារដែល **គ្មាន checker ណាមើល** —
+ចូលទៅក្នុងស្រទាប់សុវត្ថិភាពផ្ទាល់។ មុនទទួលយក PR ណាមួយ (ពីមនុស្ស ឬពី bot)
+ត្រូវសួរ ៖ «**តើការអះអាងអំពីមូលហេតុ ពិតទេ?**» រួច `grep` វា។
+
+Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់ **៤** លើ tree
+របស់ PR #150; mutation ៦ ➜ ចាប់បានទាំង ៦ រួម **ទិសផ្ទុយ ១**)។
+
 
 ---
 

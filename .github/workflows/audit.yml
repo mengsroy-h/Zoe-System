@@ -79,6 +79,9 @@ jobs:
           CRUD_FLOW_STRICT: '1'
         run: node audit-tools/emu/restore-deadlock-test.js
 
+      - name: «អនុវត្ត ➜ ដកវិញ» ជាគូបញ្ច្រាសពិត (ledger លើ RTDB ពិត)
+        run: node audit-tools/emu/ledger-revert-emu-test.js
+
       - name: rules ↔ schema (ស្តាទិច)
         run: |
           node audit-tools/payload-schema.js

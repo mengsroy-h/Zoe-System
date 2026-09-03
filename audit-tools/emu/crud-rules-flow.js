@@ -91,8 +91,21 @@ function makeSandbox(store, now) {
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
         getServerNow: () => w.now, getFormattedDate: () => '2026-08-26',
-        addRevenueToDailyAndMonthlyRecord: () => null, addPickupToDailyRecord: () => null,
-        revertRevenueLedgerDelta: () => null, revertPickupLedgerDelta: () => null,
+        // ⛔ តេស្តនេះវាស់ **payload ↔ rules** មិនមែនលេខ ledger — តែ stub ត្រូវ
+        // រក្សា **រូបរាងពិត** (ត្រឡប់ delta ដែលអនុវត្ត) បើមិនដូច្នេះផ្លូវដកវិញ
+        // ក្លាយជា no-op ស្ងាត់ ហើយ `ReferenceError` នឹងលេចតែពេលមានសេណារីយ៉ូថ្មី។
+        addRevenueToDailyAndMonthlyRecord: (d, cod, dod, count) => ({
+            scanDate: d,
+            daily: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
+            monthly: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
+            dailyServer: Promise.resolve(null), monthlyServer: Promise.resolve(null)
+        }),
+        addPickupToDailyRecord: (d, key, cust, pkg) => ({
+            scanDate: d, phoneKey: key || null,
+            packages: parseFloat(pkg) || 0, customer: parseFloat(cust) || 0
+        }),
+        revertRevenueLedgerDelta: (applied) => applied || null,
+        revertPickupLedgerDelta: (applied) => applied || null,
         correctPickupLedgerToActual: (applied) => applied,
         commitDailyPickupDelta: () => {}, dailyPickupData: {},
         showToast: (m) => w.toasts.push(m), confirm: () => true, alert: () => {},

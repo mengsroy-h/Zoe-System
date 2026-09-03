@@ -42,8 +42,61 @@ const vm = require('vm');
 
 let acorn;
 try { acorn = require('acorn'); } catch (e) {
+
     console.log('SKIP — ត្រូវការ acorn (npm i acorn)');
     process.exit(0);
+}
+
+// ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
+// ពិត clamp ត្រឹម 0 ហើយ **ត្រឡប់ delta ដែលអនុវត្តពិត** ដែល
+// `revertRevenueLedgerDelta()` ត្រូវការ។ stub ដែលត្រឡប់ `undefined` ឬលទ្ធផល
+// របស់ `.push()` (ជា *លេខ*) ធ្វើឲ្យផ្លូវដកវិញក្លាយជា **no-op ស្ងាត់** ➜
+// checker បៃតងខណៈវាមើលមិនឃើញការដកវិញសោះ (វាស់បាន 2026-09-03)។
+// ជាគូ ៖ ការអនុវត្ត និងការដកវិញត្រូវចែក ledger **តែមួយ** បើមិនដូច្នេះ
+// ការដកវិញមិនប៉ះអ្វីដែលការអនុវត្តបានធ្វើទេ ➜ ការវាស់ក្លាយជាការក្លែង។
+function ledgerStubEntries(onEntry) {
+    const s = makeLedgerStub(onEntry);
+    return {
+        addRevenueToDailyAndMonthlyRecord: s.add,
+        revertRevenueLedgerDelta: s.revert
+    };
+}
+
+function makeLedgerStub(onEntry) {
+    const buckets = {};
+    const add = function (d, cod, dod, count) {
+        if (onEntry) onEntry(d, cod, dod, count);
+        const b = buckets[d] || (buckets[d] = { codDollar: 0, dodDollar: 0, totalCount: 0 });
+        const before = { codDollar: b.codDollar, dodDollar: b.dodDollar, totalCount: b.totalCount };
+        b.codDollar = Math.round((b.codDollar + (parseFloat(cod) || 0)) * 100) / 100;
+        b.dodDollar = Math.round((b.dodDollar + (parseFloat(dod) || 0)) * 100) / 100;
+        b.totalCount = b.totalCount + (parseFloat(count) || 0);
+        if (b.codDollar < 0) b.codDollar = 0;
+        if (b.dodDollar < 0) b.dodDollar = 0;
+        if (b.totalCount < 0) b.totalCount = 0;
+        const applied = {
+            cod: Math.round((b.codDollar - before.codDollar) * 100) / 100,
+            dod: Math.round((b.dodDollar - before.dodDollar) * 100) / 100,
+            count: b.totalCount - before.totalCount
+        };
+        return { scanDate: d, daily: applied, monthly: applied, dailyServer: Promise.resolve(applied), monthlyServer: Promise.resolve(applied) };
+    };
+    const revert = function (applied) {
+        if (!applied || !applied.scanDate || !applied.daily) return null;
+        const dd = applied.daily;
+        if (!dd.cod && !dd.dod && !dd.count) return applied;
+        add(applied.scanDate, -dd.cod, -dd.dod, -dd.count);
+        return applied;
+    };
+    const addPickup = function (d, key, cust, pkg) {
+        return { scanDate: d, phoneKey: key || null, packages: parseFloat(pkg) || 0, customer: parseFloat(cust) || 0 };
+    };
+    const revertPickup = function (applied) {
+        if (!applied || !applied.scanDate) return null;
+        if (!applied.packages && !applied.customer) return applied;
+        return applied;
+    };
+    return { add: add, revert: revert, addPickup: addPickup, revertPickup: revertPickup, buckets: buckets };
 }
 
 const ROOT = process.env.DBSTALL_APP_DIR || path.join(__dirname, '..');
@@ -380,7 +433,7 @@ function runAbandonCleanup(mode) {
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         getServerNow: () => NOW,
         getFormattedDate: () => '2026-08-21',
-        addRevenueToDailyAndMonthlyRecord: (d, cod, dod, c) => revenueLog.push({ d, cod, dod, c }),
+        ...ledgerStubEntries((d, cod, dod, c) => revenueLog.push({ d: d, cod: cod, dod: dod, c: c })),
         showToast: () => {},
         releaseBarcodesInRegistry: () => Promise.resolve(),
         scanHistory: [], deletedItems: []

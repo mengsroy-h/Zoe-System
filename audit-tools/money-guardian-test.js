@@ -34,9 +34,15 @@ if (!fs.existsSync(APP)) { console.log('  FAIL  រកមិនឃើញ ' + APP
 const SRC = fs.readFileSync(APP, 'utf8');
 
 // អ្នកយាម ៖ [ឈ្មោះឯកសារ, env override, តើវា SKIP បានទេ]
+// `needs` ៖ dependency ខាងក្រៅដែលអ្នកយាមនោះទាមទារ។ ពេលវាបាត់ (ឧ.
+// `run-all.sh` ដែលរត់គ្មាន emulator) នោះ mutation ដែល **មានតែវាទេដែលឃើញ**
+// ត្រូវរាយជា `--` ព្រមទាំងមូលហេតុ — មិនមែនជាការធ្លាក់ដែលច្រឡំអ្នកអានទេ។
+// ⛔ តែក្នុង CI ដែលមាន emulator ត្រូវដាក់ `MONEYGUARD_STRICT=1` ➜ `--`
+// នោះក្លាយជាការធ្លាក់ (ថ្នាក់ «SKIP ធំពេក» — មេរៀន 2.25.8 §៣ង)។
+const STRICT = process.env.MONEYGUARD_STRICT === '1';
 const GUARDS = [
-    { file: 'emu/ledger-revert-emu-test.js', env: 'LEDGEREMU_APP_DIR', skippable: true },
-    { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', skippable: false }
+    { file: 'emu/ledger-revert-emu-test.js', env: 'LEDGEREMU_APP_DIR', needs: 'RTDB emulator' },
+    { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
@@ -53,11 +59,13 @@ const MUTATIONS = [
         to: '        return { cod: Math.round(((parseFloat(codToAdd) || 0)) * 100) / 100, dod: Math.round(((parseFloat(dodToAdd) || 0)) * 100) / 100, count: (parseFloat(countToAdd) || 0) };'
     },
     {
+        needs: 'RTDB emulator',
         name: 'ការដកវិញខាង server មិនគោរពសាលក្រម server',
         from: '            const d = serverApplied || memoryApplied;',
         to: '            const d = memoryApplied;'
     },
     {
+        needs: 'RTDB emulator',
         name: 'ការ clamp ត្រូវដកចេញ (rules នឹងបដិសេធការសរសេរ)',
         from: '            if (codDollar < 0) codDollar = 0;\n            if (dodDollar < 0) dodDollar = 0;\n            if (totalCount < 0) totalCount = 0;\n            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;',
         to: '            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;'
@@ -83,6 +91,7 @@ function buildMutant(mutation) {
 function runGuard(guard, appDir) {
     const env = Object.assign({}, process.env);
     env[guard.env] = appDir;
+    if (process.env.MONEYGUARD_NO_EMU === '1') env.LEDGEREMU_PORT = '9099';
     try {
         const out = execFileSync(process.execPath, [path.join(__dirname, guard.file)],
             { env, encoding: 'utf8', timeout: 240000, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -95,14 +104,20 @@ function runGuard(guard, appDir) {
 // ⛔ ជាន់ចាំបាច់ ៖ អ្នកយាមត្រូវ **បៃតងលើ tree ស្អាត** បើមិនដូច្នេះ «ក្រហម
 // លើ mutant» គ្មានន័យទេ (វាក្រហមជានិច្ច)។
 const alive = [];
+const absent = new Set();
 GUARDS.forEach((g) => {
     const r = runGuard(g, ROOT);
-    const skipped = /^SKIP/m.test(r.out);
-    if (skipped) { console.log('  --    ' + g.file + ' — SKIP (dependency មិនមាន) ➜ មិនរាប់ជាអ្នកយាម'); return; }
+    if (/^SKIP/m.test(r.out)) {
+        if (g.needs) absent.add(g.needs);
+        if (STRICT) { ok(false, '⛔ STRICT ៖ អ្នកយាម ' + g.file + ' SKIP (ត្រូវការ ' + (g.needs || 'dependency') + ')'); }
+        else { console.log('  --    ' + g.file + ' — SKIP (ត្រូវការ ' + (g.needs || 'dependency') + ') ➜ មិនរាប់ជាអ្នកយាម'); }
+        return;
+    }
     ok(r.code === 0, 'អ្នកយាម ' + g.file + ' បៃតងលើ tree ស្អាត', r.out.split('\n').slice(-3).join(' | '));
     if (r.code === 0) alive.push(g);
 });
 ok(alive.length > 0, '⛔ ជាន់អប្បបរមា៖ មានអ្នកយាមយ៉ាងតិច ១ ដែលរត់បាន', 'alive=' + alive.length);
+if (STRICT) ok(absent.size === 0, '⛔ STRICT ៖ អ្នកយាមទាំងអស់ត្រូវរត់បាន (គ្មាន SKIP)', Array.from(absent).join(', '));
 
 let applicable = 0;
 MUTATIONS.forEach((m) => {
@@ -116,10 +131,20 @@ MUTATIONS.forEach((m) => {
     const caught = [];
     alive.forEach((g) => { if (runGuard(g, dir).code !== 0) caught.push(g.file); });
     if (m.equivalent) {
-        // ⛔ equivalent mutant ៖ អ្វីដែលត្រូវអះអាងគឺ **វានៅតែ equivalent** —
-        // បើថ្ងៃណាវាក្លាយជាមើលឃើញ នោះការវិភាគចាស់លែងពិត ➜ ត្រូវពិនិត្យឡើងវិញ។
-        ok(caught.length === 0, '⚠️ equivalent (វាស់រួច — មិនទាមទារអ្នកយាម): ' + m.name,
-            'វាក្លាយជាមើលឃើញហើយ ➜ ការវិភាគចាស់លែងពិត: ' + caught.join(', '));
+        // ⛔⛔ **កុំអះអាងថាវានៅតែចាប់មិនបាន។** ការសរសេរ `ok(caught.length === 0)`
+        // នឹងធ្វើឲ្យតេស្ត **ធ្លាក់ពេលនរណាម្នាក់ធ្វើឲ្យអ្នកយាមខ្លាំងជាងមុន** —
+        // នោះជា **ការអះអាងដែលចាក់សោកំហុស** មិនមែនការការពារ (មេរៀន 2.20.6 ៖
+        // «តើការអះអាងនេះការពារអ្វី ឬចាក់សោអ្វី?»)។ ត្រង់នេះជាកំណត់ត្រា
+        // **ព័ត៌មាន** ៖ វាបានវាស់រួច ហើយលទ្ធផលបច្ចុប្បន្នត្រូវរាយឲ្យឃើញ។
+        console.log('  --    equivalent (វាស់រួច — មិនទាមទារអ្នកយាម): ' + m.name);
+        console.log('        ស្ថានភាពបច្ចុប្បន្ន: ' + (caught.length
+            ? 'ក្លាយជាចាប់បានហើយដោយ ' + caught.join(', ') + ' ➜ ការវិភាគ equivalent លែងពិត (ជាដំណឹងល្អ)'
+            : 'នៅតែចាប់មិនបាន — ស៊ីនឹងការវិភាគ (សតិខុសបណ្តោះអាសន្ន តែ listener សរសេរជាន់វិញ)'));
+    } else if (caught.length === 0 && m.needs && absent.has(m.needs)) {
+        // ⛔ គ្មានអ្នកយាមក្រហម **ព្រោះអ្នកយាមរបស់វាមិនបានរត់** — មិនមែនព្រោះ
+        // កូដខូចទេ។ ការរាយវាជាការធ្លាក់ ជា «ការធ្លាក់ក្លែងក្លាយ» ដែលបញ្ជូន
+        // ជុំក្រោយទៅដេញតាមខ្យល់ (មេរៀន 2026-08-29)។
+        console.log('  --    mutation មិនបានវាស់ (ត្រូវការ ' + m.needs + '): ' + m.name);
     } else {
         ok(caught.length > 0, 'mutation ត្រូវចាប់បាន: ' + m.name,
             '🔴 គ្មានអ្នកយាមណាក្រហម ➜ ថ្នាក់លុយនេះលែងមានអ្នកយាម');

@@ -40,6 +40,11 @@ const COOKIE_STORE_KEY = 'cookie';
 const COOKIE_CACHE_TTL_MS = 60000;
 const COOKIE_STORE_TIMEOUT_MS = 3000;
 const COOKIE_RENEW_MIN_GAP_MS = 60000;
+const COOKIE_RENEW_WRITE_TIMEOUT_MS = 900;
+const COOKIE_BUDGET_RESERVE_MS = 1200;
+const COOKIE_READ_MIN_TIMEOUT_MS = 300;
+const COOKIE_WRITE_MIN_TIMEOUT_MS = 200;
+const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const cookieState = {
@@ -198,6 +203,9 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
         return { cookie: '', source: '', store: null, renewal: '' };
     }
     const skipCache = !!(options && options.fresh);
+    const readTimeoutMs = (options && options.timeoutMs !== undefined)
+        ? options.timeoutMs
+        : COOKIE_STORE_TIMEOUT_MS;
     const opened = openCookieStore(netlifyEvent);
     // ⛔ មូលហេតុត្រូវរស់រានពី cache ។ ការសរសេរ `storeReason = opened.reason`
     // (ជា `''` ពេល store បើកបាន) មុនការពិនិត្យ cache លុបមូលហេតុនៃការអាន
@@ -207,10 +215,10 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     if (!skipCache && cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }
-    if (opened.store) {
+    if (opened.store && readTimeoutMs > 0) {
         const read = await settleWithin(
             () => opened.store.get(COOKIE_STORE_KEY, { type: 'text' }),
-            COOKIE_STORE_TIMEOUT_MS,
+            readTimeoutMs,
             'read'
         );
         if (read.ok) {
@@ -227,6 +235,7 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
             cookieState.storeReason = read.reason;
         }
     }
+    if (opened.store && !(readTimeoutMs > 0)) cookieState.storeReason = 'budget';
     const envCookie = sanitizeEnvCookie(env.ZTO_COOKIE);
     cookieState.value = envCookie;
     cookieState.source = envCookie ? 'env' : '';
@@ -255,15 +264,17 @@ function noteCookieRenewal(session, response) {
     session.renewal = merged;
 }
 
-async function flushCookieRenewal(session) {
+async function flushCookieRenewal(session, timeoutMs) {
     if (!session || !session.store || !session.renewal) return;
+    const budgetedMs = timeoutMs === undefined ? COOKIE_RENEW_WRITE_TIMEOUT_MS : timeoutMs;
+    if (!(budgetedMs > 0)) { session.renewal = ''; return; }
     const merged = session.renewal;
     session.renewal = '';
     if (elapsedSince(cookieState.renewAt) < COOKIE_RENEW_MIN_GAP_MS) return;
     cookieState.renewAt = Date.now();
     const write = await settleWithin(
         () => session.store.set(COOKIE_STORE_KEY, merged),
-        COOKIE_STORE_TIMEOUT_MS,
+        budgetedMs,
         'write'
     );
     if (!write.ok) {
@@ -744,6 +755,57 @@ async function fetchOrder(config, headers, barcode, startedAt, session) {
     }
 }
 
+function budgetLeftMs(config, startedAt) {
+    return config.budgetMs - elapsedSince(startedAt);
+}
+
+function cookieReadTimeoutMs(config, startedAt) {
+    const room = budgetLeftMs(config, startedAt) - COOKIE_BUDGET_RESERVE_MS - config.upstreamTimeoutMs;
+    if (room < COOKIE_READ_MIN_TIMEOUT_MS) return 0;
+    return Math.min(COOKIE_STORE_TIMEOUT_MS, room);
+}
+
+function cookieRenewTimeoutMs(config, startedAt) {
+    const room = budgetLeftMs(config, startedAt) - COOKIE_BUDGET_RESERVE_MS;
+    if (room < COOKIE_WRITE_MIN_TIMEOUT_MS) return 0;
+    return Math.min(COOKIE_RENEW_WRITE_TIMEOUT_MS, room);
+}
+
+async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie) {
+    if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return null;
+    if (budgetLeftMs(config, startedAt) < COOKIE_REFRESH_RETRY_RESERVE_MS) return null;
+    const readMs = cookieReadTimeoutMs(config, startedAt);
+    if (!(readMs > 0)) return null;
+    let fresh;
+    try {
+        fresh = await resolveCookieCredential(netlifyEvent, process.env, { fresh: true, timeoutMs: readMs });
+    } catch (_) {
+        return null;
+    }
+    if (!fresh.cookie || fresh.cookie === previousCookie) {
+        // ⛔ ការអានឡើងវិញ **ចាក់ cache ៦០ វិ. សាជាថ្មី** ជាផលរំខាន។ បើ
+        // Cookie មិនប្រែ នោះវាពិតជាផុតកំណត់ ➜ ត្រូវលុប cache ម្តងទៀត
+        // បើមិនដូច្នេះ Cookie ថ្មីដែល helper សរសេរក្រោយមក ត្រូវរង់ចាំ ៦០ វិ.
+        invalidateCookieCache();
+        return null;
+    }
+    let built;
+    try {
+        built = buildHeaders(config, process.env, fresh.cookie);
+    } catch (_) {
+        return null;
+    }
+    if (!built.authKind) return null;
+    const cacheKey = config.fingerprint + '|' + (cookieFingerprint(fresh.cookie) || '-') + '|' + barcode.toUpperCase();
+    let outcome;
+    try {
+        outcome = await runSharedLookup(cacheKey, config, built.headers, barcode, fresh, startedAt);
+    } catch (_) {
+        return null;
+    }
+    return { outcome: outcome, session: fresh, cacheKey: cacheKey };
+}
+
 function storeCachedBody(key, body) {
     resultCache.delete(key);
     resultCache.set(key, { at: Date.now(), body });
@@ -763,10 +825,10 @@ function readCachedBody(key, ttlMs) {
     return hit.body;
 }
 
-function runSharedLookup(key, config, headers, barcode, session) {
+function runSharedLookup(key, config, headers, barcode, session, startedAt) {
     const existing = inFlight.get(key);
     if (existing) return existing;
-    const run = fetchOrder(config, headers, barcode, Date.now(), session);
+    const run = fetchOrder(config, headers, barcode, startedAt, session);
     inFlight.set(key, run);
     run.then(() => {}, () => {}).then(() => {
         if (inFlight.get(key) === run) inFlight.delete(key);
@@ -833,6 +895,7 @@ function diagnosticsBody(config, headers, authKind, credential) {
 }
 
 exports.handler = async function handler(event) {
+    const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
         await prewarmCookieCredential(event);
         return { statusCode: 204, headers: { Allow: 'GET, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
@@ -869,7 +932,10 @@ exports.handler = async function handler(event) {
     let headers;
     let authKind;
     try {
-        session = await resolveCookieCredential(event, process.env, { fresh: wantsFreshCookie });
+        session = await resolveCookieCredential(event, process.env, {
+            fresh: wantsFreshCookie,
+            timeoutMs: wantsDiagnostics ? COOKIE_STORE_TIMEOUT_MS : cookieReadTimeoutMs(config, startedAt)
+        });
         const built = buildHeaders(config, process.env, session.cookie);
         headers = built.headers;
         authKind = built.authKind;
@@ -888,13 +954,13 @@ exports.handler = async function handler(event) {
         });
     }
 
-    const cacheKey = config.fingerprint + '|' + (cookieFingerprint(session.cookie) || '-') + '|' + barcode.toUpperCase();
+    let cacheKey = config.fingerprint + '|' + (cookieFingerprint(session.cookie) || '-') + '|' + barcode.toUpperCase();
     const cached = readCachedBody(cacheKey, config.cacheTtlMs);
     if (cached) return json(200, Object.assign({}, cached, { cached: true }));
 
     let outcome;
     try {
-        outcome = await runSharedLookup(cacheKey, config, headers, barcode, session);
+        outcome = await runSharedLookup(cacheKey, config, headers, barcode, session, startedAt);
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     }
@@ -903,12 +969,29 @@ exports.handler = async function handler(event) {
         session.renewal = '';
         invalidateCookieCache();
         noteCookieRejected();
-        return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+        // ⛔ មូលហេតុទី ១ នៃ 401 គឺ **cache សតិ ៦០ វិ. របស់ instance នេះ**
+        // ដែលនៅកាន់ Cookie ចាស់ ខណៈ helper ទើបសរសេរ Cookie ថ្មីចូល Blobs។
+        // ដូច្នេះអានឡើងវិញដោយ `fresh` ១ ដង ហើយសាកម្តងទៀត **តែពេល
+        // fingerprint ប្រែ** — បើមិនប្រែ វាជាការផុតកំណត់ពិត ➜ ឆ្លើយ 401
+        // ភ្លាមដោយគ្មានការហៅ upstream ឥតប្រយោជន៍។
+        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie);
+        if (!retried) {
+            return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+        }
+        session = retried.session;
+        cacheKey = retried.cacheKey;
+        outcome = retried.outcome;
+        if (outcome.kind === 'authRejected') {
+            session.renewal = '';
+            invalidateCookieCache();
+            noteCookieRejected();
+            return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+        }
     }
 
     if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted();
 
-    await flushCookieRenewal(session);
+    await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
 
     if (outcome.kind === 'ok') {
         if (config.cacheTtlMs > 0) storeCachedBody(cacheKey, outcome.body);

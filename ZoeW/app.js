@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.6';
+    const APP_VERSION = '2.25.7';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -9588,34 +9588,31 @@
                     showToast("⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ! ការកែទឹកប្រាក់មិនត្រូវបានរក្សាទុកទេ។");
                     return;
                 }
-                fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
-                    serverApplied = false;
-                    if (!currentItem) return currentItem;
-                    if (currentItem.clearClaim) return;
-                    return applyEditedPriceTo(currentItem);
-                }).then((result) => {
-                    if (!result || !result.committed) {
-                        throw new Error('Barcode price transaction was not committed');
-                    }
-                    const committedItem = result.snapshot ? result.snapshot.val() : null;
-                    if (committedItem && !committedItem.id) committedItem.id = editedItemId;
-                    if (!serverApplied) {
-                        if (revenueApplied) {
-                            addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
-                        }
-                        const staleItem = scanHistory.find(i => i.id === editedItemId);
-                        const staleB = staleItem && Array.isArray(staleItem.barcodes)
-                            ? staleItem.barcodes.find(b => b.code === editedBarcodeCode)
-                            : null;
-                        if (staleB) {
-                            staleB.cod = oldCod;
-                            staleB.dod = oldDod;
-                            staleItem.cod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                            staleItem.dod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                            staleItem.price = Math.round((staleItem.cod + staleItem.dod) * 100) / 100;
-                            refreshCurrentHistoryView();
-                        }
-                        showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! ទឹកប្រាក់មិនត្រូវបានកែទេ។");
+                const revertEditedPriceLocally = () => {
+                    const staleItem = scanHistory.find(i => i.id === editedItemId);
+                    const staleB = staleItem && Array.isArray(staleItem.barcodes)
+                        ? staleItem.barcodes.find(b => b.code === editedBarcodeCode)
+                        : null;
+                    if (!staleB) return;
+                    staleB.cod = oldCod;
+                    staleB.dod = oldDod;
+                    staleItem.cod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                    staleItem.dod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                    staleItem.price = Math.round((staleItem.cod + staleItem.dod) * 100) / 100;
+                    refreshCurrentHistoryView();
+                };
+                const undoEditedPriceRevenue = () => {
+                    if (!revenueApplied) return;
+                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
+                };
+                const settleEditedPrice = (result) => {
+                    const committed = !!(result && result.committed);
+                    if (!committed || !serverApplied) {
+                        undoEditedPriceRevenue();
+                        revertEditedPriceLocally();
+                        showToast(committed
+                            ? "⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! ទឹកប្រាក់មិនត្រូវបានកែទេ។"
+                            : "⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                         return;
                     }
                     const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;
@@ -9626,25 +9623,31 @@
                         addRevenueToDailyAndMonthlyRecord(revenueScanDate, correctionCod, correctionDod, 0);
                     }
                     showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
-                }, () => {
-                    if (revenueApplied) {
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
-                    }
-                    const revertItem = scanHistory.find(i => i.id === editedItemId);
-                    const revertB = revertItem && Array.isArray(revertItem.barcodes)
-                        ? revertItem.barcodes.find(b => b.code === editedBarcodeCode)
-                        : null;
-                    if (revertB) {
-                        revertB.cod = oldCod;
-                        revertB.dod = oldDod;
-                        revertItem.cod = Math.round(revertItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                        revertItem.dod = Math.round(revertItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                        revertItem.price = Math.round((revertItem.cod + revertItem.dod) * 100) / 100;
-                    }
+                };
+                const failEditedPrice = (err) => {
+                    undoEditedPriceRevenue();
+                    revertEditedPriceLocally();
                     refreshCurrentHistoryView();
                     const viewListEl = document.getElementById('viewListModal');
                     if (viewListEl && viewListEl.style.display === 'flex') openViewListModal(editedItemId);
                     showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                    if (err && window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveEditedBarcodePrice transaction failed' });
+                };
+                const priceTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
+                    serverApplied = false;
+                    if (!currentItem) return currentItem;
+                    if (currentItem.clearClaim) return;
+                    return applyEditedPriceTo(currentItem);
+                });
+                dbOp(priceTx).then(settleEditedPrice, (error) => {
+                    if (dbOpStalled(error) && armLateCommit(priceTx, settleEditedPrice, (lateErr, lateResult) => {
+                        if (lateResult) { settleEditedPrice(lateResult); return; }
+                        failEditedPrice(lateErr);
+                    }, 'saveEditedBarcodePrice')) {
+                        showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការកែទឹកប្រាក់នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំកែម្ដងទៀត។");
+                        return;
+                    }
+                    failEditedPrice(error);
                 }).catch((postErr) => {
                     console.error('saveEditedBarcodePrice post-transaction handler failed: ', postErr);
                     if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedBarcodePrice post-transaction handler' });

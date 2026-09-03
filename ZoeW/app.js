@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.7';
+    const APP_VERSION = '2.25.8';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -592,6 +592,31 @@
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'armLateCommit ' + (label || '') });
         });
         return true;
+    }
+
+    function armLateWrite(promise, onDone, onFailed, label) {
+        if (!promise || typeof promise.then !== 'function') return false;
+        promise.then(() => (onDone ? onDone() : undefined), (error) => (onFailed ? onFailed(error) : undefined))
+            .catch((error) => {
+                console.error('Late write follow-up failed for', label, error);
+                if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'armLateWrite ' + (label || '') });
+            });
+        return true;
+    }
+
+    function notifyIfSlow(promise, ms, message) {
+        if (!promise || typeof promise.then !== 'function') return promise;
+        let timer = setTimeout(() => {
+            timer = null;
+            showToast(message);
+        }, ms);
+        const stop = () => {
+            if (timer === null) return;
+            clearTimeout(timer);
+            timer = null;
+        };
+        promise.then(stop, stop);
+        return promise;
     }
 
     function viewListModalShowing(itemId) {
@@ -3106,7 +3131,7 @@
     const CUSTOMER_TABLE_SOON_MS = 1200;
     const CUSTOMER_TABLE_SOON_BUSY_MS = 3000;
     const CUSTOMER_TABLE_SOON_MAX_WAIT_MS = 90 * 1000;
-    const ZTO_WARMUP_COOLDOWN_MS = 10 * 60 * 1000;
+    const ZTO_WARMUP_COOLDOWN_MS = 4 * 60 * 1000;
     let customerTableRetryTimer = null;
     let customerTableFailStreak = 0;
     let customerTableSoonTimer = null;
@@ -3523,9 +3548,9 @@
     const AUTO_LOOKUP_QUEUE_RETRY_MS = 400;
     const AUTO_LOOKUP_QUEUE_MAX_WAIT_MS = 20000;
     const AUTO_LOOKUP_TIMEOUT_MS = 16000;
-    const ZTO_AUTO_LOOKUP_TIMEOUT_MS = 20000;
+    const ZTO_AUTO_LOOKUP_TIMEOUT_MS = 13000;
     const LOOKUP_TEST_TIMEOUT_MS = 20000;
-    const ZTO_TEST_TIMEOUT_MS = 18000;
+    const ZTO_TEST_TIMEOUT_MS = 11000;
     const LOOKUP_FAST_CACHE_TTL_MS = 10 * 60 * 1000;
     const LOOKUP_FAST_CACHE_MAX = 300;
     const autoLookupInFlight = new Map();
@@ -3917,6 +3942,7 @@
     const ABANDON_AGE_MS = 7 * 24 * 60 * 60 * 1000;
     const EXPIRED_TRASH_RETENTION_MS = 2 * 24 * 60 * 60 * 1000;
     const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+    const TRASH_WRITE_SLOW_NOTICE_MS = 15000;
     let sessionExpiryCheckInFlight = false;
 
     function clearRememberedSession(keepEmail) {
@@ -4591,14 +4617,15 @@
         if (source && isActiveRestoreClaim(source.restoreClaim)) return;
         staleRestoreMarkerSweeps.add(item.id);
         const release = () => { staleRestoreMarkerSweeps.delete(item.id); };
-        fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+        dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
             if (!currentItem) return currentItem;
             if (!itemHasRestoreMarkers(currentItem)) return;
             delete currentItem.restoreClaimId;
             delete currentItem.restoreClaimToken;
             return currentItem;
-        }).then(release, (error) => {
+        })).then(release, (error) => {
             release();
+            if (dbOpStalled(error)) return;
             console.error('Failed to clear stale restore markers for', item.id, error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'clearStaleRestoreMarkers', itemId: item.id });
         });
@@ -4820,7 +4847,9 @@
             stripHistoryOnlyMarkers(trashItem);
 
             deletedItems.unshift(trashItem);
-            await retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500).catch(async (trashErr) => {
+            await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
+                TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").catch(async (trashErr) => {
                 if (revenueDeducted) {
                     addRevenueToDailyAndMonthlyRecord(revenueScanDate, revenueCod, revenueDod, revenueCount);
                 }
@@ -4898,33 +4927,52 @@
             }
             if (!purgeable.length) return;
 
+            const applyPurged = (list) => {
+                if (!list || !list.length) return Promise.resolve();
+                const purgedSet = new Set(list.map((c) => c.id));
+                deletedItems = deletedItems.filter(item => !purgedSet.has(item.id));
+                let purgedBarcodes = [];
+                list.forEach((candidate) => { purgedBarcodes = purgedBarcodes.concat(candidate.barcodes); });
+                return releaseBarcodesInRegistry(purgedBarcodes);
+            };
+
             let purged = purgeable;
+            const batchWrite = purgeDeletedItemsQuietly(purgeable.map((c) => c.id));
             try {
-                await purgeDeletedItemsQuietly(purgeable.map((c) => c.id));
+                await dbOp(batchWrite);
             } catch (batchError) {
+                if (dbOpStalled(batchError)) {
+                    armLateWrite(batchWrite, () => applyPurged(purgeable), null, 'purgeDeletedItems batch');
+                    return;
+                }
                 purged = [];
                 let lastError = batchError;
+                let stalled = false;
                 for (const candidate of purgeable) {
+                    const singleWrite = purgeDeletedItemsQuietly([candidate.id]);
                     try {
-                        await purgeDeletedItemsQuietly([candidate.id]);
+                        await dbOp(singleWrite);
                         purged.push(candidate);
                     } catch (singleError) {
                         lastError = singleError;
+                        if (dbOpStalled(singleError)) {
+                            armLateWrite(singleWrite, () => applyPurged([candidate]), null, 'purgeDeletedItems single');
+                            stalled = true;
+                            break;
+                        }
                     }
                 }
                 if (!purged.length) {
-                    console.error('Error purging deleted items: ', lastError);
-                    if (window.ZoeErrors) ZoeErrors.capture(lastError, { context: 'Error purging deleted items: ' });
-                    showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
+                    if (!stalled) {
+                        console.error('Error purging deleted items: ', lastError);
+                        if (window.ZoeErrors) ZoeErrors.capture(lastError, { context: 'Error purging deleted items: ' });
+                        showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
+                    }
                     return;
                 }
             }
 
-            const purgedSet = new Set(purged.map((c) => c.id));
-            deletedItems = deletedItems.filter(item => !purgedSet.has(item.id));
-            let purgedBarcodes = [];
-            purged.forEach((candidate) => { purgedBarcodes = purgedBarcodes.concat(candidate.barcodes); });
-            await releaseBarcodesInRegistry(purgedBarcodes);
+            await applyPurged(purged);
         } catch (e) {
             console.error('Automatic trash purge failed', e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'runAutomaticDeletedCleanup' });
@@ -9263,7 +9311,9 @@
             refreshCurrentHistoryView();
 
             let trashSaved = false;
-            await retryAsync(() => saveSingleDeletedItemToFirebase(itemToTrash), 4, 1500).then(() => {
+            await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(itemToTrash), 4, 1500),
+                TRASH_WRITE_SLOW_NOTICE_MS,
+                `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
                 trashSaved = true;
             }).catch(async (trashErr) => {
                 if (deductionApplied) {
@@ -10015,7 +10065,9 @@
             updateRecentPhonesList();
 
             let trashSaved = false;
-            await retryAsync(() => saveSingleDeletedItemToFirebase(removed), 4, 1500).then(() => {
+            await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(removed), 4, 1500),
+                TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការលុប… សូមកុំបិទ App។").then(() => {
                 trashSaved = true;
             }).catch(async (trashErr) => {
                 const staleIdx = deletedItems.findIndex(i => i.id === removed.id);
@@ -10682,7 +10734,8 @@
 
         try {
             await releaseStaleRestoreClaimForPurge(id);
-            await deleteSingleDeletedItemFromFirebase(id);
+            await notifyIfSlow(deleteSingleDeletedItemFromFirebase(id), TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងលុបជាអចិន្ត្រៃយ៍… សូមកុំបិទ App។");
             releaseBarcodesInRegistry(collectItemBarcodes(purgedItem));
         } catch (e) {
             if (!deletedItems.some((i) => i && i.id === id)) {

@@ -104,7 +104,7 @@ const REAL_FNS = [
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
-const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing'];
+const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -113,7 +113,10 @@ for (const name of REAL_FNS) {
 }
 check(missing.length === 0, 'រក function ពិតឃើញទាំង ' + REAL_FNS.length, missing);
 for (const name of missing) fnSrc[name] = 'function ' + name + '() { return Promise.resolve(); }';
-const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).join('\n\n');
+const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).join('\n\n')
+    // ⛔ លើ tree មុនកែ `notifyIfSlow` អវត្តមាន ➜ ត្រូវ stub ដើម្បីឲ្យការអះអាង
+    // ឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
+    + (extractFn('notifyIfSlow') ? '' : '\n\nfunction notifyIfSlow(p) { return p; }');
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;
@@ -253,6 +256,7 @@ function buildWorld(seed, opts) {
         extractConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         extractConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
+        extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');

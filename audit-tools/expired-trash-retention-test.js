@@ -19,6 +19,12 @@ function check(condition, label, detail) {
     }
 }
 
+function optionalFunction(name, fallback) {
+    // ⛔ tree មុនកែគ្មាន helper ថ្មី ➜ ត្រូវ stub ជំនួសការគាំង ដើម្បីឲ្យការ
+    // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
+    try { return balancedFunction(name); } catch (e) { return fallback; }
+}
+
 function balancedFunction(name) {
     const marker = 'function ' + name + '(';
     let start = source.indexOf(marker);
@@ -52,6 +58,8 @@ function build(items) {
         Promise,
         Set,
         Map,
+        setTimeout,
+        clearTimeout,
         window: {},
         deletedItems: JSON.parse(JSON.stringify(items)),
         deletedCleanupInFlight: false,
@@ -68,6 +76,13 @@ function build(items) {
     const code = [
         constant('EXPIRED_TRASH_RETENTION_MS'),
         constant('TRASH_RETENTION_MS'),
+        // ⛔ ការ purge ត្រូវឆ្លងកាត់ពិដាន (`dbOp`) ដើម្បីកុំឲ្យសោសម្អាតជាប់
+        // អស់កល្ប ➜ sandbox ត្រូវផ្ទុក **function ពិត** មិនមែន stub ទេ។
+        constant('DB_OP_TIMEOUT_MS'),
+        balancedFunction('withTimeout'),
+        balancedFunction('dbOp'),
+        balancedFunction('dbOpStalled'),
+        optionalFunction('armLateWrite', 'function armLateWrite() { return false; }'),
         balancedFunction('trashRetentionMs'),
         balancedFunction('runAutomaticDeletedCleanup'),
         'globalThis.__run = runAutomaticDeletedCleanup;',

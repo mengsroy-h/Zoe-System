@@ -313,6 +313,67 @@ async function runHandler(opts) {
             state.upstreamCalls === 1, { calls: state.upstreamCalls });
     }
 
+    // ═══ cache លទ្ធផល ត្រូវរស់រានពីការបន្តអាយុ Cookie ═══════════════════════
+    // ⛔ លទ្ធផលរបស់ barcode មួយ **មិនអាស្រ័យលើ session ណាដែលទៅយក** ➜ កូនសោ
+    // cache មិនត្រូវផ្ទុក fingerprint នៃ Cookie ។ បើវាផ្ទុក នោះរាល់ការបន្តអាយុ
+    // Cookie **បោះ cache ទាំងមូលចោល** ➜ ការស្កេនបន្ទាប់ត្រូវឆ្លងបណ្តាញម្តងទៀត។
+    // ហើយ cache hit ត្រូវឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs** — នោះជាល្បឿនពិត។
+    {
+        console.log('\n== cache ↔ ការបន្តអាយុ Cookie ==');
+        mod.resetCachesForTests();
+        const state = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: GOOD_COOKIE, writeStartedAt: 0 };
+        mod.setBlobsModuleForTests(fakeBlobs({ readMs: 5, writeMs: 5, state }));
+        applyEnv({ budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1 });
+        global.fetch = upstream({ state, upstreamMs: 5, renew: true });
+
+        const code = nextBarcode();
+        const r1 = await mod.handler(makeEvent({ barcode: code }));
+        ok('ការហៅទី ១ ➜ ទៅដល់ upstream', r1.statusCode === 200 && /"cached":false/.test(r1.body), r1.body);
+        const readsAfterFirst = state.reads;
+        const upstreamAfterFirst = state.upstreamCalls;
+        ok('ការហៅទី ១ បានបន្តអាយុ Cookie ពិត (ជាន់អប្បបរមា)', state.writes >= 1, state.writes);
+
+        const r2 = await mod.handler(makeEvent({ barcode: code }));
+        ok('⛔ ការស្កេនដដែលក្រោយការបន្តអាយុ ➜ នៅតែ cache hit',
+            r2.statusCode === 200 && /"cached":true/.test(r2.body), r2.body);
+        ok('⛔ cache hit មិនហៅ upstream ម្តងទៀត',
+            state.upstreamCalls === upstreamAfterFirst, { before: upstreamAfterFirst, after: state.upstreamCalls });
+        ok('⛔ cache hit មិនប៉ះ Netlify Blobs សោះ (ល្បឿនពិត)',
+            state.reads === readsAfterFirst, { before: readsAfterFirst, after: state.reads });
+
+        // ⛔ ទិសផ្ទុយ ៖ barcode ផ្សេង នៅតែឆ្លងបណ្តាញដដែល
+        const other = nextBarcode();
+        const r3 = await mod.handler(makeEvent({ barcode: other }));
+        ok('⛔ ទិសផ្ទុយ ៖ barcode ផ្សេង នៅតែហៅ upstream',
+            r3.statusCode === 200 && /"cached":false/.test(r3.body) && state.upstreamCalls > upstreamAfterFirst,
+            { body: r3.body, calls: state.upstreamCalls });
+    }
+
+    // ═══ ថវិកាលំនាំដើម ត្រូវសមក្នុងពិដានពិតរបស់ Netlify ══════════════════
+    // ⛔ Netlify សម្លាប់ **synchronous function** នៅ **១០ វិនាទី** (លំនាំដើម
+    // គ្រប់ plan)។ ថវិកាដែលធំជាងនោះមានន័យថា Function ត្រូវសម្លាប់ **មុន**
+    // វាឆ្លើយ JSON ដែលមានឈ្មោះ ➜ អ្នកប្រើឃើញ `Failed to fetch` ជំនួស
+    // «⏱️ ZTO ឆ្លើយតបយឺតពេក» — ការរំលោភផ្ទាល់លើមេរៀន 2.24.6។
+    // ⚠️ ការវាស់ត្រូវអានលេខ **ចេញពី Function ពិត** មិនមែនចាក់ literal ក្នុង
+    // checker (បើមិនដូច្នេះ វាចាក់សោការសន្មតចាស់ — មេរៀន 2.25.5)។
+    {
+        console.log('\n== ថវិកាលំនាំដើម ↔ ពិដាន Netlify ==');
+        const NETLIFY_SYNC_LIMIT_MS = 10000;
+        const budgetDefault = /ZTO_REQUEST_BUDGET_MS,\s*(\d+),/.exec(SRC);
+        const upstreamDefault = /ZTO_UPSTREAM_TIMEOUT_MS,\s*(\d+),/.exec(SRC);
+        ok('រកឃើញថវិកាលំនាំដើមក្នុង Function', !!(budgetDefault && upstreamDefault));
+        if (budgetDefault && upstreamDefault) {
+            const budget = Number(budgetDefault[1]);
+            const upstream = Number(upstreamDefault[1]);
+            ok('⛔ ថវិកាលំនាំដើមត្រូវសមក្នុងពិដាន ១០ វិ. របស់ Netlify',
+                budget <= NETLIFY_SYNC_LIMIT_MS - 500, { budgetMs: budget, limitMs: NETLIFY_SYNC_LIMIT_MS });
+            ok('⛔ ពិដានក្នុងមួយសំណើត្រូវតូចជាងថវិកា (ទុកកន្លែងឲ្យការឆ្លើយ)',
+                upstream > 0 && upstream <= budget - 1500, { upstreamMs: upstream, budgetMs: budget });
+            ok('ថវិកាមិនត្រូវតូចពេក (ការស្កេនពិតត្រូវការពេល)',
+                budget >= 6000, budget);
+        }
+    }
+
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);
     process.exit(fail ? 1 : 0);
 })().catch((e) => {

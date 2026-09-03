@@ -44,6 +44,12 @@ function extractFn(src, name) {
     return (m[2] ? 'async ' : '') + src.slice(head, brace) + sliceBalanced(src, brace);
 }
 
+// ⛔ tree មុនកែគ្មានធាតុថ្មី ➜ ត្រូវ stub ជំនួសការគាំង ដើម្បីឲ្យការអះអាង
+// ឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
+function optionalPart(read, fallback) {
+    try { return read() || fallback; } catch (e) { return fallback; }
+}
+
 function extractConst(src, name) {
     const re = new RegExp('\\n\\s*const ' + name + ' = ([^;]+);');
     const m = re.exec(src);
@@ -153,6 +159,10 @@ function buildWorld(historySeed, startNow) {
         extractFn(src, 'withTimeout'),
         extractFn(src, 'dbOp'),
         extractFn(src, 'dbOpStalled'),
+        // ⛔ សារវឌ្ឍនភាពនៃការសរសេរធុងសំរាមជាហេដ្ឋារចនាសម្ព័ន្ធរួមដែរ ➜ sandbox
+        // ត្រូវផ្ទុក function ពិត; លើ tree មុនកែ វាអវត្តមាន ➜ stub (កុំបញ្ឈប់ checker)។
+        optionalPart(() => extractConst(src, 'TRASH_WRITE_SLOW_NOTICE_MS'), 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;'),
+        optionalPart(() => extractFn(src, 'notifyIfSlow'), 'function notifyIfSlow(p) { return p; }'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ sandbox
         // ត្រូវផ្ទុក **function ពិត** បូក `serverClockTrusted = true` ដែលជា
         // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ

@@ -43,9 +43,14 @@ function extractFn(src, name) {
     const brace = src.indexOf('{', src.indexOf('(', head));
     return (m[2] ? 'async ' : '') + src.slice(head, brace) + sliceBalanced(src, brace);
 }
+const optionalFn = (src, n, fallback) => { try { return extractFn(src, n); } catch (e) { return fallback; } };
+const optionalConst = (src, n, fallback) => { try { return extractConst(src, n); } catch (e) { return fallback; } };
 const extractConst = (src, n) => { const m = new RegExp('\\n\\s*const ' + n + ' = ([^;]+);').exec(src); if (!m) throw new Error('missing const ' + n); return `const ${n} = ${m[1]};`; };
 
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
+let SANDBOX_SOURCE = '';
+let acorn = null;
+try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
@@ -95,10 +100,19 @@ function makeSandbox(store, now) {
         document: { getElementById: () => null },
         scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null
     });
-    new vm.Script([
+    const assembled = [
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
+        // ⛔ សារវឌ្ឍនភាពនៃការសរសេរធុងសំរាម (2.25.8) ក៏ជាហេដ្ឋារចនាសម្ព័ន្ធរួមដែរ ➜
+        // ផ្ទុក function ពិត។ លើ tree មុនកែវាអវត្តមាន ➜ stub (កុំបញ្ឈប់ checker)។
+        optionalConst(src, 'TRASH_WRITE_SLOW_NOTICE_MS', 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;'),
+        optionalFn(src, 'notifyIfSlow', 'function notifyIfSlow(p) { return p; }'),
+        optionalFn(src, 'armLateWrite', 'function armLateWrite() { return false; }'),
+        // ⛔ ២ ខាងក្រោមឈរក្នុងផ្លូវ **ព្យួរ** របស់ «ដក»/«លុប» ➜ សេណារីយ៉ូនៅទីនេះ
+        // មិនប៉ះវា តែការត្រួតពិនិត្យរចនាសម្ព័ន្ធរកឃើញថាវាអវត្តមាន (2.25.8)។
+        optionalFn(src, 'armLateCommit', 'function armLateCommit() { return false; }'),
+        optionalFn(src, 'viewListModalShowing', 'function viewListModalShowing() { return false; }'),
         // ⛔ ច្រកទ្វារនាឡិការបស់ការសម្អាត (2.20.5) ➜ ផ្ទុក function ពិត បូក
         // `serverClockTrusted = true` ដែលជាស្ថានភាព App ដែលភ្ជាប់រួច។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
@@ -106,7 +120,9 @@ function makeSandbox(store, now) {
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'
-    ].join('\n\n')).runInContext(ctx);
+    ].join('\n\n');
+    SANDBOX_SOURCE = assembled;
+    new vm.Script(assembled).runInContext(ctx);
     w.ctx = ctx;
     w.sync = () => {
         const h = get('zoew_scan_history_cod_dod') || {};
@@ -163,6 +179,58 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
         smoke.ctx.api.stripHistoryOnlyMarkers({ id: 'smoke_1', restoreClaimId: 'x' });
         smoke.ctx.api.runAutomaticCleanupRules();
         check(true, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator');
+
+        // ⛔⛔ **ការគ្របតាមសេណារីយ៉ូ មិនអាចជំនួសការគ្របតាមរចនាសម្ព័ន្ធបានទេ។**
+        // ការហៅ smoke ខាងលើប៉ះតែ ៥ ក្នុងចំណោម function ដែលស្រង់ ➜ helper ថ្មី
+        // ដែលរស់នៅក្នុងផ្លូវ **ដក/លុប/សម្អាត** (ដែលត្រូវការ emulator ដើម្បីរត់)
+        // លេចជា `ReferenceError` **តែក្នុង CI** ប៉ុណ្ណោះ។ វាកើតឡើងពិតនៅ 2.25.8
+        // (`notifyIfSlow`)។ ដូច្នេះត្រូវសួរសំណួរ **រចនាសម្ព័ន្ធ** ជំនួស ៖
+        // «តើឈ្មោះទាំងអស់ដែល function ដែលស្រង់ *ហៅ* មានក្នុង sandbox ទេ?»
+        const declared = new Set(Object.keys(smoke.ctx));
+        SANDBOX_SOURCE.replace(/\bfunction\s+([A-Za-z_$][\w$]*)/g, (_, n) => { declared.add(n); return _; });
+        SANDBOX_SOURCE.replace(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g, (_, n) => { declared.add(n); return _; });
+        const BUILTINS = new Set(['Promise', 'Math', 'Date', 'JSON', 'Set', 'Map', 'Object', 'Array', 'Number',
+            'String', 'Boolean', 'Error', 'parseFloat', 'parseInt', 'isNaN', 'isFinite', 'setTimeout',
+            'clearTimeout', 'console', 'globalThis', 'require', 'RegExp', 'Symbol', 'BigInt']);
+        const unresolved = new Set();
+        let smokeAst = null;
+        try { smokeAst = acorn.parse(SANDBOX_SOURCE, { ecmaVersion: 2022 }); } catch (e) {}
+        if (smokeAst) {
+            (function walk(node, locals) {
+                if (!node || typeof node.type !== 'string') return;
+                let scope = locals;
+                if (/Function/.test(node.type)) {
+                    scope = new Set(locals);
+                    (node.params || []).forEach((prm) => {
+                        JSON.stringify(prm, (k, v) => {
+                            if (v && v.type === 'Identifier' && k !== 'property') scope.add(v.name);
+                            return v;
+                        });
+                    });
+                    if (node.id) scope.add(node.id.name);
+                }
+                if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier') scope.add(node.id.name);
+                if (node.type === 'CallExpression' && node.callee && node.callee.type === 'Identifier') {
+                    const name = node.callee.name;
+                    if (!declared.has(name) && !BUILTINS.has(name) && !scope.has(name)) unresolved.add(name);
+                }
+                for (const key in node) {
+                    if (key === 'type' || key === 'start' || key === 'end') continue;
+                    const v = node[key];
+                    if (Array.isArray(v)) v.forEach((c) => walk(c, scope));
+                    else if (v && typeof v === 'object') walk(v, scope);
+                }
+            })(smokeAst, new Set());
+        }
+        check(!!smokeAst, 'sandbox៖ parse កូដដែលផ្គុំបាន (parse error = ការធ្លាក់)');
+        check(unresolved.size === 0,
+            '⛔ រាល់ function ដែល sandbox ហៅ ត្រូវមានក្នុង sandbox (គ្មាន ReferenceError ដែលលេចតែក្នុង CI)',
+            Array.from(unresolved).join(', '));
+        if (unresolved.size) {
+            console.log('\n❌ sandbox ខ្វះឈ្មោះ ➜ ការធ្លាក់ **ទោះគ្មាន emulator**');
+            console.log('   បន្ថែមវាក្នុង `FNS` ឬក្នុង context របស់ `makeSandbox()`។');
+            process.exit(1);
+        }
     } catch (sandboxError) {
         check(false, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator',
             String(sandboxError && sandboxError.message || sandboxError));

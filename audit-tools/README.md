@@ -126,6 +126,7 @@ bash audit-tools/emu/rules.sh
 | `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | — |
 | `version-check.js` | `app.js` ↔ `manifest.json` ↔ `index.html` ក្នុង App នីមួយៗ | `VERSION_APP_DIR` |
 | `version-bump-scope.js` | ឡើងកំណែ **តែ App ដែលកែពិត** | `VERSIONSCOPE_APP_DIR` · `VERSIONSCOPE_BASE` |
+| `netlify-config-scope-test.js` | ⛔ **គ្មាន root `netlify.toml`** (វាបង្វែរ build របស់ App មួយទៀត) · config ត្រូវស៊ីនឹងអ្វីដែល App ship · រាល់ config ត្រូវមាន checker អាន | `NETLIFYSCOPE_APP_DIR` |
 | `function-surface-test.js` | ផ្ទៃ function ទាំងមូល · ទប់ declaration ឈ្មោះស្ទួន · រាល់ `data-act` មាន function ពិត | `FNSURFACE_APP_DIR` |
 
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត

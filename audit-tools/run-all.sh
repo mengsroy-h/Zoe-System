@@ -113,6 +113,7 @@ run "exit-code-integrity (meta)" node audit-tools/exit-code-integrity.js
 run "version-bump-scope" node audit-tools/version-bump-scope.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
+run "netlify-config-scope" node audit-tools/netlify-config-scope-test.js
 # ⛔ តេស្ត emulator ៖ CI រត់ពួកវា ដូច្នេះ `run-all.sh` ត្រូវរត់ពួកវាដែរ។
 # មុនកំណែ 2.20.1 ពួកវា **រត់តែក្នុង CI** ➜ ការប្តូរ `app.js` ដែលធ្វើឲ្យ
 # sandbox របស់វាខូច បង្ហាញជាបៃតងនៅមូលដ្ឋាន រួចក្រហមនៅ CI ក្រោយ push។
@@ -313,6 +314,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     RESTORERACE_APP_DIR="$BASE" node audit-tools/restore-race-test.js 2>&1 | tail -1 | sed 's/^/   restore-race:    /'
     FUZZ_APP_DIR="$BASE" node audit-tools/revenue-fuzz-test.js 2>&1 | tail -1 | sed 's/^/   revenue-fuzz:    /'
     RULESDUP_APP_DIR="$BASE" node audit-tools/rules-duplicate-keys.js 2>&1 | tail -1 | sed 's/^/   rules-duplicate-keys:/'
+    NETLIFYSCOPE_APP_DIR="$BASE" node audit-tools/netlify-config-scope-test.js 2>&1 | tail -1 | sed 's/^/   netlify-config-scope:/'
     SDKBOOT_APP_DIR="$BASE" node audit-tools/sdk-offline-boot-test.js 2>&1 | tail -1 | sed 's/^/   sdk-offline-boot:/'
     SDKSURFACE_APP_DIR="$BASE" node audit-tools/sdk-surface.js 2>&1 | tail -1 | sed 's/^/   sdk-surface:     /'
     SECRET_APP_DIR="$BASE" node audit-tools/secret-hygiene.js 2>&1 | tail -1 | sed 's/^/   secret-hygiene:  /'

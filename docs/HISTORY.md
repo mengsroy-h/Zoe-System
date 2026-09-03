@@ -6396,6 +6396,81 @@ iOS កំពុងដើរ** ➜ បញ្ជីលោតរំលងភ្ល
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
 
+### 2026-09-03 · ⛔⛔ root `netlify.toml` របស់ bot — config ដែលគ្មាន checker ណាមើល
+
+> 🔴 **រកឃើញពិត — PR #150 ដែលបើកដោយ `netlify-coding[bot]` (Codex agent)។**
+
+**អ្វីដែល bot អះអាង** ៖ *«The build is failing because the base directory does
+not exist. This is caused by a misconfigured `base` setting in your
+`netlify.toml` file … the invalid absolute `/opt/build` path.»*
+
+**អ្វីដែលវាស់បាន — ការអះអាងនោះមិនពិត** ៖
+
+```
+$ grep -n 'base' ZoeW/netlify.toml ZoeKeyGen/netlify.toml     ➜ គ្មានលទ្ធផល
+$ find . -name netlify.toml -not -path './node_modules/*'
+./ZoeKeyGen/netlify.toml
+./ZoeW/netlify.toml
+```
+
+គ្មានពាក្យ `base` ក្នុងឯកសារណាមួយ · គ្មាន root `netlify.toml` · ហើយ PR នោះ
+**មិនប៉ះឯកសារចាស់ណាមួយឡើយ** (`1 file changed: netlify.toml (added) +63/−0`)។
+ភស្តុតាងបន្ថែម ៖ លើ PR #149 (tree ដដែល) Deploy Preview របស់ `zoekeygen`
+**ជោគជ័យ**។ មូលហេតុពិតស្ថិតក្នុង **Netlify UI** (Base directory ក្នុងមួយ site)។
+
+**អ្វីដែលវានឹងបំបែក** ៖ repo នេះ deploy ជា Netlify site **២** ពីថតតែមួយ។
+Netlify អាន root `netlify.toml` សម្រាប់ site ទាំង ២ ហើយវាឈ្នះលើ UI ➜
+`base = "ZoeKeyGen"` បង្វែរ build របស់ **ZoeW** (App អាជីវកម្ម) ៖
+
+| # | ផលលើ ZoeW |
+|---|---|
+| ១ | Build ចង្អុលទៅថត `ZoeKeyGen` |
+| ២ | CSP គ្មាន `'wasm-unsafe-eval'` ➜ ម៉ាស៊ីនស្កេន ZXing-WASM ស្លាប់ |
+| ៣ | CSP គ្មាន `https://script.google.com` · `https://*.googleusercontent.com` ➜ Lookup API និងនាំចូល Excel ស្លាប់ |
+| ៤ | គ្មាន `functions = "netlify/functions"` ➜ ZTO Function មិន deploy |
+| ៥ | គ្មាន header `/*.wasm ➜ application/wasm` |
+| ៦ | គ្មាន `worker-src 'self' blob:` |
+
+⛔ **ហើយចន្លោះពិត ៖ គ្មាន checker ណាឃើញវាទេ។** `csp-enforced` ·
+`csp-lazy-resource` · `scan-engine` · `offline-shell` · `sheet-import` ·
+`zto-proxy` សុទ្ធតែបើក **ផ្លូវផ្ទាល់** (`ZoeW/netlify.toml` ឬ
+`ZoeKeyGen/netlify.toml`) ➜ root file អាចបម្រើ CSP ខុសលើផលិតកម្ម ខណៈ
+`run-all.sh` **បៃតងទាំង ១៣៣**។
+
+**ការសម្រេច** ៖ បិទ PR #150 (ជាមួយ comment ពន្យល់) ហើយសាង checker។
+
+**ការវាស់របស់ checker ថ្មី** (`netlify-config-scope-test.js`, ២១ assertion) ៖
+
+| សេណារីយ៉ូ | លទ្ធផល |
+|---|---|
+| tree ស្អាត | ✅ ok 21 |
+| **tree របស់ PR #150 ពិត** | ❌ **ធ្លាក់ ៤** |
+| ដក `'wasm-unsafe-eval'` | ❌ ចាប់បាន |
+| ដក `functions = ` | ❌ ចាប់បាន |
+| ដក `application/wasm` | ❌ ចាប់បាន |
+| ដក `script.google.com` ពី `connect-src` | ❌ ចាប់បាន |
+| ចម្លង config ZoeKeyGen ជាន់លើ ZoeW | ❌ ចាប់បាន |
+| បន្ថែម `base = ` ក្នុង config របស់ App | ❌ ចាប់បាន |
+| ⛔ **ទិសផ្ទុយ** ៖ ZoeKeyGen ទទួល `wasm-unsafe-eval` | ✅ **មិនធ្លាក់** |
+| ថតទទេ (`checker-coverage`) | ❌ ធ្លាក់ |
+
+⚠️ **មេរៀនអំពីឧបករណ៍ ១ ៖ `exit-code-integrity.js` ចាប់ checker ថ្មីនេះភ្លាម។**
+ជំនាន់ដំបូងសរសេរ `if (fail) { …; process.exit(1); } … process.exit(0);` —
+ត្រឹមត្រូវតាមឥរិយាបថ តែ AST scan រាយវាថា «`process.exit(0)` ក្រោយការអះអាង
+ដោយគ្មានច្រកទ្វារ»។ ការកែ ៖ `process.exit(fail ? 1 : 0)`។ **នេះជាភស្តុតាងថា
+meta-checker នៅរស់** — វាចាប់សូម្បីតែ checker ដែលទើបសរសេរដើម្បីបិទចន្លោះ។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ ២ ៖ ការកែដែល bot ស្នើ ក៏ត្រូវឆ្លងកាត់វិន័យដដែល។**
+រាល់ PR (ពីមនុស្ស ឬពី bot) ត្រូវសួរ **«តើការអះអាងអំពីមូលហេតុ ពិតទេ?»** រួច
+`grep` វា — មុនអានការកែផង។ ត្រង់នេះ ការ `grep` ១ បន្ទាត់បដិសេធការវិភាគទាំងមូល។
+
+⚠️ **មេរៀនអំពីឧបករណ៍ ៣ ៖ checker នេះជា *ការវាស់អថេរ* មិនមែន *សោចាក់កំហុស*។**
+តម្រូវការនីមួយៗ **ដេរីវេចេញពីឯកសារដែល ship ពិត** (មាន `.wasm`? មាន
+`netlify/functions/*.js`? `index.html` សុំ Apps Script URL?) ➜ ការបន្ថែម
+មុខងារថ្មីនាំមកនូវការអះអាងថ្មីដោយស្វ័យប្រវត្តិ ហើយ App ដែលមិនត្រូវការ
+មិនត្រូវបង្ខំ (ទិសផ្ទុយត្រូវវាស់ដោយឡែក)។
+
+
 ### 2.26.0ខ — 2026-09-03 · ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — វាស់ភាពងងឹតរបស់ checker
 
 **សំណួររបស់ម្ចាស់គម្រោង** ៖ *«ពេលកែហើយ ឃើញថាបៃតងទាំងអស់ តែពេលខ្ញុំឲ្យពិនិត្យ

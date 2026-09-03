@@ -160,6 +160,7 @@ run "app-lock (browser ពិត)" node audit-tools/app-lock-test.js
 run "listener-leak (browser ពិត)" node audit-tools/listener-leak-test.js
 run "storage-blocked-boot (browser ពិត)" node audit-tools/storage-blocked-boot-test.js
 run "db-stall-guard" node audit-tools/db-stall-guard-test.js
+run "write-stall-guard" node audit-tools/write-stall-guard-test.js
 
 echo
 echo
@@ -222,6 +223,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
     PARTIAL_APP_DIR="$BASE" node audit-tools/partial-pickup-cleanup-test.js 2>&1 | tail -1 | sed 's/^/   partial-pickup:  /'
     LATECOMMIT_APP_DIR="$BASE" node audit-tools/late-commit-test.js 2>&1 | tail -1 | sed 's/^/   late-commit:     /'
+    WRITESTALL_APP_DIR="$BASE" node audit-tools/write-stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   write-stall:     /'
     MARKER_APP_DIR="$BASE" node audit-tools/restore-marker-hygiene-test.js 2>&1 | tail -1 | sed 's/^/   marker-hygiene:  /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'

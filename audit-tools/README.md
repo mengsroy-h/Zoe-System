@@ -175,6 +175,7 @@ bash audit-tools/emu/rules.sh
 | `license-network-pressure-test.js` | ផ្លូវបណ្តាញទី ៣ (`license-verify.js`) មានពិដានដែរ | `LICPRESSURE_APP_DIR` |
 | `stall-guard-test.js` | បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `STALLGUARD_APP_DIR` |
 | `db-stall-guard-test.js` | RTDB មិនបដិសេធពេលក្រៅបណ្តាញ ➜ សោ in-flight ជាប់រហូត | `DBSTALL_APP_DIR` |
+| `write-stall-guard-test.js` | ការសរសេរដែលព្យួរ **ខាងក្រោយ helper** ➜ ការសម្អាតស្វ័យប្រវត្តិងាប់ · គ្មានសារដល់អ្នកប្រើ | `WRITESTALL_APP_DIR` |
 | `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |

@@ -450,8 +450,8 @@ function readConfig(env) {
         codPaths: readFieldPaths(env.ZTO_FIELD_COD, COD_PATHS, 'cod'),
         dodPaths: readFieldPaths(env.ZTO_FIELD_DOD, DOD_PATHS, 'dod'),
         barcodePaths: readFieldPaths(env.ZTO_FIELD_BARCODE, BARCODE_PATHS, 'barcode'),
-        upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 8000, 2000, 20000),
-        budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 14000, 4000, 24000),
+        upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 6000, 2000, 20000),
+        budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 9000, 4000, 24000),
         retries: boundedInteger(env.ZTO_UPSTREAM_RETRIES, 1, 0, 3),
         cacheTtlMs: boundedInteger(env.ZTO_CACHE_TTL_MS, 60000, 0, 600000)
     };
@@ -796,14 +796,14 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
         return null;
     }
     if (!built.authKind) return null;
-    const cacheKey = config.fingerprint + '|' + (cookieFingerprint(fresh.cookie) || '-') + '|' + barcode.toUpperCase();
+    const flightKey = config.fingerprint + '|' + (cookieFingerprint(fresh.cookie) || '-') + '|' + barcode.toUpperCase();
     let outcome;
     try {
-        outcome = await runSharedLookup(cacheKey, config, built.headers, barcode, fresh, startedAt);
+        outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt);
     } catch (_) {
         return null;
     }
-    return { outcome: outcome, session: fresh, cacheKey: cacheKey };
+    return { outcome: outcome, session: fresh };
 }
 
 function storeCachedBody(key, body) {
@@ -928,6 +928,18 @@ exports.handler = async function handler(event) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
     }
 
+    // ⛔ **កូនសោ cache មិនត្រូវផ្ទុក fingerprint នៃ Cookie ទេ។** លទ្ធផលរបស់
+    // barcode មួយ ជាទិន្នន័យបញ្ជាទិញ — វា **មិនអាស្រ័យលើ session ណាដែលទៅយក**។
+    // ការដាក់ Cookie ចូលកូនសោធ្វើឲ្យ **រាល់ការបន្តអាយុ Cookie បោះ cache
+    // ទាំងមូលចោល** ហើយបង្ខំឲ្យអានឡើងវិញពី store មុនឆ្លើយ។ ការប្តូរ config
+    // (endpoint · field · method) នៅតែផ្លាស់កូនសោដដែល តាម `config.fingerprint`។
+    // ផលដែលវាស់បាន ៖ ការស្កេនដដែលក្នុង TTL ឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs**។
+    const cacheKey = config.fingerprint + '|' + barcode.toUpperCase();
+    if (!wantsDiagnostics) {
+        const early = readCachedBody(cacheKey, config.cacheTtlMs);
+        if (early) return json(200, Object.assign({}, early, { cached: true }));
+    }
+
     let session;
     let headers;
     let authKind;
@@ -954,13 +966,13 @@ exports.handler = async function handler(event) {
         });
     }
 
-    let cacheKey = config.fingerprint + '|' + (cookieFingerprint(session.cookie) || '-') + '|' + barcode.toUpperCase();
-    const cached = readCachedBody(cacheKey, config.cacheTtlMs);
-    if (cached) return json(200, Object.assign({}, cached, { cached: true }));
+    // ⛔ ការចែក run (single-flight) នៅតែត្រូវ **ដាច់តាម Cookie** — សំណើ ២
+    // ដែលកាន់ session ខុសគ្នា មិនត្រូវចែកលទ្ធផលនៃការហៅដែលកំពុងដំណើរការទេ។
+    const flightKey = cacheKey + '|' + (cookieFingerprint(session.cookie) || '-');
 
     let outcome;
     try {
-        outcome = await runSharedLookup(cacheKey, config, headers, barcode, session, startedAt);
+        outcome = await runSharedLookup(flightKey, config, headers, barcode, session, startedAt);
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     }
@@ -979,7 +991,6 @@ exports.handler = async function handler(event) {
             return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
-        cacheKey = retried.cacheKey;
         outcome = retried.outcome;
         if (outcome.kind === 'authRejected') {
             session.renewal = '';

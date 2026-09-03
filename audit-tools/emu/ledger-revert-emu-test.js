@@ -20,7 +20,7 @@ const http = require('http');
 const vm = require('vm');
 
 const ROOT = process.env.LEDGEREMU_APP_DIR ? path.resolve(process.env.LEDGEREMU_APP_DIR) : path.join(__dirname, '..', '..');
-const BASE = { host: '127.0.0.1', port: 9000 };
+const BASE = { host: '127.0.0.1', port: parseInt(process.env.LEDGEREMU_PORT || '9000', 10) };
 const NS = 'ns=demo-zoe-ledger';
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));
 const DATE = '2026-08-26';
@@ -162,7 +162,10 @@ async function scenario(label, seedDaily, seedMonthly, delta, memoryDaily) {
 (async () => {
     const probe = await owner('GET', '/.json').catch(() => null);
     if (!probe || probe.status >= 500) {
-        console.log('SKIP — គ្មាន RTDB emulator នៅ 127.0.0.1:9000');
+        // ⛔ SKIP ត្រឹមត្រូវត្រង់នេះ ៖ emulator ជា dependency **បរិស្ថាន**
+        // មិនមែនឯកសាររបស់ repo ទេ។ CI ដាក់ `MONEYGUARD_STRICT=1` ក្នុង job
+        // ដែលមាន emulator ➜ SKIP នោះក្លាយជាការធ្លាក់នៅទីនោះ។
+        console.log('SKIP — គ្មាន RTDB emulator នៅ 127.0.0.1:' + BASE.port);
         process.exit(0);
     }
     // rules ពិត

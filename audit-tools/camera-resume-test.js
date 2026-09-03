@@ -127,6 +127,7 @@ console.log('\n=== ⛔ `navigator.mediaDevices` អវត្តមាន (បរ
                 document: { getElementById: () => null, querySelectorAll: () => [] },
                 window: {},
                 noteAppLockExcuse: () => {},
+                warmZtoLookupProxyNow: () => false,
                 stopCurrentStream: () => {},
                 showToast: (m) => toasts.push(String(m)),
                 setupTrackCapabilities: () => {},

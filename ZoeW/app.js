@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.5';
+    const APP_VERSION = '2.25.6';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -580,6 +580,23 @@
 
     function dbOpStalled(error) {
         return !!(error && /stalled/i.test(String(error.message || error)));
+    }
+
+    function armLateCommit(promise, onCommitted, onFailed, label) {
+        if (!promise || typeof promise.then !== 'function') return false;
+        promise.then((result) => {
+            if (result && result.committed) return onCommitted(result);
+            return onFailed ? onFailed(null, result) : undefined;
+        }, (error) => (onFailed ? onFailed(error, null) : undefined)).catch((error) => {
+            console.error('Late commit follow-up failed for', label, error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'armLateCommit ' + (label || '') });
+        });
+        return true;
+    }
+
+    function viewListModalShowing(itemId) {
+        const modalEl = document.getElementById('viewListModal');
+        return !!(modalEl && modalEl.style && modalEl.style.display === 'flex' && activeParentItemId === itemId);
     }
 
     function fetchWithTimeout(url, options, ms, timeoutMsg, readBody) {
@@ -3202,6 +3219,16 @@
         return true;
     }
 
+    function warmZtoLookupProxyNow() {
+        try {
+            const cfg = getLookupApiConfig();
+            if (!cfg || !cfg.enabled || !customerTablePrefetchAllowed()) return false;
+            return warmZtoLookupProxyIfConfigured(cfg);
+        } catch (e) {
+            return false;
+        }
+    }
+
     function lookupApiSupportsList(cfg) {
         return !!(cfg && cfg.url && !lookupApiIsZto(cfg));
     }
@@ -4659,81 +4686,79 @@
         let claimedWhole = null;
         let claimedPartial = null;
         let updatedRemainder = null;
-        try {
-            const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-            const result = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
-                claimedWhole = null;
-                claimedPartial = null;
-                updatedRemainder = null;
-                if (!currentItem) return currentItem;
-                if (currentItem.clearClaim) return currentItem;
-                if (itemHasRestoreMarkers(currentItem)) return;
-                normalizeBarcodesOf(currentItem);
-                const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
+        const cleanupUpdater = (currentItem) => {
+            claimedWhole = null;
+            claimedPartial = null;
+            updatedRemainder = null;
+            if (!currentItem) return currentItem;
+            if (currentItem.clearClaim) return currentItem;
+            if (itemHasRestoreMarkers(currentItem)) return;
+            normalizeBarcodesOf(currentItem);
+            const ts = currentItem.createdAt || parseTimestampFromId(id) || getServerNow();
 
-                if (reason === 'abandon') {
-                    if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
+            if (reason === 'abandon') {
+                if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
 
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                        const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
-                        const stillActive = currentItem.barcodes.filter(b => b.isClosed);
-                        if (staleOpen.length === 0) return currentItem;
+                if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
+                    const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
+                    const stillActive = currentItem.barcodes.filter(b => b.isClosed);
+                    if (staleOpen.length === 0) return currentItem;
 
-                        if (stillActive.length === 0) {
-                            claimedWhole = currentItem;
-                            return null;
-                        }
-
-                        claimedPartial = { ...currentItem, barcodes: staleOpen };
-                        const updated = { ...currentItem, barcodes: stillActive };
-                        updated.count = stillActive.length;
-                        updated.cod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                        updated.dod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                        updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
-                        updated.barcode = stillActive[0].code;
-                        updated.isClosed = true;
-                        if (!updated.closedAt) updated.closedAt = getServerNow();
-                        updatedRemainder = updated;
-                        return updated;
+                    if (stillActive.length === 0) {
+                        claimedWhole = currentItem;
+                        return null;
                     }
 
-                    claimedWhole = currentItem;
-                    return null;
-                } else {
-                    if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                        const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
-                        const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow()));
-                        if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
-
-                        const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow()));
-                        if (keptBarcodes.length === 0) {
-                            claimedWhole = currentItem;
-                            return null;
-                        }
-
-                        claimedPartial = { ...currentItem, barcodes: ripeClosed };
-                        const updated = { ...currentItem, barcodes: keptBarcodes };
-                        updated.count = keptBarcodes.length;
-                        updated.cod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                        updated.dod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                        updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
-                        updated.barcode = keptBarcodes[0].code;
-                        updated.isClosed = keptBarcodes.every(b => b.isClosed);
-                        if (updated.isClosed) {
-                            if (!updated.closedAt) updated.closedAt = getServerNow();
-                        } else {
-                            delete updated.closedAt;
-                        }
-                        updatedRemainder = updated;
-                        return updated;
-                    }
-
-                    if (!currentItem.isClosed || !currentItem.closedAt || (getServerNow() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
-                    claimedWhole = currentItem;
-                    return null;
+                    claimedPartial = { ...currentItem, barcodes: staleOpen };
+                    const updated = { ...currentItem, barcodes: stillActive };
+                    updated.count = stillActive.length;
+                    updated.cod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                    updated.dod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                    updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                    updated.barcode = stillActive[0].code;
+                    updated.isClosed = true;
+                    if (!updated.closedAt) updated.closedAt = getServerNow();
+                    updatedRemainder = updated;
+                    return updated;
                 }
-            }));
 
+                claimedWhole = currentItem;
+                return null;
+            } else {
+                if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
+                    const stamped = normalizeBarcodeCloseStamps(currentItem, getServerNow());
+                    const ripeClosed = currentItem.barcodes.filter(b => barcodeCloseIsRipe(b, getServerNow()));
+                    if (ripeClosed.length === 0) return stamped ? currentItem : undefined;
+
+                    const keptBarcodes = currentItem.barcodes.filter(b => !barcodeCloseIsRipe(b, getServerNow()));
+                    if (keptBarcodes.length === 0) {
+                        claimedWhole = currentItem;
+                        return null;
+                    }
+
+                    claimedPartial = { ...currentItem, barcodes: ripeClosed };
+                    const updated = { ...currentItem, barcodes: keptBarcodes };
+                    updated.count = keptBarcodes.length;
+                    updated.cod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+                    updated.dod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+                    updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                    updated.barcode = keptBarcodes[0].code;
+                    updated.isClosed = keptBarcodes.every(b => b.isClosed);
+                    if (updated.isClosed) {
+                        if (!updated.closedAt) updated.closedAt = getServerNow();
+                    } else {
+                        delete updated.closedAt;
+                    }
+                    updatedRemainder = updated;
+                    return updated;
+                }
+
+                if (!currentItem.isClosed || !currentItem.closedAt || (getServerNow() - currentItem.closedAt) <= TWO_HOURS_MS) return currentItem;
+                claimedWhole = currentItem;
+                return null;
+            }
+        };
+        const finishCleanup = async (result) => {
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
             let trashItem;
@@ -4813,6 +4838,20 @@
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
             });
+        };
+        try {
+            const cleanupTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), cleanupUpdater);
+            let result;
+            try {
+                result = await dbOp(cleanupTx);
+            } catch (txError) {
+                if (dbOpStalled(txError)) {
+                    armLateCommit(cleanupTx, finishCleanup, null, 'claimAndCleanupItem ' + reason);
+                    return;
+                }
+                throw txError;
+            }
+            await finishCleanup(result);
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
@@ -5803,6 +5842,7 @@
 
         if (target === 'entry') {
             setEntryScanMode(entryScanMode);
+            warmZtoLookupProxyNow();
         } else {
             const cameraWasLive = isCameraScanning || isCameraStarting;
             stopCurrentStream();
@@ -7387,6 +7427,7 @@
             showCameraClosedBox();
             return;
         }
+        warmZtoLookupProxyNow();
         isCameraStarting = true;
 
         stopCurrentStream();
@@ -9139,42 +9180,39 @@
         let claimedParent = null;
         let claimedBarcode = null;
         let claimedWhole = null;
-        try {
-            const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
-                claimedParent = null;
-                claimedBarcode = null;
-                claimedWhole = null;
-                if (!currentItem) return currentItem;
-                if (currentItem.clearClaim) return currentItem;
-                dropStaleRestoreMarkers(currentItem);
-                normalizeBarcodesOf(currentItem);
-                if (!Array.isArray(currentItem.barcodes)) return currentItem;
-                const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
-                if (idx === -1) return currentItem;
-                claimedParent = currentItem;
-                claimedBarcode = currentItem.barcodes[idx];
-                const kept = currentItem.barcodes.filter((b, i) => i !== idx);
-                if (kept.length === 0) {
-                    claimedWhole = currentItem;
-                    return null;
-                }
-                const updated = { ...currentItem, barcodes: kept };
-                updated.count = kept.length;
-                updated.cod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                updated.dod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
-                updated.barcode = kept[0].code;
-                updated.isClosed = kept.every(b => b.isClosed);
-                if (updated.isClosed) {
-                    if (!updated.closedAt) updated.closedAt = getServerNow();
-                } else {
-                    delete updated.closedAt;
-                }
-                return updated;
-            }));
-
-            if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
-
+        const removeUpdater = (currentItem) => {
+            claimedParent = null;
+            claimedBarcode = null;
+            claimedWhole = null;
+            if (!currentItem) return currentItem;
+            if (currentItem.clearClaim) return currentItem;
+            dropStaleRestoreMarkers(currentItem);
+            normalizeBarcodesOf(currentItem);
+            if (!Array.isArray(currentItem.barcodes)) return currentItem;
+            const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
+            if (idx === -1) return currentItem;
+            claimedParent = currentItem;
+            claimedBarcode = currentItem.barcodes[idx];
+            const kept = currentItem.barcodes.filter((b, i) => i !== idx);
+            if (kept.length === 0) {
+                claimedWhole = currentItem;
+                return null;
+            }
+            const updated = { ...currentItem, barcodes: kept };
+            updated.count = kept.length;
+            updated.cod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+            updated.dod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+            updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+            updated.barcode = kept[0].code;
+            updated.isClosed = kept.every(b => b.isClosed);
+            if (updated.isClosed) {
+                if (!updated.closedAt) updated.closedAt = getServerNow();
+            } else {
+                delete updated.closedAt;
+            }
+            return updated;
+        };
+        const finishRemoval = async (result, late) => {
             if (!claimedBarcode) {
                 refreshCurrentHistoryView();
                 showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
@@ -9185,7 +9223,7 @@
             const localIdx = scanHistory.findIndex(i => i.id === itemId);
             if (claimedWhole) {
                 if (localIdx !== -1) scanHistory.splice(localIdx, 1);
-                closeModal('viewListModal');
+                if (!late || viewListModalShowing(itemId)) closeModal('viewListModal');
             } else if (localIdx !== -1 && committedItem) {
                 scanHistory[localIdx] = { ...committedItem, id: itemId };
             }
@@ -9221,7 +9259,7 @@
             }
 
             deletedItems.unshift(itemToTrash);
-            if (!claimedWhole) openViewListModal(itemId);
+            if (!claimedWhole && (!late || viewListModalShowing(itemId))) openViewListModal(itemId);
             refreshCurrentHistoryView();
 
             let trashSaved = false;
@@ -9252,8 +9290,30 @@
                 }
             });
             if (trashSaved) {
-                showToast("បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+                showToast(late
+                    ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!`
+                    : "បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
             }
+        };
+        try {
+            const removeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), removeUpdater);
+            let result;
+            try {
+                result = await dbOp(removeTx);
+            } catch (txError) {
+                if (dbOpStalled(txError)) {
+                    armLateCommit(removeTx, (late) => finishRemoval(late, true), (lateErr) => {
+                        refreshCurrentHistoryView();
+                        showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។`);
+                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'removeSingleBarcode late transaction failed', itemId });
+                    }, 'removeSingleBarcode');
+                    showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ការដក (${barcodeCode}) នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំដកម្ដងទៀត។`);
+                    return;
+                }
+                throw txError;
+            }
+            if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
+            await finishRemoval(result, false);
         } catch (e) {
             console.error("Error removing single barcode: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error removing single barcode: " });
@@ -9323,9 +9383,42 @@
 
         if (!db || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return;
 
+        const revertBarcodeCloseLocally = () => {
+            if (previousState) {
+                const revertItem = scanHistory.find(i => i.id === itemId);
+                const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
+                if (revertItem && revertB) {
+                    revertB.isClosed = previousState.isClosed;
+                    if (previousState.barcodeClosedAt !== undefined) revertB.closedAt = previousState.barcodeClosedAt;
+                    else delete revertB.closedAt;
+                    revertItem.isClosed = previousState.itemIsClosed;
+                    if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
+                    else delete revertItem.closedAt;
+                    if (previousState.itemCallMark !== undefined) revertItem.callMark = previousState.itemCallMark;
+                    else delete revertItem.callMark;
+                    if (previousState.itemCallMarkTime !== undefined) revertItem.callMarkTime = previousState.itemCallMarkTime;
+                    else delete revertItem.callMarkTime;
+                    if (viewListModalShowing(itemId)) openViewListModal(itemId);
+                    refreshCurrentHistoryView();
+                }
+            }
+            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
+                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+                pickupCustomerDelta = 0;
+                pickupPackageDelta = 0;
+            }
+        };
+        const settleBarcodeClose = (barcodeCloseResult) => {
+            if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
+                revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePickupDeltaWithServer();
+            }
+        };
+        let closeTx = null;
         try {
-            const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`);
-            const barcodeCloseResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
+            closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
@@ -9361,39 +9454,22 @@
                 }
                 serverApplied = true;
                 return currentItem;
-            }));
-            const committedItem = (barcodeCloseResult && barcodeCloseResult.committed && barcodeCloseResult.snapshot) ? barcodeCloseResult.snapshot.val() : null;
-            if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
-                revertPickupDeltaAfterNoOp();
-            } else {
-                reconcilePickupDeltaWithServer();
-            }
+            });
+            settleBarcodeClose(await dbOp(closeTx));
         } catch (error) {
+            if (dbOpStalled(error) && armLateCommit(closeTx, settleBarcodeClose, (lateErr, lateResult) => {
+                if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
+                revertBarcodeCloseLocally();
+                showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
+                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'toggleIndividualBarcodeClose late transaction failed' });
+            }, 'toggleIndividualBarcodeClose')) {
+                showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាព (${barcodeCode}) នឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។`);
+                return;
+            }
             console.error("Error toggling barcode close: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling barcode close: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
-            if (previousState) {
-                const revertItem = scanHistory.find(i => i.id === itemId);
-                const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
-                if (revertItem && revertB) {
-                    revertB.isClosed = previousState.isClosed;
-                    if (previousState.barcodeClosedAt !== undefined) revertB.closedAt = previousState.barcodeClosedAt;
-                    else delete revertB.closedAt;
-                    revertItem.isClosed = previousState.itemIsClosed;
-                    if (previousState.itemClosedAt !== undefined) revertItem.closedAt = previousState.itemClosedAt;
-                    else delete revertItem.closedAt;
-                    if (previousState.itemCallMark !== undefined) revertItem.callMark = previousState.itemCallMark;
-                    else delete revertItem.callMark;
-                    if (previousState.itemCallMarkTime !== undefined) revertItem.callMarkTime = previousState.itemCallMarkTime;
-                    else delete revertItem.callMarkTime;
-                    openViewListModal(itemId);
-                    refreshCurrentHistoryView();
-                }
-            }
-            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
-                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
-            }
+            revertBarcodeCloseLocally();
         }
     }
 
@@ -9791,9 +9867,46 @@
 
         if (!db || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
 
+        const revertCloseLocally = () => {
+            if (previousState) {
+                const revertItem = scanHistory.find(i => i.id === id);
+                if (revertItem) {
+                    revertItem.isClosed = previousState.isClosed;
+                    if (previousState.closedAt !== undefined) revertItem.closedAt = previousState.closedAt;
+                    else delete revertItem.closedAt;
+                    if (previousState.callMark !== undefined) revertItem.callMark = previousState.callMark;
+                    else delete revertItem.callMark;
+                    if (previousState.callMarkTime !== undefined) revertItem.callMarkTime = previousState.callMarkTime;
+                    else delete revertItem.callMarkTime;
+                    if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
+                        revertItem.barcodes.forEach((b, i) => {
+                            if (previousState.barcodeStates[i] === undefined) return;
+                            b.isClosed = previousState.barcodeStates[i];
+                            const stamp = previousState.barcodeCloseStamps ? previousState.barcodeCloseStamps[i] : undefined;
+                            if (stamp !== undefined) b.closedAt = stamp;
+                            else delete b.closedAt;
+                        });
+                    }
+                    refreshCurrentHistoryView();
+                }
+            }
+            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
+                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
+                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+                pickupCustomerDelta = 0;
+                pickupPackageDelta = 0;
+            }
+        };
+        const settleClose = (closeResult) => {
+            if (!serverApplied || !(closeResult && closeResult.committed)) {
+                revertPickupDeltaAfterNoOp();
+            } else {
+                reconcilePickupDeltaWithServer();
+            }
+        };
+        let closeTx = null;
         try {
-            const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
-            const closeResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {
+            closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
                 serverApplied = false;
                 serverPackageDelta = 0;
                 serverCustomerDelta = 0;
@@ -9824,43 +9937,22 @@
                 }
                 serverApplied = true;
                 return currentItem;
-            }));
-            const committedItem = (closeResult && closeResult.committed && closeResult.snapshot) ? closeResult.snapshot.val() : null;
-            if (!serverApplied || !(closeResult && closeResult.committed)) {
-                revertPickupDeltaAfterNoOp();
-            } else {
-                reconcilePickupDeltaWithServer();
-            }
+            });
+            settleClose(await dbOp(closeTx));
         } catch (error) {
+            if (dbOpStalled(error) && armLateCommit(closeTx, settleClose, (lateErr, lateResult) => {
+                if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
+                revertCloseLocally();
+                showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
+                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'toggleCloseStatus late transaction failed' });
+            }, 'toggleCloseStatus')) {
+                showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាពបញ្ជីនឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។");
+                return;
+            }
             console.error("Error toggling close status: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling close status: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
-            if (previousState) {
-                const revertItem = scanHistory.find(i => i.id === id);
-                if (revertItem) {
-                    revertItem.isClosed = previousState.isClosed;
-                    if (previousState.closedAt !== undefined) revertItem.closedAt = previousState.closedAt;
-                    else delete revertItem.closedAt;
-                    if (previousState.callMark !== undefined) revertItem.callMark = previousState.callMark;
-                    else delete revertItem.callMark;
-                    if (previousState.callMarkTime !== undefined) revertItem.callMarkTime = previousState.callMarkTime;
-                    else delete revertItem.callMarkTime;
-                    if (previousState.barcodeStates && revertItem.barcodes && Array.isArray(revertItem.barcodes)) {
-                        revertItem.barcodes.forEach((b, i) => {
-                            if (previousState.barcodeStates[i] === undefined) return;
-                            b.isClosed = previousState.barcodeStates[i];
-                            const stamp = previousState.barcodeCloseStamps ? previousState.barcodeCloseStamps[i] : undefined;
-                            if (stamp !== undefined) b.closedAt = stamp;
-                            else delete b.closedAt;
-                        });
-                    }
-                    refreshCurrentHistoryView();
-                }
-            }
-            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
-                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
-            }
+            revertCloseLocally();
         }
     }
 
@@ -9880,22 +9972,19 @@
 
         let claimedWhole = null;
         let clearClaimBlocked = false;
-        try {
-            const result = await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
-                claimedWhole = null;
-                clearClaimBlocked = false;
-                if (!currentItem) return currentItem;
-                if (currentItem.clearClaim) {
-                    clearClaimBlocked = true;
-                    return currentItem;
-                }
-                normalizeBarcodesOf(currentItem);
-                claimedWhole = currentItem;
-                return null;
-            }));
-
-            if (!result || !result.committed) throw new Error('Delete item transaction was not committed');
-
+        const deleteUpdater = (currentItem) => {
+            claimedWhole = null;
+            clearClaimBlocked = false;
+            if (!currentItem) return currentItem;
+            if (currentItem.clearClaim) {
+                clearClaimBlocked = true;
+                return currentItem;
+            }
+            normalizeBarcodesOf(currentItem);
+            claimedWhole = currentItem;
+            return null;
+        };
+        const finishDelete = async (result, late) => {
             if (!claimedWhole) {
                 if (!clearClaimBlocked) {
                     const staleIdx = scanHistory.findIndex(i => i.id === id);
@@ -9948,8 +10037,29 @@
                 }
             });
             if (trashSaved) {
-                showToast("បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+                showToast(late ? "✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!" : "បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
             }
+        };
+        try {
+            const deleteTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), deleteUpdater);
+            let result;
+            try {
+                result = await dbOp(deleteTx);
+            } catch (txError) {
+                if (dbOpStalled(txError)) {
+                    armLateCommit(deleteTx, (late) => finishDelete(late, true), (lateErr) => {
+                        refreshCurrentHistoryView();
+                        updateRecentPhonesList();
+                        showToast("⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
+                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'deleteSingleItem late transaction failed', itemId: id });
+                    }, 'deleteSingleItem');
+                    showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការលុបនឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំលុបម្ដងទៀត។");
+                    return;
+                }
+                throw txError;
+            }
+            if (!result || !result.committed) throw new Error('Delete item transaction was not committed');
+            await finishDelete(result, false);
         } catch (e) {
             console.error("Error deleting single item: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });

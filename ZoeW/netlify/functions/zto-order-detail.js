@@ -781,6 +781,13 @@ function configErrorResponse(error) {
     return json(503, body);
 }
 
+async function prewarmCookieCredential(netlifyEvent) {
+    if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) return;
+    try {
+        await resolveCookieCredential(netlifyEvent, process.env, {});
+    } catch (_) {}
+}
+
 function diagnosticsBody(config, headers, authKind, credential) {
     return {
         ok: true,
@@ -827,6 +834,7 @@ function diagnosticsBody(config, headers, authKind, credential) {
 
 exports.handler = async function handler(event) {
     if (event.httpMethod === 'OPTIONS') {
+        await prewarmCookieCredential(event);
         return { statusCode: 204, headers: { Allow: 'GET, OPTIONS', 'Cache-Control': 'no-store' }, body: '' };
     }
     if (event.httpMethod !== 'GET') {

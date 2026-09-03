@@ -6416,7 +6416,17 @@ $ find . -name netlify.toml -not -path './node_modules/*'
 គ្មានពាក្យ `base` ក្នុងឯកសារណាមួយ · គ្មាន root `netlify.toml` · ហើយ PR នោះ
 **មិនប៉ះឯកសារចាស់ណាមួយឡើយ** (`1 file changed: netlify.toml (added) +63/−0`)។
 ភស្តុតាងបន្ថែម ៖ លើ PR #149 (tree ដដែល) Deploy Preview របស់ `zoekeygen`
-**ជោគជ័យ**។ មូលហេតុពិតស្ថិតក្នុង **Netlify UI** (Base directory ក្នុងមួយ site)។
+**ជោគជ័យ**។
+
+**✅ មូលហេតុពិត — បញ្ជាក់ដោយម្ចាស់គម្រោង** ៖ Base directory ក្នុង **Netlify
+UI** ត្រូវបានដាក់ជា **`zoekeygen`** (អក្សរតូច) ជំនួស **`ZoeKeyGen`**។
+Netlify build រត់លើ **Linux ដែលប្រកាន់អក្សរតូចធំ** ➜ ថតនោះពិតជាមិនមាន ➜
+សារ «base directory does not exist» **ត្រឹមត្រូវទាំងស្រុង**។ បញ្ហាមិនដែល
+នៅក្នុង repo ទេ ហើយ **គ្មានការកែឯកសារណាមួយអាចជួសជុលវាបាន**។
+
+⛔ **នេះជាតំបន់ 📝** ៖ វារស់ក្នុង Netlify UI ➜ គ្មាន checker ចាក់សោបាន។
+មេរៀនអនុវត្ត ៖ ពេល deploy ធ្លាក់ដោយ «base directory does not exist» ត្រូវ
+**ពិនិត្យអក្សរតូចធំក្នុង UI ជាមុនគេ**។
 
 **អ្វីដែលវានឹងបំបែក** ៖ repo នេះ deploy ជា Netlify site **២** ពីថតតែមួយ។
 Netlify អាន root `netlify.toml` សម្រាប់ site ទាំង ២ ហើយវាឈ្នះលើ UI ➜

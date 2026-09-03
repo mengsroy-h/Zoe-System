@@ -188,10 +188,14 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 - **`zto-import/google-sheets-api/Code.gs` ជា template** — ការកែក្នុង repo
   **មិនប្តូរ script ដែល deploy រួច**។ ត្រូវ copy-paste ចូល script.google.com
   ដោយដៃ រួច Deploy ជាកំណែថ្មី។
+- **Base directory របស់ Netlify រស់ក្នុង UI** — `zoew` ➜ **`ZoeW`** ·
+  `zoekeygen` ➜ **`ZoeKeyGen`** (**ប្រកាន់អក្សរតូចធំ** — Linux)។ checker ក្នុង
+  repo មើលមិនឃើញវា ហើយ PAT ក្នុង Netlify env ត្រូវហាម។ មើលផ្នែក «config
+  របស់ Netlify» ខាងក្រោម។
 - **ការលុប site data បាត់ `seenMax` របស់ License** — តែវាមិនផ្តល់សិទ្ធិអ្វី
   ដោយគ្មាន server ទេ (`activate()` ទាមទារ `checkOnline().ok === true`)។
 
-⛔ **បីធាតុដំបូងគឺជាតំបន់ 📝 (គ្មានឧបករណ៍ចាក់សោ) — ពួកវាជាការទទួលយកដោយ
+⛔ **បួនធាតុដំបូងគឺជាតំបន់ 📝 (គ្មានឧបករណ៍ចាក់សោ) — ពួកវាជាការទទួលយកដោយ
 ចេតនា មិនមែនចន្លោះទេ។ កុំសាងឧបករណ៍សម្រាប់ពួកវាដោយគ្មានការស្នើ។**
 
 ---
@@ -204,7 +208,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 >
 > **📝 = គ្មានឧបករណ៍ចាក់សោ** ➜ ច្បាប់នោះពឹងលើការប្រុងប្រយ័ត្នរបស់មនុស្ស
 > តែម្យ៉ាង ➜ **វាជាកន្លែងដែលកំហុសបន្ទាប់នឹងកើត**។ បើអ្នកប៉ះតំបន់ 📝 ណាមួយ
-> សូមសាងឧបករណ៍ជាមុនសិន។ (ឥឡូវនៅសល់ **៣** — មើលផ្នែក «អ្វីដែលទទួលយក
+> សូមសាងឧបករណ៍ជាមុនសិន។ (ឥឡូវនៅសល់ **៤** — មើលផ្នែក «អ្វីដែលទទួលយក
 > ដោយចេតនា» ខាងលើ។ ទាំង ៣ ជាការទទួលយក មិនមែនចន្លោះទេ។)
 
 | តំបន់ | ច្បាប់ខ្លី | ឧបករណ៍ |
@@ -306,6 +310,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
+| **Base directory របស់ Netlify** | ⛔ **ប្រកាន់អក្សរតូចធំ** ៖ `ZoeW` · `ZoeKeyGen` (រស់ក្នុង UI) | 📝 |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
 
 ---
@@ -1350,6 +1355,23 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 
 Repo នេះ deploy ជា Netlify site **២** (`zoew` · `zoekeygen`) ពីថតតែមួយ។
 **Base directory ជារបស់ Netlify UI ក្នុងមួយ site** — មិនមែនក្នុង repo ទេ។
+
+### ⛔ 📝 Base directory ត្រូវប្រកាន់អក្សរតូចធំ (គ្មានឧបករណ៍ចាក់សោបាន)
+
+| Netlify site | Base directory ត្រឹមត្រូវ |
+|---|---|
+| `zoew` | **`ZoeW`** |
+| `zoekeygen` | **`ZoeKeyGen`** |
+
+🔴 **មូលហេតុពិតនៃ deploy ដែលធ្លាក់ 2026-09-03** ៖ base ត្រូវបានដាក់ជា
+**`zoekeygen`** (អក្សរតូច) ជំនួស **`ZoeKeyGen`**។ Netlify build រត់លើ
+**Linux ដែលប្រកាន់អក្សរតូចធំ** ➜ ថតនោះពិតជាមិនមាន ➜ សារ «base directory
+does not exist» **ត្រឹមត្រូវ** — បញ្ហាមិនដែលនៅក្នុង repo ទេ។
+
+⛔ **នេះជាតំបន់ 📝** ៖ វារស់ក្នុង Netlify UI ដែល checker ក្នុង repo មើលមិនឃើញ
+ហើយការដាក់ PAT ចូល Netlify env ត្រូវហាម ➜ **គ្មានឧបករណ៍ណាចាក់សោវាបានទេ**។
+ដូច្នេះពេល deploy ធ្លាក់ដោយ «base directory does not exist» ៖ **ពិនិត្យ
+អក្សរតូចធំក្នុង UI ជាមុនគេ** មុននឹងជឿការវិភាគណាមួយដែលចង្អុលទៅ repo។
 
 ច្បាប់ ៖
 

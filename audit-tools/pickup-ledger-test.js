@@ -51,8 +51,12 @@ function sliceFn(name) {
 }
 
 // ── ១. ជាន់អប្បបរមា — checker នេះត្រូវពិតជាបានឃើញកូដ ────────────────
-const callSites = SRC.match(/addPickupToDailyRecord\(/g) || [];
-ok('ជាន់អប្បបរមា៖ ឃើញកន្លែងហៅ addPickupToDailyRecord >= 10',
+// ⛔ ការហៅខ្លះឥឡូវឆ្លងកាត់ helper (`revertPickupLedgerDelta` ·
+// `correctPickupLedgerToActual` · `applyPickupRefMove`) ➜ ជាន់ត្រូវរាប់
+// **ទាំងអស់** បើមិនដូច្នេះ refactor ធម្មតាធ្វើឲ្យជាន់ធ្លាក់ខុស ហើយការបន្ថយ
+// លេខដោយគ្មានហេតុផលបង្កើតបៃតងក្លែងក្លាយសម្រាប់ជុំក្រោយ។
+const callSites = SRC.match(/(?:addPickupToDailyRecord|revertPickupLedgerDelta|correctPickupLedgerToActual|applyPickupRefMove)\(/g) || [];
+ok('ជាន់អប្បបរមា៖ ឃើញកន្លែងហៅផ្លូវស្ថិតិយក >= 10',
     callSites.length >= 10, callSites.length);
 
 // ── ២. helper រាប់ barcode បិទ ត្រូវមាន និងត្រឹមត្រូវ ──────────────────
@@ -107,6 +111,8 @@ vm.runInContext([
     sliceFn('getPickupPhoneKey'),
     sliceFn('countPickedUpCustomers'),
     sliceFn('addPickupToDailyRecord'),
+    sliceFn('revertPickupLedgerDelta'),
+    sliceFn('correctPickupLedgerToActual'),
     helperSrc || 'function closedBarcodeCount(item){ return item && item.barcodes ? item.barcodes.filter(function(b){return b && b.isClosed;}).length : 0; }',
     'this.api = { getPickupPhoneKey, countPickedUpCustomers, addPickupToDailyRecord, closedBarcodeCount };'
 ].filter(Boolean).join('\n\n'), ctx);

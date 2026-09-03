@@ -37,7 +37,7 @@ function buildRunner(appFile) {
 
     // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
     const claimBlock = slice(src,
-        '            let trashItem;\n            let revenueDeducted = false;',
+        '            let trashItem;\n            let revenueApplied = null;',
         '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {\n                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                    }\n                }\n            }',
         'claim');
 
@@ -49,7 +49,7 @@ function buildRunner(appFile) {
 
     // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
     const removeBlock = slice(src,
-        '            let deductedCod = 0;\n            let deductedDod = 0;',
+        '            let deductionApplied = null;\n            const revenueScanDate = claimedParent.scanDate',
         '            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };',
         'remove');
 
@@ -62,9 +62,24 @@ function buildRunner(appFile) {
         var revenueLog = [];
         function addRevenueToDailyAndMonthlyRecord(d, cod, dod, count) {
             revenueLog.push({ d, cod, dod, count });
+            const before = { cod: stats.cod, dod: stats.dod, count: stats.count };
             stats.cod = Math.round((stats.cod + cod) * 100) / 100;
             stats.dod = Math.round((stats.dod + dod) * 100) / 100;
             stats.count += count;
+            if (stats.cod < 0) stats.cod = 0;
+            if (stats.dod < 0) stats.dod = 0;
+            if (stats.count < 0) stats.count = 0;
+            const applied = {
+                cod: Math.round((stats.cod - before.cod) * 100) / 100,
+                dod: Math.round((stats.dod - before.dod) * 100) / 100,
+                count: stats.count - before.count
+            };
+            return { scanDate: d, daily: applied, monthly: applied, dailyServer: Promise.resolve(applied), monthlyServer: Promise.resolve(applied) };
+        }
+        function revertRevenueLedgerDelta(applied) {
+            if (!applied || !applied.daily) return null;
+            addRevenueToDailyAndMonthlyRecord(applied.scanDate, -applied.daily.cod, -applied.daily.dod, -applied.daily.count);
+            return applied;
         }
         var stats = { cod: 0, dod: 0, count: 0 };
     `;
@@ -72,11 +87,11 @@ function buildRunner(appFile) {
     const script = new vm.Script(prelude + `
         function runClaim(claimedWhole, claimedPartial, reason, id) {
 ${claimBlock}
-            return { trashItem, revenueDeducted };
+            return { trashItem, revenueDeducted: !!revenueApplied };
         }
         function runRemoveBarcode(claimedParent, claimedBarcode) {
 ${removeBlock}
-            return { removedBc, deductionApplied, deductedCod, deductedDod };
+            return { removedBc, deductionApplied: !!deductionApplied, deductedCod: deductionApplied ? -deductionApplied.daily.cod : 0, deductedDod: deductionApplied ? -deductionApplied.daily.dod : 0 };
         }
         function runRestore(itemToRestore) {
             const restoredWasRemoved = itemToRestore.isFromDeletion === false;
@@ -178,7 +193,7 @@ for (const app of ['ZoeW']) {
     // ---------- ⛔ ប៊ូតុងលុបដោយដៃ ៖ មិនត្រូវប៉ះលុយសោះ (រចនាសម្ព័ន្ធ) ----------
     console.log('\n-- ⛔ លុបដោយដៃ / លុបទាំងអស់ ៖ គ្មានការសរសេរលុយក្នុង function ទាំងមូល --');
     const REVENUE_SINKS = [
-        'addRevenueToDailyAndMonthlyRecord',
+        'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements',
         'zoew_daily_revenue_cod_dod',
         'zoew_monthly_revenue_cod_dod'

@@ -93,7 +93,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          stall-guard-test \
          periodic-network-guard-test \
          pickup-ledger-test pickup-repair-test pickup-reset-test \
-         revenue-rules-clamp-test registry-release-test \
+         revenue-rules-clamp-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
          lookup-burst-test; do
@@ -221,6 +221,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     BIOMETRIC_APP_DIR="$BASE" node audit-tools/biometric-unlock-test.js 2>&1 | tail -1 | sed 's/^/   biometric:       /'
     POLICY_APP_DIR="$BASE"  node audit-tools/policy-test.js 2>&1 | tail -1 | sed 's/^/   policy:          /'
     PARTIAL_APP_DIR="$BASE" node audit-tools/partial-pickup-cleanup-test.js 2>&1 | tail -1 | sed 's/^/   partial-pickup:  /'
+    LATECOMMIT_APP_DIR="$BASE" node audit-tools/late-commit-test.js 2>&1 | tail -1 | sed 's/^/   late-commit:     /'
     MARKER_APP_DIR="$BASE" node audit-tools/restore-marker-hygiene-test.js 2>&1 | tail -1 | sed 's/^/   marker-hygiene:  /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'

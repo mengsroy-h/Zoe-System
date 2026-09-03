@@ -67,16 +67,17 @@ function makeCtx(src) {
     // ⛔ យុថ្កាដែលរកមិនឃើញ ➜ `indexOf` ត្រឡប់ -1 ➜ `sliceBalanced` កាត់កូដ
     // **ខុសកន្លែងទាំងស្រុង** ➜ ការធ្លាក់គ្មានឈ្មោះដែលចំណាយពេលដេញតាមយូរ
     // (មេរៀន «ការធ្លាក់ក្លែងក្លាយ» — សំណួរទី ១១)។ ត្រូវធ្លាក់ដោយមានឈ្មោះជំនួស។
-    const anchorWhole = 'const closeResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {';
-    const anchorOne = 'const barcodeCloseResult = await dbOp(fb.runTransaction(itemRef, (currentItem) => {';
+    const anchorWhole = 'closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {';
+    const anchorOne = 'closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {';
     if (src.indexOf(anchorWhole) === -1 || src.indexOf(anchorOne) === -1) {
         throw new Error('raw-read-shape: រកយុថ្កា transaction មិនឃើញក្នុង app.js ➜ '
             + 'ការស្រង់នឹងកាត់កូដខុសកន្លែង។ ត្រូវធ្វើបច្ចុប្បន្នភាពយុថ្កាក្នុងឯកសារនេះ។');
     }
+    const bodyAt = (anchor) => src.indexOf(anchor) + anchor.length - 1;
     vm.runInContext('function toggleWholeTx(currentItem) ' +
-        sliceBalanced(src, src.indexOf('{', src.indexOf(anchorWhole)), '{', '}'), ctx);
+        sliceBalanced(src, bodyAt(anchorWhole), '{', '}'), ctx);
     vm.runInContext('function toggleOneTx(currentItem) ' +
-        sliceBalanced(src, src.indexOf('{', src.indexOf(anchorOne)), '{', '}'), ctx);
+        sliceBalanced(src, bodyAt(anchorOne), '{', '}'), ctx);
     return ctx;
 }
 

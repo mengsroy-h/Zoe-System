@@ -52,7 +52,7 @@ function sliceFn(name) {
 const FNS = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
-    'lookupApiIsZto', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'buildCustomerListApiUrl',
+    'lookupApiIsZto', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'warmZtoLookupProxyNow', 'buildCustomerListApiUrl',
     'prefetchCustomerDataTableRowsIfConfigured',
     'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
     'scheduleCustomerTableSoonRefresh', 'runCustomerTableSoonRefresh',
@@ -180,6 +180,48 @@ scenario('ZTO មិនគាំទ្រការទាញតារាង list=
     ok('ZTO URL ដែលមាន slash ខាងចុង មិនបាញ់ list=1',
         ztoTrailingSlash.__calls.length === 0 && ztoTrailingSlash.__warmCalls.length === 1,
         [ztoTrailingSlash.__calls, ztoTrailingSlash.__warmCalls]);
+
+    // ⛔ warm-up តាម **ចេតនារបស់អ្នកប្រើ** មិនមែនតាមវដ្ត ៥ នាទីតែម្យ៉ាង។
+    // វដ្តនោះអាចបាញ់ចុងក្រោយ ៩ នាទីមុន ➜ Lambda ត្រជាក់វិញ ➜ ការស្កេន
+    // **ដំបូង** ចំណាយ cold start បូកការអាន Netlify Blobs។ ការបើកទំព័រ
+    // «បញ្ចូលទិន្នន័យ» និងការបើកកាមេរ៉ា ជាសញ្ញាច្បាស់ថាការស្កេនជិតមកដល់។
+    const intent = build({ cfg: ztoCfg });
+    ok('warmZtoLookupProxyNow() warm ភ្លាមតាមចេតនា',
+        vm.runInContext('warmZtoLookupProxyNow()', intent) === true && intent.__warmCalls.length === 1,
+        intent.__warmCalls);
+    ok('⛔ ការហៅភ្លាមៗម្តងទៀត មិនបាញ់ស្ទួន (cooldown ១០ នាទី)',
+        vm.runInContext('warmZtoLookupProxyNow()', intent) === false && intent.__warmCalls.length === 1,
+        intent.__warmCalls);
+
+    const busyIntent = build({ cfg: ztoCfg, isModalOpen: true });
+    ok('⛔ ប្រអប់បើក (កំពុងស្កេន) ➜ warm-up មិនជាន់ការស្កេន',
+        vm.runInContext('warmZtoLookupProxyNow()', busyIntent) === false && busyIntent.__warmCalls.length === 0,
+        busyIntent.__warmCalls);
+    const offlineIntent = build({ cfg: ztoCfg, onLine: false });
+    ok('⛔ ក្រៅបណ្តាញ ➜ warm-up មិនបាញ់',
+        vm.runInContext('warmZtoLookupProxyNow()', offlineIntent) === false && offlineIntent.__warmCalls.length === 0,
+        offlineIntent.__warmCalls);
+    const apiIntent = build({});
+    ok('⛔ Apps Script (មិនមែន ZTO) ➜ warm-up មិនបាញ់ OPTIONS',
+        vm.runInContext('warmZtoLookupProxyNow()', apiIntent) === false && apiIntent.__warmCalls.length === 0,
+        apiIntent.__warmCalls);
+
+    // ស្នាមភ្ជាប់ ៖ warm-up ត្រូវ **ឈានដល់បាន** ពីផ្លូវចេតនាទាំង ២
+    const fnBody = (name) => {
+        const at = SRC.search(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\('));
+        if (at === -1) return '';
+        let depth = 0;
+        const start = SRC.indexOf('{', SRC.indexOf(')', at));
+        for (let k = start; k < SRC.length; k++) {
+            if (SRC[k] === '{') depth++;
+            else if (SRC[k] === '}') { depth--; if (!depth) return SRC.slice(at, k + 1); }
+        }
+        return '';
+    };
+    ok('⛔ ការបើកទំព័រ «បញ្ចូលទិន្នន័យ» ហៅ warm-up',
+        fnBody('switchAppPage').indexOf('warmZtoLookupProxyNow()') !== -1);
+    ok('⛔ ការបើកកាមេរ៉ាហៅ warm-up',
+        fnBody('requestCameraPermission').indexOf('warmZtoLookupProxyNow()') !== -1);
 
     const generic = build({});
     const genericUrl = vm.runInContext('buildCustomerListApiUrl(getLookupApiConfig())', generic);

@@ -196,7 +196,11 @@ async function run() {
             'diag ប្រាប់ប្រភព', 'diag មិនបញ្ចេញតម្លៃ Cookie',
             'blob ទទេ ➜ diag ប្រាប់មូលហេតុ', 'មូលហេតុមិនបាត់ក្រោយ cache',
             'ការអានធ្លាក់ ➜ មូលហេតុនៅមើលឃើញ', 'blob ដើរធម្មតា ➜ គ្មានមូលហេតុសល់',
-            'diag ប្រាប់ថា Cookie ត្រូវ ZTO បដិសេធពេលណា'
+            'diag ប្រាប់ថា Cookie ត្រូវ ZTO បដិសេធពេលណា',
+            'OPTIONS ➜ 204 ដដែល', 'OPTIONS មិនបញ្ចេញតម្លៃ Cookie',
+            'warm-up អាន store ជាមុន', 'ការស្កេនដំបូងក្រោយ warm-up មិនអានស្ទួន',
+            'warm-up ក្នុង cache មិនអានម្តងទៀត', 'store ព្យួរ ➜ OPTIONS នៅ 204',
+            'គ្មាន event.blobs ➜ warm-up ស្ងាត់', 'API ផ្លូវការ ➜ warm-up មិនប៉ះ store'
         ];
         labels.forEach((label) => ok(label, false, 'Function មិនគាំទ្រ Blobs (' + loadError + ')'));
         return;
@@ -501,6 +505,67 @@ async function run() {
     ok('ការស្វែងរកជោគជ័យ ➜ សញ្ញាបដិសេធត្រូវលុប',
         recovered.statusCode === 200 && diag.cookie && diag.cookie.authRejectedAgeMs === null,
         diag.cookie);
+
+    // ── ៧. warm-up (OPTIONS) ត្រូវរៀបចំ Cookie ជាមុន ────────────────────────
+    // ⛔ ថ្នាក់ ៖ ការស្កេន **ដំបូង** ក្រោយ Lambda ត្រជាក់ ចំណាយទាំង cold start
+    // **និង** ការអាន Netlify Blobs (ពិដាន ៣ វិ.) ➜ អ្នកប្រើរង់ចាំពីរដង។
+    // warm-up របស់ client ជា `OPTIONS` ដែលធ្លាប់ត្រឡប់ 204 **មុនប៉ះ Cookie សោះ**
+    // ➜ វា warm តែ container មិន warm ព័ត៌មានសម្ងាត់ទេ។
+    console.log('\n== ៧. warm-up (OPTIONS) រៀបចំ Cookie ជាមុន ==');
+    const warmEvent = (withBlobs) => {
+        const event = { httpMethod: 'OPTIONS', headers: {}, queryStringParameters: null };
+        if (withBlobs !== false) {
+            event.blobs = Buffer.from(JSON.stringify({
+                url: 'https://blobs.netlify.test', token: 'blob-token-for-tests'
+            })).toString('base64');
+            event.headers['x-nf-site-id'] = 'site-for-tests';
+            event.headers['x-nf-deploy-id'] = 'deploy-for-tests';
+        }
+        return proxy.handler(event);
+    };
+    const reads = (fake) => fake.calls.filter((c) => c.fn === 'get').length;
+
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    blobs = useBlobs();
+    let warm = await warmEvent();
+    ok('OPTIONS ➜ 204 ដដែល (កិច្ចសន្យាមិនប្រែ)', warm.statusCode === 204, warm.statusCode);
+    ok('⛔ OPTIONS មិនបញ្ចេញតម្លៃ Cookie សោះ',
+        String(warm.body || '').indexOf('BOS-MAN-SESSION') === -1
+        && JSON.stringify(warm.headers || {}).indexOf('BOS-MAN-SESSION') === -1, warm);
+    ok('⛔ ស្នូល ៖ warm-up អាន store ជាមុន (រៀបចំ cache)', reads(blobs) === 1, blobs.names());
+
+    const readsAfterWarm = reads(blobs);
+    net = upstream();
+    res = await call({ barcode: BARCODE });
+    ok('⛔ ស្នូល ៖ ការស្កេនដំបូងក្រោយ warm-up **មិនអាន store ស្ទួន**',
+        reads(blobs) === readsAfterWarm, blobs.names());
+    ok('ការស្កេននោះប្រើ Cookie ពី blob ពិត',
+        res.statusCode === 200 && sentCookie(net) === BLOB_COOKIE, sentCookie(net));
+
+    await warmEvent();
+    ok('⛔ warm-up ដដែលក្នុង cache ៦០ វិ. ➜ មិនអាន store ម្តងទៀត (មិនវាយ Blobs)',
+        reads(blobs) === readsAfterWarm, blobs.names());
+
+    // ⛔ ទិសផ្ទុយ ៖ store ព្យួរ ➜ OPTIONS នៅតែត្រូវ settle ជា 204
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    blobs = useBlobs({ readHangs: true });
+    warm = await warmEvent();
+    ok('⛔ store ព្យួរ ➜ OPTIONS នៅតែឆ្លើយ 204 (settle ដោយរចនាសម្ព័ន្ធ)',
+        warm.statusCode === 204, warm.statusCode);
+
+    // ⛔ គ្មាន event.blobs ➜ មិនប៉ះ store សោះ
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+    blobs = useBlobs();
+    warm = await warmEvent(false);
+    ok('គ្មាន event.blobs ➜ warm-up ស្ងាត់ទាំងស្រុង',
+        warm.statusCode === 204 && blobs.calls.length === 0, blobs.names());
+
+    // ⛔ API ផ្លូវការ ➜ warm-up មិនត្រូវប៉ះ store ឡើយ (វាលឿនរួចហើយ)
+    resetEnv({ ZTO_COOKIE: ENV_COOKIE, ZTO_AUTHORIZATION: 'Bearer official-token' });
+    blobs = useBlobs();
+    warm = await warmEvent();
+    ok('API ផ្លូវការ ➜ warm-up មិនប៉ះ store',
+        warm.statusCode === 204 && blobs.calls.length === 0, blobs.names());
 }
 
 run().then(() => {

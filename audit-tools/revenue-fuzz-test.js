@@ -63,6 +63,56 @@ const BOOT = function (seed) {
         }
         return cur === undefined ? null : cur;
     }
+    // ⛔ **rules ពិតបដិសេធតម្លៃអវិជ្ជមាន** លើ node ស្ថិតិទាំង ៣
+    // (`newData.val() >= 0` · `pickedUpPhones/$k > 0`)។ Fake SDK ដែល
+    // ទទួលយកការសរសេរ **ណាមួយ** ធ្វើឲ្យ «server បដិសេធ» ក្លាយជា
+    // **របៀបបរាជ័យដែលមិនដែលត្រូវសាក** — មេរៀន 2.25.5 ។
+    window.__ruleRejects = 0;
+    function ledgerRuleViolation(p, val) {
+        const parts = p.split('/').filter(Boolean);
+        const root = parts[0];
+        if (root !== 'zoew_daily_revenue_cod_dod' && root !== 'zoew_monthly_revenue_cod_dod' && root !== 'zoew_daily_pickup_cod_dod') return null;
+        if (val && typeof val === 'object' && typeof val.__increment === 'number') {
+            const base = typeof getPath(p) === 'number' ? getPath(p) : 0;
+            val = Math.round((base + val.__increment + Number.EPSILON) * 100) / 100;
+        }
+        const numOk = (v) => typeof v === 'number' && isFinite(v);
+        const AMOUNTS = ['codDollar', 'dodDollar', 'totalCount', 'packagesPickedUp'];
+        const checkRec = (rec) => {
+            if (!rec || typeof rec !== 'object') return null;
+            for (const k of AMOUNTS) {
+                if (rec[k] !== undefined && rec[k] !== null && (!numOk(rec[k]) || rec[k] < 0)) return k + '=' + rec[k];
+            }
+            const ph = rec.pickedUpPhones;
+            if (ph && typeof ph === 'object') {
+                for (const k of Object.keys(ph)) {
+                    if (ph[k] === null) continue;
+                    if (!numOk(ph[k]) || !(ph[k] > 0)) return 'pickedUpPhones/' + k + '=' + ph[k];
+                }
+            }
+            return null;
+        };
+        if (root === 'zoew_monthly_revenue_cod_dod' && parts.length === 1) {
+            for (const m of Object.keys(val || {})) { const w = checkRec(val[m]); if (w) return m + '.' + w; }
+            return null;
+        }
+        if (parts.length === 2) return checkRec(val);
+        if (parts.length >= 3) {
+            const leaf = parts[parts.length - 1];
+            if (AMOUNTS.indexOf(leaf) !== -1 && val !== null && (!numOk(val) || val < 0)) return leaf + '=' + val;
+            if (parts[2] === 'pickedUpPhones' && parts.length === 4 && val !== null && (!numOk(val) || !(val > 0))) return 'pickedUpPhones/' + parts[3] + '=' + val;
+            if (parts[2] === 'pickedUpPhones' && parts.length === 3 && val && typeof val === 'object') {
+                for (const k of Object.keys(val)) { if (val[k] !== null && (!numOk(val[k]) || !(val[k] > 0))) return 'pickedUpPhones/' + k + '=' + val[k]; }
+            }
+        }
+        return null;
+    }
+    function ruleDenied(why) {
+        window.__ruleRejects++;
+        const e = new Error('PERMISSION_DENIED ' + why);
+        e.code = 'PERMISSION_DENIED';
+        return Promise.reject(e);
+    }
     function setPath(p, val) {
         const parts = p.split('/').filter(Boolean);
         if (!parts.length) return;
@@ -154,12 +204,25 @@ const BOOT = function (seed) {
         off: () => {}, goOnline: () => {},
         increment: (n) => ({ __increment: n }),
         get: (r) => Promise.resolve(snapOf(r.path)),
-        set: (r, v) => { setPath(r.path, v); fireAll(); return Promise.resolve(); },
-        update: (r, obj) => { Object.keys(obj).forEach((k) => setPath((r.path ? r.path + '/' : '') + k, obj[k])); fireAll(); return Promise.resolve(); },
+        set: (r, v) => {
+            const why = ledgerRuleViolation(r.path, v);
+            if (why) return ruleDenied(why);
+            setPath(r.path, v); fireAll(); return Promise.resolve();
+        },
+        update: (r, obj) => {
+            const base = r.path ? r.path + '/' : '';
+            for (const k of Object.keys(obj)) {
+                const why = ledgerRuleViolation(base + k, obj[k]);
+                if (why) return ruleDenied(why);
+            }
+            Object.keys(obj).forEach((k) => setPath(base + k, obj[k])); fireAll(); return Promise.resolve();
+        },
         runTransaction: (r, fn) => {
             const cur = getPath(r.path);
             const next = fn(cur === null ? null : JSON.parse(JSON.stringify(cur)));
             if (next === undefined) return Promise.resolve({ committed: false, snapshot: snapOf(r.path) });
+            const why = ledgerRuleViolation(r.path, next);
+            if (why) return ruleDenied(why);
             setPath(r.path, next); fireAll();
             return Promise.resolve({ committed: true, snapshot: snapOf(r.path) });
         }
@@ -208,7 +271,31 @@ const BOOT = function (seed) {
         const pick = (s.zoew_daily_pickup_cod_dod || {})[dateKey] || {};
         const phones = pick.pickedUpPhones || {};
         const badRef = Object.keys(phones).filter((k) => !(phones[k] > 0));
+        // ⛔ អថេរដែលឯកសារចែង តែគ្មានឧបករណ៍វាស់ក្នុងលំដាប់ចៃដន្យ ៖
+        //   ១. sum(pickedUpPhones) === packagesPickedUp
+        //   ២. barcode មិនត្រូវនៅ **ទាំង** ប្រវត្តិ **និង** ធុងសំរាម (ថ្នាក់ 2.17.3)
+        //   ៣. កូនសោ registry មិនត្រូវកំព្រា (ថ្នាក់ 2.25.5 / 2.25.9)
+        let phoneSum = 0;
+        Object.keys(phones).forEach((k) => { phoneSum += parseFloat(phones[k]) || 0; });
+        const seenCodes = {};
+        const dupCodes = [];
+        const noteCodes = (bag, where) => Object.keys(bag).forEach((id) => {
+            const it = bag[id]; if (!it) return;
+            const list = bcsOf(it) || (it.barcode ? [{ code: it.barcode }] : []);
+            list.forEach((b) => {
+                if (!b || !b.code) return;
+                if (seenCodes[b.code]) dupCodes.push(b.code + '@' + seenCodes[b.code] + '+' + where);
+                else seenCodes[b.code] = where;
+            });
+        });
+        noteCodes(hist, 'hist'); noteCodes(trash, 'trash');
+        const registryKeyOf = (code) => String(code).toUpperCase().replace(/[^A-Z0-9_-]/g, '_');
+        const liveKeys = {};
+        Object.keys(seenCodes).forEach((c) => { liveKeys[registryKeyOf(c)] = true; });
+        const reg = s.zoew_barcode_registry || {};
+        const orphanKeys = Object.keys(reg).filter((k) => reg[k] === true && !liveKeys[k]);
         return {
+            phoneSum: phoneSum, dupCodes: dupCodes, orphanKeys: orphanKeys, ruleRejects: window.__ruleRejects,
             expectCod: r2(cod), gotCod: r2(parseFloat(rev.codDollar) || 0),
             expectDod: r2(dod), gotDod: r2(parseFloat(rev.dodDollar) || 0),
             expectCount: count, gotCount: parseFloat(rev.totalCount) || 0,
@@ -265,7 +352,7 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
         const dir = path.join(ROOT, app);
         const server = await serve(dir);
         const port = server.address().port;
-        let appFail = 0, appRuns = 0, lastDetail = '';
+        let appFail = 0, appRuns = 0, lastDetail = '', staleViewRuns = 0;
         const RUN0 = parseInt(process.env.FUZZ_RUN0 || '0', 10);
         for (let run = RUN0; run < RUN0 + RUNS; run++) {
             const ctx = await browser.newContext({ viewport: { width: 412, height: 780 } });
@@ -291,7 +378,10 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                 const pick = r();
                 const amt = Math.round(r() * 4000) / 100;
                 if (r() < 0.35) {
-                    const kind = r() < 0.45 ? 'delete' : 'remove';
+                    // ⛔ `other:remove` ជាការចាក់ដ៏មានតម្លៃបំផុត ៖ វាទុក
+                    // **ទិដ្ឋភាពមូលដ្ឋានចាស់** ខណៈ ledger លើ server ទាបរួច ➜
+                    // នោះជាស្ថានភាពដែលកំហុស clamp រស់នៅ (មេរៀន 2026-09-03)។
+                    const kind = r() < 0.35 ? 'delete' : 'remove';
                     const injected = await page.evaluate((a) => window.__otherDevice(a.kind, a.pick), { kind, pick: r() });
                     if (injected) { trail.push(injected); if (process.env.FUZZ_DEBUG === '1') console.log('    ~ ' + injected); }
                 }
@@ -382,6 +472,9 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                 }
                 if (inv.zeroRefPhones.length) { broke = 'pickedUpPhones មាន refCount សូន្យ/អវិជ្ជមាន ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv); break; }
                 if (inv.pkg < 0) { broke = 'packagesPickedUp អវិជ្ជមាន ក្រោយ [' + trail.join(' > ') + ']'; break; }
+                if (inv.phoneSum !== inv.pkg) { broke = '⛔ អថេរ sum(pickedUpPhones) !== packagesPickedUp ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv); break; }
+                if (inv.dupCodes.length) { broke = '⛔ barcode ស្ថិតនៅទាំងប្រវត្តិ និងធុងសំរាម ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv.dupCodes.slice(0, 5)); break; }
+                if (inv.orphanKeys.length) { broke = '⛔ កូនសោ zoew_barcode_registry កំព្រា (barcode ស្កេនចូលមិនបានទៀត) ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv.orphanKeys.slice(0, 5)); break; }
                 if (inv.pkg !== inv.expectPkg) {
                     broke = 'ស្ថិតិយកកញ្ចប់ខុសពីចំនួន barcode ដែលបិទ ក្រោយ [' + trail.join(' > ') + ']\n        ' + JSON.stringify(inv);
                     if (process.env.FUZZ_DEBUG === '1') {
@@ -396,10 +489,15 @@ const OPNAMES = ['scan', 'closeOrder', 'closeBarcode', 'removeBarcode', 'deleteI
                 }
             }
             appRuns++;
+            if (trail.indexOf('other:remove') !== -1) staleViewRuns++;
             if (broke) { appFail++; if (!lastDetail) lastDetail = 'app=' + app + ' run=' + run + ' ' + broke; }
             await ctx.close();
         }
         check(appFail === 0, app + ': invariant ចំណូល រក្សាបាន ក្នុង ' + appRuns + ' លំដាប់ចៃដន្យ × ' + OPS + ' ប្រតិបត្តិការ', lastDetail);
+        // ⛔ ជាន់អប្បបរមា ៖ បើការចាក់ «ឧបករណ៍ផ្សេងដក» មិនដែលបាញ់សោះ នោះ
+        // ការរត់នេះមិនបានទៅដល់ស្ថានភាព **ទិដ្ឋភាពមូលដ្ឋានចាស់** ទេ ➜ បៃតងក្លែងក្លាយ។
+        check(staleViewRuns > 0, app + ': ការចាក់ «ឧបករណ៍ផ្សេងដក» បានបាញ់ពិត (' + staleViewRuns + ' លំដាប់)',
+            'គ្មានលំដាប់ណាឈានដល់ទិដ្ឋភាពមូលដ្ឋានចាស់ ➜ ការវាស់មិនបានគ្រប');
         server.close();
     }
     await browser.close();

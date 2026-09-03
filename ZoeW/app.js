@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.25.9';
+    const APP_VERSION = '2.26.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1632,7 +1632,6 @@
         if (state && !supported && !isBiometricEnabled()) state.textContent = 'មិនគាំទ្រ';
     }
 
-
     const APP_LOCK_SESSION_KEY = 'zoew_app_unlocked';
     const APP_LOCK_MAX_FAILS = 5;
     const APP_LOCK_LOCKOUT_MS = 60000;
@@ -2482,7 +2481,6 @@
             if (btnEl) btnEl.disabled = false;
         }
     }
-
 
     const SHEET_IMPORT_STORE_KEY = 'zoew_sheet_import_config';
     const SHEET_IMPORT_SECRET_SALT = 'zoew_sheet_import_secret_v1';
@@ -4445,7 +4443,15 @@
         const listenerGeneration = ++dbListenerGeneration;
         dbListenerPendingPaths.clear();
         dbListenerFailedPaths.clear();
-        DB_LISTENER_KEYS.forEach((key) => dbListenerPendingPaths.add(key));
+        const listenerRefs = {
+            exchangeRate: dbRefExchangeRate,
+            dailyRevenue: dbRefDailyRevenue,
+            monthlyRevenue: dbRefMonthlyRevenue,
+            dailyPickup: dbRefDailyPickup,
+            history: dbRefHistory,
+            deleted: dbRefDeleted
+        };
+        DB_LISTENER_KEYS.forEach((key) => { if (listenerRefs[key]) dbListenerPendingPaths.add(key); });
         dbListenerPendingSeen = dbListenerPendingPaths.size;
         dbListenerProgressAt = 0;
 
@@ -4664,7 +4670,7 @@
     async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
         const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
         let clearClaimBlocked = false;
-        return retryAsync(() => fb.runTransaction(itemRef, (currentItem) => {
+        return retryAsync(() => dbOp(fb.runTransaction(itemRef, (currentItem) => {
             clearClaimBlocked = false;
             if (currentItem && currentItem.clearClaim) {
                 clearClaimBlocked = true;
@@ -4701,7 +4707,7 @@
                 delete updated.closedAt;
             }
             return updated;
-        }), 3, 1500).then((result) => {
+        })), 3, 1500).then((result) => {
             if (clearClaimBlocked || !result || !result.committed) throw new Error('CLEAR_HISTORY_IN_PROGRESS');
             return result;
         });
@@ -4790,7 +4796,7 @@
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
             let trashItem;
-            let revenueDeducted = false;
+            let revenueApplied = null;
             let revenueScanDate = null;
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
@@ -4817,8 +4823,7 @@
                     revenueCod = trashItem.cod;
                     revenueDod = trashItem.dod;
                     revenueCount = trashItem.count;
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
-                    revenueDeducted = true;
+                    revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
                 }
             } else {
                 trashItem = { ...claimedWhole, id };
@@ -4834,8 +4839,7 @@
                     revenueCod = parseFloat(trashItem.cod) || 0;
                     revenueDod = parseFloat(trashItem.dod) || 0;
                     revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
-                    revenueDeducted = true;
+                    revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
                 } else {
                     trashItem.isFromDeletion = true;
                     trashItem.trashReason = 'pickup';
@@ -4851,9 +4855,7 @@
             await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").catch(async (trashErr) => {
-                if (revenueDeducted) {
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, revenueCod, revenueDod, revenueCount);
-                }
+                revertRevenueLedgerDelta(revenueApplied);
                 const staleIdx = deletedItems.findIndex(i => i.id === trashItem.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
@@ -5327,6 +5329,7 @@
             if (document.hidden) return;
             sweepRecallHighlights();
             runScheduledCleanup();
+            if (currentAppPage === 'entry') warmZtoLookupProxyNow();
         });
 
         (function waitForZXingThenInitScanEngine(deadline) {
@@ -5420,62 +5423,111 @@
         };
     }
 
-    function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
-        if (!scanDateStr) scanDateStr = getFormattedDate();
+    function applyLedgerBucketDelta(bucketMap, key, codToAdd, dodToAdd, countToAdd) {
+        if (!bucketMap[key]) bucketMap[key] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+        const bucket = bucketMap[key];
+        const before = { ...bucket };
 
-        if (!dailyRevenueData[scanDateStr]) {
-            dailyRevenueData[scanDateStr] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
-        }
+        bucket.codDollar = Math.round(((parseFloat(bucket.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
+        bucket.dodDollar = Math.round(((parseFloat(bucket.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
+        bucket.totalCount = (parseFloat(bucket.totalCount) || 0) + (parseFloat(countToAdd) || 0);
 
-        const beforeDaily = { ...dailyRevenueData[scanDateStr] };
+        if (bucket.codDollar < 0) bucket.codDollar = 0;
+        if (bucket.dodDollar < 0) bucket.dodDollar = 0;
+        if (bucket.totalCount < 0) bucket.totalCount = 0;
 
-        dailyRevenueData[scanDateStr].codDollar = Math.round(((parseFloat(dailyRevenueData[scanDateStr].codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
-        dailyRevenueData[scanDateStr].dodDollar = Math.round(((parseFloat(dailyRevenueData[scanDateStr].dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-        dailyRevenueData[scanDateStr].totalCount = (parseFloat(dailyRevenueData[scanDateStr].totalCount) || 0) + (parseFloat(countToAdd) || 0);
-
-        if (dailyRevenueData[scanDateStr].codDollar < 0) dailyRevenueData[scanDateStr].codDollar = 0;
-        if (dailyRevenueData[scanDateStr].dodDollar < 0) dailyRevenueData[scanDateStr].dodDollar = 0;
-        if (dailyRevenueData[scanDateStr].totalCount < 0) dailyRevenueData[scanDateStr].totalCount = 0;
-
-        commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd,
-            ledgerAppliedDelta(beforeDaily, dailyRevenueData[scanDateStr]));
-
-        let ymKey = scanDateStr.substring(0, 7);
-        if (!monthlyRevenueData[ymKey]) {
-            monthlyRevenueData[ymKey] = { codDollar: 0, dodDollar: 0, totalCount: 0 };
-        }
-
-        const beforeMonthly = { ...monthlyRevenueData[ymKey] };
-
-        monthlyRevenueData[ymKey].codDollar = Math.round(((parseFloat(monthlyRevenueData[ymKey].codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
-        monthlyRevenueData[ymKey].dodDollar = Math.round(((parseFloat(monthlyRevenueData[ymKey].dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-        monthlyRevenueData[ymKey].totalCount = (parseFloat(monthlyRevenueData[ymKey].totalCount) || 0) + (parseFloat(countToAdd) || 0);
-
-        if (monthlyRevenueData[ymKey].codDollar < 0) monthlyRevenueData[ymKey].codDollar = 0;
-        if (monthlyRevenueData[ymKey].dodDollar < 0) monthlyRevenueData[ymKey].dodDollar = 0;
-        if (monthlyRevenueData[ymKey].totalCount < 0) monthlyRevenueData[ymKey].totalCount = 0;
-
-        commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
-            ledgerAppliedDelta(beforeMonthly, monthlyRevenueData[ymKey]));
+        return ledgerAppliedDelta(before, bucket);
     }
 
-    function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta) {
-        if (!dbRefDailyRevenue) return;
+    function commitRevenueBucketDelta(scanDateStr, bucket, codToAdd, dodToAdd, countToAdd) {
+        if (!codToAdd && !dodToAdd && !countToAdd) return { applied: { cod: 0, dod: 0, count: 0 }, server: Promise.resolve(null) };
+        if (bucket === 'daily') {
+            const applied = applyLedgerBucketDelta(dailyRevenueData, scanDateStr, codToAdd, dodToAdd, countToAdd);
+            return { applied, server: commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, applied) };
+        }
+        const ymKey = scanDateStr.substring(0, 7);
+        const applied = applyLedgerBucketDelta(monthlyRevenueData, ymKey, codToAdd, dodToAdd, countToAdd);
+        return { applied, server: commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, applied) };
+    }
+
+    function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAdd, countToAdd) {
+        if (!scanDateStr) scanDateStr = getFormattedDate();
+        const ymKey = scanDateStr.substring(0, 7);
+        const appliedDaily = applyLedgerBucketDelta(dailyRevenueData, scanDateStr, codToAdd, dodToAdd, countToAdd);
+        const dailyServer = commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDaily);
+        const appliedMonthly = applyLedgerBucketDelta(monthlyRevenueData, ymKey, codToAdd, dodToAdd, countToAdd);
+        const monthlyServer = commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedMonthly);
+        return {
+            scanDate: scanDateStr,
+            daily: appliedDaily, monthly: appliedMonthly,
+            dailyServer: dailyServer, monthlyServer: monthlyServer
+        };
+    }
+
+    function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise, memoryApplied) {
+        return Promise.resolve(serverPromise).then((serverApplied) => {
+            const d = serverApplied || memoryApplied;
+            if (!d || (!d.cod && !d.dod && !d.count)) return null;
+            const ymKey = scanDateStr.substring(0, 7);
+            return bucket === 'daily'
+                ? commitDailyRevenueDelta(scanDateStr, -d.cod, -d.dod, -d.count, d, true)
+                : commitMonthlyRevenueDelta(ymKey, -d.cod, -d.dod, -d.count, d, true);
+        }, () => null);
+    }
+
+    function revertRevenueLedgerDelta(applied) {
+        if (!applied || !applied.scanDate) return null;
+        const daily = applied.daily || { cod: 0, dod: 0, count: 0 };
+        const monthly = applied.monthly || { cod: 0, dod: 0, count: 0 };
+        if (daily.cod || daily.dod || daily.count) {
+            applyLedgerBucketDelta(dailyRevenueData, applied.scanDate, -daily.cod, -daily.dod, -daily.count);
+        }
+        if (monthly.cod || monthly.dod || monthly.count) {
+            applyLedgerBucketDelta(monthlyRevenueData, applied.scanDate.substring(0, 7), -monthly.cod, -monthly.dod, -monthly.count);
+        }
+        revertLedgerBucketOnServer(applied.scanDate, 'daily', applied.dailyServer, daily);
+        revertLedgerBucketOnServer(applied.scanDate, 'monthly', applied.monthlyServer, monthly);
+        return applied;
+    }
+
+    function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, actualDod, actualCount) {
+        const daily = (applied && applied.daily) || { cod: 0, dod: 0, count: 0 };
+        const monthly = (applied && applied.monthly) || { cod: 0, dod: 0, count: 0 };
+        const r2 = (n) => Math.round(n * 100) / 100;
+        commitRevenueBucketDelta(scanDateStr, 'daily',
+            r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count);
+        commitRevenueBucketDelta(scanDateStr, 'monthly',
+            r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count);
+    }
+
+    function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
+        if (!dbRefDailyRevenue) return Promise.resolve(null);
         const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
-        const recordRef = dailyRevenueData[scanDateStr];
+        const recordRef = serverOnly ? null : dailyRevenueData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
-        fb.runTransaction(dateRef, (current) => {
-            let codDollar = Math.round(((parseFloat(current && current.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
-            let dodDollar = Math.round(((parseFloat(current && current.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-            let totalCount = (parseFloat(current && current.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+        let serverBefore = null;
+        let serverAfter = null;
+        return fb.runTransaction(dateRef, (current) => {
+            serverBefore = {
+                codDollar: parseFloat(current && current.codDollar) || 0,
+                dodDollar: parseFloat(current && current.dodDollar) || 0,
+                totalCount: parseFloat(current && current.totalCount) || 0
+            };
+            let codDollar = Math.round((serverBefore.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
+            let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
+            let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
             }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
-            return { codDollar, dodDollar, totalCount };
-        }).catch(() => {
+            serverAfter = { codDollar, dodDollar, totalCount };
+            return serverAfter;
+        }).then((result) => {
+            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
+            return ledgerAppliedDelta(serverBefore, serverAfter);
+        }, () => {
             if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
                 recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
                 recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
@@ -5486,33 +5538,45 @@
                 refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
+            return null;
         });
     }
 
-    function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta) {
-        if (!dbRefMonthlyRevenue) return;
+    function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
+        if (!dbRefMonthlyRevenue) return Promise.resolve(null);
         const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
-        const recordRef = monthlyRevenueData[ymKey];
-        fb.runTransaction(dbRefMonthlyRevenue, (current) => {
+        const recordRef = serverOnly ? null : monthlyRevenueData[ymKey];
+        let serverBefore = null;
+        let serverAfter = null;
+        return fb.runTransaction(dbRefMonthlyRevenue, (current) => {
             const months = (current && typeof current === 'object') ? current : {};
             const existing = months[ymKey] || {};
-            let codDollar = Math.round(((parseFloat(existing.codDollar) || 0) + (parseFloat(codToAdd) || 0)) * 100) / 100;
-            let dodDollar = Math.round(((parseFloat(existing.dodDollar) || 0) + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-            let totalCount = (parseFloat(existing.totalCount) || 0) + (parseFloat(countToAdd) || 0);
+            serverBefore = {
+                codDollar: parseFloat(existing.codDollar) || 0,
+                dodDollar: parseFloat(existing.dodDollar) || 0,
+                totalCount: parseFloat(existing.totalCount) || 0
+            };
+            let codDollar = Math.round((serverBefore.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
+            let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
+            let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { context: ymKey, codDollar, dodDollar, totalCount });
             }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
             if (totalCount < 0) totalCount = 0;
-            months[ymKey] = { codDollar, dodDollar, totalCount };
+            serverAfter = { codDollar, dodDollar, totalCount };
+            months[ymKey] = serverAfter;
 
             const latestThreeMonths = {};
             Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {
                 latestThreeMonths[key] = months[key];
             });
             return latestThreeMonths;
-        }).catch(() => {
+        }).then((result) => {
+            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
+            return ledgerAppliedDelta(serverBefore, serverAfter);
+        }, () => {
             if (recordRef && monthlyRevenueData[ymKey] === recordRef) {
                 recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
                 recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
@@ -5522,6 +5586,7 @@
                 if (recordRef.totalCount < 0) recordRef.totalCount = 0;
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
+            return null;
         });
     }
 
@@ -5635,6 +5700,28 @@
         };
 
         commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, applied);
+        return { scanDate: scanDateStr, phoneKey: phoneKey || null, packages: applied.packages, customer: applied.customer };
+    }
+
+    function revertPickupLedgerDelta(applied) {
+        if (!applied || !applied.scanDate) return null;
+        if (!applied.packages && !applied.customer) return applied;
+        addPickupToDailyRecord(applied.scanDate, applied.phoneKey, -applied.customer, -applied.packages);
+        return applied;
+    }
+
+    function correctPickupLedgerToActual(applied, actualCustomer, actualPackages) {
+        if (!applied || !applied.scanDate) return applied;
+        const customerDiff = actualCustomer - applied.customer;
+        const packageDiff = actualPackages - applied.packages;
+        if (customerDiff === 0 && packageDiff === 0) return applied;
+        const extra = addPickupToDailyRecord(applied.scanDate, applied.phoneKey, customerDiff, packageDiff);
+        return {
+            scanDate: applied.scanDate,
+            phoneKey: applied.phoneKey,
+            packages: applied.packages + (extra ? extra.packages : 0),
+            customer: applied.customer + (extra ? extra.customer : 0)
+        };
     }
 
     function requestPinBeforeResetPickup() {
@@ -8065,7 +8152,6 @@
         searchByPhone();
     }
 
-
     function setPhoneSearchPulledUp(on) {
         const sidebar = document.getElementById('dataSideSection');
         if (!sidebar) return;
@@ -8305,11 +8391,12 @@
         if (!releasable.length) return;
         registryReleaseFlushInFlight = true;
         const keys = releasable.map((pair) => pair[0]);
+        const releaseFlushDone = () => { registryReleaseFlushInFlight = false; };
         releaseRegistryKeys(keys).then((done) => {
             if (!done) releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
         }, () => {
             releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
-        }).then(() => { registryReleaseFlushInFlight = false; });
+        }).then(releaseFlushDone, releaseFlushDone);
     }
 
     const LOCKER_PREFIX_KEY = 'zoe_locker_prefix';
@@ -9051,9 +9138,9 @@
             existingIndex = scanHistory.findIndex(item => item.phone === phone && item.scanDate === dateString && !item.isClosed);
         }
 
-        addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
+        const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
         const revertRevenueOnSaveFailure = (err) => {
-            addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
+            revertRevenueLedgerDelta(scanRevenueApplied);
             throw err;
         };
 
@@ -9110,7 +9197,7 @@
             savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
                 .then((committedItem) => {
                     if (!mergeAddedBarcode) {
-                        addRevenueToDailyAndMonthlyRecord(dateString, -cod, -dod, -1);
+                        revertRevenueLedgerDelta(scanRevenueApplied);
                         showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
                     }
                 }, (err) => {
@@ -9278,15 +9365,12 @@
                 scanHistory[localIdx] = { ...committedItem, id: itemId };
             }
 
-            let deductedCod = 0;
-            let deductedDod = 0;
-            let deductionApplied = false;
+            let deductionApplied = null;
             const revenueScanDate = claimedParent.scanDate || getFormattedDate();
             if (!claimedBarcode.isDeducted) {
-                deductedCod = parseFloat(claimedBarcode.cod) || 0;
-                deductedDod = parseFloat(claimedBarcode.dod) || 0;
-                addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
-                deductionApplied = true;
+                const deductedCod = parseFloat(claimedBarcode.cod) || 0;
+                const deductedDod = parseFloat(claimedBarcode.dod) || 0;
+                deductionApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
             }
 
             const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };
@@ -9318,9 +9402,7 @@
                 `⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការដក (${barcodeCode})… សូមកុំបិទ App។`).then(() => {
                 trashSaved = true;
             }).catch(async (trashErr) => {
-                if (deductionApplied) {
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, deductedCod, deductedDod, 1);
-                }
+                revertRevenueLedgerDelta(deductionApplied);
                 const staleIdx = deletedItems.findIndex(i => i.id === itemToTrash.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
@@ -9392,23 +9474,21 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let pickupLedgerApplied = null;
         let serverApplied = false;
         let serverPackageDelta = 0;
         let serverCustomerDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
+            if (!pickupLedgerApplied) return;
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
-            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            revertPickupLedgerDelta(pickupLedgerApplied);
+            pickupLedgerApplied = null;
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
         const reconcilePickupDeltaWithServer = () => {
-            const customerDiff = serverCustomerDelta - pickupCustomerDelta;
-            const packageDiff = serverPackageDelta - pickupPackageDelta;
-            if (customerDiff === 0 && packageDiff === 0) return;
-            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, customerDiff, packageDiff);
+            pickupLedgerApplied = correctPickupLedgerToActual(pickupLedgerApplied, serverCustomerDelta, serverPackageDelta);
             pickupCustomerDelta = serverCustomerDelta;
             pickupPackageDelta = serverPackageDelta;
         };
@@ -9426,7 +9506,7 @@
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
             pickupCustomerDelta = pickupPackageDelta;
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
+            pickupLedgerApplied = addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             openViewListModal(itemId);
             refreshCurrentHistoryView();
@@ -9454,9 +9534,9 @@
                     refreshCurrentHistoryView();
                 }
             }
-            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
-                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            if (pickupLedgerApplied && (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0)) {
+                revertPickupLedgerDelta(pickupLedgerApplied);
+                pickupLedgerApplied = null;
                 pickupCustomerDelta = 0;
                 pickupPackageDelta = 0;
             }
@@ -9620,15 +9700,15 @@
 
                 const revenueScanDate = item.scanDate || getFormattedDate();
                 const revenueApplied = (codDiff !== 0 || dodDiff !== 0);
+                let editRevenueApplied = null;
                 if (revenueApplied) {
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
+                    editRevenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, codDiff, dodDiff, 0);
                 }
 
                 serverApplied = false;
                 if (!db || !fb || !/^[a-zA-Z0-9_-]+$/.test(String(editedItemId || ''))) {
-                    if (revenueApplied) {
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
-                    }
+                    revertRevenueLedgerDelta(editRevenueApplied);
+                    editRevenueApplied = null;
                     targetB.cod = oldCod;
                     targetB.dod = oldDod;
                     item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
@@ -9654,8 +9734,8 @@
                     refreshCurrentHistoryView();
                 };
                 const undoEditedPriceRevenue = () => {
-                    if (!revenueApplied) return;
-                    addRevenueToDailyAndMonthlyRecord(revenueScanDate, -codDiff, -dodDiff, 0);
+                    revertRevenueLedgerDelta(editRevenueApplied);
+                    editRevenueApplied = null;
                 };
                 const settleEditedPrice = (result) => {
                     const committed = !!(result && result.committed);
@@ -9669,11 +9749,8 @@
                     }
                     const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;
                     const actualDodDiff = Math.round((newDod - serverOldDod) * 100) / 100;
-                    const correctionCod = Math.round((actualCodDiff - (revenueApplied ? codDiff : 0)) * 100) / 100;
-                    const correctionDod = Math.round((actualDodDiff - (revenueApplied ? dodDiff : 0)) * 100) / 100;
-                    if (correctionCod !== 0 || correctionDod !== 0) {
-                        addRevenueToDailyAndMonthlyRecord(revenueScanDate, correctionCod, correctionDod, 0);
-                    }
+                    correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0);
+                    editRevenueApplied = null;
                     showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
                 };
                 const failEditedPrice = (err) => {
@@ -9808,16 +9885,21 @@
             const pickupDate = item.scanDate || getFormattedDate();
             let pickupRefMoved = false;
             let movedPickupRefs = closedBarcodeCount(item);
-            if (movedPickupRefs > 0 && prevPickupKey !== nextPickupKey) {
-                addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
-                addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
+            let pickupMoveOut = null;
+            let pickupMoveIn = null;
+            const applyPickupRefMove = () => {
+                pickupMoveOut = addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
+                pickupMoveIn = addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
                 pickupRefMoved = true;
-            }
+            };
+            if (movedPickupRefs > 0 && prevPickupKey !== nextPickupKey) applyPickupRefMove();
             const revertPickupRefMove = () => {
                 if (!pickupRefMoved) return;
                 pickupRefMoved = false;
-                addPickupToDailyRecord(pickupDate, nextPickupKey, -movedPickupRefs, 0);
-                addPickupToDailyRecord(pickupDate, prevPickupKey, movedPickupRefs, 0);
+                revertPickupLedgerDelta(pickupMoveIn);
+                revertPickupLedgerDelta(pickupMoveOut);
+                pickupMoveIn = null;
+                pickupMoveOut = null;
             };
             let serverWasClosed = null;
             let serverPickupRefs = 0;
@@ -9825,9 +9907,7 @@
                 if (serverWasClosed === null || prevPickupKey === nextPickupKey) return;
                 if (serverPickupRefs > 0 && !pickupRefMoved) {
                     movedPickupRefs = serverPickupRefs;
-                    addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
-                    addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
-                    pickupRefMoved = true;
+                    applyPickupRefMove();
                 } else if (serverPickupRefs <= 0 && pickupRefMoved) {
                     revertPickupRefMove();
                 }
@@ -9869,23 +9949,21 @@
         let pickupCustomerDelta = 0;
         let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
+        let pickupLedgerApplied = null;
         let serverApplied = false;
         let serverPackageDelta = 0;
         let serverCustomerDelta = 0;
         const revertPickupDeltaAfterNoOp = () => {
+            if (!pickupLedgerApplied) return;
             if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
-            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            revertPickupLedgerDelta(pickupLedgerApplied);
+            pickupLedgerApplied = null;
             pickupCustomerDelta = 0;
             pickupPackageDelta = 0;
             showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
         const reconcilePickupDeltaWithServer = () => {
-            const customerDiff = serverCustomerDelta - pickupCustomerDelta;
-            const packageDiff = serverPackageDelta - pickupPackageDelta;
-            if (customerDiff === 0 && packageDiff === 0) return;
-            const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, customerDiff, packageDiff);
+            pickupLedgerApplied = correctPickupLedgerToActual(pickupLedgerApplied, serverCustomerDelta, serverPackageDelta);
             pickupCustomerDelta = serverCustomerDelta;
             pickupPackageDelta = serverPackageDelta;
         };
@@ -9914,7 +9992,7 @@
                 pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
             }
             pickupCustomerDelta = pickupPackageDelta;
-            addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
+            pickupLedgerApplied = addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
 
             refreshCurrentHistoryView();
         }
@@ -9945,9 +10023,9 @@
                     refreshCurrentHistoryView();
                 }
             }
-            if (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0) {
-                const pickupScanDate = (freshItem && freshItem.scanDate) || getFormattedDate();
-                addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, -pickupCustomerDelta, -pickupPackageDelta);
+            if (pickupLedgerApplied && (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0)) {
+                revertPickupLedgerDelta(pickupLedgerApplied);
+                pickupLedgerApplied = null;
                 pickupCustomerDelta = 0;
                 pickupPackageDelta = 0;
             }

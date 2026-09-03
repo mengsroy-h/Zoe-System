@@ -80,7 +80,8 @@ function sliceFn(name) {
 const NEEDED = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateCommit',
     'getFormattedDate', 'appZoneParts', 'getZoneDateKey', 'getServerNow',
-    'ledgerNumber', 'ledgerAppliedDelta',
+    'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
+    'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'normalizeBarcodesOf', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',

@@ -73,9 +73,10 @@ console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះ�
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
 
 const REQUIRED_FNS = [
-    'ledgerNumber', 'ledgerAppliedDelta',
+    'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
+    'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
-    'addPickupToDailyRecord', 'commitDailyPickupDelta', 'getFormattedDate'
+    'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta', 'getFormattedDate'
 ];
 const fnSrc = {};
 const missing = [];
@@ -247,6 +248,11 @@ function makeSandbox(seed) {
         fnSrc.getFormattedDate + '\n'
         + fnSrc.ledgerNumber + '\n'
         + fnSrc.ledgerAppliedDelta + '\n'
+        + fnSrc.applyLedgerBucketDelta + '\n'
+        + fnSrc.commitRevenueBucketDelta + '\n'
+        + fnSrc.revertLedgerBucketOnServer + '\n'
+        + fnSrc.revertRevenueLedgerDelta + '\n'
+        + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'

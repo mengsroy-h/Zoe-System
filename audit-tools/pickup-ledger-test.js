@@ -116,6 +116,7 @@ vm.runInContext([
     sliceFn('addPickupToDailyRecord'),
     sliceFn('revertPickupOnServer'),
     sliceFn('revertPickupLedgerDelta'),
+    sliceFn('correctPickupServerToActual'),
     sliceFn('correctPickupLedgerToActual'),
     helperSrc || 'function closedBarcodeCount(item){ return item && item.barcodes ? item.barcodes.filter(function(b){return b && b.isClosed;}).length : 0; }',
     'this.api = { getPickupPhoneKey, countPickedUpCustomers, addPickupToDailyRecord, closedBarcodeCount };'

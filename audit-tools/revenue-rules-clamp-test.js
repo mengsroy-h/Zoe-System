@@ -76,7 +76,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
-    'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
+    'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'correctPickupServerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
     'pickupAppliedDelta', 'applyPickupMemoryDelta', 'revertPickupOnServer', 'getFormattedDate'
 ];
 const fnSrc = {};
@@ -263,6 +263,7 @@ function makeSandbox(seed) {
         + fnSrc.commitDailyPickupDelta + '\n'
         + fnSrc.revertPickupOnServer + '\n'
         + fnSrc.revertPickupLedgerDelta + '\n'
+        + fnSrc.correctPickupServerToActual + '\n'
         + fnSrc.correctPickupLedgerToActual + '\n',
         ctx);
     return ctx;
@@ -485,6 +486,32 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         ok('⛔ ទិសផ្ទុយ ៖ ឆ្លងសូន្យរួច revert ➜ server ត្រឡប់ទៅ 1 (មិនមែន 3)',
             srv && srv.packagesPickedUp === 1, srv);
         ok('⛔ ទិសផ្ទុយ ៖ key ត្រឡប់ទៅ 1', srv && (srv.pickedUpPhones || {})['0974158508'] === 1, srv);
+    }
+
+    {
+        // 🔴 រាយការណ៍ដោយអ្នកប្រើ (2026-09-04) ៖ A បិទ «យក» ➜ បិទ WiFi ➜
+        // បើកវិញ (ចូជួរក្រៅបណ្តាញ) ➜ B បើកកញ្ចប់នោះមុន ➜ A ភ្ជាប់មកវិញ។
+        // ពេលនោះ transaction របស់ item ឃើញថា server **បើករួច** ➜
+        // `serverPackageDelta = 0` ➜ `reconcilePickupDeltaWithServer()` សន្មតថា
+        // ledger បានចុះ -1 ពិត ហើយ «ជួសជុល» ដោយបូក +1 ត្រឡប់។ តែ ledger
+        // ខាង server ត្រូវ **clamp** ជា 0 រួចទៅហើយ (B យកវាទៅ 0 មុន) ➜
+        // +1 នោះបង្កើតកញ្ចប់ពីអាកាសធាតុ។
+        const ctx = makeSandbox({
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0, pickedUpPhones: {} } }
+        });
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } };
+        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -1, -1)', ctx);
+        await settle(); await settle();
+        const srvMid = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ server clamp ជា 0 មុន reconcile', srvMid && srvMid.packagesPickedUp === 0, srvMid);
+        vm.runInContext('globalThis.__applied = correctPickupLedgerToActual(__applied, 0, 0)', ctx);
+        await settle(); await settle(); await settle();
+        const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
+        ok('⛔ reconcile ៖ server មិនត្រូវទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន (នៅ 0)',
+            srv && srv.packagesPickedUp === 0, srv);
+        ok('⛔ reconcile ៖ គ្មាន key លេខទូរស័ព្ទថ្មីលើ server',
+            srv && (!srv.pickedUpPhones || Object.keys(srv.pickedUpPhones).length === 0), srv);
+        ok('គ្មានការបដិសេធពី rules', ctx.__rejected.length === 0, ctx.__rejected);
     }
 
     {

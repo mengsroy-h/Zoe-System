@@ -97,7 +97,7 @@ const REAL_FNS = [
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getPickupPhoneKey',
-    'closedBarcodeCount', 'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
+    'closedBarcodeCount', 'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'correctPickupServerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
     'pickupAppliedDelta', 'applyPickupMemoryDelta', 'revertPickupOnServer',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',

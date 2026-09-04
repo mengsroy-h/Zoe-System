@@ -88,6 +88,16 @@ const MUTATIONS = [
         to: '            return applied;'
     },
     {
+        // 🔴 ថ្នាក់ដដែលជាលើកទី ៣ (2026-09-04) — ផ្លូវ **reconcile** មិនមែន revert។
+        // `correctPickupLedgerToActual()` ធ្លាប់គណនាភាពខុសធៀបនឹង delta របស់
+        // **សតិ** រួចសរសេរវាទៅ server ➜ ពេល ledger ខាង server ត្រូវ clamp
+        // (ឧបករណ៍ផ្សេងយកវាទៅ 0 មុន) ការ «ជួសជុល» នោះបង្កើតកញ្ចប់ពីអាកាសធាតុ។
+        // អ្នកប្រើវាស់បានលើឧបករណ៍ពិត ៖ កញ្ចប់យក 0 ➜ 1 ដោយបញ្ជីមានតែ ១ កញ្ចប់បើក។
+        name: 'ស្ថិតិយក ៖ reconcile គណនាធៀបនឹង delta របស់សតិ ជំនួសសាលក្រម server',
+        from: '            const customerDiff = actualCustomer - ledgerNumber(base.customer);\n            const packageDiff = actualPackages - ledgerNumber(base.packages);',
+        to: '            const customerDiff = actualCustomer - ledgerNumber(applied.customer);\n            const packageDiff = actualPackages - ledgerNumber(applied.packages);'
+    },
+    {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',
         from: '    function revertRevenueLedgerDelta(applied) {',
         to: '    function revertRevenueLedgerDelta(applied) { return applied; }\n    function revertRevenueLedgerDeltaDead(applied) {'

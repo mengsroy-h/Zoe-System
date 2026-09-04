@@ -64,7 +64,8 @@ function sliceFn(name) {
 
 const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookupTimeoutNoRetry',
     'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse',
-    'safeLookupReason', 'lookupApiIsZto', 'getFastLookupRow', 'setFastLookupRow',
+    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+    'getFastLookupRow', 'setFastLookupRow',
     'attemptAutoLookup'];
 // ជាន់អប្បបរមាទី ២ ៖ ចំនួន function ដែលស្រង់បាន — refactor ដែលដក function
 // ចេញមិនត្រូវធ្វើឲ្យ checker បៃតងដោយស្ងាត់

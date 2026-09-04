@@ -97,7 +97,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.27.2` (`zoew-v162`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.27.3` (`zoew-v163`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.16` (`zoekeygen-v86`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -152,6 +152,17 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    `ZoeKeyGen/firebase-database.rules.json` (License)។
 ១១. **⛔ កុំប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ភាពរលូននៃការរមូរ ដោយគ្មានការស្នើ
    ច្បាស់លាស់។** មើលផ្នែកបន្ទាប់។
+១២. **⛔ មុននឹងកត់ត្រាអ្វីថ្មីចូល `CLAUDE.md` ឬ `docs/HISTORY.md` ត្រូវ
+   `grep` រកជាមុនសិន។** ឯកសារនេះខ្លីដោយចេតនា — គោលដៅគឺឲ្យវា **ត្រូវបាន
+   អានទាំងមូល**។ ច្បាប់ស្ទួន ២ កន្លែងធ្វើឲ្យវាវែងឥតប្រយោជន៍ ហើយ **អាក្រក់
+   ជាងនោះ** ៖ ជុំក្រោយកែច្បាប់មួយដោយភ្លេចមួយទៀត ➜ **ច្បាប់ ២ ផ្ទុយគ្នា
+   ក្នុងឯកសារតែមួយ** ➜ session បន្ទាប់ជឿមួយណាក៏បាន។
+   🔴 **វាកើតឡើងពិតក្នុងជុំ 2.27.3** ៖ ច្បាប់ «សំណើទៅ Apps Script ត្រូវជា
+   *simple request*» មានរួចហើយ តែច្បាប់ដដែលត្រូវបានបន្ថែមជាជួរថ្មីដាច់ដោយឡែក
+   — **អ្នកប្រើចាប់បាន មិនមែនឧបករណ៍ទេ**។
+   **វិធីត្រឹមត្រូវ** ៖ ⛔ ច្បាប់ដដែលដែលអនុវត្តលើសាខាថ្មី ➜ **ពង្រីកច្បាប់ដើម**
+   មិនមែន **ចម្លងវា**។ ជួរថ្មីក្នុងតារាងស្នូលត្រូវបន្ថែម **តែពេលច្បាប់នោះ
+   ទទួលអ្នកយាម *ថ្មី*** (ឧបករណ៍ផ្សេង) ហើយត្រូវយោងទៅច្បាប់ដើម មិនសរសេរវាឡើងវិញ។
 
 ---
 
@@ -298,6 +309,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
+| **Apps Script ↔ simple request** | ⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវ Lookup ផង** — គ្មាន header ផ្ទាល់ខ្លួន ហើយ **មិនសុំ PIN** សម្រាប់វា | `lookup-prefetch-test` |
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
 | **ZTO ៖ auto-login** | ⛔ **ដកចេញរួច (2.25.0)** — IdP មិនបើកឲ្យ IP របស់ Netlify; កុំនាំវាមកវិញ | `zto-proxy-test` |
@@ -405,6 +417,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការសម្គាល់ការខលបាត់ ព្រោះតំណ `tel:` ផ្អាក App កណ្តាល transaction | `history-patch-retry-test.js` |
 | ការទាញតារាងអតិថិជនធ្លាក់ ➜ រាល់ការស្កេនឆ្លងបណ្តាញ ១៥ នាទី · ការព្យាយាមវិញជាន់ការស្កេន | `lookup-prefetch-test.js` |
 | **នាំចូល Excel ➜ Sheet** ៖ រំលង PIN · preflight `OPTIONS` សម្លាប់ការនាំចូល · secret ជាអក្សរធម្មតា · toast កុហក | `sheet-import-test.js` |
+| **header ផ្ទាល់ខ្លួន ➜ preflight ➜ Apps Script ស្លាប់** (ផ្លូវ Lookup) · ការសុំ PIN សម្រាប់ header ដែលមិនដែលផ្ញើ | `lookup-prefetch-test.js` |
 | **នាំចូលរួច តែទិន្នន័យអតិថិជនមិនមកដល់** ៖ តារាងត្រូវលុបចោលដោយគ្មានអ្នកបំពេញវិញ · cache ៥ នាទីរបស់ Apps Script បាំង barcode ថ្មី | `lookup-freshness-test.js` |
 | **ចាក់សោ App** ៖ សោដែលមិនចាក់ (បើក **ឬត្រឡប់មក**) · ទិន្នន័យលេចពីក្រោយសោ · សោដែលបំផ្លាញ PTR ឬការខល · សោដែលកាត់ session ៤ ម៉ោង | `app-lock-test.js` |
 | **listener/node ដែលកកកុញ** ៖ សកម្មភាពរត់ស្ទួន · handler រត់ N ដងក្នុង ១ snapshot · ការរមូរញាក់ | `listener-leak-test.js` |
@@ -1299,6 +1312,14 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `Content-Type: text/plain;charset=utf-8` និង **គ្មាន header ផ្ទាល់ខ្លួន**។
   Apps Script **មិនឆ្លើយ `OPTIONS`** ➜ preflight = **ការនាំចូលស្លាប់ទាំងស្រុង
   លើផលិតកម្ម ខណៈតេស្តដែល stub `fetch` ជោគជ័យទាំងអស់**។
+  ⛔ **ច្បាប់នេះគ្របផ្លូវ *ទាំងអស់* ទៅ Apps Script មិនត្រឹមការនាំចូលទេ**
+  (កំណែ 2.27.3 ៖ ផ្លូវ **Lookup** ខ្វះវា ➜ វាល «ឈ្មោះ Header» ធ្វើឲ្យ
+  `?list=1` និង `?code=` ស្លាប់ដោយ `Failed to fetch` លើផលិតកម្មពិត)។
+  `lookupApiSendsHeader(cfg)` ជាច្រកទ្វារតែមួយ ៖ header **និង** ការសុំ PIN
+  ត្រូវរំលងសម្រាប់ Apps Script។ ⛔ **Apps Script អាន header មិនបានទាល់តែសោះ**
+  (`Code.gs` អានពី `e.parameter`) ➜ header នោះគ្មានប្រយោជន៍ **និង** បំផ្លាញ។
+  ⛔ ការសម្គាល់ត្រូវប្រៀបធៀប **hostname** មិនមែន substring (`script.google.com.evil…`
+  មិនរាប់)។ ⛔ ការមិនផ្ញើត្រូវប្រាប់អ្នកប្រើ — **គ្មានការទម្លាក់ស្ងាត់**។
 - ⛔ **`fetch()` មិន reject លើ HTTP error ទេ** — 408/425/429/5xx ត្រូវបម្លែងទៅ
   rejection **ខាងក្នុង** callback របស់ `retryAsync()`; 401/403 នៅក្រៅ។
 
@@ -1688,7 +1709,15 @@ bash audit-tools/emu/rules.sh
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
 
-## ✅ គ្មានការងារនៅសល់
+## ⏳ កំណែ 2.27.3 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+
+**Lookup ពី Google Sheet ដែលមានវាល «ឈ្មោះ Header»** ៖ មុននេះ header ផ្ទាល់ខ្លួន
+ត្រូវផ្ញើទៅ Apps Script ➜ browser ផ្ញើ preflight ➜ Apps Script មិនឆ្លើយ ➜
+**`Failed to fetch`** (វាស់ពី Sentry ផលិតកម្មពិត 2026-09-04)។ ឥឡូវ header នោះ
+មិនត្រូវផ្ញើទេ (ហើយក៏មិនសុំ PIN ដែរ) ➜ **តារាងអតិថិជន និង Lookup ពី Sheet
+ដំណើរការទោះបីវាល Header មិនទទេ**។ សូមសាក ៖ ដាក់ឈ្មោះ Header ណាមួយក្នុង Config
+រួចបើកតារាងអតិថិជន ➜ គួរដំណើរការធម្មតា ហើយឃើញសារ «Apps Script អាន Header
+មិនបានទេ»។
 
 កំណែ **2.27.0** · **2.27.1** · **2.27.2** ត្រូវបាន **អ្នកប្រើផ្ទៀងផ្ទាត់លើ
 ឧបករណ៍ពិតរួចហើយ** (2026-09-04) ➜ ធាតុទាំងនោះត្រូវលុបចេញពីទីនេះតាមច្បាប់។

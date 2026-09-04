@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.26.1';
+    const APP_VERSION = '2.26.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5730,26 +5730,37 @@
         return applied;
     }
 
+    function correctPickupServerToActual(applied, actualCustomer, actualPackages) {
+        return Promise.resolve(applied && applied.server).then((serverApplied) => {
+            const base = serverApplied || { packages: applied.packages, customer: applied.customer };
+            const customerDiff = actualCustomer - ledgerNumber(base.customer);
+            const packageDiff = actualPackages - ledgerNumber(base.packages);
+            if (!customerDiff && !packageDiff) return base;
+            return Promise.resolve(commitDailyPickupDelta(applied.scanDate, applied.phoneKey, customerDiff, packageDiff, { packages: packageDiff, customer: customerDiff }, true)).then((extraApplied) => {
+                const add = extraApplied || { packages: 0, customer: 0 };
+                return {
+                    packages: ledgerNumber(base.packages) + ledgerNumber(add.packages),
+                    customer: ledgerNumber(base.customer) + ledgerNumber(add.customer)
+                };
+            }, () => base);
+        }, () => null);
+    }
+
     function correctPickupLedgerToActual(applied, actualCustomer, actualPackages) {
         if (!applied || !applied.scanDate) return applied;
         const customerDiff = actualCustomer - applied.customer;
         const packageDiff = actualPackages - applied.packages;
-        if (customerDiff === 0 && packageDiff === 0) return applied;
-        const extra = addPickupToDailyRecord(applied.scanDate, applied.phoneKey, customerDiff, packageDiff);
+        const server = correctPickupServerToActual(applied, actualCustomer, actualPackages);
+        if (customerDiff === 0 && packageDiff === 0) {
+            return { scanDate: applied.scanDate, phoneKey: applied.phoneKey, packages: applied.packages, customer: applied.customer, server: server };
+        }
+        const extra = applyPickupMemoryDelta(applied.scanDate, applied.phoneKey, customerDiff, packageDiff);
         return {
             scanDate: applied.scanDate,
             phoneKey: applied.phoneKey,
             packages: applied.packages + (extra ? extra.packages : 0),
             customer: applied.customer + (extra ? extra.customer : 0),
-            server: Promise.all([applied.server, extra ? extra.server : null]).then((parts) => {
-                const a = parts[0];
-                const b = parts[1];
-                if (!a && !b) return null;
-                return {
-                    packages: (a ? a.packages : 0) + (b ? b.packages : 0),
-                    customer: (a ? a.customer : 0) + (b ? b.customer : 0)
-                };
-            }, () => null)
+            server: server
         };
     }
 

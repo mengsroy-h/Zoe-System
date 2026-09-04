@@ -258,7 +258,7 @@ bash audit-tools/emu/rules.sh
 | `phone-search-swipe-test.js` | កាយវិការអូស និង auto pull up | `SWIPE_APP_DIR` |
 | `phone-suggest-test.js` | ការណែនាំលេខទូរស័ព្ទ | `PHONE_APP_DIR` |
 | `page-nav-test.js` | រចនាសម្ព័ន្ធទំព័រ · របា Slide · Locker | `PAGENAV_APP_DIR` |
-| `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ | `UIFLOW_APP_DIR` |
+| `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ · ប្រអប់ជាន់លើបិទ ➜ ផ្លូវលុប/កែ មិនខូច | `UIFLOW_APP_DIR` |
 | `toast-truth-test.js` | Toast និយាយការពិត realtime | `TOAST_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |

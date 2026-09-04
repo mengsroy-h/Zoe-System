@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.27.2';
+    const APP_VERSION = '2.27.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2435,6 +2435,9 @@
         closeModal('lookupApiConfigModal');
         prefetchCustomerDataTableRowsIfConfigured();
         showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
+        if (cfg.headerName && lookupApiIsAppsScript(cfg)) {
+            showToast("ℹ️ Google Apps Script អាន Header មិនបានទេ — សោត្រូវដាក់ក្នុង URL។ Header នេះនឹងមិនត្រូវផ្ញើ។");
+        }
     }
 
     async function testLookupApiConfig(btnEl) {
@@ -2457,7 +2460,7 @@
         const existingCfg = getLookupApiConfig() || {};
         const typedValue = headerValueIn ? headerValueIn.value.trim() : '';
         const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
-        if (hName && hValue) headers[hName] = hValue;
+        if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
 
         const testIsZto = lookupApiIsZto({ url: url });
         const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;
@@ -3298,6 +3301,23 @@
         }
     }
 
+    function lookupApiIsAppsScript(cfg) {
+        if (!cfg || !cfg.url) return false;
+        const raw = String(cfg.url).trim();
+        let host = '';
+        try {
+            host = new URL(raw).hostname;
+        } catch (e) {
+            const m = raw.match(/^https?:\/\/([^/?#]+)/i);
+            host = m ? m[1] : '';
+        }
+        return /(^|\.)script\.google\.com$/i.test(host) || /(^|\.)script\.googleusercontent\.com$/i.test(host);
+    }
+
+    function lookupApiSendsHeader(cfg) {
+        return !!(cfg && cfg.headerName) && !lookupApiIsAppsScript(cfg);
+    }
+
     function lookupApiSupportsList(cfg) {
         return !!(cfg && cfg.url && !lookupApiIsZto(cfg));
     }
@@ -3363,11 +3383,13 @@
         customerDataTableFetchPromise = (async () => {
             try {
                 const headers = {};
-                if (cfg.headerName && cfg.headerValueEnc) {
-                    const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-                    if (decrypted) headers[cfg.headerName] = decrypted;
-                } else if (cfg.headerName && cfg.headerValue) {
-                    headers[cfg.headerName] = cfg.headerValue;
+                if (lookupApiSendsHeader(cfg)) {
+                    if (cfg.headerValueEnc) {
+                        const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                        if (decrypted) headers[cfg.headerName] = decrypted;
+                    } else if (cfg.headerValue) {
+                        headers[cfg.headerName] = cfg.headerValue;
+                    }
                 }
                 const out = await retryAsync(
                     () => fetchWithTimeout(listUrl, { headers }, 20000, 'Customer table fetch timed out',
@@ -3847,7 +3869,7 @@
 
         scheduleCustomerTableSoonRefresh();
 
-        if (cfg.headerName && cfg.headerValueEnc && !lookupSecretKey) {
+        if (lookupApiSendsHeader(cfg) && cfg.headerValueEnc && !lookupSecretKey) {
             dropAutoLookupQueueEntry(lookupKey);
             setLookupStatus(barcode, 'warn', '🔒 សូមវាយ PIN ដើម្បីដោះសោ ' + lookupSource + ' Lookup');
             if (pendingLookupUnlockResolve) pendingLookupUnlockResolve();
@@ -3903,11 +3925,13 @@
         try {
             const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(barcode));
             const headers = {};
-            if (cfg.headerName && cfg.headerValueEnc) {
-                const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
-                if (decrypted) headers[cfg.headerName] = decrypted;
-            } else if (cfg.headerName && cfg.headerValue) {
-                headers[cfg.headerName] = cfg.headerValue;
+            if (lookupApiSendsHeader(cfg)) {
+                if (cfg.headerValueEnc) {
+                    const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                    if (decrypted) headers[cfg.headerName] = decrypted;
+                } else if (cfg.headerValue) {
+                    headers[cfg.headerName] = cfg.headerValue;
+                }
             }
 
             const out = await retryAsync(

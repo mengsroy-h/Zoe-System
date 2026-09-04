@@ -55,7 +55,8 @@ function sliceFn(name) {
 const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'retryAsync', 'retryTransientLookupResponse', 'attemptAutoLookup', 'setLookupStatus',
-    'safeLookupReason', 'lookupApiIsZto', 'retryPendingLookupAfterUnlock', 'elapsedSince',
+    'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+    'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
     'lookupFailureIsDefinitive'];
 const src = {};
@@ -135,7 +136,7 @@ function buildRuntime(plan) {
     };
     ctx.window = ctx;
     vm.createContext(ctx);
-    ['elapsedSince', 'lookupApiIsZto', 'safeLookupReason', 'setLookupStatus',
+    ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
      'retryPendingLookupAfterUnlock', 'lookupResponseError', 'markLookupTimeoutNoRetry',
      'retryTransientLookupResponse', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',

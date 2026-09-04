@@ -52,7 +52,7 @@ function sliceFn(name) {
 const FNS = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
     'elapsedSince', 'linkIsFrugal', 'customerTablePrefetchAllowed', 'preconnectToOrigin', 'preconnectToLookupHost',
-    'lookupApiIsZto', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'warmZtoLookupProxyNow', 'buildCustomerListApiUrl',
+    'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'lookupApiSupportsList', 'warmZtoLookupProxyIfConfigured', 'warmZtoLookupProxyNow', 'buildCustomerListApiUrl',
     'prefetchCustomerDataTableRowsIfConfigured',
     'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
     'scheduleCustomerTableSoonRefresh', 'runCustomerTableSoonRefresh',
@@ -348,6 +348,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         const filled = [];
         const unlockActions = [];
         const deferreds = [];
+        const fetchOptions = [];
         const statusEl = { className: 'lookup-status', textContent: '', hidden: true };
         const modals = {
             phoneModal: { style: { display: 'none' } },
@@ -363,6 +364,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Number: Number,
             Math: Math, Date: Date, Error: Error, Set: Set, Map: Map, parseFloat: parseFloat, isNaN: isNaN,
             encodeURIComponent: encodeURIComponent,
+            URL: URL,
             setTimeout: setTimeout, clearTimeout: clearTimeout,
             navigator: { onLine: o.onLine === undefined ? true : o.onLine },
             AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
@@ -392,7 +394,9 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             elapsedSince: (m) => (m ? Date.now() - m : Infinity),
             getFastLookupRow: () => null,
             setFastLookupRow: () => {},
-            getLookupApiConfig: () => ({ url: o.zto ? '/.netlify/functions/zto-order-detail?barcode={barcode}' : 'https://x/exec?code={barcode}', enabled: true,
+            getLookupApiConfig: () => ({ url: o.appsScript
+                                            ? 'https://script.google.com/macros/s/AKfycb/exec?code={barcode}&key=k'
+                                            : (o.zto ? '/.netlify/functions/zto-order-detail?barcode={barcode}' : 'https://x/exec?code={barcode}'), enabled: true,
                                          fastMode: !!o.fastMode,
                                          headerName: o.locked ? 'X-Zoe-Proxy-Key' : '',
                                          headerValueEnc: o.locked ? { iv: [1], data: [2] } : null,
@@ -405,12 +409,13 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             applyLookupFillToModal: (bc, p2) => filled.push(p2),
             getNestedField: (d, k) => (d ? d[k] : null),
             showToast: () => {},
-            decryptLookupSecret: () => Promise.resolve(''),
+            decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? 'secret-value-123' : o.secretPlain),
             isPinFlowPending: () => false,
             requestPinBeforeConfig: (action) => unlockActions.push(action),
             retryAsync: (fn) => fn(),
-            fetchWithTimeout: (url) => {
+            fetchWithTimeout: (url, options) => {
                 fetches.push(url);
+                fetchOptions.push(options || {});
                 if (o.deferred) {
                     return new Promise((resolve, reject) => deferreds.push({ resolve: resolve, reject: reject }));
                 }
@@ -452,11 +457,14 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             ZoeErrors: { capture: (e, c) => captures.push(c && c.context) },
             __fetches: fetches, __captures: captures, __filled: filled, __unlockActions: unlockActions,
             __status: statusEl, __deferreds: deferreds, __modals: modals, __store: storeData,
+            __fetchOptions: fetchOptions,
             __modalIds: modals
         };
         ctx.window = ctx;
         vm.createContext(ctx);
         vm.runInContext(sliceFn('lookupApiIsZto'), ctx);
+        vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
+        vm.runInContext(sliceFn('lookupApiSendsHeader') || 'function lookupApiSendsHeader(cfg) { return !!(cfg && cfg.headerName); }', ctx);
         vm.runInContext(sliceFn('safeLookupReason'), ctx);
         vm.runInContext(sliceFn('setLookupStatus'), ctx);
         vm.runInContext(sliceFn('retryPendingLookupAfterUnlock'), ctx);
@@ -600,7 +608,8 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
         };
         ctx.window = ctx;
         vm.createContext(ctx);
-        ['lookupApiIsZto', 'lookupApiSupportsList', 'buildCustomerListApiUrl',
+        ['lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
+            'lookupApiSupportsList', 'buildCustomerListApiUrl',
             'retryTransientLookupResponse', 'retryAsync'].forEach((name) => {
             vm.runInContext(sliceFn(name), ctx);
         });
@@ -744,6 +753,89 @@ scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ច�
     vm.runInContext('closeModal("editPhoneModal");', nested);
     ok('បិទប្រអប់កែលេខពិត ➜ editingItemId ត្រូវសម្អាត',
         nested.editingItemId === null, nested.editingItemId);
+});
+
+// === ⛔ Header ផ្ទាល់ខ្លួន ➜ preflight ➜ Apps Script ស្លាប់ ===
+// 🔴 វាស់ពី Sentry ផលិតកម្មពិត (2026-09-04) ៖
+//   09:55:42  GET ?list=1&key=…  200 ✅
+//   09:56:54  អ្នកប្រើកែវាល «ឈ្មោះ Header» រួចរក្សាទុក
+//   09:56:54  GET ?list=1&key=…  ❌ TypeError: Failed to fetch
+// មូលហេតុ ៖ header ផ្ទាល់ខ្លួន ➜ browser ផ្ញើ **preflight OPTIONS** ➜
+//   **Apps Script មិនឆ្លើយ OPTIONS** ➜ សំណើស្លាប់ទាំងស្រុង។
+// ⛔ ហើយវា **គ្មានប្រយោជន៍សោះ** ៖ `Code.gs` អានសោពី `e.parameter` (URL) —
+//   Apps Script **មើលមិនឃើញ header ទាល់តែសោះ**។
+// ច្បាប់នេះមានក្នុង CLAUDE.md សម្រាប់ផ្លូវ **នាំចូល** រួចហើយ (`callSheetImportApi`
+//   ផ្ញើតែ `text/plain`) — តែ **ផ្លូវ Lookup ខ្វះវា**។
+scenario('⛔ Apps Script ➜ មិនផ្ញើ header ផ្ទាល់ខ្លួន (preflight សម្លាប់សំណើ)', () => {
+    const ctx = buildAutoRuntime({ appsScript: true, locked: true, fetchSuccess: true });
+    ctx.lookupSecretKey = { unlocked: true };
+    return vm.runInContext('attemptAutoLookup("BC1")', ctx).then(() => {
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ សំណើចេញពិត', ctx.__fetches.length === 1, ctx.__fetches);
+        const sent = (ctx.__fetchOptions[0] || {}).headers || {};
+        ok('⛔ Apps Script ➜ **គ្មាន header ផ្ទាល់ខ្លួន** (បើមាន ➜ preflight ➜ Failed to fetch)',
+            Object.keys(sent).length === 0, sent);
+    });
+});
+
+scenario('⛔ ទិសផ្ទុយ ៖ API ដែលមិនមែន Apps Script ➜ header ត្រូវផ្ញើដដែល', () => {
+    const ctx = buildAutoRuntime({ locked: true, fetchSuccess: true });
+    ctx.lookupSecretKey = { unlocked: true };
+    return vm.runInContext('attemptAutoLookup("BC1")', ctx).then(() => {
+        const sent = (ctx.__fetchOptions[0] || {}).headers || {};
+        ok('⛔ ទិសផ្ទុយ ៖ API ធម្មតា ➜ header នៅតែផ្ញើ (ការកែមិនកាត់សុវត្ថិភាព)',
+            sent['X-Zoe-Proxy-Key'] !== undefined, sent);
+    });
+});
+
+// ⛔ កុំ `await` promise របស់ផ្លូវជាប់សោ ៖ វា **មិនដែលដោះ** រហូតដល់ PIN
+//   ត្រូវដោះ ➜ `Promise.all(pendingScenarios)` ព្យួរ ➜ សរុបមិនបោះពុម្ព
+//   ➜ **បៃតងក្លែងក្លាយ** (អន្ទាក់ដែលឯកសារនេះព្រមានផ្ទាល់)។
+scenario('⛔ Apps Script ➜ មិនត្រូវសុំ PIN សម្រាប់ header ដែលមិនដែលផ្ញើ', () => {
+    const ctx = buildAutoRuntime({ appsScript: true, locked: true, fetchSuccess: true });
+    ctx.lookupSecretKey = null;
+    vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    return new Promise((resolve) => setTimeout(resolve, 10)).then(() => {
+        ok('⛔ Apps Script + សោជាប់ ➜ **មិនសុំ PIN** (header នោះគ្មានប្រយោជន៍)',
+            ctx.__unlockActions.length === 0, ctx.__unlockActions.length);
+        ok('⛔ Apps Script + សោជាប់ ➜ ការស្វែងរកបន្តធម្មតា មិនព្យួរ',
+            ctx.__fetches.length === 1, ctx.__fetches);
+    });
+});
+
+scenario('⛔ ទិសផ្ទុយ ៖ ZTO ដែលសោជាប់ ➜ នៅតែសុំ PIN', () => {
+    const ctx = buildAutoRuntime({ zto: true, locked: true, fetchSuccess: true });
+    ctx.lookupSecretKey = null;
+    vm.runInContext('attemptAutoLookup("BC1")', ctx);
+    return Promise.resolve().then(() => {
+        ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ ការសុំ PIN នៅដដែល', ctx.__unlockActions.length === 1, ctx.__unlockActions.length);
+        ok('⛔ ទិសផ្ទុយ ៖ ZTO ➜ មិនបាញ់សំណើមុនដោះសោ', ctx.__fetches.length === 0, ctx.__fetches);
+    });
+});
+
+// ⛔ «គ្មានការទម្លាក់ស្ងាត់» ៖ ការមិនផ្ញើ header ត្រូវប្រាប់អ្នកប្រើ ដើម្បី
+//   កុំឲ្យគាត់ជឿថាសោនោះកំពុងការពារអ្វីមួយ។
+// ⛔ ថ្នាក់ដដែលមាន **ទ្វារ ៤** ៖ header របស់តារាង · header របស់ lookup ·
+//   ផ្លូវ PIN · និង **ប៊ូតុង «សាកល្បង»** ដែលសង់ header ដោយឡែក។ បើកែតែ ៣
+//   នោះ «សាកល្បង» ធ្លាក់ ខណៈមុខងារពិតដើរ ➜ អ្នកប្រើជឿថា Config ខូច។
+const testCfgFn = sliceFn('testLookupApiConfig') || '';
+ok('ប៊ូតុង «សាកល្បង» ក៏ឆ្លងកាត់ច្រកទ្វារដដែល (ទ្វារទី ៤)',
+    testCfgFn.indexOf('lookupApiSendsHeader(') !== -1, testCfgFn.length);
+
+const saveCfgFn = sliceFn('saveLookupApiConfig') || '';
+ok('រក្សាទុក Config ជាមួយ Apps Script + Header ➜ ប្រាប់អ្នកប្រើ (មិនទម្លាក់ស្ងាត់)',
+    /lookupApiIsAppsScript\(cfg\)/.test(saveCfgFn) && /showToast\(/.test(saveCfgFn),
+    saveCfgFn.length);
+
+scenario('សម្គាល់ URL របស់ Apps Script', () => {
+    const ctx = build({ cfg: { url: 'https://script.google.com/macros/s/AKfycb/exec?code={barcode}&key=k', enabled: true } });
+    ok('សម្គាល់ script.google.com', vm.runInContext('lookupApiIsAppsScript(getLookupApiConfig())', ctx) === true);
+    const uc = build({ cfg: { url: 'https://script.googleusercontent.com/macros/echo?x=1', enabled: true } });
+    ok('សម្គាល់ script.googleusercontent.com ដែរ', vm.runInContext('lookupApiIsAppsScript(getLookupApiConfig())', uc) === true);
+    const zto = build({ cfg: { url: '/.netlify/functions/zto-order-detail?barcode={barcode}', enabled: true } });
+    ok('⛔ ទិសផ្ទុយ ៖ ZTO មិនមែន Apps Script', vm.runInContext('lookupApiIsAppsScript(getLookupApiConfig())', zto) === false);
+    const fake = build({ cfg: { url: 'https://script.google.com.evil.example/exec', enabled: true } });
+    ok('⛔ domain ក្លែង (script.google.com.evil…) មិនត្រូវរាប់ជា Apps Script',
+        vm.runInContext('lookupApiIsAppsScript(getLookupApiConfig())', fake) === false);
 });
 
 // === ជណ្តើរព្យាយាមវិញ ===

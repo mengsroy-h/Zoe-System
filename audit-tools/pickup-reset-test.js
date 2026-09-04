@@ -66,7 +66,8 @@ ok('index.html មិនទទេ (>= 400 បន្ទាត់)', HTML.split('\
 const REQUIRED_FNS = [
     'getFilterTargetDateKey', 'getPickupResetTargetDates', 'getCurrentFilterLabel',
     'countPickedUpCustomers', 'resetPickupStats', 'requestPinBeforeResetPickup',
-    'moreMenuResetPickup', 'planPickupLedgerRepair', 'closedBarcodeCount',
+    'moreMenuResetPickup', 'planPickupLedgerRepair', 'collectPickupMarks',
+    'pickupBarcodeKey', 'barcodeRegistryKey', 'pickupSetSize', 'ledgerNumber',
     'getPickupPhoneKey', 'updateDailyScheduleStats'
 ];
 function sliceConstDecl(name) {
@@ -316,13 +317,14 @@ async function runReset(opts) {
     // ── ៥. ការជួសជុល ledger មិនត្រូវដកការ Reset វិញ ──────────────────
     console.log('\n=== ៥. planPickupLedgerRepair() មិនត្រូវដកការ Reset វិញ ===');
     {
-        const ctx = vm.createContext({ console });
-        vm.runInContext(fnSrc['closedBarcodeCount'], ctx);
-        vm.runInContext(fnSrc['getPickupPhoneKey'], ctx);
-        vm.runInContext(fnSrc['planPickupLedgerRepair'], ctx);
+        const ctx = vm.createContext({ console, Object, Math, String, parseFloat, isNaN, Array });
+        vm.runInContext((/const PICKUP_PHONE_KEY_MAX = [0-9]+;/.exec(SRC) || ['const PICKUP_PHONE_KEY_MAX = 64;'])[0], ctx);
+        ['ledgerNumber', 'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize',
+            'getPickupPhoneKey', 'collectPickupMarks', 'planPickupLedgerRepair']
+            .forEach((n) => vm.runInContext(fnSrc[n], ctx));
         const history = [
-            { id: 'a', phone: '011111111', scanDate: '2026-08-26', barcodes: [{ isClosed: true }, { isClosed: true }] },
-            { id: 'b', phone: '022222222', scanDate: '2026-08-26', barcodes: [{ isClosed: true }] }
+            { id: 'a', phone: '011111111', scanDate: '2026-08-26', barcodes: [{ code: 'RA1', isClosed: true }, { code: 'RA2', isClosed: true }] },
+            { id: 'b', phone: '022222222', scanDate: '2026-08-26', barcodes: [{ code: 'RB1', isClosed: true }] }
         ];
         const resetLedger = { '2026-08-26': { packagesPickedUp: 0 } };
         const plans = vm.runInContext('planPickupLedgerRepair', ctx)(resetLedger, history, []);

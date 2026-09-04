@@ -92,7 +92,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          sw-abort-propagation-test \
          stall-guard-test \
          periodic-network-guard-test \
-         pickup-ledger-test pickup-repair-test pickup-reset-test \
+         pickup-ledger-test pickup-repair-test pickup-reset-test pickup-barcode-identity-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
@@ -262,6 +262,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PICKUP_APP_DIR="$BASE"  node audit-tools/pickup-ledger-test.js 2>&1 | tail -1 | sed 's/^/   pickup-ledger:   /'
     PICKUPREPAIR_APP_DIR="$BASE" node audit-tools/pickup-repair-test.js 2>&1 | tail -1 | sed 's/^/   pickup-repair:   /'
     PICKUPRESET_APP_DIR="$BASE" node audit-tools/pickup-reset-test.js 2>&1 | tail -1 | sed 's/^/   pickup-reset:    /'
+    PICKUPID_APP_DIR="$BASE" node audit-tools/pickup-barcode-identity-test.js 2>&1 | tail -1 | sed 's/^/   pickup-identity: /'
     REVCLAMP_APP_DIR="$BASE" node audit-tools/revenue-rules-clamp-test.js 2>&1 | tail -1 | sed 's/^/   revenue-clamp:   /'
     PRICEABORT_APP_DIR="$BASE" node audit-tools/price-edit-abort-test.js 2>&1 | tail -1 | sed 's/^/   price-edit-abort:/'
     REGISTRY_APP_DIR="$BASE" node audit-tools/registry-release-test.js 2>&1 | tail -1 | sed 's/^/   registry-rel:    /'

@@ -53,8 +53,10 @@ const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const cookieState = {
-    value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0
+    value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
+    mustRevalidate: false
 };
+let cookieRefreshInFlight = false;
 let blobsModuleForTests = null;
 
 function setCookieLines(response) {
@@ -203,6 +205,46 @@ function settleWithin(run, timeoutMs, label) {
     });
 }
 
+// ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ — ទាំងភាពអាចប្រើបាន ទាំងល្បឿន។**
+// ក្រោយ TTL ៦០ វិនាទី ការអានចាស់ឈរ **លើផ្លូវឆ្លើយតប** ➜ រាល់ការស្កេនរង់ចាំ
+// Netlify Blobs មុនហៅ ZTO ទោះបីជា Cookie ដដែលនៅក្នុងសតិក៏ដោយ។ ដូច្នេះពេលមាន
+// តម្លៃក្នុងសតិរួច ៖ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់ **ខាងក្រោយ**។ ⛔ ក្រោយ 401
+// (`invalidateCookieCache()`) ការអានត្រូវ **ទប់** វិញ — ទីនោះជាកន្លែងដែល
+// ការអានតម្លៃថ្មីពិតជាចាំបាច់មុនហៅ upstream។
+function refreshCookieInBackground(store) {
+    if (cookieRefreshInFlight || !store) return;
+    cookieRefreshInFlight = true;
+    // ⛔ Netlify អាច **បង្កក** container ភ្លាមក្រោយការឆ្លើយតប ➜ ការអាននេះអាច
+    // ដោះវិញយូរក្រោយមក ដោយកាន់ទិដ្ឋភាព **ចាស់**។ ខណៈនោះ Argus អាចបានប្តូរ
+    // session ហើយ (`adoptRenewedCookie`) ➜ ការសរសេរជាន់ដោយទិដ្ឋភាពចាស់នឹង
+    // បង្កើត 401 ដែលយើងទើបជៀសផុត។ ដូច្នេះអនុវត្តតែពេលសតិ **មិនប្រែ**។
+    const seen = cookieState.value;
+    settleWithin(
+        () => store.get(COOKIE_STORE_KEY, { type: 'text' }),
+        COOKIE_STORE_TIMEOUT_MS,
+        'read'
+    ).then((read) => {
+        if (!read.ok) {
+            cookieState.storeReason = read.reason;
+            return;
+        }
+        const stored = sanitizeStoredCookie(read.value);
+        if (!stored) {
+            cookieState.storeReason = read.value ? 'invalid' : 'empty';
+            return;
+        }
+        if (cookieState.value !== seen) return;
+        cookieState.value = stored;
+        cookieState.source = 'blob';
+        cookieState.at = Date.now();
+        cookieState.storeReason = '';
+    }, () => {}).then(() => {
+        cookieRefreshInFlight = false;
+    }, () => {
+        cookieRefreshInFlight = false;
+    });
+}
+
 async function resolveCookieCredential(netlifyEvent, env, options) {
     if (env.ZTO_AUTHORIZATION || env.ZTO_TOKEN) {
         return { cookie: '', source: '', store: null, renewal: '' };
@@ -220,6 +262,11 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     if (!skipCache && cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }
+    const blocking = !!(options && options.blocking);
+    if (!skipCache && !blocking && !cookieState.mustRevalidate && cookieState.value && opened.store && readTimeoutMs > 0) {
+        refreshCookieInBackground(opened.store);
+        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+    }
     if (opened.store && readTimeoutMs > 0) {
         const read = await settleWithin(
             () => opened.store.get(COOKIE_STORE_KEY, { type: 'text' }),
@@ -233,6 +280,7 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
                 cookieState.source = 'blob';
                 cookieState.at = Date.now();
                 cookieState.storeReason = '';
+                cookieState.mustRevalidate = false;
                 return { cookie: stored, source: 'blob', store: opened.store, renewal: '' };
             }
             cookieState.storeReason = read.value ? 'invalid' : 'empty';
@@ -245,11 +293,13 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     cookieState.value = envCookie;
     cookieState.source = envCookie ? 'env' : '';
     cookieState.at = envCookie ? Date.now() : 0;
+    cookieState.mustRevalidate = false;
     return { cookie: envCookie, source: cookieState.source, store: opened.store, renewal: '' };
 }
 
 function invalidateCookieCache() {
     cookieState.at = 0;
+    cookieState.mustRevalidate = true;
 }
 
 function noteCookieRejected() {
@@ -269,12 +319,25 @@ function noteCookieRenewal(session, response) {
     session.renewal = merged;
 }
 
+// ⛔ ពិដានល្បឿន និងថវិកាពេល ការពារ **ការសរសេរទៅ Blobs** — មិនមែនការចងចាំទេ។
+// Argus ទើបប្រគល់ session ថ្មីមកឲ្យយើងក្នុងសំណើនេះ ៖ ការបោះវាចោលទាំងស្រុង
+// ធ្វើឲ្យសំណើបន្ទាប់នៃ instance ដដែលផ្ញើ Cookie **ចាស់** ➜ 401 ដែលអាចជៀសបាន
+// ➜ អាន store ឡើងវិញ បូកការសាកម្តងទៀត (ថ្លៃមួយជុំពេញនៃថវិកា)។ ដូច្នេះការ
+// ចងចាំកើតឡើង **ជានិច្ច** ចំណែកការសរសេរនៅតែស្ថិតក្រោមពិដានដដែល។
+function adoptRenewedCookie(session, merged) {
+    if (!merged) return;
+    session.cookie = merged;
+    if (cookieState.value === merged) return;
+    cookieState.value = merged;
+}
+
 async function flushCookieRenewal(session, timeoutMs) {
     if (!session || !session.store || !session.renewal) return;
     const budgetedMs = timeoutMs === undefined ? COOKIE_RENEW_WRITE_TIMEOUT_MS : timeoutMs;
-    if (!(budgetedMs > 0)) { session.renewal = ''; return; }
     const merged = session.renewal;
     session.renewal = '';
+    adoptRenewedCookie(session, merged);
+    if (!(budgetedMs > 0)) return;
     if (elapsedSince(cookieState.renewAt) < COOKIE_RENEW_MIN_GAP_MS) return;
     cookieState.renewAt = Date.now();
     const write = await settleWithin(
@@ -286,8 +349,6 @@ async function flushCookieRenewal(session, timeoutMs) {
         cookieState.storeReason = write.reason;
         return;
     }
-    session.cookie = merged;
-    cookieState.value = merged;
     cookieState.source = 'blob';
     cookieState.at = Date.now();
     cookieState.storeReason = '';
@@ -862,10 +923,13 @@ function configErrorResponse(error) {
     return json(503, body);
 }
 
+// ⛔ ការត្រៀម (OPTIONS) ឈរ **ក្រៅ** ផ្លូវស្កេន ➜ វាត្រូវ **បញ្ចប់** ការអាន
+// ពិត មិនមែនត្រឹមតាំងវាខាងក្រោយ។ នោះជាចំណុចទាំងមូលរបស់ការត្រៀម ៖ បង់ថ្លៃ
+// ការអាន Blobs នៅទីនេះ ដើម្បីកុំឲ្យការស្កេនបង់វា។
 async function prewarmCookieCredential(netlifyEvent) {
     if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) return;
     try {
-        await resolveCookieCredential(netlifyEvent, process.env, {});
+        await resolveCookieCredential(netlifyEvent, process.env, { blocking: true });
     } catch (_) {}
 }
 
@@ -1039,9 +1103,15 @@ exports.handler = async function handler(event) {
     return outcome.response;
 };
 
+exports.expireCookieCacheForTests = function expireCookieCacheForTests() {
+    if (cookieState.at) cookieState.at = 1;
+};
+
 exports.resetCachesForTests = function resetCachesForTests() {
     resultCache.clear();
     inFlight.clear();
+    cookieRefreshInFlight = false;
+    cookieState.mustRevalidate = false;
     cookieState.value = '';
     cookieState.source = '';
     cookieState.at = 0;

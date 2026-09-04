@@ -492,6 +492,95 @@ function seedData() {
             check(phB.exists === false, app + ': កែលេខលើកញ្ចប់ដែលលែងមាន ➜ មិនបង្កើត record ខ្មោច', JSON.stringify(phB));
         }
 
+        // --- ⛔ ប្រអប់ជាន់លើបិទ ➜ ផ្លូវ «លុប» និង «កែ» មិនត្រូវខូច ---
+        // 🔴 កំណែ 2.27.1 ៖ `closeModal()` ធ្លាប់លុប `pendingBarcode` ·
+        //   `editingItemId` · `markingItemId` **គ្រប់ប្រអប់** ➜ ការបិទប្រអប់
+        //   ណាមួយដែលឈរ *ជាន់លើ* (ឧ. ប្រអប់ PIN) លុបស្ថានភាពរបស់ប្រអប់ខាងក្រោម
+        //   ➜ ការកែលេខ/សម្គាល់ការខល ធ្វើលើ **គ្មានធាតុ** ដោយស្ងាត់។
+        {
+            const dk = seed._dateKey;
+            await page.evaluate((a) => {
+                const now = Date.now();
+                window.__fakeStore.zoew_scan_history_cod_dod.id_nest_edit = {
+                    id: 'id_nest_edit', phone: '0915000001', scanDate: a.dk, createdAt: now - 20000,
+                    cod: 4, dod: 0, price: 4, count: 1, barcode: 'NE1', time: '08:00', isClosed: false,
+                    barcodes: [{ code: 'NE1', time: '08:00', cod: 4, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 20000 }]
+                };
+                window.__fakeStore.zoew_scan_history_cod_dod.id_nest_mark = {
+                    id: 'id_nest_mark', phone: '0915000002', scanDate: a.dk, createdAt: now - 19000,
+                    cod: 4, dod: 0, price: 4, count: 1, barcode: 'NM1', time: '08:01', isClosed: false,
+                    barcodes: [{ code: 'NM1', time: '08:01', cod: 4, dod: 0, locker: 'N/A', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: now - 19000 }]
+                };
+                window.__fireAll();
+            }, { dk: dk });
+            await page.waitForTimeout(300);
+
+            // ក. កែលេខ ៖ បើកប្រអប់កែ ➜ បើក/បិទប្រអប់ជាន់លើ ➜ រក្សាទុក
+            const nestEdit = await page.evaluate(() => {
+                window.openEditModal('id_nest_edit');
+                document.getElementById('editPhoneInput').value = '0915000009';
+                window.openModalHelper('pinModal');
+                window.closeModal('pinModal');
+                const stillOpen = document.getElementById('editPhoneModal').style.display === 'flex';
+                const lockedScroll = document.body.style.overflow === 'hidden';
+                window.saveEditedPhone();
+                return { stillOpen: stillOpen, lockedScroll: lockedScroll };
+            });
+            await page.waitForTimeout(700);
+            const nestEditOut = await page.evaluate(() => ({
+                phone: (window.__fakeStore.zoew_scan_history_cod_dod.id_nest_edit || {}).phone || ''
+            }));
+            check(nestEdit.stillOpen === true,
+                app + ': ⛔ បិទប្រអប់ជាន់លើ ➜ ប្រអប់កែលេខនៅបើកដដែល', JSON.stringify(nestEdit));
+            check(nestEdit.lockedScroll === true,
+                app + ': ⛔ បិទប្រអប់ជាន់លើ ➜ ការចាក់សោរមូរនៅដដែល', JSON.stringify(nestEdit));
+            check(nestEditOut.phone === '0915000009',
+                app + ': ⛔ បិទប្រអប់ជាន់លើ ➜ ការកែលេខនៅធ្វើលើធាតុត្រឹមត្រូវ', JSON.stringify(nestEditOut));
+
+            // ខ. សម្គាល់ការខល ៖ ផ្លូវដដែល តាមប្រអប់ callMarkModal
+            await page.evaluate(() => {
+                window.openCallMarkModal('id_nest_mark');
+                window.openModalHelper('pinModal');
+                window.closeModal('pinModal');
+                window.setCallMark('called');
+            });
+            await page.waitForTimeout(700);
+            const nestMark = await page.evaluate(() => ({
+                mark: (window.__fakeStore.zoew_scan_history_cod_dod.id_nest_mark || {}).callMark || ''
+            }));
+            check(nestMark.mark === 'called',
+                app + ': ⛔ បិទប្រអប់ជាន់លើ ➜ ការសម្គាល់ការខលនៅធ្វើលើធាតុត្រឹមត្រូវ', JSON.stringify(nestMark));
+
+            // គ. ⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ **ម្ចាស់** ➜ ស្ថានភាពត្រូវសម្អាតពិត
+            //    (បើអត់ ការចុចម្តងទៀតនឹងកែធាតុចាស់ដោយស្ងាត់)
+            const ownerClose = await page.evaluate(() => {
+                window.openEditModal('id_nest_edit');
+                window.closeModal('editPhoneModal');
+                document.getElementById('editPhoneInput').value = '0915000077';
+                window.saveEditedPhone();
+                window.openCallMarkModal('id_nest_mark');
+                window.closeModal('callMarkModal');
+                window.setCallMark('wrong-number');
+                const anyOpen = Array.from(document.querySelectorAll('.modal'))
+                    .some((m) => m.style.display === 'flex');
+                return { scroll: document.body.style.overflow, anyOpen: anyOpen };
+            });
+            await page.waitForTimeout(700);
+            const ownerOut = await page.evaluate(() => {
+                const e = window.__fakeStore.zoew_scan_history_cod_dod.id_nest_edit || {};
+                const m = window.__fakeStore.zoew_scan_history_cod_dod.id_nest_mark || {};
+                return { phone: e.phone || '', mark: m.callMark || '' };
+            });
+            check(ownerOut.phone === '0915000009',
+                app + ': ⛔ ទិសផ្ទុយ ៖ បិទប្រអប់កែលេខ ➜ ការរក្សាទុកក្រោយមក មិនប៉ះធាតុចាស់', JSON.stringify(ownerOut));
+            check(ownerOut.mark === 'called',
+                app + ': ⛔ ទិសផ្ទុយ ៖ បិទប្រអប់សម្គាល់ ➜ ការសម្គាល់ក្រោយមក មិនប៉ះធាតុចាស់', JSON.stringify(ownerOut));
+            // ⛔ អថេរពិត ៖ ការចាក់សោរមូរត្រូវឆ្លុះ **ជង់ប្រអប់ពិត** មិនមែន
+            //    «ការបិទចុងក្រោយ» — បើប្រអប់ណានៅបើក វាត្រូវជាប់សោដដែល។
+            check(ownerClose.anyOpen === (ownerClose.scroll === 'hidden'),
+                app + ': ⛔ ការចាក់សោរមូរឆ្លុះជង់ប្រអប់ពិត', JSON.stringify(ownerClose));
+        }
+
         // --- ការស្តារពីធុងសំរាម ត្រូវធ្វើលើច្បាប់ចម្លងរបស់ server ---
         {
             const dk = seed._dateKey;

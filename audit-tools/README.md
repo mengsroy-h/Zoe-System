@@ -203,7 +203,7 @@ bash audit-tools/emu/rules.sh
 
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
-| `lookup-prefetch-test.js` | ការទាញតារាងជាមុន ៖ ព្យាយាមវិញលឿន តែមិនបាញ់ចំពេលស្កេន | `LOOKUPPREFETCH_APP_DIR` |
+| `lookup-prefetch-test.js` | ការទាញតារាងជាមុន ៖ ព្យាយាមវិញលឿន តែមិនបាញ់ចំពេលស្កេន · ការដោះសោ PIN ➜ Lookup បន្តភ្លាម · Keyboard មិនលោតកាត់ការស្វែងរក | `LOOKUPPREFETCH_APP_DIR` |
 | `lookup-freshness-test.js` | នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម (client **និង** Apps Script) | `LOOKUPFRESH_APP_DIR` |
 | `lookup-failure-identity-test.js` | `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ | `LOOKUPFAILURE_APP_DIR` |
 | `lookup-burst-test.js` | ការស្កេនជាបន្តបន្ទាប់ ៖ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `LOOKUPBURST_APP_DIR` |
@@ -211,10 +211,10 @@ bash audit-tools/emu/rules.sh
 | `google-sheets-cache-test.js` | cache ខាង Apps Script | — |
 | `sheet-import-test.js` | នាំចូល Excel ៖ PIN ជាច្រកទ្វារ · *simple request* · secret អ៊ិនគ្រីប · លេខ ០ នាំមុខ | `SHEETIMPORT_APP_DIR` |
 | `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret | `ZTOPROXY_APP_DIR` |
-| `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ | `ZTOSTORE_APP_DIR` |
+| `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ (ពិដានទប់ការសរសេរ តែមិនទប់ការចងចាំ) | `ZTOSTORE_APP_DIR` |
 | `zto-budget-test.js` | ⛔ ថវិកាពេលត្រូវគ្របដណ្តប់ handler ទាំងមូល (អាន Cookie + upstream + ការបន្តអាយុ) · 401 ដោយ Cookie ចាស់ក្នុង cache ➜ អានឡើងវិញ ១ ដង | `ZTOBUDGET_APP_DIR` |
 | `zto-negative-cache-test.js` | ⛔ សាលក្រម «រកមិនឃើញ» ត្រូវចូល cache (TTL ខ្លី) ដោយ **ការបរាជ័យបណ្តោះអាសន្នមិនចូល** · ស្នាមភ្ជាប់ ៖ លេខលំនាំដើមក្នុង `ZTO-SETUP-KH.md` ត្រូវស៊ីនឹងកូដ | `ZTONEG_APP_DIR` |
-| `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` | `ZTO_SYNC_APP_DIR` |
+| `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` · ការព្យាយាមឡើងវិញមានពិដានពេលបណ្តាញដាច់ | `ZTO_SYNC_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។
@@ -258,7 +258,7 @@ bash audit-tools/emu/rules.sh
 | `phone-search-swipe-test.js` | កាយវិការអូស និង auto pull up | `SWIPE_APP_DIR` |
 | `phone-suggest-test.js` | ការណែនាំលេខទូរស័ព្ទ | `PHONE_APP_DIR` |
 | `page-nav-test.js` | រចនាសម្ព័ន្ធទំព័រ · របា Slide · Locker | `PAGENAV_APP_DIR` |
-| `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ | `UIFLOW_APP_DIR` |
+| `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ · ប្រអប់ជាន់លើបិទ ➜ ផ្លូវលុប/កែ មិនខូច | `UIFLOW_APP_DIR` |
 | `toast-truth-test.js` | Toast និយាយការពិត realtime | `TOAST_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |

@@ -240,7 +240,8 @@ sync-zto-cookie.cmd
 | Netlify បដិសេធ Site ID ឬ Token | រត់ `setup.cmd` ហើយបញ្ចូលថ្មី |
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
 | `It is still reading ZTO_COOKIE (env), not the blob` | ពិនិត្យថា deploy ចុងក្រោយរួចរាល់; សារនោះបន្ថែម `store reason: …` ដែលប្រាប់ថាជាប់ត្រង់ណា (`empty` · `no-context` · `read:…`) |
-| ការសរសេរចូល Blobs បរាជ័យ | សាកម្តងទៀត; បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
+| ការសរសេរចូល Blobs បរាជ័យ | ឧបករណ៍ព្យាយាមឡើងវិញដោយស្វ័យប្រវត្តិ **៣ ដង** សម្រាប់ការធ្លាក់បណ្តោះអាសន្ន (បណ្តាញដាច់ · timeout · 429 · 5xx) ដោយមិនបង្ខំឲ្យចាប់ Cookie ម្តងទៀត។ បើនៅតែធ្លាក់ ដាក់ Cookie ក្នុង `ZTO_COOKIE` env ដោយដៃ រួច Trigger deploy |
+| `NETLIFY_BLOB_URL_FAILED` ភ្លាមៗ (គ្មានការព្យាយាមឡើងវិញ) | នេះជាសាលក្រម **ស្ថាពរ** (PAT ខុស/ផុត · Site ID ខុស) — ការព្យាយាមឡើងវិញមិនជួយ។ រត់ `setup.cmd` ហើយបញ្ចូល PAT ថ្មី |
 
 ---
 

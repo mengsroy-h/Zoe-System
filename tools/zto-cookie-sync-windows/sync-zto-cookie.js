@@ -35,6 +35,8 @@ const VERIFY_GAP_MS = 5 * 1000;
 const VERIFY_MAX_ATTEMPTS = 32;
 const SITE_URL_MAX_LENGTH = 512;
 const NETLIFY_TIMEOUT_MS = 30 * 1000;
+const NETLIFY_RETRY_ATTEMPTS = 3;
+const NETLIFY_RETRY_BASE_MS = 800;
 const NETLIFY_RESPONSE_MAX_BYTES = 1024 * 1024;
 
 const COOKIE_NAME_RE = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]{1,128}$/;
@@ -53,10 +55,20 @@ function droppedCookieNames() {
     return lastDroppedCookieNames.slice();
 }
 
-function codedError(code) {
+function codedError(code, transient) {
     const error = new Error(code);
     error.code = code;
+    error.transient = !!transient;
     return error;
+}
+
+// ការធ្លាក់ **បណ្តោះអាសន្ន** ៖ 408 · 425 · 429 · 5xx ។ 4xx ដទៃទៀត (401 · 403 ·
+// 404 · 422) ជាសាលក្រម **ស្ថាពរ** ៖ PAT ខុស ឬ site id ខុស — ការព្យាយាមឡើងវិញ
+// មិនជួយអ្វីទេ ហើយធ្វើឲ្យអ្នកប្រើរង់ចាំយូរដោយឥតប្រយោជន៍។
+function statusIsTransient(status) {
+    const code = Number(status) || 0;
+    if (code === 408 || code === 425 || code === 429) return true;
+    return code >= 500 && code < 600;
 }
 
 function isTargetApiUrl(raw) {
@@ -289,7 +301,7 @@ function timedFetch(url, options, controls) {
         };
         const timer = setTimeout(() => {
             try { controller.abort(); } catch (_) {}
-            finish(codedError('NETLIFY_TIMEOUT'));
+            finish(codedError('NETLIFY_TIMEOUT', true));
         }, timeoutMs);
 
         let pending;
@@ -298,12 +310,12 @@ function timedFetch(url, options, controls) {
                 signal: controller.signal
             }));
         } catch (_) {
-            finish(codedError('NETLIFY_NETWORK'));
+            finish(codedError('NETLIFY_NETWORK', true));
             return;
         }
         Promise.resolve(pending).then(
             (response) => finish(null, response),
-            () => finish(codedError('NETLIFY_NETWORK'))
+            () => finish(codedError('NETLIFY_NETWORK', true))
         );
     });
 }
@@ -366,8 +378,9 @@ async function getNetlifySite(siteId, token, controls) {
         controls
     );
     if (!response || !response.ok) {
+        const status = response ? response.status : 0;
         await discardResponse(response);
-        throw codedError('NETLIFY_SITE_REJECTED');
+        throw codedError('NETLIFY_SITE_REJECTED', statusIsTransient(status));
     }
     const site = await readSmallJson(response);
     const accountId = validateSiteId(site && site.account_id, 'NETLIFY_SITE_INVALID_RESPONSE');
@@ -386,8 +399,9 @@ async function requestBlobUploadUrl(siteId, token, controls) {
         }
     }, controls);
     if (!response || !response.ok) {
+        const status = response ? response.status : 0;
         await discardResponse(response);
-        throw codedError('NETLIFY_BLOB_URL_FAILED');
+        throw codedError('NETLIFY_BLOB_URL_FAILED', statusIsTransient(status));
     }
     const payload = await readSmallJson(response, 'NETLIFY_BLOB_URL_INVALID');
     return validateSignedUrl(payload && payload.url);
@@ -406,8 +420,9 @@ async function uploadCookieToBlob(signedUrl, cookieHeader, controls) {
         throw codedError('NETLIFY_BLOB_REDIRECT');
     }
     if (!response || !response.ok) {
+        const status = response ? response.status : 0;
         await discardResponse(response);
-        throw codedError('NETLIFY_BLOB_UPLOAD_FAILED');
+        throw codedError('NETLIFY_BLOB_UPLOAD_FAILED', statusIsTransient(status));
     }
     await discardResponse(response);
 }
@@ -578,12 +593,33 @@ async function verifyNetlifySetup(options) {
     }
 }
 
+// ⛔ ជំហានថ្លៃជាងគេគឺ **ការចាប់ Cookie ដោយដៃ** (បើក browser ➜ Login ➜ Arrival
+// Scan)។ ការធ្លាក់បណ្តោះអាសន្នមួយភ្លែតរបស់ Netlify API មិនត្រូវបង្ខំអ្នកប្រើ
+// ធ្វើជំហាននោះឡើងវិញទេ។ រាល់ជុំព្យាយាមស្នើ **signed URL ថ្មី** ព្រោះ URL
+// ដែលចេញរួច មានអាយុខ្លី។ ⛔ ការព្យាយាមមានពិដានពិត — គ្មានរង្វិលជុំគ្មានទីបញ្ចប់។
 async function syncNetlifyCookie(cookieHeader, options) {
+    const config = options || {};
     let cleanCookie = validateCookieHeader(cookieHeader);
     const credentials = await resolveCredentials(options);
+    const maxAttempts = Number.isFinite(config.retryAttempts)
+        ? Math.max(1, Math.floor(config.retryAttempts))
+        : NETLIFY_RETRY_ATTEMPTS;
+    const baseMs = Number.isFinite(config.retryBaseMs)
+        ? Math.max(0, Math.floor(config.retryBaseMs))
+        : NETLIFY_RETRY_BASE_MS;
+    const sleepImpl = config.sleepImpl
+        || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     try {
-        const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options);
-        await uploadCookieToBlob(signedUrl, cleanCookie, options);
+        for (let attempt = 1; ; attempt++) {
+            try {
+                const signedUrl = await requestBlobUploadUrl(credentials.siteId, credentials.token, options);
+                await uploadCookieToBlob(signedUrl, cleanCookie, options);
+                return;
+            } catch (error) {
+                if (!error || !error.transient || attempt >= maxAttempts) throw error;
+                await sleepImpl(baseMs * attempt);
+            }
+        }
     } finally {
         cleanCookie = '';
         credentials.token = '';
@@ -904,6 +940,7 @@ module.exports = {
     loadConfig,
     localStateRoot,
     netlifyApiUrl,
+    NETLIFY_RETRY_ATTEMPTS,
     profileRoot,
     readDiagnostics,
     readTokenViaPowerShell,

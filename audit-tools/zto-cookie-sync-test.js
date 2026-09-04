@@ -244,7 +244,7 @@ async function run() {
     ok('timeout settle ដោយ timer ពិត បន្ថែមលើ AbortController',
         /new Promise\(\(resolve, reject\)/.test(source)
         && /new AbortController\(\)/.test(source)
-        && /finish\(codedError\('NETLIFY_TIMEOUT'\)\)/.test(source));
+        && /finish\(codedError\('NETLIFY_TIMEOUT'[^)]*\)\)/.test(source));
     ok('response ដែលអាចមាន secret ត្រូវ discard មិន print body',
         /await discardResponse\(response\)/.test(source)
         && !/console\.(log|error)\([^\r\n]*(response|cleanCookie|credentials\.token)/.test(source));
@@ -679,28 +679,90 @@ async function run() {
             redirectCode === 'NETLIFY_BLOB_REDIRECT' && redirectCalls.length === 2,
             redirectCode + '/' + redirectCalls.length);
 
+        // ⛔ ការចាប់ Cookie ជាជំហាន **ដោយដៃ** ដែលថ្លៃជាងគេ (បើក browser ➜ Login
+        //   ➜ Arrival Scan)។ ដូច្នេះការធ្លាក់ **បណ្តោះអាសន្ន** នៃ Netlify API
+        //   (timeout · 429 · 5xx) មិនត្រូវបង្ខំអ្នកប្រើធ្វើជំហាននោះឡើងវិញទេ —
+        //   វាត្រូវព្យាយាមឡើងវិញដោយស្វ័យប្រវត្តិ **ក្នុងពិដាន**។
         const uploadFailureCalls = [];
+        const uploadFailureSleeps = [];
         let uploadFailureCode = '';
         try {
             await api.syncNetlifyCookie(COOKIE, {
                 siteId: SITE_ID,
                 token: TOKEN,
                 timeoutMs: 100,
+                sleepImpl: async (ms) => { uploadFailureSleeps.push(ms); },
                 fetchImpl: async (url, options) => {
                     uploadFailureCalls.push({ url, options });
-                    if (uploadFailureCalls.length === 1) return fakeResponse(200, { url: SIGNED_URL });
-                    return fakeResponse(500, { secret: COOKIE });
+                    return uploadFailureCalls.length % 2 === 1
+                        ? fakeResponse(200, { url: SIGNED_URL })
+                        : fakeResponse(500, { secret: COOKIE });
                 }
             });
         } catch (error) {
             uploadFailureCode = error.code;
         }
+        const retryAttempts = api.NETLIFY_RETRY_ATTEMPTS;
         ok('upload ធ្លាក់ ➜ សារមិនកុហក',
-            uploadFailureCode === 'NETLIFY_BLOB_UPLOAD_FAILED' && uploadFailureCalls.length === 2,
-            uploadFailureCode);
+            uploadFailureCode === 'NETLIFY_BLOB_UPLOAD_FAILED', uploadFailureCode);
+        ok('⛔ ការព្យាយាមឡើងវិញមានពិដានពិត (មិនរង្វិលជុំគ្មានទីបញ្ចប់)',
+            typeof retryAttempts === 'number' && retryAttempts >= 2 && retryAttempts <= 4
+            && uploadFailureCalls.length === 2 * retryAttempts
+            && uploadFailureSleeps.length === retryAttempts - 1,
+            uploadFailureCalls.length + '/' + retryAttempts + '/' + uploadFailureSleeps.length);
+
+        // ⛔ ការធ្លាក់ត្រូវរាយ **ជាឈ្មោះ** មិនត្រូវបញ្ឈប់ checker ទាំងមូល
+        //   (បើអត់ tree មុនកែបង្ហាញ «checker បោះកំហុស» ជំនួសការធ្លាក់ដែលមានឈ្មោះ)។
+        const flakyCalls = [];
+        const flakySleeps = [];
+        let flakyCode = '';
+        try {
+            await api.syncNetlifyCookie(COOKIE, {
+                siteId: SITE_ID,
+                token: TOKEN,
+                timeoutMs: 100,
+                sleepImpl: async (ms) => { flakySleeps.push(ms); },
+                fetchImpl: async (url, options) => {
+                    flakyCalls.push({ url, options });
+                    if (flakyCalls.length === 1) return fakeResponse(503, {});
+                    if (flakyCalls.length === 2) return fakeResponse(200, { url: SIGNED_URL });
+                    return fakeResponse(200, {});
+                }
+            });
+        } catch (error) {
+            flakyCode = error && error.code;
+        }
+        ok('⛔ Netlify ឆ្លើយ 503 មួយភ្លែត ➜ ព្យាយាមឡើងវិញ ហើយ upload ជោគជ័យ',
+            !flakyCode && flakyCalls.length === 3 && flakySleeps.length === 1,
+            (flakyCode || 'ok') + '/' + flakyCalls.length + '/' + flakySleeps.length);
+        ok('⛔ ការព្យាយាមឡើងវិញត្រូវស្នើ signed URL **ថ្មី** (URL ចាស់អាចផុត)',
+            !!(flakyCalls[1] && flakyCalls[1].url === BLOB_URL
+                && flakyCalls[2] && flakyCalls[2].url === SIGNED_URL),
+            flakyCalls.map((call) => call.url).join(' | '));
+
+        const authFailCalls = [];
+        let authFailCode = '';
+        try {
+            await api.syncNetlifyCookie(COOKIE, {
+                siteId: SITE_ID,
+                token: TOKEN,
+                timeoutMs: 100,
+                sleepImpl: async () => {},
+                fetchImpl: async (url, options) => {
+                    authFailCalls.push({ url, options });
+                    return fakeResponse(401, {});
+                }
+            });
+        } catch (error) {
+            authFailCode = error.code;
+        }
+        ok('⛔ ទិសផ្ទុយ ៖ 401 (PAT ខុស/ផុត) ➜ **មិនព្យាយាមឡើងវិញ**',
+            authFailCode === 'NETLIFY_BLOB_URL_FAILED' && authFailCalls.length === 1,
+            authFailCode + '/' + authFailCalls.length);
 
         const started = Date.now();
         let timeoutCode = '';
+        let timeoutError = null;
         try {
             await api.timedFetch('https://api.netlify.com/api/v1/sites/test', { method: 'GET' }, {
                 fetchImpl: () => new Promise(() => {}),
@@ -708,11 +770,14 @@ async function run() {
             });
         } catch (error) {
             timeoutCode = error.code;
+            timeoutError = error;
         }
         const elapsed = Date.now() - started;
         ok('fetch មិន settle ក៏ timer បញ្ចប់បាន',
             timeoutCode === 'NETLIFY_TIMEOUT' && elapsed < 500,
             timeoutCode + '/' + elapsed + 'ms');
+        ok('⛔ timeout ត្រូវសម្គាល់ជា **បណ្តោះអាសន្ន** ➜ ការព្យាយាមឡើងវិញចាប់វាបាន',
+            timeoutError && timeoutError.transient === true, timeoutError && timeoutError.transient);
 
         let networkCode = '';
         try {

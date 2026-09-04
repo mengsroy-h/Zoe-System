@@ -3130,6 +3130,8 @@
     const CUSTOMER_TABLE_SOON_BUSY_MS = 3000;
     const CUSTOMER_TABLE_SOON_MAX_WAIT_MS = 90 * 1000;
     const ZTO_WARMUP_COOLDOWN_MS = 4 * 60 * 1000;
+    let ztoWarmSoonTimer = null;
+    let ztoWarmSoonArmedAt = 0;
     let customerTableRetryTimer = null;
     let customerTableFailStreak = 0;
     let customerTableSoonTimer = null;
@@ -3242,10 +3244,54 @@
         return true;
     }
 
+    function clearZtoWarmSoon() {
+        if (ztoWarmSoonTimer) {
+            clearTimeout(ztoWarmSoonTimer);
+            ztoWarmSoonTimer = null;
+        }
+        ztoWarmSoonArmedAt = 0;
+    }
+
+    function scheduleZtoWarmSoon() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !lookupApiIsZto(cfg)) {
+            clearZtoWarmSoon();
+            return false;
+        }
+        if (ztoWarmSoonTimer) return true;
+        ztoWarmSoonArmedAt = Date.now();
+        ztoWarmSoonTimer = setTimeout(runZtoWarmSoon, CUSTOMER_TABLE_SOON_BUSY_MS);
+        return true;
+    }
+
+    function runZtoWarmSoon() {
+        ztoWarmSoonTimer = null;
+        if (elapsedSince(ztoWarmSoonArmedAt) >= CUSTOMER_TABLE_SOON_MAX_WAIT_MS) {
+            ztoWarmSoonArmedAt = 0;
+            return;
+        }
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !lookupApiIsZto(cfg)) {
+            clearZtoWarmSoon();
+            return;
+        }
+        if (!customerTablePrefetchAllowed()) {
+            ztoWarmSoonTimer = setTimeout(runZtoWarmSoon, CUSTOMER_TABLE_SOON_BUSY_MS);
+            return;
+        }
+        ztoWarmSoonArmedAt = 0;
+        warmZtoLookupProxyIfConfigured(cfg);
+    }
+
     function warmZtoLookupProxyNow() {
         try {
             const cfg = getLookupApiConfig();
-            if (!cfg || !cfg.enabled || !customerTablePrefetchAllowed()) return false;
+            if (!cfg || !cfg.enabled) return false;
+            if (!customerTablePrefetchAllowed()) {
+                scheduleZtoWarmSoon();
+                return false;
+            }
+            clearZtoWarmSoon();
             return warmZtoLookupProxyIfConfigured(cfg);
         } catch (e) {
             return false;
@@ -3398,6 +3444,7 @@
     function clearCustomerDataTableCache() {
         clearCustomerTableRetry();
         clearCustomerTableSoonRefresh();
+        clearZtoWarmSoon();
         customerTableIsPartial = false;
         customerDataTableSessionGeneration++;
         customerDataTableRows = null;
@@ -3519,7 +3566,12 @@
         if (!lookupApiSupportsList(cfg)) {
             clearCustomerTableRetry();
             clearCustomerTableSoonRefresh();
-            if (customerTablePrefetchAllowed()) warmZtoLookupProxyIfConfigured(cfg);
+            if (customerTablePrefetchAllowed()) {
+                clearZtoWarmSoon();
+                warmZtoLookupProxyIfConfigured(cfg);
+            } else {
+                scheduleZtoWarmSoon();
+            }
             return;
         }
         if (!customerTablePrefetchAllowed()) {

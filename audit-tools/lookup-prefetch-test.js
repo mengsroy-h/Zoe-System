@@ -57,6 +57,7 @@ const FNS = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'customerTableNeedsRefresh', 'clearCustomerTableSoonRefresh',
     'scheduleCustomerTableSoonRefresh', 'runCustomerTableSoonRefresh',
     'clearCustomerTableRetry', 'scheduleCustomerTableRetry', 'runCustomerTableRetry',
+    'clearZtoWarmSoon', 'scheduleZtoWarmSoon', 'runZtoWarmSoon',
     'lookupIsWorkingOn', 'armLookupFocus'];
 const src = {};
 FNS.forEach((n) => { src[n] = sliceFn(n); ok('រកឃើញ function ' + n + '()', !!src[n]); });
@@ -67,6 +68,7 @@ const DECLS = ['CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS', 'CU
     'customerTableSoonTimer', 'customerTableSoonArmedAt', 'customerTableIsPartial',
     'customerDataTableRows', 'customerDataTableFetchedAt',
     'ZTO_WARMUP_COOLDOWN_MS', 'ztoWarmupAt', 'ztoWarmupInFlight',
+    'ztoWarmSoonTimer', 'ztoWarmSoonArmedAt',
     'LOOKUP_FOCUS_GRACE_MS', 'LOOKUP_MANUAL_FALLBACK_MS', 'LOOKUP_FOCUS_MAX_WAIT_MS',
     'AUTO_LOOKUP_TIMEOUT_MS', 'ZTO_AUTO_LOOKUP_TIMEOUT_MS', 'AUTO_LOOKUP_QUEUE_MAX_WAIT_MS',
     'autoLookupInFlight', 'autoLookupQueueRetries', 'pendingLookupUnlockBarcode'];
@@ -204,6 +206,20 @@ scenario('ZTO មិនគាំទ្រការទាញតារាង list=
     ok('⛔ ប្រអប់បើក (កំពុងស្កេន) ➜ warm-up មិនជាន់ការស្កេន',
         vm.runInContext('warmZtoLookupProxyNow()', busyIntent) === false && busyIntent.__warmCalls.length === 0,
         busyIntent.__warmCalls);
+    // ⛔ ទ្វារទី ២ នៃថ្នាក់ដដែល ៖ ការត្រៀមតាម **ចេតនា** (ត្រឡប់មក App ·
+    //   ប្តូរទៅទំព័របញ្ចូល · បើកកាមេរ៉ា) ក៏មិនត្រូវបោះបង់ស្ងាត់ពេលរវល់ដែរ។
+    ok('⛔ ចេតនាពេលរវល់ ➜ **តាំងម៉ោងឡើងវិញ** មិនបោះបង់',
+        busyIntent.__clock.pending() >= 1, busyIntent.__clock.pending());
+    vm.runInContext('isModalOpen = false;', busyIntent);
+    busyIntent.__clock.advance(vm.runInContext('CUSTOMER_TABLE_SOON_BUSY_MS', busyIntent) + 1);
+    ok('⛔ ចេតនា ➜ ទំនេរវិញ ➜ ការត្រៀមកើតឡើងពិត',
+        busyIntent.__warmCalls.length === 1, busyIntent.__warmCalls);
+
+    const busyApiIntent = build({ isModalOpen: true });
+    vm.runInContext('warmZtoLookupProxyNow()', busyApiIntent);
+    ok('⛔ ទិសផ្ទុយ ៖ API ធម្មតាពេលរវល់ ➜ មិនតាំងម៉ោងត្រៀម ZTO',
+        busyApiIntent.__clock.pending() === 0 && busyApiIntent.__warmCalls.length === 0,
+        busyApiIntent.__clock.pending() + '/' + busyApiIntent.__warmCalls.length);
     const offlineIntent = build({ cfg: ztoCfg, onLine: false });
     ok('⛔ ក្រៅបណ្តាញ ➜ warm-up មិនបាញ់',
         vm.runInContext('warmZtoLookupProxyNow()', offlineIntent) === false && offlineIntent.__warmCalls.length === 0,
@@ -461,7 +477,12 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             });
         }
         if (o.realRetry) vm.runInContext(sliceFn('retryAsync'), ctx);
-        if (o.loadClear) vm.runInContext(sliceFn('clearCustomerDataTableCache'), ctx);
+        if (o.loadClear) {
+            // ⛔ រាល់ឈ្មោះដែល sandbox *ហៅ* ត្រូវមានក្នុង sandbox
+            vm.runInContext('let ztoWarmSoonTimer = null; let ztoWarmSoonArmedAt = 0;', ctx);
+            vm.runInContext(sliceFn('clearZtoWarmSoon') || 'function clearZtoWarmSoon() {}', ctx);
+            vm.runInContext(sliceFn('clearCustomerDataTableCache'), ctx);
+        }
         vm.runInContext(autoSrc, ctx);
         return ctx;
     }
@@ -748,6 +769,74 @@ scenario('ជណ្តើរព្យាយាមវិញ', () => {
         vm.runInContext('customerTableFailStreak', cleared) === 0);
 });
 
+// === ⛔ ការត្រៀម ZTO ៖ រវល់ពេលដល់ម៉ោង ➜ តាំងម៉ោងឡើងវិញ មិនបោះបង់ ===
+// 🔴 ចន្លោះពិត ៖ វដ្ត ៥ នាទីត្រៀម Lambda របស់ ZTO តាមរយៈ
+//   `prefetchCustomerDataTableRowsIfConfigured()` — តែសាខា ZTO របស់វា
+//   **បោះបង់ស្ងាត់** ពេល `customerTablePrefetchAllowed()` ជា false
+//   (ប្រអប់កញ្ចប់បើក ឬមាន lookup កំពុងដំណើរការ)។ ក្នុងហាងដែលស្កេនជាប់ៗ
+//   ប្រអប់បើកស្ទើររាល់ពេល ➜ ការត្រៀមអាចខកខានច្រើនវដ្តជាប់គ្នា ➜ Lambda
+//   ត្រជាក់វិញ ➜ ការស្កេនក្រោយពេលស្ងៀម បង់ថ្លៃ cold start។
+// ⛔ ផ្លូវតារាងអតិថិជនមានច្បាប់នេះរួចហើយ (`scheduleCustomerTableSoonRefresh`)
+//   — សាខា ZTO ត្រូវមានដូចគ្នា។ ⛔ ទិសផ្ទុយ ៖ ការតាំងម៉ោងឡើងវិញត្រូវ
+//   **បោះបង់ក្រោយពិដាន** មិនមែនភ្ញាក់រហូត។
+scenario('ការត្រៀម ZTO ៖ រវល់ ➜ តាំងម៉ោងឡើងវិញ', () => {
+    const ztoCfg = { url: '/.netlify/functions/zto-order-detail?barcode={barcode}', enabled: true };
+    const busy = build({ cfg: ztoCfg, isModalOpen: true });
+    vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', busy);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ រវល់ ➜ មិនត្រៀមភ្លាម', busy.__warmCalls.length === 0, busy.__warmCalls);
+    ok('⛔ រវល់ ➜ **តាំងម៉ោងឡើងវិញ** (មិនបោះបង់ស្ងាត់)', busy.__clock.pending() >= 1, busy.__clock.pending());
+
+    const busyMs = vm.runInContext('CUSTOMER_TABLE_SOON_BUSY_MS', busy);
+    busy.__clock.advance(busyMs + 1);
+    ok('⛔ នៅរវល់ ➜ តាំងម៉ោងបន្តទៀត មិនត្រៀមកាត់ការស្កេន',
+        busy.__warmCalls.length === 0 && busy.__clock.pending() >= 1,
+        busy.__warmCalls.length + '/' + busy.__clock.pending());
+
+    vm.runInContext('isModalOpen = false;', busy);
+    busy.__clock.advance(busyMs + 1);
+    ok('⛔ ទំនេរវិញ ➜ ការត្រៀមកើតឡើងពិត', busy.__warmCalls.length === 1, busy.__warmCalls);
+    ok('ត្រៀមរួច ➜ លែងបន្សល់ម៉ោង', busy.__clock.pending() === 0, busy.__clock.pending());
+
+    // ⛔ ទិសផ្ទុយ ១ ៖ ការរង់ចាំមានពិដាន — មិនភ្ញាក់រហូតខណៈអ្នកប្រើរវល់
+    // ⚠️ អន្ទាក់ harness ៖ នាឡិកាក្លែងមិនរំកិល `Date.now()` ➜ `elapsedSince()`
+    //    នៅ ~0 ជារៀងរហូត ➜ ពិដានមិនដែលដល់។ ត្រូវប្រើ Date និម្មិត និង epoch ពិត។
+    let stuckNow = 1700000000000;
+    const stuck = build({ cfg: ztoCfg, isModalOpen: true, dateNow: () => stuckNow });
+    vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', stuck);
+    const maxWait = vm.runInContext('CUSTOMER_TABLE_SOON_MAX_WAIT_MS', stuck);
+    let guard = 0;
+    while (stuck.__clock.pending() > 0 && guard < 400) {
+        guard++;
+        stuckNow += busyMs + 1;
+        stuck.__clock.advance(busyMs + 1);
+    }
+    ok('⛔ រវល់យូរពេក ➜ បោះបង់ (វដ្ត ៥ នាទីនឹងសាកម្ដងទៀត)',
+        stuck.__clock.pending() === 0 && stuck.__warmCalls.length === 0,
+        stuck.__clock.pending() + '/' + stuck.__warmCalls.length);
+    ok('ពិដានរង់ចាំសមហេតុផល (<= ២ នាទី)', typeof maxWait === 'number' && maxWait <= 120000, maxWait);
+
+    // ⛔ ទិសផ្ទុយ ២ ៖ ទំនេរតាំងពីដើម ➜ ត្រៀមភ្លាម គ្មានម៉ោងបន្សល់
+    const idle = build({ cfg: ztoCfg });
+    vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', idle);
+    ok('⛔ ទិសផ្ទុយ ៖ ទំនេរ ➜ ត្រៀមភ្លាម មិនពន្យារ',
+        idle.__warmCalls.length === 1 && idle.__clock.pending() === 0,
+        idle.__warmCalls.length + '/' + idle.__clock.pending());
+
+    // ⛔ ទិសផ្ទុយ ៣ ៖ API ធម្មតា (មិនមែន ZTO) មិនត្រូវប្រើផ្លូវនេះ
+    const api = build({ isModalOpen: true });
+    vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', api);
+    ok('⛔ ទិសផ្ទុយ ៖ API ធម្មតា ➜ មិនកេះការត្រៀម ZTO',
+        api.__warmCalls.length === 0, api.__warmCalls);
+
+    // ⛔ ការលុបម៉ោងដោយផ្ទាល់ ➜ គ្មាន timer កំព្រា
+    const cleared = build({ cfg: ztoCfg, isModalOpen: true });
+    vm.runInContext('prefetchCustomerDataTableRowsIfConfigured();', cleared);
+    const armed = cleared.__clock.pending();
+    vm.runInContext('clearZtoWarmSoon();', cleared);
+    ok('⛔ លុបម៉ោងត្រៀម ZTO ➜ គ្មាន timer កំព្រា',
+        armed >= 1 && cleared.__clock.pending() === 0, armed + '/' + cleared.__clock.pending());
+});
+
 // === TTL cache ===
 scenario('TTL cache', () => {
     const ctx = build({});
@@ -939,6 +1028,9 @@ const scanFn = SRC.indexOf('armLookupFocus(modalPhoneInput');
 ok('ផ្លូវស្កេនប្រើ armLookupFocus()', scanFn !== -1);
 const cacheClear = sliceFn('clearCustomerDataTableCache') || '';
 ok('ការចាកចេញ/ប្តូរ Config ➜ លុបម៉ោងព្យាយាមវិញ', cacheClear.indexOf('clearCustomerTableRetry()') !== -1);
+// ⛔ ការចាកចេញ/ប្តូរ Config ត្រូវលុប **គ្រប់ម៉ោង** — timer ត្រៀម ZTO ដែល
+//   នៅរស់ក្រោយចាកចេញ គឺជាការភ្ញាក់ដែលគ្មានម្ចាស់។
+ok('ការចាកចេញ/ប្តូរ Config ➜ លុបម៉ោងត្រៀម ZTO ដែរ', cacheClear.indexOf('clearZtoWarmSoon()') !== -1);
 
 Promise.all(pendingScenarios).then(() => new Promise((r) => setTimeout(r, 10))).then(() => {
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');

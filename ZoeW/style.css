@@ -1444,3 +1444,15 @@
             border-color: rgba(255, 255, 255, 0.55);
             box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
         }
+
+.health-list{display:flex;flex-direction:column;gap:8px;max-height:56vh;overflow-y:auto;margin:6px 0 4px;}
+.health-row{display:flex;align-items:flex-start;gap:8px;padding:9px 10px;border-radius:10px;background:var(--card-bg);border:1px solid var(--border);}
+.health-ico{flex:none;font-size:calc(14 * var(--fs-unit));line-height:1.35;}
+.health-text{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;font-size:calc(12.5 * var(--fs-unit));}
+.health-text b{font-weight:700;}
+.health-detail{color:var(--text-muted);font-size:calc(11.5 * var(--fs-unit));word-break:break-word;}
+.health-ok{border-color:rgba(34,197,94,.45);}
+.health-warn{border-color:rgba(234,179,8,.55);}
+.health-bad{border-color:rgba(239,68,68,.55);}
+.health-info{border-color:var(--border);}
+.health-note{margin:2px 0 0;font-size:calc(11 * var(--fs-unit));color:var(--text-muted);text-align:center;}

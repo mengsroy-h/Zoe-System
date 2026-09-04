@@ -62,7 +62,7 @@ for (const app of APPS) {
             const body = handler ? srcOf(code, handler) : '';
             const isRecovery = RECOVERY_CALL.test(body) ||
                 (handler && handler.params && handler.params.length > 0 &&
-                 /addRevenueToDailyAndMonthlyRecord\(\s*[^,]+,\s*-|addPickupToDailyRecord\(\s*[^,]+,\s*[^,]+,\s*-|scanHistory\s*=\s*\w*[Ss]napshot|deletedItems\s*=\s*\w*[Ss]napshot/.test(body)) ||
+                 /addRevenueToDailyAndMonthlyRecord\(\s*[^,]+,\s*-|revertPickupMarks\(|scanHistory\s*=\s*\w*[Ss]napshot|deletedItems\s*=\s*\w*[Ss]napshot/.test(body)) ||
                 (handler && handler.id && RECOVERY.test(handler.id.name));
             if (isRecovery && aCanThrow) {
                 const key = app + ':' + node.loc.start.line;

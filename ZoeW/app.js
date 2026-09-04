@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.27.3';
+    const APP_VERSION = '2.28.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -59,6 +59,7 @@
         "openConfigQrScanner",
         "openDailyStatsModal",
         "openEditBarcodePriceModal",
+        "openHealthCheck",
         "openEditModal",
         "openLockerPicker",
         "openMonthlyStatsModal",
@@ -75,6 +76,7 @@
         "resetSheetImportFileSelection",
         "runAppLockBiometric",
         "runBiometricUnlock",
+        "runHealthCheck",
         "runSheetImport",
         "runSheetImportClear",
         "saveEditedBarcodePrice",
@@ -3247,6 +3249,186 @@
         return true;
     }
 
+    const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
+
+    function healthRowHtml(state, label, detail) {
+        const icon = HEALTH_ICONS[state] || HEALTH_ICONS.info;
+        const cls = 'health-row health-' + (HEALTH_ICONS[state] ? state : 'info');
+        return '<div class="' + cls + '"><span class="health-ico">' + sanitizeInput(icon) + '</span>'
+            + '<span class="health-text"><b>' + sanitizeInput(label) + '</b>'
+            + '<span class="health-detail">' + sanitizeInput(detail) + '</span></span></div>';
+    }
+
+    function healthAgeText(mark) {
+        const ms = elapsedSince(mark);
+        if (!isFinite(ms)) return 'មិនស្គាល់';
+        const sec = Math.round(ms / 1000);
+        if (sec < 60) return sec + ' វិនាទីមុន';
+        const min = Math.round(sec / 60);
+        if (min < 60) return min + ' នាទីមុន';
+        return Math.round(min / 60) + ' ម៉ោងមុន';
+    }
+
+    function healthNetworkRow() {
+        return navigator.onLine === false
+            ? healthRowHtml('bad', 'អ៊ីនធឺណិត', 'ក្រៅបណ្ដាញ — ការស្កេនចូលនៅដំណើរការ តែ Lookup និងការសរសេរនឹងចូលជួររង់ចាំ')
+            : healthRowHtml('ok', 'អ៊ីនធឺណិត', 'ភ្ជាប់');
+    }
+
+    function healthDatabaseRow() {
+        if (!isDatabaseConnected) {
+            return healthRowHtml('bad', 'Firebase', hasEverConnectedToDatabase
+                ? 'ដាច់ការតភ្ជាប់ — កំពុងព្យាយាមភ្ជាប់ឡើងវិញ'
+                : 'មិនទាន់ភ្ជាប់ម្តងណាទេ — សូមពិនិត្យ Config');
+        }
+        const stale = DB_LISTENER_KEYS.filter((k) => dbListenerViewIsStale(k));
+        if (stale.length) {
+            return healthRowHtml('warn', 'Firebase', 'ភ្ជាប់រួច តែទិន្នន័យ ' + stale.length
+                + ' ផ្នែកមិនទាន់មកដល់ (' + stale.join(', ') + ')');
+        }
+        return healthRowHtml('ok', 'Firebase', 'ភ្ជាប់ ហើយទិន្នន័យមកដល់គ្រប់ផ្នែក');
+    }
+
+    function healthClockRow() {
+        if (!serverClockTrusted) {
+            return healthRowHtml('warn', 'នាឡិកា Server', 'មិនទាន់ sync — ការសម្អាតស្វ័យប្រវត្តិត្រូវបានផ្អាកដោយចេតនា');
+        }
+        const drift = Math.round(Math.abs(serverTimeOffsetMs) / 1000);
+        const cleanupReady = cleanupClockIsTrustworthy();
+        return healthRowHtml(cleanupReady ? 'ok' : 'warn', 'នាឡិកា Server',
+            'sync រួច · គម្លាតនឹងនាឡិកាឧបករណ៍ ' + drift + ' វិនាទី'
+            + (cleanupReady ? '' : ' · ការសម្អាតផ្អាកព្រោះការតភ្ជាប់មិនរស់'));
+    }
+
+    async function healthLicenseRow() {
+        if (!window.ZoeLicense || typeof ZoeLicense.getStatus !== 'function') {
+            return healthRowHtml('warn', 'អាជ្ញាប័ណ្ណ', 'ម៉ូឌុល License មិនទាន់ផ្ទុក');
+        }
+        try {
+            const status = await withTimeout(ZoeLicense.getStatus(LICENSE_APP_CODE), 8000, 'License check timed out');
+            if (status && status.state === 'active') {
+                return healthRowHtml('ok', 'អាជ្ញាប័ណ្ណ', 'សកម្ម');
+            }
+            const reason = safeLookupReason(status && status.reason);
+            return healthRowHtml('warn', 'អាជ្ញាប័ណ្ណ',
+                'ស្ថានភាព ៖ ' + ((status && status.state) || 'មិនស្គាល់') + (reason ? ' (' + reason + ')' : ''));
+        } catch (e) {
+            return healthRowHtml('warn', 'អាជ្ញាប័ណ្ណ', 'ពិនិត្យមិនបាន — មិនមែនមានន័យថា Key ខុសទេ');
+        }
+    }
+
+    function healthCustomerTableRow() {
+        if (!Array.isArray(customerDataTableRows)) {
+            return healthRowHtml('info', 'តារាងអតិថិជន', 'មិនទាន់ទាញមកទេ');
+        }
+        const state = customerTableIsPartial ? 'warn' : 'ok';
+        return healthRowHtml(state, 'តារាងអតិថិជន',
+            customerDataTableRows.length + ' ជួរដេក · ទាញនៅ ' + healthAgeText(customerDataTableFetchedAt)
+            + (customerTableIsPartial ? ' · មិនពេញលេញ' : ''));
+    }
+
+    function healthStorageRow() {
+        const parts = [];
+        if (!appLocalStore) parts.push('localStorage');
+        if (!appSessionStore) parts.push('sessionStorage');
+        return parts.length
+            ? healthRowHtml('bad', 'ការផ្ទុកក្នុងឧបករណ៍', parts.join(' និង ') + ' ត្រូវបានបិទ — Config និងសោនឹងមិនរស់រានក្រោយបិទ App')
+            : healthRowHtml('ok', 'ការផ្ទុកក្នុងឧបករណ៍', 'ដំណើរការធម្មតា');
+    }
+
+    function healthServiceWorkerRow() {
+        if (!('serviceWorker' in navigator)) {
+            return healthRowHtml('warn', 'របៀបក្រៅបណ្ដាញ', 'Browser នេះមិនគាំទ្រ Service Worker');
+        }
+        return navigator.serviceWorker.controller
+            ? healthRowHtml('ok', 'របៀបក្រៅបណ្ដាញ', 'សំបក App ត្រូវបាន cache ➜ បើកបានពេលបណ្ដាញដាច់')
+            : healthRowHtml('warn', 'របៀបក្រៅបណ្ដាញ', 'មិនទាន់គ្រប់គ្រងទំព័រនេះ — សូមទាញចុះ ១ ដងទៀត');
+    }
+
+    function ztoDiagnosticsUrl(cfg) {
+        const raw = String(cfg.url).trim();
+        const marker = '/.netlify/functions/zto-order-detail';
+        const markerAt = raw.toLowerCase().indexOf(marker);
+        return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + '?diag=1';
+    }
+
+    async function healthLookupRow() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !cfg.url) {
+            return healthRowHtml('info', 'Lookup អតិថិជន', 'មិនទាន់បើក');
+        }
+        let host = '';
+        try { host = new URL(String(cfg.url).trim()).hostname; } catch (e) { host = ''; }
+        if (lookupApiIsAppsScript(cfg)) {
+            return healthRowHtml('ok', 'Lookup អតិថិជន (Google Sheet)',
+                'បើករួច · ' + (host || 'script.google.com') + ' · មិនផ្ញើ Header ផ្ទាល់ខ្លួន (ត្រឹមត្រូវ)');
+        }
+        if (!lookupApiIsZto(cfg)) {
+            return healthRowHtml('info', 'Lookup អតិថិជន', 'បើករួច · ' + (host || 'មិនស្គាល់ host'));
+        }
+        if (cfg.headerValueEnc && !lookupSecretKey) {
+            return healthRowHtml('info', 'Lookup អតិថិជន (ZTO)',
+                'បើករួច តែពិនិត្យមិនបាន — សូមវាយ PIN ម្តងជាមុន រួចពិនិត្យម្តងទៀត');
+        }
+        if (navigator.onLine === false) {
+            return healthRowHtml('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច — ពិនិត្យមិនបានខណៈក្រៅបណ្ដាញ');
+        }
+        const headers = {};
+        if (cfg.headerName) {
+            const value = cfg.headerValueEnc ? await decryptLookupSecret(cfg.headerValueEnc) : (cfg.headerValue || '');
+            if (!value) {
+                return healthRowHtml('warn', 'Lookup អតិថិជន (ZTO)', 'បើករួច តែស្រាយសោមិនបាន — សូមកំណត់ Header ម្តងទៀត');
+            }
+            headers[cfg.headerName] = value;
+        }
+        try {
+            const res = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
+                { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
+                ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out');
+            if (!res.ok) {
+                return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)', 'Server ឆ្លើយ HTTP ' + res.status);
+            }
+            const body = await res.json();
+            const source = safeLookupReason(body && body.cookie && body.cookie.source) || 'none';
+            const fingerprint = safeLookupReason(body && body.cookie && body.cookie.fingerprint);
+            if (source === 'none' || !fingerprint) {
+                return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)',
+                    'គ្មាន Cookie ➜ ការស្វែងរកនឹងធ្លាក់។ សូមរត់ឧបករណ៍ sync-zto-cookie លើ Windows');
+            }
+            const ageMs = body && body.cookie && body.cookie.ageMs;
+            const reason = safeLookupReason(body && body.cookie && body.cookie.storeReason);
+            return healthRowHtml('ok', 'Lookup អតិថិជន (ZTO)',
+                'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
+                + (typeof ageMs === 'number' ? ' · អាយុ ' + Math.round(ageMs / 60000) + ' នាទី' : '')
+                + (reason ? ' · ' + reason : ''));
+        } catch (e) {
+            return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
+        }
+    }
+
+    function openHealthCheck() {
+        closeSideDrawer();
+        openModalHelper('healthCheckModal');
+        runHealthCheck();
+    }
+
+    async function runHealthCheck() {
+        const list = document.getElementById('healthCheckList');
+        const btn = document.getElementById('healthRecheckBtn');
+        if (!list) return;
+        if (btn) btn.disabled = true;
+        list.innerHTML = '<div class="health-row health-info"><span class="health-ico">⏳</span>'
+            + '<span class="health-text"><b>កំពុងពិនិត្យ…</b></span></div>';
+        const rows = [healthNetworkRow(), healthDatabaseRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow()];
+        const [licenseRow, lookupRow] = await Promise.all([healthLicenseRow(), healthLookupRow()]);
+        rows.splice(3, 0, licenseRow);
+        rows.push(lookupRow);
+        const stillOpen = document.getElementById('healthCheckModal');
+        if (!stillOpen || stillOpen.style.display !== 'flex') return;
+        list.innerHTML = rows.join('');
+        if (btn) btn.disabled = false;
+    }
+
     function clearZtoWarmSoon() {
         if (ztoWarmSoonTimer) {
             clearTimeout(ztoWarmSoonTimer);
@@ -4119,6 +4301,7 @@
             'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
             'dailyStatsContainer', 'monthlyStatsContainer',
             'menuContentContainer', 'lockerListTableBody', 'lockerListSearchInput',
+            'healthCheckList',
             'locationWarningText', 'customLockerInput',
             'entryListTableBody', 'entryListSearchInput', 'entryListCount',
             'siApiUrlInput', 'siApiPasswordInput', 'siFileInput', 'siHeaderRowInput', 'siModeSel',

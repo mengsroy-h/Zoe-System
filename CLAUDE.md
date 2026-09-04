@@ -309,6 +309,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
+| **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM | `health-check-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
 | **Apps Script ↔ simple request** | ⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវ Lookup ផង** — គ្មាន header ផ្ទាល់ខ្លួន ហើយ **មិនសុំ PIN** សម្រាប់វា | `lookup-prefetch-test` |
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
@@ -421,6 +422,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **header ផ្ទាល់ខ្លួន ➜ preflight ➜ Apps Script ស្លាប់** (ផ្លូវ Lookup) · ការសុំ PIN សម្រាប់ header ដែលមិនដែលផ្ញើ | `lookup-prefetch-test.js` |
 | **នាំចូលរួច តែទិន្នន័យអតិថិជនមិនមកដល់** ៖ តារាងត្រូវលុបចោលដោយគ្មានអ្នកបំពេញវិញ · cache ៥ នាទីរបស់ Apps Script បាំង barcode ថ្មី | `lookup-freshness-test.js` |
 | **ចាក់សោ App** ៖ សោដែលមិនចាក់ (បើក **ឬត្រឡប់មក**) · ទិន្នន័យលេចពីក្រោយសោ · សោដែលបំផ្លាញ PTR ឬការខល · សោដែលកាត់ session ៤ ម៉ោង | `app-lock-test.js` |
+| **ការវិនិច្ឆ័យដែលនិយាយមិនពិត** ៖ រាយ ❌ លើអ្វីដែល *មិនបានវាស់* · បង្ខំ PIN ពេល App មានបញ្ហារួច · secret ធ្លាក់ចូល DOM · Apps Script ទទួល header | `health-check-test.js` |
 | **listener/node ដែលកកកុញ** ៖ សកម្មភាពរត់ស្ទួន · handler រត់ N ដងក្នុង ១ snapshot · ការរមូរញាក់ | `listener-leak-test.js` |
 | `${...}` ក្នុង template HTML ដែលមិនឆ្លងកាត់ `sanitizeInput()` | `html-sink-escaping.js` |
 | ការធ្វើឲ្យសំបកស្រស់ខាងក្រោយស៊ីកូតាការតភ្ជាប់អស់ ➜ សំណើចាំបាច់ចេញមិនបាន | `sw-revalidate-pressure-test.js` |
@@ -699,6 +701,15 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | Config/Reconfig, API ស្វែងរក, តារាងអតិថិជន, Locker, នាំចូល Excel, ចាក់សោ App, ចូល/ចាកចេញ |
 | ប៊ូតុង (...) | `globalMoreMenu` | Export, កែទឹកប្រាក់ (PIN), អត្រាប្រាក់, ធុងសំរាម, Reset ចំនួនយករួច (PIN), លុបទាំងអស់ (PIN) |
+
+**🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (របា Slide) ៖ ជួរ **៨** ដែល **អានសុទ្ធសាធ** —
+បណ្តាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន ·
+Lookup។ ⛔ **«ពិនិត្យមិនបាន» ត្រូវរាយ ⚠️ មិនមែន ❌** (ច្បាប់ដដែលនឹង
+`license-verify.js` ៖ «មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស»)។ ⛔ **មិនបង្ខំ PIN** —
+សោមិនទាន់ដោះ ➜ ប្រាប់មូលហេតុ (ការសុំ PIN ខណៈ App មានបញ្ហារួច ជាការធ្វើទុក្ខ
+អ្នកប្រើ)។ ⛔ **តម្លៃ header សម្ងាត់មិនត្រូវឡើងដល់ DOM** — មានតែ fingerprint
+៨ តួពី `?diag=1`។ ⛔ **ផ្លូវ Apps Script មិនហៅបណ្តាញសោះ** (ច្បាប់ simple
+request — មើលផ្នែក ZTO Lookup)។
 
 **`entryScanMode`** (`'parcel'` / `'locker'`) ជាចំណុចបំបែក **តែមួយ** —
 គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។

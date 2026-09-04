@@ -96,7 +96,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
-         lookup-burst-test; do
+         lookup-burst-test health-check-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -272,6 +272,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LOOKUPFRESH_APP_DIR="$BASE" node audit-tools/lookup-freshness-test.js 2>&1 | tail -1 | sed 's/^/   lookup-freshness:/'
     LOOKUPFAILURE_APP_DIR="$BASE" node audit-tools/lookup-failure-identity-test.js 2>&1 | tail -1 | sed 's/^/   lookup-failure-identity:/'
     LOOKUPBURST_APP_DIR="$BASE" node audit-tools/lookup-burst-test.js 2>&1 | tail -1 | sed 's/^/   lookup-burst:  /'
+    HEALTH_APP_DIR="$BASE" node audit-tools/health-check-test.js 2>&1 | tail -1 | sed 's/^/   health-check:  /'
     ZTOPROXY_APP_DIR="$BASE" node audit-tools/zto-proxy-test.js 2>&1 | tail -1 | sed 's/^/   zto-proxy:       /'
     ZTOBUDGET_APP_DIR="$BASE" node audit-tools/zto-budget-test.js 2>&1 | tail -1 | sed 's/^/   zto-budget:      /'
     ZTONEG_APP_DIR="$BASE" node audit-tools/zto-negative-cache-test.js 2>&1 | tail -1 | sed 's/^/   zto-neg-cache:   /'

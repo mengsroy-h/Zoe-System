@@ -346,6 +346,9 @@
         <button type="button" class="drawer-item" data-act="drawerSheetImportFlow">
             <span class="ico">📥</span><span>នាំចូល Excel ទៅ Sheet</span>
         </button>
+        <button type="button" class="drawer-item" data-act="openHealthCheck">
+            <span class="ico">🩺</span><span>ពិនិត្យសុខភាពប្រព័ន្ធ</span>
+        </button>
         <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
             <span class="ico">🔒</span><span class="drawer-toggle-label">ចាក់សោពេលបើក App</span><span class="drawer-toggle-state" id="appLockToggleState">បិទ</span>
         </button>
@@ -852,6 +855,18 @@ const firebaseConfig = {
             <button class="btn-cancel" id="activationLogoutBtn" data-act="logoutApp">ចាកចេញ</button>
         </div>
         <p style="margin-top:10px; font-size:calc(11.5 * var(--fs-unit)); color:var(--text-muted); text-align:center;">មិនទាន់មាន Key? ទាក់ទង <a href="https://t.me/mengsroyhun" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:600;">@mengsroyhun</a> តាម Telegram</p>
+    </div>
+</div>
+
+<div id="healthCheckModal" class="modal">
+    <div class="modal-content" style="max-width: 460px;">
+        <h3>🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</h3>
+        <div id="healthCheckList" class="health-list"></div>
+        <p class="health-note">ការពិនិត្យនេះ <b>អានតែប៉ុណ្ណោះ</b> — វាមិនកែទិន្នន័យ ឬលុយអ្វីទាំងអស់។</p>
+        <div class="modal-btns">
+            <button class="btn-confirm" id="healthRecheckBtn" data-act="runHealthCheck">ពិនិត្យម្តងទៀត</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["healthCheckModal"]'>បិទ</button>
+        </div>
     </div>
 </div>
 

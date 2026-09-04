@@ -1735,6 +1735,8 @@ bash audit-tools/emu/rules.sh
 |---|---|
 | **ច្បាប់ដែលត្រូវអនុវត្ត** | **ឯកសារនេះ** (`CLAUDE.md`) |
 | ហេតុអ្វីច្បាប់មួយមាន · លេខដែលវាស់បាន · លទ្ធផល mutation | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ២** |
+| **រកឈ្មោះ checker តែមិនដឹងវារស់នៅឯណា** | [`docs/HISTORY.md`](docs/HISTORY.md) **🔎 លិបិក្រម** នៅចុងឯកសារ |
+| កំណែមុន 2.20.0 · អត្ថបទចាស់ដែលដកចេញពី `CLAUDE.md` | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · [`docs/ARCHIVE-2026-09-03.md`](docs/ARCHIVE-2026-09-03.md) |
 | «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» របស់កំណែណាមួយ · អ្នកប្រើឃើញអ្វីខុសពីមុន | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ១** |
 | របៀបប្រើ App និងឧបករណ៍នីមួយៗ | `README.md` នៃថតនោះ |
 | បញ្ជី checker និងអ្វីដែលនីមួយៗវាស់ | [`audit-tools/README.md`](audit-tools/README.md) |

@@ -199,7 +199,15 @@
     }
 
     function sendToSentry(err, extra) {
-        try { global.Sentry.captureException(err, extra ? { extra: extra } : undefined); } catch (e) {}
+        try {
+            let scope;
+            if (extra) {
+                scope = { extra: extra };
+                const zone = extra.zone;
+                if (typeof zone === 'string' && /^[a-z][a-z0-9-]{0,23}$/.test(zone)) scope.tags = { zone: zone };
+            }
+            global.Sentry.captureException(err, scope);
+        } catch (e) {}
     }
 
     function flushQueuedEvents() {

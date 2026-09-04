@@ -34,12 +34,12 @@ const PAGE = `<!doctype html><meta charset="utf-8"><title>t</title><body></body>
 // នៅ bound។ នេះជាឥរិយាបថពិតរបស់ Sentry៖ `captureException` លើ SDK ដែល
 // មិនទាន់ init ដើរដោយគ្មាន error តែ event មិនទៅណាទេ។
 const FAKE_SDK = `
-window.__log = { init: [], sent: [], closed: 0, unbound: 0 };
+window.__log = { init: [], sent: [], scopes: [], closed: 0, unbound: 0 };
 (function () {
     var bound = false;
     window.Sentry = {
         init: function (o) { window.__log.init.push(o && o.dsn); bound = true; },
-        captureException: function (e) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); },
+        captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra) }); },
         setTag: function () {},
         close: function () { window.__log.closed++; bound = false; return Promise.resolve(true); },
         getCurrentHub: function () {
@@ -132,6 +132,38 @@ async function makePage(browser, origin, sdkDelayMs) {
         });
         ok('error មុន SDK មកដល់ ➜ ត្រូវទុកជួរ រួចផ្ញើពេលរួចរាល់',
             out.log.sent.indexOf('boot-error') !== -1 && out.log.sent.indexOf('boot-error-2') !== -1, out.log);
+        await ctx.close();
+    }
+
+    // ៥ — `zone` ត្រូវក្លាយជា **tag** មិនមែន `extra`
+    // ⛔ ច្បាប់ជាមួយ Sentry ៖ **alert rule ស្វែងរកបានតែលើ tag** — `extra`
+    //    មិនអាចជាលក្ខខណ្ឌបានទេ។ បើ `zone` ដេកនៅ `extra` នោះការជូនដំណឹង
+    //    «កំហុសលុយ» **សរសេរមិនកើត** ហើយ Sentry ក្លាយជាកន្លែងទុកកំហុសដែល
+    //    គ្មាននរណាមើល។
+    {
+        const { ctx, page } = await makePage(browser, origin, 300);
+        const out = await page.evaluate(async () => {
+            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+            await window.ZoeErrors.init('zoew');
+            window.ZoeErrors.capture(new Error('money-err'), { zone: 'money', context: 'x' });
+            window.ZoeErrors.capture(new Error('plain-err'), { context: 'x' });
+            window.ZoeErrors.capture(new Error('bad-zone'), { zone: 'NOT A TAG!', context: 'x' });
+            window.ZoeErrors.capture(new Error('no-extra'));
+            await wait(150);
+            return window.__log;
+        });
+        const find = (m) => out.scopes.filter((x) => x.msg === m)[0];
+        ok('`zone` ក្លាយជា tag ពិតដែលទៅដល់ Sentry (alert rule ស្វែងរកបាន)',
+            find('money-err') && find('money-err').tags && find('money-err').tags.zone === 'money',
+            find('money-err'));
+        ok('`zone` នៅតែស្ថិតក្នុង `extra` ដែរ (សម្រាប់អ្នកអានកំហុស)',
+            find('money-err') && find('money-err').hasExtra === true);
+        ok('⛔ គ្មាន `zone` ➜ គ្មាន tag (មិនប៉ះការហៅដែលមានស្រាប់)',
+            find('plain-err') && find('plain-err').tags === null, find('plain-err'));
+        ok('⛔ `zone` ដែលមិនត្រឹមទម្រង់ ត្រូវច្រានចេញ (កុំបំពុលបញ្ជី tag)',
+            find('bad-zone') && find('bad-zone').tags === null, find('bad-zone'));
+        ok('⛔ capture() គ្មាន extra សោះ នៅតែដំណើរការ',
+            out.sent.indexOf('no-extra') !== -1, out.sent);
         await ctx.close();
     }
 

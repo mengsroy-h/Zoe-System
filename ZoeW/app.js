@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.28.1';
+    const APP_VERSION = '2.28.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -591,7 +591,7 @@
             return onFailed ? onFailed(null, result) : undefined;
         }, (error) => (onFailed ? onFailed(error, null) : undefined)).catch((error) => {
             console.error('Late commit follow-up failed for', label, error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'armLateCommit ' + (label || '') });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'armLateCommit ' + (label || '') });
         });
         return true;
     }
@@ -601,7 +601,7 @@
         promise.then(() => (onDone ? onDone() : undefined), (error) => (onFailed ? onFailed(error) : undefined))
             .catch((error) => {
                 console.error('Late write follow-up failed for', label, error);
-                if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'armLateWrite ' + (label || '') });
+                if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'armLateWrite ' + (label || '') });
             });
         return true;
     }
@@ -2483,7 +2483,7 @@
             const out = await fetchWithTimeout(testUrl, { headers }, testTimeoutMs, 'Test API timed out', (r) => r.text());
             alert("ស្ថានភាព HTTP៖ " + out.res.status + "\n\nលទ្ធផល JSON (ប្រើដើម្បីដឹងឈ្មោះ Field)៖\n" + String(out.body).substring(0, 1500));
         } catch (e) {
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'testLookupApiConfig' });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'testLookupApiConfig' });
             const timedOut = e && e.message === 'Test API timed out';
             const slowNote = testIsZto
                 ? "អស់ពេល (Timeout) — ZTO ឆ្លើយតបយឺត ឬ Cookie ផុតកំណត់។ សូមសាកល្បងម្តងទៀត; បើនៅតែយឺត សូមយក Cookie ថ្មីពី Argus"
@@ -3632,7 +3632,7 @@
                 if (myGeneration !== customerDataTableSessionGeneration) return;
                 customerDataTableLastFailedAt = Date.now();
                 scheduleCustomerTableRetry();
-                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'fetchCustomerDataTableRows' });
+                if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'fetchCustomerDataTableRows' });
                 const curStatusEl = document.getElementById('customerDataTableStatus');
                 if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
                 if (customerDataTableRows) filterCustomerDataTable();
@@ -4216,7 +4216,7 @@
                 setLookupStatus(barcode, 'error', '⚠️ មិនអាចភ្ជាប់ ' + lookupSource + ' បាន — សូមស្កេនម្ដងទៀត');
             }
             console.error("Lookup API error:", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Lookup API error:" });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: "Lookup API error:" });
         } finally {
             if (autoLookupInFlight.get(lookupKey) === lookupRunToken) {
                 autoLookupInFlight.delete(lookupKey);
@@ -4951,7 +4951,7 @@
             release();
             if (dbOpStalled(error)) return;
             console.error('Failed to clear stale restore markers for', item.id, error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'clearStaleRestoreMarkers', itemId: item.id });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'clearStaleRestoreMarkers', itemId: item.id });
         });
     }
 
@@ -5176,14 +5176,14 @@
                 const staleIdx = deletedItems.findIndex(i => i.id === trashItem.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
-                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
                 try {
                     const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
                     const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
-                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
             });
@@ -5203,7 +5203,7 @@
             await finishCleanup(result);
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Automatic cleanup transaction failed for' });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'Automatic cleanup transaction failed for' });
         } finally {
             cleanupInFlight.delete(id);
         }
@@ -5239,7 +5239,7 @@
                         await releaseStaleRestoreClaimForPurge(candidate.id);
                     } catch (claimError) {
                         console.error('Failed to release stale restore claim before purge for', candidate.id, claimError);
-                        if (window.ZoeErrors) ZoeErrors.capture(claimError, { context: 'runAutomaticDeletedCleanup stale claim release', itemId: candidate.id });
+                        if (window.ZoeErrors) ZoeErrors.capture(claimError, { zone: 'data', context: 'runAutomaticDeletedCleanup stale claim release', itemId: candidate.id });
                         continue;
                     }
                 }
@@ -5285,7 +5285,7 @@
                 if (!purged.length) {
                     if (!stalled) {
                         console.error('Error purging deleted items: ', lastError);
-                        if (window.ZoeErrors) ZoeErrors.capture(lastError, { context: 'Error purging deleted items: ' });
+                        if (window.ZoeErrors) ZoeErrors.capture(lastError, { zone: 'data', context: 'Error purging deleted items: ' });
                         showToast("⚠️ បរាជ័យក្នុងការលុបធុងសំរាមចាស់ចេញពី Firebase!");
                     }
                     return;
@@ -5295,7 +5295,7 @@
             await applyPurged(purged);
         } catch (e) {
             console.error('Automatic trash purge failed', e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'runAutomaticDeletedCleanup' });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'runAutomaticDeletedCleanup' });
         } finally {
             deletedCleanupInFlight = false;
         }
@@ -5834,7 +5834,7 @@
             let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { context: scanDateStr, codDollar, dodDollar, totalCount });
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { zone: 'money', context: scanDateStr, codDollar, dodDollar, totalCount });
             }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
@@ -5877,7 +5877,7 @@
             let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
             let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
             if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { context: ymKey, codDollar, dodDollar, totalCount });
+                if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { zone: 'money', context: ymKey, codDollar, dodDollar, totalCount });
             }
             if (codDollar < 0) codDollar = 0;
             if (dodDollar < 0) dodDollar = 0;
@@ -6077,7 +6077,7 @@
             }
             pickupLedgerRepairDone = true;
         } catch (e) {
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'repairPickupLedgerOnce' });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'repairPickupLedgerOnce' });
         } finally {
             pickupLedgerRepairRunning = false;
         }
@@ -6185,7 +6185,7 @@
                     doneCount++;
                 } catch (e) {
                     failedCount++;
-                    if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'resetPickupStats', date: dateKey });
+                    if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'resetPickupStats', date: dateKey });
                     if (dbOpStalled(e)) { stalled = true; break; }
                 }
             }
@@ -9139,7 +9139,7 @@
             if (reported) return;
             reported = true;
             console.error('Locker assignment failed: ', err);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'assignLockerToEntry' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'assignLockerToEntry' });
             lockerErrorFeedback();
             showToast('❌ មានបញ្ហា! មិនអាចរក្សាទុកទីតាំងបានទេ សូមព្យាយាមម្តងទៀត');
         };
@@ -9488,7 +9488,7 @@
                     }, (lateErr) => {
                         rollbackFailedSave();
                         showToast(`⚠️ រក្សាទុក (${barcodeToSave}) បរាជ័យ! សូមស្កេនម្ដងទៀត។`);
-                        if (window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'savePhoneAndSave late write' });
+                        if (window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'savePhoneAndSave late write' });
                     });
                     closeModal('phoneModal');
                     showToast(`⏳ កំពុងរក្សាទុក (${barcodeToSave})… សូមកុំស្កេនម្ដងទៀត។`);
@@ -9696,7 +9696,7 @@
         if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) {
             const idErr = new Error('Unsafe id during removeSingleBarcode');
             console.error(idErr.message, itemId);
-            if (window.ZoeErrors) ZoeErrors.capture(idErr, { context: 'removeSingleBarcode' });
+            if (window.ZoeErrors) ZoeErrors.capture(idErr, { zone: 'money', context: 'removeSingleBarcode' });
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
             return;
         }
@@ -9793,7 +9793,7 @@
                 const staleIdx = deletedItems.findIndex(i => i.id === itemToTrash.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for removeSingleBarcode of', itemId, trashErr);
-                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'removeSingleBarcode trash write failed after retries', itemId });
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'removeSingleBarcode trash write failed after retries', itemId });
                 let restoredItem = null;
                 let restoreOk = false;
                 try {
@@ -9802,7 +9802,7 @@
                     restoreOk = true;
                 } catch (restoreErr) {
                     console.error('Failed to restore barcode to scan history after trash write failure for', itemId, restoreErr);
-                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'removeSingleBarcode restore-after-trash-failure also failed', itemId });
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'removeSingleBarcode restore-after-trash-failure also failed', itemId });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + barcodeCode + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
                 if (restoreOk) {
@@ -9826,7 +9826,7 @@
                     armLateCommit(removeTx, (late) => finishRemoval(late, true), (lateErr) => {
                         refreshCurrentHistoryView();
                         showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។`);
-                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'removeSingleBarcode late transaction failed', itemId });
+                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'removeSingleBarcode late transaction failed', itemId });
                     }, 'removeSingleBarcode');
                     showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ការដក (${barcodeCode}) នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំដកម្ដងទៀត។`);
                     return;
@@ -9837,7 +9837,7 @@
             await finishRemoval(result, false);
         } catch (e) {
             console.error("Error removing single barcode: ", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error removing single barcode: " });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: "Error removing single barcode: " });
             refreshCurrentHistoryView();
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
         }
@@ -9976,13 +9976,13 @@
                 if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
                 revertBarcodeCloseLocally();
                 showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
-                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'toggleIndividualBarcodeClose late transaction failed' });
+                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
             }, 'toggleIndividualBarcodeClose')) {
                 showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាព (${barcodeCode}) នឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។`);
                 return;
             }
             console.error("Error toggling barcode close: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling barcode close: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
             revertBarcodeCloseLocally();
         }
@@ -10143,7 +10143,7 @@
                     const viewListEl = document.getElementById('viewListModal');
                     if (viewListEl && viewListEl.style.display === 'flex') openViewListModal(editedItemId);
                     showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
-                    if (err && window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveEditedBarcodePrice transaction failed' });
+                    if (err && window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice transaction failed' });
                 };
                 const priceTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
                     serverApplied = false;
@@ -10162,7 +10162,7 @@
                     failEditedPrice(error);
                 }).catch((postErr) => {
                     console.error('saveEditedBarcodePrice post-transaction handler failed: ', postErr);
-                    if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedBarcodePrice post-transaction handler' });
+                    if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'money', context: 'saveEditedBarcodePrice post-transaction handler' });
                 });
                 refreshCurrentHistoryView();
             }
@@ -10295,7 +10295,7 @@
                 }
             }, revertPickupRefMove).catch((postErr) => {
                 console.error('saveEditedPhone post-patch handler failed: ', postErr);
-                if (window.ZoeErrors) ZoeErrors.capture(postErr, { context: 'saveEditedPhone post-patch handler' });
+                if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'data', context: 'saveEditedPhone post-patch handler' });
             });
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
@@ -10426,13 +10426,13 @@
                 if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
                 revertCloseLocally();
                 showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
-                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'toggleCloseStatus late transaction failed' });
+                if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
             }, 'toggleCloseStatus')) {
                 showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ស្ថានភាពបញ្ជីនឹងធ្វើបច្ចុប្បន្នភាពពេលបណ្តាញត្រឡប់មកវិញ។");
                 return;
             }
             console.error("Error toggling close status: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error toggling close status: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
             revertCloseLocally();
         }
@@ -10447,7 +10447,7 @@
         if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
             const idErr = new Error('Unsafe id during deleteSingleItem');
             console.error(idErr.message, id);
-            if (window.ZoeErrors) ZoeErrors.capture(idErr, { context: 'deleteSingleItem' });
+            if (window.ZoeErrors) ZoeErrors.capture(idErr, { zone: 'data', context: 'deleteSingleItem' });
             showToast("⚠️ លុបមិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
             return;
         }
@@ -10502,7 +10502,7 @@
                 const staleIdx = deletedItems.findIndex(i => i.id === removed.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for deleteSingleItem of', id, trashErr);
-                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { context: 'deleteSingleItem trash write failed after retries', itemId: id });
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'data', context: 'deleteSingleItem trash write failed after retries', itemId: id });
                 let restoredItem = null;
                 let restoreOk = false;
                 try {
@@ -10511,7 +10511,7 @@
                     restoreOk = true;
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
-                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { context: 'deleteSingleItem restore-after-trash-failure also failed', itemId: id });
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'data', context: 'deleteSingleItem restore-after-trash-failure also failed', itemId: id });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
                 if (restoreOk) {
@@ -10535,7 +10535,7 @@
                         refreshCurrentHistoryView();
                         updateRecentPhonesList();
                         showToast("⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
-                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { context: 'deleteSingleItem late transaction failed', itemId: id });
+                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'deleteSingleItem late transaction failed', itemId: id });
                     }, 'deleteSingleItem');
                     showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការលុបនឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំលុបម្ដងទៀត។");
                     return;
@@ -10546,7 +10546,7 @@
             await finishDelete(result, false);
         } catch (e) {
             console.error("Error deleting single item: ", e);
-            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Error deleting single item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: "Error deleting single item: " });
             refreshCurrentHistoryView();
             updateRecentPhonesList();
             showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
@@ -11101,7 +11101,7 @@
             if (error && error.message === 'RESTORE_CLAIM_LOST') activeRestoreClaims.delete(restoredId);
             if (!alreadyRestored) {
                 console.error("Restore failed: ", restoredId, error);
-                if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Restore failed: " });
+                if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Restore failed: " });
             }
             try {
                 const [histSnap, delSnap] = await dbOp(Promise.all([fb.get(dbRefHistory), fb.get(dbRefDeleted)]));
@@ -11111,7 +11111,7 @@
                 deletedItems = delData ? Object.keys(delData).map(k => { const v = delData[k]; if (v && !v.id) v.id = k; return normalizeBarcodesOf(v); }).filter(Boolean) : [];
             } catch (resyncError) {
                 console.error("Resync after failed restore also failed: ", resyncError);
-                if (window.ZoeErrors) ZoeErrors.capture(resyncError, { context: "Resync after failed restore also failed: " });
+                if (window.ZoeErrors) ZoeErrors.capture(resyncError, { zone: 'money', context: "Resync after failed restore also failed: " });
             }
             if (alreadyRestored) {
                 alert("⚠️ ទិន្នន័យនេះត្រូវបានស្តារ ឬលុបចោលរួចហើយពី device ផ្សេង! ស្ថានភាពត្រូវបានធ្វើបច្ចុប្បន្នភាពវិញ។");
@@ -11179,7 +11179,7 @@
         if (!db || !fb || !id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
             const err = new Error('Refusing to merge barcode into history item with missing/unsafe id');
             console.error(err.message, id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'mergeBarcodeIntoHistoryItem' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'mergeBarcodeIntoHistoryItem' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
@@ -11197,7 +11197,7 @@
             return committed;
         }).catch((error) => {
             console.error("Error merging barcode into history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error merging barcode into history item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error merging barcode into history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
             throw error;
         });
@@ -11208,13 +11208,13 @@
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to save history item with missing/unsafe id');
             console.error(err.message, item && item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveSingleHistoryItemToFirebase' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'saveSingleHistoryItemToFirebase' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
         return fb.update(dbRefHistory, { [item.id]: item }).catch((error) => {
             console.error("Error saving history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving history item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error saving history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase!");
             throw error;
         });
@@ -11271,7 +11271,7 @@
                 started = patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
                     { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX });
             } catch (e) {
-                if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'flushPendingHistoryPatches' });
+                if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'flushPendingHistoryPatches' });
                 if (attempts < HISTORY_PATCH_RETRY_MAX) {
                     queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields);
                     noteAttempt(itemId, attempts);
@@ -11291,7 +11291,7 @@
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to patch history item with missing/unsafe id');
             console.error(err.message, item && item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'patchHistoryItemFields' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'patchHistoryItemFields' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.resolve(false);
         }
@@ -11333,7 +11333,7 @@
                 return false;
             }
             console.error("Error patching history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error patching history item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error patching history item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
             revertLocalFields();
             return false;
@@ -11345,13 +11345,13 @@
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to save deleted item with missing/unsafe id');
             console.error(err.message, item && item.id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'saveSingleDeletedItemToFirebase' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'saveSingleDeletedItemToFirebase' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
         return fb.update(dbRefDeleted, { [item.id]: item }).catch((error) => {
             console.error("Error saving deleted item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error saving deleted item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error saving deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
@@ -11362,13 +11362,13 @@
         if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
             const err = new Error('Refusing to delete deleted item with missing/unsafe id');
             console.error(err.message, id);
-            if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'deleteSingleDeletedItemFromFirebase' });
+            if (window.ZoeErrors) ZoeErrors.capture(err, { zone: 'data', context: 'deleteSingleDeletedItemFromFirebase' });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.reject(err);
         }
         return fb.update(dbRefDeleted, { [id]: null }).catch((error) => {
             console.error("Error deleting deleted item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { context: "Error deleting deleted item: " });
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error deleting deleted item: " });
             showToast("⚠️ បរាជ័យក្នុងការ Save ធុងសំរាមទៅ Firebase!");
             throw error;
         });
@@ -11771,7 +11771,7 @@
                     } else {
                         failedCount++;
                         console.error('Error clearing history item:', id, error);
-                        if (window.ZoeErrors) ZoeErrors.capture(error, { context: 'Error clearing history item', itemId: id });
+                        if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'Error clearing history item', itemId: id });
                         if (dbOpStalled(error)) { stalled = true; break; }
                     }
                 }

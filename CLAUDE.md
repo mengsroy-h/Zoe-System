@@ -90,14 +90,14 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.26.0` (`zoew-v157`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.26.1` (`zoew-v158`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.16` (`zoekeygen-v86`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
 `admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា — កុំយកទៅច្រឡំគ្នា។
 
-ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១២៧) · `zto-import/` (Apps Script ខាង
+ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១២៨) · `zto-import/` (Apps Script ខាង
 server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup/`
 (CLI ដាច់ដោយឡែក) · `docs/HISTORY.md`។
 
@@ -226,6 +226,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **តម្លៃដែល rules បដិសេធ** | ⛔ លេខអវិជ្ជមានត្រូវ **clamp មុនសរសេរ** — សតិត្រូវស៊ីនឹង server | `revenue-rules-clamp-test` |
 | **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
 | **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
+| **ស្ថិតិយក ↔ សាលក្រម server** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `pickedUpPhones` និង `packagesPickedUp` — **មិនមែនតែលុយទេ** | `revenue-rules-clamp-test` · `money-guardian-test` |
 | **transaction ដែល *បោះបង់*** | ⛔ `committed: false` ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល (`throw` ក្នុង handler ជោគជ័យ **មិន**ទៅដល់ handler បរាជ័យ) | `price-edit-abort-test` |
 | **កូនសោ registry កំព្រា** | ⛔ ការដោះដែលធ្លាក់ត្រូវចូលជួរ រួចរត់ឡើងវិញ — មិនលេបស្ងាត់ | `registry-release-test` |
 | **ជួរដោះ registry ↔ អ្នកដោះ** | ⛔ ការពន្យារត្រូវមានច្រកចេញទី ២ (ទិដ្ឋភាពមកដល់) | `registry-release-test` |
@@ -405,7 +406,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **checker បោះ «FAIL» តែចេញ exit 0** ➜ `run-all.sh` រាយថា PASS | `exit-code-integrity.js` (**រត់នេះមុនគេដែរ**) |
 
 | **ledger ៖ «អនុវត្ត ➜ ដកវិញ» លែងជាគូបញ្ច្រាស** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ | `ledger-clamp-symmetry-test.js` · **`emu/ledger-revert-emu-test.js`** (RTDB ពិត + rules ពិត) |
-| **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៤ ➜ អ្នកយាមត្រូវក្រហម) |
+| **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៦ ➜ អ្នកយាមត្រូវក្រហម) |
 | declaration ឈ្មោះ **ស្ទួន** ដែល JS hoist/សរសេរជាន់ស្ងាត់ · function ងាប់ | `function-surface-test.js` |
 | ជួរ barcode ខូច (sparse · `null`) ➜ **បញ្ជីកក** | `barcode-shape-test.js` |
 | រូបរាងទិន្នន័យឆៅពី Firebase (object ជំនួស array …) | `raw-read-shape-test.js` |
@@ -577,12 +578,20 @@ ledger តូចជាង delta ដែលកំពុងដក ៖ ការអ�
   `ZoeErrors.capture('… clamped to 0')` **មិនមែនជាការ clamp ទេ**។
 - **`pickedUpPhones/$phoneKey` ទាមទារ `> 0`** ➜ កូនសោដែលធ្លាក់ដល់ 0 ត្រូវ
   **លុប** មិនមែនសរសេរ `0`។
+- ⛔⛔ **ច្បាប់នេះអនុវត្តលើ *ស្ថិតិយក* ដូចគ្នាបេះបិទ** (កំណែ 2.26.1) ៖
+  `commitDailyPickupDelta` ត្រូវចាប់ `serverBefore`/`serverAfter` **ខាងក្នុង
+  transaction** រួចត្រឡប់ `pickupAppliedDelta(...)`; `revertPickupOnServer`
+  ត្រូវរង់ចាំសាលក្រមនោះ។ **ការបំបែក memory ↔ server ជាកាតព្វកិច្ច** ៖
+  `applyPickupMemoryDelta` (សតិ) ធៀបនឹង `commitDailyPickupDelta(..., serverOnly)`
+  (server) — ដូច `applyLedgerBucketDelta` ធៀបនឹង `commitDailyRevenueDelta`។
+  ⛔ **កុំឲ្យ `revertPickupLedgerDelta` ហៅ `addPickupToDailyRecord` វិញ** —
+  នោះជាការដកវិញតាម delta របស់សតិ ➜ **server ទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន**។
 - ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ ការដកធម្មតា (`50 - 12.5`) ត្រូវសរសេរ `37.5`
   **ពិតប្រាកដ** គ្មានការ clamp មុនពេល។
 
 Tools ៖ `ledger-clamp-symmetry-test` (browser) · **`emu/ledger-revert-emu-test`**
 (RTDB ពិត + rules ពិត តាម ETag/`if-match` — ជា ground truth) ·
-`money-guardian-test` (mutation ៤ ➜ អ្នកយាមត្រូវក្រហមពិត) ·
+`money-guardian-test` (mutation ៦ ➜ អ្នកយាមត្រូវក្រហមពិត) ·
 `price-edit-abort-test` · `revenue-rules-clamp-test` · `revenue-fuzz-test`។
 
 ## ⛔ barcode ស្ទួន ➜ លុយបូកស្ទួន
@@ -1404,7 +1413,7 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 
 # 🔬 វិន័យរបស់ឧបករណ៍ (checker discipline)
 
-## ⛔ សំណួរ ១២ មុនជឿថា checker ថ្មីមួយដំណើរការ
+## ⛔ សំណួរ ១៣ មុនជឿថា checker ថ្មីមួយដំណើរការ
 
 ១. វា **ស្កេន/រត់ឯកសារណា**ខ្លះ?
 ២. វាស្កេន **ទម្រង់វេយ្យាករណ៍ណា**ខ្លះ? (template literal ធៀបនឹងការតភ្ជាប់ខ្សែអក្សរ)
@@ -1639,14 +1648,33 @@ bash audit-tools/emu/rules.sh
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
 
-## ✅ គ្មានអ្វីនៅរង់ចាំទេ (2026-09-03)
+## កំណែ 2.26.1 — ស្ថិតិយកកើតឡើងពីអាកាសធាតុ
 
-កំណែ **2.26.0** (កំហុសលុយ ៖ ចំណូលកើតឡើងពីអាកាសធាតុ) ត្រូវបាន **ផ្ទៀងផ្ទាត់
-ដោយម្ចាស់គម្រោងលើ Firebase ពិត** រួចហើយ — រួមទាំង **ការបង្កើតកំហុសឡើងវិញ
-ដោយឧបករណ៍ ២**។ លម្អិតក្នុង [`docs/HISTORY.md`](docs/HISTORY.md)។
+**ZoeW ប៉ុណ្ណោះ** (`zoew-v157` ➜ `zoew-v158`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.16`)។
+⛔ **សកម្មភាពដែលត្រូវធ្វើដោយដៃ ៖ គ្មាន។** Firebase rules មិនប្រែ · env មិនប្រែ
+· CSP មិនប្រែ។
 
-⛔ **ជុំបន្ទាប់ត្រូវបន្ថែមធាតុថ្មីត្រង់នេះ** ពេលមានការកែដែលទាមទារការសាក
-លើឧបករណ៍ពិត — ហើយ **លុបវាចេញពេលអ្នកប្រើបញ្ជាក់**។
+ថ្នាក់កំហុសដដែលនឹង 2.26.0 តែនៅ **ស្ថិតិយក** ៖ ការដកវិញប្រើ delta របស់ **សតិ**
+ជំនួសសាលក្រម **server** ➜ ពេលទិដ្ឋភាពមូលដ្ឋានចាស់ជាង server នោះ server
+**ទទួលកញ្ចប់ និងលេខទូរស័ព្ទដែលវាមិនធ្លាប់មាន** ➜ លេខ «អតិថិជនយក / កញ្ចប់យក»
+ឡើងខ្ពស់ជាងការពិត **ជាអចិន្ត្រៃយ៍** (listener ផ្សាយតម្លៃខុសទៅគ្រប់ឧបករណ៍)។
+
+សូមផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត (ប្រើ **database តេស្ត** ដូចជុំមុន) ៖
+
+១. ⛔ **តេស្តសំខាន់បំផុត (ស្ថិតិយក · ឧបករណ៍ ២)** ៖
+   - **A** ៖ ស្កេនកញ្ចប់ ➜ បិទ «យក» ➜ អតិថិជនយក `1` · កញ្ចប់យក `1`
+   - **A** ៖ ចុចបើកវិញ **តែបិទ WiFi មុនវាចប់** (ទិដ្ឋភាពកក)
+   - **B** ៖ បើកកញ្ចប់នោះវិញ ➜ server ចុះមក `0`
+   - **A** ៖ បើក WiFi ➜ ទុកឲ្យវាដកវិញ
+   - ✅ លេខត្រូវនៅ **`0`** ⛔ មុនកែ វានឹង **ឡើងទៅ `1` ឬច្រើនជាង**
+២. **បិទ/បើក «យក» ធម្មតា** (បណ្តាញល្អ) ➜ លេខឡើងចុះ **១ ដងគត់** រាល់ការចុច។
+៣. **កែលេខទូរស័ព្ទរបស់កញ្ចប់ដែលយករួច** ➜ ស្ថិតិយកផ្លាស់ពីលេខចាស់ទៅថ្មី
+   **សរុបមិនប្រែ**។
+៤. **Reset ចំនួនយករួច** (PIN) ➜ លេខទៅ `0` ហើយ **មិនលោតត្រឡប់មកវិញ**។
+៥. ⛔ **អថេរ ៖ ផលបូក «អតិថិជនយក» ត្រូវស្មើ «កញ្ចប់យក»** គ្រប់ពេល។
+៦. **ការស្កេនធម្មតា · ដក · លុប · ស្តារ · ធុងសំរាម · Export · Locker ·
+   នាំចូល Excel · ចាក់សោ PIN** ត្រូវដើរដដែលបេះបិទ។
+៧. **Refresh** ➜ ត្រូវឃើញ `2.26.1` ក្នុងប្រអប់ចូលប្រព័ន្ធ។
 
 ---
 

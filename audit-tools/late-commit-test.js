@@ -98,6 +98,7 @@ const REAL_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getPickupPhoneKey',
     'closedBarcodeCount', 'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
+    'pickupAppliedDelta', 'applyPickupMemoryDelta', 'revertPickupOnServer',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'toggleCloseStatus'

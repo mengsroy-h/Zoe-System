@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.26.0';
+    const APP_VERSION = '2.26.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5673,9 +5673,16 @@
         }
     }
 
-    function addPickupToDailyRecord(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
-        if (!scanDateStr) scanDateStr = getFormattedDate();
+    function pickupAppliedDelta(before, after, phoneKey) {
+        const beforePhones = (before && before.pickedUpPhones) || {};
+        const afterPhones = (after && after.pickedUpPhones) || {};
+        return {
+            packages: ledgerNumber(after && after.packagesPickedUp) - ledgerNumber(before && before.packagesPickedUp),
+            customer: phoneKey ? (ledgerNumber(afterPhones[phoneKey]) - ledgerNumber(beforePhones[phoneKey])) : 0
+        };
+    }
 
+    function applyPickupMemoryDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
         if (!dailyPickupData[scanDateStr]) {
             dailyPickupData[scanDateStr] = { packagesPickedUp: 0, pickedUpPhones: {} };
         }
@@ -5694,19 +5701,32 @@
             else record.pickedUpPhones[phoneKey] = refCount;
         }
 
-        const applied = {
+        return {
             packages: record.packagesPickedUp - beforePackages,
             customer: phoneKey ? (ledgerNumber(record.pickedUpPhones[phoneKey]) - beforeRefCount) : 0
         };
+    }
 
-        commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, applied);
-        return { scanDate: scanDateStr, phoneKey: phoneKey || null, packages: applied.packages, customer: applied.customer };
+    function addPickupToDailyRecord(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
+        if (!scanDateStr) scanDateStr = getFormattedDate();
+        const applied = applyPickupMemoryDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd);
+        const server = commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, applied);
+        return { scanDate: scanDateStr, phoneKey: phoneKey || null, packages: applied.packages, customer: applied.customer, server: server };
+    }
+
+    function revertPickupOnServer(applied) {
+        return Promise.resolve(applied && applied.server).then((serverApplied) => {
+            const d = serverApplied || { packages: applied.packages, customer: applied.customer };
+            if (!d || (!d.packages && !d.customer)) return null;
+            return commitDailyPickupDelta(applied.scanDate, applied.phoneKey, -d.customer, -d.packages, d, true);
+        }, () => null);
     }
 
     function revertPickupLedgerDelta(applied) {
         if (!applied || !applied.scanDate) return null;
         if (!applied.packages && !applied.customer) return applied;
-        addPickupToDailyRecord(applied.scanDate, applied.phoneKey, -applied.customer, -applied.packages);
+        applyPickupMemoryDelta(applied.scanDate, applied.phoneKey, -applied.customer, -applied.packages);
+        revertPickupOnServer(applied);
         return applied;
     }
 
@@ -5720,7 +5740,16 @@
             scanDate: applied.scanDate,
             phoneKey: applied.phoneKey,
             packages: applied.packages + (extra ? extra.packages : 0),
-            customer: applied.customer + (extra ? extra.customer : 0)
+            customer: applied.customer + (extra ? extra.customer : 0),
+            server: Promise.all([applied.server, extra ? extra.server : null]).then((parts) => {
+                const a = parts[0];
+                const b = parts[1];
+                if (!a && !b) return null;
+                return {
+                    packages: (a ? a.packages : 0) + (b ? b.packages : 0),
+                    customer: (a ? a.customer : 0) + (b ? b.customer : 0)
+                };
+            }, () => null)
         };
     }
 
@@ -5785,15 +5814,18 @@
         }
     }
 
-    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, appliedDelta) {
-        if (!dbRefDailyPickup) return;
+    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, appliedDelta, serverOnly) {
+        if (!dbRefDailyPickup) return Promise.resolve(null);
         const applied = appliedDelta || { packages: ledgerNumber(packagesToAdd), customer: ledgerNumber(customerRefDelta) };
-        const recordRef = dailyPickupData[scanDateStr];
+        const recordRef = serverOnly ? null : dailyPickupData[scanDateStr];
         const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
-        fb.runTransaction(dateRef, (current) => {
+        let serverBefore = null;
+        let serverAfter = null;
+        return fb.runTransaction(dateRef, (current) => {
             const record = (current && typeof current === 'object') ? current : {};
             const pickedUpPhones = (record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? { ...record.pickedUpPhones } : {};
-            let packagesPickedUp = (parseFloat(record.packagesPickedUp) || 0) + (parseFloat(packagesToAdd) || 0);
+            serverBefore = { packagesPickedUp: parseFloat(record.packagesPickedUp) || 0, pickedUpPhones: { ...pickedUpPhones } };
+            let packagesPickedUp = serverBefore.packagesPickedUp + (parseFloat(packagesToAdd) || 0);
             if (packagesPickedUp < 0) {
                 if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily pickup underflow clamped to 0'), { context: scanDateStr, packagesPickedUp });
                 packagesPickedUp = 0;
@@ -5803,8 +5835,12 @@
                 if (refCount <= 0) delete pickedUpPhones[phoneKey];
                 else pickedUpPhones[phoneKey] = refCount;
             }
-            return { packagesPickedUp, pickedUpPhones };
-        }).catch(() => {
+            serverAfter = { packagesPickedUp, pickedUpPhones };
+            return serverAfter;
+        }).then((result) => {
+            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
+            return pickupAppliedDelta(serverBefore, serverAfter, phoneKey);
+        }, () => {
             if (recordRef && dailyPickupData[scanDateStr] === recordRef) {
                 recordRef.packagesPickedUp = ledgerNumber(recordRef.packagesPickedUp) - applied.packages;
                 if (recordRef.packagesPickedUp < 0) recordRef.packagesPickedUp = 0;
@@ -5817,6 +5853,7 @@
                 refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
+            return null;
         });
     }
 

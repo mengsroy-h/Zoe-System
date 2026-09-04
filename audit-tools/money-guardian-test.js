@@ -42,18 +42,22 @@ const SRC = fs.readFileSync(APP, 'utf8');
 const STRICT = process.env.MONEYGUARD_STRICT === '1';
 const GUARDS = [
     { file: 'emu/ledger-revert-emu-test.js', env: 'LEDGEREMU_APP_DIR', needs: 'RTDB emulator' },
-    { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', needs: null }
+    { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', needs: null },
+    { file: 'revenue-rules-clamp-test.js', env: 'REVCLAMP_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
 const MUTATIONS = [
     {
-        // ⚠️ **equivalent mutant ដែលវាស់រួច — កុំទាមទារអ្នកយាម។** ការត្រឡប់
-        // delta ដែល *ស្នើ* ធ្វើឲ្យ **សតិ** ខុសបណ្តោះអាសន្ន តែ
-        // `onValue(dbRefDailyRevenue)` សរសេរជាន់សតិពី server វិញក្នុងរយៈពេល
-        // មិល្លីវិនាទី ➜ **លទ្ធផលដែលអ្នកប្រើឃើញមិនប្រែ**។ វានៅក្នុងបញ្ជីនេះ
-        // ដើម្បីឲ្យ session ក្រោយដឹងថាវា **ត្រូវបានវាស់** មិនមែនត្រូវភ្លេច។
-        equivalent: true,
+        // 📌 **ធ្លាប់ជា equivalent mutant — លែងមែនទៀតហើយ (2026-09-03ខ).**
+        // ការវិភាគចាស់ ៖ ការត្រឡប់ delta ដែល *ស្នើ* ធ្វើឲ្យ **សតិ** ខុស
+        // បណ្តោះអាសន្ន តែ `onValue(dbRefDailyRevenue)` សរសេរជាន់វិញ ➜
+        // អ្នកប្រើមិនឃើញភាពខុស។ ការវិភាគនោះពិត **រហូតដល់ថ្ងៃដែល
+        // `revenue-rules-clamp-test` ចូលជាអ្នកយាម** — វាអះអាង «សតិ == server»
+        // ដោយផ្ទាល់ ➜ mutation នេះក្លាយជា **ចាប់បាន**។
+        // ⛔ មេរៀន ៖ «equivalent» ជាការវាស់នៃ *ថ្ងៃនោះ* មិនមែនលក្ខណៈអចិន្ត្រៃយ៍ទេ។
+        // ការសរសេរវាជា **ព័ត៌មាន** (មិនមែន `ok(caught.length === 0)`) ជាមូលហេតុ
+        // ដែលការដំឡើងនេះមិនធ្វើឲ្យ CI ធ្លាក់ក្លែងក្លាយ។
         name: 'ការដកវិញប្រើ delta ដែល *ស្នើ* ជំនួស delta ដែល *អនុវត្ត* (សតិតែម្យ៉ាង)',
         from: '        return ledgerAppliedDelta(before, bucket);',
         to: '        return { cod: Math.round(((parseFloat(codToAdd) || 0)) * 100) / 100, dod: Math.round(((parseFloat(dodToAdd) || 0)) * 100) / 100, count: (parseFloat(countToAdd) || 0) };'
@@ -69,6 +73,19 @@ const MUTATIONS = [
         name: 'ការ clamp ត្រូវដកចេញ (rules នឹងបដិសេធការសរសេរ)',
         from: '            if (codDollar < 0) codDollar = 0;\n            if (dodDollar < 0) dodDollar = 0;\n            if (totalCount < 0) totalCount = 0;\n            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;',
         to: '            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;'
+    },
+    {
+        // ⛔ ថ្នាក់ដដែលនឹង 2.26.0 តែនៅ **ស្ថិតិយក** ៖ `commitDailyPickupDelta`
+        // clamp ខាង server តែមិនត្រឡប់ delta ដែលអនុវត្តពិត ➜ ការដកវិញប្រើ
+        // delta របស់សតិ ➜ server ទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន។
+        name: 'ស្ថិតិយក ៖ ការដកវិញមិនគោរពសាលក្រម server',
+        from: '            const d = serverApplied || { packages: applied.packages, customer: applied.customer };',
+        to: '            const d = { packages: applied.packages, customer: applied.customer };'
+    },
+    {
+        name: 'ស្ថិតិយក ៖ commit ត្រឡប់ delta សតិ ជំនួសសាលក្រម server',
+        from: '            return pickupAppliedDelta(serverBefore, serverAfter, phoneKey);',
+        to: '            return applied;'
     },
     {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',

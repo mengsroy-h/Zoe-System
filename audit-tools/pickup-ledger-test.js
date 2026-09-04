@@ -102,7 +102,8 @@ ok('⛔ ការ merge ស្កេនមិនបញ្ចេញ delta (គ្
 const ctx = {
     console, Object, Math, parseFloat, String, Set, Date, Array, isNaN,
     dailyPickupData: {},
-    commitDailyPickupDelta: () => {},
+    Promise,
+    commitDailyPickupDelta: () => Promise.resolve(null),
     getFormattedDate: () => '2026-08-27'
 };
 vm.createContext(ctx);
@@ -110,7 +111,10 @@ vm.runInContext([
     sliceFn('ledgerNumber'),
     sliceFn('getPickupPhoneKey'),
     sliceFn('countPickedUpCustomers'),
+    sliceFn('pickupAppliedDelta'),
+    sliceFn('applyPickupMemoryDelta'),
     sliceFn('addPickupToDailyRecord'),
+    sliceFn('revertPickupOnServer'),
     sliceFn('revertPickupLedgerDelta'),
     sliceFn('correctPickupLedgerToActual'),
     helperSrc || 'function closedBarcodeCount(item){ return item && item.barcodes ? item.barcodes.filter(function(b){return b && b.isClosed;}).length : 0; }',

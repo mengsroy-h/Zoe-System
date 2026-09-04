@@ -451,7 +451,8 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             resumeScanVideo: () => {},
             ZoeErrors: { capture: (e, c) => captures.push(c && c.context) },
             __fetches: fetches, __captures: captures, __filled: filled, __unlockActions: unlockActions,
-            __status: statusEl, __deferreds: deferreds, __modals: modals, __store: storeData
+            __status: statusEl, __deferreds: deferreds, __modals: modals, __store: storeData,
+            __modalIds: modals
         };
         ctx.window = ctx;
         vm.createContext(ctx);
@@ -706,6 +707,25 @@ scenario('⛔ បិទប្រអប់ PIN ➜ Lookup បន្តភ្ល�
 
 // ⛔ ទិសផ្ទុយ ៖ ការកែមិនត្រូវក្លាយជា «មិនសម្អាតអ្វីសោះ» — ស្ថានភាពរបស់
 //   ប្រអប់ណា ត្រូវសម្អាតពេលប្រអប់ **នោះ** បិទ ហើយពេលជង់ប្រអប់ទទេទាំងស្រុង។
+// ⛔ ផ្លូវចាកចេញ ៖ `showLoginModalWithPrefill()` បិទប្រអប់ **ទាំងអស់** ជាវដ្ត។
+//   ក្រោយការកែ ការសម្អាតជា «ម្ចាស់ ឬ ជង់ទទេ» ➜ ត្រូវបញ្ជាក់ថាវដ្តនោះនៅតែ
+//   សម្អាតគ្រប់យ៉ាង បើមិនដូច្នេះទិន្នន័យអតិថិជននឹងរស់រានក្រោយចាកចេញ។
+scenario('⛔ ចាកចេញ ៖ បិទប្រអប់ទាំងអស់ជាវដ្ត ➜ សម្អាតគ្រប់ស្ថានភាព', () => {
+    const ctx = buildAutoRuntime({ realModals: true });
+    vm.runInContext('openModalHelper("phoneModal"); openModalHelper("editPhoneModal"); openModalHelper("callMarkModal");', ctx);
+    vm.runInContext('pendingBarcode = "BC1"; editingItemId = "E1"; markingItemId = "M1";', ctx);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ប្រអប់ ៣ បើកពិត',
+        ctx.__modals.phoneModal.style.display === 'flex'
+        && ctx.__modals.editPhoneModal.style.display === 'flex'
+        && ctx.__modals.callMarkModal.style.display === 'flex');
+    // ធ្វើត្រាប់តាមវដ្តរបស់ showLoginModalWithPrefill()
+    vm.runInContext('Object.keys(__modalIds).forEach(function (id) { if (id !== "loginModal") closeModal(id); });', ctx);
+    ok('⛔ ចាកចេញ ➜ pendingBarcode ត្រូវសម្អាត', ctx.pendingBarcode === '', ctx.pendingBarcode);
+    ok('⛔ ចាកចេញ ➜ editingItemId ត្រូវសម្អាត', ctx.editingItemId === null, ctx.editingItemId);
+    ok('⛔ ចាកចេញ ➜ markingItemId ត្រូវសម្អាត', ctx.markingItemId === null, ctx.markingItemId);
+    ok('⛔ ចាកចេញ ➜ ដោះការចាក់សោរមូរ', ctx.document.body.style.overflow === '', ctx.document.body.style.overflow);
+});
+
 scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ចាស់ ➜ ស្ថានភាពត្រូវសម្អាតពិត', () => {
     const ctx = buildAutoRuntime({ realModals: true });
     vm.runInContext('openModalHelper("phoneModal"); pendingBarcode = "BC1"; editingItemId = "E1"; markingItemId = "M1";', ctx);

@@ -258,8 +258,12 @@ for (const app of APPS) {
 
 ok('ស្កេន ' + scanned + ' ឯកសារ · រកឃើញ template HTML ' + sinkCount
     + ' កន្លែង · HTML តាមការតភ្ជាប់ខ្សែអក្សរ ' + concatCount + ' កន្លែង');
-ok('ទម្រង់ HTML ទាំង ២ ត្រូវបានស្កេន (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)',
-    concatCount > 0);
+if (concatCount > 0) {
+    ok('ទម្រង់ HTML ទាំង ២ ត្រូវបានស្កេន (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)');
+} else {
+    bad('⛔ ជាន់អប្បបរមា ៖ ការស្កេន HTML តាមការតភ្ជាប់ខ្សែអក្សររកមិនឃើញអ្វីសោះ',
+        'concatCount = 0 ➜ ទម្រង់នោះលែងត្រូវបានវាស់ (scanner ខូច ឬលំនាំប្រែ)');
+}
 if (offenders.length === 0) {
     ok('គ្រប់ `${...}` ក្នុង sink ឆ្លងកាត់ sanitizeInput()/escapeHtml() ឬជាលេខ');
 } else {

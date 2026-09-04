@@ -17,11 +17,12 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const { emuNamespace } = require('./ns.js');
 const vm = require('vm');
 
 const ROOT = process.env.LEDGEREMU_APP_DIR ? path.resolve(process.env.LEDGEREMU_APP_DIR) : path.join(__dirname, '..', '..');
 const BASE = { host: '127.0.0.1', port: parseInt(process.env.LEDGEREMU_PORT || '9000', 10) };
-const NS = 'ns=demo-zoe-ledger';
+const NS = 'ns=' + emuNamespace('demo-zoe-ledger');
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));
 const DATE = '2026-08-26';
 const MONTH = DATE.substring(0, 7);
@@ -227,5 +228,7 @@ async function scenario(label, seedDaily, seedMonthly, delta, memoryDaily) {
 
     if (pass + fail < 11) { console.log('  FAIL  ការអះអាងតិចជាងជាន់អប្បបរមា (' + (pass + fail) + ' < 11)'); fail++; }
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')' : '✅ គ្មានបញ្ហា — ok ' + pass));
+    if (fail) console.log('  namespace: ' + NS);
+    else await owner('PUT', '/.json', null);
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.log('  FAIL  ' + (e && e.message || e)); process.exit(1); });

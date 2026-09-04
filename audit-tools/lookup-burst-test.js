@@ -63,7 +63,7 @@ function sliceFn(name) {
 }
 
 const NEEDED = ['elapsedSince', 'retryAsync', 'lookupResponseError', 'markLookupTimeoutNoRetry',
-    'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse',
+    'lookupFailureCooldownMs', 'lookupFailureIsDefinitive', 'retryTransientLookupResponse', 'noteSheetScriptVersion',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'getFastLookupRow', 'setFastLookupRow',
     'attemptAutoLookup'];
@@ -105,6 +105,7 @@ function buildRuntime(opts) {
         lookupFastCache: new Map(),
         lookupLockedNoticeShown: false,
         lookupSecretKey: null,
+        sheetScriptVersionSeen: null,
         pendingLookupUnlockBarcode: '',
         pendingLookupUnlockResolve: null,
         pendingBarcode: '',

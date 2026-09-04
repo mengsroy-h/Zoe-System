@@ -309,7 +309,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
-| **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM | `health-check-test` |
+| **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub** | `health-check-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
 | **Apps Script ↔ simple request** | ⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវ Lookup ផង** — គ្មាន header ផ្ទាល់ខ្លួន ហើយ **មិនសុំ PIN** សម្រាប់វា | `lookup-prefetch-test` |
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
@@ -340,7 +340,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
 | **Base directory របស់ Netlify** | ⛔ **ប្រកាន់អក្សរតូចធំ** ៖ `ZoeW` · `ZoeKeyGen` (រស់ក្នុង UI) | 📝 |
-| **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច | 📝 |
+| **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច ➜ `SCRIPT_VERSION` ត្រូវឡើងលើ **រាល់ចម្លើយ** ពីចំណុចចេញ **តែមួយ** | `google-sheets-cache-test` · `health-check-test` |
 
 ---
 

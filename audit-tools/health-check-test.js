@@ -47,9 +47,9 @@ function sliceFn(name) {
 
 const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'ztoDiagnosticsUrl', 'runHealthCheck',
+    'healthServiceWorkerRow', 'healthLookupRow', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
-    'sanitizeInput', 'elapsedSince'];
+    'sanitizeInput', 'elapsedSince', 'fetchWithTimeout'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -85,18 +85,33 @@ function buildRuntime(over) {
         customerDataTableFetchedAt: 1,
         customerTableIsPartial: !!o.partial,
         lookupSecretKey: o.unlocked === false ? null : {},
+        SHEET_SCRIPT_VERSION_EXPECTED: 1,
+        sheetScriptVersionSeen: o.scriptSeen === undefined ? null : o.scriptSeen,
         dbListenerViewIsStale: () => !!o.stale,
         cleanupClockIsTrustworthy: () => o.cleanupOk !== false,
         getServerNow: () => 1770000000000,
         getLookupApiConfig: () => (o.cfg === undefined ? null : o.cfg),
         decryptLookupSecret: () => Promise.resolve(o.secretPlain === undefined ? SECRET : o.secretPlain),
         withTimeout: (p) => p,
-        fetchWithTimeout: (url, init) => {
+        AbortController: typeof AbortController === 'function' ? AbortController : undefined,
+        // ⛔ `fetchWithTimeout` ត្រូវជា **កូដពិត** ដែលស្រង់ចេញពី app.js ៖ វាដោះ
+        //    ជា `{ res, body }` មិនមែន `Response` ទេ។ ជំនាន់មុននៃឯកសារនេះ
+        //    **stub វា** ➜ ការហៅដែលអានវាជា `Response` (`res.ok` = undefined)
+        //    ឆ្លងកាត់ការវាស់ ➜ ផលិតកម្មរាយ «HTTP undefined» ជា ❌ លើ Cookie
+        //    ដែលដំណើរការធម្មតា។ **ការ stub ស្នាមភ្ជាប់ដែលកំពុងវាស់ = ការវាស់
+        //    អ្វីផ្សេង។** ដូច្នេះឥឡូវ stub តែ `fetch` ប៉ុណ្ណោះ។
+        fetch: (url, init) => {
             fetches.push({ url, headers: (init && init.headers) || {} });
             if (o.fetchImpl) return o.fetchImpl(url, init);
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(o.diagBody || {
-                ok: true, cookie: { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 600000, storeReason: 'env-fallback' }
-            }) });
+            const status = o.httpStatus || 200;
+            const okRes = status >= 200 && status < 300;
+            return Promise.resolve({
+                ok: okRes,
+                status: status,
+                json: () => Promise.resolve(o.diagBody || {
+                    ok: true, cookie: { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 600000, storeReason: 'env-fallback' }
+                })
+            });
         },
         closeSideDrawer: () => {},
         openModalHelper: () => {},
@@ -107,7 +122,7 @@ function buildRuntime(over) {
     vm.createContext(ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n')
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
-        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, ztoDiagnosticsUrl };';
+        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl };';
     vm.runInContext(code, ctx);
     return { api: ctx.api, fetches, pinPrompts, listEl, btnEl };
 }
@@ -127,6 +142,17 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         ok('ZTO ៖ header សម្ងាត់ត្រូវផ្ញើក្នុង request', rt.fetches[0].headers['X-Zoe-Proxy-Key'] === SECRET);
         ok('⛔ ZTO ៖ តម្លៃសម្ងាត់មិនឡើងដល់អត្ថបទដែលបង្ហាញ', html.indexOf(SECRET) === -1);
         ok('ZTO ៖ បង្ហាញលេខសម្គាល់ Cookie ៨ តួ', html.indexOf('a1b2c3d4') !== -1);
+        // 🔴 ការថយក្រោយពិត (រាយការណ៍ដោយអ្នកប្រើលើឧបករណ៍ពិត) ៖ កូដអាន
+        //    លទ្ធផលរបស់ `fetchWithTimeout` ជា `Response` ➜ `res.ok` undefined
+        //    ➜ **រាយ ❌ «HTTP undefined» លើ Cookie ដែលដំណើរការ**។
+        ok('⛔ Cookie ដំណើរការ ➜ មិនត្រូវរាយ ❌ ដាច់ខាត', html.indexOf('health-bad') === -1, html.slice(0, 120));
+        ok('⛔ គ្មានពាក្យ «undefined» ក្នុងអត្ថបទដែលអ្នកប្រើអាន', html.indexOf('undefined') === -1);
+    }
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, httpStatus: 500 });
+        const html = await rt.api.healthLookupRow();
+        ok('⛔ HTTP 500 ➜ ❌ ព្រមទាំង **លេខពិត** មិនមែន undefined',
+            state(html) === 'bad' && /500/.test(html) && html.indexOf('undefined') === -1, html.slice(0, 140));
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: { source: 'none', fingerprint: null } } });
@@ -196,9 +222,30 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         await rt.api.runHealthCheck();
         const html = rt.listEl.innerHTML;
         const rows = (html.match(/class="health-row/g) || []).length;
-        ok('runHealthCheck() បង្ហាញជួរគ្រប់ ៨', rows === 8, rows);
+        ok('runHealthCheck() បង្ហាញជួរគ្រប់ ៩', rows === 9, rows);
         ok('⛔ លទ្ធផលទាំងមូលមិនផ្ទុកតម្លៃសម្ងាត់', html.indexOf(SECRET) === -1);
         ok('ប៊ូតុងពិនិត្យម្តងទៀតត្រូវដោះវិញក្រោយចប់', rt.btnEl.disabled === false);
+    }
+    {
+        ok('⛔ Lookup មិនប្រើ Sheet ➜ ជួរកំណែ Script ជា ℹ️ (មិនពាក់ព័ន្ធ)',
+            state(buildRuntime({ cfg: ZTO_CFG, scriptSeen: 1 }).api.healthSheetScriptRow()) === 'info');
+        ok('⛔ មិនទាន់ឃើញកំណែសោះ ➜ ℹ️ ព្រមទាំងវិធីដឹង (មិនមែន ❌)',
+            state(buildRuntime({ cfg: SHEET_CFG }).api.healthSheetScriptRow()) === 'info');
+        const same = buildRuntime({ cfg: SHEET_CFG, scriptSeen: 1 }).api.healthSheetScriptRow();
+        ok('កំណែត្រូវគ្នា ➜ ✅ (ទិសវិជ្ជមាន)', state(same) === 'ok', state(same));
+        const older = buildRuntime({ cfg: SHEET_CFG, scriptSeen: 0 }).api.healthSheetScriptRow();
+        ok('⛔ Script ដែល deploy ចាស់ជាង App ➜ ⚠️ ព្រមទាំងវិធីដោះស្រាយ',
+            state(older) === 'warn' && /Deploy/.test(older), state(older));
+        const newer = buildRuntime({ cfg: SHEET_CFG, scriptSeen: 9 }).api.healthSheetScriptRow();
+        ok('⛔ ទិសផ្ទុយ ៖ Script ថ្មីជាង App ➜ ⚠️ ព្រមទាំងណែនាំទាញ App',
+            state(newer) === 'warn' && /ទាញ App/.test(newer), state(newer));
+        // ⛔ ប្តូរ config Lookup ➜ កំណែដែលឃើញត្រូវបាត់ បើមិនដូច្នេះជួរនេះបង្ហាញ
+        //    កំណែរបស់ deployment **ចាស់** លើ URL ថ្មី ➜ ការវិនិច្ឆ័យកុហក។
+        const srcAll = NEEDED.map((n) => src[n] || '').join('\n');
+        ok('⛔ `clearCustomerDataTableCache()` លុបកំណែដែលឃើញចោល',
+            /function clearCustomerDataTableCache\(\)\s*\{\s*sheetScriptVersionSeen = null;/.test(srcAll));
+        ok('ស្លាកប្រាប់ច្បាស់ថាវាគ្របផ្លូវ Lookup (គម្រោងសរសេរចូលជាគម្រោងផ្សេង)',
+            /កំណែ Apps Script \(Lookup\)/.test(same), same.slice(0, 90));
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG });

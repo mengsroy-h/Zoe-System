@@ -81,7 +81,8 @@ function testMalformedCachedRowsRefreshes() {
         barcode: 'abc-1',
         dod: 12,
         cod: 34,
-        phone: '012345678'
+        phone: '012345678',
+        scriptVersion: 1
     });
     assert.deepStrictEqual(api.calls.remove, ['customer_rows_v2_2']);
     assert.strictEqual(api.calls.ranges, 1);
@@ -97,6 +98,7 @@ function testOversizeRowsSkipCacheAndRespond() {
     assert.strictEqual(lookup.barcode, 'BIG-1');
     assert.strictEqual(lookup.phone, oversizedPhone);
     assert.deepStrictEqual(list.rows, [{ barcode: 'BIG-1', dod: 45, cod: 67, phone: oversizedPhone }]);
+    assert.strictEqual(list.scriptVersion, 1);
     assert.strictEqual(api.calls.put.length, 0);
     assert.strictEqual(api.calls.ranges, 2);
 }
@@ -112,7 +114,8 @@ function testCachePutFailureDoesNotBreakLookup() {
         barcode: 'SAFE-1',
         dod: 5,
         cod: 6,
-        phone: '010101'
+        phone: '010101',
+        scriptVersion: 1
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.ranges, 1);
@@ -126,7 +129,8 @@ function testSmallRowsAreCached() {
         rows: [
             { barcode: 'CACHE-1', dod: 1, cod: 2, phone: '0123' },
             { barcode: 'CACHE-2', dod: 3, cod: 4, phone: '0456' }
-        ]
+        ],
+        scriptVersion: 1
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.put[0].key, 'customer_rows_v2_3');
@@ -138,4 +142,30 @@ testMalformedCachedRowsRefreshes();
 testOversizeRowsSkipCacheAndRespond();
 testCachePutFailureDoesNotBreakLookup();
 testSmallRowsAreCached();
+
+// ⛔ កំណែ Script ត្រូវឡើងលើ **រាល់** ចម្លើយ — ការដាក់វាក្នុង `jsonResponse()`
+//    (ចំណុចរួមតែមួយ) ជាអ្វីដែលធានាថាគ្មានផ្លូវណាភ្លេចវា។ បើថ្ងៃណានរណាម្នាក់
+//    សរសេរ `ContentService.createTextOutput(...)` ដោយផ្ទាល់ ការអះអាងនេះធ្លាក់។
+function testEveryResponseCarriesScriptVersion() {
+    const src = source;
+    const declared = /var\s+SCRIPT_VERSION\s*=\s*(\d+)\s*;/.exec(src);
+    assert.ok(declared, 'SCRIPT_VERSION ត្រូវប្រកាសជាចំនួនគត់');
+    const version = Number(declared[1]);
+
+    const api = createApi({ rows: [['V-1', 1, 2, '0123']] });
+    const responses = [
+        api.request({ code: 'V-1' }),
+        api.request({ code: 'NOT-THERE' }),
+        api.request({ list: '1' }),
+        api.request({ key: 'wrong-key' })
+    ];
+    for (const res of responses) {
+        assert.strictEqual(res.scriptVersion, version);
+    }
+
+    const outputs = (src.match(/ContentService\.createTextOutput/g) || []).length;
+    assert.strictEqual(outputs, 1, 'ត្រូវមានចំណុចចេញតែ ១ (jsonResponse) ➜ គ្មានផ្លូវណារំលងកំណែបាន');
+}
+
+testEveryResponseCarriesScriptVersion();
 console.log('google-sheets-cache-test: PASS');

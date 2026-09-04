@@ -54,7 +54,7 @@ function sliceFn(name) {
 
 const NEEDED = ['dropAutoLookupQueueEntry', 'scheduleAutoLookupQueueRetry',
     'pumpAutoLookupQueue', 'clearAutoLookupQueueRetries',
-    'retryAsync', 'retryTransientLookupResponse', 'attemptAutoLookup', 'setLookupStatus',
+    'retryAsync', 'retryTransientLookupResponse', 'noteSheetScriptVersion', 'attemptAutoLookup', 'setLookupStatus',
     'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
     'retryPendingLookupAfterUnlock', 'elapsedSince',
     'lookupResponseError', 'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs',
@@ -93,6 +93,7 @@ function buildRuntime(plan) {
         lookupFastCache: new Map(),
         lookupLockedNoticeShown: false,
         lookupSecretKey: null,
+        sheetScriptVersionSeen: null,
         pendingLookupUnlockBarcode: '',
         pendingLookupUnlockResolve: null,
         pendingBarcode: 'BC1',
@@ -138,7 +139,7 @@ function buildRuntime(plan) {
     vm.createContext(ctx);
     ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
      'retryPendingLookupAfterUnlock', 'lookupResponseError', 'markLookupTimeoutNoRetry',
-     'retryTransientLookupResponse', 'retryAsync', 'lookupFailureCooldownMs',
+     'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',
      'lookupFailureIsDefinitive', 'dropAutoLookupQueueEntry',
      'scheduleAutoLookupQueueRetry', 'pumpAutoLookupQueue',
      'clearAutoLookupQueueRetries'].forEach((n) => {

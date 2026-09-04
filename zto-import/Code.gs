@@ -1,3 +1,4 @@
+var SCRIPT_VERSION = 1;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
@@ -463,7 +464,9 @@ function runApiAction_(body) {
 }
 
 function jsonOut_(payload) {
-    return ContentService.createTextOutput(JSON.stringify(payload))
+    var body = payload || {};
+    body.scriptVersion = SCRIPT_VERSION;
+    return ContentService.createTextOutput(JSON.stringify(body))
         .setMimeType(ContentService.MimeType.JSON);
 }
 

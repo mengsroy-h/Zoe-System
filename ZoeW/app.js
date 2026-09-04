@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.28.0';
+    const APP_VERSION = '2.28.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -722,7 +722,15 @@
         return /^HTTP (401|403)$/.test(error && error.message || '');
     }
 
+    function noteSheetScriptVersion(body) {
+        const raw = body && body.scriptVersion;
+        const seen = typeof raw === 'number' ? raw : parseInt(String(raw === undefined ? '' : raw), 10);
+        if (!Number.isFinite(seen) || seen < 0) return;
+        sheetScriptVersionSeen = seen;
+    }
+
     function retryTransientLookupResponse(out) {
+        noteSheetScriptVersion(out && out.body);
         const status = Number(out && out.res && out.res.status);
         const code = String(out && out.body && out.body.code || '');
         if (code === 'ZTO_AUTH_NOT_CONFIGURED' || code === 'ZTO_CONFIG_INVALID'
@@ -3142,6 +3150,7 @@
     let customerTableSoonTimer = null;
     let customerTableSoonArmedAt = 0;
     let customerTableIsPartial = false;
+    let sheetScriptVersionSeen = null;
     let ztoWarmupAt = 0;
     let ztoWarmupInFlight = false;
 
@@ -3249,6 +3258,8 @@
         return true;
     }
 
+    const SHEET_SCRIPT_VERSION_EXPECTED = 1;
+
     const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
 
     function healthRowHtml(state, label, detail) {
@@ -3317,6 +3328,28 @@
         }
     }
 
+    function healthSheetScriptRow() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !lookupApiIsAppsScript(cfg)) {
+            return healthRowHtml('info', 'កំណែ Apps Script (Lookup)', 'មិនពាក់ព័ន្ធ (Lookup មិនប្រើ Google Sheet)');
+        }
+        if (sheetScriptVersionSeen === null) {
+            return healthRowHtml('info', 'កំណែ Apps Script (Lookup)',
+                'មិនទាន់ដឹង — សូមស្កេនកញ្ចប់ ១ ដង ឬទាញតារាងអតិថិជន រួចពិនិត្យម្តងទៀត');
+        }
+        if (sheetScriptVersionSeen === SHEET_SCRIPT_VERSION_EXPECTED) {
+            return healthRowHtml('ok', 'កំណែ Apps Script (Lookup)', 'កំណែ ' + sheetScriptVersionSeen + ' — ត្រូវគ្នានឹង App');
+        }
+        if (sheetScriptVersionSeen < SHEET_SCRIPT_VERSION_EXPECTED) {
+            return healthRowHtml('warn', 'កំណែ Apps Script (Lookup)',
+                'Script ដែល deploy ជាកំណែ ' + sheetScriptVersionSeen + ' តែ App រំពឹង '
+                + SHEET_SCRIPT_VERSION_EXPECTED + ' — សូម copy Code.gs ថ្មីចូល script.google.com រួច Deploy ជាកំណែថ្មី');
+        }
+        return healthRowHtml('warn', 'កំណែ Apps Script (Lookup)',
+            'Script ជាកំណែ ' + sheetScriptVersionSeen + ' ថ្មីជាង App (' + SHEET_SCRIPT_VERSION_EXPECTED
+            + ') — សូមទាញ App ចុះឡើងវិញ');
+    }
+
     function healthCustomerTableRow() {
         if (!Array.isArray(customerDataTableRows)) {
             return healthRowHtml('info', 'តារាងអតិថិជន', 'មិនទាន់ទាញមកទេ');
@@ -3382,13 +3415,17 @@
             headers[cfg.headerName] = value;
         }
         try {
-            const res = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
+            const out = await fetchWithTimeout(ztoDiagnosticsUrl(cfg),
                 { method: 'GET', headers, cache: 'no-store', credentials: 'same-origin' },
-                ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out');
-            if (!res.ok) {
-                return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)', 'Server ឆ្លើយ HTTP ' + res.status);
+                ZTO_TEST_TIMEOUT_MS, 'ZTO diagnostics timed out',
+                (r) => (r.ok ? r.json() : null));
+            const res = out && out.res;
+            if (!res || !res.ok) {
+                const status = Number(res && res.status);
+                return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)',
+                    'Server ឆ្លើយ HTTP ' + (Number.isFinite(status) ? status : 'មិនស្គាល់'));
             }
-            const body = await res.json();
+            const body = out.body;
             const source = safeLookupReason(body && body.cookie && body.cookie.source) || 'none';
             const fingerprint = safeLookupReason(body && body.cookie && body.cookie.fingerprint);
             if (source === 'none' || !fingerprint) {
@@ -3419,7 +3456,7 @@
         if (btn) btn.disabled = true;
         list.innerHTML = '<div class="health-row health-info"><span class="health-ico">⏳</span>'
             + '<span class="health-text"><b>កំពុងពិនិត្យ…</b></span></div>';
-        const rows = [healthNetworkRow(), healthDatabaseRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow()];
+        const rows = [healthNetworkRow(), healthDatabaseRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
         const [licenseRow, lookupRow] = await Promise.all([healthLicenseRow(), healthLookupRow()]);
         rows.splice(3, 0, licenseRow);
         rows.push(lookupRow);
@@ -3646,6 +3683,7 @@
     }
 
     function clearCustomerDataTableCache() {
+        sheetScriptVersionSeen = null;
         clearCustomerTableRetry();
         clearCustomerTableSoonRefresh();
         clearZtoWarmSoon();
@@ -4280,6 +4318,7 @@
         expandedTrashGroups.clear();
         activeParentItemId = null;
         lookupSecretKey = null;
+        sheetScriptVersionSeen = null;
         cancelPendingLookupUnlock();
         clearLookupStatus();
         clearSheetImportSession();

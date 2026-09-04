@@ -381,6 +381,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             lookupFastCache: new Map(),
             lookupLockedNoticeShown: false,
             lookupSecretKey: null,
+            sheetScriptVersionSeen: null,
             pendingLookupUnlockBarcode: '',
             pendingLookupUnlockResolve: null,
             pendingBarcode: 'BC1',
@@ -472,6 +473,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('markLookupTimeoutNoRetry'), ctx);
         vm.runInContext(sliceFn('lookupFailureCooldownMs'), ctx);
         vm.runInContext(sliceFn('lookupFailureIsDefinitive'), ctx);
+        vm.runInContext(sliceFn('noteSheetScriptVersion'), ctx);
         vm.runInContext(sliceFn('retryTransientLookupResponse'), ctx);
         vm.runInContext(sliceFn('dropAutoLookupQueueEntry'), ctx);
         vm.runInContext(sliceFn('scheduleAutoLookupQueueRetry'), ctx);
@@ -610,7 +612,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
         vm.createContext(ctx);
         ['lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
             'lookupApiSupportsList', 'buildCustomerListApiUrl',
-            'retryTransientLookupResponse', 'retryAsync'].forEach((name) => {
+            'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync'].forEach((name) => {
             vm.runInContext(sliceFn(name), ctx);
         });
         vm.runInContext(listSrc, ctx);

@@ -1,3 +1,4 @@
+var SCRIPT_VERSION = 1;
 var CACHE_TTL_SECONDS = 300;
 var CACHE_KEY_PREFIX = 'customer_rows_v2_';
 
@@ -89,5 +90,7 @@ function doGet(e) {
 }
 
 function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  var payload = obj || {};
+  payload.scriptVersion = SCRIPT_VERSION;
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 }

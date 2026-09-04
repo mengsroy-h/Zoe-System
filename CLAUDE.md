@@ -97,7 +97,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.27.1` (`zoew-v161`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.27.2` (`zoew-v162`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.16` (`zoekeygen-v86`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -302,7 +302,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
 | **ZTO ៖ auto-login** | ⛔ **ដកចេញរួច (2.25.0)** — IdP មិនបើកឲ្យ IP របស់ Netlify; កុំនាំវាមកវិញ | `zto-proxy-test` |
 | **ZTO ៖ Cookie store** | ⛔ Blobs ដាច់/ព្យួរ ➜ ត្រូវធ្លាក់ចុះទៅ env មិនមែនធ្លាក់ lookup | `zto-cookie-store-test` |
-| **ZTO ៖ ការត្រៀម (warm-up)** | ត្រៀមតាម **ចេតនាអ្នកប្រើ** ហើយត្រៀម **Cookie** ផង មិនត្រឹម container | `lookup-prefetch-test` · `zto-cookie-store-test` |
+| **ZTO ៖ ការត្រៀម (warm-up)** | ត្រៀមតាម **ចេតនាអ្នកប្រើ** ហើយត្រៀម **Cookie** ផង មិនត្រឹម container; ⛔ **រវល់ពេលដល់ម៉ោង ➜ តាំងម៉ោងឡើងវិញ មិនបោះបង់** (ពិដាន ៩០ វិ.) | `lookup-prefetch-test` · `zto-cookie-store-test` |
 | **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
 | **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
 | **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
@@ -1688,7 +1688,7 @@ bash audit-tools/emu/rules.sh
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
 
-## ⏳ កំណែ 2.27.1 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+## ⏳ កំណែ 2.27.1 (merge រួច) និង 2.27.2 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
 កែតាមរបាយការណ៍អ្នកប្រើ ៖
 
@@ -1697,7 +1697,8 @@ bash audit-tools/emu/rules.sh
    ស្រាប់ ➜ ប្រអប់ PIN នេះលែងលោតពេលស្កេនទាល់តែសោះ។
 ២. **Keyboard មិនលោតកាត់ខណៈកំពុងស្វែងរក** ➜ ពេល ZTO ឆ្លើយថារកមិនឃើញ
    (ឬធ្លាក់) Keyboard មកក្នុង ០.២៥ វិ.។
-៣. **ZTO Lookup លឿនជាងមុន** ៖ ការស្កេនក្រោយ TTL ៦០ វិ. លែងទប់រង់ចាំការអាន
+៣. **ZTO Lookup លឿនជាងមុន** ៖ (2.27.2) ការត្រៀម Lambda លែងខកខានពេលកំពុងស្កេន
+   (រវល់ ➜ សាកវិញរាល់ ៣ វិ.) ➜ cold start តិចជាងមុន។ (2.27.1) ការស្កេនក្រោយ TTL ៦០ វិ. លែងទប់រង់ចាំការអាន
    Netlify Blobs (វាស់បាន ៖ ៦១ms ➜ ០ms · ២៥២ms ➜ ០ms · ១,៨០១ms ➜ ០ms
    តាមល្បឿន Blobs)។ Cookie ដែល Argus បន្តអាយុ លែងត្រូវបោះចោលដោយពិដានល្បឿន
    ➜ 401 តិចជាងមុន។ **ឧបករណ៍ Cookie លើ Windows** ព្យាយាមឡើងវិញ ៣ ដងពេល

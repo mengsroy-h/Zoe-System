@@ -266,7 +266,7 @@ if (process.env.EXITCODE_CHILD) {
     }
 }
 
-console.log('\n=== ៦. checker ត្រូវ bind port ចៃដន្យ លើ 127.0.0.1 ប៉ុណ្ណោះ ===');
+console.log('\n=== ៦. checker មិនត្រូវចែករំលែកធនធានថេរ (port · RTDB namespace) ===');
 // ⛔ ច្បាប់នេះរស់នៅក្នុង `CLAUDE.md` តាំងពីយូរ **ដោយគ្មានឧបករណ៍ចាក់សោ** —
 // ហើយវាត្រូវបានរំលោភពិត ៖ checker **៥** ប្រើ port ថេរ រហូតដល់កំណែ 2.20.7
 // (វាស់ដោយផ្ទាល់ខណៈធ្វើ mutation testing ស្របគ្នា ៖ `layout-check` និង
@@ -350,6 +350,162 @@ function stripLiterals(src) {
             offenders.join('\n         '));
     } else {
         ok('រាល់ការហៅ `.listen(` ប្រើ port ចៃដន្យ លើ 127.0.0.1');
+    }
+}
+
+// ⛔ ច្បាប់ដដែល **នៅកម្រិត RTDB namespace**។ checker `emu/*` ចែក emulator
+// តែមួយ (127.0.0.1:9000) ➜ namespace ថេរ ធ្វើឲ្យការរត់ ២ ស្របគ្នាសរសេរចូល
+// node ដដែល។ វាកើតឡើងពិត (2026-09-04) ៖ `emu/ledger-revert` រាយ
+// `❌ ធ្លាក់ 5 (ok 7)` លើ tree ដែល **មិនប៉ះកូដ ledger សោះ** ព្រោះ suite ២
+// រត់ជាន់គ្នា។ វាស់មុនកែ ៖ ledger-revert ×2 ➜ ធ្លាក់ ១ និង ៣;
+// restore-deadlock ×2 ➜ ធ្លាក់ ៣ និង ២។
+// ⛔ ការធ្លាក់ក្លែងក្លាយគ្រោះថ្នាក់ជាងវាមើលទៅ ៖ វាបង្រៀនឲ្យជុំក្រោយចាត់ទុក
+// ការធ្លាក់របស់ `emu/*` ជា «flake» — ខណៈ checker ទាំងនោះជា **ground truth
+// នៃលុយ** (rules ពិត លើ RTDB ពិត)។
+{
+    const EMU = path.join(TOOLS, 'emu');
+    let names = [];
+    try { names = fs.readdirSync(EMU); } catch (e) {}
+
+    const nsAssigns = [];
+    const literalNs = [];
+    for (const n of names) {
+        if (!n.endsWith('.js') || n === 'ns.js' || n.startsWith('.tmp-poison-')) continue;
+        let src = '';
+        try { src = fs.readFileSync(path.join(EMU, n), 'utf8'); } catch (e) { continue; }
+        const re = /const\s+NS\s*=\s*([^;]+);/g;
+        let m;
+        while ((m = re.exec(src)) !== null) {
+            nsAssigns.push(n);
+            if (!/emuNamespace\s*\(/.test(m[1])) literalNs.push(n + '  ' + m[1].trim().slice(0, 60));
+        }
+    }
+    const MIN_NS = 3;
+    if (nsAssigns.length < MIN_NS) {
+        bad('ជាន់អប្បបរមា៖ រកឃើញ `const NS =` ក្នុង emu/ >= ' + MIN_NS, nsAssigns.length);
+    } else {
+        ok('ជាន់អប្បបរមា៖ ស្កេន namespace របស់ emu/ ' + nsAssigns.length + ' កន្លែង');
+    }
+    if (literalNs.length) {
+        bad('⛔ checker emu/ ' + literalNs.length + ' ប្រើ namespace ថេរ — ត្រូវឆ្លងកាត់ `emuNamespace()`',
+            literalNs.join('\n         '));
+    } else {
+        ok('រាល់ checker emu/ យក namespace ពី `emuNamespace()` (តែមួយក្នុងមួយការរត់)');
+    }
+
+    let sh = '';
+    try { sh = fs.readFileSync(path.join(EMU, 'rules.sh'), 'utf8'); } catch (e) {}
+    const shNs = (sh.match(/^NS=.*$/m) || [''])[0];
+    if (shNs && /\$\$|urandom|RANDOM/.test(shNs)) {
+        ok('⛔ emu/rules.sh ក៏មាន namespace តែមួយក្នុងមួយការរត់ដែរ');
+    } else {
+        bad('⛔ emu/rules.sh ប្រើ namespace ថេរ', shNs || '(រក NS= មិនឃើញ)');
+    }
+
+    // ⛔ ការអះអាង **ឥរិយាបថ** ៖ ការស្កេនស្តាទិចខាងលើចាក់សោត្រឹម *ឈ្មោះ*។
+    // បើថ្ងៃណា `emuNamespace()` ត្រឡប់តម្លៃថេរវិញ ការស្កេននោះនៅតែបៃតង។
+    let emuNs = null;
+    try { ({ emuNamespace: emuNs } = require(path.join(EMU, 'ns.js'))); } catch (e) {}
+    if (typeof emuNs !== 'function') {
+        bad('⛔ emu/ns.js ត្រូវ export `emuNamespace()`', String(emuNs));
+    } else {
+        const a = emuNs('demo-zoe-probe');
+        const b = emuNs('demo-zoe-probe');
+        if (a !== b) ok('⛔ `emuNamespace()` ត្រឡប់តម្លៃ *ខុសគ្នា* រាល់ការហៅ');
+        else bad('⛔ `emuNamespace()` ត្រឡប់តម្លៃដដែល ➜ ការរត់ ២ ស្របគ្នានៅតែប៉ះគ្នា', a);
+        if (a.startsWith('demo-zoe-probe-') && /^[a-z0-9-]+$/.test(a)) {
+            ok('namespace រក្សាបុព្វបទដែលអានបាន និងតួអក្សរសុវត្ថិភាព');
+        } else {
+            bad('namespace មិនរក្សាបុព្វបទ ឬមានតួអក្សរមិនសុវត្ថិភាព', a);
+        }
+        let threw = false;
+        try { emuNs('Bad NS!'); } catch (e) { threw = true; }
+        if (threw) ok('⛔ slug មិនត្រឹមត្រូវត្រូវបោះ មិនមែនសាង namespace ខូច');
+        else bad('⛔ slug មិនត្រឹមត្រូវត្រូវបានទទួលយក ➜ namespace ខូចស្ងាត់ៗ');
+    }
+}
+
+console.log('\n=== ៦ខ. ការអះអាងត្រូវ *អាចធ្លាក់បាន* — `ok()` មិនត្រូវលេបលក្ខខណ្ឌ ===');
+// ⛔⛔ 🔴 **កើតឡើងពិត ២ ដង** ៖ checker ខ្លះកំណត់ `ok` ជា `(label) => { pass++ }`
+// ដែលទទួល **តែស្លាក**។ ការហៅវាជា `ok(label, condition)` ធ្វើឲ្យលក្ខខណ្ឌ
+// **ត្រូវបោះចោលស្ងាត់ៗ** ➜ ការអះអាងនោះ **មិនអាចធ្លាក់បានទេ** ➜ បៃតងក្លែងក្លាយ
+// ដែលមើលទៅដូចការការពារពិត។
+//   · `html-sink-escaping.js:261` — ជាន់អប្បបរមារបស់ការស្កេន «HTML តាមការ
+//     តភ្ជាប់ខ្សែអក្សរ» ងាប់ ➜ បើ scanner នោះឈប់ផ្គូផ្គង គ្មានអ្វីនិយាយទេ។
+//   · ការបន្ថែមផ្នែក ៦ ខាងលើ (2026-09-04) ធ្លាក់ចូលអន្ទាក់ដដែល ៤ កន្លែង —
+//     ចាប់បានដោយ mutation testing មុន commit។
+// ⛔ ការរាប់អាគុយម៉ង់ត្រូវធ្វើដោយ **parser ពិត** មិនមែនការស្កេនអក្សរ ៖
+// ជំនាន់ដំបូងរបស់ការត្រួតពិនិត្យនេះប្រើ `stripLiterals()` ➜ វារាយ
+// `zto-cookie-sync-test.js:182` ខុស ព្រោះ **regex literal** ដែលផ្ទុក `'` និង
+// `,` (`/-File', scriptPath, .../`) មិនត្រូវបានស្គាល់ ➜ សញ្ញាក្លែងក្លាយ។
+// ⛔ acorn បាត់ ➜ **ធ្លាក់** មិនមែនស្ងាត់ ៖ «វាស់មិនបាន» ≠ «ត្រឹមត្រូវ»។
+{
+    let acornMod = null;
+    try { acornMod = require('acorn'); } catch (e) {}
+    if (!acornMod) {
+        bad('⛔ ការត្រួតពិនិត្យនេះត្រូវការ acorn — វាស់មិនបាន ≠ ត្រឹមត្រូវ', 'npm i acorn');
+    } else {
+        const walk = (node, fn) => {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { for (const n of node) walk(n, fn); return; }
+            if (node.type) fn(node);
+            for (const k of Object.keys(node)) {
+                if (k === 'type' || k === 'start' || k === 'end' || k === 'loc') continue;
+                walk(node[k], fn);
+            }
+        };
+        const files = [];
+        for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+            let names = [];
+            try { names = fs.readdirSync(dir); } catch (e) { continue; }
+            for (const n of names) {
+                if (!n.endsWith('.js') || n.startsWith('.tmp-poison-')) continue;
+                files.push(path.join(dir, n));
+            }
+        }
+        let defs = 0, calls = 0;
+        const offenders = [];
+        for (const f of files) {
+            let src = '';
+            try { src = fs.readFileSync(f, 'utf8'); } catch (e) { continue; }
+            let ast = null;
+            for (const sourceType of ['script', 'module']) {
+                try { ast = acornMod.parse(src, { ecmaVersion: 2022, sourceType }); break; } catch (e) {}
+            }
+            if (!ast) continue;
+            const arities = [];
+            walk(ast, (nd) => {
+                if (nd.type === 'FunctionDeclaration' && nd.id && nd.id.name === 'ok') arities.push(nd.params.length);
+                if (nd.type === 'VariableDeclarator' && nd.id && nd.id.name === 'ok' && nd.init
+                    && (nd.init.type === 'ArrowFunctionExpression' || nd.init.type === 'FunctionExpression')) {
+                    arities.push(nd.init.params.length);
+                }
+            });
+            if (!arities.length) continue;
+            defs++;
+            const arity = Math.max.apply(null, arities);
+            walk(ast, (nd) => {
+                if (nd.type !== 'CallExpression') return;
+                if (!nd.callee || nd.callee.type !== 'Identifier' || nd.callee.name !== 'ok') return;
+                calls++;
+                if (nd.arguments.length > arity) {
+                    offenders.push(path.basename(f) + ':' + src.slice(0, nd.start).split('\n').length
+                        + '  ok() ទទួល ' + arity + ' តែហៅដោយ ' + nd.arguments.length);
+                }
+            });
+        }
+        const MIN_OK_DEFS = 40;
+        if (defs < MIN_OK_DEFS) {
+            bad('ជាន់អប្បបរមា៖ រកឃើញនិយមន័យ `ok()` >= ' + MIN_OK_DEFS, defs);
+        } else {
+            ok('ជាន់អប្បបរមា៖ ស្កេននិយមន័យ `ok()` ' + defs + ' · ការហៅ ' + calls);
+        }
+        if (offenders.length) {
+            bad('⛔ ការអះអាង ' + offenders.length + ' បញ្ជូនលក្ខខណ្ឌទៅ `ok()` ដែលមិនអានវា ➜ ធ្លាក់មិនបាន',
+                offenders.join('\n         '));
+        } else {
+            ok('គ្មានការហៅ `ok()` ណាបញ្ជូនអាគុយម៉ង់លើសពីអ្វីដែលនិយមន័យអាន');
+        }
     }
 }
 

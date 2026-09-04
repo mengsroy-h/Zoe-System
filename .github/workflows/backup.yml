@@ -1,0 +1,141 @@
+# Backup ស្វ័យប្រវត្តិរបស់ Firebase Realtime Database ទៅជា artifact ដែល
+# **អ៊ិនគ្រីបរួច**។
+#
+# ⛔ ហេតុអ្វី artifact ត្រូវអ៊ិនគ្រីប ៖ dump មានទិន្នន័យអតិថិជនពិត (លេខទូរស័ព្ទ
+#    · ចំនួន COD/DOD)។ អ្នកណាដែលអានឯកសារ repo បាន ក៏ទាញ artifact បានដែរ ➜
+#    plaintext នៅទីនោះស្មើនឹងការលេចធ្លាយ។ ដូច្នេះ `crypt.js seal` អ៊ិនគ្រីប
+#    (AES-256-GCM) **និងលុប plaintext** មុនជំហាន upload ហើយមានជំហានផ្ទៀងផ្ទាត់
+#    ដាច់ដោយឡែកដែលធ្លាក់បើនៅសល់ `.json.gz` ណាមួយ។
+#
+# ⛔ សោ service account មិនដែលចុះលើ checkout ទេ — `ci-config.js` បដិសេធផ្លូវ
+#    ណាមួយក្នុង repo ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើតតាមរចនាសម្ព័ន្ធ។
+#
+# Secret ២ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions ៖
+#   · ZOE_BACKUP_TARGETS    — JSON array (មើល firebase-backup/README.md)
+#   · ZOE_BACKUP_PASSPHRASE — ពាក្យសម្ងាត់ >= ១៦ តួ (រក្សាទុកក្រៅ repo)
+# បើ secret ណាមួយមិនទាន់មាន ➜ job ចេញដោយ **ជោគជ័យ** ព្រមទាំងសារណែនាំ
+# (មិនមែនក្រហមរាល់ថ្ងៃទេ រហូតដល់អ្នកប្រើរៀបចំរួច)។
+
+name: Backup
+
+on:
+  schedule:
+    # 19:00 UTC = 02:00 ម៉ោងកម្ពុជា (Asia/Phnom_Penh = UTC+7, គ្មាន DST)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup ➜ អ៊ិនគ្រីប ➜ artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ពិនិត្យថា secret ត្រូវបានកំណត់ហើយឬនៅ
+        id: guard
+        env:
+          ZOE_BACKUP_TARGETS: ${{ secrets.ZOE_BACKUP_TARGETS }}
+          ZOE_BACKUP_PASSPHRASE: ${{ secrets.ZOE_BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${ZOE_BACKUP_TARGETS:-}" ] || missing="${missing} ZOE_BACKUP_TARGETS"
+          [ -n "${ZOE_BACKUP_PASSPHRASE:-}" ] || missing="${missing} ZOE_BACKUP_PASSPHRASE"
+          if [ -n "${missing}" ]; then
+            echo "ready=no" >> "$GITHUB_OUTPUT"
+            echo "::notice::Backup is not configured yet. Missing secret(s):${missing}. See firebase-backup/README.md."
+            exit 0
+          fi
+          if [ "${#ZOE_BACKUP_PASSPHRASE}" -lt 16 ]; then
+            echo "ZOE_BACKUP_PASSPHRASE is too short: ${#ZOE_BACKUP_PASSPHRASE} characters, need at least 16." >&2
+            exit 1
+          fi
+          echo "ready=yes" >> "$GITHUB_OUTPUT"
+
+      - name: ត្រៀម config និងសោ (ក្រៅ checkout)
+        if: steps.guard.outputs.ready == 'yes'
+        env:
+          ZOE_BACKUP_TARGETS: ${{ secrets.ZOE_BACKUP_TARGETS }}
+        run: node firebase-backup/ci-config.js "$RUNNER_TEMP/zoe-backup"
+
+      # ⛔ `continue-on-error` ដោយចេតនា ៖ `backup.js` បន្តទៅ Project បន្ទាប់ពេល
+      #    មួយធ្លាក់ រួចចេញ exit មិនមែន 0។ បើជំហាននេះបញ្ឈប់ job នោះអាជីវកម្ម
+      #    **ដែលជោគជ័យ** ក៏បាត់ backup ដែរ រៀងរាល់ថ្ងៃ រហូតដល់សោនោះត្រូវជួស។
+      #    ដូច្នេះយើងរក្សា backup ដែលបាន រួច **បញ្ចប់ job ជាក្រហម** នៅជំហាន
+      #    ចុងក្រោយ ➜ អ្នកប្រើនៅតែទទួល Email ប្រាប់។
+      - name: ទាញទិន្នន័យពី Firebase
+        id: pull
+        if: steps.guard.outputs.ready == 'yes'
+        continue-on-error: true
+        run: node firebase-backup/backup.js "$RUNNER_TEMP/zoe-backup/config.json"
+
+      - name: អ៊ិនគ្រីប រួចលុប plaintext
+        if: steps.guard.outputs.ready == 'yes'
+        env:
+          ZOE_BACKUP_PASSPHRASE: ${{ secrets.ZOE_BACKUP_PASSPHRASE }}
+        run: node firebase-backup/crypt.js seal "$RUNNER_TEMP/zoe-backup/backups"
+
+      # ⛔ ជាន់ការពារចុងក្រោយ ៖ បើ `seal` ខកខានឯកសារណាមួយ ជំហាននេះធ្លាក់
+      #    មុន upload ➜ plaintext មិនអាចឡើងទៅ artifact បានឡើយ។
+      - name: ផ្ទៀងផ្ទាត់ថាគ្មាន plaintext សល់
+        if: steps.guard.outputs.ready == 'yes'
+        env:
+          RETENTION_DAYS: ${{ vars.ZOE_BACKUP_RETENTION_DAYS || 30 }}
+        run: |
+          set -euo pipefail
+          # ⛔ `.zoe-backup.lock` ជាការលើកលែង **តែមួយគត់** ៖ វាផ្ទុកតែ
+          #    `pid:ពេលវេលា:ចៃដន្យ` (គ្មានទិន្នន័យអតិថិជន) ហើយវាអាចសល់ពេល
+          #    `backup.js` ត្រូវសម្លាប់មុន `finally`។ បើមិនលើកលែង នោះ lock
+          #    កំព្រា ១ ធ្វើឲ្យ backup **ដែលល្អ** មិនត្រូវ upload — ជាថ្នាក់
+          #    «ធ្លាក់ ១ ➜ បាត់ទាំងអស់» ដដែល។ ⛔ កុំបន្ថែមឈ្មោះផ្សេងក្នុងបញ្ជីនេះ។
+          leaked=$(find "$RUNNER_TEMP/zoe-backup/backups" -type f ! -name '*.enc' ! -name '.zoe-backup.lock')
+          if [ -n "$leaked" ]; then
+            echo "❌ មានឯកសារមិនទាន់អ៊ិនគ្រីបសល់ ➜ បញ្ឈប់មុន upload:" >&2
+            echo "$leaked" >&2
+            exit 1
+          fi
+          count=$(find "$RUNNER_TEMP/zoe-backup/backups" -type f -name '*.enc' | wc -l)
+          if [ "$count" -lt 1 ]; then
+            echo "❌ គ្មានឯកសារ .enc សោះ ➜ គ្មានអ្វីត្រូវរក្សាទុក" >&2
+            exit 1
+          fi
+          # ទំហំក្នុងមួយជុំ × ចំនួនថ្ងៃរក្សាទុក = ទំហំដែលស៊ីកូតា Actions
+          # (GitHub Free · repo ឯកជន = 500 MB) — មើល firebase-backup/README.md
+          kb=$(du -sk "$RUNNER_TEMP/zoe-backup/backups" | cut -f1)
+          echo "✅ ឯកសារអ៊ិនគ្រីប ${count} · ទំហំជុំនេះ ${kb} KB"
+          echo "### Backup ${count} ឯកសារ · ${kb} KB · រក្សាទុក ${RETENTION_DAYS} ថ្ងៃ" >> "$GITHUB_STEP_SUMMARY"
+
+      # ⛔ ត្រូវរត់ជានិច្ច (រួមទាំងពេលជំហានខាងលើធ្លាក់) — សោ service account
+      #    មិនត្រូវសល់ក្នុង runner បន្តទៅជំហានក្រោយឡើយ។
+      - name: លុបសោ service account
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/zoe-backup/secrets" "$RUNNER_TEMP/zoe-backup/config.json"
+
+      - name: រក្សាទុកជា artifact (អ៊ិនគ្រីបរួច)
+        if: steps.guard.outputs.ready == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zoe-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/zoe-backup/backups/**/*.enc
+          if-no-files-found: error
+          retention-days: ${{ vars.ZOE_BACKUP_RETENTION_DAYS || 30 }}
+
+      # ⛔ ឈរ **ក្រោយ** upload ដោយចេតនា ៖ backup ដែលបានត្រូវរក្សាទុកជាមុន
+      #    រួចទើប job ក្លាយជាក្រហម។ ⛔ កុំផ្លាស់វាឡើងលើ។
+      - name: បញ្ចប់ជាក្រហមបើអាជីវកម្មណាមួយធ្លាក់
+        if: steps.guard.outputs.ready == 'yes' && steps.pull.outcome == 'failure'
+        run: |
+          echo "❌ អាជីវកម្មយ៉ាងតិច ១ ទាញមិនបាន — មើល log ជំហាន «ទាញទិន្នន័យពី Firebase»" >&2
+          exit 1

@@ -7,13 +7,14 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const http = require('http');
+const { emuNamespace } = require('./ns.js');
 
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` បញ្ជាក់បានថា
 // ឯកសារនេះពិតជាអានកូដមែន (ច្បាប់ដដែលនឹង checker ទាំងអស់ក្នុងគម្រោង)។
 const ROOT = process.env.CRUDFLOW_APP_DIR ? path.resolve(process.env.CRUDFLOW_APP_DIR) : path.join(__dirname, '..', '..');
 const APP = path.join(ROOT, 'ZoeW', 'app.js');
 const BASE = { host: '127.0.0.1', port: 9000 };
-const NS = 'ns=demo-zoe';
+const NS = 'ns=' + emuNamespace('demo-zoe-crud');
 const AUTH = 'auth_variable_override=' + encodeURIComponent(JSON.stringify({ uid: 'userA' }));
 
 let pass = 0, fail = 0;
@@ -353,6 +354,9 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
     }
 
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
+
+    if (fail) console.log('  namespace: ' + NS);
+    else await asOwner('PUT', '/.json', null);
 
     // ⛔ សន្ទះការពារ «បៃតងក្លែងក្លាយ»៖ បើចំនួន assertion ធ្លាក់ក្រោមកម្រិតអប្បបរមា
     // នោះមានន័យថាតេស្តត្រូវបានកាត់ចេញ ឬរត់មិនពេញ — CI ត្រូវក្រហម ទោះគ្មាន fail។

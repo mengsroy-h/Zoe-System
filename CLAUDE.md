@@ -106,7 +106,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១២៩) · `zto-import/` (Apps Script ខាង
 server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup/`
-(CLI ដាច់ដោយឡែក) · `docs/HISTORY.md`។
+(CLI ដាច់ដោយឡែក + workflow backup) · `.github/workflows/` (`audit.yml` ·
+`backup.yml`) · `docs/HISTORY.md`។
 
 ---
 
@@ -231,7 +232,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 
 | តំបន់ | ច្បាប់ខ្លី | ឧបករណ៍ |
 |---|---|---|
-| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង | `checker-coverage.js` |
+| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ | `hang-guard.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ | `checker-coverage.js` |
@@ -262,7 +263,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **listener `.info/*` ដែលងាប់តែឯង** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `.info/connected` និង `.info/serverTimeOffset` ដែរ | `connection-recovery-test` |
 | **ការលាក់ secret** | ⛔ វត្ថុដែលសរសេរជាន់មិនបាន ត្រូវលាក់តាមច្បាប់ចម្លង | `secret-hygiene` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ ការពុលត្រូវធ្វើលើឯកសារស្រមោល — SIGKILL មិនត្រូវប៉ះឯកសារដើម | `checker-coverage` |
-| **ឧបករណ៍ខ្លួនវា** | ⛔ `listen(0, '127.0.0.1')` ជានិច្ច — គ្មាន port ថេរ គ្មាន `0.0.0.0` | `checker-coverage` |
+| **ឧបករណ៍ខ្លួនវា** | ⛔ គ្មានធនធានចែករំលែក **ថេរ** ៖ `listen(0, '127.0.0.1')` ជានិច្ច · RTDB namespace របស់ `emu/*` ត្រូវតែមួយក្នុងមួយការរត់ | `checker-coverage` |
 | **ការសរសេរ ↔ ការចាកចេញទៅខល** | ⛔ ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ត្រូវរត់ឡើងវិញ | `history-patch-retry-test` |
 | **ការទាញតារាងជាមុន** | ព្យាយាមវិញលឿន **តែមិនបាញ់ចំពេលស្កេន** | `lookup-prefetch-test` |
 | **ស្ថានភាព ↔ ម្ចាស់ប្រអប់** | ⛔ `closeModal()` សម្អាតតែស្ថានភាពរបស់ប្រអប់ **នោះ** (ឬពេលជង់ទទេ) — ប្រអប់ជាន់លើមិនត្រូវលុប Barcode · ការកែលេខ · ការសម្គាល់ខល របស់ប្រអប់ខាងក្រោម | `lookup-prefetch-test` · `ui-flow-test` |
@@ -456,7 +457,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការណែនាំលេខទូរស័ព្ទ (`collectPhoneSuggestions`) | `phone-suggest-test.js` |
 | ជាន់ការពារ devtools (⚠️ **ជាឧបសគ្គ មិនមែនការការពារ** — មើលច្បាប់ 📝) | `devtools-guard-test.js` |
 | config Netlify ៖ root file ដែលបង្វែរ build · CSP ឃ្លាតពីតម្រូវការ App · config ដែលគ្មាន checker អាន | `netlify-config-scope-test.js` |
-| ឧបករណ៍ Backup ៖ `.partial` ➜ `rename()` · lock · retry · គ្មាន credential ក្នុង output | `firebase-backup-test.js` |
+| ឧបករណ៍ Backup ៖ `.partial` ➜ `rename()` · lock · retry · គ្មាន credential ក្នុង output · ⛔ **artifact ត្រូវអ៊ិនគ្រីប ហើយ plaintext ត្រូវលុប *មុន* upload** | `firebase-backup-test.js` |
 | comment និង trailing whitespace ក្នុងកូដ ship | `comments.js` (សម្អាតដោយ `strip-comments.js`; `trimws.js` ជា helper) |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល
@@ -1395,6 +1396,31 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   គ្មាន dependency)។ `config.json` · `secrets/` · `backups/` ស្ថិតក្នុង
   `.gitignore` — ⛔ **service-account key ជា credential ពិត កុំ commit វា។**
   Backup សរសេរទៅ `.partial` រួច `rename()`។
+- **វារត់បាន ២ ផ្លូវ** ៖ ដោយដៃ/Task Scheduler លើម៉ាស៊ីនអ្នកប្រើ **និង**
+  `.github/workflows/backup.yml` (រាល់ថ្ងៃ ០២:០០ ម៉ោងកម្ពុជា = cron `0 19 * * *`)។
+  ផ្លូវ GitHub ប្រើ `ci-config.js` (សាង config + សោពី secret) ➜ `backup.js` ➜
+  `crypt.js seal` (AES-256-GCM តាម scrypt)។
+- ⛔ **artifact មិនត្រូវផ្ទុក plaintext ដាច់ខាត** — dump មានលេខទូរស័ព្ទ និង
+  ចំនួន COD/DOD ពិត។ `seal` អ៊ិនគ្រីប **និងលុប `.json.gz`** រួចមានជំហាន
+  ផ្ទៀងផ្ទាត់ដាច់ដោយឡែកដែល **ធ្លាក់មុន upload** បើនៅសល់ឯកសារណាមិនមែន `.enc`។
+  ⛔ ការអ៊ិនគ្រីបត្រូវ **ស្រាយត្រឡប់វិញផ្ទៀងផ្ទាត់** មុនសរសេរ — backup ដែល
+  បើកមិនរួច គឺគ្មានតម្លៃ ហើយវាមិនត្រូវកើតឡើងស្ងាត់ៗឡើយ។
+- ⛔ **សោមិនចុះលើ checkout** — `ci-config.js` **បដិសេធ** ផ្លូវណាមួយក្នុង repo
+  ➜ ការ commit ដោយចៃដន្យធ្វើមិនកើត *តាមរចនាសម្ព័ន្ធ*; workflow លុបសោចោល
+  **ទោះជុំធ្លាក់** (`if: always()`) ហើយសិទ្ធិ token ត្រឹម `contents: read`។
+- **អាជីវកម្មច្រើន ➜ Project ច្រើន** ៖ `ZOE_BACKUP_TARGETS` ជា **Array** ➜ ជុំ
+  មួយគ្រប Project ប៉ុន្មានក៏បាន (ថតដាច់ដោយឡែកក្នុងមួយឈ្មោះ; ធ្លាក់មួយមិន
+  បញ្ឈប់មួយទៀត)។ តែព្រំដែន **មិនមែនបច្ចេកទេស** ៖ ទិន្នន័យអតិថិជនស្ថិតក្នុង
+  Project **របស់អតិថិជន** ➜ ត្រូវការសោពីគេ (សូមស្នើ Role
+  **`Firebase Realtime Database Viewer`** អានតែម្យ៉ាង) ហើយកូតា artifact របស់
+  GitHub Free (repo ឯកជន = **500 MB**) = ទំហំមួយជុំ × `ZOE_BACKUP_RETENTION_DAYS`។
+- ⛔ **អាជីវកម្មមួយធ្លាក់ មិនត្រូវបំផ្លាញ backup របស់អាជីវកម្មផ្សេង** —
+  ជំហានទាញដាក់ `continue-on-error: true` (ព្រោះ `backup.js` ចេញ exit មិនមែន 0
+  ពេលមួយក្នុងចំណោមធ្លាក់) រួច **ជំហានចុងក្រោយ ក្រោយ upload** ធ្វើឲ្យ job
+  ក្លាយជាក្រហម។ ⛔ **កុំផ្លាស់ជំហាននោះឡើងលើ** — នោះនឹងបាត់ backup ដែលបាន។
+- ⚠️ **GitHub ផ្អាក workflow តាមកាលកំណត់ ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ** — នេះជា
+  តំបន់ 📝 (គ្មានឧបករណ៍ក្នុង repo មើលឃើញ)។ បើ backup ឈប់មកដោយស្ងាត់ ត្រូវ
+  ពិនិត្យ Actions ជាមុនគេ មុននឹងសង្ស័យកូដ។
 
 ## Firebase rules — រូបរាងបច្ចុប្បន្ន
 
@@ -1530,7 +1556,19 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
   លក្ខខណ្ឌចាំបាច់** («ប្រអប់បើកពិត») ដែលបញ្ជាក់ថាវាឈានដល់ផ្លូវដែលចង់វាស់។
 - ⛔ **checker ត្រូវ `listen(0, '127.0.0.1')` ជានិច្ច** — port ថេរ ➜ ការរត់ ២
   ស្របគ្នា ➜ `EADDRINUSE` ➜ **សញ្ញាក្លែងក្លាយ**; `listen(port)` ទទេ bind
-  `0.0.0.0` ➜ **ការលាតត្រដាង**។
+  `0.0.0.0` ➜ **ការលាតត្រដាង**។ ⛔ **ច្បាប់ដដែលអនុវត្តលើ RTDB namespace**
+  របស់ `emu/*` ៖ checker ទាំង ៣ ចែក emulator តែមួយ ➜ namespace ត្រូវយកពី
+  `emu/ns.js` (`emuNamespace()`) **តែមួយក្នុងមួយការរត់**។ វាស់បាន (2026-09-04) ៖
+  namespace ថេរ ➜ `ledger-revert` ×2 ស្របគ្នា **ធ្លាក់ ១ និង ៣** ·
+  `restore-deadlock` ×2 **ធ្លាក់ ៣ និង ២** លើ tree ដែលមិនប៉ះកូដ ledger សោះ។
+- ⛔ **`ok()` ដែលទទួល *តែស្លាក* មិនត្រូវហៅដោយលក្ខខណ្ឌ** — checker ខ្លះកំណត់
+  `ok = (label) => { pass++ }` ➜ `ok(label, condition)` **បោះលក្ខខណ្ឌចោល
+  ស្ងាត់ៗ** ➜ ការអះអាងនោះ **ធ្លាក់មិនបានទេ**។ វាកើតឡើងពិត ២ ដង ៖
+  `html-sink-escaping.js` (ជាន់អប្បបរមារបស់ scanner XSS ងាប់) និងផ្នែក ៦
+  ដែលទើបបន្ថែម (៤ កន្លែង ➜ ចាប់បានដោយ mutation មុន commit)។
+  ⛔ **ការរាប់អាគុយម៉ង់ត្រូវប្រើ parser ពិត** — ការស្កេនអក្សរច្រឡំ **regex
+  literal** ដែលផ្ទុក `'` និង `,` (វាស់បាន ៖ `zto-cookie-sync-test.js:182`
+  ត្រូវរាយខុស)។
 - ⛔ **`checker-coverage.js` ត្រូវរំលងផ្នែក ៥ ពេល `EXITCODE_CHILD` ត្រូវកំណត់** —
   បើមិនដូច្នេះកើតជា **រង្វិលជុំទៅវិញទៅមក** (checker-coverage ➜
   exit-code-integrity ➜ checker-coverage ➜ …)។ ការថត hash ក៏ត្រូវរំលង
@@ -1709,7 +1747,20 @@ bash audit-tools/emu/rules.sh
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
 
-## ✅ គ្មានការងារនៅសល់
+## ⏳ Backup ស្វ័យប្រវត្តិ — រង់ចាំការកំណត់ secret ដោយអ្នកប្រើ
+
+`.github/workflows/backup.yml` ត្រូវបាន merge រួច តែវា **មិនទាន់ backup អ្វី
+ទេ** រហូតដល់ secret ២ ត្រូវបានកំណត់ (job ចេញដោយជោគជ័យ ព្រមទាំង `::notice::`
+ដោយចេតនា — មិនមែនក្រហមរាល់ថ្ងៃ)។ ជំហានពេញលេញក្នុង
+[`firebase-backup/README.md`](firebase-backup/README.md) ជំហានទី ៦ ៖
+
+១. Settings ➜ Secrets and variables ➜ Actions ➜ `ZOE_BACKUP_TARGETS` និង
+   `ZOE_BACKUP_PASSPHRASE` (>= ១៦ តួ, រក្សាទុក **ក្រៅ GitHub**)។
+២. ចុច **Run workflow** ម្តង រួច **ទាញ artifact មកសាកស្តារ**
+   (`node crypt.js open <file>.enc out.json.gz`) — ⛔ **backup ដែលមិនទាន់សាក
+   ស្តារ មិនទាន់ជា backup ទេ**។
+៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
+   workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
 កំណែ **2.27.0** ➜ **2.27.3** ត្រូវបាន **អ្នកប្រើផ្ទៀងផ្ទាត់លើ
 ឧបករណ៍ពិតរួចហើយ** (2026-09-04) ➜ ធាតុទាំងនោះត្រូវលុបចេញពីទីនេះតាមច្បាប់។

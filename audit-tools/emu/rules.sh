@@ -12,10 +12,13 @@
 #     បើអត់ rules នៅបើកចំហ ហើយអ្វីៗជោគជ័យទាំងអស់។
 #   · សំណើដែលមាន `Bearer owner` តែគ្មាន `auth_variable_override` = ម្ចាស់ project ➜ រំលង rules។
 #     ដូច្នេះការតេស្ត "គ្មាន auth ត្រូវបដិសេធ" ត្រូវ **មិនផ្ញើ header នោះសោះ**។
+#   · namespace ត្រូវ **តែមួយក្នុងមួយការរត់** — namespace ថេរ ➜ ការរត់ ២
+#     ស្របគ្នាសរសេរចូល node ដដែល ➜ **ការធ្លាក់ក្លែងក្លាយ** (ច្បាប់ដដែលនឹង
+#     `listen(0, '127.0.0.1')` តែនៅកម្រិត namespace)។
 cd "$(dirname "$0")" || exit 1
 
 B="http://127.0.0.1:9000"
-NS="ns=demo-zoe"
+NS="ns=demo-zoe-rules-$$-$(head -c4 /dev/urandom | od -An -tx1 | tr -d " \n")"
 UID_A='auth_variable_override=%7B%22uid%22%3A%22userA%22%7D'
 UID_B='auth_variable_override=%7B%22uid%22%3A%22userB%22%7D'
 
@@ -27,6 +30,7 @@ if [ ! -f real.rules.json ]; then
   exit 1
 fi
 
+echo "namespace: $NS"
 LOAD=$(owner -X PUT "$B/.settings/rules.json?$NS" --data-binary @real.rules.json)
 echo "load real rules: $LOAD"
 case "$LOAD" in

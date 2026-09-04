@@ -242,6 +242,177 @@ function response(status, value, jsonError) {
         ok('⛔ firebase-admin ចាស់ត្រូវបានដកចេញទាំង source និង lockfile',
             !source.includes("require('firebase-admin')") && !JSON.stringify(packageLock).includes('firebase-admin'));
         ok('Backup tool ប្រកាស Node >=18 សម្រាប់ native fetch/AbortController', packageJson.engines.node === '>=18');
+
+        const cryptPath = path.join(ROOT, 'firebase-backup', 'crypt.js');
+        const ciConfigPath = path.join(ROOT, 'firebase-backup', 'ci-config.js');
+        const workflowPath = path.join(ROOT, '.github', 'workflows', 'backup.yml');
+        ok('ឧបករណ៍អ៊ិនគ្រីប firebase-backup/crypt.js មានពិត', fs.existsSync(cryptPath));
+        ok('ឧបករណ៍ត្រៀម config firebase-backup/ci-config.js មានពិត', fs.existsSync(ciConfigPath));
+        ok('Workflow .github/workflows/backup.yml មានពិត', fs.existsSync(workflowPath));
+
+        if (fs.existsSync(cryptPath)) {
+            const crypt = require(cryptPath);
+            const PASS_A = 'zoe-backup-passphrase-A';
+            const PASS_B = 'zoe-backup-passphrase-B';
+            const plain = Buffer.from(JSON.stringify({
+                zoew_scan_history_cod_dod: { i1: { phone: '012345678', cod: 12.5 } }
+            }), 'utf8');
+
+            const sealed = crypt.encryptBuffer(plain, PASS_A);
+            ok('អ៊ិនគ្រីប ➜ ស្រាយ ត្រឡប់មកដដែលបេះបិទ',
+                crypt.decryptBuffer(sealed, PASS_A).equals(plain));
+            ok('⛔ អត្ថបទដើមមិនលេចក្នុងឯកសារអ៊ិនគ្រីប',
+                sealed.indexOf(Buffer.from('012345678', 'utf8')) === -1
+                && sealed.indexOf(Buffer.from('zoew_scan_history', 'utf8')) === -1);
+            ok('⛔ salt ចៃដន្យ ➜ អត្ថបទដដែលអ៊ិនគ្រីប ២ ដងចេញផ្សេងគ្នា',
+                !crypt.encryptBuffer(plain, PASS_A).equals(sealed));
+            expectThrow('⛔ ពាក្យសម្ងាត់ខុស ស្រាយមិនបាន',
+                () => crypt.decryptBuffer(sealed, PASS_B), /wrong passphrase|modified/);
+
+            const tampered = Buffer.from(sealed);
+            tampered[tampered.length - 1] ^= 0xff;
+            expectThrow('⛔ ការកែ ១ byte ត្រូវចាប់បាន (GCM auth tag)',
+                () => crypt.decryptBuffer(tampered, PASS_A), /wrong passphrase|modified/);
+            const badMagic = Buffer.from(sealed);
+            badMagic[0] ^= 0xff;
+            expectThrow('⛔ ឯកសារដែលមិនមែនរបស់ Zoe ត្រូវបដិសេធតាម magic header',
+                () => crypt.decryptBuffer(badMagic, PASS_A), /bad magic/);
+            expectThrow('⛔ ឯកសារកាត់ខ្លីត្រូវបដិសេធ',
+                () => crypt.decryptBuffer(sealed.subarray(0, crypt.HEADER_BYTES - 1), PASS_A), /truncated/);
+
+            expectThrow('⛔ ពាក្យសម្ងាត់ខ្លីពេកត្រូវប្រាប់ចំនួនតួដែលវាយ និងចំនួនដែលត្រូវការ',
+                () => crypt.requirePassphrase('short-key'), /got 9 characters, need at least 16/);
+            ok('ពិដានប្រវែងពាក្យសម្ងាត់យ៉ាងតិច ១៦ តួ', crypt.MIN_PASSPHRASE_LENGTH >= 16);
+
+            const sealRoot = path.join(tempRoot, 'seal-run');
+            const bizDir = path.join(sealRoot, 'biz-a');
+            fs.mkdirSync(bizDir, { recursive: true });
+            const gzPath = path.join(bizDir, '2026-09-04T00-00-00-000Z-aabbcc.json.gz');
+            fs.writeFileSync(gzPath, zlib.gzipSync(plain));
+            fs.writeFileSync(path.join(bizDir, 'notes.txt'), 'ignore me');
+            ok('collectBackupFiles ដើរចូលថតកូន ហើយយកតែ .json.gz',
+                crypt.collectBackupFiles(sealRoot).length === 1);
+
+            const savedPass = process.env.ZOE_BACKUP_PASSPHRASE;
+            process.env.ZOE_BACKUP_PASSPHRASE = PASS_A;
+            try {
+                const sealedCount = crypt.runSeal(sealRoot);
+                ok('seal អ៊ិនគ្រីបគ្រប់ឯកសារ backup', sealedCount === 1 && fs.existsSync(gzPath + '.enc'));
+                ok('⛔ seal លុប plaintext ចោល ➜ គ្មាន .json.gz សល់ឲ្យ upload',
+                    !fs.existsSync(gzPath) && crypt.collectBackupFiles(sealRoot).length === 0);
+                ok('⛔ គ្មានឯកសារ .partial សល់ (ការសរសេរជា atomic)',
+                    fs.readdirSync(bizDir).every((f) => !f.endsWith('.partial')));
+                const openedPath = path.join(sealRoot, 'opened.json.gz');
+                crypt.decryptFile(gzPath + '.enc', openedPath, PASS_A);
+                ok('ឯកសារដែល seal រួច ស្រាយត្រឡប់ជា gzip ដើមវិញបាន',
+                    zlib.gunzipSync(fs.readFileSync(openedPath)).equals(plain));
+                expectThrow('⛔ ថតដែលគ្មាន backup ត្រូវធ្លាក់ មិនមែនរាយថាជោគជ័យ',
+                    () => crypt.runSeal(path.join(tempRoot, 'seal-empty')), /No .json.gz backups found/);
+            } finally {
+                if (savedPass === undefined) delete process.env.ZOE_BACKUP_PASSPHRASE;
+                else process.env.ZOE_BACKUP_PASSPHRASE = savedPass;
+            }
+        }
+
+        if (fs.existsSync(ciConfigPath)) {
+            const ciConfig = require(ciConfigPath);
+            const targets = [{
+                name: 'biz-a',
+                databaseURL: 'https://demo-a-default-rtdb.firebaseio.com',
+                serviceAccount: rawServiceAccount
+            }, {
+                name: 'license',
+                databaseURL: 'https://demo-lic-default-rtdb.asia-southeast1.firebasedatabase.app',
+                serviceAccount: JSON.stringify(rawServiceAccount)
+            }];
+            const runRoot = path.join(tempRoot, 'ci-run');
+            const built = ciConfig.buildRunDirectory(runRoot, targets);
+            const builtConfig = JSON.parse(fs.readFileSync(built.configPath, 'utf8'));
+            ok('ci-config សាង config សម្រាប់គ្រប់ target', builtConfig.businesses.length === 2);
+            ok('config ដែលសាងចេញ ឆ្លងការផ្ទៀងផ្ទាត់របស់ backup.js ខ្លួនវា', (() => {
+                try {
+                    backup.validateBusinesses(builtConfig, path.join(runRoot, 'backups'));
+                    return true;
+                } catch (e) { return false; }
+            })());
+            ok('⛔ សោ service account សរសេរដោយសិទ្ធិ 0600',
+                builtConfig.businesses.every((b) => (fs.statSync(path.join(runRoot, b.serviceAccountPath)).mode & 0o777) === 0o600));
+            ok('⛔ ការសង្ខេបមិនបញ្ចេញសម្ភារៈសោ',
+                built.summary.join('\n').indexOf('PRIVATE KEY') === -1
+                && built.summary.join('\n').indexOf(rawServiceAccount.client_email) === -1);
+
+            expectThrow('⛔ បដិសេធការសរសេរសោចូល repo checkout',
+                () => ciConfig.main(['node', 'ci-config.js', path.join(ROOT, 'firebase-backup', 'ci-tmp')]),
+                /Refusing to write credentials/);
+            expectThrow('⛔ ឈ្មោះ target ដែលឡើងថតមេត្រូវបដិសេធ',
+                () => ciConfig.buildRunDirectory(path.join(tempRoot, 'ci-evil'),
+                    [{ name: '../evil', databaseURL: 'https://a.firebaseio.com', serviceAccount: rawServiceAccount }]),
+                /Unsafe business name/);
+            expectThrow('⛔ databaseURL ក្លែងក្លាយត្រូវបដិសេធតាំងពីជំហានត្រៀម',
+                () => ciConfig.buildRunDirectory(path.join(tempRoot, 'ci-host'),
+                    [{ name: 'biz', databaseURL: 'https://a.firebaseio.com.attacker.example', serviceAccount: rawServiceAccount }]),
+                /Firebase/);
+            expectThrow('⛔ JSON ខូចត្រូវប្រាប់មូលហេតុច្បាស់',
+                () => ciConfig.parseTargets('[{'), /not valid JSON/);
+            expectThrow('⛔ បញ្ជីទទេត្រូវធ្លាក់ មិនមែន backup សូន្យដោយស្ងាត់',
+                () => ciConfig.parseTargets('[]'), /at least one entry/);
+            expectThrow('⛔ secret ដែលមិនទាន់កំណត់ត្រូវប្រាប់ឈ្មោះ env',
+                () => ciConfig.parseTargets(''), /ZOE_BACKUP_TARGETS is empty/);
+        }
+
+        if (fs.existsSync(workflowPath)) {
+            const wf = fs.readFileSync(workflowPath, 'utf8');
+            const stepCount = (wf.match(/^ {6}- (name|uses):/gm) || []).length;
+            ok('Workflow មានជំហានគ្រប់គ្រាន់ (ជាន់អប្បបរមា)', stepCount >= 7, stepCount);
+            ok('Backup រត់តាមកាលកំណត់ និងបញ្ជាដោយដៃបាន',
+                /^\s+- cron:/m.test(wf) && wf.includes('workflow_dispatch'));
+            ok('កាលកំណត់ត្រូវនឹងម៉ោងកម្ពុជា (UTC+7)', /cron: '0 19 \* \* \*'/.test(wf));
+            ok('⛔ សិទ្ធិ token ត្រឹម contents: read', /permissions:\s*\n\s+contents: read\s*\n/.test(wf)
+                && !/permissions:\s*\n\s+contents: write/.test(wf));
+
+            const sealAt = wf.indexOf('crypt.js seal');
+            const verifyAt = wf.search(/find "\$RUNNER_TEMP\/zoe-backup\/backups" -type f ! -name '\*\.enc'/);
+            const uploadAt = wf.indexOf('actions/upload-artifact');
+            ok('⛔ ការអ៊ិនគ្រីបឈរ *មុន* ការ upload', sealAt > 0 && uploadAt > 0 && sealAt < uploadAt);
+            ok('⛔ ជំហានផ្ទៀងផ្ទាត់ «គ្មាន plaintext សល់» ឈរមុន upload',
+                verifyAt > 0 && verifyAt < uploadAt);
+            ok('⛔ artifact ទទួលតែឯកសារ .enc', /path: \$\{\{ runner\.temp \}\}\/zoe-backup\/backups\/\*\*\/\*\.enc/.test(wf));
+            ok('⛔ artifact ទទេត្រូវធ្លាក់ មិនមែនជោគជ័យទទេ', /if-no-files-found: error/.test(wf));
+            ok('⛔ គ្មានផ្លូវ upload ណាទទួល .json.gz',
+                !/path:[^\n]*\.json\.gz/.test(wf) && !/path:[^\n]*backups\s*$/m.test(wf));
+
+            const cleanupAt = wf.indexOf('rm -rf "$RUNNER_TEMP/zoe-backup/secrets"');
+            ok('⛔ សោ service account ត្រូវលុប ហើយការលុបរត់ជានិច្ច (if: always())',
+                cleanupAt > 0 && /if: always\(\)\s*\n\s+run: rm -rf "\$RUNNER_TEMP\/zoe-backup\/secrets"/.test(wf));
+            ok('⛔ សោ និង backup សរសេរក្រៅ checkout ($RUNNER_TEMP)',
+                wf.includes('"$RUNNER_TEMP/zoe-backup"') && !/node firebase-backup\/ci-config\.js \.?\//.test(wf));
+            ok('⛔ គ្មានការបោះ secret ចេញទៅ log',
+                !/echo[^\n]*\$\{?ZOE_BACKUP_(PASSPHRASE|TARGETS)/.test(wf.replace(/\$\{#ZOE_BACKUP_PASSPHRASE\}/g, ''))
+                && !/cat[^\n]*ZOE_BACKUP_/.test(wf));
+            ok('secret ដែលមិនទាន់កំណត់ ➜ ចេញដោយជោគជ័យ ព្រមទាំងសារណែនាំ',
+                wf.includes('ready=no') && wf.includes('::notice::'));
+            ok('⛔ ពាក្យសម្ងាត់ខ្លីពេកត្រូវធ្លាក់តាំងពី guard', /-lt 16/.test(wf));
+            ok('រយៈពេលរក្សាទុក artifact កែបានតាម variable ដោយមានលំនាំដើម',
+                /retention-days: \$\{\{ vars\.ZOE_BACKUP_RETENTION_DAYS \|\| 30 \}\}/.test(wf));
+            ok('ជុំនីមួយៗរាយទំហំ ➜ អ្នកប្រើគណនាកូតា Actions បាន',
+                wf.includes('GITHUB_STEP_SUMMARY') && /du -sk/.test(wf));
+
+            const pullAt = wf.indexOf('node firebase-backup/backup.js');
+            const redAt = wf.indexOf("steps.pull.outcome == 'failure'");
+            ok('⛔ អាជីវកម្មមួយធ្លាក់ មិនត្រូវបំផ្លាញ backup របស់អាជីវកម្មផ្សេង',
+                /id: pull\n\s+if: steps\.guard\.outputs\.ready == 'yes'\n\s+continue-on-error: true/.test(wf)
+                && pullAt > 0);
+            ok('⛔ តែ job ត្រូវក្លាយជាក្រហម ➜ អ្នកប្រើដឹង (ជំហានឈរក្រោយ upload)',
+                redAt > uploadAt && uploadAt > 0);
+            ok('⛔ ការស្កេន plaintext មិនត្រូវកាត់ដោយ head (pipefail ➜ សារបាត់)',
+                !/! -name '\*\.enc'[^\n]*\| head/.test(wf));
+            const leakScan = (wf.match(/^\s+leaked=\$\(find [^\n]*$/m) || [''])[0];
+            const exclusions = (leakScan.match(/! -name '([^']+)'/g) || []).map((m) => m.slice(9, -1));
+            ok('⛔ ការលើកលែងក្នុងការស្កេន plaintext មានតែ .enc និង lock ប៉ុណ្ណោះ',
+                exclusions.length === 2 && exclusions[0] === '*.enc'
+                && exclusions[1] === '.zoe-backup.lock', exclusions);
+        }
+
     } finally {
         fs.rmSync(tempRoot, { recursive: true, force: true });
     }

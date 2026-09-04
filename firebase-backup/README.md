@@ -17,6 +17,16 @@ HTTPS/OAuth REST ➜ **គ្មាន third-party dependency**។
 
 ## មុខងារ
 
+### របៀបរត់ ២ (ជ្រើសយកមួយ ឬទាំងពីរ)
+
+| របៀប | រត់នៅឯណា | សមនឹង |
+|---|---|---|
+| **ដោយដៃ / Task Scheduler** | ម៉ាស៊ីនរបស់អ្នក | អ្នកចង់ទុក backup លើ Disk ខ្លួនឯង |
+| **GitHub Actions** (`.github/workflows/backup.yml`) | GitHub រៀងរាល់ថ្ងៃ ០២:០០ ម៉ោងកម្ពុជា | អ្នកចង់ឲ្យវារត់ទោះម៉ាស៊ីនបិទ |
+
+ទាំង ២ ប្រើ `backup.js` ដដែល។ របៀប GitHub Actions បន្ថែម **ការអ៊ិនគ្រីប**
+(`crypt.js`) ព្រោះ artifact ដេកនៅលើ server របស់អ្នកដទៃ។
+
 ### ហេតុអ្វីត្រូវការ
 
 ទិន្នន័យអាជីវកម្ម (Parcel/Revenue/COD/DOD) ទាំងអស់ស្ថិតនៅតែក្នុង Firebase តែមួយកន្លែងក្នុងមួយជំនួញ។
@@ -123,11 +133,109 @@ crontab -e
 0 2 * * * cd /path/to/firebase-backup && /usr/bin/node backup.js >> backup.log 2>&1
 ```
 
+### ជំហានទី ៦ — រត់ដោយស្វ័យប្រវត្តិលើ GitHub Actions (ជម្រើសទី ២)
+
+Workflow `.github/workflows/backup.yml` រត់រៀងរាល់ថ្ងៃម៉ោង **០២:០០ ម៉ោងកម្ពុជា**
+(cron `0 19 * * *` ជា UTC) ហើយអាចចុច **Run workflow** ដោយដៃបានផងដែរ។
+
+**Secret ២ ត្រូវកំណត់** នៅ GitHub ➜ **Settings ➜ Secrets and variables ➜
+Actions ➜ New repository secret** ៖
+
+| ឈ្មោះ | តម្លៃ |
+|---|---|
+| `ZOE_BACKUP_TARGETS` | JSON array (ទម្រង់ខាងក្រោម) |
+| `ZOE_BACKUP_PASSPHRASE` | ពាក្យសម្ងាត់ **យ៉ាងតិច ១៦ តួ** — រក្សាទុកក្រៅ GitHub |
+
+ទម្រង់ `ZOE_BACKUP_TARGETS` — **មួយ Object ក្នុងមួយ Firebase Project** ៖
+
+```json
+[
+  {
+    "name": "biz-a",
+    "databaseURL": "https://xxx-default-rtdb.firebaseio.com",
+    "serviceAccount": { "client_email": "...", "private_key": "...", "token_uri": "..." }
+  },
+  {
+    "name": "zoekeygen-license",
+    "databaseURL": "https://yyy-default-rtdb.firebaseio.com",
+    "serviceAccount": { "client_email": "...", "private_key": "...", "token_uri": "..." }
+  }
+]
+```
+
+`serviceAccount` ជាខ្លឹមសារ File JSON ដែលទាញពី Firebase Console (ជំហានទី ២)
+ដាក់ចូលទាំងស្រុង — ឬជា String មួយក៏បាន។ `name` អនុញ្ញាតតែអក្សរឡាតាំង/លេខ/`.`/`-`/`_`។
+
+⛔ **ពាក្យសម្ងាត់នេះជាកូនសោតែមួយ** — បើភ្លេច នោះ backup ទាំងអស់លែងបើកបាន។
+GitHub មិនអាចប្រាប់វាមកវិញទេ។ សូមរក្សាទុកក្នុងកន្លែងផ្សេង (Password Manager)។
+
+⚠️ GitHub **ផ្អាក** workflow តាមកាលកំណត់ ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ — បើគ្មាន
+commit យូរ សូមចូលទៅ Actions រួចចុច **Enable workflow** ម្តងទៀត។
+
+### អាជីវកម្មច្រើន ➜ Database ច្រើន ៖ តើ backup ចូល GitHub តែមួយកើតទេ?
+
+**កើត** — `ZOE_BACKUP_TARGETS` ជា Array ដូច្នេះ Project ប៉ុន្មានក៏បាន។ ជុំមួយ
+ទាញគ្រប់ Project រួចដាក់ **ថតដាច់ដោយឡែកក្នុងមួយអាជីវកម្ម** ក្នុង artifact តែមួយ ៖
+
+```
+zoe-backup-<run_id>/
+  biz-a/2026-09-04T19-00-00-000Z-a1b2c3.json.gz.enc
+  biz-b/2026-09-04T19-00-05-000Z-d4e5f6.json.gz.enc
+  zoekeygen-license/2026-09-04T19-00-08-000Z-778899.json.gz.enc
+```
+
+អាជីវកម្មមួយធ្លាក់ (សោខូច · Project ត្រូវលុប) **មិនបញ្ឈប់អាជីវកម្មផ្សេងទេ** —
+`backup.js` បន្តទៅ Project បន្ទាប់ ហើយ backup **ដែលជោគជ័យនៅតែត្រូវរក្សាទុក
+ជា artifact ដដែល**។ បន្ទាប់មក job ទើបក្លាយជា **ក្រហម** ➜ GitHub ផ្ញើ Email
+ប្រាប់អ្នក។ សូមមើល log ជំហាន «ទាញទិន្នន័យពី Firebase» ដើម្បីដឹងថាមួយណាធ្លាក់។
+
+តែមានព្រំដែន **ពិត ២** ដែលត្រូវសម្រេចជាមុន ៖
+
+**១. អ្នកត្រូវមានសោ Service Account របស់ Project នោះ។** ZoeW ឲ្យអតិថិជននីមួយៗ
+paste Firebase Config **របស់ខ្លួន** ➜ ទិន្នន័យស្ថិតក្នុង Project **របស់អតិថិជន**
+មិនមែនរបស់អ្នកទេ។ ដូច្នេះ ៖
+
+- Project ដែល **អ្នកជាម្ចាស់** (អាជីវកម្មរបស់អ្នក + Project License របស់
+  ZoeKeyGen) ➜ ដាក់ចូលបានតែម្ដង។
+- Project **របស់អតិថិជន** ➜ ត្រូវឲ្យអតិថិជនផ្ដល់សោមកជាមុន។ នេះជាការសម្រេច
+  **ទំនុកចិត្ត** មិនមែនបច្ចេកទេស — អ្នកនឹងកាន់ទិន្នន័យអតិថិជនគេ។ បើធ្វើ សូម
+  ស្នើសោ **អានតែម្យ៉ាង** (ខាងក្រោម) និងប្រាប់អតិថិជនឲ្យដឹងជាមុន។
+
+**សោអានតែម្យ៉ាង (សូមប្រើជានិច្ចសម្រាប់ backup)** ៖ ក្នុង Google Cloud Console
+➜ **IAM & Admin ➜ Service Accounts ➜ Create** ➜ ដាក់ Role តែ
+**`Firebase Realtime Database Viewer`** ប៉ុណ្ណោះ (កុំដាក់ Owner/Editor) ➜
+**Keys ➜ Add key ➜ JSON**។ សោបែបនេះ **អាន** បាន តែ **សរសេរ ឬលុបមិនបាន** ➜
+បើវាលេចធ្លាយ ទិន្នន័យអតិថិជននៅសុវត្ថិភាព។
+
+**២. កូតាទំហំរបស់ GitHub Actions។** Repo ឯកជនលើគម្រោង **Free** មានប្រហែល
+**500 MB** សម្រាប់ artifact (សូមពិនិត្យលេខពិតនៅ **Settings ➜ Billing and
+plans ➜ Plans and usage** ព្រោះ GitHub ប្តូរកូតាបានតាមពេល)។ រូបមន្ត ៖
+
+```
+ទំហំដែលស៊ីកូតា ≈ ទំហំមួយជុំ (គ្រប់អាជីវកម្មរួម) × ចំនួនថ្ងៃរក្សាទុក
+```
+
+ជុំនីមួយៗរាយ **ទំហំពិត** ក្នុង Summary របស់ Actions ➜ គុណនឹងចំនួនថ្ងៃ រួច
+ធៀបនឹង ៥០០ MB។ ឧទាហរណ៍ ៖ ៥ អាជីវកម្ម × ២ MB = ១០ MB/ជុំ × ៣០ ថ្ងៃ = **៣០០ MB**
+(នៅសល់)។ តែ ១៥ អាជីវកម្ម × ៣ MB = ៤៥ MB/ជុំ × ៣០ ថ្ងៃ = **១.៣ GB** (លើសកូតា)។
+
+ជុំមួយចំណាយប្រហែល **១–៣ នាទី** នៃកូតា Actions minutes (Free = ២,០០០
+នាទី/ខែ) ➜ រត់រាល់ថ្ងៃស៊ីតិចតួចប៉ុណ្ណោះ។
+
+ដើម្បីកែ ៖ **Settings ➜ Secrets and variables ➜ Actions ➜ Variables** បង្កើត
+`ZOE_BACKUP_RETENTION_DAYS` (លំនាំដើម `30`, តម្លៃត្រឹមត្រូវ **1–90**)។ ដាក់
+`7` ឬ `14` ពេលអាជីវកម្មច្រើន ហើយទាញ artifact ដែលចង់ទុកយូរមកដាក់ Disk ខ្លួនឯង។
+
 ### ការស្តារទិន្នន័យមកវិញ (Restore) — ធ្វើដោយដៃ
 
 Script នេះមិនរួមបញ្ចូល Auto-restore ទេ ដោយចេតនា (Restore គឺជាសកម្មភាពគ្រោះថ្នាក់ — អាចសរសេរជាន់ពីលើ
 ទិន្នន័យផ្ទាល់ដែលកំពុងប្រើ) ។ បើត្រូវការស្តារជាក់ស្តែង៖
 
+0. **បើទាញពី GitHub artifact** (ឈ្មោះ File បញ្ចប់ដោយ `.enc`) ត្រូវស្រាយសោជាមុន៖
+   ```
+   ZOE_BACKUP_PASSPHRASE=... node crypt.js open backup-file.json.gz.enc backup-file.json.gz
+   ```
+   (លើ Windows PowerShell ៖ `$env:ZOE_BACKUP_PASSPHRASE='...'` រួចទើបរត់បន្ទាត់ខាងលើ)
 1. Unzip File Backup ដែលចង់ស្តារ (`gunzip -k backup-file.json.gz` ឬប្រើ 7-Zip លើ Windows)
 2. ចូល Firebase Console → Realtime Database → ⋮ → **Import JSON** ហើយជ្រើស file ដែលបានបើក។
 
@@ -146,6 +254,17 @@ Firebase project បណ្ដោះអាសន្នសិន ហើយបិ�
 - **Timeout និង retry** សម្រាប់បណ្តាញដែលដាច់បណ្តោះអាសន្ន។
 - **Lock** ការពារ process ពីររត់ជាន់គ្នា។
 - **គ្មាន third-party dependency** ➜ ផ្ទៃវាយប្រហារតូចបំផុត។
+- **Artifact អ៊ិនគ្រីបជានិច្ច** — `crypt.js` ប្រើ AES-256-GCM ជាមួយកូនសោដេរីវេ
+  តាម scrypt។ ការកែ ១ byte ឬពាក្យសម្ងាត់ខុស ➜ **ស្រាយមិនបាន** (មិនមែនចេញ
+  ទិន្នន័យខូចទេ)។ ការអ៊ិនគ្រីប **ផ្ទៀងផ្ទាត់ដោយស្រាយត្រឡប់វិញ** មុនសរសេរ ➜
+  backup ដែលបើកមិនរួច មិនអាចកើតឡើងស្ងាត់ៗបានទេ។
+- **plaintext ត្រូវលុបមុន upload** ហើយ workflow មានជំហានផ្ទៀងផ្ទាត់ដាច់ដោយឡែក
+  ដែល **ធ្លាក់** បើនៅសល់ `.json.gz` ណាមួយ។
+- **សោ Service Account មិនដែលចុះលើ checkout** — `ci-config.js` បដិសេធផ្លូវ
+  ណាមួយក្នុង repo ហើយ workflow លុបសោចោល **ទោះជុំនោះធ្លាក់ក៏ដោយ** (`if: always()`)។
+- **សិទ្ធិ Token របស់ workflow ត្រឹម `contents: read`**។
+- **សូមប្រើសោអានតែម្យ៉ាង** (`Firebase Realtime Database Viewer`) សម្រាប់ backup —
+  សោដែលសរសេរបាន គឺជាហានិភ័យដែលមិនចាំបាច់។
 
 ---
 

@@ -27,12 +27,13 @@
 //
 // ច្បាប់៖ **ការដកវិញត្រូវដក *delta ដែលបានអនុវត្តពិត* មិនមែន delta ដែលស្នើ។**
 //   `applyLedgerBucketDelta()` ត្រឡប់ delta ពិត (`after − before`) ហើយ
-//   `revertRevenueLedgerDelta()` / `revertPickupLedgerDelta()` ប្រើវា ➜
+//   `revertRevenueLedgerDelta()` ប្រើវា ➜
 //   `after' = max(0, after − (after − before)) = before` **ជានិច្ច**។
 //
 // **Mutation ដែលវាស់រួច** ៖ ៥ ➜ ចាប់បាន ៤។
 //   • `const d = memoryApplied` (មិនគោរពសាលក្រម server) ➜ ចាប់បាន (សេណារីយ៉ូ ៧)
-//   • `revertPickupLedgerDelta` ដកទ្វេដង ➜ ចាប់បាន (សេណារីយ៉ូ ៦ខ)
+//   • ស្ថិតិយក ៖ ការដកទ្វេដង ➜ ចាប់បាន (សេណារីយ៉ូ ៦ខ — ចាប់ពី 2.27.0
+//     ស្ថិតិយករក្សា **សំណុំ barcode** ➜ ការដកទ្វេដងមិនអាចកើតបានទេ)
 //   • undo វិលទៅ `-codDiff/-dodDiff` ឆៅ ➜ ចាប់បាន (សេណារីយ៉ូ ១)
 //   • ដកការកែទាំងមូល (`origin/main`) ➜ ចាប់បាន ៦
 //   ⚠️ **equivalent mutant ១** ៖ `applyLedgerBucketDelta` ត្រឡប់ delta ដែល

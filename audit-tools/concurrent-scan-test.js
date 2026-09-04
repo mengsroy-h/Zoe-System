@@ -137,7 +137,7 @@ function makeCtx(server, fbSet) {
         getFormattedClockTime: () => '10:30:00',
         generateUniqueId: () => 'id_new_' + Math.random().toString(36).slice(2, 8),
         ...ledgerStubEntries((d, c, dd, n) => { revenue.cod += (parseFloat(c) || 0); revenue.dod += (parseFloat(dd) || 0); revenue.count += (parseFloat(n) || 0); }),
-        addPickupToDailyRecord: (d, key, cust, pkg) => { pickup.push({ d, key, cust, pkg }); },
+        markPickupBarcodes: (d, marks, seed) => { pickup.push({ d, marks, seed }); return null; },
         syncScannerLookupEntry: () => {},
         updateRecentPhonesList: () => {},
         refreshCurrentHistoryView: () => {},

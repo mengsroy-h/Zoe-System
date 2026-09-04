@@ -3331,21 +3331,21 @@
     function healthSheetScriptRow() {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !lookupApiIsAppsScript(cfg)) {
-            return healthRowHtml('info', 'កំណែ Apps Script', 'មិនពាក់ព័ន្ធ (Lookup មិនប្រើ Google Sheet)');
+            return healthRowHtml('info', 'កំណែ Apps Script (Lookup)', 'មិនពាក់ព័ន្ធ (Lookup មិនប្រើ Google Sheet)');
         }
         if (sheetScriptVersionSeen === null) {
-            return healthRowHtml('info', 'កំណែ Apps Script',
+            return healthRowHtml('info', 'កំណែ Apps Script (Lookup)',
                 'មិនទាន់ដឹង — សូមស្កេនកញ្ចប់ ១ ដង ឬទាញតារាងអតិថិជន រួចពិនិត្យម្តងទៀត');
         }
         if (sheetScriptVersionSeen === SHEET_SCRIPT_VERSION_EXPECTED) {
-            return healthRowHtml('ok', 'កំណែ Apps Script', 'កំណែ ' + sheetScriptVersionSeen + ' — ត្រូវគ្នានឹង App');
+            return healthRowHtml('ok', 'កំណែ Apps Script (Lookup)', 'កំណែ ' + sheetScriptVersionSeen + ' — ត្រូវគ្នានឹង App');
         }
         if (sheetScriptVersionSeen < SHEET_SCRIPT_VERSION_EXPECTED) {
-            return healthRowHtml('warn', 'កំណែ Apps Script',
+            return healthRowHtml('warn', 'កំណែ Apps Script (Lookup)',
                 'Script ដែល deploy ជាកំណែ ' + sheetScriptVersionSeen + ' តែ App រំពឹង '
                 + SHEET_SCRIPT_VERSION_EXPECTED + ' — សូម copy Code.gs ថ្មីចូល script.google.com រួច Deploy ជាកំណែថ្មី');
         }
-        return healthRowHtml('warn', 'កំណែ Apps Script',
+        return healthRowHtml('warn', 'កំណែ Apps Script (Lookup)',
             'Script ជាកំណែ ' + sheetScriptVersionSeen + ' ថ្មីជាង App (' + SHEET_SCRIPT_VERSION_EXPECTED
             + ') — សូមទាញ App ចុះឡើងវិញ');
     }
@@ -3683,6 +3683,7 @@
     }
 
     function clearCustomerDataTableCache() {
+        sheetScriptVersionSeen = null;
         clearCustomerTableRetry();
         clearCustomerTableSoonRefresh();
         clearZtoWarmSoon();

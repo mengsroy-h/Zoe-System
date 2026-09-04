@@ -127,15 +127,35 @@ checker ថ្មី **ធ្លាក់ ៦** (រួម «Cookie ដំណើ
   វិធីដោះស្រាយ) · **ទិសផ្ទុយ** ៖ Script ថ្មីជាង App ⚠️ (ណែនាំទាញ App) ·
   មិនទាន់ឃើញ ℹ️។
 
+#### កែបន្ថែម ២ (រកឃើញដោយការផ្ទៀងផ្ទាត់ផលប៉ះពាល់ ក្រោយកែ)
+
+- 🔴 **កំណែដែលឃើញមិនបាត់ពេលប្តូរ config Lookup** ➜ ការប្តូរ URL ទៅ
+  deployment ផ្សេង នៅតែបង្ហាញកំណែរបស់ deployment **ចាស់** ➜ **ការវិនិច្ឆ័យ
+  កុហក**។ `clearCustomerDataTableCache()` ឥឡូវលុប `sheetScriptVersionSeen`។
+- **ស្លាកមិនច្បាស់** ៖ «កំណែ Apps Script» អានទៅដូចគ្របគម្រោង **ទាំង ២** ខណៈ
+  ជួរនោះវាស់តែផ្លូវ **Lookup** (គម្រោងសរសេរចូលជាគម្រោងដាច់ដោយឡែក ហើយ
+  `sheetImportApiCall()` ត្រឡប់តែ `parsed.data` ➜ កំណែរបស់វាមិនឡើងដល់ App)។
+  ស្លាកក្លាយជា «**កំណែ Apps Script (Lookup)**»។
+
+#### ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់
+
+- `noteSheetScriptVersion()` ឈរនៅ **ដើមផ្លូវ lookup ទាំងអស់** ➜ វាស់ថាវា
+  **មិនបោះលើ input ណាមួយ** (១៥ ករណី ៖ `undefined` · `null` · `NaN` · object
+  · array · `Infinity` · ខ្សែអក្សរ …)។
+- រូបរាងចម្លើយប្រែ ➜ ពិនិត្យអ្នកប្រើទាំងអស់ ៖ `fetchCustomerDataTableRows`
+  (`data.rows`/`data.error`) · `attemptAutoLookup` (វាលតាម config) ·
+  `sheetImportApiCall` (`parsed.ok`/`error`/`data`) — **គ្មានកន្លែងណារាប់ key
+  ឬពិនិត្យរូបរាងតឹងទេ** ➜ វាលថ្មីមិនបំបែកអ្វី។
+
 #### ឧបករណ៍ audit
 
-- `health-check-test.js` ៖ **៥៧ ➜ ៦៧ assertion**; `fetchWithTimeout` ពិត។
+- `health-check-test.js` ៖ **៥៧ ➜ ៧០ assertion**; `fetchWithTimeout` ពិត។
 - `google-sheets-cache-test.js` ៖ បន្ថែមការអះអាងថា **រាល់ចម្លើយ** ផ្ទុក
   `scriptVersion` និងថាមាន **ចំណុចចេញតែ ១**។
-- **Mutation ៩ ➜ ចាប់បានទាំង ៩** ៖ ដក `scriptVersion` ចេញពី `jsonResponse` ·
+- **Mutation ១១ ➜ ចាប់បានទាំង ១១** ៖ ដក `scriptVersion` ចេញពី `jsonResponse` ·
   បន្ថែមផ្លូវចេញទី ២ · `SCRIPT_VERSION` ជាខ្សែអក្សរ · Script ចាស់ជាងរាយ ok ·
   Script ថ្មីជាងរាយ ok · មិនទាន់ឃើញរាយ ok · និងការស្តារកំហុស `res.ok` ឡើងវិញ
-  (ធ្លាក់ ៦)។
+  (ធ្លាក់ ៦) · ដកការលុបកំណែពេលប្តូរ config · ស្លាកមិនច្បាស់វិញ។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

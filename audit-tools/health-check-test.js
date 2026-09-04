@@ -47,7 +47,7 @@ function sliceFn(name) {
 
 const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'healthSheetScriptRow', 'ztoDiagnosticsUrl', 'runHealthCheck',
+    'healthServiceWorkerRow', 'healthLookupRow', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout'];
 const src = {};
@@ -239,6 +239,13 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const newer = buildRuntime({ cfg: SHEET_CFG, scriptSeen: 9 }).api.healthSheetScriptRow();
         ok('⛔ ទិសផ្ទុយ ៖ Script ថ្មីជាង App ➜ ⚠️ ព្រមទាំងណែនាំទាញ App',
             state(newer) === 'warn' && /ទាញ App/.test(newer), state(newer));
+        // ⛔ ប្តូរ config Lookup ➜ កំណែដែលឃើញត្រូវបាត់ បើមិនដូច្នេះជួរនេះបង្ហាញ
+        //    កំណែរបស់ deployment **ចាស់** លើ URL ថ្មី ➜ ការវិនិច្ឆ័យកុហក។
+        const srcAll = NEEDED.map((n) => src[n] || '').join('\n');
+        ok('⛔ `clearCustomerDataTableCache()` លុបកំណែដែលឃើញចោល',
+            /function clearCustomerDataTableCache\(\)\s*\{\s*sheetScriptVersionSeen = null;/.test(srcAll));
+        ok('ស្លាកប្រាប់ច្បាស់ថាវាគ្របផ្លូវ Lookup (គម្រោងសរសេរចូលជាគម្រោងផ្សេង)',
+            /កំណែ Apps Script \(Lookup\)/.test(same), same.slice(0, 90));
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG });

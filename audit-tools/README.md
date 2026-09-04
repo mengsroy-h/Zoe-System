@@ -136,6 +136,7 @@ bash audit-tools/emu/rules.sh
 | `policy-test.js` | គោលការណ៍ **លុប ទល់នឹង ដក**; `deleteSingleItem` និង `buildClearHistoryTrashItem` **មិនប៉ះលុយ** | `POLICY_APP_DIR` |
 | `trash-modal-test.js` | ស្លាកធុងសំរាម ↔ ថេរ · ការ merge · តួលេខសរុប ២ ក្រុម | `TRASH_APP_DIR` |
 | `partial-pickup-cleanup-test.js` | ច្បាប់ ២ ម៉ោង / ថ្ងៃទី ៨ ដើរតាម **barcode** មិនមែនកញ្ចប់ | `PARTIAL_APP_DIR` |
+| `expired-trash-retention-test.js` | ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` មិនត្រូវឃ្លាតពីគ្នា | `EXPIREDTRASH_APP_DIR` |
 | `restore-marker-hygiene-test.js` | marker របស់ប្រវត្តិ មិនធ្លាក់ចូលធុងសំរាម · ការសម្អាតមិនដណ្តើមធាតុដែលកំពុងស្តារ | `MARKER_APP_DIR` |
 | `pickup-ledger-test.js` | អតិថិជនយក ↔ កញ្ចប់យក រាប់លើ **មូលដ្ឋានតែមួយ** | `PICKUP_APP_DIR` |
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |
@@ -143,6 +144,9 @@ bash audit-tools/emu/rules.sh
 | `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ (rules ពិត · អថេរ registry និងធុងសំរាម) | `FUZZ_APP_DIR` |
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
+| `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
+| `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
+| `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម | `MONEYGUARD_APP_DIR` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
@@ -180,6 +184,7 @@ bash audit-tools/emu/rules.sh
 | `stall-guard-test.js` | បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `STALLGUARD_APP_DIR` |
 | `db-stall-guard-test.js` | RTDB មិនបដិសេធពេលក្រៅបណ្តាញ ➜ សោ in-flight ជាប់រហូត | `DBSTALL_APP_DIR` |
 | `write-stall-guard-test.js` | ការសរសេរដែលព្យួរ **ខាងក្រោយ helper** ➜ ការសម្អាតស្វ័យប្រវត្តិងាប់ · គ្មានសារដល់អ្នកប្រើ | `WRITESTALL_APP_DIR` |
+| `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
 | `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |
@@ -311,7 +316,7 @@ bash audit-tools/emu/rules.sh
 | **SKIP តែសម្រាប់ dependency របស់បរិស្ថាន** | SKIP លើឯកសាររបស់ repo ខ្លួនឯង ជាបៃតងក្លែងក្លាយ |
 | **គ្មាន secret ក្នុងតេស្ត** | តម្លៃសាកល្បងត្រូវជាតម្លៃក្លែង; response body ដែលអាចមាន secret ត្រូវបោះចោល |
 
-### សំណួរ ១១ មុនជឿថា checker ថ្មីមួយដំណើរការ
+### សំណួរ ១៣ មុនជឿថា checker ថ្មីមួយដំណើរការ
 
 ១. វាស្កេន **ឯកសារណា**ខ្លះ?
 ២. វាស្កេន **ទម្រង់វេយ្យាករណ៍ណា**ខ្លះ? (template literal ធៀបនឹងការតភ្ជាប់ខ្សែអក្សរ)
@@ -324,6 +329,8 @@ bash audit-tools/emu/rules.sh
 ៩. វាដាក់ dependency ក្នុង **របៀបបរាជ័យ** ណា? (ធ្លាក់ ≠ ព្យួរ)
 ១០. តើវាឃើញ **ការបដិសេធ promise** ទេ?
 ១១. តើការធ្លាក់របស់វា ជាការធ្លាក់ពិត ឬសំណល់នៃការវាស់?
+១២. តើលទ្ធផលដែលអ្នកអានជា `PASS` ឬ `SKIP`? ⛔ **`SKIP` = «វាស់មិនបាន» មិនមែន «ត្រឹមត្រូវ»**។
+១៣. តើ **អ្នកវាស់** ខ្លួនឯងចង្អុលទៅ tree ត្រឹមត្រូវទេ? ➜ `grep -n 'process.env\.[A-Z_]*APP_DIR' audit-tools/<checker>.js`
 
 ⛔ **Mutation testing ៖ សួរថា *អ្នកណាចាប់* មិនមែន *តើចាប់បានទេ*។** ពេល
 mutation មួយត្រូវចាប់បាន ត្រូវសួរបន្តថា «តើ checker ណាទៀត *គួរ* ចាប់វា

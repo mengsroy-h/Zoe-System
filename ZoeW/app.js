@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.27.0';
+    const APP_VERSION = '2.27.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -452,11 +452,11 @@
         const modalEl = document.getElementById(modalId);
         if(modalEl) modalEl.style.display = 'none';
         if (modalId === 'phoneModal') clearLookupStatus();
-        document.body.style.overflow = '';
-        pendingBarcode = "";
-        editingItemId = null;
-        markingItemId = null;
         isModalOpen = Array.from(document.querySelectorAll('.modal')).some(m => m.style.display === 'flex');
+        document.body.style.overflow = isModalOpen ? 'hidden' : '';
+        if (modalId === 'phoneModal' || !isModalOpen) pendingBarcode = "";
+        if (modalId === 'editPhoneModal' || !isModalOpen) editingItemId = null;
+        if (modalId === 'callMarkModal' || !isModalOpen) markingItemId = null;
         if (!isModalOpen) {
             safeFocusScanner();
             resumeScanVideo();
@@ -3542,6 +3542,7 @@
     const AUTO_LOOKUP_FAILURE_MAX = 100;
     const LOOKUP_FOCUS_GRACE_MS = 250;
     const LOOKUP_MANUAL_FALLBACK_MS = 1800;
+    const LOOKUP_FOCUS_MAX_WAIT_MS = 15000;
     const AUTO_LOOKUP_MAX_IN_FLIGHT = 2;
     const AUTO_LOOKUP_QUEUE_RETRY_MS = 400;
     const AUTO_LOOKUP_QUEUE_MAX_WAIT_MS = 20000;
@@ -3718,10 +3719,20 @@
         if (resolve) resolve();
     }
 
+    function lookupIsWorkingOn(barcode) {
+        const key = String(barcode || '').trim().toUpperCase();
+        if (!key) return false;
+        if (autoLookupInFlight.has(key)) return true;
+        if (autoLookupQueueRetries.has(key)) return true;
+        return String(pendingLookupUnlockBarcode || '').trim().toUpperCase() === key;
+    }
+
     function armLookupFocus(phoneInput, barcode, lookupPromise) {
         let focused = false;
         let fallbackTimer = null;
         let waitingForPin = false;
+        const armedAt = Date.now();
+        const lookupStillWorking = () => elapsedSince(armedAt) < LOOKUP_FOCUS_MAX_WAIT_MS && lookupIsWorkingOn(barcode);
         const focusIfEmpty = () => {
             if (focused || isPinFlowPending()) return;
             if (!isModalOpen || pendingBarcode !== barcode) return;
@@ -3729,25 +3740,33 @@
             focused = true;
             phoneInput.focus();
         };
+        const armFallback = (ms) => {
+            if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+            fallbackTimer = setTimeout(runFallback, ms);
+        };
         const runFallback = () => {
             fallbackTimer = null;
             if (focused) return;
+            if (!isModalOpen || pendingBarcode !== barcode) return;
             if (isPinFlowPending()) {
                 waitingForPin = true;
-                fallbackTimer = setTimeout(runFallback, LOOKUP_FOCUS_GRACE_MS);
+                armFallback(LOOKUP_FOCUS_GRACE_MS);
                 return;
             }
             if (waitingForPin) {
                 waitingForPin = false;
-                fallbackTimer = setTimeout(runFallback, LOOKUP_MANUAL_FALLBACK_MS);
+                armFallback(LOOKUP_MANUAL_FALLBACK_MS);
+                return;
+            }
+            if (lookupStillWorking()) {
+                armFallback(LOOKUP_FOCUS_GRACE_MS);
                 return;
             }
             focusIfEmpty();
         };
-        fallbackTimer = setTimeout(runFallback, isPinFlowPending() ? LOOKUP_FOCUS_GRACE_MS : LOOKUP_MANUAL_FALLBACK_MS);
+        armFallback(isPinFlowPending() ? LOOKUP_FOCUS_GRACE_MS : LOOKUP_MANUAL_FALLBACK_MS);
         return Promise.resolve(lookupPromise).finally(() => {
-            if (fallbackTimer !== null) clearTimeout(fallbackTimer);
-            setTimeout(focusIfEmpty, LOOKUP_FOCUS_GRACE_MS);
+            armFallback(LOOKUP_FOCUS_GRACE_MS);
         });
     }
 

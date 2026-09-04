@@ -82,7 +82,13 @@ function makeBlobs(behavior) {
             calls.push({ fn: 'get', key, options });
             if (state.readThrows) return Promise.reject(new Error('read failed'));
             if (state.readHangs) return new Promise(() => {});
-            return Promise.resolve(state.value);
+            // ⛔ ការអានពិតយក **ទិដ្ឋភាព** នៅពេលចាប់ផ្តើម — មិនមែនតម្លៃថ្មីបំផុត
+            // នៅពេលដោះទេ។ នេះជាអ្វីដែលធ្វើឲ្យការអានយឺតអាចជាន់តម្លៃថ្មីជាង។
+            const snapshot = state.value;
+            if (state.readDelayMs) {
+                return new Promise((resolve) => setTimeout(() => resolve(snapshot), state.readDelayMs));
+            }
+            return Promise.resolve(snapshot);
         },
         set(key, value) {
             calls.push({ fn: 'set', key, value });
@@ -118,7 +124,7 @@ function useBlobs(behavior) {
 function call(query, options) {
     const config = options || {};
     const event = {
-        httpMethod: 'GET',
+        httpMethod: config.method || 'GET',
         headers: Object.assign({ 'x-zoe-proxy-key': KEY }, config.headers || {}),
         queryStringParameters: query
     };
@@ -305,6 +311,113 @@ async function run() {
     ok('⛔ Cookie ផុត ➜ អាន store ឡើងវិញភ្លាម (មិនរង់ចាំ ៦០ វិ.)',
         sentCookie(net) === blobs.state.value, sentCookie(net));
 
+    // ── ៣ខ. ⛔ cache ផុត TTL ➜ ការអាន store មិនត្រូវឈរលើផ្លូវឆ្លើយតប ──────────
+    // 🔴 ថ្នាក់កំហុសល្បឿន ៖ ក្រោយ ៦០ វិនាទី រាល់ការស្កេន **ទប់** រង់ចាំការអាន
+    //   Netlify Blobs មុននឹងហៅ ZTO — ទោះបីជា Cookie ដដែលនៅក្នុងសតិស្រាប់ក៏ដោយ។
+    //   ពេល Blobs យឺត ឬព្យួរ ការស្កេនទាំងអស់រងផលតាមវា ➜ ផ្ទុយនឹងច្បាប់
+    //   «⛔ Blobs មិនត្រូវជាចំណុចដាច់តែមួយ»។ ដំណោះស្រាយ ៖ ឆ្លើយពីសតិភ្លាម
+    //   រួចធ្វើឲ្យស្រស់ **ខាងក្រោយ**។
+    console.log('\n== ៣ខ. cache ផុត TTL ➜ ឆ្លើយពីសតិ រួចធ្វើឲ្យស្រស់ខាងក្រោយ ==');
+    ok('Function បើកផ្លូវធ្វើឲ្យ cookie cache ចាស់ សម្រាប់តេស្ត',
+        !!(proxy && typeof proxy.expireCookieCacheForTests === 'function'),
+        proxy && typeof proxy.expireCookieCacheForTests);
+    if (proxy && typeof proxy.expireCookieCacheForTests === 'function') {
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        net = upstream();
+        await call({ barcode: BARCODE });
+        const firstCookie = sentCookie(net);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ការអានដំបូងយក Cookie ពី blob',
+            firstCookie === BLOB_COOKIE, firstCookie);
+
+        proxy.expireCookieCacheForTests();
+        blobs.state.readHangs = true;
+        net = upstream();
+        const swrStart = Date.now();
+        res = await call({ barcode: '77130527210021' });
+        const swrMs = Date.now() - swrStart;
+        ok('⛔ cache ផុត + Blobs ព្យួរ ➜ lookup នៅតែឆ្លើយ (មិនទប់)',
+            res.statusCode === 200 && JSON.parse(res.body).found === true, res.statusCode);
+        ok('⛔ cache ផុត + Blobs ព្យួរ ➜ ប្រើ Cookie ក្នុងសតិ មិនធ្លាក់ទៅ env',
+            sentCookie(net) === BLOB_COOKIE, sentCookie(net));
+        ok('⛔ cache ផុត + Blobs ព្យួរ ➜ លឿន (< ១ វិនាទី មិនរង់ចាំពិដានអាន)',
+            swrMs < 1000, swrMs + 'ms');
+
+        // ⛔ ទិសផ្ទុយ ១ ៖ គ្មានតម្លៃក្នុងសតិសោះ ➜ **ត្រូវ** អាន store ជាមុន
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        net = upstream();
+        await call({ barcode: BARCODE });
+        ok('⛔ ទិសផ្ទុយ ៖ សតិទទេ ➜ នៅតែអាន store មុនហៅ ZTO',
+            blobs.calls.filter((c) => c.fn === 'get').length === 1
+            && sentCookie(net) === BLOB_COOKIE,
+            blobs.names() + '/' + sentCookie(net));
+
+        // ⛔ ទិសផ្ទុយ ២ ៖ ការធ្វើឲ្យស្រស់ខាងក្រោយត្រូវ **កើតឡើងពិត**
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        net = upstream();
+        await call({ barcode: BARCODE });
+        proxy.expireCookieCacheForTests();
+        blobs.state.value = 'BOS-MAN-SESSION=swr-refreshed-value-4242; sidebarStatus=1';
+        net = upstream();
+        await call({ barcode: '77130527210022' });
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        ok('⛔ ការធ្វើឲ្យស្រស់ខាងក្រោយកើតឡើងពិត (អាន store លើកទី ២)',
+            blobs.calls.filter((c) => c.fn === 'get').length === 2, blobs.names());
+        net = upstream();
+        await call({ barcode: '77130527210023' });
+        ok('⛔ សំណើបន្ទាប់ប្រើតម្លៃថ្មីដែលទើបធ្វើឲ្យស្រស់',
+            sentCookie(net) === blobs.state.value, sentCookie(net));
+
+        // ⛔ container បង្កក ➜ ការអានខាងក្រោយដោះយូរក្រោយមក ដោយកាន់ទិដ្ឋភាព
+        //   **ចាស់** ➜ វាមិនត្រូវសរសេរជាន់ session ថ្មីដែល Argus ទើបប្រគល់។
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        net = upstream();
+        await call({ barcode: BARCODE });
+        proxy.expireCookieCacheForTests();
+        blobs.state.readDelayMs = 60;
+        net = upstream(['BOS-MAN-SESSION=renewed-during-refresh-5150; Path=/']);
+        await call({ barcode: '77130527210026' });
+        await new Promise((resolve) => setTimeout(resolve, 140));
+        net = upstream();
+        await call({ barcode: '77130527210027' });
+        ok('⛔ ការអានខាងក្រោយដែលយឺត មិនត្រូវសរសេរជាន់ session ថ្មីជាង',
+            String(sentCookie(net) || '').indexOf('renewed-during-refresh-5150') !== -1,
+            sentCookie(net));
+        blobs.state.readDelayMs = 0;
+
+        // ⛔ ទិសផ្ទុយ ៤ ៖ ការត្រៀម (OPTIONS) ឈរក្រៅផ្លូវស្កេន ➜ វាត្រូវ
+        //   **បញ្ចប់** ការអានពិត មិនមែនត្រឹមតាំងវាខាងក្រោយ។
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        net = upstream();
+        await call({ barcode: BARCODE });
+        proxy.expireCookieCacheForTests();
+        blobs.state.value = 'BOS-MAN-SESSION=warmed-value-8888; sidebarStatus=1';
+        await call({}, { method: 'OPTIONS' });
+        net = upstream();
+        await call({ barcode: '77130527210025' });
+        ok('⛔ ការត្រៀម (OPTIONS) ➜ បញ្ចប់ការអាន ➜ ការស្កេនបន្ទាប់ប្រើតម្លៃថ្មីភ្លាម',
+            sentCookie(net) === blobs.state.value, sentCookie(net));
+
+        // ⛔ ទិសផ្ទុយ ៣ ៖ ក្រោយ 401 ការអានត្រូវ **ទប់** មិនមែន SWR
+        resetEnv({ ZTO_COOKIE: ENV_COOKIE });
+        blobs = useBlobs();
+        unauthorizedUpstream();
+        res = await call({ barcode: BARCODE });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ Cookie ផុត ➜ 401',
+            res.statusCode === 401, res.statusCode);
+        blobs.state.value = 'BOS-MAN-SESSION=rotated-after-401-777; sidebarStatus=1';
+        net = upstream();
+        await call({ barcode: '77130527210024' });
+        ok('⛔ ក្រោយ 401 ➜ អាន store ភ្លាម (មិនប្រើសតិចាស់តាម SWR)',
+            sentCookie(net) === blobs.state.value, sentCookie(net));
+    } else {
+        for (let i = 0; i < 10; i++) ok('SWR cookie cache #' + (i + 1), false);
+    }
+
     // ── ៤. ការបន្តអាយុ Cookie តាម Set-Cookie ───────────────────────────────
     console.log('\n== ៤. Argus បន្តអាយុ Cookie ➜ សរសេរចូល store ==');
     resetEnv({ ZTO_COOKIE: ENV_COOKIE });
@@ -331,6 +444,17 @@ async function run() {
     ok('⛔ ពិដានល្បឿន ➜ មិនសរសេរស្ទួនក្នុង ៦០ វិនាទី',
         blobs.calls.filter((c) => c.fn === 'set').length === 1, blobs.names());
 
+    // ⛔ ពិដានល្បឿនការពារ **ការសរសេរទៅ Blobs** — មិនមែនការចងចាំទេ។
+    //   បើតម្លៃដែល Argus ទើបប្រគល់ត្រូវបោះចោលទាំងស្រុង នោះសំណើបន្ទាប់នៃ
+    //   instance ដដែលនៅផ្ញើ Cookie **ចាស់** ➜ 401 ដែលអាចជៀសបាន ➜ អាន store
+    //   ឡើងវិញ + សាកម្តងទៀត (ថ្លៃមួយជុំពេញ) ខណៈ session ថ្មីស្ថិតក្នុងដៃរួច។
+    net = upstream();
+    await call({ barcode: '77130527210015' });
+    ok('⛔ ពិដានល្បឿនទប់ការសរសេរ ➜ តែ session ថ្មីត្រូវប្រើបន្តក្នុងសតិ',
+        String(sentCookie(net) || '').indexOf('renewed-again-99887766') !== -1, sentCookie(net));
+    ok('⛔ ទិសផ្ទុយ ៖ ការប្រើក្នុងសតិមិនត្រូវក្លាយជាការសរសេរស្ទួន',
+        blobs.calls.filter((c) => c.fn === 'set').length === 1, blobs.names());
+
     resetEnv({ ZTO_COOKIE: ENV_COOKIE });
     blobs = useBlobs();
     net = upstream(['sidebarStatus=1']);
@@ -351,6 +475,10 @@ async function run() {
     res = await call({ barcode: BARCODE });
     ok('⛔ ការសរសេរធ្លាក់ ➜ lookup នៅជោគជ័យ (best-effort)',
         res.statusCode === 200 && JSON.parse(res.body).found === true, res.body);
+    net = upstream();
+    await call({ barcode: '77130527210016' });
+    ok('⛔ ការសរសេរធ្លាក់ ➜ session ថ្មីនៅតែប្រើក្នុងសតិ (មិនត្រឡប់ទៅចាស់)',
+        String(sentCookie(net) || '').indexOf('renewed-value-55667788') !== -1, sentCookie(net));
 
     // ── ៤ខ. jar ពិតរបស់ Argus ➜ ស្នាមភ្ជាប់នឹង helper (វាស់ 2026-09-02) ──────
     console.log('\n== ៤ខ. jar ដែលមានគូចម្លែក មិនត្រូវទម្លាក់ Cookie ថ្មី ==');

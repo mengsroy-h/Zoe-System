@@ -48,6 +48,7 @@ const LOCAL_CLOCK_OK = {
         seedCustomerTableFromImport: 'ត្រាថា cache តារាងអតិថិជនស្រស់ពេលណា — TTL local ដដែល គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         setFastLookupRow: 'ត្រាពេល cache Lookup ក្នុងសតិ — TTL local សុទ្ធសាធ គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         scheduleCustomerTableSoonRefresh: 'ត្រាពេលតាំងម៉ោងទាញឡើងវិញ — វាស់តាម elapsedSince() ដែល fail-open ពេលនាឡិកាថយក្រោយ',
+        armLookupFocus: 'ត្រាពេលនៃការរង់ចាំ Lookup មុនលើក Keyboard — local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ដែល fail-open ➜ នាឡិកាថយក្រោយ ➜ Keyboard មកភ្លាម មិនជាប់អន្ទាក់',
         scheduleAutoLookupQueueRetry: 'ត្រាពេលចូលជួររង់ចាំ Lookup — វាស់តាម elapsedSince() ដែល fail-open ពេលនាឡិកាថយក្រោយ; local សុទ្ធសាធ គ្មានទំនាក់ទំនងនឹង retention ឬលុយ',
         warmZtoLookupProxyIfConfigured: 'ត្រាពេល warm-up ZTO ក្នុង cooldown ១០ នាទី — local សុទ្ធសាធ និងមិនប៉ះ retention/revenue',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',

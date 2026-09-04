@@ -26,6 +26,12 @@
 // ⛔ **អថេរមិនអាចរំលោភបាន** ៖ `sum(pickedUpPhones) === packagesPickedUp`។
 // បើអថេរនេះកាន់ ការឃ្លាតគ្នាក្លាយជា **មិនអាចកើតឡើងបានតាមរចនាសម្ព័ន្ធ** —
 // មិនមែនត្រឹមតែ «កែកន្លែងដែលរាយការណ៍» ទេ។
+//
+// ⛔ **កំណែ 2.27.0 ៖ មូលដ្ឋានរាប់ក្លាយជា *សំណុំ barcode*** —
+// `pickedUpBarcodes/$barcodeKey = phoneKey` ហើយលេខទាំង ២ ជា **កញ្ចក់ដេរីវេ**
+// (`packagesPickedUp` = ចំនួនកូនសោ · `pickedUpPhones` = ការរាប់តម្លៃ)។
+// ដូច្នេះអថេរខាងលើក្លាយជា **ពិតតាមរចនាសម្ព័ន្ធ** ហើយឯកសារនេះឈប់វាស់
+// «delta ត្រូវចម្លងគ្នា» (ដែលលែងមាន) មកវាស់ **ការដេរីវេ** វិញ។
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -51,48 +57,33 @@ function sliceFn(name) {
 }
 
 // ── ១. ជាន់អប្បបរមា — checker នេះត្រូវពិតជាបានឃើញកូដ ────────────────
-// ⛔ ការហៅខ្លះឥឡូវឆ្លងកាត់ helper (`revertPickupLedgerDelta` ·
-// `correctPickupLedgerToActual` · `applyPickupRefMove`) ➜ ជាន់ត្រូវរាប់
-// **ទាំងអស់** បើមិនដូច្នេះ refactor ធម្មតាធ្វើឲ្យជាន់ធ្លាក់ខុស ហើយការបន្ថយ
-// លេខដោយគ្មានហេតុផលបង្កើតបៃតងក្លែងក្លាយសម្រាប់ជុំក្រោយ។
-const callSites = SRC.match(/(?:addPickupToDailyRecord|revertPickupLedgerDelta|correctPickupLedgerToActual|applyPickupRefMove)\(/g) || [];
-ok('ជាន់អប្បបរមា៖ ឃើញកន្លែងហៅផ្លូវស្ថិតិយក >= 10',
-    callSites.length >= 10, callSites.length);
+const callSites = SRC.match(/(?:markPickupBarcodes|revertPickupMarks|collectPickupMarks|reconstructPickupSet)\(/g) || [];
+ok('ជាន់អប្បបរមា៖ ឃើញកន្លែងហៅផ្លូវស្ថិតិយក >= 10', callSites.length >= 10, callSites.length);
 
-// ── ២. helper រាប់ barcode បិទ ត្រូវមាន និងត្រឹមត្រូវ ──────────────────
-const helperSrc = sliceFn('closedBarcodeCount');
-ok('មាន `closedBarcodeCount()` — មូលដ្ឋានរួមរបស់ការរាប់ទាំង ២', !!helperSrc);
+// ── ២. អត្តសញ្ញាណ ៖ កូនសោស្ថិតិយកត្រូវជាកូនសោ barcode ដដែលនឹង registry ─
+// ⛔ បើកូនសោ ២ ខាងគណនាតាមរូបមន្តខុសគ្នា នោះ barcode តែមួយអាចកាន់កន្លែង
+// **ពីរ** ➜ ការរាប់ស្ទួនវិលមកវិញតាមទ្វារថ្មី។
+const keyFn = sliceFn('pickupBarcodeKey');
+ok('មាន `pickupBarcodeKey()` — មូលដ្ឋានតែមួយនៃកូនសោស្ថិតិយក', !!keyFn);
+ok('⛔ `pickupBarcodeKey()` ប្រើ `barcodeRegistryKey()` ដដែលនឹង registry',
+    !!keyFn && /barcodeRegistryKey\(/.test(keyFn), keyFn);
 
-// ── ３. delta អតិថិជន ត្រូវ **ចម្លងចេញពី** delta កញ្ចប់ ─────────────────
-// ⛔ ការប្រៀបធៀបអាគុយម៉ង់តាមឈ្មោះមិនគ្រប់គ្រាន់ទេ (`-pickupCustomerDelta`
-// ធៀប `-pickupPackageDelta` ជាឈ្មោះខុសគ្នា តែតម្លៃដូចគ្នា)។ អ្វីដែលត្រូវ
-// អះអាងគឺ **ការផ្តល់តម្លៃ** — អតិថិជនត្រូវយកតម្លៃពីកញ្ចប់ ដោយផ្ទាល់។
-const ASSIGN_RULES = [
-    ['pickupCustomerDelta = pickupPackageDelta;', 'ផ្លូវក្នុងឧបករណ៍ (local)'],
-    ['serverCustomerDelta = serverPackageDelta;', 'ផ្លូវ transaction លើ server']
-];
-ASSIGN_RULES.forEach(([needle, where]) => {
-    const n = (SRC.split(needle).length - 1);
-    ok('delta អតិថិជនចម្លងចេញពី delta កញ្ចប់ — ' + where + ' (' + n + ' កន្លែង)',
-        n >= 2, 'រំពឹង >= 2 កន្លែង (toggle barcode និង toggle កញ្ចប់) តែឃើញ ' + n);
-});
+// ── ３. លេខទាំង ២ ត្រូវ **ដេរីវេ** ចេញពីសំណុំ មិនមែនបូក/ដក ─────────────
+const buildFn = sliceFn('buildPickupRecordFromSet');
+ok('មាន `buildPickupRecordFromSet()` — កន្លែងតែមួយដែលសាង record', !!buildFn);
+ok('⛔ `packagesPickedUp` ដេរីវេពីទំហំសំណុំ',
+    !!buildFn && /packagesPickedUp:\s*size/.test(buildFn), buildFn);
+ok('⛔ `pickedUpPhones` ដេរីវេពីការរាប់តម្លៃ (`tallyPickupPhones`)',
+    !!buildFn && /tallyPickupPhones\(/.test(buildFn), buildFn);
+const arith = SRC.match(/packagesPickedUp\s*(?:\+=|-=)|packagesPickedUp\s*=\s*[^;\n]*[+\-][^;\n]*;/g) || [];
+ok('⛔ គ្មាននព្វន្ធលើ `packagesPickedUp` នៅកន្លែងណាទៀតទេ (បូក/ដក = ការផ្ទុះ)',
+    arith.length === 0, arith);
+const phoneArith = SRC.match(/pickedUpPhones\[[^\]]+\]\s*=\s*[^;\n]*[+\-]/g) || [];
+ok('⛔ គ្មាននព្វន្ធលើ `pickedUpPhones[...]` ទៀតទេ', phoneArith.length === 0, phoneArith);
 
-// ⛔ គ្មានការគណនា delta អតិថិជនតាមស្ថានភាព «បិទពេញ» របស់ item ទៀតទេ —
-// នោះជាមូលដ្ឋានចាស់ដែលការ merge បំផ្លាញ។
-const OLD_BASIS = [
-    /pickupCustomerDelta\s*=\s*alreadyInDesiredState/,
-    /serverCustomerDelta\s*=\s*\(!!currentItem\.isClosed/,
-    /pickupCustomerDelta\s*=\s*1;[\s\S]{0,120}?previousState\.itemIsClosed/,
-    /serverCustomerDelta\s*=\s*\(!wasItemClosed/
-];
-const stale = OLD_BASIS.filter((re) => re.test(SRC));
-ok('⛔ គ្មានការគណនាតាមមូលដ្ឋានចាស់ «item បិទពេញ» នៅសល់',
-    stale.length === 0, stale.map(String).join(' | '));
-
-// ការប្តូរលេខទូរស័ព្ទត្រូវផ្លាស់ ref **ទាំងអស់** មិនមែន ±1
-ok('ការប្តូរលេខទូរស័ព្ទផ្លាស់ ref តាមចំនួន barcode បិទ មិនមែន ±1',
-    /movedPickupRefs\s*=\s*closedBarcodeCount\(item\)/.test(SRC) &&
-    !/addPickupToDailyRecord\(pickupDate, prevPickupKey, -1, 0\)/.test(SRC));
+// ការប្តូរលេខទូរស័ព្ទត្រូវផ្លាស់ **ម្ចាស់** នៃកូនសោ barcode បិទទាំងអស់
+ok('ការប្តូរលេខទូរស័ព្ទប្តូរម្ចាស់កូនសោ barcode បិទ (មិនមែន ±1)',
+    /closedPickupMarks\s*=\s*\(source\)\s*=>\s*collectPickupMarks\(/.test(SRC));
 
 // ការ merge ស្កេនមិនប្តូរ barcode ណាមួយ ➜ មិនត្រូវបញ្ចេញ delta
 ok('⛔ ការ merge ស្កេនមិនបញ្ចេញ delta (គ្មាន barcode ណាប្តូរស្ថានភាព)',
@@ -100,26 +91,31 @@ ok('⛔ ការ merge ស្កេនមិនបញ្ចេញ delta (គ្
 
 // ── ４. ការវាស់ឥរិយាបថ — សេណារីយ៉ូពិតរបស់អ្នកប្រើ ─────────────────────
 const ctx = {
-    console, Object, Math, parseFloat, String, Set, Date, Array, isNaN,
-    dailyPickupData: {},
+    console, Object, Math, parseFloat, String, Set, Date, Array, isNaN, JSON,
+    dailyPickupData: {}, scanHistory: [], deletedItems: [],
     Promise,
-    commitDailyPickupDelta: () => Promise.resolve(null),
+    dbRefDailyPickup: null, db: null, fb: null,
+    showToast: () => {},
     getFormattedDate: () => '2026-08-27'
 };
 vm.createContext(ctx);
+function sliceConst(name) {
+    const m = new RegExp('const\\s+' + name + '\\s*=\\s*([^;\\n]+);').exec(SRC);
+    return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
+}
+// ⛔ កុំបញ្ឈប់ checker ពេលរកឈ្មោះមិនឃើញ — រាយឈ្មោះដែលបាត់ រួច **stub**
+// ជំនួស ដើម្បីឲ្យការអះអាងឥរិយាបថខាងក្រោមនៅតែរត់ (មេរៀន 2.19.3)។
+const NEEDED_FNS = ['ledgerNumber', 'barcodeRegistryKey', 'getPickupPhoneKey', 'countPickedUpCustomers',
+    'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'legacyPickupPlaceholders', 'pickupSetFromRecord',
+    'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'collectPickupMarks', 'reconstructPickupSet',
+    'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks'];
+const missingFns = NEEDED_FNS.filter((n) => !sliceFn(n));
+ok('រក function ផ្លូវស្ថិតិយកឃើញទាំង ' + NEEDED_FNS.length, missingFns.length === 0, missingFns);
 vm.runInContext([
-    sliceFn('ledgerNumber'),
-    sliceFn('getPickupPhoneKey'),
-    sliceFn('countPickedUpCustomers'),
-    sliceFn('pickupAppliedDelta'),
-    sliceFn('applyPickupMemoryDelta'),
-    sliceFn('addPickupToDailyRecord'),
-    sliceFn('revertPickupOnServer'),
-    sliceFn('revertPickupLedgerDelta'),
-    sliceFn('correctPickupServerToActual'),
-    sliceFn('correctPickupLedgerToActual'),
-    helperSrc || 'function closedBarcodeCount(item){ return item && item.barcodes ? item.barcodes.filter(function(b){return b && b.isClosed;}).length : 0; }',
-    'this.api = { getPickupPhoneKey, countPickedUpCustomers, addPickupToDailyRecord, closedBarcodeCount };'
+    sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
+    sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
+    ...NEEDED_FNS.map((n) => sliceFn(n) || ('function ' + n + '() { return undefined; }')),
+    'this.api = { getPickupPhoneKey, countPickedUpCustomers, markPickupBarcodes, revertPickupMarks, collectPickupMarks, pickupBarcodeKey };'
 ].filter(Boolean).join('\n\n'), ctx);
 const API = ctx.api;
 const DAY = '2026-08-27';
@@ -134,18 +130,12 @@ function ledger() {
     };
 }
 
-// ការប្តូរស្ថានភាព barcode — ក្រោយកែ delta ទាំង ២ ត្រូវជាចំនួន barcode
-// បិទដែលប្រែ។ មុនកែ អតិថិជនគណនាតាមស្ថានភាព «បិទពេញ» របស់ item។
+// ការប្តូរស្ថានភាព barcode — សរសេរ **ស្ថានភាព** មិនមែន delta
 function toggleBarcode(item, idx, desiredClosed) {
-    const prevBc = !!item.barcodes[idx].isClosed;
-    const prevItemClosed = !!item.isClosed;
     item.barcodes[idx].isClosed = desiredClosed;
-    const allClosed = item.barcodes.every((b) => b.isClosed);
-    item.isClosed = allClosed;
-    const pkgDelta = (prevBc === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
-    const custDelta = pkgDelta;
-    void prevItemClosed; void allClosed;
-    API.addPickupToDailyRecord(DAY, API.getPickupPhoneKey(item), custDelta, pkgDelta);
+    item.isClosed = item.barcodes.every((b) => b.isClosed);
+    const key = API.pickupBarcodeKey(item.barcodes[idx].code);
+    API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(item), closed: desiredClosed }], null);
 }
 
 const PHONE = '0974158508';
@@ -181,11 +171,38 @@ ok('លេខទូរស័ព្ទ ១ · barcode បិទ ២ ➜ អតិ
     st.customers === 1, JSON.stringify(st));
 ok('⛔ អថេរ៖ ផលបូក ref === ចំនួនកញ្ចប់',
     st.refSum === st.packages, 'refSum=' + st.refSum + ' packages=' + st.packages);
+
+// ⛔ ការសរសេរដដែលៗ (ការជាន់គ្នា · ការព្យាយាមឡើងវិញ) មិនត្រូវបូកឡើង
+toggleBarcode(q, 0, true);
+toggleBarcode(q, 0, true);
+st = ledger();
+ok('⛔ idempotent ៖ បិទ barcode ដដែល ៣ ដង ➜ នៅតែ ២ កញ្ចប់',
+    st.packages === 2 && st.customers === 1, JSON.stringify(st));
+
 toggleBarcode(q, 0, false);
 toggleBarcode(q, 1, false);
 st = ledger();
 ok('បើកទាំង ២ វិញ ➜ អតិថិជន 0 · កញ្ចប់ 0',
     st.customers === 0 && st.packages === 0, JSON.stringify(st));
+
+// ⛔ ការបើកដដែលៗក៏មិនត្រូវធ្លាក់ក្រោម 0 ដែរ
+toggleBarcode(q, 0, false);
+st = ledger();
+ok('⛔ បើក barcode ដែលបើករួច ➜ នៅ 0 (គ្មានលេខអវិជ្ជមាន)',
+    st.packages === 0 && st.customers === 0, JSON.stringify(st));
+
+// ── ６. ការដកវិញ (revert) ត្រូវត្រឡប់ស្ថានភាព **ដើម** មិនមែនលេខ ───────
+{
+    ctx.dailyPickupData = {};
+    const r = { id: 'D', phone: '0111222333', scanDate: DAY, isClosed: false, barcodes: [{ code: 'Z1', isClosed: false }] };
+    const key = API.pickupBarcodeKey('Z1');
+    const applied = API.markPickupBarcodes(DAY, [{ key: key, phoneKey: API.getPickupPhoneKey(r), closed: true }], null);
+    ok('បិទ ➜ កញ្ចប់ 1', ledger().packages === 1, JSON.stringify(ledger()));
+    API.revertPickupMarks(applied);
+    ok('⛔ revert ➜ ត្រឡប់ទៅ 0 ពិតប្រាកដ', ledger().packages === 0 && ledger().customers === 0, JSON.stringify(ledger()));
+    API.revertPickupMarks(applied);
+    ok('⛔ revert ២ ដង ➜ នៅ 0 ដដែល (មិនធ្លាក់ក្រោម)', ledger().packages === 0, JSON.stringify(ledger()));
+}
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

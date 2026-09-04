@@ -603,6 +603,11 @@ function seedData() {
                 p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
                 p.pickedUpPhones = p.pickedUpPhones || {};
                 p.pickedUpPhones['0912000001'] = 1;
+                // ⛔ កំណែ 2.27.0៖ ការបិទដោយឧបករណ៍ផ្សេង សរសេរ **កូនសោ barcode**
+                // ផង — លេខទាំង ២ ជាកញ្ចក់ដេរីវេនៃសំណុំនោះ។ seed ដែលបង្កើនតែលេខ
+                // ធ្វើឲ្យទិន្នន័យចាប់ផ្តើមមិនស៊ីនឹងម៉ូដែលតាំងពីមុនកូដ App រត់ផង។
+                p.pickedUpBarcodes = p.pickedUpBarcodes || {};
+                p.pickedUpBarcodes['PA1'] = '0912000001';
                 window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
             }, { dk: seed._dateKey });
             await page.evaluate(() => window.toggleCloseStatus('id_pk_a'));
@@ -622,6 +627,8 @@ function seedData() {
                 p.packagesPickedUp = (p.packagesPickedUp || 0) + 1;
                 p.pickedUpPhones = p.pickedUpPhones || {};
                 p.pickedUpPhones['0912000002'] = (p.pickedUpPhones['0912000002'] || 0) + 1;
+                p.pickedUpBarcodes = p.pickedUpBarcodes || {};
+                p.pickedUpBarcodes['PB2'] = '0912000002';
                 window.__fakeStore.zoew_daily_pickup_cod_dod[a.dk] = p;
             }, { dk: seed._dateKey });
             await page.evaluate(() => window.toggleIndividualBarcodeClose('id_pk_b', 'PB1'));

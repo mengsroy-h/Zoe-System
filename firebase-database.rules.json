@@ -333,6 +333,11 @@
             ".validate": "newData.isNumber() && newData.val() > 0"
           }
         },
+        "pickedUpBarcodes": {
+          "$barcodeKey": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+          }
+        },
         "$other": {
           ".validate": false
         }

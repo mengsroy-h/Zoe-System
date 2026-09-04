@@ -54,7 +54,8 @@ try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
     'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
-    'getPickupPhoneKey', 'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
+    'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'reconstructPickupSet',
+    'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
     'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'toggleCloseStatus', 'executePermanentDelete'];
@@ -100,14 +101,13 @@ function makeSandbox(store, now) {
             monthly: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
             dailyServer: Promise.resolve(null), monthlyServer: Promise.resolve(null)
         }),
-        addPickupToDailyRecord: (d, key, cust, pkg) => ({
-            scanDate: d, phoneKey: key || null,
-            packages: parseFloat(pkg) || 0, customer: parseFloat(cust) || 0
+        markPickupBarcodes: (d, marks, seed) => ({
+            scanDate: d, marks: marks || [], seed: seed || null, previous: [], changed: false
         }),
         revertRevenueLedgerDelta: (applied) => applied || null,
-        revertPickupLedgerDelta: (applied) => applied || null,
-        correctPickupLedgerToActual: (applied) => applied,
-        commitDailyPickupDelta: () => {}, dailyPickupData: {},
+        revertPickupMarks: (applied) => applied || null,
+        reapplyPickupMarks: (applied) => applied || null,
+        dailyPickupData: {},
         showToast: (m) => w.toasts.push(m), confirm: () => true, alert: () => {},
         openViewListModal: () => {}, refreshCurrentHistoryView: () => {}, updateRecentPhonesList: () => {},
         renderRecentlyDeleted: () => {}, openRecentlyDeletedModal: () => {}, closeModal: () => {},
@@ -117,6 +117,7 @@ function makeSandbox(store, now) {
     });
     const assembled = [
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
+        extractConst(src, 'PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
         // ⛔ សារវឌ្ឍនភាពនៃការសរសេរធុងសំរាម (2.25.8) ក៏ជាហេដ្ឋារចនាសម្ព័ន្ធរួមដែរ ➜

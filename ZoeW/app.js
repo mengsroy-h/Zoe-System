@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.26.2';
+    const APP_VERSION = '2.27.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5590,23 +5590,122 @@
         });
     }
 
+    const PICKUP_LEGACY_KEY_PREFIX = '_lg_';
+    const PICKUP_PHONE_KEY_MAX = 64;
+
     function getPickupPhoneKey(item) {
         const rawPhone = item && item.phone;
         if (!rawPhone || rawPhone === "គ្មានលេខ") return '__item_' + (item && item.id);
-        const safePhone = String(rawPhone).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const safePhone = String(rawPhone).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, PICKUP_PHONE_KEY_MAX);
         return safePhone || ('__item_' + (item && item.id));
-    }
-
-    function closedBarcodeCount(item) {
-        if (!item) return 0;
-        if (item.barcodes && Array.isArray(item.barcodes)) {
-            return item.barcodes.filter(b => b && b.isClosed).length;
-        }
-        return item.isClosed ? (parseFloat(item.count) || 1) : 0;
     }
 
     function countPickedUpCustomers(record) {
         return record && record.pickedUpPhones ? Object.keys(record.pickedUpPhones).length : 0;
+    }
+
+    function pickupBarcodeKey(code) {
+        const raw = String(code === undefined || code === null ? '' : code).trim();
+        return raw ? barcodeRegistryKey(raw) : '';
+    }
+
+    function pickupSetSize(set) {
+        return (set && typeof set === 'object') ? Object.keys(set).length : 0;
+    }
+
+    function tallyPickupPhones(set) {
+        const phones = {};
+        Object.keys(set || {}).forEach((key) => {
+            const phone = set[key];
+            if (typeof phone !== 'string' || !phone) return;
+            phones[phone] = (phones[phone] || 0) + 1;
+        });
+        return phones;
+    }
+
+    function legacyPickupPlaceholders(record) {
+        const recorded = Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp)));
+        const phones = (record && record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? record.pickedUpPhones : {};
+        const phoneKeys = Object.keys(phones);
+        const out = {};
+        let made = 0;
+        phoneKeys.forEach((phone) => {
+            const times = Math.max(0, Math.round(ledgerNumber(phones[phone])));
+            for (let i = 1; i <= times && made < recorded; i++) {
+                out[PICKUP_LEGACY_KEY_PREFIX + phone + '_' + i] = phone;
+                made++;
+            }
+        });
+        if (made < recorded && phoneKeys.length) {
+            const phone = phoneKeys[0];
+            let extra = 1;
+            while (made < recorded) {
+                const key = PICKUP_LEGACY_KEY_PREFIX + phone + '_x' + extra;
+                if (!out[key]) { out[key] = phone; made++; }
+                extra++;
+            }
+        }
+        return out;
+    }
+
+    function pickupSetFromRecord(record, seed) {
+        if (record && record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object') return { ...record.pickedUpBarcodes };
+        const recorded = Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp)));
+        if (seed && typeof seed === 'object' && pickupSetSize(seed) === recorded) return { ...seed };
+        return legacyPickupPlaceholders(record);
+    }
+
+    function buildPickupRecordFromSet(set) {
+        const size = pickupSetSize(set);
+        const phones = tallyPickupPhones(set);
+        return {
+            packagesPickedUp: size,
+            pickedUpPhones: Object.keys(phones).length ? phones : null,
+            pickedUpBarcodes: size ? { ...set } : null
+        };
+    }
+
+    function applyPickupMarksToSet(set, marks) {
+        (marks || []).forEach((mark) => {
+            if (!mark || !mark.key) return;
+            if (mark.closed) {
+                if (typeof mark.phoneKey === 'string' && mark.phoneKey) set[mark.key] = mark.phoneKey;
+            } else delete set[mark.key];
+        });
+        return set;
+    }
+
+    function collectPickupMarks(item, closed, phoneKey) {
+        if (!item) return [];
+        const owner = phoneKey || getPickupPhoneKey(item);
+        const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
+        const marks = [];
+        if (entries) {
+            entries.forEach((b) => {
+                if (!b) return;
+                const key = pickupBarcodeKey(b.code);
+                if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!b.isClosed : !!closed });
+            });
+            return marks;
+        }
+        const key = pickupBarcodeKey(item.barcode);
+        if (key) marks.push({ key: key, phoneKey: owner, closed: closed === undefined ? !!item.isClosed : !!closed });
+        return marks;
+    }
+
+    function reconstructPickupSet(dateKey) {
+        const set = {};
+        const collect = (list) => {
+            (list || []).forEach((item) => {
+                if (!item || item.scanDate !== dateKey) return;
+                collectPickupMarks(item).forEach((mark) => {
+                    if (mark.closed) set[mark.key] = mark.phoneKey;
+                });
+            });
+        };
+        collect(scanHistory);
+        collect(deletedItems);
+        return set;
     }
 
     function planPickupLedgerRepair(ledger, historyItems, trashItems) {
@@ -5616,12 +5715,10 @@
         const collect = (list) => {
             (list || []).forEach((item) => {
                 if (!item || !item.scanDate) return;
-                const closed = closedBarcodeCount(item);
-                if (!closed) return;
-                const key = getPickupPhoneKey(item);
-                const bucket = byDate[item.scanDate] || (byDate[item.scanDate] = { phones: {}, total: 0 });
-                bucket.phones[key] = (bucket.phones[key] || 0) + closed;
-                bucket.total += closed;
+                const set = byDate[item.scanDate] || (byDate[item.scanDate] = {});
+                collectPickupMarks(item).forEach((mark) => {
+                    if (mark.closed) set[mark.key] = mark.phoneKey;
+                });
             });
         };
         collect(historyItems);
@@ -5630,15 +5727,16 @@
         Object.keys(ledger).forEach((date) => {
             const record = ledger[date];
             if (!record || typeof record !== 'object') return;
-            const recordedPackages = parseFloat(record.packagesPickedUp) || 0;
-            const bucket = byDate[date] || { phones: {}, total: 0 };
-            if (bucket.total !== recordedPackages) return;
-            const current = record.pickedUpPhones || {};
-            const nextKeys = Object.keys(bucket.phones);
-            const sameSize = nextKeys.length === Object.keys(current).length;
-            const sameValues = nextKeys.every((k) => (parseFloat(current[k]) || 0) === bucket.phones[k]);
-            if (sameSize && sameValues) return;
-            plans.push({ date: date, pickedUpPhones: bucket.phones });
+            const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
+            const set = byDate[date] || {};
+            if (pickupSetSize(set) !== recorded) return;
+            const current = (record.pickedUpBarcodes && typeof record.pickedUpBarcodes === 'object') ? record.pickedUpBarcodes : null;
+            if (!current && !recorded) return;
+            if (current) {
+                const keys = Object.keys(set);
+                if (keys.length === Object.keys(current).length && keys.every((k) => current[k] === set[k])) return;
+            }
+            plans.push({ date: date, pickedUpBarcodes: set });
         });
         return plans;
     }
@@ -5655,14 +5753,9 @@
                 const dayRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${plan.date}`);
                 await dbOp(fb.runTransaction(dayRef, (record) => {
                     if (!record) return record;
-                    const recorded = parseFloat(record.packagesPickedUp) || 0;
-                    const nextSum = Object.keys(plan.pickedUpPhones)
-                        .reduce((sum, k) => sum + plan.pickedUpPhones[k], 0);
-                    if (nextSum !== recorded) return record;
-                    record.pickedUpPhones = Object.keys(plan.pickedUpPhones).length
-                        ? { ...plan.pickedUpPhones }
-                        : null;
-                    return record;
+                    const recorded = Math.max(0, Math.round(ledgerNumber(record.packagesPickedUp)));
+                    if (pickupSetSize(plan.pickedUpBarcodes) !== recorded) return record;
+                    return buildPickupRecordFromSet(plan.pickedUpBarcodes);
                 })).catch(() => {});
             }
             pickupLedgerRepairDone = true;
@@ -5673,95 +5766,67 @@
         }
     }
 
-    function pickupAppliedDelta(before, after, phoneKey) {
-        const beforePhones = (before && before.pickedUpPhones) || {};
-        const afterPhones = (after && after.pickedUpPhones) || {};
-        return {
-            packages: ledgerNumber(after && after.packagesPickedUp) - ledgerNumber(before && before.packagesPickedUp),
-            customer: phoneKey ? (ledgerNumber(afterPhones[phoneKey]) - ledgerNumber(beforePhones[phoneKey])) : 0
+    function applyPickupMarksInMemory(scanDateStr, marks, seed) {
+        const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null, seed);
+        const previous = (marks || []).filter((m) => m && m.key).map((m) => ({
+            key: m.key,
+            phoneKey: typeof set[m.key] === 'string' ? set[m.key] : null,
+            closed: Object.prototype.hasOwnProperty.call(set, m.key)
+        }));
+        applyPickupMarksToSet(set, marks);
+        const next = buildPickupRecordFromSet(set);
+        dailyPickupData[scanDateStr] = {
+            packagesPickedUp: next.packagesPickedUp,
+            pickedUpPhones: next.pickedUpPhones || {},
+            pickedUpBarcodes: next.pickedUpBarcodes || {}
         };
+        const changed = previous.some((p, i) => {
+            const mark = marks[i];
+            return !!p.closed !== !!mark.closed || (mark.closed && p.phoneKey !== mark.phoneKey);
+        });
+        return { previous: previous, changed: changed };
     }
 
-    function applyPickupMemoryDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
-        if (!dailyPickupData[scanDateStr]) {
-            dailyPickupData[scanDateStr] = { packagesPickedUp: 0, pickedUpPhones: {} };
-        }
-        const record = dailyPickupData[scanDateStr];
-        if (!record.pickedUpPhones) record.pickedUpPhones = {};
-
-        const beforePackages = ledgerNumber(record.packagesPickedUp);
-        const beforeRefCount = phoneKey ? ledgerNumber(record.pickedUpPhones[phoneKey]) : 0;
-
-        record.packagesPickedUp = beforePackages + ledgerNumber(packagesToAdd);
-        if (record.packagesPickedUp < 0) record.packagesPickedUp = 0;
-
-        if (phoneKey && customerRefDelta) {
-            const refCount = beforeRefCount + customerRefDelta;
-            if (refCount <= 0) delete record.pickedUpPhones[phoneKey];
-            else record.pickedUpPhones[phoneKey] = refCount;
-        }
-
-        return {
-            packages: record.packagesPickedUp - beforePackages,
-            customer: phoneKey ? (ledgerNumber(record.pickedUpPhones[phoneKey]) - beforeRefCount) : 0
-        };
+    function commitPickupMarks(scanDateStr, marks, seed) {
+        if (!dbRefDailyPickup || !db || !fb) return Promise.resolve(null);
+        const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
+        return fb.runTransaction(dateRef, (current) => {
+            const set = pickupSetFromRecord((current && typeof current === 'object') ? current : null, seed);
+            applyPickupMarksToSet(set, marks);
+            return buildPickupRecordFromSet(set);
+        }).then((result) => (result && result.committed) ? true : null, () => {
+            showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
+            return null;
+        });
     }
 
-    function addPickupToDailyRecord(scanDateStr, phoneKey, customerRefDelta, packagesToAdd) {
+    function markPickupBarcodes(scanDateStr, marks, seed) {
         if (!scanDateStr) scanDateStr = getFormattedDate();
-        const applied = applyPickupMemoryDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd);
-        const server = commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, applied);
-        return { scanDate: scanDateStr, phoneKey: phoneKey || null, packages: applied.packages, customer: applied.customer, server: server };
+        const list = (marks || []).filter((m) => m && m.key);
+        if (!list.length) return null;
+        const applied = applyPickupMarksInMemory(scanDateStr, list, seed);
+        commitPickupMarks(scanDateStr, list, seed);
+        return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed };
     }
 
-    function revertPickupOnServer(applied) {
-        return Promise.resolve(applied && applied.server).then((serverApplied) => {
-            const d = serverApplied || { packages: applied.packages, customer: applied.customer };
-            if (!d || (!d.packages && !d.customer)) return null;
-            return commitDailyPickupDelta(applied.scanDate, applied.phoneKey, -d.customer, -d.packages, d, true);
-        }, () => null);
+    function reapplyPickupMarks(applied, marks, scanDateStr, seed) {
+        const next = (marks || []).filter((m) => m && m.key);
+        const keep = {};
+        next.forEach((m) => { keep[m.key] = true; });
+        const undo = ((applied && applied.previous) || [])
+            .filter((p) => !keep[p.key])
+            .map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
+        const all = undo.concat(next);
+        if (!all.length) return null;
+        return markPickupBarcodes(scanDateStr || (applied && applied.scanDate), all, seed || (applied && applied.seed) || null);
     }
 
-    function revertPickupLedgerDelta(applied) {
-        if (!applied || !applied.scanDate) return null;
-        if (!applied.packages && !applied.customer) return applied;
-        applyPickupMemoryDelta(applied.scanDate, applied.phoneKey, -applied.customer, -applied.packages);
-        revertPickupOnServer(applied);
+    function revertPickupMarks(applied) {
+        if (!applied || !applied.scanDate || !applied.previous || !applied.previous.length) return null;
+        const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));
+        applyPickupMarksInMemory(applied.scanDate, marks, applied.seed);
+        commitPickupMarks(applied.scanDate, marks, applied.seed);
         return applied;
-    }
-
-    function correctPickupServerToActual(applied, actualCustomer, actualPackages) {
-        return Promise.resolve(applied && applied.server).then((serverApplied) => {
-            const base = serverApplied || { packages: applied.packages, customer: applied.customer };
-            const customerDiff = actualCustomer - ledgerNumber(base.customer);
-            const packageDiff = actualPackages - ledgerNumber(base.packages);
-            if (!customerDiff && !packageDiff) return base;
-            return Promise.resolve(commitDailyPickupDelta(applied.scanDate, applied.phoneKey, customerDiff, packageDiff, { packages: packageDiff, customer: customerDiff }, true)).then((extraApplied) => {
-                const add = extraApplied || { packages: 0, customer: 0 };
-                return {
-                    packages: ledgerNumber(base.packages) + ledgerNumber(add.packages),
-                    customer: ledgerNumber(base.customer) + ledgerNumber(add.customer)
-                };
-            }, () => base);
-        }, () => null);
-    }
-
-    function correctPickupLedgerToActual(applied, actualCustomer, actualPackages) {
-        if (!applied || !applied.scanDate) return applied;
-        const customerDiff = actualCustomer - applied.customer;
-        const packageDiff = actualPackages - applied.packages;
-        const server = correctPickupServerToActual(applied, actualCustomer, actualPackages);
-        if (customerDiff === 0 && packageDiff === 0) {
-            return { scanDate: applied.scanDate, phoneKey: applied.phoneKey, packages: applied.packages, customer: applied.customer, server: server };
-        }
-        const extra = applyPickupMemoryDelta(applied.scanDate, applied.phoneKey, customerDiff, packageDiff);
-        return {
-            scanDate: applied.scanDate,
-            phoneKey: applied.phoneKey,
-            packages: applied.packages + (extra ? extra.packages : 0),
-            customer: applied.customer + (extra ? extra.customer : 0),
-            server: server
-        };
     }
 
     function requestPinBeforeResetPickup() {
@@ -5799,7 +5864,7 @@
             for (const dateKey of targetDates) {
                 try {
                     await dbOp(fb.runTransaction(fb.ref(db, `zoew_daily_pickup_cod_dod/${dateKey}`), () => ({ packagesPickedUp: 0 })));
-                    dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {} };
+                    dailyPickupData[dateKey] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
                     doneCount++;
                 } catch (e) {
                     failedCount++;
@@ -5823,49 +5888,6 @@
         } else {
             showToast(`✅ Reset ចំនួនអតិថិជន និងកញ្ចប់យករួច ក្នុងតម្រង «${filterLabel}» ជោគជ័យ!`);
         }
-    }
-
-    function commitDailyPickupDelta(scanDateStr, phoneKey, customerRefDelta, packagesToAdd, appliedDelta, serverOnly) {
-        if (!dbRefDailyPickup) return Promise.resolve(null);
-        const applied = appliedDelta || { packages: ledgerNumber(packagesToAdd), customer: ledgerNumber(customerRefDelta) };
-        const recordRef = serverOnly ? null : dailyPickupData[scanDateStr];
-        const dateRef = fb.ref(db, `zoew_daily_pickup_cod_dod/${scanDateStr}`);
-        let serverBefore = null;
-        let serverAfter = null;
-        return fb.runTransaction(dateRef, (current) => {
-            const record = (current && typeof current === 'object') ? current : {};
-            const pickedUpPhones = (record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? { ...record.pickedUpPhones } : {};
-            serverBefore = { packagesPickedUp: parseFloat(record.packagesPickedUp) || 0, pickedUpPhones: { ...pickedUpPhones } };
-            let packagesPickedUp = serverBefore.packagesPickedUp + (parseFloat(packagesToAdd) || 0);
-            if (packagesPickedUp < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily pickup underflow clamped to 0'), { context: scanDateStr, packagesPickedUp });
-                packagesPickedUp = 0;
-            }
-            if (phoneKey && customerRefDelta) {
-                const refCount = (parseFloat(pickedUpPhones[phoneKey]) || 0) + customerRefDelta;
-                if (refCount <= 0) delete pickedUpPhones[phoneKey];
-                else pickedUpPhones[phoneKey] = refCount;
-            }
-            serverAfter = { packagesPickedUp, pickedUpPhones };
-            return serverAfter;
-        }).then((result) => {
-            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
-            return pickupAppliedDelta(serverBefore, serverAfter, phoneKey);
-        }, () => {
-            if (recordRef && dailyPickupData[scanDateStr] === recordRef) {
-                recordRef.packagesPickedUp = ledgerNumber(recordRef.packagesPickedUp) - applied.packages;
-                if (recordRef.packagesPickedUp < 0) recordRef.packagesPickedUp = 0;
-                if (phoneKey && applied.customer) {
-                    if (!recordRef.pickedUpPhones) recordRef.pickedUpPhones = {};
-                    const refCount = ledgerNumber(recordRef.pickedUpPhones[phoneKey]) - applied.customer;
-                    if (refCount <= 0) delete recordRef.pickedUpPhones[phoneKey];
-                    else recordRef.pickedUpPhones[phoneKey] = refCount;
-                }
-                refreshCurrentHistoryView();
-            }
-            showToast("⚠️ បរាជ័យក្នុងការ Save Daily Pickup!");
-            return null;
-        });
     }
 
     function isMonthKeyRetained(ymKey) {
@@ -9519,28 +9541,28 @@
         const previousState = freshItem && freshB
             ? { isClosed: freshB.isClosed, barcodeClosedAt: freshB.closedAt, itemIsClosed: freshItem.isClosed, itemClosedAt: freshItem.closedAt, itemCallMark: freshItem.callMark, itemCallMarkTime: freshItem.callMarkTime }
             : null;
-        let pickupCustomerDelta = 0;
-        let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
-        let pickupLedgerApplied = null;
+        let pickupScanDate = null;
+        let pickupSeed = null;
+        let pickupApplied = null;
         let serverApplied = false;
-        let serverPackageDelta = 0;
-        let serverCustomerDelta = 0;
+        let serverPickupMarks = null;
         const revertPickupDeltaAfterNoOp = () => {
-            if (!pickupLedgerApplied) return;
-            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
-            revertPickupLedgerDelta(pickupLedgerApplied);
-            pickupLedgerApplied = null;
-            pickupCustomerDelta = 0;
-            pickupPackageDelta = 0;
-            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+            if (!pickupApplied) return;
+            const pickupChanged = pickupApplied.changed;
+            revertPickupMarks(pickupApplied);
+            pickupApplied = null;
+            refreshCurrentHistoryView();
+            if (pickupChanged) showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
         const reconcilePickupDeltaWithServer = () => {
-            pickupLedgerApplied = correctPickupLedgerToActual(pickupLedgerApplied, serverCustomerDelta, serverPackageDelta);
-            pickupCustomerDelta = serverCustomerDelta;
-            pickupPackageDelta = serverPackageDelta;
+            if (!serverPickupMarks) return;
+            pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+            refreshCurrentHistoryView();
         };
         if (freshItem && freshB) {
+            pickupScanDate = freshItem.scanDate || getFormattedDate();
+            pickupSeed = reconstructPickupSet(pickupScanDate);
             applyBarcodeCloseState(freshB, desiredClosed, getServerNow());
             const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);
             freshItem.isClosed = allClosedLocal;
@@ -9550,11 +9572,9 @@
                 delete freshItem.callMarkTime;
             }
 
-            const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
-            pickupPackageDelta = (!!previousState.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
-            pickupCustomerDelta = pickupPackageDelta;
-            pickupLedgerApplied = addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
+            const pickupKey = pickupBarcodeKey(barcodeCode);
+            pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
 
             openViewListModal(itemId);
             refreshCurrentHistoryView();
@@ -9582,11 +9602,9 @@
                     refreshCurrentHistoryView();
                 }
             }
-            if (pickupLedgerApplied && (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0)) {
-                revertPickupLedgerDelta(pickupLedgerApplied);
-                pickupLedgerApplied = null;
-                pickupCustomerDelta = 0;
-                pickupPackageDelta = 0;
+            if (pickupApplied) {
+                revertPickupMarks(pickupApplied);
+                pickupApplied = null;
             }
         };
         const settleBarcodeClose = (barcodeCloseResult) => {
@@ -9600,8 +9618,7 @@
         try {
             closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
                 serverApplied = false;
-                serverPackageDelta = 0;
-                serverCustomerDelta = 0;
+                serverPickupMarks = null;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return;
                 dropStaleRestoreMarkers(currentItem);
@@ -9621,9 +9638,10 @@
                 }
                 const b = currentItem.barcodes.find(bc => bc.code === barcodeCode);
                 if (!b) return currentItem;
-                serverPackageDelta = (!!b.isClosed === desiredClosed) ? 0 : (desiredClosed ? 1 : -1);
-                serverCustomerDelta = serverPackageDelta;
                 applyBarcodeCloseState(b, desiredClosed, getServerNow());
+                const serverPickupKey = pickupBarcodeKey(barcodeCode);
+                serverPickupMarks = serverPickupKey ? [{ key: serverPickupKey, phoneKey: getPickupPhoneKey(currentItem), closed: desiredClosed }] : [];
+                if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
                 const allClosed = currentItem.barcodes.every(bc => bc.isClosed);
                 currentItem.isClosed = allClosed;
                 if (allClosed) currentItem.closedAt = getServerNow();
@@ -9928,41 +9946,30 @@
                 patchFields.isCalled = false;
             }
             const prevPickupKey = getPickupPhoneKey(item);
+            const pickupDate = item.scanDate || getFormattedDate();
+            const pickupSeed = reconstructPickupSet(pickupDate);
             item.phone = newPhone;
             const nextPickupKey = getPickupPhoneKey(item);
-            const pickupDate = item.scanDate || getFormattedDate();
-            let pickupRefMoved = false;
-            let movedPickupRefs = closedBarcodeCount(item);
-            let pickupMoveOut = null;
-            let pickupMoveIn = null;
-            const applyPickupRefMove = () => {
-                pickupMoveOut = addPickupToDailyRecord(pickupDate, prevPickupKey, -movedPickupRefs, 0);
-                pickupMoveIn = addPickupToDailyRecord(pickupDate, nextPickupKey, movedPickupRefs, 0);
-                pickupRefMoved = true;
+            let pickupMoved = null;
+            const closedPickupMarks = (source) => collectPickupMarks(source, undefined, nextPickupKey).filter((mark) => mark.closed);
+            const applyPickupRefMove = (source) => {
+                const marks = closedPickupMarks(source);
+                if (!marks.length) return;
+                pickupMoved = markPickupBarcodes(pickupDate, marks, pickupSeed);
             };
-            if (movedPickupRefs > 0 && prevPickupKey !== nextPickupKey) applyPickupRefMove();
+            if (prevPickupKey !== nextPickupKey) applyPickupRefMove(item);
             const revertPickupRefMove = () => {
-                if (!pickupRefMoved) return;
-                pickupRefMoved = false;
-                revertPickupLedgerDelta(pickupMoveIn);
-                revertPickupLedgerDelta(pickupMoveOut);
-                pickupMoveIn = null;
-                pickupMoveOut = null;
+                if (!pickupMoved) return;
+                revertPickupMarks(pickupMoved);
+                pickupMoved = null;
             };
-            let serverWasClosed = null;
-            let serverPickupRefs = 0;
+            let serverPickupSource = null;
             const reconcilePickupRefWithServer = () => {
-                if (serverWasClosed === null || prevPickupKey === nextPickupKey) return;
-                if (serverPickupRefs > 0 && !pickupRefMoved) {
-                    movedPickupRefs = serverPickupRefs;
-                    applyPickupRefMove();
-                } else if (serverPickupRefs <= 0 && pickupRefMoved) {
-                    revertPickupRefMove();
-                }
+                if (!serverPickupSource || prevPickupKey === nextPickupKey) return;
+                pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed);
             };
             patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
-                serverWasClosed = !!serverItem.isClosed;
-                serverPickupRefs = closedBarcodeCount(serverItem);
+                serverPickupSource = serverItem;
             }).then((saved) => {
                 if (saved) {
                     reconcilePickupRefWithServer();
@@ -9994,28 +10001,28 @@
         const previousState = freshItem
             ? { isClosed: freshItem.isClosed, closedAt: freshItem.closedAt, callMark: freshItem.callMark, callMarkTime: freshItem.callMarkTime, barcodeStates: freshItem.barcodes ? freshItem.barcodes.map(b => b.isClosed) : null, barcodeCloseStamps: freshItem.barcodes ? freshItem.barcodes.map(b => b.closedAt) : null }
             : null;
-        let pickupCustomerDelta = 0;
-        let pickupPackageDelta = 0;
         let pickupPhoneKey = null;
-        let pickupLedgerApplied = null;
+        let pickupScanDate = null;
+        let pickupSeed = null;
+        let pickupApplied = null;
         let serverApplied = false;
-        let serverPackageDelta = 0;
-        let serverCustomerDelta = 0;
+        let serverPickupMarks = null;
         const revertPickupDeltaAfterNoOp = () => {
-            if (!pickupLedgerApplied) return;
-            if (pickupCustomerDelta === 0 && pickupPackageDelta === 0) return;
-            revertPickupLedgerDelta(pickupLedgerApplied);
-            pickupLedgerApplied = null;
-            pickupCustomerDelta = 0;
-            pickupPackageDelta = 0;
-            showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
+            if (!pickupApplied) return;
+            const pickupChanged = pickupApplied.changed;
+            revertPickupMarks(pickupApplied);
+            pickupApplied = null;
+            refreshCurrentHistoryView();
+            if (pickupChanged) showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
         };
         const reconcilePickupDeltaWithServer = () => {
-            pickupLedgerApplied = correctPickupLedgerToActual(pickupLedgerApplied, serverCustomerDelta, serverPackageDelta);
-            pickupCustomerDelta = serverCustomerDelta;
-            pickupPackageDelta = serverPackageDelta;
+            if (!serverPickupMarks) return;
+            pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
+            refreshCurrentHistoryView();
         };
         if (freshItem) {
+            pickupScanDate = freshItem.scanDate || getFormattedDate();
+            pickupSeed = reconstructPickupSet(pickupScanDate);
             freshItem.isClosed = desiredClosed;
             if (desiredClosed) {
                 freshItem.closedAt = getServerNow();
@@ -10027,20 +10034,8 @@
                 if (freshItem.barcodes && Array.isArray(freshItem.barcodes)) freshItem.barcodes.forEach(b => applyBarcodeCloseState(b, false));
             }
 
-            const pickupScanDate = freshItem.scanDate || getFormattedDate();
             pickupPhoneKey = getPickupPhoneKey(freshItem);
-            const alreadyInDesiredState = !!previousState.isClosed === desiredClosed;
-            if (previousState.barcodeStates) {
-                previousState.barcodeStates.forEach((wasClosed) => {
-                    if (desiredClosed && !wasClosed) pickupPackageDelta += 1;
-                    else if (!desiredClosed && wasClosed) pickupPackageDelta -= 1;
-                });
-            } else if (!alreadyInDesiredState) {
-                const pickupPackages = parseFloat(freshItem.count) || 1;
-                pickupPackageDelta = desiredClosed ? pickupPackages : -pickupPackages;
-            }
-            pickupCustomerDelta = pickupPackageDelta;
-            pickupLedgerApplied = addPickupToDailyRecord(pickupScanDate, pickupPhoneKey, pickupCustomerDelta, pickupPackageDelta);
+            pickupApplied = markPickupBarcodes(pickupScanDate, collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey), pickupSeed);
 
             refreshCurrentHistoryView();
         }
@@ -10071,11 +10066,9 @@
                     refreshCurrentHistoryView();
                 }
             }
-            if (pickupLedgerApplied && (pickupCustomerDelta !== 0 || pickupPackageDelta !== 0)) {
-                revertPickupLedgerDelta(pickupLedgerApplied);
-                pickupLedgerApplied = null;
-                pickupCustomerDelta = 0;
-                pickupPackageDelta = 0;
+            if (pickupApplied) {
+                revertPickupMarks(pickupApplied);
+                pickupApplied = null;
             }
         };
         const settleClose = (closeResult) => {
@@ -10089,23 +10082,14 @@
         try {
             closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
                 serverApplied = false;
-                serverPackageDelta = 0;
-                serverCustomerDelta = 0;
+                serverPickupMarks = null;
                 if (!currentItem) return currentItem;
                 if (currentItem.clearClaim) return;
                 dropStaleRestoreMarkers(currentItem);
                 normalizeBarcodesOf(currentItem);
                 const serverBarcodes = (currentItem.barcodes && Array.isArray(currentItem.barcodes)) ? currentItem.barcodes : null;
-                if (serverBarcodes) {
-                    serverBarcodes.forEach((b) => {
-                        if (desiredClosed && !b.isClosed) serverPackageDelta += 1;
-                        else if (!desiredClosed && b.isClosed) serverPackageDelta -= 1;
-                    });
-                } else if (!!currentItem.isClosed !== desiredClosed) {
-                    const serverPackages = parseFloat(currentItem.count) || 1;
-                    serverPackageDelta = desiredClosed ? serverPackages : -serverPackages;
-                }
-                serverCustomerDelta = serverPackageDelta;
+                serverPickupMarks = collectPickupMarks(currentItem, desiredClosed, getPickupPhoneKey(currentItem));
+                if (currentItem.scanDate) pickupScanDate = currentItem.scanDate;
                 currentItem.isClosed = desiredClosed;
                 if (desiredClosed) {
                     currentItem.closedAt = getServerNow();

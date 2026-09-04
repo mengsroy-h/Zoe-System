@@ -76,8 +76,9 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
-    'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'correctPickupServerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
-    'pickupAppliedDelta', 'applyPickupMemoryDelta', 'revertPickupOnServer', 'getFormattedDate'
+    'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
+    'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
+    'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
 ];
 const fnSrc = {};
 const missing = [];
@@ -162,6 +163,15 @@ function makeSandbox(seed) {
         for (const key of Object.keys(value)) {
             if (allow.indexOf(key) === -1) return '$other បដិសេធវាល `' + key + '`';
             const v = value[key];
+            if (key === 'pickedUpBarcodes') {
+                if (v === null) continue;
+                if (typeof v !== 'object') return 'pickedUpBarcodes មិនមែនវត្ថុ';
+                for (const bk of Object.keys(v)) {
+                    if (typeof v[bk] !== 'string' || !v[bk]) return 'pickedUpBarcodes/' + bk + ' មិនមែនខ្សែអក្សរ';
+                    if (v[bk].length > 64) return 'pickedUpBarcodes/' + bk + ' វែងពេក';
+                }
+                continue;
+            }
             if (key === 'pickedUpPhones') {
                 if (v === null) continue;
                 if (typeof v !== 'object') return 'pickedUpPhones មិនមែនវត្ថុ';
@@ -257,14 +267,22 @@ function makeSandbox(seed) {
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
-        + fnSrc.addPickupToDailyRecord + '\n'
-        + fnSrc.pickupAppliedDelta + '\n'
-        + fnSrc.applyPickupMemoryDelta + '\n'
-        + fnSrc.commitDailyPickupDelta + '\n'
-        + fnSrc.revertPickupOnServer + '\n'
-        + fnSrc.revertPickupLedgerDelta + '\n'
-        + fnSrc.correctPickupServerToActual + '\n'
-        + fnSrc.correctPickupLedgerToActual + '\n',
+        + fnSrc.barcodeRegistryKey + '\n'
+        + fnSrc.pickupBarcodeKey + '\n'
+        + fnSrc.pickupSetSize + '\n'
+        + fnSrc.tallyPickupPhones + '\n'
+        + fnSrc.legacyPickupPlaceholders + '\n'
+        + fnSrc.pickupSetFromRecord + '\n'
+        + fnSrc.buildPickupRecordFromSet + '\n'
+        + fnSrc.applyPickupMarksToSet + '\n'
+        + fnSrc.applyPickupMarksInMemory + '\n'
+        + fnSrc.commitPickupMarks + '\n'
+        + fnSrc.markPickupBarcodes + '\n'
+        + fnSrc.revertPickupMarks + '\n'
+        + fnSrc.reapplyPickupMarks + '\n'
+        + 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";\n'
+        + 'const PICKUP_PHONE_KEY_MAX = 64;\n'
+        + 'function mark(code, phone, closed) { return { key: pickupBarcodeKey(code), phoneKey: phone, closed: closed }; }\n',
         ctx);
     return ctx;
 }
@@ -344,18 +362,18 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         ok('ខែថ្មី ៖ 12.5 / 2.5 / 1', srvMon && srvMon.codDollar === 12.5 && srvMon.totalCount === 1, srvMon);
     }
 
-    // ── ៥. ស្ថិតិយក ៖ ការដកលើសក៏ត្រូវ clamp ដែរ ────────────────────────
-    console.log('\n=== ៥. ស្ថិតិយក ៖ ការដកលើសមិនត្រូវធ្វើឲ្យ server បដិសេធ ===');
+    // ── ៥. ស្ថិតិយក ៖ ការបើក barcode ដែលមិនមានក្នុងសំណុំ = no-op ────────
+    console.log('\n=== ៥. ស្ថិតិយក ៖ ការបើកលើសមិនត្រូវធ្វើឲ្យ server បដិសេធ ===');
     {
         const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } } }
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { P1: '0974158508' } } }
         });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } };
-        vm.runInContext('addPickupToDailyRecord("' + DATE + '", "0974158508", -3, -3)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { P1: '0974158508' } };
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("P1","0974158508",false), mark("P2","0974158508",false), mark("P3","0974158508",false)], null)', ctx);
         await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('គ្មានការបដិសេធលើស្ថិតិយក', ctx.__rejected.length === 0, ctx.__rejected);
-        ok('packagesPickedUp clamp ជា 0', srv && srv.packagesPickedUp === 0, srv);
+        ok('packagesPickedUp ធ្លាក់ដល់ 0 (គ្មានលេខអវិជ្ជមានឲ្យ clamp)', srv && srv.packagesPickedUp === 0, srv);
         ok('key ដែលធ្លាក់ដល់ 0 ត្រូវ **លុប** (rules ទាមទារ > 0)',
             srv && (!srv.pickedUpPhones || Object.keys(srv.pickedUpPhones).length === 0), srv);
         ok('សតិ == server', ctx.dailyPickupData[DATE].packagesPickedUp === srv.packagesPickedUp,
@@ -367,7 +385,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
     {
         const ctx = makeSandbox({});
         vm.runInContext('addRevenueToDailyAndMonthlyRecord("' + DATE + '", 5, 5, 1)', ctx);
-        vm.runInContext('addPickupToDailyRecord("' + DATE + '", "0977", 1, 1)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("Q1","0977",true)], null)', ctx);
         await settle(); await settle(); await settle();
         const strayDaily = Object.keys(ctx.__store.zoew_daily_revenue_cod_dod[DATE] || {})
             .filter((k) => ALLOWED['zoew_daily_revenue_cod_dod'].indexOf(k) === -1);
@@ -411,61 +429,60 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         ok('⛔ ទិសផ្ទុយ ៖ count ស្តារ 3', ctx.dailyRevenueData[DATE].totalCount === 3, ctx.dailyRevenueData[DATE]);
     }
     {
+        // ⛔ ការសរសេរស្ថិតិយកធ្លាក់ ៖ សតិ **មិនត្រូវត្រឡប់ទៅទិដ្ឋភាពចាស់** —
+        // ទិដ្ឋភាពចាស់នោះហើយជាប្រភពនៃការផ្ទុះ 2.26.0–2.26.2។ អ្វីដែលត្រូវ
+        // ធានាគឺ ៖ server មិនទទួលអ្វីសោះ · អ្នកប្រើដឹងថាការសរសេរធ្លាក់ ·
+        // ហើយ snapshot បន្ទាប់ជាអ្នកព្យាបាល។
         const ctx = makeSandbox({});
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } };
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { W1: '0974158508' } };
         ctx.__failWith.reason = 'disconnect';
-        vm.runInContext('addPickupToDailyRecord("' + DATE + '", "0974158508", -3, -3)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("W1","0974158508",false)], null)', ctx);
         await settle(); await settle();
-        ok('ស្ថិតិយក ៖ revert ស្តារ 1 (មិនមែន 3)',
-            ctx.dailyPickupData[DATE].packagesPickedUp === 1, ctx.dailyPickupData[DATE]);
-        ok('ស្ថិតិយក ៖ revert ស្តារ key លេខទូរស័ព្ទវិញ',
-            (ctx.dailyPickupData[DATE].pickedUpPhones || {})['0974158508'] === 1, ctx.dailyPickupData[DATE]);
+        ok('ស្ថិតិយក ៖ ការសរសេរធ្លាក់ ➜ server មិនទទួលអ្វីសោះ',
+            !(ctx.__store.zoew_daily_pickup_cod_dod || {})[DATE], ctx.__store.zoew_daily_pickup_cod_dod);
+        ok('ស្ថិតិយក ៖ អ្នកប្រើទទួលសារបរាជ័យ',
+            ctx.toasts.some((t) => /Daily Pickup/.test(t)), ctx.toasts);
+        ok('⛔ សតិមិនត្រឡប់ទៅទិដ្ឋភាពចាស់ (គ្មានការផ្ទុះពីទិដ្ឋភាពចាស់)',
+            ctx.dailyPickupData[DATE].packagesPickedUp === 0, ctx.dailyPickupData[DATE]);
     }
 
-    // ── ៨. ⛔⛔ ស្ថិតិយក ៖ revert ត្រូវគោរព **សាលក្រម server** ─────────
-    // ថ្នាក់ ៖ ដូច 2.26.0 បេះបិទ តែនៅផ្នែកស្ថិតិយក។ `commitDailyPickupDelta`
-    // clamp ខាង server (rules ទាមទារ `packagesPickedUp >= 0` និង
-    // `pickedUpPhones/$k > 0`) តែវា **មិនត្រឡប់ delta ដែលអនុវត្តពិត** ➜
-    // `revertPickupLedgerDelta` ដកវិញតាម delta របស់ **សតិ** ➜ ពេលទិដ្ឋភាព
-    // មូលដ្ឋានចាស់ជាង server នោះ server **ទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន**។
-    //
-    // ⛔ វា **មិនព្យាបាលខ្លួនឯងទេ** ៖ `dailyPickupData = snapshot.val()`
-    // មានន័យថា listener យកតម្លៃខុសរបស់ server ទៅផ្សាយដល់គ្រប់ឧបករណ៍។
-    //
-    // ផ្លូវពិត ៖ ឧបករណ៍ B បើកកញ្ចប់រួច (server ចុះ) ខណៈឧបករណ៍ A នៅកាន់
-    // ទិដ្ឋភាពចាស់ ➜ A បើកកញ្ចប់ ➜ transaction របស់ A ត្រូវដកវិញ។
-    console.log('\n=== ៨. ស្ថិតិយក ៖ revert ត្រូវគោរពសាលក្រម server ===');
+    // ── ៨. ⛔⛔ ស្ថិតិយក ៖ ការសរសេរជា **ស្ថានភាពរបស់ barcode** ──────────
+    // ថ្នាក់ដែលបិទត្រង់នេះ ៖ 2.26.0 · 2.26.1 · 2.26.2 សុទ្ធតែជាការគណនា
+    // **delta** ដែលធៀបនឹងទិដ្ឋភាពមូលដ្ឋាន *ចាស់* ➜ ការ «ជួសជុល» មួយបង្កើត
+    // កញ្ចប់ពីអាកាសធាតុ។ ចាប់ពី 2.27.0 ស្ថិតិយករក្សា **សំណុំ barcode**
+    // (`pickedUpBarcodes/$barcodeKey = phoneKey`) ➜ ការសរសេរជា **ស្ថានភាព
+    // idempotent** ៖ barcode តែមួយកាន់កន្លែងតែមួយ ដូច្នេះការជាន់គ្នា ·
+    // ការចូជួរក្រៅបណ្តាញ · និងការព្យាយាមឡើងវិញ **មិនអាចបូកលេខបានទេ**។
+    console.log('\n=== ៨. ស្ថិតិយក ៖ ការសរសេរជា *ស្ថានភាព* មិនមែន delta ===');
     {
+        // ⛔ ទិដ្ឋភាពមូលដ្ឋាន **ចាស់** ៖ ឧបករណ៍ផ្សេងបានបើកកញ្ចប់ទាំងអស់រួច។
+        // ការបើក barcode មួយត្រូវជា no-op លើ server — មិនមែនការដក ៣។
         const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0, pickedUpPhones: {} } }
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0 } }
         });
-        // ⛔ ទិដ្ឋភាពមូលដ្ឋាន **ចាស់** ៖ ឧបករណ៍ផ្សេងបានបើកកញ្ចប់រួច
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 } };
-        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -3, -3)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 },
+            pickedUpBarcodes: { S1: '0974158508', S2: '0974158508', S3: '0974158508' } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("S1","0974158508",false)], null)', ctx);
         await settle(); await settle();
-        const srvMid = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ server clamp ជា 0 (មិនអវិជ្ជមាន)', srvMid && srvMid.packagesPickedUp === 0, srvMid);
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ គ្មានការបដិសេធពី rules', ctx.__rejected.length === 0, ctx.__rejected);
-
-        vm.runInContext('revertPickupLedgerDelta(__applied)', ctx);
-        await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
-        ok('⛔ server មិនត្រូវឡើងលើសអ្វីដែលវាធ្លាក់ពិត (នៅ 0)',
+        ok('⛔ server នៅ 0 (barcode នោះមិនមានក្នុងសំណុំ ➜ គ្មានអ្វីត្រូវដក)',
             srv && srv.packagesPickedUp === 0, srv);
-        ok('⛔ server មិនត្រូវទទួល key លេខទូរស័ព្ទដែលវាមិនធ្លាប់មាន',
+        ok('⛔ គ្មាន key លេខទូរស័ព្ទដែល server មិនធ្លាប់មាន',
             srv && (!srv.pickedUpPhones || Object.keys(srv.pickedUpPhones).length === 0), srv);
+        ok('គ្មានការបដិសេធពី rules', ctx.__rejected.length === 0, ctx.__rejected);
     }
     {
-        // ⛔ ទិសផ្ទុយ ១ ៖ សតិ និង server ស៊ីគ្នា ➜ revert ត្រូវស្តារ **ពិតប្រាកដ**
+        // ⛔ ទិសផ្ទុយ ១ ៖ សតិ និង server ស៊ីគ្នា ➜ ការបើក/revert ត្រូវពិតប្រាកដ
+        const seedSet = { T1: '0974158508', T2: '0974158508', T3: '0974158508', T4: '0974158508', T5: '0974158508' };
         const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 } } }
+            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 }, pickedUpBarcodes: { ...seedSet } } }
         });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 } };
-        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -2, -2)', ctx);
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 5, pickedUpPhones: { '0974158508': 5 }, pickedUpBarcodes: { ...seedSet } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("T1","0974158508",false), mark("T2","0974158508",false)], null)', ctx);
         await settle(); await settle();
-        ok('ទិសផ្ទុយ ៖ ការដកធម្មតាចុះដល់ 3 ពិត', ctx.__store.zoew_daily_pickup_cod_dod[DATE].packagesPickedUp === 3,
+        ok('ទិសផ្ទុយ ៖ ការបើក ២ ចុះដល់ 3 ពិត', ctx.__store.zoew_daily_pickup_cod_dod[DATE].packagesPickedUp === 3,
             ctx.__store.zoew_daily_pickup_cod_dod[DATE]);
-        vm.runInContext('revertPickupLedgerDelta(__applied)', ctx);
+        vm.runInContext('revertPickupMarks(__applied)', ctx);
         await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ ទិសផ្ទុយ ៖ revert ស្តារ server ទៅ 5 បេះបិទ', srv && srv.packagesPickedUp === 5, srv);
@@ -473,68 +490,38 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
         ok('⛔ ទិសផ្ទុយ ៖ សតិក៏ស្តារទៅ 5 ដែរ', ctx.dailyPickupData[DATE].packagesPickedUp === 5, ctx.dailyPickupData[DATE]);
     }
     {
-        // ⛔ ទិសផ្ទុយ ២ ៖ ការឆ្លងសូន្យខណៈស៊ីគ្នា ➜ ស្តារតម្លៃដើម មិនមែន delta ដែលស្នើ
-        const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } } }
-        });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } };
-        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -3, -3)', ctx);
-        await settle(); await settle();
-        vm.runInContext('revertPickupLedgerDelta(__applied)', ctx);
-        await settle(); await settle(); await settle();
-        const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
-        ok('⛔ ទិសផ្ទុយ ៖ ឆ្លងសូន្យរួច revert ➜ server ត្រឡប់ទៅ 1 (មិនមែន 3)',
-            srv && srv.packagesPickedUp === 1, srv);
-        ok('⛔ ទិសផ្ទុយ ៖ key ត្រឡប់ទៅ 1', srv && (srv.pickedUpPhones || {})['0974158508'] === 1, srv);
-    }
-
-    {
         // 🔴 រាយការណ៍ដោយអ្នកប្រើ (2026-09-04) ៖ A បិទ «យក» ➜ បិទ WiFi ➜
         // បើកវិញ (ចូជួរក្រៅបណ្តាញ) ➜ B បើកកញ្ចប់នោះមុន ➜ A ភ្ជាប់មកវិញ។
-        // ពេលនោះ transaction របស់ item ឃើញថា server **បើករួច** ➜
-        // `serverPackageDelta = 0` ➜ `reconcilePickupDeltaWithServer()` សន្មតថា
-        // ledger បានចុះ -1 ពិត ហើយ «ជួសជុល» ដោយបូក +1 ត្រឡប់។ តែ ledger
-        // ខាង server ត្រូវ **clamp** ជា 0 រួចទៅហើយ (B យកវាទៅ 0 មុន) ➜
-        // +1 នោះបង្កើតកញ្ចប់ពីអាកាសធាតុ។
-        const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0, pickedUpPhones: {} } }
-        });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } };
-        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -1, -1)', ctx);
+        // ⛔ ការសរសេរជាស្ថានភាព ៖ ទោះ A សរសេរប៉ុន្មានដងក៏ដោយ លទ្ធផលនៅ 0 —
+        // ព្រោះ barcode តែមួយកាន់កន្លែងតែមួយ។
+        const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0 } } });
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { U1: '0974158508' } };
+        vm.runInContext('globalThis.__applied = markPickupBarcodes("' + DATE + '", [mark("U1","0974158508",false)], null)', ctx);
         await settle(); await settle();
-        const srvMid = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ server clamp ជា 0 មុន reconcile', srvMid && srvMid.packagesPickedUp === 0, srvMid);
-        vm.runInContext('globalThis.__applied = correctPickupLedgerToActual(__applied, 0, 0)', ctx);
-        await settle(); await settle(); await settle();
+        // «reconcile» ៖ សរសេរសាលក្រម server ម្តងទៀត (idempotent)
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("U1","0974158508",false)], null)', ctx);
+        await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
         ok('⛔ reconcile ៖ server មិនត្រូវទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន (នៅ 0)',
             srv && srv.packagesPickedUp === 0, srv);
         ok('⛔ reconcile ៖ គ្មាន key លេខទូរស័ព្ទថ្មីលើ server',
             srv && (!srv.pickedUpPhones || Object.keys(srv.pickedUpPhones).length === 0), srv);
+        ok('⛔ សតិក៏ចុះមក 0 ដែរ (មិនផ្ទុះ)', ctx.dailyPickupData[DATE].packagesPickedUp === 0, ctx.dailyPickupData[DATE]);
         ok('គ្មានការបដិសេធពី rules', ctx.__rejected.length === 0, ctx.__rejected);
     }
-
     {
-        // ⛔ ផ្លូវទី ២ ចូលថ្នាក់ដដែល ៖ reconcile ➜ revert។
-        // `correctPickupLedgerToActual()` ត្រឡប់ **វត្ថុ applied ថ្មី** ➜ បើវា
-        // មិនបញ្ជូនសាលក្រម server បន្តទេ នោះការ revert ក្រោយមកធ្លាក់ទៅប្រើ
-        // delta របស់សតិវិញ ➜ ថ្នាក់ដដែលតាមទ្វារផ្សេង។
-        const ctx = makeSandbox({
-            zoew_daily_pickup_cod_dod: { [DATE]: { packagesPickedUp: 0, pickedUpPhones: {} } }
-        });
-        ctx.dailyPickupData[DATE] = { packagesPickedUp: 3, pickedUpPhones: { '0974158508': 3 } };
-        vm.runInContext('globalThis.__applied = addPickupToDailyRecord("' + DATE + '", "0974158508", -3, -3)', ctx);
-        await settle(); await settle();
-        // server បញ្ជាក់ថា delta ពិតជា -1 ➜ reconcile
-        vm.runInContext('globalThis.__applied = correctPickupLedgerToActual(__applied, -1, -1)', ctx);
-        await settle(); await settle();
-        vm.runInContext('revertPickupLedgerDelta(__applied)', ctx);
+        // ⛔ ការសរសេរដដែលៗពីឧបករណ៍ ២ ➜ barcode តែមួយ = កន្លែងតែមួយ
+        const ctx = makeSandbox({ zoew_daily_pickup_cod_dod: {} });
+        ctx.dailyPickupData[DATE] = { packagesPickedUp: 0, pickedUpPhones: {}, pickedUpBarcodes: {} };
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
+        vm.runInContext('markPickupBarcodes("' + DATE + '", [mark("V1","0974158508",true)], null)', ctx);
         await settle(); await settle(); await settle();
         const srv = ctx.__store.zoew_daily_pickup_cod_dod[DATE];
-        ok('⛔ reconcile ➜ revert ៖ server មិនត្រូវឡើងលើសអ្វីដែលវាធ្លាក់ (នៅ 0)',
-            srv && srv.packagesPickedUp === 0, srv);
-        ok('⛔ reconcile ➜ revert ៖ គ្មាន key លេខទូរស័ព្ទថ្មីលើ server',
-            srv && (!srv.pickedUpPhones || Object.keys(srv.pickedUpPhones).length === 0), srv);
+        ok('⛔ idempotent ៖ បិទ barcode ដដែល ៣ ដង ➜ server = 1', srv && srv.packagesPickedUp === 1, srv);
+        ok('⛔ idempotent ៖ អតិថិជន = 1', srv && (srv.pickedUpPhones || {})['0974158508'] === 1, srv);
+        ok('អថេរ ៖ sum(pickedUpPhones) === packagesPickedUp',
+            srv && Object.keys(srv.pickedUpPhones || {}).reduce((a, k) => a + srv.pickedUpPhones[k], 0) === srv.packagesPickedUp, srv);
     }
 
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);

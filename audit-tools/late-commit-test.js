@@ -97,8 +97,10 @@ const REAL_FNS = [
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getPickupPhoneKey',
-    'closedBarcodeCount', 'revertPickupLedgerDelta', 'correctPickupLedgerToActual', 'correctPickupServerToActual', 'addPickupToDailyRecord', 'commitDailyPickupDelta',
-    'pickupAppliedDelta', 'applyPickupMemoryDelta', 'revertPickupOnServer',
+    'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
+    'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
+    'collectPickupMarks', 'reconstructPickupSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'toggleCloseStatus'
@@ -257,6 +259,8 @@ function buildWorld(seed, opts) {
         extractConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         extractConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
+        extractConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
+        extractConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc

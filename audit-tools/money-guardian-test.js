@@ -43,7 +43,9 @@ const STRICT = process.env.MONEYGUARD_STRICT === '1';
 const GUARDS = [
     { file: 'emu/ledger-revert-emu-test.js', env: 'LEDGEREMU_APP_DIR', needs: 'RTDB emulator' },
     { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', needs: null },
-    { file: 'revenue-rules-clamp-test.js', env: 'REVCLAMP_APP_DIR', needs: null }
+    { file: 'revenue-rules-clamp-test.js', env: 'REVCLAMP_APP_DIR', needs: null },
+    { file: 'pickup-barcode-identity-test.js', env: 'PICKUPID_APP_DIR', needs: null },
+    { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
@@ -75,27 +77,44 @@ const MUTATIONS = [
         to: '            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;'
     },
     {
-        // ⛔ ថ្នាក់ដដែលនឹង 2.26.0 តែនៅ **ស្ថិតិយក** ៖ `commitDailyPickupDelta`
-        // clamp ខាង server តែមិនត្រឡប់ delta ដែលអនុវត្តពិត ➜ ការដកវិញប្រើ
-        // delta របស់សតិ ➜ server ទទួលកញ្ចប់ដែលវាមិនធ្លាប់មាន។
-        name: 'ស្ថិតិយក ៖ ការដកវិញមិនគោរពសាលក្រម server',
-        from: '            const d = serverApplied || { packages: applied.packages, customer: applied.customer };',
-        to: '            const d = { packages: applied.packages, customer: applied.customer };'
+        // ⛔ ថ្នាក់ ៖ ការបើក «យក» ក្លាយជា no-op ➜ លេខឡើងហើយមិនចេះចុះ។
+        name: 'ស្ថិតិយក ៖ ការបើកមិនដកកូនសោ barcode ចេញពីសំណុំ',
+        from: '            } else delete set[mark.key];',
+        to: '            }'
     },
     {
-        name: 'ស្ថិតិយក ៖ commit ត្រឡប់ delta សតិ ជំនួសសាលក្រម server',
-        from: '            return pickupAppliedDelta(serverBefore, serverAfter, phoneKey);',
-        to: '            return applied;'
+        // ⛔ ថ្នាក់ ៖ កញ្ចក់ `pickedUpPhones` លែងដេរីវេពីសំណុំ ➜ អថេរ
+        // `sum(pickedUpPhones) === packagesPickedUp` បែក។
+        name: 'ស្ថិតិយក ៖ ការរាប់អតិថិជនលែងដេរីវេពីសំណុំ barcode',
+        from: '            phones[phone] = (phones[phone] || 0) + 1;',
+        to: '            phones[phone] = 1;'
     },
     {
-        // 🔴 ថ្នាក់ដដែលជាលើកទី ៣ (2026-09-04) — ផ្លូវ **reconcile** មិនមែន revert។
-        // `correctPickupLedgerToActual()` ធ្លាប់គណនាភាពខុសធៀបនឹង delta របស់
-        // **សតិ** រួចសរសេរវាទៅ server ➜ ពេល ledger ខាង server ត្រូវ clamp
-        // (ឧបករណ៍ផ្សេងយកវាទៅ 0 មុន) ការ «ជួសជុល» នោះបង្កើតកញ្ចប់ពីអាកាសធាតុ។
-        // អ្នកប្រើវាស់បានលើឧបករណ៍ពិត ៖ កញ្ចប់យក 0 ➜ 1 ដោយបញ្ជីមានតែ ១ កញ្ចប់បើក។
-        name: 'ស្ថិតិយក ៖ reconcile គណនាធៀបនឹង delta របស់សតិ ជំនួសសាលក្រម server',
-        from: '            const customerDiff = actualCustomer - ledgerNumber(base.customer);\n            const packageDiff = actualPackages - ledgerNumber(base.packages);',
-        to: '            const customerDiff = actualCustomer - ledgerNumber(applied.customer);\n            const packageDiff = actualPackages - ledgerNumber(applied.packages);'
+        // 🔴 ថ្នាក់ ៖ ការ seed ដោយគ្មានច្រកទ្វារស្មើភាព ➜ ការ **Reset**
+        // ត្រូវដកវិញដោយប្រវត្តិដែលនៅសល់ ➜ លេខលោតត្រឡប់មកវិញ។
+        name: 'ស្ថិតិយក ៖ ការ seed សំណុំដោយគ្មានច្រកទ្វារស្មើភាព (Reset ត្រូវរស់ឡើងវិញ)',
+        from: '        if (seed && typeof seed === \'object\' && pickupSetSize(seed) === recorded) return { ...seed };',
+        to: '        if (seed && typeof seed === \'object\') return { ...seed };'
+    },
+    {
+        // 🔴 ថ្នាក់ ៖ ថ្ងៃចាស់ដែលរាប់មិនឡើងវិញបាន ត្រូវបាត់លេខទាំងស្រុង។
+        name: 'ស្ថិតិយក ៖ ថ្ងៃចាស់ដែល seed មិនត្រូវ ➜ សំណុំទទេ (លេខបាត់)',
+        from: '        return legacyPickupPlaceholders(record);',
+        to: '        return {};'
+    },
+    {
+        // 🔴 ថ្នាក់ដដែលនឹង 2.26.0–2.26.2 តាមទ្វារថ្មី ៖ transaction សរសេរ
+        // ចេញពី **ទិដ្ឋភាពក្នុងសតិ** ជំនួសតម្លៃដែល server ផ្តល់ ➜ ទិដ្ឋភាព
+        // ចាស់របស់ឧបករណ៍មួយ សរសេរជាន់ការពិតរបស់ server។
+        name: 'ស្ថិតិយក ៖ transaction សរសេរចេញពីសតិ ជំនួសតម្លៃ server',
+        from: '            const set = pickupSetFromRecord((current && typeof current === \'object\') ? current : null, seed);',
+        to: '            const set = pickupSetFromRecord(dailyPickupData[scanDateStr] || null, seed);'
+    },
+    {
+        // ⛔ ថ្នាក់ ៖ ការដកវិញលែងស្តារ **ស្ថានភាពដើម** ➜ ការដកវិញក្លាយជា no-op។
+        name: 'ស្ថិតិយក ៖ ការដកវិញមិនស្តារស្ថានភាពដើម',
+        from: '        const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));',
+        to: '        const marks = applied.marks;'
     },
     {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',

@@ -141,6 +141,7 @@ bash audit-tools/emu/rules.sh
 | `pickup-ledger-test.js` | អតិថិជនយក ↔ កញ្ចប់យក រាប់លើ **មូលដ្ឋានតែមួយ** | `PICKUP_APP_DIR` |
 | `pickup-reset-test.js` | Reset ស្ថិតិយក ៖ node នៅមានជាមួយ `0` · គោរពតម្រង · មិនប៉ះលុយ | `PICKUPRESET_APP_DIR` |
 | `pickup-repair-test.js` | ការជួសជុលស្ថិតិយកស្វ័យប្រវត្តិ | `PICKUPREPAIR_APP_DIR` |
+| `pickup-barcode-identity-test.js` | ស្ថិតិយករាប់តាម **សំណុំ barcode** ៖ ឧបករណ៍ ២ ចែក store តែមួយ · rules ពិត · ការចូជួរក្រៅបណ្តាញ | `PICKUPID_APP_DIR` |
 | `revenue-fuzz-test.js` | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ (rules ពិត · អថេរ registry និងធុងសំរាម) | `FUZZ_APP_DIR` |
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |

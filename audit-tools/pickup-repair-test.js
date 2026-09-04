@@ -40,8 +40,8 @@ function sliceFn(name) {
 }
 
 // ជាន់អប្បបរមា — checker នេះត្រូវពិតជាបានឃើញកូដ
-ok('ជាន់អប្បបរមា៖ ឃើញ addPickupToDailyRecord ក្នុងកូដ',
-    SRC.indexOf('function addPickupToDailyRecord(') !== -1);
+ok('ជាន់អប្បបរមា៖ ឃើញ markPickupBarcodes ក្នុងកូដ',
+    SRC.indexOf('function markPickupBarcodes(') !== -1);
 
 const planFn = sliceFn('planPickupLedgerRepair');
 ok('មាន `planPickupLedgerRepair()` — គណនាផែនការជួសជុលដោយមិនសរសេរ', !!planFn);
@@ -51,17 +51,23 @@ if (!planFn) {
 }
 
 const ctx = {
-    console, Object, Math, parseFloat, String, Set, Array, isNaN, JSON,
-    getPickupPhoneKey: null, closedBarcodeCount: null
+    console, Object, Math, parseFloat, String, Set, Array, isNaN, JSON
 };
 vm.createContext(ctx);
 vm.runInContext([
+    (/const PICKUP_PHONE_KEY_MAX = ([0-9]+);/.exec(SRC) || [null, '64'])[0] || 'const PICKUP_PHONE_KEY_MAX = 64;',
+    sliceFn('ledgerNumber'),
+    sliceFn('barcodeRegistryKey'),
+    sliceFn('pickupBarcodeKey'),
+    sliceFn('pickupSetSize'),
+    sliceFn('tallyPickupPhones'),
     sliceFn('getPickupPhoneKey'),
-    sliceFn('closedBarcodeCount'),
+    sliceFn('collectPickupMarks'),
     planFn,
-    'this.api = { planPickupLedgerRepair };'
+    'this.api = { planPickupLedgerRepair, tallyPickupPhones };'
 ].filter(Boolean).join('\n\n'), ctx);
 const plan = ctx.api.planPickupLedgerRepair;
+const tally = (setObj) => ctx.api.tallyPickupPhones(setObj || {});
 
 const bc = (code, closed) => ({ code: code, isClosed: closed });
 function day(d, items, trash, ledger) {
@@ -75,10 +81,14 @@ function day(d, items, trash, ledger) {
     const out = day('2026-08-27', items, [], ledger);
     ok('ថ្ងៃដែលទិន្នន័យគ្រប់ ➜ មានផែនការជួសជុល', out.length === 1, JSON.stringify(out));
     const p = out[0] || {};
+    const phones = tally(p.pickedUpBarcodes);
     ok('អតិថិជនខ្មោច `0999000111` ត្រូវដកចេញ',
-        p.pickedUpPhones && !p.pickedUpPhones['0999000111'] && p.pickedUpPhones['0974158508'] === 1,
-        JSON.stringify(p.pickedUpPhones));
-    ok('⛔ `packagesPickedUp` **មិនត្រូវប៉ះ**', p.packagesPickedUp === undefined, JSON.stringify(p));
+        !phones['0999000111'] && phones['0974158508'] === 1, JSON.stringify(phones));
+    ok('ផែនការជាសំណុំ barcode (មិនមែនលេខសរុប)',
+        p.pickedUpBarcodes && Object.keys(p.pickedUpBarcodes).length === 1 && p.pickedUpBarcodes.B1 === '0974158508',
+        JSON.stringify(p.pickedUpBarcodes));
+    ok('⛔ `packagesPickedUp` **មិនត្រូវប៉ះ** ក្នុងផែនការ (វាដេរីវេពេលសរសេរ)',
+        p.packagesPickedUp === undefined, JSON.stringify(p));
 }
 
 // ── ２. ⛔ ថ្ងៃចាស់ដែលទិន្នន័យត្រូវ purge រួច ➜ **មិនត្រូវប៉ះ** ─────────
@@ -104,20 +114,26 @@ function day(d, items, trash, ledger) {
     const trash = [{ id: 'd', phone: '0912000004', scanDate: '2026-08-26', barcodes: [bc('D2', true)] }];
     const out = day('2026-08-26', items, trash, ledger);
     ok('ធុងសំរាមរាប់ចូលដែរ ➜ ជួសជុលបាន',
-        out.length === 1 && out[0].pickedUpPhones['0912000004'] === 2, JSON.stringify(out));
+        out.length === 1 && tally(out[0].pickedUpBarcodes)['0912000004'] === 2, JSON.stringify(out));
 }
 
 // ── ５. ថ្ងៃដែលត្រឹមត្រូវរួច ➜ គ្មានការសរសេរ (idempotent) ─────────────
 {
-    const ledger = { '2026-08-25': { packagesPickedUp: 1, pickedUpPhones: { '0912000005': 1 } } };
+    const ledger = { '2026-08-25': { packagesPickedUp: 1, pickedUpPhones: { '0912000005': 1 }, pickedUpBarcodes: { E1: '0912000005' } } };
     const items = [{ id: 'e', phone: '0912000005', scanDate: '2026-08-25', barcodes: [bc('E1', true)] }];
     const out1 = day('2026-08-25', items, [], ledger);
     ok('ថ្ងៃដែលត្រឹមត្រូវរួច ➜ គ្មានការសរសេរ', out1.length === 0, JSON.stringify(out1));
     // ដំណើរការម្តងទៀតលើលទ្ធផលដែលជួសជុលរួច ក៏ត្រូវស្ងាត់ដែរ
-    const fixedLedger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 } } };
+    const fixedLedger = { '2026-08-27': { packagesPickedUp: 1, pickedUpPhones: { '0974158508': 1 }, pickedUpBarcodes: { B1: '0974158508' } } };
     const fixedItems = [{ id: 'a', phone: '0974158508', scanDate: '2026-08-27', barcodes: [bc('B1', true), bc('B2', false)] }];
     ok('⛔ idempotent ៖ រត់ម្តងទៀតក្រោយជួសជុល ➜ គ្មានការសរសេរ',
         day('2026-08-27', fixedItems, [], fixedLedger).length === 0);
+    // ថ្ងៃចាស់ដែលមានតែលេខ (គ្មានសំណុំ) ➜ ត្រូវប្តូរទៅសំណុំ barcode ម្តង
+    const legacyLedger = { '2026-08-22': { packagesPickedUp: 1, pickedUpPhones: { '0912000009': 1 } } };
+    const legacyItems = [{ id: 'x', phone: '0912000009', scanDate: '2026-08-22', barcodes: [bc('X1', true)] }];
+    const legacyOut = day('2026-08-22', legacyItems, [], legacyLedger);
+    ok('⛔ ថ្ងៃចាស់ (លេខតែម្យ៉ាង) ➜ ផ្លាស់ទៅសំណុំ barcode ១ ដង',
+        legacyOut.length === 1 && legacyOut[0].pickedUpBarcodes.X1 === '0912000009', JSON.stringify(legacyOut));
 }
 
 // ── ６. ថ្ងៃដែលគ្មាន barcode បិទសោះ តែ ledger ទទេដែរ ➜ ស្ងាត់ ─────────
@@ -136,11 +152,12 @@ function day(d, items, trash, ledger) {
     ];
     const out = day('2026-08-23', items, [], ledger);
     ok('ការជួសជុលផ្តល់ ១ ថ្ងៃ', out.length === 1, JSON.stringify(out));
-    const refs = Object.values(out[0].pickedUpPhones).reduce((a, b) => a + b, 0);
+    const outPhones = tally(out[0].pickedUpBarcodes);
+    const refs = Object.values(outPhones).reduce((a, b) => a + b, 0);
     ok('⛔ អថេរ៖ ផលបូក ref === packagesPickedUp ដែលមានស្រាប់',
         refs === 3, 'refSum=' + refs);
     ok('អតិថិជន = ២ លេខទូរស័ព្ទ (មិនមែន ៣ barcode)',
-        Object.keys(out[0].pickedUpPhones).length === 2, JSON.stringify(out[0].pickedUpPhones));
+        Object.keys(outPhones).length === 2, JSON.stringify(outPhones));
 }
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));

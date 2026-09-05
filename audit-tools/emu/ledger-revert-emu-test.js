@@ -91,7 +91,8 @@ function extractFn(src, name) {
     throw new Error('function មិនបានបិទ: ' + name);
 }
 
-const FNS = ['ledgerNumber', 'ledgerAppliedDelta', 'applyLedgerBucketDelta',
+const FNS = ['ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
+    'applyLedgerBucketDelta',
     'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'commitRevenueBucketDelta',
     'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord'];

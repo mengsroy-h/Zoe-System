@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.17';
+const APP_VERSION = '2.19.18';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1223,6 +1223,20 @@ function firebaseConfigErrorMessage(err) {
     return 'Firebase Config មិនត្រឹមត្រូវទេ!';
 }
 
+function readNormalizedFirebaseConfig(cfgInput) {
+    const raw = cfgInput.value.trim();
+    if (!raw) { alert('សូមបញ្ចូល Firebase Config!'); return null; }
+    let normalized;
+    try {
+        normalized = normalizeFirebaseConfig(raw);
+    } catch (e) {
+        alert(firebaseConfigErrorMessage(e));
+        return null;
+    }
+    cfgInput.value = JSON.stringify(normalized.config, null, 2);
+    return normalized;
+}
+
 function saveFirebaseConfig() {
     const dsnInput = document.getElementById('sentryDsnInput');
     if (dsnInput && window.ZoeErrors) {
@@ -1231,17 +1245,9 @@ function saveFirebaseConfig() {
     }
     const cfgInput = document.getElementById('firebaseConfigInput');
     if (!cfgInput) return;
-    const raw = cfgInput.value.trim();
-    if (!raw) { alert("សូមបញ្ចូល Firebase Config!"); return; }
-    let normalized;
-    try {
-        normalized = normalizeFirebaseConfig(raw);
-    } catch (e) {
-        alert(firebaseConfigErrorMessage(e));
-        return;
-    }
+    const normalized = readNormalizedFirebaseConfig(cfgInput);
+    if (!normalized) return;
     const parsed = normalized.config;
-    cfgInput.value = JSON.stringify(parsed, null, 2);
     if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(parsed))) {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
         return;
@@ -1868,18 +1874,9 @@ function generateSetupLink() {
     const baseUrl = urlInput.value.trim().replace(/\/+$/, '');
     if (!/^https:\/\/.+/.test(baseUrl)) { alert('សូមបញ្ចូល Base URL ត្រឹមត្រូវ (ចាប់ផ្តើមដោយ https://)!'); return; }
 
-    const raw = cfgInput.value.trim();
-    if (!raw) { alert('សូមបញ្ចូល Firebase Config!'); return; }
-
-    let normalized;
-    try {
-        normalized = normalizeFirebaseConfig(raw);
-    } catch (e) {
-        alert(firebaseConfigErrorMessage(e));
-        return;
-    }
+    const normalized = readNormalizedFirebaseConfig(cfgInput);
+    if (!normalized) return;
     const parsed = normalized.config;
-    cfgInput.value = JSON.stringify(parsed, null, 2);
     if (normalized.extras.length) showToast('រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
     safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);

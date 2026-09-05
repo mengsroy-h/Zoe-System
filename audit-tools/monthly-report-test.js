@@ -519,17 +519,39 @@ scenario('ចំណូល ៖ អត្ថបទបង្ហាញ (ជា $ ន
 
 scenario('⛔ មូលដ្ឋានតែមួយ ៖ ម៉ូឌុលស្ថិតិទាំង ៣ ប្រើ helper ដដែល', () => {
     // ⛔ ច្បាប់ចម្លងទី ២ នៃការគណនាលុយ = ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ លេខ ២ ផ្ទុយគ្នា
+    //
+    // ⛔ ការស្កេនត្រូវដើរតាម **ផ្លូវហៅ ១ ជាន់** មិនមែនត្រឹមតួផ្ទាល់ ៖ កំណែ
+    // 2.30.2 រួបរួមកាតស្ថិតិថ្ងៃ/ខែទៅ `buildStatCardItem()` ➜ ការហៅ
+    // `collectedValueOf()` ផ្លាស់ចូល helper នោះ។ ការស្កេនតួផ្ទាល់តែម្យ៉ាង
+    // នឹងធ្លាក់លើការរួបរួមដែលត្រឹមត្រូវ។ ⛔ តែវា **មិនត្រូវខ្សោយដល់ថ្នាក់**
+    // «`collectedValueOf` នៅកន្លែងណាមួយក្នុងឯកសារ» ទេ — ត្រូវមានផ្លូវហៅពិត។
+    const CALL_RE = /\b([a-zA-Z_$][\w$]*)\s*\(/g;
+    const bodyWithCallees = (name) => {
+        const own = sliceFn(src, name) || '';
+        let out = own;
+        const seen = new Set([name]);
+        let m;
+        CALL_RE.lastIndex = 0;
+        while ((m = CALL_RE.exec(own))) {
+            const callee = m[1];
+            if (seen.has(callee)) continue;
+            seen.add(callee);
+            const sub = sliceFn(src, callee);
+            if (sub) out += '\n' + sub;
+        }
+        return out;
+    };
     const users = ['buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal'];
     users.forEach((name) => {
-        const body = sliceFn(src, name) || '';
+        const body = bodyWithCallees(name);
         ok(name + '() ហៅ collectedValueOf()', body.indexOf('collectedValueOf') !== -1);
         ok(name + '() ហៅ collectedValueIsMeasurable()', body.indexOf('collectedValueIsMeasurable') !== -1);
         ok(name + '() អានតម្លៃមិនទាន់យកពី uncollectedValue*()', /uncollectedValue(ByDate|ForMonth)/.test(body), name);
     });
     ok('⛔ ជាន់អប្បបរមា ៖ វាស់លើឯកសារ ១ ដែលមាន function ទាំង ៣',
         users.every((n) => !!sliceFn(src, n)), users.filter((n) => !sliceFn(src, n)).join(', '));
-    const daily = sliceFn(src, 'openDailyStatsModal') || '';
-    const monthly = sliceFn(src, 'openMonthlyStatsModal') || '';
+    const daily = bodyWithCallees('openDailyStatsModal');
+    const monthly = bodyWithCallees('openMonthlyStatsModal');
     ok('⛔ ម៉ូឌុលថ្ងៃមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', daily.indexOf('ចំណូល (យករួច)') !== -1);
     ok('⛔ ម៉ូឌុលខែមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', monthly.indexOf('ចំណូល (យករួច)') !== -1);
     ok('⛔ ម៉ូឌុលទាំង ២ នៅតែបង្ហាញតម្លៃទាំងអស់ដែរ (តម្លាភាព)',

@@ -84,7 +84,8 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
         if (core.appSessionStore === undefined) core.appSessionStore = core.sessionStorage || null;
         const extras = [
             'renderConnectionStatus', 'refreshLiveToasts', 'scheduleDbListenerRecovery', 'clearDbListenerRecovery',
-            'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners'
+            'attemptDbListenerRecovery', 'noteDbListenerAlive', 'initDatabaseListeners',
+            'rawSnapshotToItemList'
         ].map(sliceFn).filter(Boolean).join('\n\n') + '\n\n' + RESYNC_GUARD + '\n\n' + ELAPSED_HELPER;
         const src = 'let dbListenersFailed = false;\n' +
             'let dbListenerRecoveryTimer = null;\n' +
@@ -130,6 +131,7 @@ const REQUIRED_FNS = [
     'handleDbListenerError', 'scheduleDbListenerRecovery', 'attemptDbListenerRecovery',
     'retryFailedDbListenersNow', 'clearDbListenerRecovery', 'noteDbListenerAlive',
     'detachDatabaseListeners', 'detachInfoListeners', 'resetDbListenerHealthState', 'initDatabaseListeners',
+    'rawSnapshotToItemList',
     'runScheduledCleanup',
     'attachInfoListeners', 'scheduleInfoListenerRecovery', 'clearInfoListenerRecovery',
     'handleInfoListenerError', 'noteInfoListenerAlive'

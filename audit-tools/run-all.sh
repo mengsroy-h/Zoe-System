@@ -102,7 +102,7 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring function-surface-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
+for t in shared-fns wiring function-surface-test code-duplication-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -142,6 +142,7 @@ run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
 run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
 run "duplicate-money (browser ពិត)" node audit-tools/duplicate-money-test.js
+run "item-money (browser ពិត)" node audit-tools/item-money-integrity-test.js
 run "ledger-clamp-symmetry (browser ពិត)" node audit-tools/ledger-clamp-symmetry-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
@@ -238,6 +239,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
     DUPMONEY_APP_DIR="$BASE" node audit-tools/duplicate-money-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-money: /'
+    ITEMMONEY_APP_DIR="$BASE" node audit-tools/item-money-integrity-test.js 2>&1 | tail -1 | sed 's/^/   item-money:      /'
     CLAMPSYM_APP_DIR="$BASE" node audit-tools/ledger-clamp-symmetry-test.js 2>&1 | tail -1 | sed 's/^/   clamp-symmetry:  /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
@@ -330,6 +332,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     TRASH_APP_DIR="$BASE" node audit-tools/trash-modal-test.js 2>&1 | tail -1 | sed 's/^/   trash-modal-test:/'
     WIRING_APP_DIR="$BASE" node audit-tools/wiring.js 2>&1 | tail -1 | sed 's/^/   wiring:          /'
     FNSURFACE_APP_DIR="$BASE" node audit-tools/function-surface-test.js 2>&1 | tail -1 | sed 's/^/   function-surface: /'
+    DUPCODE_APP_DIR="$BASE" node audit-tools/code-duplication-test.js 2>&1 | tail -1 | sed 's/^/   code-duplication: /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
     LEAK_APP_DIR="$BASE" node audit-tools/listener-leak-test.js 2>&1 | tail -1 | sed 's/^/   listener-leak:   /'

@@ -128,6 +128,7 @@ bash audit-tools/emu/rules.sh
 | `version-bump-scope.js` | ឡើងកំណែ **តែ App ដែលកែពិត** | `VERSIONSCOPE_APP_DIR` · `VERSIONSCOPE_BASE` |
 | `netlify-config-scope-test.js` | ⛔ **គ្មាន root `netlify.toml`** (វាបង្វែរ build របស់ App មួយទៀត) · config ត្រូវស៊ីនឹងអ្វីដែល App ship · រាល់ config ត្រូវមាន checker អាន | `NETLIFYSCOPE_APP_DIR` |
 | `function-surface-test.js` | ផ្ទៃ function ទាំងមូល · ទប់ declaration ឈ្មោះស្ទួន · រាល់ `data-act` មាន function ពិត | `FNSURFACE_APP_DIR` |
+| `code-duplication-test.js` | តក្កវិជ្ជាដដែលរស់ **២ កន្លែង** ក្នុងឯកសារ ship តែមួយ (តួ function · ប្លុក statement) ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ | `DUPCODE_APP_DIR` |
 
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត
 
@@ -147,6 +148,7 @@ bash audit-tools/emu/rules.sh
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
 | `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
+| `item-money-integrity-test.js` | **លុយកម្រិត *កញ្ចប់*** ៖ `item.cod/.dod/.price` ត្រូវស្មើផលបូក barcodes — ជាន់ ១ AST (ការសរសេរលុយត្រូវឆ្លងកាត់ helper) · ជាន់ ២ helper លើ input ច្រើន · ជាន់ ៣ invariant លើ item **ក្នុងសតិ និងលើ server** ក្រោយ operation កំណត់ ៧ | `ITEMMONEY_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម | `MONEYGUARD_APP_DIR` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
@@ -286,7 +288,8 @@ bash audit-tools/emu/rules.sh
 ### ៧. Allowlist — កុំបន្ថែមដោយគ្មានហេតុផល
 
 `dom-hygiene.js` (`ACCEPTED`) · `state-hygiene.js` · `css-classes.js`
-(`IGNORE`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) មាន allowlist ដែល
+(`IGNORE`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) · `code-duplication-test.js`
+(`ACCEPTED`) មាន allowlist ដែល
 **រាល់ធាតុមានហេតុផលសរសេរជាប់**។
 
 ⛔ **ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។** បើបន្ថែម helper ចែករំលែកថ្មី

@@ -105,7 +105,8 @@ const ENV_NAMES = [
     'ZTO_REQUEST_HEADERS_JSON', 'ZTO_FIELD_PHONE', 'ZTO_FIELD_COD', 'ZTO_FIELD_DOD',
     'ZTO_FIELD_BARCODE', 'ZTO_SEND_BROWSER_HEADERS', 'ZTO_UPSTREAM_TIMEOUT_MS',
     'ZTO_REQUEST_BUDGET_MS', 'ZTO_UPSTREAM_RETRIES', 'ZTO_CACHE_TTL_MS',
-    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN'
+    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN',
+    'ZTO_PROBE_BARCODE', 'ZTO_PROBE_MIN_GAP_MS', 'ZTO_NOT_FOUND_CACHE_TTL_MS'
 ];
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 const SAVED_FETCH = global.fetch;
@@ -572,6 +573,108 @@ group('ការវិនិច្ឆ័យ ?diag=1', async () => {
     ok('⛔ ?diag=1 នៅតែត្រូវការសោ', diagNoKey.statusCode === 401, diagNoKey.statusCode);
 });
 
+group('ការស្ទង់សកម្ម ?probe=1', async () => {
+    // ⛔ **សំណើអ្នកប្រើ (2026-09-05)** ៖ *«ធ្វើអោយដឹងថា cookie អស់សុពលភាព
+    // ភ្លាម»*។ សាលក្រមធម្មតាជា **ប្រតិកម្ម** (ត្រូវការការស្កេនពិត ១ ធ្លាក់)។
+    // ការស្ទង់សកម្មលុបចន្លោះនោះ — តែវាបន្ថែម **ចរាចរណ៍ពិតទៅ ZTO** ➜ វា
+    // ត្រូវសាងដោយព្រំដែន ៤ ដែលចាក់សោនៅទីនេះ ៖
+    //   ក. ship **អសកម្ម** ៖ គ្មាន ZTO_PROBE_BARCODE ➜ មិនហៅ ZTO សោះ
+    //   ខ. «វាស់មិនបាន» ≠ «ស្លាប់» ➜ 5xx/បណ្តាញធ្លាក់ ត្រូវឆ្លើយ alive:null
+    //   គ. ពិដានល្បឿនខាង **server** ➜ ចរាចរណ៍មានពិដានតាមរចនាសម្ព័ន្ធ
+    //   ឃ. មិនប៉ះ cache លទ្ធផល និងមិនបញ្ចេញទិន្នន័យអតិថិជន
+    console.log('\n== ១០ខ. ការស្ទង់សកម្ម ?probe=1 ==');
+
+    // ក. ship អសកម្ម — នេះជាព្រំដែនសំខាន់បំផុត ៖ អ្នកប្រើបើកវាដោយចេតនា។
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
+    global.fetch = jsonResponder(ORDER);
+    jsonResponder.calls = 0;
+    const off = await call({ probe: '1' });
+    const offBody = JSON.parse(off.body);
+    ok('⛔ គ្មាន ZTO_PROBE_BARCODE ➜ 200 ជាមួយ alive:null (ship អសកម្ម)',
+        off.statusCode === 200 && offBody.alive === null, off.body);
+    ok('⛔ គ្មាន ZTO_PROBE_BARCODE ➜ **មិនហៅ ZTO សោះ**',
+        (jsonResponder.calls || 0) === 0, jsonResponder.calls);
+
+    // ខ. ZTO ទទួល ➜ alive:true
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROBE_BARCODE: '77130527210012', ZTO_PROBE_MIN_GAP_MS: '0' });
+    global.fetch = jsonResponder(ORDER);
+    jsonResponder.calls = 0;
+    const aliveRun = await call({ probe: '1' });
+    const aliveBody = JSON.parse(aliveRun.body);
+    ok('ZTO ទទួល ➜ alive:true', aliveRun.statusCode === 200 && aliveBody.alive === true, aliveRun.body);
+    ok('ការស្ទង់ហៅ ZTO ពិត ១ ដង', (jsonResponder.calls || 0) === 1, jsonResponder.calls);
+    ok('⛔ ចម្លើយការស្ទង់ **មិនបញ្ចេញទិន្នន័យអតិថិជន**',
+        aliveRun.body.indexOf('0974158508') === -1
+        && aliveRun.body.indexOf('Test Customer') === -1
+        && aliveRun.body.indexOf('6.55') === -1, aliveRun.body);
+
+    // ⛔ ការស្ទង់មិនត្រូវពុល cache ៖ ការស្កេនពិតបន្ទាប់ត្រូវហៅ ZTO ដដែល។
+    jsonResponder.calls = 0;
+    const afterProbe = await call({ barcode: '77130527210012' });
+    ok('⛔ ការស្ទង់មិនពុល cache លទ្ធផល (ការស្កេនពិតនៅតែហៅ ZTO)',
+        (jsonResponder.calls || 0) === 1 && JSON.parse(afterProbe.body).cached === false,
+        jsonResponder.calls);
+
+    // ⛔ ហើយផ្ទុយមកវិញ ៖ cache ដែលមានស្រាប់មិនត្រូវបំពេញការស្ទង់ — បើអត់
+    // ការស្ទង់នឹងឆ្លើយ «alive» ដោយមិនបានសាក session សោះ = ការវាស់ក្លែងក្លាយ។
+    jsonResponder.calls = 0;
+    const probeAfterCache = await call({ probe: '1' });
+    ok('⛔ ការស្ទង់រំលង cache ជានិច្ច (បើអត់ ➜ សាលក្រមក្លែងក្លាយ)',
+        (jsonResponder.calls || 0) === 1 && JSON.parse(probeAfterCache.body).alive === true,
+        jsonResponder.calls);
+
+    // គ. ZTO បដិសេធ ➜ alive:false ហើយត្រូវ **ចាក់ស្ថានភាពដដែល** នឹងការស្កេនពិត
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROBE_BARCODE: '77130527210012', ZTO_PROBE_MIN_GAP_MS: '0' });
+    global.fetch = jsonResponder({ error: 'unauthorized' }, 401);
+    const dead = await call({ probe: '1' });
+    ok('ZTO បដិសេធ ➜ alive:false', JSON.parse(dead.body).alive === false, dead.body);
+    const diagAfterDead = JSON.parse((await call({ diag: '1' })).body);
+    ok('⛔ ការស្ទង់ចាក់ស្ថានភាពដដែលនឹងការស្កេនពិត (--auto ដឹងភ្លាមដោយមិនកែ)',
+        diagAfterDead.cookie && diagAfterDead.cookie.authRejectedAgeMs !== null,
+        diagAfterDead.cookie);
+
+    // ឃ. «វាស់មិនបាន» ≠ «ស្លាប់» — ច្បាប់មាសរបស់គម្រោង អនុវត្តលើអ័ក្សនេះដែរ។
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROBE_BARCODE: '77130527210012', ZTO_PROBE_MIN_GAP_MS: '0' });
+    global.fetch = jsonResponder({ error: 'boom' }, 500);
+    ok('⛔ ZTO ធ្លាក់ 5xx ➜ alive:null មិនមែន false',
+        JSON.parse((await call({ probe: '1' })).body).alive === null);
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROBE_BARCODE: '77130527210012', ZTO_PROBE_MIN_GAP_MS: '0' });
+    global.fetch = async () => { throw new Error('network down'); };
+    ok('⛔ បណ្តាញដាច់ ➜ alive:null (កុំបើក browser ដោយ ZTO ដាច់)',
+        JSON.parse((await call({ probe: '1' })).body).alive === null);
+
+    // ង. ពិដានល្បឿនខាង server ៖ ចរាចរណ៍ត្រូវមានពិដាន **តាមរចនាសម្ព័ន្ធ**
+    // មិនមែនដោយសង្ឃឹមថាឧបករណ៍ខាង client សួរមិនញឹក។
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t', ZTO_PROBE_BARCODE: '77130527210012', ZTO_PROBE_MIN_GAP_MS: '600000' });
+    global.fetch = jsonResponder(ORDER);
+    jsonResponder.calls = 0;
+    const first = JSON.parse((await call({ probe: '1' })).body);
+    const second = JSON.parse((await call({ probe: '1' })).body);
+    ok('ការស្ទង់ទី ១ ហៅ ZTO', (jsonResponder.calls || 0) === 1, jsonResponder.calls);
+    ok('⛔ ការស្ទង់ទី ២ ក្នុងពិដាន ➜ **មិនហៅ ZTO** តែឆ្លើយសាលក្រមចាស់',
+        (jsonResponder.calls || 0) === 1 && second.alive === first.alive && second.throttled === true,
+        { calls: jsonResponder.calls, second });
+
+    // ច. ច្រកទ្វារ ៖ សោ និងអ្នកហៅ
+    const probeNoKey = await proxy.handler({ httpMethod: 'GET', headers: {}, queryStringParameters: { probe: '1' } });
+    ok('⛔ ?probe=1 ត្រូវការសោ', probeNoKey.statusCode === 401, probeNoKey.statusCode);
+});
+
+// ⛔ **ការស្ទង់ជារបស់ឧបករណ៍ Windows ប៉ុណ្ណោះ។** បើ App ហៅវា នោះរាល់សំណើ
+// ដែលធ្លាក់នឹងក្លាយជា **error event ក្នុង Sentry** ➜ វាបំពេញ Sentry ហើយ
+// **បាំង alert លុយ** (ថ្នាក់ដែល `docs/HISTORY.md` កត់ត្រារួច)។ នេះជាព្រំដែន
+// ដែលធ្វើឲ្យការស្ទង់សុវត្ថិភាព — ចាក់សោវាទាំង ២ ខាង។
+queue.then(() => {
+    console.log('\n== ១០គ. ការស្ទង់មិនត្រូវចេញពី App ==');
+    ok('⛔ app.js មិនហៅ ?probe=1 សោះ (Sentry មិនត្រូវទទួល event ពីការស្ទង់)',
+        APP_SRC.indexOf('probe=1') === -1 && APP_SRC.indexOf("probe: '1'") === -1);
+    ok('⛔ Function គាំទ្រ probe ពិត (ជាន់អប្បបរមា ៖ កុំឲ្យការស្កេនខាងលើទទេ)',
+        FUNCTION_SRC.indexOf('ZTO_PROBE_BARCODE') !== -1 && FUNCTION_SRC.indexOf('probe') !== -1);
+    ok('⛔ ឧបករណ៍ Windows ជាអ្នកហៅតែម្នាក់',
+        readOr(path.join(ROOT, 'tools', 'zto-cookie-sync-windows', 'sync-zto-cookie.js'), '')
+            .indexOf('probe=1') !== -1);
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // ១១. ពិដានពេលខាង client ត្រូវស៊ីនឹងថវិកាខាង server
 // ────────────────────────────────────────────────────────────────────────────
@@ -610,6 +713,17 @@ queue.then(() => {
         lookupSource.indexOf('throw lookupResponseError(out.res.status, data, false)') !== -1);
     ok('សារ ZTO_AUTH_EXPIRED ប្រាប់ឲ្យយក Cookie ថ្មី',
         lookupSource.indexOf("e.lookupCode === 'ZTO_AUTH_EXPIRED'") !== -1 && lookupSource.indexOf('Cookie ZTO ផុតកំណត់') !== -1);
+    // ⛔ **សារដែលចាស់ គឺជាសារខុស។** មុនមានឧបករណ៍ស្វ័យប្រវត្តិ សារនេះប្រាប់
+    // អ្នកប្រើឲ្យ «ចូល Argus យក Cookie ថ្មី ដាក់ក្នុង Netlify» — ការណែនាំនោះ
+    // ឥឡូវ **ខុស ២ កន្លែង** ៖ ការដាក់ក្នុង Netlify លែងជាជំហានទៀតហើយ
+    // (helper សរសេរចូល Blobs ដោយផ្ទាល់) ហើយ Task ជួសជុលវាក្នុងប្រហែល ១ នាទី
+    // ➜ អ្នកប្រើចំណាយ ៥ នាទីធ្វើអ្វីដែលនឹងរួចដោយខ្លួនឯង។
+    ok('⛔ សារលែងប្រាប់ឲ្យដាក់ Cookie ក្នុង Netlify ដោយដៃ',
+        lookupSource.indexOf('ដាក់ក្នុង Netlify') === -1,
+        'ជំហាននោះលែងមានទៀតហើយ — helper សរសេរចូល Blobs ដោយផ្ទាល់');
+    ok('⛔ សារប្រាប់ឲ្យស្កេនម្ដងទៀត និងផ្លូវចេញពេលនៅតែធ្លាក់',
+        /ស្កេនម្[ដ]?ងទៀត/.test(lookupSource) && lookupSource.indexOf('ZTO Cookie Sync') !== -1,
+        'សារត្រូវពិតទាំងពេលមាន Task និងពេលគ្មាន Task');
     ok('សារ ZTO_CONFIG_INVALID មាន', lookupSource.indexOf("e.lookupCode === 'ZTO_CONFIG_INVALID'") !== -1);
     ok('សារ ZTO_RATE_LIMITED មាន', lookupSource.indexOf("e.lookupCode === 'ZTO_RATE_LIMITED'") !== -1);
 

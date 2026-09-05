@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.2';
+    const APP_VERSION = '2.30.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4202,7 +4202,7 @@
             } else if (e && e.message === 'Auto lookup timed out') {
                 setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
             } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-                setLookupStatus(barcode, 'error', '🔒 Cookie ZTO ផុតកំណត់ — សូមចូល Argus យក Cookie ថ្មី ដាក់ក្នុង Netlify');
+                setLookupStatus(barcode, 'error', '🔒 Cookie ZTO ផុតកំណត់ — សូមស្កេនម្ដងទៀតក្នុង ១ នាទី; បើនៅតែធ្លាក់ ➜ រត់ ZTO Cookie Sync លើកុំព្យូទ័រ');
             } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
                 setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');
             } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED')) {

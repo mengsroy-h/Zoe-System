@@ -345,6 +345,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
 | **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
+| **ZTO ៖ ការស្ទង់សកម្ម** | ⛔ ship **អសកម្ម** (គ្មាន `ZTO_PROBE_BARCODE` ➜ គ្មានការហៅ ZTO)។ ⛔ «វាស់មិនបាន» ≠ «ស្លាប់» ➜ 5xx · បណ្តាញធ្លាក់ · គ្មាន auth ត្រូវឆ្លើយ **`alive: null`**។ ⛔ ពិដានល្បឿនឈរខាង **server** (`ZTO_PROBE_MIN_GAP_MS`) មិនមែនពឹងលើ client។ ⛔ រំលង cache **ទាំង ២ ទិស** (អាន ➜ សាលក្រមក្លែងក្លាយ; សរសេរ ➜ ពុល cache ការស្កេន)។ ⛔ ចម្លើយគ្មានទិន្នន័យអតិថិជន។ ⛔ **App មិនហៅវាទេ** — បើហៅ ➜ Sentry ពេញ ➜ **បាំង alert លុយ** | `zto-proxy-test` · `zto-cookie-sync-test` |
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |

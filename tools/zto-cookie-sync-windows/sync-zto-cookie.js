@@ -28,6 +28,11 @@ const DIAG_PATH = '/.netlify/functions/zto-order-detail?diag=1';
 // `diag=1` (ដែលការពារដោយ proxy key) ➜ ផ្លូវ lookup មិនអាចត្រូវបង្ខំឲ្យ
 // អាន blob រាល់ការស្កេនបានឡើយ។
 const DIAG_FRESH_PATH = DIAG_PATH + '&fresh=1';
+// ⛔ ការស្ទង់សកម្ម ៖ វា **ត្រៀម** សាលក្រមឲ្យ Function ដឹងមុនអ្នកប្រើ ប៉ុណ្ណោះ។
+// ការសម្រេចបើក browser នៅតែជារបស់ `shouldRefreshInAuto()` ដដែល ➜ គ្មាន
+// តក្កវិជ្ជាទី ២ ដែលអាចឃ្លាតពីផ្លូវដើម។
+const PROBE_PATH = '/.netlify/functions/zto-order-detail?probe=1';
+const PROBE_TIMEOUT_MS = 15 * 1000;
 const PROXY_KEY_HEADER = 'X-Zoe-Proxy-Key';
 const VERIFY_TIMEOUT_MS = 10 * 1000;
 const VERIFY_DEADLINE_MS = 75 * 1000;
@@ -589,6 +594,54 @@ async function checkCookieHealth(options) {
     }, info);
 }
 
+// ⛔ **fail-open ពេញលេញ** ៖ រាល់ការធ្លាក់ត្រឡប់ `alive: null` — «វាស់មិនបាន»
+// មិនមែន «ស្លាប់»។ ការបង្វែរការធ្លាក់ទៅ `false` ធ្វើឲ្យ ZTO ដាច់ ១ ម៉ោង
+// ក្លាយជា browser លោតឡើងរាល់នាទីពេញម៉ោងនោះ។
+async function probeCookieLive(options) {
+    const config = options || {};
+    let origin = '';
+    try {
+        origin = validateSiteUrl(config.siteUrl);
+    } catch (_) {
+        origin = '';
+    }
+    const proxyKey = String(config.proxyKey || '');
+    if (!origin || !proxyKey) return { alive: null, reason: 'unconfigured', throttled: false };
+    const headers = { Accept: 'application/json' };
+    headers[PROXY_KEY_HEADER] = proxyKey;
+    try {
+        const response = await timedFetch(origin + PROBE_PATH, {
+            method: 'GET',
+            headers
+        }, Object.assign({ timeoutMs: PROBE_TIMEOUT_MS }, config));
+        if (!response || !response.ok) {
+            await discardResponse(response);
+            return { alive: null, reason: 'rejected', throttled: false };
+        }
+        const payload = await readSmallJson(response, 'PROBE_INVALID');
+        const raw = payload && payload.alive;
+        return {
+            alive: raw === true ? true : (raw === false ? false : null),
+            reason: payload && typeof payload.reason === 'string' ? payload.reason : '',
+            throttled: !!(payload && payload.throttled)
+        };
+    } catch (_) {
+        return { alive: null, reason: 'unreachable', throttled: false };
+    }
+}
+
+function describeProbe(probe) {
+    const info = probe || {};
+    if (info.alive === false) return 'PROBE: ZTO rejected the cookie - a new one is needed.';
+    if (info.alive === true) {
+        return 'PROBE: ZTO accepted the cookie'
+            + (info.throttled ? ' (cached verdict, no upstream call).' : '.');
+    }
+    return 'PROBE: not measured'
+        + (info.reason ? ' (' + info.reason + ')' : '')
+        + ' - this is not the same as expired.';
+}
+
 async function resolveVerification(options) {
     const config = options || {};
     if (config.siteUrl !== undefined || config.proxyKey !== undefined) {
@@ -1083,15 +1136,28 @@ async function main() {
         return;
     }
 
+    if (process.argv.includes('--probe')) {
+        console.log('Asking the Function to test the cookie against ZTO...');
+        console.log(describeProbe(await probeCookieLive(await resolveVerification())));
+        return;
+    }
+
     const autoMode = process.argv.includes('--auto');
     let autoHealth = null;
     if (autoMode) {
+        const verification = await resolveVerification();
+        // ⛔ ការស្ទង់ឈរ **មុន** ការអានសុខភាព ៖ វាធ្វើឲ្យ Function ដាក់
+        // `authRejectedAt` មុនអ្នកប្រើស្កេន ➜ ការអានខាងក្រោមឃើញវាភ្លាម។
+        // ⛔ វា **មិនសម្រេច** អ្វីទេ ៖ ការធ្លាក់របស់វា (alive:null) ទុកឲ្យ
+        // ផ្លូវដើមសម្រេចដដែល។ Function ship អសកម្មរហូតដល់អ្នកប្រើដាក់
+        // `ZTO_PROBE_BARCODE` ➜ ជុំនេះមិនប្តូរអ្វីសោះលើ site ដែលមិនបានបើក។
+        console.log(describeProbe(await probeCookieLive(verification)));
         // ⛔ ការស្ទង់រត់រាល់នាទី ➜ `fresh: false` ដោយចេតនា ៖ សាលក្រម «ស្លាប់»
         // មកពី `authRejectedAgeMs` ដែលជាស្ថានភាព **ក្នុងសតិ** របស់ Function
         // ➜ `fresh=1` មិនធ្វើឲ្យវាដឹងឆាប់ជាងទេ តែវាបង្ខំការអាន Blobs
         // ១,៤៤០ ដង/ថ្ងៃ។ ⛔ `--check` (ដោយដៃ) នៅ fresh ដដែល។
         autoHealth = await checkCookieHealth(
-            Object.assign(await resolveVerification(), { fresh: false })
+            Object.assign({}, verification, { fresh: false })
         );
         console.log(describeHealth(autoHealth));
         if (!shouldRefreshInAuto(autoHealth)) {
@@ -1151,6 +1217,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+    probeCookieLive,
+    describeProbe,
     autoNotifyKind,
     telegramMessage,
     notifyThrottleAllows,

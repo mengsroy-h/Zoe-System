@@ -54,6 +54,14 @@ function read(file) {
     try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; }
 }
 
+// ⛔ helper ដែលសន្យាថា **មិនដែល reject** ត្រូវហៅតាមរយៈវា ៖ ការហៅទទេធ្វើឲ្យ
+// mutation «បោះជំនួសការត្រឡប់សាលក្រម» **សម្លាប់ checker ទាំងមូល** ជំនួស
+// ការធ្លាក់ដែលមានឈ្មោះ ➜ ការអះអាងខាងក្រោមមិនដែលរត់ (វាស់រួច ២ ដង ៖
+// mutation ៧ និង ២៣)។ ការបោះត្រូវក្លាយជា **សាលក្រម** ដែលអះអាងបាន។
+async function settle(promise) {
+    try { return await promise; } catch (error) { return 'THREW:' + (error && error.code || 'unknown'); }
+}
+
 function isWindowsCmdSafe(text) {
     return /^[\x00-\x7f]*$/.test(text)
         && text.includes('\r\n')
@@ -1098,6 +1106,66 @@ async function run() {
     ok('schedule-zto-cookie.cmd នៅជា ASCII + CRLF ហើយហៅ --auto-ready មុនចុះឈ្មោះ',
         isWindowsCmdSafe(schedule) && /--auto-ready/.test(schedule), schedule.length);
 
+    console.log('\n=== ៩ខ. ការស្ទង់សកម្ម ៖ fail-open និងសោមិនចូល URL ===');
+    // ⛔ ការស្ទង់ជា **ការត្រៀម** មិនមែនផ្លូវសម្រេច ៖ វាគ្រាន់តែធ្វើឲ្យ
+    // Function ដឹងមុនអ្នកប្រើ។ ការសម្រេចបើក browser នៅតែជារបស់
+    // `shouldRefreshInAuto()` ដដែល ➜ គ្មានតក្កវិជ្ជាទី ២ ដែលអាចឃ្លាតគ្នា។
+    if (api && typeof api.probeCookieLive === 'function') {
+        const probeCalls = [];
+        const deadProbe = await settle(api.probeCookieLive({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY,
+            fetchImpl: async (url, options) => {
+                probeCalls.push({ url, options });
+                return fakeResponse(200, { ok: true, code: 'ZTO_PROBE', alive: false, reason: '' });
+            }
+        }));
+        ok('ZTO បដិសេធ ➜ alive:false', deadProbe && deadProbe.alive === false, JSON.stringify(deadProbe));
+        ok('ការស្ទង់ហៅផ្លូវ ?probe=1',
+            probeCalls.length === 1 && probeCalls[0].url.indexOf('probe=1') !== -1, probeCalls[0] && probeCalls[0].url);
+        ok('⛔ សោចូល header មិនចូល URL',
+            probeCalls[0] && probeCalls[0].url.indexOf(PROXY_KEY) === -1
+            && probeCalls[0].options.headers['X-Zoe-Proxy-Key'] === PROXY_KEY,
+            probeCalls[0] && probeCalls[0].url);
+
+        const aliveProbe = await settle(api.probeCookieLive({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY,
+            fetchImpl: async () => fakeResponse(200, { ok: true, alive: true })
+        }));
+        ok('ZTO ទទួល ➜ alive:true', aliveProbe && aliveProbe.alive === true, JSON.stringify(aliveProbe));
+
+        // ⛔ ច្បាប់មាស ៖ «វាស់មិនបាន» ≠ «ស្លាប់»។ បើការធ្លាក់បង្វែរទៅ `false`
+        // នោះ ZTO ដាច់ ១ ម៉ោង = browser លោតឡើងរាល់នាទីពេញម៉ោងនោះ។
+        const httpFail = await settle(api.probeCookieLive({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY,
+            fetchImpl: async () => fakeResponse(502, { error: 'boom' })
+        }));
+        ok('⛔ HTTP ធ្លាក់ ➜ alive:null មិនមែន false', httpFail && httpFail.alive === null, JSON.stringify(httpFail));
+        const threw = await settle(api.probeCookieLive({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY,
+            fetchImpl: async () => { throw new Error('network down'); }
+        }));
+        ok('⛔ បណ្តាញធ្លាក់ ➜ alive:null ហើយ **មិន reject**',
+            threw && threw.alive === null, JSON.stringify(threw));
+        const badJson = await settle(api.probeCookieLive({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY,
+            fetchImpl: async () => ({ ok: true, status: 200, text: async () => 'not json', body: { cancel: async () => {} } })
+        }));
+        ok('⛔ ចម្លើយខូច ➜ alive:null', badJson && badJson.alive === null, JSON.stringify(badJson));
+
+        let called = 0;
+        const unconfigured = await settle(api.probeCookieLive({
+            siteUrl: '', proxyKey: '',
+            fetchImpl: async () => { called++; return fakeResponse(200, { alive: true }); }
+        }));
+        ok('⛔ មិនទាន់កំណត់ ➜ alive:null ហើយ **មិនហៅបណ្តាញសោះ**',
+            unconfigured && unconfigured.alive === null && called === 0, called);
+    } else {
+        for (let i = 0; i < 8; i++) ok('probeCookieLive #' + (i + 1), false, 'មិន export');
+    }
+    ok('⛔ របៀប --auto ត្រៀមដោយការស្ទង់ជាមុន', /probe=1/.test(source), 'គ្មានផ្លូវស្ទង់ក្នុងឧបករណ៍');
+    ok('⛔ មានផ្លូវសាកការស្ទង់ដោយដៃ', /--probe/.test(source) && /--probe/.test(readme),
+        'ការកំណត់ដែលផ្ទៀងផ្ទាត់មិនបាន ជាការកំណត់ដែលមិនទាន់ផ្ទៀងផ្ទាត់');
+
     console.log('\n=== ១០. ការជូនដំណឹង Telegram ៖ outbound · fail-open · មិនលេចសម្ងាត់ ===');
     // ⛔ ការជូនដំណឹងជា **ការរាយការណ៍** មិនមែនផ្លូវអាជីវកម្ម ➜ ការធ្លាក់របស់វា
     // មិនត្រូវធ្វើឲ្យការ sync ធ្លាក់ឡើយ (fail-open ពេញលេញ)។ ហើយវាត្រូវ
@@ -1170,9 +1238,6 @@ async function run() {
         // «បោះជំនួសការត្រឡប់សាលក្រម» **សម្លាប់ checker ទាំងមូល** ជំនួសការ
         // ធ្លាក់ដែលមានឈ្មោះ (វាស់រួច ៖ mutation ៧ ➜ «checker បោះកំហុស»
         // ហើយការអះអាង ៨ ខាងក្រោមមិនដែលរត់)។ ការបោះត្រូវក្លាយជា **សាលក្រម**។
-        const settle = async (promise) => {
-            try { return await promise; } catch (error) { return 'THREW:' + (error && error.code || 'unknown'); }
-        };
         const sendCalls = [];
         const sent = await settle(api.sendTelegram('hello', {
             chatId: '123456789',

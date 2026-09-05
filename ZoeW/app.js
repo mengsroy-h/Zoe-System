@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.28.2';
+    const APP_VERSION = '2.29.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -36,6 +36,8 @@
         "exportDataAsCsvForSheets",
         "exportDataAsExcel",
         "exportDataAsPDF",
+        "exportMonthlyReportAsExcel",
+        "exportMonthlyReportAsPDF",
         "fetchCustomerDataTableRows",
         "filterCustomerDataTable",
         "filterDataByCustomDate",
@@ -52,6 +54,7 @@
         "moreMenuExchangeRate",
         "moreMenuExport",
         "moreMenuManualAdjust",
+        "moreMenuMonthlyReport",
         "moreMenuRecentlyDeleted",
         "moreMenuResetPickup",
         "moreMenuViewList",
@@ -71,6 +74,7 @@
         "removeSingleBarcode",
         "renderEntryList",
         "renderLockerList",
+        "renderMonthlyReport",
         "renderSheetImportPreview",
         "requestCameraPermission",
         "resetSheetImportFileSelection",
@@ -4340,7 +4344,7 @@
             'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
             'dailyStatsContainer', 'monthlyStatsContainer',
             'menuContentContainer', 'lockerListTableBody', 'lockerListSearchInput',
-            'healthCheckList',
+            'healthCheckList', 'monthlyReportBody',
             'locationWarningText', 'customLockerInput',
             'entryListTableBody', 'entryListSearchInput', 'entryListCount',
             'siApiUrlInput', 'siApiPasswordInput', 'siFileInput', 'siHeaderRowInput', 'siModeSel',
@@ -4357,6 +4361,9 @@
         });
         const lockerListFilter = document.getElementById('lockerListFilter');
         if (lockerListFilter) lockerListFilter.innerHTML = '<option value="">ទីតាំងទាំងអស់</option>';
+        const monthlyReportMonthSel = document.getElementById('monthlyReportMonthSel');
+        if (monthlyReportMonthSel) monthlyReportMonthSel.innerHTML = '';
+        monthlyReportMonth = '';
     }
 
     function showLoginModalWithPrefill() {
@@ -7343,6 +7350,8 @@
 
     function moreMenuExport() { openExportDataModal(); closeGlobalMoreMenu(); }
 
+    function moreMenuMonthlyReport() { openMonthlyReportModal(); closeGlobalMoreMenu(); }
+
     function moreMenuManualAdjust() { requestPinBeforeConfig(openManualAdjustModal, 'manualAdjust'); closeGlobalMoreMenu(); }
 
     function moreMenuExchangeRate() { openExchangeRateModal(); closeGlobalMoreMenu(); }
@@ -7368,6 +7377,7 @@
 
         container.innerHTML = `
             <button data-act="moreMenuExport">📤 Export Data</button>
+            <button data-act="moreMenuMonthlyReport">📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</button>
             <button data-act="moreMenuManualAdjust">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
             <button data-act="moreMenuExchangeRate">💱 អត្រាប្រាក់ (${exchangeRateRiel}៛)</button>
             <button data-act="moreMenuRecentlyDeleted">🗑️ ធុងសំរាម</button>
@@ -7606,9 +7616,10 @@
     const EXPORT_HEADERS = ['ល.រ', 'លេខទូរស័ព្ទ', 'Barcode', 'ទីតាំង Locker', 'COD ($)', 'DOD ($)', 'សរុប ($)', 'ស្ថានភាព', 'ថ្ងៃស្កេន', 'ម៉ោង'];
     const EXPORT_TEXT_COLUMN_INDEXES = [1, 2];
 
-    function forceExportTextCells(ws, rowCount) {
+    function forceSheetTextCells(ws, rowCount, columnIndexes) {
+        const cols = Array.isArray(columnIndexes) ? columnIndexes : [];
         for (let r = 1; r <= rowCount; r++) {
-            EXPORT_TEXT_COLUMN_INDEXES.forEach(c => {
+            cols.forEach(c => {
                 const cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
                 if (!cell) return;
                 cell.t = 's';
@@ -7618,6 +7629,10 @@
                 delete cell.f;
             });
         }
+    }
+
+    function forceExportTextCells(ws, rowCount) {
+        forceSheetTextCells(ws, rowCount, EXPORT_TEXT_COLUMN_INDEXES);
     }
 
     function openExportDataModal() {
@@ -7743,6 +7758,254 @@
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast("✅ បាន Export ជា CSV ជោគជ័យ! បើក Google Sheets ➜ File ➜ Import ដើម្បីនាំចូល");
+    }
+
+    const MONTHLY_REPORT_MONTH_PATTERN = /^\d{4}-\d{2}$/;
+    const MONTHLY_REPORT_HEADERS = ['ថ្ងៃ', 'កញ្ចប់ចូល', 'COD ($)', 'DOD ($)', 'សរុប ($)', 'កញ្ចប់យករួច', 'អតិថិជនយក'];
+    const MONTHLY_REPORT_TEXT_COLUMN_INDEXES = [0];
+    const MONTHLY_REPORT_MONEY_TOLERANCE = 0.005;
+
+    let monthlyReportMonth = '';
+
+    function monthlyReportMonthOf(dateKey) {
+        const key = String(dateKey === undefined || dateKey === null ? '' : dateKey);
+        return PICKUP_DATE_KEY_PATTERN.test(key) ? key.substring(0, 7) : '';
+    }
+
+    function monthlyReportPositive(value) {
+        const n = ledgerNumber(value);
+        return n > 0 ? n : 0;
+    }
+
+    function monthlyReportMoney(value) {
+        return Math.round(monthlyReportPositive(value) * 100) / 100;
+    }
+
+    function monthlyReportCount(value) {
+        return Math.round(monthlyReportPositive(value));
+    }
+
+    function monthlyReportAvailableMonths() {
+        const months = {};
+        const safeMap = (map) => ((map && typeof map === 'object') ? map : {});
+        [safeMap(dailyRevenueData), safeMap(dailyPickupData)].forEach((map) => {
+            Object.keys(map).forEach((key) => {
+                const ym = monthlyReportMonthOf(key);
+                if (ym) months[ym] = true;
+            });
+        });
+        Object.keys(safeMap(monthlyRevenueData)).forEach((key) => {
+            if (MONTHLY_REPORT_MONTH_PATTERN.test(key)) months[key] = true;
+        });
+        return Object.keys(months).sort().reverse();
+    }
+
+    function buildMonthlyReport(ym) {
+        const month = MONTHLY_REPORT_MONTH_PATTERN.test(String(ym === undefined || ym === null ? '' : ym)) ? String(ym) : '';
+        const report = {
+            month: month,
+            days: [],
+            totals: { count: 0, cod: 0, dod: 0, total: 0, picked: 0, customers: 0, activeDays: 0, pickupRate: null },
+            ledger: null,
+            mismatch: false
+        };
+        if (!month) return report;
+        const revenueMap = (dailyRevenueData && typeof dailyRevenueData === 'object') ? dailyRevenueData : {};
+        const pickupMap = (dailyPickupData && typeof dailyPickupData === 'object') ? dailyPickupData : {};
+        const dates = {};
+        [revenueMap, pickupMap].forEach((map) => {
+            Object.keys(map).forEach((key) => {
+                if (monthlyReportMonthOf(key) === month) dates[key] = true;
+            });
+        });
+        Object.keys(dates).sort().forEach((date) => {
+            const revenue = revenueMap[date] || {};
+            const pickup = pickupMap[date] || {};
+            const cod = monthlyReportMoney(revenue.codDollar);
+            const dod = monthlyReportMoney(revenue.dodDollar);
+            const count = monthlyReportCount(revenue.totalCount);
+            const picked = monthlyReportCount(pickup.packagesPickedUp);
+            const customers = countPickedUpCustomers(pickup);
+            report.days.push({
+                date: date,
+                count: count,
+                cod: cod,
+                dod: dod,
+                total: Math.round((cod + dod) * 100) / 100,
+                picked: picked,
+                customers: customers
+            });
+            report.totals.count += count;
+            report.totals.cod += cod;
+            report.totals.dod += dod;
+            report.totals.picked += picked;
+            report.totals.customers += customers;
+        });
+        report.totals.cod = Math.round(report.totals.cod * 100) / 100;
+        report.totals.dod = Math.round(report.totals.dod * 100) / 100;
+        report.totals.total = Math.round((report.totals.cod + report.totals.dod) * 100) / 100;
+        report.totals.activeDays = report.days.length;
+        report.totals.pickupRate = report.totals.count > 0
+            ? Math.round((report.totals.picked / report.totals.count) * 1000) / 10
+            : null;
+        const stored = (monthlyRevenueData && typeof monthlyRevenueData === 'object') ? monthlyRevenueData[month] : null;
+        if (stored && typeof stored === 'object') {
+            report.ledger = {
+                cod: monthlyReportMoney(stored.codDollar),
+                dod: monthlyReportMoney(stored.dodDollar),
+                count: monthlyReportCount(stored.totalCount)
+            };
+            report.mismatch = Math.abs(report.ledger.cod - report.totals.cod) > MONTHLY_REPORT_MONEY_TOLERANCE
+                || Math.abs(report.ledger.dod - report.totals.dod) > MONTHLY_REPORT_MONEY_TOLERANCE
+                || report.ledger.count !== report.totals.count;
+        }
+        return report;
+    }
+
+    function monthlyReportRiel(dollar) {
+        return Math.round((Number(dollar) || 0) * exchangeRateRiel);
+    }
+
+    function monthlyReportFilenameBase() {
+        return ('ZoeW_report_' + (monthlyReportMonth || 'month')).replace(/[^a-zA-Z0-9_\-]/g, '');
+    }
+
+    function monthlyReportRows(report) {
+        const rows = report.days.map((d) => [d.date, d.count, d.cod, d.dod, d.total, d.picked, d.customers]);
+        rows.push(['សរុប', report.totals.count, report.totals.cod, report.totals.dod, report.totals.total, report.totals.picked, report.totals.customers]);
+        return rows;
+    }
+
+    function monthlyReportMismatchNote(report) {
+        if (!report.mismatch || !report.ledger) return '';
+        return `<p class="mrep-note">⚠️ លេខសរុបប្រចាំខែក្នុង Database (COD $${report.ledger.cod.toFixed(2)}
+            · DOD $${report.ledger.dod.toFixed(2)} · ${report.ledger.count.toLocaleString()} កញ្ចប់)
+            មិនត្រូវនឹងផលបូកតាមថ្ងៃទេ។ របាយការណ៍នេះប្រើ <b>លេខតាមថ្ងៃ</b> ជាមូលដ្ឋាន
+            ព្រោះវាជាកំណត់ត្រាដែលរក្សាទុករាល់ថ្ងៃ។</p>`;
+    }
+
+    function renderMonthlyReport() {
+        const body = document.getElementById('monthlyReportBody');
+        if (!body) return;
+        const select = document.getElementById('monthlyReportMonthSel');
+        if (select && MONTHLY_REPORT_MONTH_PATTERN.test(select.value)) monthlyReportMonth = select.value;
+        const report = buildMonthlyReport(monthlyReportMonth);
+        if (!report.month || !report.days.length) {
+            body.innerHTML = '<p class="mrep-empty">គ្មានទិន្នន័យសម្រាប់ខែនេះទេ</p>';
+            return;
+        }
+        const totals = report.totals;
+        const tiles = [
+            { label: 'ចំណូលសរុប', value: '$' + totals.total.toFixed(2), sub: monthlyReportRiel(totals.total).toLocaleString() + ' ៛' },
+            { label: 'COD', value: '$' + totals.cod.toFixed(2), sub: monthlyReportRiel(totals.cod).toLocaleString() + ' ៛' },
+            { label: 'DOD', value: '$' + totals.dod.toFixed(2), sub: monthlyReportRiel(totals.dod).toLocaleString() + ' ៛' },
+            { label: 'កញ្ចប់ចូល', value: totals.count.toLocaleString(), sub: 'ថ្ងៃមានប្រតិបត្តិការ ' + totals.activeDays.toLocaleString() },
+            { label: 'កញ្ចប់យករួច', value: totals.picked.toLocaleString(), sub: totals.pickupRate === null ? 'អត្រាយក —' : 'អត្រាយក ' + totals.pickupRate.toFixed(1) + '%' },
+            { label: 'អតិថិជនយក', value: totals.customers.toLocaleString(), sub: 'បូកតាមថ្ងៃ' }
+        ];
+        const monthlyReportTilesHtml = tiles.map((t) => `<div class="mrep-tile">
+            <span class="mrep-tile-label">${sanitizeInput(t.label)}</span>
+            <b>${sanitizeInput(t.value)}</b>
+            <span class="mrep-tile-sub">${sanitizeInput(t.sub)}</span>
+        </div>`).join('');
+        const monthlyReportRowsHtml = report.days.map((d) => `<tr>
+            <td>${sanitizeInput(d.date)}</td>
+            <td>${d.count.toLocaleString()}</td>
+            <td>${d.cod.toFixed(2)}</td>
+            <td>${d.dod.toFixed(2)}</td>
+            <td>${d.total.toFixed(2)}</td>
+            <td>${d.picked.toLocaleString()}</td>
+            <td>${d.customers.toLocaleString()}</td>
+        </tr>`).join('');
+        body.innerHTML = `<div class="mrep-sum">${monthlyReportTilesHtml}</div>
+            ${monthlyReportMismatchNote(report)}
+            <div class="mrep-table-wrap">
+                <table class="mrep-table">
+                    <thead><tr>${MONTHLY_REPORT_HEADERS.map((h) => `<th>${sanitizeInput(h)}</th>`).join('')}</tr></thead>
+                    <tbody>${monthlyReportRowsHtml}</tbody>
+                </table>
+            </div>`;
+    }
+
+    function openMonthlyReportModal() {
+        const months = monthlyReportAvailableMonths();
+        const currentMonth = getZoneDateKey(getServerNow(), 0).substring(0, 7);
+        if (months.indexOf(currentMonth) === -1) months.unshift(currentMonth);
+        if (months.indexOf(monthlyReportMonth) === -1) monthlyReportMonth = months[0] || currentMonth;
+        const select = document.getElementById('monthlyReportMonthSel');
+        if (select) {
+            select.innerHTML = months.map((m) => `<option value="${sanitizeInput(m)}">${sanitizeInput(m)}</option>`).join('');
+            select.value = monthlyReportMonth;
+        }
+        openModalHelper('monthlyReportModal');
+        renderMonthlyReport();
+    }
+
+    async function exportMonthlyReportAsExcel() {
+        const report = buildMonthlyReport(monthlyReportMonth);
+        if (!report.days.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!"); return; }
+        closeModal('monthlyReportModal');
+        showToast("កំពុងរៀបចំ Excel...");
+        try {
+            await loadScriptOnce('xlsx');
+            const rows = monthlyReportRows(report);
+            const aoa = [MONTHLY_REPORT_HEADERS].concat(rows);
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            forceSheetTextCells(ws, rows.length, MONTHLY_REPORT_TEXT_COLUMN_INDEXES);
+            ws['!cols'] = [{ wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 13 }, { wch: 12 }];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'របាយការណ៍ខែ');
+            XLSX.writeFile(wb, monthlyReportFilenameBase() + '.xlsx', { bookSST: true });
+            showToast("✅ បាន Export របាយការណ៍ប្រចាំខែជា Excel ជោគជ័យ!");
+        } catch (e) {
+            console.error("Monthly report Excel export failed:", e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { context: "Monthly report Excel export failed:" });
+            showToast(exportFailureMessage(e));
+        }
+    }
+
+    function exportMonthlyReportAsPDF() {
+        const report = buildMonthlyReport(monthlyReportMonth);
+        if (!report.days.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!"); return; }
+        closeModal('monthlyReportModal');
+        const printArea = document.getElementById('pdfExportPrintArea');
+        if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
+        const totals = report.totals;
+        const monthlyReportRowsHtml = report.days.map((d) => `<tr>
+            <td>${sanitizeInput(d.date)}</td>
+            <td>${d.count.toLocaleString()}</td>
+            <td>${d.cod.toFixed(2)}</td>
+            <td>${d.dod.toFixed(2)}</td>
+            <td>${d.total.toFixed(2)}</td>
+            <td>${d.picked.toLocaleString()}</td>
+            <td>${d.customers.toLocaleString()}</td>
+        </tr>`).join('');
+        printArea.innerHTML = `
+            <h2>ZoeW — របាយការណ៍អាជីវកម្មប្រចាំខែ ${sanitizeInput(report.month)}</h2>
+            <table>
+                <thead><tr>${MONTHLY_REPORT_HEADERS.map((h) => `<th>${sanitizeInput(h)}</th>`).join('')}</tr></thead>
+                <tbody>
+                    ${monthlyReportRowsHtml}
+                    <tr class="export-total-row">
+                        <td>សរុប</td>
+                        <td>${totals.count.toLocaleString()}</td>
+                        <td>${totals.cod.toFixed(2)}</td>
+                        <td>${totals.dod.toFixed(2)}</td>
+                        <td>${totals.total.toFixed(2)}</td>
+                        <td>${totals.picked.toLocaleString()}</td>
+                        <td>${totals.customers.toLocaleString()}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="export-footer">ចំណូលសរុប ${monthlyReportRiel(totals.total).toLocaleString()} ៛ (អត្រា ${exchangeRateRiel.toLocaleString()} ៛)
+                · ថ្ងៃមានប្រតិបត្តិការ ${totals.activeDays.toLocaleString()}
+                · នាំចេញនៅ ${sanitizeInput(getZoneDateKey(getServerNow(), 0) + ' ' + getFormattedClockTime(getServerNow()))}</p>
+        `;
+        if (pdfExportOriginalTitle === null) pdfExportOriginalTitle = document.title;
+        document.title = monthlyReportFilenameBase();
+        window.addEventListener('afterprint', restoreAfterPdfExport);
+        noteAppLockExcuse();
+        window.print();
     }
 
     function applyCurrentFilter() {

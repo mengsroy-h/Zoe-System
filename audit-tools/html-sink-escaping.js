@@ -52,6 +52,9 @@ const BUILDER_ALLOW = {
     ZoeW: {
         editMoneyHtml: 'HTML សាងខាងលើក្នុង function ដដែល; តម្លៃឆ្លង sanitizeInput(id) រួច',
         bodyRows: 'ជួរដេក Export សាងខាងលើ; គ្រប់វាលឆ្លង sanitizeInput() ឬ toFixed()',
+        monthlyReportTilesHtml: 'ប្លុកសង្ខេបរបាយការណ៍ខែ សាងខាងលើក្នុង function ដដែល; ស្លាកនិងតម្លៃឆ្លង sanitizeInput()',
+        monthlyReportRowsHtml: 'ជួរដេករបាយការណ៍ខែ សាងខាងលើ; ថ្ងៃឆ្លង sanitizeInput() ចំណែកលេខឆ្លង toFixed()/toLocaleString()',
+        monthlyReportMismatchNote: 'អត្ថបទព្រមានសាងក្នុង function ដាច់ដោយឡែក; មានតែលេខដែលឆ្លង toFixed()/toLocaleString()',
         bcTimeDisplay: 'HTML សាងខាងលើ; b.time ឆ្លង sanitizeInput()',
         closeBtnClass: 'ឈ្មោះ class ថេរ ២ (btn-toggle-bc-close[ closed])',
         closeBtnText: 'អត្ថបទថេរ ២ («យកហើយ» / «✅ យក»)',

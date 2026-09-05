@@ -181,6 +181,43 @@ declaration ថ្នាក់កំពូល **មិនអាច** មាន�
 «មកមើលទីនេះ»។ ការសម្រេចថារួបរួម ឬទុកចោល (`ACCEPTED` ជាមួយហេតុផល) ជាការងារ
 របស់មនុស្ស បន្ទាប់ពីជាន់ ១ និង ២ ។
 
+#### 🔍 ការផ្ទៀងផ្ទាត់ **កន្លែងម្តងៗ** — ១៨ កន្លែងហៅ (សំណើម្ចាស់គម្រោង)
+
+*«លុបកន្លែងណាខ្លះ សូមផ្ទៀងផ្ទាត់ឲ្យល្អិតល្អន់ ថាវាប៉ះពាល់អត់?»*
+**ចម្លើយ ៖ មិនប៉ះពាល់។** វិធីវាស់ខុសគ្នាតាមប្រភេទ helper ៖
+
+**ក្រុម ក — ពង្រីកត្រឡប់វិញ token-for-token** (helper ជា statement សុទ្ធ) ៖
+យកតួ helper ជំនួស parameter ដោយ argument ពិត រួចប្រៀបធៀប **token stream**
+នឹងកូដដើមដែលលុបចេញពី `origin/main`។ **token ដូចគ្នាបេះបិទ ➜ មិនអាចខុសបានទេ**។
+
+| helper | បន្ទាត់ (ក្រោយកែ) | លទ្ធផល |
+|---|---|---|
+| `recalcItemMoneyFromBarcodes` | 9787 · 9953 · 10480 · 10495 · 11443 | ✅ token ដូចគ្នាបេះបិទ |
+| `revertLedgerRecordInMemory` | 5884 · 5919 | ✅ token ដូចគ្នាបេះបិទ |
+| `rejectScanAndRefocus` | 9825 · 9850 · 9855 | ✅ token ដូចគ្នាបេះបិទ |
+
+**ក្រុម ខ — វាស់ឥរិយាបថនៅកម្រិត function ពិត** (រចនាសម្ព័ន្ធប្តូរ ➜ token
+មិនអាចដូចគ្នា)។ ⛔ កូដដើម **ស្រង់ស្វ័យប្រវត្តិ** ពី `origin/main` មិនចម្លងដោយដៃ ៖
+
+| helper | បន្ទាត់ | អ្វីដែលរត់ | ករណី | លទ្ធផល |
+|---|---|---|---|---|
+| `ledgerDeltaWithClamp` | 5877 · 5906 | `commitDailyRevenueDelta` **និង** `commitMonthlyRevenueDelta` ទាំងមូល (រួមផ្លូវបរាជ័យ) | **៥៦០** | ✅ ដូចគ្នា ៥៦០ |
+| `rawSnapshotToItemList` | 4838 · 4888 | helper ធៀបនឹងតួ listener ដើម | ១៦ | ✅ ដូចគ្នា ១៦ |
+| `showGlobalMoreMenu` | 7404 · 7422 | `toggleHeaderMoreDropdown` + `toggleMoreDropdown` លើ DOM ក្លែង | ១០ | ✅ ដូចគ្នា ១០ |
+| `readNormalizedFirebaseConfig` | ZoeKeyGen 1248 · 1877 | `saveFirebaseConfig` **ទាំងមូល** | ១៤ | ✅ ដូចគ្នា ១៤ |
+
+អ្វីដែលប្រៀបធៀបក្នុងក្រុម ខ ៖ តម្លៃត្រឡប់ · សតិ · ស្ថានភាព server ·
+`ZoeErrors.capture` · toast · `refreshCurrentHistoryView` · `alert` · storage ·
+`closeModal` · `initFirebase` · តម្លៃ input ក្រោយ · **ការបោះ** · និង **លំដាប់**
+(`innerHTML` ➜ `classList.add` ➜ `positionMenuSafely`)។
+
+⛔ **ការវាស់ `showGlobalMoreMenu` ចាំបាច់ជាពិសេស** ព្រោះការរួបរួមប្តូរ
+**លំដាប់** ៖ `scanHistory.find()` ឥឡូវរត់ **មុន** `event.stopPropagation()`។
+សេណារីយ៉ូ ១០ (រួម ៖ គ្មាន `event` · គ្មាន `#globalMoreMenu` · គ្មាន container ·
+`id` រកមិនឃើញ · `barcodes` undefined) បញ្ជាក់ថាអ្វីដែលអ្នកប្រើឃើញមិនប្រែ —
+ការផ្សព្វផ្សាយ event វាយតម្លៃ **ក្រោយ** handler ត្រឡប់ ដូច្នេះលំដាប់ខាងក្នុង
+មិនសំខាន់។
+
 #### ការជាន់គ្នាដែល **រាយការណ៍ តែមិនប៉ះ**
 
 `ZoeW/style.css` មាន `@media (max-width: 991px)` **២ ប្លុកដាច់ដោយឡែក** (បន្ទាត់

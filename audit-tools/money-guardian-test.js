@@ -200,5 +200,66 @@ MUTATIONS.forEach((m) => {
 });
 ok(applicable === MUTATIONS.length, '⛔ ជាន់អប្បបរមា៖ mutation ទាំង ' + MUTATIONS.length + ' ចាក់បានពិត', 'ចាក់បាន ' + applicable);
 
+// ⛔ រាល់កំហុសក្នុងផ្លូវលុយ ត្រូវ **ជូនដំណឹងបាន** ៖ Sentry alert rule ស្វែងរក
+// បានតែលើ **tag** ➜ `ZoeErrors.capture()` ក្នុង function លុយត្រូវបញ្ជូន
+// `zone: 'money'`។ បើគ្មានវា កំហុសលុយដេកក្នុង dashboard ដោយគ្មាននរណាដឹង —
+// ដែលស្មើនឹងគ្មានការរាយការណ៍សោះសម្រាប់ប្រព័ន្ធដែលមានអ្នកប្រើតែម្នាក់។
+{
+    let acorn = null;
+    try { acorn = require('acorn'); } catch (e) {}
+    if (!acorn) {
+        ok(false, '⛔ ការត្រួតពិនិត្យ zone ត្រូវការ acorn — វាស់មិនបាន ≠ ត្រឹមត្រូវ', 'npm i acorn');
+    } else {
+        const MONEY_FNS = new Set(['armLateCommit', 'claimAndCleanupItem', 'commitDailyRevenueDelta',
+            'commitMonthlyRevenueDelta', 'executeRestoreItem', 'removeSingleBarcode', 'repairPickupLedgerOnce',
+            'resetPickupStats', 'saveEditedBarcodePrice', 'toggleCloseStatus', 'toggleIndividualBarcodeClose']);
+        const src = fs.readFileSync(APP, 'utf8');
+        const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
+        const stack = [];
+        const inMoney = [];
+        const outside = [];
+        (function walk(node) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            let pushed = false;
+            if ((node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression') && node.id) {
+                stack.push(node.id.name); pushed = true;
+            }
+            if (node.type === 'CallExpression' && node.callee && node.callee.type === 'MemberExpression'
+                && node.callee.object && node.callee.object.name === 'ZoeErrors'
+                && node.callee.property && node.callee.property.name === 'capture') {
+                let zone = null;
+                const arg = node.arguments[1];
+                if (arg && arg.type === 'ObjectExpression') {
+                    for (const prop of arg.properties) {
+                        const key = prop.key && (prop.key.name || prop.key.value);
+                        if (key === 'zone' && prop.value && prop.value.type === 'Literal') zone = prop.value.value;
+                    }
+                }
+                const fn = stack.length ? stack[stack.length - 1] : '(top)';
+                const rec = { fn: fn, zone: zone, line: node.loc.start.line };
+                if (MONEY_FNS.has(fn)) inMoney.push(rec); else outside.push(rec);
+            }
+            for (const k of Object.keys(node)) {
+                if (k === 'loc' || k === 'start' || k === 'end') continue;
+                const v = node[k];
+                if (Array.isArray(v)) v.forEach(walk);
+                else if (v && typeof v.type === 'string') walk(v);
+            }
+            if (pushed) stack.pop();
+        })(ast);
+
+        const MIN_MONEY_CAPTURES = 18;
+        ok(inMoney.length >= MIN_MONEY_CAPTURES,
+            '⛔ ជាន់អប្បបរមា៖ capture ក្នុង function លុយ >= ' + MIN_MONEY_CAPTURES,
+            'រកឃើញ ' + inMoney.length + ' — ការប្តូរឈ្មោះ function ធ្វើឲ្យការត្រួតពិនិត្យនេះទទេ');
+        const missing = inMoney.filter((r) => r.zone !== 'money');
+        ok(missing.length === 0, '⛔ រាល់ capture ក្នុងផ្លូវលុយ ផ្ទុក `zone: \'money\'` (alert rule ស្វែងរកបាន)',
+            missing.map((r) => r.fn + ':' + r.line + ' zone=' + JSON.stringify(r.zone)).join('\n        '));
+        ok(outside.some((r) => r.zone !== 'money'),
+            '⛔ ទិសផ្ទុយ៖ មិនត្រូវដាក់ `money` លើអ្វីៗទាំងអស់ (alert ដែលបន្លឺគ្រប់ពេល = គ្មាន alert)');
+    }
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')' : '✅ គ្មានបញ្ហា — ok ' + pass));
 process.exit(fail ? 1 : 0);

@@ -1459,6 +1459,7 @@
 .mrep-body{margin:2px 0 6px;}
 .mrep-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
 .mrep-tile{display:flex;flex-direction:column;gap:1px;padding:8px 6px;border-radius:10px;background:var(--card-bg);border:1px solid var(--border-color);text-align:center;min-width:0;}
+.mrep-tile:last-child:nth-child(3n+1){grid-column:1/-1;}
 .mrep-tile b{font-weight:800;font-size:calc(13 * var(--fs-unit));color:var(--primary);word-break:break-word;}
 .mrep-tile-label{font-size:calc(10 * var(--fs-unit));color:var(--text-muted);}
 .mrep-tile-sub{font-size:calc(9.5 * var(--fs-unit));color:var(--text-muted);word-break:break-word;}

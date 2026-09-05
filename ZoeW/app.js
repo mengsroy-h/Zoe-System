@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.29.0';
+    const APP_VERSION = '2.30.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -6282,17 +6282,20 @@
         container.innerHTML = '';
 
         let sortedKeys = Object.keys(dailyRevenueData).sort().reverse();
+        const uncollectedMap = uncollectedValueByDate();
+        const measurable = collectedValueIsMeasurable();
 
         if (sortedKeys.length === 0) {
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
         } else {
             sortedKeys.forEach(dateStr => {
                 let data = dailyRevenueData[dateStr] || {};
-                let cod = parseFloat(data.codDollar) || 0;
-                let dod = parseFloat(data.dodDollar) || 0;
+                let cod = statsMoney(data.codDollar);
+                let dod = statsMoney(data.dodDollar);
                 let totalD = Math.round((cod + dod) * 100) / 100;
-                let riel = Math.round(totalD * exchangeRateRiel);
-                let count = parseFloat(data.totalCount) || 0;
+                let count = statsCount(data.totalCount);
+                let collected = collectedValueOf(cod, dod, uncollectedMap[dateStr]);
+                let pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
 
                 let div = document.createElement('div');
                 div.className = 'stat-card-item';
@@ -6300,10 +6303,13 @@
                     <div class="m-title">📅 ថ្ងៃទី៖ ${sanitizeInput(dateStr)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong style="color:var(--accent-blue);">$${cod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${dod.toFixed(2)}</strong></span>
+                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
                     </div>
                     <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
-                        សរុប៖ <strong style="color:var(--primary);">$${totalD.toFixed(2)}</strong> (${riel.toLocaleString()} ៛)
+                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
+                    </div>
+                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
+                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
                     </div>
                 `;
                 container.appendChild(div);
@@ -6319,17 +6325,20 @@
         container.innerHTML = '';
 
         let sortedKeys = Object.keys(monthlyRevenueData).sort().reverse();
+        const uncollectedMap = uncollectedValueByDate();
+        const measurable = collectedValueIsMeasurable();
 
         if (sortedKeys.length === 0) {
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
         } else {
             sortedKeys.forEach(ym => {
                 let data = monthlyRevenueData[ym] || {};
-                let cod = parseFloat(data.codDollar) || 0;
-                let dod = parseFloat(data.dodDollar) || 0;
+                let cod = statsMoney(data.codDollar);
+                let dod = statsMoney(data.dodDollar);
                 let totalD = Math.round((cod + dod) * 100) / 100;
-                let riel = Math.round(totalD * exchangeRateRiel);
-                let count = parseFloat(data.totalCount) || 0;
+                let count = statsCount(data.totalCount);
+                let collected = collectedValueOf(cod, dod, uncollectedValueForMonth(uncollectedMap, ym));
+                let pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
 
                 let div = document.createElement('div');
                 div.className = 'stat-card-item';
@@ -6337,10 +6346,13 @@
                     <div class="m-title">📅 ខែ៖ ${sanitizeInput(ym)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong style="color:var(--accent-blue);">$${cod.toFixed(2)}</strong> | DOD: <strong style="color:var(--accent-purple);">$${dod.toFixed(2)}</strong></span>
+                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
                     </div>
                     <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
-                        សរុប៖ <strong style="color:var(--primary);">$${totalD.toFixed(2)}</strong> (${riel.toLocaleString()} ៛)
+                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
+                    </div>
+                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
+                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
                     </div>
                 `;
                 container.appendChild(div);
@@ -7760,29 +7772,105 @@
         showToast("✅ បាន Export ជា CSV ជោគជ័យ! បើក Google Sheets ➜ File ➜ Import ដើម្បីនាំចូល");
     }
 
+    function uncollectedBarcodeValue(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        return { cod: statsMoney(entry.cod), dod: statsMoney(entry.dod) };
+    }
+
+    function uncollectedItemValue(item) {
+        const out = { cod: 0, dod: 0 };
+        if (!item || typeof item !== 'object') return out;
+        const add = (source) => {
+            const value = uncollectedBarcodeValue(source);
+            if (!value) return;
+            out.cod += value.cod;
+            out.dod += value.dod;
+        };
+        const entries = (item.barcodes && Array.isArray(item.barcodes)) ? item.barcodes : null;
+        if (entries) {
+            entries.forEach((b) => { if (b && !b.isClosed && !b.isDeducted) add(b); });
+            return out;
+        }
+        if (!item.isClosed && !item.isDeducted) add(item);
+        return out;
+    }
+
+    function uncollectedValueByDate() {
+        const out = {};
+        [scanHistory, deletedItems].forEach((list) => {
+            if (!Array.isArray(list)) return;
+            list.forEach((item) => {
+                if (!item || typeof item !== 'object') return;
+                const date = String(item.scanDate === undefined || item.scanDate === null ? '' : item.scanDate);
+                if (!PICKUP_DATE_KEY_PATTERN.test(date)) return;
+                const value = uncollectedItemValue(item);
+                if (!value.cod && !value.dod) return;
+                const bucket = out[date] || (out[date] = { cod: 0, dod: 0 });
+                bucket.cod += value.cod;
+                bucket.dod += value.dod;
+            });
+        });
+        return out;
+    }
+
+    function uncollectedValueForMonth(map, ym) {
+        const out = { cod: 0, dod: 0 };
+        const source = (map && typeof map === 'object') ? map : {};
+        Object.keys(source).forEach((date) => {
+            if (statsMonthOf(date) !== ym) return;
+            const bucket = source[date] || {};
+            out.cod += statsMoney(bucket.cod);
+            out.dod += statsMoney(bucket.dod);
+        });
+        return out;
+    }
+
+    function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
+        const open = (uncollected && typeof uncollected === 'object') ? uncollected : {};
+        const cod = Math.round(Math.max(0, statsMoney(ledgerCod) - statsMoney(open.cod)) * 100) / 100;
+        const dod = Math.round(Math.max(0, statsMoney(ledgerDod) - statsMoney(open.dod)) * 100) / 100;
+        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100 };
+    }
+
+    function collectedValueIsMeasurable() {
+        return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED);
+    }
+
+    function collectedMoneyText(dollar, measurable) {
+        if (!measurable) return MONTHLY_REPORT_UNKNOWN;
+        return '$' + statsMoney(dollar).toFixed(2);
+    }
+
+    function collectedRielText(dollar, measurable) {
+        if (!measurable) return 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន';
+        return monthlyReportRiel(statsMoney(dollar)).toLocaleString() + ' ៛';
+    }
+
     const MONTHLY_REPORT_MONTH_PATTERN = /^\d{4}-\d{2}$/;
-    const MONTHLY_REPORT_HEADERS = ['ថ្ងៃ', 'កញ្ចប់ចូល', 'COD ($)', 'DOD ($)', 'សរុប ($)', 'កញ្ចប់យករួច', 'អតិថិជនយក'];
+    const MONTHLY_REPORT_HEADERS = ['ថ្ងៃ', 'កញ្ចប់ចូល', 'COD យករួច ($)', 'DOD យករួច ($)',
+        'ចំណូលយករួច ($)', 'មិនទាន់យក ($)', 'តម្លៃទាំងអស់ ($)', 'កញ្ចប់យករួច', 'អតិថិជនយក'];
+    const MONTHLY_REPORT_UNKNOWN = '—';
     const MONTHLY_REPORT_TEXT_COLUMN_INDEXES = [0];
     const MONTHLY_REPORT_MONEY_TOLERANCE = 0.005;
 
     let monthlyReportMonth = '';
 
-    function monthlyReportMonthOf(dateKey) {
+    function statsMonthOf(dateKey) {
         const key = String(dateKey === undefined || dateKey === null ? '' : dateKey);
         return PICKUP_DATE_KEY_PATTERN.test(key) ? key.substring(0, 7) : '';
     }
 
-    function monthlyReportPositive(value) {
+    function statsPositive(value) {
         const n = ledgerNumber(value);
         return n > 0 ? n : 0;
     }
 
-    function monthlyReportMoney(value) {
-        return Math.round(monthlyReportPositive(value) * 100) / 100;
+    function statsMoney(value) {
+        return Math.round(statsPositive(value) * 100) / 100;
     }
 
-    function monthlyReportCount(value) {
-        return Math.round(monthlyReportPositive(value));
+    function statsCount(value) {
+        return Math.round(statsPositive(value));
     }
 
     function monthlyReportAvailableMonths() {
@@ -7790,7 +7878,7 @@
         const safeMap = (map) => ((map && typeof map === 'object') ? map : {});
         [safeMap(dailyRevenueData), safeMap(dailyPickupData)].forEach((map) => {
             Object.keys(map).forEach((key) => {
-                const ym = monthlyReportMonthOf(key);
+                const ym = statsMonthOf(key);
                 if (ym) months[ym] = true;
             });
         });
@@ -7805,45 +7893,66 @@
         const report = {
             month: month,
             days: [],
-            totals: { count: 0, cod: 0, dod: 0, total: 0, picked: 0, customers: 0, activeDays: 0, pickupRate: null },
+            totals: {
+                count: 0, cod: 0, dod: 0, total: 0,
+                collectedCod: 0, collectedDod: 0, collectedTotal: 0, pendingTotal: 0,
+                picked: 0, customers: 0, activeDays: 0, pickupRate: null, collectedMeasurable: false
+            },
             ledger: null,
             mismatch: false
         };
         if (!month) return report;
         const revenueMap = (dailyRevenueData && typeof dailyRevenueData === 'object') ? dailyRevenueData : {};
         const pickupMap = (dailyPickupData && typeof dailyPickupData === 'object') ? dailyPickupData : {};
+        const uncollectedMap = uncollectedValueByDate();
+        report.totals.collectedMeasurable = collectedValueIsMeasurable();
         const dates = {};
         [revenueMap, pickupMap].forEach((map) => {
             Object.keys(map).forEach((key) => {
-                if (monthlyReportMonthOf(key) === month) dates[key] = true;
+                if (statsMonthOf(key) === month) dates[key] = true;
             });
         });
         Object.keys(dates).sort().forEach((date) => {
             const revenue = revenueMap[date] || {};
             const pickup = pickupMap[date] || {};
-            const cod = monthlyReportMoney(revenue.codDollar);
-            const dod = monthlyReportMoney(revenue.dodDollar);
-            const count = monthlyReportCount(revenue.totalCount);
-            const picked = monthlyReportCount(pickup.packagesPickedUp);
+            const cod = statsMoney(revenue.codDollar);
+            const dod = statsMoney(revenue.dodDollar);
+            const count = statsCount(revenue.totalCount);
+            const picked = statsCount(pickup.packagesPickedUp);
             const customers = countPickedUpCustomers(pickup);
+            const total = Math.round((cod + dod) * 100) / 100;
+            const collected = collectedValueOf(cod, dod, uncollectedMap[date]);
+            const pending = Math.round(Math.max(0, total - collected.total) * 100) / 100;
             report.days.push({
                 date: date,
                 count: count,
                 cod: cod,
                 dod: dod,
-                total: Math.round((cod + dod) * 100) / 100,
+                total: total,
+                collectedCod: collected.cod,
+                collectedDod: collected.dod,
+                collectedTotal: collected.total,
+                pendingTotal: pending,
                 picked: picked,
                 customers: customers
             });
             report.totals.count += count;
             report.totals.cod += cod;
             report.totals.dod += dod;
+            report.totals.collectedCod += collected.cod;
+            report.totals.collectedDod += collected.dod;
+            report.totals.collectedTotal += collected.total;
+            report.totals.pendingTotal += pending;
             report.totals.picked += picked;
             report.totals.customers += customers;
         });
         report.totals.cod = Math.round(report.totals.cod * 100) / 100;
         report.totals.dod = Math.round(report.totals.dod * 100) / 100;
         report.totals.total = Math.round((report.totals.cod + report.totals.dod) * 100) / 100;
+        report.totals.collectedCod = Math.round(report.totals.collectedCod * 100) / 100;
+        report.totals.collectedDod = Math.round(report.totals.collectedDod * 100) / 100;
+        report.totals.collectedTotal = Math.round(report.totals.collectedTotal * 100) / 100;
+        report.totals.pendingTotal = Math.round(report.totals.pendingTotal * 100) / 100;
         report.totals.activeDays = report.days.length;
         report.totals.pickupRate = report.totals.count > 0
             ? Math.round((report.totals.picked / report.totals.count) * 1000) / 10
@@ -7851,9 +7960,9 @@
         const stored = (monthlyRevenueData && typeof monthlyRevenueData === 'object') ? monthlyRevenueData[month] : null;
         if (stored && typeof stored === 'object') {
             report.ledger = {
-                cod: monthlyReportMoney(stored.codDollar),
-                dod: monthlyReportMoney(stored.dodDollar),
-                count: monthlyReportCount(stored.totalCount)
+                cod: statsMoney(stored.codDollar),
+                dod: statsMoney(stored.dodDollar),
+                count: statsCount(stored.totalCount)
             };
             report.mismatch = Math.abs(report.ledger.cod - report.totals.cod) > MONTHLY_REPORT_MONEY_TOLERANCE
                 || Math.abs(report.ledger.dod - report.totals.dod) > MONTHLY_REPORT_MONEY_TOLERANCE
@@ -7871,8 +7980,13 @@
     }
 
     function monthlyReportRows(report) {
-        const rows = report.days.map((d) => [d.date, d.count, d.cod, d.dod, d.total, d.picked, d.customers]);
-        rows.push(['សរុប', report.totals.count, report.totals.cod, report.totals.dod, report.totals.total, report.totals.picked, report.totals.customers]);
+        const measurable = !!(report && report.totals && report.totals.collectedMeasurable);
+        const cell = (value) => (measurable ? value : MONTHLY_REPORT_UNKNOWN);
+        const rows = report.days.map((d) => [d.date, d.count, cell(d.collectedCod), cell(d.collectedDod),
+            cell(d.collectedTotal), cell(d.pendingTotal), d.total, d.picked, d.customers]);
+        const t = report.totals;
+        rows.push(['សរុប', t.count, cell(t.collectedCod), cell(t.collectedDod), cell(t.collectedTotal),
+            cell(t.pendingTotal), t.total, t.picked, t.customers]);
         return rows;
     }
 
@@ -7895,13 +8009,20 @@
             return;
         }
         const totals = report.totals;
+        const measurable = totals.collectedMeasurable;
         const tiles = [
-            { label: 'ចំណូលសរុប', value: '$' + totals.total.toFixed(2), sub: monthlyReportRiel(totals.total).toLocaleString() + ' ៛' },
-            { label: 'COD', value: '$' + totals.cod.toFixed(2), sub: monthlyReportRiel(totals.cod).toLocaleString() + ' ៛' },
-            { label: 'DOD', value: '$' + totals.dod.toFixed(2), sub: monthlyReportRiel(totals.dod).toLocaleString() + ' ៛' },
+            { label: '💵 ចំណូលសរុប (យករួច)', value: collectedMoneyText(totals.collectedTotal, measurable), sub: collectedRielText(totals.collectedTotal, measurable) },
+            { label: 'COD (យករួច)', value: collectedMoneyText(totals.collectedCod, measurable), sub: collectedRielText(totals.collectedCod, measurable) },
+            { label: 'DOD (យករួច)', value: collectedMoneyText(totals.collectedDod, measurable), sub: collectedRielText(totals.collectedDod, measurable) },
             { label: 'កញ្ចប់ចូល', value: totals.count.toLocaleString(), sub: 'ថ្ងៃមានប្រតិបត្តិការ ' + totals.activeDays.toLocaleString() },
             { label: 'កញ្ចប់យករួច', value: totals.picked.toLocaleString(), sub: totals.pickupRate === null ? 'អត្រាយក —' : 'អត្រាយក ' + totals.pickupRate.toFixed(1) + '%' },
-            { label: 'អតិថិជនយក', value: totals.customers.toLocaleString(), sub: 'បូកតាមថ្ងៃ' }
+            { label: 'អតិថិជនយក', value: totals.customers.toLocaleString(), sub: 'បូកតាមថ្ងៃ' },
+            {
+                label: '📦 តម្លៃកញ្ចប់ទាំងអស់ (រួមមិនទាន់យក)',
+                value: '$' + totals.total.toFixed(2),
+                sub: monthlyReportRiel(totals.total).toLocaleString() + ' ៛ · មិនទាន់យក '
+                    + collectedMoneyText(totals.pendingTotal, measurable)
+            }
         ];
         const monthlyReportTilesHtml = tiles.map((t) => `<div class="mrep-tile">
             <span class="mrep-tile-label">${sanitizeInput(t.label)}</span>
@@ -7911,8 +8032,10 @@
         const monthlyReportRowsHtml = report.days.map((d) => `<tr>
             <td>${sanitizeInput(d.date)}</td>
             <td>${d.count.toLocaleString()}</td>
-            <td>${d.cod.toFixed(2)}</td>
-            <td>${d.dod.toFixed(2)}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedCod, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedDod, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedTotal, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.pendingTotal, measurable))}</td>
             <td>${d.total.toFixed(2)}</td>
             <td>${d.picked.toLocaleString()}</td>
             <td>${d.customers.toLocaleString()}</td>
@@ -7952,7 +8075,8 @@
             const aoa = [MONTHLY_REPORT_HEADERS].concat(rows);
             const ws = XLSX.utils.aoa_to_sheet(aoa);
             forceSheetTextCells(ws, rows.length, MONTHLY_REPORT_TEXT_COLUMN_INDEXES);
-            ws['!cols'] = [{ wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 13 }, { wch: 12 }];
+            ws['!cols'] = [{ wch: 12 }, { wch: 11 }, { wch: 14 }, { wch: 14 }, { wch: 15 },
+                { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 12 }];
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'របាយការណ៍ខែ');
             XLSX.writeFile(wb, monthlyReportFilenameBase() + '.xlsx', { bookSST: true });
@@ -7971,11 +8095,14 @@
         const printArea = document.getElementById('pdfExportPrintArea');
         if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
         const totals = report.totals;
+        const measurable = totals.collectedMeasurable;
         const monthlyReportRowsHtml = report.days.map((d) => `<tr>
             <td>${sanitizeInput(d.date)}</td>
             <td>${d.count.toLocaleString()}</td>
-            <td>${d.cod.toFixed(2)}</td>
-            <td>${d.dod.toFixed(2)}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedCod, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedDod, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.collectedTotal, measurable))}</td>
+            <td>${sanitizeInput(collectedMoneyText(d.pendingTotal, measurable))}</td>
             <td>${d.total.toFixed(2)}</td>
             <td>${d.picked.toLocaleString()}</td>
             <td>${d.customers.toLocaleString()}</td>
@@ -7989,15 +8116,19 @@
                     <tr class="export-total-row">
                         <td>សរុប</td>
                         <td>${totals.count.toLocaleString()}</td>
-                        <td>${totals.cod.toFixed(2)}</td>
-                        <td>${totals.dod.toFixed(2)}</td>
+                        <td>${sanitizeInput(collectedMoneyText(totals.collectedCod, measurable))}</td>
+                        <td>${sanitizeInput(collectedMoneyText(totals.collectedDod, measurable))}</td>
+                        <td>${sanitizeInput(collectedMoneyText(totals.collectedTotal, measurable))}</td>
+                        <td>${sanitizeInput(collectedMoneyText(totals.pendingTotal, measurable))}</td>
                         <td>${totals.total.toFixed(2)}</td>
                         <td>${totals.picked.toLocaleString()}</td>
                         <td>${totals.customers.toLocaleString()}</td>
                     </tr>
                 </tbody>
             </table>
-            <p class="export-footer">ចំណូលសរុប ${monthlyReportRiel(totals.total).toLocaleString()} ៛ (អត្រា ${exchangeRateRiel.toLocaleString()} ៛)
+            <p class="export-footer">ចំណូលសរុប (យករួច) ${sanitizeInput(collectedMoneyText(totals.collectedTotal, measurable))}
+                / ${sanitizeInput(collectedRielText(totals.collectedTotal, measurable))} (អត្រា ${exchangeRateRiel.toLocaleString()} ៛)
+                · តម្លៃកញ្ចប់ទាំងអស់ $${totals.total.toFixed(2)}
                 · ថ្ងៃមានប្រតិបត្តិការ ${totals.activeDays.toLocaleString()}
                 · នាំចេញនៅ ${sanitizeInput(getZoneDateKey(getServerNow(), 0) + ' ' + getFormattedClockTime(getServerNow()))}</p>
         `;

@@ -244,7 +244,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **listener ដែលកកកុញ** | ⛔ វដ្តពិត N ជុំ ➜ ចំនួន listener និង node មិនត្រូវកើន | `listener-leak-test.js` |
 | លុប ទល់នឹង ដក | `isDeducted` ជាវាល **តែមួយ** ដែលកំណត់លុយ | `policy-test` · `revenue-fuzz` |
 | **barcode ស្ទួន ↔ លុយ** | ⛔ រក្សាទុកបានតែពេលមានសាលក្រម `'claimed'` ពិត | `duplicate-money-test` |
-| **លុយកម្រិត *កញ្ចប់*** | ⛔ `item.cod/.dod/.price` ត្រូវស្មើ **ផលបូក barcodes** ជានិច្ច (ឈរតែពេល `barcodes` មិនទទេ — item ចាស់ដេរីវេពី `price`)។ ⛔ **ត្រូវពិនិត្យលើ server ដែរ** ៖ `initDatabaseListeners` គណនា `price` ឡើងវិញពេលអាន ➜ វា **ព្យាបាល** កំហុសក្នុងសតិ ខណៈលេខខុសអង្គុយលើ server និងចេញក្នុង Excel។ ⛔ អ្នកយាម ledger **មិនឃើញថ្នាក់នេះទេ** (វាស់បាន ៖ កំហុស ០.០១ ➜ ១៣០/១៣១ checker បៃតង) | `item-money-integrity-test` |
+| **លុយសរុបរបស់ *ជួរដេក*** | ⚠️ វាក្យស័ព្ទ ៖ **`barcode` = កញ្ចប់ ១** · **`item` = ជួរដេក = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ** (`addOrUpdateEntry` merge តាម `phone`+`scanDate`) ➜ `item.count` = **ចំនួនកញ្ចប់** ➜ ស្លាក «កញ្ចប់សរុប» ត្រឹមត្រូវ។ ⛔ `item.cod/.dod/.price` ត្រូវស្មើ **ផលបូក barcodes** ជានិច្ច (ឈរតែពេល `barcodes` មិនទទេ — item ចាស់ដេរីវេពី `price`)។ ⛔ **ត្រូវពិនិត្យលើ server ដែរ** ៖ `initDatabaseListeners` គណនា `price` ឡើងវិញពេលអាន ➜ វា **ព្យាបាល** កំហុសក្នុងសតិ ខណៈលេខខុសអង្គុយលើ server និងចេញក្នុង Excel។ ⛔ អ្នកយាម ledger **មិនឃើញថ្នាក់នេះទេ** (វាស់បាន ៖ កំហុស ០.០១ ➜ ១៣០/១៣១ checker បៃតង) | `item-money-integrity-test` |
 | **តម្លៃដែល rules បដិសេធ** | ⛔ លេខអវិជ្ជមានត្រូវ **clamp មុនសរសេរ** — សតិត្រូវស៊ីនឹង server | `revenue-rules-clamp-test` |
 | **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
 | **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
@@ -314,7 +314,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
 | **របាយការណ៍ខែ** | ⛔ ដេរីវេពី **ថ្ងៃ** (node ខែរក្សាតែ ៣ ខែ) · **អានសុទ្ធសាធ** · មូលដ្ឋានដូចអេក្រង់ដើម | `monthly-report-test` |
-| **«ចំណូល» ↔ កញ្ចប់មិនទាន់យក** | ⛔ ចំណូល = ledger **ដក** តម្លៃ barcode `!isDeducted && !isClosed` · clamp ក្នុងមួយរូបិយវត្ថុ · វាស់មិនបាន ➜ `—` · អេក្រង់ស្ថិតិទាំង ៣ ប្រើ helper ដដែល | `monthly-report-test` |
+| **«ចំណូល» ↔ កញ្ចប់មិនទាន់យក** | ⛔ ចំណូល = ledger **ដក** តម្លៃ barcode `!isDeducted && !isClosed` · clamp ក្នុងមួយរូបិយវត្ថុ · វាស់មិនបាន ➜ `—` · អេក្រង់ស្ថិតិទាំង ៣ ប្រើ helper ដដែល។ ⛔ **អ្នកយាម ២ ជាន់ដាច់ដោយឡែក** ៖ `monthly-report-test` ចាក់សោ **ការហៅ** (ស្តាទិច) · `stats-collected-truth-test` ចាក់សោ **លេខដែលអ្នកប្រើអានលើអេក្រង់** (ឥរិយាបថ · browser ពិត)។ វាស់បាន (2026-09-05) ៖ mutation ដែលរក្សាការហៅទុក តែប្តូរ **អាគុយម៉ង់** ➜ ស្តាទិចបៃតង ➜ **០/១៣២ ចាប់បាន** | `monthly-report-test` · `stats-collected-truth-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
 | **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub** | `health-check-test` |
@@ -405,7 +405,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | **barcode ស្ទួន ➜ លុយបូកស្ទួន** ៖ ជាន់ ១–៣ អានសតិ; ជាន់ ៤ ជាសាលក្រម server តែមួយ | `duplicate-money-test.js` |
-| **លុយកម្រិតកញ្ចប់ខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់ និងក្នុង Excel ដោយគ្មានអ្នកយាមណាដឹង (អ្នកយាមលុយទាំងអស់មើល **ledger** ប៉ុណ្ណោះ) | `item-money-integrity-test.js` |
+| **អេក្រង់ស្ថិតិបង្ហាញ ledger ឆៅជា «ចំណូល»** ➜ លេខ **ធំជាងការពិត** ក្នុង ៧ ថ្ងៃដំបូង (រាប់កញ្ចប់មិនទាន់យក) — checker ស្តាទិចមើលមិនឃើញ ព្រោះការហៅនៅដដែល ប្តូរតែអាគុយម៉ង់ | `stats-collected-truth-test.js` |
+| **លុយសរុបរបស់ជួរដេកខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់ និងក្នុង Excel ដោយគ្មានអ្នកយាមណាដឹង (អ្នកយាមលុយទាំងអស់មើល **ledger** ប៉ុណ្ណោះ) | `item-money-integrity-test.js` |
 | **ស្ថិតិយកកើតពីអាកាសធាតុ** ៖ ក្រៅបណ្តាញ ➜ ឧបករណ៍ផ្សេងបើកមុន ➜ ភ្ជាប់មកវិញ · ការជាន់គ្នា · ទិដ្ឋភាព barcode ក្នុងស្រុកចាស់ (ឧបករណ៍ ២ ចែក store តែមួយ + rules ពិត) | `pickup-barcode-identity-test.js` |
 | **តម្លៃដែល Firebase rules ពិតបដិសេធ** ➜ ចំណូល **ឡើង** ជំនួសការចុះ · revert មិនមែនបញ្ច្រាសនៃ apply | `revenue-rules-clamp-test.js` |
 | **កូនសោ `zoew_barcode_registry` កំព្រា** ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត | `registry-release-test.js` |

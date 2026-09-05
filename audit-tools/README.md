@@ -128,6 +128,7 @@ bash audit-tools/emu/rules.sh
 | `version-bump-scope.js` | ឡើងកំណែ **តែ App ដែលកែពិត** | `VERSIONSCOPE_APP_DIR` · `VERSIONSCOPE_BASE` |
 | `netlify-config-scope-test.js` | ⛔ **គ្មាន root `netlify.toml`** (វាបង្វែរ build របស់ App មួយទៀត) · config ត្រូវស៊ីនឹងអ្វីដែល App ship · រាល់ config ត្រូវមាន checker អាន | `NETLIFYSCOPE_APP_DIR` |
 | `function-surface-test.js` | ផ្ទៃ function ទាំងមូល · ទប់ declaration ឈ្មោះស្ទួន · រាល់ `data-act` មាន function ពិត | `FNSURFACE_APP_DIR` |
+| `code-duplication-test.js` | តក្កវិជ្ជាដដែលរស់ **២ កន្លែង** ក្នុងឯកសារ ship តែមួយ (តួ function · ប្លុក statement) ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ | `DUPCODE_APP_DIR` |
 
 #### តក្កវិជ្ជាអាជីវកម្ម — លុយ · ធុងសំរាម · ការសម្អាត
 
@@ -286,7 +287,8 @@ bash audit-tools/emu/rules.sh
 ### ៧. Allowlist — កុំបន្ថែមដោយគ្មានហេតុផល
 
 `dom-hygiene.js` (`ACCEPTED`) · `state-hygiene.js` · `css-classes.js`
-(`IGNORE`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) មាន allowlist ដែល
+(`IGNORE`) · `shared-fns.js` (`EXPECTED_DIVERGENT`) · `code-duplication-test.js`
+(`ACCEPTED`) មាន allowlist ដែល
 **រាល់ធាតុមានហេតុផលសរសេរជាប់**។
 
 ⛔ **ធាតុគ្មានហេតុផលនឹងលាក់កំហុសបន្ទាប់។** បើបន្ថែម helper ចែករំលែកថ្មី

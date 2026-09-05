@@ -98,14 +98,15 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.29.0` (`zoew-v167`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.17` (`zoekeygen-v87`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.1` (`zoew-v169`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.18` (`zoekeygen-v88`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
 `admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា — កុំយកទៅច្រឡំគ្នា។
 
-ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១៣៨) · `zto-import/` (Apps Script ខាង
+ថតផ្សេងទៀត ៖ `audit-tools/` (បញ្ជី checker ៖ [`audit-tools/README.md`](audit-tools/README.md)
+ផ្នែក ៦ — ⛔ **កុំចម្លងចំនួនមកទីនេះ វាចាស់លឿន**) · `zto-import/` (Apps Script ខាង
 server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup/`
 (CLI ដាច់ដោយឡែក + workflow backup) · `.github/workflows/` (`audit.yml` ·
 `backup.yml`) · `docs/HISTORY.md`។
@@ -300,6 +301,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
 | Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ» | `toast-truth-test` |
 | helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
+| **តក្កវិជ្ជាដដែលក្នុងឯកសារតែមួយ** | ⛔ រូបមន្តតែមួយមិនត្រូវរស់នៅ ២ កន្លែង — ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **២ ច្បាប់ផ្ទុយគ្នាក្នុងកូដតែមួយ** (ច្បាប់ ១២ តែលើ *កូដ*) | `code-duplication-test` |
 | `fb.X` ដែល loader មិន export | `undefined` ស្ងាត់លើផលិតកម្ម | `sdk-surface` |
 | កំណែ App | `app.js` ↔ `manifest.json` ↔ `index.html` **ក្នុង App នីមួយៗ** | `version-check` |
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ ឡើងតែ App ដែលកែពិត (កុំបង្ខំអ្នកប្រើទាញឡើងវិញ) | `version-bump-scope` |
@@ -447,6 +449,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ledger ៖ «អនុវត្ត ➜ ដកវិញ» លែងជាគូបញ្ច្រាស** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ | `ledger-clamp-symmetry-test.js` · **`emu/ledger-revert-emu-test.js`** (RTDB ពិត + rules ពិត) |
 | **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៧ ➜ អ្នកយាមត្រូវក្រហម) |
 | declaration ឈ្មោះ **ស្ទួន** ដែល JS hoist/សរសេរជាន់ស្ងាត់ · function ងាប់ | `function-surface-test.js` |
+| **កូដជាន់គ្នា** ៖ តួ function ដដែល ឬប្លុក statement ដដែល ក្នុងឯកសារ ship តែមួយ (⚠️ ការជាន់គ្នា **ឆ្លង App** ជាចេតនា ➜ `shared-fns.js` មិនមែនឧបករណ៍នេះ) | `code-duplication-test.js` |
 | ជួរ barcode ខូច (sparse · `null`) ➜ **បញ្ជីកក** | `barcode-shape-test.js` |
 | រូបរាងទិន្នន័យឆៅពី Firebase (object ជំនួស array …) | `raw-read-shape-test.js` |
 | ការស្តារស្ថានភាព auth · ការព្យាយាមពិនិត្យតួនាទីឡើងវិញ | `auth-recovery-test.js` |
@@ -1018,7 +1021,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | `.page-main` | `height` ថេរ + `flex: none` (`max-width: 991px`) | កាតត្រូវខ្ពស់ដូចគ្នា ២ របៀប (តារាងចំណុច ៥) |
 | `.table-responsive` | `max-height: none; flex: 1` **scope ត្រឹម `.page-main`** | modal រក្សា 62vh |
 | `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **មិនមែន `width: 100%`** | `width:100%` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `nowrap` ធ្វើឲ្យអត្ថបទ **ហៀរជាន់គ្នា** ជំនួសការរមូរផ្តេក (`layout-check` ចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរក្នុងមួយក្រឡា) |
-| `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` | បើភ្លេច ➜ **PTR ស្លាប់** |
+| `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` — ⚠️ **តម្លៃ ២ នេះរស់នៅក្នុង `@media (max-width: 991px)` *២ ប្លុកដាច់ដោយឡែក*** (`scroll-padding-top` នៅប្លុកទី ១ · `padding-top` នៅប្លុកទី ២ ប្រហែល ៣០០ បន្ទាត់ក្រោម) ➜ **កែមួយ ត្រូវពិនិត្យមួយទៀត**។ ⛔ កុំរួមប្លុកទាំង ២ ដើម្បី «សម្អាត» — នោះប្តូរលំដាប់ cascade ក្នុងតំបន់ហាមចូល | បើភ្លេច ➜ **PTR ស្លាប់** (`panel-motion-test` ៖ `snapRestNearTop`) |
 | `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |
 | `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | safe-area នៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ ៥៣px លើ iPhone |
@@ -1837,21 +1840,19 @@ bash audit-tools/emu/rules.sh
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
-## ⏳ កំណែ 2.28.0 ➜ 2.30.0 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+## ⏳ កំណែ 2.30.1 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
 | កំណែ | អ្វីដែលអ្នកប្រើត្រូវសាក |
 |---|---|
-| **2.28.0–2.28.2** | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ · កំណែ Apps Script (Lookup) · Sentry `zone` |
-| **2.29.0** | 📈 **របាយការណ៍អាជីវកម្មប្រចាំខែ** ៖ ប៊ូតុង `(...)` ➜ ជ្រើសខែ ➜ Excel និង PDF |
-| **2.29.0** | 🩺 ជួរពិនិត្យសុខភាព **មានគែមពណ៌ពិត** ហើយ (មុននេះ `var(--border)` ខូច ➜ គ្មានគែមសោះ) |
-| **2.30.0** | 💵 **«ចំណូល» ក្លាយជាតម្លៃកញ្ចប់ដែល *យករួច*** ក្នុងកន្លែងទាំង ៣ ៖ របាយការណ៍ខែ · 📅 ស្ថិតិប្រចាំថ្ងៃ · 📊 ស្ថិតិ ៣ ខែ។ ⛔ **លេខនឹងតូចជាងមុន** សម្រាប់ថ្ងៃថ្មីៗ — នោះជាការត្រឹមត្រូវ (កញ្ចប់មិនទាន់យក លែងរាប់ជាចំណូល)។ សូមផ្ទៀងផ្ទាត់ថា «ចំណូល + មិនទាន់យក = តម្លៃកញ្ចប់ទាំងអស់» |
+| **2.30.1** | ⚙️ **ជុំរួបរួមកូដជាន់គ្នា — គ្មានមុខងារថ្មី គ្មានការប្តូរឥរិយាបថដែលចង់បាន។** អ្វីដែលត្រូវសាកគឺថា **អ្វីៗនៅដដែល** ៖ បិទ/បើក «យក» (barcode ១ និងកញ្ចប់ទាំងមូល) · ដក/លុប/ស្តារ · កែតម្លៃក្នុងកញ្ចប់ · ស្កេន barcode ស្ទួន (ត្រូវឃើញសារព្រមាន + ញ័រ + ត្រឡប់ទៅម៉ាស៊ីនស្កេន) · ប៊ូតុង `(...)` និងម៉ឺនុយ 🗑️/✏️ ក្នុងជួរតារាង · ស្ថិតិចំណូលថ្ងៃ និងខែ |
+| **2.30.1** (ZoeKeyGen) | ⚙️ paste Firebase Config ➜ **Save** និង ➜ **បង្កើត Setup Link/QR** ត្រូវដើរដដែល (រួមទាំងសារកំហុសពេល config ខុស) |
 
-⛔ **អ្នកប្រើត្រូវទាញ App ចុះឡើងវិញ ១ ដង** (`zoew-v168`) មុនសាក។
+⛔ **អ្នកប្រើត្រូវទាញ App ចុះឡើងវិញ ១ ដង** (`zoew-v169` · `zoekeygen-v88`) មុនសាក។
 ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
 ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
 
-កំណែ **2.27.0** ➜ **2.27.3** ត្រូវបាន **អ្នកប្រើផ្ទៀងផ្ទាត់លើ
-ឧបករណ៍ពិតរួចហើយ** (2026-09-04)។
+កំណែ **2.27.0** ➜ **2.30.0** ត្រូវបាន **អ្នកប្រើផ្ទៀងផ្ទាត់លើ
+ឧបករណ៍ពិតរួចហើយ** (2026-09-04 · 2026-09-05)។
 
 ## ✅ Sentry error ពី barcode តេស្ត (2026-09-05) — **អ្នកប្រើសម្រេចថាមិនកែ**
 

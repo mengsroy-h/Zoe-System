@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.0';
+    const APP_VERSION = '2.30.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4835,9 +4835,7 @@
             if (listenerGeneration !== dbListenerGeneration) return;
             noteDbListenerAlive('history');
             const data = snapshot.val();
-            if (!data) scanHistory = [];
-            else if (Array.isArray(data)) scanHistory = data.filter(item => item !== null);
-            else scanHistory = Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
+            scanHistory = rawSnapshotToItemList(data);
 
             scanHistory.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
@@ -4887,9 +4885,7 @@
             if (listenerGeneration !== dbListenerGeneration) return;
             noteDbListenerAlive('deleted');
             const data = snapshot.val();
-            if (!data) deletedItems = [];
-            else if (Array.isArray(data)) deletedItems = data.filter(item => item !== null);
-            else deletedItems = Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
+            deletedItems = rawSnapshotToItemList(data);
 
             deletedItems.forEach(item => {
                 if(!item.id) item.id = generateUniqueId();
@@ -5734,6 +5730,25 @@
         }
     }
 
+    function rejectScanAndRefocus(message) {
+        closeModal('phoneModal');
+        showToast(message);
+        if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+        safeFocusScanner();
+    }
+
+    function rawSnapshotToItemList(data) {
+        if (!data) return [];
+        if (Array.isArray(data)) return data.filter(item => item !== null);
+        return Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
+    }
+
+    function recalcItemMoneyFromBarcodes(target) {
+        target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
+        target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
+        target.price = Math.round((target.cod + target.dod) * 100) / 100;
+    }
+
     function ledgerNumber(value) {
         const n = parseFloat(value);
         return isFinite(n) ? n : 0;
@@ -5745,6 +5760,28 @@
             dod: Math.round((ledgerNumber(after.dodDollar) - ledgerNumber(before.dodDollar)) * 100) / 100,
             count: ledgerNumber(after.totalCount) - ledgerNumber(before.totalCount)
         };
+    }
+
+    function ledgerDeltaWithClamp(before, codToAdd, dodToAdd, countToAdd, label, context) {
+        let codDollar = Math.round((before.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
+        let dodDollar = Math.round((before.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
+        let totalCount = before.totalCount + (parseFloat(countToAdd) || 0);
+        if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
+            if (window.ZoeErrors) ZoeErrors.capture(new Error(label + ' revenue underflow clamped to 0'), { zone: 'money', context: context, codDollar, dodDollar, totalCount });
+        }
+        if (codDollar < 0) codDollar = 0;
+        if (dodDollar < 0) dodDollar = 0;
+        if (totalCount < 0) totalCount = 0;
+        return { codDollar, dodDollar, totalCount };
+    }
+
+    function revertLedgerRecordInMemory(recordRef, applied) {
+        recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
+        recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
+        recordRef.totalCount = ledgerNumber(recordRef.totalCount) - applied.count;
+        if (recordRef.codDollar < 0) recordRef.codDollar = 0;
+        if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
+        if (recordRef.totalCount < 0) recordRef.totalCount = 0;
     }
 
     function applyLedgerBucketDelta(bucketMap, key, codToAdd, dodToAdd, countToAdd) {
@@ -5837,28 +5874,14 @@
                 dodDollar: parseFloat(current && current.dodDollar) || 0,
                 totalCount: parseFloat(current && current.totalCount) || 0
             };
-            let codDollar = Math.round((serverBefore.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
-            let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-            let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
-            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Daily revenue underflow clamped to 0'), { zone: 'money', context: scanDateStr, codDollar, dodDollar, totalCount });
-            }
-            if (codDollar < 0) codDollar = 0;
-            if (dodDollar < 0) dodDollar = 0;
-            if (totalCount < 0) totalCount = 0;
-            serverAfter = { codDollar, dodDollar, totalCount };
+            serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr);
             return serverAfter;
         }).then((result) => {
             if (!result || !result.committed || !serverBefore || !serverAfter) return null;
             return ledgerAppliedDelta(serverBefore, serverAfter);
         }, () => {
             if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
-                recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
-                recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
-                recordRef.totalCount = ledgerNumber(recordRef.totalCount) - applied.count;
-                if (recordRef.codDollar < 0) recordRef.codDollar = 0;
-                if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
-                if (recordRef.totalCount < 0) recordRef.totalCount = 0;
+                revertLedgerRecordInMemory(recordRef, applied);
                 refreshCurrentHistoryView();
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
@@ -5880,16 +5903,7 @@
                 dodDollar: parseFloat(existing.dodDollar) || 0,
                 totalCount: parseFloat(existing.totalCount) || 0
             };
-            let codDollar = Math.round((serverBefore.codDollar + (parseFloat(codToAdd) || 0)) * 100) / 100;
-            let dodDollar = Math.round((serverBefore.dodDollar + (parseFloat(dodToAdd) || 0)) * 100) / 100;
-            let totalCount = serverBefore.totalCount + (parseFloat(countToAdd) || 0);
-            if (codDollar < 0 || dodDollar < 0 || totalCount < 0) {
-                if (window.ZoeErrors) ZoeErrors.capture(new Error('Monthly revenue underflow clamped to 0'), { zone: 'money', context: ymKey, codDollar, dodDollar, totalCount });
-            }
-            if (codDollar < 0) codDollar = 0;
-            if (dodDollar < 0) dodDollar = 0;
-            if (totalCount < 0) totalCount = 0;
-            serverAfter = { codDollar, dodDollar, totalCount };
+            serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Monthly', ymKey);
             months[ymKey] = serverAfter;
 
             const latestThreeMonths = {};
@@ -5902,12 +5916,7 @@
             return ledgerAppliedDelta(serverBefore, serverAfter);
         }, () => {
             if (recordRef && monthlyRevenueData[ymKey] === recordRef) {
-                recordRef.codDollar = Math.round((ledgerNumber(recordRef.codDollar) - applied.cod) * 100) / 100;
-                recordRef.dodDollar = Math.round((ledgerNumber(recordRef.dodDollar) - applied.dod) * 100) / 100;
-                recordRef.totalCount = ledgerNumber(recordRef.totalCount) - applied.count;
-                if (recordRef.codDollar < 0) recordRef.codDollar = 0;
-                if (recordRef.dodDollar < 0) recordRef.dodDollar = 0;
-                if (recordRef.totalCount < 0) recordRef.totalCount = 0;
+                revertLedgerRecordInMemory(recordRef, applied);
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
             return null;
@@ -7380,14 +7389,19 @@
 
     function moreMenuDelete(id) { deleteSingleItem(id); closeGlobalMoreMenu(); }
 
-    function toggleHeaderMoreDropdown(btn, event) {
+    function showGlobalMoreMenu(btn, event, html) {
         if (event) event.stopPropagation();
         const rect = btn.getBoundingClientRect();
         const menu = document.getElementById('globalMoreMenu');
         const container = document.getElementById('menuContentContainer');
         if(!menu || !container) return;
+        container.innerHTML = html;
+        menu.classList.add('show');
+        positionMenuSafely(menu, rect);
+    }
 
-        container.innerHTML = `
+    function toggleHeaderMoreDropdown(btn, event) {
+        showGlobalMoreMenu(btn, event, `
             <button data-act="moreMenuExport">📤 Export Data</button>
             <button data-act="moreMenuMonthlyReport">📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</button>
             <button data-act="moreMenuManualAdjust">✏️ កែទឹកប្រាក់/កញ្ចប់</button>
@@ -7395,33 +7409,21 @@
             <button data-act="moreMenuRecentlyDeleted">🗑️ ធុងសំរាម</button>
             <button data-act="moreMenuResetPickup">♻️ Reset ចំនួនយករួច (${sanitizeInput(getCurrentFilterLabel())})</button>
             <button class="delete-opt" data-act="moreMenuClearHistory">❌ លុបទាំងអស់</button>
-        `;
-
-        menu.classList.add('show');
-        positionMenuSafely(menu, rect);
+        `);
     }
 
     function toggleMoreDropdown(btn, event, id) {
-        if (event) event.stopPropagation();
-        const rect = btn.getBoundingClientRect();
-        const menu = document.getElementById('globalMoreMenu');
-        const container = document.getElementById('menuContentContainer');
-        if(!menu || !container) return;
-
         const item = scanHistory.find(i => i.id === id);
         let editMoneyHtml = '';
         if (item && item.barcodes && item.barcodes.length > 0) {
             editMoneyHtml = `<button data-act="moreMenuViewList" data-a1="${sanitizeInput(id)}">💵 កែ/ដកកញ្ចប់អីវ៉ាន់</button>`;
         }
 
-        container.innerHTML = `
+        showGlobalMoreMenu(btn, event, `
             ${editMoneyHtml}
             <button data-act="moreMenuEditPhone" data-a1="${sanitizeInput(id)}">✏️ កែលេខទូរស័ព្ទ</button>
             <button class="delete-opt" data-act="moreMenuDelete" data-a1="${sanitizeInput(id)}">🗑️ លុប</button>
-        `;
-
-        menu.classList.add('show');
-        positionMenuSafely(menu, rect);
+        `);
     }
 
     function positionMenuSafely(menu, rect) {
@@ -9782,9 +9784,7 @@
             item.barcodes.splice(at, 1);
             if (!item.barcodes.length) { scanHistory.splice(i, 1); return; }
             item.count = item.barcodes.length;
-            item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            item.price = Math.round((item.cod + item.dod) * 100) / 100;
+            recalcItemMoneyFromBarcodes(item);
             return;
         }
     }
@@ -9822,10 +9822,7 @@
         }
 
         if (isBarcodeAlreadyUsed(barcodeToSave)) {
-            closeModal('phoneModal');
-            showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
-            if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
-            safeFocusScanner();
+            rejectScanAndRefocus(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             return;
         }
 
@@ -9850,18 +9847,12 @@
                 throw claimError;
             }
             if (claim === 'taken') {
-                closeModal('phoneModal');
-                showToast(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
-                if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
-                safeFocusScanner();
+                rejectScanAndRefocus(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
                 return;
             }
 
             if (claim !== 'claimed') {
-                closeModal('phoneModal');
-                showToast(`⚠️ មិនអាចផ្ទៀងផ្ទាត់ថា (${barcodeToSave}) ស្ទួនឬអត់ទេ (ទិន្នន័យមិនទាន់មកដល់) — សូមរង់ចាំបន្តិច ហើយស្កេនម្ដងទៀត។`);
-                if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
-                safeFocusScanner();
+                rejectScanAndRefocus(`⚠️ មិនអាចផ្ទៀងផ្ទាត់ថា (${barcodeToSave}) ស្ទួនឬអត់ទេ (ទិន្នន័យមិនទាន់មកដល់) — សូមរង់ចាំបន្តិច ហើយស្កេនម្ដងទៀត។`);
                 return;
             }
 
@@ -9959,9 +9950,7 @@
                 }
 
                 target.count = target.barcodes.length;
-                target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                recalcItemMoneyFromBarcodes(target);
                 target.barcode = barcode;
                 target.time = timeString;
                 target.scanDate = dateString;
@@ -10488,9 +10477,7 @@
                     editRevenueApplied = null;
                     targetB.cod = oldCod;
                     targetB.dod = oldDod;
-                    item.cod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                    item.dod = Math.round(item.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                    item.price = Math.round((item.cod + item.dod) * 100) / 100;
+                    recalcItemMoneyFromBarcodes(item);
                     refreshCurrentHistoryView();
                     closeModal('editBarcodePriceModal');
                     openViewListModal(item.id);
@@ -10505,9 +10492,7 @@
                     if (!staleB) return;
                     staleB.cod = oldCod;
                     staleB.dod = oldDod;
-                    staleItem.cod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                    staleItem.dod = Math.round(staleItem.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                    staleItem.price = Math.round((staleItem.cod + staleItem.dod) * 100) / 100;
+                    recalcItemMoneyFromBarcodes(staleItem);
                     refreshCurrentHistoryView();
                 };
                 const undoEditedPriceRevenue = () => {
@@ -11455,9 +11440,7 @@
                     });
                 }
                 target.count = target.barcodes.length;
-                target.cod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                target.dod = Math.round(target.barcodes.reduce((sum, b) => sum + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                recalcItemMoneyFromBarcodes(target);
                 target.isClosed = target.barcodes.length > 0 && target.barcodes.every(b => b.isClosed);
                 if (target.isClosed) {
                     target.closedAt = getServerNow();

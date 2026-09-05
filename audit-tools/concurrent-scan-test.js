@@ -150,6 +150,7 @@ function makeCtx(server, fbSet) {
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);
     for (const fn of ['barcodeEntriesOf', 'normalizeBarcodesOf', 'getPickupPhoneKey',
+                      'recalcItemMoneyFromBarcodes',
                       'itemHasRestoreMarkers', 'isActiveRestoreClaim', 'dropStaleRestoreMarkers',
                       'saveSingleHistoryItemToFirebase',
                       'mergeBarcodeIntoHistoryItem', 'addOrUpdateEntry']) {

@@ -73,8 +73,8 @@ const MUTATIONS = [
     {
         needs: 'RTDB emulator',
         name: 'ការ clamp ត្រូវដកចេញ (rules នឹងបដិសេធការសរសេរ)',
-        from: '            if (codDollar < 0) codDollar = 0;\n            if (dodDollar < 0) dodDollar = 0;\n            if (totalCount < 0) totalCount = 0;\n            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;',
-        to: '            serverAfter = { codDollar, dodDollar, totalCount };\n            return serverAfter;'
+        from: '        if (codDollar < 0) codDollar = 0;\n        if (dodDollar < 0) dodDollar = 0;\n        if (totalCount < 0) totalCount = 0;\n        return { codDollar, dodDollar, totalCount };',
+        to: '        return { codDollar, dodDollar, totalCount };'
     },
     {
         // ⛔ ថ្នាក់ ៖ ការបើក «យក» ក្លាយជា no-op ➜ លេខឡើងហើយមិនចេះចុះ។

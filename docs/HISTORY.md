@@ -69,6 +69,106 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.30.1] — 2026-09-05 · ⚙️ រួបរួមកូដជាន់គ្នា + checker ថ្មី `code-duplication-test`
+
+**App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v168` ➜ `zoew-v169`, `2.30.0` ➜ `2.30.1`) និង
+ZoeKeyGen (`zoekeygen-v87` ➜ `zoekeygen-v88`, `2.19.17` ➜ `2.19.18`)។
+
+#### ផ្លាស់ប្តូរ — ⛔ គ្មានមុខងារថ្មី គ្មានការប្តូរឥរិយាបថដែលចង់បាន
+
+ជុំនេះជា **ការរួបរួមកូដដែលជាន់គ្នា** ប៉ុណ្ណោះ។ តក្កវិជ្ជាដដែលដែលរស់នៅ ២ ឬ ៥
+កន្លែង ត្រូវយកមករួមជា helper តែមួយ ៖
+
+| អ្វី | មុន | ក្រោយ |
+|---|---|---|
+| រូបមន្ត clamp របស់ ledger ក្នុង transaction (ថ្ងៃ · ខែ) | ២ ច្បាប់ចម្លង ១១ បន្ទាត់ | `ledgerDeltaWithClamp()` |
+| ការដកវិញក្នុងសតិពេលការសរសេរធ្លាក់ (ថ្ងៃ · ខែ) | ២ ច្បាប់ចម្លង ៦ បន្ទាត់ **byte-identical** | `revertLedgerRecordInMemory()` |
+| គណនា `cod`/`dod`/`price` របស់ item ឡើងវិញពី `barcodes` | **៥ កន្លែង** | `recalcItemMoneyFromBarcodes()` |
+| snapshot ឆៅ ➜ បញ្ជី item (`scanHistory` · `deletedItems`) | ២ កន្លែង | `rawSnapshotToItemList()` |
+| បដិសេធការស្កេន ➜ បិទប្រអប់ · toast · ញ័រ · focus scanner | ៣ កន្លែង | `rejectScanAndRefocus()` |
+| ក្បាល/កន្ទុយរបស់ម៉ឺនុយ `(...)` | ២ កន្លែង | `showGlobalMoreMenu()` |
+| ZoeKeyGen ៖ អាន + normalize Firebase Config | ២ កន្លែង (Save · Setup Link) | `readNormalizedFirebaseConfig()` |
+
+**លេខ** ៖ `ZoeW/app.js` ➜ លុប **៨៣** បន្ទាត់ បន្ថែម **៦៦** (សុទ្ធ **−១៧**)។
+រាល់បន្ទាត់ដែលលុប **ពន្យល់បាន** — គ្មានការលុបដែលពន្យល់មិនបាន។
+
+⛔ **អ្វីដែល *មិន* រួបរួម ដោយចេតនា** ៖ closure `revertPickupDeltaAfterNoOp` និង
+`reconcilePickupDeltaWithServer` ក្នុង `toggleIndividualBarcodeClose` និង
+`toggleCloseStatus` (ជាន់គ្នា ១៥ បន្ទាត់)។ ពួកវាបិទលើអថេរ `let` ក្នុងស្រុក **៦**
+ដែលតួ function ទាំងមូលអាន និងសរសេរ ➜ ការរួបរួមទាមទារកែ **~៤០ បន្ទាត់** ក្នុង
+២ function ដែលប៉ះលុយផ្ទាល់ ដើម្បីលុបការជាន់គ្នា ១៥។ ផ្ទៃហានិភ័យធំជាង
+អត្ថប្រយោជន៍ ➜ កត់ជា `ACCEPTED` **ជាមួយហេតុផល** ក្នុង checker ថ្មី។
+
+#### ឧបករណ៍ audit
+
+**`code-duplication-test.js` ថ្មី** — រកតួ function ដដែល ឬប្លុក statement ដដែល
+ក្នុងឯកសារ ship **តែមួយ**។ ⛔ វា **មិនប៉ះការជាន់គ្នាឆ្លង App** ទេ (ZoeW ↔
+ZoeKeyGen) ព្រោះនោះជាការជាន់គ្នា **ដោយចេតនា** ដែល `shared-fns.js` ចាក់សោរួច។
+
+- **ធ្លាក់ ៥ លើ `origin/main`** · បៃតងលើ tree ក្រោយកែ ➜ វាមិនទទេ។
+- **ថតទទេ ➜ exit 1** (ជាន់អប្បបរមា ៖ ឯកសារ ៩ · function >= ៩០០ · statement >= ៦០០០)។
+- **probe វិជ្ជមាន** ៖ ប្លុកដែលដាំ **គណនាធៀបនឹងពិដានពិត** (`BLOCK_WINDOW` ·
+  `BLOCK_MIN_CHARS`) មិនមែនអត្ថបទថេរ ➜ ការតម្លើងពិដានថ្ងៃណាមួយ មិនអាចធ្វើឲ្យ
+  probe ក្លាយជាបៃតងក្លែងក្លាយបានទេ។
+- **probe ទិសផ្ទុយ** ៖ កូដស្អាតមិនត្រូវរាយការជាន់គ្នា។
+- **allowlist មិនអាចមានធាតុងាប់** ៖ ធាតុ `ACCEPTED` ដែលលែងបិទបាំងអ្វី ➜ ធ្លាក់;
+  ធាតុគ្មានហេតុផល (< ២០ តួ) ➜ ធ្លាក់។ acceptance ចងលើ **ខ្លឹមសារ** មិនមែន
+  **លេខបន្ទាត់** (លេខបន្ទាត់រអិលរាល់ការកែ)។
+- **Mutation ៦ ➜ ចាប់បានទាំង ៦** ៖ ដាំតួ function ដដែល · ដាក់ clamp ledger
+  ស្ទួនវិញ · detector ប្លុករាយ `[]` · detector តួ function រាយ `[]` · ធាតុ
+  ACCEPTED ងាប់ · ធាតុ ACCEPTED គ្មានហេតុផល។
+
+**ឧបករណ៍ដែលត្រូវកែតាម** (sandbox ស្រង់ function តាមឈ្មោះ — ការធ្លាក់របស់ពួកវា
+ជា **សញ្ញាល្អ** ព្រោះវាបញ្ជាក់ថាពួកវារត់កូដ ship ពិត) ៖ `revenue-rules-clamp-test` ·
+`price-edit-abort-test` · `late-commit-test` · `concurrent-scan-test` ·
+`connection-recovery-test` · `emu/ledger-revert-emu-test`។ ហើយ
+`money-guardian-test` ៖ mutation «ការ clamp ត្រូវដកចេញ» ត្រូវសរសេរឡើងវិញឲ្យ
+ចាក់ចូល `ledgerDeltaWithClamp()` — ⛔ **ឥឡូវវាគ្រប ថ្ងៃ *និង* ខែ ក្នុងការចាក់
+តែមួយ** ខណៈមុននេះវាចាក់ចូល **ផ្លូវថ្ងៃប៉ុណ្ណោះ**។
+
+#### ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់ (ជំហានទី ៤ ៖ ឥរិយាបថ មុន ធៀប ក្រោយ)
+
+កូដ **មុន** (ពី `origin/main`) និង **ក្រោយ** (ស្រង់ចេញពី `app.js` ពិតចូល `vm`)
+រត់លើ **ករណីដដែល** ៖
+
+| helper | ករណី | លទ្ធផល |
+|---|---|---|
+| `ledgerDeltaWithClamp` | ៤២០ (រួម `NaN` · `null` · `undefined` · ខ្សែអក្សរ · អវិជ្ជមាន) | ដូចគ្នា **៤២០** — រួមទាំងការហៅ `ZoeErrors.capture` |
+| `revertLedgerRecordInMemory` | ៤២០ | ដូចគ្នា **៤២០** |
+| `recalcItemMoneyFromBarcodes` | ១០ | ដូចគ្នា **១០** |
+| `rawSnapshotToItemList` | ១១ | ដូចគ្នា **១១** |
+| `readNormalizedFirebaseConfig` (ZoeKeyGen) | ១៤ (រួម JSON ខូច · វាលលើស · `databaseURL` http) | ដូចគ្នា **១៤** — រួមទាំងសារ `alert` និងតម្លៃ `cfgInput.value` ក្រោយ |
+
+**ជំហានទី ៥ (helper លើផ្លូវក្តៅ អាចបោះទេ?)** ៖ `undefined` · `null` · `NaN` ·
+`{}` · `[]` · `{barcodes: null}` · `{barcodes: 'x'}` · `{barcodes: [null]}` …
+➜ **៣៣ ការប្រៀបធៀប មុន/ក្រោយ ➜ ដូចគ្នា ៣៣** រួមទាំង **ប្រភេទ exception**
+ដែលបោះ។ គ្មាន helper ណាបន្ថែមការបោះថ្មីនៅដើមផ្លូវទេ។
+
+**ជំហានទី ៦ (helper ចែករំលែកឬ?)** ៖ **ទេ** — helper ថ្មីទាំង ៧ រស់នៅក្នុង App
+**តែមួយ** (៦ ក្នុង ZoeW · ១ ក្នុង ZoeKeyGen) ➜ គ្មានឈ្មោះជាន់គ្នា ➜ `shared-fns.js`
+មិនប៉ះពាល់ (បញ្ជាក់ ៖ វាបៃតង)។
+
+⛔ **`count` មិនចូល `recalcItemMoneyFromBarcodes()` ដោយចេតនា** ៖ ក្នុង ៥ កន្លែង
+មាន **២** ដែលមិនកំណត់វា (ផ្លូវដកការកែតម្លៃវិញ — ចំនួន barcode មិនប្តូរ)។ helper
+ដែលកំណត់វាជានិច្ច នឹងជាការប្តូរឥរិយាបថ មិនមែនការរួបរួម។
+
+#### ការជាន់គ្នាដែល **រាយការណ៍ តែមិនប៉ះ**
+
+`ZoeW/style.css` មាន `@media (max-width: 991px)` **២ ប្លុកដាច់ដោយឡែក** (បន្ទាត់
+~២១៣ និង ~៥២៤) ហើយ `.app-pages` ត្រូវកំណត់ក្នុង **ទាំង ២** ៖ `scroll-padding-top`
+នៅប្លុកទី ១ ចំណែក `padding-top` នៅប្លុកទី ២ — ខណៈ `CLAUDE.md` ទាមទារថាតម្លៃ
+ទាំង ២ **ស្មើគ្នា**។ ⛔ **មិនប៉ះ** ព្រោះ ៖ (១) វាជា **តំបន់ហាមចូល** (PTR ·
+ចលនាផ្ទាំង · ការរមូរ); (២) ការផ្លាស់ប្លុកប្តូរ **លំដាប់ cascade**; (៣) វា
+**មានអ្នកយាមឥរិយាបថរួចហើយ** — `panel-motion-test.js` (`snapRestNearTop`)
+ធ្លាក់បើ `scroll-padding-top` បាត់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+**គ្មាន** — គ្មាន Firebase rules ថ្មី · គ្មាន env ថ្មី។ អ្នកប្រើត្រូវ **ទាញ App
+ចុះឡើងវិញ ១ ដង** (`zoew-v169` · `zoekeygen-v88`) មុនសាក។
+
+---
+
 ### [2.30.0] — 2026-09-05 · 💵 «ចំណូល» ក្លាយជាតម្លៃកញ្ចប់ដែល **យករួច**
 
 **ZoeW ប៉ុណ្ណោះ** (`zoew-v167` ➜ `zoew-v168`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.17`)។
@@ -6817,6 +6917,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `clear-history-claim-test` | — (មិនទាន់មានប្រវត្តិ) |
 | `clear-history-finalization-fence-test` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `clock-hygiene` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `code-duplication-test` | **ផ្នែក ១** (កំណែ 2.30.1) |
 | `comments` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `compensation-order` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `concurrent-scan-test` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |

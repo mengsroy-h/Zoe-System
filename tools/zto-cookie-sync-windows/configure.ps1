@@ -11,27 +11,33 @@ $stateRoot = Join-Path $env:LOCALAPPDATA 'Zoe-System\ZTO-Cookie-Sync'
 $configPath = Join-Path $stateRoot 'config.json'
 $tokenPath = Join-Path $stateRoot 'netlify-token.dpapi'
 $proxyKeyPath = Join-Path $stateRoot 'proxy-key.dpapi'
+$telegramTokenPath = Join-Path $stateRoot 'telegram-token.dpapi'
 
 $PROXY_KEY_MIN = 16
+$TELEGRAM_TOKEN_MIN = 16
 
 # Re-running setup must KEEP the old values: Netlify shows a PAT only once,
 # so forcing a new one just to fill in two optional values is a dead end.
 $existingSiteId = ''
 $existingSiteUrl = ''
+$existingChatId = ''
 if (Test-Path -LiteralPath $configPath) {
     try {
         $existing = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($null -ne $existing) {
             $existingSiteId = [string]$existing.siteId
             $existingSiteUrl = [string]$existing.siteUrl
+            $existingChatId = [string]$existing.telegramChatId
         }
     } catch {
         $existingSiteId = ''
         $existingSiteUrl = ''
+        $existingChatId = ''
     }
 }
 $hasToken = Test-Path -LiteralPath $tokenPath
 $hasProxyKey = Test-Path -LiteralPath $proxyKeyPath
+$hasTelegramToken = Test-Path -LiteralPath $telegramTokenPath
 
 Write-Host ''
 Write-Host 'Find the Netlify Site ID under Project configuration > General > Project details.'
@@ -137,6 +143,67 @@ if (-not [string]::IsNullOrWhiteSpace($siteUrl)) {
     }
 }
 
+# Telegram is optional and OUTBOUND ONLY: the tool sends a message and never
+# reads one back. A bot that accepts commands would be a remote-code path into
+# the machine that holds the Netlify token, which is a different risk class.
+Write-Host ''
+Write-Host 'Telegram alerts (optional) - the tool tells you when the ZTO cookie'
+Write-Host 'needs a real login, so you do not find out from a failed scan.'
+Write-Host 'Create a bot with @BotFather, then send it a message and read your'
+Write-Host 'chat id from https://api.telegram.org/bot<token>/getUpdates'
+if (-not [string]::IsNullOrWhiteSpace($existingChatId)) {
+    Write-Host ('Saved chat id: ' + $existingChatId + ' - press Enter to keep it.')
+    Write-Host 'Type - (a single dash) to turn Telegram alerts off.'
+} else {
+    Write-Host 'Press Enter to skip (then no alerts are sent).'
+}
+
+$chatId = ''
+while ($true) {
+    $answer = (Read-Host 'Enter the Telegram chat id').Trim()
+    if ($answer -eq '-') { $chatId = ''; break }
+    if ([string]::IsNullOrWhiteSpace($answer)) { $chatId = $existingChatId; break }
+    if ($answer -match '^-?[0-9]{1,20}$') { $chatId = $answer; break }
+    Write-Host 'A chat id is digits only (a group id may start with -).' -ForegroundColor Yellow
+}
+
+$secureTelegramToken = $null
+$keepTelegramToken = $false
+if (-not [string]::IsNullOrWhiteSpace($chatId)) {
+    Write-Host ''
+    Write-Host 'The Telegram bot token from @BotFather.'
+    if ($hasTelegramToken) {
+        Write-Host 'The old bot token is already saved - press Enter to keep it.' -ForegroundColor Green
+    } else {
+        Write-Host ('This value is not shown on screen. At least ' + $TELEGRAM_TOKEN_MIN + ' characters.')
+    }
+    while ($true) {
+        $secureTelegramToken = Read-Host 'Enter the Telegram bot token' -AsSecureString
+        if ($secureTelegramToken.Length -eq 0) {
+            if ($hasTelegramToken) { $keepTelegramToken = $true; break }
+            Write-Host 'No bot token means no alerts are sent.' -ForegroundColor Yellow
+            $confirm = (Read-Host 'Skip it? Type y to skip, or press Enter to type the token').Trim()
+            if ($confirm -match '^(y|yes)$') {
+                $secureTelegramToken.Dispose()
+                $secureTelegramToken = $null
+                $chatId = ''
+                break
+            }
+            $secureTelegramToken.Dispose()
+            continue
+        }
+        # Never dropped in silence: a token that is too short leaves the user
+        # believing alerts are on while nothing is ever sent.
+        if ($secureTelegramToken.Length -lt $TELEGRAM_TOKEN_MIN) {
+            Write-Host ('The bot token is too short: you typed ' + $secureTelegramToken.Length + ' characters, at least ' + $TELEGRAM_TOKEN_MIN + ' are needed.') -ForegroundColor Yellow
+            $secureTelegramToken.Dispose()
+            $secureTelegramToken = $null
+            continue
+        }
+        break
+    }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
 
@@ -166,7 +233,22 @@ try {
         )
     }
 
-    $configJson = @{ version = 1; siteId = $siteId; siteUrl = $siteUrl } | ConvertTo-Json -Compress
+    if ([string]::IsNullOrWhiteSpace($chatId)) {
+        # Same orphan rule as the proxy key: a token with no chat id makes the
+        # setup look configured while every alert is dropped in silence.
+        if (Test-Path -LiteralPath $telegramTokenPath) {
+            Remove-Item -LiteralPath $telegramTokenPath -Force
+        }
+    } elseif ($null -ne $secureTelegramToken -and -not $keepTelegramToken) {
+        $encryptedTelegramToken = ConvertFrom-SecureString -SecureString $secureTelegramToken
+        [System.IO.File]::WriteAllText(
+            $telegramTokenPath,
+            $encryptedTelegramToken,
+            [System.Text.Encoding]::ASCII
+        )
+    }
+
+    $configJson = @{ version = 1; siteId = $siteId; siteUrl = $siteUrl; telegramChatId = $chatId } | ConvertTo-Json -Compress
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
     [System.IO.File]::WriteAllText($configPath, $configJson, $utf8NoBom)
 
@@ -180,7 +262,16 @@ try {
     } else {
         Write-Host 'OK: --auto and --check are ready.' -ForegroundColor Green
     }
+    if ([string]::IsNullOrWhiteSpace($chatId) -or -not (Test-Path -LiteralPath $telegramTokenPath)) {
+        Write-Host 'INFO: Telegram alerts are off.' -ForegroundColor Yellow
+    } else {
+        Write-Host 'OK: Telegram alerts are on. Test them with:' -ForegroundColor Green
+        Write-Host '     sync-zto-cookie.cmd --test-telegram'
+    }
 } finally {
+    if ($null -ne $secureTelegramToken) {
+        $secureTelegramToken.Dispose()
+    }
     if ($null -ne $secureToken) {
         $secureToken.Dispose()
     }

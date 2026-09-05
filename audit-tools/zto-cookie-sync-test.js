@@ -19,6 +19,7 @@ const PACKAGE_PATH = path.join(TOOL_DIR, 'package.json');
 const SETUP_PATH = path.join(TOOL_DIR, 'setup.cmd');
 const RUN_PATH = path.join(TOOL_DIR, 'sync-zto-cookie.cmd');
 const SCHEDULE_PATH = path.join(TOOL_DIR, 'schedule-zto-cookie.cmd');
+const SCHEDULE_PS_PATH = path.join(TOOL_DIR, 'schedule.ps1');
 const CONFIGURE_PATH = path.join(TOOL_DIR, 'configure.ps1');
 const TOKEN_READER_PATH = path.join(TOOL_DIR, 'read-token.ps1');
 const README_PATH = path.join(TOOL_DIR, 'README-KH.md');
@@ -80,6 +81,7 @@ const source = read(SOURCE_PATH);
 const setup = read(SETUP_PATH);
 const runner = read(RUN_PATH);
 const schedule = read(SCHEDULE_PATH);
+const schedulePs = read(SCHEDULE_PS_PATH);
 const configure = read(CONFIGURE_PATH);
 const tokenReader = read(TOKEN_READER_PATH);
 const readme = read(README_PATH);
@@ -468,9 +470,16 @@ async function run() {
         autoCases && api.shouldRefreshInAuto({ status: 'unconfigured', healthy: false }) === false);
     ok('⛔ --auto ៖ ភ្ជាប់ Function មិនបាន ➜ មិនបើក browser (ការសរសេរក៏ធ្លាក់ដែរ)',
         autoCases && api.shouldRefreshInAuto({ status: 'unreachable', healthy: false }) === false);
-    ok('schedule-zto-cookie.cmd ប្រើ schtasks ជាមួយ --auto និងមានផ្លូវលុប',
-        /schtasks/i.test(schedule) && /--auto/.test(schedule) && /\/Delete/i.test(schedule),
-        schedule.length);
+    // ⛔ **ការអះអាងវាស់ការពិត មិនមែនការជ្រើសពាក្យ** ៖ អ្វីដែលសំខាន់គឺ «មាន
+    // Task ដែលរត់ --auto ហើយលុបវិញបាន» — មិនមែនថាវាសរសេរដោយ `schtasks` ឬ
+    // PowerShell ទេ។ ការចាក់ឈ្មោះឧបករណ៍ជាប់ ធ្វើឲ្យការកែឫសគល់ «Access is
+    // denied» (2026-09-05) ធ្លាក់ដោយខុស។
+    const scheduleAll = schedule + '\n' + schedulePs;
+    ok('មានផ្លូវចុះឈ្មោះ Task ដែលរត់ --auto និងមានផ្លូវលុបវិញ',
+        /--auto/.test(scheduleAll)
+        && /(schtasks|Register-ScheduledTask)/i.test(scheduleAll)
+        && /(\/Delete|Unregister-ScheduledTask)/i.test(scheduleAll),
+        scheduleAll.length);
     ok('sync-zto-cookie.cmd បញ្ជូន argument ទៅ node',
         /node sync-zto-cookie\.js %\*/.test(runner), runner.length);
     // ⛔ ជំនាន់ regex ចាប់ **ឈ្មោះ** ➜ វារាយការណ៍ខុសលើសារដែលបង្ហាញ *ឈ្មោះ*
@@ -481,7 +490,8 @@ async function run() {
     // argus ក្នុង cmd ផង»* ➜ `cookieHeader` ត្រូវដកចេញពីបញ្ជីនេះដោយចេតនា។
     // ⛔ **Netlify PAT និង ZTO_PROXY_KEY នៅតែហាមដាច់ខាត** — ពួកវាជាសិទ្ធិលើ
     // គណនី Netlify ចំណែក Cookie ជា session ZTO ដែលអ្នកប្រើកាន់ស្រាប់។
-    const SECRET_IDS = ['proxyKey', 'PROXY_KEY', 'token', 'secureProxyKey'];
+    const SECRET_IDS = ['proxyKey', 'PROXY_KEY', 'token', 'secureProxyKey',
+        'botToken', 'telegramToken', 'secureTelegramToken'];
     let secretPrints = [];
     if (acorn) {
         const tree = acorn.parse(source, { ecmaVersion: 2022, locations: true });
@@ -967,6 +977,242 @@ async function run() {
         /--auto-ready/.test(schedule), schedule.length);
     ok('⛔ sync-zto-cookie.js គាំទ្រ --auto-ready',
         /--auto-ready/.test(source), 'ច្រកទ្វារត្រូវវាស់តម្លៃពិត មិនមែនវត្តមានឯកសារ');
+
+
+    console.log('\n=== ៩. ការចុះឈ្មោះ Task ៖ per-user មិនមែនសកល (Access is denied 2026-09-05) ===');
+    // 🔴 **របាយការណ៍អ្នកប្រើពិត (2026-09-05, រូបថតអេក្រង់)** ៖ `--auto-ready`
+    // ចេញ OK រួច តែ `schtasks /Create` ធ្លាក់ភ្លាមដោយ «ERROR: Access is denied».
+    // មូលហេតុ ៖ `/SC ONLOGON` **គ្មាន `/RU`** ចុះឈ្មោះ trigger សម្រាប់អ្នកប្រើ
+    // **គ្រប់រូប** ➜ Windows ទាមទារ Administrator។ ⛔ ឧបករណ៍នេះរត់ជា **អ្នកប្រើ
+    // ធម្មតា** ដោយចេតនា (DPAPI/CurrentUser + profile របស់ browser ជារបស់គាត់)
+    // ➜ ការចុះឈ្មោះត្រូវជា **per-user** ជានិច្ច។
+    ok('⛔ ការចុះឈ្មោះ Task ដាក់ឈ្មោះម្ចាស់ជាក់លាក់ (per-user)',
+        /-UserId/.test(schedulePs) && /New-ScheduledTaskPrincipal/.test(schedulePs),
+        'គ្មាន principal ➜ logon សកល ➜ Access is denied លើ Windows ធម្មតា');
+    ok('⛔ ប្រើ InteractiveToken ➜ គ្មានការសុំពាក្យសម្ងាត់ និងគ្មាន credential ស្តុក',
+        /Interactive/.test(schedulePs),
+        'LogonType ផ្សេង ➜ schtasks/PowerShell សុំ password ➜ ផ្លូវងាប់');
+    ok('⛔ សិទ្ធិត្រូវនៅ Limited (កុំសុំ elevation ដែលមិនចាំបាច់)',
+        /Limited/.test(schedulePs), schedulePs.length);
+
+    // ⛔ ចំណុចស្នូលនៃសំណើ ៖ ONLOGON តែម្យ៉ាង មានន័យថា Cookie ដែលស្លាប់ម៉ោង
+    // ១០ ព្រឹក រង់ចាំដល់ការ restart បន្ទាប់។ ត្រូវមាន trigger ដដែលៗក្នុងថ្ងៃ។
+    ok('⛔ មាន trigger ដដែលៗ បន្ថែមលើ logon (ONLOGON តែម្យ៉ាង ➜ រង់ចាំ restart)',
+        /RepetitionInterval/.test(schedulePs) && /AtLogOn/.test(schedulePs),
+        'ខ្វះមួយណាក៏ដោយ ➜ ការជួសជុលខ្លួនឯងមិនកើតឡើងក្នុងម៉ោងធ្វើការ');
+    ok('⛔ បង្អួចដដែលៗមានទាំង ចន្លោះពេល និង រយៈពេល (កុំរត់ ២៤ ម៉ោង)',
+        /RepetitionDuration/.test(schedulePs), schedulePs.length);
+    // ⛔ ការអះអាងដើមខ្សោយ ៖ `/--auto/` ឆ្លងបានទោះជា `--auto-ready` ក៏ដោយ។
+    // អ្វីដែលត្រូវវាស់គឺ **អាគុយម៉ង់របស់ Action** ៖ Task ត្រូវរត់ `--auto`
+    // លើ `sync-zto-cookie.cmd` — ផ្លូវធម្មតាបើក browser រាល់ជុំស្ទង់។
+    const actionArg = /ArgumentList[^\r\n]*'--auto'/.test(schedulePs)
+        || /-Argument[^\r\n]*--auto(?!-ready)/.test(schedulePs);
+    ok('⛔ Action របស់ Task រត់ --auto លើ sync-zto-cookie.cmd',
+        actionArg && /sync-zto-cookie\.cmd/.test(schedulePs),
+        'ផ្លូវធម្មតា ➜ browser លោតឡើងរាល់ជុំស្ទង់');
+    // ⛔ ការចាប់ Cookie ថ្មីអាចយូរដល់ ១០ នាទី ខណៈនាឡិកា ៣០ នាទីនៅតែដើរ ➜
+    // គ្មានច្រកទ្វារ ➜ browser ជាន់គ្នាច្រើនផ្ទាំង។
+    ok('⛔ ការរត់ជាន់គ្នាត្រូវទប់ (browser មិនត្រូវបើកជាន់គ្នា)',
+        /MultipleInstances/.test(schedulePs) && /IgnoreNew/.test(schedulePs),
+        schedulePs.length);
+    ok('⛔ មានផ្លូវលុប Task វិញ', /Unregister-ScheduledTask/.test(schedulePs), schedulePs.length);
+    // ⛔ ការចុះឈ្មោះម៉ោង ១៥:០០ ខណៈបង្អួចចាប់ផ្តើម ០៦:០០ ➜ trigger ប្រចាំថ្ងៃ
+    // បន្ទាប់គឺ **ថ្ងៃស្អែក** ➜ ការស្ទង់មិនចាប់ផ្តើមសោះក្នុងថ្ងៃដំឡើង។
+    // ការចាប់ផ្តើម Task ១ ដងភ្លាម បិទចន្លោះនោះ **និង** បញ្ជាក់ថា Task ដើរពិត។
+    ok('⛔ ចាប់ផ្តើម Task ១ ដងភ្លាមក្រោយចុះឈ្មោះ (កុំរង់ចាំដល់ថ្ងៃស្អែក)',
+        /Start-ScheduledTask/.test(schedulePs),
+        'ដំឡើងរសៀល ➜ បង្អួចថ្ងៃនេះកន្លងផុត ➜ គ្មានការស្ទង់រហូតដល់ស្អែក');
+
+    // ⛔ **សំណើអ្នកប្រើ (2026-09-05)** ៖ *«ធ្វើអោយដឹងថា cookie អស់សុពលភាព
+    // ភ្លាម វា sync ភ្លាមហ្មងទៅ»*។ សាលក្រម «ស្លាប់» កើតឡើងភ្លាមនៅខាង
+    // Function (`noteCookieRejected()`) — ការពន្យារទាំងអស់គឺ **ចន្លោះពេល
+    // ស្ទង់** ។ ៣០ នាទី ➜ ការស្កេនធ្លាក់រហូតដល់ ៣០ នាទី; ១ នាទី ➜ បាត់តែ
+    // ការស្កេនដំបូង។ ⛔ លេខត្រូវអានចេញពីកូដពិត មិនមែនចាក់ literal ក្នុង checker។
+    const intervalDefault = (/\[int\]\$IntervalMinutes\s*=\s*(\d+)/.exec(schedulePs) || [])[1];
+    const windowDefault = (/\[int\]\$WindowHours\s*=\s*(\d+)/.exec(schedulePs) || [])[1];
+    ok('⛔ ចន្លោះស្ទង់លំនាំដើម <= ១ នាទី (ដឹងភ្លាម ➜ sync ភ្លាម)',
+        !!intervalDefault && Number(intervalDefault) <= 1, String(intervalDefault));
+    ok('⛔ បង្អួចលំនាំដើមគ្របម៉ោងធ្វើការ (>= ១២ ម៉ោង)',
+        !!windowDefault && Number(windowDefault) >= 12, String(windowDefault));
+    // ⛔ ការស្ទង់រាល់នាទីមិនត្រូវបង្ខំអាន Blobs រាល់ជុំ ៖ សាលក្រម «ស្លាប់»
+    // មកពី `authRejectedAgeMs` ដែលជាស្ថានភាព **ក្នុងសតិ** របស់ Function ➜
+    // `fresh=1` មិនធ្វើឲ្យវាឆាប់ដឹងជាងទេ តែវាបន្ថែមការអាន Blobs ១,៤៤០ ដង/ថ្ងៃ។
+    // ⛔ **ការស្កេនតាមអក្សរធ្លាក់មិនបាន** ៖ ជំនាន់ដំបូងសរសេរ
+    // `/fresh:\s*false/.test(source)` ➜ mutation ដែល **ដកកូដពិតចេញ** នៅតែ
+    // ឆ្លង ព្រោះខ្សែអក្សរនោះមានក្នុង **comment** ខាងលើវា (វាស់បាន ៖
+    // mutation ១៤ រស់រាន)។ detector ត្រូវជា **រចនាសម្ព័ន្ធ** — AST គ្មាន comment។
+    let freshWired = false;
+    let healthCalls = 0;
+    if (acorn) {
+        const tree = acorn.parse(source, { ecmaVersion: 2022, locations: true });
+        (function walk(node) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.type === 'CallExpression' && node.callee
+                && node.callee.type === 'Identifier' && node.callee.name === 'checkCookieHealth') {
+                healthCalls++;
+                (function findFresh(inner) {
+                    if (!inner || typeof inner !== 'object') return;
+                    if (Array.isArray(inner)) { inner.forEach(findFresh); return; }
+                    if (inner.type === 'Property' && inner.key
+                        && (inner.key.name === 'fresh' || inner.key.value === 'fresh')
+                        && inner.value && inner.value.value === false) {
+                        freshWired = true;
+                    }
+                    for (const key of Object.keys(inner)) {
+                        if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+                        findFresh(inner[key]);
+                    }
+                })(node.arguments);
+            }
+            for (const key of Object.keys(node)) {
+                if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+                walk(node[key]);
+            }
+        })(tree);
+    }
+    ok('ជាន់អប្បបរមា ៖ ឃើញការហៅ checkCookieHealth ពិត', healthCalls >= 2, healthCalls);
+    ok('⛔ ការស្ទង់ --auto មិនបង្ខំអាន Blobs (`fresh: false` ក្នុង AST មិនមែន comment)',
+        acorn && freshWired, 'ការស្ទង់រាល់នាទីដោយ fresh=1 = ការអាន Blobs ១,៤៤០ ដង/ថ្ងៃ');
+    if (api && typeof api.checkCookieHealth === 'function') {
+        const freshCalls = [];
+        await api.checkCookieHealth({
+            siteUrl: SITE_URL, proxyKey: PROXY_KEY, fresh: false,
+            fetchImpl: async (url) => {
+                freshCalls.push(url);
+                return fakeResponse(200, { ok: true, auth: 'cookie', cookie: { source: 'blob', fingerprint: 'aaaabbbb', renewals: 0, authRejectedAgeMs: null } });
+            }
+        });
+        ok('⛔ `fresh: false` ➜ URL គ្មាន fresh=1 ពិត (មិនមែនត្រឹមអក្សរក្នុងកូដ)',
+            freshCalls.length === 1 && freshCalls[0].indexOf('fresh=1') === -1,
+            freshCalls[0]);
+    } else {
+        ok('⛔ `fresh: false` ➜ URL គ្មាន fresh=1 ពិត', false, 'មិន export');
+    }
+
+    // ⛔ ការធ្លាក់ត្រូវ **ដាក់ឈ្មោះដំណោះស្រាយ** — «could not be created» ទទេ
+    // ជាអ្វីដែលអ្នកប្រើកែមិនបាន (វាស់រួច ៖ រូបថតអេក្រង់ 2026-09-05)។
+    ok('⛔ ការធ្លាក់ប្រាប់មូលហេតុពិត មិនមែន «could not be created» ទទេ',
+        /Administrator/i.test(schedulePs) && /already exists|existing/i.test(schedulePs),
+        'អ្នកប្រើត្រូវដឹងថា ៖ Task ចាស់របស់ admin ជាប់ ឬត្រូវលុបវាចោល');
+    ok('schedule-zto-cookie.cmd នៅជា ASCII + CRLF ហើយហៅ --auto-ready មុនចុះឈ្មោះ',
+        isWindowsCmdSafe(schedule) && /--auto-ready/.test(schedule), schedule.length);
+
+    console.log('\n=== ១០. ការជូនដំណឹង Telegram ៖ outbound · fail-open · មិនលេចសម្ងាត់ ===');
+    // ⛔ ការជូនដំណឹងជា **ការរាយការណ៍** មិនមែនផ្លូវអាជីវកម្ម ➜ ការធ្លាក់របស់វា
+    // មិនត្រូវធ្វើឲ្យការ sync ធ្លាក់ឡើយ (fail-open ពេញលេញ)។ ហើយវាត្រូវ
+    // **outbound ប៉ុណ្ណោះ** — គ្មានការទទួលពាក្យបញ្ជា ➜ គ្មានផ្លូវ RCE ចូល
+    // ម៉ាស៊ីនដែលកាន់ Netlify PAT។
+    const notifyApi = api && typeof api.autoNotifyKind === 'function'
+        && typeof api.notifyThrottleAllows === 'function'
+        && typeof api.telegramMessage === 'function'
+        && typeof api.sendTelegram === 'function'
+        && typeof api.validateChatId === 'function';
+    ok('export helper ជូនដំណឹងសម្រាប់វាស់ឥរិយាបថ', notifyApi);
+
+    if (notifyApi) {
+        // ⛔ ជាន់សំខាន់បំផុត ៖ សុខភាពល្អ ➜ **ស្ងាត់**។ ការរត់រាល់ ១ នាទី
+        // ក្នុង ១៦ ម៉ោង = ៩៦០ ជុំ/ថ្ងៃ ➜ សារ «គ្រប់យ៉ាងល្អ» រាប់រយដង ធ្វើឲ្យ
+        // អ្នកប្រើបិទការជូនដំណឹង ➜ សារពិតលេចបាត់។
+        ok('⛔ Cookie ដំណើរការល្អ ➜ មិនផ្ញើសារសោះ',
+            api.autoNotifyKind({ status: 'ok', healthy: true }, { ok: true }) === '',
+            api.autoNotifyKind({ status: 'ok', healthy: true }, { ok: true }));
+        ok('Cookie ស្លាប់ ➜ យកថ្មីមិនបាន ➜ ត្រូវការមនុស្ស',
+            api.autoNotifyKind({ status: 'ok', healthy: false },
+                { ok: false, code: 'CAPTURE_TIMEOUT' }) === 'needs-human');
+        ok('Cookie ស្លាប់ ➜ យកថ្មីបានដោយខ្លួនឯង ➜ រាយការណ៍ថាជួសជុលរួច',
+            api.autoNotifyKind({ status: 'ok', healthy: false }, { ok: true }) === 'repaired');
+        ok('⛔ ភ្ជាប់ Function មិនបាន ➜ រាយការណ៍ (បើអត់ ➜ ងាប់ស្ងាត់ជាច្រើនថ្ងៃ)',
+            api.autoNotifyKind({ status: 'unreachable', healthy: false }, null) === 'blocked');
+        ok('⛔ មិនទាន់កំណត់ ➜ រាយការណ៍ដែរ',
+            api.autoNotifyKind({ status: 'unconfigured', healthy: false }, null) === 'blocked');
+
+        // ⛔ សារមិនត្រូវផ្ទុក Cookie ៖ Telegram ជា server របស់អ្នកដទៃ ហើយ
+        // ប្រវត្តិ chat រស់នៅជារៀងរហូត។ Cookie បង្ហាញលើ cmd បាន (សំណើអ្នកប្រើ)
+        // តែ **មិនត្រូវចេញក្រៅម៉ាស៊ីន**។
+        const messages = ['needs-human', 'repaired', 'blocked']
+            .map((kind) => api.telegramMessage(kind, { cookie: COOKIE, proxyKey: PROXY_KEY }));
+        ok('⛔ សារ Telegram មិនផ្ទុក Cookie ដាច់ខាត',
+            messages.every((text) => text.indexOf('BOS-MAN-SESSION') === -1
+                && text.indexOf('s3cr3t987') === -1),
+            messages.join(' | ').slice(0, 160));
+        ok('⛔ សារ Telegram មិនផ្ទុកសោណាមួយ',
+            messages.every((text) => text.indexOf(PROXY_KEY) === -1
+                && text.indexOf(TOKEN) === -1));
+        ok('សារនីមួយៗមានអត្ថន័យខុសគ្នា និងមិនទទេ',
+            new Set(messages).size === 3 && messages.every((text) => text.length > 12));
+
+        ok('chat id ត្រឹមត្រូវ ➜ ទទួល', api.validateChatId('123456789') === '123456789');
+        ok('chat id ក្រុម (អវិជ្ជមាន) ➜ ទទួល', api.validateChatId('-1001234567890') === '-1001234567890');
+        ok('⛔ chat id ខូច ➜ បដិសេធ', (() => {
+            try { api.validateChatId('abc; rm -rf'); return false; } catch (e) { return e.code === 'TELEGRAM_CHAT_INVALID'; }
+        })());
+
+        // ⛔ ពិដានល្បឿន ៖ Netlify ដាច់ពេញថ្ងៃ ➜ ២៦ សារដដែល។ តែពិដានដែល
+        // **ខូចហើយស្ងាត់** អាក្រក់ជាង ➜ state អានមិនបាន ត្រូវ **ផ្ញើ**។
+        const now = 1000000000000;
+        ok('ជុំដំបូង ➜ ផ្ញើ', api.notifyThrottleAllows({}, 'needs-human', now, 3600000) === true);
+        ok('⛔ ជុំទី ២ ក្នុងចន្លោះពេល ➜ មិនផ្ញើ',
+            api.notifyThrottleAllows({ 'needs-human': now - 60000 }, 'needs-human', now, 3600000) === false);
+        ok('ផុតចន្លោះពេល ➜ ផ្ញើឡើងវិញ',
+            api.notifyThrottleAllows({ 'needs-human': now - 7200000 }, 'needs-human', now, 3600000) === true);
+        ok('⛔ ប្រភេទសារផ្សេង ➜ ពិដានឯករាជ្យ',
+            api.notifyThrottleAllows({ blocked: now - 60000 }, 'needs-human', now, 3600000) === true);
+        ok('⛔ state ខូច/អានមិនបាន ➜ នៅតែផ្ញើ (ពិដានដែលងាប់ = គ្មានការជូនដំណឹង)',
+            api.notifyThrottleAllows(null, 'needs-human', now, 3600000) === true
+            && api.notifyThrottleAllows('not-an-object', 'needs-human', now, 3600000) === true);
+        ok('⛔ ត្រាពេលអនាគត (នាឡិកាថយក្រោយ) ➜ ផ្ញើ មិនស្ងាត់ជារៀងរហូត',
+            api.notifyThrottleAllows({ 'needs-human': now + 99999999 }, 'needs-human', now, 3600000) === true);
+
+        // ⛔ fail-open ៖ Telegram ធ្លាក់ · ព្យួរ · គ្មានបណ្តាញ ➜ helper ត្រឡប់
+        // សាលក្រម មិនដែល reject ➜ ការ sync នៅតែបន្ត។
+        // ⛔ helper នេះសន្យាថា **មិនដែល reject** ➜ ការហៅវាទទេធ្វើឲ្យ mutation
+        // «បោះជំនួសការត្រឡប់សាលក្រម» **សម្លាប់ checker ទាំងមូល** ជំនួសការ
+        // ធ្លាក់ដែលមានឈ្មោះ (វាស់រួច ៖ mutation ៧ ➜ «checker បោះកំហុស»
+        // ហើយការអះអាង ៨ ខាងក្រោមមិនដែលរត់)។ ការបោះត្រូវក្លាយជា **សាលក្រម**។
+        const settle = async (promise) => {
+            try { return await promise; } catch (error) { return 'THREW:' + (error && error.code || 'unknown'); }
+        };
+        const sendCalls = [];
+        const sent = await settle(api.sendTelegram('hello', {
+            chatId: '123456789',
+            botToken: 'bot-token-value-should-never-leak',
+            fetchImpl: async (url, options) => {
+                sendCalls.push({ url, options });
+                return fakeResponse(200, { ok: true });
+            }
+        }));
+        ok('ផ្ញើបានជោគជ័យ ➜ សាលក្រម sent', sent === 'sent', sent);
+        ok('⛔ ផ្ញើតាម POST ហើយសារនៅក្នុង body មិនមែនក្នុង URL',
+            sendCalls.length === 1 && sendCalls[0].options.method === 'POST'
+            && sendCalls[0].url.indexOf('hello') === -1
+            && String(sendCalls[0].options.body).indexOf('hello') !== -1,
+            JSON.stringify(sendCalls[0] && sendCalls[0].url).slice(0, 120));
+        const failed = await settle(api.sendTelegram('hello', {
+            chatId: '123456789',
+            botToken: 'bot-token-value-should-never-leak',
+            fetchImpl: async () => { throw new Error('network down'); }
+        }));
+        ok('⛔ បណ្តាញធ្លាក់ ➜ ត្រឡប់សាលក្រម មិន reject (ការ sync មិនត្រូវធ្លាក់តាម)',
+            failed === 'failed', failed);
+        const skipped = await settle(api.sendTelegram('hello', {
+            chatId: '', botToken: '', fetchImpl: async () => { throw new Error('must not be called'); }
+        }));
+        ok('⛔ មិនទាន់កំណត់ Telegram ➜ រំលងស្ងាត់ មិនធ្លាក់', skipped === 'skipped', skipped);
+    } else {
+        for (let i = 0; i < 20; i++) ok('notify #' + (i + 1), false, 'មិន export');
+    }
+
+    // ⛔ Bot token ជា credential ថ្នាក់ដដែលនឹង PAT ➜ DPAPI ដដែល និងមិនបង្ហាញ។
+    ok('⛔ bot token អ៊ិនគ្រីបដោយ DPAPI ដូច PAT (មិនមែន plaintext)',
+        /telegram-token\.dpapi/.test(source) && /telegram-token\.dpapi/.test(configure),
+        'token ជាអក្សរធម្មតា ➜ អ្នកដែលអានឯកសារបាន បញ្ជា bot បាន');
+    ok('⛔ chat id ទទេ ➜ លុប telegram token កំព្រាចោល',
+        /Remove-Item[^\r\n]*telegramTokenPath/.test(configure),
+        'token កំព្រា ➜ ការជូនដំណឹងងាប់ស្ងាត់ ខណៈមើលទៅដូចកំណត់រួច');
+    ok('⛔ មានផ្លូវសាកការជូនដំណឹងដោយមិនរង់ចាំកំហុសពិត',
+        /--test-telegram/.test(source) && /--test-telegram/.test(readme),
+        'ការកំណត់ដែលផ្ទៀងផ្ទាត់មិនបាន ជាការកំណត់ដែលមិនទាន់ផ្ទៀងផ្ទាត់');
 
     console.log('\n' + (fail
         ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'

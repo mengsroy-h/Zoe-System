@@ -1466,7 +1466,7 @@
 .mrep-note{margin:8px 0 0;padding:8px 10px;border-radius:10px;border:1px solid rgba(234,179,8,.55);background:var(--card-bg);font-size:calc(11 * var(--fs-unit));color:var(--text-muted);text-align:left;}
 .mrep-empty{margin:14px 0;text-align:center;color:var(--text-muted);font-size:calc(12 * var(--fs-unit));}
 .mrep-table-wrap{margin-top:8px;max-height:38vh;overflow-y:auto;overflow-x:auto;border:1px solid var(--border-color);border-radius:10px;}
-.mrep-table{width:100%;border-collapse:collapse;font-size:calc(11 * var(--fs-unit));}
+.mrep-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:calc(11 * var(--fs-unit));}
 .mrep-table th,.mrep-table td{padding:5px 7px;border-bottom:1px solid var(--border-color);text-align:right;white-space:nowrap;}
 .mrep-table th:first-child,.mrep-table td:first-child{text-align:left;}
 .mrep-table thead th{position:sticky;top:0;background:var(--card-bg);font-weight:700;z-index:1;}

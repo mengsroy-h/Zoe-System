@@ -374,7 +374,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | កំហុស runtime ពេល boot (App ពិតក្នុង Chromium) | `boot-runtime.js` |
 | អន្តរកម្ម UI ជម្រៅ + ការប្រណាំងឧបករណ៍ច្រើន + ផ្លូវបរាជ័យ | `ui-flow-test.js` |
 | រចនាសម្ព័ន្ធទំព័រ/របា Slide/Locker/លុបទាំងអស់ | `page-nav-test.js` |
-| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** | `layout-check.js` |
+| CSS បំបែក / លើសទទឹង លើអេក្រង់តូច · **និង App ដែលនៅជាជួរឈរទូរស័ព្ទលើកុំព្យូទ័រ** · **អត្ថបទហៀរជាន់គ្នាក្នុងក្រឡាតារាងដែល JS សាង** | `layout-check.js` |
 | រូបរាងវាលឆៅក្រៅពី `barcodes` (លេខជាចំនួន, null, XSS) | `field-shape-test.js` |
 | invariant ចំណូល/ស្ថិតិ លើលំដាប់ចៃដន្យ | `revenue-fuzz-test.js` |
 | ការសរសេរដែលចុះយឺតក្រោយ timeout | `slow-write-test.js` |
@@ -1017,6 +1017,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | `.scan-line` | ចលនាលើ `transform` មិនមែន `top` | `top` បង្កើត layout រាល់ស៊ុមចំពេលឌិកូដ |
 | `.page-main` | `height` ថេរ + `flex: none` (`max-width: 991px`) | កាតត្រូវខ្ពស់ដូចគ្នា ២ របៀប (តារាងចំណុច ៥) |
 | `.table-responsive` | `max-height: none; flex: 1` **scope ត្រឹម `.page-main`** | modal រក្សា 62vh |
+| `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **មិនមែន `width: 100%`** | `width:100%` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `nowrap` ធ្វើឲ្យអត្ថបទ **ហៀរជាន់គ្នា** ជំនួសការរមូរផ្តេក (`layout-check` ចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរក្នុងមួយក្រឡា) |
 | `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` | បើភ្លេច ➜ **PTR ស្លាប់** |
 | `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |

@@ -98,14 +98,14 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.27.3` (`zoew-v163`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.16` (`zoekeygen-v86`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.29.0` (`zoew-v167`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.17` (`zoekeygen-v87`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
 `admin` ក្នុង License Project ដាច់ដោយឡែករបស់វា — កុំយកទៅច្រឡំគ្នា។
 
-ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១២៩) · `zto-import/` (Apps Script ខាង
+ថតផ្សេងទៀត ៖ `audit-tools/` (checker ១៣៨) · `zto-import/` (Apps Script ខាង
 server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup/`
 (CLI ដាច់ដោយឡែក + workflow backup) · `.github/workflows/` (`audit.yml` ·
 `backup.yml`) · `docs/HISTORY.md`។
@@ -296,6 +296,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | DOM · state ក្រោយចាកចេញ | គ្មានទិន្នន័យអតិថិជនសល់ | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
 | PTR · ចលនាផ្ទាំង · រមូរ | ⛔ កុំប៉ះដោយគ្មានការស្នើ | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `phone-search-swipe-test` |
 | ទម្រង់បង្ហាញ | អះអាង **២ ខាង** (មិនលើស **និង** មិនច្របាច់) | `layout-check` · `fluid-type-focus-test` |
+| **អថេរ CSS ដែលមិនប្រកាស** | ⛔ `var(--x)` គ្មាន `--x` ➜ **ច្បាប់ទាំងមូលស្លាប់ស្ងាត់ៗ** (មិនមែនត្រឹមពណ៌) | `css-var-test` |
 | **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
 | Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ» | `toast-truth-test` |
 | helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
@@ -309,6 +310,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការការពារ inspect element | ⛔ ពង្រឹងមិនបានទេ — កុំព្យាយាម | 📝 (រចនាសម្ព័ន្ធ) |
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **ថ្ងៃ និងម៉ោង** | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `khmer-timezone-test` |
+| **របាយការណ៍ខែ** | ⛔ ដេរីវេពី **ថ្ងៃ** (node ខែរក្សាតែ ៣ ខែ) · **អានសុទ្ធសាធ** · មូលដ្ឋានដូចអេក្រង់ដើម | `monthly-report-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `app-lock-test` |
 | **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub** | `health-check-test` |
@@ -384,6 +386,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | credential សល់ក្នុង DOM + ការលាក់ secret មុនផ្ញើទៅ Sentry | `secret-hygiene.js` |
 | pull-to-refresh និងការលាក់ navbar/tabbar តាមទិសរមូរ | `gesture-test.js` |
 | លេខទូរស័ព្ទ/Barcode ត្រូវជា TEXT ក្នុង XML របស់ Excel | `export-cells-test.js` |
+| **របាយការណ៍ខែ** ៖ ខែចាស់បាត់ (ដេរីវេពី node ខែ) · លុយ NaN/អវិជ្ជមាន · ២ មូលដ្ឋានធៀបអេក្រង់ដើម · ថ្ងៃក្លាយជាកាលបរិច្ឆេទក្នុង Excel | `monthly-report-test.js` |
+| **`var(--x)` ដែលគ្មានការប្រកាស** ➜ `border`/`background` ស្លាប់ស្ងាត់ៗ ខណៈ `css-classes` បៃតង | `css-var-test.js` |
 | ល្បឿន, **ជួរអាន** និងភាពត្រឹមត្រូវនៃម៉ាស៊ីនស្កេន Barcode (រួមទាំងការអានលេខខុសឆ្លង format) | `scan-engine-test.js` |
 | ការពឹងផ្អែកលើ CDN ដែលមិន cache ➜ ស្កេនមិនកើតពេលបណ្តាញដាច់ | `offline-shell-test.js` |
 | SW activate ដោយ APP_SHELL មិនពេញ ➜ ស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ | `sw-install-integrity-test.js` |
@@ -1796,10 +1800,48 @@ bash audit-tools/emu/rules.sh
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
+## ⏳ កំណែ 2.28.0 ➜ 2.29.0 — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+
+| កំណែ | អ្វីដែលអ្នកប្រើត្រូវសាក |
+|---|---|
+| **2.28.0–2.28.2** | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ · កំណែ Apps Script (Lookup) · Sentry `zone` |
+| **2.29.0** | 📈 **របាយការណ៍អាជីវកម្មប្រចាំខែ** ៖ ប៊ូតុង `(...)` ➜ ជ្រើសខែ ➜ Excel និង PDF |
+| **2.29.0** | 🩺 ជួរពិនិត្យសុខភាព **មានគែមពណ៌ពិត** ហើយ (មុននេះ `var(--border)` ខូច ➜ គ្មានគែមសោះ) |
+
+⛔ **អ្នកប្រើត្រូវទាញ App ចុះឡើងវិញ ១ ដង** (`zoew-v167`) មុនសាក។
+ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
+ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
+
 កំណែ **2.27.0** ➜ **2.27.3** ត្រូវបាន **អ្នកប្រើផ្ទៀងផ្ទាត់លើ
-ឧបករណ៍ពិតរួចហើយ** (2026-09-04) ➜ ធាតុទាំងនោះត្រូវលុបចេញពីទីនេះតាមច្បាប់។
-កំណត់ត្រាអចិន្ត្រៃយ៍ (រួមទាំង «សកម្មភាពដែលត្រូវធ្វើដោយដៃ») ស្ថិតក្នុង
-[`docs/HISTORY.md`](docs/HISTORY.md) ផ្នែក ១។
+ឧបករណ៍ពិតរួចហើយ** (2026-09-04)។
+
+## ✅ Sentry error ពី barcode តេស្ត (2026-09-05) — **អ្នកប្រើសម្រេចថាមិនកែ**
+
+⛔ **កុំ «កែ» វាដោយគ្មានការស្នើថ្មី។** នេះជា **ការទទួលយកដោយចេតនា**
+មិនមែនចន្លោះទេ។
+
+**អ្វីដែលឃើញ** ៖ barcode `63678288383` (**១១ ខ្ទង់** ខណៈលេខ ZTO ពិតជា
+**១៤ ខ្ទង់** `771305…`) ➜ Function ឆ្លើយ **HTTP 502 `ZTO_UPSTREAM_REJECTED`**
+➜ client ព្យាយាម ២ ដង ➜ សារ «⚠️ មិនអាចភ្ជាប់ ZTO បាន» ➜ Sentry ចេញ
+**error event**។
+
+**មូលហេតុពិត** ៖ **អ្នកប្រើបញ្ចូលកញ្ចប់តេស្តដែលគ្មានក្នុង ZTO** (បញ្ជាក់
+ដោយអ្នកប្រើផ្ទាល់ 2026-09-05)។ **App មិនមានបញ្ហាទេ** — ZTO ឆ្លើយធម្មតា
+ហើយប្រាប់ថាគ្មានលេខនោះ។
+
+**ការសម្រេចរបស់អ្នកប្រើ** ៖ **មិនកែ** — វាមិនប៉ះការប្រើប្រាស់ពិត។
+
+⚠️ **អ្វីដែលត្រូវដឹង បើថ្ងៃណាវាក្លាយជាបញ្ហាពិត** (ឧ. Sentry ពេញដោយ event
+បែបនេះរហូតដល់បាំង alert លុយ) ៖ `ZTO_UPSTREAM_REJECTED` ជា **កន្តុំរួម** —
+វារួមទាំង «លេខមិនស្គាល់» និង «ZTO មានបញ្ហាពិត»។ ⛔ ការធ្វើឲ្យវាស្ងាត់
+**ទាំងអស់** នឹង **បាំងការដាច់របស់ ZTO ពិត** ➜ ការកែត្រូវចាប់ផ្តើមដោយ
+**យក payload ពិតរបស់ ZTO មកមើលជាមុនសិន** មិនមែនដោយការស្មាន។
+
+⚠️ **សម្មតិកម្មដែលបដិសេធរួច ➜ កុំសាកម្តងទៀត** ៖ `lookupReason: ""` ក្នុង
+breadcrumb **មិនមែនកំហុសទេ**។ server ដាក់សារក្នុងវាល `error` ចំណែក client
+អាន `body.reason` **ដោយចេតនា** — `reason` ត្រូវផ្ញើតែលើផ្លូវ
+`ZTO_CONFIG_INVALID` (`configErrorResponse()`) ដែលជាផ្លូវតែមួយដែលសារខាង
+client ប្រើវា។
 
 ⛔ **រំលឹកសម្រាប់ជុំក្រោយ** ៖ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` ត្រូវបានដាក់
 ក្នុង **Netlify env** (មិនមែនក្នុងកូដ) ដោយផ្អែកលើការវាស់ផលិតកម្មពិត ៖ ZTO

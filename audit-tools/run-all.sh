@@ -96,7 +96,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
-         lookup-burst-test health-check-test; do
+         lookup-burst-test health-check-test monthly-report-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -128,6 +128,7 @@ run "emu/ledger-revert" node audit-tools/emu/ledger-revert-emu-test.js
 run "money-guardian" node audit-tools/money-guardian-test.js
 run "css-classes" node audit-tools/css-classes.js
 run "css-media-override" node audit-tools/css-media-override.js
+run "css-var" node audit-tools/css-var-test.js
 run "animation-cost" node audit-tools/animation-cost.js
 run "layout-thrash (browser ពិត)" node audit-tools/layout-thrash.js
 run "panel-motion (browser ពិត)" node audit-tools/panel-motion-test.js
@@ -300,8 +301,10 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CLOCK_APP_DIR="$BASE" node audit-tools/clock-hygiene.js 2>&1 | tail -1 | sed 's/^/   clock-hygiene:   /'
     COMMENTS_APP_DIR="$BASE" node audit-tools/comments.js 2>&1 | tail -1 | sed 's/^/   comments:        /'
     CSSCLASS_APP_DIR="$BASE" node audit-tools/css-classes.js 2>&1 | tail -1 | sed 's/^/   css-classes:     /'
+    CSSVAR_APP_DIR="$BASE" node audit-tools/css-var-test.js 2>&1 | tail -1 | sed 's/^/   css-var:         /'
     DOMHYG_APP_DIR="$BASE" node audit-tools/dom-hygiene.js 2>&1 | tail -1 | sed 's/^/   dom-hygiene:     /'
     EXPORT_APP_DIR="$BASE" node audit-tools/export-cells-test.js 2>&1 | tail -1 | sed 's/^/   export-cells:    /'
+    MREPORT_APP_DIR="$BASE" node audit-tools/monthly-report-test.js 2>&1 | tail -1 | sed 's/^/   monthly-report:  /'
     CFGPASTE_APP_DIR="$BASE" node audit-tools/firebase-config-paste-test.js 2>&1 | tail -1 | sed 's/^/   firebase-config-paste:/'
     SHEETCACHE_APP_DIR="$BASE" node audit-tools/google-sheets-cache-test.js 2>&1 | tail -1 | sed 's/^/   google-sheets-cache:/'
     SINK_APP_DIR="$BASE" node audit-tools/html-sink-escaping.js 2>&1 | tail -1 | sed 's/^/   html-sink-escaping:/'

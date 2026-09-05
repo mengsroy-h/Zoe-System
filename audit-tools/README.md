@@ -263,6 +263,7 @@ bash audit-tools/emu/rules.sh
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
 | `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ · ច្បាប់ `@media` ដែលស្លាប់ | `CSSMEDIA_APP_DIR` |
+| `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |
 | `listener-leak-test.js` | listener/node កកកុញឆ្លងវដ្តពិត | `LEAK_APP_DIR` · `LEAK_CHROME` |
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
@@ -277,6 +278,7 @@ bash audit-tools/emu/rules.sh
 | `barcode-shape-test.js` | រូបរាង Barcode | `BARCODE_APP_DIR` |
 | `camera-resume-test.js` | កាមេរ៉ាកកក្រោយប្រអប់ native · dependency អវត្តមាន | `CAMERA_APP_DIR` |
 | `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
+| `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel | `MREPORT_APP_DIR` |
 | `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល | `PENDINGKEY_APP_DIR` |
 | `comments.js` · `strip-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment | `STRIP_APP_DIR` |
 | `trimws.js <files>` | លុប trailing whitespace | — |

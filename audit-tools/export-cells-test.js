@@ -80,7 +80,10 @@ vm.createContext(sandbox);
     if (m) vm.runInContext('const ' + name + ' = ' + m[1] + ';', sandbox);
 });
 ['appZoneParts', 'getZoneDateKey', 'getFormattedClockTime',
- 'getFormattedDate', 'getFilteredDataByDate', 'buildExportRows', 'forceExportTextCells'].forEach((name) => {
+ 'getFormattedDate', 'getFilteredDataByDate', 'buildExportRows',
+ // ⛔ `forceExportTextCells()` ប្រតិភូកម្មទៅ helper ទូទៅ ➜ ត្រូវផ្ទុកវាមុន
+ // បើមិនដូច្នេះ sandbox បោះ ReferenceError (សញ្ញាថា checker នេះរត់កូដពិត)។
+ 'forceSheetTextCells', 'forceExportTextCells'].forEach((name) => {
     const fn = sliceFn(src, name);
     ok('រកឃើញ ' + name + '() ក្នុង app.js', !!fn);
     if (fn) vm.runInContext(fn, sandbox);

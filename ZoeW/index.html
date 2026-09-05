@@ -840,6 +840,21 @@ const firebaseConfig = {
     </div>
 </div>
 
+<div id="monthlyReportModal" class="modal">
+    <div class="modal-content" style="max-width: 520px;">
+        <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
+        <p>សង្ខេបចំណូល និងកញ្ចប់ក្នុងមួយខែ គិតចេញពី <b>កំណត់ត្រាប្រចាំថ្ងៃ</b> ដែលរក្សាទុកជានិច្ចក្នុង Database។</p>
+        <select id="monthlyReportMonthSel" data-act="renderMonthlyReport" data-on="change" aria-label="ជ្រើសរើសខែ"></select>
+        <div id="monthlyReportBody" class="mrep-body"></div>
+        <p class="mrep-foot">របាយការណ៍នេះ <b>អានតែប៉ុណ្ណោះ</b> — វាមិនកែទិន្នន័យ ឬលុយអ្វីទាំងអស់។</p>
+        <div class="modal-btns" style="flex-direction: column; gap: 8px;">
+            <button class="btn-confirm" style="background:#1d6f42;" data-act="exportMonthlyReportAsExcel">📗 Excel (.xlsx)</button>
+            <button class="btn-confirm" style="background:#b91c1c;" data-act="exportMonthlyReportAsPDF">📕 PDF (.pdf)</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["monthlyReportModal"]'>បិទ</button>
+        </div>
+    </div>
+</div>
+
 <div class="phone-suggest" id="phoneSuggestBox"></div>
 <div id="globalMoreMenu" class="more-menu">
     <div id="menuContentContainer"></div>

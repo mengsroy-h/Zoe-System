@@ -45,9 +45,27 @@ function sliceFn(src, name) {
     }
     return src.slice(start, i);
 }
+// ⛔ ការប្រកាសដែលរុំច្រើនបន្ទាត់ ធ្វើឲ្យ regex បន្ទាត់តែមួយស្រង់ចេញ **ពាក់កណ្តាល**
+// ➜ `vm` បោះ SyntaxError ➜ checker **ងាប់មុនអះអាងអ្វីសោះ** (វាស់បាន 2.30.0)។
+// ➜ ត្រូវរាប់តង្កៀបឲ្យស៊ី រួចឈប់ត្រឹម `;` នៅជម្រៅ 0។
 function sliceConst(src, name) {
-    const m = src.match(new RegExp('^ *(?:const|let) ' + name + ' = .*$', 'm'));
-    return m ? m[0] : null;
+    const m = new RegExp('^ *(?:const|let) ' + name + ' = ', 'm').exec(src);
+    if (!m) return null;
+    let i = m.index + m[0].length, depth = 0, quote = null;
+    for (; i < src.length; i++) {
+        const c = src[i];
+        if (quote) {
+            if (c === '\\') i++;
+            else if (c === quote) quote = null;
+            continue;
+        }
+        if (c === '"' || c === "'" || c === '`') quote = c;
+        else if (c === '[' || c === '{' || c === '(') depth++;
+        else if (c === ']' || c === '}' || c === ')') depth--;
+        else if (c === ';' && depth === 0) { i++; break; }
+        else if (c === '\n' && depth === 0) break;
+    }
+    return src.slice(m.index, i);
 }
 function unzipEntry(buf, wanted) {
     let offset = 0;
@@ -80,11 +98,15 @@ const src = fs.readFileSync(appFile, 'utf8');
 const writes = [];
 const sandbox = {
     console,
-    Math, String, Number, Object, Array, JSON, Date, isFinite, isNaN, parseFloat, parseInt, RegExp,
+    Math, String, Number, Object, Array, JSON, Date, Set, isFinite, isNaN, parseFloat, parseInt, RegExp,
     exchangeRateRiel: 4100,
     dailyRevenueData: {},
     monthlyRevenueData: {},
     dailyPickupData: {},
+    scanHistory: [],
+    deletedItems: [],
+    dbListenerPendingPaths: new Set(),
+    dbListenerFailedPaths: new Set(),
     getServerNow: () => Date.UTC(2026, 8, 5, 3, 0, 0),
     fb: {
         update: (...a) => { writes.push(['update', a]); return Promise.resolve(); },
@@ -96,7 +118,8 @@ vm.createContext(sandbox);
 
 const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_DATE_KEY_PATTERN',
     'MONTHLY_REPORT_MONTH_PATTERN', 'MONTHLY_REPORT_HEADERS', 'MONTHLY_REPORT_TEXT_COLUMN_INDEXES',
-    'MONTHLY_REPORT_MONEY_TOLERANCE', 'EXPORT_TEXT_COLUMN_INDEXES'];
+    'MONTHLY_REPORT_MONEY_TOLERANCE', 'MONTHLY_REPORT_UNKNOWN', 'EXPORT_TEXT_COLUMN_INDEXES',
+    'DB_LISTENER_KEY_HISTORY', 'DB_LISTENER_KEY_DELETED'];
 CONSTS.forEach((name) => {
     const line = sliceConst(src, name);
     ok('រកឃើញ ' + name + ' ក្នុង app.js', !!line);
@@ -105,9 +128,12 @@ CONSTS.forEach((name) => {
 vm.runInContext('let monthlyReportMonth = "";', sandbox);
 
 const FNS = ['appZoneParts', 'getZoneDateKey', 'ledgerNumber', 'countPickedUpCustomers',
-    'monthlyReportMonthOf', 'monthlyReportPositive', 'monthlyReportMoney', 'monthlyReportCount',
+    'statsMonthOf', 'statsPositive', 'statsMoney', 'statsCount',
     'monthlyReportAvailableMonths', 'buildMonthlyReport', 'monthlyReportRiel',
-    'monthlyReportFilenameBase', 'monthlyReportRows', 'forceSheetTextCells'];
+    'monthlyReportFilenameBase', 'monthlyReportRows', 'forceSheetTextCells',
+    'dbListenerViewIsStale', 'uncollectedBarcodeValue', 'uncollectedItemValue',
+    'uncollectedValueByDate', 'uncollectedValueForMonth', 'collectedValueOf',
+    'collectedValueIsMeasurable', 'collectedMoneyText', 'collectedRielText'];
 FNS.forEach((name) => {
     const fn = sliceFn(src, name);
     ok('រកឃើញ ' + name + '() ក្នុង app.js', !!fn);
@@ -119,6 +145,23 @@ function setData(daily, pickup, monthly) {
     sandbox.dailyRevenueData = daily || {};
     sandbox.dailyPickupData = pickup || {};
     sandbox.monthlyRevenueData = monthly || {};
+    setLive([], []);
+}
+function setLive(history, trash) {
+    sandbox.scanHistory = history || [];
+    sandbox.deletedItems = trash || [];
+    sandbox.dbListenerPendingPaths.clear();
+    sandbox.dbListenerFailedPaths.clear();
+}
+// ⛔ `bc()` សាង barcode ដែលកំណត់ `isDeducted` **ច្បាស់លាស់** —
+// «មិនកំណត់» និង «false» ត្រូវប្រព្រឹត្តដូចគ្នា (លុយនៅក្នុង ledger)។
+function bc(cod, dod, closed, deducted) {
+    const b = { code: 'C' + cod + '_' + dod, cod: cod, dod: dod, isClosed: !!closed };
+    if (deducted !== undefined) b.isDeducted = deducted;
+    return b;
+}
+function item(scanDate, barcodes) {
+    return { id: 'i' + scanDate + barcodes.length, scanDate: scanDate, phone: '012000111', barcodes: barcodes };
 }
 function build(ym) {
     sandbox.__ym = ym;
@@ -287,6 +330,241 @@ scenario('មូលដ្ឋានតែមួយជាមួយអេក្រ�
     ok('អតិថិជនយក = 2 ដូចអេក្រង់', r.days[0].customers === 2, r.days[0].customers);
 });
 
+// ⛔ ថ្នាក់កំហុស ៖ «ចំណូល» ដែលរាប់កញ្ចប់ដែលអតិថិជន *មិនទាន់យក* (កំណែ 2.30.0)។
+//
+// អាជីវកម្មពិត ៖ កញ្ចប់ដែលអតិថិជនមិនយកក្នុង ៧ ថ្ងៃ ➜ `claimAndCleanupItem('abandon')`
+// ➜ `trashReason: 'expired'` · `isDeducted: true` · **ដកលុយចេញ** ➜ កញ្ចប់ត្រឡប់
+// ទៅសាខាកណ្តាល។ ដូច្នេះ ledger ប្រចាំថ្ងៃ **មិនមែនលុយដែលទទួលបានទេ** — វាជា
+// «យករួច + កំពុងរង់ចាំ + លុបដោយដៃ» ➜ វា **ប៉ោង** រហូតដល់កញ្ចប់ដោះស្រាយចប់។
+//
+// ច្បាប់មាស ៖ **`isDeducted` ជាវាលតែមួយគត់ដែលកំណត់លុយ** ➜ «តម្លៃមិនទាន់យក»
+// រាប់តែ barcode ដែល `!isDeducted` (លុយនៅក្នុង ledger) **និង** `!isClosed`
+// (មិនទាន់យក)។ ច្រឡំវាលណាមួយ ➜ លេខលុយខុសភ្លាម ៖
+//   · រាប់ barcode `isDeducted: true` ➜ ដកស្ទួន ➜ ចំណូល **តូចជាងការពិត**
+//   · រំលង barcode បើកក្នុងធុងសំរាម «លុប» (លុយមិនប៉ះ) ➜ **ធំជាងការពិត**
+//   · រាប់ barcode ដែលបិទរួច ➜ ដកលុយដែលទើបតែទទួល ➜ **តូចជាងការពិត**
+scenario('ចំណូល ៖ `isDeducted` និង `isClosed` ជាច្រកទ្វារតែ ២', () => {
+    const one = (barcodes) => vm.runInContext('uncollectedItemValue(__item)',
+        Object.assign(sandbox, { __item: item('2026-09-01', barcodes) }));
+    ok('barcode បើក មិនទាន់ដកលុយ ➜ រាប់ជា «មិនទាន់យក»',
+        JSON.stringify(one([bc(10, 5, false, false)])) === JSON.stringify({ cod: 10, dod: 5 }),
+        JSON.stringify(one([bc(10, 5, false, false)])));
+    ok('⛔ barcode បិទរួច (យករួច) មិនរាប់',
+        one([bc(10, 5, true, false)]).cod === 0);
+    ok('⛔ barcode ដែលដកលុយរួច (ផុតកំណត់/ដក) មិនរាប់',
+        one([bc(10, 5, false, true)]).cod === 0);
+    ok('barcode គ្មានវាល isDeducted = មិនទាន់ដក ➜ រាប់',
+        one([bc(10, 0, false, undefined)]).cod === 10);
+    ok('⛔ ទិសផ្ទុយ ៖ barcode ច្រើនត្រូវបូកគ្នា',
+        one([bc(10, 0, false, false), bc(4, 1, false, false), bc(99, 0, true, false)]).cod === 14);
+
+    setData({ '2026-09-01': { codDollar: 100, dodDollar: 0, totalCount: 10 } },
+        { '2026-09-01': { packagesPickedUp: 7, pickedUpPhones: { '012': 7 } } }, {});
+    setLive([item('2026-09-01', [bc(10, 0, false, false), bc(11, 0, false, false), bc(9, 0, false, false),
+        bc(50, 0, false, true), bc(25, 0, true, false)])], []);
+    const r = build('2026-09');
+    ok('ledger 100 ដក មិនទាន់យក 30 ➜ ចំណូល (យករួច) 70', r.days[0].collectedTotal === 70, r.days[0].collectedTotal);
+    ok('«មិនទាន់យក» = 30', r.days[0].pendingTotal === 30, r.days[0].pendingTotal);
+    ok('⛔ តម្លៃកញ្ចប់ទាំងអស់នៅដដែល 100 (មូលដ្ឋាន ledger មិនត្រូវបាត់)', r.days[0].total === 100, r.days[0].total);
+    ok('ចំណូល + មិនទាន់យក = តម្លៃទាំងអស់', r.days[0].collectedTotal + r.days[0].pendingTotal === r.days[0].total);
+    ok('សរុបប្រចាំខែ ៖ ចំណូល 70', r.totals.collectedTotal === 70, r.totals.collectedTotal);
+    ok('សរុបប្រចាំខែ ៖ តម្លៃទាំងអស់ 100', r.totals.total === 100, r.totals.total);
+});
+
+scenario('ចំណូល ៖ COD និង DOD ត្រូវដកដាច់ដោយឡែក', () => {
+    setData({ '2026-09-01': { codDollar: 60, dodDollar: 40, totalCount: 10 } }, {}, {});
+    setLive([item('2026-09-01', [bc(10, 0, false, false), bc(0, 25, false, false)])], []);
+    const d = build('2026-09').days[0];
+    ok('COD យករួច = 60 − 10 = 50', d.collectedCod === 50, d.collectedCod);
+    ok('DOD យករួច = 40 − 25 = 15', d.collectedDod === 15, d.collectedDod);
+    ok('⛔ COD មិនត្រូវលេប DOD (ផលបូក = 65)', d.collectedTotal === 65, d.collectedTotal);
+    ok('⛔ ទិសផ្ទុយ ៖ ledger COD/DOD នៅដដែល', d.cod === 60 && d.dod === 40, d.cod + '/' + d.dod);
+
+    // ⛔ clamp ត្រូវឈរ **ក្នុងមួយរូបិយវត្ថុ** ៖ DOD មិនទាន់យក ធំជាង DOD ledger
+    // មិនត្រូវទៅកាត់ COD ដែលទទួលបានពិត (ទិន្នន័យចាស់អាចមិនស៊ីគ្នា)។
+    setData({ '2026-09-01': { codDollar: 60, dodDollar: 0, totalCount: 6 } }, {}, {});
+    setLive([item('2026-09-01', [bc(10, 5, false, false)])], []);
+    const skew = build('2026-09').days[0];
+    ok('⛔ DOD មិនទាន់យក លើស ledger ➜ DOD យករួច clamp 0', skew.collectedDod === 0, skew.collectedDod);
+    ok('⛔ ហើយវាមិនត្រូវកាត់ COD យករួច (នៅ 50)', skew.collectedCod === 50, skew.collectedCod);
+});
+
+scenario('ចំណូល ៖ ធុងសំរាមដែល *រក្សា* លុយត្រូវដកចេញដែរ', () => {
+    setData({ '2026-09-02': { codDollar: 60, dodDollar: 0, totalCount: 6 } }, {}, {});
+    setLive([], [item('2026-09-02', [bc(20, 0, false, false)])]);
+    ok('ធាតុ «លុប» (លុយមិនប៉ះ) ត្រូវដកចេញ ➜ 40',
+        build('2026-09').days[0].collectedTotal === 40, build('2026-09').days[0].collectedTotal);
+    setLive([], [item('2026-09-02', [bc(20, 0, false, true)])]);
+    ok('⛔ ធាតុ «ដក/ផុតកំណត់» ដកលុយរួច ➜ មិនដកម្តងទៀត ➜ 60',
+        build('2026-09').days[0].collectedTotal === 60, build('2026-09').days[0].collectedTotal);
+    setLive([], [item('2026-09-02', [bc(20, 0, true, false)])]);
+    ok('ធាតុ «យករួច» ក្នុងធុងសំរាម ➜ ចំណូលនៅ 60',
+        build('2026-09').days[0].collectedTotal === 60, build('2026-09').days[0].collectedTotal);
+    setLive([item('2026-09-02', [bc(10, 0, false, false)])], [item('2026-09-02', [bc(15, 0, false, false)])]);
+    ok('⛔ ប្រវត្តិ និងធុងសំរាមរាប់ជា *ផលបូក* មិនមែនជំនួសគ្នា ➜ 35',
+        build('2026-09').days[0].collectedTotal === 35, build('2026-09').days[0].collectedTotal);
+});
+
+scenario('ចំណូល ៖ ខែដែលដោះស្រាយចប់ ➜ ចំណូល = តម្លៃទាំងអស់', () => {
+    // ⛔ មូលហេតុដែលការ **ដក** ត្រូវជាងការបូកតម្លៃ barcode ដែលបិទ ៖ ធុងសំរាម
+    // រក្សាតែ ៣០ ថ្ងៃ (ធាតុ `expired` ត្រឹម ២ ថ្ងៃ) តែ ledger រក្សា **ជានិច្ច**។
+    setData({
+        '2026-01-04': { codDollar: 12.5, dodDollar: 7.5, totalCount: 4 },
+        '2026-01-05': { codDollar: 10, dodDollar: 0, totalCount: 2 }
+    }, { '2026-01-04': { packagesPickedUp: 4, pickedUpPhones: { '012': 4 } } }, {});
+    const r = build('2026-01');
+    ok('គ្មានកញ្ចប់រង់ចាំទៀត ➜ ចំណូល = តម្លៃទាំងអស់', r.totals.collectedTotal === r.totals.total, r.totals.collectedTotal);
+    ok('ចំណូលខែចាស់ = 30', r.totals.collectedTotal === 30, r.totals.collectedTotal);
+    ok('មិនទាន់យក = 0', r.totals.pendingTotal === 0, r.totals.pendingTotal);
+});
+
+scenario('ចំណូល ៖ ការត្រងខែ និងថ្ងៃត្រូវច្បាស់', () => {
+    setData({ '2026-09-01': { codDollar: 50, dodDollar: 0, totalCount: 5 },
+        '2026-09-02': { codDollar: 50, dodDollar: 0, totalCount: 5 } }, {}, {});
+    setLive([item('2026-08-31', [bc(40, 0, false, false)]), item('2026-10-01', [bc(40, 0, false, false)]),
+        item('2026-09-02', [bc(20, 0, false, false)]),
+        { id: 'bogus', scanDate: 'nope', barcodes: [bc(77, 0, false, false)] }], []);
+    const r = build('2026-09');
+    const d1 = r.days.filter((d) => d.date === '2026-09-01')[0];
+    const d2 = r.days.filter((d) => d.date === '2026-09-02')[0];
+    ok('⛔ ខែជិតខាងមិនកាត់ចំណូល', d1.collectedTotal === 50, d1.collectedTotal);
+    ok('⛔ តម្លៃមិនទាន់យកចុះលើ *ថ្ងៃស្កេន* របស់វា', d2.collectedTotal === 30, d2.collectedTotal);
+    ok('សរុប = 80', r.totals.collectedTotal === 80, r.totals.collectedTotal);
+    const map = vm.runInContext('uncollectedValueByDate()', sandbox);
+    ok('⛔ កូនសោថ្ងៃមិនត្រូវទម្រង់ត្រូវរំលង', map['nope'] === undefined, JSON.stringify(Object.keys(map)));
+    sandbox.__map = map;
+    const aug = vm.runInContext('uncollectedValueForMonth(__map, "2026-08")', sandbox);
+    ok('uncollectedValueForMonth() ប្រមូលតាមខែ', aug.cod === 40, JSON.stringify(aug));
+    ok('⛔ ខែគ្មានទិន្នន័យ ➜ សូន្យ មិនមែន NaN',
+        vm.runInContext('uncollectedValueForMonth(__map, "2025-01")', sandbox).cod === 0);
+});
+
+scenario('ចំណូល ៖ រូបរាងឆៅ · clamp · មិនបោះ', () => {
+    setData({ '2026-09-01': { codDollar: 10, dodDollar: 0, totalCount: 1 } }, {}, {});
+    setLive([item('2026-09-01', [bc(999, 0, false, false)])], []);
+    const over = build('2026-09');
+    ok('⛔ មិនទាន់យក ធំជាង ledger ➜ clamp ត្រឹម 0 (មិនអវិជ្ជមាន)',
+        over.days[0].collectedTotal === 0 && over.totals.collectedTotal === 0, over.days[0].collectedTotal);
+    ok('⛔ «មិនទាន់យក» ក៏មិនត្រូវលើសតម្លៃទាំងអស់', over.days[0].pendingTotal === 10, over.days[0].pendingTotal);
+
+    setData({ '2026-09-01': { codDollar: 20, dodDollar: 0, totalCount: 2 } }, {}, {});
+    setLive([{ id: 'legacy', scanDate: '2026-09-01', cod: '5', dod: null, isClosed: false }], []);
+    ok('ធាតុចាស់ (គ្មានជួរ barcodes) ក៏រាប់ដែរ ➜ 15',
+        build('2026-09').days[0].collectedTotal === 15, build('2026-09').days[0].collectedTotal);
+    setLive([item('2026-09-01', [bc(-30, 0, false, false)])], []);
+    ok('⛔ តម្លៃ barcode អវិជ្ជមានមិនត្រូវធ្វើឲ្យចំណូលធំជាង ledger',
+        build('2026-09').days[0].collectedTotal === 20, build('2026-09').days[0].collectedTotal);
+    setLive([item('2026-09-01', [bc(-30, 0, false, false), bc(5, 0, false, false)])], []);
+    ok('⛔ barcode អវិជ្ជមានមិនត្រូវលុបតម្លៃរបស់បងប្អូន',
+        build('2026-09').days[0].collectedTotal === 15, build('2026-09').days[0].collectedTotal);
+
+    let bad = 0, ran = 0;
+    const junk = [[null, null], [[null, undefined, 5, 'x'], [{ scanDate: '2026-09-01' }]],
+        ['nope', { a: 1 }], [[{ scanDate: '2026-09-01', barcodes: 'nope' }],
+            [{ scanDate: '2026-09-01', barcodes: [null, { cod: {}, dod: [] }] }]]];
+    junk.forEach((set) => {
+        sandbox.scanHistory = set[0];
+        sandbox.deletedItems = set[1];
+        ran++;
+        try {
+            const r = build('2026-09');
+            const finite = r.days.every((d) => [d.collectedCod, d.collectedDod, d.collectedTotal, d.pendingTotal]
+                .every((n) => Number.isFinite(n) && n >= 0));
+            if (!finite) { bad++; console.log('        NaN/អវិជ្ជមាន ៖ ' + JSON.stringify(r.days)); }
+        } catch (e) { bad++; console.log('        បោះ ៖ ' + e.message); }
+    });
+    ok('⛔ ' + ran + ' ទិដ្ឋភាពសំរាម ➜ បោះ ឬ NaN ' + bad + ' ដង', bad === 0);
+    ok('⛔ ជាន់អប្បបរមា ៖ សាកយ៉ាងតិច ៤ ទិដ្ឋភាព', ran >= 4, ran);
+});
+
+scenario('⛔ ភាពស្មោះត្រង់ ៖ ទិដ្ឋភាពមិនទាន់មកដល់ ➜ មិនអះអាងលេខលុយ', () => {
+    // ការដក «តម្លៃមិនទាន់យក» ត្រូវការទិដ្ឋភាព **ពេញលេញ** ៖ បើ listener ប្រវត្តិ
+    // ឬធុងសំរាមមិនទាន់មកដល់ នោះ `scanHistory` ទទេ ➜ ចំណូល = តម្លៃទាំងអស់
+    // **ដោយខុស** ➜ ត្រូវរាយថា «វាស់មិនបាន» មិនមែនលេខក្លែងក្លាយ។
+    setData({ '2026-09-01': { codDollar: 100, dodDollar: 0, totalCount: 10 } }, {}, {});
+    setLive([item('2026-09-01', [bc(30, 0, false, false)])], []);
+    ok('ទិដ្ឋភាពគ្រប់ ➜ វាស់បាន', build('2026-09').totals.collectedMeasurable === true);
+    sandbox.dbListenerPendingPaths.add(vm.runInContext('DB_LISTENER_KEY_HISTORY', sandbox));
+    ok('⛔ listener ប្រវត្តិមិនទាន់មកដល់ ➜ collectedMeasurable = false',
+        build('2026-09').totals.collectedMeasurable === false);
+    sandbox.dbListenerPendingPaths.clear();
+    sandbox.dbListenerFailedPaths.add(vm.runInContext('DB_LISTENER_KEY_DELETED', sandbox));
+    ok('⛔ listener ធុងសំរាមងាប់ ➜ collectedMeasurable = false',
+        build('2026-09').totals.collectedMeasurable === false);
+    sandbox.dbListenerFailedPaths.clear();
+    ok('⛔ ទិសផ្ទុយ ៖ ដោះស្រាយរួច ➜ វាស់បានវិញ', build('2026-09').totals.collectedMeasurable === true);
+    ok('⛔ ច្រកទ្វារឆ្លងកាត់ dbListenerViewIsStale() (មូលដ្ឋានតែមួយ)',
+        (sliceFn(src, 'collectedValueIsMeasurable') || '').indexOf('dbListenerViewIsStale') !== -1);
+});
+
+scenario('ចំណូល ៖ អត្ថបទបង្ហាញ (ជា $ និង ៛)', () => {
+    // ⛔ អ្នកប្រើសុំ **ទាំង $ ទាំង ៛** ➜ វាស់ជា *ឥរិយាបថ* មិនមែនស្កេនឈ្មោះអថេរ។
+    sandbox.__v = 549.64;
+    ok('បង្ហាញជាដុល្លារ', vm.runInContext('collectedMoneyText(__v, true)', sandbox) === '$549.64');
+    const riel = vm.runInContext('collectedRielText(__v, true)', sandbox);
+    ok('បង្ហាញជារៀល (អត្រា 4100)', riel.indexOf('៛') !== -1 && /2[,.]253[,.]524/.test(riel), riel);
+    const marker = vm.runInContext('MONTHLY_REPORT_UNKNOWN', sandbox);
+    const unknown = vm.runInContext('collectedMoneyText(__v, false)', sandbox);
+    ok('⛔ វាស់មិនបាន ➜ មិនត្រូវបង្ហាញលេខលុយ',
+        unknown === marker && unknown.indexOf('549') === -1, unknown);
+    ok('⛔ វាស់មិនបាន ➜ បន្ទាត់រងក៏មិនបង្ហាញរៀល',
+        vm.runInContext('collectedRielText(__v, false)', sandbox).indexOf('៛') === -1);
+    sandbox.__v = -5;
+    ok('⛔ តម្លៃអវិជ្ជមានមិនត្រូវឡើងដល់អេក្រង់',
+        vm.runInContext('collectedMoneyText(__v, true)', sandbox) === '$0.00');
+    sandbox.__v = 'abc';
+    ok('⛔ តម្លៃមិនមែនលេខមិនត្រូវក្លាយជា NaN លើអេក្រង់',
+        vm.runInContext('collectedMoneyText(__v, true)', sandbox) === '$0.00');
+});
+
+scenario('⛔ មូលដ្ឋានតែមួយ ៖ ម៉ូឌុលស្ថិតិទាំង ៣ ប្រើ helper ដដែល', () => {
+    // ⛔ ច្បាប់ចម្លងទី ២ នៃការគណនាលុយ = ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ លេខ ២ ផ្ទុយគ្នា
+    const users = ['buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal'];
+    users.forEach((name) => {
+        const body = sliceFn(src, name) || '';
+        ok(name + '() ហៅ collectedValueOf()', body.indexOf('collectedValueOf') !== -1);
+        ok(name + '() ហៅ collectedValueIsMeasurable()', body.indexOf('collectedValueIsMeasurable') !== -1);
+        ok(name + '() អានតម្លៃមិនទាន់យកពី uncollectedValue*()', /uncollectedValue(ByDate|ForMonth)/.test(body), name);
+    });
+    ok('⛔ ជាន់អប្បបរមា ៖ វាស់លើឯកសារ ១ ដែលមាន function ទាំង ៣',
+        users.every((n) => !!sliceFn(src, n)), users.filter((n) => !sliceFn(src, n)).join(', '));
+    const daily = sliceFn(src, 'openDailyStatsModal') || '';
+    const monthly = sliceFn(src, 'openMonthlyStatsModal') || '';
+    ok('⛔ ម៉ូឌុលថ្ងៃមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', daily.indexOf('ចំណូល (យករួច)') !== -1);
+    ok('⛔ ម៉ូឌុលខែមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', monthly.indexOf('ចំណូល (យករួច)') !== -1);
+    ok('⛔ ម៉ូឌុលទាំង ២ នៅតែបង្ហាញតម្លៃទាំងអស់ដែរ (តម្លាភាព)',
+        daily.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1 && monthly.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1);
+});
+
+scenario('ចំណូល ៖ ជួរឈរនាំចេញ', () => {
+    const headers = vm.runInContext('MONTHLY_REPORT_HEADERS', sandbox);
+    const iCollected = headers.indexOf('ចំណូលយករួច ($)');
+    const iPending = headers.indexOf('មិនទាន់យក ($)');
+    const iAll = headers.indexOf('តម្លៃទាំងអស់ ($)');
+    ok('⛔ ចំណងជើងមានជួរឈរ «ចំណូលយករួច ($)»', iCollected !== -1, JSON.stringify(headers));
+    ok('⛔ ចំណងជើងមានជួរឈរ «មិនទាន់យក ($)»', iPending !== -1, JSON.stringify(headers));
+    ok('⛔ ចំណងជើងនៅរក្សាជួរឈរ «តម្លៃទាំងអស់ ($)» (តម្លាភាព)', iAll !== -1, JSON.stringify(headers));
+    setData({ '2026-09-01': { codDollar: 40, dodDollar: 0, totalCount: 4 } },
+        { '2026-09-01': { packagesPickedUp: 3, pickedUpPhones: { '012': 3 } } }, {});
+    setLive([item('2026-09-01', [bc(10, 0, false, false)])], []);
+    sandbox.__report = build('2026-09');
+    const rows = vm.runInContext('monthlyReportRows(__report)', sandbox);
+    ok('ចំនួនជួរឈរស៊ីនឹងចំណងជើង', rows[0].length === headers.length, rows[0].length + ' ធៀប ' + headers.length);
+    ok('ជួរថ្ងៃ ៖ ចំណូល 30 · មិនទាន់យក 10 · ទាំងអស់ 40',
+        rows[0][iCollected] === 30 && rows[0][iPending] === 10 && rows[0][iAll] === 40, JSON.stringify(rows[0]));
+    ok('ជួរសរុបផ្ទុកលេខដដែល',
+        rows[1][iCollected] === 30 && rows[1][iAll] === 40, JSON.stringify(rows[1]));
+    sandbox.dbListenerPendingPaths.add(vm.runInContext('DB_LISTENER_KEY_HISTORY', sandbox));
+    sandbox.__report = build('2026-09');
+    const dash = vm.runInContext('monthlyReportRows(__report)', sandbox);
+    const marker = vm.runInContext('MONTHLY_REPORT_UNKNOWN', sandbox);
+    ok('⛔ វាស់មិនបាន ➜ ជួរឈរចំណូលនាំចេញជា «—»',
+        dash[0][iCollected] === marker && dash[1][iCollected] === marker, JSON.stringify(dash[0]));
+    ok('⛔ តែជួរឈរ «តម្លៃទាំងអស់» នៅតែជាលេខ (វាមិនអាស្រ័យលើប្រវត្តិ)',
+        dash[0][iAll] === 40, JSON.stringify(dash[0]));
+    sandbox.dbListenerPendingPaths.clear();
+});
+
 scenario('ឈ្មោះឯកសារ និងជួរដេកនាំចេញ', () => {
     setData({ '2026-09-01': { codDollar: 1.5, dodDollar: 2.25, totalCount: 4 } },
         { '2026-09-01': { packagesPickedUp: 1, pickedUpPhones: { '012': 1 } } }, {});
@@ -361,9 +639,9 @@ scenario('CSP ៖ ប៊ូតុងទាំងអស់ឆ្លងកាត�
 });
 
 scenario('⛔ ជាន់អប្បបរមា ៖ ការវាស់មិនត្រូវទទេ', () => {
-    ok('ស្រង់ function យ៉ាងតិច ១៤ ចេញពី app.js ពិត', FNS.every((n) => !!sliceFn(src, n)),
+    ok('ស្រង់ function យ៉ាងតិច ២៣ ចេញពី app.js ពិត', FNS.every((n) => !!sliceFn(src, n)),
         FNS.filter((n) => !sliceFn(src, n)).join(', '));
-    ok('ការវាស់លើសពី ៤០ assertion', pass + fail >= 40, pass + fail);
+    ok('ការវាស់លើសពី ១០០ assertion', pass + fail >= 100, pass + fail);
 });
 
 console.log('');

@@ -726,7 +726,7 @@ const firebaseConfig = {
 
 <div id="dailyStatsModal" class="modal">
     <div class="modal-content" style="max-width: 380px;">
-        <h3>📅 កញ្ចប់ & ចំណូល (COD/DOD) ប្រចាំថ្ងៃ</h3>
+        <h3>📅 កញ្ចប់ & ចំណូល (យករួច) ប្រចាំថ្ងៃ</h3>
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="dailyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
         <div class="modal-btns">
@@ -737,7 +737,7 @@ const firebaseConfig = {
 
 <div id="monthlyStatsModal" class="modal">
     <div class="modal-content" style="max-width: 380px;">
-        <h3>📊 ស្ថិតិចំណូល COD & DOD ៣ ខែចុងក្រោយ</h3>
+        <h3>📊 ស្ថិតិចំណូល (យករួច) ៣ ខែចុងក្រោយ</h3>
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="monthlyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
         <div class="modal-btns">
@@ -843,7 +843,7 @@ const firebaseConfig = {
 <div id="monthlyReportModal" class="modal">
     <div class="modal-content" style="max-width: 520px;">
         <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
-        <p>សង្ខេបចំណូល និងកញ្ចប់ក្នុងមួយខែ គិតចេញពី <b>កំណត់ត្រាប្រចាំថ្ងៃ</b> ដែលរក្សាទុកជានិច្ចក្នុង Database។</p>
+        <p>សង្ខេបចំណូល និងកញ្ចប់ក្នុងមួយខែ គិតចេញពី <b>កំណត់ត្រាប្រចាំថ្ងៃ</b> ដែលរក្សាទុកជានិច្ចក្នុង Database។ <b>ចំណូល = តម្លៃកញ្ចប់ដែលអតិថិជនយករួច</b> ប៉ុណ្ណោះ។</p>
         <select id="monthlyReportMonthSel" data-act="renderMonthlyReport" data-on="change" aria-label="ជ្រើសរើសខែ"></select>
         <div id="monthlyReportBody" class="mrep-body"></div>
         <p class="mrep-foot">របាយការណ៍នេះ <b>អានតែប៉ុណ្ណោះ</b> — វាមិនកែទិន្នន័យ ឬលុយអ្វីទាំងអស់។</p>

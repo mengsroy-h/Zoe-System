@@ -40,6 +40,20 @@ function serve(dir) {
 // ធាតុដែលមានហេតុផលឲ្យលើសទទឹង (តារាង/ដុំកូដ ដែលមាន overflow-x ផ្ទាល់ខ្លួន)
 const ALLOW_OVERFLOW = /^(TABLE|PRE|CODE)$/;
 
+// ⛔ តារាងរបាយការណ៍ខែត្រូវសាងដោយ JS ➜ ការផ្ទុក `index.html` ស្ងាត់ៗ **មិនដែល
+// ឃើញវាសោះ** ➜ ការបំបែក CSS របស់វារស់នៅក្រៅការវាស់។ វាស់បាន (2.30.0) ៖
+// `.mrep-table{width:100%}` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `white-space:nowrap`
+// ធ្វើឲ្យអត្ថបទ **ហៀរចេញក្រៅក្រឡា ជាន់លើគ្នា** ជំនួសការរមូរផ្តេក ➜ លេខលុយ
+// អានមិនចេញ ខណៈ «modal សមនឹងអេក្រង់» នៅ **បៃតង** (ក្រឡាមិនលើសអេក្រង់ទេ)។
+// ➜ ត្រូវចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរ **ក្នុងមួយក្រឡា**។
+function reportHeaders(root) {
+    const f = path.join(root, 'ZoeW', 'app.js');
+    if (!fs.existsSync(f)) return [];
+    const m = /const MONTHLY_REPORT_HEADERS = \[([\s\S]*?)\];/.exec(fs.readFileSync(f, 'utf8'));
+    if (!m) return [];
+    return (m[1].match(/'([^']*)'/g) || []).map((x) => x.slice(1, -1));
+}
+
 // ⛔ ការអះអាង «គ្មានធាតុលើសអេក្រង់» ជាការអះអាង **ម្ខាង** — App ដែលនៅជាជួរឈរ
 // ទទឹងទូរស័ព្ទលើកុំព្យូទ័រ ក៏ជាប់ដែរ។ ការត្រួតពិនិត្យខាងក្រោមជាខាងទីពីរ៖
 // លើអេក្រង់ធំ layout ត្រូវ **ប្រើកន្លែងពិត** និង **បត់ទៅជាជួរឈរច្រើន**។
@@ -162,6 +176,42 @@ const cardRowsAt = (page, cfg) => page.evaluate((c) => {
                 if (r && r.boxIssue) modalBad.push(mid + ' ➜ ' + r.boxIssue);
             }
             check(modalBad.length === 0, label + ': modal ទាំងអស់សមនឹងអេក្រង់', modalBad.slice(0, 5).join('\n        '));
+
+            if (app === 'ZoeW') {
+                const headers = reportHeaders(ROOT);
+                const cellR = headers.length ? await page.evaluate((hs) => {
+                    const body = document.getElementById('monthlyReportBody');
+                    const modal = document.getElementById('monthlyReportModal');
+                    if (!body || !modal) return { skip: true };
+                    const prevAll = [...document.querySelectorAll('.modal')].map((x) => [x, x.style.display]);
+                    prevAll.forEach(([x]) => { x.style.display = 'none'; });
+                    modal.style.display = 'flex';
+                    const prevBody = body.innerHTML;
+                    const cell = (i) => (i === 0 ? '2026-09-01' : (i === hs.length - 1 || i === hs.length - 2 ? '122' : '$1,234.56'));
+                    const row = '<tr>' + hs.map((h, i) => '<td>' + cell(i) + '</td>').join('') + '</tr>';
+                    body.innerHTML = '<div class="mrep-table-wrap"><table class="mrep-table"><thead><tr>'
+                        + hs.map((h) => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>' + row + row + '</tbody></table></div>';
+                    const wrap = body.querySelector('.mrep-table-wrap');
+                    const table = body.querySelector('.mrep-table');
+                    const cells = [...body.querySelectorAll('.mrep-table th, .mrep-table td')];
+                    const clipped = cells.filter((c) => c.scrollWidth > c.clientWidth + 1)
+                        .map((c) => (c.textContent || '').slice(0, 14) + ' ' + c.scrollWidth + '>' + c.clientWidth);
+                    const needsScroll = Math.round(table.getBoundingClientRect().width) > wrap.clientWidth + 1;
+                    const canScroll = /(auto|scroll)/.test(getComputedStyle(wrap).overflowX);
+                    body.innerHTML = prevBody;
+                    prevAll.forEach(([x, d]) => { x.style.display = d; });
+                    return { clipped, needsScroll, canScroll, cols: hs.length };
+                }, headers) : { skip: true };
+                if (cellR.skip) {
+                    check(false, label + ': វាស់តារាងរបាយការណ៍ខែបាន', 'រក MONTHLY_REPORT_HEADERS ឬ #monthlyReportBody មិនឃើញ');
+                } else {
+                    check(cellR.clipped.length === 0,
+                        label + ': ⛔ ក្រឡាតារាងរបាយការណ៍ (' + cellR.cols + ' ជួរឈរ) មិនហៀរជាន់គ្នា',
+                        cellR.clipped.slice(0, 4).join('\n        '));
+                    check(!cellR.needsScroll || cellR.canScroll,
+                        label + ': តារាងរបាយការណ៍ធំជាងកន្សោម ➜ ត្រូវរមូរផ្តេកបាន');
+                }
+            }
 
             if (DESKTOP[app] && (size.w === 412 || size.w === 1280 || size.w === 1440)) {
                 shape[size.w] = await cardRowsAt(page, DESKTOP[app]);

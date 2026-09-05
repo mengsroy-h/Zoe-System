@@ -114,6 +114,7 @@ const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 
 const REAL_FNS = [
     'barcodeEntriesOf',
+    'recalcItemMoneyFromBarcodes',
     'normalizeBarcodesOf',
     'applyBarcodeCloseState',
     'barcodeCloseIsRipe',

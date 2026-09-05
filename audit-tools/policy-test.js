@@ -53,7 +53,12 @@ function buildRunner(appFile) {
         '            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };',
         'remove');
 
-    const prelude = `
+    // ⛔ helper ពិតត្រូវស្រង់ចេញពី `app.js` — មិនចម្លងដោយដៃ (តេស្តលើកូដចម្លង
+    // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា
+    // តាំងពីកំណែ 2.30.2 ដែលរួបរួមរូបមន្តលុយទៅកន្លែងតែមួយ។
+    const moneyHelper = fnBody(src, 'function recalcItemMoneyFromBarcodes(', 'recalcItemMoneyFromBarcodes');
+
+    const prelude = moneyHelper + `
         var NOW = 1000000;
         function getServerNow() { return NOW; }
         function getFormattedDate() { return '2026-08-19'; }

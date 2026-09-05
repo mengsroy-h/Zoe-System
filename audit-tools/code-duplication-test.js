@@ -30,6 +30,12 @@ const FN_MIN_STMTS = 3;
 const FN_MIN_CHARS = 120;
 const BLOCK_WINDOW = 4;
 const BLOCK_MIN_CHARS = 200;
+// ⛔ detector រចនាសម្ព័ន្ធ ៖ ពិដានខ្ពស់ជាង ព្រោះកូដខ្លីៗច្រើនមានរូបរាងដូចគ្នា
+// ដោយចៃដន្យ។ លេខនេះជា **កម្រិតដែលវាស់រួច** ៖ ជុំ 2026-09-05 រកឃើញថា
+// រូបមន្តលុយ `X.cod = Math.round(X.barcodes.reduce(…))` រស់នៅ **១១ កន្លែង**
+// ខណៈ detector អក្សរចាប់បានតែ **៥** — ៦ ទៀតខុសត្រឹមឈ្មោះ parameter របស់
+// arrow function (`(s, b)` ធៀប `(sum, b)` ធៀប `(sum, bc)`) និងឈ្មោះ array។
+const STRUCT_MIN_CHARS = 260;
 
 const SHIP_FILES = [
     'ZoeW/app.js',
@@ -66,6 +72,28 @@ const ACCEPTED = [
         // ២ function ដែលប៉ះលុយ **ដោយផ្ទាល់** ដើម្បីលុបការជាន់គ្នា ១៥ បន្ទាត់។
         // ផ្ទៃហានិភ័យធំជាងអត្ថប្រយោជន៍ ➜ **ទទួលយកដោយចេតនា** (2026-09-05)។
         reason: 'closure លើអថេរក្នុងស្រុក ៦ — ការរួបរួមប៉ះផ្លូវលុយ ~៤០ បន្ទាត់ ដើម្បីលុប ១៥'
+    },
+    {
+        file: 'ZoeW/app.js',
+        signature: 'const finalDiffY = endedTouch ? endedTouch.clientY - startY : 0;',
+        // ⛔ `finishMainSwipe` និង `finishScrollerSwipe` ចែកក្បាល ៦ បន្ទាត់
+        // (អាន touch ដែលលើក · គណនា diff · ច្រកចេញ PTR) រួច **បែកគ្នាទាំងស្រុង**
+        // ៖ មួយសម្រេច `pendingAction`; មួយទៀតគណនា `finalDownward`/`shouldExpand`។
+        // ⛔ វាស្ថិតក្នុង **តំបន់ហាមចូល** របស់ `CLAUDE.md` (PTR · ចលនាផ្ទាំង ·
+        // ការរមូរ) ដែលត្រូវការ ~១១ ជុំ និងការថយក្រោយ ២ ដងទំរាំត្រូវ ហើយ
+        // `CLAUDE.md` ហាមកែវាដោយគ្មានការស្នើពីអ្នកប្រើ។
+        reason: 'តំបន់ហាមចូល (PTR · កាយវិការ · ការរមូរ) — ក្បាលរួម ៦ បន្ទាត់ តែតួបែកគ្នាទាំងស្រុង'
+    },
+    {
+        file: 'ZoeW/app.js',
+        signature: 'const allClosedLocal = freshItem.barcodes.every(b => b.isClosed);',
+        // ⛔ គូ **ដោយចេតនា** ៖ ច្បាប់ចម្លងទី ១ ធ្វើលើ **សតិ** (`freshItem` —
+        // ទិដ្ឋភាពរបស់ទូរស័ព្ទនេះ) ចំណែកទី ២ ធ្វើលើ **record របស់ server**
+        // ខាងក្នុង `runTransaction` (`currentItem`)។ `CLAUDE.md` ចែងថា «រាល់ការ
+        // កែកញ្ចប់ធ្វើដោយ `runTransaction` លើ record របស់ *server* មិនមែនលើ
+        // ច្បាប់ចម្លងក្នុងសតិទេ» ➜ ការរួបរួមបង្កើត **សោភ្ជាប់រវាងផ្លូវសតិ និង
+        // ផ្លូវ transaction** លើផ្លូវលុយ។ ហានិភ័យធំជាងអត្ថប្រយោជន៍។
+        reason: 'គូចេតនា ៖ ផ្លូវសតិ ធៀប ផ្លូវ transaction លើ server — ការរួបរួមភ្ជាប់ ២ ផ្លូវលុយចូលគ្នា'
     }
 ];
 const acceptedHits = ACCEPTED.map(() => 0);
@@ -177,6 +205,83 @@ function duplicateStatementBlocks(source, ast) {
     return kept;
 }
 
+// ── detector ៣៖ ប្លុកដែល **រូបរាងដូចគ្នា** តែឈ្មោះក្នុងស្រុកខុស ─────────────
+// ⛔ វាជាចន្លោះពិតរបស់ detector ២ ៖ ការប្តូរឈ្មោះអថេរធ្វើឲ្យតក្កវិជ្ជាដដែល
+// មើលទៅជាកូដថ្មី។ literal (សារ · លេខ) **រក្សាដដែល** ➜ ការជាន់គ្នាដែលរាយ
+// ជាតក្កវិជ្ជាដដែលពិត មិនមែនត្រឹមរូបរាងស្រដៀង។
+function structuralSignature(source, nodes) {
+    const slots = new Map();
+    const out = [];
+    function slot(name) {
+        if (!slots.has(name)) slots.set(name, '#' + slots.size);
+        return slots.get(name);
+    }
+    function walk(node, parent) {
+        if (!node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.forEach((c) => walk(c, parent)); return; }
+        if (typeof node.type !== 'string') return;
+        out.push(node.type);
+        if (node.type === 'Identifier') {
+            const isProp = parent && parent.type === 'MemberExpression' && parent.property === node && !parent.computed;
+            const isKey = parent && parent.type === 'Property' && parent.key === node && !parent.computed;
+            // ⛔ property និង key **រក្សាឈ្មោះពិត** — `.cod` ធៀប `.dod` ជា
+            // តក្កវិជ្ជាខុសគ្នា មិនមែនការប្តូរឈ្មោះទេ។
+            out.push(isProp || isKey ? ':' + node.name : ':' + slot(node.name));
+            return;
+        }
+        // ⛔ regex literal ៖ `JSON.stringify(/a/)` = `{}` ➜ **គ្រប់ regex មើលទៅ
+        // ដូចគ្នា** ➜ បញ្ជី `const X_RE = /…/;` ៨ បន្ទាត់ត្រូវរាយជាការជាន់គ្នា
+        // ក្លែងក្លាយ (វាស់បាន ៖ `zto-order-detail.js:12-20`)។ ត្រូវប្រើ `raw`។
+        if (node.type === 'Literal') {
+            out.push(':' + (node.regex ? node.raw : JSON.stringify(node.value)));
+            return;
+        }
+        for (const key of Object.keys(node)) {
+            if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range') continue;
+            const value = node[key];
+            if (value && typeof value === 'object') walk(value, node);
+        }
+    }
+    nodes.forEach((n) => walk(n, null));
+    return out.join('|');
+}
+
+function duplicateStructuralBlocks(source, ast) {
+    const lists = [];
+    walk(ast, (node) => {
+        if (Array.isArray(node.body) && node.body.length && node.body[0] && node.body[0].type) lists.push(node.body);
+        if (Array.isArray(node.consequent) && node.consequent.length) lists.push(node.consequent);
+    });
+    const buckets = new Map();
+    for (const list of lists) {
+        for (let i = 0; i + BLOCK_WINDOW <= list.length; i++) {
+            const win = list.slice(i, i + BLOCK_WINDOW);
+            const raw = win.map((st) => norm(source, st)).join(' ');
+            if (raw.length < STRUCT_MIN_CHARS) continue;
+            const sig = structuralSignature(source, win);
+            if (!buckets.has(sig)) buckets.set(sig, []);
+            buckets.get(sig).push({
+                line: win[0].loc.start.line,
+                endLine: win[BLOCK_WINDOW - 1].loc.end.line,
+                chars: raw.length,
+                text: raw
+            });
+        }
+    }
+    const overlaps = (a, b) => a.line <= b.endLine && b.line <= a.endLine;
+    const groups = [...buckets.values()]
+        .filter((v) => v.length > 1 && new Set(v.map((x) => x.line)).size > 1)
+        // ⛔ អ្វីដែល detector ២ ចាប់រួច មិនត្រូវរាយស្ទួន
+        .filter((v) => new Set(v.map((x) => x.text)).size > 1)
+        .sort((a, b) => b[0].chars - a[0].chars);
+    const kept = [];
+    for (const g of groups) {
+        const covered = kept.some((k) => g.every((l) => k.some((kl) => overlaps(l, kl))));
+        if (!covered) kept.push(g);
+    }
+    return kept;
+}
+
 function acceptedText(rel, text, names) {
     for (let i = 0; i < ACCEPTED.length; i++) {
         const entry = ACCEPTED[i];
@@ -223,6 +328,13 @@ for (const rel of SHIP_FILES) {
         if (acceptedText(rel, group[0].text, null)) continue;
         findings.push({
             kind: 'statement-block', file: rel, chars: group[0].chars,
+            where: group.map((g) => g.line + '-' + g.endLine).join('  |  ')
+        });
+    }
+    for (const group of duplicateStructuralBlocks(source, ast)) {
+        if (group.some((g) => acceptedText(rel, g.text, null))) continue;
+        findings.push({
+            kind: 'structural-block', file: rel, chars: group[0].chars,
             where: group.map((g) => g.line + '-' + g.endLine).join('  |  ')
         });
     }
@@ -302,10 +414,64 @@ const CLEAN = `
     }
 `;
 const cleanAst = parse(CLEAN);
+// probe វិជ្ជមានទី ៣ ៖ តក្កវិជ្ជាដដែល ឈ្មោះខុស ➜ detector ២ **ខកខាន**
+// (នោះជាហេតុផលដែល detector ៣ មាន) តែ detector ៣ **ត្រូវចាប់បាន**។
+function renamedBody(a, b) {
+    const lines = [];
+    let chars = 0;
+    let i = 0;
+    while (i < BLOCK_WINDOW || chars <= STRUCT_MIN_CHARS + 40) {
+        const line = '        holder.field' + i + ' = Math.round(' + a + '.list.reduce(('
+            + a + 'Acc, ' + b + ') => ' + a + 'Acc + (parseFloat(' + b + '.cod) || 0), 0) * 100) / 100;';
+        lines.push(line);
+        chars += line.trim().length + 1;
+        i++;
+    }
+    return lines.join('\n');
+}
+const RENAMED = 'function alphaRenamed(holder, sum, b) {\n' + renamedBody('sum', 'b')
+    + '\n        return holder;\n    }\n'
+    + 'function betaRenamed(holder, total, bc) {\n' + renamedBody('total', 'bc')
+    + '\n        return holder;\n    }\n';
+const renamedAst = parse(RENAMED);
+check('probe វិជ្ជមាន៖ detector រចនាសម្ព័ន្ធចាប់តក្កវិជ្ជាដដែលដែលប្តូរឈ្មោះ',
+    duplicateStructuralBlocks(RENAMED, renamedAst).length >= 1,
+    duplicateStructuralBlocks(RENAMED, renamedAst).length);
+check('probe ៖ detector អក្សរ **ខកខាន** វា (ហេតុផលដែល detector ៣ មាន)',
+    duplicateStatementBlocks(RENAMED, renamedAst).length === 0,
+    duplicateStatementBlocks(RENAMED, renamedAst).length);
+
+// ⛔ probe ទិសផ្ទុយទី ២ ៖ ប្លុក ២ ដែលខុសត្រឹម **ឈ្មោះវាល** មិនមែនការជាន់គ្នា
+// ទេ — `X.cod = …` និង `X.dod = …` ជាតក្កវិជ្ជា **ខុសគ្នា**។ បើថ្ងៃណា
+// `structuralSignature()` ចាប់ផ្តើម normalize property ដែរ វានឹងរាយពួកវាជា
+// ការជាន់គ្នាក្លែងក្លាយ ➜ ការអះអាងនេះធ្លាក់។ (mutation បញ្ជាក់ ៖ ការដក
+// `isProp || isKey` ចេញ ធ្វើឲ្យវាក្រហម។)
+function fieldBody(field) {
+    const lines = [];
+    let chars = 0;
+    let i = 0;
+    while (i < BLOCK_WINDOW || chars <= STRUCT_MIN_CHARS + 40) {
+        const line = '        holder' + i + '.' + field + ' = Math.round(rows.reduce((acc, row) => acc + ('
+            + 'parseFloat(row.' + field + ') || 0), 0) * 100) / 100;';
+        lines.push(line);
+        chars += line.trim().length + 1;
+        i++;
+    }
+    return lines.join('\n');
+}
+const FIELD_DIFF = 'function usesCod(rows) {\n' + fieldBody('cod') + '\n        return rows;\n    }\n'
+    + 'function usesDod(rows) {\n' + fieldBody('dod') + '\n        return rows;\n    }\n';
+const fieldAst = parse(FIELD_DIFF);
+check('probe ទិសផ្ទុយ៖ ប្លុកដែលខុសត្រឹម **ឈ្មោះវាល** មិនមែនការជាន់គ្នា',
+    duplicateStructuralBlocks(FIELD_DIFF, fieldAst).length === 0,
+    duplicateStructuralBlocks(FIELD_DIFF, fieldAst).length);
+
 check('probe ទិសផ្ទុយ៖ កូដស្អាតមិនត្រូវរាយការជាន់គ្នា',
     duplicateFunctionBodies(CLEAN, cleanAst).length === 0
-    && duplicateStatementBlocks(CLEAN, cleanAst).length === 0,
-    duplicateFunctionBodies(CLEAN, cleanAst).length + '/' + duplicateStatementBlocks(CLEAN, cleanAst).length);
+    && duplicateStatementBlocks(CLEAN, cleanAst).length === 0
+    && duplicateStructuralBlocks(CLEAN, cleanAst).length === 0,
+    duplicateFunctionBodies(CLEAN, cleanAst).length + '/' + duplicateStatementBlocks(CLEAN, cleanAst).length
+    + '/' + duplicateStructuralBlocks(CLEAN, cleanAst).length);
 
 console.log('\n         scan: ' + filesParsed + ' files · ' + functionsSeen
     + ' functions · ' + statementsSeen + ' statements · '

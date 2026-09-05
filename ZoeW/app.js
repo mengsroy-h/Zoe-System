@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.1';
+    const APP_VERSION = '2.30.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5016,9 +5016,7 @@
             const merged = [...(base.barcodes || []), ...reclaimed.filter(b => !existingCodes.has(b.code))];
             const updated = { ...base, barcodes: merged };
             updated.count = merged.length;
-            updated.cod = Math.round(merged.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            updated.dod = Math.round(merged.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+            recalcItemMoneyFromBarcodes(updated);
             updated.barcode = merged[0] ? merged[0].code : updated.barcode;
             updated.isClosed = merged.length > 0 && merged.every(b => b.isClosed);
             if (updated.isClosed) {
@@ -5066,9 +5064,7 @@
                     claimedPartial = { ...currentItem, barcodes: staleOpen };
                     const updated = { ...currentItem, barcodes: stillActive };
                     updated.count = stillActive.length;
-                    updated.cod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                    updated.dod = Math.round(stillActive.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                    updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                    recalcItemMoneyFromBarcodes(updated);
                     updated.barcode = stillActive[0].code;
                     updated.isClosed = true;
                     if (!updated.closedAt) updated.closedAt = getServerNow();
@@ -5093,9 +5089,7 @@
                     claimedPartial = { ...currentItem, barcodes: ripeClosed };
                     const updated = { ...currentItem, barcodes: keptBarcodes };
                     updated.count = keptBarcodes.length;
-                    updated.cod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                    updated.dod = Math.round(keptBarcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                    updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+                    recalcItemMoneyFromBarcodes(updated);
                     updated.barcode = keptBarcodes[0].code;
                     updated.isClosed = keptBarcodes.every(b => b.isClosed);
                     if (updated.isClosed) {
@@ -5124,9 +5118,7 @@
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
                 trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b, isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
-                trashItem.cod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-                trashItem.dod = Math.round(trashItem.barcodes.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-                trashItem.price = Math.round((trashItem.cod + trashItem.dod) * 100) / 100;
+                recalcItemMoneyFromBarcodes(trashItem);
                 trashItem.barcode = trashItem.barcodes[0].code;
                 trashItem.deletedAt = getServerNow();
                 if (partialIsPickup) {
@@ -5730,6 +5722,28 @@
         }
     }
 
+    function buildStatCardItem(label, key, cod, dod, count, uncollected, measurable) {
+        const totalD = Math.round((cod + dod) * 100) / 100;
+        const collected = collectedValueOf(cod, dod, uncollected);
+        const pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
+        const div = document.createElement('div');
+        div.className = 'stat-card-item';
+        div.innerHTML = `
+                    <div class="m-title">📅 ${sanitizeInput(label)}៖ ${sanitizeInput(key)}</div>
+                    <div class="m-details">
+                        <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
+                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
+                    </div>
+                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
+                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
+                    </div>
+                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
+                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
+                    </div>
+                `;
+        return div;
+    }
+
     function rejectScanAndRefocus(message) {
         closeModal('phoneModal');
         showToast(message);
@@ -6298,30 +6312,10 @@
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
         } else {
             sortedKeys.forEach(dateStr => {
-                let data = dailyRevenueData[dateStr] || {};
-                let cod = statsMoney(data.codDollar);
-                let dod = statsMoney(data.dodDollar);
-                let totalD = Math.round((cod + dod) * 100) / 100;
-                let count = statsCount(data.totalCount);
-                let collected = collectedValueOf(cod, dod, uncollectedMap[dateStr]);
-                let pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
-
-                let div = document.createElement('div');
-                div.className = 'stat-card-item';
-                div.innerHTML = `
-                    <div class="m-title">📅 ថ្ងៃទី៖ ${sanitizeInput(dateStr)}</div>
-                    <div class="m-details">
-                        <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
-                    </div>
-                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
-                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
-                    </div>
-                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
-                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
-                    </div>
-                `;
-                container.appendChild(div);
+                const data = dailyRevenueData[dateStr] || {};
+                container.appendChild(buildStatCardItem('ថ្ងៃទី', dateStr,
+                    statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
+                    uncollectedMap[dateStr], measurable));
             });
         }
 
@@ -6341,30 +6335,10 @@
             container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
         } else {
             sortedKeys.forEach(ym => {
-                let data = monthlyRevenueData[ym] || {};
-                let cod = statsMoney(data.codDollar);
-                let dod = statsMoney(data.dodDollar);
-                let totalD = Math.round((cod + dod) * 100) / 100;
-                let count = statsCount(data.totalCount);
-                let collected = collectedValueOf(cod, dod, uncollectedValueForMonth(uncollectedMap, ym));
-                let pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
-
-                let div = document.createElement('div');
-                div.className = 'stat-card-item';
-                div.innerHTML = `
-                    <div class="m-title">📅 ខែ៖ ${sanitizeInput(ym)}</div>
-                    <div class="m-details">
-                        <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
-                    </div>
-                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
-                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
-                    </div>
-                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
-                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
-                    </div>
-                `;
-                container.appendChild(div);
+                const data = monthlyRevenueData[ym] || {};
+                container.appendChild(buildStatCardItem('ខែ', ym,
+                    statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
+                    uncollectedValueForMonth(uncollectedMap, ym), measurable));
             });
         }
 
@@ -10107,9 +10081,7 @@
             }
             const updated = { ...currentItem, barcodes: kept };
             updated.count = kept.length;
-            updated.cod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.cod) || 0), 0) * 100) / 100;
-            updated.dod = Math.round(kept.reduce((s, b) => s + (parseFloat(b.dod) || 0), 0) * 100) / 100;
-            updated.price = Math.round((updated.cod + updated.dod) * 100) / 100;
+            recalcItemMoneyFromBarcodes(updated);
             updated.barcode = kept[0].code;
             updated.isClosed = kept.every(b => b.isClosed);
             if (updated.isClosed) {
@@ -10455,9 +10427,7 @@
                     serverOldDod = parseFloat(b.dod) || 0;
                     b.cod = newCod;
                     b.dod = newDod;
-                    target.cod = Math.round(target.barcodes.reduce((sum, bc) => sum + (parseFloat(bc.cod) || 0), 0) * 100) / 100;
-                    target.dod = Math.round(target.barcodes.reduce((sum, bc) => sum + (parseFloat(bc.dod) || 0), 0) * 100) / 100;
-                    target.price = Math.round((target.cod + target.dod) * 100) / 100;
+                    recalcItemMoneyFromBarcodes(target);
                     serverApplied = true;
                     return target;
                 };

@@ -283,6 +283,14 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | `ZTO_UPSTREAM_RETRIES` | `1` | ចំនួនព្យាយាមឡើងវិញពេលបណ្តាញដាច់/5xx (0–3) |
 | `ZTO_CACHE_TTL_MS` | `60000` | Cache លទ្ធផលខាង server (0 = បិទ; អតិបរមា ១០ នាទី) |
 | `ZTO_NOT_FOUND_CACHE_TTL_MS` | `15000` | Cache សាលក្រម «រកមិនឃើញ» (0 = បិទ)។ ខ្លីជាងខាងលើដោយចេតនា ➜ កញ្ចប់ដែល ZTO ទើបបញ្ចូល ត្រូវរកឃើញវិញឆាប់។ វាមិនអាចលើស `ZTO_CACHE_TTL_MS` ទេ |
+| `ZTO_PROBE_BARCODE` | **ទទេ (បិទ)** | បើកការស្ទង់សកម្ម ៖ ដាក់លេខ Waybill **ពិត** មួយ ➜ ឧបករណ៍ ZTO Cookie Sync សុំ Function សាក session ទៅ ZTO មុនអ្នកប្រើស្កេន។ ⛔ **ទទេ = គ្មានការហៅ ZTO បន្ថែមសោះ** (ship អសកម្ម) |
+| `ZTO_PROBE_MIN_GAP_MS` | `60000` | ពិដានល្បឿនខាង **server** នៃការស្ទង់ (0–3,600,000)។ ការស្ទង់ក្នុងចន្លោះនេះឆ្លើយសាលក្រមចាស់ ដោយ **មិនហៅ ZTO**។ តម្លៃធំ = ចរាចរណ៍តិច តែបង្អួចប្រថុយធំជាង |
+
+⛔ **ការស្ទង់សកម្មជារបស់ឧបករណ៍ Windows ប៉ុណ្ណោះ** — ZoeW **មិនហៅវាទេ**។ បើ
+App ហៅវា រាល់ការស្ទង់ដែលធ្លាក់នឹងក្លាយជា error event ក្នុង Sentry ➜ បំពេញ
+Sentry ➜ **បាំង alert លុយ**។ សូមមើល
+[`tools/zto-cookie-sync-windows/README-KH.md`](../tools/zto-cookie-sync-windows/README-KH.md)
+ផ្នែក «ការស្ទង់សកម្ម»។
 
 អ្វីដែលធ្វើឲ្យវាលឿនតាំងពី 2.25.0៖
 

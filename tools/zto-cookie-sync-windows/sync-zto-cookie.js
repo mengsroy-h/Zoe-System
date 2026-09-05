@@ -28,6 +28,11 @@ const DIAG_PATH = '/.netlify/functions/zto-order-detail?diag=1';
 // `diag=1` (ដែលការពារដោយ proxy key) ➜ ផ្លូវ lookup មិនអាចត្រូវបង្ខំឲ្យ
 // អាន blob រាល់ការស្កេនបានឡើយ។
 const DIAG_FRESH_PATH = DIAG_PATH + '&fresh=1';
+// ⛔ ការស្ទង់សកម្ម ៖ វា **ត្រៀម** សាលក្រមឲ្យ Function ដឹងមុនអ្នកប្រើ ប៉ុណ្ណោះ។
+// ការសម្រេចបើក browser នៅតែជារបស់ `shouldRefreshInAuto()` ដដែល ➜ គ្មាន
+// តក្កវិជ្ជាទី ២ ដែលអាចឃ្លាតពីផ្លូវដើម។
+const PROBE_PATH = '/.netlify/functions/zto-order-detail?probe=1';
+const PROBE_TIMEOUT_MS = 15 * 1000;
 const PROXY_KEY_HEADER = 'X-Zoe-Proxy-Key';
 const VERIFY_TIMEOUT_MS = 10 * 1000;
 const VERIFY_DEADLINE_MS = 75 * 1000;
@@ -38,6 +43,18 @@ const NETLIFY_TIMEOUT_MS = 30 * 1000;
 const NETLIFY_RETRY_ATTEMPTS = 3;
 const NETLIFY_RETRY_BASE_MS = 800;
 const NETLIFY_RESPONSE_MAX_BYTES = 1024 * 1024;
+
+// ⛔ ការជូនដំណឹងជា **outbound ប៉ុណ្ណោះ** ៖ helper ផ្ញើទៅ Telegram ហើយ
+// **មិនដែលអាន** សារត្រឡប់មកវិញទេ។ bot ដែល *ទទួល* ពាក្យបញ្ជា នឹងក្លាយជា
+// ផ្លូវរត់កូដពីចម្ងាយចូលម៉ាស៊ីនដែលកាន់ Netlify PAT (DPAPI) ➜ ថ្នាក់ហានិភ័យ
+// ថ្មីទាំងស្រុង។ ⛔ កុំបន្ថែម `getUpdates` ឬ webhook ដោយគ្មានការស្នើច្បាស់លាស់។
+const TELEGRAM_API_ORIGIN = 'https://api.telegram.org';
+const TELEGRAM_TIMEOUT_MS = 10 * 1000;
+// ⛔ ការរត់រាល់ ១ នាទីក្នុង ១៦ ម៉ោង = ៩៦០ ជុំ/ថ្ងៃ ➜ Netlify ដាច់ពេញថ្ងៃ
+// នឹងផ្ញើសារដដែលរាប់រយដង ➜ អ្នកប្រើបិទការជូនដំណឹង ➜ សារពិតលេចបាត់។
+const TELEGRAM_MIN_GAP_MS = 4 * 60 * 60 * 1000;
+const TELEGRAM_CHAT_ID_RE = /^-?[0-9]{1,20}$/;
+const NOTIFY_REASON_RE = /^[A-Z_]{1,40}$/;
 
 const COOKIE_NAME_RE = /^[A-Za-z0-9!#$%&'*+\-.^_`|~]{1,128}$/;
 const COOKIE_VALUE_RE = /^[\x21-\x3a\x3c-\x7e]{0,4096}$/;
@@ -148,7 +165,9 @@ function statePaths() {
         root,
         config: path.join(root, 'config.json'),
         token: path.join(root, 'netlify-token.dpapi'),
-        proxyKey: path.join(root, 'proxy-key.dpapi')
+        proxyKey: path.join(root, 'proxy-key.dpapi'),
+        telegramToken: path.join(root, 'telegram-token.dpapi'),
+        notifyState: path.join(root, 'notify-state.json')
     };
 }
 
@@ -188,6 +207,12 @@ function validateToken(raw) {
     return token;
 }
 
+function validateChatId(raw) {
+    const text = String(raw === undefined || raw === null ? '' : raw).trim();
+    if (!TELEGRAM_CHAT_ID_RE.test(text)) throw codedError('TELEGRAM_CHAT_INVALID');
+    return text;
+}
+
 function loadConfig(configPath) {
     const target = configPath || statePaths().config;
     let parsed;
@@ -203,7 +228,15 @@ function loadConfig(configPath) {
     } catch (_) {
         siteUrl = '';
     }
-    return { siteId: validateSiteId(parsed && parsed.siteId), siteUrl };
+    // ⛔ តម្លៃស្រេចចិត្ត ៖ អវត្តមាន ឬទម្រង់ខូច **មិនត្រូវធ្វើឲ្យ config
+    // ទាំងមូលធ្លាក់** — ការជូនដំណឹងជាមុខងារបន្ថែម មិនមែនផ្លូវអាជីវកម្មទេ។
+    let telegramChatId = '';
+    try {
+        telegramChatId = validateChatId(parsed && parsed.telegramChatId);
+    } catch (_) {
+        telegramChatId = '';
+    }
+    return { siteId: validateSiteId(parsed && parsed.siteId), siteUrl, telegramChatId };
 }
 
 function readTokenViaPowerShell(options) {
@@ -561,6 +594,54 @@ async function checkCookieHealth(options) {
     }, info);
 }
 
+// ⛔ **fail-open ពេញលេញ** ៖ រាល់ការធ្លាក់ត្រឡប់ `alive: null` — «វាស់មិនបាន»
+// មិនមែន «ស្លាប់»។ ការបង្វែរការធ្លាក់ទៅ `false` ធ្វើឲ្យ ZTO ដាច់ ១ ម៉ោង
+// ក្លាយជា browser លោតឡើងរាល់នាទីពេញម៉ោងនោះ។
+async function probeCookieLive(options) {
+    const config = options || {};
+    let origin = '';
+    try {
+        origin = validateSiteUrl(config.siteUrl);
+    } catch (_) {
+        origin = '';
+    }
+    const proxyKey = String(config.proxyKey || '');
+    if (!origin || !proxyKey) return { alive: null, reason: 'unconfigured', throttled: false };
+    const headers = { Accept: 'application/json' };
+    headers[PROXY_KEY_HEADER] = proxyKey;
+    try {
+        const response = await timedFetch(origin + PROBE_PATH, {
+            method: 'GET',
+            headers
+        }, Object.assign({ timeoutMs: PROBE_TIMEOUT_MS }, config));
+        if (!response || !response.ok) {
+            await discardResponse(response);
+            return { alive: null, reason: 'rejected', throttled: false };
+        }
+        const payload = await readSmallJson(response, 'PROBE_INVALID');
+        const raw = payload && payload.alive;
+        return {
+            alive: raw === true ? true : (raw === false ? false : null),
+            reason: payload && typeof payload.reason === 'string' ? payload.reason : '',
+            throttled: !!(payload && payload.throttled)
+        };
+    } catch (_) {
+        return { alive: null, reason: 'unreachable', throttled: false };
+    }
+}
+
+function describeProbe(probe) {
+    const info = probe || {};
+    if (info.alive === false) return 'PROBE: ZTO rejected the cookie - a new one is needed.';
+    if (info.alive === true) {
+        return 'PROBE: ZTO accepted the cookie'
+            + (info.throttled ? ' (cached verdict, no upstream call).' : '.');
+    }
+    return 'PROBE: not measured'
+        + (info.reason ? ' (' + info.reason + ')' : '')
+        + ' - this is not the same as expired.';
+}
+
 async function resolveVerification(options) {
     const config = options || {};
     if (config.siteUrl !== undefined || config.proxyKey !== undefined) {
@@ -867,6 +948,169 @@ function describeCapturedCookie(cookieHeader) {
     return lines.join('\n');
 }
 
+// ⛔ សុខភាពល្អ ➜ **ស្ងាត់**។ ការជូនដំណឹង «គ្រប់យ៉ាងល្អ» រាប់រយដង/ថ្ងៃ បង្រៀន
+// អ្នកប្រើឲ្យមិនអានវា ➜ សារពិតដែលមកថ្ងៃក្រោយក៏មិនត្រូវអានដែរ។ ដូច្នេះមាន
+// តែ ៣ ស្ថានភាពដែលនិយាយ ៖ ត្រូវការមនុស្ស · ជួសជុលដោយខ្លួនឯង · វាស់មិនបាន។
+function autoNotifyKind(health, outcome) {
+    const state = health || {};
+    if (state.status !== 'ok') return 'blocked';
+    if (state.healthy) return '';
+    return (outcome && outcome.ok) ? 'repaired' : 'needs-human';
+}
+
+// ⛔ សារត្រូវជា ASCII អង់គ្លេស ដូចអត្ថបទ cmd ទាំងអស់ ហើយ **មិនត្រូវផ្ទុក
+// Cookie ឬសោណាមួយ** ៖ Telegram ជា server របស់អ្នកដទៃ ហើយប្រវត្តិ chat រស់នៅ
+// ជារៀងរហូត។ Cookie បង្ហាញលើ cmd បាន (សំណើអ្នកប្រើ) ព្រោះនោះជាអេក្រង់របស់
+// គាត់ផ្ទាល់ — ការចេញក្រៅម៉ាស៊ីនជារឿងផ្សេង។
+function telegramMessage(kind, detail) {
+    const messages = {
+        'needs-human': 'ZTO cookie expired and could not be renewed on its own.'
+            + ' Open the shop PC, run sync-zto-cookie.cmd, and log in to Argus.',
+        repaired: 'ZTO cookie had expired and was renewed automatically. No action needed.',
+        blocked: 'ZTO cookie check could not run. Check the internet connection, then the'
+            + ' Site URL and proxy key in setup.cmd.',
+        test: 'ZTO cookie sync: this is a test message. Notifications are working.'
+    };
+    const text = messages[kind] || 'ZTO cookie sync reported an unknown state.';
+    // ⛔ មូលហេតុត្រូវឆ្លងកាត់ allowlist ៖ តម្លៃដែលហូរចេញពីកន្លែងផ្សេងអាច
+    // ផ្ទុកអ្វីក៏បាន ➜ បញ្ជីតួអក្សរតឹងរឹងជាព្រំដែន មិនមែនការជឿទុកចិត្ត។
+    const reason = detail && detail.reason ? String(detail.reason) : '';
+    return NOTIFY_REASON_RE.test(reason) ? text + ' (' + reason + ')' : text;
+}
+
+// ⛔ ពិដានដែល **ងាប់ស្ងាត់** អាក្រក់ជាងសារស្ទួន ៖ state អានមិនបាន · ត្រា
+// ខូច · នាឡិកាថយក្រោយ ➜ ត្រូវ **ផ្ញើ**។ សារច្រើនពេកមើលឃើញ ហើយកែបាន;
+// ការស្ងាត់ជារៀងរហូតមើលមិនឃើញ រហូតដល់ការស្កេនធ្លាក់នៅហាង។
+function notifyThrottleAllows(state, kind, nowMs, gapMs) {
+    if (!state || typeof state !== 'object') return true;
+    const last = Number(state[kind]);
+    if (!Number.isFinite(last) || last <= 0) return true;
+    const elapsed = Number(nowMs) - last;
+    if (!(elapsed >= 0)) return true;
+    return elapsed >= Number(gapMs);
+}
+
+function readNotifyState(statePath) {
+    try {
+        const text = fs.readFileSync(statePath, 'utf8').replace(/^\uFEFF/, '');
+        const parsed = JSON.parse(text);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function writeNotifyState(state, statePath) {
+    try {
+        fs.mkdirSync(path.dirname(statePath), { recursive: true });
+        fs.writeFileSync(statePath, JSON.stringify(state), 'utf8');
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+// ⛔ **fail-open ពេញលេញ** ៖ helper នេះជាការរាយការណ៍ មិនមែនផ្លូវអាជីវកម្ម ➜
+// វាត្រឡប់ **សាលក្រម** ជានិច្ច និងមិនដែល reject ឡើយ។ ការធ្វើឲ្យការ sync
+// ធ្លាក់ ព្រោះ Telegram ដាច់ គឺជាការប្តូរបញ្ហាតូចទៅជាបញ្ហាធំ។
+async function sendTelegram(text, options) {
+    const config = options || {};
+    let chatId = '';
+    let secret = '';
+    try {
+        chatId = validateChatId(config.chatId);
+        secret = validateToken(config.botToken);
+    } catch (_) {
+        return 'skipped';
+    }
+    // ⛔ Telegram ទទួលសោក្នុង **path របស់ URL** ប៉ុណ្ណោះ (គ្មានជម្រើស header)
+    // ➜ URL នេះជាតម្លៃសម្ងាត់ ➜ **មិនត្រូវបោះពុម្ពវាកន្លែងណាទាំងអស់**។
+    // អត្ថបទសារនៅក្នុង body ដើម្បីកុំឲ្យវាចូល log របស់ proxy ណាមួយ។
+    const url = TELEGRAM_API_ORIGIN + '/bot' + secret + '/sendMessage';
+    const body = JSON.stringify({
+        chat_id: chatId,
+        text: String(text || ''),
+        disable_web_page_preview: true
+    });
+    try {
+        const response = await timedFetch(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body
+        }, Object.assign({ timeoutMs: TELEGRAM_TIMEOUT_MS }, config));
+        const delivered = !!(response && response.ok);
+        await discardResponse(response);
+        return delivered ? 'sent' : 'failed';
+    } catch (_) {
+        return 'failed';
+    } finally {
+        secret = '';
+    }
+}
+
+async function notifyAuto(kind, options) {
+    if (!kind) return 'skipped';
+    const config = options || {};
+    const statePath = config.notifyStatePath || statePaths().notifyState;
+    const now = Number.isFinite(config.nowMs) ? config.nowMs : Date.now();
+    const gapMs = Number.isFinite(config.gapMs) ? config.gapMs : TELEGRAM_MIN_GAP_MS;
+    const state = readNotifyState(statePath);
+    if (!notifyThrottleAllows(state, kind, now, gapMs)) return 'throttled';
+    let chatId = '';
+    try {
+        chatId = validateChatId(loadConfig(config.configPath).telegramChatId);
+    } catch (_) {
+        return 'skipped';
+    }
+    let secret = '';
+    try {
+        secret = await readTokenViaPowerShell(
+            Object.assign({}, config, { tokenPath: statePaths().telegramToken })
+        );
+    } catch (_) {
+        return 'skipped';
+    }
+    let verdict;
+    try {
+        verdict = await sendTelegram(
+            telegramMessage(kind, config.detail),
+            Object.assign({}, config, { chatId, botToken: secret })
+        );
+    } catch (_) {
+        verdict = 'failed';
+    } finally {
+        secret = '';
+    }
+    if (verdict === 'sent') {
+        const next = Object.assign({}, state && typeof state === 'object' ? state : {});
+        next[kind] = now;
+        writeNotifyState(next, statePath);
+    }
+    return verdict;
+}
+
+function describeNotify(verdict) {
+    const messages = {
+        sent: 'OK: the Telegram message was delivered.',
+        failed: 'ERROR: Telegram did not accept the message. Check the chat id and the bot token.',
+        skipped: 'INFO: Telegram is not configured yet. Run setup.cmd and fill in the two Telegram prompts.',
+        throttled: 'INFO: the same alert was already sent recently, so this one was held back.'
+    };
+    return messages[verdict] || 'INFO: nothing to report.';
+}
+
+// ⛔ ការរាយការណ៍មិនត្រូវក្លាយជាមូលហេតុនៃការធ្លាក់ ៖ រាល់ការបោះខាងក្នុង
+// ត្រូវលេប ដើម្បីកុំឲ្យវាជំនួសកំហុសដើមដែលកំពុងហូរឡើងលើ។ `autoHealth` ជា
+// `null` លើការរត់ដោយដៃ ➜ គ្មានការជូនដំណឹង (មនុស្សឈរមើលអេក្រង់ស្រាប់)។
+async function reportAutoOutcome(health, outcome) {
+    if (!health) return;
+    try {
+        const kind = autoNotifyKind(health, outcome);
+        if (!kind) return;
+        await notifyAuto(kind, { detail: { reason: outcome && outcome.code } });
+    } catch (_) {}
+}
+
 async function main() {
     if (process.argv.includes('--auto-ready')) {
         const readiness = autoReadiness(await resolveVerification());
@@ -881,10 +1125,46 @@ async function main() {
         return;
     }
 
-    if (process.argv.includes('--auto')) {
-        const health = await checkCookieHealth(await resolveVerification());
-        console.log(describeHealth(health));
-        if (!shouldRefreshInAuto(health)) {
+    if (process.argv.includes('--test-telegram')) {
+        console.log('Sending a test message to Telegram...');
+        // ⛔ `gapMs: 0` រំលងពិដានដោយចេតនា ៖ ការសាកដែលត្រូវទប់ដោយពិដាន
+        // មិនប្រាប់អ្វីអំពីការកំណត់ទេ។ ការកំណត់ដែលផ្ទៀងផ្ទាត់មិនបាន
+        // គឺជាការកំណត់ដែលមិនទាន់ផ្ទៀងផ្ទាត់។
+        const verdict = await notifyAuto('test', { gapMs: 0 });
+        console.log(describeNotify(verdict));
+        if (verdict !== 'sent') process.exitCode = 1;
+        return;
+    }
+
+    if (process.argv.includes('--probe')) {
+        console.log('Asking the Function to test the cookie against ZTO...');
+        console.log(describeProbe(await probeCookieLive(await resolveVerification())));
+        return;
+    }
+
+    const autoMode = process.argv.includes('--auto');
+    let autoHealth = null;
+    if (autoMode) {
+        const verification = await resolveVerification();
+        // ⛔ ការស្ទង់ឈរ **មុន** ការអានសុខភាព ៖ វាធ្វើឲ្យ Function ដាក់
+        // `authRejectedAt` មុនអ្នកប្រើស្កេន ➜ ការអានខាងក្រោមឃើញវាភ្លាម។
+        // ⛔ វា **មិនសម្រេច** អ្វីទេ ៖ ការធ្លាក់របស់វា (alive:null) ទុកឲ្យ
+        // ផ្លូវដើមសម្រេចដដែល។ Function ship អសកម្មរហូតដល់អ្នកប្រើដាក់
+        // `ZTO_PROBE_BARCODE` ➜ ជុំនេះមិនប្តូរអ្វីសោះលើ site ដែលមិនបានបើក។
+        console.log(describeProbe(await probeCookieLive(verification)));
+        // ⛔ ការស្ទង់រត់រាល់នាទី ➜ `fresh: false` ដោយចេតនា ៖ សាលក្រម «ស្លាប់»
+        // មកពី `authRejectedAgeMs` ដែលជាស្ថានភាព **ក្នុងសតិ** របស់ Function
+        // ➜ `fresh=1` មិនធ្វើឲ្យវាដឹងឆាប់ជាងទេ តែវាបង្ខំការអាន Blobs
+        // ១,៤៤០ ដង/ថ្ងៃ។ ⛔ `--check` (ដោយដៃ) នៅ fresh ដដែល។
+        autoHealth = await checkCookieHealth(
+            Object.assign({}, verification, { fresh: false })
+        );
+        console.log(describeHealth(autoHealth));
+        if (!shouldRefreshInAuto(autoHealth)) {
+            // ⛔ សុខភាពល្អ ➜ `autoNotifyKind` ត្រឡប់ទទេ ➜ ស្ងាត់។ ត្រឹម
+            // «unreachable» / «unconfigured» ទេដែលនិយាយ — បើអត់ ការងាប់
+            // ស្ងាត់ជាច្រើនថ្ងៃ មើលមិនឃើញរហូតដល់ការស្កេនធ្លាក់នៅហាង។
+            await reportAutoOutcome(autoHealth, null);
             console.log('No browser needed. Nothing to do.');
             return;
         }
@@ -899,7 +1179,13 @@ async function main() {
     }
 
     console.log('Capturing the cookie from a real request header - no DevTools, no extension...');
-    let cookieHeader = await captureCookieHeader();
+    let cookieHeader;
+    try {
+        cookieHeader = await captureCookieHeader();
+    } catch (error) {
+        await reportAutoOutcome(autoHealth, { ok: false, code: error && error.code });
+        throw error;
+    }
     console.log('OK: cookie captured.');
     console.log(describeCapturedCookie(cookieHeader));
     // ⛔ ការរំលងគូត្រូវ **មើលឃើញ** — ការរំលងស្ងាត់ធ្វើឲ្យបញ្ហាថ្ងៃក្រោយ
@@ -914,9 +1200,13 @@ async function main() {
         await syncNetlifyCookie(cookieHeader);
         console.log('\nOK: the new cookie is in Netlify Blobs - no redeploy needed.');
         await reportVerification(cookieHeader);
+    } catch (error) {
+        await reportAutoOutcome(autoHealth, { ok: false, code: error && error.code });
+        throw error;
     } finally {
         cookieHeader = '';
     }
+    await reportAutoOutcome(autoHealth, { ok: true, code: '' });
 }
 
 if (require.main === module) {
@@ -927,6 +1217,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+    probeCookieLive,
+    describeProbe,
+    autoNotifyKind,
+    telegramMessage,
+    notifyThrottleAllows,
+    sendTelegram,
+    notifyAuto,
+    validateChatId,
+    describeNotify,
     autoReadiness,
     describeCapturedCookie,
     diagnosticsCookie,

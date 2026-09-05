@@ -128,6 +128,8 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក** — 
 ពេល Cookie របស់ ZTO ផុតកំណត់ ៖ រត់
 [`tools/zto-cookie-sync-windows/`](tools/zto-cookie-sync-windows/README-KH.md)
 លើ Windows ➜ វាសរសេរ Cookie ថ្មីចូល **Netlify Blobs** ➜ **មិនបាច់ redeploy**។
+រត់ `schedule-zto-cookie.cmd` ម្តង ➜ វាធ្វើវាដោយខ្លួនឯង (ពេលចូល Windows និង
+រាល់ ៣០ នាទីក្នុងម៉ោងធ្វើការ) ហើយផ្ញើសារ Telegram តែពេលចាំបាច់ត្រូវ Login។
 
 ### ៥. ចេញ Activation Key (ZoeKeyGen)
 

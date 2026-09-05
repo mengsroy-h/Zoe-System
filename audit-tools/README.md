@@ -213,11 +213,11 @@ bash audit-tools/emu/rules.sh
 | `lookup-config-secret-test.js` | Secret របស់ Lookup API ត្រូវអ៊ិនគ្រីប | — |
 | `google-sheets-cache-test.js` | cache ខាង Apps Script | — |
 | `sheet-import-test.js` | នាំចូល Excel ៖ PIN ជាច្រកទ្វារ · *simple request* · secret អ៊ិនគ្រីប · លេខ ០ នាំមុខ | `SHEETIMPORT_APP_DIR` |
-| `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret | `ZTOPROXY_APP_DIR` |
+| `zto-proxy-test.js` | ZTO proxy ៖ ការដក auto-login · ថវិកាពេល · «រកមិនឃើញ» ≠ កំហុស · `?diag=1` គ្មាន secret · **ការស្ទង់សកម្ម `?probe=1`** (ship អសកម្ម · «វាស់មិនបាន» ≠ «ស្លាប់» · ពិដានល្បឿនខាង server · រំលង cache ២ ទិស · App មិនហៅ) | `ZTOPROXY_APP_DIR` |
 | `zto-cookie-store-test.js` | Cookie ក្នុង Netlify Blobs · Blobs មិនមែនចំណុចដាច់តែមួយ · ការបន្តអាយុ (ពិដានទប់ការសរសេរ តែមិនទប់ការចងចាំ) | `ZTOSTORE_APP_DIR` |
 | `zto-budget-test.js` | ⛔ ថវិកាពេលត្រូវគ្របដណ្តប់ handler ទាំងមូល (អាន Cookie + upstream + ការបន្តអាយុ) · 401 ដោយ Cookie ចាស់ក្នុង cache ➜ អានឡើងវិញ ១ ដង | `ZTOBUDGET_APP_DIR` |
 | `zto-negative-cache-test.js` | ⛔ សាលក្រម «រកមិនឃើញ» ត្រូវចូល cache (TTL ខ្លី) ដោយ **ការបរាជ័យបណ្តោះអាសន្នមិនចូល** · ស្នាមភ្ជាប់ ៖ លេខលំនាំដើមក្នុង `ZTO-SETUP-KH.md` ត្រូវស៊ីនឹងកូដ | `ZTONEG_APP_DIR` |
-| `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` · ការព្យាយាមឡើងវិញមានពិដានពេលបណ្តាញដាច់ | `ZTO_SYNC_APP_DIR` |
+| `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` · ការព្យាយាមឡើងវិញមានពិដានពេលបណ្តាញដាច់ · ការចុះឈ្មោះ Task ជា **per-user** (មិនសុំ Administrator) និង trigger ដដែលៗ · ការជូនដំណឹង Telegram (outbound · fail-open · គ្មាន Cookie/សោក្នុងសារ) | `ZTO_SYNC_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។

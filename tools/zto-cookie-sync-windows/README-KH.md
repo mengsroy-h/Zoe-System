@@ -155,6 +155,8 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\config.json
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\netlify-token.dpapi
 %LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\proxy-key.dpapi
+%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\telegram-token.dpapi
+%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync\notify-state.json
 ```
 
 `proxy-key.dpapi` អ៊ិនគ្រីបដោយ **DPAPI ដដែល** នឹង PAT ➜ គ្មានថ្នាក់ហានិភ័យ
@@ -195,8 +197,107 @@ BOS-MAN-SESSION=...; sidebarStatus=0
 | `sync-zto-cookie.cmd` | យក Cookie ថ្មី (ធម្មតា) |
 | `sync-zto-cookie.cmd --check` | **មិនបើក browser** — ត្រឹមប្រាប់ថា Cookie នៅដំណើរការឬអត់ (ប្រភព · ចំនួនបន្តអាយុ · ZTO បដិសេធពេលណា) |
 | `sync-zto-cookie.cmd --auto` | ពិនិត្យជាមុន ➜ បើ Cookie នៅដំណើរការ **មិនបើក browser សោះ**; បើស្លាប់ ទើបយកថ្មី |
-| `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` **រាល់ពេលចូល Windows** |
+| `sync-zto-cookie.cmd --test-telegram` | ផ្ញើសារសាកមួយទៅ Telegram ដើម្បីបញ្ជាក់ថាការជូនដំណឹងដើរពិត |
+| `sync-zto-cookie.cmd --probe` | សុំ Function សាក Cookie ទៅ ZTO ពិត ➜ ប្រាប់ថា session នៅរស់ · ស្លាប់ · ឬវាស់មិនបាន |
+| `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` **ពេលចូល Windows និងរាល់ ១ នាទី** ក្នុងម៉ោងធ្វើការ |
 | `schedule-zto-cookie.cmd remove` | លុប Task នោះវិញ |
+
+### របៀបស្វ័យប្រវត្តិ — Task និងការជូនដំណឹង
+
+`schedule-zto-cookie.cmd` ចុះឈ្មោះ Task **តែមួយ** ឈ្មោះ `Zoe ZTO Cookie Sync`
+ដែលមាន trigger **២** ៖ ពេលចូល Windows · និងរាល់ **១ នាទី** ចាប់ពី **06:00**
+រយៈពេល **១៦ ម៉ោង** (ដល់ 22:00)។ ⛔ trigger ទី ២ ចាំបាច់ ព្រោះ Cookie ដែល
+ស្លាប់ម៉ោង ១០ ព្រឹក បើមាន trigger ចូល Windows តែម្យ៉ាង នឹងរង់ចាំដល់ការ
+restart បន្ទាប់។
+
+⛔ **ហេតុអ្វី ១ នាទី** ៖ Function ដឹងថា Cookie ស្លាប់ **ភ្លាមៗ** ពេល ZTO
+បដិសេធការស្កេនពិត — ការពន្យារទាំងអស់គឺ **ចន្លោះស្ទង់** មិនមែនការរកឃើញ។
+៣០ នាទី ➜ ការស្កេនធ្លាក់រហូតដល់កន្លះម៉ោង; ១ នាទី ➜ បាត់តែ **ការស្កេន
+ដំបូង** ។ ការស្ទង់នោះ **ថោក** ៖ `?diag=1` ឆ្លើយពីសតិរបស់ Function
+(⛔ **គ្មានការហៅ ZTO សោះ**) ហើយវា **មិនបង្ខំអាន Netlify Blobs** ។
+
+⛔ **ការចុះឈ្មោះចាប់ផ្តើម Task ១ ដងភ្លាម** — បើអ្នកដំឡើងវាម៉ោង ៣ រសៀល
+ខណៈបង្អួចចាប់ផ្តើម ០៦:០០ នោះ trigger ប្រចាំថ្ងៃបន្ទាប់គឺ **ថ្ងៃស្អែក** ➜
+ការចាប់ផ្តើមភ្លាមបិទចន្លោះនោះ ហើយបញ្ជាក់ថា Task ដើរពិត។
+
+ចង់ប្តូរបង្អួចនោះ ៖
+
+```cmd
+powershell -NoProfile -ExecutionPolicy Bypass -File schedule.ps1 -Start 07:00 -IntervalMinutes 5 -WindowHours 13
+```
+
+⛔ **Task ចុះឈ្មោះសម្រាប់ Windows user របស់អ្នកតែម្នាក់** (`InteractiveToken`
+· `Limited`) ➜ វាមិនត្រូវការសិទ្ធិ Administrator និងមិនស្តុកពាក្យសម្ងាត់ទេ។
+វារត់តែពេលអ្នកកំពុងចូលប្រព័ន្ធ ព្រោះការចាប់ Cookie ត្រូវការ browser ពិត។
+
+**ការជូនដំណឹង Telegram (ស្រេចចិត្ត)** ៖ បំពេញ **chat id** និង **bot token**
+ក្នុង `setup.cmd` រួចសាកដោយ `sync-zto-cookie.cmd --test-telegram`។ វាផ្ញើសារ
+**តែ ៣ ស្ថានភាព** ៖
+
+| ស្ថានភាព | សារ |
+|---|---|
+| Cookie ស្លាប់ ហើយយកថ្មីមិនបាន | ត្រូវទៅ Login Argus នៅកុំព្យូទ័រ |
+| Cookie ស្លាប់ តែយកថ្មីបានដោយខ្លួនឯង | រាយការណ៍ថាជួសជុលរួច — គ្មានអ្វីត្រូវធ្វើ |
+| ពិនិត្យមិនបាន (បណ្តាញដាច់ · មិនទាន់កំណត់) | ប្រាប់ថាការពិនិត្យរត់មិនកើត |
+
+⛔ **Cookie ដំណើរការល្អ ➜ ស្ងាត់ទាំងស្រុង** ហើយសារដដែលមានពិដាន **៤ ម៉ោង**
+ក្នុងមួយប្រភេទ — បើអត់ ការរត់ ៩៦០ ជុំ/ថ្ងៃនឹងផ្ញើសារដដែលរាប់រយដង។
+
+⛔ **វាជាការផ្ញើចេញ *តែម្យ៉ាង*** — bot **មិនទទួលពាក្យបញ្ជា** ទេ។ bot ដែល
+រត់ cmd តាមសំណើពីចម្ងាយ នឹងក្លាយជាផ្លូវចូលកុំព្យូទ័រដែលកាន់ Netlify PAT។
+
+#### ⚡ ការស្ទង់សកម្ម — ដឹងមុនការស្កេនដំបូងធ្លាក់ (ស្រេចចិត្ត)
+
+តាមលំនាំដើម សាលក្រម «Cookie ស្លាប់» ជា **ប្រតិកម្ម** ➜ ការស្កេនដំបូងក្រោយ
+ផុតកំណត់នៅតែធ្លាក់។ ការស្ទង់សកម្មលុបចន្លោះនោះ ៖ Function សាក Cookie ទៅ ZTO
+ដោយខ្លួនឯង ➜ Task ដឹងមុនអ្នកប្រើ។
+
+⛔ **វា ship អសកម្ម** — គ្មាន env នេះ ➜ **គ្មានការហៅ ZTO បន្ថែមសោះ**។ បើក
+វាដោយបន្ថែម variable ក្នុង Netlify (`Functions` · `Production`) ៖
+
+| Key | Value | ធ្វើអ្វី |
+|---|---|---|
+| `ZTO_PROBE_BARCODE` | លេខ Waybill **ពិត** មួយ (ឧ. `771305…`) | បើកការស្ទង់។ លុបវាចេញ ➜ បិទវិញ |
+| `ZTO_PROBE_MIN_GAP_MS` | ស្រេចចិត្ត — លំនាំដើម `60000` | ពិដានល្បឿនខាង **server** ៖ ការស្ទង់ក្នុងចន្លោះនេះឆ្លើយសាលក្រមចាស់ ដោយ **មិនហៅ ZTO** |
+
+សាកវាដោយ `sync-zto-cookie.cmd --probe` ៖
+
+```text
+PROBE: ZTO accepted the cookie.
+PROBE: ZTO rejected the cookie - a new one is needed.
+PROBE: not measured (unreachable) - this is not the same as expired.
+```
+
+⛔ **«វាស់មិនបាន» មិនមែន «ស្លាប់» ទេ** — ZTO ដាច់ · បណ្តាញធ្លាក់ · 5xx
+សុទ្ធតែឆ្លើយ `alive: null` ហើយ **មិនបើក browser** ។ បើអត់ ZTO ដាច់ ១ ម៉ោង
+នឹងក្លាយជា browser លោតឡើងរាល់នាទីពេញម៉ោងនោះ។
+
+⛔ **App មិនហៅផ្លូវនេះទេ** — មានតែឧបករណ៍នេះ។ បើ App ហៅវា រាល់ការស្ទង់ដែល
+ធ្លាក់នឹងក្លាយជា error event ក្នុង **Sentry** ➜ បំពេញ Sentry ➜ **បាំង alert
+លុយ**។
+
+**ថ្លៃពិត** ៖ ជាមួយពិដាន ៦០ វិនាទី ការស្ទង់ហៅ ZTO **យ៉ាងច្រើន ១ ដង/នាទី**
+(~៩៦០/ថ្ងៃ ក្នុងបង្អួច ១៦ ម៉ោង)។ ចង់តិចជាងនេះ ➜ ដំឡើង `ZTO_PROBE_MIN_GAP_MS`
+(ឧ. `300000` = ៥ នាទី ➜ ~១៩២/ថ្ងៃ ហើយបង្អួចប្រថុយធំបំផុតត្រឹម ៥ នាទី)។
+
+#### ⛔ អ្វីដែលរបៀបស្វ័យប្រវត្តិនេះ **មិន** ធ្វើ
+
+សាលក្រម «Cookie ស្លាប់» ជា **ប្រតិកម្ម** មិនមែន **ការព្យាករណ៍** ៖ Function
+ដឹងថា Cookie ស្លាប់ **តែក្រោយពេល ZTO បដិសេធការស្កេនពិតមួយ**។ ដូច្នេះ ៖
+
+- ការស្កេន **ដំបូង** ក្រោយ Cookie ផុត នៅតែធ្លាក់ដដែល — Task ជួសជុលវា
+  **ក្នុងរយៈពេលប្រហែល ១ នាទីបន្ទាប់** មិនមែនការពារជាមុនទេ។
+- ការរត់ត្រឹមម្តងមុនបើកហាង **មិនជួយ** ព្រោះពេលនោះគ្មាននរណាត្រូវបដិសេធនៅ
+  ឡើយ ➜ វារាយថា «OK» ➜ នោះជាមូលហេតុដែល trigger ជាបង្អួច **ដដែលៗ**។
+- ⛔ ចង់ឲ្យសូម្បីតែការស្កេន **ដំបូង** មិនធ្លាក់ ➜ បើក **ការស្ទង់សកម្ម**
+  ខាងលើ (`ZTO_PROBE_BARCODE`)។ បើមិនបើក ចន្លោះនេះនៅដដែល។
+- Task រត់តែពេលកុំព្យូទ័រ **បើក ហើយអ្នកចូលប្រព័ន្ធរួច** — ការចាប់ Cookie
+  ត្រូវការ browser ពិត។
+
+បើ session ក្នុង browser profile នៅរស់ ការជួសជុលកើតឡើង **ដោយគ្មានការចុច**។
+បើ ZTO សុំ Login នោះទើបសារ Telegram មកដល់។ ⛔ **អាយុនៃ session នោះមិនទាន់
+មានលេខវាស់ទេ** — រត់ `sync-zto-cookie.cmd --check` រាល់ព្រឹក ១ សប្តាហ៍
+ដើម្បីដឹងថាប៉ុន្មានថ្ងៃទើបត្រូវ Login ម្តង។
 
 ⛔ **`--check` និង `--auto` ត្រូវការ Site URL + `ZTO_PROXY_KEY`** ក្នុង
 `setup.cmd`។ បើគ្មាន `--auto` នឹង **មិនបើក browser ទេ** ហើយប្រាប់មូលហេតុ —
@@ -234,6 +335,8 @@ sync-zto-cookie.cmd
 | សារ | ត្រូវធ្វើអ្វី |
 |---|---|
 | `'orlevel'` / `'utionPolicy' is not recognized` | អ្នកកំពុងប្រើ `.cmd` UTF-8 ចាស់។ ទាញកំណែថ្មីដែលជា ASCII + CRLF រួចជំនួស `setup.cmd` និង `sync-zto-cookie.cmd` ទាំង ២ |
+| `ERROR: Access is denied.` ពេលចុះឈ្មោះ Task | Task ចាស់ឈ្មោះ `Zoe ZTO Cookie Sync` ត្រូវបានបង្កើតដោយ Administrator ➜ បើក **Task Scheduler** លុបវាចោល រួចរត់ `schedule-zto-cookie.cmd` ម្តងទៀត។ សារនោះប្រាប់មូលហេតុទាំង ២ ដែលអាចកើតរួចហើយ |
+| Telegram មិនទទួលសារ | រត់ `sync-zto-cookie.cmd --test-telegram` — វាប្រាប់ថាខ្វះការកំណត់ ឬ Telegram បដិសេធ។ ⛔ ត្រូវផ្ញើសារទៅ bot **មុន** ទើប chat id មាន |
 | មិនទាន់ Setup/config/token | បើក `setup.cmd` |
 | Browser launch failed | បិទបង្អួច ZTO Cookie Sync ចាស់ទាំងអស់ រួចសាកវិញ |
 | មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |
@@ -267,6 +370,8 @@ sync-zto-cookie.cmd
 | **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់តាមសំណើអ្នកប្រើ** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
 | **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
 | **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
+| **Telegram bot token** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `telegram-token.dpapi`; មិនបោះពុម្ព។ chat id ទទេ ➜ ឯកសារនោះត្រូវលុបចោល (កុំទុកសោកំព្រា) |
+| **សារ Telegram** | ⛔ **មិនផ្ទុក Cookie ឬសោណាមួយ** — ប្រវត្តិ chat រស់នៅលើ server របស់អ្នកដទៃជារៀងរហូត |
 | **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout ដែល settle ដោយ timer ពិត · response body បោះចោលដោយមិនបង្ហាញ |
 | **ការ upload** | signed URL ត្រូវជា **HTTPS** មុនផ្ញើ Cookie ហើយ ⛔ **PAT មិនហូរទៅ host នោះសោះ**; redirect ត្រូវបដិសេធដោយឈ្មោះ |
 | **ទម្រង់ Cookie** | ត្រូវមាន `BOS-MAN-SESSION` ពិត · បដិសេធ CR/LF/NUL · ពិដាន ៨ KiB និង ៦៤ គូ ➜ header injection កើតមិនបាន |

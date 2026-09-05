@@ -52,10 +52,6 @@ const COOKIE_WRITE_MIN_TIMEOUT_MS = 200;
 const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
-// ⛔ សាលក្រមចុងក្រោយនៃការស្ទង់ ៖ `alive` មាន ៣ តម្លៃ — `true` · `false` ·
-// **`null` (វាស់មិនបាន)**។ ច្បាប់មាស «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស» អនុវត្ត
-// ត្រង់នេះដែរ ៖ ZTO ដាច់ **មិនមែន** Cookie ស្លាប់ទេ។
-const probeState = { at: 0, alive: null };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     mustRevalidate: false
@@ -523,15 +519,7 @@ function readConfig(env) {
         upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 6000, 2000, 20000),
         budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 9000, 4000, 24000),
         retries: boundedInteger(env.ZTO_UPSTREAM_RETRIES, 1, 0, 3),
-        cacheTtlMs: boundedInteger(env.ZTO_CACHE_TTL_MS, 60000, 0, 600000),
-        // ⛔ ការស្ទង់សកម្ម ship **អសកម្ម** ៖ គ្មាន barcode ➜ គ្មានការហៅ ZTO
-        // សោះ។ អ្នកប្រើបើកវាដោយចេតនា ហើយបិទវាវិញដោយលុប env នេះចេញ។
-        probeBarcode: BARCODE_RE.test(String(env.ZTO_PROBE_BARCODE || '').trim())
-            ? String(env.ZTO_PROBE_BARCODE || '').trim()
-            : '',
-        // ⛔ ពិដានល្បឿនត្រូវឈរខាង **server** ៖ ចរាចរណ៍ទៅ ZTO ត្រូវមានពិដាន
-        // តាមរចនាសម្ព័ន្ធ មិនមែនដោយសង្ឃឹមថាឧបករណ៍ខាង client សួរមិនញឹក។
-        probeMinGapMs: boundedInteger(env.ZTO_PROBE_MIN_GAP_MS, 60000, 0, 3600000)
+        cacheTtlMs: boundedInteger(env.ZTO_CACHE_TTL_MS, 60000, 0, 600000)
     };
 
     // ⛔ TTL អវិជ្ជមានត្រូវ **មិនលើស** cache សរុប ➜ `ZTO_CACHE_TTL_MS=0`
@@ -945,26 +933,6 @@ async function prewarmCookieCredential(netlifyEvent) {
     } catch (_) {}
 }
 
-// ⛔ រូបរាងចម្លើយនៃការស្ទង់ត្រូវ **តូច និងគ្មានទិន្នន័យអតិថិជន** ៖ អ្នកហៅ
-// គឺឧបករណ៍ថែទាំ មិនមែន App ➜ វាត្រូវការតែសាលក្រម session ប៉ុណ្ណោះ។ លេខ
-// ទូរស័ព្ទ · ឈ្មោះ · COD មិនត្រូវចេញតាមផ្លូវនេះឡើយ។
-function probeBody(alive, reason, throttled) {
-    return {
-        ok: true,
-        code: 'ZTO_PROBE',
-        alive: alive === true ? true : (alive === false ? false : null),
-        reason: reason || '',
-        throttled: !!throttled,
-        ageMs: probeState.at ? elapsedSince(probeState.at) : null
-    };
-}
-
-function probeVerdictFromOutcome(kind) {
-    if (kind === 'authRejected') return false;
-    if (kind === 'ok' || kind === 'notFound') return true;
-    return null;
-}
-
 function diagnosticsBody(config, headers, authKind, credential) {
     return {
         ok: true,
@@ -1039,19 +1007,9 @@ exports.handler = async function handler(event) {
     const query = event.queryStringParameters || {};
     const wantsDiagnostics = String(query.diag || '') === '1';
     const wantsFreshCookie = wantsDiagnostics && String(query.fresh || '') === '1';
-    const wantsProbe = !wantsDiagnostics && String(query.probe || '') === '1';
-    const barcode = wantsProbe ? config.probeBarcode : String(query.barcode || '').trim();
-    if (!wantsDiagnostics && !wantsProbe && !BARCODE_RE.test(barcode)) {
+    const barcode = String(query.barcode || '').trim();
+    if (!wantsDiagnostics && !BARCODE_RE.test(barcode)) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
-    }
-
-    if (wantsProbe) {
-        // ⛔ ផ្លូវចេញ ២ នេះឈរ **មុន** ការអាន Cookie store ដោយចេតនា ៖ ការស្ទង់
-        // ដែលមិនហៅ ZTO មិនត្រូវចំណាយអ្វីសោះ។
-        if (!barcode) return json(200, probeBody(null, 'not-configured', false));
-        if (config.probeMinGapMs > 0 && elapsedSince(probeState.at) < config.probeMinGapMs) {
-            return json(200, probeBody(probeState.alive, 'throttled', true));
-        }
     }
 
     // ⛔ **កូនសោ cache មិនត្រូវផ្ទុក fingerprint នៃ Cookie ទេ។** លទ្ធផលរបស់
@@ -1061,9 +1019,7 @@ exports.handler = async function handler(event) {
     // (endpoint · field · method) នៅតែផ្លាស់កូនសោដដែល តាម `config.fingerprint`។
     // ផលដែលវាស់បាន ៖ ការស្កេនដដែលក្នុង TTL ឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs**។
     const cacheKey = config.fingerprint + '|' + barcode.toUpperCase();
-    // ⛔ ការស្ទង់ត្រូវ **រំលង cache ទាំង ២ ទិស** ៖ ចម្លើយពី cache មិនបាន
-    // សាក session សោះ ➜ សាលក្រម «alive» ដែលកើតពី cache ជាការវាស់ក្លែងក្លាយ។
-    if (!wantsDiagnostics && !wantsProbe) {
+    if (!wantsDiagnostics) {
         const early = readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
         if (early) return json(200, Object.assign({}, early, { cached: true }));
     }
@@ -1088,10 +1044,6 @@ exports.handler = async function handler(event) {
     }
 
     if (!authKind) {
-        // ⛔ គ្មាន auth ➜ ការស្ទង់ **វាស់មិនបាន** មិនមែន «ស្លាប់» ៖ ការឆ្លើយ
-        // `false` ត្រង់នេះនឹងធ្វើឲ្យឧបករណ៍បើក browser រាល់ជុំ ខណៈបញ្ហាពិត
-        // គឺ config មិនទាន់រួច។
-        if (wantsProbe) return json(200, probeBody(null, 'no-auth', false));
         return json(503, {
             error: 'ZTO authentication is not configured',
             code: 'ZTO_AUTH_NOT_CONFIGURED'
@@ -1106,33 +1058,7 @@ exports.handler = async function handler(event) {
     try {
         outcome = await runSharedLookup(flightKey, config, headers, barcode, session, startedAt);
     } catch (_) {
-        // ⛔ ការស្ទង់ដែលបោះ = **វាស់មិនបាន** ៖ ZTO ដាច់មិនមែន Cookie ស្លាប់ទេ។
-        if (wantsProbe) {
-            probeState.at = Date.now();
-            probeState.alive = null;
-            return json(200, probeBody(null, 'unreachable', false));
-        }
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
-    }
-
-    if (wantsProbe) {
-        // ⛔ ការស្ទង់ចាក់ **ស្ថានភាពដដែល** នឹងការស្កេនពិត (`noteCookieRejected`
-        // / `noteCookieAccepted`) ➜ `?diag=1` ដែល `--auto` អានស្រាប់ ដឹងភ្លាម
-        // ដោយមិនចាំបាច់មានតក្កវិជ្ជាថ្មីទី ២។
-        const alive = probeVerdictFromOutcome(outcome.kind);
-        probeState.at = Date.now();
-        probeState.alive = alive;
-        if (alive === false) {
-            session.renewal = '';
-            invalidateCookieCache();
-            noteCookieRejected();
-        } else if (alive === true) {
-            noteCookieAccepted();
-            await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
-        }
-        // ⛔ គ្មាន `storeCachedBody` ត្រង់នេះ ៖ ការស្ទង់មិនត្រូវពុល cache
-        // ដែលការស្កេនពិតអាន។
-        return json(200, probeBody(alive, alive === null ? String(outcome.kind || '') : '', false));
     }
 
     if (outcome.kind === 'authRejected') {
@@ -1193,8 +1119,6 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.renewAt = 0;
     cookieState.renewals = 0;
     cookieState.authRejectedAt = 0;
-    probeState.at = 0;
-    probeState.alive = null;
 };
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {

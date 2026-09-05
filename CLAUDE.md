@@ -332,10 +332,9 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | ⛔ ពិដានការពារ **ការសរសេរទៅ Blobs** មិនមែនការចងចាំ — session ថ្មីត្រូវប្រើបន្តក្នុងសតិ | `zto-cookie-store-test` |
 | **ZTO ៖ ការអាន Blobs ↔ ផ្លូវឆ្លើយតប** | ⛔ មានតម្លៃក្នុងសតិ ➜ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់**ខាងក្រោយ**; ⛔ សតិទទេ ឬក្រោយ 401 ➜ អាន**ទប់**ដដែល | `zto-cookie-store-test` |
 | **ZTO helper ៖ បណ្តាញដាច់មួយភ្លែត** | ⛔ ការធ្លាក់បណ្តោះអាសន្នព្យាយាមឡើងវិញ **ក្នុងពិដាន** (signed URL ថ្មីរាល់ជុំ); 401/403/404/422 **មិនព្យាយាម** | `zto-cookie-sync-test` |
-| **ZTO ៖ របៀបស្វ័យប្រវត្តិ** | ⛔ មិនបើក browser ដោយមិនដឹងស្ថានភាព។ ⛔ **Task ត្រូវចុះឈ្មោះ *per-user*** (`New-ScheduledTaskPrincipal -UserId … -LogonType Interactive -RunLevel Limited`) — `schtasks /SC ONLOGON` គ្មាន `/RU` ចុះឈ្មោះសម្រាប់អ្នកប្រើ **គ្រប់រូប** ➜ ទាមទារ Administrator ➜ **`Access is denied`** (វាស់បាន 2026-09-05)។ ⛔ ត្រូវមាន trigger **ដដែលៗ** បន្ថែមលើ logon (logon តែម្យ៉ាង ➜ Cookie ស្លាប់ពេលថ្ងៃ រង់ចាំដល់ restart) ហើយ `MultipleInstances IgnoreNew` ទប់ browser ជាន់គ្នា។ ⛔ ចន្លោះស្ទង់លំនាំដើម **<= ១ នាទី** — Function ដឹងភ្លាមៗ (`noteCookieRejected`) ➜ ការពន្យារទាំងអស់ជា **ចន្លោះស្ទង់**; ការស្ទង់ត្រូវ **`fresh: false`** (សាលក្រមមកពីសតិ មិនមែន Blobs) ហើយ ⛔ **detector ត្រូវជារចនាសម្ព័ន្ធ** — ការស្កេនអក្សរចាប់បាន `fresh: false` ដែលនៅក្នុង **comment** ➜ ធ្លាក់មិនបាន (វាស់បាន ៖ mutation ១៤ រស់រាន) | `zto-cookie-sync-test` |
+| **ZTO ៖ របៀបស្វ័យប្រវត្តិ** | ⛔ មិនបើក browser ដោយមិនដឹងស្ថានភាព | `zto-cookie-sync-test` |
 | **ZTO ៖ ផ្លូវ setup** | ⛔ រត់ឡើងវិញត្រូវរក្សា PAT — Netlify បង្ហាញវាតែម្តង | `zto-cookie-sync-test` |
 | **ZTO ៖ ច្រកទ្វារ `--auto`** | ⛔ វាស់តម្លៃដែលដោះសោបាន មិនមែនវត្តមានឯកសារ | `zto-cookie-sync-test` |
-| **ZTO ៖ ការជូនដំណឹង** | ⛔ **outbound តែម្យ៉ាង** — bot ដែល *ទទួល* ពាក្យបញ្ជាជាផ្លូវរត់កូដពីចម្ងាយចូលម៉ាស៊ីនដែលកាន់ PAT ➜ កុំសាង។ ⛔ សុខភាពល្អ ➜ **ស្ងាត់** (៩៦០ ជុំ/ថ្ងៃ ➜ សារល្អ ៩៦០ ដង = អ្នកប្រើឈប់អាន) · ពិដាន ៤ ម៉ោងក្នុងមួយប្រភេទ · ពិដានដែល **ងាប់** (state អានមិនបាន · នាឡិកាថយក្រោយ) ➜ **ផ្ញើ** មិនស្ងាត់។ ⛔ សារមិនផ្ទុក Cookie ឬសោ · bot token ជា DPAPI ដូច PAT · ការធ្លាក់របស់វា **មិនធ្វើឲ្យការ sync ធ្លាក់** | `zto-cookie-sync-test` |
 | **ZTO ៖ jar របស់ Argus** | ⛔ គូខូច ➜ រំលង; គ្មាន session ➜ បដិសេធ | `zto-cookie-sync-test` · `zto-cookie-store-test` |
 | **ZTO ៖ «មិនទាន់ចូល»** | ⛔ ZTO ឆ្លើយ **URL របស់ IdP** មិនមែនកូដ auth | `zto-proxy-test` |
 | **ZTO ៖ ពិដានពេលរបស់ Netlify** | ⛔ Function ត្រូវឆ្លើយ JSON មុនត្រូវសម្លាប់ | `zto-proxy-test` |
@@ -345,7 +344,6 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ បណ្តាញព្យួរ** | ⛔ ការ settle ធានាដោយ **រចនាសម្ព័ន្ធ** មិនមែនដោយ `AbortController` | `zto-proxy-test` |
 | **ZTO ៖ API ផ្លូវការ** | ⛔ header ក្លែងរបស់ Argus **មិនត្រូវផ្ញើ** ទៅ Token/Authorization | `zto-proxy-test` |
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
-| **ZTO ៖ ការស្ទង់សកម្ម** | ⛔ ship **អសកម្ម** (គ្មាន `ZTO_PROBE_BARCODE` ➜ គ្មានការហៅ ZTO)។ ⛔ «វាស់មិនបាន» ≠ «ស្លាប់» ➜ 5xx · បណ្តាញធ្លាក់ · គ្មាន auth ត្រូវឆ្លើយ **`alive: null`**។ ⛔ ពិដានល្បឿនឈរខាង **server** (`ZTO_PROBE_MIN_GAP_MS`) មិនមែនពឹងលើ client។ ⛔ រំលង cache **ទាំង ២ ទិស** (អាន ➜ សាលក្រមក្លែងក្លាយ; សរសេរ ➜ ពុល cache ការស្កេន)។ ⛔ ចម្លើយគ្មានទិន្នន័យអតិថិជន។ ⛔ **App មិនហៅវាទេ** — បើហៅ ➜ Sentry ពេញ ➜ **បាំង alert លុយ** | `zto-proxy-test` · `zto-cookie-sync-test` |
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |

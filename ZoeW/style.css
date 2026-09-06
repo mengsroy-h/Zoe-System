@@ -916,7 +916,7 @@
         @media (min-width: 992px) {
             .modal { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         }
-        .modal-content { background-color: white; padding: 20px 18px 18px; border-radius: var(--radius-xl); width: 100%; max-width: 340px; text-align: center; box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(15, 23, 42, 0.05); max-height: 85vh; overflow-y: auto; color: var(--text-main); animation: modalPopIn 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .modal-content { background-color: white; padding: 20px 18px 18px; border-radius: var(--radius-xl); width: 100%; max-width: clamp(340px, 54vw, 600px); text-align: center; box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.32), 0 0 0 1px rgba(15, 23, 42, 0.05); max-height: 85vh; overflow-y: auto; color: var(--text-main); animation: modalPopIn 0.26s cubic-bezier(0.34, 1.56, 0.64, 1); }
         #phoneModal .modal-content { position: relative; }
         .lookup-status { margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; color: var(--text-muted); font-size: calc(10.5 * var(--fs-unit)); font-weight: 600; line-height: 1.45; text-align: left; overflow-wrap: anywhere; }
         .lookup-status-loading { background: var(--accent-blue-light); border-color: #bae6fd; color: #075985; }
@@ -929,8 +929,30 @@
         .modal-close-x:disabled { opacity: 0.45; cursor: not-allowed; }
         #phoneModal .modal-content h3 { padding: 0 32px; }
 
-        .trash-modal-content { max-width: min(720px, 96vw); text-align: left; }
+        .trash-modal-content { max-width: clamp(340px, 96vw, 1100px); text-align: left; }
         .trash-modal-content h3, .trash-modal-content p { text-align: center; }
+
+        #pinModal .modal-content,
+        #pinSetupModal .modal-content { max-width: clamp(300px, 46vw, 520px); }
+        #callMarkModal .modal-content,
+        #exchangeRateModal .modal-content,
+        #lockerSettingsModal .modal-content,
+        #permanentDeleteWarningModal .modal-content,
+        #restoreWarningModal .modal-content { max-width: clamp(320px, 48vw, 560px); }
+        #exportDataModal .modal-content,
+        #locationWarningModal .modal-content,
+        #manualAdjustModal .modal-content { max-width: clamp(340px, 50vw, 600px); }
+        #configModal .modal-content,
+        #configQrScanModal .modal-content { max-width: clamp(360px, 52vw, 640px); }
+        #activationModal .modal-content,
+        #dailyStatsModal .modal-content,
+        #lockerPickerModal .modal-content,
+        #lookupApiConfigModal .modal-content,
+        #monthlyStatsModal .modal-content { max-width: clamp(380px, 56vw, 700px); }
+        #viewListModal .modal-content { max-width: clamp(440px, 62vw, 780px); }
+        #healthCheckModal .modal-content { max-width: clamp(460px, 64vw, 820px); }
+        #monthlyReportModal .modal-content { max-width: clamp(520px, 74vw, 960px); }
+        #customerDataTableModal .modal-content { max-width: clamp(760px, 92vw, 1100px); }
 
         .trash-summary { margin-bottom: 8px; }
         .trash-sum-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -968,7 +990,7 @@
         .trash-sub-row td { padding-top: 5px; padding-bottom: 5px; }
         .trash-sub-row td:first-child { padding-left: 14px; border-left: 3px solid var(--primary-light); }
         @media (min-width: 992px) {
-            .trash-modal-content { max-width: min(1100px, 94vw); padding: 20px; }
+            .trash-modal-content { padding: 20px; }
             .trash-table-wrap { max-height: 50vh; }
         }
         @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1008,6 +1030,8 @@
             cursor: pointer;
         }
         .app-version-line { margin-top: 10px; text-align: center; font-size: calc(10.5 * var(--fs-unit)); color: var(--text-muted); font-weight: 600; }
+        .app-copyright-line { margin-top: 4px; text-align: center; font-size: calc(9 * var(--fs-unit)); color: var(--text-muted); font-weight: 400; line-height: 1.5; opacity: 0.75; }
+        .app-copyright-en { font-size: calc(8.5 * var(--fs-unit)); opacity: 0.6; }
 
         .barcode-list-item {
             display: flex;
@@ -1109,7 +1133,7 @@
         #pdfExportPrintArea .export-footer { font-size: 9px; color: #555; margin-top: 8px; }
 
         .si-modal-content {
-            max-width: 640px;
+            max-width: clamp(340px, 96vw, 900px);
             text-align: left;
             display: flex;
             flex-direction: column;

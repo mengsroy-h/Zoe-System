@@ -1,0 +1,178 @@
+អាជ្ញាប័ណ្ណកម្មសិទ្ធិឯកជន — Zoe-System
+PROPRIETARY LICENSE — Zoe-System
+
+រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)
+Copyright © 2026 MENGSROY HEN. All rights reserved.
+
+
+===============================================================================
+ផ្នែកទី ១ — អត្ថបទជាភាសាខ្មែរ (អត្ថបទដើមដែលមានអានុភាពច្បាប់)
+===============================================================================
+
+១. កម្មសិទ្ធិបញ្ញា
+
+   ប្រព័ន្ធ Zoe-System រួមទាំង source code, ឯកសារ, ការរចនា, រចនាសម្ព័ន្ធ
+   ទិន្នន័យ, Firebase rules, ឧបករណ៍ត្រួតពិនិត្យ (audit-tools), script,
+   ការកំណត់ config និងខ្លឹមសារទាំងអស់ក្នុង repository នេះ ជាកម្មសិទ្ធិ
+   ផ្តាច់មុខរបស់ ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN) ដែលហៅថា «ម្ចាស់» ក្នុង
+   ឯកសារនេះ។ រក្សាសិទ្ធិគ្រប់យ៉ាង។
+
+២. គ្មានការផ្តល់សិទ្ធិដោយប្រយោល
+
+   ការចូលមើល ការទាញយក ការទទួលបានច្បាប់ចម្លងណាមួយ ឬការចូលរួមក្នុងការ
+   អភិវឌ្ឍ មិនផ្តល់នូវសិទ្ធិកម្មសិទ្ធិ ឬអាជ្ញាប័ណ្ណណាមួយឡើយ។ សិទ្ធិទាំង
+   ឡាយណាដែលមិនបានផ្តល់ជាលាយលក្ខណ៍អក្សរច្បាស់លាស់ ត្រូវបានរក្សាទុកទាំងស្រុង
+   ដោយម្ចាស់។
+
+៣. ការហាមឃាត់
+
+   បើគ្មានការអនុញ្ញាតជាលាយលក្ខណ៍អក្សរជាមុនពីម្ចាស់ទេ ហាមមិនឲ្យបុគ្គល ឬ
+   ស្ថាប័នណាមួយ៖
+
+   ក. ចម្លង ផលិតឡើងវិញ ឬរក្សាទុកខ្លឹមសារណាមួយ ក្រៅពីគោលបំណងដែលម្ចាស់
+      បានអនុញ្ញាតជាក់លាក់។
+   ខ. ចែកចាយ បោះពុម្ពផ្សាយ ផ្ទេរ លក់ ជួល ឬផ្តល់អាជ្ញាប័ណ្ណបន្ត។
+   គ. កែប្រែ បង្កើតស្នាដៃដេរីវេ ឬបញ្ចូលទៅក្នុងផលិតផល ឬសេវាកម្មផ្សេង។
+   ឃ. បំបែកកូដ (reverse engineer) decompile ឬ disassemble។
+   ង. ដកចេញ លាក់បាំង ឬកែប្រែសេចក្តីជូនដំណឹងកម្មសិទ្ធិណាមួយ រួមទាំង
+      ឯកសារ LICENSE និង NOTICE នេះ។
+   ច. ប្រើប្រាស់ខ្លឹមសារនេះដើម្បីបណ្តុះបណ្តាល ធ្វើតេស្ត ឬអភិវឌ្ឍគំរូ
+      បញ្ញាសិប្បនិម្មិត (AI/ML) ណាមួយ។
+
+៤. ការចូលរួមរបស់អ្នកអភិវឌ្ឍ
+
+   រាល់ការចូលរួម (commit, patch, ការរចនា, ឯកសារ ឬខ្លឹមសារផ្សេងទៀត) ដែល
+   ធ្វើឡើងដោយនិយោជិត អ្នកម៉ៅការ ឬអ្នកសហការណាមួយ ត្រូវចាត់ទុកជាស្នាដៃ
+   ដែលបង្កើតឡើងតាមការជួល (work made for hire) ហើយកម្មសិទ្ធិបញ្ញាទាំងអស់
+   លើការចូលរួមនោះ ត្រូវផ្ទេរទៅម្ចាស់ដោយស្វ័យប្រវត្តិនៅពេលបង្កើត ដោយ
+   មិនត្រូវការឯកសារបន្ថែមឡើយ។
+
+៥. អាជ្ញាប័ណ្ណប្រើប្រាស់របស់អតិថិជន (ដាច់ដោយឡែក)
+
+   ឯកសារនេះគ្រប់គ្រងកម្មសិទ្ធិលើ source code ប៉ុណ្ណោះ។ សិទ្ធិប្រើប្រាស់
+   កម្មវិធីរបស់អតិថិជនចុងក្រោយ ត្រូវគ្រប់គ្រងដោយ Activation Key ដែលចេញ
+   ពី ZoeKeyGen ដោយឡែក — Key នីមួយៗ sign ដោយ ECDSA P-256 មានថ្ងៃផុត
+   កំណត់ ហើយអាចត្រូវ Revoke ឬ Extend ដោយម្ចាស់គ្រប់ពេល។
+
+   ⛔ ការទទួលបាន Activation Key មិនផ្តល់សិទ្ធិណាមួយលើ source code ឡើយ។
+
+៦. កូដភាគីទីបី
+
+   ឯកសារមួយចំនួនក្នុង repository នេះជាកម្មសិទ្ធិរបស់ភាគីទីបី ហើយត្រូវ
+   គ្រប់គ្រងដោយអាជ្ញាប័ណ្ណរៀងៗខ្លួនរបស់ពួកគេ មិនមែនដោយឯកសារនេះទេ។
+   បញ្ជីពេញលេញ និងអត្ថបទអាជ្ញាប័ណ្ណ ស្ថិតក្នុងឯកសារ NOTICE។
+
+៧. ទិន្នន័យអាជីវកម្ម
+
+   ទិន្នន័យដែលដំណើរការដោយប្រព័ន្ធនេះ (លេខទូរស័ព្ទ កញ្ចប់ ចំនួន COD/DOD
+   និងទិន្នន័យអតិថិជនផ្សេងទៀត) ជាកម្មសិទ្ធិរបស់អាជីវកម្មដែលប្រើប្រាស់
+   ប្រព័ន្ធនេះ មិនមែនរបស់ម្ចាស់ software ទេ។
+
+៨. គ្មានការធានា
+
+   ប្រព័ន្ធនេះត្រូវបានផ្គត់ផ្គង់ «ដូចដែលវាមាន» (AS IS) ដោយគ្មានការធានា
+   ណាមួយឡើយ មិនថាច្បាស់លាស់ ឬដោយប្រយោល រួមទាំងការធានាអំពីគុណភាព
+   ពាណិជ្ជកម្ម ភាពសមស្របនឹងគោលបំណងជាក់លាក់ និងការមិនរំលោភសិទ្ធិ។
+
+៩. ការកំណត់ការទទួលខុសត្រូវ
+
+   ក្នុងករណីណាក៏ដោយ ម្ចាស់មិនទទួលខុសត្រូវចំពោះការខូចខាតណាមួយ រួមទាំង
+   ការបាត់បង់ទិន្នន័យ ការបាត់បង់ប្រាក់ចំណូល ឬការរំខានដល់អាជីវកម្ម ដែល
+   កើតឡើងពីការប្រើប្រាស់ ឬអសមត្ថភាពក្នុងការប្រើប្រាស់ប្រព័ន្ធនេះឡើយ។
+
+១០. ច្បាប់គ្រប់គ្រង
+
+   ឯកសារនេះត្រូវគ្រប់គ្រង និងបកស្រាយតាមច្បាប់នៃព្រះរាជាណាចក្រកម្ពុជា។
+
+១១. ភាសា
+
+   អត្ថបទជាភាសាខ្មែរ (ផ្នែកទី ១) ជាអត្ថបទដើមដែលមានអានុភាពច្បាប់។ ការ
+   បកប្រែជាភាសាអង់គ្លេស (ផ្នែកទី ២) មានគោលបំណងជាព័ត៌មានតែប៉ុណ្ណោះ។
+   ក្នុងករណីមានភាពមិនស៊ីគ្នា អត្ថបទខ្មែរជាធំ។
+
+
+===============================================================================
+PART 2 — ENGLISH TRANSLATION (for information only)
+===============================================================================
+
+1. OWNERSHIP
+
+   Zoe-System, including its source code, documentation, design, data
+   structures, Firebase rules, audit tooling, scripts, configuration and
+   all other content in this repository, is the exclusive property of
+   MENGSROY HEN ("the Owner"). All rights reserved.
+
+2. NO IMPLIED GRANT
+
+   Viewing, downloading, receiving a copy of, or contributing to this
+   repository grants no ownership interest and no licence of any kind.
+   All rights not expressly granted in writing are reserved.
+
+3. RESTRICTIONS
+
+   Without the Owner's prior written permission, no person or entity may:
+
+   a. Copy, reproduce or retain any content beyond the purpose the Owner
+      has specifically authorised.
+   b. Distribute, publish, transfer, sell, rent or sublicense it.
+   c. Modify it, create derivative works, or incorporate it into any
+      other product or service.
+   d. Reverse engineer, decompile or disassemble it.
+   e. Remove, obscure or alter any proprietary notice, including this
+      LICENSE and the NOTICE file.
+   f. Use this content to train, evaluate or develop any artificial
+      intelligence or machine learning model.
+
+4. CONTRIBUTIONS
+
+   Every contribution (commit, patch, design, documentation or other
+   content) made by any employee, contractor or collaborator is a work
+   made for hire, and all intellectual property rights in it vest in the
+   Owner automatically upon creation, with no further instrument needed.
+
+5. END-USER LICENCE (SEPARATE)
+
+   This document governs ownership of the source code only. End-user
+   rights to run the application are governed separately by an
+   Activation Key issued from ZoeKeyGen — each key is signed with
+   ECDSA P-256, carries an expiry date, and may be revoked or extended
+   by the Owner at any time.
+
+   Holding an Activation Key grants no rights whatsoever in the source
+   code.
+
+6. THIRD-PARTY CODE
+
+   Certain files in this repository are owned by third parties and are
+   governed by their own licences, not by this document. The complete
+   inventory and licence texts are in the NOTICE file.
+
+7. BUSINESS DATA
+
+   Data processed by this system (phone numbers, parcels, COD/DOD
+   amounts and other customer data) belongs to the business operating
+   the system, not to the Owner of the software.
+
+8. NO WARRANTY
+
+   This system is provided "AS IS", without warranty of any kind,
+   express or implied, including the warranties of merchantability,
+   fitness for a particular purpose and non-infringement.
+
+9. LIMITATION OF LIABILITY
+
+   In no event shall the Owner be liable for any damages whatsoever,
+   including loss of data, loss of revenue or business interruption,
+   arising out of the use of or inability to use this system.
+
+10. GOVERNING LAW
+
+   This document is governed by and construed under the laws of the
+   Kingdom of Cambodia.
+
+11. LANGUAGE
+
+   The Khmer text (Part 1) is the original and legally authoritative
+   version. This English translation (Part 2) is provided for
+   information only. In case of any discrepancy, the Khmer text
+   prevails.

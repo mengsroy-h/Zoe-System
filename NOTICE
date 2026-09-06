@@ -1,0 +1,118 @@
+NOTICE — កូដភាគីទីបីក្នុង Zoe-System
+NOTICE — Third-party components in Zoe-System
+
+រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)
+Copyright © 2026 MENGSROY HEN. All rights reserved.
+
+
+===============================================================================
+គោលបំណងនៃឯកសារនេះ
+===============================================================================
+
+Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយចំនួនរួមជាមួយកូដផ្ទាល់ខ្លួន។
+
+⛔ កូដទាំងនោះ មិនស្ថិតក្រោមឯកសារ LICENSE របស់គម្រោងទេ — វាស្ថិតក្រោម
+   អាជ្ញាប័ណ្ណរៀងៗខ្លួនរបស់វា ដូចរាយខាងក្រោម។
+
+ឯកសារនេះជាការបំពេញកាតព្វកិច្ច attribution របស់អាជ្ញាប័ណ្ណទាំងនោះ។ ការដក
+ឯកសារនេះចេញ ឬការដកកូដភាគីទីបីណាមួយចេញពីបញ្ជីនេះ ខណៈវានៅតែ ship នឹងធ្វើ
+ឲ្យគម្រោងរំលោភអាជ្ញាប័ណ្ណរបស់ភាគីទីបីនោះ។
+
+⛔ ពេលបន្ថែម ដក ឬឡើងកំណែកូដភាគីទីបីណាមួយ ត្រូវកែឯកសារនេះក្នុង commit ដដែល។
+
+
+===============================================================================
+បញ្ជីកូដភាគីទីបី (៤)
+===============================================================================
+
+-------------------------------------------------------------------------------
+១. SheetJS Community Edition (xlsx) — កំណែ 0.20.3
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : ZoeW/vendor/xlsx.full.min.js
+   តួនាទី          : អាន និងសរសេរឯកសារ Excel (នាំចូល និង Export)
+   អាជ្ញាប័ណ្ណ      : Apache License 2.0
+   កម្មសិទ្ធិ       : Copyright (C) 2013-present SheetJS LLC
+   គេហទំព័រ        : https://sheetjs.com/
+   អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/Apache-2.0.txt
+
+-------------------------------------------------------------------------------
+២. zxing-wasm — កំណែ 3.1.3 (កូដភ្ជាប់ JavaScript)
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : ZoeW/vendor/zxing-wasm.js
+   តួនាទី          : កូដភ្ជាប់ (glue) រវាង JavaScript និងម៉ូឌុល WebAssembly
+   អាជ្ញាប័ណ្ណ      : MIT License
+   កម្មសិទ្ធិ       : Copyright (c) Sec-ant
+   គេហទំព័រ        : https://github.com/Sec-ant/zxing-wasm
+   អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
+
+-------------------------------------------------------------------------------
+៣. ZXing-C++ (zxing-cpp) — ចងក្រងជា WebAssembly
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : ZoeW/vendor/zxing_reader.wasm
+   តួនាទី          : ម៉ាស៊ីនអាន Barcode (Code 128) របស់ ZoeW
+   អាជ្ញាប័ណ្ណ      : Apache License 2.0
+   គេហទំព័រ        : https://github.com/zxing-cpp/zxing-cpp
+   អត្ថបទអាជ្ញាប័ណ្ណ : LICENSES/Apache-2.0.txt
+
+   ចំណាំ ៖ ឯកសារនេះជា reader តែម្យ៉ាង (បានផ្ទៀងផ្ទាត់ ៖ គ្មានផ្លូវសរសេរ
+   Barcode) ➜ បណ្ណាល័យ zint (BSD-3-Clause) ដែល zxing-wasm ប្រើសម្រាប់
+   ការសរសេរ Barcode មិនត្រូវបាន ship ក្នុងគម្រោងនេះទេ។
+
+-------------------------------------------------------------------------------
+៤. QR Code Generator for JavaScript
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : ZoeKeyGen/qrcode.js
+   តួនាទី          : បង្កើត QR Code សម្រាប់ Setup Link របស់ ZoeKeyGen
+   អាជ្ញាប័ណ្ណ      : MIT License
+   កម្មសិទ្ធិ       : Copyright (c) 2009 Kazuhiko Arase
+   គេហទំព័រ        : http://www.d-project.com/
+   អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
+
+   ពាណិជ្ជសញ្ញា ៖ ពាក្យ «QR Code» ជាពាណិជ្ជសញ្ញាចុះបញ្ជីរបស់
+   DENSO WAVE INCORPORATED — https://www.denso-wave.com/qrcode/
+
+
+===============================================================================
+កូដភាគីទីបីដែល មិន ត្រូវបាន ship ក្នុង repository នេះ
+===============================================================================
+
+ធាតុខាងក្រោមត្រូវបានទាញយកពេលដំឡើង (npm) ឬផ្ទុកពី CDN ខាងក្រៅ ➜ ពួកវា
+មិនត្រូវបានចែកចាយក្នុង repository នេះទេ ហើយមិនត្រូវការ attribution ត្រង់
+នេះឡើយ។ ពួកវារាយទុកជាព័ត៌មានតែប៉ុណ្ណោះ ៖
+
+   @netlify/blobs 11.0.2  — ZoeW/package.json (npm)
+   playwright-core 1.62.1 — tools/zto-cookie-sync-windows/package.json (npm)
+   Firebase JavaScript SDK — ផ្ទុកពី CDN របស់ Google ពេលដំណើរការ
+   Sentry Browser SDK      — ផ្ទុកពី js.sentry-cdn.com ពេលដំណើរការ
+   acorn · xlsx            — ប្រើតែក្នុង audit-tools (មិន deploy)
+
+
+===============================================================================
+អត្ថបទ MIT License (អនុវត្តលើធាតុទី ២ និងទី ៤)
+===============================================================================
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+===============================================================================
+អត្ថបទ Apache License 2.0 (អនុវត្តលើធាតុទី ១ និងទី ៣)
+===============================================================================
+
+អត្ថបទពេញលេញ ស្ថិតក្នុង ៖ LICENSES/Apache-2.0.txt
+ប្រភពផ្លូវការ      ៖ https://www.apache.org/licenses/LICENSE-2.0.txt

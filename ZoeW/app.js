@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.3';
+    const APP_VERSION = '2.30.4';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5835,7 +5835,8 @@
         return {
             scanDate: scanDateStr,
             daily: appliedDaily, monthly: appliedMonthly,
-            dailyServer: dailyServer, monthlyServer: monthlyServer
+            dailyServer: dailyServer,
+            monthlyServer: alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer)
         };
     }
 
@@ -5884,14 +5885,30 @@
 
     function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, actualDod, actualCount) {
         const r2 = (n) => Math.round(n * 100) / 100;
-        ledgerServerVerdict(applied && applied.dailyServer).then((daily) => {
+        const dailyFix = ledgerServerVerdict(applied && applied.dailyServer).then((daily) =>
             commitRevenueBucketDelta(scanDateStr, 'daily',
-                r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count);
-        });
-        ledgerServerVerdict(applied && applied.monthlyServer).then((monthly) => {
+                r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count).server);
+        const monthlyFix = ledgerServerVerdict(applied && applied.monthlyServer).then((monthly) =>
             commitRevenueBucketDelta(scanDateStr, 'monthly',
-                r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count);
-        });
+                r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count).server);
+        return alignMonthlyLedgerToDaily(scanDateStr.substring(0, 7), dailyFix, monthlyFix);
+    }
+
+    function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
+        const monthlyVerdict = ledgerServerVerdict(monthlyServer);
+        return Promise.all([ledgerServerVerdict(dailyServer), monthlyVerdict]).then((verdicts) => {
+            const dailyApplied = verdicts[0];
+            const monthlyApplied = verdicts[1];
+            const cod = Math.round((dailyApplied.cod - monthlyApplied.cod) * 100) / 100;
+            const dod = Math.round((dailyApplied.dod - monthlyApplied.dod) * 100) / 100;
+            const count = dailyApplied.count - monthlyApplied.count;
+            if (!cod && !dod && !count) return monthlyApplied;
+            return ledgerServerVerdict(commitMonthlyRevenueDelta(ymKey, cod, dod, count, null, true)).then((fix) => ({
+                cod: Math.round((monthlyApplied.cod + fix.cod) * 100) / 100,
+                dod: Math.round((monthlyApplied.dod + fix.dod) * 100) / 100,
+                count: monthlyApplied.count + fix.count
+            }), () => monthlyApplied);
+        }).catch(() => monthlyVerdict);
     }
 
     function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
@@ -5946,7 +5963,10 @@
             return latestThreeMonths;
         }).then((result) => {
             if (!result || !result.committed || !serverBefore || !serverAfter) return null;
-            return ledgerAppliedDelta(serverBefore, serverAfter);
+            const storedMonths = result.snapshot ? result.snapshot.val() : null;
+            const storedMonth = (storedMonths && typeof storedMonths === 'object') ? storedMonths[ymKey] : null;
+            if (!storedMonth || typeof storedMonth !== 'object') return ledgerZeroDelta();
+            return ledgerAppliedDelta(serverBefore, storedMonth);
         }, () => {
             if (recordRef && monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
                 revertLedgerRecordInMemory(recordRef, applied);
@@ -11313,7 +11333,8 @@
             monthly[month].count += parseFloat(delta.count) || 0;
         });
         const append = (path, amount) => {
-            if (amount) updates[path] = fb.increment(amount);
+            const value = Math.round((parseFloat(amount) || 0) * 100) / 100;
+            if (value) updates[path] = fb.increment(value);
         };
         Object.keys(daily).forEach((scanDate) => {
             const delta = daily[scanDate];

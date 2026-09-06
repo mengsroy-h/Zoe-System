@@ -147,6 +147,7 @@ bash audit-tools/emu/rules.sh
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `ledger-failed-apply-revert-test.js` | ការសរសេរ ledger **ធ្លាក់** រួចការដកវិញ **ជោគជ័យ** ➜ មិនត្រូវដកលេខដែលមិនដែលត្រូវបូក | `LEDGERFAIL_APP_DIR` |
+| `monthly-ledger-agreement-test.js` | `monthly[M]` ត្រូវស្មើផលបូក `daily[d ∈ M]` — clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ | `MONTHLYAGREE_APP_DIR` |
 | `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
 | `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
 | `item-money-integrity-test.js` | **លុយសរុបរបស់ *ជួរដេក*** (⚠️ `item` = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ · `barcode` = កញ្ចប់ ១) ៖ `item.cod/.dod/.price` ត្រូវស្មើផលបូក barcodes — ជាន់ ១ AST (ការសរសេរលុយត្រូវឆ្លងកាត់ helper) · ជាន់ ២ helper លើ input ច្រើន · ជាន់ ៣ invariant លើ item **ក្នុងសតិ និងលើ server** ក្រោយ operation កំណត់ ៧ | `ITEMMONEY_APP_DIR` |

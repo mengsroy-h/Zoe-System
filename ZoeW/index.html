@@ -361,11 +361,13 @@
     </div>
     <div class="drawer-foot">
         <div class="app-version-line" data-app-version></div>
+        <div class="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
+        <div class="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
     </div>
 </aside>
 
 <div id="pinModal" class="modal" data-close="cancelPinEntryFlow">
-    <div class="modal-content" style="max-width: 300px;">
+    <div class="modal-content">
         <h3>🔒 បញ្ចូល Security PIN</h3>
         <p id="pinModalDesc">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
         <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autocomplete="off">
@@ -380,7 +382,7 @@
 </div>
 
 <div id="pinSetupModal" class="modal" data-close="cancelPinSetupFlow">
-    <div class="modal-content" style="max-width: 300px;">
+    <div class="modal-content">
         <h3>⚙️ កំណត់ Security PIN ថ្មី</h3>
         <p id="pinSetupModalDesc">សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ</p>
         <input type="password" id="newSecurityPinInput" placeholder="លេខកូដ PIN ថ្មី" autocomplete="off">
@@ -392,7 +394,7 @@
 </div>
 
 <div id="configModal" class="modal">
-    <div class="modal-content" style="max-width: 360px;">
+    <div class="modal-content">
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>បិទភ្ជាប់អ្វីដែល copy ពី <b>Firebase Console ➜ Project settings ➜ Your apps</b> ទាំងស្រុងបានតែម្តង — រួមទាំង <code>import</code>, comment និង <code>const firebaseConfig = …</code>។</p>
         <div class="modal-btns" style="margin-bottom:10px;">
@@ -416,7 +418,7 @@ const firebaseConfig = {
 </div>
 
 <div id="configQrScanModal" class="modal" data-close="closeConfigQrScanner">
-    <div class="modal-content" style="max-width: 360px;">
+    <div class="modal-content">
         <h3>📷 ស្កេន QR (Setup Link)</h3>
         <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
         <video id="configQrVideo" style="width:100%; border-radius:8px; background:#000;" playsinline muted autoplay></video>
@@ -427,7 +429,7 @@ const firebaseConfig = {
 </div>
 
 <div id="lookupApiConfigModal" class="modal">
-    <div class="modal-content" style="max-width: 380px;">
+    <div class="modal-content">
         <h3>🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ</h3>
         <p style="text-align:left;">
             ភ្ជាប់ទៅប្រព័ន្ធផ្ទាល់ខ្លួនរបស់អ្នក (Google Sheet/Apps Script, ប្រព័ន្ធក្រុមហ៊ុន...) ដើម្បីស្កេន Barcode រួចទាញយក លេខទូរស័ព្ទ/COD/DOD ដោយស្វ័យប្រវត្តិ។
@@ -590,7 +592,7 @@ const firebaseConfig = {
 </div>
 
 <div id="exchangeRateModal" class="modal">
-    <div class="modal-content" style="max-width: 320px;">
+    <div class="modal-content">
         <h3>💱 កំណត់អត្រាប្តូរប្រាក់ (1$ = ? ៛)</h3>
         <p>បញ្ចូលអត្រាប្តូរប្រាក់រៀលសម្រាប់ 1 ដុល្លារ (USD)</p>
         <input type="number" id="exchangeRateInput" placeholder="ឧ. 4100" min="1" step="1">
@@ -623,7 +625,7 @@ const firebaseConfig = {
 </div>
 
 <div id="manualAdjustModal" class="modal">
-    <div class="modal-content" style="max-width: 340px;">
+    <div class="modal-content">
         <h3>⚙️ កែប្រែ COD, DOD & កញ្ចប់ដោយដៃ</h3>
         <p>ជ្រើសរើសកាលបរិច្ឆេទ (YYYY-MM-DD) និងចំនួនដែលចង់កែប្រែ</p>
         
@@ -683,7 +685,7 @@ const firebaseConfig = {
 </div>
 
 <div id="callMarkModal" class="modal">
-    <div class="modal-content" style="max-width: 320px;">
+    <div class="modal-content">
         <h3>📞 សម្គាល់ការខល</h3>
         <p>លេខទូរស័ព្ទ៖ <strong id="callMarkPhoneText" style="color:var(--primary);"></strong></p>
         <div class="modal-btns" style="margin-top: 6px;">
@@ -712,7 +714,7 @@ const firebaseConfig = {
 </div>
 
 <div id="viewListModal" class="modal">
-    <div class="modal-content" style="max-width: 440px;">
+    <div class="modal-content">
         <h3>📦 បញ្ជីអីវ៉ាន់ទាំងអស់</h3>
         <p style="margin-bottom: 6px;">លេខទូរស័ព្ទ៖ <strong id="listModalPhoneText" style="color:var(--primary); font-size:calc(12 * var(--fs-unit));"></strong></p>
         <div class="table-responsive" style="max-height: 280px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
@@ -725,7 +727,7 @@ const firebaseConfig = {
 </div>
 
 <div id="dailyStatsModal" class="modal">
-    <div class="modal-content" style="max-width: 380px;">
+    <div class="modal-content">
         <h3>📅 កញ្ចប់ & ចំណូល (យករួច) ប្រចាំថ្ងៃ</h3>
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="dailyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
@@ -736,7 +738,7 @@ const firebaseConfig = {
 </div>
 
 <div id="monthlyStatsModal" class="modal">
-    <div class="modal-content" style="max-width: 380px;">
+    <div class="modal-content">
         <h3>📊 ស្ថិតិចំណូល (យករួច) ៣ ខែចុងក្រោយ</h3>
         <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
         <div id="monthlyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
@@ -747,7 +749,7 @@ const firebaseConfig = {
 </div>
 
 <div id="customerDataTableModal" class="modal">
-    <div class="modal-content" style="max-width: 760px; text-align: left; display: flex; flex-direction: column; height: 88vh;">
+    <div class="modal-content" style="text-align: left; display: flex; flex-direction: column; height: 88vh;">
         <h3 style="text-align:center;">📊 តារាងអតិថិជន (Barcode / DOD / COD / Phone)</h3>
         <p style="text-align:center;">ទាញពី Google Sheet — Read-only, ស្វែងរកលឿនក្នុងឧបករណ៍ដោយផ្ទាល់</p>
         <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
@@ -802,7 +804,7 @@ const firebaseConfig = {
 </div>
 
 <div id="restoreWarningModal" class="modal" style="z-index: 1060;" data-close="cancelRestoreItem">
-    <div class="modal-content" style="max-width: 320px;">
+    <div class="modal-content">
         <h3 style="color: var(--warning);">⚠️ បញ្ជាក់ការស្តារទិន្នន័យ</h3>
         <p>តើអ្នកពិតជាចង់ស្តារទិន្នន័យកញ្ចប់អីវ៉ាន់នេះពីធុងសំរាមមែនទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
@@ -815,7 +817,7 @@ const firebaseConfig = {
 </div>
 
 <div id="permanentDeleteWarningModal" class="modal" style="z-index: 1060;" data-close="cancelPermanentDelete">
-    <div class="modal-content" style="max-width: 320px;">
+    <div class="modal-content">
         <h3 style="color: #ef4444;">🗑️ លុបជាអចិន្ត្រៃយ៍</h3>
         <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
@@ -828,7 +830,7 @@ const firebaseConfig = {
 </div>
 
 <div id="exportDataModal" class="modal">
-    <div class="modal-content" style="max-width: 340px;">
+    <div class="modal-content">
         <h3>📤 Export ទិន្នន័យ</h3>
         <p>Export ទិន្នន័យប្រវត្តិដែលកំពុងបង្ហាញ (តាមតម្រង «<span id="exportFilterLabel">ថ្ងៃនេះ</span>») ចេញជាឯកសារ</p>
         <div class="modal-btns" style="flex-direction: column; gap: 8px;">
@@ -841,7 +843,7 @@ const firebaseConfig = {
 </div>
 
 <div id="monthlyReportModal" class="modal">
-    <div class="modal-content" style="max-width: 520px;">
+    <div class="modal-content">
         <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
         <p>សង្ខេបចំណូល និងកញ្ចប់ក្នុងមួយខែ គិតចេញពី <b>កំណត់ត្រាប្រចាំថ្ងៃ</b> ដែលរក្សាទុកជានិច្ចក្នុង Database។ <b>ចំណូល = តម្លៃកញ្ចប់ដែលអតិថិជនយករួច</b> ប៉ុណ្ណោះ។</p>
         <select id="monthlyReportMonthSel" data-act="renderMonthlyReport" data-on="change" aria-label="ជ្រើសរើសខែ"></select>
@@ -861,7 +863,7 @@ const firebaseConfig = {
 </div>
 
 <div id="activationModal" class="modal" style="display: none;" data-nodismiss="true">
-    <div class="modal-content" style="max-width: 380px;">
+    <div class="modal-content">
         <h3>🔑 ត្រូវការ Activation Key</h3>
         <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។</p>
         <textarea id="activationKeyInput" placeholder="ZOEKEY-..." style="min-height:70px; font-family: monospace; font-size: calc(11 * var(--fs-unit));"></textarea>
@@ -874,7 +876,7 @@ const firebaseConfig = {
 </div>
 
 <div id="healthCheckModal" class="modal">
-    <div class="modal-content" style="max-width: 460px;">
+    <div class="modal-content">
         <h3>🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</h3>
         <div id="healthCheckList" class="health-list"></div>
         <p class="health-note">ការពិនិត្យនេះ <b>អានតែប៉ុណ្ណោះ</b> — វាមិនកែទិន្នន័យ ឬលុយអ្វីទាំងអស់។</p>
@@ -886,7 +888,7 @@ const firebaseConfig = {
 </div>
 
 <div id="lockerPickerModal" class="modal" style="z-index: 1055;">
-    <div class="modal-content" style="max-width: 380px;">
+    <div class="modal-content">
         <h3>📍 ជ្រើសរើសទីតាំង Locker</h3>
         <p>រាល់ Barcode ដែលស្កេនបន្ទាប់ពីនេះ នឹងត្រូវកំណត់ទីតាំងតាមទូដែលបានជ្រើសរើស។</p>
         <div class="locker-grid" id="lockerGrid"></div>
@@ -901,7 +903,7 @@ const firebaseConfig = {
 </div>
 
 <div id="lockerSettingsModal" class="modal" style="z-index: 1060;">
-    <div class="modal-content" style="max-width: 320px;">
+    <div class="modal-content">
         <h3>🗄️ កំណត់ទូ Locker</h3>
         <p>កំណត់បុព្វបទ (Prefix) និងចំនួនទូ ដែលបង្ហាញក្នុងអេក្រង់ជ្រើសរើសទីតាំង</p>
         <input type="text" id="lockerPrefixInput" placeholder="បុព្វបទ (ឧ. ទូ)" maxlength="10">
@@ -916,7 +918,7 @@ const firebaseConfig = {
 </div>
 
 <div id="locationWarningModal" class="modal" style="z-index: 1065;" data-close="cancelLocationChange">
-    <div class="modal-content" style="max-width: 340px;">
+    <div class="modal-content">
         <h3 style="color: var(--warning);">⚠️ កញ្ចប់នេះមានទីតាំងស្រាប់</h3>
         <p id="locationWarningText"></p>
         <div class="modal-btns" style="margin-top: 10px;">

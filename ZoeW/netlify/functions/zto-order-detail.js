@@ -54,6 +54,7 @@ const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
+    authAcceptedAt: 0,
     mustRevalidate: false
 };
 let cookieRefreshInFlight = false;
@@ -322,6 +323,7 @@ function noteCookieRejected() {
 
 function noteCookieAccepted() {
     cookieState.authRejectedAt = 0;
+    cookieState.authAcceptedAt = Date.now();
 }
 
 function noteCookieRenewal(session, response) {
@@ -960,6 +962,9 @@ function diagnosticsBody(config, headers, authKind, credential) {
             renewals: cookieState.renewals,
             authRejectedAgeMs: cookieState.authRejectedAt
                 ? elapsedSince(cookieState.authRejectedAt)
+                : null,
+            authAcceptedAgeMs: cookieState.authAcceptedAt
+                ? elapsedSince(cookieState.authAcceptedAt)
                 : null
         },
         endpoint: {
@@ -1133,6 +1138,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.renewAt = 0;
     cookieState.renewals = 0;
     cookieState.authRejectedAt = 0;
+    cookieState.authAcceptedAt = 0;
 };
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {

@@ -109,7 +109,7 @@ function buildRuntime(over) {
                 ok: okRes,
                 status: status,
                 json: () => Promise.resolve(o.diagBody || {
-                    ok: true, cookie: { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 600000, storeReason: 'env-fallback' }
+                    ok: true, cookie: { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 600000, storeReason: 'env-fallback', authAcceptedAgeMs: 5000 }
                 })
             });
         },
@@ -147,6 +147,51 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         //    ➜ **រាយ ❌ «HTTP undefined» លើ Cookie ដែលដំណើរការ**។
         ok('⛔ Cookie ដំណើរការ ➜ មិនត្រូវរាយ ❌ ដាច់ខាត', html.indexOf('health-bad') === -1, html.slice(0, 120));
         ok('⛔ គ្មានពាក្យ «undefined» ក្នុងអត្ថបទដែលអ្នកប្រើអាន', html.indexOf('undefined') === -1);
+    }
+    // 🔴 ការថយក្រោយពិត (រាយការណ៍ដោយអ្នកប្រើលើឧបករណ៍ពិត 2026-09-06) ៖
+    //    health check រាយ **✅ «Cookie ពី blob · លេខសម្គាល់ 3ad3c71f»** ខណៈ
+    //    ការស្កេនពិត **ក្នុងនាទីដដែល** ឆ្លើយ «🔒 Cookie ZTO ផុតកំណត់»។
+    //
+    // មូលហេតុ ៖ `healthLookupRow()` សម្រេច ✅ ត្រឹម **វត្តមាន** នៃ Cookie
+    // (`source !== 'none' && fingerprint`) ដោយ **មិនដែលសួរថា ZTO ទទួលយកវាឬអត់**។
+    // Function កត់សាលក្រមនោះរួចហើយ (`noteCookieRejected()` លើ 401 ·
+    // `noteCookieAccepted()` លើជោគជ័យ) ហើយ **បង្ហាញវាក្នុង `?diag=1`** —
+    // តែជួរ health **មិនអានវាសោះ**។
+    //
+    // នេះជាថ្នាក់ដដែលនឹងច្បាប់ «ការវិនិច្ឆ័យដែលនិយាយមិនពិត» តែ **ក្នុងទិស
+    // ផ្ទុយ** ៖ ច្បាប់ចាស់ហាមរាយ ❌ លើអ្វីដែល *មិនបានវាស់*; ត្រង់នេះវារាយ
+    // **✅** លើអ្វីដែល *មិនបានវាស់*។ ⛔ ✅ ក្លែងក្លាយលើផ្លូវ Lookup គឺ
+    // **អាក្រក់ជាង** ❌ ក្លែងក្លាយ ព្រោះវាបញ្ជូនអ្នកប្រើទៅរកមូលហេតុខុស។
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
+            source: 'blob', fingerprint: '3ad3c71f', ageMs: 0, authRejectedAgeMs: 4000 } } });
+        const html = await rt.api.healthLookupRow();
+        ok('⛔ ZTO បដិសេធ Cookie (401) ➜ មិនត្រូវរាយ ✅ ដាច់ខាត',
+            state(html) !== 'ok', state(html) + ' :: ' + html.slice(0, 160));
+        ok('⛔ ZTO បដិសេធ Cookie ➜ ត្រូវប្រាប់ថា **ផុតកំណត់/បដិសេធ**',
+            /ផុតកំណត់|បដិសេធ/.test(html), html.slice(0, 200));
+        ok('⛔ ZTO បដិសេធ Cookie ➜ ត្រូវប្រាប់វិធីដោះស្រាយ (sync-zto-cookie)',
+            /sync-zto-cookie/.test(html), html.slice(0, 220));
+    }
+    // ⛔ ទិសផ្ទុយ ១ ៖ សាលក្រម **ទទួលយក** ពិត ➜ នៅតែត្រូវរាយ ✅
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
+            source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000 } } });
+        const html = await rt.api.healthLookupRow();
+        ok('⛔ ទិសផ្ទុយ ៖ ZTO ទទួលយក Cookie ➜ រាយ ✅ ដដែល', state(html) === 'ok', state(html));
+    }
+    // ⛔ ទិសផ្ទុយ ២ ៖ Cookie មាន តែ **មិនទាន់ដែលប្រើ** លើ container នេះ ➜
+    //    «ពិនិត្យមិនបាន» ➜ ⚠️ មិនមែន ✅ និង **មិនមែន ❌** (ច្បាប់គម្រោង)។
+    //    `cookieState` ជារបស់ container នីមួយៗ ➜ diag អាចចុះលើ container ថ្មី
+    //    ដែលមិនដែលឃើញ 401 ➜ ការរាយ ✅ នៅទីនោះជាការអះអាងលើអ្វីដែលមិនបានវាស់។
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true, cookie: {
+            source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000 } } });
+        const html = await rt.api.healthLookupRow();
+        ok('⛔ Cookie មាន តែមិនទាន់ដែលប្រើ ➜ ⚠️ «ពិនិត្យមិនបាន» មិនមែន ✅',
+            state(html) === 'warn', state(html) + ' :: ' + html.slice(0, 160));
+        ok('⛔ ករណីនោះមិនត្រូវរាយ ❌ (មិនអះអាងថាខូច)',
+            state(html) !== 'bad', state(html));
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, httpStatus: 500 });

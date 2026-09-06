@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.4';
+    const APP_VERSION = '2.30.5';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3438,10 +3438,22 @@
             }
             const ageMs = body && body.cookie && body.cookie.ageMs;
             const reason = safeLookupReason(body && body.cookie && body.cookie.storeReason);
-            return healthRowHtml('ok', 'Lookup អតិថិជន (ZTO)',
-                'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
+            const rejectedAgeMs = body && body.cookie && body.cookie.authRejectedAgeMs;
+            const acceptedAgeMs = body && body.cookie && body.cookie.authAcceptedAgeMs;
+            const cookieText = 'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
                 + (typeof ageMs === 'number' ? ' · អាយុ ' + Math.round(ageMs / 60000) + ' នាទី' : '')
-                + (reason ? ' · ' + reason : ''));
+                + (reason ? ' · ' + reason : '');
+            if (typeof rejectedAgeMs === 'number') {
+                return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)',
+                    'ZTO បដិសេធ Cookie នេះ (ផុតកំណត់) ➜ ការស្វែងរកនឹងធ្លាក់។ '
+                    + 'សូមរត់ឧបករណ៍ sync-zto-cookie លើ Windows យក Cookie ថ្មី · ' + cookieText);
+            }
+            if (typeof acceptedAgeMs !== 'number') {
+                return healthRowHtml('warn', 'Lookup អតិថិជន (ZTO)',
+                    'មាន Cookie តែ ZTO មិនទាន់ដែលប្រើវា ➜ ពិនិត្យមិនបានថាវានៅសុពលភាព។ '
+                    + 'សូមស្កេនកញ្ចប់ ១ រួចពិនិត្យម្ដងទៀត · ' + cookieText);
+            }
+            return healthRowHtml('ok', 'Lookup អតិថិជន (ZTO)', 'ZTO ទទួលយក · ' + cookieText);
         } catch (e) {
             return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)', 'ភ្ជាប់ទៅ Server មិនបាន — ' + safeLookupReason(e && e.message));
         }

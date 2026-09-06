@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.2';
+    const APP_VERSION = '2.30.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5839,9 +5839,26 @@
         };
     }
 
-    function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise, memoryApplied) {
-        return Promise.resolve(serverPromise).then((serverApplied) => {
-            const d = serverApplied || memoryApplied;
+    function ledgerZeroDelta() {
+        return { cod: 0, dod: 0, count: 0 };
+    }
+
+    function ledgerServerVerdict(serverPromise) {
+        return Promise.resolve(serverPromise).then(
+            (serverApplied) => serverApplied || ledgerZeroDelta(),
+            () => ledgerZeroDelta()
+        );
+    }
+
+    function ledgerMemoryCompensationClaimed(applied) {
+        if (!applied || typeof applied !== 'object') return false;
+        if (applied.memoryCompensated) return true;
+        applied.memoryCompensated = true;
+        return false;
+    }
+
+    function revertLedgerBucketOnServer(scanDateStr, bucket, serverPromise) {
+        return ledgerServerVerdict(serverPromise).then((d) => {
             if (!d || (!d.cod && !d.dod && !d.count)) return null;
             const ymKey = scanDateStr.substring(0, 7);
             return bucket === 'daily'
@@ -5854,25 +5871,27 @@
         if (!applied || !applied.scanDate) return null;
         const daily = applied.daily || { cod: 0, dod: 0, count: 0 };
         const monthly = applied.monthly || { cod: 0, dod: 0, count: 0 };
-        if (daily.cod || daily.dod || daily.count) {
+        if ((daily.cod || daily.dod || daily.count) && !ledgerMemoryCompensationClaimed(daily)) {
             applyLedgerBucketDelta(dailyRevenueData, applied.scanDate, -daily.cod, -daily.dod, -daily.count);
         }
-        if (monthly.cod || monthly.dod || monthly.count) {
+        if ((monthly.cod || monthly.dod || monthly.count) && !ledgerMemoryCompensationClaimed(monthly)) {
             applyLedgerBucketDelta(monthlyRevenueData, applied.scanDate.substring(0, 7), -monthly.cod, -monthly.dod, -monthly.count);
         }
-        revertLedgerBucketOnServer(applied.scanDate, 'daily', applied.dailyServer, daily);
-        revertLedgerBucketOnServer(applied.scanDate, 'monthly', applied.monthlyServer, monthly);
+        revertLedgerBucketOnServer(applied.scanDate, 'daily', applied.dailyServer);
+        revertLedgerBucketOnServer(applied.scanDate, 'monthly', applied.monthlyServer);
         return applied;
     }
 
     function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, actualDod, actualCount) {
-        const daily = (applied && applied.daily) || { cod: 0, dod: 0, count: 0 };
-        const monthly = (applied && applied.monthly) || { cod: 0, dod: 0, count: 0 };
         const r2 = (n) => Math.round(n * 100) / 100;
-        commitRevenueBucketDelta(scanDateStr, 'daily',
-            r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count);
-        commitRevenueBucketDelta(scanDateStr, 'monthly',
-            r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count);
+        ledgerServerVerdict(applied && applied.dailyServer).then((daily) => {
+            commitRevenueBucketDelta(scanDateStr, 'daily',
+                r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count);
+        });
+        ledgerServerVerdict(applied && applied.monthlyServer).then((monthly) => {
+            commitRevenueBucketDelta(scanDateStr, 'monthly',
+                r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count);
+        });
     }
 
     function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
@@ -5894,7 +5913,7 @@
             if (!result || !result.committed || !serverBefore || !serverAfter) return null;
             return ledgerAppliedDelta(serverBefore, serverAfter);
         }, () => {
-            if (recordRef && dailyRevenueData[scanDateStr] === recordRef) {
+            if (recordRef && dailyRevenueData[scanDateStr] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
                 revertLedgerRecordInMemory(recordRef, applied);
                 refreshCurrentHistoryView();
             }
@@ -5929,7 +5948,7 @@
             if (!result || !result.committed || !serverBefore || !serverAfter) return null;
             return ledgerAppliedDelta(serverBefore, serverAfter);
         }, () => {
-            if (recordRef && monthlyRevenueData[ymKey] === recordRef) {
+            if (recordRef && monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
                 revertLedgerRecordInMemory(recordRef, applied);
             }
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");

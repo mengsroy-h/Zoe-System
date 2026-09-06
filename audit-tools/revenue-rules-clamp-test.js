@@ -75,7 +75,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
-    'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
+    'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
@@ -264,6 +264,9 @@ function makeSandbox(seed) {
         + fnSrc.revertLedgerRecordInMemory + '\n'
         + fnSrc.applyLedgerBucketDelta + '\n'
         + fnSrc.commitRevenueBucketDelta + '\n'
+        + fnSrc.ledgerZeroDelta + '\n'
+        + fnSrc.ledgerServerVerdict + '\n'
+        + fnSrc.ledgerMemoryCompensationClaimed + '\n'
         + fnSrc.revertLedgerBucketOnServer + '\n'
         + fnSrc.revertRevenueLedgerDelta + '\n'
         + fnSrc.correctRevenueLedgerToActual + '\n'

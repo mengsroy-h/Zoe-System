@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.2` (`zoew-v170`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.3` (`zoew-v171`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.18` (`zoekeygen-v88`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -248,6 +248,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **តម្លៃដែល rules បដិសេធ** | ⛔ លេខអវិជ្ជមានត្រូវ **clamp មុនសរសេរ** — សតិត្រូវស៊ីនឹង server | `revenue-rules-clamp-test` |
 | **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
 | **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
+| **ការដកវិញក្រោយការអនុវត្តដែល *ធ្លាក់*** | ⛔ ច្បាប់ «ដកតាម delta ពិតដែលអនុវត្ត» (ជួរខាងលើ) អនុវត្តលើសាលក្រម **`null`** ដែរ ៖ `null` = «server មិនបានអនុវត្ត» ➜ **គ្មានអ្វីត្រូវដក** (⛔ កុំធ្លាក់ចុះទៅ delta របស់សតិ)។ ការដកវិញក្នុងសតិត្រូវ **idempotent** ព្រោះ `catch` របស់ commit ដក memory រួចហើយ | `ledger-failed-apply-revert-test` |
 | **ស្ថិតិយក ៖ អត្តសញ្ញាណ** | ⛔ រាប់តាម **សំណុំ barcode** (`pickedUpBarcodes`) — លេខទាំង ២ ជា **កញ្ចក់ដេរីវេ** មិនមែន counter | `pickup-barcode-identity-test` · `pickup-ledger-test` |
 | **ស្ថិតិយក ↔ កូនសោ registry** | ⛔ កូនសោ barcode ត្រូវជា `barcodeRegistryKey()` ដដែល — កូនសោ ២ រូបមន្ត = ការរាប់ស្ទួន | `pickup-ledger-test` |
 | **ស្ថិតិយក ↔ សាលក្រម server** | ⛔ ការសរសេរជា **ស្ថានភាព idempotent** — គ្មាននព្វន្ធលើ `packagesPickedUp` | `revenue-rules-clamp-test` · `money-guardian-test` |
@@ -450,6 +451,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **checker បោះ «FAIL» តែចេញ exit 0** ➜ `run-all.sh` រាយថា PASS | `exit-code-integrity.js` (**រត់នេះមុនគេដែរ**) |
 
 | **ledger ៖ «អនុវត្ត ➜ ដកវិញ» លែងជាគូបញ្ច្រាស** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ | `ledger-clamp-symmetry-test.js` · **`emu/ledger-revert-emu-test.js`** (RTDB ពិត + rules ពិត) |
+| **ការសរសេរ ledger ធ្លាក់ ➜ ការដកវិញ *ជោគជ័យ*** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ · សតិឃ្លាតពី server · ការកែទឹកប្រាក់បាត់ស្ងាត់ៗ | `ledger-failed-apply-revert-test.js` |
 | **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៧ ➜ អ្នកយាមត្រូវក្រហម) |
 | declaration ឈ្មោះ **ស្ទួន** ដែល JS hoist/សរសេរជាន់ស្ងាត់ · function ងាប់ | `function-surface-test.js` |
 | **កូដជាន់គ្នា** ៖ តួ function ដដែល ឬប្លុក statement ដដែល ក្នុងឯកសារ ship តែមួយ (⚠️ ការជាន់គ្នា **ឆ្លង App** ជាចេតនា ➜ `shared-fns.js` មិនមែនឧបករណ៍នេះ) | `code-duplication-test.js` |
@@ -670,6 +672,13 @@ ledger តូចជាង delta ដែលកំពុងដក ៖ ការអ�
 
 - **`ledgerAppliedDelta(before, after)` ជាមូលដ្ឋាននៃ revert តែមួយ** — revert
   ត្រូវដក **delta ពិតដែលបានអនុវត្ត** (`after - before`) មិនមែន delta ដែលស្នើ។
+- ⛔ **សាលក្រម `null` = «server មិនបានអនុវត្ត» មិនមែន «មិនដឹង»** —
+  `ledgerServerVerdict(serverPromise)` ជាមូលដ្ឋានតែមួយ ៖ បដិសេធ ឬ
+  `committed: false` ➜ `{cod:0,dod:0,count:0}` ➜ **គ្មានអ្វីត្រូវដកវិញ**។
+  ⛔ ការធ្លាក់ចុះទៅ delta របស់សតិ ដកលេខដែលមិនដែលត្រូវបូក (វាស់បាន ៖ បណ្តាញ
+  ដាច់មួយភ្លែតពេលអនុវត្ត ➜ ដកវិញជោគជ័យ ➜ ថ្ងៃឡើងពី **$10.00 ទៅ $14.00**)។
+  ⛔ ការដកវិញ **ក្នុងសតិ** ត្រូវ idempotent (`ledgerMemoryCompensationClaimed`)
+  ព្រោះ `catch` របស់ commit ដក memory រួចហើយ — **ទាំង ២ លំដាប់**។
 - ⛔ **ការដកវិញខាង server ត្រូវរង់ចាំ *សាលក្រម server*** — `commitDailyRevenueDelta`
   និង `commitMonthlyRevenueDelta` ចាប់ `serverBefore`/`serverAfter` **ខាងក្នុង
   transaction** រួចត្រឡប់ `ledgerAppliedDelta(...)` ។ សតិ និង server អាចឃ្លាតគ្នា
@@ -693,7 +702,8 @@ ledger តូចជាង delta ដែលកំពុងដក ៖ ការអ�
 - ⛔ **ទិសផ្ទុយត្រូវរក្សា** ៖ ការដកធម្មតា (`50 - 12.5`) ត្រូវសរសេរ `37.5`
   **ពិតប្រាកដ** គ្មានការ clamp មុនពេល។
 
-Tools ៖ `ledger-clamp-symmetry-test` (browser) · **`emu/ledger-revert-emu-test`**
+Tools ៖ `ledger-clamp-symmetry-test` (browser) · **`ledger-failed-apply-revert-test`**
+(ការអនុវត្តក្នុងរបៀបបរាជ័យ) · **`emu/ledger-revert-emu-test`**
 (RTDB ពិត + rules ពិត តាម ETag/`if-match` — ជា ground truth) ·
 `money-guardian-test` (mutation ១០ ➜ អ្នកយាមត្រូវក្រហមពិត) ·
 `price-edit-abort-test` · `revenue-rules-clamp-test` · `revenue-fuzz-test`។
@@ -1848,10 +1858,11 @@ bash audit-tools/emu/rules.sh
 | កំណែ | អ្វីដែលអ្នកប្រើត្រូវសាក |
 |---|---|
 | **2.30.1** | ⚙️ **ជុំរួបរួមកូដជាន់គ្នា — គ្មានមុខងារថ្មី គ្មានការប្តូរឥរិយាបថដែលចង់បាន។** អ្វីដែលត្រូវសាកគឺថា **អ្វីៗនៅដដែល** ៖ បិទ/បើក «យក» (barcode ១ និងកញ្ចប់ទាំងមូល) · ដក/លុប/ស្តារ · កែតម្លៃក្នុងកញ្ចប់ · ស្កេន barcode ស្ទួន (ត្រូវឃើញសារព្រមាន + ញ័រ + ត្រឡប់ទៅម៉ាស៊ីនស្កេន) · ប៊ូតុង `(...)` និងម៉ឺនុយ 🗑️/✏️ ក្នុងជួរតារាង · ស្ថិតិចំណូលថ្ងៃ និងខែ |
+| **2.30.3** | 💰 **ជុំកែកំហុសលុយ។** ការប្រើប្រាស់ធម្មតាត្រូវនៅ **ដដែលបេះបិទ** (ការកែប៉ះតែផ្លូវ *បរាជ័យ*) ៖ ស្កេនថ្មី · **ដក barcode** · **កែទឹកប្រាក់ក្នុងកញ្ចប់** · ស្តារពីធុងសំរាម ➜ លេខ 📅 ស្ថិតិថ្ងៃ និង 📊 ស្ថិតិ ៣ ខែ ត្រូវនៅដដែល។ ⛔ **តេស្តដែលបង្កើតកំហុសឡើងវិញ ត្រូវការការបិទបណ្តាញ** — មើលបញ្ជីក្នុង `docs/HISTORY.md` ផ្នែក ២ |
 | **2.30.2** | ⚙️ **ជុំរួបរួមបន្ត — គ្មានមុខងារថ្មីដដែល។** បន្ថែមលើជួរខាងលើ សូមផ្ទៀងផ្ទាត់ ៖ **📅 ស្ថិតិប្រចាំថ្ងៃ** និង **📊 ស្ថិតិ ៣ ខែ** (កាតទាំង ២ ឥឡូវសាងដោយ helper រួម — លេខ និងអក្សរត្រូវនៅដដែល) · **ការសម្អាតស្វ័យប្រវត្តិ ២ ម៉ោង/៧ ថ្ងៃ** · **ការដក barcode** · **ការស្តារពីធុងសំរាម** |
 | **2.30.1** (ZoeKeyGen) | ⚙️ paste Firebase Config ➜ **Save** និង ➜ **បង្កើត Setup Link/QR** ត្រូវដើរដដែល (រួមទាំងសារកំហុសពេល config ខុស) |
 
-⛔ **អ្នកប្រើត្រូវទាញ App ចុះឡើងវិញ ១ ដង** (`zoew-v170` · `zoekeygen-v88`) មុនសាក។
+⛔ **អ្នកប្រើត្រូវទាញ App ចុះឡើងវិញ ១ ដង** (`zoew-v171` · `zoekeygen-v88`) មុនសាក។
 ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
 ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
 

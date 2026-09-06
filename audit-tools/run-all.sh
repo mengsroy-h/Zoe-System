@@ -144,6 +144,7 @@ run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
 run "duplicate-money (browser ពិត)" node audit-tools/duplicate-money-test.js
 run "item-money (browser ពិត)" node audit-tools/item-money-integrity-test.js
 run "stats-truth (browser ពិត)" node audit-tools/stats-collected-truth-test.js
+run "ledger-failed-apply-revert" node audit-tools/ledger-failed-apply-revert-test.js
 run "ledger-clamp-symmetry (browser ពិត)" node audit-tools/ledger-clamp-symmetry-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
@@ -242,6 +243,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     DUPMONEY_APP_DIR="$BASE" node audit-tools/duplicate-money-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-money: /'
     ITEMMONEY_APP_DIR="$BASE" node audit-tools/item-money-integrity-test.js 2>&1 | tail -1 | sed 's/^/   item-money:      /'
     STATSTRUTH_APP_DIR="$BASE" node audit-tools/stats-collected-truth-test.js 2>&1 | tail -1 | sed 's/^/   stats-truth:     /'
+    LEDGERFAIL_APP_DIR="$BASE" node audit-tools/ledger-failed-apply-revert-test.js 2>&1 | tail -1 | sed 's/^/   ledger-failfirst:/'
     CLAMPSYM_APP_DIR="$BASE" node audit-tools/ledger-clamp-symmetry-test.js 2>&1 | tail -1 | sed 's/^/   clamp-symmetry:  /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'

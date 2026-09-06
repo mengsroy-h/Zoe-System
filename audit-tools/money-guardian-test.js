@@ -44,6 +44,7 @@ const GUARDS = [
     { file: 'emu/ledger-revert-emu-test.js', env: 'LEDGEREMU_APP_DIR', needs: 'RTDB emulator' },
     { file: 'price-edit-abort-test.js', env: 'PRICEABORT_APP_DIR', needs: null },
     { file: 'revenue-rules-clamp-test.js', env: 'REVCLAMP_APP_DIR', needs: null },
+    { file: 'ledger-failed-apply-revert-test.js', env: 'LEDGERFAIL_APP_DIR', needs: null },
     { file: 'pickup-barcode-identity-test.js', env: 'PICKUPID_APP_DIR', needs: null },
     { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null }
 ];
@@ -67,8 +68,8 @@ const MUTATIONS = [
     {
         needs: 'RTDB emulator',
         name: 'ការដកវិញខាង server មិនគោរពសាលក្រម server',
-        from: '            const d = serverApplied || memoryApplied;',
-        to: '            const d = memoryApplied;'
+        from: '        return ledgerServerVerdict(serverPromise).then((d) => {',
+        to: '        return Promise.resolve(memoryApplied).then((d) => {'
     },
     {
         needs: 'RTDB emulator',

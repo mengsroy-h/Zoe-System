@@ -212,7 +212,7 @@ ok(applicable === MUTATIONS.length, '⛔ ជាន់អប្បបរមា៖
         ok(false, '⛔ ការត្រួតពិនិត្យ zone ត្រូវការ acorn — វាស់មិនបាន ≠ ត្រឹមត្រូវ', 'npm i acorn');
     } else {
         const MONEY_FNS = new Set(['armLateCommit', 'claimAndCleanupItem', 'commitDailyRevenueDelta',
-            'commitMonthlyRevenueDelta', 'executeRestoreItem', 'removeSingleBarcode', 'repairPickupLedgerOnce',
+            'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'executeRestoreItem', 'removeSingleBarcode', 'repairPickupLedgerOnce',
             'resetPickupStats', 'saveEditedBarcodePrice', 'toggleCloseStatus', 'toggleIndividualBarcodeClose']);
         const src = fs.readFileSync(APP, 'utf8');
         const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });

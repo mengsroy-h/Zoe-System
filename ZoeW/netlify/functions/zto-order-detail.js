@@ -263,7 +263,11 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }
     const blocking = !!(options && options.blocking);
-    if (!skipCache && !blocking && !cookieState.mustRevalidate && cookieState.value && opened.store && readTimeoutMs > 0) {
+    // ⛔ ការធ្វើឲ្យស្រស់ខាងក្រោយ **មិនបង់ថ្លៃពេលរបស់សំណើនេះទេ** (វាមានពិដាន
+    // ផ្ទាល់ខ្លួន `COOKIE_STORE_TIMEOUT_MS`) ➜ ការចាក់សោវាក្រោយ `readTimeoutMs`
+    // ធ្វើឲ្យថវិកាតឹង **បង្កក Cookie ជារៀងរហូត** ៖ ការស្កេនលែងធ្វើឲ្យវាស្រស់
+    // ហើយ helper ដែលសរសេរ Cookie ថ្មី ត្រូវរង់ចាំការត្រៀមជុំក្រោយ។
+    if (!skipCache && !blocking && !cookieState.mustRevalidate && cookieState.value && opened.store) {
         refreshCookieInBackground(opened.store);
         return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
     }
@@ -289,6 +293,16 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
         }
     }
     if (opened.store && !(readTimeoutMs > 0)) cookieState.storeReason = 'budget';
+    // ⛔ **«អានឡើងវិញមិនបាន» ≠ «Cookie បាត់»** — ច្បាប់ដដែលនឹង `license-verify.js`
+    // («មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស») អនុវត្តលើ Cookie ៖ Cookie blob ដែលមាន
+    // ក្នុងសតិ ត្រូវ **រស់** រហូតដល់មានសាលក្រម 401 ពិត (`mustRevalidate`)។
+    // ការសរសេរជាន់វាដោយ `ZTO_COOKIE` env ដែល **មិនមាន** បំផ្លាញ credential
+    // ដ៏ល្អ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតជានៅដដែល
+    // (វាស់បាន ៖ ៥/១០ ការស្កេនធ្លាក់ ជាមួយ `ZTO_UPSTREAM_TIMEOUT_MS=7500`)។
+    // វាក៏រក្សា **លំដាប់អាទិភាព** ដែលឯកសារចែងផង ៖ blob ឈ្នះលើ `ZTO_COOKIE`។
+    if (!skipCache && !cookieState.mustRevalidate && cookieState.value) {
+        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+    }
     const envCookie = sanitizeEnvCookie(env.ZTO_COOKIE);
     cookieState.value = envCookie;
     cookieState.source = envCookie ? 'env' : '';

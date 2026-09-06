@@ -93,7 +93,7 @@ function extractFn(src, name) {
 
 const FNS = ['ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta',
-    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'commitRevenueBucketDelta',
+    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
     'addRevenueToDailyAndMonthlyRecord'];
 

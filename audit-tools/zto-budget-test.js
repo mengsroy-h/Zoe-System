@@ -156,13 +156,14 @@ function applyEnv(env) {
 }
 
 async function runHandler(opts) {
-    mod.resetCachesForTests();
+    if (!opts.keepCaches) mod.resetCachesForTests();
     const state = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: opts.storedCookie === undefined ? GOOD_COOKIE : opts.storedCookie, writeStartedAt: 0 };
     mod.setBlobsModuleForTests(fakeBlobs({ readMs: opts.readMs, writeMs: opts.writeMs, state }));
     applyEnv(opts);
     global.fetch = upstream({ state, hang: opts.hangUpstream, upstreamMs: opts.upstreamMs, renew: opts.renew, rejectCookie: opts.rejectCookie });
     const startedAt = Date.now();
-    const res = await mod.handler(makeEvent({ barcode: opts.barcode || nextBarcode() }));
+    const query = opts.diag ? { diag: '1' } : { barcode: opts.barcode || nextBarcode() };
+    const res = await mod.handler(makeEvent(query));
     return { ms: Date.now() - startedAt, res: res, state: state };
 }
 
@@ -372,6 +373,92 @@ async function runHandler(opts) {
             ok('ថវិកាមិនត្រូវតូចពេក (ការស្កេនពិតត្រូវការពេល)',
                 budget >= 6000, budget);
         }
+    }
+
+    // ═══ ៨. «អានឡើងវិញមិនបាន» ≠ «Cookie បាត់» ═══════════════════════════
+    // 🔴 កំហុសផលិតកម្មពិត (វាស់ 2026-09-06)។ `resolveCookieCredential()` ធ្លាក់
+    // ចុះទៅសាខា env **គ្រប់ពេលដែលការអាន store មិនកើត** ហើយនៅទីនោះវា
+    // **សរសេរជាន់ `cookieState.value` ដោយ `ZTO_COOKIE` env** ។ ពេលការតំឡើង
+    // ប្រើ **Netlify Blobs** (helper Windows) នោះ env នោះ **មិនមាន** ➜
+    // Cookie blob ដ៏ល្អក្នុងសតិ **ត្រូវលុបចោល** ➜ HTTP 503
+    // `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតជានៅដដែលក្នុង store។
+    //
+    // ផ្លូវចូល ២ ដែលវាស់បាន ៖
+    //   ១. **ការត្រៀម (OPTIONS) ខណៈ Blobs ព្យួរ** — ការអានទប់ធ្លាក់ ➜ លុបសតិ។
+    //   ២. **ថវិកាតឹង** — `cookieReadTimeoutMs()` = `budget − elapsed − 1200
+    //      − upstreamTimeout` ។ `readConfig()` បង្ខំ `budget >= upstream + 1500`
+    //      ➜ តម្លៃនោះ **ស្មើ ៣០០ គត់** នៅ elapsed 0 ហើយធ្លាក់ក្រោម
+    //      `COOKIE_READ_MIN_TIMEOUT_MS` (៣០០) ក្នុង **១ មិល្លីវិនាទី** ➜ 0។
+    //      ជាមួយ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` (កំណត់ក្នុង Netlify env ពិត)
+    //      វាស់បាន ៖ **៥/១០ ការស្កេនធ្លាក់ 503**។
+    //
+    // ⚠️ ផ្លូវទី ២ ជា **ការប្រណាំងលើគែម ១ ms** ➜ វាមិនអាចធ្វើជាការអះអាង
+    // ដែលទុកចិត្តបានទេ (checker ភ្លឹបភ្លែតអាក្រក់ជាងគ្មាន checker)។ ដូច្នេះ
+    // ឯកសារនេះចាក់សោ **មូលហេតុរួម** តាមផ្លូវទី ១ ដែល **កំណត់ជាក់លាក់** ៖
+    // ការអានដែលធ្លាក់ មិនត្រូវបំផ្លាញ credential ដែលមានក្នុងសតិ។
+    //
+    // ច្បាប់ ៖ នេះជាច្បាប់ដដែលនឹង `license-verify.js` («មិនអាចផ្ទៀងផ្ទាត់»
+    // ≠ «ខុស») អនុវត្តលើ Cookie ៖ សតិដែលមានតម្លៃត្រូវ **រស់** រហូតដល់មាន
+    // សាលក្រម 401 ពិត (`mustRevalidate`)។ វាក៏រក្សាលំដាប់អាទិភាពដែលឯកសារ
+    // ចែងផង ៖ **blob ឈ្នះលើ `ZTO_COOKIE` env**។
+    console.log('\n=== ៨. ការអាន store ដែលធ្លាក់ មិនត្រូវបំផ្លាញ Cookie ក្នុងសតិ ===');
+    {
+        // ១. ជុំដំបូងដាក់ Cookie blob ចូលសតិ
+        const warm = await runHandler({
+            budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1,
+            readMs: 5, writeMs: 5, upstreamMs: 5
+        });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំត្រៀមអាន Cookie ចេញពី store បាន',
+            warm.res.statusCode === 200 && warm.state.reads >= 1,
+            { status: warm.res.statusCode, reads: warm.state.reads });
+
+        // ២. cache ៦០ វិ. ផុត រួច **ការត្រៀម (OPTIONS) ជួប Blobs ព្យួរ**
+        //    ➜ ការអានទប់ធ្លាក់ ដោយ **គ្មាន ZTO_COOKIE env** ជាបម្រុង
+        mod.expireCookieCacheForTests();
+        const stalledState = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: GOOD_COOKIE, writeStartedAt: 0 };
+        mod.setBlobsModuleForTests(fakeBlobs({ readMs: 60000, writeMs: 60000, state: stalledState }));
+        applyEnv({ budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1 });
+        await mod.handler({
+            httpMethod: 'OPTIONS',
+            headers: { 'x-zoe-proxy-key': PROXY_KEY },
+            queryStringParameters: {},
+            blobs: 'test-context'
+        });
+
+        // ３. ស្កេនបន្ទាប់ ៖ Cookie ពិតនៅតែមានក្នុងសតិ ➜ ត្រូវជោគជ័យ
+        const afterStall = await runHandler({
+            keepCaches: true,
+            budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1,
+            readMs: 60000, writeMs: 60000, upstreamMs: 5
+        });
+        ok('⛔ ការត្រៀមដែលការអាន store ធ្លាក់ ➜ ការស្កេនបន្ទាប់មិនត្រូវឆ្លើយ ZTO_AUTH_NOT_CONFIGURED',
+            !/ZTO_AUTH_NOT_CONFIGURED/.test(afterStall.res.body),
+            { status: afterStall.res.statusCode, body: afterStall.res.body.slice(0, 160) });
+        ok('⛔ ការស្កេនបន្ទាប់នៅតែផ្ញើ Cookie ពិតទៅ ZTO (សតិមិនត្រូវលុប)',
+            afterStall.state.sentCookies.indexOf(GOOD_COOKIE) !== -1,
+            afterStall.state.sentCookies);
+
+        // ４. ⛔ ទិសផ្ទុយ ១ ៖ សតិទទេ + store ធ្លាក់ + គ្មាន env ➜ ត្រូវនៅតែ
+        //    ប្រាប់ថា «មិនទាន់កំណត់» (ការកែមិនត្រូវច្រឡំ «គ្មាន» ជា «មាន»)
+        mod.resetCachesForTests();
+        const emptyState = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: '', writeStartedAt: 0 };
+        mod.setBlobsModuleForTests(fakeBlobs({ readMs: 5, writeMs: 5, state: emptyState }));
+        applyEnv({ budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1 });
+        global.fetch = upstream({ state: emptyState, upstreamMs: 5 });
+        const noCookie = await mod.handler(makeEvent({ barcode: nextBarcode() }));
+        ok('⛔ ទិសផ្ទុយ ៖ ពិតជាគ្មាន Cookie សោះ ➜ នៅតែឆ្លើយ ZTO_AUTH_NOT_CONFIGURED',
+            /ZTO_AUTH_NOT_CONFIGURED/.test(noCookie.body), noCookie.body.slice(0, 160));
+
+        // ５. ⛔ ទិសផ្ទុយ ២ ៖ សាលក្រម 401 ពិត ➜ Cookie ក្នុងសតិមិនត្រូវ
+        //    ត្រូវប្រើឡើងវិញដោយងងឹតងងុល
+        const rejected = await runHandler({
+            budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1,
+            readMs: 5, writeMs: 5, upstreamMs: 5,
+            storedCookie: GOOD_COOKIE, rejectCookie: GOOD_COOKIE
+        });
+        ok('⛔ ទិសផ្ទុយ ៖ 401 ពិត ➜ នៅតែឆ្លើយជាកំហុសដែលមានឈ្មោះ (មិនលេបស្ងាត់)',
+            rejected.res.statusCode >= 400 && /"code":"ZTO_/.test(rejected.res.body),
+            { status: rejected.res.statusCode, body: rejected.res.body.slice(0, 120) });
     }
 
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);

@@ -94,7 +94,7 @@ ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('
 
 const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
-    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer',
+    'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
     'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate'
 ];
@@ -183,7 +183,8 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
-        + fnSrc.commitMonthlyRevenueDelta + '\n',
+        + fnSrc.commitMonthlyRevenueDelta + '\n'
+        + fnSrc.alignMonthlyLedgerToDaily + '\n',
         ctx);
     return ctx;
 }

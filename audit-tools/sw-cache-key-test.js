@@ -45,6 +45,7 @@ console.log('\n=== កូនសោ cache របស់ sw.js (ស្តាទិ�
                 setup: cacheKeyFor({ mode: 'navigate', url: '${origin}?setup=secret' }),
                 deep: cacheKeyFor({ mode: 'navigate', url: '${origin}some/deep/route' }),
                 guide: cacheKeyFor({ mode: 'navigate', url: '${origin}guide.html?setup=secret' }),
+                prettyGuide: cacheKeyFor({ mode: 'navigate', url: '${origin}guide' }),
                 directAppJs: cacheKeyFor({ mode: 'navigate', url: '${origin}app.js' })
             };
         `, sandbox);
@@ -56,8 +57,8 @@ console.log('\n=== កូនសោ cache របស់ sw.js (ស្តាទិ�
         !!keys && (keys.guide === './index.html' || keys.guide === './guide.html'), keys);
     ok(app + '/sw.js បង្វែរ navigation ត្រង់ទៅ app.js មក index.html ដដែល',
         !!keys && keys.directAppJs === './index.html', keys);
-    if (app === 'ZoeW') ok('ZoeW/sw.js រក្សា guide.html ជាឯកសារដាច់ពី index.html',
-        !!keys && keys.guide === './guide.html', keys);
+    if (app === 'ZoeW') ok('ZoeW/sw.js រក្សា guide.html និង Netlify /guide ដាច់ពី index.html',
+        !!keys && keys.guide === './guide.html' && keys.prettyGuide === './guide.html', keys);
     ok(app + '/sw.js មិនប្រើ `request` ឆៅជាកូនសោ cache.put ទៀតទេ', !/cache\.put\(request,/.test(sw));
     ok(app + '/sw.js មិនប្រើ `request` ឆៅជាកូនសោ cache.match ទៀតទេ', !/cache\.match\(request\)/.test(sw));
     ok(app + '/sw.js មិន cache ការឆ្លើយតបដែល redirect', /!response\.redirected/.test(sw));
@@ -133,15 +134,15 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     });
     ok('service worker ចុះឈ្មោះ ហើយចាប់យក client', swReady === 'ok', swReady);
 
-    await page.goto(origin + '/guide.html', { waitUntil: 'load', timeout: 30000 });
+    await page.goto(origin + '/guide', { waitUntil: 'load', timeout: 30000 });
     const guidePage = await page.evaluate(() => ({
         path: location.pathname,
         title: document.title,
         hasGuide: !!document.getElementById('main-content'),
         hasApp: !!document.getElementById('appPages')
     }));
-    ok('navigation ទៅ guide.html បង្ហាញសៀវភៅ មិនមែន index.html',
-        guidePage.path === '/guide.html' && guidePage.title === 'សៀវភៅណែនាំ ZoeW' &&
+    ok('navigation ទៅ Netlify /guide បង្ហាញសៀវភៅ មិនមែន index.html',
+        guidePage.path === '/guide' && guidePage.title === 'សៀវភៅណែនាំ ZoeW' &&
         guidePage.hasGuide && !guidePage.hasApp, guidePage);
 
     // អ្នកប្រើបើក Setup Link ដែលអ្នកលក់ផ្ញើឲ្យ

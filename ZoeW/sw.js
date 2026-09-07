@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v177';
+const CACHE_VERSION = 'zoew-v178';
 
 const CORE_SHELL = [
     './',
@@ -44,11 +44,12 @@ self.addEventListener('activate', (event) => {
 });
 
 const GUIDE_PATH = new URL('./guide.html', self.location.href).pathname;
+const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 
 function cacheKeyFor(request) {
     if (request.mode !== 'navigate') return request;
     const url = new URL(request.url);
-    return url.pathname === GUIDE_PATH ? './guide.html' : './index.html';
+    return url.pathname === GUIDE_PATH || url.pathname === GUIDE_PRETTY_PATH ? './guide.html' : './index.html';
 }
 
 function linkIsFrugal() {

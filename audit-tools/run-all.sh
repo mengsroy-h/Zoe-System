@@ -111,6 +111,8 @@ run "checker-coverage (meta)" node audit-tools/checker-coverage.js
 run "hang-guard (meta)" node audit-tools/hang-guard.js
 run "exit-code-integrity (meta)" node audit-tools/exit-code-integrity.js
 run "version-bump-scope" node audit-tools/version-bump-scope.js
+run "semantic-ui-color" node audit-tools/semantic-ui-color-test.js
+run "user-guide" node audit-tools/user-guide-test.js
 run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "netlify-config-scope" node audit-tools/netlify-config-scope-test.js
@@ -222,6 +224,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     COMP_APP_DIR="$BASE" node audit-tools/compensation-order.js 2>&1 | tail -1 | sed 's/^/   compensation:    /'
     STALEWRITE_APP_DIR="$BASE" node audit-tools/stale-write.js 2>&1 | tail -1 | sed 's/^/   stale-write:     /'
     VERSION_APP_DIR="$BASE" node audit-tools/version-check.js 2>&1 | tail -1 | sed 's/^/   version-check:   /'
+    SEMANTIC_UI_APP_DIR="$BASE" node audit-tools/semantic-ui-color-test.js 2>&1 | tail -1 | sed 's/^/   semantic-color:  /'
+    USER_GUIDE_APP_DIR="$BASE" node audit-tools/user-guide-test.js 2>&1 | tail -1 | sed 's/^/   user-guide:      /'
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
@@ -355,4 +359,3 @@ else
     echo "❌ ធ្លាក់ $fail  (ជោគជ័យ $pass, មួយផ្នែក $partial, រំលង $skip)"
 fi
 exit "$fail"
-

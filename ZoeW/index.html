@@ -108,7 +108,7 @@
                         <span class="label">ស្កេនតាមថ្ងៃ</span>
                         <span class="value" id="todayTotalCount">0</span>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card picked-up">
                         <span class="label">អតិថិជនយក</span>
                         <span class="value" id="todayClosedCount">0</span>
                         <span class="sub-value">📦 <span id="todayPackagesPickedUpCount">0</span></span>
@@ -119,25 +119,25 @@
                     <div class="financial-row">
                         <span class="lbl">ទឹកប្រាក់ COD សរុប (នៅសល់)៖</span>
                         <div>
-                            <span id="summaryCodDollar" class="val-cod">$0.00</span>
+                            <span id="summaryCodDollar" class="val-pending">$0.00</span>
                             <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryCodRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:600; color:var(--text-muted);">0 ៛</span>
+                            <span id="summaryCodRiel" class="val-pending" style="font-size:calc(10 * var(--fs-unit));">0 ៛</span>
                         </div>
                     </div>
                     <div class="financial-row">
                         <span class="lbl">ទឹកប្រាក់ DOD សរុប (នៅសល់)៖</span>
                         <div>
-                            <span id="summaryDodDollar" class="val-dod">$0.00</span>
+                            <span id="summaryDodDollar" class="val-pending">$0.00</span>
                             <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryDodRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:600; color:var(--text-muted);">0 ៛</span>
+                            <span id="summaryDodRiel" class="val-pending" style="font-size:calc(10 * var(--fs-unit));">0 ៛</span>
                         </div>
                     </div>
                     <div class="financial-row" style="border-top: 1px dashed var(--border-color); padding-top: 4px; margin-top: 2px;">
                         <span class="lbl">ទឹកប្រាក់សរុបរួម (COD+DOD នៅសល់)៖</span>
                         <div>
-                            <span id="summaryTotalDollar" class="val-total">$0.00</span>
+                            <span id="summaryTotalDollar" class="val-pending">$0.00</span>
                             <span style="font-size:calc(10 * var(--fs-unit)); color:var(--text-muted); margin:0 2px;">/</span>
-                            <span id="summaryTotalRiel" style="font-size:calc(10 * var(--fs-unit)); font-weight:700; color:var(--primary);">0 ៛</span>
+                            <span id="summaryTotalRiel" class="val-pending" style="font-size:calc(10 * var(--fs-unit));">0 ៛</span>
                         </div>
                     </div>
                 </div>
@@ -360,7 +360,7 @@
         </button>
     </div>
     <div class="drawer-foot">
-        <div class="app-version-line" data-app-version></div>
+        <a class="app-version-line" data-app-version href="./guide.html" target="_blank" rel="noopener" aria-label="បើកសៀវភៅណែនាំ ZoeW"></a>
         <div class="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
         <div class="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
     </div>
@@ -398,7 +398,7 @@
         <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
         <p>បិទភ្ជាប់អ្វីដែល copy ពី <b>Firebase Console ➜ Project settings ➜ Your apps</b> ទាំងស្រុងបានតែម្តង — រួមទាំង <code>import</code>, comment និង <code>const firebaseConfig = …</code>។</p>
         <div class="modal-btns" style="margin-bottom:10px;">
-            <button type="button" class="btn-skip" data-act="openConfigQrScanner">📷 ស្កេន QR (Setup Link)</button>
+            <button type="button" class="btn-info" data-act="openConfigQrScanner">📷 ស្កេន QR (Setup Link)</button>
         </div>
         <textarea id="firebaseConfigInput" placeholder='បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖
 
@@ -470,7 +470,7 @@ const firebaseConfig = {
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-skip" data-act="testLookupApiConfig" data-self="1">🧪 សាកល្បង</button>
+                <button class="btn-info" data-act="testLookupApiConfig" data-self="1">🧪 សាកល្បង</button>
                 <button class="btn-confirm" data-act="saveLookupApiConfig">រក្សាទុក</button>
             </div>
             <button class="btn-cancel" data-act="closeModal" data-args='["lookupApiConfigModal"]'>បោះបង់</button>
@@ -620,7 +620,7 @@ const firebaseConfig = {
                 <button type="submit" class="btn-confirm" id="loginBtn">ចូលប្រព័ន្ធ</button>
             </div>
         </form>
-        <div class="app-version-line" data-app-version></div>
+        <a class="app-version-line" data-app-version href="./guide.html" target="_blank" rel="noopener" aria-label="បើកសៀវភៅណែនាំ ZoeW"></a>
     </div>
 </div>
 
@@ -643,7 +643,7 @@ const firebaseConfig = {
 
         <div class="modal-btns" style="margin-top: 6px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="manualAdjustSubmitBtn" data-act="submitManualAdjustment">បញ្ជាក់ការកែប្រែ</button>
+                <button class="btn-confirm btn-warning" id="manualAdjustSubmitBtn" data-act="submitManualAdjustment">បញ្ជាក់ការកែប្រែ</button>
                 <button class="btn-cancel" data-act="closeModal" data-args='["manualAdjustModal"]'>បោះបង់</button>
             </div>
         </div>
@@ -809,7 +809,7 @@ const firebaseConfig = {
         <p>តើអ្នកពិតជាចង់ស្តារទិន្នន័យកញ្ចប់អីវ៉ាន់នេះពីធុងសំរាមមែនទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="restoreConfirmBtn" data-act="executeRestoreItem">យល់ព្រមស្តារ</button>
+                <button class="btn-confirm btn-success" id="restoreConfirmBtn" data-act="executeRestoreItem">យល់ព្រមស្តារ</button>
                 <button class="btn-cancel" data-act="cancelRestoreItem">បោះបង់</button>
             </div>
         </div>
@@ -822,7 +822,7 @@ const firebaseConfig = {
         <p>ទិន្នន័យនេះនឹងបាត់អស់អចិន្ត្រៃយ៍ <strong>មិនអាចស្តារមកវិញបានទៀតទេ!</strong> តើអ្នកប្រាកដទេ?</p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" style="background:#ef4444;" id="permanentDeleteConfirmBtn" data-act="executePermanentDelete">លុបជាអចិន្ត្រៃយ៍</button>
+                <button class="btn-confirm btn-danger" id="permanentDeleteConfirmBtn" data-act="executePermanentDelete">លុបជាអចិន្ត្រៃយ៍</button>
                 <button class="btn-cancel" data-act="cancelPermanentDelete">បោះបង់</button>
             </div>
         </div>
@@ -836,7 +836,7 @@ const firebaseConfig = {
         <div class="modal-btns" style="flex-direction: column; gap: 8px;">
             <button class="btn-confirm" style="background:#1d6f42;" data-act="exportDataAsExcel">📗 Excel (.xlsx)</button>
             <button class="btn-confirm" style="background:#b91c1c;" data-act="exportDataAsPDF">📕 PDF (.pdf)</button>
-            <button class="btn-confirm" style="background:#0f9d58;" data-act="exportDataAsCsvForSheets">📊 Google Sheet (.csv)</button>
+            <button class="btn-confirm" style="background:#137333;" data-act="exportDataAsCsvForSheets">📊 Google Sheet (.csv)</button>
             <button class="btn-cancel" data-act="closeModal" data-args='["exportDataModal"]'>បោះបង់</button>
         </div>
     </div>
@@ -923,7 +923,7 @@ const firebaseConfig = {
         <p id="locationWarningText"></p>
         <div class="modal-btns" style="margin-top: 10px;">
             <div class="modal-btns-row">
-                <button class="btn-confirm" id="locationWarningConfirmBtn" data-act="confirmLocationChange">យល់ព្រម ផ្លាស់ទី</button>
+                <button class="btn-confirm btn-warning" id="locationWarningConfirmBtn" data-act="confirmLocationChange">យល់ព្រម ផ្លាស់ទី</button>
                 <button class="btn-cancel" data-act="cancelLocationChange">បោះបង់</button>
             </div>
         </div>

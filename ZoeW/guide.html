@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#E31837">
+    <meta name="description" content="សៀវភៅណែនាំផ្លូវការសម្រាប់កម្មវិធី ZoeW">
+    <title>សៀវភៅណែនាំ ZoeW</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --brand: #E31837;
+            --primary: #0066FF;
+            --danger: #E61F26;
+            --collected: #15803D;
+            --pending: #B45309;
+            --total: #6D28D9;
+            --ink: #172033;
+            --muted: #5E6B7D;
+            --line: #DCE3EC;
+            --paper: #FFFFFF;
+            --canvas: #F5F7FA;
+            --soft-blue: #EAF2FF;
+            --soft-green: #ECFDF3;
+            --soft-amber: #FFF8E7;
+            --soft-red: #FFF0F1;
+            --soft-purple: #F4F0FF;
+            --radius: 14px;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            background: var(--canvas);
+            color: var(--ink);
+            font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
+            font-size: 16px;
+            line-height: 1.75;
+        }
+        a { color: #0054D6; text-underline-offset: 3px; }
+        a:hover { color: #003D99; }
+        :focus-visible { outline: 3px solid #F59E0B; outline-offset: 3px; border-radius: 4px; }
+        .skip-link {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            z-index: 20;
+            transform: translateY(-160%);
+            padding: 9px 12px;
+            border-radius: 8px;
+            background: var(--ink);
+            color: #FFFFFF;
+        }
+        .skip-link:focus { transform: translateY(0); }
+        .topbar {
+            background: var(--brand);
+            color: #FFFFFF;
+            padding: max(10px, env(safe-area-inset-top)) 18px 10px;
+        }
+        .topbar-inner, .hero, .layout, .footer-inner { width: min(1160px, 100%); margin: 0 auto; }
+        .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+        .brand-mark {
+            display: inline-grid;
+            width: 42px;
+            height: 42px;
+            place-items: center;
+            border-radius: 12px;
+            background: #FFFFFF;
+            color: var(--brand);
+            font-size: 20px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 40px;
+            padding: 7px 12px;
+            border: 1px solid rgba(255,255,255,.55);
+            border-radius: 999px;
+            color: #FFFFFF;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .hero { padding: 40px 20px 24px; }
+        .eyebrow { color: var(--brand); font-weight: 800; letter-spacing: .02em; }
+        h1 { max-width: 820px; margin: 4px 0 10px; font-size: clamp(30px, 6vw, 52px); line-height: 1.25; }
+        .lead { max-width: 820px; margin: 0; color: var(--muted); font-size: clamp(17px, 2.4vw, 21px); }
+        .quick-note {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .quick-note article { padding: 15px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+        .quick-note strong { display: block; margin-bottom: 2px; }
+        .quick-note span { color: var(--muted); font-size: 14px; }
+        .layout { display: grid; grid-template-columns: 265px minmax(0, 1fr); gap: 22px; padding: 0 20px 48px; align-items: start; }
+        .toc {
+            position: sticky;
+            top: 14px;
+            max-height: calc(100vh - 28px);
+            overflow: auto;
+            padding: 15px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--paper);
+        }
+        .toc strong { display: block; margin-bottom: 8px; }
+        .toc ol { margin: 0; padding-left: 24px; }
+        .toc li { margin: 4px 0; }
+        .toc a { color: var(--ink); text-decoration: none; font-size: 14px; }
+        .toc a:hover { color: var(--primary); text-decoration: underline; }
+        main { min-width: 0; }
+        section {
+            scroll-margin-top: 16px;
+            margin-bottom: 18px;
+            padding: clamp(18px, 4vw, 30px);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--paper);
+            box-shadow: 0 4px 18px rgba(23,32,51,.045);
+        }
+        h2 { margin: 0 0 12px; font-size: clamp(22px, 4vw, 30px); line-height: 1.4; }
+        h3 { margin: 22px 0 8px; font-size: 19px; line-height: 1.5; }
+        p { margin: 8px 0; }
+        ul, ol { padding-left: 26px; }
+        li + li { margin-top: 5px; }
+        .callout { margin: 15px 0; padding: 13px 15px; border-left: 5px solid var(--primary); border-radius: 9px; background: var(--soft-blue); }
+        .callout.warning { border-color: var(--pending); background: var(--soft-amber); }
+        .callout.danger { border-color: var(--danger); background: var(--soft-red); }
+        .callout.success { border-color: var(--collected); background: var(--soft-green); }
+        .steps { counter-reset: step; list-style: none; padding: 0; }
+        .steps > li { position: relative; min-height: 42px; padding-left: 50px; }
+        .steps > li::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #FFFFFF;
+            font-weight: 800;
+        }
+        .table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; background: #FFFFFF; }
+        th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+        th { background: #F0F4F8; font-size: 14px; }
+        tr:last-child td { border-bottom: 0; }
+        code, kbd { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+        code { padding: 2px 6px; border-radius: 5px; background: #EEF2F7; overflow-wrap: anywhere; }
+        kbd { padding: 2px 6px; border: 1px solid #BFC9D6; border-bottom-width: 2px; border-radius: 5px; background: #FFFFFF; }
+        .palette { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+        .swatch { padding: 14px; border-radius: 10px; color: #FFFFFF; font-weight: 800; }
+        .swatch small { display: block; color: inherit; opacity: .88; font-weight: 600; }
+        .collected { background: var(--collected); }
+        .pending { background: var(--pending); }
+        .total { background: var(--total); }
+        .action { background: var(--primary); }
+        .destructive { background: var(--danger); }
+        .neutral { background: #64748B; }
+        .equation { padding: 16px; border: 1px solid #DDD6FE; border-radius: 10px; background: var(--soft-purple); color: #4C1D95; font-size: 18px; font-weight: 800; text-align: center; }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding-left: 28px; position: relative; }
+        .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--collected); font-weight: 900; }
+        details { margin: 10px 0; padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px; background: #FAFBFD; }
+        summary { cursor: pointer; font-weight: 800; }
+        footer { padding: 26px 20px calc(26px + env(safe-area-inset-bottom)); background: #162033; color: #D7DFEA; }
+        footer a { color: #FFFFFF; }
+        .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        @media (max-width: 820px) {
+            .layout { grid-template-columns: 1fr; }
+            .toc { position: static; max-height: none; }
+            .quick-note, .palette { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 520px) {
+            body { font-size: 15px; }
+            .topbar-inner { align-items: flex-start; }
+            .back-link { padding: 6px 9px; font-size: 13px; }
+            .hero { padding-top: 26px; }
+            .layout, .hero { padding-left: 12px; padding-right: 12px; }
+            section { padding: 17px 14px; }
+            th, td { min-width: 130px; padding: 9px; }
+        }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+        @media print {
+            body { background: #FFFFFF; color: #000000; font-size: 11pt; }
+            .topbar, .toc, .skip-link, footer { display: none; }
+            .hero, .layout { width: 100%; padding: 0; display: block; }
+            .hero { margin-bottom: 18px; }
+            section { break-inside: avoid; box-shadow: none; border-color: #B8B8B8; margin-bottom: 10px; }
+            a { color: #000000; text-decoration: none; }
+            .table-wrap { overflow: visible; }
+        }
+    </style>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">រំលងទៅមាតិកាសំខាន់</a>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">Z</span><span>ZoeW · ឯកសារផ្លូវការ</span></div>
+            <a class="back-link" href="./index.html">← ត្រឡប់ទៅ App</a>
+        </div>
+    </header>
+
+    <div class="hero">
+        <div class="eyebrow">សៀវភៅណែនាំអ្នកប្រើប្រាស់</div>
+        <h1>របៀបប្រើ ZoeW ឲ្យបានត្រឹមត្រូវ និងមានសុវត្ថិភាព</h1>
+        <p class="lead">ចាប់ពីការដំឡើង ការស្កេន ការគ្រប់គ្រង Locker និងទឹកប្រាក់ រហូតដល់របាយការណ៍ ការបម្រុងទុក និងការដោះស្រាយបញ្ហា។</p>
+        <div class="quick-note">
+            <article><strong>📱 PWA</strong><span>ដំឡើងដូច App និងដំណើរការក្រៅបណ្ដាញ</span></article>
+            <article><strong>🔐 ទិន្នន័យពិត</strong><span>Firebase Authentication + Security PIN + ជីវមាត្រ</span></article>
+            <article><strong>💵 ទឹកប្រាក់ត្រឹមត្រូវ</strong><span>យករួច មិនទាន់យក និងសរុបទាំងអស់បែងចែកច្បាស់</span></article>
+        </div>
+    </div>
+
+    <div class="layout">
+        <nav class="toc" aria-label="មាតិកាសៀវភៅណែនាំ">
+            <strong>មាតិកា</strong>
+            <ol>
+                <li><a href="#overview">ស្គាល់ ZoeW</a></li>
+                <li><a href="#getting-started">ចាប់ផ្ដើម និងដំឡើង</a></li>
+                <li><a href="#setup">Activation និង Firebase</a></li>
+                <li><a href="#security">ចូលប្រព័ន្ធ និងសុវត្ថិភាព</a></li>
+                <li><a href="#interface">ផ្នែកនៃ App</a></li>
+                <li><a href="#scan">ការស្កេនកញ្ចប់</a></li>
+                <li><a href="#locker">ទីតាំង Locker</a></li>
+                <li><a href="#records">ស្វែងរក និងគ្រប់គ្រង</a></li>
+                <li><a href="#pickup">បិទ បើក និងយករួច</a></li>
+                <li><a href="#money">ទឹកប្រាក់ COD/DOD</a></li>
+                <li><a href="#statistics">ស្ថិតិ និងរបាយការណ៍</a></li>
+                <li><a href="#edit-delete">កែ ដក លុប និងស្តារ</a></li>
+                <li><a href="#import-export">Import និង Export</a></li>
+                <li><a href="#lookup">Lookup និង ZTO</a></li>
+                <li><a href="#offline">Offline និង Update</a></li>
+                <li><a href="#backup">Backup និងឯកជនភាព</a></li>
+                <li><a href="#health">ពិនិត្យសុខភាព</a></li>
+                <li><a href="#troubleshooting">ដោះស្រាយបញ្ហា</a></li>
+                <li><a href="#checklist">បញ្ជីត្រួតពិនិត្យ</a></li>
+            </ol>
+        </nav>
+
+        <main id="main-content">
+            <section id="overview">
+                <h2>១. ស្គាល់ ZoeW</h2>
+                <p>ZoeW ជា PWA សម្រាប់គ្រប់គ្រងកញ្ចប់អីវ៉ាន់ អតិថិជន ទីតាំង Locker ទឹកប្រាក់ និងស្ថិតិអាជីវកម្ម។ ទិន្នន័យសំខាន់រក្សាទុកក្នុង Firebase Realtime Database ហើយ App អាចដំឡើងលើ Android, iPhone, tablet និង desktop។</p>
+                <div class="callout"><strong>ប្រភពលេខកំណែ៖</strong> លេខកំណែដែលបង្ហាញក្នុងប្រអប់ Login និងខាងក្រោមរបា Slide ជាលេខពិតរបស់ ZoeW។ ចុចលើលេខនោះដើម្បីបើកសៀវភៅនេះ។</div>
+                <h3>ពាក្យសំខាន់</h3>
+                <ul>
+                    <li><strong>កញ្ចប់</strong> អាចមាន Barcode មួយ ឬច្រើន ហើយភ្ជាប់លេខទូរស័ព្ទតែមួយ។</li>
+                    <li><strong>COD</strong> និង <strong>DOD</strong> ជាទឹកប្រាក់ពីរប្រភេទដែល App កត់ត្រាដាច់ដោយឡែក។</li>
+                    <li><strong>យករួច</strong> មានន័យថា Barcode ត្រូវបានបិទដោយសារអតិថិជនមកយក។</li>
+                    <li><strong>មិនទាន់យក</strong> ជា Barcode ដែលនៅរង់ចាំ និងមិនទាន់ត្រូវរាប់ជាចំណូល។</li>
+                </ul>
+            </section>
+
+            <section id="getting-started">
+                <h2>២. ចាប់ផ្ដើម និងដំឡើង</h2>
+                <ol class="steps">
+                    <li><strong>បើក URL ផ្លូវការ</strong><br>ប្រើ Chrome, Edge ឬ Safari កំណែថ្មី។ កុំប្រើ URL ដែលផ្ញើពីប្រភពមិនស្គាល់។</li>
+                    <li><strong>ដាក់ Activation Key</strong><br>ការផ្ទៀងផ្ទាត់លើកដំបូងត្រូវការអ៊ីនធឺណិត។</li>
+                    <li><strong>កំណត់ Firebase និងចូលប្រព័ន្ធ</strong><br>ប្រើ Setup Link/QR ឬបញ្ចូល Config ដោយដៃ រួចចូលដោយគណនី Firebase។</li>
+                    <li><strong>កំណត់ Security PIN</strong><br>PIN ការពារសកម្មភាពសំខាន់ និងអ៊ិនគ្រីបការកំណត់រសើបលើឧបករណ៍។</li>
+                    <li><strong>ដំឡើងជា PWA</strong><br>Android/Chrome៖ ម៉ឺនុយ browser → Install app។ iPhone/Safari៖ Share → Add to Home Screen។</li>
+                </ol>
+                <div class="callout warning"><strong>កុំលុប browser data ដោយមិនចាំបាច់។</strong> វាអាចលុប Activation, PIN, cache Offline និងការកំណត់ដែលរក្សាទុកលើឧបករណ៍។ ទិន្នន័យក្នុង Firebase មិនត្រូវលុបតាមទេ។</div>
+            </section>
+
+            <section id="setup">
+                <h2>៣. Activation និង Firebase</h2>
+                <h3>Setup Link/QR</h3>
+                <ol>
+                    <li>ទទួល Setup Link ឬ QR ពី ZoeKeyGen ដែលទុកចិត្តបាន។</li>
+                    <li>នៅ ZoeW ចូលរបា Slide → កំណត់ត្រាសម្ងាត់ Firebase → ស្កេន QR ឬបើក link។</li>
+                    <li>ផ្ទៀងផ្ទាត់ Security PIN មុនរក្សាទុក។</li>
+                    <li>ចុច <strong>រក្សាទុក និងភ្ជាប់</strong> ហើយរង់ចាំស្ថានភាព Firebase បង្ហាញថាភ្ជាប់រួច។</li>
+                </ol>
+                <h3>បញ្ចូល Firebase Config ដោយដៃ</h3>
+                <p>ចម្លង object config ពី Firebase Console → Project settings → Your apps។ វាត្រូវមានវាលដូចជា <code>apiKey</code>, <code>authDomain</code>, <code>databaseURL</code>, <code>projectId</code> និង <code>appId</code>។</p>
+                <div class="callout danger"><strong>សុវត្ថិភាព៖</strong> Firebase Config មិនមែនជាពាក្យសម្ងាត់ ប៉ុន្តែ Database Rules និង Authentication ត្រូវតែកំណត់ត្រឹមត្រូវ។ កុំផ្ញើ PIN, ពាក្យសម្ងាត់ ឬ API secret ក្នុង chat ឬ screenshot។</div>
+            </section>
+
+            <section id="security">
+                <h2>៤. ចូលប្រព័ន្ធ និងសុវត្ថិភាព</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ស្រទាប់</th><th>តួនាទី</th><th>ត្រូវចាំ</th></tr></thead>
+                        <tbody>
+                            <tr><td>Activation Key</td><td>អនុញ្ញាតឧបករណ៍ប្រើ ZoeW</td><td>Offline អនុគ្រោះបានរហូតដល់ ៣ ថ្ងៃតាមគោលការណ៍អាជ្ញាប័ណ្ណ</td></tr>
+                            <tr><td>Firebase Login</td><td>ការពារទិន្នន័យ server</td><td>វគ្គចូលប្រព័ន្ធមានរយៈពេលកំណត់</td></tr>
+                            <tr><td>Security PIN</td><td>ការពារមុខងាររសើប និងបង្កើតកូនសោអ៊ិនគ្រីប</td><td>ខុស ៥ ដង ចាក់សោ ១ នាទី</td></tr>
+                            <tr><td>ក្រយៅដៃ/មុខ</td><td>ដោះសោ PIN ឲ្យលឿន</td><td>ជាជម្រើសបន្ថែម មិនមែនជំនួស PIN ទេ</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>ពេលបើក App ក្នុងវគ្គថ្មី ឬត្រឡប់ពី App ផ្សេង អេក្រង់សោអាចបង្ហាញ។ វាយ PIN ឬប្រើជីវមាត្រ។ Refresh ក្នុងវគ្គដដែលមិនគួរសុំ PIN ម្ដងទៀត។</p>
+                <div class="callout warning"><strong>ភ្លេច PIN?</strong> មុខងារនេះលុប PIN និងការចងជីវមាត្រលើឧបករណ៍ រួចចាកចេញ។ ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ត្រូវកំណត់ឡើងវិញ។</div>
+            </section>
+
+            <section id="interface">
+                <h2>៥. ផ្នែកនៃ App</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ផ្នែក</th><th>អ្វីដែលមាន</th></tr></thead>
+                        <tbody>
+                            <tr><td>ទិន្នន័យ</td><td>កញ្ចប់នៅសល់ ស្កេនតាមថ្ងៃ អតិថិជនយក ទឹកប្រាក់ តម្រង និងតារាងប្រវត្តិ</td></tr>
+                            <tr><td>បញ្ចូលទិន្នន័យ</td><td>របៀបកញ្ចប់/Locker កាមេរ៉ា hardware scanner រូបភាព និងវាយ Barcode</td></tr>
+                            <tr><td>របា Slide</td><td>Firebase, Lookup API, តារាងអតិថិជន, Locker, Google Sheet, Health Check, PIN, ជីវមាត្រ និង Login</td></tr>
+                            <tr><td>ម៉ឺនុយ (…) </td><td>Export, របាយការណ៍ខែ, កែទឹកប្រាក់, អត្រាប្ដូរប្រាក់, ធុងសំរាម, Reset និងលុបទាំងអស់</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="scan">
+                <h2>៦. ការស្កេនកញ្ចប់</h2>
+                <h3>ផ្លូវបញ្ចូល ៤</h3>
+                <ul>
+                    <li><strong>កាមេរ៉ា</strong>៖ អនុញ្ញាតសិទ្ធិកាមេរ៉ា រក្សា Barcode ឲ្យនៅក្នុងស៊ុម ហើយរង់ចាំការបញ្ជាក់ពីរស៊ុម។</li>
+                    <li><strong>Hardware scanner</strong>៖ ដាក់ cursor ក្នុងប្រអប់ រួចស្កេនឲ្យឧបករណ៍បញ្ចូន Enter។</li>
+                    <li><strong>រូបភាព</strong>៖ ជ្រើសរូបច្បាស់ដែលមាន Barcode CODE-128 មួយ។</li>
+                    <li><strong>វាយដោយដៃ</strong>៖ វាយ Barcode ពេញ រួចចុច បញ្ជូន។</li>
+                </ul>
+                <h3>បំពេញទិន្នន័យក្រោយស្កេន</h3>
+                <ol>
+                    <li>ពិនិត្យ Barcode និងស្ថានភាព Lookup។</li>
+                    <li>បំពេញ ឬផ្ទៀងផ្ទាត់លេខទូរស័ព្ទ។</li>
+                    <li>ពិនិត្យទីតាំង Locker និងទឹកប្រាក់ COD/DOD។</li>
+                    <li>ចុច <strong>យល់ព្រម</strong> ដើម្បីរក្សាទុក។ ប្រសិនបើ Lookup រកមិនឃើញ ហើយអ្នកពិតជាចង់បន្តដោយគ្មានទិន្នន័យនោះ ចុច <strong>រំលង</strong>។</li>
+                </ol>
+                <div class="palette" aria-label="ពណ៌ប៊ូតុង">
+                    <div class="swatch action">#0066FF<small>យល់ព្រម · រក្សាទុក · បិទ</small></div>
+                    <div class="swatch destructive">#E61F26<small>រំលង · បើកវិញ · លុប</small></div>
+                    <div class="swatch neutral">ប្រផេះ<small>បោះបង់ · បិទផ្ទាំង</small></div>
+                </div>
+                <div class="callout warning">បើសារ Lookup នៅតែ «កំពុងស្វែងរក» អ្នកអាចវាយលេខបានក្រោយ ១.៨ វិនាទី។ ទិន្នន័យដែលអ្នកវាយដោយដៃមិនត្រូវឲ្យលទ្ធផលយឺតសរសេរជាន់ឡើយ។</div>
+            </section>
+
+            <section id="locker">
+                <h2>៧. កំណត់ទីតាំង Locker</h2>
+                <ol>
+                    <li>បើកទំព័រ បញ្ចូលទិន្នន័យ។</li>
+                    <li>ជ្រើសរបៀប <strong>កំណត់ទីតាំង Locker</strong>។</li>
+                    <li>ជ្រើសទូបច្ចុប្បន្ន ឬបន្ថែមឈ្មោះទីតាំងថ្មី។</li>
+                    <li>ស្កេន Barcode ដែលត្រូវផ្លាស់ទៅទីតាំងនោះ។</li>
+                    <li>ពិនិត្យសារបញ្ជាក់។ បើទីតាំងចាស់មានរួច App នឹងព្រមានមុនផ្លាស់ទី។</li>
+                </ol>
+                <p>ពណ៌ស្វាយត្រូវបានប្រើសម្រាប់ទីតាំង Locker ដើម្បីកុំច្រឡំជាមួយទឹកប្រាក់ ឬសកម្មភាពគ្រោះថ្នាក់។</p>
+            </section>
+
+            <section id="records">
+                <h2>៨. ស្វែងរក និងគ្រប់គ្រងកំណត់ត្រា</h2>
+                <ul>
+                    <li>ប្រើតម្រង <strong>ថ្ងៃនេះ · ម្សិលមិញ · ម្សិលម្ងៃ · ទាំងអស់</strong> ឬជ្រើសថ្ងៃជាក់លាក់។</li>
+                    <li>ស្វែងរកតាមកន្ទុយលេខទូរស័ព្ទ ៣–៤ ខ្ទង់។</li>
+                    <li>ចុច <strong>📦 បញ្ជី</strong> ដើម្បីមើល Barcode នីមួយៗក្នុងកញ្ចប់។</li>
+                    <li>ចុច 📞 ដើម្បីខល ហើយសម្គាល់ អត់លើក, អត់ចូល ឬខុសលេខតាមស្ថានភាពពិត។</li>
+                    <li>ប្រើម៉ឺនុយ ⋮ ក្នុងជួរ ដើម្បីកែលេខ កែ/ដក Barcode ឬលុបកញ្ចប់។</li>
+                </ul>
+                <div class="callout">ស្ថានភាពការខលដែលបណ្តាញយឺតអាចចូលជួររង់ចាំ ហើយសរសេរឡើងវិញពេលភ្ជាប់។ មិនចាំបាច់ចុចស្ទួន។</div>
+            </section>
+
+            <section id="pickup">
+                <h2>៩. បិទ បើក និងស្ថានភាព «យករួច»</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ប៊ូតុង</th><th>ពណ៌</th><th>ផលប៉ះពាល់</th></tr></thead>
+                        <tbody>
+                            <tr><td>✅ បិទ</td><td><strong style="color:#0066FF">ខៀវ #0066FF</strong></td><td>សម្គាល់ថាអតិថិជនយករួច និងបន្ថែមទៅចំណូល/ស្ថិតិយក</td></tr>
+                            <tr><td>❌ បើក</td><td><strong style="color:#E61F26">ក្រហម #E61F26</strong></td><td>ត្រឡប់ពីយករួចទៅមិនទាន់យក និងដកចេញពីចំណូល/ស្ថិតិយក</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>អ្នកអាចបិទ/បើកទាំងកញ្ចប់ពីជួរមេ ឬ Barcode មួយៗពីផ្ទាំងបញ្ជី។ Barcode បិទលើស ២ ម៉ោងអាចចូលធុងសំរាមប្រភេទ <code>pickup</code> ដោយស្វ័យប្រវត្តិ ប៉ុន្តែមិនដកទឹកប្រាក់ពីចំណូល។</p>
+                <div class="callout danger"><strong>កុំចុច បើក ដើម្បីគ្រាន់តែមើល។</strong> វាជាសកម្មភាពប្ដូរស្ថានភាពហិរញ្ញវត្ថុពិត។</div>
+            </section>
+
+            <section id="money">
+                <h2>១០. ទឹកប្រាក់ COD/DOD និងអត្ថន័យពណ៌</h2>
+                <div class="palette">
+                    <div class="swatch collected">យករួច<small>បៃតង #15803D · ចំណូលពិត</small></div>
+                    <div class="swatch pending">មិនទាន់យក<small>លឿងទុំ #B45309 · កំពុងរង់ចាំ</small></div>
+                    <div class="swatch total">សរុបទាំងអស់<small>ស្វាយ #6D28D9 · ផលបូករួម</small></div>
+                </div>
+                <div class="equation">ចំណូល (យករួច) + មិនទាន់យក = តម្លៃកញ្ចប់ទាំងអស់</div>
+                <ul>
+                    <li><strong>ចំណូល</strong> រាប់តែ Barcode ដែលយករួច មិនមែន ledger ឆៅទាំងអស់ទេ។</li>
+                    <li><strong>មិនទាន់យក</strong> អាចត្រូវដកស្វ័យប្រវត្តិពេលលើស ៧×២៤ ម៉ោង និងចូលថ្ងៃទី ៨។</li>
+                    <li><strong>តម្លៃកញ្ចប់ទាំងអស់</strong> រួមទាំងយករួច និងមិនទាន់យក។</li>
+                    <li>បើប្រវត្តិមិនទាន់ទាញមកគ្រប់ ចំណូលបង្ហាញ <strong>—</strong> ដែលមានន័យថា «វាស់មិនបាន» មិនមែន $0.00 ទេ។</li>
+                    <li>តម្លៃជារៀលគណនាតាមអត្រាប្ដូរប្រាក់ក្នុងម៉ឺនុយ (…) ហើយចែករំលែករវាងឧបករណ៍។</li>
+                </ul>
+            </section>
+
+            <section id="statistics">
+                <h2>១១. ស្ថិតិ និងរបាយការណ៍</h2>
+                <h3>ស្ថិតិប្រចាំថ្ងៃ/ខែ</h3>
+                <p><strong>អតិថិជនយក</strong> រាប់លេខទូរស័ព្ទផ្សេងៗគ្នាដែលមាន Barcode បិទយ៉ាងតិចមួយ។ <strong>កញ្ចប់យករួច</strong> រាប់ចំនួន Barcode បិទ។</p>
+                <h3>របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
+                <ol>
+                    <li>ម៉ឺនុយ (…) → របាយការណ៍អាជីវកម្មប្រចាំខែ។</li>
+                    <li>ជ្រើសខែ ហើយពិនិត្យ ចំណូល COD/DOD, កញ្ចប់ចូល, កញ្ចប់យករួច, អតិថិជនយក, មិនទាន់យក និងតម្លៃទាំងអស់។</li>
+                    <li>តារាងខាងក្រោមបំបែកលេខតាមថ្ងៃ។</li>
+                    <li>Export ទៅ Excel ឬ PDF តាមតម្រូវការ។</li>
+                </ol>
+                <div class="callout success">របាយការណ៍ខែអានតែប៉ុណ្ណោះ និងគិតពីកំណត់ត្រាប្រចាំថ្ងៃដែលរក្សាទុកជានិច្ច។ ការបើក ឬ Export មិនកែទិន្នន័យទេ។</div>
+            </section>
+
+            <section id="edit-delete">
+                <h2>១២. កែ ដក លុប និងស្តារ</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>សកម្មភាព</th><th>អត្ថន័យ</th><th>ទឹកប្រាក់</th></tr></thead>
+                        <tbody>
+                            <tr><td>កែតម្លៃ</td><td>កែ COD/DOD របស់ Barcode</td><td>កែ ledger តាមភាពខុសគ្នា</td></tr>
+                            <tr><td>ដក</td><td>ដក Barcode មួយពីកញ្ចប់</td><td>ដកតម្លៃភ្លាម ហើយបូកវិញពេលស្តារ</td></tr>
+                            <tr><td>លុប</td><td>ដាក់កញ្ចប់ទាំងមូលទៅធុងសំរាម</td><td>មិនប្ដូរចំណូល</td></tr>
+                            <tr><td>ស្តារ</td><td>យកធាតុពីធុងសំរាមត្រឡប់មកវិញ</td><td>អនុវត្តតាមប្រភេទដែលបានលុប</td></tr>
+                            <tr><td>លុបអចិន្ត្រៃយ៍</td><td>ដកចេញពីធុងសំរាមជាអចិន្ត្រៃយ៍</td><td>មិនអាចស្តារវិញ</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="callout danger"><strong>ពណ៌ក្រហមមានន័យថាសកម្មភាពគ្រោះថ្នាក់។</strong> អានសារបញ្ជាក់ និងពិនិត្យលេខទូរស័ព្ទ/Barcode មុនចុច។</div>
+                <p><strong>Reset ចំនួនយករួច</strong> ប៉ះតែតម្រងថ្ងៃដែលកំពុងជ្រើស និងមិនប៉ះទឹកប្រាក់។ <strong>លុបទាំងអស់</strong> ជាសកម្មភាពដាច់ដោយឡែកដែលត្រូវការផ្ទៀងផ្ទាត់ PIN។</p>
+            </section>
+
+            <section id="import-export">
+                <h2>១៣. Import Google Sheet និង Export</h2>
+                <h3>នាំចូល Excel ទៅ Google Sheet</h3>
+                <ol>
+                    <li>របា Slide → នាំចូល Excel ទៅ Sheet → វាយ Security PIN។</li>
+                    <li>កំណត់ Web app URL និងពាក្យសម្ងាត់ រួចសាកល្បង និងរក្សាទុក។</li>
+                    <li>ជ្រើស <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code> ឬ <code>.tsv</code>។</li>
+                    <li>ផ្ទៀងផ្ទាត់ Tab, ជួរ header និង mapping Barcode/DOD/COD/Phone។</li>
+                    <li>ជ្រើសរបៀប ជំនួសទាំងអស់, បន្ថែម+កែ ឬបន្ថែមតែ Barcode ថ្មី។</li>
+                </ol>
+                <h3>Export</h3>
+                <ul>
+                    <li><strong>Excel</strong> រក្សាលេខទូរស័ព្ទ និង Barcode ជា TEXT ដើម្បីរក្សាលេខ ០ នាំមុខ។</li>
+                    <li><strong>CSV សម្រាប់ Google Sheet</strong> បិទអក្សរដែលអាចក្លាយជារូបមន្តគ្រោះថ្នាក់។</li>
+                    <li><strong>PDF</strong> ប្រើ print dialog របស់ browser ដើម្បីរក្សាទម្រង់អក្សរខ្មែរ។</li>
+                </ul>
+                <div class="callout warning">ឯកសារ Export អាចមានលេខទូរស័ព្ទ និងទិន្នន័យហិរញ្ញវត្ថុ។ រក្សាទុកនៅកន្លែងមានសុវត្ថិភាព និងលុបចេញពីឧបករណ៍សាធារណៈក្រោយប្រើ។</div>
+            </section>
+
+            <section id="lookup">
+                <h2>១៤. Lookup API និង ZTO</h2>
+                <p>Lookup អាចបំពេញលេខទូរស័ព្ទ និងតម្លៃពី Google Sheet ឬ ZTO Cambodia។ ការកំណត់ secret ត្រូវបានអ៊ិនគ្រីប AES-GCM ដោយកូនសោចេញពី Security PIN។</p>
+                <ul>
+                    <li>តារាងអតិថិជន cache ៥ នាទី ហើយអាចបំពេញភ្លាមពីសតិ។</li>
+                    <li>ZTO Fast Mode ចងចាំលទ្ធផលបាន ១០ នាទី និងលទ្ធផលមិនឃើញរយៈពេលខ្លី ១៥ វិនាទី។</li>
+                    <li>បណ្តាញយឺតបង្ហាញស្ថានភាពជាក់លាក់ ហើយមិនសរសេរជាន់អ្វីដែលអ្នកវាយដោយដៃ។</li>
+                    <li>Cookie/Token របស់ ZTO ត្រូវរស់ខាង server ប៉ុណ្ណោះ មិនដាក់ក្នុង App client ឡើយ។</li>
+                </ul>
+                <div class="callout">បើ ZTO បង្ហាញថាគ្មាន Cookie សូមដំណើរការ sync tool លើ Windows ឬទាក់ទងអ្នកគ្រប់គ្រង server។ មិនចាំបាច់ redeploy ZoeW។</div>
+            </section>
+
+            <section id="offline">
+                <h2>១៥. Offline, Sync និង Update</h2>
+                <ul>
+                    <li>Service Worker cache សំបក App, ម៉ាស៊ីនស្កេន, SheetJS និងសៀវភៅនេះ។</li>
+                    <li>នៅ Offline អ្នកអាចបើក App និងប្រើធនធានដែលបាន cache ប៉ុន្តែការផ្ទៀងផ្ទាត់ server និងការសរសេរខ្លះត្រូវរង់ចាំបណ្តាញ។</li>
+                    <li>សារ <strong>⏳ នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ</strong> មានន័យថាការងារចូលជួររង់ចាំ។ កុំចុចសកម្មភាពដដែលម្ដងទៀត។</li>
+                    <li>ពេលមានកំណែថ្មី របាជូនដំណឹងបង្ហាញឲ្យ Refresh។ រង់ចាំការងារសំខាន់ចប់សិន មុន Refresh។</li>
+                </ul>
+                <h3>បើកំណែមិនទាន់ផ្លាស់</h3>
+                <ol>
+                    <li>ភ្ជាប់បណ្តាញល្អ ហើយបិទ/បើក App ម្ដង។</li>
+                    <li>ចុច Refresh ពេលរបា Update បង្ហាញ។</li>
+                    <li>បើនៅតែចាស់ សូមលុប PWA ហើយដំឡើងម្ដងទៀត តែត្រូវប្រាកដថាចាំ URL, Login និង PIN recovery plan។</li>
+                </ol>
+            </section>
+
+            <section id="backup">
+                <h2>១៦. Backup, Privacy និងការការពារទិន្នន័យ</h2>
+                <ul>
+                    <li>រៀបចំ Firebase Backup តាមគោលការណ៍អាជីវកម្ម និងសាកល្បង Restore ជាប្រចាំ។ Backup ដែលមិនធ្លាប់សាកល្បង Restore មិនទាន់ជាភស្តុតាងថាអាចប្រើបានទេ។</li>
+                    <li>កុំចែករំលែក Activation Key, Login, PIN, Setup Link, API secret ឬឯកសារ Export។</li>
+                    <li>ចាកចេញពី App មុនប្រគល់ឧបករណ៍ឲ្យអ្នកផ្សេង។</li>
+                    <li>ប្រើ Firebase Rules default-deny និង Publish rules ដោយដៃពេលមានការកែដែលបានអនុម័ត។</li>
+                    <li>Sentry លាក់ secret មុនផ្ញើ report ប៉ុន្តែ Barcode និងលេខសម្គាល់បច្ចេកទេសអាចត្រូវរក្សាទុកសម្រាប់ដោះស្រាយបញ្ហា។</li>
+                </ul>
+                <div class="callout danger">ZoeW មិនមានតួនាទីអ្នកប្រើច្រើនកម្រិតទេ។ គណនីដែលចូលបានអាចប្រើមុខងារដូចគ្នា ដូច្នេះត្រូវគ្រប់គ្រងគណនី Firebase យ៉ាងតឹងរឹង។</div>
+            </section>
+
+            <section id="health">
+                <h2>១៧. ពិនិត្យសុខភាពប្រព័ន្ធ</h2>
+                <p>របា Slide → <strong>🩺 ពិនិត្យសុខភាពប្រព័ន្ធ</strong>។ វាអានស្ថានភាពបណ្តាញ, Firebase, ម៉ោង server, អាជ្ញាប័ណ្ណ, local storage, Offline cache, តារាងអតិថិជន, Lookup និងកំណែ Apps Script។ វាមិនកែទិន្នន័យ ឬទឹកប្រាក់ទេ។</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>សញ្ញា</th><th>អត្ថន័យ</th><th>សកម្មភាព</th></tr></thead>
+                        <tbody>
+                            <tr><td>✅</td><td>ធម្មតា</td><td>មិនចាំបាច់ធ្វើអ្វី</td></tr>
+                            <tr><td>⚠️</td><td>គួរពិនិត្យ ឬពិនិត្យមិនបាន</td><td>អានមូលហេតុ; ផ្ទៀងផ្ទាត់បណ្តាញ/PIN</td></tr>
+                            <tr><td>❌</td><td>មានបញ្ហាដែលបានផ្ទៀងផ្ទាត់</td><td>អនុវត្តការណែនាំក្នុងជួរនោះ</td></tr>
+                            <tr><td>ℹ️</td><td>ព័ត៌មាន ឬមិនទាន់អាចវាស់</td><td>ពិនិត្យម្ដងទៀតពេលលក្ខខណ្ឌរួចរាល់</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>១៨. ដោះស្រាយបញ្ហា</h2>
+                <details open>
+                    <summary>App បង្ហាញ Offline ឬទិន្នន័យមិនមក</summary>
+                    <ol><li>ពិនិត្យអ៊ីនធឺណិត និងស្ថានភាព Server នៅក្បាល App។</li><li>បើក Health Check ដើម្បីមើល listener ណាដែលមិនទាន់មក។</li><li>រង់ចាំការតភ្ជាប់ឡើងវិញ មុនចុចសកម្មភាពស្ទួន។</li></ol>
+                </details>
+                <details>
+                    <summary>កាមេរ៉ាមិនបើក ឬស្កេនមិនចូល</summary>
+                    <ol><li>អនុញ្ញាត Camera permission ក្នុង browser/system settings។</li><li>ប្រើពន្លឺល្អ និងរក្សា Barcode ឲ្យត្រង់/ច្បាស់។</li><li>សាកល្បង hardware scanner, រូបភាព ឬវាយដោយដៃ។</li><li>ផ្ទៀងផ្ទាត់ថា Barcode ជា CODE-128 ត្រឹមត្រូវ។</li></ol>
+                </details>
+                <details>
+                    <summary>ចំណូលបង្ហាញ —</summary>
+                    <p>វាមានន័យថាប្រវត្តិមិនទាន់មកដល់គ្រប់ ដូច្នេះ App មិនអាចដក «មិនទាន់យក» ពី ledger ដោយសុវត្ថិភាព។ ពិនិត្យ Firebase និងរង់ចាំ sync។ កុំចាត់ទុកវាជា $0.00។</p>
+                </details>
+                <details>
+                    <summary>បិទ/បើក ឬលុបនៅសារ ⏳</summary>
+                    <p>កុំចុចម្ដងទៀត។ App នឹងបញ្ចប់ transaction, ធុងសំរាម និងការកែ ledger ពេលបណ្តាញត្រឡប់មកវិញ។ ពិនិត្យ Health Check បន្ទាប់ពីភ្ជាប់។</p>
+                </details>
+                <details>
+                    <summary>លេខទូរស័ព្ទមិនបំពេញស្វ័យប្រវត្តិ</summary>
+                    <p>ពិនិត្យ Lookup config, PIN unlock, តារាងអតិថិជន និង ZTO Cookie។ អ្នកនៅតែអាចវាយលេខដោយដៃ ហើយលទ្ធផលយឺតមិនគួរសរសេរជាន់វា។</p>
+                </details>
+                <details>
+                    <summary>ត្រូវការជំនួយបន្ថែម</summary>
+                    <p>កត់លេខកំណែ ZoeW, ពេលវេលាកើតបញ្ហា, មុខងារដែលប្រើ និងសារកំហុស ដោយលាក់ PIN/secret។ ទាក់ទង <a href="https://t.me/mengsroyhun" rel="noopener">@mengsroyhun តាម Telegram</a>។</p>
+                </details>
+            </section>
+
+            <section id="checklist">
+                <h2>១៩. បញ្ជីត្រួតពិនិត្យប្រចាំថ្ងៃ</h2>
+                <ul class="checklist">
+                    <li>ស្ថានភាព Server បៃតង និង Firebase ទាញទិន្នន័យមកគ្រប់។</li>
+                    <li>ថ្ងៃ/ម៉ោងឧបករណ៍ត្រឹមត្រូវ ហើយ Health Check មិនមាន ❌។</li>
+                    <li>Locker បច្ចុប្បន្នត្រឹមត្រូវ មុនស្កេនជាបន្តបន្ទាប់។</li>
+                    <li>ពិនិត្យលេខទូរស័ព្ទ និង COD/DOD មុនចុច យល់ព្រម។</li>
+                    <li>ផ្ទៀងផ្ទាត់ «យករួច + មិនទាន់យក = តម្លៃកញ្ចប់ទាំងអស់»។</li>
+                    <li>កុំចុចសកម្មភាពម្ដងទៀតពេល App បង្ហាញ ⏳។</li>
+                    <li>Export/Backup តាមកាលវិភាគ និងរក្សាឯកសារដោយសុវត្ថិភាព។</li>
+                    <li>ចាកចេញពេលបញ្ចប់ការងារលើឧបករណ៍ដែលមានអ្នកប្រើច្រើន។</li>
+                </ul>
+                <p><strong>ការបោះពុម្ព៖</strong> ប្រើម៉ឺនុយ browser → Print ឬ <kbd>Ctrl</kbd> + <kbd>P</kbd> ដើម្បីរក្សាសៀវភៅនេះជា PDF។</p>
+            </section>
+        </main>
+    </div>
+
+    <footer>
+        <div class="footer-inner">
+            <span>© 2026 ZoeW · សៀវភៅណែនាំអ្នកប្រើប្រាស់</span>
+            <span><a href="#main-content">ត្រឡប់ទៅខាងលើ</a> · <a href="./index.html">បើក ZoeW</a></span>
+        </div>
+    </footer>
+</body>
+</html>

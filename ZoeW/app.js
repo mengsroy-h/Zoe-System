@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.6';
+    const APP_VERSION = '2.30.7';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5744,13 +5744,14 @@
                     <div class="m-title">📅 ${sanitizeInput(label)}៖ ${sanitizeInput(key)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong style="color:var(--accent-blue);">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong style="color:var(--accent-purple);">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
+                        <span>COD (យករួច): <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD (យករួច): <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
                     </div>
-                    <div style="font-size: calc(10 * var(--fs-unit)); color: var(--text-muted); text-align: right; margin-top: 3px;">
-                        ចំណូល (យករួច)៖ <strong style="color:var(--primary);">${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
+                    <div class="stat-money-row money-collected">
+                        ចំណូល (យករួច)៖ <strong>${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
                     </div>
-                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted); text-align: right;">
-                        តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)} · មិនទាន់យក ${sanitizeInput(collectedMoneyText(pending, measurable))}
+                    <div class="stat-money-row stat-money-breakdown">
+                        <span class="money-total">តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)}</span>
+                        <span class="money-pending">មិនទាន់យក៖ ${sanitizeInput(collectedMoneyText(pending, measurable))}</span>
                     </div>
                 `;
         return div;
@@ -8038,32 +8039,37 @@
         const totals = report.totals;
         const measurable = totals.collectedMeasurable;
         const tiles = [
-            { label: '💵 ចំណូលសរុប (យករួច)', value: collectedMoneyText(totals.collectedTotal, measurable), sub: collectedRielText(totals.collectedTotal, measurable) },
-            { label: 'COD (យករួច)', value: collectedMoneyText(totals.collectedCod, measurable), sub: collectedRielText(totals.collectedCod, measurable) },
-            { label: 'DOD (យករួច)', value: collectedMoneyText(totals.collectedDod, measurable), sub: collectedRielText(totals.collectedDod, measurable) },
+            { tone: 'money-collected', label: '💵 ចំណូលសរុប (យករួច)', value: collectedMoneyText(totals.collectedTotal, measurable), sub: collectedRielText(totals.collectedTotal, measurable) },
+            { tone: 'money-collected', label: 'COD (យករួច)', value: collectedMoneyText(totals.collectedCod, measurable), sub: collectedRielText(totals.collectedCod, measurable) },
+            { tone: 'money-collected', label: 'DOD (យករួច)', value: collectedMoneyText(totals.collectedDod, measurable), sub: collectedRielText(totals.collectedDod, measurable) },
             { label: 'កញ្ចប់ចូល', value: totals.count.toLocaleString(), sub: 'ថ្ងៃមានប្រតិបត្តិការ ' + totals.activeDays.toLocaleString() },
             { label: 'កញ្ចប់យករួច', value: totals.picked.toLocaleString(), sub: totals.pickupRate === null ? 'អត្រាយក —' : 'អត្រាយក ' + totals.pickupRate.toFixed(1) + '%' },
             { label: 'អតិថិជនយក', value: totals.customers.toLocaleString(), sub: 'បូកតាមថ្ងៃ' },
             {
-                label: '📦 តម្លៃកញ្ចប់ទាំងអស់ (រួមមិនទាន់យក)',
+                tone: 'money-total',
+                label: '📦 តម្លៃកញ្ចប់ទាំងអស់',
                 value: '$' + totals.total.toFixed(2),
-                sub: monthlyReportRiel(totals.total).toLocaleString() + ' ៛ · មិនទាន់យក '
-                    + collectedMoneyText(totals.pendingTotal, measurable)
+                sub: monthlyReportRiel(totals.total).toLocaleString() + ' ៛',
+                pending: 'មិនទាន់យក ' + collectedMoneyText(totals.pendingTotal, measurable)
             }
         ];
-        const monthlyReportTilesHtml = tiles.map((t) => `<div class="mrep-tile">
-            <span class="mrep-tile-label">${sanitizeInput(t.label)}</span>
-            <b>${sanitizeInput(t.value)}</b>
-            <span class="mrep-tile-sub">${sanitizeInput(t.sub)}</span>
-        </div>`).join('');
+        const monthlyReportTilesHtml = tiles.map((t) => {
+            const toneClass = t.tone || '';
+            return `<div class="mrep-tile ${sanitizeInput(toneClass)}">
+                <span class="mrep-tile-label">${sanitizeInput(t.label)}</span>
+                <b>${sanitizeInput(t.value)}</b>
+                <span class="mrep-tile-sub">${sanitizeInput(t.sub)}</span>
+                ${t.pending ? `<span class="mrep-tile-sub mrep-money-pending">${sanitizeInput(t.pending)}</span>` : ''}
+            </div>`;
+        }).join('');
         const monthlyReportRowsHtml = report.days.map((d) => `<tr>
             <td>${sanitizeInput(d.date)}</td>
             <td>${d.count.toLocaleString()}</td>
-            <td>${sanitizeInput(collectedMoneyText(d.collectedCod, measurable))}</td>
-            <td>${sanitizeInput(collectedMoneyText(d.collectedDod, measurable))}</td>
-            <td>${sanitizeInput(collectedMoneyText(d.collectedTotal, measurable))}</td>
-            <td>${sanitizeInput(collectedMoneyText(d.pendingTotal, measurable))}</td>
-            <td>${d.total.toFixed(2)}</td>
+            <td class="money-collected">${sanitizeInput(collectedMoneyText(d.collectedCod, measurable))}</td>
+            <td class="money-collected">${sanitizeInput(collectedMoneyText(d.collectedDod, measurable))}</td>
+            <td class="money-collected">${sanitizeInput(collectedMoneyText(d.collectedTotal, measurable))}</td>
+            <td class="money-pending">${sanitizeInput(collectedMoneyText(d.pendingTotal, measurable))}</td>
+            <td class="money-total">${d.total.toFixed(2)}</td>
             <td>${d.picked.toLocaleString()}</td>
             <td>${d.customers.toLocaleString()}</td>
         </tr>`).join('');
@@ -10052,8 +10058,10 @@
             let itemLocker = b.locker || "N/A";
             let totalSub = Math.round((itemCod + itemDod) * 100) / 100;
             let isBcClosed = b.isClosed || false;
-            let closeBtnClass = isBcClosed ? 'btn-toggle-bc-close closed' : 'btn-toggle-bc-close';
-            let closeBtnText = isBcClosed ? 'យកហើយ' : '✅ យក';
+            let closeBtnClass = isBcClosed ? 'btn-toggle-bc-close is-reopen-action' : 'btn-toggle-bc-close is-close-action';
+            let closeBtnText = isBcClosed ? '❌ បើក' : '✅ បិទ';
+            let bcMoneyClass = isBcClosed ? 'money-collected' : 'money-pending';
+            let bcMoneyStatus = isBcClosed ? 'យករួច' : 'មិនទាន់យក';
 
             let bcTimeDisplay = b.time ? `<div class="bc-time-line">${sanitizeInput(formatScanStamp(b.time))}</div>` : '';
 
@@ -10064,14 +10072,14 @@
             let bcMoneyHtml = '';
             if (bcHasCod && bcHasDod) {
                 bcMoneyHtml = `
-                    <div class="bc-money-line">COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
-                    <div class="bc-money-line">DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
-                    <div class="bc-sum-line">សរុប: <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
+                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-sum-line ${sanitizeInput(bcMoneyClass)}">សរុប (${sanitizeInput(bcMoneyStatus)}): <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
                 `;
             } else if (bcHasDod) {
-                bcMoneyHtml = `<div class="bc-money-line">DOD: <strong style="color:var(--accent-purple);">$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
+                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
             } else {
-                bcMoneyHtml = `<div class="bc-money-line">COD: <strong style="color:var(--accent-blue);">$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
+                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
             }
 
             div.innerHTML = `
@@ -11856,7 +11864,8 @@
             }
 
             let closeBtnText = item.isClosed ? "❌ បើក" : "✅ បិទ";
-            let closeAction = `<button class="btn-sm close-btn btn-primary-action" data-act="toggleCloseStatus" data-a1="${sanitizeInput(item.id)}">${closeBtnText}</button>`;
+            let closeBtnClass = item.isClosed ? 'is-reopen-action' : 'is-close-action';
+            let closeAction = `<button class="btn-sm close-btn btn-primary-action ${closeBtnClass}" data-act="toggleCloseStatus" data-a1="${sanitizeInput(item.id)}">${closeBtnText}</button>`;
 
             let moreDropdown = `
                 <div class="more-dropdown row-more-corner">
@@ -11902,21 +11911,21 @@
                 let bothTotal = Math.round((activeCod + activeDod) * 100) / 100;
                 let bothRiel = codRiel + dodRiel;
                 priceDisplayHtml = `
-                    <div style="font-size: calc(10 * var(--fs-unit));">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
-                    <div style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
-                    <div class="price-sum-line">សរុប: <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
+                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit));">COD (មិនទាន់យក): <strong>$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
+                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD (មិនទាន់យក): <strong>$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
+                    <div class="price-sum-line money-pending">សរុប (មិនទាន់យក): <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
                 `;
             } else if (hasCod) {
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div style="font-size: calc(10.5 * var(--fs-unit));">COD: <strong style="color:var(--accent-blue);">$${activeCod.toFixed(2)}</strong></div>
-                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted);">${codRiel.toLocaleString()} ៛</div>
+                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">COD (មិនទាន់យក): <strong>$${activeCod.toFixed(2)}</strong></div>
+                    <div class="money-pending" style="font-size: calc(9.5 * var(--fs-unit));">${codRiel.toLocaleString()} ៛</div>
                 `;
             } else if (hasDod) {
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div style="font-size: calc(10.5 * var(--fs-unit));">DOD: <strong style="color:var(--accent-purple);">$${activeDod.toFixed(2)}</strong></div>
-                    <div style="font-size: calc(9.5 * var(--fs-unit)); color: var(--text-muted);">${dodRiel.toLocaleString()} ៛</div>
+                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">DOD (មិនទាន់យក): <strong>$${activeDod.toFixed(2)}</strong></div>
+                    <div class="money-pending" style="font-size: calc(9.5 * var(--fs-unit));">${dodRiel.toLocaleString()} ៛</div>
                 `;
             } else {
                 priceDisplayHtml = `

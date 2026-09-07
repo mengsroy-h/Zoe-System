@@ -1,8 +1,9 @@
-const CACHE_VERSION = 'zoew-v174';
+const CACHE_VERSION = 'zoew-v175';
 
 const CORE_SHELL = [
     './',
     './index.html',
+    './guide.html',
     './style.css',
     './app.js',
     './boot-flags.js',

@@ -61,12 +61,14 @@ if (routeStart !== -1 && routeEnd > routeStart) {
     vm.runInNewContext(sw.slice(routeStart, routeEnd) + `
         result = [
             cacheKeyFor({ mode: 'navigate', url: 'https://example.test/app/guide.html' }),
+            cacheKeyFor({ mode: 'navigate', url: 'https://example.test/app/guide' }),
             cacheKeyFor({ mode: 'navigate', url: 'https://example.test/app/index.html' })
         ];
     `, sandbox);
-    guideNavigationIsDistinct = sandbox.result[0] === './guide.html' && sandbox.result[1] === './index.html';
+    guideNavigationIsDistinct = sandbox.result[0] === './guide.html' &&
+        sandbox.result[1] === './guide.html' && sandbox.result[2] === './index.html';
 }
-check('Service Worker មិនបង្វែរ guide.html navigation ទៅ index.html', guideNavigationIsDistinct);
+check('Service Worker មិនបង្វែរ guide.html ឬ Netlify /guide ទៅ index.html', guideNavigationIsDistinct);
 
 if (failures) {
     console.error('\n❌ user guide test ធ្លាក់ ' + failures + ' ចំណុច');

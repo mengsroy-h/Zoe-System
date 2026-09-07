@@ -69,6 +69,45 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.30.9] — 2026-09-07 · 📖 គាំទ្រ Netlify Pretty URL `/guide` · 📱 សម្រួលអក្សរតារាងតូច
+
+**ZoeW ប៉ុណ្ណោះ** (`zoew-v177` ➜ `zoew-v178`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.18`)។
+
+#### កែកំហុស — ចុចលេខកំណែហើយត្រឡប់ទៅ Login/App វិញ
+
+- Production Netlify បម្លែង `href="./guide.html"` ក្នុង HTML ទៅ Pretty URL
+  `href="/guide"`។ Service Worker កំណែ 2.30.8 ស្គាល់តែ `/guide.html` ដូច្នេះ
+  `/guide` ត្រូវបានចាត់ជាផ្លូវ App ហើយឆ្លើយដោយ `index.html`។
+- Service Worker ឥឡូវស្គាល់ទាំង `/guide.html` និង `/guide` ហើយប្រើ cache key
+  `./guide.html` ដូចគ្នា។ Direct navigation ទៅ `/app.js` និងផ្លូវ App ផ្សេងទៀត
+  នៅតែប្រើ `./index.html` ដដែល។ CSS និងតក្កវិជ្ជាលុយមិនប្រែ។
+- ដកពាក្យស្ថានភាពស្ទួន `(យករួច)` / `(មិនទាន់យក)` ដែលកំណែ 2.30.7 បានបន្ថែម
+  ក្នុងតារាងតូចៗ ហើយត្រឡប់មកស្លាកខ្លី `COD:` · `DOD:` · `សរុប:` វិញ។
+  class និងពណ៌ semantic បៃតង/លឿងទុំនៅដដែល ដូច្នេះមានតែអក្សរប្រែ មិនប៉ះ
+  រូបមន្ត ឬស្ថានភាពកញ្ចប់ទេ។
+
+#### ភស្តុតាង និងឧបករណ៍ audit
+
+- Browser លើ production ឃើញតំណត្រូវបានបម្លែងទៅ `/guide`; navigation ទៅផ្លូវ
+  នោះបង្ហាញ title របស់ ZoeW App, `hasGuide=false` និង `hasApp=true`។ ចំណែក
+  `/guide.html` ដោយផ្ទាល់បង្ហាញ title «សៀវភៅណែនាំ ZoeW» ត្រឹមត្រូវ។
+- ពង្រីក `user-guide-test.js` និង `sw-cache-key-test.js` ឱ្យសាក Netlify Pretty
+  URL `/guide` ពិត មិនមែនសាកតែ `/guide.html`។ លើកូដ 2.30.8 មុនកែ checker
+  ទាំង ២ **ធ្លាក់ ១ ចំណុច** (`1/31` និង `1/13`); ក្រោយកែ
+  `user-guide-test.js` **ជោគជ័យ ៣១/៣១** និង `sw-cache-key-test.js`
+  static **ជោគជ័យ ១៣/១៣**។
+- ពង្រីក `semantic-ui-color-test.js` ដើម្បីចាប់ការបញ្ចូលពាក្យស្ថានភាពស្ទួន
+  ក្នុងតារាងតូច។ មុនដកពាក្យ checker ថ្មី **ធ្លាក់ ១ ចំណុច**; ក្រោយកែ
+  **ជោគជ័យ ១៦/១៦**។
+- Local CI ពេញបញ្ចប់ដោយ **គ្មាន failure**៖ ១០៦ checker ពេញលេញ, ៩ partial
+  និង ៣០ skip ដែលកំណត់ឈ្មោះច្បាស់សម្រាប់ browser/Firebase emulator ដែល
+  local sandbox មិនអាចបើក។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+**គ្មាន Firebase Rules និងគ្មាន Netlify env ត្រូវកែ។** ក្រោយ deploy សូម Refresh
+ឬទាញ ZoeW ចុះឡើងវិញ ១ ដង (`zoew-v178`) រួចចុចលេខកំណែពី Login និងរបា Slide។
+
 ### [2.30.8] — 2026-09-07 · 📖 Service Worker បើកសៀវភៅណែនាំត្រឹមត្រូវ
 
 **ZoeW ប៉ុណ្ណោះ** (`zoew-v175` ➜ `zoew-v177`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.18`)។
@@ -112,8 +151,8 @@
 - ទឹកប្រាក់ដែល **យករួច = បៃតង `#15803D`** · **មិនទាន់យក = លឿងទុំ
   `#B45309`** · **តម្លៃកញ្ចប់ទាំងអស់ = ស្វាយ `#6D28D9`** ក្នុងស្ថិតិ
   សង្ខេបខាងលើ · តារាងប្រវត្តិ · បញ្ជី Barcode · ប្រចាំថ្ងៃ/ខែ និង
-  របាយការណ៍ខែ។ ពាក្យស្ថានភាពបង្ហាញជាមួយពណ៌ ដើម្បីកុំឲ្យពឹងលើពណ៌តែមួយ។
-  រូបមន្ត និងតក្កវិជ្ជាគណនាលុយមិនប្រែ។
+  របាយការណ៍ខែ។ កំណែ 2.30.9 ក្រោយមកបានដកពាក្យស្ថានភាពស្ទួនចេញពីតារាងតូច
+  ដើម្បីកុំឲ្យចង្អៀតលើទូរស័ព្ទ។ រូបមន្ត និងតក្កវិជ្ជាគណនាលុយមិនប្រែ។
 
 #### បន្ថែម — សៀវភៅណែនាំ ZoeW ជា HTML
 
@@ -5109,6 +5148,25 @@ CSP ក៏មិនប្រែដែរ។
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
 
+### 2.30.9 — 2026-09-07 · 🔴 Netlify បម្លែង `guide.html` ទៅ `/guide`
+
+**របៀបដែលវារកឃើញ** ៖ ម្ចាស់គម្រោងបាន merge 2.30.8 ហើយសាក App production
+ពិត ប៉ុន្តែចុចលេខកំណែរួចនៅតែត្រឡប់ទៅ Login/App។ ការសាក browser លើ production
+បង្ហាញថា DOM ដែល deploy រួចមាន `href="/guide"` ទោះ source ក្នុង repo សរសេរ
+`href="./guide.html"`។ ការបើក `/guide` ក្រោម SW ផ្តល់ title របស់ ZoeW App,
+`hasGuide=false`, `hasApp=true`; ប៉ុន្តែ `/guide.html` ផ្តល់សៀវភៅត្រឹមត្រូវ។
+
+**មូលហេតុឫសគល់** ៖ Netlify Pretty URLs post-processing ដក `.html` ចេញពីតំណ។
+`GUIDE_PATH` ក្នុង 2.30.8 ស្មើតែ `/guide.html`; ដូច្នេះ `cacheKeyFor()` មើល
+`/guide` ជា navigation ធម្មតា ហើយបញ្ជូន `./index.html` តាមការរចនា។ នេះមិនមែន
+បញ្ហា `target`, ឯកសារបាត់ ឬ Firebase Login ទេ។
+
+**ការកែ និងអ្នកយាមថ្មី** ៖ បង្កើត `GUIDE_PRETTY_PATH` ពី `GUIDE_PATH` ហើយ
+ទទួលទាំង path មាន `.html` និង path ដែល Netlify ដក extension។ URL ផ្សេងទៀត
+រួមទាំង direct `/app.js` នៅតែទៅ `index.html`។ `user-guide-test.js` និង
+`sw-cache-key-test.js` ត្រូវបានប្តូរឱ្យវាស់ `/guide` ដោយផ្ទាល់; មុនកែវាធ្លាក់
+មួយចំណុចក្នុង checker នីមួយៗ ហើយក្រោយកែជោគជ័យ **៣១/៣១** និង **១៣/១៣**។
+
 ### 2.30.8 — 2026-09-07 · 🔴 Service Worker បង្វែរ `guide.html` ទៅ App shell
 
 **របៀបដែលវារកឃើញ** ៖ ម្ចាស់គម្រោងសាក Deploy Preview លើឧបករណ៍ពិត ហើយរាយការណ៍
@@ -5134,6 +5192,10 @@ App shell ហើយអ្នកប្រើមើលទៅដូចជាចុ�
 ចាក់សោថា guide មិនមែន App shell, Setup query មិនលេចក្នុង cache key និង direct
 `/app.js` navigation នៅតែទៅ `index.html`។ ផ្នែក browser ត្រូវសាកលើ Deploy
 Preview/ឧបករណ៍ពិត ព្រោះ Chromium ត្រូវបាន local sandbox ទប់មិនឱ្យចាប់ផ្តើម។
+
+**ចន្លោះដែលនៅសល់ក្រោយ deploy** ៖ checker ខាងលើប្រើតែ `/guide.html` ដោយផ្ទាល់
+ហើយមិនបានឃើញ Netlify បម្លែងតំណទៅ Pretty URL `/guide`។ ដូច្នេះ 2.30.8
+នៅតែត្រឡប់ App shell ពេលចុចតំណ production; ការកែពេញលេញស្ថិតនៅ 2.30.9។
 
 ### 2.30.7 — 2026-09-07 · 🔴 ពណ៌សកម្មភាពផ្ទុយគ្នា និងទឹកប្រាក់គ្មានន័យច្បាស់
 

@@ -47,12 +47,17 @@ check('ប៊ូតុងគ្រោះថ្នាក់ប្រើពណ៌�
     /\.btn-danger\s*\{[^}]*background-color\s*:\s*var\(--action-danger\)/s.test(css));
 check('ស្ថិតិទឹកប្រាក់បំបែក class យករួច មិនទាន់យក និងសរុប',
     app.includes('money-collected') && app.includes('money-pending') && app.includes('money-total') &&
-    /COD \(យករួច\): <strong class="money-collected">/.test(app) &&
+    /COD: <strong class="money-collected">/.test(app) &&
     /bcMoneyClass\s*=\s*isBcClosed\s*\?\s*['"]money-collected['"]\s*:\s*['"]money-pending['"]/.test(app) &&
-    /COD \(មិនទាន់យក\): <strong>/.test(app) &&
+    /class="money-pending"[^>]*>COD: <strong>/.test(app) &&
     ['summaryCodDollar', 'summaryCodRiel', 'summaryDodDollar', 'summaryDodRiel',
         'summaryTotalDollar', 'summaryTotalRiel'].every((id) =>
         new RegExp('id="' + id + '" class="val-pending"').test(html)));
+check('តារាងតូចរក្សាអក្សរខ្លី ហើយប្រើពណ៌ជំនួសពាក្យស្ថានភាពស្ទួន',
+    !/COD \((?:យករួច|មិនទាន់យក)\):/.test(app) &&
+    !/DOD \((?:យករួច|មិនទាន់យក)\):/.test(app) &&
+    !/សរុប \((?:យករួច|មិនទាន់យក)\):/.test(app) &&
+    !/\bbcMoneyStatus\b/.test(app));
 check('របាយការណ៍ខែបំបែក tone ទឹកប្រាក់ ៣ ប្រភេទ',
     /tone:\s*['"]money-collected['"]/.test(app) &&
     /mrep-money-pending/.test(app) &&

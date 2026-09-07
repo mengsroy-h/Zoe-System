@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.8';
+    const APP_VERSION = '2.30.9';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5744,7 +5744,7 @@
                     <div class="m-title">📅 ${sanitizeInput(label)}៖ ${sanitizeInput(key)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD (យករួច): <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD (យករួច): <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
+                        <span>COD: <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
                     </div>
                     <div class="stat-money-row money-collected">
                         ចំណូល (យករួច)៖ <strong>${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
@@ -10061,7 +10061,6 @@
             let closeBtnClass = isBcClosed ? 'btn-toggle-bc-close is-reopen-action' : 'btn-toggle-bc-close is-close-action';
             let closeBtnText = isBcClosed ? '❌ បើក' : '✅ បិទ';
             let bcMoneyClass = isBcClosed ? 'money-collected' : 'money-pending';
-            let bcMoneyStatus = isBcClosed ? 'យករួច' : 'មិនទាន់យក';
 
             let bcTimeDisplay = b.time ? `<div class="bc-time-line">${sanitizeInput(formatScanStamp(b.time))}</div>` : '';
 
@@ -10072,14 +10071,14 @@
             let bcMoneyHtml = '';
             if (bcHasCod && bcHasDod) {
                 bcMoneyHtml = `
-                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
-                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
-                    <div class="bc-sum-line ${sanitizeInput(bcMoneyClass)}">សរុប (${sanitizeInput(bcMoneyStatus)}): <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
+                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD: <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-sum-line ${sanitizeInput(bcMoneyClass)}">សរុប: <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
                 `;
             } else if (bcHasDod) {
-                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
+                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
             } else {
-                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD (${sanitizeInput(bcMoneyStatus)}): <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
+                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD: <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
             }
 
             div.innerHTML = `
@@ -11911,20 +11910,20 @@
                 let bothTotal = Math.round((activeCod + activeDod) * 100) / 100;
                 let bothRiel = codRiel + dodRiel;
                 priceDisplayHtml = `
-                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit));">COD (មិនទាន់យក): <strong>$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
-                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD (មិនទាន់យក): <strong>$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
-                    <div class="price-sum-line money-pending">សរុប (មិនទាន់យក): <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
+                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit));">COD: <strong>$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
+                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong>$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
+                    <div class="price-sum-line money-pending">សរុប: <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
                 `;
             } else if (hasCod) {
                 let codRiel = Math.round(activeCod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">COD (មិនទាន់យក): <strong>$${activeCod.toFixed(2)}</strong></div>
+                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">COD: <strong>$${activeCod.toFixed(2)}</strong></div>
                     <div class="money-pending" style="font-size: calc(9.5 * var(--fs-unit));">${codRiel.toLocaleString()} ៛</div>
                 `;
             } else if (hasDod) {
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">DOD (មិនទាន់យក): <strong>$${activeDod.toFixed(2)}</strong></div>
+                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">DOD: <strong>$${activeDod.toFixed(2)}</strong></div>
                     <div class="money-pending" style="font-size: calc(9.5 * var(--fs-unit));">${dodRiel.toLocaleString()} ៛</div>
                 `;
             } else {

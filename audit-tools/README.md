@@ -127,7 +127,7 @@ bash audit-tools/emu/rules.sh
 | `version-check.js` | `app.js` ↔ `manifest.json` ↔ `index.html` ក្នុង App នីមួយៗ | `VERSION_APP_DIR` |
 | `version-bump-scope.js` | ឡើងកំណែ **តែ App ដែលកែពិត** | `VERSIONSCOPE_APP_DIR` · `VERSIONSCOPE_BASE` |
 | `semantic-ui-color-test.js` | ពណ៌ប៊ូតុងតាមអត្ថន័យ និងស្ថានភាព បិទ/បើក · ពណ៌ទឹកប្រាក់ យករួច/មិនទាន់យក/សរុប | `SEMANTIC_UI_APP_DIR` |
-| `user-guide-test.js` | សៀវភៅណែនាំ HTML ពេញលេញ · accessibility · តំណពីលេខកំណែទាំង ២ បើកក្នុងផ្ទាំង App ដដែលសម្រាប់ PWA/WebView · cache Offline | `USER_GUIDE_APP_DIR` |
+| `user-guide-test.js` | សៀវភៅណែនាំ HTML ពេញលេញ · accessibility · តំណពីលេខកំណែទាំង ២ បើកក្នុងផ្ទាំង App ដដែលសម្រាប់ PWA/WebView · cache Offline · SW មិនបង្វែរ `guide.html` ទៅ `index.html` | `USER_GUIDE_APP_DIR` |
 | `netlify-config-scope-test.js` | ⛔ **គ្មាន root `netlify.toml`** (វាបង្វែរ build របស់ App មួយទៀត) · config ត្រូវស៊ីនឹងអ្វីដែល App ship · រាល់ config ត្រូវមាន checker អាន | `NETLIFYSCOPE_APP_DIR` |
 | `function-surface-test.js` | ផ្ទៃ function ទាំងមូល · ទប់ declaration ឈ្មោះស្ទួន · រាល់ `data-act` មាន function ពិត | `FNSURFACE_APP_DIR` |
 | `code-duplication-test.js` | តក្កវិជ្ជាដដែលរស់ **២ កន្លែង** ក្នុងឯកសារ ship តែមួយ (តួ function · ប្លុក statement) ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ | `DUPCODE_APP_DIR` |
@@ -198,7 +198,7 @@ bash audit-tools/emu/rules.sh
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |
 | `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ | `SWINTEG_APP_DIR` |
 | `sw-shell-latency-test.js` | សំបកដែល cache រួច មិនរង់ចាំបណ្តាញ | `SWLATENCY_APP_DIR` |
-| `sw-cache-key-test.js` | URL រសើប (Setup Link) មិនជាប់ក្នុង Cache Storage | `SWKEY_APP_DIR` |
+| `sw-cache-key-test.js` | URL រសើប (Setup Link) មិនជាប់ក្នុង Cache Storage · `guide.html` មាន route ផ្ទាល់ · direct navigation ទៅ `/app.js` នៅតែត្រឡប់ `index.html` | `SWKEY_APP_DIR` |
 | `sw-cache-failure-test.js` | Cache API បរាជ័យ ≠ App ដាច់ | `SWFAIL_APP_DIR` |
 | `sw-revalidate-pressure-test.js` | ការធ្វើឲ្យសំបកស្រស់ មិនស៊ីកូតាការតភ្ជាប់ | `SWREVAL_APP_DIR` |
 | `sw-abort-propagation-test.js` | SW គោរព caller abort | `SWABORT_APP_DIR` |

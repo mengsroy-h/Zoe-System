@@ -69,6 +69,35 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.30.8] — 2026-09-07 · 📖 Service Worker បើកសៀវភៅណែនាំត្រឹមត្រូវ
+
+**ZoeW ប៉ុណ្ណោះ** (`zoew-v175` ➜ `zoew-v177`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.18`)។
+
+#### កែកំហុស — ចុចលេខកំណែហើយសៀវភៅណែនាំមិនបើក
+
+- កែ Service Worker ដែលធ្លាប់បង្វែរ **គ្រប់** navigation រួមទាំង `guide.html`
+  ទៅ `index.html`។ ឥឡូវមានតែ `guide.html` ដែលទទួល cache key របស់សៀវភៅ;
+  navigation ផ្សេងទៀត រួមទាំង direct `/app.js` នៅតែត្រឡប់ទៅ App shell ដដែល។
+- តំណលេខកំណែទាំងក្នុងប្រអប់ Login និងខាងក្រោមរបា Slide បើក `guide.html`
+  ក្នុងផ្ទាំង App ដដែល ដើម្បីគាំទ្រ standalone PWA/Android WebView។
+- ក្នុងសៀវភៅមានតំណ **«ត្រឡប់ទៅ App»** នៅក្បាលទំព័រ និង **«បើក ZoeW»** នៅ
+  បាតទំព័រ ដើម្បីត្រឡប់មក App វិញ។ ពណ៌ semantic និងតក្កវិជ្ជា App មិនប្រែ។
+
+#### ឧបករណ៍ audit
+
+- `user-guide-test.js` ចាក់សោទាំង `target="_self"` និង route របស់ Service Worker។
+  assertion ថ្មីលើ tree មុនកែ **ធ្លាក់ ១/៣១ ចំណុច**; ក្រោយកែ
+  **ជោគជ័យ ៣១/៣១**។
+- `sw-cache-key-test.js` ពិនិត្យថា `guide.html` បើកជាសៀវភៅ, query រសើបមិន
+  ជាប់ក្នុង cache key និង direct navigation ទៅ `/app.js` នៅតែប្រើ `index.html`;
+  ផ្នែក static **ជោគជ័យ ១៣/១៣**។ ផ្នែក browser ត្រូវផ្ទៀងផ្ទាត់លើ Deploy
+  Preview/ឧបករណ៍ពិត ព្រោះ Chromium ក្នុង local sandbox មិនអាចចាប់ផ្តើមបាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+**គ្មាន Firebase Rules និងគ្មាន Netlify env ត្រូវកែ។** ក្រោយ deploy សូម Refresh
+ឬទាញ ZoeW ចុះឡើងវិញ ១ ដង (`zoew-v177`) រួចចុចលេខកំណែពី Login និងរបា Slide។
+
 ### [2.30.7] — 2026-09-07 · 🎨 ពណ៌ប៊ូតុងតាមអត្ថន័យ · 📖 សៀវភៅណែនាំក្នុង App
 
 **ZoeW ប៉ុណ្ណោះ** (`zoew-v174` ➜ `zoew-v175`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.18`)។
@@ -5079,6 +5108,32 @@ CSP ក៏មិនប្រែដែរ។
 > 2.19.1 · 2.19.3។ **ការសរសេរវាលើកទី ១៣ មិនបានទប់ការកើតឡើងលើកទី ១៤ ទេ។**
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
+
+### 2.30.8 — 2026-09-07 · 🔴 Service Worker បង្វែរ `guide.html` ទៅ App shell
+
+**របៀបដែលវារកឃើញ** ៖ ម្ចាស់គម្រោងសាក Deploy Preview លើឧបករណ៍ពិត ហើយរាយការណ៍
+ថា ចុចលេខកំណែហើយសៀវភៅណែនាំមិនចេញ។ សម្មតិកម្មដំបូងថា `target="_blank"`
+មិនស៊ីនឹង PWA/WebView បាននាំឱ្យប្តូរទៅ `target="_self"` ប៉ុន្តែម្ចាស់គម្រោង
+សាកឡើងវិញហើយរាយការណ៍ថា **នៅដដែល**។ នេះជាភស្តុតាងថា root cause មិនមែន
+window ថ្មីទេ ហើយ checker ចាស់ក៏មិនបានដំណើរការ navigation ឆ្លងកាត់ SW។
+
+**មូលហេតុឫសគល់** ៖ `cacheKeyFor(request)` ក្នុង `ZoeW/sw.js` ប្តូរសំណើដែលមាន
+`request.mode === 'navigate'` **ទាំងអស់** ទៅ `./index.html`។ ដូច្នេះទោះតំណ
+ទៅ `guide.html` ត្រឹមត្រូវ និងឯកសារមានក្នុង `CORE_SHELL` ក៏ SW នៅតែឆ្លើយដោយ
+App shell ហើយអ្នកប្រើមើលទៅដូចជាចុចមិនចេញ។
+
+**ការកែ និងលេខដែលវាស់បាន** ៖ បន្ថែម `GUIDE_PATH` ដើម្បីឱ្យ navigation ទៅ
+`guide.html` ប្រើ `./guide.html`; navigation ផ្សេងទៀតនៅតែប្រើ `./index.html`។
+នេះរក្សាឥរិយាបថ direct navigation ទៅ `/app.js` ឱ្យត្រឡប់ App shell ដដែល
+ប៉ុន្តែ **មិនមែនជាព្រំដែនសុវត្ថិភាព** ទេ ព្រោះ browser ត្រូវទាញ JavaScript
+ជាធនធានដើម្បីដំណើរការ App។ Secret និងសិទ្ធិត្រូវការពារនៅ Firebase Rules/server។
+តំណទាំង ២ នៅ `target="_self"` និងតំណត្រឡប់ទៅ `index.html` ត្រូវបានរក្សាទុក។
+
+`user-guide-test.js` ថ្មីបរាជ័យ **១/៣១** លើ SW មុនកែ និងជោគជ័យ
+**៣១/៣១** ក្រោយកែ។ `sw-cache-key-test.js` static ជោគជ័យ **១៣/១៣** ហើយ
+ចាក់សោថា guide មិនមែន App shell, Setup query មិនលេចក្នុង cache key និង direct
+`/app.js` navigation នៅតែទៅ `index.html`។ ផ្នែក browser ត្រូវសាកលើ Deploy
+Preview/ឧបករណ៍ពិត ព្រោះ Chromium ត្រូវបាន local sandbox ទប់មិនឱ្យចាប់ផ្តើម។
 
 ### 2.30.7 — 2026-09-07 · 🔴 ពណ៌សកម្មភាពផ្ទុយគ្នា និងទឹកប្រាក់គ្មានន័យច្បាស់
 

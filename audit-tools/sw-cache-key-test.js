@@ -10,11 +10,13 @@
 //      `caches.keys()` ក្នុង console) ដោយមិនចាំបាច់ដឹង PIN។
 //   ៣. រាល់ផ្លូវ SPA ខុសៗគ្នាបង្កើត entry ថ្មី ➜ cache រីកឥតប្រយោជន៍។
 //
-// ដំណោះស្រាយ៖ សំណើ navigate ត្រូវប្រើ `./index.html` ជាកូនសោ **ជានិច្ច** —
-// ការឆ្លើយតបគឺ index.html ដដែលសម្រាប់គ្រប់ផ្លូវ (Netlify rewrite)។
+// ដំណោះស្រាយ៖ សំណើ navigate ធម្មតា និង URL ដែលមាន payload ត្រូវប្រើ
+// `./index.html` ជាកូនសោ។ ឯកសារ static ដែលរាយច្បាស់ ដូចជា guide.html អាចមាន
+// កូនសោផ្ទាល់ខ្លួន ប៉ុន្តែមិនត្រូវរក្សា query string ក្នុង Cache Storage។
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = process.env.SWKEY_APP_DIR || path.join(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -30,7 +32,32 @@ function ok(label, cond, detail) {
 console.log('\n=== កូនសោ cache របស់ sw.js (ស្តាទិច) ===');
 ['ZoeW', 'ZoeKeyGen'].forEach((app) => {
     const sw = fs.readFileSync(path.join(ROOT, app, 'sw.js'), 'utf8');
-    ok(app + '/sw.js ធ្វើឲ្យកូនសោ navigate ធម្មតា', /request\.mode === 'navigate' \? '\.\/index\.html'/.test(sw));
+    const fnAt = sw.indexOf('function cacheKeyFor');
+    const guideAt = sw.lastIndexOf('const GUIDE_PATH', fnAt);
+    const endAt = sw.indexOf('function linkIsFrugal', fnAt);
+    let keys = null;
+    if (fnAt !== -1 && endAt > fnAt) {
+        const startAt = guideAt === -1 ? fnAt : guideAt;
+        const origin = 'https://example.test/' + app + '/';
+        const sandbox = { self: { location: { href: origin + 'sw.js' } }, URL };
+        vm.runInNewContext(sw.slice(startAt, endAt) + `
+            result = {
+                setup: cacheKeyFor({ mode: 'navigate', url: '${origin}?setup=secret' }),
+                deep: cacheKeyFor({ mode: 'navigate', url: '${origin}some/deep/route' }),
+                guide: cacheKeyFor({ mode: 'navigate', url: '${origin}guide.html?setup=secret' }),
+                directAppJs: cacheKeyFor({ mode: 'navigate', url: '${origin}app.js' })
+            };
+        `, sandbox);
+        keys = sandbox.result;
+    }
+    ok(app + '/sw.js ធ្វើឲ្យ Setup Link និងផ្លូវ SPA ប្រើកូនសោ index.html',
+        !!keys && keys.setup === './index.html' && keys.deep === './index.html', keys);
+    ok(app + '/sw.js មិនរក្សា query រសើបជាកូនសោ navigation',
+        !!keys && (keys.guide === './index.html' || keys.guide === './guide.html'), keys);
+    ok(app + '/sw.js បង្វែរ navigation ត្រង់ទៅ app.js មក index.html ដដែល',
+        !!keys && keys.directAppJs === './index.html', keys);
+    if (app === 'ZoeW') ok('ZoeW/sw.js រក្សា guide.html ជាឯកសារដាច់ពី index.html',
+        !!keys && keys.guide === './guide.html', keys);
     ok(app + '/sw.js មិនប្រើ `request` ឆៅជាកូនសោ cache.put ទៀតទេ', !/cache\.put\(request,/.test(sw));
     ok(app + '/sw.js មិនប្រើ `request` ឆៅជាកូនសោ cache.match ទៀតទេ', !/cache\.match\(request\)/.test(sw));
     ok(app + '/sw.js មិន cache ការឆ្លើយតបដែល redirect', /!response\.redirected/.test(sw));
@@ -105,6 +132,17 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
         return 'មិនចាប់យក client';
     });
     ok('service worker ចុះឈ្មោះ ហើយចាប់យក client', swReady === 'ok', swReady);
+
+    await page.goto(origin + '/guide.html', { waitUntil: 'load', timeout: 30000 });
+    const guidePage = await page.evaluate(() => ({
+        path: location.pathname,
+        title: document.title,
+        hasGuide: !!document.getElementById('main-content'),
+        hasApp: !!document.getElementById('appPages')
+    }));
+    ok('navigation ទៅ guide.html បង្ហាញសៀវភៅ មិនមែន index.html',
+        guidePage.path === '/guide.html' && guidePage.title === 'សៀវភៅណែនាំ ZoeW' &&
+        guidePage.hasGuide && !guidePage.hasApp, guidePage);
 
     // អ្នកប្រើបើក Setup Link ដែលអ្នកលក់ផ្ញើឲ្យ
     await page.goto(origin + '/?setup=' + encodeURIComponent(SETUP_B64), { waitUntil: 'load', timeout: 30000 });

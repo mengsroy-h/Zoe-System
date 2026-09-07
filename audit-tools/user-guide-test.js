@@ -3,6 +3,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const appDir = process.env.USER_GUIDE_APP_DIR || path.join(__dirname, '..', 'ZoeW');
 const read = (name) => {
@@ -45,10 +46,27 @@ check('តំណលេខកំណែទាំង ២ បើក guide.html',
 check('តំណលេខកំណែមាន aria-label និងការពារ opener',
     (index.match(/aria-label="បើកសៀវភៅណែនាំ ZoeW"/g) || []).length === 2 &&
     (index.match(/rel="noopener"/g) || []).length >= 2);
+check('តំណលេខកំណែបើកក្នុងផ្ទាំង App ដដែល ដើម្បីគាំទ្រ PWA/WebView',
+    (index.match(/<a\b[^>]*class="app-version-line"[^>]*data-app-version[^>]*>/g) || [])
+        .every((tag) => /\btarget\s*=\s*["']_self["']/i.test(tag)));
 check('CSS បង្ហាញថាលេខកំណែអាចចុចអានសៀវភៅណែនាំ',
     /\.app-version-line\[href\]::after\s*\{[^}]*content\s*:/s.test(css));
 check('Service Worker cache ឯកសារណែនាំសម្រាប់ Offline',
     /CORE_SHELL\s*=\s*\[[\s\S]*['"]\.\/guide\.html['"]/.test(sw));
+const routeStart = sw.indexOf('const GUIDE_PATH');
+const routeEnd = sw.indexOf('function linkIsFrugal');
+let guideNavigationIsDistinct = false;
+if (routeStart !== -1 && routeEnd > routeStart) {
+    const sandbox = { self: { location: { href: 'https://example.test/app/sw.js' } }, URL };
+    vm.runInNewContext(sw.slice(routeStart, routeEnd) + `
+        result = [
+            cacheKeyFor({ mode: 'navigate', url: 'https://example.test/app/guide.html' }),
+            cacheKeyFor({ mode: 'navigate', url: 'https://example.test/app/index.html' })
+        ];
+    `, sandbox);
+    guideNavigationIsDistinct = sandbox.result[0] === './guide.html' && sandbox.result[1] === './index.html';
+}
+check('Service Worker មិនបង្វែរ guide.html navigation ទៅ index.html', guideNavigationIsDistinct);
 
 if (failures) {
     console.error('\n❌ user guide test ធ្លាក់ ' + failures + ' ចំណុច');

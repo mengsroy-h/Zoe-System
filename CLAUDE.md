@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.7` (`zoew-v175`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.8` (`zoew-v177`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.18` (`zoekeygen-v88`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -281,7 +281,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ជណ្តើរភ្ជាប់ឡើងវិញ | វដ្តមិនត្រូវកាត់ handshake | `reconnect-ladder-test` |
 | Timeout · retry | រាល់ `fetch` ត្រូវ abort ពិត | `network-timeout-test` |
 | សម្ពាធបណ្តាញ | ពិដានចំនួនស្របគ្នា | `network-pressure` · `license-network-pressure` |
-| Service worker | cache-first; Cache API បរាជ័យ ≠ App ដាច់ | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` |
+| Service worker | cache-first; Cache API បរាជ័យ ≠ App ដាច់; navigation ធម្មតា និង direct asset ដូច `/app.js` ➜ `index.html`; មានតែ `guide.html` ដែលរាយច្បាស់ ➜ cache សៀវភៅ; query រសើបមិនត្រូវជាប់ក្នុង cache key | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` |
 | **ការរង់ចាំគ្មានពិដាន** | ⛔ បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `stall-guard-test` |
 | **ការហៅ Firebase ដែលព្យួរ** | ⛔ RTDB មិនបដិសេធពេលក្រៅបណ្តាញ — វាព្យួរ ➜ សោ in-flight ជាប់រហូត | `db-stall-guard-test` |
 | **ការសរសេរដែលព្យួរ ខាងក្រោយ helper** | ⛔ សោសម្អាតត្រូវដោះ · ការសរសេរយឺតត្រូវបញ្ចប់ការងារ · អ្នកប្រើត្រូវឃើញសារ | `write-stall-guard-test` |
@@ -1858,16 +1858,16 @@ bash audit-tools/emu/rules.sh
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
-## ⏳ ZoeW `2.30.7` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+## ⏳ ZoeW `2.30.8` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
 | អ្វីដែលអ្នកប្រើត្រូវសាក | លទ្ធផលដែលត្រូវឃើញ |
 |---|---|
 | បិទ/បើកកញ្ចប់ទាំងមូល និង Barcode មួយ | **បិទ = ខៀវ `#0066FF`** · ក្រោយបិទរួច **បើក = ក្រហម `#E61F26`** · លេខចំណូល/មិនទាន់យកប្រែត្រឹមត្រូវ |
 | ស្កេន Barcode ដែល Lookup មិនឃើញ | **រំលង = ក្រហម** · **យល់ព្រម = ខៀវ** · បោះបង់ = ប្រផេះ |
 | មើលសង្ខេប/ប្រវត្តិ/បញ្ជី Barcode និងបើកស្ថិតិប្រចាំថ្ងៃ/ខែ | **យករួច = បៃតង** · **មិនទាន់យក = លឿងទុំ** · **តម្លៃកញ្ចប់ទាំងអស់ = ស្វាយ** · មានពាក្យស្ថានភាពជាមួយពណ៌ |
-| ចុចលេខកំណែក្នុង Login និងខាងក្រោមរបា Slide | បើកសៀវភៅណែនាំ ZoeW HTML; បើបានបើកម្ដងហើយ ត្រូវអានបានពេល Offline |
+| ចុចលេខកំណែក្នុង Login និងខាងក្រោមរបា Slide | បើកសៀវភៅណែនាំ ZoeW HTML **ក្នុងផ្ទាំង App ដដែល**; តំណ «ត្រឡប់ទៅ App» ត្រូវបើក ZoeW វិញ; បើបានបើកម្ដងហើយ ត្រូវអានបានពេល Offline |
 
-⛔ ទាញ ZoeW ចុះឡើងវិញ ១ ដង (`zoew-v175`) មុនសាក។ គ្មាន Firebase Rules
+⛔ ទាញ ZoeW ចុះឡើងវិញ ១ ដង (`zoew-v177`) មុនសាក។ គ្មាន Firebase Rules
 ឬ Netlify env ត្រូវកែសម្រាប់កំណែនេះទេ។
 
 ## ⏳ ZoeW `2.30.4` ផ្នែកទី ២ — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
@@ -1876,10 +1876,10 @@ bash audit-tools/emu/rules.sh
 |---|---|
 | **ZoeW `2.30.4`** | 🔌 **ZTO Lookup** ៖ ស្កេនកញ្ចប់ថ្មីៗបន្តបន្ទាប់ ➜ **មិនត្រូវឃើញសារ «🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO» ទៀតទេ** (វាធ្លាប់លេចឡើងប្រហែលពាក់កណ្តាលនៃការស្កេន ក្រោយទុកចោលមួយភ្លែត)។ ⛔ **មិនត្រូវប្តូរ `ZTO_UPSTREAM_TIMEOUT_MS` ក្នុង Netlify ទេ**។ ✅ **ផ្នែក «ស្ថិតិលុយ» ជាប់រួច** (2026-09-06 ៖ វាស់លើទិន្នន័យផលិតកម្មពិត — ផលបូក ledger ថ្ងៃ = ledger ខែ បេះបិទ ៖ **137 កញ្ចប់ · $443.02** ហើយអេក្រង់ទាំង ៣ បង្ហាញលេខដូចគ្នា) |
 
-⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.30.7` ចំណែក ZoeKeyGen នៅ `2.19.18`
+⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.30.8` ចំណែក ZoeKeyGen នៅ `2.19.18`
 (ច្បាប់ ៦)។ ⛔ កុំដាក់ស្លាកជុំរបស់ ZoeW លើ ZoeKeyGen។
 
-⛔ **អ្នកប្រើត្រូវទាញ ZoeW ចុះឡើងវិញ ១ ដង** (`zoew-v175`) មុនសាក។
+⛔ **អ្នកប្រើត្រូវទាញ ZoeW ចុះឡើងវិញ ១ ដង** (`zoew-v177`) មុនសាក។
 ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
 ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
 

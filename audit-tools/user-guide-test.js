@@ -45,6 +45,9 @@ check('តំណលេខកំណែទាំង ២ បើក guide.html',
 check('តំណលេខកំណែមាន aria-label និងការពារ opener',
     (index.match(/aria-label="បើកសៀវភៅណែនាំ ZoeW"/g) || []).length === 2 &&
     (index.match(/rel="noopener"/g) || []).length >= 2);
+check('តំណលេខកំណែបើកក្នុងផ្ទាំង App ដដែល ដើម្បីគាំទ្រ PWA/WebView',
+    (index.match(/<a\b[^>]*class="app-version-line"[^>]*data-app-version[^>]*>/g) || [])
+        .every((tag) => /\btarget\s*=\s*["']_self["']/i.test(tag)));
 check('CSS បង្ហាញថាលេខកំណែអាចចុចអានសៀវភៅណែនាំ',
     /\.app-version-line\[href\]::after\s*\{[^}]*content\s*:/s.test(css));
 check('Service Worker cache ឯកសារណែនាំសម្រាប់ Offline',

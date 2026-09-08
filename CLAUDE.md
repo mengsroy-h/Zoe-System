@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.2` (`zoew-v182`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.3` (`zoew-v183`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.21` (`zoekeygen-v91`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -188,8 +188,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
   **វាមិនមែនជាកូដដែលមិនទាន់សាកទេ**។ កុំ «កែ» វាដោយផ្អែកលើការសង្ស័យ ការអានកូដ
   ឬទ្រឹស្តីអំពី WebKit។
 - បើ `run-all.sh` **បៃតង** នោះមិនមានអ្វីត្រូវកែក្នុងតំបន់នេះទេ។
-  `gesture-test.js` · `panel-motion-test.js` · `ios-panel-glide-test.js` និង
-  `phone-search-swipe-test.js` ចាក់សោវាទុករួចហើយ។
+  `gesture-test.js` · `panel-motion-test.js` · `ios-panel-glide-test.js` ·
+  `panel-snap-ownership-test.js` និង `phone-search-swipe-test.js` ចាក់សោវាទុករួចហើយ។
 - កែបានតែពេល **អ្នកប្រើរាយការណ៍បញ្ហាពិត** (វីដេអូ ឬការពិពណ៌នាជាក់លាក់)។
 - បើចាំបាច់ត្រូវប៉ះមែន ៖ អាន «តារាងចំណុច ៥ នៃចលនាផ្ទាំង» ខាងក្រោមឲ្យចប់សិន
   រួច **វាស់** iOS ធៀប Android ដោយផ្ទាល់ — កុំសន្មត់ — ហើយសាកលើ **ឧបករណ៍ពិត
@@ -297,7 +297,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការលេចធ្លាយ secret | redaction ដើរលើ event ទាំងមូល | `secret-hygiene` |
 | **ការជូនដំណឹងពីកំហុស** | ⛔ alert rule ស្វែងរកបានតែលើ **tag** ➜ ផ្លូវលុយត្រូវផ្ញើ `zone: 'money'` | `money-guardian-test` · `sentry-load-race-test` |
 | DOM · state ក្រោយចាកចេញ | គ្មានទិន្នន័យអតិថិជនសល់ | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
-| PTR · ចលនាផ្ទាំង · រមូរ | ⛔ កុំប៉ះដោយគ្មានការស្នើ | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `phone-search-swipe-test` |
+| PTR · ចលនាផ្ទាំង · រមូរ | ⛔ កុំប៉ះដោយគ្មានការស្នើ | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` |
 | ទម្រង់បង្ហាញ | អះអាង **២ ខាង** (មិនលើស **និង** មិនច្របាច់) | `layout-check` · `fluid-type-focus-test` |
 | **អថេរ CSS ដែលមិនប្រកាស** | ⛔ `var(--x)` គ្មាន `--x` ➜ **ច្បាប់ទាំងមូលស្លាប់ស្ងាត់ៗ** (មិនមែនត្រឹមពណ៌) | `css-var-test` |
 | **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
@@ -372,6 +372,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | animation ដែលបង្កើត layout/paint រាល់ស៊ុម និង `transition: all` | `animation-cost.js` |
 | ការបង្ខំ layout ឡើងវិញក្នុង handler របស់ touch/scroll/rAF | `layout-thrash.js` |
 | លក្ខខណ្ឌនៃចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើគ្នា, snap ↔ PTR) | `panel-motion-test.js` |
+| callback ចាស់ក្រោយ watchdog/cleanup ដោះ snap pause របស់ចលនាថ្មី | `panel-snap-ownership-test.js` (`PANELSNAP_APP_DIR`) |
 | comment / trailing whitespace | `comments.js` |
 | payload ដែលសរសេរទៅ Firebase ↔ schema ក្នុង rules | `payload-schema.js` |
 | សរសេរ item ទាំងមូលពីសតិ | `stale-write.js` |
@@ -779,7 +780,9 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 
 ម៉ឺនុយ (...) ខាងលើ និងតាមជួរ ត្រូវបិទពេលចាប់ផ្តើមអូសផ្ទាំងខាងក្រៅ ឬ
 រមូរប្រវត្តិ។ ការចុច/រមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។ ការអូសផ្ទាំងដោយ transform
-មិនធានាថាមាន `scroll` event ទេ (`history-menu-dismiss-test.js`)។
+មិនធានាថាមាន `scroll` event ទេ។ ចលនាបើក scope ត្រឹម `#globalMoreMenu`
+ត្រូវគោរព Reduce Motion ហើយមិនពន្យារការបិទពេលអូសខាងក្រៅ
+(`history-menu-dismiss-test.js`)។
 
 **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (របា Slide) ៖ ជួរ **៨** ដែល **អានសុទ្ធសាធ** —
 បណ្តាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន ·
@@ -850,7 +853,7 @@ navbar តាម `order`។ **របា Slide បិទត្រូវមាន 
 | ២ | ខ្សែសង្វាក់ flex ខាងក្នុង ៖ `.history-section`/`.panel-section`/`#parcelPanel`/`#lockerPanel` ជា `flex: 1; min-height: 0` និង `.table-responsive` ជា `max-height: none; flex: 1; min-height: 0` (**scope ត្រឹម `.page-main`** ➜ modal រក្សា 62vh) | ដដែល |
 | ៣ | `.app-pages` មាន `scroll-snap-type: y proximity` **បូក** `scroll-padding-top` ស្មើ `padding-top`; កូន ២ មាន `scroll-snap-align: start` | ដដែល |
 | ៤ | `panelGlideFrom()` (FLIP តាម Web Animations) ត្រូវហៅ **គ្មានលក្ខខណ្ឌ** ក្នុង `applyPanelAction()` និង handler `click` របស់ `#dragHandle` — ⛔ **កុំដាក់ការលើកលែង iOS មកវិញ** | `app.js` |
-| ៥ | `panelGlideFrom()` ត្រូវ **ផ្អាក snap** (`#appPages.panel-gliding` ➜ `scroll-snap-type: none`) អំឡុងចលនា ហើយ **ដកចេញវិញតាមផ្លូវ ២** (`anim.finished.then(release, release)` **បូក** `setTimeout(…, PANEL_GLIDE_MS + GRACE)`) | `app.js` + `style.css` |
+| ៥ | `panelGlideFrom()` ត្រូវ **ផ្អាក snap** (`#appPages.panel-gliding` ➜ `scroll-snap-type: none`) អំឡុងចលនា ហើយ **ដកចេញវិញតាមផ្លូវ ២** (`anim.finished.then(release, release)` **បូក** `setTimeout(…, PANEL_GLIDE_MS + GRACE)`)។ ក្រោយ watchdog ឬ cleanup បញ្ចប់វគ្គចាស់ callback របស់វគ្គនោះ **មិនត្រូវដោះ pause របស់វគ្គថ្មី** (`panel-snap-ownership-test.js`) | `app.js` + `style.css` |
 
 ⛔ **បើ `scroll-padding-top` បាត់ ➜ ចំណុច snap «បើក» ធ្លាក់ត្រឹម `scrollTop 71`
 ➜ PTR ស្លាប់ទាំងស្រុង** (វាទាមទារ `scrollTop <= 1`)។ ដូចគ្នាដែរបើ class
@@ -1918,6 +1921,15 @@ bash audit-tools/emu/rules.sh
    ស្តារ មិនទាន់ជា backup ទេ**។
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
+
+## ⏳ ZoeW `2.31.3` — រង់ចាំភាពរលូនលើ Android និង iPhone ពិត
+
+- សាកចុច/អូសបង្រួម និងពង្រីកផ្ទាំងប្រវត្តិ រមូរជិតកំពូល និង PTR មុន merge។
+  ការកែ ownership របស់ snap រក្សា duration/easing/gesture ដើម; ចលនាបើកថ្មី
+  មានត្រឹមម៉ឺនុយ (...) និងគោរព Reduce Motion។
+- សាកម៉ឺនុយខាងលើ និងតាមជួរ៖ បើកដោយចលនាស្រាល បិទភ្លាមពេលអូសខាងក្រៅ
+  ហើយចុច/រមូរក្នុងម៉ឺនុយនៅប្រើបាន។ អានភស្តុតាង CI និងការផ្អាក session ក្នុង
+  `docs/HISTORY.md` ផ្នែក ២។ Chromium មិនជំនួសការសាកទូរស័ព្ទពិតទេ។
 
 ## ⏳ ZoeW `2.31.2` — រង់ចាំការផ្ទៀងផ្ទាត់ Cookie និងម៉ឺនុយលើឧបករណ៍ពិត
 

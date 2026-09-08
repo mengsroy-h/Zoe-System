@@ -100,7 +100,7 @@ for (const app of ['ZoeW']) {
         });
         // ស្ថានភាពចលនាផ្ទាំង — ចាក់ **កូដពិត** មិនមែន stub ទទេ ដើម្បីឲ្យ
         // តេស្តពិតជាបញ្ជាក់ថាការចាកចេញដោះការផ្អាក snap។
-        ['panelGlideTokens', 'panelGlideRelease'].forEach((n) => {
+        ['panelGlideTokens', 'panelGlideEpoch', 'panelGlideRelease'].forEach((n) => {
             const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
         });

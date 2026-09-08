@@ -137,6 +137,7 @@ run "animation-cost" node audit-tools/animation-cost.js
 run "layout-thrash (browser ពិត)" node audit-tools/layout-thrash.js
 run "panel-motion (browser ពិត)" node audit-tools/panel-motion-test.js
 run "ios-panel-glide (browser ពិត)" node audit-tools/ios-panel-glide-test.js
+run "panel-snap-ownership" node audit-tools/panel-snap-ownership-test.js
 run "boot-runtime (browser ពិត)" node audit-tools/boot-runtime.js
 run "sdk-offline-boot (browser ពិត)" node audit-tools/sdk-offline-boot-test.js
 run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
@@ -261,6 +262,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
     IOSGLIDE_APP_DIR="$BASE" node audit-tools/ios-panel-glide-test.js 2>&1 | tail -1 | sed 's/^/   ios-panel-glide: /'
+    PANELSNAP_APP_DIR="$BASE" node audit-tools/panel-snap-ownership-test.js 2>&1 | tail -1 | sed 's/^/   panel-snap:     /'
     NETTIMEOUT_APP_DIR="$BASE" node audit-tools/network-timeout-test.js 2>&1 | tail -1 | sed 's/^/   network-timeout: /'
     SWKEY_APP_DIR="$BASE"   node audit-tools/sw-cache-key-test.js 2>&1 | tail -1 | sed 's/^/   sw-cache-key:    /'
     CONNRECOVERY_APP_DIR="$BASE" node audit-tools/connection-recovery-test.js 2>&1 | tail -1 | sed 's/^/   conn-recovery:   /'

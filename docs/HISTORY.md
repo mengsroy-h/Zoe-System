@@ -69,6 +69,24 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeW 2.31.3] — 2026-09-08 · Snap pause និងចលនាម៉ឺនុយ (...)
+
+**ZoeW** (`zoew-v182` ➜ `zoew-v183`)។ ZoeKeyGen រក្សា `2.19.21`។
+
+- Callback របស់ចលនាចាស់ក្រោយ watchdog/cleanup លែងដោះ snap pause របស់ចលនា
+  ថ្មី។ រយៈពេល **220 ms**, easing និងកាយវិការរបស់ផ្ទាំងរក្សាដដែល។
+- ម៉ឺនុយ (...) ខាងលើ និងតាមជួរបើកដោយចលនាស្រាល **160 ms** តាមសំណើអ្នកប្រើ។
+  Reduce Motion បិទចលនានេះ; អូសខាងក្រៅនៅបិទម៉ឺនុយភ្លាមដដែល។ CSS បន្ថែម
+  ត្រឹមម៉ឺនុយ ហើយច្បាប់ iOS/PTR/history ដែលមានពីមុនមិនប្រែ។
+- បន្ថែមតេស្ត callback ចាស់ និងចលនាម៉ឺនុយ ដោយរក្សា assertions ដើម។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **មុន merge**៖ សាកចុច/អូសបង្រួម/ពង្រីក រមូរជិតកំពូល និង PTR លើ
+  **Android និង iPhone ពិត**។ PR នៅជា draft រហូតបានផ្ទៀងផ្ទាត់ភាពរលូន។
+- ក្រោយ merge/deploy បើក ZoeW ឡើងវិញឲ្យឃើញ **2.31.3** ហើយសាកម៉ឺនុយទាំង ២។
+  Firebase rules, Netlify env និង Windows helper មិនប្រែសម្រាប់កំណែនេះ។
+
 ### [ZoeW 2.31.2] — 2026-09-08 · Cookie ក្រោយ Sync និងម៉ឺនុយប្រវត្តិ
 
 **ZoeW** (`zoew-v181` ➜ `zoew-v182`)។ ZoeKeyGen រក្សា `2.19.21`។
@@ -5353,6 +5371,60 @@ CSP ក៏មិនប្រែដែរ។
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
 
+### 2.31.3 — 2026-09-08 · ម្ចាស់ Snap pause និងចលនាម៉ឺនុយ
+
+អ្នកប្រើស្នើឲ្យបន្តពិនិត្យ Android snap និងព្រមានកុំឲ្យបាត់ភាពរលូន។ ការបង្កើត
+ករណីប្រណាំងឡើងវិញរកឃើញថា watchdog/cleanup កំណត់ counter ទៅសូន្យ ប៉ុន្តែ
+callback `finished` របស់ចលនាចាស់អាចមកក្រោយចលនាថ្មីចាប់ផ្តើម ហើយដក counter
+របស់ចលនាថ្មី ➜ snap បើកវិញខណៈ transform ថ្មីនៅកំពុងរត់។
+
+- **កូដមុនកែ**៖ `486f5925`។ Full-app Chromium ប្រើរបាចាប់ពិត និង Web Animations
+  ពិត ប៉ុន្តែបង្ខំ pause ចលនាចាស់ឲ្យឆ្លង watchdog **៤៨០ ms** ឬហៅ cleanup
+  រួច finish/cancel ចលនាចាស់ក្រោយចលនាថ្មីចាប់ផ្តើម។ Android និង iOS gate
+  ក្នុង Chromium៖ **0 PASS / 6 FAIL** ➜ guard ថ្មី **6 PASS / 0 FAIL**។
+  វាជាការវាស់លំដាប់ callback ដែលគ្រប់គ្រងដោយតេស្ត; មិនមែន Android/iPhone ពិត។
+- **ការកែ**៖ បន្ថែមអត្តសញ្ញាណវគ្គ pause។ ពេល watchdog/cleanup បញ្ចប់វគ្គ
+  callback ចាស់លែងមានសិទ្ធិដោះ pause ថ្មី។ រក្សា duration **220 ms**, easing,
+  grace **260 ms**, watchdog និងផ្លូវ resolve/reject ដដែល។ CSS និង gesture
+  មិនប្រែ; ចលនាមិនត្រូវបានដក ឬកាត់រយៈពេល។
+- **តេស្តចាក់សោ**៖ `panel-snap-ownership-test.js` (`PANELSNAP_APP_DIR`) ស្រង់
+  function ពិតទៅ VM ហើយគ្រប callback យឺតក្រោយ reset, ចលនាស្របគ្នា,
+  release ស្ទួន, watchdog, exception និង fallback `onfinish`៖ baseline
+  **25 PASS / 5 FAIL** ➜ **30 PASS / 0 FAIL**។ Mutation ដែលដកតែការផ្ទៀងផ្ទាត់
+  អត្តសញ្ញាណវគ្គ បង្កើត **25 PASS / 5 FAIL** ដដែល។ `ios-panel-glide-test.js`
+  រក្សា assertions ចលនាដើម ហើយបន្ថែមករណី browser ទាំង ៦៖ baseline
+  **32 PASS / 6 FAIL** ➜ **38 PASS / 0 FAIL**។ Log ថ្មីរក្សា sample ខូចពេញលេញ។
+- CI ជុំបន្ទាប់បានឈប់ក្រោយ **82 PASS / 1 FAIL** ព្រោះ fixture របស់
+  `setup-link-logout-test.js` ខ្វះ declaration `panelGlideEpoch` ដែលកូដថ្មី
+  ត្រូវការ។ បានបំពេញការស្រង់ state ពិតដោយរក្សា assertions ដដែល៖ **24/24 PASS**។
+  ជុំនេះមិនរាប់ជាការ CI ពេញលេញ; log និងមូលហេតុឈប់ត្រូវរក្សាទុក។
+- **ចលនាម៉ឺនុយតាមសំណើថ្មី**៖ CSS បន្ថែម scope ត្រឹមម៉ឺនុយ (...) ជាមួយ
+  opacity/transform និង Reduce Motion។ វាមិនប្តូរច្បាប់ CSS របស់ iOS,
+  PTR, history layout ឬ snap ទេ; `history-menu-dismiss-test.js` ផ្ទៀងផ្ទាត់
+  ចលនាបើក និងការបិទភ្លាម ទាំងម៉ឺនុយខាងលើ និងតាមជួរ។ Snapshot មុនបន្ថែម
+  animation៖ **45 PASS / 12 FAIL** ➜ **57 PASS / 0 FAIL** ក្រោយបន្ថែម;
+  assertions ចាស់ទាំង **២៩** រក្សាដដែល។ CSS បន្ថែមតែ **៣ បន្ទាត់** ក្រៅតំបន់ហាម។
+- **ព្រំដែននៃភស្តុតាង**៖ ករណីនេះបញ្ជាក់កំហុសម្ចាស់ pause; វា **មិនទាន់បញ្ជាក់
+  មូលហេតុរបស់ CI FAIL ដំបូង** ដែល sample ខូចមិនបានរក្សាទុក។ លទ្ធផល CI
+  ដំបូង និងការស៊ើបអង្កេត ៨ ជុំខាងលើត្រូវរក្សាទុកដដែល។ ត្រូវសាកឧបករណ៍ពិតមុន merge។
+- **CI លើកូដចុងក្រោយ**៖ `run-all.sh` បានបញ្ចប់ **124 checks / 0 FAIL** រួច
+  session រត់បាត់ មុនមាន exit code ចុងក្រោយ។ ការផ្ទៀងផ្ទាត់ hash លើ
+  **២២៦ ឯកសារ** បញ្ជាក់ថាគ្មាន non-Markdown ប្រែ។ បានបន្ត commands ដើមដែលនៅសល់
+  ដោយរក្សា log និង exit code របស់ជំហាននីមួយៗ; មិនរាប់ថា `run-all.sh` មួយដង
+  បានចប់ដោយ exit 0 ទេ។ Fuzz ដើមរក្សា seeds **0–11 × 45** ដោយបែងជា ៣ ក្រុម
+  និង Fuzz បន្ថែមរក្សា seeds **100–113 × 50**។ រាល់ seed ក្នុង checker ដើមក៏
+  បើក browser context ថ្មីដែរ; គ្មានការកែ assertion ឬកាត់ករណីចេញ។
+  លទ្ធផលចប់៖ **154/154 checks · 0 FAIL · 0 PARTIAL · 0 SKIP** ដោយរួម
+  **124 checks** ពីការរត់ដើម និង **30 checks** ដែលបន្តលើ source ដដែល។
+  Strict money guardian **22/22**, mutants **10/10** និង Fuzz បន្ថែម
+  **700/700 ប្រតិបត្តិការ** ឆ្លង។ Runtime និង non-Markdown source មិនប្រែឆ្លងវគ្គ។
+- ខណៈកំពុងរត់ CI, PR **#186** បាន merge ទៅ main `ff895ef1`; tree
+  `5774b88e` ដូច baseline `486f5925` បេះបិទ។ ដូច្នេះការកែបន្ថែមនេះចេញជា
+  **2.31.3** ក្នុង PR ថ្មី។ ក្រោយ CI ប្តូរតែ `APP_VERSION` និង `manifest.version`
+  ពី 2.31.2 ទៅ 2.31.3; bytes ក្រៅ metadata ទាំង ២ រក្សាដដែល។ ការផ្ទៀងផ្ទាត់
+  លេខកំណែ, version scope, user guide, boot, offline shell និង SW install
+  ត្រូវបានរត់ឡើងវិញលើលេខកំណែចុងក្រោយ ហើយឆ្លងទាំង **៦**។
+
 ### 2.31.2 — 2026-09-08 · Cookie ក្រោយ Sync និងម៉ឺនុយដែលជាប់ពេលអូស
 
 **របាយការណ៍អ្នកប្រើ**៖ Cookie ទើប Sync មិនទាន់ ៥ នាទី ត្រូវរាយថា expire;
@@ -5401,7 +5473,7 @@ CSP ក៏មិនប្រែដែរ។
 401 ➜ 200; adapter ប្តូរតែ URL សម្រាប់ target matcher ដោយមិនប្តូរ response
 methods។ វាមិនមែនការវាស់ live ZTO ឬ Windows Edge ពិតទេ។
 
-**CI ពេញលេញលើកូដ freeze**៖ **152 PASS / 1 FAIL / 0 PARTIAL / 0 SKIP**,
+**CI ពេញលេញដំបូងលើកូដ Cookie/ម៉ឺនុយដែល freeze**៖ **152 PASS / 1 FAIL / 0 PARTIAL / 0 SKIP**,
 exit **1**, **1275.094 វិនាទី**។ តេស្តដែលធ្លាក់គឺ
 `ios-panel-glide-test.js`៖ Android snap អំឡុងចលនា **31 PASS / 1 FAIL**។
 Assertion ពិនិត្យ sample ទាំងអស់ តែ log បង្ហាញតែ ៦ ដំបូងដែលសុទ្ធតែ `none`;
@@ -5410,7 +5482,7 @@ Assertion ពិនិត្យ sample ទាំងអស់ តែ log បង�
 ការស៊ើបអង្កេតដាច់ដោយឡែករក្សា assertions ដើមដដែល៖ baseline និងកូដថ្មី
 **៣ ដងក្នុងមួយ tree**, សរុប **៦ ដង × 32 PASS** និង **៦៧២ rAF samples**
 មិនឃើញ sample ខូច។ វាមិនទាន់បញ្ជាក់ថា failure ដើមជាបញ្ហា observer ឬ
-ផលិតកម្មទេ។ CSS, កូដ panel motion, gesture និង checker ដើមដូច main
+ផលិតកម្មទេ។ នៅ tree `486f5925` នេះ CSS, កូដ panel motion, gesture និង checker ដើមដូច main
 បេះបិទ; គ្មានការកែតំបន់ iOS ដែលអ្នកប្រើហាម ឬបន្ធូរ assertion ដើម្បីឲ្យឆ្លង។
 Original checker ដែលមិន instrument ក៏រត់ baseline/new មួយដងក្នុងមួយបាន
 **32/32 PASS**; សរុបការស៊ើបអង្កេត **៨ ជុំ** ដោយរក្សា failure ក្នុង CI ដើម។
@@ -8470,6 +8542,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `offline-shell-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `page-nav-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `panel-motion-test` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `panel-snap-ownership-test` | **ផ្នែក ១** · **ផ្នែក ២ — 2.31.3** |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `payload-schema` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `perf-check` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |

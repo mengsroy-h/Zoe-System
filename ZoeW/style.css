@@ -894,6 +894,9 @@
 
         .more-menu { display: none; position: fixed; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1040; min-width: 150px; max-width: calc(100vw - 20px); overflow: hidden; }
         .more-menu.show { display: block; }
+        #globalMoreMenu.show { animation: moreMenuPopIn .16s cubic-bezier(0.22, 1, 0.36, 1); }
+        @keyframes moreMenuPopIn { from { opacity: 0; transform: translateY(4px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @media (prefers-reduced-motion: reduce) { #globalMoreMenu.show { animation: none; } }
 
         .more-menu button { width: 100%; padding: 12px 14px; text-align: left; background: none; border: none; font-size: calc(12 * var(--fs-unit)); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-main); white-space: nowrap; }
         .more-menu button:hover { background: #f8fafc; }

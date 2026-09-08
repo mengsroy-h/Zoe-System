@@ -129,6 +129,88 @@ async function settle(page) {
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+async function checkMenuAnimation(page) {
+    for (const [kind, selector] of [['header', '.header-more-btn'], ['row', '#historyTableBody .more-btn']]) {
+        const close = async () => {
+            await page.evaluate(() => closeGlobalMoreMenu());
+            await settle(page);
+        };
+        await close();
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        const entry = await page.evaluate(async selector => {
+            const menu = document.getElementById('globalMoreMenu');
+            document.querySelector(selector).click();
+            const animations = menu.getAnimations();
+            const style = getComputedStyle(menu);
+            const start = {
+                opacity: Number(style.opacity), transform: style.transform,
+                animations: animations.map(animation => ({
+                    duration: animation.effect.getTiming().duration,
+                    ownTarget: animation.effect.target === menu,
+                    keyframes: animation.effect.getKeyframes()
+                }))
+            };
+            await Promise.allSettled(animations.map(animation => animation.finished));
+            const finalStyle = getComputedStyle(menu);
+            const rect = menu.getBoundingClientRect();
+            return {
+                start, end: {
+                    opacity: Number(finalStyle.opacity), transform: finalStyle.transform,
+                    open: menu.classList.contains('show'), animations: menu.getAnimations().length,
+                    inViewport: rect.left >= 9 && rect.right <= innerWidth - 9
+                        && rect.top >= 9 && rect.bottom <= innerHeight - 9,
+                    unscaled: Math.abs(rect.width - menu.offsetWidth) < 1
+                        && Math.abs(rect.height - menu.offsetHeight) < 1
+                }
+            };
+        }, selector);
+        const own = entry.start.animations.filter(animation => animation.ownTarget);
+        check(own.length === 1 && own[0].duration >= 100 && own[0].duration <= 220,
+            kind + ': ម៉ឺនុយមានចលនាបើកខ្លីតាម browser ពិត', JSON.stringify(entry.start));
+        check(own.length === 1 && own[0].keyframes.some(frame => Number(frame.opacity) < 1 && frame.transform && frame.transform !== 'none')
+            && entry.start.opacity < 1 && entry.start.transform !== 'none',
+            kind + ': ចលនាបើកប្តូរភាពច្បាស់ និង transform ពិត', JSON.stringify(entry.start));
+        check(entry.end.open && entry.end.opacity === 1 && entry.end.transform === 'none' && entry.end.animations === 0,
+            kind + ': ចលនាចប់ដោយស្វ័យប្រវត្តិ ហើយម៉ឺនុយច្បាស់ពេញ', JSON.stringify(entry.end));
+        check(entry.end.inViewport && entry.end.unscaled,
+            kind + ': ចលនាមិនប្តូរទំហំ ឬធ្វើឲ្យម៉ឺនុយចេញក្រៅអេក្រង់', JSON.stringify(entry.end));
+
+        await close();
+        const interrupted = await page.evaluate(selector => {
+            const menu = document.getElementById('globalMoreMenu');
+            document.querySelector(selector).click();
+            const reopening = menu.getAnimations().some(animation => animation.effect.target === menu);
+            document.getElementById('dataMainSection').dispatchEvent(new PointerEvent('pointerdown', {
+                bubbles: true, pointerType: 'touch', pointerId: 81
+            }));
+            return {
+                reopening, open: menu.classList.contains('show'),
+                display: getComputedStyle(menu).display, animations: menu.getAnimations().length
+            };
+        }, selector);
+        check(interrupted.reopening, kind + ': បិទហើយបើកម្ដងទៀត ➜ ចលនាចាប់ផ្តើមឡើងវិញ');
+        check(!interrupted.open && interrupted.display === 'none' && interrupted.animations === 0,
+            kind + ': ចាប់អូសក្រៅពេលចលនាកំពុងរត់ ➜ បិទភ្លាមគ្មានចាំ animation', JSON.stringify(interrupted));
+
+        await close();
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        const reduced = await page.evaluate(selector => {
+            const menu = document.getElementById('globalMoreMenu');
+            document.querySelector(selector).click();
+            const style = getComputedStyle(menu);
+            return {
+                open: menu.classList.contains('show'), animation: style.animationName,
+                animations: menu.getAnimations().length, opacity: Number(style.opacity), transform: style.transform
+            };
+        }, selector);
+        check(reduced.open && reduced.animation === 'none' && reduced.animations === 0
+            && reduced.opacity === 1 && reduced.transform === 'none',
+            kind + ': Reduce Motion ➜ បើកភ្លាមដោយគ្មានចលនា', JSON.stringify(reduced));
+        await close();
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+    }
+}
+
 (async () => {
     let browser;
     let server;
@@ -269,6 +351,7 @@ async function settle(page) {
             await page.setViewportSize({ width: mobile ? 430 : 1300, height: mobile ? 790 : 910 });
             await page.waitForFunction(() => !document.getElementById('globalMoreMenu').classList.contains('show'));
             check(!await visible(), 'ប្តូរទំហំអេក្រង់ ➜ បិទម៉ឺនុយ');
+            await checkMenuAnimation(page);
             check(errors.length === 0, 'គ្មានកំហុស runtime', JSON.stringify(errors));
             await context.close();
         }

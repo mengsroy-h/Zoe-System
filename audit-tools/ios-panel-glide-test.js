@@ -154,6 +154,7 @@ function extractIOSBlock(cssSrc) {
 const MEASURE = async () => {
     const wait = (ms) => new Promise((x) => setTimeout(x, ms));
     const snapSeen = [];
+    const snapFailures = [];
     const frames = (n) => new Promise((res) => {
         const out = [];
         const main = document.getElementById('dataMainSection');
@@ -164,7 +165,19 @@ const MEASURE = async () => {
             const m = /matrix\(([^)]*)\)/.exec(tr);
             const dy = m ? Math.round(parseFloat(m[1].split(',')[5]) || 0) : 0;
             out.push(dy);
-            if (Math.abs(dy) > 1) snapSeen.push(getComputedStyle(pg).scrollSnapType);
+            if (Math.abs(dy) > 1) {
+                const snap = getComputedStyle(pg).scrollSnapType;
+                snapSeen.push(snap);
+                if (snap !== 'none') snapFailures.push({
+                    at: performance.now(), transform: tr, snap,
+                    currentTransform: getComputedStyle(main).transform,
+                    paused: pg.classList.contains('panel-gliding'), tokens: panelGlideTokens,
+                    animations: main.getAnimations().map(a => ({
+                        playState: a.playState, currentTime: a.currentTime,
+                        pending: a.pending, duration: a.effect.getTiming().duration
+                    }))
+                });
+            }
             if (--left <= 0) return res(out);
             requestAnimationFrame(tick);
         };
@@ -232,7 +245,51 @@ const MEASURE = async () => {
     out.snapRestNearTop = pages.scrollTop;
     pages.scrollTop = 0;
     out.snapWhileMoving = snapSeen.slice();
+    out.snapFailures = snapFailures;
     return out;
+};
+
+// ចុចដងអូសពិត និងប្រើ WAAPI ពិត។ ផ្អាកចលនាចាស់ដោយចេតនាដើម្បីគ្រប់គ្រង
+// លំដាប់ callback ក្រោយ watchdog/cleanup; នេះមិនមែនការវាស់ទូរស័ព្ទពិតទេ។
+const MEASURE_OWNERSHIP = async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const frame = () => new Promise(requestAnimationFrame);
+    const main = document.getElementById('dataMainSection');
+    const pages = document.getElementById('appPages');
+    const handle = document.getElementById('dragHandle');
+    const snapBefore = getComputedStyle(pages).scrollSnapType;
+    const observations = [];
+    const state = animation => ({
+        snap: getComputedStyle(pages).scrollSnapType,
+        paused: pages.classList.contains('panel-gliding'),
+        playState: animation.playState, currentTime: animation.currentTime,
+        duration: animation.effect.getTiming().duration
+    });
+    for (const action of ['cancel', 'finish', 'cleanup']) {
+        handle.click();
+        const old = main.getAnimations()[0];
+        if (!old) throw new Error('ចុចលើកទី១មិនបង្កើតចលនា');
+        old.pause();
+        old.currentTime = 50;
+        await frame();
+        if (action === 'cleanup') endPanelGlideSnapPause();
+        else await wait(PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS + 30);
+        const reset = state(old);
+        handle.click();
+        const current = main.getAnimations().find(a => a !== old);
+        if (!current) throw new Error('ចុចលើកទី២មិនបង្កើតចលនា');
+        await frame();
+        const before = state(current);
+        if (action === 'finish') old.finish();
+        else old.cancel();
+        await frame();
+        const after = state(current);
+        await current.finished;
+        await wait(50);
+        observations.push({ action, snapBefore, reset, before, after, ended: state(current) });
+        await wait(350);
+    }
+    return observations;
 };
 
 (async () => {
@@ -277,6 +334,7 @@ const MEASURE = async () => {
             (mode === 'ios') === (gate.standalone && gate.callout), JSON.stringify(gate));
 
         runs[mode] = await page.evaluate(MEASURE);
+        runs[mode].ownership = await page.evaluate(MEASURE_OWNERSHIP);
         await ctx.close();
     }
 
@@ -331,9 +389,17 @@ const MEASURE = async () => {
             'snapAfter=' + r.snapAfter + ' (before=' + r.snapBefore + ')');
         ok(tag + ': snap ត្រូវផ្អាក **អំឡុង** ចលនា (WebKit មិន snap ជាន់)',
             r.snapWhileMoving.length > 0 && r.snapWhileMoving.every((v) => v === 'none'),
-            JSON.stringify(r.snapWhileMoving.slice(0, 6)));
+            JSON.stringify({ snaps: r.snapWhileMoving, failures: r.snapFailures }));
         ok(tag + ': snap ឈប់ត្រឹម 0 (PTR កេះបាន)', r.snapRestNearTop <= 1, 'scrollTop=' + r.snapRestNearTop);
         ok(tag + ': #appPages មិនជាប់ offset ក្រោយហូតចុះ', r.pagesScrollTop <= 1, 'scrollTop=' + r.pagesScrollTop);
+        for (const sample of r.ownership) {
+            ok(tag + ': callback ចាស់មិនដក pause របស់ចលនាថ្មី (' + sample.action + ')',
+                sample.snapBefore !== 'none' && !sample.reset.paused &&
+                sample.before.snap === 'none' && sample.after.snap === 'none' &&
+                sample.after.playState === 'running' && sample.after.currentTime < sample.after.duration &&
+                sample.ended.snap === sample.snapBefore && !sample.ended.paused,
+                JSON.stringify(sample));
+        }
     }
 
     await browser.close();

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.2';
+    const APP_VERSION = '2.31.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -6753,11 +6753,13 @@
     }
 
     let panelGlideTokens = 0;
+    let panelGlideEpoch = 0;
     let panelGlideRelease = null;
 
     function beginPanelGlideSnapPause() {
         const pages = document.getElementById('appPages');
         if (!pages) return () => {};
+        const epoch = panelGlideEpoch;
         panelGlideTokens++;
         pages.classList.add('panel-gliding');
         if (panelGlideRelease !== null) clearTimeout(panelGlideRelease);
@@ -6766,12 +6768,14 @@
         return () => {
             if (done) return;
             done = true;
+            if (epoch !== panelGlideEpoch) return;
             panelGlideTokens--;
             if (panelGlideTokens <= 0) endPanelGlideSnapPause();
         };
     }
 
     function endPanelGlideSnapPause() {
+        panelGlideEpoch++;
         panelGlideTokens = 0;
         if (panelGlideRelease !== null) {
             clearTimeout(panelGlideRelease);

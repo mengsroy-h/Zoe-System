@@ -62,6 +62,23 @@ ok('`run-all.sh` រាយការណ៍ការផុតកំណត់ជា
     /rc" -eq 124/.test(runall) && /ព្យួរ/.test(runall),
     'ការផុតកំណត់ត្រូវបែកចេញពី FAIL ធម្មតា ដើម្បីឲ្យអ្នកអានដឹងថាវាព្យួរ');
 
+// checker-coverage ត្រូវ probe checker ជាង ១០០។ បើរត់ `execFileSync` ជាជួរ
+// checker browser នីមួយៗអាចចំណាយរាប់វិនាទី ➜ meta-checker ខ្លួនឯងលើសពិដាន
+// ៣០០ វិនាទី ទោះ checker ទាំងអស់ត្រឹមត្រូវ។ នេះកើតឡើងពិតក្នុង baseline
+// 2.30.9 (2026-09-08)។ ចាក់សោថាវាប្រើ bounded parallelism មិនមែនជួរតែមួយ។
+const coverageSrc = srcOf.get('checker-coverage.js') || '';
+const emptyProbeAt = coverageSrc.indexOf('=== ៤.');
+const emptyProbeEnd = coverageSrc.indexOf('=== ៥.', emptyProbeAt + 1);
+const emptyProbeSrc = emptyProbeAt >= 0 && emptyProbeEnd > emptyProbeAt
+    ? coverageSrc.slice(emptyProbeAt, emptyProbeEnd)
+    : '';
+ok('`checker-coverage` probe ថតទទេដោយ bounded parallelism (មិនព្យួរ CI > 300s)',
+    /EMPTY_PROBE_CONCURRENCY/.test(emptyProbeSrc)
+        && /Promise\.all\s*\(/.test(emptyProbeSrc)
+        && /execFile\s*\(/.test(emptyProbeSrc)
+        && !/execFileSync\s*\(/.test(emptyProbeSrc),
+    'ផ្នែក probe ថតទទេនៅតែរត់ checker ជាជួរ');
+
 // ═══ ３. គ្មាន `navigator.serviceWorker.ready` ដែល await ដោយគ្មានពិដាន ═══
 // នេះជា **ការព្យួរពិត** ដែលធ្វើឲ្យ CI ដួល ២ ដង។
 const bareReady = [];

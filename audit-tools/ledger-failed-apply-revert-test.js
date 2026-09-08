@@ -52,8 +52,10 @@
 //      ត្រឡប់ server និងសតិមកតម្លៃដើម **ពិតប្រាកដ** (ការកែមិនត្រូវត្រឹមតែ
 //      «បិទការដកវិញ» ចោល)។
 //   ៤. ⛔ ករណី **គ្មាន `dbRef`** ៖ គ្មាន server សោះ ➜ សតិត្រូវនៅតែដកវិញ។
-//   ៥. `correctRevenueLedgerToActual()` មិនត្រូវសរសេរការកែតម្រូវទៅ server
-//      ពេលការអនុវត្តដើមមិនដែលចុះដល់ server។
+//   ៥. `correctRevenueLedgerToActual()` ត្រូវសរសេរ delta ដែលខ្វះទៅ server
+//      ពេល business record ជោគជ័យ តែការអនុវត្ត ledger ដើមមិនចុះដល់ server។
+//   ៦. រាល់ផ្លូវដែលរក្សា business record បានជោគជ័យ (ស្កេន · ដក · ផុត ៧ ថ្ងៃ)
+//      និង manual adjustment ត្រូវកេះការកែតម្រូវនេះ មិនមែនមាន helper តែគ្មានអ្នកហៅ។
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -96,7 +98,8 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate'
+    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
+    'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
 const missing = [];
@@ -107,6 +110,23 @@ for (const n of REQUIRED_FNS) {
 // ⛔ កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស ដើម្បីកុំបិទបាំងការអះអាងខាងក្រោម
 ok('រក function ចាំបាច់ទាំង ' + REQUIRED_FNS.length + ' ឃើញ', missing.length === 0, missing);
 for (const n of missing) fnSrc[n] = 'function ' + n + '() {}';
+
+console.log('\n=== ០.១. ផ្លូវ business ដែលជោគជ័យត្រូវ reconcile ledger ===');
+ok('ស្កេនថ្មី/បញ្ចូលជួរចាស់ ➜ កេះ correctRevenueLedgerToActual ក្រោយ history ជោគជ័យ',
+    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.addOrUpdateEntry));
+ok('ស្កេនមិនប្រកាស success មុន ledger reconciliation បញ្ចប់',
+    /return\s+correctRevenueLedgerToActual\s*\(/.test(fnSrc.addOrUpdateEntry)
+        && /const\s+saveStatus\s*=\s*await\s+withTimeout\s*\(/.test(fnSrc.confirmPhone)
+        && /saveStatus\s*!==\s*true/.test(fnSrc.confirmPhone));
+ok('ដក barcode ➜ កេះ correctRevenueLedgerToActual ក្រោយ trash ជោគជ័យ',
+    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.removeSingleBarcode));
+ok('auto-abandon > ៧ ថ្ងៃ ➜ កេះ correctRevenueLedgerToActual ក្រោយ trash ជោគជ័យ',
+    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.claimAndCleanupItem));
+ok('manual adjustment ➜ កេះ correctRevenueLedgerToActual ដើម្បីជួសជុល partial failure',
+    /correctRevenueLedgerToActual\s*\(/.test(fnSrc.submitManualAdjustment));
+ok('manual adjustment មិនអះអាង success មុន reconciliation បញ្ជាក់ `status.ok`',
+    /status\s*&&\s*status\.ok/.test(fnSrc.submitManualAdjustment)
+        && /កំពុងផ្ទៀងផ្ទាត់/.test(fnSrc.submitManualAdjustment));
 
 // ── sandbox ៖ server ក្លែងដែលអាចដាក់ក្នុង *របៀបបរាជ័យ* បាន ─────────────
 // `txPlan` ជាបញ្ជីសាលក្រមក្នុងមួយការហៅ ៖ 'ok' · 'reject' · 'abort'។
@@ -296,8 +316,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
         seed(ctx, 10, 0, 2);
         const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, -4, 0, -1);
         await settle();
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ សតិចុះមក $6.00 (គ្មាន server)',
-            same(ctx.dailyRevenueData[DATE], { codDollar: 6, dodDollar: 0, totalCount: 1 }), ctx.dailyRevenueData[DATE]);
+        ok('⛔ គ្មាន server ref ➜ optimistic local ត្រូវ rollback ភ្លាម មិនកុហកថា $6.00',
+            same(ctx.dailyRevenueData[DATE], { codDollar: 10, dodDollar: 0, totalCount: 2 }), ctx.dailyRevenueData[DATE]);
         vm.runInContext('revertRevenueLedgerDelta', ctx)(applied);
         await settle();
         ok('សតិត្រឡប់មក $10.00 · ២ ពិតប្រាកដ',
@@ -331,10 +351,108 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
         await settle();
         ok('លក្ខខណ្ឌចាំបាច់ ៖ ការអនុវត្តមិនចុះដល់ server',
             same(dailyServer(ctx), { codDollar: 10, dodDollar: 0, totalCount: 2 }), dailyServer(ctx));
-        vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
+        const repair = vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
         await settle();
+        const repairResult = await repair;
         ok('⛔ server ត្រូវឈានដល់ $15.00 (តម្លៃពិត) មិនមែននៅ $10.00',
             same(dailyServer(ctx), { codDollar: 15, dodDollar: 0, totalCount: 2 }), dailyServer(ctx));
+        ok('សតិត្រូវឈានដល់ $15.00 ដែរ ក្រោយ listener write ដើមបានដក local delta វិញ',
+            same(ctx.dailyRevenueData[DATE], { codDollar: 15, dodDollar: 0, totalCount: 2 }), ctx.dailyRevenueData[DATE]);
+        ok('repair ប្រាប់អ្នកហៅថា daily/monthly reconciliation ជោគជ័យ',
+            !!repairResult && repairResult.ok === true, repairResult);
+    }
+
+    // ── ៨. 🔴 committed:false មិនបានសរសេរ server ➜ optimistic local ត្រូវ rollback ──
+    console.log('\n=== ៨. 🔴 committed:false ➜ rollback local រួច correction បូកតែម្តង ===');
+    {
+        const ctx = makeSandbox(['abort', 'abort', 'ok']);
+        seed(ctx, 10, 0, 2);
+        const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, 5, 0, 0);
+        await settle();
+        ok('⛔ committed:false មិនបានសរសេរ server ➜ optimistic daily ត្រូវត្រឡប់ $10.00',
+            same(ctx.dailyRevenueData[DATE], { codDollar: 10, dodDollar: 0, totalCount: 2 }), ctx.dailyRevenueData[DATE]);
+        ok('⛔ committed:false ➜ optimistic monthly ក៏ត្រូវត្រឡប់ $10.00',
+            same(ctx.monthlyRevenueData[MONTH], { codDollar: 10, dodDollar: 0, totalCount: 2 }), ctx.monthlyRevenueData[MONTH]);
+        vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
+        await settle();
+        ok('server ត្រូវទទួល delta ដែលខ្វះ ➜ $15.00',
+            same(dailyServer(ctx), { codDollar: 15, dodDollar: 0, totalCount: 2 }), dailyServer(ctx));
+        ok('⛔ សតិមិនត្រូវឡើង $20.00 — operation មួយត្រូវបូកតែម្តង',
+            same(ctx.dailyRevenueData[DATE], { codDollar: 15, dodDollar: 0, totalCount: 2 }), ctx.dailyRevenueData[DATE]);
+        ok('⛔ សតិប្រចាំខែក៏មិនត្រូវបូកទ្វេដង',
+            same(ctx.monthlyRevenueData[MONTH], { codDollar: 15, dodDollar: 0, totalCount: 2 }), ctx.monthlyRevenueData[MONTH]);
+    }
+
+    console.log('\n=== ៩. correction ធ្លាក់ទាំងស្រុង ➜ អ្នកហៅត្រូវទទួលសាលក្រម false ===');
+    {
+        const ctx = makeSandbox(['reject']);
+        seed(ctx, 10, 0, 2);
+        const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, 5, 0, 0);
+        await settle();
+        const repairResult = await vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
+        await settle();
+        ok('⛔ correction បរាជ័យ ➜ result.ok = false (កុំបង្ហាញ success ក្លែង)',
+            !!repairResult && repairResult.ok === false, repairResult);
+        ok('correction បរាជ័យ ➜ server មិនបង្កើតលុយពីអាកាស',
+            same(dailyServer(ctx), { codDollar: 10, dodDollar: 0, totalCount: 2 }), dailyServer(ctx));
+        ok('correction បរាជ័យ ➜ optimistic memory ត្រូវ rollback',
+            same(ctx.dailyRevenueData[DATE], { codDollar: 10, dodDollar: 0, totalCount: 2 }), ctx.dailyRevenueData[DATE]);
+    }
+
+    console.log('\n=== ១០. partial failure មួយជ្រុង ➜ correction មិនត្រូវលុបជ្រុងដែលជួសជុលបាន ===');
+    {
+        const ctx = makeSandbox(['ok', 'reject', 'reject', 'ok']);
+        seed(ctx, 10, 0, 2);
+        const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, 5, 0, 0);
+        await settle();
+        ok('លក្ខខណ្ឌ៖ daily ដល់ $15 តែ monthly នៅ $10 មុន correction',
+            dailyServer(ctx).codDollar === 15 && monthlyServer(ctx).codDollar === 10,
+            { daily: dailyServer(ctx), monthly: monthlyServer(ctx) });
+        const result = await vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
+        await settle();
+        ok('⛔ correction ជួសជុល monthly ទៅ $15 មិនមែនបូកហើយដកវិញទៅ $10',
+            monthlyServer(ctx).codDollar === 15, monthlyServer(ctx));
+        ok('សតិ daily/monthly ស៊ីគ្នា $15 ក្រោយជួសជុល',
+            ctx.dailyRevenueData[DATE].codDollar === 15
+            && ctx.monthlyRevenueData[MONTH].codDollar === 15,
+            { daily: ctx.dailyRevenueData[DATE], monthly: ctx.monthlyRevenueData[MONTH] });
+        ok('អ្នកហៅទទួលសាលក្រម success ក្រោយជួសជុល monthly បានពិត',
+            !!result && result.ok === true, result);
+    }
+    {
+        const ctx = makeSandbox(['reject', 'ok', 'reject', 'ok']);
+        seed(ctx, 10, 0, 2);
+        const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, 5, 0, 0);
+        await settle();
+        ok('លក្ខខណ្ឌទិសផ្ទុយ៖ daily នៅ $10 តែ monthly ដល់ $15 មុន correction',
+            dailyServer(ctx).codDollar === 10 && monthlyServer(ctx).codDollar === 15,
+            { daily: dailyServer(ctx), monthly: monthlyServer(ctx) });
+        const result = await vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, 5, 0, 0);
+        await settle();
+        ok('⛔ correction ជួសជុល daily ទៅ $15 ដោយមិនបូក monthly ស្ទួនទៅ $20',
+            dailyServer(ctx).codDollar === 15 && monthlyServer(ctx).codDollar === 15,
+            { daily: dailyServer(ctx), monthly: monthlyServer(ctx) });
+        ok('សតិទិសផ្ទុយ daily/monthly ស៊ីគ្នា $15',
+            ctx.dailyRevenueData[DATE].codDollar === 15
+            && ctx.monthlyRevenueData[MONTH].codDollar === 15,
+            { daily: ctx.dailyRevenueData[DATE], monthly: ctx.monthlyRevenueData[MONTH] });
+        ok('អ្នកហៅទទួលសាលក្រម success ក្រោយជួសជុល daily បានពិត',
+            !!result && result.ok === true, result);
+    }
+
+    console.log('\n=== ១១. correction ត្រូវរាយ false បើ clamp មិនអាចឈានដល់ delta ពិត ===');
+    {
+        const ctx = makeSandbox(['ok']);
+        seed(ctx, 3, 0, 1);
+        const applied = vm.runInContext('addRevenueToDailyAndMonthlyRecord', ctx)(DATE, -5, 0, -1);
+        await settle();
+        const result = await vm.runInContext('correctRevenueLedgerToActual', ctx)(DATE, applied, -5, 0, -1);
+        await settle();
+        ok('លក្ខខណ្ឌ៖ rules clamp server ត្រឹម 0 ដូច្នេះអនុវត្តពិតបានតែ −3 មិនមែន −5',
+            dailyServer(ctx).codDollar === 0 && result && result.daily && result.daily.cod === -3,
+            { daily: dailyServer(ctx), result: result });
+        ok('⛔ delta ខ្វះក្រោយ clamp ➜ result.ok = false (កុំបង្ហាញ success ក្លែង)',
+            !!result && result.ok === false, result);
     }
 
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);

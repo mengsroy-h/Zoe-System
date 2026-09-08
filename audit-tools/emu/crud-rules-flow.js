@@ -102,6 +102,11 @@ function makeSandbox(store, now) {
             monthly: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
             dailyServer: Promise.resolve(null), monthlyServer: Promise.resolve(null)
         }),
+        correctRevenueLedgerToActual: () => Promise.resolve({
+            ok: true,
+            daily: { cod: 0, dod: 0, count: 0 },
+            monthly: { cod: 0, dod: 0, count: 0 }
+        }),
         markPickupBarcodes: (d, marks, seed) => ({
             scanDate: d, marks: marks || [], seed: seed || null, previous: [], changed: false
         }),

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v178';
+const CACHE_VERSION = 'zoew-v179';
 
 const CORE_SHELL = [
     './',
@@ -47,9 +47,11 @@ const GUIDE_PATH = new URL('./guide.html', self.location.href).pathname;
 const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 
 function cacheKeyFor(request) {
-    if (request.mode !== 'navigate') return request;
     const url = new URL(request.url);
-    return url.pathname === GUIDE_PATH || url.pathname === GUIDE_PRETTY_PATH ? './guide.html' : './index.html';
+    if (request.mode === 'navigate') {
+        return url.pathname === GUIDE_PATH || url.pathname === GUIDE_PRETTY_PATH ? './guide.html' : './index.html';
+    }
+    return SHELL_PATHS.has(url.pathname) ? url.pathname : request;
 }
 
 function linkIsFrugal() {
@@ -61,7 +63,7 @@ function linkIsFrugal() {
 }
 
 const REVALIDATE_TIMEOUT_MS = 6000;
-const REVALIDATE_MAX_IN_FLIGHT = 4;
+const REVALIDATE_MAX_IN_FLIGHT = 3;
 const revalidateInFlight = new Set();
 
 function revalidateShell(cache, request, cacheKey) {
@@ -85,7 +87,7 @@ function revalidateShell(cache, request, cacheKey) {
         release();
     }, REVALIDATE_TIMEOUT_MS);
 
-    const target = cacheKey === './index.html' ? './index.html' : request;
+    const target = typeof cacheKey === 'string' ? cacheKey : request;
     return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
         if (!response || !response.ok || response.redirected) { release(); return; }
         return cache.put(cacheKey, response.clone()).then(release, release);
@@ -167,7 +169,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     const cacheKey = cacheKeyFor(request);
-    const isShell = cacheKey === './index.html' || SHELL_PATHS.has(url.pathname);
+    const isShell = typeof cacheKey === 'string';
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>

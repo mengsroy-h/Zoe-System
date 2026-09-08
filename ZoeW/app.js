@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.9';
+    const APP_VERSION = '2.30.10';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5176,9 +5176,12 @@
             stripHistoryOnlyMarkers(trashItem);
 
             deletedItems.unshift(trashItem);
+            let trashSaved = false;
             await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
                 TRASH_WRITE_SLOW_NOTICE_MS,
-                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").catch(async (trashErr) => {
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
+                trashSaved = true;
+            }).catch(async (trashErr) => {
                 revertRevenueLedgerDelta(revenueApplied);
                 const staleIdx = deletedItems.findIndex(i => i.id === trashItem.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
@@ -5194,6 +5197,17 @@
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
             });
+            if (trashSaved && revenueApplied) {
+                correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
+                    -revenueCod, -revenueDod, -revenueCount).then((status) => {
+                    if (status && status.ok) return;
+                    const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
+                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+                    showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
+                }, (ledgerErr) => {
+                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+                });
+            }
         };
         try {
             const cleanupTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), cleanupUpdater);
@@ -5898,13 +5912,67 @@
 
     function correctRevenueLedgerToActual(scanDateStr, applied, actualCod, actualDod, actualCount) {
         const r2 = (n) => Math.round(n * 100) / 100;
-        const dailyFix = ledgerServerVerdict(applied && applied.dailyServer).then((daily) =>
-            commitRevenueBucketDelta(scanDateStr, 'daily',
-                r2(actualCod - daily.cod), r2(actualDod - daily.dod), actualCount - daily.count).server);
-        const monthlyFix = ledgerServerVerdict(applied && applied.monthlyServer).then((monthly) =>
-            commitRevenueBucketDelta(scanDateStr, 'monthly',
-                r2(actualCod - monthly.cod), r2(actualDod - monthly.dod), actualCount - monthly.count).server);
-        return alignMonthlyLedgerToDaily(scanDateStr.substring(0, 7), dailyFix, monthlyFix);
+        const desired = { cod: ledgerNumber(actualCod), dod: ledgerNumber(actualDod), count: ledgerNumber(actualCount) };
+        return Promise.all([
+            ledgerServerVerdict(applied && applied.dailyServer),
+            ledgerServerVerdict(applied && applied.monthlyServer)
+        ]).then((initial) => {
+            const daily = initial[0];
+            const monthly = initial[1];
+            const dailyNeed = {
+                cod: r2(desired.cod - daily.cod),
+                dod: r2(desired.dod - daily.dod),
+                count: desired.count - daily.count
+            };
+            const monthlyNeed = {
+                cod: r2(desired.cod - monthly.cod),
+                dod: r2(desired.dod - monthly.dod),
+                count: desired.count - monthly.count
+            };
+            const dailyNeeded = !!(dailyNeed.cod || dailyNeed.dod || dailyNeed.count);
+            const monthlyNeeded = !!(monthlyNeed.cod || monthlyNeed.dod || monthlyNeed.count);
+            const dailyFix = dailyNeeded
+                ? commitRevenueBucketDelta(scanDateStr, 'daily', dailyNeed.cod, dailyNeed.dod, dailyNeed.count).server
+                : Promise.resolve(ledgerZeroDelta());
+            const monthlyFix = monthlyNeeded
+                ? commitRevenueBucketDelta(scanDateStr, 'monthly', monthlyNeed.cod, monthlyNeed.dod, monthlyNeed.count).server
+                : Promise.resolve(ledgerZeroDelta());
+            const dailyStatus = Promise.resolve(dailyFix).then(
+                (value) => ({ ok: !dailyNeeded || value !== null, delta: value || ledgerZeroDelta() }),
+                () => ({ ok: false, delta: ledgerZeroDelta() })
+            );
+            const monthlyStatus = Promise.resolve(monthlyFix).then(
+                (value) => ({ delta: value || ledgerZeroDelta() }),
+                () => ({ delta: ledgerZeroDelta() })
+            );
+            return Promise.all([dailyStatus, monthlyStatus]).then((fixed) => {
+                const dailyTotal = {
+                    cod: r2(daily.cod + fixed[0].delta.cod),
+                    dod: r2(daily.dod + fixed[0].delta.dod),
+                    count: daily.count + fixed[0].delta.count
+                };
+                const monthlyTotal = {
+                    cod: r2(monthly.cod + fixed[1].delta.cod),
+                    dod: r2(monthly.dod + fixed[1].delta.dod),
+                    count: monthly.count + fixed[1].delta.count
+                };
+                return ledgerServerVerdict(alignMonthlyLedgerToDaily(
+                    scanDateStr.substring(0, 7),
+                    Promise.resolve(dailyTotal),
+                    Promise.resolve(monthlyTotal)
+                )).then((alignedMonthly) => ({
+                    ok: fixed[0].ok
+                        && dailyTotal.cod === desired.cod
+                        && dailyTotal.dod === desired.dod
+                        && dailyTotal.count === desired.count
+                        && dailyTotal.cod === alignedMonthly.cod
+                        && dailyTotal.dod === alignedMonthly.dod
+                        && dailyTotal.count === alignedMonthly.count,
+                    daily: dailyTotal,
+                    monthly: alignedMonthly
+                }));
+            });
+        });
     }
 
     function alignMonthlyLedgerToDaily(ymKey, dailyServer, monthlyServer) {
@@ -5925,9 +5993,18 @@
     }
 
     function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
-        if (!dbRefDailyRevenue) return Promise.resolve(null);
         const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
         const recordRef = serverOnly ? null : dailyRevenueData[scanDateStr];
+        const rollbackMemory = () => {
+            if (recordRef && dailyRevenueData[scanDateStr] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
+                revertLedgerRecordInMemory(recordRef, applied);
+                refreshCurrentHistoryView();
+            }
+        };
+        if (!dbRefDailyRevenue) {
+            rollbackMemory();
+            return Promise.resolve(null);
+        }
         const dateRef = fb.ref(db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
         let serverBefore = null;
         let serverAfter = null;
@@ -5940,22 +6017,31 @@
             serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr);
             return serverAfter;
         }).then((result) => {
-            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
+            if (!result || !result.committed || !serverBefore || !serverAfter) {
+                rollbackMemory();
+                showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
+                return null;
+            }
             return ledgerAppliedDelta(serverBefore, serverAfter);
         }, () => {
-            if (recordRef && dailyRevenueData[scanDateStr] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
-                revertLedgerRecordInMemory(recordRef, applied);
-                refreshCurrentHistoryView();
-            }
+            rollbackMemory();
             showToast("⚠️ បរាជ័យក្នុងការ Save Daily Revenue!");
             return null;
         });
     }
 
     function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd, appliedDelta, serverOnly) {
-        if (!dbRefMonthlyRevenue) return Promise.resolve(null);
         const applied = appliedDelta || { cod: ledgerNumber(codToAdd), dod: ledgerNumber(dodToAdd), count: ledgerNumber(countToAdd) };
         const recordRef = serverOnly ? null : monthlyRevenueData[ymKey];
+        const rollbackMemory = () => {
+            if (recordRef && monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
+                revertLedgerRecordInMemory(recordRef, applied);
+            }
+        };
+        if (!dbRefMonthlyRevenue) {
+            rollbackMemory();
+            return Promise.resolve(null);
+        }
         let serverBefore = null;
         let serverAfter = null;
         return fb.runTransaction(dbRefMonthlyRevenue, (current) => {
@@ -5975,15 +6061,17 @@
             });
             return latestThreeMonths;
         }).then((result) => {
-            if (!result || !result.committed || !serverBefore || !serverAfter) return null;
+            if (!result || !result.committed || !serverBefore || !serverAfter) {
+                rollbackMemory();
+                showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
+                return null;
+            }
             const storedMonths = result.snapshot ? result.snapshot.val() : null;
             const storedMonth = (storedMonths && typeof storedMonths === 'object') ? storedMonths[ymKey] : null;
             if (!storedMonth || typeof storedMonth !== 'object') return ledgerZeroDelta();
             return ledgerAppliedDelta(serverBefore, storedMonth);
         }, () => {
-            if (recordRef && monthlyRevenueData[ymKey] === recordRef && !ledgerMemoryCompensationClaimed(applied)) {
-                revertLedgerRecordInMemory(recordRef, applied);
-            }
+            rollbackMemory();
             showToast("⚠️ បរាជ័យក្នុងការ Save Monthly Revenue!");
             return null;
         });
@@ -6324,6 +6412,11 @@
         let dodChange = dodChangeEl ? (parseFloat(dodChangeEl.value) || 0) : 0;
         let countChange = countChangeEl ? (parseInt(countChangeEl.value) || 0) : 0;
 
+        if (!codChange && !dodChange && !countChange) {
+            alert("សូមបញ្ចូលយ៉ាងហោចណាស់ការកែប្រែ COD, DOD ឬចំនួនកញ្ចប់មួយ!");
+            return;
+        }
+
         const dateRegex = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
         if (!dateVal || !dateRegex.test(dateVal)) {
             alert("សូមបញ្ចូលកាលបរិច្ឆេទឱ្យបានត្រឹមត្រូវតាមទម្រង់ YYYY-MM-DD (ឧ. 2026-06-05)!");
@@ -6344,10 +6437,22 @@
         }
 
         if (submitBtn) submitBtn.disabled = true;
-        addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
+        const manualRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
+        correctRevenueLedgerToActual(dateVal, manualRevenueApplied, codChange, dodChange, countChange).then((status) => {
+            if (status && status.ok) {
+                showToast("កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
+                return;
+            }
+            const ledgerErr = new Error('Manual revenue reconciliation did not commit');
+            if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'submitManualAdjustment ledger reconciliation' });
+            showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យបណ្តាញ ហើយសាកល្បងម្ដងទៀត។");
+        }, (ledgerErr) => {
+            if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'submitManualAdjustment ledger reconciliation' });
+            showToast("⚠️ ការកែប្រែមិនទាន់រក្សាទុកពេញលេញទេ! សូមពិនិត្យបណ្តាញ ហើយសាកល្បងម្ដងទៀត។");
+        });
 
         closeModal('manualAdjustModal');
-        showToast("កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
+        showToast("⏳ កំពុងផ្ទៀងផ្ទាត់ការកែប្រែស្ថិតិជាមួយ Firebase…");
         refreshCurrentHistoryView();
     }
 
@@ -9895,11 +10000,15 @@
 
             const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
             try {
-                await withTimeout(savePromise, 15000, 'Save timed out');
+                const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
+                if (saveStatus !== true) {
+                    closeModal('phoneModal');
+                    return;
+                }
             } catch (saveError) {
                 if (saveError && saveError.message === 'Save timed out') {
-                    savePromise.then(() => {
-                        showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
+                    savePromise.then((lateStatus) => {
+                        if (lateStatus === true) showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
                         refreshCurrentHistoryView();
                     }, (lateErr) => {
                         rollbackFailedSave();
@@ -9942,6 +10051,19 @@
         }
 
         const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
+        const reconcileSavedScanRevenue = () => {
+            return correctRevenueLedgerToActual(dateString, scanRevenueApplied, cod, dod, 1).then((status) => {
+                if (status && status.ok) return true;
+                const ledgerErr = new Error('Scanned parcel revenue reconciliation did not commit');
+                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'addOrUpdateEntry ledger reconciliation', barcode });
+                showToast(`⚠️ កញ្ចប់ (${barcode}) បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
+                return false;
+            }, (ledgerErr) => {
+                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'addOrUpdateEntry ledger reconciliation', barcode });
+                showToast(`⚠️ កញ្ចប់ (${barcode}) បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
+                return false;
+            });
+        };
         const revertRevenueOnSaveFailure = (err) => {
             revertRevenueLedgerDelta(scanRevenueApplied);
             throw err;
@@ -10000,7 +10122,9 @@
                     if (!mergeAddedBarcode) {
                         revertRevenueLedgerDelta(scanRevenueApplied);
                         showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
+                        return null;
                     }
+                    return reconcileSavedScanRevenue();
                 }, (err) => {
                     const revertIndex = scanHistory.findIndex(i => i.id === itemSnapshot.id);
                     if (revertIndex !== -1) scanHistory[revertIndex] = itemSnapshot;
@@ -10025,7 +10149,9 @@
             };
 
             scanHistory.push(newItem);
-            savePromise = saveSingleHistoryItemToFirebase(newItem).catch(revertRevenueOnSaveFailure);
+            savePromise = saveSingleHistoryItemToFirebase(newItem).then((savedItem) => {
+                return reconcileSavedScanRevenue();
+            }, revertRevenueOnSaveFailure);
         }
 
         updateRecentPhonesList();
@@ -10224,9 +10350,30 @@
                 }
             });
             if (trashSaved) {
-                showToast(late
-                    ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!`
-                    : "បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+                if (deductionApplied) {
+                    correctRevenueLedgerToActual(revenueScanDate, deductionApplied,
+                        -itemToTrash.cod, -itemToTrash.dod, -1).then((status) => {
+                        if (status && status.ok) {
+                            showToast(late
+                                ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!`
+                                : "បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+                            return;
+                        }
+                        const ledgerErr = new Error('Removed barcode revenue reconciliation did not commit');
+                        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'removeSingleBarcode ledger reconciliation', itemId });
+                        showToast(`⚠️ បានដកកញ្ចប់ (${barcodeCode}) ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
+                    }, (ledgerErr) => {
+                        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'removeSingleBarcode ledger reconciliation', itemId });
+                        showToast(`⚠️ បានដកកញ្ចប់ (${barcodeCode}) ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
+                    });
+                }
+                if (!deductionApplied) {
+                    showToast(late
+                        ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) រួចរាល់!`
+                        : "បានដកកញ្ចប់អីវ៉ាន់រួចរាល់!");
+                } else if (!late) {
+                    showToast(`⏳ បានដកកញ្ចប់ (${barcodeCode}) — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់ជាមួយ Firebase…`);
+                }
             }
         };
         try {
@@ -10539,9 +10686,20 @@
                     }
                     const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;
                     const actualDodDiff = Math.round((newDod - serverOldDod) * 100) / 100;
-                    correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0);
+                    correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0).then((status) => {
+                        if (status && status.ok) {
+                            showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+                            return;
+                        }
+                        const ledgerErr = new Error('Edited price revenue reconciliation did not commit');
+                        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
+                        showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
+                    }, (ledgerErr) => {
+                        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
+                        showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
+                    });
                     editRevenueApplied = null;
-                    showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+                    showToast("⏳ តម្លៃកញ្ចប់បានរក្សាទុក — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់…");
                 };
                 const failEditedPrice = (err) => {
                     undoEditedPriceRevenue();

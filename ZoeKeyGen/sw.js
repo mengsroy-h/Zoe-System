@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v88';
+const CACHE_VERSION = 'zoekeygen-v89';
 
 const CORE_SHELL = [
     './',
@@ -41,7 +41,9 @@ self.addEventListener('activate', (event) => {
 });
 
 function cacheKeyFor(request) {
-    return request.mode === 'navigate' ? './index.html' : request;
+    if (request.mode === 'navigate') return './index.html';
+    const url = new URL(request.url);
+    return SHELL_PATHS.has(url.pathname) ? url.pathname : request;
 }
 
 function linkIsFrugal() {
@@ -53,7 +55,7 @@ function linkIsFrugal() {
 }
 
 const REVALIDATE_TIMEOUT_MS = 6000;
-const REVALIDATE_MAX_IN_FLIGHT = 4;
+const REVALIDATE_MAX_IN_FLIGHT = 3;
 const revalidateInFlight = new Set();
 
 function revalidateShell(cache, request, cacheKey) {
@@ -77,7 +79,7 @@ function revalidateShell(cache, request, cacheKey) {
         release();
     }, REVALIDATE_TIMEOUT_MS);
 
-    const target = cacheKey === './index.html' ? './index.html' : request;
+    const target = typeof cacheKey === 'string' ? cacheKey : request;
     return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
         if (!response || !response.ok || response.redirected) { release(); return; }
         return cache.put(cacheKey, response.clone()).then(release, release);
@@ -154,7 +156,7 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== self.location.origin) return;
 
     const cacheKey = cacheKeyFor(request);
-    const isShell = cacheKey === './index.html' || SHELL_PATHS.has(url.pathname);
+    const isShell = typeof cacheKey === 'string';
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>

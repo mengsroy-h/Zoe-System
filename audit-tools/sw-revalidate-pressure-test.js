@@ -12,9 +12,9 @@
 //
 //   | អ្វី                              | មុនកែ            | ក្រោយកែ |
 //   |-----------------------------------|------------------|---------|
-//   | ការតភ្ជាប់ដែល server កាន់ទុក      | ៦ (ពេញពិដាន)     | ៦       |
+//   | ការតភ្ជាប់ដែល server កាន់ទុក      | ៦ (ពេញពិដាន)     | ≤ ៤     |
 //   | សំណើថ្មីទៅដល់ server              | **០ ដង**         | ១ ដង    |
-//   | ពេលវេលារបស់សំណើថ្មី               | **មិនដែលមកដល់**  | ~៦ ms   |
+//   | ពេលវេលាទៅដល់ server               | **មិនដែលមកដល់**  | < ៣ វិ. |
 //
 // នេះជាថ្នាក់កំហុសដដែលនឹង `network-pressure-test.js` (សំណើកកកុញនៅខាង App)
 // តែនៅក្នុង **service worker** ដែលគ្មានឧបករណ៍ណាមើលពីមុន។
@@ -90,7 +90,7 @@ for (const app of APPS) {
     const timeout = Number((sw.match(/const REVALIDATE_TIMEOUT_MS = (\d+);/) || [])[1] || 0);
     ok(app + ': ពេលកំណត់សមហេតុផល (១–១៥ វិ.)', timeout >= 1000 && timeout <= 15000, timeout);
     const cap = Number((sw.match(/const REVALIDATE_MAX_IN_FLIGHT = (\d+);/) || [])[1] || 0);
-    ok(app + ': ពិដានទុកកន្លែងទំនេរក្នុងកូតា browser (≤ ៤)', cap >= 1 && cap <= 4, cap);
+    ok(app + ': ពិដានទុកកន្លែងទំនេរក្នុងកូតា browser (≤ ៣)', cap >= 1 && cap <= 3, cap);
 }
 
 // === ផ្នែកទី ២ — វាស់លើ Chromium ពិត ===
@@ -109,13 +109,16 @@ if (!fs.existsSync(CHROME)) {
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.txt': 'text/plain' };
 const CANARY_PATH = '/zoe-audit-canary.txt';
-const CANARY_BUDGET_MS = 9000;
+const CANARY_BUDGET_MS = 3000;
 
 (async () => {
     const APP = path.join(ROOT, 'ZoeW');
     let hangMode = false;
     const held = [];
     let canaryHits = 0;
+    let canaryStartedAt = 0;
+    let canaryArrivedAt = 0;
+    let canaryFinishedAt = 0;
 
     const server = http.createServer((req, res) => {
         let p = decodeURIComponent(req.url.split('?')[0]);
@@ -123,6 +126,8 @@ const CANARY_BUDGET_MS = 9000;
         // កូតា connection ត្រូវបានស៊ីអស់ដោយការធ្វើឲ្យស្រស់ដែលព្យួរ។
         if (p === CANARY_PATH) {
             canaryHits++;
+            if (!canaryArrivedAt) canaryArrivedAt = Date.now();
+            res.once('finish', () => { if (!canaryFinishedAt) canaryFinishedAt = Date.now(); });
             res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
             res.end('canary-ok');
             return;
@@ -163,13 +168,18 @@ const CANARY_BUDGET_MS = 9000;
         await page.evaluate(() => new Promise((r) => setTimeout(r, 800)));
 
         // ៣) សំណើ same-origin ថ្មី — server នឹងឆ្លើយវាភ្លាម បើវាទៅដល់
-        result = await page.evaluate(([p, budget]) => {
-            const t = performance.now();
-            return Promise.race([
-                fetch(p, { cache: 'no-store' }).then((r) => r.text()).then((txt) => ({ ok: txt === 'canary-ok', ms: Math.round(performance.now() - t) })),
-                new Promise((res) => setTimeout(() => res({ ok: false, ms: Math.round(performance.now() - t), timedOut: true }), budget))
-            ]);
-        }, [CANARY_PATH, CANARY_BUDGET_MS]);
+        canaryStartedAt = Date.now();
+        await page.evaluate((p) => {
+            fetch(p, { cache: 'no-store' }).catch(() => {});
+        }, CANARY_PATH);
+        const deadline = canaryStartedAt + CANARY_BUDGET_MS;
+        while ((!canaryArrivedAt || !canaryFinishedAt) && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        result = {
+            arrivedMs: canaryArrivedAt ? canaryArrivedAt - canaryStartedAt : null,
+            finishedMs: canaryFinishedAt ? canaryFinishedAt - canaryStartedAt : null
+        };
     } finally {
         await browser.close();
         held.forEach((r) => { try { r.destroy(); } catch (e) {} });
@@ -179,10 +189,12 @@ const CANARY_BUDGET_MS = 9000;
     ok('សំណើ same-origin ថ្មីទៅដល់ server ខណៈការធ្វើឲ្យស្រស់កំពុងព្យួរ',
         canaryHits >= 1, { canaryHits: canaryHits, heldByServer: held.length });
     ok('សំណើនោះមិនត្រូវអត់ឃ្លានក្នុងកូតា connection',
-        result && result.ok === true, result);
+        result && result.arrivedMs !== null && result.arrivedMs <= CANARY_BUDGET_MS
+            && result.finishedMs !== null && result.finishedMs <= CANARY_BUDGET_MS, result);
 
     console.log('\n  ↳ ការតភ្ជាប់ដែល server កាន់ទុក: ' + held.length +
-        ' · សំណើ canary ទៅដល់: ' + canaryHits + ' ដង · ' + (result ? result.ms + ' ms' : 'n/a'));
+        ' · សំណើ canary ទៅដល់: ' + canaryHits + ' ដង · ' +
+        (result && result.arrivedMs !== null ? result.arrivedMs + ' ms' : 'n/a'));
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

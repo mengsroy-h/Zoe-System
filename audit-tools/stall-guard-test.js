@@ -99,10 +99,11 @@ function loadSw(app, opts) {
     const listeners = {};
     const netCalls = [];
     const aborted = [];
-    const store = new Map(Object.entries(opts.seed || {}));
+    const cacheUrl = (key) => new URL(typeof key === 'string' ? key : key.url, 'https://example.test/').href;
+    const store = new Map(Object.entries(opts.seed || {}).map(([key, value]) => [cacheUrl(key), value]));
     const cache = {
-        match(key) { return Promise.resolve(store.get(typeof key === 'string' ? key : key.url)); },
-        put(key, res) { store.set(typeof key === 'string' ? key : key.url, res); return Promise.resolve(); },
+        match(key) { return Promise.resolve(store.get(cacheUrl(key))); },
+        put(key, res) { store.set(cacheUrl(key), res); return Promise.resolve(); },
         add() { return Promise.resolve(); },
         addAll() { return Promise.resolve(); }
     };

@@ -42,15 +42,15 @@ function makeResponse(status, tag) {
 //   'inner'  — តែការធ្លាក់ចុះទៅ './index.html' ប៉ុណ្ណោះដែលបដិសេធ
 //   null     — ដំណើរការធម្មតា (cache ទទេ ឬមានតាម `seed`)
 function buildCaches(mode, seed) {
-    const store = new Map(Object.entries(seed || {}));
+    const cacheUrl = (key) => new URL(typeof key === 'string' ? key : key.url, 'https://example.test/').href;
+    const store = new Map(Object.entries(seed || {}).map(([key, value]) => [cacheUrl(key), value]));
     const cache = {
         match(key) {
             if (mode === 'match') return Promise.reject(new Error('QuotaExceededError'));
             if (mode === 'inner' && key === './index.html') return Promise.reject(new Error('UnknownError'));
-            const k = typeof key === 'string' ? key : key.url;
-            return Promise.resolve(store.get(k));
+            return Promise.resolve(store.get(cacheUrl(key)));
         },
-        put(key, res) { store.set(typeof key === 'string' ? key : key.url, res); return Promise.resolve(); },
+        put(key, res) { store.set(cacheUrl(key), res); return Promise.resolve(); },
         add() { return Promise.resolve(); },
         addAll() { return Promise.resolve(); }
     };

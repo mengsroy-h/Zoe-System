@@ -31,7 +31,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execFileSync } = require('child_process');
+const { execFile, execFileSync } = require('child_process');
 
 const TOOLS = path.resolve(__dirname);
 const RUNALL = path.join(TOOLS, 'run-all.sh');
@@ -155,30 +155,38 @@ else ok('គ្មាន checker ណាបិទបាំងការអះអ�
 
 console.log('\n=== ៤. ថតទទេ ➜ គ្មាន checker ណាមួយអាចជោគជ័យបានទេ ===');
 console.log('    (ការវាស់ឥរិយាបថពិត — រត់ checker នីមួយៗលើថតទទេ)');
+const EMPTY_PROBE_CONCURRENCY = 12;
+
+function probeCheckerOnEmpty(f, env, empty) {
+    return new Promise((resolve) => {
+        execFile(process.execPath, [path.join(TOOLS, f)], {
+            env: Object.assign({}, process.env, { [env]: empty }),
+            encoding: 'utf8',
+            timeout: SLOW.has(f) ? 180000 : 90000,
+            maxBuffer: 4 * 1024 * 1024
+        }, (error, stdout, stderr) => {
+            const output = String(stdout || '') + '\n' + String(stderr || '');
+            resolve({ f, green: !error && !/(^|\n)\s*SKIP\b/.test(output) });
+        });
+    });
+}
+
+(async () => {
 const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-empty-'));
 const greenOnEmpty = [];
 let probed = 0;
-for (const f of checkers) {
-    const env = envOf.get(f);
-    if (!env) continue;
-    probed++;
-    let code = 1;
-    let output = '';
-    try {
-        output = execFileSync(process.execPath, [path.join(TOOLS, f)], {
-            env: Object.assign({}, process.env, { [env]: empty }),
-            stdio: ['ignore', 'pipe', 'pipe'],
-            encoding: 'utf8',
-            timeout: SLOW.has(f) ? 180000 : 90000
-        });
-        code = 0;
-    } catch (e) {
-        // ការធ្លាក់ · ការគាំង · timeout — សុទ្ធតែ «មិនបៃតង» ដែលជាអ្វីដែលត្រូវការ
-        code = typeof e.status === 'number' ? e.status : 1;
-        output = String((e && e.stdout) || '') + '\n' + String((e && e.stderr) || '');
+const jobs = checkers.map((f) => ({ f, env: envOf.get(f) })).filter((job) => job.env);
+probed = jobs.length;
+let nextJob = 0;
+await Promise.all(Array.from({ length: Math.min(EMPTY_PROBE_CONCURRENCY, jobs.length) }, async () => {
+    for (;;) {
+        const index = nextJob++;
+        if (index >= jobs.length) return;
+        const job = jobs[index];
+        const result = await probeCheckerOnEmpty(job.f, job.env, empty);
+        if (result.green) greenOnEmpty.push(result.f);
     }
-    if (code === 0 && !/(^|\n)\s*SKIP\b/.test(output)) greenOnEmpty.push(f);
-}
+}));
 try { fs.rmSync(empty, { recursive: true, force: true }); } catch (e) {}
 
 if (greenOnEmpty.length) {
@@ -599,4 +607,8 @@ console.log('\n=== ៨. checker ដែលមើល pageerror ត្រូវម�
 }
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
-process.exit(fail ? 1 : 0);
+process.exitCode = fail ? 1 : 0;
+})().catch((error) => {
+    console.error('  FAIL   checker-coverage គាំង ➜ ' + (error && error.stack ? error.stack : error));
+    process.exitCode = 1;
+});

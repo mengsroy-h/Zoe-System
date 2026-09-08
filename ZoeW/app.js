@@ -9983,6 +9983,7 @@
         const writePromise = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
             applied = false;
             if (!currentItem || typeof currentItem !== 'object') return currentItem;
+            if (currentItem.clearClaim) return currentItem;
             return applyLockerTo({ ...currentItem });
         });
 

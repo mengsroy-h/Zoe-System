@@ -286,6 +286,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ការហៅ Firebase ដែលព្យួរ** | ⛔ RTDB មិនបដិសេធពេលក្រៅបណ្តាញ — វាព្យួរ ➜ សោ in-flight ជាប់រហូត | `db-stall-guard-test` |
 | **ការសរសេរដែលព្យួរ ខាងក្រោយ helper** | ⛔ សោសម្អាតត្រូវដោះ · ការសរសេរយឺតត្រូវបញ្ចប់ការងារ · អ្នកប្រើត្រូវឃើញសារ | `write-stall-guard-test` |
 | **សោការងារ ↔ ការសរសេរធុងសំរាមដែលព្យួរ** | ⛔ ច្បាប់ជួរខាងលើអនុវត្តលើសោដែលឈរខាងក្រោយការសរសេរ **គ្មានពិដាន** ដែរ ៖ លំដាប់ «transaction ចុះលឿន ➜ បណ្តាញដាច់ ➜ `fb.update` ព្យួរ» ធ្វើឲ្យ `finally` **មិនរត់** ➜ សោជាប់អស់កល្ប ➜ ⛔ ច្បាប់ **២ ម៉ោង/៧ ថ្ងៃ** ងាប់លើកញ្ចប់នោះ (**លុយមិនត្រូវដក**) និងរបៀបស្កេនដកងាប់។ ⛔ ការកែជា `settleLockWithin()` លើ **សោ** — **មិនមែន** `dbOp()` លើការសរសេរ (នោះនឹងបញ្ច្រាសលុយខុសពេលការសរសេរចុះយឺត) | `stall-lock-release-test` |
+| **ការកំណត់ Locker ↔ claim** | ⛔ `assignLockerToEntry()` ត្រូវមាន gate `clearClaim` **ដូចផ្លូវសរសេរដទៃទាំង ១០** — Firebase rules មិនទប់វាទេ (fence អនុញ្ញាតរាល់ការសរសេរដែល `newData.exists()`; វាការពារត្រឹមតែ **ការលុប**)។ បើគ្មាន ➜ «លុបទាំងអស់» សរសេរ trash ពី snapshot **មុន** Locker ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ **✅**។ ⛔ **កុំបន្ថែម gate សម្រាប់ restore markers** — វាស់រួច ៖ ផ្លូវស្តារ **មិនបាត់** Locker (`applyClaimedRestoreToHistory` merge លើ `currentItem` · `finalizeClaimedRestore` សរសេរតែ field-level) | `locker-claim-guard-test` |
 | **ZTO ៖ ថវិកា ↔ ពិដាន Netlify** | ⛔ ថវិកាលំនាំដើមត្រូវសមក្នុង **១០ វិ.** បើមិនដូច្នេះ Function ត្រូវសម្លាប់មុនឆ្លើយ | `zto-budget-test` |
 | **ZTO ៖ cache ↔ ការបន្តអាយុ Cookie** | ⛔ កូនសោ cache មិនផ្ទុក Cookie; cache hit មិនប៉ះ Blobs | `zto-budget-test` |
 | **ZTO ៖ សាលក្រម «រកមិនឃើញ»** | ⛔ ត្រូវចូល cache (TTL ខ្លី); ការបរាជ័យបណ្តោះអាសន្ន **មិនត្រូវ** | `zto-negative-cache-test` |
@@ -482,6 +483,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | config Netlify ៖ root file ដែលបង្វែរ build · CSP ឃ្លាតពីតម្រូវការ App · config ដែលគ្មាន checker អាន | `netlify-config-scope-test.js` |
 | ឧបករណ៍ Backup ៖ `.partial` ➜ `rename()` · lock · retry · គ្មាន credential ក្នុង output · ⛔ **artifact ត្រូវអ៊ិនគ្រីប ហើយ plaintext ត្រូវលុប *មុន* upload** | `firebase-backup-test.js` |
 | **សោការងារជាប់អស់កល្ប** ក្រោមការសរសេរធុងសំរាមដែលព្យួរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) · របៀបស្កេនដកងាប់ | `stall-lock-release-test.js` |
+| **ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់»** ➜ ការងារអ្នកប្រើបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ ជោគជ័យ | `locker-claim-guard-test.js` |
 | comment និង trailing whitespace ក្នុងកូដ ship | `comments.js` (សម្អាតដោយ `strip-comments.js`; `trimws.js` ជា helper) |
 
 ឧបករណ៍ខ្លះមាន allowlist (`ACCEPTED` / `EXPECTED_DIVERGENT` / `IGNORE`) ដែល **រាល់ធាតុមានហេតុផល

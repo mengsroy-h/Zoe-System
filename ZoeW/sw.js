@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoew-v180';
+const CACHE_VERSION = 'zoew-v181';
 
 const CORE_SHELL = [
     './',
@@ -152,8 +152,8 @@ function timedFetch(request, options) {
     });
 }
 
-function networkOnly(request) {
-    return timedFetch(request).then((response) => response || Response.error(), () => Response.error());
+function networkOnly(request, options) {
+    return timedFetch(request, options).then((response) => response || Response.error(), () => Response.error());
 }
 
 self.addEventListener('fetch', (event) => {
@@ -170,6 +170,8 @@ self.addEventListener('fetch', (event) => {
 
     const cacheKey = cacheKeyFor(request);
     const isShell = typeof cacheKey === 'string';
+    const networkTarget = request.mode === 'navigate' ? cacheKey : request;
+    const networkOptions = request.mode === 'navigate' ? { signal: request.signal } : undefined;
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>
@@ -180,7 +182,7 @@ self.addEventListener('fetch', (event) => {
                     return cached;
                 }
 
-                const networkFetch = timedFetch(request)
+                const networkFetch = timedFetch(networkTarget, networkOptions)
                     .then((response) => {
                         if (isShell && response && response.ok && !response.redirected) cache.put(cacheKey, response.clone()).catch(() => {});
                         return response;
@@ -199,7 +201,7 @@ self.addEventListener('fetch', (event) => {
                     networkFetch.then((response) => response || cached),
                     new Promise((resolve) => setTimeout(() => resolve(cached), 3000))
                 ]);
-            }, () => networkOnly(request))
-        ).catch(() => networkOnly(request))
+            }, () => networkOnly(networkTarget, networkOptions))
+        ).catch(() => networkOnly(networkTarget, networkOptions))
     );
 });

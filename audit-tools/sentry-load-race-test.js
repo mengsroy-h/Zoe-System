@@ -88,10 +88,35 @@ async function makePage(browser, origin, sdkDelayMs) {
         return r.abort();
     });
     await page.addInitScript(SHRINK_TIMERS);
+    await page.addInitScript(() => {
+        window.__sentrySdkLoaded = false;
+        document.addEventListener('load', (event) => {
+            const script = event.target;
+            if (script && script.tagName === 'SCRIPT' && script.src.indexOf('sentry-cdn.com') !== -1) {
+                setTimeout(() => { window.__sentrySdkLoaded = true; }, 0);
+            }
+        }, true);
+    });
     await page.addInitScript(`window.localStorage.setItem('zoe_sentry_dsn', 'https://k@o0.ingest.sentry.io/1');`);
     await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
     await page.addScriptTag({ url: '/error-reporting.js' });
     return { ctx, page };
+}
+
+async function waitForSdkLoad(page) {
+    // ព្រឹត្តិការណ៍ load បញ្ជាក់តែការមកដល់ SDK។ កុំរង់ចាំ sent/init ដែល
+    // ជាលទ្ធផលដែល assertion ខាងក្រោមត្រូវវាស់ដោយឯករាជ្យ។
+    try {
+        await page.waitForFunction(() => window.__sentrySdkLoaded === true, null, { timeout: 5000 });
+    } catch (e) {
+        ok('SDK មិនមានព្រឹត្តិការណ៍ load ក្នុងពិដាន ៥ វិនាទី', false);
+    }
+}
+
+async function readSentryLog(page) {
+    // SDK មិនមកដល់ក្នុងពិដាន ➜ assertion ក្រហមដែលមានឈ្មោះ; មិនបោះ
+    // TypeError ដោយអាន __log ដែលមិនទាន់មាន រួចលេបសេណារីយ៉ូក្រោយ។
+    return page.evaluate(() => window.__log || { init: [], sent: [], scopes: [], closed: 0, unbound: 0 });
 }
 
 (async () => {
@@ -102,14 +127,12 @@ async function makePage(browser, origin, sdkDelayMs) {
     // ១ — CDN យឺតលើសបង្អួច timeout រួចមកដល់ក្រោយមក
     {
         const { ctx, page } = await makePage(browser, origin, 700);
-        const out = await page.evaluate(async () => {
-            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
-            const started = await window.ZoeErrors.init('zoew');
-            await wait(1500);
+        const started = await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        await waitForSdkLoad(page);
+        await page.evaluate(() => {
             window.ZoeErrors.capture(new Error('after-late-load'));
-            await wait(150);
-            return { started, log: window.__log, hasSentry: typeof window.Sentry };
         });
+        const out = { started, log: await readSentryLog(page) };
         ok('CDN យឺត ➜ init() រាយការណ៍ការបរាជ័យដោយស្មោះ', out.started === false, out);
         ok('SDK មកដល់យឺត ➜ init ត្រូវបញ្ចប់ (មិនទុក SDK ដែលមិនទាន់ init)',
             out.log.init.length === 1, out.log);
@@ -121,15 +144,14 @@ async function makePage(browser, origin, sdkDelayMs) {
     // ២ — error ក្នុងបង្អួច boot មុន SDK មកដល់
     {
         const { ctx, page } = await makePage(browser, origin, 300);
-        const out = await page.evaluate(async () => {
-            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+        await page.evaluate(async () => {
             window.ZoeErrors.capture(new Error('boot-error'));
             const started = window.ZoeErrors.init('zoew');
             window.ZoeErrors.capture(new Error('boot-error-2'));
             await started;
-            await wait(200);
-            return { log: window.__log };
         });
+        await waitForSdkLoad(page);
+        const out = { log: await readSentryLog(page) };
         ok('error មុន SDK មកដល់ ➜ ត្រូវទុកជួរ រួចផ្ញើពេលរួចរាល់',
             out.log.sent.indexOf('boot-error') !== -1 && out.log.sent.indexOf('boot-error-2') !== -1, out.log);
         await ctx.close();
@@ -142,20 +164,15 @@ async function makePage(browser, origin, sdkDelayMs) {
     //    គ្មាននរណាមើល។
     {
         const { ctx, page } = await makePage(browser, origin, 300);
-        const out = await page.evaluate(async () => {
-            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+        await page.evaluate(async () => {
             await window.ZoeErrors.init('zoew');
             window.ZoeErrors.capture(new Error('money-err'), { zone: 'money', context: 'x' });
             window.ZoeErrors.capture(new Error('plain-err'), { context: 'x' });
             window.ZoeErrors.capture(new Error('bad-zone'), { zone: 'NOT A TAG!', context: 'x' });
             window.ZoeErrors.capture(new Error('no-extra'));
-            const deadline = Date.now() + 2000;
-            while (Date.now() < deadline
-                && (!window.__log || !Array.isArray(window.__log.sent) || window.__log.sent.length < 4)) {
-                await wait(25);
-            }
-            return window.__log || { init: [], sent: [], scopes: [], closed: 0, unbound: 0 };
         });
+        await waitForSdkLoad(page);
+        const out = await readSentryLog(page);
         const scopes = Array.isArray(out.scopes) ? out.scopes : [];
         const find = (m) => scopes.filter((x) => x.msg === m)[0];
         ok('`zone` ក្លាយជា tag ពិតដែលទៅដល់ Sentry (alert rule ស្វែងរកបាន)',
@@ -175,18 +192,15 @@ async function makePage(browser, origin, sdkDelayMs) {
     // ៣ — លុប DSN ➜ ត្រូវផ្តាច់ client ពិត
     {
         const { ctx, page } = await makePage(browser, origin, 0);
-        const out = await page.evaluate(async () => {
-            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
-            await window.ZoeErrors.init('zoew');
-            await wait(50);
+        await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        await waitForSdkLoad(page);
+        await page.evaluate(async () => {
             window.ZoeErrors.capture(new Error('before-clear'));
             window.ZoeErrors.setDsn('');
             await window.ZoeErrors.init('zoew');
-            await wait(50);
             window.ZoeErrors.capture(new Error('after-clear'));
-            await wait(50);
-            return { log: window.__log };
         });
+        const out = { log: await readSentryLog(page) };
         ok('មុនលុប DSN ➜ event ទៅដល់ធម្មតា', out.log.sent.indexOf('before-clear') !== -1, out.log);
         ok('លុប DSN ➜ client ត្រូវផ្តាច់ពិត (close ឬ bindClient(undefined))',
             (out.log.closed + out.log.unbound) >= 1, out.log);
@@ -197,15 +211,14 @@ async function makePage(browser, origin, sdkDelayMs) {
     // ៤ — init ២ ដងស្របគ្នា (boot + saveFirebaseConfig) ➜ DSN ចុងក្រោយត្រូវឈ្នះ
     {
         const { ctx, page } = await makePage(browser, origin, 60);
-        const out = await page.evaluate(async () => {
-            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+        await page.evaluate(async () => {
             const first = window.ZoeErrors.init('zoew');
             window.ZoeErrors.setDsn('https://new@o0.ingest.sentry.io/2');
             const second = window.ZoeErrors.init('zoew');
             await Promise.all([first, second]);
-            await wait(150);
-            return { log: window.__log };
         });
+        await waitForSdkLoad(page);
+        const out = { log: await readSentryLog(page) };
         const last = out.log.init[out.log.init.length - 1] || '';
         ok('init ស្របគ្នា ➜ DSN ចុងក្រោយឈ្នះ (init ចាស់មិនសរសេរជាន់)',
             last.indexOf('new@') !== -1, out.log);

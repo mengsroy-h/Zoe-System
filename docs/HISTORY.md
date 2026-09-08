@@ -69,6 +69,50 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeW 2.31.1 / ZoeKeyGen 2.19.21] — 2026-09-08 · លុយ · Restore · បណ្តាញ · Secret · ZTO
+
+**App ទាំង ២ ប្រែ**៖ ZoeW `zoew-v181` និង ZoeKeyGen `zoekeygen-v91`។
+Apps Script នាំចូលឡើង `SCRIPT_VERSION = 2`។
+
+- តម្លៃ COD/DOD ពេលបញ្ចូល និងកែ Barcode រក្សាត្រឹមសេន ដើម្បីឲ្យតម្លៃកញ្ចប់
+  និងការដកពី ledger ប្រើមូលដ្ឋានដូចគ្នា។ ការកែតម្លៃចាស់គណនាផលខុសគ្នាពី
+  សេនរបស់តម្លៃចាស់/ថ្មីទាំង local និង server ដើម្បីទប់ការបូកលុយពីការបង្គត់។
+  ទិន្នន័យចាស់ដែលមានខ្ទង់លើសសេន ក៏បង្គត់តម្លៃវិជ្ជមានមុនដក/សម្អាត
+  និងរក្សាតម្លៃនោះក្នុង trash សម្រាប់ស្តារត្រឡប់ស្មើគ្នា។
+- ការលុប ដក និងកែតម្លៃរង់ចាំ Restore ដែលកំពុងបញ្ចប់។ Business rules ទប់
+  ការដោះ marker ចាស់ដែលប្រណាំងនឹង claim រស់ ដោយយោងម៉ោង server និង witness។
+- Barcode ដែលស្តារបើកវិញទទួលត្រា `restoredAt` ដើម្បីចាប់អាយុ ៧ ថ្ងៃថ្មី
+  ទោះ merge ចូលជួរចាស់។ Siblings រក្សាអាយុដើម ហើយ retry/reload ត្រូវរក្សា
+  Barcode តែមួយ ដោយរក្សា prepared target តាម claim របស់ server ទោះ token
+  ត្រូវប្តូរពេល reload ឬទទួលបន្ត claim ដែលផុតកំណត់។
+- Registry រង់ចាំ snapshot ថ្មីអនុវត្តរួច មុនដោះកូនសោ; ការភ្ជាប់ឡើងវិញ
+  លែងលុបកូនសោរបស់ Barcode ដែលទើបត្រឡប់មកវិញ។
+- Service Worker ទាំង ២ ប្រើសំបក `index.html` ត្រឹមត្រូវ ពេល cache បាត់ ឬ
+  Cache API បដិសេធ ហើយបញ្ជូន abort បន្ត។
+- License ទប់សាលក្រមចាស់ពីការលុប/សរសេរជាន់ Activation ថ្មី និងរួមការពិនិត្យ
+  ស្របគ្នា។ Sentry លាក់ credential ដែលធ្លាប់រអិលកាត់ក្នុង JSON, Cookie,
+  Bearer/Basic, parameter ដែល encode និងវត្ថុ frozen មាន cycle។
+- Cookie helper កំណត់ពេលដល់អាន HTTP body ចប់ និងបដិសេធ body លើស 1 MB;
+  ZTO lookup រួមសំណើស្ទួនពេល Cookie ប្តូរ។ Import replace សរសេរថ្មីជោគជ័យ
+  មុនសម្អាតជួរចាស់លើស ដើម្បីរក្សាទិន្នន័យពេល write/resize បដិសេធ។
+
+**ច្បាប់អាជីវកម្ម**៖ Delete មិនប៉ះលុយ; Restore របស់ Delete មិនបូកស្ទួន។
+Remove/expired ដកតាម `isDeducted`; Restore បូកត្រឡប់ម្តងគត់។ Pickup ២ ម៉ោង,
+abandon **លើស** ៧ ថ្ងៃ, expired trash ២ ថ្ងៃ និង trash ផ្សេង ៣០ ថ្ងៃ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+1. **Business Firebase Project**៖ ចម្លង `firebase-database.rules.json` ទៅ
+   Realtime Database ➜ Rules ➜ **Publish**។ Netlify មិន publish rules ឲ្យទេ។
+2. ក្រោយ deploy App ទាំង ២ ត្រូវ reload ឧបករណ៍ដែលកំពុងបើកឲ្យទទួលកំណែថ្មី
+   ជាពិសេសមុនសាក Restore ស្របគ្នា។ Client ចាស់មិនមាន guard ថ្មីទាំងអស់ទេ។
+3. ជំនួស `zto-import/Code.gs` ក្នុង Apps Script រួច Deploy ជាកំណែថ្មី
+   (`SCRIPT_VERSION = 2`)។
+4. Update `tools/zto-cookie-sync-windows/sync-zto-cookie.js` លើ Windows
+   រួចសាក `sync-zto-cookie.cmd --check` និងការស្កេន ZTO ពិត។
+
+ភស្តុតាងមុន/ក្រោយ និងព្រំដែននៃ CI កត់នៅផ្នែក ២ ខាងក្រោម។
+
 ### [ZoeW 2.31.0 / ZoeKeyGen 2.19.20] — 2026-09-08 · 🗑️ ស្កេនដកកញ្ចប់ · 🔔 Toast និយាយតាម commit ពិត
 
 **App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v179` ➜ `zoew-v180`, `2.30.10` ➜
@@ -5283,6 +5327,134 @@ CSP ក៏មិនប្រែដែរ។
 > 2.19.1 · 2.19.3។ **ការសរសេរវាលើកទី ១៣ មិនបានទប់ការកើតឡើងលើកទី ១៤ ទេ។**
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
+
+### 2.31.1 / 2.19.21 — 2026-09-08 · Deep Audit លើកូដពិត និងការប្រណាំងពិត
+
+**Baseline**៖ `f63f39e591de1670c9bb2d8af0befd6ccf26188d`។ Snapshot ឯកសារ
+ទាំងអស់ត្រូវបានផ្ទៀងផ្ទាត់ Git blob SHA ទល់ tree របស់ commit នេះ។ Suite ចាស់
+រត់ពី snapshot ដាច់ដោយឡែកបាន **147 PASS / 0 FAIL / 0 PARTIAL / 0 SKIP**;
+strict money guardian **22 PASS**, mutation **10/10** ត្រូវចាប់បាន។
+Fuzz បន្ថែម seed **100–113**, **14 × 50 ប្រតិបត្តិការ** ក៏ឆ្លង។ ដូច្នេះ
+«បៃតង» របស់ suite ចាស់មិនបានបញ្ជាក់ថាករណីខាងក្រោមត្រឹមត្រូវទេ។
+
+| ករណី និងការវាស់ | មុនកែ | ក្រោយកែ |
+|---|---|---|
+| Restore, Delete/Remove/Price កំពុង prepare, cached source/history, lease renewal, late write, retry/reload និង cleanup (`emu/restore-mutation-emu-test`) | checker ថ្មីលើ baseline៖ 81 PASS / **70 FAIL** | **157 PASS** លើ RTDB និង rules ពិត |
+| Registry release ពេល snapshot មកដល់ (`registry-release-test`) | **2 FAIL**៖ កូនសោដែលមានម្ចាស់ត្រូវបានដោះ | **57 PASS** |
+| Listener pending/stale source (`listener-pending-key-test`) | **2 FAIL** / 15 PASS | **17 PASS**; ប្រភពបាត់ពិតនៅអាចសម្អាតបាន |
+| Navigation ពេល cache បាត់ ឬ Cache API បដិសេធ | VM **15 FAIL**; Chromium **2 FAIL** | `sw-cache-failure` **44 PASS**, `sw-cache-key` **27 PASS** |
+| Secret redaction លើ credential សាកល្បង (`secret-hygiene`) | **14 FAIL** / 117 PASS | **131 PASS** |
+| License record ផ្លាស់ពេល signature/REST កំពុងរត់ (`license-record-race-test`) | **36 FAIL** / 42 PASS | **78 PASS**, ECDSA ពិត និង context ពីរចែក storage |
+| Cookie HTTP body និង ZTO auth retry (`zto-network-boundaries-test`) | **8 FAIL** / 3 PASS | **11 PASS**; Cookie ថ្មី + Barcode ដូចគ្នា upstream 2 ➜ 1 |
+| Import replace ពេល grid/write បដិសេធ (`zto-import/test.js`) | **6 FAIL** / 63 PASS | **69 PASS**; ទិន្នន័យចាស់នៅសល់ពេលសរសេរបរាជ័យ |
+
+**លុយកន្លះសេន**៖ Chromium ប្រើ form និងសកម្មភាពពិតបានបញ្ជាក់ថា input
+`0.005` រក្សាជា raw ខណៈ ledger រាប់ `0.01`; Remove អាចទុកសំណល់។ ក្រោយ
+បង្គត់ input បាន review ឆ្លងគ្នារកឃើញ regression មួយក្នុងកូដកំពុងកែ៖
+កែ legacy `0.005` ដដែលអាចបូក ledger ពី `0.01` ទៅ `0.02`។ ការដកសេនចាស់
+ពីសេនថ្មីទាំង local/server កែវាបាន (`price-edit-abort`៖ intermediate
+**9 FAIL** ➜ **39 PASS**)។ បន្ទាប់មកបានសាក raw legacy data ដោយមិនឆ្លង
+form៖ Remove **6 FAIL**, whole abandon **6 FAIL**, partial abandon **2 FAIL**
+មុនកែតាមផ្លូវនីមួយៗ។ `item-money-integrity` ចុងក្រោយ **38 PASS** រួម
+ledger ថ្ងៃ/ខែ, trash, Restore និង siblings។ ទិន្នន័យដើមសម្រាប់ rollback
+រក្សាដដែល។ ចំនួន FAIL ទាំងនេះជាការអះអាងបរាជ័យ មិនមែនចំនួន bug ផ្សេងៗគ្នាទេ។
+
+**មូលហេតុសំខាន់ៗ**៖
+
+- Snapshot ត្រូវអនុវត្តមុនប្រកាស listener ស្រស់។ `fb.get()` មិនផ្តល់
+  atomic proof ដល់ transaction ក្រោយទេ; server rule ត្រូវទប់ marker
+  removal/change ពេល matching claim នៅរស់។ Atomic finalize មាន witness
+  ត្រឹមត្រូវត្រូវនៅអនុញ្ញាត។
+- Restore ទៅ parent ចាស់ធ្លាប់លោតចូល expired វិញភ្លាម។ ការសាកល្បងដំបូង
+ ដែលប្តូរ target បង្ក barcode ស្ទួនពេល retry; វាត្រូវបានដកចេញមុនបញ្ចប់។
+  ការកែចុងក្រោយរក្សា prepared target តាម claim ដែល transaction ទទួល និង
+  បន្ថែម `barcode.restoredAt` សម្រាប់ open restored barcode ប៉ុណ្ណោះ។
+  សាកពិត៖ sibling ចាស់ផុតកំណត់, Barcode ទើបស្តារនៅ OPEN, ៧ថ្ងៃគត់នៅសល់
+  ហើយ ៧ថ្ងៃ + ១ms ផុតកំណត់។
+- Cookie helper ត្រូវកំណត់ពេលរហូតអាន body ចប់ និងកំណត់ទំហំខណៈ stream;
+  HTTP 401/403 ដែលដឹងហើយនៅជាសាលក្រមស្ថាពរ ទោះ cancel ព្យួរ។
+
+**CI ក្នុងបរិស្ថាននេះ** ប្រើ Node **24.19.0**, Java **17**, Chromium **149**
+និង RTDB emulator **4.11.2**។ Workflow ប្រើ Node 22; កំណែ 22 មិនមានក្នុង
+runtime/cache ហើយ Node 24 ស្ថិតក្នុង engines ដែល project អនុញ្ញាត។ បញ្ជា៖
+
+```bash
+CRUD_FLOW_STRICT=1 CRUD_FLOW_MIN_ASSERTS=57 VERSIONSCOPE_STRICT=1 bash audit-tools/run-all.sh
+MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
+FUZZ_RUN0=100 FUZZ_RUNS=14 FUZZ_OPS=50 node audit-tools/revenue-fuzz-test.js
+```
+
+Attempt ដំបូងចាប់បាន extractor ចាស់ ២ (`policy-test`, `listener-pending-key`)
+និង helper លែងប្រើ ១ (`clearRestoreHistoryMarker`)។ បានកែ extractor ឲ្យ
+រត់កូដពិតដដែល រក្សា inverse assertion នៃការដោះ marker ដែលងាប់ ហើយដក
+helper គ្មាន caller ចេញ។ Log នៃ attempt នោះរក្សាទុកជាមួយការរត់ចុងក្រោយ។
+
+Attempt ទី ២ បង្ហាញចន្លោះសំខាន់ក្នុង oracle របស់ `emu/crud-rules-flow`៖
+វាធ្លាប់ **រំពឹងថា Remove ជោគជ័យ ទោះ Restore កំពុងដំណើរការ**។ ការរំពឹងនោះ
+ផ្ទុយនឹងការការពារលុយដែលតេស្តប្រណាំងពិតបានបញ្ជាក់។ ការកែ checker ត្រូវ
+អះអាងថា active claim រក្សាកញ្ចប់/marker/trash ដើម; orphan marker ត្រូវឆ្លង
+ការសម្អាត async ពិត មុន retry សកម្មភាព។ ការស្រង់ payload មិនត្រូវបោះចោល
+write ដែល rules បដិសេធ ឬបន្ថយការអះអាង Delete/Remove/closedAt ដើម្បីបៃតងទេ។
+ក្រោយកែ oracle និងលំដាប់ lifecycle៖ **57 PASS** លើ emulator ពិត ហើយ
+`CRUD_FLOW_MIN_ASSERTS` ឡើងពី 43 ទៅ **57** ដើម្បីរក្សាកម្រិតការពារនេះក្នុង CI។
+
+Attempt ទី ៣ រត់ចប់បាន **147 PASS / 3 FAIL / 0 PARTIAL / 0 SKIP**;
+strict money guardian **22 PASS**, mutation **10/10**, fuzz seed 100–113
+**2/2 gates PASS**។ បានរក្សា logs និង hash manifests ទាំងអស់។ ករណី FAIL៖
+
+- `sentry-load-race` រង់ចាំ 200ms ថេរក្រោយ init timeout រួចអាន `sent`
+  មុន fake SDK execute។ កំណត់ CDN delay 600ms បង្ក TypeError ដូចគ្នាលើកូដ
+  App ដដែល។ Checker កែរង់ចាំ script load ក្នុងពិដាន 5s ឯករាជ្យពី event
+  ដែលត្រូវវាស់៖ ធម្មតា/600ms **14 PASS** ទាំងពីរ; បិទ queue ➜ **6 FAIL**;
+  បដិសេធ CDN load ➜ deadline FAIL ជាក់លាក់ និង behavior FAIL។
+- `db-stall-guard` ខ្វះ `recalcItemMoneyFromBarcodes` ក្នុង sandbox។ ការអាន
+  raw log ក៏ឃើញ `armLateCommit` បាត់ដែលមិនធ្លាប់ធ្វើឲ្យ assertion ក្រហម។
+  បានផ្ទុក helper ពិតដែលផ្លូវនេះប្រើ រួម notify/reconcile, seed ledger មាន
+  ប្រាក់ដើម និងវាស់ទាំង balance/trash/កំហុសដែលត្រូវចាប់៖ **31 PASS**។
+- `write-stall-guard` រំពឹង transaction ចាប់ផ្តើម ទោះ source GET ព្យួរ។
+  Checker ថ្មីបែងចែក GET ព្យួរ និង GET ជោគជ័យ/transaction ព្យួរ ហើយវាស់
+  lock timeout និង retry ទាំងពីរ។ Sentry recorder ត្រូវភ្ជាប់ពិត ដើម្បីឲ្យ
+  assertion «មិនផ្ញើពេល timeout» មានន័យ និងមាន rejection ជាទិសផ្ទុយ៖
+  **40 PASS** ក្រោយកែ ទល់នឹង **28 PASS / 1 FAIL** មុនកែ។
+
+`run-all.sh` ធ្លាប់បង្ហាញតែ 12 បន្ទាត់ចុងក្រោយនៃ failure ដែលលាក់ assertion
+ដំបូងរបស់ stall checks។ ឥឡូវ failure/timeout បង្ហាញ stdout ពេញ។ បានសាក
+ករណី exit 1 និងការព្យួរ៖ ទាំងពីររាប់ FAIL ហើយរក្សា root-cause បន្ទាត់ដើម។
+កូដ App មិនបានប្រែក្រោយ attempt ទី ៣; ការកែខាងលើជាការវាស់ និង diagnostic។
+
+**ការរត់ CI ពេញចុងក្រោយ (attempt ទី ៤)**៖ **150/150 ក្រុម PASS,
+0 FAIL, 0 PARTIAL, 0 SKIP**។ Sentry **14**, DB stall **31** និង write stall
+**40** បាន PASS ក្នុង invocation ពេញនេះ។ Strict money guardian ដាច់ដោយឡែក
+**22 PASS** ហើយចាប់ mutations លុយ **10/10** ពិត។
+Fuzz បន្ថែម seed **100–113** បាន **2/2 gates PASS**៖ **14 × 50 = 700
+ប្រតិបត្តិការ** រួមការចាក់សកម្មភាពដកពីឧបករណ៍ផ្សេងក្នុង 14 លំដាប់។
+Runner ចេញ **exit 0**; manifest មុន/ក្រោយមាន **222 ឯកសារ** ហើយ
+**source/test/config គ្មានការប្រែ**; HEAD និង base ក៏ដូចគ្នា។ មានតែ
+`docs/HISTORY.md` ប្រែអំឡុងការរត់ ដើម្បីកត់លទ្ធផលពិត។
+
+**ព្រំដែនភស្តុតាង**៖ Browser/HTTP/RTDB ពិតក្នុងបរិស្ថានសាកល្បង; Apps Script
+ប្រើ simulation នៃ grid/write failure។ មិនបានសាកឧបករណ៍ iOS/Android/Windows
+ពិត, Windows DPAPI, live ZTO Cookie ឬ Apps Script ផលិតកម្ម។ មិនបានកែ ឬ
+ផ្សះផ្សា ledger ផលិតកម្ម និងមិនបានស្កេន secret ក្នុងប្រវត្តិ Git ទាំងមូល។
+Suite និង function-surface checks មិនមែនជា runtime branch coverage ១០០%
+នៃគ្រប់ function ឬការធានាថាគ្រប់ឧបករណ៍គ្មាន bug ទេ។
+`npm audit` របស់ ZoeW/Windows helper មិនបានចប់ ព្រោះការអនុញ្ញាតបណ្តាញត្រូវ
+បានបោះបង់; មិនអាចអះអាងថា dependency ទាំងអស់គ្មាន vulnerability ទេ។
+
+បានពិនិត្យកំណែ SheetJS 0.20.3 ទល់ advisory របស់ម្ចាស់សម្រាប់
+[CVE-2024-22363](https://cdn.sheetjs.com/advisories/CVE-2024-22363) និង
+[CVE-2023-30533](https://cdn.sheetjs.com/advisories/CVE-2023-30533) និង
+Playwright 1.62.1 ទល់ [GHSA-7mvr-c777-76hp](https://github.com/advisories/GHSA-7mvr-c777-76hp)។
+ការពិនិត្យនេះមិនជំនួស registry audit ពេញទេ។ XSS/CSP Chromium checks
+**XSS 22 PASS និង CSP 33 PASS** និង security boundary RTDB checks **26 PASS**
+ត្រូវបានរត់ពិត។
+
+**សម្រាប់ការដាក់ប្រើ**៖ Publish Business rules ទទួល field `restoredAt`
+និង marker fence ហើយ reload clients ទាំងអស់។ Fence នេះមិនរារាំង
+marker-preserving edits របស់ client ចាស់ទាំងអស់ទេ។ Business authenticated
+users នៅមានសិទ្ធិដូចគ្នាតាមគោលការណ៍ដើម; ការធានា aggregate ledger ទល់នឹង
+client ដែលកែដោយចេតនានៅតែត្រូវការ backend ដែលទុកចិត្ត។ ជំហាន manual ពេញលេញ
+នៅផ្នែក ១ នៃកំណែនេះ។
 
 ### 2.31.0 / 2.19.20 — 2026-09-08 · 🔴 Toast success មុន durable commit
 

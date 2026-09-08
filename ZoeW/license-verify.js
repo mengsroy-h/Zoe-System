@@ -290,17 +290,37 @@
     }
 
 
-    async function getStatus(appCode) {
+    const statusInFlight = new Map();
+
+    function getStatus(appCode) {
         const record = loadLocalRecord(appCode);
+        const requestKey = appCode + ':' + JSON.stringify(record);
+        const existing = statusInFlight.get(requestKey);
+        if (existing) return existing;
+        const pending = checkLocalStatus(appCode, record, 0);
+        statusInFlight.set(requestKey, pending);
+        const release = () => { statusInFlight.delete(requestKey); };
+        pending.then(release, release);
+        return pending;
+    }
+
+    async function checkLocalStatus(appCode, record, retryCount) {
         if (!record) return { state: 'required' };
+        const recordSnapshot = JSON.stringify(record);
+        const maxRechecks = 2;
+        const recheck = () => (retryCount || 0) < maxRechecks
+            ? checkLocalStatus(appCode, loadLocalRecord(appCode), (retryCount || 0) + 1)
+            : { state: 'required', reason: 'verify-unavailable' };
 
         const sigCheck = await verifySignatureAndScope(record.keyString, appCode);
+        if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (!sigCheck.valid && !sigCheck.unverified) {
             clearLocalRecord(appCode);
             return { state: 'required', reason: sigCheck.reason };
         }
 
         const online = await checkOnline(appCode, record.id);
+        if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (online.ok === false) {
             clearLocalRecord(appCode);
             return { state: 'required', reason: online.reason };

@@ -357,6 +357,45 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
         }
     }
 
+    // រត់ callback ដែល attach ពិត៖ ស្ថានភាព fresh ត្រូវស្របនឹង snapshot ក្នុងសតិ។
+    for (const finalPath of ['history', 'deleted']) {
+        for (const hasOwner of [true, false]) {
+            const ctx = makeCtx(() => Promise.resolve());
+            const callbacks = new Map();
+            Object.assign(ctx, {
+                dbRefHistory: { path: 'history' }, dbRefDeleted: { path: 'deleted' },
+                dbRefDailyRevenue: null, dbRefMonthlyRevenue: null, dbRefDailyPickup: null, dbRefExchangeRate: null,
+                DB_LISTENER_KEYS: ['history', 'deleted'], dbListenerGeneration: 0,
+                dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(),
+                dbListenerProgressAt: 0, dbListenerPendingSeen: 0, dbListenersFailed: false,
+                refreshLiveToasts() {}, clearDbListenerRecovery() {}, renderConnectionStatus() {}, showToast() {},
+                debouncedRenderAfterHistorySync() {}, runAutomaticDeletedCleanup() {},
+                generateUniqueId: () => 'fixture', parseTimestampFromId: () => 1, getServerNow: () => 1000
+            });
+            ctx.fb.off = () => {};
+            ctx.fb.onValue = (ref, cb) => { callbacks.set(ref.path, cb); };
+            const names = ['initDatabaseListeners', 'detachDatabaseListeners', 'noteDbListenerAlive',
+                'dbListenerViewIsStale', 'rawSnapshotToItemList', 'barcodeEntriesOf', 'normalizeBarcodesOf'];
+            const absent = names.filter((name) => !sliceFn(name));
+            ok('callback ' + finalPath + ' ៖ ផ្ទុក listener និង helper ពិតគ្រប់', absent.length === 0, absent);
+            vm.runInContext(names.map((name) => sliceFn(name) || 'function ' + name + '() {}').join('\n'), ctx);
+            vm.runInContext('initDatabaseListeners()', ctx);
+            ok('callback ' + finalPath + ' ៖ attach history/deleted ពិត', callbacks.size === 2, [...callbacks.keys()]);
+            if (callbacks.size !== 2) continue;
+            callbacks.get(finalPath === 'history' ? 'deleted' : 'history')({ val: () => null });
+            vm.runInContext('queueRegistryReleaseRetry(["ZTO900444"], 1)', ctx);
+            const item = { id: 'new-owner', createdAt: 1, cod: 5, dod: 0, barcodes: [{ code: 'ZTO900444', cod: 5, dod: 0 }] };
+            callbacks.get(finalPath)({ val: () => hasOwner ? JSON.parse(JSON.stringify({ 'new-owner': item })) : null });
+            await tick(20);
+            ok('callback ' + finalPath + ' ៖ snapshot មកដល់ត្រូវបានដាក់ក្នុងសតិពិត',
+                ctx.registryKeyIsOwned('ZTO900444') === hasOwner, { hasOwner, history: ctx.scanHistory, deleted: ctx.deletedItems });
+            ok('callback ' + finalPath + (hasOwner ? ' ៖ ម្ចាស់ថ្មីមកដល់ក្នុង snapshot ចុងក្រោយ មិនត្រូវដោះ registry' : ' ៖ snapshot ទទេអនុញ្ញាតដោះកូនសោកំព្រាម្តង'),
+                ctx.__calls.length === (hasOwner ? 0 : 1), ctx.__calls);
+            ok('callback ' + finalPath + ' ៖ ជួរបញ្ចប់ដោយគ្មានការហៅ flush ដោយដៃ',
+                ctx.pendingRegistryReleases.size === 0, [...ctx.pendingRegistryReleases.keys()]);
+        }
+    }
+
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);
     process.exit(fail ? 1 : 0);
 })().catch((e) => {

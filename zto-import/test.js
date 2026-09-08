@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const root = __dirname;
+const root = process.env.ZTO_IMPORT_APP_DIR ? path.resolve(process.env.ZTO_IMPORT_APP_DIR) : __dirname;
 const sandbox = {
     console,
     Date,
@@ -218,6 +218,87 @@ equal('sanitize drops out of range columns', sanitizeMapping_({ barcode: 0, dod:
     { barcode: 0, dod: -1, cod: 2, phone: 3 });
 equal('sanitize drops non numeric', sanitizeMapping_({ barcode: 'x', dod: 1, cod: 2, phone: 3 }, 4),
     { barcode: -1, dod: 1, cod: 2, phone: 3 });
+
+// រត់ច្រក importRows ពិត ជាមួយ grid មានពិដាន និងការបដិសេធសរសេរ។
+function importFixture(initial, capacity, options) {
+    const settings = options || {};
+    const state = { rows: JSON.parse(JSON.stringify(initial)), capacity, releases: 0, clears: 0 };
+    const sheet = {
+        getName: () => 'Customers',
+        getMaxRows: () => state.capacity,
+        getLastRow: () => {
+            let length = state.rows.length;
+            while (length && state.rows[length - 1].every((value) => value === '')) length--;
+            return length;
+        },
+        insertRowsAfter(at, count) {
+            if (settings.failResize) throw new Error('synthetic-resize-rejected');
+            if (at !== state.capacity) throw new Error('synthetic-invalid-insert');
+            state.capacity += count;
+        },
+        getRange(start, col, count, width) {
+            if (start + count - 1 > state.capacity) throw new Error('synthetic-grid-overflow');
+            return {
+                getValues: () => Array.from({ length: count }, (_, i) =>
+                    (state.rows[start - 1 + i] || ['', '', '', '']).slice(col - 1, col - 1 + width)),
+                setNumberFormat() {},
+                clearContent() {
+                    state.clears++;
+                    for (let i = 0; i < count; i++) state.rows[start - 1 + i] = ['', '', '', ''];
+                },
+                setValues(values) {
+                    if (settings.failWrite) throw new Error('synthetic-write-rejected');
+                    for (let i = 0; i < count; i++) state.rows[start - 1 + i] = Array.from(values[i]);
+                }
+            };
+        }
+    };
+    const context = vm.createContext({
+        PropertiesService: { getScriptProperties: () => ({
+            getProperty: (key) => ({ IMPORT_PASSWORD: 'synthetic-password', SHEET_ID: 'synthetic-sheet' })[key]
+        }) },
+        SpreadsheetApp: { openById: () => ({ getSheetByName: () => sheet }), flush() {} },
+        LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock() { state.releases++; } }) }
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), context);
+    return { state, run: (rows) => context.importRows('synthetic-password', { rows, mode: 'replace' }) };
+}
+
+const originalRows = [['barcode', 'dod', 'cod', 'phone'], ['OLD001', 1, 2, '012345678']];
+const incomingRows = [['NEW001', 1, 3, '012345678'], ['NEW002', 1, 4, '012345679']];
+for (const rows of [[], [['', 0, 0, '']]]) {
+    const fixture = importFixture(originalRows, 5);
+    let rejected = false;
+    try { fixture.run(rows); } catch (_) { rejected = true; }
+    check('replace គ្មាន Barcode ប្រើបាន ➜ បដិសេធ', rejected);
+    equal('replace គ្មាន Barcode ប្រើបាន ➜ ទិន្នន័យដើមនៅដដែល', fixture.state.rows, originalRows);
+    check('replace គ្មាន Barcode ប្រើបាន ➜ មិនលុបជួរ', fixture.state.clears === 0);
+}
+{
+    const fixture = importFixture(originalRows, 2);
+    let result;
+    try { result = fixture.run(incomingRows); } catch (_) {}
+    check('replace ធំជាង grid ➜ ពង្រីកជាមុន ហើយសរសេរពេញលេញ',
+        result && result.rowsAfter === 2 && fixture.state.capacity >= 3);
+    equal('replace ធំជាង grid ➜ ទិន្នន័យត្រូវគ្នាពិត', fixture.state.rows.slice(1), incomingRows);
+    check('replace ធំជាង grid ➜ ដោះសោវិញ', fixture.state.releases === 1);
+}
+for (const failure of ['failWrite', 'failResize']) {
+    const fixture = importFixture(originalRows, failure === 'failWrite' ? 5 : 2, { [failure]: true });
+    let rejected = false;
+    try { fixture.run(incomingRows); } catch (_) { rejected = true; }
+    check('replace ' + failure + ' ➜ ប្រាប់ការបរាជ័យ', rejected);
+    equal('replace ' + failure + ' ➜ ទិន្នន័យដើមមិនបាត់', fixture.state.rows, originalRows);
+    check('replace ' + failure + ' ➜ មិនលុបមុនសរសេរជោគជ័យ', fixture.state.clears === 0);
+    check('replace ' + failure + ' ➜ ដោះសោវិញ', fixture.state.releases === 1);
+}
+{
+    const fixture = importFixture([originalRows[0], ...incomingRows], 5);
+    const result = fixture.run([incomingRows[0]]);
+    check('replace តូចជាងមុន ➜ លុបតែជួរចាស់លើស និងមិនទុកសំណល់',
+        result.rowsAfter === 1 && fixture.state.rows[2].every((value) => value === ''));
+    equal('replace តូចជាងមុន ➜ ក្បាលតារាងនៅដដែល', fixture.state.rows[0], originalRows[0]);
+}
 
 console.log('');
 console.log('zto-import — ' + passed + ' assertions passed, ' + failed + ' failed');

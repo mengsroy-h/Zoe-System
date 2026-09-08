@@ -59,6 +59,7 @@ function build(serverRecord, opts) {
         const NET_TIMEOUT_MS = 10000;
         const NET_MAX_IN_FLIGHT = 2;
         const netInFlight = new Map();
+        const statusInFlight = new Map();
         function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {
@@ -67,7 +68,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'checkOnline', 'syncServerTime', 'activate', 'getStatus']), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
     return { ctx, store, clock };
 }
 

@@ -5,7 +5,7 @@
     const SENTRY_SDK_URL = 'https://browser.sentry-cdn.com/7.120.3/bundle.min.js';
     const SDK_LOAD_TIMEOUT_MS = 10000;
     const MAX_QUEUED_EVENTS = 20;
-    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup)';
+    const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|cookie)';
     const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
 
@@ -52,6 +52,7 @@
 
     function isSecretParamName(name) {
         if (!name) return false;
+        try { name = decodeURIComponent(name); } catch (e) {}
         const split = String(name)
             .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
             .replace(/[.-]/g, '_');
@@ -60,7 +61,7 @@
 
     function redactPairs(text, leadClass, valueClass) {
         return text.replace(
-            new RegExp('(' + leadClass + ')([A-Za-z0-9_.\\-]{1,64})=(' + valueClass + '+)', 'g'),
+            new RegExp('(' + leadClass + ')([A-Za-z0-9_.%\\-]{1,64})=(' + valueClass + '+)', 'g'),
             (whole, lead, name) => (isSecretParamName(name) ? lead + name + '=[redacted]' : whole)
         );
     }
@@ -77,7 +78,21 @@
 
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
-        let out = redactPairs(url, '[?&#]', '[^&#\\s"\'<>]');
+        if (/^\s*[\[{]/.test(url)) {
+            try {
+                const parsed = JSON.parse(url);
+                const before = JSON.stringify(parsed);
+                const after = JSON.stringify(redactDeep(parsed, 0, new Map(), { n: 0 }));
+                if (before !== after) url = after;
+            } catch (e) {}
+        }
+        let out = url
+            .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
+            .replace(/(^|[\s{])((?:set-)?cookie[ \t]*:[ \t]*)[^\r\n]*/gi, '$1$2[redacted]')
+            .replace(/(^|[\s"'([,;{|])(["']?)([A-Za-z0-9_.%\-]{1,64})\2(\s*[:=]\s*)("(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*')/g,
+                (whole, lead, quote, name, sep, value) => isSecretParamName(name)
+                    ? lead + quote + name + quote + sep + value[0] + '[redacted]' + value[0] : whole);
+        out = redactPairs(out, '[?&#]', '[^&#\\s"\'<>]');
         out = redactPairs(out, '^|[\\s"\'([,;{|]', '[^&#\\s"\'<>,;)\\]}|]');
         out = redactColonPairs(out);
         return out
@@ -89,7 +104,7 @@
 
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
         + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
-        + 'credential|authorization|bearer|jwt|setup)';
+        + 'credential|authorization|bearer|jwt|setup|cookie)';
     const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
 
     function isSecretKeyName(name) {
@@ -120,8 +135,8 @@
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
         if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return '[truncated]';
-        if (seen.has(value)) return seen.get(value);
-        seen.set(value, value);
+        if (seen.has(value)) return seen.get(value) || '[circular]';
+        seen.set(value, null);
         budget.n++;
 
         let target = value;
@@ -132,7 +147,6 @@
                     if (target[key] === next) return;
                 } catch (e) {}
                 target = shallowCopy(value);
-                seen.set(value, target);
             }
             try { target[key] = next; } catch (e) {}
         };
@@ -142,6 +156,7 @@
                 if (budget.n >= REDACT_MAX_NODES) { put(i, redactOverBudget(value[i])); continue; }
                 put(i, redactDeep(value[i], depth + 1, seen, budget));
             }
+            seen.set(value, target);
             return target;
         }
         const keys = Object.keys(value);
@@ -156,6 +171,7 @@
                 put(keys[i], redactDeep(value[keys[i]], depth + 1, seen, budget));
             } catch (e) {}
         }
+        seen.set(value, target);
         return target;
     }
 

@@ -340,6 +340,53 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('លាក់៖ ' + label, out.indexOf(secret) === -1, 'got: ' + out);
     });
 
+    // តេស្តទម្រង់ដែលលាក់តែផ្នែកដើម ហើយទុក credential ខាងក្រោយ។
+    // ទាំងអស់ជាទិន្នន័យសាកល្បង; កុំបោះតម្លៃពេញទៅ output ពេលធ្លាក់។
+    const completeSecretCases = [
+        ['Authorization: Bearer opaque_test_credential_123', 'opaque_test_credential_123', 'Bearer ដែលមិនមែន JWT'],
+        ['Authorization: Basic dGVzdDp0ZXN0MTIzNA==', 'dGVzdDp0ZXN0MTIzNA==', 'Basic ក្នុង header'],
+        ['{"password":"first SECOND_TEST_PART","barcode":"SAFE"}', 'SECOND_TEST_PART', 'JSON password មានចន្លោះ'],
+        ["password: 'first SECOND_TEST_PART', barcode: SAFE", 'SECOND_TEST_PART', 'password ប្រើ quote តែមួយ'],
+        ['{"password":"first \\"SECOND_TEST_PART\\" last","barcode":"SAFE"}', 'SECOND_TEST_PART', 'JSON password មាន quote ដែល escape'],
+        ['password="first SECOND_TEST_PART" barcode=SAFE', 'SECOND_TEST_PART', 'password ជាគូស្មើដែលមាន quote'],
+        ['{"credential":["ARRAY_TEST_SECRET"],"barcode":"SAFE"}', 'ARRAY_TEST_SECRET', 'JSON credential ជា array'],
+        ['{"token":{"value":"OBJECT_TEST_SECRET"},"barcode":"SAFE"}', 'OBJECT_TEST_SECRET', 'JSON token ជា object'],
+        ['{"key":"GENERIC_KEY_TEST","barcode":"SAFE"}', 'GENERIC_KEY_TEST', 'JSON key ដែលច្បាប់អត្ថបទធ្លាប់លាក់'],
+        ['{"auth":"AUTH_TEST_VALUE","barcode":"SAFE"}', 'AUTH_TEST_VALUE', 'JSON auth ដែលច្បាប់អត្ថបទធ្លាប់លាក់'],
+        ['https://example.test/?api%5Fkey=ENCODED_TEST_VALUE&barcode=SAFE', 'ENCODED_TEST_VALUE', 'URL parameter ដែល encode ឈ្មោះ'],
+        ['Cookie: BOS-MAN-SESSION=COOKIE_TEST_VALUE; other=SECOND_COOKIE_VALUE\nbarcode: SAFE', 'COOKIE_TEST_VALUE', 'Cookie header ទាំងមូល'],
+        ['Cookie: BOS-MAN-SESSION=COOKIE_TEST_VALUE; other=SECOND_COOKIE_VALUE\nbarcode: SAFE', 'SECOND_COOKIE_VALUE', 'Cookie ទីពីរក្នុង header']
+    ];
+    completeSecretCases.forEach(([input, secret, label]) => {
+        const out = redact(input);
+        ok('លាក់ពេញ៖ ' + label, out.indexOf(secret) === -1);
+        if (input.indexOf('SAFE') !== -1) ok('រក្សា Barcode ក្រោយ៖ ' + label, out.indexOf('SAFE') !== -1);
+    });
+    if (typeof api.redactEvent === 'function') {
+        const out = api.redactEvent({ request: { headers: {
+            Cookie: 'COOKIE_TEST_VALUE', 'Set-Cookie': ['COOKIE_ONE', 'COOKIE_TWO'], 'Content-Type': 'application/json'
+        } } });
+        ok('Cookie ក្នុង object ត្រូវលាក់', out.request.headers.Cookie === '[redacted]');
+        ok('Set-Cookie ក្នុង object ត្រូវលាក់ទាំង array', out.request.headers['Set-Cookie'] === '[redacted]');
+        ok('Content-Type នៅតែរក្សា', out.request.headers['Content-Type'] === 'application/json');
+        const frozenCycle = {};
+        frozenCycle.self = frozenCycle;
+        frozenCycle.barcode = 'SAFE';
+        frozenCycle.password = 'CYCLE_TEST_VALUE';
+        Object.freeze(frozenCycle);
+        const cleanCycle = api.redactEvent({ extra: frozenCycle, again: frozenCycle });
+        const visited = new Set();
+        const includesSecret = (value) => {
+            if (typeof value === 'string') return value.indexOf('CYCLE_TEST_VALUE') !== -1;
+            if (!value || typeof value !== 'object' || visited.has(value)) return false;
+            visited.add(value);
+            return Object.keys(value).some((key) => includesSecret(value[key]));
+        };
+        ok('frozen cycle គ្មាន reference ទៅ secret ដើម', !includesSecret(cleanCycle));
+        ok('frozen cycle រក្សា Barcode និង reference ដែលសម្អាតរួច',
+            cleanCycle.extra.barcode === 'SAFE' && cleanCycle.again.password === '[redacted]');
+    }
+
     // ⛔ ២ ខាង ៖ អ្នកបំបែក `:` **មិនត្រូវលាក់លើស** — ម៉ោង · ID · URL ·
     //    សារ error ត្រូវការសម្រាប់ debug ហើយពួកវាសុទ្ធតែមាន `:`។
     const colonKeep = [

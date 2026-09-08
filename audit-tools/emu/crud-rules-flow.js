@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const http = require('http');
+const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
 
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` បញ្ជាក់បានថា
@@ -53,7 +54,7 @@ let SANDBOX_SOURCE = '';
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
 const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBarcodes', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
-    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
+    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'reconstructPickupSet',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
@@ -63,7 +64,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
 
 // ---- vm ដែលចាប់រាល់ការសរសេរ (មិនអនុវត្ត rules) ----
 function makeSandbox(store, now) {
-    const w = { store, now, writes: [], toasts: [] };
+    const w = { store, now, writes: [], toasts: [], revenueCalls: [] };
     const get = (raw) => { let c = store; for (const p of String(raw || '').split('/').filter(Boolean)) { if (!c || typeof c !== 'object') return null; c = c[p]; } return c === undefined ? null : c; };
     const set = (raw, v) => { const parts = String(raw || '').split('/').filter(Boolean); let c = store; for (let i = 0; i < parts.length - 1; i++) { if (!c[parts[i]] || typeof c[parts[i]] !== 'object') c[parts[i]] = {}; c = c[parts[i]]; } const k = parts[parts.length - 1]; if (v === null) delete c[k]; else c[k] = clone(v); };
     const fb = {
@@ -96,12 +97,15 @@ function makeSandbox(store, now) {
         // ⛔ តេស្តនេះវាស់ **payload ↔ rules** មិនមែនលេខ ledger — តែ stub ត្រូវ
         // រក្សា **រូបរាងពិត** (ត្រឡប់ delta ដែលអនុវត្ត) បើមិនដូច្នេះផ្លូវដកវិញ
         // ក្លាយជា no-op ស្ងាត់ ហើយ `ReferenceError` នឹងលេចតែពេលមានសេណារីយ៉ូថ្មី។
-        addRevenueToDailyAndMonthlyRecord: (d, cod, dod, count) => ({
+        addRevenueToDailyAndMonthlyRecord: (d, cod, dod, count) => {
+            w.revenueCalls.push({ scanDate: d, cod, dod, count });
+            return {
             scanDate: d,
             daily: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
             monthly: { cod: parseFloat(cod) || 0, dod: parseFloat(dod) || 0, count: parseFloat(count) || 0 },
             dailyServer: Promise.resolve(null), monthlyServer: Promise.resolve(null)
-        }),
+            };
+        },
         correctRevenueLedgerToActual: () => Promise.resolve({
             ok: true,
             daily: { cod: 0, dod: 0, count: 0 },
@@ -158,7 +162,7 @@ function makeSandbox(store, now) {
     return w;
 }
 
-const T0 = 1750000000000;
+const T0 = Date.now() - 3600000;
 const bc = (code, cod, closed, closedAt) => Object.assign({ code, cod, dod: 0, locker: 'N/A', time: 't', isClosed: !!closed, isDeducted: false, isFromDeletion: false, createdAt: T0 }, closed && closedAt !== undefined ? { closedAt } : {});
 const parcel = (id, barcodes, extra) => Object.assign({ id, phone: '098798880', scanDate: '2026-08-26', createdAt: T0, time: 't', barcodes, count: barcodes.length, cod: barcodes.reduce((s, b) => s + b.cod, 0), dod: 0, price: barcodes.reduce((s, b) => s + b.cod, 0), barcode: barcodes[0].code, isClosed: barcodes.every((b) => b.isClosed), isCalled: false }, extra || {});
 
@@ -174,6 +178,21 @@ async function replay(label, writes) {
 }
 
 async function seedServer(store) { await asOwner('PUT', '/.json', store); }
+
+async function clearOrphanBeforeRetry(w, label) {
+    const start = w.writes.length;
+    const item = clone(w.store.zoew_scan_history_cod_dod.id_x);
+    w.ctx.clearStaleRestoreMarkers(item);
+    await w.drain();
+    w.sync();
+    const cleared = w.store.zoew_scan_history_cod_dod.id_x;
+    const sweepWrites = w.writes.slice(start);
+    check(sweepWrites.length === 1 && sweepWrites[0].path === 'zoew_scan_history_cod_dod/id_x' &&
+        sweepWrites[0].value && !sweepWrites[0].value.restoreClaimId && !sweepWrites[0].value.restoreClaimToken &&
+        cleared && !cleared.restoreClaimId && !cleared.restoreClaimToken,
+        label + ' ➜ async stale sweep សរសេរលុប marker ពិតមុន retry', JSON.stringify(sweepWrites));
+    check(w.revenueCalls.length === 0, label + ' ➜ ការដោះ marker មិនប៉ះប្រាក់');
+}
 
 (async () => {
     console.log('crud-rules-flow — payload ពិត ធៀបនឹង firebase rules ពិត (RTDB emulator)\n');
@@ -287,6 +306,7 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
         const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, false), bc('B2', 3.72, false)], extra) }, zoew_recently_deleted_cod_dod: {} };
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
+        if (extra.restoreClaimId) await clearOrphanBeforeRetry(w, label);
         await w.ctx[fn](...args); await w.drain();
         await seedServer(base);
         await replay(label + ' ➜ rules ទទួល', w.writes);
@@ -315,12 +335,30 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
         await w.ctx.removeSingleBarcode('id_x', 'B1'); await w.drain();
+        if (extra.restoreClaimId && !liveSource) {
+            check(w.writes.length === 0 && w.revenueCalls.length === 0 && w.store.zoew_scan_history_cod_dod.id_x.restoreClaimToken === 'ghost_tok',
+                'ដក — orphan marker ➜ រង់ចាំការសម្អាត មិនដកមុន');
+            await clearOrphanBeforeRetry(w, 'ដក — ' + label);
+            await w.ctx.removeSingleBarcode('id_x', 'B1'); await w.drain();
+        }
         await seedServer(base);
         const ok = await replay('ដក — ' + label + ' ➜ rules ទទួល', w.writes);
         const trash = Object.values(w.store.zoew_recently_deleted_cod_dod || {}).find((t) => t && t.trashReason === 'remove');
-        check(!!trash && trash.trashReason === 'remove', 'ដក — ' + label + ' ➜ ស្លាក «ដក» (remove)', trash && trash.trashReason);
-        check(!!trash && trash.barcodes.every((b) => b.isDeducted === true), 'ដក — ' + label + ' ➜ isDeducted = true (ដកលុយ)');
-        check(!!trash && trash.restoreClaimId === undefined && trash.restoreClaimToken === undefined, 'ដក — ' + label + ' ➜ គ្មាន marker សល់ក្នុងធុងសំរាម');
+        if (liveSource) {
+            check(JSON.stringify(w.store.zoew_scan_history_cod_dod.id_x) === JSON.stringify(base.zoew_scan_history_cod_dod.id_x),
+                'ដក — claim រស់ ➜ barcode និង marker ត្រូវនៅដដែល');
+            check(!trash && JSON.stringify(w.store.zoew_recently_deleted_cod_dod) === JSON.stringify(base.zoew_recently_deleted_cod_dod),
+                'ដក — claim រស់ ➜ source នៅគ្រប់ និងមិនបង្កើតធុងសំរាមថ្មី');
+            check(w.revenueCalls.length === 0 && w.writes.length === 0,
+                'ដក — claim រស់ ➜ មិនដកប្រាក់ និងមិនសរសេរ payload', JSON.stringify(w.revenueCalls));
+            const saved = await asUser('GET', '/zoew_scan_history_cod_dod/id_x.json');
+            check(!denied(saved) && isDeepStrictEqual(JSON.parse(saved.body).barcodes, base.zoew_scan_history_cod_dod.id_x.barcodes) &&
+                JSON.parse(saved.body).restoreClaimToken === 'live_tok', 'ដក — claim រស់ ➜ server ពិតរក្សា barcode និង marker');
+        } else {
+            check(!!trash && trash.trashReason === 'remove', 'ដក — ' + label + ' ➜ ស្លាក «ដក» (remove)', trash && trash.trashReason);
+            check(!!trash && trash.barcodes.every((b) => b.isDeducted === true), 'ដក — ' + label + ' ➜ isDeducted = true (ដកលុយ)');
+            check(!!trash && trash.restoreClaimId === undefined && trash.restoreClaimToken === undefined, 'ដក — ' + label + ' ➜ គ្មាន marker សល់ក្នុងធុងសំរាម');
+        }
         if (!ok) console.log('        (ការបដិសេធនេះជាកំហុសដែល 2.17.3 កែ)');
     }
 
@@ -331,6 +369,12 @@ async function seedServer(store) { await asOwner('PUT', '/.json', store); }
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
         await w.ctx.deleteSingleItem('id_x'); await w.drain();
+        if (extra.restoreClaimId) {
+            check(w.writes.length === 0 && w.revenueCalls.length === 0 && w.store.zoew_scan_history_cod_dod.id_x.restoreClaimToken === 'ghost_tok',
+                'លុប — orphan marker ➜ រង់ចាំការសម្អាត មិនលុបមុន');
+            await clearOrphanBeforeRetry(w, 'លុប — ' + label);
+            await w.ctx.deleteSingleItem('id_x'); await w.drain();
+        }
         await seedServer(base);
         await replay('លុប — ' + label + ' ➜ rules ទទួល', w.writes);
         const trash = w.store.zoew_recently_deleted_cod_dod.id_x;

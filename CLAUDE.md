@@ -98,8 +98,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.0` (`zoew-v180`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.20` (`zoekeygen-v90`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.1` (`zoew-v181`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.21` (`zoekeygen-v91`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -401,14 +401,14 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | SW activate ដោយ APP_SHELL មិនពេញ ➜ ស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ | `sw-install-integrity-test.js` |
 | timeout ដែលមិន abort សំណើ ➜ សំណើជាន់គ្នា និងការអានតួព្យួររហូត | `network-timeout-test.js` |
 | ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
-| Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ | `sentry-load-race-test.js` |
+| Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ; checker រង់ចាំ script load ក្នុងពិដាន ដាច់ពីចំនួន event ដែលត្រូវវាស់ | `sentry-load-race-test.js` |
 | listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
 | URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
 | ស្កេនដកកញ្ចប់ ៖ preview · in-flight fence · trash/ledger · responsive · reload safe | `scan-remove-mode-test.js` |
 | **barcode ស្ទួន ➜ លុយបូកស្ទួន** ៖ ជាន់ ១–៣ អានសតិ; ជាន់ ៤ ជាសាលក្រម server តែមួយ | `duplicate-money-test.js` |
 | **អេក្រង់ស្ថិតិបង្ហាញ ledger ឆៅជា «ចំណូល»** ➜ លេខ **ធំជាងការពិត** ក្នុង ៧ ថ្ងៃដំបូង (រាប់កញ្ចប់មិនទាន់យក) — checker ស្តាទិចមើលមិនឃើញ ព្រោះការហៅនៅដដែល ប្តូរតែអាគុយម៉ង់ | `stats-collected-truth-test.js` |
-| **លុយសរុបរបស់ជួរដេកខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់ និងក្នុង Excel ដោយគ្មានអ្នកយាមណាដឹង (អ្នកយាមលុយទាំងអស់មើល **ledger** ប៉ុណ្ណោះ) | `item-money-integrity-test.js` |
+| **លុយសរុបរបស់ជួរដេកខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់/Excel; តម្លៃបញ្ចូល និងកែ Barcode ត្រូវបង្គត់ដល់សេន **មុនរក្សាទុក** ដើម្បីឲ្យការដកប្រើតម្លៃដូច ledger | `item-money-integrity-test.js` |
 | **ស្ថិតិយកកើតពីអាកាសធាតុ** ៖ ក្រៅបណ្តាញ ➜ ឧបករណ៍ផ្សេងបើកមុន ➜ ភ្ជាប់មកវិញ · ការជាន់គ្នា · ទិដ្ឋភាព barcode ក្នុងស្រុកចាស់ (ឧបករណ៍ ២ ចែក store តែមួយ + rules ពិត) | `pickup-barcode-identity-test.js` |
 | **តម្លៃដែល Firebase rules ពិតបដិសេធ** ➜ ចំណូល **ឡើង** ជំនួសការចុះ · revert មិនមែនបញ្ច្រាសនៃ apply | `revenue-rules-clamp-test.js` |
 | **កូនសោ `zoew_barcode_registry` កំព្រា** ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត | `registry-release-test.js` |
@@ -562,7 +562,7 @@ ledger **ប៉ោងបណ្តោះអាសន្ន** រហូតដល�
 | ច្បាប់ | អ្វីត្រូវវាស់ | លទ្ធផល | លុយ |
 |---|---|---|---|
 | **២ ម៉ោង** (`TWO_HOURS_MS`) | `barcode.closedAt` **របស់ barcode នីមួយៗ** | ➜ ធុងសំរាម `pickup` | មិនប៉ះ |
-| **លើស ៧×២៤ ម៉ោង** (`ABANDON_AGE_MS`) | `item.createdAt` រួចបែងចែកតាម `barcode.isClosed` | ➜ ធុងសំរាម `expired` | **ដកចេញ** |
+| **លើស ៧×២៤ ម៉ោង** (`ABANDON_AGE_MS`) | `item.createdAt`; Barcode ដែលស្តារបើកវិញប្រើម៉ោងក្រោយរវាង parent និង `barcode.restoredAt` រួចបែងចែកតាម `barcode.isClosed` | ➜ ធុងសំរាម `expired` | **ដកចេញ** |
 | **២ ថ្ងៃ** | ធាតុ `expired` ក្នុងធុងសំរាម | ➜ purge អចិន្ត្រៃយ៍ | — |
 | **៣០ ថ្ងៃ** (`TRASH_RETENTION_MS`) | ធាតុប្រភេទផ្សេងក្នុងធុងសំរាម | ➜ purge អចិន្ត្រៃយ៍ | — |
 
@@ -575,6 +575,11 @@ ledger **ប៉ោងបណ្តោះអាសន្ន** រហូតដល�
 អត្ថបទក្នុង `index.html` និងសារ «ជួរទៀត» — **បូកអះអាងថាការប្រៀបធៀបនៅតែជា
 `>`** (បើថ្ងៃណាវាក្លាយជា `>=` នោះការ `+ 1` ខុសភ្លាម ➜ ធ្លាក់)។ ការស្កេន
 «លេខថ្ងៃចាស់សល់» ត្រូវគ្រប **ទម្រង់ទាំង ២** («៨ ថ្ងៃ» និង «៨ថ្ងៃ»)។
+
+**ការស្តារបើកវិញមានត្រា `barcode.restoredAt` ស្រេចចិត្ត**៖ កុំប្តូរនាឡិកា
+របស់ parent ឬ siblings។ Barcode ដែលគ្មានត្រានេះនៅគោរពអាយុ parent ដដែល។
+ការជ្រើសសម្អាត និង transaction ត្រូវប្រើ helper អាយុតែមួយ; ក្រោយដកចេញតែ
+ខ្លះ ត្រូវគណនា `isClosed` ពី Barcode ដែលនៅសល់ពិត។
 
 **ការបែងចែកតាម barcode លើកញ្ចប់លាយ** (A បិទ · B បើក) ៖
 
@@ -617,13 +622,20 @@ ledger **ប៉ោងបណ្តោះអាសន្ន** រហូតដល�
 |---|---|---|
 | `restoreClaimId` · `restoreClaimToken` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** (`stripHistoryOnlyMarkers`) |
 | `clearClaim` | `zoew_scan_history_cod_dod` | **ធុងសំរាម** |
-| `restoreClaim` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`dropStaleRestoreMarkers`) |
+| `restoreClaim` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`executeRestoreItem`) |
 | `trashReason` · `deletedAt` · `isFromDeletion` | `zoew_recently_deleted_cod_dod` | **ប្រវត្តិ** (`executeRestoreItem`) |
 
-- **ការសម្អាតត្រូវរំលងធាតុដែលកំពុងស្តារ** (`itemHasRestoreMarkers()` ជា gate)។
-- **claim ដែលងាប់ត្រូវដោះ** — `clearStaleRestoreMarkers()` និង
-  `releaseStaleRestoreClaimForPurge()` តែពេលហួស `RESTORE_CLAIM_LEASE_MS`
-  (២ នាទី); claim ដែលនៅរស់មានន័យថាឧបករណ៍ផ្សេងកំពុងស្តារ ➜ **កុំប៉ះ**។
+- **ការសម្អាត លុប ដក និងកែតម្លៃត្រូវរំលងធាតុដែលកំពុងស្តារ**
+  (`itemHasRestoreMarkers()` ជា gate ក្នុង transaction)។
+- **claim ដែលងាប់ត្រូវដោះ** — `clearStaleRestoreMarkers()` អាន source មុន
+  ដោះ history marker នៅពេល source បាត់ ឬគ្មាន claim រស់។
+  `releaseStaleRestoreClaimForPurge()` ដោះ trash claim ក្នុង transaction
+  តែពេលវាមិនរស់; lease គឺ `RESTORE_CLAIM_LEASE_MS` (២ នាទី)។ Claim ដែលនៅរស់
+  មានន័យថាឧបករណ៍ផ្សេងកំពុងស្តារ ➜ **កុំប៉ះ**។
+  ទិដ្ឋភាពក្នុងស្រុក ឬ `fb.get()` តែមួយមិនមែនជាភស្តុតាង atomic ទេ៖
+  history `.write` ត្រូវទប់ការលុប/ប្តូរ marker ដែល source មាន matching claim
+  រស់តាម `now` របស់ server។ Finalize ត្រូវមាន witness ត្រូវគ្នា និងលុប source
+  ក្នុង atomic write ដដែល (`emu/restore-mutation-emu-test.js`)។
 - **ការ purge ជាក្រុមជា atomic** — ធាតុ ១ ដែលមានបញ្ហាចាក់សោធាតុស្អាតទាំងអស់
   ➜ ក្រុមធ្លាក់ ត្រូវ **ថយទៅលុបមួយៗ**។
 
@@ -733,6 +745,8 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
   **ច្រកចេញទី ២** ៖ `noteDbListenerAlive()` (ទិដ្ឋភាពមកដល់វិញ) បូកជាន់
   សុវត្ថិភាពក្នុង `runScheduledCleanup()`។ ⛔ ជួរដែលអាច *ពន្យារ* ដោយគ្មាន
   អ្នកដោះទី ២ = **ការជាប់ស្ថាពរ**។
+  Callback ត្រូវអនុវត្ត និង normalize snapshot **មុន** `noteDbListenerAlive()`;
+  បើប្រកាសស្រស់មុន នោះជួរដោះអាចលុប registry របស់ Barcode ដែលទើបត្រឡប់មកវិញ។
 - **`registryReleaseVerdict(key)` មាន ៣ លទ្ធផល** ៖ `release` · `owned`
   (barcode ត្រឡប់មកវិញ ➜ មិនដោះ) · `defer` (`dbListenerViewIsStale()`)។
   ⛔ **ផ្លូវដោះ *ភ្លាមៗ* មិនត្រូវមានច្រកទ្វារនោះទេ**។
@@ -1214,6 +1228,9 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `cache.match()` (អាគុយម៉ង់ទី ២ របស់ `.then`) · `caches.open()` (`.catch`
   ខាងក្រៅ) · និងការធ្លាក់ចុះទៅ `./index.html` ក្នុងផ្លូវ navigate។ វាត្រូវ
   **resolve** ជា `Response.error()` — មិនត្រូវបដិសេធ។
+  ផ្លូវ navigate ទាំង cache miss និង Cache API បដិសេធ ត្រូវ fetch **សំបក
+  `cacheKey` ដដែល** និងបញ្ជូន `request.signal` បន្ត; កុំ cache JavaScript ឬ
+  asset ដើមក្រោមកូនសោ `index.html`។
 - `/.netlify/functions/` ទៅ **`networkOnly()`** ដោយផ្ទាល់ ➜ Function
   **មិនដែលចូល cache** ➜ វាមិនអាចធ្វើឲ្យសំបកចាស់បានឡើយ (មូលហេតុនៃការលើកលែង
   ក្នុង `version-bump-scope.js` សម្រាប់ `netlify/` និង `tools/`)។
@@ -1233,6 +1250,10 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `getStatus()` លុប record **តែពេល `ok === false`**។ **ការប្តូរវាទៅ `false`
   លុប License របស់អតិថិជនពេលបណ្តាញអន់ — កុំធ្វើ។**
 - **`activate()` (អ្នកប្រើចុចផ្ទាល់) ត្រូវឆ្លងកាត់ `{ priority: true }`**។
+- **`getStatus()` ចងសាលក្រមទៅ snapshot របស់ record** ហើយពិនិត្យឡើងវិញក្រោយ
+  `await` លើ signature និង REST; record ប្រែ ➜ អានថ្មី មិនលុប/សរសេរជាន់វា។
+  សំណើរួមតាម App + snapshot និង recheck មានពិដាន ២
+  (`license-record-race-test.js` ប្រើ ECDSA ពិត និង storage រួម)។
 - ⚠️ `license-grace-test.js` ស្រង់ function តាមឈ្មោះចូល `vm` — **បន្ថែម
   helper ថ្មី ➜ ត្រូវបន្ថែមឈ្មោះក្នុងបញ្ជីស្រង់នោះ**។
 
@@ -1272,6 +1293,8 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 - **រាល់តម្លៃដែលចូល HTML ត្រូវ `sanitizeInput()`** — `html-sink-escaping.js`
   ស្កេន **ទាំង ២ ទម្រង់** (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)។
 - **`redactDeep()` ដើរលើ event ទាំងមូល** មុនផ្ញើទៅ Sentry ៖
+  - Bearer/Basic ត្រូវលាក់មុនបំបែក colon; Cookie header លាក់ទាំងតម្លៃ។ គ្រប
+    JSON credential ដែលមានចន្លោះ/quote/array/object និងឈ្មោះ URL param ដែល encode។
   - អ្នកបំបែកត្រូវរួម `, ; { |` បន្ថែមលើ `?&#` និងចន្លោះ (breadcrumb របស់
     console ជាផ្លូវលេចធំបំផុត — Sentry ចាប់វា **ដោយស្វ័យប្រវត្តិ**)។
   - ⛔ **តម្លៃត្រូវឈប់ត្រឹមអ្នកបំបែក** បើមិនដូច្នេះគូមួយលេបគូបន្ទាប់។
@@ -1280,6 +1303,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   - ⛔ **ការសរសេរត្រូវផ្ទៀងផ្ទាត់ថាជាប់ពិត** (`if (target[key] === next) return;`)
     ហើយពេលកែនៅនឹងកន្លែងមិនបាន (frozen · `writable: false` · getter) ➜
     **ចម្លងវត្ថុនោះម្តង** រួចត្រឡប់ច្បាប់ចម្លង។ `seen` ត្រូវជា **`Map`**។
+    Cycle ដែលកំពុងដើរត្រូវកាត់ជា `[circular]`; កុំត្រឡប់វត្ថុដើមដែលមិនទាន់លាក់។
   - ច្បាប់ **«keep case»** ៖ `barcode` · `keyId` · `id` · `count` **ត្រូវនៅ
     មើលឃើញ** — បញ្ជីឈ្មោះកូនសោតូចជាងបញ្ជី URL param។
 - **`appLocalStore` / `appSessionStore` ជាផ្លូវតែមួយទៅ storage** — ពួកវាអាន
@@ -1342,7 +1366,8 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   ➜ **cooldown ៣០ វិនាទី**។
 - **Cache ខាង server** ៖ កូនសោ = `config.fingerprint + '|' + barcode` —
   ⛔ **មិនផ្ទុក fingerprint នៃ Cookie** (លទ្ធផលជាទិន្នន័យបញ្ជាទិញ, មិន
-  អាស្រ័យលើ session)។ កូនសោ **single-flight នៅតែផ្ទុក Cookie**។ ការពិនិត្យ
+  អាស្រ័យលើ session)។ កូនសោ **single-flight នៅតែផ្ទុក Cookie** និងលំដាប់
+  `config|barcode|cookie` ដូចគ្នាទាំង lookup ធម្មតា និង retry ក្រោយ auth បដិសេធ។ ការពិនិត្យ
   cache ត្រូវឈរ **មុន** `resolveCookieCredential()`។
   **សាលក្រម `notFound` ក៏ចូល cache ដែរ** (TTL ខ្លី **១៥ វិ.**) —
   ⛔ **ការបរាជ័យ *បណ្តោះអាសន្ន* មិនត្រូវចូល cache ដាច់ខាត** (401 · 5xx · 429
@@ -1429,12 +1454,17 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   មិនមែន *វត្តមានឯកសារ***។
 - **`--auto` បើក browser តែពេលមានសាលក្រមច្បាស់** (`status === 'ok' &&
   healthy === false`)។ `mismatch` **មិនមែន `error` ទេ**។
+- **Timeout របស់ Netlify គ្របដល់អាន body ចប់**; stream លើស 1 MB បដិសេធ
+  មុន EOF។ EOF ខូចជា network ដែល retry បាន; 401/403 មិន retry ទោះ
+  `body.cancel()` ព្យួរក៏ដោយ (`zto-network-boundaries-test.js`)។
 - ⛔ **server env ដែល extension ចាស់ធ្លាប់ប្រើ ត្រូវនៅតែលុប** ៖
   `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
   `NETLIFY_SITE_ID`។
 
 ## នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW) និង `zto-import`
 
+- **Replace ត្រូវពង្រីក grid និងសរសេរថ្មីជោគជ័យមុនសម្អាតជួរចាស់លើស**;
+  write/resize បដិសេធមិនត្រូវលុបទិន្នន័យចាស់ (`zto-import/test.js`)។
 - **ផ្លូវតែមួយទៅប្រអប់គឺ PIN** — `requestPinBeforeConfig(openSheetImportModal,
   'sheetImport')`។ ⛔ **`openSheetImportModal` មិនត្រូវដាក់ក្នុង
   `ACTION_ALLOWLIST`**។
@@ -1864,6 +1894,13 @@ bash audit-tools/emu/rules.sh
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
+## ⏳ ZoeW `2.31.1` + ZoeKeyGen `2.19.21` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+
+Publish Business rules និងធ្វើជំហាន manual ក្នុង `docs/HISTORY.md` ផ្នែក ១
+សម្រាប់កំណែនេះ មុនទទួលយកលទ្ធផលលើផលិតកម្ម។ ត្រូវសាក Restore ស្របគ្នាលើ
+ឧបករណ៍ ២, offline/reconnect, ZTO ពិត និង Windows helper។ CI ប្រើ Chromium
+និង RTDB emulator; វាមិនជំនួសការផ្ទៀងផ្ទាត់ iPhone/Android/Windows ពិតទេ។
+
 ## ⏳ ZoeW `2.31.0` + ZoeKeyGen `2.19.20` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
 | អ្វីដែលអ្នកប្រើត្រូវសាក | លទ្ធផលដែលត្រូវឃើញ |
@@ -1885,11 +1922,11 @@ bash audit-tools/emu/rules.sh
 |---|---|
 | **ZoeW `2.30.4`** | 🔌 **ZTO Lookup** ៖ ស្កេនកញ្ចប់ថ្មីៗបន្តបន្ទាប់ ➜ **មិនត្រូវឃើញសារ «🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO» ទៀតទេ** (វាធ្លាប់លេចឡើងប្រហែលពាក់កណ្តាលនៃការស្កេន ក្រោយទុកចោលមួយភ្លែត)។ ⛔ **មិនត្រូវប្តូរ `ZTO_UPSTREAM_TIMEOUT_MS` ក្នុង Netlify ទេ**។ ✅ **ផ្នែក «ស្ថិតិលុយ» ជាប់រួច** (2026-09-06 ៖ វាស់លើទិន្នន័យផលិតកម្មពិត — ផលបូក ledger ថ្ងៃ = ledger ខែ បេះបិទ ៖ **137 កញ្ចប់ · $443.02** ហើយអេក្រង់ទាំង ៣ បង្ហាញលេខដូចគ្នា) |
 
-⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.31.0` ចំណែក ZoeKeyGen នៅ `2.19.20`
+⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.31.1` ចំណែក ZoeKeyGen នៅ `2.19.21`
 (ច្បាប់ ៦)។ ⛔ កុំដាក់ស្លាកជុំរបស់ ZoeW លើ ZoeKeyGen។
 
-⛔ **អ្នកប្រើត្រូវទាញ App ទាំង ២ ចុះឡើងវិញ ១ ដង** (`zoew-v180` ·
-`zoekeygen-v90`) មុនសាក។
+⛔ **អ្នកប្រើត្រូវទាញ App ទាំង ២ ចុះឡើងវិញ ១ ដង** (`zoew-v181` ·
+`zoekeygen-v91`) មុនសាក។
 ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
 ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
 

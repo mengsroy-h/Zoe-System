@@ -103,13 +103,15 @@ function constSource(name) { return extractConst(src, name) || CONST_STUBS[name]
 
 // ── ២. Sandbox ដែលរត់កូដ ship ពិត ─────────────────────────────────────────
 function buildWorld(mode) {
-    const log = { toasts: [], updates: 0, txs: 0, registryUpdates: 0, captures: [] };
+    const log = { toasts: [], updates: 0, gets: 0, txs: 0, registryUpdates: 0, captures: [] };
+    const errorRecorder = { capture: (error, details) => log.captures.push({ message: String(error && error.message || error), details }) };
     const ctx = {
         console: { log: () => {}, error: () => {}, warn: () => {} },
         Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map, Date,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt,
         navigator: { onLine: true },
-        window: {},
+        ZoeErrors: errorRecorder,
+        window: { ZoeErrors: errorRecorder },
         __log: log
     };
     vm.createContext(ctx);
@@ -171,11 +173,15 @@ globalThis.__notifyIfSlow = notifyIfSlow;
         },
         runTransaction: (ref, updater) => {
             log.txs++;
-            if (mode === 'hang') return hang();
+            if (mode === 'hang' || mode === 'tx-hang') return hang();
             try { updater(null); } catch (e) {}
             return Promise.resolve({ committed: true, snapshot: { val: () => null } });
         },
-        get: () => (mode === 'hang' ? hang() : Promise.resolve({ exists: () => false, val: () => null }))
+        get: () => {
+            log.gets++;
+            if (mode === 'get-reject') return Promise.reject(new Error('SOURCE_READ_FAILED'));
+            return mode === 'hang' ? hang() : Promise.resolve({ exists: () => false, val: () => null });
+        }
     };
     ctx.__setFb(fbImpl);
     return { ctx, log, releaseLateWrites: () => { later.splice(0).forEach((r) => r()); } };
@@ -238,25 +244,46 @@ const WAIT_AFTER_TIMEOUT = DB_TIMEOUT + 2500;
 
     // ── ៤. `clearStaleRestoreMarkers` ៖ ការសម្អាតកញ្ចប់មិនត្រូវងាប់ ────────
     console.log('\n== ៤. សោសម្អាត marker ស្តារ ==');
-    {
-        const w = buildWorld('hang');
+    await Promise.all(['hang', 'tx-hang'].map(async (mode) => {
+        const w = buildWorld(mode);
+        const label = mode === 'hang' ? 'source GET ព្យួរ' : 'source GET ជោគជ័យ តែ transaction ព្យួរ';
         w.ctx.__clearStale({ id: 'id_9_9', restoreClaimId: 'src1', restoreClaimToken: 't' });
         await sleep(200);
-        ok('transaction បានចេញដំណើរពិត (ជាន់អប្បបរមា)', w.log.txs >= 1, w.log.txs);
-        ok('id ត្រូវកាន់ខណៈកំពុងដំណើរការ',
+        ok(label + ' ➜ អាន source ពិតមុនសរសេរ', w.log.gets === 1, w.log.gets);
+        ok(label + ' ➜ ចាប់ transaction តែបន្ទាប់ពី source GET ជោគជ័យ',
+            w.log.txs === (mode === 'hang' ? 0 : 1), w.log.txs);
+        ok(label + ' ➜ id ត្រូវកាន់ខណៈកំពុងដំណើរការ',
             w.ctx.__sweeps().indexOf('id_9_9') !== -1, w.ctx.__sweeps());
         await sleep(WAIT_AFTER_TIMEOUT);
-        ok('⛔ id ត្រូវដោះក្នុងពេលកំណត់ (ច្បាប់ ២ម៉ោង/៧ថ្ងៃ មិនងាប់លើកញ្ចប់នោះ)',
+        ok(label + ' ➜ id ត្រូវដោះក្នុងពេលកំណត់ (ច្បាប់ ២ម៉ោង/៧ថ្ងៃ មិនងាប់លើកញ្ចប់នោះ)',
             w.ctx.__sweeps().length === 0, w.ctx.__sweeps());
-        ok('⛔ ការព្យួរមិនត្រូវបំពេញ Sentry',
+        ok(label + ' ➜ ការព្យួរមិនត្រូវបំពេញ Sentry',
             w.log.captures.length === 0, w.log.captures);
-    }
+        const beforeGets = w.log.gets;
+        const beforeTxs = w.log.txs;
+        w.ctx.__clearStale({ id: 'id_9_9', restoreClaimId: 'src1', restoreClaimToken: 't' });
+        await sleep(200);
+        ok(label + ' ➜ ក្រោយ timeout អាចចាប់សម្អាតម្តងទៀត',
+            w.log.gets === beforeGets + 1 && w.log.txs === beforeTxs + (mode === 'hang' ? 0 : 1),
+            { gets: w.log.gets, txs: w.log.txs });
+    }));
     {
         const w = buildWorld('ok');
         w.ctx.__clearStale({ id: 'id_8_8', restoreClaimId: 'src2', restoreClaimToken: 't' });
         await sleep(300);
         ok('ទិសផ្ទុយ ៖ បណ្តាញធម្មតា ➜ id ត្រូវដោះដដែល',
             w.ctx.__sweeps().length === 0, w.ctx.__sweeps());
+    }
+    {
+        const w = buildWorld('get-reject');
+        w.ctx.__clearStale({ id: 'id_7_7', restoreClaimId: 'src3', restoreClaimToken: 't' });
+        await sleep(300);
+        ok('source GET បដិសេធ ➜ មិនចាប់ history transaction', w.log.gets === 1 && w.log.txs === 0, { gets: w.log.gets, txs: w.log.txs });
+        ok('source GET បដិសេធ ➜ សោ sweep ត្រូវដោះ', w.ctx.__sweeps().length === 0, w.ctx.__sweeps());
+        ok('ទិសផ្ទុយ Sentry៖ កំហុសមិនមែន timeout ត្រូវ capture ពិត',
+            w.ctx.ZoeErrors === w.ctx.window.ZoeErrors && w.log.captures.length === 1 &&
+            w.log.captures[0].message === 'SOURCE_READ_FAILED' && w.log.captures[0].details.context === 'clearStaleRestoreMarkers',
+            w.log.captures);
     }
 
     // ── ៥. សារវឌ្ឍនភាព ៖ អ្នកប្រើត្រូវដឹងថាមានអ្វីកើតឡើង ──────────────────

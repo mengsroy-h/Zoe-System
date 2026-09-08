@@ -294,6 +294,156 @@ function serve(dir) {
     check(results.bad.length === 0, 'invariant ៖ `item.cod/.dod/.price` ស្មើផលបូក barcodes ក្រោយ operation ទាំង ' + OPS.length + ' (សតិ ' + results.checked + ' · server ' + results.checkedSrv + ')',
         results.bad.slice(0, 6).join('\n        '));
 
+    const fractionalEdit = await page.evaluate(async () => {
+        const store = window.__fakeStore;
+        const history = store.zoew_scan_history_cod_dod || {};
+        const item = Object.values(history).find((entry) => entry && entry.barcodes && entry.barcodes.length);
+        if (!item) return { reached: false };
+        const barcode = item.barcodes[0];
+        const before = JSON.parse(JSON.stringify(store.zoew_daily_revenue_cod_dod[item.scanDate]));
+        const original = { cod: barcode.cod, dod: barcode.dod };
+        const itemId = item.id;
+        const code = barcode.code;
+        openEditBarcodePriceModal(itemId, code);
+        document.getElementById('editBcCodInput').value = '0.005';
+        document.getElementById('editBcDodInput').value = '0.005';
+        saveEditedBarcodePrice();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const edited = JSON.parse(JSON.stringify(store.zoew_scan_history_cod_dod[itemId].barcodes.find((entry) => entry.code === code)));
+        await removeSingleBarcode(itemId, code);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const removed = JSON.parse(JSON.stringify(store.zoew_daily_revenue_cod_dod[item.scanDate]));
+        const trash = Object.values(store.zoew_recently_deleted_cod_dod || {}).find((entry) => entry && entry.barcodes && entry.barcodes.some((b) => b.code === code));
+        return { reached: true, before, original, edited, removed, trash: !!trash };
+    });
+    check(fractionalEdit.reached && fractionalEdit.trash, 'កែទឹកប្រាក់មានខ្ទង់លើសសេន រួចដក Barcode ពិតទៅធុងសំរាម', JSON.stringify(fractionalEdit));
+    if (fractionalEdit.reached) {
+        check(fractionalEdit.edited.cod === 0.01 && fractionalEdit.edited.dod === 0.01,
+            'ទឹកប្រាក់ដែលរក្សាទុកលើ Barcode ត្រូវមានភាពច្បាស់ដល់សេនដូច ledger', JSON.stringify(fractionalEdit.edited));
+        const round2 = (value) => Math.round(value * 100) / 100;
+        check(fractionalEdit.removed.codDollar === round2(fractionalEdit.before.codDollar - fractionalEdit.original.cod) &&
+            fractionalEdit.removed.dodDollar === round2(fractionalEdit.before.dodDollar - fractionalEdit.original.dod),
+            'កែទៅកន្លះសេន រួចដក មិនបន្សល់លុយពី Barcode ដែលចេញរួច', JSON.stringify(fractionalEdit));
+    }
+
+    const fractionalScan = await page.evaluate(async () => {
+        document.querySelectorAll('.modal').forEach((modal) => closeModal(modal.id));
+        setEntryScanMode('parcel');
+        const code = 'CENTINPUT001';
+        triggerScanAction(code);
+        const modal = document.getElementById('phoneModal');
+        if (!modal || getComputedStyle(modal).display === 'none' || pendingBarcode !== code) return { reached: false };
+        document.getElementById('modalPhoneInput').value = '0990000123';
+        document.getElementById('modalCodInput').value = '0.005';
+        document.getElementById('modalDodInput').value = '0.005';
+        await confirmPhone();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const row = Object.values(window.__fakeStore.zoew_scan_history_cod_dod || {}).find((entry) => entry && entry.barcodes && entry.barcodes.some((b) => b.code === code));
+        return { reached: true, barcode: row && row.barcodes.find((b) => b.code === code) };
+    });
+    check(fractionalScan.reached && !!fractionalScan.barcode, 'ស្កេនថ្មីប្រើ confirmPhone និងរក្សាទុក Barcode ពិត', JSON.stringify(fractionalScan));
+    check(fractionalScan.barcode && fractionalScan.barcode.cod === 0.01 && fractionalScan.barcode.dod === 0.01,
+        'ការស្កេនថ្មីរក្សាទុកទឹកប្រាក់ដល់សេនដូចការកែតម្លៃ', JSON.stringify(fractionalScan));
+
+    const legacyRemovals = await page.evaluate(async () => {
+        const store = window.__fakeStore;
+        const day = getFormattedDate();
+        const month = day.slice(0, 7);
+        const copy = (value) => JSON.parse(JSON.stringify(value));
+        const wait = () => new Promise((resolve) => setTimeout(resolve, 300));
+        const results = [];
+        const cases = [
+            { amounts: [0.005, 0.015], reason: 'remove' },
+            { amounts: [0.015, 0.005], reason: 'remove' },
+            { amounts: [0.005, 0.015], reason: 'abandon' },
+            { amounts: [0.015, 0.005], reason: 'abandon' },
+            { amounts: [0.005, 0.005], reason: 'abandon', quantity: 2, partial: true }
+        ];
+        for (const [index, { amounts, reason, quantity = 1, partial = false }] of cases.entries()) {
+            const id = 'legacy_cent_remove_' + index;
+            const code = 'LEGACYCENT' + index;
+            const unitCod = Math.round(amounts[0] * 100) / 100;
+            const unitDod = Math.round(amounts[1] * 100) / 100;
+            const cod = unitCod * quantity;
+            const dod = unitDod * quantity;
+            const empty = { codDollar: 0, dodDollar: 0, totalCount: 0 };
+            const beforeDaily = copy((store.zoew_daily_revenue_cod_dod || {})[day] || empty);
+            const beforeMonthly = copy((store.zoew_monthly_revenue_cod_dod || {})[month] || empty);
+            if (partial) {
+                beforeDaily.totalCount++;
+                beforeMonthly.totalCount++;
+            }
+            const add = (record) => ({ ...record, codDollar: record.codDollar + cod,
+                dodDollar: record.dodDollar + dod, totalCount: record.totalCount + quantity });
+            window.__setPath('zoew_daily_revenue_cod_dod/' + day, add(beforeDaily));
+            window.__setPath('zoew_monthly_revenue_cod_dod/' + month, add(beforeMonthly));
+            const createdAt = Date.now() - (reason === 'abandon' ? 8 * 86400000 : 0);
+            const barcodes = Array.from({ length: quantity }, (_, index) => ({
+                code: code + (index ? '_' + index : ''), cod: amounts[0], dod: amounts[1], time: '10:00',
+                locker: 'A1', isClosed: false, isDeducted: false, isFromDeletion: false, createdAt
+            }));
+            if (partial) barcodes.push({ code: 'KEEPCENT' + index, cod: 0, dod: 0, time: '10:00',
+                locker: 'A1', isClosed: true, closedAt: Date.now(), isDeducted: false,
+                isFromDeletion: false, createdAt: Date.now() });
+            window.__setPath('zoew_scan_history_cod_dod/' + id, {
+                id, phone: '099100000' + index, scanDate: day, createdAt,
+                cod: reason === 'abandon' ? amounts[0] * quantity : cod,
+                dod: reason === 'abandon' ? amounts[1] * quantity : dod,
+                price: Math.round((cod + dod) * 100) / 100, count: barcodes.length,
+                barcode: code, time: '10:00', isClosed: false,
+                barcodes
+            });
+            await wait();
+            const loaded = scanHistory.find((item) => item.id === id);
+            const rawLoaded = loaded && loaded.barcodes[0].cod === amounts[0] && loaded.barcodes[0].dod === amounts[1];
+            const status = reason === 'abandon'
+                ? await claimAndCleanupItem(id, reason)
+                : await removeSingleBarcode(id, code);
+            await wait();
+            const trash = Object.values(store.zoew_recently_deleted_cod_dod || {}).find((item) =>
+                item && item.barcodes && item.barcodes.some((barcode) => barcode.code === code));
+            const removedDaily = copy(store.zoew_daily_revenue_cod_dod[day]);
+            const removedMonthly = copy(store.zoew_monthly_revenue_cod_dod[month]);
+            const savedTrash = trash && copy(trash);
+            const remaining = store.zoew_scan_history_cod_dod[id];
+            const removed = partial
+                ? !!remaining && remaining.barcodes.length === 1 && remaining.barcodes[0].code === 'KEEPCENT' + index
+                : !remaining;
+            if (trash) {
+                promptRestoreDeletedItem(trash.id);
+                await executeRestoreItem();
+                await wait();
+            }
+            const restoredItem = Object.values(store.zoew_scan_history_cod_dod || {}).find((item) =>
+                item && item.barcodes && item.barcodes.some((barcode) => barcode.code === code));
+            results.push({ code, cod, dod, unitCod, unitDod, quantity, partial, reason,
+                rawLoaded, status, removed, beforeDaily, beforeMonthly,
+                removedDaily, removedMonthly, trash: savedTrash, restored: !!restoredItem,
+                restoredDaily: copy(store.zoew_daily_revenue_cod_dod[day]),
+                restoredMonthly: copy(store.zoew_monthly_revenue_cod_dod[month]) });
+        }
+        return results;
+    });
+    check(legacyRemovals.length === 5, 'ករណីដក និងផុតកំណត់ទាំងមូល/មួយផ្នែក លើទិន្នន័យចាស់ 0.005 និង 0.015 រត់ក្នុង Chromium ទាំង COD និង DOD');
+    for (const result of legacyRemovals) {
+        const equalMoney = (left, right) => ['codDollar', 'dodDollar', 'totalCount'].every((key) =>
+            Math.round(left[key] * 100) === Math.round(right[key] * 100));
+        const expectedRestore = (before) => ({ codDollar: before.codDollar + result.cod,
+            dodDollar: before.dodDollar + result.dod, totalCount: before.totalCount + result.quantity });
+        check(result.rawLoaded && result.removed && (result.reason === 'abandon' || result.status === 'done') && !!result.trash,
+            result.code + ' ' + result.reason + '៖ ដក Barcode ចាស់ដែលនៅមានខ្ទង់លើសសេនពិត', JSON.stringify(result));
+        check(equalMoney(result.removedDaily, result.beforeDaily) && equalMoney(result.removedMonthly, result.beforeMonthly),
+            result.code + '៖ ដកប្រាក់ដល់សេនពេញពីស្ថិតិថ្ងៃ និងខែ ដោយមិនបន្សល់កន្លះសេន', JSON.stringify(result));
+        const trash = result.trash;
+        check(trash && trash.cod === result.cod && trash.dod === result.dod &&
+            trash.barcodes.length === result.quantity && trash.barcodes.every((barcode) =>
+                barcode.cod === result.unitCod && barcode.dod === result.unitDod),
+            result.code + '៖ លុយក្នុងធុងសំរាម និង Barcode ស្មើប្រាក់ដែលបានដក', JSON.stringify(trash));
+        check(result.restored && equalMoney(result.restoredDaily, expectedRestore(result.beforeDaily)) &&
+            equalMoney(result.restoredMonthly, expectedRestore(result.beforeMonthly)),
+            result.code + '៖ ស្ដារមកវិញបូកចំនួនសេនដដែលមួយដង', JSON.stringify(result));
+    }
+
     await ctx.close();
     server.close();
     await browser.close();

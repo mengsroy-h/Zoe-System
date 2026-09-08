@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.0';
+    const APP_VERSION = '2.31.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4923,7 +4923,6 @@
         if (dbRefHistory) {
         fb.onValue(dbRefHistory, (snapshot) => {
             if (listenerGeneration !== dbListenerGeneration) return;
-            noteDbListenerAlive('history');
             const data = snapshot.val();
             scanHistory = rawSnapshotToItemList(data);
 
@@ -4963,6 +4962,7 @@
                 }
             });
 
+            noteDbListenerAlive('history');
             debouncedRenderAfterHistorySync();
         }, (err) => {
             if (listenerGeneration !== dbListenerGeneration) return;
@@ -4973,7 +4973,6 @@
         if (dbRefDeleted) {
         fb.onValue(dbRefDeleted, (snapshot) => {
             if (listenerGeneration !== dbListenerGeneration) return;
-            noteDbListenerAlive('deleted');
             const data = snapshot.val();
             deletedItems = rawSnapshotToItemList(data);
 
@@ -4984,6 +4983,7 @@
                 }
                 normalizeBarcodesOf(item);
             });
+            noteDbListenerAlive('deleted');
             runAutomaticDeletedCleanup();
         }, (err) => {
             if (listenerGeneration !== dbListenerGeneration) return;
@@ -5027,6 +5027,7 @@
         if (staleRestoreMarkerSweeps.has(item.id)) return;
         if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return;
         const sourceId = item.restoreClaimId;
+        const sourceToken = item.restoreClaimToken;
         if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return;
         const source = (typeof sourceId === 'string')
             ? deletedItems.find((entry) => entry && entry.id === sourceId)
@@ -5034,13 +5035,21 @@
         if (source && isActiveRestoreClaim(source.restoreClaim)) return;
         staleRestoreMarkerSweeps.add(item.id);
         const release = () => { staleRestoreMarkerSweeps.delete(item.id); };
-        dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
-            if (!currentItem) return currentItem;
-            if (!itemHasRestoreMarkers(currentItem)) return;
-            delete currentItem.restoreClaimId;
-            delete currentItem.restoreClaimToken;
-            return currentItem;
-        })).then(release, (error) => {
+        const sourceRead = Promise.resolve().then(() => typeof sourceId === 'string' && /^[a-zA-Z0-9_-]+$/.test(sourceId)
+            ? dbOp(fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${sourceId}`)))
+            : null);
+        sourceRead.then((snapshot) => {
+            const currentSource = snapshot && snapshot.val();
+            if (currentSource && isActiveRestoreClaim(currentSource.restoreClaim)) return;
+            return dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+                if (!currentItem) return currentItem;
+                if (!itemHasRestoreMarkers(currentItem)) return;
+                if (currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== sourceToken) return;
+                delete currentItem.restoreClaimId;
+                delete currentItem.restoreClaimToken;
+                return currentItem;
+            }));
+        }).then(release, (error) => {
             release();
             if (dbOpStalled(error)) return;
             console.error('Failed to clear stale restore markers for', item.id, error);
@@ -5061,7 +5070,7 @@
             }
             let itemTimestamp = item.createdAt || parseTimestampFromId(item.id) || currentTime;
 
-            if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS)) {
+            if (!item.isClosed && (currentTime - itemTimestamp > ABANDON_AGE_MS) && (!Array.isArray(item.barcodes) || !item.barcodes.length || item.barcodes.some(b => barcodeAbandonIsRipe(b, itemTimestamp, currentTime)))) {
                 claimAndCleanupItem(item.id, 'abandon');
                 return;
             }
@@ -5142,8 +5151,9 @@
                 if (currentItem.isClosed || (getServerNow() - ts) <= ABANDON_AGE_MS) return currentItem;
 
                 if (currentItem.barcodes && Array.isArray(currentItem.barcodes) && currentItem.barcodes.length) {
-                    const staleOpen = currentItem.barcodes.filter(b => !b.isClosed);
-                    const stillActive = currentItem.barcodes.filter(b => b.isClosed);
+                    const staleOpen = currentItem.barcodes.filter(b => barcodeAbandonIsRipe(b, ts, getServerNow()));
+                    const staleSet = new Set(staleOpen);
+                    const stillActive = currentItem.barcodes.filter(b => !staleSet.has(b));
                     if (staleOpen.length === 0) return currentItem;
 
                     if (stillActive.length === 0) {
@@ -5156,8 +5166,12 @@
                     updated.count = stillActive.length;
                     recalcItemMoneyFromBarcodes(updated);
                     updated.barcode = stillActive[0].code;
-                    updated.isClosed = true;
-                    if (!updated.closedAt) updated.closedAt = getServerNow();
+                    updated.isClosed = stillActive.every(b => b.isClosed);
+                    if (updated.isClosed) {
+                        if (!updated.closedAt) updated.closedAt = getServerNow();
+                    } else {
+                        delete updated.closedAt;
+                    }
                     updatedRemainder = updated;
                     return updated;
                 }
@@ -5206,7 +5220,10 @@
             if (claimedPartial) {
                 const partialIsPickup = reason !== 'abandon';
                 trashItem = { ...claimedPartial, id: generateUniqueId() };
-                trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b, isDeducted: true, isFromDeletion: false }));
+                trashItem.barcodes = trashItem.barcodes.map(b => partialIsPickup ? ({ ...b, isFromDeletion: true }) : ({ ...b,
+                    cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
+                    dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
+                    isDeducted: true, isFromDeletion: false }));
                 trashItem.count = trashItem.barcodes.length;
                 recalcItemMoneyFromBarcodes(trashItem);
                 trashItem.barcode = trashItem.barcodes[0].code;
@@ -5234,12 +5251,16 @@
                 if (reason === 'abandon') {
                     trashItem.isFromDeletion = false;
                     trashItem.trashReason = 'expired';
-                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {
-                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isDeducted: true, isFromDeletion: false }));
+                    if (Array.isArray(trashItem.barcodes) && trashItem.barcodes.length) {
+                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b,
+                            cod: Math.round((parseFloat(b.cod) || 0) * 100) / 100,
+                            dod: Math.round((parseFloat(b.dod) || 0) * 100) / 100,
+                            isDeducted: true, isFromDeletion: false }));
+                        recalcItemMoneyFromBarcodes(trashItem);
                     }
                     revenueScanDate = trashItem.scanDate || getFormattedDate();
-                    revenueCod = parseFloat(trashItem.cod) || 0;
-                    revenueDod = parseFloat(trashItem.dod) || 0;
+                    revenueCod = Math.round((parseFloat(trashItem.cod) || 0) * 100) / 100;
+                    revenueDod = Math.round((parseFloat(trashItem.dod) || 0) * 100) / 100;
                     revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
                     revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
                 } else {
@@ -5488,15 +5509,8 @@
     function dropStaleRestoreMarkers(currentItem) {
         if (!itemHasRestoreMarkers(currentItem)) return false;
         if (dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) return false;
-        const sourceId = currentItem.restoreClaimId;
-        if (typeof sourceId === 'string' && activeRestoreClaims.has(sourceId)) return false;
-        const source = (typeof sourceId === 'string')
-            ? deletedItems.find((entry) => entry && entry.id === sourceId)
-            : null;
-        if (source && isActiveRestoreClaim(source.restoreClaim)) return false;
-        delete currentItem.restoreClaimId;
-        delete currentItem.restoreClaimToken;
-        return true;
+        clearStaleRestoreMarkers(currentItem);
+        return false;
     }
 
     function applyBarcodeCloseState(barcode, closed, at) {
@@ -5509,6 +5523,12 @@
 
     function barcodeCloseIsRipe(barcode, now) {
         return !!(barcode && barcode.isClosed && typeof barcode.closedAt === 'number' && (now - barcode.closedAt) > TWO_HOURS_MS);
+    }
+
+    function barcodeAbandonIsRipe(barcode, parentCreatedAt, now) {
+        if (!barcode || barcode.isClosed) return false;
+        const restoredAt = typeof barcode.restoredAt === 'number' && isFinite(barcode.restoredAt) && barcode.restoredAt >= 0 ? barcode.restoredAt : 0;
+        return now - Math.max(parentCreatedAt, restoredAt) > ABANDON_AGE_MS;
     }
 
     function normalizeBarcodeCloseStamps(item, now) {
@@ -10188,11 +10208,11 @@
         let phone = isSkip ? "គ្មានលេខ" : normalizeStoredPhone(phoneEl ? phoneEl.value : '');
         let rawLocker = lockerEl ? lockerEl.value.trim() : '';
         let locker = rawLocker;
-        let cod = codEl ? (parseFloat(codEl.value) || 0) : 0;
-        let dod = dodEl ? (parseFloat(dodEl.value) || 0) : 0;
+        let cod = codEl ? Math.round((parseFloat(codEl.value) || 0) * 100) / 100 : 0;
+        let dod = dodEl ? Math.round((parseFloat(dodEl.value) || 0) * 100) / 100 : 0;
 
-        if (isNaN(cod) || cod < 0) cod = 0;
-        if (isNaN(dod) || dod < 0) dod = 0;
+        if (!Number.isFinite(cod) || cod < 0) cod = 0;
+        if (!Number.isFinite(dod) || dod < 0) dod = 0;
 
         if (isSkip || !phone) {
             phone = "គ្មានលេខ";
@@ -10503,13 +10523,18 @@
         let claimedParent = null;
         let claimedBarcode = null;
         let claimedWhole = null;
+        let restoreClaimBlocked = false;
         const removeUpdater = (currentItem) => {
             claimedParent = null;
             claimedBarcode = null;
             claimedWhole = null;
+            restoreClaimBlocked = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return currentItem;
-            dropStaleRestoreMarkers(currentItem);
+            if (itemHasRestoreMarkers(currentItem)) {
+                restoreClaimBlocked = true;
+                return;
+            }
             ensureBarcodeArrayForItem(currentItem);
             if (!Array.isArray(currentItem.barcodes)) return currentItem;
             const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
@@ -10549,15 +10574,16 @@
                 scanHistory[localIdx] = { ...committedItem, id: itemId };
             }
 
+            const removedBc = { ...claimedBarcode,
+                cod: Math.round((parseFloat(claimedBarcode.cod) || 0) * 100) / 100,
+                dod: Math.round((parseFloat(claimedBarcode.dod) || 0) * 100) / 100,
+                isDeducted: true, isFromDeletion: false };
             let deductionApplied = null;
             const revenueScanDate = claimedParent.scanDate || getFormattedDate();
             if (!claimedBarcode.isDeducted) {
-                const deductedCod = parseFloat(claimedBarcode.cod) || 0;
-                const deductedDod = parseFloat(claimedBarcode.dod) || 0;
-                deductionApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -deductedCod, -deductedDod, -1);
+                deductionApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -removedBc.cod, -removedBc.dod, -1);
             }
 
-            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };
             const itemToTrash = stripHistoryOnlyMarkers({ ...claimedParent, barcodes: [removedBc], count: 1 });
             itemToTrash.id = generateUniqueId();
             itemToTrash.deletedAt = getServerNow();
@@ -10651,7 +10677,9 @@
                     }, (lateErr) => {
                         try {
                             refreshCurrentHistoryView();
-                            showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
+                            showToast(restoreClaimBlocked
+                                ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។"
+                                : `⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
                             if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'removeSingleBarcode late transaction failed', itemId });
                         } finally {
                             if (confirmedScanToken) clearScannedRemovalInFlight(itemId, barcodeCode, confirmedScanToken);
@@ -10662,7 +10690,13 @@
                 }
                 throw txError;
             }
-            if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
+            if (!result || !result.committed) {
+                if (restoreClaimBlocked) {
+                    showToast("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកដកម្តងទៀត។");
+                    return 'failed';
+                }
+                throw new Error('Remove barcode transaction was not committed');
+            }
             return await finishRemoval(result, false);
         } catch (e) {
             console.error("Error removing single barcode: ", e);
@@ -10859,10 +10893,10 @@
         const editBcCodInput = document.getElementById('editBcCodInput');
         const editBcDodInput = document.getElementById('editBcDodInput');
 
-        let newCod = editBcCodInput ? (parseFloat(editBcCodInput.value) || 0) : 0;
-        let newDod = editBcDodInput ? (parseFloat(editBcDodInput.value) || 0) : 0;
-        if (isNaN(newCod) || newCod < 0) newCod = 0;
-        if (isNaN(newDod) || newDod < 0) newDod = 0;
+        let newCod = editBcCodInput ? Math.round((parseFloat(editBcCodInput.value) || 0) * 100) / 100 : 0;
+        let newDod = editBcDodInput ? Math.round((parseFloat(editBcDodInput.value) || 0) * 100) / 100 : 0;
+        if (!Number.isFinite(newCod) || newCod < 0) newCod = 0;
+        if (!Number.isFinite(newDod) || newDod < 0) newDod = 0;
 
         const item = scanHistory.find(i => i.id === activeParentItemId);
         if (item) {
@@ -10875,14 +10909,15 @@
                 let oldCod = parseFloat(targetB.cod) || 0;
                 let oldDod = parseFloat(targetB.dod) || 0;
 
-                let codDiff = Math.round((newCod - oldCod) * 100) / 100;
-                let dodDiff = Math.round((newDod - oldDod) * 100) / 100;
+                let codDiff = (Math.round(newCod * 100) - Math.round(oldCod * 100)) / 100;
+                let dodDiff = (Math.round(newDod * 100) - Math.round(oldDod * 100)) / 100;
 
                 const editedItemId = item.id;
                 const editedBarcodeCode = activeEditingBarcode;
                 let serverOldCod = null;
                 let serverOldDod = null;
                 let serverApplied = false;
+                let restoreClaimBlocked = false;
 
                 const applyEditedPriceTo = (target) => {
                     serverApplied = false;
@@ -10955,13 +10990,15 @@
                     if (!committed || !serverApplied) {
                         undoEditedPriceRevenue();
                         revertEditedPriceLocally();
-                        showToast(committed
+                        showToast(restoreClaimBlocked
+                            ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកកែទឹកប្រាក់ម្តងទៀត។"
+                            : committed
                             ? "⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! ទឹកប្រាក់មិនត្រូវបានកែទេ។"
                             : "⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                         return;
                     }
-                    const actualCodDiff = Math.round((newCod - serverOldCod) * 100) / 100;
-                    const actualDodDiff = Math.round((newDod - serverOldDod) * 100) / 100;
+                    const actualCodDiff = (Math.round(newCod * 100) - Math.round(serverOldCod * 100)) / 100;
+                    const actualDodDiff = (Math.round(newDod * 100) - Math.round(serverOldDod * 100)) / 100;
                     correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0).then((status) => {
                         if (status && status.ok) {
                             showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
@@ -10988,8 +11025,13 @@
                 };
                 const priceTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${editedItemId}`), (currentItem) => {
                     serverApplied = false;
+                    restoreClaimBlocked = false;
                     if (!currentItem) return currentItem;
                     if (currentItem.clearClaim) return;
+                    if (itemHasRestoreMarkers(currentItem)) {
+                        restoreClaimBlocked = true;
+                        return;
+                    }
                     return applyEditedPriceTo(currentItem);
                 });
                 dbOp(priceTx).then(settleEditedPrice, (error) => {
@@ -11328,13 +11370,19 @@
 
         let claimedWhole = null;
         let clearClaimBlocked = false;
+        let restoreClaimBlocked = false;
         const deleteUpdater = (currentItem) => {
             claimedWhole = null;
             clearClaimBlocked = false;
+            restoreClaimBlocked = false;
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) {
                 clearClaimBlocked = true;
                 return currentItem;
+            }
+            if (itemHasRestoreMarkers(currentItem)) {
+                restoreClaimBlocked = true;
+                return;
             }
             normalizeBarcodesOf(currentItem);
             claimedWhole = currentItem;
@@ -11408,7 +11456,9 @@
                     armLateCommit(deleteTx, (late) => finishDelete(late, true), (lateErr) => {
                         refreshCurrentHistoryView();
                         updateRecentPhonesList();
-                        showToast("⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
+                        showToast(restoreClaimBlocked
+                            ? "⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។"
+                            : "⚠️ លុបមិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។");
                         if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'deleteSingleItem late transaction failed', itemId: id });
                     }, 'deleteSingleItem');
                     showToast("⏳ បណ្តាញឆ្លើយមិនចេញ — ការលុបនឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំលុបម្ដងទៀត។");
@@ -11416,7 +11466,13 @@
                 }
                 throw txError;
             }
-            if (!result || !result.committed) throw new Error('Delete item transaction was not committed');
+            if (!result || !result.committed) {
+                if (restoreClaimBlocked) {
+                    showToast("⏳ កញ្ចប់នេះកំពុងស្តារ — សូមរង់ចាំឲ្យចប់ រួចសាកលុបម្តងទៀត។");
+                    return;
+                }
+                throw new Error('Delete item transaction was not committed');
+            }
             await finishDelete(result, false);
         } catch (e) {
             console.error("Error deleting single item: ", e);
@@ -11693,6 +11749,11 @@
             const historySnap = await dbOp(fb.get(dbRefHistory));
             const history = historySnap && historySnap.val();
             if (!history || typeof history !== 'object') return itemToRestore.id;
+            const existingClaim = itemToRestore.restoreClaim;
+            const preparedTarget = existingClaim && history[existingClaim.targetId];
+            if (preparedTarget && preparedTarget.restoreClaimId === itemToRestore.id && preparedTarget.restoreClaimToken === existingClaim.token) {
+                return existingClaim.targetId;
+            }
             const matchingId = Object.keys(history).find((id) => {
                 const candidate = cloneRestoreItem(history[id]);
                 return candidate && isRestoreMergeTarget(candidate, itemToRestore);
@@ -11756,16 +11817,6 @@
         if (!bound || !result || !result.committed) throw new Error('RESTORE_CLAIM_LOST');
     }
 
-    async function clearRestoreHistoryMarker(targetId, sourceId, token) {
-        if (!targetId || !sourceId || !token) return;
-        await dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`), (currentItem) => {
-            if (!currentItem || currentItem.restoreClaimId !== sourceId || currentItem.restoreClaimToken !== token) return;
-            delete currentItem.restoreClaimId;
-            delete currentItem.restoreClaimToken;
-            return currentItem;
-        }));
-    }
-
     async function clearRestoreFinalization(sourceId, token) {
         if (!sourceId || !token) return;
         await dbOp(fb.runTransaction(fb.ref(db, `zoew_restore_finalizations/${sourceId}`), (currentFinalization) => {
@@ -11785,7 +11836,8 @@
                 targetChanged = true;
                 return;
             }
-            if (targetId !== itemToRestore.id && !isRestoreMergeTarget(currentItem, itemToRestore)) {
+            const alreadyPrepared = currentItem && currentItem.restoreClaimId === sourceId;
+            if (!alreadyPrepared && targetId !== itemToRestore.id && !isRestoreMergeTarget(currentItem, itemToRestore)) {
                 targetChanged = true;
                 return;
             }
@@ -11889,8 +11941,10 @@
             }
             const claimed = await claimDeletedItemForRestore(restoredId, token, targetId);
             activeRestoreClaims.set(restoredId, { token, targetId });
-            if (claimed.replacedClaim && claimed.replacedClaim.targetId) {
-                await clearRestoreHistoryMarker(claimed.replacedClaim.targetId, restoredId, claimed.replacedClaim.token).catch(() => {});
+            if (claimed.replacedClaim && safeIdPattern.test(claimed.replacedClaim.targetId) && claimed.replacedClaim.targetId !== targetId) {
+                targetId = claimed.replacedClaim.targetId;
+                await bindRestoreClaimTarget(restoredId, token, targetId);
+                activeRestoreClaims.set(restoredId, { token, targetId });
             }
 
             let itemToRestore = claimed.item;
@@ -11919,7 +11973,10 @@
                     }
                     restoredBc.isFromDeletion = false;
                     if (restoredBc.isClosed) restoredBc.closedAt = getServerNow();
-                    else delete restoredBc.closedAt;
+                    else {
+                        delete restoredBc.closedAt;
+                        restoredBc.restoredAt = getServerNow();
+                    }
                 });
             } else if (restoredWasRemoved) {
                 const legacyCod = parseFloat(itemToRestore.cod) || 0;
@@ -11932,7 +11989,9 @@
                 if (!target.barcodes || !Array.isArray(target.barcodes)) target.barcodes = [];
                 if (itemToRestore.barcodes && Array.isArray(itemToRestore.barcodes)) {
                     itemToRestore.barcodes.forEach(restoredBc => {
-                        if (!target.barcodes.some(b => b && b.code === restoredBc.code)) target.barcodes.push({ ...restoredBc });
+                        const existing = target.barcodes.find(b => b && b.code === restoredBc.code);
+                        if (!existing) target.barcodes.push({ ...restoredBc });
+                        else if (target.restoreClaimId === restoredId && !restoredBc.isClosed) existing.restoredAt = restoredBc.restoredAt;
                     });
                 }
                 target.count = target.barcodes.length;

@@ -5,7 +5,7 @@
     "zoew_scan_history_cod_dod": {
       ".read": "auth != null",
       "$itemId": {
-        ".write": "auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))",
+        ".write": "(auth != null && (newData.exists() || !data.child('clearClaim').exists() || (data.child('clearClaim').child('token').isString() && data.child('clearClaim').child('claimedAt').isNumber() && newData.parent().parent().child('zoew_clear_history_finalizations').child($itemId).child('token').val() === data.child('clearClaim').child('token').val()))) && (!data.child('restoreClaimId').isString() || !data.child('restoreClaimToken').isString() || (newData.child('restoreClaimId').val() === data.child('restoreClaimId').val() && newData.child('restoreClaimToken').val() === data.child('restoreClaimToken').val()) || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('token').val() !== data.child('restoreClaimToken').val() || root.child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).child('restoreClaim').child('claimedAt').val() <= now - 120000 || (!newData.parent().parent().child('zoew_recently_deleted_cod_dod').child(data.child('restoreClaimId').val()).exists() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('token').val() === data.child('restoreClaimToken').val() && newData.parent().parent().child('zoew_restore_finalizations').child(data.child('restoreClaimId').val()).child('targetId').val() === $itemId))",
         "id": {
           ".validate": "newData.isString()"
         },
@@ -106,6 +106,9 @@
             },
             "$other": {
               ".validate": false
+            },
+            "restoredAt": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
             }
           }
         },
@@ -260,6 +263,9 @@
             },
             "$other": {
               ".validate": false
+            },
+            "restoredAt": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
             }
           }
         },

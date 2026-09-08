@@ -257,30 +257,71 @@ const dropFn = sliceFn('dropStaleRestoreMarkers');
 const hasMarkersFn = sliceFn('itemHasRestoreMarkers');
 ok('រកឃើញ dropStaleRestoreMarkers និង itemHasRestoreMarkers', !!dropFn && !!hasMarkersFn);
 
-function runDrop(opts) {
+async function runDrop(opts) {
+    const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    const operations = new Set();
+    const reads = [];
+    const transactions = [];
+    let serverItem = clone(opts.item);
+    const defer = (operation) => {
+        const pending = new Promise((resolve, reject) => setTimeout(() => {
+            try { resolve(operation()); } catch (error) { reject(error); }
+        }, 0));
+        operations.add(pending);
+        pending.then(() => operations.delete(pending), () => operations.delete(pending));
+        return pending;
+    };
+    const fb = {
+        ref: (_, node) => ({ path: node }),
+        get: (ref) => defer(() => {
+            reads.push(ref.path);
+            if (opts.sourceReadFails) throw new Error('SOURCE_READ_UNAVAILABLE');
+            const sources = opts.serverItems || opts.deletedItems;
+            const id = ref.path.split('/').pop();
+            const source = sources.find((item) => item && item.id === id) || null;
+            return { exists: () => source !== null, val: () => clone(source) };
+        }),
+        runTransaction: (ref, updater) => defer(() => {
+            transactions.push(ref.path);
+            if (ref.path !== 'zoew_scan_history_cod_dod/' + opts.item.id) throw new Error('WRONG_HISTORY_TRANSACTION_PATH');
+            const result = updater(clone(serverItem));
+            if (result !== undefined) serverItem = clone(result);
+            return { committed: result !== undefined, snapshot: { val: () => clone(serverItem) } };
+        })
+    };
     const sandbox = {
-        console, Set, Date, JSON, Object, Array, String, Number, Boolean,
+        console: { error() {} }, Set, Map, Date, JSON, Object, Array, String, Number, Boolean,
+        setTimeout, clearTimeout, db: {}, fb, window: {}, getServerNow: () => Date.now(),
+        DB_OP_TIMEOUT_MS: 1000, RESTORE_CLAIM_LEASE_MS: 120000,
+        staleRestoreMarkerSweeps: new Set(),
         dbListenerPendingPaths: new Set(opts.pending),
         // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ**
         // «listener ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវមាន Set ទាំង ២។
         dbListenerFailedPaths: new Set(opts.failed || []),
         deletedItems: opts.deletedItems,
-        activeRestoreClaims: new Set(opts.activeClaims || []),
-        isActiveRestoreClaim: (claim) => !!(claim && claim.token && (Date.now() - claim.at) < 120000)
+        activeRestoreClaims: new Map((opts.activeClaims || []).map((id) => [id, {}]))
     };
     const ctx = vm.createContext(sandbox);
     // ⛔ កូនសោនេះត្រូវយកចេញពី **កូដពិត** — បើយកតម្លៃដោយដៃ នោះតេស្តនឹងបៃតង
     // ទោះ `app.js` សរសេរកូនសោខុសក៏ដោយ (នោះជាបញ្ហាដែលឯកសារនេះដេញតាម)។
     vm.runInContext('const DB_LISTENER_KEY_DELETED = ' + JSON.stringify(DELETED_KEY_IN_CODE) + ';', ctx);
-    vm.runInContext(hasMarkersFn || 'function itemHasRestoreMarkers(i){return !!(i&&(i.restoreClaimId!==undefined||i.restoreClaimToken!==undefined));}', ctx);
-    // helper **ពិត** ពី app.js បើមាន; បើអត់ ➜ stub ដែលរក្សាឥរិយាបថចាស់
-    // ➜ ការអះអាងធ្លាក់ដោយហេតុផលរបស់វា មិនមែនដោយ ReferenceError។
-    vm.runInContext(sliceFn('dbListenerViewIsStale')
-        || 'function dbListenerViewIsStale(k) { return dbListenerPendingPaths.has(k); }', ctx);
-    vm.runInContext(dropFn || 'function dropStaleRestoreMarkers(){ return false; }', ctx);
-    sandbox.__item = opts.item;
+    const dependencyNames = ['itemHasRestoreMarkers', 'dbListenerViewIsStale', 'clearStaleRestoreMarkers',
+        'isActiveRestoreClaim', 'dbOp', 'dbOpStalled', 'withTimeout', 'dropStaleRestoreMarkers'];
+    const dependencies = dependencyNames.map((name) => {
+        const source = sliceFn(name);
+        if (!source) throw new Error('Function ពិតបាត់៖ ' + name);
+        return source;
+    });
+    vm.runInContext(dependencies.join('\n'), ctx);
+    sandbox.__item = clone(opts.item);
     const dropped = vm.runInContext('dropStaleRestoreMarkers(__item)', ctx);
-    return { dropped, item: sandbox.__item };
+    for (let round = 0; round < 100; round++) {
+        await Promise.allSettled(Array.from(operations));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (!operations.size && !sandbox.staleRestoreMarkerSweeps.size) break;
+    }
+    if (operations.size || sandbox.staleRestoreMarkerSweeps.size) throw new Error('ការសម្អាត marker មិនចប់');
+    return { dropped, item: dropped ? sandbox.__item : serverItem, localItem: sandbox.__item, serverItem, reads, transactions };
 }
 
 // កូនសោដែលកូដពិតដាក់ចូលសម្រាប់ node ធុងសំរាម
@@ -289,50 +330,53 @@ ok('⛔ កូនសោការការពារ ត្រូវជាសម�
     { guard: DELETED_KEY_IN_CODE, inserted: pendingKeys });
 const TRASH_KEY = DELETED_KEY_IN_CODE;
 
+async function runBehaviorChecks() {
 // ២ក. snapshot ធុងសំរាមមិនទាន់មក ➜ **ត្រូវរង់ចាំ** មិនត្រូវលុប marker
 {
-    const r = runDrop({
+    const r = await runDrop({
         pending: [TRASH_KEY],
         deletedItems: [],
         item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' }
     });
     ok('⛔ snapshot ធុងសំរាមមិនទាន់មក ➜ marker របស់ការស្តារឆ្លងឧបករណ៍ **មិនត្រូវលុប**',
-        r.dropped === false && r.item.restoreClaimToken === 'tok_abc', r.item);
+        r.dropped === false && r.item.restoreClaimToken === 'tok_abc' && !r.reads.length && !r.transactions.length, r);
 }
 
 // ២ខ. snapshot មកគ្រប់ហើយ ហើយ claim នៅរស់ ➜ ក៏មិនត្រូវលុបដែរ
 {
-    const r = runDrop({
+    const r = await runDrop({
         pending: [],
-        deletedItems: [{ id: 'trash_1', restoreClaim: { token: 'tok_abc', at: Date.now() } }],
+        deletedItems: [{ id: 'trash_1', restoreClaim: { token: 'tok_abc', claimedAt: Date.now() } }],
         item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' }
     });
-    ok('claim នៅរស់ ➜ marker មិនត្រូវលុប', r.dropped === false && r.item.restoreClaimToken === 'tok_abc', r.item);
+    ok('claim នៅរស់ ➜ marker មិនត្រូវលុប', r.dropped === false && r.item.restoreClaimToken === 'tok_abc' && !r.transactions.length, r);
 }
 
 // ២គ. ទិសផ្ទុយ ៖ snapshot មកគ្រប់ ហើយប្រភពលែងមាន ➜ marker **ងាប់ពិត** ➜ ត្រូវលុប
 //     បើអត់ការអះអាងនេះ ការ «រង់ចាំគ្រប់ពេល» នឹងបៃតងដោយខុស ហើយ marker ងាប់
 //     នឹងជាប់ជារៀងរហូត (ថ្នាក់កំហុសផ្ទុយពីខាងលើ)។
 {
-    const r = runDrop({
+    const r = await runDrop({
         pending: [],
         deletedItems: [],
         item: { id: 'id_1', restoreClaimId: 'trash_gone', restoreClaimToken: 'tok_old' }
     });
     ok('⛔ ទិសផ្ទុយ ៖ snapshot មកគ្រប់ + ប្រភពលែងមាន ➜ marker ងាប់ **ត្រូវលុប**',
-        r.dropped === true && r.item.restoreClaimToken === undefined, r.item);
+        r.item.restoreClaimToken === undefined && r.item.restoreClaimId === undefined, r);
+    ok('marker ងាប់ត្រូវកែតាម return synchronous ចាស់ ឬ transaction async ពិត',
+        r.dropped === true || (r.reads[0] === 'zoew_recently_deleted_cod_dod/trash_gone' && r.transactions.length === 1 && !r.serverItem.restoreClaimToken), r);
 }
 
 // ២ឃ. path ផ្សេងនៅរង់ចាំ តែធុងសំរាមមកដល់ហើយ ➜ មិនត្រូវទប់ការសម្អាត marker ងាប់
 {
     const otherKey = pendingKeys.find((k) => k !== TRASH_KEY) || 'history';
-    const r = runDrop({
+    const r = await runDrop({
         pending: [otherKey],
         deletedItems: [],
         item: { id: 'id_1', restoreClaimId: 'trash_gone', restoreClaimToken: 'tok_old' }
     });
     ok('path ផ្សេងរង់ចាំ តែធុងសំរាមមកដល់ ➜ marker ងាប់នៅតែត្រូវលុប',
-        r.dropped === true, r.item);
+        r.item.restoreClaimToken === undefined && r.item.restoreClaimId === undefined, r);
 }
 
 // ២ង. ⛔ **listener `deleted` ងាប់** ➜ ទិដ្ឋភាពកក ➜ marker មិនត្រូវលុប
@@ -343,27 +387,50 @@ const TRASH_KEY = DELETED_KEY_IN_CODE;
 // `deletedItems` ដែលកក** ➜ marker របស់ឧបករណ៍ **ផ្សេង** ដែលកំពុងស្តារ
 // ត្រូវលុប ➜ `permission_denied` ➜ «ដក»/«លុប» ស្លាប់ជារៀងរហូត។
 {
-    const r = runDrop({
+    const r = await runDrop({
         pending: [],
         failed: [TRASH_KEY],
         deletedItems: [],
         item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' }
     });
     ok('⛔ listener `deleted` ងាប់ (pending ទទេ) ➜ marker **មិនត្រូវលុប**',
-        r.dropped === false && r.item.restoreClaimId === 'trash_1', r.item);
+        r.dropped === false && r.item.restoreClaimId === 'trash_1' && !r.reads.length && !r.transactions.length, r);
 }
 
 // ⛔ ទិសផ្ទុយ ៖ គ្មាន pending ហើយក៏គ្មានការងាប់ ➜ marker ងាប់ត្រូវលុបដដែល
 {
-    const r = runDrop({
+    const r = await runDrop({
         pending: [],
         failed: [],
         deletedItems: [],
         item: { id: 'id_1', restoreClaimId: 'trash_gone', restoreClaimToken: 'tok_old' }
     });
     ok('⛔ ទិសផ្ទុយ ៖ listener ទាំងអស់រស់ ➜ marker ងាប់នៅតែត្រូវលុប',
-        r.dropped === true, r.item);
+        r.item.restoreClaimToken === undefined && r.item.restoreClaimId === undefined, r);
 }
 
+{
+    const r = await runDrop({ pending: [], deletedItems: [], activeClaims: ['trash_1'],
+        item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' } });
+    ok('claim របស់ឧបករណ៍នេះកំពុងស្តារ ➜ marker នៅគ្រប់',
+        r.dropped === false && r.item.restoreClaimToken === 'tok_abc' && !r.transactions.length, r);
+}
+{
+    const r = await runDrop({ pending: [], deletedItems: [],
+        serverItems: [{ id: 'trash_1', restoreClaim: { token: 'tok_abc', claimedAt: Date.now() } }],
+        item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' } });
+    ok('snapshot ក្នុងម៉ាស៊ីនខ្វះប្រភព តែ server claim រស់ ➜ marker មិនត្រូវលុប',
+        r.dropped === false && r.item.restoreClaimToken === 'tok_abc' && r.reads.length === 1 && !r.transactions.length, r);
+}
+{
+    const r = await runDrop({ pending: [], deletedItems: [], sourceReadFails: true,
+        item: { id: 'id_1', restoreClaimId: 'trash_1', restoreClaimToken: 'tok_abc' } });
+    ok('អានប្រភព server បរាជ័យ ➜ marker ត្រូវរក្សា និងមិនចាប់ transaction',
+        r.dropped === false && r.item.restoreClaimToken === 'tok_abc' && r.reads.length === 1 && !r.transactions.length, r);
+}
+}
+
+runBehaviorChecks().then(() => {
 console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);
+}, (error) => { console.error(error.stack || error); process.exit(1); });

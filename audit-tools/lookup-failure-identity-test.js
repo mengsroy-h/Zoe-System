@@ -217,8 +217,9 @@ scenario('Config/auth ខុស ➜ សាលក្រមស្ថាពរ', as
         badConfig.text.indexOf('body:invalid-json') !== -1, badConfig.text);
 
     const expired = await run([{ status: 401, code: 'ZTO_AUTH_EXPIRED' }]);
-    ok('⛔ ZTO_AUTH_EXPIRED ➜ សារប្រាប់ឲ្យរត់ sync tool ទៅ Netlify Blobs',
-        expired.text.indexOf('ZTO Cookie Sync') !== -1 && expired.text.indexOf('Netlify Blobs') !== -1,
+    ok('⛔ ZTO_AUTH_EXPIRED ➜ ប្រាប់ថា ZTO បដិសេធ ហើយឲ្យរត់ sync tool លើ Windows',
+        expired.text.indexOf('ZTO Cookie Sync') !== -1 && expired.text.indexOf('Windows') !== -1
+        && /បដិសេធ/.test(expired.text) && !/ផុតកំណត់/.test(expired.text),
         expired.text);
     ok('⛔ ZTO_AUTH_EXPIRED ➜ មិនប្រាប់ឲ្យដាក់ Cookie ក្នុង Netlify ដោយដៃ',
         expired.text.indexOf('ចូល Argus យក Cookie ថ្មី ដាក់ក្នុង Netlify') === -1,

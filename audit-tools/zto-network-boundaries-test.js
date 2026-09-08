@@ -157,7 +157,9 @@ async function main() {
                     ZTO_REQUEST_BUDGET_MS: '9000', ZTO_CACHE_TTL_MS: '0' });
                 proxy.resetCachesForTests();
                 proxy.setBlobsModuleForTests({ connectLambda() {}, getStore() {
-                    return { get: async () => stored, set: async () => {} };
+                    return { get: async () => stored,
+                        getWithMetadata: async () => ({ data: stored, etag: '"' + stored.length + '"', metadata: {} }),
+                        set: async () => {} };
                 } });
                 await proxy.handler(event({ diag: '1' }));
                 stored = FRESH;

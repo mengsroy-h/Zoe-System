@@ -608,8 +608,9 @@ queue.then(() => {
     ok('ផ្លូវស្កេនយក `reason` ពី proxy', errorBuilder.indexOf('error.lookupReason = safeLookupReason(body && body.reason)') !== -1);
     ok('⛔ ការឆ្លើយតបមិន ok ប្រើអ្នកសាងកំហុសដដែល (អត្តសញ្ញាណមិនបាត់)',
         lookupSource.indexOf('throw lookupResponseError(out.res.status, data, false)') !== -1);
-    ok('សារ ZTO_AUTH_EXPIRED ប្រាប់ឲ្យយក Cookie ថ្មី',
-        lookupSource.indexOf("e.lookupCode === 'ZTO_AUTH_EXPIRED'") !== -1 && lookupSource.indexOf('Cookie ZTO ផុតកំណត់') !== -1);
+    ok('សារ ZTO_AUTH_EXPIRED ប្រាប់ថា ZTO បដិសេធ Cookie ដោយមិនអះអាងថាផុតកំណត់តាមពេល',
+        lookupSource.indexOf("e.lookupCode === 'ZTO_AUTH_EXPIRED'") !== -1
+        && /ZTO បដិសេធ Cookie/.test(lookupSource) && !/Cookie ZTO ផុតកំណត់/.test(lookupSource));
     ok('សារ ZTO_CONFIG_INVALID មាន', lookupSource.indexOf("e.lookupCode === 'ZTO_CONFIG_INVALID'") !== -1);
     ok('សារ ZTO_RATE_LIMITED មាន', lookupSource.indexOf("e.lookupCode === 'ZTO_RATE_LIMITED'") !== -1);
 

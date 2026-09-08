@@ -76,6 +76,44 @@ function fakeResponse(status, data, counters) {
     };
 }
 
+function emitOrderResponse(context, cookie) {
+    const request = {
+        url: () => 'https://aargus-api.ztoglobal.com/scan/get/order/detail',
+        method: () => 'POST',
+        allHeaders: async () => ({ cookie })
+    };
+    context.emit('request', request);
+    context.emit('response', {
+        url: request.url,
+        request: () => request,
+        status: () => 200,
+        allHeaders: async () => ({ 'content-type': 'application/json' }),
+        headerValues: async () => [],
+        body: async () => Buffer.from('{"success":true,"data":{}}')
+    });
+}
+
+function responseValuesReachConsole(src) {
+    if (!acorn) return true;
+    let found = false;
+    function inspect(node, withinConsole) {
+        if (!node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.forEach((child) => inspect(child, withinConsole)); return; }
+        if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+            && node.callee.object.name === 'console') {
+            inspect(node.arguments, true);
+            return;
+        }
+        if (withinConsole && node.type === 'Identifier' && /^(?:response|cleanCookie|credentials)$/.test(node.name)) found = true;
+        for (const [key, value] of Object.entries(node)) {
+            if (key !== 'loc' && value && typeof value === 'object') inspect(value, withinConsole);
+        }
+    }
+    try { inspect(acorn.parse(src, { ecmaVersion: 2022 }), false); }
+    catch (_) { return true; }
+    return found;
+}
+
 const source = read(SOURCE_PATH);
 const setup = read(SETUP_PATH);
 const runner = read(RUN_PATH);
@@ -122,11 +160,9 @@ async function run() {
         api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ HTTP', api && !api.isTargetApiUrl('http://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ host បន្លំ', api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com.evil.test/scan/get/order/detail'));
-    // ⛔ Cookie ជារបស់ **domain** មិនមែន path ➜ សំណើណាមួយទៅ host នោះក៏ផ្ទុក
-    // BOS-MAN-SESSION ដដែល ➜ អ្នកប្រើលែងត្រូវចុចបើកកញ្ចប់រាល់ដង។
-    // ការការពារពិតគឺ validateCookieHeader() ដែលទាមទារ session ពិត។
-    ok('ទទួល path ណាមួយលើ host ដដែល (លែងត្រូវចុចបើកកញ្ចប់)',
-        api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other'));
+    // ⛔ request ដែលមាន Cookie មិនបញ្ជាក់ថា session នៅតែប្រើបានទេ។
+    ok('path ផ្សេងមិនអាចជំនួស Order Detail ដែលផ្ទៀងផ្ទាត់ session',
+        api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other'));
     ok('បដិសេធ host ផ្សេងទាំងស្រុង',
         api && !api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'));
     ok('ប្រើ request.allHeaders() ពិត', /await request\.allHeaders\(\)/.test(source));
@@ -254,7 +290,7 @@ async function run() {
         && /finish\(codedError\('NETLIFY_TIMEOUT'[^)]*\)\)/.test(source));
     ok('response ដែលអាចមាន secret ត្រូវ discard មិន print body',
         /await discardResponse\(response\)/.test(source)
-        && !/console\.(log|error)\([^\r\n]*(response|cleanCookie|credentials\.token)/.test(source));
+        && !responseValuesReachConsole(source));
     ok('គ្មាន server-side token/update endpoint ឬ Netlify CLI login',
         !/ZTO_COOKIE_UPDATE_KEY|NETLIFY_AUTH_TOKEN|netlify-cli|\['login'\]|\['link'\]/.test(source + setup + configure));
     ok('Cookie មិនសរសេរចូល file/env',
@@ -279,14 +315,8 @@ async function run() {
 
         const context = new EventEmitter();
         const waiting = api.waitForOrderCookie(context, 200);
-        context.emit('request', {
-            url: () => 'https://aargus-api.ztoglobal.com/scan/get/order/detail',
-            allHeaders: async () => ({ cookie: 'sidebarStatus=0' })
-        });
-        setTimeout(() => context.emit('request', {
-            url: () => 'https://aargus-api.ztoglobal.com/scan/get/order/detail',
-            allHeaders: async () => ({ cookie: COOKIE })
-        }), 5);
+        emitOrderResponse(context, 'sidebarStatus=0');
+        setTimeout(() => emitOrderResponse(context, COOKIE), 5);
         ok('request មុន Login គ្មាន session ➜ រង់ចាំ request ត្រឹមត្រូវបន្ទាប់',
             await waiting === COOKIE);
     } else {
@@ -432,10 +462,11 @@ async function run() {
             proxyKey: PROXY_KEY,
             timeoutMs: 100,
             fetchImpl: diagResponder({
-                cookie: { source: 'blob', fingerprint: goodFingerprint, ageMs: 10, renewals: 2, authRejectedAgeMs: null }
+                cookie: { source: 'blob', fingerprint: goodFingerprint, ageMs: 10, renewals: 2,
+                    authRejectedAgeMs: null, authAcceptedAgeMs: 1000 }
             })
         });
-        ok('សុខភាព ៖ គ្មានការបដិសេធ ➜ healthy',
+        ok('សុខភាព ៖ ZTO បានទទួលយក ➜ healthy',
             healthy.status === 'ok' && healthy.healthy === true && healthy.renewals === 2,
             JSON.stringify(healthy));
 
@@ -918,10 +949,7 @@ async function run() {
 
         const ctx2 = new EventEmitter();
         const waiting2 = api.waitForOrderCookie(ctx2, 400);
-        ctx2.emit('request', {
-            url: () => 'https://aargus-api.ztoglobal.com/scan/get/order/detail',
-            allHeaders: async () => ({ cookie: SESSION + '; _ga_ref=Mozilla 5.0' })
-        });
+        emitOrderResponse(ctx2, SESSION + '; _ga_ref=Mozilla 5.0');
         let captured;
         try { captured = await waiting2; } catch (e) { captured = 'THROW:' + e.code; }
         ok('⛔ jar ចម្លែក ➜ capture នៅតែជោគជ័យ មិនស្លាប់',

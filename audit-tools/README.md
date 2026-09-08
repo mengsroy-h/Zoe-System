@@ -224,6 +224,8 @@ bash audit-tools/emu/rules.sh
 | `zto-negative-cache-test.js` | ⛔ សាលក្រម «រកមិនឃើញ» ត្រូវចូល cache (TTL ខ្លី) ដោយ **ការបរាជ័យបណ្តោះអាសន្នមិនចូល** · ស្នាមភ្ជាប់ ៖ លេខលំនាំដើមក្នុង `ZTO-SETUP-KH.md` ត្រូវស៊ីនឹងកូដ | `ZTONEG_APP_DIR` |
 | `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` · ការព្យាយាមឡើងវិញមានពិដានពេលបណ្តាញដាច់ | `ZTO_SYNC_APP_DIR` |
 | `zto-network-boundaries-test.js` | HTTP body ព្យួរ/លើសទំហំ/ដាច់កណ្តាល · រក្សា HTTP rejection · Cookie ថ្មីប្រើ single-flight តែមួយ | `ZTO_BOUNDARIES_APP_DIR` |
+| `zto-cookie-session-test.js` | ការបន្ត Cookie ឆ្លង TTL · ទប់ write ចាស់ជាន់ Sync ថ្មី · សាលក្រម auth តាម Cookie | `ZTO_SESSION_APP_DIR` |
+| `zto-cookie-capture-test.js` | រង់ចាំ Order Detail response ពិត · Cookie ក្រោយ renewal · បែងចែក fingerprint និងសុពលភាព | `ZTO_CAPTURE_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។
@@ -263,6 +265,7 @@ bash audit-tools/emu/rules.sh
 | `layout-check.js` | CSS បំបែក/លើសទទឹង លើ 320–1440px (**អះអាង ២ ខាង**) | `LAYOUT_APP_DIR` |
 | `fluid-type-focus-test.js` | មាត្រដ្ឋានអក្សរ ៣ ជំហាន និងសញ្ញាផ្តោត | `FLUIDTYPE_APP_DIR` |
 | `gesture-test.js` | PTR · ការលាក់របា Tab · ចង្វាក់ស៊ុម | `GESTURE_APP_DIR` |
+| `history-menu-dismiss-test.js` | Chromium ពិត៖ ម៉ឺនុយ (...) បិទពេលអូសផ្ទាំង/រមូរខាងក្រៅ ហើយចុច/រមូរក្នុងម៉ឺនុយនៅប្រើបាន | `HISTORYMENU_APP_DIR` |
 | `panel-motion-test.js` | ចលនាផ្ទាំង ១:១ (កម្ពស់ស្មើ · snap ↔ PTR) | `PANELMOTION_APP_DIR` |
 | `ios-panel-glide-test.js` | ចលនាលើ iOS មិនឃ្លាតពី Android | `IOSGLIDE_APP_DIR` |
 | `phone-search-swipe-test.js` | កាយវិការអូស និង auto pull up | `SWIPE_APP_DIR` |

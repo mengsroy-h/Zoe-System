@@ -96,7 +96,8 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
-         lookup-burst-test health-check-test monthly-report-test zto-network-boundaries-test; do
+         lookup-burst-test health-check-test monthly-report-test zto-network-boundaries-test \
+         zto-cookie-session-test zto-cookie-capture-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -142,6 +143,7 @@ run "setup-link (browser ពិត)" node audit-tools/setup-link-browser-test.js
 run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
+run "history-menu (browser ពិត)" node audit-tools/history-menu-dismiss-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
 run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
 run "scan-remove (browser ពិត)" node audit-tools/scan-remove-mode-test.js
@@ -245,6 +247,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     WRITESTALL_APP_DIR="$BASE" node audit-tools/write-stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   write-stall:     /'
     MARKER_APP_DIR="$BASE" node audit-tools/restore-marker-hygiene-test.js 2>&1 | tail -1 | sed 's/^/   marker-hygiene:  /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
+    HISTORYMENU_APP_DIR="$BASE" node audit-tools/history-menu-dismiss-test.js 2>&1 | tail -1 | sed 's/^/   history-menu:    /'
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
@@ -295,6 +298,8 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTONEG_APP_DIR="$BASE" node audit-tools/zto-negative-cache-test.js 2>&1 | tail -1 | sed 's/^/   zto-neg-cache:   /'
     ZTO_SYNC_APP_DIR="$BASE" node audit-tools/zto-cookie-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-sync: /'
     ZTO_BOUNDARIES_APP_DIR="$BASE" node audit-tools/zto-network-boundaries-test.js 2>&1 | tail -1 | sed 's/^/   zto-boundaries:  /'
+    ZTO_SESSION_APP_DIR="$BASE" node audit-tools/zto-cookie-session-test.js 2>&1 | tail -1 | sed 's/^/   zto-session:     /'
+    ZTO_CAPTURE_APP_DIR="$BASE" node audit-tools/zto-cookie-capture-test.js 2>&1 | tail -1 | sed 's/^/   zto-capture:     /'
     ZTOSTORE_APP_DIR="$BASE" node audit-tools/zto-cookie-store-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-store:/'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'

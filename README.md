@@ -5,7 +5,7 @@
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.31.1` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.31.2` |
 | **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.19.21` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
@@ -127,9 +127,15 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក** — 
 - **Google Sheet** តាម Apps Script — មើល [`zto-import/`](zto-import/README.md)
 - **ZTO** តាម Netlify Function — មើល [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md)
 
-ពេល Cookie របស់ ZTO ផុតកំណត់ ៖ រត់
+ពេល ZTO បដិសេធ Cookie ៖ រត់
 [`tools/zto-cookie-sync-windows/`](tools/zto-cookie-sync-windows/README-KH.md)
-លើ Windows ➜ វាសរសេរ Cookie ថ្មីចូល **Netlify Blobs** ➜ **មិនបាច់ redeploy**។
+លើ Windows ➜ Login Argus ➜ **Scan Management ➜ Arrival Scan** ➜ ស្កេន
+Waybill មួយ ហើយរង់ចាំ ZTO ឆ្លើយ។ ឧបករណ៍សរសេរ Cookie ចូល **Netlify Blobs**
+ដោយ **មិនបាច់ redeploy**។
+
+ការផ្ទៀងផ្ទាត់ថា Function ឃើញ Cookie ដូចគ្នា មិនប្រាប់អាយុសុពលភាពដែលនៅសល់ទេ។
+ពិនិត្យស្ថានភាពក្នុង ZoeW ក្រោយ Lookup មួយ៖ **ទទួលយក**, **បដិសេធ** ឬ
+**មិនទាន់ផ្ទៀងផ្ទាត់**។ Timeout ប្រាប់ថាសំណើយឺត; សូមសាកម្ដងទៀតពេលបណ្ដាញល្អ។
 
 ### ៥. ចេញ Activation Key (ZoeKeyGen)
 

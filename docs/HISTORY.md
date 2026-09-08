@@ -69,6 +69,31 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeW 2.31.2] — 2026-09-08 · Cookie ក្រោយ Sync និងម៉ឺនុយប្រវត្តិ
+
+**ZoeW** (`zoew-v181` ➜ `zoew-v182`)។ ZoeKeyGen រក្សា `2.19.21`។
+
+- Cookie ដែល ZTO ទើបបន្ត ត្រូវបានការពារពីការអាន store ចាស់ និងសំណើចាស់
+  ដែលទើបឆ្លើយ។ ការរក្សាទុកមានលក្ខខណ្ឌតាម ETag ដើម្បីទប់ការសរសេរជាន់
+  Cookie ដែលបាន Sync ពី Windows ឬ Function ផ្សេង។
+- ស្ថានភាព Cookie បែងចែក ទទួលយក/បដិសេធ/មិនទាន់វាស់ តាម credential
+  ដែល ZTO បានប្រើពិត។ Timeout មិនរាយថា Cookie ផុតកំណត់ទៀត។
+- Windows Sync រង់ចាំ Order Detail response ជោគជ័យ និងបញ្ចូល Cookie
+  ដែល response បន្ត មុនបិទ browser។ ការផ្ទៀងផ្ទាត់ការផ្ទុក Cookie
+  ប្រាប់ដាច់ពីការទទួលយករបស់ ZTO។
+- ម៉ឺនុយ (...) ខាងលើប្រវត្តិ និងតាមជួរ បិទពេលចាប់ផ្តើមអូសខាងក្រៅ
+  រួមទាំងអូសចេញពីប៊ូតុង។ ការចុច និងរមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ក្រោយ merge និង Netlify deploy សូមបើក ZoeW ឡើងវិញឲ្យឃើញ `2.31.2`។
+- លើ Windows សូមយកឯកសារ helper កំណែថ្មីទៅថតឧបករណ៍ដដែល។ រក្សា
+  profile និងការកំណត់ដែលមាន រួច Login Argus ➜ Arrival Scan ➜ Lookup
+  Waybill ជោគជ័យ ➜ Sync។ ការប្តូរ Cookie មិនត្រូវការ redeploy បន្ថែមទេ។
+- ផ្ទៀងផ្ទាត់ Lookup ក្រោយ Sync និងក្រោយរង់ចាំលើស ៥ នាទី; ពិនិត្យម៉ឺនុយ
+  ទាំង ២ ពេលអូសប្រវត្តិលើទូរស័ព្ទ។ ការធានាអាយុ session ពិតនៅត្រូវវាស់
+  ជាមួយ ZTO និងឧបករណ៍របស់អ្នកប្រើ។ Firebase rules និង env មិនប្រែ។
+
 ### [ZoeW 2.31.1 / ZoeKeyGen 2.19.21] — 2026-09-08 · លុយ · Restore · បណ្តាញ · Secret · ZTO
 
 **App ទាំង ២ ប្រែ**៖ ZoeW `zoew-v181` និង ZoeKeyGen `zoekeygen-v91`។
@@ -5328,6 +5353,75 @@ CSP ក៏មិនប្រែដែរ។
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
 
+### 2.31.2 — 2026-09-08 · Cookie ក្រោយ Sync និងម៉ឺនុយដែលជាប់ពេលអូស
+
+**របាយការណ៍អ្នកប្រើ**៖ Cookie ទើប Sync មិនទាន់ ៥ នាទី ត្រូវរាយថា expire;
+រូបថតបង្ហាញម៉ឺនុយប្រវត្តិ (...) នៅអណ្ដែតពេលអូសផ្ទាំង។ Baseline ជា main
+`db9ec681f5e67a8e307cea292ea08131f471607e` ដែលមាន tree ដូច audit commit
+`50dfdb0080408236af8b4ad771f5153aa7b2c621`។
+
+ការប្រៀបធៀបមុន audit `f63f39e` បង្ហាញថា proxy ប្រែតែកូនសោ single-flight
+មួយបន្ទាត់ និង Windows helper ប្រែផ្នែក timeout/body។ បញ្ហា renewal/expiry
+ដែលរកឃើញខាងក្រោម ក៏បង្កើតបានលើកូដមុន audit; មិនទាន់មានភស្តុតាងភ្ជាប់
+មូលហេតុជាក់លាក់ទៅ session ផលិតកម្មដែលអ្នកប្រើរាយទេ។
+
+- **Cookie ថ្មីត្រូវចាស់សរសេរជាន់**៖ A ➜ B សរសេរទៅ Blobs; B ➜ C
+  ក្នុង ១ វិនាទីត្រូវ throttle ៦០ វិនាទី។ ក្រោយ TTL, background read យក B
+  មកជាន់ C។ Handler ពិតក្នុង fixture ឆ្លើយ **200, 200, 200, 401** នៅ
+  ប្រហែល **៦២ វិនាទី** ទាំងមុន និងក្រោយ audit។ ការកែរក្សា pending renewal,
+  ទប់ចម្លើយចាស់ និងសរសេរដោយ ETag មានលក្ខខណ្ឌ។ Session ស្នូលដែលប្រែ
+  ត្រូវសរសេរភ្លាមក្នុងថវិកា; throttle នៅលើការប្តូរ Cookie ជំនួយ និង retry
+  នៃតម្លៃដដែល (`zto-cookie-session-test.js`)។
+  Checker ចុងក្រោយលើ baseline៖ **3 PASS / 22 FAIL** ➜ **25 PASS**។
+  Existing store **81**, budget **39**, network boundaries **11** និង
+  negative cache **35 PASS**។ គ្រប cold instance ក្រោយ rotation លើកទី ២,
+  fresh read បរាជ័យ, write មកយឺត និង invalid store ជាមួយ env fallback។
+- **សាលក្រមចាស់ជាប់ Cookie ថ្មី**៖ store adoption មិនសម្អាត auth verdict
+  ហើយចម្លើយយឺតពី credential ចាស់អាចប្តូរស្ថានភាព credential ថ្មី។ ការកែ
+  ចងសាលក្រមទៅ identity/version របស់សំណើ និងរក្សាការចងចាំដែលនៅប្រើបាន
+  ពេលការអាន store បរាជ័យ។
+- **Sync មិនបានផ្ទៀងផ្ទាត់ upstream**៖ request ទៅ API path ណាមួយអាច
+  បញ្ចប់ capture មុនឆ្លើយ 401 ឬមុន Set-Cookie ថ្មី។ Fingerprint ត្រូវគ្នា
+  ក៏ធ្លាប់រាយជោគជ័យទោះមាន verdict rejected។ តេស្ត capture ពិតចេញពី
+  source៖ baseline **6 PASS / 34 FAIL** ➜ **40 PASS / 0 FAIL**។
+- **សារដែលសន្និដ្ឋានលើសភស្តុតាង**៖ timeout និង rejection ត្រូវហៅថា
+  expire។ Actual-source health checker៖ **93 PASS / 5 FAIL** ➜
+  **98 PASS**; proxy **135 PASS** និង lookup failure identity **39 PASS**។
+- **ម៉ឺនុយជាប់**៖ កូដរង់ចាំ click/scroll ខណៈ panel ប្រើ transform។
+  Chromium full-app checker៖ baseline **22 PASS / 7 FAIL** ➜ **29 PASS**;
+  គ្រប header/row, touch start, transform មុន native scroll, desktop wheel,
+  menu action និង internal scroll។ Gesture **107**, panel motion **47**,
+  iOS glide gate ក្នុង Chromium **32 PASS**។ មិនបានកែ PTR/animation/CSS។
+
+**ផ្ទៀងផ្ទាត់ឯករាជ្យ**៖ pinned SDK `@netlify/blobs 11.0.2` រាយ
+`modified:true` តែ ETag ទទេលើ conditional write ដែល HTTP 401/403/5xx។
+កូដមិនត្រូវរាប់វាថារក្សាទុករួច។ តេស្ត actual SDK ជាមួយ network fixture
+ផ្ទៀងផ្ទាត់ 200/401/403/412/503 ដាច់ពីតេស្ត handler។ Chromium + local HTTP
+ក៏ផ្ទៀងផ្ទាត់ request/response headers ពិត, HTTPOnly Set-Cookie និងការរង់ចាំ
+401 ➜ 200; adapter ប្តូរតែ URL សម្រាប់ target matcher ដោយមិនប្តូរ response
+methods។ វាមិនមែនការវាស់ live ZTO ឬ Windows Edge ពិតទេ។
+
+**CI ពេញលេញលើកូដ freeze**៖ **152 PASS / 1 FAIL / 0 PARTIAL / 0 SKIP**,
+exit **1**, **1275.094 វិនាទី**។ តេស្តដែលធ្លាក់គឺ
+`ios-panel-glide-test.js`៖ Android snap អំឡុងចលនា **31 PASS / 1 FAIL**។
+Assertion ពិនិត្យ sample ទាំងអស់ តែ log បង្ហាញតែ ៦ ដំបូងដែលសុទ្ធតែ `none`;
+វាមិនផ្ទុក sample ខូចពេញលេញទេ។ **មិនអះអាងថា CI បៃតងទាំងអស់ឡើយ**។
+
+ការស៊ើបអង្កេតដាច់ដោយឡែករក្សា assertions ដើមដដែល៖ baseline និងកូដថ្មី
+**៣ ដងក្នុងមួយ tree**, សរុប **៦ ដង × 32 PASS** និង **៦៧២ rAF samples**
+មិនឃើញ sample ខូច។ វាមិនទាន់បញ្ជាក់ថា failure ដើមជាបញ្ហា observer ឬ
+ផលិតកម្មទេ។ CSS, កូដ panel motion, gesture និង checker ដើមដូច main
+បេះបិទ; គ្មានការកែតំបន់ iOS ដែលអ្នកប្រើហាម ឬបន្ធូរ assertion ដើម្បីឲ្យឆ្លង។
+Original checker ដែលមិន instrument ក៏រត់ baseline/new មួយដងក្នុងមួយបាន
+**32/32 PASS**; សរុបការស៊ើបអង្កេត **៨ ជុំ** ដោយរក្សា failure ក្នុង CI ដើម។
+
+Strict money guardian ដាច់ដោយឡែក៖ **22 PASS**, mutation **10/10** ចាប់បាន,
+exit **0**, **73.361 វិនាទី**។ Fuzz បន្ថែម seed **100–113**, **14 × 50 = 700**
+ប្រតិបត្តិការ៖ **2/2 PASS**, exit **0**, **174.414 វិនាទី**។
+Runtime៖ Node **24.19.0** (workflow កំណត់ 22), Chromium **149.0.7827.0**,
+Java **17.0.20**, RTDB emulator **4.11.2**។ Source hashes **២២៥ ឯកសារ**
+មុន/ក្រោយ CI៖ គ្មាន non-Markdown, HEAD ឬ base ប្រែ។
+
 ### 2.31.1 / 2.19.21 — 2026-09-08 · Deep Audit លើកូដពិត និងការប្រណាំងពិត
 
 **Baseline**៖ `f63f39e591de1670c9bb2d8af0befd6ccf26188d`។ Snapshot ឯកសារ
@@ -8343,6 +8437,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `google-sheets-cache-test` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `hang-guard` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `history-patch-retry-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `history-menu-dismiss-test` | **ផ្នែក ១** · **ផ្នែក ២ — 2.31.2** |
 | `html-sink-escaping` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `inline-handler-xss-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `ios-panel-glide-test` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
@@ -8426,6 +8521,8 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `write-stall-guard-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `zto-budget-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `zto-cookie-store-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `zto-cookie-session-test` | **ផ្នែក ១** · **ផ្នែក ២ — 2.31.2** |
+| `zto-cookie-capture-test` | **ផ្នែក ១** · **ផ្នែក ២ — 2.31.2** |
 | `zto-cookie-sync-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `zto-negative-cache-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `zto-proxy-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |

@@ -212,7 +212,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `lookup-prefetch-test.js` | ការទាញតារាងជាមុន ៖ ព្យាយាមវិញលឿន តែមិនបាញ់ចំពេលស្កេន · ការដោះសោ PIN ➜ Lookup បន្តភ្លាម · Keyboard មិនលោតកាត់ការស្វែងរក | `LOOKUPPREFETCH_APP_DIR` |
 | `lookup-freshness-test.js` | នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម (client **និង** Apps Script) | `LOOKUPFRESH_APP_DIR` |
-| `lookup-failure-identity-test.js` | `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ | `LOOKUPFAILURE_APP_DIR` |
+| `lookup-failure-identity-test.js` | `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ · 401 ត្រូវណែនាំ Windows sync tool ➜ Netlify Blobs មិនមែន paste Cookie ដោយដៃ | `LOOKUPFAILURE_APP_DIR` |
 | `lookup-burst-test.js` | ការស្កេនជាបន្តបន្ទាប់ ៖ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `LOOKUPBURST_APP_DIR` |
 | `lookup-config-secret-test.js` | Secret របស់ Lookup API ត្រូវអ៊ិនគ្រីប | — |
 | `google-sheets-cache-test.js` | cache ខាង Apps Script | — |
@@ -267,6 +267,7 @@ bash audit-tools/emu/rules.sh
 | `page-nav-test.js` | រចនាសម្ព័ន្ធទំព័រ · របា Slide · Locker | `PAGENAV_APP_DIR` |
 | `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ · ប្រអប់ជាន់លើបិទ ➜ ផ្លូវលុប/កែ មិនខូច | `UIFLOW_APP_DIR` |
 | `toast-truth-test.js` | Toast និយាយការពិត realtime | `TOAST_APP_DIR` |
+| `toast-action-truth-test.js` | Toast សកម្មភាពសរសេរ៖ pending/reject/commit ពិត · static semantic marker ទាំង ២ App | `TOAST_ACTION_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
 | `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ · ច្បាប់ `@media` ដែលស្លាប់ | `CSSMEDIA_APP_DIR` |
@@ -281,6 +282,7 @@ bash audit-tools/emu/rules.sh
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
 | `scan-engine-test.js` | ល្បឿន · ជួរអាន · ភាពត្រឹមត្រូវនៃ Barcode (ITF ត្រូវបដិសេធ) | `SCAN_APP_DIR` |
+| `scan-remove-mode-test.js` | របៀបស្កេនដក៖ preview · transaction/trash/ledger · duplicate/no-op/XSS · responsive ៤ ទំហំ | `SCANREMOVE_APP_DIR` |
 | `duplicate-scan-test.js` | ការទប់ស្កាត់ Barcode ស្ទួន ៥ ជាន់ | `DUP_APP_DIR` |
 | `barcode-shape-test.js` | រូបរាង Barcode | `BARCODE_APP_DIR` |
 | `camera-resume-test.js` | កាមេរ៉ាកកក្រោយប្រអប់ native · dependency អវត្តមាន | `CAMERA_APP_DIR` |

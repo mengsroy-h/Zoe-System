@@ -69,6 +69,66 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [ZoeW 2.31.0 / ZoeKeyGen 2.19.20] — 2026-09-08 · 🗑️ ស្កេនដកកញ្ចប់ · 🔔 Toast និយាយតាម commit ពិត
+
+**App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v179` ➜ `zoew-v180`, `2.30.10` ➜
+`2.31.0`) និង ZoeKeyGen (`zoekeygen-v89` ➜ `zoekeygen-v90`, `2.19.19` ➜
+`2.19.20`)។ ZoeKeyGen ប្រែតែ semantic toast; មុខងារ Key និង Firebase path
+មិនប្រែ។
+
+#### មុខងារថ្មី — ស្កេន Barcode ដើម្បីដកកញ្ចប់
+
+- ទំព័រ «ស្កេន» មានរបៀបទី ៣ **ស្កេនដកកញ្ចប់**។ កាមេរ៉ា, hardware scanner,
+  រូបភាព និងការវាយដៃឆ្លងកាត់ route តែមួយដូចការស្កេនធម្មតា។
+- មុនដក ផ្ទាំងព្រមានបង្ហាញ Barcode, លេខទូរស័ព្ទ, Locker, COD, DOD និង
+  ស្ថានភាពឲ្យផ្ទៀងផ្ទាត់។ ប៊ូតុងដកដោយដៃក្នុងបញ្ជី Barcode ត្រូវបានដកចេញ;
+  ម៉ឺនុយនៅសល់ «កែតម្លៃកញ្ចប់»។
+- សោ in-flight ទប់ការចុចបញ្ជាក់/ស្កេនស្ទួន។ Barcode ដែលនៅក្នុង trash រួច,
+  លែងមាន ឬ listener មិនទាន់ស្រស់ មិនអាចដក ឬកាត់ប្រាក់ស្ទួន។ របៀបដកមិន
+  persist ទេ — reload ត្រឡប់ទៅ «បញ្ចូលកញ្ចប់»។
+- ច្បាប់លុយមិនប្រែ៖ **ដក** កាត់ស្ថិតិម្តងគត់ និង Restore បូកត្រឡប់ម្តងគត់;
+  **លុប** មិនប៉ះស្ថិតិ និង Restore មិនបូក។
+
+#### កែកំហុស — Toast ត្រូវនិយាយតាមស្ថានភាពពិត
+
+- បិទ/បើកកញ្ចប់, call mark, កែលេខទូរស័ព្ទ និងអត្រាប្រាក់ លែងបង្ហាញ success
+  មុន Firebase transaction/write commit។ ពេល offline/timeout វាបង្ហាញ ⏳
+  ឬ ⚠️ ហើយ queue ប្រកាស ✅ តែក្រោយ reconnect commit ពិត។
+- ការចាកចេញ, biometric/PIN, locker settings, delete/restore និង ref Firebase
+  អវត្តមាន លែងអះអាង rollback ឬ success ដែលមិនបានផ្ទៀងផ្ទាត់។ Toast static
+  ទាំង ២ App មានសញ្ញា success/info/warning/pending/error ច្បាស់។
+- សារ ZTO ក្នុង modal ក្រោយស្កេន លែងប្រាប់ឲ្យ «យក Cookie ពី Argus ដាក់ក្នុង
+  Netlify» ដោយដៃ។ វាប្រាប់ឲ្យរត់ **ZTO Cookie Sync លើ Windows** ដែលសរសេរ
+  Cookie ថ្មីទៅ **Netlify Blobs** ដោយស្វ័យប្រវត្តិ។ សារ «រកឃើញ — កំពុង
+  រក្សាទុក» ប្តូរពី ✅ ទៅ ⏳ ព្រោះ record មិនទាន់ commit។
+
+#### ភស្តុតាង និងឧបករណ៍ audit
+
+- `scan-remove-mode-test.js` លើ tree មុន feature៖ **១ ok / ១៤ FAIL**; ក្រោយកែ
+  **៧៩/៧៩** លើ 320×568, 390×844, 768×1024 និង 1366×768។ វារត់ modal,
+  transaction, trash reason/`isDeducted`, daily/monthly ledger, duplicate
+  confirm, already-trash/missing no-op, XSS, logout cleanup និង layout ពិត។
+- `toast-action-truth-test.js` លើ tree មុនកែ៖ **៦ ok / ២៥ FAIL**; ក្រោយកែ
+  **៣១/៣១**។ `toast-truth-test.js` នៅ **៨៨/៨៨** និង
+  `history-patch-retry-test.js` **៧២/៧២**។
+- ការកែសារ ZTO មាន behavioral guard ក្នុង `lookup-failure-identity-test.js`៖
+  tree មុនកែ **៣៧ ok / ២ FAIL**; ក្រោយកែ **៣៩/៣៩**។
+- `setup-link-logout-test.js` **២៤/២៤** ចាក់ state Barcode ដែលកំពុងដកចូល
+  logout ពិត ហើយបញ្ជាក់ថាវាត្រូវសម្អាត។ `panel-motion-test.js` រង់ចាំសញ្ញា
+  `panel-gliding` ចប់ពិត ជំនួសពេលថេរ 400ms; CSS/ចលនា App មិនបានប្តូរ ហើយ
+  ការអះអាងនៅតែ **៤៧/៤៧**។
+- Local CI strict ពេញមួយជុំ៖ **១៤៧ PASS ពេញលេញ · ០ partial · ០ skip**។
+  RTDB emulator ពិត៖ CRUD/Rules **៤៦/៤៦**, restore deadlock **១២/១២**,
+  ledger revert **១២/១២** និង money guardian **២១/២១** (mutation ខុសចេតនា
+  ទាំង **១០** ត្រូវបានចាប់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+**គ្មាន Firebase Rules និងគ្មាន Netlify env ត្រូវកែ។** ក្រោយ deploy សូម
+Refresh ឬទាញ App ទាំង ២ ចុះឡើងវិញ ១ ដង (`zoew-v180` · `zoekeygen-v90`)។
+ZTO Cookie នៅតែធ្វើបច្ចុប្បន្នភាពតាម Windows sync tool ➜ Netlify Blobs;
+មិនបាច់ paste Cookie ឬ redeploy ទេ។
+
 ### [2.30.10] — 2026-09-08 · 💰 បិទចន្លោះ ledger · 🔐 សម្អាត cache key · ⚙️ CI ពិត
 
 **App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v178` ➜ `zoew-v179`, `2.30.9` ➜
@@ -5224,6 +5284,49 @@ CSP ក៏មិនប្រែដែរ។
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
 
+### 2.31.0 / 2.19.20 — 2026-09-08 · 🔴 Toast success មុន durable commit
+
+**របៀបដែលវារកឃើញ** ៖ inventory ដោយ AST រកបាន toast/live-toast call-site
+ជាង ១៥០ បន្ទាប់មក fake Firebase ត្រូវបានដាក់ក្នុង ៣ ស្ថានភាព៖ promise
+ព្យួរ, resolve និង reject។ Checker បៃតងចាស់ផ្ទៀងផ្ទាត់តែពណ៌ និង connection
+toast; វាមិនដែលព្យួរ write ពិត ហើយសួរថា success លេចនៅពេលណាទេ។
+
+**មូលហេតុឫសគល់** ៖ ផ្លូវបិទ/បើកកញ្ចប់, call mark, កែលេខទូរស័ព្ទ និង
+អត្រាប្រាក់ ប្តូរ optimistic UI រួចហៅ `showToast()` នៅក្រៅ callback របស់
+transaction/write។ ដូច្នេះ permission denied, offline queue ឬ timeout អាច
+ឲ្យអ្នកប្រើឃើញ «រួចរាល់» មុន server ទទួល — ហើយខ្លះបង្ហាញ failure តាមក្រោយ
+success ពីរបីវិនាទី។ Helper history/trash ដែលគ្មាន Firebase ref ក៏ធ្លាប់
+`Promise.resolve()` ធ្វើឲ្យ caller ជឿថាសរសេររួច។
+
+**ការកែ** ៖ success ត្រូវចងក្រោយ `committed && serverApplied` ឬ write resolve;
+timeout ដែលអាច late-commit បង្ហាញ ⏳ ហើយប្រកាស ✅ ពេល commit មកដល់។ Offline
+call-mark queue កាន់ success message រហូតដល់ reconnect write ជោគជ័យ។ Ref
+អវត្តមានត្រូវ reject; storage/signOut/biometric/delete ដែលមិនអាចបញ្ជាក់
+rollback ប្រើសារស្ថានភាពមិនប្រាកដជំនួសការអះអាង។ Semantic marker static
+ទាំងអស់ត្រូវបញ្ជាក់ប្រភេទ toast; ZTO «រកឃើញ ហើយកំពុងរក្សាទុក» ប្រើ ⏳
+មិនមែន ✅។
+
+**លេខ និងអ្នកយាម** ៖ `toast-action-truth-test.js` លើ baseline **៦ ok / ២៥
+FAIL** ហើយក្រោយកែ **៣១/៣១**; វារត់ Chromium ពិតលើ hold/resolve/reject
+សម្រាប់ close, mark, phone និង exchange rate ហើយធ្វើ AST semantic inventory
+លើ ZoeW និង ZoeKeyGen។ `toast-truth-test.js` **៨៨/៨៨** និង
+`history-patch-retry-test.js` **៧២/៧២** ចាក់សោ connection/reconnect និង queue។
+
+### 2.31.0 — 2026-09-08 · 🟠 Modal ZTO ប្រាប់ workflow Cookie ចាស់
+
+**រោគសញ្ញាដែលអ្នកប្រើចាប់បាន** ៖ ក្រោយស្កេន បើ ZTO ឆ្លើយ
+`ZTO_AUTH_EXPIRED`, modal សរសេរ «ចូល Argus យក Cookie ថ្មី ដាក់ក្នុង Netlify»។
+វាជា workflow មុន Netlify Blobs ហើយអាចនាំឲ្យ Admin paste secret ទៅ env និង
+redeploy ដោយមិនចាំបាច់។ Architecture ពិតបច្ចុប្បន្នគឺ Windows
+`sync-zto-cookie` ចាប់ Cookie ហើយ upload ទៅ **Netlify Blobs** ដោយស្វ័យប្រវត្តិ;
+Function អាន Blob មុន env fallback។
+
+**ការកែ និងអ្នកយាម** ៖ សារក្នុង modal និងសារ test timeout ណែនាំឲ្យរត់ ZTO
+Cookie Sync លើ Windows ➜ Netlify Blobs។ `lookup-failure-identity-test.js`
+រត់ `attemptAutoLookup()` ពិតជាមួយ 401៖ baseline **៣៧ ok / ២ FAIL**;
+ក្រោយកែ **៣៩/៣៩** ហើយអះអាងទាំងពាក្យដែលត្រូវមាន និង workflow ចាស់ដែលត្រូវ
+អវត្តមាន។
+
 ### 2.30.10 — 2026-09-08 · 🔴 Business record និង money ledger មិនមែន atomic
 
 **របៀបដែលវារកឃើញ** ៖ អានផ្លូវសរសេរពិត មិនពឹងលើ checker បៃតង។ ការស្កេន,
@@ -8123,6 +8226,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `revenue-rules-clamp-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `rules-duplicate-keys` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |
 | `scan-engine-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `scan-remove-mode-test` | **ផ្នែក ១** |
 | `sdk-offline-boot-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `sdk-surface` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `secret-hygiene` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
@@ -8140,6 +8244,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `storage-guard` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `strip-comments` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |
 | `toast-truth-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
+| `toast-action-truth-test` | **ផ្នែក ១** · **ផ្នែក ២** |
 | `trash-modal-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `trimws` | [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `ui-flow-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |

@@ -208,8 +208,14 @@
     <section class="app-page" id="pageEntry">
         <div class="page-side" id="entrySideSection">
             <div class="scan-mode-row">
-                <button type="button" class="mode-btn active" id="modeParcelBtn" data-act="setEntryScanMode" data-args='["parcel"]'>📦 បញ្ចូលកញ្ចប់</button>
-                <button type="button" class="mode-btn" id="modeLockerBtn" data-act="setEntryScanMode" data-args='["locker"]'>📍 កំណត់ទីតាំង Locker</button>
+                <button type="button" class="mode-btn active" id="modeParcelBtn" data-act="setEntryScanMode" data-args='["parcel"]' aria-pressed="true">📦 បញ្ចូលកញ្ចប់</button>
+                <button type="button" class="mode-btn" id="modeLockerBtn" data-act="setEntryScanMode" data-args='["locker"]' aria-pressed="false">📍 កំណត់ទីតាំង Locker</button>
+                <button type="button" class="mode-btn mode-remove-btn" id="modeRemoveBtn" data-act="setEntryScanMode" data-args='["remove"]' aria-pressed="false">🗑️ ស្កេនដកកញ្ចប់</button>
+            </div>
+
+            <div class="remove-scan-banner hidden" id="removeScanBanner" role="status" aria-live="polite">
+                <span class="remove-scan-icon" aria-hidden="true">🗑️</span>
+                <span class="remove-scan-copy"><strong>របៀបស្កេនដកកញ្ចប់</strong><span id="removeScanBannerDetail">ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។</span></span>
             </div>
 
             <div class="app-card scanner-section">
@@ -233,7 +239,7 @@
             </div>
 
             <div class="hardware-scanner-box" id="hardwareScannerBox">
-                <label for="hwScannerInput">ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ</label>
+                <label for="hwScannerInput" id="hardwareScannerLabel">ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ</label>
                 <div class="scanner-input-wrapper">
                     <span class="icon">⚡</span>
                     <input type="text" id="hwScannerInput" placeholder="ស្កេន Barcode..." autocomplete="off">
@@ -320,7 +326,7 @@
         <span class="tab-ico">📋</span><span>ទិន្នន័យ</span>
     </button>
     <button type="button" class="page-tab" id="pageTabEntry" data-act="switchAppPage" data-args='["entry"]'>
-        <span class="tab-ico">📷</span><span>បញ្ចូលទិន្នន័យ</span>
+        <span class="tab-ico">📷</span><span>ស្កេន</span>
     </button>
 </nav>
 
@@ -666,6 +672,28 @@ const firebaseConfig = {
                 <button class="btn-confirm" id="phoneModalConfirmBtn" data-act="confirmPhone" data-args='[false]'>យល់ព្រម</button>
             </div>
             <button class="btn-cancel" id="phoneModalCancelBtn" data-act="closeModal" data-args='["phoneModal"]'>បោះបង់</button>
+        </div>
+    </div>
+</div>
+
+<div id="scanRemoveModal" class="modal" style="z-index: 1065;" data-close="cancelScannedRemoval" role="dialog" aria-modal="true" aria-labelledby="scanRemoveModalTitle">
+    <div class="modal-content scan-remove-modal-content">
+        <h3 id="scanRemoveModalTitle">🗑️ ផ្ទៀងផ្ទាត់មុនដកកញ្ចប់</h3>
+        <p>សូមពិនិត្យ Barcode និងព័ត៌មានកញ្ចប់ឲ្យត្រូវ មុនបញ្ជាក់ការដក។</p>
+        <dl class="scan-remove-preview">
+            <div class="scan-remove-field scan-remove-field-wide"><dt>Barcode</dt><dd id="scanRemoveBarcodeText"></dd></div>
+            <div class="scan-remove-field scan-remove-field-wide"><dt>លេខទូរស័ព្ទ</dt><dd id="scanRemovePhoneText"></dd></div>
+            <div class="scan-remove-field"><dt>ទីតាំង Locker</dt><dd id="scanRemoveLockerText"></dd></div>
+            <div class="scan-remove-field"><dt>ស្ថានភាព</dt><dd id="scanRemoveStateText"></dd></div>
+            <div class="scan-remove-field"><dt>COD</dt><dd id="scanRemoveCodText"></dd></div>
+            <div class="scan-remove-field"><dt>DOD</dt><dd id="scanRemoveDodText"></dd></div>
+        </dl>
+        <div class="scan-remove-warning">ការដកនេះនឹងកាត់ទឹកប្រាក់ និងចំនួនកញ្ចប់ចេញពីស្ថិតិភ្លាមៗ។ អ្នកអាចស្តារពីធុងសំរាម ដើម្បីបូកត្រឡប់វិញបាន។</div>
+        <div class="modal-btns scan-remove-actions">
+            <div class="modal-btns-row">
+                <button type="button" class="btn-danger" id="scanRemoveConfirmBtn" data-act="confirmScannedRemoval">🗑️ បញ្ជាក់ដក</button>
+                <button type="button" class="btn-cancel" id="scanRemoveCancelBtn" data-act="cancelScannedRemoval">បោះបង់</button>
+            </div>
         </div>
     </div>
 </div>

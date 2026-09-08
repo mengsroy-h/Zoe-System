@@ -98,8 +98,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.30.10` (`zoew-v179`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.19` (`zoekeygen-v89`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.0` (`zoew-v180`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.20` (`zoekeygen-v90`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -272,7 +272,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ការទាញតារាងជាមុន** | ព្យាយាមវិញលឿន **តែមិនបាញ់ចំពេលស្កេន** | `lookup-prefetch-test` |
 | **ស្ថានភាព ↔ ម្ចាស់ប្រអប់** | ⛔ `closeModal()` សម្អាតតែស្ថានភាពរបស់ប្រអប់ **នោះ** (ឬពេលជង់ទទេ) — ប្រអប់ជាន់លើមិនត្រូវលុប Barcode · ការកែលេខ · ការសម្គាល់ខល របស់ប្រអប់ខាងក្រោម | `lookup-prefetch-test` · `ui-flow-test` |
 | **Keyboard ↔ ការស្វែងរក** | ⛔ មិនលោតកាត់ខណៈ lookup កំពុងធ្វើការ; ចប់ ➜ មកភ្លាម; ពិដាន ១៥ វិ. (fail-open) | `lookup-prefetch-test` |
-| **អត្តសញ្ញាណនៃការបរាជ័យ Lookup** | ⛔ `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ | `lookup-failure-identity-test` |
+| **អត្តសញ្ញាណនៃការបរាជ័យ Lookup** | ⛔ `lookupCode` ត្រូវរស់រានពីការព្យាយាមឡើងវិញ; សារ Cookie ត្រូវតាម Windows sync tool ➜ Netlify Blobs មិនមែន workflow paste env ចាស់ | `lookup-failure-identity-test` |
 | **ការស្កេនជាបន្តបន្ទាប់** | ⛔ ការរវល់ជា *ការរង់ចាំ* មិនមែន *ការបញ្ចប់* | `lookup-burst-test` |
 | **ធាតុជួរ lookup កំព្រា** | ⛔ ផ្លូវចេញមុន **ត្រូវដោះ** ធាតុជួរ; ពិដានវាស់តែការរង់ចាំ **ពិត** | `lookup-burst-test` |
 | **ស្លាកច្បាប់សម្អាត ↔ ថេរ** | ⛔ អត្ថបទដែលអ្នកប្រើអាន ត្រូវអានចេញពីថេរ | `trash-modal-test` |
@@ -301,7 +301,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ទម្រង់បង្ហាញ | អះអាង **២ ខាង** (មិនលើស **និង** មិនច្របាច់) | `layout-check` · `fluid-type-focus-test` |
 | **អថេរ CSS ដែលមិនប្រកាស** | ⛔ `var(--x)` គ្មាន `--x` ➜ **ច្បាប់ទាំងមូលស្លាប់ស្ងាត់ៗ** (មិនមែនត្រឹមពណ៌) | `css-var-test` |
 | **មាត្រដ្ឋានអក្សរ ៣ ជំហាន** | ទូរស័ព្ទ `<700` · ថេប្លេត `700–991` · desktop `>=992` | `fluid-type-focus-test` · `layout-check` |
-| Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ» | `toast-truth-test` |
+| Toast និយាយការពិត | «ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»; success នៃ write ត្រូវក្រោយ durable commit មិនមែន optimistic UI | `toast-truth-test` · `toast-action-truth-test` |
 | helper ចែករំលែក ២ App | byte-identical លើកលែងបញ្ជីដែលមានហេតុផល | `shared-fns` |
 | **តក្កវិជ្ជាដដែលក្នុងឯកសារតែមួយ** | ⛔ រូបមន្តតែមួយមិនត្រូវរស់នៅ ២ កន្លែង — ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **២ ច្បាប់ផ្ទុយគ្នាក្នុងកូដតែមួយ** (ច្បាប់ ១២ តែលើ *កូដ*)។ ⛔ **checker រាយ ≠ «ត្រូវលុប»** — «អក្សរដូចគ្នា តែមុខងារខុសគ្នា» ជារឿងពិត ➜ មុនរួបរួម ត្រូវវាស់ **អថេរសេរី** (helper ដែលអានតែ parameter + function ថ្នាក់កំពូល ទើបសុវត្ថិភាព) រួច **រក្សាភាពខុសគ្នាជា parameter ឬទុកនៅកន្លែងហៅ** មិនមែនលុបវា។ ⛔ **ការស្កេនតាមអក្សរខកខានពាក់កណ្តាល** — វាស់បាន (2.30.2) ៖ រូបមន្តលុយរស់នៅ **១១ កន្លែង** ខណៈ detector អក្សរចាប់បានតែ **៥**; ៦ ទៀតខុសត្រឹមឈ្មោះ parameter/array ➜ ត្រូវការ detector **រចនាសម្ព័ន្ធ** ដែល **រក្សាឈ្មោះ property** (`.cod` ≠ `.dod`) | `code-duplication-test` |
 | `fb.X` ដែល loader មិន export | `undefined` ស្ងាត់លើផលិតកម្ម | `sdk-surface` |
@@ -405,6 +405,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
 | URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |
+| ស្កេនដកកញ្ចប់ ៖ preview · in-flight fence · trash/ledger · responsive · reload safe | `scan-remove-mode-test.js` |
 | **barcode ស្ទួន ➜ លុយបូកស្ទួន** ៖ ជាន់ ១–៣ អានសតិ; ជាន់ ៤ ជាសាលក្រម server តែមួយ | `duplicate-money-test.js` |
 | **អេក្រង់ស្ថិតិបង្ហាញ ledger ឆៅជា «ចំណូល»** ➜ លេខ **ធំជាងការពិត** ក្នុង ៧ ថ្ងៃដំបូង (រាប់កញ្ចប់មិនទាន់យក) — checker ស្តាទិចមើលមិនឃើញ ព្រោះការហៅនៅដដែល ប្តូរតែអាគុយម៉ង់ | `stats-collected-truth-test.js` |
 | **លុយសរុបរបស់ជួរដេកខុស ខណៈ ledger ត្រឹមត្រូវ** ➜ លេខខុសលើអេក្រង់ និងក្នុង Excel ដោយគ្មានអ្នកយាមណាដឹង (អ្នកយាមលុយទាំងអស់មើល **ledger** ប៉ុណ្ណោះ) | `item-money-integrity-test.js` |
@@ -757,7 +758,7 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | ផ្នែក | id | មាតិកា |
 |---|---|---|
 | ទំព័រ ១ — ទិន្នន័យ | `pageData` | គ្រប់គ្រងប្រចាំថ្ងៃ, ស្វែងរកលេខ, តារាងប្រវត្តិ |
-| ទំព័រ ២ — បញ្ចូលទិន្នន័យ | `pageEntry` | របៀបស្កេន ២, កាមេរ៉ា, hardware scanner, រូបភាព, `parcelPanel`, `lockerPanel` |
+| ទំព័រ ២ — ស្កេន | `pageEntry` | របៀបស្កេន ៣ (កញ្ចប់, Locker, ដក), កាមេរ៉ា, hardware scanner, រូបភាព, `parcelPanel`, `lockerPanel` |
 | របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | Config/Reconfig, API ស្វែងរក, តារាងអតិថិជន, Locker, នាំចូល Excel, ចាក់សោ App, ចូល/ចាកចេញ |
 | ប៊ូតុង (...) | `globalMoreMenu` | Export, កែទឹកប្រាក់ (PIN), អត្រាប្រាក់, ធុងសំរាម, Reset ចំនួនយករួច (PIN), លុបទាំងអស់ (PIN) |
@@ -774,8 +775,10 @@ Lookup។ ⛔ **«ពិនិត្យមិនបាន» ត្រូវរ�
 ៨ តួពី `?diag=1`។ ⛔ **ផ្លូវ Apps Script មិនហៅបណ្តាញសោះ** (ច្បាប់ simple
 request — មើលផ្នែក ZTO Lookup)។
 
-**`entryScanMode`** (`'parcel'` / `'locker'`) ជាចំណុចបំបែក **តែមួយ** —
-គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់ `triggerScanAction()`។
+**`entryScanMode`** (`'parcel'` / `'locker'` / `'remove'`) ជាចំណុចបំបែក
+**តែមួយ** — គ្រប់ប្រភពស្កេន (កាមេរ៉ា, hardware, រូបភាព) ឆ្លងកាត់
+`triggerScanAction()`។ របៀប `'remove'` មិន persist ទេ; reload ត្រឡប់ទៅ
+`'parcel'` ដើម្បីកុំឲ្យការស្កេនបន្ទាប់ដកដោយចៃដន្យ។
 
 **`history-expanded` តាមទំព័រដែលកំពុងសកម្ម។** `syncHistoryExpandedLock()`
 ដាក់ class នោះលើ `#appPages` តែពេល `.page-side` **របស់ទំព័រសកម្ម** មាន
@@ -794,7 +797,7 @@ navbar តាម `order`។ **របា Slide បិទត្រូវមាន 
 | ទំព័រ | `.page-side` | `.page-main` | ដងអូស | កន្សោមរមូរ |
 |---|---|---|---|---|
 | ទិន្នន័យ | `#dataSideSection` | `#dataMainSection` | `#dragHandle` | `#tableResponsive` |
-| បញ្ចូលទិន្នន័យ | `#entrySideSection` | `#entryMainSection` | `#entryDragHandle` | `#entryTableResponsive` ឬ `#lockerTableResponsive` |
+| ស្កេន | `#entrySideSection` | `#entryMainSection` | `#entryDragHandle` | `#entryTableResponsive` ឬ `#lockerTableResponsive` |
 
 ទំព័រ ២ មានកន្សោមរមូរ **២** — `entryScrollerInView()` ជ្រើសតាមផ្ទាំងដែល
 បង្ហាញ។ កាតបញ្ជីត្រូវមាន class **`.panel-section`** បើមិនដូច្នេះ
@@ -1263,6 +1266,9 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 - **ថ្នាក់ toast ៤ តាមសញ្ញាដើមសារ**; `renderConnectionStatus()` ជាកន្លែងផ្សាយ
   **តែមួយ**; ការចុះឈ្មោះ toast រស់នៅ **ក្នុង DOM** មិនមែន module state។
   ⛔ **«ភ្ជាប់រួច» ≠ «ទិន្នន័យមកដល់» ≠ «នៅចូលប្រព័ន្ធ»។**
+- ⛔ **optimistic UI ≠ durable commit** — write success លេចតែក្រោយ Firebase
+  resolve/`committed:true`; offline/timeout ដែលអាច late-commit ត្រូវជា ⏳/⚠️
+  ហើយទើបប្រកាស ✅ ក្រោយ reconnect (`toast-action-truth-test.js`)។
 - **រាល់តម្លៃដែលចូល HTML ត្រូវ `sanitizeInput()`** — `html-sink-escaping.js`
   ស្កេន **ទាំង ២ ទម្រង់** (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)។
 - **`redactDeep()` ដើរលើ event ទាំងមូល** មុនផ្ញើទៅ Sentry ៖
@@ -1858,17 +1864,20 @@ bash audit-tools/emu/rules.sh
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
 
-## ⏳ ZoeW `2.30.10` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+## ⏳ ZoeW `2.31.0` + ZoeKeyGen `2.19.20` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
 | អ្វីដែលអ្នកប្រើត្រូវសាក | លទ្ធផលដែលត្រូវឃើញ |
 |---|---|
+| ទំព័រ **ស្កេន** ➜ ជ្រើស **ស្កេនដកកញ្ចប់** ➜ ស្កេន Barcode ពិត | ផ្ទាំងក្រហមបង្ហាញ Barcode · លេខទូរស័ព្ទ · Locker · COD/DOD · ស្ថានភាពត្រឹមត្រូវ; ចុចបញ្ជាក់ម្តង ➜ ដក និងកាត់ស្ថិតិម្តងគត់; Restore ➜ បូកត្រឡប់ម្តងគត់ |
+| Refresh ខណៈនៅរបៀបដក ហើយពិនិត្យបញ្ជី Barcode | ក្រោយ Refresh ត្រឡប់ទៅ **បញ្ចូលកញ្ចប់**; គ្មានប៊ូតុងដកដោយដៃក្នុងបញ្ជី; ម៉ឺនុយនៅមាន **កែតម្លៃកញ្ចប់** |
+| សាកសកម្មភាពសរសេរពេលបណ្តាញយឺត/offline រួចបើកបណ្តាញវិញ | មុន commit ឃើញ ⏳/⚠️ ប៉ុណ្ណោះ; ក្រោយ Firebase commit ពិតទើបឃើញ ✅; មិនមាន success toast ក្លែងក្លាយ |
 | បិទ/បើកកញ្ចប់ទាំងមូល និង Barcode មួយ | **បិទ = ខៀវ `#0066FF`** · ក្រោយបិទរួច **បើក = ក្រហម `#E61F26`** · លេខចំណូល/មិនទាន់យកប្រែត្រឹមត្រូវ |
 | ស្កេន Barcode ដែល Lookup មិនឃើញ | **រំលង = ក្រហម** · **យល់ព្រម = ខៀវ** · បោះបង់ = ប្រផេះ |
 | មើលសង្ខេប/ប្រវត្តិ/បញ្ជី Barcode និងបើកស្ថិតិប្រចាំថ្ងៃ/ខែ | **យករួច = បៃតង** · **មិនទាន់យក = លឿងទុំ** · **តម្លៃកញ្ចប់ទាំងអស់ = ស្វាយ** · តារាងតូចរក្សាស្លាក `COD:`/`DOD:`/`សរុប:` ខ្លី |
 | ចុចលេខកំណែក្នុង Login និងខាងក្រោមរបា Slide | បើកសៀវភៅណែនាំ ZoeW HTML **ក្នុងផ្ទាំង App ដដែល**; តំណ «ត្រឡប់ទៅ App» ត្រូវបើក ZoeW វិញ; បើបានបើកម្ដងហើយ ត្រូវអានបានពេល Offline |
 
-⛔ ទាញ ZoeW ចុះឡើងវិញ ១ ដង (`zoew-v179`) មុនសាក។ គ្មាន Firebase Rules
-ឬ Netlify env ត្រូវកែសម្រាប់កំណែនេះទេ។
+⛔ ទាញ ZoeW និង ZoeKeyGen ចុះឡើងវិញ ១ ដង (`zoew-v180` · `zoekeygen-v90`)
+មុនសាក។ គ្មាន Firebase Rules ឬ Netlify env ត្រូវកែសម្រាប់កំណែនេះទេ។
 
 ## ⏳ ZoeW `2.30.4` ផ្នែកទី ២ — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
@@ -1876,10 +1885,11 @@ bash audit-tools/emu/rules.sh
 |---|---|
 | **ZoeW `2.30.4`** | 🔌 **ZTO Lookup** ៖ ស្កេនកញ្ចប់ថ្មីៗបន្តបន្ទាប់ ➜ **មិនត្រូវឃើញសារ «🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO» ទៀតទេ** (វាធ្លាប់លេចឡើងប្រហែលពាក់កណ្តាលនៃការស្កេន ក្រោយទុកចោលមួយភ្លែត)។ ⛔ **មិនត្រូវប្តូរ `ZTO_UPSTREAM_TIMEOUT_MS` ក្នុង Netlify ទេ**។ ✅ **ផ្នែក «ស្ថិតិលុយ» ជាប់រួច** (2026-09-06 ៖ វាស់លើទិន្នន័យផលិតកម្មពិត — ផលបូក ledger ថ្ងៃ = ledger ខែ បេះបិទ ៖ **137 កញ្ចប់ · $443.02** ហើយអេក្រង់ទាំង ៣ បង្ហាញលេខដូចគ្នា) |
 
-⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.30.10` ចំណែក ZoeKeyGen នៅ `2.19.19`
+⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.31.0` ចំណែក ZoeKeyGen នៅ `2.19.20`
 (ច្បាប់ ៦)។ ⛔ កុំដាក់ស្លាកជុំរបស់ ZoeW លើ ZoeKeyGen។
 
-⛔ **អ្នកប្រើត្រូវទាញ ZoeW ចុះឡើងវិញ ១ ដង** (`zoew-v179`) មុនសាក។
+⛔ **អ្នកប្រើត្រូវទាញ App ទាំង ២ ចុះឡើងវិញ ១ ដង** (`zoew-v180` ·
+`zoekeygen-v90`) មុនសាក។
 ពេលអ្នកប្រើបញ្ជាក់ថាដំណើរការ ➜ **លុបធាតុនោះចេញពីទីនេះ** (`docs/HISTORY.md`
 ផ្នែក ១ កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ)។
 

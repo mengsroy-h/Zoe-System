@@ -92,7 +92,7 @@ check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្�
 
 const REAL_FNS = [
     'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'retryAsync',
-    'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'barcodeCloseIsRipe',
+    'barcodeEntriesOf', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'applyBarcodeCloseState', 'barcodeCloseIsRipe',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers',
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
@@ -120,7 +120,8 @@ for (const name of missing) fnSrc[name] = 'function ' + name + '() { return Prom
 const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).join('\n\n')
     // ⛔ លើ tree មុនកែ `notifyIfSlow` អវត្តមាន ➜ ត្រូវ stub ដើម្បីឲ្យការអះអាង
     // ឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
-    + (extractFn('notifyIfSlow') ? '' : '\n\nfunction notifyIfSlow(p) { return p; }');
+    + (extractFn('notifyIfSlow') ? '' : '\n\nfunction notifyIfSlow(p) { return p; }')
+    + '\n\nfunction clearScannedRemovalInFlight() {}';
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;

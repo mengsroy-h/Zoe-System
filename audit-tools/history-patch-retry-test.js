@@ -166,6 +166,8 @@ async function scenario(label, fn) {
             }
             const queued = vm.runInContext('pendingHistoryPatches.size', ctx);
             ok('ដាច់បណ្តាញ ➜ ' + name + ' ចូលជួររង់ចាំ', queued === 1, queued);
+            ok('ដាច់បណ្តាញ ➜ ' + name + ' toast ប្រាប់ថារង់ចាំ មិនអះអាង success',
+                ctx.__toasts.some((t) => /^⏳/.test(t)) && !ctx.__toasts.some((t) => /^✅/.test(t)), ctx.__toasts);
 
             vm.runInContext('__mode.value = "ok";', ctx);
             vm.runInContext('flushPendingHistoryPatches();', ctx);
@@ -177,6 +179,8 @@ async function scenario(label, fn) {
                 ok('ភ្ជាប់មកវិញ ➜ ' + name + ' ទៅដល់ server ពិត', onServer.callMark === mark, onServer.callMark);
             }
             ok('ភ្ជាប់មកវិញ ➜ ' + name + ' ជួររង់ចាំទទេវិញ', vm.runInContext('pendingHistoryPatches.size', ctx) === 0);
+            ok('ភ្ជាប់មកវិញ ➜ ' + name + ' ទើប toast ប្រកាសថា Firebase រួចរាល់',
+                ctx.__toasts.some((t) => /^✅/.test(t) && /Firebase/.test(t)), ctx.__toasts);
         });
     }
 

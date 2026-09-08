@@ -9,8 +9,8 @@
 //     `scroll-padding-top` នោះ **PTR លែងកេះបាន** (វាទាមទារ `scrollTop <= 1`)។
 //   • ចលនា FLIP មិនត្រូវបន្សល់ `transform` សេសសល់លើកាតឡើយ។
 //
-// ព្រមទាំងចាក់សោថាប៊ូតុងក្នុងជួរដេកសរសេរ «បញ្ជី» ហើយការកែ/ដកកញ្ចប់
-// **នៅតែមាន** ក្នុងម៉ឺនុយ (...) — ការដកអត្ថបទស្ទួនចេញមិនត្រូវដកមុខងារទេ។
+// ព្រមទាំងចាក់សោថាប៊ូតុងក្នុងជួរដេកសរសេរ «បញ្ជី» ហើយការកែតម្លៃកញ្ចប់
+// **នៅតែមាន** ក្នុងម៉ឺនុយ (...) ខណៈការដកត្រូវផ្ទៀងផ្ទាត់តាមរបៀបស្កេន។
 // ដំណើរការពេល scanHistory ធំ (ថ្ងៃមមាញឹក) — ថ្នាក់ដែល runbook រាយថាមិនទាន់មានឧបករណ៍។
 // វាស់ក្នុង Chromium ពិត៖ ការ render តារាង, ការវាយក្នុងប្រអប់ស្វែងរកលេខ, និងការ repaint ពី listener។
 let chromium;
@@ -167,12 +167,12 @@ function seedBig(n) {
             out.rowBtnTexts = Array.from(new Set(btns.map((b) => b.textContent.replace(/\d+/g, 'N').trim()))).slice(0, 4);
             out.anyOldLabel = btns.some((b) => b.textContent.indexOf('កែ/ដក') !== -1);
             out.anyInlineYellow = btns.some((b) => (b.getAttribute('style') || '').indexOf('fef08a') !== -1);
-            // ២ — ម៉ឺនុយ (...) នៅតែមានការកែ/ដក
+            // ២ — ម៉ឺនុយ (...) នៅតែមានការកែតម្លៃកញ្ចប់
             const firstId = document.querySelector('#historyTableBody tr') ? document.querySelector('#historyTableBody tr').dataset.id : null;
             if (firstId) {
                 window.toggleMoreDropdown(document.querySelector('#historyTableBody .more-btn') || document.body,
                     { stopPropagation() {} }, firstId);
-                out.menuHasEdit = document.getElementById('menuContentContainer').textContent.indexOf('កែ/ដកកញ្ចប់អីវ៉ាន់') !== -1;
+                out.menuHasEdit = document.getElementById('menuContentContainer').textContent.indexOf('កែតម្លៃកញ្ចប់') !== -1;
                 document.getElementById('globalMoreMenu').classList.remove('show');
             }
             // ៣ — កម្ពស់កាតស្មើគ្នា + តារាងរមូរបាន
@@ -180,6 +180,10 @@ function seedBig(n) {
             const main = document.getElementById('dataMainSection');
             const table = document.getElementById('tableResponsive');
             const pages = document.getElementById('appPages');
+            const waitForPanelGlide = async () => {
+                const deadline = performance.now() + 1500;
+                while (pages.classList.contains('panel-gliding') && performance.now() < deadline) await wait(20);
+            };
             const hN = Math.round(main.getBoundingClientRect().height), tN = table.clientHeight;
             side.classList.add('collapsed'); window.syncHistoryExpandedLock(); await wait(60);
             const hC = Math.round(main.getBoundingClientRect().height), tC = table.clientHeight;
@@ -193,7 +197,7 @@ function seedBig(n) {
             pages.scrollTop = 0; await wait(120);
             // ៥ — គ្មាន transform សេសសល់ក្រោយចលនា
             const handle = document.getElementById('dragHandle');
-            if (handle) { handle.click(); await wait(400); handle.click(); await wait(400); }
+            if (handle) { handle.click(); await waitForPanelGlide(); handle.click(); await waitForPanelGlide(); }
             out.residualTransform = getComputedStyle(main).transform;
             out.sideAfterToggles = side.classList.contains('collapsed');
             // ៥ខ — កន្លែងរបា Tab ត្រូវប្រគល់មកវិញ **ស្របគ្នានឹងរបា** មិនមែនពន្យារ
@@ -233,7 +237,7 @@ function seedBig(n) {
         const tag = vp.w + 'px';
         ok(tag + ': ប៊ូតុងជួរដេកលែងមាន «កែ/ដក»', r.anyOldLabel === false, JSON.stringify(r.rowBtnTexts));
         ok(tag + ': លែងមានពណ៌លឿង inline', r.anyInlineYellow === false, '');
-        ok(tag + ': ម៉ឺនុយ (...) នៅមានការកែ/ដកកញ្ចប់', r.menuHasEdit === true, String(r.menuHasEdit));
+        ok(tag + ': ម៉ឺនុយ (...) នៅមានការកែតម្លៃកញ្ចប់', r.menuHasEdit === true, String(r.menuHasEdit));
         ok(tag + ': កម្ពស់កាតស្មើគ្នា ២ របៀប (≤2px)', r.cardHeightDelta <= 2, 'delta=' + r.cardHeightDelta);
         ok(tag + ': កម្ពស់តារាងស្មើគ្នា ២ របៀប (≤2px)', r.tableHeightDelta <= 2, 'delta=' + r.tableHeightDelta);
         ok(tag + ': តារាងនៅតែរមូរបាន', r.tableScrolls === true, '');

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.19';
+const APP_VERSION = '2.19.20';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -965,7 +965,7 @@ async function saveNewSecurityPin() {
         if (newPinIn) newPinIn.value = '';
     }
     closeModal('pinSetupModal');
-    showToast("បានកំណត់ Security PIN រួចរាល់!");
+    showToast("✅ បានកំណត់ Security PIN រួចរាល់!");
     targetAction();
 }
 
@@ -1252,7 +1252,7 @@ function saveFirebaseConfig() {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
         return;
     }
-    if (normalized.extras.length) showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+    if (normalized.extras.length) showToast("ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
     closeModal('configModal');
     initFirebase();
     showLiveToast('config');
@@ -1638,7 +1638,7 @@ async function loadSigningKey() {
         signingPrivateKeyJwk = jwk;
         if (input) input.value = '';
         updateSigningKeyBadge();
-        showToast('Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
+        showToast('✅ Signing Key ត្រូវបាន Load ដោយជោគជ័យ!');
 
         const rememberCb = document.getElementById('rememberSigningKeyCheckbox');
         if (rememberCb && rememberCb.checked) {
@@ -1670,7 +1670,7 @@ function clearSigningKey(silent) {
     const genBtn = document.getElementById('genGenerateBtn');
     if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     updateSigningKeyBadge();
-    if (!silent) showToast('បានសម្អាត Signing Key ចេញពីសតិ');
+    if (!silent) showToast('✅ បានសម្អាត Signing Key ចេញពីសតិ');
 }
 
 let keypairPrivateCopied = false;
@@ -1716,7 +1716,7 @@ function copyTextarea(id) {
     const markCopied = () => {
         if (!isSensitiveSessionCurrent(operation, true)) return;
         if (id === 'newPrivateKeyOutput') keypairPrivateCopied = true;
-        showToast('បានចម្លង!');
+        showToast('✅ បានចម្លង!');
     };
     navigator.clipboard?.writeText(el.value).then(markCopied).catch(() => {
         try { document.execCommand('copy'); markCopied(); } catch (e) {}
@@ -1828,7 +1828,7 @@ async function generateLicenseKey() {
         document.getElementById('genNoteInput').value = '';
 
         if (failedPaths.length === 0) {
-            showToast('Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
+            showToast('✅ Key ត្រូវបានបង្កើត និងកត់ត្រាទុករួចរាល់!');
         } else {
             const extraWarning = appPathsTagFailed
                 ? '\n\n⚠️ បន្ថែមទៀត Key List នៅក្នុង App នេះប្រហែលជាមិនបង្ហាញត្រឹមត្រូវថា Key នេះ Active នៅ App ណាខ្លះទេ — សូមពិនិត្យផ្ទាល់នៅ Firebase Console (path license_keys) មុននឹង Revoke ឬបន្ថែមសុពលភាព Key នេះ។'
@@ -1852,7 +1852,7 @@ async function generateLicenseKey() {
 
 function copyGeneratedKey() {
     if (!lastGeneratedKey) return;
-    navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('បានចម្លង Key!')).catch(() => {});
+    navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('✅ បានចម្លង Key!')).catch(() => {});
 }
 
 const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
@@ -1877,7 +1877,7 @@ function generateSetupLink() {
     const normalized = readNormalizedFirebaseConfig(cfgInput);
     if (!normalized) return;
     const parsed = normalized.config;
-    if (normalized.extras.length) showToast('រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
+    if (normalized.extras.length) showToast('ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
     safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);
 
@@ -1912,7 +1912,7 @@ function generateSetupLink() {
 
 function copySetupLink() {
     if (!lastGeneratedSetupLink) return;
-    navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('បានចម្លង Link!')).catch(() => {});
+    navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('✅ បានចម្លង Link!')).catch(() => {});
 }
 
 let isSignedInUiActive = false;
@@ -2069,7 +2069,7 @@ async function migrateLegacyLicenseKeyMetadata() {
         });
 
         if (migratedCount === 0) {
-            showToast('គ្មាន Key ចាស់ត្រូវការ Migrate ទេ — ស្អាតរួចហើយ!');
+            showToast('ℹ️ គ្មាន Key ចាស់ត្រូវការ Migrate ទេ — ស្អាតរួចហើយ!');
             return;
         }
 
@@ -2092,7 +2092,7 @@ async function toggleRevokeKey(id) {
         const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
-            showToast(newRevoked ? 'Key ត្រូវបាន Revoke!' : 'Key ត្រូវបានសង្គ្រោះមកវិញ!');
+            showToast(newRevoked ? '✅ Key ត្រូវបាន Revoke!' : '✅ Key ត្រូវបានសង្គ្រោះមកវិញ!');
         } else if (failedPaths.length < row.paths.length) {
             alert(`⚠️ ជោគជ័យមិនពេញលេញ! Key ត្រូវបាន${newRevoked ? ' Revoke' : 'សង្គ្រោះ'}សម្រាប់ App: ${row.paths.filter(p => !failedPaths.includes(p)).join(', ')}\nបរាជ័យសម្រាប់: ${failedPaths.join(', ')} — សូមសាកល្បងម្តងទៀត ព្រោះ Key នេះនៅតែអាចប្រើបានលើ App ដែលបរាជ័យ!`);
         } else {
@@ -2128,7 +2128,7 @@ async function confirmExtendKey() {
         const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
-            showToast('បានបន្ថែមសុពលភាពរួចរាល់!');
+            showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់!');
         } else if (failedPaths.length < row.paths.length) {
             alert(`⚠️ ជោគជ័យមិនពេញលេញ! សូមសាកល្បងម្តងទៀតសម្រាប់ App: ${failedPaths.join(', ')}`);
         } else {

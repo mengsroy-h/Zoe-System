@@ -9,15 +9,16 @@ const vm = require('vm');
 // checker បៃតងខណៈវាមើលមិនឃើញការដកវិញសោះ (វាស់បាន 2026-09-03)។
 // ជាគូ ៖ ការអនុវត្ត និងការដកវិញត្រូវចែក ledger **តែមួយ** បើមិនដូច្នេះ
 // ការដកវិញមិនប៉ះអ្វីដែលការអនុវត្តបានធ្វើទេ ➜ ការវាស់ក្លាយជាការក្លែង។
-function ledgerStubEntries(onEntry) {
-    const s = makeLedgerStub(onEntry);
+function ledgerStubEntries(onEntry, onCorrect) {
+    const s = makeLedgerStub(onEntry, onCorrect);
     return {
         addRevenueToDailyAndMonthlyRecord: s.add,
-        revertRevenueLedgerDelta: s.revert
+        revertRevenueLedgerDelta: s.revert,
+        correctRevenueLedgerToActual: s.correct
     };
 }
 
-function makeLedgerStub(onEntry) {
+function makeLedgerStub(onEntry, onCorrect) {
     const buckets = {};
     const add = function (d, cod, dod, count) {
         if (onEntry) onEntry(d, cod, dod, count);
@@ -51,7 +52,11 @@ function makeLedgerStub(onEntry) {
         if (!applied.packages && !applied.customer) return applied;
         return applied;
     };
-    return { add: add, revert: revert, addPickup: addPickup, revertPickup: revertPickup, buckets: buckets };
+    const correct = function (d, applied, cod, dod, count) {
+        if (onCorrect) onCorrect(d, applied, cod, dod, count);
+        return Promise.resolve({ ok: true });
+    };
+    return { add: add, revert: revert, correct: correct, addPickup: addPickup, revertPickup: revertPickup, buckets: buckets };
 }
 
 
@@ -136,7 +141,7 @@ function buildWorld(historySeed, startNow) {
         zoew_scan_history_cod_dod: clone(historySeed),
         zoew_recently_deleted_cod_dod: {}
     };
-    const world = { store, now: startNow, revenueLog: [], transactionCalls: 0, commits: 0 };
+    const world = { store, now: startNow, revenueLog: [], reconcileLog: [], transactionCalls: 0, commits: 0 };
 
     function getPath(raw) {
         const parts = String(raw || '').split('/').filter(Boolean);
@@ -195,7 +200,10 @@ function buildWorld(historySeed, startNow) {
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         getServerNow: () => world.now,
         getFormattedDate: () => '2026-08-19',
-        ...ledgerStubEntries((scanDate, cod, dod, count) => world.revenueLog.push({ scanDate: scanDate, cod: cod, dod: dod, count: count })),
+        ...ledgerStubEntries(
+            (scanDate, cod, dod, count) => world.revenueLog.push({ scanDate: scanDate, cod: cod, dod: dod, count: count }),
+            (scanDate, applied, cod, dod, count) => world.reconcileLog.push({ scanDate, applied, cod, dod, count })
+        ),
         showToast: (msg) => { world.toasts.push(msg); },
         scanHistory: [],
         deletedItems: []
@@ -328,6 +336,8 @@ async function scenarioMixedParcel() {
     const total = revenueTotal(world.revenueLog);
     check(total.cod === 0 && total.dod === -25 && total.count === -1,
         '⛔ ស្នូល៖ ដកតែ B ($25 dod, ១ កញ្ចប់) — លុយរបស់ A នៅគ្រប់', JSON.stringify(total));
+    check(world.reconcileLog.length === 1 && world.reconcileLog[0].dod === -25 && world.reconcileLog[0].count === -1,
+        'trash commit ជោគជ័យ ➜ reconcile តែ delta របស់ B ម្តងគត់', JSON.stringify(world.reconcileLog));
 }
 
 async function scenarioLegacyStamp() {
@@ -375,6 +385,8 @@ async function scenarioAllOpen() {
     const total = revenueTotal(world.revenueLog);
     check(total.cod === -10 && total.dod === -25 && total.count === -2,
         'ដកចំណូលពេញ (cod -10 · dod -25 · count -2)', JSON.stringify(total));
+    check(world.reconcileLog.length === 1 && world.reconcileLog[0].cod === -10 && world.reconcileLog[0].count === -2,
+        'auto-abandon ទាំងមូល reconcile ledger ម្តងគត់', JSON.stringify(world.reconcileLog));
 }
 
 async function scenarioAllClosed() {

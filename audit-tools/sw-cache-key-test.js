@@ -39,14 +39,19 @@ console.log('\n=== កូនសោ cache របស់ sw.js (ស្តាទិ�
     if (fnAt !== -1 && endAt > fnAt) {
         const startAt = guideAt === -1 ? fnAt : guideAt;
         const origin = 'https://example.test/' + app + '/';
-        const sandbox = { self: { location: { href: origin + 'sw.js' } }, URL };
+        const sandbox = {
+            self: { location: { href: origin + 'sw.js' } },
+            URL,
+            SHELL_PATHS: new Set([new URL('app.js', origin).pathname])
+        };
         vm.runInNewContext(sw.slice(startAt, endAt) + `
             result = {
                 setup: cacheKeyFor({ mode: 'navigate', url: '${origin}?setup=secret' }),
                 deep: cacheKeyFor({ mode: 'navigate', url: '${origin}some/deep/route' }),
                 guide: cacheKeyFor({ mode: 'navigate', url: '${origin}guide.html?setup=secret' }),
                 prettyGuide: cacheKeyFor({ mode: 'navigate', url: '${origin}guide' }),
-                directAppJs: cacheKeyFor({ mode: 'navigate', url: '${origin}app.js' })
+                directAppJs: cacheKeyFor({ mode: 'navigate', url: '${origin}app.js' }),
+                staticAppJs: cacheKeyFor({ mode: 'cors', url: '${origin}app.js?setup=static-secret' })
             };
         `, sandbox);
         keys = sandbox.result;
@@ -55,6 +60,9 @@ console.log('\n=== កូនសោ cache របស់ sw.js (ស្តាទិ�
         !!keys && keys.setup === './index.html' && keys.deep === './index.html', keys);
     ok(app + '/sw.js មិនរក្សា query រសើបជាកូនសោ navigation',
         !!keys && (keys.guide === './index.html' || keys.guide === './guide.html'), keys);
+    ok(app + '/sw.js មិនរក្សា query រសើបជាកូនសោ static shell',
+        !!keys && typeof keys.staticAppJs === 'string' && keys.staticAppJs.indexOf('?') === -1,
+        keys && keys.staticAppJs);
     ok(app + '/sw.js បង្វែរ navigation ត្រង់ទៅ app.js មក index.html ដដែល',
         !!keys && keys.directAppJs === './index.html', keys);
     if (app === 'ZoeW') ok('ZoeW/sw.js រក្សា guide.html និង Netlify /guide ដាច់ពី index.html',
@@ -134,21 +142,53 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     });
     ok('service worker ចុះឈ្មោះ ហើយចាប់យក client', swReady === 'ok', swReady);
 
+    if (swReady === 'ok') {
+        await page.reload({ waitUntil: 'load', timeout: 30000 });
+    }
+
     await page.goto(origin + '/guide', { waitUntil: 'load', timeout: 30000 });
-    const guidePage = await page.evaluate(() => ({
-        path: location.pathname,
+    const guidePage = await page.evaluate(async () => {
+        let cachedGuideTitle = '';
+        for (const name of await caches.keys()) {
+            const cache = await caches.open(name);
+            const hit = await cache.match('./guide.html');
+            if (hit) {
+                const text = await hit.text();
+                cachedGuideTitle = (text.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+                break;
+            }
+        }
+        return {
+            path: location.pathname,
+            title: document.title,
+            hasGuide: !!document.getElementById('main-content'),
+            hasApp: !!document.getElementById('appPages'),
+            controller: navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL,
+            cachedGuideTitle
+        };
+    });
+    ok('navigation ទៅ Netlify /guide បង្ហាញសៀវភៅ មិនមែន index.html',
+        guidePage.path === '/guide' && guidePage.title === 'សៀវភៅណែនាំ ZoeW' &&
+        guidePage.hasGuide && !guidePage.hasApp, guidePage);
+
+    await page.waitForTimeout(500);
+    await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 });
+    await page.goto(origin + '/guide', { waitUntil: 'load', timeout: 30000 });
+    const guideAfterRevalidate = await page.evaluate(() => ({
         title: document.title,
         hasGuide: !!document.getElementById('main-content'),
         hasApp: !!document.getElementById('appPages')
     }));
-    ok('navigation ទៅ Netlify /guide បង្ហាញសៀវភៅ មិនមែន index.html',
-        guidePage.path === '/guide' && guidePage.title === 'សៀវភៅណែនាំ ZoeW' &&
-        guidePage.hasGuide && !guidePage.hasApp, guidePage);
+    ok('revalidate /guide មិនសរសេរ index.html ជាន់ guide cache',
+        guideAfterRevalidate.title === 'សៀវភៅណែនាំ ZoeW' &&
+        guideAfterRevalidate.hasGuide && !guideAfterRevalidate.hasApp,
+        guideAfterRevalidate);
 
     // អ្នកប្រើបើក Setup Link ដែលអ្នកលក់ផ្ញើឲ្យ
     await page.goto(origin + '/?setup=' + encodeURIComponent(SETUP_B64), { waitUntil: 'load', timeout: 30000 });
     // ហើយបើកផ្លូវ SPA មួយទៀត (Netlify rewrite ➜ index.html ដដែល)
     await page.goto(origin + '/some/deep/route', { waitUntil: 'load', timeout: 30000 });
+    await page.evaluate(() => fetch('./app.js?setup=static-secret').then((r) => r.text()));
     await page.waitForTimeout(600);
 
     const cacheState = await page.evaluate(async (o) => {
@@ -167,6 +207,8 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     ok('**គ្មាន payload config ជាប់ក្នុងកូនសោ cache**', b64Leak.length === 0, b64Leak);
     const spaLeak = cacheState.keys.filter((u) => u.indexOf('/some/deep/route') !== -1);
     ok('ផ្លូវ SPA មិនបង្កើត entry ថ្មីក្នុង cache', spaLeak.length === 0, spaLeak);
+    const staticLeak = cacheState.keys.filter((u) => u.indexOf('static-secret') !== -1);
+    ok('static shell មិនរក្សា query រសើបក្នុង cache', staticLeak.length === 0, staticLeak);
     ok('សំបក index.html នៅតែស្ថិតក្នុង cache (ក្រៅបណ្តាញនៅដើរ)', cacheState.hasIndex, cacheState.keys);
 
     // ក្រៅបណ្តាញ៖ ការបើក Setup Link ត្រូវនៅតែផ្តល់សំបក App មិនមែនទំព័រទទេ

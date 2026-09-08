@@ -9,15 +9,16 @@ const vm = require('vm');
 // checker បៃតងខណៈវាមើលមិនឃើញការដកវិញសោះ (វាស់បាន 2026-09-03)។
 // ជាគូ ៖ ការអនុវត្ត និងការដកវិញត្រូវចែក ledger **តែមួយ** បើមិនដូច្នេះ
 // ការដកវិញមិនប៉ះអ្វីដែលការអនុវត្តបានធ្វើទេ ➜ ការវាស់ក្លាយជាការក្លែង។
-function ledgerStubEntries(onEntry) {
-    const s = makeLedgerStub(onEntry);
+function ledgerStubEntries(onEntry, onCorrect) {
+    const s = makeLedgerStub(onEntry, onCorrect);
     return {
         addRevenueToDailyAndMonthlyRecord: s.add,
-        revertRevenueLedgerDelta: s.revert
+        revertRevenueLedgerDelta: s.revert,
+        correctRevenueLedgerToActual: s.correct
     };
 }
 
-function makeLedgerStub(onEntry) {
+function makeLedgerStub(onEntry, onCorrect) {
     const buckets = {};
     const add = function (d, cod, dod, count) {
         if (onEntry) onEntry(d, cod, dod, count);
@@ -51,7 +52,11 @@ function makeLedgerStub(onEntry) {
         if (!applied.packages && !applied.customer) return applied;
         return applied;
     };
-    return { add: add, revert: revert, addPickup: addPickup, revertPickup: revertPickup, buckets: buckets };
+    const correct = function (d, applied, cod, dod, count) {
+        if (onCorrect) onCorrect(d, applied, cod, dod, count);
+        return Promise.resolve({ ok: true });
+    };
+    return { add: add, revert: revert, correct: correct, addPickup: addPickup, revertPickup: revertPickup, buckets: buckets };
 }
 
 
@@ -125,6 +130,7 @@ function makeFirebase(server) {
 
 function makeCtx(server, fbSet) {
     const revenue = { cod: 0, dod: 0, count: 0 };
+    const reconciliations = [];
     const pickup = [];
     const scanHistory = [];
     const ctx = {
@@ -136,7 +142,10 @@ function makeCtx(server, fbSet) {
         // ⛔ `addOrUpdateEntry()` បោះត្រាម៉ោងតាមប្រតិទិនកម្ពុជា (2.20.5)
         getFormattedClockTime: () => '10:30:00',
         generateUniqueId: () => 'id_new_' + Math.random().toString(36).slice(2, 8),
-        ...ledgerStubEntries((d, c, dd, n) => { revenue.cod += (parseFloat(c) || 0); revenue.dod += (parseFloat(dd) || 0); revenue.count += (parseFloat(n) || 0); }),
+        ...ledgerStubEntries(
+            (d, c, dd, n) => { revenue.cod += (parseFloat(c) || 0); revenue.dod += (parseFloat(dd) || 0); revenue.count += (parseFloat(n) || 0); },
+            (d, applied, c, dd, n) => reconciliations.push({ d, applied, cod: c, dod: dd, count: n })
+        ),
         markPickupBarcodes: (d, marks, seed) => { pickup.push({ d, marks, seed }); return null; },
         syncScannerLookupEntry: () => {},
         updateRecentPhonesList: () => {},
@@ -144,7 +153,8 @@ function makeCtx(server, fbSet) {
         showToast: () => {},
         window: {},
         revenue,
-        pickup
+        pickup,
+        reconciliations
     };
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
@@ -199,6 +209,8 @@ console.log('\n=== ZoeW — ឧបករណ៍ ២ ស្កេនចូល orde
             'ផលបូក cod កម្រិត item ត្រូវនឹង barcodes ពិត', { item: server['ord1'].cod, sum: sumCod });
         ok(server['ord1'].count === codes.length, 'count ត្រូវនឹងចំនួន barcode ពិត', server['ord1'].count);
         ok(ctx.revenue.count === 1, 'លុយត្រូវបានបូកតែម្តងសម្រាប់ការស្កេននេះ', ctx.revenue.count);
+        ok(ctx.reconciliations.length === 1 && ctx.reconciliations[0].cod === 7 && ctx.reconciliations[0].count === 1,
+            'history commit ជោគជ័យ ➜ reconcile ledger តែម្តង', ctx.reconciliations);
         runScenario2();
     })();
 }
@@ -220,6 +232,7 @@ function runScenario2() {
         ok(it.isClosed === false && it.closedAt === undefined, 'order បើកវិញ ហើយ closedAt ត្រូវលុប');
         ok(it.barcode === 'BBB', 'barcode កម្រិត item ជា barcode ចុងក្រោយ', it.barcode);
         ok(ctx.revenue.count === 1 && ctx.revenue.cod === 7, 'លុយបូកតែ barcode ថ្មី', ctx.revenue);
+        ok(ctx.reconciliations.length === 1, 'ការស្កេនធម្មតា reconcile ledger តែម្តង', ctx.reconciliations);
         const local = ctx.scanHistory.find((i) => i.id === 'ord1');
         ok(local && local.barcodes.length === 2, 'ស្ថានភាពក្នុងសតិត្រូវបានធ្វើបច្ចុប្បន្នភាពភ្លាម', local && local.barcodes.length);
         ok(ctx.pickup.length === 0, 'order ដែលបើកស្រាប់ ➜ មិនប៉ះស្ថិតិយកកញ្ចប់', JSON.stringify(ctx.pickup));

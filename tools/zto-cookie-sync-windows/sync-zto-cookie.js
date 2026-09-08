@@ -118,7 +118,7 @@ function validateCookieHeader(raw) {
         pairs.push(name + '=' + value);
     }
     if (!hasSession) throw codedError('COOKIE_SESSION_MISSING');
-    if (dropped.length) lastDroppedCookieNames = dropped.slice(0, 12);
+    lastDroppedCookieNames = dropped.slice(0, 12);
     return pairs.join('; ');
 }
 

@@ -69,6 +69,82 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.30.10] — 2026-09-08 · 💰 បិទចន្លោះ ledger · 🔐 សម្អាត cache key · ⚙️ CI ពិត
+
+**App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v178` ➜ `zoew-v179`, `2.30.9` ➜
+`2.30.10`) និង ZoeKeyGen (`zoekeygen-v88` ➜ `zoekeygen-v89`, `2.19.18` ➜
+`2.19.19`)។
+
+#### កែកំហុសសំខាន់ — កញ្ចប់បានរក្សាទុក តែស្ថិតិប្រាក់អាចខ្វះ ឬបូកស្ទួន
+
+- ផ្លូវស្កេនថ្មី · ដក barcode · auto-abandon លើស ៧ ថ្ងៃ និងការកែស្ថិតិដោយដៃ
+  ឥឡូវផ្ទៀងផ្ទាត់ daily/monthly ledger ម្តងទៀត **ក្រោយ** business record
+  របស់វាត្រូវបានរក្សាទុកពិត។ បើ transaction លុយដើមបដិសេធ ឬ
+  `committed:false` វាបំពេញតែ delta ដែលខ្វះ មិនបូកទ្វេដង។
+- ករណី daily ជោគជ័យតែ monthly ធ្លាក់ (និងទិសផ្ទុយ) ត្រូវបានកែដាច់ដោយឡែក។
+  ជំនាន់មុនអាចជួសជុល monthly ទៅ `$15` រួច alignment ដកវាត្រឡប់ទៅ `$10`
+  ឬបូក monthly ពី `$15` ទៅ `$20`។ ឥឡូវ alignment ធៀប **ផលសរុបក្រោយ
+  correction** មិនមែនធៀបតែ correction delta នីមួយៗទេ។
+- `committed:false` និងករណី Firebase ref មិនទាន់មាន លែងទុក optimistic
+  money ក្នុងសតិ។ UI បង្ហាញ success តែបន្ទាប់ពី reconciliation ឆ្លើយ
+  `status.ok=true`; បើកញ្ចប់បានរក្សាទុក តែលុយមិនទាន់ស៊ីគ្នា វាប្រាប់ Admin
+  ត្រង់ៗ មិនកុហកថាបរាជ័យទាំងអស់ ឬជោគជ័យទាំងអស់។
+- សាលក្រម `status.ok` ឥឡូវមិនត្រឹមតែពិនិត្យថា daily និង monthly ស្មើគ្នាទេ;
+  វាត្រូវស្មើ **delta ដែលចង់បានពិត** ផង។ ដូច្នេះករណី ledger មាន `$2`
+  តែស្នើដក `$5` ហើយ Firebase clamp បានត្រឹម `-$2` លែងរាយ success ក្លែង។
+
+#### សុវត្ថិភាព និង Service Worker
+
+- Static shell request ដូចជា `app.js?setup=...` ក្នុង App ទាំង ២ លែងរក្សា
+  query string រសើបជាកូនសោ Cache Storage។ Navigation Setup Link នៅប្រើ
+  `index.html` ដដែល ហើយ Netlify Function នៅជា network-only ដដែល។
+- ZoeW `/guide` ឥឡូវត្រូវចាត់ជា shell ពិត។ Background revalidation ទាញ
+  `guide.html` ចូល cache key របស់ guide ដដែល មិនទាញ `index.html` មកសរសេរ
+  ជាន់វា; navigation ទី ២ ក៏នៅបង្ហាញសៀវភៅត្រឹមត្រូវ។
+- Background revalidation មានពិដាន **៣ សំណើ** ក្នុងពេលតែមួយ ដើម្បីទុក
+  connection slot សម្រាប់សំណើចាំបាច់របស់ App ទោះ browser កំណត់ same-origin
+  connection តិច។ ពិដាននេះត្រូវបានវាស់តាមពេល server ទទួលសំណើពិត មិនពឹង
+  timer របស់ Chromium ដែលអាចយឺតក្រោម CI load។
+- Windows ZTO cookie helper លុបបញ្ជី «cookie ដែលបានរំលង» ចាស់ ពេល capture
+  ថ្មីស្អាត ដូច្នេះ health/status មិនបន្តរាយការព្រមានចាស់។ តម្លៃ Cookie និង
+  PAT នៅមិនចូល log/file/repo ដដែល។ Timeout និងគោលការណ៍ retry របស់ ZTO
+  **មិនបានប្តូរ**។
+
+#### ច្បាប់ Delete/Remove/Restore/cleanup ដែលបានផ្ទៀងផ្ទាត់ឡើងវិញ
+
+- **Delete ទាំង item** ៖ មិនប៉ះស្ថិតិប្រាក់; Restore មិនបូក; ចុចស្ទួនក៏
+  មិនប៉ះលុយ។ **Remove barcode** ៖ ដកភ្លាមម្តងគត់; Restore បូកត្រឡប់ម្តងគត់
+  តាម `isDeducted`។ Pickup មិនប៉ះ revenue។
+- Closed barcode ចូល trash ក្រោយ ២ ម៉ោង; open barcode នៅ **៧ ថ្ងៃគត់**
+  មិនទាន់ចេញ ហើយចេញតែពេល **លើស** ៧ ថ្ងៃ; expired trash លុបក្រោយ ២ ថ្ងៃ;
+  trash ផ្សេងលុបក្រោយ ៣០ ថ្ងៃ។ Destructive cleanup នៅតែទាមទារ server clock
+  ដែលទុកចិត្តបាន និង Firebase live។
+
+#### ភស្តុតាង និងឧបករណ៍ audit
+
+- `ledger-failed-apply-revert-test.js` ថ្មី/ពង្រីក **ធ្លាក់ ១៩ ចំណុចលើ
+  `main` ចាស់** ហើយជោគជ័យ **៥០/៥០** ក្រោយកែ។ Regression ផ្សេង៖ concurrent
+  scan **២៣/២៣**, partial pickup/cleanup **៥២/៥២**, late commit **៦៧/៦៧**,
+  price-edit abort **២៣/២៣** និង toast truth **៨៨/៨៨**។
+- `sw-cache-key-test.js` ធ្លាក់ **៤/២៤** លើ `main` ចាស់ (static query ទាំង ២
+  App និង guide navigation/revalidation ២) ហើយជោគជ័យ **២៤/២៤** ក្រោយកែ។
+- `zto-cookie-sync-test.js` ធ្លាក់ **១/១៤៧** លើ helper ចាស់ ហើយជោគជ័យ
+  **១៤៧/១៤៧** ក្រោយកែ។
+- `checker-coverage.js` លែងរត់ checker ជាង ១០០ ជាជួរតែមួយដែលលើសពិដាន
+  ៣០០ វិនាទី។ វាប្រើ worker មានពិដាន; `hang-guard.js` ចាក់សោមិនឱ្យ
+  regression ត្រឡប់មកវិញ។
+- CI មូលដ្ឋានពេញត្រូវបានរត់ក្នុងម៉ាស៊ីននេះជំនួស GitHub Actions៖ **១៤៥/១៤៥
+  ក្រុម PASS · ០ PARTIAL · ០ SKIP · ០ FAIL**។ Fuzz បន្ថែម seed 100–113
+  ចំនួន **១៤ × ៥០ = ៧០០ operation** ក៏រក្សា invariant បានទាំងអស់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+**គ្មាន Firebase Rules និងគ្មាន Netlify env ត្រូវកែ។** ក្រោយ deploy សូម
+Refresh ឬទាញ ZoeW និង ZoeKeyGen ចុះឡើងវិញ ១ ដង (`zoew-v179` ·
+`zoekeygen-v89`)។ បើប្រើ Windows ZTO helper ដែលបានចម្លងចេញពី repo សូមជំនួស
+`sync-zto-cookie.js` ដោយកំណែថ្មី; config និង PAT ដែលបានអ៊ិនគ្រីបស្រាប់
+មិនបាច់បញ្ចូលឡើងវិញទេ។
+
 ### [2.30.9] — 2026-09-07 · 📖 គាំទ្រ Netlify Pretty URL `/guide` · 📱 សម្រួលអក្សរតារាងតូច
 
 **ZoeW ប៉ុណ្ណោះ** (`zoew-v177` ➜ `zoew-v178`)។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.19.18`)។
@@ -5147,6 +5223,95 @@ CSP ក៏មិនប្រែដែរ។
 > 2.19.1 · 2.19.3។ **ការសរសេរវាលើកទី ១៣ មិនបានទប់ការកើតឡើងលើកទី ១៤ ទេ។**
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
+
+### 2.30.10 — 2026-09-08 · 🔴 Business record និង money ledger មិនមែន atomic
+
+**របៀបដែលវារកឃើញ** ៖ អានផ្លូវសរសេរពិត មិនពឹងលើ checker បៃតង។ ការស្កេន,
+ដក barcode, auto-abandon និង manual adjustment សរសេរ business record និង
+daily/monthly revenue ជា operation ដាច់ពីគ្នា។ `correctRevenueLedgerToActual()`
+មានស្រាប់ ប៉ុន្តែអ្នកហៅមានតែផ្លូវកែតម្លៃ barcode មួយ; ផ្លូវសំខាន់ ៤ ខាងលើ
+មិនកេះវាក្រោយ business record commit ទេ។
+
+**មូលហេតុឫសគល់ និងផលប៉ះពាល់** ៖ Firebase transaction លុយអាចបដិសេធ ឬ
+ត្រឡប់ `committed:false` ខណៈការសរសេរប្រវត្តិ/trash ជោគជ័យ។ ឧទាហរណ៍ ដក
+barcode `$10` ៖ trash រក្សា `isDeducted=true` ប៉ុន្តែ ledger មិនដក។ ពេល
+Restore វាឃើញ `isDeducted` ហើយបូក `$10` ត្រឡប់ ➜ អាចក្លាយពី `$10` ទៅ `$20`។
+ជាមួយគ្នានោះ `commitDailyRevenueDelta()` និង `commitMonthlyRevenueDelta()`
+ធ្លាប់ rollback optimistic memory តែពេល Promise reject; `committed:false`
+ឬ dbRef ទទេ ទុកលេខក្នុងសតិខុសពី server។
+
+**កំហុស partial failure ទី ២** ៖ helper កែតម្រូវធៀប `dailyFix` និង
+`monthlyFix` ជំនួសឱ្យ total delta ក្រោយកែ។ សេណារីយ៉ូ server ពិតដែលវាស់៖
+
+| មុន correction | correction ដែលចង់បាន | លទ្ធផលចាស់ |
+|---|---|---|
+| daily `$15`, monthly `$10` | monthly `+$5` | បូក `+$5` រួច align `-$5` ➜ monthly `$10` |
+| daily `$10`, monthly `$15` | daily `+$5` | align បូក monthly `+$5` ទៀត ➜ monthly `$20` |
+
+**ការកែ** ៖ rollback local លើ reject · `committed:false` · ref ទទេ; ក្រោយ
+business record រឹងមាំ គណនា delta ដែល server ទទួលពិត ហើយបំពេញតែផ្នែកខ្វះ។
+Alignment ធៀប total daily/monthly ក្រោយ correction។ អ្នកហៅទទួល `{ok,
+daily, monthly}` ហើយសារ success រង់ចាំ `ok=true`; failure ត្រូវបញ្ជូនទៅ
+Sentry ដោយ context `zone: money` និងប្រាប់ Admin ដោយមិនលុប business record
+ដែលបាន commit រួច។
+
+**កំហុស partial/clamp ទី ៣** ៖ daily និង monthly អាចស្មើគ្នាបន្ទាប់ពី clamp
+ប៉ុន្តែមិនស្មើ delta ដែល business record ទាមទារ។ ឧទាហរណ៍ ទាំងពីរមាន `$2`,
+ស្នើដក `$5`, transaction អនុវត្តបានត្រឹម `-$2` ទៅ `0`។ សាលក្រមចាស់ឃើញ
+`daily === monthly` ហើយត្រឡប់ `ok:true` ទោះនៅខ្វះ `-$3`។ ឥឡូវ `ok` ទាមទារ
+ទាំង agreement **និង** total `{cod,dod,count}` ស្មើ delta ដែលចង់បាន។
+
+**លេខ និងអ្នកយាម** ៖ `ledger-failed-apply-revert-test.js` ជោគជ័យ **៣១**
+និងធ្លាក់ **១៩** លើ `main` ចាស់; ក្រោយកែ **៥០/៥០**។ វាគ្រប reject,
+`committed:false`, dbRef ទទេ, clamp ឆ្លង 0, correction បរាជ័យទាំងស្រុង,
+partial failure ទាំង ២ ទិស, false-success ក្រោយ clamp និង callsite ទាំង ៤។ `concurrent-scan-test.js`
+**២៣/២៣**, `partial-pickup-cleanup-test.js` **៥២/៥២** និង
+`late-commit-test.js` **៦៧/៦៧** ចាក់សោថាការកែមិនបង្កើតការបូក/ដកស្ទួន។
+
+### 2.30.10 / 2.19.19 — 2026-09-08 · 🔴 Static query ជាប់ cache និង guide cache ត្រូវ poison
+
+**របៀបដែលវារកឃើញ** ៖ រត់ Service Worker ពិតក្នុង Chromium បន្ទាប់ពីអាន
+`cacheKeyFor()` និង `revalidateShell()`។ ការការពារ Setup Link មានតែលើ
+navigation; request static shell ដូច `app.js?setup=static-secret` នៅប្រើ
+Request ពេញជាកូនសោ។ ZoeW `/guide` mapping មានហើយ តែ `isShell` មិនរាប់វា;
+បើកែតែ `isShell`, revalidation ប្រើ request `/guide` ហើយ Netlify-style server
+ឆ្លើយ `index.html` មកសរសេរជាន់ cache `guide.html`។
+
+**ការកែ** ៖ static shell ដែលមានឈ្មោះក្នុង allowlist ប្រើ pathname ស្អាតគ្មាន
+query; shell ទាំងអស់សម្គាល់ដោយ normalized string key; revalidation ទាញតាម
+normalized target ដដែល។ URL មិនមែន shell មិនត្រូវ cache ហើយ Function នៅ
+network-only។ Fake Cache API ក្នុង checker ២ ត្រូវ normalize relative key
+ទៅ absolute URL ដូច browser ពិត ដើម្បីកុំឱ្យ harness បង្កើត failure ក្លែង។
+
+**លេខ និងអ្នកយាម** ៖ `sw-cache-key-test.js` លើ `main` ចាស់ **២០ ok / ៤
+FAIL**; ក្រោយកែ **២៤/២៤** រួម navigation `/guide` ពីរដង ដើម្បីចាប់ cache
+poison ក្រោយ background revalidation។ `REVALIDATE_MAX_IN_FLIGHT` ត្រូវបាន
+បន្ថយពី ៤ ទៅ **៣** ក្រោយ full-load run បង្ហាញថា non-shell request មួយអាច
+បំពេញ connection ទី ៥ ហើយធ្វើឱ្យ canary timeout ៩.១ វិនាទី។ Pressure test
+៣ ជុំស្របគ្នា **៧២/៧២**; `stall-guard-test.js` **១៩/១៩** និង
+`sw-cache-failure-test.js` **១៤/១៤**។
+
+### tools — 2026-09-08 · 🟠 ZTO helper រាយ cookie ដែលបានរំលងពី capture ចាស់
+
+`lastDroppedCookieNames` ត្រូវបានកែតែពេល `dropped.length > 0`; capture ស្អាត
+បន្ទាប់មិនលុបបញ្ជីចាស់។ វាមិនបង្ហាញ secret និងមិនធ្វើឱ្យ upload ខុស ប៉ុន្តែ
+status អាចបន្តប្រាប់ការព្រមានចាស់ ធ្វើឱ្យ Admin សន្មតថា Cookie ថ្មីនៅខូច។
+ឥឡូវរាល់ validation ជោគជ័យជំនួសបញ្ជីដោយលទ្ធផលថ្មី (រួមទាំង `[]`)។
+`zto-cookie-sync-test.js` លើ helper ចាស់ **១៤៦ ok / ១ FAIL**; ក្រោយកែ
+**១៤៧/១៤៧**។
+
+### audit — 2026-09-08 · 🔴 Meta-checker ខ្លួនឯងលើសពិដាន ហើយ CI ខាងក្រោយត្រូវ skip
+
+Baseline ពិតបង្ហាញ `checker-coverage.js` រត់ empty-tree probe ជាង ១០០
+process តាម `execFileSync` ជាជួរ ហើយលើសពិដាន **៣០០ វិនាទី**។ `run-all.sh`
+រាយវាជា FAIL ហើយ checker browser/Firebase ខាងក្រោយមិនទទួលការវាស់ពេញលេញ។
+វាត្រូវបានប្តូរទៅ bounded worker **១២** ដែលនៅតែរត់ checker នីមួយៗពិត និង
+រក្សា timeout ផ្ទាល់ខ្លួន; ក្នុងម៉ាស៊ីន audit ជុំនេះវាបញ្ចប់ប្រហែល **៦០
+វិនាទី** និង **២៤/២៤**។ `hang-guard.js` បន្ថែមការអះអាងថាផ្នែក empty probe
+មិនត្រឡប់ទៅ synchronous serial វិញ (**៨/៨**)។ Sentry browser test ក៏លែង
+ពឹង fixed wait ១៥០ ms ដែលអាចក្លាយជា failure ក្លែងក្រោម full CI load; វារង់ចាំ
+readiness មានពិដាន និងបានឆ្លង **៥ ជុំ = ៧០/៧០**។ លទ្ធផល strict ចុងក្រោយ៖
+**១៤៥/១៤៥ ក្រុម PASS · ០ PARTIAL · ០ SKIP · ០ FAIL**។
 
 ### 2.30.9 — 2026-09-07 · 🔴 Netlify បម្លែង `guide.html` ទៅ `/guide`
 

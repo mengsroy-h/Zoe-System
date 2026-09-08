@@ -149,10 +149,15 @@ async function makePage(browser, origin, sdkDelayMs) {
             window.ZoeErrors.capture(new Error('plain-err'), { context: 'x' });
             window.ZoeErrors.capture(new Error('bad-zone'), { zone: 'NOT A TAG!', context: 'x' });
             window.ZoeErrors.capture(new Error('no-extra'));
-            await wait(150);
-            return window.__log;
+            const deadline = Date.now() + 2000;
+            while (Date.now() < deadline
+                && (!window.__log || !Array.isArray(window.__log.sent) || window.__log.sent.length < 4)) {
+                await wait(25);
+            }
+            return window.__log || { init: [], sent: [], scopes: [], closed: 0, unbound: 0 };
         });
-        const find = (m) => out.scopes.filter((x) => x.msg === m)[0];
+        const scopes = Array.isArray(out.scopes) ? out.scopes : [];
+        const find = (m) => scopes.filter((x) => x.msg === m)[0];
         ok('`zone` ក្លាយជា tag ពិតដែលទៅដល់ Sentry (alert rule ស្វែងរកបាន)',
             find('money-err') && find('money-err').tags && find('money-err').tags.zone === 'money',
             find('money-err'));

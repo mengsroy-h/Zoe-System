@@ -136,6 +136,13 @@ async function run() {
     console.log('\n=== ៣. Cookie validation និង header injection ===');
     if (api) {
         ok('ទម្រង់ធម្មតាត្រូវ normalize', api.validateCookieHeader('  ' + COOKIE + '  ') === COOKIE);
+        api.validateCookieHeader(COOKIE + '; malformed flag');
+        ok('កត់ឈ្មោះ cookie ដែលបានរំលងដោយមិនបង្ហាញតម្លៃ',
+            api.droppedCookieNames().length === 1
+            && api.droppedCookieNames()[0] === '(malformed name)');
+        api.validateCookieHeader(COOKIE);
+        ok('សម្អាតបញ្ជី cookie ដែលបានរំលង ពេល capture ថ្មីស្អាត',
+            api.droppedCookieNames().length === 0, api.droppedCookieNames());
         for (const [label, value, code] of [
             ['CR/LF', 'SESSION=abc\r\nX-Evil=yes', 'COOKIE_CONTROL_CHAR'],
             ['CR/LF នៅគែម', '\r\nSESSION=abc', 'COOKIE_CONTROL_CHAR'],

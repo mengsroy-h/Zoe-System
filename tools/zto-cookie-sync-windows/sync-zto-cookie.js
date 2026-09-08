@@ -281,7 +281,7 @@ function readTokenViaPowerShell(options) {
     });
 }
 
-function timedFetch(url, options, controls) {
+function timedFetch(url, options, controls, consume) {
     const config = controls || {};
     const fetchImpl = config.fetchImpl || globalThis.fetch;
     const timeoutMs = Number.isFinite(config.timeoutMs)
@@ -296,7 +296,10 @@ function timedFetch(url, options, controls) {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            if (error) reject(error);
+            if (error) {
+                try { controller.abort(); } catch (_) {}
+                reject(error);
+            }
             else resolve(response);
         };
         const timer = setTimeout(() => {
@@ -314,9 +317,12 @@ function timedFetch(url, options, controls) {
             return;
         }
         Promise.resolve(pending).then(
-            (response) => finish(null, response),
-            () => finish(codedError('NETLIFY_NETWORK', true))
-        );
+            (response) => {
+                if (settled) return;
+                return typeof consume === 'function' ? consume(response) : response;
+            },
+            () => { throw codedError('NETLIFY_NETWORK', true); }
+        ).then((value) => finish(null, value), (error) => finish(error));
     });
 }
 
@@ -334,7 +340,7 @@ function netlifyHeaders(token) {
 async function discardResponse(response) {
     try {
         if (response && response.body && typeof response.body.cancel === 'function') {
-            await response.body.cancel();
+            Promise.resolve(response.body.cancel()).catch(() => {});
         }
     } catch (_) {}
 }
@@ -343,9 +349,31 @@ async function readSmallJson(response, errorCode) {
     const code = errorCode || 'NETLIFY_SITE_INVALID_RESPONSE';
     let text;
     try {
-        text = await response.text();
-    } catch (_) {
-        throw codedError(code);
+        if (response.body && typeof response.body.getReader === 'function') {
+            const reader = response.body.getReader();
+            const chunks = [];
+            let bytes = 0;
+            try {
+                for (;;) {
+                    const part = await reader.read();
+                    if (part.done) break;
+                    bytes += part.value.byteLength;
+                    if (bytes > NETLIFY_RESPONSE_MAX_BYTES) {
+                        Promise.resolve(reader.cancel()).catch(() => {});
+                        throw codedError(code);
+                    }
+                    chunks.push(Buffer.from(part.value));
+                }
+                text = Buffer.concat(chunks, bytes).toString('utf8');
+            } finally {
+                reader.releaseLock();
+            }
+        } else {
+            text = await response.text();
+        }
+    } catch (error) {
+        if (error && error.code === code) throw error;
+        throw codedError('NETLIFY_NETWORK', true);
     }
     if (Buffer.byteLength(text, 'utf8') > NETLIFY_RESPONSE_MAX_BYTES) {
         throw codedError(code);
@@ -372,59 +400,63 @@ function validateSignedUrl(raw) {
 
 async function getNetlifySite(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
-    const response = await timedFetch(
+    return timedFetch(
         netlifyApiUrl('/api/v1/sites/' + encodeURIComponent(cleanSiteId)),
         { method: 'GET', headers: netlifyHeaders(token) },
-        controls
+        controls,
+        async (response) => {
+            if (!response || !response.ok) {
+                const status = response ? response.status : 0;
+                await discardResponse(response);
+                throw codedError('NETLIFY_SITE_REJECTED', statusIsTransient(status));
+            }
+            const site = await readSmallJson(response);
+            const accountId = validateSiteId(site && site.account_id, 'NETLIFY_SITE_INVALID_RESPONSE');
+            return { accountId };
+        }
     );
-    if (!response || !response.ok) {
-        const status = response ? response.status : 0;
-        await discardResponse(response);
-        throw codedError('NETLIFY_SITE_REJECTED', statusIsTransient(status));
-    }
-    const site = await readSmallJson(response);
-    const accountId = validateSiteId(site && site.account_id, 'NETLIFY_SITE_INVALID_RESPONSE');
-    return { accountId };
 }
 
 async function requestBlobUploadUrl(siteId, token, controls) {
     const cleanSiteId = validateSiteId(siteId);
     const pathname = '/api/v1/blobs/' + encodeURIComponent(cleanSiteId)
         + '/' + BLOB_STORE_PATH + '/' + BLOB_KEY;
-    const response = await timedFetch(netlifyApiUrl(pathname), {
+    return timedFetch(netlifyApiUrl(pathname), {
         method: 'PUT',
         headers: {
             accept: SIGNED_URL_ACCEPT,
             Authorization: 'Bearer ' + validateToken(token)
         }
-    }, controls);
-    if (!response || !response.ok) {
-        const status = response ? response.status : 0;
-        await discardResponse(response);
-        throw codedError('NETLIFY_BLOB_URL_FAILED', statusIsTransient(status));
-    }
-    const payload = await readSmallJson(response, 'NETLIFY_BLOB_URL_INVALID');
-    return validateSignedUrl(payload && payload.url);
+    }, controls, async (response) => {
+        if (!response || !response.ok) {
+            const status = response ? response.status : 0;
+            await discardResponse(response);
+            throw codedError('NETLIFY_BLOB_URL_FAILED', statusIsTransient(status));
+        }
+        const payload = await readSmallJson(response, 'NETLIFY_BLOB_URL_INVALID');
+        return validateSignedUrl(payload && payload.url);
+    });
 }
 
 async function uploadCookieToBlob(signedUrl, cookieHeader, controls) {
     const cleanCookie = validateCookieHeader(cookieHeader);
-    const response = await timedFetch(signedUrl, {
+    await timedFetch(signedUrl, {
         method: 'PUT',
         redirect: 'manual',
         headers: { 'cache-control': 'max-age=0, stale-while-revalidate=60' },
         body: cleanCookie
-    }, controls);
-    if (response && response.status >= 300 && response.status < 400) {
+    }, controls, async (response) => {
+        if (response && response.status >= 300 && response.status < 400) {
+            await discardResponse(response);
+            throw codedError('NETLIFY_BLOB_REDIRECT');
+        }
+        if (!response || !response.ok) {
+            const status = response ? response.status : 0;
+            await discardResponse(response);
+            throw codedError('NETLIFY_BLOB_UPLOAD_FAILED', statusIsTransient(status));
+        }
         await discardResponse(response);
-        throw codedError('NETLIFY_BLOB_REDIRECT');
-    }
-    if (!response || !response.ok) {
-        const status = response ? response.status : 0;
-        await discardResponse(response);
-        throw codedError('NETLIFY_BLOB_UPLOAD_FAILED', statusIsTransient(status));
-    }
-    await discardResponse(response);
+    });
 }
 
 async function resolveCredentials(options) {
@@ -444,15 +476,16 @@ async function readDiagnostics(siteUrl, proxyKey, controls) {
     const headers = { Accept: 'application/json' };
     headers[PROXY_KEY_HEADER] = String(proxyKey || '');
     const path = (controls && controls.fresh === false) ? DIAG_PATH : DIAG_FRESH_PATH;
-    const response = await timedFetch(origin + path, {
+    return timedFetch(origin + path, {
         method: 'GET',
         headers
-    }, Object.assign({ timeoutMs: VERIFY_TIMEOUT_MS }, controls));
-    if (!response || !response.ok) {
-        await discardResponse(response);
-        throw codedError('DIAG_REJECTED');
-    }
-    return readSmallJson(response, 'DIAG_INVALID');
+    }, Object.assign({ timeoutMs: VERIFY_TIMEOUT_MS }, controls), async (response) => {
+        if (!response || !response.ok) {
+            await discardResponse(response);
+            throw codedError('DIAG_REJECTED');
+        }
+        return readSmallJson(response, 'DIAG_INVALID');
+    });
 }
 
 function diagnosticsCookie(payload) {

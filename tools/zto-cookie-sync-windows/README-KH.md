@@ -267,7 +267,7 @@ sync-zto-cookie.cmd
 | **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់តាមសំណើអ្នកប្រើ** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
 | **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
 | **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
-| **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout ដែល settle ដោយ timer ពិត · response body បោះចោលដោយមិនបង្ហាញ |
+| **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout គ្របដល់ body ចប់ · JSON មានពិដាន 1 MB · response body មិនបង្ហាញ |
 | **ការ upload** | signed URL ត្រូវជា **HTTPS** មុនផ្ញើ Cookie ហើយ ⛔ **PAT មិនហូរទៅ host នោះសោះ**; redirect ត្រូវបដិសេធដោយឈ្មោះ |
 | **ទម្រង់ Cookie** | ត្រូវមាន `BOS-MAN-SESSION` ពិត · បដិសេធ CR/LF/NUL · ពិដាន ៨ KiB និង ៦៤ គូ ➜ header injection កើតមិនបាន |
 | **⛔ អ្វីដែលមិនធ្វើ** | មិនបង្កើត endpoint សរសេរ Cookie ពី internet · មិនដាក់ `NETLIFY_AUTH_TOKEN` ក្នុង Netlify env · មិនប្រើ browser extension |

@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = 1;
+var SCRIPT_VERSION = 2;
 var DEFAULT_SHEET_NAME = 'Customers';
 var MAX_IMPORT_ROWS = 20000;
 var MAX_SAVED_MAPPINGS = 12;
@@ -371,11 +371,15 @@ function writeToSheet_(rows, mode) {
     var plan = planImport_(existing, normalized.records, mode);
 
     if (plan.mode === 'replace') {
-        if (lastRow >= 2) {
-            sheet.getRange(2, 1, lastRow - 1, 4).clearContent();
+        var replacementLastRow = plan.rows.length + 1;
+        if (sheet.getMaxRows() < replacementLastRow) {
+            sheet.insertRowsAfter(sheet.getMaxRows(), replacementLastRow - sheet.getMaxRows());
         }
         applyColumnFormats_(sheet, 2, plan.rows.length);
         sheet.getRange(2, 1, plan.rows.length, 4).setValues(plan.rows);
+        if (lastRow > replacementLastRow) {
+            sheet.getRange(replacementLastRow + 1, 1, lastRow - replacementLastRow, 4).clearContent();
+        }
     } else {
         var runs = contiguousRuns_(plan.updatedRows);
         for (var i = 0; i < runs.length; i++) {

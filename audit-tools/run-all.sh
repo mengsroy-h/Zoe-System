@@ -45,7 +45,7 @@ run() {
     fi
     if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
         echo "*** FAIL *** (ព្យួរ — លើសពិដាន ${CHECKER_TIMEOUT}s)"
-        printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
+        printf '%s\n' "$out" | sed 's/^/      /'
         fail=$((fail+1))
         return
     fi
@@ -65,7 +65,7 @@ run() {
             pass=$((pass+1))
         fi
     else
-        echo "*** FAIL ***"; printf '%s\n' "$out" | tail -12 | sed 's/^/      /'
+        echo "*** FAIL ***"; printf '%s\n' "$out" | sed 's/^/      /'
         fail=$((fail+1))
     fi
 }
@@ -74,7 +74,7 @@ skipm() { printf '  %-32s SKIPPED (no acorn)\n' "$1"; skip=$((skip+1)); }
 echo "== តេស្តឥរិយាបថ (រត់កូដពិតចេញពី app.js) =="
 for t in policy-test auth-recovery-test keylist-consistency-test \
          license-grace-test license-clock-trust-test \
-         license-clock-rollback-test \
+         license-clock-rollback-test license-record-race-test \
          cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
@@ -96,7 +96,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          revenue-rules-clamp-test price-edit-abort-test registry-release-test late-commit-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
-         lookup-burst-test health-check-test monthly-report-test; do
+         lookup-burst-test health-check-test monthly-report-test zto-network-boundaries-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -124,6 +124,7 @@ run "netlify-config-scope" node audit-tools/netlify-config-scope-test.js
 run "emu/crud-rules-flow" node audit-tools/emu/crud-rules-flow.js
 run "emu/restore-deadlock" node audit-tools/emu/restore-deadlock-test.js
 run "emu/ledger-revert" node audit-tools/emu/ledger-revert-emu-test.js
+run "emu/restore-mutation" node audit-tools/emu/restore-mutation-emu-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
@@ -293,12 +294,14 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTOBUDGET_APP_DIR="$BASE" node audit-tools/zto-budget-test.js 2>&1 | tail -1 | sed 's/^/   zto-budget:      /'
     ZTONEG_APP_DIR="$BASE" node audit-tools/zto-negative-cache-test.js 2>&1 | tail -1 | sed 's/^/   zto-neg-cache:   /'
     ZTO_SYNC_APP_DIR="$BASE" node audit-tools/zto-cookie-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-sync: /'
+    ZTO_BOUNDARIES_APP_DIR="$BASE" node audit-tools/zto-network-boundaries-test.js 2>&1 | tail -1 | sed 's/^/   zto-boundaries:  /'
     ZTOSTORE_APP_DIR="$BASE" node audit-tools/zto-cookie-store-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-store:/'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'
     DEADLOCK_APP_DIR="$BASE" node audit-tools/emu/restore-deadlock-test.js 2>&1 | tail -1 | sed 's/^/   emu-deadlock:    /'
     LEDGEREMU_APP_DIR="$BASE" node audit-tools/emu/ledger-revert-emu-test.js 2>&1 | tail -1 | sed 's/^/   emu-ledger-rev:  /'
+    RESTOREMUTATION_APP_DIR="$BASE" node audit-tools/emu/restore-mutation-emu-test.js 2>&1 | tail -1 | sed 's/^/   restore-mutation:/'
     MONEYGUARD_APP_DIR="$BASE" node audit-tools/money-guardian-test.js 2>&1 | tail -1 | sed 's/^/   money-guardian:  /'
     HANGGUARD_APP_DIR="$BASE" node audit-tools/hang-guard.js 2>&1 | tail -1 | sed 's/^/   hang-guard:      /'
     EXITCODE_APP_DIR="$BASE" node audit-tools/exit-code-integrity.js 2>&1 | tail -1 | sed 's/^/   exit-code:       /'
@@ -328,6 +331,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     KEYLIST_APP_DIR="$BASE" node audit-tools/keylist-consistency-test.js 2>&1 | tail -1 | sed 's/^/   keylist-consistency:/'
     LICGRACE_APP_DIR="$BASE" node audit-tools/license-grace-test.js 2>&1 | tail -1 | sed 's/^/   license-grace:   /'
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'
+    LICRACE_APP_DIR="$BASE" node audit-tools/license-record-race-test.js 2>&1 | tail -1 | sed 's/^/   license-race:    /'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'
@@ -348,6 +352,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     FNSURFACE_APP_DIR="$BASE" node audit-tools/function-surface-test.js 2>&1 | tail -1 | sed 's/^/   function-surface: /'
     DUPCODE_APP_DIR="$BASE" node audit-tools/code-duplication-test.js 2>&1 | tail -1 | sed 's/^/   code-duplication: /'
     SHEETIMPORT_APP_DIR="$BASE" node audit-tools/sheet-import-test.js 2>&1 | tail -1 | sed 's/^/   sheet-import:    /'
+    ZTO_IMPORT_APP_DIR="$BASE/zto-import" node zto-import/test.js 2>&1 | tail -1 | sed 's/^/   zto-import:      /'
     APPLOCK_APP_DIR="$BASE" node audit-tools/app-lock-test.js 2>&1 | tail -1 | sed 's/^/   app-lock:        /'
     LEAK_APP_DIR="$BASE" node audit-tools/listener-leak-test.js 2>&1 | tail -1 | sed 's/^/   listener-leak:   /'
     STALLGUARD_APP_DIR="$BASE" node audit-tools/stall-guard-test.js 2>&1 | tail -1 | sed 's/^/   stall-guard:     /'

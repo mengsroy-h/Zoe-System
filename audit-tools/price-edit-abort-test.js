@@ -86,7 +86,7 @@ const NEEDED = [
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
-    'saveEditedBarcodePrice'
+    'saveEditedBarcodePrice', 'itemHasRestoreMarkers'
 ];
 const missing = NEEDED.filter((n) => !sliceFn(n));
 ok('ជាន់អប្បបរមា៖ រកឃើញ function ដែលចាំបាច់ទាំង ' + NEEDED.length,
@@ -296,6 +296,49 @@ function toastText(ctx) { return ctx.toasts.join(' | '); }
             { cod: serverBarcodeCod(ctx) });
         ok('commit យឺត ៖ លុយនៅ +$15 ១ ដងគត់', memoryCod(ctx) === 15 && serverCod(ctx) === 15,
             { memory: memoryCod(ctx), server: serverCod(ctx) });
+    }
+
+    console.log('\n=== ៦. ទិន្នន័យចាស់មានខ្ទង់លើសសេន ➜ កែដោយមិនបង្កើតលុយ ===');
+    const legacyCases = [
+        { label: 'តម្លៃដដែល 0.005 ទាំង COD និង DOD', server: [0.005, 0.005], next: [0.005, 0.005], expected: [0.01, 0.01] },
+        { label: 'បន្ថយ COD និងបង្កើន DOD ពីតម្លៃចាស់', server: [0.015, 0.005], next: [0.005, 2.005], expected: [0.01, 2.01] },
+        { label: 'ទិដ្ឋភាពចាស់ ត្រូវកែតាមសាលក្រម server', local: [0.015, 0.025], server: [0.005, 0.015], next: [0.015, 0.005], expected: [0.02, 0.01] },
+        { label: 'ទិសផ្ទុយ តម្លៃសេនធម្មតា', server: [0.01, 0.02], next: [2.01, 3.02], expected: [2.01, 3.02] }
+    ];
+    for (const entry of legacyCases) {
+        const ctx = setup('commit');
+        const local = entry.local || entry.server;
+        const records = [[ctx.scanHistory[0], local], [ctx.__serverHistory.id_1, entry.server]];
+        for (const [record, values] of records) {
+            record.barcodes[0].cod = values[0];
+            record.barcodes[0].dod = values[1];
+            record.cod = Math.round(values[0] * 100) / 100;
+            record.dod = Math.round(values[1] * 100) / 100;
+            record.price = Math.round((record.cod + record.dod) * 100) / 100;
+        }
+        const ledger = { codDollar: Math.round(entry.server[0] * 100) / 100,
+            dodDollar: Math.round(entry.server[1] * 100) / 100, totalCount: 1 };
+        const month = DATE_KEY.slice(0, 7);
+        ctx.dailyRevenueData[DATE_KEY] = { ...ledger };
+        ctx.monthlyRevenueData[month] = { ...ledger };
+        ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY] = { ...ledger };
+        ctx.__serverLedger.zoew_monthly_revenue_cod_dod = { [month]: { ...ledger } };
+        ctx.__els.editBcCodInput.value = String(entry.next[0]);
+        ctx.__els.editBcDodInput.value = String(entry.next[1]);
+        ctx.saveEditedBarcodePrice();
+        await settle(); await settle();
+        const daily = ctx.__serverLedger['zoew_daily_revenue_cod_dod/' + DATE_KEY];
+        const monthly = ctx.__serverLedger.zoew_monthly_revenue_cod_dod[month];
+        const barcode = ctx.__serverHistory.id_1.barcodes[0];
+        const match = (record) => record && record.codDollar === entry.expected[0]
+            && record.dodDollar === entry.expected[1];
+        ok(entry.label + ' ៖ ledger ថ្ងៃជា COD/DOD ពិត', match(daily), { actual: daily, expected: entry.expected });
+        ok(entry.label + ' ៖ ledger ខែជា COD/DOD ពិត', match(monthly), { actual: monthly, expected: entry.expected });
+        ok(entry.label + ' ៖ barcode និងសតិត្រូវនឹង ledger',
+            barcode.cod === entry.expected[0] && barcode.dod === entry.expected[1]
+            && match(ctx.dailyRevenueData[DATE_KEY]), { barcode, memory: ctx.dailyRevenueData[DATE_KEY] });
+        ok(entry.label + ' ៖ មានសាលក្រមជោគជ័យក្រោយ commit',
+            ctx.toasts.some((message) => message.startsWith('✅')), toastText(ctx));
     }
 
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);

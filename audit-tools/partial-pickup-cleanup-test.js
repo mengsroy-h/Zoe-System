@@ -123,6 +123,7 @@ const REAL_FNS = [
     'normalizeBarcodesOf',
     'applyBarcodeCloseState',
     'barcodeCloseIsRipe',
+    'barcodeAbandonIsRipe',
     'normalizeBarcodeCloseStamps',
     'itemHasRestoreMarkers',
     'stripHistoryOnlyMarkers',

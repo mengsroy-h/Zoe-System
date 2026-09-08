@@ -884,7 +884,7 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
         return null;
     }
     if (!built.authKind) return null;
-    const flightKey = config.fingerprint + '|' + (cookieFingerprint(fresh.cookie) || '-') + '|' + barcode.toUpperCase();
+    const flightKey = config.fingerprint + '|' + barcode.toUpperCase() + '|' + (cookieFingerprint(fresh.cookie) || '-');
     let outcome;
     try {
         outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt);

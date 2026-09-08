@@ -54,14 +54,6 @@ try { acorn = require('acorn'); } catch (e) {
 // checker បៃតងខណៈវាមើលមិនឃើញការដកវិញសោះ (វាស់បាន 2026-09-03)។
 // ជាគូ ៖ ការអនុវត្ត និងការដកវិញត្រូវចែក ledger **តែមួយ** បើមិនដូច្នេះ
 // ការដកវិញមិនប៉ះអ្វីដែលការអនុវត្តបានធ្វើទេ ➜ ការវាស់ក្លាយជាការក្លែង។
-function ledgerStubEntries(onEntry) {
-    const s = makeLedgerStub(onEntry);
-    return {
-        addRevenueToDailyAndMonthlyRecord: s.add,
-        revertRevenueLedgerDelta: s.revert
-    };
-}
-
 function makeLedgerStub(onEntry) {
     const buckets = {};
     const add = function (d, cod, dod, count) {
@@ -398,13 +390,18 @@ function runPatch(mode) {
 // ចម្លើយត្រូវជា **ការវាស់** មិនមែនការអះអាង ៖ ការកាត់លុយកើតឡើង **ក្រោយ**
 // transaction ដោះ ➜ ការព្យួរ ➜ គ្មានការកាត់សោះ ➜ លុយមិនប្រែ។
 const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState',
-    'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
+    'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
     'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
     'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
-    'claimAndCleanupItem'];
+    'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow',
+    'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
+    'correctRevenueLedgerToActual', 'claimAndCleanupItem'];
 
 function runAbandonCleanup(mode) {
     const revenueLog = [];
+    const errors = [];
+    const ledger = makeLedgerStub((d, cod, dod, c) => revenueLog.push({ d, cod, dod, c }));
+    ledger.buckets['2026-08-21'] = { codDollar: 5, dodDollar: 2, totalCount: 1 };
     const writes = [];
     const store = {};
     const hang = mode === 'hang';
@@ -433,7 +430,11 @@ function runAbandonCleanup(mode) {
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         getServerNow: () => NOW,
         getFormattedDate: () => '2026-08-21',
-        ...ledgerStubEntries((d, cod, dod, c) => revenueLog.push({ d: d, cod: cod, dod: dod, c: c })),
+        addRevenueToDailyAndMonthlyRecord: ledger.add,
+        revertRevenueLedgerDelta: ledger.revert,
+        console: { ...console, error: (...args) => { errors.push(args.map(String).join(' ')); console.error(...args); } },
+        commitRevenueBucketDelta: () => { throw new Error('Unexpected ledger correction'); },
+        commitMonthlyRevenueDelta: () => { throw new Error('Unexpected monthly correction'); },
         showToast: () => {},
         releaseBarcodesInRegistry: () => Promise.resolve(),
         scanHistory: [], deletedItems: []
@@ -442,6 +443,7 @@ function runAbandonCleanup(mode) {
     loadCommon(ctx, zoewSrc);
     const parts = [
         sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'),
+        sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();'
@@ -468,7 +470,7 @@ function runAbandonCleanup(mode) {
         setTimeout(() => {
             const inflight = vm.runInContext('__inflight()', ctx);
             box.__timers.dispose();
-            resolve({ revenueLog, writes, inflight });
+            resolve({ revenueLog, writes, inflight, errors, ledger: ledger.buckets['2026-08-21'], trash: box.deletedItems });
         }, 1200);
     });
 }
@@ -527,6 +529,15 @@ function runAbandonCleanup(mode) {
         bad('រក function ' + (abHang.missing || abFine.missing) + ' ឃើញ',
             'checker មិនអាចវាស់ផ្លូវលុយបានទេ');
     } else {
+        check(abFine.errors.length === 0 && abHang.errors.length === 0,
+            'កូដសម្អាតទាំងពីរផ្លូវគ្មាន dependency បាត់ ឬកំហុសដែលត្រូវលាក់',
+            { fast: abFine.errors, hang: abHang.errors });
+        check(JSON.stringify(abFine.ledger) === JSON.stringify({ codDollar: 0, dodDollar: 0, totalCount: 0 }),
+            'ទិសផ្ទុយ ៖ បណ្តាញធម្មតាកាត់លុយពី ledger ដែលបាន seed ពិត', abFine.ledger);
+        check(JSON.stringify(abHang.ledger) === JSON.stringify({ codDollar: 5, dodDollar: 2, totalCount: 1 }),
+            'តំណព្យួរ ៖ ledger ដែលមានប្រាក់ដើមរក្សាដដែល', abHang.ledger);
+        check(abFine.writes.some(p => p.includes('zoew_recently_deleted_cod_dod')) && abFine.trash.length === 1,
+            'ទិសផ្ទុយ ៖ បណ្តាញធម្មតាសរសេរធុងសំរាមពិតមួយធាតុ', { writes: abFine.writes, trash: abFine.trash });
         check(abFine.revenueLog.length === 1,
             'ជាន់អប្បបរមា ៖ បណ្តាញធម្មតា ➜ ផ្លូវ `abandon` ពិតជាកាត់លុយ ១ ដង',
             'បើ 0 នោះការវាស់មិនបានឈានដល់ផ្លូវលុយសោះ ➜ លទ្ធផលគ្មានន័យ');

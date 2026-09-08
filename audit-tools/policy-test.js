@@ -48,10 +48,14 @@ function buildRunner(appFile) {
         'restore');
 
     // --- real block 3: removeSingleBarcode's deduct-once guard (ដក ដោយដៃ) ---
-    const removeBlock = slice(src,
-        '            let deductionApplied = null;\n            const revenueScanDate = claimedParent.scanDate',
-        '            const removedBc = { ...claimedBarcode, isDeducted: true, isFromDeletion: false };',
-        'remove');
+    const removeSource = fnBody(src, 'function removeSingleBarcode(', 'removeSingleBarcode');
+    const removeStarts = ['            let deductionApplied = null;', '            const removedBc = { ...claimedBarcode']
+        .map((marker) => removeSource.indexOf(marker));
+    const removeEnd = removeSource.indexOf('            const itemToTrash = stripHistoryOnlyMarkers(');
+    if (removeStarts.some((at) => at < 0) || removeEnd <= Math.max(...removeStarts)) {
+        throw new Error('remove deduction block not found');
+    }
+    const removeBlock = removeSource.slice(Math.min(...removeStarts), removeEnd);
 
     // ⛔ helper ពិតត្រូវស្រង់ចេញពី `app.js` — មិនចម្លងដោយដៃ (តេស្តលើកូដចម្លង
     // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា

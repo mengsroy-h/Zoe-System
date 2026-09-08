@@ -175,6 +175,7 @@ function buildWorld(opts) {
         extractFn(src, 'detachInfoListeners'),
         extractFn(src, 'attachInfoListeners'),
         extractFn(src, 'runAutomaticCleanupRules'),
+        extractFn(src, 'barcodeAbandonIsRipe'),
         extractFn(src, 'trashRetentionMs'),
         extractFn(src, 'runAutomaticDeletedCleanup'),
         'globalThis.__seed = (h, t) => { scanHistory = h; deletedItems = t; };',

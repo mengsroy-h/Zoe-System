@@ -70,6 +70,7 @@ function loadSw(app, opts) {
     const src = fs.readFileSync(path.join(ROOT, app, 'sw.js'), 'utf8');
     const listeners = {};
     const netCalls = [];
+    const netSignals = [];
     const self = {
         location: { href: 'https://example.test/', origin: 'https://example.test' },
         addEventListener: (type, fn) => { listeners[type] = fn; },
@@ -82,16 +83,24 @@ function loadSw(app, opts) {
         navigator: { onLine: true },
         caches: buildCaches(opts.cacheMode, opts.seed),
         Response: { error: () => makeResponse(0, 'Response.error') },
-        fetch: (req) => {
+        fetch: (req, options) => {
             netCalls.push(typeof req === 'string' ? req : req.url);
+            netSignals.push(options && options.signal);
+            if (opts.networkHang) {
+                return new Promise((resolve, reject) => {
+                    const signal = options && options.signal;
+                    if (signal) signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+                });
+            }
             if (opts.networkDown) return Promise.reject(new TypeError('Failed to fetch'));
-            return Promise.resolve(makeResponse(200, 'network'));
+            const pathname = new URL(typeof req === 'string' ? req : req.url, self.location.href).pathname;
+            return Promise.resolve(makeResponse(200, opts.networkByPath ? pathname : 'network'));
         }
     };
     ctx.globalThis = ctx;
     vm.createContext(ctx);
     vm.runInContext(src, ctx, { filename: app + '/sw.js' });
-    return { listeners, netCalls, ctx };
+    return { listeners, netCalls, netSignals, ctx };
 }
 
 function dispatchFetch(sw, request) {
@@ -169,6 +178,55 @@ function req(url, mode) {
             const res = await dispatchFetch(sw, req(SHELL));
             ok(app + ' ៖ ផ្លូវធម្មតាមិនប្រែ — សំបកដែល cache ទុកឆ្លើយពី cache',
                 res && res.__tag === 'cached', JSON.stringify(res));
+        }
+
+        // Cache ដែលបាត់ក្រោយ install មិនត្រូវឲ្យ JavaScript ចូលជំនួស HTML។
+        for (const cacheMode of [null, 'open', 'match']) {
+            const options = { cacheMode, networkByPath: true };
+            const sw = loadSw(app, options);
+            const res = await dispatchFetch(sw, req(SHELL + '?setup=secret', 'navigate'));
+            ok(app + ' ៖ cache ' + (cacheMode || 'ទទេ') + ' + navigation /app.js ទាញ index.html ពិត',
+                res && res.__tag === '/index.html', { tag: res && res.__tag, netCalls: sw.netCalls });
+            ok(app + ' ៖ navigation ទៅ asset មិនទាញ JavaScript ឬ query រសើប',
+                sw.netCalls.length === 1 && new URL(sw.netCalls[0], 'https://example.test/').pathname === '/index.html'
+                    && !sw.netCalls[0].includes('setup='), sw.netCalls);
+            if (cacheMode === null) {
+                options.networkDown = true;
+                sw.ctx.navigator.onLine = false;
+                const next = await dispatchFetch(sw, req('https://example.test/', 'navigate'));
+                ok(app + ' ៖ ក្រោយ cache បាត់ និងស្តារ navigation ក្រៅបណ្តាញនៅជា HTML',
+                    next && next.__tag === '/index.html', next);
+            }
+        }
+
+        if (app === 'ZoeW') {
+            const sw = loadSw(app, { cacheMode: null, networkByPath: true });
+            const res = await dispatchFetch(sw, req('https://example.test/guide?setup=secret', 'navigate'));
+            ok('ZoeW ៖ guide cache បាត់ ទាញ guide.html ផ្ទាល់ មិនពឹង rewrite របស់ server',
+                res && res.__tag === '/guide.html', { tag: res && res.__tag, netCalls: sw.netCalls });
+
+            const api = loadSw(app, { cacheMode: null, networkByPath: true });
+            const apiResponse = await dispatchFetch(api, req('https://example.test/.netlify/functions/zto-order-detail?diag=1', 'navigate'));
+            ok('ZoeW ៖ navigation ទៅ Function នៅតែឆ្លងទៅ API ផ្ទាល់',
+                apiResponse && apiResponse.__tag === '/.netlify/functions/zto-order-detail', api.netCalls);
+        }
+
+        {
+            const sw = loadSw(app, { cacheMode: null, networkByPath: true });
+            const res = await dispatchFetch(sw, req(SHELL));
+            ok(app + ' ៖ ការផ្ទុក app.js ជា script នៅតែផ្តល់ JavaScript', res && res.__tag === '/app.js', sw.netCalls);
+        }
+
+        for (const cacheMode of [null, 'open', 'match']) {
+            const sw = loadSw(app, { cacheMode, networkHang: true });
+            const caller = new AbortController();
+            const pending = dispatchFetch(sw, Object.assign(req(SHELL, 'navigate'), { signal: caller.signal }));
+            await Promise.resolve(); await Promise.resolve();
+            ok(app + ' ៖ navigation ' + (cacheMode || 'ទទេ') + ' ចេញទៅបណ្តាញពិតមុនបោះបង់', sw.netCalls.length === 1, sw.netCalls);
+            caller.abort();
+            const res = await pending;
+            ok(app + ' ៖ navigation ' + (cacheMode || 'ទទេ') + ' បញ្ជូន abort របស់អ្នកហៅដល់សំណើពិត',
+                sw.netSignals.length === 1 && sw.netSignals[0].aborted && res && res.status === 0, sw.netCalls);
         }
     }
 

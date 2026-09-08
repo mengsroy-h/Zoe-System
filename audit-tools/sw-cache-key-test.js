@@ -211,6 +211,45 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     ok('static shell មិនរក្សា query រសើបក្នុង cache', staticLeak.length === 0, staticLeak);
     ok('សំបក index.html នៅតែស្ថិតក្នុង cache (ក្រៅបណ្តាញនៅដើរ)', cacheState.hasIndex, cacheState.keys);
 
+    // លុបតែ HTML ដែល cache ទុក ដើម្បីត្រាប់តាម eviction ខណៈ SW នៅ active។
+    const eviction = await page.evaluate(async () => {
+        let removed = 0, remaining = 0;
+        for (const name of await caches.keys()) {
+            const cache = await caches.open(name);
+            if (await cache.delete(location.origin + '/index.html')) removed++;
+            if (await cache.match(location.origin + '/index.html')) remaining++;
+        }
+        return { removed, remaining, controlled: !!navigator.serviceWorker.controller };
+    });
+    ok('សេណារីយ៉ូ eviction លុប HTML ពិត ខណៈ SW នៅ active',
+        eviction.removed > 0 && eviction.remaining === 0 && eviction.controlled, eviction);
+    await page.goto(origin + '/app.js?setup=asset-navigation-secret', { waitUntil: 'load', timeout: 30000 });
+    const evictedNavigation = await page.evaluate(async () => {
+        let cachedHtml = false;
+        for (const name of await caches.keys()) {
+            const cache = await caches.open(name);
+            const res = await cache.match(location.origin + '/index.html');
+            if (res) cachedHtml = /<html[\s>]/i.test(await res.text());
+        }
+        return { hasShell: !!document.getElementById('appPages'), cachedHtml };
+    });
+    ok('ក្រោយ HTML cache បាត់ navigation /app.js បង្ហាញ App ពិត', evictedNavigation.hasShell, evictedNavigation);
+    ok('ក្រោយ eviction មិន cache JavaScript ជា index.html', evictedNavigation.cachedHtml, evictedNavigation);
+
+    await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 });
+    // ស្តារ fixture ឲ្យផ្លូវ offline ខាងក្រោមអាចវាស់ឯករាជ្យពីការធ្លាក់នេះ។
+    await page.evaluate(async (o) => {
+        for (const name of await caches.keys()) {
+            const cache = await caches.open(name);
+            await cache.delete(o + '/index.html');
+        }
+        const res = await fetch(o + '/index.html');
+        for (const name of await caches.keys()) {
+            const cache = await caches.open(name);
+            await cache.put(o + '/index.html', res.clone());
+        }
+    }, origin);
+
     // ក្រៅបណ្តាញ៖ ការបើក Setup Link ត្រូវនៅតែផ្តល់សំបក App មិនមែនទំព័រទទេ
     // ⛔ `server.close(cb)` ហៅ cb តែពេល **គ្រប់ការតភ្ជាប់បិទអស់** — Chromium
     // រក្សា socket keep-alive ➜ ការរង់ចាំនេះអាចមិនចេះចប់។ បិទវាដោយបង្ខំ។

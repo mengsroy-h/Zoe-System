@@ -168,6 +168,7 @@ bash audit-tools/emu/rules.sh
 | `clear-history-claim-test.js` · `clear-history-finalization-fence-test.js` | «លុបទាំងអស់» claim និង fence | — |
 | `emu/crud-rules-flow.js` | payload ពិត ធៀបនឹង **rules ពិត** លើ emulator | `CRUDFLOW_APP_DIR` |
 | `emu/restore-deadlock-test.js` | witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង) | `DEADLOCK_APP_DIR` |
+| `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
 | `emu/rules.sh` | rules ពិតលើ emulator ពិត | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 
@@ -222,6 +223,7 @@ bash audit-tools/emu/rules.sh
 | `zto-budget-test.js` | ⛔ ថវិកាពេលត្រូវគ្របដណ្តប់ handler ទាំងមូល (អាន Cookie + upstream + ការបន្តអាយុ) · 401 ដោយ Cookie ចាស់ក្នុង cache ➜ អានឡើងវិញ ១ ដង | `ZTOBUDGET_APP_DIR` |
 | `zto-negative-cache-test.js` | ⛔ សាលក្រម «រកមិនឃើញ» ត្រូវចូល cache (TTL ខ្លី) ដោយ **ការបរាជ័យបណ្តោះអាសន្នមិនចូល** · ស្នាមភ្ជាប់ ៖ លេខលំនាំដើមក្នុង `ZTO-SETUP-KH.md` ត្រូវស៊ីនឹងកូដ | `ZTONEG_APP_DIR` |
 | `zto-cookie-sync-test.js` | Windows helper ៖ ចាប់ header ពិត · DPAPI · signed URL · របៀប `--auto` · ការព្យាយាមឡើងវិញមានពិដានពេលបណ្តាញដាច់ | `ZTO_SYNC_APP_DIR` |
+| `zto-network-boundaries-test.js` | HTTP body ព្យួរ/លើសទំហំ/ដាច់កណ្តាល · រក្សា HTTP rejection · Cookie ថ្មីប្រើ single-flight តែមួយ | `ZTO_BOUNDARIES_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។
@@ -246,6 +248,7 @@ bash audit-tools/emu/rules.sh
 | `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record | — |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
+| `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ | — |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |

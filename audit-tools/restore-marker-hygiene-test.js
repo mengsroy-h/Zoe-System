@@ -97,7 +97,7 @@ function extractConst(src, name) {
 const src = fs.readFileSync(APP, 'utf8').replace(/\r\n?/g, '\n');
 
 const FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'stripHistoryOnlyMarkers', 'itemHasRestoreMarkers', 'dropStaleRestoreMarkers',
-    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
+    'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'normalizeBarcodeCloseStamps', 'parseTimestampFromId',
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers',
     'releaseStaleRestoreClaimForPurge', 'claimAndCleanupItem', 'runAutomaticCleanupRules',

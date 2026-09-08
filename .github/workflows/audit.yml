@@ -71,7 +71,7 @@ jobs:
       - name: payload ពិត ធៀបនឹង rules ពិត
         env:
           CRUD_FLOW_STRICT: '1'
-          CRUD_FLOW_MIN_ASSERTS: '43'
+          CRUD_FLOW_MIN_ASSERTS: '57'
         run: node audit-tools/emu/crud-rules-flow.js
 
       - name: witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង)
@@ -81,6 +81,11 @@ jobs:
 
       - name: «អនុវត្ត ➜ ដកវិញ» ជាគូបញ្ច្រាសពិត (ledger លើ RTDB ពិត)
         run: node audit-tools/emu/ledger-revert-emu-test.js
+
+      - name: ស្តារកំពុងដំណើរការ មិនត្រូវជាន់ដោយលុប ដក ឬកែតម្លៃ
+        env:
+          CRUD_FLOW_STRICT: '1'
+        run: node audit-tools/emu/restore-mutation-emu-test.js
 
       # ⛔ job នេះ **មាន** emulator ➜ `MONEYGUARD_STRICT=1` ធ្វើឲ្យ SKIP របស់
       # អ្នកយាមណាមួយក្លាយជា **ការធ្លាក់**។ (ក្នុង job `run-all.sh` ដែលគ្មាន

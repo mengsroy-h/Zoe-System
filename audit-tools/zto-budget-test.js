@@ -80,6 +80,7 @@ const RENEWED_COOKIE = 'BOS-MAN-SESSION=' + 'b'.repeat(48);
 
 function fakeBlobs(opts) {
     const state = opts.state;
+    const etagOf = (value) => '"' + require('crypto').createHash('sha256').update(String(value || '')).digest('hex') + '"';
     return {
         connectLambda() {},
         getStore() {
@@ -88,12 +89,18 @@ function fakeBlobs(opts) {
                     state.reads++;
                     return new Promise((resolve) => setTimeout(() => resolve(state.value), opts.readMs));
                 },
-                set(key, value) {
+                async getWithMetadata() {
+                    const value = await this.get();
+                    return value === null ? null : { data: value, etag: etagOf(value), metadata: {} };
+                },
+                set(key, value, options) {
                     state.writeStartedAt = Date.now();
                     return new Promise((resolve) => setTimeout(() => {
+                        if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(state.value)) return resolve({ modified: false });
+                        if (options && options.onlyIfNew && state.value !== null) return resolve({ modified: false });
                         state.writes++;
                         state.value = value;
-                        resolve();
+                        resolve({ modified: true, etag: etagOf(value) });
                     }, opts.writeMs));
                 }
             };

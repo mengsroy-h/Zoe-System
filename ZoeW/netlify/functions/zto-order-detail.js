@@ -55,9 +55,12 @@ const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
-    mustRevalidate: false
+    authIdentity: '', version: 0, storeCookie: '', storeEtag: '', storeMissing: false,
+    renewAttemptValue: '', renewAttemptEtag: '',
+    pendingRenewal: null, obsolete: new Set(), mustRevalidate: false
 };
 let cookieRefreshInFlight = false;
+let cookieWriteInFlight = null;
 let blobsModuleForTests = null;
 
 function setCookieLines(response) {
@@ -147,6 +150,66 @@ function cookieFingerprint(cookie) {
     return crypto.createHash('sha256').update(cookie).digest('hex').slice(0, 8);
 }
 
+function cookieCredentialIdentity(cookie) {
+    const value = process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN || cookie || '';
+    return value ? crypto.createHash('sha256').update(value).digest('hex') : '';
+}
+
+function sessionCookieValue(cookie) {
+    const pairs = parseCookieHeader(cookie);
+    const pair = pairs && pairs.find((entry) => entry.name === SESSION_COOKIE_NAME);
+    return pair ? pair.value : '';
+}
+
+function currentCookieCredential(store) {
+    return { cookie: cookieState.value, source: cookieState.source, store: store, renewal: '',
+        version: cookieState.version, identity: cookieCredentialIdentity(cookieState.value) };
+}
+
+function cookieSessionIsCurrent(session) {
+    if (!session || session.identity !== cookieCredentialIdentity(cookieState.value)) return false;
+    if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return !session.cookie;
+    return session.cookie === cookieState.value && session.version === cookieState.version;
+}
+
+function replaceCookieValue(value) {
+    if (cookieState.value === value) return;
+    if (cookieState.value) cookieState.obsolete.add(cookieState.value);
+    while (cookieState.obsolete.size > 32) cookieState.obsolete.delete(cookieState.obsolete.values().next().value);
+    cookieState.value = value;
+    cookieState.version += 1;
+    cookieState.authIdentity = '';
+    cookieState.authRejectedAt = 0;
+    cookieState.authAcceptedAt = 0;
+}
+
+function adoptStoredCookie(stored, etag, version) {
+    if (version !== cookieState.version) return false;
+    const pending = cookieState.pendingRenewal;
+    if (pending && (stored === pending.baseCookie || pending.ancestors.has(stored))) {
+        if (etag) {
+            pending.baseCookie = stored;
+            pending.etag = etag;
+            pending.missing = false;
+            cookieState.storeCookie = stored;
+            cookieState.storeEtag = etag;
+            cookieState.storeMissing = false;
+        }
+        return false;
+    }
+    if (stored !== cookieState.value && cookieState.obsolete.has(stored) && !cookieState.mustRevalidate) return false;
+    replaceCookieValue(stored);
+    cookieState.source = 'blob';
+    cookieState.at = Date.now();
+    cookieState.storeReason = '';
+    cookieState.storeCookie = stored;
+    cookieState.storeEtag = etag || '';
+    cookieState.storeMissing = false;
+    cookieState.pendingRenewal = null;
+    cookieState.mustRevalidate = false;
+    return true;
+}
+
 function loadBlobsModule() {
     if (blobsModuleForTests) return blobsModuleForTests;
     return require('@netlify/blobs');
@@ -219,9 +282,9 @@ function refreshCookieInBackground(store) {
     // ដោះវិញយូរក្រោយមក ដោយកាន់ទិដ្ឋភាព **ចាស់**។ ខណៈនោះ Argus អាចបានប្តូរ
     // session ហើយ (`adoptRenewedCookie`) ➜ ការសរសេរជាន់ដោយទិដ្ឋភាពចាស់នឹង
     // បង្កើត 401 ដែលយើងទើបជៀសផុត។ ដូច្នេះអនុវត្តតែពេលសតិ **មិនប្រែ**។
-    const seen = cookieState.value;
+    const seen = cookieState.version;
     settleWithin(
-        () => store.get(COOKIE_STORE_KEY, { type: 'text' }),
+        () => store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }),
         COOKIE_STORE_TIMEOUT_MS,
         'read'
     ).then((read) => {
@@ -229,16 +292,13 @@ function refreshCookieInBackground(store) {
             cookieState.storeReason = read.reason;
             return;
         }
-        const stored = sanitizeStoredCookie(read.value);
+        const entry = read.value;
+        const stored = sanitizeStoredCookie(entry && entry.data);
         if (!stored) {
-            cookieState.storeReason = read.value ? 'invalid' : 'empty';
+            cookieState.storeReason = entry && entry.data ? 'invalid' : 'empty';
             return;
         }
-        if (cookieState.value !== seen) return;
-        cookieState.value = stored;
-        cookieState.source = 'blob';
-        cookieState.at = Date.now();
-        cookieState.storeReason = '';
+        adoptStoredCookie(stored, entry.etag, seen);
     }, () => {}).then(() => {
         cookieRefreshInFlight = false;
     }, () => {
@@ -248,12 +308,13 @@ function refreshCookieInBackground(store) {
 
 async function resolveCookieCredential(netlifyEvent, env, options) {
     if (env.ZTO_AUTHORIZATION || env.ZTO_TOKEN) {
-        return { cookie: '', source: '', store: null, renewal: '' };
+        return { cookie: '', source: '', store: null, renewal: '', identity: cookieCredentialIdentity('') };
     }
     const skipCache = !!(options && options.fresh);
     const readTimeoutMs = (options && options.timeoutMs !== undefined)
         ? options.timeoutMs
         : COOKIE_STORE_TIMEOUT_MS;
+    let storeWitness = null;
     const opened = openCookieStore(netlifyEvent);
     // ⛔ មូលហេតុត្រូវរស់រានពី cache ។ ការសរសេរ `storeReason = opened.reason`
     // (ជា `''` ពេល store បើកបាន) មុនការពិនិត្យ cache លុបមូលហេតុនៃការអាន
@@ -261,7 +322,7 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     // `?diag=1` ១៤ ដង ហើយមើលឃើញ `source: env` ដោយ **គ្មានមូលហេតុ**។
     if (opened.reason) cookieState.storeReason = opened.reason;
     if (!skipCache && cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
-        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+        return currentCookieCredential(opened.store);
     }
     const blocking = !!(options && options.blocking);
     // ⛔ ការធ្វើឲ្យស្រស់ខាងក្រោយ **មិនបង់ថ្លៃពេលរបស់សំណើនេះទេ** (វាមានពិដាន
@@ -270,25 +331,26 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     // ហើយ helper ដែលសរសេរ Cookie ថ្មី ត្រូវរង់ចាំការត្រៀមជុំក្រោយ។
     if (!skipCache && !blocking && !cookieState.mustRevalidate && cookieState.value && opened.store) {
         refreshCookieInBackground(opened.store);
-        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+        return currentCookieCredential(opened.store);
     }
     if (opened.store && readTimeoutMs > 0) {
+        const version = cookieState.version;
         const read = await settleWithin(
-            () => opened.store.get(COOKIE_STORE_KEY, { type: 'text' }),
+            () => opened.store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }),
             readTimeoutMs,
             'read'
         );
+        if (version !== cookieState.version) return currentCookieCredential(opened.store);
         if (read.ok) {
-            const stored = sanitizeStoredCookie(read.value);
+            const entry = read.value;
+            const stored = sanitizeStoredCookie(entry && entry.data);
             if (stored) {
-                cookieState.value = stored;
-                cookieState.source = 'blob';
-                cookieState.at = Date.now();
-                cookieState.storeReason = '';
-                cookieState.mustRevalidate = false;
-                return { cookie: stored, source: 'blob', store: opened.store, renewal: '' };
+                adoptStoredCookie(stored, entry.etag, version);
+                return currentCookieCredential(opened.store);
             }
-            cookieState.storeReason = read.value ? 'invalid' : 'empty';
+            storeWitness = { cookie: entry && typeof entry.data === 'string' ? entry.data : '',
+                etag: entry && typeof entry.etag === 'string' ? entry.etag : '', missing: entry === null };
+            cookieState.storeReason = entry && entry.data ? 'invalid' : 'empty';
         } else {
             cookieState.storeReason = read.reason;
         }
@@ -301,27 +363,37 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
     // ដ៏ល្អ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតជានៅដដែល
     // (វាស់បាន ៖ ៥/១០ ការស្កេនធ្លាក់ ជាមួយ `ZTO_UPSTREAM_TIMEOUT_MS=7500`)។
     // វាក៏រក្សា **លំដាប់អាទិភាព** ដែលឯកសារចែងផង ៖ blob ឈ្នះលើ `ZTO_COOKIE`។
-    if (!skipCache && !cookieState.mustRevalidate && cookieState.value) {
-        return { cookie: cookieState.value, source: cookieState.source, store: opened.store, renewal: '' };
+    if (!cookieState.mustRevalidate && cookieState.value) {
+        return currentCookieCredential(opened.store);
     }
     const envCookie = sanitizeEnvCookie(env.ZTO_COOKIE);
-    cookieState.value = envCookie;
+    replaceCookieValue(envCookie);
     cookieState.source = envCookie ? 'env' : '';
     cookieState.at = envCookie ? Date.now() : 0;
+    cookieState.storeCookie = storeWitness ? storeWitness.cookie : '';
+    cookieState.storeEtag = storeWitness ? storeWitness.etag : '';
+    cookieState.storeMissing = !!(storeWitness && storeWitness.missing);
+    cookieState.pendingRenewal = null;
     cookieState.mustRevalidate = false;
-    return { cookie: envCookie, source: cookieState.source, store: opened.store, renewal: '' };
+    return currentCookieCredential(opened.store);
 }
 
-function invalidateCookieCache() {
+function invalidateCookieCache(session) {
+    if (session && !cookieSessionIsCurrent(session)) return;
     cookieState.at = 0;
     cookieState.mustRevalidate = true;
 }
 
-function noteCookieRejected() {
+function noteCookieRejected(session) {
+    if (!cookieSessionIsCurrent(session)) return;
+    cookieState.authIdentity = session.identity;
     cookieState.authRejectedAt = Date.now();
+    if (cookieState.pendingRenewal && cookieState.pendingRenewal.value === session.cookie) cookieState.pendingRenewal = null;
 }
 
-function noteCookieAccepted() {
+function noteCookieAccepted(session) {
+    if (!cookieSessionIsCurrent(session)) return;
+    cookieState.authIdentity = session.identity;
     cookieState.authRejectedAt = 0;
     cookieState.authAcceptedAt = Date.now();
 }
@@ -341,34 +413,73 @@ function noteCookieRenewal(session, response) {
 // ➜ អាន store ឡើងវិញ បូកការសាកម្តងទៀត (ថ្លៃមួយជុំពេញនៃថវិកា)។ ដូច្នេះការ
 // ចងចាំកើតឡើង **ជានិច្ច** ចំណែកការសរសេរនៅតែស្ថិតក្រោមពិដានដដែល។
 function adoptRenewedCookie(session, merged) {
-    if (!merged) return;
+    if (!merged || !cookieSessionIsCurrent(session)) return;
+    const pending = cookieState.pendingRenewal;
+    const baseCookie = pending ? pending.baseCookie : cookieState.storeCookie;
+    const etag = pending ? pending.etag : cookieState.storeEtag;
+    const ancestors = new Set(pending ? pending.ancestors : []);
+    ancestors.add(session.cookie);
+    while (ancestors.size > 32) ancestors.delete(ancestors.values().next().value);
+    replaceCookieValue(merged);
     session.cookie = merged;
-    if (cookieState.value === merged) return;
-    cookieState.value = merged;
+    session.version = cookieState.version;
+    session.identity = cookieCredentialIdentity(merged);
+    cookieState.pendingRenewal = { value: merged, baseCookie: baseCookie, etag: etag,
+        missing: cookieState.storeMissing, version: cookieState.version, ancestors: ancestors };
 }
 
 async function flushCookieRenewal(session, timeoutMs) {
-    if (!session || !session.store || !session.renewal) return;
+    if (!session || !session.store) return;
     const budgetedMs = timeoutMs === undefined ? COOKIE_RENEW_WRITE_TIMEOUT_MS : timeoutMs;
-    const merged = session.renewal;
-    session.renewal = '';
-    adoptRenewedCookie(session, merged);
-    if (!(budgetedMs > 0)) return;
-    if (elapsedSince(cookieState.renewAt) < COOKIE_RENEW_MIN_GAP_MS) return;
-    cookieState.renewAt = Date.now();
-    const write = await settleWithin(
-        () => session.store.set(COOKIE_STORE_KEY, merged),
-        budgetedMs,
-        'write'
-    );
-    if (!write.ok) {
-        cookieState.storeReason = write.reason;
+    if (session.renewal) {
+        const merged = session.renewal;
+        session.renewal = '';
+        adoptRenewedCookie(session, merged);
+    }
+    const pending = cookieState.pendingRenewal;
+    if (!pending || !(budgetedMs > 0) || cookieWriteInFlight) return;
+    const criticalRotation = sessionCookieValue(pending.value) !== sessionCookieValue(pending.baseCookie);
+    const sameAttempt = pending.value === cookieState.renewAttemptValue && pending.etag === cookieState.renewAttemptEtag;
+    if (elapsedSince(cookieState.renewAt) < COOKIE_RENEW_MIN_GAP_MS && (!criticalRotation || sameAttempt)) return;
+    if (!pending.etag && !pending.missing) {
+        cookieState.storeReason = 'write:no-etag';
         return;
     }
-    cookieState.source = 'blob';
-    cookieState.at = Date.now();
-    cookieState.storeReason = '';
-    cookieState.renewals += 1;
+    cookieState.renewAt = Date.now();
+    cookieState.renewAttemptValue = pending.value;
+    cookieState.renewAttemptEtag = pending.etag;
+    const baseCookie = pending.baseCookie;
+    const baseEtag = pending.etag;
+    const options = baseEtag ? { onlyIfMatch: baseEtag } : { onlyIfNew: true };
+    const run = Promise.resolve().then(() => session.store.set(COOKIE_STORE_KEY, pending.value, options)).then((result) => {
+        if (cookieState.storeCookie !== baseCookie || cookieState.storeEtag !== baseEtag) return;
+        if (!result || result.modified !== true || typeof result.etag !== 'string' || !result.etag) {
+            cookieState.storeReason = result && result.modified === false ? 'write:conflict' : 'write:unconfirmed';
+            cookieState.at = 0;
+            cookieState.mustRevalidate = true;
+            return;
+        }
+        cookieState.storeCookie = pending.value;
+        cookieState.storeEtag = result.etag;
+        cookieState.storeMissing = false;
+        const current = cookieState.pendingRenewal;
+        if (current === pending) cookieState.pendingRenewal = null;
+        else if (current && current.baseCookie === baseCookie && current.etag === baseEtag) {
+            current.baseCookie = pending.value;
+            current.etag = result.etag;
+            current.missing = false;
+        }
+        cookieState.source = 'blob';
+        if (cookieState.value === pending.value) cookieState.at = Date.now();
+        cookieState.storeReason = '';
+        cookieState.renewals += 1;
+    });
+    cookieWriteInFlight = run;
+    const write = await settleWithin(() => run, budgetedMs, 'write');
+    if (cookieWriteInFlight === run) cookieWriteInFlight = null;
+    if (!write.ok) {
+        if (cookieState.pendingRenewal && cookieState.pendingRenewal.baseCookie === baseCookie) cookieState.storeReason = write.reason;
+    }
 }
 
 function noteUpstreamSetCookie(response) {
@@ -872,9 +983,9 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     }
     if (!fresh.cookie || fresh.cookie === previousCookie) {
         // ⛔ ការអានឡើងវិញ **ចាក់ cache ៦០ វិ. សាជាថ្មី** ជាផលរំខាន។ បើ
-        // Cookie មិនប្រែ នោះវាពិតជាផុតកំណត់ ➜ ត្រូវលុប cache ម្តងទៀត
+        // Cookie មិនប្រែ នោះគ្មាន credential ថ្មីសម្រាប់សាក ➜ លុប cache ម្តងទៀត
         // បើមិនដូច្នេះ Cookie ថ្មីដែល helper សរសេរក្រោយមក ត្រូវរង់ចាំ ៦០ វិ.
-        invalidateCookieCache();
+        invalidateCookieCache(fresh);
         return null;
     }
     let built;
@@ -950,6 +1061,7 @@ async function prewarmCookieCredential(netlifyEvent) {
 }
 
 function diagnosticsBody(config, headers, authKind, credential) {
+    const verdictMatches = credential && credential.identity === cookieState.authIdentity;
     return {
         ok: true,
         code: 'ZTO_DIAG',
@@ -960,10 +1072,10 @@ function diagnosticsBody(config, headers, authKind, credential) {
             ageMs: cookieState.at ? elapsedSince(cookieState.at) : null,
             storeReason: cookieState.storeReason || null,
             renewals: cookieState.renewals,
-            authRejectedAgeMs: cookieState.authRejectedAt
+            authRejectedAgeMs: verdictMatches && cookieState.authRejectedAt
                 ? elapsedSince(cookieState.authRejectedAt)
                 : null,
-            authAcceptedAgeMs: cookieState.authAcceptedAt
+            authAcceptedAgeMs: verdictMatches && cookieState.authAcceptedAt
                 ? elapsedSince(cookieState.authAcceptedAt)
                 : null
         },
@@ -1082,28 +1194,28 @@ exports.handler = async function handler(event) {
 
     if (outcome.kind === 'authRejected') {
         session.renewal = '';
-        invalidateCookieCache();
-        noteCookieRejected();
+        invalidateCookieCache(session);
+        noteCookieRejected(session);
         // ⛔ មូលហេតុទី ១ នៃ 401 គឺ **cache សតិ ៦០ វិ. របស់ instance នេះ**
         // ដែលនៅកាន់ Cookie ចាស់ ខណៈ helper ទើបសរសេរ Cookie ថ្មីចូល Blobs។
         // ដូច្នេះអានឡើងវិញដោយ `fresh` ១ ដង ហើយសាកម្តងទៀត **តែពេល
-        // fingerprint ប្រែ** — បើមិនប្រែ វាជាការផុតកំណត់ពិត ➜ ឆ្លើយ 401
+        // fingerprint ប្រែ** — បើមិនប្រែ ➜ ឆ្លើយការបដិសេធ 401
         // ភ្លាមដោយគ្មានការហៅ upstream ឥតប្រយោជន៍។
         const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie);
         if (!retried) {
-            return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+            return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
         session = retried.session;
         outcome = retried.outcome;
         if (outcome.kind === 'authRejected') {
             session.renewal = '';
-            invalidateCookieCache();
-            noteCookieRejected();
-            return json(401, { error: 'ZTO session or token expired', code: 'ZTO_AUTH_EXPIRED' });
+            invalidateCookieCache(session);
+            noteCookieRejected(session);
+            return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
     }
 
-    if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted();
+    if (outcome.kind === 'ok' || outcome.kind === 'notFound') noteCookieAccepted(session);
 
     await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
 
@@ -1130,6 +1242,7 @@ exports.resetCachesForTests = function resetCachesForTests() {
     resultCache.clear();
     inFlight.clear();
     cookieRefreshInFlight = false;
+    cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;
     cookieState.value = '';
     cookieState.source = '';
@@ -1139,6 +1252,15 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.renewals = 0;
     cookieState.authRejectedAt = 0;
     cookieState.authAcceptedAt = 0;
+    cookieState.authIdentity = '';
+    cookieState.version += 1;
+    cookieState.storeCookie = '';
+    cookieState.storeEtag = '';
+    cookieState.storeMissing = false;
+    cookieState.pendingRenewal = null;
+    cookieState.obsolete.clear();
+    cookieState.renewAttemptValue = '';
+    cookieState.renewAttemptEtag = '';
 };
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {

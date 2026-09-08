@@ -96,28 +96,27 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 ៥. ឃើញ `OK: setup is complete` គឺចប់។ ⛔ សារក្នុង cmd ជាភាសាអង់គ្លេស
    ទាំងអស់ (សំណើអ្នកប្រើ 2026-09-02) ព្រោះ `cmd.exe` បង្ហាញខ្មែរបែកបាក់។
 
-### រាល់ពេល Cookie ផុត
+### ពេល ZTO បដិសេធ Cookie
 
 ១. Double-click **`sync-zto-cookie.cmd`**។
 ២. បើ ZTO សុំ សូម Login ក្នុង Edge/Chrome ដែលវាបើក។
-៣. បើក ឬស្វែងរកកញ្ចប់ណាមួយក្នុង Argus ដើម្បីបង្កើត Order Detail request។
-៤. ឧបករណ៍បិទ browser ➜ សរសេរ Cookie ចូល Netlify Blobs ➜ ចប់។
-   ⛔ **មិនចាំបាច់ redeploy** — ការស្កេនថ្មីប្រើវាក្នុងរយៈពេលមួយនាទី
-   (ការឆ្លើយ 401 ពី ZTO កាត់ការរង់ចាំនោះភ្លាម)។
-
-⚡ **តាំងពី 2026-09-02ខ ៖ ជាញឹកញាប់មិនបាច់ចុចអ្វីសោះ** — ការចាប់ដើរតាម
-**host** មិនមែន path ➜ ត្រឹមតែបើក Argus គឺវាចាប់បាន។
+៣. ចូល **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។
+៤. រង់ចាំ Order Detail ឆ្លើយជោគជ័យ។ ឧបករណ៍បញ្ចូល `Set-Cookie` ថ្មី
+   រួចបិទ browser ➜ សរសេរ Cookie ចូល Netlify Blobs។ **មិនចាំបាច់ redeploy**។
+   បើ ZTO សុំ Login វានៅរង់ចាំឲ្យអ្នកចូល និង Lookup ជោគជ័យ។
 
 **របៀបផ្សេងទៀត** (ត្រូវការ Site URL + `ZTO_PROXY_KEY` ក្នុង `setup.cmd`)៖
 
 | ពាក្យបញ្ជា | ធ្វើអ្វី |
 | --- | --- |
-| `sync-zto-cookie.cmd --check` | ប្រាប់សុខភាព Cookie **ដោយមិនបើក browser** |
-| `sync-zto-cookie.cmd --auto` | បើ Cookie នៅដំណើរការ ➜ **មិនបើក browser សោះ** |
+| `sync-zto-cookie.cmd --check` | រាយ ទទួលយក/បដិសេធ/មិនទាន់វាស់ **ដោយមិនបើក browser** |
+| `sync-zto-cookie.cmd --auto` | បើ Cookie បាត់ ឬត្រូវបដិសេធ ទើបបើក browser; មិនទាន់វាស់មិនបើក |
 | `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` រាល់ពេលចូល Windows |
 
 ក្រោយយក Cookie រួច helper **ផ្ទៀងផ្ទាត់ខ្លួនឯង** តាម `?diag=1` ដោយប្រៀបធៀប
-fingerprint ➜ `OK: verified - the Function is using the new cookie (source: blob, …)`។
+fingerprint ➜ `OK: stored cookie verified in the Function (source: blob, …)`។
+នេះបញ្ជាក់ការផ្ទុក Cookie ត្រូវគ្នា។ សូម Lookup ក្នុង ZoeW ដើម្បីឲ្យ ZTO
+ផ្ទៀងផ្ទាត់ការប្រើ Cookie ពី Netlify; អាយុ session ពិតសម្រេចដោយ ZTO។
 
 Cookie **បង្ហាញក្នុង console ដោយចេតនា** (សំណើអ្នកប្រើ 2026-09-02 — ងាយ
 ស្រួល paste ចូល `ZTO_COOKIE` ជាផ្លូវបម្រុង) តែវាមិនសរសេរចូល file/config
@@ -264,10 +263,11 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | --- | --- |
 | `source` | `blob` = អានពី Netlify Blobs (helper ដើរត្រឹមត្រូវ) · `env` = ធ្លាក់ចុះទៅ `ZTO_COOKIE` · `none` = គ្មានសោះ |
 | `fingerprint` | ៨ តួនៃ SHA-256 របស់ Cookie — ⛔ **មិនមែនតម្លៃ Cookie** ទេ; ប្រើដើម្បីមើលថាតម្លៃប្រែឬអត់ |
-| `ageMs` | រយៈពេលដែលតម្លៃនេះនៅក្នុង cache សតិ (ពិដាន ៦០ វិនាទី) |
+| `ageMs` | ពេលតាំងពី cache ត្រូវបានអាន/ធ្វើឲ្យស្រស់; ប្រើសម្រាប់ cache ដែលមាន TTL ៦០ វិនាទី |
 | `storeReason` | មូលហេតុពេលអានចេញពី Blobs មិនបាន (`no-context` · `getstore` · `read:timeout` · `invalid` · `empty` …) |
-| `renewals` | ចំនួនដងដែល Cookie ត្រូវបានបន្តអាយុដោយស្វ័យប្រវត្តិពី `Set-Cookie` របស់ Argus |
+| `renewals` | ចំនួនការរក្សាទុក Cookie បន្តពី Argus ដែលបានបញ្ជាក់ជោគជ័យក្នុង instance នេះ |
 | `authRejectedAgeMs` | ZTO ទើបបដិសេធ Cookie នេះនៅប៉ុន្មាន ms មុន (`null` = មិនដែលបដិសេធ ឬការស្កេនក្រោយនោះជោគជ័យ) — ជាមូលដ្ឋានរបស់របៀប `--auto` |
+| `authAcceptedAgeMs` | ពេលតាំងពី ZTO ទទួលយក Cookie នេះ; auth fields ទាំង ២ ជា `null` មានន័យថាមិនទាន់វាស់ |
 
 ⛔ **ក្រោយរត់ `sync-zto-cookie.cmd` ថ្មី ៖ `source` ត្រូវជា `blob`។** បើវានៅ
 `env` សូមមើល `storeReason` ➜ វាប្រាប់ថាធ្លាក់ត្រង់ណា។
@@ -324,7 +324,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 
 | `code` | អ្វីអ្នកឃើញក្នុង ZoeW | ត្រូវធ្វើអ្វី |
 | --- | --- | --- |
-| `ZTO_AUTH_EXPIRED` | 🔒 Cookie ZTO ផុតកំណត់ | រត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
+| `ZTO_AUTH_EXPIRED` | 🔒 ZTO បដិសេធ Cookie | Login Argus និង Lookup ជោគជ័យ រួចរត់ `sync-zto-cookie.cmd` (ផ្នែក ២) ឬពិនិត្យ Token |
 | `ZTO_AUTH_NOT_CONFIGURED` | 🔒 Netlify មិនទាន់មាន Cookie ឬ Token | រត់ `sync-zto-cookie.cmd` ឬដាក់ `ZTO_COOKIE`/`ZTO_AUTHORIZATION` |
 | `ZTO_CONFIG_INVALID` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | មើលវាល `reason` (ឧ. `api-url:not-https`, `body:invalid-json`) |
 | `ZTO_PROXY_NOT_CONFIGURED` | ⚙️ Config ZTO មិនត្រឹមត្រូវ | ភ្លេចដាក់ `ZTO_PROXY_KEY` |
@@ -332,7 +332,7 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
 | `ZTO_RATE_LIMITED` | 🚦 ZTO កំណត់ល្បឿន | រង់ចាំបន្តិច; បន្ថយល្បឿនស្កេន |
 | `ZTO_TIMEOUT` · `ZTO_UPSTREAM_UNAVAILABLE` | ⏱️ ZTO ឆ្លើយតបយឺតពេក | បណ្តាញ ឬ ZTO យឺត — ស្កេនម្តងទៀត |
 | `ZTO_UPSTREAM_REJECTED` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | សារពិតរបស់ ZTO នៅក្នុងវាល `error` |
-| `ZTO_INVALID_RESPONSE` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | ZTO ឆ្លើយមិនមែន JSON — ជាធម្មតា Cookie ផុត |
+| `ZTO_INVALID_RESPONSE` | ⚠️ មិនអាចភ្ជាប់ ZTO បាន | ZTO ឆ្លើយមិនមែន JSON; ពិនិត្យស្ថានភាព និងសាក Lookup ម្ដងទៀត |
 
 ---
 

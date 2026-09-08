@@ -22,14 +22,14 @@
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
 `%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ហើយចាប់បន្ទាត់ `Cookie:` ពី
-**សំណើពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
+**សំណើ Order Detail ពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
 `document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថាត្រឡប់
 បញ្ជីទទេលើ Edge របស់អ្នកទេ។
 
-⚡ **តាំងពី 2026-09-02 វាទទួល path ណាមួយលើ host នោះ** មិនត្រឹម Order Detail
-ទេ — Cookie ជារបស់ **domain** មិនមែន path ➜ ជាញឹកញាប់ត្រឹមតែ **បើក Argus
-ចប់ គឺវាចាប់បានហើយ ដោយមិនបាច់ចុចបើកកញ្ចប់**។ ការការពារពិតនៅដដែល ៖ សំណើ
-ដែលគ្មាន `BOS-MAN-SESSION` ត្រឹមត្រូវ ត្រូវរង់ចាំសំណើបន្ទាប់។
+ឧបករណ៍រង់ចាំ **ចម្លើយជោគជ័យពី Order Detail** មុនបិទ browser។ សូមចូល
+**Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។ វាបញ្ចូល
+ការបន្ត `Set-Cookie` ពីចម្លើយនោះ មុនយក Cookie ទៅរក្សាទុក។ បើ ZTO បដិសេធ
+session វានៅរង់ចាំ ដើម្បីឲ្យអ្នក Login និងសាក Waybill ម្ដងទៀត។
 
 បន្ទាប់មកវាហៅ Netlify API ដោយផ្ទាល់ ដើម្បីសរសេរ Cookie ចូល
 **Netlify Blobs** (store `zto-auth` ➜ ឈ្មោះខាងក្នុង `site:zto-auth`,
@@ -45,7 +45,7 @@ Netlify ឆ្លើយជោគជ័យ តែ Function អានមិនឃ�
 
 ⛔ **វាលែង trigger deploy ទៀតទេ** — តាំងពី 2026-09-02 ZoeW Function អាន
 Cookie ចេញពី Blobs **ពេលមានសំណើ** ដូច្នេះការប្តូរមានប្រសិទ្ធភាព
-**ក្នុងរយៈពេលមួយនាទី ដោយគ្មានការ redeploy**។
+**ជាធម្មតាក្នុងរយៈពេលមួយនាទី ដោយគ្មានការ redeploy**។
 
 ---
 
@@ -171,11 +171,18 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
    ហើយ **វាយ ឬស្កេន Waybill មួយ**។ ⛔ វាស់រួច (2026-09-02) ៖ Cookie
    `BOS-MAN-SESSION` លេចឡើង **តែពេលសំណើ Order Detail បាញ់** — ការ Login
    តែម្យ៉ាង ឬការបើកទំព័រទទេ **មិនគ្រប់គ្រាន់ទេ**។
-4. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
-   ⛔ **មិនចាំបាច់ redeploy ទេ** — ការស្កេនថ្មីប្រើ Cookie នេះក្នុងមួយនាទី។
+4. រង់ចាំ Order Detail ឆ្លើយជោគជ័យ។ ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ
+   Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។ **មិនចាំបាច់ redeploy ទេ**។
 5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា
    **ផ្ទៀងផ្ទាត់ដោយខ្លួនឯង** ថា Function ឃើញ Cookie ថ្មីពិត ៖
-   `OK: verified - the Function is using the new cookie (source: blob, a1b2c3d4)`
+   `OK: stored cookie verified in the Function (source: blob, a1b2c3d4).`
+   សារនេះបញ្ជាក់ថា Cookie ត្រូវគ្នា។ បើមាន `ZTO acceptance from Netlify is
+   not yet verified` សូម Lookup កញ្ចប់មួយក្នុង ZoeW ហើយពិនិត្យម្តងទៀត។
+   បើមាន `the stored cookie matches, but ZTO rejected it` សូម Login Argus
+   ថ្មី រង់ចាំ Lookup ជោគជ័យ រួច Sync ម្ដងទៀត។
+
+អាយុសុពលភាព session សម្រេចដោយ ZTO។ ការទើប Sync ឬលេខ fingerprint ដូចគ្នា
+មិនធានាថានៅសល់សុពលភាពប៉ុន្មាននាទីទេ។
 
 ⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** (សំណើអ្នកប្រើ 2026-09-02) ៖
 
@@ -193,8 +200,8 @@ BOS-MAN-SESSION=...; sidebarStatus=0
 | ពាក្យបញ្ជា | ធ្វើអ្វី |
 |---|---|
 | `sync-zto-cookie.cmd` | យក Cookie ថ្មី (ធម្មតា) |
-| `sync-zto-cookie.cmd --check` | **មិនបើក browser** — ត្រឹមប្រាប់ថា Cookie នៅដំណើរការឬអត់ (ប្រភព · ចំនួនបន្តអាយុ · ZTO បដិសេធពេលណា) |
-| `sync-zto-cookie.cmd --auto` | ពិនិត្យជាមុន ➜ បើ Cookie នៅដំណើរការ **មិនបើក browser សោះ**; បើស្លាប់ ទើបយកថ្មី |
+| `sync-zto-cookie.cmd --check` | **មិនបើក browser** — រាយថា ZTO ទទួលយក បដិសេធ ឬមិនទាន់ផ្ទៀងផ្ទាត់ Cookie |
+| `sync-zto-cookie.cmd --auto` | ពិនិត្យជាមុន ➜ បើ Cookie បាត់ ឬត្រូវបដិសេធ ទើបបើក browser យកថ្មី; ស្ថានភាពមិនទាន់វាស់មិនបើក browser |
 | `schedule-zto-cookie.cmd` | ដំឡើង Windows Task ឲ្យរត់ `--auto` **រាល់ពេលចូល Windows** |
 | `schedule-zto-cookie.cmd remove` | លុប Task នោះវិញ |
 

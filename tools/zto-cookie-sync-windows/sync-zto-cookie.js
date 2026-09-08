@@ -9,7 +9,9 @@ const { spawn } = require('child_process');
 const TOOL_DIR = __dirname;
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
 const API_HOST = 'aargus-api.ztoglobal.com';
+const ORDER_DETAIL_PATH = '/scan/get/order/detail';
 const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
+const CAPTURE_RESPONSE_TIMEOUT_MS = 10 * 1000;
 
 const NETLIFY_API_ORIGIN = 'https://api.netlify.com';
 const BLOB_STORE_NAME = 'zto-auth';
@@ -74,7 +76,8 @@ function statusIsTransient(status) {
 function isTargetApiUrl(raw) {
     try {
         const url = new URL(String(raw || ''));
-        return url.protocol === 'https:' && url.hostname === API_HOST;
+        return url.protocol === 'https:' && url.hostname === API_HOST
+            && !url.port && !url.username && !url.password && url.pathname === ORDER_DETAIL_PATH;
     } catch (_) {
         return false;
     }
@@ -500,8 +503,14 @@ function diagnosticsCookie(payload) {
         storeReason: typeof info.storeReason === 'string' ? info.storeReason : '',
         ageMs: typeof info.ageMs === 'number' ? info.ageMs : null,
         renewals: typeof info.renewals === 'number' ? info.renewals : 0,
-        authRejectedAgeMs: typeof info.authRejectedAgeMs === 'number' ? info.authRejectedAgeMs : null
+        authRejectedAgeMs: Number.isFinite(info.authRejectedAgeMs) && info.authRejectedAgeMs >= 0 ? info.authRejectedAgeMs : null,
+        authAcceptedAgeMs: Number.isFinite(info.authAcceptedAgeMs) && info.authAcceptedAgeMs >= 0 ? info.authAcceptedAgeMs : null
     };
+}
+
+function cookieValidity(info) {
+    if (info.authRejectedAgeMs !== null) return 'rejected';
+    return info.authAcceptedAgeMs !== null ? 'accepted' : 'unknown';
 }
 
 // ⛔ `resolveCookieCredential()` ចេញ **ភ្លាម** ពេលមាន ZTO_AUTHORIZATION ឬ
@@ -540,8 +549,10 @@ async function verifyCookieLive(cookieHeader, options) {
         try {
             const info = diagnosticsCookie(await readDiagnostics(siteUrl, proxyKey, config));
             if (info.fingerprint && info.fingerprint === wanted) {
+                const validity = cookieValidity(info);
                 return {
-                    status: 'match',
+                    status: validity === 'rejected' ? 'rejected' : 'match',
+                    validity,
                     attempts,
                     source: info.source,
                     fingerprint: info.fingerprint,
@@ -588,9 +599,11 @@ async function checkCookieHealth(options) {
     }
     const info = diagnosticsCookie(payload);
     const usable = info.source === 'blob' || info.source === 'env';
+    const validity = cookieValidity(info);
     return Object.assign({
         status: 'ok',
-        healthy: usable && info.authRejectedAgeMs === null
+        validity,
+        healthy: !usable || validity === 'rejected' ? false : validity === 'accepted' ? true : null
     }, info);
 }
 
@@ -683,33 +696,124 @@ async function launchLocalBrowser() {
     throw lastFailure || codedError('BROWSER_NOT_FOUND');
 }
 
-function waitForOrderCookie(context, timeoutMs) {
+function captureResponseSucceeded(payload) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+    const code = String(payload.code ?? payload.errorCode ?? payload.statusCode ?? '').trim().toLowerCase();
+    const message = [payload.error, payload.message, payload.msg, payload.errorMsg]
+        .filter((value) => typeof value === 'string').join(' ').slice(0, 4096);
+    if (/^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(code)) return false;
+    if (/https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[.\/]|iam[-.])/i.test(message)) return false;
+    if (/(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/i.test(message)) return false;
+    if (payload.success === false || payload.status === false || payload.result === false) return false;
+    if (code && !/^(?:0+|200|success|succeed|ok|true)$/.test(code)) return false;
+    return !!code || payload.success === true || payload.status === true || payload.result === true;
+}
+
+function cookieAfterResponse(cookieHeader, lines, targetUrl) {
+    const dropped = droppedCookieNames();
+    const base = validateCookieHeader(cookieHeader);
+    if (!Array.isArray(lines) || lines.length > COOKIE_MAX_PAIRS) throw codedError('COOKIE_PAIR_SHAPE');
+    const target = new URL(targetUrl);
+    const pairs = new Map();
+    for (const part of base.split('; ')) {
+        const at = part.indexOf('=');
+        const name = part.slice(0, at);
+        const value = part.slice(at + 1);
+        if (name === REQUIRED_COOKIE_NAME && pairs.has(name) && pairs.get(name) !== value) {
+            throw codedError('COOKIE_PAIR_SHAPE');
+        }
+        pairs.set(name, value);
+    }
+    for (const raw of lines) {
+        const line = String(raw || '');
+        if (line.length > COOKIE_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(line)) throw codedError('COOKIE_CONTROL_CHAR');
+        const parts = line.split(';');
+        const head = parts.shift().trim();
+        const at = head.indexOf('=');
+        if (at < 1) { dropped.push('(malformed name)'); continue; }
+        const name = head.slice(0, at).trim();
+        const value = head.slice(at + 1).trim();
+        if (!COOKIE_NAME_RE.test(name) || !COOKIE_VALUE_RE.test(value)) {
+            if (name === REQUIRED_COOKIE_NAME) throw codedError('COOKIE_PAIR_SHAPE');
+            dropped.push(COOKIE_NAME_RE.test(name) ? name : '(malformed name)');
+            continue;
+        }
+        const attributes = new Map();
+        for (const part of parts) {
+            const equalsAt = part.indexOf('=');
+            attributes.set((equalsAt < 0 ? part : part.slice(0, equalsAt)).trim().toLowerCase(),
+                equalsAt < 0 ? '' : part.slice(equalsAt + 1).trim());
+        }
+        const domain = String(attributes.get('domain') || target.hostname).replace(/^\./, '').toLowerCase();
+        if (domain !== target.hostname && !target.hostname.endsWith('.' + domain)) continue;
+        const defaultPath = target.pathname.slice(0, target.pathname.lastIndexOf('/')) || '/';
+        const rawPath = attributes.get('path');
+        const cookiePath = rawPath && rawPath.startsWith('/') ? rawPath : defaultPath;
+        if (target.pathname !== cookiePath && !(target.pathname.startsWith(cookiePath)
+            && (cookiePath.endsWith('/') || target.pathname[cookiePath.length] === '/'))) continue;
+        const maxAge = attributes.get('max-age');
+        const expires = Date.parse(attributes.get('expires') || '');
+        const removed = /^-?\d+$/.test(maxAge || '') ? Number(maxAge) <= 0 : Number.isFinite(expires) && expires <= Date.now();
+        if (removed || !value) pairs.delete(name);
+        else pairs.set(name, value);
+    }
+    const result = validateCookieHeader(Array.from(pairs, ([name, value]) => name + '=' + value).join('; '));
+    lastDroppedCookieNames = Array.from(new Set(dropped.concat(droppedCookieNames()))).slice(0, 12);
+    return result;
+}
+
+function waitForOrderCookie(context, timeoutMs, options) {
+    const configuredTimeout = options && options.responseTimeoutMs;
+    const responseTimeoutMs = Number.isFinite(configuredTimeout)
+        ? Math.max(1, Math.min(CAPTURE_RESPONSE_TIMEOUT_MS, configuredTimeout)) : CAPTURE_RESPONSE_TIMEOUT_MS;
     return new Promise((resolve, reject) => {
         let settled = false;
+        const pending = new Set();
         const finish = (error, value) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            context.off('request', onRequest);
+            context.off('response', onResponse);
             context.off('close', onClose);
+            for (const job of pending) job.cancel();
+            pending.clear();
             if (error) reject(error);
             else resolve(value);
         };
-        const onRequest = async (request) => {
-            if (settled || !isTargetApiUrl(request.url())) return;
-            try {
+        const onResponse = (response) => {
+            if (settled || pending.size >= 4 || !isTargetApiUrl(response.url())) return;
+            const request = response.request();
+            if (!request || request.method() !== 'POST' || !isTargetApiUrl(request.url())) return;
+            const status = response.status();
+            if (status < 200 || status >= 300) return;
+            const job = { active: true, cancel: () => {} };
+            const deadline = new Promise((done) => {
+                const responseTimer = setTimeout(() => job.cancel(), responseTimeoutMs);
+                job.cancel = () => { job.active = false; clearTimeout(responseTimer); done(''); };
+            });
+            pending.add(job);
+            const inspect = async () => {
+                const headers = await response.allHeaders();
+                if (!job.active || settled) return '';
+                if (!/^application\/(?:[\w.+-]+\+)?json\b/i.test(headers['content-type'] || '')) return '';
+                const declaredLength = Number(headers['content-length']);
+                if (Number.isFinite(declaredLength) && declaredLength > NETLIFY_RESPONSE_MAX_BYTES) return '';
+                const body = await response.body();
+                if (!job.active || settled || body.length > NETLIFY_RESPONSE_MAX_BYTES) return '';
+                if (!captureResponseSucceeded(JSON.parse(body.toString('utf8')))) return '';
                 const cookie = await cookieHeaderFromRequest(request);
-                if (cookie) finish(null, cookie);
-            } catch (error) {
-                // Request មុន Login អាចមានតែ UI cookie។ រង់ចាំ request ថ្មី
-                // ក្រោយ Login ជំនួសការបញ្ចប់ helper ឬ upload cookie ឥត session។
-                if (error && error.code === 'COOKIE_SESSION_MISSING') return;
-                finish(error);
-            }
+                if (!job.active || settled || !cookie) return '';
+                const lines = await response.headerValues('set-cookie');
+                if (!job.active || settled) return '';
+                return cookieAfterResponse(cookie, lines, request.url());
+            };
+            Promise.race([inspect(), deadline]).then((cookie) => {
+                if (cookie && job.active && !settled) finish(null, cookie);
+            }, () => {}).finally(() => { job.cancel(); pending.delete(job); });
         };
         const onClose = () => finish(codedError('BROWSER_CLOSED'));
         const timer = setTimeout(() => finish(codedError('CAPTURE_TIMEOUT')), timeoutMs);
-        context.on('request', onRequest);
+        context.on('response', onResponse);
         context.on('close', onClose);
     });
 }
@@ -727,7 +831,7 @@ async function captureCookieHeader() {
         console.log('   1. Log in to Argus (if ZTO asks for it).');
         console.log('   2. Open Scan Management -> Arrival Scan.');
         console.log('   3. Type or scan one Waybill -> the Order Detail request fires.');
-        console.log('   This tool continues by itself as soon as it sees that request.');
+        console.log('   This tool waits for a successful Order Detail response before continuing.');
         try {
             await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
@@ -821,6 +925,9 @@ function describeHealth(health) {
     if (health.status === 'unreachable') {
         return 'WARNING: could not reach the Function. Check your internet or the Site URL.';
     }
+    if (health.healthy === null) {
+        return 'INFO: the cookie is stored, but ZTO acceptance is not yet verified. Try a parcel lookup.';
+    }
     const parts = [
         'source: ' + (health.source || 'none'),
         'renewals: ' + health.renewals
@@ -853,8 +960,16 @@ async function reportVerification(cookieHeader) {
         result = { status: 'unverifiable', attempts: 0 };
     }
     if (result.status === 'match') {
-        console.log('   OK: verified - the Function is using the new cookie (source: '
+        console.log('   OK: stored cookie verified in the Function (source: '
             + (result.source || 'blob') + ', ' + result.fingerprint + ').');
+        console.log(result.validity === 'accepted'
+            ? '   ZTO accepted this cookie on a recent lookup.'
+            : '   ZTO acceptance from Netlify is not yet verified. Try a parcel lookup.');
+        return;
+    }
+    if (result.status === 'rejected') {
+        console.log('   WARNING: the stored cookie matches, but ZTO rejected it.');
+        console.log('   Log in to Argus again, complete a successful parcel lookup, then sync again.');
         return;
     }
     if (result.status === 'unreachable') {
@@ -963,6 +1078,7 @@ module.exports = {
     autoReadiness,
     describeCapturedCookie,
     diagnosticsCookie,
+    describeHealth,
     droppedCookieNames,
     checkCookieHealth,
     cookieFingerprint,

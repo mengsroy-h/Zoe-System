@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.1';
+    const APP_VERSION = '2.31.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2501,7 +2501,7 @@
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'testLookupApiConfig' });
             const timedOut = e && e.message === 'Test API timed out';
             const slowNote = testIsZto
-                ? "អស់ពេល (Timeout) — ZTO ឆ្លើយតបយឺត ឬ Cookie ផុតកំណត់។ សូមសាកល្បងម្តងទៀត; បើនៅតែយឺត សូមរត់ ZTO Cookie Sync លើ Windows ដើម្បីធ្វើបច្ចុប្បន្នភាព Netlify Blobs"
+                ? "អស់ពេល (Timeout) — មិនទាន់ទទួលបានចម្លើយពី ZTO។ សូមពិនិត្យបណ្ដាញ ហើយសាកល្បងម្ដងទៀត"
                 : "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត";
             alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (timedOut ? slowNote : e.message));
         } finally {
@@ -3456,8 +3456,8 @@
                 + (reason ? ' · ' + reason : '');
             if (typeof rejectedAgeMs === 'number') {
                 return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)',
-                    'ZTO បដិសេធ Cookie នេះ (ផុតកំណត់) ➜ ការស្វែងរកនឹងធ្លាក់។ '
-                    + 'សូមរត់ឧបករណ៍ sync-zto-cookie លើ Windows យក Cookie ថ្មី · ' + cookieText);
+                    'ZTO បដិសេធ Cookie នេះ — សូមចូល Argus ហើយរត់ឧបករណ៍ sync-zto-cookie លើ Windows '
+                    + 'ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត · ' + cookieText);
             }
             if (typeof acceptedAgeMs !== 'number') {
                 return healthRowHtml('warn', 'Lookup អតិថិជន (ZTO)',
@@ -4225,7 +4225,7 @@
             } else if (e && e.message === 'Auto lookup timed out') {
                 setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
             } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-                setLookupStatus(barcode, 'error', '🔒 Cookie ZTO ផុតកំណត់ — សូមរត់ ZTO Cookie Sync លើ Windows ដើម្បីបញ្ចូល Cookie ថ្មីទៅ Netlify Blobs ដោយស្វ័យប្រវត្តិ');
+                setLookupStatus(barcode, 'error', '🔒 ZTO បដិសេធ Cookie — សូមចូល Argus ហើយរត់ ZTO Cookie Sync លើ Windows ដើម្បីផ្ទៀងផ្ទាត់ និង Sync ម្ដងទៀត');
             } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
                 setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');
             } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED')) {
@@ -5821,13 +5821,15 @@
         setupSheetImportDropZone();
 
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.more-btn') && !e.target.closest('.header-more-btn') && !e.target.closest('#globalMoreMenu')) {
-                closeGlobalMoreMenu();
-            }
+            dismissGlobalMoreMenuOutside(e);
             safeFocusScanner();
         });
 
-        window.addEventListener('scroll', closeGlobalMoreMenu, true);
+        document.addEventListener('pointerdown', dismissGlobalMoreMenuOutside, { capture: true, passive: true });
+        window.addEventListener('scroll', (e) => {
+            if (e.target && e.target.closest && e.target.closest('#globalMoreMenu')) return;
+            closeGlobalMoreMenu();
+        }, { capture: true, passive: true });
         window.addEventListener('resize', closeGlobalMoreMenu);
 
         document.addEventListener('click', (e) => {
@@ -7612,6 +7614,14 @@
         park();
         syncPullMoveListener();
         indicator.classList.remove('snapping');
+    }
+
+    function dismissGlobalMoreMenuOutside(e) {
+        if (e.target && e.target.closest) {
+            if (e.target.closest('#globalMoreMenu')) return;
+            if (e.type === 'click' && e.target.closest('.more-btn, .header-more-btn')) return;
+        }
+        closeGlobalMoreMenu();
     }
 
     function closeGlobalMoreMenu() {

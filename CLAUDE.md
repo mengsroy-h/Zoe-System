@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.1` (`zoew-v181`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.31.2` (`zoew-v182`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.21` (`zoekeygen-v91`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -330,8 +330,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
 | **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
 | **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
-| **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; មានពិដានល្បឿន | `zto-cookie-store-test` |
-| **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | ⛔ ពិដានការពារ **ការសរសេរទៅ Blobs** មិនមែនការចងចាំ — session ថ្មីត្រូវប្រើបន្តក្នុងសតិ | `zto-cookie-store-test` |
+| **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag មានលក្ខខណ្ឌ | `zto-cookie-store-test` · `zto-cookie-session-test` |
+| **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | Cookie ជំនួយ/retry ដដែលមានពិដាន ៦០ វិ.; session ស្នូលថ្មីសាកសរសេរភ្លាមក្នុងថវិកា ហើយ pending រស់រហូតដល់បញ្ជាក់ការរក្សាទុក | `zto-cookie-session-test` |
 | **ZTO ៖ ការអាន Blobs ↔ ផ្លូវឆ្លើយតប** | ⛔ មានតម្លៃក្នុងសតិ ➜ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់**ខាងក្រោយ**; ⛔ សតិទទេ ឬក្រោយ 401 ➜ អាន**ទប់**ដដែល | `zto-cookie-store-test` |
 | **ZTO helper ៖ បណ្តាញដាច់មួយភ្លែត** | ⛔ ការធ្លាក់បណ្តោះអាសន្នព្យាយាមឡើងវិញ **ក្នុងពិដាន** (signed URL ថ្មីរាល់ជុំ); 401/403/404/422 **មិនព្យាយាម** | `zto-cookie-sync-test` |
 | **ZTO ៖ របៀបស្វ័យប្រវត្តិ** | ⛔ មិនបើក browser ដោយមិនដឹងស្ថានភាព | `zto-cookie-sync-test` |
@@ -776,6 +776,10 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | Config/Reconfig, API ស្វែងរក, តារាងអតិថិជន, Locker, នាំចូល Excel, ចាក់សោ App, ចូល/ចាកចេញ |
 | ប៊ូតុង (...) | `globalMoreMenu` | Export, កែទឹកប្រាក់ (PIN), អត្រាប្រាក់, ធុងសំរាម, Reset ចំនួនយករួច (PIN), លុបទាំងអស់ (PIN) |
+
+ម៉ឺនុយ (...) ខាងលើ និងតាមជួរ ត្រូវបិទពេលចាប់ផ្តើមអូសផ្ទាំងខាងក្រៅ ឬ
+រមូរប្រវត្តិ។ ការចុច/រមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។ ការអូសផ្ទាំងដោយ transform
+មិនធានាថាមាន `scroll` event ទេ (`history-menu-dismiss-test.js`)។
 
 **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** (របា Slide) ៖ ជួរ **៨** ដែល **អានសុទ្ធសាធ** —
 បណ្តាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន ·
@@ -1389,6 +1393,19 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 - **401 ពី ZTO ត្រូវលុប cache នោះភ្លាម** (`invalidateCookieCache()`) ហើយ
   `?diag=1` ត្រូវឆ្លើយមូលហេតុ **ដែលរស់រានពី cache ៦០ វិ.**។ ⛔ **តម្លៃសម្ងាត់
   មិនដែលចេញ** — មានតែ `fingerprint` ៨ តួ។
+- **សាលក្រម auth ជារបស់ Cookie ដែល ZTO បានវាស់**៖ Cookie ថ្មីពី Sync ត្រូវ
+  ចាប់ផ្តើមជា «មិនទាន់ផ្ទៀងផ្ទាត់»; ចម្លើយយឺតរបស់ Cookie ចាស់មិនត្រូវបដិសេធ
+  ឬទទួលយកជំនួស Cookie ថ្មី (`zto-cookie-session-test.js`)។ សារ client ប្រាប់
+  **«បដិសេធ»**; HTTP 401 មិនបញ្ជាក់មូលហេតុផុតកំណត់តាមពេល ហើយ timeout
+  មិនមែនសាលក្រម auth (`health-check-test.js`)។
+- **Renewal ត្រូវរក្សាទុកដោយមិនជាន់ Sync ថ្មី**៖ ប្រើ `getWithMetadata()`
+  របស់ SDK ដែលចាក់សោកំណែ ហើយ `set()` ជាមួយ `onlyIfMatch` តាម ETag
+  ដែលបានអាន ឬ `onlyIfNew` ពេលអានឃើញថាមិនមាន។ `modified:false` គឺ conflict;
+  `modified:true` ដែលគ្មាន ETag ក៏មិនបញ្ជាក់ថាសរសេរជោគជ័យដែរ។
+  ការប្តូរ `BOS-MAN-SESSION` ត្រូវសាកសរសេរភ្លាមក្នុងថវិកាដដែល; ពិដាន
+  ៦០ វិនាទីនៅលើ Cookie ជំនួយ និងការសាកឡើងវិញតម្លៃដដែល។ Pending មិនត្រូវ
+  បាត់ពេល budget/timeout ឬការអាន cache ចាស់ ហើយ fresh read បរាជ័យមិនត្រូវ
+  លុប Cookie ដែលនៅប្រើបាន (`zto-cookie-session-test.js` · `zto-cookie-store-test.js`)។
 - **ការស្កេនជាបន្តបន្ទាប់** ៖ ការរវល់ជា **ការរង់ចាំ** មិនមែន **ការបញ្ចប់** ➜
   កញ្ចប់ដែលជាប់ពិដានចូល `autoLookupQueueRetries` ហើយព្យាយាមឡើងវិញ។
   ⛔ **រាល់ផ្លូវចេញមុនត្រូវហៅ `dropAutoLookupQueueEntry(lookupKey)`**
@@ -1457,6 +1474,14 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 - **Timeout របស់ Netlify គ្របដល់អាន body ចប់**; stream លើស 1 MB បដិសេធ
   មុន EOF។ EOF ខូចជា network ដែល retry បាន; 401/403 មិន retry ទោះ
   `body.cancel()` ព្យួរក៏ដោយ (`zto-network-boundaries-test.js`)។
+- **Capture ត្រូវរង់ចាំចម្លើយ Order Detail ដែលទទួលយក session**៖ តែ HTTPS
+  `POST /scan/get/order/detail` លើ host ពិត។ Request ទទេ, HTTP 401/403,
+  redirect/IdP និង JSON ខូច មិនអាចបញ្ជាក់ជោគជ័យ។ អាន response ចប់ និងបញ្ចូល
+  `Set-Cookie` ដែលត្រូវនឹង URL មុនបិទ browser; រក្សាពិដានពេល និងដក listener
+  រាល់ផ្លូវចេញ (`zto-cookie-capture-test.js`)។
+- **Fingerprint ដូចគ្នា បញ្ជាក់តែការផ្ទុក Cookie**៖ សាលក្រមមាន ៣ គឺ
+  ទទួលយក/បដិសេធ/មិនទាន់វាស់។ `--auto` មិនបើក browser ព្រោះស្ថានភាពមិនទាន់
+  វាស់ទេ (`zto-cookie-sync-test.js` · `zto-cookie-capture-test.js`)។
 - ⛔ **server env ដែល extension ចាស់ធ្លាប់ប្រើ ត្រូវនៅតែលុប** ៖
   `ZTO_COOKIE_UPDATE_KEY` · `NETLIFY_AUTH_TOKEN` · `NETLIFY_ACCOUNT_ID` ·
   `NETLIFY_SITE_ID`។
@@ -1893,6 +1918,18 @@ bash audit-tools/emu/rules.sh
    ស្តារ មិនទាន់ជា backup ទេ**។
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
+
+## ⏳ ZoeW `2.31.2` — រង់ចាំការផ្ទៀងផ្ទាត់ Cookie និងម៉ឺនុយលើឧបករណ៍ពិត
+
+- CI ពេញលេញមាន **152 PASS / 1 FAIL** លើ Android snap ក្នុង Chromium។
+  ការវាស់ដាច់ដោយឡែកមិនទាន់បង្កើត failure ឡើងវិញបាន; មូលហេតុនៅមិនទាន់
+  បញ្ជាក់។ រក្សា CSS/iOS motion និង assertion ដើមដដែល ហើយអានភស្តុតាង
+  ក្នុង `docs/HISTORY.md` ផ្នែក ២ មុនសម្រេចអ្វីលើតំបន់ហាមចូល។
+- ក្រោយ deploy និងទទួល helper ថ្មី៖ Login Argus ➜ Arrival Scan ➜ Lookup
+  ជោគជ័យ ➜ Sync ➜ Lookup ក្នុង ZoeW ភ្លាម និងក្រោយលើស ៥ នាទី។ កុំរាយថា
+  session ផលិតកម្មបានជួសជុលរួច ដោយផ្អែកតែ fixture ឬ fingerprint match។
+- បើកម៉ឺនុយ (...) ខាងលើប្រវត្តិ និងតាមជួរ រួចអូសផ្ទាំង/រមូរ។ ម៉ឺនុយត្រូវ
+  បិទ ហើយចុច/រមូរក្នុងម៉ឺនុយនៅប្រើបាន។ CSS, PTR និង animation មិនប្រែ។
 
 ## ⏳ ZoeW `2.31.1` + ZoeKeyGen `2.19.21` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 

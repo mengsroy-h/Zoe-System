@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = process.env.ZTOSTORE_APP_DIR
     ? path.resolve(process.env.ZTOSTORE_APP_DIR)
@@ -77,6 +78,7 @@ function resetEnv(extra) {
 function makeBlobs(behavior) {
     const state = Object.assign({ value: BLOB_COOKIE }, behavior || {});
     const calls = [];
+    const etagOf = (value) => '"' + crypto.createHash('sha256').update(String(value || '')).digest('hex') + '"';
     const store = {
         get(key, options) {
             calls.push({ fn: 'get', key, options });
@@ -90,11 +92,17 @@ function makeBlobs(behavior) {
             }
             return Promise.resolve(snapshot);
         },
-        set(key, value) {
+        async getWithMetadata(key, options) {
+            const value = await store.get(key, options);
+            return value === null ? null : { data: value, etag: etagOf(value), metadata: {} };
+        },
+        set(key, value, options) {
             calls.push({ fn: 'set', key, value });
             if (state.writeThrows) return Promise.reject(new Error('write failed'));
+            if (options && options.onlyIfMatch && options.onlyIfMatch !== etagOf(state.value)) return Promise.resolve({ modified: false });
+            if (options && options.onlyIfNew && state.value !== null) return Promise.resolve({ modified: false });
             state.value = value;
-            return Promise.resolve();
+            return Promise.resolve({ modified: true, etag: etagOf(value) });
         }
     };
     return {
@@ -441,19 +449,17 @@ async function run() {
 
     net = upstream(['BOS-MAN-SESSION=renewed-again-99887766; Path=/']);
     await call({ barcode: '77130527210014' });
-    ok('⛔ ពិដានល្បឿន ➜ មិនសរសេរស្ទួនក្នុង ៦០ វិនាទី',
-        blobs.calls.filter((c) => c.fn === 'set').length === 1, blobs.names());
+    ok('⛔ Session ប្តូរពិត ➜ រក្សាទុកភ្លាម ទោះក្នុង ៦០ វិនាទី',
+        blobs.calls.filter((c) => c.fn === 'set').length === 2, blobs.names());
 
-    // ⛔ ពិដានល្បឿនការពារ **ការសរសេរទៅ Blobs** — មិនមែនការចងចាំទេ។
-    //   បើតម្លៃដែល Argus ទើបប្រគល់ត្រូវបោះចោលទាំងស្រុង នោះសំណើបន្ទាប់នៃ
-    //   instance ដដែលនៅផ្ញើ Cookie **ចាស់** ➜ 401 ដែលអាចជៀសបាន ➜ អាន store
-    //   ឡើងវិញ + សាកម្តងទៀត (ថ្លៃមួយជុំពេញ) ខណៈ session ថ្មីស្ថិតក្នុងដៃរួច។
+    // ⛔ BOS-MAN-SESSION ថ្មីត្រូវរក្សាទុកភ្លាម និងប្រើបន្តក្នុងសតិ។
+    // ការប្តូរគូធម្មតានៅគោរព throttle; zto-cookie-session-test វាស់ឆ្លង TTL។
     net = upstream();
     await call({ barcode: '77130527210015' });
-    ok('⛔ ពិដានល្បឿនទប់ការសរសេរ ➜ តែ session ថ្មីត្រូវប្រើបន្តក្នុងសតិ',
+    ok('⛔ Session ថ្មីត្រូវប្រើបន្តក្នុងសតិ',
         String(sentCookie(net) || '').indexOf('renewed-again-99887766') !== -1, sentCookie(net));
     ok('⛔ ទិសផ្ទុយ ៖ ការប្រើក្នុងសតិមិនត្រូវក្លាយជាការសរសេរស្ទួន',
-        blobs.calls.filter((c) => c.fn === 'set').length === 1, blobs.names());
+        blobs.calls.filter((c) => c.fn === 'set').length === 2, blobs.names());
 
     resetEnv({ ZTO_COOKIE: ENV_COOKIE });
     blobs = useBlobs();

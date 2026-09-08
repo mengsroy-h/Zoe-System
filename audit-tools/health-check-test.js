@@ -49,7 +49,10 @@ const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDat
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
     'healthServiceWorkerRow', 'healthLookupRow', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
-    'sanitizeInput', 'elapsedSince', 'fetchWithTimeout'];
+    'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
+    'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
+    'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs', 'lookupFailureIsDefinitive',
+    'retryTransientLookupResponse', 'noteSheetScriptVersion', 'getNestedField', 'dropAutoLookupQueueEntry'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -65,6 +68,14 @@ function buildRuntime(over) {
     const listEl = { innerHTML: '' };
     const btnEl = { disabled: false };
     const modalEl = { style: { display: 'flex' } };
+    const alerts = [];
+    const lookupStatuses = [];
+    const fills = [];
+    const inputs = {
+        lookupApiUrlInput: { value: o.cfg && o.cfg.url || '' },
+        lookupApiHeaderNameInput: { value: o.cfg && o.cfg.headerName || '' },
+        lookupApiHeaderValueInput: { value: '' }
+    };
     const ctx = {
         console: { error: () => {}, log: () => {} },
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, Set, Map,
@@ -73,7 +84,29 @@ function buildRuntime(over) {
         window: { ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
         ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },
         LICENSE_APP_CODE: 'ADM',
-        ZTO_TEST_TIMEOUT_MS: 11000,
+        ZTO_TEST_TIMEOUT_MS: o.testTimeoutMs || 11000,
+        LOOKUP_TEST_TIMEOUT_MS: 20000,
+        ZTO_AUTO_LOOKUP_TIMEOUT_MS: o.testTimeoutMs || 13000,
+        AUTO_LOOKUP_TIMEOUT_MS: 16000,
+        AUTO_LOOKUP_FAIL_COOLDOWN_MS: 30000,
+        AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS: 6000,
+        AUTO_LOOKUP_FAILURE_MAX: 100,
+        AUTO_LOOKUP_MAX_IN_FLIGHT: 2,
+        autoLookupInFlight: new Map(),
+        autoLookupFailureAt: new Map(),
+        autoLookupQueueRetries: new Map(),
+        customerDataTableSessionGeneration: 1,
+        getFastLookupRow: () => null,
+        findCustomerDataTableRow: () => null,
+        scheduleCustomerTableSoonRefresh: () => {},
+        pumpAutoLookupQueue: () => {},
+        setLookupStatus: (barcode, kind, message) => lookupStatuses.push({ barcode, kind, message }),
+        setFastLookupRow: () => {},
+        rememberCustomerTableRow: () => {},
+        applyLookupFillToModal: (...args) => fills.push(args),
+        alert: (message) => alerts.push(message),
+        prompt: () => 'ZTO-HEALTH-TEST-001',
+        showToast: () => {},
         DB_LISTENER_KEYS: ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'],
         isDatabaseConnected: o.dbConnected !== false,
         hasEverConnectedToDatabase: true,
@@ -116,15 +149,15 @@ function buildRuntime(over) {
         closeSideDrawer: () => {},
         openModalHelper: () => {},
         requestPinBeforeConfig: (fn, key) => { pinPrompts.push(key); },
-        document: { getElementById: (id) => (id === 'healthCheckList' ? listEl : id === 'healthRecheckBtn' ? btnEl : id === 'healthCheckModal' ? modalEl : null) }
+        document: { getElementById: (id) => (id === 'healthCheckList' ? listEl : id === 'healthRecheckBtn' ? btnEl : id === 'healthCheckModal' ? modalEl : inputs[id] || null) }
     };
     ctx.globalThis = ctx;
     vm.createContext(ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n')
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
-        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl };';
+        + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
     vm.runInContext(code, ctx);
-    return { api: ctx.api, fetches, pinPrompts, listEl, btnEl };
+    return { api: ctx.api, fetches, pinPrompts, listEl, btnEl, alerts, lookupStatuses, fills };
 }
 
 const ZTO_CFG = { enabled: true, url: 'https://x.netlify.app/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: { data: [1], iv: [2] } };
@@ -168,8 +201,10 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
         const html = await rt.api.healthLookupRow();
         ok('⛔ ZTO បដិសេធ Cookie (401) ➜ មិនត្រូវរាយ ✅ ដាច់ខាត',
             state(html) !== 'ok', state(html) + ' :: ' + html.slice(0, 160));
-        ok('⛔ ZTO បដិសេធ Cookie ➜ ត្រូវប្រាប់ថា **ផុតកំណត់/បដិសេធ**',
-            /ផុតកំណត់|បដិសេធ/.test(html), html.slice(0, 200));
+        ok('⛔ ZTO បដិសេធ Cookie ➜ ប្រាប់សាលក្រមបដិសេធពិត',
+            /បដិសេធ/.test(html), html.slice(0, 200));
+        ok('⛔ សាលក្រមបដិសេធមិនបញ្ជាក់ថា Cookie ផុតកំណត់តាមពេល',
+            !/ផុតកំណត់/.test(html), html.slice(0, 200));
         ok('⛔ ZTO បដិសេធ Cookie ➜ ត្រូវប្រាប់វិធីដោះស្រាយ (sync-zto-cookie)',
             /sync-zto-cookie/.test(html), html.slice(0, 220));
     }
@@ -192,6 +227,48 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
             state(html) === 'warn', state(html) + ' :: ' + html.slice(0, 160));
         ok('⛔ ករណីនោះមិនត្រូវរាយ ❌ (មិនអះអាងថាខូច)',
             state(html) !== 'bad', state(html));
+    }
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, testTimeoutMs: 20, fetchImpl: () => new Promise(() => {}) });
+        await rt.api.testLookupApiConfig(rt.btnEl);
+        const message = rt.alerts[rt.alerts.length - 1] || '';
+        ok('⛔ សាក API ៖ សំណើព្យួរឆ្លង timeout ពិត ហើយបើកប៊ូតុងឡើងវិញ',
+            rt.fetches.length === 1 && /Timeout/.test(message) && !rt.btnEl.disabled, message);
+        ok('⛔ Timeout មិនមែនភស្តុតាងថា Cookie ផុតកំណត់',
+            !/ផុតកំណត់/.test(message), message);
+        ok('⛔ Timeout ប្រាប់ឲ្យសាកបណ្ដាញឡើងវិញ ដោយមិនបញ្ជូនទៅ Sync Cookie',
+            /សាកល្បង/.test(message) && !/Cookie Sync|sync-zto-cookie/.test(message), message);
+    }
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, httpStatus: 401,
+            diagBody: { code: 'ZTO_AUTH_EXPIRED', reason: 'upstream-auth-rejected' } });
+        await rt.api.attemptAutoLookup('ZTO-HEALTH-TEST-002');
+        const verdict = rt.lookupStatuses[rt.lookupStatuses.length - 1] || {};
+        ok('⛔ Lookup ៖ HTTP 401 ពិតទៅដល់សារ auth ហើយមិន retry',
+            rt.fetches.length === 1 && verdict.kind === 'error' && /Cookie/.test(verdict.message || ''), verdict);
+        ok('⛔ Lookup ៖ ZTO_AUTH_EXPIRED រក្សា compatibility តែប្រាប់ថា ZTO បដិសេធ',
+            /ZTO/.test(verdict.message || '') && /បដិសេធ/.test(verdict.message || ''), verdict);
+        ok('⛔ Lookup ៖ សាលក្រមបដិសេធមិនអះអាងថាផុតកំណត់តាមពេល',
+            !/ផុតកំណត់/.test(verdict.message || ''), verdict);
+        ok('⛔ Lookup ៖ បដិសេធត្រូវផ្តល់វិធីស្តារ Cookie ហើយមិនបំពេញទិន្នន័យ',
+            /Cookie Sync/.test(verdict.message || '') && rt.fills.length === 0, verdict);
+    }
+    {
+        const rt = buildRuntime({ cfg: ZTO_CFG, testTimeoutMs: 20, fetchImpl: () => new Promise(() => {}) });
+        await rt.api.attemptAutoLookup('ZTO-HEALTH-TEST-003');
+        const verdict = rt.lookupStatuses[rt.lookupStatuses.length - 1] || {};
+        ok('⛔ Lookup ៖ timeout ពិតប្រាប់ថាយឺត ដោយមិនប្រាប់ថា Cookie ខូច',
+            rt.fetches.length === 1 && verdict.kind === 'error' && /យឺត/.test(verdict.message || '')
+            && !/Cookie|ផុតកំណត់/.test(verdict.message || ''), verdict);
+    }
+    {
+        const cfg = Object.assign({}, ZTO_CFG, { phoneField: 'phone', codField: 'cod', dodField: 'dod' });
+        const rt = buildRuntime({ cfg, diagBody: { found: true, phone: '012345678', cod: 5, dod: 1 } });
+        await rt.api.attemptAutoLookup('ZTO-HEALTH-TEST-004');
+        const verdict = rt.lookupStatuses[rt.lookupStatuses.length - 1] || {};
+        ok('⛔ ទិសផ្ទុយ ៖ Lookup ជោគជ័យពិត នៅតែបំពេញទិន្នន័យ និងបង្ហាញជោគជ័យ',
+            rt.fetches.length === 1 && verdict.kind === 'success' && rt.fills.length === 1
+            && rt.fills[0][1] === '012345678' && rt.fills[0][2] === 5 && rt.fills[0][3] === 1, verdict);
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, httpStatus: 500 });

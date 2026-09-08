@@ -44,7 +44,7 @@
 
         button, .btn-sm, .date-filter-btn, .more-btn, .header-more-btn, .file-upload-btn, .btn-submit-barcode,
         .daily-stats-btn, .monthly-stats-btn, .recently-deleted-btn, .manual-adjust-btn, .security-btn, .btn-view-list,
-        .btn-edit-item-price, .btn-toggle-bc-close, .btn-delete-bc {
+        .btn-edit-item-price, .btn-toggle-bc-close {
             touch-action: manipulation;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
@@ -54,7 +54,7 @@
         button:active, .btn-sm:active, .date-filter-btn:active, .more-btn:active, .header-more-btn:active,
         .file-upload-btn:active, .btn-submit-barcode:active, .daily-stats-btn:active, .monthly-stats-btn:active,
         .recently-deleted-btn:active, .manual-adjust-btn:active, .security-btn:active, .btn-view-list:active,
-        .btn-edit-item-price:active, .btn-toggle-bc-close:active, .btn-delete-bc:active {
+        .btn-edit-item-price:active, .btn-toggle-bc-close:active {
             transform: scale(0.94);
         }
         input, select, textarea { touch-action: manipulation; }
@@ -408,16 +408,33 @@
         .btn-biometric:disabled { opacity: 0.6; cursor: progress; }
 
         .scan-mode-row {
-            display: flex; gap: 6px; background: #f1f5f9; padding: 4px;
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; background: #f1f5f9; padding: 4px;
             border-radius: var(--radius-lg); border: 1px solid var(--border-color);
         }
         .mode-btn {
-            flex: 1; text-align: center; padding: 9px 6px; border-radius: var(--radius-md);
+            min-width: 0; min-height: 46px; text-align: center; padding: 8px 6px; border-radius: var(--radius-md);
             font-size: calc(12 * var(--fs-unit)); font-weight: 700; color: var(--text-muted);
             background: transparent; border: none; cursor: pointer;
+            line-height: 1.4; overflow-wrap: anywhere;
             transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
         }
         .mode-btn.active { background: var(--card-bg); color: var(--action-primary); box-shadow: var(--shadow-sm); }
+        .mode-remove-btn { grid-column: 1 / -1; }
+        .mode-remove-btn.active { background: var(--action-danger); color: #fff; box-shadow: 0 4px 12px -6px rgba(230, 31, 38, 0.8); }
+        .remove-scan-banner {
+            display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px;
+            border: 1px solid #fecaca; border-radius: var(--radius-lg); background: #fff1f2; color: #9f1239;
+        }
+        .remove-scan-icon { flex: none; font-size: calc(17 * var(--fs-unit)); line-height: 1.25; }
+        .remove-scan-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.45; }
+        .remove-scan-copy strong { font-size: calc(11.5 * var(--fs-unit)); }
+        .remove-scan-copy span { font-size: calc(10 * var(--fs-unit)); color: #be123c; overflow-wrap: anywhere; }
+        .remove-scan-active .scanner-section { border-color: #fda4af; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.08); }
+
+        @media (min-width: 560px) and (max-width: 991px), (min-width: 1600px) {
+            .scan-mode-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .mode-remove-btn { grid-column: auto; }
+        }
 
         .active-locker-bar {
             display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -945,6 +962,7 @@
         #callMarkModal .modal-content,
         #exchangeRateModal .modal-content,
         #lockerSettingsModal .modal-content,
+        #scanRemoveModal .modal-content,
         #permanentDeleteWarningModal .modal-content,
         #restoreWarningModal .modal-content { max-width: clamp(320px, 48vw, 560px); }
         #exportDataModal .modal-content,
@@ -1007,6 +1025,17 @@
         .modal-content p { font-size: calc(11 * var(--fs-unit)); color: var(--text-muted); margin-bottom: 14px; line-height: 1.65; }
         .modal-content input, .modal-content select, .modal-content textarea { width: 100%; padding: 11px 12px; min-height: 46px; font-size: calc(12.5 * var(--fs-unit)); border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 10px; outline: none; text-align: center; background: #f8fafc; color: var(--text-main); box-sizing: border-box; transition: border-color .15s ease, background-color .15s ease; }
         .modal-content textarea { height: 100px; min-height: 100px; resize: vertical; font-family: monospace; font-size: calc(11 * var(--fs-unit)); text-align: left; }
+        .scan-remove-modal-content { overflow-wrap: anywhere; text-align: left; }
+        .scan-remove-modal-content h3, .scan-remove-modal-content > p { text-align: center; }
+        .scan-remove-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 2px 0 10px; }
+        .scan-remove-field { min-width: 0; padding: 8px 9px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; }
+        .scan-remove-field-wide { grid-column: 1 / -1; }
+        .scan-remove-field dt { margin-bottom: 2px; color: var(--text-muted); font-size: calc(9.5 * var(--fs-unit)); font-weight: 700; }
+        .scan-remove-field dd { margin: 0; color: var(--text-main); font-size: calc(11.5 * var(--fs-unit)); font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
+        .scan-remove-field-wide:first-child dd { color: var(--primary); }
+        .scan-remove-warning { padding: 9px 10px; border: 1px solid #fecaca; border-radius: var(--radius-md); background: #fff1f2; color: #9f1239; font-size: calc(10 * var(--fs-unit)); font-weight: 650; line-height: 1.55; text-align: left; }
+        .scan-remove-actions { margin-top: 10px; }
+        .modal-btns.scan-remove-actions button { min-height: 48px; }
         .trash-search-box { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; padding: 0 12px; margin-bottom: 8px; min-height: 46px; box-sizing: border-box; transition: border-color .15s ease, background-color .15s ease; }
         .trash-search-box .icon { font-size: calc(12 * var(--fs-unit)); color: var(--text-muted); flex: none; }
         .trash-search-box input { border: none; background: transparent; border-radius: 0; box-shadow: none; margin-bottom: 0; text-align: left; padding: 0; min-height: 0; flex: 1; min-width: 0; }
@@ -1088,18 +1117,6 @@
             cursor: pointer;
             white-space: nowrap;
         }
-        .btn-delete-bc {
-            background: var(--action-danger);
-            color: white;
-            border: none;
-            padding: 8px 10px;
-            border-radius: 6px;
-            font-size: calc(10 * var(--fs-unit));
-            font-weight: 700;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
         .stat-card-item {
             background: #f8fafc;
             border: 1px solid var(--border-color);

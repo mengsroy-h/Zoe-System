@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.30.10';
+    const APP_VERSION = '2.31.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -10,6 +10,7 @@
         "cancelPinEntryFlow",
         "cancelPinSetupFlow",
         "cancelRestoreItem",
+        "cancelScannedRemoval",
         "closeCameraManually",
         "closeConfigQrScanner",
         "closeEditBarcodeModal",
@@ -19,6 +20,7 @@
         "closeSideDrawer",
         "confirmLocationChange",
         "confirmPhone",
+        "confirmScannedRemoval",
         "debouncedSearchByPhone",
         "decodeImageFile",
         "dismissPhoneModal",
@@ -71,7 +73,6 @@
         "pickSheetImportFile",
         "promptPermanentDelete",
         "promptRestoreDeletedItem",
-        "removeSingleBarcode",
         "renderEntryList",
         "renderLockerList",
         "renderMonthlyReport",
@@ -333,6 +334,7 @@
     let activeEditingBarcode = null;
     let activeParentItemId = null;
     let pendingRestoreId = null;
+    let exchangeRateSaveInFlight = false;
     const pendingHistoryPatches = new Map();
     const HISTORY_PATCH_RETRY_MAX = 5;
     const HISTORY_PATCH_QUEUE_MAX = 50;
@@ -1310,7 +1312,7 @@
         refreshBiometricUi();
         markAppUnlockedForSession();
         refreshAppLockUi();
-        showToast("បានកំណត់ Security PIN រួចរាល់!");
+        showToast("✅ បានកំណត់ Security PIN រួចរាល់!");
         (pinTargetAction || openConfigModal)(pinVal);
     }
 
@@ -1412,8 +1414,9 @@
     function clearBiometricRecord() {
         try {
             appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
+            return true;
         } catch (e) {
-            return;
+            return false;
         }
     }
 
@@ -1568,7 +1571,7 @@
         const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');
         if (lockoutUntil && Date.now() < lockoutUntil) {
             const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
-            showToast(`បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
+            showToast(`⚠️ បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ${secondsLeft} វិនាទី។`);
             return false;
         }
         biometricUnlockInFlight = true;
@@ -1629,9 +1632,12 @@
     function toggleBiometricUnlock() {
         if (isBiometricEnabled()) {
             if (!confirm('បិទការចូលដោយក្រយៅដៃ ឬមុខ? អ្នកនឹងត្រូវវាយលេខកូដ PIN ដូចមុនវិញ។')) return;
-            clearBiometricRecord();
+            if (!clearBiometricRecord()) {
+                showToast('❌ មិនអាចបិទការចូលដោយក្រយៅដៃ ឬមុខបានទេ — ការកំណត់នៅដដែល។');
+                return;
+            }
             refreshBiometricUi();
-            showToast('បានបិទការចូលដោយក្រយៅដៃ ឬមុខ។');
+            showToast('✅ បានបិទការចូលដោយក្រយៅដៃ ឬមុខ។');
             return;
         }
         requestPinBeforeConfig(startBiometricEnrollment, 'biometric');
@@ -1893,7 +1899,10 @@
 
     function forgetAppLockPin() {
         if (!confirm('លុប Security PIN នៃឧបករណ៍នេះ រួចចាកចេញពីប្រព័ន្ធ?\n\n· ទិន្នន័យអាជីវកម្មមិនរងផលទេ\n· អ្នកនឹងត្រូវចូលប្រព័ន្ធដោយអ៊ីមែល និងពាក្យសម្ងាត់ម្តងទៀត\n· ការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN ចាស់ ត្រូវកំណត់ថ្មី')) return;
-        safeStoreRemove(appLocalStore, 'zoew_security_pin_hash');
+        if (!safeStoreRemove(appLocalStore, 'zoew_security_pin_hash')) {
+            showToast('❌ លុប Security PIN មិនបានទេ — PIN និងស្ថានភាពចូលប្រព័ន្ធនៅដដែល។');
+            return;
+        }
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         clearBiometricRecord();
@@ -1902,12 +1911,14 @@
         hideAppLockScreen();
         refreshBiometricUi();
         refreshAppLockUi();
-        const finish = () => {
+        const finish = (signedOut) => {
             showLoginModalWithPrefill();
-            reannounceOrShowToast('⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត');
+            reannounceOrShowToast(signedOut
+                ? '⚠️ បានលុប PIN និងចាកចេញពីប្រព័ន្ធ — សូមចូលប្រព័ន្ធម្ដងទៀត'
+                : '⚠️ បានលុប PIN ក្នុងឧបករណ៍ ប៉ុន្តែមិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase ទេ — សូមពិនិត្យបណ្ដាញ ហើយ Refresh');
         };
-        if (auth) fb.signOut(auth).then(finish, finish);
-        else finish();
+        if (auth) fb.signOut(auth).then(() => finish(true), () => finish(false));
+        else finish(false);
     }
 
     function drawerAppLockFlow() {
@@ -2164,7 +2175,7 @@
             return;
         }
         if (normalized.extras.length) {
-            showToast("រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
+            showToast("ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ " + normalized.extras.join(', '));
         }
         closeModal('configModal');
         initFirebase();
@@ -2252,7 +2263,7 @@
     async function openConfigQrScanner() {
         if (configQrScanActive) return;
         if (isCameraScanning || isCameraStarting) {
-            showToast("សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
+            showToast("⚠️ សូមបិទកាមេរ៉ាស្កេនបាកូដសិន មុននឹងស្កេន QR Setup Link");
             return;
         }
         if (!scanEngineReady()) {
@@ -2448,7 +2459,7 @@
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
         prefetchCustomerDataTableRowsIfConfigured();
-        showToast(enabled ? "បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
+        showToast(enabled ? "✅ បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "ℹ️ បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
         if (cfg.headerName && lookupApiIsAppsScript(cfg)) {
             showToast("ℹ️ Google Apps Script អាន Header មិនបានទេ — សោត្រូវដាក់ក្នុង URL។ Header នេះនឹងមិនត្រូវផ្ញើ។");
         }
@@ -2478,7 +2489,7 @@
 
         const testIsZto = lookupApiIsZto({ url: url });
         const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;
-        showToast(testIsZto ? "កំពុងសាកល្បង ZTO..." : "កំពុងសាកល្បង API...");
+        showToast(testIsZto ? "⏳ កំពុងសាកល្បង ZTO..." : "⏳ កំពុងសាកល្បង API...");
         if (btnEl) btnEl.disabled = true;
         const progressTimers = testIsZto ? [
             setTimeout(() => showToast("⏳ នៅរង់ចាំ ZTO ឆ្លើយតប...", 'warn'), 6000)
@@ -2490,7 +2501,7 @@
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'testLookupApiConfig' });
             const timedOut = e && e.message === 'Test API timed out';
             const slowNote = testIsZto
-                ? "អស់ពេល (Timeout) — ZTO ឆ្លើយតបយឺត ឬ Cookie ផុតកំណត់។ សូមសាកល្បងម្តងទៀត; បើនៅតែយឺត សូមយក Cookie ថ្មីពី Argus"
+                ? "អស់ពេល (Timeout) — ZTO ឆ្លើយតបយឺត ឬ Cookie ផុតកំណត់។ សូមសាកល្បងម្តងទៀត; បើនៅតែយឺត សូមរត់ ZTO Cookie Sync លើ Windows ដើម្បីធ្វើបច្ចុប្បន្នភាព Netlify Blobs"
                 : "អស់ពេល (Timeout) — Google Apps Script ដំបូងអាចយឺត (cold start), សូមសាកល្បងម្តងទៀត ឬពិនិត្យ URL/ការតភ្ជាប់អ៊ីនធឺណិត";
             alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (timedOut ? slowNote : e.message));
         } finally {
@@ -4000,7 +4011,7 @@
         }
 
         if (cfg.autoSubmit && phoneWasAutoFilled && pendingBarcode === barcode && isModalOpen) {
-            showToast("✅ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
+            showToast("⏳ បានរកឃើញអតិថិជន — កំពុងរក្សាទុកស្វ័យប្រវត្តិ...");
             confirmPhone(false);
         } else if (filledAny) {
             showToast("✅ បានទាញយកទិន្នន័យអតិថិជនស្វ័យប្រវត្តិ!");
@@ -4214,7 +4225,7 @@
             } else if (e && e.message === 'Auto lookup timed out') {
                 setLookupStatus(barcode, 'error', '⏱️ ' + lookupSource + ' ឆ្លើយតបយឺតពេក — សូមស្កេនម្ដងទៀត');
             } else if (e && e.lookupCode === 'ZTO_AUTH_EXPIRED') {
-                setLookupStatus(barcode, 'error', '🔒 Cookie ZTO ផុតកំណត់ — សូមចូល Argus យក Cookie ថ្មី ដាក់ក្នុង Netlify');
+                setLookupStatus(barcode, 'error', '🔒 Cookie ZTO ផុតកំណត់ — សូមរត់ ZTO Cookie Sync លើ Windows ដើម្បីបញ្ចូល Cookie ថ្មីទៅ Netlify Blobs ដោយស្វ័យប្រវត្តិ');
             } else if (e && e.lookupCode === 'ZTO_AUTH_NOT_CONFIGURED') {
                 setLookupStatus(barcode, 'error', '🔒 Netlify មិនទាន់មាន Cookie ឬ Token សម្រាប់ ZTO');
             } else if (e && (e.lookupCode === 'ZTO_CONFIG_INVALID' || e.lookupCode === 'ZTO_PROXY_NOT_CONFIGURED')) {
@@ -4247,23 +4258,60 @@
         openModalHelper('exchangeRateModal');
     }
 
-    function saveExchangeRate() {
+    async function saveExchangeRate() {
+        if (exchangeRateSaveInFlight) return 'pending';
         const rateInput = document.getElementById('exchangeRateInput');
         let val = rateInput ? (parseFloat(rateInput.value) || 4100) : 4100;
         if (val <= 0) val = 4100;
 
+        const previousRate = exchangeRateRiel;
+        const restorePreviousRate = () => {
+            exchangeRateRiel = previousRate;
+            safeStoreSet(appLocalStore, 'zoew_exchange_rate', previousRate);
+            refreshCurrentHistoryView();
+        };
+        if (!safeStoreSet(appLocalStore, 'zoew_exchange_rate', val)) {
+            showToast('❌ មិនអាចរក្សាទុកអត្រាប្រាក់ក្នុងឧបករណ៍នេះបានទេ — គ្មានអ្វីត្រូវបានផ្លាស់ប្តូរ។');
+            return 'failed';
+        }
         exchangeRateRiel = val;
-        safeStoreSet(appLocalStore, 'zoew_exchange_rate', val);
-
-        if (dbRefExchangeRate) {
-            fb.set(dbRefExchangeRate, val).catch(() => {
-                showToast("⚠️ បរាជ័យក្នុងការ Save អត្រាប្រាក់ទៅ Firebase!");
-            });
+        closeModal('exchangeRateModal');
+        refreshCurrentHistoryView();
+        if (!dbRefExchangeRate || !db || !fb) {
+            restorePreviousRate();
+            showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ — អត្រាប្រាក់មិនត្រូវបានផ្លាស់ប្តូរ។');
+            return 'failed';
         }
 
-        closeModal('exchangeRateModal');
-        showToast(`បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛`);
-        refreshCurrentHistoryView();
+        exchangeRateSaveInFlight = true;
+        let exchangeRateWrite = null;
+        let lateArmed = false;
+        try {
+            exchangeRateWrite = fb.set(dbRefExchangeRate, val);
+            await dbOp(exchangeRateWrite);
+            showToast(`✅ បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ ទៅ Firebase រួចរាល់!`);
+            return 'done';
+        } catch (error) {
+            if (exchangeRateWrite && dbOpStalled(error)) {
+                lateArmed = armLateWrite(exchangeRateWrite, () => {
+                    exchangeRateSaveInFlight = false;
+                    showToast(`✅ បណ្តាញត្រឡប់មកវិញ — អត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ បានរក្សាទុកទៅ Firebase រួចរាល់!`);
+                }, () => {
+                    exchangeRateSaveInFlight = false;
+                    restorePreviousRate();
+                    showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
+                }, 'saveExchangeRate');
+                if (lateArmed) {
+                    showToast('⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរង់ចាំរក្សាទុកអត្រាប្រាក់។ សូមកុំកែម្ដងទៀត។');
+                    return 'pending';
+                }
+            }
+            restorePreviousRate();
+            showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
+            return 'failed';
+        } finally {
+            if (!lateArmed) exchangeRateSaveInFlight = false;
+        }
     }
 
     const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
@@ -4328,6 +4376,10 @@
         historyPatchFlushInFlight = false;
         pendingRegistryReleases.clear();
         registryReleaseFlushInFlight = false;
+        pendingScannedRemoval = null;
+        scanRemoveInFlight = null;
+        entryScanMode = 'parcel';
+        safeStoreSet(appLocalStore, ENTRY_SCAN_MODE_KEY, 'parcel');
         appLockExcuseAt = 0;
         appLockVeiled = false;
         deletedSearchQuery = '';
@@ -4359,6 +4411,9 @@
             'healthCheckList', 'monthlyReportBody',
             'locationWarningText', 'customLockerInput',
             'entryListTableBody', 'entryListSearchInput', 'entryListCount',
+            'scanRemoveBarcodeText', 'scanRemovePhoneText', 'scanRemoveLockerText',
+            'scanRemoveStateText', 'scanRemoveCodText', 'scanRemoveDodText',
+            'removeScanBannerDetail', 'hardwareScannerLabel',
             'siApiUrlInput', 'siApiPasswordInput', 'siFileInput', 'siHeaderRowInput', 'siModeSel',
             'siConfigSummary', 'siConfigMsg', 'siFileMsg', 'siMapMsg', 'siActionMsg', 'siClearMsg',
             'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
@@ -4375,6 +4430,29 @@
         if (lockerListFilter) lockerListFilter.innerHTML = '<option value="">ទីតាំងទាំងអស់</option>';
         const monthlyReportMonthSel = document.getElementById('monthlyReportMonthSel');
         if (monthlyReportMonthSel) monthlyReportMonthSel.innerHTML = '';
+        const parcelBtn = document.getElementById('modeParcelBtn');
+        const lockerBtn = document.getElementById('modeLockerBtn');
+        const removeBtn = document.getElementById('modeRemoveBtn');
+        if (parcelBtn) parcelBtn.classList.add('active');
+        if (lockerBtn) lockerBtn.classList.remove('active');
+        if (removeBtn) removeBtn.classList.remove('active');
+        if (parcelBtn) parcelBtn.setAttribute('aria-pressed', 'true');
+        if (lockerBtn) lockerBtn.setAttribute('aria-pressed', 'false');
+        if (removeBtn) removeBtn.setAttribute('aria-pressed', 'false');
+        const entryPage = document.getElementById('pageEntry');
+        if (entryPage) entryPage.classList.remove('remove-scan-active');
+        const removeBanner = document.getElementById('removeScanBanner');
+        if (removeBanner) removeBanner.classList.add('hidden');
+        const lockerPanel = document.getElementById('lockerPanel');
+        if (lockerPanel) lockerPanel.classList.add('hidden');
+        const parcelPanel = document.getElementById('parcelPanel');
+        if (parcelPanel) parcelPanel.classList.remove('hidden');
+        const hwInput = document.getElementById('hwScannerInput');
+        if (hwInput) hwInput.placeholder = 'ស្កេន Barcode...';
+        const hwLabel = document.getElementById('hardwareScannerLabel');
+        if (hwLabel) hwLabel.textContent = 'ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ';
+        const removeDetail = document.getElementById('removeScanBannerDetail');
+        if (removeDetail) removeDetail.textContent = 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
         monthlyReportMonth = '';
     }
 
@@ -4452,7 +4530,7 @@
         try {
             const input = document.getElementById('activationKeyInput');
             const keyStr = input ? input.value.trim() : '';
-            if (!keyStr) { showToast('សូមបញ្ចូល Activation Key!'); return; }
+            if (!keyStr) { showToast('⚠️ សូមបញ្ចូល Activation Key!'); return; }
             const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 30000, 'Activation timed out');
             if (!result.valid) {
                 if (input) input.value = '';
@@ -4663,12 +4741,12 @@
                 resetClearHistoryOperationState();
                 clearRememberedSession(false);
                 showLoginModalWithPrefill();
-                showToast("បានចាកចេញពីប្រព័ន្ធ!");
+                showToast("✅ បានចាកចេញពីប្រព័ន្ធ!");
             }).catch(() => {
                 resetClearHistoryOperationState();
                 clearRememberedSession(false);
                 showLoginModalWithPrefill();
-                showToast("⚠️ បានចាកចេញលើឧបករណ៍នេះ — តែមិនអាចប្រាប់ Server បានទេ");
+                showToast("⚠️ មិនអាចបញ្ជាក់ថាបានចាកចេញពី Firebase ទេ — បានសម្អាតការចងចាំក្នុង App ប៉ុណ្ណោះ។ សូមពិនិត្យបណ្ដាញ ហើយសាកម្តងទៀត។");
             });
         }
     }
@@ -5371,6 +5449,27 @@
         }
         item.barcodes = list;
         return item;
+    }
+
+    function ensureBarcodeArrayForItem(item) {
+        if (!item || typeof item !== 'object') return [];
+        normalizeBarcodesOf(item);
+        if (!Array.isArray(item.barcodes) && item.barcode) {
+            const cod = parseFloat(item.cod !== undefined ? item.cod : item.price) || 0;
+            const dod = parseFloat(item.dod) || 0;
+            item.barcodes = [{
+                code: item.barcode,
+                time: item.time,
+                cod: cod,
+                dod: dod,
+                locker: item.locker || "N/A",
+                isClosed: item.isClosed || false,
+                isDeducted: false,
+                isFromDeletion: false,
+                createdAt: item.createdAt || getServerNow()
+            }];
+        }
+        return Array.isArray(item.barcodes) ? item.barcodes : [];
     }
 
     function stripHistoryOnlyMarkers(item) {
@@ -6440,7 +6539,7 @@
         const manualRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
         correctRevenueLedgerToActual(dateVal, manualRevenueApplied, codChange, dodChange, countChange).then((status) => {
             if (status && status.ok) {
-                showToast("កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
+                showToast("✅ កែប្រែស្ថិតិ COD, DOD និងកញ្ចប់ដោយដៃបានជោគជ័យ!");
                 return;
             }
             const ledgerErr = new Error('Manual revenue reconciliation did not commit');
@@ -7547,7 +7646,7 @@
         const item = scanHistory.find(i => i.id === id);
         let editMoneyHtml = '';
         if (item && item.barcodes && item.barcodes.length > 0) {
-            editMoneyHtml = `<button data-act="moreMenuViewList" data-a1="${sanitizeInput(id)}">💵 កែ/ដកកញ្ចប់អីវ៉ាន់</button>`;
+            editMoneyHtml = `<button data-act="moreMenuViewList" data-a1="${sanitizeInput(id)}">💵 កែតម្លៃកញ្ចប់</button>`;
         }
 
         showGlobalMoreMenu(btn, event, `
@@ -7790,7 +7889,7 @@
         const rows = buildExportRows();
         if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
         closeModal('exportDataModal');
-        showToast("កំពុងរៀបចំ Excel...");
+        showToast("⏳ កំពុងរៀបចំ Excel...");
         try {
             await loadScriptOnce('xlsx');
             const aoa = [EXPORT_HEADERS, ...rows.map(r => [r.no, r.phone, r.barcode, r.locker, r.cod, r.dod, r.total, r.status, r.scanDate, r.time])];
@@ -8206,7 +8305,7 @@
         const report = buildMonthlyReport(monthlyReportMonth);
         if (!report.days.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!"); return; }
         closeModal('monthlyReportModal');
-        showToast("កំពុងរៀបចំ Excel...");
+        showToast("⏳ កំពុងរៀបចំ Excel...");
         try {
             await loadScriptOnce('xlsx');
             const rows = monthlyReportRows(report);
@@ -9171,7 +9270,7 @@
             decodeBarcodeFromImageDataUrl(evt.target.result);
         };
         reader.onerror = function() {
-            showToast("មិនអាចអានរូបភាពនេះបានទេ។ សូមសាកល្បងរូបភាពផ្សេង។");
+            showToast("❌ មិនអាចអានរូបភាពនេះបានទេ។ សូមសាកល្បងរូបភាពផ្សេង។");
         };
         reader.readAsDataURL(f);
     }
@@ -9205,10 +9304,10 @@
                 } catch (err) {
                 }
             }
-            showToast("រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។ សូមសាកល្បងថតរូបឲ្យច្បាស់ ត្រង់ៗ និងជិត Barcode ជាងនេះ ឬប្រើកាមេរ៉ាស្កេនផ្ទាល់។");
+            showToast("⚠️ រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។ សូមសាកល្បងថតរូបឲ្យច្បាស់ ត្រង់ៗ និងជិត Barcode ជាងនេះ ឬប្រើកាមេរ៉ាស្កេនផ្ទាល់។");
         };
         img.onerror = function () {
-            showToast("រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។");
+            showToast("⚠️ រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។");
         };
         img.src = originalDataUrl;
     }
@@ -9335,6 +9434,8 @@
     let lockerBarcodeIndex = {};
     let pendingLockerCode = null;
     let lockerAssignGeneration = 0;
+    let pendingScannedRemoval = null;
+    let scanRemoveInFlight = null;
 
     function lockerCodeKey(code) {
         return String(code === null || code === undefined ? '' : code).trim().toUpperCase();
@@ -9424,11 +9525,20 @@
         const countInput = document.getElementById('lockerCountInput');
         const prefix = (prefixInput ? prefixInput.value.trim() : '') || 'ទូ';
         const count = Math.min(200, Math.max(1, parseInt(countInput ? countInput.value : '', 10) || 24));
-        safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, prefix);
-        safeStoreSet(appLocalStore, LOCKER_COUNT_KEY, String(count));
+        const previousPrefix = getLockerPrefix();
+        const previousCount = getLockerCount();
+        const prefixSaved = safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, prefix);
+        const countSaved = safeStoreSet(appLocalStore, LOCKER_COUNT_KEY, String(count));
+        if (!prefixSaved || !countSaved) {
+            if (prefixSaved) safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, previousPrefix);
+            if (countSaved) safeStoreSet(appLocalStore, LOCKER_COUNT_KEY, String(previousCount));
+            showToast('❌ រក្សាទុកការកំណត់ទូមិនបានពេញលេញទេ — សូមបិទ/បើក App ហើយពិនិត្យការកំណត់ឡើងវិញ។');
+            return false;
+        }
         closeModal('lockerSettingsModal');
         renderLockerGrid();
         showToast('✅ បានរក្សាទុកការកំណត់ទូ');
+        return true;
     }
 
     function renderLockerGrid() {
@@ -9478,7 +9588,7 @@
         if (!input) return;
         const val = input.value.trim();
         if (!isValidLockerName(val)) {
-            showToast('សូមបញ្ចូលទីតាំងពិតប្រាកដ (មិនអាចជា N/A និងមិនលើស 64 តួអក្សរ)!');
+            showToast('⚠️ សូមបញ្ចូលទីតាំងពិតប្រាកដ (មិនអាចជា N/A និងមិនលើស 64 តួអក្សរ)!');
             return;
         }
         input.value = '';
@@ -9490,20 +9600,153 @@
         if (label) label.innerText = activeLocker || '-';
     }
 
+    function findScannedRemovalTarget(code) {
+        const key = lockerCodeKey(code);
+        if (!key) return null;
+        for (const item of scanHistory) {
+            if (!item || !item.id) continue;
+            const barcode = ensureBarcodeArrayForItem(item).find((entry) => entry && lockerCodeKey(entry.code) === key);
+            if (barcode) return { itemId: item.id, barcodeCode: barcode.code, item, barcode };
+        }
+        return null;
+    }
+
+    function findScannedRemovalTrash(code) {
+        const key = lockerCodeKey(code);
+        if (!key) return null;
+        return deletedItems.find((item) => collectItemBarcodes(item).some((entry) => lockerCodeKey(entry) === key)) || null;
+    }
+
+    function setScannedRemovalText(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = String(value === null || value === undefined || value === '' ? '—' : value);
+    }
+
+    function refreshRemoveScanBanner() {
+        const detail = document.getElementById('removeScanBannerDetail');
+        if (!detail) return;
+        detail.textContent = scanRemoveInFlight
+            ? `កំពុងដក Barcode ${scanRemoveInFlight.barcodeCode}… សូមកុំស្កេនស្ទួន។`
+            : 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
+    }
+
+    function clearScannedRemovalInFlight(itemId, barcodeCode, operationToken) {
+        if (!scanRemoveInFlight) return;
+        if (operationToken && scanRemoveInFlight.operationToken !== operationToken) return;
+        if (itemId && scanRemoveInFlight.itemId !== itemId) return;
+        if (barcodeCode && scanRemoveInFlight.barcodeCode !== barcodeCode) return;
+        scanRemoveInFlight = null;
+        refreshRemoveScanBanner();
+        safeFocusScanner();
+    }
+
+    function showScannedRemovalPreview(target) {
+        const barcode = target.barcode || {};
+        const item = target.item || {};
+        pendingScannedRemoval = { itemId: target.itemId, barcodeCode: target.barcodeCode };
+        const cod = parseFloat(barcode.cod) || 0;
+        const dod = parseFloat(barcode.dod) || 0;
+        setScannedRemovalText('scanRemoveBarcodeText', target.barcodeCode);
+        setScannedRemovalText('scanRemovePhoneText', item.phone || 'គ្មានលេខ');
+        setScannedRemovalText('scanRemoveLockerText', barcode.locker || item.locker || 'N/A');
+        setScannedRemovalText('scanRemoveStateText', barcode.isClosed ? 'យករួច / បិទ' : 'មិនទាន់យក / បើក');
+        setScannedRemovalText('scanRemoveCodText', `$${cod.toFixed(2)}`);
+        setScannedRemovalText('scanRemoveDodText', `$${dod.toFixed(2)}`);
+        playBeep();
+        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+        openModalHelper('scanRemoveModal');
+    }
+
+    function handleRemoveScan(code) {
+        const key = lockerCodeKey(code);
+        if (!key) return;
+        if (scanRemoveInFlight) {
+            const same = lockerCodeKey(scanRemoveInFlight.barcodeCode) === key;
+            showToast(same
+                ? `⏳ ការដក (${scanRemoveInFlight.barcodeCode}) កំពុងដំណើរការ — សូមកុំស្កេនស្ទួន។`
+                : `⏳ សូមរង់ចាំការដក (${scanRemoveInFlight.barcodeCode}) ឲ្យចប់សិន។`);
+            if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+            safeFocusScanner();
+            return;
+        }
+        if (!db || !fb || !isDatabaseInitialized) {
+            showToast('⚠️ ទិន្នន័យមិនទាន់ត្រៀមរួចទេ — សូមរង់ចាំ Firebase ភ្ជាប់ ហើយស្កេនម្តងទៀត។');
+            safeFocusScanner();
+            return;
+        }
+        const target = findScannedRemovalTarget(key);
+        if (target) {
+            showScannedRemovalPreview(target);
+            return;
+        }
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) || dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)) {
+            showToast(`⚠️ ទិន្នន័យមិនទាន់ Sync គ្រប់ — មិនអាចបញ្ជាក់ថា Barcode (${key}) នៅទីណាបានទេ។ សូមរង់ចាំ ហើយស្កេនម្តងទៀត។`);
+            safeFocusScanner();
+            return;
+        }
+        const trashed = findScannedRemovalTrash(key);
+        if (trashed) {
+            showToast(`ℹ️ Barcode (${key}) នៅក្នុងធុងសំរាមរួចហើយ — គ្មានការដក ឬកាត់ប្រាក់ស្ទួនទេ។`);
+            safeFocusScanner();
+            return;
+        }
+        showToast(`❌ រកមិនឃើញ Barcode (${key}) ក្នុងកញ្ចប់ដែលកំពុងគ្រប់គ្រងទេ — គ្មានអ្វីត្រូវបានដក។`);
+        if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
+        safeFocusScanner();
+    }
+
+    function cancelScannedRemoval() {
+        pendingScannedRemoval = null;
+        closeModal('scanRemoveModal');
+    }
+
+    async function confirmScannedRemoval() {
+        if (!pendingScannedRemoval || scanRemoveInFlight) return false;
+        const job = pendingScannedRemoval;
+        pendingScannedRemoval = null;
+        const operationToken = {};
+        scanRemoveInFlight = { itemId: job.itemId, barcodeCode: job.barcodeCode, operationToken };
+        refreshRemoveScanBanner();
+        closeModal('scanRemoveModal');
+        let outcome;
+        try {
+            outcome = await removeSingleBarcode(job.itemId, job.barcodeCode, 'scan-confirmed');
+            return outcome !== 'failed' && outcome !== 'missing';
+        } finally {
+            if (outcome !== 'pending') clearScannedRemovalInFlight(job.itemId, job.barcodeCode, operationToken);
+        }
+    }
+
     function setEntryScanMode(mode) {
-        entryScanMode = mode === 'locker' ? 'locker' : 'parcel';
-        safeStoreSet(appLocalStore, ENTRY_SCAN_MODE_KEY, entryScanMode);
+        entryScanMode = mode === 'locker' ? 'locker' : (mode === 'remove' ? 'remove' : 'parcel');
+        safeStoreSet(appLocalStore, ENTRY_SCAN_MODE_KEY, entryScanMode === 'remove' ? 'parcel' : entryScanMode);
         const parcelBtn = document.getElementById('modeParcelBtn');
         const lockerBtn = document.getElementById('modeLockerBtn');
+        const removeBtn = document.getElementById('modeRemoveBtn');
         if (parcelBtn) parcelBtn.classList.toggle('active', entryScanMode === 'parcel');
         if (lockerBtn) lockerBtn.classList.toggle('active', entryScanMode === 'locker');
+        if (removeBtn) removeBtn.classList.toggle('active', entryScanMode === 'remove');
+        if (parcelBtn) parcelBtn.setAttribute('aria-pressed', entryScanMode === 'parcel' ? 'true' : 'false');
+        if (lockerBtn) lockerBtn.setAttribute('aria-pressed', entryScanMode === 'locker' ? 'true' : 'false');
+        if (removeBtn) removeBtn.setAttribute('aria-pressed', entryScanMode === 'remove' ? 'true' : 'false');
+        const entryPage = document.getElementById('pageEntry');
+        if (entryPage) entryPage.classList.toggle('remove-scan-active', entryScanMode === 'remove');
+        const removeBanner = document.getElementById('removeScanBanner');
+        if (removeBanner) removeBanner.classList.toggle('hidden', entryScanMode !== 'remove');
+        refreshRemoveScanBanner();
         const lockerPanel = document.getElementById('lockerPanel');
         if (lockerPanel) lockerPanel.classList.toggle('hidden', entryScanMode !== 'locker');
         const parcelPanel = document.getElementById('parcelPanel');
-        if (parcelPanel) parcelPanel.classList.toggle('hidden', entryScanMode !== 'parcel');
-        if (entryScanMode === 'parcel') renderEntryList();
+        if (parcelPanel) parcelPanel.classList.toggle('hidden', entryScanMode === 'locker');
+        if (entryScanMode !== 'locker') renderEntryList();
         const hwInput = document.getElementById('hwScannerInput');
-        if (hwInput) hwInput.placeholder = entryScanMode === 'locker' ? 'ស្កេន Barcode ដើម្បីកំណត់ទីតាំង...' : 'ស្កេន Barcode...';
+        const hwLabel = document.getElementById('hardwareScannerLabel');
+        if (hwInput) hwInput.placeholder = entryScanMode === 'locker'
+            ? 'ស្កេន Barcode ដើម្បីកំណត់ទីតាំង...'
+            : (entryScanMode === 'remove' ? 'ស្កេន Barcode ដែលត្រូវដក...' : 'ស្កេន Barcode...');
+        if (hwLabel) hwLabel.textContent = entryScanMode === 'remove'
+            ? 'ស្កេន Barcode ដែលត្រូវដក (កាមេរ៉ា/Bluetooth/USB/វាយដោយដៃ)'
+            : 'ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ';
         if (entryScanMode === 'locker') {
             buildLockerBarcodeIndex();
             renderLockerList();
@@ -9520,6 +9763,12 @@
             lockerErrorFeedback();
             showToast('⚠️ សូមជ្រើសរើសទីតាំង Locker សិន!');
             openLockerPicker();
+            return;
+        }
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) {
+            lockerErrorFeedback();
+            showToast(`⚠️ ទិន្នន័យកញ្ចប់មិនទាន់ Sync គ្រប់ — មិនអាចបញ្ជាក់ទីតាំង Barcode "${key}" បានទេ។ សូមរង់ចាំ ហើយស្កេនម្តងទៀត។`);
+            safeFocusScanner();
             return;
         }
         const entry = lockerBarcodeIndex[key];
@@ -9871,6 +10120,11 @@
             return;
         }
 
+        if (entryScanMode === 'remove') {
+            handleRemoveScan(cleanBarcode);
+            return;
+        }
+
         if (isBarcodeAlreadyUsed(cleanBarcode)) {
             showToast(`⚠️ លេខ Barcode នេះ (${cleanBarcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
             if (navigator.vibrate) navigator.vibrate([100, 60, 100]);
@@ -10025,7 +10279,7 @@
             }
 
             closeModal('phoneModal');
-            showToast("រក្សាទុកបានជោគជ័យ!");
+            showToast("✅ រក្សាទុកបានជោគជ័យ!");
         } catch (e) {
             showToast(`⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
         } finally {
@@ -10169,12 +10423,7 @@
         if(!container) return;
         container.innerHTML = '';
 
-        if (!item.barcodes || !Array.isArray(item.barcodes)) {
-            let cVal = parseFloat(item.cod !== undefined ? item.cod : item.price) || 0;
-            let dVal = parseFloat(item.dod) || 0;
-            let lVal = item.locker || "N/A";
-            item.barcodes = [{ code: item.barcode, time: item.time, cod: cVal, dod: dVal, locker: lVal, isClosed: item.isClosed || false, isDeducted: false, isFromDeletion: false, createdAt: item.createdAt || getServerNow() }];
-        }
+        ensureBarcodeArrayForItem(item);
 
         item.barcodes.forEach((b, idx) => {
             const div = document.createElement('div');
@@ -10216,7 +10465,6 @@
                 <div class="barcode-actions-group">
                     <button class="${closeBtnClass}" data-act="toggleIndividualBarcodeClose" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">${closeBtnText}</button>
                     <button class="btn-edit-item-price" data-act="openEditBarcodePriceModal" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">✏️ កែ</button>
-                    <button class="btn-delete-bc" data-act="removeSingleBarcode" data-a1="${sanitizeInput(item.id)}" data-a2="${sanitizeInput(b.code)}">🗑️ ដក</button>
                 </div>
             `;
             container.appendChild(div);
@@ -10226,21 +10474,31 @@
     }
 
     async function removeSingleBarcode(itemId, barcodeCode) {
-        const item = scanHistory.find(i => i.id === itemId);
-        if (!item || !item.barcodes) return;
-
-        const bcIndex = item.barcodes.findIndex(b => b.code === barcodeCode);
-        if (bcIndex === -1) return;
-
-        if (!confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return;
-
+        const confirmedByScan = arguments[2] === 'scan-confirmed' && scanRemoveInFlight &&
+            scanRemoveInFlight.itemId === itemId && scanRemoveInFlight.barcodeCode === barcodeCode;
+        const confirmedScanToken = confirmedByScan ? scanRemoveInFlight.operationToken : null;
         if (!itemId || !/^[a-zA-Z0-9_-]+$/.test(itemId)) {
             const idErr = new Error('Unsafe id during removeSingleBarcode');
             console.error(idErr.message, itemId);
             if (window.ZoeErrors) ZoeErrors.capture(idErr, { zone: 'money', context: 'removeSingleBarcode' });
             showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! (ID មិនត្រឹមត្រូវ)");
-            return;
+            return 'failed';
         }
+        const item = scanHistory.find(i => i.id === itemId);
+        if (!item) {
+            if (confirmedByScan) showToast(`⚠️ Barcode (${barcodeCode}) លែងមានក្នុងបញ្ជីទៀតហើយ — គ្មានអ្វីត្រូវបានដក។`);
+            return 'missing';
+        }
+        ensureBarcodeArrayForItem(item);
+        if (!item.barcodes) return 'missing';
+
+        const bcIndex = item.barcodes.findIndex(b => b.code === barcodeCode);
+        if (bcIndex === -1) {
+            if (confirmedByScan) showToast(`⚠️ Barcode (${barcodeCode}) លែងមានក្នុងបញ្ជីទៀតហើយ — គ្មានអ្វីត្រូវបានដក។`);
+            return 'missing';
+        }
+
+        if (!confirmedByScan && !confirm(`តើអ្នកពិតជាចង់ដកកញ្ចប់អីវ៉ាន់ (${barcodeCode}) នេះចេញពីការគ្រប់គ្រងមែនទេ? (ចំណាំ៖ មិនមែនលុបអចិន្ត្រៃយ៍ទេ អាចស្តារវិញបាន)`)) return 'cancelled';
 
         let claimedParent = null;
         let claimedBarcode = null;
@@ -10252,7 +10510,7 @@
             if (!currentItem) return currentItem;
             if (currentItem.clearClaim) return currentItem;
             dropStaleRestoreMarkers(currentItem);
-            normalizeBarcodesOf(currentItem);
+            ensureBarcodeArrayForItem(currentItem);
             if (!Array.isArray(currentItem.barcodes)) return currentItem;
             const idx = currentItem.barcodes.findIndex(b => b && b.code === barcodeCode);
             if (idx === -1) return currentItem;
@@ -10279,7 +10537,7 @@
             if (!claimedBarcode) {
                 refreshCurrentHistoryView();
                 showToast("⚠️ កញ្ចប់នេះលែងមានក្នុងប្រព័ន្ធទៀតហើយ! គ្មានអ្វីត្រូវដកទេ។");
-                return;
+                return 'missing';
             }
 
             const committedItem = result.snapshot ? result.snapshot.val() : null;
@@ -10319,7 +10577,7 @@
             }
 
             deletedItems.unshift(itemToTrash);
-            if (!claimedWhole && (!late || viewListModalShowing(itemId))) openViewListModal(itemId);
+            if (!confirmedByScan && !claimedWhole && (!late || viewListModalShowing(itemId))) openViewListModal(itemId);
             refreshCurrentHistoryView();
 
             let trashSaved = false;
@@ -10346,7 +10604,7 @@
                 }
                 if (restoreOk) {
                     refreshCurrentHistoryView();
-                    showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+                    showToast("⚠️ ការដកត្រូវបានបោះបង់ ហើយកញ្ចប់បានស្ដារមកក្នុងបញ្ជីវិញ។ ស្ថិតិកំពុងកែសម្រួលដោយស្វ័យប្រវត្តិ។");
                 }
             });
             if (trashSaved) {
@@ -10356,7 +10614,7 @@
                         if (status && status.ok) {
                             showToast(late
                                 ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!`
-                                : "បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
+                                : "✅ បានដកកញ្ចប់អីវ៉ាន់ និងកាត់ប្រាក់ចេញពីស្ថិតិរួចរាល់!");
                             return;
                         }
                         const ledgerErr = new Error('Removed barcode revenue reconciliation did not commit');
@@ -10370,11 +10628,12 @@
                 if (!deductionApplied) {
                     showToast(late
                         ? `✅ បណ្តាញត្រឡប់មកវិញ — បានដកកញ្ចប់ (${barcodeCode}) រួចរាល់!`
-                        : "បានដកកញ្ចប់អីវ៉ាន់រួចរាល់!");
+                        : "✅ បានដកកញ្ចប់អីវ៉ាន់រួចរាល់!");
                 } else if (!late) {
                     showToast(`⏳ បានដកកញ្ចប់ (${barcodeCode}) — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់ជាមួយ Firebase…`);
                 }
             }
+            return trashSaved ? 'done' : 'failed';
         };
         try {
             const removeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), removeUpdater);
@@ -10383,23 +10642,34 @@
                 result = await dbOp(removeTx);
             } catch (txError) {
                 if (dbOpStalled(txError)) {
-                    armLateCommit(removeTx, (late) => finishRemoval(late, true), (lateErr) => {
-                        refreshCurrentHistoryView();
-                        showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! សូមសាកល្បងម្តងទៀត។`);
-                        if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'removeSingleBarcode late transaction failed', itemId });
+                    armLateCommit(removeTx, async (late) => {
+                        try {
+                            await finishRemoval(late, true);
+                        } finally {
+                            if (confirmedScanToken) clearScannedRemovalInFlight(itemId, barcodeCode, confirmedScanToken);
+                        }
+                    }, (lateErr) => {
+                        try {
+                            refreshCurrentHistoryView();
+                            showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
+                            if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'removeSingleBarcode late transaction failed', itemId });
+                        } finally {
+                            if (confirmedScanToken) clearScannedRemovalInFlight(itemId, barcodeCode, confirmedScanToken);
+                        }
                     }, 'removeSingleBarcode');
                     showToast(`⏳ បណ្តាញឆ្លើយមិនចេញ — ការដក (${barcodeCode}) នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិពេលបណ្តាញត្រឡប់មកវិញ។ សូមកុំដកម្ដងទៀត។`);
-                    return;
+                    return 'pending';
                 }
                 throw txError;
             }
             if (!result || !result.committed) throw new Error('Remove barcode transaction was not committed');
-            await finishRemoval(result, false);
+            return await finishRemoval(result, false);
         } catch (e) {
             console.error("Error removing single barcode: ", e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: "Error removing single barcode: " });
             refreshCurrentHistoryView();
-            showToast("⚠️ ដកកញ្ចប់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+            showToast(`⚠️ ដកកញ្ចប់ (${barcodeCode}) មិនបានជោគជ័យ! គ្មានការដកដែលបានបញ្ជាក់ទេ — សូម Sync រួចសាកល្បងម្តងទៀត។`);
+            return 'failed';
         }
     }
 
@@ -10412,6 +10682,10 @@
         const actionText = targetB.isClosed ? "បើក" : "បិទ";
         const desiredClosed = !targetB.isClosed;
         if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}ស្ថានភាពកញ្ចប់អីវ៉ាន់ (${targetB.code}) នេះមែនទេ?`)) return;
+        if (!db || !fb || !/^[a-zA-Z0-9_-]+$/.test(itemId)) {
+            showToast(`⚠️ មិនទាន់ភ្ជាប់ Firebase ឬ ID មិនត្រឹមត្រូវ — ស្ថានភាព Barcode (${barcodeCode}) មិនត្រូវបានផ្លាស់ប្តូរ។`);
+            return false;
+        }
 
         const freshItem = scanHistory.find(i => i.id === itemId);
         const freshB = freshItem && freshItem.barcodes ? freshItem.barcodes.find(b => b.code === barcodeCode) : null;
@@ -10456,9 +10730,6 @@
             openViewListModal(itemId);
             refreshCurrentHistoryView();
         }
-        showToast(`បាន${actionText}ស្ថានភាព Barcode រួចរាល់!`);
-
-        if (!db || !/^[a-zA-Z0-9_-]+$/.test(itemId)) return;
 
         const revertBarcodeCloseLocally = () => {
             if (previousState) {
@@ -10484,12 +10755,17 @@
                 pickupApplied = null;
             }
         };
-        const settleBarcodeClose = (barcodeCloseResult) => {
+        const settleBarcodeClose = (barcodeCloseResult, late) => {
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
-                revertPickupDeltaAfterNoOp();
-            } else {
-                reconcilePickupDeltaWithServer();
+                revertBarcodeCloseLocally();
+                showToast(`⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
+                return false;
             }
+            reconcilePickupDeltaWithServer();
+            showToast(late
+                ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
+                : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);
+            return true;
         };
         let closeTx = null;
         try {
@@ -10530,10 +10806,9 @@
                 serverApplied = true;
                 return currentItem;
             });
-            settleBarcodeClose(await dbOp(closeTx));
+            return settleBarcodeClose(await dbOp(closeTx), false);
         } catch (error) {
-            if (dbOpStalled(error) && armLateCommit(closeTx, settleBarcodeClose, (lateErr, lateResult) => {
-                if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
+            if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
                 revertBarcodeCloseLocally();
                 showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
                 if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
@@ -10543,8 +10818,9 @@
             }
             console.error("Error toggling barcode close: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling barcode close: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
             revertBarcodeCloseLocally();
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
+            return false;
         }
     }
 
@@ -10688,7 +10964,7 @@
                     const actualDodDiff = Math.round((newDod - serverOldDod) * 100) / 100;
                     correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0).then((status) => {
                         if (status && status.ok) {
-                            showToast("បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
+                            showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
                             return;
                         }
                         const ledgerErr = new Error('Edited price revenue reconciliation did not commit');
@@ -10769,22 +11045,38 @@
 
     function setCallMark(mark) {
         const item = scanHistory.find(i => i.id === markingItemId);
+        let savePromise = null;
         if (item) {
+            if (!dbRefHistory || !db || !fb) {
+                showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ — ការសម្គាល់មិនត្រូវបានផ្លាស់ប្តូរ។');
+                return Promise.resolve(false);
+            }
             const prevCallMark = item.callMark;
             const prevCallMarkTime = item.callMarkTime;
+            const committedToast = mark
+                ? '✅ បានសម្គាល់ និងរក្សាទុកទៅ Firebase រួចរាល់!'
+                : '✅ បានសម្អាតការសម្គាល់ពី Firebase រួចរាល់!';
             if (mark) {
                 item.callMark = mark;
                 item.callMarkTime = getServerNow();
-                patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true });
+                savePromise = patchHistoryItemFields(item, { callMark: mark, callMarkTime: item.callMarkTime }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true, queuedSuccessToast: committedToast });
             } else {
                 delete item.callMark;
                 delete item.callMarkTime;
-                patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true });
+                savePromise = patchHistoryItemFields(item, { callMark: null, callMarkTime: null }, { callMark: prevCallMark, callMarkTime: prevCallMarkTime }, null, { retryOnDisconnect: true, queuedSuccessToast: committedToast });
             }
             refreshCurrentHistoryView();
-            showToast(mark ? "បានសម្គាល់រួចរាល់!" : "បានសម្អាតការសម្គាល់!");
         }
         closeModal('callMarkModal');
+        if (!savePromise) return Promise.resolve(false);
+        return Promise.resolve(savePromise).then((saved) => {
+            if (saved === 'queued') {
+                showToast('⏳ ការសម្គាល់បានចូលជួររង់ចាំ — នឹងរក្សាទុកទៅ Firebase ពេលបណ្តាញត្រឡប់មកវិញ។');
+                return saved;
+            }
+            if (saved) showToast(mark ? '✅ បានសម្គាល់ និងរក្សាទុកទៅ Firebase រួចរាល់!' : '✅ បានសម្អាតការសម្គាល់ពី Firebase រួចរាល់!');
+            return saved;
+        });
     }
 
     function openEditModal(id) {
@@ -10813,6 +11105,10 @@
 
         const item = scanHistory.find(i => i.id === editingItemId);
         if (item) {
+            if (!dbRefHistory || !db || !fb) {
+                showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ — លេខទូរស័ព្ទមិនត្រូវបានផ្លាស់ប្តូរ។');
+                return Promise.resolve(false);
+            }
             const prevPhone = item.phone;
             const patchFields = { phone: newPhone };
             const previousFields = { phone: prevPhone };
@@ -10850,26 +11146,33 @@
                 if (!serverPickupSource || prevPickupKey === nextPickupKey) return;
                 pickupMoved = reapplyPickupMarks(pickupMoved, closedPickupMarks(serverPickupSource), pickupDate, pickupSeed);
             };
-            patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
+            const phoneSavePromise = patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
                 serverPickupSource = serverItem;
             }).then((saved) => {
                 if (saved) {
                     reconcilePickupRefWithServer();
+                    showToast('✅ កែប្រែលេខទូរស័ព្ទ និងរក្សាទុកទៅ Firebase រួចរាល់!');
                 } else {
                     revertPickupRefMove();
+                    updateRecentPhonesList();
+                    applyCurrentFilter();
                 }
+                return saved;
             }, revertPickupRefMove).catch((postErr) => {
                 console.error('saveEditedPhone post-patch handler failed: ', postErr);
                 if (window.ZoeErrors) ZoeErrors.capture(postErr, { zone: 'data', context: 'saveEditedPhone post-patch handler' });
+                return false;
             });
             updateRecentPhonesList();
             const searchInput = document.getElementById('searchPhoneInput');
             if (searchInput) searchInput.value = '';
             applyCurrentFilter();
-            showToast("កែប្រែលេខទូរស័ព្ទរួចរាល់!");
+            closeModal('editPhoneModal');
+            return phoneSavePromise;
         }
 
         closeModal('editPhoneModal');
+        return Promise.resolve(false);
     }
 
     async function toggleCloseStatus(id) {
@@ -10878,6 +11181,10 @@
         const actionText = item.isClosed ? "បើក" : "បិទ";
         const desiredClosed = !item.isClosed;
         if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}បញ្ជីនេះមែនទេ?`)) return;
+        if (!db || !fb || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+            showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ឬ ID មិនត្រឹមត្រូវ — ស្ថានភាពបញ្ជីមិនត្រូវបានផ្លាស់ប្តូរ។');
+            return false;
+        }
 
         const freshItem = scanHistory.find(i => i.id === id);
         const previousState = freshItem
@@ -10921,9 +11228,6 @@
 
             refreshCurrentHistoryView();
         }
-        showToast(`បាន${actionText}បញ្ជីជោគជ័យ!`);
-
-        if (!db || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
 
         const revertCloseLocally = () => {
             if (previousState) {
@@ -10953,12 +11257,17 @@
                 pickupApplied = null;
             }
         };
-        const settleClose = (closeResult) => {
+        const settleClose = (closeResult, late) => {
             if (!serverApplied || !(closeResult && closeResult.committed)) {
-                revertPickupDeltaAfterNoOp();
-            } else {
-                reconcilePickupDeltaWithServer();
+                revertCloseLocally();
+                showToast('⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
+                return false;
             }
+            reconcilePickupDeltaWithServer();
+            showToast(late
+                ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`
+                : `✅ បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`);
+            return true;
         };
         let closeTx = null;
         try {
@@ -10985,10 +11294,9 @@
                 serverApplied = true;
                 return currentItem;
             });
-            settleClose(await dbOp(closeTx));
+            return settleClose(await dbOp(closeTx), false);
         } catch (error) {
-            if (dbOpStalled(error) && armLateCommit(closeTx, settleClose, (lateErr, lateResult) => {
-                if (lateResult && !lateResult.committed) { revertPickupDeltaAfterNoOp(); return; }
+            if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
                 revertCloseLocally();
                 showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
                 if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
@@ -10998,8 +11306,9 @@
             }
             console.error("Error toggling close status: ", error);
             if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: "Error toggling close status: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
             revertCloseLocally();
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
+            return false;
         }
     }
 
@@ -11086,7 +11395,7 @@
                 }
             });
             if (trashSaved) {
-                showToast(late ? "✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!" : "បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
+                showToast(late ? "✅ បណ្តាញត្រឡប់មកវិញ — បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!" : "✅ បានលុបទៅធុងសំរាមបណ្តោះអាសន្ន!");
             }
         };
         try {
@@ -11114,7 +11423,7 @@
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: "Error deleting single item: " });
             refreshCurrentHistoryView();
             updateRecentPhonesList();
-            showToast("⚠️ លុបមិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
+            showToast("⚠️ ការលុបមិនបានបញ្ចប់ទេ — មិនអាចបញ្ជាក់ថាទិន្នន័យបានផ្លាស់ប្តូរឡើយ។ សូមរង់ចាំ Sync រួចសាកល្បងម្តងទៀត។");
         }
     }
 
@@ -11659,7 +11968,7 @@
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
             updateRecentPhonesList();
-            showToast("បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
+            showToast("✅ បានស្តារទិន្នន័យមកទីតាំងដើមវិញដោយសុវត្ថិភាព!");
         } catch (error) {
             const alreadyRestored = !!(error && (error.message === 'ALREADY_RESTORED' || error.message === 'RESTORE_CLAIM_LOST'));
             if (error && error.message === 'RESTORE_CLAIM_LOST') activeRestoreClaims.delete(restoredId);
@@ -11768,7 +12077,7 @@
     }
 
     function saveSingleHistoryItemToFirebase(item) {
-        if (!dbRefHistory) return Promise.resolve();
+        if (!dbRefHistory || !db || !fb) return Promise.reject(new Error('History Firebase reference unavailable'));
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to save history item with missing/unsafe id');
             console.error(err.message, item && item.id);
@@ -11787,21 +12096,23 @@
     function historyPatchErrorIsDisconnect(error) {
         if (!error) return false;
         const text = String((error && (error.message || error.code)) || error);
-        return /disconnect/i.test(text);
+        return /disconnect|already deleted/i.test(text);
     }
 
-    function queueHistoryPatchRetry(itemId, fields, previousFields) {
+    function queueHistoryPatchRetry(itemId, fields, previousFields, successToast) {
         if (!itemId || !fields) return false;
         const existing = pendingHistoryPatches.get(itemId);
         if (existing) {
             if (existing.attempts >= HISTORY_PATCH_RETRY_MAX) return false;
             Object.assign(existing.fields, fields);
+            if (successToast) existing.successToast = successToast;
             return true;
         }
         if (pendingHistoryPatches.size >= HISTORY_PATCH_QUEUE_MAX) return false;
         pendingHistoryPatches.set(itemId, {
             fields: Object.assign({}, fields),
             previousFields: previousFields ? Object.assign({}, previousFields) : null,
+            successToast: successToast || '',
             attempts: 0
         });
         return true;
@@ -11833,18 +12144,19 @@
             let started = null;
             try {
                 started = patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
-                    { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX });
+                    { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX, queuedSuccessToast: entry.successToast });
             } catch (e) {
                 if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'flushPendingHistoryPatches' });
                 if (attempts < HISTORY_PATCH_RETRY_MAX) {
-                    queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields);
+                    queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields, entry.successToast);
                     noteAttempt(itemId, attempts);
                 }
                 done();
                 return;
             }
             Promise.resolve(started).then((saved) => {
-                if (!saved) noteAttempt(itemId, attempts);
+                if (!saved || saved === 'queued') noteAttempt(itemId, attempts);
+                else if (entry.successToast) showToast(entry.successToast);
                 done();
             }, done);
         });
@@ -11869,20 +12181,37 @@
             });
             refreshCurrentHistoryView();
         };
+        const handlePatchFailure = (error) => {
+            if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(error)
+                && queueHistoryPatchRetry(item.id, fields, previousFields, opts.queuedSuccessToast)) {
+                return 'queued';
+            }
+            console.error("Error patching history item: ", error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error patching history item: " });
+            revertLocalFields();
+            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! ស្ថានភាពក្នុង App ត្រូវបានត្រឡប់ដើមវិញ។");
+            return false;
+        };
         let serverItemExisted = false;
-        return dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
-            serverItemExisted = false;
-            if (!currentItem) return currentItem;
-            normalizeBarcodesOf(currentItem);
-            if (currentItem.clearClaim) return;
-            if (onServerItem) onServerItem(currentItem);
-            Object.keys(fields).forEach((key) => {
-                if (fields[key] === null) delete currentItem[key];
-                else currentItem[key] = fields[key];
+        let patchTransaction;
+        try {
+            patchTransaction = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+                serverItemExisted = false;
+                if (!currentItem) return currentItem;
+                normalizeBarcodesOf(currentItem);
+                if (currentItem.clearClaim) return;
+                if (onServerItem) onServerItem(currentItem);
+                Object.keys(fields).forEach((key) => {
+                    if (fields[key] === null) delete currentItem[key];
+                    else currentItem[key] = fields[key];
+                });
+                serverItemExisted = true;
+                return currentItem;
             });
-            serverItemExisted = true;
-            return currentItem;
-        })).then((result) => {
+        } catch (error) {
+            return Promise.resolve(handlePatchFailure(error));
+        }
+        return dbOp(patchTransaction).then((result) => {
             if (!serverItemExisted || !(result && result.committed)) {
                 revertLocalFields();
                 showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");
@@ -11891,21 +12220,11 @@
             const committedItem = result.snapshot ? normalizeBarcodesOf(result.snapshot.val()) : null;
             if (committedItem && !committedItem.id) committedItem.id = item.id;
             return committedItem || true;
-        }, (error) => {
-            if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(error)
-                && queueHistoryPatchRetry(item.id, fields, previousFields)) {
-                return false;
-            }
-            console.error("Error patching history item: ", error);
-            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: "Error patching history item: " });
-            showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! កំពុងត្រឡប់ស្ថានភាពដើមវិញ...");
-            revertLocalFields();
-            return false;
-        });
+        }, handlePatchFailure);
     }
 
     function saveSingleDeletedItemToFirebase(item) {
-        if (!dbRefDeleted) return Promise.resolve();
+        if (!dbRefDeleted || !db || !fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
         if (!item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) {
             const err = new Error('Refusing to save deleted item with missing/unsafe id');
             console.error(err.message, item && item.id);
@@ -11922,7 +12241,7 @@
     }
 
     function deleteSingleDeletedItemFromFirebase(id) {
-        if (!dbRefDeleted) return Promise.resolve();
+        if (!dbRefDeleted || !db || !fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
         if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
             const err = new Error('Refusing to delete deleted item with missing/unsafe id');
             console.error(err.message, id);
@@ -11939,7 +12258,8 @@
     }
 
     function purgeDeletedItemsQuietly(ids) {
-        if (!dbRefDeleted || !ids || !ids.length) return Promise.resolve();
+        if (!ids || !ids.length) return Promise.resolve();
+        if (!dbRefDeleted || !db || !fb) return Promise.reject(new Error('Trash Firebase reference unavailable'));
         const updates = {};
         ids.forEach(id => {
             if (id && /^[a-zA-Z0-9_-]+$/.test(id)) updates[id] = null;
@@ -12348,7 +12668,7 @@
                     ? `⚠️ បណ្តាញឆ្លើយមិនចេញ — លុបបានតែ ${clearedCount} ធាតុ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។`
                     : "⚠️ បណ្តាញឆ្លើយមិនចេញ — លុបមិនបានទេ។ ទិន្នន័យនៅរក្សាទុកដោយសុវត្ថិភាព។");
             } else if (clearedCount && !blockedCount && !failedCount) {
-                showToast(`បានលុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedCount} ធាតុ!`);
+                showToast(`✅ បានលុបទិន្នន័យក្នុងតម្រង «${filterLabel}» ចំនួន ${clearedCount} ធាតុ!`);
             } else if (clearedCount) {
                 showToast(`⚠️ បានលុប ${clearedCount} ធាតុ។ ធាតុខ្លះកំពុងត្រូវបានកែពីឧបករណ៍ផ្សេង ឬអាចសាកល្បងម្ដងទៀតបាន។`);
             } else if (blockedCount) {

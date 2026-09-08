@@ -143,6 +143,7 @@ run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
 run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
+run "scan-remove (browser ពិត)" node audit-tools/scan-remove-mode-test.js
 run "duplicate-money (browser ពិត)" node audit-tools/duplicate-money-test.js
 run "item-money (browser ពិត)" node audit-tools/item-money-integrity-test.js
 run "stats-truth (browser ពិត)" node audit-tools/stats-collected-truth-test.js
@@ -168,6 +169,7 @@ run "inline-handler-xss (browser ពិត)" node audit-tools/inline-handler-xss
 run "csp-enforced (browser ពិត)" node audit-tools/csp-enforced-test.js
 run "fluid-type-focus (browser ពិត)" node audit-tools/fluid-type-focus-test.js
 run "toast-truth (browser ពិត)" node audit-tools/toast-truth-test.js
+run "toast-action-truth (browser ពិត)" node audit-tools/toast-action-truth-test.js
 run "csp-lazy-resource (browser ពិត)" node audit-tools/csp-lazy-resource-test.js
 run "sheet-import (browser ពិត)" node audit-tools/sheet-import-test.js
 run "app-lock (browser ពិត)" node audit-tools/app-lock-test.js
@@ -245,6 +247,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SCAN_APP_DIR="$BASE"    node audit-tools/scan-engine-test.js 2>&1 | tail -1 | sed 's/^/   scan-engine:     /'
     CAMERA_APP_DIR="$BASE"  node audit-tools/camera-resume-test.js 2>&1 | tail -1 | sed 's/^/   camera-resume:   /'
     DUP_APP_DIR="$BASE"     node audit-tools/duplicate-scan-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-scan:  /'
+    SCANREMOVE_APP_DIR="$BASE" node audit-tools/scan-remove-mode-test.js 2>&1 | tail -1 | sed 's/^/   scan-remove:     /'
     DUPMONEY_APP_DIR="$BASE" node audit-tools/duplicate-money-test.js 2>&1 | tail -1 | sed 's/^/   duplicate-money: /'
     ITEMMONEY_APP_DIR="$BASE" node audit-tools/item-money-integrity-test.js 2>&1 | tail -1 | sed 's/^/   item-money:      /'
     STATSTRUTH_APP_DIR="$BASE" node audit-tools/stats-collected-truth-test.js 2>&1 | tail -1 | sed 's/^/   stats-truth:     /'
@@ -305,6 +308,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CSP_APP_DIR="$BASE" node audit-tools/csp-enforced-test.js 2>&1 | tail -1 | sed 's/^/   csp-enforced:    /'
     FLUIDTYPE_APP_DIR="$BASE" node audit-tools/fluid-type-focus-test.js 2>&1 | tail -1 | sed 's/^/   fluid-type:      /'
     TOAST_APP_DIR="$BASE" node audit-tools/toast-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-truth:     /'
+    TOAST_ACTION_APP_DIR="$BASE" node audit-tools/toast-action-truth-test.js 2>&1 | tail -1 | sed 's/^/   toast-actions:   /'
     CSPLAZY_APP_DIR="$BASE" node audit-tools/csp-lazy-resource-test.js 2>&1 | tail -1 | sed 's/^/   csp-lazy:        /'
     AUTH_APP_DIR="$BASE" node audit-tools/auth-recovery-test.js 2>&1 | tail -1 | sed 's/^/   auth-recovery:   /'
     BOOT_APP_DIR="$BASE" node audit-tools/boot-runtime.js 2>&1 | tail -1 | sed 's/^/   boot-runtime:    /'

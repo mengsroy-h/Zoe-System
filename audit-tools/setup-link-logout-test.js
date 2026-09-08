@@ -72,6 +72,11 @@ for (const app of ['ZoeW']) {
         // ⚠️ ការចាក់ប្រើ `typeof … === 'undefined'` ➜ កូដពិតដែលស្រង់ចូលក្រោយ
         // **ឈ្នះ** shim នេះជានិច្ច។
         vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
+        const entryModeKeyDecl = (src.match(/^ *const ENTRY_SCAN_MODE_KEY = .*$/m) || ["const ENTRY_SCAN_MODE_KEY = 'zoe_entry_scan_mode';"])[0];
+        vm.runInContext(entryModeKeyDecl, ctx);
+        ctx.pendingScannedRemoval = { itemId: 'id-secret', barcodeCode: 'ZTO-SECRET' };
+        ctx.scanRemoveInFlight = { itemId: 'id-secret', barcodeCode: 'ZTO-SECRET', operationToken: {} };
+        ctx.entryScanMode = 'remove';
         vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
         vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
         ['scanConfirmCode', 'scanConfirmCount', 'scanConfirmAt'].forEach((n) => {
@@ -149,6 +154,10 @@ for (const app of ['ZoeW']) {
         ok(vm.runInContext('scanConfirmCode', ctx) === '' && vm.runInContext('scanConfirmCount', ctx) === 0,
             'the barcode held for scan confirmation does not survive logout',
             vm.runInContext('scanConfirmCode', ctx));
+        const scanRemoveState = vm.runInContext(
+            '({ pending: pendingScannedRemoval, inFlight: scanRemoveInFlight, mode: entryScanMode })', ctx);
+        ok(scanRemoveState.pending === null && scanRemoveState.inFlight === null && scanRemoveState.mode === 'parcel',
+            'ចាកចេញ ➜ សម្អាត Barcode ដកដែលកំពុងរង់ចាំ ហើយត្រឡប់ទៅ parcel mode', scanRemoveState);
         const sheetImport = vm.runInContext(
             "({ key: sheetImportKey, url: sheetImportUrl, pw: sheetImportPassword, sig: sheetImportSignature, busy: sheetImportBusy })", ctx);
         ok(sheetImport.key === null && sheetImport.url === '' && sheetImport.pw === '',

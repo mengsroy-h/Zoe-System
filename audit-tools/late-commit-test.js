@@ -108,7 +108,7 @@ const REAL_FNS = [
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
-const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow'];
+const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -121,6 +121,9 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     // ⛔ លើ tree មុនកែ `notifyIfSlow` អវត្តមាន ➜ ត្រូវ stub ដើម្បីឲ្យការអះអាង
     // ឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
     + (extractFn('notifyIfSlow') ? '' : '\n\nfunction notifyIfSlow(p) { return p; }')
+    // ⛔ `settleLockWithin` អវត្តមានលើ tree មុនកែ ➜ stub ដែល **រក្សាឥរិយាបថដើម**
+    // (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់) ដើម្បីឲ្យការអះអាងឥរិយាបថនៅតែរត់។
+    + (extractFn('settleLockWithin') ? '' : '\n\nfunction settleLockWithin(p) { return Promise.resolve(p); }')
     + '\n\nfunction clearScannedRemovalInFlight() {}';
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
@@ -264,6 +267,7 @@ function buildWorld(seed, opts) {
         extractConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
         extractConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
+        extractConst('LOCK_STALL_RELEASE_MS') || 'const LOCK_STALL_RELEASE_MS = 15000;',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');

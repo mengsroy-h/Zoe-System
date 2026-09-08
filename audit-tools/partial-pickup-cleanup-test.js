@@ -224,6 +224,11 @@ function buildWorld(historySeed, startNow) {
         // ត្រូវផ្ទុក function ពិត; លើ tree មុនកែ វាអវត្តមាន ➜ stub (កុំបញ្ឈប់ checker)។
         optionalPart(() => extractConst(src, 'TRASH_WRITE_SLOW_NOTICE_MS'), 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;'),
         optionalPart(() => extractFn(src, 'notifyIfSlow'), 'function notifyIfSlow(p) { return p; }'),
+        // ⛔ `settleLockWithin` ដោះសោការសម្អាតតាមពិដាន ដោយ **មិនបោះបង់ការងារ** ➜
+        // sandbox ត្រូវផ្ទុក function ពិត; លើ tree មុនកែវាអវត្តមាន ➜ stub ដែល
+        // **រក្សាឥរិយាបថដើម** (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់)។
+        optionalPart(() => extractConst(src, 'LOCK_STALL_RELEASE_MS'), 'const LOCK_STALL_RELEASE_MS = 15000;'),
+        optionalPart(() => extractFn(src, 'settleLockWithin'), 'function settleLockWithin(p) { return Promise.resolve(p); }'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ sandbox
         // ត្រូវផ្ទុក **function ពិត** បូក `serverClockTrusted = true` ដែលជា
         // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ

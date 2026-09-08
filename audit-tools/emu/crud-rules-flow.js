@@ -140,6 +140,11 @@ function makeSandbox(store, now) {
         // មិនប៉ះវា តែការត្រួតពិនិត្យរចនាសម្ព័ន្ធរកឃើញថាវាអវត្តមាន (2.25.8)។
         optionalFn(src, 'armLateCommit', 'function armLateCommit() { return false; }'),
         optionalFn(src, 'viewListModalShowing', 'function viewListModalShowing() { return false; }'),
+        // ⛔ `settleLockWithin` ដោះសោការសម្អាត/ការស្កេនដក តាមពិដាន ដោយមិន
+        // បោះបង់ការងារ ➜ ផ្ទុក function ពិត; tree មុនកែ ➜ stub ដែលរក្សា
+        // ឥរិយាបថដើម (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់)។
+        optionalConst(src, 'LOCK_STALL_RELEASE_MS', 'const LOCK_STALL_RELEASE_MS = 15000;'),
+        optionalFn(src, 'settleLockWithin', 'function settleLockWithin(p) { return Promise.resolve(p); }'),
         // ⛔ ច្រកទ្វារនាឡិការបស់ការសម្អាត (2.20.5) ➜ ផ្ទុក function ពិត បូក
         // `serverClockTrusted = true` ដែលជាស្ថានភាព App ដែលភ្ជាប់រួច។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),

@@ -67,7 +67,7 @@ const DECLS = ['CUSTOMER_TABLE_CACHE_MS', 'CUSTOMER_TABLE_FAIL_COOLDOWN_MS', 'CU
     'CUSTOMER_TABLE_SOON_MS', 'CUSTOMER_TABLE_SOON_BUSY_MS', 'CUSTOMER_TABLE_SOON_MAX_WAIT_MS',
     'customerTableSoonTimer', 'customerTableSoonArmedAt', 'customerTableIsPartial',
     'customerDataTableRows', 'customerDataTableFetchedAt',
-    'ZTO_WARMUP_COOLDOWN_MS', 'ztoWarmupAt', 'ztoWarmupInFlight',
+    'ZTO_WARMUP_COOLDOWN_MS', 'ZTO_WARMUP_TIMEOUT_MS', 'ztoWarmupAt', 'ztoWarmupInFlight',
     'ztoWarmSoonTimer', 'ztoWarmSoonArmedAt',
     'LOOKUP_FOCUS_GRACE_MS', 'LOOKUP_MANUAL_FALLBACK_MS', 'LOOKUP_FOCUS_MAX_WAIT_MS',
     'AUTO_LOOKUP_TIMEOUT_MS', 'ZTO_AUTO_LOOKUP_TIMEOUT_MS', 'AUTO_LOOKUP_QUEUE_MAX_WAIT_MS',
@@ -245,6 +245,23 @@ scenario('ZTO មិនគាំទ្រការទាញតារាង list=
         fnBody('switchAppPage').indexOf('warmZtoLookupProxyNow()') !== -1);
     ok('⛔ ការបើកកាមេរ៉ាហៅ warm-up',
         fnBody('requestCameraPermission').indexOf('warmZtoLookupProxyNow()') !== -1);
+    // ⛔ **container របស់ Netlify ត្រជាក់កណ្តាលវគ្គស្កេន។** ការត្រៀមតែពេល
+    // បើកទំព័រ/កាមេរ៉ា គ្រប់ត្រឹមការស្កេន *ដំបូង* ៖ ក្រោយប៉ុន្មាននាទី
+    // container ត្រូវបង្កក ➜ `cookieState` ក្នុងសតិបាត់ ➜ ការស្កេនបន្ទាប់
+    // បង់ថ្លៃ cold start **បូក** ការអាន Blobs ដែល **ទប់**។ ការហៅត្រៀមក្រោយ
+    // រាល់ការស្កេនចប់ ធ្វើឲ្យ container នៅក្តៅពេញវគ្គ ដោយចំណាយត្រឹម ១ សំណើ
+    // ក្នុងមួយ `ZTO_WARMUP_COOLDOWN_MS` (cooldown ជាអ្នកកំណត់ល្បឿន)។
+    ok('⛔ ការស្កេនចប់ក៏ហៅ warm-up ដែរ (container មិនត្រជាក់កណ្តាលវគ្គ)',
+        fnBody('confirmPhone').indexOf('warmZtoLookupProxyNow()') !== -1);
+    // ⛔ ពិដានការត្រៀមត្រូវ **វែងជាង** ការអាន Blobs ខាង server
+    // (`COOKIE_STORE_TIMEOUT_MS` = ៣ វិ.) បូកចន្លោះ cold start — បើមិនដូច្នេះ
+    // client abort មុនការត្រៀមចប់ ➜ `ztoWarmupInFlight` ដោះដោយកុហក។
+    const warmTimeoutRaw = (/const ZTO_WARMUP_TIMEOUT_MS = ([0-9*\s]+);/.exec(SRC) || [])[1] || '0';
+    const warmTimeout = warmTimeoutRaw.split('*').reduce((acc, part) => acc * (Number(part.trim()) || 0), 1);
+    ok('⛔ ពិដានការត្រៀម >= ៥ វិ. (វែងជាងការអាន Blobs ខាង server)',
+        warmTimeout >= 5000 && warmTimeout <= 12000, warmTimeout);
+    ok('⛔ ការត្រៀមអានពិដានចេញពីថេរ មិនមែនលេខថេរក្នុងកូដ',
+        /fetchWithTimeout\([^)]*ZTO_WARMUP_TIMEOUT_MS/.test(fnBody('warmZtoLookupProxyIfConfigured')));
 
     const generic = build({});
     const genericUrl = vm.runInContext('buildCustomerListApiUrl(getLookupApiConfig())', generic);

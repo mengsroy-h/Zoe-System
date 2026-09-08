@@ -393,7 +393,7 @@ const CLEANUP_FNS = ['barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeClo
     'barcodeCloseIsRipe', 'barcodeAbandonIsRipe', 'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers',
     'stripHistoryOnlyMarkers', 'parseTimestampFromId', 'generateUniqueId', 'retryAsync',
     'cloneRestoreItem', 'saveSingleDeletedItemToFirebase', 'isActiveRestoreClaim',
-    'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow',
+    'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily',
     'correctRevenueLedgerToActual', 'claimAndCleanupItem'];
 
@@ -444,6 +444,7 @@ function runAbandonCleanup(mode) {
     const parts = [
         sliceConst(zoewSrc, 'TWO_HOURS_MS'), sliceConst(zoewSrc, 'ABANDON_AGE_MS'),
         sliceConst(zoewSrc, 'TRASH_WRITE_SLOW_NOTICE_MS'),
+        sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();'

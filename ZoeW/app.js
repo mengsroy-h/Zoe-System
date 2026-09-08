@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.3';
+    const APP_VERSION = '2.31.4';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -610,6 +610,24 @@
                 if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'armLateWrite ' + (label || '') });
             });
         return true;
+    }
+
+    const LOCK_STALL_RELEASE_MS = DB_OP_TIMEOUT_MS;
+
+    function settleLockWithin(promise, ms, label) {
+        if (!promise || typeof promise.then !== 'function') return Promise.resolve(promise);
+        let timer = null;
+        return new Promise((resolve) => {
+            timer = setTimeout(() => { timer = null; resolve(undefined); }, ms);
+            promise.then((value) => {
+                if (timer !== null) { clearTimeout(timer); timer = null; }
+                resolve(value);
+            }, (error) => {
+                if (timer !== null) { clearTimeout(timer); timer = null; }
+                if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'settleLockWithin ' + (label || '') });
+                resolve(undefined);
+            });
+        });
     }
 
     function notifyIfSlow(promise, ms, message) {
@@ -3158,6 +3176,7 @@
     const CUSTOMER_TABLE_SOON_BUSY_MS = 3000;
     const CUSTOMER_TABLE_SOON_MAX_WAIT_MS = 90 * 1000;
     const ZTO_WARMUP_COOLDOWN_MS = 4 * 60 * 1000;
+    const ZTO_WARMUP_TIMEOUT_MS = 6000;
     let ztoWarmSoonTimer = null;
     let ztoWarmSoonArmedAt = 0;
     let customerTableRetryTimer = null;
@@ -3267,7 +3286,7 @@
         const target = markerAt === -1 ? marker : raw.slice(0, markerAt) + marker;
         ztoWarmupAt = Date.now();
         ztoWarmupInFlight = true;
-        fetchWithTimeout(target, { method: 'OPTIONS', cache: 'no-store', credentials: 'same-origin' }, 3000, 'ZTO warmup timed out')
+        fetchWithTimeout(target, { method: 'OPTIONS', cache: 'no-store', credentials: 'same-origin' }, ZTO_WARMUP_TIMEOUT_MS, 'ZTO warmup timed out')
             .catch(() => {})
             .finally(() => { ztoWarmupInFlight = false; });
         return true;
@@ -5320,7 +5339,7 @@
                 }
                 throw txError;
             }
-            await finishCleanup(result);
+            await settleLockWithin(finishCleanup(result), LOCK_STALL_RELEASE_MS, 'claimAndCleanupItem ' + reason);
         } catch (e) {
             console.error('Automatic cleanup transaction failed for', id, e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'Automatic cleanup transaction failed for' });
@@ -9744,7 +9763,9 @@
         closeModal('scanRemoveModal');
         let outcome;
         try {
-            outcome = await removeSingleBarcode(job.itemId, job.barcodeCode, 'scan-confirmed');
+            outcome = await settleLockWithin(
+                removeSingleBarcode(job.itemId, job.barcodeCode, 'scan-confirmed'),
+                LOCK_STALL_RELEASE_MS, 'confirmScannedRemoval');
             return outcome !== 'failed' && outcome !== 'missing';
         } finally {
             if (outcome !== 'pending') clearScannedRemovalInFlight(job.itemId, job.barcodeCode, operationToken);
@@ -10321,6 +10342,7 @@
             if (confirmBtn) confirmBtn.disabled = false;
             if (cancelBtn) cancelBtn.disabled = false;
             if (closeXBtn) closeXBtn.disabled = false;
+            warmZtoLookupProxyNow();
         }
     }
 

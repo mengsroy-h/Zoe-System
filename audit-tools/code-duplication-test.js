@@ -62,16 +62,20 @@ const SHIP_FILES = [
 const ACCEPTED = [
     {
         file: 'ZoeW/app.js',
-        signature: 'const revertPickupDeltaAfterNoOp = () =>',
-        names: ['revertPickupDeltaAfterNoOp', 'reconcilePickupDeltaWithServer'],
-        // ⛔ closure ២ នេះបិទលើអថេរ `let` ក្នុងស្រុក ៦ (`pickupApplied` ·
-        // `serverPickupMarks` · `pickupScanDate` · `pickupSeed` · `serverApplied` ·
-        // `pickupPhoneKey`) ដែល **តួ function ទាំងមូលអាន និងសរសេរ**។ ការរួបរួម
-        // ពួកវាទាមទារបំប្លែងអថេរទាំង ៦ ទៅជាវាលរបស់ object ➜ ការកែ ~៤០ បន្ទាត់
-        // ក្នុង `toggleIndividualBarcodeClose` និង `toggleCloseStatus` ដែលជា
-        // ២ function ដែលប៉ះលុយ **ដោយផ្ទាល់** ដើម្បីលុបការជាន់គ្នា ១៥ បន្ទាត់។
+        signature: 'const reconcilePickupDeltaWithServer = () =>',
+        names: ['reconcilePickupDeltaWithServer'],
+        // ⛔ closure នេះបិទលើអថេរ `let` ក្នុងស្រុក ៥ (`pickupApplied` ·
+        // `serverPickupMarks` · `pickupScanDate` · `pickupSeed` · `serverApplied`)
+        // ដែល **តួ function ទាំងមូលអាន និងសរសេរ**។ ការរួបរួមទាមទារបំប្លែង
+        // អថេរទាំង ៥ ទៅជាវាលរបស់ object ➜ ការកែ ~៤០ បន្ទាត់ក្នុង
+        // `toggleIndividualBarcodeClose` និង `toggleCloseStatus` ដែលជា ២
+        // function ដែលប៉ះលុយ **ដោយផ្ទាល់** ដើម្បីលុបការជាន់គ្នា ៨ បន្ទាត់។
         // ផ្ទៃហានិភ័យធំជាងអត្ថប្រយោជន៍ ➜ **ទទួលយកដោយចេតនា** (2026-09-05)។
-        reason: 'closure លើអថេរក្នុងស្រុក ៦ — ការរួបរួមប៉ះផ្លូវលុយ ~៤០ បន្ទាត់ ដើម្បីលុប ១៥'
+        // ⚠️ 2026-09-09 ៖ ធាតុនេះធ្លាប់ការពារ **១៥** បន្ទាត់ ព្រោះ
+        // `revertPickupDeltaAfterNoOp` ជាន់គ្នាដែរ — តែវា **មិនដែលត្រូវហៅ**
+        // សោះ (កូដងាប់) ➜ ត្រូវលុបចេញ។ allowlist នៃការជាន់គ្នា **មិនវាស់ថា
+        // កូដនោះរស់ឬអត់** ➜ វាអាចបិទបាំងកូដងាប់បាន។
+        reason: 'closure លើអថេរក្នុងស្រុក ៥ — ការរួបរួមប៉ះផ្លូវលុយ ~៤០ បន្ទាត់ ដើម្បីលុប ៨'
     },
     {
         file: 'ZoeW/app.js',

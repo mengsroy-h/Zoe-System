@@ -10,7 +10,7 @@ const APPS = ['ZoeW', 'ZoeKeyGen'];
 
 // ការសង្គ្រោះ = ហៅ function ដែលបញ្ច្រាស/ដោះ/ស្តារ ស្ថានភាពដែលបានអនុវត្តជាមុន
 const RECOVERY = /^(revert|rollback|restore|release|undo)/i;
-const RECOVERY_CALL = /(revertRevenueOnSaveFailure|rollbackFailedSave|releaseBarcodesInRegistry|restoreClaimedItemToScanHistory|revertPickupDeltaAfterNoOp)/;
+const RECOVERY_CALL = /(revertRevenueOnSaveFailure|rollbackFailedSave|releaseBarcodesInRegistry|restoreClaimedItemToScanHistory|revertPickupMarks)/;
 
 // ធាតុដែលបានពិនិត្យរួច ហើយ B មិនមែនជាការសង្គ្រោះ (គ្រាន់តែ log / toast / capture)
 const ACCEPTED = new Set([

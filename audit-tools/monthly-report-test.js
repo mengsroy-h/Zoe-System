@@ -132,7 +132,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'ledgerNumber', 'countPickedUpCus
     'monthlyReportAvailableMonths', 'buildMonthlyReport', 'monthlyReportRiel',
     'monthlyReportFilenameBase', 'monthlyReportRows', 'forceSheetTextCells',
     'dbListenerViewIsStale', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'uncollectedValueForMonth', 'collectedValueOf',
+    'uncollectedValueByDate', 'collectedValueForMonth', 'collectedValueOf',
     'collectedValueIsMeasurable', 'collectedMoneyText', 'collectedRielText'];
 FNS.forEach((name) => {
     const fn = sliceFn(src, name);
@@ -433,10 +433,12 @@ scenario('ចំណូល ៖ ការត្រងខែ និងថ្ងៃ�
     const map = vm.runInContext('uncollectedValueByDate()', sandbox);
     ok('⛔ កូនសោថ្ងៃមិនត្រូវទម្រង់ត្រូវរំលង', map['nope'] === undefined, JSON.stringify(Object.keys(map)));
     sandbox.__map = map;
-    const aug = vm.runInContext('uncollectedValueForMonth(__map, "2026-08")', sandbox);
-    ok('uncollectedValueForMonth() ប្រមូលតាមខែ', aug.cod === 40, JSON.stringify(aug));
+    // ⛔ ចំណូលរបស់ខែត្រូវដេរីវេពី **ថ្ងៃ** (clamp ក្នុងមួយថ្ងៃ) មិនមែនបូកមុន clamp
+    const sep = vm.runInContext('collectedValueForMonth(dailyRevenueData, __map, "2026-09")', sandbox);
+    ok('collectedValueForMonth() ស្មើផលបូកចំណូលតាមថ្ងៃ',
+        sep.total === r.totals.collectedTotal, JSON.stringify(sep) + ' ធៀប ' + r.totals.collectedTotal);
     ok('⛔ ខែគ្មានទិន្នន័យ ➜ សូន្យ មិនមែន NaN',
-        vm.runInContext('uncollectedValueForMonth(__map, "2025-01")', sandbox).cod === 0);
+        vm.runInContext('collectedValueForMonth(dailyRevenueData, __map, "2025-01")', sandbox).total === 0);
 });
 
 scenario('ចំណូល ៖ រូបរាងឆៅ · clamp · មិនបោះ', () => {

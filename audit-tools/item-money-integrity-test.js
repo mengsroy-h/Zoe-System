@@ -70,7 +70,6 @@ const WRITE_ALLOW = {
     renderTrashSummary: 'តួលេខសរុបបង្ហាញ មិនមែន item',
     uncollectedItemValue: 'តម្លៃមិនទាន់យក (out) មិនមែន item',
     uncollectedValueByDate: 'bucket សរុប មិនមែន item',
-    uncollectedValueForMonth: 'bucket សរុប មិនមែន item',
     saveEditedBarcodePrice: 'សរសេរលើ **barcode** (b/targetB/staleB) មិនមែន item',
     addOrUpdateEntry: 'តែ `count` (ចំនួន barcode) — លុយឆ្លងកាត់ helper',
     claimAndCleanupItem: 'តែ `count` — លុយឆ្លងកាត់ helper',

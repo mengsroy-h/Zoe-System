@@ -33,14 +33,19 @@ catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); pr
 // salt ចៃដន្យក្នុងមួយការរត់ ➜ ⛔ hash **បញ្ច្រាសមិនបាន** ទោះដឹងលេខទូរស័ព្ទក៏ដោយ
 const SALT = crypto.randomBytes(16);
 const memo = new Map();
-function h(prefix, value) {
-    const v = String(value === undefined || value === null ? '' : value);
-    if (!v) return v;
-    const k = prefix + ' ' + v;
-    if (memo.has(k)) return memo.get(k);
-    const d = crypto.createHash('sha256').update(SALT).update(k).digest('hex').slice(0, 8);
-    const r = prefix + '_' + d;
-    memo.set(k, r);
+// ⛔ **namespace តែមួយ** សម្រាប់អត្តសញ្ញាណទាំងអស់ ៖ តម្លៃដដែល ត្រូវឲ្យ hash
+// ដដែល **ទោះវាលេចនៅកន្លែងណា**។ វាស់បានលើទិន្នន័យពិត (2026-09-09) ៖ កូនសោ
+// `zoew_barcode_registry` (តួលេខសុទ្ធ) ធ្លាក់ចូល namespace `ph` ខណៈ
+// `barcodes[].code` ចូល `bc` ➜ ទំនាក់ទំនងរលាយ ➜ ការវិភាគរាយ **«៥៩៨ កំព្រា»
+// ដែលជាការជូនដំណឹងក្លែងក្លាយទាំងស្រុង**។
+// ⛔ ធ្វើឲ្យធម្មតាជាអក្សរធំដែរ — `barcodeRegistryKey()` ប្រើអក្សរធំ។
+function h(value) {
+    const v = String(value === undefined || value === null ? '' : value).toUpperCase();
+    if (!v) return String(value === undefined || value === null ? '' : value);
+    if (memo.has(v)) return memo.get(v);
+    const d = crypto.createHash('sha256').update(SALT).update(v).digest('hex').slice(0, 8);
+    const r = 'id_' + d;
+    memo.set(v, r);
     return r;
 }
 
@@ -66,10 +71,10 @@ function walk(node, keyName) {
     if (Array.isArray(node)) return node.map((x) => walk(x, keyName));
     if (node === null || typeof node !== 'object') {
         if (typeof node === 'number' || typeof node === 'boolean') { kept++; return node; }
-        if (AS_PHONE.has(keyName)) { hashed++; return h('ph', node); }
-        if (AS_CODE.has(keyName)) { hashed++; return h('bc', node); }
+        if (AS_PHONE.has(keyName)) { hashed++; return h(node); }
+        if (AS_CODE.has(keyName)) { hashed++; return h(node); }
         if (KEEP_EXACT.has(keyName)) { kept++; return node; }
-        hashed++; return h('x', node);
+        hashed++; return h(node);
     }
     const res = {};
     Object.keys(node).forEach((k) => {
@@ -77,8 +82,8 @@ function walk(node, keyName) {
         // ⛔ កូនសោ (key) ក៏អាចជា PII ដែរ ៖ id ធាតុ · phoneKey · barcodeKey
         let outKey = k;
         if (isStructKey(k)) { kept++; }
-        else if (/^[0-9+]{6,}$/.test(k)) { outKey = h('ph', k); hashed++; }
-        else { outKey = h('k', k); hashed++; }   // ⛔ អ្វីដែលនៅសល់ជាអត្តសញ្ញាណ ➜ hash (fail closed)
+        else if (/^[0-9+]{6,}$/.test(k)) { outKey = h(k); hashed++; }
+        else { outKey = h(k); hashed++; }   // ⛔ អ្វីដែលនៅសល់ជាអត្តសញ្ញាណ ➜ hash (fail closed)
         res[outKey] = walk(node[k], k);
     });
     return res;

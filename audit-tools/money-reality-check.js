@@ -250,6 +250,41 @@ history.forEach((it) => barcodesOf(it).forEach((b) => {
 if (!dup) ok('barcode ' + seen.size + ' ក្នុងប្រវត្តិ — គ្មានស្ទួន');
 else bad(dup + ' barcode ស្ទួនក្នុងប្រវត្តិ (ហានិភ័យលុយបូកស្ទួន)', 'barcode ខុសគ្នា ' + seen.size);
 
+// ── ៧. កូនសោ registry កំព្រា ➜ barcode ជាប់អន្ទាក់ស្ថាពរ ──────────────
+// ⛔ ថ្នាក់ពិត ៖ អ្នកប្រើឃើញ «⚠️ ត្រូវបានបញ្ចូលរួចហើយ» ខណៈកញ្ចប់នោះ
+// **គ្មានក្នុងប្រវត្តិ និងធុងសំរាមសោះ** ➜ ស្កេនចូលមិនបានជារៀងរហូត។
+say('\n── ៧. កូនសោ registry កំព្រា (barcode ជាប់អន្ទាក់) ──');
+const registry = (db.zoew_barcode_registry && typeof db.zoew_barcode_registry === 'object')
+    ? db.zoew_barcode_registry : null;
+if (!registry) may('គ្មាន node `zoew_barcode_registry` ក្នុង dump — រំលង');
+else {
+    const rkey = (c) => (sb.barcodeRegistryKey ? sb.barcodeRegistryKey(c) : String(c || '').toUpperCase());
+    const owned = new Set();
+    [history, deleted].forEach((list) => list.forEach((it) => {
+        barcodesOf(it).forEach((b) => { if (b.code) owned.add(rkey(b.code)); });
+        if (it.barcode) owned.add(rkey(it.barcode));
+    }));
+    const rk = Object.keys(registry).map((k) => rkey(k));
+    const orphan = rk.filter((k) => !owned.has(k));
+    const unreg = [...owned].filter((k) => rk.indexOf(k) === -1);
+    if (!orphan.length) ok('កូនសោ registry ' + rk.length + ' ទាំងអស់មានម្ចាស់');
+    else if (rk.length > 0 && orphan.length === rk.length) {
+        // ⛔ ១០០% កំព្រា = ស្នាមនៃ **ទម្រង់កូនសោមិនត្រូវគ្នា** មិនមែនកំហុសពិត
+        may('កូនសោ registry ' + rk.length + ' **ទាំងអស់** មើលទៅដូចកំព្រា',
+            'នេះស្ទើរតែជានិច្ចជាសញ្ញានៃ **ទម្រង់កូនសោមិនត្រូវគ្នា** មិនមែន barcode\n'
+            + '       ជាប់អន្ទាក់ទេ (ឧ. dump ដែលសម្អាតដោយកំណែចាស់នៃ `redact-dump.js`)។\n'
+            + '       ⛔ កុំសន្និដ្ឋានថាមានបញ្ហា — សាកលើ dump ដើម។');
+    } else {
+        bad(orphan.length + '/' + rk.length + ' កូនសោ registry **កំព្រា**',
+            'barcode ទាំងនេះនឹងបដិសេធការស្កេនដោយ «ត្រូវបានបញ្ចូលរួចហើយ»\n'
+            + '       ខណៈវាគ្មានក្នុងប្រវត្តិ និងធុងសំរាមសោះ។\n'
+            + '       ⛔ `CLAUDE.md` ៖ លុបដោយដៃក្នុង Console — កុំសាងការជួសជុលស្វ័យប្រវត្តិ។');
+        notes.push(orphan.length + ' barcode នឹងស្កេនចូលមិនបាន («ត្រូវបានបញ្ចូលរួចហើយ»)');
+    }
+    if (unreg.length) may(unreg.length + ' barcode គ្មានក្នុង registry',
+        'ធម្មតាសម្រាប់ទិន្នន័យចាស់ (មុនមាន registry) — មិនប៉ះលុយ');
+}
+
 say('\n╔══════════════════════════════════════════════════════════╗');
 say('  ✅ ' + pass + '   ⚠️ ' + warn + '   ❌ ' + fail);
 if (notes.length) { say('\n  អ្វីដែលអ្នកនឹងឃើញលើអេក្រង់ ៖'); notes.forEach((n) => say('   • ' + n)); }

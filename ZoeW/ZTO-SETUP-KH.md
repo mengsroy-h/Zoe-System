@@ -183,6 +183,8 @@ Function ត្រូវបានសរសេរឲ្យ **សម្របទ�
 | `ZTO_FIELD_COD` | បញ្ជីលំនាំដើម | ផ្លូវ field COD |
 | `ZTO_FIELD_DOD` | បញ្ជីលំនាំដើម | ផ្លូវ field DOD |
 | `ZTO_FIELD_BARCODE` | បញ្ជីលំនាំដើម | ផ្លូវ field លេខបាកូដ |
+| `ZTO_FIELD_SIGNED` | **ទទេ** | ផ្លូវ field ស្ថានភាព «បិទរួច/សញ្ញាបញ្ជាក់» នៅ ZTO (ឧ. `signStatus`) — ⛔ ទទេ ➜ មុខងារ **ដេកលក់** |
+| `ZTO_SIGNED_VALUES` | **ទទេ** | តម្លៃដែលមានន័យថា «បិទរួច» បំបែកដោយ `,` (ឧ. `70,signed`) — ត្រូវដាក់ **គូនឹង** `ZTO_FIELD_SIGNED` |
 | `ZTO_SEND_BROWSER_HEADERS` | ស្វ័យប្រវត្តិ | `false` = កុំផ្ញើ `Origin`/`Referer` របស់ Argus |
 
 ### អ្វីដែល Function ធ្វើដោយខ្លួនឯង

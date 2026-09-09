@@ -237,6 +237,8 @@ bash audit-tools/emu/rules.sh
 | `zto-network-boundaries-test.js` | HTTP body ព្យួរ/លើសទំហំ/ដាច់កណ្តាល · រក្សា HTTP rejection · Cookie ថ្មីប្រើ single-flight តែមួយ | `ZTO_BOUNDARIES_APP_DIR` |
 | `zto-cookie-session-test.js` | ការបន្ត Cookie ឆ្លង TTL · ទប់ write ចាស់ជាន់ Sync ថ្មី · សាលក្រម auth តាម Cookie | `ZTO_SESSION_APP_DIR` |
 | `zto-cookie-capture-test.js` | រង់ចាំ Order Detail response ពិត · Cookie ក្រោយ renewal · បែងចែក fingerprint និងសុពលភាព | `ZTO_CAPTURE_APP_DIR` |
+| `zto-signed-status-test.js` | ⛔ សាលក្រម «បិទរួចនៅ ZTO» មាន **៣** (`true`/`false`/`null`) · ការកំណត់ខុសបិទតែមុខងារនេះ **មិនសម្លាប់ Lookup** · cache ដាច់តាមការកំណត់ · តម្លៃមិនលេចក្នុង `?diag=1` | `ZTOSIGNED_APP_DIR` |
+| `zto-sync-banner-test.js` | ⛔ របា «ZTO មិនទាន់បិទ» ៖ «មិនទាន់វាស់» មិនក្លាយជា «មិនទាន់បិទ» · មុខងារដេកលក់ពេលគ្មានការកំណត់ · Barcode បើកវិញ ➜ របាបាត់ · XSS · ការចាកចេញលុបទាំង DOM ទាំង storage | `ZTOBANNER_APP_DIR` |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។

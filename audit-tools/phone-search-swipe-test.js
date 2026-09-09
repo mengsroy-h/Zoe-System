@@ -94,6 +94,7 @@ function buildEnv(src, opts) {
         },
         scheduleChromeLayoutSettle() {},
         hidePhoneSuggestions() { calls.hideSuggest++; els.phoneSuggestBox.classList.remove('show'); },
+        clearZtoPickupStatusStore() {},
         positionPhoneSuggestBox() { calls.position++; },
         document: {
             getElementById: (id) => els[id] || null,

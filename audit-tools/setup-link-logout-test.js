@@ -58,6 +58,7 @@ for (const app of ['ZoeW']) {
             document: fakeDom(pinOpen),
             localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
             hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {},
+            clearZtoPickupStatusStore() {},
             setPhoneSearchPulledUp() {},
             scheduleChromeLayoutSettle() {},
             closeModal() {}, openModalHelper() {}, openConfigModal() {}

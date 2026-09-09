@@ -134,6 +134,7 @@ function buildSandbox(state) {
         dailyPickupData: state.dailyPickupData || {},
         monthlyRevenueData: state.monthlyRevenueData || {},
         exchangeRateRiel: 4100,
+        renderZtoSyncBanner() {}, scheduleZtoStatusSweep() {},
         deletedSearchQuery: state.query || '',
         expandedTrashGroups: new Set(),
         DELETED_LIST_MAX_ROWS: 200,

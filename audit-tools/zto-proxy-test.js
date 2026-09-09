@@ -201,7 +201,7 @@ group('Cookie ធៀបនឹង API ផ្លូវការ', async () => {
     ok('Cookie ➜ បំពេញ phone/cod/dod ត្រឹមត្រូវ',
         cookieBody.phone === '0974158508' && cookieBody.cod === 6.55 && cookieBody.dod === 1.25, cookieBody);
     ok('រូបរាងចម្លើយថេរ',
-        JSON.stringify(Object.keys(cookieBody).sort()) === JSON.stringify(['barcode', 'cached', 'cod', 'dod', 'found', 'phone', 'success']),
+        JSON.stringify(Object.keys(cookieBody).sort()) === JSON.stringify(['barcode', 'cached', 'cod', 'dod', 'found', 'phone', 'success', 'ztoClosed']),
         Object.keys(cookieBody).sort());
     ok('⛔ ឈ្មោះអតិថិជនមិនហូរទៅ browser', cookieRun.body.indexOf('Test Customer') === -1);
 

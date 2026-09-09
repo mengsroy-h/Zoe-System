@@ -97,7 +97,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
          lookup-burst-test health-check-test monthly-report-test zto-network-boundaries-test \
-         zto-cookie-session-test zto-cookie-capture-test; do
+         zto-cookie-session-test zto-cookie-capture-test zto-signed-status-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -145,6 +145,7 @@ run "ui-flow (browser ពិត)"    node audit-tools/ui-flow-test.js
 run "page-nav (browser ពិត)"   node audit-tools/page-nav-test.js
 run "gesture (browser ពិត)"    node audit-tools/gesture-test.js
 run "history-menu (browser ពិត)" node audit-tools/history-menu-dismiss-test.js
+run "zto-sync-banner (browser ពិត)" node audit-tools/zto-sync-banner-test.js
 run "scan-engine (browser ពិត)" node audit-tools/scan-engine-test.js
 run "duplicate-scan (browser ពិត)" node audit-tools/duplicate-scan-test.js
 run "scan-remove (browser ពិត)" node audit-tools/scan-remove-mode-test.js
@@ -243,6 +244,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     PERF_APP_DIR="$BASE" node audit-tools/perf-check.js 2>&1 | tail -1 | sed 's/^/   perf:            /'
     SETUP_APP_DIR="$BASE"   node audit-tools/setup-link-logout-test.js 2>&1 | tail -1 | sed 's/^/   setup-link:      /'
     PAGENAV_APP_DIR="$BASE" node audit-tools/page-nav-test.js 2>&1 | tail -1 | sed 's/^/   page-nav:        /'
+    ZTOBANNER_APP_DIR="$BASE" node audit-tools/zto-sync-banner-test.js 2>&1 | tail -1 | sed 's/^/   zto-banner:      /'
     SWIPE_APP_DIR="$BASE" node audit-tools/phone-search-swipe-test.js 2>&1 | tail -1 | sed 's/^/   swipe-pullup:    /'
     PINPROMPT_APP_DIR="$BASE" node audit-tools/pin-prompt-test.js 2>&1 | tail -1 | sed 's/^/   pin-prompt:      /'
     CSSMEDIA_APP_DIR="$BASE" node audit-tools/css-media-override.js 2>&1 | tail -1 | sed 's/^/   css-media:       /'
@@ -319,6 +321,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTO_SESSION_APP_DIR="$BASE" node audit-tools/zto-cookie-session-test.js 2>&1 | tail -1 | sed 's/^/   zto-session:     /'
     ZTO_CAPTURE_APP_DIR="$BASE" node audit-tools/zto-cookie-capture-test.js 2>&1 | tail -1 | sed 's/^/   zto-capture:     /'
     ZTOSTORE_APP_DIR="$BASE" node audit-tools/zto-cookie-store-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-store:/'
+    ZTOSIGNED_APP_DIR="$BASE" node audit-tools/zto-signed-status-test.js 2>&1 | tail -1 | sed 's/^/   zto-signed:      /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'

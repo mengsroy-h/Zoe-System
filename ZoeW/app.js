@@ -5082,7 +5082,10 @@
 
         scanHistory.forEach(item => {
             if (!item.id) return;
-            if (item.clearClaim) return;
+            if (item.clearClaim) {
+                releaseStaleClearHistoryClaim(item);
+                return;
+            }
             if (itemHasRestoreMarkers(item)) {
                 clearStaleRestoreMarkers(item);
                 return;
@@ -12616,6 +12619,28 @@
         const claimedAt = claim && parseFloat(claim.claimedAt);
         const now = getServerNow();
         return !!(claim && typeof claim.token === 'string' && claim.token && isFinite(claimedAt) && claimedAt <= now && (now - claimedAt) < CLEAR_HISTORY_CLAIM_LEASE_MS);
+    }
+
+    const staleClearClaimSweeps = new Set();
+
+    function releaseStaleClearHistoryClaim(item) {
+        if (!db || !fb || !item || !item.id || !/^[a-zA-Z0-9_-]+$/.test(item.id)) return;
+        if (!item.clearClaim || isActiveClearHistoryClaim(item.clearClaim)) return;
+        if (activeClearHistoryClaims.has(item.id)) return;
+        if (staleClearClaimSweeps.has(item.id)) return;
+        staleClearClaimSweeps.add(item.id);
+        const release = () => { staleClearClaimSweeps.delete(item.id); };
+        dbOp(fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+            if (!currentItem || !currentItem.clearClaim) return;
+            if (isActiveClearHistoryClaim(currentItem.clearClaim)) return;
+            delete currentItem.clearClaim;
+            return currentItem;
+        })).then(release, (error) => {
+            release();
+            if (dbOpStalled(error)) return;
+            console.error('Failed to release stale clear-history claim for', item.id, error);
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'money', context: 'releaseStaleClearHistoryClaim', itemId: item.id });
+        });
     }
 
     function generateClearHistoryClaimToken() {

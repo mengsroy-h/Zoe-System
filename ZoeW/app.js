@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.6';
+    const APP_VERSION = '2.31.7';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -372,6 +372,7 @@
     const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
     const DB_LISTENER_KEY_DELETED = 'deleted';
     const DB_LISTENER_KEY_HISTORY = 'history';
+    const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';
     const dbListenerPendingPaths = new Set();
     const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
@@ -4921,12 +4922,12 @@
         if (dbRefDailyRevenue) {
             fb.onValue(dbRefDailyRevenue, (snapshot) => {
                 if (listenerGeneration !== dbListenerGeneration) return;
-                noteDbListenerAlive('dailyRevenue');
+                noteDbListenerAlive(DB_LISTENER_KEY_DAILY_REVENUE);
                 dailyRevenueData = snapshot.val() || {};
                 debouncedRenderAfterHistorySync();
             }, (err) => {
                 if (listenerGeneration !== dbListenerGeneration) return;
-                handleDbListenerError(err, 'dailyRevenue');
+                handleDbListenerError(err, DB_LISTENER_KEY_DAILY_REVENUE);
             });
         }
 
@@ -8141,7 +8142,9 @@
     }
 
     function collectedValueIsMeasurable() {
-        return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY) && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED);
+        return !dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)
+            && !dbListenerViewIsStale(DB_LISTENER_KEY_DELETED)
+            && !dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_REVENUE);
     }
 
     function collectedMoneyText(dollar, measurable) {

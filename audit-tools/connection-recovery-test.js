@@ -259,6 +259,7 @@ function buildContext() {
         "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
         "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
         "const DB_LISTENER_KEY_HISTORY = 'history';\n" +
+        "const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';\n" +
         'let dbListenersFailed = false;\n' +
         'let dbListenerGeneration = 0;\n' +
         'let dbListenerRecoveryTimer = null;\n' +

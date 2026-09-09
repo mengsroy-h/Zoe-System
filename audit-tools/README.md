@@ -155,6 +155,7 @@ bash audit-tools/emu/rules.sh
 | `item-money-integrity-test.js` | **លុយសរុបរបស់ *ជួរដេក*** (⚠️ `item` = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ · `barcode` = កញ្ចប់ ១) ៖ `item.cod/.dod/.price` ត្រូវស្មើផលបូក barcodes — ជាន់ ១ AST (ការសរសេរលុយត្រូវឆ្លងកាត់ helper) · ជាន់ ២ helper លើ input ច្រើន · ជាន់ ៣ invariant លើ item **ក្នុងសតិ និងលើ server** ក្រោយ operation កំណត់ ៧ | `ITEMMONEY_APP_DIR` |
 | `stats-collected-truth-test.js` | **«ចំណូល (យករួច)» លើអេក្រង់ស្ថិតិទាំង ៣** ៖ browser ពិត ➜ seed ដែលមាន ៣ ស្ថានភាព (យករួច · មិនទាន់យក · ដករួច) ➜ អានលេខ **ចេញពី DOM** ➜ អះអាងថាចំណូល = ledger ដក មិនទាន់យក ហើយ «តម្លៃកញ្ចប់ទាំងអស់» **មិនត្រូវកាត់** | `STATSTRUTH_APP_DIR` |
 | `stats-screen-agreement-test.js` | **អេក្រង់ស្ថិតិទាំង ៣ ត្រូវបង្ហាញលេខដូចគ្នា** ៖ រត់ `openDailyStatsModal()` · `openMonthlyStatsModal()` · `buildMonthlyReport()` **ពិត** ក្នុង `vm` ជាមួយ DOM ក្លែង រួច **អានលេខចេញពី HTML** ➜ អះអាងថា «ចំណូល (យករួច)» · «COD/DOD (យករួច)» និង «មិនទាន់យក» របស់កាតខែ **ស្មើរបាយការណ៍ខែ** ⛔ រួមទាំងពេលថ្ងៃណាមួយមាន `open_d > cod_d` (កម្រិតបូកខុសគ្នា) | `STATSAGREE_APP_DIR` |
+| `stats-measurable-gate-test.js` | **អេក្រង់ស្ថិតិមិនត្រូវរាយលេខលើអ្វីដែលវាស់មិនបាន** ៖ រូបមន្ត «ចំណូល» គឺ `ledger − កញ្ចប់មិនទាន់យក` ➜ ច្រកទ្វារ `collectedValueIsMeasurable()` ត្រូវគ្រប **ទាំងសងខាង** (`history` · `deleted` **និង `dailyRevenue`**)។ រត់អេក្រង់ពិត ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ** និង **ងាប់** រួចអានលេខចេញពី HTML ➜ ត្រូវឃើញ `—` មិនមែន `$0.00` | `STATSGATE_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម | `MONEYGUARD_APP_DIR` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
@@ -299,7 +300,7 @@ bash audit-tools/emu/rules.sh
 | `camera-resume-test.js` | កាមេរ៉ាកកក្រោយប្រអប់ native · dependency អវត្តមាន | `CAMERA_APP_DIR` |
 | `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
 | `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel | `MREPORT_APP_DIR` |
-| `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល | `PENDINGKEY_APP_DIR` |
+| `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល ⛔ និង listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (`noteDbListenerAlive` / `handleDbListenerError` ត្រូវផ្គូផ្គង `listenerRefs`) | `PENDINGKEY_APP_DIR` |
 | `comments.js` · `strip-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment | `STRIP_APP_DIR` |
 | `trimws.js <files>` | លុប trailing whitespace | — |
 

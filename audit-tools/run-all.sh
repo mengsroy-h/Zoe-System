@@ -155,6 +155,7 @@ run "ledger-failed-apply-revert" node audit-tools/ledger-failed-apply-revert-tes
 run "ledger-clamp-symmetry (browser ពិត)" node audit-tools/ledger-clamp-symmetry-test.js
 run "monthly-ledger-agreement" node audit-tools/monthly-ledger-agreement-test.js
 run "stats-screen-agreement" node audit-tools/stats-screen-agreement-test.js
+run "stats-measurable-gate" node audit-tools/stats-measurable-gate-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
 run "slow-write (browser ពិត)"  node audit-tools/slow-write-test.js
@@ -267,6 +268,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CLAMPSYM_APP_DIR="$BASE" node audit-tools/ledger-clamp-symmetry-test.js 2>&1 | tail -1 | sed 's/^/   clamp-symmetry:  /'
     MONTHLYAGREE_APP_DIR="$BASE" node audit-tools/monthly-ledger-agreement-test.js 2>&1 | tail -1 | sed 's/^/   monthly-agree:   /'
     STATSAGREE_APP_DIR="$BASE" node audit-tools/stats-screen-agreement-test.js 2>&1 | tail -1 | sed 's/^/   stats-agree:     /'
+    STATSGATE_APP_DIR="$BASE" node audit-tools/stats-measurable-gate-test.js 2>&1 | tail -1 | sed 's/^/   stats-gate:      /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'
     IOSGLIDE_APP_DIR="$BASE" node audit-tools/ios-panel-glide-test.js 2>&1 | tail -1 | sed 's/^/   ios-panel-glide: /'

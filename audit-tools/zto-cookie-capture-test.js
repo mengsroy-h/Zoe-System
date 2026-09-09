@@ -4,6 +4,7 @@
 const assert = require('assert/strict');
 const { EventEmitter } = require('events');
 const path = require('path');
+const fs = require('fs');
 const ROOT = process.env.ZTO_CAPTURE_APP_DIR
     ? path.resolve(process.env.ZTO_CAPTURE_APP_DIR) : path.resolve(__dirname, '..');
 let api;
@@ -249,6 +250,34 @@ async function main() {
         assert.equal(health.healthy, null);
         assert.equal(api.shouldRefreshInAuto(health), false);
         assert.match(api.describeHealth(health), /not yet verified/i);
+    });
+    // ⛔ **ចំណុចចាប់ផ្តើមរបស់ helper** ៖ `argus.ztoglobal.com` ទាមទារ login
+    // **រាល់ដង** ចំណែក `gate.ztoglobal.com` រក្សា session (វាស់ដោយម្ចាស់
+    // គម្រោង 2026-09-09 ៖ gate homepage មានកាត «ប្រព័ន្ធប្រតិបត្តិការប្រើ
+    // សម្រាប់សាខា» ➜ ចុច ➜ ចូល Argus ភ្លាមដោយមិនវាយ password)។
+    // ⛔ ការចាប់ Cookie នៅតែកើតលើ `aargus-api` ដដែល — មានតែ **ទំព័រដែល
+    // helper បើក** ដែលប្តូរ។
+    await scenario('helper ចាប់ផ្តើមពី gate (session នៅ) មិនមែន argus (login រាល់ដង)', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const m = /const PORTAL_URL = '([^']+)';/.exec(src);
+        assert.ok(m, 'រកការប្រកាស PORTAL_URL មិនឃើញ');
+        assert.equal(m[1], 'https://gate.ztoglobal.com/');
+        assert.ok(/page\.goto\(PORTAL_URL/.test(src), 'browser ត្រូវបើក PORTAL_URL');
+        assert.ok(!/ARGUS_URL/.test(src), 'ថេរចាស់មិនត្រូវនៅសល់');
+    });
+    await scenario('⛔ ការចាប់នៅតែចង់ទៅ aargus-api ដដែល (gate មិនប្តូរគោលដៅ)', async () => {
+        assert.equal(api.isTargetApiUrl(TARGET), true);
+        assert.equal(api.isTargetApiUrl('https://gate.ztoglobal.com/scan/get/order/detail'), false);
+        assert.equal(api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'), false);
+    });
+    await scenario('⛔ ការណែនាំលើអេក្រង់ cmd ជា ASCII ហើយប្រាប់ជំហាន gate', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const lines = src.split('\n').filter((l) => /console\.log\('/.test(l));
+        assert.ok(lines.length > 10, 'ជាន់អប្បបរមា ៖ សារ console មិនទទេ');
+        const nonAscii = lines.filter((l) => /[^\x00-\x7F]/.test(l));
+        assert.deepEqual(nonAscii, [], 'សារ cmd ត្រូវជា ASCII');
+        assert.ok(/Branch Operations/.test(src), 'ត្រូវប្រាប់ថាចុចកាតណា');
+        assert.ok(/gate usually keeps your session/.test(src), 'ត្រូវប្រាប់ថា gate រក្សា session');
     });
     console.log('\n' + pass + ' PASS / ' + fail + ' FAIL / 0 SKIP');
     process.exitCode = fail ? 1 : 0;

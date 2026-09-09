@@ -18,7 +18,7 @@
 
 មកនៅត្រឹម៖
 
-`double-click sync-zto-cookie.cmd ➜ Login Argus បើចាំបាច់ ➜ បើកកញ្ចប់មួយ`
+`double-click sync-zto-cookie.cmd ➜ ចុចកាតទី ១ ➜ បើកកញ្ចប់មួយ`
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
 `%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ហើយចាប់បន្ទាត់ `Cookie:` ពី
@@ -166,8 +166,10 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ### ប្រើរាល់ពេល Cookie ផុត
 
 1. Double-click **`sync-zto-cookie.cmd`**។
-2. Edge/Chrome profile ពិសេសបើក Argus។
-3. បើ ZTO សុំ សូម Login ជាធម្មតា រួច **ចូល Scan Management ➜ Arrival Scan**
+2. Edge/Chrome profile ពិសេសបើក **`gate.ztoglobal.com`** ដែល **រក្សា session**
+   (ខុសពី `argus.ztoglobal.com` ដែលសុំ Login រាល់ដង)។
+3. បើ ZTO សុំ សូម Login (ជាធម្មតាមិនសុំ) រួច **ចុចកាតទី ១ «ប្រព័ន្ធប្រតិបត្តិការ
+   ប្រើសម្រាប់សាខា» ➜ វាបើក Argus ភ្លាម** រួច **ចូល Scan Management ➜ Arrival Scan**
    ហើយ **វាយ ឬស្កេន Waybill មួយ**។ ⛔ វាស់រួច (2026-09-02) ៖ Cookie
    `BOS-MAN-SESSION` លេចឡើង **តែពេលសំណើ Order Detail បាញ់** — ការ Login
    តែម្យ៉ាង ឬការបើកទំព័រទទេ **មិនគ្រប់គ្រាន់ទេ**។
@@ -243,7 +245,7 @@ sync-zto-cookie.cmd
 | `'orlevel'` / `'utionPolicy' is not recognized` | អ្នកកំពុងប្រើ `.cmd` UTF-8 ចាស់។ ទាញកំណែថ្មីដែលជា ASCII + CRLF រួចជំនួស `setup.cmd` និង `sync-zto-cookie.cmd` ទាំង ២ |
 | មិនទាន់ Setup/config/token | បើក `setup.cmd` |
 | Browser launch failed | បិទបង្អួច ZTO Cookie Sync ចាស់ទាំងអស់ រួចសាកវិញ |
-| មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |
+| មិនឃើញ Order Detail request | ចុចកាតទី ១ ចូល Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |
 | Netlify បដិសេធ Site ID ឬ Token | រត់ `setup.cmd` ហើយបញ្ចូលថ្មី |
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
 | `It is still reading ZTO_COOKIE (env), not the blob` | ពិនិត្យថា deploy ចុងក្រោយរួចរាល់; សារនោះបន្ថែម `store reason: …` ដែលប្រាប់ថាជាប់ត្រង់ណា (`empty` · `no-context` · `read:…`) |

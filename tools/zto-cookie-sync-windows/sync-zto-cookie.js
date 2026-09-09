@@ -7,7 +7,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const TOOL_DIR = __dirname;
-const ARGUS_URL = 'https://argus.ztoglobal.com/';
+const PORTAL_URL = 'https://gate.ztoglobal.com/';
 const API_HOST = 'aargus-api.ztoglobal.com';
 const ORDER_DETAIL_PATH = '/scan/get/order/detail';
 const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -827,15 +827,16 @@ async function captureCookieHeader() {
         waiter.catch(() => {});
         const pages = context.pages();
         const page = pages[0] || await context.newPage();
-        console.log('Argus is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
-        console.log('   1. Log in to Argus (if ZTO asks for it).');
-        console.log('   2. Open Scan Management -> Arrival Scan.');
-        console.log('   3. Type or scan one Waybill -> the Order Detail request fires.');
+        console.log('The ZTO gate is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
+        console.log('   1. Log in only if ZTO asks - the gate usually keeps your session.');
+        console.log('   2. Click the first card (Branch Operations) -> it opens Argus.');
+        console.log('   3. Open Scan Management -> Arrival Scan.');
+        console.log('   4. Type or scan one Waybill -> the Order Detail request fires.');
         console.log('   This tool waits for a successful Order Detail response before continuing.');
         try {
-            await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await page.goto(PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
-            console.log('WARNING: Argus did not answer yet. The page stays open, so log in or refresh.');
+            console.log('WARNING: the ZTO gate did not answer yet. The page stays open, so log in or refresh.');
         }
         return await waiter;
     } finally {
@@ -845,7 +846,7 @@ async function captureCookieHeader() {
 
 function safeFailureMessage(code) {
     const messages = {
-        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no Order Detail request. Log in to Argus and open one parcel.',
+        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no Order Detail request. Open Argus from the gate and scan one parcel.',
         BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
         BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
         BROWSER_NOT_FOUND: 'Microsoft Edge or Google Chrome was not found.',

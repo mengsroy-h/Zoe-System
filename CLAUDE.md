@@ -333,7 +333,6 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
 | **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
 | **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
-| **ZTO helper ៖ ចំណុចចាប់ផ្តើម** | ⛔ បើក **`gate.ztoglobal.com`** (រក្សា session) មិនមែន `argus.ztoglobal.com` (សុំ Login រាល់ដង)។ អ្នកប្រើចុចកាត «ប្រព័ន្ធប្រតិបត្តិការប្រើសម្រាប់សាខា» ➜ Argus ភ្លាម។ ⛔ ការចាប់ Cookie នៅតែចង់ទៅ `aargus-api` ដដែល — មានតែ *ទំព័រដែល helper បើក* ដែលប្តូរ | `zto-cookie-capture-test` |
 | **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag មានលក្ខខណ្ឌ | `zto-cookie-store-test` · `zto-cookie-session-test` |
 | **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | Cookie ជំនួយ/retry ដដែលមានពិដាន ៦០ វិ.; session ស្នូលថ្មីសាកសរសេរភ្លាមក្នុងថវិកា ហើយ pending រស់រហូតដល់បញ្ជាក់ការរក្សាទុក | `zto-cookie-session-test` |
 | **ZTO ៖ ការអាន Blobs ↔ ផ្លូវឆ្លើយតប** | ⛔ មានតម្លៃក្នុងសតិ ➜ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់**ខាងក្រោយ**; ⛔ សតិទទេ ឬក្រោយ 401 ➜ អាន**ទប់**ដដែល | `zto-cookie-store-test` |

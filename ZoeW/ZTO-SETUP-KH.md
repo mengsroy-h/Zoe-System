@@ -98,13 +98,12 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 
 ### ពេល ZTO បដិសេធ Cookie
 
-១. Double-click **`sync-zto-cookie.cmd`** ➜ វាបើក **`gate.ztoglobal.com`**។
-២. `gate` **រក្សា session** ➜ ជាធម្មតាមិនសុំ Login ទេ (ខុសពី
-   `argus.ztoglobal.com` ដែលសុំរាល់ដង)។ បើវាសុំ សូម Login ម្តង។
-៣. ចុចកាតទី ១ **«ប្រព័ន្ធប្រតិបត្តិការប្រើសម្រាប់សាខា»** ➜ Argus បើកភ្លាម។
-៤. ចូល **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។
-៥. រង់ចាំ Order Detail ឆ្លើយជោគជ័យ។ ឧបករណ៍បញ្ចូល `Set-Cookie` ថ្មី
+១. Double-click **`sync-zto-cookie.cmd`**។
+២. បើ ZTO សុំ សូម Login ក្នុង Edge/Chrome ដែលវាបើក។
+៣. ចូល **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។
+៤. រង់ចាំ Order Detail ឆ្លើយជោគជ័យ។ ឧបករណ៍បញ្ចូល `Set-Cookie` ថ្មី
    រួចបិទ browser ➜ សរសេរ Cookie ចូល Netlify Blobs។ **មិនចាំបាច់ redeploy**។
+   បើ ZTO សុំ Login វានៅរង់ចាំឲ្យអ្នកចូល និង Lookup ជោគជ័យ។
 
 **របៀបផ្សេងទៀត** (ត្រូវការ Site URL + `ZTO_PROXY_KEY` ក្នុង `setup.cmd`)៖
 
@@ -137,8 +136,7 @@ Function។ សេចក្តីណែនាំពេញ និងព្រំ�
 
 បើ Windows helper មានបញ្ហា៖
 
-១. បើក `https://gate.ztoglobal.com` ក្នុង browser (វា **រក្សា session** ➜ ជាធម្មតា
-   មិនសុំ Login ទេ) ➜ ចុចកាត **«ប្រព័ន្ធប្រតិបត្តិការប្រើសម្រាប់សាខា»** ➜ Argus បើក។
+១. បើក `https://argus.ztoglobal.com` ក្នុង browser រួចចូលប្រព័ន្ធ។
 ២. `F12` ➜ **Network** ➜ បើក/ស្វែងរកកញ្ចប់មួយ។
 ៣. ជ្រើសសំណើទៅ `aargus-api.ztoglobal.com/scan/get/order/detail` ➜
    **Request Headers** ➜ ចម្លងតម្លៃពេញរបស់ `Cookie:`។

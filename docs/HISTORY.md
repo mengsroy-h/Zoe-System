@@ -69,50 +69,6 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [មិនឡើងកំណែ] — 2026-09-09 · 🔑 ZTO helper ចាប់ផ្តើមពី `gate.ztoglobal.com`
-
-**គ្មាន App ណាប្រែទេ** — ការកែស្ថិតក្នុង `tools/zto-cookie-sync-windows/`
-ប៉ុណ្ណោះ ➜ ZoeW នៅ `2.31.5` (`zoew-v185`) · ZoeKeyGen នៅ `2.19.21`
-(`version-bump-scope.js` លើកលែង `tools/` ដោយចេតនា — helper មិន ship ក្នុង PWA)។
-
-#### ផ្លាស់ប្តូរ
-
-- **`sync-zto-cookie.cmd` បើក `https://gate.ztoglobal.com/` ជំនួស
-  `https://argus.ztoglobal.com/`។** ការវាស់របស់ម្ចាស់គម្រោង ៖
-
-  | ចំណុចចាប់ផ្តើម | អ្វីដែលកើតឡើងរាល់ដង |
-  |---|---|
-  | `argus.ztoglobal.com` | **សុំ Login រាល់លើក** — session មិនរស់រាន |
-  | `gate.ztoglobal.com` | **រក្សា session** ➜ បើកភ្លាមចូលបាន ជាធម្មតាមិនសុំ Login |
-
-  ដូច្នេះជំហានរបស់អ្នកប្រើថយពី «វាយ username + password រាល់ដង» មកត្រឹម
-  «ចុចកាតទី ១ **ប្រព័ន្ធប្រតិបត្តិការប្រើសម្រាប់សាខា** ➜ Argus បើកភ្លាម»។
-- ⛔ **ការចាប់ Cookie មិនប្រែសោះ** — helper នៅតែរង់ចាំ `POST`
-  `https://aargus-api.ztoglobal.com/scan/get/order/detail` ដដែល ហើយនៅតែ
-  ទាមទារ `BOS-MAN-SESSION` ត្រឹមត្រូវ។ `gate` ជាត្រឹម **ទ្វារចូល** ៖ ផ្លូវ
-  ពិតនៅតែ Argus ➜ Scan Management ➜ Arrival Scan ➜ វាយ Waybill។
-- សារលើអេក្រង់ `cmd` សរសេរឡើងវិញជា **ជំហាន ៤** (ASCII អង់គ្លេសដដែល តាមច្បាប់
-  `cmd.exe` បំបែក UTF-8) ដោយបញ្ជាក់ថា *«Log in only if ZTO asks — the gate
-  usually keeps your session»*។
-
-#### ឧបករណ៍ audit
-
-- `zto-cookie-capture-test.js` បន្ថែម **៣** សេណារីយ៉ូ (៤០ ➜ ៤៣) ដែលចាក់សោ
-  ចំណុចចាប់ផ្តើម ៖ helper ត្រូវ `goto` **gate** · មិនត្រូវ `goto` **argus**
-  ដោយផ្ទាល់ · ហើយ **ការចាប់ Cookie នៅតែសំដៅ `aargus-api`** (ទិសផ្ទុយ — បើ
-  ថ្ងៃណានរណាម្នាក់ប្តូរ capture host តាម start page នោះវាធ្លាក់)។
-  វាស់បាន ៖ **៤៣ PASS លើ tree ថ្មី** · **២ FAIL លើ `origin/main`**
-  (តាម `ZTO_CAPTURE_APP_DIR` — ⛔ ឈ្មោះ env ខុសធ្វើឲ្យ baseline បៃតងក្លែងក្លាយ
-  ដូចច្បាប់ទី ១៣ ព្រមាន; ជុំនេះខុសម្តងហើយចាប់បាន)។
-
-#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
-
-- **គ្មាន** — Firebase rules និង Netlify env មិនប្រែ។ App មិនត្រូវទាញចុះឡើងវិញ។
-- **អ្វីដែលត្រូវសាក (Windows)** ៖ រត់ `sync-zto-cookie.cmd` ➜ `gate` គួរបើក
-  ដោយ **មិនសុំ Login** (បើសុំ សូម Login ម្តង រួចលើកក្រោយវាគួររក្សា) ➜ ចុច
-  កាតទី ១ ➜ Arrival Scan ➜ វាយ Waybill ១ ➜ helper គួររាយ `Cookie captured`
-  រួច Sync ចូល Netlify Blobs។ ⛔ **មិនចាំបាច់ redeploy**។
-
 ### [ZoeW 2.31.5] — 2026-09-09 · 🩺 បង្ហាញការបន្តអាយុ Cookie របស់ ZTO
 
 **ZoeW** (`zoew-v184` ➜ `zoew-v185`)។ ZoeKeyGen រក្សា `2.19.21`។

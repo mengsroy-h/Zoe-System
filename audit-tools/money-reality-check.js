@@ -22,24 +22,30 @@ const file = process.argv[2];
 
 let pass = 0, warn = 0, fail = 0;
 const notes = [];
-function ok(label, detail) { console.log('  ✅ ' + label + (detail ? '  — ' + detail : '')); pass++; }
-function bad(label, detail) { console.log('  ❌ ' + label + (detail ? '\n       ' + detail : '')); fail++; }
-function may(label, detail) { console.log('  ⚠️  ' + label + (detail ? '\n       ' + detail : '')); warn++; }
+// ⛔ `cmd.exe` បំបែក UTF-8 Khmer កណ្តាលពាក្យ (ច្បាប់គម្រោង) ➜ ពេលមាន `--report`
+// របាយការណ៍ខ្មែរទៅ **ឯកសារ** ហើយអេក្រង់ទទួលតែ **ASCII អង់គ្លេស**។
+const argi = process.argv.indexOf('--report');
+const REPORT = argi !== -1 ? process.argv[argi + 1] : null;
+const LINES = [];
+function say(line) { LINES.push(line); if (!REPORT) console.log(line); }
+function ok(label, detail) { say('  ✅ ' + label + (detail ? '  — ' + detail : '')); pass++; }
+function bad(label, detail) { say('  ❌ ' + label + (detail ? '\n       ' + detail : '')); fail++; }
+function may(label, detail) { say('  ⚠️  ' + label + (detail ? '\n       ' + detail : '')); warn++; }
 function check(cond, label, detail) { cond ? ok(label, cond === true && detail ? detail : undefined) : bad(label, detail); }
 
 if (!file) {
     console.log('របៀបប្រើ ៖ node audit-tools/money-reality-check.js <dump.json ឬ dump.json.gz>');
-    console.log('  យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON');
+    say('  យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON');
     process.exit(2);
 }
-if (!fs.existsSync(APP_JS)) { console.log('❌ រកមិនឃើញ ' + APP_JS); process.exit(1); }
-if (!fs.existsSync(file)) { console.log('❌ រកមិនឃើញឯកសារ ' + file); process.exit(1); }
+if (!fs.existsSync(APP_JS)) { console.log('ERROR: ZoeW/app.js not found at ' + APP_JS); process.exit(1); }
+if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(1); }
 
 let raw = fs.readFileSync(file);
 if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
 let db;
 try { db = JSON.parse(raw.toString('utf8')); }
-catch (e) { console.log('❌ អានឯកសារមិនបាន (មិនមែន JSON?) ៖ ' + e.message); process.exit(1); }
+catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(1); }
 
 // ⛔ ស្រង់កូដលុយ **ពិត** ចេញពី app.js — កុំសរសេរតេស្តលើកូដចម្លង
 const SRC = fs.readFileSync(APP_JS, 'utf8');
@@ -93,20 +99,20 @@ const r2 = (n) => Math.round(n * 100) / 100;
 const $ = (n) => '$' + r2(n).toFixed(2);
 const barcodesOf = (it) => (Array.isArray(it.barcodes) ? it.barcodes.filter(Boolean) : []);
 
-console.log('\n╔══════════════════════════════════════════════════════════╗');
-console.log('║  🩺 ការវាស់លុយលើទិន្នន័យពិត — អានសុទ្ធសាធ                ║');
-console.log('╚══════════════════════════════════════════════════════════╝');
-console.log('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).toFixed(0) + ' KB)');
-console.log('រក function លុយពិត ៖ ' + (WANT.length - missing.length) + '/' + WANT.length
+say('\n╔══════════════════════════════════════════════════════════╗');
+say('║  🩺 ការវាស់លុយលើទិន្នន័យពិត — អានសុទ្ធសាធ                ║');
+say('╚══════════════════════════════════════════════════════════╝');
+say('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).toFixed(0) + ' KB)');
+say('រក function លុយពិត ៖ ' + (WANT.length - missing.length) + '/' + WANT.length
     + (missing.length ? '  ⚠️ បាត់ ៖ ' + missing.join(', ') : ''));
 if (WANT.length - missing.length < 12) {
-    console.log('❌ ស្រង់កូដពិតមិនគ្រប់ ➜ លទ្ធផលគ្មានន័យ'); process.exit(1);
+    console.log('ERROR: could not extract enough real money functions from app.js.'); process.exit(1);
 }
-console.log('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
+say('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
     + ' · ថ្ងៃក្នុង ledger ' + Object.keys(daily).length + ' · ខែ ' + Object.keys(monthly).length);
 
 // ── ១. ledger ខែ ត្រូវស្មើផលបូក ledger ថ្ងៃ ─────────────────────────────
-console.log('\n── ១. ledger ខែ = ផលបូក ledger ថ្ងៃ ──');
+say('\n── ១. ledger ខែ = ផលបូក ledger ថ្ងៃ ──');
 const sumByMonth = {};
 Object.keys(daily).forEach((d) => {
     if (!sb.PICKUP_DATE_KEY_PATTERN.test(d)) return;
@@ -139,7 +145,7 @@ Object.keys(monthly).sort().forEach((ym) => {
 if (!monthsChecked && !Object.keys(monthly).length) may('គ្មាន node ខែក្នុង dump — រំលង');
 
 // ── ២. លុយជួរដេក = ផលបូក barcodes ─────────────────────────────────────
-console.log('\n── ២. លុយសរុបរបស់ជួរដេក = ផលបូក barcodes ──');
+say('\n── ២. លុយសរុបរបស់ជួរដេក = ផលបូក barcodes ──');
 let rowsWithBc = 0, rowBad = 0, worst = 0, worstDate = '';
 [history, deleted].forEach((list) => list.forEach((it) => {
     const bcs = barcodesOf(it);
@@ -159,7 +165,7 @@ else bad('ជួរដេក ' + rowBad + '/' + rowsWithBc + ' មិនស៊�
     'គម្លាតធំបំផុត ' + $(worst) + ' នៅថ្ងៃ ' + worstDate + ' ➜ លេខខុសនឹងចេញក្នុង Excel');
 
 // ── ៣. ស្ថិតិយក ៖ អត្តសញ្ញាណ ──────────────────────────────────────────
-console.log('\n── ៣. ស្ថិតិយក ៖ សំណុំ barcode = counter ──');
+say('\n── ៣. ស្ថិតិយក ៖ សំណុំ barcode = counter ──');
 let pkChecked = 0, pkBad = 0;
 Object.keys(pickup).sort().forEach((d) => {
     const rec = pickup[d] || {};
@@ -183,7 +189,7 @@ if (!pkChecked) may('គ្មាន node ស្ថិតិយក — រំល
 else if (!pkBad) ok('ថ្ងៃ ' + pkChecked + ' ទាំងអស់ ៖ សំណុំ = packagesPickedUp = Σ pickedUpPhones');
 
 // ── ៤. រូបរាងលេខ ៖ អវិជ្ជមាន · NaN ────────────────────────────────────
-console.log('\n── ៤. រូបរាងលេខក្នុង ledger ──');
+say('\n── ៤. រូបរាងលេខក្នុង ledger ──');
 let shapeBad = 0;
 [['ថ្ងៃ', daily], ['ខែ', monthly]].forEach(([label, map]) => {
     Object.keys(map).forEach((k) => {
@@ -198,7 +204,7 @@ let shapeBad = 0;
 if (!shapeBad) ok('គ្មានលេខអវិជ្ជមាន ឬ NaN ក្នុង ledger ថ្ងៃ និងខែ');
 
 // ── ៥. «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ ────────────────────────────
-console.log('\n── ៥. «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ (កូដពិត) ──');
+say('\n── ៥. «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ (កូដពិត) ──');
 const openMap = sb.uncollectedValueByDate();
 let gCollected = 0, gLedger = 0, gOpen = 0;
 const perMonth = {};
@@ -216,11 +222,11 @@ Object.keys(perMonth).sort().forEach((ym) => {
     const b = perMonth[ym];
     const card = sb.collectedValueForMonth(daily, openMap, ym);
     const agree = Math.abs(card.total - b.c) < 0.005;
-    console.log('  ' + (agree ? '✅' : '❌') + ' ខែ ' + ym
+    say('  ' + (agree ? '✅' : '❌') + ' ខែ ' + ym
         + ' ៖ ចំណូល(យករួច) ' + $(b.c) + ' · មិនទាន់យក ' + $(b.o) + ' · ledger ឆៅ ' + $(b.l));
     agree ? pass++ : (fail++, notes.push('ខែ ' + ym + ' ៖ កាតខែ ' + $(card.total) + ' ≠ ផលបូកថ្ងៃ ' + $(b.c)));
 });
-console.log('  ── សរុប ៖ ចំណូល(យករួច) ' + $(gCollected) + ' · មិនទាន់យក ' + $(gOpen) + ' · ledger ឆៅ ' + $(gLedger));
+say('  ── សរុប ៖ ចំណូល(យករួច) ' + $(gCollected) + ' · មិនទាន់យក ' + $(gOpen) + ' · ledger ឆៅ ' + $(gLedger));
 const gap = r2(gLedger - gCollected - gOpen);
 if (Math.abs(gap) < 0.02) ok('ការអភិរក្ស ៖ ចំណូល + មិនទាន់យក = ledger ឆៅ', 'គម្លាត ' + $(gap));
 else may('ការអភិរក្ស ៖ គម្លាត ' + $(gap),
@@ -229,7 +235,7 @@ else may('ការអភិរក្ស ៖ គម្លាត ' + $(gap),
     + '\n          «កែទឹកប្រាក់» ដោយដៃ។ បើវាធំមិនធម្មតា ➜ ពិនិត្យជាមុនគេ។');
 
 // ── ៦. barcode ស្ទួន ➜ ហានិភ័យលុយស្ទួន ────────────────────────────────
-console.log('\n── ៦. barcode ស្ទួនក្នុងប្រវត្តិ ──');
+say('\n── ៦. barcode ស្ទួនក្នុងប្រវត្តិ ──');
 const seen = new Map();
 let dup = 0;
 history.forEach((it) => barcodesOf(it).forEach((b) => {
@@ -240,8 +246,20 @@ history.forEach((it) => barcodesOf(it).forEach((b) => {
 if (!dup) ok('barcode ' + seen.size + ' ក្នុងប្រវត្តិ — គ្មានស្ទួន');
 else bad(dup + ' barcode ស្ទួនក្នុងប្រវត្តិ (ហានិភ័យលុយបូកស្ទួន)', 'barcode ខុសគ្នា ' + seen.size);
 
-console.log('\n╔══════════════════════════════════════════════════════════╗');
-console.log('  ✅ ' + pass + '   ⚠️ ' + warn + '   ❌ ' + fail);
-if (notes.length) { console.log('\n  អ្វីដែលអ្នកនឹងឃើញលើអេក្រង់ ៖'); notes.forEach((n) => console.log('   • ' + n)); }
-console.log('╚══════════════════════════════════════════════════════════╝');
+say('\n╔══════════════════════════════════════════════════════════╗');
+say('  ✅ ' + pass + '   ⚠️ ' + warn + '   ❌ ' + fail);
+if (notes.length) { say('\n  អ្វីដែលអ្នកនឹងឃើញលើអេក្រង់ ៖'); notes.forEach((n) => say('   • ' + n)); }
+say('╚══════════════════════════════════════════════════════════╝');
+if (REPORT) {
+    // ⛔ BOM ៖ Notepad ចាស់អាន UTF-8 ដោយគ្មានវាមិនបាន
+    fs.writeFileSync(REPORT, '\ufeff' + LINES.join('\n') + '\n', 'utf8');
+    // ⛔ ASCII អង់គ្លេសសុទ្ធសាធទៅអេក្រង់ cmd
+    console.log('Money reality check finished.');
+    console.log('  passed  : ' + pass);
+    console.log('  warnings: ' + warn);
+    console.log('  FAILED  : ' + fail);
+    console.log('  report  : ' + path.resolve(REPORT));
+    console.log(fail ? '  RESULT  : PROBLEM FOUND - open the report.'
+                     : '  RESULT  : all measured checks agree.');
+}
 process.exit(fail ? 1 : 0);

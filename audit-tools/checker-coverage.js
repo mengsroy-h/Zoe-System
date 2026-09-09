@@ -37,7 +37,15 @@ const TOOLS = path.resolve(__dirname);
 const RUNALL = path.join(TOOLS, 'run-all.sh');
 
 // ឯកសារដែលមិនមែនជា checker — ពួកវាជាឧបករណ៍កែកូដ
-const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js']);
+// ⛔ រាល់ធាតុត្រូវមានហេតុផលសរសេរជាប់ — កុំបន្ថែមដើម្បីឲ្យបៃតង
+//   trimws · strip-comments ៖ ឧបករណ៍សម្អាតកូដ មិនអះអាងអ្វី
+//   checker-coverage      ៖ ខ្លួនវាផ្ទាល់
+//   redact-dump           ៖ ឧបករណ៍សម្អាតទិន្នន័យ — **មិនអាន `app.js` សោះ**
+//                           ➜ `*_APP_DIR` គ្មានន័យសម្រាប់វា (អ្នកយាមរបស់វា
+//                           ជា `money-reality-check` ដែលបញ្ជាក់ថាលទ្ធផល
+//                           មុន/ក្រោយសម្អាត ដូចគ្នាបេះបិទ)
+const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
+    'redact-dump.js']);
 
 // checker ដែលរត់ browser ពិត — ការ probe ថតទទេនៅតែធ្វើ តែឲ្យពេលវែងជាង
 const SLOW = new Set([

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.4';
+    const APP_VERSION = '2.31.5';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -3419,6 +3419,19 @@
         return (markerAt === -1 ? marker : raw.slice(0, markerAt) + marker) + '?diag=1';
     }
 
+    function ztoRenewalText(body) {
+        const cookie = body && typeof body.cookie === 'object' ? body.cookie : null;
+        const signal = body && typeof body.sessionRenewal === 'object' && body.sessionRenewal
+            && !Array.isArray(body.sessionRenewal) ? body.sessionRenewal : null;
+        const renewals = cookie && Number.isFinite(cookie.renewals)
+            ? Math.max(0, Math.round(cookie.renewals)) : 0;
+        if (renewals > 0) return ' · បន្តអាយុស្វ័យប្រវត្តិ ' + renewals + ' ដង';
+        if (!signal || signal.observed !== true) return ' · ការបន្តអាយុមិនទាន់វាស់';
+        return signal.setCookie === true
+            ? ' · ZTO ផ្ញើ Cookie ថ្មី ➜ បន្តអាយុបាន'
+            : ' · ZTO មិនផ្ញើ Cookie ថ្មី ➜ ត្រូវ Sync ដោយដៃពេលផុត';
+    }
+
     async function healthLookupRow() {
         const cfg = getLookupApiConfig();
         if (!cfg || !cfg.enabled || !cfg.url) {
@@ -3472,7 +3485,8 @@
             const acceptedAgeMs = body && body.cookie && body.cookie.authAcceptedAgeMs;
             const cookieText = 'Cookie ពី ' + source + ' · លេខសម្គាល់ ' + fingerprint
                 + (typeof ageMs === 'number' ? ' · អាយុ ' + Math.round(ageMs / 60000) + ' នាទី' : '')
-                + (reason ? ' · ' + reason : '');
+                + (reason ? ' · ' + reason : '')
+                + ztoRenewalText(body);
             if (typeof rejectedAgeMs === 'number') {
                 return healthRowHtml('bad', 'Lookup អតិថិជន (ZTO)',
                     'ZTO បដិសេធ Cookie នេះ — សូមចូល Argus ហើយរត់ឧបករណ៍ sync-zto-cookie លើ Windows '

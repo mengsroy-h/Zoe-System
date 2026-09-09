@@ -47,7 +47,7 @@ function sliceFn(name) {
 
 const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
-    'healthServiceWorkerRow', 'healthLookupRow', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
+    'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
@@ -227,6 +227,58 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
             state(html) === 'warn', state(html) + ' :: ' + html.slice(0, 160));
         ok('⛔ ករណីនោះមិនត្រូវរាយ ❌ (មិនអះអាងថាខូច)',
             state(html) !== 'bad', state(html));
+    }
+    // ── ការបន្តអាយុ Cookie ដោយស្វ័យប្រវត្តិ ────────────────────────────────
+    // ⛔ ច្បាប់ដដែលនឹងសាលក្រម auth ៖ **«មិនបានវាស់» មិនត្រូវរាយជាសាលក្រម**។
+    // `upstreamCookieSignal` ជារបស់ container នីមួយៗ ➜ diag អាចចុះលើ container
+    // ត្រជាក់ដែល **មិនទាន់ហៅ ZTO ម្តងណា** ➜ `observed: false` **មិនមែន**
+    // «Argus មិនផ្ញើ Set-Cookie» ទេ។ វាស់បានលើផលិតកម្មពិត (2026-09-09) ៖
+    // `observed:false · cacheEntries:0 · authAccepted/Rejected: null` ស៊ីគ្នា
+    // ទាំង ３ ➜ container ត្រជាក់ — មិនមែនភស្តុតាងអំពីការបន្តអាយុឡើយ។
+    // ការវាស់ទី ２ លើ container ក្តៅ ➜ `observed:true · setCookie:false` ➜
+    // នោះទើបជាភស្តុតាងថា Argus មិនផ្ញើ Cookie ថ្មី។
+    //
+    // ⛔ ការបន្ថែមនេះ **មិនត្រូវប្តូរសាលក្រម** ❌/⚠️/✅ ដែលជួរខាងលើចាក់សោ។
+    {
+        const base = { source: 'blob', fingerprint: 'a1b2c3d4', ageMs: 60000, authAcceptedAgeMs: 3000 };
+        const rowFor = async (cookieExtra, sessionRenewal) => {
+            const rt = buildRuntime({ cfg: ZTO_CFG, diagBody: { ok: true,
+                cookie: Object.assign({}, base, cookieExtra), sessionRenewal: sessionRenewal } });
+            return rt.api.healthLookupRow();
+        };
+
+        const coldHtml = await rowFor({ renewals: 0 }, { observed: false, setCookie: false, names: [], ageMs: null });
+        ok('⛔ ការបន្តអាយុមិនទាន់វាស់ ➜ ប្រាប់ថា «មិនទាន់វាស់»',
+            /មិនទាន់វាស់/.test(coldHtml), coldHtml.slice(0, 300));
+        ok('⛔ មិនទាន់វាស់ ➜ **មិនត្រូវ**អះអាងថា ZTO មិនផ្ញើ Cookie ថ្មី',
+            !/មិនផ្ញើ/.test(coldHtml), coldHtml.slice(0, 300));
+        ok('⛔ ការបន្ថែមមិនត្រូវប្តូរសាលក្រម auth (នៅ ✅ ដដែល)',
+            state(coldHtml) === 'ok', state(coldHtml));
+
+        const noSetHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: false, names: [], ageMs: 1000 });
+        ok('⛔ វាស់រួច · Argus មិនផ្ញើ ➜ ប្រាប់ត្រង់ៗ',
+            /មិនផ្ញើ/.test(noSetHtml), noSetHtml.slice(0, 300));
+        ok('⛔ ករណីនោះមិនត្រូវរាយថា «មិនទាន់វាស់»',
+            !/មិនទាន់វាស់/.test(noSetHtml), noSetHtml.slice(0, 300));
+        ok('⛔ ការបន្ថែមមិនត្រូវប្តូរសាលក្រម auth (នៅ ✅ ដដែល)',
+            state(noSetHtml) === 'ok', state(noSetHtml));
+
+        const canRenewHtml = await rowFor({ renewals: 0 }, { observed: true, setCookie: true, names: ['BOS-MAN-SESSION'], ageMs: 1000 });
+        ok('⛔ Argus ផ្ញើ Cookie ថ្មី ➜ ប្រាប់ថាបន្តអាយុបាន',
+            /បន្តអាយុ/.test(canRenewHtml) && !/មិនផ្ញើ/.test(canRenewHtml), canRenewHtml.slice(0, 300));
+
+        const renewedHtml = await rowFor({ renewals: 7 }, { observed: true, setCookie: true, names: ['BOS-MAN-SESSION'], ageMs: 1000 });
+        ok('⛔ បន្តអាយុពិត ➜ បង្ហាញចំនួនដង',
+            /7/.test(renewedHtml) && /បន្តអាយុ/.test(renewedHtml), renewedHtml.slice(0, 300));
+
+        ok('⛔ ឈ្មោះ cookie មិនត្រូវឡើងដល់ DOM',
+            !/BOS-MAN-SESSION/.test(renewedHtml) && !/BOS-MAN-SESSION/.test(canRenewHtml), renewedHtml.slice(0, 300));
+
+        for (const bad of [null, 'x', 42, [], { observed: 'yes' }]) {
+            const junkHtml = await rowFor({ renewals: bad }, bad);
+            ok('⛔ sessionRenewal ខូច (' + JSON.stringify(bad) + ') ➜ នៅតែរាយជួរបាន',
+                state(junkHtml) === 'ok' && junkHtml.length > 40, state(junkHtml));
+        }
     }
     {
         const rt = buildRuntime({ cfg: ZTO_CFG, testTimeoutMs: 20, fetchImpl: () => new Promise(() => {}) });

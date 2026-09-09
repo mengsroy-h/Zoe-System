@@ -58,7 +58,12 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'uncollectedValueForMonth', 'collectedValueOf',
     'collectedMoneyText', 'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem',
-    'buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal', 'collectedValueForMonth'];
+    'buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal', 'collectedValueForMonth',
+    'dbListenerViewIsStale', 'anyDbListenerViewIsStale', 'emptyViewMessage'];
+function readAppConst(name) {
+    const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(SRC);
+    return m ? m[1] : '\u0001none\u0001';
+}
 const missing = [];
 const bodies = WANT.map((n) => {
     const body = sliceFn(SRC, n);
@@ -101,6 +106,16 @@ function buildSandbox(state) {
         PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
         MONTHLY_REPORT_MONTH_PATTERN: /^\d{4}-\d{2}$/,
         MONTHLY_REPORT_UNKNOWN: '—',
+        VIEW_NOT_MEASURABLE_TEXT: readAppConst('VIEW_NOT_MEASURABLE_TEXT'),
+        VIEW_NOT_MEASURABLE_NOTICE: '\u23f3 ' + readAppConst('VIEW_NOT_MEASURABLE_TEXT'),
+        DB_LISTENER_KEY_HISTORY: readAppConst('DB_LISTENER_KEY_HISTORY'),
+        DB_LISTENER_KEY_DELETED: readAppConst('DB_LISTENER_KEY_DELETED'),
+        DB_LISTENER_KEY_DAILY_REVENUE: readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'),
+        DB_LISTENER_KEY_MONTHLY_REVENUE: readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'),
+        STATS_DAILY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
+        STATS_MONTHLY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'), readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
+        dbListenerPendingPaths: new Set(state.pending || []),
+        dbListenerFailedPaths: new Set(state.failed || []),
         MONTHLY_REPORT_MONEY_TOLERANCE: 0.005,
         collectedValueIsMeasurable: () => state.measurable !== false,
         getFormattedDate: () => '2026-09-30',

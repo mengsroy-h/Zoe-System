@@ -1483,11 +1483,16 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 - **Timeout របស់ Netlify គ្របដល់អាន body ចប់**; stream លើស 1 MB បដិសេធ
   មុន EOF។ EOF ខូចជា network ដែល retry បាន; 401/403 មិន retry ទោះ
   `body.cancel()` ព្យួរក៏ដោយ (`zto-network-boundaries-test.js`)។
-- **Capture ត្រូវរង់ចាំចម្លើយ Order Detail ដែលទទួលយក session**៖ តែ HTTPS
-  `POST /scan/get/order/detail` លើ host ពិត។ Request ទទេ, HTTP 401/403,
-  redirect/IdP និង JSON ខូច មិនអាចបញ្ជាក់ជោគជ័យ។ អាន response ចប់ និងបញ្ចូល
-  `Set-Cookie` ដែលត្រូវនឹង URL មុនបិទ browser; រក្សាពិដានពេល និងដក listener
-  រាល់ផ្លូវចេញ (`zto-cookie-capture-test.js`)។
+- **Capture ត្រូវរង់ចាំ *ចម្លើយ* ដែលបញ្ជាក់ថា ZTO ទទួលយក session**៖ HTTPS
+  `GET`/`POST` លើ **host ពិត** (⛔ **path ណាមួយ** — Cookie ជារបស់ **domain**
+  មិនមែន path)។ Request ទទេ, HTTP 401/403, redirect/IdP, OPTIONS/HEAD និង
+  JSON ខូច មិនអាចបញ្ជាក់ជោគជ័យ។ អាន response ចប់ និងបញ្ចូល `Set-Cookie`
+  ដែលត្រូវនឹង URL មុនបិទ browser; រក្សាពិដានពេល និងដក listener រាល់ផ្លូវចេញ។
+  ⛔ **ការចាក់សោ path `/scan/get/order/detail` ជាការថយក្រោយ** (2.31.2 ➜
+  អ្នកប្រើរាយការណ៍ 2026-09-09) ៖ វាបង្ខំឲ្យ **ស្កេនកញ្ចប់មួយរាល់ដង** ខណៈ
+  វាមិនបន្ថែមការការពារអ្វីទេ — ការការពារឋិតនៅ **ចម្លើយ** មិនមែននៅ path។
+  ⛔ ដូច្នេះ host ជាច្រកទ្វារ URL **តែមួយ** ➜ ការធូររបស់វា (`endsWith`) ត្រូវ
+  មានអ្នកយាម (`zto-cookie-capture-test.js` · `zto-cookie-sync-test.js`)។
 - **Fingerprint ដូចគ្នា បញ្ជាក់តែការផ្ទុក Cookie**៖ សាលក្រមមាន ៣ គឺ
   ទទួលយក/បដិសេធ/មិនទាន់វាស់។ `--auto` មិនបើក browser ព្រោះស្ថានភាពមិនទាន់
   វាស់ទេ (`zto-cookie-sync-test.js` · `zto-cookie-capture-test.js`)។

@@ -18,18 +18,21 @@
 
 មកនៅត្រឹម៖
 
-`double-click sync-zto-cookie.cmd ➜ Login Argus បើចាំបាច់ ➜ បើកកញ្ចប់មួយ`
+`double-click sync-zto-cookie.cmd ➜ Login Argus បើចាំបាច់ ➜ រង់ចាំវាចាប់`
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
 `%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ហើយចាប់បន្ទាត់ `Cookie:` ពី
-**សំណើ Order Detail ពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
+**សំណើពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
 `document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថាត្រឡប់
 បញ្ជីទទេលើ Edge របស់អ្នកទេ។
 
-ឧបករណ៍រង់ចាំ **ចម្លើយជោគជ័យពី Order Detail** មុនបិទ browser។ សូមចូល
-**Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។ វាបញ្ចូល
-ការបន្ត `Set-Cookie` ពីចម្លើយនោះ មុនយក Cookie ទៅរក្សាទុក។ បើ ZTO បដិសេធ
-session វានៅរង់ចាំ ដើម្បីឲ្យអ្នក Login និងសាក Waybill ម្ដងទៀត។
+ឧបករណ៍រង់ចាំ **ចម្លើយជោគជ័យ** ពី API host នោះ (2xx · JSON · envelope
+ជោគជ័យ) មុនបិទ browser ៖ នោះជាភស្តុតាងថា ZTO **ទទួលយក** session នោះពិត។
+ជាទូទៅ **ការ Login រួច** គឺគ្រប់គ្រាន់ ព្រោះ Argus ហៅ API ភ្លាមក្រោយចូល។
+បើវានៅរង់ចាំ សូមចូល **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន
+Waybill មួយ។ វាបញ្ចូលការបន្ត `Set-Cookie` ពីចម្លើយនោះ មុនយក Cookie ទៅ
+រក្សាទុក។ បើ ZTO បដិសេធ session (401/403 ឬទំព័រ Login) វា **មិនចាប់ទេ** —
+វានៅរង់ចាំ ដើម្បីឲ្យអ្នក Login ម្ដងទៀត។
 
 បន្ទាប់មកវាហៅ Netlify API ដោយផ្ទាល់ ដើម្បីសរសេរ Cookie ចូល
 **Netlify Blobs** (store `zto-auth` ➜ ឈ្មោះខាងក្នុង `site:zto-auth`,
@@ -43,7 +46,7 @@ key `cookie`)៖
 `site:zto-auth`)។ ការសរសេរទៅឈ្មោះឥតបច្ច័យ ធ្លាក់ចូល namespace ចាស់ ➜
 Netlify ឆ្លើយជោគជ័យ តែ Function អានមិនឃើញ។
 
-⛔ **វាលែង trigger deploy ទៀតទេ** — តាំងពី 2026-09-02 ZoeW Function អាន
+⛔ **វាមិន trigger deploy ទេ** — ZoeW Function អាន
 Cookie ចេញពី Blobs **ពេលមានសំណើ** ដូច្នេះការប្តូរមានប្រសិទ្ធភាព
 **ជាធម្មតាក្នុងរយៈពេលមួយនាទី ដោយគ្មានការ redeploy**។
 
@@ -73,7 +76,7 @@ env ទាំងនេះ និងមិនបង្កើតវាទេ; វ�
 | `ZTO_PROXY_KEY` | សោចៃដន្យ ៣២ bytes (វិធីបង្កើតនៅខាងក្រោម) | ✅ Yes | **Functions** | **Production** |
 | `ZTO_COOKIE` | **ស្រេចចិត្ត** — ផ្លូវបម្រុងពេល Blobs ដាច់ | ✅ Yes | **Functions** | **Production** |
 
-តាំងពី 2026-09-02 **`ZTO_COOKIE` លែងចាំបាច់ទៀតទេ** ៖ helper សរសេរ Cookie ចូល
+**`ZTO_COOKIE` មិនចាំបាច់ទេ** ៖ helper សរសេរ Cookie ចូល
 Netlify Blobs ដោយផ្ទាល់។ ទុកវាបានជា **ផ្លូវបម្រុង** — Function ប្រើ env នេះ
 តែពេលអានចេញពី Blobs មិនបាន។ បើអ្នកមានតម្លៃចាស់ក្នុងនោះរួច **កុំលុបវាចេញ**។
 
@@ -128,7 +131,7 @@ screenshot ឬដាក់ក្នុង repo។ អ្នកអាច revoke �
 7. ឧបករណ៍ផ្ទៀងផ្ទាត់ token + site តាម Netlify API។ ឃើញ
    `OK: setup is complete` គឺចប់។
 
-⛔ **សារទាំងអស់ក្នុង cmd ជាភាសាអង់គ្លេស** (សំណើអ្នកប្រើ 2026-09-02) ព្រោះ
+⛔ **សារទាំងអស់ក្នុង cmd ជាភាសាអង់គ្លេស** ព្រោះ
 `cmd.exe` បង្ហាញអក្សរខ្មែរបែកបាក់ពិបាកអាន។ ឯកសារនេះនៅជាខ្មែរដដែល។
 
 **រត់ `setup.cmd` ឡើងវិញបានគ្រប់ពេល ដោយមិនបាត់អ្វី។** វាបង្ហាញតម្លៃចាស់
@@ -167,12 +170,12 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 
 1. Double-click **`sync-zto-cookie.cmd`**។
 2. Edge/Chrome profile ពិសេសបើក Argus។
-3. បើ ZTO សុំ សូម Login ជាធម្មតា រួច **ចូល Scan Management ➜ Arrival Scan**
-   ហើយ **វាយ ឬស្កេន Waybill មួយ**។ ⛔ វាស់រួច (2026-09-02) ៖ Cookie
-   `BOS-MAN-SESSION` លេចឡើង **តែពេលសំណើ Order Detail បាញ់** — ការ Login
-   តែម្យ៉ាង ឬការបើកទំព័រទទេ **មិនគ្រប់គ្រាន់ទេ**។
-4. រង់ចាំ Order Detail ឆ្លើយជោគជ័យ។ ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ
-   Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។ **មិនចាំបាច់ redeploy ទេ**។
+3. បើ ZTO សុំ សូម **Login ជាធម្មតា** រួច **ទុកទំព័រនោះចោល**។ ឧបករណ៍
+   បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយជោគជ័យ (ជាទូទៅ
+   Argus ហៅ API ភ្លាមក្រោយ Login)។ បើវានៅរង់ចាំ សូមចូល **Scan Management
+   ➜ Arrival Scan** ហើយ **វាយ ឬស្កេន Waybill មួយ**។
+4. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
+   **មិនចាំបាច់ redeploy ទេ**។
 5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា
    **ផ្ទៀងផ្ទាត់ដោយខ្លួនឯង** ថា Function ឃើញ Cookie ថ្មីពិត ៖
    `OK: stored cookie verified in the Function (source: blob, a1b2c3d4).`
@@ -184,7 +187,7 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 អាយុសុពលភាព session សម្រេចដោយ ZTO។ ការទើប Sync ឬលេខ fingerprint ដូចគ្នា
 មិនធានាថានៅសល់សុពលភាពប៉ុន្មាននាទីទេ។
 
-⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** (សំណើអ្នកប្រើ 2026-09-02) ៖
+⛔ **Cookie ដែលចាប់បាន ត្រូវបង្ហាញលើអេក្រង់** ៖
 
 ```text
 --- Cookie captured from Argus (paste into ZTO_COOKIE if you ever need a fallback) ---
@@ -221,7 +224,7 @@ ERROR: --auto mode needs these missing values:
 ដំណោះស្រាយ ៖ រត់ `setup.cmd` ម្តងទៀត ចុច Enter កាត់ prompt ដែលមានតម្លៃរួច
 រួចបំពេញតែ ២ នោះ។
 
-Cookie ត្រូវបានបង្ហាញក្នុង console **ដោយចេតនា** (សំណើអ្នកប្រើ) តែវា
+Cookie ត្រូវបានបង្ហាញក្នុង console **ដោយចេតនា** តែវា
 **មិនសរសេរចូល config/file** និងមិនចូល shell history ទេ។ Netlify API response ដែលអាចពាក់ព័ន្ធនឹង secret ត្រូវបោះចោល
 ដោយមិនបង្ហាញ body។ Chrome/Edge profile ពិសេសនៅតែផ្ទុក session ដោយការអ៊ិនគ្រីប
 របស់ browser ដូច profile ធម្មតា — កុំចែករំលែកថត
@@ -243,7 +246,7 @@ sync-zto-cookie.cmd
 | `'orlevel'` / `'utionPolicy' is not recognized` | អ្នកកំពុងប្រើ `.cmd` UTF-8 ចាស់។ ទាញកំណែថ្មីដែលជា ASCII + CRLF រួចជំនួស `setup.cmd` និង `sync-zto-cookie.cmd` ទាំង ២ |
 | មិនទាន់ Setup/config/token | បើក `setup.cmd` |
 | Browser launch failed | បិទបង្អួច ZTO Cookie Sync ចាស់ទាំងអស់ រួចសាកវិញ |
-| មិនឃើញ Order Detail request | Login Argus ហើយបើក/ស្វែងរកកញ្ចប់មួយ |
+| រង់ចាំយូរដោយមិនចាប់ (`no signed-in ZTO API answer`) | Login Argus ឲ្យរួច; បើនៅរង់ចាំ សូមចូល Scan Management ➜ Arrival Scan ហើយស្កេន Waybill មួយ |
 | Netlify បដិសេធ Site ID ឬ Token | រត់ `setup.cmd` ហើយបញ្ចូលថ្មី |
 | Netlify មិនអនុញ្ញាតឲ្យសរសេរ Cookie store | ពិនិត្យថា PAT មានសិទ្ធិលើ ZoeW site; ការស្កេននៅតែប្រើ `ZTO_COOKIE` env ជាបម្រុង |
 | `It is still reading ZTO_COOKIE (env), not the blob` | ពិនិត្យថា deploy ចុងក្រោយរួចរាល់; សារនោះបន្ថែម `store reason: …` ដែលប្រាប់ថាជាប់ត្រង់ណា (`empty` · `no-context` · `read:…`) |
@@ -271,7 +274,7 @@ sync-zto-cookie.cmd
 
 | អ្វី | របៀបការពារ |
 |---|---|
-| **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់តាមសំណើអ្នកប្រើ** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
+| **Cookie ZTO** | រស់ក្នុងសតិ ហើយ **បង្ហាញលើអេក្រង់ដោយចេតនា** — តែ **មិនសរសេរចូល file/config** និងមិនចូល shell history |
 | **Netlify Personal Access Token** | អ៊ិនគ្រីបដោយ **Windows DPAPI / CurrentUser** ក្នុង `%LOCALAPPDATA%` — Windows user ផ្សេង ឬកុំព្យូទ័រផ្សេងដោះសោមិនបាន |
 | **`ZTO_PROXY_KEY`** (ស្រេចចិត្ត) | អ៊ិនគ្រីបដោយ **DPAPI ដដែល** ក្នុង `proxy-key.dpapi`; មិនចូល URL · មិនចូល command line · មិនបោះពុម្ព |
 | **ការហៅ Netlify API** | HTTPS origin ថេរ · `redirect: 'error'` · timeout គ្របដល់ body ចប់ · JSON មានពិដាន 1 MB · response body មិនបង្ហាញ |

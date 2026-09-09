@@ -9,7 +9,10 @@ const { spawn } = require('child_process');
 const TOOL_DIR = __dirname;
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
 const API_HOST = 'aargus-api.ztoglobal.com';
-const ORDER_DETAIL_PATH = '/scan/get/order/detail';
+// ⛔ OPTIONS (preflight) និង HEAD មិនបញ្ជាក់ថា ZTO ទទួលយក session ទេ —
+// preflight មិនផ្ញើ Cookie សោះ។ មានតែ GET និង POST ដែល ZTO
+// ឆ្លើយមកដោយ envelope ជោគជ័យ ទើបជាភស្តុតាង។
+const CAPTURE_METHODS = ['GET', 'POST'];
 const CAPTURE_TIMEOUT_MS = 10 * 60 * 1000;
 const CAPTURE_RESPONSE_TIMEOUT_MS = 10 * 1000;
 
@@ -73,11 +76,17 @@ function statusIsTransient(status) {
     return code >= 500 && code < 600;
 }
 
+// ⛔ Cookie ជារបស់ **domain** មិនមែន **path** — សំណើណាមួយទៅ
+// API host ក៏ផ្ទុក `BOS-MAN-SESSION` ដដែល។ ការទាមទារ path
+// `/scan/get/order/detail` មិនបន្ថែមការការពារណាមួយទេ — ការការពារពិត
+// ឈរនៅក្នុង **ចម្លើយ** (2xx · JSON · envelope ជោគជ័យ · មិនមែន
+// 401/403 និងមិនមែនទំព័រ Login) — ចំណែក path ត្រឹមតែបង្ខំអ្នកប្រើ
+// ឲ្យស្កេនកញ្ចប់មួយរាល់ដង (រង្វាស់នៅ 2.31.2 ➜ អ្នកប្រើរាយការណ៍)។
 function isTargetApiUrl(raw) {
     try {
         const url = new URL(String(raw || ''));
         return url.protocol === 'https:' && url.hostname === API_HOST
-            && !url.port && !url.username && !url.password && url.pathname === ORDER_DETAIL_PATH;
+            && !url.port && !url.username && !url.password;
     } catch (_) {
         return false;
     }
@@ -783,7 +792,8 @@ function waitForOrderCookie(context, timeoutMs, options) {
         const onResponse = (response) => {
             if (settled || pending.size >= 4 || !isTargetApiUrl(response.url())) return;
             const request = response.request();
-            if (!request || request.method() !== 'POST' || !isTargetApiUrl(request.url())) return;
+            if (!request || !isTargetApiUrl(request.url())) return;
+            if (CAPTURE_METHODS.indexOf(String(request.method() || '').toUpperCase()) < 0) return;
             const status = response.status();
             if (status < 200 || status >= 300) return;
             const job = { active: true, cancel: () => {} };
@@ -829,9 +839,10 @@ async function captureCookieHeader() {
         const page = pages[0] || await context.newPage();
         console.log('Argus is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
         console.log('   1. Log in to Argus (if ZTO asks for it).');
-        console.log('   2. Open Scan Management -> Arrival Scan.');
-        console.log('   3. Type or scan one Waybill -> the Order Detail request fires.');
-        console.log('   This tool waits for a successful Order Detail response before continuing.');
+        console.log('   2. Stay on the page. This tool continues by itself as soon as ZTO');
+        console.log('      answers one signed-in API call with success.');
+        console.log('   3. If it keeps waiting, open Scan Management -> Arrival Scan and');
+        console.log('      type or scan one Waybill.');
         try {
             await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
@@ -845,7 +856,7 @@ async function captureCookieHeader() {
 
 function safeFailureMessage(code) {
     const messages = {
-        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no Order Detail request. Log in to Argus and open one parcel.',
+        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no signed-in ZTO API answer. Log in to Argus, then scan one Waybill.',
         BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
         BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
         BROWSER_NOT_FOUND: 'Microsoft Edge or Google Chrome was not found.',

@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.5';
+    const APP_VERSION = '2.31.6';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5905,9 +5905,10 @@
         }
     }
 
-    function buildStatCardItem(label, key, cod, dod, count, uncollected, measurable) {
+    function buildStatCardItem(label, key, cod, dod, count, collectedValue, measurable) {
         const totalD = Math.round((cod + dod) * 100) / 100;
-        const collected = collectedValueOf(cod, dod, uncollected);
+        const collected = (collectedValue && typeof collectedValue === 'object')
+            ? collectedValue : { cod: 0, dod: 0, total: 0 };
         const pending = Math.round(Math.max(0, totalD - collected.total) * 100) / 100;
         const div = document.createElement('div');
         div.className = 'stat-card-item';
@@ -6629,7 +6630,7 @@
                 const data = dailyRevenueData[dateStr] || {};
                 container.appendChild(buildStatCardItem('ថ្ងៃទី', dateStr,
                     statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
-                    uncollectedMap[dateStr], measurable));
+                    collectedValueOf(data.codDollar, data.dodDollar, uncollectedMap[dateStr]), measurable));
             });
         }
 
@@ -6652,7 +6653,7 @@
                 const data = monthlyRevenueData[ym] || {};
                 container.appendChild(buildStatCardItem('ខែ', ym,
                     statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
-                    uncollectedValueForMonth(uncollectedMap, ym), measurable));
+                    collectedValueForMonth(dailyRevenueData, uncollectedMap, ym), measurable));
             });
         }
 
@@ -8115,16 +8116,21 @@
         return out;
     }
 
-    function uncollectedValueForMonth(map, ym) {
-        const out = { cod: 0, dod: 0 };
-        const source = (map && typeof map === 'object') ? map : {};
+    function collectedValueForMonth(revenueMap, uncollectedMap, ym) {
+        const source = (revenueMap && typeof revenueMap === 'object') ? revenueMap : {};
+        const open = (uncollectedMap && typeof uncollectedMap === 'object') ? uncollectedMap : {};
+        let cod = 0;
+        let dod = 0;
         Object.keys(source).forEach((date) => {
             if (statsMonthOf(date) !== ym) return;
             const bucket = source[date] || {};
-            out.cod += statsMoney(bucket.cod);
-            out.dod += statsMoney(bucket.dod);
+            const day = collectedValueOf(bucket.codDollar, bucket.dodDollar, open[date]);
+            cod += day.cod;
+            dod += day.dod;
         });
-        return out;
+        cod = Math.round(cod * 100) / 100;
+        dod = Math.round(dod * 100) / 100;
+        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100 };
     }
 
     function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
@@ -10786,14 +10792,6 @@
         let pickupApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
-        const revertPickupDeltaAfterNoOp = () => {
-            if (!pickupApplied) return;
-            const pickupChanged = pickupApplied.changed;
-            revertPickupMarks(pickupApplied);
-            pickupApplied = null;
-            refreshCurrentHistoryView();
-            if (pickupChanged) showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
-        };
         const reconcilePickupDeltaWithServer = () => {
             if (!serverPickupMarks) return;
             pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);
@@ -11292,14 +11290,6 @@
         let pickupApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
-        const revertPickupDeltaAfterNoOp = () => {
-            if (!pickupApplied) return;
-            const pickupChanged = pickupApplied.changed;
-            revertPickupMarks(pickupApplied);
-            pickupApplied = null;
-            refreshCurrentHistoryView();
-            if (pickupChanged) showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ស្ថិតិត្រូវបានកែតម្រូវវិញ។");
-        };
         const reconcilePickupDeltaWithServer = () => {
             if (!serverPickupMarks) return;
             pickupApplied = reapplyPickupMarks(pickupApplied, serverPickupMarks, pickupScanDate, pickupSeed);

@@ -172,6 +172,69 @@ console.log('\n=== ៤. ច្រកទ្វារសុវត្ថិភា�
     ok('⛔ កំព្រា ១០០% ➜ មិនបញ្ចេញឯកសារ', r3.payload === null);
 }
 
+// ── សេណារីយ៉ូ ៤ខ ៖ dump ដែល `redact-dump.js` សម្អាតរួច ────────────────────
+// 🔴 អ្នកប្រើរាយការណ៍ពិត (2026-09-09) ៖ រត់លើ dump សម្អាតរួច ➜ ទទួលបាន hash
+// ៤១៥។ ការសម្អាតរក្សា **ទំនាក់ទំនងម្ចាស់** (namespace តែមួយ · ការកែ b6cc107)
+// ➜ ច្រកទ្វារ «កំព្រា ១០០%» **មិនបាញ់** ➜ ឧបករណ៍បញ្ចេញ payload ឥតប្រយោជន៍
+// (កូនសោពិតជាអក្សរធំជានិច្ច ➜ hash អក្សរតូចមិនអាចមានក្នុង registry ពិត)។
+console.log('\n=== ៤ខ. dump ដែលសម្អាតរួច ➜ ត្រូវបដិសេធ ===');
+{
+    // ⛔ បច្ច័យត្រូវអានចេញពី redact-dump.js ពិត — កុំចាក់ literal ក្នុងតេស្ត
+    let prefix = 'id_';
+    try {
+        const rd = fs.readFileSync(path.join(ROOT, 'audit-tools', 'redact-dump.js'), 'utf8');
+        const m = /const\s+r\s*=\s*'([A-Za-z0-9_]{1,12})'\s*\+\s*d\s*;/.exec(rd);
+        if (m) prefix = m[1];
+    } catch (e) {}
+    const hashKey = (n) => prefix + ('0123abcd' .slice(0, 4) + String(n).padStart(4, '0'));
+    const registry = {};
+    for (let i = 0; i < 20; i++) registry[hashKey(i)] = true;
+    registry[prefix + 'deadbeef'] = true;
+    const dump = writeDump('redacted.json', {
+        // ⛔ ម្ចាស់ ១ ត្រូវផ្គូផ្គង ➜ កំព្រា **មិនមែន ១០០%** ➜ ច្រកទ្វារ ៣ មិនបាញ់
+        zoew_scan_history_cod_dod: { i1: { id: 'i1', barcodes: [{ code: prefix + 'deadbeef' }] } },
+        zoew_recently_deleted_cod_dod: {},
+        zoew_barcode_registry: registry
+    });
+    const outFile = path.join(TMP, 'out4b.json');
+    const r = run(dump, outFile);
+    ok('⛔ dump សម្អាតរួច ➜ បដិសេធ (exit != 0)', r.code !== 0, r.code);
+    ok('⛔ dump សម្អាតរួច ➜ **មិនបញ្ចេញឯកសារ**', r.payload === null, r.payload);
+    ok('⛔ សារត្រូវប្រាប់ថាជា dump សម្អាតរួច (មិនមែនសារកំព្រា ១០០%)',
+        /REDACTED/.test(r.out) && !/KEY-FORMAT MISMATCH/.test(r.out), r.out.slice(-300));
+    ok('⛔ ជាន់អប្បបរមា ៖ ករណីនេះកំព្រា **មិនមែន ១០០%** (ច្រកទ្វារ ៣ មិនបាញ់)',
+        /orphan keys   : 20\b/.test(r.out) || /orphan keys/.test(r.out), r.out.slice(0, 400));
+}
+
+// ── សេណារីយ៉ូ ៤គ ៖ ⛔ ទិសផ្ទុយ — barcode ពិតដែល *មើលទៅដូច* hash ─────────
+// ⛔ `barcodeRegistryKey()` ធ្វើ `.toUpperCase()` ជានិច្ច ➜ កូនសោពិត
+// **មិនអាចមានបច្ច័យអក្សរតូច** បានឡើយ។ ដូច្នេះការរាវរក «សម្អាតរួច» ត្រូវ
+// ចាក់លើ **បច្ច័យអក្សរតូច** ប៉ុណ្ណោះ។ បើនរណាម្នាក់ធ្វើឲ្យវាមិនប្រកាន់
+// អក្សរតូចធំ ➜ អ្នកប្រើដែលស្កេន barcode ឈ្មោះបែបនោះ **លែងអាចសម្អាត
+// registry បានជារៀងរហូត** (ការបដិសេធក្លែងក្លាយ)។
+console.log('\n=== ៤គ. ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែលមើលទៅដូច hash ➜ មិនត្រូវបដិសេធ ===');
+{
+    let prefix = 'id_';
+    try {
+        const rd = fs.readFileSync(path.join(ROOT, 'audit-tools', 'redact-dump.js'), 'utf8');
+        const m = /const\s+r\s*=\s*'([A-Za-z0-9_]{1,12})'\s*\+\s*d\s*;/.exec(rd);
+        if (m) prefix = m[1];
+    } catch (e) {}
+    const upper = prefix.toUpperCase();          // កូនសោពិតតែងតែជាអក្សរធំ
+    const dump = writeDump('lookalike.json', {
+        zoew_scan_history_cod_dod: { i1: { id: 'i1', barcodes: [{ code: upper + 'ABCDEF' }] } },
+        zoew_recently_deleted_cod_dod: {},
+        zoew_barcode_registry: { [upper + 'ABCDEF']: true, [upper + 'DEADBEEF']: true }
+    });
+    const outFile = path.join(TMP, 'out4c.json');
+    const r = run(dump, outFile);
+    ok('⛔ កូនសោពិត (អក្សរធំ) មិនត្រូវរាយជា «សម្អាតរួច»',
+        !/REDACTED/.test(r.out), r.out.slice(-260));
+    ok('⛔ វានៅតែបញ្ចេញ payload ធម្មតា', !!r.payload, r.out.slice(-260));
+    const keys = r.payload ? Object.keys(r.payload) : [];
+    ok('កូនសោកំព្រាពិតនៅតែចាប់បាន', keys.length === 1 && keys[0] === upper + 'DEADBEEF', keys);
+}
+
 // ── សេណារីយ៉ូ ៥ ៖ ⛔ ទិសផ្ទុយ — គ្មានកំព្រា ➜ មិនត្រូវបញ្ចេញឯកសារ ────────
 console.log('\n=== ៥. ⛔ ទិសផ្ទុយ ៖ registry ស្អាត ➜ គ្មានអ្វីត្រូវលុប ===');
 {

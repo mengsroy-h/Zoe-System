@@ -42,6 +42,16 @@ const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
 const REGISTRY_NODE = 'zoew_barcode_registry';
 const CHUNK_MAX = 5000;
 
+// ⛔ បច្ច័យរបស់ `redact-dump.js` ត្រូវអានចេញពីឯកសារពិត — កុំចាក់ literal
+function redactedPrefix() {
+    try {
+        const src = fs.readFileSync(path.join(ROOT, 'audit-tools', 'redact-dump.js'), 'utf8');
+        const m = /const\s+r\s*=\s*'([A-Za-z0-9_]{1,12})'\s*\+\s*d\s*;/.exec(src);
+        if (m) return m[1];
+    } catch (e) {}
+    return 'id_';
+}
+
 const args = process.argv.slice(2).filter((a) => !a.startsWith('-'));
 const file = args[0];
 const outArg = args[1];
@@ -147,6 +157,24 @@ console.log('registry keys : ' + registryKeys.length);
 console.log('owned barcodes: ' + owned.size);
 console.log('orphan keys   : ' + orphans.length);
 console.log('');
+
+// ── ច្រកទ្វារ ៤ ៖ dump ដែល `redact-dump.js` សម្អាតរួច ────────────────────
+// 🔴 វាស់បាន (2026-09-09, អ្នកប្រើរាយការណ៍) ៖ ការសម្អាតជំនួស barcode ដោយ
+// `<prefix><hash 8>` ហើយវា **រក្សាទំនាក់ទំនងម្ចាស់** (namespace តែមួយ) ➜
+// ច្រកទ្វារ «កំព្រា ១០០%» **មិនបាញ់** ➜ ឧបករណ៍បញ្ចេញ hash ដែលឥតប្រយោជន៍។
+// ⛔ កូនសោ registry ពិត **មិនអាចជាអក្សរតូចបានទេ** — `barcodeRegistryKey()`
+// ធ្វើ `.toUpperCase()` ជានិច្ច ➜ ទម្រង់ `<prefix>` + hex អក្សរតូច ជាស្នាម
+// ច្បាស់លាស់នៃការសម្អាត មិនមែន barcode ពិតទេ។
+const REDACT_RE = new RegExp('^' + redactedPrefix().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[0-9a-f]{6,}$');
+const redacted = registryKeys.filter((k) => REDACT_RE.test(k));
+if (redacted.length) {
+    console.log('REFUSED: this dump looks REDACTED (' + redacted.length + '/' + registryKeys.length
+        + ' keys match the redact-dump.js hash shape).');
+    console.log('  Those keys are hashes, not real barcodes: deleting them would do NOTHING');
+    console.log('  because they do not exist in the real registry (real keys are UPPERCASE).');
+    console.log('  Re-run this on the ORIGINAL Export JSON, not the redacted copy.');
+    process.exit(4);
+}
 
 if (!orphans.length) {
     console.log('OK: every registry key has an owner. Nothing to delete.');

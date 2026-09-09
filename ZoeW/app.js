@@ -12588,7 +12588,7 @@
     }
 
     const ZTO_STATUS_STORE_KEY = 'zoew_zto_pickup_status_v1';
-    const ZTO_STATUS_TTL_MS = 3 * 60 * 60 * 1000;
+    const ZTO_STATUS_TTL_MS = 12 * 60 * 60 * 1000;
     const ZTO_STATUS_MAX = 300;
     const ZTO_STATUS_SWEEP_DELAY_MS = 1500;
     const ZTO_STATUS_SWEEP_GAP_MS = 20000;
@@ -12652,43 +12652,53 @@
         return cfg;
     }
 
-    function collectClosedBarcodesForZtoStatus(dataToScan = scanHistory) {
+    function ztoStatusTrashItemCounts(item) {
+        if (!item || trashReasonOf(item) !== 'pickup') return false;
+        return elapsedSince(parseFloat(item.deletedAt)) <= ZTO_STATUS_TTL_MS;
+    }
+
+    function collectClosedBarcodesForZtoStatus(dataToScan = scanHistory, trashToScan = deletedItems) {
         const out = [];
         const seen = new Set();
-        if (!Array.isArray(dataToScan)) return out;
-        for (let i = 0; i < dataToScan.length; i++) {
-            const item = dataToScan[i];
-            const list = item && Array.isArray(item.barcodes) ? item.barcodes : null;
-            if (!list) continue;
-            for (let j = 0; j < list.length; j++) {
-                const b = list[j];
-                if (!b || !b.isClosed) continue;
-                const key = pickupBarcodeKey(b.code);
-                if (!key || seen.has(key)) continue;
-                seen.add(key);
-                out.push({ key: key, code: String(b.code || '') });
+        const addFrom = (list, trashSide) => {
+            if (!Array.isArray(list)) return;
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                if (trashSide && !ztoStatusTrashItemCounts(item)) continue;
+                const codes = item && Array.isArray(item.barcodes) ? item.barcodes : null;
+                if (!codes) continue;
+                for (let j = 0; j < codes.length; j++) {
+                    const b = codes[j];
+                    if (!b || !b.isClosed) continue;
+                    const key = pickupBarcodeKey(b.code);
+                    if (!key || seen.has(key)) continue;
+                    seen.add(key);
+                    out.push({ key: key, code: String(b.code || '') });
+                }
             }
-        }
+        };
+        addFrom(dataToScan, false);
+        addFrom(trashToScan, true);
         return out;
     }
 
-    function ztoStatusPendingCodes(dataToScan = scanHistory) {
+    function ztoStatusPendingCodes(dataToScan = scanHistory, trashToScan = deletedItems) {
         loadZtoPickupStatusOnce();
         let hasOpenVerdict = false;
         ztoPickupStatus.forEach((entry) => { if (entry && entry.closed === false) hasOpenVerdict = true; });
         if (!hasOpenVerdict) return [];
         const out = [];
-        collectClosedBarcodesForZtoStatus(dataToScan).forEach((entry) => {
+        collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
             const verdict = ztoPickupStatus.get(entry.key);
             if (verdict && verdict.closed === false) out.push(entry.code);
         });
         return out;
     }
 
-    function renderZtoSyncBanner(dataToScan = scanHistory) {
+    function renderZtoSyncBanner(dataToScan = scanHistory, trashToScan = deletedItems) {
         const banner = document.getElementById('ztoSyncBanner');
         if (!banner) return;
-        const pending = ztoStatusPendingCodes(dataToScan);
+        const pending = ztoStatusPendingCodes(dataToScan, trashToScan);
         const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
         const signature = codes.length + '|' + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
         if (signature === ztoStatusBannerSig) return;
@@ -12735,7 +12745,7 @@
         return data && typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null;
     }
 
-    async function runZtoStatusSweep(force, dataToScan = scanHistory) {
+    async function runZtoStatusSweep(force, dataToScan = scanHistory, trashToScan = deletedItems) {
         const cfg = ztoStatusFeatureConfig();
         if (!cfg) return 0;
         if (ztoStatusInFlight) return 0;
@@ -12746,7 +12756,7 @@
         if (!force && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return 0;
         loadZtoPickupStatusOnce();
         ztoStatusLastSweepAt = getServerNow();
-        const work = collectClosedBarcodesForZtoStatus(dataToScan)
+        const work = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
             .filter((entry) => {
                 const verdict = ztoPickupStatus.get(entry.key);
                 if (!verdict) return true;

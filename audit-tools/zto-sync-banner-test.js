@@ -170,6 +170,57 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     state = await bannerState();
     ok('⛔ Barcode បើកវិញ ➜ របាលាក់ (សាលក្រមចាស់មិនកាន់កាប់)', state.hidden === true, state);
 
+    console.log('\n== ៣ខ. ការសម្អាត ២ ម៉ោង ➜ ធុងសំរាម (របាមិនត្រូវបាត់) ==');
+
+    // ⛔ ថ្នាក់កំហុស ៖ ច្បាប់ ២ ម៉ោងផ្លាស់ barcode បិទចេញពី `scanHistory` ចូល
+    // ធុងសំរាម (`trashReason: 'pickup'`) ➜ បើរបាស្កេនតែប្រវត្តិ នោះការដាស់តឿន
+    // **រលត់ស្ងាត់ៗ** ខណៈកញ្ចប់នោះនៅតែមិនទាន់បិទក្នុង Palm ➜ ការភ្លេចនោះ
+    // **គ្មានអ្នកណាប្រាប់ទៀតទេ** ជារៀងរហូត។ ច្បាប់ដដែលនឹង `uncollectedValueByDate()`
+    // ៖ ត្រូវស្កេន **ទាំង ២ បញ្ជី**។
+    await setup(ZTO_URL);
+    const afterCleanup = await page.evaluate((trashItem) => {
+        setZtoPickupVerdict('BAR000001', false);
+        renderZtoSyncBanner([], [trashItem]);
+        const banner = document.getElementById('ztoSyncBanner');
+        return { hidden: banner.classList.contains('hidden'), text: banner.textContent || '' };
+    }, {
+        id: 't1', phone: '011', trashReason: 'pickup', isFromDeletion: true,
+        deletedAt: Date.now(), barcodes: [{ code: 'BAR000001', isClosed: true, isFromDeletion: true }]
+    });
+    ok('⛔ បិទរួច ➜ ចូលធុងសំរាម `pickup` ➜ របា **នៅតែលេច**',
+        afterCleanup.hidden === false && afterCleanup.text.indexOf('BAR000001') !== -1, afterCleanup);
+
+    // ⛔ ទិសផ្ទុយ ៖ ធុងសំរាមប្រភេទផ្សេង **មិនរាប់** — «ដក» និង «ផុតកំណត់»
+    // ដកលុយចេញ ហើយកញ្ចប់ត្រឡប់ទៅសាខាកណ្តាល ➜ ស្ថានភាព ZTO លែងពាក់ព័ន្ធ។
+    for (const reason of ['remove', 'expired', 'delete']) {
+        const other = await page.evaluate((args) => {
+            clearZtoPickupStatusStore();
+            setZtoPickupVerdict('BAR000009', false);
+            renderZtoSyncBanner([], [{
+                id: 't2', phone: '011', trashReason: args.reason, deletedAt: Date.now(),
+                barcodes: [{ code: 'BAR000009', isClosed: true }]
+            }]);
+            const banner = document.getElementById('ztoSyncBanner');
+            return banner.classList.contains('hidden');
+        }, { reason: reason });
+        ok('⛔ ទិសផ្ទុយ ៖ ធុងសំរាម «' + reason + '» ➜ របាលាក់', other === true, other);
+    }
+
+    // ⛔ ធុងសំរាមរក្សា ៣០ ថ្ងៃ ➜ ត្រូវមានព្រំដែនអាយុ បើមិនដូច្នេះរបាដាស់តឿន
+    // កញ្ចប់ចាស់ជាសប្តាហ៍។
+    const tooOld = await page.evaluate(() => {
+        clearZtoPickupStatusStore();
+        setZtoPickupVerdict('BAR000010', false);
+        renderZtoSyncBanner([], [{
+            id: 't3', phone: '011', trashReason: 'pickup',
+            deletedAt: Date.now() - (48 * 60 * 60 * 1000),
+            barcodes: [{ code: 'BAR000010', isClosed: true }]
+        }]);
+        const banner = document.getElementById('ztoSyncBanner');
+        return banner.classList.contains('hidden');
+    });
+    ok('⛔ ធុងសំរាមចាស់ជាងព្រំដែន ➜ របាលាក់', tooOld === true, tooOld);
+
     console.log('\n== ៤. មុខងារដេកលក់ ==');
 
     await setup(PLAIN_URL);

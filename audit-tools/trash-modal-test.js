@@ -167,7 +167,9 @@ vm.createContext(ctx);
  sliceFn(src, 'trashItemCodes'),
  sliceFn(src, 'trashGroupKeyOf'),
  sliceFn(src, 'buildTrashGroups'),
- sliceFn(src, 'trashGroupMatchesQuery')].forEach((code, i) => {
+ sliceFn(src, 'trashGroupMatchesQuery'),
+ sliceFn(src, 'trashSummaryCardHtml'),
+ sliceFn(src, 'renderTrashSummary')].forEach((code, i) => {
     if (!code) { ok(false, 'ស្រង់កូដពិតបានលេខ ' + i); return; }
     vm.runInContext(code, ctx);
 });
@@ -317,6 +319,89 @@ const renderFn = sliceFn(src, 'renderRecentlyDeleted');
 ok(/liveKeys = new Set\(allGroups\.map/.test(renderFn),
     'renderRecentlyDeleted កាត់កូនសោធៀបនឹង allGroups (មិនមែនក្រុមដែលត្រងរួច)',
     (renderFn.match(/liveKeys = .*/) || [])[0]);
+
+// ================= ៦. តួលេខសរុបរបស់ធុងសំរាម (កូដពិត ➜ អាន HTML) =================
+// 🔴 វាស់បាន (2026-09-09) ៖ mutation ២ លើ `renderTrashSummary` **រស់រាន** លើ
+// checker ១៦០ ទាំងអស់ — ការត្រឡប់ក្រុម `deducted`↔`kept` និងការបង្គត់ត្រឹមដុល្លារ។
+// មូលហេតុ ៖ គ្មាន checker ណារត់ function នោះ ហើយអានលេខដែលអ្នកប្រើឃើញឡើយ។
+console.log('\n=== តួលេខសរុបរបស់ធុងសំរាម (កូដពិត ➜ អាន HTML) ===');
+{
+    let boxHtml = null;
+    ctx.document.getElementById = (id) => (id === 'trashSummaryBox'
+        ? { set innerHTML(v) { boxHtml = v; }, get innerHTML() { return boxHtml; } } : null);
+
+    // ក្រុមសាកល្បង ៖ តម្លៃ **មានសេន** ដោយចេតនា (លេខមូលលាក់ mutation នៃការបង្គត់)
+    const groups = [
+        { reason: 'remove', total: 12.34, count: 2, codes: [], key: 'g1' },
+        { reason: 'expired', total: 7.21, count: 1, codes: [], key: 'g2' },
+        { reason: 'pickup', total: 30.05, count: 3, codes: [], key: 'g3' },
+        { reason: 'delete', total: 9.90, count: 1, codes: [], key: 'g4' }
+    ];
+    const rendered = (() => {
+        try { ctx.renderTrashSummary(groups, ''); return true; } catch (e) { return e; }
+    })();
+    ok(rendered === true, '⛔ លក្ខខណ្ឌចាំបាច់៖ `renderTrashSummary()` ពិតរត់ដល់ចប់', rendered);
+    ok(typeof boxHtml === 'string' && boxHtml.length > 50,
+        '⛔ ជាន់អប្បបរមា៖ វាពិតជាសរសេរ HTML ចូលប្រអប់', (boxHtml || '').slice(0, 60));
+
+    const html = String(boxHtml || '');
+    const cardMoney = (cls) => {
+        const at = html.indexOf(cls);
+        if (at === -1) return null;
+        const m = /trash-sum-money">\$(-?[\d.]+)</.exec(html.slice(at));
+        return m ? m[1] : null;
+    };
+    const cardCount = (cls) => {
+        const at = html.indexOf(cls);
+        if (at === -1) return null;
+        const m = /trash-sum-count">📦 (-?\d+)/.exec(html.slice(at));
+        return m ? m[1] : null;
+    };
+
+    // `TRASH_REASON_META[r].deducted` ជាប្រភពការពិត — ⛔ កុំចាក់ក្រុមជា literal
+    const wantDeducted = groups.filter((g) => META[g.reason] && META[g.reason].deducted);
+    const wantKept = groups.filter((g) => !(META[g.reason] && META[g.reason].deducted));
+    const sum = (list, f) => Math.round(list.reduce((a, g) => a + g[f], 0) * 100) / 100;
+
+    ok(wantDeducted.length > 0 && wantKept.length > 0,
+        '⛔ ជាន់អប្បបរមា៖ ស្ថានភាពមានក្រុមទាំង ២ ខាង (បើអត់ ការត្រឡប់មិនបែងចែក)',
+        wantDeducted.length + '/' + wantKept.length);
+
+    // 🔴 T1 ៖ ការត្រឡប់ក្រុម deducted ↔ kept
+    ok(cardMoney('trash-sum-deducted') === sum(wantDeducted, 'total').toFixed(2),
+        '⛔ កាត «➖ ដក + ផុតកំណត់» = ផលបូកក្រុមដែល `META.deducted === true`',
+        cardMoney('trash-sum-deducted') + ' ≠ ' + sum(wantDeducted, 'total').toFixed(2));
+    ok(cardMoney('trash-sum-kept') === sum(wantKept, 'total').toFixed(2),
+        '⛔ កាត «✅ យករួច + លុប» = ផលបូកក្រុមដែល `META.deducted !== true`',
+        cardMoney('trash-sum-kept') + ' ≠ ' + sum(wantKept, 'total').toFixed(2));
+    ok(cardCount('trash-sum-deducted') === String(sum(wantDeducted, 'count')),
+        'ចំនួនកញ្ចប់របស់ក្រុម «ដក + ផុតកំណត់» ត្រឹមត្រូវ', cardCount('trash-sum-deducted'));
+    ok(cardCount('trash-sum-kept') === String(sum(wantKept, 'count')),
+        'ចំនួនកញ្ចប់របស់ក្រុម «យករួច + លុប» ត្រឹមត្រូវ', cardCount('trash-sum-kept'));
+
+    // 🔴 T2 ៖ ការបង្គត់ត្រូវរក្សា **សេន**
+    const grand = /សរុប \$(-?[\d.]+)/.exec(html);
+    const wantGrand = Math.round((sum(wantDeducted, 'total') + sum(wantKept, 'total')) * 100) / 100;
+    ok(!!grand && grand[1] === wantGrand.toFixed(2),
+        '⛔ សរុបធំ រក្សាសេន (មិនបង្គត់ត្រឹមដុល្លារ)', grand && grand[1]);
+    ok(!!grand && /\.\d{2}$/.test(grand[1]) && grand[1].slice(-2) !== '00',
+        '⛔ ជាន់អប្បបរមា៖ ចម្លើយពិតជា**មានសេន** (បើគត់ mutation នៃការបង្គត់លាក់បាន)',
+        grand && grand[1]);
+
+    // ⛔ ការអភិរក្ស ៖ ក្រុម ២ បូកគ្នាត្រូវស្មើសរុបធំ និងចំនួនក្រុម
+    const gCount = /📦 (\d+) កញ្ចប់ · (\d+) ជួរ/.exec(html);
+    ok(!!gCount && Number(gCount[1]) === sum(wantDeducted, 'count') + sum(wantKept, 'count'),
+        '⛔ ការអភិរក្ស៖ ចំនួនកញ្ចប់សរុប = ក្រុម ១ + ក្រុម ២', gCount && gCount[1]);
+    ok(!!gCount && Number(gCount[2]) === groups.length,
+        'ចំនួនជួរ = ចំនួនក្រុមដែលបញ្ចូល', gCount && gCount[2]);
+
+    // ⛔ ទិសផ្ទុយ ៖ គ្មានក្រុម ➜ $0.00 ទាំង ២ ខាង (មិនមែនបោះ ឬ NaN)
+    boxHtml = null;
+    ctx.renderTrashSummary([], '');
+    const empty = String(boxHtml || '');
+    ok(empty.indexOf('$0.00') !== -1 && empty.indexOf('NaN') === -1,
+        '⛔ ទិសផ្ទុយ៖ ធុងសំរាមទទេ ➜ $0.00 គ្មាន NaN', empty.slice(0, 80));
+}
 
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យទាំងអស់ (' + pass + ')' : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));
 process.exit(fail === 0 ? 0 : 1);

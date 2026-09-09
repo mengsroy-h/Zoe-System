@@ -560,6 +560,54 @@ scenario('⛔ មូលដ្ឋានតែមួយ ៖ ម៉ូឌុលស�
         daily.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1 && monthly.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1);
 });
 
+// 🔴 វាស់បាន (2026-09-09) ៖ mutation ដែលប្តូរជួរឈរ «COD យករួច ($)» ➜ `d.total`
+// **រស់រាន** លើ checker ១៦០ ទាំងអស់ — ព្រោះសេណារីយ៉ូខាងក្រោមអះអាងតែជួរឈរ ៣
+// (ចំណូល · មិនទាន់យក · ទាំងអស់) ហើយ **មិនដែលមើលជួរឈរ COD/DOD សោះ**។
+// ⛔ ការអះអាងត្រូវ **ដេរីវេពីចំណងជើង** មិនមែនចាក់លេខ literal។
+scenario('⛔ ជួរឈរនាំចេញ **គ្រប់ជួរ** ត្រូវផ្ទុកវាលរបស់របាយការណ៍ដែលត្រូវគ្នា', () => {
+    const headers = vm.runInContext('MONTHLY_REPORT_HEADERS', sandbox);
+    // ចំណងជើង ➜ វាលក្នុង report.days[i] (ថ្ងៃ) និង report.totals (សរុប)
+    const MAP = {
+        'កញ្ចប់ចូល': 'count', 'COD យករួច ($)': 'collectedCod', 'DOD យករួច ($)': 'collectedDod',
+        'ចំណូលយករួច ($)': 'collectedTotal', 'មិនទាន់យក ($)': 'pendingTotal',
+        'តម្លៃទាំងអស់ ($)': 'total', 'កញ្ចប់យករួច': 'picked', 'អតិថិជនយក': 'customers'
+    };
+    const mapped = Object.keys(MAP).filter((h) => headers.indexOf(h) !== -1);
+    ok('⛔ ជាន់អប្បបរមា៖ ចំណងជើងត្រូវគ្របវាលយ៉ាងតិច ៨', mapped.length >= 8,
+        JSON.stringify(headers));
+
+    // ⛔ តម្លៃ **មានសេន** និង **ខុសគ្នាទាំងអស់** ➜ ការប្តូរជួរឈរណាមួយត្រូវចាប់បាន
+    setData({ '2026-09-02': { codDollar: 17.31, dodDollar: 9.42, totalCount: 5 } },
+        { '2026-09-02': { packagesPickedUp: 4, pickedUpPhones: { '012': 3, '013': 1 } } }, {});
+    setLive([item('2026-09-02', [bc(3.11, 0, false, false), bc(0, 1.22, false, false)])], []);
+    sandbox.__report = build('2026-09');
+    const rep = sandbox.__report;
+    const rows = vm.runInContext('monthlyReportRows(__report)', sandbox);
+    ok('⛔ លក្ខខណ្ឌចាំបាច់៖ របាយការណ៍មានជួរដេកថ្ងៃ ១ និងជួរសរុប',
+        rep.days.length === 1 && rows.length === 2, rows.length);
+
+    const dayVals = mapped.map((h) => rep.days[0][MAP[h]]);
+    ok('⛔ ជាន់អប្បបរមា៖ តម្លៃសាកល្បង **ខុសគ្នាទាំងអស់** (បើដូចគ្នា ការប្តូរជួរឈរលាក់បាន)',
+        new Set(dayVals).size === dayVals.length, JSON.stringify(dayVals));
+    ok('⛔ ជាន់អប្បបរមា៖ លុយសាកល្បង **មានសេន** (លេខមូលលាក់ mutation នៃការបង្គត់)',
+        [rep.days[0].collectedCod, rep.days[0].collectedDod, rep.days[0].total]
+            .some((v) => Math.round(v * 100) % 100 !== 0),
+        JSON.stringify([rep.days[0].collectedCod, rep.days[0].collectedDod, rep.days[0].total]));
+
+    mapped.forEach((h) => {
+        const i = headers.indexOf(h);
+        ok('ជួរដេកថ្ងៃ ៖ ជួរឈរ «' + h + '» = report.days[0].' + MAP[h],
+            rows[0][i] === rep.days[0][MAP[h]],
+            'នាំចេញ=' + rows[0][i] + ' · របាយការណ៍=' + rep.days[0][MAP[h]]);
+        ok('ជួរសរុប ៖ ជួរឈរ «' + h + '» = report.totals.' + MAP[h],
+            rows[1][i] === rep.totals[MAP[h]],
+            'នាំចេញ=' + rows[1][i] + ' · របាយការណ៍=' + rep.totals[MAP[h]]);
+    });
+    ok('ជួរដេកទី ១ ចាប់ផ្តើមដោយថ្ងៃ · ជួរចុងក្រោយដោយ «សរុប»',
+        rows[0][0] === rep.days[0].date && rows[1][0] === 'សរុប',
+        JSON.stringify([rows[0][0], rows[1][0]]));
+});
+
 scenario('ចំណូល ៖ ជួរឈរនាំចេញ', () => {
     const headers = vm.runInContext('MONTHLY_REPORT_HEADERS', sandbox);
     const iCollected = headers.indexOf('ចំណូលយករួច ($)');

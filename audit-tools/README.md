@@ -137,7 +137,7 @@ bash audit-tools/emu/rules.sh
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
 | `policy-test.js` | គោលការណ៍ **លុប ទល់នឹង ដក**; `deleteSingleItem` និង `buildClearHistoryTrashItem` **មិនប៉ះលុយ** | `POLICY_APP_DIR` |
-| `trash-modal-test.js` | ស្លាកធុងសំរាម ↔ ថេរ · ការ merge · តួលេខសរុប ២ ក្រុម | `TRASH_APP_DIR` |
+| `trash-modal-test.js` | ស្លាកធុងសំរាម ↔ ថេរ · ការ merge · តួលេខសរុប ២ ក្រុម ⛔ **បូក ៖ រត់ `renderTrashSummary()` ពិត ➜ អានលេខចេញពី HTML** (ក្រុម ២ ដេរីវេពី `TRASH_REASON_META` · រក្សាសេន · ការអភិរក្សចំនួន) | `TRASH_APP_DIR` |
 | `partial-pickup-cleanup-test.js` | ច្បាប់ ២ ម៉ោង / ថ្ងៃទី ៨ ដើរតាម **barcode** មិនមែនកញ្ចប់ | `PARTIAL_APP_DIR` |
 | `expired-trash-retention-test.js` | ថេររក្សាទុក ២ ថ្ងៃ / ៣០ ថ្ងៃ និង `DB_OP_TIMEOUT_MS` មិនត្រូវឃ្លាតពីគ្នា | `EXPIREDTRASH_APP_DIR` |
 | `restore-marker-hygiene-test.js` | marker របស់ប្រវត្តិ មិនធ្លាក់ចូលធុងសំរាម · ការសម្អាតមិនដណ្តើមធាតុដែលកំពុងស្តារ | `MARKER_APP_DIR` |
@@ -149,13 +149,14 @@ bash audit-tools/emu/rules.sh
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `ledger-failed-apply-revert-test.js` | ការសរសេរ ledger **ធ្លាក់** រួចការដកវិញ **ជោគជ័យ** ➜ មិនត្រូវដកលេខដែលមិនដែលត្រូវបូក | `LEDGERFAIL_APP_DIR` |
-| `monthly-ledger-agreement-test.js` | `monthly[M]` ត្រូវស្មើផលបូក `daily[d ∈ M]` — clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ | `MONTHLYAGREE_APP_DIR` |
+| `monthly-ledger-agreement-test.js` | `monthly[M]` ត្រូវស្មើផលបូក `daily[d ∈ M]` — clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ ⛔ **បូក ៖ ការស្តារត្រូវបូកត្រឡប់គ្រប់វាល (COD·DOD·count) ចូលទាំងធុងថ្ងៃ និងធុងខែ** | `MONTHLYAGREE_APP_DIR` |
 | `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
 | `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
 | `item-money-integrity-test.js` | **លុយសរុបរបស់ *ជួរដេក*** (⚠️ `item` = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ · `barcode` = កញ្ចប់ ១) ៖ `item.cod/.dod/.price` ត្រូវស្មើផលបូក barcodes — ជាន់ ១ AST (ការសរសេរលុយត្រូវឆ្លងកាត់ helper) · ជាន់ ២ helper លើ input ច្រើន · ជាន់ ៣ invariant លើ item **ក្នុងសតិ និងលើ server** ក្រោយ operation កំណត់ ៧ | `ITEMMONEY_APP_DIR` |
 | `stats-collected-truth-test.js` | **«ចំណូល (យករួច)» លើអេក្រង់ស្ថិតិទាំង ៣** ៖ browser ពិត ➜ seed ដែលមាន ៣ ស្ថានភាព (យករួច · មិនទាន់យក · ដករួច) ➜ អានលេខ **ចេញពី DOM** ➜ អះអាងថាចំណូល = ledger ដក មិនទាន់យក ហើយ «តម្លៃកញ្ចប់ទាំងអស់» **មិនត្រូវកាត់** | `STATSTRUTH_APP_DIR` |
 | `stats-screen-agreement-test.js` | **អេក្រង់ស្ថិតិទាំង ៣ ត្រូវបង្ហាញលេខដូចគ្នា** ៖ រត់ `openDailyStatsModal()` · `openMonthlyStatsModal()` · `buildMonthlyReport()` **ពិត** ក្នុង `vm` ជាមួយ DOM ក្លែង រួច **អានលេខចេញពី HTML** ➜ អះអាងថា «ចំណូល (យករួច)» · «COD/DOD (យករួច)» និង «មិនទាន់យក» របស់កាតខែ **ស្មើរបាយការណ៍ខែ** ⛔ រួមទាំងពេលថ្ងៃណាមួយមាន `open_d > cod_d` (កម្រិតបូកខុសគ្នា) | `STATSAGREE_APP_DIR` |
 | `stats-measurable-gate-test.js` | **អេក្រង់ស្ថិតិមិនត្រូវរាយលេខលើអ្វីដែលវាស់មិនបាន** ៖ រូបមន្ត «ចំណូល» គឺ `ledger − កញ្ចប់មិនទាន់យក` ➜ ច្រកទ្វារ `collectedValueIsMeasurable()` ត្រូវគ្រប **ទាំងសងខាង** (`history` · `deleted` **និង `dailyRevenue`**)។ រត់អេក្រង់ពិត ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ** និង **ងាប់** រួចអានលេខចេញពី HTML ➜ ត្រូវឃើញ `—` មិនមែន `$0.00` | `STATSGATE_APP_DIR` |
+| `collected-value-fuzz-test.js` | **លេខលុយលើអេក្រង់ត្រូវត្រឹមត្រូវលើ *លំដាប់ចៃដន្យ*** ៖ សាងស្ថានភាពចៃដន្យ (រួមទាំងការឃ្លាតពិត ៖ «កែទឹកប្រាក់» ដោយដៃ · ថ្ងៃគ្មានជួរ ledger · ledger ខែឃ្លាតពីថ្ងៃ · listener ព្យួរ/ងាប់) រួចរត់អេក្រង់ **ពិត** ក្នុង `vm` ហើយអានលេខចេញពី HTML។ អះអាងអថេរ ៥ ៖ (ក) ថ្ងៃ↔របាយការណ៍ខែ · (ខ) ខែ=ផលបូកថ្ងៃ · (គ) វាស់មិនបាន➜`—` · (ឃ) ចំណូល=Σ barcode `isClosed && !isDeducted` · (ង) ចំណូល+មិនទាន់យក=តម្លៃទាំងអស់។ ⛔ តម្លៃសាកល្បង**មានសេន** (លេខមូលលាក់ mutation នៃការបង្គត់) | `COLLECTFUZZ_APP_DIR` · `CFUZZ_RUNS` · `CFUZZ_RUN0` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
 | `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម | `MONEYGUARD_APP_DIR` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
@@ -299,7 +300,7 @@ bash audit-tools/emu/rules.sh
 | `barcode-shape-test.js` | រូបរាង Barcode | `BARCODE_APP_DIR` |
 | `camera-resume-test.js` | កាមេរ៉ាកកក្រោយប្រអប់ native · dependency អវត្តមាន | `CAMERA_APP_DIR` |
 | `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
-| `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel | `MREPORT_APP_DIR` |
+| `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel ⛔ **បូក ៖ គ្រប់ជួរឈរនាំចេញត្រូវផ្ទុកវាលរបស់របាយការណ៍ដែលចំណងជើងសន្យា** (ដេរីវេពីចំណងជើង) | `MREPORT_APP_DIR` |
 | `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល ⛔ និង listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (`noteDbListenerAlive` / `handleDbListenerError` ត្រូវផ្គូផ្គង `listenerRefs`) | `PENDINGKEY_APP_DIR` |
 | `comments.js` · `strip-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment | `STRIP_APP_DIR` |
 | `trimws.js <files>` | លុប trailing whitespace | — |

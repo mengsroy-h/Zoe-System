@@ -193,6 +193,9 @@ bash audit-tools/emu/rules.sh
 | `stall-guard-test.js` | បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `STALLGUARD_APP_DIR` |
 | `db-stall-guard-test.js` | RTDB មិនបដិសេធពេលក្រៅបណ្តាញ ➜ សោ in-flight ជាប់រហូត | `DBSTALL_APP_DIR` |
 | `write-stall-guard-test.js` | ការសរសេរដែលព្យួរ **ខាងក្រោយ helper** ➜ ការសម្អាតស្វ័យប្រវត្តិងាប់ · គ្មានសារដល់អ្នកប្រើ | `WRITESTALL_APP_DIR` |
+| `stall-lock-release-test.js` | សោការងារដែលឈរខាងក្រោយ **ការសរសេរធុងសំរាមដែលព្យួរ** ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) · របៀបស្កេនដកងាប់ទាំងស្រុង | `STALLLOCK_APP_DIR` |
+| `locker-claim-guard-test.js` | ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់» ដែល claim រួច ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ | `LOCKERCLAIM_APP_DIR` |
+| `stale-clear-claim-test.js` | `clearClaim` ដែល lease ផុត ជាអន្ទាក់ស្ថាពរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) | `STALECLAIM_APP_DIR` |
 | `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
 | `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |

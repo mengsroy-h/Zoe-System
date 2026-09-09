@@ -145,10 +145,14 @@ function makeSandbox(store, now) {
         // ឥរិយាបថដើម (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់)។
         optionalConst(src, 'LOCK_STALL_RELEASE_MS', 'const LOCK_STALL_RELEASE_MS = 15000;'),
         optionalFn(src, 'settleLockWithin', 'function settleLockWithin(p) { return Promise.resolve(p); }'),
+        // ⛔ អ្នកដោះ `clearClaim` ដែលងាប់ ត្រូវហៅពី `runAutomaticCleanupRules()` ➜
+        // sandbox ត្រូវផ្ទុក function ពិត; tree មុនកែ ➜ stub គ្មានផលរំខាន។
+        optionalFn(src, 'isActiveClearHistoryClaim', 'function isActiveClearHistoryClaim() { return false; }'),
+        optionalFn(src, 'releaseStaleClearHistoryClaim', 'function releaseStaleClearHistoryClaim() {}'),
         // ⛔ ច្រកទ្វារនាឡិការបស់ការសម្អាត (2.20.5) ➜ ផ្ទុក function ពិត បូក
         // `serverClockTrusted = true` ដែលជាស្ថានភាព App ដែលភ្ជាប់រួច។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'

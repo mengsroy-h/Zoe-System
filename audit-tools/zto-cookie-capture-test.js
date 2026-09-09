@@ -89,9 +89,36 @@ function diag(info) {
     });
 }
 
+async function captured(options, expected) {
+    const ctx = context();
+    const task = waiting(ctx);
+    try {
+        emit(ctx, options);
+        assert.equal(await task.promise, expected === undefined ? NEW : expected);
+        assertClean(ctx);
+    } finally { ctx.emit('close'); await task.promise.catch(() => {}); }
+}
+
 async function main() {
-    await scenario('API path ផ្សេង ➜ រង់ចាំ Order Detail ពិត', () => rejectedThenAccepted({ url: 'https://aargus-api.ztoglobal.com/user/info' }));
-    await scenario('GET/OPTIONS មិនអាចជំនួស POST ដែលបានផ្ទៀងផ្ទាត់', () => rejectedThenAccepted({ method: 'OPTIONS' }));
+    // ⛔ Cookie ជារបស់ **domain** មិនមែន path ➜ ការទាមទារ `/scan/get/order/detail`
+    // បង្ខំអ្នកប្រើឲ្យស្កេនកញ្ចប់មួយរាល់ដង ខណៈវាមិនបន្ថែមការការពារអ្វីទេ ៖
+    // អ្វីដែលបញ្ជាក់ថា ZTO ទទួលយក session គឺ **ចម្លើយ** (2xx · JSON ·
+    // envelope ជោគជ័យ) ដែលអះអាងក្នុងសេណារីយ៉ូខាងក្រោម។
+    await scenario('API path ផ្សេងដែលឆ្លើយជោគជ័យ ➜ ចាប់បានភ្លាមក្រោយ Login',
+        () => captured({ url: 'https://aargus-api.ztoglobal.com/user/info' }));
+    await scenario('GET ជោគជ័យលើ path ផ្សេង ➜ ចាប់បានដដែល',
+        () => captured({ url: 'https://aargus-api.ztoglobal.com/sys/menu/list', method: 'GET' }));
+    // ⛔ ទិសផ្ទុយ ៖ ការបើក path មិនត្រូវធ្វើឲ្យច្រកទ្វារ *ចម្លើយ* ខ្សោយឡើយ។
+    await scenario('path ផ្សេង តែ JSON ប្រាប់ថាមិនទាន់ Login ➜ មិនចាប់',
+        () => rejectedThenAccepted({ url: 'https://aargus-api.ztoglobal.com/user/info', payload: { success: false, code: 'not_login' } }));
+    await scenario('path ផ្សេង តែ HTTP 401 ➜ មិនចាប់',
+        () => rejectedThenAccepted({ url: 'https://aargus-api.ztoglobal.com/user/info', status: 401 }));
+    await scenario('host ផ្សេង ទោះឆ្លើយជោគជ័យ ➜ មិនចាប់',
+        () => rejectedThenAccepted({ url: 'https://argus.ztoglobal.com/user/info' }));
+    await scenario('OPTIONS/HEAD មិនអាចជំនួសការហៅដែលមាន session', async () => {
+        await rejectedThenAccepted({ method: 'OPTIONS' });
+        await rejectedThenAccepted({ method: 'HEAD' });
+    });
     for (const status of [401, 403, 302, 500]) {
         await scenario('HTTP ' + status + ' ➜ មិនចាប់ session មុន Login ថ្មី', () => rejectedThenAccepted({ status }));
     }

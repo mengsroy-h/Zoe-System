@@ -160,9 +160,22 @@ async function run() {
         api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ HTTP', api && !api.isTargetApiUrl('http://aargus-api.ztoglobal.com/scan/get/order/detail'));
     ok('បដិសេធ host បន្លំ', api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com.evil.test/scan/get/order/detail'));
-    // ⛔ request ដែលមាន Cookie មិនបញ្ជាក់ថា session នៅតែប្រើបានទេ។
-    ok('path ផ្សេងមិនអាចជំនួស Order Detail ដែលផ្ទៀងផ្ទាត់ session',
-        api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other'));
+    // ⛔ Cookie ជារបស់ **domain** មិនមែន path ➜ សំណើណាមួយទៅ host នេះក៏ផ្ទុក
+    // `BOS-MAN-SESSION` ដដែល។ ភស្តុតាងថា ZTO ទទួលយក session ឋិតនៅក្នុង
+    // **ចម្លើយ** (`zto-cookie-capture-test.js`) មិនមែននៅក្នុង path ទេ —
+    // ការចាក់សោ path បង្ខំអ្នកប្រើឲ្យស្កេនកញ្ចប់មួយរាល់ដង (អ្នកប្រើរាយការណ៍
+    // 2026-09-09 ៖ helper 2.30.9 ចាប់បានភ្លាមក្រោយ Login · 2.31.2 មិនចាប់)។
+    ok('path ណាមួយលើ API host ក៏ជាគោលដៅ (cookie ជារបស់ domain)',
+        api && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/other')
+        && api.isTargetApiUrl('https://aargus-api.ztoglobal.com/scan/get/order/detail'));
+    // ⛔ ឥឡូវ host ជាច្រកទ្វារ URL **តែមួយ** (path លែងរួមចំណែក) ➜ ការធូរ
+    // របស់វាទៅជា `endsWith()` ត្រូវធ្វើឲ្យអ្នកយាមក្រហម មិនមែនរស់រាន។
+    ok('⛔ host ដែលបញ្ចប់ដូច API host តែមិនស្មើ ត្រូវបដិសេធ',
+        api && !api.isTargetApiUrl('https://evil-aargus-api.ztoglobal.com/scan/get/order/detail')
+        && !api.isTargetApiUrl('https://xaargus-api.ztoglobal.com/other'));
+    ok('⛔ ទិសផ្ទុយ ៖ port ឬ credential ក្នុង URL នៅតែត្រូវបដិសេធ',
+        api && !api.isTargetApiUrl('https://aargus-api.ztoglobal.com:8443/other')
+        && !api.isTargetApiUrl('https://user:pass@aargus-api.ztoglobal.com/other'));
     ok('បដិសេធ host ផ្សេងទាំងស្រុង',
         api && !api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'));
     ok('ប្រើ request.allHeaders() ពិត', /await request\.allHeaders\(\)/.test(source));

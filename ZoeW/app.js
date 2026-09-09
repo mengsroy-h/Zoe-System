@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.7';
+    const APP_VERSION = '2.31.8';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -373,6 +373,11 @@
     const DB_LISTENER_KEY_DELETED = 'deleted';
     const DB_LISTENER_KEY_HISTORY = 'history';
     const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';
+    const DB_LISTENER_KEY_MONTHLY_REVENUE = 'monthlyRevenue';
+    const VIEW_NOT_MEASURABLE_TEXT = 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន';
+    const VIEW_NOT_MEASURABLE_NOTICE = '⏳ ' + VIEW_NOT_MEASURABLE_TEXT;
+    const STATS_DAILY_VIEW_KEYS = [DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
+    const STATS_MONTHLY_VIEW_KEYS = [DB_LISTENER_KEY_MONTHLY_REVENUE, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
     const dbListenerPendingPaths = new Set();
     const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
@@ -405,7 +410,7 @@
 
     function normalizeOneStoredPhone(part) {
         let trimmed = String(part).trim();
-        trimmed = trimmed.replace(/^[='"\s-]+/, '');
+        trimmed = trimmed.replace(/^[='"\s-]+/, '').replace(/["'\s]+$/, '');
         if (/^\+?855/.test(trimmed)) {
             trimmed = trimmed.replace(/^\+?855[\s-]*/, '');
         }
@@ -4804,6 +4809,18 @@
         return dbListenerPendingPaths.has(pathKey) || dbListenerFailedPaths.has(pathKey);
     }
 
+    function anyDbListenerViewIsStale(pathKeys) {
+        if (!Array.isArray(pathKeys)) return false;
+        for (let i = 0; i < pathKeys.length; i++) {
+            if (dbListenerViewIsStale(pathKeys[i])) return true;
+        }
+        return false;
+    }
+
+    function emptyViewMessage(pathKeys, emptyText) {
+        return anyDbListenerViewIsStale(pathKeys) ? VIEW_NOT_MEASURABLE_NOTICE : emptyText;
+    }
+
     function noteDbListenerAlive(pathKey) {
         const wasPending = dbListenerPendingPaths.delete(pathKey);
         dbListenerFailedPaths.delete(pathKey);
@@ -4934,11 +4951,11 @@
         if (dbRefMonthlyRevenue) {
             fb.onValue(dbRefMonthlyRevenue, (snapshot) => {
                 if (listenerGeneration !== dbListenerGeneration) return;
-                noteDbListenerAlive('monthlyRevenue');
+                noteDbListenerAlive(DB_LISTENER_KEY_MONTHLY_REVENUE);
                 monthlyRevenueData = snapshot.val() || {};
             }, (err) => {
                 if (listenerGeneration !== dbListenerGeneration) return;
-                handleDbListenerError(err, 'monthlyRevenue');
+                handleDbListenerError(err, DB_LISTENER_KEY_MONTHLY_REVENUE);
             });
         }
 
@@ -6625,7 +6642,7 @@
         const measurable = collectedValueIsMeasurable();
 
         if (sortedKeys.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យប្រចាំថ្ងៃទេ</p>`;
+            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">${sanitizeInput(emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យប្រចាំថ្ងៃទេ'))}</p>`;
         } else {
             sortedKeys.forEach(dateStr => {
                 const data = dailyRevenueData[dateStr] || {};
@@ -6648,7 +6665,7 @@
         const measurable = collectedValueIsMeasurable();
 
         if (sortedKeys.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">គ្មានទិន្នន័យចំណូលប្រចាំខែទេ</p>`;
+            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">${sanitizeInput(emptyViewMessage(STATS_MONTHLY_VIEW_KEYS, 'គ្មានទិន្នន័យចំណូលប្រចាំខែទេ'))}</p>`;
         } else {
             sortedKeys.forEach(ym => {
                 const data = monthlyRevenueData[ym] || {};
@@ -7959,7 +7976,7 @@
 
     async function exportDataAsExcel() {
         const rows = buildExportRows();
-        if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
+        if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
         closeModal('exportDataModal');
         showToast("⏳ កំពុងរៀបចំ Excel...");
         try {
@@ -7992,7 +8009,7 @@
 
     function exportDataAsPDF() {
         const rows = buildExportRows();
-        if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
+        if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
         closeModal('exportDataModal');
 
         const printArea = document.getElementById('pdfExportPrintArea');
@@ -8042,7 +8059,7 @@
 
     function exportDataAsCsvForSheets() {
         const rows = buildExportRows();
-        if (!rows.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!"); return; }
+        if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
         closeModal('exportDataModal');
 
         const csvEscape = (val) => {
@@ -8153,7 +8170,7 @@
     }
 
     function collectedRielText(dollar, measurable) {
-        if (!measurable) return 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន';
+        if (!measurable) return VIEW_NOT_MEASURABLE_TEXT;
         return monthlyReportRiel(statsMoney(dollar)).toLocaleString() + ' ៛';
     }
 
@@ -8316,7 +8333,7 @@
         if (select && MONTHLY_REPORT_MONTH_PATTERN.test(select.value)) monthlyReportMonth = select.value;
         const report = buildMonthlyReport(monthlyReportMonth);
         if (!report.month || !report.days.length) {
-            body.innerHTML = '<p class="mrep-empty">គ្មានទិន្នន័យសម្រាប់ខែនេះទេ</p>';
+            body.innerHTML = '<p class="mrep-empty">' + sanitizeInput(emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យសម្រាប់ខែនេះទេ')) + '</p>';
             return;
         }
         const totals = report.totals;
@@ -8382,7 +8399,7 @@
 
     async function exportMonthlyReportAsExcel() {
         const report = buildMonthlyReport(monthlyReportMonth);
-        if (!report.days.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!"); return; }
+        if (!report.days.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!")); return; }
         closeModal('monthlyReportModal');
         showToast("⏳ កំពុងរៀបចំ Excel...");
         try {
@@ -8406,7 +8423,7 @@
 
     function exportMonthlyReportAsPDF() {
         const report = buildMonthlyReport(monthlyReportMonth);
-        if (!report.days.length) { showToast("⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!"); return; }
+        if (!report.days.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!")); return; }
         closeModal('monthlyReportModal');
         const printArea = document.getElementById('pdfExportPrintArea');
         if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
@@ -11751,7 +11768,7 @@
         Array.from(expandedTrashGroups).forEach((key) => { if (!liveKeys.has(key)) expandedTrashGroups.delete(key); });
 
         if (groups.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #888; padding: 14px;">${query ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ' : 'គ្មានទិន្នន័យដែលបានលុបទេ'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #888; padding: 14px;">${sanitizeInput(query ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ' : emptyViewMessage([DB_LISTENER_KEY_DELETED], 'គ្មានទិន្នន័យដែលបានលុបទេ'))}</td></tr>`;
             return;
         }
 
@@ -12556,7 +12573,7 @@
         countSpan.innerText = dataToRender.length;
 
         if (dataToRender.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 16px;">📦 គ្មានទិន្នន័យបង្ហាញទេ</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 16px;">${sanitizeInput(emptyViewMessage([DB_LISTENER_KEY_HISTORY], '📦 គ្មានទិន្នន័យបង្ហាញទេ'))}</td></tr>`;
             return;
         }
 

@@ -468,6 +468,52 @@ async function runHandler(opts) {
             { status: rejected.res.statusCode, body: rejected.res.body.slice(0, 120) });
     }
 
+    // ═══ ⛔ ថវិកា ↔ នាឡិកា ៖ `budgetLeftMs()` ជាច្បាប់ចម្លងទី ២ ═══════════
+    // ច្បាប់ក្នុង CLAUDE.md ៖ «ថវិកាត្រូវវាស់តាម `elapsedSince()` (ថយក្រោយ ➜
+    // fail-open)»។ `zto-proxy-test` ចាក់សោ **រង្វិលជុំ retry** (`fetchOrder`)
+    // ប៉ុណ្ណោះ — តែ `budgetLeftMs()` ជាមូលដ្ឋានទី ២ ដែលចិញ្ចឹម
+    // `cookieReadTimeoutMs()` · `cookieRenewTimeoutMs()` · `retryAfterAuthRejected()`។
+    // 🔴 វាស់បាន (2026-09-09) ៖ mutation ដែលប្តូរ `elapsedSince(startedAt)` ក្នុង
+    // `budgetLeftMs()` ទៅ `Date.now() - startedAt` **រស់រានលើ checker ១៦០
+    // ទាំងអស់**។ ផលពិត ៖ នាឡិកាថយក្រោយ ➜ ថវិកា *ធំជាងការពិត* ➜ handler
+    // ចំណាយ ៣ វិ. លើការអាន Blobs រួច ៦ វិ. លើ upstream ➜ **Netlify សម្លាប់
+    // នៅ ១០ វិ. មុនវាឆ្លើយ** ➜ អ្នកប្រើឃើញ `Failed to fetch`។
+    console.log('\n=== ⛔ ថវិកា ↔ នាឡិកាថយក្រោយ (budgetLeftMs) ===');
+    {
+        const realNow = Date.now;
+        const runWithClock = async (backwards) => {
+            mod.resetCachesForTests();
+            const state = { reads: 0, writes: 0, upstreamCalls: 0, sentCookies: [], value: GOOD_COOKIE, writeStartedAt: 0 };
+            mod.setBlobsModuleForTests(fakeBlobs({ readMs: 5, writeMs: 5, state }));
+            applyEnv({ budgetMs: 9000, upstreamTimeoutMs: 6000, retries: 1, envCookie: GOOD_COOKIE });
+            global.fetch = upstream({ state, upstreamMs: 5 });
+            let calls = 0;
+            if (backwards) {
+                // ការហៅទី ១ = `startedAt`; រាល់ការហៅបន្ទាប់ ➜ ថយក្រោយ ១ ម៉ោង
+                Date.now = () => { calls++; return calls === 1 ? realNow.call(Date) : realNow.call(Date) - 3600000; };
+            }
+            try {
+                const res = await mod.handler(makeEvent({ barcode: nextBarcode() }));
+                return { res: res, state: state };
+            } finally {
+                Date.now = realNow;
+            }
+        };
+
+        // ⛔ ទិសផ្ទុយមុន ៖ នាឡិកាធម្មតា ➜ ការអាន Blobs ត្រូវកើតឡើងពិត
+        const normalClock = await runWithClock(false);
+        ok('⛔ ទិសផ្ទុយ ៖ នាឡិកាធម្មតា ➜ ការអាន Cookie store កើតឡើងពិត (ជាន់អប្បបរមា)',
+            normalClock.state.reads >= 1, { reads: normalClock.state.reads });
+
+        const backClock = await runWithClock(true);
+        ok('⛔ នាឡិកាថយក្រោយ ➜ ថវិកាអស់ភ្លាម ➜ ការអាន Cookie store ត្រូវរំលង',
+            backClock.state.reads === 0,
+            { reads: backClock.state.reads, hint: 'budgetLeftMs() ត្រូវប្រើ elapsedSince() មិនមែន Date.now() ឆៅ' });
+        ok('⛔ នាឡិកាថយក្រោយ ➜ នៅតែឆ្លើយជា JSON ដែលមានឈ្មោះ (មិនព្យួរ)',
+            !!backClock.res && backClock.res.statusCode > 0 && /"(code|success|found)"/.test(String(backClock.res.body)),
+            backClock.res && { status: backClock.res.statusCode, body: String(backClock.res.body).slice(0, 120) });
+    }
+
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail : '✅ គ្មានបញ្ហា') + ' — ok ' + pass);
     process.exit(fail ? 1 : 0);
 })().catch((e) => {

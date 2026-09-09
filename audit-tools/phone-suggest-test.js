@@ -119,6 +119,49 @@ vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, listeners, has: (n) => present.indexOf(n) !== -1 };
 }
 
+// ⛔ លេខទូរស័ព្ទដែលរក្សាទុក ជា **អត្តសញ្ញាណអតិថិជន** ៖ វាជាកូនសោ merge
+// (`phone` + `scanDate`) និងជាមូលដ្ឋាននៃ `getPickupPhoneKey()` ➜ តួអក្សរ
+// កាកសំណល់តែមួយបំបែកអតិថិជនម្នាក់ជា **ពីរ** ➜ ស្ថិតិយករាប់ស្ទួន។
+// 🔴 វាស់បាន (2.31.8) ៖ `normalizeOneStoredPhone()` លុប `="` **ខាងមុខ**
+// (ទម្រង់របស់ Google Sheets / Excel) តែ **ទុកសញ្ញា `"` ខាងចុង** ➜
+// ការ paste `="012345678"` រក្សាទុកជា `012345678"`។ ការលុបត្រូវ **ស៊ីមេទ្រី**។
+function storedPhoneCheck() {
+    const app = slice('ZoeW/app.js', ['normalizeOneStoredPhone', 'normalizeStoredPhone']);
+    const ctx = { String };
+    vm.createContext(ctx);
+    vm.runInContext(app, ctx);
+    // [input, expected] — តម្លៃដែលអ្នកប្រើពិតជា paste ចូលវាលលេខទូរស័ព្ទ
+    const cases = [
+        ['012345678', '012345678'],
+        ['="012345678"', '012345678'],
+        ["'012345678", '012345678'],
+        ['"012345678"', '012345678'],
+        ['+85512345678', '012345678'],
+        ['85512345678', '012345678'],
+        ['12345678', '012345678'],
+        ['  012345678  ', '012345678'],
+        ['012345678/098765432', '012345678/098765432'],
+        ['="012345678"/="098765432"', '012345678/098765432'],
+        ['', '']
+    ];
+    cases.forEach(([input, want]) => {
+        ok('normalizeStoredPhone(' + JSON.stringify(input) + ') = ' + JSON.stringify(want),
+            ctx.normalizeStoredPhone(input) === want, ctx.normalizeStoredPhone(input));
+    });
+    // ⛔ ទិសផ្ទុយ ១ ៖ សញ្ញាបំបែក **ខាងក្នុង** ត្រូវនៅដដែល (កុំប្តូរទម្រង់
+    //   ដែលរក្សាទុករួច ➜ វានឹងបំបែកការ merge ជាមួយទិន្នន័យចាស់)
+    ok('⛔ ទិសផ្ទុយ ៖ សញ្ញាបំបែកខាងក្នុងមិនត្រូវលុប',
+        ctx.normalizeStoredPhone('012-345 678') === '012-345 678',
+        ctx.normalizeStoredPhone('012-345 678'));
+    // ⛔ ទិសផ្ទុយ ២ ៖ អត្ថបទដែលមិនមែនលេខ (ស្កេនរំលង) ត្រូវនៅដដែល
+    ok('⛔ ទិសផ្ទុយ ៖ «គ្មានលេខ» មិនត្រូវប្រែ',
+        ctx.normalizeStoredPhone('គ្មានលេខ') === 'គ្មានលេខ',
+        ctx.normalizeStoredPhone('គ្មានលេខ'));
+    // ⛔ ជាន់អប្បបរមា ៖ បញ្ជាក់ថា helper ពិតជាធ្វើការងារ (មិនមែន identity)
+    ok('⛔ ជាន់អប្បបរមា ៖ helper ពិតជាធ្វើការធម្មតា (មិនមែន identity)',
+        ctx.normalizeStoredPhone('85512345678') !== '85512345678');
+}
+
 function itemsFixture() {
     const items = [];
     for (let i = 0; i < 40; i++) {
@@ -251,6 +294,8 @@ function blurRaceCheck() {
         }, 260);
     });
 }
+
+storedPhoneCheck();
 
 blurRaceCheck().then(() => {
     console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));

@@ -338,6 +338,50 @@ async function scenario(name, fn) {
         });
     });
 
+    // ── ៨. ⛔ ការស្តារត្រូវបូកត្រឡប់ **គ្រប់វាល និងគ្រប់ធុង** ─────────────
+    // 🔴 វាស់បាន (2026-09-09) ៖ សេណារីយ៉ូ ៧ ហៅដោយ `dod: 0` **ជានិច្ច** ➜ mutation
+    // ដែលធ្វើឲ្យផ្លូវ **DOD ខាងខែ** បាត់ (`monthly[month].dod += 0`) **រស់រាន**
+    // លើ checker ១៦០ ទាំងអស់ — រួម checker នេះខ្លួនឯង ដែលជាម្ចាស់ច្បាប់
+    // «ledger ខែ ត្រូវស្មើផលបូក ledger ថ្ងៃ»។ នេះជាថ្នាក់ «checker មិនដែលដាក់
+    // ប្រព័ន្ធក្នុងស្ថានភាពនោះ» (សំណួរទី ៨ ក្នុង `CLAUDE.md`)។
+    await scenario('៨. ការស្តារ ៖ ថ្ងៃ និងខែ ត្រូវទទួល **គ្រប់វាល** (COD · DOD · count)', async () => {
+        const ctx = makeSandbox({});
+        const M1 = D1.substring(0, 7);
+        const updates = {};
+        ctx.appendRestoreRevenueIncrements(updates, [
+            { scanDate: D1, cod: 12.34, dod: 5.67, count: 2 },
+            { scanDate: D1, cod: 0.66, dod: 4.33, count: 1 }
+        ]);
+        const inc = (path) => {
+            const v = updates[path];
+            return (v && typeof v === 'object' && '__increment' in v) ? v.__increment : v;
+        };
+        const want = { cod: 13, dod: 10, count: 3 };
+        [['daily', 'zoew_daily_revenue_cod_dod/' + D1],
+         ['monthly', 'zoew_monthly_revenue_cod_dod/' + M1]].forEach(([label, base]) => {
+            ok('ការស្តារ ➜ ' + label + ' codDollar = ' + want.cod,
+                inc(base + '/codDollar') === want.cod, inc(base + '/codDollar'));
+            // ⛔ ជួរដែល mutation ធ្លាប់រស់រាន ៖ DOD ខាង **ខែ**
+            ok('⛔ ការស្តារ ➜ ' + label + ' dodDollar = ' + want.dod,
+                inc(base + '/dodDollar') === want.dod, inc(base + '/dodDollar'));
+            ok('ការស្តារ ➜ ' + label + ' totalCount = ' + want.count,
+                inc(base + '/totalCount') === want.count, inc(base + '/totalCount'));
+        });
+        // ⛔ អថេរស្នូល ៖ អ្វីដែលថ្ងៃទទួល ខែត្រូវទទួល **ដូចគ្នាបេះបិទ**
+        ['codDollar', 'dodDollar', 'totalCount'].forEach((field) => {
+            ok('⛔ ខែ === ថ្ងៃ លើវាល ' + field + ' (ក្នុងខែតែមួយ)',
+                inc('zoew_monthly_revenue_cod_dod/' + M1 + '/' + field)
+                === inc('zoew_daily_revenue_cod_dod/' + D1 + '/' + field),
+                'ខែ=' + inc('zoew_monthly_revenue_cod_dod/' + M1 + '/' + field)
+                + ' · ថ្ងៃ=' + inc('zoew_daily_revenue_cod_dod/' + D1 + '/' + field));
+        });
+        // ⛔ ទិសផ្ទុយ ៖ តម្លៃ 0 មិនត្រូវសរសេរជា increment ទទេ
+        const zero = {};
+        ctx.appendRestoreRevenueIncrements(zero, [{ scanDate: D1, cod: 0, dod: 0, count: 0 }]);
+        ok('⛔ ទិសផ្ទុយ៖ delta សូន្យ ➜ គ្មានការសរសេរ', Object.keys(zero).length === 0,
+            JSON.stringify(zero));
+    });
+
     console.log('\n' + (fail === 0
         ? '✅ បៃតង — ' + pass + ' ការអះអាង'
         : '❌ ធ្លាក់ ' + fail + ' / ជោគជ័យ ' + pass));

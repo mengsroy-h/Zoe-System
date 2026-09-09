@@ -253,6 +253,82 @@ const deletedKeyMatch = SRC.match(/const DB_LISTENER_KEY_DELETED = '([^']+)';/);
 const DELETED_KEY_IN_CODE = deletedKeyMatch ? deletedKeyMatch[1] : '__មិនបានប្រកាស__';
 ok('រកឃើញការប្រកាស DB_LISTENER_KEY_DELETED ក្នុងកូដពិត', !!deletedKeyMatch, DELETED_KEY_IN_CODE);
 
+// ------------------------------------------------------------------
+// ⛔ ការពង្រីកច្បាប់ដដែល ៖ «កូនសោដែលសួរ ↔ កូនសោដែលដាក់ចូល» មិនគ្រាន់តែទាមទារ
+// ថាកូនសោ *មាន* ក្នុង Set ទេ — វាទាមទារថា listener នីមួយៗរាយការណ៍ **កូនសោ
+// របស់ខ្លួន**។ បើ callback របស់ listener មួយបញ្ជូនកូនសោ **របស់បងប្អូន** នោះ
+// ៖ (១) ការងាប់របស់វាមិនដែលចុះក្នុង `dbListenerFailedPaths` ➜ រាល់ការការពារ
+// ដែលសួរ `dbListenerViewIsStale(<កូនសោនោះ>)` **ងាប់ស្ងាត់ៗ**; (២) បងប្អូន
+// ត្រូវប្រកាសជា «ងាប់» ឬ «សះស្បើយ» ជំនួសវា។ វាស់បាន ៖ mutation ដែលប្តូរ
+// `handleDbListenerError(err, DB_LISTENER_KEY_DAILY_REVENUE)` ➜ `'exchangeRate'`
+// **រស់រាន** លើ checker ១៥៨ ទាំងអស់មុនពេលបន្ថែមការអះអាងនេះ។
+{
+    const initFn = sliceFn('initDatabaseListeners') || '';
+    const refsBlock = /listenerRefs\s*=\s*\{([\s\S]*?)\}/.exec(initFn);
+    const refToKey = {};
+    if (refsBlock) {
+        refsBlock[1].split(',').forEach((pair) => {
+            const m = /^\s*([A-Za-z_$][\w$]*)\s*:\s*([A-Za-z_$][\w$]*)\s*$/.exec(pair);
+            if (m) refToKey[m[2]] = m[1];
+        });
+    }
+    ok('រកឃើញផែនទី listenerRefs ➜ កូនសោ (យ៉ាងតិច ៦)',
+        Object.keys(refToKey).length >= 6, refToKey);
+
+    // ថេរកូនសោ ៖ `const DB_LISTENER_KEY_X = 'y';` ➜ ដោះស្រាយទៅតម្លៃពិត
+    const constKeys = {};
+    const constRe = /const\s+(DB_LISTENER_KEY_[A-Z_]+)\s*=\s*'([^']+)';/g;
+    let cm;
+    while ((cm = constRe.exec(SRC)) !== null) constKeys[cm[1]] = cm[2];
+    const resolveKey = (raw) => {
+        const t = String(raw).trim();
+        const lit = /^'([^']*)'$/.exec(t) || /^"([^"]*)"$/.exec(t);
+        if (lit) return lit[1];
+        return Object.prototype.hasOwnProperty.call(constKeys, t) ? constKeys[t] : null;
+    };
+
+    // ចែកតួ initDatabaseListeners ជាប្លុកក្នុងមួយ listener តាម `fb.onValue(<ref>`
+    const calls = [];
+    const onValueRe = /fb\.onValue\(\s*([A-Za-z_$][\w$]*)\s*,/g;
+    let om;
+    while ((om = onValueRe.exec(initFn)) !== null) calls.push({ ref: om[1], at: om.index });
+    calls.forEach((c, i) => { c.body = initFn.slice(c.at, i + 1 < calls.length ? calls[i + 1].at : initFn.length); });
+
+    ok('⛔ ជាន់អប្បបរមា៖ រកឃើញ listener យ៉ាងតិច ៦ ក្នុង initDatabaseListeners()',
+        calls.length >= 6, calls.length);
+
+    const wrong = [];
+    let checkedAlive = 0, checkedErr = 0;
+    calls.forEach((c) => {
+        const want = refToKey[c.ref];
+        if (!want) return;
+        const alive = /noteDbListenerAlive\(\s*([^)]*?)\s*\)/.exec(c.body);
+        const err = /handleDbListenerError\(\s*err\s*,\s*([^)]*?)\s*\)/.exec(c.body);
+        if (alive) {
+            checkedAlive++;
+            if (resolveKey(alive[1]) !== want) wrong.push(c.ref + ' ➜ noteDbListenerAlive(' + alive[1] + ') តែរំពឹង \'' + want + '\'');
+        }
+        if (err) {
+            checkedErr++;
+            if (resolveKey(err[1]) !== want) wrong.push(c.ref + ' ➜ handleDbListenerError(err, ' + err[1] + ') តែរំពឹង \'' + want + '\'');
+        }
+    });
+    ok('⛔ ជាន់អប្បបរមា៖ វាស់ការហៅ noteDbListenerAlive យ៉ាងតិច ៦ និង handleDbListenerError យ៉ាងតិច ៦',
+        checkedAlive >= 6 && checkedErr >= 6, 'alive=' + checkedAlive + ' err=' + checkedErr);
+    ok('⛔ listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (មិនមែនកូនសោបងប្អូន)',
+        wrong.length === 0, wrong.join(' · '));
+
+    // ⛔ ទិសផ្ទុយ ៖ កូនសោដែលរាយការណ៍ ត្រូវជាសមាជិកនៃ DB_LISTENER_KEYS ពិត
+    const reported = [];
+    calls.forEach((c) => {
+        const err = /handleDbListenerError\(\s*err\s*,\s*([^)]*?)\s*\)/.exec(c.body);
+        if (err) { const k = resolveKey(err[1]); if (k) reported.push(k); }
+    });
+    ok('⛔ ទិសផ្ទុយ៖ រាល់កូនសោដែល listener រាយការណ៍ ស្ថិតក្នុង DB_LISTENER_KEYS',
+        reported.length >= 6 && reported.every((k) => pendingKeys.indexOf(k) !== -1),
+        'រាយការណ៍=' + reported.join(',') + ' · បញ្ជី=' + pendingKeys.join(','));
+}
+
 const dropFn = sliceFn('dropStaleRestoreMarkers');
 const hasMarkersFn = sliceFn('itemHasRestoreMarkers');
 ok('រកឃើញ dropStaleRestoreMarkers និង itemHasRestoreMarkers', !!dropFn && !!hasMarkersFn);

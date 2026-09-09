@@ -11,6 +11,10 @@
 // ⛔ ឯកសារ dump មានលេខទូរស័ព្ទ និងលុយពិត — ឧបករណ៍នេះ **មិនបោះពុម្ព
 // លេខទូរស័ព្ទ ឬ barcode ណាមួយឡើយ** (មានតែថ្ងៃ · ចំនួន · ទឹកប្រាក់សរុប)។
 // ⛔ វា **មិនភ្ជាប់បណ្តាញ** និង **មិនសរសេរទៅ Firebase** ដាច់ខាត។
+//
+// Exit code ៖ 0 = គ្រប់យ៉ាងស៊ីគ្នា · 1 = **រកឃើញបញ្ហាពិត** ·
+//             2 = ប្រើខុសវិធី · 3 = **រត់មិនបាន** (គ្មានឯកសារ · JSON ខូច · app.js)
+// ⛔ 1 និង 3 ត្រូវបែងចែក — «ឧបករណ៍ខូច» មិនមែន «លុយខុស» ទេ។
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -38,14 +42,14 @@ if (!file) {
     say('  យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON');
     process.exit(2);
 }
-if (!fs.existsSync(APP_JS)) { console.log('ERROR: ZoeW/app.js not found at ' + APP_JS); process.exit(1); }
-if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(1); }
+if (!fs.existsSync(APP_JS)) { console.log('ERROR: ZoeW/app.js not found at ' + APP_JS); process.exit(3); }
+if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(3); }
 
 let raw = fs.readFileSync(file);
 if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
 let db;
 try { db = JSON.parse(raw.toString('utf8')); }
-catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(1); }
+catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(3); }
 
 // ⛔ ស្រង់កូដលុយ **ពិត** ចេញពី app.js — កុំសរសេរតេស្តលើកូដចម្លង
 const SRC = fs.readFileSync(APP_JS, 'utf8');
@@ -106,7 +110,7 @@ say('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).t
 say('រក function លុយពិត ៖ ' + (WANT.length - missing.length) + '/' + WANT.length
     + (missing.length ? '  ⚠️ បាត់ ៖ ' + missing.join(', ') : ''));
 if (WANT.length - missing.length < 12) {
-    console.log('ERROR: could not extract enough real money functions from app.js.'); process.exit(1);
+    console.log('ERROR: could not extract enough real money functions from app.js.'); process.exit(3);
 }
 say('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
     + ' · ថ្ងៃក្នុង ledger ' + Object.keys(daily).length + ' · ខែ ' + Object.keys(monthly).length);

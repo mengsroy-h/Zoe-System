@@ -12731,8 +12731,10 @@
         banner.classList.remove('hidden');
     }
 
-    function ztoStatusNetworkAllowed() {
+    function ztoStatusNetworkAllowed(userAsked) {
         if (navigator.onLine === false) return false;
+        if (!userAsked && linkIsFrugal()) return false;
+        if (!userAsked && isModalOpen) return false;
         return autoLookupInFlight.size === 0;
     }
 
@@ -12762,7 +12764,7 @@
         const cfg = ztoStatusFeatureConfig();
         if (!cfg) return 0;
         if (ztoStatusInFlight) return 0;
-        if (!ztoStatusNetworkAllowed()) {
+        if (!ztoStatusNetworkAllowed(force)) {
             scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
             return 0;
         }
@@ -12783,7 +12785,7 @@
         let recorded = 0;
         try {
             for (let i = 0; i < work.length; i++) {
-                if (!ztoStatusNetworkAllowed()) break;
+                if (!ztoStatusNetworkAllowed(force)) break;
                 let answer = null;
                 try {
                     answer = await checkZtoStatusForBarcode(cfg, work[i].code);

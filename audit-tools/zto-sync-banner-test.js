@@ -115,6 +115,8 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const banner = document.getElementById('ztoSyncBanner');
         banner.innerHTML = '';
         banner.classList.add('hidden');
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        try { closeModal(); } catch (e) { /* sandbox */ }
         clearZtoPickupStatusStore();
     }, cfgUrl);
 
@@ -308,6 +310,14 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
 
     console.log('\n== ៨. សាលក្រម «វាស់មិនបាន» ត្រូវចងចាំ — កុំហៅជាប់រហូត ==');
 
+    await setup(ZTO_URL);
+    const gateDiag = await page.evaluate(() => ({
+        frugal: linkIsFrugal(),
+        allowed: ztoStatusNetworkAllowed()
+    }));
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ច្រកទ្វារបើកមុនវាស់ (គ្មានសំណល់ឆ្លងសេណារីយ៉ូ)',
+        gateDiag.allowed === true && gateDiag.frugal === false, gateDiag);
+
     // ⛔ ថ្នាក់កំហុស ៖ ក្នុងស្ថានភាព «ដេកលក់» (env `ZTO_FIELD_SIGNED` មិនទាន់
     // ដាក់) Function ត្រឡប់ `ztoClosed: null` ជានិច្ច ➜ `setZtoPickupVerdict`
     // មិនដែលត្រូវហៅ ➜ barcode នៅ «មិនទាន់វាស់» ជារៀងរហូត ➜ រាល់ជុំសួរដដែល
@@ -359,6 +369,80 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     // ⛔ ថ្នាក់កំហុសទី ២ ៖ ការបោះចោលពេលពេញ (`ZTO_STATUS_MAX`) ដើរតាមលំដាប់
     // ចាក់ចូល ➜ សាលក្រម `false` (អ្វីដែលរបាត្រូវការ!) ត្រូវបោះមុនសាលក្រម
     // `true` ដែលគ្មានតម្លៃ ➜ ការដាស់តឿនរលត់ស្ងាត់ៗ លើសាខាដែលរវល់។
+    console.log('\n== ៩. ច្រកទ្វារដូចផ្លូវ Lookup ==');
+
+    // ⛔ ចេតនាអ្នកប្រើត្រូវឈ្នះការសន្សំ ៖ ច្បាប់ដដែលនឹង `activate()` របស់
+    // `license-verify.js` (ការចុចផ្ទាល់ ➜ `priority: true`)។ បើការចុចត្រូវ
+    // បិទដោយ Data Saver នោះ toast រាយ «សូមសាកម្ដងទៀត» ខណៈការសាកម្ដងទៀត
+    // ធ្លាក់ដដែល ➜ សារកុហក។
+    await setup(ZTO_URL);
+    const userIntent = await page.evaluate(async () => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
+        };
+        Object.defineProperty(navigator, 'connection', { value: { saveData: true }, configurable: true });
+        const items = [{ id: 'x1', phone: '011', barcodes: [{ code: 'BARWISH001', isClosed: true }] }];
+        const realNow = Date.now;
+        Date.now = () => realNow.call(Date) + 30 * 60000;
+        const auto = await runZtoStatusSweep(false, items, []);
+        const afterAuto = asked.length;
+        const manual = await runZtoStatusSweep(true, items, []);
+        Date.now = realNow;
+        Object.defineProperty(navigator, 'connection', { value: undefined, configurable: true });
+        window.fetchWithTimeout = realFetch;
+        return { autoCalls: afterAuto, manualCalls: asked.length - afterAuto, auto: auto, manual: manual };
+    });
+    ok('⛔ 2G ៖ ជុំបោស **ស្វ័យប្រវត្តិ** មិនហៅបណ្ដាញ', userIntent.autoCalls === 0, userIntent);
+    ok('⛔ 2G ៖ ការចុច **ដោយអ្នកប្រើ** ត្រូវដើរដដែល', userIntent.manualCalls > 0, userIntent);
+
+    // ⛔ ជុំបោសនេះជា **ការងារបណ្តាញស្រេចចិត្ត** (ការដាស់តឿន មិនមែនមុខងារ
+    // អាជីវកម្ម) ➜ វាត្រូវគោរពច្រកទ្វារដដែលនឹង `customerTablePrefetchAllowed()`
+    // ៖ `linkIsFrugal()` (2G/Data Saver) និង `isModalOpen` (កំពុងស្កេន)។
+    const gateProbe = async (mode, baseMin) => {
+        await setup(ZTO_URL);
+        return page.evaluate(async (args) => {
+            const m = args.m;
+            const asked = [];
+            const realFetch = window.fetchWithTimeout;
+            window.fetchWithTimeout = async (url) => {
+                asked.push(String(url));
+                return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
+            };
+            if (m === 'frugal') {
+                Object.defineProperty(navigator, 'connection', {
+                    value: { saveData: true }, configurable: true });
+            }
+            if (m === 'modal') openModalHelper('ztoGateProbeModal');
+            const items = [{ id: 'x1', phone: '011', barcodes: [{ code: 'BARGATE001', isClosed: true }] }];
+            const realNow = Date.now;
+            let shift = args.baseMin * 60000;
+            Date.now = () => realNow.call(Date) + shift;
+            await runZtoStatusSweep(false, items, []);
+            const blocked = asked.length;
+            if (m === 'frugal') {
+                Object.defineProperty(navigator, 'connection', {
+                    value: undefined, configurable: true });
+            }
+            if (m === 'modal') closeModal();
+            shift += 30 * 60000;
+            await runZtoStatusSweep(false, items, []);
+            Date.now = realNow;
+            window.fetchWithTimeout = realFetch;
+            return { blocked: blocked, afterRelease: asked.length - blocked };
+        }, { m: mode, baseMin: baseMin });
+    };
+
+    const frugalGate = await gateProbe('frugal', 90);
+    ok('⛔ 2G / Data Saver ➜ ជុំបោសមិនហៅបណ្ដាញ', frugalGate.blocked === 0, frugalGate);
+    ok('ទិសផ្ទុយ ៖ បណ្ដាញធម្មតាវិញ ➜ ជុំបោសដើរ', frugalGate.afterRelease > 0, frugalGate);
+
+    const modalGate = await gateProbe('modal', 240);
+    ok('⛔ ប្រអប់បើក (កំពុងស្កេន) ➜ ជុំបោសមិនហៅបណ្ដាញ', modalGate.blocked === 0, modalGate);
+    ok('ទិសផ្ទុយ ៖ ប្រអប់បិទវិញ ➜ ជុំបោសដើរ', modalGate.afterRelease > 0, modalGate);
+
     // ⛔ ទិសផ្ទុយ ៖ «upstream ធ្លាក់» ≠ «ZTO គ្មានវាលនេះ» — ការចងចាំការធ្លាក់
     // បណ្ដាញជា «វាស់មិនបាន» នឹងបិទការពិនិត្យពេញ TTL ខណៈ ZTO ដាច់ត្រឹមមួយភ្លែត។
     await setup(ZTO_URL);

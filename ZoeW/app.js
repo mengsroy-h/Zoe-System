@@ -4432,6 +4432,7 @@
         }
         const ztoSyncListEl = document.getElementById('ztoSyncList');
         if (ztoSyncListEl) ztoSyncListEl.innerHTML = '';
+        ztoStatusModalSig = '';
         const ztoSyncNoteEl = document.getElementById('ztoSyncModalNote');
         if (ztoSyncNoteEl) ztoSyncNoteEl.innerText = '';
         closeModal('ztoSyncModal');
@@ -12607,6 +12608,7 @@
     let ztoStatusInFlight = false;
     let ztoStatusLastSweepAt = 0;
     let ztoStatusBannerSig = '';
+    let ztoStatusModalSig = '';
 
     function loadZtoPickupStatusOnce() {
         if (ztoStatusLoaded) return;
@@ -12638,6 +12640,7 @@
     function clearZtoPickupStatusStore() {
         ztoPickupStatus.clear();
         ztoStatusBannerSig = '';
+        ztoStatusModalSig = '';
         safeStoreRemove(appLocalStore, ZTO_STATUS_STORE_KEY);
         renderZtoSyncBanner();
     }
@@ -12851,6 +12854,10 @@
         const entries = ztoStatusFeatureConfig()
             ? ztoStatusPendingList(dataToScan, trashToScan) : [];
         const waiting = ztoStatusUnmeasuredCount(dataToScan, trashToScan);
+        const signature = waiting + '|' + entries.map((entry) => entry.code).join(',');
+        if (signature === ztoStatusModalSig) return;
+        ztoStatusModalSig = signature;
+        const keepScroll = listEl.scrollTop;
         if (noteEl) {
             const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
             noteEl.innerText = entries.length
@@ -12882,6 +12889,9 @@
                 wraps[idx].textContent = '⚠️ លេខនេះគូរជារូប Barcode មិនបាន — សូមវាយដោយដៃ';
             }
         }
+        if (keepScroll > 0 && listEl.scrollHeight > listEl.clientHeight) {
+            listEl.scrollTop = Math.min(keepScroll, listEl.scrollHeight - listEl.clientHeight);
+        }
     }
 
     function renderZtoSyncViews(dataToScan = scanHistory, trashToScan = deletedItems) {
@@ -12891,6 +12901,7 @@
 
     function openZtoSyncModal(dataToScan = scanHistory, trashToScan = deletedItems) {
         if (!ztoStatusFeatureConfig()) return;
+        ztoStatusModalSig = '';
         renderZtoSyncModalList(dataToScan, trashToScan);
         openModalHelper('ztoSyncModal');
     }

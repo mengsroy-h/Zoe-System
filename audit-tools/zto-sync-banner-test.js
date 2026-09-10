@@ -1156,6 +1156,48 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok("⛔ រូបត្រូវធំល្មមស្កេនបាន (ទទឹង >= 120px · កម្ពស់ >= 40px)",
         fitRows.every((r) => r.svgTooThin === 0 && r.svgTall === 0), fitRows.filter((r) => r.svgTooThin || r.svgTall));
 
+    // ── ២១. បញ្ជីមិនត្រូវសាងឡើងវិញដោយឥតប្រយោជន៍ ─────────────────────────
+    // ⛔ ជុំបោសហៅការគូរឡើងវិញ **ក្នុងមួយ barcode ដែលវាស់បាន** (ដល់ ១០ ដង
+    // ក្នុងមួយជុំ)។ ការសាង `innerHTML` ឡើងវិញរាល់ដង ➜ (ក) **ទីតាំងរមូរលោត
+    // ត្រឡប់ទៅកំពូល** ខណៈអ្នកប្រើកំពុងអានបញ្ជីដើម្បីស្កេន · (ខ) វាស់បាន
+    // **៣៥ms ក្នុងមួយដង** នៅពិដាន ៣០០ ជួរ (លើសពិដានស៊ុមវែង)។ របាមាន
+    // `ztoStatusBannerSig` រួចហើយ ➜ បញ្ជីត្រូវមានលំនាំដដែល។
+    console.log("\n== ២១. បញ្ជីមិនសាងឡើងវិញដោយឥតប្រយោជន៍ ==");
+    await setup(ZTO_URL);
+    const rebuild = await page.evaluate(async () => {
+        const mk = (n) => {
+            const barcodes = [];
+            for (let i = 0; i < n; i++) barcodes.push({ code: "SIG" + String(100000 + i), isClosed: true });
+            return [{ id: "sig1", phone: "011", barcodes: barcodes }];
+        };
+        const items = mk(12);
+        items[0].barcodes.forEach((b) => setZtoPickupVerdict(b.code, false));
+        openZtoSyncModal(items);
+        await new Promise((r) => setTimeout(r, 60));
+        const list = document.getElementById("ztoSyncList");
+        const first = list.firstElementChild;
+        first.setAttribute("data-probe", "1");
+        renderZtoSyncModalList(items, []);
+        renderZtoSyncModalList(items, []);
+        const survived = list.firstElementChild === first && list.firstElementChild.getAttribute("data-probe") === "1";
+        list.scrollTop = 40;
+        const scrolledTo = list.scrollTop;
+        // ការប្តូរពិត ➜ ត្រូវសាងឡើងវិញ តែរក្សាទីតាំងរមូរ
+        setZtoPickupVerdict(items[0].barcodes[0].code, true);
+        renderZtoSyncModalList(items, []);
+        const rebuilt = list.firstElementChild !== first;
+        const rowsNow = list.querySelectorAll(".zto-sync-item").length;
+        const scrollKept = list.scrollTop;
+        closeZtoSyncModal();
+        return { survived: survived, rebuilt: rebuilt, rowsNow: rowsNow, scrolledTo: scrolledTo, scrollKept: scrollKept };
+    });
+    ok("⛔ ទិន្នន័យដដែល ➜ បញ្ជីមិនសាងឡើងវិញ (node ដដែលនៅរស់)", rebuild.survived === true, rebuild);
+    ok("ទិសផ្ទុយ ៖ សាលក្រមប្តូរ ➜ បញ្ជីត្រូវសាងឡើងវិញពិត",
+        rebuild.rebuilt === true && rebuild.rowsNow === 11, rebuild);
+    ok("លក្ខខណ្ឌចាំបាច់ ៖ បញ្ជីរមូរបានពិត", rebuild.scrolledTo > 0, rebuild);
+    ok("⛔ ការសាងឡើងវិញត្រូវរក្សាទីតាំងរមូរ (បញ្ជីមិនលោតទៅកំពូល)",
+        rebuild.scrollKept > 0, rebuild);
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

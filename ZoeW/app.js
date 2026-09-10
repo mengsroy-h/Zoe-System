@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.8';
+    const APP_VERSION = '2.31.9';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -73,6 +73,7 @@
         "pickSheetImportFile",
         "promptPermanentDelete",
         "promptRestoreDeletedItem",
+        "recheckZtoPickupStatus",
         "renderEntryList",
         "renderLockerList",
         "renderMonthlyReport",
@@ -3603,6 +3604,19 @@
         return !!(cfg && cfg.headerName) && !lookupApiIsAppsScript(cfg);
     }
 
+    async function buildLookupRequestHeaders(cfg) {
+        const headers = {};
+        if (lookupApiSendsHeader(cfg)) {
+            if (cfg.headerValueEnc) {
+                const decrypted = await decryptLookupSecret(cfg.headerValueEnc);
+                if (decrypted) headers[cfg.headerName] = decrypted;
+            } else if (cfg.headerValue) {
+                headers[cfg.headerName] = cfg.headerValue;
+            }
+        }
+        return headers;
+    }
+
     function lookupApiSupportsList(cfg) {
         return !!(cfg && cfg.url && !lookupApiIsZto(cfg));
     }
@@ -4364,6 +4378,7 @@
     function clearRememberedSession(keepEmail) {
         safeStoreRemove(appLocalStore, 'zoew_login_time');
         if (!keepEmail) safeStoreRemove(appLocalStore, 'remembered_email');
+        clearZtoPickupStatusStore();
     }
 
     async function isFirebaseSessionExpired(user) {
@@ -4407,6 +4422,12 @@
     function clearSensitiveModalFields() {
         hidePhoneSuggestions();
         setPhoneSearchPulledUp(false);
+        clearZtoPickupStatusStore();
+        const ztoSyncBannerEl = document.getElementById('ztoSyncBanner');
+        if (ztoSyncBannerEl) {
+            ztoSyncBannerEl.innerHTML = '';
+            ztoSyncBannerEl.classList.add('hidden');
+        }
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -12566,6 +12587,270 @@
             return { isClosedRow: !!item.isClosed, html: html };
     }
 
+    const ZTO_STATUS_STORE_KEY = 'zoew_zto_pickup_status_v1';
+    const ZTO_STATUS_TTL_MS = 12 * 60 * 60 * 1000;
+    const ZTO_STATUS_MAX = 300;
+    const ZTO_STATUS_SWEEP_DELAY_MS = 1500;
+    const ZTO_STATUS_SWEEP_GAP_MS = 20000;
+    const ZTO_STATUS_SWEEP_BATCH = 10;
+    const ZTO_STATUS_BANNER_CODES = 3;
+    const ztoPickupStatus = new Map();
+    let ztoStatusLoaded = false;
+    let ztoStatusSweepTimer = null;
+    let ztoStatusInFlight = false;
+    let ztoStatusLastSweepAt = 0;
+    let ztoStatusBannerSig = '';
+
+    function loadZtoPickupStatusOnce() {
+        if (ztoStatusLoaded) return;
+        ztoStatusLoaded = true;
+        let parsed = null;
+        try {
+            const raw = appLocalStore ? appLocalStore.getItem(ZTO_STATUS_STORE_KEY) : null;
+            parsed = raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            parsed = null;
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+        Object.keys(parsed).forEach((key) => {
+            const entry = parsed[key];
+            if (!entry || typeof entry !== 'object') return;
+            if (entry.closed !== true && entry.closed !== false && entry.closed !== null) return;
+            const at = parseFloat(entry.at);
+            if (!isFinite(at) || elapsedSince(at) > ZTO_STATUS_TTL_MS) return;
+            ztoPickupStatus.set(key, { closed: entry.closed, at: at });
+        });
+    }
+
+    function saveZtoPickupStatus() {
+        const out = {};
+        ztoPickupStatus.forEach((entry, key) => { out[key] = { closed: entry.closed, at: entry.at }; });
+        safeStoreSet(appLocalStore, ZTO_STATUS_STORE_KEY, JSON.stringify(out));
+    }
+
+    function clearZtoPickupStatusStore() {
+        ztoPickupStatus.clear();
+        ztoStatusBannerSig = '';
+        safeStoreRemove(appLocalStore, ZTO_STATUS_STORE_KEY);
+        renderZtoSyncBanner();
+    }
+
+    function evictOneZtoPickupVerdict() {
+        let victim = null;
+        ztoPickupStatus.forEach((entry, key) => {
+            if (victim !== null) return;
+            if (!entry || entry.closed !== false) victim = key;
+        });
+        if (victim === null) victim = ztoPickupStatus.keys().next().value;
+        if (victim !== undefined) ztoPickupStatus.delete(victim);
+    }
+
+    function setZtoPickupVerdict(code, closed) {
+        const key = pickupBarcodeKey(code);
+        if (!key) return;
+        if (closed !== true && closed !== false && closed !== null) return;
+        loadZtoPickupStatusOnce();
+        ztoPickupStatus.delete(key);
+        ztoPickupStatus.set(key, { closed: closed, at: getServerNow() });
+        while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
+            evictOneZtoPickupVerdict();
+        }
+        saveZtoPickupStatus();
+    }
+
+    function ztoStatusFeatureConfig() {
+        const cfg = getLookupApiConfig();
+        if (!cfg || !cfg.enabled || !cfg.url || !lookupApiIsZto(cfg)) return null;
+        return cfg;
+    }
+
+    function ztoStatusTrashItemCounts(item) {
+        if (!item || trashReasonOf(item) !== 'pickup') return false;
+        return elapsedSince(parseFloat(item.deletedAt)) <= ZTO_STATUS_TTL_MS;
+    }
+
+    function collectClosedBarcodesForZtoStatus(dataToScan = scanHistory, trashToScan = deletedItems) {
+        const out = [];
+        const seen = new Set();
+        const addFrom = (list, trashSide) => {
+            if (!Array.isArray(list)) return;
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                if (trashSide && !ztoStatusTrashItemCounts(item)) continue;
+                const codes = item && Array.isArray(item.barcodes) ? item.barcodes : null;
+                if (!codes) continue;
+                for (let j = 0; j < codes.length; j++) {
+                    const b = codes[j];
+                    if (!b || !b.isClosed) continue;
+                    const key = pickupBarcodeKey(b.code);
+                    if (!key || seen.has(key)) continue;
+                    seen.add(key);
+                    out.push({ key: key, code: String(b.code || '') });
+                }
+            }
+        };
+        addFrom(dataToScan, false);
+        addFrom(trashToScan, true);
+        return out;
+    }
+
+    function ztoStatusPendingCodes(dataToScan = scanHistory, trashToScan = deletedItems) {
+        loadZtoPickupStatusOnce();
+        let hasOpenVerdict = false;
+        ztoPickupStatus.forEach((entry) => { if (entry && entry.closed === false) hasOpenVerdict = true; });
+        if (!hasOpenVerdict) return [];
+        const out = [];
+        collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
+            const verdict = ztoPickupStatus.get(entry.key);
+            if (verdict && verdict.closed === false) out.push(entry.code);
+        });
+        return out;
+    }
+
+    function ztoStatusUnmeasuredCount(dataToScan = scanHistory, trashToScan = deletedItems) {
+        let n = 0;
+        collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
+            if (!ztoPickupStatus.get(entry.key)) n++;
+        });
+        return n;
+    }
+
+    function renderZtoSyncBanner(dataToScan = scanHistory, trashToScan = deletedItems) {
+        const banner = document.getElementById('ztoSyncBanner');
+        if (!banner) return;
+        const pending = ztoStatusPendingCodes(dataToScan, trashToScan);
+        const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
+        const waiting = codes.length ? ztoStatusUnmeasuredCount(dataToScan, trashToScan) : 0;
+        const signature = codes.length + '|' + waiting + '|'
+            + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
+        if (signature === ztoStatusBannerSig) return;
+        ztoStatusBannerSig = signature;
+        if (!codes.length) {
+            banner.classList.add('hidden');
+            banner.innerHTML = '';
+            return;
+        }
+        const more = codes.length > ZTO_STATUS_BANNER_CODES
+            ? ' · និង ' + (codes.length - ZTO_STATUS_BANNER_CODES) + ' ទៀត' : '';
+        const waitingNote = waiting ? ' · កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត' : '';
+        const detail = codes.slice(0, ZTO_STATUS_BANNER_CODES).join(' · ') + more + waitingNote
+            + ' — ចុចដើម្បីពិនិត្យម្តងទៀត';
+        const headline = codes.length + ' កញ្ចប់បិទក្នុង ZoeW តែ ZTO មិនទាន់បិទ';
+        banner.innerHTML = '<span class="zto-sync-icon" aria-hidden="true">🔄</span>'
+            + '<span class="zto-sync-copy"><strong>' + sanitizeInput(headline)
+            + '</strong><span>' + sanitizeInput(detail) + '</span></span>'
+            + '<span class="zto-sync-go" aria-hidden="true">›</span>';
+        banner.classList.remove('hidden');
+    }
+
+    function ztoStatusNetworkAllowed(userAsked) {
+        if (navigator.onLine === false) return false;
+        if (!userAsked && linkIsFrugal()) return false;
+        if (!userAsked && isModalOpen) return false;
+        return autoLookupInFlight.size === 0;
+    }
+
+    function ztoStatusBlockIsTransient() {
+        if (navigator.onLine === false) return false;
+        if (linkIsFrugal()) return false;
+        if (isModalOpen) return false;
+        return true;
+    }
+
+    function scheduleZtoStatusSweep(delayMs) {
+        if (ztoStatusSweepTimer || ztoStatusInFlight) return;
+        if (!delayMs && ztoStatusLastSweepAt
+            && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return;
+        if (!ztoStatusFeatureConfig()) return;
+        ztoStatusSweepTimer = setTimeout(() => {
+            ztoStatusSweepTimer = null;
+            runZtoStatusSweep(false);
+        }, delayMs || ZTO_STATUS_SWEEP_DELAY_MS);
+    }
+
+    async function checkZtoStatusForBarcode(cfg, code) {
+        const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
+        const headers = await buildLookupRequestHeaders(cfg);
+        const out = await fetchWithTimeout(targetUrl, { headers }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
+            'ZTO status timed out', (r) => r.json().catch(() => null));
+        if (!out.res.ok) return null;
+        const data = out.body;
+        if (!data || typeof data !== 'object') return null;
+        return { closed: typeof data.ztoClosed === 'boolean' ? data.ztoClosed : null };
+    }
+
+    async function runZtoStatusSweep(force, dataToScan = scanHistory, trashToScan = deletedItems) {
+        const cfg = ztoStatusFeatureConfig();
+        if (!cfg) return 0;
+        if (ztoStatusInFlight) return 0;
+        if (!ztoStatusNetworkAllowed(force)) {
+            if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
+            return 0;
+        }
+        if (!force && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return 0;
+        loadZtoPickupStatusOnce();
+        ztoStatusLastSweepAt = getServerNow();
+        const work = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
+            .filter((entry) => {
+                const verdict = ztoPickupStatus.get(entry.key);
+                if (!verdict) return true;
+                if (verdict.closed === true) return false;
+                return force;
+            })
+            .slice(0, ZTO_STATUS_SWEEP_BATCH);
+        if (!work.length) return 0;
+        ztoStatusInFlight = true;
+        let measured = 0;
+        let recorded = 0;
+        try {
+            for (let i = 0; i < work.length; i++) {
+                if (!ztoStatusNetworkAllowed(force)) break;
+                let answer = null;
+                try {
+                    answer = await checkZtoStatusForBarcode(cfg, work[i].code);
+                } catch (e) {
+                    answer = null;
+                }
+                if (!answer) continue;
+                recorded++;
+                setZtoPickupVerdict(work[i].code, answer.closed);
+                if (typeof answer.closed === 'boolean') {
+                    measured++;
+                    renderZtoSyncBanner();
+                }
+            }
+        } finally {
+            ztoStatusInFlight = false;
+        }
+        renderZtoSyncBanner();
+        if (recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) {
+            scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS + 500);
+        }
+        return measured;
+    }
+
+    async function recheckZtoPickupStatus() {
+        if (!ztoStatusFeatureConfig()) return;
+        if (navigator.onLine === false) {
+            showToast('⚠️ ក្រៅបណ្ដាញ — មិនអាចពិនិត្យស្ថានភាពនៅ ZTO បានទេ');
+            return;
+        }
+        if (ztoStatusInFlight) {
+            showToast('⏳ កំពុងពិនិត្យស្ថានភាពនៅ ZTO រួចហើយ...');
+            return;
+        }
+        showToast('🔄 កំពុងពិនិត្យស្ថានភាពនៅ ZTO...');
+        const measured = await runZtoStatusSweep(true);
+        if (!measured) {
+            showToast('⚠️ ពិនិត្យស្ថានភាពនៅ ZTO មិនបាន — សូមសាកម្ដងទៀត');
+            return;
+        }
+        const left = ztoStatusPendingCodes().length;
+        showToast(left
+            ? '🔄 នៅសល់ ' + left + ' កញ្ចប់ដែល ZTO មិនទាន់បិទ'
+            : '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់');
+    }
+
     function renderHistory(dataToRender = scanHistory) {
         const tbody = document.getElementById('historyTableBody');
         const countSpan = document.getElementById('count');
@@ -12626,6 +12911,9 @@
         existingRows.forEach((tr, id) => {
             if (!seenIds.has(id)) tr.remove();
         });
+
+        renderZtoSyncBanner();
+        scheduleZtoStatusSweep();
     }
 
     const CLEAR_HISTORY_CLAIM_LEASE_MS = 2 * 60 * 1000;

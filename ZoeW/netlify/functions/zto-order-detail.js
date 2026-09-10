@@ -15,6 +15,9 @@ const FORBIDDEN_FORWARD_HEADER_RE = /^(?:authorization|connection|content-length
 const FIELD_PATH_RE = /^[A-Za-z0-9_$]+(?:\.[A-Za-z0-9_$]+)*$/;
 const QUERY_PARAM_RE = /^[A-Za-z0-9_.-]{1,40}$/;
 const SAFE_REASON_RE = /^[A-Za-z0-9_.:@-]{1,80}$/;
+const SIGNED_VALUE_RE = /^[A-Za-z0-9_.:@-]{1,40}$/;
+const SIGNED_PATH_MAX = 8;
+const SIGNED_VALUE_MAX = 16;
 const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]+/g;
 const SUCCESS_CODE_RE = /^(?:0+|200|success|succeed|ok|true)$/;
 const LOGIN_REDIRECT_RE = /https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[.\/]|iam[-.])/i;
@@ -580,6 +583,37 @@ function readFieldPaths(raw, defaults, label) {
     return merged.slice(0, 24);
 }
 
+// ⛔ ស្ថានភាព «បិទរួចនៅ ZTO» ជាវាល **ស្រេចចិត្ត** ៖ បើគ្មានការកំណត់ ➜ មុខងារ
+// ដេកលក់ទាំងស្រុង។ ⛔ ហើយការកំណត់ **ខុស មិនត្រូវសម្លាប់ lookup** ដូច
+// `ZTO_FIELD_PHONE` ដទៃទេ (ពួកនោះបោះ `ZtoConfigError` ➜ 503) — លេខទូរស័ព្ទ
+// និងលុយសំខាន់ជាងស្លាកស្ថានភាព ➜ ការកំណត់ខុសបិទតែមុខងារនេះ ហើយប្រាប់
+// មូលហេតុក្នុង `?diag=1`។
+function readSignedConfig(env) {
+    const out = { paths: [], values: [], reason: '' };
+    const rawPaths = String(env.ZTO_FIELD_SIGNED || '').trim();
+    const rawValues = String(env.ZTO_SIGNED_VALUES || '').trim();
+    if (!rawPaths && !rawValues) return out;
+    if (!rawPaths || !rawValues) {
+        out.reason = rawPaths ? 'values:missing' : 'paths:missing';
+        return out;
+    }
+    const paths = rawPaths.split(',').map((part) => part.trim()).filter(Boolean);
+    if (!paths.length || paths.length > SIGNED_PATH_MAX
+        || paths.some((part) => part.length > 120 || !FIELD_PATH_RE.test(part))) {
+        out.reason = 'paths:invalid';
+        return out;
+    }
+    const values = rawValues.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
+    if (!values.length || values.length > SIGNED_VALUE_MAX
+        || values.some((part) => !SIGNED_VALUE_RE.test(part))) {
+        out.reason = 'values:invalid';
+        return out;
+    }
+    out.paths = paths;
+    out.values = values;
+    return out;
+}
+
 function readHttpsUrl(raw, label) {
     let url;
     try {
@@ -643,6 +677,7 @@ function readConfig(env) {
         codPaths: readFieldPaths(env.ZTO_FIELD_COD, COD_PATHS, 'cod'),
         dodPaths: readFieldPaths(env.ZTO_FIELD_DOD, DOD_PATHS, 'dod'),
         barcodePaths: readFieldPaths(env.ZTO_FIELD_BARCODE, BARCODE_PATHS, 'barcode'),
+        signed: readSignedConfig(env),
         upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 6000, 2000, 20000),
         budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 9000, 4000, 24000),
         retries: boundedInteger(env.ZTO_UPSTREAM_RETRIES, 1, 0, 3),
@@ -666,6 +701,8 @@ function readConfig(env) {
         .update(String(env.ZTO_TOKEN || '')).update(FIELD_SEPARATOR)
         .update(String(env.ZTO_COOKIE || '')).update(FIELD_SEPARATOR)
         .update(config.phonePaths.join(',') + config.codPaths.join(',') + config.dodPaths.join(','))
+        .update(FIELD_SEPARATOR)
+        .update(config.signed.paths.join(',') + '|' + config.signed.values.join(','))
         .digest('base64url')
         .slice(0, 22);
 
@@ -801,6 +838,23 @@ function pickNumber(candidates, paths) {
     return null;
 }
 
+// ⛔ សាលក្រមមាន **៣** ៖ `true` (បិទរួចនៅ ZTO) · `false` (មិនទាន់បិទ) ·
+// `null` («មិនទាន់វាស់»)។ វាលដែលរកមិនឃើញ ត្រូវជា `null` ⛔ **មិនមែន `false`**
+// — នេះជាច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស» ដដែលនឹង `license-verify.js`។
+function pickSignedVerdict(candidates, signed) {
+    if (!signed || !signed.paths.length || !signed.values.length) return null;
+    for (let i = 0; i < candidates.length; i++) {
+        for (let j = 0; j < signed.paths.length; j++) {
+            const raw = getPath(candidates[i], signed.paths[j]);
+            if (raw === null || raw === undefined || typeof raw === 'object') continue;
+            const text = String(raw).replace(CONTROL_CHAR_RE, '').trim().toLowerCase();
+            if (!text) continue;
+            return signed.values.indexOf(text) !== -1;
+        }
+    }
+    return null;
+}
+
 function extractOrder(config, upstream) {
     const candidates = orderCandidates(upstream);
     if (!candidates.length) return null;
@@ -812,7 +866,8 @@ function extractOrder(config, upstream) {
         barcode: pickText(candidates, config.barcodePaths),
         phone,
         cod: cod === null ? 0 : cod,
-        dod: dod === null ? 0 : dod
+        dod: dod === null ? 0 : dod,
+        signed: pickSignedVerdict(candidates, config.signed)
     };
 }
 
@@ -906,7 +961,8 @@ async function requestOnce(config, headers, barcode, timeoutMs, session) {
                 barcode: order.barcode || barcode,
                 phone: order.phone,
                 cod: order.cod,
-                dod: order.dod
+                dod: order.dod,
+                ztoClosed: order.signed
             }
         };
     }
@@ -1090,7 +1146,10 @@ function diagnosticsBody(config, headers, authKind, credential) {
             phone: config.phonePaths.slice(0, 4),
             cod: config.codPaths.slice(0, 4),
             dod: config.dodPaths.slice(0, 4),
-            barcode: config.barcodePaths.slice(0, 4)
+            barcode: config.barcodePaths.slice(0, 4),
+            signed: config.signed.paths.slice(0, 4),
+            signedValues: config.signed.values.length,
+            signedReason: config.signed.reason || null
         },
         timing: {
             upstreamTimeoutMs: config.upstreamTimeoutMs,

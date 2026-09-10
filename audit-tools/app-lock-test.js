@@ -750,6 +750,170 @@ async function withTimeout(promise, ms, label) {
             check(s.locked && s.modal === 'hidden',
                 '⛔ ការចាក់សោគ្របប្រអប់ដែលបើកនៅ — បើអត់ ➜ លេខអតិថិជនអានឃើញពីក្រោយសោ', s);
         });
+
+        // ២០. ⛔ របាយការណ៍ពិតពីអ្នកប្រើ (2026-09-10) ៖ *«ដោះសោ Applock រួច
+        //     ក៏ api lookup ទាមទារដោះសោដដែល ទាល់តែដោះសោក្នុង api lookup
+        //     បានវាលោតមុខងារ មិនទាន់បិទ ZTO»*។
+        //
+        //     ⛔ ការអានកូដ **បញ្ជាក់ខុស** ៖ `completeAppUnlock(pin)` ពិតជា
+        //     កំណត់ `lookupSecretKey` មែន ➜ ជុំមុនសន្និដ្ឋានថា «វាដំណើរការ
+        //     រួចហើយ»។ អ្វីដែលការអានកូដមើលមិនឃើញគឺ **អាយុ** នៃតម្លៃទាំង ២ ៖
+        //       · ទង់ដោះសោ App Lock រស់ក្នុង `sessionStorage` ➜ **រស់រាន
+        //         ការផ្ទុកឡើងវិញ** (ចាំបាច់ — បើអត់ រាល់ការទាញចុះ PTR
+        //         ត្រូវវាយ PIN; មើលក្រុម ៨ និង ១៥)។
+        //       · `lookupSecretKey` ជា **អថេរក្នុងសតិ** ➜ **ងាប់រាល់ការ
+        //         ផ្ទុកឡើងវិញ** ហើយវាដេរីវេពី PIN ដែល **មិនត្រូវរក្សាទុក**។
+        //     ➜ ក្រោយ PTR ដំបូង ៖ App Lock **ដោះរួច** ខណៈសោ ZTO **ជាប់វិញ**
+        //     ➜ អ្នកប្រើត្រូវវាយ PIN ម្តងទៀតតាមផ្លូវ Lookup ហើយមុខងារ
+        //     «ZTO មិនទាន់បិទ» ទើបភ្ញាក់។ PTR ជាកាយវិការស្នូលរបស់ App នេះ
+        //     ➜ ថ្នាក់នេះកើត **រាល់ថ្ងៃ**។
+        await group('២០. ⛔ ការដោះសោ App Lock ➜ សោ ZTO Lookup ត្រូវរស់រាន **ការផ្ទុកឡើងវិញ**', async () => {
+            const ZTO_CFG = {
+                enabled: true,
+                url: '/.netlify/functions/zto-order-detail',
+                headerName: 'x-zto-proxy-key',
+                headerValueEnc: 'v1:ZmFrZQ==:ZmFrZQ=='
+            };
+            const readLock = () => page.evaluate(() => {
+                const cfg = typeof ztoStatusFeatureConfig === 'function' ? ztoStatusFeatureConfig() : null;
+                return {
+                    hasCfg: !!cfg,
+                    secret: typeof lookupSecretKey !== 'undefined' ? !!lookupSecretKey : null,
+                    ztoLocked: typeof ztoStatusSecretIsLocked === 'function' ? ztoStatusSecretIsLocked(cfg) : null
+                };
+            });
+            await page.evaluate((cfg) => {
+                localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+            }, ZTO_CFG);
+            await unlockFresh();
+            await page.evaluate((cfg) => {
+                localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+            }, ZTO_CFG);
+            const afterPin = await readLock();
+            check(afterPin.hasCfg === true,
+                'លក្ខខណ្ឌចាំបាច់ ៖ ការកំណត់ ZTO Lookup ត្រូវបានអាន', afterPin);
+            check(afterPin.secret === true && afterPin.ztoLocked === false,
+                'ដោះសោដោយ PIN ➜ សោ ZTO Lookup ដោះតាមភ្លាម', afterPin);
+
+            await withTimeout(load(), 30000, 'reload-after-unlock');
+            await settle();
+            const s = await state();
+            check(!s.bodyLocked && s.unlockedFlag === '1',
+                'លក្ខខណ្ឌចាំបាច់ ៖ ការផ្ទុកឡើងវិញក្នុងវគ្គដដែល **មិនចាក់សោ** (មិនប្តូរឥរិយាបថ PTR)', s);
+            const afterReload = await readLock();
+            check(afterReload.hasCfg === true,
+                'លក្ខខណ្ឌចាំបាច់ ៖ ការកំណត់នៅរស់រានការផ្ទុកឡើងវិញ', afterReload);
+            check(afterReload.ztoLocked === false,
+                '⛔ ក្រោយ PTR ៖ App Lock ដោះរួច ➜ សោ ZTO Lookup **មិនត្រូវជាប់វិញ**', afterReload);
+
+            // ⛔ ការធ្វើឲ្យសោរស់រានការផ្ទុកឡើងវិញ ជា **ការប្តូរកន្លែងដែល
+            //    សោសម្ងាត់រស់នៅ** ➜ បើគ្មានទិសផ្ទុយ វាជា **រន្ធសុវត្ថិភាព**
+            //    មិនមែនការកែទេ។
+            // ⛔ **លំដាប់សំខាន់** ៖ ការសាក «វគ្គថ្មីមិនត្រូវស្តារ» ត្រូវរត់
+            //    ខណៈកំណត់ត្រា **នៅមានពិត** — វាស់បាន ៖ បើលុបកំណត់ត្រាមុន
+            //    (តាម `clearAppUnlockedForSession()`) នោះ mutation ដែលដក
+            //    ច្រកទ្វារ `appLockShouldArm()` ចេញ **រស់រាន** ព្រោះគ្មាន
+            //    អ្វីត្រូវស្តារ ➜ ការអះអាងបៃតង **ដោយចៃដន្យ**។
+            const exportable = await page.evaluate(async () => {
+                if (typeof lookupSecretKey === 'undefined' || !lookupSecretKey) return 'no-key';
+                try {
+                    await crypto.subtle.exportKey('raw', lookupSecretKey);
+                    return 'EXPORTED';
+                } catch (e) { return 'threw'; }
+            });
+            check(exportable === 'threw',
+                '⛔ សោដែលស្តារមកវិញ ត្រូវ **នាំចេញមិនបាន** (extractable:false) — បើនាំចេញបាន script ណាមួយអានសោបាន', exportable);
+
+            const readStored = () => page.evaluate(() => new Promise((resolve) => {
+                let done = false;
+                const fin = (v) => { if (!done) { done = true; resolve(v); } };
+                setTimeout(() => fin('timeout'), 2000);
+                try {
+                    const req = indexedDB.open('zoew_lookup_key_v1', 1);
+                    req.onsuccess = () => {
+                        try {
+                            const g = req.result.transaction('k', 'readonly').objectStore('k').get('lookupSecretKey');
+                            g.onsuccess = () => fin(g.result ? 'PRESENT' : 'gone');
+                            g.onerror = () => fin('gone');
+                        } catch (e) { fin('gone'); }
+                    };
+                    req.onerror = () => fin('gone');
+                } catch (e) { fin('gone'); }
+            }));
+            check((await readStored()) === 'PRESENT',
+                'លក្ខខណ្ឌចាំបាច់ ៖ សោត្រូវបានរក្សាទុកពិត (បើអត់ ការសាកខាងក្រោមបៃតងដោយចៃដន្យ)');
+
+            // ⛔ ការការពារមាន **២ ជាន់ឯករាជ្យ** ➜ ត្រូវវាស់ដាច់ពីគ្នា ៖
+            //    ជាន់ ១ = `restoreLookupSecretKey()` បដិសេធពេល `appLockShouldArm()`
+            //    ជាន់ ២ = កំណត់ត្រាត្រូវលុប **ភ្លាមពេលសោចាក់** (`clearAppUnlockedForSession`)
+            //    ⛔ ការសាកតាមផ្លូវ boot តែម្យ៉ាង **មិនអាចញែកជាន់ ១ បានទេ** —
+            //    វាស់បាន ៖ ជាន់ ២ លុបកំណត់ត្រាមុនការស្តាររត់ ➜ mutation ដែល
+            //    ដកជាន់ ១ ចេញ **រស់រាន**។ ដូច្នេះជាន់ ១ ត្រូវវាស់ **ដោយផ្ទាល់
+            //    គ្មានការប្រណាំង** ៖ ដាក់ប្រព័ន្ធក្នុងស្ថានភាព «សោគួរចាក់ ហើយ
+            //    កំណត់ត្រានៅមាន» រួចហៅការស្តារដោយផ្ទាល់។
+            const gate = await page.evaluate(async () => {
+                sessionStorage.removeItem('zoew_app_unlocked');
+                lookupSecretKey = null;
+                const armed = typeof appLockShouldArm === 'function' ? appLockShouldArm() : null;
+                const restored = await restoreLookupSecretKey();
+                return { armed: armed, restored: restored, secret: !!lookupSecretKey };
+            });
+            check(gate.armed === true,
+                'លក្ខខណ្ឌចាំបាច់ ៖ ស្ថានភាព «សោគួរចាក់» ពិត ខណៈកំណត់ត្រានៅមាន', gate);
+            check(gate.restored === false && gate.secret === false,
+                '⛔⛔ ជាន់ ១ ៖ សោគួរចាក់ ➜ ការស្តារត្រូវ **បដិសេធ** ទោះកំណត់ត្រានៅមាន', gate);
+
+            await withTimeout(load(), 30000, 'reload-new-session');
+            await settle();
+            const sNew = await state();
+            check(sNew.bodyLocked && sNew.lockShown,
+                'លក្ខខណ្ឌចាំបាច់ ៖ វគ្គថ្មី ➜ App Lock ចាក់សោវិញ', sNew);
+            const newSession = await readLock();
+            check(newSession.secret !== true && newSession.ztoLocked !== false,
+                '⛔⛔ វគ្គថ្មី (App Lock ចាក់សោ) ➜ សោ **មិនត្រូវស្តារ** — បើស្តារ នោះការចាក់សោត្រូវរំលងទាំងស្រុង', newSession);
+            check((await readStored()) === 'gone',
+                '⛔ ជាន់ ២ ៖ សោចាក់ពេល boot ➜ កំណត់ត្រាត្រូវ **លុបភ្លាម** (មិនរស់ក្រោមសោ)');
+
+            await typePin(PIN);
+            await page.waitForTimeout(300);
+            check((await readStored()) === 'PRESENT',
+                'លក្ខខណ្ឌចាំបាច់ ៖ ដោះសោវិញ ➜ សោត្រូវរក្សាទុកម្តងទៀត');
+            await page.evaluate(() => {
+                if (typeof clearAppUnlockedForSession === 'function') clearAppUnlockedForSession();
+            });
+            await page.waitForTimeout(400);
+            check((await readStored()) === 'gone',
+                '⛔ ការចាក់សោពិត / ចាកចេញ ➜ សោដែលរក្សាទុក ត្រូវ **លុបចោល**');
+
+            // ⛔ កំណត់ត្រាដែល **ខូច ឬត្រូវពុល** មិនត្រូវក្លាយជាសោ — `lookupSecretKey`
+            //    ដែលមិនមែន CryptoKey ធ្វើឲ្យ `decryptLookupSecret()` បោះ ➜ ផ្លូវ
+            //    Lookup ស្លាប់ស្ងាត់ៗ ខណៈ `ztoStatusSecretIsLocked()` រាយថា «ដោះរួច»។
+            const poisoned = await page.evaluate(async () => {
+                sessionStorage.setItem('zoew_app_unlocked', '1');
+                lookupSecretKey = null;
+                await new Promise((resolve) => {
+                    let done = false;
+                    const fin = () => { if (!done) { done = true; resolve(); } };
+                    setTimeout(fin, 2000);
+                    try {
+                        const req = indexedDB.open('zoew_lookup_key_v1', 1);
+                        req.onsuccess = () => {
+                            try {
+                                const tx = req.result.transaction('k', 'readwrite');
+                                tx.objectStore('k').put({ type: 'not-a-key', raw: 'AAAA' }, 'lookupSecretKey');
+                                tx.oncomplete = fin;
+                                tx.onerror = fin;
+                            } catch (e) { fin(); }
+                        };
+                        req.onerror = fin;
+                    } catch (e) { fin(); }
+                });
+                const restored = await restoreLookupSecretKey();
+                return { restored: restored, secret: !!lookupSecretKey };
+            });
+            check(poisoned.restored === false && poisoned.secret === false,
+                '⛔ កំណត់ត្រាខូច/ត្រូវពុល ➜ ការស្តារត្រូវ **បដិសេធ** មិនយកវាធ្វើជាសោ', poisoned);
+        });
     } catch (e) {
         bad('ផ្នែក browser បោះកំហុស', String(e && e.message ? e.message : e));
     }

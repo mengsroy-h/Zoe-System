@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.10';
+    const APP_VERSION = '2.31.11';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1222,6 +1222,115 @@
         }
     }
 
+    const LOOKUP_KEY_DB_NAME = 'zoew_lookup_key_v1';
+    const LOOKUP_KEY_STORE = 'k';
+    const LOOKUP_KEY_ID = 'lookupSecretKey';
+    const LOOKUP_KEY_DB_TIMEOUT_MS = 3000;
+
+    function lookupKeyDbFactory() {
+        try {
+            return window.indexedDB || null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function lookupKeyDbDeadline(done) {
+        try {
+            setTimeout(() => done(null), LOOKUP_KEY_DB_TIMEOUT_MS);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function openLookupKeyDb() {
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = (value) => { if (!settled) { settled = true; resolve(value); } };
+            if (!lookupKeyDbDeadline(done)) { done(null); return; }
+            try {
+                const factory = lookupKeyDbFactory();
+                if (!factory) { done(null); return; }
+                const req = factory.open(LOOKUP_KEY_DB_NAME, 1);
+                req.onupgradeneeded = () => {
+                    try {
+                        const db = req.result;
+                        if (db && !db.objectStoreNames.contains(LOOKUP_KEY_STORE)) db.createObjectStore(LOOKUP_KEY_STORE);
+                    } catch (e) { done(null); }
+                };
+                req.onsuccess = () => {
+                    if (settled) {
+                        try { req.result.close(); } catch (e) { }
+                        return;
+                    }
+                    done(req.result || null);
+                };
+                req.onerror = () => done(null);
+                req.onblocked = () => done(null);
+            } catch (e) {
+                done(null);
+            }
+        });
+    }
+
+    function lookupKeyDbRun(mode, action) {
+        return new Promise((resolve) => {
+            let settled = false;
+            const done = (value) => { if (!settled) { settled = true; resolve(value); } };
+            if (!lookupKeyDbDeadline(done)) { done(null); return; }
+            openLookupKeyDb().then((db) => {
+                if (!db) { done(null); return; }
+                const finish = (value) => {
+                    try { db.close(); } catch (e) { }
+                    done(value);
+                };
+                try {
+                    const tx = db.transaction(LOOKUP_KEY_STORE, mode);
+                    const req = action(tx.objectStore(LOOKUP_KEY_STORE));
+                    tx.onabort = () => finish(null);
+                    tx.onerror = () => finish(null);
+                    if (!req) { tx.oncomplete = () => finish(true); return; }
+                    req.onsuccess = () => finish(req.result === undefined ? true : req.result);
+                    req.onerror = () => finish(null);
+                } catch (e) {
+                    finish(null);
+                }
+            }, () => done(null));
+        });
+    }
+
+    function rememberLookupSecretKey(key) {
+        if (!key) return Promise.resolve(false);
+        try {
+            return lookupKeyDbRun('readwrite', (store) => store.put(key, LOOKUP_KEY_ID)).then((r) => r !== null, () => false);
+        } catch (e) {
+            return Promise.resolve(false);
+        }
+    }
+
+    function forgetStoredLookupSecretKey() {
+        try {
+            return lookupKeyDbRun('readwrite', (store) => store.delete(LOOKUP_KEY_ID)).then(() => true, () => false);
+        } catch (e) {
+            return Promise.resolve(false);
+        }
+    }
+
+    function restoreLookupSecretKey() {
+        if (lookupSecretKey) return Promise.resolve(true);
+        try {
+            if (appLockShouldArm()) return Promise.resolve(false);
+            return lookupKeyDbRun('readonly', (store) => store.get(LOOKUP_KEY_ID)).then((stored) => {
+                if (!stored || typeof stored !== 'object' || stored.type !== 'secret') return false;
+                lookupSecretKey = stored;
+                return true;
+            }, () => false);
+        } catch (e) {
+            return Promise.resolve(false);
+        }
+    }
+
     async function encryptLookupSecret(plainText) {
         if (!lookupSecretKey || !plainText) return null;
         try {
@@ -1335,6 +1444,7 @@
         try {
             appLocalStore.setItem('zoew_security_pin_hash', await hashPin(pinVal));
             lookupSecretKey = await deriveLookupSecretKey(pinVal);
+        await rememberLookupSecretKey(lookupSecretKey);
             await migrateLookupSecretIfNeeded();
         } catch (e) {
             alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
@@ -1398,6 +1508,7 @@
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
         lookupSecretKey = await deriveLookupSecretKey(pin);
+        await rememberLookupSecretKey(lookupSecretKey);
         await migrateLookupSecretIfNeeded();
         closeModal('pinModal');
         (pinTargetAction || openConfigModal)(pin);
@@ -1720,6 +1831,7 @@
 
     function clearAppUnlockedForSession() {
         safeStoreRemove(appSessionStore, APP_LOCK_SESSION_KEY);
+        forgetStoredLookupSecretKey();
     }
 
     function appLockShouldArm() {
@@ -1850,6 +1962,7 @@
             safeStoreSet(appLocalStore, 'zoew_security_pin_hash', await hashPin(pin));
         }
         lookupSecretKey = await deriveLookupSecretKey(pin);
+        await rememberLookupSecretKey(lookupSecretKey);
         await migrateLookupSecretIfNeeded();
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
@@ -1984,6 +2097,12 @@
     }
 
     initAppLock();
+
+    restoreLookupSecretKey().then((restored) => {
+        if (!restored) return;
+        renderZtoSyncViews();
+        scheduleZtoStatusSweep();
+    }, () => {});
 
     function checkPinAndOpenConfig(isFirstTime = false) {
         if (isPinFlowPending()) return;

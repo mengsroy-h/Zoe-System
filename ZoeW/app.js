@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.9';
+    const APP_VERSION = '2.31.10';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -70,9 +70,11 @@
         "openMonthlyStatsModal",
         "openSideDrawer",
         "openViewListModal",
+        "openZtoSyncModal",
         "pickSheetImportFile",
         "promptPermanentDelete",
         "promptRestoreDeletedItem",
+        "closeZtoSyncModal",
         "recheckZtoPickupStatus",
         "renderEntryList",
         "renderLockerList",
@@ -1253,6 +1255,14 @@
         lookupApi: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ API ស្វែងរកអតិថិជន',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ API ស្វែងរកអតិថិជន លើកក្រោយ'
+        },
+        lookupUnlock: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីដោះសោការស្វែងរកអតិថិជន',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ដោះសោការស្វែងរកអតិថិជន លើកក្រោយ'
+        },
+        ztoStatus: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO លើកក្រោយ'
         },
         locker: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ទូ Locker',
@@ -4180,7 +4190,7 @@
                     lookupLockedNoticeShown = true;
                     showToast("🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការស្វែងរកអតិថិជន");
                 }
-                if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi');
+                if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupUnlock');
             });
         }
 
@@ -4428,6 +4438,12 @@
             ztoSyncBannerEl.innerHTML = '';
             ztoSyncBannerEl.classList.add('hidden');
         }
+        const ztoSyncListEl = document.getElementById('ztoSyncList');
+        if (ztoSyncListEl) ztoSyncListEl.innerHTML = '';
+        ztoStatusModalSig = '';
+        const ztoSyncNoteEl = document.getElementById('ztoSyncModalNote');
+        if (ztoSyncNoteEl) ztoSyncNoteEl.innerText = '';
+        closeModal('ztoSyncModal');
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -12600,6 +12616,7 @@
     let ztoStatusInFlight = false;
     let ztoStatusLastSweepAt = 0;
     let ztoStatusBannerSig = '';
+    let ztoStatusModalSig = '';
 
     function loadZtoPickupStatusOnce() {
         if (ztoStatusLoaded) return;
@@ -12631,6 +12648,7 @@
     function clearZtoPickupStatusStore() {
         ztoPickupStatus.clear();
         ztoStatusBannerSig = '';
+        ztoStatusModalSig = '';
         safeStoreRemove(appLocalStore, ZTO_STATUS_STORE_KEY);
         renderZtoSyncBanner();
     }
@@ -12685,7 +12703,12 @@
                     const key = pickupBarcodeKey(b.code);
                     if (!key || seen.has(key)) continue;
                     seen.add(key);
-                    out.push({ key: key, code: String(b.code || '') });
+                    out.push({
+                        key: key,
+                        code: String(b.code || ''),
+                        phone: String((item && item.phone) || ''),
+                        locker: String((b && b.locker) || (item && item.locker) || '')
+                    });
                 }
             }
         };
@@ -12694,7 +12717,7 @@
         return out;
     }
 
-    function ztoStatusPendingCodes(dataToScan = scanHistory, trashToScan = deletedItems) {
+    function ztoStatusPendingList(dataToScan = scanHistory, trashToScan = deletedItems) {
         loadZtoPickupStatusOnce();
         let hasOpenVerdict = false;
         ztoPickupStatus.forEach((entry) => { if (entry && entry.closed === false) hasOpenVerdict = true; });
@@ -12702,9 +12725,13 @@
         const out = [];
         collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
             const verdict = ztoPickupStatus.get(entry.key);
-            if (verdict && verdict.closed === false) out.push(entry.code);
+            if (verdict && verdict.closed === false) out.push(entry);
         });
         return out;
+    }
+
+    function ztoStatusPendingCodes(dataToScan = scanHistory, trashToScan = deletedItems) {
+        return ztoStatusPendingList(dataToScan, trashToScan).map((entry) => entry.code);
     }
 
     function ztoStatusUnmeasuredCount(dataToScan = scanHistory, trashToScan = deletedItems) {
@@ -12741,6 +12768,154 @@
             + '</strong><span>' + sanitizeInput(detail) + '</span></span>'
             + '<span class="zto-sync-go" aria-hidden="true">›</span>';
         banner.classList.remove('hidden');
+    }
+
+    const CODE128_PATTERNS = [
+        '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312',
+        '132212', '221213', '221312', '231212', '112232', '122132', '122231', '113222',
+        '123122', '123221', '223211', '221132', '221231', '213212', '223112', '312131',
+        '311222', '321122', '321221', '312212', '322112', '322211', '212123', '212321',
+        '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+        '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121',
+        '313121', '211331', '231131', '213113', '213311', '213131', '311123', '311321',
+        '331121', '312113', '312311', '332111', '314111', '221411', '431111', '111224',
+        '111422', '121124', '121421', '141122', '141221', '112214', '112412', '122114',
+        '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+        '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112',
+        '421211', '212141', '214121', '412121', '111143', '111341', '131141', '114113',
+        '114311', '411113', '411311', '113141', '114131', '311141', '411131', '211412',
+        '211214', '211232', '2331112'
+    ];
+    const CODE128_START_B = 104;
+    const CODE128_START_C = 105;
+    const CODE128_STOP = 106;
+    const CODE128_QUIET = 10;
+    const CODE128_HEIGHT = 60;
+
+    function code128Values(text) {
+        const raw = String(text == null ? '' : text);
+        if (!raw) return null;
+        if (/^[0-9]+$/.test(raw) && raw.length % 2 === 0) {
+            const digits = [CODE128_START_C];
+            for (let i = 0; i < raw.length; i += 2) digits.push(parseInt(raw.substr(i, 2), 10));
+            return digits;
+        }
+        const chars = [CODE128_START_B];
+        for (let i = 0; i < raw.length; i++) {
+            const c = raw.charCodeAt(i);
+            if (c < 32 || c > 126) return null;
+            chars.push(c - 32);
+        }
+        return chars;
+    }
+
+    function code128Bars(text) {
+        const values = code128Values(text);
+        if (!values) return null;
+        let sum = values[0];
+        for (let i = 1; i < values.length; i++) sum += values[i] * i;
+        const seq = values.concat([sum % 103, CODE128_STOP]);
+        let widths = '';
+        for (let i = 0; i < seq.length; i++) widths += CODE128_PATTERNS[seq[i]];
+        const bars = [];
+        let x = CODE128_QUIET;
+        let isBar = true;
+        for (let i = 0; i < widths.length; i++) {
+            const w = parseInt(widths.charAt(i), 10);
+            if (isBar) bars.push([x, w]);
+            x += w;
+            isBar = !isBar;
+        }
+        return { bars: bars, width: x + CODE128_QUIET };
+    }
+
+    function code128SvgElement(text) {
+        const drawing = code128Bars(text);
+        if (!drawing) return null;
+        const NS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('class', 'zto-sync-bc');
+        svg.setAttribute('viewBox', '0 0 ' + drawing.width + ' ' + CODE128_HEIGHT);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        for (let i = 0; i < drawing.bars.length; i++) {
+            const rect = document.createElementNS(NS, 'rect');
+            rect.setAttribute('x', drawing.bars[i][0]);
+            rect.setAttribute('y', '0');
+            rect.setAttribute('width', drawing.bars[i][1]);
+            rect.setAttribute('height', CODE128_HEIGHT);
+            svg.appendChild(rect);
+        }
+        return svg;
+    }
+
+    function ztoSyncModalIsOpen() {
+        const el = document.getElementById('ztoSyncModal');
+        return !!el && el.style.display === 'flex';
+    }
+
+    function renderZtoSyncModalList(dataToScan = scanHistory, trashToScan = deletedItems) {
+        const listEl = document.getElementById('ztoSyncList');
+        const noteEl = document.getElementById('ztoSyncModalNote');
+        if (!listEl) return;
+        const entries = ztoStatusFeatureConfig()
+            ? ztoStatusPendingList(dataToScan, trashToScan) : [];
+        const waiting = ztoStatusUnmeasuredCount(dataToScan, trashToScan);
+        const signature = waiting + '|' + entries.map((entry) => entry.code).join(',');
+        if (signature === ztoStatusModalSig) return;
+        ztoStatusModalSig = signature;
+        if (noteEl) {
+            const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
+            noteEl.innerText = entries.length
+                ? 'ស្កេនលេខខាងក្រោមចូល ZTO Palm ដើម្បីបិទ។' + waitingNote
+                : 'កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់។' + waitingNote;
+        }
+        if (!entries.length) {
+            listEl.innerHTML = '<div class="zto-sync-empty">' + sanitizeInput('✅ គ្មានកញ្ចប់ណាដែល ZTO មិនទាន់បិទទេ') + '</div>';
+            return;
+        }
+        listEl.innerHTML = entries.map((entry, idx) => {
+            const meta = (entry.phone || '—') + (entry.locker ? ' · ' + entry.locker : '');
+            return '<div class="zto-sync-item">'
+                + '<div class="zto-sync-head">'
+                + '<span class="zto-sync-no">' + sanitizeInput(String(idx + 1)) + '</span>'
+                + '<span class="zto-sync-body">'
+                + '<span class="zto-sync-code">' + sanitizeInput(entry.code) + '</span>'
+                + '<span class="zto-sync-meta">' + sanitizeInput(meta) + '</span>'
+                + '</span></div>'
+                + '<div class="zto-sync-bc-wrap"></div></div>';
+        }).join('');
+        const wraps = listEl.querySelectorAll('.zto-sync-bc-wrap');
+        for (let idx = 0; idx < wraps.length; idx++) {
+            const svg = entries[idx] ? code128SvgElement(entries[idx].code) : null;
+            if (svg) {
+                wraps[idx].appendChild(svg);
+            } else {
+                wraps[idx].classList.add('zto-sync-bc-none');
+                wraps[idx].textContent = '⚠️ លេខនេះគូរជារូប Barcode មិនបាន — សូមវាយដោយដៃ';
+            }
+        }
+    }
+
+    function renderZtoSyncViews(dataToScan = scanHistory, trashToScan = deletedItems) {
+        renderZtoSyncBanner(dataToScan, trashToScan);
+        if (ztoSyncModalIsOpen()) renderZtoSyncModalList(dataToScan, trashToScan);
+    }
+
+    function openZtoSyncModal(dataToScan = scanHistory, trashToScan = deletedItems) {
+        if (!ztoStatusFeatureConfig()) return;
+        ztoStatusModalSig = '';
+        renderZtoSyncModalList(dataToScan, trashToScan);
+        openModalHelper('ztoSyncModal');
+    }
+
+    function closeZtoSyncModal() {
+        closeModal('ztoSyncModal');
+    }
+
+    function ztoStatusSecretIsLocked(cfg) {
+        return !!(cfg && lookupApiSendsHeader(cfg) && cfg.headerValueEnc && !lookupSecretKey);
     }
 
     function ztoStatusNetworkAllowed(userAsked) {
@@ -12782,6 +12957,7 @@
     async function runZtoStatusSweep(force, dataToScan = scanHistory, trashToScan = deletedItems) {
         const cfg = ztoStatusFeatureConfig();
         if (!cfg) return 0;
+        if (ztoStatusSecretIsLocked(cfg)) return 0;
         if (ztoStatusInFlight) return 0;
         if (!ztoStatusNetworkAllowed(force)) {
             if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
@@ -12816,13 +12992,13 @@
                 setZtoPickupVerdict(work[i].code, answer.closed);
                 if (typeof answer.closed === 'boolean') {
                     measured++;
-                    renderZtoSyncBanner();
+                    renderZtoSyncViews(dataToScan, trashToScan);
                 }
             }
         } finally {
             ztoStatusInFlight = false;
         }
-        renderZtoSyncBanner();
+        renderZtoSyncViews(dataToScan, trashToScan);
         if (recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) {
             scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS + 500);
         }
@@ -12830,7 +13006,13 @@
     }
 
     async function recheckZtoPickupStatus() {
-        if (!ztoStatusFeatureConfig()) return;
+        const cfg = ztoStatusFeatureConfig();
+        if (!cfg) return;
+        if (ztoStatusSecretIsLocked(cfg)) {
+            showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីពិនិត្យស្ថានភាពនៅ ZTO');
+            if (!isPinFlowPending()) requestPinBeforeConfig(recheckZtoPickupStatus, 'ztoStatus');
+            return;
+        }
         if (navigator.onLine === false) {
             showToast('⚠️ ក្រៅបណ្ដាញ — មិនអាចពិនិត្យស្ថានភាពនៅ ZTO បានទេ');
             return;
@@ -12846,6 +13028,7 @@
             return;
         }
         const left = ztoStatusPendingCodes().length;
+        if (ztoSyncModalIsOpen()) renderZtoSyncModalList();
         showToast(left
             ? '🔄 នៅសល់ ' + left + ' កញ្ចប់ដែល ZTO មិនទាន់បិទ'
             : '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់');
@@ -12912,7 +13095,7 @@
             if (!seenIds.has(id)) tr.remove();
         });
 
-        renderZtoSyncBanner();
+        renderZtoSyncViews();
         scheduleZtoStatusSweep();
     }
 

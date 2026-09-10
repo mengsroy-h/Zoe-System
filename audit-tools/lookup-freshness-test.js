@@ -122,7 +122,15 @@ ok('Fast Mode cache មាន TTL', src.getFastLookupRow && src.getFastLookupRow
 ok('Fast Mode cache មានពិដាន', src.setFastLookupRow && src.setFastLookupRow.includes('LOOKUP_FAST_CACHE_MAX'));
 ok('ការដោះសោ App ដោះសោ Lookup Secret ផង', src.completeAppUnlock && src.completeAppUnlock.includes('lookupSecretKey = await deriveLookupSecretKey(pin)'));
 ok('Lookup ដែលរង់ចាំត្រូវបានសាកល្បងឡើងវិញក្រោយវាយ PIN', src.retryPendingLookupAfterUnlock && src.retryPendingLookupAfterUnlock.includes('attemptAutoLookup(barcode)'));
-ok('ស្កេនដំបូងបើក PIN ដោយស្វ័យប្រវត្តិពេល Secret នៅជាប់សោ', src.attemptAutoLookup && src.attemptAutoLookup.includes("requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi')"));
+// ⛔ ការអះអាងនេះត្រូវវាស់ **ការធានា** («ស្កេនដំបូងបើកលំហូរ PIN ជាមួយ
+// អ្នកបន្តត្រឹមត្រូវ») មិនមែន **ការជ្រើសពាក្យ** ៖ អាគុយម៉ង់ទី ២ ជា
+// *ឈ្មោះសារ* ដែលចូល `applyPinPromptText()` ប៉ុណ្ណោះ ➜ វាមិនប្តូរឥរិយាបថ
+// ហើយវាមានអ្នកយាមផ្ទាល់ខ្លួនរួចហើយ (`pin-prompt-test.js` ៖ ឈ្មោះត្រូវមាន
+// ក្នុងតារាង និងបម្រើសកម្មភាពគោលដៅតែមួយ)។ ការចាក់ `'lookupApi'` ជា literal
+// ត្រង់នេះ ធ្វើឲ្យការដាក់ឈ្មោះសារត្រឹមត្រូវ **ធ្លាក់ដោយខុស** (វាស់បាន
+// 2.31.10)។ ➜ អះអាងលើអ្នកបន្ត បូកវត្តមាននៃឈ្មោះសារណាមួយ។
+ok('ស្កេនដំបូងបើក PIN ដោយស្វ័យប្រវត្តិពេល Secret នៅជាប់សោ',
+    !!(src.attemptAutoLookup && /requestPinBeforeConfig\(\s*retryPendingLookupAfterUnlock\s*,\s*'[^']+'\s*\)/.test(src.attemptAutoLookup)));
 
 function makeClock() {
     let now = 1000000, seq = 0;

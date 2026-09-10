@@ -1259,7 +1259,13 @@
                         if (db && !db.objectStoreNames.contains(LOOKUP_KEY_STORE)) db.createObjectStore(LOOKUP_KEY_STORE);
                     } catch (e) { done(null); }
                 };
-                req.onsuccess = () => done(req.result || null);
+                req.onsuccess = () => {
+                    if (settled) {
+                        try { req.result.close(); } catch (e) { }
+                        return;
+                    }
+                    done(req.result || null);
+                };
                 req.onerror = () => done(null);
                 req.onblocked = () => done(null);
             } catch (e) {

@@ -797,6 +797,58 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         ok('⛔ ជួរនីមួយៗបង្ហាញលេខទូរស័ព្ទអតិថិជន (ងាយផ្ទៀងផ្ទាត់)',
             tap.metaText.indexOf('0967778889') !== -1, tap.metaText);
         ok('⛔ ទីតាំង Locker បង្ហាញពេលមាន', tap.metaText.indexOf('A-01') !== -1, tap.metaText);
+        // ⛔ ចន្លោះដែល mutation បង្ហាញ (2.31.10) ៖ ទីតាំង Locker រស់នៅ **២
+        // កម្រិត** — លើ barcode ឬលើ item។ ការវាស់ដើមដាក់វាលើ **barcode
+        // តែម្យ៉ាង** ➜ mutation «ដក fallback របស់ item ចេញ» **រស់រាន**
+        // (120 ok · 0 FAIL) ខណៈកញ្ចប់ដែលកំណត់ Locker នៅកម្រិត item
+        // (ផ្លូវធម្មតារបស់ `assignLockerToEntry()`) នឹង **បាត់ទីតាំង** ➜
+        // អ្នកប្រើរកកញ្ចប់មិនឃើញ។
+        const lockerFallback = await page.evaluate(async () => {
+            const item = { id: 'lk1', phone: '0961112223', locker: 'B-07', barcodes: [
+                { code: 'LOCKER00000001', isClosed: true }
+            ] };
+            setZtoPickupVerdict('LOCKER00000001', false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 60));
+            const meta = document.querySelector('#ztoSyncList .zto-sync-meta');
+            const out = { meta: meta ? meta.textContent : '' };
+            closeZtoSyncModal();
+            return out;
+        });
+        ok('⛔ ទីតាំង Locker ដែលកំណត់នៅកម្រិត **item** ក៏ត្រូវបង្ហាញដែរ',
+            lockerFallback.meta.indexOf('B-07') !== -1, lockerFallback);
+
+        // ⛔ ចន្លោះដែល mutation បង្ហាញ (2.31.10) ៖ `ztoStatusModalSig` ជា
+        // cache នៃការគូរឡើងវិញ។ បើ **N ដែលនៅសល់** មិនចូល signature នោះ
+        // អត្ថបទ «កំពុងពិនិត្យបន្ត N ទៀត» **បង្កកនៅលេខចាស់** ខណៈជុំបោស
+        // ដើរបន្ត — ព្រោះបញ្ជីកូដមិនប្រែ។ នេះជាច្បាប់ដដែលដែល `CLAUDE.md`
+        // សរសេរសម្រាប់ **របា** រួចហើយ ➜ វាអនុវត្តលើ **បញ្ជី** ដែរ។
+        // mutation «ដក `waiting` ចេញពី signature» ➜ រស់រាន (120 ok) មុនបន្ថែម។
+        const noteFresh = await page.evaluate(async () => {
+            const item = { id: 'nf1', phone: '0964440001', barcodes: [
+                { code: 'NOTE000000001', isClosed: true },
+                { code: 'NOTE000000002', isClosed: true },
+                { code: 'NOTE000000003', isClosed: true }
+            ] };
+            setZtoPickupVerdict('NOTE000000001', false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 60));
+            const noteEl = document.getElementById('ztoSyncModalNote');
+            const before = noteEl ? noteEl.textContent : '';
+            // ⛔ សាលក្រម `true` ➜ `waiting` ថយ ១ ខណៈ **បញ្ជីកូដមិនប្រែ**
+            setZtoPickupVerdict('NOTE000000002', true);
+            renderZtoSyncModalList([item]);
+            await new Promise((r) => setTimeout(r, 30));
+            const after = noteEl ? noteEl.textContent : '';
+            const rows = document.querySelectorAll('#ztoSyncList .zto-sync-item').length;
+            closeZtoSyncModal();
+            return { before: before, after: after, rows: rows };
+        });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ អត្ថបទដំបូងរាយចំនួនដែលនៅសល់ពិត',
+            /2/.test(noteFresh.before) && noteFresh.rows === 1, noteFresh);
+        ok('⛔ អត្ថបទ «កំពុងពិនិត្យបន្ត N ទៀត» ត្រូវស្រស់ ខណៈបញ្ជីកូដមិនប្រែ',
+            noteFresh.after !== noteFresh.before, noteFresh);
+
         ok('⛔ ចុច «បិទ» ➜ ប្រអប់បិទពិត', tap.closedState === 'none', tap);
 
         // ⛔ ថ្នាក់កំហុស ៖ barcode មកពី Firebase ➜ អាចផ្ទុក HTML។ បញ្ជីនេះជា

@@ -47,9 +47,37 @@ ok('⛔ របាហៅតាម `data-act` (គ្មាន `onclick=`)',
     /id="ztoSyncBanner"[^>]*data-act="recheckZtoPickupStatus"/.test(HTML_SRC));
 ok('សកម្មភាពស្ថិតក្នុង ACTION_ALLOWLIST',
     APP_SRC.indexOf('"recheckZtoPickupStatus"') !== -1);
-ok('⛔ សាលក្រមមិនចូល Firebase (គ្មានផ្លូវសរសេរ)',
-    APP_SRC.indexOf('zoew_zto_pickup_status_v1') !== -1
-    && APP_SRC.indexOf("ref(db, `zoew_zto_pickup") === -1);
+ok('⛔ សាលក្រមរស់ក្នុង localStorage ពិត',
+    APP_SRC.indexOf('zoew_zto_pickup_status_v1') !== -1);
+
+// ⛔ អ្នកយាមចាស់ពិនិត្យតែ literal តែមួយ ➜ វាមិនចាប់ `fb.set()` ·
+// `runTransaction` · ការប៉ះ `isDeducted` ឬ node ចំណូលទេ។ ត្រង់នេះយើងស្រង់
+// **ម៉ូឌុលពិត** ចេញពី `app.js` រួចទាមទារថាគ្មាន token លុយ/Firebase ណាមួយ
+// នៅក្នុងវាសោះ។
+function ztoStatusModuleSource(appSrc) {
+    const from = appSrc.indexOf('const ZTO_STATUS_STORE_KEY');
+    if (from === -1) return '';
+    const head = appSrc.indexOf('async function recheckZtoPickupStatus', from);
+    if (head === -1) return '';
+    const tail = appSrc.indexOf('\n    }', appSrc.indexOf('showToast(left', head));
+    if (tail === -1) return '';
+    return appSrc.slice(from, tail + 6);
+}
+
+const ZTO_MODULE = ztoStatusModuleSource(APP_SRC);
+ok('លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់ម៉ូឌុលស្ថានភាព ZTO ចេញពី app.js ពិត',
+    ZTO_MODULE.length > 2000 && ZTO_MODULE.indexOf('runZtoStatusSweep') !== -1,
+    ZTO_MODULE.length);
+
+const MONEY_TOKENS = ['fb.', 'runTransaction', 'isDeducted', 'dbRef', 'dbOp(',
+    'zoew_daily_revenue', 'zoew_monthly_revenue', 'pickedUpBarcodes',
+    'packagesPickedUp', 'zoew_scan_history', 'zoew_recently_deleted',
+    'claimAndCleanupItem', 'applyBarcodeCloseState', 'removeSingleBarcode',
+    'deleteSingleItem', 'ledgerAppliedDelta', 'commitDailyRevenueDelta',
+    'commitMonthlyRevenueDelta', 'armLateCommit', 'trashReason ='];
+const MONEY_HITS = MONEY_TOKENS.filter((t) => ZTO_MODULE.indexOf(t) !== -1);
+ok('⛔ ម៉ូឌុលមិនប៉ះលុយ · Firebase · ធុងសំរាម · ស្ថិតិយក (គ្មាន token ណាមួយ)',
+    MONEY_HITS.length === 0, MONEY_HITS);
 
 function serve(dir) {
     return new Promise((res) => {

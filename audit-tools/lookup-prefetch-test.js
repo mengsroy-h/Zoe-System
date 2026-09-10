@@ -398,6 +398,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             lookupFastCache: new Map(),
             lookupLockedNoticeShown: false,
             lookupSecretKey: null,
+            rememberLookupSecretKey: () => Promise.resolve(true),
             sheetScriptVersionSeen: null,
             pendingLookupUnlockBarcode: '',
             pendingLookupUnlockResolve: null,

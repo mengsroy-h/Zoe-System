@@ -144,6 +144,13 @@ function makeEnv(opts) {
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_STORAGE_KEY'), ctx);
     vm.runInContext(sliceConstLine(src, 'BIOMETRIC_PRF_SALT'), ctx);
     vm.runInContext('let biometricUnlockInFlight = false;', ctx);
+    // ⛔ `completePinUnlock()` ហៅ `rememberLookupSecretKey()` (កំណែ 2.31.11 —
+    //    សោ Lookup ត្រូវរស់រានការផ្ទុកឡើងវិញ)។ ការខ្វះឈ្មោះនោះក្នុង sandbox
+    //    ធ្វើឲ្យការដោះសោ **បោះ** ➜ ច្បាប់គម្រោង ៖ *stub* ជំនួស មិនបញ្ឈប់
+    //    checker។ ហើយ stub នោះ **រាប់ការហៅ** ➜ ការវាស់ក្លាយជាការគ្របបន្ថែម ៖
+    //    ផ្លូវជីវមាត្រក៏ត្រូវរក្សាសោដែរ មិនត្រឹមផ្លូវវាយ PIN។
+    sandbox.__rememberedKeys = [];
+    vm.runInContext('function rememberLookupSecretKey(k) { __rememberedKeys.push(!!k); return Promise.resolve(true); }', ctx);
     [
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',
@@ -183,7 +190,10 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         await e.sandbox.startBiometricEnrollment(PIN);
         e.log.webauthn.length = 0;
         e.store['zoew_pin_fail_count'] = '3';
+        e.sandbox.__rememberedKeys.length = 0;
         const okUnlock = await e.sandbox.runBiometricUnlock();
+        ok('⛔ ផ្លូវជីវមាត្រក៏រក្សាសោ Lookup ដែរ (មិនត្រឹមផ្លូវវាយ PIN)',
+            e.sandbox.__rememberedKeys.length === 1, e.sandbox.__rememberedKeys);
         ok('ដោះសោបានជោគជ័យ', okUnlock === true);
         ok('បិទប្រអប់ PIN', e.log.modalsClosed.indexOf('pinModal') !== -1);
         ok('រត់សកម្មភាពគោលដៅ', e.log.target.indexOf('openConfigModal') !== -1);

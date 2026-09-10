@@ -308,6 +308,42 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     });
     ok('⛔ ក្រៅបណ្ដាញ ➜ មិនហៅបណ្ដាញសោះ', offlineVerdict === 0, offlineVerdict);
 
+    console.log('\n== ១៣. ទទឹងលើទូរស័ព្ទតូច (អត្ថបទវែងបំផុត) ==');
+
+    // ⛔ របាលាក់តាមលំនាំដើម ➜ `layout-check` **មិនដែលឃើញវាពេលមានអត្ថបទ**
+    // (០ ការយោង) ➜ ទទឹងគ្មានអ្នកវាស់។ អត្ថបទវែងបំផុត = barcode ៣ + «និង N
+    // ទៀត» + «កំពុងពិនិត្យបន្ត N ទៀត» + ការណែនាំចុច។
+    await setup(ZTO_URL);
+    await page.setViewportSize({ width: 360, height: 780 });
+    const widest = await page.evaluate(() => {
+        const barcodes = [];
+        for (let i = 1; i <= 40; i++) {
+            const code = 'BARWIDE' + String(i).padStart(6, '0');
+            barcodes.push({ code: code, isClosed: true });
+            if (i <= 25) setZtoPickupVerdict(code, false);
+        }
+        const items = [{ id: 'x1', phone: '011', barcodes: barcodes }];
+        renderZtoSyncBanner(items, []);
+        const el = document.getElementById('ztoSyncBanner');
+        const parent = el.parentElement;
+        return {
+            hidden: el.classList.contains('hidden'),
+            text: (el.textContent || '').slice(0, 120),
+            bannerW: Math.round(el.getBoundingClientRect().width),
+            parentW: Math.round(parent.getBoundingClientRect().width),
+            bannerScrollW: el.scrollWidth,
+            bannerClientW: el.clientWidth,
+            docScrollW: document.documentElement.scrollWidth,
+            innerW: window.innerWidth
+        };
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលេចជាមួយអត្ថបទវែងបំផុត',
+        widest.hidden === false && widest.text.indexOf('កំពុងពិនិត្យបន្ត') !== -1, widest);
+    ok('⛔ របាមិនលើសទទឹងឪពុករបស់វា', widest.bannerW <= widest.parentW + 1, widest);
+    ok('⛔ របាខ្លួនវាមិនរមូរផ្តេក', widest.bannerScrollW <= widest.bannerClientW + 1, widest);
+    ok('⛔ ទំព័រមិនរមូរផ្តេកដោយសាររបា', widest.docScrollW <= widest.innerW + 1, widest);
+    await page.setViewportSize({ width: 412, height: 800 });
+
     console.log('\n== ១២. របាត្រូវប្រាប់ថាការរាប់មិនទាន់ចប់ ==');
 
     // ⛔ របារាយចំនួន **ដែលវាស់រួច** ប៉ុណ្ណោះ ៖ ជុំបោសដើរ ១០ ក្នុង ២០ វិ. ➜

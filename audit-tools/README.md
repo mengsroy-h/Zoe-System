@@ -186,7 +186,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `clock-hygiene.js` | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `CLOCK_APP_DIR` |
 | `clock-basis-test.js` | ត្រាដែលវាស់ដោយ `elapsedSince()` ត្រូវបោះដោយ `Date.now()` (មូលដ្ឋានលាយគ្នា ➜ ពិដានល្បឿនរលាយ) — ទាំងត្រាដែលជា **អថេរ** និងត្រាដែលជា **property** (`{P: …}` · `x.P = …`) បូកអាគុយម៉ង់ដែលមិនមែន Identifier; ⛔ ឈ្មោះ property តែមួយមិនត្រូវផ្ទុក **មូលដ្ឋាន ២** | `CLOCKBASIS_APP_DIR` |
-| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal។ **ផ្នែក ៤** ៖ `docs/AUDIT-PROMPT.md` មិនចាស់ស្ងាត់ៗ — ក្បាលតារាងត្រូវនិយាយកំណែដែលដេរីវេពី `APP_VERSION` ពិត ហើយឈ្មោះ checker ដែលវាយោងត្រូវមានពិត | `DOCSCOPE_APP_DIR` |
+| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal។ **ផ្នែក ៤** ៖ `docs/AUDIT-PROMPT.md` មិនចាស់ស្ងាត់ៗ។ **ផ្នែក ៥** ៖ ការអះអាងកំណែ **បច្ចុប្បន្ន** (ជួរតារាង root · «កំណែបច្ចុប្បន្ន» របស់ README នីមួយៗ · តារាងក្បាល `CLAUDE.md` រួម `CACHE_VERSION`) ត្រូវដេរីវេពី `APP_VERSION` ពិត — ⛔ ការយោង *ប្រវត្តិ* មិនប៉ះ | `DOCSCOPE_APP_DIR` |
 | `monotonic-gate-test.js` | រយៈពេលកន្លងផុតឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `MONOGATE_APP_DIR` |
 | `khmer-timezone-test.js` | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `KHMERTZ_APP_DIR` |
 | `cleanup-clock-guard-test.js` | ការសម្អាតដែលបំផ្លាញ ត្រូវការនាឡិកា server **និងការភ្ជាប់រស់** | `CLEANUPCLOCK_APP_DIR` |

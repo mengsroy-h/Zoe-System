@@ -12738,6 +12738,13 @@
         return autoLookupInFlight.size === 0;
     }
 
+    function ztoStatusBlockIsTransient() {
+        if (navigator.onLine === false) return false;
+        if (linkIsFrugal()) return false;
+        if (isModalOpen) return false;
+        return true;
+    }
+
     function scheduleZtoStatusSweep(delayMs) {
         if (ztoStatusSweepTimer || ztoStatusInFlight) return;
         if (!delayMs && ztoStatusLastSweepAt
@@ -12765,7 +12772,7 @@
         if (!cfg) return 0;
         if (ztoStatusInFlight) return 0;
         if (!ztoStatusNetworkAllowed(force)) {
-            scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
+            if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
             return 0;
         }
         if (!force && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return 0;

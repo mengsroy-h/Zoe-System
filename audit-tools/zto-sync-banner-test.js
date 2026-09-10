@@ -308,6 +308,65 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     });
     ok('⛔ ក្រៅបណ្ដាញ ➜ មិនហៅបណ្ដាញសោះ', offlineVerdict === 0, offlineVerdict);
 
+    console.log('\n== ១១. ការទប់រយៈពេលវែង មិនត្រូវភ្ញាក់រហូត ==');
+
+    // ⛔ ច្បាប់គម្រោង ៖ «ការភ្ញាក់រាល់ ៣ វិនាទីខណៈក្រៅបណ្តាញ ជាការស៊ីថ្មសុទ្ធសាធ»។
+    // ការទប់ដែល **រយៈពេលវែង** (ក្រៅបណ្ដាញ · 2G · ប្រអប់បើក) មិនត្រូវតាំងម៉ោង
+    // ឡើងវិញគ្មានទីបញ្ចប់ — `renderHistory` ជាអ្នកដោះទី ២ រួចហើយ។
+    await setup(ZTO_URL);
+    const rearm = await page.evaluate(async () => {
+        const realSched = window.scheduleZtoStatusSweep;
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        let calls = 0;
+        window.scheduleZtoStatusSweep = function () { calls++; };
+        window.fetchWithTimeout = async () => ({ res: { ok: true, status: 200 }, body: { ztoClosed: false } });
+        Date.now = () => realNow.call(Date) + 400 * 60000;
+
+        const many = [];
+        for (let i = 1; i <= 12; i++) many.push({ code: 'BARARM' + String(i).padStart(4, '0'), isClosed: true });
+        await runZtoStatusSweep(false, [{ id: 'x1', phone: '011', barcodes: many }], []);
+        const afterFullBatch = calls;
+
+        calls = 0;
+        Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+        await runZtoStatusSweep(false, [{ id: 'x2', phone: '011',
+            barcodes: [{ code: 'BAROFF0001', isClosed: true }] }], []);
+        const offlineCalls = calls;
+        Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        window.scheduleZtoStatusSweep = realSched;
+        return { afterFullBatch: afterFullBatch, offlineCalls: offlineCalls };
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំពេញ ➜ តាំងម៉ោងបន្តពិត (ការរាប់ដើរ)',
+        rearm.afterFullBatch > 0, rearm);
+    ok('⛔ ក្រៅបណ្ដាញ ➜ មិនតាំងម៉ោងភ្ញាក់ឡើងវិញ', rearm.offlineCalls === 0, rearm);
+
+    console.log('\n== ១០. ស្នាមភ្ជាប់ ៖ ឈ្មោះវាលរវាង Function និង App ==');
+
+    // ⛔ សំណួរទី ៧ នៃវិន័យឧបករណ៍ ៖ ឈ្មោះវាលរស់នៅ **២ ឯកសារ** ៖ Function
+    // ផលិតវា ហើយ `app.js` អានវា។ តេស្តនីមួយៗចាក់សោ *ខាងខ្លួន* ដោយ literal
+    // ➜ ការស៊ីគ្នាជាការចៃដន្យ មិនមែនការវាស់។ ត្រង់នេះយើងដេរីវេឈ្មោះចេញពី
+    // Function ពិត រួចទាមទារឲ្យ App អានឈ្មោះ **ដដែល**។
+    const FN_PATH = path.join(APP_DIR, 'netlify', 'functions', 'zto-order-detail.js');
+    const FN_SRC = fs.existsSync(FN_PATH) ? fs.readFileSync(FN_PATH, 'utf8') : '';
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន Function ពិតបាន', FN_SRC.length > 0, FN_PATH);
+    const emitted = /(\w+)\s*:\s*order\.signed\b/.exec(FN_SRC);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ រកឃើញឈ្មោះវាលដែល Function ផលិត', !!emitted,
+        emitted ? emitted[1] : null);
+    if (emitted) {
+        const field = emitted[1];
+        const readRe = new RegExp('data\\.' + field + '\\b');
+        ok('⛔ App ត្រូវអានឈ្មោះវាល **ដដែល** នឹង Function ផលិត ៖ ' + field,
+            readRe.test(APP_SRC), field);
+        ok('⛔ App មិនត្រូវអានឈ្មោះផ្សេងសម្រាប់ស្ថានភាព ZTO',
+            (APP_SRC.match(/data\.zto[A-Za-z]+/g) || [])
+                .every((m) => m === 'data.' + field),
+            (APP_SRC.match(/data\.zto[A-Za-z]+/g) || []).slice(0, 4));
+    }
+
     console.log('\n== ៨. សាលក្រម «វាស់មិនបាន» ត្រូវចងចាំ — កុំហៅជាប់រហូត ==');
 
     await setup(ZTO_URL);

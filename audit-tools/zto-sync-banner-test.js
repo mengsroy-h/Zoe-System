@@ -1496,6 +1496,91 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok("ទិសផ្ទុយ ៖ សាលក្រមប្តូរ ➜ បញ្ជីត្រូវសាងឡើងវិញពិត",
         rebuild.rebuilt === true && rebuild.rowsNow === 11, rebuild);
 
+    // ========================================================================
+    // ផ្នែក ១៤ — មូលដ្ឋាននាឡិកា និងព្រំដែន TTL របស់ផ្លូវធុងសំរាម (ឥរិយាបថ)
+    // ========================================================================
+    //
+    // 🔴 ហេតុអ្វីវាមាន (វាស់បាន 2026-09-10) ៖ `ztoStatusTrashItemCounts()` វាស់
+    // `item.deletedAt` — ត្រា **retention ដែលបោះដោយ `getServerNow()`** នៅ ៥ កន្លែង —
+    // ដោយ `elapsedSince()` ដែលឈរលើនាឡិកា **ឧបករណ៍** ➜ ឧបករណ៍ដែលនាឡិកាឃ្លាត
+    // ពី server ➜ កញ្ចប់ដែលច្បាប់ ២ ម៉ោងផ្លាស់ចូលធុងសំរាម **ធ្លាក់ចេញពីការស្កេន**
+    // ➜ របាដាស់តឿន **រលត់ស្ងាត់ៗ** (ថ្នាក់ដដែលដែលច្បាប់ «ត្រូវស្កេនទាំង
+    // scanHistory និង deletedItems» សរសេរឡើងដើម្បីការពារ)។
+    //
+    // ⛔ `clock-basis-test.js` ចាក់សោវាជា **ស្តាទិច**; ផ្នែកនេះចាក់សោ **ឥរិយាបថ**
+    // (ច្បាប់គម្រោង ៖ ថ្នាក់ដែលវាស់បានក្នុង browser គួរមាន checker ឥរិយាបថ)។
+    // វាស់បាន ៖ mutation ព្រំដែន `<=` ➜ `<` និងការដកច្រកទ្វាររូបរាងចេញ
+    // **រស់រានលើ ១៣៥ ការអះអាងមុននេះទាំងអស់**។
+    const TRASH_STORE_KEY = (APP_SRC.match(/ZTO_STATUS_STORE_KEY\s*=\s*'([^']+)'/) || [])[1] || '';
+    const TRASH_TTL_MS = (function () {
+        const m = APP_SRC.match(/ZTO_STATUS_TTL_MS\s*=\s*([^;]+);/);
+        if (!m) return 0;
+        try { return Function('"use strict";return (' + m[1] + ');')(); } catch (e) { return 0; }
+    })();
+    ok('ផ្នែក ១៤ ៖ អាន TTL និងកូនសោ store ចេញពី app.js ពិត (មិនមែន literal)',
+        TRASH_TTL_MS > 0 && TRASH_STORE_KEY !== '', { TRASH_TTL_MS, TRASH_STORE_KEY });
+
+    const trashGate = await page.evaluate((arg) => {
+        const ttl = arg.ttl, storeKey = arg.storeKey;
+        if (typeof ztoStatusTrashItemCounts !== 'function') return { missing: true };
+        const real = getServerNow;
+        const withOffset = (offsetMs, fn) => {
+            window.getServerNow = () => Date.now() + offsetMs;
+            try { return fn(); } finally { window.getServerNow = real; }
+        };
+        const counts = (ageMs, offsetMs) => withOffset(offsetMs, () =>
+            ztoStatusTrashItemCounts({ trashReason: 'pickup', deletedAt: getServerNow() - ageMs }));
+        const shape = (v) => ztoStatusTrashItemCounts({ trashReason: 'pickup', deletedAt: v });
+        const MIN = 60000, HOUR = 3600000;
+
+        // ត្រាដែលសរសេរចូល store ត្រូវឈរលើនាឡិកា **ឧបករណ៍**
+        let stampSkewMs = null;
+        if (typeof setZtoPickupVerdict === 'function' && storeKey) {
+            withOffset(2 * HOUR, () => { setZtoPickupVerdict('CLOCKBASISPROBE', false); });
+            try {
+                const raw = JSON.parse(localStorage.getItem(storeKey) || '{}');
+                const hit = Object.keys(raw).map((k) => raw[k])
+                    .filter((e) => e && typeof e.at === 'number').pop();
+                if (hit) stampSkewMs = Math.abs(hit.at - Date.now());
+            } catch (e) { stampSkewMs = null; }
+        }
+
+        return {
+            missing: false,
+            atTtl: counts(ttl, 0),
+            pastTtl: counts(ttl + 1000, 0),
+            fresh: counts(MIN, 0),
+            skewSlow5m: counts(MIN, 5 * MIN),
+            skewSlow2h: counts(MIN, 2 * HOUR),
+            skewFast13h: counts(MIN, -13 * HOUR),
+            skewSlowOld: counts(13 * HOUR, 2 * HOUR),
+            shapes: [undefined, null, 0, -1, 'abc', Infinity, NaN].map(shape),
+            notPickup: ztoStatusTrashItemCounts({ trashReason: 'delete', deletedAt: Date.now() }),
+            stampSkewMs: stampSkewMs
+        };
+    }, { ttl: TRASH_TTL_MS, storeKey: TRASH_STORE_KEY });
+
+    ok('ផ្នែក ១៤ ៖ `ztoStatusTrashItemCounts` ឈានដល់ពិតប្រាកដ', trashGate.missing === false, trashGate);
+    ok('⛔ ព្រំដែន ៖ អាយុ **ស្មើ** TTL គត់ ➜ នៅចូលការស្កេន (`<=` មិនមែន `<`)',
+        trashGate.atTtl === true, trashGate);
+    ok('ទិសផ្ទុយ ៖ អាយុលើស TTL ➜ ធ្លាក់ចេញ', trashGate.pastTtl === false, trashGate);
+    ok('អាយុថ្មី ➜ ចូលការស្កេន', trashGate.fresh === true, trashGate);
+    ok('⛔ នាឡិកាឧបករណ៍ **យឺតជាង** server ៥ នាទី ➜ កញ្ចប់ទើបលុប នៅតែចូល',
+        trashGate.skewSlow5m === true, trashGate);
+    ok('⛔ នាឡិកាឧបករណ៍ **យឺតជាង** server ២ ម៉ោង ➜ កញ្ចប់ទើបលុប នៅតែចូល',
+        trashGate.skewSlow2h === true, trashGate);
+    ok('⛔ នាឡិកាឧបករណ៍ **លឿនជាង** server ១៣ ម៉ោង ➜ កញ្ចប់ទើបលុប នៅតែចូល',
+        trashGate.skewFast13h === true, trashGate);
+    ok('ទិសផ្ទុយ ៖ នាឡិកាឃ្លាត **មិន**ធ្វើឲ្យកញ្ចប់ចាស់ជាង TTL ចូលវិញ',
+        trashGate.skewSlowOld === false, trashGate);
+    ok('⛔ រូបរាងឆៅពី Firebase (undefined · null · 0 · អវិជ្ជមាន · អក្សរ · Infinity · NaN) ➜ ធ្លាក់ចេញទាំងអស់',
+        Array.isArray(trashGate.shapes) && trashGate.shapes.length === 7
+        && trashGate.shapes.every((v) => v === false), trashGate.shapes);
+    ok('ទិសផ្ទុយ ៖ `trashReason` មិនមែន `pickup` ➜ ធ្លាក់ចេញ', trashGate.notPickup === false, trashGate);
+    ok('⛔ ត្រា `at` ដែលសរសេរចូល store ឈរលើនាឡិកា **ឧបករណ៍** មិនមែន server',
+        typeof trashGate.stampSkewMs === 'number' && trashGate.stampSkewMs < 60000,
+        { stampSkewMs: trashGate.stampSkewMs, note: 'offset សាកល្បង = ២ ម៉ោង ➜ ត្រាឈរលើ server នឹងផ្តល់ ~7200000' });
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

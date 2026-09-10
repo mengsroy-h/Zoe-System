@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.13';
+    const APP_VERSION = '2.31.14';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -12800,7 +12800,7 @@
         if (closed !== true && closed !== false && closed !== null) return;
         loadZtoPickupStatusOnce();
         ztoPickupStatus.delete(key);
-        ztoPickupStatus.set(key, { closed: closed, at: getServerNow() });
+        ztoPickupStatus.set(key, { closed: closed, at: Date.now() });
         while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
             if (!evictOneZtoPickupVerdict(key)) break;
         }
@@ -12815,7 +12815,9 @@
 
     function ztoStatusTrashItemCounts(item) {
         if (!item || trashReasonOf(item) !== 'pickup') return false;
-        return elapsedSince(parseFloat(item.deletedAt)) <= ZTO_STATUS_TTL_MS;
+        const deletedAt = parseFloat(item.deletedAt);
+        if (!isFinite(deletedAt) || deletedAt <= 0) return false;
+        return (getServerNow() - deletedAt) <= ZTO_STATUS_TTL_MS;
     }
 
     function collectClosedBarcodesForZtoStatus(dataToScan = scanHistory, trashToScan = deletedItems) {

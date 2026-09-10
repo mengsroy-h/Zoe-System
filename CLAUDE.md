@@ -148,6 +148,9 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    README ដែលត្រូវពិនិត្យរាល់ជុំ ៖ root · `ZoeW/` · `ZoeKeyGen/` ·
    `audit-tools/` · `tools/zto-cookie-sync-windows/` · `firebase-backup/` ·
    `zto-import/` (និង `google-sheets-api/`)។ **README ចាស់ គឺជាឯកសារខុស។**
+   ⛔ **ច្បាប់នេះគ្របលើ [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) ដែរ**
+   (សំណើអ្នកប្រើ 2026-09-10)។ `doc-scope-test.js` ចាក់សោវា ៖ ផ្នែក ៥ តាមលំដាប់
+   បូកការហាមប្រវត្តិកំហុស · កំណត់ត្រាតាមកំណែ · ចំនួន assertion ជា literal។
 ១០. **Firebase rules មិន deploy ស្វ័យប្រវត្តិទេ** — Netlify បម្រើតែឯកសារ
    static។ រាល់ពេលបន្ថែម path ថ្មី ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយ
    **ប្រាប់អ្នកប្រើថាត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ**។
@@ -357,6 +360,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
+| **វិសាលភាពឯកសារ** | ⛔ README និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** — គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal (ច្បាប់ ៩)។ ប្រវត្តិទៅ `docs/HISTORY.md` **តែមួយកន្លែង** | `doc-scope-test` |
 | **Base directory របស់ Netlify** | ⛔ **ប្រកាន់អក្សរតូចធំ** ៖ `ZoeW` · `ZoeKeyGen` (រស់ក្នុង UI) | 📝 |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច ➜ `SCRIPT_VERSION` ត្រូវឡើងលើ **រាល់ចម្លើយ** ពីចំណុចចេញ **តែមួយ** | `google-sheets-cache-test` · `health-check-test` |
 
@@ -441,6 +445,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
 | នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |
 | **ត្រាដែលបោះដោយនាឡិកាមួយ តែវាស់ដោយនាឡិកាមួយទៀត** ➜ `elapsedSince()` ត្រឡប់ `Infinity` ➜ ពិដានល្បឿន និងជណ្តើរ backoff **រលាយស្ងាត់ៗ** លើឧបករណ៍ដែលនាឡិកាឃ្លាតពី server | `clock-basis-test.js` |
+| **ឯកសារ «របៀបប្រើ» ដែលប្រែជាឯកសារប្រវត្តិ** ➜ ចំនួន assertion ចាក់ជា literal ចាស់ស្ងាត់ៗ · ប្រវត្តិកំហុសរាយ ២ កន្លែងផ្ទុយគ្នា | `doc-scope-test.js` |
 | **នាឡិកាថយក្រោយ ➜ ពិដានល្បឿនបិទជាអចិន្ត្រៃយ៍** ➜ App លែងភ្ជាប់ឡើងវិញ · lookup ងាប់ · `setTimeout` យក្ស | `monotonic-gate-test.js` |
 | សំណើ License កកកុញ ➜ សំណើចាំបាច់ជាប់គាំង (ផ្លូវបណ្តាញទី ៣) | `license-network-pressure-test.js` |
 | App ប្រាប់ម៉ូឌុល License ថានាឡិកា «sync រួច» មុន handshake ➜ **លុប License របស់អតិថិជន** | `license-clock-trust-test.js` |
@@ -1973,6 +1978,9 @@ bash audit-tools/emu/rules.sh
 
 ## ⏳ ZoeW `2.31.13` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
+⛔ **merge ចូល `main` រួច (PR #203 · 2026-09-10)** ➜ Netlify deploy `zoew-v193`។
+នេះជាកំណែ **តែមួយ** ដែលនៅរង់ចាំការសាកលើឧបករណ៍ពិត។
+
 ⛔ **ប្រាប់មុន ៖ ក្នុងការប្រើប្រាស់ធម្មតា អ្នកនឹង *មិនឃើញអ្វីប្រែសោះ*។**
 ជុំនេះកែ **កំហុសពិត ២** ដែល **checker ១៦៤ ទាំងអស់មិនបានចាប់** —
 មិនប៉ះលុយ · មិនប៉ះស្ថិតិយក · មិនប៉ះច្បាប់សម្អាត · មិនប៉ះ Firebase។
@@ -1996,13 +2004,12 @@ bash audit-tools/emu/rules.sh
 ១. **គ្មាន Firebase rules ត្រូវ Publish ទេ។**
 ២. អ្នកប្រើត្រូវទាញ **ZoeW** ចុះឡើងវិញ ១ ដង (`zoew-v193`); **ZoeKeyGen មិនប្រែ**
    (`zoekeygen-v91`)។
-៣. ⚙️ **Netlify env (ស្រេចចិត្ត — គម្លាតបន្ថែម)** ៖ `ZTO_UPSTREAM_TIMEOUT_MS`
-   `7500` ➜ **`7000`** (អ្នកប្រើសម្រេច 2026-09-10)។ ⛔ **វាមិនចាំបាច់សម្រាប់
-   ការកែទេ** — កូដធានាបង្អួចអានរួចហើយ; វាគ្រាន់តែបន្ថែមគម្លាតឲ្យបង្អួចនោះ
-   ពី ០ ➜ **៨០០ ms** ដោយមិនពឹងលើផ្លូវអប្បបរមា។ ផ្លូវ ៖ `Netlify → zoew →
-   Project configuration → Environment variables → ZTO_UPSTREAM_TIMEOUT_MS →
-   Edit → 7000 → Save` រួច **Trigger deploy ម្តង** (⛔ env ថ្មីមិនចូលជាធរមាន
-   ដោយខ្លួនឯងទេ)។ ផ្ទៀងផ្ទាត់ ៖ `?diag=1` ត្រូវរាយ `"upstreamTimeoutMs": 7000`។
+៣. ✅ **Netlify env ៖ ធ្វើរួច និងផ្ទៀងផ្ទាត់រួច (2026-09-10)** —
+   `ZTO_UPSTREAM_TIMEOUT_MS` `7500` ➜ **`7000`** បូក Trigger deploy។
+   ភស្តុតាង ៖ `?diag=1` រាយ `"timing":{"upstreamTimeoutMs":7000,"budgetMs":9000}`។
+   ⛔ វាជា **គម្លាតបន្ថែម មិនមែនការជួសជុល** (កូដធានាបង្អួចអានរួចហើយ) ➜
+   បង្អួច ០ ➜ **៨០០ ms** ដោយមិនពឹងលើផ្លូវអប្បបរមា។ ច្បាប់មេ និងតារាងគម្លាត
+   ស្ថិតក្នុង [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) ផ្នែក ៥។
 
 ⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.31.13` ចំណែក ZoeKeyGen នៅ `2.19.21`
 (ច្បាប់ ៦)។ ⛔ កុំដាក់ស្លាកជុំរបស់ ZoeW លើ ZoeKeyGen។

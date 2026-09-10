@@ -188,7 +188,7 @@
                     <span class="row-num-wrong-number">❗ ខុសលេខ</span>
                 </div>
 
-                <div class="zto-sync-banner hidden" id="ztoSyncBanner" role="status" aria-live="polite" data-act="recheckZtoPickupStatus"></div>
+                <div class="zto-sync-banner hidden" id="ztoSyncBanner" role="status" aria-live="polite" data-act="openZtoSyncModal"></div>
 
                 <div class="table-responsive" id="tableResponsive">
                     <table class="history-table">
@@ -695,6 +695,20 @@ const firebaseConfig = {
             <div class="modal-btns-row">
                 <button type="button" class="btn-danger" id="scanRemoveConfirmBtn" data-act="confirmScannedRemoval">🗑️ បញ្ជាក់ដក</button>
                 <button type="button" class="btn-cancel" id="scanRemoveCancelBtn" data-act="cancelScannedRemoval">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="ztoSyncModal" class="modal" data-close="closeZtoSyncModal" role="dialog" aria-modal="true" aria-labelledby="ztoSyncModalTitle">
+    <div class="modal-content zto-sync-modal-content">
+        <h3 id="ztoSyncModalTitle">🔄 កញ្ចប់ដែល ZTO មិនទាន់បិទ</h3>
+        <p id="ztoSyncModalNote"></p>
+        <div class="zto-sync-list" id="ztoSyncList"></div>
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button type="button" class="btn-confirm" id="ztoSyncRecheckBtn" data-act="recheckZtoPickupStatus">🔄 ពិនិត្យម្តងទៀត</button>
+                <button type="button" class="btn-cancel" id="ztoSyncCloseBtn" data-act="closeZtoSyncModal">បិទ</button>
             </div>
         </div>
     </div>

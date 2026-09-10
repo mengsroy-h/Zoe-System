@@ -44,9 +44,16 @@ ok('index.html មានរបា `ztoSyncBanner`', HTML_SRC.indexOf('id="ztoSyn
 ok('⛔ របាលាក់តាមលំនាំដើម (class `hidden`)',
     /<div class="zto-sync-banner hidden" id="ztoSyncBanner"/.test(HTML_SRC));
 ok('⛔ របាហៅតាម `data-act` (គ្មាន `onclick=`)',
-    /id="ztoSyncBanner"[^>]*data-act="recheckZtoPickupStatus"/.test(HTML_SRC));
+    /id="ztoSyncBanner"[^>]*data-act="openZtoSyncModal"/.test(HTML_SRC));
 ok('សកម្មភាពស្ថិតក្នុង ACTION_ALLOWLIST',
-    APP_SRC.indexOf('"recheckZtoPickupStatus"') !== -1);
+    APP_SRC.indexOf('"recheckZtoPickupStatus"') !== -1
+    && APP_SRC.indexOf('"openZtoSyncModal"') !== -1
+    && APP_SRC.indexOf('"closeZtoSyncModal"') !== -1);
+ok('index.html មានប្រអប់ `ztoSyncModal` និងបញ្ជី `ztoSyncList`',
+    HTML_SRC.indexOf('id="ztoSyncModal"') !== -1 && HTML_SRC.indexOf('id="ztoSyncList"') !== -1);
+ok('⛔ ប្រអប់មានប៊ូតុងពិនិត្យម្តងទៀត និងបិទ (គ្មាន `onclick=`)',
+    /id="ztoSyncModal"[\s\S]{0,900}data-act="recheckZtoPickupStatus"/.test(HTML_SRC)
+    && /id="ztoSyncModal"[\s\S]{0,900}data-act="closeZtoSyncModal"/.test(HTML_SRC));
 ok('⛔ សាលក្រមរស់ក្នុង localStorage ពិត',
     APP_SRC.indexOf('zoew_zto_pickup_status_v1') !== -1);
 
@@ -721,6 +728,236 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         fuzz.bad.filter((b) => b.why === 'count').length === 0, fuzz);
     ok('⛔ Barcode ដែល ZoeW មិនបិទ មិនដែលលេចលើរបា (លំដាប់ចៃដន្យ)',
         fuzz.bad.filter((b) => b.why === 'open nagged').length === 0, fuzz);
+
+    // ── ១៥. ចុចរបា ➜ ប្រអប់បញ្ជី Barcode ─────────────────────────────────
+    // ⛔ សំណើអ្នកប្រើ (2026-09-10) ៖ របាប្រាប់ថា «មាន N កញ្ចប់» តែមិនប្រាប់ថា
+    // **លេខណា** ➜ អ្នកប្រើត្រូវរកដោយភ្នែកក្នុងតារាង មុននឹងស្កេនចូល Palm។
+    // ការចុចត្រូវបើកបញ្ជីលេខ **តែម្តង**។ ⛔ បញ្ជីត្រូវផ្ទុក **តែ** barcode ដែល
+    // មានសាលក្រម `false` ពិត — សាលក្រម `true` និង «មិនទាន់វាស់» មិនត្រូវលេច
+    // (បើអត់ អ្នកប្រើនឹងស្កេនកញ្ចប់ដែលបិទរួចចូល Palm ម្តងទៀត)។
+    console.log('\n== ១៥. ចុចរបា ➜ ប្រអប់បញ្ជី Barcode ==');
+    await setup(ZTO_URL);
+    const modalReady = await page.evaluate(() => ({
+        modal: !!document.getElementById('ztoSyncModal'),
+        list: !!document.getElementById('ztoSyncList'),
+        open: typeof openZtoSyncModal === 'function',
+        close: typeof closeZtoSyncModal === 'function',
+        renderList: typeof renderZtoSyncModalList === 'function'
+    }));
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ប្រអប់ និង function ទាំងអស់មានពិត',
+        modalReady.modal && modalReady.list && modalReady.open
+        && modalReady.close && modalReady.renderList, modalReady);
+
+    if (modalReady.modal && modalReady.open) {
+        const tap = await page.evaluate(async () => {
+            const item = { id: 'm1', phone: '0967778889', barcodes: [
+                { code: 'MODAL0000001', isClosed: true, locker: 'A-01' },
+                { code: 'MODAL0000002', isClosed: true },
+                { code: 'MODAL0000003', isClosed: true }
+            ] };
+            setZtoPickupVerdict('MODAL0000001', false);
+            setZtoPickupVerdict('MODAL0000002', true);
+            setZtoPickupVerdict('MODAL0000003', false);
+            renderZtoSyncBanner([item]);
+            const banner = document.getElementById('ztoSyncBanner');
+            const bannerShown = !banner.classList.contains('hidden');
+            banner.click();
+            await new Promise((r) => setTimeout(r, 60));
+            const modal = document.getElementById('ztoSyncModal');
+            renderZtoSyncModalList([item]);
+            const rows = Array.from(document.querySelectorAll('#ztoSyncList .zto-sync-item'));
+            const codes = rows.map((el) => {
+                const c = el.querySelector('.zto-sync-code');
+                return c ? c.textContent.trim() : '';
+            });
+            const metaText = rows.map((el) => {
+                const m = el.querySelector('.zto-sync-meta');
+                return m ? m.textContent : '';
+            }).join(' | ');
+            const openState = modal.style.display;
+            document.getElementById('ztoSyncCloseBtn').click();
+            await new Promise((r) => setTimeout(r, 60));
+            return {
+                bannerShown: bannerShown,
+                openState: openState,
+                closedState: modal.style.display,
+                codes: codes,
+                metaText: metaText
+            };
+        });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលេចមុនចុច', tap.bannerShown, tap);
+        ok('⛔ ចុចរបា ➜ ប្រអប់បើក', tap.openState === 'flex', tap);
+        ok('⛔ បញ្ជីផ្ទុក **តែ** barcode ដែលមានសាលក្រម «មិនទាន់បិទ»',
+            tap.codes.length === 2
+            && tap.codes.indexOf('MODAL0000001') !== -1
+            && tap.codes.indexOf('MODAL0000003') !== -1, tap.codes);
+        ok('⛔ barcode ដែល ZTO បិទរួច មិនត្រូវលេចក្នុងបញ្ជី',
+            tap.codes.indexOf('MODAL0000002') === -1, tap.codes);
+        ok('⛔ ជួរនីមួយៗបង្ហាញលេខទូរស័ព្ទអតិថិជន (ងាយផ្ទៀងផ្ទាត់)',
+            tap.metaText.indexOf('0967778889') !== -1, tap.metaText);
+        ok('⛔ ទីតាំង Locker បង្ហាញពេលមាន', tap.metaText.indexOf('A-01') !== -1, tap.metaText);
+        ok('⛔ ចុច «បិទ» ➜ ប្រអប់បិទពិត', tap.closedState === 'none', tap);
+
+        // ⛔ ថ្នាក់កំហុស ៖ barcode មកពី Firebase ➜ អាចផ្ទុក HTML។ បញ្ជីនេះជា
+        // sink ថ្មី ➜ ត្រូវឆ្លងកាត់ `sanitizeInput()` ដូច sink ដទៃទាំងអស់។
+        const xss = await page.evaluate(async () => {
+            const payload = '<img src=x onerror="window.__ztoModalXss=1">';
+            const item = { id: 'm2', phone: '011', barcodes: [{ code: payload, isClosed: true }] };
+            setZtoPickupVerdict(payload, false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 80));
+            const injected = document.querySelectorAll('#ztoSyncList img').length;
+            const text = (document.getElementById('ztoSyncList') || {}).textContent || '';
+            closeZtoSyncModal();
+            return { injected: injected, fired: !!window.__ztoModalXss, hasText: text.indexOf('onerror') !== -1 };
+        });
+        ok('⛔ បញ្ជីមិនចាក់ HTML ចូល (គ្មាន img ថ្មី · គ្មានការរត់)',
+            xss.injected === 0 && !xss.fired, xss);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ អត្ថបទឆៅនៅបង្ហាញជាអក្សរ', xss.hasText, xss);
+
+        // ⛔ ច្បាប់គម្រោង ៖ ទិន្នន័យអតិថិជនមិនត្រូវសល់ក្រោយចាកចេញ។ បញ្ជីនេះ
+        // ផ្ទុក **លេខទូរស័ព្ទ** ➜ វាជា sink ថ្មីសម្រាប់ `dom-hygiene`។
+        const afterLogout = await page.evaluate(async () => {
+            const item = { id: 'm3', phone: '0961112223', barcodes: [{ code: 'MODAL0000009', isClosed: true }] };
+            setZtoPickupVerdict('MODAL0000009', false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 60));
+            const before = (document.getElementById('ztoSyncList') || {}).innerHTML || '';
+            clearSensitiveModalFields();
+            await new Promise((r) => setTimeout(r, 60));
+            const modal = document.getElementById('ztoSyncModal');
+            return {
+                before: before.indexOf('0961112223') !== -1,
+                after: (document.getElementById('ztoSyncList') || {}).innerHTML || '',
+                display: modal.style.display
+            };
+        });
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ បញ្ជីពិតជាផ្ទុកលេខទូរស័ព្ទមុនចាកចេញ', afterLogout.before, afterLogout);
+        ok('⛔ ចាកចេញ ➜ បញ្ជីត្រូវទទេ (គ្មានលេខអតិថិជនសល់ក្នុង DOM)',
+            afterLogout.after === '', afterLogout);
+        ok('⛔ ចាកចេញ ➜ ប្រអប់ត្រូវបិទ', afterLogout.display === 'none', afterLogout);
+
+        // ⛔ ទិសផ្ទុយ ៖ Lookup មិនមែន ZTO ➜ មុខងារទាំងមូលដេកលក់ ➜ ការបើក
+        // ប្រអប់ដោយកូដ មិនត្រូវបង្ហាញអ្វីទេ។
+        await setup(PLAIN_URL);
+        const plain = await page.evaluate(async () => {
+            const item = { id: 'm4', phone: '011', barcodes: [{ code: 'MODAL0000010', isClosed: true }] };
+            setZtoPickupVerdict('MODAL0000010', false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 60));
+            const modal = document.getElementById('ztoSyncModal');
+            return { display: modal.style.display };
+        });
+        ok('⛔ ទិសផ្ទុយ ៖ Lookup មិនមែន ZTO ➜ ប្រអប់មិនបើក',
+            plain.display !== 'flex', plain);
+    }
+
+    // ── ១៦. រូប Barcode ត្រូវអានចេញវិញជា **លេខដដែល** ────────────────────
+    // ⛔ ថ្នាក់កំហុសដែលថ្លៃបំផុតនៃមុខងារនេះ ៖ រូបដែលគូរខុស ➜ អ្នកប្រើស្កេនវា
+    // ចូល ZTO Palm ➜ **កញ្ចប់ខុសត្រូវបិទ**។ ការអានកូដមិនអាចបញ្ជាក់តារាងលំនាំ
+    // ១០៧ ធាតុ · checksum mod 103 · ការជ្រើស Code Set B/C បានទេ ➜ ត្រូវ
+    // **គូរពិត រួចអានវិញដោយ ZXing ពិត** (engine ដដែលនឹងកាមេរ៉ារបស់ App)។
+    console.log('\n== ១៦. រូប Barcode ➜ អានវិញដោយ ZXing ពិត ==');
+    const engineReady = await page.evaluate(async () => {
+        if (typeof ZXingWASM === 'undefined' || !ZXingWASM.readBarcodes) return false;
+        try {
+            ZXingWASM.prepareZXingModule({
+                overrides: { locateFile: (f, p) => (f.endsWith('.wasm') ? './vendor/' + f : p + f) },
+                fireImmediately: true
+            });
+        } catch (e) { return false; }
+        return true;
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ engine ZXing ពិតផ្ទុកបាន', engineReady, engineReady);
+
+    if (engineReady && (await page.evaluate(() => typeof code128Bars)) === 'function') {
+        const roundTrip = await page.evaluate(async () => {
+            const SAMPLES = ['77130534020575', '11600100131126', '0123456789', 'ZTO7788123456', 'AB-12'];
+            const out = [];
+            for (let i = 0; i < SAMPLES.length; i++) {
+                const text = SAMPLES[i];
+                const drawing = code128Bars(text);
+                if (!drawing) { out.push({ text: text, decoded: null, drawn: false }); continue; }
+                const scale = 3;
+                const height = 90;
+                const c = document.createElement('canvas');
+                c.width = drawing.width * scale;
+                c.height = height;
+                const g = c.getContext('2d', { willReadFrequently: true });
+                g.fillStyle = '#fff';
+                g.fillRect(0, 0, c.width, c.height);
+                g.fillStyle = '#000';
+                for (let b = 0; b < drawing.bars.length; b++) {
+                    g.fillRect(drawing.bars[b][0] * scale, 0, drawing.bars[b][1] * scale, height);
+                }
+                const data = g.getImageData(0, 0, c.width, c.height);
+                let decoded = '';
+                try {
+                    const res = await ZXingWASM.readBarcodes(data, { formats: ['Code128'], tryHarder: true, maxNumberOfSymbols: 1 });
+                    decoded = (res && res.length && res[0] && res[0].text) || '';
+                } catch (e) { decoded = 'ERR:' + String(e && e.message); }
+                out.push({ text: text, decoded: decoded, drawn: true });
+            }
+            return out;
+        });
+        const mismatched = roundTrip.filter((r) => r.drawn && r.decoded !== r.text);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ គូររូបបានពិតគ្រប់គំរូ',
+            roundTrip.filter((r) => r.drawn).length === roundTrip.length, roundTrip);
+        ok('⛔ រូបដែលគូរ ត្រូវអានចេញវិញជា **លេខដដែលបេះបិទ** (Code Set B និង C)',
+            mismatched.length === 0, mismatched);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ គំរូគ្រប ១៤ ខ្ទង់ពិតរបស់ ZTO',
+            roundTrip.some((r) => r.text === '77130534020575' && r.decoded === r.text), roundTrip[0]);
+
+        // ⛔ probe ទិសផ្ទុយ ៖ បើអ្នកវាស់ «អានចេញវិញដដែល» ដោយចៃដន្យបៃតង
+        // (ឧ. decoder ត្រឡប់ input) នោះការបំភ្លៃរូបមួយបន្ទាត់ត្រូវនៅតែធ្លាក់។
+        const poisoned = await page.evaluate(async () => {
+            const drawing = code128Bars('77130534020575');
+            const scale = 3;
+            const c = document.createElement('canvas');
+            c.width = drawing.width * scale; c.height = 90;
+            const g = c.getContext('2d', { willReadFrequently: true });
+            g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+            g.fillStyle = '#000';
+            for (let b = 0; b < drawing.bars.length; b++) {
+                const w = b === 3 ? drawing.bars[b][1] + 1 : drawing.bars[b][1];
+                g.fillRect(drawing.bars[b][0] * scale, 0, w * scale, 90);
+            }
+            const data = g.getImageData(0, 0, c.width, c.height);
+            try {
+                const res = await ZXingWASM.readBarcodes(data, { formats: ['Code128'], tryHarder: true, maxNumberOfSymbols: 1 });
+                return (res && res.length && res[0] && res[0].text) || '';
+            } catch (e) { return ''; }
+        });
+        ok('⛔ probe ទិសផ្ទុយ ៖ រូបដែលបំភ្លៃ មិនត្រូវអានចេញជាលេខដដែល',
+            poisoned !== '77130534020575', poisoned);
+
+        // ⛔ រូបក្នុងប្រអប់ត្រូវដេរីវេពី `code128Bars()` ដដែល — មិនមែនផ្លូវទី ២
+        // (ផ្លូវ ២ = ថ្ងៃណាមួយវាឃ្លាតគ្នា ហើយអ្នកយាមខាងលើមើលមិនឃើញ)។
+        await setup(ZTO_URL);
+        const inModal = await page.evaluate(async () => {
+            const code = '77130534020575';
+            const item = { id: 'bc1', phone: '011', barcodes: [{ code: code, isClosed: true }] };
+            setZtoPickupVerdict(code, false);
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 80));
+            const svg = document.querySelector('#ztoSyncList .zto-sync-bc');
+            const rects = svg ? svg.querySelectorAll('rect').length : 0;
+            const viewBox = svg ? svg.getAttribute('viewBox') : '';
+            const drawing = code128Bars(code);
+            closeZtoSyncModal();
+            return {
+                rects: rects,
+                viewBox: viewBox,
+                wantRects: drawing.bars.length,
+                wantViewBox: '0 0 ' + drawing.width + ' 60'
+            };
+        });
+        ok('⛔ ប្រអប់គូររូប Barcode ពិត (មិនត្រឹមអក្សរ)', inModal.rects > 20, inModal);
+        ok('⛔ របារបស់រូបក្នុងប្រអប់ = លទ្ធផលរបស់ code128Bars() បេះបិទ',
+            inModal.rects === inModal.wantRects && inModal.viewBox === inModal.wantViewBox, inModal);
+    } else {
+        ok('⛔ វាស់រូប Barcode មិនបាន — code128Bars ឬ engine មិនមាន', false, engineReady);
+    }
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

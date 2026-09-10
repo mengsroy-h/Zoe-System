@@ -103,7 +103,7 @@ done
 
 echo
 echo "== ការត្រួតពិនិត្យរចនាសម្ព័ន្ធ =="
-for t in shared-fns wiring function-surface-test code-duplication-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene adaptive-link-test version-check; do
+for t in shared-fns wiring function-surface-test code-duplication-test dom-hygiene state-hygiene comments payload-schema compensation-order stale-write storage-guard secret-hygiene html-sink-escaping clock-hygiene clock-basis-test adaptive-link-test version-check; do
     [ -n "$NO_ACORN" ] && { skipm "$t"; continue; }
     run "$t" node "audit-tools/$t.js"
 done
@@ -344,6 +344,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     CLEARCLAIM_APP_DIR="$BASE" node audit-tools/clear-history-claim-test.js 2>&1 | tail -1 | sed 's/^/   clear-history-claim:/'
     CLEARFENCE_APP_DIR="$BASE" node audit-tools/clear-history-finalization-fence-test.js 2>&1 | tail -1 | sed 's/^/   clear-history-finalization-fence:/'
     CLOCK_APP_DIR="$BASE" node audit-tools/clock-hygiene.js 2>&1 | tail -1 | sed 's/^/   clock-hygiene:   /'
+    CLOCKBASIS_APP_DIR="$BASE" node audit-tools/clock-basis-test.js 2>&1 | tail -1 | sed 's/^/   clock-basis:     /'
     COMMENTS_APP_DIR="$BASE" node audit-tools/comments.js 2>&1 | tail -1 | sed 's/^/   comments:        /'
     CSSCLASS_APP_DIR="$BASE" node audit-tools/css-classes.js 2>&1 | tail -1 | sed 's/^/   css-classes:     /'
     CSSVAR_APP_DIR="$BASE" node audit-tools/css-var-test.js 2>&1 | tail -1 | sed 's/^/   css-var:         /'

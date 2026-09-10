@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.12';
+    const APP_VERSION = '2.31.13';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -13109,7 +13109,7 @@
         }
         if (!force && elapsedSince(ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return 0;
         loadZtoPickupStatusOnce();
-        ztoStatusLastSweepAt = getServerNow();
+        ztoStatusLastSweepAt = Date.now();
         const work = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
             .filter((entry) => {
                 const verdict = ztoPickupStatus.get(entry.key);

@@ -115,6 +115,67 @@ ok(ABANDON_DAYS > 0 && ABANDON_DAYS < 60, 'ច្បាប់បោះបង់�
 const cleanupFn = sliceFn(src, 'runAutomaticCleanupRules');
 ok(cleanupFn.indexOf('> ABANDON_AGE_MS') !== -1 && cleanupFn.indexOf('>= ABANDON_AGE_MS') === -1,
     '⛔ ការប្រៀបធៀបជា `>` ➜ ៧ថ្ងៃគត់មិនទាន់ដក ➜ ស្លាកត្រូវជាថ្ងៃលំដាប់ទី ' + (ABANDON_DAYS + 1));
+
+// ⛔ **ព្រំដែនតែមួយ រស់នៅ ៦ កន្លែង — ពួកវាត្រូវនិយាយរឿងដដែល។**
+//
+// 🔴 វាស់បាន (2026-09-10) ៖ ការអះអាងខាងលើចាក់សោតែ `runAutomaticCleanupRules()`។
+// រូបមន្តព្រំដែនដដែលរស់នៅ **៣ កន្លែងក្នុងមួយច្បាប់** ៖
+//   ៧ ថ្ងៃ ៖ `runAutomaticCleanupRules` (`>`) · `claimAndCleanupItem` (`<=` ជាបញ្ច្រាស)
+//            · `barcodeAbandonIsRipe` (`>`)
+//   ២ ម៉ោង ៖ `runAutomaticCleanupRules` (`>`) · `claimAndCleanupItem` (`<=`)
+//            · `barcodeCloseIsRipe` (`>`)
+// mutation ៤ លើច្បាប់ចម្លងដែលមិនត្រូវបានចាក់សោ (`>` ➜ `>=` និង `<=` ➜ `<`)
+// **រស់រានលើ checker ១៦០ ទាំងអស់**។ ផលមិនមែនត្រឹមមួយ tick ទេ ៖ វាបើកទ្វារ
+// ឲ្យ **ច្បាប់ ២ ផ្ទុយគ្នាក្នុងឯកសារតែមួយ** (ថ្នាក់ដែល CLAUDE.md ច្បាប់ ១២
+// ដាស់តឿន) — ជុំក្រោយកែច្បាប់មួយ ភ្លេចមួយ ➜ អ្នកសម្រេច (`claimAndCleanupItem`)
+// និងអ្នកជ្រើស (`runAutomaticCleanupRules`) ឈប់ស៊ីគ្នា ➜ កញ្ចប់ត្រូវជ្រើស
+// រួចបដិសេធរាល់ជុំ (រង្វិលជុំស្ងាត់) ឬដកលុយមួយថ្ងៃមុនកំណត់។
+{
+    const abandonRipeFn = sliceFn(src, 'barcodeAbandonIsRipe');
+    const closeRipeFn = sliceFn(src, 'barcodeCloseIsRipe');
+    const claimFn = sliceFn(src, 'claimAndCleanupItem');
+    ok(abandonRipeFn.length > 0 && closeRipeFn.length > 0 && claimFn.length > 0,
+        'លក្ខខណ្ឌចាំបាច់ ៖ រកឃើញអ្នកសម្រេចព្រំដែនទាំង ៣');
+
+    ok(abandonRipeFn.indexOf('> ABANDON_AGE_MS') !== -1 && abandonRipeFn.indexOf('>= ABANDON_AGE_MS') === -1,
+        '⛔ `barcodeAbandonIsRipe()` ប្រើ `>` ដូច `runAutomaticCleanupRules()`',
+        abandonRipeFn.slice(-120));
+    ok(closeRipeFn.indexOf('> TWO_HOURS_MS') !== -1 && closeRipeFn.indexOf('>= TWO_HOURS_MS') === -1,
+        '⛔ `barcodeCloseIsRipe()` ប្រើ `>` ដូច `runAutomaticCleanupRules()`',
+        closeRipeFn.slice(-120));
+
+    // `claimAndCleanupItem()` ជា **បញ្ច្រាស** ៖ វា `return` ពេល *មិនទាន់* ទុំ
+    // ➜ ត្រូវជា `<=` ។ `<` នឹងធ្វើឲ្យវាទទួលយកនៅព្រំដែនគត់ ខណៈអ្នកជ្រើសមិនទាន់។
+    ok(claimFn.indexOf('<= ABANDON_AGE_MS') !== -1 && !/[^<]< ABANDON_AGE_MS/.test(claimFn),
+        '⛔ `claimAndCleanupItem()` ប្រើ `<=` ជាបញ្ច្រាសពិតនៃ `>` (៧ ថ្ងៃ)',
+        (/.{0,80}ABANDON_AGE_MS/.exec(claimFn) || [''])[0]);
+    ok(claimFn.indexOf('<= TWO_HOURS_MS') !== -1 && !/[^<]< TWO_HOURS_MS/.test(claimFn),
+        '⛔ `claimAndCleanupItem()` ប្រើ `<=` ជាបញ្ច្រាសពិតនៃ `>` (២ ម៉ោង)',
+        (/.{0,80}TWO_HOURS_MS/.exec(claimFn) || [''])[0]);
+
+    // ⛔ ជាន់អប្បបរមា ៖ រាប់ច្បាប់ចម្លងពិត — បើជុំក្រោយបន្ថែមកន្លែងទី ៤
+    //    ដោយគ្មានការចាក់សោ ការអះអាងនេះត្រូវធ្លាក់ ➜ បង្ខំឲ្យពិនិត្យ។
+    const abandonSites = (src.match(/[<>]=? ABANDON_AGE_MS/g) || []).length;
+    const closeSites = (src.match(/[<>]=? TWO_HOURS_MS/g) || []).length;
+    ok(abandonSites === 3, '⛔ ព្រំដែន ៧ ថ្ងៃ រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', abandonSites);
+    ok(closeSites === 3, '⛔ ព្រំដែន ២ ម៉ោង រស់នៅត្រឹម ៣ កន្លែងដែលចាក់សោទាំងអស់', closeSites);
+
+    // ⛔ ឥរិយាបថ ៖ អ្នកសម្រេចទាំង ២ ដែលស្រង់បានពិត ត្រូវយល់ស្របនៅព្រំដែនគត់
+    const vm = require('vm');
+    const ctx = { TWO_HOURS_MS: 2 * 60 * 60 * 1000, ABANDON_AGE_MS: 7 * 24 * 60 * 60 * 1000 };
+    vm.createContext(ctx);
+    vm.runInContext(abandonRipeFn + '\n' + closeRipeFn, ctx);
+    const NOW = 1700000000000;
+    ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS, NOW) === false,
+        '⛔ ឥរិយាបថ ៖ នៅ ៧×២៤ ម៉ោង **គត់** barcode មិនទាន់ទុំ (លុយមិនត្រូវដក)');
+    ok(ctx.barcodeAbandonIsRipe({ isClosed: false }, NOW - ctx.ABANDON_AGE_MS - 1, NOW) === true,
+        '⛔ ឥរិយាបថ ៖ ១ ms ក្រោយ ៧×២៤ ម៉ោង barcode ទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS }, NOW) === false,
+        '⛔ ឥរិយាបថ ៖ នៅ ២ ម៉ោង **គត់** barcode បិទមិនទាន់ទុំ');
+    ok(ctx.barcodeCloseIsRipe({ isClosed: true, closedAt: NOW - ctx.TWO_HOURS_MS - 1 }, NOW) === true,
+        '⛔ ឥរិយាបថ ៖ ១ ms ក្រោយ ២ ម៉ោង barcode បិទទុំ');
+}
+
 const ABANDON_LABEL_DAY = ABANDON_DAYS + 1;
 const abandonLabel = '\u1795\u17bb\u178f\u1780\u17c6\u178e\u178f\u17cb ' + khmerNum(ABANDON_LABEL_DAY) + '\u1790\u17d2\u1784\u17c3\u17d6 ';
 const indexHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');

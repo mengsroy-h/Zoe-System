@@ -468,6 +468,68 @@ async function runHandler(opts) {
             { status: rejected.res.statusCode, body: rejected.res.body.slice(0, 120) });
     }
 
+    // ═══ ⛔ ថវិកាតឹង ➜ ការអាន Cookie ត្រូវរំលង ➜ 503 លើ container ត្រជាក់ ═══
+    // 🔴 ផ្លូវទី ២ នៃផ្នែក ៨ ខាងលើ — ជុំមុនបានរកឃើញវា តែ **មិនបានចាក់សោ**
+    // ដោយយល់ថាវាជា «ការប្រណាំងលើគែម ១ ms» ។ វា **មិនមែន** ៖ បង្អួចអាន
+    // ជា **អនុគមន៍សុទ្ធ** នៃ config ➜ វាស់បានដោយកំណត់ជាក់លាក់។
+    //
+    // វាស់បាន (2026-09-10) ជាមួយ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` ដែល
+    // **កំណត់ក្នុង Netlify env ពិត** បូក `ZTO_REQUEST_BUDGET_MS` លំនាំដើម
+    // ៩០០០ ៖ បង្អួចអាន = **៣០០ ms** នៅ elapsed 0 ហើយ **០ ms** នៅ elapsed
+    // ៥០ ms (ការវិភាគ config · ការប្រៀបធៀបសោ proxy · ការមើល cache
+    // សុទ្ធតែឈរមុន)។ បង្អួច ០ ➜ ការអាន Blobs **ត្រូវរំលង** ➜ ការតំឡើងដែល
+    // ប្រើ Blobs (គ្មាន `ZTO_COOKIE` env) ឆ្លើយ **503 ZTO_AUTH_NOT_CONFIGURED**
+    // លើ container **ត្រជាក់** — ខណៈ Cookie ពិតអង្គុយក្នុង store ដ៏ល្អ។
+    //
+    // ⛔ ច្បាប់ ៖ ពេល **គ្មាន Cookie ក្នុងសតិសោះ** ការអាន **មិនមែនការងារ
+    // ស្រេចចិត្តទេ** — គ្មានវា ការហៅ upstream កើតមិនបានទាល់តែសោះ ➜ ការរំលង
+    // វាធានា 503។ ដូច្នេះការអានត្រូវទទួលបង្អួចអប្បបរមាជានិច្ច ដរាបណាថវិកា
+    // នៅសល់។ `fetchOrder()` កាត់ `timeoutMs` តាម `remaining − 200` រួចហើយ
+    // ➜ ការចំណាយនោះ **មិនធ្វើឲ្យលើសពិដាន ១០ វិ. របស់ Netlify** ទេ។
+    console.log('\n=== ៨ខ. ថវិកាតឹង ➜ ការអាន Cookie លើ container ត្រជាក់ ===');
+    {
+        const probe = mod.cookieReadWindowForTests;
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ មានច្រកវាស់បង្អួចអាន', typeof probe === 'function');
+        if (typeof probe === 'function') {
+            // ការកំណត់ពិតរបស់ផលិតកម្ម ៖ upstream 7500 (Netlify env) · budget 9000 (លំនាំដើម)
+            const prod = { upstreamTimeoutMs: 7500, budgetMs: 9000 };
+            const started = Date.now();
+            for (const elapsed of [0, 1, 25, 50, 150]) {
+                const cold = probe(prod, started - elapsed, false);
+                ok('⛔ upstream 7500 · budget 9000 · elapsed ' + elapsed
+                    + 'ms ➜ container ត្រជាក់ នៅតែទទួលបង្អួចអាន > 0',
+                    cold > 0,
+                    { window: cold, hint: 'បង្អួច 0 ➜ រំលងការអាន Blobs ➜ 503 ZTO_AUTH_NOT_CONFIGURED' });
+            }
+            // គ្រប​ជួរ config ដែល `readConfig()` អនុញ្ញាត
+            const starved = [];
+            for (let up = 2000; up <= 20000; up += 500) {
+                for (const budget of [4000, 6000, 9000, 12000, 16000, 24000]) {
+                    if (budget < up + 1500) continue;
+                    const w = probe({ upstreamTimeoutMs: up, budgetMs: budget }, Date.now() - 50, false);
+                    if (!(w > 0)) starved.push('up=' + up + ' budget=' + budget);
+                }
+            }
+            ok('⛔ គ្មាន config ណាដែល `readConfig()` ទទួល ធ្វើឲ្យ container ត្រជាក់អត់បង្អួចអាន',
+                starved.length === 0, starved.slice(0, 8));
+
+            // ⛔ ទិសផ្ទុយ ១ ៖ ពេលមាន Cookie ក្នុងសតិរួច ការអានជា *ស្រេចចិត្ត*
+            //    ➜ ថវិកាតឹងត្រូវនៅតែរំលងវា (កុំលួចពេលរបស់ upstream)
+            ok('⛔ ទិសផ្ទុយ ៖ សតិមាន Cookie + ថវិកាតឹង ➜ ការអាននៅតែត្រូវរំលង (0)',
+                probe({ upstreamTimeoutMs: 7500, budgetMs: 9000 }, Date.now() - 50, true) === 0,
+                { window: probe({ upstreamTimeoutMs: 7500, budgetMs: 9000 }, Date.now() - 50, true) });
+
+            // ⛔ ទិសផ្ទុយ ២ ៖ ថវិកាអស់ពិត (នាឡិកាថយក្រោយ ➜ elapsedSince = Infinity)
+            //    ➜ សូម្បីតែ container ត្រជាក់ ក៏មិនត្រូវអានដែរ (គ្មានពេលសល់)
+            ok('⛔ ទិសផ្ទុយ ៖ ថវិកាអស់ទាំងស្រុង ➜ បង្អួច 0 ទោះ container ត្រជាក់',
+                probe({ upstreamTimeoutMs: 6000, budgetMs: 9000 }, Date.now() + 60000, false) === 0);
+
+            // ⛔ ទិសផ្ទុយ ៣ ៖ ថវិកាធំ ➜ បង្អួចមិនត្រូវលើស COOKIE_STORE_TIMEOUT_MS
+            ok('⛔ ទិសផ្ទុយ ៖ ថវិកាធំ ➜ បង្អួចនៅមានពិដានរបស់វា (មិនរីកគ្មានព្រំដែន)',
+                probe({ upstreamTimeoutMs: 2000, budgetMs: 24000 }, Date.now(), false) <= 3000);
+        }
+    }
+
     // ═══ ⛔ ថវិកា ↔ នាឡិកា ៖ `budgetLeftMs()` ជាច្បាប់ចម្លងទី ២ ═══════════
     // ច្បាប់ក្នុង CLAUDE.md ៖ «ថវិកាត្រូវវាស់តាម `elapsedSince()` (ថយក្រោយ ➜
     // fail-open)»។ `zto-proxy-test` ចាក់សោ **រង្វិលជុំ retry** (`fetchOrder`)

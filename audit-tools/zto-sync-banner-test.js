@@ -643,6 +643,85 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('⛔ ពេញពិដាន ➜ សាលក្រម «មិនទាន់បិទ» ត្រូវរស់ (កុំបោះមុន «បិទរួច»)',
         evicted.hidden === false, evicted);
 
+    console.log('\n== ១៤. លំដាប់ចៃដន្យ (fuzz) ==');
+
+    // ⛔ ជាន់ទី ៥ នៃមេរៀនគម្រោង ៖ សេណារីយ៉ូ **សរសេរដោយដៃ** ទាំងអស់ ➜ រាល់ជុំ
+    // សរសេរល្អជាងមុនបន្តិច ➜ រកឃើញកំហុសមួយទៀតក្នុងកូដដដែល។ ត្រង់នេះលំដាប់
+    // ជាចៃដន្យ ៖ ចំនួន barcode · បិទ/បើក · ចម្លើយ upstream (true · false ·
+    // គ្មានវាល · HTTP ធ្លាក់) ➜ អថេរ ៣ ត្រូវឈរជានិច្ច។
+    await setup(ZTO_URL);
+    const FUZZ_RUNS = parseInt(process.env.ZTOBANNER_FUZZ_RUNS || '40', 10);
+    const fuzz = await page.evaluate(async (runs) => {
+        const bad = [];
+        const rnd = (s) => { let x = s; return () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }; };
+        for (let run = 0; run < runs; run++) {
+            const r = rnd(run * 7919 + 13);
+            document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+            try { closeModal(); } catch (e) { /* sandbox */ }
+            clearZtoPickupStatusStore();
+            const n = 1 + Math.floor(r() * 14);
+            const barcodes = [];
+            const truth = {};
+            for (let i = 0; i < n; i++) {
+                const code = 'FZ' + run + 'X' + String(i).padStart(3, '0');
+                const closed = r() < 0.7;
+                barcodes.push({ code: code, isClosed: closed });
+                truth[code] = closed;
+            }
+            const items = [{ id: 'i' + run, phone: '011', barcodes: barcodes }];
+            const answers = {};
+            const realFetch = window.fetchWithTimeout;
+            window.fetchWithTimeout = async (url) => {
+                const m = /FZ\d+X\d{3}/.exec(String(url));
+                const code = m ? m[0] : '';
+                const roll = r();
+                let body;
+                if (roll < 0.25) body = { ztoClosed: true };
+                else if (roll < 0.55) body = { ztoClosed: false };
+                else if (roll < 0.8) body = {};
+                else return { res: { ok: false, status: 502 }, body: null };
+                answers[code] = body.ztoClosed === undefined ? null : body.ztoClosed;
+                return { res: { ok: true, status: 200 }, body: body };
+            };
+            const realNow = Date.now;
+            let shift = (run + 1) * 3600000;
+            Date.now = () => realNow.call(Date) + shift;
+            for (let round = 0; round < 4; round++) {
+                await runZtoStatusSweep(false, items, []);
+                shift += 1800000;
+            }
+            Date.now = realNow;
+            window.fetchWithTimeout = realFetch;
+
+            renderZtoSyncBanner(items, []);
+            const el = document.getElementById('ztoSyncBanner');
+            const hidden = el.classList.contains('hidden');
+            const txt = el.textContent || '';
+            let expectShown = false;
+            let expectCount = 0;
+            Object.keys(answers).forEach((c) => {
+                if (answers[c] === false && truth[c] === true) { expectShown = true; expectCount++; }
+            });
+            if (hidden === expectShown) bad.push({ run: run, why: 'hidden', hidden: hidden, expect: expectShown });
+            if (expectShown) {
+                const m = /^\D*(\d+)/.exec(txt.replace('🔄', ''));
+                const shown = m ? parseInt(m[1], 10) : -1;
+                if (shown !== expectCount) bad.push({ run: run, why: 'count', shown: shown, expect: expectCount });
+            }
+            Object.keys(truth).forEach((c) => {
+                if (!truth[c] && txt.indexOf(c) !== -1) bad.push({ run: run, why: 'open nagged', code: c });
+            });
+        }
+        return { bad: bad.slice(0, 5), badCount: bad.length, runs: runs };
+    }, FUZZ_RUNS);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំ fuzz រត់ពិត', fuzz.runs >= 40, fuzz);
+    ok('⛔ របាលេច ⇔ មានសាលក្រម «មិនទាន់បិទ» ពិត (លំដាប់ចៃដន្យ)',
+        fuzz.bad.filter((b) => b.why === 'hidden').length === 0, fuzz);
+    ok('⛔ លេខលើរបា = ចំនួនសាលក្រម «មិនទាន់បិទ» (លំដាប់ចៃដន្យ)',
+        fuzz.bad.filter((b) => b.why === 'count').length === 0, fuzz);
+    ok('⛔ Barcode ដែល ZoeW មិនបិទ មិនដែលលេចលើរបា (លំដាប់ចៃដន្យ)',
+        fuzz.bad.filter((b) => b.why === 'open nagged').length === 0, fuzz);
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

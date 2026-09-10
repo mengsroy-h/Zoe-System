@@ -286,10 +286,18 @@ curl -H "X-Zoe-Proxy-Key: <ZTO_PROXY_KEY>" \
    (`.../scan/get/order/detail`) ➜ ផ្ទាំង **Response** ឬ **Preview**។
 ៥. រកវាលដែលមានន័យថា «បានចុះហត្ថលេខា / បិទរួច»។ ឈ្មោះទូទៅ ៖ `signStatus` ·
    `signState` · `status` · `orderStatus`។ **កត់ទុក ២ យ៉ាង** ៖
-   - **ផ្លូវពេញ** របស់វា (ឧ. `data.signStatus`) និង
+   - **ឈ្មោះ field** របស់វា (ឧ. `signStatus`) និង
    - **តម្លៃ** ដែលវាបង្ហាញសម្រាប់កញ្ចប់ **ដែលបិទរួច** (ឧ. `70` ឬ `signed`)។
 ៦. ⛔ **ធ្វើដដែលនឹងកញ្ចប់ដែល *មិនទាន់* បិទ** ➜ តម្លៃត្រូវ **ខុសគ្នា**។
    បើតម្លៃដូចគ្នាទាំង ២ នោះវាលនោះ **មិនមែន** វាលស្ថានភាពទេ ➜ រកវាលផ្សេង។
+
+> ⛔ **សរសេរឈ្មោះ field *រាបស្មើ* — កុំដាក់ `data.` នាំមុខ។** Function
+> **ស្រាយសំបកចេញរួចហើយ** ៖ វារកទិន្នន័យក្នុង `data` · `result` · `data.data` ·
+> `result.data` · `body` · `rows` ឬ root ដោយស្វ័យប្រវត្តិ រួចទើបអានឈ្មោះ field
+> ខាងក្នុងនោះ។ នេះជាហេតុផលដែលវាលដទៃទាំងអស់ក្នុងគម្រោងនេះរាបស្មើដែរ ៖
+> `consigneePhone` · `billCode` · `agentAmount` — គ្មាន `data.` សោះ។
+> ⛔ ការដាក់ `data.signStatus` អាចដើរដោយចៃដន្យ (root ជា candidate ចុងក្រោយ)
+> តែវា **ធ្លាក់ពេល ZTO ដាក់ទិន្នន័យក្រោម `result` ជំនួស** ➜ កុំប្រើ។
 
 ### ជំហានទី ២ — ដាក់ក្នុង Netlify
 
@@ -298,11 +306,11 @@ Netlify ➜ site **zoew** ➜ **Site configuration ➜ Environment variables** �
 
 | Key | តម្លៃដែលត្រូវដាក់ | ឧទាហរណ៍ |
 |---|---|---|
-| `ZTO_FIELD_SIGNED` | ផ្លូវ field ពីជំហានទី ១ | `data.signStatus` |
+| `ZTO_FIELD_SIGNED` | ឈ្មោះ field ពីជំហានទី ១ | `signStatus` |
 | `ZTO_SIGNED_VALUES` | តម្លៃដែលមានន័យថា «បិទរួច» | `70` |
 
 - ដាក់បាន **ច្រើនផ្លូវ** បំបែកដោយ `,` (ZTO ប្តូរឈ្មោះតាមកំណែ) ៖
-  `data.signStatus,result.signState` — Function សាកតាមលំដាប់ រហូតដល់ឃើញតម្លៃ។
+  `signStatus,signState,orderStatus` — Function សាកតាមលំដាប់ រហូតដល់ឃើញតម្លៃ។
 - ដាក់បាន **ច្រើនតម្លៃ** ដែរ ៖ `70,signed,SIGNED` (មិនប្រកាន់អក្សរតូចធំ)។
 - ⛔ **ត្រូវដាក់គូគ្នា** ៖ ដាក់តែមួយ ➜ មុខងារនៅដេកលក់ ហើយ `?diag=1` នឹងប្រាប់
   មូលហេតុ (`paths:missing` ឬ `values:missing`)។
@@ -320,7 +328,7 @@ https://<site>.netlify.app/.netlify/functions/zto-order-detail?diag=1
 
 | អ្វីដែលឃើញ | មានន័យថា |
 |---|---|
-| `"signedReason": null` និង `"signed": ["data.signStatus"]` | ✅ កំណត់ត្រឹមត្រូវ |
+| `"signedReason": null` និង `"signed": ["signStatus"]` | ✅ កំណត់ត្រឹមត្រូវ |
 | `"signedReason": "paths:missing"` | ដាក់តែ `ZTO_SIGNED_VALUES` ➜ ខ្វះ `ZTO_FIELD_SIGNED` |
 | `"signedReason": "values:missing"` | ដាក់តែ `ZTO_FIELD_SIGNED` ➜ ខ្វះ `ZTO_SIGNED_VALUES` |
 | `"signedReason": "paths:invalid"` | ផ្លូវ field មានតួអក្សរមិនត្រឹមត្រូវ ឬវែងពេក |

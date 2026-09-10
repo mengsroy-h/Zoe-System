@@ -37,6 +37,7 @@ if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chr
 // ── ការអះអាងស្តាទិច (ជាន់អប្បបរមា ៖ ថតទទេ ➜ ធ្លាក់) ──────────────────────
 const APP_SRC = fs.existsSync(path.join(APP_DIR, 'app.js')) ? fs.readFileSync(path.join(APP_DIR, 'app.js'), 'utf8') : '';
 const HTML_SRC = fs.existsSync(path.join(APP_DIR, 'index.html')) ? fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8') : '';
+const CSS_SRC = fs.existsSync(path.join(APP_DIR, 'style.css')) ? fs.readFileSync(path.join(APP_DIR, 'style.css'), 'utf8') : '';
 
 ok('អាន app.js បាន (ជាន់អប្បបរមា)', APP_SRC.length > 100000, APP_SRC.length);
 ok('អាន index.html បាន (ជាន់អប្បបរមា)', HTML_SRC.length > 20000, HTML_SRC.length);
@@ -1153,7 +1154,19 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
                 svgCount: svgs.length,
                 svgWide: svgs.filter((el, i) => el.getBoundingClientRect().width > wraps[i].getBoundingClientRect().width + 1).length,
                 svgTooThin: svgs.filter((el) => el.getBoundingClientRect().width < 120).length,
-                svgTall: svgs.filter((el) => el.getBoundingClientRect().height < 40).length
+                svgTall: svgs.filter((el) => el.getBoundingClientRect().height < 40).length,
+                bc: Array.from(list.querySelectorAll(".zto-sync-item")).map((it) => {
+                    const el = it.querySelector(".zto-sync-bc");
+                    const codeEl = it.querySelector(".zto-sync-code");
+                    const vb = el ? String(el.getAttribute("viewBox") || "").trim().split(/\s+/) : [];
+                    const modules = Number(vb[2]) || 0;
+                    const w = el ? el.getBoundingClientRect().width : 0;
+                    return {
+                        code: codeEl ? String(codeEl.textContent || "") : "",
+                        modules: modules,
+                        px: modules ? Number((w / modules).toFixed(3)) : 0
+                    };
+                })
             };
             closeZtoSyncModal();
             return out;
@@ -1171,8 +1184,100 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         fitRows.every((r) => r.boxLeft >= 0 && r.boxRight <= r.vw), fitRows.filter((r) => r.boxLeft < 0 || r.boxRight > r.vw));
     ok("⛔ រូប Barcode មិនត្រូវលើសក្របរបស់វា",
         fitRows.every((r) => r.svgWide === 0), fitRows.filter((r) => r.svgWide > 0));
-    ok("⛔ រូបត្រូវធំល្មមស្កេនបាន (ទទឹង >= 120px · កម្ពស់ >= 40px)",
+    ok("⛔ រូបមិនត្រូវតូចជាង 120×40px (ព្រំដែនអប្បបរមានៃការបង្ហាញ)",
         fitRows.every((r) => r.svgTooThin === 0 && r.svgTall === 0), fitRows.filter((r) => r.svgTooThin || r.svgTall));
+
+    // ⛔ ចន្លោះដែលវាស់បាន (2.31.10) ៖ **ទទឹងសរុបមិនមែនជារង្វាស់នៃភាព
+    // ស្កេនបានទេ** — អ្វីដែលសម្រេចគឺ **ទទឹងក្នុងមួយ module**។ រូបលាតពេញ
+    // ក្របជានិច្ច (`width: 100%` + `preserveAspectRatio: none`) ➜ លេខវែង
+    // ជាង ចែកទទឹងដដែលជា module ច្រើនជាង ➜ របានីមួយៗស្តើងជាង។ វាស់បាន ៖
+    // លេខ ២៥ ខ្ទង់ (៣៣០ module) ធ្លាក់ត្រឹម **0.77px/module** នៅ 320px
+    // ➜ ស្នាមប្រផេះ ស្កេនមិនចេញ — ខណៈការអះអាង «ធំល្មមស្កេនបាន» ខាងលើ
+    // រាយ ✅ ព្រោះទទឹងសរុប > 120px។ ⛔ នោះជា «✅ លើអ្វីដែលមិនបានវាស់»។
+    // ពិដាន 1.5px ដេរីវេពីស្តង់ដារ X-dimension ~0.25mm (1 CSS px ≈ 0.15mm
+    // លើទូរស័ព្ទ ➜ 0.25mm ≈ 1.7px) ដោយទុករង្វាន់សុវត្ថិភាពបន្តិច។
+    // ⛔ ការអះអាងគ្របតែប្រវែងដែលប្រព័ន្ធនេះ **ពិតជាផលិត** ៖ Waybill ZTO
+    // ជា **១២–១៤ ខ្ទង់** (គំរូពិត `77130534020575`) ➜ ១៤ ជាពិដាន។ វាមិនមែន
+    // លេខដែលជ្រើសឲ្យតេស្តបៃតងទេ — វាជាប្រវែងដែលឯកសារ ZTO និងគំរូពិត
+    // របស់ការវាស់នេះប្រើ។ វាស់បាន ៖ ១៤ ខ្ទង់ ➜ ១៣២ module ➜ **>= 1.5px
+    // គ្រប់ទទឹង ៣២០–១២៨០**។
+    // ⚠️ **ព្រំដែនដែលវាស់បាន ហើយ *មិន* បានកែ** ៖ លេខ **១៥ តួឡើងទៅ**
+    // (>= ២២០ module) ធ្លាក់ត្រឹម **0.99px/module នៅ 320px** · 1.20px នៅ
+    // 412px ➜ ស្កេនពីអេក្រង់មិនចេញ។ វាមិនអាចកែដោយ CSS បានទេ ៖ ២២០ module
+    // × 1.5px = **330px** ធំជាងអេក្រង់ 320px ទាំងមូល។ ផ្លូវចេញធម្មជាតិ
+    // មានរួចហើយ ៖ ប្រអប់បង្ហាញ **លេខជាអក្សរ monospace** ខាងលើរូបជានិច្ច
+    // ➜ វាយចូល Palm ដោយដៃបាន។ ⛔ គ្មានភស្តុតាងថាអាជីវកម្មនេះមានលេខបែបនោះ
+    // ➜ **កុំសាង UI ថ្មីលើការសង្ស័យ** (ច្បាប់គម្រោង) — បើថ្ងៃណាអ្នកប្រើ
+    // រាយការណ៍លេខវែង នោះទើបជាពេលកែ ហើយលេខនៅទីនេះជាចំណុចចាប់ផ្តើម។
+    // ⛔ ចន្លោះទី ៨ ដែល mutation បង្ហាញ (2.31.10) ៖ mutation ដែលធ្វើឲ្យ
+    // `.zto-sync-modal-content { max-width }` **តូចជាងមុនច្រើន** មិនប្តូរ
+    // ការវាស់អ្វីសោះ ➜ ការប្រកាសនោះ **ស្លាប់ស្ងាត់ៗ** ៖ វាឈរ **មុន**
+    // `.modal-content` ក្នុងឯកសារដដែល ដោយ specificity **ស្មើ** (class ១
+    // ដូចគ្នា) ➜ **លំដាប់សម្រេច** ➜ ច្បាប់ទូទៅឈ្នះ។ នេះជាច្បាប់ CSS
+    // invariant ដែលមានក្នុង `CLAUDE.md` រួចហើយ («ការសរសេរជាន់ត្រូវឈរក្រោយ
+    // វា ឬបង្កើន specificity»)។ រាល់ការសរសេរជាន់ដទៃរបស់ modal ក្នុងឯកសារ
+    // នេះ (`.trash-modal-content` · `.scan-remove-modal-content` · `#…
+    // .modal-content`) ឈរ **ក្រោយ** ➜ មានតែជួរ ZTO ដែលខុស។
+    // ⛔ អះអាងលើ **តម្លៃដែលគណនាចេញពិត** ដោយ **ដេរីវេពី CSS** ទាំង ២ ជួរ
+    // (មិនចាក់ literal) បូក probe ថាតម្លៃទាំង ២ **ខុសគ្នាពិត** — បើដូចគ្នា
+    // នោះការអះអាងបៃតងដោយចៃដន្យ។
+    {
+        const clampOf = (sel) => {
+            const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{[^}]*max-width:\\s*clamp\\(([^)]*)\\)');
+            const m = re.exec(CSS_SRC);
+            if (!m) return null;
+            const parts = m[1].split(',').map((x) => x.trim());
+            return parts.length === 3 ? parts : null;
+        };
+        const px = (v, vw) => (/vw$/.test(v) ? (parseFloat(v) / 100) * vw : parseFloat(v));
+        const evalClamp = (parts, vw) => Math.min(Math.max(px(parts[0], vw), px(parts[1], vw)), px(parts[2], vw));
+        const ztoClamp = clampOf('.zto-sync-modal-content');
+        const genericClamp = clampOf('.modal-content');
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន max-width ទាំង ២ ជួរចេញពី style.css បាន',
+            !!(ztoClamp && genericClamp), { ztoClamp: ztoClamp, genericClamp: genericClamp });
+        if (ztoClamp && genericClamp) {
+            const VW = 1280;
+            const want = evalClamp(ztoClamp, VW);
+            const generic = evalClamp(genericClamp, VW);
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ ជួរ ZTO និងជួរទូទៅផ្តល់តម្លៃខុសគ្នានៅ ' + VW + 'px',
+                Math.abs(want - generic) > 1, { want: want, generic: generic });
+            await page.setViewportSize({ width: VW, height: 800 });
+            const applied = await page.evaluate(async () => {
+                const item = { id: 'css1', phone: '011', barcodes: [{ code: '77130534020575', isClosed: true }] };
+                setZtoPickupVerdict('77130534020575', false);
+                openZtoSyncModal([item]);
+                await new Promise((r) => setTimeout(r, 60));
+                const box = document.querySelector('#ztoSyncModal .modal-content');
+                const cs = getComputedStyle(box);
+                const out = { maxWidth: parseFloat(cs.maxWidth), textAlign: cs.textAlign };
+                closeZtoSyncModal();
+                return out;
+            });
+            await page.setViewportSize({ width: 412, height: 800 });
+            ok('⛔ ការប្រកាស `max-width` របស់ប្រអប់ ZTO ត្រូវ **ឈ្នះ** មិនស្លាប់ស្ងាត់ៗ',
+                Math.abs(applied.maxWidth - want) <= 1, { applied: applied.maxWidth, want: want, generic: generic });
+            const wantAlign = /\.zto-sync-modal-content\s*\{[^}]*text-align:\s*([a-z]+)/.exec(CSS_SRC);
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន text-align របស់ជួរ ZTO បាន', !!wantAlign, wantAlign && wantAlign[1]);
+            if (wantAlign) {
+                ok('⛔ ការប្រកាស `text-align` របស់ប្រអប់ ZTO ត្រូវ **ឈ្នះ** ដែរ',
+                    applied.textAlign === wantAlign[1], { applied: applied.textAlign, want: wantAlign[1] });
+            }
+        }
+    }
+
+    const SCAN_MIN_MODULE_PX = 1.5;
+    const REALISTIC_CODE_MAX = 14;
+    const realistic = [];
+    fitRows.forEach((r) => {
+        (r.bc || []).forEach((b) => {
+            if (b.code && b.code.length <= REALISTIC_CODE_MAX) realistic.push({ w: r.w, code: b.code, modules: b.modules, px: b.px });
+        });
+    });
+    ok("លក្ខខណ្ឌចាំបាច់ ៖ វាស់ទទឹងក្នុងមួយ module បានពិត",
+        realistic.length >= WIDTHS.length && realistic.every((b) => b.modules > 0 && b.px > 0), realistic);
+    ok("⛔ រូបរបស់លេខដែលប្រព័ន្ធផលិតពិត ត្រូវ >= " + SCAN_MIN_MODULE_PX + "px ក្នុងមួយ module",
+        realistic.every((b) => b.px >= SCAN_MIN_MODULE_PX),
+        realistic.filter((b) => b.px < SCAN_MIN_MODULE_PX));
 
     // ── ២១. បញ្ជីមិនត្រូវសាងឡើងវិញដោយឥតប្រយោជន៍ ─────────────────────────
     // ⛔ ជុំបោសហៅការគូរឡើងវិញ **ក្នុងមួយ barcode ដែលវាស់បាន** (ដល់ ១០ ដង

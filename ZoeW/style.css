@@ -431,7 +431,7 @@
         .zto-sync-copy strong { font-size: calc(11.5 * var(--fs-unit)); }
         .zto-sync-copy span { font-size: calc(10 * var(--fs-unit)); color: #b45309; overflow-wrap: anywhere; }
         .zto-sync-go { margin-left: auto; flex: none; font-size: calc(14 * var(--fs-unit)); color: #b45309; }
-        .zto-sync-modal-content { max-width: clamp(300px, 94vw, 520px); text-align: left; }
+        .modal-content.zto-sync-modal-content { max-width: clamp(300px, 94vw, 520px); text-align: left; }
         .zto-sync-modal-content h3, .zto-sync-modal-content > p { text-align: center; }
         #ztoSyncModalNote { font-size: calc(11 * var(--fs-unit)); color: var(--text-muted); line-height: 1.5; }
         .zto-sync-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 4px; }

@@ -1014,10 +1014,27 @@ function budgetLeftMs(config, startedAt) {
     return config.budgetMs - elapsedSince(startedAt);
 }
 
+// ⛔ **ការអាន Cookie លើ container *ត្រជាក់* មិនមែនការងារស្រេចចិត្តទេ។**
+// ពេលមានតម្លៃក្នុងសតិរួច ការអានជាការធ្វើឲ្យស្រស់ ➜ ថវិកាតឹង ➜ រំលងវាបាន
+// ដោយសុវត្ថិភាព។ តែពេល **សតិទទេ** (container ទើបត្រជាក់) ការរំលងការអាន
+// មិនសន្សំពេលទេ — វា **ធានាការធ្លាក់** ៖ គ្មាន Cookie ➜ គ្មានការហៅ upstream
+// សោះ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតអង្គុយក្នុង store។
+//
+// 🔴 វាស់បាន (2026-09-10) ៖ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` (កំណត់ក្នុង
+// Netlify env ពិត) បូក budget លំនាំដើម ៩០០០ ➜ បង្អួច = ៣០០ ms នៅ elapsed 0
+// ហើយ **០** នៅ elapsed ១ ms ➜ ការស្កេនលើ container ត្រជាក់ធ្លាក់ 503។
+// ដូច្នេះកក់បង្អួចអប្បបរមាឲ្យការអាន ដរាបណាថវិកានៅសល់ពិត។ `fetchOrder()`
+// កាត់ `timeoutMs` តាម `remaining − 200` រួចហើយ ➜ ការចំណាយនេះ **មិនអាច
+// ធ្វើឲ្យលើសពិដាន ១០ វិនាទីរបស់ Netlify** បានទេ។
 function cookieReadTimeoutMs(config, startedAt) {
-    const room = budgetLeftMs(config, startedAt) - COOKIE_BUDGET_RESERVE_MS - config.upstreamTimeoutMs;
-    if (room < COOKIE_READ_MIN_TIMEOUT_MS) return 0;
-    return Math.min(COOKIE_STORE_TIMEOUT_MS, room);
+    const left = budgetLeftMs(config, startedAt);
+    const room = left - COOKIE_BUDGET_RESERVE_MS - config.upstreamTimeoutMs;
+    if (room >= COOKIE_READ_MIN_TIMEOUT_MS) return Math.min(COOKIE_STORE_TIMEOUT_MS, room);
+    // សតិមានតម្លៃ ➜ ការអានជាការធ្វើឲ្យស្រស់សុទ្ធសាធ ➜ រំលងពេលថវិកាតឹង
+    if (cookieState.value) return 0;
+    // សតិទទេ ➜ កក់បង្អួចអប្បបរមា តែ **មិនលើសអ្វីដែលថវិកានៅសល់ពិត**
+    const floor = Math.min(COOKIE_READ_MIN_TIMEOUT_MS, left - COOKIE_BUDGET_RESERVE_MS);
+    return floor > 0 ? floor : 0;
 }
 
 function cookieRenewTimeoutMs(config, startedAt) {
@@ -1320,6 +1337,19 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.obsolete.clear();
     cookieState.renewAttemptValue = '';
     cookieState.renewAttemptEtag = '';
+};
+
+// ⛔ ច្រកសម្រាប់អ្នកយាមតែប៉ុណ្ណោះ ៖ បង្អួចអានរបស់ Cookie store ជា **អនុគមន៍
+// សុទ្ធ** នៃ (config · elapsed · តើមាន Cookie ក្នុងសតិឬទេ) ➜ អ្នកយាមអាចវាស់
+// វា **ដោយកំណត់ជាក់លាក់** ជំនួសការប្រណាំងលើគែម ១ ms ក្នុង handler ពិត។
+exports.cookieReadWindowForTests = function cookieReadWindowForTests(config, startedAt, hasMemoryCookie) {
+    const saved = cookieState.value;
+    cookieState.value = hasMemoryCookie ? 'probe=1' : '';
+    try {
+        return cookieReadTimeoutMs(config, startedAt);
+    } finally {
+        cookieState.value = saved;
+    }
 };
 
 exports.setBlobsModuleForTests = function setBlobsModuleForTests(blobsModule) {

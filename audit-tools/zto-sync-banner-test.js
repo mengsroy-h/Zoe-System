@@ -928,6 +928,18 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
                 return (res && res.length && res[0] && res[0].text) || '';
             } catch (e) { return ''; }
         });
+        // ⛔ ចន្លោះដែល mutation បង្ហាញ (2026-09-10) ៖ ការដក **quiet zone**
+        // ចេញទាំងស្រុង **រស់រាន** ការអានវិញដោយ ZXing — ព្រោះ ZXing ធូរ ហើយ
+        // canvas របស់តេស្តមានទំហំត្រូវនឹងរូបបេះបិទ។ ⛔ តែម៉ាស៊ីនស្កេនដៃពិត
+        // (ZTO Palm) ត្រូវការចន្លោះស ១០ module ក្នុងមួយចំហៀងតាមស្តង់ដារ ➜
+        // ការវាស់ត្រូវជា **រចនាសម្ព័ន្ធ** មិនមែនតាមការអានវិញ។
+        const quiet = await page.evaluate(() => {
+            const d = code128Bars("77130534020575");
+            const last = d.bars[d.bars.length - 1];
+            return { firstX: d.bars[0][0], lastEnd: last[0] + last[1], width: d.width };
+        });
+        ok("⛔ quiet zone ខាងឆ្វេង >= ១០ module", quiet.firstX >= 10, quiet);
+        ok("⛔ quiet zone ខាងស្តាំ >= ១០ module", quiet.width - quiet.lastEnd >= 10, quiet);
         ok('⛔ probe ទិសផ្ទុយ ៖ រូបដែលបំភ្លៃ មិនត្រូវអានចេញជាលេខដដែល',
             poisoned !== '77130534020575', poisoned);
 
@@ -1180,23 +1192,17 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         renderZtoSyncModalList(items, []);
         renderZtoSyncModalList(items, []);
         const survived = list.firstElementChild === first && list.firstElementChild.getAttribute("data-probe") === "1";
-        list.scrollTop = 40;
-        const scrolledTo = list.scrollTop;
-        // ការប្តូរពិត ➜ ត្រូវសាងឡើងវិញ តែរក្សាទីតាំងរមូរ
+        // ការប្តូរពិត ➜ ត្រូវសាងឡើងវិញ
         setZtoPickupVerdict(items[0].barcodes[0].code, true);
         renderZtoSyncModalList(items, []);
         const rebuilt = list.firstElementChild !== first;
         const rowsNow = list.querySelectorAll(".zto-sync-item").length;
-        const scrollKept = list.scrollTop;
         closeZtoSyncModal();
-        return { survived: survived, rebuilt: rebuilt, rowsNow: rowsNow, scrolledTo: scrolledTo, scrollKept: scrollKept };
+        return { survived: survived, rebuilt: rebuilt, rowsNow: rowsNow };
     });
     ok("⛔ ទិន្នន័យដដែល ➜ បញ្ជីមិនសាងឡើងវិញ (node ដដែលនៅរស់)", rebuild.survived === true, rebuild);
     ok("ទិសផ្ទុយ ៖ សាលក្រមប្តូរ ➜ បញ្ជីត្រូវសាងឡើងវិញពិត",
         rebuild.rebuilt === true && rebuild.rowsNow === 11, rebuild);
-    ok("លក្ខខណ្ឌចាំបាច់ ៖ បញ្ជីរមូរបានពិត", rebuild.scrolledTo > 0, rebuild);
-    ok("⛔ ការសាងឡើងវិញត្រូវរក្សាទីតាំងរមូរ (បញ្ជីមិនលោតទៅកំពូល)",
-        rebuild.scrollKept > 0, rebuild);
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

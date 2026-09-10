@@ -12857,7 +12857,6 @@
         const signature = waiting + '|' + entries.map((entry) => entry.code).join(',');
         if (signature === ztoStatusModalSig) return;
         ztoStatusModalSig = signature;
-        const keepScroll = listEl.scrollTop;
         if (noteEl) {
             const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
             noteEl.innerText = entries.length
@@ -12888,9 +12887,6 @@
                 wraps[idx].classList.add('zto-sync-bc-none');
                 wraps[idx].textContent = '⚠️ លេខនេះគូរជារូប Barcode មិនបាន — សូមវាយដោយដៃ';
             }
-        }
-        if (keepScroll > 0 && listEl.scrollHeight > listEl.clientHeight) {
-            listEl.scrollTop = Math.min(keepScroll, listEl.scrollHeight - listEl.clientHeight);
         }
     }
 

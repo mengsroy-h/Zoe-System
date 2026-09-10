@@ -171,5 +171,102 @@ if (prompt === null) {
         'រកមិនឃើញ: ' + missing.join(' · '));
 }
 
+// ============================================================================
+// ផ្នែក ៥ — «README ចាស់ គឺជាឯកសារខុស» (ច្បាប់ ៩)
+// ============================================================================
+//
+// 🔴 ហេតុអ្វីវាមាន (2026-09-10) ៖ ច្បាប់ ៩ ចែងថា README ត្រូវពិនិត្យ **រាល់ជុំ**
+// ហើយ «**README ចាស់ គឺជាឯកសារខុស**» — តែផ្នែក ១–៣ ខាងលើវាស់ត្រឹម *រចនាសម្ព័ន្ធ*
+// (ផ្នែក ៥ តាមលំដាប់) និង *លំនាំហាម*។ គ្មាននរណាវាស់ **លេខកំណែ** ដែល README
+// អះអាងទេ ➜ វាចាស់ស្ងាត់ៗ ៖
+//
+//   README.md      រាយ ZoeW `2.31.12`  ខណៈ App ship `2.31.14`  (ចាស់ ២ ជុំ)
+//   ZoeW/README.md រាយ      `2.31.13`  ខណៈ App ship `2.31.14`
+//
+// ⛔ **អ្នកប្រើចាប់បាន មិនមែនឧបករណ៍ទេ** — ជាលើកទី ២ ក្នុងជុំដដែល (មើលផ្នែក ៤)។
+// នេះជាភស្តុតាងនៃបច្ចេកទេស «បោសសំអាតតាមផ្ទៃ» ៖ ក្រោយបិទថ្នាក់មួយ
+// (`AUDIT-PROMPT.md` ចាស់) ត្រូវសួរ «**ឯកសារណាទៀតផ្ទុកកំណែដែលអាចចាស់?**»។
+//
+// ⛔ អ្វីដែលចាក់សោគឺ **ការអះអាងអំពីកំណែ *បច្ចុប្បន្ន*** ប៉ុណ្ណោះ — ការយោង
+// ប្រវត្តិ («ដាច់ពីគ្នាតាំងពី 2.19.4») មិនត្រូវប៉ះទេ។ តម្លៃដែលប្រៀបធៀបត្រូវ
+// **ដេរីវេពី `APP_VERSION` ពិត** មិនមែន literal ២ ខាងឯករាជ្យ។
+
+const APPS = { ZoeW: 'ZoeW/app.js', ZoeKeyGen: 'ZoeKeyGen/app.js' };
+const shippedVersion = {};
+for (const app of Object.keys(APPS)) {
+    const f = path.join(ROOT, APPS[app]);
+    if (!fs.existsSync(f)) continue;
+    const m = fs.readFileSync(f, 'utf8').match(/APP_VERSION\s*=\s*'([0-9]+\.[0-9]+\.[0-9]+)'/);
+    if (m) shippedVersion[app] = m[1];
+}
+check(Object.keys(shippedVersion).length === 2,
+    'README ៖ អានបាន APP_VERSION ពិតរបស់ App ទាំង ២ (មូលដ្ឋាននៃការប្រៀបធៀប)',
+    'អានបាន ' + Object.keys(shippedVersion).join(', '));
+
+const versionClaims = [];   // { rel, app, claimed, line }
+function claimFrom(rel, re, app) {
+    const f = path.join(ROOT, rel);
+    if (!fs.existsSync(f)) return;
+    const lines = fs.readFileSync(f, 'utf8').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const m = re.exec(lines[i]);
+        if (m) { versionClaims.push({ rel, app, claimed: m[1], line: i + 1 }); return; }
+    }
+}
+// ជួរតារាងរបស់ root ៖ ជួរដែលភ្ជាប់ទៅ README របស់ App នោះ
+claimFrom('README.md', /\[ZoeW\]\(ZoeW\/README\.md\).*`([0-9]+\.[0-9]+\.[0-9]+)`/, 'ZoeW');
+claimFrom('README.md', /\[ZoeKeyGen\]\(ZoeKeyGen\/README\.md\).*`([0-9]+\.[0-9]+\.[0-9]+)`/, 'ZoeKeyGen');
+// ផ្នែក «កំណែ» របស់ README នីមួយៗ ៖ ការអះអាង «កំណែបច្ចុប្បន្ន»
+claimFrom('ZoeW/README.md', /កំណែបច្ចុប្បន្ន[^0-9]*`([0-9]+\.[0-9]+\.[0-9]+)`/, 'ZoeW');
+claimFrom('ZoeKeyGen/README.md', /កំណែបច្ចុប្បន្ន[^0-9]*`([0-9]+\.[0-9]+\.[0-9]+)`/, 'ZoeKeyGen');
+
+check(versionClaims.length >= 4,
+    'ជាន់អប្បបរមា ៖ រកឃើញការអះអាងកំណែបច្ចុប្បន្នយ៉ាងតិច ៤',
+    'រកឃើញ ' + versionClaims.length + ' ➜ ការស្កេនប្រហែលរអិលចេញពីគោលដៅ');
+
+const staleDocs = versionClaims.filter((c) => shippedVersion[c.app] && c.claimed !== shippedVersion[c.app]);
+check(staleDocs.length === 0,
+    '⛔ README ៖ កំណែដែលរាយ ត្រូវជាកំណែដែល App **ពិតជា ship** (ច្បាប់ ៩ ៖ README ចាស់ = ឯកសារខុស)',
+    staleDocs.map((c) => c.rel + ':' + c.line + '  រាយ `' + c.claimed
+        + '` ខណៈ ' + c.app + ' ship `' + shippedVersion[c.app] + '`').join('\n        '));
+
+// ⛔ ច្បាប់ដដែលគ្រប **តារាងក្បាលរបស់ `CLAUDE.md`** ដែរ — វាជាឯកសារដែល session
+// ថ្មីអានមុនគេ ➜ លេខចាស់ត្រង់នោះនាំច្រឡំរាល់ជុំ។ ⛔ ចន្លោះនេះ **វាស់រួច មិនមែន
+// សន្មត** (2026-09-10) ៖ តារាងនោះធ្លាប់ចាស់ **៤ commit** — កំណែ `2.31.4` និង
+// `2.31.5` ដើរដោយ `CLAUDE.md` រាយ `2.31.3`។ វាចាក់សោ **ទាំង** `APP_VERSION`
+// **ទាំង** `CACHE_VERSION` ព្រោះជួរនោះអះអាងទាំង ២។
+const cacheVersion = {};
+for (const app of Object.keys(APPS)) {
+    const f = path.join(ROOT, app + '/sw.js');
+    if (!fs.existsSync(f)) continue;
+    const m = fs.readFileSync(f, 'utf8').match(/CACHE_VERSION\s*=\s*'([^']+)'/);
+    if (m) cacheVersion[app] = m[1];
+}
+const claudeText = fs.existsSync(path.join(ROOT, 'CLAUDE.md'))
+    ? fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8') : '';
+const headRows = [];
+for (const app of Object.keys(APPS)) {
+    const re = new RegExp('^\\| \\*\\*' + app + '\\*\\* \\|.*?`([0-9]+\\.[0-9]+\\.[0-9]+)`\\s*\\(`([^`]+)`\\)', 'm');
+    const m = re.exec(claudeText);
+    if (m) headRows.push({ app, ver: m[1], cache: m[2] });
+}
+check(headRows.length === 2, 'ជាន់អប្បបរមា ៖ អានជួរតារាងក្បាលរបស់ CLAUDE.md បានទាំង ២',
+    'អានបាន ' + headRows.length);
+const claudeStale = headRows.filter((r) =>
+    (shippedVersion[r.app] && r.ver !== shippedVersion[r.app])
+    || (cacheVersion[r.app] && r.cache !== cacheVersion[r.app]));
+check(claudeStale.length === 0,
+    '⛔ CLAUDE.md ៖ តារាងក្បាលត្រូវរាយ `APP_VERSION` និង `CACHE_VERSION` ដែល App **ពិតជា ship**',
+    claudeStale.map((r) => r.app + ' ៖ តារាងរាយ `' + r.ver + '` (`' + r.cache
+        + '`) ខណៈកូដ ship `' + shippedVersion[r.app] + '` (`' + cacheVersion[r.app] + '`)').join('\n        '));
+
+// ⛔ ទិសផ្ទុយ ៖ ការយោង **ប្រវត្តិ** មិនត្រូវធ្វើឲ្យធ្លាក់ — បើច្បាប់នេះហាមរាល់
+// លេខកំណែក្នុង README នោះវាជាទោស មិនមែនការការពារ។
+const zwReadme = fs.existsSync(path.join(ROOT, 'ZoeW/README.md'))
+    ? fs.readFileSync(path.join(ROOT, 'ZoeW/README.md'), 'utf8') : '';
+check(/តាំងពី 2\.19\.4/.test(zwReadme) && staleDocs.length === 0,
+    '⛔ ទិសផ្ទុយ ៖ ការយោងកំណែ *ប្រវត្តិ* ក្នុង README ត្រូវឆ្លងកាត់',
+    'ការយោងប្រវត្តិបាត់ ឬត្រូវរាយខុសជាការធ្លាក់');
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

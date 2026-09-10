@@ -12977,13 +12977,13 @@
                 setZtoPickupVerdict(work[i].code, answer.closed);
                 if (typeof answer.closed === 'boolean') {
                     measured++;
-                    renderZtoSyncViews();
+                    renderZtoSyncViews(dataToScan, trashToScan);
                 }
             }
         } finally {
             ztoStatusInFlight = false;
         }
-        renderZtoSyncViews();
+        renderZtoSyncViews(dataToScan, trashToScan);
         if (recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) {
             scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS + 500);
         }

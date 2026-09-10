@@ -1060,6 +1060,102 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         && /biometricUnlockPin\(\)[\s\S]{0,900}completeAppUnlock\(/.test(APP_SRC),
         (APP_SRC.match(/completeAppUnlock\(/g) || []).length);
 
+    // ── ១៩. បញ្ជីត្រូវស្រស់ *ខណៈប្រអប់នៅបើក* ─────────────────────────────
+    // ⛔ ចន្លោះការគ្រប ៖ ការចុច «ពិនិត្យម្តងទៀត» កើតឡើង **ខណៈប្រអប់បើក** ➜
+    // (១) `isModalOpen` ជា `true` ➜ ច្រកទ្វារ `ztoStatusNetworkAllowed` ត្រូវ
+    // អនុញ្ញាតវា ព្រោះវាជា **ការចុចរបស់អ្នកប្រើ** (`force`); បើអត់ ➜ toast រាយ
+    // «សូមសាកម្ដងទៀត» ខណៈការសាកម្ដងទៀតធ្លាក់ដដែល = សារកុហក។ (២) ជួរដេកដែល
+    // ZTO បិទរួច ត្រូវ **ធ្លាក់ចេញភ្លាម** ដោយមិនបាច់បិទ-បើកប្រអប់ឡើងវិញ។
+    console.log("\n== ១៩. បញ្ជីស្រស់ខណៈប្រអប់នៅបើក ==");
+    await setup(ZTO_URL);
+    const liveRefresh = await page.evaluate(async () => {
+        const item = { id: "live1", phone: "011", barcodes: [
+            { code: "LIVE00000001", isClosed: true },
+            { code: "LIVE00000002", isClosed: true }
+        ] };
+        setZtoPickupVerdict("LIVE00000001", false);
+        setZtoPickupVerdict("LIVE00000002", false);
+        openZtoSyncModal([item]);
+        await new Promise((r) => setTimeout(r, 60));
+        const rowsBefore = document.querySelectorAll("#ztoSyncList .zto-sync-item").length;
+        const openBefore = document.getElementById("ztoSyncModal").style.display;
+        let calls = 0;
+        const real = window.fetchWithTimeout;
+        window.fetchWithTimeout = async (url) => {
+            calls++;
+            const closed = String(url).indexOf("LIVE00000001") !== -1;
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: closed } };
+        };
+        let measured = 0;
+        try { measured = await runZtoStatusSweep(true, [item], []); } finally { window.fetchWithTimeout = real; }
+        await new Promise((r) => setTimeout(r, 60));
+        const rowsAfter = Array.from(document.querySelectorAll("#ztoSyncList .zto-sync-item"))
+            .map((el) => { const c = el.querySelector(".zto-sync-code"); return c ? c.textContent.trim() : ""; });
+        const stillOpen = document.getElementById("ztoSyncModal").style.display;
+        closeZtoSyncModal();
+        return {
+            rowsBefore: rowsBefore, openBefore: openBefore, calls: calls,
+            measured: measured, rowsAfter: rowsAfter, stillOpen: stillOpen
+        };
+    });
+    ok("លក្ខខណ្ឌចាំបាច់ ៖ ប្រអប់បើកជាមួយជួរដេក ២", liveRefresh.openBefore === "flex" && liveRefresh.rowsBefore === 2, liveRefresh);
+    ok("⛔ ការចុចខណៈប្រអប់បើក ➜ សំណើត្រូវចេញពិត (`isModalOpen` មិនទប់ការចុច)",
+        liveRefresh.calls === 2 && liveRefresh.measured === 2, liveRefresh);
+    ok("⛔ Barcode ដែល ZTO បិទរួច ត្រូវធ្លាក់ចេញភ្លាម ដោយមិនបាច់បើកឡើងវិញ",
+        liveRefresh.rowsAfter.length === 1 && liveRefresh.rowsAfter[0] === "LIVE00000002", liveRefresh);
+    ok("⛔ ប្រអប់មិនត្រូវបិទដោយខ្លួនឯងអំឡុងការធ្វើឲ្យស្រស់", liveRefresh.stillOpen === "flex", liveRefresh);
+
+    // ── ២០. ប្រអប់ត្រូវសមគ្រប់ទំហំអេក្រង់ ─────────────────────────────────
+    // ⛔ សំណើអ្នកប្រើ ៖ «សាង modal អោយស្របតាមគ្រប់ទំហំអេក្រង»។ ការវាស់ត្រូវជា
+    // **ការហៀរពិត** មិនមែនការអានកូដ CSS ៖ រូប Barcode មាន `viewBox` ធំ
+    // (~១៣២ module) ➜ បើ CSS ណាមួយបាត់ វានឹងលាតប្រអប់ចេញក្រៅអេក្រង់។
+    console.log("\n== ២០. ប្រអប់សមគ្រប់ទំហំអេក្រង់ ==");
+    const WIDTHS = [320, 360, 412, 768, 1280];
+    const fitRows = [];
+    for (let w = 0; w < WIDTHS.length; w++) {
+        await page.setViewportSize({ width: WIDTHS[w], height: 760 });
+        const fit = await page.evaluate(async () => {
+            const codes = ["77130534020575", "AB-1234567890XY", "0123456789012345678901234"];
+            const item = { id: "fit1", phone: "0964310697", barcodes: codes.map((c) => ({ code: c, isClosed: true, locker: "A-01" })) };
+            codes.forEach((c) => setZtoPickupVerdict(c, false));
+            openZtoSyncModal([item]);
+            await new Promise((r) => setTimeout(r, 80));
+            const modal = document.getElementById("ztoSyncModal");
+            const box = modal.querySelector(".modal-content");
+            const list = document.getElementById("ztoSyncList");
+            const svgs = Array.from(list.querySelectorAll(".zto-sync-bc"));
+            const wraps = Array.from(list.querySelectorAll(".zto-sync-bc-wrap"));
+            const out = {
+                vw: window.innerWidth,
+                docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                boxOverflow: box.scrollWidth - box.clientWidth,
+                boxRight: Math.round(box.getBoundingClientRect().right),
+                boxLeft: Math.round(box.getBoundingClientRect().left),
+                listScrolls: list.scrollHeight > list.clientHeight + 1,
+                svgCount: svgs.length,
+                svgWide: svgs.filter((el, i) => el.getBoundingClientRect().width > wraps[i].getBoundingClientRect().width + 1).length,
+                svgTooThin: svgs.filter((el) => el.getBoundingClientRect().width < 120).length,
+                svgTall: svgs.filter((el) => el.getBoundingClientRect().height < 40).length
+            };
+            closeZtoSyncModal();
+            return out;
+        });
+        fitRows.push(Object.assign({ w: WIDTHS[w] }, fit));
+    }
+    await page.setViewportSize({ width: 412, height: 800 });
+    ok("លក្ខខណ្ឌចាំបាច់ ៖ រូប Barcode គូរពិតគ្រប់ទទឹង",
+        fitRows.every((r) => r.svgCount === 3), fitRows);
+    ok("⛔ ទំព័រមិនត្រូវរមូរផ្តេក លើទទឹងណាមួយ",
+        fitRows.every((r) => r.docOverflow <= 0), fitRows.filter((r) => r.docOverflow > 0));
+    ok("⛔ ប្រអប់មិនត្រូវហៀរខាងក្នុង (គ្មានការរមូរផ្តេក)",
+        fitRows.every((r) => r.boxOverflow <= 1), fitRows.filter((r) => r.boxOverflow > 1));
+    ok("⛔ ប្រអប់ត្រូវនៅក្នុងអេក្រង់ទាំងស្រុង",
+        fitRows.every((r) => r.boxLeft >= 0 && r.boxRight <= r.vw), fitRows.filter((r) => r.boxLeft < 0 || r.boxRight > r.vw));
+    ok("⛔ រូប Barcode មិនត្រូវលើសក្របរបស់វា",
+        fitRows.every((r) => r.svgWide === 0), fitRows.filter((r) => r.svgWide > 0));
+    ok("⛔ រូបត្រូវធំល្មមស្កេនបាន (ទទឹង >= 120px · កម្ពស់ >= 40px)",
+        fitRows.every((r) => r.svgTooThin === 0 && r.svgTall === 0), fitRows.filter((r) => r.svgTooThin || r.svgTall));
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

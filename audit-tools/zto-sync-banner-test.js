@@ -622,7 +622,9 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         Date.now = () => realNow.call(Date) + shift;
         await runZtoStatusSweep(false, items, []);
         const first = asked.length;
-        shift += 60000;
+        // ⛔ ត្រូវលើសជំហានទប់ **ច្បាស់លាស់** — ការឈរចំគែម (៦០០០០ ធៀប ៦០០០០)
+        // ធ្វើឲ្យបៃតងអាស្រ័យលើ `<` ធៀប `<=` ជំនួសលើឥរិយាបថពិត។
+        shift += 150000;
         await runZtoStatusSweep(false, items, []);
         Date.now = realNow;
         window.fetchWithTimeout = realFetch;
@@ -631,6 +633,82 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('លក្ខខណ្ឌចាំបាច់ ៖ upstream ធ្លាក់ ➜ ជុំទី ១ សួរពិត', upstreamDown.first > 0, upstreamDown);
     ok('⛔ upstream ធ្លាក់ ≠ «វាស់មិនបាន» ➜ ត្រូវសាកឡើងវិញ',
         upstreamDown.second > 0, upstreamDown);
+
+    // ⛔ **ការសាកឡើងវិញត្រូវមានព្រំដែន។** ជួរខាងលើទាមទារថា ZTO ដែលដាច់មួយភ្លែត
+    // មិនត្រូវបិទមុខងារពេញ TTL — តែបើគ្មានការទប់សោះ ការធ្លាក់ **យូរ** ក្លាយជា
+    // ១០ ការហៅរៀងរាល់ ២០ វិនាទី គ្មានទីបញ្ចប់ (៣០ ការហៅ/នាទី លើទិន្នន័យ
+    // ទូរស័ព្ទ)។ ⛔ ការទប់ត្រូវដើរលើ **ចង្វាក់សាកឡើងវិញ** មិនមែនលើការចងចាំ
+    // សាលក្រម ➜ គ្មានការធ្លាក់ណាចូល `ztoPickupStatus` ហើយជោគជ័យតែមួយ
+    // (ឬបណ្ដាញត្រឡប់មកវិញ) ត្រូវលុបការទប់ភ្លាម។
+    await setup(ZTO_URL);
+    const backoff = await page.evaluate(async () => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        let mode = 'down';
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            if (mode === 'down') return { res: { ok: false, status: 502 }, body: null };
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: true } };
+        };
+        let shift = 0;
+        Date.now = () => realNow.call(Date) + shift;
+        const itemA = { id: 'a', phone: '011', barcodes: [{ code: 'BARBACK001', isClosed: true }] };
+        const itemB = { id: 'b', phone: '012', barcodes: [{ code: 'BARBACK002', isClosed: true }] };
+        const step = async (advanceMs, item) => {
+            shift += advanceMs;
+            const before = asked.length;
+            await runZtoStatusSweep(false, [item], []);
+            return asked.length - before;
+        };
+        const out = {};
+        out.first = await step(10 * 60000, itemA);
+        out.tooSoon = await step(25000, itemA);
+        out.afterBackoff = await step(120000, itemA);
+        mode = 'up';
+        out.recovered = await step(5 * 60000, itemA);
+        out.afterReset = await step(25000, itemB);
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        return out;
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ upstream ធ្លាក់ ➜ ជុំទី ១ សួរពិត', backoff.first === 1, backoff);
+    ok('⛔ ការធ្លាក់ជាប់ៗ ➜ ជុំបន្ទាប់ត្រូវទប់ (មិនហៅរាល់ ២០ វិ.)',
+        backoff.tooSoon === 0, backoff);
+    ok('⛔ ការទប់មានព្រំដែន ➜ ផុតជំហានហើយត្រូវសាកឡើងវិញ',
+        backoff.afterBackoff === 1, backoff);
+    ok('ទិសផ្ទុយ ៖ ជោគជ័យ ➜ ការទប់ត្រូវលុប ➜ barcode ថ្មីសួរតាមចង្វាក់ធម្មតា',
+        backoff.recovered === 1 && backoff.afterReset === 1, backoff);
+
+    // ⛔ ការទប់ខ្លួនឯងបង្កើត **ការយឺត** ថ្មី ៖ ជំហានចុងក្រោយ (១០ នាទី) អាចនៅ
+    // ដំណើរការខណៈបណ្ដាញត្រឡប់មកវិញរួច ➜ របាធ្វើឲ្យស្រស់យឺតដល់ ១០ នាទី។
+    // `online` ត្រូវ **កាត់ម៉ោងដែលកំពុងរង់ចាំឲ្យខ្លី** — ⛔ តែវាត្រូវប៉ះ
+    // **តែម៉ោងដែលដាក់រួច** ប៉ុណ្ណោះ ➜ បណ្ដាញភ្លឹបភ្លែត មិនអាចបង្កើតជុំបោស
+    // បន្ថែមបានទេ (ចង្វាក់ ២០ វិ. ក្នុង `runZtoStatusSweep` នៅឈរដដែល)។
+    await setup(ZTO_URL);
+    const reconnect = await page.evaluate(async () => {
+        const out = { armedBefore: false, armedAfter: false, noTimerStaysNoTimer: false, present: false };
+        // ⛔ tree មុនកែគ្មាន helper នេះ ➜ **stub** ជំនួសការគាំង ដើម្បីឲ្យការ
+        // អះអាងធ្លាក់ដោយ **មានឈ្មោះ** មិនមែនលេប checker ទាំងមូល (មេរៀន 2.19.3)។
+        out.present = typeof resumeZtoStatusSweep === 'function';
+        const resume = out.present ? resumeZtoStatusSweep : function () {};
+        if (ztoStatusSweepTimer) { clearTimeout(ztoStatusSweepTimer); ztoStatusSweepTimer = null; }
+        resume();
+        out.noTimerStaysNoTimer = !ztoStatusSweepTimer;
+        scheduleZtoStatusSweep(10 * 60000);
+        out.armedBefore = !!ztoStatusSweepTimer;
+        const longId = ztoStatusSweepTimer;
+        resume();
+        out.armedAfter = !!ztoStatusSweepTimer && ztoStatusSweepTimer !== longId;
+        if (ztoStatusSweepTimer) { clearTimeout(ztoStatusSweepTimer); ztoStatusSweepTimer = null; }
+        return out;
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ការទប់វែងដាក់ម៉ោងពិត', reconnect.armedBefore === true, reconnect);
+    ok('⛔ `resumeZtoStatusSweep()` ត្រូវមានក្នុងកូដ ship', reconnect.present === true, reconnect);
+    ok('⛔ បណ្ដាញត្រឡប់មកវិញ ➜ ម៉ោងវែងត្រូវជំនួសដោយម៉ោងខ្លី',
+        reconnect.armedAfter === true, reconnect);
+    ok('⛔ គ្មានម៉ោងដាក់រួច ➜ `online` មិនបង្កើតជុំបោសបន្ថែម (បណ្ដាញភ្លឹបភ្លែត)',
+        reconnect.noTimerStaysNoTimer === true, reconnect);
 
     const MAXCAP = (() => {
         const m = /ZTO_STATUS_MAX\s*=\s*(\d+)/.exec(APP_SRC);
@@ -650,6 +728,57 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     }, MAXCAP);
     ok('⛔ ពេញពិដាន ➜ សាលក្រម «មិនទាន់បិទ» ត្រូវរស់ (កុំបោះមុន «បិទរួច»)',
         evicted.hidden === false, evicted);
+
+    // ⛔ **ទិសផ្ទុយនៃជួរខាងលើ** — ជួរខាងលើវាស់ថា សាលក្រម `false` **រស់** ពេល
+    // cache ពេញដោយ `true`។ តែថ្ងៃរវល់ (ឬ `ZTO_SIGNED_VALUES` កំណត់ខុស ➜
+    // **គ្រប់** កញ្ចប់អាន `false`) ធ្វើឲ្យ cache ពេញដោយ `false` វិញ ➜ ត្រង់នោះ
+    // សាលក្រម **ថ្មី** ដែលជា `true` ឬ «វាស់មិនបាន» ត្រូវតែ **ចូលបាន**។
+    // វាស់បាន (2026-09-10) ៖ អ្នកបោះជ្រើស «ធាតុទី ១ ដែលមិនមែន `false`» ➜
+    // ធាតុនោះគឺ **ធាតុដែលទើបចាក់ចូល** ព្រោះវាជាធាតុតែមួយដែលមិនមែន `false`
+    // ➜ សាលក្រមថ្មីត្រូវបោះភ្លាម ➜ barcode នោះក្លាយជា «មិនទាន់វាស់» រៀងរាល់
+    // ជុំ ➜ **១០ ការហៅក្នុង ១០ ជុំ** ជំនួស ១ (ថ្នាក់ដដែលនឹង 2.31.9)។
+    await setup(ZTO_URL);
+    const capNew = await page.evaluate(async (cap) => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: true } };
+        };
+        for (let i = 1; i <= cap; i++) {
+            setZtoPickupVerdict('BARSAT' + String(i).padStart(4, '0'), false);
+        }
+        const item = { id: 'x1', phone: '011', barcodes: [{ code: 'BARFRESH01', isClosed: true }] };
+        const realNow = Date.now;
+        let shift = 0;
+        Date.now = () => realNow.call(Date) + shift;
+        const perRound = [];
+        for (let round = 0; round < 4; round++) {
+            shift += 30 * 60000;
+            const before = asked.length;
+            await runZtoStatusSweep(false, [item], []);
+            perRound.push(asked.length - before);
+        }
+        // សាលក្រម «វាស់មិនបាន» (`null`) ត្រូវចងចាំដូចគ្នា
+        setZtoPickupVerdict('BARNULL001', null);
+        const item2 = { id: 'x2', phone: '012', barcodes: [{ code: 'BARNULL001', isClosed: true }] };
+        shift += 30 * 60000;
+        const beforeNull = asked.length;
+        await runZtoStatusSweep(false, [item2], []);
+        const nullCalls = asked.length - beforeNull;
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        return { perRound: perRound, total: asked.filter((u) => u.indexOf('BARFRESH01') !== -1).length,
+            nullCalls: nullCalls };
+    }, MAXCAP);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ cache ពេញដោយ `false` ➜ ជុំទី ១ សួរ barcode ថ្មីពិត',
+        capNew.perRound[0] === 1, capNew);
+    ok('⛔ cache ពេញដោយ `false` ➜ សាលក្រម `true` **ថ្មី** ត្រូវចងចាំ (មិនបោះខ្លួនឯង)',
+        capNew.perRound[1] === 0 && capNew.perRound[2] === 0 && capNew.perRound[3] === 0, capNew);
+    ok('⛔ គ្មានការហៅជាប់រហូត ៖ barcode ថ្មី ១ សួរតែ ១ ដងក្នុង ៤ ជុំ',
+        capNew.total === 1, capNew);
+    ok('⛔ សាលក្រម «វាស់មិនបាន» ថ្មី ក៏ត្រូវចងចាំពេល cache ពេញដែរ',
+        capNew.nullCalls === 0, capNew);
 
     console.log('\n== ១៤. លំដាប់ចៃដន្យ (fuzz) ==');
 

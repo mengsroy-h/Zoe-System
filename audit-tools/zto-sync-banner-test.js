@@ -872,7 +872,13 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
 
     if (engineReady && (await page.evaluate(() => typeof code128Bars)) === 'function') {
         const roundTrip = await page.evaluate(async () => {
-            const SAMPLES = ['77130534020575', '11600100131126', '0123456789', 'ZTO7788123456', 'AB-12'];
+        // ⛔ គំរូលេខ **សេស** ចាំបាច់ (2.31.10) ៖ Set C ដើរជា **គូ** ➜
+        // `code128Values()` ត្រូវធ្លាក់ទៅ Set B ពេលចំនួនខ្ទង់សេស។ បើគំរូ
+        // ទាំងអស់ជាលេខគូ នោះ mutation «ដក `raw.length % 2 === 0` ចេញ»
+        // **រស់រាន** (វាស់បាន ៖ 113 ok · 0 FAIL) ខណៈខ្ទង់ចុងក្រោយចូល Set C
+        // ជា `parseInt('7')` = 7 ➜ ចេញជាគូ `07` ➜ `1234567` អានចេញវិញជា
+        // **`12345607`** ➜ ⛔ **កញ្ចប់ខុសត្រូវបិទក្នុង ZTO**។
+        const SAMPLES = ['77130534020575', '11600100131126', '0123456789', '1234567', '7713053402057', 'ZTO7788123456', 'AB-12'];
             const out = [];
             for (let i = 0; i < SAMPLES.length; i++) {
                 const text = SAMPLES[i];

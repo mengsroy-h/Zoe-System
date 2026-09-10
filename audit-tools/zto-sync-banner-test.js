@@ -306,6 +306,104 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     });
     ok('⛔ ក្រៅបណ្ដាញ ➜ មិនហៅបណ្ដាញសោះ', offlineVerdict === 0, offlineVerdict);
 
+    console.log('\n== ៨. សាលក្រម «វាស់មិនបាន» ត្រូវចងចាំ — កុំហៅជាប់រហូត ==');
+
+    // ⛔ ថ្នាក់កំហុស ៖ ក្នុងស្ថានភាព «ដេកលក់» (env `ZTO_FIELD_SIGNED` មិនទាន់
+    // ដាក់) Function ត្រឡប់ `ztoClosed: null` ជានិច្ច ➜ `setZtoPickupVerdict`
+    // មិនដែលត្រូវហៅ ➜ barcode នៅ «មិនទាន់វាស់» ជារៀងរហូត ➜ រាល់ជុំសួរដដែល
+    // ➜ **ហៅ ZTO ១០ ដងរាល់ ២០ វិនាទី គ្មានទីបញ្ចប់**។ នេះផ្ទុយនឹងច្បាប់
+    // «គ្មានការហៅជាប់រហូត ៖ ១ ដងក្នុងមួយ barcode»។
+    await setup(ZTO_URL);
+    const dormant = await page.evaluate(async () => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: null } };
+        };
+        const barcodes = [];
+        for (let i = 1; i <= 12; i++) {
+            barcodes.push({ code: 'BARDORM' + String(i).padStart(3, '0'), isClosed: true });
+        }
+        const items = [{ id: 'x1', phone: '011', barcodes: barcodes }];
+        const perRound = [];
+        let shift = 60000;
+        Date.now = () => realNow.call(Date) + shift;
+        for (let round = 0; round < 4; round++) {
+            const before = asked.length;
+            await runZtoStatusSweep(false, items, []);
+            perRound.push(asked.length - before);
+            shift += 60000;
+            Date.now = () => realNow.call(Date) + shift;
+        }
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        const unique = {};
+        asked.forEach((u) => {
+            const m = /BARDORM\d+/.exec(u);
+            if (m) unique[m[0]] = (unique[m[0]] || 0) + 1;
+        });
+        let maxPerCode = 0;
+        Object.keys(unique).forEach((k) => { if (unique[k] > maxPerCode) maxPerCode = unique[k]; });
+        return { total: asked.length, perRound: perRound, maxPerCode: maxPerCode };
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ជុំទី ១ សួរ upstream ពិត', dormant.perRound[0] > 0, dormant);
+    ok('⛔ ចម្លើយ «វាស់មិនបាន» ត្រូវចងចាំ ➜ ជុំបោសត្រូវឈប់',
+        dormant.perRound[2] === 0 && dormant.perRound[3] === 0, dormant);
+    ok('⛔ គ្មានការហៅជាប់រហូត ៖ barcode ១ មិនត្រូវសួរលើស ១ ដង',
+        dormant.maxPerCode <= 1, dormant);
+    ok('⛔ ការហៅសរុប = ចំនួន barcode (មិនកើនតាមចំនួនជុំ)',
+        dormant.total === 12, dormant);
+
+    // ⛔ ថ្នាក់កំហុសទី ២ ៖ ការបោះចោលពេលពេញ (`ZTO_STATUS_MAX`) ដើរតាមលំដាប់
+    // ចាក់ចូល ➜ សាលក្រម `false` (អ្វីដែលរបាត្រូវការ!) ត្រូវបោះមុនសាលក្រម
+    // `true` ដែលគ្មានតម្លៃ ➜ ការដាស់តឿនរលត់ស្ងាត់ៗ លើសាខាដែលរវល់។
+    // ⛔ ទិសផ្ទុយ ៖ «upstream ធ្លាក់» ≠ «ZTO គ្មានវាលនេះ» — ការចងចាំការធ្លាក់
+    // បណ្ដាញជា «វាស់មិនបាន» នឹងបិទការពិនិត្យពេញ TTL ខណៈ ZTO ដាច់ត្រឹមមួយភ្លែត។
+    await setup(ZTO_URL);
+    const upstreamDown = await page.evaluate(async () => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            return { res: { ok: false, status: 502 }, body: null };
+        };
+        const items = [{ id: 'x1', phone: '011', barcodes: [{ code: 'BARDOWN001', isClosed: true }] }];
+        let shift = 60000;
+        Date.now = () => realNow.call(Date) + shift;
+        await runZtoStatusSweep(false, items, []);
+        const first = asked.length;
+        shift += 60000;
+        await runZtoStatusSweep(false, items, []);
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        return { first: first, second: asked.length - first };
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ upstream ធ្លាក់ ➜ ជុំទី ១ សួរពិត', upstreamDown.first > 0, upstreamDown);
+    ok('⛔ upstream ធ្លាក់ ≠ «វាស់មិនបាន» ➜ ត្រូវសាកឡើងវិញ',
+        upstreamDown.second > 0, upstreamDown);
+
+    const MAXCAP = (() => {
+        const m = /ZTO_STATUS_MAX\s*=\s*(\d+)/.exec(APP_SRC);
+        return m ? parseInt(m[1], 10) : 0;
+    })();
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ អាន `ZTO_STATUS_MAX` ចេញពីកូដពិត', MAXCAP > 0, MAXCAP);
+    await setup(ZTO_URL);
+    const evicted = await page.evaluate((cap) => {
+        setZtoPickupVerdict('BAROPEN001', false);
+        for (let i = 1; i <= cap + 20; i++) {
+            setZtoPickupVerdict('BARFILL' + String(i).padStart(4, '0'), true);
+        }
+        const item = { id: 'x1', phone: '011', barcodes: [{ code: 'BAROPEN001', isClosed: true }] };
+        renderZtoSyncBanner([item], []);
+        const el = document.getElementById('ztoSyncBanner');
+        return { hidden: el.classList.contains('hidden'), text: (el.textContent || '').trim() };
+    }, MAXCAP);
+    ok('⛔ ពេញពិដាន ➜ សាលក្រម «មិនទាន់បិទ» ត្រូវរស់ (កុំបោះមុន «បិទរួច»)',
+        evicted.hidden === false, evicted);
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

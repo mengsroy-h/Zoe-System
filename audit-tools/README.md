@@ -186,6 +186,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `clock-hygiene.js` | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `CLOCK_APP_DIR` |
 | `clock-basis-test.js` | ត្រាដែលវាស់ដោយ `elapsedSince()` ត្រូវបោះដោយ `Date.now()` (មូលដ្ឋានលាយគ្នា ➜ ពិដានល្បឿនរលាយ) | `CLOCKBASIS_APP_DIR` |
+| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal | `DOCSCOPE_APP_DIR` |
 | `monotonic-gate-test.js` | រយៈពេលកន្លងផុតឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `MONOGATE_APP_DIR` |
 | `khmer-timezone-test.js` | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `KHMERTZ_APP_DIR` |
 | `cleanup-clock-guard-test.js` | ការសម្អាតដែលបំផ្លាញ ត្រូវការនាឡិកា server **និងការភ្ជាប់រស់** | `CLEANUPCLOCK_APP_DIR` |

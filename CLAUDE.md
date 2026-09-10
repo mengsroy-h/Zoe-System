@@ -148,6 +148,9 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    README ដែលត្រូវពិនិត្យរាល់ជុំ ៖ root · `ZoeW/` · `ZoeKeyGen/` ·
    `audit-tools/` · `tools/zto-cookie-sync-windows/` · `firebase-backup/` ·
    `zto-import/` (និង `google-sheets-api/`)។ **README ចាស់ គឺជាឯកសារខុស។**
+   ⛔ **ច្បាប់នេះគ្របលើ [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) ដែរ**
+   (សំណើអ្នកប្រើ 2026-09-10)។ `doc-scope-test.js` ចាក់សោវា ៖ ផ្នែក ៥ តាមលំដាប់
+   បូកការហាមប្រវត្តិកំហុស · កំណត់ត្រាតាមកំណែ · ចំនួន assertion ជា literal។
 ១០. **Firebase rules មិន deploy ស្វ័យប្រវត្តិទេ** — Netlify បម្រើតែឯកសារ
    static។ រាល់ពេលបន្ថែម path ថ្មី ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយ
    **ប្រាប់អ្នកប្រើថាត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ**។
@@ -357,6 +360,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **វិសាលភាពនៃការឡើងកំណែ** | ⛔ កូដ **ខាង server** មិនត្រូវបង្ខំសំបក PWA ឲ្យឡើង | `version-bump-scope` |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
+| **វិសាលភាពឯកសារ** | ⛔ README និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** — គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal (ច្បាប់ ៩)។ ប្រវត្តិទៅ `docs/HISTORY.md` **តែមួយកន្លែង** | `doc-scope-test` |
 | **Base directory របស់ Netlify** | ⛔ **ប្រកាន់អក្សរតូចធំ** ៖ `ZoeW` · `ZoeKeyGen` (រស់ក្នុង UI) | 📝 |
 | **`zto-import` · Apps Script** | ការកែក្នុង repo មិនប្តូរ script ដែល deploy រួច ➜ `SCRIPT_VERSION` ត្រូវឡើងលើ **រាល់ចម្លើយ** ពីចំណុចចេញ **តែមួយ** | `google-sheets-cache-test` · `health-check-test` |
 
@@ -441,6 +445,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការបើកក្រៅបណ្តាញបង្ហាញប្រអប់ PIN/Config ជំនួសស្ថានភាព «ក្រៅបណ្ដាញ» | `sdk-offline-boot-test.js` |
 | នាឡិកាឧបករណ៍ឆៅក្នុងផ្លូវ retention/revenue (`Date.now()` **និង** `new Date()`) | `clock-hygiene.js` |
 | **ត្រាដែលបោះដោយនាឡិកាមួយ តែវាស់ដោយនាឡិកាមួយទៀត** ➜ `elapsedSince()` ត្រឡប់ `Infinity` ➜ ពិដានល្បឿន និងជណ្តើរ backoff **រលាយស្ងាត់ៗ** លើឧបករណ៍ដែលនាឡិកាឃ្លាតពី server | `clock-basis-test.js` |
+| **ឯកសារ «របៀបប្រើ» ដែលប្រែជាឯកសារប្រវត្តិ** ➜ ចំនួន assertion ចាក់ជា literal ចាស់ស្ងាត់ៗ · ប្រវត្តិកំហុសរាយ ២ កន្លែងផ្ទុយគ្នា | `doc-scope-test.js` |
 | **នាឡិកាថយក្រោយ ➜ ពិដានល្បឿនបិទជាអចិន្ត្រៃយ៍** ➜ App លែងភ្ជាប់ឡើងវិញ · lookup ងាប់ · `setTimeout` យក្ស | `monotonic-gate-test.js` |
 | សំណើ License កកកុញ ➜ សំណើចាំបាច់ជាប់គាំង (ផ្លូវបណ្តាញទី ៣) | `license-network-pressure-test.js` |
 | App ប្រាប់ម៉ូឌុល License ថានាឡិកា «sync រួច» មុន handshake ➜ **លុប License របស់អតិថិជន** | `license-clock-trust-test.js` |
@@ -1973,6 +1978,9 @@ bash audit-tools/emu/rules.sh
 
 ## ⏳ ZoeW `2.31.13` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 
+⛔ **merge ចូល `main` រួច (PR #203 · 2026-09-10)** ➜ Netlify deploy `zoew-v193`។
+នេះជាកំណែ **តែមួយ** ដែលនៅរង់ចាំការសាកលើឧបករណ៍ពិត។
+
 ⛔ **ប្រាប់មុន ៖ ក្នុងការប្រើប្រាស់ធម្មតា អ្នកនឹង *មិនឃើញអ្វីប្រែសោះ*។**
 ជុំនេះកែ **កំហុសពិត ២** ដែល **checker ១៦៤ ទាំងអស់មិនបានចាប់** —
 មិនប៉ះលុយ · មិនប៉ះស្ថិតិយក · មិនប៉ះច្បាប់សម្អាត · មិនប៉ះ Firebase។
@@ -1991,9 +1999,17 @@ bash audit-tools/emu/rules.sh
 | ZTO មកវិញ ➜ ចុចរបា «🔄 ពិនិត្យម្តងទៀត» | ដើរ **ភ្លាម** (ការចុចរបស់អ្នកប្រើរំលងការទប់) |
 | ចាកចេញ ➜ ចូលវិញ | របាចាប់ផ្តើមស្អាតដូចដើម |
 
-⛔ **សកម្មភាពដែលត្រូវធ្វើដោយដៃ ៖ គ្មានទេ** — គ្មាន Firebase rules ត្រូវ
-Publish · គ្មាន Netlify env ត្រូវកែ។ អ្នកប្រើត្រូវទាញ **ZoeW** ចុះឡើងវិញ
-១ ដង (`zoew-v193`) មុនសាក; **ZoeKeyGen មិនប្រែ** (`zoekeygen-v91`)។
+⛔ **សកម្មភាពដែលត្រូវធ្វើដោយដៃ** ៖
+
+១. **គ្មាន Firebase rules ត្រូវ Publish ទេ។**
+២. អ្នកប្រើត្រូវទាញ **ZoeW** ចុះឡើងវិញ ១ ដង (`zoew-v193`); **ZoeKeyGen មិនប្រែ**
+   (`zoekeygen-v91`)។
+៣. ✅ **Netlify env ៖ ធ្វើរួច និងផ្ទៀងផ្ទាត់រួច (2026-09-10)** —
+   `ZTO_UPSTREAM_TIMEOUT_MS` `7500` ➜ **`7000`** បូក Trigger deploy។
+   ភស្តុតាង ៖ `?diag=1` រាយ `"timing":{"upstreamTimeoutMs":7000,"budgetMs":9000}`។
+   ⛔ វាជា **គម្លាតបន្ថែម មិនមែនការជួសជុល** (កូដធានាបង្អួចអានរួចហើយ) ➜
+   បង្អួច ០ ➜ **៨០០ ms** ដោយមិនពឹងលើផ្លូវអប្បបរមា។ ច្បាប់មេ និងតារាងគម្លាត
+   ស្ថិតក្នុង [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) ផ្នែក ៥។
 
 ⛔ **កំណែជារបស់ App នីមួយៗ** — ZoeW នៅ `2.31.13` ចំណែក ZoeKeyGen នៅ `2.19.21`
 (ច្បាប់ ៦)។ ⛔ កុំដាក់ស្លាកជុំរបស់ ZoeW លើ ZoeKeyGen។
@@ -2036,11 +2052,21 @@ breadcrumb **មិនមែនកំហុសទេ**។ server ដាក់ស
 `ZTO_CONFIG_INVALID` (`configErrorResponse()`) ដែលជាផ្លូវតែមួយដែលសារខាង
 client ប្រើវា។
 
-⛔ **រំលឹកសម្រាប់ជុំក្រោយ** ៖ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` ត្រូវបានដាក់
-ក្នុង **Netlify env** (មិនមែនក្នុងកូដ) ដោយផ្អែកលើការវាស់ផលិតកម្មពិត ៖ ZTO
-ឆ្លើយ **២.១–៥.៣ វិនាទី** ធៀបនឹងលំនាំដើមចាស់ ៦ វិនាទី ➜ គម្លាតតូចពេក។
-បើជុំណាឃើញ `upstreamTimeoutMs: 7500` ក្នុង `?diag=1` នោះជាការកំណត់ដោយចេតនា
-**មិនមែនកំហុសទេ** — ហើយកូដនៅរក្សាលំនាំដើម `6000` ដដែល។
+⛔ **រំលឹកសម្រាប់ជុំក្រោយ** ៖ `ZTO_UPSTREAM_TIMEOUT_MS` ត្រូវបានដាក់ក្នុង
+**Netlify env** (មិនមែនក្នុងកូដ — កូដនៅរក្សាលំនាំដើម `6000` ដដែល) ដោយផ្អែក
+លើការវាស់ផលិតកម្មពិត ៖ ZTO ឆ្លើយ **២.១–៥.៣ វិនាទី** ធៀបនឹងលំនាំដើម ៦ វិនាទី
+➜ គម្លាតតូចពេក។ ដូច្នេះតម្លៃដែលមិនមែន `6000` ក្នុង `?diag=1` គឺជា **ការកំណត់
+ដោយចេតនា មិនមែនកំហុសទេ**។
+
+**ប្រវត្តិនៃតម្លៃនោះ** ៖
+
+| តម្លៃ | ពេលណា | ហេតុអ្វី |
+|---|---|---|
+| `7500` | រហូតដល់ 2026-09-10 | គម្លាតលើការឆ្លើយ ៥,៣ វិ. |
+| **`7000`** | **ចាប់ពី 2026-09-10 (2.31.13)** | ⛔ `7500` + budget `9000` ធ្វើឲ្យបង្អួចអាន Cookie លើ container **ត្រជាក់** ធ្លាក់ដល់ **០** (`9000 − 1200 − 7500 = 300` ➜ ០ ភ្លាមក្រោយ elapsed ១ ms)។ កំណែ 2.31.13 កែវាក្នុង **កូដ** រួចហើយ (បង្អួចអប្បបរមាធានាដោយរចនាសម្ព័ន្ធ) ➜ `7000` ជា **គម្លាតបន្ថែម មិនមែនការជួសជុល** ៖ វាធ្វើឲ្យបង្អួច = `9000 − 1200 − 7000` = **៨០០ ms** ដោយមិនពឹងលើផ្លូវអប្បបរមាសោះ។ ៧ វិនាទីនៅមានគម្លាតគ្រប់គ្រាន់លើការឆ្លើយ ៥,៣ វិ. |
+
+⛔ **កុំបង្កើន `ZTO_REQUEST_BUDGET_MS` ដល់ `10000`** ជំនួសវិញ — នោះស្មើពិដាន
+សម្លាប់ ១០ វិនាទីរបស់ Netlify គត់ ➜ Function អាចត្រូវសម្លាប់មុនវាឆ្លើយ។
 
 ✅ **Firebase rules របស់ Project Business ត្រូវបាន Publish រួចនៅ 2026-09-04**
 (node `pickedUpBarcodes` សម្រាប់ស្ថិតិយក — អ្នកប្រើបញ្ជាក់)។ ⛔ **រំលឹកសម្រាប់

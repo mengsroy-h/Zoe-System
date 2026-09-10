@@ -298,6 +298,29 @@ console.log('\n== ៧. ឯកសារត្រូវនឹងកូដ (ZTO-SET
     ok('⛔ វាល `?diag=1` ត្រូវមានទាំងក្នុងកូដ ទាំងក្នុងឯកសារ',
         missingKeys.length === 0, missingKeys);
 
+    // ⛔ ថ្នាក់កំហុសពិត (2.31.9) ៖ ឯកសារបង្ហាញឧទាហរណ៍ `data.signStatus`
+    // ខណៈ `orderCandidates()` **ស្រាយសំបកចេញរួចហើយ** ➜ ផ្លូវ field ត្រូវ
+    // រាបស្មើ ដូច `PHONE_PATHS`/`BARCODE_PATHS` ដទៃទាំងអស់។ ការដាក់ `data.`
+    // ដើរដោយចៃដន្យ (root ជា candidate ចុងក្រោយ) តែធ្លាក់ពេល ZTO ដាក់
+    // ទិន្នន័យក្រោម `result` ជំនួស។
+    const flatDefaults = /const PHONE_PATHS = \[([^\]]*)\]/.exec(FUNCTION_SRC);
+    ok('ជាន់អប្បបរមា ៖ រកបញ្ជីលំនាំដើមក្នុង Function ពិត', !!flatDefaults,
+        flatDefaults ? flatDefaults[1].slice(0, 40) : null);
+    ok('⛔ លំនាំដើមរបស់ Function រាបស្មើ (គ្មាន `data.` នាំមុខ)',
+        !!flatDefaults && flatDefaults[1].indexOf('data.') === -1,
+        flatDefaults ? flatDefaults[1].slice(0, 60) : null);
+
+    const sampleRows = doc.split('\n').filter((l) =>
+        l.indexOf('ZTO_FIELD_SIGNED') !== -1 && l.indexOf('|') !== -1);
+    ok('ជាន់អប្បបរមា ៖ ឯកសារមានជួរឧទាហរណ៍ `ZTO_FIELD_SIGNED`',
+        sampleRows.length >= 2, sampleRows.length);
+    const badSample = sampleRows.filter((l) => /`[A-Za-z_$]+\.[A-Za-z_$]/.test(l));
+    ok('⛔ ឧទាហរណ៍ក្នុងឯកសារត្រូវរាបស្មើដូចលំនាំដើម (គ្មាន `x.y`)',
+        badSample.length === 0, badSample.map((l) => l.slice(0, 70)));
+
+    ok('⛔ ឯកសារត្រូវពន្យល់ថា Function ស្រាយសំបកចេញ (`data`/`result`) ជាមុន',
+        /ស្រាយសំបកចេញរួចហើយ/.test(doc), true);
+
     ok('⛔ ឯកសារត្រូវប្រាប់ថាតម្លៃមិនលេចក្នុង `?diag=1`',
         /មិនបង្ហាញក្នុង `\?diag=1`|រាយត្រឹម \*\*ចំនួន\*\*/.test(doc), true);
 })();

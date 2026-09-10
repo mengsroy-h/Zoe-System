@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.11';
+    const APP_VERSION = '2.31.12';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -992,6 +992,8 @@
             retryFirebaseSdkNow();
             nudgeDatabaseConnection();
             retryFailedDbListenersNow();
+            ztoStatusFailStreak = 0;
+            resumeZtoStatusSweep();
             if (window.ZoeLicense && typeof ZoeLicense.syncServerTime === 'function') {
                 ZoeLicense.syncServerTime().catch(() => {});
             }
@@ -12727,6 +12729,7 @@
     const ZTO_STATUS_MAX = 300;
     const ZTO_STATUS_SWEEP_DELAY_MS = 1500;
     const ZTO_STATUS_SWEEP_GAP_MS = 20000;
+    const ZTO_STATUS_FAIL_BACKOFF_MS = [20000, 60000, 180000, 600000];
     const ZTO_STATUS_SWEEP_BATCH = 10;
     const ZTO_STATUS_BANNER_CODES = 3;
     const ztoPickupStatus = new Map();
@@ -12734,6 +12737,7 @@
     let ztoStatusSweepTimer = null;
     let ztoStatusInFlight = false;
     let ztoStatusLastSweepAt = 0;
+    let ztoStatusFailStreak = 0;
     let ztoStatusBannerSig = '';
     let ztoStatusModalSig = '';
 
@@ -12768,18 +12772,26 @@
         ztoPickupStatus.clear();
         ztoStatusBannerSig = '';
         ztoStatusModalSig = '';
+        ztoStatusFailStreak = 0;
         safeStoreRemove(appLocalStore, ZTO_STATUS_STORE_KEY);
         renderZtoSyncBanner();
     }
 
-    function evictOneZtoPickupVerdict() {
+    function evictOneZtoPickupVerdict(protectedKey) {
         let victim = null;
         ztoPickupStatus.forEach((entry, key) => {
-            if (victim !== null) return;
+            if (victim !== null || key === protectedKey) return;
             if (!entry || entry.closed !== false) victim = key;
         });
-        if (victim === null) victim = ztoPickupStatus.keys().next().value;
-        if (victim !== undefined) ztoPickupStatus.delete(victim);
+        if (victim === null) {
+            ztoPickupStatus.forEach((entry, key) => {
+                if (victim !== null || key === protectedKey) return;
+                victim = key;
+            });
+        }
+        if (victim === null) return false;
+        ztoPickupStatus.delete(victim);
+        return true;
     }
 
     function setZtoPickupVerdict(code, closed) {
@@ -12790,7 +12802,7 @@
         ztoPickupStatus.delete(key);
         ztoPickupStatus.set(key, { closed: closed, at: getServerNow() });
         while (ztoPickupStatus.size > ZTO_STATUS_MAX) {
-            evictOneZtoPickupVerdict();
+            if (!evictOneZtoPickupVerdict(key)) break;
         }
         saveZtoPickupStatus();
     }
@@ -13044,6 +13056,12 @@
         return autoLookupInFlight.size === 0;
     }
 
+    function ztoStatusSweepGapMs() {
+        const idx = Math.min(ztoStatusFailStreak, ZTO_STATUS_FAIL_BACKOFF_MS.length - 1);
+        const step = ZTO_STATUS_FAIL_BACKOFF_MS[idx];
+        return step > ZTO_STATUS_SWEEP_GAP_MS ? step : ZTO_STATUS_SWEEP_GAP_MS;
+    }
+
     function ztoStatusBlockIsTransient() {
         if (navigator.onLine === false) return false;
         if (linkIsFrugal()) return false;
@@ -13051,10 +13069,17 @@
         return true;
     }
 
+    function resumeZtoStatusSweep() {
+        if (!ztoStatusSweepTimer) return;
+        clearTimeout(ztoStatusSweepTimer);
+        ztoStatusSweepTimer = null;
+        scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_DELAY_MS);
+    }
+
     function scheduleZtoStatusSweep(delayMs) {
         if (ztoStatusSweepTimer || ztoStatusInFlight) return;
         if (!delayMs && ztoStatusLastSweepAt
-            && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return;
+            && elapsedSince(ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return;
         if (!ztoStatusFeatureConfig()) return;
         ztoStatusSweepTimer = setTimeout(() => {
             ztoStatusSweepTimer = null;
@@ -13079,10 +13104,10 @@
         if (ztoStatusSecretIsLocked(cfg)) return 0;
         if (ztoStatusInFlight) return 0;
         if (!ztoStatusNetworkAllowed(force)) {
-            if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
+            if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ztoStatusSweepGapMs());
             return 0;
         }
-        if (!force && elapsedSince(ztoStatusLastSweepAt) < ZTO_STATUS_SWEEP_GAP_MS) return 0;
+        if (!force && elapsedSince(ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return 0;
         loadZtoPickupStatusOnce();
         ztoStatusLastSweepAt = getServerNow();
         const work = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
@@ -13097,10 +13122,12 @@
         ztoStatusInFlight = true;
         let measured = 0;
         let recorded = 0;
+        let attempted = 0;
         try {
             for (let i = 0; i < work.length; i++) {
                 if (!ztoStatusNetworkAllowed(force)) break;
                 let answer = null;
+                attempted++;
                 try {
                     answer = await checkZtoStatusForBarcode(cfg, work[i].code);
                 } catch (e) {
@@ -13117,9 +13144,11 @@
         } finally {
             ztoStatusInFlight = false;
         }
+        if (recorded > 0) ztoStatusFailStreak = 0;
+        else if (attempted > 0) ztoStatusFailStreak++;
         renderZtoSyncViews(dataToScan, trashToScan);
         if (recorded > 0 && work.length === ZTO_STATUS_SWEEP_BATCH) {
-            scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS + 500);
+            scheduleZtoStatusSweep(ztoStatusSweepGapMs() + 500);
         }
         return measured;
     }

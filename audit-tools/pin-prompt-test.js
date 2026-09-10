@@ -134,6 +134,29 @@ callSites.forEach((c) => {
     }
 });
 
+// ⛔ ចន្លោះដែលវាស់បាន (2.31.10) ៖ សារពិពណ៌នា **អ្វីដែលនឹងកើតក្រោយវាយ PIN**
+// ➜ ឈ្មោះសារតែមួយដែលចែករំលែកដោយ **សកម្មភាពគោលដៅ ២ ផ្សេងគ្នា** មានន័យថា
+// យ៉ាងហោចណាស់ម្ខាងអានសារខុស។ វាស់បាន ៖ `lookupApi` ធ្លាប់បម្រើគោលដៅ ៣
+// (បើកប្រអប់កំណត់ API · ដោះសោការស្កេន · ពិនិត្យស្ថានភាព ZTO) ➜ ការស្កេន
+// បង្ហាញ toast «ដោះសោការស្វែងរក» រួចប្រអប់រាយ «ដើម្បី**កំណត់** API» —
+// អ្នកប្រើដែលមិនចង់កំណត់អ្វី បោះបង់ចោល ➜ មុខងារស្លាប់ដោយសារកុហក។
+const keyTargets = new Map();
+callSites.forEach((c) => {
+    const lit = /^'([^']+)'$/.exec(c.args[1] || '');
+    if (!lit) return;
+    const target = String(c.args[0] || '').trim() || 'null';
+    const normalized = (target === 'null' || target === 'undefined') ? 'openConfigModal' : target;
+    if (!keyTargets.has(lit[1])) keyTargets.set(lit[1], new Set());
+    keyTargets.get(lit[1]).add(normalized);
+});
+const sharedKeys = Array.from(keyTargets.entries())
+    .filter(([, targets]) => targets.size > 1)
+    .map(([key, targets]) => key + ' ➜ ' + Array.from(targets).join(' | '));
+ok('⛔ ឈ្មោះសារនីមួយៗបម្រើ **សកម្មភាពគោលដៅតែមួយ** (សារត្រូវនិយាយការពិត)',
+    sharedKeys.length === 0, sharedKeys);
+ok('លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់សកម្មភាពគោលដៅចេញពីកន្លែងហៅបានពិត',
+    keyTargets.size >= 6 && Array.from(keyTargets.values()).every((t) => t.size >= 1), keyTargets.size);
+
 const drawerKeys = htmlCalls.map((c) => (/^'([^']+)'$/.exec(c.args[1] || '') || [])[1]);
 ok('ប៊ូតុងក្នុងរបា Slide នីមួយៗប្រើឈ្មោះរបស់ខ្លួន (គ្មានពីរចែករំលែក)',
     drawerKeys.every(Boolean) && new Set(drawerKeys).size === drawerKeys.length, drawerKeys);

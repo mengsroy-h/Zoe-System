@@ -1256,6 +1256,14 @@
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ API ស្វែងរកអតិថិជន',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ API ស្វែងរកអតិថិជន លើកក្រោយ'
         },
+        lookupUnlock: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីដោះសោការស្វែងរកអតិថិជន',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ដោះសោការស្វែងរកអតិថិជន លើកក្រោយ'
+        },
+        ztoStatus: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO លើកក្រោយ'
+        },
         locker: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ទូ Locker',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ទូ Locker លើកក្រោយ'
@@ -4182,7 +4190,7 @@
                     lookupLockedNoticeShown = true;
                     showToast("🔒 សូមវាយ PIN ម្តង ដើម្បីដោះសោការស្វែងរកអតិថិជន");
                 }
-                if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupApi');
+                if (!isPinFlowPending()) requestPinBeforeConfig(retryPendingLookupAfterUnlock, 'lookupUnlock');
             });
         }
 
@@ -13002,7 +13010,7 @@
         if (!cfg) return;
         if (ztoStatusSecretIsLocked(cfg)) {
             showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីពិនិត្យស្ថានភាពនៅ ZTO');
-            if (!isPinFlowPending()) requestPinBeforeConfig(recheckZtoPickupStatus, 'lookupApi');
+            if (!isPinFlowPending()) requestPinBeforeConfig(recheckZtoPickupStatus, 'ztoStatus');
             return;
         }
         if (navigator.onLine === false) {

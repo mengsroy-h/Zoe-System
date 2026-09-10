@@ -257,6 +257,51 @@ async function diagBody(env) {
     });
     global.fetch = SAVED_FETCH;
 
-    console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
+    
+// ⛔ ច្បាប់គម្រោង ៖ «លំនាំដើម និងលេខក្នុងឯកសារ ត្រូវអានចេញពីកូដពិត» —
+// ចន្លោះនេះកើតឡើងពិតម្តងរួចហើយ (2026-09-03, `zto-negative-cache-test`)។
+// ត្រង់នេះយើងទាមទារថា `ZTO-SETUP-KH.md` ពិពណ៌នា env ថ្មីទាំង ២ ត្រឹមត្រូវ ៖
+// មូលហេតុទាំង ៤ · ពិដានចំនួន · និងវាល `?diag=1` ត្រូវអានចេញពី Function ពិត។
+console.log('\n== ៧. ឯកសារត្រូវនឹងកូដ (ZTO-SETUP-KH.md) ==');
+(function () {
+    const DOC_PATH = path.join(ROOT, 'ZoeW', 'ZTO-SETUP-KH.md');
+    let doc = '';
+    try { doc = fs.readFileSync(DOC_PATH, 'utf8'); } catch (_) { doc = ''; }
+    const khmerToLatin = (s) => s.replace(/[\u17E0-\u17E9]/g,
+        (c) => String(c.charCodeAt(0) - 0x17E0));
+    const docNum = khmerToLatin(doc);
+    ok('ជាន់អប្បបរមា ៖ អាន ZTO-SETUP-KH.md បាន', doc.length > 2000, doc.length);
+    ok('⛔ ឯកសារពន្យល់ការបើកមុខងារ (មិនត្រឹមជួរតារាង env)',
+        doc.indexOf('ZTO_FIELD_SIGNED') !== -1
+        && doc.indexOf('ZTO_SIGNED_VALUES') !== -1
+        && /Network|DevTools|F12/.test(doc), doc.indexOf('F12'));
+
+    const reasons = (FUNCTION_SRC.match(/'(paths|values):(missing|invalid)'/g) || [])
+        .map((s) => s.replace(/'/g, ''));
+    ok('ជាន់អប្បបរមា ៖ រកមូលហេតុក្នុង Function ពិត', reasons.length >= 4, reasons);
+    const missingReasons = reasons.filter((r) => doc.indexOf(r) === -1);
+    ok('⛔ រាល់មូលហេតុ `signedReason` ត្រូវមានក្នុងឯកសារ',
+        missingReasons.length === 0, missingReasons);
+
+    const capMatch = /SIGNED_VALUE_MAX\s*=\s*(\d+)/.exec(FUNCTION_SRC);
+    ok('ជាន់អប្បបរមា ៖ រកពិដានចំនួនតម្លៃក្នុងកូដពិត', !!capMatch,
+        capMatch ? capMatch[1] : null);
+    if (capMatch) {
+        const capPhrase = 'ច្រើនជាង ' + capMatch[1];
+        ok('⛔ ពិដានចំនួនតម្លៃក្នុងឯកសារ ត្រូវស្មើកូដ (' + capMatch[1] + ')',
+            docNum.indexOf(capPhrase) !== -1, capPhrase);
+    }
+
+    const diagKeys = ['signedReason', 'signedValues'];
+    const missingKeys = diagKeys.filter((k) =>
+        FUNCTION_SRC.indexOf(k) === -1 || doc.indexOf(k) === -1);
+    ok('⛔ វាល `?diag=1` ត្រូវមានទាំងក្នុងកូដ ទាំងក្នុងឯកសារ',
+        missingKeys.length === 0, missingKeys);
+
+    ok('⛔ ឯកសារត្រូវប្រាប់ថាតម្លៃមិនលេចក្នុង `?diag=1`',
+        /មិនបង្ហាញក្នុង `\?diag=1`|រាយត្រឹម \*\*ចំនួន\*\*/.test(doc), true);
+})();
+
+console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     process.exit(fail ? 1 : 0);
 })();

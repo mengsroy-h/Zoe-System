@@ -185,8 +185,8 @@ bash audit-tools/emu/rules.sh
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
 | `clock-hygiene.js` | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `CLOCK_APP_DIR` |
-| `clock-basis-test.js` | ត្រាដែលវាស់ដោយ `elapsedSince()` ត្រូវបោះដោយ `Date.now()` (មូលដ្ឋានលាយគ្នា ➜ ពិដានល្បឿនរលាយ) | `CLOCKBASIS_APP_DIR` |
-| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal | `DOCSCOPE_APP_DIR` |
+| `clock-basis-test.js` | ត្រាដែលវាស់ដោយ `elapsedSince()` ត្រូវបោះដោយ `Date.now()` (មូលដ្ឋានលាយគ្នា ➜ ពិដានល្បឿនរលាយ) — ទាំងត្រាដែលជា **អថេរ** និងត្រាដែលជា **property** (`{P: …}` · `x.P = …`) បូកអាគុយម៉ង់ដែលមិនមែន Identifier; ⛔ ឈ្មោះ property តែមួយមិនត្រូវផ្ទុក **មូលដ្ឋាន ២** | `CLOCKBASIS_APP_DIR` |
+| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal។ **ផ្នែក ៤** ៖ `docs/AUDIT-PROMPT.md` មិនចាស់ស្ងាត់ៗ — ក្បាលតារាងត្រូវនិយាយកំណែដែលដេរីវេពី `APP_VERSION` ពិត ហើយឈ្មោះ checker ដែលវាយោងត្រូវមានពិត | `DOCSCOPE_APP_DIR` |
 | `monotonic-gate-test.js` | រយៈពេលកន្លងផុតឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `MONOGATE_APP_DIR` |
 | `khmer-timezone-test.js` | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `KHMERTZ_APP_DIR` |
 | `cleanup-clock-guard-test.js` | ការសម្អាតដែលបំផ្លាញ ត្រូវការនាឡិកា server **និងការភ្ជាប់រស់** | `CLEANUPCLOCK_APP_DIR` |
@@ -240,7 +240,7 @@ bash audit-tools/emu/rules.sh
 | `zto-cookie-session-test.js` | ការបន្ត Cookie ឆ្លង TTL · ទប់ write ចាស់ជាន់ Sync ថ្មី · សាលក្រម auth តាម Cookie | `ZTO_SESSION_APP_DIR` |
 | `zto-cookie-capture-test.js` | រង់ចាំ Order Detail response ពិត · Cookie ក្រោយ renewal · បែងចែក fingerprint និងសុពលភាព | `ZTO_CAPTURE_APP_DIR` |
 | `zto-signed-status-test.js` | ⛔ សាលក្រម «បិទរួចនៅ ZTO» មាន **៣** (`true`/`false`/`null`) · ការកំណត់ខុសបិទតែមុខងារនេះ **មិនសម្លាប់ Lookup** · cache ដាច់តាមការកំណត់ · តម្លៃមិនលេចក្នុង `?diag=1` | `ZTOSIGNED_APP_DIR` · **ឯកសារត្រូវនឹងកូដ** (មូលហេតុ `signedReason` · ពិដានចំនួន · វាល `?diag=1` ក្នុង `ZTO-SETUP-KH.md`) |
-| `zto-sync-banner-test.js` | ⛔ របា «ZTO មិនទាន់បិទ» ៖ «មិនទាន់វាស់» មិនក្លាយជា «មិនទាន់បិទ» · មុខងារដេកលក់ពេលគ្មានការកំណត់ · Barcode បើកវិញ ➜ របាបាត់ · XSS · ការចាកចេញលុបទាំង DOM ទាំង storage | `ZTOBANNER_APP_DIR` · **ការហៅជាប់រហូតពេលដេកលក់** · ការបោះចោលតាមតម្លៃ (`false` រស់ចុងក្រោយ **និងសាលក្រមថ្មីមិនបោះខ្លួនឯង**) · **ការទប់ពេល upstream ធ្លាក់ជាប់ៗ និងការកាត់ឲ្យខ្លីពេលបណ្ដាញត្រឡប់មកវិញ** · ច្រកទ្វារ 2G/ប្រអប់ (ចេតនាអ្នកប្រើឈ្នះ) · ការទប់វែងមិនភ្ញាក់រហូត · ស្នាមភ្ជាប់ឈ្មោះវាល ២ ឯកសារ · ទទឹងលើទូរស័ព្ទ ៣៦០px · អ្នកយាមលុយស្កេនម៉ូឌុលពិត · **fuzz លំដាប់ចៃដន្យ** |
+| `zto-sync-banner-test.js` | ⛔ របា «ZTO មិនទាន់បិទ» ៖ «មិនទាន់វាស់» មិនក្លាយជា «មិនទាន់បិទ» · មុខងារដេកលក់ពេលគ្មានការកំណត់ · Barcode បើកវិញ ➜ របាបាត់ · XSS · ការចាកចេញលុបទាំង DOM ទាំង storage | `ZTOBANNER_APP_DIR` · **ការហៅជាប់រហូតពេលដេកលក់** · ការបោះចោលតាមតម្លៃ (`false` រស់ចុងក្រោយ **និងសាលក្រមថ្មីមិនបោះខ្លួនឯង**) · **ការទប់ពេល upstream ធ្លាក់ជាប់ៗ និងការកាត់ឲ្យខ្លីពេលបណ្ដាញត្រឡប់មកវិញ** · ច្រកទ្វារ 2G/ប្រអប់ (ចេតនាអ្នកប្រើឈ្នះ) · ការទប់វែងមិនភ្ញាក់រហូត · ស្នាមភ្ជាប់ឈ្មោះវាល ២ ឯកសារ · ទទឹងលើទូរស័ព្ទ ៣៦០px · អ្នកយាមលុយស្កេនម៉ូឌុលពិត · **fuzz លំដាប់ចៃដន្យ** · **ព្រំដែន TTL និងមូលដ្ឋាននាឡិកានៃផ្លូវធុងសំរាម** (រូបរាងឆៅ · នាឡិកាឃ្លាត ៣ ទិស · ត្រា `at` ឈរលើនាឡិកាឧបករណ៍) |
 
 ⛔ ក្រុមតេស្តរបស់ `zto-proxy-test.js` រត់ **តាមលំដាប់** ព្រោះពួកវាចែក
 `process.env` និង `global.fetch` — ការរត់ស្របគ្នាបង្កើត **ការធ្លាក់ក្លែងក្លាយ**។

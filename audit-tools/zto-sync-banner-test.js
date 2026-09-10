@@ -959,6 +959,107 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         ok('⛔ វាស់រូប Barcode មិនបាន — code128Bars ឬ engine មិនមាន', false, engineReady);
     }
 
+    // ── ១៧. សោ PIN ➜ ជុំបោសមិនត្រូវបាញ់សំណើដែលធ្លាក់ជានិច្ច ────────────
+    // ⛔ សោសម្ងាត់របស់ ZTO (`headerValueEnc`) ស្រាយបានតែក្រោយអ្នកប្រើវាយ PIN។
+    // មុននោះ `buildLookupRequestHeaders()` ត្រឡប់ header **ទទេ** ➜ Function
+    // ឆ្លើយ 401 ជានិច្ច ➜ ជុំបោសបាញ់ ១០ សំណើរាល់ ២០ វិ. ដែល **មិនអាចជោគជ័យ
+    // បានទេ**។ ផ្លូវស្កេនធម្មតាមានច្រកទ្វារនេះរួចហើយ (`attemptAutoLookup`)
+    // ➜ ជុំបោសត្រូវមានដូចគ្នា។ ⛔ ហើយការចុចរបស់អ្នកប្រើត្រូវប្រាប់ **មូលហេតុ
+    // ពិត** — «សូមសាកម្ដងទៀត» ជាសារកុហក ព្រោះការសាកម្ដងទៀតធ្លាក់ដដែល។
+    console.log('\n== ១៧. សោ PIN ➜ ជុំបោសមិនបាញ់សំណើឥតប្រយោជន៍ ==');
+    const lockedGate = await page.evaluate(async () => {
+        const item = { id: 'p1', phone: '011', barcodes: [{ code: 'LOCK00000001', isClosed: true }] };
+        const base = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
+        const run = async (cfg) => {
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify(cfg));
+            document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+            clearZtoPickupStatusStore();
+            let calls = 0;
+            const real = window.fetchWithTimeout;
+            window.fetchWithTimeout = async () => {
+                calls++;
+                return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
+            };
+            let measured = 0;
+            try { measured = await runZtoStatusSweep(true, [item], []); } finally { window.fetchWithTimeout = real; }
+            return { calls: calls, measured: measured };
+        };
+        const locked = await run({
+            enabled: true, url: base,
+            headerName: 'X-Zoe-Proxy-Key',
+            headerValueEnc: { data: [1, 2, 3], iv: [4, 5, 6] }
+        });
+        const unlocked = await run({ enabled: true, url: base });
+        return { locked: locked, unlocked: unlocked };
+    });
+    ok('⛔ សោ PIN មិនទាន់ដោះ ➜ ជុំបោសបាញ់ **០** សំណើ',
+        lockedGate.locked.calls === 0 && lockedGate.locked.measured === 0, lockedGate.locked);
+    ok('ទិសផ្ទុយ ៖ គ្មានសោអ៊ិនគ្រីប ➜ ជុំបោសដើរធម្មតា',
+        lockedGate.unlocked.calls > 0 && lockedGate.unlocked.measured > 0, lockedGate.unlocked);
+
+    const lockedToast = await page.evaluate(async () => {
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({
+            enabled: true,
+            url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}',
+            headerName: 'X-Zoe-Proxy-Key',
+            headerValueEnc: { data: [1, 2, 3], iv: [4, 5, 6] }
+        }));
+        document.querySelectorAll('.toast-container').forEach((c) => { c.innerHTML = ''; });
+        let calls = 0;
+        const real = window.fetchWithTimeout;
+        window.fetchWithTimeout = async () => { calls++; return { res: { ok: true, status: 200 }, body: {} }; };
+        try { await recheckZtoPickupStatus(); } finally { window.fetchWithTimeout = real; }
+        await new Promise((r) => setTimeout(r, 60));
+        const box = document.querySelector('.toast-container');
+        const text = box ? box.textContent : '';
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        return { text: text, calls: calls };
+    });
+    ok('⛔ ការចុចខណៈសោជាប់ ➜ សារប្រាប់ថាត្រូវវាយ PIN',
+        lockedToast.text.indexOf('PIN') !== -1, lockedToast);
+    ok('⛔ សារមិនត្រូវនិយាយ «សូមសាកម្ដងទៀត» (ការសាកម្ដងទៀតធ្លាក់ដដែល)',
+        lockedToast.text.indexOf('សូមសាកម្ដងទៀត') === -1, lockedToast);
+    ok('⛔ ការចុចខណៈសោជាប់ ➜ មិនបាញ់សំណើសោះ', lockedToast.calls === 0, lockedToast);
+
+    // ── ១៨. ការដោះសោ App Lock ត្រូវដោះសោ ZTO Lookup ដែរ ─────────────────
+    // ⛔ ស្នាមភ្ជាប់ ៖ `completeAppUnlock(pin)` ជាផ្លូវ **តែមួយ** សម្រាប់ទាំង
+    // ការវាយ PIN និងជីវមាត្រ (ជីវមាត្រត្រឹមតែ *រុំ PIN ទុក* ➜ វាស្រាយ PIN
+    // ចេញ ផ្ទៀងផ្ទាត់នឹង `zoew_security_pin_hash` រួចហៅ function ដដែល)។
+    // បើថ្ងៃណាវាឈប់កំណត់ `lookupSecretKey` នោះអ្នកប្រើដែលដោះសោ App Lock
+    // រួច នឹងនៅតែឃើញ «🔒 សូមវាយ PIN» លើ ZTO Lookup ដោយគ្មានហេតុផល។
+    console.log('\n== ១៨. ដោះសោ App Lock ➜ ដោះសោ ZTO Lookup ដែរ ==');
+    const seamReady = await page.evaluate(() => ({
+        gate: typeof ztoStatusSecretIsLocked === 'function',
+        unlock: typeof completeAppUnlock === 'function'
+    }));
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ `ztoStatusSecretIsLocked` និង `completeAppUnlock` មានពិត',
+        seamReady.gate && seamReady.unlock, seamReady);
+    const unlockSeam = (seamReady.gate && seamReady.unlock) ? await page.evaluate(async () => {
+        const cfg = {
+            enabled: true,
+            url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}',
+            headerName: 'X-Zoe-Proxy-Key',
+            headerValueEnc: { data: [1, 2, 3], iv: [4, 5, 6] }
+        };
+        const before = ztoStatusSecretIsLocked(cfg);
+        let threw = '';
+        try { await completeAppUnlock('123456'); } catch (e) { threw = String(e && e.message); }
+        const after = ztoStatusSecretIsLocked(cfg);
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        return { before: before, after: after, threw: threw };
+    }) : { before: null, after: null, threw: 'មិនមាន function' };
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ មុនដោះសោ សោពិតជាជាប់', unlockSeam.before === true, unlockSeam);
+    ok('⛔ `completeAppUnlock()` ត្រូវដោះសោ ZTO Lookup ដែរ',
+        unlockSeam.after === false, unlockSeam);
+    ok('⛔ ការដោះសោមិនត្រូវបោះកំហុស', unlockSeam.threw === '', unlockSeam);
+
+    // ⛔ ជីវមាត្រមិនមែនផ្លូវទី ២ ៖ វាត្រូវហូរតាម `completeAppUnlock` ដដែល
+    // (បើវាមានផ្លូវផ្ទាល់ខ្លួន នោះការកែម្ខាងនឹងភ្លេចម្ខាង)។
+    ok('⛔ ផ្លូវជីវមាត្រហូរតាម `completeAppUnlock` ដដែល',
+        (APP_SRC.match(/completeAppUnlock\(/g) || []).length >= 3
+        && /biometricUnlockPin\(\)[\s\S]{0,900}completeAppUnlock\(/.test(APP_SRC),
+        (APP_SRC.match(/completeAppUnlock\(/g) || []).length);
+
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 
     await browser.close();

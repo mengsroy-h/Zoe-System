@@ -12899,6 +12899,10 @@
         closeModal('ztoSyncModal');
     }
 
+    function ztoStatusSecretIsLocked(cfg) {
+        return !!(cfg && lookupApiSendsHeader(cfg) && cfg.headerValueEnc && !lookupSecretKey);
+    }
+
     function ztoStatusNetworkAllowed(userAsked) {
         if (navigator.onLine === false) return false;
         if (!userAsked && linkIsFrugal()) return false;
@@ -12938,6 +12942,7 @@
     async function runZtoStatusSweep(force, dataToScan = scanHistory, trashToScan = deletedItems) {
         const cfg = ztoStatusFeatureConfig();
         if (!cfg) return 0;
+        if (ztoStatusSecretIsLocked(cfg)) return 0;
         if (ztoStatusInFlight) return 0;
         if (!ztoStatusNetworkAllowed(force)) {
             if (ztoStatusBlockIsTransient()) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_GAP_MS);
@@ -12986,7 +12991,13 @@
     }
 
     async function recheckZtoPickupStatus() {
-        if (!ztoStatusFeatureConfig()) return;
+        const cfg = ztoStatusFeatureConfig();
+        if (!cfg) return;
+        if (ztoStatusSecretIsLocked(cfg)) {
+            showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីពិនិត្យស្ថានភាពនៅ ZTO');
+            if (!isPinFlowPending()) requestPinBeforeConfig(recheckZtoPickupStatus, 'lookupApi');
+            return;
+        }
         if (navigator.onLine === false) {
             showToast('⚠️ ក្រៅបណ្ដាញ — មិនអាចពិនិត្យស្ថានភាពនៅ ZTO បានទេ');
             return;

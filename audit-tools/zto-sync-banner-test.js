@@ -308,6 +308,38 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     });
     ok('⛔ ក្រៅបណ្ដាញ ➜ មិនហៅបណ្ដាញសោះ', offlineVerdict === 0, offlineVerdict);
 
+    console.log('\n== ១២. របាត្រូវប្រាប់ថាការរាប់មិនទាន់ចប់ ==');
+
+    // ⛔ របារាយចំនួន **ដែលវាស់រួច** ប៉ុណ្ណោះ ៖ ជុំបោសដើរ ១០ ក្នុង ២០ វិ. ➜
+    // កញ្ចប់ ១០០ ត្រូវការ ~៣ នាទីទំរាំគ្រប់។ អំឡុងនោះ លេខតូចជាងការពិត ➜
+    // អ្នកប្រើអាចបិទ App ដោយគិតថាសល់ត្រឹមប៉ុណ្ណោះ។ ច្បាប់ដដែលនឹង
+    // «អេក្រង់ត្រូវប្រាប់ថាវាស់មិនបាន» ៖ ការរាប់ដែលមិនទាន់ចប់ ត្រូវនិយាយឲ្យដឹង។
+    await setup(ZTO_URL);
+    const partial = await page.evaluate(() => {
+        setZtoPickupVerdict('BARSEEN001', false);
+        const items = [{ id: 'x1', phone: '011', barcodes: [
+            { code: 'BARSEEN001', isClosed: true },
+            { code: 'BARWAIT001', isClosed: true },
+            { code: 'BARWAIT002', isClosed: true }
+        ] }];
+        renderZtoSyncBanner(items, []);
+        const el = document.getElementById('ztoSyncBanner');
+        const partialText = el.textContent || '';
+        setZtoPickupVerdict('BARWAIT001', true);
+        setZtoPickupVerdict('BARWAIT002', true);
+        renderZtoSyncBanner(items, []);
+        return { partialText: partialText, doneText: el.textContent || '' };
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ របាលេចពេលមានសាលក្រម «មិនទាន់បិទ»',
+        partial.partialText.indexOf('១') !== -1 || /\d/.test(partial.partialText), partial);
+    ok('⛔ នៅមានកញ្ចប់មិនទាន់វាស់ ➜ របាត្រូវប្រាប់',
+        partial.partialText.indexOf('កំពុងពិនិត្យបន្ត') !== -1, partial);
+    ok('⛔ ចំនួនដែលមិនទាន់វាស់ត្រូវត្រឹមត្រូវ (២)',
+        partial.partialText.indexOf('2') !== -1, partial);
+    ok('ទិសផ្ទុយ ៖ វាស់គ្រប់រួច ➜ គ្មានសារនោះទៀត',
+        partial.doneText.indexOf('កំពុងពិនិត្យបន្ត') === -1
+        && partial.doneText.trim() !== '', partial);
+
     console.log('\n== ១១. ការទប់រយៈពេលវែង មិនត្រូវភ្ញាក់រហូត ==');
 
     // ⛔ ច្បាប់គម្រោង ៖ «ការភ្ញាក់រាល់ ៣ វិនាទីខណៈក្រៅបណ្តាញ ជាការស៊ីថ្មសុទ្ធសាធ»។

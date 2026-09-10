@@ -12707,12 +12707,22 @@
         return out;
     }
 
+    function ztoStatusUnmeasuredCount(dataToScan = scanHistory, trashToScan = deletedItems) {
+        let n = 0;
+        collectClosedBarcodesForZtoStatus(dataToScan, trashToScan).forEach((entry) => {
+            if (!ztoPickupStatus.get(entry.key)) n++;
+        });
+        return n;
+    }
+
     function renderZtoSyncBanner(dataToScan = scanHistory, trashToScan = deletedItems) {
         const banner = document.getElementById('ztoSyncBanner');
         if (!banner) return;
         const pending = ztoStatusPendingCodes(dataToScan, trashToScan);
         const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
-        const signature = codes.length + '|' + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
+        const waiting = codes.length ? ztoStatusUnmeasuredCount(dataToScan, trashToScan) : 0;
+        const signature = codes.length + '|' + waiting + '|'
+            + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
         if (signature === ztoStatusBannerSig) return;
         ztoStatusBannerSig = signature;
         if (!codes.length) {
@@ -12722,7 +12732,9 @@
         }
         const more = codes.length > ZTO_STATUS_BANNER_CODES
             ? ' · និង ' + (codes.length - ZTO_STATUS_BANNER_CODES) + ' ទៀត' : '';
-        const detail = codes.slice(0, ZTO_STATUS_BANNER_CODES).join(' · ') + more + ' — ចុចដើម្បីពិនិត្យម្តងទៀត';
+        const waitingNote = waiting ? ' · កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត' : '';
+        const detail = codes.slice(0, ZTO_STATUS_BANNER_CODES).join(' · ') + more + waitingNote
+            + ' — ចុចដើម្បីពិនិត្យម្តងទៀត';
         const headline = codes.length + ' កញ្ចប់បិទក្នុង ZoeW តែ ZTO មិនទាន់បិទ';
         banner.innerHTML = '<span class="zto-sync-icon" aria-hidden="true">🔄</span>'
             + '<span class="zto-sync-copy"><strong>' + sanitizeInput(headline)

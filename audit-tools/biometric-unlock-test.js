@@ -151,6 +151,8 @@ function makeEnv(opts) {
     //    ផ្លូវជីវមាត្រក៏ត្រូវរក្សាសោដែរ មិនត្រឹមផ្លូវវាយ PIN។
     sandbox.__rememberedKeys = [];
     vm.runInContext('function rememberLookupSecretKey(k) { __rememberedKeys.push(!!k); return Promise.resolve(true); }', ctx);
+    sandbox.__ztoSweeps = [];
+    vm.runInContext('function scheduleZtoStatusSweep() { __ztoSweeps.push(1); }', ctx);
     [
         'safeStoreSet', 'safeStoreRemove', 'safeStoreGet',
         'bytesToB64', 'b64ToBytes', 'readBiometricRecord', 'writeBiometricRecord', 'clearBiometricRecord',

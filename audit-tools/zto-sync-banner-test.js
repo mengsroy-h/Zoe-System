@@ -62,6 +62,13 @@ ok('⛔ សាលក្រមរស់ក្នុង localStorage ពិត',
 // `runTransaction` · ការប៉ះ `isDeducted` ឬ node ចំណូលទេ។ ត្រង់នេះយើងស្រង់
 // **ម៉ូឌុលពិត** ចេញពី `app.js` រួចទាមទារថាគ្មាន token លុយ/Firebase ណាមួយ
 // នៅក្នុងវាសោះ។
+//
+// ⛔ **ការពិតប្រែនៅ 2026-09-11 (សំណើអ្នកប្រើ)** ៖ ម៉ូឌុលនេះឥឡូវ **សរសេរបាន**
+// — វាបិទកញ្ចប់ក្នុង ZoeW ពេល ZTO ឆ្លើយថាបិទរួច។ តែវាសរសេរតាម **ទ្វារតែមួយ**
+// គឺ `applyBarcodeCloseChange()` ដែលជាតួស្នូលដដែលនឹងការចុចដោយដៃ ➜ ជួរទី ១
+// និងទី ២ នៃតារាងសេណារីយ៉ូ ➜ **លុយមិនប៉ះ**។ ដូច្នេះបញ្ជី token នៅដដែល
+// (រួម `isDeducted` · ledger · ធុងសំរាម · `fb.` ដោយផ្ទាល់) ហើយបន្ថែម
+// ការអះអាងថាទ្វារនោះ **មានពិត** — បើថ្ងៃណាមានអ្នកសរសេរផ្លូវទី ២ វាធ្លាក់។
 function ztoStatusModuleSource(appSrc) {
     const from = appSrc.indexOf('const ZTO_STATUS_STORE_KEY');
     if (from === -1) return '';
@@ -84,6 +91,9 @@ const MONEY_TOKENS = ['fb.', 'runTransaction', 'isDeducted', 'dbRef', 'dbOp(',
     'deleteSingleItem', 'ledgerAppliedDelta', 'commitDailyRevenueDelta',
     'commitMonthlyRevenueDelta', 'armLateCommit', 'trashReason ='];
 const MONEY_HITS = MONEY_TOKENS.filter((t) => ZTO_MODULE.indexOf(t) !== -1);
+ok('⛔ ការសរសេរតែមួយរបស់ម៉ូឌុល ៖ តួស្នូលចែករំលែក (មិនមែនផ្លូវថ្មី)',
+    (ZTO_MODULE.match(/applyBarcodeCloseChange\(/g) || []).length === 1,
+    (ZTO_MODULE.match(/applyBarcodeCloseChange\(/g) || []).length);
 ok('⛔ ម៉ូឌុលមិនប៉ះលុយ · Firebase · ធុងសំរាម · ស្ថិតិយក (គ្មាន token ណាមួយ)',
     MONEY_HITS.length === 0, MONEY_HITS);
 
@@ -115,6 +125,14 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+    await page.addInitScript(`(function () {
+            var real = window.setInterval;
+            window.__ticks = [];
+            window.setInterval = function (fn, ms) {
+                window.__ticks.push({ fn: fn, ms: ms });
+                return real.apply(window, arguments);
+            };
+        })();`);
     await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
             var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
             setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
@@ -1580,6 +1598,145 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('⛔ ត្រា `at` ដែលសរសេរចូល store ឈរលើនាឡិកា **ឧបករណ៍** មិនមែន server',
         typeof trashGate.stampSkewMs === 'number' && trashGate.stampSkewMs < 60000,
         { stampSkewMs: trashGate.stampSkewMs, note: 'offset សាកល្បង = ២ ម៉ោង ➜ ត្រាឈរលើ server នឹងផ្តល់ ~7200000' });
+
+    console.log('\n== ១៤. ⛔ ទិសផ្ទុយ ៖ ZTO បិទរួច ➜ ZoeW ត្រូវបិទតាម (សំណើអ្នកប្រើ) ==');
+
+    // ⛔ **ថ្នាក់កំហុសដែលអ្នកយាមនេះទប់** ៖ ការបិទស្វ័យប្រវត្តិសរសេរចូល
+    // `zoew_scan_history_cod_dod` **ដោយគ្មានអ្នកប្រើនៅទីនោះ** ➜ ការបិទខុស
+    // មួយធ្វើឲ្យ (១) ស្ថិតិ «យករួច» ឡើងខុស និង (២) ច្បាប់ ២ ម៉ោងផ្លាស់កញ្ចប់
+    // ចូលធុងសំរាម ➜ អ្នកប្រើរកកញ្ចប់មិនឃើញ។ ដូច្នេះ ៖
+    // ១. ⛔ **តែសាលក្រម `true` ពិត** ទើបបិទ — `false` និង `null` (មិនទាន់
+    //    វាស់) **មិនបិទ** (ច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»)។
+    // ២. ⛔ កុងតាក់បិទ ➜ **មិនសួរ ZTO អំពីកញ្ចប់បើកសោះ** (សន្សំទិន្នន័យ)។
+    // ៣. ⛔ ការបិទឆ្លងកាត់ **តួស្នូលដដែល** នឹងការចុចដោយដៃ ហើយត្រូវ `silent`
+    //    និង **មិនបើកប្រអប់** (អ្នកប្រើកំពុងធ្វើការ)។
+    let autoClose = null;
+    try {
+        autoClose = await page.evaluate(async () => {
+        const base = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
+        const realFetch = window.fetchWithTimeout;
+        const realApply = window.applyBarcodeCloseChange;
+        const run = async (opts) => {
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base }));
+            localStorage.setItem('zoew_zto_autoclose_v1', opts.on ? '1' : '0');
+            document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+            clearZtoPickupStatusStore();
+            const item = { id: 'a1', phone: '011', barcodes: [
+                { code: 'OPEN00000001', isClosed: false },
+                { code: 'SHUT00000002', isClosed: true }
+            ] };
+            const asked = [];
+            const closed = [];
+            window.fetchWithTimeout = async (url) => {
+                asked.push(String(url).split('barcode=')[1] || '');
+                return { res: { ok: true, status: 200 }, body: { ztoClosed: opts.verdict } };
+            };
+            window.applyBarcodeCloseChange = async (id, code, want, o) => {
+                closed.push({ id: id, code: code, want: want, silent: !!(o && o.silent), modal: !!(o && o.showModal) });
+                return true;
+            };
+            try { await runZtoStatusSweep(true, [item], []); }
+            finally { window.fetchWithTimeout = realFetch; window.applyBarcodeCloseChange = realApply; }
+            return { asked: asked, closed: closed };
+        };
+        const onTrue = await run({ on: true, verdict: true });
+        const onFalse = await run({ on: true, verdict: false });
+        const onNull = await run({ on: true, verdict: 'មិនមែន boolean' });
+        const off = await run({ on: false, verdict: true });
+        const dflt = (function () {
+            localStorage.removeItem('zoew_zto_autoclose_v1');
+            return ztoAutoCloseEnabled();
+        })();
+        return { onTrue: onTrue, onFalse: onFalse, onNull: onNull, off: off, dflt: dflt };
+        });
+    } catch (e) { autoClose = null; }
+    if (!autoClose) {
+        autoClose = { onTrue: { asked: [], closed: [] }, onFalse: { closed: [] },
+            onNull: { closed: [] }, off: { asked: [], closed: [] }, dflt: false };
+        ok('⛔ មុខងារបិទតាម ZTO មិនទាន់មាន — វាស់មិនបាន', false, 'ztoAutoCloseEnabled/autoCloseBarcodeFromZto');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ កុងតាក់បើក ➜ សួរទាំង barcode បើក ទាំងបិទ',
+        autoClose.onTrue.asked.length === 2, autoClose.onTrue);
+    ok('⛔ ZTO ឆ្លើយ «បិទរួច» ➜ បិទ **តែ barcode ដែល ZoeW នៅបើក**',
+        autoClose.onTrue.closed.length === 1
+        && autoClose.onTrue.closed[0].code === 'OPEN00000001'
+        && autoClose.onTrue.closed[0].want === true, autoClose.onTrue.closed);
+    ok('⛔ ការបិទស្វ័យប្រវត្តិត្រូវស្ងាត់ និងមិនបើកប្រអប់',
+        autoClose.onTrue.closed[0] && autoClose.onTrue.closed[0].silent === true
+        && autoClose.onTrue.closed[0].modal === false, autoClose.onTrue.closed[0]);
+    ok('⛔ ZTO ឆ្លើយ «មិនទាន់បិទ» ➜ មិនបិទសោះ',
+        autoClose.onFalse.closed.length === 0, autoClose.onFalse);
+    ok('⛔ «មិនទាន់វាស់» (មិនមែន boolean) ➜ មិនបិទសោះ',
+        autoClose.onNull.closed.length === 0, autoClose.onNull);
+    ok('⛔ កុងតាក់បិទ ➜ មិនសួរ barcode បើក និងមិនបិទ',
+        autoClose.off.asked.length === 1 && autoClose.off.asked[0].indexOf('SHUT') === 0
+        && autoClose.off.closed.length === 0, autoClose.off);
+    ok('លំនាំដើម ៖ កុងតាក់បើក (សំណើអ្នកប្រើ)', autoClose.dflt === true, autoClose.dflt);
+
+    // ⛔ **ចង្វាក់សួរ** ៖ សាលក្រមរបស់កញ្ចប់ **បើក** មិនស្ថាពរទេ — អតិថិជនមក
+    // យកពេលណាក៏បាន ➜ ត្រូវសួរឡើងវិញរាល់ ១ ម៉ោង។ ⛔ តែមិនត្រូវសួរញឹកជាងនោះ
+    // (ការស៊ីទិន្នន័យ)។ ការវាស់ធ្វើដោយ **បោះត្រាចាស់** ចូល store ពិត។
+    let cadence = null;
+    try {
+        cadence = await page.evaluate(() => ({
+        none: ztoOpenRecheckIsDue(undefined),
+        fresh5m: ztoOpenRecheckIsDue({ closed: false, at: Date.now() - 5 * 60 * 1000 }),
+        just59m: ztoOpenRecheckIsDue({ closed: false, at: Date.now() - 59 * 60 * 1000 }),
+        past61m: ztoOpenRecheckIsDue({ closed: false, at: Date.now() - 61 * 60 * 1000 }),
+        future: ztoOpenRecheckIsDue({ closed: false, at: Date.now() + 60 * 60 * 1000 })
+        }));
+    } catch (e) { cadence = null; }
+    if (!cadence) {
+        cadence = { none: false, fresh5m: true, just59m: true, past61m: false, future: false };
+        ok('⛔ ច្បាប់ចង្វាក់សួរ (ztoOpenRecheckIsDue) មិនទាន់មាន — វាស់មិនបាន', false, 'ztoOpenRecheckIsDue');
+    }
+    ok('⛔ គ្មានសាលក្រម ➜ ត្រូវសួរ', cadence.none === true, cadence);
+    ok('⛔ សាលក្រមថ្មី (៥ នាទី) ➜ មិនសួរឡើងវិញ (សន្សំទិន្នន័យ)', cadence.fresh5m === false, cadence);
+    ok('⛔ ព្រំដែន ៖ ៥៩ នាទី ➜ មិនទាន់ដល់', cadence.just59m === false, cadence);
+    ok('⛔ សាលក្រមចាស់ជាង ១ ម៉ោង ➜ សួរឡើងវិញ', cadence.past61m === true, cadence);
+    ok('⛔ នាឡិកាលោតទៅមុខ ➜ fail-open (សួរ មិនមែនស្ងាត់រហូត)', cadence.future === true, cadence);
+
+    console.log('\n== ១៣. ⛔ ជុំបោសត្រូវមានអ្នកបើក *ដោយខ្លួនឯង* មិនមែនតែពេលតារាងគូរឡើងវិញ ==');
+
+    // ⛔ **ថ្នាក់កំហុស** ៖ `scheduleZtoStatusSweep()` ត្រូវបានហៅតែពី
+    // `renderHistory()` (បូក boot តែពេលសោស្តារបាន)។ ក្នុងហាងដែលស្ងប់ស្ងាត់
+    // — គ្មានការស្កេន គ្មានការប្រែទិន្នន័យ — **គ្មានជុំបោសសោះ** ➜ របា
+    // «មិនទាន់បិទ» ជូនចេញជូនអត់។ ⛔ `resumeZtoStatusSweep()` លើ `online`
+    // ក៏មិនជួយដែរ ៖ វា `return` ភ្លាមពេលគ្មានម៉ោងដាក់រួច។
+    // អ្នកយាមនេះវាស់ **ការហៅពិត** មិនមែនវត្តមានអក្សរ ៖ ជំនួស
+    // `scheduleZtoStatusSweep` ដោយឧបករណ៍រាប់ រួចកេះអ្នកបើកនីមួយៗ។
+    let drivers = null;
+    try {
+        drivers = await page.evaluate(() => {
+        const real = window.scheduleZtoStatusSweep;
+        let calls = 0;
+        window.scheduleZtoStatusSweep = function () { calls++; };
+        const ticks = (window.__ticks || []).filter((t) => t.ms === 60000);
+        const before = calls;
+        ticks.forEach((t) => { try { t.fn(); } catch (e) { /* db មិនទាន់ត្រៀម */ } });
+        const afterTick = calls;
+        calls = 0;
+        document.dispatchEvent(new Event('visibilitychange'));
+        const afterVisible = calls;
+        window.scheduleZtoStatusSweep = real;
+        return { ticks: ticks.length, before: before, afterTick: afterTick, afterVisible: afterVisible };
+        });
+    } catch (e) { drivers = null; }
+    if (!drivers) {
+        drivers = { ticks: 0, before: 0, afterTick: 0, afterVisible: 0 };
+        ok('⛔ វាស់អ្នកបើកជុំបោសមិនបាន', false, 'scheduleZtoStatusSweep');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ឃើញវដ្ត ៦០ វិនាទីពិត', drivers.ticks > 0, drivers);
+    ok('⛔ វដ្តតាមកាលកំណត់ត្រូវបើកជុំបោស (ហាងស្ងប់ស្ងាត់ ➜ របានៅតែស្រស់)',
+        drivers.afterTick > drivers.before, drivers);
+    ok('⛔ ការត្រឡប់មកមើល App វិញ ត្រូវបើកជុំបោស',
+        drivers.afterVisible > 0, drivers);
+
+    // ⛔ ការវាយ PIN ជាច្រកទ្វារនៃ `lookupSecretKey` ➜ មុននោះមុខងារ **ដេកលក់**
+    // (`ztoStatusSecretIsLocked`) ➜ ការដោះសោត្រូវបើកជុំបោសភ្លាម បើមិនដូច្នេះ
+    // អ្នកប្រើវាយ PIN រួច តែរបានៅស្ងាត់រហូតដល់មានការគូរតារាងបន្ទាប់។
+    ok('⛔ ការដោះសោ PIN ត្រូវបើកជុំបោស',
+        /completePinUnlock[\s\S]{0,900}?scheduleZtoStatusSweep\(\)/.test(APP_SRC), 'completePinUnlock');
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

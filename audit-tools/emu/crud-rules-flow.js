@@ -60,7 +60,8 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
     'claimAndCleanupItem', 'runAutomaticCleanupRules', 'deleteSingleItem', 'removeSingleBarcode',
-    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'toggleCloseStatus', 'executePermanentDelete'];
+    'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
+    'toggleCloseStatus', 'executePermanentDelete'];
 
 // ---- vm ដែលចាប់រាល់ការសរសេរ (មិនអនុវត្ត rules) ----
 function makeSandbox(store, now) {

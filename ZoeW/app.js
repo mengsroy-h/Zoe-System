@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.31.14';
+    const APP_VERSION = '2.32.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -32,6 +32,7 @@
         "drawerLoginFlow",
         "drawerLookupApiFlow",
         "drawerSheetImportFlow",
+        "drawerZtoAutoCloseFlow",
         "editSheetImportConfig",
         "executePermanentDelete",
         "executeRestoreItem",
@@ -1513,6 +1514,7 @@
         await rememberLookupSecretKey(lookupSecretKey);
         await migrateLookupSecretIfNeeded();
         closeModal('pinModal');
+        scheduleZtoStatusSweep();
         (pinTargetAction || openConfigModal)(pin);
     }
 
@@ -5993,11 +5995,15 @@
         setInterval(runPeriodicLicenseCheck, LICENSE_RECHECK_INTERVAL_MS);
 
         setInterval(sweepRecallHighlights, 60000);
-        setInterval(runScheduledCleanup, 60000);
+        setInterval(() => {
+            runScheduledCleanup();
+            scheduleZtoStatusSweep();
+        }, 60000);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) return;
             sweepRecallHighlights();
             runScheduledCleanup();
+            scheduleZtoStatusSweep();
             if (currentAppPage === 'entry') warmZtoLookupProxyNow();
         });
 
@@ -6874,6 +6880,7 @@
         if (!drawer || !backdrop) return;
         showAppChrome();
         hidePhoneSuggestions();
+        refreshZtoAutoCloseUi();
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         backdrop.classList.add('open');
@@ -10954,8 +10961,16 @@
         const actionText = targetB.isClosed ? "បើក" : "បិទ";
         const desiredClosed = !targetB.isClosed;
         if (!confirm(`តើអ្នកប្រាកដជាចង់${actionText}ស្ថានភាពកញ្ចប់អីវ៉ាន់ (${targetB.code}) នេះមែនទេ?`)) return;
+        return applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed, {});
+    }
+
+    async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed, options) {
+        const opts = options || {};
+        const silent = opts.silent === true;
+        const showModalAfterApply = opts.showModal !== false;
+        const actionText = desiredClosed ? "បិទ" : "បើក";
         if (!db || !fb || !/^[a-zA-Z0-9_-]+$/.test(itemId)) {
-            showToast(`⚠️ មិនទាន់ភ្ជាប់ Firebase ឬ ID មិនត្រឹមត្រូវ — ស្ថានភាព Barcode (${barcodeCode}) មិនត្រូវបានផ្លាស់ប្តូរ។`);
+            if (!silent) showToast(`⚠️ មិនទាន់ភ្ជាប់ Firebase ឬ ID មិនត្រឹមត្រូវ — ស្ថានភាព Barcode (${barcodeCode}) មិនត្រូវបានផ្លាស់ប្តូរ។`);
             return false;
         }
 
@@ -10991,7 +11006,7 @@
             const pickupKey = pickupBarcodeKey(barcodeCode);
             pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
 
-            openViewListModal(itemId);
+            if (showModalAfterApply) openViewListModal(itemId);
             refreshCurrentHistoryView();
         }
 
@@ -11026,7 +11041,7 @@
                 return false;
             }
             reconcilePickupDeltaWithServer();
-            showToast(late
+            if (!silent) showToast(late
                 ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
                 : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);
             return true;
@@ -12732,6 +12747,8 @@
     const ZTO_STATUS_FAIL_BACKOFF_MS = [20000, 60000, 180000, 600000];
     const ZTO_STATUS_SWEEP_BATCH = 10;
     const ZTO_STATUS_BANNER_CODES = 3;
+    const ZTO_AUTOCLOSE_KEY = 'zoew_zto_autoclose_v1';
+    const ZTO_OPEN_RECHECK_MS = 60 * 60 * 1000;
     const ztoPickupStatus = new Map();
     let ztoStatusLoaded = false;
     let ztoStatusSweepTimer = null;
@@ -12848,6 +12865,69 @@
         addFrom(dataToScan, false);
         addFrom(trashToScan, true);
         return out;
+    }
+
+    function ztoAutoCloseEnabled() {
+        return safeStoreGet(appLocalStore, ZTO_AUTOCLOSE_KEY) !== '0';
+    }
+
+    function refreshZtoAutoCloseUi() {
+        const on = ztoAutoCloseEnabled();
+        const state = document.getElementById('ztoAutoCloseState');
+        if (state) state.textContent = on ? 'បើក' : 'បិទ';
+        const btn = document.getElementById('ztoAutoCloseBtn');
+        if (btn) btn.classList.toggle('is-on', on);
+    }
+
+    function drawerZtoAutoCloseFlow() {
+        drawerAction(function () {
+            const next = !ztoAutoCloseEnabled();
+            safeStoreSet(appLocalStore, ZTO_AUTOCLOSE_KEY, next ? '1' : '0');
+            refreshZtoAutoCloseUi();
+            showToast(next
+                ? '✅ បើករួច ៖ កញ្ចប់ដែល ZTO បិទរួច នឹងបិទក្នុង ZoeW ដោយស្វ័យប្រវត្តិ'
+                : 'ℹ️ បិទរួច ៖ ត្រូវចុចបិទ «យក» ដោយដៃវិញ');
+            if (next) scheduleZtoStatusSweep(ZTO_STATUS_SWEEP_DELAY_MS);
+        });
+    }
+
+    function ztoOpenRecheckIsDue(entry) {
+        if (!entry) return true;
+        return elapsedSince(entry.at) > ZTO_OPEN_RECHECK_MS;
+    }
+
+    function collectOpenBarcodesForZtoStatus(dataToScan = scanHistory) {
+        const out = [];
+        const seen = new Set();
+        if (!Array.isArray(dataToScan)) return out;
+        for (let i = 0; i < dataToScan.length; i++) {
+            const item = dataToScan[i];
+            if (!item || !item.id) continue;
+            if (item.clearClaim || itemHasRestoreMarkers(item)) continue;
+            const codes = Array.isArray(item.barcodes) ? item.barcodes : null;
+            if (!codes) continue;
+            for (let j = 0; j < codes.length; j++) {
+                const b = codes[j];
+                if (!b || b.isClosed) continue;
+                const key = pickupBarcodeKey(b.code);
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+                out.push({ key: key, code: String(b.code || ''), itemId: String(item.id), open: true });
+            }
+        }
+        return out;
+    }
+
+    async function autoCloseBarcodeFromZto(entry, dataToScan) {
+        if (!entry || !ztoAutoCloseEnabled()) return false;
+        const list = Array.isArray(dataToScan) ? dataToScan : scanHistory;
+        const item = list.find((i) => i && i.id === entry.itemId);
+        if (!item || !Array.isArray(item.barcodes)) return false;
+        const b = item.barcodes.find((x) => x && x.code === entry.code);
+        if (!b || b.isClosed) return false;
+        const done = await applyBarcodeCloseChange(entry.itemId, entry.code, true,
+            { silent: true, showModal: false });
+        return done === true;
     }
 
     function ztoStatusPendingList(dataToScan = scanHistory, trashToScan = deletedItems) {
@@ -13112,17 +13192,22 @@
         if (!force && elapsedSince(ztoStatusLastSweepAt) < ztoStatusSweepGapMs()) return 0;
         loadZtoPickupStatusOnce();
         ztoStatusLastSweepAt = Date.now();
-        const work = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
+        const closedWork = collectClosedBarcodesForZtoStatus(dataToScan, trashToScan)
             .filter((entry) => {
                 const verdict = ztoPickupStatus.get(entry.key);
                 if (!verdict) return true;
                 if (verdict.closed === true) return false;
                 return force;
-            })
-            .slice(0, ZTO_STATUS_SWEEP_BATCH);
+            });
+        const openWork = ztoAutoCloseEnabled()
+            ? collectOpenBarcodesForZtoStatus(dataToScan)
+                .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)))
+            : [];
+        const work = closedWork.concat(openWork).slice(0, ZTO_STATUS_SWEEP_BATCH);
         if (!work.length) return 0;
         ztoStatusInFlight = true;
         let measured = 0;
+        let autoClosed = 0;
         let recorded = 0;
         let attempted = 0;
         try {
@@ -13140,11 +13225,17 @@
                 setZtoPickupVerdict(work[i].code, answer.closed);
                 if (typeof answer.closed === 'boolean') {
                     measured++;
+                    if (work[i].open && answer.closed === true) {
+                        if (await autoCloseBarcodeFromZto(work[i], dataToScan)) autoClosed++;
+                    }
                     renderZtoSyncViews(dataToScan, trashToScan);
                 }
             }
         } finally {
             ztoStatusInFlight = false;
+        }
+        if (autoClosed > 0) {
+            showToast('✅ ZTO បិទរួច ➜ បិទ ' + autoClosed + ' កញ្ចប់ក្នុង ZoeW ដោយស្វ័យប្រវត្តិ');
         }
         if (recorded > 0) ztoStatusFailStreak = 0;
         else if (attempted > 0) ztoStatusFailStreak++;

@@ -1831,8 +1831,16 @@ npm i acorn playwright-core xlsx
 bash audit-tools/run-all.sh
 ```
 
-⛔ **គ្មាន RTDB emulator ➜ checker ៣ (`emu/*`) នឹង `SKIP` — ហើយ `SKIP`
-មិនមែន `PASS` ទេ។** មុនអះអាងថា tree បៃតង ត្រូវរត់ដូច CI ៖
+⛔ **គ្មាន RTDB emulator ➜ checker ៤ (`emu/*`) ធ្លាក់ចុះ — ហើយ `SKIP`
+មិនមែន `PASS` ទេ។** វាស់បាន (2026-09-11) ៖ ការធ្លាក់ចុះមាន **២ រូបរាង** ➜
+`emu/restore-deadlock` និង `emu/ledger-revert` ចេញ **`SKIPPED`** ត្រង់ៗ
+ចំណែក `emu/crud-rules-flow` និង `emu/restore-mutation` ចេញ
+**`PARTIAL PASS (3; SKIP …)`** / **`(1; SKIP …)`**។ ⛔ រូបរាងទី ២ ជា
+គ្រោះថ្នាក់ជាង ព្រោះវា **ផ្ទុកពាក្យ `PASS`** ➜ ងាយអានរំលងជាបៃតង ខណៈ
+ការអះអាងស្នូលរបស់វា (rules ពិត) **មិនដែលរត់សោះ**។ ⛔ បន្ទាត់សង្ខេបរបស់
+`run-all.sh` រាយវាដាច់ដោយឡែក (`… ពេញលេញ, 2 មួយផ្នែក, រំលង 2`) ➜ **អាន
+លេខ «មួយផ្នែក» និង «រំលង» ជានិច្ច មិនត្រឹម ✅ ខាងដើម**។
+មុនអះអាងថា tree បៃតង ត្រូវរត់ដូច CI ៖
 
 ```bash
 npm i firebase-tools

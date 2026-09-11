@@ -16,8 +16,8 @@ const TOOL_DIR = __dirname;
 const PORTAL_URL = 'https://gate.ztoglobal.com/';
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
 const ARGUS_HOST = new URL(ARGUS_URL).hostname;
-const PORTAL_OPEN_TIMEOUT_MS = 20 * 1000;
-const PORTAL_OPEN_POLL_MS = 1000;
+const PORTAL_OPEN_TIMEOUT_MS = 45 * 1000;
+const PORTAL_SETTLE_MS = 10 * 1000;
 const API_HOST = 'aargus-api.ztoglobal.com';
 // ⛔ OPTIONS (preflight) និង HEAD មិនបញ្ជាក់ថា ZTO ទទួលយក session ទេ —
 // preflight មិនផ្ញើ Cookie សោះ។ មានតែ GET និង POST ដែល ZTO
@@ -886,60 +886,37 @@ function isArgusHost(hostname) {
     return host === ARGUS_HOST || host.endsWith('.' + ARGUS_HOST);
 }
 
-// ⛔ **ការចុចជំនួសអ្នកប្រើ ត្រូវ fail-open ទាំងស្រុង** ៖ រកតំណមិនឃើញ · ទំព័រ
-// ប្តូរ · evaluate បោះ ➜ ឧបករណ៍ត្រឡប់ទៅឥរិយាបថចាស់បេះបិទ (អ្នកប្រើចុចដោយដៃ)។
-// ⛔ វាដើរតាម **អត្តសញ្ញាណ host** មិនមែនតាម *លំដាប់កាត* ឬ *ពាក្យក្នុងចំណងជើង*
-// (ទំព័រ gate ប្តូរភាសាបាន ➜ ការផ្គូផ្គងតាមអក្សរធ្លាក់ស្ងាត់ៗ)។
-// ⛔ ច្រកទ្វារ ៣ មុនចុច ៖ ទំព័រនៅលើ gate · គ្មាន tab ណាឈរលើ Argus រួច
-// (អ្នកប្រើចុចមុន ➜ កុំបើកស្ទួន) · ការចាប់មិនទាន់ចប់។
+// ⛔ **វាស់បាន (2026-09-11, ការថតអេក្រង់របស់ម្ចាស់គម្រោង)** ៖ ការចុចកាតសាខា
+// បើក **tab ថ្មី** ត្រង់ `https://argus.ztoglobal.com/#/` ធម្មតា ➜ Argus
+// redirect ទៅ `#/index` ដោយ **ចូលរួចស្រាប់**។ ⛔ **គ្មាន token ក្នុង URL សោះ**
+// ➜ អ្វីដែលផ្តល់សិទ្ធិគឺ **ការផ្ទុកទំព័រ gate មុន** (វាធ្វើ SSO handshake)
+// មិនមែនតួកាតទេ ➜ ការស្កេន DOM រកតំណ **មិនចាំបាច់** (វាស់បានថាទំព័រនោះរាយ
+// **០ តំណ** ក្នុង frame មេ)។ ដូច្នេះ helper គ្រាន់តែបើក tab ថ្មីទៅ Argus។
+// ⛔ **fail-open ទាំងស្រុង** ៖ បើកមិនកើត ឬ Argus ឆ្លើយយឺត ➜ ឥរិយាបថត្រឡប់ទៅ
+// «អ្នកប្រើចុចកាតដោយដៃ» ដដែល។ ⛔ **ច្រកទ្វារ ៣ មុនបើក** ៖ ការចាប់មិនទាន់ចប់ ·
+// គ្មាន tab ណាឈរលើ Argus រួច (អ្នកប្រើចុចមុន ➜ កុំបើកស្ទួន) · ទំព័រ gate
+// មិនទាន់ស្ថិតស្ថេរ ➜ រង់ចាំក្នុងពិដាន (SSO handshake ត្រូវរត់មុន)។
 async function openArgusFromPortal(context, page, isDone, options) {
     const config = options || {};
-    const timeoutMs = Number.isFinite(config.timeoutMs)
-        ? Math.max(1, Math.min(PORTAL_OPEN_TIMEOUT_MS, config.timeoutMs)) : PORTAL_OPEN_TIMEOUT_MS;
-    const pollMs = Number.isFinite(config.pollMs)
-        ? Math.max(1, Math.min(PORTAL_OPEN_POLL_MS, config.pollMs)) : PORTAL_OPEN_POLL_MS;
-    const deadline = Date.now() + timeoutMs;
-    let links = 0;
-    while (!isDone() && Date.now() < deadline) {
-        let here = '';
-        try { here = new URL(page.url()).hostname.toLowerCase(); } catch (_) { return { opened: false, links, reason: 'page' }; }
-        if (isArgusHost(here)) return { opened: false, links, reason: 'already' };
-        for (const other of context.pages()) {
-            let host = '';
-            try { host = new URL(other.url()).hostname.toLowerCase(); } catch (_) { continue; }
-            if (isArgusHost(host)) return { opened: false, links, reason: 'already' };
-        }
-        let found = null;
-        try {
-            found = await page.evaluate((host) => {
-                const points = (value) => {
-                    try {
-                        const name = new URL(value, location.href).hostname.toLowerCase();
-                        return name === host || name.endsWith('.' + host);
-                    } catch (_) { return false; }
-                };
-                const links = Array.from(document.querySelectorAll('a[href]'));
-                const direct = links.filter((node) => points(node.href));
-                if (direct.length) { direct[0].click(); return { total: links.length, clicked: true, via: 'href' }; }
-                for (const node of Array.from(document.querySelectorAll('*'))) {
-                    for (const attr of Array.from(node.attributes || [])) {
-                        const value = String(attr.value || '');
-                        if (value.indexOf(host) !== -1 && points(value)) {
-                            node.click();
-                            return { total: links.length, clicked: true, via: 'attr' };
-                        }
-                    }
-                }
-                return { total: links.length, clicked: false, via: '' };
-            }, ARGUS_HOST);
-        } catch (_) { found = null; }
-        if (found) {
-            links = Number(found.total) || 0;
-            if (found.clicked) return { opened: true, links, reason: String(found.via || 'link') };
-        }
-        try { await page.waitForTimeout(pollMs); } catch (_) { return { opened: false, links, reason: 'page' }; }
+    const settleMs = Number.isFinite(config.settleMs)
+        ? Math.max(0, Math.min(PORTAL_SETTLE_MS, config.settleMs)) : PORTAL_SETTLE_MS;
+    const openMs = Number.isFinite(config.openMs)
+        ? Math.max(1, Math.min(PORTAL_OPEN_TIMEOUT_MS, config.openMs)) : PORTAL_OPEN_TIMEOUT_MS;
+    try { await page.waitForLoadState('networkidle', { timeout: settleMs }); } catch (_) {}
+    if (isDone()) return { opened: false, reason: 'done' };
+    for (const other of context.pages()) {
+        let host = '';
+        try { host = new URL(other.url()).hostname.toLowerCase(); } catch (_) { continue; }
+        if (isArgusHost(host)) return { opened: false, reason: 'already' };
     }
-    return { opened: false, links, reason: isDone() ? 'done' : 'no-link' };
+    let tab = null;
+    try {
+        tab = await context.newPage();
+        await tab.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: openMs });
+        return { opened: true, reason: 'tab' };
+    } catch (_) {
+        return tab ? { opened: true, reason: 'tab-slow' } : { opened: false, reason: 'failed' };
+    }
 }
 
 async function captureCookieHeader() {
@@ -955,7 +932,7 @@ async function captureCookieHeader() {
         const page = pages[0] || await context.newPage();
         console.log('The ZTO gate page is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
         console.log('   1. The gate usually keeps your session. Log in only if ZTO asks.');
-        console.log('   2. This tool opens Argus for you. If it does not, click the branch card.');
+        console.log('   2. This tool opens Argus in a new tab. If it does not, click the branch card.');
         console.log('   3. Stay on the page. This tool continues by itself as soon as ZTO');
         console.log('      answers one signed-in API call with success.');
         console.log('   4. If it keeps waiting, open Scan Management -> Arrival Scan and');
@@ -970,10 +947,9 @@ async function captureCookieHeader() {
         waiter.then(() => { captured = true; }, () => { captured = true; });
         try {
             const opened = await openArgusFromPortal(context, page, () => captured);
-            if (opened.opened) console.log('   Opened Argus for you. Waiting for a signed-in answer...');
-            else if (opened.reason === 'no-link') {
-                console.log('   Could not find the Argus link on the gate page (' + opened.links + ' link(s) seen).');
-                console.log('   Please click the branch card yourself. Everything else keeps working.');
+            if (opened.opened) console.log('   Opened Argus in a new tab. Waiting for a signed-in answer...');
+            else if (opened.reason === 'failed') {
+                console.log('   Could not open the Argus tab. Please click the branch card yourself.');
             }
         } catch (_) {
             console.log('   Could not open Argus automatically. Please click the branch card yourself.');

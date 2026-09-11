@@ -1542,8 +1542,14 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const ttl = arg.ttl, storeKey = arg.storeKey;
         if (typeof ztoStatusTrashItemCounts !== 'function') return { missing: true };
         const real = getServerNow;
+        // ⛔ **បង្កក** នាឡិកា ៖ `counts()` អាន `getServerNow()` ម្តងដើម្បីសាង
+        // ត្រា រួចកូដ ship អានវា **ម្តងទៀត** ➜ បើមិល្លីវិនាទីរអិលចន្លោះនោះ
+        // ព្រំដែន «អាយុ = TTL គត់» ក្លាយជា `TTL + 1` ➜ ការអះអាងធ្លាក់ **ដោយ
+        // សំណាង** មិនមែនដោយកំហុស។ checker ដែលបៃតង/ក្រហមដោយសំណាង ជា checker
+        // ដែលមិនអាចជឿបាន។
         const withOffset = (offsetMs, fn) => {
-            window.getServerNow = () => Date.now() + offsetMs;
+            const frozen = Date.now();
+            window.getServerNow = () => frozen + offsetMs;
             try { return fn(); } finally { window.getServerNow = real; }
         };
         const counts = (ageMs, offsetMs) => withOffset(offsetMs, () =>
@@ -1737,6 +1743,269 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     // អ្នកប្រើវាយ PIN រួច តែរបានៅស្ងាត់រហូតដល់មានការគូរតារាងបន្ទាប់។
     ok('⛔ ការដោះសោ PIN ត្រូវបើកជុំបោស',
         /completePinUnlock[\s\S]{0,900}?scheduleZtoStatusSweep\(\)/.test(APP_SRC), 'completePinUnlock');
+
+    console.log('\n== ១៤. ⛔ ជួរបោសមិនត្រូវជាប់លើក្បាលដដែល (ការអត់ឃ្លាន) ==');
+
+    // 🔴 **ថ្នាក់កំហុសពិត** (វាស់បាន 2026-09-11) ៖ `checkZtoStatusForBarcode()`
+    // ត្រឡប់ `null` ពេល `res.ok === false` ➜ `if (!answer) continue;` ➜
+    // **គ្មានសាលក្រមត្រូវសរសេរ** (ត្រឹមត្រូវ — ច្បាប់ «ការធ្លាក់ upstream
+    // មិនត្រូវចងចាំ»)។ តែជួរត្រូវជ្រើសដោយ `.slice(0, BATCH)` លើបញ្ជីដែល
+    // **តម្រៀបដដែលរាល់ជុំ** ➜ barcode ១០ ដែល ZTO បដិសេធជានិច្ច (លេខតេស្ត ·
+    // កញ្ចប់មិនមែន ZTO · លេខស្កេនខុស) **ឈរនៅក្បាលជួររហូត** ➜
+    //   • barcode ទី ១១ ឡើងទៅ **មិនដែលត្រូវវាស់** ➜ របាដាស់តឿន **រលត់ស្ងាត់ៗ**
+    //   • `openWork` ឈរ **ក្រោយ** `closedWork` ➜ **ការបិទស្វ័យប្រវត្តិមិនដែលរត់**
+    // វាស់បានមុនកែ ៖ ១២ barcode បដិសេធ + ២ បើក ➜ ៥ ជុំ × ១០ ការហៅ =
+    // **៥០ ការហៅទៅ barcode ១០ ដដែល** · barcode បើកត្រូវសួរ **០** ដង។
+    let starve = null;
+    try {
+        starve = await page.evaluate(async () => {
+        const base = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base }));
+        localStorage.setItem('zoew_zto_autoclose_v1', '1');
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        clearZtoPickupStatusStore();
+        const bcs = [];
+        for (let i = 0; i < 12; i++) bcs.push({ code: 'BAD' + String(100000 + i), isClosed: true });
+        bcs.push({ code: 'OPEN00000001', isClosed: false });
+        bcs.push({ code: 'OPEN00000002', isClosed: false });
+        const item = { id: 'a1', phone: '011', barcodes: bcs };
+        const asked = [];
+        const closed = [];
+        const realFetch = window.fetchWithTimeout;
+        const realApply = window.applyBarcodeCloseChange;
+        window.fetchWithTimeout = async (url) => {
+            const code = String(url).split('barcode=')[1] || '';
+            asked.push(code);
+            // ⛔ ZTO បដិសេធ ➜ HTTP 502 ➜ `res.ok === false` ➜ គ្មានសាលក្រម
+            if (code.indexOf('BAD') === 0) return { res: { ok: false, status: 502 }, body: { code: 'ZTO_UPSTREAM_REJECTED' } };
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: true } };
+        };
+        window.applyBarcodeCloseChange = async (id, code) => { closed.push(code); return true; };
+        try {
+            for (let r = 0; r < 5; r++) await runZtoStatusSweep(true, [item], []);
+        } finally { window.fetchWithTimeout = realFetch; window.applyBarcodeCloseChange = realApply; }
+        const uniq = {};
+        asked.forEach((c) => { uniq[c] = (uniq[c] || 0) + 1; });
+        return { total: asked.length, uniq: Object.keys(uniq).length,
+            openAsked: asked.filter((c) => c.indexOf('OPEN') === 0).length,
+            badUniq: Object.keys(uniq).filter((c) => c.indexOf('BAD') === 0).length,
+            closed: closed.length };
+        });
+    } catch (e) { starve = null; }
+    if (!starve) {
+        starve = { total: 0, uniq: 0, openAsked: 0, badUniq: 0, closed: 0 };
+        ok('⛔ វាស់ការអត់ឃ្លានមិនបាន — កូដមិនទាន់មាន', false, 'runZtoStatusSweep');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ៥ ជុំបាញ់ការហៅពិត', starve.total >= 40, starve);
+    ok('⛔ barcode ដែល ZTO បដិសេធ មិនត្រូវជាប់ក្បាលជួរ ➜ ១២ ត្រូវបានសួរគ្រប់',
+        starve.badUniq === 12, starve);
+    ok('⛔ កញ្ចប់ **បើក** ត្រូវទទួលកន្លែងក្នុងជួរ (ការបិទស្វ័យប្រវត្តិមិនស្លាប់)',
+        starve.openAsked > 0, starve);
+    ok('⛔ ZTO ឆ្លើយ «បិទរួច» លើកញ្ចប់បើក ➜ ត្រូវបិទពិត',
+        starve.closed > 0, starve);
+
+    // ⛔ ទិសផ្ទុយ ៖ ការបង្វិលជួរ **មិនត្រូវ** បង្កើតការហៅបន្ថែម — barcode
+    // ដែលទទួលសាលក្រមរួច ត្រូវធ្លាក់ចេញដដែល (ច្បាប់ «១ ដងក្នុងមួយ barcode»)។
+    let rotateCost = null;
+    try {
+        rotateCost = await page.evaluate(async () => {
+        localStorage.setItem('zoew_zto_autoclose_v1', '0');
+        clearZtoPickupStatusStore();
+        const bcs = [];
+        for (let i = 0; i < 12; i++) bcs.push({ code: 'GOOD' + String(200000 + i), isClosed: true });
+        const item = { id: 'b1', phone: '012', barcodes: bcs };
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url).split('barcode=')[1] || '');
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
+        };
+        // ⛔ ជម្នះច្រកទ្វារចន្លោះពេល និងជណ្តើរ backoff ដោយរំកិលនាឡិកា ៣០ នាទី
+        let shift = 30 * 60000;
+        try {
+            for (let r = 0; r < 4; r++) {
+                Date.now = () => realNow.call(Date) + shift;
+                await runZtoStatusSweep(false, [item], []);
+                shift += 30 * 60000;
+            }
+        } finally { Date.now = realNow; window.fetchWithTimeout = realFetch; }
+        const uniq = {};
+        asked.forEach((c) => { uniq[c] = (uniq[c] || 0) + 1; });
+        return { total: asked.length, uniq: Object.keys(uniq).length,
+            maxPer: Math.max.apply(null, Object.keys(uniq).map((k) => uniq[k]).concat([0])) };
+        });
+    } catch (e) { rotateCost = null; }
+    if (!rotateCost) {
+        rotateCost = { total: 0, uniq: 0, maxPer: 99 };
+        ok('⛔ វាស់ថ្លៃនៃការបង្វិលជួរមិនបាន', false, 'runZtoStatusSweep');
+    }
+    ok('⛔ ទិសផ្ទុយ ៖ barcode ១២ ➜ សួរ ១២ ដង (មិនកើនតាមចំនួនជុំ)',
+        rotateCost.total === 12 && rotateCost.uniq === 12, rotateCost);
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មាន barcode ណាសួរលើស ១ ដង', rotateCost.maxPer === 1, rotateCost);
+
+    // ⛔ **ការបង្វិលត្រូវរស់រានពីការបោះក្នុងរង្វិលជុំ** ៖ ការរំកិល cursor ស្ថិត
+    // ក្នុង `finally` ដោយចេតនា — បើវាឈរ **ក្រោយ** ប្លុក `try` នោះកំហុសគូរ
+    // តែមួយ (DOM ប្រែ · extension) ធ្វើឲ្យ cursor **កក** ➜ ការអត់ឃ្លានវិលមក
+    // តាមទ្វារថ្មី ដោយស្ងាត់។
+    let cursorSafe = null;
+    try {
+        cursorSafe = await page.evaluate(async () => {
+        localStorage.setItem('zoew_zto_autoclose_v1', '0');
+        clearZtoPickupStatusStore();
+        const bcs = [];
+        for (let i = 0; i < 14; i++) bcs.push({ code: 'THRW' + String(300000 + i), isClosed: true });
+        const item = { id: 'f1', phone: '016', barcodes: bcs };
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        const realViews = window.renderZtoSyncViews;
+        const realNow = Date.now;
+        // ⛔ ការឆ្លើយត្រូវ **ជោគជ័យ** ➜ `measured++` ➜ រង្វិលជុំឈានដល់ការគូរ
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url).split('barcode=')[1] || '');
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: false } };
+        };
+        // ⛔ កេះការបោះ **ខាងក្នុង** រង្វិលជុំ (ធាតុទី ១ ➜ ជុំនោះបញ្ចប់ភ្លាម)
+        window.renderZtoSyncViews = () => { throw new Error('probe: render failed'); };
+        const rounds = [];
+        let shift = 60 * 60000;
+        try {
+            for (let r = 0; r < 2; r++) {
+                Date.now = () => realNow.call(Date) + shift;
+                const n = asked.length;
+                try { await runZtoStatusSweep(true, [item], []); } catch (e) { /* រំពឹងទុក */ }
+                rounds.push(asked.slice(n));
+                shift += 60 * 60000;
+            }
+        } finally {
+            Date.now = realNow;
+            window.renderZtoSyncViews = realViews;
+            window.fetchWithTimeout = realFetch;
+        }
+        const first = (rounds[0] || [])[0] || '';
+        const second = (rounds[1] || [])[0] || '';
+        return { total: asked.length, first: first, second: second,
+            moved: !!first && !!second && first !== second };
+        });
+    } catch (e) { cursorSafe = null; }
+    if (!cursorSafe) {
+        cursorSafe = { total: 0, moved: false };
+        ok('⛔ វាស់ភាពរឹងមាំរបស់ cursor មិនបាន', false, 'runZtoStatusSweep');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ២ ជុំបាញ់ការហៅពិត ទោះការគូរបោះ', cursorSafe.total >= 2, cursorSafe);
+    ok('⛔ ការបោះក្នុងរង្វិលជុំ មិនត្រូវធ្វើឲ្យជួរកក (cursor ក្នុង `finally`)',
+        cursorSafe.moved === true, cursorSafe);
+
+    console.log('\n== ១៥. ⛔ ច្រកទ្វារបណ្តាញ និងជាន់ការពារ ត្រូវវាស់ដាច់ពីគ្នា ==');
+
+    // ⛔ **ការងារបណ្តាញស្រេចចិត្ត** ៖ `ztoStatusNetworkAllowed()` ត្រូវគ្រប
+    // `linkIsFrugal()` · `isModalOpen` **និង `autoLookupInFlight`**។ ជុំមុន
+    // វាស់តែ ២ ដំបូង ➜ mutation ដែលដក `autoLookupInFlight` ចេញ **រស់រាន** ➜
+    // ជុំបោសបាញ់ **ចំពេលស្កេន** ➜ សំណើទី ៣ ស្របគ្នាខណៈពិដានជា ២ (2.31.9)។
+    let gates = null;
+    try {
+        gates = await page.evaluate(async () => {
+        localStorage.setItem('zoew_zto_autoclose_v1', '1');
+        document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
+        clearZtoPickupStatusStore();
+        const item = { id: 'c1', phone: '013', barcodes: [
+            { code: 'GATE00000001', isClosed: true }, { code: 'GATE00000002', isClosed: false }] };
+        const realFetch = window.fetchWithTimeout;
+        const realNow = Date.now;
+        let shift = 30 * 60000;
+        const count = async (setup, teardown, force) => {
+            let n = 0;
+            window.fetchWithTimeout = async () => { n++; return { res: { ok: true, status: 200 }, body: { ztoClosed: false } }; };
+            clearZtoPickupStatusStore();
+            shift += 30 * 60000;
+            Date.now = () => realNow.call(Date) + shift;
+            setup();
+            try { await runZtoStatusSweep(force === true, [item], []); }
+            finally { teardown(); Date.now = realNow; window.fetchWithTimeout = realFetch; }
+            return n;
+        };
+        const nop = () => {};
+        const freeRun = await count(nop, nop);
+        const duringScan = await count(() => { autoLookupInFlight.set('X', 1); },
+            () => { autoLookupInFlight.delete('X'); });
+        const scanForced = await count(() => { autoLookupInFlight.set('X', 1); },
+            () => { autoLookupInFlight.delete('X'); }, true);
+        return { freeRun: freeRun, duringScan: duringScan, scanForced: scanForced };
+        });
+    } catch (e) { gates = null; }
+    if (!gates) {
+        gates = { freeRun: 0, duringScan: 99, scanForced: 99 };
+        ok('⛔ វាស់ច្រកទ្វារ `ztoStatusNetworkAllowed` មិនបាន', false, 'ztoStatusNetworkAllowed');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ គ្មានឧបសគ្គ ➜ ជុំបោសបាញ់ការហៅពិត', gates.freeRun > 0, gates);
+    ok('⛔ ខណៈស្កេនកំពុងដំណើរការ ➜ ជុំបោស **ស្វ័យប្រវត្តិ** មិនត្រូវបាញ់សោះ',
+        gates.duringScan === 0, gates);
+    // ⛔ `autoLookupInFlight` ជា **ពិដានសំណើស្របគ្នា** មិនមែនច្រកទ្វារ «សន្សំ
+    // ទិន្នន័យ» ➜ វាទប់ **ទាំងការចុចរបស់អ្នកប្រើ** ដោយចេតនា (ការស្កេនចប់ក្នុង
+    // ១៣ វិ. ➜ ការសាកម្ដងទៀតដើរពិត)។ ⛔ ផ្ទុយពី `linkIsFrugal()` និង
+    // `isModalOpen` ដែលទប់តែជុំស្វ័យប្រវត្តិ — ពីរនោះមានអ្នកយាមរួចក្នុង
+    // ផ្នែក gate probe ខាងលើ (`ztoGateProbeModal`) ➜ កុំសាងស្ទួន។
+    ok('⛔ ពិដានសំណើស្របគ្នា ៖ ការស្កេនទប់ទាំងការចុចរបស់អ្នកប្រើដែរ',
+        gates.scanForced === 0, gates);
+
+    // ⛔ **ជាន់ការពារ ២ ត្រូវវាស់ដាច់ពីគ្នា** (មេរៀន 2.31.11) ៖ កុងតាក់បិទ
+    // ត្រូវទប់ **ទាំងការប្រមូល** (`collectOpenBarcodesForZtoStatus` មិនរត់)
+    // **និងការបិទខ្លួនវា** (`autoCloseBarcodeFromZto`)។ ការវាស់រួមគ្នាវាស់តែ
+    // ជាន់ដែលលឿនជាង ➜ mutation លើជាន់យឺតរស់រាន។ ត្រង់នេះយើងកេះជាន់យឺត
+    // **ដោយផ្ទាល់** ដោយបិទកុងតាក់ក្រោយពេលការប្រមូលរួចហើយ។
+    let layer2 = null;
+    try {
+        layer2 = await page.evaluate(async () => {
+        localStorage.setItem('zoew_zto_autoclose_v1', '1');
+        const item = { id: 'd1', phone: '014', barcodes: [{ code: 'LAYR00000001', isClosed: false }] };
+        const closed = [];
+        const realApply = window.applyBarcodeCloseChange;
+        window.applyBarcodeCloseChange = async (id, code) => { closed.push(code); return true; };
+        let ranWithToggleOn = false;
+        try {
+            ranWithToggleOn = (await autoCloseBarcodeFromZto(
+                { key: 'LAYR00000001', code: 'LAYR00000001', itemId: 'd1', open: true }, [item])) === true;
+            localStorage.setItem('zoew_zto_autoclose_v1', '0');
+            const after = closed.length;
+            await autoCloseBarcodeFromZto(
+                { key: 'LAYR00000001', code: 'LAYR00000001', itemId: 'd1', open: true }, [item]);
+            return { ranWithToggleOn: ranWithToggleOn, blockedWhenOff: closed.length === after };
+        } finally { window.applyBarcodeCloseChange = realApply; }
+        });
+    } catch (e) { layer2 = null; }
+    if (!layer2) {
+        layer2 = { ranWithToggleOn: false, blockedWhenOff: false };
+        ok('⛔ វាស់ជាន់ទី ២ នៃកុងតាក់មិនបាន', false, 'autoCloseBarcodeFromZto');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ កុងតាក់បើក ➜ ជាន់ទី ២ អនុញ្ញាតការបិទ',
+        layer2.ranWithToggleOn === true, layer2);
+    ok('⛔ ជាន់ទី ២ ៖ កុងតាក់បិទកណ្តាលជុំ ➜ `autoCloseBarcodeFromZto` ត្រូវទប់',
+        layer2.blockedWhenOff === true, layer2);
+
+    // ⛔ ធាតុដែលកំពុងស្តារ ឬកំពុងត្រូវ «លុបទាំងអស់» មិនត្រូវចូលជួរបិទ
+    // ស្វ័យប្រវត្តិ (marker កំពុងរស់ ➜ transaction នឹងបដិសេធ ➜ toast ⚠️ ក្លែង)។
+    let claimSkip = null;
+    try {
+        claimSkip = await page.evaluate(() => {
+        const plain = { id: 'e1', phone: '015', barcodes: [{ code: 'PLAI00000001', isClosed: false }] };
+        const claimed = { id: 'e2', phone: '015', clearClaim: { id: 'zzz', at: Date.now() },
+            barcodes: [{ code: 'CLAI00000001', isClosed: false }] };
+        const restoring = { id: 'e3', phone: '015', restoreClaimId: 'rrr',
+            barcodes: [{ code: 'REST00000001', isClosed: false }] };
+        const codes = collectOpenBarcodesForZtoStatus([plain, claimed, restoring]).map((e) => e.code);
+        return { codes: codes };
+        });
+    } catch (e) { claimSkip = null; }
+    if (!claimSkip) {
+        claimSkip = { codes: [] };
+        ok('⛔ វាស់ការរំលង marker មិនបាន', false, 'collectOpenBarcodesForZtoStatus');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ធាតុធម្មតាចូលជួរ',
+        claimSkip.codes.indexOf('PLAI00000001') !== -1, claimSkip);
+    ok('⛔ ធាតុដែលមាន `clearClaim` មិនត្រូវចូលជួរបិទស្វ័យប្រវត្តិ',
+        claimSkip.codes.indexOf('CLAI00000001') === -1, claimSkip);
+    ok('⛔ ធាតុដែលមាន marker ស្តារ មិនត្រូវចូលជួរបិទស្វ័យប្រវត្តិ',
+        claimSkip.codes.indexOf('REST00000001') === -1, claimSkip);
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

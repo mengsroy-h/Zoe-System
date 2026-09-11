@@ -33,7 +33,8 @@ const SECTIONED = [
     'audit-tools/README.md',
     'firebase-backup/README.md',
     'zto-import/README.md',
-    'tools/zto-cookie-sync-windows/README-KH.md'
+    'tools/zto-cookie-sync-windows/README-KH.md',
+    'tools/money-check-windows/README-KH.md'
 ];
 // ឯកសារ «របៀបប្រើ» ដទៃ ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
 const CONTENT_ONLY = [
@@ -42,6 +43,32 @@ const CONTENT_ONLY = [
 ];
 
 const SECTIONS = ['កំណែ', 'មុខងារ', 'របៀបប្រើប្រាស់', 'ប្រព័ន្ធសុវត្ថិភាព', 'អាជ្ញាប័ណ្ណ'];
+
+// ⛔ បញ្ជីរឹងខាងលើជា **កាលបរិច្ឆេទផុតកំណត់** ៖ README ដែលកើត *ក្រោយ* វា
+// មិនចូលបញ្ជី ➜ ច្បាប់ ៩ នៅរស់ តែឯកសារនោះ **គ្មានអ្នកយាមសោះ**។ វាស់បាន
+// (2026-09-11) ៖ `tools/money-check-windows/README-KH.md` រស់ក្នុង repo
+// ដោយគ្មានឈ្មោះក្នុងបញ្ជីណាមួយ — ហើយក៏គ្មានឯកសារណាយោងវាដែរ។ ដូច្នេះ
+// បញ្ជីត្រូវ **ប្រៀបធៀបនឹងថតពិត** មិនមែនជឿខ្លួនឯង។
+function listReadmeFiles(dir, rel, out) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    entries.forEach((entry) => {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        const next = rel ? rel + '/' + entry.name : entry.name;
+        if (entry.isDirectory()) listReadmeFiles(path.join(dir, entry.name), next, out);
+        else if (/^README.*\.md$/i.test(entry.name)) out.push(next);
+    });
+    return out;
+}
+
+const KNOWN_DOCS = SECTIONED.concat(CONTENT_ONLY);
+const FOUND_READMES = listReadmeFiles(ROOT, '', []);
+check(FOUND_READMES.length >= 7,
+    'ជាន់អប្បបរមា ៖ រកឃើញ README យ៉ាងតិច ៧ ក្នុងថតពិត', String(FOUND_READMES.length));
+const UNGUARDED_DOCS = FOUND_READMES.filter((rel) => KNOWN_DOCS.indexOf(rel) === -1);
+check(UNGUARDED_DOCS.length === 0,
+    '⛔ រាល់ README ក្នុង repo ត្រូវឈរក្នុងបញ្ជីរបស់ checker នេះ (បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់)',
+    'គ្មានអ្នកយាម ៖ ' + UNGUARDED_DOCS.join(' · '));
 
 // ⛔ លំនាំដែលហាម — រាល់មួយមានហេតុផល ៖
 const BANNED = [

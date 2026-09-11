@@ -6,6 +6,11 @@ const ROOT = process.env.PERIODICGUARD_APP_DIR || path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 let pass = 0;
 let fail = 0;
+// ⛔ ការចេញដោយ **event loop ស្ងួត** (ឧ. `await` លើ promise ដែលគ្មានអ្នកដោះ)
+// ធ្វើឲ្យ node ចេញ **exit 0** ខណៈការអះអាងពាក់កណ្តាល **មិនដែលរត់សោះ** ➜
+// `run-all.sh` រាយ PASS។ ដូច្នេះ exit code ចាប់ផ្តើមជា **១** ហើយមានតែបន្ទាត់
+// សង្ខេបនៅចុងឯកសារទេដែលអាចបន្ទាបវា — ការធានាដោយ **រចនាសម្ព័ន្ធ**។
+process.exitCode = 1;
 
 function ok(label, condition, detail) {
     if (condition) {
@@ -148,9 +153,14 @@ function sliceFn(name) {
             ok('⛔ ក្រោយ arm ចប់ ទង់ត្រូវ settle ចេញពី `pending`',
                 armCtx.flag() !== 'pending', armCtx.flag());
             const before = armCounts.session;
-            await armCtx.sessionCheck();
+            // ⛔ `isFirebaseSessionExpired` របស់ sandbox ត្រឡប់ promise ដែល
+            // **តេស្តជាអ្នកដោះ** ➜ `await` ដោយមិនដោះ = ព្យួរ ➜ event loop ស្ងួត
+            // ➜ node ចេញ **exit 0 ដោយស្ងាត់** ហើយការអះអាងខាងក្រោមមិនដែលរត់។
+            const againCheck = armCtx.sessionCheck();
             ok('⛔ វដ្ត ៦០ វិ. ត្រូវរត់បានវិញក្រោយ Activate',
                 armCounts.session === before + 1, armCounts);
+            if (resolveArmSession) resolveArmSession(false);
+            await againCheck;
         }
 
         const firstLicense = context.licenseCheck();

@@ -54,6 +54,45 @@ function sliceFn(src, name) {
     return src.slice(start, i);
 }
 
+// ការដាក់ទង់ «មិនទាន់ដឹង» អាចរស់នៅ **ក្នុង helper** មិនមែនក្នុងតួអ្នកហៅ
+// (កំណែ 2.33.2 ៖ `armSessionExpiryCheck()` ជាចំណុចច្របាច់តែមួយ ព្រោះផ្លូវ
+// Activate ក៏ត្រូវ arm ដែរ)។ ⛔ ដូច្នេះការស្កេនរក **អក្សរ** នៃការដាក់ទង់
+// ក្នុងតួអ្នកហៅ ជា **កាលបរិច្ឆេទផុតកំណត់** — វាធ្លាក់ពេលកូដត្រូវរៀបចំឡើងវិញ
+// ដោយត្រឹមត្រូវ។ អ្នកយាមត្រូវ **ដេរីវេ** ឈ្មោះអ្នកដាក់ទង់ចេញពីកូដពិត ៖
+// ឈ្មោះ function ណាដែលតួរបស់វាដាក់ទង់ = ការហៅវាក៏ជាការដាក់ទង់ដែរ។
+// ⛔ វានៅតែធ្លាក់បាន ៖ បើគ្មានអ្នកណាដាក់ទង់ ឬបើ helper ឈប់ដាក់ទង់
+// បញ្ជីនឹងសល់តែអក្សរដើម ➜ រកមិនឃើញក្នុងតួអ្នកហៅ ➜ FAIL។
+function armingTokens(src, literal) {
+    const tokens = [literal];
+    const re = /function\s+([A-Za-z0-9_$]+)\s*\(/g;
+    const decls = [];
+    let m;
+    while ((m = re.exec(src)) !== null) decls.push({ name: m[1], at: m.index });
+    let from = src.indexOf(literal);
+    while (from !== -1) {
+        let best = null;
+        for (let i = 0; i < decls.length; i++) {
+            if (decls[i].at >= from) break;
+            const body = sliceFn(src, decls[i].name);
+            if (!body) continue;
+            if (decls[i].at + body.length <= from) continue;
+            if (!best || decls[i].at > best.at) best = decls[i];
+        }
+        if (best && tokens.indexOf(best.name + '(') === -1) tokens.push(best.name + '(');
+        from = src.indexOf(literal, from + literal.length);
+    }
+    return tokens;
+}
+
+function earliestOf(hay, tokens) {
+    let best = -1;
+    for (let i = 0; i < tokens.length; i++) {
+        const at = hay.indexOf(tokens[i]);
+        if (at !== -1 && (best === -1 || at < best)) best = at;
+    }
+    return best;
+}
+
 function sliceConst(src, name) {
     const start = src.indexOf('const ' + name + ' =');
     if (start === -1) return null;
@@ -176,10 +215,15 @@ console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ t
     ok('ZoeW ៖ មិនអះអាងជោគជ័យខណៈការផ្ទៀងផ្ទាត់វគ្គមិនទាន់ចប់',
         /sessionExpiryCheck === 'pending'/.test(state));
 
-    const armAt = proceed.indexOf("sessionExpiryCheck = 'pending'");
+    const ARM_LITERAL = "sessionExpiryCheck = 'pending'";
+    const armTokens = armingTokens(js, ARM_LITERAL);
+    const armSites = js.split(ARM_LITERAL).length - 1;
+    ok('ZoeW ៖ មានអ្នកដាក់ទង់ «មិនទាន់ដឹង» ពិតក្នុងកូដ ship (ដេរីវេ មិនមែន literal)',
+        armSites >= 2 && armTokens.length >= 1, { armSites, armTokens });
+    const armAt = earliestOf(proceed, armTokens);
     const announceAt = proceed.indexOf("showLiveToast('signin')");
     ok('ZoeW ៖ proceedAfterLogin ដាក់ទង់ «មិនទាន់ដឹង» មុនប្រកាស',
-        armAt !== -1 && announceAt !== -1 && armAt < announceAt, { armAt, announceAt });
+        armAt !== -1 && announceAt !== -1 && armAt < announceAt, { armAt, announceAt, armTokens });
 
     const markAt = expire.indexOf("sessionExpiryCheck = 'expired'");
     const signOutAt = expire.indexOf('fb.signOut');

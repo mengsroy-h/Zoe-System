@@ -1502,6 +1502,34 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 ផ្លូវពិតក្នុង Argus ៖ **Login ➜ Scan Management ➜ Arrival Scan ➜ វាយ Waybill**
 ➜ ទើប `POST https://aargus-api.ztoglobal.com/scan/get/order/detail` បាញ់។
 
+⛔ **ចំណុចចាប់ផ្តើម ≠ គោលដៅចាប់** ៖ helper បើក **`gate.ztoglobal.com`**
+(រក្សា session ➜ ចុចកាតសាខា ➜ Argus បើកដោយមិនវាយ password) ចំណែក
+`argus.ztoglobal.com` សុំ Login **រាល់ដង** ➜ វានៅតែបោះពុម្ពជា **ផ្លូវបម្រុង**
+(⛔ កុំដកចេញ)។ ការចាប់ **មិនប្តូរតាមវាទេ** ៖ `BOS-MAN-SESSION` ជារបស់
+**`aargus-api.ztoglobal.com`** ➜ ការចូលត្រឹម gate មិនបង្កើត Cookie នោះទេ។
+⛔ **Cookie អាយុវែងលើ `argus` មិនជំនួសវាបានឡើយ** (`__zcat_uuid__` ផុត
+២០២៧ · `ZTO_INTL_BOS_MAN_TOKEN`) — ពួកវា **domain ផ្សេង** ➜ browser មិនផ្ញើ
+ទៅ API host សោះ ➜ `validateCookieHeader()` ត្រូវទាមទារ `BOS-MAN-SESSION` ដដែល។
+⛔ **ការបើក Argus ជំនួសអ្នកប្រើ** (`openArgusFromPortal()`) ៖ **វាស់បាន
+(2026-09-11 · ការថតអេក្រង់របស់ម្ចាស់គម្រោង)** ការចុចកាតសាខាបើក **tab ថ្មី**
+ត្រង់ `https://argus.ztoglobal.com/#/` ធម្មតា រួច Argus redirect ទៅ `#/index`
+ដោយ **ចូលរួចស្រាប់** ➜ ⛔ **គ្មាន token ក្នុង URL សោះ** ➜ អ្វីដែលផ្តល់សិទ្ធិគឺ
+**ការផ្ទុកទំព័រ gate មុន** (SSO handshake) មិនមែនតួកាតទេ។ ដូច្នេះ helper
+**បើក tab ថ្មីទៅ `ARGUS_URL` ដោយផ្ទាល់** ⛔ **មិនស្កេន DOM រកតំណទេ** (វាស់បាន
+៖ frame មេរាយ **០ តំណ** ➜ ការស្កេនជាម៉ាស៊ីនឥតប្រយោជន៍)។ ⛔ **ច្រកទ្វារ ៣ មុន
+បើក** ៖ ការចាប់មិនទាន់ចប់ · គ្មាន tab ណាឈរលើ Argus រួច (`isArgusHost()` —
+⛔ **មិនមែន `endsWith` ធូរ** ៖ `aargus-api` និង `notargus` មិនរាប់ ➜ បើរាប់
+នឹងមិនបើកសោះ) · ទំព័រ gate ស្ថិតស្ថេររួច (`waitForLoadState` ក្នុងពិដាន ➜
+handshake រត់មុន)។ ⛔ **fail-open ទាំងស្រុង** ៖ `newPage` ធ្លាក់ · `goto` យឺត ·
+`waitForLoadState` ធ្លាក់ ➜ មិនបោះចេញ ហើយ **tab ដែលបើករួចត្រូវទុកចោល**
+(`goto` យឺត ≠ បរាជ័យ — ទំព័រនៅតែផ្ទុកបន្ត)។
+⛔ ការសាកលើកមុន (`a59d139`, ដកចេញវិញ `8718909`) ធ្លាក់ព្រោះជុំនោះ
+`isTargetApiUrl()` នៅទាមទារ path — **មិនមែនព្រោះ gate**។ ⛔ ហើយមូលហេតុពិត
+មិនអាចវាស់បាន ព្រោះ helper ចេញត្រឹមពាក្យ «អស់ម៉ោង» ➜ `watchApiTraffic()`
+រាយចំនួនការហៅ API ដែលឃើញ (សរុប · 2xx · 401/403) ពេលធ្លាក់ ៖ វាឈរ **ក្រៅ
+ផ្លូវចាប់** · ចុះឈ្មោះក្រោយអ្នកចាប់ · រុំក្នុង `try` ➜ មិនអាចធ្វើឲ្យការចាប់
+ធ្លាក់បានទេ · ⛔ **លេខប៉ុណ្ណោះ គ្មាន URL គ្មាន Cookie**។
+
 - Cookie រស់ក្នុងសតិ; **បង្ហាញលើអេក្រង់ cmd តាមសំណើអ្នកប្រើ**។ ⛔ **PAT និង
   `ZTO_PROXY_KEY` ហាមបង្ហាញដាច់ខាត** (AST scan — សួរថា «តើ **តម្លៃ** អាចឡើង
   ដល់ output ទេ?» មិនមែន regex លើ **ឈ្មោះ**)។

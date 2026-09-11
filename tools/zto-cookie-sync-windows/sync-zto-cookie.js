@@ -7,7 +7,17 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const TOOL_DIR = __dirname;
+// ⛔ **ចំណុចចាប់ផ្តើម ≠ គោលដៅចាប់** ៖ `gate.ztoglobal.com` រក្សា session
+// ចំណែក `argus.ztoglobal.com` សុំ Login **រាល់ដង** (វាស់ដោយម្ចាស់គម្រោង
+// 2026-09-09 និងបញ្ជាក់ឡើងវិញ 2026-09-11) ➜ helper បើក gate រួចអ្នកប្រើចុច
+// កាតសាខា ➜ Argus បើកដោយមិនវាយ password ➜ session ដែលទើបកើតថ្មី។
+// ⛔ ការចាប់ **មិនប្តូរសោះ** — វានៅតែឈរលើ `API_HOST` ខាងក្រោម។ `ARGUS_URL`
+// នៅតែបោះពុម្ពជា **ផ្លូវបម្រុង** សម្រាប់ថ្ងៃដែល gate បើកមិនកើត។
+const PORTAL_URL = 'https://gate.ztoglobal.com/';
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
+const ARGUS_HOST = new URL(ARGUS_URL).hostname;
+const PORTAL_OPEN_TIMEOUT_MS = 45 * 1000;
+const PORTAL_SETTLE_MS = 10 * 1000;
 const API_HOST = 'aargus-api.ztoglobal.com';
 // ⛔ OPTIONS (preflight) និង HEAD មិនបញ្ជាក់ថា ZTO ទទួលយក session ទេ —
 // preflight មិនផ្ញើ Cookie សោះ។ មានតែ GET និង POST ដែល ZTO
@@ -771,6 +781,47 @@ function cookieAfterResponse(cookieHeader, lines, targetUrl) {
     return result;
 }
 
+// ⛔ «ចាប់មិនកើត» ជា **ពាក្យ** មិនមែនរង្វាស់ ៖ ជុំ 2026-09-09 ដកចំណុច
+// ចាប់ផ្តើម gate ចេញវិញ ដោយ **មូលហេតុឫសគល់មិនទាន់វាស់** ព្រោះ helper
+// មិនប្រាប់ថា browser បានទៅដល់ណា។ អ្នករាប់នេះឆ្លើយសំណួរនោះពេលអស់ម៉ោង ៖
+// គ្មានការហៅ API សោះ (មិនទាន់បើក Argus) · មាន តែ ZTO បដិសេធ (session ងាប់) ·
+// ឬមាន ២xx (ការជាប់ឋិតនៅជំហានក្រោយ)។
+// ⛔ វាឈរ **ក្រៅផ្លូវចាប់ទាំងស្រុង** ៖ listener ដាច់ដោយឡែក · ចុះឈ្មោះ
+// **ក្រោយ** អ្នកចាប់ · គ្រប់ការអានរុំក្នុង try ➜ getter ដែលបោះ មិនអាច
+// កាត់ផ្តាច់ការចាប់បានទេ។ ⛔ **លេខប៉ុណ្ណោះ** — គ្មាន URL គ្មាន Cookie។
+function watchApiTraffic(context) {
+    const tally = { seen: 0, ok: 0, denied: 0, other: 0 };
+    const onResponse = (response) => {
+        try {
+            if (new URL(String(response.url() || '')).hostname !== API_HOST) return;
+            tally.seen++;
+            const status = Number(response.status()) || 0;
+            if (status >= 200 && status < 300) tally.ok++;
+            else if (status === 401 || status === 403) tally.denied++;
+            else tally.other++;
+        } catch (_) {}
+    };
+    context.on('response', onResponse);
+    return {
+        tally: () => Object.assign({}, tally),
+        summary: () => {
+            const lines = ['Seen on the ZTO API: ' + tally.seen + ' answer(s), ' + tally.ok
+                + ' OK, ' + tally.denied + ' not-signed-in, ' + tally.other + ' other.'];
+            if (!tally.seen) {
+                lines.push('   The browser never called the ZTO API. Open Argus from the gate page');
+                lines.push('   (the branch card), then scan one Waybill.');
+            } else if (!tally.ok) {
+                lines.push('   ZTO refused every call. Log in again in the browser window, then retry.');
+            } else {
+                lines.push('   ZTO answered, but no signed-in success carried a usable session cookie.');
+                lines.push('   Open Scan Management -> Arrival Scan and scan one Waybill, then retry.');
+            }
+            return lines;
+        },
+        stop: () => { context.off('response', onResponse); }
+    };
+}
+
 function waitForOrderCookie(context, timeoutMs, options) {
     const configuredTimeout = options && options.responseTimeoutMs;
     const responseTimeoutMs = Number.isFinite(configuredTimeout)
@@ -828,35 +879,94 @@ function waitForOrderCookie(context, timeoutMs, options) {
     });
 }
 
+// ⛔ ច្រកទ្វារ **អត្តសញ្ញាណ** មិនមែន `endsWith` ធូរ ៖ `aargus-api.ztoglobal.com`
+// មិនត្រូវរាប់ជា Argus ហើយ `argus.ztoglobal.com.evil.test` ក៏ដូចគ្នា។
+function isArgusHost(hostname) {
+    const host = String(hostname || '').toLowerCase();
+    return host === ARGUS_HOST || host.endsWith('.' + ARGUS_HOST);
+}
+
+// ⛔ **វាស់បាន (2026-09-11, ការថតអេក្រង់របស់ម្ចាស់គម្រោង)** ៖ ការចុចកាតសាខា
+// បើក **tab ថ្មី** ត្រង់ `https://argus.ztoglobal.com/#/` ធម្មតា ➜ Argus
+// redirect ទៅ `#/index` ដោយ **ចូលរួចស្រាប់**។ ⛔ **គ្មាន token ក្នុង URL សោះ**
+// ➜ អ្វីដែលផ្តល់សិទ្ធិគឺ **ការផ្ទុកទំព័រ gate មុន** (វាធ្វើ SSO handshake)
+// មិនមែនតួកាតទេ ➜ ការស្កេន DOM រកតំណ **មិនចាំបាច់** (វាស់បានថាទំព័រនោះរាយ
+// **០ តំណ** ក្នុង frame មេ)។ ដូច្នេះ helper គ្រាន់តែបើក tab ថ្មីទៅ Argus។
+// ⛔ **fail-open ទាំងស្រុង** ៖ បើកមិនកើត ឬ Argus ឆ្លើយយឺត ➜ ឥរិយាបថត្រឡប់ទៅ
+// «អ្នកប្រើចុចកាតដោយដៃ» ដដែល។ ⛔ **ច្រកទ្វារ ៣ មុនបើក** ៖ ការចាប់មិនទាន់ចប់ ·
+// គ្មាន tab ណាឈរលើ Argus រួច (អ្នកប្រើចុចមុន ➜ កុំបើកស្ទួន) · ទំព័រ gate
+// មិនទាន់ស្ថិតស្ថេរ ➜ រង់ចាំក្នុងពិដាន (SSO handshake ត្រូវរត់មុន)។
+async function openArgusFromPortal(context, page, isDone, options) {
+    const config = options || {};
+    const settleMs = Number.isFinite(config.settleMs)
+        ? Math.max(0, Math.min(PORTAL_SETTLE_MS, config.settleMs)) : PORTAL_SETTLE_MS;
+    const openMs = Number.isFinite(config.openMs)
+        ? Math.max(1, Math.min(PORTAL_OPEN_TIMEOUT_MS, config.openMs)) : PORTAL_OPEN_TIMEOUT_MS;
+    try { await page.waitForLoadState('networkidle', { timeout: settleMs }); } catch (_) {}
+    if (isDone()) return { opened: false, reason: 'done' };
+    for (const other of context.pages()) {
+        let host = '';
+        try { host = new URL(other.url()).hostname.toLowerCase(); } catch (_) { continue; }
+        if (isArgusHost(host)) return { opened: false, reason: 'already' };
+    }
+    let tab = null;
+    try {
+        tab = await context.newPage();
+        await tab.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: openMs });
+        return { opened: true, reason: 'tab' };
+    } catch (_) {
+        return tab ? { opened: true, reason: 'tab-slow' } : { opened: false, reason: 'failed' };
+    }
+}
+
 async function captureCookieHeader() {
     const launched = await launchLocalBrowser();
     const context = launched.context;
     let waiter;
+    let watcher = null;
     try {
         waiter = waitForOrderCookie(context, CAPTURE_TIMEOUT_MS);
         waiter.catch(() => {});
+        watcher = watchApiTraffic(context);
         const pages = context.pages();
         const page = pages[0] || await context.newPage();
-        console.log('Argus is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
-        console.log('   1. Log in to Argus (if ZTO asks for it).');
-        console.log('   2. Stay on the page. This tool continues by itself as soon as ZTO');
+        console.log('The ZTO gate page is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
+        console.log('   1. The gate usually keeps your session. Log in only if ZTO asks.');
+        console.log('   2. This tool opens Argus in a new tab. If it does not, click the branch card.');
+        console.log('   3. Stay on the page. This tool continues by itself as soon as ZTO');
         console.log('      answers one signed-in API call with success.');
-        console.log('   3. If it keeps waiting, open Scan Management -> Arrival Scan and');
+        console.log('   4. If it keeps waiting, open Scan Management -> Arrival Scan and');
         console.log('      type or scan one Waybill.');
+        console.log('   If the gate page does not open, type ' + ARGUS_URL + ' in the address bar.');
         try {
-            await page.goto(ARGUS_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await page.goto(PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
-            console.log('WARNING: Argus did not answer yet. The page stays open, so log in or refresh.');
+            console.log('WARNING: the ZTO gate did not answer yet. The page stays open, so log in or refresh.');
+        }
+        let captured = false;
+        waiter.then(() => { captured = true; }, () => { captured = true; });
+        try {
+            const opened = await openArgusFromPortal(context, page, () => captured);
+            if (opened.opened) console.log('   Opened Argus in a new tab. Waiting for a signed-in answer...');
+            else if (opened.reason === 'failed') {
+                console.log('   Could not open the Argus tab. Please click the branch card yourself.');
+            }
+        } catch (_) {
+            console.log('   Could not open Argus automatically. Please click the branch card yourself.');
         }
         return await waiter;
+    } catch (error) {
+        if (watcher) for (const line of watcher.summary()) console.log(line);
+        throw error;
     } finally {
+        if (watcher) watcher.stop();
         try { await context.close(); } catch (_) {}
     }
 }
 
 function safeFailureMessage(code) {
     const messages = {
-        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no signed-in ZTO API answer. Log in to Argus, then scan one Waybill.',
+        CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no signed-in ZTO API answer. Open Argus from the gate page, then scan one Waybill.',
         BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
         BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
         BROWSER_NOT_FOUND: 'Microsoft Edge or Google Chrome was not found.',
@@ -1096,6 +1206,7 @@ module.exports = {
     cookieHeaderFromHeaders,
     cookieHeaderFromRequest,
     getNetlifySite,
+    isArgusHost,
     isTargetApiUrl,
     loadConfig,
     localStateRoot,
@@ -1119,5 +1230,7 @@ module.exports = {
     verifyCookieLive,
     validateToken,
     verifyNetlifySetup,
-    waitForOrderCookie
+    openArgusFromPortal,
+    waitForOrderCookie,
+    watchApiTraffic
 };

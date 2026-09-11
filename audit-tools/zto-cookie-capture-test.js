@@ -4,6 +4,8 @@
 const assert = require('assert/strict');
 const { EventEmitter } = require('events');
 const path = require('path');
+const fs = require('fs');
+const vm = require('vm');
 const ROOT = process.env.ZTO_CAPTURE_APP_DIR
     ? path.resolve(process.env.ZTO_CAPTURE_APP_DIR) : path.resolve(__dirname, '..');
 let api;
@@ -16,6 +18,33 @@ const GOOD = { success: true, data: { billCode: 'synthetic-parcel' } };
 let pass = 0;
 let fail = 0;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// ⛔ callback របស់ `page.evaluate` រត់ **ក្នុង browser** ➜ ការ stub តម្លៃ
+// ត្រឡប់ ធ្វើឲ្យតក្កវិជ្ជាជ្រើសតំណ **គ្មានតេស្តសោះ**។ ដូច្នេះយើងរត់ callback
+// **ពិត** ក្នុង `vm` ជាមួយ DOM ក្លែង ➜ mutation លើការផ្គូផ្គង host ចាប់បាន។
+function portal(options) {
+    const cfg = options || {};
+    const state = { opened: [], newPages: 0, settles: 0 };
+    const page = {
+        url: () => cfg.url || 'https://gate.ztoglobal.com/',
+        waitForLoadState: async () => {
+            state.settles++;
+            if (cfg.settleThrows) throw new Error('synthetic settle timeout');
+        }
+    };
+    const pages = (cfg.pages || ['https://gate.ztoglobal.com/']).map((url) => ({ url: () => url }));
+    const ctx = {
+        pages: () => pages,
+        newPage: async () => {
+            state.newPages++;
+            if (cfg.newPageThrows) throw new Error('synthetic newPage failure');
+            return { goto: async (url) => {
+                state.opened.push(url);
+                if (cfg.gotoThrows) throw new Error('synthetic goto timeout');
+            } };
+        }
+    };
+    return { page, ctx, state };
+}
 function deferred() {
     let resolve;
     return { promise: new Promise((done) => { resolve = done; }), resolve: (value) => resolve(value) };
@@ -276,6 +305,149 @@ async function main() {
         assert.equal(health.healthy, null);
         assert.equal(api.shouldRefreshInAuto(health), false);
         assert.match(api.describeHealth(health), /not yet verified/i);
+    });
+    // ⛔ **ចំណុចចាប់ផ្តើមរបស់ helper** ៖ `argus.ztoglobal.com` សុំ Login
+    // **រាល់ដង** ចំណែក `gate.ztoglobal.com` រក្សា session ➜ ចុចកាតសាខា ➜
+    // Argus បើកដោយមិនវាយ password (វាស់ដោយម្ចាស់គម្រោង)។ ⛔ ការសាកលើកមុន
+    // (a59d139) ធ្លាក់ ព្រោះជុំនោះ `isTargetApiUrl` ទាមទារ path
+    // `/scan/get/order/detail` ➜ ការចូល Argus តែម្យ៉ាងមិនគ្រប់គ្រាន់។ ជុំ
+    // 6c82ea9 ដក path នោះចេញរួចហើយ ➜ ច្រកទ្វារឥឡូវជា **host** សុទ្ធសាធ។
+    await scenario('helper បើក gate (session នៅ) មិនមែន argus (Login រាល់ដង)', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const portal = /const PORTAL_URL = '([^']+)';/.exec(src);
+        assert.ok(portal, 'រកការប្រកាស PORTAL_URL មិនឃើញ');
+        assert.equal(new URL(portal[1]).hostname, 'gate.ztoglobal.com');
+        assert.ok(/page\.goto\(PORTAL_URL/.test(src), 'browser ត្រូវបើក PORTAL_URL');
+        assert.ok(!/page\.goto\(ARGUS_URL/.test(src), 'មិនត្រូវបើក argus ជាចំណុចចាប់ផ្តើម');
+    });
+    // ⛔ **ទិសផ្ទុយ** ៖ ការដក argus ចេញទាំងស្រុង ជាការថយក្រោយ — ថ្ងៃណាដែល
+    // gate បើកមិនកើត អ្នកប្រើនៅតែត្រូវការ URL ផ្ទាល់នៅលើអេក្រង់។
+    await scenario('⛔ argus នៅតែបោះពុម្ពជាផ្លូវបម្រុង (កុំកាត់ផ្លូវចេញ)', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const argus = /const ARGUS_URL = '([^']+)';/.exec(src);
+        assert.ok(argus, 'ថេរ ARGUS_URL ត្រូវនៅ');
+        assert.equal(new URL(argus[1]).hostname, 'argus.ztoglobal.com');
+        assert.ok(/console\.log\([^\n]*ARGUS_URL/.test(src), 'ARGUS_URL ត្រូវលេចលើអេក្រង់ cmd');
+    });
+    // ⛔ ចំណុចចាប់ផ្តើមប្តូរ **មិនត្រូវ** ទាញគោលដៅចាប់ទៅតាមវាទេ ៖ Cookie
+    // ដែលត្រូវការជារបស់ `aargus-api` ដដែល។
+    await scenario('⛔ ការចាប់នៅតែសំដៅ aargus-api (gate មិនប្តូរគោលដៅ)', async () => {
+        assert.equal(api.isTargetApiUrl(TARGET), true);
+        assert.equal(api.isTargetApiUrl('https://aargus-api.ztoglobal.com/any/other/path'), true);
+        assert.equal(api.isTargetApiUrl('https://gate.ztoglobal.com/scan/get/order/detail'), false);
+        assert.equal(api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'), false);
+    });
+    // ⛔ ជុំ 2026-09-09 ដកចំណុចចាប់ផ្តើម gate ចេញវិញដោយ **មូលហេតុមិនទាន់
+    // វាស់** ៖ helper ចេញត្រឹមពាក្យ «អស់ម៉ោង» ដោយមិនប្រាប់ថា browser ទៅដល់ណា។
+    // អ្នករាប់នេះបំពេញចន្លោះនោះ — ហើយវាត្រូវឈរ **ក្រៅ** ផ្លូវចាប់ ៖ រាល់ការ
+    // អានរុំក្នុង try ➜ getter ដែលបោះ មិនអាចកាត់ផ្តាច់ការចាប់បាន។
+    await scenario('រង្វាស់ពេលអស់ម៉ោង ៖ រាប់តែ aargus-api និងបែងចែក 2xx/401', async () => {
+        const ctx = context();
+        const watcher = api.watchApiTraffic(ctx);
+        assert.deepEqual(watcher.tally(), { seen: 0, ok: 0, denied: 0, other: 0 });
+        assert.match(watcher.summary().join(' '), /never called the ZTO API/i);
+        emit(ctx, { url: 'https://gate.ztoglobal.com/home' });
+        emit(ctx, { url: 'https://argus.ztoglobal.com/' });
+        assert.deepEqual(watcher.tally(), { seen: 0, ok: 0, denied: 0, other: 0 });
+        emit(ctx, { status: 401 });
+        assert.deepEqual(watcher.tally(), { seen: 1, ok: 0, denied: 1, other: 0 });
+        assert.match(watcher.summary().join(' '), /refused every call/i);
+        emit(ctx, { status: 503 });
+        emit(ctx, {});
+        assert.deepEqual(watcher.tally(), { seen: 3, ok: 1, denied: 1, other: 1 });
+        assert.match(watcher.summary().join(' '), /no signed-in success/i);
+        assert.ok(watcher.summary().every((line) => /^[\x20-\x7e]*$/.test(line)), 'សារ cmd ត្រូវជា ASCII');
+        watcher.stop();
+        assert.equal(ctx.listenerCount('response'), 0);
+        emit(ctx, {});
+        assert.equal(watcher.tally().seen, 3);
+    });
+    await scenario('⛔ អ្នករាប់ដែលបោះ មិនត្រូវសម្លាប់ការចាប់', async () => {
+        const ctx = context();
+        const task = waiting(ctx);
+        const watcher = api.watchApiTraffic(ctx);
+        try {
+            ctx.emit('response', {
+                url: () => 'https://aargus-api.ztoglobal.com/x',
+                request: () => null,
+                status: () => { throw new Error('synthetic status getter'); }
+            });
+            assert.deepEqual(watcher.tally(), { seen: 1, ok: 0, denied: 0, other: 0 });
+            emit(ctx);
+            assert.equal(await task.promise, NEW);
+        } finally { watcher.stop(); ctx.emit('close'); await task.promise.catch(() => {}); }
+    });
+    // ⛔ **អត្តសញ្ញាណ host មិនមែន `endsWith` ធូរ** — `aargus-api.ztoglobal.com`
+    // មិនមែន Argus ហើយ `argus.ztoglobal.com.evil.test` ក៏មិនមែនដែរ។
+    await scenario('⛔ ច្រកទ្វារ host របស់ Argus ៖ ៤ ទិស', async () => {
+        assert.equal(api.isArgusHost('argus.ztoglobal.com'), true);
+        assert.equal(api.isArgusHost('bos.argus.ztoglobal.com'), true);
+        assert.equal(api.isArgusHost('aargus-api.ztoglobal.com'), false);
+        assert.equal(api.isArgusHost('argus.ztoglobal.com.evil.test'), false);
+        assert.equal(api.isArgusHost('notargus.ztoglobal.com'), false);
+        assert.equal(api.isArgusHost('ARGUS.ZTOGLOBAL.COM'), true);
+        assert.equal(api.isArgusHost(''), false);
+    });
+    // ⛔ **សំណើអ្នកប្រើ (2026-09-11)** ៖ *«វាអត់ auto click ទៅ argus ផង»* ➜
+    // ឧបករណ៍ចុចជំនួស ដោយដើរតាម **តំណដែលសំដៅ host របស់ Argus** មិនមែនតាម
+    // *លំដាប់កាត* ឬ *ពាក្យក្នុងចំណងជើង* (ទំព័រ gate ប្តូរភាសាបាន)។
+    // ⛔ **វាស់បាន (2026-09-11 · ការថតអេក្រង់)** ៖ កាតសាខាបើក **tab ថ្មី**
+    // ត្រង់ `https://argus.ztoglobal.com/#/` **គ្មាន token** ➜ អ្វីដែលផ្តល់សិទ្ធិ
+    // គឺការផ្ទុកទំព័រ gate មុន មិនមែនតួកាត ➜ helper បើក tab ថ្មីដោយផ្ទាល់។
+    await scenario('ក្រោយ gate ស្ថិតស្ថេរ ➜ បើក tab ថ្មីទៅ Argus', async () => {
+        const p = portal({});
+        const out = await api.openArgusFromPortal(p.ctx, p.page, () => false, { settleMs: 5, openMs: 5 });
+        assert.deepEqual(out, { opened: true, reason: 'tab' });
+        assert.equal(p.state.newPages, 1);
+        assert.equal(p.state.opened.length, 1);
+        assert.equal(api.isArgusHost(new URL(p.state.opened[0]).hostname), true);
+        assert.equal(p.state.settles, 1, 'ត្រូវរង់ចាំ SSO handshake មុនបើក');
+    });
+    // ⛔ **កុំបើកស្ទួន** ៖ អ្នកប្រើចុចមុន ➜ tab មួយឈរលើ Argus រួច ➜ មិនបើកទៀត។
+    await scenario('⛔ Argus បើករួច ➜ មិនបើក tab ស្ទួន', async () => {
+        const p = portal({ pages: ['https://gate.ztoglobal.com/', 'https://argus.ztoglobal.com/#/index'] });
+        assert.deepEqual(await api.openArgusFromPortal(p.ctx, p.page, () => false, { settleMs: 5, openMs: 5 }),
+            { opened: false, reason: 'already' });
+        assert.equal(p.state.newPages, 0);
+        const near = portal({ pages: ['https://aargus-api.ztoglobal.com/scan'] });
+        assert.equal((await api.openArgusFromPortal(near.ctx, near.page, () => false, { settleMs: 5, openMs: 5 })).opened,
+            true, 'aargus-api មិនមែន Argus');
+    });
+    // ⛔ **fail-open ទាំងស្រុង** ៖ newPage ធ្លាក់ · goto យឺត · settle ធ្លាក់ ·
+    // ការចាប់ចប់មុន ➜ មិនបោះចេញ ហើយ tab ដែលបើករួចត្រូវទុកចោល។
+    await scenario('⛔ newPage ធ្លាក់ · goto យឺត · settle ធ្លាក់ ➜ fail-open', async () => {
+        const dead = portal({ newPageThrows: true });
+        assert.deepEqual(await api.openArgusFromPortal(dead.ctx, dead.page, () => false, { settleMs: 5, openMs: 5 }),
+            { opened: false, reason: 'failed' });
+        const slow = portal({ gotoThrows: true });
+        assert.deepEqual(await api.openArgusFromPortal(slow.ctx, slow.page, () => false, { settleMs: 5, openMs: 5 }),
+            { opened: true, reason: 'tab-slow' });
+        const stuck = portal({ settleThrows: true });
+        assert.equal((await api.openArgusFromPortal(stuck.ctx, stuck.page, () => false, { settleMs: 5, openMs: 5 })).opened,
+            true, 'settle ធ្លាក់ មិនត្រូវបញ្ឈប់ការបើក');
+        const done = portal({});
+        assert.deepEqual(await api.openArgusFromPortal(done.ctx, done.page, () => true, { settleMs: 5, openMs: 5 }),
+            { opened: false, reason: 'done' });
+        assert.equal(done.state.newPages, 0);
+    });
+    // ⛔ លេខលំនាំដើមត្រូវអានចេញពីកូដពិត មិនមែនចាក់ literal ក្នុង checker។
+    await scenario('⛔ ពិដានបើកស្វ័យប្រវត្តិ ៖ លំនាំដើមពិត និងការហៅ fail-open', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const timeout = /const PORTAL_OPEN_TIMEOUT_MS = ([^;]+);/.exec(src);
+        const settle = /const PORTAL_SETTLE_MS = ([^;]+);/.exec(src);
+        assert.ok(timeout && settle, 'រកថេរពិដានមិនឃើញ');
+        const openMs = vm.runInNewContext(timeout[1]);
+        const settleMs = vm.runInNewContext(settle[1]);
+        assert.ok(openMs >= 20000, 'ពិដានបើក Argus ខ្លីពេក ៖ ' + openMs);
+        assert.ok(settleMs >= 3000 && settleMs <= openMs, 'ការរង់ចាំ SSO handshake មិនសម');
+        assert.ok(/tab\.goto\(ARGUS_URL/.test(src), 'tab ថ្មីត្រូវទៅ ARGUS_URL');
+        const call = src.indexOf('await openArgusFromPortal(context, page');
+        assert.ok(call > 0, 'captureCookieHeader ត្រូវហៅវា');
+        const tryAt = src.lastIndexOf('try {', call);
+        const catchAt = src.indexOf('} catch (_) {', call);
+        assert.ok(tryAt > 0 && catchAt > call, 'ការហៅត្រូវឈរក្នុង try');
+        assert.match(src.slice(catchAt, catchAt + 220), /Could not open Argus automatically/,
+            'catch ត្រូវ fail-open ជាសារ មិនមែនបោះចេញ');
     });
     console.log('\n' + pass + ' PASS / ' + fail + ' FAIL / 0 SKIP');
     process.exitCode = fail ? 1 : 0;

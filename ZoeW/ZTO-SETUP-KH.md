@@ -97,11 +97,18 @@ screenshot។ ក្រោយ Save ត្រូវ **Trigger deploy** ម្ត�
 
 ### ពេល ZTO បដិសេធ Cookie
 
-១. Double-click **`sync-zto-cookie.cmd`**។
-២. បើ ZTO សុំ សូម Login ក្នុង Edge/Chrome ដែលវាបើក រួច **ទុកទំព័រនោះចោល**។
+១. Double-click **`sync-zto-cookie.cmd`** ➜ វាបើកទំព័រ
+   **`gate.ztoglobal.com`** (ទំព័រនោះរក្សា session ➜ ជាទូទៅមិនសុំ password)។
+២. ឧបករណ៍ **បើក Argus ក្នុង tab ថ្មីជំនួសអ្នក** (បើ ZTO សុំ សូម Login
+   ជាធម្មតា) រួច **ទុកទំព័រនោះចោល**។ បើវាបើកមិនកើត សូមចុច **កាតសាខា**
+   ដោយខ្លួនឯង។ បើទំព័រ gate បើកមិនកើត ឧបករណ៍បោះពុម្ព URL របស់
+   Argus លើអេក្រង់ ➜ វាយវាក្នុង address bar ដោយផ្ទាល់។
 ៣. ឧបករណ៍បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយជោគជ័យ
-   (ជាទូទៅ Argus ហៅ API ភ្លាមក្រោយ Login)។ បើវានៅរង់ចាំ សូមចូល
+   (ជាទូទៅ Argus ហៅ API ភ្លាមក្រោយចូល)។ បើវានៅរង់ចាំ សូមចូល
    **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន Waybill មួយ។
+   ⛔ ការចាប់ឈរលើ Cookie របស់ **`aargus-api.ztoglobal.com`** ➜ ការចូល
+   ត្រឹមទំព័រ gate តែម្យ៉ាង **មិនទាន់គ្រប់គ្រាន់ទេ**។ បើអស់ម៉ោង ឧបករណ៍រាយ
+   ចំនួនការហៅ API ដែលវាឃើញ (សរុប · 2xx · មិនទាន់ Login)។
 ៤. ឧបករណ៍បញ្ចូល `Set-Cookie` ថ្មី រួចបិទ browser ➜ សរសេរ Cookie ចូល
    Netlify Blobs។ **មិនចាំបាច់ redeploy**។ បើ ZTO បដិសេធ session
    (401/403 ឬទំព័រ Login) វា **មិនយក Cookie នោះទេ** — វានៅរង់ចាំ។

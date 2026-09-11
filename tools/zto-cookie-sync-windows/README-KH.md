@@ -18,19 +18,22 @@
 
 មកនៅត្រឹម៖
 
-`double-click sync-zto-cookie.cmd ➜ Login Argus បើចាំបាច់ ➜ រង់ចាំវាចាប់`
+`double-click sync-zto-cookie.cmd ➜ ចុចកាតសាខាលើទំព័រ gate ➜ រង់ចាំវាចាប់`
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
-`%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ហើយចាប់បន្ទាត់ `Cookie:` ពី
-**សំណើពិត** ទៅ `aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
+`%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ត្រង់ទំព័រ
+**`gate.ztoglobal.com`** ដែលរក្សា session (ចំណែក `argus.ztoglobal.com`
+សុំ Login រាល់ដង) ហើយចាប់បន្ទាត់ `Cookie:` ពី **សំណើពិត** ទៅ
+`aargus-api.ztoglobal.com`។ ដូច្នេះវាមិនប្រើ
 `document.cookie` និងមិនប្រើ `chrome.cookies` API ដែលបានវាស់ថាត្រឡប់
 បញ្ជីទទេលើ Edge របស់អ្នកទេ។
 
 ឧបករណ៍រង់ចាំ **ចម្លើយជោគជ័យ** ពី API host នោះ (2xx · JSON · envelope
 ជោគជ័យ) មុនបិទ browser ៖ នោះជាភស្តុតាងថា ZTO **ទទួលយក** session នោះពិត។
-ជាទូទៅ **ការ Login រួច** គឺគ្រប់គ្រាន់ ព្រោះ Argus ហៅ API ភ្លាមក្រោយចូល។
+ជាទូទៅ **ការបើក Argus រួច** គឺគ្រប់គ្រាន់ ព្រោះ Argus ហៅ API ភ្លាមក្រោយចូល។
 បើវានៅរង់ចាំ សូមចូល **Scan Management ➜ Arrival Scan** ហើយវាយ ឬស្កេន
-Waybill មួយ។ វាបញ្ចូលការបន្ត `Set-Cookie` ពីចម្លើយនោះ មុនយក Cookie ទៅ
+Waybill មួយ។ បើវាអស់ម៉ោង វារាយ **ចំនួនការហៅ API ដែលវាឃើញ** (សរុប · 2xx ·
+មិនទាន់ Login) ដើម្បីឲ្យអ្នកដឹងថាជាប់ត្រង់ណា។ វាបញ្ចូលការបន្ត `Set-Cookie` ពីចម្លើយនោះ មុនយក Cookie ទៅ
 រក្សាទុក។ បើ ZTO បដិសេធ session (401/403 ឬទំព័រ Login) វា **មិនចាប់ទេ** —
 វានៅរង់ចាំ ដើម្បីឲ្យអ្នក Login ម្ដងទៀត។
 
@@ -169,11 +172,13 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 ### ប្រើរាល់ពេល Cookie ផុត
 
 1. Double-click **`sync-zto-cookie.cmd`**។
-2. Edge/Chrome profile ពិសេសបើក Argus។
-3. បើ ZTO សុំ សូម **Login ជាធម្មតា** រួច **ទុកទំព័រនោះចោល**។ ឧបករណ៍
-   បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយជោគជ័យ (ជាទូទៅ
-   Argus ហៅ API ភ្លាមក្រោយ Login)។ បើវានៅរង់ចាំ សូមចូល **Scan Management
-   ➜ Arrival Scan** ហើយ **វាយ ឬស្កេន Waybill មួយ**។
+2. Edge/Chrome profile ពិសេសបើកទំព័រ **`gate.ztoglobal.com`**។
+3. ចុច **កាតសាខា** លើទំព័រនោះ ➜ **Argus** បើក (ជាទូទៅមិនសុំ password ទេ
+   ព្រោះ gate រក្សា session; បើវាសុំ សូម Login ជាធម្មតា) រួច **ទុកទំព័រនោះ
+   ចោល**។ ឧបករណ៍បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយ
+   ជោគជ័យ។ បើវានៅរង់ចាំ សូមចូល **Scan Management ➜ Arrival Scan** ហើយ
+   **វាយ ឬស្កេន Waybill មួយ**។ បើទំព័រ gate បើកមិនកើត ឧបករណ៍បោះពុម្ព URL
+   របស់ Argus លើអេក្រង់ ➜ វាយវាក្នុង address bar ដោយផ្ទាល់។
 4. ទុកឲ្យឧបករណ៍បិទ browser រួចសរសេរ Cookie ចូល Netlify Blobs ដោយខ្លួនឯង។
    **មិនចាំបាច់ redeploy ទេ**។
 5. បើអ្នកបានបញ្ចូល **Site URL + `ZTO_PROXY_KEY`** ក្នុង `setup.cmd` នោះវា

@@ -4,6 +4,7 @@
 const assert = require('assert/strict');
 const { EventEmitter } = require('events');
 const path = require('path');
+const fs = require('fs');
 const ROOT = process.env.ZTO_CAPTURE_APP_DIR
     ? path.resolve(process.env.ZTO_CAPTURE_APP_DIR) : path.resolve(__dirname, '..');
 let api;
@@ -276,6 +277,77 @@ async function main() {
         assert.equal(health.healthy, null);
         assert.equal(api.shouldRefreshInAuto(health), false);
         assert.match(api.describeHealth(health), /not yet verified/i);
+    });
+    // ⛔ **ចំណុចចាប់ផ្តើមរបស់ helper** ៖ `argus.ztoglobal.com` សុំ Login
+    // **រាល់ដង** ចំណែក `gate.ztoglobal.com` រក្សា session ➜ ចុចកាតសាខា ➜
+    // Argus បើកដោយមិនវាយ password (វាស់ដោយម្ចាស់គម្រោង)។ ⛔ ការសាកលើកមុន
+    // (a59d139) ធ្លាក់ ព្រោះជុំនោះ `isTargetApiUrl` ទាមទារ path
+    // `/scan/get/order/detail` ➜ ការចូល Argus តែម្យ៉ាងមិនគ្រប់គ្រាន់។ ជុំ
+    // 6c82ea9 ដក path នោះចេញរួចហើយ ➜ ច្រកទ្វារឥឡូវជា **host** សុទ្ធសាធ។
+    await scenario('helper បើក gate (session នៅ) មិនមែន argus (Login រាល់ដង)', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const portal = /const PORTAL_URL = '([^']+)';/.exec(src);
+        assert.ok(portal, 'រកការប្រកាស PORTAL_URL មិនឃើញ');
+        assert.equal(new URL(portal[1]).hostname, 'gate.ztoglobal.com');
+        assert.ok(/page\.goto\(PORTAL_URL/.test(src), 'browser ត្រូវបើក PORTAL_URL');
+        assert.ok(!/page\.goto\(ARGUS_URL/.test(src), 'មិនត្រូវបើក argus ជាចំណុចចាប់ផ្តើម');
+    });
+    // ⛔ **ទិសផ្ទុយ** ៖ ការដក argus ចេញទាំងស្រុង ជាការថយក្រោយ — ថ្ងៃណាដែល
+    // gate បើកមិនកើត អ្នកប្រើនៅតែត្រូវការ URL ផ្ទាល់នៅលើអេក្រង់។
+    await scenario('⛔ argus នៅតែបោះពុម្ពជាផ្លូវបម្រុង (កុំកាត់ផ្លូវចេញ)', async () => {
+        const src = fs.readFileSync(path.join(ROOT, 'tools/zto-cookie-sync-windows/sync-zto-cookie.js'), 'utf8');
+        const argus = /const ARGUS_URL = '([^']+)';/.exec(src);
+        assert.ok(argus, 'ថេរ ARGUS_URL ត្រូវនៅ');
+        assert.equal(new URL(argus[1]).hostname, 'argus.ztoglobal.com');
+        assert.ok(/console\.log\([^\n]*ARGUS_URL/.test(src), 'ARGUS_URL ត្រូវលេចលើអេក្រង់ cmd');
+    });
+    // ⛔ ចំណុចចាប់ផ្តើមប្តូរ **មិនត្រូវ** ទាញគោលដៅចាប់ទៅតាមវាទេ ៖ Cookie
+    // ដែលត្រូវការជារបស់ `aargus-api` ដដែល។
+    await scenario('⛔ ការចាប់នៅតែសំដៅ aargus-api (gate មិនប្តូរគោលដៅ)', async () => {
+        assert.equal(api.isTargetApiUrl(TARGET), true);
+        assert.equal(api.isTargetApiUrl('https://aargus-api.ztoglobal.com/any/other/path'), true);
+        assert.equal(api.isTargetApiUrl('https://gate.ztoglobal.com/scan/get/order/detail'), false);
+        assert.equal(api.isTargetApiUrl('https://argus.ztoglobal.com/scan/get/order/detail'), false);
+    });
+    // ⛔ ជុំ 2026-09-09 ដកចំណុចចាប់ផ្តើម gate ចេញវិញដោយ **មូលហេតុមិនទាន់
+    // វាស់** ៖ helper ចេញត្រឹមពាក្យ «អស់ម៉ោង» ដោយមិនប្រាប់ថា browser ទៅដល់ណា។
+    // អ្នករាប់នេះបំពេញចន្លោះនោះ — ហើយវាត្រូវឈរ **ក្រៅ** ផ្លូវចាប់ ៖ រាល់ការ
+    // អានរុំក្នុង try ➜ getter ដែលបោះ មិនអាចកាត់ផ្តាច់ការចាប់បាន។
+    await scenario('រង្វាស់ពេលអស់ម៉ោង ៖ រាប់តែ aargus-api និងបែងចែក 2xx/401', async () => {
+        const ctx = context();
+        const watcher = api.watchApiTraffic(ctx);
+        assert.deepEqual(watcher.tally(), { seen: 0, ok: 0, denied: 0, other: 0 });
+        assert.match(watcher.summary().join(' '), /never called the ZTO API/i);
+        emit(ctx, { url: 'https://gate.ztoglobal.com/home' });
+        emit(ctx, { url: 'https://argus.ztoglobal.com/' });
+        assert.deepEqual(watcher.tally(), { seen: 0, ok: 0, denied: 0, other: 0 });
+        emit(ctx, { status: 401 });
+        assert.deepEqual(watcher.tally(), { seen: 1, ok: 0, denied: 1, other: 0 });
+        assert.match(watcher.summary().join(' '), /refused every call/i);
+        emit(ctx, { status: 503 });
+        emit(ctx, {});
+        assert.deepEqual(watcher.tally(), { seen: 3, ok: 1, denied: 1, other: 1 });
+        assert.match(watcher.summary().join(' '), /no signed-in success/i);
+        assert.ok(watcher.summary().every((line) => /^[\x20-\x7e]*$/.test(line)), 'សារ cmd ត្រូវជា ASCII');
+        watcher.stop();
+        assert.equal(ctx.listenerCount('response'), 0);
+        emit(ctx, {});
+        assert.equal(watcher.tally().seen, 3);
+    });
+    await scenario('⛔ អ្នករាប់ដែលបោះ មិនត្រូវសម្លាប់ការចាប់', async () => {
+        const ctx = context();
+        const task = waiting(ctx);
+        const watcher = api.watchApiTraffic(ctx);
+        try {
+            ctx.emit('response', {
+                url: () => 'https://aargus-api.ztoglobal.com/x',
+                request: () => null,
+                status: () => { throw new Error('synthetic status getter'); }
+            });
+            assert.deepEqual(watcher.tally(), { seen: 1, ok: 0, denied: 0, other: 0 });
+            emit(ctx);
+            assert.equal(await task.promise, NEW);
+        } finally { watcher.stop(); ctx.emit('close'); await task.promise.catch(() => {}); }
     });
     console.log('\n' + pass + ' PASS / ' + fail + ' FAIL / 0 SKIP');
     process.exitCode = fail ? 1 : 0;

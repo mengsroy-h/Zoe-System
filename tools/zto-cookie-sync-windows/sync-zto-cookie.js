@@ -15,6 +15,9 @@ const TOOL_DIR = __dirname;
 // នៅតែបោះពុម្ពជា **ផ្លូវបម្រុង** សម្រាប់ថ្ងៃដែល gate បើកមិនកើត។
 const PORTAL_URL = 'https://gate.ztoglobal.com/';
 const ARGUS_URL = 'https://argus.ztoglobal.com/';
+const ARGUS_HOST = new URL(ARGUS_URL).hostname;
+const PORTAL_OPEN_TIMEOUT_MS = 20 * 1000;
+const PORTAL_OPEN_POLL_MS = 1000;
 const API_HOST = 'aargus-api.ztoglobal.com';
 // ⛔ OPTIONS (preflight) និង HEAD មិនបញ្ជាក់ថា ZTO ទទួលយក session ទេ —
 // preflight មិនផ្ញើ Cookie សោះ។ មានតែ GET និង POST ដែល ZTO
@@ -876,6 +879,69 @@ function waitForOrderCookie(context, timeoutMs, options) {
     });
 }
 
+// ⛔ ច្រកទ្វារ **អត្តសញ្ញាណ** មិនមែន `endsWith` ធូរ ៖ `aargus-api.ztoglobal.com`
+// មិនត្រូវរាប់ជា Argus ហើយ `argus.ztoglobal.com.evil.test` ក៏ដូចគ្នា។
+function isArgusHost(hostname) {
+    const host = String(hostname || '').toLowerCase();
+    return host === ARGUS_HOST || host.endsWith('.' + ARGUS_HOST);
+}
+
+// ⛔ **ការចុចជំនួសអ្នកប្រើ ត្រូវ fail-open ទាំងស្រុង** ៖ រកតំណមិនឃើញ · ទំព័រ
+// ប្តូរ · evaluate បោះ ➜ ឧបករណ៍ត្រឡប់ទៅឥរិយាបថចាស់បេះបិទ (អ្នកប្រើចុចដោយដៃ)។
+// ⛔ វាដើរតាម **អត្តសញ្ញាណ host** មិនមែនតាម *លំដាប់កាត* ឬ *ពាក្យក្នុងចំណងជើង*
+// (ទំព័រ gate ប្តូរភាសាបាន ➜ ការផ្គូផ្គងតាមអក្សរធ្លាក់ស្ងាត់ៗ)។
+// ⛔ ច្រកទ្វារ ៣ មុនចុច ៖ ទំព័រនៅលើ gate · គ្មាន tab ណាឈរលើ Argus រួច
+// (អ្នកប្រើចុចមុន ➜ កុំបើកស្ទួន) · ការចាប់មិនទាន់ចប់។
+async function openArgusFromPortal(context, page, isDone, options) {
+    const config = options || {};
+    const timeoutMs = Number.isFinite(config.timeoutMs)
+        ? Math.max(1, Math.min(PORTAL_OPEN_TIMEOUT_MS, config.timeoutMs)) : PORTAL_OPEN_TIMEOUT_MS;
+    const pollMs = Number.isFinite(config.pollMs)
+        ? Math.max(1, Math.min(PORTAL_OPEN_POLL_MS, config.pollMs)) : PORTAL_OPEN_POLL_MS;
+    const deadline = Date.now() + timeoutMs;
+    let links = 0;
+    while (!isDone() && Date.now() < deadline) {
+        let here = '';
+        try { here = new URL(page.url()).hostname.toLowerCase(); } catch (_) { return { opened: false, links, reason: 'page' }; }
+        if (isArgusHost(here)) return { opened: false, links, reason: 'already' };
+        for (const other of context.pages()) {
+            let host = '';
+            try { host = new URL(other.url()).hostname.toLowerCase(); } catch (_) { continue; }
+            if (isArgusHost(host)) return { opened: false, links, reason: 'already' };
+        }
+        let found = null;
+        try {
+            found = await page.evaluate((host) => {
+                const points = (value) => {
+                    try {
+                        const name = new URL(value, location.href).hostname.toLowerCase();
+                        return name === host || name.endsWith('.' + host);
+                    } catch (_) { return false; }
+                };
+                const links = Array.from(document.querySelectorAll('a[href]'));
+                const direct = links.filter((node) => points(node.href));
+                if (direct.length) { direct[0].click(); return { total: links.length, clicked: true, via: 'href' }; }
+                for (const node of Array.from(document.querySelectorAll('*'))) {
+                    for (const attr of Array.from(node.attributes || [])) {
+                        const value = String(attr.value || '');
+                        if (value.indexOf(host) !== -1 && points(value)) {
+                            node.click();
+                            return { total: links.length, clicked: true, via: 'attr' };
+                        }
+                    }
+                }
+                return { total: links.length, clicked: false, via: '' };
+            }, ARGUS_HOST);
+        } catch (_) { found = null; }
+        if (found) {
+            links = Number(found.total) || 0;
+            if (found.clicked) return { opened: true, links, reason: String(found.via || 'link') };
+        }
+        try { await page.waitForTimeout(pollMs); } catch (_) { return { opened: false, links, reason: 'page' }; }
+    }
+    return { opened: false, links, reason: isDone() ? 'done' : 'no-link' };
+}
+
 async function captureCookieHeader() {
     const launched = await launchLocalBrowser();
     const context = launched.context;
@@ -889,7 +955,7 @@ async function captureCookieHeader() {
         const page = pages[0] || await context.newPage();
         console.log('The ZTO gate page is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
         console.log('   1. The gate usually keeps your session. Log in only if ZTO asks.');
-        console.log('   2. Click the branch card on the gate page -> Argus opens.');
+        console.log('   2. This tool opens Argus for you. If it does not, click the branch card.');
         console.log('   3. Stay on the page. This tool continues by itself as soon as ZTO');
         console.log('      answers one signed-in API call with success.');
         console.log('   4. If it keeps waiting, open Scan Management -> Arrival Scan and');
@@ -899,6 +965,18 @@ async function captureCookieHeader() {
             await page.goto(PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } catch (_) {
             console.log('WARNING: the ZTO gate did not answer yet. The page stays open, so log in or refresh.');
+        }
+        let captured = false;
+        waiter.then(() => { captured = true; }, () => { captured = true; });
+        try {
+            const opened = await openArgusFromPortal(context, page, () => captured);
+            if (opened.opened) console.log('   Opened Argus for you. Waiting for a signed-in answer...');
+            else if (opened.reason === 'no-link') {
+                console.log('   Could not find the Argus link on the gate page (' + opened.links + ' link(s) seen).');
+                console.log('   Please click the branch card yourself. Everything else keeps working.');
+            }
+        } catch (_) {
+            console.log('   Could not open Argus automatically. Please click the branch card yourself.');
         }
         return await waiter;
     } catch (error) {
@@ -1152,6 +1230,7 @@ module.exports = {
     cookieHeaderFromHeaders,
     cookieHeaderFromRequest,
     getNetlifySite,
+    isArgusHost,
     isTargetApiUrl,
     loadConfig,
     localStateRoot,
@@ -1175,6 +1254,7 @@ module.exports = {
     verifyCookieLive,
     validateToken,
     verifyNetlifySetup,
+    openArgusFromPortal,
     waitForOrderCookie,
     watchApiTraffic
 };

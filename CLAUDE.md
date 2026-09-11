@@ -1510,6 +1510,14 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 ⛔ **Cookie អាយុវែងលើ `argus` មិនជំនួសវាបានឡើយ** (`__zcat_uuid__` ផុត
 ២០២៧ · `ZTO_INTL_BOS_MAN_TOKEN`) — ពួកវា **domain ផ្សេង** ➜ browser មិនផ្ញើ
 ទៅ API host សោះ ➜ `validateCookieHeader()` ត្រូវទាមទារ `BOS-MAN-SESSION` ដដែល។
+⛔ **ការចុចបើក Argus ជំនួសអ្នកប្រើ** (`openArgusFromPortal()`) ដើរតាម
+**អត្តសញ្ញាណ host** ៖ តំណ ឬ attribute ណាមួយដែលសំដៅ `argus.ztoglobal.com`
+(`isArgusHost()` — ⛔ **មិនមែន `endsWith` ធូរ** ៖ `aargus-api` និង
+`notargus` មិនរាប់) ⛔ **មិនមែនតាមលំដាប់កាត ឬពាក្យក្នុងចំណងជើង** (gate ជា
+SPA ហើយប្តូរភាសាបាន ➜ ការផ្គូផ្គងតាមអក្សរធ្លាក់ស្ងាត់ៗ)។ ⛔ **fail-open
+ទាំងស្រុង** ៖ រកមិនឃើញ · `evaluate` បោះ · ទំព័រប្តូរ ➜ ត្រឡប់ទៅ «អ្នកប្រើ
+ចុចដោយដៃ» ដដែល។ ⛔ **ច្រកទ្វារ ៣ មុនចុច** ៖ ទំព័រនៅលើ gate · គ្មាន tab ណា
+ឈរលើ Argus រួច (អ្នកប្រើចុចមុន ➜ កុំបើកស្ទួន) · ការចាប់មិនទាន់ចប់។
 ⛔ ការសាកលើកមុន (`a59d139`, ដកចេញវិញ `8718909`) ធ្លាក់ព្រោះជុំនោះ
 `isTargetApiUrl()` នៅទាមទារ path — **មិនមែនព្រោះ gate**។ ⛔ ហើយមូលហេតុពិត
 មិនអាចវាស់បាន ព្រោះ helper ចេញត្រឹមពាក្យ «អស់ម៉ោង» ➜ `watchApiTraffic()`

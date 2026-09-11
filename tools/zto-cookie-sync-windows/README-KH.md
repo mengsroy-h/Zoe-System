@@ -18,7 +18,7 @@
 
 មកនៅត្រឹម៖
 
-`double-click sync-zto-cookie.cmd ➜ ចុចកាតសាខាលើទំព័រ gate ➜ រង់ចាំវាចាប់`
+`double-click sync-zto-cookie.cmd ➜ រង់ចាំវាចាប់`
 
 វាបើក **Microsoft Edge** (ឬ Chrome) ជាមួយ profile ដាច់ដោយឡែកក្នុង
 `%LOCALAPPDATA%\Zoe-System\ZTO-Cookie-Sync` ត្រង់ទំព័រ
@@ -173,9 +173,10 @@ environment variable, Netlify Function, browser extension ឬ repo ឡើយ។
 
 1. Double-click **`sync-zto-cookie.cmd`**។
 2. Edge/Chrome profile ពិសេសបើកទំព័រ **`gate.ztoglobal.com`**។
-3. ចុច **កាតសាខា** លើទំព័រនោះ ➜ **Argus** បើក (ជាទូទៅមិនសុំ password ទេ
-   ព្រោះ gate រក្សា session; បើវាសុំ សូម Login ជាធម្មតា) រួច **ទុកទំព័រនោះ
-   ចោល**។ ឧបករណ៍បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយ
+3. ឧបករណ៍ **ចុចបើក Argus ជំនួសអ្នក** (ជាទូទៅមិនសុំ password ទេ ព្រោះ gate
+   រក្សា session; បើវាសុំ សូម Login ជាធម្មតា) រួច **ទុកទំព័រនោះចោល**។
+   បើវាចុចមិនកើត វាប្រាប់លើអេក្រង់ ➜ សូមចុច **កាតសាខា** ដោយខ្លួនឯង
+   (មុខងារដទៃទាំងអស់នៅដំណើរការដដែល)។ ឧបករណ៍បន្តដោយខ្លួនឯង ភ្លាមពេល ZTO ឆ្លើយការហៅ API ណាមួយដោយ
    ជោគជ័យ។ បើវានៅរង់ចាំ សូមចូល **Scan Management ➜ Arrival Scan** ហើយ
    **វាយ ឬស្កេន Waybill មួយ**។ បើទំព័រ gate បើកមិនកើត ឧបករណ៍បោះពុម្ព URL
    របស់ Argus លើអេក្រង់ ➜ វាយវាក្នុង address bar ដោយផ្ទាល់។

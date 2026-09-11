@@ -86,6 +86,12 @@
 
 ### `[មិនឡើងកំណែ]` 2026-09-11 · helper Windows ចាប់ផ្តើមពី `gate.ztoglobal.com` (ជុំទី ២) + រង្វាស់ពេលចាប់មិនកើត
 
+> ✅ **ផ្ទៀងផ្ទាត់លើ Windows ពិតរួច (2026-09-11)** — ម្ចាស់គម្រោងរាយ ៖
+> `Opened Argus in a new tab. Waiting for a signed-in answer...` ➜
+> `OK: cookie captured.` ➜ **ស្វ័យប្រវត្តិទាំងស្រុង ៖ ចុចសូន្យដង**។
+> ⛔ ផ្លូវពេញ ៖ `sync-zto-cookie.cmd` ➜ gate (SSO handshake) ➜ tab ថ្មីទៅ
+> Argus ➜ ការហៅ API ដែលចូលរួច ➜ ចាប់ Cookie ➜ សរសេរចូល Netlify Blobs។
+
 **គ្មានកូដ ship ប្រែ** ➜ ⛔ **គ្មានការឡើងកំណែ PWA** ៖ ZoeW នៅ `2.31.14`
 (`zoew-v194`) · ZoeKeyGen នៅ `2.19.21` (`zoekeygen-v91`)។ ការកែស្ថិតក្នុង
 `tools/zto-cookie-sync-windows/` ដែល `version-bump-scope` លើកលែងដោយចេតនា។

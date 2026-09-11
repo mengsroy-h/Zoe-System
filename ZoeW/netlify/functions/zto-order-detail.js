@@ -27,6 +27,50 @@ const COD_PATHS = ['agentAmount', 'codAmount', 'collectionAmount', 'codFee', 'co
 const DOD_PATHS = ['arrivalServiceCharge', 'dodAmount', 'arrivalCharge', 'serviceCharge', 'dod'];
 const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcode'];
 
+// ⛔ ផ្លូវ **បញ្ជី** (`/scan/page/scan`) ជាផ្លូវទី ២ ឆ្ពោះទៅ ZTO ៖ វាទាញ
+// កញ្ចប់តាម **ជួរកាលបរិច្ឆេទ** ជំនួសការសួរ barcode ម្តងមួយ។ សំបករបស់វា
+// ផ្ទុក **array** (`data.result[]`) ➜ `orderCandidates()` ដែលរកវត្ថុ
+// **តែមួយ** មិនស្រង់វាចេញបានទេ។ វាល barcode ក៏ផ្សេងដែរ ៖ `scanBillCode`។
+//
+// ⛔ **មុខងារនេះជាការស្រេចចិត្ត** — គ្មាន `ZTO_LIST_SITE_CODE` ➜ វាដេកលក់
+// ទាំងស្រុង ហើយការកំណត់ **ខុស** បិទតែវា មិនប៉ះការស្កេន (ច្បាប់ដដែលនឹង
+// `ZTO_FIELD_SIGNED` ៖ លេខទូរស័ព្ទ និងលុយសំខាន់ជាងបញ្ជី)។
+const DEFAULT_LIST_URL = 'https://aargus-api.ztoglobal.com/scan/page/scan';
+const DEFAULT_LIST_SCAN_TYPE = '03';
+// ⛔ `scanTypeCode` ជាតម្រងដែល **ZTO** អនុវត្ត ➜ យើងផ្ទៀងផ្ទាត់វាមិនបាន។
+// ជួរដេកដែលត្រឡប់មកផ្ទុក `scanTypeDesc` ជាអត្ថបទ ➜ នោះជាជាន់ការពារ
+// **ខាងយើង** ៖ បើលេខកូដប្រែ ឬ ZTO បញ្ចូលប្រភេទស្កេនផ្សេង (ចេញដំណើរ ·
+// ប្រគល់) នោះកញ្ចប់ខុសនឹងចូល ZoeW ដោយស្ងាត់។ (សំណើម្ចាស់គម្រោង 2026-09-11។)
+// ⛔ ច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស» នៅដដែល ៖ ជួរដេកដែល **គ្មានវាលនេះ**
+// មិនត្រូវរំលង — មានតែ «មានវាល ហើយវាខុស» ទើបសម្គាល់។
+const DEFAULT_LIST_SCAN_DESC = 'អីវ៉ាន់មកដល់';
+const LIST_SCAN_DESC_PATHS = ['scanTypeDesc', 'scanTypeName', 'scanDesc'];
+// ⛔ **ជាន់ទី ២ ៖ កូដស្ថិរ។** `scanTypeDesc` ជាអត្ថបទដែល **បកប្រែ** ➜ វាប្រែ
+// តាមភាសារបស់គណនី ➜ ការពឹងលើវាតែម្យ៉ាងធ្វើឲ្យការប្តូរភាសាក្លាយជា **បញ្ជីទទេ
+// កុហក**។ `scanTypeCode` ជាកូដស្ថិរ ➜ ទាំង ២ ត្រូវពិនិត្យ **ឯករាជ្យ**
+// (សំណើម្ចាស់គម្រោង 2026-09-11 ៖ «អោយ sync តែ `03` + «អីវ៉ាន់មកដល់»»)។
+const LIST_SCAN_CODE_PATHS = ['scanTypeCode', 'scanType'];
+const LIST_SITE_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
+const LIST_SCAN_TYPE_RE = /^[A-Za-z0-9_-]{1,8}$/;
+const LIST_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
+const LIST_RANGE_MAX_DAYS = 31;
+const LIST_ROW_MAX = 200;
+const LIST_CACHE_TTL_MAX_MS = 60000;
+// ⛔ បញ្ជីដាក់ `scanBillCode` **មុខគេ** ព្រោះជួរដេករបស់វាអាចផ្ទុក
+// `billCode` ផ្សេង (លេខមេ) ដែលមិនមែនលេខស្លាកដែលស្កេនចូល។ បញ្ជីដើម
+// នៅជាប្រភពតែមួយ ➜ **ការបន្ថែម មិនមែនការចម្លង**។
+const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
+const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
+// ⛔ **`fcAmount` ជា DOD លើផ្លូវបញ្ជី** (ការបញ្ជាក់របស់ម្ចាស់គម្រោង
+// 2026-09-11 លើ payload ពិត) ៖ កញ្ចប់ `ztda` ដែលអតិថិជនទទួល មាន
+// `agentAmount: 0` (គ្មានប្រាក់ប្រមូលជំនួស) ប៉ុន្តែ `fcAmount: 2.5` គឺជា
+// **ថ្លៃដឹកដែលអតិថិជនបង់ពេលទទួល** = DOD ក្នុងវាក្យស័ព្ទ ZoeW។ កញ្ចប់
+// Shopee មាន `fcAmount: 0.0` ➜ DOD 0 ដដែល។
+// ⛔ **វាប៉ះតែផ្លូវបញ្ជី** ៖ `DOD_PATHS` នៅដដែល ➜ ផ្លូវស្កេន (`/detail`)
+// ដែលកំពុងដំណើរការជាមួយ **លុយពិត** មិនប្រែសោះ។ ⛔ ការបន្ថែម មិនមែនការចម្លង។
+const LIST_DOD_PATHS = ['fcAmount'].concat(DOD_PATHS);
+
 const FIELD_SEPARATOR = '|';
 const CACHE_MAX = 200;
 // សាលក្រម «រកមិនឃើញ» មានអាយុខ្លីជាងលទ្ធផលពិតដោយចេតនា ៖ កញ្ចប់ដែល ZTO
@@ -614,6 +658,168 @@ function readSignedConfig(env) {
     return out;
 }
 
+// ⛔ **មិនបោះជាដាច់ខាត** ៖ ការកំណត់បញ្ជីខុសត្រូវបិទតែមុខងារបញ្ជី ហើយ
+// រាយមូលហេតុក្នុង `?diag=1` — មិនមែនបោះ `ZtoConfigError` ➜ 503 ដែលនឹង
+// **សម្លាប់ការស្កេន** ទាំងស្រុង។
+function readListConfig(env) {
+    const out = {
+        enabled: false, url: null, siteCode: '', scanType: DEFAULT_LIST_SCAN_TYPE,
+        pageSize: 100, maxPages: 3, reason: '', fingerprint: ''
+    };
+    const rawSite = String(env.ZTO_LIST_SITE_CODE || '').trim();
+    if (!rawSite) { out.reason = 'site:missing'; return out; }
+    if (!LIST_SITE_CODE_RE.test(rawSite)) { out.reason = 'site:invalid'; return out; }
+    let url;
+    try {
+        url = new URL(String(env.ZTO_LIST_URL || '').trim() || DEFAULT_LIST_URL);
+    } catch (_) {
+        out.reason = 'url:invalid';
+        return out;
+    }
+    if (url.protocol !== 'https:') { out.reason = 'url:invalid'; return out; }
+    const scanType = String(env.ZTO_LIST_SCAN_TYPE || '').trim() || DEFAULT_LIST_SCAN_TYPE;
+    if (!LIST_SCAN_TYPE_RE.test(scanType)) { out.reason = 'scan-type:invalid'; return out; }
+    out.enabled = true;
+    out.url = url;
+    out.siteCode = rawSite;
+    out.scanType = scanType;
+    // ⛔ អត្ថបទទទេ ជាការ **បិទជាន់នេះដោយចេតនា** (ZTO ប្តូរឈ្មោះ ➜ អ្នកប្រើ
+    // ត្រូវអាចដោះវាចេញភ្លាម ដោយមិនរង់ចាំ deploy កូដ)។ `undefined` ➜ លំនាំដើម។
+    out.scanDesc = env.ZTO_LIST_SCAN_DESC === undefined
+        ? DEFAULT_LIST_SCAN_DESC
+        : String(env.ZTO_LIST_SCAN_DESC).trim();
+    out.pageSize = boundedInteger(env.ZTO_LIST_PAGE_SIZE, 100, 10, 100);
+    out.maxPages = boundedInteger(env.ZTO_LIST_MAX_PAGES, 3, 1, 20);
+    out.fingerprint = crypto.createHash('sha256')
+        .update(url.href).update(FIELD_SEPARATOR)
+        .update(rawSite).update(FIELD_SEPARATOR)
+        .update(scanType).update(FIELD_SEPARATOR)
+        .update(out.scanDesc).update(FIELD_SEPARATOR)
+        .update(String(out.pageSize))
+        .digest('base64url')
+        .slice(0, 16);
+    return out;
+}
+
+// ⛔ កាលបរិច្ឆេទត្រូវ **ពិត** មិនត្រឹមត្រូវនឹង regex ៖ `2026-02-31` ឆ្លង
+// `LIST_DATE_RE` តែរអិលទៅ `2026-03-03` ➜ ជួរដែលអ្នកប្រើមិនបានស្នើ។
+function listDateIsValid(text) {
+    if (!LIST_DATE_RE.test(text)) return false;
+    const at = Date.parse(text + 'T00:00:00Z');
+    if (!Number.isFinite(at)) return false;
+    return new Date(at).toISOString().slice(0, 10) === text;
+}
+
+function listRange(fromText, toText) {
+    const from = String(fromText || '').trim();
+    const to = String(toText || '').trim();
+    if (!listDateIsValid(from) || !listDateIsValid(to)) return null;
+    const a = Date.parse(from + 'T00:00:00Z');
+    const b = Date.parse(to + 'T00:00:00Z');
+    if (b < a) return null;
+    if ((b - a) / 86400000 > LIST_RANGE_MAX_DAYS - 1) return null;
+    return { from: from, to: to, start: from + ' 00:00:00', end: to + ' 23:59:59' };
+}
+
+function listRequestBody(listConfig, range, page) {
+    return {
+        condition: {
+            dispatchOrSendManCode: null,
+            mailNos: [],
+            preOrNextStationCode: null,
+            scanEndTime: range.end,
+            scanManCode: null,
+            scanSiteCode: listConfig.siteCode,
+            scanStartTime: range.start,
+            scanTypeCode: listConfig.scanType,
+            signMan: null
+        },
+        pageNum: page,
+        pageSize: listConfig.pageSize
+    };
+}
+
+// ⛔ សំបកមាន **ជាន់** ៖ `{data:{pageNum,pages,total,result:[…]}}`។ ជួរដេក
+// ត្រូវរកឃើញជា **array** ពិត — `result` ដែលមិនមែន array ត្រូវជា **ការធ្លាក់**
+// មិនមែន «០ ជួរដេក» ស្ងាត់ៗ (០ ជួរដេកកុហក ធ្វើឲ្យអ្នកប្រើជឿថាថ្ងៃនោះទទេ)។
+function listContainerOf(upstream) {
+    if (!upstream || typeof upstream !== 'object') return null;
+    const roots = [upstream.data, upstream.result, upstream.data && upstream.data.data,
+        upstream.body, upstream];
+    const keys = ['result', 'rows', 'list', 'records', 'items'];
+    for (let i = 0; i < roots.length; i++) {
+        const node = roots[i];
+        if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+        for (let j = 0; j < keys.length; j++) {
+            if (Array.isArray(node[keys[j]])) return { rows: node[keys[j]], meta: node };
+        }
+    }
+    for (let i = 0; i < roots.length; i++) {
+        if (Array.isArray(roots[i])) return { rows: roots[i], meta: {} };
+    }
+    return null;
+}
+
+// ⛔ កញ្ចប់ដែល **មិនមែនរបស់អតិថិជន** (ឆ្លងកាត់ · ផ្ទាល់ខ្លួន) មកជាមួយ
+// `consigneeMobile: "0"` ➜ វាមិនមែនលេខទូរស័ព្ទទេ។ ⛔ តែ `cod === 0`
+// **មិនមែនតម្រង** — កញ្ចប់ `taobao` ដែលបង់មុន មាន COD = 0 ស្របច្បាប់។
+function listPhoneIsPlaceholder(text) {
+    const digits = String(text || '').replace(/[^0-9]/g, '');
+    return !digits || /^0+$/.test(digits);
+}
+
+// ⛔ **ការបញ្ចាំងឈរនៅ server** ៖ ឈ្មោះ · អាសយដ្ឋាន · `fcAmount` (ថ្លៃដឹក)
+// មិនត្រូវឆ្លងកាត់ទេ — PII ដែលមិនប្រើ និងទំហំដែលមិនចាំបាច់។
+// ⛔ សាលក្រម ៣ ៖ `''` (ប្រើបាន) · `'scan-type'` (ប្រភេទស្កេនខុស) ·
+// `''` សម្រាប់ជួរដេកដែល **គ្មានវាល** — «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»។
+// ⛔ តម្លៃពិតរបស់វាល **មិនឆ្លងកាត់ទៅ browser** — ត្រឹមសាលក្រម។
+function listScanTypeSkip(listConfig, candidates) {
+    const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
+    if (code && code !== listConfig.scanType) return 'scan-type';
+    if (!listConfig.scanDesc) return '';
+    const desc = pickText(candidates, LIST_SCAN_DESC_PATHS);
+    if (!desc) return '';
+    return desc === listConfig.scanDesc ? '' : 'scan-type';
+}
+
+function projectListRow(config, row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+    const candidates = [row];
+    const phone = pickText(candidates, config.phonePaths);
+    const cod = pickNumber(candidates, config.codPaths);
+    // ⛔ `ZTO_FIELD_DOD` (បើកំណត់) ឈ្នះជានិច្ច ➜ ការប្តូរវាលនាពេលអនាគត
+    // នៅតែធ្វើបានដោយ env តែម្យ៉ាង គ្មានការកែកូដ។
+    const dod = pickNumber(candidates,
+        config.dodPaths === DOD_PATHS ? LIST_DOD_PATHS : config.dodPaths);
+    const at = pickText(candidates, LIST_TIME_PATHS);
+    return {
+        barcode: pickText(candidates, LIST_BARCODE_PATHS),
+        phone: listPhoneIsPlaceholder(phone) ? '' : phone,
+        cod: cod === null ? 0 : cod,
+        dod: dod === null ? 0 : dod,
+        at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : '',
+        skip: listScanTypeSkip(config.list, candidates)
+    };
+}
+
+function listResponseBody(config, container, page) {
+    const rows = container.rows.slice(0, LIST_ROW_MAX)
+        .map((row) => projectListRow(config, row))
+        .filter(Boolean);
+    const meta = container.meta || {};
+    const pages = Number(meta.pages);
+    const total = Number(meta.total);
+    return {
+        success: true,
+        list: true,
+        enabled: true,
+        page: page,
+        pages: Number.isFinite(pages) ? pages : (rows.length ? 1 : 0),
+        total: Number.isFinite(total) ? total : rows.length,
+        rows: rows
+    };
+}
+
 function readHttpsUrl(raw, label) {
     let url;
     try {
@@ -678,6 +884,7 @@ function readConfig(env) {
         dodPaths: readFieldPaths(env.ZTO_FIELD_DOD, DOD_PATHS, 'dod'),
         barcodePaths: readFieldPaths(env.ZTO_FIELD_BARCODE, BARCODE_PATHS, 'barcode'),
         signed: readSignedConfig(env),
+        list: readListConfig(env),
         upstreamTimeoutMs: boundedInteger(env.ZTO_UPSTREAM_TIMEOUT_MS, 6000, 2000, 20000),
         budgetMs: boundedInteger(env.ZTO_REQUEST_BUDGET_MS, 9000, 4000, 24000),
         retries: boundedInteger(env.ZTO_UPSTREAM_RETRIES, 1, 0, 3),
@@ -689,6 +896,11 @@ function readConfig(env) {
     config.notFoundCacheTtlMs = Math.min(
         boundedInteger(env.ZTO_NOT_FOUND_CACHE_TTL_MS, NOT_FOUND_CACHE_TTL_DEFAULT_MS, 0, 120000),
         config.cacheTtlMs);
+
+    // ⛔ បញ្ជីប្រែរាល់ការស្កេនថ្មីរបស់ ZTO ➜ TTL របស់វាខ្លីដោយចេតនា ហើយ
+    // ឈរ **ក្រោម** `cacheTtlMs` ➜ `ZTO_CACHE_TTL_MS=0` បិទគ្រប់ផ្លូវ cache
+    // ក្នុងកន្លែងតែមួយ។
+    config.listCacheTtlMs = Math.min(config.cacheTtlMs, LIST_CACHE_TTL_MAX_MS);
 
     config.budgetMs = Math.min(24000, Math.max(config.budgetMs, config.upstreamTimeoutMs + 1500));
     config.upstreamTimeoutMs = Math.min(config.upstreamTimeoutMs, config.budgetMs - 1000);
@@ -730,7 +942,7 @@ function applyAuthentication(headers, env, cookie) {
     return '';
 }
 
-function buildHeaders(config, env, cookie) {
+function buildHeaders(config, env, cookie, wantsPost) {
     const credential = {};
     const authKind = applyAuthentication(credential, env, cookie);
     const headers = {
@@ -738,7 +950,9 @@ function buildHeaders(config, env, cookie) {
         'Accept-Language': config.acceptLanguage,
         'User-Agent': config.userAgent
     };
-    if (config.method === 'POST') headers['Content-Type'] = 'application/json;charset=UTF-8';
+    // ⛔ ផ្លូវបញ្ជីជា POST ជានិច្ច ទោះ `ZTO_API_METHOD` ជា GET ➜ header
+    // ត្រូវដេរីវេពី **សំណើដែលនឹងចេញពិត** មិនមែនពី method លំនាំដើម។
+    if (config.method === 'POST' || wantsPost) headers['Content-Type'] = 'application/json;charset=UTF-8';
     const wantsBrowserHeaders = config.sendBrowserHeaders === null
         ? authKind === 'cookie'
         : config.sendBrowserHeaders === true;
@@ -877,7 +1091,10 @@ function abortError() {
     return error;
 }
 
-async function requestOnce(config, headers, barcode, timeoutMs, session) {
+// ⛔ `plan` ជា **ការបន្ថែមស្រេចចិត្ត** មិនមែនផ្លូវទី ២ ៖ abort · សាលក្រម
+// auth · ការបន្តអាយុ Cookie · ការបម្លែង 429/5xx/HTML ត្រូវ **ប្រើរួម**។
+// ការចម្លងរង្វិលជុំនេះសម្រាប់បញ្ជី នឹងបង្កើតផ្លូវបណ្តាញដែលគ្មានអ្នកយាម។
+async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
     const controller = new AbortController();
     let timer = null;
     const settleGuard = new Promise((_, reject) => {
@@ -889,14 +1106,16 @@ async function requestOnce(config, headers, barcode, timeoutMs, session) {
     settleGuard.catch(() => {});
 
     async function attempt() {
-        const target = new URL(config.endpoint.href);
+        const target = new URL(plan ? plan.href : config.endpoint.href);
         const init = {
-            method: config.method,
+            method: plan ? 'POST' : config.method,
             headers,
             signal: controller.signal,
             redirect: 'manual'
         };
-        if (config.method === 'POST') {
+        if (plan) {
+            init.body = JSON.stringify(plan.body);
+        } else if (config.method === 'POST') {
             init.body = JSON.stringify(fillTemplate(config.bodyTemplate, barcode, 0));
         } else {
             target.searchParams.set(config.queryParam, barcode);
@@ -951,6 +1170,23 @@ async function requestOnce(config, headers, barcode, timeoutMs, session) {
             };
         }
 
+        if (plan) {
+            // ⛔ សំបកដែលគ្មានជួរដេកជា **ការធ្លាក់** មិនមែន «រកមិនឃើញ» ៖
+            // `found:false` ជាសាលក្រមរបស់ barcode តែមួយ — បញ្ជីទទេពិត
+            // មកជា array ទទេ ដែលឆ្លងផ្លូវជោគជ័យដដែល។
+            const built = plan.extract(upstream);
+            if (!built) {
+                return {
+                    kind: 'fatal',
+                    response: json(502, {
+                        error: upstreamMessage(upstream, 'ZTO list response has no rows'),
+                        code: 'ZTO_UPSTREAM_REJECTED'
+                    })
+                };
+            }
+            return { kind: 'ok', body: built };
+        }
+
         const order = extractOrder(config, upstream);
         if (!order) return { kind: 'notFound' };
         return {
@@ -987,7 +1223,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session) {
     }
 }
 
-async function fetchOrder(config, headers, barcode, startedAt, session) {
+async function fetchOrder(config, headers, barcode, startedAt, session, plan) {
     let attempt = 0;
     let lastTransient = null;
     for (;;) {
@@ -999,7 +1235,7 @@ async function fetchOrder(config, headers, barcode, startedAt, session) {
             };
         }
         const timeoutMs = Math.max(1000, Math.min(config.upstreamTimeoutMs, remaining - 200));
-        const outcome = await requestOnce(config, headers, barcode, timeoutMs, session);
+        const outcome = await requestOnce(config, headers, barcode, timeoutMs, session, plan);
         if (outcome.kind !== 'transient') return outcome;
         lastTransient = { kind: 'fatal', response: outcome.response };
         attempt += 1;
@@ -1043,7 +1279,7 @@ function cookieRenewTimeoutMs(config, startedAt) {
     return Math.min(COOKIE_RENEW_WRITE_TIMEOUT_MS, room);
 }
 
-async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie) {
+async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, previousCookie, plan) {
     if (process.env.ZTO_AUTHORIZATION || process.env.ZTO_TOKEN) return null;
     if (budgetLeftMs(config, startedAt) < COOKIE_REFRESH_RETRY_RESERVE_MS) return null;
     const readMs = cookieReadTimeoutMs(config, startedAt);
@@ -1063,15 +1299,16 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
     }
     let built;
     try {
-        built = buildHeaders(config, process.env, fresh.cookie);
+        built = buildHeaders(config, process.env, fresh.cookie, !!plan);
     } catch (_) {
         return null;
     }
     if (!built.authKind) return null;
-    const flightKey = config.fingerprint + '|' + barcode.toUpperCase() + '|' + (cookieFingerprint(fresh.cookie) || '-');
+    const flightKey = (plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase())
+        + '|' + (cookieFingerprint(fresh.cookie) || '-');
     let outcome;
     try {
-        outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt);
+        outcome = await runSharedLookup(flightKey, config, built.headers, barcode, fresh, startedAt, plan);
     } catch (_) {
         return null;
     }
@@ -1105,10 +1342,10 @@ function readCachedBody(key, ttlMs, negativeTtlMs) {
     return hit.body;
 }
 
-function runSharedLookup(key, config, headers, barcode, session, startedAt) {
+function runSharedLookup(key, config, headers, barcode, session, startedAt, plan) {
     const existing = inFlight.get(key);
     if (existing) return existing;
-    const run = fetchOrder(config, headers, barcode, startedAt, session);
+    const run = fetchOrder(config, headers, barcode, startedAt, session, plan);
     inFlight.set(key, run);
     run.then(() => {}, () => {}).then(() => {
         if (inFlight.get(key) === run) inFlight.delete(key);
@@ -1168,6 +1405,21 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedValues: config.signed.values.length,
             signedReason: config.signed.reason || null
         },
+        // ⛔ ស្ថានភាព **បើក/បិទ + មូលហេតុ** ប៉ុណ្ណោះ ៖ លេខសាខាជាការកំណត់
+        // របស់អាជីវកម្ម ➜ វាមិនត្រូវលេចក្នុងចម្លើយវិនិច្ឆ័យទេ (ច្បាប់ដដែល
+        // នឹង `signedValues` ដែលរាយត្រឹម **ចំនួន**)។
+        list: {
+            enabled: config.list.enabled,
+            reason: config.list.reason || null,
+            host: config.list.url ? config.list.url.hostname : null,
+            path: config.list.url ? config.list.url.pathname : null,
+            pageSize: config.list.pageSize,
+            maxPages: config.list.maxPages,
+            scanTypeIsDefault: config.list.scanType === DEFAULT_LIST_SCAN_TYPE,
+            scanDescIsDefault: config.list.scanDesc === DEFAULT_LIST_SCAN_DESC,
+            scanDescEnforced: !!config.list.scanDesc,
+            cacheTtlMs: config.listCacheTtlMs
+        },
         timing: {
             upstreamTimeoutMs: config.upstreamTimeoutMs,
             budgetMs: config.budgetMs,
@@ -1215,7 +1467,50 @@ exports.handler = async function handler(event) {
     const wantsDiagnostics = String(query.diag || '') === '1';
     const wantsFreshCookie = wantsDiagnostics && String(query.fresh || '') === '1';
     const barcode = String(query.barcode || '').trim();
-    if (!wantsDiagnostics && !BARCODE_RE.test(barcode)) {
+
+    // ⛔ សាខាបញ្ជីឈរ **មុន** ការត្រួតពិនិត្យ `BARCODE_RE` ៖ សំណើបញ្ជី
+    // គ្មាន barcode សោះ ➜ ការដាក់វាក្រោយធ្វើឲ្យវាធ្លាក់ 400 ជានិច្ច។
+    const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
+    let plan = null;
+    if (wantsList) {
+        // ⛔ មុខងារបិទ ≠ កំហុស ➜ HTTP 200 **គ្មានវាល `error`** (ច្បាប់ដដែល
+        // នឹង `found:false` ៖ វាល `error` បង្ខំ client ចូល cooldown)។
+        if (!config.list.enabled) {
+            return json(200, {
+                success: false,
+                list: true,
+                enabled: false,
+                code: 'ZTO_LIST_NOT_CONFIGURED',
+                reason: config.list.reason || 'site:missing'
+            });
+        }
+        const range = listRange(query.from, query.to);
+        if (!range) {
+            return json(400, {
+                error: 'Invalid list date range',
+                code: 'ZTO_LIST_RANGE_INVALID'
+            });
+        }
+        const page = Number(String(query.page || '1').trim());
+        if (!Number.isInteger(page) || page < 1 || page > config.list.maxPages) {
+            return json(400, { error: 'Invalid list page', code: 'ZTO_LIST_PAGE_INVALID' });
+        }
+        plan = {
+            href: config.list.url.href,
+            body: listRequestBody(config.list, range, page),
+            extract: (upstream) => {
+                const container = listContainerOf(upstream);
+                return container ? listResponseBody(config, container, page) : null;
+            },
+            // ⛔ កូនសោបញ្ជីត្រូវ **ផ្សេងតាមរចនាសម្ព័ន្ធ** ពីកូនសោ barcode ៖
+            // `BARCODE_RE` មិនអនុញ្ញាត `|` ➜ បច្ច័យ `|L|` មិនអាចប៉ះគ្នាបាន។
+            cacheKey: config.fingerprint + '|L|' + config.list.fingerprint
+                + '|' + range.from + '|' + range.to + '|' + page,
+            cacheTtlMs: config.listCacheTtlMs
+        };
+    }
+
+    if (!wantsDiagnostics && !plan && !BARCODE_RE.test(barcode)) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
     }
 
@@ -1225,9 +1520,11 @@ exports.handler = async function handler(event) {
     // ទាំងមូលចោល** ហើយបង្ខំឲ្យអានឡើងវិញពី store មុនឆ្លើយ។ ការប្តូរ config
     // (endpoint · field · method) នៅតែផ្លាស់កូនសោដដែល តាម `config.fingerprint`។
     // ផលដែលវាស់បាន ៖ ការស្កេនដដែលក្នុង TTL ឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs**។
-    const cacheKey = config.fingerprint + '|' + barcode.toUpperCase();
+    const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();
     if (!wantsDiagnostics) {
-        const early = readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
+        const early = plan
+            ? readCachedBody(cacheKey, plan.cacheTtlMs, 0)
+            : readCachedBody(cacheKey, config.cacheTtlMs, config.notFoundCacheTtlMs);
         if (early) return json(200, Object.assign({}, early, { cached: true }));
     }
 
@@ -1239,7 +1536,7 @@ exports.handler = async function handler(event) {
             fresh: wantsFreshCookie,
             timeoutMs: wantsDiagnostics ? COOKIE_STORE_TIMEOUT_MS : cookieReadTimeoutMs(config, startedAt)
         });
-        const built = buildHeaders(config, process.env, session.cookie);
+        const built = buildHeaders(config, process.env, session.cookie, !!plan);
         headers = built.headers;
         authKind = built.authKind;
     } catch (error) {
@@ -1263,7 +1560,7 @@ exports.handler = async function handler(event) {
 
     let outcome;
     try {
-        outcome = await runSharedLookup(flightKey, config, headers, barcode, session, startedAt);
+        outcome = await runSharedLookup(flightKey, config, headers, barcode, session, startedAt, plan);
     } catch (_) {
         return json(502, { error: 'Unable to reach ZTO', code: 'ZTO_UNAVAILABLE' });
     }
@@ -1277,7 +1574,7 @@ exports.handler = async function handler(event) {
         // ដូច្នេះអានឡើងវិញដោយ `fresh` ១ ដង ហើយសាកម្តងទៀត **តែពេល
         // fingerprint ប្រែ** — បើមិនប្រែ ➜ ឆ្លើយការបដិសេធ 401
         // ភ្លាមដោយគ្មានការហៅ upstream ឥតប្រយោជន៍។
-        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie);
+        const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan);
         if (!retried) {
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
         }
@@ -1296,7 +1593,8 @@ exports.handler = async function handler(event) {
     await flushCookieRenewal(session, cookieRenewTimeoutMs(config, startedAt));
 
     if (outcome.kind === 'ok') {
-        if (config.cacheTtlMs > 0) storeCachedBody(cacheKey, outcome.body);
+        const ttlMs = plan ? plan.cacheTtlMs : config.cacheTtlMs;
+        if (ttlMs > 0) storeCachedBody(cacheKey, outcome.body);
         return json(200, Object.assign({}, outcome.body, { cached: false }));
     }
     if (outcome.kind === 'notFound') {

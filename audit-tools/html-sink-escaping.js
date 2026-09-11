@@ -94,7 +94,9 @@ const BUILDER_ALLOW = {
         activeCount: 'លេខ — ចំនួន barcode ដែលមិនទាន់បិទ',
         moreDropdown: 'HTML សាងខាងលើ; item.id ឆ្លង sanitizeInput()',
         callAction: 'HTML សាងខាងលើ; item.phone និង item.id ឆ្លង sanitizeInput()',
-        closeAction: 'HTML សាងខាងលើ; item.id ឆ្លង sanitizeInput()'
+        closeAction: 'HTML សាងខាងលើ; item.id ឆ្លង sanitizeInput()',
+        groupRowsHtml: 'ជួរដេកបញ្ជី ZTO សាងខាងលើក្នុង function ដដែល; barcode និង meta ឆ្លង sanitizeInput()',
+        groupMoreHtml: 'អត្ថបទ «និង N ទៀត» សាងខាងលើ; ឆ្លង sanitizeInput() ជាមួយលេខ'
     },
     ZoeKeyGen: {
         statusHtml: 'HTML សាងខាងលើពី badge ថេរ + escapeHtml()',

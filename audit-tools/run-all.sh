@@ -97,7 +97,8 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          listener-pending-key-test history-patch-retry-test lookup-prefetch-test \
          lookup-freshness-test zto-proxy-test zto-budget-test zto-negative-cache-test zto-cookie-sync-test zto-cookie-store-test lookup-failure-identity-test \
          lookup-burst-test health-check-test monthly-report-test zto-network-boundaries-test \
-         zto-cookie-session-test zto-cookie-capture-test zto-signed-status-test; do
+         zto-cookie-session-test zto-cookie-capture-test zto-signed-status-test \
+         zto-list-sync-test; do
     run "$t" node "audit-tools/$t.js"
 done
 
@@ -322,6 +323,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ZTO_CAPTURE_APP_DIR="$BASE" node audit-tools/zto-cookie-capture-test.js 2>&1 | tail -1 | sed 's/^/   zto-capture:     /'
     ZTOSTORE_APP_DIR="$BASE" node audit-tools/zto-cookie-store-test.js 2>&1 | tail -1 | sed 's/^/   zto-cookie-store:/'
     ZTOSIGNED_APP_DIR="$BASE" node audit-tools/zto-signed-status-test.js 2>&1 | tail -1 | sed 's/^/   zto-signed:      /'
+    ZTOLIST_APP_DIR="$BASE" node audit-tools/zto-list-sync-test.js 2>&1 | tail -1 | sed 's/^/   zto-list-sync:   /'
     DEPSEC_APP_DIR="$BASE" node audit-tools/dependency-security-test.js 2>&1 | tail -1 | sed 's/^/   dependency-sec:  /'
     FBACKUP_APP_DIR="$BASE" node audit-tools/firebase-backup-test.js 2>&1 | tail -1 | sed 's/^/   firebase-backup: /'
     CRUDFLOW_APP_DIR="$BASE" node audit-tools/emu/crud-rules-flow.js 2>&1 | tail -1 | sed 's/^/   emu-crud-flow:   /'

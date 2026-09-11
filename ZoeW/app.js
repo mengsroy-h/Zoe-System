@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.32.1';
+    const APP_VERSION = '2.33.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -33,6 +33,7 @@
         "drawerLookupApiFlow",
         "drawerSheetImportFlow",
         "drawerZtoAutoCloseFlow",
+        "drawerZtoListSyncFlow",
         "editSheetImportConfig",
         "executePermanentDelete",
         "executeRestoreItem",
@@ -48,6 +49,7 @@
         "filterRecentlyDeleted",
         "forgetAppLockPin",
         "handleCallAction",
+        "importZtoListRows",
         "handleSheetImportFileInput",
         "loadSheetImportSelectedSheet",
         "logoutApp",
@@ -71,12 +73,15 @@
         "openMonthlyStatsModal",
         "openSideDrawer",
         "openViewListModal",
+        "openZtoListSyncModal",
         "openZtoSyncModal",
         "pickSheetImportFile",
         "promptPermanentDelete",
         "promptRestoreDeletedItem",
+        "closeZtoListSyncModal",
         "closeZtoSyncModal",
         "recheckZtoPickupStatus",
+        "runZtoListSyncPreview",
         "renderEntryList",
         "renderLockerList",
         "renderMonthlyReport",
@@ -1377,6 +1382,10 @@
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពិនិត្យស្ថានភាពកញ្ចប់នៅ ZTO លើកក្រោយ'
         },
+        ztoListSync: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីទាញបញ្ជីកញ្ចប់ពី ZTO',
+            setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការទាញបញ្ជីកញ្ចប់ពី ZTO លើកក្រោយ'
+        },
         locker: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីកំណត់ទូ Locker',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការកំណត់ទូ Locker លើកក្រោយ'
@@ -2617,6 +2626,7 @@
         clearCustomerDataTableCache();
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
+        refreshZtoListSyncUi();
         prefetchCustomerDataTableRowsIfConfigured();
         showToast(enabled ? "✅ បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "ℹ️ បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
         if (cfg.headerName && lookupApiIsAppsScript(cfg)) {
@@ -4568,6 +4578,11 @@
         const ztoSyncNoteEl = document.getElementById('ztoSyncModalNote');
         if (ztoSyncNoteEl) ztoSyncNoteEl.innerText = '';
         closeModal('ztoSyncModal');
+        const ztoListBodyEl = document.getElementById('ztoListSyncBody');
+        if (ztoListBodyEl) ztoListBodyEl.innerHTML = '';
+        ztoListSyncResult = null;
+        ztoListSyncInFlight = false;
+        closeModal('ztoListSyncModal');
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -4618,7 +4633,8 @@
             'siConfigSummary', 'siConfigMsg', 'siFileMsg', 'siMapMsg', 'siActionMsg', 'siClearMsg',
             'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
             'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
-            'appLockPinInput', 'appLockMsg'
+            'appLockPinInput', 'appLockMsg',
+            'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -5985,6 +6001,7 @@
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();
+        refreshZtoListSyncUi();
         prefetchCustomerDataTableRowsIfConfigured();
 
         setInterval(() => {
@@ -6882,6 +6899,7 @@
         showAppChrome();
         hidePhoneSuggestions();
         refreshZtoAutoCloseUi();
+        refreshZtoListSyncUi();
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         backdrop.classList.add('open');
@@ -13293,6 +13311,372 @@
             ? '🔄 នៅសល់ ' + left + ' កញ្ចប់ដែល ZTO មិនទាន់បិទ'
                 + (leftIsPartial ? ' · ' + VIEW_NOT_MEASURABLE_TEXT : '')
             : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់'));
+    }
+
+    const ZTO_LISTSYNC_KEY = 'zoew_zto_listsync_v1';
+    const ZTO_LIST_DEFAULT_DAYS = 4;
+    const ZTO_LIST_CLIENT_MAX_PAGES = 3;
+    const ZTO_LIST_PREVIEW_ROWS = 12;
+    const ZTO_LIST_IMPORT_MAX = 100;
+    let ztoListSyncInFlight = false;
+    let ztoListSyncResult = null;
+
+    function ztoListSyncEnabled() {
+        return safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1';
+    }
+
+    function refreshZtoListSyncUi() {
+        const on = ztoListSyncEnabled();
+        const state = document.getElementById('ztoListSyncState');
+        if (state) state.textContent = on ? 'បើក' : 'បិទ';
+        const drawerBtn = document.getElementById('ztoListSyncDrawerBtn');
+        if (drawerBtn) drawerBtn.classList.toggle('is-on', on);
+        const btn = document.getElementById('ztoListSyncBtn');
+        if (btn) btn.classList.toggle('hidden', !(on && ztoStatusFeatureConfig()));
+    }
+
+    function drawerZtoListSyncFlow() {
+        drawerAction(function () {
+            const next = !ztoListSyncEnabled();
+            safeStoreSet(appLocalStore, ZTO_LISTSYNC_KEY, next ? '1' : '0');
+            refreshZtoListSyncUi();
+            showToast(next
+                ? '✅ បើករួច ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចនៅរបាប្រវត្តិ'
+                : 'ℹ️ បិទរួច ៖ ប៊ូតុងបញ្ជី ZTO ត្រូវលាក់វិញ');
+        });
+    }
+
+    function classifyZtoListRows(rows, historyList, trashList) {
+        const out = { fresh: [], existing: [], duplicate: [], skipped: [] };
+        const list = Array.isArray(rows) ? rows : [];
+        const known = new Set();
+        const addKnown = (items) => {
+            if (!Array.isArray(items)) return;
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (!item) continue;
+                const codes = Array.isArray(item.barcodes) ? item.barcodes : null;
+                if (codes) {
+                    for (let j = 0; j < codes.length; j++) {
+                        const key = pickupBarcodeKey(codes[j] && codes[j].code);
+                        if (key) known.add(key);
+                    }
+                }
+                const single = item.barcode ? pickupBarcodeKey(item.barcode) : '';
+                if (single) known.add(single);
+            }
+        };
+        addKnown(historyList);
+        addKnown(trashList);
+
+        const best = new Map();
+        const order = [];
+        for (let i = 0; i < list.length; i++) {
+            const raw = list[i] || {};
+            const key = pickupBarcodeKey(raw.barcode);
+            const phone = normalizeStoredPhone(raw.phone);
+            const cod = Number(raw.cod);
+            const dod = Number(raw.dod);
+            const row = {
+                barcode: String(raw.barcode === undefined || raw.barcode === null ? '' : raw.barcode),
+                phone: phone,
+                cod: isFinite(cod) ? cod : 0,
+                dod: isFinite(dod) ? dod : 0,
+                at: String(raw.at === undefined || raw.at === null ? '' : raw.at),
+                skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
+                key: key
+            };
+            if (!key || !phone || row.skip) {
+                out.skipped.push(row);
+                continue;
+            }
+            const prior = best.get(key);
+            if (!prior) {
+                best.set(key, row);
+                order.push(key);
+                continue;
+            }
+            if (row.at >= prior.at) {
+                out.duplicate.push(prior);
+                best.set(key, row);
+            } else {
+                out.duplicate.push(row);
+            }
+        }
+        for (let i = 0; i < order.length; i++) {
+            const row = best.get(order[i]);
+            if (known.has(row.key)) out.existing.push(row);
+            else out.fresh.push(row);
+        }
+        return out;
+    }
+
+    function buildZtoListApiUrl(cfg, from, to, page) {
+        if (!cfg || !cfg.url) return '';
+        const raw = String(cfg.url).trim();
+        const marker = '/.netlify/functions/zto-order-detail';
+        const markerAt = raw.toLowerCase().indexOf(marker);
+        const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
+        return base + '?list=1&from=' + encodeURIComponent(from)
+            + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page));
+    }
+
+    async function fetchZtoListPage(cfg, from, to, page) {
+        const url = buildZtoListApiUrl(cfg, from, to, page);
+        if (!url) return null;
+        const headers = await buildLookupRequestHeaders(cfg);
+        const out = await fetchWithTimeout(url, { headers: headers, cache: 'no-store' },
+            ZTO_AUTO_LOOKUP_TIMEOUT_MS, 'ZTO list timed out', (r) => r.json().catch(() => null));
+        const body = out.body;
+        if (!body || typeof body !== 'object') {
+            throw new Error('ZTO_LIST_INVALID');
+        }
+        if (body.enabled === false) {
+            const err = new Error('ZTO_LIST_NOT_CONFIGURED');
+            err.listReason = safeLookupReason(body.reason);
+            err.notConfigured = true;
+            throw err;
+        }
+        if (!out.res.ok || !Array.isArray(body.rows)) {
+            const err = new Error('ZTO_LIST_FAILED');
+            err.httpStatus = out.res.status;
+            throw err;
+        }
+        return body;
+    }
+
+    function ztoListSyncRangeFromInputs() {
+        const fromEl = document.getElementById('ztoListSyncFrom');
+        const toEl = document.getElementById('ztoListSyncTo');
+        const from = fromEl && fromEl.value ? String(fromEl.value).trim() : '';
+        const to = toEl && toEl.value ? String(toEl.value).trim() : '';
+        const shape = /^\d{4}-\d{2}-\d{2}$/;
+        if (!shape.test(from) || !shape.test(to) || to < from) return null;
+        return { from: from, to: to };
+    }
+
+    function setZtoListSyncNote(text) {
+        const el = document.getElementById('ztoListSyncNote');
+        if (el) el.innerText = text;
+    }
+
+    function ztoListGroupHtml(title, rows, toneClass) {
+        const shown = rows.slice(0, ZTO_LIST_PREVIEW_ROWS);
+        const groupMoreHtml = rows.length > shown.length
+            ? '<div class="zto-list-more">' + sanitizeInput('និង ' + (rows.length - shown.length) + ' ទៀត') + '</div>'
+            : '';
+        const groupRowsHtml = shown.length
+            ? shown.map((row) => {
+                const money = [
+                    row.cod ? 'COD $' + row.cod.toFixed(2) : '',
+                    row.dod ? 'DOD $' + row.dod.toFixed(2) : ''
+                ].filter(Boolean).join(' · ');
+                const meta = [row.phone || '—', money, row.at].filter(Boolean).join(' · ');
+                return '<div class="zto-list-row">'
+                    + '<span class="zto-list-code">' + sanitizeInput(row.barcode || '—') + '</span>'
+                    + '<span class="zto-list-meta">' + sanitizeInput(meta) + '</span></div>';
+            }).join('')
+            : '<div class="zto-list-row zto-list-row-none">' + sanitizeInput('— គ្មាន —') + '</div>';
+        return `<div class="zto-list-group ${sanitizeInput(toneClass)}">`
+            + '<div class="zto-list-group-head">' + sanitizeInput(title + ' (' + rows.length + ')') + '</div>'
+            + groupRowsHtml + groupMoreHtml + '</div>';
+    }
+
+    function renderZtoListSyncPreview() {
+        const box = document.getElementById('ztoListSyncBody');
+        if (!box) return;
+        const result = ztoListSyncResult;
+        if (!result) {
+            box.innerHTML = '<div class="zto-list-empty">'
+                + sanitizeInput('ជ្រើសជួរកាលបរិច្ឆេទ រួចចុច «📥 ទាញបញ្ជី» ដើម្បីមើលកញ្ចប់ពី ZTO។')
+                + '</div>';
+            return;
+        }
+        const groups = classifyZtoListRows(result.rows, scanHistory, deletedItems);
+        const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
+        const freshTitle = stale ? '🆕 ថ្មី ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '🆕 ថ្មី (មិនទាន់មានក្នុង ZoeW)';
+        const existingTitle = stale ? '✅ មានក្នុង ZoeW រួច ➜ ' + VIEW_NOT_MEASURABLE_TEXT : '✅ មានក្នុង ZoeW រួច';
+        box.innerHTML = ztoListGroupHtml(freshTitle, groups.fresh, 'zto-list-fresh')
+            + ztoListGroupHtml(existingTitle, groups.existing, 'zto-list-existing')
+            + ztoListGroupHtml('♻️ ស្ទួនក្នុងបញ្ជី ZTO', groups.duplicate, 'zto-list-dup')
+            + ztoListGroupHtml('⏭️ រំលង (មិនមែនកញ្ចប់អតិថិជន)', groups.skipped, 'zto-list-skip');
+        const truncated = result.truncated
+            ? ' · ⚠️ បញ្ជីវែងជាង ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
+            : '';
+        setZtoListSyncNote('ZTO រាយ ' + result.total + ' ជួរដេក · ទាញបាន ' + result.rows.length
+            + ' · ' + result.from + ' ➜ ' + result.to + truncated
+            + (stale ? ' · ' + VIEW_NOT_MEASURABLE_NOTICE : '')
+            + ' — ⛔ ជុំនេះជាការមើលជាមុន ៖ គ្មានអ្វីត្រូវបញ្ចូលទេ។');
+    }
+
+    async function runZtoListSyncPreview() {
+        const cfg = ztoStatusFeatureConfig();
+        if (!cfg) {
+            showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
+            return;
+        }
+        if (ztoStatusSecretIsLocked(cfg)) {
+            showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីទាញបញ្ជីពី ZTO');
+            if (!isPinFlowPending()) requestPinBeforeConfig(openZtoListSyncModal, 'ztoListSync');
+            return;
+        }
+        if (navigator.onLine === false) {
+            showToast('⚠️ ក្រៅបណ្ដាញ — មិនអាចទាញបញ្ជីពី ZTO បានទេ');
+            return;
+        }
+        if (ztoListSyncInFlight) {
+            showToast('⏳ កំពុងទាញបញ្ជីពី ZTO រួចហើយ...');
+            return;
+        }
+        const range = ztoListSyncRangeFromInputs();
+        if (!range) {
+            showToast('⚠️ ជួរកាលបរិច្ឆេទមិនត្រឹមត្រូវ — ថ្ងៃបញ្ចប់ត្រូវនៅក្រោយថ្ងៃចាប់ផ្តើម');
+            return;
+        }
+        ztoListSyncInFlight = true;
+        setZtoListSyncNote('⏳ កំពុងទាញបញ្ជីពី ZTO...');
+        const rows = [];
+        let pages = 1;
+        let total = 0;
+        try {
+            for (let page = 1; page <= ZTO_LIST_CLIENT_MAX_PAGES; page++) {
+                const body = await fetchZtoListPage(cfg, range.from, range.to, page);
+                if (!body) break;
+                for (let i = 0; i < body.rows.length; i++) rows.push(body.rows[i]);
+                const reported = Number(body.pages);
+                pages = isFinite(reported) && reported > 0 ? reported : page;
+                const reportedTotal = Number(body.total);
+                if (isFinite(reportedTotal)) total = reportedTotal;
+                if (page >= pages) break;
+            }
+            ztoListSyncResult = {
+                rows: rows,
+                from: range.from,
+                to: range.to,
+                total: total || rows.length,
+                truncated: pages > ZTO_LIST_CLIENT_MAX_PAGES
+            };
+            renderZtoListSyncPreview();
+            showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
+        } catch (e) {
+            ztoListSyncResult = null;
+            renderZtoListSyncPreview();
+            if (e && e.notConfigured) {
+                setZtoListSyncNote('⚠️ មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify ('
+                    + (e.listReason || 'site:missing') + ') — សូមមើល ZTO-SETUP-KH.md ផ្នែក ៦');
+                showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
+            } else {
+                setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
+                showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
+            }
+        } finally {
+            ztoListSyncInFlight = false;
+        }
+    }
+
+    async function importZtoListRows() {
+        if (ztoListSyncInFlight) {
+            showToast('⏳ កំពុងដំណើរការរួចហើយ...');
+            return;
+        }
+        const result = ztoListSyncResult;
+        if (!result || !Array.isArray(result.rows) || !result.rows.length) {
+            showToast('⚠️ សូមទាញបញ្ជីជាមុនសិន');
+            return;
+        }
+        if (navigator.onLine === false) {
+            showToast('⚠️ ក្រៅបណ្ដាញ — មិនអាចបញ្ចូលបានទេ');
+            return;
+        }
+        if (anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS)) {
+            showToast('⏳ ' + VIEW_NOT_MEASURABLE_TEXT + ' — មិនអាចបញ្ចូលបានទេ');
+            return;
+        }
+        const groups = classifyZtoListRows(result.rows, scanHistory, deletedItems);
+        const queue = groups.fresh.slice(0, ZTO_LIST_IMPORT_MAX);
+        if (!queue.length) {
+            showToast('ℹ️ គ្មានកញ្ចប់ថ្មីត្រូវបញ្ចូលទេ');
+            return;
+        }
+        const capped = groups.fresh.length > queue.length
+            ? ' (ពិដាន ' + ZTO_LIST_IMPORT_MAX + ' ក្នុងមួយដង)' : '';
+        if (!confirm('បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
+            + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។')) {
+            return;
+        }
+        ztoListSyncInFlight = true;
+        let saved = 0;
+        let taken = 0;
+        let failed = 0;
+        try {
+            for (let i = 0; i < queue.length; i++) {
+                const row = queue[i];
+                setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + (i + 1) + '/' + queue.length + '...');
+                if (navigator.onLine === false) break;
+                if (isBarcodeAlreadyUsed(row.barcode)) continue;
+                let claim = 'unknown';
+                try {
+                    claim = await withTimeout(claimBarcodeInRegistry(row.barcode), 15000,
+                        'Barcode claim timed out');
+                } catch (e) {
+                    claim = 'unknown';
+                }
+                if (claim === 'taken') { taken++; continue; }
+                if (claim !== 'claimed') { failed++; continue; }
+                try {
+                    const status = await withTimeout(
+                        addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A'),
+                        15000, 'Save timed out');
+                    if (status === true) saved++;
+                    else failed++;
+                } catch (e) {
+                    failed++;
+                    releaseBarcodesInRegistry([row.barcode]);
+                    dropOptimisticBarcode(row.barcode);
+                    refreshCurrentHistoryView();
+                }
+            }
+        } finally {
+            ztoListSyncInFlight = false;
+        }
+        ztoListSyncResult = null;
+        renderZtoListSyncPreview();
+        const parts = ['✅ បញ្ចូល ' + saved + ' កញ្ចប់'];
+        if (taken) parts.push('♻️ ស្ទួន ' + taken);
+        if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
+        showToast(parts.join(' · '));
+        setZtoListSyncNote(parts.join(' · ') + ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');
+    }
+
+    function openZtoListSyncModal() {
+        const cfg = ztoStatusFeatureConfig();
+        if (!cfg) {
+            showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
+            return;
+        }
+        if (!ztoListSyncEnabled()) {
+            showToast('ℹ️ មុខងារទាញបញ្ជីពី ZTO បិទ — បើកវាក្នុងរបា Slide ជាមុនសិន');
+            return;
+        }
+        if (ztoStatusSecretIsLocked(cfg)) {
+            showToast('🔒 សូមវាយ PIN ម្តងជាមុន ដើម្បីទាញបញ្ជីពី ZTO');
+            if (!isPinFlowPending()) requestPinBeforeConfig(openZtoListSyncModal, 'ztoListSync');
+            return;
+        }
+        const fromEl = document.getElementById('ztoListSyncFrom');
+        const toEl = document.getElementById('ztoListSyncTo');
+        const now = getServerNow();
+        if (fromEl && !fromEl.value) fromEl.value = getZoneDateKey(now, -(ZTO_LIST_DEFAULT_DAYS - 1));
+        if (toEl && !toEl.value) toEl.value = getZoneDateKey(now, 0);
+        ztoListSyncResult = null;
+        renderZtoListSyncPreview();
+        setZtoListSyncNote('');
+        openModalHelper('ztoListSyncModal');
+    }
+
+    function closeZtoListSyncModal() {
+        ztoListSyncResult = null;
+        closeModal('ztoListSyncModal');
     }
 
     function renderHistory(dataToRender = scanHistory) {

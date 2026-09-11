@@ -177,6 +177,7 @@
                         📋 ប្រវត្តិ (<span id="count">0</span> នាក់)
                     </div>
                     <div class="header-actions">
+                        <button type="button" class="zto-list-btn hidden" id="ztoListSyncBtn" data-act="openZtoListSyncModal" title="ទាញបញ្ជីកញ្ចប់ពី ZTO Argus">📥 បញ្ជី ZTO</button>
                         <button class="daily-stats-btn" data-act="openDailyStatsModal">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
                         <button class="monthly-stats-btn" data-act="openMonthlyStatsModal">📊 ស្ថិតិចំណូល</button>
                     </div>
@@ -359,6 +360,9 @@
         </button>
         <button type="button" class="drawer-item drawer-toggle" id="ztoAutoCloseBtn" data-act="drawerZtoAutoCloseFlow">
             <span class="ico">🔄</span><span class="drawer-toggle-label">បិទតាម ZTO ស្វ័យប្រវត្តិ</span><span class="drawer-toggle-state" id="ztoAutoCloseState">បើក</span>
+        </button>
+        <button type="button" class="drawer-item drawer-toggle" id="ztoListSyncDrawerBtn" data-act="drawerZtoListSyncFlow">
+            <span class="ico">📥</span><span class="drawer-toggle-label">ទាញបញ្ជីកញ្ចប់ពី ZTO</span><span class="drawer-toggle-state" id="ztoListSyncState">បិទ</span>
         </button>
         <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
             <span class="ico">🔒</span><span class="drawer-toggle-label">ចាក់សោពេលបើក App</span><span class="drawer-toggle-state" id="appLockToggleState">បិទ</span>
@@ -712,6 +716,27 @@ const firebaseConfig = {
             <div class="modal-btns-row">
                 <button type="button" class="btn-confirm" id="ztoSyncRecheckBtn" data-act="recheckZtoPickupStatus">🔄 ពិនិត្យម្តងទៀត</button>
                 <button type="button" class="btn-cancel" id="ztoSyncCloseBtn" data-act="closeZtoSyncModal">បិទ</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="ztoListSyncModal" class="modal" data-close="closeZtoListSyncModal" role="dialog" aria-modal="true" aria-labelledby="ztoListSyncTitle">
+    <div class="modal-content zto-list-modal-content">
+        <h3 id="ztoListSyncTitle">📥 បញ្ជីកញ្ចប់ពី ZTO</h3>
+        <div class="zto-list-range">
+            <label for="ztoListSyncFrom">ពីថ្ងៃ</label>
+            <input type="date" id="ztoListSyncFrom">
+            <label for="ztoListSyncTo">ដល់ថ្ងៃ</label>
+            <input type="date" id="ztoListSyncTo">
+        </div>
+        <p id="ztoListSyncNote"></p>
+        <div class="zto-list-body" id="ztoListSyncBody"></div>
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button type="button" class="btn-confirm" id="ztoListSyncRunBtn" data-act="runZtoListSyncPreview">📥 ទាញបញ្ជី</button>
+                <button type="button" class="btn-confirm zto-list-import-btn" id="ztoListSyncImportBtn" data-act="importZtoListRows">➕ បញ្ចូលកញ្ចប់ថ្មី</button>
+                <button type="button" class="btn-cancel" id="ztoListSyncCloseBtn" data-act="closeZtoListSyncModal">បិទ</button>
             </div>
         </div>
     </div>

@@ -80,6 +80,79 @@ function sliceFn(name) {
         resolveSession(false);
         await thirdSession;
 
+        // ══════════════════════════════════════════════════════════════
+        // ⛔ ច្រកទ្វារ `sessionExpiryCheck === 'pending'` ជា **អន្ទាក់ស្ថាពរ**
+        //    បើគ្មាននរណា settle វា ៖ `runSessionExpiryCheck()` មានអ្នកហៅ
+        //    **តែមួយ** គឺ `setInterval(…, 60000)` ➜ ទង់ជាប់ `'pending'` =
+        //    ច្បាប់ ៤ ម៉ោង **ងាប់ពេញអាយុទំព័រ**។
+        //
+        //    លំដាប់ពិត ៖ ឧបករណ៍ថ្មី ➜ `proceedAfterLogin()` ➜
+        //    `ensureAppActivated()` ត្រឡប់ `false` ➜ **`return` មុនបន្ទាត់
+        //    arming** ➜ ទង់នៅតម្លៃដើម `'pending'` ➜ អ្នកប្រើវាយ Activation Key
+        //    ➜ `submitActivationKey()` ហៅ `initDatabaseListeners()` **ដោយផ្ទាល់**
+        //    ➜ App ប្រើបាន ១០០% ខណៈទង់នៅ `'pending'` ជារៀងរហូត។
+        //
+        //    ⛔ sandbox ខាងលើចាក់ `sessionExpiryCheck = "live"` ➜ ស្ថានភាព
+        //    `'pending'` **មិនដែលត្រូវវាស់សោះ** ➜ ថ្នាក់នេះមើលមិនឃើញ។
+        // ══════════════════════════════════════════════════════════════
+        const activateFn = sliceFn('submitActivationKey');
+        ok('⛔ ជាន់អប្បបរមា ៖ ស្រង់ `submitActivationKey()` ពិតបាន', !!activateFn);
+        if (activateFn) {
+            const armCounts = { session: 0, listeners: 0, expired: 0, toast: 0 };
+            let resolveArmSession = null;
+            const armCtx = vm.createContext({
+                Promise, console,
+                authGeneration: 7,
+                auth: { currentUser: { uid: 'u1' } },
+                isModalOpen: false,
+                withTimeout: (promise) => promise,
+                ZoeLicense: { activate: () => Promise.resolve({ valid: true }) },
+                LICENSE_APP_CODE: 'ADM',
+                ensureAppActivated: () => Promise.resolve(true),
+                initDatabaseListeners: () => { armCounts.listeners++; return true; },
+                isFirebaseSessionExpired: () => {
+                    armCounts.session++;
+                    return new Promise((resolve) => { resolveArmSession = resolve; });
+                },
+                forceExpireSession: () => { armCounts.expired++; },
+                refreshLiveToasts: () => {},
+                showToast: () => { armCounts.toast++; },
+                updateAuthButton: () => {},
+                safeFocusScanner: () => {},
+                licenseFailureMessage: () => 'x',
+                document: { getElementById: () => ({ value: 'KEY-1', disabled: false, textContent: '', focus: () => {} }) },
+                window: { ZoeErrors: { capture: () => {} } },
+                ZoeErrors: { capture: () => {} }
+            });
+            // ⛔ ទង់ចាប់ផ្តើមជា `'pending'` — **តម្លៃដើមពិតរបស់ `app.js`**
+            vm.runInContext('let sessionExpiryCheckInFlight = false; let isDatabaseInitialized = false;'
+                + ' let sessionExpiryCheck = "pending";\n'
+                + sessionFn + '\n' + activateFn + '\n'
+                + (sliceFn('armSessionExpiryCheck') || '')
+                + '\nthis.sessionCheck = runSessionExpiryCheck;'
+                + ' this.activate = submitActivationKey;'
+                + ' this.flag = () => sessionExpiryCheck;', armCtx);
+
+            // probe ទិសផ្ទុយ ៖ ខណៈ `'pending'` ច្រកទ្វារ **ត្រូវ** ទប់ (ការរចនា)
+            await armCtx.sessionCheck();
+            ok('⛔ ទិសផ្ទុយ ៖ ខណៈ `pending` ច្រកទ្វារទប់ការពិនិត្យ (ការរចនា)',
+                armCounts.session === 0, armCounts);
+
+            await armCtx.activate();
+            ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ Activate ឈានដល់ `initDatabaseListeners()` ពិត',
+                armCounts.listeners === 1, armCounts);
+            ok('⛔ ការ Activate ជោគជ័យត្រូវ **arm** ច្រកទ្វារវគ្គ (បើអត់ ➜ ច្បាប់ ៤ ម៉ោង ងាប់ពេញអាយុទំព័រ)',
+                armCounts.session === 1, armCounts);
+            if (resolveArmSession) resolveArmSession(false);
+            await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+            ok('⛔ ក្រោយ arm ចប់ ទង់ត្រូវ settle ចេញពី `pending`',
+                armCtx.flag() !== 'pending', armCtx.flag());
+            const before = armCounts.session;
+            await armCtx.sessionCheck();
+            ok('⛔ វដ្ត ៦០ វិ. ត្រូវរត់បានវិញក្រោយ Activate',
+                armCounts.session === before + 1, armCounts);
+        }
+
         const firstLicense = context.licenseCheck();
         const secondLicense = context.licenseCheck();
         ok('License interval ២ ជាន់គ្នា ➜ បាញ់ Server តែមួយសំណើ', counts.license === 1, counts);

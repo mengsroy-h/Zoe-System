@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.33.1` (`zoew-v198`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.33.2` (`zoew-v199`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.21` (`zoekeygen-v91`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -483,7 +483,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ជួរ barcode ខូច (sparse · `null`) ➜ **បញ្ជីកក** | `barcode-shape-test.js` |
 | រូបរាងទិន្នន័យឆៅពី Firebase (object ជំនួស array …) | `raw-read-shape-test.js` |
 | ការស្តារស្ថានភាព auth · ការព្យាយាមពិនិត្យតួនាទីឡើងវិញ | `auth-recovery-test.js` |
-| timer តាមកាលកំណត់ ៖ ការអាន token គ្មានពិដាន · សោ session មិនដោះ | `periodic-network-guard-test.js` |
+| timer តាមកាលកំណត់ ៖ ការអាន token គ្មានពិដាន · សោ session មិនដោះ · ⛔ **ច្រកទ្វារ `sessionExpiryCheck === 'pending'` ដែលគ្មាននរណា settle** (ថ្នាក់ដដែលនឹង «កូនសោ registry កំព្រា» ៖ អន្ទាក់ស្ថាពរ) — `runSessionExpiryCheck()` មានអ្នកហៅ **តែមួយ** គឺ `setInterval(…, 60000)` ➜ ទង់ជាប់ = ច្បាប់ ៤ ម៉ោង **ងាប់ពេញអាយុទំព័រ**។ ⛔ រាល់ផ្លូវដែលធ្វើឲ្យ App **ប្រើបាន** ត្រូវ arm ច្រកទ្វារនោះតាម `armSessionExpiryCheck()` (ចំណុចច្របាច់តែមួយ) — វាស់បាន (2.33.2) ៖ `submitActivationKey()` ហៅ `initDatabaseListeners()` **ដោយផ្ទាល់** ➜ ឧបករណ៍ដែលទើប Activate ដើរដោយច្រកទ្វារងាប់ ខណៈ **checker ១៦៧ បៃតង** ព្រោះ sandbox ចាក់ `sessionExpiryCheck = "live"` ➜ ស្ថានភាព `'pending'` មិនដែលត្រូវវាស់ | `periodic-network-guard-test.js` |
 | SW មិនបញ្ជូនសញ្ញា abort បន្ត | `sw-abort-propagation-test.js` |
 | សារកំហុសពេល paste Firebase config មិនបែងចែកមូលហេតុ (App ២ ត្រូវដូចគ្នា) | `firebase-config-paste-test.js` |
 | កូនសោស្ទួនក្នុង rules JSON ➜ ធាតុមុនត្រូវសរសេរជាន់ស្ងាត់ | `rules-duplicate-keys.js` |
@@ -2013,6 +2013,29 @@ bash audit-tools/emu/rules.sh
    ស្តារ មិនទាន់ជា backup ទេ**។
 ៣. បើ backup ឈប់មកដោយស្ងាត់ ➜ ពិនិត្យ **Actions** ជាមុនគេ (GitHub ផ្អាក
    workflow តាមកាលកំណត់ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ) មុននឹងសង្ស័យកូដ។
+
+## ⏳ ZoeW `2.33.2` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
+
+⛔ **`2.33.1` និង `2.33.2` រង់ចាំជាមួយគ្នា** ៖ `2.33.1` merge ចូល `main` រួច
+(PR #213) តែមិនទាន់មានរបាយការណ៍ពីឧបករណ៍ពិត ➜ `2.33.2` ship **ជំនួសវា**
+(`zoew-v199`)។ ការសាកតែម្តងគ្រប **ទាំង ២** (តារាងរបស់ `2.33.1` ខាងក្រោម
+នៅតែត្រូវសាកដដែល)។
+
+| # | អ្វីដែលកែ | អ្នកប្រើឃើញអ្វី |
+|---|---|---|
+| ១ | **ច្រកទ្វារវគ្គ ៤ ម៉ោង ងាប់លើឧបករណ៍ដែលទើប Activate** — `proceedAfterLogin()` `return` មុនបន្ទាត់ arming ពេល Key មិនទាន់ Active ➜ ទង់ជាប់ `'pending'` ➜ `submitActivationKey()` ហៅ `initDatabaseListeners()` **ដោយផ្ទាល់** ➜ App ប្រើបាន ១០០% ខណៈវដ្ត ៦០ វិ. **មិនដែលរត់** ➜ ច្បាប់ ៤ ម៉ោងលែងអនុវត្ត | ⛔ **គ្មានអ្វីប្រែក្នុងការប្រើប្រាស់ធម្មតា** — ក្រោយ ៤ ម៉ោងលើឧបករណ៍ដែលទើប Activate ប្រព័ន្ធសុំពាក្យសម្ងាត់ម្តងទៀត **ដូចឧបករណ៍ដទៃ** |
+
+| អ្វីដែលអ្នកប្រើត្រូវសាក | លទ្ធផលដែលត្រូវឃើញ |
+|---|---|
+| **Activate ឧបករណ៍ថ្មី** ៖ ចូលប្រព័ន្ធ ➜ បញ្ចូល Activation Key ➜ ប្រើធម្មតា | ⛔ ដូចមុនបេះបិទ — ស្កេនបាន · ទិន្នន័យមក · លុយត្រឹមត្រូវ |
+| ទុកឧបករណ៍នោះបើកចោល **លើស ៤ ម៉ោង** ➜ ត្រឡប់មកប្រើ | ⛔ ត្រូវសុំ **ពាក្យសម្ងាត់ម្តងទៀត** (មុននេះ **មិនសុំសោះ** ទាល់តែផ្ទុកទំព័រឡើងវិញ) |
+| ឧបករណ៍ដែល Activate រួចជាយូរ (ចូលធម្មតា) | ⛔ ឥរិយាបថ **មិនប្រែ** |
+| ពិនិត្យលុយ · ស្ថិតិយក · ធុងសំរាម | ⛔ **មិនប្រែសោះ** |
+
+⛔ **សកម្មភាពដែលត្រូវធ្វើដោយដៃ** ៖ **គ្មាន Firebase rules** · **គ្មាន Netlify env** ·
+ទាញ **ZoeW** ចុះឡើងវិញ ១ ដង (`zoew-v199`)។ **ZoeKeyGen មិនប្រែ** (`zoekeygen-v91`)។
+
+---
 
 ## ⏳ ZoeW `2.33.1` — រង់ចាំការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 

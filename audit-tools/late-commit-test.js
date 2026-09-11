@@ -104,7 +104,7 @@ const REAL_FNS = [
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
-    'toggleIndividualBarcodeClose', 'toggleCloseStatus'
+    'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)

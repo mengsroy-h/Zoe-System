@@ -115,6 +115,7 @@ const logoutFn = sliceFn(APP, 'logoutApp');
 const clearBiometricFn = sliceFn(APP, 'clearBiometricRecord');
 const toggleBiometricFn = sliceFn(APP, 'toggleBiometricUnlock');
 const forgetPinFn = sliceFn(APP, 'forgetAppLockPin');
+const closeCoreFn = sliceFn(APP, 'applyBarcodeCloseChange');
 const deleteFn = sliceFn(APP, 'deleteSingleItem');
 const queuePatchFn = sliceFn(APP, 'queueHistoryPatchRetry');
 const flushPatchFn = sliceFn(APP, 'flushPendingHistoryPatches');
@@ -128,8 +129,8 @@ ok('ការកំណត់ Locker៖ ពិនិត្យលទ្ធផល l
 ok('Locker lookup៖ មិនអះអាង not-found/already-there ពេល listener stale',
     /dbListenerViewIsStale\(DB_LISTENER_KEY_HISTORY\)/.test(lockerScanFn));
 ok('បិទ/បើក Barcode៖ success នៅក្នុង settle ក្រោយ committed ពិត',
-    /const settleBarcodeClose[\s\S]*committed[\s\S]*showToast/.test(oneCloseFn) &&
-    !/refreshCurrentHistoryView\(\);\s*}\s*showToast\(`បាន\$\{actionText}/.test(oneCloseFn));
+    /const settleBarcodeClose[\s\S]*committed[\s\S]*showToast/.test(closeCoreFn) &&
+    !/refreshCurrentHistoryView\(\);\s*}\s*showToast\(`បាន\$\{actionText}/.test(closeCoreFn));
 ok('បិទ/បើកបញ្ជី៖ success នៅក្នុង settle ក្រោយ committed ពិត',
     /const settleClose[\s\S]*committed[\s\S]*showToast/.test(allCloseFn) &&
     !/refreshCurrentHistoryView\(\);\s*}\s*showToast\(`បាន\$\{actionText}/.test(allCloseFn));

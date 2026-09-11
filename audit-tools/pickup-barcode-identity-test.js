@@ -85,7 +85,7 @@ const REAL_FNS = [
     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
     'getFormattedDate', 'armLateCommit', 'viewListModalShowing', 'notifyIfSlow',
-    'toggleIndividualBarcodeClose', 'toggleCloseStatus'
+    'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
 ];
 // ឈ្មោះខាងក្រោមប្រែតាមម៉ូដែល ៖ tree មុនកែប្រើ **delta** ចំណែក tree ក្រោយ
 // កែប្រើ **សំណុំ barcode**។ យកអ្វីដែលមាន — កុំបញ្ឈប់ checker (មេរៀន 2.19.3)។

@@ -498,6 +498,9 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         vm.runInContext(sliceFn('pumpAutoLookupQueue'), ctx);
         vm.runInContext(sliceFn('clearAutoLookupQueueRetries'), ctx);
         if (o.realModals) {
+            // ⛔ `completePinUnlock()` បើកជុំបោស ZTO (2.32.0) ➜ stub ដែលរាប់
+            //    ការហៅ (ច្បាប់ ៖ stub ជំនួសការបញ្ឈប់; stub ដែលវាស់បាន = ការគ្របបន្ថែម)
+            vm.runInContext('var __ztoSweeps = 0; function scheduleZtoStatusSweep() { __ztoSweeps++; }', ctx);
             ['clearLookupStatus', 'openModalHelper', 'closeModal', 'isPinFlowPending',
                 'requestPinBeforeConfig', 'completePinUnlock'].forEach((n) => {
                 const fnSrc = sliceFn(n);

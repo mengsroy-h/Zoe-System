@@ -56,6 +56,10 @@ function readConst(name, fallback) {
     const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(SRC);
     return m ? m[1] : fallback;
 }
+function readNumConst(name, fallback) {
+    const m = new RegExp('const\\s+' + name + '\\s*=\\s*(\\d+)').exec(SRC);
+    return m ? parseInt(m[1], 10) : fallback;
+}
 
 // ⛔ រកឈ្មោះមិនឃើញ ➜ **stub** មិនមែន exit (បើអត់ ការអះអាងខាងក្រោមត្រូវបិទបាំង)។
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
@@ -70,7 +74,14 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'barcodeEntriesOf', 'formatScanStamp', 'buildHistoryRowContent', 'escapeAttr',
     'buildHistoryRowHtml',
     'collectedValueIsMeasurable', 'dbListenerViewIsStale',
-    'anyDbListenerViewIsStale', 'emptyViewMessage'];
+    'anyDbListenerViewIsStale', 'emptyViewMessage',
+    // ⛔ អេក្រង់ទី ៦ និងទី ៧ ៖ របា និងប្រអប់ «ZTO មិនទាន់បិទ» — ពួកវាកើតក្រោយ
+    // ច្បាប់នេះ ហើយជុំមុន **stub ពួកវាចោល** ➜ ស្នាមភ្ជាប់គ្មានតេស្តសោះ។
+    'barcodeRegistryKey', 'pickupBarcodeKey', 'loadZtoPickupStatusOnce',
+    'ztoStatusTrashItemCounts', 'collectClosedBarcodesForZtoStatus',
+    'ztoStatusPendingList', 'ztoStatusPendingCodes', 'ztoStatusUnmeasuredCount',
+    'ztoStatusFeatureConfig', 'ztoSyncModalIsOpen',
+    'renderZtoSyncBanner', 'renderZtoSyncModalList'];
 const missing = [];
 const bodies = WANT.map((n) => {
     const body = sliceFn(SRC, n);
@@ -110,6 +121,7 @@ function makeEl() {
             return child;
         },
         setAttribute() {}, getAttribute() { return null; }, querySelector() { return null; },
+        querySelectorAll() { return []; },
         classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
     };
 }
@@ -123,7 +135,8 @@ function buildSandbox(state) {
         dailyStatsContainer: makeEl(), monthlyStatsContainer: makeEl(),
         monthlyReportBody: makeEl(), monthlyReportMonthSel: makeEl(),
         historyTableBody: makeEl(), count: makeEl(),
-        deletedTableBody: makeEl(), trashSummaryBox: makeEl()
+        deletedTableBody: makeEl(), trashSummaryBox: makeEl(),
+        ztoSyncBanner: makeEl(), ztoSyncList: makeEl(), ztoSyncModalNote: makeEl()
     };
     const sandbox = {
         console, Set, Map, Array, Object, Math, JSON, String, Number,
@@ -134,7 +147,19 @@ function buildSandbox(state) {
         dailyPickupData: state.dailyPickupData || {},
         monthlyRevenueData: state.monthlyRevenueData || {},
         exchangeRateRiel: 4100,
-        renderZtoSyncBanner() {}, renderZtoSyncViews() {}, scheduleZtoStatusSweep() {},
+        renderZtoSyncViews() {}, scheduleZtoStatusSweep() {},
+        // ⛔ ម៉ូឌុល ZTO ៖ តម្លៃត្រូវអានចេញពី app.js ពិត — កុំចាក់ literal
+        RegExp: RegExp,
+        ztoPickupStatus: new Map(state.verdicts || []),
+        ztoStatusLoaded: true,
+        ztoStatusBannerSig: '', ztoStatusModalSig: '',
+        ZTO_STATUS_BANNER_CODES: readNumConst('ZTO_STATUS_BANNER_CODES', 3),
+        ZTO_STATUS_TTL_MS: 12 * 60 * 60 * 1000,
+        ZTO_STATUS_STORE_KEY: readConst('ZTO_STATUS_STORE_KEY', 'zoew_zto_pickup_status_v1'),
+        appLocalStore: null,
+        elapsedSince: (m) => (!m ? Infinity : Math.max(0, Date.now() - m)),
+        getLookupApiConfig: () => ({ enabled: true, url: 'https://x/.netlify/functions/zto-order-detail?code={barcode}' }),
+        lookupApiIsZto: () => true,
         deletedSearchQuery: state.query || '',
         expandedTrashGroups: new Set(),
         DELETED_LIST_MAX_ROWS: 200,
@@ -159,6 +184,8 @@ function buildSandbox(state) {
         document: { getElementById: (id) => containers[id] || null, createElement: () => makeEl() },
         __containers: containers
     };
+    sandbox.ZTO_SYNC_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_HISTORY,
+        sandbox.DB_LISTENER_KEY_DELETED];
     sandbox.STATS_DAILY_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_REVENUE,
         sandbox.DB_LISTENER_KEY_HISTORY, sandbox.DB_LISTENER_KEY_DELETED];
     sandbox.STATS_MONTHLY_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_MONTHLY_REVENUE,
@@ -180,25 +207,43 @@ const SCREENS = [
     { name: '🗑️ ធុងសំរាម', run: (s) => s.renderRecentlyDeleted(), read: 'deletedTableBody',
         breaks: ['deleted'] },
     { name: '📦 តារាងប្រវត្តិ', run: (s) => s.renderHistory(s.scanHistory), read: 'historyTableBody',
-        breaks: ['history'] }
+        breaks: ['history'] },
+    // ⛔ អេក្រង់ទី ៦ ៖ ប្រអប់ «ZTO មិនទាន់បិទ» — រូបមន្តអានប្រភព **២**
+    // (`scanHistory` និង `deletedItems`) ➜ ច្រកទ្វារត្រូវគ្រប **២** ដែរ។
+    { name: '🔄 ប្រអប់ ZTO មិនទាន់បិទ', run: (s) => s.renderZtoSyncModalList(), read: 'ztoSyncList',
+        breaks: ['history', 'deleted'] }
 ];
+
+// ⛔ សាលក្រម ZTO រស់ក្នុង localStorage ➜ វា **រស់រាន reload** ខណៈទិដ្ឋភាព
+// Firebase មិនទាន់មកដល់ ➜ នោះជាលក្ខខណ្ឌដែលបង្កើតការអះអាង «✅ គ្មានកញ្ចប់ណា…»
+// ខណៈការពិតគឺ «មិនទាន់ដឹង»។ រាល់សេណារីយ៉ូត្រូវចាប់ផ្តើមពីសាលក្រមទាំងនេះ។
+const ZTO_VERDICTS = [['AAA111', { closed: false, at: Date.now() - 5000 }],
+    ['BBB222', { closed: false, at: Date.now() - 5000 }]];
+const ZTO_CLOSED_ITEM = { id: 'z1', phone: '011222333', scanDate: '2026-09-09',
+    barcodes: [{ code: 'AAA111', cod: 10, dod: 0, isClosed: true,
+        closedAt: Date.now() - 1000, isDeducted: false }] };
+const ZTO_TRASHED_ITEM = { id: 'z2', phone: '012999888', scanDate: '2026-09-09',
+    trashReason: 'pickup', isFromDeletion: true, deletedAt: Date.now() - 60000,
+    barcodes: [{ code: 'BBB222', cod: 5, dod: 0, isClosed: true,
+        closedAt: Date.now() - 70000, isDeducted: false }] };
 
 const LIVE_ITEM = [{ id: 'a', scanDate: '2026-09-09', phone: '011', barcodes: [
     { code: 'A1', cod: 10, dod: 0, isClosed: false, isDeducted: false }] }];
 
 function screenText(screen, state) {
-    const sandbox = buildSandbox(state);
+    const sandbox = buildSandbox(Object.assign({ verdicts: ZTO_VERDICTS }, state));
     screen.run(sandbox);
     return textOf(sandbox.__containers[screen.read].innerHTML);
 }
 
 // ------------------------------------------------------------------
 scenario('លក្ខខណ្ឌចាំបាច់៖ កូដពិតត្រូវរកឃើញ (បើ stub ➜ ការវាស់ខាងក្រោមទទេ)', () => {
-    ok('⛔ ជាន់អប្បបរមា៖ រក function ពិតបានយ៉ាងតិច 28',
-        WANT.length - missing.length >= 28, 'បាត់៖ ' + missing.join(', '));
-    ok('អេក្រង់ទាំង ៥ និងច្រកទ្វារមានក្នុង app.js ពិត',
+    ok('⛔ ជាន់អប្បបរមា៖ រក function ពិតបានយ៉ាងតិច 40',
+        WANT.length - missing.length >= 40, 'បាត់៖ ' + missing.join(', '));
+    ok('អេក្រង់ទាំងអស់ និងច្រកទ្វារមានក្នុង app.js ពិត',
         ['openDailyStatsModal', 'openMonthlyStatsModal', 'renderMonthlyReport',
-            'renderRecentlyDeleted', 'renderHistory', 'dbListenerViewIsStale']
+            'renderRecentlyDeleted', 'renderHistory', 'dbListenerViewIsStale',
+            'renderZtoSyncModalList', 'renderZtoSyncBanner']
             .every((n) => missing.indexOf(n) === -1), 'បាត់៖ ' + missing.join(', '));
     ok('⛔ អត្ថបទ «វាស់មិនបាន» ត្រូវអានចេញពីថេរក្នុង app.js ពិត',
         NOT_MEASURABLE.length >= 8 && SRC.indexOf(NOT_MEASURABLE) !== -1, NOT_MEASURABLE);
@@ -221,7 +266,8 @@ scenario('ជាន់អប្បបរមា៖ ករណីទទេត្រ
     SCREENS.forEach((screen) => {
         if (screenText(screen, { pending: [], failed: [] }).length >= 5) produced++;
     });
-    ok('អេក្រង់ទាំង ៥ ផលិតសារករណីទទេ', produced === SCREENS.length, 'produced=' + produced);
+    ok('អេក្រង់ទាំងអស់ផលិតសារករណីទទេ', produced === SCREENS.length,
+        'produced=' + produced + '/' + SCREENS.length);
 });
 
 // ------------------------------------------------------------------
@@ -266,6 +312,132 @@ scenario('⛔ ទិសផ្ទុយ៖ listener ងាប់ តែបញ្�
     const text = textOf(sandbox.__containers.historyTableBody.innerHTML);
     ok('ប្រវត្តិមានជួរដេក ➜ មិនត្រូវជំនួសដោយសារ «វាស់មិនបាន»',
         text.indexOf(NOT_MEASURABLE) === -1, text);
+});
+
+// ------------------------------------------------------------------
+// 🔴 ថ្នាក់កំហុសពិត (វាស់បាន 2026-09-11, tree ដែល checker ១៦៦ បៃតង · SKIP 0) ៖
+// របា និងប្រអប់ «ZTO មិនទាន់បិទ» អានប្រភព **២** (`scanHistory` ·
+// `deletedItems`) តែមាន **ច្រកទ្វារ ០** ➜
+//   listener ងាប់ទាំង ២ ➜ ប្រអប់រាយ «✅ គ្មានកញ្ចប់ណាដែល ZTO មិនទាន់បិទទេ»
+//   `deleted` ងាប់ម្នាក់ឯង  ➜ របារាយ «1 កញ្ចប់» ខណៈការពិតគឺ «2»
+// អ្នកប្រើអាន ✅ ➜ មិនបើក Palm ➜ កញ្ចប់នៅតែបើកក្នុង ZTO។
+// ⛔ នេះជាច្បាប់ «✅ ក៏ត្រូវវាស់ដែរ» ដដែលនឹងជួរ ZTO ក្នុង 🩺 ពិនិត្យសុខភាព។
+function ztoBannerText(state) {
+    const sandbox = buildSandbox(Object.assign({ verdicts: ZTO_VERDICTS }, state));
+    sandbox.renderZtoSyncBanner();
+    return textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
+}
+const ZTO_BOTH_LIVE = { scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [ZTO_TRASHED_ITEM] };
+
+scenario('⛔ របា ZTO ៖ លេខត្រូវនិយាយការពិត ពេលទិដ្ឋភាពមិនពេញ', () => {
+    const live = ztoBannerText(Object.assign({ pending: [], failed: [] }, ZTO_BOTH_LIVE));
+    ok('ជាន់អប្បបរមា៖ listener រស់ទាំង ២ ➜ របារាប់ ២ កញ្ចប់ពិត',
+        live.indexOf('2') !== -1 && live.indexOf('AAA111') !== -1
+        && live.indexOf('BBB222') !== -1, live);
+    ok('⛔ ទិសផ្ទុយ៖ listener រស់ ➜ របាមិនត្រូវរាយ «វាស់មិនបាន»',
+        live.indexOf(NOT_MEASURABLE) === -1, live);
+    [['history', 'pending'], ['deleted', 'pending'],
+        ['history', 'failed'], ['deleted', 'failed']].forEach((pair) => {
+        const state = Object.assign({ pending: [], failed: [] }, ZTO_BOTH_LIVE);
+        state[pair[1]] = [pair[0]];
+        if (pair[0] === 'history') state.scanHistory = [];
+        else state.deletedItems = [];
+        const text = ztoBannerText(state);
+        ok('របា · ' + pair[0] + ' ' + pair[1] + ' ➜ លេខខ្វះត្រូវមានសញ្ញា «វាស់មិនបាន»',
+            text.length === 0 || text.indexOf(NOT_MEASURABLE) !== -1, text);
+    });
+});
+
+scenario('⛔ ប្រអប់ ZTO ៖ កំណត់ចំណាំ (note) ក៏ជាការអះអាងដែរ', () => {
+    const build = (state) => {
+        const sandbox = buildSandbox(Object.assign({ verdicts: ZTO_VERDICTS }, state));
+        sandbox.renderZtoSyncModalList();
+        return String(sandbox.__containers.ztoSyncModalNote.innerText || '');
+    };
+    const live = build({ pending: [], failed: [] });
+    ok('⛔ ទិសផ្ទុយ៖ listener រស់ + ទទេពិត ➜ «ត្រូវគ្នានឹង ZTO ទាំងអស់» ដដែល',
+        live.length > 0 && live.indexOf(NOT_MEASURABLE) === -1, live);
+    ['history', 'deleted'].forEach((key) => {
+        const p = build({ pending: [key], failed: [] });
+        ok('note · ' + key + ' pending ➜ មិនអះអាង «ត្រូវគ្នាទាំងអស់»',
+            p.indexOf(NOT_MEASURABLE) !== -1, p);
+        const f = build({ pending: [], failed: [key] });
+        ok('note · ' + key + ' failed ➜ មិនអះអាង «ត្រូវគ្នាទាំងអស់»',
+            f.indexOf(NOT_MEASURABLE) !== -1, f);
+    });
+    // 🔴 សាខា **ដែលមានធាតុ** ជាសាខាដាច់ដោយឡែក ៖ សេណារីយ៉ូខាងលើរត់លើបញ្ជីទទេ
+    // ជានិច្ច ➜ វាមិនដែលដាក់ប្រព័ន្ធក្នុងស្ថានភាពដែលសាខានោះទប់សោះ។
+    // (វាស់បាន ៖ mutation ដែលដកការអះអាងចេញពីសាខានោះ **រស់រាន** មុនការបន្ថែមនេះ។)
+    const partial = build({ pending: [], failed: ['deleted'],
+        scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [] });
+    ok('⛔ note · មានធាតុ + `deleted` ងាប់ ➜ ត្រូវប្រាប់ថាទិដ្ឋភាពមិនពេញ',
+        partial.indexOf('AAA111') === -1 && partial.indexOf(NOT_MEASURABLE) !== -1, partial);
+    const fullLive = build({ pending: [], failed: [],
+        scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [ZTO_TRASHED_ITEM] });
+    ok('⛔ ទិសផ្ទុយ៖ មានធាតុ + listener រស់ ➜ note មិនមានសញ្ញា «វាស់មិនបាន»',
+        fullLive.length > 0 && fullLive.indexOf(NOT_MEASURABLE) === -1, fullLive);
+});
+
+// ------------------------------------------------------------------
+// 🔴 cache នៃការគូរ ៖ របា និងប្រអប់ចងចាំ signature ➜ **ការគូរទី ២ ត្រូវរំលង**
+// បើ signature មិនប្រែ។ ដូច្នេះការដាក់សញ្ញា «វាស់មិនបាន» ចូលអត្ថបទ **មិន
+// គ្រប់គ្រាន់** ៖ បើភាពមិនពេញនៃទិដ្ឋភាពមិនចូល signature ផង នោះទិដ្ឋភាព
+// ដែល *ក្លាយជា* មិនពេញ (listener ងាប់ក្រោយ) នឹងរក្សាអត្ថបទចាស់រហូត។
+// (វាស់បាន 2026-09-11 ៖ mutation «ដក stale ចេញពី signature របស់របា»
+//  **រស់រាន** លើការអះអាងអត្ថបទតែម្យ៉ាង។)
+scenario('⛔ cache ៖ ទិដ្ឋភាពដែលក្លាយជាមិនពេញ ត្រូវគូរឡើងវិញ', () => {
+    const sandbox = buildSandbox({ verdicts: ZTO_VERDICTS,
+        pending: [], failed: [], scanHistory: [ZTO_CLOSED_ITEM], deletedItems: [] });
+    sandbox.renderZtoSyncBanner();
+    const before = textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
+    ok('ជាន់អប្បបរមា៖ ការគូរទី ១ ផលិតរបាពិត',
+        before.indexOf('AAA111') !== -1 && before.indexOf(NOT_MEASURABLE) === -1, before);
+    // listener ងាប់ក្រោយមក — **បញ្ជីមិនប្រែ** ➜ មានតែ `stale` ដែលប្រែ
+    sandbox.dbListenerFailedPaths.add(sandbox.DB_LISTENER_KEY_DELETED);
+    sandbox.renderZtoSyncBanner();
+    const after = textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
+    ok('⛔ របាត្រូវគូរឡើងវិញ ➜ សញ្ញា «វាស់មិនបាន» លេចចេញ',
+        after.indexOf(NOT_MEASURABLE) !== -1, after);
+    // ⛔ ទិសផ្ទុយ ៖ ត្រឡប់ទៅរស់វិញ ➜ សញ្ញាត្រូវ **បាត់**
+    sandbox.dbListenerFailedPaths.delete(sandbox.DB_LISTENER_KEY_DELETED);
+    sandbox.renderZtoSyncBanner();
+    const back = textOf(sandbox.__containers.ztoSyncBanner.innerHTML);
+    ok('⛔ ទិសផ្ទុយ៖ listener ត្រឡប់មករស់ ➜ សញ្ញាត្រូវបាត់វិញ',
+        back.indexOf(NOT_MEASURABLE) === -1 && back.indexOf('AAA111') !== -1, back);
+});
+
+// ⛔ ច្រកទ្វារត្រូវ **ដេរីវេ** ពីបញ្ជីកូនសោតែមួយ មិនមែនចាក់ literal ២ ខាង
+scenario('⛔ ច្រកទ្វារ ZTO ត្រូវគ្របប្រភពទាំង ២ របស់រូបមន្ត', () => {
+    const keys = /const\s+ZTO_SYNC_VIEW_KEYS\s*=\s*\[([^\]]*)\]/.exec(SRC);
+    ok('⛔ `ZTO_SYNC_VIEW_KEYS` មានក្នុង app.js ពិត', !!keys, keys && keys[1]);
+    if (keys) {
+        ok('⛔ វាគ្រប DB_LISTENER_KEY_HISTORY និង DB_LISTENER_KEY_DELETED',
+            keys[1].indexOf('DB_LISTENER_KEY_HISTORY') !== -1
+            && keys[1].indexOf('DB_LISTENER_KEY_DELETED') !== -1, keys[1]);
+    }
+    // ⛔ សារ toast របស់ការចុច 🔄 ជាការអះអាងទី ៣ នៃថ្នាក់ដដែល
+    const recheck = /async function recheckZtoPickupStatus[\s\S]*?\n    \}/.exec(SRC);
+    ok('⛔ ជាន់អប្បបរមា៖ រក `recheckZtoPickupStatus` ឃើញ', !!recheck);
+    if (recheck) {
+        ok('⛔ toast «ត្រូវគ្នានឹង ZTO ទាំងអស់» ត្រូវឆ្លងកាត់ `emptyViewMessage`',
+            /emptyViewMessage\(\s*ZTO_SYNC_VIEW_KEYS/.test(recheck[0]), recheck[0].slice(-400));
+    }
+});
+
+// ⛔ cache នៃការគូរមិនត្រូវបង្កកអត្ថបទចាស់ (ច្បាប់ដដែលនឹង 2.31.10 ៖ `waiting`
+// ត្រូវចូល signature) — ឥឡូវ **ភាពមិនពេញនៃទិដ្ឋភាព** និង **meta ដែលគូរពិត**
+// (លេខទូរស័ព្ទ · Locker) ក៏ត្រូវចូលដែរ បើមិនដូច្នេះការប្តូរពីឧបករណ៍ផ្សេង
+// មិនដែលលេចលើអេក្រង់ទេ។
+scenario('⛔ signature របស់ប្រអប់ត្រូវគ្រប់អ្វីដែលវាគូរ', () => {
+    const body = /function renderZtoSyncModalList[\s\S]*?\n    \}/.exec(SRC);
+    ok('⛔ ជាន់អប្បបរមា៖ រក `renderZtoSyncModalList` ឃើញ', !!body);
+    if (!body) return;
+    const sig = /const signature = ([^;]+);/.exec(body[0]);
+    ok('⛔ រក signature ឃើញ', !!sig, sig && sig[1]);
+    if (!sig) return;
+    ['waiting', 'stale', 'phone', 'locker'].forEach((part) => {
+        ok('signature ផ្ទុក «' + part + '»', sig[1].indexOf(part) !== -1, sig[1]);
+    });
 });
 
 console.log('');

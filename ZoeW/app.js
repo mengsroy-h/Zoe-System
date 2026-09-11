@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.32.0';
+    const APP_VERSION = '2.32.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -382,6 +382,7 @@
     const VIEW_NOT_MEASURABLE_NOTICE = '⏳ ' + VIEW_NOT_MEASURABLE_TEXT;
     const STATS_DAILY_VIEW_KEYS = [DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
     const STATS_MONTHLY_VIEW_KEYS = [DB_LISTENER_KEY_MONTHLY_REVENUE, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
+    const ZTO_SYNC_VIEW_KEYS = [DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
     const dbListenerPendingPaths = new Set();
     const dbListenerFailedPaths = new Set();
     let dbListenerPendingSeen = 0;
@@ -12757,6 +12758,7 @@
     let ztoStatusFailStreak = 0;
     let ztoStatusBannerSig = '';
     let ztoStatusModalSig = '';
+    let ztoStatusSweepCursor = 0;
 
     function loadZtoPickupStatusOnce() {
         if (ztoStatusLoaded) return;
@@ -12822,6 +12824,13 @@
             if (!evictOneZtoPickupVerdict(key)) break;
         }
         saveZtoPickupStatus();
+    }
+
+    function rotateZtoSweepQueue(list, cursor) {
+        if (!Array.isArray(list) || list.length <= 1) return list || [];
+        const at = ((cursor % list.length) + list.length) % list.length;
+        if (!at) return list;
+        return list.slice(at).concat(list.slice(0, at));
     }
 
     function ztoStatusFeatureConfig() {
@@ -12961,7 +12970,8 @@
         const pending = ztoStatusPendingCodes(dataToScan, trashToScan);
         const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
         const waiting = codes.length ? ztoStatusUnmeasuredCount(dataToScan, trashToScan) : 0;
-        const signature = codes.length + '|' + waiting + '|'
+        const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
+        const signature = codes.length + '|' + waiting + '|' + (stale ? '1' : '0') + '|'
             + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
         if (signature === ztoStatusBannerSig) return;
         ztoStatusBannerSig = signature;
@@ -12973,8 +12983,9 @@
         const more = codes.length > ZTO_STATUS_BANNER_CODES
             ? ' · និង ' + (codes.length - ZTO_STATUS_BANNER_CODES) + ' ទៀត' : '';
         const waitingNote = waiting ? ' · កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត' : '';
+        const staleNote = stale ? ' · ' + VIEW_NOT_MEASURABLE_TEXT : '';
         const detail = codes.slice(0, ZTO_STATUS_BANNER_CODES).join(' · ') + more + waitingNote
-            + ' — ចុចដើម្បីពិនិត្យម្តងទៀត';
+            + staleNote + ' — ចុចដើម្បីពិនិត្យម្តងទៀត';
         const headline = codes.length + ' កញ្ចប់បិទក្នុង ZoeW តែ ZTO មិនទាន់បិទ';
         banner.innerHTML = '<span class="zto-sync-icon" aria-hidden="true">🔄</span>'
             + '<span class="zto-sync-copy"><strong>' + sanitizeInput(headline)
@@ -13075,17 +13086,22 @@
         const entries = ztoStatusFeatureConfig()
             ? ztoStatusPendingList(dataToScan, trashToScan) : [];
         const waiting = ztoStatusUnmeasuredCount(dataToScan, trashToScan);
-        const signature = waiting + '|' + entries.map((entry) => entry.code).join(',');
+        const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
+        const signature = waiting + '|' + (stale ? '1' : '0') + '|'
+            + entries.map((entry) => entry.code + '~' + entry.phone + '~' + entry.locker).join(',');
         if (signature === ztoStatusModalSig) return;
         ztoStatusModalSig = signature;
         if (noteEl) {
             const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
             noteEl.innerText = entries.length
                 ? 'ស្កេនលេខខាងក្រោមចូល ZTO Palm ដើម្បីបិទ។' + waitingNote
-                : 'កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់។' + waitingNote;
+                    + (stale ? ' ' + VIEW_NOT_MEASURABLE_NOTICE : '')
+                : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, 'កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់។') + waitingNote;
         }
         if (!entries.length) {
-            listEl.innerHTML = '<div class="zto-sync-empty">' + sanitizeInput('✅ គ្មានកញ្ចប់ណាដែល ZTO មិនទាន់បិទទេ') + '</div>';
+            listEl.innerHTML = '<div class="zto-sync-empty">'
+                + sanitizeInput(emptyViewMessage(ZTO_SYNC_VIEW_KEYS, '✅ គ្មានកញ្ចប់ណាដែល ZTO មិនទាន់បិទទេ'))
+                + '</div>';
             return;
         }
         listEl.innerHTML = entries.map((entry, idx) => {
@@ -13203,7 +13219,8 @@
             ? collectOpenBarcodesForZtoStatus(dataToScan)
                 .filter((entry) => force || ztoOpenRecheckIsDue(ztoPickupStatus.get(entry.key)))
             : [];
-        const work = closedWork.concat(openWork).slice(0, ZTO_STATUS_SWEEP_BATCH);
+        const queue = closedWork.concat(openWork);
+        const work = rotateZtoSweepQueue(queue, ztoStatusSweepCursor).slice(0, ZTO_STATUS_SWEEP_BATCH);
         if (!work.length) return 0;
         ztoStatusInFlight = true;
         let measured = 0;
@@ -13233,6 +13250,7 @@
             }
         } finally {
             ztoStatusInFlight = false;
+            ztoStatusSweepCursor += attempted || work.length;
         }
         if (autoClosed > 0) {
             showToast('✅ ZTO បិទរួច ➜ បិទ ' + autoClosed + ' កញ្ចប់ក្នុង ZoeW ដោយស្វ័យប្រវត្តិ');
@@ -13270,9 +13288,11 @@
         }
         const left = ztoStatusPendingCodes().length;
         if (ztoSyncModalIsOpen()) renderZtoSyncModalList();
+        const leftIsPartial = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
         showToast(left
             ? '🔄 នៅសល់ ' + left + ' កញ្ចប់ដែល ZTO មិនទាន់បិទ'
-            : '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់');
+                + (leftIsPartial ? ' · ' + VIEW_NOT_MEASURABLE_TEXT : '')
+            : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, '✅ កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់'));
     }
 
     function renderHistory(dataToRender = scanHistory) {

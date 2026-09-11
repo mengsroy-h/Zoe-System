@@ -37,6 +37,20 @@ check('មានផ្នែកមាតិកាគ្រប់គ្រាន�
     'ស្ថិតិ', 'របាយការណ៍', 'Export', 'Google Sheet', 'សុវត្ថិភាព',
     'Offline', 'Backup', 'ដោះស្រាយបញ្ហា'
 ].forEach((term) => check('មានប្រធានបទ «' + term + '»', guide.includes(term)));
+
+// ⛔ បញ្ជីពាក្យខាងលើជា **កាលបរិច្ឆេទផុតកំណត់** ៖ វាត្រូវសរសេរនៅជុំមួយ ហើយ
+// មុខងារដែល ship *ក្រោយ* មិនចូលបញ្ជី ➜ សៀវភៅចាស់ស្ងាត់ៗ ខណៈ checker បៃតង។
+// វាស់បាន (2026-09-11) ៖ កុងតាក់របា Slide **ទាំង ៤** អវត្តមានក្នុង
+// `guide.html` — **អ្នកប្រើចាប់បាន មិនមែនឧបករណ៍ទេ**។ ដូច្នេះបញ្ជីត្រូវ
+// **ដេរីវេចេញពី `index.html` ពិត** ៖ រាល់កុងតាក់ដែលអ្នកប្រើឃើញ ត្រូវមាន
+// ការពន្យល់ក្នុងសៀវភៅ។
+const drawerLabels = (index.match(/class="drawer-toggle-label">[^<]+</g) || [])
+    .map((tag) => tag.replace(/^class="drawer-toggle-label">/, '').replace(/<$/, '').trim())
+    .filter(Boolean);
+check('ជាន់អប្បបរមា៖ អានស្លាកកុងតាក់របា Slide ចេញពី index.html បានយ៉ាងតិច ៣',
+    drawerLabels.length >= 3);
+drawerLabels.forEach((label) => check('សៀវភៅពន្យល់កុងតាក់ «' + label + '»',
+    guide.includes(label)));
 check('គ្មាន JavaScript ឬ inline event handler ក្នុងឯកសារអាន',
     !/<script\b/i.test(guide) && !/\son[a-z]+\s*=/i.test(guide) && !/javascript:/i.test(guide));
 check('មានរចនាប័ទ្ម print និង focus ដែលអាចមើលឃើញ',

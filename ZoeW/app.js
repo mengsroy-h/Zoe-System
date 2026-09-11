@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.33.0';
+    const APP_VERSION = '2.33.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -9646,6 +9646,14 @@
         return dbOp(fb.update(fb.ref(db, 'zoew_barcode_registry'), updates)).then(() => true, () => false);
     }
 
+    function releaseLateBarcodeClaim(claimPromise, code) {
+        if (!claimPromise || typeof claimPromise.then !== 'function') return false;
+        claimPromise.then((lateClaim) => {
+            if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
+        }, () => {});
+        return true;
+    }
+
     function releaseBarcodesInRegistry(codes) {
         if (!db || !fb || !codes || !codes.length) return Promise.resolve();
         const keys = [];
@@ -10514,9 +10522,7 @@
             try {
                 claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
             } catch (claimError) {
-                claimPromise.then((lateClaim) => {
-                    if (lateClaim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
-                }, () => {});
+                releaseLateBarcodeClaim(claimPromise, barcodeToSave);
                 throw claimError;
             }
             if (claim === 'taken') {
@@ -13608,32 +13614,43 @@
         let saved = 0;
         let taken = 0;
         let failed = 0;
+        let pending = 0;
         try {
             for (let i = 0; i < queue.length; i++) {
                 const row = queue[i];
                 setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + (i + 1) + '/' + queue.length + '...');
                 if (navigator.onLine === false) break;
                 if (isBarcodeAlreadyUsed(row.barcode)) continue;
+                const claimPromise = claimBarcodeInRegistry(row.barcode);
                 let claim = 'unknown';
                 try {
-                    claim = await withTimeout(claimBarcodeInRegistry(row.barcode), 15000,
+                    claim = await withTimeout(claimPromise, 15000,
                         'Barcode claim timed out');
                 } catch (e) {
+                    releaseLateBarcodeClaim(claimPromise, row.barcode);
                     claim = 'unknown';
                 }
                 if (claim === 'taken') { taken++; continue; }
                 if (claim !== 'claimed') { failed++; continue; }
-                try {
-                    const status = await withTimeout(
-                        addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A'),
-                        15000, 'Save timed out');
-                    if (status === true) saved++;
-                    else failed++;
-                } catch (e) {
-                    failed++;
+                const rollbackImportedRow = () => {
                     releaseBarcodesInRegistry([row.barcode]);
                     dropOptimisticBarcode(row.barcode);
                     refreshCurrentHistoryView();
+                };
+                const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A');
+                try {
+                    const status = await withTimeout(savePromise, 15000, 'Save timed out');
+                    if (status === true) saved++;
+                    else failed++;
+                } catch (e) {
+                    if (e && e.message === 'Save timed out') {
+                        pending++;
+                        armLateWrite(savePromise, refreshCurrentHistoryView, rollbackImportedRow,
+                            'ZTO list import save');
+                    } else {
+                        failed++;
+                        rollbackImportedRow();
+                    }
                 }
             }
         } finally {
@@ -13643,6 +13660,7 @@
         renderZtoListSyncPreview();
         const parts = ['✅ បញ្ចូល ' + saved + ' កញ្ចប់'];
         if (taken) parts.push('♻️ ស្ទួន ' + taken);
+        if (pending) parts.push('⏳ កំពុងរក្សាទុក ' + pending);
         if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
         showToast(parts.join(' · '));
         setZtoListSyncNote(parts.join(' · ') + ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');

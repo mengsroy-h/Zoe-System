@@ -55,6 +55,12 @@ function ok(label, cond, detail) {
     else { console.log('  FAIL   ' + label + (detail !== undefined ? '  got: ' + JSON.stringify(detail) : '')); fail++; }
 }
 
+function deferred() {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+}
+
 function readOr(file) {
     try { return fs.readFileSync(file, 'utf8'); } catch (_) { return ''; }
 }
@@ -916,6 +922,8 @@ function firstBody(requests) {
     const importParts = ['importZtoListRows', 'classifyZtoListRows', 'barcodeRegistryKey',
         'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone']
         .map((name) => extractFn(APP_SRC, name) || '');
+    const importOptional = ['armLateWrite', 'releaseLateBarcodeClaim']
+        .map((name) => extractFn(APP_SRC, name) || '').filter(Boolean);
     const importMissing = importParts.filter((src) => !src).length;
     ok('ជាន់អប្បបរមា ៖ ស្រង់ function ចាំបាច់ទាំងអស់សម្រាប់ sandbox',
         importMissing === 0, importMissing);
@@ -931,11 +939,16 @@ function firstBody(requests) {
             navigator: { onLine: true },
             anyDbListenerViewIsStale: () => box.__stale === true,
             isBarcodeAlreadyUsed: () => false,
-            claimBarcodeInRegistry: async (code) => { calls.claim.push(code); return box.__claim || 'claimed'; },
-            addOrUpdateEntry: async (code, phone, cod, dod, locker) => {
+            claimBarcodeInRegistry: (code) => {
+                calls.claim.push(code);
+                if (box.__claimHangs) { const d = deferred(); box.__claimDeferreds.push(d); return d.promise; }
+                return Promise.resolve(box.__claim || 'claimed');
+            },
+            addOrUpdateEntry: (code, phone, cod, dod, locker) => {
                 calls.save.push({ code, phone, cod, dod, locker });
-                if (box.__saveThrows) throw new Error('save failed');
-                return true;
+                if (box.__saveHangs) { const d = deferred(); box.__saveDeferreds.push(d); return d.promise; }
+                if (box.__saveThrows) return Promise.reject(new Error('save failed'));
+                return Promise.resolve(true);
             },
             releaseBarcodesInRegistry: (codes) => { calls.release.push(codes); },
             dropOptimisticBarcode: () => {},
@@ -944,7 +957,12 @@ function firstBody(requests) {
             setZtoListSyncNote: () => {},
             showToast: (msg) => { calls.toast.push(String(msg)); },
             confirm: () => box.__confirm !== false,
-            withTimeout: (promise) => promise,
+            withTimeout: (promise, ms, msg) => {
+                if (box.__timeoutLabel && String(msg) === box.__timeoutLabel) {
+                    return Promise.reject(new Error(msg));
+                }
+                return promise;
+            },
             VIEW_NOT_MEASURABLE_TEXT: 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន',
             ZTO_LIST_IMPORT_MAX: 100
         };
@@ -953,7 +971,8 @@ function firstBody(requests) {
         let runImport = null;
         try {
             vm.createContext(box);
-            vm.runInContext(importParts.join('\n') + '\nglobalThis.__run = importZtoListRows;', box);
+            vm.runInContext(importParts.concat(importOptional).join('\n')
+                + '\nglobalThis.__run = importZtoListRows;', box);
             runImport = box.__run;
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
@@ -971,6 +990,8 @@ function firstBody(requests) {
                 box.ztoListSyncInFlight = false;
                 box.__stale = false; box.__claim = 'claimed';
                 box.__saveThrows = false; box.__confirm = true;
+                box.__claimHangs = false; box.__saveHangs = false; box.__timeoutLabel = '';
+                box.__claimDeferreds = []; box.__saveDeferreds = [];
                 box.navigator.onLine = true;
                 box.ztoListSyncResult = { rows: FRESH.slice(), from: '2026-09-08', to: '2026-09-11', total: 2 };
             };
@@ -1044,6 +1065,57 @@ function firstBody(requests) {
             ok('⛔ **តែក្រុម «ថ្មី»** ត្រូវបញ្ចូល (មានរួច · រំលង ➜ ទុកចោល)',
                 calls.save.length === 1 && calls.save[0].code === '77130500000902', calls.save);
             box.scanHistory = [];
+
+            console.log('\n== ៩. \u26d4 \u179a\u1794\u17c0\u1794\u1794\u179a\u17b6\u1787\u17d0\u1799 \u00ab\u1796\u17d2\u1799\u17bd\u179a\u00bb \u1793\u17b7\u1784 \u00ab\u1799\u17ba\u178f\u178f\u17c2\u1787\u17c4\u1782\u1787\u17d0\u1799\u00bb ==');
+            const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+            const releasedCodes = () => calls.release.reduce((all, codes) => all.concat(codes), []);
+
+            reset();
+            box.__claimHangs = true;
+            box.__timeoutLabel = 'Barcode claim timed out';
+            await runImport();
+            ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «claim ព្យួរ» ត្រូវបានឈានដល់ពិត',
+                box.__claimDeferreds.length === 2, box.__claimDeferreds.length);
+            ok('⛔ claim ព្យួរ ➜ មិនរក្សាទុក', calls.save.length === 0, calls.save);
+            ok('⛔ claim ព្យួរ ➜ មិនដោះមុនដឹងសាលក្រម', releasedCodes().length === 0, calls.release);
+            box.__claimDeferreds.forEach((d) => d.resolve('claimed'));
+            await flush();
+            ok('⛔ claim ដែលចុះ **យឺត** ជា `claimed` ➜ ត្រូវដោះវិញ (បើអត់ ➜ កូនសោ registry កំព្រា ➜ barcode ស្កេនចូលមិនបានជារៀងរហូត)',
+                releasedCodes().length === 2, calls.release);
+
+            reset();
+            box.__claimHangs = true;
+            box.__timeoutLabel = 'Barcode claim timed out';
+            await runImport();
+            box.__claimDeferreds.forEach((d) => d.resolve('taken'));
+            await flush();
+            ok('⛔ ទិសផ្ទុយ ៖ claim យឺតដែលជា `taken` **មិនត្រូវដោះ** (មិនមែនរបស់យើង)',
+                releasedCodes().length === 0, calls.release);
+
+            reset();
+            box.__saveHangs = true;
+            box.__timeoutLabel = 'Save timed out';
+            await runImport();
+            ok('⛔ ជាន់អប្បបរមា ៖ ផ្លូវ «ការសរសេរព្យួរ» ត្រូវបានឈានដល់ពិត',
+                box.__saveDeferreds.length === 2, box.__saveDeferreds.length);
+            ok('⛔ ការសរសេរព្យួរ ➜ **មិនដោះកូនសោ registry ភ្លាម** (RTDB ចាក់ជួរ ➜ commit យឺត ➜ ការដោះ = barcode ស្កេនចូលបាន ២ ដង ➜ **លុយបូកស្ទួន**)',
+                releasedCodes().length === 0, calls.release);
+            ok('⛔ សារមិនត្រូវអះអាងថា «បរាជ័យ» ខណៈការសរសេរនៅរស់',
+                calls.toast.some((m) => m.indexOf('⏳') !== -1), calls.toast);
+            box.__saveDeferreds.forEach((d) => d.resolve(true));
+            await flush();
+            ok('⛔ commit យឺត **ជោគជ័យ** ➜ នៅតែមិនដោះកូនសោ',
+                releasedCodes().length === 0, calls.release);
+
+            reset();
+            box.__saveHangs = true;
+            box.__timeoutLabel = 'Save timed out';
+            await runImport();
+            box.__saveDeferreds.forEach((d) => d.reject(new Error('write rejected')));
+            await flush();
+            ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ',
+                releasedCodes().length === 2, calls.release);
+            reset();
         }
     }
 

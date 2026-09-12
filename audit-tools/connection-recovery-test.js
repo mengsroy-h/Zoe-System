@@ -148,6 +148,27 @@ const missing = REQUIRED_FNS.filter((n) => !sliceFn(n));
 missing.forEach((n) => ok('មុខងារស្តារការតភ្ជាប់ `' + n + '` មានក្នុង app.js', false));
 const FN_STUBS = missing.map((n) => 'function ' + n + '() {}').join('\n');
 
+const REAL_LISTENER_KEYS = (function () {
+    const m = SRC.match(/const\s+DB_LISTENER_KEYS\s*=\s*\[([^\]]*)\]/);
+    if (!m) return [];
+    return m[1].split(',').map((x) => x.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+})();
+const REAL_LISTENER_KEY_CONSTS = (function () {
+    const out = [];
+    const re = /const\s+(DB_LISTENER_KEY_[A-Z_]+)\s*=\s*'([^']+)'/g;
+    let m;
+    while ((m = re.exec(SRC))) out.push('const ' + m[1] + " = '" + m[2] + "';");
+    return out.join('\n');
+})();
+
+const REAL_LISTENER_REF_NAMES = (function () {
+    const out = [];
+    const re = /let\s+(dbRef[A-Za-z0-9_]+)\s*=\s*null/g;
+    let m;
+    while ((m = re.exec(SRC))) if (out.indexOf(m[1]) === -1) out.push(m[1]);
+    return out;
+})();
+
 const REQUIRED_CONSTS = ['RECONNECT_FORCE_MIN_GAP_MS', 'RECONNECT_WATCHDOG_STEPS_MS', 'LISTENER_RECOVERY_STEPS_MS',
     'DB_LISTENER_RETRY_MIN_GAP_MS', 'DB_LISTENER_PROGRESS_GRACE_MS', 'CONNECTING_GRACE_ATTEMPTS', 'INFO_LISTENER_RECOVERY_STEPS_MS'];
 const missingConsts = REQUIRED_CONSTS.filter((n) => !sliceConst(n));
@@ -199,8 +220,7 @@ function buildContext() {
     };
 
     const refs = {};
-    ['history', 'deleted', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'exchangeRate']
-        .forEach((k) => { refs[k] = { __path: k }; });
+    REAL_LISTENER_KEYS.forEach((k) => { refs[k] = { __path: k }; });
 
     const statusDot = { classes: {}, classList: { toggle: (c, on) => { statusDot.classes[c] = !!on; } } };
     const statusText = { innerText: '', classes: {}, classList: { toggle: (c, on) => { statusText.classes[c] = !!on; } } };
@@ -225,10 +245,6 @@ function buildContext() {
         isDatabaseInitialized: false,
         dbRefHistory: refs.history,
         dbRefDeleted: refs.deleted,
-        dbRefDailyRevenue: refs.dailyRevenue,
-        dbRefMonthlyRevenue: refs.monthlyRevenue,
-        dbRefDailyPickup: refs.dailyPickup,
-        dbRefExchangeRate: refs.exchangeRate,
         showToast: (m) => log.toasts.push(m),
         scanHistory: [],
         deletedItems: [],
@@ -243,10 +259,20 @@ function buildContext() {
         normalizeBarcodesOf: () => {},
         debouncedRenderAfterHistorySync: () => {},
         runAutomaticDeletedCleanup: () => {},
+        runAutomaticCollectedCleanup: () => {},
         repairPickupLedgerOnce: () => {},
         runAutomaticCleanupRules: () => { log.cleanupRuns++; },
         ZoeErrors: { capture: (e) => log.captures.push(e) }
     };
+    REAL_LISTENER_REF_NAMES.forEach((name) => {
+        const key = name.slice(5, 6).toLowerCase() + name.slice(6);
+        if (!refs[key]) refs[key] = { __path: key };
+        ctx[name] = refs[key];
+    });
+    REAL_LISTENER_KEYS.forEach((k) => {
+        const dataName = k + 'Data';
+        if (ctx[dataName] === undefined) ctx[dataName] = {};
+    });
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
@@ -256,11 +282,8 @@ function buildContext() {
     const code = 'let dbListenerPendingSeen = 0;\nlet dbListenerProgressAt = 0;\n' + CONST_STUBS + '\n'
         + REQUIRED_CONSTS.map(sliceConst).filter(Boolean).join('\n') + '\n' +
         REQUIRED_FNS.map(sliceFn).filter(Boolean).join('\n\n') + '\n' + FN_STUBS + '\n' + RESYNC_GUARD + '\n' + ELAPSED_HELPER + '\n' +
-        "const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];\n" +
-        "const DB_LISTENER_KEY_DELETED = 'deleted';\n" +
-        "const DB_LISTENER_KEY_HISTORY = 'history';\n" +
-        "const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';\n" +
-        "const DB_LISTENER_KEY_MONTHLY_REVENUE = 'monthlyRevenue';\n" +
+        'const DB_LISTENER_KEYS = ' + JSON.stringify(REAL_LISTENER_KEYS) + ';\n' +
+        REAL_LISTENER_KEY_CONSTS + '\n' +
         'let dbListenersFailed = false;\n' +
         'let dbListenerGeneration = 0;\n' +
         'let dbListenerRecoveryTimer = null;\n' +
@@ -321,8 +344,10 @@ function buildContext() {
 {
     const t = buildContext();
     t.api.initDatabaseListeners();
-    ok('ភ្ជាប់ listener ទាំង ៦', t.log.attached.length === 6, t.log.attached);
-    ok('detach មុនភ្ជាប់ (គ្មាន listener ស្ទួន)', t.log.off.length === 6, t.log.off);
+    ok('ភ្ជាប់ listener គ្រប់ (ចំនួនដេរីវេពី DB_LISTENER_KEYS)',
+        REAL_LISTENER_KEYS.length >= 6 && t.log.attached.length === REAL_LISTENER_KEYS.length, t.log.attached);
+    ok('detach មុនភ្ជាប់ (គ្មាន listener ស្ទួន)',
+        t.log.off.length === REAL_LISTENER_KEYS.length, t.log.off);
     ok('ស្ថានភាព = online ពេលធម្មតា', t.api.connectionLooksOnline() === true);
     t.api.renderConnectionStatus();
     ok('អត្ថបទ = ភ្ជាប់ Server រួចរាល់', t.statusText.innerText.indexOf('រួចរាល់') !== -1, t.statusText.innerText);
@@ -369,7 +394,7 @@ function buildContext() {
 {
     const t = buildContext();
     t.api.initDatabaseListeners();
-    ['history', 'deleted', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'exchangeRate']
+    REAL_LISTENER_KEYS
         .forEach((p) => t.listenerCallbacks[p].errCb(new Error('permission_denied')));
     const outage = t.log.toasts.filter((m) => m.indexOf('ដាចការទាញយកទិន្នន័យ') !== -1);
     ok('សារដាច់ការតភ្ជាប់បង្ហាញតែ ១ ដង (មិនមែន ៦)', outage.length === 1, t.log.toasts);
@@ -386,10 +411,11 @@ function buildContext() {
     ok('មិនទាន់ស្តារមុនដល់ពេល', t.log.attached.length === attachedBefore, t.log.attached.length);
 
     t.advance(2000);
-    ok('ស្តារ listener ឡើងវិញដោយស្វ័យប្រវត្តិ', t.log.attached.length === attachedBefore + 6, t.log.attached.length);
-    ok('detach មុនស្តារ (គ្មាន listener ស្ទួន)', t.log.off.length === 12, t.log.off.length);
+    ok('ស្តារ listener ឡើងវិញដោយស្វ័យប្រវត្តិ', t.log.attached.length === attachedBefore + REAL_LISTENER_KEYS.length, t.log.attached.length);
+    ok('detach មុនស្តារ (គ្មាន listener ស្ទួន)', t.log.off.length === REAL_LISTENER_KEYS.length * 2, t.log.off.length);
     ok('ទង់នៅតែបរាជ័យរហូតដល់ snapshot មកដល់', t.probe().dbListenersFailed === true);
-    ok('path ទាំង ៦ នៅរង់ចាំ', t.probe().pending.length === 6, t.probe().pending);
+    ok('path ទាំងអស់នៅរង់ចាំ (ចំនួនដេរីវេ)',
+        t.probe().pending.length === REAL_LISTENER_KEYS.length, t.probe().pending);
 }
 
 // ── ៥. ទង់រលត់តែពេល path ទាំងអស់ដឹងខ្លួន ─────────────────────────────
@@ -400,7 +426,7 @@ function buildContext() {
     t.advance(3000);
 
     const snap = (v) => ({ val: () => v });
-    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history']
+    REAL_LISTENER_KEYS.filter((p) => p !== 'deleted')
         .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
     ok('ទង់នៅតែបរាជ័យ ខណៈ path មួយនៅស្ងាត់', t.probe().dbListenersFailed === true, t.probe().pending);
 
@@ -444,7 +470,7 @@ function buildContext() {
     const snap = (v) => ({ val: () => v });
 
     // ១. App ដំណើរការធម្មតា ៖ path ទាំង ៦ មកដល់គ្រប់ ➜ pending ទទេ
-    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+    REAL_LISTENER_KEYS
         .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
     ok('រៀបចំ ៖ path ទាំង ៦ មកដល់គ្រប់ ➜ គ្មាន pending',
         t.probe().pending.length === 0 && t.probe().dbListenersFailed === false, t.probe());
@@ -469,11 +495,11 @@ function buildContext() {
     // ៤. ជណ្តើរស្តារត្រូវ attach ឡើងវិញពិត
     t.advance(3000);
     ok('⛔ listener ដែលងាប់ត្រូវ attach ឡើងវិញពិត',
-        t.log.attached.length === attachedBefore + 6, t.log.attached.length);
+        t.log.attached.length === attachedBefore + REAL_LISTENER_KEYS.length, t.log.attached.length);
 
     // ៥. ⛔ ទិសផ្ទុយ ៖ ក្រោយ attach ឡើងវិញ ការមកដល់គ្រប់ path ត្រូវ
     //    លុបទង់ដដែល — ការកែមិនត្រូវធ្វើឲ្យទង់ជាប់ជារៀងរហូត។
-    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+    REAL_LISTENER_KEYS
         .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
     ok('⛔ ទិសផ្ទុយ ៖ ការជាសះស្បើយពិត នៅតែលុបទង់បរាជ័យដដែល',
         t.probe().dbListenersFailed === false, t.probe());
@@ -491,7 +517,7 @@ function buildContext() {
     const t = buildContext();
     t.api.initDatabaseListeners();
     const snap = (v) => ({ val: () => v });
-    ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted']
+    REAL_LISTENER_KEYS
         .forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
 
     t.listenerCallbacks.deleted.errCb(new Error('permission_denied'));
@@ -541,8 +567,9 @@ function buildContext() {
     ok('⛔ គ្មាន `onValue(..., handleDbListenerError)` ទទេ (ត្រូវបញ្ជូនកូនសោ path)',
         bare === 0, bare);
     const keyed = (initFn.match(/handleDbListenerError\(\s*\w+\s*,/g) || []).length;
-    ok('រាល់ listener ទាំង ៦ បញ្ជូនកូនសោ path ចូល handleDbListenerError',
-        keyed === 6, keyed);
+    ok('រាល់ listener បញ្ជូនកូនសោ path ចូល handleDbListenerError (ចំនួនដេរីវេពី DB_LISTENER_KEYS)',
+        REAL_LISTENER_KEYS.length >= 6 && keyed === REAL_LISTENER_KEYS.length,
+        keyed + '/' + REAL_LISTENER_KEYS.length);
 }
 
 // ── ៦. ការសម្អាតស្វ័យប្រវត្តិមិនត្រូវរត់លើទិន្នន័យកក ─────────────────
@@ -572,7 +599,7 @@ function buildContext() {
 
     t.ctx.navigator.onLine = true;
     t.api.retryFailedDbListenersNow();
-    ok('ស្តារភ្លាមពេលបណ្តាញត្រឡប់មក', t.log.attached.length === before + 6, t.log.attached.length);
+    ok('ស្តារភ្លាមពេលបណ្តាញត្រឡប់មក', t.log.attached.length === before + REAL_LISTENER_KEYS.length, t.log.attached.length);
 }
 
 // ── ៨. ចាកចេញ ➜ សម្អាតស្ថានភាព ─────────────────────────────────────
@@ -717,7 +744,7 @@ function buildContext() {
     const base = t.log.attached.length;
 
     for (let i = 0; i < 10; i++) { t.advance(100); t.api.retryFailedDbListenersNow(); }
-    const burst = (t.log.attached.length - base) / 6;
+    const burst = (t.log.attached.length - base) / REAL_LISTENER_KEYS.length;
     ok('ព្រឹត្តិការណ៍ខាងក្រៅ ១០ ដងក្នុង ១ វិ. ➜ យ៉ាងច្រើន ១ ជុំភ្ជាប់ឡើងវិញ',
         burst <= 1, burst);
 
@@ -726,7 +753,7 @@ function buildContext() {
     t2.listenerCallbacks.history.errCb(new Error('permission_denied'));
     const b2 = t2.log.attached.length;
     for (let i = 0; i < 30; i++) { t2.advance(2000); t2.api.retryFailedDbListenersNow(); }
-    const sustained = (t2.log.attached.length - b2) / 6;
+    const sustained = (t2.log.attached.length - b2) / REAL_LISTENER_KEYS.length;
     ok('ព្រឹត្តិការណ៍រៀងរាល់ ២ វិ. អស់ ៦០ វិ. ➜ មិនលើស ២១ ជុំ (មុនកែ ៦០)',
         sustained <= 21, sustained);
 
@@ -737,7 +764,7 @@ function buildContext() {
     const b3 = t3.log.attached.length;
     t3.advance(60000);
     ok('ជណ្តើរ backoff ធម្មតានៅដដែល (៤ ជុំក្នុង ៦០ វិ.)',
-        (t3.log.attached.length - b3) / 6 === 4, (t3.log.attached.length - b3) / 6);
+        (t3.log.attached.length - b3) / REAL_LISTENER_KEYS.length === 4, (t3.log.attached.length - b3) / REAL_LISTENER_KEYS.length);
 
     // ការស្តារនៅតែកើតឡើងពិត — ពិដានពន្យារវា មិនមែនលុបវាទេ
     const t4 = buildContext();
@@ -751,7 +778,7 @@ function buildContext() {
     t4.ctx.navigator.onLine = true;
     t4.api.retryFailedDbListenersNow();
     ok('បណ្តាញត្រឡប់មក ➜ ស្តារភ្លាម (ពិដានមិនទប់ការព្យាយាមលើកដំបូង)',
-        t4.log.attached.length === b4 + 6, t4.log.attached.length - b4);
+        t4.log.attached.length === b4 + REAL_LISTENER_KEYS.length, t4.log.attached.length - b4);
 
     // ក្រោយចាកចេញ ត្រូវភ្លេចពេលព្យាយាមចុងក្រោយ
     t4.api.resetDbListenerHealthState();
@@ -773,7 +800,7 @@ function buildContext() {
 // **កំពុងតូចទៅៗ** ជណ្តើរត្រូវរង់ចាំ មិនត្រូវ attach ឡើងវិញ។ បើវាឈប់តូច
 // (ជាប់មែន) នោះជុំបន្ទាប់ attach ឡើងវិញដូចមុន ➜ ការស្តារនៅតែកើតឡើងពិត។
 {
-    const PATHS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
+    const PATHS = REAL_LISTENER_KEYS;
     const t = buildContext();
     t.api.initDatabaseListeners();
     t.listenerCallbacks.history.errCb(new Error('permission_denied'));
@@ -786,7 +813,7 @@ function buildContext() {
         if (cbs && cbs.cb) cbs.cb({ val: () => null });
     });
 
-    const rounds = (t.log.attached.length - base) / 6;
+    const rounds = (t.log.attached.length - base) / REAL_LISTENER_KEYS.length;
     ok('resync យឺត ➜ ជណ្តើរមិនកាត់ផ្តាច់វា (យ៉ាងច្រើន ៣ ជុំ attach ឡើងវិញ)',
         rounds <= 3, rounds);
     ok('⛔ resync យឺតត្រូវ **ចប់បាន** — មិនមែនចាប់ផ្តើមសាជាថ្មីរហូត',
@@ -801,7 +828,7 @@ function buildContext() {
     const b2 = t2.log.attached.length;
     t2.advance(60000);
     ok('គ្មានវឌ្ឍនភាពសោះ ➜ ជណ្តើរនៅ attach ឡើងវិញដដែល (៤ ជុំក្នុង ៦០ វិ.)',
-        (t2.log.attached.length - b2) / 6 === 4, (t2.log.attached.length - b2) / 6);
+        (t2.log.attached.length - b2) / REAL_LISTENER_KEYS.length === 4, (t2.log.attached.length - b2) / REAL_LISTENER_KEYS.length);
 
     // វឌ្ឍនភាពមួយផ្នែករួចជាប់ ➜ ជុំបន្ទាប់ត្រូវ attach ឡើងវិញ (ស្តារដោយខ្លួនឯង)
     const t3 = buildContext();
@@ -815,7 +842,7 @@ function buildContext() {
     t3.advance(60000);
     ok('វឌ្ឍនភាពជាប់ ➜ ជុំបន្ទាប់ attach ឡើងវិញ (ការពន្យារមិនក្លាយជាការឈប់)',
         afterProgress === b3 && t3.log.attached.length > b3,
-        'skip=' + (afterProgress === b3) + ' later=' + (t3.log.attached.length - b3) / 6);
+        'skip=' + (afterProgress === b3) + ' later=' + (t3.log.attached.length - b3) / REAL_LISTENER_KEYS.length);
 
     t3.api.resetDbListenerHealthState();
     ok('ចាកចេញ ➜ ការតាមដានវឌ្ឍនភាពត្រូវ reset',
@@ -874,9 +901,8 @@ function buildContext() {
         t.log.attached.length === before, t.log.attached.length - before);
 
     // resync ដដែលត្រូវ **ចប់បាន** — ការកែនេះជាការរង់ចាំ មិនមែនការទប់ទេ
-    ['dailyPickup', 'history', 'deleted'].forEach((p) => {
-        t.listenerCallbacks[p].cb({ val: () => null });
-    });
+    REAL_LISTENER_KEYS.filter((p) => p !== 'exchangeRate' && p !== 'dailyRevenue' && p !== 'monthlyRevenue')
+        .forEach((p) => { t.listenerCallbacks[p].cb({ val: () => null }); });
     ok('resync ចប់ ➜ ទង់បរាជ័យរលត់',
         t.probe().dbListenersFailed === false && t.probe().pending.length === 0,
         JSON.stringify(t.probe().pending));
@@ -890,7 +916,7 @@ function buildContext() {
     const b2 = t2.log.attached.length;
     t2.advance(120000);
     ok('⛔ resync ស្លាប់ពិត ➜ ការរង់ចាំផុតកំណត់ ហើយជណ្តើរ attach ឡើងវិញ',
-        t2.log.attached.length > b2, (t2.log.attached.length - b2) / 6);
+        t2.log.attached.length > b2, (t2.log.attached.length - b2) / REAL_LISTENER_KEYS.length);
 }
 
 // ── ១០ខ១គ. listener `.info/*` ដែលត្រូវបោះបង់ ក៏ត្រូវមានផ្លូវស្តារដែរ ────

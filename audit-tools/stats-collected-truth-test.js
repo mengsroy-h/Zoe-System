@@ -3,7 +3,9 @@
 // 🔴 ហេតុអ្វីវាមាន (វាស់បាន 2026-09-05) ៖ mutation ដែលធ្វើឲ្យ
 // **📅 ស្ថិតិប្រចាំថ្ងៃ** បង្ហាញ **ledger ឆៅ** ជំនួស «ចំណូល (យករួច)»
 // (បញ្ជូន `undefined` ជា `uncollected` ទៅ `buildStatCardItem()`) ➜ រត់
-// checker **១៣២** ➜ **០ ចាប់បាន**។ ការធ្វើដដែលលើ **📊 ស្ថិតិ ៣ ខែ** ➜
+// checker **១៣២** ➜ **០ ចាប់បាន**។ (⛔ អេក្រង់ **📊 ស្ថិតិ ៣ ខែ** ត្រូវដក
+// ចេញក្នុងកំណែ 2.34.0 ➜ ការវាស់កម្រិតខែផ្លាស់ទៅ `stats-screen-agreement-test`
+// ដែលប្រៀប **ផលបូកកាតថ្ងៃ** នឹង **របាយការណ៍ខែ**។) ការធ្វើដដែល ➜
 // ចាប់បាន ១ តែដោយ `function-surface-test` ព្រោះ `uncollectedValueForMonth`
 // ក្លាយជា **function ងាប់** — មិនមែនដោយសារលេខខុសទេ ➜ ការការពារ **ផុយ**
 // (mutation ដែលបញ្ជូន `{cod:0,dod:0}` ជំនួស `undefined` នឹងរស់រានដែរ)។
@@ -177,10 +179,6 @@ function serve(dir) {
         if (typeof openDailyStatsModal === 'function') { openDailyStatsModal(); await new Promise(r => setTimeout(r, 250)); }
         out.screens.daily = readCards('dailyStatsContainer');
         if (typeof closeModal === 'function') closeModal();
-        await new Promise(r => setTimeout(r, 150));
-        if (typeof openMonthlyStatsModal === 'function') { openMonthlyStatsModal(); await new Promise(r => setTimeout(r, 250)); }
-        out.screens.monthly = readCards('monthlyStatsContainer');
-        if (typeof closeModal === 'function') closeModal();
         return out;
     }, DAY);
 
@@ -193,7 +191,7 @@ function serve(dir) {
         'មិនពេញ ➜ អេក្រង់បង្ហាញ «—» ➜ លេខមិនអាចវាស់');
 
     // ═══ អេក្រង់នីមួយៗ ៖ លេខដែលអ្នកប្រើអាន ═══
-    [['📅 ស្ថិតិប្រចាំថ្ងៃ', res.screens.daily], ['📊 ស្ថិតិ ៣ ខែ', res.screens.monthly]].forEach(([label, cards]) => {
+    [['📅 ស្ថិតិប្រចាំថ្ងៃ', res.screens.daily]].forEach(([label, cards]) => {
         if (!cards || !cards.length) { bad(label + ' ៖ រកកាតស្ថិតិមិនឃើញ', 'អេក្រង់មិនបើក ឬ container ប្តូរឈ្មោះ'); return; }
         const card = cards[0];
         check(card.collected !== null, label + ' ៖ អានលេខ «ចំណូល (យករួច)» ចេញពី DOM បាន', card.text);

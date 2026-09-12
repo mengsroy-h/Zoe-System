@@ -133,7 +133,7 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'ledgerNumber', 'countPickedUpCus
     'monthlyReportAvailableMonths', 'buildMonthlyReport', 'monthlyReportRiel',
     'monthlyReportFilenameBase', 'monthlyReportRows', 'forceSheetTextCells',
     'dbListenerViewIsStale', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'collectedValueForMonth', 'collectedValueOf',
+    'uncollectedValueByDate', 'collectedValueOf',
     'collectedValueIsMeasurable', 'collectedMoneyText', 'collectedRielText'];
 FNS.forEach((name) => {
     const fn = sliceFn(src, name);
@@ -434,12 +434,18 @@ scenario('ចំណូល ៖ ការត្រងខែ និងថ្ងៃ�
     const map = vm.runInContext('uncollectedValueByDate()', sandbox);
     ok('⛔ កូនសោថ្ងៃមិនត្រូវទម្រង់ត្រូវរំលង', map['nope'] === undefined, JSON.stringify(Object.keys(map)));
     sandbox.__map = map;
-    // ⛔ ចំណូលរបស់ខែត្រូវដេរីវេពី **ថ្ងៃ** (clamp ក្នុងមួយថ្ងៃ) មិនមែនបូកមុន clamp
-    const sep = vm.runInContext('collectedValueForMonth(dailyRevenueData, __map, "2026-09")', sandbox);
-    ok('collectedValueForMonth() ស្មើផលបូកចំណូលតាមថ្ងៃ',
-        sep.total === r.totals.collectedTotal, JSON.stringify(sep) + ' ធៀប ' + r.totals.collectedTotal);
+    // ⛔ ចំណូលរបស់ខែត្រូវដេរីវេពី **ថ្ងៃ** (clamp ក្នុងមួយថ្ងៃ) មិនមែនបូកមុន clamp។
+    // ⛔ កំណែ 2.34.0 ដក `collectedValueForMonth()` ចេញជាមួយអេក្រង់ «ស្ថិតិ ៣ ខែ»
+    // ➜ អ្នកកាន់ច្បាប់នេះឥឡូវជា **`buildMonthlyReport()` ខ្លួនវា** (វាបូកថ្ងៃ
+    // មួយៗចូល `totals`) ➜ ការអះអាងត្រូវវាស់ **កូដដែល ship ពិត**។
+    const daySum = r.days.reduce((sum, d) => sum + d.collectedTotal, 0);
+    ok('សរុបខែ ស្មើផលបូកចំណូលតាមថ្ងៃ (clamp ក្នុងមួយថ្ងៃ)',
+        Math.abs(r.totals.collectedTotal - daySum) < 0.0001,
+        r.totals.collectedTotal + ' ធៀប ' + daySum);
+    const emptyMonth = vm.runInContext('buildMonthlyReport("2025-01")', sandbox);
     ok('⛔ ខែគ្មានទិន្នន័យ ➜ សូន្យ មិនមែន NaN',
-        vm.runInContext('collectedValueForMonth(dailyRevenueData, __map, "2025-01")', sandbox).total === 0);
+        emptyMonth.totals.collectedTotal === 0 && emptyMonth.days.length === 0,
+        JSON.stringify(emptyMonth.totals.collectedTotal));
 });
 
 scenario('ចំណូល ៖ រូបរាងឆៅ · clamp · មិនបោះ', () => {
@@ -544,21 +550,21 @@ scenario('⛔ មូលដ្ឋានតែមួយ ៖ ម៉ូឌុលស�
         }
         return out;
     };
-    const users = ['buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal'];
+    const users = ['buildMonthlyReport', 'openDailyStatsModal'];
     users.forEach((name) => {
         const body = bodyWithCallees(name);
         ok(name + '() ហៅ collectedValueOf()', body.indexOf('collectedValueOf') !== -1);
         ok(name + '() ហៅ collectedValueIsMeasurable()', body.indexOf('collectedValueIsMeasurable') !== -1);
         ok(name + '() អានតម្លៃមិនទាន់យកពី uncollectedValue*()', /uncollectedValue(ByDate|ForMonth)/.test(body), name);
     });
-    ok('⛔ ជាន់អប្បបរមា ៖ វាស់លើឯកសារ ១ ដែលមាន function ទាំង ៣',
+    ok('⛔ ជាន់អប្បបរមា ៖ វាស់លើឯកសារ ១ ដែលមាន function ទាំង ២',
         users.every((n) => !!sliceFn(src, n)), users.filter((n) => !sliceFn(src, n)).join(', '));
     const daily = bodyWithCallees('openDailyStatsModal');
-    const monthly = bodyWithCallees('openMonthlyStatsModal');
     ok('⛔ ម៉ូឌុលថ្ងៃមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', daily.indexOf('ចំណូល (យករួច)') !== -1);
-    ok('⛔ ម៉ូឌុលខែមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', monthly.indexOf('ចំណូល (យករួច)') !== -1);
-    ok('⛔ ម៉ូឌុលទាំង ២ នៅតែបង្ហាញតម្លៃទាំងអស់ដែរ (តម្លាភាព)',
-        daily.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1 && monthly.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1);
+    ok('⛔ ម៉ូឌុលថ្ងៃនៅតែបង្ហាញតម្លៃទាំងអស់ដែរ (តម្លាភាព)',
+        daily.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1);
+    ok('⛔ អេក្រង់ «ស្ថិតិ ៣ ខែ» ត្រូវបានដកចេញពិត ➜ គ្មានផ្ទៃទី ៣ ដែលអាចឃ្លាតទៀតទេ',
+        src.indexOf('openMonthlyStatsModal') === -1 && src.indexOf('collectedValueForMonth') === -1);
 });
 
 // 🔴 វាស់បាន (2026-09-09) ៖ mutation ដែលប្តូរជួរឈរ «COD យករួច ($)» ➜ `d.total`

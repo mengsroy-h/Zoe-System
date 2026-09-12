@@ -179,7 +179,7 @@
                     <div class="header-actions">
                         <button type="button" class="zto-list-btn hidden" id="ztoListSyncBtn" data-act="openZtoListSyncModal" title="ទាញបញ្ជីកញ្ចប់ពី ZTO Argus">📥 បញ្ជី ZTO</button>
                         <button class="daily-stats-btn" data-act="openDailyStatsModal">📅 កញ្ចប់ប្រចាំថ្ងៃ</button>
-                        <button class="monthly-stats-btn" data-act="openMonthlyStatsModal">📊 ស្ថិតិចំណូល</button>
+                        <button class="monthly-stats-btn" data-act="openCollectedStatsModal">💵 ចំណូលប្រចាំថ្ងៃ</button>
                     </div>
                 </div>
 
@@ -809,13 +809,14 @@ const firebaseConfig = {
     </div>
 </div>
 
-<div id="monthlyStatsModal" class="modal">
+<div id="collectedStatsModal" class="modal">
     <div class="modal-content">
-        <h3>📊 ស្ថិតិចំណូល (យករួច) ៣ ខែចុងក្រោយ</h3>
-        <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
-        <div id="monthlyStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
+        <h3>💵 ចំណូលប្រចាំថ្ងៃ (តាមថ្ងៃយក)</h3>
+        <p>លុយដែល <b>ទទួលបានក្នុងថ្ងៃនោះ</b> — កញ្ចប់ថ្មី ឬចាស់ក៏ដោយ គិតតាម <b>ថ្ងៃដែលបិទ «យក»</b>។ រក្សាទុកក្នុង Database <b>៧ ថ្ងៃចុងក្រោយ</b> ហើយថ្ងៃចាស់ជាងនោះលុបចោលស្វ័យប្រវត្តិ។</p>
+        <div id="collectedStatsContainer" style="max-height: 260px; overflow-y: auto; margin-bottom: 8px;"></div>
+        <p class="mrep-foot">⛔ នេះ <b>មិនមែន</b> «📅 កញ្ចប់ប្រចាំថ្ងៃ» ទេ — ផ្ទាំងនោះគិតតាម <b>ថ្ងៃស្កេនចូល</b>។</p>
         <div class="modal-btns">
-            <button class="btn-cancel" data-act="closeModal" data-args='["monthlyStatsModal"]'>បិទ</button>
+            <button class="btn-cancel" data-act="closeModal" data-args='["collectedStatsModal"]'>បិទ</button>
         </div>
     </div>
 </div>

@@ -56,9 +56,9 @@ function sliceFn(src, name) {
 // ⛔ រកឈ្មោះមិនឃើញ ➜ **stub** មិនមែន exit (បើអត់ ការអះអាងខាងក្រោមត្រូវបិទបាំង)។
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'collectedValueOf', 'collectedValueForMonth', 'collectedMoneyText',
+    'uncollectedValueByDate', 'collectedValueOf', 'collectedMoneyText',
     'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
-    'openDailyStatsModal', 'openMonthlyStatsModal', 'collectedValueIsMeasurable',
+    'openDailyStatsModal', 'collectedValueIsMeasurable',
     'dbListenerViewIsStale'];
 const missing = [];
 const bodies = WANT.map((n) => {
@@ -83,7 +83,7 @@ function moneyAfter(html, label) {
 
 // state.pending / state.failed ជាឈ្មោះ path របស់ listener ដែលមិនទាន់មក / ងាប់
 function buildSandbox(state) {
-    const containers = { dailyStatsContainer: makeEl(), monthlyStatsContainer: makeEl() };
+    const containers = { dailyStatsContainer: makeEl(), collectedStatsContainer: makeEl() };
     const sandbox = {
         console,
         scanHistory: state.scanHistory || [],
@@ -151,9 +151,9 @@ function cardsOf(sandbox, which) {
 scenario('សំណុំ function ពិតត្រូវរកឃើញ (បើ stub ➜ ការវាស់ខាងក្រោមមិនមានន័យ)', () => {
     ok('⛔ ជាន់អប្បបរមា៖ រក function ស្ថិតិពិតបានយ៉ាងតិច 19',
         WANT.length - missing.length >= 19, 'បាត់៖ ' + missing.join(', '));
-    ok('ច្រកទ្វារវាស់បាន និងអេក្រង់ទាំង ៣ មានក្នុង app.js ពិត',
+    ok('ច្រកទ្វារវាស់បាន និងអេក្រង់ទាំង ២ មានក្នុង app.js ពិត',
         ['collectedValueIsMeasurable', 'dbListenerViewIsStale', 'openDailyStatsModal',
-            'openMonthlyStatsModal', 'buildMonthlyReport'].every((n) => missing.indexOf(n) === -1),
+            'buildMonthlyReport'].every((n) => missing.indexOf(n) === -1),
         'បាត់៖ ' + missing.join(', '));
 });
 
@@ -214,13 +214,6 @@ scenario('🔴 listener ledger ងាប់ ➜ អេក្រង់មិន�
         moneyAfter(dayCard, LBL_COLLECTED) === '—', 'អាន=' + moneyAfter(dayCard, LBL_COLLECTED));
     ok('⛔ ស្ថិតិប្រចាំថ្ងៃ «' + LBL_PENDING + '» = «—»',
         moneyAfter(dayCard, LBL_PENDING) === '—', 'អាន=' + moneyAfter(dayCard, LBL_PENDING));
-
-    s.openMonthlyStatsModal();
-    const monCard = cardsOf(s, 'monthlyStatsContainer').find((h) => h.indexOf('2026-09') !== -1) || '';
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_COLLECTED + '» = «—»',
-        moneyAfter(monCard, LBL_COLLECTED) === '—', 'អាន=' + moneyAfter(monCard, LBL_COLLECTED));
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_PENDING + '» = «—»',
-        moneyAfter(monCard, LBL_PENDING) === '—', 'អាន=' + moneyAfter(monCard, LBL_PENDING));
 
     const report = s.buildMonthlyReport('2026-09');
     ok('⛔ របាយការណ៍ខែត្រូវរាយថា វាស់មិនបាន',

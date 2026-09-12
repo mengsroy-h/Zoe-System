@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.33.3';
+    const APP_VERSION = '2.34.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -70,7 +70,7 @@
         "openHealthCheck",
         "openEditModal",
         "openLockerPicker",
-        "openMonthlyStatsModal",
+        "openCollectedStatsModal",
         "openSideDrawer",
         "openViewListModal",
         "openZtoListSyncModal",
@@ -286,6 +286,7 @@
     let dbRefDailyRevenue = null;
     let dbRefMonthlyRevenue = null;
     let dbRefDailyPickup = null;
+    let dbRefDailyCollected = null;
     let dbRefExchangeRate = null;
     let dbRefConnected = null;
     let dbRefServerTimeOffset = null;
@@ -330,6 +331,7 @@
     let dailyRevenueData = {};
     let monthlyRevenueData = {};
     let dailyPickupData = {};
+    let dailyCollectedData = {};
     let pickupResetInFlight = false;
     const PICKUP_DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
     let currentFilterMode = 'today';
@@ -378,15 +380,16 @@
     let dbListenerRecoveryAttempt = 0;
     let lastDbListenerAttemptAt = 0;
     let dbListenerOutageNoticeShown = false;
-    const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'history', 'deleted'];
+    const DB_LISTENER_KEYS = ['exchangeRate', 'dailyRevenue', 'monthlyRevenue', 'dailyPickup', 'dailyCollected', 'history', 'deleted'];
     const DB_LISTENER_KEY_DELETED = 'deleted';
     const DB_LISTENER_KEY_HISTORY = 'history';
     const DB_LISTENER_KEY_DAILY_REVENUE = 'dailyRevenue';
     const DB_LISTENER_KEY_MONTHLY_REVENUE = 'monthlyRevenue';
+    const DB_LISTENER_KEY_DAILY_COLLECTED = 'dailyCollected';
     const VIEW_NOT_MEASURABLE_TEXT = 'ទិន្នន័យមិនទាន់មកដល់គ្រប់ ➜ វាស់មិនបាន';
     const VIEW_NOT_MEASURABLE_NOTICE = '⏳ ' + VIEW_NOT_MEASURABLE_TEXT;
     const STATS_DAILY_VIEW_KEYS = [DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
-    const STATS_MONTHLY_VIEW_KEYS = [DB_LISTENER_KEY_MONTHLY_REVENUE, DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
+    const STATS_COLLECTED_VIEW_KEYS = [DB_LISTENER_KEY_DAILY_COLLECTED];
     const ZTO_SYNC_VIEW_KEYS = [DB_LISTENER_KEY_HISTORY, DB_LISTENER_KEY_DELETED];
     const dbListenerPendingPaths = new Set();
     const dbListenerFailedPaths = new Set();
@@ -1159,6 +1162,7 @@
             dbRefDailyRevenue = fb.ref(db, 'zoew_daily_revenue_cod_dod');
             dbRefMonthlyRevenue = fb.ref(db, 'zoew_monthly_revenue_cod_dod');
             dbRefDailyPickup = fb.ref(db, 'zoew_daily_pickup_cod_dod');
+            dbRefDailyCollected = fb.ref(db, 'zoew_daily_collected_cod_dod');
             dbRefExchangeRate = fb.ref(db, 'zoew_settings/exchange_rate');
             dbRefConnected = fb.ref(db, '.info/connected');
             dbRefServerTimeOffset = fb.ref(db, '.info/serverTimeOffset');
@@ -4594,6 +4598,7 @@
         const ztoListBodyEl = document.getElementById('ztoListSyncBody');
         if (ztoListBodyEl) ztoListBodyEl.innerHTML = '';
         ztoListSyncResult = null;
+        ztoListSignedProbe.clear();
         ztoListSyncInFlight = false;
         closeModal('ztoListSyncModal');
         restoreAfterPdfExport();
@@ -4634,7 +4639,7 @@
             'editModalBarcodeText', 'lookupApiHeaderValueInput',
             'modalBarcodeText', 'pdfExportPrintArea', 'phoneSuggestBox',
             'deletedTableBody', 'deletedSearchInput', 'trashSummaryBox',
-            'dailyStatsContainer', 'monthlyStatsContainer',
+            'dailyStatsContainer', 'collectedStatsContainer',
             'menuContentContainer', 'lockerListTableBody', 'lockerListSearchInput',
             'healthCheckList', 'monthlyReportBody',
             'locationWarningText', 'customLockerInput',
@@ -4977,7 +4982,7 @@
     function detachDatabaseListeners() {
         dbListenerGeneration++;
         if (!fb) return;
-        [dbRefDailyRevenue, dbRefMonthlyRevenue, dbRefDailyPickup, dbRefHistory, dbRefDeleted, dbRefExchangeRate]
+        [dbRefDailyRevenue, dbRefMonthlyRevenue, dbRefDailyPickup, dbRefDailyCollected, dbRefHistory, dbRefDeleted, dbRefExchangeRate]
             .forEach((ref) => { if (ref) { try { fb.off(ref); } catch (e) {} } });
     }
 
@@ -5097,6 +5102,7 @@
             dailyRevenue: dbRefDailyRevenue,
             monthlyRevenue: dbRefMonthlyRevenue,
             dailyPickup: dbRefDailyPickup,
+            dailyCollected: dbRefDailyCollected,
             history: dbRefHistory,
             deleted: dbRefDeleted
         };
@@ -5152,6 +5158,18 @@
             }, (err) => {
                 if (listenerGeneration !== dbListenerGeneration) return;
                 handleDbListenerError(err, 'dailyPickup');
+            });
+        }
+
+        if (dbRefDailyCollected) {
+            fb.onValue(dbRefDailyCollected, (snapshot) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                noteDbListenerAlive(DB_LISTENER_KEY_DAILY_COLLECTED);
+                dailyCollectedData = snapshot.val() || {};
+                debouncedRenderAfterHistorySync();
+            }, (err) => {
+                if (listenerGeneration !== dbListenerGeneration) return;
+                handleDbListenerError(err, DB_LISTENER_KEY_DAILY_COLLECTED);
             });
         }
 
@@ -5664,6 +5682,7 @@
         flushPendingRegistryReleases();
         runAutomaticCleanupRules();
         runAutomaticDeletedCleanup();
+        runAutomaticCollectedCleanup();
         repairPickupLedgerOnce();
     }
 
@@ -6157,6 +6176,24 @@
                     <div class="stat-money-row stat-money-breakdown">
                         <span class="money-total">តម្លៃកញ្ចប់ទាំងអស់៖ $${totalD.toFixed(2)}</span>
                         <span class="money-pending">មិនទាន់យក៖ ${sanitizeInput(collectedMoneyText(pending, measurable))}</span>
+                    </div>
+                `;
+        return div;
+    }
+
+    function buildCollectedCardItem(day, totals) {
+        const sums = (totals && typeof totals === 'object')
+            ? totals : { cod: 0, dod: 0, total: 0, count: 0 };
+        const div = document.createElement('div');
+        div.className = 'stat-card-item';
+        div.innerHTML = `
+                    <div class="m-title">💵 ថ្ងៃយក៖ ${sanitizeInput(day)}</div>
+                    <div class="m-details">
+                        <span>កញ្ចប់យករួច៖ <strong>${sums.count}</strong></span>
+                        <span>COD: <strong class="money-collected">$${sums.cod.toFixed(2)}</strong> | DOD: <strong class="money-collected">$${sums.dod.toFixed(2)}</strong></span>
+                    </div>
+                    <div class="stat-money-row money-collected">
+                        ចំណូលថ្ងៃនេះ៖ <strong>$${sums.total.toFixed(2)}</strong> (${Math.round(sums.total * exchangeRateRiel).toLocaleString()} ៛)
                     </div>
                 `;
         return div;
@@ -6687,6 +6724,167 @@
         return { scanDate: scanDateStr, marks: list, seed: seed || null, previous: applied.previous, changed: applied.changed };
     }
 
+    const DAILY_COLLECTED_KEEP_DAYS = 7;
+    const DAILY_COLLECTED_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+    function collectedSetFromRecord(record) {
+        const out = {};
+        if (!record || typeof record !== 'object') return out;
+        Object.keys(record).forEach((key) => {
+            const entry = record[key];
+            if (!entry || typeof entry !== 'object') return;
+            out[key] = { c: statsMoney(entry.c), d: statsMoney(entry.d) };
+        });
+        return out;
+    }
+
+    function collectedMarkValueOf(barcode) {
+        return { c: statsMoney(barcode && barcode.cod), d: statsMoney(barcode && barcode.dod) };
+    }
+
+    function collectedDayOfStamp(stamp) {
+        const ms = parseFloat(stamp);
+        return isFinite(ms) && ms > 0 ? getZoneDateKey(ms, 0) : '';
+    }
+
+    function collectedDayHoldingKey(key) {
+        if (!key || !dailyCollectedData || typeof dailyCollectedData !== 'object') return '';
+        const days = Object.keys(dailyCollectedData).sort().reverse();
+        for (let i = 0; i < days.length; i++) {
+            const record = dailyCollectedData[days[i]];
+            if (record && typeof record === 'object' && Object.prototype.hasOwnProperty.call(record, key)) return days[i];
+        }
+        return '';
+    }
+
+    function collectedMarksFor(barcode, desiredClosed, previousClosedAt) {
+        const key = pickupBarcodeKey(barcode && barcode.code);
+        if (!key) return [];
+        const priorDay = collectedDayOfStamp(previousClosedAt) || collectedDayHoldingKey(key);
+        if (!desiredClosed) return priorDay ? [{ key: key, day: priorDay, value: null }] : [];
+        const day = collectedDayOfStamp(barcode && barcode.closedAt);
+        if (!day) return [];
+        const out = [];
+        if (priorDay && priorDay !== day) out.push({ key: key, day: priorDay, value: null });
+        out.push({ key: key, day: day, value: collectedMarkValueOf(barcode) });
+        return out;
+    }
+
+    function collectItemCollectedMarks(item, desiredClosed, previousStamps) {
+        const list = (item && Array.isArray(item.barcodes)) ? item.barcodes : [];
+        const stamps = Array.isArray(previousStamps) ? previousStamps : [];
+        let out = [];
+        list.forEach((barcode, index) => {
+            out = out.concat(collectedMarksFor(barcode, desiredClosed, stamps[index]));
+        });
+        return out;
+    }
+
+    function collectedPreviousValue(day, key) {
+        const record = dailyCollectedData[day];
+        const entry = (record && typeof record === 'object') ? record[key] : null;
+        return (entry && typeof entry === 'object') ? { c: statsMoney(entry.c), d: statsMoney(entry.d) } : null;
+    }
+
+    function applyCollectedMarksInMemory(marks) {
+        (marks || []).forEach((mark) => {
+            if (!mark || !mark.key || !mark.day) return;
+            const current = dailyCollectedData[mark.day];
+            const record = (current && typeof current === 'object') ? current : {};
+            if (mark.value) record[mark.key] = { c: mark.value.c, d: mark.value.d };
+            else delete record[mark.key];
+            if (Object.keys(record).length) dailyCollectedData[mark.day] = record;
+            else delete dailyCollectedData[mark.day];
+        });
+    }
+
+    function commitCollectedMarks(dayKey, marks) {
+        if (!dbRefDailyCollected || !db || !fb || !dayKey) return Promise.resolve(null);
+        const dayRef = fb.ref(db, `zoew_daily_collected_cod_dod/${dayKey}`);
+        return fb.runTransaction(dayRef, (current) => {
+            const set = collectedSetFromRecord(current);
+            (marks || []).forEach((mark) => {
+                if (!mark || !mark.key) return;
+                if (mark.value) set[mark.key] = { c: mark.value.c, d: mark.value.d };
+                else delete set[mark.key];
+            });
+            return Object.keys(set).length ? set : null;
+        }).then((result) => (result && result.committed) ? true : null, () => {
+            showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
+            return null;
+        });
+    }
+
+    function markCollectedRevenue(marks) {
+        const list = (marks || []).filter((mark) => mark && mark.key && mark.day);
+        if (!list.length) return null;
+        list.forEach((mark) => { mark.previous = collectedPreviousValue(mark.day, mark.key); });
+        applyCollectedMarksInMemory(list);
+        const byDay = {};
+        list.forEach((mark) => {
+            if (!byDay[mark.day]) byDay[mark.day] = [];
+            byDay[mark.day].push(mark);
+        });
+        Object.keys(byDay).forEach((day) => { commitCollectedMarks(day, byDay[day]); });
+        return list;
+    }
+
+    function syncCollectedValueForBarcode(itemId, barcodeCode) {
+        const key = pickupBarcodeKey(barcodeCode);
+        if (!key) return null;
+        const day = collectedDayHoldingKey(key);
+        if (!day) return null;
+        const item = scanHistory.find((i) => i && i.id === itemId);
+        const barcode = (item && Array.isArray(item.barcodes))
+            ? item.barcodes.find((b) => b && b.code === barcodeCode) : null;
+        if (!barcode || !barcode.isClosed) return null;
+        return markCollectedRevenue([{ key: key, day: day, value: collectedMarkValueOf(barcode) }]);
+    }
+
+    function revertCollectedMarks(applied) {
+        if (!applied || !applied.length) return null;
+        return markCollectedRevenue(applied.map((mark) => ({ key: mark.key, day: mark.day, value: mark.previous })));
+    }
+
+    function collectedTotalsOfDay(record) {
+        const set = collectedSetFromRecord(record);
+        const keys = Object.keys(set);
+        let cod = 0;
+        let dod = 0;
+        keys.forEach((key) => { cod += set[key].c; dod += set[key].d; });
+        cod = Math.round(cod * 100) / 100;
+        dod = Math.round(dod * 100) / 100;
+        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100, count: keys.length };
+    }
+
+    function collectedRetentionCutoffKey(now) {
+        return getZoneDateKey(now, -(DAILY_COLLECTED_KEEP_DAYS - 1));
+    }
+
+    function staleCollectedDays(map, now) {
+        const source = (map && typeof map === 'object') ? map : {};
+        const cutoff = collectedRetentionCutoffKey(now);
+        return Object.keys(source)
+            .filter((day) => DAILY_COLLECTED_DAY_PATTERN.test(day) && day < cutoff)
+            .sort();
+    }
+
+    function runAutomaticCollectedCleanup() {
+        if (!db || !fb || !dbRefDailyCollected) return;
+        if (!cleanupClockIsTrustworthy()) return;
+        if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_COLLECTED)) return;
+        const stale = staleCollectedDays(dailyCollectedData, getServerNow());
+        if (!stale.length) return;
+        const payload = {};
+        stale.forEach((day) => {
+            payload[day] = null;
+            delete dailyCollectedData[day];
+        });
+        dbOp(fb.update(dbRefDailyCollected, payload), 'ការសម្អាតចំណូលប្រចាំថ្ងៃ').catch((error) => {
+            if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'runAutomaticCollectedCleanup' });
+        });
+    }
+
     function reapplyPickupMarks(applied, marks, scanDateStr, seed) {
         const next = (marks || []).filter((m) => m && m.key);
         const keep = {};
@@ -6870,27 +7068,25 @@
         openModalHelper('dailyStatsModal');
     }
 
-    function openMonthlyStatsModal() {
-        const container = document.getElementById('monthlyStatsContainer');
-        if(!container) return;
+    function openCollectedStatsModal() {
+        const container = document.getElementById('collectedStatsContainer');
+        if (!container) return;
         container.innerHTML = '';
 
-        let sortedKeys = Object.keys(monthlyRevenueData).sort().reverse();
-        const uncollectedMap = uncollectedValueByDate();
-        const measurable = collectedValueIsMeasurable();
+        const days = Object.keys(dailyCollectedData || {})
+            .filter((day) => DAILY_COLLECTED_DAY_PATTERN.test(day))
+            .sort().reverse()
+            .slice(0, DAILY_COLLECTED_KEEP_DAYS);
 
-        if (sortedKeys.length === 0) {
-            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">${sanitizeInput(emptyViewMessage(STATS_MONTHLY_VIEW_KEYS, 'គ្មានទិន្នន័យចំណូលប្រចាំខែទេ'))}</p>`;
+        if (!days.length) {
+            container.innerHTML = `<p style="text-align: center; color: #888; padding: 12px;">${sanitizeInput(emptyViewMessage(STATS_COLLECTED_VIEW_KEYS, 'មិនទាន់មានកញ្ចប់ណាបិទ «យក» ក្នុង ៧ ថ្ងៃចុងក្រោយទេ'))}</p>`;
         } else {
-            sortedKeys.forEach(ym => {
-                const data = monthlyRevenueData[ym] || {};
-                container.appendChild(buildStatCardItem('ខែ', ym,
-                    statsMoney(data.codDollar), statsMoney(data.dodDollar), statsCount(data.totalCount),
-                    collectedValueForMonth(dailyRevenueData, uncollectedMap, ym), measurable));
+            days.forEach((day) => {
+                container.appendChild(buildCollectedCardItem(day, collectedTotalsOfDay(dailyCollectedData[day])));
             });
         }
 
-        openModalHelper('monthlyStatsModal');
+        openModalHelper('collectedStatsModal');
     }
 
     let currentAppPage = 'data';
@@ -8349,23 +8545,6 @@
             });
         });
         return out;
-    }
-
-    function collectedValueForMonth(revenueMap, uncollectedMap, ym) {
-        const source = (revenueMap && typeof revenueMap === 'object') ? revenueMap : {};
-        const open = (uncollectedMap && typeof uncollectedMap === 'object') ? uncollectedMap : {};
-        let cod = 0;
-        let dod = 0;
-        Object.keys(source).forEach((date) => {
-            if (statsMonthOf(date) !== ym) return;
-            const bucket = source[date] || {};
-            const day = collectedValueOf(bucket.codDollar, bucket.dodDollar, open[date]);
-            cod += day.cod;
-            dod += day.dod;
-        });
-        cod = Math.round(cod * 100) / 100;
-        dod = Math.round(dod * 100) / 100;
-        return { cod: cod, dod: dod, total: Math.round((cod + dod) * 100) / 100 };
     }
 
     function collectedValueOf(ledgerCod, ledgerDod, uncollected) {
@@ -10613,17 +10792,19 @@
         }
     }
 
-    function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stampMs = 0) {
+    function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stampMs = 0, closedAtMs = 0) {
         let savePromise;
         const stamp = Number(stampMs);
         const currentTimeMillis = isFinite(stamp) && stamp > 0 ? stamp : getServerNow();
+        const closeStamp = Number(closedAtMs);
+        const bornClosed = isFinite(closeStamp) && closeStamp > 0;
         const dateString = getFormattedDate(currentTimeMillis);
 
         const timeFormatted = getFormattedClockTime(currentTimeMillis);
         const timeString = `${timeFormatted} (${dateString})`;
 
         let existingIndex = -1;
-        if (phone !== "គ្មានលេខ") {
+        if (phone !== "គ្មានលេខ" && !bornClosed) {
             existingIndex = scanHistory.findIndex(item => item.phone === phone && item.scanDate === dateString && !item.isClosed);
         }
 
@@ -10718,12 +10899,13 @@
                 price: Math.round((cod + dod) * 100) / 100,
                 count: 1,
                 barcode: barcode,
-                barcodes: [{ code: barcode, time: timeString, cod: cod, dod: dod, locker: locker, isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: currentTimeMillis }],
+                barcodes: [applyBarcodeCloseState({ code: barcode, time: timeString, cod: cod, dod: dod, locker: locker, isClosed: false, isDeducted: false, isFromDeletion: false, createdAt: currentTimeMillis }, bornClosed, closeStamp)],
                 time: timeString,
                 scanDate: dateString,
-                isClosed: false,
+                isClosed: bornClosed,
                 isCalled: false
             };
+            if (bornClosed) newItem.closedAt = closeStamp;
 
             scanHistory.push(newItem);
             savePromise = saveSingleHistoryItemToFirebase(newItem).then((savedItem) => {
@@ -11041,6 +11223,7 @@
         let pickupScanDate = null;
         let pickupSeed = null;
         let pickupApplied = null;
+        let collectedApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
         const reconcilePickupDeltaWithServer = () => {
@@ -11063,6 +11246,8 @@
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             const pickupKey = pickupBarcodeKey(barcodeCode);
             pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
+            collectedApplied = markCollectedRevenue(collectedMarksFor(freshB, desiredClosed,
+                previousState ? previousState.barcodeClosedAt : undefined));
 
             if (showModalAfterApply) openViewListModal(itemId);
             refreshCurrentHistoryView();
@@ -11090,6 +11275,10 @@
             if (pickupApplied) {
                 revertPickupMarks(pickupApplied);
                 pickupApplied = null;
+            }
+            if (collectedApplied) {
+                revertCollectedMarks(collectedApplied);
+                collectedApplied = null;
             }
         };
         const settleBarcodeClose = (barcodeCloseResult, late) => {
@@ -11300,6 +11489,7 @@
                             : "⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                         return;
                     }
+                    syncCollectedValueForBarcode(editedItemId, editedBarcodeCode);
                     const actualCodDiff = (Math.round(newCod * 100) - Math.round(serverOldCod * 100)) / 100;
                     const actualDodDiff = (Math.round(newDod * 100) - Math.round(serverOldDod * 100)) / 100;
                     correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0).then((status) => {
@@ -11539,6 +11729,7 @@
         let pickupScanDate = null;
         let pickupSeed = null;
         let pickupApplied = null;
+        let collectedApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
         const reconcilePickupDeltaWithServer = () => {
@@ -11562,6 +11753,8 @@
 
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             pickupApplied = markPickupBarcodes(pickupScanDate, collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey), pickupSeed);
+            collectedApplied = markCollectedRevenue(collectItemCollectedMarks(freshItem, desiredClosed,
+                previousState ? previousState.barcodeCloseStamps : null));
 
             refreshCurrentHistoryView();
         }
@@ -11592,6 +11785,10 @@
             if (pickupApplied) {
                 revertPickupMarks(pickupApplied);
                 pickupApplied = null;
+            }
+            if (collectedApplied) {
+                revertCollectedMarks(collectedApplied);
+                collectedApplied = null;
             }
         };
         const settleClose = (closeResult, late) => {
@@ -13357,12 +13554,16 @@
     const ZTO_LIST_CLIENT_MAX_PAGES = 3;
     const ZTO_LIST_PREVIEW_ROWS = 12;
     const ZTO_LIST_IMPORT_MAX = 100;
+    const ZTO_LIST_SIGNED_PROBE_MAX = 20;
     const ZTO_LIST_SKIP_TEXT = {
         'scan-type': 'មិនមែនស្កេន «មកដល់»',
-        'too-old': 'ថ្ងៃស្កេន ZTO ចាស់ជាងច្បាប់សម្អាតស្វ័យប្រវត្តិ ➜ បញ្ចូល ➜ ចូលធុងសំរាមភ្លាម'
+        'too-old-open': 'ចាស់ជាងច្បាប់សម្អាត ហើយ ZTO មិនទាន់បិទបញ្ជី ➜ មិនបញ្ចូល (បញ្ចូល ➜ ចូលធុងសំរាមភ្លាម ➜ ដកលុយ)',
+        'too-old-unknown': 'ចាស់ជាងច្បាប់សម្អាត ហើយវាស់ស្ថានភាព ZTO មិនបាន ➜ មិនបញ្ចូល (សូមសាកទាញម្តងទៀត)',
+        'too-old-purged': 'ចាស់ជាងអាយុធុងសំរាម ➜ ពិនិត្យស្ទួនមិនបាន ➜ មិនបញ្ចូល (ការបញ្ចូល = ហានិភ័យលុយបូកស្ទួន)'
     };
     let ztoListSyncInFlight = false;
     let ztoListSyncResult = null;
+    const ztoListSignedProbe = new Map();
 
     function ztoListSkipText(reason) {
         const key = String(reason === undefined || reason === null ? '' : reason);
@@ -13392,6 +13593,57 @@
                 ? '✅ បើករួច ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចនៅរបាប្រវត្តិ'
                 : 'ℹ️ បិទរួច ៖ ប៊ូតុងបញ្ជី ZTO ត្រូវលាក់វិញ');
         });
+    }
+
+    function ztoListSignedVerdict(raw, key) {
+        if (key && ztoListSignedProbe.has(key)) return ztoListSignedProbe.get(key);
+        return raw && typeof raw.ztoClosed === 'boolean' ? raw.ztoClosed : null;
+    }
+
+    function ztoListRowAgeState(stampMs, now) {
+        if (!stampMs || !barcodeAbandonIsRipe({ isClosed: false }, stampMs, now)) return 'fresh';
+        return now - stampMs > trashRetentionMs({ trashReason: 'pickup' }) ? 'purged' : 'old';
+    }
+
+    function ztoListRowNeedsSignedProbe(raw, now) {
+        if (!raw || raw.skip) return false;
+        if (typeof raw.ztoClosed === 'boolean') return false;
+        const key = pickupBarcodeKey(raw.barcode);
+        if (!key || ztoListSignedProbe.has(key)) return false;
+        if (!normalizeStoredPhone(raw.phone)) return false;
+        return ztoListRowAgeState(ztoScanStampMillis(raw.at), now) === 'old';
+    }
+
+    async function resolveZtoListSignedVerdicts(cfg, rows) {
+        if (!cfg || !Array.isArray(rows)) return 0;
+        const now = getServerNow();
+        const seen = new Set();
+        const pending = [];
+        for (let i = 0; i < rows.length; i++) {
+            if (!ztoListRowNeedsSignedProbe(rows[i], now)) continue;
+            const key = pickupBarcodeKey(rows[i].barcode);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            pending.push({ key: key, code: String(rows[i].barcode) });
+            if (pending.length >= ZTO_LIST_SIGNED_PROBE_MAX) break;
+        }
+        let measured = 0;
+        for (let i = 0; i < pending.length; i++) {
+            if (navigator.onLine === false) break;
+            setZtoListSyncNote('⏳ កំពុងពិនិត្យស្ថានភាព ZTO ' + (i + 1) + '/' + pending.length + '...');
+            let verdict = null;
+            try {
+                const out = await checkZtoStatusForBarcode(cfg, pending[i].code);
+                verdict = out && typeof out.closed === 'boolean' ? out.closed : null;
+            } catch (e) {
+                verdict = null;
+            }
+            if (typeof verdict === 'boolean') {
+                ztoListSignedProbe.set(pending[i].key, verdict);
+                measured++;
+            }
+        }
+        return measured;
     }
 
     function classifyZtoListRows(rows, historyList, trashList) {
@@ -13434,6 +13686,8 @@
                 dod: isFinite(dod) ? dod : 0,
                 at: at,
                 stampMs: stampMs,
+                ztoClosed: ztoListSignedVerdict(raw, key),
+                closedAtZto: false,
                 skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
                 key: key
             };
@@ -13441,10 +13695,19 @@
                 out.skipped.push(row);
                 continue;
             }
-            if (stampMs && barcodeAbandonIsRipe({ isClosed: false }, stampMs, getServerNow())) {
-                row.skip = 'too-old';
+            const ageState = ztoListRowAgeState(stampMs, getServerNow());
+            if (ageState === 'purged') {
+                row.skip = 'too-old-purged';
                 out.skipped.push(row);
                 continue;
+            }
+            if (ageState === 'old') {
+                if (row.ztoClosed !== true) {
+                    row.skip = row.ztoClosed === false ? 'too-old-open' : 'too-old-unknown';
+                    out.skipped.push(row);
+                    continue;
+                }
+                row.closedAtZto = true;
             }
             const prior = best.get(key);
             if (!prior) {
@@ -13527,7 +13790,9 @@
                     row.cod ? 'COD $' + row.cod.toFixed(2) : '',
                     row.dod ? 'DOD $' + row.dod.toFixed(2) : ''
                 ].filter(Boolean).join(' · ');
-                const meta = [row.phone || '—', money, row.at, ztoListSkipText(row.skip)].filter(Boolean).join(' · ');
+                const meta = [row.phone || '—', money, row.at,
+                    row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
+                    ztoListSkipText(row.skip)].filter(Boolean).join(' · ');
                 return '<div class="zto-list-row">'
                     + '<span class="zto-list-code">' + sanitizeInput(row.barcode || '—') + '</span>'
                     + '<span class="zto-list-meta">' + sanitizeInput(meta) + '</span></div>';
@@ -13605,6 +13870,7 @@
                 if (isFinite(reportedTotal)) total = reportedTotal;
                 if (page >= pages) break;
             }
+            await resolveZtoListSignedVerdicts(cfg, rows);
             ztoListSyncResult = {
                 rows: rows,
                 from: range.from,
@@ -13616,6 +13882,7 @@
             showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
         } catch (e) {
             ztoListSyncResult = null;
+            ztoListSignedProbe.clear();
             renderZtoListSyncPreview();
             if (e && e.notConfigured) {
                 setZtoListSyncNote('⚠️ មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify ('
@@ -13627,6 +13894,19 @@
             }
         } finally {
             ztoListSyncInFlight = false;
+        }
+    }
+
+    async function markZtoListRowPickedUp(code) {
+        const item = scanHistory.find((i) => i && Array.isArray(i.barcodes)
+            && i.barcodes.some((b) => b && b.code === code));
+        if (!item || !item.id) return false;
+        try {
+            return (await applyBarcodeCloseChange(item.id, code, true,
+                { silent: true, showModal: false })) === true;
+        } catch (e) {
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'markZtoListRowPickedUp', barcode: code });
+            return false;
         }
     }
 
@@ -13660,10 +13940,14 @@
         const noStampNote = noStamp
             ? '\n⏱️ ' + noStamp + ' កញ្ចប់គ្មានម៉ោងស្កេនពី ZTO ➜ ប្រើម៉ោងបញ្ចូលជំនួស។'
             : '';
+        const pickedUp = queue.filter((row) => row.closedAtZto === true).length;
+        const pickedUpNote = pickedUp
+            ? '\n🔒 ' + pickedUp + ' កញ្ចប់ចាស់ដែល ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច» ➜ ចូលធុងសំរាមក្នុង ២ ម៉ោង (លុយមិនត្រូវដក)។'
+            : '';
         if (!confirm('បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
             + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។'
             + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
-            + noStampNote)) {
+            + noStampNote + pickedUpNote)) {
             return;
         }
         ztoListSyncInFlight = true;
@@ -13671,6 +13955,7 @@
         let taken = 0;
         let failed = 0;
         let pending = 0;
+        let takenOver = 0;
         const savedDates = new Set();
         try {
             for (let i = 0; i < queue.length; i++) {
@@ -13695,10 +13980,17 @@
                     refreshCurrentHistoryView();
                 };
                 const rowDateKey = getZoneDateKey(row.stampMs || getServerNow(), 0);
-                const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs);
+                const closedStampMs = row.closedAtZto === true ? getServerNow() : 0;
+                const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs, closedStampMs);
                 try {
                     const status = await withTimeout(savePromise, 15000, 'Save timed out');
-                    if (status === true) { saved++; savedDates.add(rowDateKey); }
+                    if (status === true) {
+                        saved++;
+                        savedDates.add(rowDateKey);
+                        if (closedStampMs) {
+                            takenOver += (await markZtoListRowPickedUp(row.barcode)) ? 1 : 0;
+                        }
+                    }
                     else failed++;
                 } catch (e) {
                     if (e && e.message === 'Save timed out') {
@@ -13716,8 +14008,10 @@
             ztoListSyncInFlight = false;
         }
         ztoListSyncResult = null;
+        ztoListSignedProbe.clear();
         renderZtoListSyncPreview();
         const parts = ['✅ បញ្ចូល ' + saved + ' កញ្ចប់'];
+        if (takenOver) parts.push('🔒 យករួច ' + takenOver);
         if (taken) parts.push('♻️ ស្ទួន ' + taken);
         if (pending) parts.push('⏳ កំពុងរក្សាទុក ' + pending);
         if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
@@ -13751,6 +14045,7 @@
         if (fromEl && !fromEl.value) fromEl.value = getZoneDateKey(now, -(ZTO_LIST_DEFAULT_DAYS - 1));
         if (toEl && !toEl.value) toEl.value = getZoneDateKey(now, 0);
         ztoListSyncResult = null;
+        ztoListSignedProbe.clear();
         renderZtoListSyncPreview();
         setZtoListSyncNote('');
         openModalHelper('ztoListSyncModal');
@@ -13758,6 +14053,7 @@
 
     function closeZtoListSyncModal() {
         ztoListSyncResult = null;
+        ztoListSignedProbe.clear();
         closeModal('ztoListSyncModal');
     }
 

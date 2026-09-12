@@ -15,8 +15,14 @@
 // ថ្ងៃដែលមានកញ្ចប់បើក តែគ្មានជួរក្នុង `zoew_daily_revenue_cod_dod` សោះ។
 //
 // ⛔ តេស្តនេះរត់ **កូដពិត** របស់អេក្រង់ (`openDailyStatsModal` ·
-// `openMonthlyStatsModal` · `buildMonthlyReport`) ក្នុង `vm` ជាមួយ DOM ក្លែង
-// រួច **អាន HTML ដែលអ្នកប្រើមើលឃើញ** — មិនមែនអះអាងលើឈ្មោះ function ទេ។
+// `buildMonthlyReport`) ក្នុង `vm` ជាមួយ DOM ក្លែង រួច **អាន HTML ដែល
+// អ្នកប្រើមើលឃើញ** — មិនមែនអះអាងលើឈ្មោះ function ទេ។
+//
+// ⛔ **កំណែ 2.34.0 ដកអេក្រង់ «ស្ថិតិ ៣ ខែ» ចេញ** (សំណើអ្នកប្រើ) ➜ អ្នកយាម
+// នេះប្តូរឧបករណ៍វាស់ ៖ ជំនួសឲ្យ «កាតខែ ធៀប របាយការណ៍ខែ» វាឥឡូវប្រៀប
+// **ផលបូកកាតថ្ងៃពិត** ធៀបនឹង **សរុបរបស់របាយការណ៍ខែ** — ជាការវាស់ដដែល
+// នៃ *កម្រិតបូក* តែលើផ្ទៃដែល **នៅ ship ពិត**។ ⛔ ការលុបអ្នកយាមចោល
+// ជំនួសនឹងបានបើកថ្នាក់កំហុសនោះឡើងវិញ។
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -56,9 +62,9 @@ function sliceFn(src, name) {
 // ⛔ រកឈ្មោះមិនឃើញ ➜ **stub** មិនមែន exit (បើអត់ ការអះអាងខាងក្រោមត្រូវបិទបាំង)។
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'uncollectedValueForMonth', 'collectedValueOf',
+    'uncollectedValueByDate', 'collectedValueOf',
     'collectedMoneyText', 'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem',
-    'buildMonthlyReport', 'openDailyStatsModal', 'openMonthlyStatsModal', 'collectedValueForMonth',
+    'buildMonthlyReport', 'openDailyStatsModal',
     'dbListenerViewIsStale', 'anyDbListenerViewIsStale', 'emptyViewMessage'];
 function readAppConst(name) {
     const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(SRC);
@@ -93,7 +99,7 @@ function moneyAfter(html, label) {
 function buildSandbox(state) {
     const containers = {
         dailyStatsContainer: makeEl(),
-        monthlyStatsContainer: makeEl()
+        collectedStatsContainer: makeEl()
     };
     const sandbox = {
         console,
@@ -113,7 +119,6 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_DAILY_REVENUE: readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'),
         DB_LISTENER_KEY_MONTHLY_REVENUE: readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'),
         STATS_DAILY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
-        STATS_MONTHLY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'), readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
         dbListenerPendingPaths: new Set(state.pending || []),
         dbListenerFailedPaths: new Set(state.failed || []),
         MONTHLY_REPORT_MONEY_TOLERANCE: 0.005,
@@ -136,15 +141,50 @@ const LBL_ALL = 'តម្លៃកញ្ចប់ទាំងអស់';
 const LBL_PENDING = 'មិនទាន់យក';
 
 function money(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
+function moneyValue(text) {
+    const m = /^\$(-?\d+(?:\.\d+)?)$/.exec(String(text || '').trim());
+    return m ? parseFloat(m[1]) : NaN;
+}
+// ⛔ ផ្ទៃទី ២ ដែលនៅសល់ជា **កាតថ្ងៃ** ➜ ការបូកពួកវាដោយអ្នកយាម ជាអ្វីដែល
+// អ្នកប្រើធ្វើដោយភ្នែក ➜ វាត្រូវស្មើសរុបរបស់របាយការណ៍ខែ **បេះបិទ**។
+function dayScreenMonthTotals(s, ym) {
+    s.openDailyStatsModal();
+    const cards = cardTexts(s.__containers.dailyStatsContainer).filter((h) => h.indexOf(ym) !== -1);
+    let collected = 0;
+    let pending = 0;
+    let cod = 0;
+    let dod = 0;
+    let measurable = true;
+    cards.forEach((html) => {
+        const c = moneyValue(moneyAfter(html, LBL_COLLECTED));
+        const p = moneyValue(moneyAfter(html, LBL_PENDING));
+        const cc = moneyValue(moneyAfter(html, 'COD:'));
+        const dd = moneyValue(moneyAfter(html, 'DOD:'));
+        if (!isFinite(c) || !isFinite(p)) { measurable = false; return; }
+        collected += c;
+        pending += p;
+        if (isFinite(cc)) cod += cc;
+        if (isFinite(dd)) dod += dd;
+    });
+    return {
+        cards: cards,
+        collected: measurable ? money(collected) : '—',
+        pending: measurable ? money(pending) : '—',
+        cod: measurable ? money(cod) : '—',
+        dod: measurable ? money(dod) : '—'
+    };
+}
 
 // ------------------------------------------------------------------
 scenario('សំណុំ function ពិតត្រូវរកឃើញ (បើ stub ➜ ការវាស់ខាងក្រោមមិនមានន័យ)', () => {
     ok('⛔ ជាន់អប្បបរមា៖ រក function ស្ថិតិពិតបានយ៉ាងតិច 18',
         WANT.length - missing.length >= 18, 'បាត់៖ ' + missing.join(', '));
-    ok('អេក្រង់ទាំង ៣ មានក្នុង app.js ពិត',
+    ok('អេក្រង់ទាំង ២ ដែលនៅសល់ មានក្នុង app.js ពិត',
         missing.indexOf('openDailyStatsModal') === -1
-        && missing.indexOf('openMonthlyStatsModal') === -1
         && missing.indexOf('buildMonthlyReport') === -1, 'បាត់៖ ' + missing.join(', '));
+    ok('⛔ ទិសផ្ទុយ ៖ អេក្រង់ «ស្ថិតិ ៣ ខែ» ត្រូវបានដកចេញពិត (គ្មានផ្ទៃទី ៣ ទៀតទេ)',
+        SRC.indexOf('openMonthlyStatsModal') === -1 && SRC.indexOf('collectedValueForMonth') === -1,
+        'នៅសល់ក្នុង app.js');
 });
 
 // ------------------------------------------------------------------
@@ -167,22 +207,19 @@ const stateA = {
 scenario('ថ្ងៃណាមួយមាន «មិនទាន់យក» ធំជាង ledger របស់ថ្ងៃនោះ', () => {
     const s = buildSandbox(stateA);
     const report = s.buildMonthlyReport('2026-09');
-    s.openMonthlyStatsModal();
-    const cards = cardTexts(s.__containers.monthlyStatsContainer);
-    ok('ស្ថិតិ ៣ ខែ គូរកាតសម្រាប់ខែ 2026-09 ពិត', cards.length === 1, 'cards=' + cards.length);
-    const card = cards[0] || '';
+    const dayTotals = dayScreenMonthTotals(s, '2026-09');
+    ok('ស្ថិតិប្រចាំថ្ងៃ គូរកាតគ្រប់ថ្ងៃរបស់ខែ 2026-09', dayTotals.cards.length === 2,
+        'cards=' + dayTotals.cards.length);
 
     const reportCollected = money(report.totals.collectedTotal);
-    const cardCollected = moneyAfter(card, LBL_COLLECTED);
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ',
-        cardCollected === reportCollected,
-        'កាត=' + cardCollected + ' · របាយការណ៍=' + reportCollected);
+    ok('⛔ ផលបូកកាតថ្ងៃ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ',
+        dayTotals.collected === reportCollected,
+        'ថ្ងៃ=' + dayTotals.collected + ' · របាយការណ៍=' + reportCollected);
 
     const reportPending = money(report.totals.pendingTotal);
-    const cardPending = moneyAfter(card, LBL_PENDING);
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_PENDING + '» ត្រូវស្មើរបាយការណ៍ខែ',
-        cardPending === reportPending,
-        'កាត=' + cardPending + ' · របាយការណ៍=' + reportPending);
+    ok('⛔ ផលបូកកាតថ្ងៃ «' + LBL_PENDING + '» ត្រូវស្មើរបាយការណ៍ខែ',
+        dayTotals.pending === reportPending,
+        'ថ្ងៃ=' + dayTotals.pending + ' · របាយការណ៍=' + reportPending);
 
     ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាពនេះពិតជាកេះ clamp ក្នុងមួយថ្ងៃ (បើអត់ តេស្តទទេ)',
         report.days.length === 2 && report.days[0].collectedTotal === 0
@@ -221,14 +258,13 @@ const stateB = {
 scenario('ថ្ងៃដែលមានកញ្ចប់បើក តែគ្មានជួរក្នុង ledger ថ្ងៃ', () => {
     const s = buildSandbox(stateB);
     const report = s.buildMonthlyReport('2026-08');
-    s.openMonthlyStatsModal();
-    const card = (cardTexts(s.__containers.monthlyStatsContainer)[0]) || '';
+    const dayTotalsB = dayScreenMonthTotals(s, '2026-08');
     ok('⛔ ជាន់អប្បបរមា៖ របាយការណ៍ខែពិតជាមិនរាប់ថ្ងៃ 2026-08-11',
         report.days.length === 1 && report.days[0].date === '2026-08-10',
         JSON.stringify(report.days.map(d => d.date)));
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ (ថ្ងៃគ្មាន ledger)',
-        moneyAfter(card, LBL_COLLECTED) === money(report.totals.collectedTotal),
-        'កាត=' + moneyAfter(card, LBL_COLLECTED) + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
+    ok('⛔ ផលបូកកាតថ្ងៃ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ (ថ្ងៃគ្មាន ledger)',
+        dayTotalsB.collected === money(report.totals.collectedTotal),
+        'ថ្ងៃ=' + dayTotalsB.collected + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
 });
 
 // ------------------------------------------------------------------
@@ -246,20 +282,16 @@ const stateC = {
         isFromDeletion: true, barcodes: [{ code: 'D1', cod: 3, dod: 0, isClosed: false, isDeducted: false }] }]
 };
 
-scenario('ដំណើរការធម្មតា — អេក្រង់ទាំង ៣ ត្រូវនៅតែស្មើគ្នា (ទិសផ្ទុយ)', () => {
+scenario('ដំណើរការធម្មតា — អេក្រង់ទាំង ២ ត្រូវនៅតែស្មើគ្នា (ទិសផ្ទុយ)', () => {
     const s = buildSandbox(stateC);
     const report = s.buildMonthlyReport('2026-07');
-    s.openMonthlyStatsModal();
-    const card = (cardTexts(s.__containers.monthlyStatsContainer)[0]) || '';
+    const dayTotalsC = dayScreenMonthTotals(s, '2026-07');
     ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាពនេះមានចំណូលពិត (មិនមែន 0)',
         report.totals.collectedTotal > 0, report.totals.collectedTotal);
-    ok('ស្ថិតិ ៣ ខែ ស្មើរបាយការណ៍ខែ (ធម្មតា)',
-        moneyAfter(card, LBL_COLLECTED) === money(report.totals.collectedTotal),
-        'កាត=' + moneyAfter(card, LBL_COLLECTED) + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
-    ok('«' + LBL_ALL + '» របស់កាត ស្មើ ledger ខែ',
-        card.indexOf(LBL_ALL + '៖ ' + money(23.75)) !== -1, card.slice(0, 300));
-    s.openDailyStatsModal();
-    const dayCards = cardTexts(s.__containers.dailyStatsContainer);
+    ok('ផលបូកកាតថ្ងៃ ស្មើរបាយការណ៍ខែ (ធម្មតា)',
+        dayTotalsC.collected === money(report.totals.collectedTotal),
+        'ថ្ងៃ=' + dayTotalsC.collected + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
+    const dayCards = dayTotalsC.cards;
     ok('ស្ថិតិប្រចាំថ្ងៃមានកាតគ្រប់ថ្ងៃ', dayCards.length === 2, dayCards.length);
     report.days.forEach((d) => {
         const html = dayCards.find((h) => h.indexOf(d.date) !== -1) || '';
@@ -290,18 +322,16 @@ const stateD = {
 scenario('clamp ក្នុងមួយរូបិយវត្ថុ ក្នុងមួយថ្ងៃ (COD មិនត្រូវត្រូវ DOD ស៊ី)', () => {
     const s = buildSandbox(stateD);
     const report = s.buildMonthlyReport('2026-06');
-    s.openMonthlyStatsModal();
-    const card = (cardTexts(s.__containers.monthlyStatsContainer)[0]) || '';
+    const dayTotalsD = dayScreenMonthTotals(s, '2026-06');
     ok('⛔ ជាន់អប្បបរមា៖ ថ្ងៃទាំង ២ ពិតជា clamp ម្ខាងៗ',
         report.days.length === 2 && report.days[0].collectedCod === 0 && report.days[1].collectedDod === 0,
         JSON.stringify(report.days.map(d => [d.date, d.collectedCod, d.collectedDod])));
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ (clamp ២ រូបិយវត្ថុ)',
-        moneyAfter(card, LBL_COLLECTED) === money(report.totals.collectedTotal),
-        'កាត=' + moneyAfter(card, LBL_COLLECTED) + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
-    const codAt = card.indexOf('COD:');
-    ok('COD (យករួច) របស់កាត ស្មើរបាយការណ៍ខែ',
-        codAt !== -1 && card.slice(codAt, codAt + 120).indexOf(money(report.totals.collectedCod)) !== -1,
-        'card=' + card.slice(codAt, codAt + 120) + ' · របាយការណ៍=' + money(report.totals.collectedCod));
+    ok('⛔ ផលបូកកាតថ្ងៃ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ (clamp ២ រូបិយវត្ថុ)',
+        dayTotalsD.collected === money(report.totals.collectedTotal),
+        'ថ្ងៃ=' + dayTotalsD.collected + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
+    ok('COD (យករួច) ៖ ផលបូកកាតថ្ងៃ ស្មើរបាយការណ៍ខែ',
+        dayTotalsD.cod === money(report.totals.collectedCod),
+        'ថ្ងៃ=' + dayTotalsD.cod + ' · របាយការណ៍=' + money(report.totals.collectedCod));
 });
 
 // ------------------------------------------------------------------
@@ -328,8 +358,7 @@ const stateE = {
 scenario('សេន ៖ លេខមិនត្រូវបង្គត់ត្រឹមដុល្លារ', () => {
     const s = buildSandbox(stateE);
     const report = s.buildMonthlyReport('2026-04');
-    s.openMonthlyStatsModal();
-    const card = (cardTexts(s.__containers.monthlyStatsContainer)[0]) || '';
+    const dayTotalsE = dayScreenMonthTotals(s, '2026-04');
     ok('⛔ ជាន់អប្បបរមា៖ ចំណូលរបស់ខែពិតជាមានសេន (មិនមែនលេខគត់)',
         Math.abs(report.totals.collectedTotal - Math.round(report.totals.collectedTotal)) > 0.004,
         report.totals.collectedTotal);
@@ -337,30 +366,30 @@ scenario('សេន ៖ លេខមិនត្រូវបង្គត់ត�
         Math.abs(report.totals.collectedCod - Math.round(report.totals.collectedCod)) > 0.004
         && Math.abs(report.totals.collectedDod - Math.round(report.totals.collectedDod)) > 0.004,
         report.totals.collectedCod + ' / ' + report.totals.collectedDod);
-    ok('⛔ ស្ថិតិ ៣ ខែ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ ដល់សេន',
-        moneyAfter(card, LBL_COLLECTED) === money(report.totals.collectedTotal),
-        'កាត=' + moneyAfter(card, LBL_COLLECTED) + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
-    const codAt = card.indexOf('COD:');
-    ok('COD និង DOD (យករួច) របស់កាត ស្មើរបាយការណ៍ខែ ដល់សេន',
-        codAt !== -1 && card.slice(codAt, codAt + 160).indexOf(money(report.totals.collectedCod)) !== -1
-        && card.slice(codAt, codAt + 160).indexOf(money(report.totals.collectedDod)) !== -1,
-        'card=' + card.slice(codAt, codAt + 160) + ' · របាយការណ៍=' + money(report.totals.collectedCod) + ' / ' + money(report.totals.collectedDod));
+    ok('⛔ ផលបូកកាតថ្ងៃ «' + LBL_COLLECTED + '» ត្រូវស្មើរបាយការណ៍ខែ ដល់សេន',
+        dayTotalsE.collected === money(report.totals.collectedTotal),
+        'ថ្ងៃ=' + dayTotalsE.collected + ' · របាយការណ៍=' + money(report.totals.collectedTotal));
+    ok('COD និង DOD (យករួច) ៖ ផលបូកកាតថ្ងៃ ស្មើរបាយការណ៍ខែ ដល់សេន',
+        dayTotalsE.cod === money(report.totals.collectedCod)
+        && dayTotalsE.dod === money(report.totals.collectedDod),
+        'ថ្ងៃ=' + dayTotalsE.cod + ' / ' + dayTotalsE.dod
+        + ' · របាយការណ៍=' + money(report.totals.collectedCod) + ' / ' + money(report.totals.collectedDod));
     ok('⛔ «' + LBL_PENDING + '» ក៏ត្រូវស្មើដល់សេនដែរ',
-        moneyAfter(card, LBL_PENDING) === money(report.totals.pendingTotal),
-        'កាត=' + moneyAfter(card, LBL_PENDING) + ' · របាយការណ៍=' + money(report.totals.pendingTotal));
+        dayTotalsE.pending === money(report.totals.pendingTotal),
+        'ថ្ងៃ=' + dayTotalsE.pending + ' · របាយការណ៍=' + money(report.totals.pendingTotal));
 });
 
 // ------------------------------------------------------------------
-scenario('ទិដ្ឋភាពមិនគ្រប់ ➜ អេក្រង់ទាំង ២ ត្រូវរាយ «—» ដូចគ្នា', () => {
+scenario('ទិដ្ឋភាពមិនគ្រប់ ➜ អេក្រង់ដែលនៅសល់ត្រូវរាយ «—» ដូចគ្នា', () => {
     const s = buildSandbox({ ...stateA, measurable: false });
-    s.openMonthlyStatsModal();
     s.openDailyStatsModal();
-    const card = (cardTexts(s.__containers.monthlyStatsContainer)[0]) || '';
     const dayCard = (cardTexts(s.__containers.dailyStatsContainer)[0]) || '';
-    ok('ស្ថិតិ ៣ ខែ រាយ «—» ពេលវាស់មិនបាន', moneyAfter(card, LBL_COLLECTED) === '—', moneyAfter(card, LBL_COLLECTED));
+    const report = s.buildMonthlyReport('2026-09');
     ok('ស្ថិតិប្រចាំថ្ងៃ រាយ «—» ពេលវាស់មិនបាន', moneyAfter(dayCard, LBL_COLLECTED) === '—', moneyAfter(dayCard, LBL_COLLECTED));
+    ok('របាយការណ៍ខែ ក៏សម្គាល់ថាវាស់មិនបានដែរ',
+        report.totals.collectedMeasurable === false, report.totals.collectedMeasurable);
     ok('«' + LBL_ALL + '» នៅតែបង្ហាញលេខ (ledger វាស់បានជានិច្ច)',
-        card.indexOf(LBL_ALL + '៖ $') !== -1, card.slice(0, 300));
+        dayCard.indexOf(LBL_ALL + '៖ $') !== -1, dayCard.slice(0, 300));
 });
 
 console.log('');

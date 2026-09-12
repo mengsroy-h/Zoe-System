@@ -8,6 +8,7 @@ try { acorn = require('acorn'); } catch (e) { console.log('SKIP — ត្រូ
 const ROOT = process.env.EXITCODE_APP_DIR || path.join(__dirname, '..');
 const TOOLS = path.join(ROOT, 'audit-tools');
 const RUNALL = path.join(TOOLS, 'run-all.sh');
+const ZTO_IMPORT_TEST = '../zto-import/test.js';
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -28,11 +29,14 @@ function checkersFromRunAll() {
     for (const m of sh.matchAll(/for\s+\w+\s+in\s+([^;]+);\s*do/g)) {
         for (const w of m[1].split(/\s+/)) if (/^[A-Za-z0-9_\-/]+$/.test(w) && fs.existsSync(path.join(TOOLS, w + '.js'))) found.add(w + '.js');
     }
+    const normal = sh.replace(/^\s*#.*$/gm, '').split(/if \[ -n "\$BASE" \]/)[0];
+    if (/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(normal)) found.add(ZTO_IMPORT_TEST);
     return [...found].filter((f) => fs.existsSync(path.join(TOOLS, f)));
 }
 
 const checkers = checkersFromRunAll();
 const MIN_CHECKERS = 40;
+ok('zto-import/test.js ៖ រកឃើញការរត់ពិតក្នុងផ្នែកធម្មតា', checkers.includes(ZTO_IMPORT_TEST));
 ok('ជាន់អប្បបរមា៖ រកឃើញ checker ក្នុង run-all.sh >= ' + MIN_CHECKERS + ' (ឃើញ ' + checkers.length + ')',
     checkers.length >= MIN_CHECKERS, { found: checkers.length });
 if (checkers.length < MIN_CHECKERS) {
@@ -125,6 +129,7 @@ ok('គ្មាន `process.exit(0)` ដែលឈរក្រោយការអ
 console.log('\n=== ការវាស់ឥរិយាបថ ៖ ការអះអាងធ្លាក់ ➜ exit != 0 ===');
 
 const POISON = [
+    [/function check\(name, condition, detail\) \{/, 'function check(name, condition, detail) { condition = false;'],
     [/function ok\(label, cond, detail\) \{/, 'function ok(label, cond, detail) { cond = false;'],
     [/function ok\(cond, label, got\) \{/, 'function ok(cond, label, got) { cond = false;'],
     [/function ok\(label, condition, detail\) \{/, 'function ok(label, condition, detail) { condition = false;'],
@@ -184,7 +189,7 @@ const runnable = checkers.filter((rel) => {
 // (រួមទាំង SIGKILL) **មិនអាចធ្វើឲ្យ repo ខូចបានទេ**។ សំណល់ដែលនៅសល់ជា
 // ឯកសារ `.tmp-poison-*` ដែលគ្មានគ្រោះថ្នាក់ ហើយត្រូវបោសចោលពេលចាប់ផ្តើម។
 const POISON_PREFIX = '.tmp-poison-';
-const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu')];
+const POISON_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(ROOT, 'zto-import')];
 
 function sweepPoisonLeftovers() {
     for (const dir of POISON_DIRS) {
@@ -209,6 +214,7 @@ process.on('exit', dropShadows);
 sweepPoisonLeftovers();
 
 let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [];
+let ztoPoison = null;
 try {
     for (const rel of runnable) {
         const file = path.join(TOOLS, rel);
@@ -233,6 +239,11 @@ try {
         try { fs.unlinkSync(shadow); } catch (e) {}
         shadows.delete(shadow);
         poisoned++;
+        if (rel === ZTO_IMPORT_TEST) {
+            const summary = /zto-import — (\d+) assertions passed, (\d+) failed/.exec(out);
+            ztoPoison = { rc, passed: summary ? Number(summary[1]) : null, failed: summary ? Number(summary[2]) : null,
+                unchanged: fs.readFileSync(file, 'utf8') === src };
+        }
         if (rc !== 0) continue;
         // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
         // នោះ **មិនបានអះអាងអ្វីសោះ** ហើយ `run-all.sh` រាយវាជា SKIPPED មិនមែន
@@ -250,6 +261,9 @@ try {
 }
 
 const MIN_POISONED = 25;
+ok('zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
+    ztoPoison && ztoPoison.rc === 1 && ztoPoison.passed === 0 && ztoPoison.failed >= 69 && ztoPoison.unchanged,
+    ztoPoison);
 ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិនប្រើ browser >= ' + MIN_POISONED + ' (ពុលបាន ' + poisoned + ')',
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });
 ok('គ្មាន checker ណាចេញ exit 0 ខណៈការអះអាងទាំងអស់ធ្លាក់',

@@ -30,6 +30,8 @@ audit-tools/emu/real.rules.json
 # ឯកសារស្រមោលបណ្តោះអាសន្នរបស់ audit-tools/exit-code-integrity.js
 # (ការរត់ដែលត្រូវសម្លាប់អាចបន្សល់វា — វាមិនត្រូវចូល repo ឡើយ)
 audit-tools/.tmp-poison-*
+audit-tools/emu/.tmp-poison-*
+zto-import/.tmp-poison-*
 
 # Windows ZTO Cookie Sync: npm lock មូលដ្ឋាន (dependency ត្រូវបាន pin ក្នុង package.json)
 tools/zto-cookie-sync-windows/package-lock.json

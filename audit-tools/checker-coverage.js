@@ -35,6 +35,8 @@ const { execFile, execFileSync } = require('child_process');
 
 const TOOLS = path.resolve(__dirname);
 const RUNALL = path.join(TOOLS, 'run-all.sh');
+const CHECKER_DIRS = [TOOLS, path.join(TOOLS, 'emu'), path.join(TOOLS, '..', 'zto-import')];
+const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DIR' }];
 
 // ឯកសារដែលមិនមែនជា checker — ពួកវាជាឧបករណ៍កែកូដ
 // ⛔ រាល់ធាតុត្រូវមានហេតុផលសរសេរជាប់ — កុំបន្ថែមដើម្បីឲ្យបៃតង
@@ -42,10 +44,17 @@ const RUNALL = path.join(TOOLS, 'run-all.sh');
 //   checker-coverage      ៖ ខ្លួនវាផ្ទាល់
 //   redact-dump           ៖ ឧបករណ៍សម្អាតទិន្នន័យ — **មិនអាន `app.js` សោះ**
 //                           ➜ `*_APP_DIR` គ្មានន័យសម្រាប់វា (អ្នកយាមរបស់វា
-//                           ជា `money-reality-check` ដែលបញ្ជាក់ថាលទ្ធផល
+//                           ជា `money-reality-test` ដែលបញ្ជាក់ថាលទ្ធផល
 //                           មុន/ក្រោយសម្អាត ដូចគ្នាបេះបិទ)
+//   money-reality-check · registry-orphan-list ៖ CLI ដែលត្រូវការ dump ពិត។
+//       usage exit 2 មិនមែនភស្តុតាង checker ទេ — ត្រូវមាន fixture checker ខាងក្រោម។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
-    'redact-dump.js']);
+    'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js']);
+const CLI_GUARDS = new Map([
+    ['money-reality-check.js', 'money-reality-test.js'],
+    ['redact-dump.js', 'money-reality-test.js'],
+    ['registry-orphan-list.js', 'registry-orphan-list-test.js']
+]);
 
 // checker ដែលរត់ browser ពិត — ការ probe ថតទទេនៅតែធ្វើ តែឲ្យពេលវែងជាង
 const SLOW = new Set([
@@ -67,11 +76,41 @@ const runall = fs.readFileSync(RUNALL, 'utf8');
 
 // ឈ្មោះ checker ដែល `run-all.sh` រត់ — ទាំងក្នុងរង្វិលជុំ `for t in …`
 // និងទាំងជាបន្ទាត់ `run "…" node audit-tools/x.js` ដាច់ដោយឡែក
-const runNames = new Set();
-for (const m of runall.matchAll(/for t in ([\s\S]*?); do/g)) {
-    m[1].split(/\s+/).filter(Boolean).forEach((n) => runNames.add(n.replace(/\\$/, '')));
+function runnableNames(source) {
+    const text = source.replace(/^\s*#.*$/gm, '');
+    const names = new Set();
+    for (const m of text.matchAll(/for t in ([\s\S]*?); do([\s\S]*?)\bdone\b/g)) {
+        if (!/^\s*run\s+"\$t"\s+node\s+"audit-tools\/\$t\.js"/m.test(m[2])) continue;
+        for (const name of m[1].split(/\s+/)) {
+            if (/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(name)) names.add(name);
+        }
+    }
+    for (const m of text.matchAll(/^\s*(?:run\s+"[^"]*"\s+|(?:[A-Z0-9_]+="[^"]*"\s+)*)node\s+audit-tools\/([A-Za-z0-9._/-]+)\.js(?=\s|$)/gm)) names.add(m[1]);
+    return names;
 }
-for (const m of runall.matchAll(/audit-tools\/([A-Za-z0-9._-]+)\.js/g)) runNames.add(m[1]);
+const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
+const mainSection = baselineAt === -1 ? runall : runall.slice(0, baselineAt);
+const baselineSection = baselineAt === -1 ? '' : runall.slice(baselineAt);
+const runNames = runnableNames(mainSection);
+function externalWiringFailures(normal, baseline) {
+    const active = (source) => source.replace(/^\s*#.*$/gm, '');
+    const failures = [];
+    if (!/^\s*run\s+"[^"]*"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(active(normal))) failures.push('zto-import/test.js (normal)');
+    if (!/^\s*ZTO_IMPORT_APP_DIR="\$BASE\/zto-import"\s+node\s+zto-import\/test\.js(?=\s|$)/m.test(active(baseline))) failures.push('zto-import/test.js (baseline)');
+    return failures;
+}
+function wiringFailures(entries, normal, baseline) {
+    const names = runnableNames(normal);
+    const activeBaseline = baseline.replace(/^\s*#.*$/gm, '');
+    const failures = [];
+    for (const [file, env] of entries) {
+        const name = file.replace(/\.js$/, '');
+        const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (!names.has(name)) failures.push(file + ' (normal)');
+        if (!new RegExp('^\\s*' + env + '="\\$BASE"\\s+node\\s+audit-tools/' + escaped + '(?=\\s|$)', 'm').test(activeBaseline)) failures.push(file + ' (baseline)');
+    }
+    return failures;
+}
 
 // ⛔ ឯកសារស្រមោលរបស់ `exit-code-integrity.js` (`.tmp-poison-*`) មិនមែនជា
 // checker ទេ — បើវាត្រូវរាប់ នោះការរត់ស្របគ្នា ២ នឹងរាយការធ្លាក់ក្លែងក្លាយ។
@@ -92,15 +131,51 @@ if (missingEnv.length) bad('checker ' + missingEnv.length + ' គ្មាន `*
     missingEnv.join(', '));
 else ok('checker ទាំង ' + checkers.length + ' មាន `*_APP_DIR` override');
 
-console.log('\n=== ២. រាល់ override ត្រូវត្រូវបានហៅក្នុងផ្នែក baseline របស់ run-all.sh ===');
-const notWired = [];
-for (const [f, env] of envOf) {
-    if (!runNames.has(f.replace(/\.js$/, ''))) continue;
-    if (!new RegExp(env + '="\\$BASE"').test(runall)) notWired.push(f + ' (' + env + ')');
-}
-if (notWired.length) bad('checker ' + notWired.length + ' មិនត្រូវបានហៅក្នុងផ្នែក baseline',
+console.log('\n=== ២. រាល់ checker ត្រូវរត់ធម្មតា និងមាន baseline override ===');
+const notWired = wiringFailures(envOf, mainSection, baselineSection).concat(externalWiringFailures(mainSection, baselineSection));
+if (notWired.length) bad('checker ដែលខ្វះការភ្ជាប់ក្នុង run-all.sh',
     notWired.join(', '));
-else ok('រាល់ checker ក្នុង run-all ត្រូវបានហៅក្នុងផ្នែក baseline ដែរ');
+else ok('រាល់ checker រត់ក្នុងផ្នែកធម្មតា និង baseline ដោយ override របស់ខ្លួន');
+{
+    const entries = new Map([['fixture-test.js', 'FIXTURE_APP_DIR']]);
+    const normal = 'run "fixture" node audit-tools/fixture-test.js';
+    const baseline = 'FIXTURE_APP_DIR="$BASE" node audit-tools/fixture-test.js';
+    const cases = [
+        ['ការភ្ជាប់ពេញលេញត្រូវឆ្លង', normal, baseline, 0],
+        ['checker ដែលភ្លេចភ្ជាប់ត្រូវធ្លាក់', '', '', 2],
+        ['baseline តែមួយមិនជំនួសការរត់ធម្មតា', '', baseline, 1],
+        ['comment មិនអាចជំនួសការរត់ពិត', '# ' + normal, '# ' + baseline, 2],
+        ['override របស់ checker ផ្សេងមិនត្រូវរាប់', normal, baseline.replace('fixture-test.js', 'other-test.js'), 1],
+        ['ឯកសារបម្រុង .js.bak មិនមែន checker ពិត', normal + '.bak', baseline + '.bak', 2],
+        ['ឯកសារបិទ .js-disabled មិនមែន checker ពិត', normal + '-disabled', baseline + '-disabled', 2],
+        ['រង្វិលជុំ runner ត្រឹមត្រូវត្រូវឆ្លង', 'for t in fixture-test; do\nrun "$t" node "audit-tools/$t.js"\ndone', baseline, 0],
+        ['ការរាយឈ្មោះក្នុងរង្វិលជុំដែលមិនរត់មិនត្រូវរាប់', 'for t in fixture-test; do\ntrue\ndone', baseline, 1]
+    ];
+    for (const [label, main, base, expected] of cases) {
+        const actual = wiringFailures(entries, main, base);
+        if (actual.length === expected) ok(label); else bad(label, actual);
+    }
+}
+const missingCliGuards = [...CLI_GUARDS].filter(([file, guard]) =>
+    !fs.existsSync(path.join(TOOLS, file)) || !checkers.includes(guard) || !runNames.has(guard.replace(/\.js$/, '')));
+if (missingCliGuards.length) bad('CLI ត្រូវមាន fixture checker ដែលរត់ក្នុង suite', missingCliGuards);
+else ok('CLI ដែលទាមទារ dump ត្រូវបានយាមដោយ fixture checker ពិត មិនរាប់ usage exit ជាភស្តុតាង');
+{
+    const normal = 'run "zto-import/test.js" node zto-import/test.js';
+    const baseline = 'ZTO_IMPORT_APP_DIR="$BASE/zto-import" node zto-import/test.js';
+    const cases = [[normal, baseline, 0], ['', baseline, 1], [normal, '', 1],
+        ['# ' + normal, '# ' + baseline, 2], ['echo ' + normal, baseline, 1],
+        [normal + '.bak', baseline + '.bak', 2], [normal, baseline.replace('$BASE/zto-import', '$BASE'), 1]];
+    const mismatches = cases.filter(([main, base, count]) => externalWiringFailures(main, base).length !== count);
+    if (mismatches.length) bad('ការភ្ជាប់ checker ខាងក្រៅត្រូវវាស់ការរត់ពិត និង baseline ត្រឹមត្រូវ', mismatches);
+    else ok('ការភ្ជាប់ checker ខាងក្រៅ៖ ករណីត្រឹមត្រូវ និងការបំបែក ៧ ករណីត្រូវបានស្គាល់');
+    const missing = EXTERNAL_CHECKERS.filter(({ f, env }) => {
+        try { return !fs.readFileSync(path.join(TOOLS, f), 'utf8').includes('process.env.' + env); }
+        catch (_) { return true; }
+    });
+    if (missing.length) bad('checker ខាងក្រៅត្រូវមានឯកសារ និង override ដែលប្រើបាន', missing);
+    else ok('checker ខាងក្រៅមានឯកសារ និង override សម្រាប់ការរត់លើថតទទេ');
+}
 
 console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែល `run-all.sh` មិនរត់ ===');
 // ⛔ ថ្នាក់កំហុស៖ **checker ដែលរស់តែក្នុង CI**។ `run-all.sh` ជាការត្រួតពិនិត្យ
@@ -131,17 +206,11 @@ console.log('\n=== ២ខ. CI មិនត្រូវរត់ checker ដែ�
         // ⛔ ពិនិត្យតែ **ផ្នែករត់ធម្មតា** — ផ្នែក baseline (`if [ -n "$BASE" ]`)
         // រត់តែពេលមាន argument ដូច្នេះការលេចត្រឹមទីនោះ **មិនធានាថា checker
         // នោះរត់ក្នុងការហៅធម្មតាទេ** ➜ ចន្លោះនៅដដែល។
-        const baselineAt = runall.search(/if \[ -n "\$BASE" \]/);
-        const mainSection = baselineAt === -1 ? runall : runall.slice(0, baselineAt);
         // ⛔ ត្រូវអាន **ទាំង ២ ទម្រង់** ដូច `runNames` ខាងលើ — រង្វិលជុំ
         // `for t in …; do` និងបន្ទាត់ `node audit-tools/x.js` ដាច់ដោយឡែក។
         // ការអានតែទម្រង់ទី ២ ធ្វើឲ្យ checker ភាគច្រើន (ដែលហៅតាមរង្វិលជុំ)
         // ត្រូវរាយខុសថា «រត់តែក្នុង CI»។
-        const mainNames = new Set();
-        for (const m of mainSection.matchAll(/for t in ([\s\S]*?); do/g)) {
-            m[1].split(/\s+/).filter(Boolean).forEach((n) => mainNames.add(n.replace(/\\$/, '')));
-        }
-        for (const m of mainSection.matchAll(/audit-tools\/([A-Za-z0-9._\/-]+)\.js/g)) mainNames.add(m[1]);
+        const mainNames = runNames;
         const ciOnly = [...ciCheckers].filter((name) => {
             if (/run-all\.sh/.test(name)) return false;
             return !mainNames.has(name);
@@ -183,7 +252,7 @@ function probeCheckerOnEmpty(f, env, empty) {
 const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-empty-'));
 const greenOnEmpty = [];
 let probed = 0;
-const jobs = checkers.map((f) => ({ f, env: envOf.get(f) })).filter((job) => job.env);
+const jobs = checkers.map((f) => ({ f, env: envOf.get(f) })).filter((job) => job.env).concat(EXTERNAL_CHECKERS);
 probed = jobs.length;
 let nextJob = 0;
 await Promise.all(Array.from({ length: Math.min(EMPTY_PROBE_CONCURRENCY, jobs.length) }, async () => {
@@ -231,7 +300,7 @@ if (process.env.EXITCODE_CHILD) {
     const { spawn, execFileSync: runSync } = require('child_process');
     const snapshot = () => {
         const out = new Map();
-        for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+        for (const dir of CHECKER_DIRS) {
             let names = [];
             try { names = fs.readdirSync(dir); } catch (e) { continue; }
             for (const n of names) {
@@ -272,7 +341,7 @@ if (process.env.EXITCODE_CHILD) {
         else ok('គ្មានឯកសារ .js ចម្លែកបន្សល់');
     }
     // បោសសំណល់ `.tmp-poison-*` របស់ដំណើរការដែលត្រូវសម្លាប់
-    for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+    for (const dir of CHECKER_DIRS) {
         let names = [];
         try { names = fs.readdirSync(dir); } catch (e) { continue; }
         for (const n of names) {
@@ -328,7 +397,7 @@ function stripLiterals(src) {
 {
     const LISTEN = /\.listen\s*\(([^)]*?)(?:,\s*(?:\(\)|function)[^)]*)?\)/g;
     const files = [];
-    for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+    for (const dir of CHECKER_DIRS) {
         let names = [];
         try { names = fs.readdirSync(dir); } catch (e) { continue; }
         for (const n of names) {
@@ -471,7 +540,7 @@ console.log('\n=== ៦ខ. ការអះអាងត្រូវ *អាចធ
             }
         };
         const files = [];
-        for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+        for (const dir of CHECKER_DIRS) {
             let names = [];
             try { names = fs.readdirSync(dir); } catch (e) { continue; }
             for (const n of names) {
@@ -547,7 +616,7 @@ console.log('\n=== ៧. គ្មាន checker ណានៅផ្ទុកស�
     ];
     let scanned = 0;
     const poisoned = [];
-    for (const dir of [TOOLS, path.join(TOOLS, 'emu')]) {
+    for (const dir of CHECKER_DIRS) {
         let names = [];
         try { names = fs.readdirSync(dir); } catch (e) { continue; }
         for (const n of names) {

@@ -20,11 +20,6 @@
 // ៤. **Toast និយាយការពិត** (មេរៀន 2.19.0)៖ server ត្រឡប់ `{ok:false}` ឬ
 //    ឧបករណ៍ក្រៅបណ្ដាញ ➜ សារបរាជ័យ **មិនមែន ✅** ហើយក្រៅបណ្ដាញ
 //    **មិនត្រូវបាញ់សំណើសោះ**។
-let chromium;
-try { chromium = require('playwright-core').chromium; } catch (e) {
-    console.log('SKIP — ត្រូវការ playwright-core (npm i playwright-core)');
-    process.exit(0);
-}
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -33,6 +28,14 @@ const vm = require('vm');
 const CHROME = process.env.SHEETIMPORT_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ROOT = process.env.SHEETIMPORT_APP_DIR ? path.resolve(process.env.SHEETIMPORT_APP_DIR) : path.resolve(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
+let XLSX;
+try { XLSX = require(path.join(APP, 'vendor', 'xlsx.full.min.js')); }
+catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
+let chromium;
+try { chromium = require('playwright-core').chromium; } catch (e) {
+    console.log('SKIP — ត្រូវការ playwright-core (npm i playwright-core)');
+    process.exit(0);
+}
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png' };
 
 let pass = 0, fail = 0;
@@ -229,21 +232,11 @@ function writeCsvSample(dir) {
     return file;
 }
 
-let sampleIsRealWorkbook = false;
-
 function writeSample(dir) {
-    let XLSX = null;
-    try { XLSX = require('xlsx'); } catch (e) { XLSX = null; }
-    if (XLSX) {
-        sampleIsRealWorkbook = true;
-        const file = path.join(dir, 'zoe-sheet-import-sample.xlsx');
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(SAMPLE), 'Data');
-        XLSX.writeFile(wb, file);
-        return file;
-    }
-    const file = path.join(dir, 'zoe-sheet-import-sample.csv');
-    fs.writeFileSync(file, SAMPLE.map((r) => r.join(',')).join('\n'), 'utf8');
+    const file = path.join(dir, 'zoe-sheet-import-sample.xlsx');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(SAMPLE), 'Data');
+    fs.writeFileSync(file, Buffer.from(XLSX.write(wb, { type: 'array', bookType: 'xlsx' })));
     return file;
 }
 
@@ -271,14 +264,7 @@ async function withTimeout(promise, ms, label) {
     const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'zoe-si-'));
     const samplePath = writeSample(tmpDir);
     const csvSamplePath = writeCsvSample(tmpDir);
-    if (sampleIsRealWorkbook) {
-        console.log('   ចំណាំ ៖ ផ្នែក ១០–១៣ រត់លើ .xlsx ពិត (package `xlsx` ដំឡើងរួច)។');
-    } else {
-        console.log('   ⚠️  ចំណាំ ៖ គ្មាន package `xlsx` ➜ ផ្នែក ១០–១៣ ធ្លាក់ទៅ **CSV**');
-        console.log('       ➜ ផ្លូវ .xlsx ពិត **មិនត្រូវបានវាស់** ក្នុងការរត់នេះទេ។');
-        console.log('       ➜ រត់ `npm i xlsx` ដើម្បីគ្របវា (CI ដំឡើងវារួចស្រាប់)។');
-        console.log('       ផ្នែក ១៦ (CSV ➜ លេខ 0 នាំមុខ) រត់ជានិច្ច មិនអាស្រ័យលើវាទេ។');
-    }
+    console.log('   ផ្នែក ១០–១៣ រត់លើ .xlsx ពិតដែលបង្កើតដោយ SheetJS ដូច App ក្នុង target tree។');
     const server = await serve(APP);
     const port = server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME });

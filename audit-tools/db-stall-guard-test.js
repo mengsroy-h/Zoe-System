@@ -345,7 +345,7 @@ function runPatch(mode) {
         refreshCurrentHistoryView: () => {},
         normalizeBarcodesOf: (o) => o,
         getServerNow: () => Date.now(),
-        db: {}, dbRefHistory: {},
+        db: {}, dbRefHistory: {}, authGeneration: 0,
         fb: {
             ref: (_db, p) => ({ path: p }),
             runTransaction: (ref, fn) => {

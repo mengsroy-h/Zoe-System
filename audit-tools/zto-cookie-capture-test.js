@@ -154,6 +154,8 @@ async function main() {
     for (const payload of [
         { success: false, code: 'not_login' },
         { success: true, code: 401 },
+        { success: true, code: 0, statusCode: 401 },
+        { success: true, code: 'OK', errorCode: 403 },
         { success: true, message: 'https://synthetic-iam.example/login?ticket=synthetic' },
         { success: true, message: 'session expired' },
         { success: false, code: 500 },

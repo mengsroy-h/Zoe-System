@@ -29,6 +29,7 @@
 // ៦. ⛔ **ស្នាមភ្ជាប់ឈ្មោះ node រវាង `app.js` និង rules ពិត** — ការសរសេរទៅ
 //    path ដែល rules មិនស្គាល់ ➜ `permission_denied` ស្ងាត់ៗលើផលិតកម្ម។
 'use strict';
+process.exitCode = 1;
 
 const fs = require('fs');
 const path = require('path');
@@ -79,9 +80,8 @@ function readConst(name, fallback) {
 
 // ⛔ ឈ្មោះដែលរកមិនឃើញ ➜ **stub** មិនមែនការឈប់ (ច្បាប់វិន័យឧបករណ៍)។
 const WANT = ['collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp',
-    'collectedDayHoldingKey', 'collectedMarksFor', 'collectItemCollectedMarks',
-    'collectedPreviousValue', 'applyCollectedMarksInMemory', 'commitCollectedMarks',
-    'markCollectedRevenue', 'revertCollectedMarks', 'syncCollectedValueForBarcode',
+    'collectedDayHoldingKey', 'collectedMarksFor',
+    'commitCollectedMarks', 'markCollectedRevenue', 'syncCollectedValueForBarcode', 'reconcileCollectedHistory',
     'collectedTotalsOfDay', 'collectedRetentionCutoffKey', 'staleCollectedDays',
     'runAutomaticCollectedCleanup', 'openCollectedStatsModal', 'buildCollectedCardItem',
     'statsMoney', 'statsPositive', 'ledgerNumber', 'pickupBarcodeKey', 'barcodeRegistryKey', 'getZoneDateKey',
@@ -112,7 +112,7 @@ function makeSandbox(state) {
         STATS_COLLECTED_VIEW_KEYS: [readConst('DB_LISTENER_KEY_DAILY_COLLECTED', 'dailyCollected')],
         dbListenerPendingPaths: new Set(opts.pending || []),
         dbListenerFailedPaths: new Set(opts.failed || []),
-        db: {}, dbRefDailyCollected: { __ref: NODE },
+        db: {}, authGeneration: 0, dbRefDailyCollected: { __ref: NODE },
         getServerNow: () => opts.now,
         cleanupClockIsTrustworthy: () => opts.clockOk !== false,
         showToast: (m) => calls.toast.push(String(m)),
@@ -131,7 +131,17 @@ function makeSandbox(state) {
             },
             update: (ref, payload) => {
                 calls.update.push(JSON.parse(JSON.stringify(payload)));
-                Object.keys(payload).forEach((k) => { if (payload[k] === null) delete server[k]; });
+                Object.keys(payload).forEach((k) => {
+                    const parts = k.split('/');
+                    if (parts.length === 1) { if (payload[k] === null) delete server[k]; else server[k] = JSON.parse(JSON.stringify(payload[k])); }
+                    else {
+                        const day = parts[0], key = parts[1];
+                        if (!server[day]) server[day] = {};
+                        if (payload[k] === null) delete server[day][key];
+                        else server[day][key] = JSON.parse(JSON.stringify(payload[k]));
+                        if (!Object.keys(server[day]).length) delete server[day];
+                    }
+                });
                 return Promise.resolve(true);
             }
         },
@@ -168,8 +178,8 @@ scenario('១. លុយចុះលើ **ថ្ងៃបិទ** មិនម�
     ok('⛔ តម្លៃយក COD/DOD របស់ barcode នោះ',
         marks[0].value.c === 6.47 && marks[0].value.d === 2.5, marks[0].value);
     s.markCollectedRevenue(marks);
-    ok('សរសេរទៅ node ថ្ងៃនោះតែមួយ',
-        s.__calls.tx.length === 1 && s.__calls.tx[0].day === DAY_B, s.__calls.tx);
+    const writtenDays = [...new Set(s.__calls.tx.map((call) => call.day).concat(s.__calls.update.flatMap((payload) => Object.keys(payload).map((key) => key.split('/')[0]))))];
+    ok('សរសេរទៅ node ថ្ងៃនោះតែមួយ', writtenDays.length === 1 && writtenDays[0] === DAY_B, writtenDays);
     const totals = s.collectedTotalsOfDay(s.__server[DAY_B]);
     ok('សរុបថ្ងៃ = $8.97 · ១ កញ្ចប់',
         totals.total === 8.97 && totals.count === 1, totals);
@@ -185,8 +195,7 @@ scenario('២. ⛔ អត្តសញ្ញាណ ៖ បិទ ២ ដងលើ
     ok('⛔ សរុបនៅ $5.00 (មិនមែន $15.00) ➜ សំណុំ មិនមែន counter',
         totals.total === 5 && totals.count === 1, totals);
     ok('⛔ គ្មាននព្វន្ធ delta ក្នុងផ្លូវសរសេរ',
-        !/\+=|\-=/.test(sliceFn(SRC, 'commitCollectedMarks') || '')
-        && !/\+=|\-=/.test(sliceFn(SRC, 'applyCollectedMarksInMemory') || ''), true);
+        !/\+=|\-=/.test(sliceFn(SRC, 'commitCollectedMarks') || ''), true);
 });
 
 scenario('៣. ⛔ បើកវិញ ➜ ដកចេញពី **ថ្ងៃដើម** មិនមែនថ្ងៃនេះ', () => {
@@ -228,29 +237,23 @@ scenario('៥. ⛔ បិទឡើងវិញថ្ងៃក្រោយ ➜ **
 scenario('៦. ⛔ កញ្ចប់ទាំងមូល ៖ barcode ច្រើន ថ្ងៃដើមខុសគ្នា', () => {
     const s = makeSandbox({ now: NOW_B });
     const item = { barcodes: [bc('77130500000001', 5, 0, NOW_B), bc('77130500000002', 3, 1, NOW_B)] };
-    s.markCollectedRevenue(s.collectItemCollectedMarks(item, true, [undefined, undefined]));
+    s.markCollectedRevenue(item.barcodes.flatMap(barcode => s.collectedMarksFor(barcode, true)));
     ok('កញ្ចប់ ២ ចុះលើថ្ងៃដដែល',
         s.collectedTotalsOfDay(s.__server[DAY_B]).count === 2, s.__server[DAY_B]);
     ok('សរុប $9.00', s.collectedTotalsOfDay(s.__server[DAY_B]).total === 9, s.__server[DAY_B]);
     const openItem = { barcodes: [bc('77130500000001', 5, 0), bc('77130500000002', 3, 1)] };
-    s.markCollectedRevenue(s.collectItemCollectedMarks(openItem, false, [NOW_B, NOW_B]));
+    s.markCollectedRevenue(openItem.barcodes.flatMap(barcode => s.collectedMarksFor(barcode, false, NOW_B)));
     ok('⛔ បើកកញ្ចប់ទាំងមូល ➜ ថ្ងៃនោះទទេវិញ', s.__server[DAY_B] === undefined, s.__server);
 });
 
-scenario('៧. ⛔ ការបញ្ច្រាស (transaction ធ្លាក់) ➜ ត្រឡប់តម្លៃដើមវិញ', () => {
+scenario('៧. ⛔ ទិដ្ឋភាពចំណូលរង់ចាំ snapshot ពី Firebase', () => {
     const s = makeSandbox({ now: NOW_B, local: { [DAY_B]: { '77130500000001': { c: 2, d: 0 } } },
         server: { [DAY_B]: { '77130500000001': { c: 2, d: 0 } } } });
-    const applied = s.markCollectedRevenue(s.collectedMarksFor(bc('77130500000001', 9, 0, NOW_B), true, NOW_B));
+    s.markCollectedRevenue(s.collectedMarksFor(bc('77130500000001', 9, 0, NOW_B), true, NOW_B));
     ok('⛔ ជាន់អប្បបរមា ៖ តម្លៃថ្មីចុះពិត',
         s.collectedTotalsOfDay(s.__server[DAY_B]).total === 9, s.__server[DAY_B]);
-    s.revertCollectedMarks(applied);
-    ok('⛔ ការបញ្ច្រាសត្រឡប់ទៅ $2.00 វិញ (មិនមែនលុបចោល)',
-        s.collectedTotalsOfDay(s.__server[DAY_B]).total === 2, s.__server[DAY_B]);
-    const s2 = makeSandbox({ now: NOW_B });
-    const applied2 = s2.markCollectedRevenue(s2.collectedMarksFor(bc('77130500000001', 9, 0, NOW_B), true, undefined));
-    s2.revertCollectedMarks(applied2);
-    ok('⛔ ធាតុដែលមិនធ្លាប់មាន ➜ ការបញ្ច្រាសលុបវាចោល',
-        s2.__server[DAY_B] === undefined, s2.__server);
+    ok('⛔ ការហៅសរសេរមិនកែ memory មុន snapshot',
+        s.collectedTotalsOfDay(s.dailyCollectedData[DAY_B]).total === 2 && s.collectedTotalsOfDay(s.__server[DAY_B]).total === 9, s.dailyCollectedData[DAY_B]);
 });
 
 scenario('៨. ⛔ ការកែទឹកប្រាក់ ៖ ធ្វើឲ្យស៊ីគ្នា តែ **មិនអាចបង្កើត** ធាតុថ្មី', () => {
@@ -265,7 +268,7 @@ scenario('៨. ⛔ ការកែទឹកប្រាក់ ៖ ធ្វើ�
         scanHistory: [{ id: 'i1', barcodes: [bc('77130500000001', 8.25, 0, NOW_B)] }] });
     s2.syncCollectedValueForBarcode('i1', '77130500000001');
     ok('⛔ គ្មានធាតុស្រាប់ ➜ **មិនសរសេរអ្វីទាំងអស់** (មិនអាចបង្កើតលុយ)',
-        s2.__calls.tx.length === 0 && Object.keys(s2.__server).length === 0, s2.__server);
+        s2.__calls.tx.length === 0 && s2.__calls.update.length === 0 && Object.keys(s2.__server).length === 0, s2.__server);
     const s3 = makeSandbox({ now: NOW_B,
         local: { [DAY_B]: { '77130500000001': { c: 5, d: 0 } } },
         server: { [DAY_B]: { '77130500000001': { c: 5, d: 0 } } },
@@ -309,8 +312,8 @@ scenario('៩. ⛔ ការសម្អាត ៧ ថ្ងៃ', () => {
 });
 
 scenario('១០. ⛔ វា *មិនមែន* លុយ ៖ គ្មានការប៉ះ ledger ឬ `isDeducted`', () => {
-    const FNS = ['collectedMarksFor', 'collectItemCollectedMarks', 'markCollectedRevenue',
-        'commitCollectedMarks', 'applyCollectedMarksInMemory', 'revertCollectedMarks',
+    const FNS = ['collectedMarksFor', 'markCollectedRevenue',
+        'commitCollectedMarks',
         'runAutomaticCollectedCleanup', 'syncCollectedValueForBarcode', 'collectedTotalsOfDay'];
     const joined = FNS.map((n) => sliceFn(SRC, n) || '').join('\n');
     ok('⛔ ជាន់អប្បបរមា ៖ ស្រង់តួទាំង ' + FNS.length + ' បាន',
@@ -388,6 +391,339 @@ scenario('១៣. ⛔ UI ៖ ប៊ូតុង · ប្រអប់ · កា�
     ok('⛔ ប្រអប់ប្រាប់ពី ៧ ថ្ងៃ', /៧ ថ្ងៃ/.test(modalHtml), modalHtml.slice(0, 600));
 });
 
-console.log('');
-if (fail) { console.log('❌ ធ្លាក់ ' + fail + '  (ok ' + pass + ')'); process.exit(1); }
-console.log('✅ ចំណូលប្រចាំថ្ងៃ — ok ' + pass);
+
+// ស្រង់មុខងារពិតតាម AST ដើម្បីវាស់ស្នាមភ្ជាប់ close/delete/restore ជាមួយគ្នា។
+const operationAst = require('acorn').parse(SRC, { ecmaVersion: 'latest' });
+const fnCode = operationAst.body.filter(node => node.type === 'FunctionDeclaration').map(node => SRC.slice(node.start, node.end)).join('\n');
+const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
+const HISTORY = 'zoew_scan_history_cod_dod';
+const TRASH = 'zoew_recently_deleted_cod_dod';
+const COLLECTED = NODE;
+const DAILY = 'zoew_daily_revenue_cod_dod';
+const MONTHLY = 'zoew_monthly_revenue_cod_dod';
+const PICKUP = 'zoew_daily_pickup_cod_dod';
+function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
+    const server = sharedStore || clone(initial);
+    const calls = [];
+    const messages = [];
+    function read(p) { return p.split('/').filter(Boolean).reduce((v, key) => v && v[key], server) ?? null; }
+    function write(p, value) {
+        const parts = p.split('/').filter(Boolean);
+        const key = parts.pop();
+        let node = server;
+        for (const part of parts) node = node[part] || (node[part] = {});
+        if (value === null) delete node[key];
+        else if (value && typeof value === 'object' && '__increment' in value) node[key] = (node[key] || 0) + value.__increment;
+        else node[key] = clone(value);
+    }
+    function snap(p) { const value = clone(read(p)); return { exists: () => value !== null, val: () => clone(value) }; }
+    const box = {
+        console, Date, Intl, setTimeout, clearTimeout, Promise, Set, Map,
+        db: {}, authGeneration: 0, dbRefHistory: { path: HISTORY }, dbRefDeleted: { path: TRASH },
+        dbRefDailyCollected: { path: COLLECTED }, dbRefDailyPickup: { path: PICKUP },
+        dailyCollectedData: clone(server[COLLECTED] || {}), dailyPickupData: clone(server[PICKUP] || {}),
+        dailyRevenueData: clone(server[DAILY] || {}), monthlyRevenueData: clone(server[MONTHLY] || {}),
+        scanHistory: Object.values(clone(server[HISTORY] || {})), deletedItems: Object.values(clone(server[TRASH] || {})),
+        pendingRestoreId: null, activeRestoreClaims: new Map(), scanRemoveInFlight: null,
+        dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(),
+        DB_LISTENER_KEY_DELETED: 'deleted', DB_LISTENER_KEY_DAILY_COLLECTED: 'dailyCollected',
+        cleanupInFlightIds: new Set(), cleanupNextAttemptAt: new Map(), activeClearHistoryClaims: new Map(),
+        confirm: () => true, alert: message => messages.push(message),
+        fb: {
+            ref: (db, p = '') => ({ path: p }),
+            get: ref => Promise.resolve(snap(ref.path)),
+            increment: amount => ({ __increment: amount }),
+            runTransaction: (ref, updater) => {
+                const value = updater(clone(read(ref.path)));
+                calls.push({ kind: 'transaction', path: ref.path, value: clone(value) });
+                if (value !== undefined) write(ref.path, value);
+                return Promise.resolve({ committed: value !== undefined, snapshot: snap(ref.path) });
+            },
+            update: (ref, updates) => {
+                calls.push({ kind: 'update', path: ref.path, value: clone(updates) });
+                Object.entries(updates).forEach(([p, value]) => write([ref.path, p].filter(Boolean).join('/'), value));
+                if (ref.path === COLLECTED || Object.keys(updates).some(p => p.startsWith(COLLECTED + '/'))) box.dailyCollectedData = clone(read(COLLECTED) || {});
+                return Promise.resolve();
+            }
+        }
+    };
+    box.window = box;
+    box.globalThis = box;
+    vm.createContext(box);
+    vm.runInContext(fnCode, box);
+    for (const name of ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'PICKUP_PHONE_KEY_MAX', 'PICKUP_LEGACY_KEY_PREFIX',
+        'RESTORE_CLAIM_LEASE_MS', 'DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'DAILY_COLLECTED_KEEP_DAYS',
+        'ABANDON_AGE_MS', 'TWO_HOURS_MS', 'TRASH_RETENTION_MS', 'EXPIRED_TRASH_RETENTION_MS']) {
+        const declaration = operationAst.body.filter(node => node.type === 'VariableDeclaration').flatMap(node => node.declarations).find(node => node.id.name === name);
+        if (declaration) box[name] = vm.runInContext(SRC.slice(declaration.init.start, declaration.init.end), box);
+    }
+    Object.assign(box, {
+        PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/, DAILY_COLLECTED_DAY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
+        getServerNow: () => now, getFormattedDate: () => new Date(now).toISOString().slice(0, 10),
+        showToast: message => messages.push(message), refreshCurrentHistoryView() {}, closeModal() {},
+        updateRecentPhonesList() {}, openRecentlyDeletedModal() {}, openViewListModal() {}, viewListModalShowing: () => false,
+        generateUniqueId: (() => { let id = 0; return () => 'fixture_' + (++id); })()
+    });
+    return { box, server, calls, messages, read, write, sync() {
+        box.scanHistory = Object.values(clone(server[HISTORY] || {}));
+        box.deletedItems = Object.values(clone(server[TRASH] || {}));
+        box.dailyCollectedData = clone(server[COLLECTED] || {});
+    } };
+}
+function operationItem(cod, closed, at) {
+    const result = { id: 'fixture_item', phone: '0900000001', scanDate: '2026-09-09', createdAt: NOW_A - 86400000,
+        cod, dod: 0.75, price: cod + 0.75, count: 1, barcode: 'FIXTURE1', isClosed: closed,
+        barcodes: [{ code: 'FIXTURE1', cod, dod: 0.75, isClosed: closed, isDeducted: false }] };
+    if (closed) { result.closedAt = at; result.barcodes[0].closedAt = at; }
+    return result;
+}
+
+async function operationScenario(name, action) {
+    console.log('\n== ' + name + ' ==');
+    try { await action(); }
+    catch (error) { ok(name + ' រត់ដល់ចប់', false, error.stack || error.message); }
+}
+function collectedTotal(store) {
+    return Object.values(store[COLLECTED] || {}).reduce((total, day) => total + Object.values(day || {}).reduce((sum, value) => sum + value.c + value.d, 0), 0);
+}
+async function closeOperation(s, method, closed) {
+    if (method === 'single') return s.box.applyBarcodeCloseChange('fixture_item', 'FIXTURE1', closed, { showModal: false });
+    return s.box.toggleCloseStatus('fixture_item');
+}
+(async () => {
+    for (const method of ['single', 'whole']) {
+        await operationScenario('១៤. ទិដ្ឋភាពតម្លៃចាស់ត្រូវស៊ីនឹងសាលក្រម server — ' + method, async () => {
+            const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(24.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+            s.box.scanHistory = [operationItem(5.25, false)];
+            const result = await closeOperation(s, method, true);
+            await new Promise(resolve => setTimeout(resolve, 0));
+            ok('ការបិទត្រូវបាន server ទទួលពិត — ' + method, result === true && s.read(HISTORY + '/fixture_item/barcodes/0').isClosed === true);
+            ok('ចំណូលមកពី COD $24.50 និង DOD $0.75 របស់ server — ' + method, collectedTotal(s.server) === 25.25, s.read(COLLECTED));
+        });
+        await operationScenario('១៥. លុប/ស្តារថ្ងៃក្រោយ/បើកវិញ — ' + method, async () => {
+            const ledger = { '2026-09-09': { codDollar: 12.5, dodDollar: 0.75, totalCount: 1 } };
+            const monthly = { '2026-09': { codDollar: 12.5, dodDollar: 0.75, totalCount: 1 } };
+            const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, true, NOW_A) },
+                [COLLECTED]: { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 } } }, [DAILY]: ledger, [MONTHLY]: monthly, [PICKUP]: {} });
+            await s.box.deleteSingleItem('fixture_item');
+            ok('លុបផ្លាស់ទៅធុងសំរាម ហើយមិនដកលុយ — ' + method,
+                !s.read(HISTORY + '/fixture_item') && !!s.read(TRASH + '/fixture_item') && collectedTotal(s.server) === 13.25);
+            s.box.pendingRestoreId = 'fixture_item';
+            await s.box.executeRestoreItem();
+            ok('ស្តារពិត reset ត្រាទៅថ្ងៃក្រោយ តែមិនបូកចំណូលម្តងទៀត — ' + method,
+                s.read(HISTORY + '/fixture_item/barcodes/0/closedAt') === NOW_B && collectedTotal(s.server) === 13.25);
+            ok('លុប/ស្តារមិនប្តូរ ledger ថ្ងៃ/ខែ — ' + method,
+                JSON.stringify(s.server[DAILY]) === JSON.stringify(ledger) && JSON.stringify(s.server[MONTHLY]) === JSON.stringify(monthly));
+            s.sync();
+            await closeOperation(s, method, false);
+            await new Promise(resolve => setTimeout(resolve, 0));
+            ok('បើកវិញដកកំណត់ត្រាពីថ្ងៃយកដើម — ' + method, collectedTotal(s.server) === 0, s.read(COLLECTED));
+        });
+    }
+    await operationScenario('១៦. ផ្លាស់ថ្ងៃដោយសរសេរតែមួយ ដែលបដិសេធជាឯកតា', async () => {
+        const initial = { [HISTORY]: { fixture_item: operationItem(12.5, true, NOW_A) },
+            [COLLECTED]: { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 }, UNRELATED: { c: 4, d: 0.5 } } }, [PICKUP]: {} };
+        const s = makeOperationSandbox(initial);
+        let rejected = false;
+        const transaction = s.box.fb.runTransaction;
+        const update = s.box.fb.update;
+        const rejectFirst = ref => {
+            if (!rejected && ref.path.startsWith(COLLECTED)) { rejected = true; return true; }
+            return false;
+        };
+        s.box.fb.runTransaction = (ref, updater) => rejectFirst(ref) ? Promise.reject(new Error('permission_denied: fixture')) : transaction(ref, updater);
+        s.box.fb.update = (ref, values) => rejectFirst(ref) ? Promise.reject(new Error('permission_denied: fixture')) : update(ref, values);
+        await closeOperation(s, 'single', true);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ok('ជាន់អប្បបរមា៖ បានបង្ខំការបដិសេធពិត', rejected);
+        ok('ការផ្លាស់ថ្ងៃធ្លាក់មិនអាចបង្កើត barcode នៅពីរថ្ងៃ', collectedTotal(s.server) === 17.75, s.read(COLLECTED));
+        ok('barcode ផ្សេងនៅដដែលក្រោយការបដិសេធ', s.read(COLLECTED + '/' + DAY_A + '/UNRELATED/c') === 4);
+        ok('memory ត្រឡប់ដើម និងសារមិនអះអាងជោគជ័យគ្រប់ពេលសរសេរធ្លាក់',
+            collectedTotal({ [COLLECTED]: s.box.dailyCollectedData }) === 17.75 && s.messages.some(message => message.includes('⚠️')) && !s.messages.some(message => message.includes('✅')),
+            { local: s.box.dailyCollectedData, messages: s.messages });
+    });
+    await operationScenario('១៧. បើកវិញក្រោយស្តារ ខណៈ listener ចំណូលមិនទាន់មកដល់', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, true, NOW_B) },
+            [COLLECTED]: { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 } } }, [PICKUP]: {} });
+        s.box.dailyCollectedData = {};
+        await closeOperation(s, 'single', false);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ok('អត្តសញ្ញាណថ្ងៃយកមិនបាត់ដោយសារ listener ចាស់', collectedTotal(s.server) === 0, s.read(COLLECTED));
+    });
+    await operationScenario('១៨. ចម្លើយបិទចាស់មកយឺត ក្រោយឧបករណ៍ផ្សេងបើកវិញ', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        let release;
+        const transaction = s.box.fb.runTransaction;
+        s.box.fb.runTransaction = (ref, updater) => {
+            const result = transaction(ref, updater);
+            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
+            return result;
+        };
+        const closing = closeOperation(s, 'single', true);
+        const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+        await closeOperation(second, 'single', false);
+        await release();
+        await closing;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ok('ឧបករណ៍ទីពីរបើក barcode ពិត', s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === false);
+        ok('ចម្លើយចាស់មិនបង្កើតចំណូលឡើងវិញក្រោយបើក', collectedTotal(s.server) === 0, s.read(COLLECTED));
+    });
+    await operationScenario('១៩. ការសរសេរចំណូលចាស់មកដល់ក្រោយការបើកថ្មី', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        let release;
+        const update = s.box.fb.update;
+        s.box.fb.update = (ref, values) => {
+            if (ref.path !== COLLECTED || release) return update(ref, values);
+            return new Promise(resolve => { release = async () => { await update(ref, values); resolve(); }; });
+        };
+        const closing = closeOperation(s, 'single', true);
+        for (let count = 0; !release && count < 30; count++) await new Promise(resolve => setTimeout(resolve, 0));
+        ok('បានព្យួរការសរសេរចំណូលពិត', !!release);
+        if (!release) return;
+        const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+        await closeOperation(second, 'single', false);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await release(); await closing;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ok('ការសរសេរចាស់ត្រូវបានកែតាមស្ថានភាពបើកថ្មី', s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === false && collectedTotal(s.server) === 0, s.read(COLLECTED));
+    });
+    await operationScenario('២០. លុបចន្លោះការបិទ និងការឆ្លើយតប មិនអាចដកចំណូល', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, true, NOW_A) },
+            [COLLECTED]: { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 } } }, [PICKUP]: {} });
+        let release;
+        const transaction = s.box.fb.runTransaction;
+        s.box.fb.runTransaction = (ref, updater) => {
+            const result = transaction(ref, updater);
+            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
+            return result;
+        };
+        const closing = closeOperation(s, 'single', true);
+        const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+        await second.box.deleteSingleItem('fixture_item');
+        await release(); await closing;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        ok('ការលុបពិតបានរក្សាចំណូលដើម', !s.read(HISTORY + '/fixture_item') && !!s.read(TRASH + '/fixture_item') && collectedTotal(s.server) === 13.25, s.read(COLLECTED));
+    });
+    for (const method of ['single', 'whole']) {
+        await operationScenario('២១. ចម្លើយយឺតក្រោយប្តូរអាជីវកម្ម — ' + method, async () => {
+            const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+            let release;
+            const transaction = s.box.fb.runTransaction;
+            s.box.fb.runTransaction = (ref, updater) => {
+                const result = transaction(ref, updater);
+                if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
+                return result;
+            };
+            const closing = closeOperation(s, method, true);
+            s.box.authGeneration++; s.box.db = {};
+            s.box.dailyCollectedData = { [DAY_B]: { OTHER_BUSINESS: { c: 2, d: 0 } } };
+            const before = s.calls.length;
+            await release(); const result = await closing;
+            ok('ចម្លើយចាស់មិនសរសេរ ឬបង្ហាញសារក្នុងអាជីវកម្មថ្មី — ' + method,
+                result === false && s.calls.length === before && s.messages.length === 0 && s.box.dailyCollectedData[DAY_B].OTHER_BUSINESS.c === 2,
+                { result, calls: s.calls.length - before, messages: s.messages });
+        });
+    }
+    await operationScenario('២២. ការកែចំណូលដែលប្រណាំងជាប់ៗគ្នាមានព្រំដែន', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        const update = s.box.fb.update;
+        let writes = 0;
+        s.box.fb.update = async (ref, values) => {
+            await update(ref, values);
+            if (ref.path === COLLECTED) {
+                writes++;
+                s.write(HISTORY + '/fixture_item/barcodes/0/cod', 12.5 + writes);
+            }
+        };
+        await closeOperation(s, 'single', true);
+        ok('មិន retry គ្មានទីបញ្ចប់ ហើយប្រាប់ថាមិនទាន់ Sync ពេញលេញ', writes > 0 && writes <= 3 && s.messages.some(message => message.includes('⚠️')) && !s.messages.some(message => message.includes('✅')), { writes, messages: s.messages });
+    });
+    await operationScenario('២៣. ការសរសេរចំណូលព្យួរមិនរាំង UI ហើយកែវិញពេលដោះយឺត', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        s.box.DB_OP_TIMEOUT_MS = 10;
+        let release;
+        const update = s.box.fb.update;
+        s.box.fb.update = (ref, values) => {
+            if (ref.path !== COLLECTED || release) return update(ref, values);
+            return new Promise(resolve => { release = async () => { await update(ref, values); resolve(); }; });
+        };
+        const closing = closeOperation(s, 'single', true);
+        const result = await Promise.race([closing, new Promise(resolve => setTimeout(() => resolve('still-waiting'), 100))]);
+        ok('history បានបិទ ប៉ុន្តែ UI មិនព្យួរលើការសរសេរចំណូល', result === true && !!release && s.messages.some(message => message.includes('⚠️')), { result, messages: s.messages });
+        if (!release) return;
+        const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+        await closeOperation(second, 'single', false);
+        await release(); await closing;
+        await new Promise(resolve => setTimeout(resolve, 20));
+        ok('ការសរសេរចាស់ដោះក្រោយពិដាន ត្រូវកែទៅស្ថានភាពបើកថ្មី', collectedTotal(s.server) === 0, s.read(COLLECTED));
+    });
+    await operationScenario('២៤. បិទលើកដំបូង ហើយលុបមុនចម្លើយមកដល់', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: { fixture_item: operationItem(12.5, false) }, [COLLECTED]: {}, [PICKUP]: {} });
+        let release;
+        const transaction = s.box.fb.runTransaction;
+        s.box.fb.runTransaction = (ref, updater) => {
+            const result = transaction(ref, updater);
+            if (ref.path === HISTORY + '/fixture_item') return new Promise(resolve => { release = async () => resolve(await result); });
+            return result;
+        };
+        const closing = closeOperation(s, 'single', true);
+        const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
+        await second.box.deleteSingleItem('fixture_item');
+        await release(); await closing;
+        ok('កញ្ចប់ចូលធុងសំរាម ក៏ចំណូលពីការបិទលើកដំបូងមិនបាត់', !s.read(HISTORY + '/fixture_item') && !!s.read(TRASH + '/fixture_item') && collectedTotal(s.server) === 13.25, s.read(COLLECTED));
+    });
+    await operationScenario('២៥. ការសរសេរចាស់ធ្លាក់ ក្រោយតម្លៃដដែលពីការសរសេរថ្មីជោគជ័យ', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: {}, [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 2, d: 0 } } }, [PICKUP]: {} });
+        let reject;
+        const update = s.box.fb.update;
+        s.box.fb.update = (ref, values) => !reject && ref.path === COLLECTED
+            ? new Promise((resolve, fail) => { reject = fail; }) : update(ref, values);
+        const old = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 9, d: 0 } }]);
+        const newer = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 9, d: 0 } }]);
+        await newer.server;
+        reject(new Error('permission_denied: old fixture')); await old.server;
+        ok('ចម្លើយបដិសេធចាស់មិនត្រឡប់តម្លៃថ្មីដែល server បានទទួល', s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 9 && s.box.dailyCollectedData[DAY_B].FIXTURE1.c === 9, s.box.dailyCollectedData);
+    });
+    await operationScenario('២៦. ប្រភពផ្លាស់ទីទៅ ID ផ្សេង មិនអាចអះអាងថា Sync រួច', async () => {
+        const mirror = { [DAY_B]: { FIXTURE1: { c: 12.5, d: 0.75 }, UNRELATED: { c: 2, d: 0 } } };
+        const s = makeOperationSandbox({ [HISTORY]: {}, [TRASH]: { moved: operationItem(12.5, true, NOW_B) }, [COLLECTED]: mirror, [PICKUP]: {} });
+        const result = await s.box.reconcileCollectedHistory('fixture_item', ['FIXTURE1']);
+        ok('រកប្រភពមិនឃើញ ➜ រក្សាចំណូល និងប្រាប់ថាមិនទាន់បញ្ជាក់', result === null && JSON.stringify(s.read(COLLECTED)) === JSON.stringify(mirror) && s.messages.some(message => message.includes('⚠️')), { result, messages: s.messages });
+    });
+    for (const order of [[0, 1], [1, 0]]) {
+        await operationScenario('២៧. ការសរសេរពីរជាប់គ្នាធ្លាក់ទាំងពីរ — ' + order.join(' → '), async () => {
+            const s = makeOperationSandbox({ [HISTORY]: {}, [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 2, d: 0 } } }, [PICKUP]: {} });
+            const queued = [];
+            s.box.fb.update = () => new Promise((resolve, reject) => queued.push({ resolve, reject }));
+            const old = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 9, d: 0 } }]);
+            const newer = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 12, d: 0 } }]);
+            for (const index of order) { queued[index].reject(new Error('permission_denied: fixture ' + index)); await Promise.resolve(); }
+            await Promise.all([old.server, newer.server]);
+            ok('ការបដិសេធទាំងពីររក្សាតម្លៃចុងក្រោយដែលបានបញ្ជាក់ $2', s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 2 && s.box.dailyCollectedData[DAY_B].FIXTURE1.c === 2, s.box.dailyCollectedData);
+        });
+    }
+    await operationScenario('២៨. ការសរសេរចាស់ជោគជ័យ តែការសរសេរថ្មីធ្លាក់', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: {}, [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 2, d: 0 } } }, [PICKUP]: {} });
+        const queued = [];
+        const update = s.box.fb.update;
+        s.box.fb.update = (ref, values) => new Promise((resolve, reject) => queued.push({ commit: async () => { await update(ref, values); resolve(); }, reject }));
+        const old = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 9, d: 0 } }]);
+        const newer = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 12, d: 0 } }]);
+        await queued[0].commit(); await old.server;
+        queued[1].reject(new Error('permission_denied: newer fixture')); await newer.server;
+        ok('snapshot របស់ការសរសេរជោគជ័យនៅ $9 ក្រោយការបដិសេធថ្មី', s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 9 && s.box.dailyCollectedData[DAY_B].FIXTURE1.c === 9, s.box.dailyCollectedData);
+    });
+    await operationScenario('២៩. ACK ចាស់មិនអាចជាន់ snapshot ថ្មីរបស់ឧបករណ៍ផ្សេង', async () => {
+        const s = makeOperationSandbox({ [HISTORY]: {}, [COLLECTED]: { [DAY_B]: { FIXTURE1: { c: 2, d: 0 } } }, [PICKUP]: {} });
+        let release;
+        const update = s.box.fb.update;
+        s.box.fb.update = (ref, values) => { update(ref, values); return new Promise(resolve => { release = resolve; }); };
+        const old = s.box.markCollectedRevenue([{ key: 'FIXTURE1', day: DAY_B, value: { c: 9, d: 0 } }]);
+        s.write(COLLECTED + '/' + DAY_B + '/FIXTURE1', { c: 21, d: 0 }); s.sync();
+        release(); await old.server;
+        ok('snapshot $21 នៅដដែលក្រោយ ACK $9 ចាស់', s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 21 && s.box.dailyCollectedData[DAY_B].FIXTURE1.c === 21, s.box.dailyCollectedData);
+    });
+    console.log('');
+    if (fail) { console.log('❌ ធ្លាក់ ' + fail + '  (ok ' + pass + ')'); process.exitCode = 1; }
+    else { console.log('✅ ចំណូលប្រចាំថ្ងៃ — ok ' + pass); process.exitCode = 0; }
+})().catch(error => { console.error(error); process.exitCode = 1; });

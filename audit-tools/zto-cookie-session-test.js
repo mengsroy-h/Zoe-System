@@ -149,6 +149,59 @@ async function main() {
         assert.equal(f.state.value, cookie('MANUAL'));
         assert.equal((await f.diag()).cookie.fingerprint, fingerprint(cookie('MANUAL')));
     });
+    await scenario('Attempt ដែល timeout៖ response មកយឺតមិនជាន់ renewal របស់ retry', async () => {
+        const f = fixture(null, { ZTO_UPSTREAM_TIMEOUT_MS: '2000', ZTO_UPSTREAM_RETRIES: '1' });
+        const oldResponse = defer(); const retryBody = defer(); const retryBegan = defer();
+        let count = 0; let oldSignal;
+        f.hooks.fetch = async (_url, init) => {
+            if (++count === 1) { oldSignal = init.signal; return oldResponse.promise; }
+            const accepted = response(200, cookie('RETRY'));
+            accepted.json = async () => { retryBegan.resolve(); await retryBody.promise; return response(200).json(); };
+            return accepted;
+        };
+        const lookup = f.lookup();
+        let watchdog;
+        try {
+            await Promise.race([retryBegan.promise, new Promise((_, reject) => {
+                watchdog = setTimeout(() => reject(new Error('retry មិនចាប់ផ្តើម')), 5500);
+            })]);
+            assert.equal(oldSignal.aborted, true);
+            oldResponse.resolve(response(200, cookie('TIMED-OUT')));
+            await tick();
+            retryBody.resolve();
+            assert.equal((await lookup).statusCode, 200);
+            assert.equal(f.state.value, cookie('RETRY'));
+            assert.equal(f.calls.set.length, 1);
+        } finally {
+            clearTimeout(watchdog);
+            oldResponse.resolve(response(200)); retryBody.resolve(); await lookup;
+        }
+    });
+    for (const envelope of [{ statusCode: 401 }, { statusCode: 403 },
+        { code: 0, statusCode: 401 }, { code: 'OK', errorCode: 403 }]) {
+        await scenario('HTTP 200 ប៉ុន្តែ auth បដិសេធ ' + JSON.stringify(envelope) + '៖ មិនអះអាងថា Cookie នៅល្អ', async () => {
+            const f = fixture();
+            f.hooks.fetch = async () => Object.assign(response(200, cookie('REJECTED')), {
+                json: async () => Object.assign({ success: true, data: { consigneePhone: '012345678', agentAmount: 1 } }, envelope)
+            });
+            assert.equal((await f.lookup()).statusCode, 401);
+            const d = await f.diag();
+            assert.equal(d.cookie.authAcceptedAgeMs, null);
+            assert.equal(typeof d.cookie.authRejectedAgeMs, 'number');
+            assert.equal(f.calls.set.length, 0);
+        });
+    }
+    for (const statusCode of [0, 200]) {
+        await scenario('statusCode ' + statusCode + ' ជោគជ័យ៖ lookup និង renewal នៅដើរ', async () => {
+            const f = fixture();
+            f.hooks.fetch = async () => Object.assign(response(200, cookie('ACCEPTED')), {
+                json: async () => ({ statusCode, data: { consigneePhone: '012345678', agentAmount: 1 } })
+            });
+            assert.equal((await f.lookup()).statusCode, 200);
+            assert.equal(f.state.value, cookie('ACCEPTED'));
+            assert.equal(f.calls.set.length, 1);
+        });
+    }
     await scenario('Manual sync នៅចន្លោះ write៖ conditional write មិនជាន់ Cookie ថ្មី', async () => {
         const f = fixture(); f.hooks.fetch = async () => response(200, cookie('B'));
         f.hooks.set = async (_record, commit) => { f.sync(cookie('MANUAL')); return commit(); };

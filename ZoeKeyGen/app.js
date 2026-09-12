@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.21';
+const APP_VERSION = '2.19.22';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1705,21 +1705,47 @@ async function generateNewKeypair() {
     }
 }
 
+async function copySensitiveText(text, isValueCurrent, onCopied) {
+    if (!text) return;
+    const operation = captureSensitiveSession(true);
+    if (!operation) return;
+    const isCurrent = () => isSensitiveSessionCurrent(operation, true) && isValueCurrent();
+    let copied = false;
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+        }
+    } catch (e) {}
+    if (!isCurrent()) return;
+    if (!copied) {
+        let textarea = null;
+        try {
+            textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', 'true');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            copied = document.execCommand('copy') === true;
+        } catch (e) {}
+        finally {
+            if (textarea) { textarea.value = ''; textarea.remove(); }
+        }
+    }
+    if (!isCurrent()) return;
+    if (copied) onCopied();
+    else showToast('⚠️ មិនអាចចម្លងដោយស្វ័យប្រវត្តិបានទេ។ សូមចម្លងអត្ថបទដោយដៃ។');
+}
+
 function copyTextarea(id) {
     const el = document.getElementById(id);
     if (!el) return;
-    const operation = captureSensitiveSession(true);
-    if (!operation) return;
-    el.removeAttribute('readonly');
-    el.select();
-    el.setAttribute('readonly', 'true');
-    const markCopied = () => {
-        if (!isSensitiveSessionCurrent(operation, true)) return;
+    const text = el.value;
+    return copySensitiveText(text, () => document.getElementById(id) === el && el.value === text, () => {
         if (id === 'newPrivateKeyOutput') keypairPrivateCopied = true;
         showToast('✅ បានចម្លង!');
-    };
-    navigator.clipboard?.writeText(el.value).then(markCopied).catch(() => {
-        try { document.execCommand('copy'); markCopied(); } catch (e) {}
     });
 }
 
@@ -1851,8 +1877,8 @@ async function generateLicenseKey() {
 }
 
 function copyGeneratedKey() {
-    if (!lastGeneratedKey) return;
-    navigator.clipboard?.writeText(lastGeneratedKey).then(() => showToast('✅ បានចម្លង Key!')).catch(() => {});
+    const text = lastGeneratedKey;
+    return copySensitiveText(text, () => lastGeneratedKey === text, () => showToast('✅ បានចម្លង Key!'));
 }
 
 const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
@@ -1911,8 +1937,8 @@ function generateSetupLink() {
 }
 
 function copySetupLink() {
-    if (!lastGeneratedSetupLink) return;
-    navigator.clipboard?.writeText(lastGeneratedSetupLink).then(() => showToast('✅ បានចម្លង Link!')).catch(() => {});
+    const text = lastGeneratedSetupLink;
+    return copySensitiveText(text, () => lastGeneratedSetupLink === text, () => showToast('✅ បានចម្លង Link!'));
 }
 
 let isSignedInUiActive = false;
@@ -1944,7 +1970,7 @@ async function refreshKeyList() {
         }
         const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
 
-        const byId = {};
+        const byId = Object.create(null);
         [LICENSE_APP_CODE].forEach((appCode) => {
             const bucket = publicData[appCode] || {};
             Object.keys(bucket).forEach((id) => {
@@ -2084,12 +2110,16 @@ async function migrateLegacyLicenseKeyMetadata() {
 }
 
 async function toggleRevokeKey(id) {
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) return;
     const row = keyListCache.find((r) => r.id === id);
     if (!row) return;
     const newRevoked = !row.revoked;
     if (!confirm(newRevoked ? 'តើអ្នកចង់ Revoke Key នេះមែនទេ? អ្នកប្រើប្រាស់នឹងលែងចូល App បានក្នុងពេលឆាប់ៗ។' : 'សង្គ្រោះ Key នេះមកវិញ?')) return;
     try {
-        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { revoked: newRevoked }))), 15000, 'Update timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
             showToast(newRevoked ? '✅ Key ត្រូវបាន Revoke!' : '✅ Key ត្រូវបានសង្គ្រោះមកវិញ!');
@@ -2100,6 +2130,7 @@ async function toggleRevokeKey(id) {
         }
         refreshKeyList();
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
     }
@@ -2114,18 +2145,24 @@ function openExtendModal(id) {
 }
 
 async function confirmExtendKey() {
-    const row = keyListCache.find((r) => r.id === extendTargetId);
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) return;
+    const targetId = extendTargetId;
+    const row = keyListCache.find((r) => r.id === targetId);
     if (!row) { closeModal('extendModal'); return; }
     const days = parseFloat(document.getElementById('extendDaysInput').value);
     if (isNaN(days) || days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
     const timeSynced = await waitForServerTimeSync(15000);
+    if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
     if (!timeSynced) {
         alert('មិនអាចផ្ទៀងផ្ទាត់ម៉ោង Server បានទេ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។');
         return;
     }
     const newExpiresAt = getServerNow() + Math.round(days * 86400000);
     try {
-        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(db, `license_keys/${p}/${extendTargetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
+        const results = await withTimeout(Promise.allSettled(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${targetId}`), { expiresAt: newExpiresAt }))), 15000, 'Update timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         const failedPaths = row.paths.filter((p, i) => results[i].status === 'rejected');
         if (failedPaths.length === 0) {
             showToast('✅ បានបន្ថែមសុពលភាពរួចរាល់!');
@@ -2134,11 +2171,12 @@ async function confirmExtendKey() {
         } else {
             alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
         }
-        closeModal('extendModal');
+        if (extendTargetId === targetId) closeModal('extendModal');
         refreshKeyList();
     } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'confirmExtendKey' });
-        closeModal('extendModal');
+        if (extendTargetId === targetId) closeModal('extendModal');
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
         refreshKeyList();
     }

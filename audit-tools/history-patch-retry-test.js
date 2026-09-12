@@ -93,6 +93,7 @@ function build(mode, opts) {
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Math: Math,
         setTimeout: setTimeout, clearTimeout: clearTimeout,
         db: {}, dbRefHistory: {},
+        authGeneration: 0,
         scanHistory: (opts && opts.scanHistory) || [],
         markingItemId: (opts && opts.markingItemId) || null,
         showToast: (t) => toasts.push(t),
@@ -238,6 +239,132 @@ async function scenario(label, fn) {
         }
         ok('ការដាច់បណ្តាញមិនចេះចប់ ➜ ជួរមិនរីកគ្មានពិដាន',
             vm.runInContext('pendingHistoryPatches.size', ctx) <= 1);
+    });
+
+    await scenario('ការកែវាលខុសគ្នាក្នុងជួរ ត្រូវ revert គ្រប់វាលពេល server បដិសេធ', async () => {
+        const original = { id: 'id1', callMark: 'wrong-number', callMarkTime: 111, isCalled: false };
+        const ctx = build('disconnect', { server: { id1: { ...original } }, scanHistory: [{ ...original }], markingItemId: 'id1' });
+        await vm.runInContext('setCallMark("no-connect")', ctx);
+        vm.runInContext('handleCallAction("id1")', ctx);
+        await tick(); await tick();
+        ok('វាលសម្គាល់ និង isCalled ចូលជួរតែមួយពិត',
+            vm.runInContext('pendingHistoryPatches.get("id1").fields.isCalled', ctx) === true
+            && vm.runInContext('pendingHistoryPatches.get("id1").fields.callMark', ctx) === 'no-connect');
+        ctx.__mode.value = 'denied';
+        vm.runInContext('flushPendingHistoryPatches()', ctx);
+        await tick(); await tick();
+        ok('ការបដិសេធ queued patch ដែលបញ្ចូលគ្នា ➜ ស្ដាររាល់វាលទៅតម្លៃមុនការកែដំបូង',
+            JSON.stringify(ctx.scanHistory[0]) === JSON.stringify(original), ctx.scanHistory[0]);
+    });
+
+    await scenario('ការបដិសេធ retry ចាស់មកក្រោយ មិនត្រូវសរសេរជាន់ស្លាកថ្មីក្នុងជួរ', async () => {
+        const item = { id: 'id1', callMark: 'no-answer', callMarkTime: 111 };
+        const ctx = build('disconnect', { server: { id1: { ...item } }, scanHistory: [item], markingItemId: 'id1' });
+        await vm.runInContext('setCallMark("no-connect")', ctx);
+        const delayed = [];
+        const realTransaction = ctx.fb.runTransaction;
+        ctx.fb.runTransaction = () => new Promise((resolve, reject) => delayed.push({ resolve, reject }));
+        vm.runInContext('flushPendingHistoryPatches(); setCallMark("wrong-number")', ctx);
+        ok('retry ចាស់ និងការកែថ្មីកំពុងរង់ចាំពិត', delayed.length === 2, delayed.length);
+        delayed[1].reject(new Error('disconnect'));
+        await tick(); await tick();
+        delayed[0].reject(new Error('disconnect'));
+        await tick(); await tick();
+        ok('retry ចាស់ដែលបដិសេធក្រោយ ➜ ជួររក្សាជម្រើសថ្មីរបស់អ្នកប្រើ',
+            vm.runInContext('pendingHistoryPatches.get("id1").fields.callMark', ctx) === 'wrong-number');
+        ctx.fb.runTransaction = realTransaction;
+        ctx.__mode.value = 'ok';
+        vm.runInContext('flushPendingHistoryPatches()', ctx);
+        await tick(); await tick();
+        ok('ភ្ជាប់មកវិញក្រោយ response មកបញ្ច្រាសលំដាប់ ➜ server ទទួលស្លាកថ្មី',
+            ctx.__server.id1.callMark === 'wrong-number', ctx.__server.id1);
+    });
+
+    await scenario('callback patch ចាស់មិនអាចចូលជួរឬសរសេរលើ session ថ្មី', async () => {
+        const item = { id: 'id1', callMark: 'no-answer', callMarkTime: 111 };
+        const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item], markingItemId: 'id1' });
+        let rejectOld;
+        ctx.fb.runTransaction = () => new Promise((resolve, reject) => { rejectOld = reject; });
+        const pending = vm.runInContext('setCallMark("wrong-number")', ctx);
+        vm.runInContext('authGeneration++; pendingHistoryPatches.clear(); historyPatchFlushInFlight = false;', ctx);
+        ctx.scanHistory = [{ id: 'id1', callMark: 'new-session', callMarkTime: 222 }];
+        rejectOld(new Error('disconnect'));
+        await pending;
+        ok('ចាកចេញមុន disconnect callback ➜ មិនបង្កើត queued write សម្រាប់ session ថ្មី',
+            vm.runInContext('pendingHistoryPatches.size', ctx) === 0);
+        ok('callback របស់ session ចាស់ ➜ មិនកែ state ឬបញ្ចេញ toast នៅ session ថ្មី',
+            ctx.scanHistory[0].callMark === 'new-session' && ctx.__toasts.length === 0, ctx.__toasts);
+    });
+
+    await scenario('transaction ចាស់ផុតសុពលភាពពេលប្តូរ Database', async () => {
+        const item = { id: 'id1', callMark: 'no-answer', callMarkTime: 111 };
+        const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item], markingItemId: 'id1' });
+        let updateOld, resolveOld;
+        ctx.fb.runTransaction = (ref, updater) => {
+            updateOld = updater;
+            updater({ ...item });
+            return new Promise((resolve) => { resolveOld = resolve; });
+        };
+        const pending = vm.runInContext('setCallMark("wrong-number")', ctx);
+        ctx.db = {};
+        const staleUpdate = updateOld({ id: 'id1', callMark: 'new-session' });
+        ok('SDK retry updater ក្រោយប្តូរ Database ➜ បោះបង់ transaction ចាស់', staleUpdate === undefined, staleUpdate);
+        resolveOld({ committed: true, snapshot: { val: () => ({ id: 'id1', callMark: 'wrong-number' }) } });
+        await pending;
+        ok('ack ជោគជ័យចាស់ក្រោយប្តូរ Database ➜ មិនអះអាងថា session ថ្មីបានរក្សាទុក', ctx.__toasts.length === 0, ctx.__toasts);
+    });
+
+    await scenario('flush ចាស់មិនអាចដោះសោរបស់ flush នៅ session ថ្មី', async () => {
+        const item = { id: 'id1', callMark: 'no-answer', callMarkTime: 111 };
+        const ctx = build('disconnect', { server: { id1: { ...item } }, scanHistory: [item], markingItemId: 'id1' });
+        await vm.runInContext('setCallMark("no-connect")', ctx);
+        const delayed = [];
+        ctx.fb.runTransaction = () => new Promise((resolve, reject) => delayed.push({ resolve, reject }));
+        vm.runInContext('flushPendingHistoryPatches()', ctx);
+        vm.runInContext('authGeneration++; pendingHistoryPatches.clear(); historyPatchFlushInFlight = false;', ctx);
+        vm.runInContext('queueHistoryPatchRetry("id1", { callMark: "wrong-number" }, { callMark: "no-answer" }); flushPendingHistoryPatches();', ctx);
+        ok('flush ទាំងពីរបានចាប់ផ្ដើម transaction ពិត', delayed.length === 2, delayed.length);
+        ctx.__toasts.length = 0;
+        delayed[0].reject(new Error('disconnect'));
+        await tick(); await tick();
+        ok('callback flush ចាស់ ➜ មិនដោះសោថ្មី មិនបន្ថែមជួរចាស់ មិនបញ្ចេញ toast',
+            vm.runInContext('historyPatchFlushInFlight && pendingHistoryPatches.size === 0', ctx) && ctx.__toasts.length === 0);
+        delayed[1].reject(new Error('disconnect'));
+        await tick(); await tick();
+        ok('callback flush បច្ចុប្បន្ន ➜ ដោះសោ និងរក្សាជម្រើសបច្ចុប្បន្នសម្រាប់ retry',
+            vm.runInContext('!historyPatchFlushInFlight && pendingHistoryPatches.get("id1").fields.callMark === "wrong-number"', ctx));
+    });
+
+    await scenario('កែលេខទូរស័ព្ទ មិនទូទាត់ស្ថិតិយកទៅ Database ថ្មីក្រោយប្តូរ session', async () => {
+        const phoneSource = sliceFn('saveEditedPhone');
+        ok('ស្រង់ saveEditedPhone ពិតសម្រាប់ផ្លូវ callback របស់ patch', !!phoneSource);
+        for (const changedSession of [false, true]) {
+            const item = { id: 'id1', phone: '012345678', scanDate: '2026-09-12', isClosed: true };
+            const ctx = build('ok', { server: { id1: { ...item } }, scanHistory: [item] });
+            const moves = [];
+            ctx.editingItemId = 'id1';
+            ctx.document = { getElementById: (id) => id === 'editPhoneInput' ? { value: '098765432' } : null };
+            ctx.normalizeStoredPhone = (v) => v;
+            ctx.getPickupPhoneKey = (v) => v.phone;
+            ctx.reconstructPickupSet = () => ({});
+            ctx.collectPickupMarks = () => [{ key: 'BARCODE', closed: true }];
+            ctx.markPickupBarcodes = () => { moves.push('optimistic'); return [{ key: 'BARCODE' }]; };
+            ctx.revertPickupMarks = () => { moves.push('revert'); };
+            ctx.updateRecentPhonesList = () => {};
+            ctx.applyCurrentFilter = () => {};
+            let rejectPhone;
+            ctx.fb.runTransaction = () => new Promise((resolve, reject) => { rejectPhone = reject; });
+            vm.runInContext(phoneSource, ctx);
+            const pending = vm.runInContext('saveEditedPhone()', ctx);
+            ok('កែលេខទូរស័ព្ទ ➜ ប្តូរក្រុមស្ថិតិយកសិន មុនរង់ចាំ Firebase', moves.join(',') === 'optimistic', moves);
+            if (changedSession) { ctx.authGeneration++; ctx.db = {}; }
+            rejectPhone(new Error('permission_denied'));
+            await pending;
+            ok(changedSession
+                ? 'callback phone ចាស់ ➜ មិន revert ស្ថិតិយកទៅ Database របស់ session ថ្មី'
+                : 'ទិសផ្ទុយ ៖ phone ក្នុង session ដដែល ➜ permission_denied នៅតែ revert ស្ថិតិយក',
+                moves.join(',') === (changedSession ? 'optimistic' : 'optimistic,revert'), moves);
+        }
     });
 
     // ⛔ ពិដាន **ចំនួនធាតុ** ក្នុងជួរ — ដាច់ដោយឡែកពីពិដានចំនួនព្យាយាម។

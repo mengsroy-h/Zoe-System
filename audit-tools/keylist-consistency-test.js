@@ -116,6 +116,14 @@ const meta = { ADM: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2
     ok('Key មួយ App ➜ paths មួយ', JSON.stringify(row.paths) === '["ADM"]', row.paths);
     ok('Key មួយ App ➜ គ្មានផ្លាកព្រមាន', r.html.indexOf('មិនត្រូវគ្នា') === -1);
 
+    const specialIds = JSON.parse('{"ADM":{"__proto__":{"expiresAt":4000,"revoked":false},"constructor":{"expiresAt":5000,"revoked":true},"toString":{"expiresAt":6000,"revoked":false}}}');
+    r = await build(specialIds, {});
+    ok('Firebase key ដែលដូចឈ្មោះ prototype មិនធ្វើឲ្យបញ្ជីគាំង', r.rendered.length === 3, r.rendered);
+    ok('ID ពិសេសទាំងអស់នៅជាធាតុឯករាជ្យក្នុងបញ្ជី',
+        ['__proto__', 'constructor', 'toString'].every((id) => r.rendered.some((entry) => entry.id === id)), r.rendered);
+    ok('ID ពិសេសនៅអាចបង្ហាញ និងបញ្ជូនទៅប៊ូតុងបាន',
+        ['__proto__', 'constructor', 'toString'].every((id) => r.html.includes('data-key-id="' + id + '"')), r.html);
+
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));
     process.exit(fail === 0 ? 0 : 1);
 })();

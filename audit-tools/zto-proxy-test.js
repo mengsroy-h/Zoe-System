@@ -105,7 +105,7 @@ const ENV_NAMES = [
     'ZTO_REQUEST_HEADERS_JSON', 'ZTO_FIELD_PHONE', 'ZTO_FIELD_COD', 'ZTO_FIELD_DOD',
     'ZTO_FIELD_BARCODE', 'ZTO_SEND_BROWSER_HEADERS', 'ZTO_UPSTREAM_TIMEOUT_MS',
     'ZTO_REQUEST_BUDGET_MS', 'ZTO_UPSTREAM_RETRIES', 'ZTO_CACHE_TTL_MS',
-    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN'
+    'ZTO_USER_AGENT', 'ZTO_ACCEPT_LANGUAGE', 'ZTO_BROWSER_ORIGIN', 'ZTO_LIST_SITE_CODE'
 ];
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 const SAVED_FETCH = global.fetch;
@@ -386,13 +386,42 @@ group('រកមិនឃើញ ធៀបនឹងកំហុស', async () => 
     const rejected = await call({ barcode: 'ZZ99999999' });
     ok('ZTO បដិសេធពិត ➜ 502 ZTO_UPSTREAM_REJECTED',
         rejected.statusCode === 502 && JSON.parse(rejected.body).code === 'ZTO_UPSTREAM_REJECTED', rejected.body);
-    ok('សារពិតរបស់ ZTO ឆ្លងកាត់', JSON.parse(rejected.body).error === 'system busy', rejected.body);
+    ok('ការបដិសេធរក្សា HTTP status ដោយគ្មានសារឆៅពី upstream',
+        /HTTP 200/.test(JSON.parse(rejected.body).error) && !rejected.body.includes('system busy'), rejected.body);
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     global.fetch = jsonResponder({}, 429);
     const throttled = await call({ barcode: 'ZZ99999999' });
     ok('HTTP 429 ➜ ZTO_RATE_LIMITED',
         throttled.statusCode === 429 && JSON.parse(throttled.body).code === 'ZTO_RATE_LIMITED', throttled.body);
+});
+
+group('ព្រំដែន secret ក្នុងចម្លើយ upstream', async () => {
+    const secret = 'synthetic-server-only-credential-987654321';
+    for (const mode of ['cookie', 'token', 'authorization']) {
+        resetEnv(Object.assign({ ZTO_CACHE_TTL_MS: '0' }, mode === 'cookie' ? { ZTO_COOKIE: 'BOS-MAN-SESSION=' + secret }
+            : mode === 'token' ? { ZTO_TOKEN: secret } : { ZTO_AUTHORIZATION: 'Bearer ' + secret }));
+        global.fetch = jsonResponder({ success: false, code: 'E42', message: 'Unexpected input: ' + secret });
+        const rejected = await call({ barcode: 'SYNTHETIC001' });
+        ok('Upstream error ' + mode + '៖ credential របស់ server មិនចេញទៅ browser',
+            rejected.statusCode === 502 && JSON.parse(rejected.body).code === 'ZTO_UPSTREAM_REJECTED'
+            && !rejected.body.includes(secret), JSON.parse(rejected.body).code);
+    }
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=' + secret, ZTO_CACHE_TTL_MS: '0' });
+    global.fetch = async () => ({ ok: true, status: 200,
+        headers: { get: () => 'application/x-' + secret },
+        json: async () => { throw new SyntaxError('synthetic invalid JSON'); }
+    });
+    const invalid = await call({ barcode: 'SYNTHETIC001' });
+    ok('Upstream Content-Type ខូច៖ header ឆៅមិនចេញទៅ browser',
+        invalid.statusCode === 502 && JSON.parse(invalid.body).code === 'ZTO_INVALID_RESPONSE'
+        && !invalid.body.includes(secret), JSON.parse(invalid.body).code);
+    resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=' + secret, ZTO_CACHE_TTL_MS: '0', ZTO_LIST_SITE_CODE: '881859' });
+    global.fetch = jsonResponder({ success: true, message: 'Unexpected input: ' + secret, data: {} });
+    const invalidList = await call({ list: '1', from: '2026-09-08', to: '2026-09-11' });
+    ok('Upstream បញ្ជីគ្មាន rows៖ សារឆៅមិនចេញទៅ browser',
+        invalidList.statusCode === 502 && JSON.parse(invalidList.body).code === 'ZTO_UPSTREAM_REJECTED'
+        && !invalidList.body.includes(secret), JSON.parse(invalidList.body).code);
 });
 
 group('ល្បឿន ៖ cache និង single-flight', async () => {

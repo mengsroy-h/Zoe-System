@@ -15,14 +15,15 @@
 //
 // ⛔ តេស្តនេះស្រង់ function **ពិត** ចេញពី `app.js` មករត់ក្នុង `vm` —
 // មិនសរសេរតក្កវិជ្ជាចម្លងទេ។
-let XLSX = null;
-try { XLSX = require('xlsx'); } catch (e) { XLSX = null; }
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const zlib = require('zlib');
 
-const ROOT = process.env.MREPORT_APP_DIR || path.join(__dirname, '..');
+const ROOT = path.resolve(process.env.MREPORT_APP_DIR || path.join(__dirname, '..'));
+let XLSX;
+try { XLSX = require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')); }
+catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -661,7 +662,6 @@ scenario('ឈ្មោះឯកសារ និងជួរដេកនាំច
 });
 
 scenario('Excel ៖ ជួរឈរថ្ងៃត្រូវជា TEXT ក្នុង XML ពិត', () => {
-    if (!XLSX) { ok('⛔ ត្រូវការ package xlsx ដើម្បីវាស់ថ្នាក់នេះ (npm i xlsx)', false, 'xlsx មិនបានដំឡើង'); return; }
     setData({
         '2026-09-01': { codDollar: 1.5, dodDollar: 2.25, totalCount: 4 },
         '2026-09-02': { codDollar: 0, dodDollar: 1, totalCount: 1 }
@@ -677,7 +677,7 @@ scenario('Excel ៖ ជួរឈរថ្ងៃត្រូវជា TEXT ក្
     vm.runInContext('forceSheetTextCells(__ws, __rowCount, MONTHLY_REPORT_TEXT_COLUMN_INDEXES)', sandbox);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'report');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', bookSST: true });
+    const buf = Buffer.from(XLSX.write(wb, { type: 'array', bookType: 'xlsx', bookSST: true }));
     const sheetXml = unzipEntry(buf, 'xl/worksheets/sheet1.xml');
     ok('អាន sheet1.xml ចេញពី .xlsx ពិតបាន', !!sheetXml);
     if (!sheetXml) return;

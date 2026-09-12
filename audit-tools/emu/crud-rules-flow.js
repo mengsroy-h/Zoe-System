@@ -58,8 +58,7 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'generateUniqueId', 'retryAsync', 'cloneRestoreItem', 'isActiveRestoreClaim', 'collectItemBarcodes',
     'getPickupPhoneKey', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectPickupMarks', 'reconstructPickupSet',
     'collectedDayOfStamp', 'collectedDayHoldingKey', 'collectedMarkValueOf', 'collectedMarksFor',
-    'collectItemCollectedMarks', 'markCollectedRevenue', 'revertCollectedMarks',
-    'collectedSetFromRecord', 'collectedPreviousValue', 'applyCollectedMarksInMemory', 'commitCollectedMarks',
+    'markCollectedRevenue', 'reconcileCollectedHistory', 'collectedSetFromRecord', 'commitCollectedMarks',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'saveSingleDeletedItemToFirebase', 'deleteSingleDeletedItemFromFirebase',
     'restoreClaimedItemToScanHistory', 'clearStaleRestoreMarkers', 'releaseStaleRestoreClaimForPurge',
@@ -154,17 +153,22 @@ function makeSandbox(store, now) {
             return { committed: true, snapshot: { val: () => clone(get(ref.path)) } };
         }),
         update: (ref, updates) => Promise.resolve().then(() => {
+            w.writes.push({ method: 'PATCH', path: ref.path, value: clone(updates) });
             Object.entries(updates).forEach(([k, v]) => {
                 const full = [ref.path, k].filter(Boolean).join('/');
-                w.writes.push({ method: 'PUT', path: full, value: v === null ? null : clone(v) });
                 set(full, v);
             });
+            if (ref.path === 'zoew_daily_collected_cod_dod') {
+                const collected = clone(get(ref.path) || {});
+                Object.keys(collected).forEach(day => { if (!collected[day] || !Object.keys(collected[day]).length) delete collected[day]; });
+                ctx.dailyCollectedData = collected;
+            }
         }),
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
     const ctx = vm.createContext({
         console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
-        db: {}, fb,
+        db: {}, authGeneration: 0, fb,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
@@ -206,6 +210,7 @@ function makeSandbox(store, now) {
     const assembled = [
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
         extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
+        extractConst(src, 'PICKUP_DATE_KEY_PATTERN'), extractConst(src, 'DAILY_COLLECTED_KEEP_DAYS'),
         extractConst(src, 'PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
@@ -258,7 +263,7 @@ async function replay(label, writes) {
     await asOwner('PUT', '/zoew_restore_finalizations.json', {});
     let bad = null;
     for (const wr of writes) {
-        const r = await asUser('PUT', `/${wr.path}.json`, wr.value);
+        const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value);
         if (denied(r)) { bad = { path: wr.path, body: r.body.slice(0, 120) }; break; }
     }
     check(!bad, label, bad ? `បដិសេធនៅ ${bad.path}` : '');
@@ -318,12 +323,13 @@ async function clearOrphanBeforeRetry(w, label) {
         await smoke.drain();
         const smokeRecord = { [smokeKey]: { c: 4.57, d: 1.25 } };
         check(isDeepStrictEqual(clone(smoke.ctx.dailyCollectedData[smokeDay]), smokeRecord) &&
-            smoke.writes.some((wr) => wr.path === 'zoew_daily_collected_cod_dod/' + smokeDay && isDeepStrictEqual(wr.value, smokeRecord)),
+            smoke.writes.some((wr) => wr.method === 'PATCH' && wr.path === 'zoew_daily_collected_cod_dod' &&
+                isDeepStrictEqual(wr.value[smokeDay + '/' + smokeKey], smokeRecord[smokeKey])),
             'sandbox៖ បិទ barcode ➜ memory និង payload ចំណូលពិតនៅថ្ងៃកម្ពុជា (មុន emulator)');
         smoke.ctx.api.markCollectedRevenue(smoke.ctx.api.collectedMarksFor(collectedBarcode, false));
         await smoke.drain();
         check(!smoke.ctx.dailyCollectedData[smokeDay] &&
-            smoke.writes.some((wr) => wr.path === 'zoew_daily_collected_cod_dod/' + smokeDay && wr.value === null),
+            smoke.writes.some((wr) => wr.method === 'PATCH' && wr.path === 'zoew_daily_collected_cod_dod' && wr.value[smokeDay + '/' + smokeKey] === null),
             'sandbox៖ បើក barcode វិញដោយគ្មានត្រាចាស់ ➜ រកថ្ងៃក្នុង state ហើយលុប payload ពិត');
         const normalIntl = smoke.ctx.Intl;
         try {
@@ -383,6 +389,36 @@ async function clearOrphanBeforeRetry(w, label) {
     }
     const invalidCollected = await asUser('PUT', '/zoew_daily_collected_cod_dod/2026-08-26/invalid_probe.json', { c: -1, d: 0 });
     check(denied(invalidCollected), 'rules ពិត៖ payload ចំណូលអវិជ្ជមានត្រូវបដិសេធ (បញ្ជាក់ថាមិនរំលង rules)');
+
+    const moveBase = { '2026-08-25': { MOVE_KEY: { c: 12.5, d: 0.75 }, KEEP_KEY: { c: 4, d: 0.5 } } };
+    const moving = makeSandbox({ zoew_daily_collected_cod_dod: clone(moveBase) }, T0);
+    moving.ctx.api.markCollectedRevenue([
+        { day: '2026-08-25', key: 'MOVE_KEY', value: null },
+        { day: '2026-08-26', key: 'MOVE_KEY', value: { c: 12.5, d: 0.75 } }
+    ]);
+    await moving.drain();
+    const moveWrites = moving.writes.filter((write) => write.path.startsWith('zoew_daily_collected_cod_dod'));
+    check(moveWrites.length === 1 && moveWrites[0].method === 'PATCH' && moveWrites[0].path === 'zoew_daily_collected_cod_dod',
+        'ការផ្លាស់ថ្ងៃ៖ កូដពិតសាង multipath update តែមួយ មិនមែនសរសេរថ្ងៃពីរដាច់គ្នា');
+    if (moveWrites.length === 1 && moveWrites[0].method === 'PATCH') {
+        const movePayload = clone(moveWrites[0].value);
+        const rejectedPayload = clone(movePayload);
+        rejectedPayload['2026-08-26/MOVE_KEY'].c = -1;
+        await asOwner('PUT', '/zoew_daily_collected_cod_dod.json', moveBase);
+        const rejectedMove = await asUser('PATCH', '/zoew_daily_collected_cod_dod.json', rejectedPayload);
+        const afterRejected = await asUser('GET', '/zoew_daily_collected_cod_dod.json');
+        check(denied(rejectedMove) && isDeepStrictEqual(JSON.parse(afterRejected.body), moveBase),
+            'rules ពិត៖ ថ្ងៃថ្មីបដិសេធ ➜ ការលុបថ្ងៃចាស់ក៏មិនចុះ (atomic)');
+        const concurrent = await Promise.all([
+            asUser('PATCH', '/zoew_daily_collected_cod_dod.json', movePayload),
+            asUser('PATCH', '/zoew_daily_collected_cod_dod.json', { '2026-08-25/KEEP_KEY': { c: 8.25, d: 0.5 } })
+        ]);
+        const afterConcurrent = JSON.parse((await asUser('GET', '/zoew_daily_collected_cod_dod.json')).body);
+        check(concurrent.every((response) => !denied(response)) &&
+            !afterConcurrent['2026-08-25'].MOVE_KEY && afterConcurrent['2026-08-25'].KEEP_KEY.c === 8.25 &&
+            afterConcurrent['2026-08-26'].MOVE_KEY.c === 12.5,
+            'rules ពិត៖ ផ្លាស់ barcode និងកែ barcode ផ្សេងស្របគ្នា ➜ រក្សាលទ្ធផលទាំងពីរ');
+    }
 
     // ---------- បិទ / បើក ----------
     console.log('=== ១. បិទ «យក» / បើកវិញ (barcode តែមួយ និងកញ្ចប់ទាំងមូល) ===');
@@ -501,7 +537,7 @@ async function clearOrphanBeforeRetry(w, label) {
         await w.ctx.executePermanentDelete(); await w.drain();
         await seedServer(base);
         let bad = null;
-        for (const wr of w.writes) { const r = await asUser('PUT', `/${wr.path}.json`, wr.value); if (denied(r)) { bad = wr.path; break; } }
+        for (const wr of w.writes) { const r = await asUser(wr.method || 'PUT', `/${wr.path}.json`, wr.value); if (denied(r)) { bad = wr.path; break; } }
         const gone = (await asUser('GET', '/zoew_recently_deleted_cod_dod/id_t.json')).body.trim() === 'null';
         check(expectOk ? (!bad && gone) : !gone, '✖️ ' + label + (expectOk ? ' ➜ លុបបាន' : ' ➜ ត្រូវការពារ មិនលុប'), bad ? 'បដិសេធនៅ ' + bad : '');
     }

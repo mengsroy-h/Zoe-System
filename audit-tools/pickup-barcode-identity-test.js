@@ -80,7 +80,7 @@ console.log('\n=== ០. ជាន់អប្បបរមា (checker នេះ�
 ok('ZoeW/app.js មិនទទេ (>= 4000 បន្ទាត់)', SRC.split('\n').length >= 4000, SRC.split('\n').length);
 
 const REAL_FNS = [
-    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled',
+    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'applyBarcodeCloseState', 'normalizeBarcodeCloseStamps',
     'itemHasRestoreMarkers', 'dropStaleRestoreMarkers', 'barcodeRegistryKey',
     'ledgerNumber', 'getPickupPhoneKey', 'countPickedUpCustomers',
@@ -97,8 +97,7 @@ const EITHER_FNS = [
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'collectPickupMarks', 'reconstructPickupSet',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'collectItemCollectedMarks', 'collectedPreviousValue',
-    'applyCollectedMarksInMemory', 'commitCollectedMarks', 'markCollectedRevenue', 'revertCollectedMarks'
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory'
 ];
 const fnSrc = {};
 const missing = [];
@@ -270,7 +269,7 @@ function makeDevice(shared, name) {
         clearTimeout: (t) => { dev.timers.delete(t); return clearTimeout(t); },
         document: { getElementById: () => null },
         confirm: () => true,
-        db: {}, fb: fb,
+        db: {}, authGeneration: 0, fb: fb,
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
         dbRefDailyPickup: { path: 'zoew_daily_pickup_cod_dod' },
@@ -297,6 +296,8 @@ function makeDevice(shared, name) {
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         sliceConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
         sliceConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
+        sliceConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
+        sliceConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
         sliceConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc

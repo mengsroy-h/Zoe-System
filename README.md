@@ -5,8 +5,8 @@
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.34.0` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.19.21` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.34.1` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.19.22` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -134,8 +134,9 @@ App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក** — 
 
 ពេល ZTO បដិសេធ Cookie ៖ រត់
 [`tools/zto-cookie-sync-windows/`](tools/zto-cookie-sync-windows/README-KH.md)
-លើ Windows ➜ Login Argus ➜ **Scan Management ➜ Arrival Scan** ➜ ស្កេន
-Waybill មួយ ហើយរង់ចាំ ZTO ឆ្លើយ។ ឧបករណ៍សរសេរ Cookie ចូល **Netlify Blobs**
+លើ Windows ➜ Login ហើយបើក Argus។ បើឧបករណ៍នៅរង់ចាំ ទើបចូល
+**Scan Management ➜ Arrival Scan** ➜ ស្កេន Waybill មួយ។
+ឧបករណ៍រង់ចាំចម្លើយ API ជោគជ័យ រួចសរសេរ Cookie ចូល **Netlify Blobs**
 ដោយ **មិនបាច់ redeploy**។
 
 ការផ្ទៀងផ្ទាត់ថា Function ឃើញ Cookie ដូចគ្នា មិនប្រាប់អាយុសុពលភាពដែលនៅសល់ទេ។
@@ -150,7 +151,7 @@ Extend · Setup Link/QR។
 ### ៦. ការធានាគុណភាព (សម្រាប់អ្នកថែទាំ)
 
 ```bash
-npm i acorn playwright-core xlsx     # ម្តងក្នុងមួយ session
+npm i acorn playwright-core     # ម្តងក្នុងមួយ session
 bash audit-tools/run-all.sh          # រត់ការត្រួតពិនិត្យទាំងអស់
 ```
 

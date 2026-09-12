@@ -91,7 +91,7 @@ const dbOpSites = (src.match(/await dbOp\(fb\.runTransaction\(/g) || []).length;
 check(dbOpSites >= 6, 'ឃើញ `await dbOp(fb.runTransaction(` >= 6 កន្លែង', dbOpSites);
 
 const REAL_FNS = [
-    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'retryAsync',
+    'elapsedSince', 'withTimeout', 'dbOp', 'dbOpStalled', 'armLateWrite', 'retryAsync',
     'barcodeEntriesOf', 'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'applyBarcodeCloseState', 'barcodeCloseIsRipe', 'barcodeAbandonIsRipe',
     'normalizeBarcodeCloseStamps', 'itemHasRestoreMarkers', 'stripHistoryOnlyMarkers',
     'dropStaleRestoreMarkers', 'parseTimestampFromId', 'generateUniqueId', 'cloneRestoreItem',
@@ -103,8 +103,7 @@ const REAL_FNS = [
     'collectPickupMarks', 'reconstructPickupSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'collectItemCollectedMarks', 'collectedPreviousValue',
-    'applyCollectedMarksInMemory', 'commitCollectedMarks', 'markCollectedRevenue', 'revertCollectedMarks',
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
@@ -234,7 +233,7 @@ function buildWorld(seed, opts) {
         window: {},
         document: { getElementById: () => null },
         confirm: () => true,
-        db: {},
+        db: {}, authGeneration: 0,
         fb,
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
@@ -274,6 +273,7 @@ function buildWorld(seed, opts) {
         extractConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
         extractConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
         extractConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
+        extractConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
         extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
         extractConst('LOCK_STALL_RELEASE_MS') || 'const LOCK_STALL_RELEASE_MS = 15000;',
         ...REAL_FNS.map((name) => fnSrc[name]),

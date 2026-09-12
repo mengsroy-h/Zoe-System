@@ -93,10 +93,33 @@
 >
 > ⛔ **`2.31.12` មិនរាប់បញ្ចូលទេ** — ពេលអ្នកប្រើបញ្ជាក់ វានៅក្នុង PR មិនទាន់
 > merge (`main` នៅ `2.31.11` / `zoew-v191`) ➜ សាកមិនបាន។ PR #201 merge
-> **ក្រោយមក** ក្នុងថ្ងៃដដែល ➜ `zoew-v192` deploy រួច ➜ វានៅ **រង់ចាំការសាក**។
+> **ក្រោយមក** ក្នុងថ្ងៃដដែល ➜ `zoew-v192` deploy រួច ➜ **នៅពេលនោះ** វានៅរង់ចាំការសាក (ការបញ្ជាក់ 2026-09-11 ខាងលើបានបិទរួច)។
 >
 > ⛔ **កំណែមុនៗដែលបញ្ជាក់រួច** ៖ `2.27.0` ➜ `2.30.3` · `2.30.5` · `2.31.4` ·
 > `2.31.6`; ZoeKeyGen `2.19.18` (2026-09-04 · 09-05 · 09-06 · 09-09)។
+
+### ZoeW `2.34.1` និង ZoeKeyGen `2.19.22` — 2026-09-12 · ចំណូល, race, បណ្ដាញ និងសុវត្ថិភាព
+
+**ZoeW** (`zoew-v202` ➜ `zoew-v203`) និង **ZoeKeyGen** (`zoekeygen-v91` ➜ `zoekeygen-v92`)។
+
+- កែអត្ថបទ «ចំណូលប្រចាំថ្ងៃ» តាមសំណើអ្នកប្រើ៖ បង្ហាញទឹកប្រាក់តាមថ្ងៃដែលចុច «យក» លើកញ្ចប់ ដោយមិនគិតថាកញ្ចប់ស្កេនចូលថ្ងៃណាទេ។ ទិន្នន័យរក្សាទុកសម្រាប់ ៧ ថ្ងៃចុងក្រោយ។
+- ចំណូលប្រើ COD/DOD ពី history ដែល server បញ្ជាក់, ផ្លាស់ថ្ងៃដោយ update ទាំងគូ និងកែស្ថានភាពដែល response មកយឺត។ Delete/restore មិនបូក ledger ស្ទួន; Remove/restore បូកត្រឡប់តែចំនួនដែលធ្លាប់ដក។
+- Retry មិនជាន់ជម្រើសថ្មី និងរក្សា rollback គ្រប់វាល។ ក្រោយ logout/ប្ដូរ Firebase សំណើចាស់មិនអាចបំពេញ queue, ដកស្ថិតិ ឬបង្ហាញសារក្នុងវគ្គថ្មី។
+- ZTO មិនទទួល auth rejection ក្នុង envelope ជា success និងមិនឲ្យ response ដែល timeout ជាន់ Cookie ថ្មី។ សារ upstream ដែលអាច echo credential មិនចេញទៅ browser។ Windows token reader មានពិដាន ៣០ វិនាទី។
+- ZoeKeyGen Extend មិនប្ដូរទៅ Key ផ្សេងកណ្តាល await; Extend/Revoke ផ្ទៀងវគ្គ និង database មុនបង្ហាញលទ្ធផល។ បញ្ជី Key ទទួល ID ដូច `__proto__` ដោយសុវត្ថិភាព។ ការចម្លងត្រូវផ្ទៀងថាជោគជ័យ និងគាំទ្រផ្លូវបម្រុងពេល Clipboard API អវត្តមាន។
+- Redaction ទាំងពីរ App គ្រប private/signing JWK រួម JSON string និងរក្សា public JWK/វាលលុយ។ នេះជាចន្លោះដែលសាកដោយទិន្នន័យសិប្បនិម្មិត; មិនមានភស្តុតាងថា production បានផ្ញើ private JWK ទេ។
+- សម្អាត README/guide/CLAUDE៖ អ័ក្សថ្ងៃ, ២ ម៉ោង/៧ ថ្ងៃ/២ ថ្ងៃ/៣០ ថ្ងៃ, Backup រក្សាថ្មីបំផុត, តារាង Google Sheets ដែលអនុវត្តរួច និងថវិកា ZTO ដែលមិនផ្ទុយគ្នា។
+
+**ព្រំដែនចំណូល**៖ history និង collected mirror ជាការសរសេរដាច់គ្នា។ Repair មានពិដាន; បើ client បិទកណ្តាល ឬ rules បដិសេធក្រោយ history commit, mirror អាចនៅមិនស៊ីគ្នារហូតដល់ reconcile បន្ទាប់។ មិនអះអាងការធានា 100% ឆ្លង node ឬលើគ្រប់ឧបករណ៍ទេ។
+
+**CI មូលដ្ឋានចុងក្រោយ**៖ `run-all.sh` ជាមួយ Chrome និង RTDB emulator ពិត, `CRUD_FLOW_STRICT=1`, `VERSIONSCOPE_STRICT=1`, `MONEYGUARD_STRICT=1` ➜ **171 PASS, 0 FAIL, 0 PARTIAL, 0 SKIP; exit 0**។ បរិស្ថាន៖ Windows, Node24.19.0, Chrome152.0.7977.83, Java21.0.10, emulator4.11.2។ GitHub Actions quota អស់; ជុំនេះមិនយក status របស់ GitHub ជំនួសការរត់នេះទេ។
+
+ការរត់ដំបូងត្រូវបានបញ្ឈប់ក្រោយ `raw-read-shape-test` ខ្វះ closure របស់ `closeIsCurrent`។ Checker ឥឡូវស្រង់ auth/database captures ពិតពី App ហើយឆ្លង27/27; guard bypass ធ្លាក់8 និង normalizer noop ធ្លាក់10 ដោយ assertions។ ក្រោយកែបានរត់ suite ពេញឡើងវិញដល់ exit0 ខាងលើ។
+
+ភស្តុតាងចុងក្រោយបន្ថែម៖ collected104, history89, connection177, KeyGen/session/clipboard74, key-list18, redaction147, dependency18, export33, monthly187 និង sheet-import81 ឆ្លង។ ផែនទីអ្នកយាមគ្រប250ឯកសារ (behavior29/static211/integrity5/manual5); inventory មាន2366 functions/callbacks ជាផែនទីស្តាទិច មិនមែន branch coverage ឬភស្តុតាងសាកគ្រប់ឧបករណ៍។
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+គ្មាន Firebase rules ឬ Netlify env ថ្មី។ ក្រោយ merge/deploy ត្រូវប្រើ App កំណែថ្មី និងទាញ helper Windows ដែលបានកែ។ ការសាកទូរស័ព្ទដែលអ្នកប្រើបញ្ជាក់មុននេះគ្រប ZoeW 2.34.0; ជុំនេះសាក Chromium និង emulator ក្នុងម៉ាស៊ីន មិនមែនទូរស័ព្ទពិត។
 
 ### ឧបករណ៍ audit — 2026-09-12 · បិទចន្លោះ checker និងសម្អាតការងារដែលចប់
 
@@ -7868,6 +7891,20 @@ CSP ក៏មិនប្រែដែរ។
 ---
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន
+
+### 2026-09-12 — ចន្លោះរវាង state ក្នុងសតិ, server និង callback យឺត
+
+- Probe ចំណូលលើកូដមុនកែ៖ server COD 24.50 + DOD 0.75 តែ collected យក COD ចាស់ 5.25; delete ➜ restore ថ្ងៃក្រោយ ➜ reopen បន្សល់ $13.25 នៅថ្ងៃដើម។ ការផ្លាស់ថ្ងៃដាច់ពីរដែលខាងដកបដិសេធ អាចទុក $13.25 ទាំងពីរថ្ងៃ។ តេស្តបានពង្រីកក្នុង `daily-collected-test` និង CRUD ពិតលើ emulator; payload ដែល rules បដិសេធត្រូវបដិសេធ multipath update ទាំងគូ និងរក្សា barcode ផ្សេង។
+- Network fixtures ថ្មីលើ tree មុនកែ៖ `history-patch-retry-test` ធ្លាក់ ៩ និង `connection-recovery-test` ធ្លាក់ ៤។ ក្រោយកែ history 89/0, connection 177/0, stall 31/0; isolated regressions ៧ ត្រូវបដិសេធ។ Browser ពិត៖ toast 31/31, SDK offline 15/0, listener leak 17/0។
+- ZoeKeyGen probes មុនកែ៖ session 11 PASS/6 FAIL; បញ្ជី Key 15 PASS/3 FAIL ពី prototype ID។ ក្រោយកែដំបូង session 17/0 និងបញ្ជី 18/0; តេស្តពង្រីកបន្ថែមសម្រាប់ DB-only, late rejection និង clipboard នៅក្នុងអ្នកយាមចាស់។
+- ZTO probes មុនកែវាស់ late renewal, HTTP 200 auth envelope, mixed success/auth rejection, secret reflection និង child timeout។ ក្រោយកែ៖ session 32, sync 156, proxy 140, capture 56 PASS; mutation ដក fix មួយៗធ្លាក់ដោយសាលក្រមឥរិយាបថ។ Windows DPAPI ពិតលើ token សិប្បនិម្មិត PASS ក្នុង 741 ms។
+- Secret redaction fixture មុនកែ 132 PASS/3 FAIL; ក្រោយកែដំបូង 135/0; បន្ថែមសារ JSON ដែលមានបុព្វបទ និងពិដាន scan/parse បាន 147/0។ Rendering paragraph ពី HTML/CSS ពិតមានអត្ថបទតាមសំណើ និងគ្មាន horizontal overflow នៅ 320/390/768/1366 px; scripts ត្រូវបិទសម្រាប់ preview ដូច្នេះវាមិនជំនួស functional browser tests ទេ។
+- Independent finance review រកឃើញ first-close ➜ delete មុន acknowledgement និង overlapping mirror writes ដែលបដិសេធ។ ការរក្សា ownership មួយមុខមិនគ្រប double rejection ទេ; ដូច្នេះដកការសរសេរ/rollback mirror ក្នុងសតិដោយ App ចេញ ហើយប្រើ Firebase listener ជាអ្នកបំពេញ state តែមួយ។ ការផ្ទៀង server និង timeout/repair មានពិដាននៅដដែល។
+- ពង្រីក fuzz ក្រៅ seed លំនាំដើម៖ revenue run100–113 × 50 operations ឆ្លង 2/2; collected-value run500–819 ឆ្លង 2407 assertions (ស្ថានភាពស្អាត 53, ឃ្លាត 267, listener មិនគ្រប់ 79)។ ការសាកដំបូងត្រឹម 160 runs ធ្លាក់ coverage floor ព្រោះមានស្ថានភាពស្អាតតែ17; មិនបានបន្ថយ floor ទេ។
+- Dependency audit រកមិនឃើញ advisory ក្នុង runtime ZoeW/backup/helper ដែលបានសួរ។ npm `xlsx@0.18.5` របស់ឧបករណ៍ CI មាន HIGH advisories ២; App ship vendor `0.20.3` រួចហើយ។ Checker Excel ប្តូរទៅ vendor ពិត និង CI លែងដំឡើង npm xlsx ចាស់។
+- `External ZTO assertion poison: 0 PASS, 69 FAIL, exit 1` ជា negative control ដែលបង្ខំ assertion ឲ្យខុស ដើម្បីចាប់ checker បៃតងក្លែងក្លាយ។ លទ្ធផលដែលរំពឹងគឺត្រូវ FAIL; តេស្តធម្មតាត្រូវវាស់ដាច់ដោយឡែក។
+- គ្មានរូបិយប័ណ្ណ ឬទិន្នន័យ production ត្រូវបានសរសេរក្នុងជុំនេះ។ លេខ baseline 171 PASS ក្នុងធាតុ audit មុន មិនត្រូវយកជំនួសលទ្ធផល CI ចុងក្រោយរបស់ tree ថ្មី។
+
 
 > **ហេតុអ្វីផ្នែកនេះមាន** ៖ `CLAUDE.md` ធ្លាប់ធំដល់ **៥,០៦៥ បន្ទាត់** ដែល
 > ភាគច្រើនជារឿងអតីតកាល (⛔/🔴)។ រាល់ជុំ audit **បន្ថែម** ដោយមិនដែលបង្រួម

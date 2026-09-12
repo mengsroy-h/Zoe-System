@@ -12,25 +12,27 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-12 · ZoeW 2.34.0 · សម្អាតអ្នកយាម)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-12 · ZoeW 2.34.1 · ZoeKeyGen 2.19.22)
 
-ជុំនេះកែឧបករណ៍ audit, Windows launcher និងឯកសារ។ កំណែ App មិនប្រែ ព្រោះ
-គ្មានការកែកូដដែល ship ក្នុង App ទាំងពីរ។ មេរៀនដែលមានឧបករណ៍ចាក់សោរួច យោង
-អ្នកយាមខាងក្រោម; ភស្តុតាងមុន/ក្រោយ និងប្រវត្តិលម្អិតនៅ `docs/HISTORY.md`។
+ជុំនេះសាកកូដពិតលើ schedule ដែលអ្នកយាមចាស់មិនវាស់ ហើយបញ្ជាក់ failure មុនកែ។
+ច្បាប់បច្ចុប្បន្ននៅ `CLAUDE.md`; ភស្តុតាង និងព្រំដែននៅ `docs/HISTORY.md`។
 
 | ការប្រែ | អ្នកយាម និងព្រំដែន |
 |---|---|
-| បំពេញ state/ref និង dependency សម្រាប់ចំណូលតាមថ្ងៃយកក្នុង emulator sandbox | `emu/crud-rules-flow.js` វាស់ collected payload និងការបដិសេធរបស់ rules ពិត |
-| រាយការយាមតាមឯកសារគ្រប់ឯកសារដែល Git តាមដាន | `repository-file-coverage.js` និង `repository-contract-test` ចាប់ឯកសារថ្មី ឬ guard បាត់; integrity/manual មិនមែនការវាស់ឥរិយាបថ |
-| ភ្ជាប់ checker នៅក្រៅ `audit-tools/` និងបំបែក CLI ដែលត្រូវការ dump | `checker-coverage.js` និង `exit-code-integrity.js` គ្រប `zto-import/test.js`; usage exit មិនមែនភស្តុតាងថាបានវាស់ទិន្នន័យ |
-| វាស់របាយការណ៍លុយមុន/ក្រោយ redaction និងការសម្អាតព័ត៌មានរសើប | `money-reality-test` រត់ CLI ពិតលើ fixture; Windows launcher ប្រកាសថាផ្ញើបានតែពេល exit 0 និងមាន output ថ្មី |
-| ផ្ទៀងផ្ទាត់សិទ្ធិ backup ឲ្យត្រូវនឹង OS | `firebase-backup-test` វាស់ mode ដែលស្នើពិតលើគ្រប់ OS និង permission ពិតបន្ថែមលើ POSIX; Windows `stat` មិនវាស់ ACL ទេ |
-| បិទការងារក្នុង `docs/NEXT-SESSION.md` និងលុបឯកសារនោះ | អ្នកប្រើបញ្ជាក់ថា Firebase rules, ZTO env និងការសាកលើទូរស័ព្ទរួចរាល់; កំណត់ត្រាអចិន្ត្រៃយ៍នៅ `docs/HISTORY.md` |
+| ចំណូលតាមថ្ងៃយកយក state server, ផ្លាស់ថ្ងៃទាំងគូ និង repair late write មានពិដាន | `daily-collected-test` · `emu/crud-rules-flow.js` · `pickup-barcode-identity-test` · `late-commit-test`; history/mirror មិនមែន transaction តែមួយ |
+| Retry រក្សាជម្រើសថ្មី និងបិទ callback ក្រោយប្ដូរ auth/database | `history-patch-retry-test` · `connection-recovery-test` · `db-stall-guard-test` |
+| ZTO late Cookie, auth envelope, upstream secret reflection និង DPAPI deadline | `zto-cookie-session-test` · `zto-cookie-capture-test` · `zto-proxy-test` · `zto-cookie-sync-test` |
+| ZoeKeyGen ចាប់ Key/db មុន await, បញ្ជីទទួល key ដែលដូច prototype និងចម្លងតាមសមត្ថភាព browser | `keygen-session-security-test` · `keylist-consistency-test` |
+| Redaction គ្រប private/signing JWK និងរក្សា public JWK | `secret-hygiene` |
+| កែអត្ថបទចំណូលតាមសំណើ និងសម្អាត guide/README/current rules | `user-guide-test` · `doc-scope-test`; កំណត់ត្រាសាកទូរស័ព្ទចាស់មិនបញ្ជាក់កំណែថ្មី |
+
+ការវាស់ផ្ទៃ function និងផែនទីតាមឯកសារមិនមែនភស្តុតាងថាគ្រប់ branch/ឧបករណ៍ត្រូវបានសាក។
+CI ត្រូវរត់ក្នុង session នេះជាមួយ Chrome និង RTDB emulator ពិត ព្រោះ GitHub Actions quota អស់។
 
 ## ជំហាន ០ — baseline ពិត (SKIP ០) · ⛔ **រត់ក្នុង session នេះ មិនមែន GitHub**
 
 ```bash
-npm i acorn playwright-core xlsx firebase-tools
+npm i acorn playwright-core firebase-tools
 npx --no-install firebase setup:emulators:database
 setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
     --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &

@@ -186,6 +186,58 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ok('⛔ `count` ត្រូវ **រក្សាទុក**', ev2.extra.count === 7, JSON.stringify(ev2.extra.count));
         ok('⛔ `closedAt` ត្រូវ **រក្សាទុក**', ev2.extra.closedAt === 1756200000000, JSON.stringify(ev2.extra.closedAt));
 
+        const privateKeys = {
+            privateKeyJwk: { kty: 'EC', crv: 'P-256', d: 'EC_PRIVATE_VALUE', x: 'PUBLIC_X', y: 'PUBLIC_Y' },
+            signingKey: 'SIGNING_PRIVATE_VALUE',
+            payload: { kty: 'RSA', n: 'PUBLIC_N', e: 'AQAB', p: 'RSA_PRIVATE_VALUE' },
+            imported: { kty: 'oct', k: 'SYMMETRIC_PRIVATE_VALUE' },
+            encoded: JSON.stringify({ kty: 'OKP', crv: 'Ed25519', d: 'OKP_PRIVATE_VALUE', x: 'PUBLIC_X' }),
+            publicKey: { kty: 'EC', crv: 'P-256', x: 'PUBLIC_X', y: 'PUBLIC_Y' },
+            d: 7, k: 'business-key', keyId: 'K1'
+        };
+        const safeKeys = api.redactEvent({ extra: privateKeys }).extra;
+        ok('Sentry លាក់ private/signing key តាមឈ្មោះ',
+            safeKeys.privateKeyJwk === '[redacted]' && safeKeys.signingKey === '[redacted]', safeKeys);
+        ok('Sentry លាក់ JWK ឯកជន/សម្ងាត់ ទោះនៅក្រោមឈ្មោះធម្មតា',
+            safeKeys.payload === '[redacted]' && safeKeys.imported === '[redacted]', safeKeys);
+        ok('JWK ឯកជនក្នុង JSON string មិនអាចរអិលកាត់', !String(safeKeys.encoded).includes('OKP_PRIVATE_VALUE'), safeKeys.encoded);
+        ok('Public JWK និងវាលអាជីវកម្ម d/k/keyId នៅតែអាច debug បាន',
+            safeKeys.publicKey.x === 'PUBLIC_X' && safeKeys.d === 7 && safeKeys.k === 'business-key' && safeKeys.keyId === 'K1', safeKeys);
+
+        const embeddedSecret = 'SYNTHETIC_EMBEDDED_PRIVATE_VALUE';
+        const embeddedJwk = { kty: 'EC', crv: 'P-256', x: 'PUBLIC_X', y: 'PUBLIC_Y', d: embeddedSecret };
+        for (const text of [
+            'import JWK: ' + JSON.stringify(embeddedJwk),
+            'result: ' + JSON.stringify({ key: embeddedJwk, d: 7 }) + ' done',
+            'keys: [' + JSON.stringify(embeddedJwk) + ',{"kty":"RSA","p":"' + embeddedSecret + '"}]',
+            'key: ' + JSON.stringify({ note: 'braces { } and quote " inside a value', d: embeddedSecret, kty: 'EC' }),
+            'key: {"\\u006bty":"OKP","d":"' + embeddedSecret + '"}'
+        ]) {
+            const clean = api.redactEvent({ message: text }).message;
+            ok('JWK ឯកជនក្នុងសារដែលមានបុព្វបទ ត្រូវលាក់ដោយសម្គាល់ JSON ពិត',
+                !String(clean).includes(embeddedSecret) && String(clean).includes('[redacted]'), clean);
+        }
+        for (const text of ['debug: {"kty":"EC","x":"PUBLIC_X","y":"PUBLIC_Y"}',
+            'debug: {"d":7,"k":"business-key"}', 'status: ready { business note']) {
+            ok('សារធម្មតា/Public JWK មិនត្រូវលាក់តាម d/k ឥតបរិបទ', redact(text) === text, redact(text));
+        }
+        const hugeText = 'log: ' + 'x'.repeat(70 * 1024) + JSON.stringify(embeddedJwk);
+        const hugeOut = redact(hugeText);
+        ok('សារ JSON ធំពេក៖ កាត់ផ្នែកមិនទាន់វាស់ មិនប្រគល់ secret ឆៅ',
+            !hugeOut.includes(embeddedSecret) && hugeOut.includes('[truncated]') && hugeOut.length < 66000, hugeOut.length);
+        const deepText = 'log: ' + '{"nested":'.repeat(20) + JSON.stringify(embeddedJwk) + '}'.repeat(20);
+        const deepOut = redact(deepText);
+        ok('JSON ដែលមានបុព្វបទ និងជ្រៅលើសពិដាន ត្រូវកាត់',
+            !deepOut.includes(embeddedSecret) && deepOut.includes('[truncated]'), deepOut);
+        const manyOut = redact('log: [' + '{},'.repeat(5100) + JSON.stringify(embeddedJwk) + ']');
+        ok('ចំនួន JSON fragments លើសពិដាន ត្រូវកាត់ដោយមិនស្កេនគ្មានដែន',
+            !manyOut.includes(embeddedSecret) && manyOut.includes('[truncated]') && manyOut.length < 15500, manyOut.length);
+        const repeatedParse = 'log: ' + '{"nested":'.repeat(10) + JSON.stringify({ note: 'x'.repeat(8192) })
+            + '}'.repeat(10) + ' next: ' + JSON.stringify(embeddedJwk);
+        const repeatedOut = redact(repeatedParse);
+        ok('ការស្រាយ JSON សរុបមានពិដាន ទោះ string ទាំងមូលខ្លីជាងពិដានក៏ដោយ',
+            !repeatedOut.includes(embeddedSecret) && repeatedOut.includes('[truncated]'), repeatedOut.length);
+
         // ⛔⛔ ចន្លោះទី ៣ ៖ **វត្ថុដែលសរសេរជាន់មិនបាន** (កំណែ 2.20.8)
         //
         // 🔴 វាស់បានលើកូដពិត ៖ `redactDeep()` កែ **នៅនឹងកន្លែង**

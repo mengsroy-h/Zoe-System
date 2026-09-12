@@ -980,10 +980,10 @@ function upstreamMessage(upstream, fallback) {
 
 function ztoAuthRejected(response, upstream) {
     if (response && (response.status === 401 || response.status === 403)) return true;
-    const code = String(upstream && (upstream.code || upstream.errorCode) || '').toLowerCase();
+    const codes = upstream ? [upstream.code, upstream.errorCode, upstream.statusCode] : [];
     const raw = upstreamMessage(upstream, '');
     const message = raw.toLowerCase();
-    if (/^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(code)) return true;
+    if (codes.some((code) => /^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(String(code ?? '').trim().toLowerCase()))) return true;
     if (LOGIN_REDIRECT_RE.test(raw)) return true;
     return /(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/.test(message);
 }
@@ -1127,6 +1127,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         }
 
         const response = await fetch(target.href, init);
+        if (controller.signal.aborted) throw abortError();
         noteUpstreamSetCookie(response);
         noteCookieRenewal(session, response);
         const contentType = response.headers && response.headers.get
@@ -1158,7 +1159,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             return {
                 kind: 'fatal',
                 response: json(502, {
-                    error: 'ZTO returned non-JSON (HTTP ' + response.status + ', ' + (contentType || 'unknown').split(';')[0] + ')',
+                    error: 'ZTO returned non-JSON (HTTP ' + response.status + ')',
                     code: 'ZTO_INVALID_RESPONSE'
                 })
             };
@@ -1169,7 +1170,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
             return {
                 kind: 'fatal',
                 response: json(502, {
-                    error: upstreamMessage(upstream, 'ZTO HTTP ' + response.status),
+                    error: 'ZTO rejected the request (HTTP ' + response.status + ')',
                     code: 'ZTO_UPSTREAM_REJECTED'
                 })
             };
@@ -1184,7 +1185,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
                 return {
                     kind: 'fatal',
                     response: json(502, {
-                        error: upstreamMessage(upstream, 'ZTO list response has no rows'),
+                        error: 'ZTO list response has no rows',
                         code: 'ZTO_UPSTREAM_REJECTED'
                     })
                 };

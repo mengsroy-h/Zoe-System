@@ -1,5 +1,7 @@
 'use strict';
 
+process.exitCode = 1;
+
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -49,6 +51,28 @@ function response(status, value, jsonError) {
             return value;
         }
     };
+}
+
+// Windows មិនរក្សា POSIX permission bits ទេ។ វាស់ mode ដែលកូដស្នើពិត
+// លើគ្រប់ OS ហើយវាស់ permission លើឯកសារពិតបន្ថែមលើ POSIX។
+function captureWrites() {
+    const original = fs.writeFileSync;
+    const writes = [];
+    fs.writeFileSync = function(file, data, options) {
+        writes.push({ file: path.resolve(String(file)), mode: options && options.mode });
+        return original.apply(this, arguments);
+    };
+    return { writes, restore() { fs.writeFileSync = original; } };
+}
+
+function privateFile(label, file, writes, writtenPath) {
+    const requested = writes.filter((write) => write.file === path.resolve(writtenPath || file));
+    ok(label + ' ស្នើ mode 0600 ពេលសរសេរពិត',
+        requested.length === 1 && requested[0].mode === 0o600, requested);
+    if (process.platform !== 'win32') {
+        const actual = fs.statSync(file).mode & 0o777;
+        ok(label + ' មាន permission 0600 លើ POSIX', actual === 0o600, actual.toString(8));
+    }
 }
 
 (async () => {
@@ -179,24 +203,28 @@ function response(status, value, jsonError) {
         fs.writeFileSync(path.join(businessDir, '2001-01-01T00-00-00-000Z-old.json.gz'), zlib.gzipSync('{}'));
 
         let backupFetchCount = 0;
-        const outFile = await backup.backupOne({
-            name: 'business-a',
-            serviceAccountPath: './secrets/service-account.json',
-            databaseURL: 'https://business-a-default-rtdb.firebaseio.com'
-        }, {
-            backupRoot,
-            configDir: tempRoot,
-            keepCount: 2,
-            network: { timeoutMs: 1000, retryCount: 0, retryDelayMs: 100 }
-        }, {
-            nowMs,
-            fetchImpl: async (url) => {
-                backupFetchCount += 1;
-                return url.includes('oauth2.googleapis.com')
-                    ? response(200, { access_token: 'backup-token' })
-                    : response(200, { barcode: { ABC123: { status: 'open' } } });
-            }
-        });
+        const backupWrites = captureWrites();
+        let outFile;
+        try {
+            outFile = await backup.backupOne({
+                name: 'business-a',
+                serviceAccountPath: './secrets/service-account.json',
+                databaseURL: 'https://business-a-default-rtdb.firebaseio.com'
+            }, {
+                backupRoot,
+                configDir: tempRoot,
+                keepCount: 2,
+                network: { timeoutMs: 1000, retryCount: 0, retryDelayMs: 100 }
+            }, {
+                nowMs,
+                fetchImpl: async (url) => {
+                    backupFetchCount += 1;
+                    return url.includes('oauth2.googleapis.com')
+                        ? response(200, { access_token: 'backup-token' })
+                        : response(200, { barcode: { ABC123: { status: 'open' } } });
+                }
+            });
+        } finally { backupWrites.restore(); }
         const restored = JSON.parse(zlib.gunzipSync(fs.readFileSync(outFile)).toString('utf8'));
         const retained = fs.readdirSync(businessDir).filter((file) => file.endsWith('.json.gz')).sort();
         ok('Backup end-to-end ស្នើ token + database ត្រឹម 2 requests', backupFetchCount === 2, backupFetchCount);
@@ -205,10 +233,7 @@ function response(status, value, jsonError) {
             retained.length === 2 && !retained.some((file) => file.includes('2000-01-01')), retained);
         ok('Atomic write មិនបន្សល់ .partial',
             !fs.readdirSync(businessDir).some((file) => file.endsWith('.partial')));
-        if (process.platform !== 'win32') {
-            ok('⛔ Backup ថ្មីមាន file permission 0600', (fs.statSync(outFile).mode & 0o777) === 0o600,
-                (fs.statSync(outFile).mode & 0o777).toString(8));
-        }
+        privateFile('⛔ Backup ថ្មី', outFile, backupWrites.writes, `${outFile}.${process.pid}.partial`);
 
         const release = backup.acquireRunLock(backupRoot, 60000);
         expectThrow('⛔ Lock រារាំង backup ពីររត់ជាន់គ្នា',
@@ -326,7 +351,10 @@ function response(status, value, jsonError) {
                 serviceAccount: JSON.stringify(rawServiceAccount)
             }];
             const runRoot = path.join(tempRoot, 'ci-run');
-            const built = ciConfig.buildRunDirectory(runRoot, targets);
+            const configWrites = captureWrites();
+            let built;
+            try { built = ciConfig.buildRunDirectory(runRoot, targets); }
+            finally { configWrites.restore(); }
             const builtConfig = JSON.parse(fs.readFileSync(built.configPath, 'utf8'));
             ok('ci-config សាង config សម្រាប់គ្រប់ target', builtConfig.businesses.length === 2);
             ok('config ដែលសាងចេញ ឆ្លងការផ្ទៀងផ្ទាត់របស់ backup.js ខ្លួនវា', (() => {
@@ -335,8 +363,11 @@ function response(status, value, jsonError) {
                     return true;
                 } catch (e) { return false; }
             })());
-            ok('⛔ សោ service account សរសេរដោយសិទ្ធិ 0600',
-                builtConfig.businesses.every((b) => (fs.statSync(path.join(runRoot, b.serviceAccountPath)).mode & 0o777) === 0o600));
+            builtConfig.businesses.forEach((business) => {
+                privateFile('⛔ សោ service account ' + business.name,
+                    path.join(runRoot, business.serviceAccountPath), configWrites.writes);
+            });
+            privateFile('⛔ Config ដែលសាងចេញ', built.configPath, configWrites.writes);
             ok('⛔ ការសង្ខេបមិនបញ្ចេញសម្ភារៈសោ',
                 built.summary.join('\n').indexOf('PRIVATE KEY') === -1
                 && built.summary.join('\n').indexOf(rawServiceAccount.client_email) === -1);

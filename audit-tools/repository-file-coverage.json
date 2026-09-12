@@ -1,0 +1,1175 @@
+{
+  "schemaVersion": 1,
+  "description": "បញ្ជីអ្នកយាមតាមឯកសារពិត។ behavior = លទ្ធផលលើសេណារីយ៉ូ; static = កិច្ចសន្យាប្រភព; integrity = bytes; manual = review អត្ថបទរួម hash។ មិនអះអាងការគ្របដណ្តប់អាកប្បកិរិយាគ្រប់បន្ទាត់ទេ។",
+  "policies": {
+    "guard-1": {
+      "category": "static",
+      "guards": [
+        "audit-tools/checker-coverage.js",
+        "audit-tools/exit-code-integrity.js"
+      ],
+      "evidence": "ពិនិត្យ input override, suite wiring, assertion និង exit code តាម meta-checkers។",
+      "limitation": "ការយាម meta មិនបញ្ជាក់ថារាល់សេណារីយ៉ូក្នុង checker ចាប់ regression ទាំងអស់ទេ។"
+    },
+    "guard-2": {
+      "category": "static",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "អាន config/manifest/lock ពិត; ផ្ទៀងផ្ទាត់សេវា, defaults, dependency graph និងលំនាំ ignore។",
+      "limitation": "ការយាម contract ក្នុង repo មិនបញ្ជាក់ការកំណត់ Google/Firebase/Netlify ផលិតកម្មទេ។"
+    },
+    "guard-3": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "អាន CSV ពិតដោយ SheetJS ហើយរត់ importer និង Google Sheets reader លើជួរទិន្នន័យនោះ។",
+      "limitation": "Google service ត្រូវបាន mock; មិនសាកការបើក CSV ដោយកម្មវិធី spreadsheet គ្រប់ប្រភេទទេ។"
+    },
+    "guard-4": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/repository-contract-test.js"
+      ],
+      "evidence": "រត់ CLI សម្អាតលើ fixture ពិត; ផ្ទៀងផ្ទាត់ comment, string និង template literal ដែលមាន whitespace សំខាន់។",
+      "limitation": "គ្រប fixture ដែលសាក; ការសម្អាតកូដពិតនៅត្រូវពិនិត្យ diff ដដែល។"
+    },
+    "guard-5": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/money-reality-test.js"
+      ],
+      "evidence": "រត់ money checker និង redactor ពិតលើ dump fixture; វាស់លទ្ធផលលុយ, secret និង exit code។",
+      "limitation": "គ្របតែ fixture និងកិច្ចសន្យាដែលសាក; មិនអះអាងថាទិន្នន័យផលិតកម្មទាំងអស់ត្រឹមត្រូវ។"
+    },
+    "guard-6": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/money-reality-test.js"
+      ],
+      "evidence": "ពិនិត្យ launcher និងរត់ cmd ពិតលើ Windows ជាមួយ subprocess fixture ដើម្បីវាស់លំដាប់/កំហុសរបាយការណ៍។",
+      "limitation": "ការរត់ cmd ពិតមានតែលើ Windows; platform ផ្សេងមានតែ static contract។"
+    },
+    "guard-7": {
+      "category": "manual",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "SHA-256 ចាក់សោអត្ថបទអាជ្ញាប័ណ្ណ/បណ្ណសារដែលបានកត់ត្រា; ការកែត្រូវពិនិត្យអត្ថបទ និង update hash ដោយចេតនា។",
+      "limitation": "Hash បញ្ជាក់តែថា bytes មិនប្រែ; ភាពត្រឹមត្រូវផ្នែកអាជ្ញាប័ណ្ណ និងប្រវត្តិត្រូវ review ដោយដៃ។"
+    },
+    "guard-8": {
+      "category": "integrity",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "SHA-256 ចាក់សោ asset/library ដែលមានស្រាប់នៅ fd9f30d; អក្សរ JS normalize តែ CRLF ទៅ LF។",
+      "limitation": "Hash មិនបញ្ជាក់ភាពត្រឹមត្រូវនៃរូបសញ្ញា ឬ algorithm របស់ library ទេ; កំណែថ្មីត្រូវ review មុនប្តូរ hash។"
+    },
+    "guard-9": {
+      "category": "static",
+      "guards": [
+        "audit-tools/repository-file-coverage.js"
+      ],
+      "evidence": "ប្រៀប mapping នឹង git ls-files រួមឯកសារថ្មី; archive ដើរថតពិត; ពិនិត្យ stale path, category និង guard wiring។",
+      "limitation": "Inventory បង្ហាញប្រភេទភស្តុតាង; ការមាន mapping មិនស្មើ behavioral coverage 100% ទេ។"
+    },
+    "guard-10": {
+      "category": "static",
+      "guards": [
+        "audit-tools/checker-coverage.js",
+        "audit-tools/run-all.sh"
+      ],
+      "evidence": "audit-tools/checker-coverage.js ផ្ទៀងផ្ទាត់ checker ដែល CI យោងធៀបនឹង run-all.sh",
+      "limitation": "ពិនិត្យតែ wiring មួយផ្នែក។ មិនបញ្ជាក់ថា Actions ពិតអាចរត់ ឬមានកូតាគ្រប់គ្រាន់ទេ។"
+    },
+    "guard-11": {
+      "category": "static",
+      "guards": [
+        "audit-tools/firebase-backup-test.js"
+      ],
+      "evidence": "audit-tools/firebase-backup-test.js ពិនិត្យ workflow និងលំដាប់អ៊ិនគ្រីប",
+      "limitation": "ការអះអាងលើអត្ថបទ workflow មិនបញ្ជាក់ secret ឬ backup ផលិតកម្មដែលរត់ពិតទេ។"
+    },
+    "guard-12": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js"
+      ],
+      "evidence": "audit-tools/doc-scope-test.js ផ្ទៀងផ្ទាត់ច្បាប់ README និងតារាងកំណែ App/CACHE",
+      "limitation": "ត្រួតពិនិត្យតែផ្នែកជាក់លាក់។ ច្បាប់ និងអត្ថបទទាំងមូលនៅត្រូវការការពិនិត្យដោយដៃ។"
+    },
+    "guard-13": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js"
+      ],
+      "evidence": "audit-tools/doc-scope-test.js រាប់ README ពិត និងផ្ទៀងផ្ទាត់វិសាលភាព/ផ្នែក/កំណែតាមប្រភេទ",
+      "limitation": "ការយាមជាស្តាទិច។ មិនបញ្ជាក់ថាគ្រប់ជំហានរបៀបប្រើអាចអនុវត្តបានពិតទេ។"
+    },
+    "guard-14": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/function-surface-test.js",
+        "audit-tools/keygen-session-security-test.js"
+      ],
+      "evidence": "Function inventory និងតេស្តឥរិយាបថ session របស់ ZoeKeyGen អាន app.js ពិត។",
+      "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
+    },
+    "guard-15": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/boot-animation-test.js"
+      ],
+      "evidence": "audit-tools/boot-animation-test.js អានកូដពិត និងវាស់ផ្លូវ boot",
+      "limitation": "គ្របលើ boot/fallback ដែលបានរៀបចំក្នុងតេស្ត។ មិនស្មើតេស្តគ្រប់ឧបករណ៍ពិត។"
+    },
+    "guard-16": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/secret-hygiene.js",
+        "audit-tools/sentry-load-race-test.js",
+        "audit-tools/run-all.sh"
+      ],
+      "evidence": "audit-tools/secret-hygiene.js និង audit-tools/sentry-load-race-test.js; run-all.sh ផ្ទៀងផ្ទាត់ byte-identical ទាំង 2 App",
+      "limitation": "តេស្តវាស់ redaction និង Sentry load ជាក់លាក់។ មិនបញ្ជាក់ការកំណត់ Sentry ផលិតកម្មទាំងមូល។"
+    },
+    "guard-17": {
+      "category": "static",
+      "guards": [
+        "audit-tools/rules-duplicate-keys.js",
+        "audit-tools/payload-schema.js"
+      ],
+      "evidence": "audit-tools/rules-duplicate-keys.js និង payload-schema.js",
+      "limitation": "មានការពិនិត្យ schema/duplicate keys។ មិនអះអាង License rules behavioral coverage ពេញលេញ ឬ rules ផលិតកម្មដូច repo។"
+    },
+    "guard-18": {
+      "category": "static",
+      "guards": [
+        "audit-tools/sdk-surface.js",
+        "audit-tools/function-surface-test.js"
+      ],
+      "evidence": "audit-tools/sdk-surface.js ផ្ទៀងផ្ទាត់ SDK ដែល app.js ហៅ; function-surface-test.js parse helper",
+      "limitation": "ការយាមស្នាមភ្ជាប់ SDK ជាស្តាទិច និង boot scenarios មានកម្រិត។"
+    },
+    "guard-19": {
+      "category": "static",
+      "guards": [
+        "audit-tools/function-surface-test.js",
+        "audit-tools/boot-animation-test.js",
+        "audit-tools/version-check.js"
+      ],
+      "evidence": "audit-tools/function-surface-test.js boot-animation-test.js និង version-check.js",
+      "limitation": "មាន wiring/boot/version checks និង browser tests។ មិនធានារាល់ UI state ឬអត្ថបទទាំងអស់។"
+    },
+    "guard-20": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/license-network-pressure-test.js",
+        "audit-tools/license-clock-trust-test.js"
+      ],
+      "evidence": "audit-tools/license-network-pressure-test.js និង license-clock-trust-test.js; byte-identical ទាំង 2 App",
+      "limitation": "គ្របតែសេណារីយ៉ូ license/network/clock ដែលបានសាក។ មិនបញ្ជាក់ License Project ផលិតកម្ម។"
+    },
+    "guard-21": {
+      "category": "static",
+      "guards": [
+        "audit-tools/version-check.js"
+      ],
+      "evidence": "audit-tools/version-check.js អាន JSON និងផ្ទៀងផ្ទាត់ version ជាមួយ APP_VERSION",
+      "limitation": "មាន targeted version check។ មិនបានបញ្ជាក់វាល manifest និង installation behavior គ្រប់វាល/គ្រប់ platform។"
+    },
+    "guard-22": {
+      "category": "static",
+      "guards": [
+        "audit-tools/netlify-config-scope-test.js"
+      ],
+      "evidence": "audit-tools/netlify-config-scope-test.js រាប់ config និងផ្ទៀងផ្ទាត់ CSP/functions/publish តាម App",
+      "limitation": "គ្របលើ config ក្នុង repo។ Base directory និងការកំណត់ដែលរស់នៅក្នុង Netlify UI មិនស្ថិតក្នុងឯកសារនេះ។"
+    },
+    "guard-23": {
+      "category": "static",
+      "guards": [
+        "audit-tools/boot-animation-test.js",
+        "audit-tools/css-var-test.js",
+        "audit-tools/css-media-override.js"
+      ],
+      "evidence": "audit-tools/boot-animation-test.js audit-tools/css-var-test.js និង css-media-override.js",
+      "limitation": "ការយាម CSS និង browser scenarios មួយផ្នែក។ មិនបញ្ជាក់គ្រប់ viewport ឬឧបករណ៍ពិត។"
+    },
+    "guard-24": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/sw-cache-key-test.js",
+        "audit-tools/sw-cache-failure-test.js",
+        "audit-tools/sw-install-integrity-test.js"
+      ],
+      "evidence": "audit-tools/sw-cache-key-test.js sw-cache-failure-test.js និង sw-install-integrity-test.js",
+      "limitation": "គ្រប cache/install/network scenarios ដែលបានសាក។ មិនមែនការធានា browser implementation ទាំងអស់។"
+    },
+    "guard-25": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js",
+        "audit-tools/zto-negative-cache-test.js"
+      ],
+      "evidence": "audit-tools/doc-scope-test.js និង audit-tools/zto-negative-cache-test.js ពិនិត្យអត្ថបទណែនាំ/លំនាំដើម",
+      "limitation": "គ្របតែលំនាំនិងតម្លៃដែលបានអះអាង។ ការកំណត់ Netlify/ZTO ផលិតកម្មត្រូវផ្ទៀងផ្ទាត់ដោយឡែក។"
+    },
+    "guard-26": {
+      "category": "static",
+      "guards": [
+        "audit-tools/user-guide-test.js",
+        "audit-tools/sw-cache-key-test.js"
+      ],
+      "evidence": "audit-tools/user-guide-test.js អាន guide និងផ្ទៀងផ្ទាត់ការភ្ជាប់; sw-cache-key-test.js វាស់ navigation guide",
+      "limitation": "គ្របតែការអះអាងក្នុង user-guide checker និងការបើក cache។ ខ្លឹមសារណែនាំទាំងមូលត្រូវពិនិត្យដោយដៃ។"
+    },
+    "guard-27": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zto-proxy-test.js",
+        "audit-tools/zto-budget-test.js",
+        "audit-tools/zto-cookie-store-test.js"
+      ],
+      "evidence": "audit-tools/zto-proxy-test.js រត់ module ពិត; zto-budget-test.js និង zto-cookie-store-test.js",
+      "limitation": "មានតេស្ត handler ជាក់លាក់ដោយ mock dependency។ មិនបញ្ជាក់ upstream ZTO/Netlify ផលិតកម្មគ្រប់ស្ថានភាព។"
+    },
+    "guard-28": {
+      "category": "static",
+      "guards": [
+        "audit-tools/zto-proxy-test.js"
+      ],
+      "evidence": "audit-tools/zto-proxy-test.js ផ្ទៀងផ្ទាត់ JSON/dependency allowlist និង version pin",
+      "limitation": "មិនមានន័យថា dependency គ្មានចន្លោះសុវត្ថិភាពទាំងអស់ ឬ installation ទាំងអស់ជោគជ័យ។"
+    },
+    "guard-29": {
+      "category": "static",
+      "guards": [
+        "audit-tools/dependency-security-test.js"
+      ],
+      "evidence": "audit-tools/dependency-security-test.js ផ្ទៀងផ្ទាត់ SHA256 release និង Excel read/write",
+      "limitation": "Hash គ្រប bytes របស់ release ដែលបានអនុម័ត។ មិនមែនការស្វែងរក vulnerability ថ្មីៗដោយស្វ័យប្រវត្តិ។"
+    },
+    "guard-30": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/scan-engine-test.js",
+        "audit-tools/offline-shell-test.js"
+      ],
+      "evidence": "audit-tools/scan-engine-test.js និង offline-shell-test.js រត់ engine/ផ្ទុក vendor ពិត",
+      "limitation": "មាន scan/cache scenarios ជាក់លាក់។ មិនបានបញ្ជាក់ barcode គ្រប់ប្រភេទ ឬ approved-byte hash។"
+    },
+    "guard-31": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/scan-engine-test.js",
+        "audit-tools/offline-shell-test.js"
+      ],
+      "evidence": "audit-tools/scan-engine-test.js និង offline-shell-test.js",
+      "limitation": "វាស់វត្តមាន និង scan/cache scenarios។ មិនធានា engine internals ទាំងអស់។"
+    },
+    "guard-32": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/checker-coverage.js"
+      ],
+      "evidence": "audit-tools/checker-coverage.js រត់ emuNamespace ពិត ផ្ទៀងផ្ទាត់ uniqueness/prefix និង invalid slug",
+      "limitation": "គ្របតែ contract ដែលបានអះអាង។ មិនបញ្ជាក់ការប្រណាំងទាំងអស់ក្នុង emulator។"
+    },
+    "guard-33": {
+      "category": "static",
+      "guards": [
+        "audit-tools/checker-coverage.js"
+      ],
+      "evidence": "audit-tools/checker-coverage.js ពិនិត្យ NS= ដែលមាន entropy",
+      "limitation": "ការយាម namespace ជាស្តាទិច។ មិនបញ្ជាក់ថា shell script ទាំងមូលរត់ត្រឹមត្រូវគ្រប់បរិស្ថាន។"
+    },
+    "guard-34": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/registry-orphan-list-test.js"
+      ],
+      "evidence": "audit-tools/registry-orphan-list-test.js រត់ CLI ពិតលើ fixture និងផ្ទៀងផ្ទាត់ output/refusal",
+      "limitation": "គ្របតែករណី fixture ដែលបានសាក។ មិនបញ្ជាក់ថា payload លុបណាមួយអាចអនុវត្តលើ production ដោយមិនពិនិត្យទិន្នន័យពិត។"
+    },
+    "guard-35": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/hang-guard.js",
+        "audit-tools/checker-coverage.js"
+      ],
+      "evidence": "audit-tools/hang-guard.js រត់ run() ពិតលើ script ព្យួរ; checker-coverage.js ផ្ទៀងផ្ទាត់ wiring និង baseline",
+      "limitation": "ការចេញ exit 0 អាចមាន SKIP/PARTIAL PASS; ត្រូវអានរបាយការណ៍ suite ជាមួយលទ្ធផលនីមួយៗ។"
+    },
+    "guard-36": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js"
+      ],
+      "evidence": "audit-tools/doc-scope-test.js ផ្ទៀងផ្ទាត់កំណែ App និងឈ្មោះ checker ដែលយោង",
+      "limitation": "ពិនិត្យ freshness/wiring ជាក់លាក់។ មិនធានាភាពត្រឹមត្រូវនៃរបាយការណ៍ ឬពាក្យបញ្ជាគ្រប់ជួរ។"
+    },
+    "guard-37": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js"
+      ],
+      "evidence": "audit-tools/doc-scope-test.js អះអាងថាមានប្រវត្តិ និងទំហំអប្បបរមា",
+      "limitation": "ជាន់ទំហំ/ពាក្យមិនធានាភាពត្រឹមត្រូវរាល់ធាតុប្រវត្តិ ឬការពារការបាត់ធាតុជាក់លាក់។"
+    },
+    "guard-38": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/firebase-backup-test.js"
+      ],
+      "evidence": "audit-tools/firebase-backup-test.js រត់ backup/config/crypt module ពិតលើ fixture និង mock network",
+      "limitation": "តេស្តកូដ និង fixture។ មិនបញ្ជាក់ service account, secret, schedule ឬ restore លើ production ពិត។"
+    },
+    "guard-39": {
+      "category": "static",
+      "guards": [
+        "audit-tools/firebase-backup-test.js"
+      ],
+      "evidence": "audit-tools/firebase-backup-test.js ផ្ទៀងផ្ទាត់ dependency និង Node engine",
+      "limitation": "ពិនិត្យ contract dependency ជាក់លាក់។ មិនបញ្ជាក់ configuration ផលិតកម្ម។"
+    },
+    "guard-40": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/payload-schema.js",
+        "audit-tools/rules-duplicate-keys.js",
+        "audit-tools/emu/crud-rules-flow.js"
+      ],
+      "evidence": "audit-tools/payload-schema.js, rules-duplicate-keys.js និង emu/crud-rules-flow.js",
+      "limitation": "ការធានាឥរិយាបថត្រូវការតេស្ត RTDB emulator មិន SKIP។ មិនបញ្ជាក់ rules ដែលបាន Publish ទៅ Firebase ពិត។"
+    },
+    "guard-41": {
+      "category": "static",
+      "guards": [
+        "audit-tools/zto-cookie-sync-test.js"
+      ],
+      "evidence": "audit-tools/zto-cookie-sync-test.js អានឯកសារនេះ និងអះអាង config/token/argument/encoding តាមប្រភេទ",
+      "limitation": "ការយាមភាគច្រើនជាស្តាទិច ឬ mocked integration។ មិនស្មើការរត់ setup/scheduled task ពេញលេញក្នុង Windows production។"
+    },
+    "guard-42": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zto-cookie-sync-test.js",
+        "audit-tools/zto-cookie-capture-test.js"
+      ],
+      "evidence": "audit-tools/zto-cookie-sync-test.js និង zto-cookie-capture-test.js រត់ helper logic ពិត",
+      "limitation": "មាន fixture/mocked browser-network scenarios។ មិនបញ្ជាក់ Windows session/ZTO production គ្រប់ករណី។"
+    },
+    "guard-43": {
+      "category": "behavior",
+      "guards": [
+        "zto-import/test.js"
+      ],
+      "evidence": "zto-import/test.js រត់ Code.gs ពិតក្នុង VM លើ mapping/import fixtures",
+      "limitation": "Google Apps Script services ជា stub/mock។ មិនបញ្ជាក់ scopes និង deployment manifest ពិត។"
+    },
+    "guard-44": {
+      "category": "static",
+      "guards": [
+        "audit-tools/dependency-security-test.js"
+      ],
+      "evidence": "audit-tools/dependency-security-test.js ផ្ទៀងផ្ទាត់ SheetJS URL/SRI និង password handling",
+      "limitation": "មាន targeted static security checks។ មិនបានបញ្ជាក់ fallback Web UI flow ពេញលេញ។"
+    },
+    "guard-45": {
+      "category": "static",
+      "guards": [
+        "audit-tools/function-surface-test.js"
+      ],
+      "evidence": "audit-tools/function-surface-test.js parse និងរាប់ helper functions",
+      "limitation": "Parse/inventory មិនបញ្ជាក់ Watch triggers, Drive ឬ mail behavior ពិត។"
+    },
+    "guard-46": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/google-sheets-cache-test.js"
+      ],
+      "evidence": "audit-tools/google-sheets-cache-test.js អាន module និងរត់ doGet ក្នុង VM។",
+      "limitation": "វាស់ cache/lookup scenarios ដោយ service mock។ មិនបញ្ជាក់ deployment និង Google services ពិត។"
+    },
+    "zoew-app": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/function-surface-test.js",
+        "audit-tools/daily-collected-test.js"
+      ],
+      "evidence": "Function inventory និងតេស្តឥរិយាបថប្រមូលលុយរបស់ ZoeW អាន app.js ពិត។",
+      "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
+    }
+  },
+  "files": {
+    ".github/workflows/audit.yml": {
+      "policy": "guard-10"
+    },
+    ".github/workflows/backup.yml": {
+      "policy": "guard-11"
+    },
+    ".gitignore": {
+      "policy": "guard-2"
+    },
+    "audit-tools/adaptive-link-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/animation-cost.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/app-lock-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/auth-recovery-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/barcode-shape-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/biometric-unlock-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/boot-animation-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/boot-runtime.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/camera-resume-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/checker-coverage.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/cleanup-clock-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/clear-history-claim-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/clear-history-finalization-fence-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/clock-basis-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/clock-hygiene.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/code-duplication-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/collected-value-fuzz-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/comments.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/compensation-order.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/concurrent-scan-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/connection-recovery-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/csp-enforced-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/csp-lazy-resource-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/css-classes.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/css-media-override.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/css-var-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/daily-collected-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/db-stall-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/dependency-security-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/devtools-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/doc-scope-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/dom-hygiene.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/duplicate-money-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/duplicate-scan-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/empty-state-truth-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/crud-rules-flow.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/ledger-revert-emu-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/ns.js": {
+      "policy": "guard-32"
+    },
+    "audit-tools/emu/restore-deadlock-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/restore-mutation-emu-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/rules.sh": {
+      "policy": "guard-33"
+    },
+    "audit-tools/exit-code-integrity.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/expired-trash-retention-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/export-cells-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/field-shape-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/firebase-backup-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/firebase-config-paste-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/fluid-type-focus-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/function-surface-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/gesture-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/google-sheets-cache-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/hang-guard.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/health-check-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/history-menu-dismiss-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/history-patch-retry-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/html-sink-escaping.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/inline-handler-xss-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/ios-panel-glide-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/item-money-integrity-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keygen-pin-flow-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keygen-session-security-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/keylist-consistency-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/khmer-timezone-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/late-commit-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/layout-check.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/layout-thrash.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/ledger-clamp-symmetry-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/ledger-failed-apply-revert-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-clock-rollback-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-clock-trust-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-grace-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-network-pressure-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-record-race-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/listener-leak-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/listener-pending-key-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/locker-claim-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/lookup-burst-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/lookup-config-secret-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/lookup-failure-identity-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/lookup-freshness-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/lookup-prefetch-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/money-guardian-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/money-reality-check.js": {
+      "policy": "guard-5"
+    },
+    "audit-tools/money-reality-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/monotonic-gate-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/monthly-ledger-agreement-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/monthly-report-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/netlify-config-scope-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/network-pressure-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/network-timeout-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/offline-shell-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/page-nav-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/panel-motion-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/panel-snap-ownership-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/partial-pickup-cleanup-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/payload-schema.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/perf-check.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/periodic-network-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/phone-search-swipe-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/phone-suggest-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/pickup-barcode-identity-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/pickup-ledger-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/pickup-repair-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/pickup-reset-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/pin-prompt-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/policy-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/price-edit-abort-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/raw-read-shape-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/README.md": {
+      "policy": "guard-13"
+    },
+    "audit-tools/reconnect-ladder-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/redact-dump.js": {
+      "policy": "guard-5"
+    },
+    "audit-tools/registry-orphan-list-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/registry-orphan-list.js": {
+      "policy": "guard-34"
+    },
+    "audit-tools/registry-release-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/repository-contract-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/repository-file-coverage.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/repository-file-coverage.json": {
+      "policy": "guard-9"
+    },
+    "audit-tools/restore-finalization-fence-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/restore-marker-hygiene-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/restore-race-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/revenue-fuzz-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/revenue-rules-clamp-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/rules-duplicate-keys.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/run-all.sh": {
+      "policy": "guard-35"
+    },
+    "audit-tools/scan-engine-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/scan-remove-mode-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sdk-offline-boot-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sdk-surface.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/secret-hygiene.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/semantic-ui-color-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sentry-load-race-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/setup-link-browser-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/setup-link-logout-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/setup-link-roundtrip-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/shared-fns.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sheet-import-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/slow-write-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stale-clear-claim-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stale-write.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stall-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stall-lock-release-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/state-hygiene.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stats-collected-truth-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stats-measurable-gate-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/stats-screen-agreement-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/storage-blocked-boot-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/storage-guard.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/strip-comments.js": {
+      "policy": "guard-4"
+    },
+    "audit-tools/sw-abort-propagation-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sw-cache-failure-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sw-cache-key-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sw-install-integrity-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sw-revalidate-pressure-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/sw-shell-latency-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/toast-action-truth-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/toast-truth-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/trash-modal-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/trimws.js": {
+      "policy": "guard-4"
+    },
+    "audit-tools/ui-flow-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/user-guide-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/version-bump-scope.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/version-check.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/wiring.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/write-stall-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-budget-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-cookie-capture-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-cookie-session-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-cookie-store-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-cookie-sync-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-list-sync-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-negative-cache-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-network-boundaries-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-proxy-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-signed-status-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/zto-sync-banner-test.js": {
+      "policy": "guard-1"
+    },
+    "CLAUDE.md": {
+      "policy": "guard-12"
+    },
+    "docs/ARCHIVE-2026-09-03.md": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "3ba736558c89747fbc0256e5bf3427d2b7ff5bad2c4b7fc9890e65153de78f0c"
+    },
+    "docs/AUDIT-PROMPT.md": {
+      "policy": "guard-36"
+    },
+    "docs/HISTORY-ARCHIVE.md": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "ddaae0ddad9dd99e8542544ba2f3118b7dc67fd218136f493143a3af1001456f"
+    },
+    "docs/HISTORY.md": {
+      "policy": "guard-37"
+    },
+    "firebase-backup/backup.js": {
+      "policy": "guard-38"
+    },
+    "firebase-backup/ci-config.js": {
+      "policy": "guard-38"
+    },
+    "firebase-backup/config.example.json": {
+      "policy": "guard-2"
+    },
+    "firebase-backup/crypt.js": {
+      "policy": "guard-38"
+    },
+    "firebase-backup/package-lock.json": {
+      "policy": "guard-39"
+    },
+    "firebase-backup/package.json": {
+      "policy": "guard-39"
+    },
+    "firebase-backup/README.md": {
+      "policy": "guard-13"
+    },
+    "firebase-database.rules.json": {
+      "policy": "guard-40"
+    },
+    "LICENSE": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "dc0c2028df327cbb31bd267eab825fc6cf7688fe88455dcf79e9e2647825dc76"
+    },
+    "LICENSES/Apache-2.0.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "NOTICE": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "117f9c6758026ddb59e6d3c4e7f1cf2fd40e260295a1935a42be3e6943667008"
+    },
+    "README.md": {
+      "policy": "guard-13"
+    },
+    "tools/money-check-windows/check-money.cmd": {
+      "policy": "guard-6"
+    },
+    "tools/money-check-windows/README-KH.md": {
+      "policy": "guard-13"
+    },
+    "tools/zto-cookie-sync-windows/configure.ps1": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/package.json": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/read-token.ps1": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/README-KH.md": {
+      "policy": "guard-13"
+    },
+    "tools/zto-cookie-sync-windows/schedule-zto-cookie.cmd": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/setup.cmd": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/sync-zto-cookie.cmd": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/sync-zto-cookie.js": {
+      "policy": "guard-42"
+    },
+    "ZoeKeyGen/app.js": {
+      "policy": "guard-14"
+    },
+    "ZoeKeyGen/boot-flags.js": {
+      "policy": "guard-15"
+    },
+    "ZoeKeyGen/error-reporting.js": {
+      "policy": "guard-16"
+    },
+    "ZoeKeyGen/firebase-database.rules.json": {
+      "policy": "guard-17"
+    },
+    "ZoeKeyGen/firebase-loader.js": {
+      "policy": "guard-18"
+    },
+    "ZoeKeyGen/icon-192.png": {
+      "policy": "guard-8",
+      "sha256": "0d5ce383c684907bb54e52899714d447c5e09f149d400d14e311e9374aea8def"
+    },
+    "ZoeKeyGen/icon-512.png": {
+      "policy": "guard-8",
+      "sha256": "4359a51f0463b8c0360746cb3da57a2906a8bc4212bb2a9208b6b72d1104ed2b"
+    },
+    "ZoeKeyGen/index.html": {
+      "policy": "guard-19"
+    },
+    "ZoeKeyGen/license-verify.js": {
+      "policy": "guard-20"
+    },
+    "ZoeKeyGen/manifest.json": {
+      "policy": "guard-21"
+    },
+    "ZoeKeyGen/netlify.toml": {
+      "policy": "guard-22"
+    },
+    "ZoeKeyGen/qrcode.js": {
+      "policy": "guard-8",
+      "encoding": "lf-text",
+      "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
+    },
+    "ZoeKeyGen/README.md": {
+      "policy": "guard-13"
+    },
+    "ZoeKeyGen/style.css": {
+      "policy": "guard-23"
+    },
+    "ZoeKeyGen/sw.js": {
+      "policy": "guard-24"
+    },
+    "ZoeW/app.js": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/boot-flags.js": {
+      "policy": "guard-15"
+    },
+    "ZoeW/error-reporting.js": {
+      "policy": "guard-16"
+    },
+    "ZoeW/firebase-loader.js": {
+      "policy": "guard-18"
+    },
+    "ZoeW/guide.html": {
+      "policy": "guard-26"
+    },
+    "ZoeW/icon-192.png": {
+      "policy": "guard-8",
+      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
+    },
+    "ZoeW/icon-512.png": {
+      "policy": "guard-8",
+      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
+    },
+    "ZoeW/index.html": {
+      "policy": "guard-19"
+    },
+    "ZoeW/license-verify.js": {
+      "policy": "guard-20"
+    },
+    "ZoeW/manifest.json": {
+      "policy": "guard-21"
+    },
+    "ZoeW/netlify.toml": {
+      "policy": "guard-22"
+    },
+    "ZoeW/netlify/functions/zto-order-detail.js": {
+      "policy": "guard-27"
+    },
+    "ZoeW/package-lock.json": {
+      "policy": "guard-2"
+    },
+    "ZoeW/package.json": {
+      "policy": "guard-28"
+    },
+    "ZoeW/README.md": {
+      "policy": "guard-13"
+    },
+    "ZoeW/style.css": {
+      "policy": "guard-23"
+    },
+    "ZoeW/sw.js": {
+      "policy": "guard-24"
+    },
+    "ZoeW/vendor/xlsx.full.min.js": {
+      "policy": "guard-29"
+    },
+    "ZoeW/vendor/zxing_reader.wasm": {
+      "policy": "guard-31"
+    },
+    "ZoeW/vendor/zxing-wasm.js": {
+      "policy": "guard-30"
+    },
+    "ZoeW/ZTO-SETUP-KH.md": {
+      "policy": "guard-25"
+    },
+    "zto-import/appsscript.json": {
+      "policy": "guard-2"
+    },
+    "zto-import/Code.gs": {
+      "policy": "guard-43"
+    },
+    "zto-import/google-sheets-api/Code.gs": {
+      "policy": "guard-46"
+    },
+    "zto-import/google-sheets-api/customer-template.csv": {
+      "policy": "guard-3"
+    },
+    "zto-import/google-sheets-api/README.md": {
+      "policy": "guard-13"
+    },
+    "zto-import/Index.html": {
+      "policy": "guard-44"
+    },
+    "zto-import/README.md": {
+      "policy": "guard-13"
+    },
+    "zto-import/test.js": {
+      "policy": "guard-1"
+    },
+    "zto-import/Watch.gs": {
+      "policy": "guard-45"
+    }
+  }
+}

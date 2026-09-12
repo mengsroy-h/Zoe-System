@@ -120,7 +120,10 @@ bash audit-tools/emu/rules.sh
 
 | File | ចាក់សោអ្វី | Override |
 |---|---|---|
-| `checker-coverage.js` | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; CI មិនរត់ checker ដែល `run-all.sh` មិនរត់; `pageerror` ត្រូវឃើញការបដិសេធ promise ដែរ | — |
+| `checker-coverage.js` | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; រាល់ checker ត្រូវភ្ជាប់ការរត់ធម្មតា និង baseline; CLI ដែលត្រូវការ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា; `pageerror` ត្រូវឃើញការបដិសេធ promise ដែរ | — |
+| `repository-file-coverage.js` | ឯកសារគម្រោងទាំងអស់ត្រូវមានធាតុក្នុងបញ្ជីការគ្របដណ្ដប់; ឯកសារថ្មី ការយាមដែលបាត់ និងតំណឯកសារសកម្មដែលបាក់ ត្រូវធ្លាក់; ប្រភេទ manual/integrity មិនមែន behavioral coverage | `REPOCOVER_APP_DIR` |
+| `repository-contract-test.js` | ផ្ទៀងផ្ទាត់ Apps Script manifest, CSV template, backup config example និង package lock ធៀបនឹងកិច្ចសន្យាកូដដែលប្រើវា | `REPOCONTRACT_APP_DIR` |
+| `money-reality-test.js` | រត់ CLI របាយការណ៍ និង redaction លើ fixture ពិត; លទ្ធផលមុន/ក្រោយត្រូវស៊ីគ្នា; ទិន្នន័យរសើបត្រូវលាក់; launcher មិនប្រកាសជោគជ័យពេល redaction ធ្លាក់ | `MONEYREALTEST_APP_DIR` |
 | `hang-guard.js` | checker ត្រូវអាចធ្លាក់បាន **ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ | `HANGGUARD_APP_DIR` |
 | `exit-code-integrity.js` | ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ | `EXITCODE_APP_DIR` |
 | `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | — |

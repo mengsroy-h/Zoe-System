@@ -67,6 +67,76 @@ const FNS = ['dbListenerViewIsStale', 'barcodeEntriesOf', 'recalcItemMoneyFromBa
     'buildClearHistoryTrashItem', 'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange',
     'toggleCloseStatus', 'executePermanentDelete'];
 
+// អានឈ្មោះដែលប្រើពិតតាម scope៖ ថេរ/state ក៏ជា dependency ដូច function call ដែរ។
+// អថេរមូលដ្ឋានរបស់ function មួយ មិនអាចលាក់ global ដែលបាត់ក្នុង function ផ្សេងបានទេ។
+function sandboxUnresolvedNames(ast, globals) {
+    const root = { parent: null, names: new Set(globals), fn: true };
+    const references = [];
+    const childScope = (parent, fn = false) => ({ parent, names: new Set(), fn });
+    function bind(pattern, target, scope) {
+        if (!pattern) return;
+        if (pattern.type === 'Identifier') target.names.add(pattern.name);
+        else if (pattern.type === 'RestElement') bind(pattern.argument, target, scope);
+        else if (pattern.type === 'AssignmentPattern') { bind(pattern.left, target, scope); walk(pattern.right, scope); }
+        else if (pattern.type === 'ArrayPattern') pattern.elements.forEach((entry) => bind(entry, target, scope));
+        else if (pattern.type === 'ObjectPattern') pattern.properties.forEach((entry) => {
+            if (entry.type === 'RestElement') bind(entry.argument, target, scope);
+            else { if (entry.computed) walk(entry.key, scope); bind(entry.value, target, scope); }
+        });
+    }
+    function walk(node, scope) {
+        if (!node || typeof node.type !== 'string') return;
+        if (node.type === 'Identifier') { references.push({ name: node.name, scope }); return; }
+        if (/^(FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(node.type)) {
+            if (node.type === 'FunctionDeclaration' && node.id) scope.names.add(node.id.name);
+            const local = childScope(scope, true);
+            if (node.id) local.names.add(node.id.name);
+            if (node.type !== 'ArrowFunctionExpression') local.names.add('arguments');
+            node.params.forEach((param) => bind(param, local, local));
+            walk(node.body, childScope(local, true));
+            return;
+        }
+        if (node.type === 'VariableDeclaration') {
+            let target = scope;
+            if (node.kind === 'var') while (target.parent && !target.fn) target = target.parent;
+            node.declarations.forEach((entry) => { bind(entry.id, target, scope); walk(entry.init, scope); });
+            return;
+        }
+        if (node.type === 'MemberExpression' || node.type === 'Property' || node.type === 'MethodDefinition') {
+            if (node.object) walk(node.object, scope);
+            if (node.computed) walk(node.property || node.key, scope);
+            if (node.value) walk(node.value, scope);
+            return;
+        }
+        if (node.type === 'CatchClause') {
+            const local = childScope(scope);
+            bind(node.param, local, local);
+            walk(node.body, local);
+            return;
+        }
+        if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+            if (node.type === 'ClassDeclaration' && node.id) scope.names.add(node.id.name);
+            const local = childScope(scope);
+            if (node.id) local.names.add(node.id.name);
+            walk(node.superClass, local);
+            walk(node.body, local);
+            return;
+        }
+        if (node.type === 'LabeledStatement') { walk(node.body, scope); return; }
+        if (node.type === 'BreakStatement' || node.type === 'ContinueStatement' || node.type === 'MetaProperty') return;
+        if (/^(BlockStatement|ForStatement|ForInStatement|ForOfStatement|SwitchStatement)$/.test(node.type)) scope = childScope(scope);
+        for (const value of Object.values(node)) {
+            if (Array.isArray(value)) value.forEach((entry) => walk(entry, scope));
+            else if (value && typeof value === 'object') walk(value, scope);
+        }
+    }
+    walk(ast, root);
+    return new Set(references.filter(({ name, scope }) => {
+        for (let current = scope; current; current = current.parent) if (current.names.has(name)) return false;
+        return true;
+    }).map(({ name }) => name));
+}
+
 // ---- vm ដែលចាប់រាល់ការសរសេរ (មិនអនុវត្ត rules) ----
 function makeSandbox(store, now) {
     const w = { store, now, writes: [], toasts: [], revenueCalls: [] };
@@ -93,11 +163,12 @@ function makeSandbox(store, now) {
         remove: (ref) => Promise.resolve().then(() => { w.writes.push({ method: 'PUT', path: ref.path, value: null }); set(ref.path, null); })
     };
     const ctx = vm.createContext({
-        console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {},
+        console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
         db: {}, fb,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
+        dbRefDailyCollected: fb.ref({}, 'zoew_daily_collected_cod_dod'),
         getServerNow: () => w.now, getFormattedDate: () => '2026-08-26',
         // ⛔ តេស្តនេះវាស់ **payload ↔ rules** មិនមែនលេខ ledger — តែ stub ត្រូវ
         // រក្សា **រូបរាងពិត** (ត្រឡប់ delta ដែលអនុវត្ត) បើមិនដូច្នេះផ្លូវដកវិញ
@@ -123,16 +194,18 @@ function makeSandbox(store, now) {
         revertPickupMarks: (applied) => applied || null,
         reapplyPickupMarks: (applied) => applied || null,
         dailyPickupData: {},
+        dailyCollectedData: {},
         showToast: (m) => w.toasts.push(m), confirm: () => true, alert: () => {},
         openViewListModal: () => {}, refreshCurrentHistoryView: () => {}, updateRecentPhonesList: () => {},
         renderRecentlyDeleted: () => {}, openRecentlyDeletedModal: () => {}, closeModal: () => {},
         releaseBarcodesInRegistry: () => Promise.resolve(), collectPhoneSuggestions: () => [],
         clearScannedRemovalInFlight: () => {},
         document: { getElementById: () => null },
-        scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null
+        scanHistory: [], deletedItems: [], pendingPermanentDeleteId: null, activeParentItemId: null, scanRemoveInFlight: null
     });
     const assembled = [
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'),
+        extractConst(src, 'APP_TIME_ZONE'), extractConst(src, 'APP_TIME_ZONE_OFFSET_MINUTES'),
         extractConst(src, 'PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
@@ -170,6 +243,7 @@ function makeSandbox(store, now) {
         ctx.scanHistory.length = 0; Object.keys(h).forEach((k) => ctx.scanHistory.push(clone(h[k])));
         const t = get('zoew_recently_deleted_cod_dod') || {};
         ctx.deletedItems.length = 0; Object.keys(t).forEach((k) => ctx.deletedItems.push(clone(t[k])));
+        ctx.dailyCollectedData = clone(get('zoew_daily_collected_cod_dod') || {});
     };
     w.drain = async () => { for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0)); };
     w.sync();
@@ -234,54 +308,49 @@ async function clearOrphanBeforeRetry(w, label) {
         smoke.ctx.api.normalizeBarcodesOf({ id: 'smoke_1', barcodes: [{ code: 'A', cod: 1, dod: 0 }] });
         smoke.ctx.api.stripHistoryOnlyMarkers({ id: 'smoke_1', restoreClaimId: 'x' });
         smoke.ctx.api.runAutomaticCleanupRules();
+        // រត់ផ្លូវចំណូលពិតមុនភ្ជាប់ emulator៖ state/ref ដែលបាត់ មិនត្រូវលាក់ក្រោយ SKIP។
+        const smokeDay = '2026-08-27';
+        const smokeStamp = Date.parse('2026-08-26T17:30:00Z');
+        const smokeKey = smoke.ctx.api.pickupBarcodeKey('SMOKE_COLLECTED');
+        const collectedBarcode = { code: 'SMOKE_COLLECTED', cod: 4.57, dod: 1.25, closedAt: smokeStamp };
+        const collectedMarks = smoke.ctx.api.collectedMarksFor(collectedBarcode, true);
+        smoke.ctx.api.markCollectedRevenue(collectedMarks);
+        await smoke.drain();
+        const smokeRecord = { [smokeKey]: { c: 4.57, d: 1.25 } };
+        check(isDeepStrictEqual(clone(smoke.ctx.dailyCollectedData[smokeDay]), smokeRecord) &&
+            smoke.writes.some((wr) => wr.path === 'zoew_daily_collected_cod_dod/' + smokeDay && isDeepStrictEqual(wr.value, smokeRecord)),
+            'sandbox៖ បិទ barcode ➜ memory និង payload ចំណូលពិតនៅថ្ងៃកម្ពុជា (មុន emulator)');
+        smoke.ctx.api.markCollectedRevenue(smoke.ctx.api.collectedMarksFor(collectedBarcode, false));
+        await smoke.drain();
+        check(!smoke.ctx.dailyCollectedData[smokeDay] &&
+            smoke.writes.some((wr) => wr.path === 'zoew_daily_collected_cod_dod/' + smokeDay && wr.value === null),
+            'sandbox៖ បើក barcode វិញដោយគ្មានត្រាចាស់ ➜ រកថ្ងៃក្នុង state ហើយលុប payload ពិត');
+        const normalIntl = smoke.ctx.Intl;
+        try {
+            smoke.ctx.Intl = { DateTimeFormat() { throw new Error('smoke៖ Intl អវត្តមាន'); } };
+            check(smoke.ctx.api.collectedDayOfStamp(smokeStamp) === smokeDay,
+                'sandbox៖ Intl បរាជ័យ ➜ ប្រើ offset ពិតរបស់ App ហើយរក្សាថ្ងៃកម្ពុជា');
+        } finally {
+            if (normalIntl === undefined) delete smoke.ctx.Intl;
+            else smoke.ctx.Intl = normalIntl;
+        }
         check(true, 'sandbox៖ ស្រង់ និងរត់ function ពិតបាន (គ្មាន ReferenceError) — មិនត្រូវការ emulator');
 
-        // ⛔⛔ **ការគ្របតាមសេណារីយ៉ូ មិនអាចជំនួសការគ្របតាមរចនាសម្ព័ន្ធបានទេ។**
-        // ការហៅ smoke ខាងលើប៉ះតែ ៥ ក្នុងចំណោម function ដែលស្រង់ ➜ helper ថ្មី
-        // ដែលរស់នៅក្នុងផ្លូវ **ដក/លុប/សម្អាត** (ដែលត្រូវការ emulator ដើម្បីរត់)
-        // លេចជា `ReferenceError` **តែក្នុង CI** ប៉ុណ្ណោះ។ វាកើតឡើងពិតនៅ 2.25.8
-        // (`notifyIfSlow`)។ ដូច្នេះត្រូវសួរសំណួរ **រចនាសម្ព័ន្ធ** ជំនួស ៖
-        // «តើឈ្មោះទាំងអស់ដែល function ដែលស្រង់ *ហៅ* មានក្នុង sandbox ទេ?»
-        const declared = new Set(Object.keys(smoke.ctx));
-        SANDBOX_SOURCE.replace(/\bfunction\s+([A-Za-z_$][\w$]*)/g, (_, n) => { declared.add(n); return _; });
-        SANDBOX_SOURCE.replace(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g, (_, n) => { declared.add(n); return _; });
-        const BUILTINS = new Set(['Promise', 'Math', 'Date', 'JSON', 'Set', 'Map', 'Object', 'Array', 'Number',
-            'String', 'Boolean', 'Error', 'parseFloat', 'parseInt', 'isNaN', 'isFinite', 'setTimeout',
-            'clearTimeout', 'console', 'globalThis', 'require', 'RegExp', 'Symbol', 'BigInt']);
-        const unresolved = new Set();
+        // សេណារីយ៉ូមិនអាចរត់គ្រប់ branch បាន៖ ពិនិត្យ dependency ទាំងអស់មុនច្រក emulator។
+        const globals = vm.runInContext('Object.getOwnPropertyNames(globalThis)', smoke.ctx);
         let smokeAst = null;
         try { smokeAst = acorn.parse(SANDBOX_SOURCE, { ecmaVersion: 2022 }); } catch (e) {}
-        if (smokeAst) {
-            (function walk(node, locals) {
-                if (!node || typeof node.type !== 'string') return;
-                let scope = locals;
-                if (/Function/.test(node.type)) {
-                    scope = new Set(locals);
-                    (node.params || []).forEach((prm) => {
-                        JSON.stringify(prm, (k, v) => {
-                            if (v && v.type === 'Identifier' && k !== 'property') scope.add(v.name);
-                            return v;
-                        });
-                    });
-                    if (node.id) scope.add(node.id.name);
-                }
-                if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier') scope.add(node.id.name);
-                if (node.type === 'CallExpression' && node.callee && node.callee.type === 'Identifier') {
-                    const name = node.callee.name;
-                    if (!declared.has(name) && !BUILTINS.has(name) && !scope.has(name)) unresolved.add(name);
-                }
-                for (const key in node) {
-                    if (key === 'type' || key === 'start' || key === 'end') continue;
-                    const v = node[key];
-                    if (Array.isArray(v)) v.forEach((c) => walk(c, scope));
-                    else if (v && typeof v === 'object') walk(v, scope);
-                }
-            })(smokeAst, new Set());
-        }
+        const unresolved = smokeAst ? sandboxUnresolvedNames(smokeAst, globals) : new Set();
         check(!!smokeAst, 'sandbox៖ parse កូដដែលផ្គុំបាន (parse error = ការធ្លាក់)');
         check(unresolved.size === 0,
-            '⛔ រាល់ function ដែល sandbox ហៅ ត្រូវមានក្នុង sandbox (គ្មាន ReferenceError ដែលលេចតែក្នុង CI)',
+            '⛔ រាល់ dependency ដែល sandbox ប្រើ ត្រូវមានក្នុង scope ពិត (function · state · ថេរ)',
             Array.from(unresolved).join(', '));
+        if (smokeAst) {
+            const probeAst = acorn.parse('function first({ value: localOnly }) { return { value: localOnly }; } function second() { return localOnly + absentState.value + absentCall(); } function third(value = bodyOnly) { var bodyOnly = 1; return value; }', { ecmaVersion: 2022 });
+            const probeMissing = Array.from(sandboxUnresolvedNames(probeAst, [])).sort();
+            check(isDeepStrictEqual(probeMissing, ['absentCall', 'absentState', 'bodyOnly', 'localOnly']),
+                'sandbox guard៖ ចាប់ function/state ដែលបាត់ និងអថេរឆ្លង scope ដោយមិនច្រឡំ property key', JSON.stringify(probeMissing));
+        }
         if (unresolved.size) {
             console.log('\n❌ sandbox ខ្វះឈ្មោះ ➜ ការធ្លាក់ **ទោះគ្មាន emulator**');
             console.log('   បន្ថែមវាក្នុង `FNS` ឬក្នុង context របស់ `makeSandbox()`។');
@@ -292,6 +361,10 @@ async function clearOrphanBeforeRetry(w, label) {
             String(sandboxError && sandboxError.message || sandboxError));
         console.log('\n❌ sandbox ខូច ➜ ការធ្លាក់ **ទោះគ្មាន emulator** (កុំឲ្យវាលេចតែក្នុង CI)');
         console.log('   ជាធម្មតា៖ `app.js` បន្ថែមថេរ/មុខងារថ្មី តែ sandbox នៅទីនេះមិនប្រកាសវា។');
+        process.exit(1);
+    }
+    if (fail) {
+        console.log('\n❌ sandbox មានការអះអាងធ្លាក់ ➜ បញ្ឈប់មុន emulator (គ្មាន SKIP បិទបាំងការធ្លាក់)');
         process.exit(1);
     }
 
@@ -308,6 +381,8 @@ async function clearOrphanBeforeRetry(w, label) {
         if (strictMode) console.log('        CRUD_FLOW_STRICT=1 ➜ ការ SKIP ត្រូវរាប់ជាការធ្លាក់ (កុំឲ្យ CI បៃតងក្លែងក្លាយ)');
         process.exit(strictMode ? 1 : 0);
     }
+    const invalidCollected = await asUser('PUT', '/zoew_daily_collected_cod_dod/2026-08-26/invalid_probe.json', { c: -1, d: 0 });
+    check(denied(invalidCollected), 'rules ពិត៖ payload ចំណូលអវិជ្ជមានត្រូវបដិសេធ (បញ្ជាក់ថាមិនរំលង rules)');
 
     // ---------- បិទ / បើក ----------
     console.log('=== ១. បិទ «យក» / បើកវិញ (barcode តែមួយ និងកញ្ចប់ទាំងមូល) ===');
@@ -317,7 +392,9 @@ async function clearOrphanBeforeRetry(w, label) {
         ['បិទ barcode តែមួយ (កញ្ចប់ជាប់គាំង marker ស្តារ)', 'toggleIndividualBarcodeClose', ['id_x', 'B1'], { restoreClaimId: 'ghost', restoreClaimToken: 'ghost_tok' }],
         ['បិទកញ្ចប់ទាំងមូល (កញ្ចប់ជាប់គាំង marker ស្តារ)', 'toggleCloseStatus', ['id_x'], { restoreClaimId: 'ghost', restoreClaimToken: 'ghost_tok' }]
     ]) {
-        const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, false), bc('B2', 3.72, false)], extra) }, zoew_recently_deleted_cod_dod: {} };
+        const untouchedCollected = { '2026-08-25': { keep_collected: { c: 2.5, d: 0.75 } } };
+        const base = { zoew_scan_history_cod_dod: { id_x: parcel('id_x', [bc('B1', 4.57, false), bc('B2', 3.72, false)], extra) },
+            zoew_recently_deleted_cod_dod: {}, zoew_daily_collected_cod_dod: clone(untouchedCollected) };
         const w = makeSandbox(clone(base), T0 + 3600000);
         w.sync();
         if (extra.restoreClaimId) await clearOrphanBeforeRetry(w, label);
@@ -327,6 +404,14 @@ async function clearOrphanBeforeRetry(w, label) {
         const closed = w.store.zoew_scan_history_cod_dod.id_x.barcodes.filter((b) => b.isClosed);
         check(closed.length > 0 && closed.every((b) => typeof b.closedAt === 'number'), label + ' ➜ បោះត្រា closedAt គ្រប់ barcode ដែលបិទ');
         check(w.store.zoew_scan_history_cod_dod.id_x.restoreClaimId === undefined, label + ' ➜ marker ស្តារដែលងាប់ត្រូវបោសចេញ');
+        const closeDay = new Date(w.now + 7 * 3600000).toISOString().slice(0, 10);
+        const expectedCollected = clone(untouchedCollected);
+        expectedCollected[closeDay] = { [w.ctx.api.pickupBarcodeKey('B1')]: { c: 4.57, d: 0 } };
+        if (fn === 'toggleCloseStatus') expectedCollected[closeDay][w.ctx.api.pickupBarcodeKey('B2')] = { c: 3.72, d: 0 };
+        const collectedOnServer = await asUser('GET', '/zoew_daily_collected_cod_dod.json');
+        check(!denied(collectedOnServer) && isDeepStrictEqual(JSON.parse(collectedOnServer.body), expectedCollected) &&
+            isDeepStrictEqual(clone(w.ctx.dailyCollectedData), expectedCollected),
+            label + ' ➜ server ពិត និង memory កត់ចំណូលថ្ងៃយក តម្លៃត្រឹមត្រូវ និងរក្សាថ្ងៃមុន');
 
         const w2 = makeSandbox(clone(w.store), T0 + 3600000);
         w2.sync();
@@ -335,6 +420,10 @@ async function clearOrphanBeforeRetry(w, label) {
         await replay(label.replace('បិទ', 'បើកវិញ') + ' ➜ rules ទទួល', w2.writes);
         const reopened = w2.store.zoew_scan_history_cod_dod.id_x.barcodes;
         check(reopened.every((b) => b.isClosed || b.closedAt === undefined), label.replace('បិទ', 'បើកវិញ') + ' ➜ ត្រា closedAt ត្រូវលុបចេញ');
+        const reopenedCollected = await asUser('GET', '/zoew_daily_collected_cod_dod.json');
+        check(!denied(reopenedCollected) && isDeepStrictEqual(JSON.parse(reopenedCollected.body), untouchedCollected) &&
+            isDeepStrictEqual(clone(w2.ctx.dailyCollectedData), untouchedCollected),
+            label.replace('បិទ', 'បើកវិញ') + ' ➜ server ពិត និង memory ដកចំណូលថ្ងៃយក ហើយរក្សាថ្ងៃមុន');
     }
 
     // ---------- ដក ----------
@@ -424,7 +513,7 @@ async function clearOrphanBeforeRetry(w, label) {
 
     // ⛔ សន្ទះការពារ «បៃតងក្លែងក្លាយ»៖ បើចំនួន assertion ធ្លាក់ក្រោមកម្រិតអប្បបរមា
     // នោះមានន័យថាតេស្តត្រូវបានកាត់ចេញ ឬរត់មិនពេញ — CI ត្រូវក្រហម ទោះគ្មាន fail។
-    const minAsserts = parseInt(process.env.CRUD_FLOW_MIN_ASSERTS || '0', 10);
+    const minAsserts = parseInt(process.env.CRUD_FLOW_MIN_ASSERTS || '70', 10);
     if (minAsserts > 0 && pass < minAsserts) {
         console.log('\n❌ assertion តិចជាងកម្រិតអប្បបរមា៖ ' + pass + ' < ' + minAsserts);
         console.log('   តេស្តត្រូវបានកាត់ចេញ ឬរត់មិនពេញ ➜ រាប់ជាការធ្លាក់។');

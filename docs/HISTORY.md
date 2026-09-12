@@ -71,6 +71,13 @@
 
 > ### ✅ កំណត់ត្រាការផ្ទៀងផ្ទាត់លើឧបករណ៍ពិត
 >
+> **2026-09-12** — អ្នកប្រើបញ្ជាក់ថា Publish Firebase Business rules ថ្មី,
+> កំណត់ `ZTO_FIELD_SIGNED=billStatus` · `ZTO_SIGNED_VALUES=5` និងសាក
+> ZoeW `2.34.0` លើទូរស័ព្ទពិត **រួចទាំងអស់**។ ការបញ្ជាក់នេះគ្រប
+> `2.33.1` · `2.33.2` · `2.33.3` · `2.33.4` · `2.34.0` ➜ ដកបញ្ជី
+> រង់ចាំទាំងនោះចេញពី `CLAUDE.md`។ Backup secrets ជាការងារផ្សេងដែលមិនបាន
+> រាប់ក្នុងការបញ្ជាក់នេះ។
+>
 > **2026-09-11** — អ្នកប្រើបញ្ជាក់ថាមុខងារថ្មី **ទាញបញ្ជីកញ្ចប់ពី ZTO**
 > (`2.33.0`) **ដំណើរការ** ➜ គ្រប **ZoeW `2.31.12` · `2.31.13` · `2.31.14` ·
 > `2.32.0` · `2.32.1` · `2.33.0`** ក្នុងជុំតែមួយ (វាដោះ «`2.31.12` មិនរាប់
@@ -90,6 +97,23 @@
 >
 > ⛔ **កំណែមុនៗដែលបញ្ជាក់រួច** ៖ `2.27.0` ➜ `2.30.3` · `2.30.5` · `2.31.4` ·
 > `2.31.6`; ZoeKeyGen `2.19.18` (2026-09-04 · 09-05 · 09-06 · 09-09)។
+
+### ឧបករណ៍ audit — 2026-09-12 · បិទចន្លោះ checker និងសម្អាតការងារដែលចប់
+
+**កំណែ App មិនប្រែ**៖ ZoeW `2.34.0` (`zoew-v202`) និង ZoeKeyGen `2.19.21` (`zoekeygen-v91`)។ ការកែប៉ះឧបករណ៍ audit, Windows launcher និងឯកសារ; គ្មានការកែ App ដែល ship។
+
+**ការផ្ទៀងផ្ទាត់ចុងក្រោយ**៖ `run-all.sh` ជាមួយ Chrome និង RTDB emulator ពិត, `CRUD_FLOW_STRICT=1`, `VERSIONSCOPE_STRICT=1`, `MONEYGUARD_STRICT=1` ➜ **171 PASS, 0 FAIL, 0 PARTIAL, 0 SKIP; exit 0**។ Meta checker ឆ្លង **36/36**, hang guard **8/8** និង exit-code integrity **8/8**។ Syntax និង whitespace checks ឆ្លង; គ្មាន shadow checker បន្សល់។
+
+- Emulator sandbox មុនកែបោះ `dailyCollectedData is not defined` នៅសេណារីយ៉ូទីមួយ។ បន្ថែម state/ref និងថេរនាឡិកាពី App ពិត, ពិនិត្យ dependency តាម scope, ហើយអះអាង collected payload និងការបដិសេធ payload មិនត្រឹមត្រូវលើ rules ពិត។
+- បន្ថែមផែនទីការយាមតាមឯកសារ និងការពិនិត្យ manifest/template/config/lock។ ឯកសារថ្មី ឬ guard ដែលបាត់មិនអាចរអិលកាត់ដោយស្ងាត់។ ប្រភេទ integrity/manual ត្រូវសរសេរមូលហេតុច្បាស់ មិនហៅថា behavioral coverage។
+- Meta checker មុនកែទទួល checker ដែលភ្លេចភ្ជាប់ និង usage exit របស់ CLI ជាភស្តុតាង។ ឥឡូវត្រូវមាន normal/baseline wiring និង fixture checker ដែលរត់ CLI ពិត។
+- Windows launcher បញ្ឈប់សារ «SAFE TO SEND» ពេល redaction ធ្លាក់ ឬគ្មានលទ្ធផលថ្មី។ តេស្តរត់របាយការណ៍ និង redaction ពិតលើទិន្នន័យសិប្បនិម្មិត ដើម្បីផ្ទៀងផ្ទាត់លេខលុយ និងការលាក់ព័ត៌មានរសើប។
+- តេស្ត backup សាកសិទ្ធិដែលស្នើលើគ្រប់ OS ហើយផ្ទៀងផ្ទាត់ POSIX mode លើ OS ដែលគាំទ្រ។ Windows មិនត្រូវធ្លាក់ដោយសារ `stat` រាយ `0666` ជំនួស `0600`។
+- លុប `docs/NEXT-SESSION.md` និងតំណសកម្មរបស់វា។ ប្រវត្តិចាស់នៅដដែល; ការពង្រីក fuzz តាមថ្ងៃបិទជាជម្រើសស្រេចចិត្តដែលមិនមែនលក្ខខណ្ឌបញ្ចប់។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+គ្មាន Firebase rules ឬ Netlify env ថ្មី។ GitHub Actions និង branch protection នៅពឹងលើសិទ្ធិ/ការទូទាត់របស់គណនី; ជុំនេះមិនប្តូរការកំណត់គណនីទេ។ ការផ្ទៀងផ្ទាត់ត្រូវរត់នៅមូលដ្ឋានជាមួយ emulator តាម Runbook។
 
 ### ZoeW `2.34.0` — 2026-09-12 · **«ចំណូលប្រចាំថ្ងៃ» — អ័ក្សលុយទី ២ (តាមថ្ងៃយក)**
 
@@ -7854,6 +7878,23 @@ CSP ក៏មិនប្រែដែរ។
 > 2.19.1 · 2.19.3។ **ការសរសេរវាលើកទី ១៣ មិនបានទប់ការកើតឡើងលើកទី ១៤ ទេ។**
 > ការកត់ត្រាមិនមែនជាការអនុវត្តទេ — មានតែ **ឧបករណ៍ដែលធ្វើឲ្យ build ធ្លាក់**
 > ទេដែលអនុវត្តបាន។ នោះជាមូលហេតុនៃ `audit-tools/checker-coverage.js`។
+
+### ឧបករណ៍ audit — 2026-09-12 · ការផ្ទៀងផ្ទាត់មុនលុបឯកសាររង់ចាំ
+
+ការរត់ baseline ជាមួយ Chrome និង RTDB emulator ពិតរកឃើញ **166 PASS, 2 FAIL, 0 PARTIAL, 0 SKIP**។ ការធ្លាក់មានក្នុង harness របស់ `emu/crud-rules-flow` និងការអះអាង POSIX mode របស់ backup លើ Windows។ កូដ App ទាំងពីរមិនប្រែ។
+
+| ចន្លោះដែលវាស់ឃើញ | ការកែ និងភស្តុតាង |
+|---|---|
+| Sandbox ខ្វះ collected state/ref និងថេរពេលវេលា | `emu/crud-rules-flow` ឆ្លង **70/70** លើ rules ពិត។ Mutation dependency ដែលលាក់ក្នុងផ្លូវមិនទាន់ហៅ និង `commitCollectedMarks` ដែលមិនធ្វើអ្វី ត្រូវបានចាប់ទាំងពីរ។ |
+| CLI usage exit ត្រូវរាប់ខុសថាបានវាស់ទិន្នន័យ | `money-reality-test` ឆ្លង **65/65**; checker ថ្មីលើ launcher ចាស់ធ្លាក់ **13**។ Mutation លាក់ money failure, លេច identity, salt ថេរ និង hash ថ្ងៃ ត្រូវបានចាប់។ |
+| Windows `stat` មិនតំណាងឲ្យ POSIX permissions | `firebase-backup-test` ឆ្លង **78/78**; តេស្តចាស់ធ្លាក់ **1** លើកូដដដែល។ Mutation ស្នើ credential mode និង backup mode ខ្សោយ ត្រូវបានចាប់ទាំងពីរ។ |
+| ឯកសារមិនមាន mapping និង contract ជាក់លាក់ | `repository-file-coverage` ឆ្លង **10/10** លើ **250 ឯកសារ**; `repository-contract-test` ឆ្លង **32/32**។ ការបំបែក manifest/template/lock និង wiring ត្រូវបានចាប់; ការប្តូរឈ្មោះ helper/config ដែលត្រឹមត្រូវនៅតែឆ្លង។ |
+| Baseline មួយអាចបិទបាំង checker ដែលមិនរត់ធម្មតា | `checker-coverage` ផ្ទៀងផ្ទាត់ normal និង override របស់ឯកសារនីមួយៗ។ រកឃើញហើយបន្ថែម baseline របស់ `keygen-session-security-test`; comment, echo និងឈ្មោះឯកសារបម្រុងមិនអាចជំនួសការរត់ពិត។ |
+| `zto-import/test.js` នៅក្រៅថតដែល meta វាស់ | បន្ថែមការរត់លើថតទទេ, wiring និង assertion poison។ ពុលការអះអាងពិត ➜ **0 PASS, 69 FAIL, exit 1**; mutation ដែលលាក់ដោយ exit 0 ត្រូវបានចាប់។ ឯកសារដើមនៅដដែល។ |
+
+បញ្ជីការគ្របមាន behavior **29**, static **211**, integrity **5**, manual **5**។ Manual មានតែអត្ថបទអាជ្ញាប័ណ្ណ និងបណ្ណសារ ដែលចាក់សោ SHA-256; វាមិនមែនភស្តុតាងឥរិយាបថគ្រប់បន្ទាត់ទេ។ ការលុប ignore សម្រាប់ shadow របស់ `emu` ឬ `zto-import` ធ្វើឲ្យ contract ធ្លាក់ ខណៈ shadow បណ្តោះអាសន្នត្រឹមត្រូវមិនធ្វើឲ្យ archive inventory ធ្លាក់។
+
+អ្នកប្រើបញ្ជាក់ Firebase Business rules, ZTO env និងការសាក ZoeW `2.34.0` លើទូរស័ព្ទរួចរាល់។ ឯកសាររង់ចាំ និងធាតុ `2.33.1` ➜ `2.34.0` ក្នុង `CLAUDE.md` ត្រូវលុប; Backup secrets នៅជាការងារផ្សេង។
 
 ### 2.33.4 — 2026-09-12 · **«ចាស់» មិនមែនជា «ផុតកំណត់» — ការប៉ាន់ស្មានក្លាយជាការវាស់**
 

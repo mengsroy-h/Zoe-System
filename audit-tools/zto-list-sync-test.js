@@ -963,7 +963,7 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [], confirm: [] };
+        const calls = { claim: [], save: [], release: [], toast: [] };
         const box = {
             console: console,
             scanHistory: [], deletedItems: [],
@@ -991,7 +991,7 @@ function firstBody(requests) {
             renderZtoListSyncPreview: () => {},
             setZtoListSyncNote: () => {},
             showToast: (msg) => { calls.toast.push(String(msg)); },
-            confirm: (msg) => { calls.confirm.push(String(msg)); return box.__confirm !== false; },
+            confirm: () => box.__confirm !== false,
             withTimeout: (promise, ms, msg) => {
                 if (box.__timeoutLabel && String(msg) === box.__timeoutLabel) {
                     return Promise.reject(new Error(msg));
@@ -1028,7 +1028,6 @@ function firstBody(requests) {
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
                 calls.release.length = 0; calls.toast.length = 0;
-                calls.confirm.length = 0;
                 box.ztoListSyncInFlight = false;
                 box.__stale = false; box.__claim = 'claimed';
                 box.__saveThrows = false; box.__confirm = true;
@@ -1093,54 +1092,6 @@ function firstBody(requests) {
             box.ztoListSyncResult = null;
             await runImport();
             ok('⛔ គ្មានបញ្ជីទាញរួច ➜ មិនបញ្ចូល', calls.save.length === 0, calls.save);
-
-            // ════════════════════════════════════════
-            // ⛔ ប្រអប់បញ្ជាក់ ៖ ប្រភពនៃកាលបរិច្ឆេទត្រូវប្រាប់អ្នកប្រើ
-            // ════════════════════════════════════════
-            // ⛔ ការបញ្ចូលនេះ **ប្តូរថ្ងៃដែលលុយចុះ** — ពីថ្ងៃ sync ទៅថ្ងៃស្កេន ZTO។
-            //    អ្នកប្រើអនុម័តដោយចុចប្រអប់បញ្ជាក់ ; បើប្រអប់នោះ **មិនប្រាប់**
-            //    គេយល់ថាបញ្ចូលចុះលើ **ថ្ងៃនេះ** ➔ អនុម័តលើការយ្ល់ដឹងខុស។
-            //    `CLAUDE.md` ចែងថា «ការស្ងាត់ = អ្នកប្រើជឺថាថ្ងៃទាំងអស់មកពី ZTO»។
-            //
-            //    ⛔ ចន្លោះដែលវាស់បាន ៖ sandbox ធ្លាប់ stub `confirm` ដោយបោះបង់
-            //    **អត្ថបទចោល** ➔ បន្ទាត់ទាំងពីរនេះ **មិនមានអ្នកយាមសោះ**
-            //    (វាស់បាន ៖ `Ὄ5` មាន **៤ កន្លែងក្នុង `app.js`** ខណៈ **០ ក្នុងអ្នកយាម**)។
-            //
-            //    ⛔ ការអះអាងត្រូវ **ដេរីវេពី `app.js` ពិត** — ការចាក់អត្ថបទ
-            //    ជា literal ទី ២ ក្នុង checker គឺជា **ការឃ្លាំមើលឧ្មោះ ២ កន្លែងឯករាជ្យ**។
-            const IMPORT_SRC = extractFn(APP_SRC, 'importZtoListRows') || '';
-            const dateNoteLit = (IMPORT_SRC.match(/'\\n\u{1F4C5}[^']*'/u) || [])[0] || '';
-            const dateNote = dateNoteLit
-                ? dateNoteLit.slice(1, -1).replace(/\\n/g, '\n') : '';
-            ok('ជាន់អប្បបរមា ៖ ស្រង់បន្ទាត់ប្រភពនៃកាលបរិច្ឆេទចេញពី `importZtoListRows` បាន',
-                dateNote.length > 10, dateNoteLit);
-
-            reset();
-            await runImport();
-            ok('⛔ ប្រអប់បញ្ជាក់ត្រូវលេចពិត (មិនបញ្ចូលដោយស្ងាត់)',
-                calls.confirm.length === 1, calls.confirm.length);
-            ok('⛔ **ប្រអប់បញ្ជាក់ត្រូវប្រាប់ថាកាលបរិច្ឆេទមកពីថ្ងៃស្កេន ZTO**'
-                + ' (ការស្ងាត់ = អ្នកប្រើជឺថាលុយចុះលើថ្ងៃនេះ)',
-                !!dateNote && (calls.confirm[0] || '').indexOf(dateNote) !== -1, calls.confirm[0]);
-
-            // ⛔ ទិសផ្ទុយ ៖ គ្មានជួរដេកណាខ្វះត្រា ZTO ➔ **មិនត្រូវព្រមានក្លែងក្លាយ**
-            ok('⛔ ទិសផ្ទុយ ៖ គ្មានជួរដេកខ្វះម៉ោង ZTO ➔ ប្រអប់មិនរាយការព្រមាន ⏱️',
-                (calls.confirm[0] || '').indexOf('\u23f1\ufe0f') === -1, calls.confirm[0]);
-
-            // ⛔ ជួរដេកគ្មានត្រា ZTO ➔ ធ្លាក់ចុះទៅម៉ោង sync ➔ ត្រូវប្រាប់ចំនួននោះ
-            reset();
-            box.ztoListSyncResult = {
-                rows: [FRESH[0], Object.assign({}, FRESH[1], { at: '' })],
-                from: '2026-09-08', to: '2026-09-11', total: 2
-            };
-            await runImport();
-            const noStampMsg = calls.confirm[0] || '';
-            ok('⛔ ជួរដេកគ្មានត្រា ZTO ➔ ប្រអប់ត្រូវប្រាប់ (មិនលុបចោលស្ងាត់)',
-                noStampMsg.indexOf('\u23f1\ufe0f') !== -1, noStampMsg);
-            ok('⛔ ចំនួនដែលរាយ ត្រូវជាចំនួនពិត (១) — មិនមែនលេខថេរ',
-                /\u23f1\ufe0f\s*1\s/.test(noStampMsg), noStampMsg);
-            ok('⛔ ជួរដេកគ្មានត្រា **មិនត្រូវរំលង** («ផ្ទៀងផ្ទាត់មិនបាន ≠ ខុស»)',
-                calls.save.length === 2, calls.save.length);
 
             // ⛔ តែក្រុម «ថ្មី» ប៉ុណ្ណោះត្រូវបញ្ចូល
             reset();

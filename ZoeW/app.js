@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.33.2';
+    const APP_VERSION = '2.33.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -5985,6 +5985,32 @@
         return getZoneDateKey(d instanceof Date ? d.getTime() : Number(d), 0);
     }
 
+    function appZoneWallClockToMillis(year, month, day, hour, minute, second) {
+        const probe = Date.UTC(year, month - 1, day, hour, minute, second);
+        if (!isFinite(probe)) return 0;
+        const parts = appZoneParts(probe);
+        const shown = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+            Number(parts.hour), Number(parts.minute), Number(parts.second));
+        if (!isFinite(shown)) return 0;
+        return probe - (shown - probe);
+    }
+
+    function ztoScanStampMillis(raw) {
+        const text = String(raw === undefined || raw === null ? '' : raw).trim();
+        const parts = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (!parts) return 0;
+        const year = Number(parts[1]);
+        const month = Number(parts[2]);
+        const day = Number(parts[3]);
+        const hour = Number(parts[4]);
+        const minute = Number(parts[5]);
+        const second = Number(parts[6] || 0);
+        if (month < 1 || month > 12 || day < 1 || day > 31) return 0;
+        if (hour > 23 || minute > 59 || second > 59) return 0;
+        const ms = appZoneWallClockToMillis(year, month, day, hour, minute, second);
+        return isFinite(ms) && ms > 0 ? ms : 0;
+    }
+
     function isMobileDevice() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
@@ -10587,11 +10613,11 @@
         }
     }
 
-    function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A") {
+    function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stampMs = 0) {
         let savePromise;
-        const now = new Date(getServerNow());
-        const dateString = getFormattedDate(now);
-        const currentTimeMillis = now.getTime();
+        const stamp = Number(stampMs);
+        const currentTimeMillis = isFinite(stamp) && stamp > 0 ? stamp : getServerNow();
+        const dateString = getFormattedDate(currentTimeMillis);
 
         const timeFormatted = getFormattedClockTime(currentTimeMillis);
         const timeString = `${timeFormatted} (${dateString})`;
@@ -13331,8 +13357,17 @@
     const ZTO_LIST_CLIENT_MAX_PAGES = 3;
     const ZTO_LIST_PREVIEW_ROWS = 12;
     const ZTO_LIST_IMPORT_MAX = 100;
+    const ZTO_LIST_SKIP_TEXT = {
+        'scan-type': 'មិនមែនស្កេន «មកដល់»',
+        'too-old': 'ថ្ងៃស្កេន ZTO ចាស់ជាងច្បាប់សម្អាតស្វ័យប្រវត្តិ ➜ បញ្ចូល ➜ ចូលធុងសំរាមភ្លាម'
+    };
     let ztoListSyncInFlight = false;
     let ztoListSyncResult = null;
+
+    function ztoListSkipText(reason) {
+        const key = String(reason === undefined || reason === null ? '' : reason);
+        return Object.prototype.hasOwnProperty.call(ZTO_LIST_SKIP_TEXT, key) ? ZTO_LIST_SKIP_TEXT[key] : '';
+    }
 
     function ztoListSyncEnabled() {
         return safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1';
@@ -13390,16 +13425,24 @@
             const phone = normalizeStoredPhone(raw.phone);
             const cod = Number(raw.cod);
             const dod = Number(raw.dod);
+            const at = String(raw.at === undefined || raw.at === null ? '' : raw.at);
+            const stampMs = ztoScanStampMillis(at);
             const row = {
                 barcode: String(raw.barcode === undefined || raw.barcode === null ? '' : raw.barcode),
                 phone: phone,
                 cod: isFinite(cod) ? cod : 0,
                 dod: isFinite(dod) ? dod : 0,
-                at: String(raw.at === undefined || raw.at === null ? '' : raw.at),
+                at: at,
+                stampMs: stampMs,
                 skip: String(raw.skip === undefined || raw.skip === null ? '' : raw.skip),
                 key: key
             };
             if (!key || !phone || row.skip) {
+                out.skipped.push(row);
+                continue;
+            }
+            if (stampMs && barcodeAbandonIsRipe({ isClosed: false }, stampMs, getServerNow())) {
+                row.skip = 'too-old';
                 out.skipped.push(row);
                 continue;
             }
@@ -13484,7 +13527,7 @@
                     row.cod ? 'COD $' + row.cod.toFixed(2) : '',
                     row.dod ? 'DOD $' + row.dod.toFixed(2) : ''
                 ].filter(Boolean).join(' · ');
-                const meta = [row.phone || '—', money, row.at].filter(Boolean).join(' · ');
+                const meta = [row.phone || '—', money, row.at, ztoListSkipText(row.skip)].filter(Boolean).join(' · ');
                 return '<div class="zto-list-row">'
                     + '<span class="zto-list-code">' + sanitizeInput(row.barcode || '—') + '</span>'
                     + '<span class="zto-list-meta">' + sanitizeInput(meta) + '</span></div>';
@@ -13512,7 +13555,7 @@
         box.innerHTML = ztoListGroupHtml(freshTitle, groups.fresh, 'zto-list-fresh')
             + ztoListGroupHtml(existingTitle, groups.existing, 'zto-list-existing')
             + ztoListGroupHtml('♻️ ស្ទួនក្នុងបញ្ជី ZTO', groups.duplicate, 'zto-list-dup')
-            + ztoListGroupHtml('⏭️ រំលង (មិនមែនកញ្ចប់អតិថិជន)', groups.skipped, 'zto-list-skip');
+            + ztoListGroupHtml('⏭️ រំលង (មិនបញ្ចូល)', groups.skipped, 'zto-list-skip');
         const truncated = result.truncated
             ? ' · ⚠️ បញ្ជីវែងជាង ' + ZTO_LIST_CLIENT_MAX_PAGES + ' ទំព័រ ➜ សូមបំបែកជួរកាលបរិច្ឆេទ'
             : '';
@@ -13613,8 +13656,14 @@
         }
         const capped = groups.fresh.length > queue.length
             ? ' (ពិដាន ' + ZTO_LIST_IMPORT_MAX + ' ក្នុងមួយដង)' : '';
+        const noStamp = queue.filter((row) => !row.stampMs).length;
+        const noStampNote = noStamp
+            ? '\n⏱️ ' + noStamp + ' កញ្ចប់គ្មានម៉ោងស្កេនពី ZTO ➜ ប្រើម៉ោងបញ្ចូលជំនួស។'
+            : '';
         if (!confirm('បញ្ចូល ' + queue.length + ' កញ្ចប់ថ្មីចូល ZoeW?' + capped
-            + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។')) {
+            + '\n\nវានឹងដើរដូចការស្កេនដោយដៃបេះបិទ ➜ ស្ថិតិប្រាក់នឹងឡើងតាម COD។'
+            + '\n📅 កាលបរិច្ឆេទ និងម៉ោង យកតាមថ្ងៃស្កេនរបស់ ZTO ➜ លុយចុះលើថ្ងៃនោះ។'
+            + noStampNote)) {
             return;
         }
         ztoListSyncInFlight = true;
@@ -13622,6 +13671,7 @@
         let taken = 0;
         let failed = 0;
         let pending = 0;
+        const savedDates = new Set();
         try {
             for (let i = 0; i < queue.length; i++) {
                 const row = queue[i];
@@ -13644,14 +13694,16 @@
                     dropOptimisticBarcode(row.barcode);
                     refreshCurrentHistoryView();
                 };
-                const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A');
+                const rowDateKey = getZoneDateKey(row.stampMs || getServerNow(), 0);
+                const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs);
                 try {
                     const status = await withTimeout(savePromise, 15000, 'Save timed out');
-                    if (status === true) saved++;
+                    if (status === true) { saved++; savedDates.add(rowDateKey); }
                     else failed++;
                 } catch (e) {
                     if (e && e.message === 'Save timed out') {
                         pending++;
+                        savedDates.add(rowDateKey);
                         armLateWrite(savePromise, refreshCurrentHistoryView, rollbackImportedRow,
                             'ZTO list import save');
                     } else {
@@ -13669,8 +13721,13 @@
         if (taken) parts.push('♻️ ស្ទួន ' + taken);
         if (pending) parts.push('⏳ កំពុងរក្សាទុក ' + pending);
         if (failed) parts.push('⚠️ បរាជ័យ ' + failed);
-        showToast(parts.join(' · '));
-        setZtoListSyncNote(parts.join(' · ') + ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');
+        const dateKeys = Array.from(savedDates).sort();
+        const dateNote = dateKeys.length
+            ? ' — 📅 កញ្ចប់ចុះលើថ្ងៃស្កេន ZTO ៖ ' + dateKeys.join(' · ')
+                + ' ➜ ប្ដូរតម្រងថ្ងៃ ដើម្បីមើលពួកវា'
+            : '';
+        showToast(parts.join(' · ') + (dateKeys.length ? ' · 📅 ' + dateKeys.join(' · ') : ''));
+        setZtoListSyncNote(parts.join(' · ') + dateNote + ' — សូមទាញបញ្ជីម្តងទៀត ដើម្បីពិនិត្យ។');
     }
 
     function openZtoListSyncModal() {

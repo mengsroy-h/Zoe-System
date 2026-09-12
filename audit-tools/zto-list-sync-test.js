@@ -98,6 +98,26 @@ function extractConst(src, name) {
     return m ? 'const ' + name + ' = ' + m[1] + ';' : null;
 }
 
+// ⛔ ឈ្មោះដែលរកមិនឃើញត្រូវក្លាយជា **stub** មិនមែនការឈប់ ៖ `process.exit`
+// ឬ sandbox ដែលបាក់ បិទបាំងការអះអាងទាំងអស់ខាងក្រោមវា ➜ tree មុនកែរាយ
+// «FAIL ៤» ជំនួស **ការធ្លាក់ដែលមានឈ្មោះ**។
+const FN_STUB_BODY = {
+    ztoScanStampMillis: 'return 0;',
+    appZoneWallClockToMillis: 'return 0;'
+};
+function fnOrStub(src, name) {
+    const found = extractFn(src, name);
+    if (found) return found;
+    const body = Object.prototype.hasOwnProperty.call(FN_STUB_BODY, name)
+        ? FN_STUB_BODY[name] : 'return undefined;';
+    return 'function ' + name + '() { ' + body + ' }';
+}
+const CONST_STUB_VALUE = { ABANDON_AGE_MS: '7 * 24 * 60 * 60 * 1000' };
+function constOrStub(src, name) {
+    return extractConst(src, name)
+        || ('const ' + name + ' = ' + (CONST_STUB_VALUE[name] || 'undefined') + ';');
+}
+
 let proxy = null;
 let loadError = '';
 try { proxy = require(FUNCTION_JS); } catch (e) { loadError = String(e && e.message); }
@@ -592,22 +612,31 @@ function firstBody(requests) {
     console.log('\n== ១០. ខាង Client ៖ ការចាត់ថ្នាក់ ៤ ក្រុម ==');
     // ═════════════════════════════════════════════════════════════════════
     const NEEDED = ['classifyZtoListRows', 'barcodeRegistryKey', 'pickupBarcodeKey',
-        'normalizeStoredPhone', 'normalizeOneStoredPhone'];
+        'normalizeStoredPhone', 'normalizeOneStoredPhone',
+        'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
+        'barcodeAbandonIsRipe'];
+    const CLOCK_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'ABANDON_AGE_MS'];
+    const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name));
+    ok('⛔ ស្រង់ថេរនាឡិកា/ច្បាប់សម្អាតចេញពី `app.js` បាន',
+        CLOCK_CONST_NAMES.every((name) => !!extractConst(APP_SRC, name)), NEEDED_CONSTS);
     const parts = [];
     const missing = [];
     NEEDED.forEach((name) => {
-        const fn = extractFn(APP_SRC, name);
-        if (fn) parts.push(fn); else missing.push(name);
+        if (!extractFn(APP_SRC, name)) missing.push(name);
+        parts.push(fnOrStub(APP_SRC, name));
     });
     ok('⛔ ស្រង់ function ចាំបាច់ចេញពី `app.js` បាន', missing.length === 0, missing);
 
     let classify = null;
-    if (!missing.length) {
-        const sandbox = { console: console };
+    {
+        const sandbox = { console: console, getServerNow: () => sandbox.__now };
         sandbox.globalThis = sandbox;
         try {
             vm.createContext(sandbox);
-            vm.runInContext(parts.join('\n') + '\nglobalThis.__classify = classifyZtoListRows;', sandbox);
+            vm.runInContext(NEEDED_CONSTS.join('\n') + '\n' + parts.join('\n')
+                + '\nglobalThis.__classify = classifyZtoListRows;'
+                + '\nglobalThis.__stamp0 = ztoScanStampMillis;', sandbox);
+            sandbox.__now = sandbox.__stamp0('2026-09-11 09:00:00');
             classify = sandbox.__classify;
         } catch (e) {
             ok('sandbox រត់បាន', false, String(e && e.message));
@@ -919,16 +948,21 @@ function firstBody(requests) {
         /id="ztoListSyncImportBtn"[^>]*data-act="importZtoListRows"/.test(HTML_SRC), true);
 
     // ⛔ ការវាស់ **ឥរិយាបថ** ៖ ស្រង់តួចូល sandbox រួចរាប់ការហៅពិត
-    const importParts = ['importZtoListRows', 'classifyZtoListRows', 'barcodeRegistryKey',
-        'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone']
-        .map((name) => extractFn(APP_SRC, name) || '');
+    const IMPORT_NAMES = ['importZtoListRows', 'classifyZtoListRows', 'barcodeRegistryKey',
+        'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone',
+        'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
+        'barcodeAbandonIsRipe'];
+    IMPORT_NAMES.push('ztoListSkipText', 'getZoneDateKey');
+    const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
+    const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
+        .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};']);
     const importOptional = ['armLateWrite', 'releaseLateBarcodeClaim']
         .map((name) => extractFn(APP_SRC, name) || '').filter(Boolean);
-    const importMissing = importParts.filter((src) => !src).length;
+    const importMissing = IMPORT_NAMES.filter((name) => !extractFn(APP_SRC, name)).length;
     ok('ជាន់អប្បបរមា ៖ ស្រង់ function ចាំបាច់ទាំងអស់សម្រាប់ sandbox',
         importMissing === 0, importMissing);
 
-    if (!importMissing) {
+    {
         const calls = { claim: [], save: [], release: [], toast: [] };
         const box = {
             console: console,
@@ -937,6 +971,7 @@ function firstBody(requests) {
             ztoListSyncResult: null,
             ZTO_SYNC_VIEW_KEYS: ['history', 'deleted'],
             navigator: { onLine: true },
+            getServerNow: () => box.__now,
             anyDbListenerViewIsStale: () => box.__stale === true,
             isBarcodeAlreadyUsed: () => false,
             claimBarcodeInRegistry: (code) => {
@@ -944,8 +979,8 @@ function firstBody(requests) {
                 if (box.__claimHangs) { const d = deferred(); box.__claimDeferreds.push(d); return d.promise; }
                 return Promise.resolve(box.__claim || 'claimed');
             },
-            addOrUpdateEntry: (code, phone, cod, dod, locker) => {
-                calls.save.push({ code, phone, cod, dod, locker });
+            addOrUpdateEntry: (code, phone, cod, dod, locker, stampMs) => {
+                calls.save.push({ code, phone, cod, dod, locker, stampMs });
                 if (box.__saveHangs) { const d = deferred(); box.__saveDeferreds.push(d); return d.promise; }
                 if (box.__saveThrows) return Promise.reject(new Error('save failed'));
                 return Promise.resolve(true);
@@ -971,8 +1006,14 @@ function firstBody(requests) {
         let runImport = null;
         try {
             vm.createContext(box);
-            vm.runInContext(importParts.concat(importOptional).join('\n')
-                + '\nglobalThis.__run = importZtoListRows;', box);
+            vm.runInContext(CLOCK_CONSTS.join('\n') + '\n'
+                + importParts.concat(importOptional).join('\n')
+                + '\nglobalThis.__run = importZtoListRows;'
+                + '\nglobalThis.__classify = classifyZtoListRows;'
+                + '\nglobalThis.__stamp = ztoScanStampMillis;'
+                + '\nglobalThis.__offsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
+                + '\nglobalThis.__skipText = ztoListSkipText;'
+                + '\nglobalThis.__abandonMs = ABANDON_AGE_MS;', box);
             runImport = box.__run;
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
@@ -993,6 +1034,7 @@ function firstBody(requests) {
                 box.__claimHangs = false; box.__saveHangs = false; box.__timeoutLabel = '';
                 box.__claimDeferreds = []; box.__saveDeferreds = [];
                 box.navigator.onLine = true;
+                box.__now = Date.UTC(2026, 8, 11, 9, 0, 0) - box.__offsetMin * 60000;
                 box.ztoListSyncResult = { rows: FRESH.slice(), from: '2026-09-08', to: '2026-09-11', total: 2 };
             };
 
@@ -1116,6 +1158,253 @@ function firstBody(requests) {
             ok('⛔ ទិសផ្ទុយ ៖ commit យឺតដែល **បដិសេធពិត** ➜ ត្រូវដោះកូនសោវិញ',
                 releasedCodes().length === 2, calls.release);
             reset();
+
+            // ═════════════════════════════════════════════════════════════
+            console.log('\n== ១៦. \u26d4 \u1780\u17b6\u179b\u1794\u179a\u17b7\u1785\u17d2\u1786\u17c1\u1791 = \u1790\u17d2\u1784\u17c3\u179f\u17d2\u1780\u17c1\u1793\u179a\u1794\u179f\u17cb ZTO ==');
+            // ═════════════════════════════════════════════════════════════
+            // ⛔ **ច្បាប់** ៖ ជួរដេកនីមួយៗត្រូវចុះក្នុង ZoeW តាម **ថ្ងៃស្កេន
+            // របស់ ZTO** មិនមែនថ្ងៃ sync ➜ `scanDate` · `time` · `createdAt`
+            // និង **ថ្ងៃរបស់ ledger** សុទ្ធតែដេរីវេពី `row.at`។
+            //
+            // ⛔ **ពាក់កណ្តាលទី ២ ៖ ច្បាប់ ៨ ថ្ងៃ** — `createdAt` ដែលចាស់ជាង
+            // `ABANDON_AGE_MS` ធ្វើឲ្យកញ្ចប់ **ចូលធុងសំរាមភ្លាម ហើយដកលុយ**
+            // (`claimAndCleanupItem('abandon')`) ➜ អ្នកប្រើឃើញ «បញ្ចូល N
+            // កញ្ចប់» រួចវាបាត់ទាំងអស់។ ដូច្នេះជួរដេកបែបនោះត្រូវចូលក្រុម
+            // «រំលង» **មុនការបញ្ចូល** ⛔ មិនមែនត្រូវបញ្ចូលរួចទុកឲ្យការសម្អាត
+            // លុបវិញទេ។
+            const classifyReal = box.__classify;
+            const stampOf = box.__stamp;
+            ok('ជាន់អប្បបរមា ៖ `ztoScanStampMillis` រត់ក្នុង sandbox បាន',
+                typeof stampOf === 'function', typeof stampOf);
+            ok('ជាន់អប្បបរមា ៖ `ABANDON_AGE_MS` អានចេញពីកូដពិត',
+                box.__abandonMs === 7 * 24 * 60 * 60 * 1000, box.__abandonMs);
+
+            if (typeof stampOf === 'function' && typeof classifyReal === 'function') {
+                const NOW = Date.UTC(2026, 8, 11, 9, 0, 0) - box.__offsetMin * 60000;
+                ok('⛔ `ztoScanStampMillis()` ត្រូវនឹង offset ក្នុងកូដពិត',
+                    stampOf('2026-09-11 09:00:00') === NOW, stampOf('2026-09-11 09:00:00'));
+                ok('⛔ ទម្រង់ `T` ក៏ទទួលដែរ', stampOf('2026-09-11T09:00:00') === NOW,
+                    stampOf('2026-09-11T09:00:00'));
+                ok('⛔ អត្ថបទដែលមិនមែនត្រា ➜ `0` (ធ្លាក់ចុះទៅម៉ោង sync)',
+                    stampOf('') === 0 && stampOf('abc') === 0 && stampOf(null) === 0, true);
+                ok('⛔ ត្រាដែលមិនអាចមាន ➜ `0` (⛔ មិនរំកិលចូលខែក្រោយស្ងាត់ៗ)',
+                    stampOf('2026-13-10 10:00:00') === 0
+                    && stampOf('2026-09-10 25:00:00') === 0
+                    && stampOf('2026-09-00 10:00:00') === 0, true);
+
+                box.__now = NOW;
+                const AGE = box.__abandonMs;
+                const old2 = new Date(NOW - AGE - 60000);
+                const pad = (n) => String(n).padStart(2, '0');
+                const zoneText = (ms) => {
+                    const d = new Date(ms + box.__offsetMin * 60000);
+                    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate())
+                        + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
+                };
+                const graded = classifyReal([
+                    { barcode: '77130500000801', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
+                    { barcode: '77130500000802', phone: '0963897345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' },
+                    { barcode: '77130500000803', phone: '0963897345', cod: 1, dod: 0, at: '', skip: '' }
+                ], [], []);
+                ok('⛔ ជួរដេកក្នុងព្រំដែន (ក្មេងជាង `ABANDON_AGE_MS`) ➜ នៅជា «ថ្មី»',
+                    graded.fresh.some((r) => r.barcode === '77130500000801'), graded.fresh);
+                ok('⛔ ជួរដេកដែលថ្ងៃស្កេន ZTO ចាស់ជាងច្បាប់សម្អាត ➜ ក្រុម «រំលង» (បើបញ្ចូល ➜ ចូលធុងសំរាមភ្លាម ➜ **ដកលុយ**)',
+                    graded.skipped.some((r) => r.barcode === '77130500000802' && r.skip === 'too-old'),
+                    graded.skipped);
+                ok('⛔ ជួរដេកគ្មានត្រា ZTO ➜ មិនត្រូវរំលង (ធ្លាក់ចុះទៅម៉ោង sync)',
+                    graded.fresh.some((r) => r.barcode === '77130500000803'), graded.fresh);
+                ok('⛔ ការអភិរក្សនៅដដែល ៖ ថ្មី+មានរួច+ស្ទួន+រំលង = ចំនួនជួរដេកដើម',
+                    graded.fresh.length + graded.existing.length
+                    + graded.duplicate.length + graded.skipped.length === 3,
+                    [graded.fresh.length, graded.existing.length, graded.duplicate.length, graded.skipped.length]);
+                ok('⛔ ជួរដេកផ្ទុក `stampMs` ដែលដេរីវេពី `at` (ស្នាមភ្ជាប់ទៅ `addOrUpdateEntry`)',
+                    (graded.fresh.find((r) => r.barcode === '77130500000801') || {}).stampMs
+                    === stampOf(zoneText(NOW - AGE + 60000)), graded.fresh[0]);
+
+                // ⛔ អ្នកប្រើត្រូវដឹង **ហេតុអ្វី** ជួរដេកមួយត្រូវរំលង ៖ ក្រុម
+                // «រំលង (N)» ដែលគ្មានមូលហេតុ = កញ្ចប់បាត់ដោយគ្មានការពន្យល់
+                // ➜ អ្នកប្រើសន្និដ្ឋានថាមុខងារខូច។
+                const skipTextFn = box.__skipText;
+                ok('ជាន់អប្បបរមា ៖ `ztoListSkipText()` រត់ក្នុង sandbox បាន',
+                    typeof skipTextFn === 'function', typeof skipTextFn);
+                if (typeof skipTextFn === 'function') {
+                    ok('⛔ មូលហេតុ «ចាស់ពេក» មានអត្ថបទពន្យល់ដល់អ្នកប្រើ',
+                        String(skipTextFn('too-old') || '').length > 8, skipTextFn('too-old'));
+                    ok('⛔ មូលហេតុ «មិនមែនស្កេនមកដល់» ក៏មានអត្ថបទដែរ',
+                        String(skipTextFn('scan-type') || '').length > 8, skipTextFn('scan-type'));
+                    ok('⛔ មូលហេតុទាំង ២ ខុសគ្នា (មិនមែនអត្ថបទរួមកន្តុំ)',
+                        skipTextFn('too-old') !== skipTextFn('scan-type'), true);
+                    ok('⛔ កូនសោមិនស្គាល់ ➜ អត្ថបទទទេ (មិនធ្លាក់ចុះទៅ prototype)',
+                        skipTextFn('') === '' && skipTextFn('constructor') === ''
+                        && skipTextFn('toString') === '', [skipTextFn('constructor'), skipTextFn('toString')]);
+                }
+                const classifySrc = extractFn(APP_SRC, 'classifyZtoListRows') || '';
+                ok('⛔ ច្រកទ្វារ «ចាស់ពេក» ហៅ **អ្នកសម្រេចដដែល** នឹងការសម្អាត (`barcodeAbandonIsRipe`) ⛔ មិនមែនច្បាប់ចម្លងទី ៤ នៃរូបមន្តព្រំដែន',
+                    /barcodeAbandonIsRipe\s*\(/.test(classifySrc)
+                    && classifySrc.indexOf('ABANDON_AGE_MS') === -1,
+                    (/.{0,90}ABANDON_AGE_MS/.exec(classifySrc) || [''])[0]);
+                const groupHtmlFn = extractFn(APP_SRC, 'ztoListGroupHtml') || '';
+                ok('⛔ ជួរដេកមើលជាមុនបង្ហាញមូលហេតុពិត (ស្នាមភ្ជាប់ទៅ `ZTO_LIST_SKIP_TEXT`)',
+                    /ztoListSkipText\s*\(\s*row\.skip\s*\)/.test(groupHtmlFn), groupHtmlFn.slice(0, 200));
+
+                reset();
+                box.__now = NOW;
+                box.ztoListSyncResult = {
+                    rows: [
+                        { barcode: '77130500000801', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - AGE + 60000), skip: '' },
+                        { barcode: '77130500000802', phone: '0963897345', cod: 1, dod: 0, at: zoneText(old2.getTime()), skip: '' }
+                    ],
+                    from: '2026-09-01', to: '2026-09-11', total: 2
+                };
+                await runImport();
+                ok('⛔ ការបញ្ចូល ៖ ជួរដេកចាស់ពេក **មិនត្រូវសរសេរ**',
+                    calls.save.length === 1 && calls.save[0].code === '77130500000801', calls.save);
+                ok('⛔ ការបញ្ចូល ៖ ត្រា ZTO ត្រូវឡើងដល់ `addOrUpdateEntry()` ជាអាគុយម៉ង់ទី ៦',
+                    calls.save[0] && calls.save[0].stampMs === stampOf(zoneText(NOW - AGE + 60000)),
+                    calls.save[0]);
+
+                // ⛔ តម្រងលំនាំដើមជា «ថ្ងៃនេះ» ➜ កញ្ចប់ដែលចុះលើថ្ងៃ ZTO ចាស់
+                // **មិនលេចក្នុងតារាង** ➜ អ្នកប្រើជឿថាការបញ្ចូលបរាជ័យ។ សារ
+                // ត្រូវប្រាប់ថ្ងៃដែលវាចុះ ⛔ មិនមែនត្រឹមចំនួន។
+                reset();
+                box.__now = NOW;
+                box.ztoListSyncResult = {
+                    rows: [
+                        { barcode: '77130500000811', phone: '0963897345', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000), skip: '' },
+                        { barcode: '77130500000813', phone: '0963897347', cod: 1, dod: 0, at: zoneText(NOW - 2 * 86400000 + 3600000), skip: '' },
+                        { barcode: '77130500000812', phone: '0963897346', cod: 1, dod: 0, at: zoneText(NOW - 86400000), skip: '' }
+                    ],
+                    from: '2026-09-08', to: '2026-09-11', total: 3
+                };
+                await runImport();
+                const lastToast = calls.toast[calls.toast.length - 1] || '';
+                ok('⛔ សារបញ្ចប់ត្រូវរាយ **ថ្ងៃដែលកញ្ចប់ចុះ** (បើអត់ ➜ តម្រង «ថ្ងៃនេះ» បង្ហាញទទេ ➜ អ្នកប្រើជឿថាបរាជ័យ)',
+                    lastToast.indexOf('2026-09-09') !== -1 && lastToast.indexOf('2026-09-10') !== -1,
+                    lastToast);
+                ok('⛔ ថ្ងៃត្រូវតម្រៀប និងមិនស្ទួន (កញ្ចប់ច្រើនក្នុងថ្ងៃដដែល ➜ ថ្ងៃម្តង)',
+                    (lastToast.match(/2026-09-09/g) || []).length === 1
+                    && lastToast.indexOf('2026-09-09') < lastToast.indexOf('2026-09-10'), lastToast);
+                reset();
+            }
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    console.log('\n== ១៧. \u26d4 `addOrUpdateEntry()` \u1796\u17b7\u178f \u17d6 \u178f\u17d2\u179a\u17b6 ZTO \u1793\u17b6\u17c6\u179b\u17bb\u1799\u1791\u17c5\u1790\u17d2\u1784\u17c3\u178e\u17b6 ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // ⛔ **នេះជាស្នាមភ្ជាប់ដែលប៉ះលុយ** ៖ `addOrUpdateEntry()` យក `dateString`
+    // ទៅ `addRevenueToDailyAndMonthlyRecord()` ➜ ថ្ងៃណាដែលវាជ្រើស គឺជាថ្ងៃ
+    // ដែល **លុយចុះ** និងជាថ្ងៃដែល **ledger ខែ** បូកចូល។ checker ដែលវាស់តែ
+    // `importZtoListRows` មើលមិនឃើញថ្នាក់នេះទេ ព្រោះ sandbox របស់វា **stub
+    // `addOrUpdateEntry` ចោល** ➜ ការបម្លែងត្រា ➜ ថ្ងៃ គ្មានអ្នកវាស់សោះ។
+    const ENTRY_NAMES = ['addOrUpdateEntry', 'getZoneDateKey', 'getFormattedClockTime',
+        'appZoneParts', 'appZoneWallClockToMillis', 'ztoScanStampMillis',
+        'getFormattedDate', 'normalizeBarcodesOf', 'barcodeEntriesOf',
+        'recalcItemMoneyFromBarcodes'];
+    const entryParts = ENTRY_NAMES.map((name) => fnOrStub(APP_SRC, name));
+    const entryMissingNames = ENTRY_NAMES.filter((name) => !extractFn(APP_SRC, name));
+    ok('ជាន់អប្បបរមា ៖ ស្រង់ `addOrUpdateEntry` និងផ្លូវនាឡិកាពិតបាន',
+        entryMissingNames.length === 0, entryMissingNames);
+    const ENTRY_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
+    const entryConsts = ENTRY_CONST_NAMES.map((name) => constOrStub(APP_SRC, name));
+    ok('ជាន់អប្បបរមា ៖ ថេរតំបន់ម៉ោងអានចេញពីកូដពិត',
+        ENTRY_CONST_NAMES.every((name) => !!extractConst(APP_SRC, name)), entryConsts);
+
+    {
+        const seen = { ledgerDays: [], saved: [], merged: [] };
+        const ebox = {
+            console: console,
+            scanHistory: [],
+            getServerNow: () => ebox.__now,
+            addRevenueToDailyAndMonthlyRecord: (dateStr, cod, dod, count) => {
+                seen.ledgerDays.push(dateStr);
+                return { scanDate: dateStr, cod, dod, count };
+            },
+            correctRevenueLedgerToActual: () => Promise.resolve({ ok: true }),
+            revertRevenueLedgerDelta: () => {},
+            generateUniqueId: () => 'id-' + (seen.saved.length + 1),
+            mergeBarcodeIntoHistoryItem: (id, apply, item) => Promise.resolve(apply(item)),
+            saveSingleHistoryItemToFirebase: (item) => { seen.saved.push(item); return Promise.resolve(item); },
+            refreshCurrentHistoryView: () => {},
+            showToast: () => {},
+            updateRecentPhonesList: () => {}
+        };
+        ebox.globalThis = ebox;
+        ebox.window = ebox;
+        let runEntry = null;
+        try {
+            vm.createContext(ebox);
+            vm.runInContext(entryConsts.join('\n') + '\n' + entryParts.join('\n')
+                + '\nglobalThis.__entry = addOrUpdateEntry;'
+                + '\nglobalThis.__stamp2 = ztoScanStampMillis;'
+                + '\nglobalThis.__zoneOffsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
+                + '\nglobalThis.__dayKey = getZoneDateKey;', ebox);
+            runEntry = ebox.__entry;
+        } catch (e) {
+            ok('sandbox នៃ `addOrUpdateEntry` រត់បាន', false, String(e && e.message));
+        }
+        ok('⛔ `addOrUpdateEntry` រត់ក្នុង sandbox បាន', typeof runEntry === 'function', typeof runEntry);
+
+        if (typeof runEntry === 'function') {
+            // ⛔ ត្រាត្រូវគណនា **ដោយឯករាជ្យ** ពី `ztoScanStampMillis()` ៖ បើ
+            // checker ប្រើវាជាទាំងប្រភព និងជាអ្វីដែលវាវាស់ នោះជាការស៊ីគ្នា
+            // ដោយចៃដន្យ។ offset ដេរីវេពីថេរក្នុងកូដពិត មិនមែនលេខរឹង។
+            const zoneMs = (y, mo, d, h, mi, se) =>
+                Date.UTC(y, mo - 1, d, h, mi, se) - ebox.__zoneOffsetMin * 60000;
+            const SYNC_AT = zoneMs(2026, 9, 12, 8, 30, 0);
+            const ZTO_AT = zoneMs(2026, 9, 10, 14, 23, 11);
+            ok('⛔ ផ្លូវបម្លែង ២ ឯករាជ្យឲ្យត្រាដដែល (`ztoScanStampMillis` ↔ offset ក្នុងកូដ)',
+                ebox.__stamp2('2026-09-10 14:23:11') === ZTO_AT, ebox.__stamp2('2026-09-10 14:23:11'));
+            ebox.__now = SYNC_AT;
+
+            await runEntry('77130500000701', '0963897345', 6.47, 0, 'N/A', ZTO_AT);
+            const first = seen.saved[0] || {};
+            ok('⛔ **លុយចុះលើថ្ងៃស្កេន ZTO** មិនមែនថ្ងៃ sync',
+                seen.ledgerDays[0] === '2026-09-10', seen.ledgerDays);
+            ok('⛔ `scanDate` = ថ្ងៃស្កេន ZTO', first.scanDate === '2026-09-10', first.scanDate);
+            ok('⛔ `time` = ម៉ោងស្កេន ZTO បេះបិទ (ទម្រង់រក្សាដដែល)',
+                first.time === '14:23:11 (2026-09-10)', first.time);
+            ok('⛔ `createdAt` = ត្រា ZTO (នាឡិកា ៨ ថ្ងៃដើរតាមវា)',
+                first.createdAt === ZTO_AT, first.createdAt);
+            ok('⛔ `barcodes[0].createdAt` ក៏ជាត្រា ZTO ដែរ',
+                first.barcodes && first.barcodes[0] && first.barcodes[0].createdAt === ZTO_AT,
+                first.barcodes && first.barcodes[0]);
+            ok('⛔ `barcodes[0].time` ក៏ជាម៉ោង ZTO ដែរ',
+                first.barcodes && first.barcodes[0] && first.barcodes[0].time === '14:23:11 (2026-09-10)',
+                first.barcodes && first.barcodes[0]);
+
+            // ⛔ ទិសផ្ទុយ ៖ ផ្លូវស្កេនដោយដៃ (គ្មានអាគុយម៉ង់ទី ៦) **មិនត្រូវប្រែ**
+            seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
+            await runEntry('77130500000702', '0963897346', 1, 0, 'N/A');
+            ok('⛔ ទិសផ្ទុយ ៖ គ្មានត្រា ➜ ថ្ងៃ sync ដដែល (ការស្កេនដោយដៃមិនប្រែ)',
+                seen.ledgerDays[0] === '2026-09-12'
+                && (seen.saved[0] || {}).createdAt === SYNC_AT, [seen.ledgerDays, (seen.saved[0] || {}).createdAt]);
+
+            seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
+            await runEntry('77130500000703', '0963897347', 1, 0, 'N/A', 0);
+            await runEntry('77130500000704', '0963897348', 1, 0, 'N/A', NaN);
+            await runEntry('77130500000705', '0963897349', 1, 0, 'N/A', -5);
+            ok('⛔ ត្រាមិនត្រឹមត្រូវ (`0` · `NaN` · អវិជ្ជមាន) ➜ ធ្លាក់ចុះទៅម៉ោង sync',
+                seen.ledgerDays.join(',') === '2026-09-12,2026-09-12,2026-09-12', seen.ledgerDays);
+
+            // ⛔ អតិថិជនម្នាក់ · ថ្ងៃ ZTO ២ ➜ ជួរដេក ២ · ថ្ងៃ ledger ២
+            seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
+            await runEntry('77130500000706', '0963897350', 2, 0, 'N/A', zoneMs(2026, 9, 9, 8, 0, 0));
+            await runEntry('77130500000707', '0963897350', 3, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
+            ok('⛔ អតិថិជនតែម្នាក់ · ថ្ងៃស្កេន ZTO ២ ➜ **មិន merge** (កូនសោ merge = `phone`+`scanDate`)',
+                seen.saved.length === 2, seen.saved.length);
+            ok('⛔ ហើយលុយបែកចូល ledger **២ ថ្ងៃ** តាម ZTO',
+                seen.ledgerDays.join(',') === '2026-09-09,2026-09-10', seen.ledgerDays);
+
+            // ⛔ អតិថិជនម្នាក់ · ថ្ងៃ ZTO តែមួយ ➜ merge ចូលជួរដេកតែមួយ
+            seen.ledgerDays.length = 0; seen.saved.length = 0; ebox.scanHistory.length = 0;
+            await runEntry('77130500000708', '0963897351', 2, 0, 'N/A', zoneMs(2026, 9, 10, 8, 0, 0));
+            await runEntry('77130500000709', '0963897351', 3, 0, 'N/A', zoneMs(2026, 9, 10, 19, 45, 0));
+            ok('⛔ ថ្ងៃស្កេន ZTO ដដែល ➜ merge ចូលជួរដេកតែមួយ (`count` = 2)',
+                ebox.scanHistory.length === 1 && ebox.scanHistory[0].count === 2,
+                ebox.scanHistory.map((i) => i.count));
+            ok('⛔ លុយសរុបរបស់ជួរដេក = ផលបូក barcodes ($5.00)',
+                ebox.scanHistory[0] && ebox.scanHistory[0].cod === 5, ebox.scanHistory[0]);
         }
     }
 

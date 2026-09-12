@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.33.1';
+    const APP_VERSION = '2.33.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4550,6 +4550,19 @@
         fb.signOut(auth).then(finish, finish);
     }
 
+    function armSessionExpiryCheck(user, generation) {
+        if (!user) return false;
+        sessionExpiryCheck = 'pending';
+        const settle = (expired) => {
+            if (generation !== authGeneration) return;
+            sessionExpiryCheck = expired ? 'expired' : 'live';
+            if (expired) forceExpireSession();
+            else refreshLiveToasts();
+        };
+        isFirebaseSessionExpired(user).then(settle, () => settle(false));
+        return true;
+    }
+
     function runSessionExpiryCheck() {
         if (sessionExpiryCheckInFlight || sessionExpiryCheck === 'pending' || sessionExpiryCheck === 'expired') return Promise.resolve(false);
         if (!auth || !auth.currentUser) return Promise.resolve(false);
@@ -4761,6 +4774,7 @@
                 if (!isDatabaseInitialized && !initDatabaseListeners()) {
                     showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
                 }
+                armSessionExpiryCheck(auth && auth.currentUser, authGeneration);
                 safeFocusScanner();
             } else {
                 showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
@@ -4795,14 +4809,7 @@
         const wasAlreadySignedIn = isDatabaseInitialized;
         updateAuthButton(true);
 
-        sessionExpiryCheck = 'pending';
-        const settleSessionExpiryCheck = (expired) => {
-            if (myAuthGeneration !== authGeneration) return;
-            sessionExpiryCheck = expired ? 'expired' : 'live';
-            if (expired) forceExpireSession();
-            else refreshLiveToasts();
-        };
-        isFirebaseSessionExpired(user).then(settleSessionExpiryCheck, () => settleSessionExpiryCheck(false));
+        armSessionExpiryCheck(user, myAuthGeneration);
 
         if (!isDatabaseInitialized && !initDatabaseListeners()) {
             showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');

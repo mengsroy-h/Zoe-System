@@ -207,7 +207,7 @@ bash audit-tools/emu/rules.sh
 | `locker-claim-guard-test.js` | ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់» ដែល claim រួច ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ | `LOCKERCLAIM_APP_DIR` |
 | `stale-clear-claim-test.js` | `clearClaim` ដែល lease ផុត ជាអន្ទាក់ស្ថាពរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) | `STALECLAIM_APP_DIR` |
 | `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
-| `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល | `PERIODICGUARD_APP_DIR` |
+| `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល  · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |
 | `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ | `SWINTEG_APP_DIR` |

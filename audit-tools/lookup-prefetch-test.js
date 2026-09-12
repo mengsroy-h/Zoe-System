@@ -410,7 +410,7 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
             customerDataTableFetchPromise: null,
             customerDataTableLastFailedAt: 0,
             customerTableIsPartial: false,
-            elapsedSince: (m) => (m ? Date.now() - m : Infinity),
+            elapsedSince: (m) => { if (!m) return Infinity; const d = Date.now() - m; return d >= 0 ? d : Infinity; },
             getFastLookupRow: () => null,
             setFastLookupRow: () => {},
             getLookupApiConfig: () => ({ url: o.appsScript
@@ -613,7 +613,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
             customerDataTableFetchPromise: null, customerDataTableLastFailedAt: 0,
             customerDataTableSessionGeneration: 0, customerTableIsPartial: false,
             CUSTOMER_TABLE_CACHE_MS: 300000, CUSTOMER_TABLE_FAIL_COOLDOWN_MS: 60000,
-            elapsedSince: (mark) => (mark ? Date.now() - mark : Infinity),
+            elapsedSince: (mark) => { if (!mark) return Infinity; const d = Date.now() - mark; return d >= 0 ? d : Infinity; },
             document: { getElementById: () => statusEl },
             decryptLookupSecret: () => Promise.resolve(''),
             clearCustomerTableRetry: () => {}, clearCustomerTableSoonRefresh: () => {},

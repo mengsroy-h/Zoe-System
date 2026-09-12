@@ -157,7 +157,7 @@ function buildSandbox(state) {
         ZTO_STATUS_TTL_MS: 12 * 60 * 60 * 1000,
         ZTO_STATUS_STORE_KEY: readConst('ZTO_STATUS_STORE_KEY', 'zoew_zto_pickup_status_v1'),
         appLocalStore: null,
-        elapsedSince: (m) => (!m ? Infinity : Math.max(0, Date.now() - m)),
+        elapsedSince: (m) => { if (!m) return Infinity; const d = Date.now() - m; return d >= 0 ? d : Infinity; },
         getLookupApiConfig: () => ({ enabled: true, url: 'https://x/.netlify/functions/zto-order-detail?code={barcode}' }),
         lookupApiIsZto: () => true,
         deletedSearchQuery: state.query || '',

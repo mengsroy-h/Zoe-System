@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const vm = require('vm');
 
 const ROOT = process.env.DEPSEC_APP_DIR ? path.resolve(process.env.DEPSEC_APP_DIR) : path.resolve(__dirname, '..');
 const VENDOR = path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js');
@@ -46,6 +47,35 @@ ok('⛔ SheetJS >= 0.20.2 ដើម្បីបិទ Prototype Pollution និ
 const digest = source ? crypto.createHash('sha256').update(source).digest('hex') : '';
 ok('⛔ ឯកសារ SheetJS ត្រូវនឹង release 0.20.3 ផ្លូវការដែលបានផ្ទៀងផ្ទាត់',
     digest === APPROVED_XLSX_SHA256, digest);
+
+// វាស់ require ដែល checker ហៅពិត មុនបើក browser ឬសរសេរ fixture។
+for (const [checker, envName] of [['export-cells-test.js', 'EXPORT_APP_DIR'],
+    ['monthly-report-test.js', 'MREPORT_APP_DIR'], ['sheet-import-test.js', 'SHEETIMPORT_APP_DIR']]) {
+    let text = '', requested = null;
+    try { text = fs.readFileSync(path.join(ROOT, 'audit-tools', checker), 'utf8'); } catch (_) {}
+    const stop = {};
+    try {
+        vm.runInNewContext(text, {
+            __dirname: path.join(ROOT, 'audit-tools'),
+            process: { env: { [envName]: ROOT }, exit() { throw stop; } },
+            console: { log() {}, error() {} },
+            require(name) {
+                if (requested) throw stop;
+                if (name === 'xlsx' || path.isAbsolute(name)) { requested = name; throw stop; }
+                if (['fs', 'path', 'vm', 'zlib', 'http'].includes(name)) return require(name);
+                throw stop;
+            }
+        }, { timeout: 1000, filename: checker });
+    } catch (_) {}
+    ok(checker + ' ផ្ទុក SheetJS ពិតពី target tree មុនការងារតេស្ត', requested === VENDOR, requested);
+    ok(checker + ' គ្មានផ្លូវត្រឡប់ទៅ npm xlsx ចាស់',
+        text.length > 1000 && !/\brequire\s*\(\s*['"]xlsx(?:\/[^'"]*)?['"]\s*\)/.test(text));
+}
+let workflow = '';
+try { workflow = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'audit.yml'), 'utf8'); } catch (_) {}
+const installs = workflow.split(/\r?\n/).filter((line) => /\bnpm\s+(?:install|i)\b/.test(line));
+ok('CI មិនដំឡើង npm xlsx ចាស់ជំនួស vendor ដែល App ប្រើ',
+    installs.length > 0 && installs.every((line) => !/(?:^|\s)xlsx(?:@[^\s]+)?(?=\s|$)/.test(line)), installs);
 
 try {
     const wb = XLSX.utils.book_new();

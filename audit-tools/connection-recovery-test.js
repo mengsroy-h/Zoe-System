@@ -1428,7 +1428,7 @@ function buildContext() {
     const initSrc = sliceFn('initFirebase');
     ok('ស្រង់ initFirebase() បាន', !!initSrc);
 
-    function runInit(changeConfigMidFlight) {
+    function runInit(changeConfigMidFlight, withExistingApp) {
         const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
         const log = { inits: [], toasts: [] };
         let releaseSdk = null;
@@ -1444,7 +1444,8 @@ function buildContext() {
             document: { getElementById: () => null, querySelectorAll: () => [] },
             __log: log,
             __store: store,
-            __releaseSdk: (fn) => { releaseSdk = fn; }
+            __releaseSdk: (fn) => { releaseSdk = fn; },
+            __existingApp: !!withExistingApp
         };
         ctx.window = ctx;
         vm.createContext(ctx);
@@ -1454,15 +1455,18 @@ function buildContext() {
         vm.runInContext([
             'let firebaseConfig = null, fb = null, auth = null, db = null;',
             'let dbRefHistory = null, dbRefDeleted = null, dbRefDailyRevenue = null, dbRefMonthlyRevenue = null;',
-            'let dbRefDailyPickup = null, dbRefExchangeRate = null, dbRefConnected = null, dbRefServerTimeOffset = null;',
+            'let dbRefDailyPickup = null, dbRefDailyCollected = null, dbRefExchangeRate = null, dbRefConnected = null, dbRefServerTimeOffset = null;',
             'let isDatabaseInitialized = false, isDatabaseConnected = false, isInitializingFirebase = false;',
             'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
+            'let authGeneration = 0, historyPatchFlushInFlight = true;',
+            'const pendingHistoryPatches = new Map([["OLD_BUSINESS_BARCODE", { fields: { isCalled: true } }]]);',
             'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
             'let scanHistory = [], deletedItems = [], dailyRevenueData = {}, monthlyRevenueData = {};',
             'let dailyPickupData = {}, lockerBarcodeIndex = {};',
-            'const FAKE_SDK = { getApps: () => [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => Promise.resolve(),',
+            'let dailyCollectedData = { "2026-09-12": { OLD_BUSINESS_BARCODE: { c: 9, d: 2 } } };',
+            'const FAKE_SDK = { getApps: () => __existingApp ? [{}] : [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => { __log.retryAtDelete = __retryState(); __existingApp = false; return Promise.resolve(); },',
             '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
-            '  onAuthStateChanged: () => (() => {}) };',
+            '  onAuthStateChanged: (a, callback) => { __log.authCallback = callback; return () => {}; } };',
             'let __sdkGate = null;',
             'function waitForFirebaseSDK() { return new Promise((res) => { __sdkGate = () => res(FAKE_SDK); __releaseSdk(__sdkGate); }); }',
             'function preconnectToDatabaseHost() {}',
@@ -1470,6 +1474,8 @@ function buildContext() {
             'function resetDbListenerHealthState() {}',
             'function renderConnectionStatus() {}',
             'function attachInfoListeners() { return true; }',
+            'function detachDatabaseListeners() { __log.detachedData = (__log.detachedData || 0) + 1; }',
+            'function detachInfoListeners() {}',
             'function setupAuthListener() {}',
             'function armLateFirebaseSdkListener() {}',
             'function scheduleFirebaseSdkRetry() {}',
@@ -1477,7 +1483,9 @@ function buildContext() {
             'function showToast(m) { __log.toasts.push(m); }',
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
-            'globalThis.__start = () => initFirebase();'
+            'globalThis.__start = () => initFirebase();',
+            'globalThis.__collected = () => dailyCollectedData;',
+            'globalThis.__retryState = () => ({ generation: authGeneration, queued: pendingHistoryPatches.size, busy: historyPatchFlushInFlight });'
         ].join('\n'), ctx);
 
         ctx.__start();
@@ -1498,6 +1506,38 @@ function buildContext() {
         for (let i = 0; i < 8; i++) { await Promise.resolve(); same.release(); }
         ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
             same.log.inits.length === 1, same.log.inits);
+
+        const reconfigured = runInit(false, true);
+        for (let i = 0; i < 8; i++) { await Promise.resolve(); reconfigured.release(); }
+        ok('Reconfig ៖ បានចូលផ្លូវដោះ Firebase App ចាស់ពិត', reconfigured.log.detachedData === 1 && !reconfigured.ctx.__existingApp);
+        ok('Reconfig ៖ ចំណូលប្រចាំថ្ងៃរបស់អាជីវកម្មចាស់មិននៅសល់ក្នុងសតិពេលរង់ចាំ listener ថ្មី',
+            Object.keys(reconfigured.ctx.__collected()).length === 0, reconfigured.ctx.__collected());
+        ok('Reconfig ៖ បោះបង់បំណងកែចាស់ និងដោះជួររង់ចាំមុនលុប Firebase App ចាស់',
+            reconfigured.log.retryAtDelete && reconfigured.log.retryAtDelete.queued === 0 && reconfigured.log.retryAtDelete.busy === false,
+            reconfigured.log.retryAtDelete);
+        ok('Reconfig ៖ callback ដែលចេញដំណើរមុន teardown ត្រូវផុតសុពលភាពមុនរង់ចាំ deleteApp',
+            reconfigured.log.retryAtDelete && reconfigured.log.retryAtDelete.generation > 0, reconfigured.log.retryAtDelete);
+
+        const signedOut = runInit(false);
+        for (let i = 0; i < 8; i++) { await Promise.resolve(); signedOut.release(); }
+        vm.runInContext([
+            'let authUnsubscribe = null, authRecoveryTimeout = null, autoLoginAttempted = false;',
+            'function attemptAuthStorageRecovery() {}',
+            'function resetClearHistoryOperationState() {}',
+            'function clearCustomerDataTableCache() {}',
+            'function applyCurrentFilter() {}',
+            'function renderRecentlyDeleted() {}',
+            'function updateRecentPhonesList() {}',
+            'function updateAuthButton(value) { __log.authButton = value; }',
+            'function showLoginModalWithPrefill() {}',
+            sliceFn('setupAuthListener') || 'function setupAuthListener() {}',
+            'setupAuthListener();'
+        ].join('\n'), signedOut.ctx);
+        signedOut.log.authCallback(null);
+        ok('ចាកចេញ ៖ បានដោះ listener និងប្តូរស្ថានភាព auth ពិត',
+            signedOut.log.detachedData === 1 && signedOut.log.authButton === false);
+        ok('ចាកចេញ ៖ ចំណូលប្រចាំថ្ងៃមិនអាចនៅក្នុងសតិឆ្លងទៅ session បន្ទាប់',
+            Object.keys(signedOut.ctx.__collected()).length === 0, signedOut.ctx.__collected());
 
         // ── listener `.info/*` ដែលងាប់ **តែឯង** ─────────────────────────
         // ⛔ ថ្នាក់ដដែលនឹង 2.20.8 (បងប្អូនប្រកាសជាសះស្បើយជំនួស) — តែ

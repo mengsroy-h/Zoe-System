@@ -45,6 +45,7 @@ function extractTrashNormalizer(src) {
 function makeCtx(src) {
     const ctx = {
         console,
+        db: {}, authGeneration: 0,
         getServerNow: () => 1700000000000,
         parseTimestampFromId: () => 1700000000000,
         generateUniqueId: () => 'id_generated',
@@ -75,10 +76,22 @@ function makeCtx(src) {
             + 'ការស្រង់នឹងកាត់កូដខុសកន្លែង។ ត្រូវធ្វើបច្ចុប្បន្នភាពយុថ្កាក្នុងឯកសារនេះ។');
     }
     const bodyAt = (anchor) => src.indexOf(anchor) + anchor.length - 1;
-    vm.runInContext('function toggleWholeTx(currentItem) ' +
-        sliceBalanced(src, bodyAt(anchorWhole), '{', '}'), ctx);
-    vm.runInContext('function toggleOneTx(currentItem) ' +
-        sliceBalanced(src, bodyAt(anchorOne), '{', '}'), ctx);
+    const ast = require('acorn').parse(src, { ecmaVersion: 'latest' });
+    for (const [name, sourceName, anchor] of [
+        ['toggleWholeTx', 'toggleCloseStatus', anchorWhole],
+        ['toggleOneTx', 'applyBarcodeCloseChange', anchorOne]
+    ]) {
+        const fn = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === sourceName);
+        const captures = ['closeAuthGeneration', 'closeDatabase', 'closeIsCurrent'];
+        const declarations = captures.map(name => fn && fn.body.body.find(node => node.type === 'VariableDeclaration'
+            && node.declarations.some(declaration => declaration.id.name === name)));
+        if (declarations.some(node => !node)) throw new Error('raw-read-shape: missing actual close session capture in ' + sourceName);
+        // Capture the real operation closure before invoking its transaction callback.
+        // Changing auth/db afterwards must exercise the shipped guard, not a fixture stub.
+        vm.runInContext('globalThis.' + name + ' = (() => {\n' +
+            [...new Set(declarations)].map(node => src.slice(node.start, node.end)).join('\n') +
+            '\nreturn function (currentItem) ' + sliceBalanced(src, bodyAt(anchor), '{', '}') + ';\n})();', ctx);
+    }
     return ctx;
 }
 
@@ -136,6 +149,26 @@ for (const app of ['ZoeW']) {
         ok(bbb && bbb.isClosed === true, label + ' ➜ barcode ដែលអតិថិជនយក ត្រូវបានបិទ', bbb);
         const aaa = list.find(b => b && b.code === 'AAA');
         ok(aaa && aaa.isClosed === false, label + ' ➜ barcode ដែលមិនទាន់យក នៅបើកដដែល', aaa);
+    }
+
+    console.log('\n=== ' + app + ' — transaction របស់ session ចាស់ ===');
+    for (const operation of ['toggleWholeTx', 'toggleOneTx']) {
+        for (const changed of ['authGeneration', 'db']) {
+            for (const [label, make] of SHAPES) {
+                const stale = makeCtx(src);
+                const item = { id: 'i1', barcode: 'AAA', isClosed: false, barcodes: make() };
+                const before = JSON.stringify(item);
+                stale.desiredClosed = true;
+                stale.barcodeCode = 'BBB';
+                if (changed === 'authGeneration') stale.authGeneration++;
+                else stale.db = {};
+                let result, threw = null;
+                try { result = stale[operation](item); } catch (error) { threw = error; }
+                ok(!threw && result === undefined && JSON.stringify(item) === before,
+                    operation + ' / ' + changed + ' / ' + label + ' ➜ បោះបង់ដោយមិនកែ barcode របស់ session ចាស់',
+                    threw ? threw.message : item);
+            }
+        }
     }
 }
 

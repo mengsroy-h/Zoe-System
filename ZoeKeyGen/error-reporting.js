@@ -8,6 +8,7 @@
     const SECRET_PARAM_PATTERN = '(?:auth|authorization|access_token|id_token|refresh_token|session_token|key|apikey|api_key|token|secret|password|passwd|passphrase|passcode|pwd|pin|credential|bearer|jwt|sig|signature|setup|cookie)';
     const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
+    const REDACT_MAX_JSON_CHARS = 64 * 1024;
 
     let loadPromise = null;
     let sentryReady = false;
@@ -76,8 +77,56 @@
                 : whole));
     }
 
+    function isPrivateJwk(value) {
+        const kty = value.kty;
+        const fields = kty === 'RSA' ? ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth']
+            : (kty === 'EC' || kty === 'OKP') ? ['d'] : kty === 'oct' ? ['k'] : null;
+        return !!(fields && fields.some((key) => Object.prototype.hasOwnProperty.call(value, key)));
+    }
+
+    function redactEmbeddedJwks(text) {
+        const first = text.indexOf('{');
+        if (first < 0) return text;
+        const limit = Math.min(text.length, REDACT_MAX_JSON_CHARS);
+        const stack = [], ranges = [];
+        let quoted = false, escaped = false, cut = limit, fragments = 0, remaining = REDACT_MAX_JSON_CHARS;
+        for (let i = first; i < limit; i++) {
+            const char = text[i];
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (char === '\\') escaped = true;
+                else if (char === '"') quoted = false;
+                continue;
+            }
+            if (char === '"' && stack.length) { quoted = true; continue; }
+            if (char === '{') {
+                if (stack.length >= REDACT_MAX_DEPTH) { cut = stack[0]; break; }
+                stack.push(i);
+            } else if (char === '}' && stack.length) {
+                const start = stack.pop(), length = i - start + 1;
+                if (++fragments > REDACT_MAX_NODES || length > remaining) { cut = stack.length ? stack[0] : start; break; }
+                remaining -= length;
+                try {
+                    if (isPrivateJwk(JSON.parse(text.slice(start, i + 1)))) {
+                        while (ranges.length && ranges[ranges.length - 1].start >= start) ranges.pop();
+                        ranges.push({ start, end: i + 1 });
+                    }
+                } catch (e) {}
+            }
+        }
+        if (cut === limit && limit < text.length && stack.length) cut = stack[0];
+        let out = '', at = 0;
+        for (const range of ranges) {
+            if (range.start >= cut) break;
+            out += text.slice(at, range.start) + '"[redacted]"';
+            at = range.end;
+        }
+        return out + text.slice(at, cut) + (cut < text.length ? '[truncated]' : '');
+    }
+
     function redactUrl(url) {
         if (typeof url !== 'string') return url;
+        url = redactEmbeddedJwks(url);
         if (/^\s*[\[{]/.test(url)) {
             try {
                 const parsed = JSON.parse(url);
@@ -104,7 +153,7 @@
 
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
         + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
-        + 'credential|authorization|bearer|jwt|setup|cookie)';
+        + 'credential|authorization|bearer|jwt|setup|cookie|private_key|signing_key)';
     const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
 
     function isSecretKeyName(name) {
@@ -134,6 +183,9 @@
     function redactDeep(value, depth, seen, budget) {
         if (typeof value === 'string') return redactUrl(value);
         if (!value || typeof value !== 'object') return value;
+        try {
+            if (isPrivateJwk(value)) return '[redacted]';
+        } catch (e) { return '[truncated]'; }
         if (depth >= REDACT_MAX_DEPTH || budget.n >= REDACT_MAX_NODES) return '[truncated]';
         if (seen.has(value)) return seen.get(value) || '[circular]';
         seen.set(value, null);

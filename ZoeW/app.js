@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.34.0';
+    const APP_VERSION = '2.34.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1130,6 +1130,9 @@
 
             const existingApps = fb.getApps();
             if (existingApps.length) {
+                authGeneration++;
+                pendingHistoryPatches.clear();
+                historyPatchFlushInFlight = false;
                 detachDatabaseListeners();
                 detachInfoListeners();
                 isDatabaseInitialized = false;
@@ -1143,6 +1146,7 @@
                 dailyRevenueData = {};
                 monthlyRevenueData = {};
                 dailyPickupData = {};
+                dailyCollectedData = {};
                 lockerBarcodeIndex = {};
                 if (typeof fb.deleteApp === 'function') {
                     await Promise.all(existingApps.map(a => fb.deleteApp(a).catch(() => {})));
@@ -4881,6 +4885,7 @@
                 dailyRevenueData = {};
                 monthlyRevenueData = {};
                 dailyPickupData = {};
+                dailyCollectedData = {};
                 lockerBarcodeIndex = {};
                 clearCustomerDataTableCache();
                 applyCurrentFilter();
@@ -6760,7 +6765,7 @@
     function collectedMarksFor(barcode, desiredClosed, previousClosedAt) {
         const key = pickupBarcodeKey(barcode && barcode.code);
         if (!key) return [];
-        const priorDay = collectedDayOfStamp(previousClosedAt) || collectedDayHoldingKey(key);
+        const priorDay = collectedDayHoldingKey(key) || collectedDayOfStamp(previousClosedAt);
         if (!desiredClosed) return priorDay ? [{ key: key, day: priorDay, value: null }] : [];
         const day = collectedDayOfStamp(barcode && barcode.closedAt);
         if (!day) return [];
@@ -6770,47 +6775,18 @@
         return out;
     }
 
-    function collectItemCollectedMarks(item, desiredClosed, previousStamps) {
-        const list = (item && Array.isArray(item.barcodes)) ? item.barcodes : [];
-        const stamps = Array.isArray(previousStamps) ? previousStamps : [];
-        let out = [];
-        list.forEach((barcode, index) => {
-            out = out.concat(collectedMarksFor(barcode, desiredClosed, stamps[index]));
-        });
-        return out;
-    }
-
-    function collectedPreviousValue(day, key) {
-        const record = dailyCollectedData[day];
-        const entry = (record && typeof record === 'object') ? record[key] : null;
-        return (entry && typeof entry === 'object') ? { c: statsMoney(entry.c), d: statsMoney(entry.d) } : null;
-    }
-
-    function applyCollectedMarksInMemory(marks) {
-        (marks || []).forEach((mark) => {
+    function commitCollectedMarks(marks) {
+        if (!dbRefDailyCollected || !db || !fb || !marks || !marks.length) return Promise.resolve(null);
+        const collectedAuthGeneration = authGeneration;
+        const collectedDatabase = db;
+        const updates = {};
+        marks.forEach((mark) => {
             if (!mark || !mark.key || !mark.day) return;
-            const current = dailyCollectedData[mark.day];
-            const record = (current && typeof current === 'object') ? current : {};
-            if (mark.value) record[mark.key] = { c: mark.value.c, d: mark.value.d };
-            else delete record[mark.key];
-            if (Object.keys(record).length) dailyCollectedData[mark.day] = record;
-            else delete dailyCollectedData[mark.day];
+            updates[`${mark.day}/${mark.key}`] = mark.value ? { c: mark.value.c, d: mark.value.d } : null;
         });
-    }
-
-    function commitCollectedMarks(dayKey, marks) {
-        if (!dbRefDailyCollected || !db || !fb || !dayKey) return Promise.resolve(null);
-        const dayRef = fb.ref(db, `zoew_daily_collected_cod_dod/${dayKey}`);
-        return fb.runTransaction(dayRef, (current) => {
-            const set = collectedSetFromRecord(current);
-            (marks || []).forEach((mark) => {
-                if (!mark || !mark.key) return;
-                if (mark.value) set[mark.key] = { c: mark.value.c, d: mark.value.d };
-                else delete set[mark.key];
-            });
-            return Object.keys(set).length ? set : null;
-        }).then((result) => (result && result.committed) ? true : null, () => {
-            showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
+        if (!Object.keys(updates).length) return Promise.resolve(null);
+        return fb.update(dbRefDailyCollected, updates).then(() => true, () => {
+            if (collectedAuthGeneration === authGeneration && collectedDatabase === db) showToast("⚠️ បរាជ័យក្នុងការ Save ចំណូលប្រចាំថ្ងៃ!");
             return null;
         });
     }
@@ -6818,15 +6794,72 @@
     function markCollectedRevenue(marks) {
         const list = (marks || []).filter((mark) => mark && mark.key && mark.day);
         if (!list.length) return null;
-        list.forEach((mark) => { mark.previous = collectedPreviousValue(mark.day, mark.key); });
-        applyCollectedMarksInMemory(list);
-        const byDay = {};
-        list.forEach((mark) => {
-            if (!byDay[mark.day]) byDay[mark.day] = [];
-            byDay[mark.day].push(mark);
-        });
-        Object.keys(byDay).forEach((day) => { commitCollectedMarks(day, byDay[day]); });
+        list.server = commitCollectedMarks(list);
         return list;
+    }
+
+    async function reconcileCollectedHistory(itemId, keys, attemptsLeft) {
+        const targetKeys = [...new Set((keys || []).filter(Boolean))];
+        if (!targetKeys.length || !dbRefDailyCollected || !db || !fb) return null;
+        const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
+        const collectedAuthGeneration = authGeneration;
+        const collectedDatabase = db;
+        const collectedSdk = fb;
+        const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
+        const isCurrent = () => collectedAuthGeneration === authGeneration && collectedDatabase === db;
+        const readState = (snapshot) => {
+            const item = snapshot && snapshot.val();
+            const barcodes = item && Array.isArray(item.barcodes) ? item.barcodes : item && item.barcode ? [item] : [];
+            return targetKeys.map((key) => {
+                const barcode = barcodes.find((entry) => entry && pickupBarcodeKey(entry.code) === key);
+                return barcode ? { code: barcode.code, cod: statsMoney(barcode.cod), dod: statsMoney(barcode.dod), isClosed: !!barcode.isClosed, closedAt: barcode.closedAt || null } : null;
+            });
+        };
+        const readCurrentState = async () => {
+            const history = await dbOp(collectedSdk.get(historyRef));
+            if (!isCurrent()) return [];
+            if (history && history.val()) return readState(history);
+            return readState(await dbOp(collectedSdk.get(collectedSdk.ref(collectedDatabase, `zoew_recently_deleted_cod_dod/${itemId}`))));
+        };
+        try {
+            let state = await readCurrentState();
+            for (let attempt = 0; attempt < attemptLimit; attempt++) {
+                if (!isCurrent()) return null;
+                const barcodes = state.filter(Boolean);
+                if (!barcodes.length) break;
+                const days = new Set(Object.keys(dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
+                const now = getServerNow();
+                for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
+                const marks = [];
+                barcodes.forEach((barcode) => {
+                    const key = pickupBarcodeKey(barcode.code);
+                    days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
+                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                });
+                const applied = markCollectedRevenue(marks);
+                if (!applied) return null;
+                let saved;
+                try {
+                    saved = await dbOp(applied.server);
+                } catch (error) {
+                    if (dbOpStalled(error) && attempt + 1 < attemptLimit) {
+                        armLateWrite(applied.server, () => isCurrent() ? reconcileCollectedHistory(itemId, targetKeys, attemptLimit - attempt - 1) : null,
+                            null, 'reconcileCollectedHistory');
+                    }
+                    throw error;
+                }
+                if (!saved || !isCurrent()) return null;
+                const next = await readCurrentState();
+                if (!isCurrent()) return null;
+                if (JSON.stringify(next) === JSON.stringify(state)) {
+                    if (state.some((barcode) => !barcode)) break;
+                    return true;
+                }
+                state = next;
+            }
+        } catch (error) {}
+        if (isCurrent()) showToast("⚠️ ស្ថានភាពបានរក្សាទុក ប៉ុន្តែចំណូលប្រចាំថ្ងៃមិនទាន់ Sync ពេញលេញទេ!");
+        return null;
     }
 
     function syncCollectedValueForBarcode(itemId, barcodeCode) {
@@ -6839,11 +6872,6 @@
             ? item.barcodes.find((b) => b && b.code === barcodeCode) : null;
         if (!barcode || !barcode.isClosed) return null;
         return markCollectedRevenue([{ key: key, day: day, value: collectedMarkValueOf(barcode) }]);
-    }
-
-    function revertCollectedMarks(applied) {
-        if (!applied || !applied.length) return null;
-        return markCollectedRevenue(applied.map((mark) => ({ key: mark.key, day: mark.day, value: mark.previous })));
     }
 
     function collectedTotalsOfDay(record) {
@@ -11205,6 +11233,9 @@
     }
 
     async function applyBarcodeCloseChange(itemId, barcodeCode, desiredClosed, options) {
+        const closeAuthGeneration = authGeneration;
+        const closeDatabase = db;
+        const closeIsCurrent = () => closeAuthGeneration === authGeneration && closeDatabase === db;
         const opts = options || {};
         const silent = opts.silent === true;
         const showModalAfterApply = opts.showModal !== false;
@@ -11223,7 +11254,6 @@
         let pickupScanDate = null;
         let pickupSeed = null;
         let pickupApplied = null;
-        let collectedApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
         const reconcilePickupDeltaWithServer = () => {
@@ -11246,14 +11276,13 @@
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             const pickupKey = pickupBarcodeKey(barcodeCode);
             pickupApplied = pickupKey ? markPickupBarcodes(pickupScanDate, [{ key: pickupKey, phoneKey: pickupPhoneKey, closed: desiredClosed }], pickupSeed) : null;
-            collectedApplied = markCollectedRevenue(collectedMarksFor(freshB, desiredClosed,
-                previousState ? previousState.barcodeClosedAt : undefined));
 
             if (showModalAfterApply) openViewListModal(itemId);
             refreshCurrentHistoryView();
         }
 
         const revertBarcodeCloseLocally = () => {
+            if (!closeIsCurrent()) return;
             if (previousState) {
                 const revertItem = scanHistory.find(i => i.id === itemId);
                 const revertB = revertItem && revertItem.barcodes ? revertItem.barcodes.find(b => b.code === barcodeCode) : null;
@@ -11276,19 +11305,18 @@
                 revertPickupMarks(pickupApplied);
                 pickupApplied = null;
             }
-            if (collectedApplied) {
-                revertCollectedMarks(collectedApplied);
-                collectedApplied = null;
-            }
         };
-        const settleBarcodeClose = (barcodeCloseResult, late) => {
+        const settleBarcodeClose = async (barcodeCloseResult, late) => {
+            if (!closeIsCurrent()) return false;
             if (!serverApplied || !(barcodeCloseResult && barcodeCloseResult.committed)) {
                 revertBarcodeCloseLocally();
                 showToast(`⚠️ Barcode (${barcodeCode}) ត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។`);
                 return false;
             }
             reconcilePickupDeltaWithServer();
-            if (!silent) showToast(late
+            const collectedSaved = await reconcileCollectedHistory(itemId, (serverPickupMarks || []).map((mark) => mark.key));
+            if (!closeIsCurrent()) return false;
+            if (!silent && collectedSaved) showToast(late
                 ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`
                 : `✅ បាន${actionText}ស្ថានភាព Barcode (${barcodeCode}) ក្នុង Firebase រួចរាល់!`);
             return true;
@@ -11296,6 +11324,7 @@
         let closeTx = null;
         try {
             closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${itemId}`), (currentItem) => {
+                if (!closeIsCurrent()) return;
                 serverApplied = false;
                 serverPickupMarks = null;
                 if (!currentItem) return currentItem;
@@ -11334,7 +11363,9 @@
             });
             return settleBarcodeClose(await dbOp(closeTx), false);
         } catch (error) {
+            if (!closeIsCurrent()) return false;
             if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleBarcodeClose(lateResult, true), (lateErr) => {
+                if (!closeIsCurrent()) return;
                 revertBarcodeCloseLocally();
                 showToast(`⚠️ បរាជ័យក្នុងការ Save ស្ថានភាព (${barcodeCode}) ទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។`);
                 if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleIndividualBarcodeClose late transaction failed' });
@@ -11644,6 +11675,9 @@
                 showToast('⚠️ មិនទាន់ភ្ជាប់ Firebase ទេ — លេខទូរស័ព្ទមិនត្រូវបានផ្លាស់ប្តូរ។');
                 return Promise.resolve(false);
             }
+            const phoneAuthGeneration = authGeneration;
+            const phoneDatabase = db;
+            const phoneSaveIsCurrent = () => phoneAuthGeneration === authGeneration && phoneDatabase === db;
             const prevPhone = item.phone;
             const patchFields = { phone: newPhone };
             const previousFields = { phone: prevPhone };
@@ -11672,6 +11706,7 @@
             };
             if (prevPickupKey !== nextPickupKey) applyPickupRefMove(item);
             const revertPickupRefMove = () => {
+                if (!phoneSaveIsCurrent()) return;
                 if (!pickupMoved) return;
                 revertPickupMarks(pickupMoved);
                 pickupMoved = null;
@@ -11684,6 +11719,7 @@
             const phoneSavePromise = patchHistoryItemFields(item, patchFields, previousFields, (serverItem) => {
                 serverPickupSource = serverItem;
             }).then((saved) => {
+                if (!phoneSaveIsCurrent()) return false;
                 if (saved) {
                     reconcilePickupRefWithServer();
                     showToast('✅ កែប្រែលេខទូរស័ព្ទ និងរក្សាទុកទៅ Firebase រួចរាល់!');
@@ -11711,6 +11747,9 @@
     }
 
     async function toggleCloseStatus(id) {
+        const closeAuthGeneration = authGeneration;
+        const closeDatabase = db;
+        const closeIsCurrent = () => closeAuthGeneration === authGeneration && closeDatabase === db;
         const item = scanHistory.find(i => i.id === id);
         if (!item) return;
         const actionText = item.isClosed ? "បើក" : "បិទ";
@@ -11729,7 +11768,6 @@
         let pickupScanDate = null;
         let pickupSeed = null;
         let pickupApplied = null;
-        let collectedApplied = null;
         let serverApplied = false;
         let serverPickupMarks = null;
         const reconcilePickupDeltaWithServer = () => {
@@ -11753,13 +11791,12 @@
 
             pickupPhoneKey = getPickupPhoneKey(freshItem);
             pickupApplied = markPickupBarcodes(pickupScanDate, collectPickupMarks(freshItem, desiredClosed, pickupPhoneKey), pickupSeed);
-            collectedApplied = markCollectedRevenue(collectItemCollectedMarks(freshItem, desiredClosed,
-                previousState ? previousState.barcodeCloseStamps : null));
 
             refreshCurrentHistoryView();
         }
 
         const revertCloseLocally = () => {
+            if (!closeIsCurrent()) return;
             if (previousState) {
                 const revertItem = scanHistory.find(i => i.id === id);
                 if (revertItem) {
@@ -11786,19 +11823,18 @@
                 revertPickupMarks(pickupApplied);
                 pickupApplied = null;
             }
-            if (collectedApplied) {
-                revertCollectedMarks(collectedApplied);
-                collectedApplied = null;
-            }
         };
-        const settleClose = (closeResult, late) => {
+        const settleClose = async (closeResult, late) => {
+            if (!closeIsCurrent()) return false;
             if (!serverApplied || !(closeResult && closeResult.committed)) {
                 revertCloseLocally();
                 showToast('⚠️ បញ្ជីនេះត្រូវបានផ្លាស់ប្តូរ ឬលុបពីឧបករណ៍ផ្សេង — ស្ថានភាពថ្មីមិនត្រូវបានរក្សាទុក។');
                 return false;
             }
             reconcilePickupDeltaWithServer();
-            showToast(late
+            const collectedSaved = await reconcileCollectedHistory(id, (serverPickupMarks || []).map((mark) => mark.key));
+            if (!closeIsCurrent()) return false;
+            if (collectedSaved) showToast(late
                 ? `✅ បណ្តាញត្រឡប់មកវិញ — បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`
                 : `✅ បាន${actionText}ស្ថានភាពបញ្ជីក្នុង Firebase រួចរាល់!`);
             return true;
@@ -11806,6 +11842,7 @@
         let closeTx = null;
         try {
             closeTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), (currentItem) => {
+                if (!closeIsCurrent()) return;
                 serverApplied = false;
                 serverPickupMarks = null;
                 if (!currentItem) return currentItem;
@@ -11830,7 +11867,9 @@
             });
             return settleClose(await dbOp(closeTx), false);
         } catch (error) {
+            if (!closeIsCurrent()) return false;
             if (dbOpStalled(error) && armLateCommit(closeTx, (lateResult) => settleClose(lateResult, true), (lateErr) => {
+                if (!closeIsCurrent()) return;
                 revertCloseLocally();
                 showToast("⚠️ បរាជ័យក្នុងការ Save ស្ថានភាពបញ្ជីទៅ Firebase! ស្ថានភាពត្រូវបានត្រឡប់ដើមវិញ។");
                 if (lateErr && window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'money', context: 'toggleCloseStatus late transaction failed' });
@@ -12650,13 +12689,19 @@
         return /disconnect|already deleted/i.test(text);
     }
 
-    function queueHistoryPatchRetry(itemId, fields, previousFields, successToast) {
+    function queueHistoryPatchRetry(itemId, fields, previousFields, successToast, preserveQueuedFields) {
         if (!itemId || !fields) return false;
         const existing = pendingHistoryPatches.get(itemId);
         if (existing) {
             if (existing.attempts >= HISTORY_PATCH_RETRY_MAX) return false;
-            Object.assign(existing.fields, fields);
-            if (successToast) existing.successToast = successToast;
+            if (preserveQueuedFields) {
+                existing.fields = Object.assign({}, fields, existing.fields);
+                existing.previousFields = Object.assign({}, existing.previousFields || {}, previousFields || {});
+            } else {
+                Object.assign(existing.fields, fields);
+                existing.previousFields = Object.assign({}, previousFields || {}, existing.previousFields || {});
+            }
+            if (successToast && !preserveQueuedFields) existing.successToast = successToast;
             return true;
         }
         if (pendingHistoryPatches.size >= HISTORY_PATCH_QUEUE_MAX) return false;
@@ -12673,17 +12718,22 @@
         if (historyPatchFlushInFlight) return;
         if (!pendingHistoryPatches.size) return;
         if (!dbRefHistory || !db || !fb) return;
+        const flushAuthGeneration = authGeneration;
+        const flushDatabase = db;
+        const flushIsCurrent = () => flushAuthGeneration === authGeneration && flushDatabase === db;
         const entries = Array.from(pendingHistoryPatches.entries());
         pendingHistoryPatches.clear();
         historyPatchFlushInFlight = true;
         let settled = 0;
         const done = () => {
+            if (!flushIsCurrent()) return;
             settled++;
             if (settled < entries.length) return;
             historyPatchFlushInFlight = false;
             scheduleHistoryViewRefresh();
         };
         const noteAttempt = (itemId, attempts) => {
+            if (!flushIsCurrent()) return;
             const requeued = pendingHistoryPatches.get(itemId);
             if (requeued) requeued.attempts = attempts;
         };
@@ -12695,17 +12745,19 @@
             let started = null;
             try {
                 started = patchHistoryItemFields(target, entry.fields, entry.previousFields, null,
-                    { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX, queuedSuccessToast: entry.successToast });
+                    { retryOnDisconnect: attempts < HISTORY_PATCH_RETRY_MAX, queuedSuccessToast: entry.successToast, preserveQueuedFields: true });
             } catch (e) {
+                if (!flushIsCurrent()) return;
                 if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'data', context: 'flushPendingHistoryPatches' });
                 if (attempts < HISTORY_PATCH_RETRY_MAX) {
-                    queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields, entry.successToast);
+                    queueHistoryPatchRetry(itemId, entry.fields, entry.previousFields, entry.successToast, true);
                     noteAttempt(itemId, attempts);
                 }
                 done();
                 return;
             }
             Promise.resolve(started).then((saved) => {
+                if (!flushIsCurrent()) return;
                 if (!saved || saved === 'queued') noteAttempt(itemId, attempts);
                 else if (entry.successToast) showToast(entry.successToast);
                 done();
@@ -12722,6 +12774,9 @@
             showToast("⚠️ បរាជ័យក្នុងការ Save ទៅ Firebase! (ID មិនត្រឹមត្រូវ)");
             return Promise.resolve(false);
         }
+        const patchAuthGeneration = authGeneration;
+        const patchDatabase = db;
+        const patchIsCurrent = () => patchAuthGeneration === authGeneration && patchDatabase === db;
         const revertLocalFields = () => {
             if (!previousFields) return;
             const revertItem = scanHistory.find(i => i.id === item.id);
@@ -12733,8 +12788,9 @@
             refreshCurrentHistoryView();
         };
         const handlePatchFailure = (error) => {
+            if (!patchIsCurrent()) return false;
             if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(error)
-                && queueHistoryPatchRetry(item.id, fields, previousFields, opts.queuedSuccessToast)) {
+                && queueHistoryPatchRetry(item.id, fields, previousFields, opts.queuedSuccessToast, opts.preserveQueuedFields)) {
                 return 'queued';
             }
             console.error("Error patching history item: ", error);
@@ -12747,6 +12803,7 @@
         let patchTransaction;
         try {
             patchTransaction = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${item.id}`), (currentItem) => {
+                if (!patchIsCurrent()) return;
                 serverItemExisted = false;
                 if (!currentItem) return currentItem;
                 normalizeBarcodesOf(currentItem);
@@ -12763,6 +12820,7 @@
             return Promise.resolve(handlePatchFailure(error));
         }
         return dbOp(patchTransaction).then((result) => {
+            if (!patchIsCurrent()) return false;
             if (!serverItemExisted || !(result && result.committed)) {
                 revertLocalFields();
                 showToast("⚠️ ទិន្នន័យនេះលែងមានក្នុងប្រព័ន្ធ! ការកែប្រែមិនត្រូវបានរក្សាទុកទេ។");

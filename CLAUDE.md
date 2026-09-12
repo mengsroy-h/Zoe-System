@@ -98,8 +98,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.34.0` (`zoew-v202`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.21` (`zoekeygen-v91`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.34.1` (`zoew-v203`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.22` (`zoekeygen-v92`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -271,10 +271,10 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការតភ្ជាប់ · ស្តារ | listener ដែលធ្លាក់ត្រូវត្រឡប់មកវិញ; SDK ស្តារបានពិត | `connection-recovery-test` |
 | **listener ដែលងាប់តែឯង** | ⛔ បងប្អូនមិនត្រូវប្រកាសជំនួសវាថាជាសះស្បើយ | `connection-recovery-test` |
 | **listener `.info/*` ដែលងាប់តែឯង** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `.info/connected` និង `.info/serverTimeOffset` ដែរ | `connection-recovery-test` |
-| **ការលាក់ secret** | ⛔ វត្ថុដែលសរសេរជាន់មិនបាន ត្រូវលាក់តាមច្បាប់ចម្លង | `secret-hygiene` |
+| **ការលាក់ secret** | វត្ថុ frozen ត្រូវលាក់តាមច្បាប់ចម្លង; private/signing key និង private JWK ត្រូវលាក់ រួម JSON string; public JWK និងវាលលុយ `d` ត្រូវនៅដដែល | `secret-hygiene` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ ការពុលត្រូវធ្វើលើឯកសារស្រមោល — SIGKILL មិនត្រូវប៉ះឯកសារដើម | `checker-coverage` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ គ្មានធនធានចែករំលែក **ថេរ** ៖ `listen(0, '127.0.0.1')` ជានិច្ច · RTDB namespace របស់ `emu/*` ត្រូវតែមួយក្នុងមួយការរត់ | `checker-coverage` |
-| **ការសរសេរ ↔ ការចាកចេញទៅខល** | ⛔ ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ត្រូវរត់ឡើងវិញ | `history-patch-retry-test` |
+| **ការសរសេរ ↔ ការចាកចេញទៅខល** | Retry រក្សា rollback គ្រប់វាល និងជម្រើសថ្មីជាង; callback ចាស់មិនអាចសរសេរ/ដកស្ថិតិ/បង្ហាញសារក្រោយប្ដូរ auth ឬ database | `history-patch-retry-test` |
 | **ការទាញតារាងជាមុន** | ព្យាយាមវិញលឿន **តែមិនបាញ់ចំពេលស្កេន** | `lookup-prefetch-test` |
 | **ស្ថានភាព ↔ ម្ចាស់ប្រអប់** | ⛔ `closeModal()` សម្អាតតែស្ថានភាពរបស់ប្រអប់ **នោះ** (ឬពេលជង់ទទេ) — ប្រអប់ជាន់លើមិនត្រូវលុប Barcode · ការកែលេខ · ការសម្គាល់ខល របស់ប្រអប់ខាងក្រោម | `lookup-prefetch-test` · `ui-flow-test` |
 | **Keyboard ↔ ការស្វែងរក** | ⛔ មិនលោតកាត់ខណៈ lookup កំពុងធ្វើការ; ចប់ ➜ មកភ្លាម; ពិដាន ១៥ វិ. (fail-open) | `lookup-prefetch-test` |
@@ -328,7 +328,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ledger ខែ ↔ ledger ថ្ងៃ** | ⛔ `monthly[M]` ត្រូវ **ស្មើផលបូក `daily[d ∈ M]`** លើ server។ `ledgerDeltaWithClamp()` clamp **ក្នុងមួយធុង** ➜ ការដកធំជាង ledger *របស់ថ្ងៃ* clamp ខាងថ្ងៃ តែ **មិន** clamp ខាងខែ ➜ 📊 ស្ថិតិ ៣ ខែ ឃ្លាតពីរបាយការណ៍ខែ **ជាអចិន្ត្រៃយ៍**។ `alignMonthlyLedgerToDaily()` ជាអ្នកតម្រឹមតែមួយ (⛔ ផ្លូវធម្មតា **គ្មានការសរសេរបន្ថែម**)។ ⛔ **ការស្តារត្រូវបូកត្រឡប់ *គ្រប់វាល* ចូល *ទាំង ២ ធុង*** (`appendRestoreRevenueIncrements`) — វាស់បាន (2.31.7ខ) ៖ mutation `monthly[month].dod += 0` **រស់រានលើ checker ១៦០ ទាំងអស់** រួម checker នេះខ្លួនឯង ព្រោះសេណារីយ៉ូរបស់វាហៅដោយ **`dod: 0` ជានិច្ច** ➜ មិនដែលដាក់ប្រព័ន្ធ ក្នុងស្ថានភាព DOD សោះ។ ⛔ សាលក្រមរបស់ខែត្រូវអានចេញពី **អ្វីដែល server រក្សាទុកពិត** — node កាត់ត្រឹម ៣ ខែ ➜ ខែដែលកាត់ចោល ➜ សាលក្រម **`0`** | `monthly-ledger-agreement-test` |
 | **«ចំណូល» ↔ កញ្ចប់មិនទាន់យក** | ⛔ ចំណូល = ledger **ដក** តម្លៃ barcode `!isDeducted && !isClosed` · clamp ក្នុងមួយរូបិយវត្ថុ · វាស់មិនបាន ➜ `—` · អេក្រង់ស្ថិតិទាំង ៣ ប្រើ helper ដដែល។ ⛔ **អ្នកយាម ២ ជាន់ដាច់ដោយឡែក** ៖ `monthly-report-test` ចាក់សោ **ការហៅ** និង «សរុបខែ = ផលបូកថ្ងៃ» (ស្តាទិច) · `stats-collected-truth-test` ចាក់សោ **លេខដែលអ្នកប្រើអានលើអេក្រង់** (ឥរិយាបថ · browser ពិត)។ វាស់បាន (2026-09-05) ៖ mutation ដែលរក្សាការហៅទុក តែប្តូរ **អាគុយម៉ង់** ➜ ស្តាទិចបៃតង ➜ **០/១៣២ ចាប់បាន**។ ⛔ **ជាន់ទី ៣ ៖ *កម្រិតបូក*** — helper ដដែល **មិនគ្រប់គ្រាន់** ៖ ចំណូលរបស់ខែត្រូវជា **ផលបូកចំណូលរបស់ថ្ងៃ** (`buildMonthlyReport()` បូក `collectedValueOf()` ក្នុងមួយថ្ងៃ — ⛔ helper `collectedValueForMonth()` ត្រូវដកចេញជាមួយអេក្រង់ ៣ ខែ) ⛔ មិនមែន «បូក ledger និងកញ្ចប់បើករបស់ខែទាំងមូល រួច clamp ម្តង» — ថ្ងៃដែល `open_d > cod_d` នឹង **ស៊ីចំណូលពិតរបស់ថ្ងៃដទៃ**។ `buildStatCardItem()` ទទួល **ចំណូលដែលគណនារួច** ➜ កម្រិតបូកជាការសម្រេចរបស់កន្លែងហៅ។ វាស់បាន (2026-09-09) ៖ $20.00 ធៀប **$15.00** លើទិន្នន័យតែមួយ។ ⛔ **ជាន់ទី ៤ ៖ *សិទ្ធិវាស់* (`—` ធៀបលេខ)** — ច្រកទ្វារត្រូវគ្រប **ខាង `ledger`** ដែរ (មើលផ្នែក «Core business rule» ➜ «ត្រូវការទិដ្ឋភាព *ពេញលេញ* ទាំង *សងខាង*»); checker ដែលចាក់សោ *លេខ* មិនឃើញថ្នាក់នេះទេ ព្រោះវាផ្គត់ផ្គង់ listener ជា «រស់» ជានិច្ច ⛔ **ជាន់ទី ៥ ៖ *លំដាប់ចៃដន្យ*** — ជាន់ ១–៤ សុទ្ធតែជា **សេណារីយ៉ូសរសេរដោយដៃ** ➜ រាល់ជុំសរសេរសេណារីយ៉ូល្អជាងមុនបន្តិច ➜ រកឃើញកំហុសមួយទៀតក្នុងកូដដដែល។ វាស់បាន (2026-09-09) ៖ ផ្លូវ **ledger** មានអ្នកយាម ៩ រួម `revenue-fuzz-test` (ចៃដន្យ) ➜ ថ្នាក់ឈប់វិលមកវិញ; ផ្លូវ **បង្ហាញ** មាន ៤ ដែល **៣ ក្នុង ៤ គ្មានចៃដន្យសោះ** ហើយ ⛔ `revenue-fuzz-test` **មិនប៉ះផ្លូវបង្ហាញសោះ** (០ ការយោង) ➜ កំហុស 2.31.6 និង 2.31.7 សុទ្ធតែរស់នៅក្នុង ១៧៦ បន្ទាត់ដែលសរសេរជុំ 2.30.0។ `collected-value-fuzz-test` បិទចន្លោះនោះ | `monthly-report-test` · `stats-collected-truth-test` · `stats-screen-agreement-test` · `stats-measurable-gate-test` · `collected-value-fuzz-test` |
 | **បញ្ជីទទេ ↔ សិទ្ធិវាស់** | ⛔ ច្បាប់ **«ជាន់ទី ៤ ៖ សិទ្ធិវាស់»** នៃជួរខាងលើ អនុវត្តលើ **សាខាបញ្ជីទទេ** ដែរ ៖ «គ្មានទិន្នន័យ» ជា **ការអះអាងអំពីអាជីវកម្ម** — ពេលទិដ្ឋភាពមិនស្រស់ ការពិតគឺ «មិនទាន់មកដល់»។ `emptyViewMessage(pathKeys, emptyText)` ជាអ្នកសម្រេចតែមួយ (ដេរីវេពី `dbListenerViewIsStale()`) ➜ គ្រប **អេក្រង់ ៥** (ស្ថិតិថ្ងៃ · **ចំណូលប្រចាំថ្ងៃ** · របាយការណ៍ខែ · ធុងសំរាម · តារាងប្រវត្តិ) និង **Export ៥**។ វាស់បាន (2.31.8) ៖ listener ងាប់ ➜ ធុងសំរាមរាយ «គ្មានទិន្នន័យដែលបានលុបទេ» ➜ អ្នកប្រើសន្និដ្ឋានថាកញ្ចប់បាត់ — **checker ១៦០ បៃតងទាំងអស់**។ ⛔ **អេក្រង់ទី ៦ និងទី ៧ ៖ របា និងប្រអប់ «ZTO មិនទាន់បិទ»** (2.32.1) — ពួកវាកើត **ក្រោយ** ច្បាប់នេះ ➜ គ្មានច្រកទ្វារសោះ ហើយអ្នកយាម **stub ពួកវាចោល** (`renderZtoSyncBanner() {}`) ➜ **ស្នាមភ្ជាប់គ្មានតេស្ត**។ `ZTO_SYNC_VIEW_KEYS` ជាបញ្ជីតែមួយ (`history` + `deleted` — ⛔ **រាប់ប្រភពរបស់រូបមន្ត រួចរាប់ប្រភពដែលច្រកទ្វារពិនិត្យ ៖ ២ លេខត្រូវស្មើគ្នា**)។ វាស់បាន (2.32.1 · ១៦៦ បៃតង) ៖ listener ងាប់ទាំង ២ ➜ ប្រអប់រាយ «**✅ គ្មានកញ្ចប់ណាដែល ZTO មិនទាន់បិទទេ**» · `deleted` ងាប់ម្នាក់ឯង ➜ របារាយ «**1**» ខណៈការពិតជា «**2**»។ ⛔ **ភាពមិនពេញត្រូវចូល signature ផង** (បើមិនដូច្នេះ cache បង្កកអត្ថបទចាស់ ពេល listener ងាប់ *ក្រោយ*) | `empty-state-truth-test` |
-| **«ចំណូលប្រចាំថ្ងៃ» ៖ អ័ក្សលុយ *ទី ២*** | ⛔ **វាខុសពីលេខដែលមានស្រាប់ទាំងអស់** ៖ `zoew_daily_revenue_cod_dod` និង `zoew_daily_pickup_cod_dod` កូនសោតាម **ថ្ងៃស្កេនចូល** (`item.scanDate`) ចំណែក `zoew_daily_collected_cod_dod` កូនសោតាម **ថ្ងៃបិទ «យក»** ➜ វាឆ្លើយថា «ថ្ងៃនេះទទួលលុយប៉ុន្មាន» (សំណើអ្នកប្រើ 2026-09-12)។ ⛔ លេខ ២ នេះ **មិនត្រូវរំពឹងថាស្មើគ្នា** — ការមិនស្មើមិនមែនកំហុសទេ ➜ ឈ្មោះ និងអត្ថបទប្រអប់ត្រូវបែងចែកវាឲ្យច្បាស់។ ⛔ **អត្តសញ្ញាណ មិនមែនចំនួន** (មេរៀន 2.27.0) ៖ កំណត់ត្រាជា **សំណុំ** `<barcodeKey> ➜ {c,d}` ➜ ការបិទ ២ ដងលើ barcode ដដែល **មិនអាចបង្កើតលុយ**; ⛔ គ្មាននព្វន្ធ delta។ ⛔ **ការបើកវិញត្រូវដកចេញពី *ថ្ងៃដើម*** (ដេរីវេពី `closedAt` ចាស់ ➜ ធ្លាក់ចុះទៅ `collectedDayHoldingKey()`) ⛔ មិនមែនថ្ងៃនេះ។ ⛔ **ការបិទឡើងវិញនៅថ្ងៃក្រោយត្រូវ *ផ្លាស់* មិនមែន *ចម្លង*** (`toggleCloseStatus` re-stamp `closedAt` គ្រប់ barcode ➜ បើមិនដកចេញពីថ្ងៃចាស់ លុយរាប់ ២ ថ្ងៃ)។ ⛔ ការសរសេរឆ្លងកាត់ **ទ្វារបិទដដែល** (`applyBarcodeCloseChange` · `toggleCloseStatus`) ហើយ **ការបញ្ច្រាសត្រូវត្រឡប់ *តម្លៃដើម*** មិនមែនលុបចោល។ ⛔ **វា *មិនមែន* លុយ — វាជាកញ្ចក់** ៖ គ្មានការប៉ះ `isDeducted` · ledger ថ្ងៃ/ខែ · `packagesPickedUp` ➜ អ្នកយាមអះអាងទិសនោះជាអក្សរ។ ⛔ **ការកែទឹកប្រាក់ធ្វើឲ្យស៊ីគ្នា តែ *មិនអាចបង្កើត* ធាតុថ្មី** (`syncCollectedValueForBarcode` ចាកចេញពេលគ្មានធាតុស្រាប់) ➜ វាមិនអាចបង្កើតលុយបានឡើយ។ ⛔ **ការសម្អាត ៧ ថ្ងៃជាការលុបដែលបំផ្លាញ** ➜ ត្រូវការ `cleanupClockIsTrustworthy()` **និង** ទិដ្ឋភាពស្រស់ ហើយ ⛔ **មិនលុបកូនសោដែលមិនមែនថ្ងៃ** (កុំលុបអ្វីដែលមិនយល់)។ ⛔ **Firebase rules ត្រូវ Publish ដោយដៃ** (ច្បាប់ ១០) — អ្នកយាមប្រៀបឈ្មោះ node **app.js ↔ rules ពិត** | `daily-collected-test` |
+| **«ចំណូលប្រចាំថ្ងៃ» ៖ តាមថ្ងៃយក** | `zoew_daily_collected_cod_dod` រាប់សំណុំ barcode `{c,d}` តាមថ្ងៃបិទ; ledger ថ្ងៃ/ខែគិតតាមថ្ងៃស្កេន។ Close ត្រូវឆ្លង history transaction សិន ហើយយកតម្លៃ server មក reconcile។ បើកវិញដកពីថ្ងៃដែលមានធាតុស្រាប់; បិទថ្ងៃក្រោយផ្លាស់ key ដោយ multipath update តែមួយ ដើម្បីដកថ្ងៃចាស់/ដាក់ថ្ងៃថ្មីទាំងគូ។ ការកែតម្លៃមិនបង្កើត collected ដែលគ្មានស្រាប់។ Mirror ក្នុងសតិអានពី Firebase listener តែមួយ; កុំសរសេរ/rollback ដោយ snapshot local បន្ថែម ព្រោះសំណើបដិសេធជាន់គ្នាអាចជាន់តម្លៃត្រឹមត្រូវ។ ការបដិសេធមិនបង្ហាញ Sync ជោគជ័យ; late callback ត្រូវនៅក្នុង auth/database ដដែល។ Repair មានពិដាន និងផ្ទៀង history ម្តងទៀត; history និង mirror នៅជា writes ដាច់គ្នា ដូច្នេះមិនអះអាង atomicity ឆ្លង node ពេល client បិទកណ្តាល។ Delete/pickup មិនលុប collected ព្រោះ history បាត់។ គ្មានការប៉ះ `isDeducted` · ledger · `packagesPickedUp` ពី mirror។ Cleanup ៧ ថ្ងៃត្រូវការនាឡិកា server/ទិដ្ឋភាពស្រស់ ហើយរក្សាកូនសោដែលមិនស្គាល់ | `daily-collected-test` |
 | **ការសម្អាតដែលបំផ្លាញ** | ⛔ ត្រូវការនាឡិកាពី server ពិត **និងការភ្ជាប់រស់** | `cleanup-clock-guard-test` |
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ។ ⛔ **អាយុរបស់ទង់ដោះសោ ត្រូវស្មើអាយុ `lookupSecretKey`** — ទង់រស់ក្នុង `sessionStorage` (រស់រាន reload) ខណៈសោដេរីវេពី PIN រស់ក្នុងសតិ (ងាប់រាល់ reload) ➜ ក្រោយ PTR ដំបូង App Lock ដោះរួច តែ Lookup ជាប់វិញ ➜ អ្នកប្រើត្រូវវាយ PIN ២ ដង។ វាស់បាន (2.31.11)។ `CryptoKey` រក្សាក្នុង **IndexedDB** (⛔ **មិនមែន sessionStorage** — នោះទាមទារ `extractable: true` ➜ XSS នាំសោចេញបាន)។ ⛔ ការលុបជាចំណុចច្របាច់តែមួយ ៖ `clearAppUnlockedForSession()`។ ⛔ **ការការពារ ២ ជាន់ត្រូវវាស់ដាច់ពីគ្នា** (ច្រកទ្វារ `appLockShouldArm()` និងការលុបពេលចាក់សោ) — វាស់រួមគ្នា = វាស់តែជាន់ដែលលឿនជាង ➜ mutation លើជាន់យឺតរស់រាន | `app-lock-test` |
 | **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub**។ ⛔ **ច្បាប់ដដែលអនុវត្តលើ *ទិសផ្ទុយ* ផង** ៖ **✅ ក៏ត្រូវវាស់ដែរ** — ការរាយ ✅ លើអ្វីដែលមិនបានវាស់ **អាក្រក់ជាង** ❌ ក្លែងក្លាយ ព្រោះវាបញ្ជូនអ្នកប្រើទៅរកមូលហេតុខុស។ វាស់បាន (2.30.5) ៖ ជួរ ZTO រាយ ✅ ត្រឹម **វត្តមាន** នៃ Cookie ខណៈការស្កេនឆ្លើយ «ផុតកំណត់» — សាលក្រម `authRejectedAgeMs`/`authAcceptedAgeMs` មានក្នុង `?diag=1` រួចហើយ តែគ្មាននរណាអាន។ ⛔ **`cookieState` ជារបស់ container នីមួយៗ** ➜ «មិនទាន់ដែលប្រើ» = **⚠️** មិនមែន ✅ ⛔ **ជួរ ZTO បង្ហាញការបន្តអាយុ Cookie ដែរ** ៖ `renewals > 0` ➜ ភស្តុតាងច្បាស់; `observed:false` ➜ **«មិនទាន់វាស់»** (⛔ មិនមែន «បន្តអាយុមិនបាន» — `upstreamCookieSignal` ជារបស់ container នីមួយៗ); `observed && !setCookie` ➜ Argus មិនផ្ញើ ➜ ត្រូវ Sync ដោយដៃ។ ⛔ ព័ត៌មាននេះ **មិនប្តូរសាលក្រម** ❌/⚠️/✅ ហើយ **ឈ្មោះ cookie មិនឡើងដល់ DOM** | `health-check-test` |
@@ -345,7 +345,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
 | **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
 | **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
-| **ZTO ៖ ការបន្តអាយុ Cookie** | ⛔ មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag មានលក្ខខណ្ឌ | `zto-cookie-store-test` · `zto-cookie-session-test` |
+| **ZTO ៖ ការបន្តអាយុ Cookie** | មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag; response ពី attempt ដែល timeout មិនអាចជាន់ renewal ថ្មី។ Auth បដិសេធក្នុង `code/errorCode/statusCode` ណាមួយត្រូវឈ្នះ success envelope | `zto-cookie-store-test` · `zto-cookie-session-test` |
 | **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | Cookie ជំនួយ/retry ដដែលមានពិដាន ៦០ វិ.; session ស្នូលថ្មីសាកសរសេរភ្លាមក្នុងថវិកា ហើយ pending រស់រហូតដល់បញ្ជាក់ការរក្សាទុក | `zto-cookie-session-test` |
 | **ZTO ៖ ការអាន Blobs ↔ ផ្លូវឆ្លើយតប** | ⛔ មានតម្លៃក្នុងសតិ ➜ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់**ខាងក្រោយ**; ⛔ សតិទទេ ឬក្រោយ 401 ➜ អាន**ទប់**ដដែល | `zto-cookie-store-test` |
 | **ZTO helper ៖ បណ្តាញដាច់មួយភ្លែត** | ⛔ ការធ្លាក់បណ្តោះអាសន្នព្យាយាមឡើងវិញ **ក្នុងពិដាន** (signed URL ថ្មីរាល់ជុំ); 401/403/404/422 **មិនព្យាយាម** | `zto-cookie-sync-test` |
@@ -497,8 +497,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការប្រណាំងនៃការស្តារ · claim របស់ «លុបទាំងអស់» | `restore-race-test.js` · `clear-history-claim-test.js` |
 | fence នៃ finalization (⚠️ **គំរូ rules សរសេរដោយដៃ** — មិនឃើញការឃ្លាតពី rules ពិត; អ្នកចាប់ពិតគឺ `emu/restore-deadlock-test.js`) | `restore-finalization-fence-test.js` · `clear-history-finalization-fence-test.js` |
 | Secret របស់ Lookup API សល់ជាអក្សរធម្មតា | `lookup-config-secret-test.js` |
-| ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` |
-| បញ្ជី Key របស់ ZoeKeyGen បង្ហាញស្ថានភាពខុស (revoked/expired) | `keylist-consistency-test.js` |
+| ផ្លូវ PIN និងសុវត្ថិភាពវគ្គរបស់ ZoeKeyGen; Extend/Revoke ចាប់យក Key និង database មុន await ហើយ callback ត្រូវនៅក្នុងវគ្គដដែល | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` |
+| បញ្ជី Key បង្ហាញ revoked/expired ត្រឹមត្រូវ និងទទួល Firebase key `__proto__`/`constructor`/`toString` ដោយមិនប៉ះ prototype | `keylist-consistency-test.js` |
 | cache ខាង **server** របស់ Apps Script (កូនសោ ↔ ចំនួនជួរដេក) | `google-sheets-cache-test.js` |
 | SheetJS ដែល ship មានកំណែ/hash រង CVE | `dependency-security-test.js` |
 | ការណែនាំលេខទូរស័ព្ទ (`collectPhoneSuggestions`) · **ការធ្វើឲ្យលេខទូរស័ព្ទដែលរក្សាទុកមានទម្រង់តែមួយ** (`normalizeStoredPhone`) | `phone-suggest-test.js` |
@@ -593,7 +593,7 @@ ledger **ប៉ោងបណ្តោះអាសន្ន** រហូតដល�
 | ១០ | **✖️ លុបជាអចិន្ត្រៃយ៍** | `executePermanentDelete` | — | — | — | **មិនប៉ះ** | — |
 
 **ច្បាប់មាស ៖ `isDeducted` ជាវាល *តែមួយគត់* ដែលកំណត់លុយ។** `trashReason` ជា
-**ស្លាកបង្ហាញ** ប៉ុណ្ណោះ។ **ជួរ ៤ និង ៨ ជាជួរតែ ២ ដែលប៉ះលុយ។**
+**ស្លាកបង្ហាញ** ប៉ុណ្ណោះ។ **ជួរ ៤ និង ៨ ដកប្រាក់; ជួរ ៩ បូកត្រឡប់តែទឹកប្រាក់ដែលធ្លាប់ដក។**
 
 ## ⛔ ការសម្អាតស្វ័យប្រវត្តិ — ថេរដែលមិនត្រូវប្តូរដោយគ្មានការស្នើ
 
@@ -1221,7 +1221,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `dbListenerResyncIsProgressing()` ជាអ្នកសម្រេច ជាមួយ
   `DB_LISTENER_PROGRESS_GRACE_MS` (២០ វិ.) ➜ វាជាការ **ពន្យារ** មិនមែនការទប់។
 - **ការដាច់បណ្តាញ ≠ ការបរាជ័យ** — `pendingHistoryPatches` រត់ឡើងវិញពេល
-  `.info/connected` ត្រឡប់ជា `true`។ ⛔ **មានតែ `disconnect` ទេដែលចូលជួរ**
+  `.info/connected` ត្រឡប់ជា `true`។ ⛔ **`disconnect` ឬ SDK `already deleted` ទើបអាចចូលជួរ**
   (`permission_denied` និង timeout ត្រូវ **revert ដដែល**)។ ⛔ ការចូលជួរជា
   **opt-in តាមកន្លែងហៅ** — `saveEditedPhone()` **មិនត្រូវប្រើវា**។
   ⛔ **កុំបន្ថែម `flushPendingHistoryPatches()` ចូលវដ្ត ៦០ វិនាទី** — វានឹង
@@ -1508,8 +1508,9 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 
 ខ្សែសង្វាក់ ៖ `sync-zto-cookie.cmd ➜ Edge/Chrome request ➜ Netlify Blobs
 (store site:zto-auth, key cookie)` — **គ្មាន redeploy**។
-ផ្លូវពិតក្នុង Argus ៖ **Login ➜ Scan Management ➜ Arrival Scan ➜ វាយ Waybill**
-➜ ទើប `POST https://aargus-api.ztoglobal.com/scan/get/order/detail` បាញ់។
+ក្រោយ Login និងបើក Argus helper អាចចាប់ពីចម្លើយ API ដែលទទួលយក session។
+បើនៅរង់ចាំ ផ្លូវបម្រុងគឺ **Scan Management ➜ Arrival Scan ➜ វាយ Waybill**
+ដើម្បីកេះ `POST https://aargus-api.ztoglobal.com/scan/get/order/detail`។
 
 ⛔ **ចំណុចចាប់ផ្តើម ≠ គោលដៅចាប់** ៖ helper បើក **`gate.ztoglobal.com`**
 (រក្សា session ➜ ចុចកាតសាខា ➜ Argus បើកដោយមិនវាយ password) ចំណែក
@@ -1550,6 +1551,7 @@ handshake រត់មុន)។ ⛔ **fail-open ទាំងស្រុង** �
 - PAT ត្រូវ prompt ដោយ `Read-Host -AsSecureString` រក្សាជា **DPAPI/CurrentUser**
   ក្នុង `%LOCALAPPDATA%` ហើយឆ្លងតែ stdout pipe (`shell:false`)។ ⛔ គ្មាន PAT
   ក្នុង command line ឬ Netlify env។ **PAT មិនហូរទៅ host របស់ signed URL**។
+  Child DPAPI ត្រូវបញ្ចប់ក្នុង ៣០ វិនាទី ហើយសម្អាត buffer/timer រាល់ផ្លូវចេញ។
 - **ផ្លូវ setup ត្រូវរត់ឡើងវិញបាន ដោយ Enter = រក្សាតម្លៃចាស់** (Netlify បង្ហាញ
   PAT **តែម្តង**)។ ⛔ **គ្មានការទម្លាក់ស្ងាត់** — សោខ្លីពេកត្រូវប្រាប់ចំនួន
   តួដែលវាយ និងចំនួនដែលត្រូវការ។ ⛔ **ច្រកទ្វារត្រូវវាស់ *តម្លៃដែលដោះសោបាន*
@@ -1845,7 +1847,7 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 «CI បៃតងលើ GitHub» ជាការរង់ចាំដែលមិនចប់។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
 
 ```bash
-npm i acorn playwright-core xlsx
+npm i acorn playwright-core
 bash audit-tools/run-all.sh
 ```
 

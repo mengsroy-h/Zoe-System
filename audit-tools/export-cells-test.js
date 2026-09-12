@@ -4,14 +4,15 @@
 //
 // CLAUDE.md៖ «កុំវិនិច្ឆ័យថ្នាក់កំហុសនេះពី cell object ក្នុងសតិ — ត្រូវពិនិត្យ XML
 // ដែល emit ចេញ។» ដូច្នេះតេស្តនេះសរសេរឯកសារ .xlsx ពិត រួចអាន XML ខាងក្នុង។
-let XLSX;
-try { XLSX = require('xlsx'); } catch (e) { console.log('SKIP — ត្រូវការ xlsx (npm i xlsx@0.18.5)'); process.exit(0); }
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const zlib = require('zlib');
 
-const ROOT = process.env.EXPORT_APP_DIR || path.join(__dirname, '..');
+const ROOT = path.resolve(process.env.EXPORT_APP_DIR || path.join(__dirname, '..'));
+let XLSX;
+try { XLSX = require(path.join(ROOT, 'ZoeW', 'vendor', 'xlsx.full.min.js')); }
+catch (e) { console.log('FAIL — មិនអាចផ្ទុក SheetJS ពិតពី target tree'); process.exit(1); }
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -121,7 +122,7 @@ sandbox.__rowCount = rows.length;
 vm.runInContext('forceExportTextCells(__ws, __rowCount)', sandbox);
 const wb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(wb, ws, 'ប្រវត្តិ');
-const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx', bookSST: true });
+const buf = Buffer.from(XLSX.write(wb, { type: 'array', bookType: 'xlsx', bookSST: true }));
 
 const sheetXml = unzipEntry(buf, 'xl/worksheets/sheet1.xml');
 const sharedXml = unzipEntry(buf, 'xl/sharedStrings.xml');

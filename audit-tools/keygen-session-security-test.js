@@ -115,8 +115,10 @@ function build(options) {
         db: {},
         auth: { currentUser: user },
         window: { ZoeLicense: license, ZoeErrors: { capture() {} } },
+        ZoeErrors: { capture() { log.captures = (log.captures || 0) + 1; } },
         showToast: (message) => log.toasts.push(message),
         openModalHelper: (id) => getElementById(id).classList.add('active'),
+        closeModal: (id) => { log.closed = (log.closed || []).concat(id); getElementById(id).classList.remove('active'); },
         updateSigningKeyBadge() {},
         refreshKeyList() { log.refreshed = (log.refreshed || 0) + 1; },
         waitForServerTimeSync: () => Promise.resolve(true),
@@ -145,6 +147,8 @@ function build(options) {
         var isGeneratingKey = false;
         var keyListSessionGeneration = 0;
         var lastGeneratedKey = '';
+        var extendTargetId = 'key-a';
+        var keyListCache = [{ id: 'key-a', paths: ['ADM'], revoked: false }, { id: 'key-b', paths: ['ADM'], revoked: false }];
         var SIGNING_KEY_SESSION_STORAGE_KEY = 'zoekeygen_signing_key_enc';
     `, ctx);
     vm.runInContext(slice([
@@ -157,6 +161,13 @@ function build(options) {
         'generateNewKeypair',
         'loadSigningKey',
         'generateLicenseKey',
+        'openExtendModal',
+        'confirmExtendKey',
+        'toggleRevokeKey',
+        'copySensitiveText',
+        'copyTextarea',
+        'copyGeneratedKey',
+        'copySetupLink',
         'tryRestoreSigningKeyFromSession'
     ]), ctx);
     return { ctx, license, log, elements, storage, getElementById };
@@ -207,6 +218,153 @@ async function run() {
     await h.ctx.tryRestoreSigningKeyFromSession();
     ok('Private Key ចាស់មិនត្រូវ Load', h.ctx.signingPrivateKeyJwk === null);
     ok('session ciphertext មិនត្រឹមត្រូវត្រូវលុប', !h.storage.has('zoekeygen_signing_key_enc'));
+
+    console.log('-- បន្ថែមសុពលភាព៖ target និង session ត្រូវនៅត្រឹមត្រូវក្រោយ await --');
+    h = build();
+    h.ctx.openExtendModal('key-a');
+    h.getElementById('extendDaysInput').value = '7';
+    const clockWait = deferred();
+    h.ctx.waitForServerTimeSync = () => clockWait.promise;
+    const targetWrites = [];
+    h.ctx.fb.update = (ref, value) => { targetWrites.push({ path: ref.path, value }); return Promise.resolve(); };
+    const extendTask = h.ctx.confirmExtendKey();
+    h.ctx.openExtendModal('key-b');
+    clockWait.resolve(true);
+    await extendTask;
+    ok('បើក Key B ខណៈ Key A រង់ចាំម៉ោង៖ សរសេរតែ Key A',
+        targetWrites.length === 1 && targetWrites[0].path === 'license_keys/ADM/key-a', targetWrites);
+    ok('ថ្ងៃសុពលភាពយកពីការបញ្ជាក់ Key A មិនមែន input ថ្មី',
+        targetWrites.length === 1 && targetWrites[0].value.expiresAt === 1000 + 7 * 86400000, targetWrites);
+    ok('ការបញ្ចប់ Key A មិនបិទ modal ថ្មីរបស់ Key B', h.getElementById('extendModal').classList.contains('active'));
+
+    h = build();
+    h.ctx.openExtendModal('key-a');
+    const logoutClock = deferred();
+    h.ctx.waitForServerTimeSync = () => logoutClock.promise;
+    const logoutBeforeWrite = h.ctx.confirmExtendKey();
+    h.ctx.invalidateSensitiveSession();
+    h.ctx.auth.currentUser = { uid: 'other-admin' };
+    h.ctx.db = { business: 'other' };
+    logoutClock.resolve(true);
+    await logoutBeforeWrite;
+    ok('logout ឬប្តូរគណនីពេលរង់ចាំម៉ោង៖ មិនសរសេរទៅ database ថ្មី', h.log.updates === 0, h.log.updates);
+    ok('សំណើរបស់ session ចាស់មិនបង្ហាញសារ ឬ refresh បញ្ជីថ្មី', !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed, h.log);
+
+    for (const kind of ['extend', 'revoke']) {
+        h = build();
+        h.ctx.openExtendModal('key-a');
+        const pendingWrite = deferred();
+        h.ctx.fb.update = () => { h.log.updates++; return pendingWrite.promise; };
+        const pendingTask = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('key-a');
+        await drain();
+        ok(kind + '៖ write ចាប់ផ្តើមមុន logout', h.log.updates === 1, h.log.updates);
+        h.ctx.invalidateSensitiveSession();
+        pendingWrite.resolve();
+        await pendingTask;
+        ok(kind + '៖ write ចាស់បញ្ចប់ក្រោយ logout មិនបង្ហាញ success/refresh/បិទ modal',
+            !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed && !h.log.closed, h.log);
+    }
+
+    h = build(); h.ctx.openExtendModal('key-a');
+    const dbClock = deferred(); h.ctx.waitForServerTimeSync = () => dbClock.promise;
+    const databaseSwitch = h.ctx.confirmExtendKey();
+    h.ctx.db = { business: 'other' };
+    dbClock.resolve(true); await databaseSwitch;
+    ok('ប្តូរ database តែមួយ ខណៈ auth generation នៅដដែល៖ មិនបន្ត write ក្រោយរង់ចាំម៉ោង',
+        h.log.updates === 0 && !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed, h.log);
+
+    for (const kind of ['extend', 'revoke']) {
+        for (const failure of ['resolve', 'timeout']) {
+            for (const change of ['db-only', 'logout']) {
+                h = build(); h.ctx.openExtendModal('key-a');
+                const pending = deferred(); const timed = deferred();
+                h.ctx.fb.update = () => { h.log.updates++; return pending.promise; };
+                if (failure === 'timeout') h.ctx.withTimeout = () => timed.promise;
+                const task = kind === 'extend' ? h.ctx.confirmExtendKey() : h.ctx.toggleRevokeKey('key-a');
+                await drain();
+                ok(kind + '/' + failure + '/' + change + '៖ write ត្រូវចាប់ផ្តើមពិត', h.log.updates === 1);
+                if (change === 'db-only') h.ctx.db = { business: 'other' };
+                else h.ctx.invalidateSensitiveSession();
+                if (failure === 'timeout') timed.reject(new Error('Update timed out'));
+                else pending.resolve();
+                await task; pending.resolve();
+                ok(kind + '/' + failure + '/' + change + '៖ completion ចាស់មិនប៉ះ UI ថ្មី',
+                    !h.log.toasts.length && !h.log.alerts.length && !h.log.refreshed && !h.log.closed && !h.log.captures, h.log);
+            }
+        }
+    }
+
+    console.log('-- Clipboard៖ API មិនមាន ឬបដិសេធ មិនត្រូវចម្លងស្ងាត់ ឬអះអាងក្លែងក្លាយ --');
+    function clipboardFixture(mode) {
+        const f = build();
+        const state = { native: [], fallback: [], temporary: [], removed: [] };
+        const el = f.getElementById('newPrivateKeyOutput'); el.value = 'synthetic-private-key';
+        el.select = () => { state.selected = el.value; };
+        el.removeAttribute = () => {}; el.setAttribute = () => {};
+        f.ctx.lastGeneratedKey = 'synthetic-generated-key';
+        f.ctx.lastGeneratedSetupLink = 'https://synthetic.example/?setup=synthetic-config';
+        f.ctx.navigator = {};
+        if (mode !== 'unavailable' && mode !== 'failed-fallback') {
+            f.ctx.navigator.clipboard = { writeText(value) {
+                state.native.push(value);
+                if (mode === 'throws') throw new Error('synthetic-denied');
+                return mode === 'rejected' || mode === 'rejected-fallback' ? Promise.reject(new Error('synthetic-denied')) : Promise.resolve();
+            } };
+        }
+        f.ctx.document.body = { appendChild(node) { state.temporary.push(node); } };
+        f.ctx.document.createElement = () => {
+            const node = { value: '', style: {}, setAttribute() {},
+                select() { state.selected = node.value; },
+                remove() { state.removed.push(node.value); state.temporary.splice(state.temporary.indexOf(node), 1); }
+            };
+            return node;
+        };
+        f.ctx.document.execCommand = () => {
+            state.fallback.push(state.selected);
+            return mode !== 'failed-fallback' && mode !== 'rejected-fallback';
+        };
+        return Object.assign(f, { state });
+    }
+    for (const kind of ['private', 'generated', 'setup']) {
+        for (const mode of ['native', 'unavailable', 'rejected', 'throws', 'failed-fallback', 'rejected-fallback']) {
+            const f = clipboardFixture(mode);
+            let threw = false;
+            try {
+                if (kind === 'private') await f.ctx.copyTextarea('newPrivateKeyOutput');
+                else if (kind === 'generated') await f.ctx.copyGeneratedKey();
+                else await f.ctx.copySetupLink();
+            } catch (_) { threw = true; }
+            await drain();
+            const expected = kind === 'private' ? 'synthetic-private-key' : kind === 'generated'
+                ? 'synthetic-generated-key' : 'https://synthetic.example/?setup=synthetic-config';
+            const copied = mode === 'native' ? f.state.native : f.state.fallback;
+            if (mode === 'failed-fallback' || mode === 'rejected-fallback') {
+                ok(kind + '៖ copy បរាជ័យមិនអះអាង success និងប្រាប់ឲ្យចម្លងដោយដៃ',
+                    !threw && !f.ctx.keypairPrivateCopied && !f.log.toasts.some((t) => t.startsWith('✅'))
+                    && f.log.toasts.some((t) => t.startsWith('⚠️')), f.log);
+            } else {
+                ok(kind + ' ' + mode + '៖ ចម្លងតម្លៃពិត រួចទើបបញ្ជាក់ success',
+                    !threw && copied.length === 1 && copied[0] === expected
+                    && f.log.toasts.filter((t) => t.startsWith('✅')).length === 1
+                    && (kind !== 'private' || f.ctx.keypairPrivateCopied), { copied, log: f.log });
+            }
+            ok(kind + ' ' + mode + '៖ មិនទុក secret ក្នុង textarea បណ្តោះអាសន្ន',
+                f.state.temporary.length === 0 && f.state.removed.every((value) => value === ''));
+        }
+    }
+    for (const change of ['logout', 'new-value']) {
+        for (const result of ['resolve', 'reject']) {
+            const f = clipboardFixture('native'); const pendingCopy = deferred();
+            f.ctx.navigator.clipboard.writeText = () => pendingCopy.promise;
+            const copying = f.ctx.copyTextarea('newPrivateKeyOutput');
+            if (change === 'logout') f.ctx.invalidateSensitiveSession();
+            else f.getElementById('newPrivateKeyOutput').value = 'synthetic-new-private-key';
+            if (result === 'resolve') pendingCopy.resolve(); else pendingCopy.reject(new Error('synthetic-denied'));
+            await copying; await drain();
+            ok('Clipboard យឺត ' + change + '/' + result + '៖ មិនចម្លង fallback ឬទទួលស្គាល់ key ថ្មីជំនួស',
+                !f.state.fallback.length && !f.ctx.keypairPrivateCopied && !f.log.toasts.length, f.log);
+        }
+    }
 
     console.log('\n' + (fail === 0 ? '✅ ' : '❌ ') + pass + '/' + (pass + fail));
     process.exit(fail === 0 ? 0 : 1);

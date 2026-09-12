@@ -50,6 +50,7 @@ const VERIFY_GAP_MS = 5 * 1000;
 const VERIFY_MAX_ATTEMPTS = 32;
 const SITE_URL_MAX_LENGTH = 512;
 const NETLIFY_TIMEOUT_MS = 30 * 1000;
+const TOKEN_READ_TIMEOUT_MS = 30 * 1000;
 const NETLIFY_RETRY_ATTEMPTS = 3;
 const NETLIFY_RETRY_BASE_MS = 800;
 const NETLIFY_RESPONSE_MAX_BYTES = 1024 * 1024;
@@ -238,11 +239,13 @@ function readTokenViaPowerShell(options) {
 
     return new Promise((resolve, reject) => {
         let settled = false;
+        let timer = null;
         let total = 0;
         const chunks = [];
         const finish = (error, value) => {
             if (settled) return;
             settled = true;
+            if (timer !== null) clearTimeout(timer);
             for (const chunk of chunks) chunk.fill(0);
             chunks.length = 0;
             if (error) reject(error);
@@ -266,6 +269,15 @@ function readTokenViaPowerShell(options) {
             return;
         }
 
+        // DPAPI គ្មានការរង់ចាំអន្តរកម្ម៖ child ព្យួរត្រូវបញ្ចប់ និងសម្អាត secret។
+        const timeoutMs = Number.isFinite(config.tokenReadTimeoutMs)
+            ? Math.max(1, Math.min(TOKEN_READ_TIMEOUT_MS, Math.floor(config.tokenReadTimeoutMs)))
+            : TOKEN_READ_TIMEOUT_MS;
+        timer = setTimeout(() => {
+            finish(codedError('NETLIFY_TOKEN_READ_TIMEOUT'));
+            try { child.kill(); } catch (_) {}
+        }, timeoutMs);
+
         child.stdout.on('data', (rawChunk) => {
             const chunk = Buffer.from(rawChunk);
             if (settled) {
@@ -275,8 +287,8 @@ function readTokenViaPowerShell(options) {
             total += chunk.length;
             if (total > 4096) {
                 chunk.fill(0);
-                try { child.kill(); } catch (_) {}
                 finish(codedError('NETLIFY_TOKEN_INVALID'));
+                try { child.kill(); } catch (_) {}
                 return;
             }
             chunks.push(chunk);
@@ -718,9 +730,10 @@ async function launchLocalBrowser() {
 function captureResponseSucceeded(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
     const code = String(payload.code ?? payload.errorCode ?? payload.statusCode ?? '').trim().toLowerCase();
+    const authCodes = [payload.code, payload.errorCode, payload.statusCode];
     const message = [payload.error, payload.message, payload.msg, payload.errorMsg]
         .filter((value) => typeof value === 'string').join(' ').slice(0, 4096);
-    if (/^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(code)) return false;
+    if (authCodes.some((value) => /^(?:401|403|unauthorized|forbidden|not[_-]?login|login[_-]?required)$/.test(String(value ?? '').trim().toLowerCase()))) return false;
     if (/https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[.\/]|iam[-.])/i.test(message)) return false;
     if (/(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/i.test(message)) return false;
     if (payload.success === false || payload.status === false || payload.result === false) return false;
@@ -975,6 +988,7 @@ function safeFailureMessage(code) {
         NETLIFY_TOKEN_MISSING: 'No Netlify token yet. Run setup.cmd.',
         NETLIFY_TOKEN_READER_MISSING: 'read-token.ps1 is missing. Download the tool folder again.',
         NETLIFY_TOKEN_READ_FAILED: 'Windows could not unlock the Netlify token. Run setup.cmd again as the same Windows user.',
+        NETLIFY_TOKEN_READ_TIMEOUT: 'Windows token unlock timed out. Close this window and try again.',
         NETLIFY_TOKEN_INVALID: 'The Netlify token has a bad shape. Run setup.cmd again.',
         NETLIFY_NETWORK: 'Could not reach the Netlify API. Check your internet connection.',
         NETLIFY_TIMEOUT: 'The Netlify API took longer than 30 seconds. Please try again.',

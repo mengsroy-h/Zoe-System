@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { EventEmitter } = require('events');
 let acorn = null;
 try { acorn = require('acorn'); } catch (_) { acorn = null; }
@@ -241,6 +242,58 @@ async function run() {
     ok('PowerShell child មិនឆ្លង shell និងមិន inherit output',
         /shell:\s*false/.test(source)
         && /stdio:\s*\['ignore', 'pipe', 'ignore'\]/.test(source));
+    if (api && typeof api.readTokenViaPowerShell === 'function') {
+        // វាស់ពិដានលំនាំដើមពីការហៅ timer ពិត ដោយមិនរង់ចាំ ៣០ វិនាទី។
+        const exported = { exports: {} }; let defaultDelay = 0; let cleared = 0;
+        vm.runInNewContext(source, { module: exported, exports: exported.exports, require,
+            __dirname: TOOL_DIR, process, Buffer, URL,
+            setTimeout(_callback, ms) { defaultDelay = ms; return 1; },
+            clearTimeout() { cleared++; }
+        }, { filename: SOURCE_PATH });
+        const normalChild = new EventEmitter(); normalChild.stdout = new EventEmitter();
+        normalChild.kill = () => {};
+        const normalRead = exported.exports.readTokenViaPowerShell({
+            tokenPath: TOKEN_READER_PATH, scriptPath: TOKEN_READER_PATH, spawnImpl: () => normalChild
+        });
+        normalChild.stdout.emit('data', Buffer.from(TOKEN)); normalChild.emit('close', 0);
+        const normalToken = await normalRead;
+        ok('DPAPI លំនាំដើម៖ ពិដានមិនលើស ៣០ វិនាទី និង success សម្អាត timer',
+            defaultDelay > 0 && defaultDelay <= 30000 && cleared === 1 && normalToken === TOKEN, defaultDelay);
+        for (const mode of ['success', 'hang', 'oversize']) {
+            const child = new EventEmitter();
+            child.stdout = new EventEmitter();
+            let killed = 0; let spawnCall;
+            child.kill = () => { killed++; };
+            const pending = api.readTokenViaPowerShell({
+                tokenPath: TOKEN_READER_PATH, scriptPath: TOKEN_READER_PATH, tokenReadTimeoutMs: 20,
+                spawnImpl(command, args, options) {
+                    spawnCall = { command, args, options };
+                    return child;
+                }
+            }).then((value) => ({ value }), (error) => ({ code: error.code }));
+            child.stdout.emit('data', mode === 'oversize' ? Buffer.alloc(4097, 65) : Buffer.from(TOKEN));
+            if (mode === 'success') child.emit('close', 0);
+            let watchdog;
+            const result = await Promise.race([pending, new Promise((resolve) => {
+                watchdog = setTimeout(() => resolve({ code: 'CHECKER_WATCHDOG' }), 500);
+            })]);
+            clearTimeout(watchdog);
+            // បិទ fixture ទោះ source ខូច ដើម្បី checker មិនទុក Promise ព្យួរ។
+            child.emit('close', 0);
+            child.stdout.emit('data', Buffer.from('late-secret-must-not-replace-result'));
+            const final = await pending;
+            ok('DPAPI ' + mode + '៖ លទ្ធផលមានកំណត់ និង response យឺតមិនប្តូរវា',
+                mode === 'success' ? result.value === TOKEN && final.value === TOKEN && killed === 0
+                    : mode === 'hang' ? result.code === 'NETLIFY_TOKEN_READ_TIMEOUT' && final.code === result.code && killed === 1
+                        : result.code === 'NETLIFY_TOKEN_INVALID' && final.code === result.code && killed === 1,
+                result.code || 'success');
+            ok('DPAPI ' + mode + '៖ secret មិនឆ្លង command arguments ឬ stdout parent',
+                spawnCall && !JSON.stringify(spawnCall.args).includes(TOKEN)
+                && spawnCall.options.shell === false && spawnCall.options.stdio.join(',') === 'ignore,pipe,ignore');
+        }
+    } else {
+        ok('DPAPI ត្រូវមាន helper ដែលអាចវាស់ឥរិយាបថបាន', false);
+    }
     ok('setup ផ្ទៀងផ្ទាត់ credential មុនអះអាងជោគជ័យ',
         /--verify-setup/.test(setup) && /await verifyNetlifySetup\(\)/.test(source));
     ok('runner ទាមទារ config + encrypted token ក្រៅ repo',

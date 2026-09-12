@@ -12,22 +12,23 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-12 · ZoeW 2.34.1 · ZoeKeyGen 2.19.22)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-13 · ZoeW 2.34.2 · ZoeKeyGen 2.19.23)
 
-ជុំនេះសាកកូដពិតលើ schedule ដែលអ្នកយាមចាស់មិនវាស់ ហើយបញ្ជាក់ failure មុនកែ។
-ច្បាប់បច្ចុប្បន្ននៅ `CLAUDE.md`; ភស្តុតាង និងព្រំដែននៅ `docs/HISTORY.md`។
+ជុំនេះពង្រីកអ្នកយាមចាស់ពីការវាស់លំដាប់ដែលបង្កើតកំហុសលើ main ពិត។
+ច្បាប់នៅ `CLAUDE.md`; លេខមុន/ក្រោយ និងព្រំដែននៅ `docs/HISTORY.md`។
 
 | ការប្រែ | អ្នកយាម និងព្រំដែន |
 |---|---|
-| ចំណូលតាមថ្ងៃយកយក state server, ផ្លាស់ថ្ងៃទាំងគូ និង repair late write មានពិដាន | `daily-collected-test` · `emu/crud-rules-flow.js` · `pickup-barcode-identity-test` · `late-commit-test`; history/mirror មិនមែន transaction តែមួយ |
-| Retry រក្សាជម្រើសថ្មី និងបិទ callback ក្រោយប្ដូរ auth/database | `history-patch-retry-test` · `connection-recovery-test` · `db-stall-guard-test` |
-| ZTO late Cookie, auth envelope, upstream secret reflection និង DPAPI deadline | `zto-cookie-session-test` · `zto-cookie-capture-test` · `zto-proxy-test` · `zto-cookie-sync-test` |
-| ZoeKeyGen ចាប់ Key/db មុន await, បញ្ជីទទួល key ដែលដូច prototype និងចម្លងតាមសមត្ថភាព browser | `keygen-session-security-test` · `keylist-consistency-test` |
-| Redaction គ្រប private/signing JWK និងរក្សា public JWK | `secret-hygiene` |
-| កែអត្ថបទចំណូលតាមសំណើ និងសម្អាត guide/README/current rules | `user-guide-test` · `doc-scope-test`; កំណត់ត្រាសាកទូរស័ព្ទចាស់មិនបញ្ជាក់កំណែថ្មី |
+| កែតម្លៃកញ្ចប់ផ្ទៀងចំណូលពី server និងការពារ ACK ចាស់ | `daily-collected-test`; history/mirror មិនមែន transaction តែមួយ |
+| Activate ចាប់ auth/database មុន await; callback ចាស់មិនប្ដូរ UI/listener | `periodic-network-guard-test` |
+| ការសរសេរអត្រាប្ដូរប្រាក់ចាស់មិន rollback session ថ្មី | `toast-action-truth-test` |
+| Generate ដោះ busy តាមម្ចាស់ session ទោះ Load Signing Key ឡើងវិញ | `keygen-session-security-test` |
+| Backup មានពិដានរហូត JSON body ពេញ និងបិទ body ពេល HTTP បដិសេធ | `firebase-backup-test`; native HTTP ក្នុងម៉ាស៊ីន មិនមែន backup ផលិតកម្ម |
+| Checker boot មិនពឹង CDN ខាងក្រៅសម្រាប់សេណារីយ៉ូធម្មតា | `boot-animation-test`; proxy ព្យួរសំណើខាងក្រៅបង្កើត failure ចាស់ឡើងវិញ |
 
-ការវាស់ផ្ទៃ function និងផែនទីតាមឯកសារមិនមែនភស្តុតាងថាគ្រប់ branch/ឧបករណ៍ត្រូវបានសាក។
-CI ត្រូវរត់ក្នុង session នេះជាមួយ Chrome និង RTDB emulator ពិត ព្រោះ GitHub Actions quota អស់។
+មេរៀនដែលមានអ្នកយាមរួច៖ សិទ្ធិបង្ហាញលទ្ធផល និងសិទ្ធិដោះ busy អាចមានអាយុខុសគ្នា;
+HTTP headers មកដល់មិនមានន័យថាការអាន body ចប់ទេ។ ពេលពង្រីកច្រកទ្វារ ត្រូវវាស់ cleanup ដែរ។
+CI ត្រូវរត់ក្នុង session នេះជាមួយ Chrome និង RTDB emulator ពិត។ កំណត់ត្រាទូរស័ព្ទចាស់មិនបញ្ជាក់កំណែថ្មី។
 
 ## ជំហាន ០ — baseline ពិត (SKIP ០) · ⛔ **រត់ក្នុង session នេះ មិនមែន GitHub**
 

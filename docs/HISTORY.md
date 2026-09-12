@@ -98,6 +98,20 @@
 > ⛔ **កំណែមុនៗដែលបញ្ជាក់រួច** ៖ `2.27.0` ➜ `2.30.3` · `2.30.5` · `2.31.4` ·
 > `2.31.6`; ZoeKeyGen `2.19.18` (2026-09-04 · 09-05 · 09-06 · 09-09)។
 
+### ZoeW `2.34.2` និង ZoeKeyGen `2.19.23` — 2026-09-13 · ផ្ទៀង callback ចាស់ និងពិដាន backup
+
+- កែតម្លៃកញ្ចប់អានស្ថានភាព server ដើម្បីផ្ទៀងចំណូលប្រចាំថ្ងៃ ទោះ listener យឺត ឬឧបករណ៍ផ្សេងបើកកញ្ចប់វិញ។ សារជោគជ័យរង់ចាំការផ្ទៀងចំណូល; ការសរសេរធ្លាក់/ព្យួរត្រូវប្រាប់ថា Sync មិនពេញលេញ។
+- លទ្ធផល Activate និងការសរសេរអត្រាប្ដូរប្រាក់ពីវគ្គចាស់មិនកែ UI ឬជាន់តម្លៃរបស់ auth/database ថ្មី។
+- ZoeKeyGen អាចបន្ត Generate បន្ទាប់ពី Load Signing Key ឡើងវិញខណៈសំណើចាស់កំពុងរង់ចាំ។ ការការពារលទ្ធផលពីសោចាស់នៅតែមាន។
+- CLI backup រក្សាពិដានរហូតអាន JSON body ពេញ និងបិទ body ពេល HTTP បដិសេធ ដើម្បីឲ្យ process ចេញបាន។
+
+ជាកំហុសដែលបង្កើតឡើងវិញបានតាមលំដាប់សកម្មភាព និងការដាច់បណ្ដាញ។ ការប្រើប្រាស់ធម្មតាលើទូរស័ព្ទមួយអាចមិនបង្ហាញភាពខុសគ្នា; backup ជា CLI ដាច់ដោយឡែក។ មិនមានការអះអាងថាបានសាកលើឧបករណ៍ពិតក្នុងជុំនេះ។ ភស្តុតាងលេខនៅផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+ក្រោយ PR ត្រូវបាន merge និង deploy សូមបើក App ឡើងវិញដើម្បីទទួលកំណែថ្មី។ គ្មានការកែ Firebase rules ឬ Netlify env។ អ្នកប្រើ CLI backup ក្នុងម៉ាស៊ីនផ្ទាល់ត្រូវទាញ `firebase-backup/backup.js` ថ្មី។ ការកំណត់ secrets សម្រាប់ backup ស្វ័យប្រវត្តិនៅតែជាសកម្មភាពដាច់ដោយឡែកដែលបានកត់ទុកមុន។
+
+
 ### ZoeW `2.34.1` និង ZoeKeyGen `2.19.22` — 2026-09-12 · ចំណូល, race, បណ្ដាញ និងសុវត្ថិភាព
 
 **ZoeW** (`zoew-v202` ➜ `zoew-v203`) និង **ZoeKeyGen** (`zoekeygen-v91` ➜ `zoekeygen-v92`)។
@@ -7892,6 +7906,62 @@ CSP ក៏មិនប្រែដែរ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន
 
+### 2026-09-12–13 · ZoeW `2.34.2` / ZoeKeyGen `2.19.23` — Audit callback និង body ដែលមកយឺត
+
+Baseline ជា `main` commit `bd2e7c94f96545e9c58a6ca16f3842087de16933`។ សាង probe ពីកូដពិត រួចពង្រីកអ្នកយាមដែលមានស្រាប់ និងបញ្ជាក់ការធ្លាក់មុនកែ។ គ្មាន checker ថ្មីស្ទួន។
+
+**ចំណាត់ថ្នាក់៖** ផ្លូវកំហុសទាំង៥អាចទៅដល់តាមសកម្មភាពដែលមានស្រាប់ ដូច្នេះជា **កំហុសសកម្មមានលក្ខខណ្ឌ**៖ សំណើមកយឺត, ប្ដូរវគ្គកណ្ដាលសំណើ, Load Signing Key ឡើងវិញ ឬ HTTP body ព្យួរ។ ការចុចធម្មតាលើទូរស័ព្ទមួយអាចមិនឃើញអ្វីខុស។ ករណី dependency សិប្បនិម្មិតដែលមិនគោរព AbortSignal ជា **អន្ទាក់រង់ចាំសម្រាប់ការផ្លាស់ dependency**; ភស្តុតាងកំហុស backup សកម្មមកពី native HTTP ក្នុងម៉ាស៊ីន។
+
+| ផ្លូវ និងមូលហេតុ | លេខមុន → ក្រោយ | អ្នកយាមដដែលលើ main → ក្រោយកែ | Mutation ចាប់បាន |
+|---|---|---|---|
+| Price edit ប្រើ scanHistory/mirror local និងមិនរង់ចាំសាលក្រម mirror | ក្រោយឧបករណ៍ផ្សេងបើក A៖ កាតថ្ងៃយក 2 កញ្ចប់/$30.75 → 1 កញ្ចប់/$4.50; callback ចាស់សរសេរ mirror 1 → 0 | `daily-collected-test`: 112 PASS, 8 FAIL → 120 PASS, 0 FAIL | 7/7 |
+| Activate មិនចាប់ auth/database មុន await | modal បើក/focus ក្រោយ logout 2 → 0 | `periodic-network-guard-test`: 34 PASS, 43 FAIL → 77 PASS, 0 FAIL | 11/11 |
+| Exchange write ចាស់ rollback state របស់វគ្គថ្មី | អត្រាថ្មី 4400 ត្រូវជាន់ទៅ 4100 → រក្សា 4400 | `toast-action-truth-test` ផ្នែក VM: 12 PASS, 24 FAIL → 36 PASS, 0 FAIL | 10/10 |
+| Generate cleanup ច្រឡំម្ចាស់ busy ជាមួយ reference JWK | Load Signing Key នៅ clock/sign/write ធ្វើឲ្យជាប់ 3/3 → 0/3 | `keygen-session-security-test`: 79 PASS, 6 FAIL → 85 PASS, 0 FAIL | 3/3 |
+| Backup បិទ timer ក្រោយ headers និងទុក body លើ HTTP error | body ព្យួរលើសពិដាន; HTTP403 ទុក Node រស់ → timeout/cleanup ពិត | `firebase-backup-test`: 85 PASS, 7 FAIL → 92 PASS, 0 FAIL | 4/4 |
+
+គ្រប់អ្នកយាមដែលពង្រីកធ្លាក់លើថតទទេជាមួយ exit 1។ Mutation 35/35 ចាប់បាន; **ករណីដូចគ្នា 648/648** (លុយ 160, Activate 120, exchange 128, KeyGen 120, backup 120) និង **ករណីដែលក្លាយជាអាក្រក់ជាងមុន 0** ក្នុងសំណុំដែលបានវាស់។ លេខនេះមិនមែន coverage គ្រប់ branch ទេ។
+
+Baseline រត់ពេញ៖ **170 PASS · 1 FAIL · 0 SKIP · 0 PARTIAL**។ `boot-animation-test` ធ្លាក់ពេល `page.goto` រង់ចាំ DOMContentLoaded លើស30វិនាទី; រត់ដាច់ដោយឡែកលើ source ដដែលឆ្លង53/53។ Proxy ក្នុងម៉ាស៊ីនដែលរក្សាសំណើខាងក្រៅឲ្យព្យួរបង្កើត timeout30វិនាទីឡើងវិញ។ កែតែ checker contexts ធម្មតា ឲ្យទប់សំណើក្រៅ origin ដូច boot-runtime; ក្រោម proxy ដដែលឆ្លង53/53។ សេណារីយ៉ូ host ខាងក្រៅព្យួរដោយចេតនានៅដដែល; គ្មានការកែចលនា App។
+
+`toast-action-truth-test` ពេញជាមួយ Chrome លើ main៖ **43 PASS · 24 FAIL · exit1**; នេះជាការផ្ទៀងផ្ទាត់បន្ថែមពីលេខ VM ខាងលើ។
+
+**CI ក្នុង session៖** សំណុំចុងក្រោយ **171 PASS · 0 FAIL · 0 SKIP · 0 PARTIAL**, exit0; Chrome ពិត និង RTDB emulator ពិត។ ការរត់បន្ថែម `MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js`៖ ✅ គ្មានបញ្ហា — ok 22។ ការរត់ baseline ដើម170/1 និងការធ្លាក់ boot checker ខាងលើនៅជាភស្តុតាងដាច់ដោយឡែក; មិនបម្លែងវាទៅជាបៃតងដោយការរត់ឡើងវិញទេ។
+
+ការរត់បញ្ចូលដំបូងក្រោយកែ៖ **169 PASS · 2 FAIL · 0 SKIP · 0 PARTIAL**។ វាចាប់ guard ស្ទួនមួយ និង fixture restore ខ្វះ `authGeneration`/collected state; កែដោយរួម guard ពិតទៅ helper និងបំពេញ dependency របស់ fixture ដោយរក្សា assertions ដើម។ Restore លើ emulator ពី150 PASS/4 FAIL ទៅ157 PASS/0 FAIL, duplication16/16។ រត់សំណុំពេញឡើងវិញក្រោយកែ ហើយផ្ទៀង hash កូដ/checker 235 ឯកសារ៖ ប្រែ0 ក្នុងការរត់ចុងក្រោយ។
+
+#### ការវាស់ដែលមិនរកឃើញ regression
+
+| ការវាស់ | លទ្ធផល និងការសម្រេច |
+|---|---|
+| Price edit ជាន់ reopen/reclose ថ្ងៃក្រោយ | ថ្ងៃដើមទទេ និងថ្ងៃថ្មី COD24.50/DOD1.75 ត្រឹមត្រូវ; មិនមានការកែបន្ថែម |
+| Auth/database ប្រែនៅ history read, mirror read និង ACK; dependency អវត្តមាន/បដិសេធ/បោះភ្លាម | Review ឯករាជ្យ៖ auth/db 6 ផ្លូវគ្មាន extra writes/messages; dependency 4 ផ្លូវមាន warning និងគ្មាន ✅ ក្លែងក្លាយ; Promise contract 3 ផ្លូវគ្មាន write; unhandled rejection 0 |
+| Activate/exchange cleanup ownership | Review ឯករាជ្យ 9 លំដាប់ឆ្លង; Activate ដោះសោពេលការងារដែលមានពិដាន settle (ចម្លើយ/បដិសេធ/timeout) ហើយ promise ដើមដែលមកយឺតមិនរត់ finally ទី២។ Exchange ទុក mutex ក្រោយ timeout រហូត write ដើម settle។ ផ្លូវ periodic ត្រូវបានវាស់ដោយ `periodic-network-guard-test` ដាច់ដោយឡែក |
+| Backup native HTTP និង dependency failure/late | Review ឯករាជ្យ 8 របៀប dependency និង 5 ផ្លូវ HTTP; ក្រោយកែ cleanup គ្មាន unhandled rejection ហើយ process ចេញ |
+| Helper លុយជាមួយ input អាក្រក់ | 8 input មិនបោះ; Promise contract មាន caller ship តែមួយ ដែលបានរង់ចាំលទ្ធផលពិត |
+
+#### លេខសម្រាប់ផ្ទៀងផ្ទាត់លើឧបករណ៍
+
+Fixture៖ A COD12.50/DOD0.75 និង B COD4.00/DOD0.50, ស្កេនថ្ងៃ 2026-09-09, បិទថ្ងៃ12, អត្រា4100។ កែ A ទៅ24.50/1.75 ហើយឧបករណ៍ទី២បើក A មុនចម្លើយកែតម្លៃ ឬ mirror write ដោះ។ លេខខាងក្រោមវាស់ពី function HTML និងរបាយការណ៍ពិតក្នុង VM; **មិនមែនលទ្ធផលសាកទូរស័ព្ទ**។
+
+| ជួរកាតថ្ងៃយក12 | មុនសកម្មភាព | main ក្រោយ race (ខុស) | ក្រោយកែ |
+|---|---:|---:|---:|
+| កញ្ចប់យករួច | 2 | 2 | 1 |
+| COD | $16.50 | $28.50 | $4.00 |
+| DOD | $1.25 | $2.25 | $0.50 |
+| ចំណូលសរុប | $17.75 | $30.75 | $4.50 |
+| ប្រាក់រៀល | 72,775៛ | 126,075៛ | 18,450៛ |
+
+កាតថ្ងៃស្កេន09 ក្រោយសកម្មភាពត្រូវដូចគ្នាទាំង main/ក្រោយកែ៖ កញ្ចប់សរុប2, CODយករួច$4.00, DODយករួច$0.50, ចំណូលយករួច$4.50/18,450៛, តម្លៃកញ្ចប់ទាំងអស់$30.75 និងមិនទាន់យក$26.25។ របាយការណ៍ខែ09៖ CODទាំងអស់$28.50, DODទាំងអស់$2.25, សរុប$30.75, យករួច$4.50, មិនទាន់យក$26.25, យករួច1/2, អតិថិជន1, ថ្ងៃសកម្ម1 និងអត្រាយក50%។ ការចុចធម្មតាលើឧបករណ៍តែមួយមិនធានាបង្កើត race ទេ; ត្រូវមានការសរសេរពីរឆ្លងគ្នាក្នុងចន្លោះដែលបានរក្សាសំណើទី១ឲ្យរង់ចាំ។
+
+#### ព្រំដែនដែលនៅសល់
+
+- **វាស់ឃើញ តែមិនទាន់បិទ៖** cleanup ពិតលុប collected ថ្ងៃ05 ខណៈ price mirror write រង់ចាំ អាចត្រូវ write ចាស់ដាក់ $26.25 ថ្ងៃ05 វិញ។ កើតទាំង baseline និងក្រោយកែ។ ការកែជុំនេះមិនធ្វើឲ្យ cleanup/history/mirror ក្លាយជា transaction តែមួយទេ; មិនអះអាងថាគ្មានការប្រណាំងសល់។
+- មិនបានសាក production database, ZTO ផលិតកម្ម, deploy settings ឬ iOS/Android ពិត។ CLI backup មិនបង្ហាញការប្រែនៅលើកាតទូរស័ព្ទទេ ហើយអាស្រ័យលើការកំណត់ backup របស់អ្នកប្រើ។
+- តំបន់ 📝 ដែលបានទទួលយក៖ aggregate អាចសរសេរដោយ client, devtools guard មិនជាព្រំដែនសុវត្ថិភាព, Apps Script ដែល deploy នៅខាងក្រៅ និង Netlify base directory ក្នុង UI។ ជុំនេះមិនអះអាងថាបានវាស់វា។
+
+
+
 ### 2026-09-12 — ចន្លោះរវាង state ក្នុងសតិ, server និង callback យឺត
 
 - Probe ចំណូលលើកូដមុនកែ៖ server COD 24.50 + DOD 0.75 តែ collected យក COD ចាស់ 5.25; delete ➜ restore ថ្ងៃក្រោយ ➜ reopen បន្សល់ $13.25 នៅថ្ងៃដើម។ ការផ្លាស់ថ្ងៃដាច់ពីរដែលខាងដកបដិសេធ អាចទុក $13.25 ទាំងពីរថ្ងៃ។ តេស្តបានពង្រីកក្នុង `daily-collected-test` និង CRUD ពិតលើ emulator; payload ដែល rules បដិសេធត្រូវបដិសេធ multipath update ទាំងគូ និងរក្សា barcode ផ្សេង។
@@ -12104,6 +12174,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 
 | Checker | ការពន្យល់នៅឯណា |
 |---|---|
+| `daily-collected-test` | **ផ្នែក ១** · **ផ្នែក ២ (2.34.2)** |
 | `adaptive-link-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `animation-cost` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `auth-recovery-test` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |
@@ -12120,7 +12191,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `clock-basis-test` | **ផ្នែក ១ (2.31.13 · 2.31.14)** · **ផ្នែក ២ (2.31.14)** |
 | `doc-scope-test` | **ផ្នែក ១ (2.31.13 · 2.31.14 · 2.33.1)** · **ផ្នែក ២ (2.33.1)** |
 | `user-guide-test` | **ផ្នែក ១ (2.33.1)** · **ផ្នែក ២ (2.33.1)** |
-| `periodic-network-guard-test` | **ផ្នែក ១ (2.33.2)** · **ផ្នែក ២ (2.33.2)** |
+| `periodic-network-guard-test` | **ផ្នែក ១ (2.33.2)** · **ផ្នែក ២ (2.33.2 · 2.34.2)** |
 | `code-duplication-test` | **ផ្នែក ១** (កំណែ 2.30.1 · 2.30.2) |
 | `comments` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `compensation-order` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
@@ -12145,7 +12216,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `expired-trash-retention-test` | ផ្នែក ១ |
 | `export-cells-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `field-shape-test` | ផ្នែក ១ · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
-| `firebase-backup-test` | ផ្នែក ១ |
+| `firebase-backup-test` | ផ្នែក ១ · **ផ្នែក ២ (2.34.2 / 2.19.23)** |
 | `firebase-config-paste-test` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |
 | `firebase-loader` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `fluid-type-focus-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
@@ -12159,7 +12230,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `inline-handler-xss-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `ios-panel-glide-test` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `keygen-pin-flow-test` | — (មិនទាន់មានប្រវត្តិ) |
-| `keygen-session-security-test` | — (មិនទាន់មានប្រវត្តិ) |
+| `keygen-session-security-test` | **ផ្នែក ២ (2.19.23)** |
 | `keylist-consistency-test` | — (មិនទាន់មានប្រវត្តិ) |
 | `khmer-timezone-test` | ផ្នែក ១ · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `late-commit-test` | ផ្នែក ១ · **ផ្នែក ២** · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
@@ -12191,7 +12262,6 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `partial-pickup-cleanup-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `payload-schema` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `perf-check` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
-| `periodic-network-guard-test` | ផ្នែក ១ |
 | `phone-search-swipe-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `phone-suggest-test` | — (មិនទាន់មានប្រវត្តិ) |
 | `pickup-barcode-identity-test` | ផ្នែក ១ · **ផ្នែក ២** |
@@ -12232,7 +12302,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 | `storage-guard` | ផ្នែក ១ · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `strip-comments` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |
 | `toast-truth-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
-| `toast-action-truth-test` | **ផ្នែក ១** · **ផ្នែក ២** |
+| `toast-action-truth-test` | **ផ្នែក ១** · **ផ្នែក ២ (2.34.2 និងប្រវត្តិមុន)** |
 | `trash-modal-test` | ផ្នែក ១ · **ផ្នែក ២ (2.31.7ខ ៖ តួលេខសរុប)** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `trimws` | [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `ui-flow-test` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |

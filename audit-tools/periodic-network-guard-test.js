@@ -39,6 +39,8 @@ function sliceFn(name) {
     return '';
 }
 
+const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function captureAuthDatabaseGuard() { return () => true; }';
+
 (async () => {
     const sessionFn = sliceFn('runSessionExpiryCheck');
     const licenseFn = sliceFn('runPeriodicLicenseCheck');
@@ -109,6 +111,7 @@ function sliceFn(name) {
                 Promise, console,
                 authGeneration: 7,
                 auth: { currentUser: { uid: 'u1' } },
+                db: {},
                 isModalOpen: false,
                 withTimeout: (promise) => promise,
                 ZoeLicense: { activate: () => Promise.resolve({ valid: true }) },
@@ -134,6 +137,7 @@ function sliceFn(name) {
                 + ' let sessionExpiryCheck = "pending";\n'
                 + sessionFn + '\n' + activateFn + '\n'
                 + (sliceFn('armSessionExpiryCheck') || '')
+                + '\n' + AUTH_DATABASE_GUARD
                 + '\nthis.sessionCheck = runSessionExpiryCheck;'
                 + ' this.activate = submitActivationKey;'
                 + ' this.flag = () => sessionExpiryCheck;', armCtx);
@@ -172,6 +176,170 @@ function sliceFn(name) {
         ok('License guard ដោះសោវិញក្រោយសំណើចប់', counts.license === 2, counts);
         resolveLicense(true);
         await thirdLicense;
+    }
+
+    // សំណើចាស់អាចមកដល់ក្រោយចាកចេញ ឬប្ដូរ database។ ប្រើ helper ដែលកែ DOM
+    // ពិត រួមនឹង withTimeout ពិត ដើម្បីកុំឱ្យ stub លាក់ស្នាមភ្ជាប់នេះ។
+    const activationNames = ['ensureAppActivated', 'submitActivationKey', 'runPeriodicLicenseCheck', 'withTimeout'];
+    const activationFunctions = activationNames.map((name) => {
+        const found = sliceFn(name);
+        ok('ស្រង់ផ្លូវវគ្គ Activation ពិត ៖ ' + name, !!found);
+        return found || 'async function ' + name + '() { return false; }';
+    }).join('\n') + '\n' + AUTH_DATABASE_GUARD;
+    const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+    function activationContext() {
+        const effects = [];
+        const reads = [];
+        const activations = [];
+        const timers = new Map();
+        let timerId = 0;
+        const elements = new Map();
+        const element = (id) => {
+            if (!elements.has(id)) elements.set(id, {
+                value: id === 'activationKeyInput' ? 'KEY-1' : '', disabled: false, textContent: '',
+                focus() { effects.push('focus:' + id); }
+            });
+            return elements.get(id);
+        };
+        const deferred = (entries) => new Promise((resolve, reject) => entries.push({ resolve, reject }));
+        const context = vm.createContext({
+            Promise, Error, console: { error() {} },
+            authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {},
+            LICENSE_APP_CODE: 'ADM', isDatabaseInitialized: true, isModalOpen: false,
+            ZoeLicense: {
+                getStatus: () => deferred(reads),
+                activate: () => deferred(activations)
+            },
+            setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
+            clearTimeout: (id) => timers.delete(id),
+            document: { getElementById: element },
+            licenseFailureMessage: (reason) => 'សិទ្ធិ៖' + reason,
+            closeModal: (id) => effects.push('close:' + id),
+            openModalHelper: (id) => effects.push('open:' + id),
+            showToast: (message) => effects.push('toast:' + message),
+            updateAuthButton: () => effects.push('auth'),
+            safeFocusScanner: () => effects.push('scanner'),
+            armSessionExpiryCheck: () => effects.push('arm'),
+            initDatabaseListeners: () => { effects.push('listeners'); return true; },
+            window: { ZoeErrors: null },
+            ZoeErrors: { capture: () => effects.push('error') }
+        });
+        vm.runInContext('let licenseRecheckInFlight = false;\n' + activationFunctions, context);
+        return { context, effects, reads, activations, timers, element };
+    }
+    const changes = {
+        'ជំនាន់ auth': (c) => { c.authGeneration++; },
+        'database': (c) => { c.db = {}; },
+        'អ្នកប្រើ': (c) => { c.auth.currentUser = { uid: 'u2' }; },
+        'អង្គភាព auth': (c) => { c.auth = { currentUser: c.auth.currentUser }; },
+        'ចាកចេញ': (c) => { c.authGeneration++; c.auth.currentUser = null; }
+    };
+    let pendingReached = 0;
+    for (const surface of ['ផ្ទៀងផ្ទាត់', 'កាលកំណត់', 'Activate ដំណាក់ទី១', 'Activate ដំណាក់ទី២']) {
+        for (const active of [true, false]) {
+            for (const change of [null, ...Object.keys(changes)]) {
+                const h = activationContext();
+                const c = h.context;
+                c.isDatabaseInitialized = surface === 'កាលកំណត់';
+                let pending;
+                if (surface === 'ផ្ទៀងផ្ទាត់') pending = c.ensureAppActivated();
+                else if (surface === 'កាលកំណត់') pending = c.runPeriodicLicenseCheck();
+                else pending = c.submitActivationKey();
+                await tick();
+                if (surface === 'Activate ដំណាក់ទី២') {
+                    if (h.activations[0]) h.activations[0].resolve({ valid: true });
+                    await tick();
+                }
+                const request = surface === 'Activate ដំណាក់ទី១' ? h.activations[0] : h.reads[0];
+                if (request) pendingReached++;
+                if (change) changes[change](c);
+                h.element('activationKeyInput').value = 'KEY-NEW';
+                h.effects.length = 0;
+                if (request) request.resolve(surface === 'Activate ដំណាក់ទី១'
+                    ? { valid: active, reason: 'revoked' }
+                    : { state: active ? 'active' : 'inactive', reason: 'revoked' });
+                await tick();
+                if (surface === 'Activate ដំណាក់ទី១' && h.reads[0]) {
+                    h.reads[0].resolve({ state: 'active' });
+                }
+                await pending;
+                const label = surface + ' · ' + (active ? 'ទទួលយក' : 'បដិសេធ') + ' · ' + (change || 'វគ្គដដែល');
+                if (change) {
+                    ok('លទ្ធផលចាស់មិនកែ UI/arm/listener ៖ ' + label,
+                        h.effects.length === 0 && h.element('activationKeyInput').value === 'KEY-NEW'
+                        && (surface !== 'Activate ដំណាក់ទី១' || h.reads.length === 0),
+                        { effects: h.effects, input: h.element('activationKeyInput').value, reads: h.reads.length });
+                } else {
+                    ok('ទិសផ្ទុយ៖ វគ្គដដែលនៅបង្ហាញសាលក្រម ៖ ' + label, h.effects.length > 0, h.effects);
+                }
+            }
+        }
+    }
+    ok('ជាន់អប្បបរមា៖ គ្រប់លំដាប់ Activation ឈានដល់ promise ព្យួរពិត', pendingReached === 48, pendingReached);
+
+    for (const stage of ['activate', 'status']) {
+        const h = activationContext();
+        const pending = h.context.submitActivationKey();
+        await tick();
+        if (stage === 'status') {
+            h.activations[0].resolve({ valid: true });
+            await tick();
+        }
+        h.context.authGeneration++;
+        h.effects.length = 0;
+        const request = stage === 'activate' ? h.activations[0] : h.reads[0];
+        if (request) request.reject(new Error('ដាច់បណ្តាញ'));
+        await pending;
+        ok('ការបដិសេធចាស់មិនបង្ហាញសារក្នុងវគ្គថ្មី ៖ ' + stage, h.effects.length === 0, h.effects);
+    }
+
+    {
+        const h = activationContext();
+        const pending = h.context.runPeriodicLicenseCheck();
+        const timeout = [...h.timers.values()].find((entry) => entry.ms === 20000);
+        ok('ជាន់អប្បបរមា៖ ការពិនិត្យកាលកំណត់ប្រើពិដានពិត', !!timeout);
+        if (timeout) timeout.fn();
+        await pending;
+        h.context.authGeneration++;
+        h.effects.length = 0;
+        h.reads[0].resolve({ state: 'inactive', reason: 'revoked' });
+        await tick();
+        ok('status មកក្រោយ timeout និងប្ដូរវគ្គមិនបើក Activation ឡើងវិញ', h.effects.length === 0, h.effects);
+    }
+
+    {
+        const h = activationContext();
+        const old = h.context.submitActivationKey();
+        h.context.authGeneration++;
+        await h.context.submitActivationKey();
+        ok('ប៊ូតុង Activate ចាស់នៅកាន់សោរហូតដល់ដោះ promise', h.activations.length === 1 && h.element('activationSubmitBtn').disabled);
+        h.activations[0].resolve({ valid: false });
+        await old;
+        ok('finally ចាស់ត្រូវដោះប៊ូតុង ដើម្បីវគ្គថ្មីអាចបន្ត', !h.element('activationSubmitBtn').disabled);
+        h.element('activationKeyInput').value = 'KEY-NEW';
+        const fresh = h.context.submitActivationKey();
+        ok('ក្រោយដោះសោ វគ្គថ្មី Activate បានពិត', h.activations.length === 2);
+        if (h.activations[1]) h.activations[1].resolve({ valid: false });
+        await fresh;
+    }
+
+    {
+        const h = activationContext();
+        const old = h.context.runPeriodicLicenseCheck();
+        h.context.authGeneration++;
+        await h.context.runPeriodicLicenseCheck();
+        ok('សោកាលកំណត់ដែលនៅរស់ទប់វគ្គថ្មី មុនចម្លើយឬពិដាន', h.reads.length === 1);
+        const timeout = [...h.timers.values()].find((entry) => entry.ms === 20000);
+        if (timeout) timeout.fn();
+        await old;
+        const fresh = h.context.runPeriodicLicenseCheck();
+        ok('ពិដានដោះសោកាលកំណត់សម្រាប់វគ្គថ្មី', h.reads.length === 2);
+        h.reads[0].resolve({ state: 'active' });
+        await tick();
+        await h.context.runPeriodicLicenseCheck();
+        ok('ចម្លើយចាស់ក្រោយពិដានមិនដោះសោរបស់សំណើថ្មី', h.reads.length === 2);
+        if (h.reads[1]) h.reads[1].resolve({ state: 'active' });
+        await fresh;
     }
 
     console.log('\n' + (fail ? 'FAIL ' + fail + '/' + (pass + fail) : 'PASS ' + pass + '/' + pass));

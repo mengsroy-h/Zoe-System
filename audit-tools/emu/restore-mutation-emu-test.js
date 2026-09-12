@@ -74,7 +74,8 @@ const SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
 const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
-    'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'TWO_HOURS_MS', 'ABANDON_AGE_MS']);
+    'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
+    'DAILY_COLLECTED_KEEP_DAYS', 'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -88,8 +89,9 @@ function tab(suffix) {
         setTimeout: (fn, ms) => setTimeout(fn, ms < 10000 ? 0 : ms), clearTimeout,
         Date, Math, JSON, Promise, window: {}, navigator: {},
         document: { getElementById: (id) => id === 'editBcCodInput' ? { value: '4' } : id === 'editBcDodInput' ? { value: '2' } : null },
-        db: {}, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
+        db: {}, authGeneration: 0, fb, dbRefHistory: fb.ref(null, 'zoew_scan_history_cod_dod'), dbRefDeleted: fb.ref(null, 'zoew_recently_deleted_cod_dod'),
         dbRefDailyRevenue: fb.ref(null, 'zoew_daily_revenue_cod_dod'), dbRefMonthlyRevenue: fb.ref(null, 'zoew_monthly_revenue_cod_dod'),
+        dbRefDailyCollected: fb.ref(null, 'zoew_daily_collected_cod_dod'), dailyCollectedData: {},
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         monthlyRevenueData: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
@@ -119,6 +121,7 @@ function tab(suffix) {
         context.deletedItems = Object.values(state.zoew_recently_deleted_cod_dod || {});
         context.dailyRevenueData = state.zoew_daily_revenue_cod_dod || {};
         context.monthlyRevenueData = state.zoew_monthly_revenue_cod_dod || {};
+        context.dailyCollectedData = state.zoew_daily_collected_cod_dod || {};
     };
     return { context, pending, toasts, settle, sync };
 }

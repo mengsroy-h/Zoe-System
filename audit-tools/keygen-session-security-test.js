@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+process.exitCode = 1;
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.KEYGEN_APP_DIR ? path.resolve(process.env.KEYGEN_APP_DIR) : root;
@@ -160,6 +161,7 @@ function build(options) {
         'validateSigningKeyAgainstShippedPublicKey',
         'generateNewKeypair',
         'loadSigningKey',
+        'clearSigningKey',
         'generateLicenseKey',
         'openExtendModal',
         'confirmExtendKey',
@@ -211,6 +213,52 @@ async function run() {
     await generateTask;
     ok('Generated key មិនត្រូវបង្ហាញក្រោយ logout', h.getElementById('genResultKey').textContent === '');
     ok('Generated key មិនត្រូវនៅក្នុង memory ក្រោយ logout', h.ctx.lastGeneratedKey === '');
+
+    console.log('-- Load Signing Key ឡើងវិញខណៈ Generate កំពុងរង់ចាំ --');
+    const reloadKey = { kty: 'EC', crv: 'P-256', d: 'synthetic-private', x: 'x', y: 'y' };
+    for (const stage of ['clock', 'sign', 'write']) {
+        h = build({ privateKey: reloadKey });
+        h.getElementById('genDaysInput').value = '30';
+        const pending = deferred();
+        if (stage === 'clock') h.ctx.waitForServerTimeSync = () => pending.promise;
+        if (stage === 'sign') h.license.signNewKey = () => pending.promise;
+        if (stage === 'write') h.ctx.fb.update = () => pending.promise;
+        const oldGenerate = h.ctx.generateLicenseKey();
+        await drain();
+        h.license.signNewKey = () => Promise.resolve({ keyString: 'synthetic-new-key', payload: { id: 'synthetic-new-id' } });
+        h.getElementById('privateKeyInput').value = JSON.stringify(reloadKey);
+        await h.ctx.loadSigningKey();
+        pending.resolve(stage === 'clock' ? true : { keyString: 'synthetic-old-key', payload: { id: 'synthetic-old-id' } });
+        await oldGenerate;
+        ok(stage + '៖ Load Key ឡើងវិញមិនទុកសោ Generate ជាប់',
+            h.ctx.isGeneratingKey === false && !h.getElementById('genGenerateBtn').disabled);
+        ok(stage + '៖ លទ្ធផលសំណើចាស់មិនជាន់ Key ដែល Load ថ្មី', h.ctx.lastGeneratedKey === '');
+        h.ctx.fb.update = () => { h.log.updates++; return Promise.resolve(); };
+        h.ctx.waitForServerTimeSync = () => Promise.resolve(true);
+        const beforeRetry = h.log.updates;
+        await h.ctx.generateLicenseKey();
+        ok(stage + '៖ Generate បន្ទាប់សរសេរ និងបង្ហាញ Key បាន',
+            h.log.updates === beforeRetry + 1 && h.ctx.lastGeneratedKey === 'synthetic-new-key');
+    }
+
+    h = build({ privateKey: reloadKey });
+    h.getElementById('genDaysInput').value = '30';
+    const oldClock = deferred();
+    const newClock = deferred();
+    h.ctx.waitForServerTimeSync = () => oldClock.promise;
+    const clearedGenerate = h.ctx.generateLicenseKey();
+    h.ctx.clearSigningKey(true);
+    h.getElementById('privateKeyInput').value = JSON.stringify(reloadKey);
+    await h.ctx.loadSigningKey();
+    h.ctx.waitForServerTimeSync = () => newClock.promise;
+    const newerGenerate = h.ctx.generateLicenseKey();
+    oldClock.resolve(true);
+    await clearedGenerate;
+    ok('សំណើដែល Clear រួចមិនដោះសោ Generate របស់សំណើថ្មី',
+        h.ctx.isGeneratingKey === true && h.getElementById('genGenerateBtn').disabled);
+    newClock.resolve(true);
+    await newerGenerate;
+    ok('សំណើថ្មីបញ្ចប់ដោយដោះសោ Generate ផ្ទាល់ខ្លួន', h.ctx.isGeneratingKey === false);
 
     console.log('-- Signing Key ចាស់ក្នុង session --');
     h = build({ sessionRecord: JSON.stringify({ iv: [1], data: [2] }) });

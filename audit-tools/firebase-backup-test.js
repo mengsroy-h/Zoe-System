@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
+const http = require('http');
 const ROOT = process.env.FBACKUP_APP_DIR
     ? path.resolve(process.env.FBACKUP_APP_DIR)
     : path.resolve(__dirname, '..');
@@ -75,9 +76,101 @@ function privateFile(label, file, writes, writtenPath) {
     }
 }
 
+async function bodyDeadlineScenario(recover) {
+    let requests = 0;
+    let bodyStarted = 0;
+    let escaped = false;
+    const server = http.createServer((req, res) => {
+        requests++;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (recover && requests > 1) res.end('{"recovered":true}');
+        else { bodyStarted++; res.write('{"held":'); }
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const watchdog = setTimeout(() => { escaped = true; server.closeAllConnections(); }, 1200);
+    let value;
+    let error;
+    try {
+        value = await backup.requestJsonWithRetry('body deadline',
+            `http://127.0.0.1:${server.address().port}/`, {},
+            { timeoutMs: 100, retryCount: recover ? 1 : 0, retryDelayMs: 1 });
+    } catch (e) { error = e; }
+    finally {
+        clearTimeout(watchdog);
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+    }
+    ok('ផ្លូវ body ព្យួរត្រូវបានឈានដល់ពិត', bodyStarted === 1, { bodyStarted, requests });
+    ok(recover ? 'body ព្យួរត្រូវ retry ហើយទទួល JSON ពេញ' : 'headers មកដល់មិនបិទពិដាន body',
+        !escaped && (recover ? requests === 2 && value && value.recovered === true
+            : requests === 1 && error && /timed out/.test(error.message)),
+        { escaped, requests, value, error: error && error.message });
+}
+
+async function uncooperativeDeadlineScenario(stage) {
+    let reached = false;
+    let signal;
+    let lateTimer;
+    let watchdog;
+    const delayed = () => new Promise((resolve) => {
+        if (stage === 'late') lateTimer = setTimeout(() => resolve({ late: true }), 150);
+    });
+    const attempt = backup.requestJsonWithRetry('dependency deadline', 'https://example.invalid', {},
+        { timeoutMs: 40, retryCount: 0, retryDelayMs: 1 }, {
+            fetchImpl: async (url, init) => {
+                signal = init.signal;
+                if (stage === 'headers') { reached = true; return delayed(); }
+                return { status: 200, ok: true, json() { reached = true; return delayed(); } };
+            }
+        }).then((value) => ({ value }), (error) => ({ error: error.message }));
+    const result = await Promise.race([attempt, new Promise((resolve) => {
+        watchdog = setTimeout(() => resolve({ escaped: true }), 350);
+    })]);
+    clearTimeout(watchdog);
+    if (lateTimer) clearTimeout(lateTimer);
+    ok('dependency ' + stage + ' ត្រូវបានឈានដល់ពិត', reached);
+    ok('dependency ' + stage + ' មិនអាចរក្សាសំណើលើសពិដាន',
+        !!signal && signal.aborted && !result.escaped && /timed out/.test(result.error || ''), result);
+}
+
+async function rejectedBodyCleanupScenario(status) {
+    let received = 0;
+    let closed;
+    let watchdog;
+    const bodyClosed = new Promise((resolve) => { closed = resolve; });
+    const server = http.createServer((req, res) => {
+        received++;
+        res.on('close', () => closed(true));
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.write('{"held":');
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    let error;
+    try {
+        await backup.requestJsonWithRetry('HTTP body', `http://127.0.0.1:${server.address().port}/`, {},
+            { timeoutMs: 100, retryCount: 0, retryDelayMs: 1 });
+    } catch (e) { error = e; }
+    const released = await Promise.race([bodyClosed, new Promise((resolve) => {
+        watchdog = setTimeout(() => resolve(false), 500);
+    })]);
+    clearTimeout(watchdog);
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+    ok('HTTP ' + status + ' ពិតត្រូវបានបដិសេធ',
+        received === 1 && error && error.message.includes('HTTP ' + status));
+    ok('HTTP ' + status + ' មិនទុក body ដែលព្យួររក្សា process ឲ្យរស់', released);
+}
+
 (async () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-backup-test-'));
     try {
+        await bodyDeadlineScenario(false);
+        await bodyDeadlineScenario(true);
+        await uncooperativeDeadlineScenario('headers');
+        await uncooperativeDeadlineScenario('body');
+        await uncooperativeDeadlineScenario('late');
+        await rejectedBodyCleanupScenario(403);
+        await rejectedBodyCleanupScenario(503);
         const keyPair = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
         const privateKey = keyPair.privateKey.export({ type: 'pkcs8', format: 'pem' });
         const publicKey = keyPair.publicKey.export({ type: 'spki', format: 'pem' });

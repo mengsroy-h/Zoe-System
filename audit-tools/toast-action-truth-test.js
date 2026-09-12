@@ -2,6 +2,7 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const acorn = require('acorn');
+const vm = require('vm');
 
 const ROOT = path.resolve(process.env.TOAST_ACTION_APP_DIR || path.join(__dirname, '..'));
 const APP_DIR = path.join(ROOT, 'ZoeW');
@@ -11,6 +12,7 @@ const APP = fs.existsSync(APP_FILE) ? fs.readFileSync(APP_FILE, 'utf8') : '';
 const KEYGEN = fs.existsSync(KEYGEN_FILE) ? fs.readFileSync(KEYGEN_FILE, 'utf8') : '';
 let pass = 0;
 let fail = 0;
+process.exitCode = 1;
 
 function ok(label, condition, detail) {
     if (condition) {
@@ -154,6 +156,73 @@ ok('offline call-mark៖ queue រក្សា success toast រហូតដល�
 ok('history/trash helper៖ ref អវត្តមានត្រូវ reject មិនមែន resolve ជោគជ័យ',
     /!dbRefHistory[\s\S]{0,180}Promise\.reject/.test(saveHistoryFn) &&
     /!dbRefDeleted[\s\S]{0,180}Promise\.reject/.test(saveTrashFn));
+
+async function runRateSessionChecks() {
+    const names = ['saveExchangeRate', 'dbOp', 'dbOpStalled', 'withTimeout', 'armLateWrite'];
+    const functions = names.map((name) => {
+        const found = sliceFn(APP, name);
+        ok('អត្រាប្រាក់៖ ស្រង់ helper ពិត ' + name, !!found);
+        return found || 'async function ' + name + '() { return false; }';
+    }).join('\n') + '\n' + (sliceFn(APP, 'captureAuthDatabaseGuard') || 'function captureAuthDatabaseGuard() { return () => true; }');
+    const changes = {
+        'ជំនាន់ auth': (c) => { c.authGeneration++; },
+        'database': (c) => { c.db = {}; },
+        'អ្នកប្រើ': (c) => { c.auth.currentUser = { uid: 'u2' }; },
+        'អង្គភាព auth': (c) => { c.auth = { currentUser: c.auth.currentUser }; }
+    };
+    const tick = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+    let writesReached = 0, lateReached = 0;
+    for (const schedule of ['ភ្លាម', 'ពិដានមុនប្ដូរ', 'ពិដានក្រោយប្ដូរ']) {
+        for (const accepted of [true, false]) {
+            for (const change of [null, ...Object.keys(changes)]) {
+                let resolveWrite, rejectWrite;
+                const effects = [];
+                const timers = new Map();
+                let timerId = 0;
+                const context = vm.createContext({
+                    Promise, Error, console: { error() {} }, window: { ZoeErrors: null },
+                    authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {}, dbRefExchangeRate: {},
+                    exchangeRateRiel: 4100, exchangeRateSaveInFlight: false,
+                    fb: { set: () => { writesReached++; return new Promise((resolve, reject) => { resolveWrite = resolve; rejectWrite = reject; }); } },
+                    appLocalStore: {},
+                    safeStoreSet: (_, key, value) => { effects.push('store:' + value); return true; },
+                    showToast: (message) => effects.push('toast:' + message),
+                    refreshCurrentHistoryView: () => effects.push('render'), closeModal() {},
+                    document: { getElementById: () => ({ value: '4200' }) },
+                    setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
+                    clearTimeout: (id) => timers.delete(id)
+                });
+                vm.runInContext('const DB_OP_TIMEOUT_MS = 15000;\n' + functions, context);
+                const pending = context.saveExchangeRate();
+                const timeout = [...timers.values()].find((entry) => entry.ms === 15000);
+                if (schedule === 'ពិដានមុនប្ដូរ' && timeout) { timeout.fn(); await pending; lateReached++; }
+                if (change) {
+                    changes[change](context);
+                    context.exchangeRateRiel = 4400;
+                }
+                effects.length = 0;
+                if (schedule === 'ពិដានក្រោយប្ដូរ' && timeout) { timeout.fn(); await pending; lateReached++; }
+                if (accepted && resolveWrite) resolveWrite();
+                if (!accepted && rejectWrite) rejectWrite(new Error('permission_denied'));
+                await pending;
+                await tick();
+                const label = schedule + ' · ' + (accepted ? 'ទទួលយក' : 'បដិសេធ') + ' · ' + (change || 'វគ្គដដែល');
+                if (change) {
+                    ok('អត្រាប្រាក់ចាស់មិនជាន់ 4400 របស់វគ្គថ្មី ឬបង្ហាញសារ ៖ ' + label,
+                        context.exchangeRateRiel === 4400 && effects.length === 0 && context.exchangeRateSaveInFlight === false,
+                        { rate: context.exchangeRateRiel, effects, locked: context.exchangeRateSaveInFlight });
+                } else {
+                    ok('អត្រាប្រាក់ទិសផ្ទុយ៖ វគ្គដដែលនៅបញ្ចប់/ដកវិញត្រឹមត្រូវ ៖ ' + label,
+                        context.exchangeRateRiel === (accepted ? 4200 : 4100)
+                        && effects.some((effect) => effect.startsWith('toast:')) && context.exchangeRateSaveInFlight === false,
+                        { rate: context.exchangeRateRiel, effects });
+                }
+            }
+        }
+    }
+    ok('អត្រាប្រាក់៖ ជាន់អប្បបរមាសរសេរពិត និងពិដានពិត', writesReached === 30 && lateReached === 20,
+        { writesReached, lateReached });
+}
 
 let chromium = null;
 try { chromium = require('playwright-core').chromium; } catch (e) {}
@@ -395,6 +464,7 @@ async function runBrowser() {
 }
 
 (async () => {
+    await runRateSessionChecks();
     if (!chromium || !fs.existsSync(CHROME) || !APP) {
         ok('browser truth test អាចចាប់ផ្តើមបាន', false, 'Chromium/app unavailable');
     } else {

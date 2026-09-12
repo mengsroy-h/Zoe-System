@@ -183,12 +183,19 @@ function serve(dir) {
     });
 }
 
+async function isolateBootContext(context, base) {
+    await context.route('**', (route) => {
+        return new URL(route.request().url()).origin === base ? route.continue() : route.abort();
+    });
+}
+
 (async () => {
     const server = await serve(path.join(ROOT, 'ZoeW'));
     const base = 'http://127.0.0.1:' + server.address().port;
     const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
     try {
         const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
+        await isolateBootContext(ctx, base);
         const page = await ctx.newPage();
         page.on('pageerror', () => {});
         await page.addInitScript(`window.addEventListener('unhandledrejection', function (ev) {
@@ -262,6 +269,7 @@ function serve(dir) {
 
         // សំណាញ់សុវត្ថិភាព៖ app.js ដួល ➜ boot-flags.js ត្រូវដកផ្ទាំងចេញដដែល
         const ctx2 = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
+        await isolateBootContext(ctx2, base);
         const page2 = await ctx2.newPage();
         page2.on('pageerror', () => {});
         await page2.route('**/app.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'throw new Error("boot failure simulated");' }));
@@ -304,6 +312,7 @@ function serve(dir) {
 
         // ការបើកឡើងវិញតាម PTR ត្រូវរំលងផ្ទាំង
         const ctx3 = await browser.newContext({ viewport: { width: 412, height: 780 }, serviceWorkers: 'block' });
+        await isolateBootContext(ctx3, base);
         const page3 = await ctx3.newPage();
         page3.on('pageerror', () => {});
         await page3.addInitScript(() => { try { sessionStorage.setItem('zoew_ptr_reload_pending', '1'); } catch (e) {} });

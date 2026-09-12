@@ -64,9 +64,9 @@ function readNumConst(name, fallback) {
 // ⛔ រកឈ្មោះមិនឃើញ ➜ **stub** មិនមែន exit (បើអត់ ការអះអាងខាងក្រោមត្រូវបិទបាំង)។
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'collectedValueOf', 'collectedValueForMonth', 'collectedMoneyText',
+    'uncollectedValueByDate', 'collectedValueOf', 'collectedMoneyText',
     'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
-    'openDailyStatsModal', 'openMonthlyStatsModal', 'renderMonthlyReport',
+    'openDailyStatsModal', 'openCollectedStatsModal', 'renderMonthlyReport',
     'monthlyReportMismatchNote', 'renderHistory', 'renderRecentlyDeleted',
     'buildTrashGroups', 'trashGroupMatchesQuery', 'renderTrashSummary', 'trashGroupRowHtml',
     'trashSummaryCardHtml', 'trashReasonOf', 'trashItemTotals', 'parseTimestampFromId',
@@ -132,7 +132,7 @@ function textOf(html) {
 
 function buildSandbox(state) {
     const containers = {
-        dailyStatsContainer: makeEl(), monthlyStatsContainer: makeEl(),
+        dailyStatsContainer: makeEl(), collectedStatsContainer: makeEl(),
         monthlyReportBody: makeEl(), monthlyReportMonthSel: makeEl(),
         historyTableBody: makeEl(), count: makeEl(),
         deletedTableBody: makeEl(), trashSummaryBox: makeEl(),
@@ -145,6 +145,9 @@ function buildSandbox(state) {
         deletedItems: state.deletedItems || [],
         dailyRevenueData: state.dailyRevenueData || {},
         dailyPickupData: state.dailyPickupData || {},
+        dailyCollectedData: state.dailyCollectedData || {},
+        DAILY_COLLECTED_KEEP_DAYS: 7,
+        DAILY_COLLECTED_DAY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
         monthlyRevenueData: state.monthlyRevenueData || {},
         exchangeRateRiel: 4100,
         renderZtoSyncViews() {}, scheduleZtoStatusSweep() {},
@@ -173,6 +176,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_DELETED: readConst('DB_LISTENER_KEY_DELETED', 'deleted'),
         DB_LISTENER_KEY_DAILY_REVENUE: readConst('DB_LISTENER_KEY_DAILY_REVENUE', 'dailyRevenue'),
         DB_LISTENER_KEY_MONTHLY_REVENUE: readConst('DB_LISTENER_KEY_MONTHLY_REVENUE', 'monthlyRevenue'),
+        DB_LISTENER_KEY_DAILY_COLLECTED: readConst('DB_LISTENER_KEY_DAILY_COLLECTED', 'dailyCollected'),
         VIEW_NOT_MEASURABLE_TEXT: NOT_MEASURABLE,
         VIEW_NOT_MEASURABLE_NOTICE: '⏳ ' + NOT_MEASURABLE,
         dbListenerPendingPaths: new Set(state.pending || []),
@@ -188,9 +192,7 @@ function buildSandbox(state) {
         sandbox.DB_LISTENER_KEY_DELETED];
     sandbox.STATS_DAILY_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_REVENUE,
         sandbox.DB_LISTENER_KEY_HISTORY, sandbox.DB_LISTENER_KEY_DELETED];
-    sandbox.STATS_MONTHLY_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_MONTHLY_REVENUE,
-        sandbox.DB_LISTENER_KEY_DAILY_REVENUE, sandbox.DB_LISTENER_KEY_HISTORY,
-        sandbox.DB_LISTENER_KEY_DELETED];
+    sandbox.STATS_COLLECTED_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_COLLECTED];
     vm.createContext(sandbox);
     vm.runInContext(CONSTS + '\n' + bodies, sandbox);
     return sandbox;
@@ -200,8 +202,11 @@ function buildSandbox(state) {
 const SCREENS = [
     { name: '📊 ស្ថិតិប្រចាំថ្ងៃ', run: (s) => s.openDailyStatsModal(), read: 'dailyStatsContainer',
         breaks: ['dailyRevenue', 'history', 'deleted'] },
-    { name: '📊 ស្ថិតិ ៣ ខែ', run: (s) => s.openMonthlyStatsModal(), read: 'monthlyStatsContainer',
-        breaks: ['monthlyRevenue', 'dailyRevenue', 'history', 'deleted'] },
+    // ⛔ អេក្រង់ទី ៨ (2.34.0) ៖ «💵 ចំណូលប្រចាំថ្ងៃ» — វាអានប្រភព **ផ្សេង**
+    // (`zoew_daily_collected_cod_dod`) ➜ «មិនទាន់មានកញ្ចប់ណាបិទ យក» ជា
+    // **ការអះអាងអំពីអាជីវកម្ម** ដដែល ➜ ត្រូវមានច្រកទ្វារផ្ទាល់ខ្លួន។
+    { name: '💵 ចំណូលប្រចាំថ្ងៃ', run: (s) => s.openCollectedStatsModal(), read: 'collectedStatsContainer',
+        breaks: ['dailyCollected'] },
     { name: '📊 របាយការណ៍ខែ', run: (s) => s.renderMonthlyReport(), read: 'monthlyReportBody',
         breaks: ['dailyRevenue', 'history', 'deleted'] },
     { name: '🗑️ ធុងសំរាម', run: (s) => s.renderRecentlyDeleted(), read: 'deletedTableBody',
@@ -241,7 +246,7 @@ scenario('លក្ខខណ្ឌចាំបាច់៖ កូដពិតត
     ok('⛔ ជាន់អប្បបរមា៖ រក function ពិតបានយ៉ាងតិច 40',
         WANT.length - missing.length >= 40, 'បាត់៖ ' + missing.join(', '));
     ok('អេក្រង់ទាំងអស់ និងច្រកទ្វារមានក្នុង app.js ពិត',
-        ['openDailyStatsModal', 'openMonthlyStatsModal', 'renderMonthlyReport',
+        ['openDailyStatsModal', 'openCollectedStatsModal', 'renderMonthlyReport',
             'renderRecentlyDeleted', 'renderHistory', 'dbListenerViewIsStale',
             'renderZtoSyncModalList', 'renderZtoSyncBanner']
             .every((n) => missing.indexOf(n) === -1), 'បាត់៖ ' + missing.join(', '));

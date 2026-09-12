@@ -66,7 +66,7 @@ function sliceFn(src, name) {
 }
 const WANT = ['ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney', 'statsCount',
     'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'collectedValueOf', 'collectedValueForMonth',
+    'uncollectedValueByDate', 'collectedValueOf', 'collectedSetFromRecord', 'collectedTotalsOfDay',
     'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'rawSnapshotToItemList'];
 const missing = [];
 const bodies = WANT.map((n) => {
@@ -81,7 +81,8 @@ const N = {
     deleted: 'zoew_recently_deleted_cod_dod',
     daily: 'zoew_daily_revenue_cod_dod',
     monthly: 'zoew_monthly_revenue_cod_dod',
-    pickup: 'zoew_daily_pickup_cod_dod'
+    pickup: 'zoew_daily_pickup_cod_dod',
+    collected: 'zoew_daily_collected_cod_dod'
 };
 const sb = {
     console, PICKUP_DATE_KEY_PATTERN: /^\d{4}-\d{2}-\d{2}$/,
@@ -97,6 +98,7 @@ const deleted = toList(db[N.deleted]);
 const daily = (db[N.daily] && typeof db[N.daily] === 'object') ? db[N.daily] : {};
 const monthly = (db[N.monthly] && typeof db[N.monthly] === 'object') ? db[N.monthly] : {};
 const pickup = (db[N.pickup] && typeof db[N.pickup] === 'object') ? db[N.pickup] : {};
+const collected = (db[N.collected] && typeof db[N.collected] === 'object') ? db[N.collected] : {};
 sb.scanHistory = history; sb.deletedItems = deleted;
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -143,7 +145,7 @@ Object.keys(monthly).sort().forEach((ym) => {
             'ខែ ៖ COD ' + $(sb.statsMoney(m.codDollar)) + ' · DOD ' + $(sb.statsMoney(m.dodDollar)) + ' · ' + sb.statsCount(m.totalCount) + ' កញ្ចប់\n'
             + '       ថ្ងៃ ៖ COD ' + $(want.cod) + ' · DOD ' + $(want.dod) + ' · ' + want.count + ' កញ្ចប់\n'
             + '       គម្លាត ៖ COD ' + $(dc) + ' · DOD ' + $(dd) + ' · ' + dn + ' កញ្ចប់');
-        notes.push('ខែ ' + ym + ' ឃ្លាត ➜ បើកស្ថិតិ ៣ ខែ នឹងឃើញលេខខុសពីរបាយការណ៍ខែ');
+        notes.push('ខែ ' + ym + ' ឃ្លាត ➜ របាយការណ៍ខែ នឹងរាយ «ledger ខែឃ្លាតពីផលបូកថ្ងៃ»');
     }
 });
 if (!monthsChecked && !Object.keys(monthly).length) may('គ្មាន node ខែក្នុង dump — រំលង');
@@ -224,11 +226,8 @@ Object.keys(daily).sort().forEach((d) => {
 });
 Object.keys(perMonth).sort().forEach((ym) => {
     const b = perMonth[ym];
-    const card = sb.collectedValueForMonth(daily, openMap, ym);
-    const agree = Math.abs(card.total - b.c) < 0.005;
-    say('  ' + (agree ? '✅' : '❌') + ' ខែ ' + ym
+    say('  •  ខែ ' + ym
         + ' ៖ ចំណូល(យករួច) ' + $(b.c) + ' · មិនទាន់យក ' + $(b.o) + ' · ledger ឆៅ ' + $(b.l));
-    agree ? pass++ : (fail++, notes.push('ខែ ' + ym + ' ៖ កាតខែ ' + $(card.total) + ' ≠ ផលបូកថ្ងៃ ' + $(b.c)));
 });
 say('  ── សរុប ៖ ចំណូល(យករួច) ' + $(gCollected) + ' · មិនទាន់យក ' + $(gOpen) + ' · ledger ឆៅ ' + $(gLedger));
 const gap = r2(gLedger - gCollected - gOpen);
@@ -237,6 +236,34 @@ else may('ការអភិរក្ស ៖ គម្លាត ' + $(gap),
     'ចំណូល ' + $(gCollected) + ' + មិនទាន់យក ' + $(gOpen) + ' ≠ ledger ' + $(gLedger)
     + '\n       ⚠️ គម្លាតនេះ **អាចធម្មតា** ៖ «លុប» មិនដកលុយ · ការ purge ៣០ ថ្ងៃ ·'
     + '\n          «កែទឹកប្រាក់» ដោយដៃ។ បើវាធំមិនធម្មតា ➜ ពិនិត្យជាមុនគេ។');
+
+// ── ៥ខ. «ចំណូលប្រចាំថ្ងៃ» (តាមថ្ងៃយក) — node ថ្មី ─────────────────────
+// ⛔ អ័ក្សផ្សេងពីផ្នែក ៥ ៖ ត្រង់នេះលុយចុះលើ **ថ្ងៃដែលបិទ «យក»** មិនមែន
+// ថ្ងៃស្កេនចូល ➜ លេខ ២ នេះ **មិនត្រូវរំពឹងថាស្មើគ្នាទេ**។
+say('\n── ៥ខ. ចំណូលប្រចាំថ្ងៃ (តាមថ្ងៃយក) ──');
+const collectedDays = Object.keys(collected).filter((d) => sb.PICKUP_DATE_KEY_PATTERN.test(d)).sort();
+const collectedBadDays = Object.keys(collected).filter((d) => !sb.PICKUP_DATE_KEY_PATTERN.test(d));
+if (!collectedDays.length && !collectedBadDays.length) {
+    may('គ្មាន node `zoew_daily_collected_cod_dod` ក្នុង dump — រំលង',
+        'ធម្មតាបើមិនទាន់មានការបិទ «យក» ណាមួយក្រោយដំឡើងកំណែថ្មី');
+} else {
+    check(collectedBadDays.length === 0, 'កូនសោថ្ងៃត្រឹមត្រូវទាំងអស់',
+        'កូនសោមិនមែនថ្ងៃ ៖ ' + collectedBadDays.length);
+    check(collectedDays.length <= 7, 'រក្សាទុកមិនលើស ៧ ថ្ងៃ',
+        'ថ្ងៃក្នុង node ៖ ' + collectedDays.length + ' (ការសម្អាតស្វ័យប្រវត្តិរត់តែពេល App បើក)');
+    let negative = 0;
+    let collectedGrand = 0;
+    collectedDays.forEach((d) => {
+        const totals = sb.collectedTotalsOfDay(collected[d]);
+        const set = sb.collectedSetFromRecord(collected[d]);
+        Object.keys(set).forEach((k) => { if (set[k].c < 0 || set[k].d < 0) negative++; });
+        collectedGrand = r2(collectedGrand + totals.total);
+        say('  •  ' + d + ' ៖ ' + totals.count + ' កញ្ចប់ · COD ' + $(totals.cod)
+            + ' · DOD ' + $(totals.dod) + ' · សរុប ' + $(totals.total));
+    });
+    check(negative === 0, 'គ្មានទឹកប្រាក់អវិជ្ជមាន', 'ធាតុអវិជ្ជមាន ៖ ' + negative);
+    say('  ── សរុប ៧ ថ្ងៃ ៖ ' + $(collectedGrand));
+}
 
 // ── ៦. barcode ស្ទួន ➜ ហានិភ័យលុយស្ទួន ────────────────────────────────
 say('\n── ៦. barcode ស្ទួនក្នុងប្រវត្តិ ──');

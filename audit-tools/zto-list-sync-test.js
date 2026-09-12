@@ -336,10 +336,32 @@ function firstBody(requests) {
     const rows = rowsOf(good.body);
     ok('ចម្លើយមាន `rows` ជា array', rows.length === 1, rows);
     const row = rows[0] || {};
-    ok('⛔ ជួរដេកមានតែវាលដែលត្រូវការ ៖ `barcode·phone·cod·dod·at·skip`',
+    ok('⛔ ជួរដេកមានតែវាលដែលត្រូវការ ៖ `barcode·phone·cod·dod·at·ztoClosed·skip`',
         JSON.stringify(Object.keys(row).sort())
-        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip']),
+        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip', 'ztoClosed']),
         Object.keys(row).sort());
+    // ⛔ **សាលក្រម «បិទរួច» លើផ្លូវបញ្ជី** — ច្រកទ្វារ «ចាស់ + បិទរួច ➜
+    // បញ្ចូលជា យករួច» ខាង client ពឹងលើវា។ សាលក្រមមាន **៣** ដដែលនឹងផ្លូវស្កេន ៖
+    // ⛔ env មិនកំណត់ ➜ `null` (**មិនទាន់វាស់**) មិនមែន `false` — បើវាធ្លាក់ចុះ
+    // ទៅ `false` នោះ client នឹងរាយ «ZTO មិនទាន់បិទ» លើកញ្ចប់ដែលយករួចទាំងអស់។
+    ok('⛔ `ztoClosed` = `null` ពេល `ZTO_FIELD_SIGNED` មិនកំណត់ (មិនទាន់វាស់)',
+        row.ztoClosed === null, row.ztoClosed);
+    const signedEnv = Object.assign({}, GOOD_LIST_ENV,
+        { ZTO_FIELD_SIGNED: 'billStatus', ZTO_SIGNED_VALUES: '5' });
+    const listSignedClosed = await listCall(listPayload([listRow({ billStatus: 5 })]), signedEnv);
+    ok('⛔ `ztoClosed` = `true` ពេលតម្លៃត្រូវនឹង `ZTO_SIGNED_VALUES`',
+        (rowsOf(listSignedClosed.body)[0] || {}).ztoClosed === true,
+        rowsOf(listSignedClosed.body)[0]);
+    const listSignedOpen = await listCall(listPayload([listRow({ billStatus: 4 })]), signedEnv);
+    ok('⛔ ទិសផ្ទុយ ៖ `ztoClosed` = `false` ពេលតម្លៃមិនត្រូវ',
+        (rowsOf(listSignedOpen.body)[0] || {}).ztoClosed === false,
+        rowsOf(listSignedOpen.body)[0]);
+    const listSignedMissing = await listCall(listPayload([listRow()]), signedEnv);
+    ok('⛔ វាលអវត្តមានក្នុងជួរដេកបញ្ជី ➜ `null` (client ធ្លាក់ចុះទៅ `/detail`)',
+        (rowsOf(listSignedMissing.body)[0] || {}).ztoClosed === null,
+        rowsOf(listSignedMissing.body)[0]);
+    ok('⛔ តម្លៃឆៅរបស់វាលមិនឡើងដល់ browser (ត្រឹមសាលក្រម)',
+        JSON.stringify(listSignedClosed.body).indexOf('billStatus') === -1, true);
     ok('⛔ ឈ្មោះអតិថិជនមិនឆ្លងកាត់',
         JSON.stringify(good.body).indexOf('ឈ្មោះអតិថិជន') === -1, true);
     ok('⛔ អាសយដ្ឋានមិនឆ្លងកាត់',
@@ -614,9 +636,12 @@ function firstBody(requests) {
     const NEEDED = ['classifyZtoListRows', 'barcodeRegistryKey', 'pickupBarcodeKey',
         'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
-        'barcodeAbandonIsRipe'];
-    const CLOCK_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'ABANDON_AGE_MS'];
-    const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name));
+        'barcodeAbandonIsRipe', 'trashRetentionMs', 'ztoListSignedVerdict', 'ztoListRowAgeState'];
+    const CLOCK_CONST_NAMES = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'ABANDON_AGE_MS',
+        'EXPIRED_TRASH_RETENTION_MS', 'TRASH_RETENTION_MS', 'ZTO_LIST_SIGNED_PROBE_MAX'];
+    const NEEDED_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
+        .concat([extractConst(APP_SRC, 'ztoListSignedProbe')
+            || 'const ztoListSignedProbe = new Map();']);
     ok('⛔ ស្រង់ថេរនាឡិកា/ច្បាប់សម្អាតចេញពី `app.js` បាន',
         CLOCK_CONST_NAMES.every((name) => !!extractConst(APP_SRC, name)), NEEDED_CONSTS);
     const parts = [];
@@ -834,9 +859,9 @@ function firstBody(requests) {
     ok('⛔ វាលអវត្តមានទាំងស្រុង ➜ **មិនរំលង**',
         !!byCode('77130500000104') && byCode('77130500000104').skip === '',
         byCode('77130500000104'));
-    ok('⛔ ជួរដេកមាន ៦ វាល (`skip` បន្ថែម) — នៅតែគ្មានឈ្មោះ/អាសយដ្ឋាន',
+    ok('⛔ ជួរដេកមាន ៧ វាល (`skip` + `ztoClosed`) — នៅតែគ្មានឈ្មោះ/អាសយដ្ឋាន',
         JSON.stringify(Object.keys(descRows[0] || {}).sort())
-        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip']),
+        === JSON.stringify(['at', 'barcode', 'cod', 'dod', 'phone', 'skip', 'ztoClosed']),
         Object.keys(descRows[0] || {}).sort());
     ok('⛔ តម្លៃ `scanTypeDesc` មិនឆ្លងកាត់ទៅ browser (ត្រឹមសាលក្រម)',
         JSON.stringify(descOut.body).indexOf('ចេញដំណើរ') === -1, true);
@@ -952,10 +977,13 @@ function firstBody(requests) {
         'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe'];
-    IMPORT_NAMES.push('ztoListSkipText', 'getZoneDateKey');
+    IMPORT_NAMES.push('ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
+        'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
+        'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const CLOCK_CONSTS = CLOCK_CONST_NAMES.map((name) => constOrStub(APP_SRC, name))
-        .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};']);
+        .concat([extractConst(APP_SRC, 'ZTO_LIST_SKIP_TEXT') || 'const ZTO_LIST_SKIP_TEXT = {};',
+            extractConst(APP_SRC, 'ztoListSignedProbe') || 'const ztoListSignedProbe = new Map();']);
     const importOptional = ['armLateWrite', 'releaseLateBarcodeClaim']
         .map((name) => extractFn(APP_SRC, name) || '').filter(Boolean);
     const importMissing = IMPORT_NAMES.filter((name) => !extractFn(APP_SRC, name)).length;
@@ -963,7 +991,7 @@ function firstBody(requests) {
         importMissing === 0, importMissing);
 
     {
-        const calls = { claim: [], save: [], release: [], toast: [] };
+        const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [] };
         const box = {
             console: console,
             scanHistory: [], deletedItems: [],
@@ -979,13 +1007,28 @@ function firstBody(requests) {
                 if (box.__claimHangs) { const d = deferred(); box.__claimDeferreds.push(d); return d.promise; }
                 return Promise.resolve(box.__claim || 'claimed');
             },
-            addOrUpdateEntry: (code, phone, cod, dod, locker, stampMs) => {
-                calls.save.push({ code, phone, cod, dod, locker, stampMs });
+            addOrUpdateEntry: (code, phone, cod, dod, locker, stampMs, closedAtMs) => {
+                calls.save.push({ code, phone, cod, dod, locker, stampMs, closedAtMs });
+                box.scanHistory.push({
+                    id: 'it-' + code, phone: phone, scanDate: '2026-09-04',
+                    isClosed: !!closedAtMs,
+                    barcodes: [{ code: code, cod: cod, dod: dod, isClosed: !!closedAtMs }]
+                });
                 if (box.__saveHangs) { const d = deferred(); box.__saveDeferreds.push(d); return d.promise; }
                 if (box.__saveThrows) return Promise.reject(new Error('save failed'));
                 return Promise.resolve(true);
             },
             releaseBarcodesInRegistry: (codes) => { calls.release.push(codes); },
+            checkZtoStatusForBarcode: (cfg, code) => {
+                calls.probe.push(code);
+                if (box.__probeThrows) return Promise.reject(new Error('probe failed'));
+                const verdict = box.__probeVerdict;
+                return Promise.resolve(verdict === undefined ? null : { closed: verdict });
+            },
+            applyBarcodeCloseChange: (itemId, code, closed, opts) => {
+                calls.close.push({ itemId, code, closed, opts });
+                return Promise.resolve(box.__closeOk !== false);
+            },
             dropOptimisticBarcode: () => {},
             refreshCurrentHistoryView: () => {},
             renderZtoListSyncPreview: () => {},
@@ -1013,7 +1056,11 @@ function firstBody(requests) {
                 + '\nglobalThis.__stamp = ztoScanStampMillis;'
                 + '\nglobalThis.__offsetMin = APP_TIME_ZONE_OFFSET_MINUTES;'
                 + '\nglobalThis.__skipText = ztoListSkipText;'
-                + '\nglobalThis.__abandonMs = ABANDON_AGE_MS;', box);
+                + '\nglobalThis.__abandonMs = ABANDON_AGE_MS;'
+                + '\nglobalThis.__trashRetentionMs = trashRetentionMs;'
+                + '\nglobalThis.__resolveSigned = resolveZtoListSignedVerdicts;'
+                + '\nglobalThis.__signedProbe = ztoListSignedProbe;'
+                + '\nglobalThis.__probeMax = ZTO_LIST_SIGNED_PROBE_MAX;', box);
             runImport = box.__run;
         } catch (e) {
             ok('sandbox នៃការបញ្ចូលរត់បាន', false, String(e && e.message));
@@ -1028,6 +1075,11 @@ function firstBody(requests) {
             const reset = () => {
                 calls.claim.length = 0; calls.save.length = 0;
                 calls.release.length = 0; calls.toast.length = 0;
+                calls.probe.length = 0; calls.close.length = 0;
+                box.scanHistory.length = 0;
+                box.__probeVerdict = undefined; box.__probeThrows = false;
+                box.__closeOk = true;
+                if (box.__signedProbe) box.__signedProbe.clear();
                 box.ztoListSyncInFlight = false;
                 box.__stale = false; box.__claim = 'claimed';
                 box.__saveThrows = false; box.__confirm = true;
@@ -1208,8 +1260,8 @@ function firstBody(requests) {
                 ], [], []);
                 ok('⛔ ជួរដេកក្នុងព្រំដែន (ក្មេងជាង `ABANDON_AGE_MS`) ➜ នៅជា «ថ្មី»',
                     graded.fresh.some((r) => r.barcode === '77130500000801'), graded.fresh);
-                ok('⛔ ជួរដេកដែលថ្ងៃស្កេន ZTO ចាស់ជាងច្បាប់សម្អាត ➜ ក្រុម «រំលង» (បើបញ្ចូល ➜ ចូលធុងសំរាមភ្លាម ➜ **ដកលុយ**)',
-                    graded.skipped.some((r) => r.barcode === '77130500000802' && r.skip === 'too-old'),
+                ok('⛔ ចាស់ជាងច្បាប់សម្អាត ហើយ **គ្មានសាលក្រម ZTO** ➜ រំលង (`too-old-unknown`)',
+                    graded.skipped.some((r) => r.barcode === '77130500000802' && r.skip === 'too-old-unknown'),
                     graded.skipped);
                 ok('⛔ ជួរដេកគ្មានត្រា ZTO ➜ មិនត្រូវរំលង (ធ្លាក់ចុះទៅម៉ោង sync)',
                     graded.fresh.some((r) => r.barcode === '77130500000803'), graded.fresh);
@@ -1228,24 +1280,110 @@ function firstBody(requests) {
                 ok('ជាន់អប្បបរមា ៖ `ztoListSkipText()` រត់ក្នុង sandbox បាន',
                     typeof skipTextFn === 'function', typeof skipTextFn);
                 if (typeof skipTextFn === 'function') {
-                    ok('⛔ មូលហេតុ «ចាស់ពេក» មានអត្ថបទពន្យល់ដល់អ្នកប្រើ',
-                        String(skipTextFn('too-old') || '').length > 8, skipTextFn('too-old'));
-                    ok('⛔ មូលហេតុ «មិនមែនស្កេនមកដល់» ក៏មានអត្ថបទដែរ',
-                        String(skipTextFn('scan-type') || '').length > 8, skipTextFn('scan-type'));
-                    ok('⛔ មូលហេតុទាំង ២ ខុសគ្នា (មិនមែនអត្ថបទរួមកន្តុំ)',
-                        skipTextFn('too-old') !== skipTextFn('scan-type'), true);
+                    const SKIP_KEYS = ['scan-type', 'too-old-open', 'too-old-unknown', 'too-old-purged'];
+                    ok('⛔ រាល់មូលហេតុរំលងមានអត្ថបទពន្យល់ដល់អ្នកប្រើ',
+                        SKIP_KEYS.every((k) => String(skipTextFn(k) || '').length > 8),
+                        SKIP_KEYS.map(skipTextFn));
+                    ok('⛔ មូលហេតុនីមួយៗខុសគ្នា (មិនមែនអត្ថបទរួមកន្តុំ) — «មិនទាន់បិទ» ≠ «វាស់មិនបាន» ≠ «ចាស់ពេក»',
+                        new Set(SKIP_KEYS.map((k) => skipTextFn(k))).size === SKIP_KEYS.length,
+                        SKIP_KEYS.map(skipTextFn));
                     ok('⛔ កូនសោមិនស្គាល់ ➜ អត្ថបទទទេ (មិនធ្លាក់ចុះទៅ prototype)',
                         skipTextFn('') === '' && skipTextFn('constructor') === ''
                         && skipTextFn('toString') === '', [skipTextFn('constructor'), skipTextFn('toString')]);
                 }
                 const classifySrc = extractFn(APP_SRC, 'classifyZtoListRows') || '';
+                // ⛔ ការអះអាងត្រូវ **ដេរីវេ** ៖ ការផ្លាស់ច្រកទ្វារចូល helper
+                // **ត្រឹមត្រូវ** (ចំណុចច្របាច់តែមួយ) មិនត្រូវធ្វើឲ្យវាធ្លាក់ទេ —
+                // តែការសរសេររូបមន្តព្រំដែនឡើងវិញ **ត្រូវធ្លាក់**។
+                const AGE_GATE_FNS = ['classifyZtoListRows', 'ztoListRowAgeState'];
+                const ripeOwners = AGE_GATE_FNS.filter((name) =>
+                    /barcodeAbandonIsRipe\s*\(/.test(extractFn(APP_SRC, name) || ''));
                 ok('⛔ ច្រកទ្វារ «ចាស់ពេក» ហៅ **អ្នកសម្រេចដដែល** នឹងការសម្អាត (`barcodeAbandonIsRipe`) ⛔ មិនមែនច្បាប់ចម្លងទី ៤ នៃរូបមន្តព្រំដែន',
-                    /barcodeAbandonIsRipe\s*\(/.test(classifySrc)
-                    && classifySrc.indexOf('ABANDON_AGE_MS') === -1,
-                    (/.{0,90}ABANDON_AGE_MS/.exec(classifySrc) || [''])[0]);
+                    ripeOwners.length === 1
+                    && AGE_GATE_FNS.every((name) =>
+                        (extractFn(APP_SRC, name) || '').indexOf('ABANDON_AGE_MS') === -1),
+                    ripeOwners);
+                ok('⛔ ហើយអ្នកចាត់ថ្នាក់ឈានដល់វា (ដោយផ្ទាល់ ឬតាមអ្នកសម្រេចអាយុ)',
+                    ripeOwners.length === 1
+                    && (ripeOwners[0] === 'classifyZtoListRows'
+                        || new RegExp(ripeOwners[0] + '\\s*\\(').test(classifySrc)),
+                    ripeOwners);
                 const groupHtmlFn = extractFn(APP_SRC, 'ztoListGroupHtml') || '';
                 ok('⛔ ជួរដេកមើលជាមុនបង្ហាញមូលហេតុពិត (ស្នាមភ្ជាប់ទៅ `ZTO_LIST_SKIP_TEXT`)',
                     /ztoListSkipText\s*\(\s*row\.skip\s*\)/.test(groupHtmlFn), groupHtmlFn.slice(0, 200));
+
+                // ═════════════════════════════════════════════════════════
+                // ⛔ **ច្រកទ្វារ ៣ ផ្លូវ ៖ «ចាស់» មិនមែនជាអ្នកសម្រេចតែម្នាក់**
+                // (សំណើអ្នកប្រើ 2026-09-12)
+                // ═════════════════════════════════════════════════════════
+                // កញ្ចប់ដែល ZTO **បិទបញ្ជីរួច** = អតិថិជនយករួច = **ជួរ ៧**
+                // នៃតារាងសេណារីយ៉ូ (`pickup` ➜ លុយ **មិនប៉ះ**) ចំណែក «ផុត
+                // កំណត់» = **ជួរ ៨** (`expired` ➜ **ដកលុយ**)។ អ្វីដែលបែងចែក
+                // ពួកវាគឺ **អតិថិជនបានយកឬអត់** មិនមែនអាយុទេ។
+                //
+                // ⛔ ហើយសាលក្រមមាន **៣** ៖ `true` ➜ បញ្ចូលជា «យករួច»;
+                // `false` ➜ រំលង; `null` (**វាស់មិនបាន**) ➜ រំលងដែរ — នេះជា
+                // ច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»។ ការចាត់ `null` ជា `true`
+                // នឹងបញ្ចូលកញ្ចប់ដែល **មិនទាន់យក** ជា «យករួច» ➜ លុយចូល
+                // ចំណូលខុស ហើយកញ្ចប់បាត់ពីបញ្ជីរង់ចាំ។
+                const RET = box.__trashRetentionMs
+                    ? box.__trashRetentionMs({ trashReason: 'pickup' }) : 0;
+                ok('ជាន់អប្បបរមា ៖ `trashRetentionMs()` អានចេញពីកូដពិត',
+                    RET === 30 * 24 * 60 * 60 * 1000, RET);
+                const oldAt = zoneText(NOW - AGE - 60000);
+                const gradeOne = (ztoClosed, at) => classifyReal([{
+                    barcode: '77130500000821', phone: '0963897345', cod: 5, dod: 0,
+                    at: at || oldAt, skip: '', ztoClosed: ztoClosed
+                }], [], []);
+                const closedOld = gradeOne(true);
+                ok('⛔ ចាស់ + ZTO **បិទបញ្ជីរួច** ➜ ចូលក្រុម «ថ្មី» (មិនរំលងទៀត)',
+                    closedOld.fresh.length === 1 && closedOld.skipped.length === 0, closedOld);
+                ok('⛔ ហើយវាត្រូវសម្គាល់ `closedAtZto` ➜ ស្នាមភ្ជាប់ទៅ `addOrUpdateEntry()` (បញ្ចូលជា «យករួច» ⛔ មិនមែន «ផុតកំណត់»)',
+                    closedOld.fresh[0] && closedOld.fresh[0].closedAtZto === true, closedOld.fresh[0]);
+                const openOld = gradeOne(false);
+                ok('⛔ ចាស់ + ZTO **មិនទាន់បិទ** ➜ រំលង (`too-old-open`) — សំណើអ្នកប្រើ ៖ «សូមកុំបញ្ចូល»',
+                    openOld.skipped.length === 1 && openOld.skipped[0].skip === 'too-old-open',
+                    openOld.skipped);
+                const unknownOld = gradeOne(null);
+                ok('⛔ ចាស់ + **វាស់មិនបាន** ➜ រំលង (`too-old-unknown`) ⛔ មិនមែនបញ្ចូល («មិនអាចផ្ទៀងផ្ទាត់ ≠ បិទរួច»)',
+                    unknownOld.skipped.length === 1 && unknownOld.skipped[0].skip === 'too-old-unknown',
+                    unknownOld.skipped);
+                // ⛔ **ពិដានអាយុ ៖ បើគ្មាន ➜ លុយបូកស្ទួន។** ការ purge ធុងសំរាម
+                // **ដោះកូនសោ registry វិញ** (`releaseBarcodesInRegistry` ក្នុង
+                // `runAutomaticDeletedCleanup`) ➜ កញ្ចប់ដែលយករួច និងកត់ក្នុង
+                // ZoeW រួច ➜ `pickup` ➜ purge នៅ `TRASH_RETENTION_MS` ➜ បាត់ពី
+                // `deletedItems` **និង** បាត់ពី registry ➜ ជាន់ការពារស្ទួន
+                // **ទាំង ២** ងាប់ ➜ ការ sync ជួរចាស់រាយវាជា «ថ្មី» ➜ **COD បូក
+                // ចូលថ្ងៃចាស់ម្តងទៀត**។
+                const purgedOld = gradeOne(true, zoneText(NOW - RET - 60000));
+                ok('⛔ ចាស់ជាងអាយុធុងសំរាម ➜ រំលង (`too-old-purged`) ទោះ ZTO បិទរួច — ពិនិត្យស្ទួនមិនបាន ➜ **ហានិភ័យលុយបូកស្ទួន**',
+                    purgedOld.skipped.length === 1 && purgedOld.skipped[0].skip === 'too-old-purged',
+                    purgedOld.skipped);
+                // ⛔ **ព្រំដែនអាយុត្រូវរស់នៅកន្លែងតែមួយ។** វាមានអ្នកអាន ២ ៖
+                // អ្នកចាត់ថ្នាក់ និងអ្នកជ្រើសជួរដេកដែលត្រូវសួរ ZTO។ បើពួកវា
+                // កាន់ច្បាប់ចម្លងៗ ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ អ្នកសួរឈប់សួរ
+                // ជួរដេកដែលអ្នកចាត់ថ្នាក់ចាត់ជា «ចាស់» ➜ **រំលងស្ងាត់ៗ**។
+                // ⛔ ការអះអាងត្រូវ **ដេរីវេឈ្មោះ** មិនមែនចាក់ literal ទី ២។
+                const BOUNDARY_READERS = ['classifyZtoListRows', 'ztoListRowAgeState',
+                    'ztoListRowNeedsSignedProbe', 'resolveZtoListSignedVerdicts'];
+                const boundaryOwners = BOUNDARY_READERS.filter((name) =>
+                    /trashRetentionMs\s*\(/.test(extractFn(APP_SRC, name) || ''));
+                ok('⛔ ព្រំដែនអាយុដេរីវេពី `trashRetentionMs()` ⛔ មិនមែនលេខថេរទី ២',
+                    boundaryOwners.length === 1
+                    && (extractFn(APP_SRC, boundaryOwners[0]) || '').indexOf('TRASH_RETENTION_MS') === -1,
+                    boundaryOwners);
+                if (boundaryOwners.length === 1) {
+                    const decider = boundaryOwners[0];
+                    const probeSrc = extractFn(APP_SRC, 'ztoListRowNeedsSignedProbe') || '';
+                    const callsDecider = (src) => decider === 'classifyZtoListRows'
+                        ? false : new RegExp(decider + '\\s*\\(').test(src);
+                    ok('⛔ **អ្នកចាត់ថ្នាក់ និងអ្នកសួរ ហៅអ្នកសម្រេចដដែល** (រូបមន្តព្រំដែនមិនរស់នៅ ២ កន្លែង)',
+                        callsDecider(classifySrc) && callsDecider(probeSrc),
+                        { decider: decider, classify: callsDecider(classifySrc), probe: callsDecider(probeSrc) });
+                }
+                ok('⛔ ទិសផ្ទុយ ៖ ជួរដេក **ក្មេង** មិនត្រូវសម្គាល់ `closedAtZto` (ការស្កេនធម្មតាមិនប្រែ)',
+                    (gradeOne(true, zoneText(NOW - AGE + 60000)).fresh[0] || {}).closedAtZto === false,
+                    gradeOne(true, zoneText(NOW - AGE + 60000)).fresh[0]);
 
                 reset();
                 box.__now = NOW;
@@ -1262,6 +1400,106 @@ function firstBody(requests) {
                 ok('⛔ ការបញ្ចូល ៖ ត្រា ZTO ត្រូវឡើងដល់ `addOrUpdateEntry()` ជាអាគុយម៉ង់ទី ៦',
                     calls.save[0] && calls.save[0].stampMs === stampOf(zoneText(NOW - AGE + 60000)),
                     calls.save[0]);
+
+                // ⛔ **កញ្ចប់ត្រូវ *កើតមកជាបិទស្រាប់* — មិនមែន «បញ្ចូលរួចទើប
+                // បិទ»។** `debouncedRenderAfterHistorySync` ជា debounce
+                // **១២០ ms** ហើយវាហៅ `runAutomaticCleanupRules()` ដែលច្បាប់
+                // abandon របស់វាឈរលើ `!item.isClosed && (now − createdAt >
+                // ABANDON_AGE_MS)` ➜ ដោយសារ `createdAt` = ត្រា ZTO ចាស់
+                // **ភ្លាមក្រោយ snapshot មកដល់ កញ្ចប់ចូលធុងសំរាមជា `expired`
+                // ហើយ *ដកលុយ*** មុនជំហានបិទរត់ទាន់ផង។ ដូច្នេះស្ថានភាពបិទ
+                // ត្រូវចុះក្នុង **ការសរសេរតែមួយដដែល** (អាគុយម៉ង់ទី ៧)។
+                reset();
+                box.__now = NOW;
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000831', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                    from: '2026-09-01', to: '2026-09-11', total: 1
+                };
+                await runImport();
+                ok('⛔ ចាស់ + បិទរួច ➜ **ត្រូវបញ្ចូល** (មិនរំលងទៀត)',
+                    calls.save.length === 1 && calls.save[0].code === '77130500000831', calls.save);
+                ok('⛔ លុយចុះលើ **ថ្ងៃស្កេន ZTO** ដដែល (អាគុយម៉ង់ទី ៦ មិនប្រែ)',
+                    calls.save[0] && calls.save[0].stampMs === stampOf(oldAt), calls.save[0]);
+                ok('⛔ **អាគុយម៉ង់ទី ៧ ជាត្រាបិទ** ➜ barcode កើតមកជាបិទ ➜ ច្បាប់ abandon មិនអាចបាញ់ (`!item.isClosed` ជាច្រកទ្វារ)',
+                    calls.save[0] && typeof calls.save[0].closedAtMs === 'number'
+                    && calls.save[0].closedAtMs > 0, calls.save[0]);
+                ok('⛔ ត្រាបិទជា **ម៉ោងឥឡូវ** មិនមែនត្រា ZTO ➜ ច្បាប់ ២ ម៉ោងទុកបង្អួចឲ្យស្ថិតិយកចុះទាន់ (ការចូលធុងសំរាម *ភ្លាម* ជាការប្រណាំងទី ២)',
+                    calls.save[0] && calls.save[0].closedAtMs === NOW, calls.save[0]);
+                ok('⛔ ស្ថិតិយកត្រូវសរសេរតាម **ទ្វារតែមួយ** `applyBarcodeCloseChange()` ⛔ មិនមែនផ្លូវសរសេរទី ២',
+                    calls.close.length === 1 && calls.close[0].code === '77130500000831'
+                    && calls.close[0].closed === true, calls.close);
+                ok('⛔ ហើយវាត្រូវស្ងាត់ និងមិនបើកប្រអប់ (ការបញ្ចូលជាក្រុម)',
+                    calls.close[0] && calls.close[0].opts
+                    && calls.close[0].opts.silent === true && calls.close[0].opts.showModal === false,
+                    calls.close[0]);
+                ok('⛔ **លុយមិនត្រូវដក** ៖ គ្មានផ្លូវណាប៉ះ `isDeducted` ក្នុងការបញ្ចូល',
+                    (extractFn(APP_SRC, 'importZtoListRows') || '').indexOf('isDeducted') === -1, true);
+                const lastPickupToast = calls.toast[calls.toast.length - 1] || '';
+                ok('⛔ សារបញ្ចប់ត្រូវរាប់កញ្ចប់ «យករួច» ដាច់ដោយឡែក (អ្នកប្រើត្រូវដឹងថាវាមិនរង់ចាំក្នុងបញ្ជី)',
+                    lastPickupToast.indexOf('🔒') !== -1, calls.toast);
+
+                reset();
+                box.__now = NOW;
+                box.__closeOk = false;
+                box.ztoListSyncResult = {
+                    rows: [{ barcode: '77130500000832', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: true }],
+                    from: '2026-09-01', to: '2026-09-11', total: 1
+                };
+                await runImport();
+                ok('⛔ ទិសផ្ទុយ ៖ ស្ថិតិយកធ្លាក់ ➜ **មិនត្រូវដោះកូនសោ registry** (កញ្ចប់ចុះរួច ➜ ការដោះ = ស្កេនចូលបាន ២ ដង ➜ លុយបូកស្ទួន)',
+                    calls.release.length === 0, calls.release);
+
+                // ⛔ **ការធ្លាក់ចុះទៅ `/detail`** ៖ ជួរដេកបញ្ជីអាចគ្មានវាល
+                // ស្ថានភាព (យើងផ្ទៀងផ្ទាត់ `billStatus` **តែលើ `/detail`**)
+                // ➜ `resolveZtoListSignedVerdicts()` ជាអ្នកវាស់ជាន់ទី ២។
+                const resolveSigned = box.__resolveSigned;
+                ok('ជាន់អប្បបរមា ៖ `resolveZtoListSignedVerdicts()` រត់ក្នុង sandbox បាន',
+                    typeof resolveSigned === 'function', typeof resolveSigned);
+                if (typeof resolveSigned === 'function') {
+                    const oldRow = { barcode: '77130500000841', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '' };
+                    const youngRow = { barcode: '77130500000842', phone: '0963897345', cod: 5, dod: 0, at: zoneText(NOW - 86400000), skip: '' };
+                    const purgedRow = { barcode: '77130500000843', phone: '0963897345', cod: 5, dod: 0, at: zoneText(NOW - RET - 60000), skip: '' };
+                    const knownRow = { barcode: '77130500000844', phone: '0963897345', cod: 5, dod: 0, at: oldAt, skip: '', ztoClosed: false };
+
+                    reset();
+                    box.__now = NOW;
+                    box.__probeVerdict = true;
+                    await resolveSigned({ url: 'x' }, [oldRow, youngRow, purgedRow, knownRow]);
+                    ok('⛔ សួរ `/detail` **តែជួរដេកចាស់ដែលវាស់មិនទាន់**',
+                        calls.probe.length === 1 && calls.probe[0] === '77130500000841', calls.probe);
+                    ok('⛔ សាលក្រមដែលវាស់បាន ត្រូវឈ្នះលើជួរដេកបញ្ជី ➜ ចាត់ថ្នាក់ជា «ថ្មី»',
+                        classifyReal([oldRow], [], []).fresh.length === 1,
+                        classifyReal([oldRow], [], []).skipped);
+
+                    reset();
+                    box.__now = NOW;
+                    box.__probeThrows = true;
+                    await resolveSigned({ url: 'x' }, [oldRow]);
+                    ok('⛔ **ការធ្លាក់មិនត្រូវចងចាំជាសាលក្រម** ➜ ជួរដេកនៅជា «វាស់មិនបាន» ⛔ មិនមែន «មិនទាន់បិទ» (ការចងចាំ `false` ➜ ZTO ដាច់មួយភ្លែត = កញ្ចប់រំលងជារៀងរហូត)',
+                        (classifyReal([oldRow], [], []).skipped[0] || {}).skip === 'too-old-unknown',
+                        classifyReal([oldRow], [], []).skipped);
+
+                    reset();
+                    box.__now = NOW;
+                    box.__probeVerdict = true;
+                    const many = [];
+                    for (let i = 0; i < box.__probeMax + 5; i++) {
+                        many.push({ barcode: '7713050000' + (9000 + i), phone: '0963897345', cod: 1, dod: 0, at: oldAt, skip: '' });
+                    }
+                    await resolveSigned({ url: 'x' }, many);
+                    ok('⛔ ការសួរមានពិដាន (`ZTO_LIST_SIGNED_PROBE_MAX`) ➜ បញ្ជីវែងមិនក្លាយជាការហៅរាប់រយ',
+                        calls.probe.length === box.__probeMax, calls.probe.length);
+
+                    reset();
+                    box.__now = NOW;
+                    box.__probeVerdict = true;
+                    box.navigator.onLine = false;
+                    await resolveSigned({ url: 'x' }, [oldRow]);
+                    ok('⛔ ក្រៅបណ្ដាញ ➜ មិនសួរសោះ', calls.probe.length === 0, calls.probe);
+                    box.navigator.onLine = true;
+                    reset();
+                    box.__now = NOW;
+                }
 
                 // ⛔ តម្រងលំនាំដើមជា «ថ្ងៃនេះ» ➜ កញ្ចប់ដែលចុះលើថ្ងៃ ZTO ចាស់
                 // **មិនលេចក្នុងតារាង** ➜ អ្នកប្រើជឿថាការបញ្ចូលបរាជ័យ។ សារ
@@ -1300,7 +1538,7 @@ function firstBody(requests) {
     const ENTRY_NAMES = ['addOrUpdateEntry', 'getZoneDateKey', 'getFormattedClockTime',
         'appZoneParts', 'appZoneWallClockToMillis', 'ztoScanStampMillis',
         'getFormattedDate', 'normalizeBarcodesOf', 'barcodeEntriesOf',
-        'recalcItemMoneyFromBarcodes'];
+        'recalcItemMoneyFromBarcodes', 'applyBarcodeCloseState'];
     const entryParts = ENTRY_NAMES.map((name) => fnOrStub(APP_SRC, name));
     const entryMissingNames = ENTRY_NAMES.filter((name) => !extractFn(APP_SRC, name));
     ok('ជាន់អប្បបរមា ៖ ស្រង់ `addOrUpdateEntry` និងផ្លូវនាឡិកាពិតបាន',

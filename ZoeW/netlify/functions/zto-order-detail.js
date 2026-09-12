@@ -792,12 +792,17 @@ function projectListRow(config, row) {
     const dod = pickNumber(candidates,
         config.dodPaths === DOD_PATHS ? LIST_DOD_PATHS : config.dodPaths);
     const at = pickText(candidates, LIST_TIME_PATHS);
+    // ⛔ សាលក្រម «បិទរួច» ជា **ជាន់ទី ១** នៃច្រកទ្វារ «ចាស់ + បិទរួច ➜ បញ្ចូល»
+    // ខាង client ៖ បើជួរដេកបញ្ជីផ្ទុកវាល `ZTO_FIELD_SIGNED` នោះការវាស់ឥតថ្លៃ។
+    // ⛔ វាលអវត្តមាន ➜ `null` (**មិនទាន់វាស់**) មិនមែន `false` — client ត្រូវ
+    // ធ្លាក់ចុះទៅផ្លូវ `/detail` ក្នុងមួយ barcode ជំនួស។
     return {
         barcode: pickText(candidates, LIST_BARCODE_PATHS),
         phone: listPhoneIsPlaceholder(phone) ? '' : phone,
         cod: cod === null ? 0 : cod,
         dod: dod === null ? 0 : dod,
         at: LIST_TIME_RE.test(at) ? at.slice(0, 19) : '',
+        ztoClosed: pickSignedVerdict(candidates, config.signed),
         skip: listScanTypeSkip(config.list, candidates)
     };
 }

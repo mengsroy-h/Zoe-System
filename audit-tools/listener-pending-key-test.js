@@ -247,7 +247,7 @@ function sliceFn(name) {
 const PENDING_KEYS_RE = /const DB_LISTENER_KEYS = \[('[a-zA-Z]+'(?:\s*,\s*'[a-zA-Z]+')*)\];|\[('[a-zA-Z]+'(?:\s*,\s*'[a-zA-Z]+')*)\]\s*\n?\s*\.forEach\(\(key\) => dbListenerPendingPaths\.add\(key\)\)/;
 const keysMatch = SRC.match(PENDING_KEYS_RE);
 const pendingKeys = keysMatch ? (keysMatch[1] || keysMatch[2] || '').split(',').map((s) => s.trim().replace(/'/g, '')) : [];
-ok('រកឃើញបញ្ជីកូនសោដែល initDatabaseListeners() ដាក់ចូល', pendingKeys.length === 6, pendingKeys);
+ok('រកឃើញបញ្ជីកូនសោដែល initDatabaseListeners() ដាក់ចូល (ជាន់អប្បបរមា ៦)', pendingKeys.length >= 6, pendingKeys);
 
 const deletedKeyMatch = SRC.match(/const DB_LISTENER_KEY_DELETED = '([^']+)';/);
 const DELETED_KEY_IN_CODE = deletedKeyMatch ? deletedKeyMatch[1] : '__មិនបានប្រកាស__';

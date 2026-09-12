@@ -364,7 +364,8 @@ const tick = (n) => new Promise((resolve) => setTimeout(resolve, n || 0));
             const callbacks = new Map();
             Object.assign(ctx, {
                 dbRefHistory: { path: 'history' }, dbRefDeleted: { path: 'deleted' },
-                dbRefDailyRevenue: null, dbRefMonthlyRevenue: null, dbRefDailyPickup: null, dbRefExchangeRate: null,
+                dbRefDailyRevenue: null, dbRefMonthlyRevenue: null, dbRefDailyPickup: null,
+                dbRefDailyCollected: null, dbRefExchangeRate: null,
                 DB_LISTENER_KEYS: ['history', 'deleted'], dbListenerGeneration: 0,
                 dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(),
                 dbListenerProgressAt: 0, dbListenerPendingSeen: 0, dbListenersFailed: false,

@@ -94,7 +94,11 @@ const EITHER_FNS = [
     'revertPickupOnServer', 'revertPickupLedgerDelta', 'correctPickupServerToActual', 'correctPickupLedgerToActual',
     'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones', 'legacyPickupPlaceholders', 'pickupSetFromRecord',
     'buildPickupRecordFromSet', 'applyPickupMarksToSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
-    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'collectPickupMarks', 'reconstructPickupSet'
+    'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'collectPickupMarks', 'reconstructPickupSet',
+    'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
+    'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
+    'collectedMarksFor', 'collectItemCollectedMarks', 'collectedPreviousValue',
+    'applyCollectedMarksInMemory', 'commitCollectedMarks', 'markCollectedRevenue', 'revertCollectedMarks'
 ];
 const fnSrc = {};
 const missing = [];
@@ -270,6 +274,7 @@ function makeDevice(shared, name) {
         dbRefHistory: { path: 'zoew_scan_history_cod_dod' },
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
         dbRefDailyPickup: { path: 'zoew_daily_pickup_cod_dod' },
+        dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
         getServerNow: () => T0,
         getFormattedDate: () => SCAN_DATE,
         showToast: (m) => { dev.toasts.push(String(m)); },
@@ -279,7 +284,7 @@ function makeDevice(shared, name) {
         updateRecentPhonesList: () => {},
         dbListenerViewIsStale: () => false,
         isActiveRestoreClaim: () => false,
-        scanHistory: [], deletedItems: [], dailyPickupData: {},
+        scanHistory: [], deletedItems: [], dailyPickupData: {}, dailyCollectedData: {},
         activeParentItemId: null, isModalOpen: false,
         cleanupInFlight: new Set(), activeRestoreClaims: new Map(),
         window: {}
@@ -290,6 +295,8 @@ function makeDevice(shared, name) {
         sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
+        sliceConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
+        sliceConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
         sliceConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         ...REAL_FNS.map((n) => fnSrc[n]),
         eitherSrc
@@ -304,6 +311,7 @@ function makeDevice(shared, name) {
         ctx.deletedItems.length = 0;
         Object.keys(trash).forEach((k) => ctx.deletedItems.push(clone(trash[k])));
         ctx.dailyPickupData = clone(shared.get('zoew_daily_pickup_cod_dod') || {});
+        ctx.dailyCollectedData = clone(shared.get('zoew_daily_collected_cod_dod') || {});
     };
     dev.reconnect = (mode) => {
         const q = dev.queue.slice();

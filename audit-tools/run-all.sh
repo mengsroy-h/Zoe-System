@@ -160,6 +160,7 @@ run "stats-screen-agreement" node audit-tools/stats-screen-agreement-test.js
 run "stats-measurable-gate" node audit-tools/stats-measurable-gate-test.js
 run "collected-value-fuzz" node audit-tools/collected-value-fuzz-test.js
 run "empty-state-truth" node audit-tools/empty-state-truth-test.js
+run "daily-collected" node audit-tools/daily-collected-test.js
 run "registry-orphan-list" node audit-tools/registry-orphan-list-test.js
 run "layout (browser ពិត)"     node audit-tools/layout-check.js
 run "field-shape (browser ពិត)" node audit-tools/field-shape-test.js
@@ -277,6 +278,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     STATSGATE_APP_DIR="$BASE" node audit-tools/stats-measurable-gate-test.js 2>&1 | tail -1 | sed 's/^/   stats-gate:      /'
     COLLECTFUZZ_APP_DIR="$BASE" node audit-tools/collected-value-fuzz-test.js 2>&1 | tail -1 | sed 's/^/   collect-fuzz:    /'
     EMPTYSTATE_APP_DIR="$BASE" node audit-tools/empty-state-truth-test.js 2>&1 | tail -1 | sed 's/^/   empty-state:     /'
+    COLLECTED_APP_DIR="$BASE" node audit-tools/daily-collected-test.js 2>&1 | tail -1 | sed 's/^/   daily-collected: /'
     REGORPHANTEST_APP_DIR="$BASE" node audit-tools/registry-orphan-list-test.js 2>&1 | tail -1 | sed 's/^/   reg-orphan:      /'
     OFFLINE_APP_DIR="$BASE" node audit-tools/offline-shell-test.js 2>&1 | tail -1 | sed 's/^/   offline-shell:   /'
     SWINTEG_APP_DIR="$BASE" node audit-tools/sw-install-integrity-test.js 2>&1 | tail -1 | sed 's/^/   sw-install:      /'

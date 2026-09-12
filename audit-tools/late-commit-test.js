@@ -102,6 +102,9 @@ const REAL_FNS = [
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'collectPickupMarks', 'reconstructPickupSet', 'applyPickupMarksInMemory', 'commitPickupMarks',
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks',
+    'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber', 'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
+    'collectedMarksFor', 'collectItemCollectedMarks', 'collectedPreviousValue',
+    'applyCollectedMarksInMemory', 'commitCollectedMarks', 'markCollectedRevenue', 'revertCollectedMarks',
     'saveSingleDeletedItemToFirebase', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem', 'removeSingleBarcode', 'deleteSingleItem',
     'toggleIndividualBarcodeClose', 'applyBarcodeCloseChange', 'toggleCloseStatus'
@@ -238,6 +241,7 @@ function buildWorld(seed, opts) {
         dbRefDailyRevenue: fb.ref({}, 'zoew_daily_revenue_cod_dod'),
         dbRefMonthlyRevenue: fb.ref({}, 'zoew_monthly_revenue_cod_dod'),
         dbRefDailyPickup: fb.ref({}, 'zoew_daily_pickup_cod_dod'),
+        dbRefDailyCollected: fb.ref({}, 'zoew_daily_collected_cod_dod'),
         getServerNow: () => world.now,
         getFormattedDate: () => SCAN_DATE,
         showToast: (msg) => { world.toasts.push(String(msg)); },
@@ -254,6 +258,7 @@ function buildWorld(seed, opts) {
         dailyRevenueData: {},
         monthlyRevenueData: {},
         dailyPickupData: {},
+        dailyCollectedData: {},
         activeParentItemId: null,
         isModalOpen: false,
         cleanupInFlight: new Set(),
@@ -266,6 +271,9 @@ function buildWorld(seed, opts) {
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         extractConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
         extractConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
+        extractConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",
+        extractConst('APP_TIME_ZONE_OFFSET_MINUTES') || 'const APP_TIME_ZONE_OFFSET_MINUTES = 420;',
+        extractConst('DAILY_COLLECTED_KEEP_DAYS') || 'const DAILY_COLLECTED_KEEP_DAYS = 7;',
         extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
         extractConst('LOCK_STALL_RELEASE_MS') || 'const LOCK_STALL_RELEASE_MS = 15000;',
         ...REAL_FNS.map((name) => fnSrc[name]),
@@ -285,6 +293,7 @@ function buildWorld(seed, opts) {
         context.dailyRevenueData = clone(getPath('zoew_daily_revenue_cod_dod') || {});
         context.monthlyRevenueData = clone(getPath('zoew_monthly_revenue_cod_dod') || {});
         context.dailyPickupData = clone(getPath('zoew_daily_pickup_cod_dod') || {});
+        context.dailyCollectedData = clone(getPath('zoew_daily_collected_cod_dod') || {});
     };
     world.wait = (ms) => new Promise((resolve) => hostSetTimeout(resolve, ms));
     world.dispose = () => { world.timers.forEach(clearTimeout); world.timers.clear(); };

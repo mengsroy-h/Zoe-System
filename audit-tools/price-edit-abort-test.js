@@ -86,7 +86,9 @@ const NEEDED = [
     'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'alignMonthlyLedgerToDaily',
     'normalizeBarcodesOf', 'ensureBarcodeArrayForItem', 'barcodeEntriesOf', 'sanitizeInput', 'formatScanStamp',
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
-    'saveEditedBarcodePrice', 'itemHasRestoreMarkers'
+    'saveEditedBarcodePrice', 'itemHasRestoreMarkers',
+    'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
+    'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode'
 ];
 const missing = NEEDED.filter((n) => !sliceFn(n));
 ok('ជាន់អប្បបរមា៖ រកឃើញ function ដែលចាំបាច់ទាំង ' + NEEDED.length,
@@ -128,7 +130,8 @@ function makeCtx(mode) {
             body: { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } }
         },
         db: {}, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
-        dailyRevenueData: {}, monthlyRevenueData: {},
+        dailyRevenueData: {}, monthlyRevenueData: {}, dailyCollectedData: {},
+        dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
         dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
         dbRefMonthlyRevenue: { path: 'zoew_monthly_revenue_cod_dod' },
         activeParentItemId: 'id_1', activeEditingBarcode: 'BC1',

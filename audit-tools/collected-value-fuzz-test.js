@@ -10,7 +10,7 @@
 //
 // ឧបករណ៍នេះសាងស្ថានភាពចៃដន្យ (រួមទាំង **ការឃ្លាតពិត** ៖ «កែទឹកប្រាក់» ដោយដៃ ·
 // ការ purge · ledger ខែឃ្លាតពីថ្ងៃ · listener ដែលព្យួរ) រួចរត់អេក្រង់ **ពិត**
-// (`openDailyStatsModal` · `openMonthlyStatsModal` · `buildMonthlyReport`) ក្នុង `vm`
+// (`openDailyStatsModal` · `buildMonthlyReport`) ក្នុង `vm`
 // ហើយ **អានលេខចេញពី HTML ដែលអ្នកប្រើមើលឃើញ** រួចអះអាងអថេរ ៥ ៖
 //
 //   (ក) ថ្ងៃ ↔ ជួរដេករបាយការណ៍ខែ  — រូបមន្តតែមួយ កម្រិតតែមួយ
@@ -68,13 +68,13 @@ function readKey(name, fallback) {
 // ⛔ រកឈ្មោះមិនឃើញ ➜ **stub** មិនមែន exit (បើអត់ ការអះអាងខាងក្រោមត្រូវបិទបាំង)។
 const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney',
     'statsCount', 'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
-    'uncollectedValueByDate', 'collectedValueOf', 'collectedValueForMonth', 'collectedMoneyText',
+    'uncollectedValueByDate', 'collectedValueOf', 'collectedMoneyText',
     'collectedRielText', 'monthlyReportRiel', 'buildStatCardItem', 'buildMonthlyReport',
-    'openDailyStatsModal', 'openMonthlyStatsModal', 'collectedValueIsMeasurable',
+    'openDailyStatsModal', 'collectedValueIsMeasurable',
     'dbListenerViewIsStale',
     // ⛔ ឈ្មោះចាស់មុន 2.31.6 — ត្រូវស្រង់ដែរ ដើម្បីឲ្យ tree មុនកែ **រត់បាន រួចរាយលេខខុស**
     // (បើអត់ sandbox បាក់ដោយ ReferenceError ➜ យើងដឹងតែថា «ធ្លាក់» មិនដឹងថា *លេខប៉ុន្មាន*)
-    'uncollectedValueForMonth'];
+];
 const missing = [];
 const bodies = WANT.map((n) => {
     const body = sliceFn(SRC, n);
@@ -101,7 +101,7 @@ const LBL_ALL = 'តម្លៃកញ្ចប់ទាំងអស់';
 const LBL_PENDING = 'មិនទាន់យក';
 
 function buildSandbox(state) {
-    const containers = { dailyStatsContainer: makeEl(), monthlyStatsContainer: makeEl() };
+    const containers = { dailyStatsContainer: makeEl(), collectedStatsContainer: makeEl() };
     const sandbox = {
         console,
         scanHistory: state.scanHistory, deletedItems: state.deletedItems,
@@ -218,18 +218,39 @@ function truthByDate(scanHistory, deletedItems) {
 
 function cardsOf(sb, which) { return sb.__containers[which].children.map((c) => String(c.innerHTML || '')); }
 function cardFor(cards, key) { return cards.find((h) => h.indexOf('៖ ' + key + '<') !== -1) || null; }
+function moneyValue(text) {
+    const m = /^\$(-?[\d,]+\.\d{2})$/.exec(String(text || '').trim());
+    return m ? parseFloat(m[1].replace(/,/g, '')) : NaN;
+}
+function dayCardSumForMonth(cards, ym) {
+    let collected = 0;
+    let pending = 0;
+    let all = 0;
+    let n = 0;
+    cards.forEach((html) => {
+        if (html.indexOf('៖ ' + ym) === -1) return;
+        const c = moneyValue(moneyAfter(html, LBL_COLLECTED));
+        const p = moneyValue(moneyAfter(html, LBL_PENDING));
+        const a = moneyValue(moneyAfter(html, LBL_ALL));
+        if (!isFinite(c) || !isFinite(p)) return;
+        collected += c; pending += p;
+        if (isFinite(a)) all += a;
+        n++;
+    });
+    return { cards: n, collected: money(collected), pending: money(pending), all: money(all) };
+}
 
 // ------------------------------------------------------------------
 scenario('សំណុំ function ពិតត្រូវរកឃើញ (បើ stub ➜ ការវាស់ខាងក្រោមមិនមានន័យ)', () => {
     ok('⛔ ជាន់អប្បបរមា៖ រក function ស្ថិតិពិតបានយ៉ាងតិច 19',
         WANT.length - missing.length >= 19, 'បាត់៖ ' + missing.join(', '));
-    ok('អេក្រង់ទាំង ៣ មានក្នុង app.js ពិត',
-        ['openDailyStatsModal', 'openMonthlyStatsModal', 'buildMonthlyReport']
+    ok('អេក្រង់ទាំង ២ ដែលនៅសល់ មានក្នុង app.js ពិត',
+        ['openDailyStatsModal', 'buildMonthlyReport']
             .every((n) => missing.indexOf(n) === -1), 'បាត់៖ ' + missing.join(', '));
 });
 
 // ------------------------------------------------------------------
-let cleanRuns = 0, driftRuns = 0, staleRuns = 0, monthCards = 0, dayCards = 0;
+let cleanRuns = 0, driftRuns = 0, staleRuns = 0, monthsChecked = 0, dayCards = 0;
 
 scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥ លើលេខដែលអ្នកប្រើអានពិត', () => {
     for (let run = RUN0; run < RUN0 + RUNS; run++) {
@@ -286,16 +307,14 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
         const sb = buildSandbox(JSON.parse(JSON.stringify(state)));
 
         sb.openDailyStatsModal();
-        sb.openMonthlyStatsModal();
         const dayCardList = cardsOf(sb, 'dailyStatsContainer');
-        const monCardList = cardsOf(sb, 'monthlyStatsContainer');
-        dayCards += dayCardList.length; monthCards += monCardList.length;
+        dayCards += dayCardList.length;
         const months = Object.keys(monthly);
         const truth = truthByDate(w.scanHistory, w.deletedItems);
 
         // ---- (គ) សិទ្ធិវាស់ ៖ ទិដ្ឋភាពមិនគ្រប់ ➜ `—` គ្រប់អេក្រង់
         if (stale) {
-            const bad = dayCardList.concat(monCardList).filter((h) =>
+            const bad = dayCardList.filter((h) =>
                 moneyAfter(h, LBL_COLLECTED) !== '—' || moneyAfter(h, LBL_PENDING) !== '—');
             ok('run=' + run + ' (គ) វាស់មិនបាន ➜ «' + LBL_COLLECTED + '» និង «' + LBL_PENDING + '» ត្រូវជា «—»',
                 bad.length === 0, 'pending=' + pending + ' failed=' + failed
@@ -310,13 +329,16 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
 
         months.forEach((ym) => {
             const rep = sb.buildMonthlyReport(ym);
-            const monCard = cardFor(monCardList, ym);
-            if (!monCard) return;
+            // ⛔ អេក្រង់ «ស្ថិតិ ៣ ខែ» ត្រូវដកចេញ (2.34.0) ➜ ផ្ទៃទី ២ ដែលនៅសល់
+            // គឺ **ផលបូកកាតថ្ងៃពិត** ➜ វាត្រូវស្មើសរុបរបស់របាយការណ៍ខែ បេះបិទ។
+            const daySum = dayCardSumForMonth(dayCardList, ym);
+            if (!daySum.cards) return;
+            monthsChecked++;
 
             // ---- (ខ) 🔴 ខែ = ផលបូកថ្ងៃ (ថ្នាក់ 2.31.6)
-            ok('run=' + run + ' (ខ) កាតខែ ' + ym + ' «' + LBL_COLLECTED + '» = ផលបូកថ្ងៃរបស់របាយការណ៍',
-                moneyAfter(monCard, LBL_COLLECTED) === money(rep.totals.collectedTotal),
-                'កាត=' + moneyAfter(monCard, LBL_COLLECTED) + ' · របាយការណ៍=' + money(rep.totals.collectedTotal));
+            ok('run=' + run + ' (ខ) ផលបូកកាតថ្ងៃ ' + ym + ' «' + LBL_COLLECTED + '» = សរុបរបស់របាយការណ៍',
+                daySum.collected === money(rep.totals.collectedTotal),
+                'ថ្ងៃ=' + daySum.collected + ' · របាយការណ៍=' + money(rep.totals.collectedTotal));
 
             // ---- (ង) ការអភិរក្សលើរបាយការណ៍ខែ ៖ ចំណូល + មិនទាន់យក = តម្លៃទាំងអស់
             ok('run=' + run + ' (ង) របាយការណ៍ខែ ' + ym + ' ៖ ចំណូល + មិនទាន់យក = តម្លៃទាំងអស់',
@@ -324,15 +346,12 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
                 rep.totals.collectedTotal + ' + ' + rep.totals.pendingTotal + ' ≠ ' + rep.totals.total);
 
             if (aligned) {
-                ok('run=' + run + ' (ខ) កាតខែ ' + ym + ' «' + LBL_PENDING + '» = របាយការណ៍',
-                    moneyAfter(monCard, LBL_PENDING) === money(rep.totals.pendingTotal),
-                    'កាត=' + moneyAfter(monCard, LBL_PENDING) + ' · របាយការណ៍=' + money(rep.totals.pendingTotal));
-                ok('run=' + run + ' (ខ) កាតខែ ' + ym + ' «' + LBL_ALL + '» = របាយការណ៍',
-                    moneyAfter(monCard, LBL_ALL) === money(rep.totals.total),
-                    'កាត=' + moneyAfter(monCard, LBL_ALL) + ' · របាយការណ៍=' + money(rep.totals.total));
-                ok('run=' + run + ' (ខ) កាតខែ ' + ym + ' «កញ្ចប់សរុប» = របាយការណ៍',
-                    countAfter(monCard) === String(rep.totals.count),
-                    'កាត=' + countAfter(monCard) + ' · របាយការណ៍=' + rep.totals.count);
+                ok('run=' + run + ' (ខ) ផលបូកកាតថ្ងៃ ' + ym + ' «' + LBL_PENDING + '» = របាយការណ៍',
+                    daySum.pending === money(rep.totals.pendingTotal),
+                    'ថ្ងៃ=' + daySum.pending + ' · របាយការណ៍=' + money(rep.totals.pendingTotal));
+                ok('run=' + run + ' (ខ) ផលបូកកាតថ្ងៃ ' + ym + ' «' + LBL_ALL + '» = របាយការណ៍',
+                    daySum.all === money(rep.totals.total),
+                    'ថ្ងៃ=' + daySum.all + ' · របាយការណ៍=' + money(rep.totals.total));
             }
 
             // ---- (ក) ថ្ងៃ ↔ ជួរដេករបស់របាយការណ៍ខែ
@@ -356,7 +375,7 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
 
     // ⛔ ជាន់អប្បបរមា ៖ បើមិនដល់ ស្ថានភាពមិនបានកេះផ្លូវពិត ➜ តេស្តទទេ
     ok('⛔ ជាន់អប្បបរមា៖ គូរកាតថ្ងៃយ៉ាងតិច 150', dayCards >= 150, 'dayCards=' + dayCards);
-    ok('⛔ ជាន់អប្បបរមា៖ គូរកាតខែយ៉ាងតិច 60', monthCards >= 60, 'monthCards=' + monthCards);
+    ok('⛔ ជាន់អប្បបរមា៖ ប្រៀបខែយ៉ាងតិច 60', monthsChecked >= 60, 'monthsChecked=' + monthsChecked);
     ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ស្អាត** យ៉ាងតិច 30 (សម្រាប់អថេរ (ឃ))', cleanRuns >= 30, 'clean=' + cleanRuns);
     ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ឃ្លាត** យ៉ាងតិច 40 (សម្រាប់អថេរ (ខ))', driftRuns >= 40, 'drift=' + driftRuns);
     ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព listener **មិនគ្រប់** យ៉ាងតិច 15 (សម្រាប់អថេរ (គ))', staleRuns >= 15, 'stale=' + staleRuns);
@@ -388,7 +407,7 @@ scenario('⛔ ទិសផ្ទុយ៖ ទិដ្ឋភាពគ្រប�
 
 console.log('');
 console.log('ស្ថានភាព ៖ ស្អាត ' + cleanRuns + ' · ឃ្លាត ' + driftRuns + ' · listener មិនគ្រប់ ' + staleRuns
-    + ' · កាតថ្ងៃ ' + dayCards + ' · កាតខែ ' + monthCards);
+    + ' · កាតថ្ងៃ ' + dayCards + ' · ខែដែលប្រៀប ' + monthsChecked);
 if (fail) {
     console.log('\nគំរូនៃការធ្លាក់ ៖');
     failSamples.forEach((s) => console.log(s));

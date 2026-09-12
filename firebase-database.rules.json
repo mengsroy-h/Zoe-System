@@ -349,6 +349,23 @@
         }
       }
     },
+    "zoew_daily_collected_cod_dod": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$date": {
+        "$barcodeKey": {
+          "c": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "zoew_monthly_revenue_cod_dod": {
       ".read": "auth != null",
       ".write": "auth != null",

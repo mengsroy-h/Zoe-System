@@ -93,8 +93,11 @@ for (const app of ['ZoeW']) {
         const resetScanFn = sliceFn(src, 'resetScanConfirm');
         if (resetScanFn) vm.runInContext(resetScanFn, ctx);
         // ស្ថានភាពធុងសំរាមដែល clearSensitiveModalFields ត្រូវ reset — ចាក់ការប្រកាស **ពិត**
+        // ⛔ `ztoListSignedProbe` ផ្ទុក barcode + សាលក្រម ZTO នៃបញ្ជីដែលមើលជាមុន
+        // ➜ វាត្រូវបាត់ពេលចាកចេញ ដូចស្ថានភាពរសើបដទៃ។
         ['deletedSearchQuery', 'expandedTrashGroups', 'pendingHistoryPatches', 'historyPatchFlushInFlight',
-            'pendingRegistryReleases', 'registryReleaseFlushInFlight',
+            'pendingRegistryReleases', 'registryReleaseFlushInFlight', 'ztoListSignedProbe',
+            'ztoListSyncResult', 'ztoListSyncInFlight',
          'appLockExcuseAt', 'appLockVeiled'].forEach((n) => {
             const decl = (src.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
@@ -142,6 +145,10 @@ for (const app of ['ZoeW']) {
 
         let threw = null;
         const pagesEl = ctx.document.getElementById('appPages');
+        // ⛔ ដាក់ស្ថានភាពរសើបរបស់បញ្ជី ZTO **មុន** ការចាកចេញ — បើមិនដាក់
+        // ការអះអាងខាងក្រោមនឹងបៃតងលើ map ទទេ = ការការពារដែលងាប់។
+        vm.runInContext("ztoListSignedProbe.set('77130500000001', true);"
+            + " ztoListSyncResult = { rows: [{ barcode: '77130500000001', phone: '0963897345' }] };", ctx);
         try { ctx.showLoginModalWithPrefill(); } catch (e) { threw = e; }
         ok(!!glidePauseFn, 'endPanelGlideSnapPause មានក្នុង app.js');
         ok(pagesEl && !pagesEl._classes.has('panel-gliding'),
@@ -165,6 +172,12 @@ for (const app of ['ZoeW']) {
             'ចាកចេញ ➜ កូនសោ AES · URL · ពាក្យសម្ងាត់នាំចូល Excel មិនរស់រានទេ', sheetImport);
         ok(sheetImport.sig === '' && sheetImport.busy === false,
             'ចាកចេញ ➜ សម័យនាំចូល Excel ត្រូវ reset អស់ (គ្មានសោជាប់)', sheetImport);
+        // ⛔ បញ្ជី ZTO ដែលមើលជាមុន ផ្ទុក **លេខទូរស័ព្ទ និង barcode របស់អតិថិជន**
+        // បូកសាលក្រម «បិទរួច» ➜ វាមិនត្រូវរស់រានក្រោយចាកចេញទេ។
+        const ztoListState = vm.runInContext(
+            '({ probe: ztoListSignedProbe.size, result: ztoListSyncResult })', ctx);
+        ok(ztoListState.probe === 0 && ztoListState.result === null,
+            'ចាកចេញ ➜ បញ្ជី ZTO និងសាលក្រម «បិទរួច» មិនរស់រានទេ', ztoListState);
 
         if (!pinOpen) {
             ok(ctx[stateVar] === null,

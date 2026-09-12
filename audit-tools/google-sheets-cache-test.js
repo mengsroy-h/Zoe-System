@@ -6,7 +6,16 @@ const vm = require('vm');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.SHEETCACHE_APP_DIR ? path.resolve(process.env.SHEETCACHE_APP_DIR) : path.resolve(__dirname, '..');
+
+// ⛔ `SCRIPT_VERSION` នៃកូដពិត — ការចាក់លេខនេះជា literal ក្នុង checker
+// គឺជា **កាលបរិច្ឆេទផុតកំណត់** ៖ ជុំណាប៉ុន្មានដែលឡើង `SCRIPT_VERSION`
+// ដោយ **ត្រឹមត្រូវ** នឹងធ្វើឲ្យ checker ធ្លាក់ — នោះជាទោស មិនមែនការការពារ។
 const source = fs.readFileSync(path.join(root, 'zto-import', 'google-sheets-api', 'Code.gs'), 'utf8');
+const SCRIPT_VERSION_REAL = (function () {
+    const m = /var\s+SCRIPT_VERSION\s*=\s*(\d+)\s*;/.exec(source);
+    if (!m) throw new Error('⛔ អាន SCRIPT_VERSION ចេញពី Code.gs មិនបាន');
+    return Number(m[1]);
+})();
 
 function createApi(options) {
     const rows = options.rows.map((row) => row.slice(0, 4));
@@ -82,7 +91,7 @@ function testMalformedCachedRowsRefreshes() {
         dod: 12,
         cod: 34,
         phone: '012345678',
-        scriptVersion: 1
+        scriptVersion: SCRIPT_VERSION_REAL
     });
     assert.deepStrictEqual(api.calls.remove, ['customer_rows_v2_2']);
     assert.strictEqual(api.calls.ranges, 1);
@@ -98,7 +107,7 @@ function testOversizeRowsSkipCacheAndRespond() {
     assert.strictEqual(lookup.barcode, 'BIG-1');
     assert.strictEqual(lookup.phone, oversizedPhone);
     assert.deepStrictEqual(list.rows, [{ barcode: 'BIG-1', dod: 45, cod: 67, phone: oversizedPhone }]);
-    assert.strictEqual(list.scriptVersion, 1);
+    assert.strictEqual(list.scriptVersion, SCRIPT_VERSION_REAL);
     assert.strictEqual(api.calls.put.length, 0);
     assert.strictEqual(api.calls.ranges, 2);
 }
@@ -115,7 +124,7 @@ function testCachePutFailureDoesNotBreakLookup() {
         dod: 5,
         cod: 6,
         phone: '010101',
-        scriptVersion: 1
+        scriptVersion: SCRIPT_VERSION_REAL
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.ranges, 1);
@@ -130,7 +139,7 @@ function testSmallRowsAreCached() {
             { barcode: 'CACHE-1', dod: 1, cod: 2, phone: '0123' },
             { barcode: 'CACHE-2', dod: 3, cod: 4, phone: '0456' }
         ],
-        scriptVersion: 1
+        scriptVersion: SCRIPT_VERSION_REAL
     });
     assert.strictEqual(api.calls.put.length, 1);
     assert.strictEqual(api.calls.put[0].key, 'customer_rows_v2_3');
@@ -168,4 +177,31 @@ function testEveryResponseCarriesScriptVersion() {
 }
 
 testEveryResponseCarriesScriptVersion();
+
+// ⛔ ស្នាមភ្ជាប់ទី ២ ៖ `SCRIPT_VERSION` នៃ `Code.gs` និង
+//    `SHEET_SCRIPT_VERSION_EXPECTED` នៃ `ZoeW/app.js` ជា **literal ២ ខាងឯករាជ្យ**
+//    ➜ ការស៊ីគ្នារបស់ពួកវាជា **ការស៊ីគ្នាដោយចៃដន្យ**។
+//
+//    ⛔ មុននេះ checker នេះចាក់សោតែ **យន្តការ** (គ្រប់ចម្លើយផ្ទុកកំណែ)
+//    ចំណែក `health-check-test` **ចាក់** តម្លៃនោះចូល sandbox ដោយផ្ទាល់ ➜
+//    វា **stub ស្នាមភ្ជាប់ដែលវាកំពុងវាស់** ➜ drift កើតដោយគ្មានអ្នកដឹង។
+//
+//    ផលប៉ះពាល់មាន ២ ទិស ៖ ឡើង `Code.gs` ដោយភ្លេច `app.js` ➜ អ្នកប្រើអាន
+//    «`Script` ថ្មីជាង App» ខណៈគ្មានអ្វីខុស ; ឡើង `app.js` ដោយភ្លេច `Code.gs`
+//    ➜ អ្នកប្រើអាន «សូម Deploy ជាកំណែថ្មី» ខណៈពួកគេ Deploy រួចហើយ។
+function testAppExpectationMatchesScript() {
+    const declared = /var\s+SCRIPT_VERSION\s*=\s*(\d+)\s*;/.exec(source);
+    assert.ok(declared, 'SCRIPT_VERSION ត្រូវប្រកាសក្នុង Code.gs');
+
+    const appFile = path.join(root, 'ZoeW', 'app.js');
+    const appSrc = fs.readFileSync(appFile, 'utf8');
+    const expected = /SHEET_SCRIPT_VERSION_EXPECTED\s*=\s*(\d+)\s*;/.exec(appSrc);
+    assert.ok(expected, 'ZoeW/app.js ត្រូវប្រកាស SHEET_SCRIPT_VERSION_EXPECTED');
+
+    assert.strictEqual(Number(expected[1]), Number(declared[1]),
+        'SHEET_SCRIPT_VERSION_EXPECTED (' + expected[1] + ') ត្រូវស្មើ '
+        + 'SCRIPT_VERSION នៃ google-sheets-api/Code.gs (' + declared[1] + ')');
+}
+
+testAppExpectationMatchesScript();
 console.log('google-sheets-cache-test: PASS');

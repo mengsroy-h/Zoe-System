@@ -37,25 +37,24 @@ clamp ម្តង**។
 
 ---
 
-## ១. ⏳ រត់ `run-all.sh` ឲ្យចប់ — ជំហានចាំបាច់តែមួយដែលនៅសល់
+## ១. ✅ `run-all.sh` — **ចប់រួច គ្មានការធ្លាក់**
 
-ការរត់ចុងក្រោយ (`full5.txt`) ដើរដល់ផ្នែក meta ដោយ **គ្មាន `*** FAIL ***`
-សោះ** តែវាមិនទាន់ចេញបន្ទាត់សង្ខេប។ ដូច្នេះជំហានដំបូងរបស់ session បន្ទាប់ ៖
+ការរត់ពេញ (2026-09-12) ៖
 
-```bash
-npm i acorn playwright-core xlsx
-bash audit-tools/run-all.sh
+```
+✅ ជោគជ័យទាំងអស់  (164 ពេញលេញ, 2 មួយផ្នែក, រំលង 2)
 ```
 
-⛔ **អានបន្ទាត់សង្ខេបទាំងមូល** — មិនត្រឹម ✅ ខាងដើម ៖ លេខ «មួយផ្នែក» និង
-«រំលង» ត្រូវអានដែរ។ គ្មាន RTDB emulator ➜ `emu/*` ៤ ធ្លាក់ចុះជា
-`SKIPPED` ២ និង `PARTIAL PASS` ២ — នោះជាការរំពឹងទុក មិនមែនការធ្លាក់។
+«មួយផ្នែក ២» និង «រំលង ២» គឺ `emu/*` ទាំង ៤ ដែលធ្លាក់ចុះព្រោះ **គ្មាន RTDB
+emulator** ក្នុងបរិស្ថាននោះ — នោះជាការរំពឹងទុក មិនមែនការធ្លាក់។
 
-បើចង់គ្របផ្លូវ `emu/*` ពិត (ណែនាំ ព្រោះ `emu/crud-rules-flow` ឥឡូវរត់
-`commitCollectedMarks` ពិត ➜ វានឹងវាស់ node ថ្មីធៀបនឹង **rules ពិត**) ៖
+⛔ **តែការអះអាងស្នូលរបស់ `emu/*` (rules ពិត) មិនដែលរត់សោះ** ➜ ជំហានតែមួយ
+ដែលនៅសល់ខាងឧបករណ៍គឺ **រត់វាជាមួយ emulator** ព្រោះ `emu/crud-rules-flow`
+ឥឡូវហៅ `commitCollectedMarks()` **ពិត** ➜ វានឹងវាស់ node ថ្មីធៀបនឹង
+**rules ពិត** (ជាភស្តុតាងចុងក្រោយថា rules ថ្មីទទួលយក payload ដែល App ផ្ញើ) ៖
 
 ```bash
-npm i firebase-tools
+npm i acorn playwright-core xlsx firebase-tools
 npx --no-install firebase setup:emulators:database
 setsid nohup java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar \
     --port 9000 --host 127.0.0.1 > /tmp/emu.log 2>&1 < /dev/null &
@@ -66,9 +65,6 @@ MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
 
 ⚠️ **កុំបិទ emulator ដោយ `pkill -f firebase-database-emulator`** — លំនាំនោះ
 ត្រូវនឹង command line របស់ shell ខ្លួនឯង ➜ **សម្លាប់ session**។
-
-បើមានការធ្លាក់ ៖ ស្ទើរតែទាំងអស់នឹងជា **sandbox ខ្វះឈ្មោះថ្មី** (មើលផ្នែក ២
-ខាងក្រោម) — នោះជា **សញ្ញាល្អ** មិនមែនការថយក្រោយ។
 
 ---
 

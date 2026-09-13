@@ -584,6 +584,19 @@ ZoeW លុបកញ្ចប់ដែលអតិថិជនមិនមកយ
 | `ZTO_CACHE_TTL_MS` | `60000` | Cache លទ្ធផលខាង server (0 = បិទ; អតិបរមា ១០ នាទី) |
 | `ZTO_NOT_FOUND_CACHE_TTL_MS` | `15000` | Cache សាលក្រម «រកមិនឃើញ» (0 = បិទ)។ ខ្លីជាងខាងលើដោយចេតនា ➜ កញ្ចប់ដែល ZTO ទើបបញ្ចូល ត្រូវរកឃើញវិញឆាប់។ វាមិនអាចលើស `ZTO_CACHE_TTL_MS` ទេ |
 
+### ស្រេចចិត្ត ៖ header ដែល Function បង្ហាញខ្លួនទៅ ZTO
+
+Function ផ្ញើ header បែប browser ទៅ ZTO ជាមួយតម្លៃលំនាំដើមដែលដំណើរការ
+រួចហើយ។ ⛔ **កុំប្តូរពួកវាដោយគ្មានមូលហេតុ** — ប្តូរតែពេល ZTO បដិសេធសំណើ
+ដោយសារ header (ឧ. ចម្លើយ HTML ជំនួស JSON) ៖
+
+| Key | Default | ន័យ |
+| --- | --- | --- |
+| `ZTO_USER_AGENT` | User-Agent បែប Chrome | អក្សរ `User-Agent` (កាត់ត្រឹម ៣០០ តួ) |
+| `ZTO_BROWSER_ORIGIN` | `https://argus.ztoglobal.com` | `Origin`/`Referer` ដែលផ្ញើទៅ ZTO — ត្រូវជា URL `https://` |
+| `ZTO_ACCEPT_LANGUAGE` | `km` | `Accept-Language` (កាត់ត្រឹម ៦០ តួ) |
+
+
 ### ⛔ គម្លាតរវាង `UPSTREAM_TIMEOUT` និង `REQUEST_BUDGET`
 
 Function អានទិន្នន័យ Cookie ពី Netlify Blobs **ក្នុងថវិកាដដែល** ជាមួយការហៅ

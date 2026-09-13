@@ -182,6 +182,7 @@ bash audit-tools/emu/rules.sh
 | `emu/restore-deadlock-test.js` | witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង) | `DEADLOCK_APP_DIR` |
 | `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; sandbox ផ្គត់ផ្គង់ auth/database និង collected ref, អាន collected snapshot ពិត និងស្រង់ថេរពី App; ព្យួរ price write មុន HTTP acceptance រួច cleanup ឆ្លងអធ្រាត្រ និងកែ sibling ដោយ client ផ្សេង ដើម្បីវាស់ ETag conflict/retry; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
 | `emu/rules.sh` | rules ពិតលើ emulator ពិត | — |
+| `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 
 #### នាឡិកា និងពេលវេលា
@@ -190,7 +191,7 @@ bash audit-tools/emu/rules.sh
 |---|---|---|
 | `clock-hygiene.js` | retention ប្រើ `getServerNow()` មិនមែន `Date.now()` | `CLOCK_APP_DIR` |
 | `clock-basis-test.js` | ត្រាដែលវាស់ដោយ `elapsedSince()` ត្រូវបោះដោយ `Date.now()` (មូលដ្ឋានលាយគ្នា ➜ ពិដានល្បឿនរលាយ) — ទាំងត្រាដែលជា **អថេរ** និងត្រាដែលជា **property** (`{P: …}` · `x.P = …`) បូកអាគុយម៉ង់ដែលមិនមែន Identifier; ⛔ ឈ្មោះ property តែមួយមិនត្រូវផ្ទុក **មូលដ្ឋាន ២** | `CLOCKBASIS_APP_DIR` |
-| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal។ **ផ្នែក ៤** ៖ `docs/AUDIT-PROMPT.md` មិនចាស់ស្ងាត់ៗ។ **ផ្នែក ៥** ៖ ការអះអាងកំណែ **បច្ចុប្បន្ន** (ជួរតារាង root · «កំណែបច្ចុប្បន្ន» របស់ README នីមួយៗ · តារាងក្បាល `CLAUDE.md` រួម `CACHE_VERSION`) ត្រូវដេរីវេពី `APP_VERSION` ពិត — ⛔ ការយោង *ប្រវត្តិ* មិនប៉ះ។ **ផ្នែក ៦** ៖ ⛔ **បញ្ជីឯកសារត្រូវប្រៀបនឹងថតពិត** (`listReadmeFiles()`) ➜ README ថ្មីណាដែលមិនចូលបញ្ជី **ធ្វើឲ្យ checker ធ្លាក់** ជំនួសការរអិលកាត់ស្ងាត់ៗ | `DOCSCOPE_APP_DIR` |
+| `doc-scope-test.js` | README ទាំងអស់ និង `ZTO-SETUP-KH.md` សរសេរតែ **របៀបប្រើ** ៖ ផ្នែក ៥ តាមលំដាប់ · គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ជា literal។ **ផ្នែក ៤** ៖ `docs/AUDIT-PROMPT.md` មិនចាស់ស្ងាត់ៗ។ **ផ្នែក ៥** ៖ ការអះអាងកំណែ **បច្ចុប្បន្ន** (ជួរតារាង root · «កំណែបច្ចុប្បន្ន» របស់ README នីមួយៗ · តារាងក្បាល `CLAUDE.md` រួម `CACHE_VERSION`) ត្រូវដេរីវេពី `APP_VERSION` ពិត — ⛔ ការយោង *ប្រវត្តិ* មិនប៉ះ។ ⛔ **បញ្ជីឯកសារត្រូវប្រៀបនឹងថតពិត** (`listReadmeFiles()`) ➜ README ថ្មីណាដែលមិនចូលបញ្ជី **ធ្វើឲ្យ checker ធ្លាក់** ជំនួសការរអិលកាត់ស្ងាត់ៗ។ **ផ្នែក ៦** ៖ ⛔ **ការរៀបរាប់ផ្ទៃ និងចំនួន ត្រូវដេរីវេពីកូដ ship** ៖ ធាតុរបា Slide និងម៉ឺនុយ (...) ស្រង់ចេញពី `index.html`/`app.js` ពិត · ចំនួនជួរ 🩺 ស្រង់ពី `runHealthCheck()` · ចំនួនអេក្រង់ដែលប្រើ `collectedValueOf()` · ទំហំ `app.js` (±១២%) · ចំនួនតំបន់ 📝 ស្មើចំនួនជួរ 📝 ពិត · ហើយ **ឈ្មោះ helper ដែលឯកសារយោង ត្រូវត្រូវបានប្រកាសនៅណាមួយក្នុង repo** (វាស់ជា *និយមន័យ* មិនមែន *វត្តមានអក្សរ* ➜ string literal របស់ checker មិនអាចធ្វើឲ្យវាងងឹត) · ហើយ **រាល់ `.js` ក្នុង `audit-tools/` ត្រូវមានឈ្មោះក្នុងកាតាឡុកនេះ** (⛔ លើកលែងឯកសារស្រមោល `.tmp-poison-*`) · ហើយចំនួនការវាស់ដែល `tools/money-check-windows/README-KH.md` អះអាង ត្រូវស្មើចំនួនផ្នែករបស់ `money-reality-check.js` ពិត | `DOCSCOPE_APP_DIR` |
 | `monotonic-gate-test.js` | រយៈពេលកន្លងផុតឆ្លងកាត់ `elapsedSince()` (ថយក្រោយ ➜ fail-open) | `MONOGATE_APP_DIR` |
 | `khmer-timezone-test.js` | ប្រតិទិនអាជីវកម្មជា `Asia/Phnom_Penh` គ្រប់ឧបករណ៍ | `KHMERTZ_APP_DIR` |
 | `cleanup-clock-guard-test.js` | ការសម្អាតដែលបំផ្លាញ ត្រូវការនាឡិកា server **និងការភ្ជាប់រស់** | `CLEANUPCLOCK_APP_DIR` |
@@ -267,6 +268,7 @@ bash audit-tools/emu/rules.sh
 | `pin-prompt-test.js` | សារប្រអប់ PIN ត្រូវតាមប៊ូតុងដែលហៅ | `PINPROMPT_APP_DIR` |
 | `biometric-unlock-test.js` | ជីវមាត្រជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN | `BIOMETRIC_APP_DIR` |
 | `app-lock-test.js` | ចាក់សោ App ៖ មិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ | `APPLOCK_APP_DIR` · `APPLOCK_CHROME` |
+| `health-check-test.js` | 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ ៖ **អានសុទ្ធសាធ** · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ **និងទិសផ្ទុយ ៖ ✅ ក៏ត្រូវវាស់ដែរ** · secret មិនឡើងដល់ DOM · ផ្លូវ Apps Script មិនផ្ញើ header · `fetchWithTimeout` ពិត មិន stub · ចំនួនជួរដែលគូរពិត | `HEALTH_APP_DIR` |
 | `license-grace-test.js` | «ផ្ទៀងផ្ទាត់មិនបាន» ≠ «ហត្ថលេខាខុស» — កុំលុប record | — |
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |

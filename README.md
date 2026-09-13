@@ -47,11 +47,13 @@ node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដ�
 | **ស្កេន Barcode ៣ ផ្លូវ** | កាមេរ៉ា (ZXing WebAssembly + `BarcodeDetector`), ម៉ាស៊ីនស្កេន hardware និងរូបភាព។ ទទួលតែ **CODE-128** ដែលមានលេខផ្ទៀងផ្ទាត់ជាកាតព្វកិច្ច |
 | **COD / DOD** | ទឹកប្រាក់ពីរប្រភេទក្នុងកញ្ចប់តែមួយ បូកលេខទូរស័ព្ទអតិថិជន និងទីតាំង Locker |
 | **ស្ថិតិ** | ចំណូល ចំនួនកញ្ចប់ និងចំនួនអតិថិជនយក ប្រចាំថ្ងៃ និងប្រចាំខែ |
+| **💵 ចំណូលប្រចាំថ្ងៃ** | អ័ក្សលុយទី ២ ៖ ទឹកប្រាក់តាម **ថ្ងៃដែលចុច «យក»** មិនមែនថ្ងៃស្កេនចូល (រក្សាទុក ៧ ថ្ងៃចុងក្រោយ) |
 | **របាយការណ៍ប្រចាំខែ** | សង្ខេបចំណូល · កញ្ចប់ · អត្រាយក ក្នុងមួយខែ បូកតារាងតាមថ្ងៃ ➜ នាំចេញជា Excel ឬ PDF |
 | **តម្រង និងស្វែងរក** | តម្រងតាមថ្ងៃ និងស្វែងរកតាមកន្ទុយលេខទូរស័ព្ទ ៣–៤ ខ្ទង់ |
 | **ផ្ទាំងប្រវត្តិ** | ចុចរបាចាប់ ឬអូសឡើង/ចុះ ដើម្បីបង្រួម/ពង្រីកផ្ទាំង; ម៉ឺនុយ (...) បើកដោយចលនាស្រាល និងបិទពេលចាប់ផ្តើមអូសខាងក្រៅ |
 | **ធុងសំរាម** | កញ្ចប់ដែលលុប/ដក ស្តារមកវិញបាន |
 | **ចាក់សោ App** | PIN ឬក្រយៅដៃ/មុខ ពេលបើក App និងពេលត្រឡប់ចូលវិញ |
+| **🩺 ពិនិត្យសុខភាពប្រព័ន្ធ** | ជួរ **អានសុទ្ធសាធ** ៩ ជួរ ៖ បណ្ដាញ · Firebase · នាឡិកា · License · storage · Service Worker · តារាងអតិថិជន · កំណែ Apps Script · Lookup |
 | **នាំចូល Excel ទៅ Sheet** | អាន `.xlsx` · `.xls` · `.csv` ➜ ផ្គូផ្គង Column ➜ សរសេរចូល Google Sheet (ការពារដោយ PIN) |
 | **ការសម្អាតស្វ័យប្រវត្តិ** | Barcode ដែលបិទ «យករួច» ➜ ធុងសំរាមក្រោយ ២ ម៉ោង; មិនទាន់បិទ ➜ ចូលថ្ងៃទី ៨; `expired` ➜ លុបអចិន្ត្រៃយ៍ក្រោយ ២ ថ្ងៃ; ប្រភេទផ្សេង ➜ ៣០ ថ្ងៃ |
 | **Export** | Excel (`.xlsx`) · CSV សម្រាប់ Google Sheets · PDF (SheetJS ស្ថិតក្នុង repo ➜ ដើរក្រៅបណ្តាញ) |
@@ -252,6 +254,7 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 | [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
+| [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៨ លើ dump ពិតរបស់អ្នក |
 | [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ---

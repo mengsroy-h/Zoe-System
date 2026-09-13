@@ -97,7 +97,7 @@ const EITHER_FNS = [
     'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'collectPickupMarks', 'reconstructPickupSet',
     'getZoneDateKey', 'appZoneParts', 'statsMoney', 'statsPositive', 'ledgerNumber',
     'collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfStamp', 'collectedDayHoldingKey',
-    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedHistory'
+    'collectedMarksFor', 'commitCollectedMarks', 'markCollectedRevenue', 'reconcileCollectedPriceState', 'reconcileCollectedHistory'
 ];
 const fnSrc = {};
 const missing = [];

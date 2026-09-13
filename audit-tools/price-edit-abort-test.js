@@ -89,7 +89,7 @@ const NEEDED = [
     'saveEditedBarcodePrice', 'itemHasRestoreMarkers',
     'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
     'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode',
-    'reconcileCollectedHistory', 'collectedMarksFor', 'collectedDayOfStamp',
+    'reconcileCollectedHistory', 'reconcileCollectedPriceState', 'collectedMarksFor', 'collectedDayOfStamp',
     'markCollectedRevenue', 'commitCollectedMarks', 'armLateWrite'
 ];
 const missing = NEEDED.filter((n) => !sliceFn(n));

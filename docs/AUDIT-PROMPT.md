@@ -12,22 +12,21 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-13 · ZoeW 2.34.2 · ZoeKeyGen 2.19.23)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-13 · ZoeW 2.34.3 · ZoeKeyGen 2.19.23)
 
 ជុំនេះពង្រីកអ្នកយាមចាស់ពីការវាស់លំដាប់ដែលបង្កើតកំហុសលើ main ពិត។
 ច្បាប់នៅ `CLAUDE.md`; លេខមុន/ក្រោយ និងព្រំដែននៅ `docs/HISTORY.md`។
 
 | ការប្រែ | អ្នកយាម និងព្រំដែន |
 |---|---|
-| កែតម្លៃកញ្ចប់ផ្ទៀងចំណូលពី server និងការពារ ACK ចាស់ | `daily-collected-test`; history/mirror មិនមែន transaction តែមួយ |
-| Activate ចាប់ auth/database មុន await; callback ចាស់មិនប្ដូរ UI/listener | `periodic-network-guard-test` |
-| ការសរសេរអត្រាប្ដូរប្រាក់ចាស់មិន rollback session ថ្មី | `toast-action-truth-test` |
-| Generate ដោះ busy តាមម្ចាស់ session ទោះ Load Signing Key ឡើងវិញ | `keygen-session-security-test` |
-| Backup មានពិដានរហូត JSON body ពេញ និងបិទ body ពេល HTTP បដិសេធ | `firebase-backup-test`; native HTTP ក្នុងម៉ាស៊ីន មិនមែន backup ផលិតកម្ម |
-| Checker boot មិនពឹង CDN ខាងក្រៅសម្រាប់សេណារីយ៉ូធម្មតា | `boot-animation-test`; proxy ព្យួរសំណើខាងក្រៅបង្កើត failure ចាស់ឡើងវិញ |
+| កែតម្លៃតាម collected ដែលនៅសល់ពេល server ទទួល transaction | `daily-collected-test`; មិនបង្កើតថ្ងៃដែល cleanup លុបរួច |
+| ចាក់សោ cleanup មុន write ចុះ server ទាំងថ្ងៃផុត និងឆ្លងអធ្រាត្រ | `emu/restore-mutation-emu-test`; ETag conflict និង retry ពិត |
+| SDK លុប transaction ដោយ `set` ពេល client ដដែលសម្អាត | `daily-collected-test`; retry មានពិដាន និងអាន history ម្តងទៀត; ផ្ទៀង native SDK ផង |
+| Cleanup ទុក mirror ឲ្យ listener គ្រប់គ្រង និងមិនរាយ error ទៅវគ្គថ្មី | `daily-collected-test`; auth/database fence |
 
-មេរៀនដែលមានអ្នកយាមរួច៖ សិទ្ធិបង្ហាញលទ្ធផល និងសិទ្ធិដោះ busy អាចមានអាយុខុសគ្នា;
-HTTP headers មកដល់មិនមានន័យថាការអាន body ចប់ទេ។ ពេលពង្រីកច្រកទ្វារ ត្រូវវាស់ cleanup ដែរ។
+មេរៀន៖ អាន server មុន write មិនធានាថា cleanup មិនបានលុបនៅចន្លោះទេ។
+CAS ក្នុង emulator adapter មិនបង្ហាញការលុប transaction របស់ native SDK ទាំងអស់ទេ។
+Transaction លើ parent ក៏ revalidate កូនដែលមិនបានកែ; ព្រំដែនទិន្នន័យខូចមាននៅ HISTORY។
 CI ត្រូវរត់ក្នុង session នេះជាមួយ Chrome និង RTDB emulator ពិត។ កំណត់ត្រាទូរស័ព្ទចាស់មិនបញ្ជាក់កំណែថ្មី។
 
 ## ជំហាន ០ — baseline ពិត (SKIP ០) · ⛔ **រត់ក្នុង session នេះ មិនមែន GitHub**

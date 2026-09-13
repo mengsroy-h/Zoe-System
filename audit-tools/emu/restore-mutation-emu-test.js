@@ -3,7 +3,9 @@ const path = require('path');
 const http = require('http');
 const vm = require('vm');
 const acorn = require('acorn');
+const { isDeepStrictEqual } = require('util');
 const { emuNamespace } = require('./ns.js');
+process.exitCode = 1;
 
 // សាកចន្លោះ prepare → finalize ជាមួយកូដ App និង Firebase rules ពិត។
 // ការសរសេររបស់ឧបករណ៍ទី ២ ត្រូវកើតនៅចន្លោះនោះ មិនមែនក្រោយ restore ចប់។
@@ -45,7 +47,7 @@ function accepted(result) {
     return result.value;
 }
 const snapshot = (value) => ({ exists: () => value !== null, val: () => clone(value) });
-function adapter(pending) {
+function adapter(pending, hooks = {}) {
     const track = (promise) => {
         pending.add(promise);
         promise.then(() => pending.delete(promise), () => pending.delete(promise));
@@ -55,14 +57,23 @@ function adapter(pending) {
         ref: (_, node = '') => ({ path: '/' + node }),
         get: (ref) => track(request('GET', ref.path).then((result) => snapshot(accepted(result)))),
         increment: (amount) => ({ '.sv': { increment: amount } }),
-        update: (ref, values) => track(request('PATCH', ref.path, values).then(accepted)),
+        update: (ref, values) => track((async () => {
+            const write = { method: 'PATCH', path: ref.path, value: clone(values) };
+            if (hooks.beforeWrite) await hooks.beforeWrite(write);
+            const result = await request('PATCH', ref.path, values);
+            if (hooks.afterWrite) hooks.afterWrite({ ...write, status: result.status });
+            return accepted(result);
+        })()),
         runTransaction: (ref, updater) => track((async () => {
             for (let attempt = 0; attempt < 12; attempt++) {
                 const current = await request('GET', ref.path, undefined, false, { 'X-Firebase-ETag': 'true' });
                 accepted(current);
                 const next = updater(clone(current.value));
                 if (next === undefined) return { committed: false, snapshot: snapshot(current.value) };
+                const write = { method: 'PUT', path: ref.path, value: clone(next), etag: current.etag, attempt };
+                if (hooks.beforeWrite) await hooks.beforeWrite(write);
                 const written = await request('PUT', ref.path, next, false, { 'if-match': current.etag });
+                if (hooks.afterWrite) hooks.afterWrite({ ...write, status: written.status });
                 if (written.status === 412) continue;
                 return { committed: true, snapshot: snapshot(accepted(written)) };
             }
@@ -75,13 +86,14 @@ const AST = acorn.parse(SOURCE, { ecmaVersion: 'latest' });
 const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
-    'DAILY_COLLECTED_KEEP_DAYS', 'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES']);
+    'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
+    'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
-function tab(suffix) {
+function tab(suffix, hooks) {
     const pending = new Set();
-    const fb = adapter(pending);
+    const fb = adapter(pending, hooks);
     const toasts = [];
     let seq = 0;
     const context = vm.createContext({
@@ -375,6 +387,118 @@ async function preparedRetryScenario(mode) {
         (!afterCleanup.zoew_scan_history_cod_dod.id_parent || afterCleanup.zoew_scan_history_cod_dod.id_parent.barcodes.every((barcode) => barcode.code === 'RESTORE_BC')),
         mode + '៖ សម្អាតក្រោយ retry រក្សា barcode ស្តារ ហើយដកតែ sibling ចាស់', remaining);
 }
+async function collectedCleanupScenario(mode) {
+    const racing = mode === 'cleanup';
+    const label = racing ? 'សម្អាតជាន់ការកែតម្លៃ' : mode === 'recent' ? 'កែតម្លៃថ្ងៃថ្មី' : 'កែតម្លៃថ្ងៃចាស់បំផុតដែលនៅរក្សា';
+    const collectedPath = '/zoew_daily_collected_cod_dod';
+    const beforeMidnight = Date.parse('2026-09-13T23:59:59+07:00');
+    let releaseWrite, markReached, gateTimer, heldWrite = null, released = false;
+    const release = new Promise((resolve) => { releaseWrite = resolve; });
+    const reached = new Promise((resolve) => { markReached = resolve; });
+    const completedWrites = [];
+    const writer = tab('collected-price', {
+        beforeWrite: async (write) => {
+            if (!racing || heldWrite || write.path !== collectedPath) return;
+            heldWrite = write;
+            markReached();
+            await release;
+        },
+        afterWrite: (write) => {
+            if (write.path === collectedPath) completedWrites.push({ ...write, released });
+        }
+    });
+    const currentDay = writer.context.getZoneDateKey(beforeMidnight);
+    const oldestDay = writer.context.collectedRetentionCutoffKey(beforeMidnight);
+    const markerDay = mode === 'recent' ? currentDay : oldestDay;
+    const key = writer.context.pickupBarcodeKey('RESTORE_BC');
+    const keepKey = writer.context.pickupBarcodeKey('KEEP_COLLECTED');
+    const oldSiblingKey = writer.context.pickupBarcodeKey('OLD_SIBLING');
+    const live = seedItem();
+    delete live.deletedAt;
+    delete live.isFromDeletion;
+    delete live.trashReason;
+    const closedAt = Date.parse(markerDay + 'T12:00:00+07:00');
+    Object.assign(live, { scanDate: currentDay, createdAt: closedAt - 1000, cod: 10.25, dod: 2.5, price: 12.75, isClosed: true, closedAt });
+    Object.assign(live.barcodes[0], { createdAt: closedAt - 1000, cod: 10.25, dod: 2.5, isClosed: true, isDeducted: false, closedAt });
+    const unrelated = clone(live);
+    Object.assign(unrelated, { id: 'id_unrelated', barcode: 'KEEP_HISTORY', cod: 7.75, dod: 0.5, price: 8.25 });
+    Object.assign(unrelated.barcodes[0], { code: 'KEEP_HISTORY', cod: 7.75, dod: 0.5 });
+    const collected = { [currentDay]: { [keepKey]: { c: 7.75, d: 0.5 } } };
+    collected[markerDay] = { ...collected[markerDay], [key]: { c: 10.25, d: 2.5 }, [oldSiblingKey]: { c: 3.75, d: 0.25 } };
+    accepted(await request('PUT', '/', {
+        zoew_scan_history_cod_dod: { id_restore: live, id_unrelated: unrelated },
+        zoew_daily_revenue_cod_dod: { [currentDay]: { codDollar: 18, dodDollar: 3, totalCount: 2 } },
+        zoew_monthly_revenue_cod_dod: { [currentDay.slice(0, 7)]: { codDollar: 18, dodDollar: 3, totalCount: 2 } },
+        zoew_daily_collected_cod_dod: collected
+    }, true));
+    writer.context.getServerNow = () => beforeMidnight;
+    writer.context.getFormattedDate = () => currentDay;
+    writer.context.document.getElementById = (id) => id === 'editBcCodInput' ? { value: '24.50' } : id === 'editBcDodInput' ? { value: '1.75' } : null;
+    await writer.sync();
+    try {
+        writer.context.saveEditedBarcodePrice();
+        if (racing) {
+            await new Promise((resolve, reject) => {
+                gateTimer = setTimeout(() => reject(new Error('COLLECTED_WRITE_DID_NOT_REACH_GATE')), 5000);
+                reached.then(resolve, reject);
+            });
+            clearTimeout(gateTimer);
+            const queued = accepted(await request('GET', '/', undefined, true));
+            const queuedPrice = queued.zoew_scan_history_cod_dod.id_restore.barcodes[0];
+            check(queuedPrice.cod === 24.5 && queuedPrice.dod === 1.75,
+                label + '៖ តម្លៃកញ្ចប់បាន commit ពិត មុន collect write ដល់ server', queuedPrice);
+            check(queued.zoew_daily_collected_cod_dod[markerDay][key].c === 10.25 && completedWrites.length === 0,
+                label + '៖ ទប់មុន HTTP ផ្ញើ មិនមែនពន្យារ ACK ក្រោយទិន្នន័យបានប្តូរ', completedWrites);
+            const cleaner = tab('collected-cleanup');
+            cleaner.context.serverClockTrusted = true;
+            cleaner.context.isDatabaseConnected = true;
+            cleaner.context.getServerNow = () => beforeMidnight + 2000;
+            await cleaner.sync();
+            check(cleaner.context.collectedRetentionCutoffKey(beforeMidnight + 2000) > markerDay,
+                label + '៖ ឆ្លងអធ្រាត្រ Phnom Penh ធ្វើឲ្យថ្ងៃគោលផុតពីរយៈពេលរក្សា');
+            cleaner.context.runAutomaticCollectedCleanup();
+            await cleaner.settle();
+            const cleaned = accepted(await request('GET', collectedPath + '/' + markerDay));
+            check(cleaned === null, label + '៖ client ទី២ សម្អាតបានជោគជ័យលើ server មុនដោះ writer', cleaned);
+            accepted(await request('PATCH', collectedPath + '/' + currentDay, { [keepKey]: { c: 9.25, d: 0.75 } }));
+        }
+    } finally {
+        clearTimeout(gateTimer);
+        released = true;
+        releaseWrite();
+        await writer.settle();
+    }
+    const final = accepted(await request('GET', '/', undefined, true));
+    const finalCollected = final.zoew_daily_collected_cod_dod || {};
+    const targetDays = Object.keys(finalCollected).filter((day) => finalCollected[day] && Object.prototype.hasOwnProperty.call(finalCollected[day], key));
+    if (racing) {
+        console.log('  ភស្តុតាងសរសេរក្រោយដោះ៖ ' + JSON.stringify(completedWrites.map(({ method, status, released: afterRelease }) => ({ method, status, afterRelease }))));
+        check(completedWrites.length > 0 && completedWrites.every((write) => write.released),
+            label + '៖ ដោះការសរសេរទៅ RTDB ពិតក្រោយ cleanup ចប់', completedWrites.map(({ method, status, released: afterRelease }) => ({ method, status, afterRelease })));
+        check(!finalCollected[markerDay] && targetDays.length === 0,
+            label + '៖ ការសរសេរយឺតមិនបង្កើតថ្ងៃដែលបានសម្អាតវិញ', finalCollected);
+    } else {
+        const saved = finalCollected[markerDay] && finalCollected[markerDay][key];
+        check(targetDays.length === 1 && targetDays[0] === markerDay && saved.c === 24.5 && saved.d === 1.75,
+            label + '៖ ថ្ងៃដើមនៅតែមួយ ហើយ COD/DOD រក្សាសេនត្រឹមត្រូវ', finalCollected);
+        check(JSON.stringify(finalCollected[markerDay][oldSiblingKey]) === JSON.stringify(collected[markerDay][oldSiblingKey]),
+            label + '៖ barcode ផ្សេងក្នុងថ្ងៃដូចគ្នានៅដដែល');
+    }
+    const kept = finalCollected[currentDay] && finalCollected[currentDay][keepKey];
+    check(!!kept && kept.c === (racing ? 9.25 : 7.75) && kept.d === (racing ? 0.75 : 0.5),
+        label + '៖ រក្សាតម្លៃថ្មីរបស់ជួរ collected ផ្សេងដែលកែជាន់គ្នា', kept);
+    const savedPrice = final.zoew_scan_history_cod_dod.id_restore.barcodes[0];
+    check(savedPrice.cod === 24.5 && savedPrice.dod === 1.75 && savedPrice.isClosed && savedPrice.closedAt === closedAt,
+        label + '៖ cleanup មិនលុបតម្លៃ ឬប្តូរស្ថានភាពនិងថ្ងៃបិទកញ្ចប់', savedPrice);
+    check(isDeepStrictEqual(final.zoew_scan_history_cod_dod.id_unrelated, unrelated),
+        label + '៖ history ជួរផ្សេងមិនត្រូវបានប៉ះ');
+    const daily = final.zoew_daily_revenue_cod_dod[currentDay];
+    const monthly = final.zoew_monthly_revenue_cod_dod[currentDay.slice(0, 7)];
+    check(daily.codDollar === 32.25 && daily.dodDollar === 2.25 && daily.totalCount === 2 && JSON.stringify(monthly) === JSON.stringify(daily),
+        label + '៖ ledger ថ្ងៃនិងខែរក្សាផលបូកត្រឹមត្រូវក្រោយកែតម្លៃ', { daily, monthly });
+    check(writer.toasts.some((message) => message.startsWith('✅')),
+        label + '៖ ការកែតម្លៃបញ្ចប់ពិត និងប្រាប់ជោគជ័យ', writer.toasts);
+}
 async function serverFenceScenario(mode) {
     const historyPath = '/zoew_scan_history_cod_dod/id_parent';
     const sourcePath = '/zoew_recently_deleted_cod_dod/id_restore';
@@ -468,6 +592,7 @@ async function serverFenceScenario(mode) {
 }
 (async () => {
     console.log('restore-mutation-emu-test — ការប្រណាំងស្តារ និងការកែទិន្នន័យ (RTDB ពិត)');
+    console.log('  Namespace៖ ' + NS);
     check(FNS.length >= 100, 'ស្រង់ function ពិតពី App មិនមែនច្បាប់ចម្លង');
     const rules = JSON.parse(fs.readFileSync(path.join(ROOT, 'firebase-database.rules.json'), 'utf8'));
     if (fail || !rules || !rules.rules || !rules.rules.zoew_scan_history_cod_dod || !rules.rules.zoew_recently_deleted_cod_dod) {
@@ -505,6 +630,10 @@ async function serverFenceScenario(mode) {
     for (const mode of ['same token', 'takeover', 'cached missing', 'cached compatible']) {
         try { await preparedRetryScenario(mode); }
         catch (error) { check(false, mode + '៖ សេណារីយ៉ូ retry បរាជ័យ', error.message); }
+    }
+    for (const mode of ['cleanup', 'recent', 'oldest']) {
+        try { await collectedCleanupScenario(mode); }
+        catch (error) { check(false, mode + '៖ សេណារីយ៉ូ collected cleanup បរាជ័យ', error.message); }
     }
     for (const mode of ['cached', 'renew', 'late', 'expired', 'missing', 'control']) {
         try { await serverFenceScenario(mode); }

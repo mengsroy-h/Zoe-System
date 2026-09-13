@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.34.2';
+    const APP_VERSION = '2.34.3';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -6816,6 +6816,26 @@
         return list;
     }
 
+    function reconcileCollectedPriceState(current, barcodes) {
+        if (!current || typeof current !== 'object' || Array.isArray(current)) return current;
+        const next = { ...current };
+        const days = Object.keys(current).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)).sort().reverse();
+        (Array.isArray(barcodes) ? barcodes : []).forEach((barcode) => {
+            const key = pickupBarcodeKey(barcode && barcode.code);
+            if (!key) return;
+            const heldDays = days.filter((day) => current[day] && typeof current[day] === 'object'
+                && Object.prototype.hasOwnProperty.call(current[day], key));
+            heldDays.forEach((day, index) => {
+                const record = { ...next[day] };
+                if (barcode.isClosed && index === 0) record[key] = collectedMarkValueOf(barcode);
+                else delete record[key];
+                if (Object.keys(record).length) next[day] = record;
+                else delete next[day];
+            });
+        });
+        return next;
+    }
+
     async function reconcileCollectedHistory(itemId, keys, attemptsLeft, preserveCollectedDay) {
         const targetKeys = [...new Set((keys || []).filter(Boolean))];
         if (!targetKeys.length || !dbRefDailyCollected || !db || !fb) return null;
@@ -6846,32 +6866,34 @@
                 if (!isCurrent()) return null;
                 const barcodes = state.filter(Boolean);
                 if (!barcodes.length) break;
-                const collectedSnapshot = preserveCollectedDay ? await dbOp(collectedSdk.get(collectedRef)) : null;
-                if (!isCurrent()) return null;
-                const collected = collectedSnapshot && collectedSnapshot.val() || {};
-                const days = new Set(Object.keys(dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
-                Object.keys(collected).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)).forEach((day) => days.add(day));
-                const now = getServerNow();
-                for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
-                const marks = [];
-                barcodes.forEach((barcode) => {
-                    const key = pickupBarcodeKey(barcode.code);
-                    const heldDay = preserveCollectedDay ? Object.keys(collected).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)
-                        && collected[day] && Object.prototype.hasOwnProperty.call(collected[day], key)).sort().reverse()[0] : null;
-                    if (preserveCollectedDay && !heldDay) return;
-                    days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
-                    if (barcode.isClosed) {
-                        if (preserveCollectedDay) marks.push({ key: key, day: heldDay, value: collectedMarkValueOf(barcode) });
-                        else marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
-                    }
-                });
-                if (preserveCollectedDay && !marks.length) return true;
-                const applied = markCollectedRevenue(marks);
+                let applied;
+                if (preserveCollectedDay) {
+                    const write = collectedSdk.runTransaction(collectedRef, (current) => {
+                        if (!isCurrent()) return;
+                        return reconcileCollectedPriceState(current, barcodes);
+                    }, { applyLocally: false });
+                    applied = { server: write.then((result) => !!(result && result.committed)) };
+                } else {
+                    const days = new Set(Object.keys(dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
+                    const now = getServerNow();
+                    for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
+                    const marks = [];
+                    barcodes.forEach((barcode) => {
+                        const key = pickupBarcodeKey(barcode.code);
+                        days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
+                        if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                    });
+                    applied = markCollectedRevenue(marks);
+                }
                 if (!applied) return null;
                 let saved;
                 try {
                     saved = await dbOp(applied.server);
                 } catch (error) {
+                    if (preserveCollectedDay && error && error.message === 'set' && attempt + 1 < attemptLimit && isCurrent()) {
+                        state = await readCurrentState();
+                        continue;
+                    }
                     if (dbOpStalled(error) && attempt + 1 < attemptLimit) {
                         armLateWrite(applied.server, () => isCurrent() ? reconcileCollectedHistory(itemId, targetKeys, attemptLimit - attempt - 1, preserveCollectedDay) : null,
                             null, 'reconcileCollectedHistory');
@@ -6927,12 +6949,14 @@
         if (dbListenerViewIsStale(DB_LISTENER_KEY_DAILY_COLLECTED)) return;
         const stale = staleCollectedDays(dailyCollectedData, getServerNow());
         if (!stale.length) return;
+        const collectedAuthGeneration = authGeneration;
+        const collectedDatabase = db;
         const payload = {};
         stale.forEach((day) => {
             payload[day] = null;
-            delete dailyCollectedData[day];
         });
         dbOp(fb.update(dbRefDailyCollected, payload), 'ការសម្អាតចំណូលប្រចាំថ្ងៃ').catch((error) => {
+            if (collectedAuthGeneration !== authGeneration || collectedDatabase !== db) return;
             if (window.ZoeErrors) ZoeErrors.capture(error, { zone: 'data', context: 'runAutomaticCollectedCleanup' });
         });
     }

@@ -110,7 +110,7 @@ const REAL_FNS = [
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
-const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin'];
+const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {

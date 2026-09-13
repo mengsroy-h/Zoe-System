@@ -88,7 +88,8 @@ const WANT = ['collectedSetFromRecord', 'collectedMarkValueOf', 'collectedDayOfS
     'appZoneParts', 'appZoneWallClockToMillis', 'sanitizeInput', 'emptyViewMessage',
     'dbListenerViewIsStale', 'anyDbListenerViewIsStale'];
 const missing = WANT.filter((n) => !sliceFn(SRC, n));
-const bodies = WANT.map((n) => sliceFn(SRC, n) || ('function ' + n + '() { return undefined; }')).join('\n');
+const bodies = WANT.map((n) => sliceFn(SRC, n) || ('function ' + n + '() { return undefined; }')).concat(
+    ['reconcileCollectedPriceState'].map(n => sliceFn(SRC, n) || '')).join('\n');
 ok('⛔ ស្រង់ function ចាំបាច់ទាំងអស់ចេញពី `app.js` ពិត', missing.length === 0, missing);
 
 const NODE = 'zoew_daily_collected_cod_dod';
@@ -415,12 +416,13 @@ function makeOperationSandbox(initial, now = NOW_B, sharedStore) {
                 const value = updater(clone(read(ref.path)));
                 calls.push({ kind: 'transaction', path: ref.path, value: clone(value) });
                 if (value !== undefined) write(ref.path, value);
+                if (ref.path === COLLECTED || ref.path.startsWith(COLLECTED + '/')) box.dailyCollectedData = clone(read(COLLECTED) || {});
                 return Promise.resolve({ committed: value !== undefined, snapshot: snap(ref.path) });
             },
             update: (ref, updates) => {
                 calls.push({ kind: 'update', path: ref.path, value: clone(updates) });
                 Object.entries(updates).forEach(([p, value]) => write([ref.path, p].filter(Boolean).join('/'), value));
-                if (ref.path === COLLECTED || Object.keys(updates).some(p => p.startsWith(COLLECTED + '/'))) box.dailyCollectedData = clone(read(COLLECTED) || {});
+                if (ref.path === COLLECTED || ref.path.startsWith(COLLECTED + '/') || Object.keys(updates).some(p => p.startsWith(COLLECTED + '/'))) box.dailyCollectedData = clone(read(COLLECTED) || {});
                 return Promise.resolve();
             }
         }
@@ -484,9 +486,41 @@ async function operationScenario(name, action) {
 function collectedTotal(store) {
     return Object.values(store[COLLECTED] || {}).reduce((total, day) => total + Object.values(day || {}).reduce((sum, value) => sum + value.c + value.d, 0), 0);
 }
+// ទប់សំណើមុន server ទទួល ហើយ transaction អានទិន្នន័យពេលដោះទប់ ដូច retry របស់ RTDB។
+// មិនពឹងលើឈ្មោះ helper ថ្មី ឬបង្ខំឱ្យ ship ប្រើ update ជំនួស transaction ទេ។
+function holdNextCollectedWrite(s) {
+    let pending = null;
+    for (const method of ['update', 'runTransaction']) {
+        const original = s.box.fb[method];
+        s.box.fb[method] = (ref, value, ...rest) => {
+            if (pending || !(ref.path === COLLECTED || ref.path.startsWith(COLLECTED + '/'))) return original(ref, value, ...rest);
+            return new Promise((resolve, reject) => {
+                pending = {
+                    method, path: ref.path,
+                    accept: async () => resolve(await original(ref, value, ...rest)),
+                    reject: (error = new Error('permission_denied')) => { s.sync(); reject(error); }
+                };
+            });
+        };
+    }
+    return { get pending() { return pending; } };
+}
+function retentionFixture(day) {
+    const initial = editFixture();
+    initial[COLLECTED] = { [day]: { FIXTURE1: { c: 12.5, d: 0.75 } } };
+    return initial;
+}
+function moneySources(s) {
+    return { daily: clone(s.read(DAILY)), monthly: clone(s.read(MONTHLY)), pickup: clone(s.read(PICKUP)) };
+}
 async function closeOperation(s, method, closed) {
-    if (method === 'single') return s.box.applyBarcodeCloseChange('fixture_item', 'FIXTURE1', closed, { showModal: false });
-    return s.box.toggleCloseStatus('fixture_item');
+    const name = method === 'single' ? 'applyBarcodeCloseChange' : 'toggleCloseStatus';
+    if (typeof s.box[name] !== 'function') {
+        ok('ជាន់អប្បបរមា៖ មុខងារបិទពិតត្រូវមាន — ' + name, false);
+        return null;
+    }
+    if (method === 'single') return s.box[name]('fixture_item', 'FIXTURE1', closed, { showModal: false });
+    return s.box[name]('fixture_item');
 }
 (async () => {
     await operationScenario('៨. ការកែទឹកប្រាក់អាន server ពិត ហើយមិនបង្កើតធាតុថ្មី', async () => {
@@ -497,8 +531,10 @@ async function closeOperation(s, method, closed) {
         ok('តម្លៃថ្មីជំនួសតម្លៃចាស់ ក្នុងថ្ងៃដដែល', collectedTotal(s.server) === 9, s.read(COLLECTED));
         initial[COLLECTED] = {};
         const missing = makeOperationSandbox(initial);
+        const unchanged = JSON.stringify(missing.server);
         await missing.box.syncCollectedValueForBarcode('fixture_item', 'FIXTURE1');
-        ok('គ្មានធាតុស្រាប់ ➜ មិនសរសេរអ្វីទាំងអស់', missing.calls.length === 0 && collectedTotal(missing.server) === 0, missing.calls);
+        // CAS អាចផ្ទៀង snapshot ដដែលដោយគ្មានការប្រែទិន្នន័យ; ច្បាប់គឺមិនបង្កើតធាតុ។
+        ok('គ្មានធាតុស្រាប់ ➜ មិនបង្កើត ឬកែទិន្នន័យ', JSON.stringify(missing.server) === unchanged && collectedTotal(missing.server) === 0, missing.server);
         initial[HISTORY].fixture_item = operationItem(8.25, false);
         initial[COLLECTED] = { [DAY_B]: { FIXTURE1: { c: 5, d: 0 } } };
         const reopened = makeOperationSandbox(initial);
@@ -742,17 +778,16 @@ async function closeOperation(s, method, closed) {
             const s = makeOperationSandbox(editFixture());
             let release;
             const transaction = s.box.fb.runTransaction;
-            const update = s.box.fb.update;
+            const held = delay === 'collected' ? holdNextCollectedWrite(s) : null;
             if (delay === 'history') s.box.fb.runTransaction = (ref, updater) => {
                 const result = transaction(ref, updater);
                 return ref.path === HISTORY + '/fixture_item' ? new Promise(resolve => { release = async () => resolve(await result); }) : result;
             };
-            else s.box.fb.update = (ref, values) => {
-                if (ref.path !== COLLECTED || release) return update(ref, values);
-                return new Promise(resolve => { release = async () => { await update(ref, values); resolve(); }; });
-            };
             editOperation(s, 24.5, 1.75);
-            for (let count = 0; !release && count < 30; count++) await operationTicks(1);
+            for (let count = 0; !release && count < 30; count++) {
+                await operationTicks(1);
+                if (held && held.pending) release = held.pending.accept;
+            }
             ok('ជាន់អប្បបរមា៖ បានពន្យារផ្លូវកែតម្លៃពិត — ' + delay, !!release);
             if (!release) return;
             const second = makeOperationSandbox(s.server, NOW_B + 1000, s.server);
@@ -788,10 +823,12 @@ async function closeOperation(s, method, closed) {
         await operationScenario('៣៣. កែតម្លៃមិនប្រាប់ Sync ជោគជ័យ ខណៈ mirror ធ្លាក់ — ' + failure, async () => {
             const s = makeOperationSandbox(editFixture());
             s.box.DB_OP_TIMEOUT_MS = 10;
-            const update = s.box.fb.update;
-            s.box.fb.update = (ref, values) => ref.path === COLLECTED
-                ? failure === 'reject' ? Promise.reject(new Error('permission_denied: fixture')) : new Promise(() => {})
-                : update(ref, values);
+            for (const method of ['update', 'runTransaction']) {
+                const original = s.box.fb[method];
+                s.box.fb[method] = (ref, ...args) => ref.path === COLLECTED || ref.path.startsWith(COLLECTED + '/')
+                    ? failure === 'reject' ? Promise.reject(new Error('permission_denied: fixture')) : new Promise(() => {})
+                    : original(ref, ...args);
+            }
             editOperation(s, 24.5, 1.75); await operationTicks(30);
             ok('history និង ledger រក្សាទុក តែសារមិនអះអាងជោគជ័យគ្រប់ — ' + failure,
                 s.read(HISTORY + '/fixture_item/price') === 26.25 && s.read(DAILY + '/2026-09-09/codDollar') === 24.5
@@ -819,16 +856,11 @@ async function closeOperation(s, method, closed) {
             if (transition === 'late-restored') initial[COLLECTED] = { [DAY_A]: { FIXTURE1: { c: 12.5, d: 0.75 } } };
             const s = makeOperationSandbox(initial);
             if (transition === 'late-restored') s.box.DB_OP_TIMEOUT_MS = 10;
-            let release;
-            const update = s.box.fb.update;
-            s.box.fb.update = (ref, values) => {
-                if (ref.path !== COLLECTED || release) return update(ref, values);
-                return new Promise(resolve => { release = async () => { await update(ref, values); resolve(); }; });
-            };
+            const held = holdNextCollectedWrite(s);
             editOperation(s, 24.5, 1.75);
-            for (let count = 0; !release && count < 30; count++) await operationTicks(1);
-            ok('ជាន់អប្បបរមា៖ បានពន្យារ mirror កែតម្លៃ — ' + transition, !!release);
-            if (!release) return;
+            for (let count = 0; !held.pending && count < 30; count++) await operationTicks(1);
+            ok('ជាន់អប្បបរមា៖ បានពន្យារ mirror កែតម្លៃ — ' + transition, !!held.pending);
+            if (!held.pending) return;
             let expectedDay = DAY_A;
             if (transition === 'next-day') {
                 const second = makeOperationSandbox(s.server, NOW_B + 86400000, s.server);
@@ -836,9 +868,206 @@ async function closeOperation(s, method, closed) {
                 await closeOperation(second, 'single', true);
                 expectedDay = second.box.collectedDayOfStamp(NOW_B + 86400000);
             } else await operationTicks(25);
-            await release(); await operationTicks(25);
+            await held.pending.accept(); await operationTicks(25);
             ok('ចំណូលនៅតែមួយថ្ងៃ និងរក្សាថ្ងៃដែលបានបញ្ជាក់ — ' + transition,
                 collectedTotal(s.server) === 26.25 && s.read(COLLECTED + '/' + expectedDay + '/FIXTURE1/c') === 24.5, s.read(COLLECTED));
+        });
+    }
+    for (const day of ['2026-09-05', '2026-09-06', '2026-09-07']) {
+        await operationScenario('៣៦. កែតម្លៃជាប់ cleanup តាមព្រំដែនរក្សាទុក — ' + day, async () => {
+            const s = makeOperationSandbox(retentionFixture(day));
+            s.box.cleanupClockIsTrustworthy = () => true;
+            const held = holdNextCollectedWrite(s);
+            editOperation(s, 24.5, 1.75);
+            await operationTicks();
+            s.box.runAutomaticCollectedCleanup(); await operationTicks();
+            const expired = day < '2026-09-06';
+            ok('cleanup លុបតែថ្ងៃហួសព្រំដែន មុនដោះសំណើ — ' + day,
+                expired ? !s.read(COLLECTED + '/' + day + '/FIXTURE1') : !!s.read(COLLECTED + '/' + day + '/FIXTURE1'), s.read(COLLECTED));
+            // កូនសោផ្សេងដែលមកដល់ក្នុងថ្ងៃនៅរក្សាទុក ត្រូវនៅសល់ពេលសំណើចាស់សម្រេច។
+            const freshDay = expired ? DAY_B : day;
+            await s.box.fb.update(s.box.dbRefDailyCollected, { [freshDay + '/FRESH2']: { c: 3.5, d: 1 } });
+            if (held.pending) await held.pending.accept();
+            await operationTicks();
+            ok('សំណើយឺតមិនបង្កើតថ្ងៃហួសអាយុឡើងវិញ — ' + day,
+                expired ? !s.read(COLLECTED + '/' + day + '/FIXTURE1') : s.read(COLLECTED + '/' + day + '/FIXTURE1/c') === 24.5, s.read(COLLECTED));
+            ok('កូនសោស្រស់ក្នុងថ្ងៃនៅរក្សាទុកនៅដដែល — ' + day,
+                JSON.stringify(s.read(COLLECTED + '/' + freshDay + '/FRESH2')) === JSON.stringify({ c: 3.5, d: 1 }), s.read(COLLECTED));
+            ok('ledger ថ្ងៃស្កេន/ខែ និង history រក្សាតម្លៃកែ — ' + day,
+                s.read(DAILY + '/2026-09-09/codDollar') === 24.5 && s.read(DAILY + '/2026-09-09/dodDollar') === 1.75 &&
+                s.read(MONTHLY + '/2026-09/codDollar') === 24.5 && s.read(MONTHLY + '/2026-09/dodDollar') === 1.75 &&
+                s.read(HISTORY + '/fixture_item/barcodes/0/cod') === 24.5 && s.read(HISTORY + '/fixture_item/barcodes/0/isClosed') === true,
+                { history: s.read(HISTORY), money: moneySources(s) });
+        });
+    }
+    for (const late of [false, true]) {
+        await operationScenario('៣៧. កែតម្លៃឆ្លងអធ្រាត្រ ខណៈ cleanup បានលុបថ្ងៃដើម — ' + late, async () => {
+            const day = '2026-09-06';
+            let now = Date.UTC(2026, 8, 12, 16, 59, 59);
+            const s = makeOperationSandbox(retentionFixture(day), now);
+            s.box.getServerNow = () => now;
+            s.box.cleanupClockIsTrustworthy = () => true;
+            if (late) s.box.DB_OP_TIMEOUT_MS = 10;
+            const held = holdNextCollectedWrite(s);
+            editOperation(s, 24.5, 1.75);
+            for (let index = 0; !held.pending && index < 30; index++) await operationTicks(1);
+            ok('ជាន់អប្បបរមា៖ សំណើត្រូវបានទប់ ខណៈថ្ងៃដើមនៅក្នុង retention',
+                !!held.pending && s.box.collectedRetentionCutoffKey(now) === day, { held: !!held.pending, cutoff: s.box.collectedRetentionCutoffKey(now) });
+            if (!held.pending) return;
+            now = Date.UTC(2026, 8, 12, 17, 0, 1);
+            s.box.runAutomaticCollectedCleanup(); await operationTicks(late ? 25 : 2);
+            ok('ក្រោយអធ្រាត្រ server បានលុបថ្ងៃដែលទើបហួសអាយុ', !s.read(COLLECTED + '/' + day + '/FIXTURE1'), s.read(COLLECTED));
+            await s.box.fb.update(s.box.dbRefDailyCollected, { ['2026-09-13/FRESH2']: { c: 3.5, d: 1 } });
+            await held.pending.accept(); await operationTicks(25);
+            ok('សំណើដែលគណនាមុនអធ្រាត្រមិនបង្កើតថ្ងៃចាស់វិញ',
+                !s.read(COLLECTED + '/' + day + '/FIXTURE1') && collectedTotal(s.server) === 4.5, s.read(COLLECTED));
+            ok('cleanup និងសំណើយឺតមិនដក ledger ថ្ងៃស្កេន/ខែ',
+                s.read(DAILY + '/2026-09-09/codDollar') === 24.5 && s.read(MONTHLY + '/2026-09/dodDollar') === 1.75,
+                moneySources(s));
+        });
+    }
+    await operationScenario('៣៨. cleanup យឺតមិនលុបកូនសោថ្មីក្នុងថ្ងៃដែលនៅរក្សាទុក', async () => {
+        const initial = retentionFixture('2026-09-05');
+        initial[COLLECTED]['2026-09-06'] = { KEEP1: { c: 6, d: 0.5 } };
+        initial[COLLECTED]['មិនមែនថ្ងៃ'] = { META: { c: 0, d: 0 } };
+        const s = makeOperationSandbox(initial);
+        s.box.cleanupClockIsTrustworthy = () => true;
+        const beforeMoney = moneySources(s);
+        const held = holdNextCollectedWrite(s);
+        s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+        ok('ជាន់អប្បបរមា៖ បានទប់សំណើ cleanup ពិត', !!held.pending);
+        if (!held.pending) return;
+        await s.box.fb.update(s.box.dbRefDailyCollected, { ['2026-09-06/FRESH2']: { c: 3.5, d: 1 } });
+        await held.pending.accept(); await operationTicks();
+        ok('ថ្ងៃហួសអាយុបាត់ ប៉ុន្តែកូនសោដើម/ថ្មីក្នុងថ្ងៃព្រំដែន និង metadata នៅសល់',
+            !s.read(COLLECTED + '/2026-09-05/FIXTURE1') &&
+            s.read(COLLECTED + '/2026-09-06/KEEP1/c') === 6 && s.read(COLLECTED + '/2026-09-06/FRESH2/c') === 3.5 &&
+            s.read(COLLECTED + '/មិនមែនថ្ងៃ/META') !== null, s.read(COLLECTED));
+        ok('cleanup មិនកែ ledger ឬ pickup', JSON.stringify(moneySources(s)) === JSON.stringify(beforeMoney), moneySources(s));
+    });
+    for (const late of [false, true]) {
+        await operationScenario('៣៩. cleanup ត្រូវបដិសេធ ហើយអាចសាកឡើងវិញ — ' + late, async () => {
+            const s = makeOperationSandbox(retentionFixture('2026-09-05'));
+            s.box.cleanupClockIsTrustworthy = () => true;
+            if (late) s.box.DB_OP_TIMEOUT_MS = 10;
+            const beforeMoney = moneySources(s);
+            const held = holdNextCollectedWrite(s);
+            s.box.runAutomaticCollectedCleanup(); await operationTicks(late ? 25 : 2);
+            ok('ជាន់អប្បបរមា៖ cleanup ត្រូវបានទប់មុនបដិសេធ', !!held.pending);
+            if (!held.pending) return;
+            held.pending.reject(); await operationTicks();
+            ok('បដិសេធមិនលុប server ហើយ snapshot rollback នៅដដែល',
+                s.read(COLLECTED + '/2026-09-05/FIXTURE1/c') === 12.5 && s.box.dailyCollectedData['2026-09-05'].FIXTURE1.c === 12.5,
+                { server: s.read(COLLECTED), local: s.box.dailyCollectedData });
+            s.box.runAutomaticCollectedCleanup(); await operationTicks();
+            ok('សាកឡើងវិញអាចលុបថ្ងៃចាស់ ដោយមិនកែ ledger/pickup',
+                !s.read(COLLECTED + '/2026-09-05/FIXTURE1') && JSON.stringify(moneySources(s)) === JSON.stringify(beforeMoney),
+                { collected: s.read(COLLECTED), money: moneySources(s) });
+        });
+    }
+    for (const change of ['auth', 'database']) {
+        await operationScenario('៤០. cleanup ដែលបដិសេធក្រោយប្ដូរ session — ' + change, async () => {
+            const s = makeOperationSandbox(retentionFixture('2026-09-05'));
+            s.box.cleanupClockIsTrustworthy = () => true;
+            const reports = [];
+            s.box.ZoeErrors = { capture: (error, context) => reports.push(context) };
+            const held = holdNextCollectedWrite(s);
+            s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+            ok('ជាន់អប្បបរមា៖ cleanup បានចាប់ផ្ដើមក្នុង session ចាស់', !!held.pending);
+            if (!held.pending) return;
+            if (change === 'auth') s.box.authGeneration++;
+            else s.box.db = {};
+            const before = s.calls.length;
+            held.pending.reject(); await operationTicks();
+            ok('callback ចាស់មិនសរសេរ ឬបញ្ចេញសារ/error report ក្នុង session ថ្មី',
+                s.calls.length === before && s.messages.length === 0 && reports.length === 0,
+                { writes: s.calls.length - before, messages: s.messages, reports });
+        });
+    }
+    for (const gate of ['clock', 'listener']) {
+        await operationScenario('៤១. មិនដាក់ការផុតអាយុថ្មី បើ cleanup មិនបានលុបពិត — ' + gate, async () => {
+            const s = makeOperationSandbox(retentionFixture('2026-09-05'));
+            s.box.cleanupClockIsTrustworthy = () => gate !== 'clock';
+            if (gate === 'listener') s.box.dbListenerFailedPaths.add(s.box.DB_LISTENER_KEY_DAILY_COLLECTED);
+            s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+            editOperation(s, 24.5, 1.75); await operationTicks();
+            ok('កែតម្លៃកំណត់ត្រាដែលនៅមាន ដោយមិនលុបតាមអាយុនៅក្នុងផ្លូវកែតម្លៃ — ' + gate,
+                s.read(COLLECTED + '/2026-09-05/FIXTURE1/c') === 24.5 && collectedTotal(s.server) === 26.25, s.read(COLLECTED));
+        });
+    }
+    await operationScenario('៤២. កែតម្លៃលើ key ស្ទួន រក្សាថ្ងៃថ្មីបំផុត និងកូនសោផ្សេងទាំងអស់', async () => {
+        const initial = editFixture();
+        initial[COLLECTED][DAY_A] = { FIXTURE1: { c: 7, d: 0.5 }, OLDER2: { c: 2, d: 0.25 } };
+        initial[COLLECTED][DAY_B].FRESH2 = { c: 3.5, d: 1 };
+        const s = makeOperationSandbox(initial);
+        editOperation(s, 24.5, 1.75); await operationTicks();
+        ok('barcode នៅតែថ្ងៃថ្មីបំផុត ដោយមិនរាប់ប្រាក់ស្ទួន',
+            !s.read(COLLECTED + '/' + DAY_A + '/FIXTURE1') && s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 24.5 && collectedTotal(s.server) === 33,
+            s.read(COLLECTED));
+        ok('កូនសោផ្សេងទាំងថ្ងៃដើម និងថ្ងៃថ្មីនៅតម្លៃដដែល',
+            s.read(COLLECTED + '/' + DAY_A + '/OLDER2/c') === 2 && s.read(COLLECTED + '/' + DAY_B + '/FRESH2/c') === 3.5,
+            s.read(COLLECTED));
+    });
+    await operationScenario('៤៣. cleanup ក្នុង SDK ដដែលបោះបង់ price transaction ដោយ Error(set)', async () => {
+        const initial = editFixture();
+        initial[COLLECTED]['2026-09-05'] = { EXPIRED2: { c: 3.5, d: 1 } };
+        const s = makeOperationSandbox(initial);
+        s.box.cleanupClockIsTrustworthy = () => true;
+        const held = holdNextCollectedWrite(s);
+        editOperation(s, 24.5, 1.75);
+        for (let index = 0; !held.pending && index < 30; index++) await operationTicks(1);
+        ok('ជាន់អប្បបរមា៖ ការកែតម្លៃពិតកំពុងរង់ចាំមុន cleanup', !!held.pending);
+        if (!held.pending) return;
+        s.box.runAutomaticCollectedCleanup(); await operationTicks(2);
+        // Native SDK បោះ Error("set") គ្មាន code សម្រាប់ transaction ប៉ុណ្ណោះ។
+        if (held.pending.method === 'runTransaction') held.pending.reject(new Error('set'));
+        else await held.pending.accept();
+        await operationTicks();
+        ok('បន្ទាប់ពី cleanup អាចកែតម្លៃថ្ងៃនៅរក្សាទុក ដោយមិនរស់ថ្ងៃចាស់ឡើងវិញ',
+            !s.read(COLLECTED + '/2026-09-05/EXPIRED2') && s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/c') === 24.5 &&
+            s.read(COLLECTED + '/' + DAY_B + '/FIXTURE1/d') === 1.75 && s.messages.some(message => message.includes('✅')),
+            { collected: s.read(COLLECTED), messages: s.messages });
+        ok('ការសាក CAS ឡើងវិញមិនកែ ledger ពីរដង',
+            s.read(DAILY + '/2026-09-09/codDollar') === 24.5 && s.read(MONTHLY + '/2026-09/dodDollar') === 1.75,
+            moneySources(s));
+    });
+    await operationScenario('៤៤. Error(set) ជាប់ៗគ្នាមានព្រំដែន ហើយមិនប្រាប់ Sync ជោគជ័យ', async () => {
+        const s = makeOperationSandbox(editFixture());
+        const transaction = s.box.fb.runTransaction;
+        let attempts = 0;
+        s.box.fb.runTransaction = (ref, ...args) => {
+            if (ref.path !== COLLECTED) return transaction(ref, ...args);
+            attempts++;
+            return Promise.reject(new Error('set'));
+        };
+        editOperation(s, 24.5, 1.75); await operationTicks();
+        ok('ការប៉ុនប៉ង transaction មិនលើស ៣ និងមិនអះអាងថា Sync រួចពេលទាំងអស់ធ្លាក់',
+            attempts === 0 ? collectedTotal(s.server) === 26.25 : attempts <= 3 &&
+                s.messages.some(message => message.includes('⚠️')) && !s.messages.some(message => message.includes('✅')),
+            { attempts, messages: s.messages });
+        ok('ការបដិសេធ CAS មិនដកតម្លៃដែល history/ledger បានរក្សាទុក',
+            s.read(HISTORY + '/fixture_item/price') === 26.25 && s.read(DAILY + '/2026-09-09/codDollar') === 24.5,
+            { history: s.read(HISTORY), money: moneySources(s) });
+    });
+    for (const change of ['auth', 'database']) {
+        await operationScenario('៤៥. Error(set) ក្រោយប្ដូរ session មិនបើកការសាកឡើងវិញ — ' + change, async () => {
+            const s = makeOperationSandbox(editFixture());
+            const held = holdNextCollectedWrite(s);
+            editOperation(s, 24.5, 1.75);
+            for (let index = 0; !held.pending && index < 30; index++) await operationTicks(1);
+            ok('ជាន់អប្បបរមា៖ price mirror កំពុងរង់ចាំក្នុង session ចាស់', !!held.pending);
+            if (!held.pending) return;
+            if (change === 'auth') s.box.authGeneration++;
+            else s.box.db = {};
+            const before = s.calls.length;
+            const acceptedWrite = held.pending.method === 'update' ? 1 : 0;
+            const priorMessages = s.messages.length;
+            if (held.pending.method === 'runTransaction') held.pending.reject(new Error('set'));
+            else await held.pending.accept();
+            await operationTicks();
+            ok('មិនមានការសាកសរសេរថ្មី ឬសារក្នុង session ថ្មី',
+                s.calls.length === before + acceptedWrite && s.messages.length === priorMessages,
+                { extraWrites: s.calls.length - before - acceptedWrite, messages: s.messages.slice(priorMessages) });
         });
     }
     console.log('');

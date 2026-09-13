@@ -98,6 +98,18 @@
 > ⛔ **កំណែមុនៗដែលបញ្ជាក់រួច** ៖ `2.27.0` ➜ `2.30.3` · `2.30.5` · `2.31.4` ·
 > `2.31.6`; ZoeKeyGen `2.19.18` (2026-09-04 · 09-05 · 09-06 · 09-09)។
 
+### ZoeW `2.34.3` — 2026-09-13 · ការពារចំណូលថ្ងៃចាស់លេចវិញក្រោយ cleanup
+
+**ZoeW** (`zoew-v204` ➜ `zoew-v205`)។ ZoeKeyGen នៅ `2.19.23` / `zoekeygen-v93`។
+
+- ការកែ COD/DOD ដែលមកយឺតមិនដាក់ចំណូលថ្ងៃចាស់ត្រឡប់វិញក្រោយការសម្អាតបានជោគជ័យ។ ថ្ងៃនៅក្នុងព្រំដែនរក្សាទុក និងកញ្ចប់ផ្សេងរក្សាឥរិយាបថដដែល។
+- ពេល Firebase លុបចោល transaction ដោយសារការសម្អាតក្នុង client ដដែល App អានប្រវត្តិម្តងទៀត និងព្យាយាមក្នុងពិដាន៣ដង; បរាជ័យបន្តប្រាប់ថា Sync មិនពេញលេញ។
+- Cleanup មិនកែសតិបន្ថែមលើ listener និងមិនរាយ error ចាស់ទៅវគ្គ auth/database ថ្មី។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+គ្មានការប្ដូរ Firebase rules, schema ឬ env។ ក្រោយ deploy ត្រូវ Refresh ឧបករណ៍ទាំងអស់ទៅ `2.34.3` ហើយសាកកែតម្លៃ/បិទ/បើកវិញ និងកាតចំណូលប្រចាំថ្ងៃ។ មិនទាន់មានការផ្ទៀងផ្ទាត់កំណែនេះលើទូរស័ព្ទ ឬ production database។
+
 ### ZoeW `2.34.2` និង ZoeKeyGen `2.19.23` — 2026-09-13 · ផ្ទៀង callback ចាស់ និងពិដាន backup
 
 - កែតម្លៃកញ្ចប់អានស្ថានភាព server ដើម្បីផ្ទៀងចំណូលប្រចាំថ្ងៃ ទោះ listener យឺត ឬឧបករណ៍ផ្សេងបើកកញ្ចប់វិញ។ សារជោគជ័យរង់ចាំការផ្ទៀងចំណូល; ការសរសេរធ្លាក់/ព្យួរត្រូវប្រាប់ថា Sync មិនពេញលេញ។
@@ -7906,6 +7918,33 @@ CSP ក៏មិនប្រែដែរ។
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន
 
+### 2026-09-13 · ZoeW `2.34.3` — បិទ cleanup race ដែលនៅសល់ពី PR #222
+
+PR #222 merge ជា `ec470bf1f0d1e03c713d75c11a11d83a1afa24ef`; ជុំនេះចាប់ផ្តើមពី remote main នោះ។ ពង្រីកអ្នកយាមដដែលមុនកែកូដ។ កំហុសនេះសកម្មមានលក្ខខណ្ឌ៖ cleanup លុបថ្ងៃចាស់នៅចន្លោះការអាន និងការទទួល price write; មិនមែនការបាត់ប្រាក់ពិតដែលវាស់លើផលិតកម្មទេ។
+
+**លេខលើកាតពី function បង្ហាញពិតក្នុង VM៖** ថ្ងៃ05ដំបូង COD12.50/DOD0.75/សរុប13.25។ Cleanup លុបបានទាំងមុន/ក្រោយកែ។ ដោះសំណើកែតម្លៃទៅ24.50/1.75៖ main បង្ហាញកាតថ្ងៃ05ឡើងវិញ **$26.25**; ក្រោយកែមិនមានកាតថ្ងៃ05។ កាតថ្មីថ្ងៃ12 **$4.50** នៅដដែល។ Ledger ថ្ងៃស្កេន04 និងខែ09 នៅ24.50/1.75 ទាំងពីរ; pickup នៅដដែល។ Renderer probe ចុងក្រោយប្រើ scan04 → collected05 → closedAt ថ្មី12 ដូចស្ថានភាពក្រោយ restore; probe ដំបូងដែលបំបែកអ័ក្សថ្ងៃដោយ scan09 នៅរក្សាក្នុង logs ដាច់ដោយឡែក។ នេះមិនមែនលេខ $30.75 លើកាតថ្ងៃនេះទេ—វាជាកាតប្រវត្តិថ្ងៃផុតកំណត់ដែលលេចវិញ។
+
+**មូលហេតុ និងការកែ៖** snapshot ពី `get` អាចចាស់មុន PATCH ទទួលចូល។ Price reconciliation ឥឡូវប្រើ transaction លើ collected root ដើម្បីរក្សាតែ key ដែល server នៅកាន់ និងផ្ទៀង duplicate days ក្នុង commit ដដែល។ Close ផ្លាស់ថ្ងៃនៅប្រើ multipath update ដដែល។ Cleanup ប្រើ listener ជាម្ចាស់ mirror និងចាប់ auth/database សម្រាប់ error callback។
+
+| ភស្តុតាង | មុន → ក្រោយ |
+|---|---|
+| `daily-collected-test` ដដែលលើ main → fix | **161 PASS / 5 FAIL → 166 PASS / 0 FAIL**; 3 cleanup-resurrection និង2 stale telemetry |
+| ថតទទេ | **12 PASS / 101 FAIL**, exit1; មិនបាត់ summary |
+| `emu/restore-mutation-emu-test` ជាមួយ rules ពិត | **181 PASS / 1 FAIL → 182 PASS / 0 FAIL**; PATCH200 បង្កើតថ្ងៃវិញ → CAS412/retry200 មិនបង្កើត |
+| Native Firebase SDK12.17.1 dependencies ពិត | មុន set-retry fix **15 PASS / 1 FAIL** ហើយឈប់ត្រង់ wrapper; សំណុំក្រោយពង្រីក3 controls **19 PASS / 0 FAIL** |
+| Mutation | **10/10 ចាប់បាន** រួម stale update, បង្កើតធាតុថ្មី, បាត់ sibling, ជ្រើសថ្ងៃចាស់, expiry សន្មត់, auth/database fence និង set retry/budget |
+| ករណីមិនគួរប្រែ | **144/144 ដូចគ្នា**, invalidBefore0/invalidAfter0/changed0; COD8 × DOD3 × ស្ថានភាព6 |
+
+Native SDK បង្ហាញភាពខុសពី REST adapter៖ update កូនក្នុង client ដដែលអាច reject ancestor transaction ជា `Error('set')`។ កូដកែដំបូងធ្វើឲ្យតម្លៃថ្ងៃនៅរស់នៅ1ជំនួស22; bounded retry កែបាន22។ Cancel3ដងបញ្ឈប់ត្រឹម3 និងប្រាប់ Sync មិនពេញលេញ។ Cold cache ត្រូវត្រឡប់ null ដើម្បីឲ្យ server ផ្ទៀង; undefined abort ក្នុងស្រុក។ Auth/database ផ្លាស់ធ្វើឲ្យ native `committed:false` និងមិនប៉ះវគ្គថ្មី។
+
+**ភាពខុសពីការសាង checker៖** fixture emulator ដំបូងប្រៀប JSON តាម key order ធ្វើឲ្យមាន false failure3; ប្ដូរទៅ deep equality រួចរត់ main/fix ដោយ checker ដដែល។ VM ដំបូងរាប់ថា absent key ត្រូវគ្មាន request; ប្ដូរទៅវាស់ថា server មិនប្រែ/មិនបង្កើត ព្រោះ cold-cache CAS អាចត្រូវផ្ញើ no-op ដើម្បីផ្ទៀង។ មិនបន្ធូរ business invariant ឡើយ។ Integration ពេញដំបូងត្រូវបានបញ្ឈប់ក្រោយ `price-edit-abort`34PASS/5FAIL ព្រោះ sandbox ខ្វះ helper ថ្មី; បន្ថែមការស្រង់ function ពិតមួយបន្ទាត់រួច39PASS/0FAIL។ `crud-rules-flow` scope guard6PASS/1FAIL→73PASS/0FAIL ដោយការកែ dependency ដូចគ្នា។ `late-commit`67 និង `pickup-barcode-identity`73 នៅPASSទាំងមុន/ក្រោយបំពេញ extraction; គ្មានការកែ assertion។ ការរត់ដែលបញ្ឈប់មិនរាប់ជា CI ពេញបៃតងទេ។
+
+**ភស្តុតាងលំដាប់សកម្មភាពពិតបន្ថែម៖** scratch RTDB probe ប្រើ pickup-trash fixture មាន scan09-05 → pickup09-07 និងនៅក្នុងព្រំដែន30ថ្ងៃ។ `executeRestoreItem` ពិតនៅ09-13បង្កើត live closed record និង `closedAt` ថ្មី ខណៈ collected នៅ09-07។ កែតម្លៃ24.50/1.75 ពិត រួចទប់ write មុន HTTP acceptance; client ទី២ cleanup ជាមួយនាឡិកា09-14 00:00:01 ហើយដោះ write។ Main **8 PASS/1 FAIL** ដាក់ថ្ងៃ07វិញ$26.25; fix **9 PASS/0 FAIL** ទប់បានដោយ CAS412→200។ Restore មិនបូក ledger ស្ទួន និងរក្សា sibling ដែលកែជាន់គ្នា។ Pickup-trash ដំបូងជាfixture; មិនបានរត់ scan/pickup/២ម៉ោងcleanup ដើម្បីបង្កើតវា និងមិនរង់ចាំអធ្រាត្រពិតទេ។
+
+**CI ក្នុង session៖** baseline **171 PASS · 0 FAIL · 0 SKIP · 0 PARTIAL**, exit0។ ការរត់ពេញចុងក្រោយ **171 PASS · 0 FAIL · 0 SKIP · 0 PARTIAL**, exit0; Chrome និង RTDB ពិត។ Extra `MONEYGUARD_STRICT=1` លើ baseline និង final មួយៗ **22 PASS**, exit0។ Hash កូដ/checker235ឯកសារមុន/ក្រោយ final CI និង extra guardian៖ **ប្រែ0**។
+
+**ព្រំដែន៖** គ្មាន transaction ឆ្លង history/ledger/collected; client បិទកណ្តាលអាចទុក Sync មិនពេញលេញ។ មិនបង្ខំ expiry បើ cleanup មិនធ្លាប់ជោគជ័យ។ Client កំណែចាស់នៅអាចសរសេរតាម PATCH ចាស់ ដូច្នេះត្រូវ Refresh។ Root CAS revalidate កូនទាំងអស់៖ unrelated row ដែល admin/restore បានដាក់ខុស schema (`c:-2` ឬ extra field) ធ្វើឲ្យ `permission_denied` ខណៈ leaf PATCH ចាស់អាចឆ្លង។ វាជារបៀបបរាជ័យថ្មីក្រោមទិន្នន័យខូច មិនរាប់ថា unaffected PASS; គ្មាន writer ឬ schema ចាស់ក្នុង repo បង្កើតទម្រង់នេះតាំងពី feature2.34.0។ កូដមិនលុបទិន្នន័យខូចស្ងាត់ និងមិន fallback ទៅ PATCH ដែលបើក race វិញ; admin ត្រូវជួសជុលទិន្នន័យមុន Sync ឆ្លង។ មិនបានសាក production ឬទូរស័ព្ទពិត។
+
 ### 2026-09-12–13 · ZoeW `2.34.2` / ZoeKeyGen `2.19.23` — Audit callback និង body ដែលមកយឺត
 
 Baseline ជា `main` commit `bd2e7c94f96545e9c58a6ca16f3842087de16933`។ សាង probe ពីកូដពិត រួចពង្រីកអ្នកយាមដែលមានស្រាប់ និងបញ្ជាក់ការធ្លាក់មុនកែ។ គ្មាន checker ថ្មីស្ទួន។
@@ -12174,7 +12213,7 @@ Mutation ដែលផ្លាស់ការដោះទៅ **មុន** `dbLi
 
 | Checker | ការពន្យល់នៅឯណា |
 |---|---|
-| `daily-collected-test` | **ផ្នែក ១** · **ផ្នែក ២ (2.34.2)** |
+| `daily-collected-test` · `emu/restore-mutation-emu-test` | **ផ្នែក ១** · **ផ្នែក ២ (2.34.3 · 2.34.2)** |
 | `adaptive-link-test` | **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `animation-cost` | ផ្នែក ១ · **ផ្នែក ២** · [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) · [ឧបសម្ព័ន្ធ](ARCHIVE-2026-09-03.md) |
 | `auth-recovery-test` | [បណ្ណសារកំណែ](HISTORY-ARCHIVE.md) |

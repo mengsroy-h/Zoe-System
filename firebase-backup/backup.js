@@ -108,13 +108,28 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchWithTimeout(url, init, timeoutMs, fetchImpl) {
+async function fetchWithTimeout(url, init, timeoutMs, fetchImpl, consumeResponse) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let timer;
+    const deadline = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            const error = new Error('Request timed out.');
+            error.name = 'AbortError';
+            reject(error);
+            controller.abort();
+        }, timeoutMs);
+    });
     try {
-        return await fetchImpl(url, Object.assign({}, init, { signal: controller.signal }));
+        return await Promise.race([
+            Promise.resolve().then(async () => {
+                const response = await fetchImpl(url, Object.assign({}, init, { signal: controller.signal }));
+                return consumeResponse(response);
+            }),
+            deadline
+        ]);
     } finally {
         clearTimeout(timer);
+        controller.abort();
     }
 }
 
@@ -129,24 +144,25 @@ async function requestJsonWithRetry(label, url, init, options, dependencies) {
     let lastError = null;
     for (let attempt = 0; attempt <= options.retryCount; attempt += 1) {
         try {
-            const response = await fetchWithTimeout(url, init, options.timeoutMs, fetchImpl);
-            if (!response || typeof response.status !== 'number') {
-                const invalidResponse = new Error(`${label} returned an invalid HTTP response.`);
-                invalidResponse.retryable = true;
-                throw invalidResponse;
-            }
-            if (!response.ok) {
-                const httpError = new Error(`${label} failed (HTTP ${response.status}).`);
-                httpError.retryable = RETRYABLE_HTTP_STATUS.has(response.status);
-                throw httpError;
-            }
-            try {
-                return await response.json();
-            } catch (e) {
-                const jsonError = new Error(`${label} returned invalid JSON.`);
-                jsonError.retryable = true;
-                throw jsonError;
-            }
+            return await fetchWithTimeout(url, init, options.timeoutMs, fetchImpl, async (response) => {
+                if (!response || typeof response.status !== 'number') {
+                    const invalidResponse = new Error(`${label} returned an invalid HTTP response.`);
+                    invalidResponse.retryable = true;
+                    throw invalidResponse;
+                }
+                if (!response.ok) {
+                    const httpError = new Error(`${label} failed (HTTP ${response.status}).`);
+                    httpError.retryable = RETRYABLE_HTTP_STATUS.has(response.status);
+                    throw httpError;
+                }
+                try {
+                    return await response.json();
+                } catch (e) {
+                    const jsonError = new Error(`${label} returned invalid JSON.`);
+                    jsonError.retryable = true;
+                    throw jsonError;
+                }
+            });
         } catch (e) {
             lastError = e && e.name === 'AbortError'
                 ? Object.assign(new Error(`${label} timed out after ${options.timeoutMs} ms.`), { retryable: true })

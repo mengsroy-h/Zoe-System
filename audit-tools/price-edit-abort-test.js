@@ -88,7 +88,9 @@ const NEEDED = [
     'openViewListModal', 'closeModal', 'openModalHelper', 'viewListModalShowing',
     'saveEditedBarcodePrice', 'itemHasRestoreMarkers',
     'statsMoney', 'statsPositive', 'barcodeRegistryKey', 'pickupBarcodeKey', 'collectedSetFromRecord',
-    'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode'
+    'collectedMarkValueOf', 'collectedDayHoldingKey', 'syncCollectedValueForBarcode',
+    'reconcileCollectedHistory', 'collectedMarksFor', 'collectedDayOfStamp',
+    'markCollectedRevenue', 'commitCollectedMarks', 'armLateWrite'
 ];
 const missing = NEEDED.filter((n) => !sliceFn(n));
 ok('ជាន់អប្បបរមា៖ រកឃើញ function ដែលចាំបាច់ទាំង ' + NEEDED.length,
@@ -129,7 +131,7 @@ function makeCtx(mode) {
             createElement: () => mkEl('x'),
             body: { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } }
         },
-        db: {}, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
+        db: {}, authGeneration: 0, serverTimeOffsetMs: 0, exchangeRateRiel: 4100,
         dailyRevenueData: {}, monthlyRevenueData: {}, dailyCollectedData: {},
         dbRefDailyCollected: { path: 'zoew_daily_collected_cod_dod' },
         dbRefDailyRevenue: { path: 'zoew_daily_revenue_cod_dod' },
@@ -176,7 +178,10 @@ function makeCtx(mode) {
             return Promise.resolve(runUpdater());
         },
         update: () => Promise.resolve(),
-        get: () => Promise.resolve({ exists: () => false, val: () => null })
+        get: ref => {
+            const value = ref.path.startsWith(HISTORY_ROOT + '/') ? serverHistory[ref.path.split('/')[1]] || null : null;
+            return Promise.resolve({ exists: () => value !== null, val: () => value === null ? null : JSON.parse(JSON.stringify(value)) });
+        }
     };
     ctx.window = ctx;
     vm.createContext(ctx);
@@ -184,7 +189,14 @@ function makeCtx(mode) {
     // មិនមែនចាក់លេខក្នុង checker (បើមិនដូច្នេះ ការប្តូរពិដានក្នុងកូដ ship
     // នឹងមិនឆ្លុះក្នុងតេស្ត ➜ ចាក់សោការសន្មតចាស់)។
     const DB_OP_TIMEOUT = /const DB_OP_TIMEOUT_MS = (\d+);/.exec(SRC);
+    const COLLECTED_DAYS = /const DAILY_COLLECTED_KEEP_DAYS = (\d+);/.exec(SRC);
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
+        + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
+        + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'
+        + ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'].map(name => {
+            const declaration = new RegExp('const ' + name + ' = [^;]+;').exec(SRC);
+            return declaration ? declaration[0] : '';
+        }).join('\n') + '\n'
         + NEEDED.filter((n) => sliceFn(n)).map(sliceFn).join('\n'), ctx);
     ctx.__els = els;
     return ctx;

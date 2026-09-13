@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.34.1';
+    const APP_VERSION = '2.34.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4463,14 +4463,24 @@
         openModalHelper('exchangeRateModal');
     }
 
+    function captureAuthDatabaseGuard() {
+        const generation = authGeneration;
+        const database = db;
+        const sessionAuth = auth;
+        const user = auth && auth.currentUser;
+        return () => generation === authGeneration && database === db && sessionAuth === auth && user === (auth && auth.currentUser);
+    }
+
     async function saveExchangeRate() {
         if (exchangeRateSaveInFlight) return 'pending';
+        const sessionIsCurrent = captureAuthDatabaseGuard();
         const rateInput = document.getElementById('exchangeRateInput');
         let val = rateInput ? (parseFloat(rateInput.value) || 4100) : 4100;
         if (val <= 0) val = 4100;
 
         const previousRate = exchangeRateRiel;
         const restorePreviousRate = () => {
+            if (!sessionIsCurrent()) return;
             exchangeRateRiel = previousRate;
             safeStoreSet(appLocalStore, 'zoew_exchange_rate', previousRate);
             refreshCurrentHistoryView();
@@ -4494,25 +4504,27 @@
         try {
             exchangeRateWrite = fb.set(dbRefExchangeRate, val);
             await dbOp(exchangeRateWrite);
-            showToast(`✅ បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ ទៅ Firebase រួចរាល់!`);
+            if (sessionIsCurrent()) showToast(`✅ បានរក្សាទុកអត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ ទៅ Firebase រួចរាល់!`);
             return 'done';
         } catch (error) {
             if (exchangeRateWrite && dbOpStalled(error)) {
                 lateArmed = armLateWrite(exchangeRateWrite, () => {
                     exchangeRateSaveInFlight = false;
+                    if (!sessionIsCurrent()) return;
                     showToast(`✅ បណ្តាញត្រឡប់មកវិញ — អត្រាប្រាក់ 1$ = ${val.toLocaleString()} ៛ បានរក្សាទុកទៅ Firebase រួចរាល់!`);
                 }, () => {
                     exchangeRateSaveInFlight = false;
+                    if (!sessionIsCurrent()) return;
                     restorePreviousRate();
                     showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
                 }, 'saveExchangeRate');
                 if (lateArmed) {
-                    showToast('⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរង់ចាំរក្សាទុកអត្រាប្រាក់។ សូមកុំកែម្ដងទៀត។');
+                    if (sessionIsCurrent()) showToast('⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរង់ចាំរក្សាទុកអត្រាប្រាក់។ សូមកុំកែម្ដងទៀត។');
                     return 'pending';
                 }
             }
             restorePreviousRate();
-            showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
+            if (sessionIsCurrent()) showToast('⚠️ អត្រាប្រាក់មិនបានរក្សាទុកទៅ Firebase ទេ — បានត្រឡប់ទៅអត្រាមុនវិញ។');
             return 'failed';
         } finally {
             if (!lateArmed) exchangeRateSaveInFlight = false;
@@ -4732,7 +4744,9 @@
     }
 
     async function ensureAppActivated() {
+        const sessionIsCurrent = captureAuthDatabaseGuard();
         const status = await ZoeLicense.getStatus(LICENSE_APP_CODE);
+        if (!sessionIsCurrent()) return false;
         if (status.state === 'active') {
             closeModal('activationModal');
             return true;
@@ -4763,6 +4777,7 @@
     async function submitActivationKey() {
         const btn = document.getElementById('activationSubmitBtn');
         if (btn && btn.disabled) return;
+        const sessionIsCurrent = captureAuthDatabaseGuard();
         const originalBtnText = btn ? btn.textContent : '';
         if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
         try {
@@ -4770,6 +4785,7 @@
             const keyStr = input ? input.value.trim() : '';
             if (!keyStr) { showToast('⚠️ សូមបញ្ចូល Activation Key!'); return; }
             const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 30000, 'Activation timed out');
+            if (!sessionIsCurrent()) return;
             if (!result.valid) {
                 if (input) input.value = '';
                 showToast(licenseFailureMessage(result.reason));
@@ -4777,6 +4793,7 @@
             }
             if (input) input.value = '';
             const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
+            if (!sessionIsCurrent()) return;
             if (activated) {
                 showToast("✅ Active ជោគជ័យ!");
                 updateAuthButton(true);
@@ -4789,6 +4806,7 @@
                 showToast("⚠️ Key ត្រូវបានផ្ទៀងផ្ទាត់ក្នុងគ្រឿង ប៉ុន្តែប្រព័ន្ធច្រានចោល — សូមមើលសារនៅក្នុងប្រអប់ខាងលើ");
             }
         } catch (e) {
+            if (!sessionIsCurrent()) return;
             console.error('submitActivationKey failed:', e);
             if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
             showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));
@@ -6798,13 +6816,14 @@
         return list;
     }
 
-    async function reconcileCollectedHistory(itemId, keys, attemptsLeft) {
+    async function reconcileCollectedHistory(itemId, keys, attemptsLeft, preserveCollectedDay) {
         const targetKeys = [...new Set((keys || []).filter(Boolean))];
         if (!targetKeys.length || !dbRefDailyCollected || !db || !fb) return null;
         const attemptLimit = Math.min(3, Math.max(1, attemptsLeft || 3));
         const collectedAuthGeneration = authGeneration;
         const collectedDatabase = db;
         const collectedSdk = fb;
+        const collectedRef = dbRefDailyCollected;
         const historyRef = collectedSdk.ref(collectedDatabase, `zoew_scan_history_cod_dod/${itemId}`);
         const isCurrent = () => collectedAuthGeneration === authGeneration && collectedDatabase === db;
         const readState = (snapshot) => {
@@ -6827,15 +6846,26 @@
                 if (!isCurrent()) return null;
                 const barcodes = state.filter(Boolean);
                 if (!barcodes.length) break;
+                const collectedSnapshot = preserveCollectedDay ? await dbOp(collectedSdk.get(collectedRef)) : null;
+                if (!isCurrent()) return null;
+                const collected = collectedSnapshot && collectedSnapshot.val() || {};
                 const days = new Set(Object.keys(dailyCollectedData || {}).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)));
+                Object.keys(collected).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)).forEach((day) => days.add(day));
                 const now = getServerNow();
                 for (let index = 0; index < DAILY_COLLECTED_KEEP_DAYS; index++) days.add(getZoneDateKey(now, -index));
                 const marks = [];
                 barcodes.forEach((barcode) => {
                     const key = pickupBarcodeKey(barcode.code);
+                    const heldDay = preserveCollectedDay ? Object.keys(collected).filter((day) => PICKUP_DATE_KEY_PATTERN.test(day)
+                        && collected[day] && Object.prototype.hasOwnProperty.call(collected[day], key)).sort().reverse()[0] : null;
+                    if (preserveCollectedDay && !heldDay) return;
                     days.forEach((day) => { marks.push({ key: key, day: day, value: null }); });
-                    if (barcode.isClosed) marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                    if (barcode.isClosed) {
+                        if (preserveCollectedDay) marks.push({ key: key, day: heldDay, value: collectedMarkValueOf(barcode) });
+                        else marks.push(...collectedMarksFor(barcode, true, barcode.closedAt));
+                    }
                 });
+                if (preserveCollectedDay && !marks.length) return true;
                 const applied = markCollectedRevenue(marks);
                 if (!applied) return null;
                 let saved;
@@ -6843,7 +6873,7 @@
                     saved = await dbOp(applied.server);
                 } catch (error) {
                     if (dbOpStalled(error) && attempt + 1 < attemptLimit) {
-                        armLateWrite(applied.server, () => isCurrent() ? reconcileCollectedHistory(itemId, targetKeys, attemptLimit - attempt - 1) : null,
+                        armLateWrite(applied.server, () => isCurrent() ? reconcileCollectedHistory(itemId, targetKeys, attemptLimit - attempt - 1, preserveCollectedDay) : null,
                             null, 'reconcileCollectedHistory');
                     }
                     throw error;
@@ -6865,13 +6895,7 @@
     function syncCollectedValueForBarcode(itemId, barcodeCode) {
         const key = pickupBarcodeKey(barcodeCode);
         if (!key) return null;
-        const day = collectedDayHoldingKey(key);
-        if (!day) return null;
-        const item = scanHistory.find((i) => i && i.id === itemId);
-        const barcode = (item && Array.isArray(item.barcodes))
-            ? item.barcodes.find((b) => b && b.code === barcodeCode) : null;
-        if (!barcode || !barcode.isClosed) return null;
-        return markCollectedRevenue([{ key: key, day: day, value: collectedMarkValueOf(barcode) }]);
+        return reconcileCollectedHistory(itemId, [key], undefined, true);
     }
 
     function collectedTotalsOfDay(record) {
@@ -11437,6 +11461,9 @@
 
                 const editedItemId = item.id;
                 const editedBarcodeCode = activeEditingBarcode;
+                const editedAuthGeneration = authGeneration;
+                const editedDatabase = db;
+                const editIsCurrent = () => editedAuthGeneration === authGeneration && editedDatabase === db;
                 let serverOldCod = null;
                 let serverOldDod = null;
                 let serverApplied = false;
@@ -11509,6 +11536,7 @@
                     editRevenueApplied = null;
                 };
                 const settleEditedPrice = (result) => {
+                    if (!editIsCurrent()) return;
                     const committed = !!(result && result.committed);
                     if (!committed || !serverApplied) {
                         undoEditedPriceRevenue();
@@ -11520,11 +11548,12 @@
                             : "⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                         return;
                     }
-                    syncCollectedValueForBarcode(editedItemId, editedBarcodeCode);
+                    const collectedSync = syncCollectedValueForBarcode(editedItemId, editedBarcodeCode);
                     const actualCodDiff = (Math.round(newCod * 100) - Math.round(serverOldCod * 100)) / 100;
                     const actualDodDiff = (Math.round(newDod * 100) - Math.round(serverOldDod * 100)) / 100;
-                    correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0).then((status) => {
-                        if (status && status.ok) {
+                    Promise.all([correctRevenueLedgerToActual(revenueScanDate, editRevenueApplied, actualCodDiff, actualDodDiff, 0), collectedSync]).then(([status, collectedSaved]) => {
+                        if (!editIsCurrent()) return;
+                        if (status && status.ok && collectedSaved !== null) {
                             showToast("✅ បានកែប្រែទឹកប្រាក់តាមកញ្ចប់ជោគជ័យ!");
                             return;
                         }
@@ -11532,6 +11561,7 @@
                         if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
                         showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
                     }, (ledgerErr) => {
+                        if (!editIsCurrent()) return;
                         if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'saveEditedBarcodePrice ledger reconciliation', itemId: editedItemId });
                         showToast("⚠️ តម្លៃកញ្ចប់បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។");
                     });
@@ -11539,6 +11569,7 @@
                     showToast("⏳ តម្លៃកញ្ចប់បានរក្សាទុក — កំពុងផ្ទៀងផ្ទាត់ស្ថិតិប្រាក់…");
                 };
                 const failEditedPrice = (err) => {
+                    if (!editIsCurrent()) return;
                     undoEditedPriceRevenue();
                     revertEditedPriceLocally();
                     refreshCurrentHistoryView();
@@ -11559,6 +11590,7 @@
                     return applyEditedPriceTo(currentItem);
                 });
                 dbOp(priceTx).then(settleEditedPrice, (error) => {
+                    if (!editIsCurrent()) return;
                     if (dbOpStalled(error) && armLateCommit(priceTx, settleEditedPrice, (lateErr, lateResult) => {
                         if (lateResult) { settleEditedPrice(lateResult); return; }
                         failEditedPrice(lateErr);

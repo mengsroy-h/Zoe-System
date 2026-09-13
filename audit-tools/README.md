@@ -161,7 +161,7 @@ bash audit-tools/emu/rules.sh
 | `stats-measurable-gate-test.js` | **អេក្រង់ស្ថិតិមិនត្រូវរាយលេខលើអ្វីដែលវាស់មិនបាន** ៖ រូបមន្ត «ចំណូល» គឺ `ledger − កញ្ចប់មិនទាន់យក` ➜ ច្រកទ្វារ `collectedValueIsMeasurable()` ត្រូវគ្រប **ទាំងសងខាង** (`history` · `deleted` **និង `dailyRevenue`**)។ រត់អេក្រង់ពិត ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ** និង **ងាប់** រួចអានលេខចេញពី HTML ➜ ត្រូវឃើញ `—` មិនមែន `$0.00` | `STATSGATE_APP_DIR` |
 | `collected-value-fuzz-test.js` | **លេខលុយលើអេក្រង់ត្រូវត្រឹមត្រូវលើ *លំដាប់ចៃដន្យ*** ៖ សាងស្ថានភាពចៃដន្យ (រួមទាំងការឃ្លាតពិត ៖ «កែទឹកប្រាក់» ដោយដៃ · ថ្ងៃគ្មានជួរ ledger · ledger ខែឃ្លាតពីថ្ងៃ · listener ព្យួរ/ងាប់) រួចរត់អេក្រង់ **ពិត** ក្នុង `vm` ហើយអានលេខចេញពី HTML។ អះអាងអថេរ ៥ ៖ (ក) ថ្ងៃ↔របាយការណ៍ខែ · (ខ) ខែ=ផលបូកថ្ងៃ · (គ) វាស់មិនបាន➜`—` · (ឃ) ចំណូល=Σ barcode `isClosed && !isDeducted` · (ង) ចំណូល+មិនទាន់យក=តម្លៃទាំងអស់។ ⛔ តម្លៃសាកល្បង**មានសេន** (លេខមូលលាក់ mutation នៃការបង្គត់) | `COLLECTFUZZ_APP_DIR` · `CFUZZ_RUNS` · `CFUZZ_RUN0` |
 | `empty-state-truth-test.js` | **អេក្រង់មិនត្រូវអះអាង «គ្មានទិន្នន័យ» ខណៈការពិតគឺ «មិនទាន់មកដល់»** ៖ ច្បាប់ដដែលនឹង 2.31.7 តែលើ **ករណីបញ្ជីទទេ**។ រត់អេក្រង់ **ពិត** (ស្ថិតិប្រចាំថ្ងៃ · **ចំណូលប្រចាំថ្ងៃ** · របាយការណ៍ខែ · ធុងសំរាម · តារាងប្រវត្តិ) ក្នុង `vm` ដោយដាក់ listener ក្នុងរបៀប **ព្យួរ (pending)** និង **ងាប់ (failed)** រួច **អានអត្ថបទដែលអ្នកប្រើឃើញ** ➜ ត្រូវជា «វាស់មិនបាន» មិនមែន «គ្មានទិន្នន័យ»។ ⛔ ទិសផ្ទុយ ៣ ៖ listener រស់ + ទទេពិត ➜ សារដើមដដែល · តម្រងស្វែងរករកមិនឃើញ ➜ «រកមិនឃើញ» · បញ្ជីមិនទទេ ➜ ជួរដេកធម្មតា។ ⛔ **អេក្រង់ទី ៦ ៖ ប្រអប់ «ZTO មិនទាន់បិទ»** (វាធ្លាប់ត្រូវ **stub ចោល** ➜ គ្មានតេស្តសោះ) បូក **របា** និង **toast 🔄** ៖ ទាំង ៣ អានប្រភព **២** ➜ ច្រកទ្វារ `ZTO_SYNC_VIEW_KEYS` ត្រូវគ្រប **២**។ បូក ៖ ភាពមិនពេញត្រូវចូល **signature** (cache មិនបង្កកអត្ថបទចាស់ ពេល listener ងាប់ *ក្រោយ*) | `EMPTYSTATE_APP_DIR` |
-| `daily-collected-test.js` | ចំណូលតាមថ្ងៃយក៖ អត្តសញ្ញាណ barcode · តម្លៃ server ក្រោយ close · ផ្លាស់ថ្ងៃទាំងគូ · បដិសេធ/late write · repair មានពិដាន · auth/database fence · delete/restore/reopen · កែតម្លៃមិនបង្កើតធាតុថ្មី · cleanup ៧ ថ្ងៃ និងស្នាមភ្ជាប់ rules។ មិនអះអាង atomicity រវាង history និង mirror | `COLLECTED_APP_DIR` |
+| `daily-collected-test.js` | ចំណូលតាមថ្ងៃយក៖ អត្តសញ្ញាណ barcode · តម្លៃ server ក្រោយ close · ផ្លាស់ថ្ងៃទាំងគូ · បដិសេធ/late write · repair មានពិដាន · auth/database fence · delete/restore/reopen · កែតម្លៃផ្ទៀង server ទោះ listener យឺត និងមិនបង្កើតធាតុថ្មី · cleanup ៧ ថ្ងៃ និងស្នាមភ្ជាប់ rules។ មិនអះអាង atomicity រវាង history និង mirror | `COLLECTED_APP_DIR` |
 | `money-reality-check.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** (ត្រូវការឯកសារ dump) | 🩺 **ការវាស់លុយលើទិន្នន័យផលិតកម្មពិត — អានសុទ្ធសាធ** ៖ `node audit-tools/money-reality-check.js <dump.json|.json.gz>` (Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON)។ យកកូដលុយ **ពិត** ចេញពី `app.js` មករត់លើ dump ➜ ពិនិត្យ ៦ ៖ ledger ខែ = Σ ថ្ងៃ · លុយជួរដេក = Σ barcodes · ស្ថិតិយកជាអត្តសញ្ញាណ · លេខអវិជ្ជមាន/NaN · «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ · barcode ស្ទួន។ ⛔ **មិនបោះពុម្ពលេខទូរស័ព្ទ ឬ barcode** · **មិនភ្ជាប់បណ្តាញ** · **មិនសរសេរអ្វី** | `MONEYREAL_APP_DIR` |
 | `redact-dump.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔒 **សម្អាត dump ➜ ឯកសារដែលផ្ញើបាន** ៖ `node audit-tools/redact-dump.js <dump.json> [out.json]`។ ជំនួសលេខទូរស័ព្ទ · barcode · id ដោយ hash (salt **ចៃដន្យរាល់ការរត់** ➜ បញ្ច្រាសមិនបាន) · លុប Locker/ឈ្មោះ/token។ ⛔ រក្សា **រចនាសម្ព័ន្ធ និងទឹកប្រាក់** ➜ `money-reality-check` ឲ្យលទ្ធផល **ដូចគ្នាបេះបិទ** (វាស់បាន ៖ កំហុស ៥ ➜ ចាប់បាន ៥ ក្រោយសម្អាត)។ មានជាន់ស្កេនរកលេខទូរស័ព្ទសល់ ➜ exit 1 | — |
 | `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json|.json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
@@ -180,7 +180,7 @@ bash audit-tools/emu/rules.sh
 | `clear-history-claim-test.js` · `clear-history-finalization-fence-test.js` | «លុបទាំងអស់» claim និង fence | — |
 | `emu/crud-rules-flow.js` | payload ពិត ធៀបនឹង **rules ពិត** លើ emulator | `CRUDFLOW_APP_DIR` |
 | `emu/restore-deadlock-test.js` | witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង) | `DEADLOCK_APP_DIR` |
-| `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
+| `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; sandbox ផ្គត់ផ្គង់ auth/database និង collected ref, អាន collected snapshot ពិត និងស្រង់ថេរពី App; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
 | `emu/rules.sh` | rules ពិតលើ emulator ពិត | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 
@@ -211,7 +211,7 @@ bash audit-tools/emu/rules.sh
 | `locker-claim-guard-test.js` | ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់» ដែល claim រួច ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ | `LOCKERCLAIM_APP_DIR` |
 | `stale-clear-claim-test.js` | `clearClaim` ដែល lease ផុត ជាអន្ទាក់ស្ថាពរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) | `STALECLAIM_APP_DIR` |
 | `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
-| `periodic-network-guard-test.js` | ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល  · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
+| `periodic-network-guard-test.js` | callback Activate ចាស់មិនប្ដូរ UI/listener របស់ auth/database ថ្មី · ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
 | `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |
 | `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ | `SWINTEG_APP_DIR` |
@@ -271,12 +271,12 @@ bash audit-tools/emu/rules.sh
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
-| `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen | `KEYGEN_APP_DIR` |
+| `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ | — |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |
-| `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក | `FBACKUP_APP_DIR` |
+| `firebase-config-paste-test.js` · `firebase-backup-test.js` | ការ paste Config និង CLI បម្រុងទុក; native HTTP body ព្យួរ/បដិសេធត្រូវមានពិដាន និងបិទ socket | `FBACKUP_APP_DIR` |
 
 #### UI · ទម្រង់បង្ហាញ · កាយវិការ
 
@@ -295,7 +295,7 @@ bash audit-tools/emu/rules.sh
 | `ui-flow-test.js` | អន្តរកម្មជម្រៅ · ការប្រណាំងឧបករណ៍ច្រើន · ផ្លូវបរាជ័យ · ប្រអប់ជាន់លើបិទ ➜ ផ្លូវលុប/កែ មិនខូច | `UIFLOW_APP_DIR` |
 | `toast-truth-test.js` | Toast និយាយការពិត realtime | `TOAST_APP_DIR` |
 | `toast-action-truth-test.js` | Toast សកម្មភាពសរសេរ៖ pending/reject/commit ពិត · static semantic marker ទាំង ២ App | `TOAST_ACTION_APP_DIR` |
-| `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
+| `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin; សេណារីយ៉ូធម្មតាទប់សំណើក្រៅ origin ដើម្បីមិនពឹង CDN | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
 | `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSMEDIA_APP_DIR` |
 | `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |

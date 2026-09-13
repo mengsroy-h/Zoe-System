@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.22';
+const APP_VERSION = '2.19.23';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1870,7 +1870,7 @@ async function generateLicenseKey() {
             ? 'អស់ពេល (Timeout)! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត។'
             : 'មិនអាចបង្កើត Key បានទេ! សូមពិនិត្យការភ្ជាប់ Firebase និងសិទ្ធិគណនី។');
     } finally {
-        if (!isSensitiveSessionCurrent(operation, true) || signingPrivateKeyJwk !== privateKeyJwk) return;
+        if (!isSensitiveSessionCurrent(operation, true)) return;
         isGeneratingKey = false;
         if (genBtn) { genBtn.disabled = false; genBtn.textContent = '🔐 Generate Key'; }
     }

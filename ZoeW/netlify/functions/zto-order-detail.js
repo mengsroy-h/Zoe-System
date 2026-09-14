@@ -32,9 +32,18 @@ const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcod
 // ផ្ទុក **array** (`data.result[]`) ➜ `orderCandidates()` ដែលរកវត្ថុ
 // **តែមួយ** មិនស្រង់វាចេញបានទេ។ វាល barcode ក៏ផ្សេងដែរ ៖ `scanBillCode`។
 //
-// ⛔ **មុខងារនេះជាការស្រេចចិត្ត** — គ្មាន `ZTO_LIST_SITE_CODE` ➜ វាដេកលក់
+// ⛔ **មុខងារនេះជាការស្រេចចិត្ត** — គ្មានលេខសាខាក្នុងសំណើ ➜ វាដេកលក់
 // ទាំងស្រុង ហើយការកំណត់ **ខុស** បិទតែវា មិនប៉ះការស្កេន (ច្បាប់ដដែលនឹង
 // `ZTO_FIELD_SIGNED` ៖ លេខទូរស័ព្ទ និងលុយសំខាន់ជាងបញ្ជី)។
+//
+// ⛔ **លេខសាខាមកពី *សំណើ* មិនមែនពី env ទៀតទេ** (សំណើម្ចាស់គម្រោង
+// 2026-09-14) ៖ `ZTO_LIST_SITE_CODE` ក្នុង Netlify ចាក់សោ deploy ទាំងមូល
+// ចូល **សាខាតែមួយ** ខណៈ ZoeW ត្រូវបម្រើសាខាច្រើន ➜ លេខសាខារស់ក្នុង
+// ZoeW របស់ឧបករណ៍នីមួយៗវិញ ហើយចូលមកជា `?site=`។ ⛔ ការបញ្ចាំងពិតឈរខាង
+// **ZTO** ៖ Cookie ជារបស់គណនីអាជីវកម្ម ➜ សាខាដែលគណនីនោះគ្មានសិទ្ធិ
+// ត្រឡប់បញ្ជីទទេ។ ⛔ ហើយលេខសាខាត្រូវចូល **កូនសោ cache** ជាដាច់ខាត —
+// បើមិនដូច្នេះ សាខា ក ទទួលបញ្ជីរបស់សាខា ខ ពី cache ➜ **COD របស់
+// អតិថិជនអ្នកដទៃចូល ZoeW**។
 const DEFAULT_LIST_URL = 'https://aargus-api.ztoglobal.com/scan/page/scan';
 const DEFAULT_LIST_SCAN_TYPE = '03';
 // ⛔ `scanTypeCode` ជាតម្រងដែល **ZTO** អនុវត្ត ➜ យើងផ្ទៀងផ្ទាត់វាមិនបាន។
@@ -663,12 +672,9 @@ function readSignedConfig(env) {
 // **សម្លាប់ការស្កេន** ទាំងស្រុង។
 function readListConfig(env) {
     const out = {
-        enabled: false, url: null, siteCode: '', scanType: DEFAULT_LIST_SCAN_TYPE,
+        enabled: false, url: null, scanType: DEFAULT_LIST_SCAN_TYPE,
         pageSize: 100, maxPages: 3, reason: '', fingerprint: ''
     };
-    const rawSite = String(env.ZTO_LIST_SITE_CODE || '').trim();
-    if (!rawSite) { out.reason = 'site:missing'; return out; }
-    if (!LIST_SITE_CODE_RE.test(rawSite)) { out.reason = 'site:invalid'; return out; }
     let url;
     try {
         url = new URL(String(env.ZTO_LIST_URL || '').trim() || DEFAULT_LIST_URL);
@@ -681,7 +687,6 @@ function readListConfig(env) {
     if (!LIST_SCAN_TYPE_RE.test(scanType)) { out.reason = 'scan-type:invalid'; return out; }
     out.enabled = true;
     out.url = url;
-    out.siteCode = rawSite;
     out.scanType = scanType;
     // ⛔ អត្ថបទទទេ ជាការ **បិទជាន់នេះដោយចេតនា** (ZTO ប្តូរឈ្មោះ ➜ អ្នកប្រើ
     // ត្រូវអាចដោះវាចេញភ្លាម ដោយមិនរង់ចាំ deploy កូដ)។ `undefined` ➜ លំនាំដើម។
@@ -692,13 +697,22 @@ function readListConfig(env) {
     out.maxPages = boundedInteger(env.ZTO_LIST_MAX_PAGES, 3, 1, 20);
     out.fingerprint = crypto.createHash('sha256')
         .update(url.href).update(FIELD_SEPARATOR)
-        .update(rawSite).update(FIELD_SEPARATOR)
         .update(scanType).update(FIELD_SEPARATOR)
         .update(out.scanDesc).update(FIELD_SEPARATOR)
         .update(String(out.pageSize))
         .digest('base64url')
         .slice(0, 16);
     return out;
+}
+
+// ⛔ សាលក្រម **៣** ដដែលនឹង `readListConfig()` ៖ អវត្តមាន ➜ `site:missing` ·
+// រូបរាងខុស ➜ `site:invalid` · ត្រឹមត្រូវ ➜ កូដ។ ⛔ វា **មិនបោះ** ៖ «បិទ»
+// មិនមែនកំហុស ➜ HTTP 200 គ្មានវាល `error` (ច្បាប់ដដែលនឹង `found:false`)។
+function listSiteCodeOf(raw) {
+    const text = String(raw === undefined || raw === null ? '' : raw).trim();
+    if (!text) return { code: '', reason: 'site:missing' };
+    if (!LIST_SITE_CODE_RE.test(text)) return { code: '', reason: 'site:invalid' };
+    return { code: text, reason: '' };
 }
 
 // ⛔ កាលបរិច្ឆេទត្រូវ **ពិត** មិនត្រឹមត្រូវនឹង regex ៖ `2026-02-31` ឆ្លង
@@ -721,7 +735,7 @@ function listRange(fromText, toText) {
     return { from: from, to: to, start: from + ' 00:00:00', end: to + ' 23:59:59' };
 }
 
-function listRequestBody(listConfig, range, page) {
+function listRequestBody(listConfig, siteCode, range, page) {
     return {
         condition: {
             dispatchOrSendManCode: null,
@@ -729,7 +743,7 @@ function listRequestBody(listConfig, range, page) {
             preOrNextStationCode: null,
             scanEndTime: range.end,
             scanManCode: null,
-            scanSiteCode: listConfig.siteCode,
+            scanSiteCode: siteCode,
             scanStartTime: range.start,
             scanTypeCode: listConfig.scanType,
             signMan: null
@@ -1413,9 +1427,12 @@ function diagnosticsBody(config, headers, authKind, credential) {
         },
         // ⛔ ស្ថានភាព **បើក/បិទ + មូលហេតុ** ប៉ុណ្ណោះ ៖ លេខសាខាជាការកំណត់
         // របស់អាជីវកម្ម ➜ វាមិនត្រូវលេចក្នុងចម្លើយវិនិច្ឆ័យទេ (ច្បាប់ដដែល
-        // នឹង `signedValues` ដែលរាយត្រឹម **ចំនួន**)។
+        // នឹង `signedValues` ដែលរាយត្រឹម **ចំនួន**)។ ⛔ `siteFromRequest`
+        // ជា **ការពិតអំពីកំណែកូដ** មិនមែនតម្លៃ ៖ វាប្រាប់ថា server លែង
+        // កាន់លេខសាខា ➜ `site:missing` លែងលេចក្នុង `?diag=1` ទៀតហើយ។
         list: {
             enabled: config.list.enabled,
+            siteFromRequest: true,
             reason: config.list.reason || null,
             host: config.list.url ? config.list.url.hostname : null,
             path: config.list.url ? config.list.url.pathname : null,
@@ -1481,13 +1498,14 @@ exports.handler = async function handler(event) {
     if (wantsList) {
         // ⛔ មុខងារបិទ ≠ កំហុស ➜ HTTP 200 **គ្មានវាល `error`** (ច្បាប់ដដែល
         // នឹង `found:false` ៖ វាល `error` បង្ខំ client ចូល cooldown)។
-        if (!config.list.enabled) {
+        const site = listSiteCodeOf(query.site);
+        if (!config.list.enabled || site.reason) {
             return json(200, {
                 success: false,
                 list: true,
                 enabled: false,
                 code: 'ZTO_LIST_NOT_CONFIGURED',
-                reason: config.list.reason || 'site:missing'
+                reason: config.list.reason || site.reason
             });
         }
         const range = listRange(query.from, query.to);
@@ -1503,15 +1521,18 @@ exports.handler = async function handler(event) {
         }
         plan = {
             href: config.list.url.href,
-            body: listRequestBody(config.list, range, page),
+            body: listRequestBody(config.list, site.code, range, page),
             extract: (upstream) => {
                 const container = listContainerOf(upstream);
                 return container ? listResponseBody(config, container, page) : null;
             },
             // ⛔ កូនសោបញ្ជីត្រូវ **ផ្សេងតាមរចនាសម្ព័ន្ធ** ពីកូនសោ barcode ៖
             // `BARCODE_RE` មិនអនុញ្ញាត `|` ➜ បច្ច័យ `|L|` មិនអាចប៉ះគ្នាបាន។
+            // ⛔ **លេខសាខាឈរក្នុងកូនសោដែរ** ៖ instance តែមួយបម្រើសាខាច្រើន
+            // ➜ កូនសោគ្មានសាខា នឹងបម្រើបញ្ជីរបស់សាខាមុនទៅសាខាបន្ទាប់
+            // (`LIST_SITE_CODE_RE` មិនអនុញ្ញាត `|` ➜ ប៉ះគ្នាមិនបាន)។
             cacheKey: config.fingerprint + '|L|' + config.list.fingerprint
-                + '|' + range.from + '|' + range.to + '|' + page,
+                + '|' + site.code + '|' + range.from + '|' + range.to + '|' + page,
             cacheTtlMs: config.listCacheTtlMs
         };
     }

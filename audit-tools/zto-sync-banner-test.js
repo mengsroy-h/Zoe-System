@@ -1623,7 +1623,9 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const realFetch = window.fetchWithTimeout;
         const realApply = window.applyBarcodeCloseChange;
         const run = async (opts) => {
-            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base }));
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({
+                enabled: true, url: base, fastMode: opts.fast !== false
+            }));
             localStorage.setItem('zoew_zto_autoclose_v1', opts.on ? '1' : '0');
             document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
             clearZtoPickupStatusStore();
@@ -1649,16 +1651,27 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const onFalse = await run({ on: true, verdict: false });
         const onNull = await run({ on: true, verdict: 'មិនមែន boolean' });
         const off = await run({ on: false, verdict: true });
+        const noFast = await run({ on: true, verdict: true, fast: false });
         const dflt = (function () {
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({
+                enabled: true, url: base, fastMode: true
+            }));
             localStorage.removeItem('zoew_zto_autoclose_v1');
             return ztoAutoCloseEnabled();
         })();
-        return { onTrue: onTrue, onFalse: onFalse, onNull: onNull, off: off, dflt: dflt };
+        const dfltNoFast = (function () {
+            localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base }));
+            localStorage.removeItem('zoew_zto_autoclose_v1');
+            return ztoAutoCloseEnabled();
+        })();
+        return { onTrue: onTrue, onFalse: onFalse, onNull: onNull, off: off,
+            noFast: noFast, dflt: dflt, dfltNoFast: dfltNoFast };
         });
     } catch (e) { autoClose = null; }
     if (!autoClose) {
         autoClose = { onTrue: { asked: [], closed: [] }, onFalse: { closed: [] },
-            onNull: { closed: [] }, off: { asked: [], closed: [] }, dflt: false };
+            onNull: { closed: [] }, off: { asked: [], closed: [] },
+            noFast: { asked: [], closed: [] }, dflt: false, dfltNoFast: true };
         ok('⛔ មុខងារបិទតាម ZTO មិនទាន់មាន — វាស់មិនបាន', false, 'ztoAutoCloseEnabled/autoCloseBarcodeFromZto');
     }
     ok('លក្ខខណ្ឌចាំបាច់ ៖ កុងតាក់បើក ➜ សួរទាំង barcode បើក ទាំងបិទ',
@@ -1678,6 +1691,13 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         autoClose.off.asked.length === 1 && autoClose.off.asked[0].indexOf('SHUT') === 0
         && autoClose.off.closed.length === 0, autoClose.off);
     ok('លំនាំដើម ៖ កុងតាក់បើក (សំណើអ្នកប្រើ)', autoClose.dflt === true, autoClose.dflt);
+    ok('⛔ ដកគ្រីស «Fast Mode» ➜ ការបិទស្វ័យប្រវត្តិ **ឈប់** (មិនត្រឹមលាក់កុងតាក់)',
+        autoClose.noFast.closed.length === 0, autoClose.noFast);
+    ok('⛔ ហើយវាមិនសួរ ZTO អំពីកញ្ចប់បើកសោះ (សន្សំទិន្នន័យដដែល)',
+        autoClose.noFast.asked.filter((c) => String(c).indexOf('OPEN') === 0).length === 0,
+        autoClose.noFast.asked);
+    ok('⛔ លំនាំដើម «បើក» មិនត្រូវឈ្នះ Fast Mode ដែលដកគ្រីស',
+        autoClose.dfltNoFast === false, autoClose.dfltNoFast);
 
     // ⛔ **ចង្វាក់សួរ** ៖ សាលក្រមរបស់កញ្ចប់ **បើក** មិនស្ថាពរទេ — អតិថិជនមក
     // យកពេលណាក៏បាន ➜ ត្រូវសួរឡើងវិញរាល់ ១ ម៉ោង។ ⛔ តែមិនត្រូវសួរញឹកជាងនោះ
@@ -1760,7 +1780,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     try {
         starve = await page.evaluate(async () => {
         const base = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
-        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base }));
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({ enabled: true, url: base, fastMode: true }));
         localStorage.setItem('zoew_zto_autoclose_v1', '1');
         document.querySelectorAll('.modal').forEach((m) => { m.style.display = 'none'; });
         clearZtoPickupStatusStore();
@@ -1956,6 +1976,10 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     let layer2 = null;
     try {
         layer2 = await page.evaluate(async () => {
+        localStorage.setItem('zoew_lookup_api_config', JSON.stringify({
+            enabled: true, fastMode: true,
+            url: 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}'
+        }));
         localStorage.setItem('zoew_zto_autoclose_v1', '1');
         const item = { id: 'd1', phone: '014', barcodes: [{ code: 'LAYR00000001', isClosed: false }] };
         const closed = [];
@@ -2006,6 +2030,54 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         claimSkip.codes.indexOf('CLAI00000001') === -1, claimSkip);
     ok('⛔ ធាតុដែលមាន marker ស្តារ មិនត្រូវចូលជួរបិទស្វ័យប្រវត្តិ',
         claimSkip.codes.indexOf('REST00000001') === -1, claimSkip);
+
+    // ══════════════════════════════════════════════════════════════════════
+    console.log('\n== ២២. ⛔ «Fast Mode» ជាច្រកទ្វារនៃកុងតាក់ ZTO ទាំង ២ ==');
+    // ═════════════════════════════════════════════════════════════════════
+    // សំណើម្ចាស់គម្រោង (2026-09-14) ៖ កុងតាក់ «បិទតាម ZTO ស្វ័យប្រវត្តិ» និង
+    // «ទាញបញ្ជីកញ្ចប់ពី ZTO» ត្រូវលេច **តែពេលគូស «Fast Mode សម្រាប់ ZTO
+    // Lookup»**។ ⛔ ការវាស់ត្រូវជា `getComputedStyle().display` ក្រោយ
+    // `openSideDrawer()` **ពិត** — មិនមែនវត្តមាន class ៖ class ដែលគ្មានច្បាប់
+    // CSS លាក់ ធ្វើឲ្យអ្នកយាមបៃតងលើ UI ដែលនៅតែលេច។
+    let drawerRows = null;
+    try {
+        drawerRows = await page.evaluate(() => {
+        const base = 'https://example.invalid/.netlify/functions/zto-order-detail?barcode={barcode}';
+        const read = () => {
+            openSideDrawer();
+            const shown = (id) => {
+                const el = document.getElementById(id);
+                return !!el && getComputedStyle(el).display !== 'none';
+            };
+            const out = { auto: shown('ztoAutoCloseBtn'), list: shown('ztoListSyncDrawerBtn') };
+            closeSideDrawer();
+            return out;
+        };
+        localStorage.setItem('zoew_zto_autoclose_v1', '1');
+        localStorage.setItem('zoew_zto_listsync_v1', '1');
+        localStorage.setItem('zoew_zto_list_site_v1', '881859');
+        localStorage.setItem('zoew_lookup_api_config',
+            JSON.stringify({ enabled: true, url: base, fastMode: true }));
+        const on = read();
+        localStorage.setItem('zoew_lookup_api_config',
+            JSON.stringify({ enabled: true, url: base, fastMode: false }));
+        const off = read();
+        localStorage.removeItem('zoew_lookup_api_config');
+        const none = read();
+        return { on: on, off: off, none: none };
+        });
+    } catch (e) { drawerRows = null; }
+    if (!drawerRows) {
+        drawerRows = { on: { auto: false, list: false }, off: { auto: true, list: true },
+            none: { auto: true, list: true } };
+        ok('⛔ វាស់ការលេច/លាក់របស់កុងតាក់មិនបាន', false, 'openSideDrawer/refreshZto*Ui');
+    }
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ គូស Fast Mode ➜ កុងតាក់ទាំង ២ **លេច**',
+        drawerRows.on.auto === true && drawerRows.on.list === true, drawerRows.on);
+    ok('⛔ ដកគ្រីស Fast Mode ➜ កុងតាក់ទាំង ២ **លាក់**',
+        drawerRows.off.auto === false && drawerRows.off.list === false, drawerRows.off);
+    ok('⛔ គ្មាន Config ស្វែងរកសោះ ➜ លាក់ដដែល (មិនធ្លាក់ចុះទៅ «លេច»)',
+        drawerRows.none.auto === false && drawerRows.none.list === false, drawerRows.none);
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

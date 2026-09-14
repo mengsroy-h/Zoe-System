@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.34.3';
+    const APP_VERSION = '2.35.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -73,15 +73,18 @@
         "openCollectedStatsModal",
         "openSideDrawer",
         "openViewListModal",
+        "openZtoListSiteModal",
         "openZtoListSyncModal",
         "openZtoSyncModal",
         "pickSheetImportFile",
         "promptPermanentDelete",
         "promptRestoreDeletedItem",
+        "closeZtoListSiteModal",
         "closeZtoListSyncModal",
         "closeZtoSyncModal",
         "recheckZtoPickupStatus",
         "runZtoListSyncPreview",
+        "saveZtoListSiteCode",
         "renderEntryList",
         "renderLockerList",
         "renderMonthlyReport",
@@ -2634,6 +2637,7 @@
         clearCustomerDataTableCache();
         if (headerValueIn) headerValueIn.value = '';
         closeModal('lookupApiConfigModal');
+        refreshZtoAutoCloseUi();
         refreshZtoListSyncUi();
         prefetchCustomerDataTableRowsIfConfigured();
         showToast(enabled ? "✅ បានបើក API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ!" : "ℹ️ បានរក្សាទុក Config (មិនទាន់បើកដំណើរការ)!");
@@ -4617,6 +4621,7 @@
         ztoListSignedProbe.clear();
         ztoListSyncInFlight = false;
         closeModal('ztoListSyncModal');
+        closeModal('ztoListSiteModal');
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -4668,7 +4673,8 @@
             'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
             'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
             'appLockPinInput', 'appLockMsg',
-            'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
+            'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo',
+            'ztoListSiteInput', 'ztoListSiteNote'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);
@@ -6076,6 +6082,7 @@
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();
+        refreshZtoAutoCloseUi();
         refreshZtoListSyncUi();
         prefetchCustomerDataTableRowsIfConfigured();
 
@@ -13207,6 +13214,11 @@
         return cfg;
     }
 
+    function ztoFastModeIsOn() {
+        const cfg = getLookupApiConfig();
+        return !!(cfg && cfg.fastMode);
+    }
+
     function ztoStatusTrashItemCounts(item) {
         if (!item || trashReasonOf(item) !== 'pickup') return false;
         const deletedAt = parseFloat(item.deletedAt);
@@ -13245,7 +13257,7 @@
     }
 
     function ztoAutoCloseEnabled() {
-        return safeStoreGet(appLocalStore, ZTO_AUTOCLOSE_KEY) !== '0';
+        return ztoFastModeIsOn() && safeStoreGet(appLocalStore, ZTO_AUTOCLOSE_KEY) !== '0';
     }
 
     function refreshZtoAutoCloseUi() {
@@ -13253,11 +13265,18 @@
         const state = document.getElementById('ztoAutoCloseState');
         if (state) state.textContent = on ? 'បើក' : 'បិទ';
         const btn = document.getElementById('ztoAutoCloseBtn');
-        if (btn) btn.classList.toggle('is-on', on);
+        if (btn) {
+            btn.classList.toggle('is-on', on);
+            btn.classList.toggle('hidden', !ztoFastModeIsOn());
+        }
     }
 
     function drawerZtoAutoCloseFlow() {
         drawerAction(function () {
+            if (!ztoFastModeIsOn()) {
+                showToast(ZTO_FAST_MODE_HINT);
+                return;
+            }
             const next = !ztoAutoCloseEnabled();
             safeStoreSet(appLocalStore, ZTO_AUTOCLOSE_KEY, next ? '1' : '0');
             refreshZtoAutoCloseUi();
@@ -13664,6 +13683,9 @@
     }
 
     const ZTO_LISTSYNC_KEY = 'zoew_zto_listsync_v1';
+    const ZTO_LIST_SITE_KEY = 'zoew_zto_list_site_v1';
+    const ZTO_LIST_SITE_RE = /^[A-Za-z0-9_-]{1,32}$/;
+    const ZTO_FAST_MODE_HINT = 'ℹ️ សូមគូស «Fast Mode សម្រាប់ ZTO Lookup» ក្នុង API ស្វែងរកជាមុនសិន';
     const ZTO_LIST_DEFAULT_DAYS = 4;
     const ZTO_LIST_CLIENT_MAX_PAGES = 3;
     const ZTO_LIST_PREVIEW_ROWS = 12;
@@ -13684,8 +13706,58 @@
         return Object.prototype.hasOwnProperty.call(ZTO_LIST_SKIP_TEXT, key) ? ZTO_LIST_SKIP_TEXT[key] : '';
     }
 
+    function ztoListSiteCode() {
+        const raw = String(safeStoreGet(appLocalStore, ZTO_LIST_SITE_KEY) || '').trim();
+        return ZTO_LIST_SITE_RE.test(raw) ? raw : '';
+    }
+
+    function setZtoListSiteNote(text) {
+        const el = document.getElementById('ztoListSiteNote');
+        if (el) el.innerText = text;
+    }
+
     function ztoListSyncEnabled() {
-        return safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1';
+        return ztoFastModeIsOn()
+            && safeStoreGet(appLocalStore, ZTO_LISTSYNC_KEY) === '1'
+            && !!ztoListSiteCode();
+    }
+
+    function openZtoListSiteModal() {
+        const input = document.getElementById('ztoListSiteInput');
+        const saved = ztoListSiteCode();
+        if (input) input.value = saved;
+        setZtoListSiteNote(saved
+            ? '🏢 សាខាបច្ចុប្បន្ន ៖ ' + saved
+            : 'បំពេញលេខសាខារបស់អ្នក រួចចុច «រក្សាទុក» ➜ មុខងារបើកភ្លាម។');
+        openModalHelper('ztoListSiteModal');
+        if (input) input.focus();
+    }
+
+    function closeZtoListSiteModal() {
+        closeModal('ztoListSiteModal');
+    }
+
+    function saveZtoListSiteCode() {
+        const input = document.getElementById('ztoListSiteInput');
+        const raw = input ? String(input.value || '').trim() : '';
+        if (!raw) {
+            setZtoListSiteNote('⚠️ សូមបំពេញលេខសាខាជាមុនសិន (រកវាក្នុង Argus ➜ Arrival Scan ➜ វាល scanSiteCode)');
+            return;
+        }
+        if (!ZTO_LIST_SITE_RE.test(raw)) {
+            setZtoListSiteNote('⚠️ លេខសាខាទទួលតែ a-z · A-Z · 0-9 · «-» · «_» ហើយវែងមិនលើស ៣២ តួ');
+            return;
+        }
+        safeStoreSet(appLocalStore, ZTO_LIST_SITE_KEY, raw);
+        safeStoreSet(appLocalStore, ZTO_LISTSYNC_KEY, '1');
+        refreshZtoListSyncUi();
+        closeZtoListSiteModal();
+        const missing = [];
+        if (!ztoFastModeIsOn()) missing.push('គូស «Fast Mode សម្រាប់ ZTO Lookup»');
+        if (!ztoStatusFeatureConfig()) missing.push('កំណត់ API ស្វែងរក ZTO');
+        showToast(missing.length
+            ? '✅ សាខា ' + raw + ' · ⚠️ នៅត្រូវ ' + missing.join(' និង ')
+            : '✅ សាខា ' + raw + ' · ប៊ូតុង «📥 បញ្ជី ZTO» លេចនៅរបាប្រវត្តិ');
     }
 
     function refreshZtoListSyncUi() {
@@ -13693,19 +13765,27 @@
         const state = document.getElementById('ztoListSyncState');
         if (state) state.textContent = on ? 'បើក' : 'បិទ';
         const drawerBtn = document.getElementById('ztoListSyncDrawerBtn');
-        if (drawerBtn) drawerBtn.classList.toggle('is-on', on);
+        if (drawerBtn) {
+            drawerBtn.classList.toggle('is-on', on);
+            drawerBtn.classList.toggle('hidden', !ztoFastModeIsOn());
+        }
         const btn = document.getElementById('ztoListSyncBtn');
         if (btn) btn.classList.toggle('hidden', !(on && ztoStatusFeatureConfig()));
     }
 
     function drawerZtoListSyncFlow() {
         drawerAction(function () {
-            const next = !ztoListSyncEnabled();
-            safeStoreSet(appLocalStore, ZTO_LISTSYNC_KEY, next ? '1' : '0');
+            if (!ztoFastModeIsOn()) {
+                showToast(ZTO_FAST_MODE_HINT);
+                return;
+            }
+            if (!ztoListSyncEnabled()) {
+                openZtoListSiteModal();
+                return;
+            }
+            safeStoreSet(appLocalStore, ZTO_LISTSYNC_KEY, '0');
             refreshZtoListSyncUi();
-            showToast(next
-                ? '✅ បើករួច ៖ ប៊ូតុង «📥 បញ្ជី ZTO» លេចនៅរបាប្រវត្តិ'
-                : 'ℹ️ បិទរួច ៖ ប៊ូតុងបញ្ជី ZTO ត្រូវលាក់វិញ');
+            showToast('ℹ️ បិទរួច ៖ ប៊ូតុងបញ្ជី ZTO ត្រូវលាក់វិញ');
         });
     }
 
@@ -13846,15 +13926,24 @@
 
     function buildZtoListApiUrl(cfg, from, to, page) {
         if (!cfg || !cfg.url) return '';
+        const site = ztoListSiteCode();
+        if (!site) return '';
         const raw = String(cfg.url).trim();
         const marker = '/.netlify/functions/zto-order-detail';
         const markerAt = raw.toLowerCase().indexOf(marker);
         const base = markerAt === -1 ? raw.split('?')[0] : raw.slice(0, markerAt) + marker;
-        return base + '?list=1&from=' + encodeURIComponent(from)
+        return base + '?list=1&site=' + encodeURIComponent(site)
+            + '&from=' + encodeURIComponent(from)
             + '&to=' + encodeURIComponent(to) + '&page=' + encodeURIComponent(String(page));
     }
 
     async function fetchZtoListPage(cfg, from, to, page) {
+        if (!ztoListSiteCode()) {
+            const missing = new Error('ZTO_LIST_NOT_CONFIGURED');
+            missing.listReason = 'site:missing';
+            missing.notConfigured = true;
+            throw missing;
+        }
         const url = buildZtoListApiUrl(cfg, from, to, page);
         if (!url) return null;
         const headers = await buildLookupRequestHeaders(cfg);
@@ -13999,9 +14088,16 @@
             ztoListSignedProbe.clear();
             renderZtoListSyncPreview();
             if (e && e.notConfigured) {
-                setZtoListSyncNote('⚠️ មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify ('
-                    + (e.listReason || 'site:missing') + ') — សូមមើល ZTO-SETUP-KH.md ផ្នែក ៦');
-                showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
+                const reason = e.listReason || 'site:missing';
+                if (reason.indexOf('site:') === 0) {
+                    setZtoListSyncNote('🏢 លេខសាខាមិនត្រឹមត្រូវ — សូមបំពេញវាឡើងវិញ រួចទាញម្តងទៀត');
+                    showToast('ℹ️ សូមបំពេញលេខសាខា ZTO ជាមុនសិន');
+                    openZtoListSiteModal();
+                } else {
+                    setZtoListSyncNote('⚠️ មុខងារបញ្ជីមិនទាន់កំណត់នៅ Netlify ('
+                        + reason + ') — សូមមើល ZTO-SETUP-KH.md ផ្នែក ៤គ');
+                    showToast('⚠️ មុខងារបញ្ជី ZTO មិនទាន់កំណត់នៅ server');
+                }
             } else {
                 setZtoListSyncNote('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
                 showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
@@ -14144,8 +14240,13 @@
             showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
             return;
         }
+        if (!ztoFastModeIsOn()) {
+            showToast(ZTO_FAST_MODE_HINT);
+            return;
+        }
         if (!ztoListSyncEnabled()) {
-            showToast('ℹ️ មុខងារទាញបញ្ជីពី ZTO បិទ — បើកវាក្នុងរបា Slide ជាមុនសិន');
+            showToast('ℹ️ សូមបំពេញលេខសាខា ZTO ដើម្បីបើកមុខងារនេះ');
+            openZtoListSiteModal();
             return;
         }
         if (ztoStatusSecretIsLocked(cfg)) {
@@ -14161,7 +14262,7 @@
         ztoListSyncResult = null;
         ztoListSignedProbe.clear();
         renderZtoListSyncPreview();
-        setZtoListSyncNote('');
+        setZtoListSyncNote('🏢 សាខា ' + ztoListSiteCode() + ' — ជ្រើសជួរកាលបរិច្ឆេទ រួចចុច «📥 ទាញបញ្ជី»');
         openModalHelper('ztoListSyncModal');
     }
 

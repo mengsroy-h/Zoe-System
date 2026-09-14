@@ -74,6 +74,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
         clearCustomerDataTableCache: () => {},
         prefetchCustomerDataTableRowsIfConfigured: () => {},
         closeModal: () => {},
+        refreshZtoAutoCloseUi: () => {},
         refreshZtoListSyncUi: () => {},
         showToast: () => {},
         alert: (message) => alerts.push(String(message))

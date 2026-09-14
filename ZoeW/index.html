@@ -358,10 +358,10 @@
         <button type="button" class="drawer-item" data-act="openHealthCheck">
             <span class="ico">🩺</span><span>ពិនិត្យសុខភាពប្រព័ន្ធ</span>
         </button>
-        <button type="button" class="drawer-item drawer-toggle" id="ztoAutoCloseBtn" data-act="drawerZtoAutoCloseFlow">
+        <button type="button" class="drawer-item drawer-toggle hidden" id="ztoAutoCloseBtn" data-act="drawerZtoAutoCloseFlow">
             <span class="ico">🔄</span><span class="drawer-toggle-label">បិទតាម ZTO ស្វ័យប្រវត្តិ</span><span class="drawer-toggle-state" id="ztoAutoCloseState">បើក</span>
         </button>
-        <button type="button" class="drawer-item drawer-toggle" id="ztoListSyncDrawerBtn" data-act="drawerZtoListSyncFlow">
+        <button type="button" class="drawer-item drawer-toggle hidden" id="ztoListSyncDrawerBtn" data-act="drawerZtoListSyncFlow">
             <span class="ico">📥</span><span class="drawer-toggle-label">ទាញបញ្ជីកញ្ចប់ពី ZTO</span><span class="drawer-toggle-state" id="ztoListSyncState">បិទ</span>
         </button>
         <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
@@ -737,6 +737,27 @@ const firebaseConfig = {
                 <button type="button" class="btn-confirm" id="ztoListSyncRunBtn" data-act="runZtoListSyncPreview">📥 ទាញបញ្ជី</button>
                 <button type="button" class="btn-confirm zto-list-import-btn" id="ztoListSyncImportBtn" data-act="importZtoListRows">➕ បញ្ចូលកញ្ចប់ថ្មី</button>
                 <button type="button" class="btn-cancel" id="ztoListSyncCloseBtn" data-act="closeZtoListSyncModal">បិទ</button>
+            </div>
+            <div class="modal-btns-row">
+                <button type="button" class="btn-cancel" id="ztoListSiteEditBtn" data-act="openZtoListSiteModal">🏢 ប្តូរលេខសាខា</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="ztoListSiteModal" class="modal" data-close="closeZtoListSiteModal" role="dialog" aria-modal="true" aria-labelledby="ztoListSiteTitle">
+    <div class="modal-content zto-list-modal-content">
+        <h3 id="ztoListSiteTitle">🏢 លេខសាខា ZTO</h3>
+        <p>លេខសាខា (<span class="zto-list-code">scanSiteCode</span>) របស់អ្នកក្នុង Argus។ វារស់នៅក្នុងឧបករណ៍នេះ ➜ សាខានីមួយៗកំណត់លេខរបស់ខ្លួន។</p>
+        <div class="zto-list-range">
+            <label for="ztoListSiteInput">លេខសាខា</label>
+            <input type="text" id="ztoListSiteInput" autocomplete="off" spellcheck="false" maxlength="32" placeholder="ឧ. 881859">
+        </div>
+        <p id="ztoListSiteNote"></p>
+        <div class="modal-btns">
+            <div class="modal-btns-row">
+                <button type="button" class="btn-confirm" id="ztoListSiteSaveBtn" data-act="saveZtoListSiteCode">💾 រក្សាទុក</button>
+                <button type="button" class="btn-cancel" id="ztoListSiteCloseBtn" data-act="closeZtoListSiteModal">បិទ</button>
             </div>
         </div>
     </div>

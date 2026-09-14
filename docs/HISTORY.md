@@ -513,7 +513,7 @@ offset ដេរីវេពី `appZoneParts()` ដែលជា **អ្នក�
 ៣. ⚠️ **មុខងារថ្មីនេះ *បិទ* ដោយលំនាំដើម ➜ គ្មានអ្វីប្រែសោះ** ទាល់តែធ្វើ
    **ទាំង ២ ជំហាន** ៖
    - **Netlify** (site `zoew`) ➜ Environment variables ➜ ដាក់
-     **`ZTO_LIST_SITE_CODE`** = លេខសាខារបស់អ្នកក្នុង Argus (ឧ. `881859`) ➜
+     **`ZTO_LIST_SITE_CODE`** = លេខសាខារបស់អ្នកក្នុង Argus (ឧ. `100200`) ➜
      **Trigger deploy**។ (env ស្រេចចិត្ត ៖ `ZTO_LIST_URL` · `ZTO_LIST_SCAN_TYPE`
      · `ZTO_LIST_PAGE_SIZE` · `ZTO_LIST_MAX_PAGES` — លំនាំដើមគ្រប់គ្រាន់រួច។)
    - **ក្នុង App** ➜ ⚙️ របា Slide ➜ **📥 ទាញបញ្ជីកញ្ចប់ពី ZTO** ➜ ប្តូរទៅ «បើក»។

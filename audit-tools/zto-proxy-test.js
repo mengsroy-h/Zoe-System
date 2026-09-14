@@ -418,7 +418,7 @@ group('ព្រំដែន secret ក្នុងចម្លើយ upstream',
         && !invalid.body.includes(secret), JSON.parse(invalid.body).code);
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=' + secret, ZTO_CACHE_TTL_MS: '0' });
     global.fetch = jsonResponder({ success: true, message: 'Unexpected input: ' + secret, data: {} });
-    const invalidList = await call({ list: '1', site: '881859', from: '2026-09-08', to: '2026-09-11' });
+    const invalidList = await call({ list: '1', site: '100200', from: '2026-09-08', to: '2026-09-11' });
     ok('Upstream បញ្ជីគ្មាន rows៖ សារឆៅមិនចេញទៅ browser',
         invalidList.statusCode === 502 && JSON.parse(invalidList.body).code === 'ZTO_UPSTREAM_REJECTED'
         && !invalidList.body.includes(secret), JSON.parse(invalidList.body).code);

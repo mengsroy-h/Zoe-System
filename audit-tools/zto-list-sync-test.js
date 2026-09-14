@@ -1939,7 +1939,7 @@ function firstBody(requests) {
 
     // ── ច. ការតភ្ជាប់ HTML ↔ សកម្មភាព ─────────────────────────────────────
     const ALLOWLIST = (/const ACTION_ALLOWLIST = \[([\s\S]*?)\];/.exec(APP_SRC) || [])[1] || '';
-    ['openZtoListSiteModal', 'closeZtoListSiteModal', 'saveZtoListSiteCode'].forEach((name) => {
+    ['closeZtoListSiteModal', 'saveZtoListSiteCode'].forEach((name) => {
         ok('⛔ `' + name + '` ស្ថិតក្នុង `ACTION_ALLOWLIST`',
             ALLOWLIST.indexOf('"' + name + '"') !== -1, ALLOWLIST.length);
     });
@@ -1949,8 +1949,28 @@ function firstBody(requests) {
     ok('⛔ ប៊ូតុងរក្សាទុក និងផ្លូវបិទ ភ្ជាប់តាម `data-act`/`data-close` (គ្មាន `on*=`)',
         HTML_SRC.indexOf('data-act="saveZtoListSiteCode"') !== -1
         && HTML_SRC.indexOf('data-close="closeZtoListSiteModal"') !== -1, false);
-    ok('⛔ ប្រអប់បញ្ជីមានផ្លូវប្តូរលេខសាខា (កែដោយមិនបិទមុខងារជាមុន)',
-        HTML_SRC.indexOf('data-act="openZtoListSiteModal"') !== -1, false);
+
+    // ⛔ **ការប្តូរលេខសាខាមិនត្រូវងាយពេក** (សំណើអ្នកប្រើ 2026-09-14) ៖ គ្មាន
+    // ប៊ូតុងផ្ទាល់ណាបើកប្រអប់នោះ ➜ ផ្លូវតែមួយគឺ **ការចុចកុងតាក់** (បិទ ➜ បើក)
+    // ឬផ្លូវកំហុស `site:*`។ ⛔ ដូច្នេះតាមច្បាប់ «សិទ្ធិតូចបំផុត» ឈ្មោះនោះ
+    // **មិនត្រូវនៅក្នុង `ACTION_ALLOWLIST`** ដែរ (`wiring` · `csp-enforced`
+    // អះអាង ២ ទិស ➜ ធាតុលើសជាការធ្លាក់)។
+    ok('⛔ គ្មានប៊ូតុងផ្ទាល់សម្រាប់ប្តូរលេខសាខា',
+        HTML_SRC.indexOf('openZtoListSiteModal') === -1, false);
+    ok('⛔ ហើយវាមិនស្ថិតក្នុង `ACTION_ALLOWLIST` (សិទ្ធិតូចបំផុត)',
+        ALLOWLIST.indexOf('"openZtoListSiteModal"') === -1, false);
+    const siteModalOpens = (APP_SRC.match(/openZtoListSiteModal\(\)/g) || []).length
+        - (/function openZtoListSiteModal\(\)/.test(APP_SRC) ? 1 : 0);
+    ok('⛔ ទិសផ្ទុយ ៖ កូដនៅតែបើកប្រអប់នោះ (ផ្លូវប្តូរមិនត្រូវបាត់ទាំងស្រុង)',
+        siteModalOpens >= 2, siteModalOpens);
+
+    // ⛔ **គ្មានឧទាហរណ៍លេខសាខា *ពិត* ក្នុងវាលបញ្ចូល** (សំណើអ្នកប្រើ) — លេខ
+    // សាខាជាការកំណត់អាជីវកម្ម ➜ ការទុកលេខពិតជា `placeholder` ធ្វើឲ្យវាហូរចូល
+    // ការថតអេក្រង់ និងឯកសារ។ `maxlength` (២ ខ្ទង់) មិនរាប់។
+    const siteInputTag = (/<input[^>]*id="ztoListSiteInput"[^>]*>/.exec(HTML_SRC) || [])[0] || '';
+    ok('ជាន់អប្បបរមា ៖ រកវាលលេខសាខាក្នុង `index.html` ឃើញ', !!siteInputTag, siteInputTag);
+    ok('⛔ វាលលេខសាខាគ្មានឧទាហរណ៍លេខសាខាពិត',
+        !!siteInputTag && !/\d{4,}/.test(siteInputTag), siteInputTag);
     ok('⛔ វាលលេខសាខាចូលបញ្ជីសម្អាតរបស់ `clearSensitiveModalFields()`',
         APP_SRC.indexOf("'ztoListSiteInput', 'ztoListSiteNote'") !== -1, false);
 

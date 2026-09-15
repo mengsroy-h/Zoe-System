@@ -2055,7 +2055,7 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         };
         localStorage.setItem('zoew_zto_autoclose_v1', '1');
         localStorage.setItem('zoew_zto_listsync_v1', '1');
-        localStorage.setItem('zoew_zto_list_site_v1', '881859');
+        localStorage.setItem('zoew_zto_list_site_v1', '100200');
         localStorage.setItem('zoew_lookup_api_config',
             JSON.stringify({ enabled: true, url: base, fastMode: true }));
         const on = read();

@@ -73,7 +73,6 @@
         "openCollectedStatsModal",
         "openSideDrawer",
         "openViewListModal",
-        "openZtoListSiteModal",
         "openZtoListSyncModal",
         "openZtoSyncModal",
         "pickSheetImportFile",

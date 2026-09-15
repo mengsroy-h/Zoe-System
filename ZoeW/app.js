@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.1';
+    const APP_VERSION = '2.36.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1480,6 +1480,10 @@
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបើកការចាក់សោពេលបើក App',
             setup: 'សូមកំណត់លេខកូដ PIN ដែលនឹងប្រើដោះសោ App រាល់ពេលបើក'
         },
+        appLockOff: {
+            verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីបិទការចាក់សោពេលបើក App',
+            setup: 'សូមកំណត់លេខកូដ PIN សិន មុននឹងប្តូរការចាក់សោពេលបើក App'
+        },
         sheetImport: {
             verify: 'សូមវាយលេខកូដសុវត្ថិភាពដើម្បីនាំចូល Excel ទៅ Google Sheet',
             setup: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការនាំចូល Excel ទៅ Google Sheet លើកក្រោយ'
@@ -1887,6 +1891,7 @@
     }
 
     const APP_LOCK_SESSION_KEY = 'zoew_app_unlocked';
+    const APP_LOCK_PREF_KEY = 'zoew_app_lock_v1';
     const APP_LOCK_MAX_FAILS = 5;
     const APP_LOCK_LOCKOUT_MS = 60000;
     const APP_LOCK_EXCUSE_WINDOW_MS = 60000;
@@ -1903,6 +1908,20 @@
         } catch (e) {
             return false;
         }
+    }
+
+    function appLockPrefIsOff() {
+        return safeStoreGet(appLocalStore, APP_LOCK_PREF_KEY) === '0';
+    }
+
+    function appLockIsEnabled() {
+        return appLockPinIsSet() && !appLockPrefIsOff();
+    }
+
+    function setAppLockPref(enabled) {
+        return enabled
+            ? safeStoreRemove(appLocalStore, APP_LOCK_PREF_KEY)
+            : safeStoreSet(appLocalStore, APP_LOCK_PREF_KEY, '0');
     }
 
     function appLockUnlockedThisSession() {
@@ -1923,7 +1942,7 @@
     }
 
     function appLockShouldArm() {
-        return appLockPinIsSet() && !appLockUnlockedThisSession();
+        return appLockIsEnabled() && !appLockUnlockedThisSession();
     }
 
     function noteAppLockExcuse() {
@@ -1942,7 +1961,7 @@
     function noteAppLockAway() {
         const excused = elapsedSince(appLockExcuseAt) < APP_LOCK_EXCUSE_WINDOW_MS;
         appLockExcuseAt = 0;
-        if (appIsLocked || excused || !appLockPinIsSet()) return;
+        if (appIsLocked || excused || !appLockIsEnabled()) return;
         appLockVeiled = true;
         showAppLockScreen(true);
     }
@@ -1982,9 +2001,9 @@
 
     function refreshAppLockUi() {
         const state = document.getElementById('appLockToggleState');
-        if (state) state.textContent = appLockPinIsSet() ? 'បើក' : 'ត្រូវកំណត់ PIN';
+        if (state) state.textContent = !appLockPinIsSet() ? 'ត្រូវកំណត់ PIN' : (appLockIsEnabled() ? 'បើក' : 'បិទ');
         const toggle = document.getElementById('appLockToggleBtn');
-        if (toggle) toggle.classList.toggle('is-on', appLockPinIsSet());
+        if (toggle) toggle.classList.toggle('is-on', appLockIsEnabled());
         const bio = document.getElementById('appLockBiometricBtn');
         if (bio) bio.classList.toggle('hidden', !isBiometricEnabled());
     }
@@ -2141,6 +2160,7 @@
         }
         safeStoreRemove(appLocalStore, 'zoew_pin_fail_count');
         safeStoreRemove(appLocalStore, 'zoew_pin_lockout_until');
+        safeStoreRemove(appLocalStore, APP_LOCK_PREF_KEY);
         clearBiometricRecord();
         clearAppUnlockedForSession();
         clearRememberedSession(false);
@@ -2159,8 +2179,8 @@
 
     function drawerAppLockFlow() {
         drawerAction(function () {
-            if (appLockPinIsSet()) {
-                showToast('🔒 ការចាក់សោពេលបើក App កំពុងដំណើរការ។ ដើម្បីប្តូរលេខកូដ សូមប្រើ «ភ្លេច PIN?» នៅលើអេក្រង់ចាក់សោ។');
+            if (appLockIsEnabled()) {
+                requestPinBeforeConfig(disableAppLockAfterPin, 'appLockOff');
                 return;
             }
             requestPinBeforeConfig(armAppLockAfterPinSetup, 'appLock');
@@ -2168,9 +2188,23 @@
     }
 
     function armAppLockAfterPinSetup() {
+        if (!setAppLockPref(true)) {
+            showToast('❌ បើកការចាក់សោមិនបានទេ — ការកំណត់នៅដដែល។');
+            return;
+        }
         markAppUnlockedForSession();
         refreshAppLockUi();
         showToast('✅ បានបើកការចាក់សោ! លើកក្រោយបើក App ត្រូវវាយ PIN ឬស្កេនក្រយៅដៃ/មុខ។');
+    }
+
+    function disableAppLockAfterPin() {
+        if (!setAppLockPref(false)) {
+            showToast('❌ បិទការចាក់សោមិនបានទេ — ការកំណត់នៅដដែល។');
+            return;
+        }
+        markAppUnlockedForSession();
+        refreshAppLockUi();
+        showToast('✅ បានបិទការចាក់សោពេលបើក App។ Security PIN នៅដដែល។');
     }
 
     function initAppLock() {

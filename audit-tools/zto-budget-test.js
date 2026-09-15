@@ -527,6 +527,37 @@ async function runHandler(opts) {
             // ⛔ ទិសផ្ទុយ ៣ ៖ ថវិកាធំ ➜ បង្អួចមិនត្រូវលើស COOKIE_STORE_TIMEOUT_MS
             ok('⛔ ទិសផ្ទុយ ៖ ថវិកាធំ ➜ បង្អួចនៅមានពិដានរបស់វា (មិនរីកគ្មានព្រំដែន)',
                 probe({ upstreamTimeoutMs: 2000, budgetMs: 24000 }, Date.now(), false) <= 3000);
+
+            // ⛔ **«បង្អួច > 0» មិនគ្រប់គ្រាន់ទេ** — បង្អួច ៨០០ ms ឆ្លងការអះអាង
+            // នោះ ខណៈវា **ធានាការធ្លាក់** ធៀបនឹង store ដែលឆ្លើយ ២,៥ វិ.។
+            // 🔴 វាស់បាន (2026-09-15, ការកំណត់ផលិតកម្ម `upstream 7000 ·
+            // budget 9000`) ៖ បង្អួចចាស់ = **៨០០ ms** ➜ Blobs ២,៥ វិ. លើ
+            // container ត្រជាក់ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` នៅ
+            // ១,៨ វិ. ខណៈថវិកា **៧,២ វិ. មិនទាន់ប្រើសោះ**។
+            // ⛔ ព្រំដែនត្រូវ **ដេរីវេពី `COOKIE_STORE_TIMEOUT_MS` ពិត** មិនមែន
+            // លេខថេរទី ២ ៖ Function ខ្លួនវាប្រកាសថាការអានអាចត្រូវការប៉ុណ្ណឹង។
+            const storeTimeout = Number((/const COOKIE_STORE_TIMEOUT_MS = (\d+);/.exec(SRC) || [])[1]);
+            ok('⛔ ជាន់អប្បបរមា៖ អាន `COOKIE_STORE_TIMEOUT_MS` ចេញពីកូដពិតបាន',
+                Number.isFinite(storeTimeout) && storeTimeout > 0, { storeTimeout });
+            if (Number.isFinite(storeTimeout) && storeTimeout > 0) {
+                for (const up of [6000, 7000, 7500]) {
+                    const cold = probe({ upstreamTimeoutMs: up, budgetMs: 9000 }, Date.now(), false);
+                    ok('⛔ container ត្រជាក់ (upstream ' + up + ' · budget 9000) ➜ បង្អួចអានត្រូវពេញតាមពិដាន store',
+                        cold === storeTimeout,
+                        { window: cold, storeTimeout: storeTimeout,
+                          hint: 'បង្អួចតូចជាងពិដាន store = 503 ធានា ខណៈ Cookie ពិតនៅក្នុង Blobs' });
+                }
+                // ⛔ ទិសផ្ទុយ ៤ ៖ ការពង្រីកបង្អួច **មិនត្រូវ** រុញ handler ហួស
+                //    ពិដានសម្លាប់ ១០ វិ. របស់ Netlify ៖ ការអានពេញ + ការហៅ
+                //    upstream ដែល `fetchOrder()` កាត់ (`remaining − 200`)។
+                for (const up of [6000, 7000, 7500]) {
+                    const budget = 9000;
+                    const cold = probe({ upstreamTimeoutMs: up, budgetMs: budget }, Date.now(), false);
+                    const worst = cold + Math.min(up, budget - cold - 200);
+                    ok('⛔ ទិសផ្ទុយ ៖ ករណីអាក្រក់បំផុត (អានពេញ + upstream) នៅក្នុងពិដាន ១០ វិ. របស់ Netlify (upstream ' + up + ')',
+                        worst <= 10000 - 500, { window: cold, worstMs: worst });
+                }
+            }
         }
     }
 

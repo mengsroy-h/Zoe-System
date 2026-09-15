@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.35.1';
+    const APP_VERSION = '2.35.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -11201,6 +11201,7 @@
                 }
             });
             if (trashSaved) {
+                markCollectedRevenue(collectedMarksFor(claimedBarcode, false, claimedBarcode.closedAt));
                 if (deductionApplied) {
                     correctRevenueLedgerToActual(revenueScanDate, deductionApplied,
                         -itemToTrash.cod, -itemToTrash.dod, -1).then((status) => {
@@ -12617,6 +12618,12 @@
             await clearRestoreFinalization(restoredId, token).catch(() => {});
             const finalSnap = await dbOp(fb.get(fb.ref(db, `zoew_scan_history_cod_dod/${targetId}`)));
             const resultingLiveItem = finalSnap.exists() ? cloneRestoreItem(finalSnap.val()) : prepared.item;
+            const restoredCollectedKeys = (Array.isArray(itemToRestore.barcodes) ? itemToRestore.barcodes : [])
+                .map((restoredBc) => pickupBarcodeKey(restoredBc && restoredBc.code))
+                .filter(Boolean);
+            if (restoredCollectedKeys.length) {
+                await reconcileCollectedHistory(targetId, restoredCollectedKeys).catch(() => null);
+            }
             openRecentlyDeletedModal();
             refreshCurrentHistoryView();
             updateRecentPhonesList();

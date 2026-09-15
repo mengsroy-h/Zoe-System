@@ -242,9 +242,9 @@ const DETAIL_ORDER = {
     data: { billCode: 'BAR0001', consigneePhone: '011222333', agentAmount: 4.5, arrivalServiceCharge: 1.25 }
 };
 
-async function detailCall(env, barcode) {
+async function detailCall(env, barcode, payload) {
     resetEnv(env);
-    global.fetch = responder(DETAIL_ORDER);
+    global.fetch = responder(payload || DETAIL_ORDER);
     const res = await call({ barcode: barcode || 'BAR0001' });
     let body = null;
     try { body = JSON.parse(res.body); } catch (_) { body = null; }
@@ -460,20 +460,155 @@ function firstBody(requests) {
     ok('⛔ តម្លៃអត្ថបទប្រភេទស្កេនមិនឡើងដល់ browser',
         JSON.stringify(lifeOut.body).indexOf('ចុះហត្ថលេខា') === -1, true);
 
-    // ⛔ **ទិសផ្ទុយដ៏សំខាន់** ៖ ការបន្ថែម `fcAmount` ត្រូវប៉ះ **តែផ្លូវបញ្ជី**។
-    // ផ្លូវស្កេន (`/detail`) កំពុងដំណើរការលើផលិតកម្មជាមួយលុយពិត ➜ ការប្តូរ
-    // របៀបអាន DOD នៅទីនោះ **ប៉ះលុយដោយគ្មានការស្នើ**។
+    // ⛔ **ការកែ 2.35.1 ៖ `fcAmount` ជា DOD លើ *ផ្លូវទាំង ២*។**
+    //
+    // ជុំ 2.33.0 បន្ថែម `fcAmount` ចូល **តែផ្លូវបញ្ជី** ដោយចេតនា ៖ ផ្លូវស្កេន
+    // កំពុងដំណើរការជាមួយលុយពិត ➜ មិនប៉ះដោយគ្មានការវាស់។ ⛔ **ការវាស់នោះមកដល់
+    // ហើយ** (payload របស់ `/detail` ពិត ពីម្ចាស់គម្រោង 2026-09-15) ៖
+    //
+    //     agentAmount:          0.00   ← COD (ត្រឹមត្រូវ)
+    //     arrivalServiceCharge: 0.00   ← វាលទី ១ នៃ `DOD_PATHS` — **មានជានិច្ច**
+    //     fcAmount:             2.50   ← លុយពិតដែលអតិថិជនបង់ពេលទទួល
+    //     dodAmount · arrivalCharge · serviceCharge · dod ← **គ្មានក្នុង ZTO សោះ**
+    //
+    // `pickNumber()` ត្រឡប់ **លេខដំបូងដែលរកឃើញ រួមទាំង `0`** ➜ ការស្វែងរក
+    // **ឈប់ត្រឹម `arrivalServiceCharge`** ➜ ផ្លូវស្កេនឆ្លើយ **DOD 0 រាល់កញ្ចប់**
+    // ហើយវាលបន្ទាប់ ៤ ជា **កូដងាប់**។ លេខ $2.50 ដែលអ្នកប្រើឃើញក្នុងតារាង
+    // មកពី **ការទាញបញ្ជី** មិនមែនពីការស្កេនទេ។
+    //
+    // ⛔ **មូលហេតុដែល checker ១៧១ បៃតងលើវា** ៖ fixture `DETAIL_ORDER` ប្រើ
+    // `arrivalServiceCharge: 1.25` ដែល **មិនដែលកើតលើផលិតកម្ម** ➜ សេណារីយ៉ូ
+    // មិនដែលដាក់ប្រព័ន្ធក្នុងស្ថានភាពពិតសោះ (សំណួរទី ៨ នៃវិន័យឧបករណ៍)។
     const dodDefaultsLine = /const DOD_PATHS = \[([^\]]*)\]/.exec(FUNCTION_SRC);
-    ok('⛔ ទិសផ្ទុយ ៖ `fcAmount` **មិន**ស្ថិតក្នុង `DOD_PATHS` (ផ្លូវស្កេនមិនប្រែ)',
-        !!dodDefaultsLine && dodDefaultsLine[1].indexOf('fcAmount') === -1,
-        dodDefaultsLine && dodDefaultsLine[1]);
-    const detailDod = await detailCall(GOOD_LIST_ENV);
-    ok('⛔ ទិសផ្ទុយ ៖ ការស្កេនធម្មតាអាន DOD តាមវាលចាស់ដដែល',
-        detailDod.body && detailDod.body.dod === 1.25, detailDod.body && detailDod.body.dod);
-    const listDodPaths = /const LIST_DOD_PATHS = \[([^\]]*)\]/.exec(FUNCTION_SRC);
-    ok('⛔ `LIST_DOD_PATHS` ដេរីវេពី `DOD_PATHS` (ការបន្ថែម មិនមែនការចម្លង)',
-        !!listDodPaths && /concat\s*\(\s*DOD_PATHS\s*\)/.test(FUNCTION_SRC),
-        listDodPaths && listDodPaths[1]);
+    const dodDefaults = (dodDefaultsLine ? dodDefaultsLine[1] : '')
+        .split(',').map((part) => part.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    ok('ជាន់អប្បបរមា ៖ អាន `DOD_PATHS` ចេញពី Function ពិត',
+        dodDefaults.length >= 5, dodDefaults);
+    ok('⛔ `fcAmount` ស្ថិតក្នុង `DOD_PATHS` (ផ្លូវស្កេនអានលុយពិត)',
+        dodDefaults.indexOf('fcAmount') !== -1, dodDefaults);
+    ok('⛔ ហើយវាឈរ *មុន* `arrivalServiceCharge` (វាលនោះមានជានិច្ចដោយ `0` ➜ វាបាំង)',
+        dodDefaults.indexOf('fcAmount') !== -1
+            && dodDefaults.indexOf('fcAmount') < dodDefaults.indexOf('arrivalServiceCharge'),
+        dodDefaults);
+    // ⛔ **អន្ទាក់ `freightFee`** ៖ លើ payload ពិតវាស្មើ `fcAmount` បេះបិទ
+    // (ទាំង ២ ជា 2.50) ➜ គំរូតែមួយ **បែងចែកពួកវាមិនបានទេ**។ ភាពខុសគ្នាលេចឡើង
+    // លើកញ្ចប់ **បង់មុន** ៖ `freightFee` នៅមិនមែន 0 (ថ្លៃដឹកពិតជាមាន) ខណៈ
+    // `fcAmount` ជា **0** (គ្មានអ្វីត្រូវប្រមូល) ➜ ការយក `freightFee` =
+    // **គិតលុយអតិថិជនលើថ្លៃដឹកដែលអ្នកផ្ញើបង់រួច**។
+    ok('⛔ អន្ទាក់ ៖ `freightFee` **មិន**ស្ថិតក្នុង `DOD_PATHS` (វាជាថ្លៃដឹក*សរុប*)',
+        dodDefaults.indexOf('freightFee') === -1, dodDefaults);
+    // ⛔ **បញ្ជីវាល DOD ត្រូវមានតែមួយ** ៖ បន្ទាប់ពីការកែនេះ `LIST_DOD_PATHS`
+    // ក្លាយជាលែងចាំបាច់ ➜ ការទុកវា = បញ្ជី ២ ដែលត្រូវស៊ីគ្នាជានិច្ច (ច្បាប់ ១២ ៖
+    // ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ ២ ផ្ទុយគ្នា)។
+    ok('⛔ បញ្ជីវាល DOD មាន **តែមួយ** (`LIST_DOD_PATHS` លែងចាំបាច់)',
+        FUNCTION_SRC.indexOf('LIST_DOD_PATHS') === -1, true);
+
+    // ─── អាកប្បកិរិយា ៖ payload `/detail` តាមរូបរាងផលិតកម្មពិត ───
+    const ZTDA_DETAIL = { success: true, error: null, data: {
+        billCode: 'BAR0009', consigneePhone: '011222333',
+        agentAmount: 0.00, agentServiceCharge: 0.00, arrivalServiceCharge: 0.00,
+        fcAmount: 2.50, freightFee: 2.50, totalFee: 0.00, billStatus: 5, payType: 'CC' } };
+    const ztdaScan = await detailCall(GOOD_LIST_ENV, 'BAR0009', ZTDA_DETAIL);
+    ok('⛔ **កញ្ចប់ `ztda` ពិត ៖ ការស្កេនអាន DOD 2.5**',
+        !!ztdaScan.body && ztdaScan.body.dod === 2.5, ztdaScan.body && ztdaScan.body.dod);
+    ok('⛔ ហើយ COD នៅ 0 (ត្រឹមត្រូវ — `agentAmount: 0`)',
+        !!ztdaScan.body && ztdaScan.body.cod === 0, ztdaScan.body && ztdaScan.body.cod);
+
+    // ⛔ **ផ្លូវទាំង ២ ត្រូវឲ្យលេខដូចគ្នាលើទិន្នន័យតែមួយ** — ការអះអាងដេរីវេ
+    // ពីលេខពិតរបស់ផ្លូវស្កេន ⛔ មិនមែន literal ២ ខាងឯករាជ្យ (នោះជាការស៊ីគ្នា
+    // ដោយចៃដន្យ)។
+    const twinRow = listRow({ scanBillCode: 'BAR0009', consigneeMobile: '011222333',
+        agentAmount: 0.00, fcAmount: 2.50, arrivalServiceCharge: 0.00, freightFee: 2.50 });
+    const twinList = rowsOf((await listCall(listPayload([twinRow]), GOOD_LIST_ENV)).body)[0] || {};
+    ok('⛔ ផ្លូវស្កេន និងផ្លូវបញ្ជីឲ្យលេខ **ដូចគ្នា** លើទិន្នន័យតែមួយ',
+        !!ztdaScan.body && twinList.cod === ztdaScan.body.cod && twinList.dod === ztdaScan.body.dod,
+        { list: { cod: twinList.cod, dod: twinList.dod },
+          scan: ztdaScan.body && { cod: ztdaScan.body.cod, dod: ztdaScan.body.dod } });
+
+    // ⛔ **ទិសផ្ទុយ ៖ កញ្ចប់បង់មុន (Shopee)** — ការបន្ថែម `fcAmount` មិនត្រូវ
+    // ធ្វើឲ្យ DOD លេចពីអាកាសធាតុ ហើយនេះជាអ្នកចាប់អន្ទាក់ `freightFee` ៖
+    // ថ្លៃដឹក 3.00 មានពិត តែអ្នកផ្ញើបង់រួច ➜ DOD ត្រូវជា **0**។
+    const SHOPEE_DETAIL = { success: true, error: null, data: {
+        billCode: 'BAR0010', consigneePhone: '011222333',
+        agentAmount: 6.47, arrivalServiceCharge: 0.00,
+        fcAmount: 0.0, freightFee: 3.00, billStatus: 4 } };
+    const shopeeScan = await detailCall(GOOD_LIST_ENV, 'BAR0010', SHOPEE_DETAIL);
+    ok('⛔ ទិសផ្ទុយ ៖ កញ្ចប់ Shopee (`fcAmount: 0.0`) ➜ DOD **0**',
+        !!shopeeScan.body && shopeeScan.body.dod === 0, shopeeScan.body && shopeeScan.body.dod);
+    ok('⛔ **អន្ទាក់ `freightFee`** ៖ ថ្លៃដឹក 3.00 បង់មុនរួច ➜ DOD ⛔ មិនមែន 3.00',
+        !!shopeeScan.body && shopeeScan.body.dod !== 3.00, shopeeScan.body && shopeeScan.body.dod);
+    ok('⛔ ហើយ COD នៅត្រឹមត្រូវ (`agentAmount: 6.47`)',
+        !!shopeeScan.body && shopeeScan.body.cod === 6.47, shopeeScan.body && shopeeScan.body.cod);
+
+    // ⛔ **ថយក្រោយបាន** ៖ ទិន្នន័យចាស់ដែលគ្មាន `fcAmount` សោះ ត្រូវធ្លាក់ចុះទៅ
+    // `arrivalServiceCharge` ដដែល ➜ ការបន្ថែមមិនកាត់ផ្តាច់ផ្លូវចាស់ទេ។
+    const legacyScan = await detailCall(GOOD_LIST_ENV);
+    ok('⛔ ថយក្រោយបាន ៖ គ្មាន `fcAmount` សោះ ➜ ធ្លាក់ចុះទៅ `arrivalServiceCharge`',
+        !!legacyScan.body && legacyScan.body.dod === 1.25, legacyScan.body && legacyScan.body.dod);
+
+    // ⛔ `ZTO_FIELD_DOD` ត្រូវឈ្នះលើ **ផ្លូវស្កេនដែរ** មិនត្រឹមផ្លូវបញ្ជីទេ ➜
+    // ថ្ងៃណា ZTO ប្តូរឈ្មោះវាល ការកែនៅតែជា env តែម្យ៉ាង គ្មានការ deploy កូដ។
+    const envScan = await detailCall({ ZTO_FIELD_DOD: 'arrivalFee' }, 'BAR0011', { success: true, data: {
+        billCode: 'BAR0011', consigneePhone: '011222333', agentAmount: 0,
+        arrivalServiceCharge: 0.00, fcAmount: 2.50, arrivalFee: 1.75 } });
+    ok('⛔ `ZTO_FIELD_DOD` ឈ្នះលើផ្លូវស្កេនដែរ (បើកវាលថ្មីដោយគ្មានការកែកូដ)',
+        !!envScan.body && envScan.body.dod === 1.75, envScan.body && envScan.body.dod);
+
+    // ⛔ **លុយអវិជ្ជមានត្រូវ clamp ត្រឹម 0 — នៅ `pickNumber()` ដែលជាចំណុច
+    // ច្របាច់តែមួយ** (សំណើម្ចាស់គម្រោង 2026-09-15)។
+    //
+    // ការបន្ថែម `fcAmount` នាំមកនូវការប៉ះពាល់ថ្មីលើផ្លូវស្កេន ៖ មុននេះ
+    // `arrivalServiceCharge: 0.00` បាំងអ្វីៗទាំងអស់ ➜ លេខអវិជ្ជមានមិនដែល
+    // ឈានដល់អ្នកប្រើ។ ឥឡូវវាឈានដល់ ➜ `fcAmount: -2.5` នឹងក្លាយជា **DOD
+    // អវិជ្ជមាន** លើអេក្រង់។ ⛔ ផ្លូវបញ្ជីមានការប៉ះពាល់នេះ **តាំងពី 2.33.0**។
+    //
+    // ⛔ **house style គឺ clamp មិនមែន «រំលងទៅវាលបន្ទាប់»** (ច្បាប់ដដែលនឹង
+    // `revenue-rules-clamp-test` ៖ «លេខអវិជ្ជមានត្រូវ clamp មុនសរសេរ») —
+    // ការរំលងនឹងធ្វើឲ្យវាលអវិជ្ជមាន **លើកតម្លៃរបស់វាលផ្សេង** ឡើងជំនួសដោយ
+    // ស្ងាត់ ➜ លេខដែលអ្នកប្រើឃើញ មិនមែនមកពីវាលដែលឯកសារសន្យា។
+    //
+    // ⛔ `pickNumber()` ប្រើ **តែសម្រាប់ COD និង DOD** (កន្លែងហៅ ៤ ទាំងអស់)
+    // ➜ ការ clamp នៅទីនោះមិនប៉ះវាលមិនមែនលុបណាមួយឡើយ។
+    const NEG_DETAIL = { success: true, error: null, data: {
+        billCode: 'BAR0012', consigneePhone: '011222333',
+        agentAmount: -6.47, arrivalServiceCharge: 0.00, fcAmount: -2.50 } };
+    const negScan = await detailCall(GOOD_LIST_ENV, 'BAR0012', NEG_DETAIL);
+    ok('⛔ `fcAmount` អវិជ្ជមាន ➜ DOD clamp ត្រឹម **0** (ផ្លូវស្កេន)',
+        !!negScan.body && negScan.body.dod === 0, negScan.body && negScan.body.dod);
+    ok('⛔ `agentAmount` អវិជ្ជមាន ➜ COD clamp ត្រឹម **0**',
+        !!negScan.body && negScan.body.cod === 0, negScan.body && negScan.body.cod);
+    const negList = rowsOf((await listCall(listPayload([listRow({
+        agentAmount: -6.47, fcAmount: -2.50 })]), GOOD_LIST_ENV)).body)[0] || {};
+    ok('⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវបញ្ជី** (ចំណុចច្របាច់តែមួយ)',
+        negList.dod === 0 && negList.cod === 0, negList);
+    // ⛔ **ទិសផ្ទុយ ១ ៖ ការ clamp មិនត្រូវក្លាយជាការ *រំលង*** — លេខអវិជ្ជមាន
+    // ត្រូវក្លាយជា `0` ហើយ **ឈប់ត្រឹមនោះ** ⛔ មិនមែនធ្លាក់ចុះទៅវាលបន្ទាប់
+    // រួចលើកលេខផ្សេងឡើងជំនួសទេ។
+    const negThenPos = await detailCall(GOOD_LIST_ENV, 'BAR0013', { success: true, data: {
+        billCode: 'BAR0013', consigneePhone: '011222333', agentAmount: 0,
+        fcAmount: -2.50, dodAmount: 3.00 } });
+    ok('⛔ ទិសផ្ទុយ ៖ អវិជ្ជមាន ➜ `0` **មិនមែន**លើក `dodAmount: 3.00` ឡើងជំនួស',
+        !!negThenPos.body && negThenPos.body.dod === 0, negThenPos.body && negThenPos.body.dod);
+    // ⛔ **ទិសផ្ទុយ ២ ៖ `0` ជាចំនួនទឹកប្រាក់ *ត្រឹមត្រូវ* មិនមែន «គ្មានតម្លៃ»**
+    // — កញ្ចប់ Shopee មាន `fcAmount: 0.0` ពិតៗ ➜ បើនរណាម្នាក់ «កែ» ការ clamp
+    // ដោយរំលង `0` ដែរ នោះ DOD នឹងលោតទៅ `dodAmount` ➜ **លុយពីអាកាសធាតុ**។
+    const zeroWins = await detailCall(GOOD_LIST_ENV, 'BAR0014', { success: true, data: {
+        billCode: 'BAR0014', consigneePhone: '011222333', agentAmount: 8.49,
+        fcAmount: 0.0, dodAmount: 3.00 } });
+    ok('⛔ ទិសផ្ទុយ ៖ `fcAmount: 0.0` ឈ្នះ (មិនរំលងទៅ `dodAmount: 3.00`)',
+        !!zeroWins.body && zeroWins.body.dod === 0, zeroWins.body && zeroWins.body.dod);
+    ok('⛔ ហើយតម្លៃវិជ្ជមានឆ្លងកាត់មិនប្រែ (`agentAmount: 8.49`)',
+        !!zeroWins.body && zeroWins.body.cod === 8.49, zeroWins.body && zeroWins.body.cod);
+    // ⛔ **ព្រំដែនត្រូវជា `0` ពិត មិនមែន «អវិជ្ជមានធំ»** — mutation ដែលប្តូរ
+    // ច្រកទ្វារទៅ `value < -1` **រស់រាន** ការអះអាងខាងលើ ព្រោះពួកវាប្រើតែ
+    // `-2.5` និង `-6.47`។ សេនតែមួយដែលអវិជ្ជមាន ក៏ជាលុយអវិជ្ជមានដែរ។
+    const tinyNeg = await detailCall(GOOD_LIST_ENV, 'BAR0015', { success: true, data: {
+        billCode: 'BAR0015', consigneePhone: '011222333',
+        agentAmount: -0.01, arrivalServiceCharge: 0.00, fcAmount: -0.01 } });
+    ok('⛔ ព្រំដែន ៖ អវិជ្ជមាន **១ សេន** ក៏ត្រូវ clamp ដែរ (COD)',
+        !!tinyNeg.body && tinyNeg.body.cod === 0, tinyNeg.body && tinyNeg.body.cod);
+    ok('⛔ ព្រំដែន ៖ អវិជ្ជមាន **១ សេន** ក៏ត្រូវ clamp ដែរ (DOD)',
+        !!tinyNeg.body && tinyNeg.body.dod === 0, tinyNeg.body && tinyNeg.body.dod);
 
     // ⛔ **DOD នៅតែបើកបានដោយ env ដោយ*គ្មានការកែកូដ*** ៖ ជួរដេកបញ្ជីអាន
     // `config.dodPaths` **ដដែល**នឹងផ្លូវស្កេន ➜ ថ្ងៃណាដែលរកឃើញវាល DOD ពិត

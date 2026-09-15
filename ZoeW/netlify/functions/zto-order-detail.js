@@ -24,7 +24,22 @@ const LOGIN_REDIRECT_RE = /https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[
 
 const PHONE_PATHS = ['consigneePhone', 'consigneeMobile', 'consigneeTel', 'receiverPhone', 'receiverMobile', 'recipientPhone', 'recipientMobile', 'phone', 'mobile'];
 const COD_PATHS = ['agentAmount', 'codAmount', 'collectionAmount', 'codFee', 'cod'];
-const DOD_PATHS = ['arrivalServiceCharge', 'dodAmount', 'arrivalCharge', 'serviceCharge', 'dod'];
+// ⛔ **`fcAmount` ជា DOD — លើ *ផ្លូវទាំង ២*** (ការវាស់របស់ម្ចាស់គម្រោង
+// 2026-09-11 លើបញ្ជី · 2026-09-15 លើ `/detail`) ៖ កញ្ចប់ `ztda` ដែល
+// អតិថិជនទទួល មាន `agentAmount: 0` (គ្មានប្រាក់ប្រមូលជំនួស) ប៉ុន្តែ
+// `fcAmount: 2.5` គឺជា **ថ្លៃដឹកដែលអតិថិជនបង់ពេលទទួល** = DOD ក្នុង
+// វាក្យស័ព្ទ ZoeW។ កញ្ចប់ Shopee មាន `fcAmount: 0.0` ➜ DOD 0 ដដែល។
+//
+// ⛔ **វាត្រូវឈរមុន `arrivalServiceCharge`** ៖ ZTO ផ្ញើវាលនោះ **ជានិច្ច
+// ដោយតម្លៃ `0.00`** ហើយ `pickNumber()` ត្រឡប់លេខដំបូងដែលរកឃើញ **រួមទាំង
+// `0`** ➜ បើវាឈរមុន ការស្វែងរកឈប់ត្រឹមនោះ ➜ **DOD 0 រាល់កញ្ចប់** ហើយ
+// វាល ៤ ខាងក្រោមក្លាយជា **កូដងាប់** (វាស់បាន 2.35.1 ៖ ការស្កេនឆ្លើយ
+// DOD 0 ខណៈការទាញបញ្ជីឆ្លើយ 2.5 លើ barcode តែមួយ)។
+//
+// ⛔ **`freightFee` មិនមែន DOD** ទោះវាស្មើ `fcAmount` លើកញ្ចប់ `payType: "CC"`
+// ក៏ដោយ ៖ លើកញ្ចប់បង់មុន វានៅមិនមែន 0 (ថ្លៃដឹកពិតជាមាន) ខណៈ `fcAmount`
+// ជា 0 ➜ ការយកវា = គិតលុយអតិថិជនលើថ្លៃដឹកដែលអ្នកផ្ញើបង់រួច។
+const DOD_PATHS = ['fcAmount', 'arrivalServiceCharge', 'dodAmount', 'arrivalCharge', 'serviceCharge', 'dod'];
 const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcode'];
 
 // ⛔ ផ្លូវ **បញ្ជី** (`/scan/page/scan`) ជាផ្លូវទី ២ ឆ្ពោះទៅ ZTO ៖ វាទាញ
@@ -71,14 +86,6 @@ const LIST_CACHE_TTL_MAX_MS = 60000;
 // នៅជាប្រភពតែមួយ ➜ **ការបន្ថែម មិនមែនការចម្លង**។
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
-// ⛔ **`fcAmount` ជា DOD លើផ្លូវបញ្ជី** (ការបញ្ជាក់របស់ម្ចាស់គម្រោង
-// 2026-09-11 លើ payload ពិត) ៖ កញ្ចប់ `ztda` ដែលអតិថិជនទទួល មាន
-// `agentAmount: 0` (គ្មានប្រាក់ប្រមូលជំនួស) ប៉ុន្តែ `fcAmount: 2.5` គឺជា
-// **ថ្លៃដឹកដែលអតិថិជនបង់ពេលទទួល** = DOD ក្នុងវាក្យស័ព្ទ ZoeW។ កញ្ចប់
-// Shopee មាន `fcAmount: 0.0` ➜ DOD 0 ដដែល។
-// ⛔ **វាប៉ះតែផ្លូវបញ្ជី** ៖ `DOD_PATHS` នៅដដែល ➜ ផ្លូវស្កេន (`/detail`)
-// ដែលកំពុងដំណើរការជាមួយ **លុយពិត** មិនប្រែសោះ។ ⛔ ការបន្ថែម មិនមែនការចម្លង។
-const LIST_DOD_PATHS = ['fcAmount'].concat(DOD_PATHS);
 
 const FIELD_SEPARATOR = '|';
 const CACHE_MAX = 200;
@@ -801,10 +808,10 @@ function projectListRow(config, row) {
     const candidates = [row];
     const phone = pickText(candidates, config.phonePaths);
     const cod = pickNumber(candidates, config.codPaths);
-    // ⛔ `ZTO_FIELD_DOD` (បើកំណត់) ឈ្នះជានិច្ច ➜ ការប្តូរវាលនាពេលអនាគត
-    // នៅតែធ្វើបានដោយ env តែម្យ៉ាង គ្មានការកែកូដ។
-    const dod = pickNumber(candidates,
-        config.dodPaths === DOD_PATHS ? LIST_DOD_PATHS : config.dodPaths);
+    // ⛔ **ផ្លូវបញ្ជី និងផ្លូវស្កេនអានបញ្ជីវាលដដែល** (`config.dodPaths`) ➜ ទិន្នន័យ
+    // តែមួយមិនអាចឲ្យលេខ ២ ផ្សេងគ្នាបានទេ។ ⛔ `ZTO_FIELD_DOD` (បើកំណត់) ឈ្នះ
+    // ជានិច្ច ➜ ការប្តូរវាលនាពេលអនាគត នៅតែជា env តែម្យ៉ាង គ្មានការកែកូដ។
+    const dod = pickNumber(candidates, config.dodPaths);
     const at = pickText(candidates, LIST_TIME_PATHS);
     // ⛔ សាលក្រម «បិទរួច» ជា **ជាន់ទី ១** នៃច្រកទ្វារ «ចាស់ + បិទរួច ➜ បញ្ចូល»
     // ខាង client ៖ បើជួរដេកបញ្ជីផ្ទុកវាល `ZTO_FIELD_SIGNED` នោះការវាស់ឥតថ្លៃ។
@@ -1059,13 +1066,25 @@ function pickText(candidates, paths) {
     return '';
 }
 
+// ⛔ **`pickNumber()` ជាចំណុចច្របាច់តែមួយនៃលុយ** — កន្លែងហៅទាំង ៤ សុទ្ធតែ
+// ជា COD ឬ DOD (ផ្លូវស្កេន និងផ្លូវបញ្ជី) ➜ ការសម្រេចត្រង់នេះគ្រប់ផ្លូវលុយ។
+//
+// ⛔ **លេខអវិជ្ជមាន clamp ត្រឹម `0`** ៖ ចំនួនទឹកប្រាក់ដែលត្រូវប្រមូល មិនអាច
+// អវិជ្ជមានបានទេ។ មុនកំណែ 2.35.1 វាមិនដែលឈានដល់អ្នកប្រើលើផ្លូវស្កេន ព្រោះ
+// `arrivalServiceCharge: 0.00` បាំងវាលខាងក្រោយទាំងអស់ — ការបន្ថែម `fcAmount`
+// បើកផ្លូវនោះ ➜ ច្រកទ្វារត្រូវឈរត្រង់នេះ (ច្បាប់ដដែលនឹង `revenue-rules-clamp-test`)។
+//
+// ⛔ **clamp មិនមែន «រំលងទៅវាលបន្ទាប់»** ៖ ការរំលងនឹងធ្វើឲ្យវាលអវិជ្ជមាន
+// លើកតម្លៃរបស់វាល *ផ្សេង* ឡើងជំនួសដោយស្ងាត់ ➜ លេខដែលអ្នកប្រើឃើញ លែងមកពី
+// វាលដែលឯកសារសន្យា។ ⛔ ហើយ `0` ជាចំនួនទឹកប្រាក់ **ត្រឹមត្រូវ** (កញ្ចប់ Shopee
+// មាន `fcAmount: 0.0` ពិតៗ) ➜ វាឈ្នះដដែល មិនត្រូវរំលងឡើយ។
 function pickNumber(candidates, paths) {
     for (let i = 0; i < candidates.length; i++) {
         for (let j = 0; j < paths.length; j++) {
             const raw = getPath(candidates[i], paths[j]);
             if (raw === null || raw === undefined || raw === '' || typeof raw === 'object' || typeof raw === 'boolean') continue;
             const value = Number(raw);
-            if (Number.isFinite(value)) return value;
+            if (Number.isFinite(value)) return value < 0 ? 0 : value;
         }
     }
     return null;

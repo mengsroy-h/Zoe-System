@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.24';
+const APP_VERSION = '2.19.25';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -833,6 +833,9 @@ async function initFirebase() {
         return false;
     } finally {
         isInitializingFirebase = false;
+        let currentConfig = savedConfig;
+        try { currentConfig = appLocalStore.getItem('zoew_firebase_config'); } catch (e) {}
+        if (currentConfig !== savedConfig) initFirebase();
     }
 }
 

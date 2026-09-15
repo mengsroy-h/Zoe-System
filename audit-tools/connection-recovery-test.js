@@ -1507,6 +1507,93 @@ function buildContext() {
         ok('⛔ ទិសផ្ទុយ ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
             same.log.inits.length === 1, same.log.inits);
 
+        // ── ១៥ខ. ⛔ ច្បាប់ដដែលអនុវត្តលើ **ZoeKeyGen** ដែរ ─────────────────
+        // `saveFirebaseConfig()` របស់ App ទាំង ២ សរសេរ `zoew_firebase_config`
+        // រួចហៅ `initFirebase()` **បេះបិទ** ➜ ដូច្នេះការ Reconfig កណ្តាល
+        // ការផ្ទុក SDK ជាលំដាប់ដែលមានក្នុង App ទាំង ២។ មុនជុំនេះ ផ្នែក ១៥
+        // ស្រង់តែ `SRC` (ZoeW) ➜ ZoeKeyGen គ្មានអ្នកយាមសោះ ហើយវា **ធ្លាក់ពិត**៖
+        // config ថ្មីត្រូវបោះចោលស្ងាត់ៗ ➜ ឧបករណ៍អ្នកលក់នៅសរសេរ Activation Key
+        // ចូល **License Project ចាស់** ខណៈអ្នកប្រើឃើញ «រក្សាទុករួចរាល់»។
+        // ⛔ បញ្ជីមិនរឹង ៖ តួ `initFirebase` ស្រង់ចេញពី app.js **ពិត** របស់
+        // App នីមួយៗ ➜ ការប្តូរឈ្មោះ ឬការដកការពារចេញ ធ្វើឲ្យវាធ្លាក់។
+        {
+            const KGINIT = fs.readFileSync(path.join(appRoot, 'ZoeKeyGen', 'app.js'), 'utf8');
+            const kgInitSrc = sliceFnFrom(KGINIT, 'initFirebase');
+            ok('ស្រង់ initFirebase() របស់ ZoeKeyGen បាន', !!kgInitSrc);
+
+            function runKeygenInit(changeConfigMidFlight) {
+                const store = { zoew_firebase_config: JSON.stringify({ apiKey: 'A', databaseURL: 'https://old.example' }) };
+                const log = { inits: [] };
+                let releaseSdk = null;
+                const ctx = {
+                    console, Promise, JSON, Object, Array, Error, Set, Map, Date,
+                    setTimeout, clearTimeout, isNaN, String, Number,
+                    navigator: { onLine: true },
+                    localStorage: {
+                        getItem: (k) => (k in store ? store[k] : null),
+                        setItem: (k, v) => { store[k] = v; },
+                        removeItem: (k) => { delete store[k]; }
+                    },
+                    document: { getElementById: () => null, querySelectorAll: () => [] },
+                    __log: log,
+                    __releaseSdk: (fn) => { releaseSdk = fn; }
+                };
+                ctx.window = ctx;
+                vm.createContext(ctx);
+                vm.runInContext([
+                    'const appLocalStore = localStorage;',
+                    'function safeStoreGet(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }',
+                    'let firebaseConfig = null, fb = null, auth = null, db = null;',
+                    'let dbRefConnected = null, dbRefServerTimeOffset = null;',
+                    'let isDatabaseConnected = false, isInitializingFirebase = false;',
+                    'let hasEverConnectedToDatabase = false, networkJustReturned = false;',
+                    'let serverTimeSynced = false, serverTimeOffsetMs = 0;',
+                    'let firebaseSdkUnavailable = false, sdkUnavailableNoticeShown = false;',
+                    'const FAKE_SDK = { getApps: () => [], initializeApp: (c) => ({ cfg: c }), deleteApp: () => Promise.resolve(),',
+                    '  getAuth: () => ({}), getDatabase: () => ({}), goOnline() {}, goOffline() {}, off() {}, ref: () => ({}),',
+                    '  onAuthStateChanged: (a, cb) => (() => {}) };',
+                    'function waitForFirebaseSDK() { return new Promise((res) => { __releaseSdk(() => res(FAKE_SDK)); }); }',
+                    'function invalidateSensitiveSession() {}',
+                    'function resetFirebaseSdkRetryHealth() {}',
+                    'function detachInfoListeners() {}',
+                    'function enforceSessionOnlyAuthPersistence() { return Promise.resolve(); }',
+                    'function attachInfoListeners() { return true; }',
+                    'function setupAuthListener() {}',
+                    'function armLateFirebaseSdkListener() {}',
+                    'function scheduleFirebaseSdkRetry() {}',
+                    'function checkPinAndOpenConfig() {}',
+                    'function renderConnectionStatus() {}',
+                    'function showToast(m) {}',
+                    (kgInitSrc || 'async function initFirebase() { return false; }')
+                        .replace('firebaseConfig = JSON.parse(savedConfig);',
+                            'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
+                    'globalThis.__start = () => initFirebase();'
+                ].join('\n'), ctx);
+                ctx.__start();
+                if (changeConfigMidFlight) {
+                    store.zoew_firebase_config = JSON.stringify({ apiKey: 'B', databaseURL: 'https://new.example' });
+                }
+                // ការរត់ឡើងវិញដំឡើងច្រកថ្មី ➜ ត្រូវដោះម្តងទៀត
+                const release = () => { if (releaseSdk) { const r = releaseSdk; releaseSdk = null; r(); } };
+                release();
+                return { log, release };
+            }
+
+            const kgChanged = runKeygenInit(true);
+            for (let i = 0; i < 8; i++) { await Promise.resolve(); kgChanged.release(); }
+            // ⛔ ជាន់អប្បបរមា ៖ បើជុំដំបូងមិនដែលរត់ សេណារីយ៉ូទទេ ➜ ការអះអាង
+            // ខាងក្រោមនឹងបៃតងដោយចៃដន្យ។
+            ok('⛔ ជាន់អប្បបរមា៖ ZoeKeyGen initFirebase ឈានដល់ការអាន config ពិត',
+                kgChanged.log.inits.length >= 1, kgChanged.log.inits);
+            ok('⛔ ZoeKeyGen ៖ Config ថ្មីដែលរក្សាទុកកណ្តាលការផ្ទុក SDK ➜ ត្រូវយកមកប្រើ មិនត្រូវបាត់',
+                kgChanged.log.inits.indexOf('https://new.example') !== -1, kgChanged.log.inits);
+
+            const kgSame = runKeygenInit(false);
+            for (let i = 0; i < 8; i++) { await Promise.resolve(); kgSame.release(); }
+            ok('⛔ ទិសផ្ទុយ ZoeKeyGen ៖ config មិនប្រែ ➜ មិនត្រូវ init ឡើងវិញ (គ្មានរង្វិលជុំ)',
+                kgSame.log.inits.length === 1, kgSame.log.inits);
+        }
+
         const reconfigured = runInit(false, true);
         for (let i = 0; i < 8; i++) { await Promise.resolve(); reconfigured.release(); }
         ok('Reconfig ៖ បានចូលផ្លូវដោះ Firebase App ចាស់ពិត', reconfigured.log.detachedData === 1 && !reconfigured.ctx.__existingApp);

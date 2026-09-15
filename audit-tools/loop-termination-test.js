@@ -45,6 +45,11 @@ if (!fs.existsSync(APP_JS)) {
 }
 const SRC = fs.readFileSync(APP_JS, 'utf8').replace(/\r\n?/g, '\n');
 
+function readAppSrc(appName) {
+    try { return fs.readFileSync(path.join(ROOT, appName, 'app.js'), 'utf8').replace(/\r\n?/g, '\n'); }
+    catch (e) { return ''; }
+}
+
 // ⛔ ថេរត្រូវ **អានចេញពីកូដពិត** មិនមែនចាក់ជា literal ក្នុង checker
 // (បើមិនដូច្នេះ ការដកពិដានចេញពី `app.js` នៅតែបៃតងត្រង់នេះ)។
 function sliceConsts(names) {
@@ -131,12 +136,17 @@ console.log('\n--- ២. legacyPickupPlaceholders (ព្រំដែនមកព
 // ៣. ⛔ អ្នកយាមរចនាសម្ព័ន្ធ ៖ រង្វិលជុំថ្មីដែលព្រំដែនមកពី *លេខ* ត្រូវមានពិដាន។
 // បញ្ជីនេះ **ដេរីវេពីកូដពិត** មិនមែនបញ្ជីរឹង ៖ រាល់ `while` ក្នុងកូដ ship
 // ដែល **មិន** ដើរលើប្រវែងខ្សែអក្សរ/ទំហំ collection/DOM node ត្រូវលេចត្រង់នេះ។
-console.log('\n--- ៣. រង្វិលជុំថ្មីដែលរាប់តាមលេខ ត្រូវមានពិដាន ---');
+// ⛔ វិសាលភាពគឺ **App ទាំង ២** ៖ ច្បាប់នេះជារចនាសម្ព័ន្ធ (tab ជាប់ស្ងាត់ៗ)
+// ➜ វាមិនមែនរបស់ ZoeW តែម្នាក់ឯងទេ។ ការស្កេនតែឯកសារ **១** គឺជា
+// កាលបរិច្ឆេទផុតកំណត់ ៖ រង្វិលជុំថ្មីក្នុង App ទី ២ រអិលកាត់ស្ងាត់ៗ។
+console.log('\n--- ៣. រង្វិលជុំថ្មីដែលរាប់តាមលេខ ត្រូវមានពិដាន (App ទាំង ២) ---');
 let acorn = null;
 try { acorn = require('acorn'); } catch (e) {}
 if (!acorn) {
     ok('⛔ ត្រូវការ acorn ដើម្បីស្កេនរង្វិលជុំ (npm i acorn)', false, 'acorn មិនមាន');
 } else {
+  [['ZoeW', SRC, 5], ['ZoeKeyGen', readAppSrc('ZoeKeyGen'), 3]].forEach(([appName, SRC, minLoops]) => {
+    if (!SRC) { ok('ស្រង់ app.js របស់ ' + appName + ' បាន', false, 'អានឯកសារមិនបាន'); return; }
     const ast = acorn.parse(SRC, { ecmaVersion: 2022, locations: true });
     const fnRanges = [];
     (function fns(n) {
@@ -163,7 +173,7 @@ if (!acorn) {
         }
         for (const k in n) { if (k === 'loc' || k === 'start' || k === 'end') continue; walk(n[k]); }
     })(ast);
-    ok('រាល់ `while` ក្នុង app.js មានព្រំដែនរចនាសម្ព័ន្ធ ឬពិដានលេខ',
+    ok(appName + ' ៖ រាល់ `while` ក្នុង app.js មានព្រំដែនរចនាសម្ព័ន្ធ ឬពិដានលេខ',
         numeric.length === 0,
         numeric.map((h) => 'L' + h.line + ' ' + h.head).join('\n        '));
     // ⛔ ជាន់អប្បបរមា ៖ បើ AST មិនឃើញរង្វិលជុំណាសោះ នោះការស្កេនវាស់អ្វីផ្សេង
@@ -174,7 +184,9 @@ if (!acorn) {
         if (n.type === 'WhileStatement' || n.type === 'DoWhileStatement') total++;
         for (const k in n) { if (k === 'loc' || k === 'start' || k === 'end') continue; count(n[k]); }
     })(ast);
-    ok('⛔ ជាន់អប្បបរមា៖ AST ឃើញរង្វិលជុំ `while` យ៉ាងតិច ៥', total >= 5, 'ឃើញ ' + total);
+    ok('⛔ ជាន់អប្បបរមា៖ AST ឃើញរង្វិលជុំ `while` របស់ ' + appName + ' យ៉ាងតិច ' + minLoops,
+        total >= minLoops, 'ឃើញ ' + total);
+  });
 }
 
 console.log('');

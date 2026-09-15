@@ -58,6 +58,27 @@ check('តារាងតូចរក្សាអក្សរខ្លី ហើ
     !/DOD \((?:យករួច|មិនទាន់យក)\):/.test(app) &&
     !/សរុប \((?:យករួច|មិនទាន់យក)\):/.test(app) &&
     !/\bbcMoneyStatus\b/.test(app));
+check('DOD មាន token ពណ៌ដាច់ដោយឡែកពី COD', hasVar('money-dod-collected', '#0E7490') &&
+    hasVar('money-dod-pending', '#A21CAF'));
+check('ច្បាប់ CSS របស់ DOD ឈ្នះលើ base (specificity ២ class + !important)',
+    /\.money-collected\.kind-dod\s*\{[^}]*color\s*:\s*var\(--money-dod-collected\)\s*!important/s.test(css) &&
+    /\.money-pending\.kind-dod\s*\{[^}]*color\s*:\s*var\(--money-dod-pending\)\s*!important/s.test(css));
+
+// ⛔ បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់ ➜ **ដេរីវេ** កន្លែងគូរទាំងអស់ចេញពី
+// `app.js` ពិត ៖ រាល់បន្ទាត់ដែលគូរ `DOD:` ជាមួយ class ទឹកប្រាក់ ត្រូវមាន
+// `kind-dod`; ⛔ **ទិសផ្ទុយ** ៖ បន្ទាត់ `COD:` មិនត្រូវមានវា (បើមាន ពណ៌
+// ត្រឡប់ទៅដូចគ្នាវិញ ហើយការអះអាងខាងលើនៅតែបៃតង)។
+const moneyLines = app.split('\n').filter((l) =>
+    /money-(collected|pending)|bcMoneyClass/.test(l) && /\b(COD|DOD):/.test(l));
+const dodLines = moneyLines.filter((l) => /\bDOD:/.test(l));
+const codOnlyLines = moneyLines.filter((l) => /\bCOD:/.test(l) && !/\bDOD:/.test(l));
+check('ជាន់អប្បបរមា ៖ រកឃើញកន្លែងគូរ DOD យ៉ាងតិច ៤ និង COD យ៉ាងតិច ៣',
+    dodLines.length >= 4 && codOnlyLines.length >= 3);
+check('រាល់កន្លែងគូរ DOD មាន `kind-dod`',
+    dodLines.length > 0 && dodLines.every((l) => l.includes('kind-dod')));
+check('⛔ ទិសផ្ទុយ ៖ បន្ទាត់ COD សុទ្ធ គ្មាន `kind-dod`',
+    codOnlyLines.length > 0 && codOnlyLines.every((l) => !l.includes('kind-dod')));
+
 check('របាយការណ៍ខែបំបែក tone ទឹកប្រាក់ ៣ ប្រភេទ',
     /tone:\s*['"]money-collected['"]/.test(app) &&
     /mrep-money-pending/.test(app) &&

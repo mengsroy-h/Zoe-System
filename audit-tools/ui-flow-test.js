@@ -1432,11 +1432,18 @@ function seedData() {
                 [...document.querySelectorAll('.modal')].forEach((m) => { if (!m.hasAttribute('data-nodismiss')) m.style.display = 'none'; });
             });
         }
-        check(clickErrors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e)).length === 0,
+        // ⛔ `loginModal` មាន `data-nodismiss` ➜ ជំហាន «លាក់ modal ទាំងអស់»
+        // **រំលងវា** ➜ `loginBtn` (`type="submit"`) ត្រូវចុចខណៈ form នៅលាក់
+        // ➜ browser ព្យាយាម focus វាល `required` ដែលមើលមិនឃើញ រួចបោះ
+        // «invalid form control … is not focusable»។ ⛔ វា **មិនអាចកើតលើ
+        // អ្នកប្រើពិតទេ** (ប៊ូតុងនោះមើលមិនឃើញ ➜ ចុចមិនបាន) ➜ វាជាសំណល់នៃ
+        // ការវាស់ ដូច `net::ERR_*` ខាងក្រោម មិនមែន crash។
+        const HARNESS_NOISE = /net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED|invalid form control[^]*not focusable/i;
+        check(clickErrors.filter((e) => !HARNESS_NOISE.test(e)).length === 0,
             app + ': ចុចប៊ូតុងទាំងអស់ ➜ គ្មាន crash',
             clickErrors.slice(0, 6).join('\n        '));
 
-        const real = errors.filter((e) => !/net::ERR_FAILED|Failed to load resource|ERR_BLOCKED|ERR_ABORTED/i.test(e));
+        const real = errors.filter((e) => !HARNESS_NOISE.test(e));
         check(real.length === 0, app + ': គ្មានកំហុស runtime ពេលធ្វើអន្តរកម្ម', real.slice(0, 3).join(' | '));
 
         await ctx.close();

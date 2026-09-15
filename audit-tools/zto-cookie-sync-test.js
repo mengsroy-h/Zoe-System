@@ -1069,6 +1069,131 @@ async function run() {
     ok('⛔ sync-zto-cookie.js គាំទ្រ --auto-ready',
         /--auto-ready/.test(source), 'ច្រកទ្វារត្រូវវាស់តម្លៃពិត មិនមែនវត្តមានឯកសារ');
 
+    // ══════════════════════════════════════════════════════════════════════
+    console.log('\n=== ៩. ផ្លូវ Android / Termux ===');
+    // ⛔ ផ្លូវទី ២ ឆ្ពោះទៅ ZTO រស់ក្នុង **helper ដដែល** ៖ validator · Cookie
+    // store · ការឆ្លើយតប ប្រើរួម ➜ សំណួរត្រឹមត្រូវគឺ «តើវាឆ្លងកាត់ *អ្នក
+    // សម្រេចដដែល* ទេ?» មិនមែន «តើវាមាន function ទេ?»។
+    const ANDROID_CAPTURE_PATH = path.join(TOOL_DIR, 'android-cdp-capture.js');
+    const TERMUX_RUN_PATH = path.join(TOOL_DIR, 'sync-zto-cookie-termux.sh');
+    const TERMUX_SETUP_PATH = path.join(TOOL_DIR, 'setup-termux.sh');
+    const HOME_BUTTON_PATH = path.join(TOOL_DIR, 'install-home-button.sh');
+    const ADB_ENSURE_PATH = path.join(TOOL_DIR, 'ensure-adb-connected.sh');
+    const readOr = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { return ''; } };
+    const capture = readOr(ANDROID_CAPTURE_PATH);
+    const termuxRun = readOr(TERMUX_RUN_PATH);
+    const termuxSetup = readOr(TERMUX_SETUP_PATH);
+    const homeButton = readOr(HOME_BUTTON_PATH);
+    const adbEnsure = readOr(ADB_ENSURE_PATH);
+
+    ok('ជាន់អប្បបរមា ៖ អានឯកសារ Android ទាំង ៥ បាន',
+        !!capture && !!termuxRun && !!termuxSetup && !!homeButton && !!adbEnsure,
+        [capture.length, termuxRun.length, termuxSetup.length, homeButton.length, adbEnsure.length].join('/'));
+
+    // ⛔ ការបើក Chrome ឆ្លងកាត់ `adb shell` ➜ **shell លើឧបករណ៍** ស្រាយ
+    // argument ម្តងទៀត ៖ `#` ចាប់ផ្តើម comment ➜ វាលេប `-p com.android.chrome`
+    // ស្ងាត់ៗ ➜ Android បើក browser ផ្សេង ➜ CDP មិនដែលឃើញទំព័រនោះ។
+    let captureApi = null;
+    try { captureApi = require(ANDROID_CAPTURE_PATH); } catch (_) { captureApi = null; }
+    if (captureApi && typeof captureApi.safeIntentUrl === 'function') {
+        const accepts = ['https://gate.ztoglobal.com/', 'https://argus.ztoglobal.com/'];
+        const rejects = ['https://argus.ztoglobal.com/#/', 'http://argus.ztoglobal.com/',
+            'https://a.test/;id', 'https://a.test/a b', 'https://a.test/$(id)', ''];
+        const okAll = accepts.every((u) => { try { return captureApi.safeIntentUrl(u) === u; } catch (_) { return false; } });
+        const badAll = rejects.every((u) => { try { captureApi.safeIntentUrl(u); return false; } catch (_) { return true; } });
+        ok('⛔ URL របស់ intent ទទួលតែ https ធម្មតា (URL ពិតទាំង ២ ឆ្លង)', okAll);
+        ok('⛔ URL ដែលមានតួ shell (`#` · ចន្លោះ · `;` · `$(`) ត្រូវបដិសេធ', badAll);
+        // ⛔ ទិសផ្ទុយ ៖ ការហៅត្រូវឆ្លងកាត់ច្រកទ្វារនោះពិត មិនមែនត្រឹមប្រកាសវា
+        ok('⛔ `openChromeUrl` ហៅ `safeIntentUrl` ពិត (មិនត្រឹមប្រកាសវា)',
+            /'-d',\s*safeIntentUrl\(url\)/.test(capture));
+    } else {
+        for (let i = 0; i < 3; i++) ok('safeIntentUrl #' + (i + 1), false, 'មិន export');
+    }
+
+    // ⛔ ការចាប់ខាង Android ត្រូវប្រើ **អ្នកសម្រេចដដែល** នឹង Windows ៖
+    // ការសរសេរ validator ច្បាប់ចម្លងទី ២ = ២ ច្បាប់ផ្ទុយគ្នាក្នុងឧបករណ៍តែមួយ។
+    const SHARED_DECIDERS = ['isTargetApiUrl', 'validateCookieHeader',
+        'captureResponseSucceeded', 'cookieAfterResponse'];
+    const passedIn = SHARED_DECIDERS.filter((n) => new RegExp('config\\.' + n + '\\(').test(capture));
+    ok('⛔ អ្នកសម្រេចរួម ៤ ត្រូវបញ្ជូនចូលពី sync-zto-cookie.js មិនមែនសរសេរឡើងវិញ',
+        passedIn.length === SHARED_DECIDERS.length,
+        'បញ្ជូនចូល ៖ ' + passedIn.join(', '));
+    const redefined = SHARED_DECIDERS.filter((n) => new RegExp('function\\s+' + n + '\\s*\\(').test(capture));
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មានអ្នកសម្រេចណាត្រូវសរសេរឡើងវិញក្នុងម៉ូឌុល Android',
+        redefined.length === 0, redefined.join(', '));
+    ok('⛔ ការហៅ Chrome DevTools ចាក់សោលើ loopback (`adb forward`)',
+        /url\.hostname = '127\.0\.0\.1'/.test(capture) && /localabstract:chrome_devtools_remote/.test(capture));
+
+    // ⛔ **កំហុសពិត ៖ `--auto` ជាផ្លូវដែល *ត្រូវការ* ADB។** វាធ្លាក់ចុះទៅការ
+    // ចាប់ពេល Cookie ខូច ➜ ការដាក់វាក្នុងសំណុំ «មិនត្រូវការ ADB» ធានាថា
+    // ផ្លូវស្វ័យប្រវត្តិធ្លាក់ `ANDROID_ADB_NOT_CONNECTED` រាល់ដង។
+    // ⚠️ `\b` រាប់ `-` ជាព្រំដែន ➜ `--auto\b` ត្រូវនឹង `--auto-ready` ដែរ។
+    // ការវាស់ត្រូវចាក់សោ `--auto)` ជា **ករណីពេញ** មិនមែនបុព្វបទ។
+    const noAdbCase = (/--check\|--verify-setup\|--auto-ready\)?[^\n]*needs_adb=0/.exec(termuxRun) || [''])[0];
+    ok('⛔ `--auto` មិនស្ថិតក្នុងសំណុំ «មិនត្រូវការ ADB»',
+        !!noAdbCase && !/--auto\)[^\n]*needs_adb=0/.test(termuxRun), noAdbCase);
+    ok('⛔ `--auto` ភ្ជាប់ ADB ជា *ការព្យាយាម* ➜ Cookie ល្អនៅតែឆ្លើយ «គ្មានអ្វីត្រូវធ្វើ»',
+        /adb_optional=1/.test(termuxRun) && /ensure-adb-connected\.sh \|\| true/.test(termuxRun));
+    ok('⛔ ការហៅ helper ឆ្លងកាត់ `bash` ➜ exec bit ដែលបាត់មិនសម្លាប់ការរត់',
+        /bash \.\/ensure-adb-connected\.sh/.test(termuxRun));
+
+    // ⛔ unzip លើ Android បោះ exec bit ចោល ➜ `./foo.sh` ធ្លាក់ «Permission
+    // denied» ក្រោម `set -e` ➜ setup ងាប់មុនឈានដល់ការរក្សា config។
+    ok('⛔ setup ប្រគល់ exec bit ឲ្យ helper ទាំងអស់ដោយឥតលក្ខខណ្ឌ',
+        /chmod \+x \.\/\*\.sh/.test(termuxSetup));
+    ok('⛔ setup ហៅ install-home-button ឆ្លងកាត់ `bash` ព្រមទាំងប្រាប់ថតពិត',
+        /bash \.\/install-home-button\.sh "\$SCRIPT_DIR"/.test(termuxSetup));
+
+    // ⛔ ថតគម្រោងចាក់ជា literal ធ្វើឲ្យ setup ធ្លាក់ដោយសារ **ខ្លួនវាផ្ទាល់** ៖
+    // អ្នកប្រើដែល unzip ទៅឈ្មោះផ្សេង ឃើញ «Run setup-termux.sh first» ខណៈ
+    // setup-termux.sh ទើបតែហៅវា។
+    ok('⛔ install-home-button ដេរីវេថតគម្រោង (argument ឬទីតាំងខ្លួនឯង)',
+        /PROJECT="\$\{1:-\$\(cd -- "\$\(dirname -- "\$\{BASH_SOURCE\[0\]\}"\)" && pwd\)\}"/.test(homeButton));
+    // ⛔ ការវាស់ត្រូវមើល **កូដ** មិនមែន comment ដែលពន្យល់ការកែ (បើអត់
+    // ការសរសេរហេតុផលជាប់ ក្លាយជាការធ្លាក់ — នោះជាទោស មិនមែនការការពារ)។
+    const homeButtonCode = homeButton.split('\n')
+        .filter((l) => !/^\s*#/.test(l)).join('\n');
+    ok('⛔ ទិសផ្ទុយ ៖ គ្មានផ្លូវ `$HOME/ZTO-Cookie-Sync` ចាក់ជា literal ក្នុងកូដ',
+        homeButtonCode.indexOf('$HOME/ZTO-Cookie-Sync') === -1,
+        homeButtonCode.indexOf('$HOME/ZTO-Cookie-Sync'));
+
+    // ⛔ secret មិនឡើងដល់អេក្រង់ ៖ សួរថា **តម្លៃ** អាចចេញទេ មិនមែន regex លើឈ្មោះ
+    const SECRET_VARS = ['token', 'proxy_key'];
+    const leaks = [];
+    [['setup-termux.sh', termuxSetup], ['install-home-button.sh', homeButton],
+     ['ensure-adb-connected.sh', adbEnsure], ['sync-zto-cookie-termux.sh', termuxRun]]
+        .forEach(([name, text]) => {
+            text.split('\n').forEach((line, i) => {
+                // ⛔ `printf '%s' "$token" > "$TOKEN_PATH"` សរសេរចូល **ឯកសារ**
+                // មិនមែនអេក្រង់ ➜ ការរាប់វាជាការលេចធ្លាយ គឺជាសញ្ញាក្លែងក្លាយ។
+                if (!/^\s*(say|echo|printf)\b/.test(line)) return;
+                if (/>\s*"?\$/.test(line)) return;
+                SECRET_VARS.forEach((v) => {
+                    if (new RegExp('\\$\\{?' + v + '\\b').test(line)) leaks.push(name + ':' + (i + 1));
+                });
+            });
+        });
+    ok('⛔ PAT និង ZTO_PROXY_KEY មិនត្រូវបោះពុម្ពលើអេក្រង់', leaks.length === 0, leaks.join(' · '));
+    ok('⛔ PAT និង proxy key អានដោយ `read -s` (មិនឡើងអេក្រង់ពេលវាយ)',
+        (termuxSetup.match(/read -r -s -p/g) || []).length >= 2);
+    ok('⛔ secret file សរសេរដោយ mode 600 និងថត 700',
+        /chmod 600 "\$TOKEN_PATH"/.test(termuxSetup) && /chmod 700 "\$STATE_ROOT"/.test(termuxSetup)
+        && /umask 077/.test(termuxSetup));
+    ok('⛔ ការអាន secret បដិសេធ file ដែលអានបានដោយក្រុម/អ្នកដទៃ',
+        /stat\.mode & 0o077/.test(source) && /NETLIFY_TOKEN_PERMISSIONS/.test(source));
+    ok('⛔ ការអាន secret បដិសេធ symlink',
+        /isSymbolicLink\(\)/.test(source));
+    ok('⛔ Android ប្រើ `.secret` ចំណែក Windows រក្សា `.dpapi` ដដែល',
+        /isAndroidRuntime\(\) \? 'netlify-token\.secret' : 'netlify-token\.dpapi'/.test(source));
+
+    // ⛔ រាល់អត្ថបទដែលចេញទៅ terminal ត្រូវជា ASCII អង់គ្លេស (ច្បាប់ដដែលនឹង
+    // `.cmd` ៖ អក្សរខ្មែរបែកបាក់លើ terminal មួយចំនួន)។
+    const nonAscii = [['setup-termux.sh', termuxSetup], ['install-home-button.sh', homeButton],
+        ['ensure-adb-connected.sh', adbEnsure], ['sync-zto-cookie-termux.sh', termuxRun],
+        ['android-cdp-capture.js', capture]]
+        .filter(([, text]) => /[^\x00-\x7F]/.test(text)).map(([name]) => name);
+    ok('⛔ ឯកសារ Android ជា ASCII សុទ្ធ', nonAscii.length === 0, nonAscii.join(' · '));
+
     console.log('\n' + (fail
         ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'
         : '✅ ជោគជ័យ ' + pass));

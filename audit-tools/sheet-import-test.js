@@ -318,6 +318,15 @@ async function withTimeout(promise, ms, label) {
     await group('៦. ចុចធាតុរបា Slide ➜ សុំ PIN មុន (មិនបើកប្រអប់ភ្លាម)', async () => {
             await withTimeout(boot(), 30000, 'boot');
             await page.evaluate(() => window.openSideDrawer());
+            // របា Slide រៀបជា Category បត់បាន ➜ អ្នកប្រើពន្លា Category មុន
+            // ចុចធាតុ។ ការធ្វើដដែលទុកឲ្យការចុចឆ្លងកាត់ **ផ្លូវ UI ពិត** ដដែល
+            // ⛔ មិនមែនហៅ function ដោយផ្ទាល់ (នោះនឹងរំលងច្រកទ្វារដែលកំពុងវាស់)។
+            await page.evaluate(() => {
+                const item = document.querySelector('[data-act="drawerSheetImportFlow"]');
+                const grp = item && item.closest ? item.closest('.drawer-group') : null;
+                const head = grp && grp.querySelector('.drawer-group-head');
+                if (head && !grp.classList.contains('is-open')) head.click();
+            });
             await page.waitForTimeout(300);
             await page.click('[data-act="drawerSheetImportFlow"]', { timeout: 6000 });
             await page.waitForTimeout(500);

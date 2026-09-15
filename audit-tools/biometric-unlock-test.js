@@ -302,8 +302,32 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         const css = fs.readFileSync(path.join(ROOT, 'ZoeW', 'style.css'), 'utf8');
         ok('ម៉ឺនុយការកំណត់មានប៊ូតុងបើក/បិទជីវមាត្រ', html.indexOf('id="biometricToggleBtn"') !== -1);
         ok('ប្រអប់ PIN មានប៊ូតុងស្កេន', html.indexOf('id="pinBiometricBtn"') !== -1);
+        // ⛔ ការអះអាងចាស់រាប់ **ចម្ងាយជាតួអក្សរ** (`{0,200}`) ➜ វាជា
+        // កាលបរិច្ឆេទផុតកំណត់ ៖ ការបន្ថែមធាតុណាមួយចូលជើងទំព័រ ធ្វើឲ្យវាធ្លាក់
+        // ខណៈការធានា («កំណែឈរក្នុងជើងទំព័រ») នៅដដែល។ ការវាស់ត្រូវជា
+        // **ការផ្ទុកតាមរចនាសម្ព័ន្ធ** ៖ ស្រង់ប្លុក `.drawer-foot` ចេញតាមការ
+        // រាប់ជម្រៅ រួចសួរថាធាតុនោះឈរ **ខាងក្នុង** ឬអត់ — វាតឹងជាងចម្ងាយ
+        // ព្រោះចម្ងាយឆ្លងកាត់បាន សូម្បីធាតុនោះឈរ *ក្រៅ* ប្លុកក៏ដោយ។
+        const footAt = html.indexOf('<div class="drawer-foot">');
+        let footBlock = '';
+        if (footAt !== -1) {
+            let depth = 0;
+            for (let i = footAt; i < html.length; i++) {
+                if (html.startsWith('<div', i)) depth++;
+                else if (html.startsWith('</div>', i)) {
+                    depth--;
+                    if (depth === 0) { footBlock = html.slice(footAt, i + 6); break; }
+                }
+            }
+        }
+        ok('ជាន់អប្បបរមា ៖ ស្រង់ប្លុក `.drawer-foot` ចេញបាន',
+            footBlock.length > 0 && footBlock.length < html.length, footBlock.length);
         ok('ម៉ឺនុយការកំណត់បង្ហាញកំណែ App នៅខាងក្រោម',
-            /<div class="drawer-foot">[\s\S]{0,200}data-app-version/.test(html));
+            footBlock.indexOf('data-app-version') !== -1);
+        ok('⛔ ប៊ូតុង ចូល/ចាកចេញ ឈរក្នុងជើងទំព័រដដែល មិនមែនក្នុងបញ្ជី',
+            footBlock.indexOf('id="navAuthBtn"') !== -1
+            && html.indexOf('<div class="drawer-body">') < footAt
+            && html.slice(html.indexOf('<div class="drawer-body">'), footAt).indexOf('id="navAuthBtn"') === -1);
         ok('style.css មានច្បាប់ .drawer-foot', /\.drawer-foot\s*\{/.test(css));
         ok('style.css មានច្បាប់ .btn-biometric', /\.btn-biometric\s*\{/.test(css));
         ok('style.css មានច្បាប់ .drawer-toggle-state', /\.drawer-toggle-state\s*\{/.test(css));

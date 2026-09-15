@@ -414,6 +414,9 @@
     ".gitignore": {
       "policy": "guard-2"
     },
+    "audit-tools/action-binding-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/adaptive-link-test.js": {
       "policy": "guard-1"
     },

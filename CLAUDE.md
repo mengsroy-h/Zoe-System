@@ -99,7 +99,7 @@ Netlify site ដាច់ដោយឡែក ៖
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
 | **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.1` (`zoew-v210`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.23` (`zoekeygen-v93`) | `zoekeygen` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.24` (`zoekeygen-v94`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -324,6 +324,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ការ commit យឺតក្រោយពិដាន** | ⛔ ការព្យួរ ≠ ការមិនកើត — ការងារក្រោយ commit ត្រូវរត់ពេលវាមកដល់ | `late-commit-test` |
 | **storage ដែលត្រូវបិទ** | ⛔ `window.localStorage` **getter ខ្លួនវា** បោះ | `storage-guard` · `storage-blocked-boot-test` |
 | **dependency អវត្តមាន** | ⛔ `TypeError` synchronous រំលង `.catch()` | `camera-resume-test` |
+| **ធាតុ `data-act` ↔ អ្នកស្តាប់ទី ២** | ⛔ ច្បាប់ ៤ នៃផ្នែក «CSP និង `data-act`» ទទួល **អ្នកយាមរចនាសម្ព័ន្ធ** ៖ `el.on<evt> =` លើធាតុដែលមាន `data-act` រួច ➜ ធ្លាក់ (ដេរីវេពី `index.html` ពិត · គោរព scope · មាន **ទិសផ្ទុយ** ៖ ធាតុគ្មាន `data-act` ចងតាម JS បានសេរី) | `action-binding-test` |
 | CSP | គ្មាន `on*=`; ធនធានផ្ទុកយឺតត្រូវឆ្លង CSP | `csp-enforced-test` · `csp-lazy-resource-test` |
 | XSS | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `html-sink-escaping` · `inline-handler-xss-test` |
 | ការលេចធ្លាយ secret | redaction ដើរលើ event ទាំងមូល | `secret-hygiene` |
@@ -1109,6 +1110,11 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
    មាន `data-act` **និង** `onclick` ➜ ការចុច «ចាកចេញ» រត់ **ពីរផ្លូវ**។
    ⛔ ការកែជា **ច្រកទ្វារតែមួយ** ៖ `data-act` មួយដែលសម្រេចតាមទង់ស្ថានភាព។
    `page-nav-test` រាប់ **ការហៅពិត** ក្រោយចុច ➜ ត្រូវជា **១**។
+   🔴 **ហើយវាវិលមកតាម App ទី ២** (2.19.24) ៖ ការកែខាងលើធ្វើតែក្នុង ZoeW
+   ➜ ZoeKeyGen `#navAuthBtn` នៅមាន `data-act` **និង** `onclick` ➜ ចូលរួច
+   ចុច «ចាកចេញ» = ចាកចេញ **ហើយ** ប្រអប់ចូលលេច។ ⛔ ការកែជាច្រកទ្វារ
+   តែមួយដដែល (`navAuthFlow()`) — ហើយថ្នាក់នេះឥឡូវចាក់សោ **តាម
+   រចនាសម្ព័ន្ធ ឆ្លង App ទាំង ២** ដោយ `action-binding-test`។
 ៥. **`<script>` ក្នុង `<head>` ត្រូវនៅក្នុង `boot-flags.js`** ដែលផ្ទុកជា
    `<script src>` **មុន stylesheet**។ វាត្រូវនៅក្នុង `CORE_SHELL` របស់ `sw.js`។
 ៦. `style-src` **នៅរក្សា `'unsafe-inline'` ដដែល** (មាន `style="…"` ជាង ១៩០
@@ -2079,6 +2085,23 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ច្បាប់ ៖ ទុកតែជុំដែល *អ្នកប្រើមិនទាន់បញ្ជាក់*។** ពេលអ្នកប្រើបញ្ជាក់ថា
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
+
+## ⏳ ZoeKeyGen `2.19.24` — **ប៊ូតុងចូល/ចាកចេញ ៖ ១ ចុច = ១ សកម្មភាព**
+
+⛔ **គ្មានសកម្មភាពដោយដៃទេ** — កូដសុទ្ធសាធ (`ZoeKeyGen/`) ➜ Netlify deploy
+ខ្លួនឯង។ ⛔ **គ្មានការកែ Firebase rules** និង **គ្មានការប្តូរ env** ដែរ។
+⛔ **ZoeW មិនប្រែសោះ** ក្នុងជុំនេះ (`APP_VERSION` របស់វាមិនឡើង)។
+
+**របៀបសាក** (ក្នុង **ZoeKeyGen** មិនមែន ZoeW) ៖ ចូលប្រព័ន្ធ ➜ ប៊ូតុងខាងលើ
+ត្រូវរាយ «🚪 ចាកចេញ» ➜ ចុចវា **ម្តង** ៖ វាត្រូវចាកចេញ **ហើយឈប់ត្រឹមនោះ**។
+⛔ មុននេះ ការចុចដដែលនោះ **បើកប្រអប់ចូលឡើងវិញភ្លាម** ក្នុងការចុចតែមួយ។
+រួចចុច «🔑 ចូល» ➜ ប្រអប់ចូលត្រូវលេច **១ ដង** (មិនមែន ២)។
+
+⛔ **សញ្ញាបើវាខូច** ៖ (ក) ចុច «ចាកចេញ» ➜ នៅតែឃើញប្រអប់ចូលលោតឡើងភ្លាម ➜
+សំបកចាស់នៅជាប់ ➜ បិទបើក App ឬសម្អាត cache (`zoekeygen-v94`); (ខ) ចុច
+«ចូល» ➜ គ្មានអ្វីកើតឡើងសោះ ➜ នោះមានន័យថា `navAuthFlow` មិននៅក្នុង
+`ACTION_ALLOWLIST` ➜ `grep` ជួរ «ធាតុ `data-act` ↔ អ្នកស្តាប់ទី ២» ក្នុង
+តារាងស្នូល។
 
 ## ⏳ ZoeW `2.36.1` — **Deep Audit ៖ រង្វិលជុំមិនចេះឈប់ ២ · គ្មានអ្វីប្រែលើអេក្រង់**
 

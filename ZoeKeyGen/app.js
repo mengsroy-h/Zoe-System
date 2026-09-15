@@ -1,7 +1,9 @@
-const APP_VERSION = '2.19.23';
+const APP_VERSION = '2.19.24';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
+
+let authButtonIsLoggedIn = false;
 
 const ACTION_ALLOWLIST = [
     "blockFormSubmit",
@@ -18,11 +20,11 @@ const ACTION_ALLOWLIST = [
     "generateSetupLink",
     "loadSigningKey",
     "migrateLegacyLicenseKeyMetadata",
+    "navAuthFlow",
     "openConfigFlow",
     "refreshKeyList",
     "saveFirebaseConfig",
     "saveNewSecurityPin",
-    "showLoginModalWithPrefill",
     "verifySecurityPin"
 ];
 function readActionArgs(el, event) {
@@ -1590,16 +1592,16 @@ function logoutApp() {
     });
 }
 
+function navAuthFlow() {
+    if (authButtonIsLoggedIn) logoutApp();
+    else showLoginModalWithPrefill();
+}
+
 function updateAuthButton(isLoggedIn) {
+    authButtonIsLoggedIn = !!isLoggedIn;
     const btn = document.getElementById('navAuthBtn');
     if (!btn) return;
-    if (isLoggedIn) {
-        btn.textContent = '🚪 ចាកចេញ';
-        btn.onclick = logoutApp;
-    } else {
-        btn.textContent = '🔑 ចូល';
-        btn.onclick = showLoginModalWithPrefill;
-    }
+    btn.textContent = authButtonIsLoggedIn ? '🚪 ចាកចេញ' : '🔑 ចូល';
 }
 
 let signingPrivateKeyJwk = null;

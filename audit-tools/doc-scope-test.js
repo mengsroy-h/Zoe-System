@@ -483,15 +483,34 @@ check(missingMenu.length === 0,
 // ⛔ ចំនួនជួរ 🩺 ត្រូវពិនិត្យ **គ្រប់ឯកសារដែលអះអាងវា** — មិនត្រឹម CLAUDE.md។
 // វាស់បាន ៖ តារាងក្នុង `ZoeW/README.md` មាន ៩ ជួរពិត ខណៈប្រយោគខាងលើវារាយ
 // «**៨ ជួរ**» ➜ បញ្ជីត្រូវ update តែលេខភ្លេច។
-const HEALTH_CLAIM_DOCS = ['CLAUDE.md', 'ZoeW/README.md'];
-const healthClaims = HEALTH_CLAIM_DOCS.map((rel) => {
-    const f = path.join(ROOT, rel);
-    const text = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
-    const hit = text.match(/ពិនិត្យសុខភាពប្រព័ន្ធ\*{0,2}[^\n]*?(?:ជួរ \*{0,2}([០-៩0-9]+)|\*{0,2}([០-៩0-9]+) ជួរ)/);
-    return { rel: rel, claimed: hit ? khmerToInt(hit[1] || hit[2]) : null };
-});
-check(healthClaims.every((c) => c.claimed !== null),
-    'ជាន់អប្បបរមា ៖ រកឃើញការអះអាងចំនួនជួរ 🩺 ក្នុងឯកសារទាំង ' + HEALTH_CLAIM_DOCS.length,
+// ⛔ **បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់** ៖ កំណែមុនរាយត្រឹម
+// `['CLAUDE.md', 'ZoeW/README.md']` ខណៈ **root `README.md`** ក៏អះអាងលេខនោះ
+// ដែរ ➜ វាអាចចាស់ដោយស្ងាត់។ វាស់បាន (mutation ពិត) ៖ ការប្តូរ root README
+// ទៅ «៨ ជួរ» **រស់រាន** `PASS (64)`។ ដូច្នេះបញ្ជីត្រូវ **ដេរីវេពីថតពិត** ៖
+// ឯកសារ `.md` ណាដែល *អះអាងលេខនោះ* ត្រូវស្ថិតក្នុងការវាស់ដោយស្វ័យប្រវត្តិ។
+const HEALTH_CLAIM_RE = /ពិនិត្យសុខភាពប្រព័ន្ធ\*{0,2}[^\n]*?(?:ជួរ \*{0,2}([០-៩0-9]+)|\*{0,2}([០-៩0-9]+) ជួរ)/;
+function listMarkdownFiles(dir, rel, out) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    entries.forEach((entry) => {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        const next = rel ? rel + '/' + entry.name : entry.name;
+        if (entry.isDirectory()) listMarkdownFiles(path.join(dir, entry.name), next, out);
+        else if (/\.md$/i.test(entry.name)) out.push(next);
+    });
+    return out;
+}
+const healthClaims = listMarkdownFiles(ROOT, '', [])
+    .map((rel) => {
+        let text = '';
+        try { text = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return null; }
+        const hit = text.match(HEALTH_CLAIM_RE);
+        return hit ? { rel: rel, claimed: khmerToInt(hit[1] || hit[2]) } : null;
+    })
+    .filter(Boolean);
+const HEALTH_CLAIM_DOCS = healthClaims.map((c) => c.rel);
+check(healthClaims.length >= 3,
+    'ជាន់អប្បបរមា ៖ ដេរីវេឯកសារដែលអះអាងចំនួនជួរ 🩺 បានយ៉ាងតិច ៣',
     healthClaims.map((c) => c.rel + '=' + c.claimed).join(' · '));
 const healthStale = healthClaims.filter((c) => c.claimed !== healthRowCount);
 check(healthStale.length === 0,

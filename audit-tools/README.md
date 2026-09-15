@@ -306,6 +306,7 @@ bash audit-tools/emu/rules.sh
 | `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |
 | `listener-leak-test.js` | listener/node កកកុញឆ្លងវដ្តពិត | `LEAK_APP_DIR` · `LEAK_CHROME` |
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
+| `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
 | `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល | `SENTRYRACE_APP_DIR` |
 

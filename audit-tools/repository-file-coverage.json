@@ -1033,6 +1033,27 @@
     "tools/zto-cookie-sync-windows/sync-zto-cookie.js": {
       "policy": "guard-42"
     },
+    "tools/zto-cookie-sync-windows/README-ANDROID-KH.md": {
+      "policy": "guard-13"
+    },
+    "tools/zto-cookie-sync-windows/android-cdp-capture.js": {
+      "policy": "guard-42"
+    },
+    "tools/zto-cookie-sync-windows/connect-android.sh": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/ensure-adb-connected.sh": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/install-home-button.sh": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/setup-termux.sh": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/sync-zto-cookie-termux.sh": {
+      "policy": "guard-41"
+    },
     "ZoeKeyGen/app.js": {
       "policy": "guard-14"
     },

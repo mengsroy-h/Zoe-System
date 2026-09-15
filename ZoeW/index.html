@@ -340,41 +340,69 @@
         <button type="button" class="drawer-close" data-act="closeSideDrawer" title="បិទ" aria-label="បិទ">✖</button>
     </div>
     <div class="drawer-body">
-        <button type="button" class="drawer-item" data-act="drawerConfigFlow">
-            <span class="ico">⚙️</span><span>Config / Reconfig</span>
-        </button>
-        <button type="button" class="drawer-item" data-act="drawerLookupApiFlow">
-            <span class="ico">🔌</span><span>API ស្វែងរកអតិថិជន</span>
-        </button>
-        <button type="button" class="drawer-item" data-act="drawerCustomerTableFlow">
-            <span class="ico">📊</span><span>តារាងអតិថិជន</span>
-        </button>
-        <button type="button" class="drawer-item" data-act="drawerLockerSettingsFlow">
-            <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
-        </button>
-        <button type="button" class="drawer-item" data-act="drawerSheetImportFlow">
-            <span class="ico">📥</span><span>នាំចូល Excel ទៅ Sheet</span>
-        </button>
-        <button type="button" class="drawer-item" data-act="openHealthCheck">
-            <span class="ico">🩺</span><span>ពិនិត្យសុខភាពប្រព័ន្ធ</span>
-        </button>
-        <button type="button" class="drawer-item drawer-toggle hidden" id="ztoAutoCloseBtn" data-act="drawerZtoAutoCloseFlow">
-            <span class="ico">🔄</span><span class="drawer-toggle-label">បិទតាម ZTO ស្វ័យប្រវត្តិ</span><span class="drawer-toggle-state" id="ztoAutoCloseState">បើក</span>
-        </button>
-        <button type="button" class="drawer-item drawer-toggle hidden" id="ztoListSyncDrawerBtn" data-act="drawerZtoListSyncFlow">
-            <span class="ico">📥</span><span class="drawer-toggle-label">ទាញបញ្ជីកញ្ចប់ពី ZTO</span><span class="drawer-toggle-state" id="ztoListSyncState">បិទ</span>
-        </button>
-        <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
-            <span class="ico">🔒</span><span class="drawer-toggle-label">ចាក់សោពេលបើក App</span><span class="drawer-toggle-state" id="appLockToggleState">បិទ</span>
-        </button>
-        <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" data-act="drawerBiometricFlow">
-            <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>
-        </button>
-        <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" data-act="drawerLoginFlow">
-            <span class="ico">🔑</span><span class="drawer-auth-label">ចូល</span>
-        </button>
+        <section class="drawer-group" id="drawerGroupConnect">
+            <button type="button" class="drawer-group-head" id="drawerGroupHeadConnect" data-act="toggleDrawerGroup" data-self="1" aria-expanded="false" aria-controls="drawerGroupBodyConnect">
+                <span class="ico">🔗</span><span class="drawer-group-label">ការតភ្ជាប់ និងទិន្នន័យ</span><span class="drawer-group-arrow" aria-hidden="true">↓</span>
+            </button>
+            <div class="drawer-group-body" id="drawerGroupBodyConnect" role="group" aria-labelledby="drawerGroupHeadConnect">
+                <button type="button" class="drawer-item" data-act="drawerConfigFlow">
+                    <span class="ico">⚙️</span><span>Config / Reconfig</span>
+                </button>
+                <button type="button" class="drawer-item" data-act="drawerLookupApiFlow">
+                    <span class="ico">🔌</span><span>API ស្វែងរកអតិថិជន</span>
+                </button>
+                <button type="button" class="drawer-item" data-act="drawerCustomerTableFlow">
+                    <span class="ico">📊</span><span>តារាងអតិថិជន</span>
+                </button>
+                <button type="button" class="drawer-item" data-act="drawerSheetImportFlow">
+                    <span class="ico">📥</span><span>នាំចូល Excel ទៅ Sheet</span>
+                </button>
+            </div>
+        </section>
+        <section class="drawer-group" id="drawerGroupZto">
+            <button type="button" class="drawer-group-head" id="drawerGroupHeadZto" data-act="toggleDrawerGroup" data-self="1" aria-expanded="false" aria-controls="drawerGroupBodyZto">
+                <span class="ico">🚚</span><span class="drawer-group-label">ZTO</span><span class="drawer-group-arrow" aria-hidden="true">↓</span>
+            </button>
+            <div class="drawer-group-body" id="drawerGroupBodyZto" role="group" aria-labelledby="drawerGroupHeadZto">
+                <button type="button" class="drawer-item drawer-toggle hidden" id="ztoAutoCloseBtn" data-act="drawerZtoAutoCloseFlow">
+                    <span class="ico">🔄</span><span class="drawer-toggle-label">បិទតាម ZTO ស្វ័យប្រវត្តិ</span><span class="drawer-toggle-state" id="ztoAutoCloseState">បើក</span>
+                </button>
+                <button type="button" class="drawer-item drawer-toggle hidden" id="ztoListSyncDrawerBtn" data-act="drawerZtoListSyncFlow">
+                    <span class="ico">📥</span><span class="drawer-toggle-label">ទាញបញ្ជីកញ្ចប់ពី ZTO</span><span class="drawer-toggle-state" id="ztoListSyncState">បិទ</span>
+                </button>
+            </div>
+        </section>
+        <section class="drawer-group" id="drawerGroupLock">
+            <button type="button" class="drawer-group-head" id="drawerGroupHeadLock" data-act="toggleDrawerGroup" data-self="1" aria-expanded="false" aria-controls="drawerGroupBodyLock">
+                <span class="ico">🔒</span><span class="drawer-group-label">ចាក់សោ និងសុវត្ថិភាព</span><span class="drawer-group-arrow" aria-hidden="true">↓</span>
+            </button>
+            <div class="drawer-group-body" id="drawerGroupBodyLock" role="group" aria-labelledby="drawerGroupHeadLock">
+                <button type="button" class="drawer-item drawer-toggle" id="appLockToggleBtn" data-act="drawerAppLockFlow">
+                    <span class="ico">🔒</span><span class="drawer-toggle-label">ចាក់សោពេលបើក App</span><span class="drawer-toggle-state" id="appLockToggleState">បិទ</span>
+                </button>
+                <button type="button" class="drawer-item drawer-toggle" id="biometricToggleBtn" data-act="drawerBiometricFlow">
+                    <span class="ico">🔐</span><span class="drawer-toggle-label">ចូលដោយក្រយៅដៃ ឬមុខ</span><span class="drawer-toggle-state" id="biometricToggleState">បិទ</span>
+                </button>
+            </div>
+        </section>
+        <section class="drawer-group" id="drawerGroupTools">
+            <button type="button" class="drawer-group-head" id="drawerGroupHeadTools" data-act="toggleDrawerGroup" data-self="1" aria-expanded="false" aria-controls="drawerGroupBodyTools">
+                <span class="ico">🧰</span><span class="drawer-group-label">ឧបករណ៍</span><span class="drawer-group-arrow" aria-hidden="true">↓</span>
+            </button>
+            <div class="drawer-group-body" id="drawerGroupBodyTools" role="group" aria-labelledby="drawerGroupHeadTools">
+                <button type="button" class="drawer-item" data-act="drawerLockerSettingsFlow">
+                    <span class="ico">🗄️</span><span>កំណត់ទូ Locker</span>
+                </button>
+                <button type="button" class="drawer-item" data-act="openHealthCheck">
+                    <span class="ico">🩺</span><span>ពិនិត្យសុខភាពប្រព័ន្ធ</span>
+                </button>
+            </div>
+        </section>
     </div>
     <div class="drawer-foot">
+        <button type="button" class="drawer-item drawer-auth" id="navAuthBtn" data-act="drawerAuthFlow">
+            <span class="ico">🔑</span><span class="drawer-auth-label">ចូល</span>
+        </button>
         <a class="app-version-line" data-app-version href="./guide.html" target="_self" rel="noopener" aria-label="បើកសៀវភៅណែនាំ ZoeW"></a>
         <div class="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
         <div class="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
@@ -902,6 +930,19 @@ const firebaseConfig = {
             <div class="modal-btns-row">
                 <button class="btn-confirm btn-success" id="restoreConfirmBtn" data-act="executeRestoreItem">យល់ព្រមស្តារ</button>
                 <button class="btn-cancel" data-act="cancelRestoreItem">បោះបង់</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="logoutConfirmModal" class="modal" style="z-index: 1060;" data-close="cancelLogout">
+    <div class="modal-content">
+        <h3>🚪 ចាកចេញពីប្រព័ន្ធ</h3>
+        <p>តើអ្នកពិតជាចង់ចាកចេញមែនទេ? អ្នកនឹងត្រូវចូលប្រព័ន្ធម្តងទៀតដើម្បីបន្តការងារ។</p>
+        <div class="modal-btns" style="margin-top: 10px;">
+            <div class="modal-btns-row">
+                <button class="btn-confirm" id="logoutConfirmBtn" data-act="confirmLogout">យល់ព្រម</button>
+                <button class="btn-cancel" data-act="cancelLogout">បោះបង់</button>
             </div>
         </div>
     </div>

@@ -98,7 +98,7 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.35.2` (`zoew-v208`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.0` (`zoew-v209`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.23` (`zoekeygen-v93`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
@@ -151,6 +151,15 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    ⛔ **ច្បាប់នេះគ្របលើ [`ZoeW/ZTO-SETUP-KH.md`](ZoeW/ZTO-SETUP-KH.md) ដែរ**
    (សំណើអ្នកប្រើ 2026-09-10)។ `doc-scope-test.js` ចាក់សោវា ៖ ផ្នែក ៥ តាមលំដាប់
    បូកការហាមប្រវត្តិកំហុស · កំណត់ត្រាតាមកំណែ · ចំនួន assertion ជា literal។
+   ⛔⛔ **វិសាលភាពគឺ គ្រប់ឯកសារ `*.md` ក្នុង repo — មិនត្រឹម README ទេ**
+   (សំណើម្ចាស់គម្រោង) ៖ **ប្រវត្តិកំហុសរស់នៅ [`docs/HISTORY.md`](docs/HISTORY.md)
+   *តែមួយកន្លែងគត់*។** ⛔ លើកលែង **តែ ២** ៖ `docs/` (ផ្ទះរបស់ប្រវត្តិ) និង
+   `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។
+   ⛔ អ្វីដែលហាមក្នុងឯកសារដទៃ ៖ លេខកំណែ (`កំណែ 2.x.y`) · សំណើចងនឹង
+   កាលបរិច្ឆេទ (`សំណើម្ចាស់គម្រោង 2026-…`) · ការវាស់ចងនឹងកំណែ ឬកាលបរិច្ឆេទ។
+   សរសេរជា **បច្ចុប្បន្នកាល** វិញ («វាដើរបែបនេះ») មិនមែន **ប្រវត្តិ**
+   («កំណែ X កែវាពី…»)។ ⛔ បញ្ជីឯកសារត្រូវ **ដេរីវេពីថតពិត** មិនមែនបញ្ជីរឹង
+   (បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់ ➜ ឯកសារថ្មីរអិលកាត់)។
 ១០. **Firebase rules មិន deploy ស្វ័យប្រវត្តិទេ** — Netlify បម្រើតែឯកសារ
    static។ រាល់ពេលបន្ថែម path ថ្មី ត្រូវបន្ថែម rule ក្នុង commit ដដែល ហើយ
    **ប្រាប់អ្នកប្រើថាត្រូវ paste ចូល Firebase Console ➜ Publish ដោយដៃ**។
@@ -251,6 +260,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | លុប ទល់នឹង ដក | `isDeducted` ជាវាល **តែមួយ** ដែលកំណត់លុយ | `policy-test` · `revenue-fuzz` |
 | **barcode ស្ទួន ↔ លុយ** | ⛔ រក្សាទុកបានតែពេលមានសាលក្រម `'claimed'` ពិត | `duplicate-money-test` |
 | **លុយសរុបរបស់ *ជួរដេក*** | ⚠️ វាក្យស័ព្ទ ៖ **`barcode` = កញ្ចប់ ១** · **`item` = ជួរដេក = អតិថិជនម្នាក់ក្នុងថ្ងៃមួយ** (`addOrUpdateEntry` merge តាម `phone`+`scanDate`) ➜ `item.count` = **ចំនួនកញ្ចប់** ➜ ស្លាក «កញ្ចប់សរុប» ត្រឹមត្រូវ។ ⛔ `item.cod/.dod/.price` ត្រូវស្មើ **ផលបូក barcodes** ជានិច្ច (ឈរតែពេល `barcodes` មិនទទេ — item ចាស់ដេរីវេពី `price`)។ ⛔ **ត្រូវពិនិត្យលើ server ដែរ** ៖ `initDatabaseListeners` គណនា `price` ឡើងវិញពេលអាន ➜ វា **ព្យាបាល** កំហុសក្នុងសតិ ខណៈលេខខុសអង្គុយលើ server និងចេញក្នុង Excel។ ⛔ អ្នកយាម ledger **មិនឃើញថ្នាក់នេះទេ** (វាស់បាន ៖ កំហុស ០.០១ ➜ ១៣០/១៣១ checker បៃតង) | `item-money-integrity-test` |
+| **ពណ៌ ៖ COD ធៀបនឹង DOD** | ⛔ ក្នុងជួរដេកតែមួយ COD និង DOD ត្រូវ **មើលឃើញខុសគ្នា** — ពណ៌ចាស់បំបែកតែ **ស្ថានភាព** (យករួច ធៀបនឹង មិនទាន់យក) ➜ លេខ ២ ជាប់គ្នាចេញពណ៌ដូចគ្នាបេះបិទ ➜ អ្នកប្រើអានច្រឡំ។ ⛔ COD **រក្សាពណ៌ស្ថានភាពដដែល** (`money-collected`/`money-pending` — កុំប្តូរ ៖ `semantic-ui-color-test` ចាក់សោអក្សរពិតរបស់វា) ចំណែក DOD ទទួល modifier `kind-dod` ➜ `--money-dod-collected` / `--money-dod-pending`។ ⛔ ការវាស់ត្រូវជា **ពណ៌គណនាពិត** ក្នុង browser មិនមែនវត្តមាន class (class គ្មានច្បាប់ CSS ➜ អ្នកយាមបៃតងលើអេក្រង់ដែលនៅដដែល) ហើយបញ្ជីកន្លែងគូរត្រូវ **ដេរីវេពី `app.js`** មិនមែនបញ្ជីរឹង។ ⛔ **ទិសផ្ទុយ ៖ បន្ទាត់ COD សុទ្ធ មិនត្រូវមាន `kind-dod`** — បើមាន ពណ៌ត្រឡប់ដូចគ្នាវិញ ខណៈការអះអាងវិជ្ជមាននៅតែបៃតង | `semantic-ui-color-test` · `page-nav-test` |
+| **របា Slide ៖ Category បត់បាន** | ⛔ ធាតុរៀបជា `.drawer-group` បត់ជាលំនាំដើម · ស្ថានភាពចងចាំក្នុង `zoew_drawer_groups_v1` · ការពន្លាមួយមិនពន្លាមួយទៀត។ ⛔ **Category ដែលធាតុទាំងអស់លាក់ ត្រូវលាក់ទាំងក្បាល** (ក្បាលទទេ = អ្នកប្រើចុចហើយឃើញអ្វីទាំងអស់) ➜ `refreshDrawerGroups()` ជាចំណុចច្របាច់តែមួយ។ ⛔ **ការវាស់ត្រូវជា `getBoundingClientRect()`** — `getComputedStyle(child).display` នៅតែ resolve ទោះ **ឪពុក** ជា `display:none` ➜ វាមិនឆ្លើយថា «អ្នកប្រើឃើញឬអត់» ទេ (⚠️ ការវាស់តាម `getComputedStyle` ត្រឹមត្រូវ **តែពេល** `.hidden` ឈរលើធាតុខ្លួនឯង ដូច `zto-sync-banner-test` ផ្នែក ២២) | `page-nav-test` · `zto-sync-banner-test` |
 | **តម្លៃដែល rules បដិសេធ** | ⛔ លេខអវិជ្ជមានត្រូវ **clamp មុនសរសេរ** — សតិត្រូវស៊ីនឹង server | `revenue-rules-clamp-test` |
 | **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
 | **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
@@ -346,6 +357,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ ការត្រៀម (warm-up)** | ត្រៀមតាម **ចេតនាអ្នកប្រើ** ហើយត្រៀម **Cookie** ផង មិនត្រឹម container; ⛔ **រវល់ពេលដល់ម៉ោង ➜ តាំងម៉ោងឡើងវិញ មិនបោះបង់** (ពិដាន ៩០ វិ.) | `lookup-prefetch-test` · `zto-cookie-store-test` |
 | **ZTO ៖ ឈ្មោះ store ២ ខាង** | ⛔ helper ត្រូវសរសេរទៅ `site:<store>` ដដែលនឹងអ្វីដែល `getStore()` អាន | `zto-cookie-sync-test` |
 | **ZTO ៖ មូលហេតុរបស់ store** | ⛔ មូលហេតុត្រូវរស់រានពី cache env ៦០ វិ. | `zto-cookie-store-test` |
+| **ZTO helper ៖ ផ្លូវ Android/Termux** | ⛔ ផ្លូវទី ២ រស់ក្នុង **helper ដដែល** ៖ អ្នកសម្រេច ៤ (`isTargetApiUrl` · `validateCookieHeader` · `captureResponseSucceeded` · `cookieAfterResponse`) ត្រូវ **បញ្ជូនចូល** ពី `sync-zto-cookie.js` ⛔ មិនមែនសរសេរឡើងវិញ (validator ច្បាប់ចម្លងទី ២ = ២ ច្បាប់ផ្ទុយគ្នាក្នុងឧបករណ៍តែមួយ)។ ⛔ **`--auto` ត្រូវការ ADB** (វាធ្លាក់ចុះទៅការចាប់) ➜ ការដាក់វាក្នុងសំណុំ «មិនត្រូវការ ADB» ធានាការធ្លាក់ **១០០%**; ការភ្ជាប់ត្រូវជា **ការព្យាយាម** (`|| true`) ដើម្បីកុំឲ្យ Cookie ល្អក៏ធ្លាក់ដែរ។ ⛔ **unzip បោះ exec bit ចោល** ➜ `chmod +x ./*.sh` ត្រូវ **ឥតលក្ខខណ្ឌ** ហើយ helper ត្រូវហៅតាម `bash` (`set -e` + «Permission denied» = setup ងាប់)។ ⛔ **ថតគម្រោងត្រូវដេរីវេ** មិនមែន literal `$HOME/ZTO-Cookie-Sync` (អ្នកដែល unzip ទៅឈ្មោះផ្សេងទទួល «Run setup-termux.sh first» ខណៈ setup ទើបតែហៅវា)។ ⛔ **URL របស់ intent ត្រូវជា https ធម្មតា គ្មានតួ shell** — `adb shell` ស្រាយ argument ម្តងទៀត **លើឧបករណ៍** ➜ `#` ចាប់ផ្តើម comment ➜ វាលេប `-p com.android.chrome` ស្ងាត់ៗ។ ⛔ secret រស់ក្នុង Termux private storage mode **600** (ថត **700**) ➜ ការអានបដិសេធ file ដែលធូរជាងនោះ និងបដិសេធ symlink; Windows រក្សា **DPAPI** ដដែល | `zto-cookie-sync-test` ផ្នែក ៩ |
 | **ZTO helper ៖ អេក្រង់ cmd** | សារជាអង់គ្លេស ASCII · Cookie បង្ហាញ · សោមិនបង្ហាញ | `zto-cookie-sync-test` |
 | **ZTO ៖ ការបន្តអាយុ Cookie** | មិនសរសេរតម្លៃដែលបាត់ session; សរសេរដោយ ETag; response ពី attempt ដែល timeout មិនអាចជាន់ renewal ថ្មី។ Auth បដិសេធក្នុង `code/errorCode/statusCode` ណាមួយត្រូវឈ្នះ success envelope | `zto-cookie-store-test` · `zto-cookie-session-test` |
 | **ZTO ៖ ពិដានល្បឿន ↔ ការចងចាំ** | Cookie ជំនួយ/retry ដដែលមានពិដាន ៦០ វិ.; session ស្នូលថ្មីសាកសរសេរភ្លាមក្នុងថវិកា ហើយ pending រស់រហូតដល់បញ្ជាក់ការរក្សាទុក | `zto-cookie-session-test` |
@@ -821,7 +833,7 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | ទំព័រ ១ — ទិន្នន័យ | `pageData` | គ្រប់គ្រងប្រចាំថ្ងៃ, ស្វែងរកលេខ, តារាងប្រវត្តិ, ប៊ូតុងស្ថិតិ ២ (📅 កញ្ចប់ប្រចាំថ្ងៃ · 💵 ចំណូលប្រចាំថ្ងៃ) |
 | ទំព័រ ២ — ស្កេន | `pageEntry` | របៀបស្កេន ៣ (កញ្ចប់, Locker, ដក), កាមេរ៉ា, hardware scanner, រូបភាព, `parcelPanel`, `lockerPanel` |
 | របា Tab ខាងក្រោម | `pageTabBar` | ប្តូរទំព័រ (`switchAppPage`) |
-| របា Slide (ម៉ឺនុយ) | `sideDrawer` | Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · កំណត់ទូ Locker · នាំចូល Excel ទៅ Sheet · ពិនិត្យសុខភាពប្រព័ន្ធ · បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO (⛔ ២ នេះលេចតែពេល Fast Mode គូស) · ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ · ចូល/ចាកចេញ |
+| របា Slide (ម៉ឺនុយ) | `sideDrawer` | **Category ៤ បត់បាន** (`.drawer-group`, បត់ជាលំនាំដើម, ស្ថានភាពក្នុង `zoew_drawer_groups_v1`) ៖ **ការតភ្ជាប់ និងទិន្នន័យ** (Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · នាំចូល Excel ទៅ Sheet) · **ZTO** (បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO — ⛔ ២ នេះ និង**ក្បាល Category ខ្លួនវា** លេចតែពេល Fast Mode គូស) · **ចាក់សោ និងសុវត្ថិភាព** (ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ) · **ឧបករណ៍** (កំណត់ទូ Locker · ពិនិត្យសុខភាពប្រព័ន្ធ)។ ⛔ **ចូល/ចាកចេញ ឈរក្នុង `.drawer-foot`** ជាមួយលេខកំណែ មិនមែនក្នុង `.drawer-body` |
 | ប៊ូតុង (...) ខាងលើ | `globalMoreMenu` | Export Data · របាយការណ៍អាជីវកម្មប្រចាំខែ · កែទឹកប្រាក់/កញ្ចប់ (PIN) · អត្រាប្រាក់ · ធុងសំរាម · Reset ចំនួនយករួច (PIN) · លុបទាំងអស់ (PIN) |
 | ប៊ូតុង (...) តាមជួរ | `globalMoreMenu` | កែតម្លៃកញ្ចប់ · កែលេខទូរស័ព្ទ · លុប |
 
@@ -1077,7 +1089,12 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 ៣. **`event.currentTarget` ជា `document`** — function ដែលត្រូវការធាតុត្រូវ
    ទទួលវាតាម `data-self`។
 ៤. ⛔ **កុំបន្ថែម listener ទី ២ លើធាតុដែលមាន `data-act` រួច** — សកម្មភាព
-   នឹង **រត់ពីរដង** (ធ្ងន់បំផុតលើ `executePermanentDelete`)។
+   នឹង **រត់ពីរដង** (ធ្ងន់បំផុតលើ `executePermanentDelete`)។ ⛔ **ទម្រង់ដែល
+   រអិលកាត់ភ្នែក ៖ `el.onclick = …` ដែលកំណត់ពី JS** — វាមិនលេចក្នុង HTML ➜
+   `wiring.js` និង `csp-enforced-test` មើលមិនឃើញ។ វាស់បាន ៖ `#navAuthBtn`
+   មាន `data-act` **និង** `onclick` ➜ ការចុច «ចាកចេញ» រត់ **ពីរផ្លូវ**។
+   ⛔ ការកែជា **ច្រកទ្វារតែមួយ** ៖ `data-act` មួយដែលសម្រេចតាមទង់ស្ថានភាព។
+   `page-nav-test` រាប់ **ការហៅពិត** ក្រោយចុច ➜ ត្រូវជា **១**។
 ៥. **`<script>` ក្នុង `<head>` ត្រូវនៅក្នុង `boot-flags.js`** ដែលផ្ទុកជា
    `<script src>` **មុន stylesheet**។ វាត្រូវនៅក្នុង `CORE_SHELL` របស់ `sw.js`។
 ៦. `style-src` **នៅរក្សា `'unsafe-inline'` ដដែល** (មាន `style="…"` ជាង ១៩០
@@ -2023,6 +2040,36 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ច្បាប់ ៖ ទុកតែជុំដែល *អ្នកប្រើមិនទាន់បញ្ជាក់*។** ពេលអ្នកប្រើបញ្ជាក់ថា
 > ដំណើរការលើឧបករណ៍ពិត ➜ លុបធាតុនោះចេញពីទីនេះ ព្រោះ `docs/HISTORY.md`
 > កាន់កំណត់ត្រាអចិន្ត្រៃយ៍រួចហើយ។
+
+## ⏳ ZoeW `2.36.0` — **របា Slide ជា Category · COD/DOD ពណ៌ខុសគ្នា**
+
+⛔ **គ្មានសកម្មភាពដោយដៃទេ** — កូដសុទ្ធសាធ ➜ Netlify deploy ខ្លួនឯង។
+⛔ **គ្មានការកែ Firebase rules** និង **គ្មានការប្តូរ env** ដែរ។
+
+**របៀបសាក ១** (របា Slide) ៖ បើក ⚙️ ➜ ត្រូវឃើញ **Category ៤** បត់ជាលំនាំដើម
+(🔗 ការតភ្ជាប់ និងទិន្នន័យ · 🚚 ZTO · 🔒 ចាក់សោ និងសុវត្ថិភាព · 🧰 ឧបករណ៍)។
+ចុចក្បាលណាមួយ ➜ វាពន្លា ហើយសញ្ញា **↓** បង្វិល។ បិទរបា រួចបើកវិញ ➜
+**ស្ថានភាពនៅដដែល**។ ប៊ូតុង **ចូល/ចាកចេញ** ត្រូវឈរនៅ **ជើងទំព័រ** ជាមួយ
+លេខកំណែ។ ⛔ កុងតាក់ ZTO ទាំង ២ នៅក្រោម Category «ZTO» ➜ ដកគ្រីស **Fast Mode**
+➜ **Category នោះបាត់ទាំងស្រុង** (មិនមែនក្បាលទទេ)។
+
+**របៀបសាក ២** (ពណ៌) ៖ មើលជួរដេកដែលមានទាំង COD និង DOD ➜ លេខទាំង ២ ត្រូវ
+**ចេញពណ៌ខុសគ្នា**។ COD នៅដដែល (លឿងទុំ «មិនទាន់យក» · បៃតង «យករួច») ចំណែក
+DOD ក្លាយជា **ស្វាយក្រហម** ឬ **ខៀវបៃតង** តាមស្ថានភាព។
+
+**របៀបសាក ៣** (ចាកចេញ) ៖ ចុច **ចាកចេញ** ➜ ត្រូវលេចប្រអប់សួរបញ្ជាក់
+«យល់ព្រម / បោះបង់» ⛔ **មិនចាកចេញភ្លាម**។ ចុច «បោះបង់» ➜ នៅក្នុងប្រព័ន្ធដដែល។
+ចុច «យល់ព្រម» ➜ ទើបចាកចេញ។
+
+**របៀបសាក ៤** (Fast Mode) ៖ ដកគ្រីស **Fast Mode សម្រាប់ ZTO Lookup** ➜
+Category «ZTO» ត្រូវ **បាត់ទាំងស្រុង**។ គូសវិញ ➜ វា **មកវិញដដែល** ហើយ
+កុងតាក់ និងលេខសាខាដែលកំណត់រួច **នៅដដែល** (មិនត្រូវវាយឡើងវិញ)។
+
+⛔ **សញ្ញាបើវាខូច** ៖ (ក) ចុច «ចាកចេញ» ➜ ប្រអប់ចូលលោតឡើង **២ ដង** ឬសកម្មភាព
+រត់ស្ទួន ➜ នោះមានន័យថា listener ចាស់ត្រឡប់មកវិញ ➜ `grep` «listener ទី ២»
+ក្នុង `CLAUDE.md`; (ខ) Category ពន្លាមិនបាន ➜ ពិនិត្យ `localStorage` key
+`zoew_drawer_groups_v1`; (គ) COD និង DOD នៅពណ៌ដូចគ្នា ➜ សំបកចាស់នៅជាប់ ➜
+ទាញចុះ (PTR) ម្តង។
 
 ## ⏳ ZoeW `2.35.2` — **Deep Audit ៖ កញ្ចក់ចំណូល · Cookie ត្រជាក់ · គ្មានសកម្មភាពដោយដៃ**
 

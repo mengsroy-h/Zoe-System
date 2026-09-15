@@ -34,6 +34,7 @@ const SECTIONED = [
     'firebase-backup/README.md',
     'zto-import/README.md',
     'tools/zto-cookie-sync-windows/README-KH.md',
+    'tools/zto-cookie-sync-windows/README-ANDROID-KH.md',
     'tools/money-check-windows/README-KH.md'
 ];
 // ឯកសារ «របៀបប្រើ» ដទៃ ៖ ច្បាប់ **ខ្លឹមសារ** អនុវត្តដែរ តែមិនមានផ្នែក ៥ ទេ
@@ -61,6 +62,25 @@ function listReadmeFiles(dir, rel, out) {
     return out;
 }
 
+// ⛔ **ច្បាប់ «ប្រវត្តិកំហុសរស់នៅ `docs/HISTORY.md` តែមួយកន្លែង» គ្រប
+// *គ្រប់ឯកសារ* មិនត្រឹម README ទេ** (សំណើម្ចាស់គម្រោង)។ `listReadmeFiles()`
+// ឃើញតែ `README*.md` ➜ ឯកសារ «របៀបប្រើ» ឈ្មោះផ្សេង (`ZTO-SETUP-KH.md` ជាដើម)
+// ពឹងលើ **បញ្ជីរឹង** `CONTENT_ONLY` ➜ ឯកសារថ្មីឈ្មោះផ្សេងរអិលកាត់ទាំងស្រុង។
+// នេះជាថ្នាក់ «បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់» ដដែល ➜ ដេរីវេពី **ថតពិត**។
+// ⛔ លើកលែង ៖ `docs/` (ផ្ទះរបស់ប្រវត្តិ) និង `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា
+// *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។
+function listAllDocs(dir, rel, out) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    entries.forEach((entry) => {
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        const next = rel ? rel + '/' + entry.name : entry.name;
+        if (entry.isDirectory()) listAllDocs(path.join(dir, entry.name), next, out);
+        else if (/\.md$/i.test(entry.name) && next !== 'CLAUDE.md') out.push(next);
+    });
+    return out;
+}
+
 const KNOWN_DOCS = SECTIONED.concat(CONTENT_ONLY);
 const FOUND_READMES = listReadmeFiles(ROOT, '', []);
 check(FOUND_READMES.length >= 7,
@@ -83,7 +103,18 @@ const BANNED = [
     { re: /កំណែ\s*2\.[0-9]+\.[0-9]+\s*(កែ|ដក|បន្ថែម|ធានា|ប្តូរ)/,
       why: 'កំណត់ត្រាតាមកំណែ — ត្រូវទៅ docs/HISTORY.md' },
     { re: /វាស់បាន\s*\(\s*2\.[0-9]+\.[0-9]+/,
-      why: 'ការវាស់ចងនឹងកំណែ — ត្រូវទៅ docs/HISTORY.md' }
+      why: 'ការវាស់ចងនឹងកំណែ — ត្រូវទៅ docs/HISTORY.md' },
+    // ⛔ លំនាំ ៣ ខាងក្រោមបន្ថែមក្រោយការវាស់ ៖ ជំនាន់មុនរបស់បញ្ជីនេះទាមទារ
+    // **កិរិយាសព្ទ** ជាប់នឹងលេខកំណែ (`កំណែ 2.x.y កែ|ដក|បន្ថែម…`) ➜ ប្រយោគ
+    // បែប «ចាប់ពីកំណែ 2.35.1 **ការអាន**វាលនេះ…» រអិលកាត់ ព្រោះ «ការអាន»
+    // មិននៅក្នុងបញ្ជីកិរិយាសព្ទ។ កំណត់ត្រាតាមកំណែ **គ្រប់ទម្រង់** ត្រូវទៅ
+    // `docs/HISTORY.md` ➜ ចាក់សោលេខកំណែខ្លួនវា មិនមែនពាក្យជុំវិញវា។
+    { re: /កំណែ\s*`?2\.[0-9]+\.[0-9]+/,
+      why: 'កំណត់ត្រាតាមកំណែ — ត្រូវទៅ docs/HISTORY.md' },
+    { re: /(សំណើម្ចាស់គម្រោង|សំណើអ្នកប្រើ)\s*20[0-9]{2}-[0-9]{2}-[0-9]{2}/,
+      why: 'សំណើចងនឹងកាលបរិច្ឆេទ (ប្រវត្តិ) — ត្រូវទៅ docs/HISTORY.md' },
+    { re: /វាស់បាន\s*\(\s*20[0-9]{2}-[0-9]{2}-[0-9]{2}/,
+      why: 'ការវាស់ចងនឹងកាលបរិច្ឆេទ — ត្រូវទៅ docs/HISTORY.md' }
 ];
 
 let scanned = 0;
@@ -116,12 +147,32 @@ for (const rel of SECTIONED) {
 
 for (const rel of CONTENT_ONLY) scanContent(rel);
 
+// ⛔ **ការបោសសំអាតតាមផ្ទៃ** ៖ បន្ថែមលើបញ្ជីដែលសរសេរដោយដៃខាងលើ ត្រូវស្កេន
+// **រាល់ `.md` ក្នុង repo** (ក្រៅពី `docs/` និង `CLAUDE.md`) ➜ ឯកសារថ្មី
+// ឈ្មោះណាក៏ដោយ ធ្លាក់ក្រោមច្បាប់នេះភ្លាម ដោយមិនចាំបាច់ចុះឈ្មោះ។
+const ALL_DOCS = listAllDocs(ROOT, '', []);
+const alreadyScanned = new Set(KNOWN_DOCS);
+for (const rel of ALL_DOCS) {
+    if (alreadyScanned.has(rel)) continue;
+    alreadyScanned.add(rel);
+    scanContent(rel);
+}
+check(ALL_DOCS.length >= FOUND_READMES.length,
+    'ជាន់អប្បបរមា ៖ ការស្កេន `.md` ទាំងអស់ គ្របយ៉ាងតិចស្មើចំនួន README',
+    ALL_DOCS.length + ' ធៀប ' + FOUND_READMES.length);
+check(ALL_DOCS.indexOf('ZoeW/ZTO-SETUP-KH.md') !== -1,
+    'ជាន់អប្បបរមា ៖ ការដេរីវេចាប់បានឯកសារ «របៀបប្រើ» ដែលមិនមែន README',
+    ALL_DOCS.join(' · '));
+
 check(offenders.length === 0,
     '⛔ គ្មានប្រវត្តិកំហុស · កំណត់ត្រាតាមកំណែ · ចំនួន assertion ក្នុងឯកសារ «របៀបប្រើ»',
     offenders.join('\n        '));
 
 // ជាន់អប្បបរមា ៖ ការស្កេនត្រូវពិតជាបានឃើញឯកសារ មិនមែនស្កេនអ្វីទទេ
 check(scanned >= 7, 'ជាន់អប្បបរមា ៖ ស្កេនឯកសារយ៉ាងតិច ៧', 'ស្កេនបាន ' + scanned);
+check(scanned === alreadyScanned.size,
+    'ជាន់អប្បបរមា ៖ រាល់ឯកសារក្នុងបញ្ជីត្រូវបានស្កេនពិត (គ្មានផ្លូវបាត់)',
+    scanned + ' ធៀប ' + alreadyScanned.size);
 
 // ⛔ ទិសផ្ទុយ ៖ ច្បាប់ខ្លួនវាត្រូវនៅរស់ក្នុង CLAUDE.md — បើនរណាលុបច្បាប់ ៩
 // ចោល នោះ checker នេះក្លាយជាការចាក់សោដោយគ្មានមូលដ្ឋាន។
@@ -129,6 +180,11 @@ const claude = fs.existsSync(path.join(ROOT, 'CLAUDE.md'))
     ? fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8') : '';
 check(/README សរសេរតែ \*{1,2}របៀបប្រើ\*{1,2}/.test(claude) && /កុំចម្លងចំនួន assertion ចូល README/.test(claude),
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ ៩ នៅរស់ក្នុង CLAUDE.md (មូលដ្ឋាននៃ checker នេះ)');
+// ⛔ ទិសផ្ទុយ ៖ ច្បាប់ដែលពង្រីកវិសាលភាពទៅ **គ្រប់ `.md`** ក៏ត្រូវរស់ក្នុង
+// `CLAUDE.md` ដែរ — បើអត់ ការស្កេនទូលាយក្លាយជាការចាក់សោគ្មានមូលដ្ឋាន។
+check(/ប្រវត្តិកំហុស.{0,40}`docs\/HISTORY\.md`.{0,40}តែមួយកន្លែងគត់/s.test(claude)
+    && /គ្រប់ឯកសារ `\*\.md`|រាល់ឯកសារ `\*\.md`/.test(claude),
+    '⛔ ទិសផ្ទុយ ៖ ច្បាប់ «ប្រវត្តិកំហុស ➜ HISTORY.md តែមួយកន្លែង» គ្របគ្រប់ `.md` នៅរស់ក្នុង CLAUDE.md');
 
 // ⛔ ទិសផ្ទុយ ២ ៖ docs/HISTORY.md ត្រូវ **ពិតជាកាន់** ប្រវត្តិនោះ — បើវាទទេ
 // នោះមានន័យថាប្រវត្តិត្រូវបានលុប មិនមែនផ្លាស់ទី។

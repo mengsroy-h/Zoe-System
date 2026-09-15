@@ -250,6 +250,35 @@ function seedData() {
     const rows = await page.evaluate(() => document.querySelectorAll('#historyTableBody tr').length);
     check(rows >= 1, 'តារាងប្រវត្តិបង្ហាញជួរពីទិន្នន័យ Firebase', 'rows=' + rows);
 
+    // ═══ ⛔ COD និង DOD ត្រូវ **មើលឃើញខុសគ្នា** ក្នុងជួរដេកតែមួយ ══════════
+    //
+    // ច្បាប់ចាស់បំបែកតែ **ស្ថានភាព** (យករួច ធៀបនឹង មិនទាន់យក) ➜ ក្នុងជួរដេក
+    // ដដែល COD និង DOD ចេញ **ពណ៌ដូចគ្នាបេះបិទ** ➜ អ្នកប្រើអានច្រឡំ។
+    // ⛔ ការវាស់ត្រូវជា `getComputedStyle().color` **ពិត** មិនមែនវត្តមាន class ៖
+    // class ដែលគ្មានច្បាប់ CSS ធ្វើឲ្យអ្នកយាមបៃតងលើអេក្រង់ដែលនៅដដែល។
+    const moneyHue = await page.evaluate(() => {
+        if (typeof filterDataByDate === 'function') filterDataByDate('all');
+        const out = { rowsScanned: 0, cod: '', dod: '', sameRow: false };
+        const trs = [...document.querySelectorAll('#historyTableBody tr')];
+        for (const tr of trs) {
+            const lines = [...tr.querySelectorAll('.money-pending, .money-collected')];
+            const cod = lines.find((el) => /(^|\s)COD:/.test(el.textContent));
+            const dod = lines.find((el) => /(^|\s)DOD:/.test(el.textContent));
+            out.rowsScanned++;
+            if (cod && dod) {
+                out.cod = getComputedStyle(cod).color;
+                out.dod = getComputedStyle(dod).color;
+                out.sameRow = true;
+                break;
+            }
+        }
+        return out;
+    });
+    check(moneyHue.sameRow, 'លក្ខខណ្ឌចាំបាច់ ៖ រកឃើញជួរដេកដែលមាន COD និង DOD ជាមួយគ្នា',
+        JSON.stringify(moneyHue));
+    check(moneyHue.sameRow && !!moneyHue.cod && !!moneyHue.dod && moneyHue.cod !== moneyHue.dod,
+        '⛔ COD និង DOD ក្នុងជួរដេកតែមួយ ចេញពណ៌ **ខុសគ្នា**', JSON.stringify(moneyHue));
+
     const entryList = await page.evaluate(() => {
         if (window.switchAppPage) window.switchAppPage('entry');
         if (window.setEntryScanMode) window.setEntryScanMode('parcel');
@@ -353,6 +382,129 @@ function seedData() {
         inNavbar: !!document.querySelector('.app-navbar #navAuthBtn')
     }));
     check(authPlace.inDrawer && !authPlace.inNavbar, 'ប៊ូតុង ចូល/ចាកចេញ ស្ថិតក្នុងរបា Slide', JSON.stringify(authPlace));
+
+    // ═══ របា Slide ៖ Category បត់បាន · ប៊ូតុងចាកចេញនៅជើងទំព័រ ═══════════
+    //
+    // ⛔ **ច្រកទ្វារពីរជាន់ ៖ ការបត់ និងការលាក់ ត្រូវវាស់ដាច់ពីគ្នា។**
+    // ការវាស់ជា `getComputedStyle().display` ក្រោយ `openSideDrawer()` **ពិត**
+    // — មិនមែនវត្តមាន class ៖ class ដែលគ្មានច្បាប់ CSS លាក់ ធ្វើឲ្យអ្នកយាម
+    // បៃតងលើ UI ដែលនៅតែលេច (មេរៀនដដែលនឹង `zto-sync-banner-test` ផ្នែក ២២)។
+    // ⛔ រាល់ការស្វែងរកធាតុត្រូវ **fail-safe** ៖ ធាតុបាត់ ➜ ការអះអាង *ដែលមាន
+    // ឈ្មោះ* ធ្លាក់ មិនមែន checker គាំងដោយ `TypeError` ➜ បិទបាំងការអះអាង
+    // ទាំងអស់ខាងក្រោមវា (ច្បាប់ «stub មិនមែន exit» របស់ `CLAUDE.md`)។
+    const groups = await page.evaluate(() => {
+        // ⛔ `getComputedStyle(child).display` នៅតែ resolve ទោះ **ឪពុក** ជា
+        // `display:none` ➜ វាមិនឆ្លើយថា «អ្នកប្រើឃើញឬអត់» ទេ។ ការវាស់ត្រូវជា
+        // ការគូរ **ពិត** ៖ ប្រអប់ព្រំដែនមានទំហំឬអត់។
+        const shown = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            return r.height > 0 && r.width > 0;
+        };
+        const aria = (id) => {
+            const el = document.getElementById(id);
+            return el ? el.getAttribute('aria-expanded') : null;
+        };
+        const tap = (id) => { const el = document.getElementById(id); if (el) el.click(); };
+        try { localStorage.removeItem('zoew_drawer_groups_v1'); } catch (e) {}
+        openSideDrawer();
+        const collapsed = {
+            heads: document.querySelectorAll('#sideDrawer .drawer-group-head').length,
+            item: shown('#drawerGroupBodyConnect .drawer-item'),
+            aria: aria('drawerGroupHeadConnect')
+        };
+        tap('drawerGroupHeadConnect');
+        const opened = {
+            item: shown('#drawerGroupBodyConnect .drawer-item'),
+            aria: aria('drawerGroupHeadConnect'),
+            other: shown('#drawerGroupBodyLock .drawer-item')
+        };
+        closeSideDrawer();
+        openSideDrawer();
+        const remembered = shown('#drawerGroupBodyConnect .drawer-item');
+        tap('drawerGroupHeadConnect');
+        closeSideDrawer();
+        openSideDrawer();
+        const reclosed = shown('#drawerGroupBodyConnect .drawer-item');
+        closeSideDrawer();
+        return { collapsed, opened, remembered, reclosed };
+    });
+    check(groups.collapsed.heads >= 4, 'របា Slide បែងចែកជា Category យ៉ាងតិច ៤', JSON.stringify(groups.collapsed));
+    check(groups.collapsed.item === false && groups.collapsed.aria === 'false',
+        'Category បត់ជាលំនាំដើម ➜ ធាតុខាងក្នុងមិនលេច', JSON.stringify(groups.collapsed));
+    check(groups.opened.item === true && groups.opened.aria === 'true',
+        'ចុចក្បាល Category ➜ ធាតុខាងក្នុងលេច', JSON.stringify(groups.opened));
+    check(groups.opened.other === false,
+        '⛔ ការពន្លា Category មួយ មិនពន្លា Category ដទៃ', JSON.stringify(groups.opened));
+    check(groups.remembered === true, 'ស្ថានភាពពន្លា រស់រានការបិទ/បើករបា Slide', String(groups.remembered));
+    check(groups.reclosed === false, '⛔ ទិសផ្ទុយ ៖ ការបត់វិញក៏ត្រូវចងចាំដែរ', String(groups.reclosed));
+
+    const footPlace = await page.evaluate(() => ({
+        inFoot: !!document.querySelector('#sideDrawer .drawer-foot #navAuthBtn'),
+        inBody: !!document.querySelector('#sideDrawer .drawer-body #navAuthBtn'),
+        versionInFoot: !!document.querySelector('#sideDrawer .drawer-foot [data-app-version]')
+    }));
+    check(footPlace.inFoot && !footPlace.inBody && footPlace.versionInFoot,
+        'ប៊ូតុង ចូល/ចាកចេញ នៅជើងរបា Slide ជាមួយលេខកំណែ', JSON.stringify(footPlace));
+
+    // ⛔ **ច្បាប់ CSP ៤ ៖ កុំបន្ថែម listener ទី ២ លើធាតុដែលមាន `data-act` រួច។**
+    // `onclick` លើធាតុ + delegation លើ `document` បាញ់ **ទាំងពីរ** ➜ សកម្មភាព
+    // រត់ពីរដង។ ការវាស់ត្រូវរាប់ **ការហៅពិត** មិនមែនអានកូដ។
+    const authFire = await page.evaluate(() => {
+        const btn = document.getElementById('navAuthBtn');
+        if (!btn) return { err: 'no button' };
+        const realLogin = window.showLoginModalWithPrefill;
+        const realLogout = window.logoutApp;
+        let logins = 0, logouts = 0;
+        window.showLoginModalWithPrefill = function () { logins++; };
+        window.logoutApp = function () { logouts++; };
+        const modalShown = () => {
+            const m = document.getElementById('logoutConfirmModal');
+            return !!m && getComputedStyle(m).display !== 'none';
+        };
+        const tap = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
+
+        // ១ ៖ មិនទាន់ចូលប្រព័ន្ធ ➜ ផ្លូវចូល រត់ **តែម្តង** គ្មានប្រអប់បញ្ជាក់
+        updateAuthButton(false);
+        openSideDrawer();
+        btn.click();
+        const loggedOut = { logins: logins, logouts: logouts, modal: modalShown() };
+
+        // ២ ៖ ចូលរួច ➜ ចុច «ចាកចេញ» ត្រូវ **សួរមុន** មិនចាកចេញភ្លាម
+        logins = 0; logouts = 0;
+        updateAuthButton(true);
+        openSideDrawer();
+        btn.click();
+        const asked = { logouts: logouts, modal: modalShown() };
+
+        // ៣ ៖ «បោះបង់» ➜ បិទប្រអប់ ហើយ **មិនចាកចេញ**
+        tap('[data-act="cancelLogout"]');
+        const cancelled = { logouts: logouts, modal: modalShown() };
+
+        // ៤ ៖ «យល់ព្រម» ➜ ចាកចេញ **តែម្តង**
+        updateAuthButton(true);
+        openSideDrawer();
+        btn.click();
+        tap('[data-act="confirmLogout"]');
+        const confirmed = { logouts: logouts, modal: modalShown() };
+
+        window.showLoginModalWithPrefill = realLogin;
+        window.logoutApp = realLogout;
+        updateAuthButton(false);
+        closeSideDrawer();
+        return { loggedOut, asked, cancelled, confirmed };
+    });
+    check(!authFire.err && authFire.loggedOut.logins === 1 && authFire.loggedOut.logouts === 0
+        && authFire.loggedOut.modal === false,
+        '⛔ មិនទាន់ចូល ➜ ចុច «ចូល» រត់ **តែម្តង** (គ្មាន listener ស្ទួន) និងគ្មានប្រអប់បញ្ជាក់',
+        JSON.stringify(authFire));
+    check(!authFire.err && authFire.asked.modal === true && authFire.asked.logouts === 0,
+        '⛔ ចុច «ចាកចេញ» ➜ **សួរបញ្ជាក់មុន** មិនចាកចេញភ្លាម', JSON.stringify(authFire));
+    check(!authFire.err && authFire.cancelled.logouts === 0 && authFire.cancelled.modal === false,
+        '⛔ «បោះបង់» ➜ បិទប្រអប់ ហើយ **មិនចាកចេញ**', JSON.stringify(authFire));
+    check(!authFire.err && authFire.confirmed.logouts === 1 && authFire.confirmed.modal === false,
+        '⛔ «យល់ព្រម» ➜ ចាកចេញ **តែម្តង** (គ្មាន listener ស្ទួន)', JSON.stringify(authFire));
 
     const moreMenu = await page.evaluate(() => {
         const btn = document.querySelector('.header-more-btn');

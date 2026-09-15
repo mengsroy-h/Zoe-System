@@ -2049,7 +2049,13 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
                 const el = document.getElementById(id);
                 return !!el && getComputedStyle(el).display !== 'none';
             };
-            const out = { auto: shown('ztoAutoCloseBtn'), list: shown('ztoListSyncDrawerBtn') };
+            const out = {
+                auto: shown('ztoAutoCloseBtn'),
+                list: shown('ztoListSyncDrawerBtn'),
+                // ⛔ ក្បាល Category «ZTO» ខ្លួនវា ៖ កុងតាក់ទាំង ២ លាក់ ➜ ក្បាល
+                // ដែលនៅសល់ជា **Category ទទេ** ➜ អ្នកប្រើចុចវាឃើញអ្វីទាំងអស់។
+                group: shown('drawerGroupZto')
+            };
             closeSideDrawer();
             return out;
         };
@@ -2064,12 +2070,23 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         const off = read();
         localStorage.removeItem('zoew_lookup_api_config');
         const none = read();
-        return { on: on, off: off, none: none };
+        // ⛔ **ផ្លូវត្រឡប់ ៖ គូស Fast Mode វិញ ➜ កុងតាក់ត្រូវ *មកវិញ*។**
+        // ការវាស់ត្រឹម on ➜ off ទុកសំណួរដ៏សំខាន់បំផុតដោយគ្មានចម្លើយ ៖ «តើវា
+        // បាត់ជារៀងរហូតទេ?»។ ការកំណត់ចាស់ត្រូវ **នៅដដែល** (ច្បាប់ ៖ ការលាក់
+        // បិទមុខងារ ⛔ មិនលុបការកំណត់) ➜ អ្នកប្រើមិនចាំបាច់តំឡើងឡើងវិញ។
+        localStorage.setItem('zoew_lookup_api_config',
+            JSON.stringify({ enabled: true, url: base, fastMode: true }));
+        const back = read();
+        back.autoStored = localStorage.getItem('zoew_zto_autoclose_v1');
+        back.listStored = localStorage.getItem('zoew_zto_listsync_v1');
+        back.siteStored = localStorage.getItem('zoew_zto_list_site_v1');
+        return { on: on, off: off, none: none, back: back };
         });
     } catch (e) { drawerRows = null; }
     if (!drawerRows) {
-        drawerRows = { on: { auto: false, list: false }, off: { auto: true, list: true },
-            none: { auto: true, list: true } };
+        drawerRows = { on: { auto: false, list: false, group: false }, off: { auto: true, list: true, group: true },
+            none: { auto: true, list: true, group: true },
+            back: { auto: false, list: false, group: false, autoStored: null, listStored: null, siteStored: null } };
         ok('⛔ វាស់ការលេច/លាក់របស់កុងតាក់មិនបាន', false, 'openSideDrawer/refreshZto*Ui');
     }
     ok('លក្ខខណ្ឌចាំបាច់ ៖ គូស Fast Mode ➜ កុងតាក់ទាំង ២ **លេច**',
@@ -2078,6 +2095,18 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
         drawerRows.off.auto === false && drawerRows.off.list === false, drawerRows.off);
     ok('⛔ គ្មាន Config ស្វែងរកសោះ ➜ លាក់ដដែល (មិនធ្លាក់ចុះទៅ «លេច»)',
         drawerRows.none.auto === false && drawerRows.none.list === false, drawerRows.none);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ គូស Fast Mode ➜ ក្បាល Category «ZTO» លេច',
+        drawerRows.on.group === true, drawerRows.on);
+    ok('⛔ កុងតាក់ទាំង ២ លាក់ ➜ ក្បាល Category «ZTO» ក៏លាក់ដែរ (គ្មាន Category ទទេ)',
+        drawerRows.off.group === false && drawerRows.none.group === false,
+        { off: drawerRows.off, none: drawerRows.none });
+    ok('⛔ **ផ្លូវត្រឡប់** ៖ គូស Fast Mode វិញ ➜ កុងតាក់ និងក្បាល Category **មកវិញ** (មិនបាត់ជារៀងរហូត)',
+        drawerRows.back.auto === true && drawerRows.back.list === true && drawerRows.back.group === true,
+        drawerRows.back);
+    ok('⛔ ការលាក់ **មិនលុបការកំណត់** ៖ កុងតាក់ និងលេខសាខានៅដដែលក្រោយផ្លូវត្រឡប់',
+        drawerRows.back.autoStored === '1' && drawerRows.back.listStored === '1'
+        && drawerRows.back.siteStored === '100200',
+        { auto: drawerRows.back.autoStored, list: drawerRows.back.listStored, site: drawerRows.back.siteStored });
 
     ok('⛔ គ្មានកំហុស runtime អំឡុងការវាស់', errors.length === 0, errors.slice(0, 3));
 

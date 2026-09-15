@@ -160,7 +160,17 @@ async function cookieHeaderFromRequest(request) {
     return raw ? validateCookieHeader(raw) : '';
 }
 
+function isAndroidRuntime() {
+    return process.platform === 'android'
+        || !!process.env.TERMUX_VERSION
+        || String(process.env.PREFIX || '').startsWith('/data/data/com.termux/');
+}
+
 function localStateRoot() {
+    if (isAndroidRuntime()) {
+        const base = process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state');
+        return path.join(base, 'Zoe-System', 'ZTO-Cookie-Sync');
+    }
     const base = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
     return path.join(base, 'Zoe-System', 'ZTO-Cookie-Sync');
 }
@@ -170,8 +180,10 @@ function statePaths() {
     return {
         root,
         config: path.join(root, 'config.json'),
-        token: path.join(root, 'netlify-token.dpapi'),
-        proxyKey: path.join(root, 'proxy-key.dpapi')
+        // Windows keeps the original DPAPI format. Android/Termux stores the
+        // secrets only inside Termux private app storage with mode 0600.
+        token: path.join(root, isAndroidRuntime() ? 'netlify-token.secret' : 'netlify-token.dpapi'),
+        proxyKey: path.join(root, isAndroidRuntime() ? 'proxy-key.secret' : 'proxy-key.dpapi')
     };
 }
 
@@ -313,6 +325,29 @@ function readTokenViaPowerShell(options) {
             finish(null, token);
         });
     });
+}
+
+function readSecretFromPrivateFile(options) {
+    const config = options || {};
+    const tokenPath = config.tokenPath || statePaths().token;
+    if (!fs.existsSync(tokenPath)) return Promise.reject(codedError('NETLIFY_TOKEN_MISSING'));
+    try {
+        const stat = fs.lstatSync(tokenPath);
+        if (!stat.isFile() || stat.isSymbolicLink()) throw codedError('NETLIFY_TOKEN_READ_FAILED');
+        // The setup script writes 0600. Reject a file that is readable by group/others.
+        if ((stat.mode & 0o077) !== 0) throw codedError('NETLIFY_TOKEN_PERMISSIONS');
+        const raw = fs.readFileSync(tokenPath, 'utf8').replace(/[\r\n]+$/, '');
+        return Promise.resolve(validateToken(raw));
+    } catch (error) {
+        if (error && error.code && String(error.code).startsWith('NETLIFY_')) return Promise.reject(error);
+        return Promise.reject(codedError('NETLIFY_TOKEN_READ_FAILED'));
+    }
+}
+
+function readStoredSecret(options) {
+    return isAndroidRuntime()
+        ? readSecretFromPrivateFile(options)
+        : readTokenViaPowerShell(options);
 }
 
 function timedFetch(url, options, controls, consume) {
@@ -499,7 +534,7 @@ async function resolveCredentials(options) {
         ? loadConfig(config.configPath)
         : { siteId: validateSiteId(config.siteId) };
     const token = config.token === undefined
-        ? await readTokenViaPowerShell(config)
+        ? await readStoredSecret(config)
         : validateToken(config.token);
     return { siteId: loaded.siteId, token };
 }
@@ -652,7 +687,7 @@ async function resolveVerification(options) {
     if (!siteUrl) return { siteUrl: '', proxyKey: '' };
     let proxyKey = '';
     try {
-        proxyKey = await readTokenViaPowerShell(
+        proxyKey = await readStoredSecret(
             Object.assign({}, config, { tokenPath: statePaths().proxyKey })
         );
     } catch (_) {
@@ -933,6 +968,24 @@ async function openArgusFromPortal(context, page, isDone, options) {
 }
 
 async function captureCookieHeader() {
+    if (isAndroidRuntime()) {
+        const { captureAndroidCookie } = require('./android-cdp-capture');
+        return captureAndroidCookie({
+            portalUrl: PORTAL_URL,
+            argusUrl: ARGUS_URL,
+            apiHost: API_HOST,
+            timeoutMs: CAPTURE_TIMEOUT_MS,
+            responseTimeoutMs: CAPTURE_RESPONSE_TIMEOUT_MS,
+            responseMaxBytes: NETLIFY_RESPONSE_MAX_BYTES,
+            captureMethods: CAPTURE_METHODS,
+            codedError,
+            isTargetApiUrl,
+            validateCookieHeader,
+            captureResponseSucceeded,
+            cookieAfterResponse
+        });
+    }
+
     const launched = await launchLocalBrowser();
     const context = launched.context;
     let waiter;
@@ -943,7 +996,10 @@ async function captureCookieHeader() {
         watcher = watchApiTraffic(context);
         const pages = context.pages();
         const page = pages[0] || await context.newPage();
-        console.log('The ZTO gate page is open in ' + (launched.channel === 'msedge' ? 'Microsoft Edge' : 'Google Chrome') + '.');
+        const browserLabel = launched.channel === 'msedge'
+            ? 'Microsoft Edge'
+            : 'Google Chrome';
+        console.log('The ZTO gate page is open in ' + browserLabel + '.');
         console.log('   1. The gate usually keeps your session. Log in only if ZTO asks.');
         console.log('   2. This tool opens Argus in a new tab. If it does not, click the branch card.');
         console.log('   3. Stay on the page. This tool continues by itself as soon as ZTO');
@@ -978,28 +1034,34 @@ async function captureCookieHeader() {
 }
 
 function safeFailureMessage(code) {
+    const android = isAndroidRuntime();
+    const setupName = android ? 'setup-termux.sh' : 'setup.cmd';
     const messages = {
         CAPTURE_TIMEOUT: 'Waited 10 minutes and saw no signed-in ZTO API answer. Open Argus from the gate page, then scan one Waybill.',
         BROWSER_CLOSED: 'The browser was closed before the cookie was captured. Please try again.',
         BROWSER_LAUNCH_FAILED: 'Could not start Edge/Chrome. Close any old ZTO Cookie Sync window, or install Edge/Chrome.',
+        ANDROID_ADB_NOT_CONNECTED: 'Android is not connected/authorized in ADB. Run ./connect-android.sh, then try again.',
+        ANDROID_CHROME_OPEN_FAILED: 'Could not open Google Chrome through ADB. Install/enable Chrome, then try again.',
+        ANDROID_CDP_UNAVAILABLE: 'Chrome DevTools could not be reached through ADB. Open Chrome, keep Wireless debugging connected, then retry.',
         BROWSER_NOT_FOUND: 'Microsoft Edge or Google Chrome was not found.',
-        NETLIFY_CONFIG_MISSING: 'No Netlify configuration yet. Run setup.cmd.',
-        NETLIFY_CONFIG_INVALID: 'The Netlify Site ID has a bad shape. Run setup.cmd again.',
-        NETLIFY_TOKEN_MISSING: 'No Netlify token yet. Run setup.cmd.',
+        NETLIFY_CONFIG_MISSING: 'No Netlify configuration yet. Run ' + setupName + '.',
+        NETLIFY_CONFIG_INVALID: 'The Netlify Site ID has a bad shape. Run ' + setupName + ' again.',
+        NETLIFY_TOKEN_MISSING: 'No Netlify token yet. Run ' + setupName + '.',
         NETLIFY_TOKEN_READER_MISSING: 'read-token.ps1 is missing. Download the tool folder again.',
-        NETLIFY_TOKEN_READ_FAILED: 'Windows could not unlock the Netlify token. Run setup.cmd again as the same Windows user.',
+        NETLIFY_TOKEN_READ_FAILED: android ? 'Android could not read the private Netlify token file. Run setup-termux.sh again.' : 'Windows could not unlock the Netlify token. Run setup.cmd again as the same Windows user.',
         NETLIFY_TOKEN_READ_TIMEOUT: 'Windows token unlock timed out. Close this window and try again.',
-        NETLIFY_TOKEN_INVALID: 'The Netlify token has a bad shape. Run setup.cmd again.',
+        NETLIFY_TOKEN_PERMISSIONS: 'The Android secret file permissions are too open. Run setup-termux.sh again to restore mode 600.',
+        NETLIFY_TOKEN_INVALID: 'The Netlify token has a bad shape. Run ' + setupName + ' again.',
         NETLIFY_NETWORK: 'Could not reach the Netlify API. Check your internet connection.',
         NETLIFY_TIMEOUT: 'The Netlify API took longer than 30 seconds. Please try again.',
-        NETLIFY_SITE_REJECTED: 'Netlify rejected the Site ID or token. Run setup.cmd and enter them again.',
+        NETLIFY_SITE_REJECTED: 'Netlify rejected the Site ID or token. Run ' + setupName + ' and enter them again.',
         NETLIFY_SITE_INVALID_RESPONSE: 'Netlify answered in an unexpected shape. The cookie was not changed.',
         NETLIFY_BLOB_URL_FAILED: 'Netlify refused to write the cookie store. Check the Site ID and the PAT scope.',
         NETLIFY_BLOB_URL_INVALID: 'Netlify returned a bad upload path. The cookie was not sent.',
         NETLIFY_BLOB_UPLOAD_FAILED: 'Writing the cookie into Netlify Blobs failed. Please try again.',
         NETLIFY_BLOB_REDIRECT: 'Netlify redirected the upload to another host. The cookie was not sent, for safety.',
-        SITE_URL_INVALID: 'The Site URL has a bad shape (https is required). Run setup.cmd again.',
-        DIAG_REJECTED: 'The Function refused the check. Verify ZTO_PROXY_KEY in setup.cmd and in Netlify.',
+        SITE_URL_INVALID: 'The Site URL has a bad shape (https is required). Run ' + setupName + ' again.',
+        DIAG_REJECTED: 'The Function refused the check. Verify ZTO_PROXY_KEY in ' + setupName + ' and in Netlify.',
         DIAG_INVALID: 'The Function answered in an unexpected shape during the check.',
         COOKIE_TOO_SHORT: 'The captured cookie is too short. Log in to Argus again.',
         COOKIE_TOO_LONG: 'The captured cookie is longer than the safety limit.',
@@ -1038,7 +1100,7 @@ function describeAutoReadiness(readiness) {
     const lines = ['ERROR: --auto mode needs these missing values:'];
     missing.forEach((key) => lines.push('   - ' + (labels[key] || key)));
     lines.push('');
-    lines.push('Run setup.cmd again. It keeps the old Site ID and Netlify token:');
+    lines.push('Run ' + (isAndroidRuntime() ? 'setup-termux.sh' : 'setup.cmd') + ' again. It keeps the old Site ID and Netlify token:');
     lines.push('press Enter to skip every prompt that already has a value.');
     if (missing.indexOf('siteUrl') !== -1) {
         lines.push('NOTE: the ZTO_PROXY_KEY prompt appears only AFTER the Site URL.');
@@ -1055,7 +1117,7 @@ function shouldRefreshInAuto(health) {
 
 function describeHealth(health) {
     if (health.status === 'unconfigured') {
-        return 'INFO: not checked - Site URL and proxy key are not set in setup.cmd yet.';
+        return 'INFO: not checked - Site URL and proxy key are not set in ' + (isAndroidRuntime() ? 'setup-termux.sh' : 'setup.cmd') + ' yet.';
     }
     if (health.status === 'unreachable') {
         return 'WARNING: could not reach the Function. Check your internet or the Site URL.';
@@ -1083,7 +1145,7 @@ async function reportVerification(cookieHeader) {
         verification = { siteUrl: '', proxyKey: '' };
     }
     if (!verification.siteUrl || !verification.proxyKey) {
-        console.log('   INFO: final check skipped - add the Site URL and proxy key in setup.cmd.');
+        console.log('   INFO: final check skipped - add the Site URL and proxy key in ' + (isAndroidRuntime() ? 'setup-termux.sh' : 'setup.cmd') + '.');
         console.log('   New scans will use this cookie within about a minute.');
         return;
     }
@@ -1177,7 +1239,9 @@ async function main() {
     if (process.argv.includes('--verify-setup')) {
         console.log('Checking the Netlify Site ID and token...');
         await verifyNetlifySetup();
-        console.log('OK: setup is complete. From now on, double-click sync-zto-cookie.cmd when the cookie expires.');
+        console.log(isAndroidRuntime()
+            ? 'OK: setup is complete. Run ./sync-zto-cookie-termux.sh when the cookie expires.'
+            : 'OK: setup is complete. From now on, double-click sync-zto-cookie.cmd when the cookie expires.');
         return;
     }
 
@@ -1223,11 +1287,14 @@ module.exports = {
     isArgusHost,
     isTargetApiUrl,
     loadConfig,
+    isAndroidRuntime,
     localStateRoot,
     netlifyApiUrl,
     NETLIFY_RETRY_ATTEMPTS,
     profileRoot,
     readDiagnostics,
+    readSecretFromPrivateFile,
+    readStoredSecret,
     readTokenViaPowerShell,
     requestBlobUploadUrl,
     resolveVerification,

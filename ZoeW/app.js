@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.35.2';
+    const APP_VERSION = '2.36.0';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -6,6 +6,7 @@
     const ACTION_ALLOWLIST = [
         "applySheetImportHeaderRow",
         "cancelLocationChange",
+        "cancelLogout",
         "cancelPermanentDelete",
         "cancelPinEntryFlow",
         "cancelPinSetupFlow",
@@ -19,17 +20,18 @@
         "closeSheetImportModal",
         "closeSideDrawer",
         "confirmLocationChange",
+        "confirmLogout",
         "confirmPhone",
         "confirmScannedRemoval",
         "debouncedSearchByPhone",
         "decodeImageFile",
         "dismissPhoneModal",
         "drawerAppLockFlow",
+        "drawerAuthFlow",
         "drawerBiometricFlow",
         "drawerConfigFlow",
         "drawerCustomerTableFlow",
         "drawerLockerSettingsFlow",
-        "drawerLoginFlow",
         "drawerLookupApiFlow",
         "drawerSheetImportFlow",
         "drawerZtoAutoCloseFlow",
@@ -115,6 +117,7 @@
         "switchAppPage",
         "testLookupApiConfig",
         "toggleCloseStatus",
+        "toggleDrawerGroup",
         "toggleHeaderMoreDropdown",
         "toggleIndividualBarcodeClose",
         "toggleMoreDropdown",
@@ -179,12 +182,73 @@
         drawerAction(openCustomerDataTableModal);
     }
 
-    function drawerLoginFlow() {
-        drawerAction(showLoginModalWithPrefill);
-    }
-
     function drawerBiometricFlow() {
         drawerAction(toggleBiometricUnlock);
+    }
+
+    const DRAWER_GROUP_KEY = 'zoew_drawer_groups_v1';
+
+    function openDrawerGroupKeys() {
+        const raw = safeStoreGet(appLocalStore, DRAWER_GROUP_KEY);
+        if (!raw) return [];
+        return String(raw).split(',').map((k) => k.trim()).filter(Boolean);
+    }
+
+    function rememberDrawerGroups(keys) {
+        safeStoreSet(appLocalStore, DRAWER_GROUP_KEY, keys.join(','));
+    }
+
+    function drawerGroupIsEmpty(group) {
+        const items = group.querySelectorAll('.drawer-group-body .drawer-item');
+        for (let i = 0; i < items.length; i++) {
+            if (!items[i].classList.contains('hidden')) return false;
+        }
+        return true;
+    }
+
+    function applyDrawerGroupState(group, open) {
+        group.classList.toggle('is-open', open);
+        const head = group.querySelector('.drawer-group-head');
+        if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function refreshDrawerGroups() {
+        const open = openDrawerGroupKeys();
+        document.querySelectorAll('#sideDrawer .drawer-group').forEach((group) => {
+            const empty = drawerGroupIsEmpty(group);
+            group.classList.toggle('hidden', empty);
+            applyDrawerGroupState(group, !empty && open.indexOf(group.id) !== -1);
+        });
+    }
+
+    function toggleDrawerGroup(el) {
+        const group = el && el.closest ? el.closest('.drawer-group') : null;
+        if (!group || !group.id) return;
+        const open = openDrawerGroupKeys();
+        const at = open.indexOf(group.id);
+        if (at === -1) open.push(group.id);
+        else open.splice(at, 1);
+        rememberDrawerGroups(open);
+        applyDrawerGroupState(group, at === -1);
+    }
+
+    let authButtonIsLoggedIn = false;
+
+    function drawerAuthFlow() {
+        drawerAction(authButtonIsLoggedIn ? promptLogout : showLoginModalWithPrefill);
+    }
+
+    function promptLogout() {
+        openModalHelper('logoutConfirmModal');
+    }
+
+    function cancelLogout() {
+        closeModal('logoutConfirmModal');
+    }
+
+    function confirmLogout() {
+        closeModal('logoutConfirmModal');
+        logoutApp();
     }
 
     function renderAppVersionLabels() {
@@ -4975,19 +5039,13 @@
     }
 
     function updateAuthButton(isLoggedIn) {
+        authButtonIsLoggedIn = !!isLoggedIn;
         const btn = document.getElementById('navAuthBtn');
         if (!btn) return;
         const ico = btn.querySelector('.ico');
         const label = btn.querySelector('.drawer-auth-label');
-        if (isLoggedIn) {
-            if (ico) ico.textContent = '🚪';
-            if (label) label.textContent = 'ចាកចេញ';
-            btn.onclick = () => drawerAction(logoutApp);
-        } else {
-            if (ico) ico.textContent = '🔑';
-            if (label) label.textContent = 'ចូល';
-            btn.onclick = () => drawerAction(showLoginModalWithPrefill);
-        }
+        if (ico) ico.textContent = authButtonIsLoggedIn ? '🚪' : '🔑';
+        if (label) label.textContent = authButtonIsLoggedIn ? 'ចាកចេញ' : 'ចូល';
     }
 
     function logoutApp() {
@@ -6197,7 +6255,7 @@
                     <div class="m-title">📅 ${sanitizeInput(label)}៖ ${sanitizeInput(key)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់សរុប៖ <strong>${count}</strong></span>
-                        <span>COD: <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
+                        <span>COD: <strong class="money-collected">${sanitizeInput(collectedMoneyText(collected.cod, measurable))}</strong> | DOD: <strong class="money-collected kind-dod">${sanitizeInput(collectedMoneyText(collected.dod, measurable))}</strong></span>
                     </div>
                     <div class="stat-money-row money-collected">
                         ចំណូល (យករួច)៖ <strong>${sanitizeInput(collectedMoneyText(collected.total, measurable))}</strong> (${sanitizeInput(collectedRielText(collected.total, measurable))})
@@ -6219,7 +6277,7 @@
                     <div class="m-title">💵 ថ្ងៃយក៖ ${sanitizeInput(day)}</div>
                     <div class="m-details">
                         <span>កញ្ចប់យករួច៖ <strong>${sums.count}</strong></span>
-                        <span>COD: <strong class="money-collected">$${sums.cod.toFixed(2)}</strong> | DOD: <strong class="money-collected">$${sums.dod.toFixed(2)}</strong></span>
+                        <span>COD: <strong class="money-collected">$${sums.cod.toFixed(2)}</strong> | DOD: <strong class="money-collected kind-dod">$${sums.dod.toFixed(2)}</strong></span>
                     </div>
                     <div class="stat-money-row money-collected">
                         ចំណូលថ្ងៃនេះ៖ <strong>$${sums.total.toFixed(2)}</strong> (${Math.round(sums.total * exchangeRateRiel).toLocaleString()} ៛)
@@ -7211,6 +7269,7 @@
         hidePhoneSuggestions();
         refreshZtoAutoCloseUi();
         refreshZtoListSyncUi();
+        refreshDrawerGroups();
         drawer.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         backdrop.classList.add('open');
@@ -11034,11 +11093,11 @@
             if (bcHasCod && bcHasDod) {
                 bcMoneyHtml = `
                     <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD: <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>
-                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
+                    <div class="bc-money-line ${sanitizeInput(bcMoneyClass)} kind-dod">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>
                     <div class="bc-sum-line ${sanitizeInput(bcMoneyClass)}">សរុប: <strong>$${totalSub.toFixed(2)}</strong> (${(bcCodRiel + bcDodRiel).toLocaleString()} ៛)</div>
                 `;
             } else if (bcHasDod) {
-                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
+                bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)} kind-dod">DOD: <strong>$${itemDod.toFixed(2)}</strong> (${bcDodRiel.toLocaleString()} ៛)</div>`;
             } else {
                 bcMoneyHtml = `<div class="bc-money-line ${sanitizeInput(bcMoneyClass)}">COD: <strong>$${itemCod.toFixed(2)}</strong> (${bcCodRiel.toLocaleString()} ៛)</div>`;
             }
@@ -13067,7 +13126,7 @@
                 let bothRiel = codRiel + dodRiel;
                 priceDisplayHtml = `
                     <div class="money-pending" style="font-size: calc(10 * var(--fs-unit));">COD: <strong>$${activeCod.toFixed(2)}</strong> (${codRiel.toLocaleString()} ៛)</div>
-                    <div class="money-pending" style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong>$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
+                    <div class="money-pending kind-dod" style="font-size: calc(10 * var(--fs-unit)); margin-top:2px;">DOD: <strong>$${activeDod.toFixed(2)}</strong> (${dodRiel.toLocaleString()} ៛)</div>
                     <div class="price-sum-line money-pending">សរុប: <strong>$${bothTotal.toFixed(2)}</strong> (${bothRiel.toLocaleString()} ៛)</div>
                 `;
             } else if (hasCod) {
@@ -13079,7 +13138,7 @@
             } else if (hasDod) {
                 let dodRiel = Math.round(activeDod * exchangeRateRiel);
                 priceDisplayHtml = `
-                    <div class="money-pending" style="font-size: calc(10.5 * var(--fs-unit));">DOD: <strong>$${activeDod.toFixed(2)}</strong></div>
+                    <div class="money-pending kind-dod" style="font-size: calc(10.5 * var(--fs-unit));">DOD: <strong>$${activeDod.toFixed(2)}</strong></div>
                     <div class="money-pending" style="font-size: calc(9.5 * var(--fs-unit));">${dodRiel.toLocaleString()} ៛</div>
                 `;
             } else {

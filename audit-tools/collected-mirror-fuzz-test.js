@@ -32,8 +32,17 @@ const CHROME = process.env.MIRRORFUZZ_CHROME || '/opt/pw-browsers/chromium-1194/
 if (!fs.existsSync(CHROME)) { console.log('SKIP — រកមិនឃើញ Chromium នៅ ' + CHROME); process.exitCode = 0; process.exit(0); }
 const ROOT = process.env.MIRRORFUZZ_APP_DIR || path.join(__dirname, '..');
 const RUN0 = parseInt(process.env.MFUZZ_RUN0 || '0', 10);
-const RUNS = parseInt(process.env.MFUZZ_RUNS || '12', 10);
-const OPS = parseInt(process.env.MFUZZ_OPS || '9', 10);
+// ⛔ លំនាំដើមត្រូវ **សមនឹងថវិកា CI** ៖ រាល់ run បើក context ថ្មី (ផ្ទុកទំព័រ
+// ~២,២ វិ.) ➜ ១២ run × ៩ op = **១២៦ វិ.** ក្នុងមួយជុំ audit។ វាស់បាន ៖
+// ៥ run × ៨ op នៅតែចាប់ mutation «ដក `markCollectedRevenue` ចេញពី
+// `removeSingleBarcode`» បាន ➜ ការបង់ ១២៦ វិ. រាល់ជុំគឺជាការចំណាយឥតបាន។
+// ⛔ ការរត់ **ជ្រៅ** ជាការងារដាច់ដោយឡែក (ដូច `revenue-fuzz-test`) ៖
+//     MFUZZ_RUN0=100 MFUZZ_RUNS=26 MFUZZ_OPS=11 node audit-tools/collected-mirror-fuzz-test.js
+// ⛔ ហើយ «រត់ជ្រៅជាងមុន» ជា **ការសំណាង មិនមែនយុទ្ធសាស្ត្រ** ៖ វាមានតម្លៃ
+// សម្រាប់ **រកឃើញថ្នាក់ថ្មី** មិនមែនការពារថ្នាក់ចាស់ទេ (ថ្នាក់ចាស់ត្រូវ
+// មានការអះអាងឈ្មោះរបស់វាផ្ទាល់)។
+const RUNS = parseInt(process.env.MFUZZ_RUNS || '5', 10);
+const OPS = parseInt(process.env.MFUZZ_OPS || '8', 10);
 const TYPES = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 const APP_ZONE = 'Asia/Phnom_Penh';
 
@@ -239,7 +248,16 @@ async function runOne(page, runIndex, day) {
             Object.keys(hist).forEach((id) => {
                 (hist[id].barcodes || []).forEach((b) => { if (b && b.code) (b.isClosed ? closed : open).push([id, b.code]); });
             });
-            return { open: open, closed: closed, hist: Object.keys(hist), trash: Object.keys(trash) };
+            // ⛔ ការស្តារ **កញ្ចប់ដែលយករួច ហើយត្រូវដក** ជាស្នាមភ្ជាប់ដែលពិបាក
+            // ប៉ះជាងគេ ៖ វាជាផ្លូវតែមួយដែលទាមទារ **ការសាងកញ្ចក់ឡើងវិញ**។
+            // ការជ្រើសចៃដន្យសុទ្ធសាធស្ទើរតែមិនដែលទៅដល់វាទេ — វាស់បាន ៖
+            // mutation «ដក `reconcileCollectedHistory` ចេញពី `executeRestoreItem`»
+            // **រស់រាន** ១២ run × ៩ op។ ដូច្នេះជួរស្តារត្រូវ **លម្អៀង** ទៅ
+            // គោលដៅនោះ ⛔ មិនមែនបង្កើន run (នោះជាការសំណាង មិនមែនការគ្រប)។
+            const trashClosed = Object.keys(trash).filter((id) => (trash[id].barcodes || [])
+                .some((b) => b && b.isClosed) && trash[id].trashReason === 'remove');
+            return { open: open, closed: closed, hist: Object.keys(hist),
+                trash: Object.keys(trash), trashClosed: trashClosed };
         });
         const choices = [];
         if (snap.open.length) choices.push('close', 'remove');
@@ -247,6 +265,7 @@ async function runOne(page, runIndex, day) {
         if (snap.open.length || snap.closed.length) choices.push('price');
         if (snap.hist.length) choices.push('delete');
         if (snap.trash.length) choices.push('restore');
+        for (let w = 0; w < 2 && snap.trashClosed.length; w++) choices.push('restore');
         if (!choices.length) break;
         const op = choices[Math.floor(rand() * choices.length)];
         try {
@@ -286,7 +305,8 @@ async function runOne(page, runIndex, day) {
                 trace.push('delete ' + id);
                 await page.evaluate((i) => window.deleteSingleItem(i), id);
             } else if (op === 'restore') {
-                const id = snap.trash[Math.floor(rand() * snap.trash.length)];
+                const pool = snap.trashClosed.length ? snap.trashClosed : snap.trash;
+                const id = pool[Math.floor(rand() * pool.length)];
                 trace.push('restore ' + id);
                 await page.evaluate((i) => window.promptRestoreDeletedItem(i), id);
                 await page.waitForTimeout(120);
@@ -294,9 +314,23 @@ async function runOne(page, runIndex, day) {
             }
         } catch (e) { trace.push('THREW:' + String(e && e.message).slice(0, 80)); }
         await page.waitForTimeout(op === 'restore' ? 1400 : 700);
+        checkInvariants(await page.evaluate(READ_STATE),
+            'run=' + runIndex + ' ក្រោយ «' + trace[trace.length - 1] + '»');
     }
     const st = await page.evaluate(READ_STATE);
-    const tag = 'run=' + runIndex + ' ops=[' + trace.join(' ➜ ') + ']';
+    checkInvariants(st, 'run=' + runIndex + ' ចុងក្រោយ ops=[' + trace.join(' ➜ ') + ']');
+    return st;
+}
+
+// ⛔ **អយស្ករត្រូវឈរ *គ្រប់ពេល* មិនមែនត្រឹមចុងលំដាប់** ៖ ការអះអាងតែនៅចុង
+// ធ្វើឲ្យប្រតិបត្តិការក្រោយៗ **លុបភស្តុតាង** នៃការធ្លាក់មុន។ វាស់បាន ៖
+// mutation «ដក `markCollectedRevenue` ចេញពី `removeSingleBarcode`» ត្រូវ
+// ការស្តារបន្ទាប់ **ព្យាបាល** កញ្ចក់វិញ ➜ ចុងលំដាប់ស្អាត ➜ រស់រាន; ចំណែក
+// mutation «ដក `reconcileCollectedHistory` ចេញពី `executeRestoreItem`»
+// ត្រូវការលំដាប់ផ្ទុយបេះបិទ។ ⛔ ការដោះស្រាយ **មិនមែន** ការបង្កើន run ឬ
+// ទម្ងន់ (នោះជាការសំណាង ហើយការចាប់មួយបាត់ការចាប់មួយទៀត) — វាគឺការវាស់
+// **ក្រោយរាល់ប្រតិបត្តិការ** ➜ ស្នាមភ្ជាប់ទាំង ២ ត្រូវវាស់ដោយរចនាសម្ព័ន្ធ។
+function checkInvariants(st, tag) {
     ok('[' + tag + '] Σ កញ្ចក់ = Σ barcode `isClosed && !isDeducted`',
         Math.abs(st.mirrorTotal - st.expected) < 0.005,
         'កញ្ចក់=' + st.mirrorTotal + ' រំពឹង=' + st.expected + '\n        mirror=' + JSON.stringify(st.mirror));
@@ -310,7 +344,6 @@ async function runOne(page, runIndex, day) {
     ok('[' + tag + '] តម្លៃកញ្ចក់ត្រូវនឹងតម្លៃ barcode ពិត', wrongValue.length === 0,
         JSON.stringify(wrongValue.map((k) => k + ': កញ្ចក់=' + st.mirrorValue[k] + ' ពិត=' + st.closedKeys[k])));
     ok('[' + tag + '] គ្មានការបដិសេធពី rules', st.rejected.length === 0, JSON.stringify(st.rejected.slice(0, 3)));
-    return st;
 }
 
 async function main() {

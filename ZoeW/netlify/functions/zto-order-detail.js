@@ -113,6 +113,12 @@ const COOKIE_BUDGET_RESERVE_MS = 1200;
 const COOKIE_READ_MIN_TIMEOUT_MS = 300;
 const COOKIE_WRITE_MIN_TIMEOUT_MS = 200;
 const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
+// ⛔ ពេល **សតិទទេ** ការអាន Cookie មិនមែនការងារស្រេចចិត្តទេ — វា *ជាសំណើ
+// ទាំងមូល*។ ដូច្នេះការកក់ពេលឲ្យ upstream ពេញ `upstreamTimeoutMs` មុនការអាន
+// គឺខុសទិស ៖ វាបង្រួមបង្អួចអានរហូតតូចជាងអ្វីដែល store ត្រូវការពិត ➜ 503
+// ខណៈថវិកានៅសល់ច្រើន។ ជំនួសវិញ កក់ត្រឹម **ការហៅ upstream អប្បបរមា ១**
+// (`fetchOrder()` ទាមទារ `remaining > 1200` ហើយកាត់ `remaining − 200`)។
+const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
 const cookieState = {
@@ -1303,13 +1309,26 @@ function budgetLeftMs(config, startedAt) {
 // ធ្វើឲ្យលើសពិដាន ១០ វិនាទីរបស់ Netlify** បានទេ។
 function cookieReadTimeoutMs(config, startedAt) {
     const left = budgetLeftMs(config, startedAt);
+    // ⛔ សតិទទេ ➜ គ្មាន Cookie ➜ គ្មានការហៅ upstream សោះ ➜ ការអាន **ជា
+    // សំណើទាំងមូល**។ វាត្រូវទទួលពិដានរបស់ store ពេញ ដរាបណាថវិកានៅសល់
+    // អាចផ្ទុកការហៅ upstream អប្បបរមា ១។ 🔴 វាស់បាន (2026-09-15) ៖ តាម
+    // រូបមន្តចាស់ (កក់ `upstreamTimeoutMs` ពេញមុនការអាន) ការកំណត់ផលិតកម្ម
+    // `upstream 7000 · budget 9000` ផ្តល់បង្អួច **៨០០ ms** ➜ Blobs ដែល
+    // ឆ្លើយ ២,៥ វិ. លើ container ត្រជាក់ ធ្លាក់ 503 `ZTO_AUTH_NOT_CONFIGURED`
+    // ខណៈថវិកា **៧,២ វិ. នៅមិនទាន់ប្រើសោះ** ហើយ Cookie ពិតអង្គុយក្នុង store។
+    if (!cookieState.value) {
+        const cold = Math.min(COOKIE_STORE_TIMEOUT_MS,
+            left - COOKIE_BUDGET_RESERVE_MS - COOKIE_COLD_UPSTREAM_RESERVE_MS);
+        if (cold >= COOKIE_READ_MIN_TIMEOUT_MS) return cold;
+        // ថវិកាតឹងខ្លាំង ➜ កក់បង្អួចអប្បបរមា តែ **មិនលើសអ្វីដែលនៅសល់ពិត**
+        const floor = Math.min(COOKIE_READ_MIN_TIMEOUT_MS, left - COOKIE_BUDGET_RESERVE_MS);
+        return floor > 0 ? floor : 0;
+    }
+    // ⛔ ទិសផ្ទុយ ៖ សតិមានតម្លៃ ➜ ការអានជាការធ្វើឲ្យស្រស់ **សុទ្ធសាធ** ➜
+    // វាមិនត្រូវលួចពេលរបស់ upstream ទេ ➜ រំលងពេលថវិកាតឹង។
     const room = left - COOKIE_BUDGET_RESERVE_MS - config.upstreamTimeoutMs;
     if (room >= COOKIE_READ_MIN_TIMEOUT_MS) return Math.min(COOKIE_STORE_TIMEOUT_MS, room);
-    // សតិមានតម្លៃ ➜ ការអានជាការធ្វើឲ្យស្រស់សុទ្ធសាធ ➜ រំលងពេលថវិកាតឹង
-    if (cookieState.value) return 0;
-    // សតិទទេ ➜ កក់បង្អួចអប្បបរមា តែ **មិនលើសអ្វីដែលថវិកានៅសល់ពិត**
-    const floor = Math.min(COOKIE_READ_MIN_TIMEOUT_MS, left - COOKIE_BUDGET_RESERVE_MS);
-    return floor > 0 ? floor : 0;
+    return 0;
 }
 
 function cookieRenewTimeoutMs(config, startedAt) {

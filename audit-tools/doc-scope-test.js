@@ -177,9 +177,35 @@ if (prompt === null) {
 } else {
     const head = (prompt.match(/^##\s*តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន».*$/m) || [])[0] || '';
     check(head !== '', PROMPT_REL + ': មានក្បាលតារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន»');
-    check(head !== '' && shipped.some((v) => head.includes(v)),
-        '⛔ ' + PROMPT_REL + ': ក្បាលតារាងនិយាយកំណែដែល App **ពិតជា ship**',
-        'ក្បាល: ' + head.trim() + '\n        កំណែ ship ពិត: ' + shipped.join(' · ')
+    // ⛔ **`some()` មិនគ្រប់គ្រាន់ទេ** — ក្បាលតារាងដាក់ឈ្មោះ App **ទាំង ២**
+    // ➜ ការទាមទារត្រឹម «កំណែណាមួយត្រូវ» ធ្វើឲ្យ App ដែល **មិន** ឡើងកំណែក្នុង
+    // ជុំនោះ (ZoeKeyGen ជាញឹកញាប់) ក្លាយជា **អាជ្ញាបណ្ណឲ្យ ZoeW ចាស់**។
+    // 🔴 វាស់បាន (2026-09-15) ៖ ក្បាលរាយ «ZoeW 2.35.0 · ZoeKeyGen 2.19.23»
+    // ខណៈ ZoeW ship **2.35.2** — checker រាយ PASS ព្រោះ `2.19.23` ត្រូវ។
+    // ⛔ ការកែ ៖ **ឈ្មោះ App នីមួយៗដែលលេចក្នុងក្បាល ត្រូវអមដោយកំណែ ship
+    // របស់វាផ្ទាល់** ➜ គ្មាន App ណាអាចលាក់ខ្លួនក្រោយ App មួយទៀតបានទៀតទេ។
+    const APP_VERSION_SOURCES = [
+        { name: 'ZoeW', rel: 'ZoeW/app.js' },
+        { name: 'ZoeKeyGen', rel: 'ZoeKeyGen/app.js' }
+    ];
+    const staleApps = [];
+    let namedApps = 0;
+    APP_VERSION_SOURCES.forEach((app) => {
+        const live = appVersionOf(app.rel);
+        if (!live) return;
+        // ⛔ `ZoeKeyGen` ផ្ទុក `ZoeW` ជា substring ➜ ត្រូវទាមទារព្រំដែនពាក្យ
+        const named = new RegExp(app.name + '(?![A-Za-z])\\s*`?([0-9]+\\.[0-9]+\\.[0-9]+)`?').exec(head);
+        if (!named) return;
+        namedApps++;
+        if (named[1] !== live) staleApps.push(app.name + ' ៖ ក្បាល ' + named[1] + ' ≠ ship ' + live);
+    });
+    check(head !== '' && namedApps >= 1,
+        PROMPT_REL + ': ជាន់អប្បបរមា ៖ ក្បាលតារាងដាក់ឈ្មោះ App យ៉ាងតិច ១ ជាមួយកំណែ',
+        'ក្បាល: ' + head.trim());
+    check(head !== '' && namedApps >= 1 && staleApps.length === 0,
+        '⛔ ' + PROMPT_REL + ': កំណែរបស់ **App នីមួយៗ** ក្នុងក្បាលតារាង ត្រូវនឹងអ្វីដែល ship',
+        'ក្បាល: ' + head.trim() + '\n        ចាស់: ' + (staleApps.join(' · ') || '(គ្មាន)')
+        + '\n        កំណែ ship ពិត: ' + shipped.join(' · ')
         + '\n        ➜ ជុំ audit កែកូដរួច តែភ្លេច update ឯកសារ prompt (ច្បាប់ជួរទី ១ របស់វា)');
 
     // ⛔ ទិសផ្ទុយ ១ ៖ ច្បាប់ខ្លួនវាត្រូវនៅរស់ក្នុងឯកសារនោះ — បើនរណាលុបច្បាប់

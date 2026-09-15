@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.0';
+    const APP_VERSION = '2.36.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2876,10 +2876,13 @@
         return Math.round(n * 100) / 100;
     }
 
+    const SHEET_IMPORT_COLUMN_LETTER_MAX = 12;
+
     function sheetImportColumnLetter(index) {
         let letter = '';
-        let n = index;
-        while (n >= 0) {
+        let n = Math.floor(Number(index));
+        if (!Number.isFinite(n) || n < 0) return '';
+        while (n >= 0 && letter.length < SHEET_IMPORT_COLUMN_LETTER_MAX) {
             letter = String.fromCharCode(65 + (n % 26)) + letter;
             n = Math.floor(n / 26) - 1;
         }
@@ -6593,6 +6596,7 @@
     }
 
     const PICKUP_LEGACY_KEY_PREFIX = '_lg_';
+    const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;
     const PICKUP_PHONE_KEY_MAX = 64;
 
     function getPickupPhoneKey(item) {
@@ -6626,7 +6630,8 @@
     }
 
     function legacyPickupPlaceholders(record) {
-        const recorded = Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp)));
+        const recorded = Math.min(PICKUP_LEGACY_PLACEHOLDER_MAX,
+            Math.max(0, Math.round(ledgerNumber(record && record.packagesPickedUp))));
         const phones = (record && record.pickedUpPhones && typeof record.pickedUpPhones === 'object') ? record.pickedUpPhones : {};
         const phoneKeys = Object.keys(phones);
         const out = {};

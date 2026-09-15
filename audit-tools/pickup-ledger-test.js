@@ -113,6 +113,7 @@ const missingFns = NEEDED_FNS.filter((n) => !sliceFn(n));
 ok('រក function ផ្លូវស្ថិតិយកឃើញទាំង ' + NEEDED_FNS.length, missingFns.length === 0, missingFns);
 vm.runInContext([
     sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
+    sliceConst('PICKUP_LEGACY_PLACEHOLDER_MAX') || 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;',
     sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
     ...NEEDED_FNS.map((n) => sliceFn(n) || ('function ' + n + '() { return undefined; }')),
     'this.api = { getPickupPhoneKey, countPickedUpCustomers, markPickupBarcodes, revertPickupMarks, collectPickupMarks, pickupBarcodeKey };'

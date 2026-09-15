@@ -465,6 +465,12 @@
     "audit-tools/collected-mirror-lifecycle-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/collected-mirror-fuzz-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/loop-termination-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/collected-value-fuzz-test.js": {
       "policy": "guard-1"
     },

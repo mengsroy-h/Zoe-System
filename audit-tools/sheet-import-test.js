@@ -144,6 +144,13 @@ check(/connect-src[^"]*https:\/\/script\.google\.com/.test(netlify),
 console.log('\n=== ៥. helper បម្លែងតម្លៃ (រត់កូដពិតក្នុង vm) ===');
 {
     const ctx = vm.createContext({ console });
+    // ⛔ ថេរត្រូវ **អានចេញពី `app.js` ពិត** មិនមែនចាក់ជា literal ៖ បើពិដាន
+    // ត្រូវដកចេញពីកូដ ការស្រង់នេះក៏ធ្លាក់ដែរ ➜ sandbox មិនលាក់ការថយក្រោយ។
+    ['SHEET_IMPORT_COLUMN_LETTER_MAX'].forEach((n) => {
+        const m = new RegExp('^\\s*const ' + n + '\\s*=\\s*[^;]+;', 'm').exec(appJs);
+        if (m) vm.runInContext(m[0].trim(), ctx);
+        else bad('រកឃើញថេរ ' + n + ' ក្នុង app.js');
+    });
     ['sheetImportCellToText', 'sheetImportToMoney', 'sheetImportColumnLetter'].forEach((n) => {
         const body = sliceFn(appJs, n);
         if (body) vm.runInContext(body, ctx);
@@ -159,6 +166,11 @@ console.log('\n=== ៥. helper បម្លែងតម្លៃ (រត់ក�
     check(toMoney('$12.345') === 12.35 && toMoney(0) === 0 && toMoney('') === 0, 'toMoney បង្គត់ ២ ខ្ទង់');
     check(toMoney('abc') === 0 && toMoney(Infinity) === 0, 'toMoney ៖ តម្លៃមិនមែនលេខ ➜ 0');
     check(letter(0) === 'A' && letter(25) === 'Z' && letter(26) === 'AA', 'columnLetter ត្រឹមត្រូវ');
+    // ⛔ តម្លៃមិនកំណត់ធ្លាប់ធ្វើឲ្យ **រង្វិលជុំមិនចេះឈប់** ➜ tab ជាប់
+    // (`Math.floor(Infinity / 26) - 1` នៅតែ `Infinity`)។ ការឈប់ពិតវាស់ដោយ
+    // `loop-termination-test`; ត្រង់នេះវាស់ត្រឹម **តម្លៃត្រឡប់**។
+    check(letter(Infinity) === '' && letter(-1) === '' && letter(NaN) === '',
+        'columnLetter ៖ តម្លៃមិនកំណត់/អវិជ្ជមាន ➜ ទទេ (មិនមែនរង្វិលជុំគ្មានទីបញ្ចប់)');
 }
 
 function serve(dir) {

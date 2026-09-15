@@ -288,6 +288,7 @@ function makeSandbox(seed) {
         + fnSrc.revertPickupMarks + '\n'
         + fnSrc.reapplyPickupMarks + '\n'
         + 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";\n'
+        + 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;\n'
         + 'const PICKUP_PHONE_KEY_MAX = 64;\n'
         + 'function mark(code, phone, closed) { return { key: pickupBarcodeKey(code), phoneKey: phone, closed: closed }; }\n',
         ctx);

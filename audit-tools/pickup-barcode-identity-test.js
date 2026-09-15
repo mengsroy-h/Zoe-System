@@ -292,6 +292,7 @@ function makeDevice(shared, name) {
     new vm.Script([
         sliceConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',
         sliceConst('PICKUP_LEGACY_KEY_PREFIX') || 'const PICKUP_LEGACY_KEY_PREFIX = "_lg_";',
+        sliceConst('PICKUP_LEGACY_PLACEHOLDER_MAX') || 'const PICKUP_LEGACY_PLACEHOLDER_MAX = 20000;',
         sliceConst('PICKUP_PHONE_KEY_MAX') || 'const PICKUP_PHONE_KEY_MAX = 64;',
         sliceConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         sliceConst('APP_TIME_ZONE') || "const APP_TIME_ZONE = 'Asia/Phnom_Penh';",

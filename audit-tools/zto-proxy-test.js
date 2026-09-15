@@ -388,6 +388,18 @@ group('រកមិនឃើញ ធៀបនឹងកំហុស', async () => 
         rejected.statusCode === 502 && JSON.parse(rejected.body).code === 'ZTO_UPSTREAM_REJECTED', rejected.body);
     ok('ការបដិសេធរក្សា HTTP status ដោយគ្មានសារឆៅពី upstream',
         /HTTP 200/.test(JSON.parse(rejected.body).error) && !rejected.body.includes('system busy'), rejected.body);
+    // ⛔ `ZTO_UPSTREAM_REJECTED` ជា **កន្តុំរួម** (លេខមិនស្គាល់ ធៀបនឹង ZTO ដាច់ពិត)។
+    // ការបំបែកពួកវាត្រូវការ payload ពិត ➜ ជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ**
+    // ក្នុង `?diag=1` ⛔ ដោយមិនប្តូរសាលក្រម។ អ្នកយាមនេះចាក់សោទាំង ២ ទិស ៖
+    // សញ្ញាត្រូវឡើង **និង** តម្លៃឆៅមិនត្រូវលេច។
+    const diagAfterReject = JSON.parse((await call({ diag: '1' })).body);
+    ok('⛔ ការបដិសេធរបស់ upstream ត្រូវលេចក្នុង `?diag=1` (កូដ + ចំនួន)',
+        !!diagAfterReject.upstreamReject && diagAfterReject.upstreamReject.observed === true
+        && diagAfterReject.upstreamReject.count >= 1 && diagAfterReject.upstreamReject.code === 'e42'
+        && diagAfterReject.upstreamReject.status === 200,
+        JSON.stringify(diagAfterReject.upstreamReject));
+    ok('⛔ ទិសផ្ទុយ ៖ សារឆៅរបស់ upstream មិនលេចក្នុង `?diag=1`',
+        JSON.stringify(diagAfterReject).indexOf('system busy') === -1, JSON.stringify(diagAfterReject.upstreamReject));
 
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
     global.fetch = jsonResponder({}, 429);

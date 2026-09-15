@@ -121,6 +121,7 @@ const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
 const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
+const upstreamRejectSignal = { at: 0, status: 0, code: '', count: 0 };
 const cookieState = {
     value: '', source: '', at: 0, storeReason: '', renewAt: 0, renewals: 0, authRejectedAt: 0,
     authAcceptedAt: 0,
@@ -1015,17 +1016,40 @@ function ztoAuthRejected(response, upstream) {
     return /(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/.test(message);
 }
 
-function upstreamSucceeded(upstream) {
-    if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream)) return false;
-    if (upstream.success === false || upstream.status === false || upstream.result === false) return false;
-    if (upstream.success === true || upstream.status === true || upstream.result === true) return true;
+// ⛔ ចំណុចច្របាច់ **តែមួយ** នៃការអានកូដរបស់ upstream ៖ `upstreamSucceeded()`
+// និង `noteUpstreamReject()` ត្រូវអានវាល **ដដែល** តាមលំដាប់ **ដដែល** —
+// ច្បាប់ចម្លងទី ២ នឹងធ្វើឲ្យសាលក្រម និងការវិនិច្ឆ័យនិយាយផ្ទុយគ្នា។
+function upstreamCodeText(upstream) {
+    if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream)) return '';
     let raw = '';
     if (upstream.code !== undefined && upstream.code !== null) raw = upstream.code;
     else if (upstream.errorCode !== undefined && upstream.errorCode !== null) raw = upstream.errorCode;
     else if (upstream.statusCode !== undefined && upstream.statusCode !== null) raw = upstream.statusCode;
-    const code = String(raw).trim().toLowerCase();
+    return String(raw).trim().toLowerCase();
+}
+
+function upstreamSucceeded(upstream) {
+    if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream)) return false;
+    if (upstream.success === false || upstream.status === false || upstream.result === false) return false;
+    if (upstream.success === true || upstream.status === true || upstream.result === true) return true;
+    const code = upstreamCodeText(upstream);
     if (!code) return true;
     return SUCCESS_CODE_RE.test(code);
+}
+
+// ⛔ **ការកត់ត្រា មិនមែនការសម្រេច** ៖ `ZTO_UPSTREAM_REJECTED` ជា **កន្តុំរួម**
+// ដែលលាយ «លេខមិនស្គាល់» (សាលក្រមស្ថាពរ — ការសាកម្តងទៀតឥតប្រយោជន៍) ជាមួយ
+// «ZTO ដាច់ពិត» (សាលក្រមបណ្តោះអាសន្ន — ការសាកម្តងទៀតត្រឹមត្រូវ)។ client
+// ព្យាយាម **២ ដង** លើទាំងពីរ ព្រោះ 5xx ជា retryable។ ⛔ ការបំបែកពួកវាត្រូវការ
+// **payload ពិតរបស់ ZTO** ដែលគ្មាននរណាធ្លាប់មើល ➜ ការទាយនឹងបាំងការដាច់ពិត។
+// ដូច្នេះជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ** ក្នុង `?diag=1` ⛔ ដោយ **មិនប្តូរ
+// សាលក្រម មិនប្តូរ cache មិនប្តូរការសាកម្តងទៀត** — ជុំក្រោយទើបសម្រេចដោយលេខ។
+function noteUpstreamReject(status, upstream) {
+    upstreamRejectSignal.at = Date.now();
+    upstreamRejectSignal.count++;
+    upstreamRejectSignal.status = Number(status) || 0;
+    const code = upstreamCodeText(upstream);
+    upstreamRejectSignal.code = SAFE_REASON_RE.test(code) ? code : (code ? 'unsafe' : '');
 }
 
 function orderCandidates(upstream) {
@@ -1206,6 +1230,7 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
 
         if (ztoAuthRejected(response, upstream)) return { kind: 'authRejected' };
         if (!response.ok || !upstreamSucceeded(upstream)) {
+            noteUpstreamReject(response.status, upstream);
             return {
                 kind: 'fatal',
                 response: json(502, {
@@ -1489,6 +1514,13 @@ function diagnosticsBody(config, headers, authKind, credential) {
             notFoundCacheTtlMs: config.notFoundCacheTtlMs
         },
         cacheEntries: resultCache.size,
+        upstreamReject: {
+            observed: upstreamRejectSignal.count > 0,
+            count: upstreamRejectSignal.count,
+            status: upstreamRejectSignal.status || null,
+            code: upstreamRejectSignal.code || null,
+            ageMs: upstreamRejectSignal.at ? elapsedSince(upstreamRejectSignal.at) : null
+        },
         sessionRenewal: {
             observed: upstreamCookieSignal.seenAt > 0,
             setCookie: upstreamCookieSignal.setCookie,

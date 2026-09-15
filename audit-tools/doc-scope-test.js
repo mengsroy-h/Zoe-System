@@ -444,14 +444,22 @@ const moneyRealSrc = fs.existsSync(path.join(ROOT, 'audit-tools/money-reality-ch
 // ⛔ ស្លាកលេចឡើង **២ ដង** (comment ក្បាលផ្នែក និង `say()` ពិត) ➜ ត្រូវ dedupe
 const moneyRealSections = new Set((moneyRealSrc.match(/──\s*[០-៩]+[ខគឃ]?\./g) || [])
     .map((m) => m.replace(/[──\s]/g, ''))).size;
-const moneyDoc = fs.existsSync(path.join(ROOT, 'tools/money-check-windows/README-KH.md'))
-    ? fs.readFileSync(path.join(ROOT, 'tools/money-check-windows/README-KH.md'), 'utf8') : '';
-const moneyClaim = khmerToInt((moneyDoc.match(/រួចពិនិត្យ \*{0,2}([០-៩0-9]+)/) || [])[1]);
+// ⛔ ហើយច្បាប់ដដែលគ្រប **គ្រប់ឯកសារដែលអះអាងចំនួននោះ** មិនត្រឹមឯកសារតែមួយ
+// (ថ្នាក់ដដែលនឹងចំនួនជួរ 🩺 ៖ បញ្ជីត្រូវ update តែលេខសង្ខេបភ្លេច)។ វាស់បាន
+// (2026-09-13) ៖ `audit-tools/README.md` រាយ «ពិនិត្យ ៦» ខណៈឧបករណ៍មាន ៨
+// ផ្នែក — ជុំមុនកែតែ README របស់ Windows ព្រោះអ្នកយាមមើលតែឯកសារនោះ។
+const MONEY_CLAIM_DOCS = ['tools/money-check-windows/README-KH.md', 'audit-tools/README.md', 'README.md'];
 check(moneyRealSections >= 5, 'ជាន់អប្បបរមា ៖ `money-reality-check.js` មានផ្នែកយ៉ាងតិច ៥',
     'រាប់បាន ' + moneyRealSections);
-check(moneyClaim !== null && moneyClaim === moneyRealSections,
-    '⛔ `tools/money-check-windows/README-KH.md` ៖ ចំនួនការវាស់ត្រូវស្មើចំនួនផ្នែកពិតរបស់ឧបករណ៍',
-    'README រាយ ' + moneyClaim + ' ខណៈឧបករណ៍មាន ' + moneyRealSections + ' ផ្នែក');
+MONEY_CLAIM_DOCS.forEach((rel) => {
+    const text = fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), 'utf8') : '';
+    // ⛔ លេខត្រូវឈរក្បែរ **ពាក្យដែលអះអាងវា** ➜ «ការត្រួតពិនិត្យ ៣៥ បើក Chromium»
+    // (ការអះអាងផ្សេង ក្នុងឯកសារដដែល) មិនត្រូវអានខុសជាចំនួនផ្នែករបស់ CLI
+    const claim = khmerToInt((text.match(/(?:ពិនិត្យ|ការវាស់លុយ) \*{0,2}([០-៩0-9]+) (?:៖|លើ)/) || [])[1]);
+    check(claim !== null && claim === moneyRealSections,
+        '⛔ `' + rel + '` ៖ ចំនួនការវាស់ត្រូវស្មើចំនួនផ្នែកពិតរបស់ឧបករណ៍',
+        'ឯកសាររាយ ' + claim + ' ខណៈឧបករណ៍មាន ' + moneyRealSections + ' ផ្នែក');
+});
 
 // ⛔ ច្បាប់ «បញ្ជីត្រូវប្រៀបនឹងថតពិត» (ផ្នែក ១ សម្រាប់ README) អនុវត្តលើ
 // **កាតាឡុក checker** ដែរ ៖ `audit-tools/README.md` ជាកន្លែងតែមួយដែលប្រាប់ថា

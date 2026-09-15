@@ -101,6 +101,49 @@ function sliceFn(src, name) {
     return src.slice(start, end + 1);
 }
 
+// ⛔ ការអះអាងអំពី **ស្នាមភ្ជាប់** ត្រូវ *ដេរីវេ* មិនមែនចាក់ឈ្មោះ helper ជា
+// literal ទី ២ (ច្បាប់ «ការអះអាងលើឯកសារត្រូវវាស់ *ការពិត* មិនមែន *ការជ្រើស
+// ពាក្យ*»)។ helper ខាងក្រោមដើរខ្សែសង្វាក់ការហៅពិត ចេញពី function មួយ រួច
+// ប្រមូល **កូនសោ storage** ដែលខ្សែសង្វាក់នោះប៉ះ — ទាំងជា string literal
+// ទាំងជាឈ្មោះថេរដែលដោះតម្លៃចេញពីកូដពិត។
+function constValue(src, name) {
+    const m = new RegExp('const\\s+' + name + "\\s*=\\s*'([^']*)'").exec(src);
+    return m ? m[1] : '';
+}
+
+function chainNames(src, body) {
+    const out = [];
+    const re = /\b([A-Za-z_$][\w$]*)\b/g;
+    let m;
+    while ((m = re.exec(body))) {
+        if (out.indexOf(m[1]) === -1 && sliceFn(src, m[1]) !== '') out.push(m[1]);
+    }
+    return out;
+}
+
+function chainKeys(src, body, depth) {
+    const keys = [];
+    const seen = {};
+    const walk = (b, d) => {
+        if (!b || d < 0) return;
+        (b.match(/'(zoew[a-z0-9_]*)'/g) || []).forEach((t) => {
+            const k = t.slice(1, -1);
+            if (keys.indexOf(k) === -1) keys.push(k);
+        });
+        (b.match(/\b[A-Z][A-Z0-9_]{3,}\b/g) || []).forEach((n) => {
+            const v = constValue(src, n);
+            if (v && v.indexOf('zoew') === 0 && keys.indexOf(v) === -1) keys.push(v);
+        });
+        chainNames(src, b).forEach((n) => {
+            if (seen[n]) return;
+            seen[n] = true;
+            walk(sliceFn(src, n), d - 1);
+        });
+    };
+    walk(body, depth);
+    return keys;
+}
+
 const appJs = readOr(path.join(APP, 'app.js'), 'ZoeW/app.js');
 const html = readOr(path.join(APP, 'index.html'), 'ZoeW/index.html');
 const css = readOr(path.join(APP, 'style.css'), 'ZoeW/style.css');
@@ -131,8 +174,13 @@ check(/^\s{4}initAppLock\(\);\s*$/m.test(appJs),
     'initAppLock() ត្រូវហៅនៅ top level (មុន Firebase និងមុនការគូរទិន្នន័យ)');
 
 const armFn = sliceFn(appJs, 'appLockShouldArm');
-check(/appLockPinIsSet\(\)\s*&&\s*!appLockUnlockedThisSession\(\)/.test(armFn),
-    'សោចាក់តែពេល **មាន PIN** ហើយ **មិនទាន់ដោះក្នុងវគ្គនេះ**', armFn);
+// ⛔ ដេរីវេ ៖ ច្រកទ្វារត្រូវទាមទារ (ក) វគ្គមិនទាន់ដោះសោ និង (ខ) PIN ដែល
+// មានពិត — តាមខ្សែសង្វាក់ការហៅ មិនមែនតាមអក្សរពិតនៃលក្ខខណ្ឌ (ការបញ្ចូល
+// ច្រកទ្វារទី ៣ ដោយ **ត្រឹមត្រូវ** មិនត្រូវធ្វើឲ្យអ្នកយាមធ្លាក់)។
+check(/!appLockUnlockedThisSession\(\)/.test(armFn),
+    'សោចាក់តែពេល **មិនទាន់ដោះក្នុងវគ្គនេះ**', armFn);
+check(chainKeys(appJs, armFn, 4).indexOf('zoew_security_pin_hash') !== -1,
+    'សោចាក់តែពេល **មាន PIN** (ដេរីវេតាមខ្សែសង្វាក់ការហៅ)', chainKeys(appJs, armFn, 4));
 
 const sessionFn = sliceFn(appJs, 'appLockUnlockedThisSession');
 // ⛔ កំណែ 2.22.5 ៖ storage ចូលប្រើតាម shim `appSessionStore` (getter ខ្លួនវា
@@ -173,8 +221,8 @@ check(/elapsedSince\(appLockExcuseAt\)/.test(awayFn),
     '⛔ បង្អួចលើកលែងវាស់តាម `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ Infinity ➜ **ចាក់សោ** (fail-safe)', awayFn);
 check(/showAppLockScreen\(true\)/.test(awayFn),
     '⛔ ការបាំងពេល `hidden` ត្រូវ **រក្សាទង់វគ្គ** (បើអត់ ➜ PTR reload ត្រូវវាយ PIN)', awayFn);
-check(/appLockPinIsSet\(\)/.test(awayFn),
-    'គ្មាន PIN ➜ មិនបាំង (ទិសផ្ទុយ — App ដើរដូចមុន)', awayFn);
+check(chainKeys(appJs, awayFn, 4).indexOf('zoew_security_pin_hash') !== -1,
+    'គ្មាន PIN ➜ មិនបាំង (ទិសផ្ទុយ — App ដើរដូចមុន)', chainKeys(appJs, awayFn, 4));
 check(/showAppLockScreen\(\)/.test(backFn) && !/showAppLockScreen\(true\)/.test(backFn),
     '⛔ ការត្រឡប់មកវិញទើបចាក់សោពិត (លុបទង់វគ្គ ➜ Refresh មិនមែនផ្លូវរំលង)', backFn);
 check(/keepSessionFlag !== true\) clearAppUnlockedForSession\(\)/.test(showFn),
@@ -226,6 +274,84 @@ check(/\.app-lock-msg \{[^}]*text-align:\s*center/.test(css),
     'CSS ៖ សាររបស់អេក្រង់ចាក់សោឈរចំកណ្តាល ដូចធាតុដទៃលើកាត');
 check(/\.btn-biometric \{[^}]*justify-content:\s*center/.test(css),
     'CSS ៖ ប៊ូតុងស្កេនជីវមាត្រ ៖ រូប + អក្សរឈរចំកណ្តាលជាក្រុមតែមួយ');
+
+console.log('\n=== ១ខ. កុងតាក់ត្រូវមាន *ទិសបិទ* — សោដែលបិទមិនបាន ជាអន្ទាក់ ===');
+
+// 🔴 របាយការណ៍អ្នកប្រើ ៖ *«ចុចបិទមុខងារ ចាក់សោពេលបើក App អត់បាន»*។
+//
+// មូលហេតុពិត ៖ មុខងារនេះធ្លាប់ដេរីវេ **ដោយផ្ទាល់** ពីវត្តមាននៃ
+// `zoew_security_pin_hash` ➜ គ្មានទង់ «បើក/បិទ» ដាច់ដោយឡែកទេ ➜ ពេលមាន
+// PIN រួច កុងតាក់ **គ្មានទិសបិទសោះ** ៖ វាត្រឹមបង្ហាញ toast រួច `return`។
+// ផ្លូវតែមួយដែលបិទបានគឺ «ភ្លេច PIN?» ដែល **លុប Security PIN សកល +
+// ចាកចេញពីប្រព័ន្ធ + បំផ្លាញការតភ្ជាប់ដែលអ៊ិនគ្រីបដោយ PIN** (Lookup API ·
+// Sheet Import) ➜ តម្លៃធំពេកសម្រាប់កុងតាក់តែមួយ។
+//
+// ⛔ នេះជាថ្នាក់ដដែលនឹងជួរ «កុងតាក់ដែលមើលមិនឃើញ តែនៅដើរ ជាអន្ទាក់» ក្នុង
+// `CLAUDE.md` — ត្រង់នេះផ្ទុយវិញ ៖ កុងតាក់ **មើលឃើញ ហើយចុចបាន** តែ
+// **គ្មានឥទ្ធិពលបិទ**។ ច្បាប់ ៖ ការកំណត់ដែលបង្ហាញជាកុងតាក់ ត្រូវប្តូរបាន
+// **ទាំង ២ ទិស** ដោយមិនទាមទារការបំផ្លាញអ្វីផ្សេង។
+
+const flowFn = sliceFn(appJs, 'drawerAppLockFlow');
+const sessionKeys = chainKeys(appJs, sliceFn(appJs, 'appLockUnlockedThisSession'), 3);
+const armKeys = chainKeys(appJs, armFn, 4)
+    .filter((k) => k !== 'zoew_security_pin_hash' && sessionKeys.indexOf(k) === -1);
+const flowKeys = chainKeys(appJs, flowFn, 4);
+const prefKeys = armKeys.filter((k) => flowKeys.indexOf(k) !== -1);
+
+check(flowFn !== '', 'មានកុងតាក់ drawerAppLockFlow()');
+check(prefKeys.length > 0,
+    '⛔⛔ កុងតាក់ត្រូវសរសេរ **កូនសោដដែល** នឹងអ្វីដែលច្រកទ្វារចាក់សោអាន — បើអត់ ការចុចមិនអាចប្តូរសាលក្រមបានទេ',
+    { armKeys: armKeys, flowKeys: flowKeys, sessionKeys: sessionKeys });
+
+const prefKey = prefKeys[0] || '';
+if (prefKey) {
+    // ⛔ ការជ្រើសរបស់អ្នកប្រើត្រូវ **រស់រានការបិទ App** ➜ localStorage
+    // មិនមែន sessionStorage (បើវគ្គ ➜ បិទបើក App ម្តង សោត្រឡប់មកវិញ)។
+    const holders = (appJs.match(/function\s+\w+\([^)]*\)\s*\{/g) || [])
+        .map((h) => sliceFn(appJs, (h.match(/function\s+(\w+)/) || [])[1]))
+        .filter((b) => b && (b.indexOf("'" + prefKey + "'") !== -1
+            || new RegExp('\\b' + (appJs.match(new RegExp("const\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*'" + prefKey + "'")) || [,'__none__'])[1] + '\\b').test(b)));
+    check(holders.length > 0 && holders.every((b) => !/appSessionStore|sessionStorage/.test(b)),
+        '⛔ ការជ្រើស បើក/បិទ រស់នៅ localStorage ➜ វារស់រានការបិទបើក App', prefKey);
+}
+
+// ⛔ ការបិទត្រូវឆ្លងកាត់ PIN ដដែល ៖ វាជា **ការបន្ថយសុវត្ថិភាព** ➜ ទូរស័ព្ទ
+// ដែលបើកចោលដោយដោះសោរួច មិនត្រូវឲ្យអ្នកដទៃបិទសោអចិន្ត្រៃយ៍បានដោយចុច ១ ដង។
+check(/requestPinBeforeConfig\(/.test(flowFn),
+    '⛔ ការប្តូរកុងតាក់ឆ្លងកាត់ PIN ជានិច្ច (ការបិទសោគឺការបន្ថយសុវត្ថិភាព)', flowFn);
+
+// ⛔ ច្បាប់ `PIN_PROMPT_MESSAGES` ៖ សារពិពណ៌នា **អ្វីដែលនឹងកើតក្រោយវាយ PIN**
+// ➜ ឈ្មោះតែមួយដែលបម្រើ «បើក» និង «បិទ» = យ៉ាងហោចណាស់ម្ខាងអានសារខុស។
+const promptKeys = (flowFn.match(/requestPinBeforeConfig\([^)]*?'([a-zA-Z]+)'\s*\)/g) || [])
+    .map((t) => (t.match(/'([a-zA-Z]+)'\s*\)$/) || [])[1]).filter(Boolean);
+check(promptKeys.length >= 2 && promptKeys[0] !== promptKeys[1],
+    '⛔ ផ្លូវបើក និងផ្លូវបិទប្រើ promptKey **ខុសគ្នា** (សារត្រូវប្រាប់អ្វីដែលនឹងកើតឡើងពិត)', promptKeys);
+promptKeys.forEach((k) => {
+    check(new RegExp('\\n\\s{8}' + k + ':\\s*\\{').test(appJs),
+        'PIN_PROMPT_MESSAGES មានធាតុ «' + k + '» (បើអត់ ➜ អ្នកប្រើឃើញសារ «Config ឬ Reconfig»)', k);
+});
+
+// ⛔ ការបិទសោ **មិនមែន** ការលុប PIN ក្លែងខ្លួន ៖ Security PIN សកលការពារ
+// Config · នាំចូល Excel · Lookup API · កែទឹកប្រាក់ · លុបទាំងអស់ ➜ ការបិទ
+// កុងតាក់តែមួយមិនត្រូវប៉ះពួកវាឡើយ។
+const togglePath = [flowFn].concat(chainNames(appJs, flowFn).map((n) => sliceFn(appJs, n))).join('\n');
+check(!/signOut|clearRememberedSession|zoew_login_time|remembered_email/.test(togglePath)
+    && !/safeStoreRemove\([^)]*'zoew_security_pin_hash'/.test(togglePath),
+    '⛔ ផ្លូវកុងតាក់ **មិនប៉ះ** Security PIN · session ៤ ម៉ោង · ការចងចាំអ៊ីមែល (ការបិទសោមិនមែនការលុប PIN ក្លែងខ្លួន)',
+    togglePath.slice(0, 300));
+
+// ⛔ ស្លាកត្រូវមាន ៣ ស្ថានភាព — «បិទ» ជាស្ថានភាពពិត មិនមែនត្រឹមតម្លៃដើមក្នុង HTML។
+const uiFn = sliceFn(appJs, 'refreshAppLockUi');
+check(/'បើក'/.test(uiFn) && /'បិទ'/.test(uiFn) && /'ត្រូវកំណត់ PIN'/.test(uiFn),
+    '⛔ ស្លាកកុងតាក់មាន ៣ ៖ «បើក» · «បិទ» · «ត្រូវកំណត់ PIN»', uiFn);
+
+// ⛔ «ភ្លេច PIN?» លុប PIN ➜ វាត្រូវលុបការជ្រើសដែរ ដើម្បីកុំឲ្យ PIN ថ្មី
+// ទទួលមរតក «បិទ» ចាស់ដោយស្ងាត់ (អ្នកប្រើនឹងជឿថាសោបើកវិញ ខណៈវាបិទ)។
+if (prefKey) {
+    const forgetFn = sliceFn(appJs, 'forgetAppLockPin');
+    check(chainKeys(appJs, forgetFn, 3).indexOf(prefKey) !== -1,
+        '⛔ «ភ្លេច PIN?» ត្រូវលុបការជ្រើស បើក/បិទ ដែរ (PIN ថ្មីមិនទទួលមរតកស្ងាត់)', forgetFn);
+}
 
 function serve(dir) {
     return new Promise((res) => {
@@ -913,6 +1039,161 @@ async function withTimeout(promise, ms, label) {
             });
             check(poisoned.restored === false && poisoned.secret === false,
                 '⛔ កំណត់ត្រាខូច/ត្រូវពុល ➜ ការស្តារត្រូវ **បដិសេធ** មិនយកវាធ្វើជាសោ', poisoned);
+        });
+
+        // ⛔⛔ ជាន់ **ឥរិយាបថ** នៃច្បាប់ «កុងតាក់ត្រូវមានទិសបិទ» (ផ្នែក ១ខ)។
+        // ជាន់ស្តាទិចចាក់សោ *ស្នាមភ្ជាប់*; ជាន់នេះចាក់សោ **អ្វីដែលអ្នកប្រើ
+        // ធ្វើពិត** ៖ បើកម៉ឺនុយ ➜ ចុចកុងតាក់ ➜ វាយ PIN ➜ បិទបើក App។
+        const lockToggleState = () => page.evaluate(() => {
+            const btn = document.getElementById('appLockToggleBtn');
+            const st = document.getElementById('appLockToggleState');
+            const modal = document.getElementById('pinModal');
+            return {
+                label: st ? String(st.textContent || '').trim() : 'missing',
+                isOn: !!btn && btn.classList.contains('is-on'),
+                pinHash: !!localStorage.getItem('zoew_security_pin_hash'),
+                loginTime: localStorage.getItem('zoew_login_time'),
+                email: localStorage.getItem('remembered_email'),
+                signOuts: window.__signOutCalls,
+                pinModalOpen: !!modal && getComputedStyle(modal).display !== 'none',
+                prompt: String((document.getElementById('pinModalDesc') || {}).textContent || '')
+            };
+        });
+
+        // ⛔ ការចុចត្រូវឆ្លងកាត់ **ធាតុពិតក្នុងម៉ឺនុយ** ៖ ធាតុដែលមើលមិនឃើញ
+        // តែចុចបានតាមកូដ ជាការវាស់អ្វីផ្សេង។ ដូច្នេះវាស់ធរណីមាត្រជាមុន។
+        const tapLockToggle = async () => {
+            const geo = await page.evaluate(() => {
+                if (typeof openSideDrawer === 'function') openSideDrawer();
+                const group = document.getElementById('drawerGroupLock');
+                if (group && !group.classList.contains('is-open')) {
+                    const head = document.getElementById('drawerGroupHeadLock');
+                    if (head) head.click();
+                }
+                return null;
+            });
+            await page.waitForTimeout(500);
+            const box = await page.evaluate(() => {
+                const btn = document.getElementById('appLockToggleBtn');
+                if (!btn) return null;
+                const r = btn.getBoundingClientRect();
+                const cs = getComputedStyle(btn);
+                return { w: r.width, h: r.height, vis: cs.visibility, disp: cs.display };
+            });
+            check(!!box && box.w > 0 && box.h > 0 && box.vis === 'visible' && box.disp !== 'none',
+                'កុងតាក់ «ចាក់សោពេលបើក App» មើលឃើញពិត និងចុចបានក្នុងម៉ឺនុយ', box || geo);
+            await page.evaluate(() => {
+                const btn = document.getElementById('appLockToggleBtn');
+                if (btn) btn.click();
+            });
+            await page.waitForTimeout(600);
+        };
+
+        const answerPin = async (pin) => {
+            const opened = await page.evaluate(() => {
+                const m = document.getElementById('pinModal');
+                return !!m && getComputedStyle(m).display !== 'none';
+            });
+            if (!opened) return false;
+            await page.evaluate((p) => {
+                const i = document.getElementById('securityPinInput');
+                if (i) i.value = p;
+                const b = document.getElementById('pinConfirmBtn');
+                if (b) b.click();
+            }, pin);
+            // PBKDF2 ១៥០,០០០ ជុំ + ការ derive សោ ➜ រង់ចាំតាម **ស្ថានភាព**
+            // មិនមែនតាមលេខថេរ។
+            for (let i = 0; i < 40; i++) {
+                await page.waitForTimeout(200);
+                const still = await page.evaluate(() => {
+                    const m = document.getElementById('pinModal');
+                    return !!m && getComputedStyle(m).display !== 'none';
+                });
+                if (!still) break;
+            }
+            await page.waitForTimeout(400);
+            return true;
+        };
+
+        const freshSession = async () => {
+            await page.evaluate(() => { sessionStorage.clear(); });
+            await withTimeout(load(), 30000, 'reload-fresh-session');
+            await settle();
+            return state();
+        };
+
+        await group('២១. ⛔⛔ កុងតាក់ «ចាក់សោពេលបើក App» ត្រូវ **បិទបាន**', async () => {
+            await unlockFresh();
+            const before = await lockToggleState();
+            check(before.label === 'បើក' && before.isOn === true,
+                'លក្ខខណ្ឌចាំបាច់ ៖ មាន PIN ➜ កុងតាក់រាយ «បើក» (លំនាំដើម)', before);
+
+            await tapLockToggle();
+            const asked = await lockToggleState();
+            check(asked.pinModalOpen === true,
+                '⛔ ការចុចបិទ ➜ សុំ PIN (ការបិទសោគឺការបន្ថយសុវត្ថិភាព)', asked);
+            check(/បិទ/.test(asked.prompt),
+                '⛔ សារប្រអប់ PIN ប្រាប់ថានឹង **បិទ** — មិនមែន «បើក» (សារកុហក ➜ អ្នកប្រើចុចខុស)', asked.prompt);
+
+            const answered = await answerPin(PIN);
+            check(answered, 'ប្រអប់ PIN ទទួលចម្លើយ');
+            const after = await lockToggleState();
+            check(after.label === 'បិទ' && after.isOn === false,
+                '⛔⛔ ក្រោយវាយ PIN ➜ កុងតាក់រាយ «បិទ» ពិត (របាយការណ៍អ្នកប្រើ ៖ «ចុចបិទអត់បាន»)', after);
+            check(after.pinHash === true,
+                '⛔ ការបិទសោ **មិនលុប Security PIN** — PIN នោះការពារ Config · Lookup API · លុបទាំងអស់', after);
+            check(after.loginTime === before.loginTime && after.email === before.email && after.signOuts === before.signOuts,
+                '⛔ ការបិទសោ **មិនប៉ះ session ៤ ម៉ោង** និងមិនចាកចេញពីប្រព័ន្ធ', after);
+        });
+
+        await group('២១ខ. ⛔ ការបិទត្រូវ **រស់រានការបិទបើក App** (វគ្គថ្មី)', async () => {
+            const s = await freshSession();
+            check(!s.bodyLocked && !s.lockShown,
+                '⛔⛔ បិទរួច ➜ បើក App ជាវគ្គថ្មី **មិនត្រូវសុំ PIN ទៀត**', s);
+            check(s.pages === 'visible', 'បិទរួច ➜ ទំព័រមើលឃើញធម្មតា', s);
+            const t = await lockToggleState();
+            check(t.label === 'បិទ' && t.isOn === false,
+                'ស្លាកកុងតាក់នៅ «បិទ» ក្រោយផ្ទុកឡើងវិញ (ការជ្រើសរស់ក្នុង localStorage)', t);
+        });
+
+        await group('២១គ. ⛔ ខណៈបិទ ➜ ការចាកចេញ **មិនបាំងអេក្រង់** (ទិសផ្ទុយ)', async () => {
+            await leaveApp();
+            const s = await state();
+            check(!s.bodyLocked && !s.lockShown,
+                '⛔ សោបិទ ➜ ការទៅ task switcher មិនត្រូវបាំង App (បើបាំង ➜ កុងតាក់បិទត្រឹមពាក់កណ្តាល)', s);
+            await returnToApp();
+            const back = await state();
+            check(!back.bodyLocked && !back.lockShown,
+                '⛔ សោបិទ ➜ ការត្រឡប់មកវិញក៏មិនចាក់សោដែរ', back);
+        });
+
+        await group('២១ឃ. ⛔ បើកវិញបាន ➜ វគ្គថ្មីចាក់សោដដែល (ទិសផ្ទុយ)', async () => {
+            await tapLockToggle();
+            const asked = await lockToggleState();
+            check(asked.pinModalOpen === true, 'ការចុចបើកវិញ ➜ សុំ PIN', asked);
+            check(/បើក/.test(asked.prompt),
+                'សារប្រអប់ PIN ប្រាប់ថានឹង **បើក**', asked.prompt);
+            await answerPin(PIN);
+            const on = await lockToggleState();
+            check(on.label === 'បើក' && on.isOn === true, 'កុងតាក់ត្រឡប់ទៅ «បើក»', on);
+            const s = await freshSession();
+            check(s.bodyLocked && s.lockShown,
+                '⛔⛔ បើកវិញ ➜ វគ្គថ្មី **ចាក់សោពិត** (បើអត់ ➜ កុងតាក់បើកត្រឹមស្លាក)', s);
+            check(s.pages === 'hidden', 'បើកវិញ ➜ ទំព័រលាក់ក្រោមសោដដែល', s);
+        });
+
+        await group('២១ង. ⛔ PIN ខុស ➜ សោ **មិនត្រូវបិទ**', async () => {
+            await typePin(PIN);
+            const unlocked = await state();
+            check(!unlocked.bodyLocked, 'លក្ខខណ្ឌចាំបាច់ ៖ ដោះសោដើម្បីឈានដល់ម៉ឺនុយ', unlocked);
+            await tapLockToggle();
+            await answerPin(WRONG);
+            const s = await lockToggleState();
+            check(s.label === 'បើក' && s.isOn === true,
+                '⛔ PIN ខុស ➜ សោនៅ «បើក» ដដែល (បើបិទ ➜ អ្នកដទៃបិទសោបានដោយមិនដឹង PIN)', s);
+            const fresh = await freshSession();
+            check(fresh.bodyLocked && fresh.lockShown,
+                '⛔ PIN ខុស ➜ វគ្គថ្មីនៅតែចាក់សោ', fresh);
         });
     } catch (e) {
         bad('ផ្នែក browser បោះកំហុស', String(e && e.message ? e.message : e));

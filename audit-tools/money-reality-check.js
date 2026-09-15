@@ -36,6 +36,9 @@ function ok(label, detail) { say('  ✅ ' + label + (detail ? '  — ' + detail 
 function bad(label, detail) { say('  ❌ ' + label + (detail ? '\n       ' + detail : '')); fail++; }
 function may(label, detail) { say('  ⚠️  ' + label + (detail ? '\n       ' + detail : '')); warn++; }
 function check(cond, label, detail) { cond ? ok(label, cond === true && detail ? detail : undefined) : bad(label, detail); }
+// ⛔ `check()` បោះពុម្ព `detail` ទាំងពេលជោគជ័យ ➜ ពន្យល់វែងនៃការធ្លាក់
+// នឹងអានថាជាបញ្ហា ខណៈវាបៃតង។ `must()` ៖ ជោគជ័យខ្លី · ធ្លាក់ទើបពន្យល់។
+function must(cond, label, detail) { cond ? ok(label) : bad(label, detail); }
 
 if (!file) {
     console.log('របៀបប្រើ ៖ node audit-tools/money-reality-check.js <dump.json ឬ dump.json.gz>');
@@ -64,17 +67,29 @@ function sliceFn(src, name) {
     }
     return src.slice(s, i);
 }
+// ⛔ ថេរក៏ត្រូវស្រង់ចេញពីកូដពិតដែរ — `appZoneParts()` ពឹងលើពួកវា
+function sliceConst(src, name) {
+    const m = new RegExp('\\bconst ' + name + ' = ([^;\n]+);').exec(src);
+    return m ? 'const ' + name + ' = ' + m[1] + ';' : '';
+}
 const WANT = ['ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney', 'statsCount',
     'countPickedUpCustomers', 'uncollectedBarcodeValue', 'uncollectedItemValue',
     'uncollectedValueByDate', 'collectedValueOf', 'collectedSetFromRecord', 'collectedTotalsOfDay',
-    'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'rawSnapshotToItemList'];
+    'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'rawSnapshotToItemList',
+    'pickupBarcodeKey', 'collectedMarkValueOf', 'appZoneParts', 'getZoneDateKey'];
+const WANT_CONST = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
 const missing = [];
-const bodies = WANT.map((n) => {
+const bodies = WANT_CONST.map((n) => {
+    const line = sliceConst(SRC, n);
+    if (line) return line;
+    missing.push(n);
+    return '';
+}).concat(WANT.map((n) => {
     const b = sliceFn(SRC, n);
     if (b) return b;
     missing.push(n);
     return 'function ' + n + '() { return undefined; }';
-}).join('\n');
+})).join('\n');
 
 const N = {
     history: 'zoew_scan_history_cod_dod',
@@ -109,9 +124,11 @@ say('\n╔═══════════════════════�
 say('║  🩺 ការវាស់លុយលើទិន្នន័យពិត — អានសុទ្ធសាធ                ║');
 say('╚══════════════════════════════════════════════════════════╝');
 say('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).toFixed(0) + ' KB)');
-say('រក function លុយពិត ៖ ' + (WANT.length - missing.length) + '/' + WANT.length
+say('រក function លុយពិត ៖ ' + (WANT.length + WANT_CONST.length - missing.length) + '/' + (WANT.length + WANT_CONST.length)
     + (missing.length ? '  ⚠️ បាត់ ៖ ' + missing.join(', ') : ''));
-if (WANT.length - missing.length < 12) {
+// ⛔ ច្បាប់ដដែលនឹងមុន («បាត់លើស ៣ ➜ នេះមិនមែន app.js ទេ») តែសរសេរធៀបនឹង
+// `missing` ➜ វាមិនធូរឡើងពេល WANT រីក (លេខថេរជាកាលបរិច្ឆេទផុតកំណត់)។
+if (missing.length > 3) {
     console.log('ERROR: could not extract enough real money functions from app.js.'); process.exit(3);
 }
 say('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
@@ -263,6 +280,156 @@ if (!collectedDays.length && !collectedBadDays.length) {
     });
     check(negative === 0, 'គ្មានទឹកប្រាក់អវិជ្ជមាន', 'ធាតុអវិជ្ជមាន ៖ ' + negative);
     say('  ── សរុប ៧ ថ្ងៃ ៖ ' + $(collectedGrand));
+
+    // ⛔ ជាន់ទី ២ ៖ **កញ្ចក់ ↔ ប្រវត្តិ**។ រូបរាងត្រឹមត្រូវ **មិនមែនភស្តុតាង**
+    // ថាលេខត្រូវទេ — `zoew_daily_collected_cod_dod` ជា **កញ្ចក់ដេរីវេ** នៃ
+    // barcode ដែលបិទ «យក» ➜ វាត្រូវផ្គូផ្គង ១:១ នឹងប្រវត្តិ + ធុងសំរាម។
+    // ការសរសេរកញ្ចក់ឈរ **ក្រៅ** transaction របស់ប្រវត្តិ (`commitCollectedMarks`
+    // ជា `fb.update` ដាច់ដោយឡែក) ➜ បិទ App កណ្តាលទី · បណ្តាញដាច់ · ការសរសេរ
+    // ធ្លាក់ ➜ កូនសោមិនចុះ ខណៈប្រវត្តិចុះរួច ➜ **កាត «💵 ចំណូលប្រចាំថ្ងៃ»
+    // រាយលុយតិចជាងការពិត ដោយស្ងាត់** ហើយ `run-all.sh` មើលមិនឃើញ (វាវាស់កូដ)។
+    const zoneReady = (() => {
+        try { return sb.PICKUP_DATE_KEY_PATTERN.test(sb.getZoneDateKey(1789100000000, 0)); }
+        catch (e) { return false; }
+    })();
+    const mirrorByKey = new Map();
+    collectedDays.forEach((d) => {
+        const set = sb.collectedSetFromRecord(collected[d]);
+        Object.keys(set).forEach((raw) => {
+            // ⛔ normalize ទាំង ២ ខាង (ច្បាប់ដដែលនឹងផ្នែក ៧) — dump ដែលសម្អាត
+            // រួចផ្លាស់កូនសោទៅអក្សរតូច ➜ ការវាស់ត្រូវដូចគ្នាមុន/ក្រោយសម្អាត
+            const k = sb.pickupBarcodeKey(raw) || raw;
+            const list = mirrorByKey.get(k) || [];
+            list.push({ day: d, c: set[raw].c, d: set[raw].d });
+            mirrorByKey.set(k, list);
+        });
+    });
+    // ⛔ រាប់តែជួរដេកទម្រង់ថ្មី (មានអារេ `barcodes`) — ជួរដេកចាស់ដែលផ្ទុក
+    // `item.barcode` មិនឆ្លងផ្លូវកញ្ចក់ដដែលទេ ➜ ការរាប់វានឹងផលិត «បាត់»
+    // ក្លែងក្លាយ។ ចំនួនដែលរំលងត្រូវរាយចេញ — ការស្ងាត់ជាការកុហក។
+    const bcByKey = new Map();
+    let legacyRows = 0, twinKeys = 0;
+    [history, deleted].forEach((list) => list.forEach((it) => {
+        if (!Array.isArray(it.barcodes)) { if (it.barcode) legacyRows++; return; }
+        it.barcodes.filter(Boolean).forEach((b) => {
+            const key = sb.pickupBarcodeKey(b.code);
+            if (!key) return;
+            const prev = bcByKey.get(key);
+            if (prev) { prev.twin = true; twinKeys++; return; }
+            const stamp = parseFloat(b.closedAt);
+            const live = isFinite(stamp) && stamp > 0 ? stamp : 0;
+            bcByKey.set(key, {
+                closed: !!b.isClosed, stamp: live,
+                day: (b.isClosed && live && zoneReady) ? sb.getZoneDateKey(live, 0) : '',
+                value: sb.collectedMarkValueOf(b)
+            });
+        });
+    }));
+    // ⛔ ព្រំដែនដេរីវេពីទិន្នន័យ មិនមែនពីនាឡិកា ៖ កញ្ចក់ទើប ship ក្នុង `2.34.0`
+    // ហើយវារក្សាតែ ៧ ថ្ងៃ ➜ barcode ដែលបិទ **មុនកូនសោដំបូងដែលមានពិត** មិនអាច
+    // វាស់បាន (គ្មានកញ្ចក់នៅពេលនោះ ឬថ្ងៃនោះត្រូវសម្អាតចោលរួច)។ ការសន្មតថា
+    // ពួកវា «បាត់» នឹងជាការរាយ ❌ លើអ្វីដែលមិនបានវាស់ — អាក្រក់ជាងការស្ងាត់។
+    let firstMeasured = Infinity;
+    bcByKey.forEach((rec, key) => {
+        if (rec.twin || !rec.closed || !rec.stamp) return;
+        if (mirrorByKey.has(key) && rec.stamp < firstMeasured) firstMeasured = rec.stamp;
+    });
+    let scoped = 0, missKey = 0, missKeyMoney = 0, missDay = 0, missDayMoney = 0;
+    let wrongDay = 0, wrongDayMoney = 0, wrongValue = 0, wrongValueGap = 0;
+    let twice = 0, twiceMoney = 0, beforeWindow = 0, noStamp = 0;
+    bcByKey.forEach((rec, key) => {
+        if (rec.twin) return;
+        const hits = mirrorByKey.get(key) || [];
+        if (hits.length > 1) {
+            twice++;
+            hits.slice(1).forEach((h) => { twiceMoney = r2(twiceMoney + h.c + h.d); });
+            return;
+        }
+        if (!rec.closed) return;
+        if (!rec.stamp || !rec.day) { noStamp++; return; }
+        if (rec.stamp < firstMeasured) { beforeWindow++; return; }
+        scoped++;
+        const money = r2(rec.value.c + rec.value.d);
+        if (!hits.length) {
+            if (collectedDays.indexOf(rec.day) !== -1) { missKey++; missKeyMoney = r2(missKeyMoney + money); }
+            else { missDay++; missDayMoney = r2(missDayMoney + money); }
+            return;
+        }
+        if (hits[0].day !== rec.day) { wrongDay++; wrongDayMoney = r2(wrongDayMoney + money); return; }
+        const gc = Math.abs(r2(hits[0].c - rec.value.c));
+        const gd = Math.abs(r2(hits[0].d - rec.value.d));
+        if (gc > 0.005 || gd > 0.005) { wrongValue++; wrongValueGap = r2(wrongValueGap + gc + gd); }
+    });
+    // ⛔ ទិសផ្ទុយ ៖ កូនសោដែលនៅសល់ក្នុងកញ្ចក់ ខណៈកញ្ចប់ **មិនបិទ** =
+    // លុយដែលរាយថាទទួលបាន ខណៈកញ្ចប់នៅក្នុងហាង។ កូនសោដែលរកម្ចាស់មិនឃើញ
+    // សោះ ជា **⚠️ មិនមែន ❌** — ការ purge ធុងសំរាមជាការពន្យល់ស្របច្បាប់។
+    let openKey = 0, openKeyMoney = 0, ghostKey = 0, ghostMoney = 0;
+    mirrorByKey.forEach((hits, key) => {
+        const rec = bcByKey.get(key);
+        const money = hits.reduce((a, h) => r2(a + h.c + h.d), 0);
+        if (!rec) { ghostKey++; ghostMoney = r2(ghostMoney + money); return; }
+        if (rec.twin || hits.length > 1) return;
+        if (!rec.closed) { openKey++; openKeyMoney = r2(openKeyMoney + money); }
+    });
+    say('  ┈┈ កញ្ចក់ ↔ ប្រវត្តិ ┈┈');
+    if (!zoneReady) {
+        may('ស្រង់ helper តំបន់ម៉ោងចេញពី `app.js` មិនបាន — ប្រៀបកញ្ចក់មិនបាន',
+            'នេះជា «វាស់មិនបាន» មិនមែន «ត្រឹមត្រូវ» ទេ — ⛔ កុំអានវាជាបៃតង');
+    } else if (!collectedDays.length) {
+        may('គ្មានថ្ងៃត្រឹមត្រូវក្នុងកញ្ចក់ — ប្រៀបនឹងប្រវត្តិមិនបាន');
+    } else if (firstMeasured === Infinity) {
+        may('គ្មានកូនសោកញ្ចក់ណាផ្គូនឹង barcode បិទក្នុងប្រវត្តិ — ប្រៀបមិនបាន',
+            'កូនសោក្នុងកញ្ចក់ ៖ ' + mirrorByKey.size + ' · barcode ដែលអានបាន ៖ ' + bcByKey.size);
+    } else {
+        say('  ── វិសាលភាព ៖ វាស់ ' + scoped + ' barcode បិទ (តាំងពី '
+            + sb.getZoneDateKey(firstMeasured, 0) + ') · រំលង ' + beforeWindow + ' មុនកញ្ចក់ចាប់ផ្តើម · '
+            + noStamp + ' គ្មានត្រាបិទ · ' + legacyRows + ' ជួរដេកទម្រង់ចាស់'
+            + (twinKeys ? ' · ' + twinKeys + ' កូនសោស្ទួន' : ''));
+        // ⛔ ជាន់អប្បបរមា ៖ ការអះអាង **អវត្តមាន** ពិតដោយស្វ័យប្រវត្តិលើសំណុំទទេ
+        // ➜ ៣ ជួរខាងក្រោមនេះឈរលើ barcode ដែលចូលវិសាលភាពពិត។ ជួរខាងកញ្ចក់
+        // (ស្ទួន · នៅសល់) មិនពឹងលើវា — ជាន់របស់ពួកវាគឺកូនសោក្នុងកញ្ចក់។
+        if (scoped) {
+            // ⛔ «បាត់» មាន ២ រូបរាង (ថ្ងៃមាន / ថ្ងៃគ្មាន) តែ **ថ្នាក់តែមួយ** ៖
+            // លុយដែលកាតគួររាយ តែមិនរាយ។ ⛔ ការ purge មិនអាចជាការពន្យល់ក្នុង
+            // វិសាលភាពនេះទេ ៖ ថ្ងៃរបស់យុថ្កានៅរស់ ➜ ថ្ងៃដែលថ្មីជាងវា មិនអាច
+            // ត្រូវ purge មុនវាបានឡើយ ➜ ⛔ ទាំង ២ ជា ❌ មិនមែន ⚠️។
+            const missWhy = '\n       ⛔ មូលហេតុដែលអាចមាន ៖ ការសរសេរកញ្ចក់ធ្លាក់ (បិទ App'
+                + ' កណ្តាលទី · បណ្តាញដាច់) ·\n          ឧបករណ៍ដែលនៅប្រើកំណែចាស់ជាង `2.34.0` ·'
+                + ' ការស្តារពីធុងសំរាម (វា reset `closedAt`\n          ទៅ «ឥឡូវ» ដោយ **មិន** reconcile កញ្ចក់)';
+            must(missKey === 0, 'barcode បិទគ្រប់មួយក្នុងវិសាលភាព មានកូនសោក្នុងកញ្ចក់',
+                missKey + ' barcode បិទ គ្មានកូនសោ ខណៈថ្ងៃនោះ**មាន**ក្នុងកញ្ចក់ ➜ កាតខ្វះ '
+                + $(missKeyMoney) + missWhy);
+            must(missDay === 0, 'គ្រប់ថ្ងៃដែលមានការបិទ «យក» មានក្នុងកញ្ចក់',
+                missDay + ' barcode បិទ គ្មានកូនសោ ហើយ**ថ្ងៃនោះក៏គ្មាន**ក្នុងកញ្ចក់ ➜ កាតខ្វះ '
+                + $(missDayMoney) + missWhy);
+            must(wrongValue === 0, 'ទឹកប្រាក់ក្នុងកញ្ចក់ = ទឹកប្រាក់របស់ barcode',
+                wrongValue + ' កូនសោមានទឹកប្រាក់ខុស ➜ គម្លាតសរុប ' + $(wrongValueGap)
+                + '\n       ⛔ ការកែតម្លៃមិនបាន reconcile ចូលកញ្ចក់');
+            // ⛔ «ថ្ងៃខុស» ជា **⚠️ មិនមែន ❌** ៖ `executeRestoreItem()` reset `closedAt`
+            // ទៅ «ឥឡូវ» (ដើម្បីកុំឲ្យច្បាប់ ២ ម៉ោងលោតចូលធុងសំរាមវិញ) ដោយមិនប៉ះកញ្ចក់
+            // ➜ លុយនៅឈរលើ **ថ្ងៃដែលអតិថិជនយកពិត** — នោះជាការបង្ហាញត្រឹមត្រូវ។
+            // ⛔ ការផ្លាស់ថ្ងៃដែលធ្លាក់ក៏ផលិតរូបរាងដដែល ➜ បែងចែកពី dump មិនបាន។
+            if (wrongDay) may(wrongDay + ' កូនសោឈរលើថ្ងៃមិនមែនថ្ងៃរបស់ `closedAt`',
+                'ទឹកប្រាក់ ' + $(wrongDayMoney) + ' — ធម្មតាក្រោយ **ការស្តារពីធុងសំរាម**\n'
+                + '       (`closedAt` reset តែកញ្ចក់មិន reconcile); ⛔ ការផ្លាស់ថ្ងៃដែលធ្លាក់\n'
+                + '       ក៏មានរូបរាងដដែល ➜ បើលេខនេះកើនរាល់ជុំ ត្រូវពិនិត្យ');
+        } else {
+            may('គ្មាន barcode បិទណាចូលវិសាលភាព — ការប្រៀបខាងប្រវត្តិ **មិនបានវាស់អ្វីទេ**',
+                '⛔ «គ្មានបាត់» លើសំណុំទទេ ពិតដោយស្វ័យប្រវត្តិ — កុំអានវាជាបៃតង');
+        }
+        must(twice === 0, 'គ្មានកូនសោណាឈរលើថ្ងៃលើសពី ១',
+            twice + ' កូនសោឈរលើ ២ ថ្ងៃ ➜ **រាប់ស្ទួន** ' + $(twiceMoney));
+        must(openKey === 0, 'គ្មានកូនសោណានៅសល់លើកញ្ចប់ដែលបើកវិញ',
+            openKey + ' កូនសោនៅសល់ ខណៈ barcode **មិនបិទ** ➜ កាតរាយលើស ' + $(openKeyMoney));
+        if (ghostKey) may(ghostKey + ' កូនសោក្នុងកញ្ចក់ រកម្ចាស់មិនឃើញ',
+            'ទឹកប្រាក់ ' + $(ghostMoney) + ' — ធម្មតាបន្ទាប់ពី purge ធុងសំរាម\n'
+            + '       (កញ្ចក់រស់ ៧ ថ្ងៃ · ធាតុ `expired` purge ក្នុង ២ ថ្ងៃ)');
+        const drift = missKey + missDay + twice + wrongValue + openKey;
+        if (drift) notes.push('កាត «💵 ចំណូលប្រចាំថ្ងៃ» ឃ្លាតពីប្រវត្តិ ' + drift
+            + ' កន្លែង ➜ លេខលើកាតខុស (ledger និង `isDeducted` មិនប៉ះ)');
+        else if (scoped) say('  ── សាលក្រម ៖ កញ្ចក់ស៊ីនឹងប្រវត្តិ ១:១ លើ barcode បិទ ' + scoped
+            + ' ➜ ការសរសេរកញ្ចក់ **មិនបាត់** លើ dump នេះ');
+    }
 }
 
 // ── ៦. barcode ស្ទួន ➜ ហានិភ័យលុយស្ទួន ────────────────────────────────

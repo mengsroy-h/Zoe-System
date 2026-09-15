@@ -45,8 +45,14 @@ const phone = '+855000000001';
 const openCode = '86000000000001';
 const closedCode = 'ZTOFIXTURE2';
 const deletedCode = '86000000000003';
+const secondCode = 'ZTOFIXTURE4';
+const trashedCode = 'ZTOFIXTURE5';
 const day = '2026-09-10';
 const pickupDay = '2026-09-11';
+// ត្រាបិទពិត ៖ `1789100000000` = 2026-09-11 11:13 ក្នុង `Asia/Phnom_Penh`
+const closedStamp = 1789100000000;
+const laterStamp = closedStamp + 20000000;
+const earlierStamp = closedStamp - 20000000;
 const fixture = {
     zoew_scan_history_cod_dod: {
         '-fixture-open-01': {
@@ -58,7 +64,7 @@ const fixture = {
         '-fixture-closed-02': {
             id: 'fixture-closed-02', phone, scanDate: day, cod: 5.5, dod: 0.25, price: 5.75, count: 1,
             email: 'fixture@example.invalid', token: 'fixture-private-token',
-            barcodes: [{ code: closedCode.toLowerCase(), cod: 5.5, dod: 0.25, isClosed: true, closedAt: 1789100000000 }]
+            barcodes: [{ code: closedCode.toLowerCase(), cod: 5.5, dod: 0.25, isClosed: true, closedAt: closedStamp }]
         }
     },
     zoew_recently_deleted_cod_dod: {
@@ -76,6 +82,43 @@ const fixture = {
     zoew_daily_collected_cod_dod: { [pickupDay]: { [closedCode]: { c: 5.5, d: 0.25 } } },
     zoew_barcode_registry: { [openCode]: true, [closedCode]: true, [deletedCode]: true }
 };
+// ⛔ ការវាស់ «កញ្ចក់ ↔ ប្រវត្តិ» ដេរីវេព្រំដែនរបស់វាពី **កូនសោដំបូងដែលមានពិត**
+// ➜ fixture ដែលមាន barcode បិទ **តែមួយ** មិនអាចបញ្ជាក់ការធ្លាក់បានទេ (ដកកូនសោ
+// នោះចេញ ➜ គ្មានយុថ្កា ➜ «ប្រៀបមិនបាន»)។ ដូច្នេះ mutation ទាំងអស់ឈរលើ barcode
+// បិទ **ទី ២** ដែលស៊ីគ្នាគ្រប់ node — រួច mutation នីមួយៗបំបែកតែអ័ក្សមួយ។
+function withSecondClose(data, stamp) {
+    const at = stamp || laterStamp;
+    data.zoew_scan_history_cod_dod['-fixture-closed-04'] = {
+        id: 'fixture-closed-04', phone, scanDate: day, cod: 3, dod: 0, price: 3, count: 1,
+        barcodes: [{ code: secondCode, cod: 3, dod: 0, isClosed: true, closedAt: at }]
+    };
+    data.zoew_daily_revenue_cod_dod[day].codDollar = 20.75;
+    data.zoew_daily_revenue_cod_dod[day].totalCount = 4;
+    data.zoew_monthly_revenue_cod_dod['2026-09'].codDollar = 20.75;
+    data.zoew_monthly_revenue_cod_dod['2026-09'].totalCount = 4;
+    data.zoew_daily_pickup_cod_dod[pickupDay] = {
+        packagesPickedUp: 2, pickedUpPhones: { [phone]: 2 },
+        pickedUpBarcodes: { [closedCode]: true, [secondCode]: true }
+    };
+    data.zoew_daily_collected_cod_dod[pickupDay][secondCode] = { c: 3, d: 0 };
+    data.zoew_barcode_registry[secondCode] = true;
+    // ⛔ barcode បិទដែលច្បាប់ ២ ម៉ោងផ្លាស់ចូល **ធុងសំរាម** ៖ កូនសោកញ្ចក់
+    // របស់វា **នៅដដែល** («Delete/pickup មិនលុប collected») ➜ ការស្កេនតែ
+    // `scanHistory` ធ្វើឲ្យវាក្លាយជាកូនសោ «គ្មានម្ចាស់» ដោយខុស។
+    data.zoew_recently_deleted_cod_dod['-fixture-trashed-05'] = {
+        id: 'fixture-trashed-05', phone, scanDate: day, cod: 1.5, dod: 0, price: 1.5, count: 1,
+        isFromDeletion: true, trashReason: 'pickup', isClosed: true,
+        barcodes: [{ code: trashedCode, cod: 1.5, dod: 0, isClosed: true, closedAt: closedStamp + 10000000 }]
+    };
+    data.zoew_daily_collected_cod_dod[pickupDay][trashedCode] = { c: 1.5, d: 0 };
+    data.zoew_daily_pickup_cod_dod[pickupDay].packagesPickedUp = 3;
+    data.zoew_daily_pickup_cod_dod[pickupDay].pickedUpPhones[phone] = 3;
+    data.zoew_daily_pickup_cod_dod[pickupDay].pickedUpBarcodes[trashedCode] = true;
+    data.zoew_barcode_registry[trashedCode] = true;
+    return data;
+}
+function copy() { return JSON.parse(JSON.stringify(fixture)); }
+
 const dump = save('fixture dump.json', fixture);
 const gzip = path.join(tempRoot, 'fixture dump.json.gz');
 fs.writeFileSync(gzip, zlib.gzipSync(fs.readFileSync(dump)));
@@ -141,7 +184,34 @@ try {
         ['barcode ស្ទួនខុសអក្សរតូច/ធំ', (data) => {
             data.zoew_scan_history_cod_dod['-fixture-open-01'].barcodes[0].code = closedCode;
         }, '1 barcode ស្ទួនក្នុងប្រវត្តិ'],
-        ['registry មានកូនសោកំព្រាពិត', (data) => { data.zoew_barcode_registry['ORPHAN-FIXTURE-4'] = true; }, '1/4 កូនសោ registry **កំព្រា**']
+        ['registry មានកូនសោកំព្រាពិត', (data) => { data.zoew_barcode_registry['ORPHAN-FIXTURE-4'] = true; }, '1/4 កូនសោ registry **កំព្រា**'],
+        // ⛔ ៥ អ័ក្ស ❌ នៃ «កញ្ចក់ ↔ ប្រវត្តិ» ៖ កូនសោបាត់ · ថ្ងៃទាំងមូលបាត់ ·
+        // រាប់ស្ទួន · ទឹកប្រាក់ខុស · កូនសោនៅសល់ក្រោយបើកវិញ។ ទាំង ៥ បង្ហាញលើកាត
+        // «💵 ចំណូលប្រចាំថ្ងៃ» ខណៈ ledger និង `isDeducted` ត្រឹមត្រូវទាំងស្រុង។
+        ['កញ្ចក់ខ្វះកូនសោ (App បិទកណ្តាលទី)', (data) => {
+            delete withSecondClose(data).zoew_daily_collected_cod_dod[pickupDay][secondCode];
+        }, '1 barcode បិទ គ្មានកូនសោ ខណៈថ្ងៃនោះ**មាន**ក្នុងកញ្ចក់ ➜ កាតខ្វះ $3.00'],
+        ['ថ្ងៃទាំងមូលបាត់ពីកញ្ចក់', (data) => {
+            // បិទនៅថ្ងៃបន្ទាប់ ➜ ថ្ងៃនោះគ្មាន node សោះ (ការសរសេរធ្លាក់ទាំងថ្ងៃ)
+            withSecondClose(data, laterStamp + 86400000);
+            delete data.zoew_daily_collected_cod_dod[pickupDay][secondCode];
+        }, '1 barcode បិទ គ្មានកូនសោ ហើយ**ថ្ងៃនោះក៏គ្មាន**ក្នុងកញ្ចក់ ➜ កាតខ្វះ $3.00'],
+        ['កូនសោតែមួយឈរលើ ២ ថ្ងៃ ➜ រាប់ស្ទួន', (data) => {
+            const node = withSecondClose(data).zoew_daily_collected_cod_dod;
+            node['2026-09-12'] = { [secondCode]: { c: 3, d: 0 } };
+        }, '1 កូនសោឈរលើ ២ ថ្ងៃ ➜ **រាប់ស្ទួន** $3.00'],
+        ['ទឹកប្រាក់ក្នុងកញ្ចក់ឃ្លាតពី barcode', (data) => {
+            withSecondClose(data).zoew_daily_collected_cod_dod[pickupDay][secondCode] = { c: 2.5, d: 0 };
+        }, '1 កូនសោមានទឹកប្រាក់ខុស ➜ គម្លាតសរុប $0.50'],
+        ['កូនសោនៅសល់ក្រោយបើកវិញ', (data) => {
+            withSecondClose(data).zoew_scan_history_cod_dod['-fixture-closed-04'].barcodes[0].isClosed = false;
+        }, '1 កូនសោនៅសល់ ខណៈ barcode **មិនបិទ** ➜ កាតរាយលើស $3.00'],
+        // ⛔ ជាន់អប្បបរមា ៖ ពេលយុថ្កាតែមួយត្រូវរាប់ស្ទួន គ្មាន barcode ណាចូល
+        // វិសាលភាពទេ ➜ ការអះអាង «គ្មានបាត់» នឹងបៃតង **ដោយគ្មានការវាស់អ្វី** ➜
+        // ឧបករណ៍ត្រូវប្រាប់ថាវាមិនបានវាស់ មិនមែនបោះពុម្ព ✅ ស្ងាត់ៗ។
+        ['វិសាលភាពទទេ ➜ ត្រូវប្រាប់ថាមិនបានវាស់', (data) => {
+            data.zoew_daily_collected_cod_dod['2026-09-12'] = { [closedCode]: { c: 5.5, d: 0.25 } };
+        }, 'គ្មាន barcode បិទណាចូលវិសាលភាព — ការប្រៀបខាងប្រវត្តិ **មិនបានវាស់អ្វីទេ**']
     ];
     changes.forEach(([label, mutate, expected], index) => scenario(label, () => {
         const data = JSON.parse(JSON.stringify(fixture));
@@ -149,6 +219,49 @@ try {
         const result = report(save('invalid-' + index + '.json', data), 'invalid-' + index + '.txt');
         ok(label + ' ➜ exit 1 និងរាយបញ្ហាត្រឹមត្រូវ', result.status === 1 && result.body.includes(expected), result.status);
     }));
+
+    // ⛔ ទិសផ្ទុយ ៖ ការធ្លាក់ដែលកើតពី **សំណល់នៃការវាស់** អាក្រក់ជាងការមិនវាស់។
+    // ៤ សេណារីយ៉ូនេះត្រូវ **នៅបៃតង** ៖ (១) កញ្ចក់ស៊ីគ្នាលើ barcode បិទ ២ ·
+    // (២) កូនសោរកម្ចាស់មិនឃើញ = ⚠️ (purge ធុងសំរាមជាការពន្យល់ស្របច្បាប់) ·
+    // (៣) កូនសោឈរខុសថ្ងៃ = ⚠️ (ការស្តារ reset `closedAt` ដោយមិនប៉ះកញ្ចក់) ·
+    // (៤) barcode ដែលបិទ **មុនកញ្ចក់ចាប់ផ្តើម** ត្រូវរំលង មិនមែនរាយថាបាត់។
+    scenario('កញ្ចក់ ↔ ប្រវត្តិ ៖ អ្វីដែលមិនត្រូវធ្លាក់', () => {
+        const clean = report(save('mirror-clean.json', withSecondClose(copy())), 'mirror-clean.txt');
+        ok('barcode បិទ ២ ដែលស៊ីគ្នា ➜ exit 0 និងសាលក្រម ១:១',
+            clean.status === 0 && clean.body.includes('កញ្ចក់ស៊ីនឹងប្រវត្តិ ១:១ លើ barcode បិទ 3'), clean.status);
+        ok('ការវាស់រាយវិសាលភាពពិត មិនមែនត្រឹមលទ្ធផល',
+            /វិសាលភាព ៖ វាស់ 3 barcode បិទ \(តាំងពី 2026-09-11\)/.test(clean.body));
+        // ⛔ barcode បិទក្នុងធុងសំរាម ត្រូវរាប់ជាម្ចាស់ ➜ គ្មានកូនសោ «គ្មានម្ចាស់»
+        ok('កូនសោរបស់ barcode បិទក្នុងធុងសំរាម មានម្ចាស់',
+            !clean.body.includes('រកម្ចាស់មិនឃើញ'));
+        const ghostData = withSecondClose(copy());
+        ghostData.zoew_daily_collected_cod_dod[pickupDay]['ZTOGHOST9'] = { c: 1.25, d: 0 };
+        const ghost = report(save('mirror-ghost.json', ghostData), 'mirror-ghost.txt');
+        ok('កូនសោរកម្ចាស់មិនឃើញ ➜ ⚠️ រក្សា exit 0 («មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»)',
+            ghost.status === 0 && ghost.body.includes('1 កូនសោក្នុងកញ្ចក់ រកម្ចាស់មិនឃើញ')
+            && ghost.body.includes('ទឹកប្រាក់ $1.25'), ghost.status);
+        const movedData = withSecondClose(copy());
+        const movedNode = movedData.zoew_daily_collected_cod_dod;
+        movedNode['2026-09-12'] = { [secondCode]: movedNode[pickupDay][secondCode] };
+        delete movedNode[pickupDay][secondCode];
+        const moved = report(save('mirror-moved.json', movedData), 'mirror-moved.txt');
+        ok('កូនសោឈរលើថ្ងៃមិនមែនថ្ងៃ `closedAt` ➜ ⚠️ រក្សា exit 0 (ការស្តារផលិតរូបរាងដដែល)',
+            moved.status === 0 && moved.body.includes('1 កូនសោឈរលើថ្ងៃមិនមែនថ្ងៃរបស់ `closedAt`')
+            && moved.body.includes('ទឹកប្រាក់ $3.00'), moved.status);
+        // ⛔ កូនសោកញ្ចក់ **ជា barcode** ➜ ផ្លូវកូដថ្មីនេះជា sink ថ្មីនៃអត្តសញ្ញាណ។
+        // ត្រូវវាស់ទាំងផ្លូវបៃតង និងផ្លូវធ្លាក់ (សារធ្លាក់ជាកន្លែងដែលងាយបំពាន)។
+        const leakData = withSecondClose(copy());
+        delete leakData.zoew_daily_collected_cod_dod[pickupDay][secondCode];
+        const leak = report(save('mirror-leak.json', leakData), 'mirror-leak.txt');
+        ok('របាយការណ៍កញ្ចក់មិនបោះពុម្ព barcode ឬលេខទូរស័ព្ទ ទាំងបៃតង ទាំងធ្លាក់',
+            leak.status === 1 && [phone, closedCode, secondCode, trashedCode]
+                .every((value) => !leak.body.includes(value) && !clean.body.includes(value)));
+        const earlyData = withSecondClose(copy(), earlierStamp);
+        delete earlyData.zoew_daily_collected_cod_dod[pickupDay][secondCode];
+        const early = report(save('mirror-early.json', earlyData), 'mirror-early.txt');
+        ok('barcode បិទមុនកូនសោដំបូង ➜ រំលង មិនរាយថាបាត់',
+            early.status === 0 && early.body.includes('រំលង 1 មុនកញ្ចក់ចាប់ផ្តើម'), early.status);
+    });
 
     scenario('CLI បដិសេធ input ខុសដោយ exit code', () => {
         const invalid = path.join(tempRoot, 'invalid json.json');

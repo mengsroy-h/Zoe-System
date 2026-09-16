@@ -48,8 +48,13 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 //                           មុន/ក្រោយសម្អាត ដូចគ្នាបេះបិទ)
 //   money-reality-check · registry-orphan-list ៖ CLI ដែលត្រូវការ dump ពិត។
 //       usage exit 2 មិនមែនភស្តុតាង checker ទេ — ត្រូវមាន fixture checker ខាងក្រោម។
+// ⛔ `idtoken-fixture.js` ជា **ម៉ូឌុលរួម** មិនមែន checker ៖ វាគ្មានការអះអាង
+// ផ្ទាល់ខ្លួន ➜ ការទាមទារ `*_APP_DIR` លើវាគ្មានន័យ។ អ្នកយាមរបស់វាគឺ checker
+// ទាំង ២ ដែល require វា (ចុះក្នុង `repository-file-coverage.json`) — ដូច
+// `emu/ns.js` ដែលត្រូវរំលងក្នុងការស្កេន `emu/` ដដែល។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
-    'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js']);
+    'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
+    'idtoken-fixture.js']);
 const CLI_GUARDS = new Map([
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],

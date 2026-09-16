@@ -722,6 +722,147 @@ function readListConfig(env) {
 // ⛔ សាលក្រម **៣** ដដែលនឹង `readListConfig()` ៖ អវត្តមាន ➜ `site:missing` ·
 // រូបរាងខុស ➜ `site:invalid` · ត្រឹមត្រូវ ➜ កូដ។ ⛔ វា **មិនបោះ** ៖ «បិទ»
 // មិនមែនកំហុស ➜ HTTP 200 គ្មានវាល `error` (ច្បាប់ដដែលនឹង `found:false`)។
+// ⛔ **លេខសាខាត្រូវមកពីអត្តសញ្ញាណ មិនមែនពី parameter របស់ client។**
+//
+// 🔴 ការវាស់របស់ម្ចាស់គម្រោង ៖ Cookie `BOS-MAN-SESSION` ផ្ទុកសិទ្ធិអាន
+// **ទូទាំងប្រទេស** ➜ លេខសាខាជាព្រំដែន **តែមួយ** ហើយវាធ្វើដំណើរជា
+// parameter ដែល client គ្រប់គ្រង ➜ អ្នកកាន់ `ZTO_PROXY_KEY` (សោដែល
+// **ចែករំលែក** ទៅគ្រប់ឧបករណ៍) អានបញ្ជីរបស់សាខា **ណាក៏បាន** ដោយហៅ
+// Function ដោយផ្ទាល់។ ការចងខាង client ទប់បានតែអ្នកប្រើស្មោះត្រង់។
+//
+// ដូច្នេះអ្នកសម្រេចឈរនៅ **server** ៖ Firebase **ID token** (RS256 ចុះ
+// ហត្ថលេខាដោយ Google) ➜ email ដែលផ្ទៀងផ្ទាត់រួច ➜ លេខសាខា។ ⛔ `?site=`
+// របស់ client ត្រូវ **បោះចោល**។
+//
+// ⛔ **ជាន់នេះឈរលើការគ្រប់គ្រងការបង្កើតគណនី** ៖ បើ Firebase បើក sign-up
+// សាធារណៈ អ្នកវាយប្រហារបង្កើត `x@zoew<សាខា>.com` ដោយខ្លួនឯង ➜ ត្រូវដក
+// «Enable create (sign-up)» ក្នុង Console។ `email_verified` **មិនត្រូវ
+// ទាមទារ** ព្រោះ domain ទាំងនោះមិនមែន domain ពិត (ម្ចាស់គម្រោងបង្កើត
+// គណនីដោយដៃ) ➜ ការទាមទារវានឹងបិទមុខងារទាំងស្រុង។
+const ID_TOKEN_HEADER = 'x-zoe-id-token';
+const FIREBASE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
+const FIREBASE_CERTS_TTL_MS = 60 * 60 * 1000;
+const FIREBASE_CERTS_MIN_TIMEOUT_MS = 1200;
+const FIREBASE_CERTS_MAX_TIMEOUT_MS = 3000;
+const ID_TOKEN_SKEW_MS = 60 * 1000;
+const PROJECT_ID_RE = /^[a-z0-9][a-z0-9-]{2,62}$/;
+const PROJECT_ID_MAX = 16;
+const SITE_EMAIL_PREFIX_RE = /^[a-z0-9-]{1,32}$/;
+const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
+
+const certsState = { at: 0, keys: null, inFlight: null };
+
+// ⛔ បញ្ជីបំបែកដោយ comma តាមលំនាំដដែលនឹង `ZTO_SIGNED_VALUES` (ច្បាប់ ១២)
+// ➜ ដកឃ្លា និងធាតុទទេមិនសំខាន់។
+function readProjectIds(env) {
+    const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
+    if (!raw) return [];
+    const parts = raw.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
+    if (!parts.length || parts.length > PROJECT_ID_MAX) return [];
+    if (parts.some((part) => !PROJECT_ID_RE.test(part))) return [];
+    return parts;
+}
+
+function siteEmailPrefix(env) {
+    const raw = String((env && env.ZTO_SITE_EMAIL_PREFIX) || '').trim().toLowerCase();
+    return SITE_EMAIL_PREFIX_RE.test(raw) ? raw : SITE_EMAIL_PREFIX_DEFAULT;
+}
+
+// ⛔ `$` ជាចំណុចសំខាន់ ៖ បើគ្មានវា `…@zoew881859.com.evil.com` នឹងឆ្លង។
+function siteCodeFromEmail(email, prefix) {
+    const text = String(email || '').trim().toLowerCase();
+    const re = new RegExp('@' + prefix + '([0-9]{4,12})\\.com$');
+    const hit = re.exec(text);
+    return hit ? hit[1] : '';
+}
+
+function b64urlBuf(text) {
+    const raw = String(text || '').replace(/-/g, '+').replace(/_/g, '/');
+    if (!/^[A-Za-z0-9+/]*$/.test(raw)) return null;
+    const pad = raw.length % 4;
+    try { return Buffer.from(raw + (pad ? '===='.slice(pad) : ''), 'base64'); } catch (_) { return null; }
+}
+
+function decodeIdToken(token) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) return null;
+    const headBuf = b64urlBuf(parts[0]);
+    const bodyBuf = b64urlBuf(parts[1]);
+    const sig = b64urlBuf(parts[2]);
+    if (!headBuf || !bodyBuf || !sig || !sig.length) return null;
+    let header, payload;
+    try {
+        header = JSON.parse(headBuf.toString('utf8'));
+        payload = JSON.parse(bodyBuf.toString('utf8'));
+    } catch (_) { return null; }
+    if (!header || typeof header !== 'object' || Array.isArray(header)) return null;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    return { header: header, payload: payload, signed: parts[0] + '.' + parts[1], signature: sig };
+}
+
+// ⛔ វិញ្ញាបនបត្ររបស់ Google **រួមសម្រាប់គ្រប់ Project** ➜ ការទាញតែម្ដង
+// បម្រើ Project ប៉ុន្មានក៏បាន។ cache ជាការចាំបាច់ ៖ ការទាញរាល់សំណើនឹង
+// ស៊ីថវិកា ហើយធ្វើឲ្យការស្កេនយឺត។
+async function firebaseCerts(timeoutMs) {
+    if (certsState.keys && elapsedSince(certsState.at) < FIREBASE_CERTS_TTL_MS) return certsState.keys;
+    if (certsState.inFlight) return certsState.inFlight;
+    certsState.inFlight = (async () => {
+        const out = await settleWithin(async () => {
+            const res = await fetch(FIREBASE_CERTS_URL, { method: 'GET' });
+            if (!res || !res.ok) throw new Error('certs:http');
+            return await res.json();
+        }, timeoutMs, 'certs');
+        certsState.inFlight = null;
+        if (!out.ok || !out.value || typeof out.value !== 'object') return certsState.keys;
+        const keys = {};
+        Object.keys(out.value).forEach((kid) => {
+            const pem = out.value[kid];
+            if (typeof pem === 'string' && pem.indexOf('BEGIN CERTIFICATE') !== -1) keys[kid] = pem;
+        });
+        if (!Object.keys(keys).length) return certsState.keys;
+        certsState.keys = keys;
+        certsState.at = Date.now();
+        return keys;
+    })();
+    return certsState.inFlight;
+}
+
+// ⛔ សាលក្រម ៣ ៖ `ok` · មូលហេតុដែល **មិនលេចតម្លៃ** · គ្មានការបោះ។
+async function verifyIdToken(token, projectIds, timeoutMs) {
+    if (!token) return { ok: false, reason: 'idtoken:missing' };
+    if (!projectIds.length) return { ok: false, reason: 'idtoken:project-unset' };
+    const parsed = decodeIdToken(token);
+    if (!parsed) return { ok: false, reason: 'idtoken:malformed' };
+    if (parsed.header.alg !== 'RS256') return { ok: false, reason: 'idtoken:alg' };
+    const kid = typeof parsed.header.kid === 'string' ? parsed.header.kid : '';
+    if (!kid) return { ok: false, reason: 'idtoken:kid' };
+
+    const aud = typeof parsed.payload.aud === 'string' ? parsed.payload.aud.toLowerCase() : '';
+    if (!aud || projectIds.indexOf(aud) === -1) return { ok: false, reason: 'idtoken:aud' };
+    if (parsed.payload.iss !== 'https://securetoken.google.com/' + aud) return { ok: false, reason: 'idtoken:iss' };
+
+    const now = Date.now();
+    const exp = Number(parsed.payload.exp) * 1000;
+    const iat = Number(parsed.payload.iat) * 1000;
+    if (!Number.isFinite(exp) || exp + ID_TOKEN_SKEW_MS < now) return { ok: false, reason: 'idtoken:expired' };
+    if (!Number.isFinite(iat) || iat - ID_TOKEN_SKEW_MS > now) return { ok: false, reason: 'idtoken:future' };
+    if (typeof parsed.payload.sub !== 'string' || !parsed.payload.sub) return { ok: false, reason: 'idtoken:sub' };
+
+    const keys = await firebaseCerts(timeoutMs);
+    if (!keys) return { ok: false, reason: 'idtoken:certs' };
+    const pem = keys[kid];
+    if (!pem) return { ok: false, reason: 'idtoken:kid-unknown' };
+
+    let good = false;
+    try {
+        good = crypto.verify('RSA-SHA256', Buffer.from(parsed.signed), crypto.createPublicKey(pem), parsed.signature);
+    } catch (_) { good = false; }
+    if (!good) return { ok: false, reason: 'idtoken:signature' };
+
+    const email = typeof parsed.payload.email === 'string' ? parsed.payload.email : '';
+    return { ok: true, email: email, reason: '' };
+}
+
 function listSiteCodeOf(raw) {
     const text = String(raw === undefined || raw === null ? '' : raw).trim();
     if (!text) return { code: '', reason: 'site:missing' };
@@ -835,7 +976,7 @@ function projectListRow(config, row) {
     };
 }
 
-function listResponseBody(config, container, page) {
+function listResponseBody(config, container, page, siteCode) {
     const rows = container.rows.slice(0, LIST_ROW_MAX)
         .map((row) => projectListRow(config, row))
         .filter(Boolean);
@@ -847,6 +988,9 @@ function listResponseBody(config, container, page) {
         list: true,
         enabled: true,
         page: page,
+        // ⛔ លេខសាខាដែល **ដេរីវេពី token** ➜ UI បង្ហាញការពិត ជំនួសលេខដែល
+        // អ្នកប្រើវាយ (ដែល server បោះចោល)។ វាជាសាខារបស់គណនីខ្លួនឯង ➜ គ្មានការលេច។
+        site: String(siteCode || ''),
         pages: Number.isFinite(pages) ? pages : (rows.length ? 1 : 0),
         total: Number.isFinite(total) ? total : rows.length,
         rows: rows
@@ -1332,6 +1476,14 @@ function budgetLeftMs(config, startedAt) {
 // ដូច្នេះកក់បង្អួចអប្បបរមាឲ្យការអាន ដរាបណាថវិកានៅសល់ពិត។ `fetchOrder()`
 // កាត់ `timeoutMs` តាម `remaining − 200` រួចហើយ ➜ ការចំណាយនេះ **មិនអាច
 // ធ្វើឲ្យលើសពិដាន ១០ វិនាទីរបស់ Netlify** បានទេ។
+// ⛔ ការទាញវិញ្ញាបនបត្រឈរ **ក្នុង** ថវិកា (ច្បាប់ដដែលនឹង Cookie store) ៖
+// ការដាក់វាក្រៅ នឹងធ្វើឲ្យ Netlify សម្លាប់ Function មុនវាឆ្លើយ។
+function certsTimeoutMs(config, startedAt) {
+    const left = budgetLeftMs(config, startedAt) - config.upstreamTimeoutMs;
+    if (left >= FIREBASE_CERTS_MAX_TIMEOUT_MS) return FIREBASE_CERTS_MAX_TIMEOUT_MS;
+    return left > FIREBASE_CERTS_MIN_TIMEOUT_MS ? left : FIREBASE_CERTS_MIN_TIMEOUT_MS;
+}
+
 function cookieReadTimeoutMs(config, startedAt) {
     const left = budgetLeftMs(config, startedAt);
     // ⛔ សតិទទេ ➜ គ្មាន Cookie ➜ គ្មានការហៅ upstream សោះ ➜ ការអាន **ជា
@@ -1568,7 +1720,26 @@ exports.handler = async function handler(event) {
     if (wantsList) {
         // ⛔ មុខងារបិទ ≠ កំហុស ➜ HTTP 200 **គ្មានវាល `error`** (ច្បាប់ដដែល
         // នឹង `found:false` ៖ វាល `error` បង្ខំ client ចូល cooldown)។
-        const site = listSiteCodeOf(query.site);
+        // ⛔ លេខសាខាមកពី **អត្តសញ្ញាណ** មិនមែនពី `?site=` — មើលការពន្យល់
+        // នៅលើ `verifyIdToken()`។ `query.site` ត្រូវបោះចោលទាំងស្រុង។
+        const projectIds = readProjectIds(process.env);
+        const idToken = (event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '';
+        const auth = await verifyIdToken(idToken, projectIds, certsTimeoutMs(config, startedAt));
+        const site = auth.ok
+            ? listSiteCodeOf(siteCodeFromEmail(auth.email, siteEmailPrefix(process.env)))
+            : { code: '', reason: auth.reason };
+        if (!auth.ok && site.reason === auth.reason) {
+            return json(200, {
+                success: false, list: true, enabled: false,
+                code: 'ZTO_LIST_NOT_CONFIGURED', reason: auth.reason
+            });
+        }
+        if (auth.ok && site.reason) {
+            return json(200, {
+                success: false, list: true, enabled: false,
+                code: 'ZTO_LIST_NOT_CONFIGURED', reason: 'site:no-account'
+            });
+        }
         if (!config.list.enabled || site.reason) {
             return json(200, {
                 success: false,
@@ -1594,7 +1765,7 @@ exports.handler = async function handler(event) {
             body: listRequestBody(config.list, site.code, range, page),
             extract: (upstream) => {
                 const container = listContainerOf(upstream);
-                return container ? listResponseBody(config, container, page) : null;
+                return container ? listResponseBody(config, container, page, site.code) : null;
             },
             // ⛔ កូនសោបញ្ជីត្រូវ **ផ្សេងតាមរចនាសម្ព័ន្ធ** ពីកូនសោ barcode ៖
             // `BARCODE_RE` មិនអនុញ្ញាត `|` ➜ បច្ច័យ `|L|` មិនអាចប៉ះគ្នាបាន។
@@ -1712,6 +1883,9 @@ exports.expireCookieCacheForTests = function expireCookieCacheForTests() {
 exports.resetCachesForTests = function resetCachesForTests() {
     resultCache.clear();
     inFlight.clear();
+    certsState.at = 0;
+    certsState.keys = null;
+    certsState.inFlight = null;
     cookieRefreshInFlight = false;
     cookieWriteInFlight = null;
     cookieState.mustRevalidate = false;

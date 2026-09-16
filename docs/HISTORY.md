@@ -289,6 +289,65 @@ email និង token មិនលេចក្នុងចម្លើយ។ ⛔
 
 
 
+### [2.36.7 · 2.19.27] — 2026-09-16 · Setup Link នាំ Sentry DSN ➜ ឧបករណ៍អតិថិជនលែងងងឹត
+
+**App ទាំង ២ ប្រែ** ៖ ZoeW (`zoew-v215` ➜ `zoew-v216`) និង ZoeKeyGen
+(`zoekeygen-v96` ➜ `zoekeygen-v97`)។
+
+#### បន្ថែម — ការរាយការណ៍កំហុសលែងពឹងលើការចាំ paste ដោយដៃ
+
+`getDsn()` អាន **តែ** `localStorage['zoe_sentry_dsn']` ៖ គ្មានតម្លៃ ➜
+`detachSentry()` ➜ **គ្មានការរាយការណ៍កំហុសសោះ**។ ហើយ Setup Link ផ្ទុក
+**តែ Firebase config**។ ➜ រាល់ឧបករណ៍អតិថិជនថ្មី **ងងឹតទាំងស្រុង** លុះត្រា
+មានអ្នកចាំ paste DSN ដោយដៃលើគ្រឿងនោះ។ ថ្នាក់នេះឈឺចាប់បំផុតពេលលក់ទៅ
+អាជីវកម្មដទៃ ៖ អ្នកលក់មិនដឹងថាអតិថិជនជួបកំហុសអ្វីទេ រហូតដល់គេទូរស័ព្ទមក។
+
+ឥឡូវប្រអប់ **🔗 បង្កើត Setup Link** របស់ ZoeKeyGen មានវាល **Sentry DSN**
+(ស្រេចចិត្ត · ចងចាំក្នុង `zoekeygen_setup_dsn_ADM` · លំនាំដើមយក DSN របស់
+ZoeKeyGen ខ្លួនឯង) ➜ ZoeW អានវាចេញពី Link រួចហៅ `ZoeErrors.setDsn()`។
+
+⛔ **ជាន់ការពារ ៣** ៖ (១) DSN អនុវត្ត **ខាងក្នុង callback របស់ PIN gate**
+ប៉ុណ្ណោះ — Setup Link មកពីខាងក្រៅ ➜ ការកំណត់ DSN មុន PIN នឹងជាផ្លូវបញ្ជូន
+កំហុស (និងទិន្នន័យក្នុងកំហុស) ទៅ server របស់អ្នកវាយប្រហារ។ (២)
+`setupLinkDsnIsValid()` ទទួលតែ `https:` និង host `sentry.io` ឬ
+`*.sentry.io` — ⛔ `endsWith('.sentry.io')` មិនមែន `includes()`
+(`evil-sentry.io` និង `sentry.io.evil.com` ត្រូវបដិសេធ)។ (៣) CSP
+`connect-src` នៅជាជាន់ចុងក្រោយ។
+
+⛔ **ភាពឆប់គ្នាថយក្រោយ** ៖ payload នៅជា **Firebase config រាបស្មើ** ដដែល
+(វាល `dsn` បន្ថែមនៅកម្រិតកំពូល) — មិនមែន envelope ថ្មីទេ ➜ Link ចាស់
+ដើរដដែល ហើយ ZoeW **ចាស់** ដែលទទួល Link ថ្មី នៅឆ្លងការផ្ទៀងផ្ទាត់
+(`apiKey`/`databaseURL` នៅគ្រប់) រួច `normalizeFirebaseConfig()` ចាប់ `dsn`
+ជា extra ➜ រំលងដោយ toast។ ⛔ `dsn` **មិនលេចក្នុងប្រអប់ Config** របស់
+ZoeW ថ្មីទេ (`delete linkConfig.dsn`) ➜ វាមិនចូល `zoew_firebase_config`។
+
+#### ឧបករណ៍ audit
+
+- `setup-link-roundtrip-test` ៖ ២០ ➜ **២៥ ការអះអាង**។ ⛔ វាឈប់ regex
+  បន្ទាត់ encode តែម្យ៉ាង — វាស្រង់ `buildSetupPayload()` និង
+  `setupLinkDsnIsValid()` **ពិត** មករត់។ រកមិនឃើញ ➜ **ការធ្លាក់ដែលមាន
+  ឈ្មោះ + stub** មិនមែន crash (crash បិទបាំងការអះអាងខាងក្រោមទាំងអស់)។
+  បន្ថែមតារាង DSN អាក្រក់ **៦** និងការអះអាងថាអ្នកសម្រេច ២ ខាងនិយាយរឿង
+  ដដែលទាំង **១០ ករណី** (បើអត់ ZoeKeyGen បញ្ជូន DSN ដែល ZoeW បោះចោល
+  ស្ងាត់ៗ ➜ អ្នកលក់ជឿថាបើករួច ខណៈវាងងឹត)។
+- `setup-link-browser-test` ៖ ៦ ➜ **១៦ ការអះអាង** (browser ពិត) ៖ DSN
+  **មិន**ចូល `localStorage` មុន PIN · ចូលក្រោយ PIN · DSN អរិមិនចូល ·
+  `dsn` មិនលេចក្នុងប្រអប់ Config · វាល Firebase នៅគ្រប់។
+
+**លេខដែលវាស់បាន** ៖ លើ tree មុនកែ — roundtrip **FAIL ៥** · browser
+**FAIL ៣** (រួម `dsn` ដែលលេចចូលប្រអប់ Config ពិត)។ Mutation ៖
+`endsWith` ➜ `includes` = **ធ្លាក់ ២**; ផ្លាស់ `setDsn()` ចេញក្រៅ PIN
+gate = **ធ្លាក់ ១** (`DSN មិនត្រូវកំណត់មុន PIN`)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. **គ្មានការកែ Firebase rules** និង **គ្មានការប្តូរ env**។
+២. ក្នុង **ZoeKeyGen ➜ 🔗 បង្កើត Setup Link** ៖ បំពេញវាល **Sentry DSN**
+   ម្តង (វាចងចាំ) មុនបង្កើត Link ឲ្យអតិថិជនថ្មី។ ទុកឲ្យទទេ ➜ ឥរិយាបថ
+   ដូចមុនបេះបិទ។
+៣. ⛔ ឧបករណ៍ **ដែលកំណត់រួចពីមុន** មិនផ្លាស់ដោយខ្លួនឯងទេ — ត្រូវបើក Setup
+   Link ថ្មីលើគ្រឿងនោះ ឬ paste DSN ដោយដៃក្នុងប្រអប់ Config។
+
 ### [2.36.6] — 2026-09-16 · Deep Audit — សៀវភៅណែនាំប្រាប់ផ្លូវដែលដកចេញរួច · អ្នកយាម ២ ដែលវាស់ដោយសំណាង
 
 **ZoeW ប៉ុណ្ណោះ** (`zoew-v214` ➜ `zoew-v215`)។ ⛔ **ZoeKeyGen មិនប្រែ**

@@ -75,7 +75,54 @@ const SEL = {
         ok(!saved, 'មិនរក្សាទុករហូតដល់មនុស្សចុច Save');
         ok(errs.length === 0, 'គ្មានកំហុស runtime កំឡុងផ្លូវនេះ', errs.slice(0, 2));
 
-        await ctx.close(); server.close();
+        await ctx.close();
+
+        // ── DSN ក្នុង Setup Link ៖ ផ្លូវពិតក្នុង browser ────────────────
+        // roundtrip test វាស់ *payload*; ត្រង់នេះវាស់ *អ្វីដែលកើតលើឧបករណ៍*៖
+        // តើ DSN ចូល localStorage ដែរឬទេ · តើវាចូល **មុន** PIN ឬអត់ ·
+        // តើ `dsn` លេចក្នុងប្រអប់ Config ដែលមនុស្សនឹងចុច Save ឬអត់។
+        const DSN_CASES = [
+            { name: 'DSN ត្រឹមត្រូវ', dsn: 'https://abc123@o1.ingest.sentry.io/456', expect: 'https://abc123@o1.ingest.sentry.io/456' },
+            { name: 'DSN ក្រៅ Sentry (អរិ)', dsn: 'https://abc@evil.example.com/1', expect: null }
+        ];
+        for (const tc of DSN_CASES) {
+            const c2 = await browser.newContext({ viewport: { width: 412, height: 780 } });
+            const p2 = await c2.newPage();
+            const errs2 = [];
+            p2.on('pageerror', (e) => errs2.push(e.message));
+            await p2.route('**', (r) => r.request().url().startsWith('http://127.0.0.1:' + port) ? r.continue() : r.abort());
+
+            const payload = Buffer.from(JSON.stringify(Object.assign({}, CONFIG, { dsn: tc.dsn }))).toString('base64');
+            console.log('\n=== ' + app + ' — Setup Link + ' + tc.name + ' ===');
+            await p2.goto('http://127.0.0.1:' + port + '/?setup=' + payload, { waitUntil: 'domcontentloaded' });
+            await p2.waitForTimeout(1500);
+
+            const dsnBeforePin = await p2.evaluate(() => localStorage.getItem('zoe_sentry_dsn'));
+            ok(!dsnBeforePin, tc.name + ' ៖ DSN **មិន**ត្រូវកំណត់មុនឆ្លងកាត់ PIN', dsnBeforePin);
+
+            await p2.fill(sel.pin, '123456');
+            if (await p2.$(sel.confirm)) await p2.fill(sel.confirm, '123456');
+            await (await p2.$('#pinSetupSaveBtn')).click();
+            await p2.waitForTimeout(1200);
+
+            const dsnAfterPin = await p2.evaluate(() => localStorage.getItem('zoe_sentry_dsn'));
+            ok(dsnAfterPin === tc.expect, tc.name + ' ៖ DSN ក្រោយ PIN ត្រូវជា ' + tc.expect, dsnAfterPin);
+
+            const filled2 = await p2.evaluate((q) => { const e = document.querySelector(q); return e ? e.value : null; }, sel.config);
+            let clean = false, keptCfg = false;
+            try {
+                const obj = JSON.parse(filled2);
+                clean = !('dsn' in obj);
+                keptCfg = obj.projectId === 'biz-a' && obj.apiKey === CONFIG.apiKey;
+            } catch (e) {}
+            ok(clean, tc.name + ' ៖ `dsn` មិនលេចក្នុងប្រអប់ Config', (filled2 || '').slice(0, 80));
+            ok(keptCfg, tc.name + ' ៖ វាល Firebase នៅគ្រប់ដដែល', (filled2 || '').slice(0, 80));
+            ok(errs2.length === 0, tc.name + ' ៖ គ្មានកំហុស runtime', errs2.slice(0, 2));
+
+            await c2.close();
+        }
+
+        server.close();
     }
     await browser.close();
     console.log('\n' + (fail ? 'FAIL ' : 'PASS ') + pass + '/' + (pass + fail));

@@ -29,7 +29,7 @@ function sliceFn(src, name) {
 const ctx = vm.createContext({
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-    escape, unescape, encodeURIComponent, decodeURIComponent, JSON, Error, URLSearchParams, URL, console
+    escape, unescape, encodeURIComponent, decodeURIComponent, JSON, Error, Object, URLSearchParams, URL, console
 });
 
 // encoder ពិតរបស់ ZoeKeyGen (បន្ទាត់ដដែលក្នុង generateSetupLink)
@@ -47,7 +47,26 @@ check(keygenHtml.indexOf('<select') === -1,
 const linkLine = (genSrc.match(/lastGeneratedSetupLink = ([^;]+);/) || [])[1];
 check(!!linkLine, 'រកឃើញបន្ទាត់សាង Link');
 
-vm.runInContext('function encodeSetup(parsed) { let b64; b64 = ' + encLine + '; return b64; }', ctx);
+// ⛔ រកមិនឃើញ ➜ **ការធ្លាក់ដែលមានឈ្មោះ + stub** មិនមែន crash។
+// crash នៅត្រង់នេះបិទបាំងការអះអាងទាំងអស់ខាងក្រោម ➜ tree មុនកែរាយ
+// «0 ok, 1 FAIL» ជំនួសបញ្ជីនៃអ្វីដែលពិតជាខ្វះ។
+function defineOrStub(src, name, alias, stubBody) {
+    let body;
+    try {
+        body = sliceFn(src, name);
+    } catch (e) {
+        bad('រកឃើញ ' + name + '() ក្នុងកូដ ship', e.message);
+        vm.runInContext('function ' + alias + '(a, b) { ' + stubBody + ' }', ctx);
+        return false;
+    }
+    ok('រកឃើញ ' + name + '() ក្នុងកូដ ship');
+    vm.runInContext(body.replace('function ' + name, 'function ' + alias), ctx);
+    return true;
+}
+
+defineOrStub(keygenSrc, 'setupLinkDsnIsValid', 'setupLinkDsnIsValid', 'return false;');
+defineOrStub(keygenSrc, 'buildSetupPayload', 'buildSetupPayload', 'return a;');
+vm.runInContext('function encodeSetup(parsed, dsn) { let b64; b64 = ' + encLine + '; return b64; }', ctx);
 vm.runInContext('function buildLink(baseUrl, b64) { let lastGeneratedSetupLink; lastGeneratedSetupLink = '
     + linkLine.replace(/\bb64\b/g, 'b64') + '; return lastGeneratedSetupLink; }', ctx);
 
@@ -55,6 +74,7 @@ const APPS = ['ZoeW'];
 APPS.forEach((app) => {
     const src = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8');
     vm.runInContext(sliceFn(src, 'decodeSetupPayload').replace('function decodeSetupPayload', 'function decode_' + app), ctx);
+    defineOrStub(src, 'setupLinkDsnIsValid', 'dsnValid_' + app, 'return false;');
 });
 
 const CONFIGS = [
@@ -66,7 +86,7 @@ const CONFIGS = [
 ];
 
 CONFIGS.forEach(({ name, cfg }) => {
-    const b64 = vm.runInContext('encodeSetup(' + JSON.stringify(cfg) + ')', ctx);
+    const b64 = vm.runInContext('encodeSetup(' + JSON.stringify(cfg) + ", '')", ctx);
     const link = ctx.buildLink('https://zoeadmin.netlify.app', b64);
     // អ្វីដែល browser ពិតឲ្យ App ទទួល
     const param = new URL(link).searchParams.get('setup');
@@ -93,6 +113,48 @@ APPS.forEach((app) => {
     try { ctx['decode_' + app]('!!!not-base64!!!'); } catch (e) { threw = true; }
     check(threw, app + ' បដិសេធអក្សរដែលមិនមែន Setup Link');
 });
+
+// ── Sentry DSN ក្នុង Setup Link ─────────────────────────────────────────
+// អ្នកលក់ដាក់ DSN ម្តង ➜ ឧបករណ៍អតិថិជនរាយការណ៍កំហុសមកវិញដោយស្វ័យប្រវត្តិ។
+// បើគ្មានជាន់នេះ `getDsn()` ត្រឡប់ '' ➜ `detachSentry()` ➜ **ងងឹតទាំងស្រុង**។
+const BASE_CFG = { apiKey: 'AIzaSyABC', databaseURL: 'https://s-default-rtdb.firebaseio.com', projectId: 's' };
+const GOOD_DSN = 'https://abc123@o1.ingest.sentry.io/456';
+
+const withDsn = vm.runInContext('encodeSetup(' + JSON.stringify(BASE_CFG) + ', ' + JSON.stringify(GOOD_DSN) + ')', ctx);
+const decodedWithDsn = ctx.decode_ZoeW(withDsn);
+check(decodedWithDsn.dsn === GOOD_DSN, 'DSN ត្រឹមត្រូវ ឆ្លងកាត់ Setup Link ដល់ ZoeW', JSON.stringify(decodedWithDsn));
+check(decodedWithDsn.apiKey === BASE_CFG.apiKey && decodedWithDsn.databaseURL === BASE_CFG.databaseURL,
+    'ការបន្ថែម DSN មិនប៉ះវាល Firebase ណាមួយ');
+
+// ⛔ ទិសផ្ទុយ ៖ DSN ដែលមិនមែនរបស់ Sentry មិនត្រូវចូល payload សោះ។
+// Setup Link មកពីខាងក្រៅ ➜ DSN ណាមួយក៏បាន = ផ្លូវបញ្ជូនកំហុស (និងទិន្នន័យ
+// ក្នុងកំហុស) ទៅ server របស់អ្នកវាយប្រហារ។ CSP connect-src ជាជាន់ទី ២។
+const BAD_DSNS = [
+    ['http មិនមែន https', 'http://abc@o1.ingest.sentry.io/1'],
+    ['host ក្រៅ Sentry', 'https://abc@evil.example.com/1'],
+    ['host ដែលមើលទៅស្រដៀង', 'https://abc@evil-sentry.io/1'],
+    ['sentry.io ជា prefix នៃ host ផ្សេង', 'https://abc@sentry.io.evil.com/1'],
+    ['អត្ថបទមិនមែន URL', 'not-a-url'],
+    ['ទទេ', '']
+];
+BAD_DSNS.forEach(([name, dsn]) => {
+    const b64 = vm.runInContext('encodeSetup(' + JSON.stringify(BASE_CFG) + ', ' + JSON.stringify(dsn) + ')', ctx);
+    const out = ctx.decode_ZoeW(b64);
+    check(!('dsn' in out), 'DSN បដិសេធ ៖ ' + name + ' ➜ មិនចូល payload', JSON.stringify(out));
+});
+
+// អ្នកសម្រេច ២ ខាងត្រូវនិយាយរឿងដដែល — បើអត់ ZoeKeyGen បញ្ជូន DSN ដែល
+// ZoeW បោះចោលស្ងាត់ៗ (អ្នកលក់ជឿថាបើករួច ខណៈវាងងឹត)។
+const DSN_TABLE = [GOOD_DSN, 'https://k@o2.ingest.us.sentry.io/9', 'https://k@o3.ingest.de.sentry.io/9',
+    'https://k@sentry.io/9'].concat(BAD_DSNS.map((r) => r[1]));
+let agree = 0;
+DSN_TABLE.forEach((dsn) => {
+    if (ctx.setupLinkDsnIsValid(dsn) === ctx.dsnValid_ZoeW(dsn)) agree++;
+});
+check(agree === DSN_TABLE.length,
+    'ZoeKeyGen និង ZoeW សម្រេចលើ DSN ដូចគ្នាទាំង ' + DSN_TABLE.length + ' ករណី', 'ស៊ីគ្នា ' + agree);
+check(ctx.dsnValid_ZoeW(GOOD_DSN) === true && ctx.dsnValid_ZoeW('https://abc@evil.example.com/1') === false,
+    'ជាន់អប្បបរមា ៖ អ្នកសម្រេច DSN ពិតជាបែងចែក (មិនមែនត្រឡប់ថេរ)');
 
 console.log('\n' + (fail ? 'FAIL ' + fail + ' / ជោគជ័យ ' + pass : 'PASS ' + pass + '/' + pass));
 process.exit(fail ? 1 : 0);

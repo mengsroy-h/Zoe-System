@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.26';
+const APP_VERSION = '2.19.27';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1887,12 +1887,33 @@ function copyGeneratedKey() {
 }
 
 const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
+const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ADM';
 let lastGeneratedSetupLink = '';
+
+function setupLinkDsnIsValid(dsn) {
+    if (typeof dsn !== 'string' || !dsn) return false;
+    let parsed;
+    try { parsed = new URL(dsn); } catch (e) { return false; }
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'sentry.io' || host.endsWith('.sentry.io');
+}
+
+function buildSetupPayload(config, dsn) {
+    const payload = Object.assign({}, config);
+    delete payload.dsn;
+    if (setupLinkDsnIsValid(dsn)) payload.dsn = dsn;
+    return payload;
+}
 
 function restoreSetupLinkBaseUrl() {
     const urlInput = document.getElementById('setupLinkUrlInput');
-    if (!urlInput) return;
-    urlInput.value = safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || '';
+    if (urlInput) urlInput.value = safeStoreGet(appLocalStore, SETUP_LINK_URL_KEY) || '';
+    const dsnInput = document.getElementById('setupLinkDsnInput');
+    if (dsnInput) {
+        const remembered = safeStoreGet(appLocalStore, SETUP_LINK_DSN_KEY) || '';
+        dsnInput.value = remembered || (window.ZoeErrors ? ZoeErrors.getDsn() : '');
+    }
 }
 
 function generateSetupLink() {
@@ -1910,11 +1931,19 @@ function generateSetupLink() {
     const parsed = normalized.config;
     if (normalized.extras.length) showToast('ℹ️ រំលងវាលដែលមិនមែនរបស់ Firebase៖ ' + normalized.extras.join(', '));
 
+    const dsnInput = document.getElementById('setupLinkDsnInput');
+    const dsn = dsnInput ? dsnInput.value.trim() : '';
+    if (dsn && !setupLinkDsnIsValid(dsn)) {
+        alert('Sentry DSN មិនត្រឹមត្រូវទេ! វាត្រូវជា https://…sentry.io/… ឬទុកឲ្យទទេ។');
+        return;
+    }
+
     safeStoreSet(appLocalStore, SETUP_LINK_URL_KEY, baseUrl);
+    safeStoreSet(appLocalStore, SETUP_LINK_DSN_KEY, dsn);
 
     let b64;
     try {
-        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+        b64 = btoa(unescape(encodeURIComponent(JSON.stringify(buildSetupPayload(parsed, dsn)))));
     } catch (e) {
         alert('មិនអាចបង្កើត Link បានទេ! សូមពិនិត្យ Config JSON');
         return;

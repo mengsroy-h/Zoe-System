@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.6';
+    const APP_VERSION = '2.36.7';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2463,6 +2463,15 @@
         return parsed;
     }
 
+    function setupLinkDsnIsValid(dsn) {
+        if (typeof dsn !== 'string' || !dsn) return false;
+        let parsed;
+        try { parsed = new URL(dsn); } catch (e) { return false; }
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host === 'sentry.io' || host.endsWith('.sentry.io');
+    }
+
     function applySetupLinkFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const setupParam = params.get('setup');
@@ -2478,11 +2487,21 @@
             return;
         }
 
+        const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
+        const linkConfig = Object.assign({}, parsed);
+        delete linkConfig.dsn;
+
         requestPinBeforeConfig(() => {
+            if (linkDsn && window.ZoeErrors) {
+                ZoeErrors.setDsn(linkDsn);
+                ZoeErrors.init('zoew');
+            }
             openConfigModal();
             const cfgInput = document.getElementById('firebaseConfigInput');
-            if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
-            showToast('✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+            if (cfgInput) cfgInput.value = JSON.stringify(linkConfig, null, 2);
+            showToast(linkDsn
+                ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
+                : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
         }, 'setupLink');
     }
 

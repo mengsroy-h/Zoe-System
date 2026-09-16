@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { tokenForSite, withCerts } = require('./idtoken-fixture.js');
 
 const ROOT = process.env.ZTOPROXY_APP_DIR ? path.resolve(process.env.ZTOPROXY_APP_DIR) : path.resolve(__dirname, '..');
 const FUNCTION_JS = path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js');
@@ -429,8 +430,12 @@ group('ព្រំដែន secret ក្នុងចម្លើយ upstream',
         invalid.statusCode === 502 && JSON.parse(invalid.body).code === 'ZTO_INVALID_RESPONSE'
         && !invalid.body.includes(secret), JSON.parse(invalid.body).code);
     resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=' + secret, ZTO_CACHE_TTL_MS: '0' });
-    global.fetch = jsonResponder({ success: true, message: 'Unexpected input: ' + secret, data: {} });
-    const invalidList = await call({ list: '1', site: '100200', from: '2026-09-08', to: '2026-09-11' });
+    process.env.FIREBASE_PROJECT_IDS = 'zoew-v1';
+    global.fetch = withCerts(jsonResponder({ success: true, message: 'Unexpected input: ' + secret, data: {} }));
+    // ⛔ ផ្លូវបញ្ជីទាមទារ ID token ➜ សំណើគ្មាន token នឹងឈប់ត្រឹម
+    // `ZTO_LIST_NOT_CONFIGURED` ➜ ការអះអាងអំពី **ការលេចសារឆៅ** វាស់អ្វីផ្សេង។
+    const invalidList = await call({ list: '1', from: '2026-09-08', to: '2026-09-11' },
+        { 'x-zoe-id-token': tokenForSite('100200') });
     ok('Upstream បញ្ជីគ្មាន rows៖ សារឆៅមិនចេញទៅ browser',
         invalidList.statusCode === 502 && JSON.parse(invalidList.body).code === 'ZTO_UPSTREAM_REJECTED'
         && !invalidList.body.includes(secret), JSON.parse(invalidList.body).code);

@@ -52,6 +52,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('crypto');
 
 const ROOT = process.env.ZTOLIST_APP_DIR
     ? path.resolve(process.env.ZTOLIST_APP_DIR)
@@ -149,10 +150,14 @@ const ENV_NAMES = [
 const SAVED_ENV = Object.fromEntries(ENV_NAMES.map((name) => [name, process.env[name]]));
 const SAVED_FETCH = global.fetch;
 
+const { TEST_CERT_PEM, TEST_KID, TEST_PROJECT, CERTS_HOST,
+    tokenFor, tokenForSite, withCerts } = require('./idtoken-fixture.js');
+
 function resetEnv(extra) {
     ENV_NAMES.forEach((name) => { delete process.env[name]; });
     process.env.ZTO_PROXY_KEY = KEY;
     process.env.ZTO_AUTHORIZATION = 'Bearer test-token';
+    process.env.FIREBASE_PROJECT_IDS = TEST_PROJECT;
     Object.keys(extra || {}).forEach((name) => {
         if (extra[name] === undefined) delete process.env[name];
         else process.env[name] = extra[name];
@@ -163,11 +168,17 @@ function resetEnv(extra) {
 // ⛔ handler ដែល **បោះ** ត្រូវក្លាយជាការធ្លាក់ដែល **មានឈ្មោះ** មិនមែន
 // ជាការ crash ដែលបិទបាំងការអះអាងខាងក្រោមទាំងអស់ (វាស់រួចលើ mutation ៖
 // `config.list.url` ជា `null` ➜ `.href` បោះ ➜ checker ស្លាប់ត្រង់នោះ)។
-async function call(query) {
+async function call(query, extraHeaders) {
+    // ⛔ សំណើបញ្ជីតម្រូវឲ្យមាន ID token ➜ ចេតនា «សុំសាខា X» ប្រែជា token
+    // របស់អ្នកប្រើសាខានោះ។ header ដែលបញ្ជូនផ្ទាល់ ឈ្នះជានិច្ច។
+    const auto = (query && query.list === '1'
+        && !(extraHeaders && 'x-zoe-id-token' in extraHeaders))
+        ? { 'x-zoe-id-token': tokenForSite(query.site) }
+        : {};
     try {
         return await proxy.handler({
             httpMethod: 'GET',
-            headers: { 'x-zoe-proxy-key': KEY },
+            headers: Object.assign({ 'x-zoe-proxy-key': KEY }, auto, extraHeaders || {}),
             queryStringParameters: query
         });
     } catch (e) {
@@ -176,8 +187,19 @@ async function call(query) {
 }
 
 const seenRequests = [];
+
+
 function responder(payload, status) {
     return async (href, init) => {
+        // ⛔ ការផ្ទៀងផ្ទាត់ ID token ទាញវិញ្ញាបនបត្ររបស់ Google ➜ responder
+        // ត្រូវឆ្លើយវាដែរ បើអត់ ការផ្ទៀងផ្ទាត់ធ្លាក់ដោយ **ហេតុផលខុស**។
+        // ⛔ ការទាញវិញ្ញាបនបត្រ **មិនចូល `seenRequests`** ៖ រាល់ការអះអាង
+        // ដែលរាប់សំណើ មានន័យថា «ការហៅ **ZTO**» ➜ ការបញ្ចូលវានឹងធ្វើឲ្យ
+        // ការអះអាងទាំងនោះវាស់អ្វីផ្សេង។
+        if (String(href).indexOf(CERTS_HOST) !== -1) {
+            return { ok: true, status: 200, headers: { get: () => 'application/json' },
+                json: async () => ({ [TEST_KID]: TEST_CERT_PEM }) };
+        }
         seenRequests.push({ href: href, init: init });
         return {
             ok: (status || 200) < 400,
@@ -290,26 +312,27 @@ function firstBody(requests) {
         dormant.status === 200, dormant.status);
     ok('⛔ គ្មានលេខសាខា ➜ `enabled:false`',
         !!dormant.body && dormant.body.enabled === false, dormant.body);
-    ok('⛔ គ្មានលេខសាខា ➜ មូលហេតុ `site:missing`',
-        !!dormant.body && dormant.body.reason === 'site:missing', dormant.body && dormant.body.reason);
+    // ⛔ លេខសាខាលែងមកពី `?site=` ➜ «គ្មានលេខសាខា» មានន័យថា **គណនីគ្មានសាខា**
+    ok('⛔ គណនីគ្មានលេខសាខា ➜ មូលហេតុ `site:no-account`',
+        !!dormant.body && dormant.body.reason === 'site:no-account', dormant.body && dormant.body.reason);
     ok('⛔ «បិទ» មិនមែនកំហុស ➜ គ្មានវាល `error` (ច្បាប់ `found:false`)',
         !!dormant.body && dormant.body.error === undefined, dormant.body && dormant.body.error);
     ok('⛔ គ្មានលេខសាខា ➜ **មិនហៅ upstream សោះ**',
         dormant.requests.length === 0, dormant.requests.length);
 
     const blankSite = await listCall(listPayload([listRow()]), {}, { site: '   ' });
-    ok('⛔ លេខសាខាជាចន្លោះទទេ ➜ `site:missing` ដដែល (មិនមែន `site:invalid`)',
+    ok('⛔ លេខសាខាជាចន្លោះទទេក្នុងសំណើ ➜ `site:no-account` (សំណើមិនសម្រេចទៀតទេ)',
         !!blankSite.body && blankSite.body.enabled === false
-        && blankSite.body.reason === 'site:missing', blankSite.body);
+        && blankSite.body.reason === 'site:no-account', blankSite.body);
 
     // ⛔ **env ដែលសល់ក្នុង Netlify មិនត្រូវចាក់សោសាខាដោយស្ងាត់** ៖ ម្ចាស់
     // គម្រោងលុប `ZTO_LIST_SITE_CODE` ចេញ — បើកូដនៅអានវា នោះឧបករណ៍គ្រប់
     // សាខាបន្តទាញបញ្ជីសាខាចាស់ ខណៈអ្នកប្រើជឿថាបានដកវាចេញរួច។
     const staleEnv = await listCall(listPayload([listRow()]),
         { ZTO_LIST_SITE_CODE: LIST_SITE }, { site: undefined });
-    ok('⛔ `ZTO_LIST_SITE_CODE` ដែលសល់ **មិនជំនួស** លេខសាខាក្នុងសំណើ',
+    ok('⛔ `ZTO_LIST_SITE_CODE` ដែលសល់ **មិនជំនួស** លេខសាខារបស់គណនី',
         !!staleEnv.body && staleEnv.body.enabled === false
-        && staleEnv.body.reason === 'site:missing', staleEnv.body);
+        && staleEnv.body.reason === 'site:no-account', staleEnv.body);
     ok('⛔ env ដែលសល់ ➜ មិនហៅ upstream សោះ',
         staleEnv.requests.length === 0, staleEnv.requests.length);
     ok('⛔ ឈ្មោះ env នោះលែងលេចក្នុងកូដ Function ទៀត',
@@ -324,8 +347,8 @@ function firstBody(requests) {
     // server មិនកាន់វា)។ ការធ្វើតេស្តត្រូវបែងចែកវា ២ បើមិនដូច្នេះការអះអាង
     // «diag រាយមូលហេតុដដែល» នឹងបង្ខំឲ្យលេខសាខាហូរចូលចម្លើយវិនិច្ឆ័យ។
     const BROKEN = [
-        ['លេខសាខាមានតួអក្សរហាម', {}, { site: 'a b#c' }, 'site:invalid', false],
-        ['លេខសាខាវែងជាង ៣២ តួ', {}, { site: 'x'.repeat(33) }, 'site:invalid', false],
+        ['លេខសាខាហាមក្នុងសំណើ ➜ បោះចោល', {}, { site: 'a b#c' }, 'site:no-account', false],
+        ['លេខសាខាវែងក្នុងសំណើ ➜ បោះចោល', {}, { site: 'x'.repeat(33) }, 'site:no-account', false],
         ['URL មិនមែន https', { ZTO_LIST_URL: 'http://x.example.com/a' }, {}, 'url:invalid', true],
         ['URL ខូច', { ZTO_LIST_URL: 'not-a-url' }, {}, 'url:invalid', true],
         ['scanType មានចន្លោះ', { ZTO_LIST_SCAN_TYPE: 'a b' }, {}, 'scan-type:invalid', true]
@@ -793,18 +816,18 @@ function firstBody(requests) {
     console.log('\n== ៨. ⛔ ផ្លូវបណ្តាញរួម (auth · timeout · សំបកខូច) ==');
     // ═════════════════════════════════════════════════════════════════════
     resetEnv(GOOD_LIST_ENV);
-    global.fetch = async () => ({
+    global.fetch = withCerts(async () => ({
         ok: false, status: 401, headers: { get: () => 'application/json' }, json: async () => ({})
-    });
+    }));
     const rejected = await call(listQuery());
     ok('⛔ 401 ពី ZTO ➜ 401 `ZTO_AUTH_EXPIRED` (សាលក្រម auth រួម)',
         rejected.statusCode === 401 && codeOf(bodyOf(rejected)) === 'ZTO_AUTH_EXPIRED',
         { s: rejected.statusCode, b: rejected.body });
 
     resetEnv(GOOD_LIST_ENV);
-    global.fetch = async () => ({
+    global.fetch = withCerts(async () => ({
         ok: false, status: 503, headers: { get: () => 'application/json' }, json: async () => ({})
-    });
+    }));
     const down = await call(listQuery());
     ok('⛔ 5xx ពី ZTO ➜ 502 (ជណ្តើរ retry រួម)', down.statusCode === 502, down.statusCode);
 
@@ -825,8 +848,11 @@ function firstBody(requests) {
 
     // ⛔ ផ្លូវបណ្តាញត្រូវ **តែមួយ** — `fetch(` ត្រូវលេចម្តងគត់ក្នុង Function
     const fetchCalls = (FUNCTION_SRC.match(/(?:^|[^.\w])fetch\s*\(/g) || []).length;
-    ok('⛔ `fetch(` លេចម្តងគត់ក្នុង Function (ផ្លូវបណ្តាញរួម មិនចម្លង)',
-        fetchCalls === 1, fetchCalls);
+    // ⛔ ការហៅ `fetch(` មាន **២** ៖ ផ្លូវ ZTO រួម (`requestOnce`) និងការទាញ
+    // វិញ្ញាបនបត្ររបស់ **Google** — upstream ផ្សេងគ្នាទាំងស្រុង។ អ្វីដែល
+    // ច្បាប់នេះហាមគឺ **ការចម្លងផ្លូវ ZTO** មិនមែនការហៅ upstream ទី ២ ទេ។
+    ok('⛔ `fetch(` លេចត្រឹម ២ ដង (ZTO រួម + វិញ្ញាបនបត្រ Google)',
+        fetchCalls === 2, fetchCalls);
 
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ៩. `?diag=1` ៖ ស្ថានភាពបញ្ជី គ្មានតម្លៃសម្ងាត់ ==');
@@ -1868,263 +1894,161 @@ function firstBody(requests) {
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    console.log('\n== ១៨. ⛔ លេខសាខារស់ក្នុង ZoeW ៖ ស្នាមភ្ជាប់ client ↔ Function ==');
+    console.log('\n== ១៨. ⛔ client ៖ ផ្ញើ ID token · លែងផ្ញើ `?site=` ==');
     // ══════════════════════════════════════════════════════════════════════
-    // ⛔ រូបរាងលេខសាខាត្រូវ **ដេរីវេ** ពី Function ពិត មិនមែន literal ២ ខាង
-    // ឯករាជ្យ (នោះជាការស៊ីគ្នាដោយចៃដន្យ) ៖ client ធូរជាង ➜ សំណើត្រូវបដិសេធ
-    // ដោយ `site:invalid` ក្រោយអ្នកប្រើវាយរួច; client តឹងជាង ➜ សាខាដែល ZTO
-    // ទទួល ត្រូវ ZoeW បដិសេធ។
-    const SERVER_SITE_RE = (/const LIST_SITE_CODE_RE = ([^;]+);/.exec(FUNCTION_SRC) || [])[1];
-    const CLIENT_SITE_RE = (/const ZTO_LIST_SITE_RE = ([^;]+);/.exec(APP_SRC) || [])[1];
-    ok('⛔ ស្រង់រូបរាងលេខសាខាចេញពី Function និង `app.js` បាន',
-        !!SERVER_SITE_RE && !!CLIENT_SITE_RE, [SERVER_SITE_RE, CLIENT_SITE_RE]);
-    ok('⛔ រូបរាងលេខសាខា **ដូចគ្នាបេះបិទ** ទាំង ២ ខាង',
-        !!SERVER_SITE_RE && String(SERVER_SITE_RE).trim() === String(CLIENT_SITE_RE).trim(),
-        [SERVER_SITE_RE, CLIENT_SITE_RE]);
+    //
+    // ជំនាន់មុននៃផ្នែកនេះវាស់ស្នាមភ្ជាប់ «លេខសាខាក្នុង ZoeW ↔ parameter
+    // `site` របស់ Function»។ ស្នាមភ្ជាប់នោះ **ត្រូវដកចេញ** ៖ លេខសាខាដែល
+    // ធ្វើដំណើរជា parameter ជាព្រំដែនក្លែងក្លាយ។ អ្វីដែលត្រូវចាក់សោឥឡូវគឺ
+    // ទិសផ្ទុយ ៖ client **មិនត្រូវ** ផ្ញើលេខសាខា ហើយ **ត្រូវ** ផ្ញើ token។
+    {
+        const urlFn = extractFn(APP_SRC, 'buildZtoListApiUrl') || '';
+        const fetchFn = extractFn(APP_SRC, 'fetchZtoListPage') || '';
+        const enabledFn = extractFn(APP_SRC, 'ztoListSyncEnabled') || '';
+        ok('⛔ ស្រង់ផ្លូវបញ្ជីខាង client ចេញពី `app.js` បាន',
+            !!urlFn && !!fetchFn && !!enabledFn,
+            { url: urlFn.length, fetch: fetchFn.length, enabled: enabledFn.length });
 
-    // ⛔ ឈ្មោះ query parameter ក៏ជាស្នាមភ្ជាប់ដែរ ➜ ដេរីវេពី Function។
-    const SITE_PARAM = (/listSiteCodeOf\(query\.([A-Za-z0-9_]+)\)/.exec(FUNCTION_SRC) || [])[1];
-    ok('⛔ ស្រង់ឈ្មោះ parameter របស់លេខសាខាចេញពី Function បាន', !!SITE_PARAM, SITE_PARAM);
-
-    const CLIENT_FNS = ['safeStoreGet', 'safeStoreSet', 'getLookupApiConfig', 'ztoFastModeIsOn',
-        'ztoListSiteCode', 'setZtoListSiteNote',
-        'ztoListSyncEnabled', 'openZtoListSiteModal', 'closeZtoListSiteModal',
-        'saveZtoListSiteCode', 'drawerZtoListSyncFlow', 'drawerAction',
-        'buildZtoListApiUrl', 'fetchZtoListPage'];
-    const CLIENT_CONSTS = ['ZTO_LISTSYNC_KEY', 'ZTO_LIST_SITE_KEY', 'ZTO_LIST_SITE_RE',
-        'ZTO_FAST_MODE_HINT', 'ZTO_AUTO_LOOKUP_TIMEOUT_MS'];
-    const missingClient = CLIENT_FNS.filter((name) => !extractFn(APP_SRC, name))
-        .concat(CLIENT_CONSTS.filter((name) => !extractConst(APP_SRC, name)));
-    ok('⛔ ស្រង់ផ្លូវលេខសាខាខាង client ចេញពី `app.js` បាន', missingClient.length === 0, missingClient);
-
-    if (!missingClient.length && SITE_PARAM) {
-        const store = new Map();
-        const els = {};
-        const el = (id) => {
-            if (!els[id]) els[id] = { id: id, value: '', innerText: '', focused: 0, focus() { this.focused++; } };
-            return els[id];
-        };
-        const seenUi = { opened: [], closed: [], toasts: [], refreshed: 0, drawerClosed: 0 };
-        const seenNet = { urls: [] };
-        const box = {
-            console: console,
-            appLocalStore: {
-                getItem: (k) => (store.has(k) ? store.get(k) : null),
-                setItem: (k, v) => { store.set(k, String(v)); },
-                removeItem: (k) => { store.delete(k); }
-            },
-            document: { getElementById: (id) => el(id) },
-            openModalHelper: (id) => { seenUi.opened.push(id); },
-            closeModal: (id) => { seenUi.closed.push(id); },
-            showToast: (text) => { seenUi.toasts.push(String(text)); },
-            refreshZtoListSyncUi: () => { seenUi.refreshed++; },
-            closeSideDrawer: () => { seenUi.drawerClosed++; },
-            ztoStatusFeatureConfig: () => ({ url: 'https://x.netlify.app/.netlify/functions/zto-order-detail' }),
-            buildLookupRequestHeaders: async () => ({}),
-            fetchWithTimeout: async (url) => {
-                seenNet.urls.push(String(url));
-                return { res: { ok: true, status: 200 }, body: { success: true, list: true, enabled: true, rows: [], pages: 1, total: 0 } };
-            }
-        };
-        box.globalThis = box;
-        vm.createContext(box);
-        vm.runInContext(CLIENT_CONSTS.map((name) => extractConst(APP_SRC, name)).join('\n') + '\n'
-            + CLIENT_FNS.map((name) => extractFn(APP_SRC, name)).join('\n')
-            + '\nglobalThis.__api = {' + CLIENT_FNS.map((n) => n + ': ' + n).join(', ')
-            + ', ZTO_LISTSYNC_KEY: ZTO_LISTSYNC_KEY, ZTO_LIST_SITE_KEY: ZTO_LIST_SITE_KEY'
-            + ', ZTO_FAST_MODE_HINT: ZTO_FAST_MODE_HINT };', box);
-        const api = box.__api;
-        const cfg = { url: 'https://x.netlify.app/.netlify/functions/zto-order-detail' };
-        // ⛔ **Fast Mode ជាច្រកទ្វារខាងលើគេ** (សំណើម្ចាស់គម្រោង 2026-09-14) ៖
-        // ដកគ្រីស ➜ កុងតាក់ទាំង ២ លាក់ **ហើយមុខងារឈប់** — កុងតាក់ដែលមើល
-        // មិនឃើញ តែនៅដើរ ជាអន្ទាក់ (អ្នកប្រើបិទវាមិនបាន)។
-        const LOOKUP_CFG_KEY = 'zoew_lookup_api_config';
-        const seedLookupCfg = (fast) => store.set(LOOKUP_CFG_KEY,
-            JSON.stringify({ enabled: true, url: cfg.url, fastMode: !!fast }));
-        seedLookupCfg(true);
-
-        // ── ក. ច្រកទ្វារ ៖ ទង់បើក **មិនគ្រប់គ្រាន់** ដោយគ្មានលេខសាខា ─────────
-        store.set(api.ZTO_LISTSYNC_KEY, '1');
-        ok('⛔ ទង់បើក តែគ្មានលេខសាខា ➜ មុខងារនៅ **បិទ** (មិនអះអាងភាពត្រៀម)',
-            api.ztoListSyncEnabled() === false, api.ztoListSyncEnabled());
-        store.set(api.ZTO_LIST_SITE_KEY, 'a b#c');
-        ok('⛔ លេខសាខាខូចក្នុង storage ➜ មុខងារនៅ **បិទ** ដដែល',
-            api.ztoListSyncEnabled() === false && api.ztoListSiteCode() === '',
-            [api.ztoListSyncEnabled(), api.ztoListSiteCode()]);
-        store.set(api.ZTO_LIST_SITE_KEY, LIST_SITE);
-        ok('ទិសផ្ទុយ ៖ ទង់បើក + លេខសាខាត្រឹមត្រូវ ➜ **បើក**',
-            api.ztoListSyncEnabled() === true && api.ztoListSiteCode() === LIST_SITE,
-            [api.ztoListSyncEnabled(), api.ztoListSiteCode()]);
-        store.set(api.ZTO_LISTSYNC_KEY, '0');
-        ok('⛔ ទិសផ្ទុយ ៖ លេខសាខាមាន តែទង់បិទ ➜ **បិទ** (ការបិទត្រូវនៅជាការបិទ)',
-            api.ztoListSyncEnabled() === false, api.ztoListSyncEnabled());
-
-        // ── ខ. URL ៖ លេខសាខាត្រូវចេញទៅ Function តាមឈ្មោះដែលវាអាន ──────────
-        store.set(api.ZTO_LISTSYNC_KEY, '1');
-        store.set(api.ZTO_LIST_SITE_KEY, LIST_SITE);
-        const listUrl = api.buildZtoListApiUrl(cfg, RANGE.from, RANGE.to, 1);
-        ok('⛔ URL ផ្ទុកលេខសាខាតាម parameter `' + SITE_PARAM + '` ដែល Function អាន',
-            listUrl.indexOf('&' + SITE_PARAM + '=' + LIST_SITE) !== -1
-            || listUrl.indexOf('?' + SITE_PARAM + '=' + LIST_SITE) !== -1, listUrl);
+        ok('⛔ URL បញ្ជី **លែងផ្ទុក `site=`** (server បោះចោលវា ➜ ការផ្ញើ = ការកុហក)',
+            urlFn.indexOf('site=') === -1, urlFn.slice(0, 200));
         ok('⛔ URL នៅផ្ទុក `list=1` · ជួរកាលបរិច្ឆេទ · ទំព័រ ដដែល',
-            listUrl.indexOf('list=1') !== -1 && listUrl.indexOf('from=' + RANGE.from) !== -1
-            && listUrl.indexOf('to=' + RANGE.to) !== -1 && listUrl.indexOf('page=1') !== -1, listUrl);
-        store.delete(api.ZTO_LIST_SITE_KEY);
-        ok('⛔ គ្មានលេខសាខា ➜ URL ទទេ (មិនបាញ់សំណើដែលដឹងជាមុនថាធ្លាក់)',
-            api.buildZtoListApiUrl(cfg, RANGE.from, RANGE.to, 1) === '',
-            api.buildZtoListApiUrl(cfg, RANGE.from, RANGE.to, 1));
+            urlFn.indexOf('list=1') !== -1 && urlFn.indexOf('from=') !== -1
+            && urlFn.indexOf('to=') !== -1 && urlFn.indexOf('page=') !== -1, urlFn.slice(0, 200));
 
-        // ── គ. ⛔ ការស្ងាត់ជាបញ្ជីទទេកុហក ➜ ត្រូវ **បោះ** ─────────────────
-        let thrown = null;
-        seenNet.urls.length = 0;
-        try { await api.fetchZtoListPage(cfg, RANGE.from, RANGE.to, 1); }
-        catch (e) { thrown = e; }
-        ok('⛔ គ្មានលេខសាខា ➜ `fetchZtoListPage` **បោះ** មិនត្រឡប់ទទេស្ងាត់ៗ',
-            !!thrown, thrown && thrown.message);
-        ok('⛔ ការបោះនោះជា `notConfigured` + `site:missing` (សំបកដដែលនឹង server)',
-            !!thrown && thrown.notConfigured === true && thrown.listReason === 'site:missing',
-            thrown && { notConfigured: thrown.notConfigured, reason: thrown.listReason });
-        ok('⛔ ហើយវាមិនប៉ះបណ្តាញសោះ', seenNet.urls.length === 0, seenNet.urls);
+        ok('⛔ `fetchZtoListPage` ភ្ជាប់ header `X-Zoe-Id-Token`',
+            /X-Zoe-Id-Token/.test(fetchFn), fetchFn.slice(0, 260));
+        ok('⛔ គ្មាន token ➜ **បោះ** `notConfigured` មុនប៉ះបណ្តាញ',
+            /idtoken:missing/.test(fetchFn) && /notConfigured/.test(fetchFn), fetchFn.slice(0, 400));
 
-        store.set(api.ZTO_LIST_SITE_KEY, LIST_SITE);
-        const page = await api.fetchZtoListPage(cfg, RANGE.from, RANGE.to, 1);
-        ok('ទិសផ្ទុយ ៖ មានលេខសាខា ➜ សំណើចេញពិត', seenNet.urls.length === 1 && !!page, seenNet.urls);
-        ok('⛔ ហើយ URL នោះផ្ទុកលេខសាខាដដែល',
-            seenNet.urls.length === 1 && seenNet.urls[0].indexOf(SITE_PARAM + '=' + LIST_SITE) !== -1,
-            seenNet.urls[0]);
+        // ⛔ ទិសផ្ទុយ ៖ មុខងារលែងអាស្រ័យលើលេខសាខាក្នុងឧបករណ៍
+        ok('⛔ `ztoListSyncEnabled()` លែងទាមទារលេខសាខាក្នុងឧបករណ៍',
+            enabledFn.indexOf('ztoListSiteCode') === -1, enabledFn);
 
-        // ── ឃ. ប្រអប់បំពេញ ៖ ការចុចកុងតាក់ត្រូវ **សួរ** មិនមែនបើកស្ងាត់ ────
-        store.clear();
-        seedLookupCfg(true);
-        seenUi.opened.length = 0;
-        seenUi.drawerClosed = 0;
-        api.drawerZtoListSyncFlow();
-        ok('⛔ ចុចកុងតាក់ខណៈគ្មានលេខសាខា ➜ **ប្រអប់បំពេញលោតភ្លាម**',
-            seenUi.opened.indexOf('ztoListSiteModal') !== -1, seenUi.opened);
-        ok('⛔ ហើយវា **មិនបើកមុខងារ** ដោយគ្មានលេខសាខា',
-            api.ztoListSyncEnabled() === false && !store.has(api.ZTO_LISTSYNC_KEY),
-            [api.ztoListSyncEnabled(), store.get(api.ZTO_LISTSYNC_KEY)]);
-        ok('ការបើកប្រអប់ឆ្លងកាត់ `drawerAction()` ➜ របា Slide បិទជាមុន',
-            seenUi.drawerClosed === 1, seenUi.drawerClosed);
-
-        // ── ង. ការរក្សាទុក ៖ តម្លៃខូចមិនត្រូវបើកមុខងារ ───────────────────
-        seenUi.opened.length = 0; seenUi.closed.length = 0; seenUi.toasts.length = 0;
-        el('ztoListSiteInput').value = '   ';
-        api.saveZtoListSiteCode();
-        ok('⛔ លេខសាខាទទេ ➜ មិនរក្សាទុក · មិនបើក · ប្រអប់នៅបើកដដែល',
-            !store.has(api.ZTO_LIST_SITE_KEY) && api.ztoListSyncEnabled() === false
-            && seenUi.closed.length === 0, [store.get(api.ZTO_LIST_SITE_KEY), seenUi.closed]);
-        ok('⛔ ហើយអ្នកប្រើទទួលមូលហេតុ (គ្មានការទម្លាក់ស្ងាត់)',
-            String(el('ztoListSiteNote').innerText).length > 0, el('ztoListSiteNote').innerText);
-
-        el('ztoListSiteInput').value = 'a b#c';
-        api.saveZtoListSiteCode();
-        ok('⛔ លេខសាខារូបរាងខុស ➜ មិនរក្សាទុក · មិនបើក',
-            !store.has(api.ZTO_LIST_SITE_KEY) && api.ztoListSyncEnabled() === false,
-            store.get(api.ZTO_LIST_SITE_KEY));
-
-        el('ztoListSiteInput').value = '  ' + LIST_SITE_2 + '  ';
-        api.saveZtoListSiteCode();
-        ok('⛔ លេខសាខាត្រឹមត្រូវ ➜ រក្សាទុក (កាត់ចន្លោះ) · **បើកមុខងារភ្លាម**',
-            store.get(api.ZTO_LIST_SITE_KEY) === LIST_SITE_2 && api.ztoListSyncEnabled() === true,
-            [store.get(api.ZTO_LIST_SITE_KEY), api.ztoListSyncEnabled()]);
-        ok('⛔ ការរក្សាទុក ➜ បិទប្រអប់ · ធ្វើឲ្យ UI ស្រស់ · ប្រាប់អ្នកប្រើ',
-            seenUi.closed.indexOf('ztoListSiteModal') !== -1 && seenUi.refreshed > 0
-            && seenUi.toasts.length > 0, [seenUi.closed, seenUi.refreshed, seenUi.toasts]);
-
-        // ⛔ ការប្តូរសាខា ➜ URL ប្តូរតាមភ្លាម (ឧបករណ៍មិនជាប់សាខាចាស់)
-        ok('⛔ ប្តូរលេខសាខា ➜ សំណើបន្ទាប់ដើរតាមសាខាថ្មីភ្លាម',
-            api.buildZtoListApiUrl(cfg, RANGE.from, RANGE.to, 1)
-                .indexOf(SITE_PARAM + '=' + LIST_SITE_2) !== -1,
-            api.buildZtoListApiUrl(cfg, RANGE.from, RANGE.to, 1));
-
-        // ⛔ ការបិទដោយចេតនាត្រូវនៅជាការបិទ (កុំវិលទៅប្រអប់ជារង្វិលជុំ)
-        seenUi.opened.length = 0;
-        api.drawerZtoListSyncFlow();
-        ok('⛔ ចុចកុងតាក់ខណៈបើក ➜ **បិទ** ដោយមិនលោតប្រអប់',
-            api.ztoListSyncEnabled() === false && seenUi.opened.length === 0, seenUi.opened);
-        ok('⛔ ការបិទ **រក្សាលេខសាខាទុក** ➜ ការបើកវិញមិនបង្ខំវាយឡើងវិញ',
-            store.get(api.ZTO_LIST_SITE_KEY) === LIST_SITE_2, store.get(api.ZTO_LIST_SITE_KEY));
-
-        // ── ច. ⛔ Fast Mode ៖ ដកគ្រីស ➜ មុខងារឈប់ មិនត្រឹមលាក់កុងតាក់ ──────
-        store.set(api.ZTO_LISTSYNC_KEY, '1');
-        store.set(api.ZTO_LIST_SITE_KEY, LIST_SITE);
-        ok('លក្ខខណ្ឌចាំបាច់ ៖ Fast Mode គូស ➜ មុខងារបញ្ជីបើក',
-            api.ztoFastModeIsOn() === true && api.ztoListSyncEnabled() === true,
-            [api.ztoFastModeIsOn(), api.ztoListSyncEnabled()]);
-        seedLookupCfg(false);
-        ok('⛔ ដកគ្រីស Fast Mode ➜ មុខងារបញ្ជី **បិទ** ទោះទង់ និងលេខសាខានៅដដែល',
-            api.ztoFastModeIsOn() === false && api.ztoListSyncEnabled() === false,
-            [api.ztoFastModeIsOn(), api.ztoListSyncEnabled()]);
-        seenUi.opened.length = 0;
-        seenUi.toasts.length = 0;
-        api.drawerZtoListSyncFlow();
-        ok('⛔ ដកគ្រីស ➜ ការចុចកុងតាក់មិនលោតប្រអប់ តែប្រាប់មូលហេតុ',
-            seenUi.opened.length === 0 && seenUi.toasts.length === 1,
-            [seenUi.opened, seenUi.toasts]);
-        ok('⛔ អត្ថបទមូលហេតុអានចេញពី **ថេរតែមួយ** (មិនមែនច្បាប់ចម្លងក្នុងមួយផ្លូវ)',
-            seenUi.toasts[0] === api.ZTO_FAST_MODE_HINT
-            && (APP_SRC.match(/ZTO_FAST_MODE_HINT/g) || []).length >= 3,
-            [seenUi.toasts[0], (APP_SRC.match(/ZTO_FAST_MODE_HINT/g) || []).length]);
-        ok('⛔ ការកំណត់ចាស់មិនត្រូវលុប ➜ គូសវិញ ➜ មុខងារត្រឡប់មកដដែល',
-            (seedLookupCfg(true), api.ztoListSyncEnabled() === true)
-            && store.get(api.ZTO_LIST_SITE_KEY) === LIST_SITE,
-            [api.ztoListSyncEnabled(), store.get(api.ZTO_LIST_SITE_KEY)]);
+        // ⛔ **ផ្ទៃដែលកុហកត្រូវបាត់ទាំងស្រុង** ៖ វាលបញ្ចូលលេខសាខាដែលនៅរស់
+        // ខណៈ server បោះចោលតម្លៃរបស់វា ជា UI ដែលកុហកអ្នកប្រើ។
+        const dead = ['ztoListSiteCode', 'openZtoListSiteModal', 'saveZtoListSiteCode',
+            'closeZtoListSiteModal', 'zoew_zto_list_site_v1'];
+        const left = dead.filter((name) => APP_SRC.indexOf(name) !== -1);
+        ok('⛔ ផ្ទៃបញ្ចូលលេខសាខាដោយដៃ ត្រូវដកចេញទាំងស្រុងពី `app.js`',
+            left.length === 0, left.join(' · '));
+        const leftHtml = ['ztoListSiteModal', 'ztoListSiteInput']
+            .filter((name) => HTML_SRC.indexOf(name) !== -1);
+        ok('⛔ ហើយប្រអប់របស់វាត្រូវដកចេញពី `index.html` ដែរ',
+            leftHtml.length === 0, leftHtml.join(' · '));
     }
 
-    // ── ច. ការតភ្ជាប់ HTML ↔ សកម្មភាព ─────────────────────────────────────
-    const ALLOWLIST = (/const ACTION_ALLOWLIST = \[([\s\S]*?)\];/.exec(APP_SRC) || [])[1] || '';
-    ['closeZtoListSiteModal', 'saveZtoListSiteCode'].forEach((name) => {
-        ok('⛔ `' + name + '` ស្ថិតក្នុង `ACTION_ALLOWLIST`',
-            ALLOWLIST.indexOf('"' + name + '"') !== -1, ALLOWLIST.length);
-    });
-    ok('⛔ ប្រអប់លេខសាខាមានក្នុង `index.html`',
-        HTML_SRC.indexOf('id="ztoListSiteModal"') !== -1
-        && HTML_SRC.indexOf('id="ztoListSiteInput"') !== -1, false);
-    ok('⛔ ប៊ូតុងរក្សាទុក និងផ្លូវបិទ ភ្ជាប់តាម `data-act`/`data-close` (គ្មាន `on*=`)',
-        HTML_SRC.indexOf('data-act="saveZtoListSiteCode"') !== -1
-        && HTML_SRC.indexOf('data-close="closeZtoListSiteModal"') !== -1, false);
+    // ========================================================================
+    // ផ្នែក ១៩ — ⛔ **លេខសាខាមកពីអត្តសញ្ញាណ មិនមែនពី parameter របស់ client**
+    // ========================================================================
+    //
+    // 🔴 ការវាស់របស់ម្ចាស់គម្រោង ៖ Cookie `BOS-MAN-SESSION` ផ្ទុកសិទ្ធិអាន
+    // **ទូទាំងប្រទេស** មិនមែនត្រឹមសាខាដែល login ➜ ការអះអាងចាស់ «ZTO ជាអ្នក
+    // បញ្ចាំងពិត» **ខុស**។ `listSiteCodeOf()` ត្រួតពិនិត្យតែ **រូបរាង** ➜
+    // អ្នកកាន់ `ZTO_PROXY_KEY` (សោដែល **ចែករំលែក** ទៅគ្រប់ឧបករណ៍) អាចអាន
+    // បញ្ជីរបស់សាខា **ណាក៏បាន** ដោយហៅ Function ដោយផ្ទាល់ — មិនបាច់បើក ZoeW ផង។
+    //
+    // ⛔ ដូច្នេះការចងលេខសាខានឹង email **ខាង client** មិនមែនជាការការពារទេ ៖
+    // លេខនោះធ្វើដំណើរជា parameter ដែល client គ្រប់គ្រង។ អ្នកសម្រេចត្រូវផ្លាស់
+    // ទៅ **server** ➜ Firebase **ID token** (ហត្ថលេខា RS256) ជាប្រភពតែមួយ។
+    //
+    // ⛔ ការវាស់ជាការរត់ handler **ពិត** ជាមួយ token ចុះហត្ថលេខាពិត។
+    {
+    const PROJECT = TEST_PROJECT;
 
-    // ⛔ **ការប្តូរលេខសាខាមិនត្រូវងាយពេក** (សំណើអ្នកប្រើ 2026-09-14) ៖ គ្មាន
-    // ប៊ូតុងផ្ទាល់ណាបើកប្រអប់នោះ ➜ ផ្លូវតែមួយគឺ **ការចុចកុងតាក់** (បិទ ➜ បើក)
-    // ឬផ្លូវកំហុស `site:*`។ ⛔ ដូច្នេះតាមច្បាប់ «សិទ្ធិតូចបំផុត» ឈ្មោះនោះ
-    // **មិនត្រូវនៅក្នុង `ACTION_ALLOWLIST`** ដែរ (`wiring` · `csp-enforced`
-    // អះអាង ២ ទិស ➜ ធាតុលើសជាការធ្លាក់)។
-    ok('⛔ គ្មានប៊ូតុងផ្ទាល់សម្រាប់ប្តូរលេខសាខា',
-        HTML_SRC.indexOf('openZtoListSiteModal') === -1, false);
-    ok('⛔ ហើយវាមិនស្ថិតក្នុង `ACTION_ALLOWLIST` (សិទ្ធិតូចបំផុត)',
-        ALLOWLIST.indexOf('"openZtoListSiteModal"') === -1, false);
-    const siteModalOpens = (APP_SRC.match(/openZtoListSiteModal\(\)/g) || []).length
-        - (/function openZtoListSiteModal\(\)/.test(APP_SRC) ? 1 : 0);
-    ok('⛔ ទិសផ្ទុយ ៖ កូដនៅតែបើកប្រអប់នោះ (ផ្លូវប្តូរមិនត្រូវបាត់ទាំងស្រុង)',
-        siteModalOpens >= 2, siteModalOpens);
+    async function listTok(token, query, env) {
+        resetEnv(env || {});
+        seenRequests.length = 0;
+        global.fetch = responder(listPayload([listRow()]));
+        // ⛔ `''` ជាសញ្ញា «គ្មាន token ដោយចេតនា» ➜ ការបញ្ជូន header ទទេ
+        // ទប់ការបំពេញស្វ័យប្រវត្តិរបស់ `call()`។
+        const res = await call(listQuery(query), { 'x-zoe-id-token': token || '' });
+        let body = null;
+        try { body = JSON.parse(res.body); } catch (e) { body = null; }
+        return { res: res, body: body };
+    }
 
-    // ⛔ **គ្មានឧទាហរណ៍លេខសាខា *ពិត* ក្នុងវាលបញ្ចូល** (សំណើអ្នកប្រើ) — លេខ
-    // សាខាជាការកំណត់អាជីវកម្ម ➜ ការទុកលេខពិតជា `placeholder` ធ្វើឲ្យវាហូរចូល
-    // ការថតអេក្រង់ និងឯកសារ។ `maxlength` (២ ខ្ទង់) មិនរាប់។
-    const siteInputTag = (/<input[^>]*id="ztoListSiteInput"[^>]*>/.exec(HTML_SRC) || [])[0] || '';
-    ok('ជាន់អប្បបរមា ៖ រកវាលលេខសាខាក្នុង `index.html` ឃើញ', !!siteInputTag, siteInputTag);
-    ok('⛔ វាលលេខសាខាគ្មានឧទាហរណ៍លេខសាខាពិត',
-        !!siteInputTag && !/\d{4,}/.test(siteInputTag), siteInputTag);
-    ok('⛔ វាលលេខសាខាចូលបញ្ជីសម្អាតរបស់ `clearSensitiveModalFields()`',
-        APP_SRC.indexOf("'ztoListSiteInput', 'ztoListSiteNote'") !== -1, false);
+    const siteSent = () => {
+        const hit = seenRequests[seenRequests.length - 1];
+        if (!hit || !hit.init || !hit.init.body) return '';
+        try {
+            const b = JSON.parse(hit.init.body);
+            return String((b && b.condition && b.condition.scanSiteCode) || b.scanSiteCode || '');
+        } catch (e) { return ''; }
+    };
+    const ztoCalls = () => seenRequests.length;
 
-    // ⛔ កុងតាក់ទាំង ២ ត្រូវ **លាក់តាមលំនាំដើម** ក្នុង `index.html` ៖ ការគូរ
-    // ដំបូងកើតមុន `refreshZto*Ui()` ណាមួយរត់ ➜ គ្មាន `hidden` ក្នុង markup
-    // មានន័យថាអ្នកប្រើឃើញកុងតាក់ភ្លឹបមួយភ្លែត រួចវាបាត់។
-    ['ztoAutoCloseBtn', 'ztoListSyncDrawerBtn'].forEach((id) => {
-        const row = (new RegExp('<button[^>]*id="' + id + '"[^>]*>').exec(HTML_SRC) || [])[0] || '';
-        ok('⛔ `' + id + '` លាក់តាមលំនាំដើមក្នុង markup', /class="[^"]*\bhidden\b/.test(row), row);
-    });
-    ok('⛔ កុងតាក់ទាំង ២ លាក់/លេច តាម `ztoFastModeIsOn()` ដដែល',
-        (extractFn(APP_SRC, 'refreshZtoAutoCloseUi') || '').indexOf('ztoFastModeIsOn()') !== -1
-        && (extractFn(APP_SRC, 'refreshZtoListSyncUi') || '').indexOf('ztoFastModeIsOn()') !== -1, false);
-    ok('⛔ ការបើករបា Slide ធ្វើឲ្យស្ថានភាពកុងតាក់ស្រស់ (មិនកក់នៅកំណែចាស់)',
-        (extractFn(APP_SRC, 'openSideDrawer') || '').indexOf('refreshZtoAutoCloseUi()') !== -1
-        && (extractFn(APP_SRC, 'openSideDrawer') || '').indexOf('refreshZtoListSyncUi()') !== -1, false);
-    ok('⛔ ការរក្សាទុក Config ក៏ធ្វើឲ្យវាស្រស់ដែរ (គូស ➜ លេចភ្លាម)',
-        (extractFn(APP_SRC, 'saveLookupApiConfig') || '').indexOf('refreshZtoAutoCloseUi()') !== -1, false);
+    console.log('\n== ១៩. លេខសាខាមកពី ID token មិនមែនពី `?site=` ==');
 
+    // ⛔ ការអះអាងស្នូល ៖ `?site=` ដែល client ផ្ញើ ត្រូវ **បោះចោល**
+    const hijack = await listTok(tokenFor('sok@zoew881859.com'), { site: '999999' });
+    ok('⛔ លេខសាខាមកពី email ក្នុង token មិនមែនពី `?site=` របស់ client',
+        siteSent() === '881859', { sent: siteSent(), body: hijack.body });
+    ok('⛔ ទិសផ្ទុយ ៖ `?site=` ដែលក្លែង **មិន**ឡើងដល់ ZTO សោះ',
+        siteSent() !== '999999', siteSent());
+
+    const noTok = await listTok(null, {});
+    ok('⛔ គ្មាន ID token ➜ បញ្ជីបិទ (HTTP 200 · `enabled:false` · គ្មានវាល `error`)',
+        noTok.res.statusCode === 200 && !!noTok.body && noTok.body.enabled === false
+        && noTok.body.error === undefined, noTok.body);
+    ok('⛔ គ្មាន token ➜ គ្មានការហៅ ZTO សោះ', ztoCalls() === 0, ztoCalls());
+
+    const forged = await listTok(tokenFor('x@zoew770022.com', { forge: true }), {});
+    ok('⛔ ហត្ថលេខាក្លែងក្លាយ ➜ បដិសេធ', !!forged.body && forged.body.enabled === false, forged.body);
+    ok('⛔ ហត្ថលេខាក្លែង ➜ គ្មានការហៅ ZTO', ztoCalls() === 0, ztoCalls());
+
+    const wrongAud = await listTok(tokenFor('x@zoew770022.com', { aud: 'someone-else' }), {});
+    ok('⛔ token របស់ Project ផ្សេង ➜ បដិសេធ', !!wrongAud.body && wrongAud.body.enabled === false, wrongAud.body);
+
+    const expired = await listTok(tokenFor('x@zoew770022.com',
+        { claims: { exp: Math.floor(Date.now() / 1000) - 120 } }), {});
+    ok('⛔ token ផុតកំណត់ ➜ បដិសេធ', !!expired.body && expired.body.enabled === false, expired.body);
+
+    const noSite = await listTok(tokenFor('user@zoew.com'), {});
+    ok('⛔ email គ្មានលេខសាខា ➜ បញ្ជីបិទ ដោយប្រាប់មូលហេតុ',
+        !!noSite.body && noSite.body.enabled === false && /site/.test(String(noSite.body.reason || '')), noSite.body);
+
+    const noEnv = await listTok(tokenFor('sok@zoew881859.com'), {}, { FIREBASE_PROJECT_IDS: undefined });
+    ok('⛔ `FIREBASE_PROJECT_IDS` មិនទាន់ដាក់ ➜ បញ្ជីបិទ (fail-closed)',
+        !!noEnv.body && noEnv.body.enabled === false, noEnv.body);
+
+    // ⛔ ទិសផ្ទុយដ៏សំខាន់ ៖ **ការស្កេនមិនត្រូវការ token សោះ**
+    // (ច្បាប់ផ្ទះ ៖ លេខទូរស័ព្ទ និងលុយសំខាន់ជាងបញ្ជី ➜ ការស្កេនមិនត្រូវធ្លាក់)
+    resetEnv({ FIREBASE_PROJECT_IDS: PROJECT });
+    seenRequests.length = 0;
+    global.fetch = responder({ success: true, data: { consigneeMobile: "855963897345", agentAmount: 1 } });
+    const scanNoTok = await call({ barcode: '77130533910996' });
+    ok('⛔ ទិសផ្ទុយ ៖ ការស្កេន **មិនត្រូវការ** ID token', scanNoTok.statusCode === 200, scanNoTok.statusCode);
+
+    // ⛔ សាខា ២ មិនត្រូវចែក cache គ្នា (កូនសោផ្ទុកសាខាដែល *ដេរីវេ*)
+    await listTok(tokenFor('a@zoew881859.com'), {});
+    const siteA = siteSent();
+    await listTok(tokenFor('b@zoew770022.com'), {});
+    const siteB = siteSent();
+    ok('⛔ សាខា ២ ➜ ការហៅ ZTO ២ ផ្សេងគ្នា (cache មិនលេចឆ្លងសាខា)',
+        siteA === '881859' && siteB === '770022', { siteA: siteA, siteB: siteB });
+
+    // ⛔ **លេខសាខាមានខ្ទង់ផ្សេងៗគ្នា** (សំណើម្ចាស់គម្រោង ៖ «លេខកូដសាខាខ្លះ ៥ ខ្ទង់»)
+    // ➜ ការចាប់ត្រូវ **មិនចងនឹងចំនួនខ្ទង់** ៖ បញ្ជីរឹងនៃប្រវែង = សាខាថ្មីដែល
+    // ខ្ទង់ខុស នឹងរអិតចេញស្ងាត់ៗ ហើយអ្នកប្រើឃើញត្រឹម «គណនីគ្មានសាខា»។
+    for (const code of ['5', '88185', '881859', '1234567890', '123456789012345']) {
+        await listTok(tokenFor('u@zoew' + code + '.com'), {});
+        ok('⛔ លេខសាខា ' + code.length + ' ខ្ទង់ ➜ ចាប់បានត្រឹមត្រូវ (' + code + ')',
+            siteSent() === code, { want: code, got: siteSent() });
+    }
+
+    // ⛔ ទិសផ្ទុយ ៖ អ្វីដែល **មិនមែន** លេខសាខា មិនត្រូវចាប់ខុស
+    for (const bad of ['u@zoew.com', 'u@zoewabc.com', 'u@notzoew881859.com',
+        'u@zoew881859.com.evil.com', 'u@zoew881859.net']) {
+        const out = await listTok(tokenFor(bad), {});
+        ok('⛔ `' + bad + '` ➜ គ្មានសាខា (មិនចាប់ខុស)',
+            !!out.body && out.body.enabled === false, { email: bad, body: out.body });
+    }
+
+    // ⛔ email និង token មិនត្រូវលេចក្នុងចម្លើយ
+    const leak = JSON.stringify(hijack.body || {});
+    ok('⛔ email និង token មិនត្រូវលេចក្នុងចម្លើយ',
+        leak.indexOf('zoew881859.com') === -1 && leak.indexOf('eyJ') === -1, leak.slice(0, 160));
+    }
     console.log('\nសរុប ៖ ' + pass + ' ok, ' + fail + ' FAIL');
     ENV_NAMES.forEach((name) => {
         if (SAVED_ENV[name] === undefined) delete process.env[name];

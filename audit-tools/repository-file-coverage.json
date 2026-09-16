@@ -402,6 +402,15 @@
       ],
       "evidence": "Function inventory និងតេស្តឥរិយាបថប្រមូលលុយរបស់ ZoeW អាន app.js ពិត។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
+    },
+    "guard-idtoken-fixture": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zto-list-sync-test.js",
+        "audit-tools/zto-proxy-test.js"
+      ],
+      "evidence": "checker ទាំង ២ ចុះហត្ថលេខា RS256 ពិតដោយវិញ្ញាបនបត្ររបស់ម៉ូឌុលនេះ រួចរត់ `zto-order-detail.js` ពិត ➜ ការផ្ទៀងផ្ទាត់ទទួលយក token ត្រឹមត្រូវ និងបដិសេធ token ក្លែង/ផុត/Project ខុស",
+      "limitation": "សោសាកល្បងប៉ុណ្ណោះ — វាមិនបញ្ជាក់ថា Google បង្វិលវិញ្ញាបនបត្រយ៉ាងណាលើផលិតកម្មទេ។"
     }
   },
   "files": {
@@ -413,6 +422,144 @@
     },
     ".gitignore": {
       "policy": "guard-2"
+    },
+    "CLAUDE.md": {
+      "policy": "guard-12"
+    },
+    "LICENSE": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "dc0c2028df327cbb31bd267eab825fc6cf7688fe88455dcf79e9e2647825dc76"
+    },
+    "LICENSES/Apache-2.0.txt": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "NOTICE": {
+      "policy": "guard-7",
+      "encoding": "lf-text",
+      "sha256": "117f9c6758026ddb59e6d3c4e7f1cf2fd40e260295a1935a42be3e6943667008"
+    },
+    "README.md": {
+      "policy": "guard-13"
+    },
+    "ZoeKeyGen/README.md": {
+      "policy": "guard-13"
+    },
+    "ZoeKeyGen/app.js": {
+      "policy": "guard-14"
+    },
+    "ZoeKeyGen/boot-flags.js": {
+      "policy": "guard-15"
+    },
+    "ZoeKeyGen/error-reporting.js": {
+      "policy": "guard-16"
+    },
+    "ZoeKeyGen/firebase-database.rules.json": {
+      "policy": "guard-17"
+    },
+    "ZoeKeyGen/firebase-loader.js": {
+      "policy": "guard-18"
+    },
+    "ZoeKeyGen/icon-192.png": {
+      "policy": "guard-8",
+      "sha256": "0d5ce383c684907bb54e52899714d447c5e09f149d400d14e311e9374aea8def"
+    },
+    "ZoeKeyGen/icon-512.png": {
+      "policy": "guard-8",
+      "sha256": "4359a51f0463b8c0360746cb3da57a2906a8bc4212bb2a9208b6b72d1104ed2b"
+    },
+    "ZoeKeyGen/index.html": {
+      "policy": "guard-19"
+    },
+    "ZoeKeyGen/license-verify.js": {
+      "policy": "guard-20"
+    },
+    "ZoeKeyGen/manifest.json": {
+      "policy": "guard-21"
+    },
+    "ZoeKeyGen/netlify.toml": {
+      "policy": "guard-22"
+    },
+    "ZoeKeyGen/qrcode.js": {
+      "policy": "guard-8",
+      "encoding": "lf-text",
+      "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
+    },
+    "ZoeKeyGen/style.css": {
+      "policy": "guard-23"
+    },
+    "ZoeKeyGen/sw.js": {
+      "policy": "guard-24"
+    },
+    "ZoeW/README.md": {
+      "policy": "guard-13"
+    },
+    "ZoeW/ZTO-SETUP-KH.md": {
+      "policy": "guard-25"
+    },
+    "ZoeW/app.js": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/boot-flags.js": {
+      "policy": "guard-15"
+    },
+    "ZoeW/error-reporting.js": {
+      "policy": "guard-16"
+    },
+    "ZoeW/firebase-loader.js": {
+      "policy": "guard-18"
+    },
+    "ZoeW/guide.html": {
+      "policy": "guard-26"
+    },
+    "ZoeW/icon-192.png": {
+      "policy": "guard-8",
+      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
+    },
+    "ZoeW/icon-512.png": {
+      "policy": "guard-8",
+      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
+    },
+    "ZoeW/index.html": {
+      "policy": "guard-19"
+    },
+    "ZoeW/license-verify.js": {
+      "policy": "guard-20"
+    },
+    "ZoeW/manifest.json": {
+      "policy": "guard-21"
+    },
+    "ZoeW/netlify.toml": {
+      "policy": "guard-22"
+    },
+    "ZoeW/netlify/functions/zto-order-detail.js": {
+      "policy": "guard-27"
+    },
+    "ZoeW/package-lock.json": {
+      "policy": "guard-2"
+    },
+    "ZoeW/package.json": {
+      "policy": "guard-28"
+    },
+    "ZoeW/style.css": {
+      "policy": "guard-23"
+    },
+    "ZoeW/sw.js": {
+      "policy": "guard-24"
+    },
+    "ZoeW/vendor/xlsx.full.min.js": {
+      "policy": "guard-29"
+    },
+    "ZoeW/vendor/zxing-wasm.js": {
+      "policy": "guard-30"
+    },
+    "ZoeW/vendor/zxing_reader.wasm": {
+      "policy": "guard-31"
+    },
+    "audit-tools/README.md": {
+      "policy": "guard-13"
     },
     "audit-tools/action-binding-test.js": {
       "policy": "guard-1"
@@ -465,13 +612,10 @@
     "audit-tools/code-duplication-test.js": {
       "policy": "guard-1"
     },
-    "audit-tools/collected-mirror-lifecycle-test.js": {
-      "policy": "guard-1"
-    },
     "audit-tools/collected-mirror-fuzz-test.js": {
       "policy": "guard-1"
     },
-    "audit-tools/loop-termination-test.js": {
+    "audit-tools/collected-mirror-lifecycle-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/collected-value-fuzz-test.js": {
@@ -594,6 +738,9 @@
     "audit-tools/html-sink-escaping.js": {
       "policy": "guard-1"
     },
+    "audit-tools/idtoken-fixture.js": {
+      "policy": "guard-idtoken-fixture"
+    },
     "audit-tools/inline-handler-xss-test.js": {
       "policy": "guard-1"
     },
@@ -667,6 +814,9 @@
       "policy": "guard-1"
     },
     "audit-tools/lookup-prefetch-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/loop-termination-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/money-guardian-test.js": {
@@ -749,9 +899,6 @@
     },
     "audit-tools/raw-read-shape-test.js": {
       "policy": "guard-1"
-    },
-    "audit-tools/README.md": {
-      "policy": "guard-13"
     },
     "audit-tools/reconnect-ladder-test.js": {
       "policy": "guard-1"
@@ -951,9 +1098,6 @@
     "audit-tools/zto-sync-banner-test.js": {
       "policy": "guard-1"
     },
-    "CLAUDE.md": {
-      "policy": "guard-12"
-    },
     "docs/ARCHIVE-2026-09-03.md": {
       "policy": "guard-7",
       "encoding": "lf-text",
@@ -969,6 +1113,9 @@
     },
     "docs/HISTORY.md": {
       "policy": "guard-37"
+    },
+    "firebase-backup/README.md": {
+      "policy": "guard-13"
     },
     "firebase-backup/backup.js": {
       "policy": "guard-38"
@@ -988,65 +1135,26 @@
     "firebase-backup/package.json": {
       "policy": "guard-39"
     },
-    "firebase-backup/README.md": {
-      "policy": "guard-13"
-    },
     "firebase-database.rules.json": {
       "policy": "guard-40"
     },
-    "LICENSE": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "dc0c2028df327cbb31bd267eab825fc6cf7688fe88455dcf79e9e2647825dc76"
-    },
-    "LICENSES/Apache-2.0.txt": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
-    },
-    "NOTICE": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "117f9c6758026ddb59e6d3c4e7f1cf2fd40e260295a1935a42be3e6943667008"
-    },
-    "README.md": {
+    "tools/money-check-windows/README-KH.md": {
       "policy": "guard-13"
     },
     "tools/money-check-windows/check-money.cmd": {
       "policy": "guard-6"
     },
-    "tools/money-check-windows/README-KH.md": {
+    "tools/zto-cookie-sync-windows/README-ANDROID-KH.md": {
       "policy": "guard-13"
-    },
-    "tools/zto-cookie-sync-windows/configure.ps1": {
-      "policy": "guard-41"
-    },
-    "tools/zto-cookie-sync-windows/package.json": {
-      "policy": "guard-41"
-    },
-    "tools/zto-cookie-sync-windows/read-token.ps1": {
-      "policy": "guard-41"
     },
     "tools/zto-cookie-sync-windows/README-KH.md": {
       "policy": "guard-13"
     },
-    "tools/zto-cookie-sync-windows/schedule-zto-cookie.cmd": {
-      "policy": "guard-41"
-    },
-    "tools/zto-cookie-sync-windows/setup.cmd": {
-      "policy": "guard-41"
-    },
-    "tools/zto-cookie-sync-windows/sync-zto-cookie.cmd": {
-      "policy": "guard-41"
-    },
-    "tools/zto-cookie-sync-windows/sync-zto-cookie.js": {
-      "policy": "guard-42"
-    },
-    "tools/zto-cookie-sync-windows/README-ANDROID-KH.md": {
-      "policy": "guard-13"
-    },
     "tools/zto-cookie-sync-windows/android-cdp-capture.js": {
       "policy": "guard-42"
+    },
+    "tools/zto-cookie-sync-windows/configure.ps1": {
+      "policy": "guard-41"
     },
     "tools/zto-cookie-sync-windows/connect-android.sh": {
       "policy": "guard-41"
@@ -1057,140 +1165,32 @@
     "tools/zto-cookie-sync-windows/install-home-button.sh": {
       "policy": "guard-41"
     },
+    "tools/zto-cookie-sync-windows/package.json": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/read-token.ps1": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/schedule-zto-cookie.cmd": {
+      "policy": "guard-41"
+    },
     "tools/zto-cookie-sync-windows/setup-termux.sh": {
+      "policy": "guard-41"
+    },
+    "tools/zto-cookie-sync-windows/setup.cmd": {
       "policy": "guard-41"
     },
     "tools/zto-cookie-sync-windows/sync-zto-cookie-termux.sh": {
       "policy": "guard-41"
     },
-    "ZoeKeyGen/app.js": {
-      "policy": "guard-14"
+    "tools/zto-cookie-sync-windows/sync-zto-cookie.cmd": {
+      "policy": "guard-41"
     },
-    "ZoeKeyGen/boot-flags.js": {
-      "policy": "guard-15"
-    },
-    "ZoeKeyGen/error-reporting.js": {
-      "policy": "guard-16"
-    },
-    "ZoeKeyGen/firebase-database.rules.json": {
-      "policy": "guard-17"
-    },
-    "ZoeKeyGen/firebase-loader.js": {
-      "policy": "guard-18"
-    },
-    "ZoeKeyGen/icon-192.png": {
-      "policy": "guard-8",
-      "sha256": "0d5ce383c684907bb54e52899714d447c5e09f149d400d14e311e9374aea8def"
-    },
-    "ZoeKeyGen/icon-512.png": {
-      "policy": "guard-8",
-      "sha256": "4359a51f0463b8c0360746cb3da57a2906a8bc4212bb2a9208b6b72d1104ed2b"
-    },
-    "ZoeKeyGen/index.html": {
-      "policy": "guard-19"
-    },
-    "ZoeKeyGen/license-verify.js": {
-      "policy": "guard-20"
-    },
-    "ZoeKeyGen/manifest.json": {
-      "policy": "guard-21"
-    },
-    "ZoeKeyGen/netlify.toml": {
-      "policy": "guard-22"
-    },
-    "ZoeKeyGen/qrcode.js": {
-      "policy": "guard-8",
-      "encoding": "lf-text",
-      "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
-    },
-    "ZoeKeyGen/README.md": {
-      "policy": "guard-13"
-    },
-    "ZoeKeyGen/style.css": {
-      "policy": "guard-23"
-    },
-    "ZoeKeyGen/sw.js": {
-      "policy": "guard-24"
-    },
-    "ZoeW/app.js": {
-      "policy": "zoew-app"
-    },
-    "ZoeW/boot-flags.js": {
-      "policy": "guard-15"
-    },
-    "ZoeW/error-reporting.js": {
-      "policy": "guard-16"
-    },
-    "ZoeW/firebase-loader.js": {
-      "policy": "guard-18"
-    },
-    "ZoeW/guide.html": {
-      "policy": "guard-26"
-    },
-    "ZoeW/icon-192.png": {
-      "policy": "guard-8",
-      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
-    },
-    "ZoeW/icon-512.png": {
-      "policy": "guard-8",
-      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
-    },
-    "ZoeW/index.html": {
-      "policy": "guard-19"
-    },
-    "ZoeW/license-verify.js": {
-      "policy": "guard-20"
-    },
-    "ZoeW/manifest.json": {
-      "policy": "guard-21"
-    },
-    "ZoeW/netlify.toml": {
-      "policy": "guard-22"
-    },
-    "ZoeW/netlify/functions/zto-order-detail.js": {
-      "policy": "guard-27"
-    },
-    "ZoeW/package-lock.json": {
-      "policy": "guard-2"
-    },
-    "ZoeW/package.json": {
-      "policy": "guard-28"
-    },
-    "ZoeW/README.md": {
-      "policy": "guard-13"
-    },
-    "ZoeW/style.css": {
-      "policy": "guard-23"
-    },
-    "ZoeW/sw.js": {
-      "policy": "guard-24"
-    },
-    "ZoeW/vendor/xlsx.full.min.js": {
-      "policy": "guard-29"
-    },
-    "ZoeW/vendor/zxing_reader.wasm": {
-      "policy": "guard-31"
-    },
-    "ZoeW/vendor/zxing-wasm.js": {
-      "policy": "guard-30"
-    },
-    "ZoeW/ZTO-SETUP-KH.md": {
-      "policy": "guard-25"
-    },
-    "zto-import/appsscript.json": {
-      "policy": "guard-2"
+    "tools/zto-cookie-sync-windows/sync-zto-cookie.js": {
+      "policy": "guard-42"
     },
     "zto-import/Code.gs": {
       "policy": "guard-43"
-    },
-    "zto-import/google-sheets-api/Code.gs": {
-      "policy": "guard-46"
-    },
-    "zto-import/google-sheets-api/customer-template.csv": {
-      "policy": "guard-3"
-    },
-    "zto-import/google-sheets-api/README.md": {
-      "policy": "guard-13"
     },
     "zto-import/Index.html": {
       "policy": "guard-44"
@@ -1198,11 +1198,23 @@
     "zto-import/README.md": {
       "policy": "guard-13"
     },
-    "zto-import/test.js": {
-      "policy": "guard-1"
-    },
     "zto-import/Watch.gs": {
       "policy": "guard-45"
+    },
+    "zto-import/appsscript.json": {
+      "policy": "guard-2"
+    },
+    "zto-import/google-sheets-api/Code.gs": {
+      "policy": "guard-46"
+    },
+    "zto-import/google-sheets-api/README.md": {
+      "policy": "guard-13"
+    },
+    "zto-import/google-sheets-api/customer-template.csv": {
+      "policy": "guard-3"
+    },
+    "zto-import/test.js": {
+      "policy": "guard-1"
     }
   }
 }

@@ -503,6 +503,49 @@ check(healthRowCount >= 7, 'ជាន់អប្បបរមា ៖ រាប�
 check(collectedCallers >= 2, 'ជាន់អប្បបរមា ៖ រាប់កន្លែងហៅ `collectedValueOf()` បានយ៉ាងតិច ២',
     'រាប់បាន ' + collectedCallers);
 check(appLineCount > 1000, 'ជាន់អប្បបរមា ៖ អាន `ZoeW/app.js` បានពិត', String(appLineCount));
+// --- ង. `setInterval` ៖ ចំនួនដេរីវេពី `app.js` ពិត ------------------------
+// ⛔ ច្បាប់ «កុំបន្ថែមច្រកទ្វារ `document.hidden`» ក្នុង `CLAUDE.md` អះអាង
+// **ចំនួន** timer ➜ វាជាលេខដេរីវេបាន ➜ វារលួយ។ វាស់បាន (ជុំនេះ) ៖ ឯកសារ
+// រាយ ៥ ខណៈកូដមាន ៦ ➜ session ក្រោយអានច្បាប់ដែលមិនត្រូវនឹងកូដ។
+// --- ច. នីតិវិធីស្ទួនឆ្លងឯកសារ (ច្បាប់ ១២) -------------------------------
+// ⛔ ប្លុកពាក្យបញ្ជាដដែលក្នុងឯកសារ ២ ជា **កាលបរិច្ឆេទផុតកំណត់** ៖ ជុំក្រោយ
+// កែមួយ ភ្លេចមួយ ➜ ២ នីតិវិធីផ្ទុយគ្នា។ វាស់បាន (ជុំនេះ) ៖
+// `audit-tools/README.md` រាយ `java -jar` ជា **foreground** (បិទ shell របស់
+// session) ខណៈ `CLAUDE.md` រាយ `setsid nohup … &` — ហើយការព្រមាន `pkill`
+// របស់វាចង្អៀតជាងច្បាប់ដើម។ ⛔ `docs/` ជាផ្ទះរបស់ប្រវត្តិ ➜ លើកលែង។
+const fenceOwners = new Map();
+listAllDocs(ROOT, "", []).concat(["CLAUDE.md"]).forEach((rel) => {
+    if (/^docs[\\/]/.test(rel)) return;
+    let text = '';
+    try { text = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return; }
+    const fences = text.match(/```[a-z]*\n[\s\S]*?```/g) || [];
+    fences.forEach((f) => {
+        const lines = f.split('\n').slice(1, -1).map((l) => l.trim()).filter(Boolean);
+        if (lines.length < 3) return;
+        const key = lines.join('\n');
+        if (!fenceOwners.has(key)) fenceOwners.set(key, new Set());
+        fenceOwners.get(key).add(rel);
+    });
+});
+const dupFences = [...fenceOwners.entries()].filter(([, owners]) => owners.size > 1);
+check(fenceOwners.size >= 5, 'ជាន់អប្បបរមា ៖ ដេរីវេប្លុកពាក្យបញ្ជាបានយ៉ាងតិច ៥',
+    'ដេរីវេបាន ' + fenceOwners.size);
+check(dupFences.length === 0,
+    '⛔ ច្បាប់ ១២ ៖ ប្លុកពាក្យបញ្ជាដដែល មិនត្រូវរស់នៅ ២ ឯកសារ (ត្រូវយោង មិនចម្លង)',
+    dupFences.map(([k, o]) => [...o].join(' ↔ ') + ' ៖ ' + k.split('\n')[0]).join('\n        '));
+
+const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length;
+check(intervalCount >= 3, 'ជាន់អប្បបរមា ៖ រាប់ `setInterval` ក្នុង `app.js` បានយ៉ាងតិច ៣',
+    'រាប់បាន ' + intervalCount);
+const KH_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+const khNum = (n) => String(n).split('').map((d) => KH_DIGITS[Number(d)] || d).join('');
+const intervalClaim = /`setInterval` ទាំង ([០-៩]+) របស់ ZoeW/.exec(claudeText);
+check(!!intervalClaim, '⛔ `CLAUDE.md` នៅរក្សាច្បាប់ `setInterval` ↔ `document.hidden`',
+    'រកប្រយោគនោះមិនឃើញ');
+check(!intervalClaim || intervalClaim[1] === khNum(intervalCount),
+    '⛔ ចំនួន `setInterval` ក្នុង `CLAUDE.md` ត្រូវស្មើចំនួនក្នុង `app.js` ពិត',
+    intervalClaim ? 'ឯកសាររាយ ' + intervalClaim[1] + ' · កូដមាន ' + khNum(intervalCount) : '');
+
 
 // ⛔ ទិសផ្ទុយ ៖ តារាង UI ត្រូវនៅរស់ក្នុង CLAUDE.md — បើនរណាលុបវាចោល នោះ
 // ការអះអាងខាងក្រោមក្លាយជាការចាក់សោដោយគ្មានមូលដ្ឋាន។

@@ -87,16 +87,9 @@ env ទាំងនេះ និងមិនបង្កើតវាទេ; វ�
 Netlify Blobs ដោយផ្ទាល់។ ទុកវាបានជា **ផ្លូវបម្រុង** — Function ប្រើ env នេះ
 តែពេលអានចេញពី Blobs មិនបាន។ បើអ្នកមានតម្លៃចាស់ក្នុងនោះរួច **កុំលុបវាចេញ**។
 
-បង្កើត `ZTO_PROXY_KEY` លើ Windows៖ បើក **PowerShell** រួចរត់បន្ទាត់ទាំងនេះ
-ហើយចម្លង output ចូល Netlify៖
-
-```powershell
-$bytes = New-Object byte[] 32
-$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($bytes)
-$rng.Dispose()
-[Convert]::ToBase64String($bytes)
-```
+បង្កើត `ZTO_PROXY_KEY` លើ Windows៖ ⛔ **ពាក្យបញ្ជា PowerShell រស់នៅ
+[`../../ZoeW/ZTO-SETUP-KH.md`](../../ZoeW/ZTO-SETUP-KH.md) តែមួយកន្លែង** —
+សូមចម្លងពីទីនោះ រួចដាក់ output ចូល Netlify។
 
 តម្លៃ `ZTO_PROXY_KEY` ដដែលនេះត្រូវដាក់ក្នុង ZoeW នៅ
 `⚙️ → 🔌 API ស្វែងរកអតិថិជនស្វ័យប្រវត្តិ → តម្លៃ Header` ដោយប្រើឈ្មោះ Header

@@ -31,6 +31,7 @@ const ACCEPTED = {
     newPrivateKeyOutput: "closeModal('keypairModal') wipes it on every dismiss path",
     newPublicKeyOutput: 'public half of the keypair, not a secret',
     setupLinkUrlInput: 'Base URL of the target site, deliberately remembered in localStorage',
+    setupLinkDsnInput: "seller's own Sentry DSN, not customer data — deliberately remembered in localStorage like setupLinkUrlInput above",
     firebaseStatusText: 'connection status label',
     navAuthBtn: 'auth button label',
     logoutBtn: 'button label',

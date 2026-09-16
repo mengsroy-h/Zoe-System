@@ -771,7 +771,7 @@ function siteEmailPrefix(env) {
 // ⛔ `$` ជាចំណុចសំខាន់ ៖ បើគ្មានវា `…@zoew881859.com.evil.com` នឹងឆ្លង។
 function siteCodeFromEmail(email, prefix) {
     const text = String(email || '').trim().toLowerCase();
-    const re = new RegExp('@' + prefix + '([0-9]{4,12})\\.com$');
+    const re = new RegExp('@' + prefix + '([0-9]{1,32})\\.com$');
     const hit = re.exec(text);
     return hit ? hit[1] : '';
 }

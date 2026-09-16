@@ -42,7 +42,7 @@ function tokenFor(email, opts) {
 // លែងជា parameter ទៀតហើយ។ លេខដែលរូបរាងខុស ➜ គណនីគ្មានសាខា។
 function tokenForSite(site) {
     const code = String(site === undefined || site === null ? '' : site).trim();
-    return tokenFor(/^[0-9]{4,12}$/.test(code) ? 'u@zoew' + code + '.com' : 'u@zoew.com');
+    return tokenFor(/^[0-9]{1,32}$/.test(code) ? 'u@zoew' + code + '.com' : 'u@zoew.com');
 }
 
 // ⛔ stub ដែលឆ្លើយ **គ្រប់** URL ដូចគ្នា នឹងធ្វើឲ្យការទាញវិញ្ញាបនបត្រធ្លាក់

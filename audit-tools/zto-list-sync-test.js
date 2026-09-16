@@ -2027,6 +2027,23 @@ function firstBody(requests) {
     ok('⛔ សាខា ២ ➜ ការហៅ ZTO ២ ផ្សេងគ្នា (cache មិនលេចឆ្លងសាខា)',
         siteA === '881859' && siteB === '770022', { siteA: siteA, siteB: siteB });
 
+    // ⛔ **លេខសាខាមានខ្ទង់ផ្សេងៗគ្នា** (សំណើម្ចាស់គម្រោង ៖ «លេខកូដសាខាខ្លះ ៥ ខ្ទង់»)
+    // ➜ ការចាប់ត្រូវ **មិនចងនឹងចំនួនខ្ទង់** ៖ បញ្ជីរឹងនៃប្រវែង = សាខាថ្មីដែល
+    // ខ្ទង់ខុស នឹងរអិតចេញស្ងាត់ៗ ហើយអ្នកប្រើឃើញត្រឹម «គណនីគ្មានសាខា»។
+    for (const code of ['5', '88185', '881859', '1234567890', '123456789012345']) {
+        await listTok(tokenFor('u@zoew' + code + '.com'), {});
+        ok('⛔ លេខសាខា ' + code.length + ' ខ្ទង់ ➜ ចាប់បានត្រឹមត្រូវ (' + code + ')',
+            siteSent() === code, { want: code, got: siteSent() });
+    }
+
+    // ⛔ ទិសផ្ទុយ ៖ អ្វីដែល **មិនមែន** លេខសាខា មិនត្រូវចាប់ខុស
+    for (const bad of ['u@zoew.com', 'u@zoewabc.com', 'u@notzoew881859.com',
+        'u@zoew881859.com.evil.com', 'u@zoew881859.net']) {
+        const out = await listTok(tokenFor(bad), {});
+        ok('⛔ `' + bad + '` ➜ គ្មានសាខា (មិនចាប់ខុស)',
+            !!out.body && out.body.enabled === false, { email: bad, body: out.body });
+    }
+
     // ⛔ email និង token មិនត្រូវលេចក្នុងចម្លើយ
     const leak = JSON.stringify(hijack.body || {});
     ok('⛔ email និង token មិនត្រូវលេចក្នុងចម្លើយ',

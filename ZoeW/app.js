@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.4';
+    const APP_VERSION = '2.36.5';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4727,7 +4727,6 @@
         ztoListSignedProbe.clear();
         ztoListSyncInFlight = false;
         closeModal('ztoListSyncModal');
-        closeModal('ztoListSiteModal');
         restoreAfterPdfExport();
         if (!isPinFlowPending()) pinTargetAction = null;
         pendingRestoreId = null;
@@ -4779,8 +4778,7 @@
             'siStatusFoot', 'siChips', 'siPreviewBody', 'siSheetSel',
             'siMapBarcode', 'siMapDod', 'siMapCod', 'siMapPhone',
             'appLockPinInput', 'appLockMsg',
-            'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo',
-            'ztoListSiteInput', 'ztoListSiteNote'
+            'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
         ];
         fieldsToBlank.forEach((id) => {
             const el = document.getElementById(id);

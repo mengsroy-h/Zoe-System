@@ -481,11 +481,13 @@ Site `zoew` ➜ **Site configuration ➜ Environment variables** ៖
 ### ជំហានទី ៣ — បង្កើតគណនីតាមសាខា
 
 លេខសាខារស់ក្នុង **domain របស់ email** តាមទម្រង់ `…@zoew<លេខសាខា>.com` ៖
+⛔ **ខ្ទង់ប៉ុន្មានក៏បាន** — ការចាប់មិនចងនឹងចំនួនខ្ទង់ទេ។
 
 | Email | សាខាដែល Function ដេរីវេ |
 | --- | --- |
-| `sok@zoew881859.com` | `881859` |
-| `chan@zoew770022.com` | `770022` |
+| `sok@zoew881859.com` | `881859` (៦ ខ្ទង់) |
+| `chan@zoew88185.com` | `88185` (៥ ខ្ទង់) |
+| `dara@zoew7700.com` | `7700` (៤ ខ្ទង់) |
 | `user@zoew.com` | គ្មាន ➜ **មុខងារបញ្ជីបិទ** (ការស្កេននៅដើរធម្មតា) |
 
 **បង្កើត** ៖ Firebase Console ➜ **Authentication ➜ Users ➜ Add user** ➜

@@ -692,5 +692,74 @@ check(deadFns.length === 0,
     'លែងមានក្នុងកូដ ៖ ' + deadFns.join(' · ')
     + '\n        ➜ មុខងារត្រូវដកចេញ តែច្បាប់នៅយោងវា (ឬឈ្មោះត្រូវប្តូរ)');
 
+// ════════════════════════════════════════════════════════════════════════
+// ផ្នែក ៧ — ⛔ **ផ្ទៃដែល *ដកចេញរួច* មិនត្រូវនៅរស់ក្នុងឯកសារ**
+// ════════════════════════════════════════════════════════════════════════
+//
+// ផ្នែក ៤–៦ ខាងលើវាស់ **ទិសមួយ** ៖ ផ្ទៃថ្មីក្នុងកូដ ត្រូវលេចក្នុងឯកសារ។
+// ⛔ **ទិសផ្ទុយគ្មានអ្នកវាស់សោះ** ៖ ផ្ទៃដែលកូដ **ដកចេញ** នៅតែអង្គុយក្នុង
+// ឯកសារ ➜ អ្នកប្រើដើរតាមសៀវភៅ រកប្រអប់ដែលមិនលេច ➜ សន្និដ្ឋានថា App ខូច។
+// 🔴 វាស់បាន (2.36.6) ៖ លេខសាខា ZTO ផ្លាស់ទៅ **អត្តសញ្ញាណគណនី** ហើយប្រអប់
+// បំពេញត្រូវលុបចេញពី `index.html` — តែ `guide.html` · `README.md` ២ និង
+// `ZTO-SETUP-KH.md` នៅប្រាប់ថា «ចុចកុងតាក់ ➜ **បំពេញលេខសាខា** ➜ រក្សាទុក»
+// ហើយ `CLAUDE.md` នៅរាយកូនសោ `zoew_zto_list_site_v1` ជា **ច្បាប់រស់** ➜
+// ជំនាន់ក្រោយអានច្បាប់ដែលផ្ទុយនឹងកូដ។ `doc-scope-test` និង `user-guide-test`
+// **បៃតងទាំង ២** លើ tree នោះ។
+
+const SHIPPED_APP_TEXT = ['ZoeW/app.js', 'ZoeKeyGen/app.js', 'ZoeW/sw.js',
+    'ZoeKeyGen/sw.js', 'ZoeW/index.html', 'ZoeKeyGen/index.html']
+    .map((rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return ''; } })
+    .join('\n');
+
+check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា ៖ អានកូដ ship ទាំង ២ App បានពិត',
+    'អានបាន ' + SHIPPED_APP_TEXT.length + ' តួ');
+
+// ⛔ កូនសោ storage ជា **ស្នាមភ្ជាប់ដែលដេរីវេបាន** ៖ ឈ្មោះមានទម្រង់ច្បាស់
+// ហើយវារស់នៅកូដ ship ពិត ➜ ការប្រៀបមិនមានសំឡេងរំខាន (វាស់បាន ៖ ២៤ កូនសោ
+// ក្នុង CLAUDE.md ➜ ១ ដែលងាប់ ➜ ០ false positive)។
+const docKeys = [...new Set((claudeText.match(/zoe[a-z]*_[a-z0-9_]{3,}/g) || []))];
+const deadKeys = docKeys.filter((k) => SHIPPED_APP_TEXT.indexOf(k) === -1);
+check(docKeys.length >= 15, 'ជាន់អប្បបរមា ៖ CLAUDE.md យោងកូនសោ storage យ៉ាងតិច ១៥',
+    'រកបាន ' + docKeys.length);
+check(deadKeys.length === 0,
+    '⛔ CLAUDE.md ៖ កូនសោ storage ដែលឯកសារយោង ត្រូវ **នៅមានក្នុងកូដ ship**',
+    'លែងមានក្នុងកូដ ៖ ' + deadKeys.join(' · ')
+    + '\n        ➜ ផ្ទៃត្រូវដកចេញ តែច្បាប់នៅរៀបរាប់វាជាផ្ទៃរស់');
+
+// ⛔ ច្រកទ្វារ **ដេរីវេ** ៖ ដរាបណា `index.html` គ្មានវាលបំពេញលេខសាខា
+// ឯកសារណាក៏មិនត្រូវប្រាប់អ្នកប្រើឲ្យបំពេញវាក្នុង App ដែរ។ បើថ្ងៃណាវាល
+// នោះត្រឡប់មកវិញ ការពិនិត្យនេះ **ធូរដោយខ្លួនឯង** (ទិសផ្ទុយ)។
+const zoewHtml = (() => {
+    try { return fs.readFileSync(path.join(ROOT, 'ZoeW/index.html'), 'utf8'); } catch (_) { return ''; }
+})();
+const siteInputExists = /ztoListSite/i.test(zoewHtml);
+// ⛔ បញ្ជីត្រូវ **ដេរីវេពីថតពិត** មិនមែនបញ្ជីរឹង (បញ្ជីរឹង = កាលបរិច្ឆេទ
+// ផុតកំណត់ ➜ ឯកសារថ្មីដែលរៀបរាប់ផ្ទៃដដែល រអិលកាត់ស្ងាត់ៗ)។ `CLAUDE.md`
+// និងសៀវភៅណែនាំក្នុង App ចូលរួមដែរ ព្រោះទាំង ២ ណែនាំអ្នកអាន។
+const SITE_DOC_FILES = listAllDocs(ROOT, '', [])
+    .concat(['CLAUDE.md', 'ZoeW/guide.html', 'ZoeKeyGen/guide.html'])
+    .filter((rel) => fs.existsSync(path.join(ROOT, rel)));
+// «បំពេញលេខសាខា…» · «លេខសាខា…បំពេញក្នុង App» · «លេខសាខា…រស់ក្នុងឧបករណ៍»
+const SITE_MANUAL_RE = /(បំពេញ[^។\n]{0,40}លេខសាខា|លេខសាខា[^។\n]{0,40}(?:បំពេញក្នុង App|បំពេញក្នុង|រស់ក្នុងឧបករណ៍|រស់ក្នុង ZoeW))/;
+// ⛔ ការបដិសេធជាប្រយោគត្រឹមត្រូវ («**គ្មាន**ផ្ទៃបំពេញលេខសាខា…») មិនមែន
+// ការណែនាំទេ ➜ បើមិនលើកលែង អ្នកយាមនឹងហាមការសរសេរការពិត។
+const SITE_NEGATION_RE = /(គ្មាន|លែង|មិនមែន|មិនមាន)/;
+const siteOffenders = siteInputExists ? [] : SITE_DOC_FILES.filter((rel) => {
+    let txt = '';
+    try { txt = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return false; }
+    const re = new RegExp(SITE_MANUAL_RE.source, 'g');
+    let m;
+    while ((m = re.exec(txt)) !== null) {
+        if (!SITE_NEGATION_RE.test(txt.slice(Math.max(0, m.index - 28), m.index))) return true;
+    }
+    return false;
+});
+check(SITE_DOC_FILES.length >= 8, 'ជាន់អប្បបរមា ៖ ដេរីវេបញ្ជីឯកសារពីថតពិតបានយ៉ាងតិច ៨',
+    SITE_DOC_FILES.length + ' ៖ ' + SITE_DOC_FILES.join(' · '));
+check(siteOffenders.length === 0,
+    '⛔ វាលបំពេញលេខសាខាដកចេញពី `index.html` ➜ គ្មានឯកសារណាត្រូវប្រាប់ឲ្យបំពេញវាក្នុង App',
+    'ឯកសារដែលនៅរៀបរាប់ ៖ ' + siteOffenders.join(' · ')
+    + '\n        ➜ លេខសាខាមកពី email របស់គណនី (`@zoew<លេខ>.com`) មិនមែនពីឧបករណ៍');
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

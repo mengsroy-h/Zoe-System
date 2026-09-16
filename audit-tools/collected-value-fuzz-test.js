@@ -258,9 +258,23 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
         const rand = w.rand;
         const daily = ledgerFromWorld(w.scanHistory, w.deletedItems);
         let clean = true;
+        // ⛔ **ការគ្របត្រូវជា *រចនាសម្ព័ន្ធ* មិនមែនជាសំណាងនៃ seed។** ការចាក់
+        // ការឃ្លាតដោយ `rand()` តែម្យ៉ាង ធ្វើឲ្យចំនួនស្ថានភាព **ស្អាត**
+        // (អ្នកវាស់តែមួយនៃអថេរ (ឃ)) ប្រែតាមជួរ seed ៖ វាស់បាន (2.36.6)
+        // លើការរត់ ១៦០ ដដែល ➜ `CFUZZ_RUN0=0` ផ្តល់ **៤៣** ស្អាត ចំណែក
+        // `CFUZZ_RUN0=500` ផ្តល់ត្រឹម **១៧** ➜ ជាន់អប្បបរមា `>= 30` ធ្លាក់
+        // ដោយ **គ្មានកំហុសក្នុងកូដ ship សោះ**។ នោះខូច ២ ទិស ៖ ការរត់ក្រៅ
+        // ជួរ seed លំនាំដើម (ដែល CLAUDE.md ណែនាំ) ចេញក្រហមក្លែងក្លាយ ហើយ
+        // ការធ្លាក់នៃចំនួនស្អាតដោយការកែប្រូបាប៊ីលីតេ អាចរអិតកាត់ស្ងាត់ៗ។
+        // ដូច្នេះបម្រុងចំណែកថេរក្នុងមួយ ៨ ជុំ ៖ ២ ស្អាតច្បាស់ · ១ listener
+        // មិនគ្រប់ច្បាប់ ➜ ជាន់ទាំងអស់ **ដេរីវេពី `RUNS`** មិនមែនលេខថេរ។
+        const slot = ((run % 8) + 8) % 8;
+        const forceClean = (slot === 0 || slot === 4);
+        const forceStale = (slot === 1);
 
         // ⛔ ការឃ្លាតពិត ៖ «កែទឹកប្រាក់» ដោយដៃ (អ្នកប្រើសរសេរតួលេខផ្ទាល់ — ទទួលយកដោយចេតនា)
-        if (rand() < 0.45) {
+        const drawEdit = rand() < 0.45;
+        if (!forceClean && drawEdit) {
             const ks = Object.keys(daily);
             if (ks.length) {
                 const d = ks[Math.floor(rand() * ks.length)];
@@ -269,14 +283,16 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
             }
         }
         // ⛔ ការឃ្លាតពិត ២ ៖ ថ្ងៃដែលមានកញ្ចប់បើក តែគ្មានជួរ ledger សោះ
-        if (rand() < 0.30) {
+        const drawDrop = rand() < 0.30;
+        if (!forceClean && drawDrop) {
             const ks = Object.keys(daily);
             if (ks.length > 1) { delete daily[ks[Math.floor(rand() * ks.length)]]; clean = false; }
         }
         const monthly = monthlyFromDaily(daily);
         // ⛔ ការឃ្លាតពិត ៣ ៖ ledger ខែឃ្លាតពីផលបូកថ្ងៃ
         let aligned = true;
-        if (rand() < 0.25) {
+        const drawMonth = rand() < 0.25;
+        if (!forceClean && drawMonth) {
             const ms = Object.keys(monthly);
             if (ms.length) {
                 const m = ms[Math.floor(rand() * ms.length)];
@@ -287,7 +303,8 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
         // ⛔ listener ព្យួរ/ងាប់ ៖ ថ្នាក់ «សិទ្ធិវាស់»
         const pending = [], failed = [];
         let stale = false;
-        if (rand() < 0.22) {
+        const drawStale = rand() < 0.22;
+        if (!forceClean && (forceStale || drawStale)) {
             const key = ['history', 'deleted', 'dailyRevenue'][Math.floor(rand() * 3)];
             (rand() < 0.5 ? pending : failed).push(key);
             stale = true; clean = false;
@@ -374,11 +391,21 @@ scenario('លំដាប់ចៃដន្យ ' + RUNS + ' ➜ អថេរ ៥
     }
 
     // ⛔ ជាន់អប្បបរមា ៖ បើមិនដល់ ស្ថានភាពមិនបានកេះផ្លូវពិត ➜ តេស្តទទេ
-    ok('⛔ ជាន់អប្បបរមា៖ គូរកាតថ្ងៃយ៉ាងតិច 150', dayCards >= 150, 'dayCards=' + dayCards);
-    ok('⛔ ជាន់អប្បបរមា៖ ប្រៀបខែយ៉ាងតិច 60', monthsChecked >= 60, 'monthsChecked=' + monthsChecked);
-    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ស្អាត** យ៉ាងតិច 30 (សម្រាប់អថេរ (ឃ))', cleanRuns >= 30, 'clean=' + cleanRuns);
-    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ឃ្លាត** យ៉ាងតិច 40 (សម្រាប់អថេរ (ខ))', driftRuns >= 40, 'drift=' + driftRuns);
-    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព listener **មិនគ្រប់** យ៉ាងតិច 15 (សម្រាប់អថេរ (គ))', staleRuns >= 15, 'stale=' + staleRuns);
+    // ⛔ ជាន់ទាំងអស់ **ដេរីវេពី `RUNS`** ➜ ការរត់ជ្រៅ ឬខ្លី មិនចេញក្រហម
+    // ក្លែងក្លាយ ហើយការដកចំណែកបម្រុងចេញ នៅតែធ្លាក់ដដែល។
+    const FLOOR_CLEAN = Math.floor(RUNS / 4);
+    const FLOOR_STALE = Math.floor(RUNS / 8);
+    const FLOOR_DRIFT = Math.floor(RUNS / 2);
+    ok('⛔ ជាន់អប្បបរមា៖ គូរកាតថ្ងៃយ៉ាងតិច ' + Math.floor(RUNS * 0.9),
+        dayCards >= Math.floor(RUNS * 0.9), 'dayCards=' + dayCards);
+    ok('⛔ ជាន់អប្បបរមា៖ ប្រៀបខែយ៉ាងតិច ' + Math.floor(RUNS * 0.375),
+        monthsChecked >= Math.floor(RUNS * 0.375), 'monthsChecked=' + monthsChecked);
+    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ស្អាត** យ៉ាងតិច ' + FLOOR_CLEAN + ' (សម្រាប់អថេរ (ឃ))',
+        cleanRuns >= FLOOR_CLEAN, 'clean=' + cleanRuns + ' floor=' + FLOOR_CLEAN);
+    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព **ឃ្លាត** យ៉ាងតិច ' + FLOOR_DRIFT + ' (សម្រាប់អថេរ (ខ))',
+        driftRuns >= FLOOR_DRIFT, 'drift=' + driftRuns + ' floor=' + FLOOR_DRIFT);
+    ok('⛔ ជាន់អប្បបរមា៖ ស្ថានភាព listener **មិនគ្រប់** យ៉ាងតិច ' + FLOOR_STALE + ' (សម្រាប់អថេរ (គ))',
+        staleRuns >= FLOOR_STALE, 'stale=' + staleRuns + ' floor=' + FLOOR_STALE);
 });
 
 // ------------------------------------------------------------------

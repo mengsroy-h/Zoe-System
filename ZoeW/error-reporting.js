@@ -153,7 +153,8 @@
 
     const SECRET_KEY_PATTERN = '(?:password|passwd|passphrase|passcode|pwd|pin|secret|'
         + 'token|apikey|api_key|access_token|id_token|refresh_token|session_token|'
-        + 'credential|authorization|bearer|jwt|setup|cookie|private_key|signing_key)';
+        + 'credential|authorization|bearer|jwt|setup|cookie|private_key|signing_key|'
+        + 'header_value|proxy_key|bos_man_session)';
     const SECRET_KEY_RE = new RegExp('(?:^|_)' + SECRET_KEY_PATTERN + '(?:$|_)', 'i');
 
     function isSecretKeyName(name) {

@@ -98,8 +98,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.2` (`zoew-v211`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.25` (`zoekeygen-v95`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.3` (`zoew-v212`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.26` (`zoekeygen-v96`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -293,7 +293,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ការតភ្ជាប់ · ស្តារ | listener ដែលធ្លាក់ត្រូវត្រឡប់មកវិញ; SDK ស្តារបានពិត | `connection-recovery-test` |
 | **listener ដែលងាប់តែឯង** | ⛔ បងប្អូនមិនត្រូវប្រកាសជំនួសវាថាជាសះស្បើយ | `connection-recovery-test` |
 | **listener `.info/*` ដែលងាប់តែឯង** | ⛔ ច្បាប់ដដែលអនុវត្តលើ `.info/connected` និង `.info/serverTimeOffset` ដែរ | `connection-recovery-test` |
-| **ការលាក់ secret** | វត្ថុ frozen ត្រូវលាក់តាមច្បាប់ចម្លង; private/signing key និង private JWK ត្រូវលាក់ រួម JSON string; public JWK និងវាលលុយ `d` ត្រូវនៅដដែល | `secret-hygiene` |
+| **callback ចាស់ក្រោយភ្ជាប់ឡើងវិញ** | ⛔ រាល់ callback របស់ `onValue` ត្រូវមានច្រកទ្វារជំនាន់ (`listenerGeneration !== dbListenerGeneration`) — `fb.off()` រុំក្នុង `try/catch` ➜ វាអាចធ្លាក់ ហើយ snapshot ដែលកំពុងហោះក៏មកដល់ **ក្រោយ** ការប្តូរ database/auth ដែរ ➜ callback ចាស់ (១) សរសេរទិន្នន័យ **Project ចាស់** ចូលសតិ និង (២) ហៅ `noteDbListenerAlive()` ➜ **ប្រកាសថាទិដ្ឋភាពស្រស់** ➜ ច្បាប់ «បញ្ជីទទេ ↔ សិទ្ធិវាស់» ងាប់ ហើយការសម្អាតបំផ្លាញរត់លើទិដ្ឋភាពចាស់។ ⛔ **ការវាស់ត្រូវដេរីវេពី `DB_LISTENER_KEYS` ពិត** — ជំនាន់មុនវាស់តែ `history` ➜ ការដកច្រកទ្វារចេញពី listener **ណាមួយផ្សេង** រស់រាន។ វាស់បាន (2.36.3) ៖ ការដកវាចេញពី `deleted` **រស់រានសំណុំពេញ (១៧៥ ពេញលេញ · SKIP ០)** | `connection-recovery-test` |
+| **ការលាក់ secret** | វត្ថុ frozen ត្រូវលាក់តាមច្បាប់ចម្លង; private/signing key និង private JWK ត្រូវលាក់ រួម JSON string; public JWK និងវាលលុយ `d` ត្រូវនៅដដែល។ ⛔ **បញ្ជីពាក្យរបស់ `SECRET_KEY_PATTERN` ត្រូវគ្រប secret ដែល *ប្រព័ន្ធនេះពិតជាកាន់*** — វាជាបញ្ជីពាក្យ**ទូទៅ** (`password` · `token` · `apikey`) ➜ វាល secret ដែលមាន**ឈ្មោះផ្ទាល់ខ្លួន** រអិលកាត់។ វាស់បាន (2.36.3) ៖ `headerValue` (**secret អក្សរធម្មតា** របស់ Lookup API មុនមានការអ៊ិនគ្រីប) · `headerValueEnc` · `X-Zoe-Proxy-Key` · `ZTO_PROXY_KEY` · `BOS-MAN-SESSION` — **៥/៥ មិនត្រូវលាក់** ខណៈ checker ១៧៥ បៃតងទាំងអស់។ ⛔ Sentry ចាប់ breadcrumb របស់ `console` **ដោយស្វ័យប្រវត្តិ** ➜ redactor ជា **ជាន់ចុងក្រោយ** សម្រាប់ផ្លូវដែលគ្មាននរណាគ្រោងទុក ➜ វាមិនត្រូវពឹងលើការសន្មតថា «គ្មាននរណា log config»។ ⛔ ការវាស់ត្រូវ **ដេរីវេពីកូដពិត** (អ្វីដែល App អ៊ិនគ្រីប/ឌិគ្រីប · ឈ្មោះ header ដែលកាន់សោ) មិនមែនបញ្ជីរឹង។ ⛔ **ទិសផ្ទុយ ៖ ការពង្រីកមិនត្រូវលេបឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង** (`path` · `patch` · `dispatch` · `headerName`) — «លាក់គ្រប់យ៉ាង» នឹងបៃតង ហើយ Sentry លែងមានតម្លៃ | `secret-hygiene` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ ការពុលត្រូវធ្វើលើឯកសារស្រមោល — SIGKILL មិនត្រូវប៉ះឯកសារដើម | `checker-coverage` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ គ្មានធនធានចែករំលែក **ថេរ** ៖ `listen(0, '127.0.0.1')` ជានិច្ច · RTDB namespace របស់ `emu/*` ត្រូវតែមួយក្នុងមួយការរត់ | `checker-coverage` |
 | **ការសរសេរ ↔ ការចាកចេញទៅខល** | Retry រក្សា rollback គ្រប់វាល និងជម្រើសថ្មីជាង; callback ចាស់មិនអាចសរសេរ/ដកស្ថិតិ/បង្ហាញសារក្រោយប្ដូរ auth ឬ database | `history-patch-retry-test` |

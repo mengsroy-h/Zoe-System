@@ -24,6 +24,14 @@ const ACCEPTED = {
     ZoeKeyGen: {}
 };
 
+function readRepoFile(rel) {
+    try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return ''; }
+}
+
+function readApp(appName) {
+    return readRepoFile(path.join(appName, 'app.js'));
+}
+
 let pass = 0;
 let fail = 0;
 function ok(label, cond, detail) {
@@ -152,6 +160,74 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         ].forEach(([label, val, want]) => {
             ok('⛔ `' + label + '` ត្រូវ **រក្សាទុក** (ត្រូវការសម្រាប់ debug)', val === want, String(val));
         });
+
+        // ⛔ **ចន្លោះទី ១ខ ៖ បញ្ជីកូនសោសម្ងាត់ ត្រូវគ្រប secret ដែល *ប្រព័ន្ធនេះ
+        // ពិតជាកាន់* — មិនមែនត្រឹមឈ្មោះទូទៅ។** `SECRET_KEY_PATTERN` ជាបញ្ជី
+        // ពាក្យទូទៅ (`password` · `token` · `apikey` …) ដែលសរសេរដោយមិនមើល
+        // កូដរបស់ App ➜ វាល secret ដែល **ឈ្មោះផ្ទាល់ខ្លួន** របស់គម្រោងនេះ
+        // រអិលកាត់ទាំងស្រុង។ ⛔ ការវាស់ត្រូវ **ដេរីវេពីកូដពិត** មិនមែនបញ្ជីរឹង
+        // (បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់ ៖ secret ថ្មីនៅជុំក្រោយរអិលកាត់)។
+        //
+        // ការដេរីវេ ៖ អ្វីដែល App **អ៊ិនគ្រីប ឬឌិគ្រីប** គឺជា secret តាម
+        // និយមន័យ ➜ ឈ្មោះ property ដែលឆ្លងកាត់ `encryptLookupSecret()` /
+        // `decryptLookupSecret()` ត្រូវតែជាឈ្មោះដែល redactor លាក់។ ដូចគ្នាដែរ
+        // សម្រាប់ **header ដែលកាន់សោ** (`PROXY_KEY_HEADER` ក្នុងឧបករណ៍ Sync)
+        // និង **env ដែល Function ប្រៀបធៀបនឹងវា** (`ZTO_PROXY_KEY`)។
+        //
+        // ⛔ ហេតុអ្វីវាសំខាន់ ៖ Sentry ចាប់ breadcrumb របស់ `console` **ដោយ
+        // ស្វ័យប្រវត្តិ** ➜ redactor ជា **ជាន់ចុងក្រោយ** សម្រាប់ផ្លូវដែលគ្មាន
+        // នរណាគ្រោងទុក។ ជាន់នោះមិនត្រូវពឹងលើការសន្មតថា «គ្មាននរណា log config»។
+        (function () {
+            const appSrc = readApp('ZoeW');
+            const toolSrc = readRepoFile('tools/zto-cookie-sync-windows/sync-zto-cookie.js');
+            const fnSrc = readRepoFile('ZoeW/netlify/functions/zto-order-detail.js');
+
+            const derived = new Set();
+            // ១) property ដែលឆ្លងកាត់ការអ៊ិនគ្រីប/ឌិគ្រីបរបស់ Lookup API
+            let m;
+            const cryptoRe = /(?:encrypt|decrypt)LookupSecret\(\s*[A-Za-z_$][\w$]*\.([A-Za-z_$][\w$]*)/g;
+            while ((m = cryptoRe.exec(appSrc)) !== null) derived.add(m[1]);
+            // ២) header ដែលកាន់សោ (ឈ្មោះអានចេញពីថេររបស់ឧបករណ៍ពិត)
+            const hdr = /PROXY_KEY_HEADER\s*=\s*'([^']+)'/.exec(toolSrc);
+            if (hdr) derived.add(hdr[1]);
+            // ៣) env ដែល Function ប្រៀបធៀបនឹង header នោះ
+            const envRe = /process\.env\.(ZTO_[A-Z0-9_]*KEY)/.exec(fnSrc);
+            if (envRe) derived.add(envRe[1]);
+            // ៤) ឈ្មោះ cookie នៃ session របស់ ZTO — secret ដ៏មានតម្លៃបំផុត
+            // ក្នុងប្រព័ន្ធ។ ផ្លូវ **ខ្សែអក្សរ** (`Cookie: …`) មានការលាក់រួចហើយ
+            // តែផ្លូវ **កូនសោវត្ថុ** (`{ 'BOS-MAN-SESSION': … }` — ទម្រង់
+            // ធម្មជាតិរបស់ cookie jar) មិនទាន់មាន។
+            const ckRe = /SESSION_COOKIE_NAME\s*=\s*'([^']+)'/.exec(fnSrc);
+            if (ckRe) derived.add(ckRe[1]);
+
+            const names = Array.from(derived);
+            // ⛔ ជាន់អប្បបរមា ៖ ការដេរីវេដែលធ្លាក់ ធ្វើឲ្យការអះអាងខាងក្រោម
+            // ពិតដោយស្វ័យប្រវត្តិ ➜ ត្រូវរាយជា FAIL មិនមែនរំលង។
+            ok('ជាន់អប្បបរមា ៖ ដេរីវេឈ្មោះវាល secret ពិតបានយ៉ាងតិច ៣',
+                names.length >= 3, 'ដេរីវេបាន ៖ ' + names.join(', '));
+
+            names.forEach((name) => {
+                const probe = { extra: {} };
+                probe.extra[name] = 'DERIVED_SECRET_PROBE_VALUE';
+                api.redactEvent(probe);
+                ok('⛔ តម្លៃក្រោមកូនសោ `' + name + '` (ដេរីវេពីកូដពិត) ត្រូវលាក់',
+                    probe.extra[name] === '[redacted]', String(probe.extra[name]));
+            });
+
+            // ⛔ ទិសផ្ទុយ ៖ ការពង្រីកបញ្ជីមិនត្រូវលេប **ឈ្មោះដែលមិនមែន secret**
+            // ដែលមើលទៅស្រដៀង (`path` · `patch` · `dispatch` · `headerName` …)។
+            // គ្មានការអះអាងនេះ ➜ «លាក់គ្រប់យ៉ាង» នឹងបៃតង ហើយ Sentry លែងមានតម្លៃ។
+            const keepEv = { extra: {
+                path: 'a/b', pathKey: 'history', patch: 'p1', dispatch: 'd1',
+                headerName: 'Authorization', value: 'v', header: 'h', compat: 'c',
+                pattern: 'x', barcode: 'ZTO900', keyId: 'K9', count: 2
+            } };
+            api.redactEvent(keepEv);
+            const overRedacted = Object.keys(keepEv.extra)
+                .filter((k) => keepEv.extra[k] === '[redacted]');
+            ok('⛔ ទិសផ្ទុយ ៖ ឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង មិនត្រូវលាក់',
+                overRedacted.length === 0, 'ត្រូវលាក់ខុស ៖ ' + overRedacted.join(', '));
+        })();
 
         // ⛔ ចន្លោះទី ២ ៖ ការលាក់ធ្វើតែពេលតម្លៃជា **string**
         // (`typeof value[k] === 'string'`) ➜ secret ដែលមិនមែនជាខ្សែអក្សរ

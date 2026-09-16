@@ -364,6 +364,51 @@ function buildContext() {
     ok('⛔ callback របស់ listener ចាស់មិនត្រូវសរសេរជាន់ snapshot ថ្មី',
         t.ctx.scanHistory.length === 1 && t.ctx.scanHistory[0].id === 'fresh', t.ctx.scanHistory);
 
+    // ⛔ **ច្បាប់នេះជារបស់ listener *ទាំងអស់* មិនមែនត្រឹម `history`។**
+    // ជំនាន់មុននៃប្លុកនេះវាស់តែ `history` ➜ ការដកច្រកទ្វារជំនាន់
+    // (`listenerGeneration !== dbListenerGeneration`) ចេញពី listener **ណាមួយ
+    // ផ្សេង** រស់រានលើ checker ទាំងអស់។ វាស់បាន ៖ ការដកវាចេញពី `deleted`
+    // **រស់រាន** សំណុំពេញ (១៧៥ ពេញលេញ · SKIP ០)។ នេះជាថ្នាក់ «អ្នកយាមដែល
+    // វាស់សាខា ១ ខណៈច្បាប់គ្រប់សាខា» ➜ ការអះអាងត្រូវ **ដេរីវេពី
+    // `DB_LISTENER_KEYS` ពិត** មិនមែនចម្លងជាប្លុកទី ២។
+    //
+    // អ្វីដែលច្រកទ្វារនោះការពារ ៖ `fb.off()` រុំក្នុង `try/catch` ➜ វាអាចធ្លាក់
+    // (SDK ត្រូវលុប · ref មិនត្រឹមត្រូវ) ហើយ snapshot ដែលកំពុងហោះក៏មកដល់
+    // **ក្រោយ** ការប្តូរ database/auth ដែរ ➜ callback ចាស់នឹង (១) សរសេរ
+    // ទិន្នន័យ **Project ចាស់** ចូលសតិ និង (២) ហៅ `noteDbListenerAlive()`
+    // ➜ **ប្រកាសថាទិដ្ឋភាពស្រស់** ខណៈ listener ថ្មីមិនទាន់មកដល់ ➜ អេក្រង់
+    // «គ្មានទិន្នន័យ» ក្លាយជាការពិត និងការសម្អាតបំផ្លាញរត់លើទិដ្ឋភាពចាស់។
+    REAL_LISTENER_KEYS.forEach((key) => {
+        const tk = buildContext();
+        tk.api.initDatabaseListeners();
+        const staleCb = tk.listenerHistory[key][0].cb;
+        tk.api.initDatabaseListeners();
+        let threw = null;
+        try { staleCb(snap(null)); } catch (e) { threw = String(e && e.message); }
+        ok('⛔ callback ចាស់របស់ `' + key + '` មិនត្រូវប្រកាសថាទិដ្ឋភាពស្រស់',
+            !threw && tk.probe().pending.indexOf(key) !== -1,
+            { key: key, threw: threw, pending: tk.probe().pending });
+        // ⛔ ទិសផ្ទុយ ៖ បើ callback **ថ្មី** ក៏មិនដកកូនសោចេញពី pending ដែរ
+        // នោះការអះអាងខាងលើពិតដោយស្វ័យប្រវត្តិ (វាស់អ្វីក៏មិនដឹង)។
+        tk.listenerCallbacks[key].cb(snap(null));
+        ok('⛔ ទិសផ្ទុយ ៖ callback ថ្មីរបស់ `' + key + '` ត្រូវប្រកាសថាស្រស់',
+            tk.probe().pending.indexOf(key) === -1, { key: key, pending: tk.probe().pending });
+    });
+
+    // ⛔ ទិន្នន័យអតិថិជនរស់នៅ **២** listener (`history` និង `deleted`) ➜
+    // ការសរសេរជាន់ត្រូវវាស់ **ទាំង ២** មិនមែនត្រឹមមួយ។
+    {
+        const td = buildContext();
+        td.api.initDatabaseListeners();
+        const staleDeleted = td.listenerHistory.deleted[0].cb;
+        td.api.initDatabaseListeners();
+        td.listenerCallbacks.deleted.cb(snap([{ id: 'fresh-del', cod: 1, dod: 0 }]));
+        staleDeleted(snap([{ id: 'stale-del', cod: 9, dod: 0 }]));
+        ok('⛔ callback `deleted` ចាស់មិនត្រូវសរសេរជាន់ snapshot ថ្មី',
+            td.ctx.deletedItems.length === 1 && td.ctx.deletedItems[0].id === 'fresh-del',
+            td.ctx.deletedItems);
+    }
+
     t.setInfoRefs({ __path: 'info/connected' }, { __path: 'info/offset' });
     t.api.attachInfoListeners();
     const staleConnected = t.listenerHistory['info/connected'][0].cb;

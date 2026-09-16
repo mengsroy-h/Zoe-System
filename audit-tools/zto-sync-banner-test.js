@@ -798,6 +798,63 @@ const openItem = (code) => ({ id: 'x1', phone: '011', barcodes: [{ code: code, i
     ok('⛔ សាលក្រម «វាស់មិនបាន» ថ្មី ក៏ត្រូវចងចាំពេល cache ពេញដែរ',
         capNew.nullCalls === 0, capNew);
 
+    // ⛔ **ថ្នាក់កំហុសទី ៣ របស់អ្នកបោះ ៖ *ជនរងគ្រោះណា* ត្រូវបោះ។** ជួរ ២
+    // ខាងលើវាស់ថា សាលក្រម `false` រស់ (cache ពេញដោយ `true`) និងថាធាតុ
+    // **ទើបចាក់ចូល** មិនបោះខ្លួនឯង (cache ពេញដោយ `false`)។ ⛔ ករណីទាំង ២
+    // នោះមានធាតុមិនមែន `false` តែ **១** ➜ អ្នកបោះមិនដែលត្រូវ *ជ្រើស* សោះ។
+    // ស្ថានភាពពិតរបស់ហាងរវល់គឺផ្ទុយ ៖ cache ពេញដោយសាលក្រម `true` **ច្រើន**
+    // ➜ អ្នកបោះត្រូវជ្រើស ហើយការជ្រើស **ធាតុថ្មីជាងគេ** ធ្វើឲ្យសាលក្រមដែល
+    // ទើបវាស់រួច ត្រូវលុបដោយការវាស់បន្ទាប់ ➜ barcode នោះវិលចូលជួរវិញ ➜
+    // **ការហៅឥតឈប់** (ថ្នាក់ដដែលនឹង 2.31.9 · 2.31.12 មកតាមទ្វារទី ៣)។
+    // វាស់បាន ៖ បោះចាស់ជាងគេ ➜ ៦ ការហៅ · បោះថ្មីជាងគេ ➜ ២៥ ការហៅ។
+    await setup(ZTO_URL);
+    const evictOrder = await page.evaluate(async (cap) => {
+        const asked = [];
+        const realFetch = window.fetchWithTimeout;
+        window.fetchWithTimeout = async (url) => {
+            asked.push(String(url));
+            return { res: { ok: true, status: 200 }, body: { ztoClosed: true } };
+        };
+        // ហាងរវល់ ៖ cache ឈានដល់ពិដានដោយសាលក្រម `true` **ច្រើន**
+        for (let i = 1; i <= cap; i++) {
+            setZtoPickupVerdict('BAROLD' + String(i).padStart(4, '0'), true);
+        }
+        const codes = [];
+        for (let i = 1; i <= 6; i++) codes.push('BARNEW' + String(i).padStart(4, '0'));
+        const items = codes.map((c, i) => ({
+            id: 'n' + i, phone: '011', barcodes: [{ code: c, isClosed: true }]
+        }));
+        const realNow = Date.now;
+        let shift = 0;
+        Date.now = () => realNow.call(Date) + shift;
+        const perRound = [];
+        for (let round = 0; round < 4; round++) {
+            shift += 30 * 60000;
+            const before = asked.length;
+            await runZtoStatusSweep(false, items, []);
+            perRound.push(asked.length - before);
+        }
+        Date.now = realNow;
+        window.fetchWithTimeout = realFetch;
+        const mine = asked.filter((u) => u.indexOf('BARNEW') !== -1);
+        const per = {};
+        codes.forEach((c) => { per[c] = mine.filter((u) => u.indexOf(c) !== -1).length; });
+        const kept = codes.filter((c) => ztoPickupStatus.has(pickupBarcodeKey(c))).length;
+        return {
+            perRound: perRound, total: mine.length,
+            max: Math.max.apply(null, codes.map((c) => per[c])), kept: kept
+        };
+    }, MAXCAP);
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ cache ពេញដោយ `true` ➜ ជុំទី ១ សួរ barcode ថ្មីទាំង ៦',
+        evictOrder.perRound[0] === 6, evictOrder);
+    ok('⛔ ជនរងគ្រោះត្រូវជាធាតុ **ចាស់ជាងគេ** ➜ សាលក្រមថ្មីទាំង ៦ រស់រាន',
+        evictOrder.kept === 6, evictOrder);
+    ok('⛔ គ្មានការហៅឥតឈប់ ៖ barcode ១ សួរតែ ១ ដងក្នុង ៤ ជុំ',
+        evictOrder.max === 1 && evictOrder.total === 6, evictOrder);
+    ok('⛔ ជុំក្រោយៗមិនត្រូវសួរឡើងវិញសោះ (ការវាស់មិនត្រូវលុបគ្នាទៅវិញទៅមក)',
+        evictOrder.perRound[1] === 0 && evictOrder.perRound[2] === 0
+        && evictOrder.perRound[3] === 0, evictOrder);
+
     console.log('\n== ១៤. លំដាប់ចៃដន្យ (fuzz) ==');
 
     // ⛔ ជាន់ទី ៥ នៃមេរៀនគម្រោង ៖ សេណារីយ៉ូ **សរសេរដោយដៃ** ទាំងអស់ ➜ រាល់ជុំ

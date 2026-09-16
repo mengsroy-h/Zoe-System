@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.6';
+    const APP_VERSION = '2.36.8';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2463,6 +2463,15 @@
         return parsed;
     }
 
+    function setupLinkDsnIsValid(dsn) {
+        if (typeof dsn !== 'string' || !dsn) return false;
+        let parsed;
+        try { parsed = new URL(dsn); } catch (e) { return false; }
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host === 'sentry.io' || host.endsWith('.sentry.io');
+    }
+
     function applySetupLinkFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const setupParam = params.get('setup');
@@ -2478,11 +2487,21 @@
             return;
         }
 
+        const linkDsn = setupLinkDsnIsValid(parsed.dsn) ? parsed.dsn : '';
+        const linkConfig = Object.assign({}, parsed);
+        delete linkConfig.dsn;
+
         requestPinBeforeConfig(() => {
+            if (linkDsn && window.ZoeErrors) {
+                ZoeErrors.setDsn(linkDsn);
+                ZoeErrors.init('zoew');
+            }
             openConfigModal();
             const cfgInput = document.getElementById('firebaseConfigInput');
-            if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
-            showToast('✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
+            if (cfgInput) cfgInput.value = JSON.stringify(linkConfig, null, 2);
+            showToast(linkDsn
+                ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
+                : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
         }, 'setupLink');
     }
 
@@ -8548,7 +8567,10 @@
 
     function forceSheetTextCells(ws, rowCount, columnIndexes) {
         const cols = Array.isArray(columnIndexes) ? columnIndexes : [];
-        for (let r = 1; r <= rowCount; r++) {
+        const cellCount = ws && typeof ws === 'object' ? Object.keys(ws).length : 0;
+        const rows = Math.min(Math.floor(rowCount), cellCount);
+        if (!cols.length || !Number.isFinite(rows) || rows < 1) return;
+        for (let r = 1; r <= rows; r++) {
             cols.forEach(c => {
                 const cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
                 if (!cell) return;
@@ -10103,6 +10125,9 @@
 
     const LOCKER_PREFIX_KEY = 'zoe_locker_prefix';
     const LOCKER_COUNT_KEY = 'zoe_locker_count';
+    const LOCKER_COUNT_MIN = 1;
+    const LOCKER_COUNT_MAX = 200;
+    const LOCKER_COUNT_DEFAULT = 24;
     const ACTIVE_LOCKER_KEY = 'zoe_active_locker';
     const ENTRY_SCAN_MODE_KEY = 'zoe_entry_scan_mode';
     const ENTRY_LIST_MAX_ROWS = 200;
@@ -10129,8 +10154,14 @@
         return safeStoreGet(appLocalStore, LOCKER_PREFIX_KEY) || 'ទូ';
     }
 
+    function clampLockerCount(raw) {
+        const n = parseInt(raw, 10);
+        if (!Number.isFinite(n) || !n) return LOCKER_COUNT_DEFAULT;
+        return Math.min(LOCKER_COUNT_MAX, Math.max(LOCKER_COUNT_MIN, n));
+    }
+
     function getLockerCount() {
-        return parseInt(safeStoreGet(appLocalStore, LOCKER_COUNT_KEY) || '24') || 24;
+        return clampLockerCount(safeStoreGet(appLocalStore, LOCKER_COUNT_KEY));
     }
 
     function isValidLockerName(value) {
@@ -10208,7 +10239,7 @@
         const prefixInput = document.getElementById('lockerPrefixInput');
         const countInput = document.getElementById('lockerCountInput');
         const prefix = (prefixInput ? prefixInput.value.trim() : '') || 'ទូ';
-        const count = Math.min(200, Math.max(1, parseInt(countInput ? countInput.value : '', 10) || 24));
+        const count = clampLockerCount(countInput ? countInput.value : '');
         const previousPrefix = getLockerPrefix();
         const previousCount = getLockerCount();
         const prefixSaved = safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, prefix);
@@ -10229,7 +10260,7 @@
         const grid = document.getElementById('lockerGrid');
         if (!grid) return;
         const prefix = getLockerPrefix();
-        const count = getLockerCount();
+        const count = Math.min(LOCKER_COUNT_MAX, getLockerCount());
         const frag = document.createDocumentFragment();
         for (let i = 1; i <= count; i++) {
             const val = `${prefix}${i}`;

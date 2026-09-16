@@ -77,7 +77,8 @@ function sliceFn(name) {
 function terminatesWithin(preludeNames, callSrc, ms, heapMb) {
     const prelude = preludeNames.map(sliceFn).join('\n');
     if (preludeNames.some((n) => !sliceFn(n))) return { ok: false, why: 'ស្រង់តួ function មិនឃើញ' };
-    const consts = sliceConsts(['PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX', 'SHEET_IMPORT_COLUMN_LETTER_MAX']);
+    const consts = sliceConsts(['PICKUP_LEGACY_KEY_PREFIX', 'PICKUP_LEGACY_PLACEHOLDER_MAX', 'SHEET_IMPORT_COLUMN_LETTER_MAX',
+        'LOCKER_COUNT_MIN', 'LOCKER_COUNT_MAX', 'LOCKER_COUNT_DEFAULT']);
     const script = consts + '\n' + prelude + '\n' + callSrc + '\nconsole.log("DONE");';
     const res = spawnSync(process.execPath, ['--max-old-space-size=' + (heapMb || 192), '-e', script],
         { timeout: ms, maxBuffer: 1024 * 1024, encoding: 'utf8' });
@@ -159,21 +160,32 @@ if (!acorn) {
     (function walk(n) {
         if (!n || typeof n !== 'object') return;
         if (Array.isArray(n)) { n.forEach(walk); return; }
-        if (n.type === 'WhileStatement' || n.type === 'DoWhileStatement' || (n.type === 'ForStatement' && !n.test)) {
+        // ⛔ `for (i = 1; i <= n; i++)` ជារូបរាងទី ៤ ៖ ជំនាន់មុនស្កេនតែ
+        // `while` · `do-while` · `for(;;)` ➜ រង្វិលជុំរាប់តាមលេខ **គ្មាន
+        // អ្នកវាស់សោះ**។ វាស់បាន ៖ `forceSheetTextCells(ws, Infinity, [1,2])`
+        // មិនចេះឈប់ ហើយ `getLockerCount()` ត្រឡប់លេខពី localStorage ដោយ
+        // គ្មានពិដាន ➜ `renderLockerGrid()` សាង DOM node រាប់លាន។
+        const countedFor = n.type === 'ForStatement' && n.test
+            && !/\.length\b|\.size\b|\.children\b|\.rows\b/.test(SRC.slice(n.test.start, n.test.end))
+            && !(n.test.right && n.test.right.type === 'Literal' && typeof n.test.right.value === 'number');
+        if (n.type === 'WhileStatement' || n.type === 'DoWhileStatement' || (n.type === 'ForStatement' && !n.test) || countedFor) {
             // ⛔ ពិដានដែលដាក់ **ខាងលើ** រង្វិលជុំ (ក្នុង function ដដែល) ក៏ជា
             // ព្រំដែនដែរ ➜ ស្កេនតួ function ទាំងមូល មិនត្រឹមតួរង្វិលជុំ។
+            // ⛔ យក scope **ក្រៅបំផុត** ៖ ពិដានដែលប្រកាសក្រៅ arrow
+            // (ឧ. `legacyPickupPlaceholders` ➜ `recorded`) មើលមិនឃើញ បើយក
+            // arrow ខាងក្នុង ➜ false positive។
             const fnStart = fnRanges.filter((f) => f.start <= n.start && f.end >= n.end)
-                .sort((a, b) => (b.start - a.start))[0];
+                .sort((a, b) => (a.start - b.start))[0];
             const body = SRC.slice(fnStart ? fnStart.start : n.start, n.end);
             // ព្រំដែនរចនាសម្ព័ន្ធ ៖ ប្រវែង · ទំហំ · DOM · break ច្បាស់លាស់
             const structural = /\.length\b|\.size\b|\.children\b|\bnode\s*=\s*node\.|\bparentElement\b|\bparentNode\b|\bbreak\b|\.indexOf\(/.test(body);
             // ពិដានលេខច្បាស់លាស់
-            const capped = /_MAX\b|_LIMIT\b|_CAP\b|Math\.min\(/.test(body);
+            const capped = /_MAX\b|_LIMIT\b|_CAP\b|Math\.min\(|Number\.isFinite\(|\bisFinite\(/.test(body);
             if (!structural && !capped) numeric.push({ line: n.loc.start.line, head: body.slice(0, 90).replace(/\s+/g, ' ') });
         }
         for (const k in n) { if (k === 'loc' || k === 'start' || k === 'end') continue; walk(n[k]); }
     })(ast);
-    ok(appName + ' ៖ រាល់ `while` ក្នុង app.js មានព្រំដែនរចនាសម្ព័ន្ធ ឬពិដានលេខ',
+    ok(appName + ' ៖ រាល់រង្វិលជុំ (`while` · `do` · `for`) ក្នុង app.js មានព្រំដែនរចនាសម្ព័ន្ធ ឬពិដានលេខ',
         numeric.length === 0,
         numeric.map((h) => 'L' + h.line + ' ' + h.head).join('\n        '));
     // ⛔ ជាន់អប្បបរមា ៖ បើ AST មិនឃើញរង្វិលជុំណាសោះ នោះការស្កេនវាស់អ្វីផ្សេង
@@ -187,6 +199,49 @@ if (!acorn) {
     ok('⛔ ជាន់អប្បបរមា៖ AST ឃើញរង្វិលជុំ `while` របស់ ' + appName + ' យ៉ាងតិច ' + minLoops,
         total >= minLoops, 'ឃើញ ' + total);
   });
+}
+
+// ៤. ⛔ រង្វិលជុំរាប់តាមលេខ ៖ ការវាស់ **ឥរិយាបថ** (ការស្កេនផ្នែក ៣ ជាស្តាទិច)
+//    វាស់បាន ៖ `forceSheetTextCells(ws, Infinity, [1,2])` មិនចេះឈប់ ហើយ
+//    `getLockerCount()` ត្រឡប់លេខឆៅពី localStorage (99999999) ➜
+//    `renderLockerGrid()` សាង DOM node រាប់លាន ➜ tab ជាប់ស្ងាត់ៗ។
+console.log('\n--- ៤. រង្វិលជុំរាប់តាមលេខ ៖ ការរត់ពិត ---');
+const XLSX_STUB = 'const XLSX={utils:{encode_cell:()=>"A1"}};const ws={A1:{t:"n",v:1}};';
+[['Infinity', 'Infinity'], ['NaN', 'NaN'], ['-Infinity', '-Infinity'], ['1e12', '1e12']].forEach(([arg, label]) => {
+    const r = terminatesWithin(['forceSheetTextCells'], XLSX_STUB + 'forceSheetTextCells(ws,' + arg + ',[1,2]);', 4000, 192);
+    ok('forceSheetTextCells(ws, ' + label + ') ឈប់', r.ok, r.why);
+});
+// ⛔ ទិសផ្ទុយ ៖ ការបន្ថែមពិដាន មិនត្រូវខូចលទ្ធផលធម្មតា
+{
+    const stub = 'const seen=[];const XLSX={utils:{encode_cell:(o)=>{seen.push(o.r+","+o.c);return "R"+o.r+"C"+o.c;}}};'
+        + 'const ws={};for(let r=1;r<=3;r++){for(const c of [1,2]){ws["R"+r+"C"+c]={t:"n",v:7};}}';
+    const r = spawnSync(process.execPath, ['-e', stub + '\n' + sliceFn('forceSheetTextCells')
+        + '\nforceSheetTextCells(ws,3,[1,2]);'
+        + '\nconsole.log(JSON.stringify({calls:seen.length,t:ws.R1C1.t,v:ws.R1C1.v}));'],
+        { timeout: 4000, encoding: 'utf8' });
+    let out = null;
+    try { out = JSON.parse(String(r.stdout).trim().split('\n').pop()); } catch (e) {}
+    ok('⛔ ទិសផ្ទុយ ៖ rowCount ធម្មតា នៅបម្លែងក្រឡាដដែល (3 ជួរ × 2 ជួរឈរ = 6)',
+        !!out && out.calls === 6 && out.t === 's' && out.v === '7', JSON.stringify(out) + ' ' + String(r.stderr || '').slice(0, 120));
+}
+// ចំនួនទូ ៖ ការអានត្រូវ clamp ដូចការសរសេរ — ការការពារម្ខាងគឺគ្មានការការពារ
+{
+    const consts = sliceConsts(['LOCKER_COUNT_MIN', 'LOCKER_COUNT_MAX', 'LOCKER_COUNT_DEFAULT']);
+    const body = sliceFn('clampLockerCount');
+    if (!body || !/LOCKER_COUNT_MAX/.test(consts)) {
+        ok('ស្រង់ clampLockerCount() និងថេរព្រំដែនបាន', false, 'រកមិនឃើញ — ការអាន clamp មិនបាន');
+    } else {
+        const r = spawnSync(process.execPath, ['-e', consts + '\n' + body
+            + '\nconst cases=["24","200","99999999","  500000 ","-5","abc","",null,undefined];'
+            + '\nconsole.log(JSON.stringify(cases.map(clampLockerCount)));'],
+            { timeout: 4000, encoding: 'utf8' });
+        let vals = null;
+        try { vals = JSON.parse(String(r.stdout).trim()); } catch (e) {}
+        ok('clampLockerCount() ៖ គ្មានតម្លៃណាលើស LOCKER_COUNT_MAX',
+            !!vals && vals.every((v) => typeof v === 'number' && v <= 200 && v >= 1), JSON.stringify(vals));
+        ok('⛔ ទិសផ្ទុយ ៖ តម្លៃធម្មតានៅដដែល (24 ➜ 24 · 200 ➜ 200)',
+            !!vals && vals[0] === 24 && vals[1] === 200, JSON.stringify(vals));
+    }
 }
 
 console.log('');

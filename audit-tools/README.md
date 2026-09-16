@@ -74,25 +74,28 @@ node audit-tools/trash-modal-test.js
 
 ### ៤. រត់លើ tree ផ្សេង (បញ្ជាក់ថាតេស្តមិនទទេ)
 
-រាល់ checker ភាគច្រើនទទួល env override ដើម្បីចង្អុលទៅថតផ្សេង។ នេះជាវិធី
-បញ្ជាក់ថា **តេស្តថ្មីពិតជាចាប់កំហុស** ៖
+រាល់ checker ភាគច្រើនទទួល env override ដើម្បីចង្អុលទៅថតផ្សេង។
 
-```bash
-git fetch origin main
-rm -rf /tmp/baseline && mkdir /tmp/baseline
-git archive origin/main | tar -x -C /tmp/baseline
-bash audit-tools/run-all.sh /tmp/baseline    # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
-```
-
-⛔ **បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវាមិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។**
-⚠️ ត្រូវ `git archive origin/main` មិនមែន `HEAD` បើបាន commit ការកែរួចហើយ។
+⛔ **ពាក្យបញ្ជាពិតរស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜ Runbook ជំហានទី ២
+តែមួយកន្លែង — សូមចម្លងពីទីនោះ។** ⛔ **បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវា
+មិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។**
 
 ### ៥. Firebase RTDB emulator (សម្រាប់ការកែ rules)
 
+⛔ **ការដំឡើង និងការបើក emulator រស់នៅ [`../CLAUDE.md`](../CLAUDE.md) ➜
+Runbook ជំហានទី ០ តែមួយកន្លែង — សូមចម្លងពីទីនោះ។**
+
+🔴 ហេតុអ្វីវាមិនស្ថិតនៅទីនេះទៀត ៖ ច្បាប់ចម្លងចាស់ក្នុងឯកសារនេះ **ឃ្លាតរួច
+ទៅហើយ** ៣ កន្លែង ហើយមួយក្នុងចំណោមនោះ **គ្រោះថ្នាក់** ៖ វារាយ `java -jar`
+ជា **foreground** (➜ បិទ shell របស់ session ជារៀងរហូត) ខណៈជំហានទី ០ រាយ
+`setsid nohup … &`; វារាយ `npx` ដោយគ្មាន `--no-install`; ហើយការព្រមាន
+`pkill` របស់វាចង្អៀតត្រឹម `firebase-database-emulator` ខណៈច្បាប់ពិតគឺ
+**លំនាំណាក៏ដោយ** ដែលលេចក្នុងពាក្យបញ្ជារបស់អ្នក។ នេះជាអ្វីដែល **ច្បាប់ ១២**
+ព្យាករណ៍ជាក់ស្តែង។
+
+ក្រោយ emulator ដើររួច ការកែ rules ត្រូវការតែ ៖
+
 ```bash
-npm i firebase-tools
-npx firebase setup:emulators:database   # ចាំបាច់ — ថត cache ទទេក្រោយ npm i
-java -jar ~/.cache/firebase/emulators/firebase-database-emulator-*.jar --port 9000 --host 127.0.0.1
 cp firebase-database.rules.json audit-tools/emu/real.rules.json
 bash audit-tools/emu/rules.sh
 ```
@@ -106,8 +109,10 @@ bash audit-tools/emu/rules.sh
 2. `.settings/rules.json` និង `auth_variable_override` **ទាំងពីរត្រូវការ**
    `-H "Authorization: Bearer owner"` — បើគ្មាន rules មិន load ទេ ហើយ
    **តេស្តទាំងអស់ជោគជ័យក្លែងក្លាយ**។
-3. កុំប្រើ `pkill -f firebase-database-emulator` — វាផ្គូផ្គងនឹង shell
-   របស់ខ្លួនឯង។ បិទតាម PID វិញ រួចផ្ទៀងផ្ទាត់ដោយ `curl` ទៅ port 9000។
+3. ⛔ កុំប្រើ `pkill -f <លំនាំ>` សម្រាប់ **លំនាំណាក៏ដោយ** ដែលលេចក្នុង
+   ពាក្យបញ្ជារបស់អ្នក — វាផ្គូផ្គងនឹង shell របស់ខ្លួនឯង ➜ សម្លាប់ session
+   (មើល `../CLAUDE.md` Runbook ជំហានទី ០)។ បិទតាម **PID ជាក់លាក់** វិញ
+   រួចផ្ទៀងផ្ទាត់ដោយ `curl` ទៅ port 9000។
 4. request ដែលមាន `Bearer owner` **ដោយគ្មាន** `auth_variable_override`
    ត្រូវចាត់ទុកជា project owner ➜ **រំលង rules ទាំងស្រុង**។ សម្រាប់តេស្ត
    «unauthenticated ត្រូវ DENIED» **កុំផ្ញើ Authorization header សោះ**។

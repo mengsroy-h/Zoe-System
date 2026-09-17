@@ -681,6 +681,9 @@
     "audit-tools/emu/ledger-revert-emu-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/emu/license-seat-rules-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
     },
@@ -790,6 +793,9 @@
       "policy": "guard-1"
     },
     "audit-tools/license-record-race-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-seat-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/listener-leak-test.js": {

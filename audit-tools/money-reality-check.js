@@ -479,6 +479,82 @@ else {
         'ធម្មតាសម្រាប់ទិន្នន័យចាស់ (មុនមាន registry) — មិនប៉ះលុយ');
 }
 
+// ── ៨. «ស្កេនតាមថ្ងៃ» ↔ កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ ─────────────────────
+// 🔴 សំណួររបស់ម្ចាស់គម្រោង (2026-09-17) ៖ «ថ្ងៃទី ១០ ស្កេន ៥៤ · អតិថិជនយក
+// ៥១ · សល់ ០ ➜ បាត់ ៣។ ខ្លាចក្រែងការដកស្វ័យប្រវត្តិមិនដកទាំងចំនួន ទាំង
+// ទឹកប្រាក់»។
+//
+// លេខ «ស្កេនតាមថ្ងៃ» លើអេក្រង់ = `zoew_daily_revenue_cod_dod/<ថ្ងៃ>/totalCount`
+// ➜ វាឡើងពេលស្កេន និង **ចុះតាមផ្លូវដកលុយ** (`ដក` និង `ផុតកំណត់ ៨ ថ្ងៃ`
+// បញ្ជូន `-count` ជាមួយ `-cod`/`-dod` ក្នុងការហៅតែមួយ)។ ⛔ ផ្លូវ «យករួច»
+// និង «លុប» **មិនប៉ះវា** ដោយចេតនា។
+//
+// ដូច្នេះ អថេររក្សា ៖ `totalCount(ថ្ងៃ)` = ចំនួន barcode នៃថ្ងៃនោះដែល
+// **មិនទាន់ដកលុយ** (`!isDeducted`) ក្នុងប្រវត្តិ **បូក** ធុងសំរាម។
+// ⛔ ព្រំដែនត្រូវ **ដេរីវេពី dump** ៖ ធុងសំរាមប្រភេទ `pickup`/`delete` purge
+// ក្នុង ៣០ ថ្ងៃ ➜ ថ្ងៃដែលចាស់ជាងនោះ **ផ្ទៀងផ្ទាត់មិនបាន** ➜ ⚠️ មិនមែន ❌។
+say('\n── ៨. «ស្កេនតាមថ្ងៃ» = កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ ──');
+{
+    const alive = {};
+    const deducted = {};
+    const closedSet = {};
+    const addRow = (it) => {
+        const d = it && it.scanDate;
+        if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(String(d))) return;
+        const bs = barcodesOf(it);
+        const rows = bs.length ? bs : [{ isDeducted: it.isDeducted, isClosed: it.isClosed, code: it.barcode }];
+        rows.forEach((b) => {
+            const isDed = (b && b.isDeducted === true) || (!bs.length && it.isDeducted === true);
+            if (isDed) deducted[d] = (deducted[d] || 0) + 1;
+            else {
+                alive[d] = (alive[d] || 0) + 1;
+                if (b && b.isClosed === true) closedSet[d] = (closedSet[d] || 0) + 1;
+            }
+        });
+    };
+    history.forEach(addRow);
+    deleted.forEach(addRow);
+
+    // ព្រំដែនដេរីវេ ៖ ថ្ងៃចាស់ជាងគេក្នុងធុងសំរាមជាយុថ្កា — មុននោះ ធុងសំរាម
+    // អាចត្រូវ purge រួច ➜ ការប្រៀបធៀបលែងមានន័យ។
+    const trashDates = deleted.map((it) => it && it.scanDate).filter((d) => d && /^\d{4}-\d{2}-\d{2}$/.test(String(d))).sort();
+    const floorDate = trashDates.length ? trashDates[0] : null;
+
+    let n8 = 0, bad8 = 0, skip8 = 0;
+    Object.keys(daily).sort().forEach((d) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+        const ledgerCount = sb.statsCount(daily[d].totalCount);
+        const liveCount = alive[d] || 0;
+        if (ledgerCount === liveCount) { n8++; return; }
+        if (floorDate && d < floorDate) {
+            skip8++;
+            may('ថ្ងៃ ' + d + ' ៖ ledger ' + ledgerCount + ' ≠ កញ្ចប់ដែលនៅ ' + liveCount
+                + ' — តែថ្ងៃនេះចាស់ជាងធាតុចាស់បំផុតក្នុងធុងសំរាម ➜ **ផ្ទៀងផ្ទាត់មិនបាន**');
+            return;
+        }
+        n8++; bad8++;
+        const pickedHere = sb.statsCount((pickup[d] || {}).packagesPickedUp);
+        // ⛔ ⚠️ មិនមែន ❌ ៖ លម្អៀងនេះអាចមានការពន្យល់ស្របច្បាប់ដែល dump
+        //    បង្ហាញមិនបាន (ការ purge ធុងសំរាម · Reset · ជួរដេកទម្រង់ចាស់)
+        //    ➜ ច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»។ ករណីដែល **បញ្ជាក់បាន**
+        //    មានអ្នករាយរួចក្នុងផ្នែក ៧ (កូនសោ registry កំព្រា)។
+        may('ថ្ងៃ ' + d + ' ៖ «ស្កេនតាមថ្ងៃ» = ' + ledgerCount + ' តែកញ្ចប់ដែលនៅក្នុងប្រព័ន្ធមាន ' + liveCount
+            + ' (លម្អៀង ' + (ledgerCount - liveCount) + ')',
+            'យករួច ' + pickedHere + ' · បិទរួចនៅក្នុងប្រព័ន្ធ ' + (closedSet[d] || 0)
+            + ' · ដកលុយរួច ' + (deducted[d] || 0)
+            + '\n       ➜ ' + (ledgerCount > liveCount
+                ? 'ledger នៅរាប់កញ្ចប់ដែលលែងមាន ➜ «ចំណូល (យករួច)» របស់ថ្ងៃនោះ **ធំជាងការពិត**'
+                : 'ledger តិចជាងកញ្ចប់ដែលនៅ ➜ ការដកបានកើតឡើង ២ ដង ឬការស្កេនមិនបានចុះ ledger'));
+    });
+    if (!n8) may('គ្មានថ្ងៃក្នុង ledger ដែលប្រៀបបាន — រំលង');
+    else if (!bad8) ok('ថ្ងៃ ' + n8 + ' ទាំងអស់ ៖ «ស្កេនតាមថ្ងៃ» ត្រូវនឹងកញ្ចប់ដែលនៅក្នុងប្រព័ន្ធពិត'
+        + (skip8 ? '  (រំលង ' + skip8 + ' ថ្ងៃដែលធុងសំរាម purge រួច)' : ''));
+    if (bad8) {
+        notes.push('«ស្កេនតាមថ្ងៃ» របស់ថ្ងៃ ' + bad8 + ' មិនត្រូវនឹងកញ្ចប់ពិត ➜ ពិនិត្យថាតើ'
+            + ' barcode ទាំងនោះចាកចេញតាមផ្លូវ «លុប» (មិនដកលុយ) ឬការសរសេរ ledger ធ្លាក់។');
+    }
+}
+
 say('\n╔══════════════════════════════════════════════════════════╗');
 say('  ✅ ' + pass + '   ⚠️ ' + warn + '   ❌ ' + fail);
 if (notes.length) { say('\n  អ្វីដែលអ្នកនឹងឃើញលើអេក្រង់ ៖'); notes.forEach((n) => say('   • ' + n)); }

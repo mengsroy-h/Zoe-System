@@ -119,6 +119,7 @@ run "sdk-surface" node audit-tools/sdk-surface.js
 run "rules-duplicate-keys" node audit-tools/rules-duplicate-keys.js
 run "license-app-code" node audit-tools/license-app-code-test.js
 run "connection-state-fuzz" node audit-tools/connection-state-fuzz-test.js
+run "ledger-count-integrity" node audit-tools/ledger-count-integrity-test.js
 run "netlify-config-scope" node audit-tools/netlify-config-scope-test.js
 # ⛔ តេស្ត emulator ៖ CI រត់ពួកវា ដូច្នេះ `run-all.sh` ត្រូវរត់ពួកវាដែរ។
 # មុនកំណែ 2.20.1 ពួកវា **រត់តែក្នុង CI** ➜ ការប្តូរ `app.js` ដែលធ្វើឲ្យ
@@ -391,6 +392,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     RULESDUP_APP_DIR="$BASE" node audit-tools/rules-duplicate-keys.js 2>&1 | tail -1 | sed 's/^/   rules-duplicate-keys:/'
     APPCODE_APP_DIR="$BASE" node audit-tools/license-app-code-test.js 2>&1 | tail -1 | sed 's/^/   license-app-code:/'
     CONNFUZZ_APP_DIR="$BASE" node audit-tools/connection-state-fuzz-test.js 2>&1 | tail -1 | sed 's/^/   connection-state-fuzz:/'
+    LEDGERCOUNT_APP_DIR="$BASE" node audit-tools/ledger-count-integrity-test.js 2>&1 | tail -1 | sed 's/^/   ledger-count-integrity:/'
     NETLIFYSCOPE_APP_DIR="$BASE" node audit-tools/netlify-config-scope-test.js 2>&1 | tail -1 | sed 's/^/   netlify-config-scope:/'
     SDKBOOT_APP_DIR="$BASE" node audit-tools/sdk-offline-boot-test.js 2>&1 | tail -1 | sed 's/^/   sdk-offline-boot:/'
     SDKSURFACE_APP_DIR="$BASE" node audit-tools/sdk-surface.js 2>&1 | tail -1 | sed 's/^/   sdk-surface:     /'

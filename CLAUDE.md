@@ -457,6 +457,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ចលនាផ្ទាំងប្រវត្តិលើ iOS ឃ្លាតពី Android | `ios-panel-glide-test.js` |
 | Sentry មកយឺត/DSN ប្តូរ ➜ កំហុសធ្លាក់ចោលស្ងាត់ៗ; checker រង់ចាំ script load ក្នុងពិដាន ដាច់ពីចំនួន event ដែលត្រូវវាស់ | `sentry-load-race-test.js` |
 | listener ដែលត្រូវបោះបង់ ➜ តារាងកក ខណៈស្ថានភាពនៅបៃតង + ការ reset backoff | `connection-recovery-test.js` |
+| **ledger ដកលុយ តែភ្លេចដកចំនួនកញ្ចប់** (ឬបញ្ច្រាស) ➜ លេខ «ស្កេនតាមថ្ងៃ» និងលុយឈប់ស៊ីគ្នាជាអចិន្ត្រៃយ៍ — ⚠️ `db-stall-guard-test` រត់ `claimAndCleanupItem` ពិត តែ **stub `addRevenueToDailyAndMonthlyRecord` ចោល** ➜ វាវាស់ត្រឹម «ការហៅកើតឡើង» មិនមែន «អ្វីដែលចុះលើ server» | `ledger-count-integrity-test.js` |
 | **ស្ថានភាព listener និយាយមិនពិត លើ *លំដាប់ចៃដន្យ*** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ ឃ្លាតគ្នា · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស listener ដែលនៅងាប់ · សារ «ភ្ជាប់មកវិញ» ចេញមុនកូនសោទាំងអស់ស្រស់ — ⚠️ `connection-recovery-test` មានសេណារីយ៉ូ **សរសេរដោយដៃ** ➜ វាវាស់តែលំដាប់ដែលអ្នកសរសេរគិតដល់ | `connection-state-fuzz-test.js` |
 | URL រសើប (Setup Link) ជាប់ក្នុង Cache Storage ក្រោយចាកចេញ | `sw-cache-key-test.js` |
 | ការទប់ស្កាត់ Barcode ស្ទួន (ជាន់ការពារទាំង ៥) | `duplicate-scan-test.js` |

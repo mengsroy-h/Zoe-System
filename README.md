@@ -256,7 +256,7 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 | [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |
 | [zto-import/](zto-import/README.md) | Apps Script ដែលទទួលការនាំចូល និងបម្រើ Lookup API |
 | [tools/zto-cookie-sync-windows/](tools/zto-cookie-sync-windows/README-KH.md) | Windows helper សម្រាប់ប្តូរ Cookie ZTO |
-| [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៨ លើ dump ពិតរបស់អ្នក |
+| [tools/money-check-windows/](tools/money-check-windows/README-KH.md) | Windows ៖ រត់ការវាស់លុយ ៩ លើ dump ពិតរបស់អ្នក |
 | [firebase-backup/](firebase-backup/README.md) | CLI បម្រុងទុកទិន្នន័យ Firebase |
 
 ---

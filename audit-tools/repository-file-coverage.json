@@ -780,6 +780,9 @@
     "audit-tools/ledger-clamp-symmetry-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/ledger-count-integrity-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/ledger-failed-apply-revert-test.js": {
       "policy": "guard-1"
     },

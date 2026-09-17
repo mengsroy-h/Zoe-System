@@ -197,6 +197,8 @@
         return { valid: true, payload: result.payload };
     }
 
+    const LICENSE_SEAT_SLOTS = ['d1', 'd2', 'd3', 'd4', 'd5'];
+    const LICENSE_SEAT_CLAIM_TRIES = 2;
     const LICENSE_DB_URL = 'https://zoew-z1-default-rtdb.firebaseio.com';
 
     const NET_TIMEOUT_MS = 10000;
@@ -259,13 +261,22 @@
                 return { ok: false, reason: 'expired-server' };
             }
             const deviceId = getDeviceId();
-            const seat = await readSeat(appCode, keyId, deviceId, priority);
+            let seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
             if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
             if (seat.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
             if (seat.unclaimed && opts && opts.claimSeat) {
-                const claimed = await claimSeat(appCode, keyId, deviceId, priority);
-                if (claimed.ok === false) return { ok: false, reason: 'seat-taken' };
-                if (claimed.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                let denied = false;
+                for (let attempt = 0; attempt < LICENSE_SEAT_CLAIM_TRIES; attempt++) {
+                    const claimed = await claimSeat(appCode, keyId, deviceId, priority, seat.slot);
+                    if (claimed.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                    if (claimed.ok !== false) { denied = false; break; }
+                    denied = true;
+                    seat = await readSeat(appCode, keyId, deviceId, priority, data.maxDevices);
+                    if (seat.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+                    if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
+                    if (!seat.unclaimed) break;
+                }
+                if (denied) return { ok: false, reason: 'seat-taken' };
             }
             const seatState = (seat.reason === 'no-device' || seat.reason === 'seat-unavailable') ? seat.reason : 'unknown';
             return { ok: true, expiresAt: data.expiresAt, seat: seatState };
@@ -274,11 +285,22 @@
         }
     }
 
-    function licenseSeatUrl(appCode, keyId) {
-        return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId + '.json';
+    function licenseSeatUrl(appCode, keyId, slot) {
+        return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId
+            + (slot ? '/' + slot : '') + '.json';
     }
 
-    async function readSeat(appCode, keyId, deviceId, priority) {
+    function seatLimitOf(maxDevices) {
+        const n = Math.floor(Number(maxDevices));
+        if (!isFinite(n) || n < 1) return 1;
+        return n > LICENSE_SEAT_SLOTS.length ? LICENSE_SEAT_SLOTS.length : n;
+    }
+
+    function seatHolderOf(entry) {
+        return (entry && typeof entry === 'object' && typeof entry.device === 'string') ? entry.device : '';
+    }
+
+    async function readSeat(appCode, keyId, deviceId, priority, maxDevices) {
         if (!deviceId) return { ok: null, reason: 'no-device' };
         try {
             const pending = sharedRequest('seat:' + appCode + '/' + keyId, priority,
@@ -288,21 +310,28 @@
             if (out.res.status === 401 || out.res.status === 403) return { ok: null, reason: 'seat-unavailable' };
             if (!out.res.ok) return { ok: null, reason: 'network' };
             const data = out.body;
-            const holder = (data && typeof data.device === 'string') ? data.device : '';
-            if (!holder) return { ok: null, reason: 'unclaimed', unclaimed: true };
-            return holder === deviceId ? { ok: true } : { ok: false, reason: 'seat-taken' };
+            const slots = LICENSE_SEAT_SLOTS.slice(0, seatLimitOf(maxDevices));
+            let free = '';
+            for (let i = 0; i < slots.length; i++) {
+                const holder = seatHolderOf(data && data[slots[i]]);
+                if (holder === deviceId) return { ok: true, slot: slots[i] };
+                if (!holder && !free) free = slots[i];
+            }
+            if (free) return { ok: null, reason: 'unclaimed', unclaimed: true, slot: free };
+            return { ok: false, reason: 'seat-taken' };
         } catch (e) {
             return { ok: null, reason: 'network' };
         }
     }
 
-    async function claimSeat(appCode, keyId, deviceId, priority) {
+    async function claimSeat(appCode, keyId, deviceId, priority, slot) {
         if (!deviceId) return { ok: null, reason: 'no-device' };
+        if (LICENSE_SEAT_SLOTS.indexOf(slot) === -1) return { ok: null, reason: 'network' };
         const stamp = Math.round(getServerNow());
         const body = JSON.stringify({ device: deviceId, at: stamp > 0 ? stamp : 1 });
         try {
-            const pending = sharedRequest('seat-claim:' + appCode + '/' + keyId, priority,
-                () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId), null, {
+            const pending = sharedRequest('seat-claim:' + appCode + '/' + keyId + '/' + slot, priority,
+                () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId, slot), null, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: body

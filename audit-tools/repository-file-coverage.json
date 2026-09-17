@@ -633,6 +633,9 @@
     "audit-tools/connection-recovery-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/connection-state-fuzz-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/csp-enforced-test.js": {
       "policy": "guard-1"
     },
@@ -778,6 +781,9 @@
       "policy": "guard-1"
     },
     "audit-tools/ledger-failed-apply-revert-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/license-app-code-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/license-clock-rollback-test.js": {

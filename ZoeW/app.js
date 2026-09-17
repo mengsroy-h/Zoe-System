@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.36.9';
+    const APP_VERSION = '2.37.1';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2290,10 +2290,13 @@
     }
 
     function matchingBraceIndex(source, start) {
+        const text = typeof source === 'string' ? source : '';
+        let from = Math.floor(Number(start));
+        if (!Number.isFinite(from) || from < 0) from = 0;
         let depth = 0;
         let quote = '';
-        for (let i = start; i < source.length; i++) {
-            const ch = source[i];
+        for (let i = from; i < text.length; i++) {
+            const ch = text[i];
             if (quote) {
                 if (ch === '\\') {
                     i++;
@@ -4852,7 +4855,7 @@
         }
     }
 
-    const LICENSE_APP_CODE = 'ADM';
+    const LICENSE_APP_CODE = 'ZOE';
     const LICENSE_RECHECK_INTERVAL_MS = 15 * 60 * 1000;
     let licenseRecheckInFlight = false;
 
@@ -4863,7 +4866,7 @@
             case 'expired-server': return 'Key នេះបានផុតកំណត់ហើយ!';
             case 'revoked': return 'Key នេះត្រូវបានដកហូតសិទ្ធិ (Revoked)!';
             case 'not-found': return 'Key នេះមិនមានក្នុងប្រព័ន្ធទេ!';
-            case 'seat-taken': return 'Key នេះកំពុងប្រើលើឧបករណ៍ផ្សេងរួចហើយ! Key ១ ប្រើបានតែ ១ ឧបករណ៍ — សូមទាក់ទងអ្នកលក់ ដើម្បីដោះឧបករណ៍ចាស់ចេញ។';
+            case 'seat-taken': return 'Key នេះប្រើគ្រប់ចំនួនឧបករណ៍ដែលអនុញ្ញាតហើយ! សូមទាក់ទងអ្នកលក់ ដើម្បីបន្ថែមចំនួនឧបករណ៍ ឬដោះឧបករណ៍ចាស់ចេញ។';
             case 'device-unverified': return 'សម្គាល់ឧបករណ៍នេះមិនបានទេ! សូមបើក Storage (Cookie) របស់ Browser រួចសាកម្តងទៀត។';
             case 'seat-unavailable': return 'ប្រព័ន្ធអាជ្ញាប័ណ្ណមិនទាន់រៀបចំរួចទេ! សូមប្រាប់អ្នកលក់ឲ្យ Publish Firebase Rules ថ្មី។';
             case 'signature': return 'Key មិនត្រឹមត្រូវទេ (Signature Invalid)!';

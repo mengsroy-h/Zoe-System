@@ -749,13 +749,64 @@ check(deadFns.length === 0,
 // ជំនាន់ក្រោយអានច្បាប់ដែលផ្ទុយនឹងកូដ។ `doc-scope-test` និង `user-guide-test`
 // **បៃតងទាំង ២** លើ tree នោះ។
 
+// ⛔ `license-verify.js` និង `error-reporting.js` ក៏ជាកូដ ship ដែរ ➜ កូនសោ
+// ដែលរស់នៅទីនោះ (ឧ. record របស់ License) មិនត្រូវរាយជា «ងាប់»។
 const SHIPPED_APP_TEXT = ['ZoeW/app.js', 'ZoeKeyGen/app.js', 'ZoeW/sw.js',
-    'ZoeKeyGen/sw.js', 'ZoeW/index.html', 'ZoeKeyGen/index.html']
+    'ZoeKeyGen/sw.js', 'ZoeW/index.html', 'ZoeKeyGen/index.html',
+    'ZoeW/license-verify.js', 'ZoeW/error-reporting.js']
     .map((rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return ''; } })
     .join('\n');
 
 check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា ៖ អានកូដ ship ទាំង ២ App បានពិត',
     'អានបាន ' + SHIPPED_APP_TEXT.length + ' តួ');
+
+// ⛔ តំណក្នុងស្រុកដែល **បាក់** ជាអន្ទាក់ស្ងាត់ ៖ session ក្រោយចុចតាមវា ➜
+// រកឯកសារមិនឃើញ ➜ ចំណាយពេលរក រួចសន្និដ្ឋានថាឯកសារនោះត្រូវលុប។
+// ⛔ ការវាស់ត្រូវ **ដេរីវេពីថតពិត** មិនមែនបញ្ជីរឹង។
+// ⛔ **បណ្ណសារលើកលែងដោយចេតនា** ៖ `docs/ARCHIVE-*.md` និង `HISTORY-ARCHIVE.md`
+//    ជារូបភាពនៃថ្ងៃដែលវាត្រូវសរសេរ ហើយក្បាលរបស់វា **ប្រាប់រឿងនោះរួចហើយ**
+//    (ឧ. «ការយោងទៅ `docs/BUG-HISTORY.md` … បញ្ចូលចូល `docs/HISTORY.md` រួច»)
+//    ➜ ការសរសេរជាន់លើបណ្ណសារ បំផ្លាញកំណត់ត្រា ដោយគ្មានតម្លៃត្រឡប់មកវិញ។
+{
+    const mdFiles = [];
+    const walkMd = (dir) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+        entries.forEach((e) => {
+            if (e.name === '.git' || e.name === 'node_modules' || e.name === 'vendor') return;
+            const full = path.join(dir, e.name);
+            if (e.isDirectory()) return walkMd(full);
+            if (e.name.endsWith('.md')) mdFiles.push(full);
+        });
+    };
+    walkMd(ROOT);
+    const isArchive = (f) => /ARCHIVE|HISTORY-ARCHIVE/.test(path.basename(f));
+    const living = mdFiles.filter((f) => !isArchive(f));
+    let linkCount = 0;
+    const broken = [];
+    living.forEach((f) => {
+        let txt = '';
+        try { txt = fs.readFileSync(f, 'utf8'); } catch (e) { return; }
+        const re = /\[[^\]]*\]\(([^)\s]+)\)/g;
+        let m;
+        while ((m = re.exec(txt))) {
+            const target = m[1].split('#')[0].trim();
+            if (!target || /^(https?:|mailto:)/.test(target)) continue;
+            linkCount++;
+            if (!fs.existsSync(path.resolve(path.dirname(f), target))) {
+                broken.push(path.relative(ROOT, f) + ' ➜ ' + target);
+            }
+        }
+    });
+    check(living.length >= 8, 'ជាន់អប្បបរមា ៖ ឯកសារ `.md` រស់យ៉ាងតិច ៨ (ដេរីវេពីថតពិត)', living.length);
+    check(linkCount >= 100, 'ជាន់អប្បបរមា ៖ តំណក្នុងស្រុកយ៉ាងតិច ១០០', linkCount);
+    check(broken.length === 0, '⛔ ឯកសាររស់ ៖ តំណក្នុងស្រុកទាំងអស់ត្រូវចង្អុលទៅឯកសារដែលមានពិត',
+        broken.slice(0, 8).join(' · '));
+    // ⛔ ទិសផ្ទុយ ៖ បណ្ណសារត្រូវនៅក្រៅវិសាលភាព (បើអត់ ច្បាប់នេះនឹងបង្ខំឲ្យ
+    //    សរសេរជាន់លើកំណត់ត្រាចាស់)។
+    check(mdFiles.length > living.length, '⛔ ទិសផ្ទុយ ៖ បណ្ណសារត្រូវលើកលែងពិត',
+        mdFiles.length + ' ➜ ' + living.length);
+}
 
 // ⛔ កូនសោ storage ជា **ស្នាមភ្ជាប់ដែលដេរីវេបាន** ៖ ឈ្មោះមានទម្រង់ច្បាស់
 // ហើយវារស់នៅកូដ ship ពិត ➜ ការប្រៀបមិនមានសំឡេងរំខាន (វាស់បាន ៖ ២៤ កូនសោ

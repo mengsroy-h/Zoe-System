@@ -193,6 +193,8 @@ bash audit-tools/emu/rules.sh
 | `idtoken-fixture.js` | helper ៖ វិញ្ញាបនបត្រ និងការចុះហត្ថលេខា **Firebase ID token សាកល្បង** (RS256 ពិត) ➜ checker ដែលរត់ `zto-order-detail.js` ពិត វាស់ការផ្ទៀងផ្ទាត់ token ដោយមិនចម្លងតក្កវិជ្ជា (សោសាកល្បងប៉ុណ្ណោះ — គ្មានសិទ្ធិលើផលិតកម្ម) | — |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
+| `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
+| `connection-state-fuzz-test.js` | ស្ថានភាព listener លើ **លំដាប់ចៃដន្យ** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស · សារ «ភ្ជាប់មកវិញ» មុនពេល | `CONNFUZZ_APP_DIR` |
 
 #### នាឡិកា និងពេលវេលា
 
@@ -282,7 +284,7 @@ bash audit-tools/emu/rules.sh
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
-| `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍ ១** ៖ ឧបករណ៍ទី ២ ដោយ Key ដដែល ត្រូវបដិសេធ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
+| `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
 | `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |

@@ -115,7 +115,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 isModalOpen: false,
                 withTimeout: (promise) => promise,
                 ZoeLicense: { activate: () => Promise.resolve({ valid: true }) },
-                LICENSE_APP_CODE: 'ADM',
+                LICENSE_APP_CODE: 'ZOE',
                 ensureAppActivated: () => Promise.resolve(true),
                 initDatabaseListeners: () => { armCounts.listeners++; return true; },
                 isFirebaseSessionExpired: () => {
@@ -205,7 +205,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
         const context = vm.createContext({
             Promise, Error, console: { error() {} },
             authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {},
-            LICENSE_APP_CODE: 'ADM', isDatabaseInitialized: true, isModalOpen: false,
+            LICENSE_APP_CODE: 'ZOE', isDatabaseInitialized: true, isModalOpen: false,
             ZoeLicense: {
                 getStatus: () => deferred(reads),
                 activate: () => deferred(activations)

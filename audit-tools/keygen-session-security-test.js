@@ -13,6 +13,13 @@ function realLicenseAppCodeDecl(source) {
     return m[0];
 }
 
+// ⛔ ថេរកៅអីត្រូវស្រង់ចេញពីកូដ ship ពិត មិនមែនចម្លងមកទីនេះ។
+function realDecl(name) {
+    const m = src.match(new RegExp('^const ' + name + ' = .*;$', 'm'));
+    if (!m) throw new Error('not found: const ' + name + ' ក្នុង ZoeKeyGen/app.js');
+    return m[0];
+}
+
 function slice(names) {
     return names.map((name) => {
         const plainStart = src.indexOf('function ' + name + '(');
@@ -138,6 +145,7 @@ function build(options) {
     vm.runInContext('var appLocalStore = typeof localStorage !== "undefined" ? localStorage : null;'
         + ' var appSessionStore = typeof sessionStorage !== "undefined" ? sessionStorage : null;', ctx);
     vm.runInContext(realLicenseAppCodeDecl(src), ctx);
+    vm.runInContext([realDecl('LICENSE_SEAT_SLOT_NAMES'), realDecl('LICENSE_SEAT_MAX')].join('\n'), ctx);
     vm.runInContext(`
         var sensitiveSessionGeneration = 0;
         var authGeneration = 7;
@@ -162,6 +170,7 @@ function build(options) {
         'generateNewKeypair',
         'loadSigningKey',
         'clearSigningKey',
+        'seatLimitOf',
         'generateLicenseKey',
         'openExtendModal',
         'confirmExtendKey',

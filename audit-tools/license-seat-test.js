@@ -1,19 +1,26 @@
-// ថ្នាក់៖ **Key ១ ត្រូវ Activate បានតែ ១ ឧបករណ៍។**
+// ថ្នាក់៖ **Key ១ ត្រូវ Activate បានតែលើឧបករណ៍ចំនួនដែលអ្នកលក់អនុញ្ញាត។**
 //
 //   node audit-tools/license-seat-test.js
 //
-// មុនជុំនេះ `activate()` សរសេរ record ចូល `localStorage` របស់ឧបករណ៍
+// មុនជុំដំបូង `activate()` សរសេរ record ចូល `localStorage` របស់ឧបករណ៍
 // នីមួយៗ ដោយ **គ្មានអ្វីនៅខាង server ចងវាទៅឧបករណ៍ណាមួយទេ** ➜ Key តែមួយ
-// ចម្លងទៅទូរស័ព្ទប៉ុន្មានក៏ Activate បានដែរ ➜ អ្នកទិញម្នាក់អាចចែករំលែក ឬ
-// លក់បន្ត Key នោះ។ ⛔ ការរាប់ «ចំនួនឧបករណ៍» ខាង client មិនមែនការការពារទេ
-// (client គ្រប់គ្រងលេខនោះ) ➜ អ្នកសម្រេចត្រូវឈរនៅ **Firebase rules**៖
-// កូនសោ `license_seats/<appCode>/<keyId>` សរសេរបានតែពេល **គ្មានវត្តមាន**
-// ឬពេលអ្នកសរសេរជា **ឧបករណ៍ដដែល**។
+// ចម្លងទៅទូរស័ព្ទប៉ុន្មានក៏ Activate បានដែរ។ ⛔ ការរាប់ «ចំនួនឧបករណ៍» ខាង
+// client មិនមែនការការពារទេ (client គ្រប់គ្រងលេខនោះ) ➜ អ្នកសម្រេចត្រូវឈរ
+// នៅ **Firebase rules**។
+//
+// ⛔ អតិថិជនខ្លះមានទូរស័ព្ទច្រើន ➜ ពិដានមិនមែន **១ ថេរ** ទេ ៖ វារស់នៅ
+// `license_keys/<app>/<keyId>/maxDevices` ដែល **មានតែ admin សរសេរបាន**
+// ហើយកៅអីរស់នៅ slot `d1..dN`។ ⛔ rules របស់ RTDB **រាប់កូនមិនបានទេ**
+// (គ្មាន `numChildren()`) ➜ ពិដានត្រូវអនុវត្តដោយ **រាយឈ្មោះ slot** ហើយ
+// ប្រៀបធៀបនឹង `maxDevices` — នោះជាមូលហេតុដែល slot មានឈ្មោះថេរ។
 //
 // ⛔ `fetch` ក្លែងក្នុងឯកសារនេះ **អនុវត្ត rule នោះពិត** (មិនទទួលយកគ្រប់
 // ការសរសេរ) — ជាន់ការពារពិតត្រូវវាស់ដោយ `emu/license-seat-rules-test.js`
 // លើ RTDB emulator ពិត ៖ ឯកសារនេះវាស់ថា **client គោរពសាលក្រម** ចំណែក
 // ឯកសារនោះវាស់ថា **server ចេញសាលក្រមនោះពិត**។
+//
+// ⛔ កូដ App (`LICENSE_APP_CODE`) និងឈ្មោះ slot ត្រូវ **ដេរីវេពីកូដ ship**
+// មិនមែនចាក់ជា literal ត្រង់នេះ — literal ជាកាលបរិច្ឆេទផុតកំណត់។
 'use strict';
 
 // ⛔ ការធ្លាក់ត្រូវឡើងដល់ exit code ៖ ដាក់ ១ តាំងពីដើម ហើយមានតែបន្ទាត់
@@ -26,6 +33,7 @@ const vm = require('vm');
 
 const root = process.env.LICSEAT_APP_DIR ? path.resolve(process.env.LICSEAT_APP_DIR) : path.resolve(__dirname, '..');
 const FILE = path.join(root, 'ZoeW/license-verify.js');
+const APP_FILE = path.join(root, 'ZoeW/app.js');
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {
@@ -33,13 +41,14 @@ function ok(label, cond, detail) {
     else { console.log('  FAIL   ' + label + (detail !== undefined ? '  got: ' + JSON.stringify(detail) : '')); fail++; }
 }
 
-if (!fs.existsSync(FILE)) {
-    console.log('  FAIL   រកមិនឃើញ ' + FILE);
+if (!fs.existsSync(FILE) || !fs.existsSync(APP_FILE)) {
+    console.log('  FAIL   រកមិនឃើញ ' + FILE + ' ឬ ' + APP_FILE);
     console.log('\n0 ok, 1 FAIL');
     process.exitCode = 1;
     return;
 }
 const SRC = fs.readFileSync(FILE, 'utf8');
+const APP_SRC = fs.readFileSync(APP_FILE, 'utf8');
 
 // ⛔ កុំ `process.exit(1)` ពេលរកឈ្មោះមិនឃើញ — នោះបិទបាំងការអះអាងខាងក្រោម
 //    ទាំងអស់ (ច្បាប់ «stub ជំនួសការបញ្ឈប់»)។ ត្រូវរាយជាការធ្លាក់ដែលមានឈ្មោះ
@@ -57,11 +66,26 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
+function constDecl(name, fallback) {
+    const m = SRC.match(new RegExp('(const ' + name + ' = [^;]+;)'));
+    if (!m) { missing.push(name); return 'const ' + name + ' = ' + fallback + ';'; }
+    return m[1];
+}
+
+const SLOT_DECL = constDecl('LICENSE_SEAT_SLOTS', "['d1']");
+const TRIES_DECL = constDecl('LICENSE_SEAT_CLAIM_TRIES', '1');
+const SLOTS = vm.runInNewContext(SLOT_DECL + '\nLICENSE_SEAT_SLOTS');
+
+const CODE = (APP_SRC.match(/const LICENSE_APP_CODE = '([A-Z]{2,8})';/) || [])[1];
+if (!CODE) missing.push('LICENSE_APP_CODE (ZoeW/app.js)');
+const APP = CODE || 'ZOE';
+const RECORD_KEY = 'zoe_license_activation_' + APP;
+
 const FNS = [
     'networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout',
     'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord',
     'recordSeenMark', 'monotonicNow',
-    'getDeviceId', 'licenseSeatUrl', 'readSeat', 'claimSeat',
+    'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat',
     'checkOnline', 'syncServerTime', 'activate', 'checkLocalStatus', 'getStatus'
 ];
 
@@ -71,21 +95,33 @@ let buildSeed = 0;
 
 const NOW = 1700000000000;
 const SIGNED_EXP = NOW + 30 * 86400000;
-const LIVE_KEY = { revoked: false, expiresAt: SIGNED_EXP };
+const liveKey = (maxDevices) => {
+    const k = { revoked: false, expiresAt: SIGNED_EXP };
+    if (maxDevices !== undefined) k.maxDevices = maxDevices;
+    return k;
+};
 
 // ── server ក្លែងដែល **អនុវត្ត rule ពិត** ──────────────────────────────
-// ច្បាប់ ៖ សរសេរ `license_seats/<app>/<key>` បានតែពេល (ក) គ្មានវត្តមាន
-// ឬ (ខ) `device` ដដែល។ ការលុបដោយ client ត្រូវបដិសេធ។
+// ច្បាប់ ៖ សរសេរ `license_seats/<app>/<key>/<slot>` បានតែពេល (ក) slot នោះ
+// ស្ថិតក្នុងពិដាន `maxDevices` របស់ Key **និង** (ខ) គ្មានវត្តមាន ឬ `device`
+// ដដែល។ ការលុបដោយ client ត្រូវបដិសេធ។
 function makeServer(opts) {
     opts = opts || {};
     const st = {
-        key: opts.key === undefined ? LIVE_KEY : opts.key,
-        seat: opts.seat === undefined ? null : opts.seat,
+        key: opts.key === undefined ? liveKey(opts.maxDevices) : opts.key,
+        seats: Object.assign({}, opts.seats),
         log: []
+    };
+    const limit = () => {
+        const raw = st.key && st.key.maxDevices;
+        const n = Math.floor(Number(raw));
+        if (!isFinite(n) || n < 1) return 1;
+        return n > SLOTS.length ? SLOTS.length : n;
     };
     st.fetch = function (url, init) {
         const method = (init && init.method) || 'GET';
-        st.log.push(method + ' ' + String(url).replace(/^https?:\/\/[^/]+/, ''));
+        const pathOnly = String(url).replace(/^https?:\/\/[^/]+/, '');
+        st.log.push(method + ' ' + pathOnly);
         if (opts.down) return Promise.reject(new Error('offline'));
         const res = (status, body) => Promise.resolve({
             ok: status >= 200 && status < 300,
@@ -94,29 +130,39 @@ function makeServer(opts) {
             json: () => Promise.resolve(body),
             text: () => Promise.resolve(JSON.stringify(body))
         });
-        if (String(url).indexOf('/license_keys/') !== -1) {
+        if (pathOnly.indexOf('/license_keys/') !== -1) {
             if (opts.keyDown) return res(503, null);
             return res(200, st.key);
         }
-        if (String(url).indexOf('/license_seats/') !== -1) {
+        if (pathOnly.indexOf('/license_seats/') !== -1) {
             if (opts.seatDown) return res(503, null);
             if (opts.rulesMissing) return res(401, { error: 'Permission denied' });
-            if (method === 'GET') return res(200, st.seat);
+            const slotMatch = /\/license_seats\/[^/]+\/[^/]+\/([^/.]+)\.json$/.exec(pathOnly);
+            const slot = slotMatch ? slotMatch[1] : null;
+            if (method === 'GET') {
+                if (slot) return res(200, st.seats[slot] || null);
+                return res(200, Object.keys(st.seats).length ? st.seats : null);
+            }
             if (method === 'PUT') {
+                if (!slot) return res(401, { error: 'Permission denied' });
+                // ⛔ ពិដានឈរនៅ server ៖ slot ក្រៅជួរ ➜ បដិសេធ
+                const idx = SLOTS.indexOf(slot);
+                if (idx === -1 || idx >= limit()) return res(401, { error: 'Permission denied' });
                 let body = null;
                 try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
                 if (!body || typeof body.device !== 'string' || typeof body.at !== 'number' || !(body.at > 0)) {
                     return res(400, null);
                 }
                 if (Object.keys(body).sort().join(',') !== 'at,device') return res(400, null);
-                if (st.seat && st.seat.device !== body.device) return res(401, { error: 'Permission denied' });
-                st.seat = body;
+                if (st.seats[slot] && st.seats[slot].device !== body.device) return res(401, { error: 'Permission denied' });
+                st.seats[slot] = body;
                 return res(200, body);
             }
             return res(401, { error: 'Permission denied' });
         }
         return res(200, {});
     };
+    st.devices = () => SLOTS.filter((s) => st.seats[s]).map((s) => st.seats[s].device);
     return st;
 }
 
@@ -124,7 +170,7 @@ function build(server, opts) {
     opts = opts || {};
     const store = Object.assign({}, opts.store);
     const sandbox = {
-        console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
+        console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN, isFinite,
         setTimeout, clearTimeout, Date, AbortController, Map, Set, TextEncoder, RegExp, Math, Uint8Array,
         crypto: { getRandomValues: ((seed) => (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 37 + seed * 101 + 11) & 255; return a; })(++buildSeed) },
         localStorage: opts.noStorage ? {
@@ -148,6 +194,8 @@ function build(server, opts) {
         const NET_MAX_IN_FLIGHT = 2;
         const DEVICE_ID_KEY = 'zoe_license_device_id';
         const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
+        ${SLOT_DECL}
+        ${TRIES_DECL}
         const netInFlight = new Map();
         const statusInFlight = new Map();
         function getServerNow() { return ${NOW}; }
@@ -163,7 +211,7 @@ function build(server, opts) {
         }
         function verifySignatureAndScope(keyString) {
             if (String(keyString).indexOf('BAD') !== -1) return Promise.resolve({ valid: false, reason: 'signature' });
-            return Promise.resolve({ valid: true, payload: { a: 'ADM', id: 'KEYID1', iat: 1, exp: ${Math.floor(SIGNED_EXP / 1000)}, note: '' } });
+            return Promise.resolve({ valid: true, payload: { a: '${APP}', id: 'KEYID1', iat: 1, exp: ${Math.floor(SIGNED_EXP / 1000)}, note: '' } });
         }
         function verifyKeyString(k) { return verifySignatureAndScope(k); }
     `, ctx);
@@ -172,147 +220,218 @@ function build(server, opts) {
 }
 
 const RECORD = (id) => JSON.stringify({
-    keyString: 'KEY1', id: id || 'KEYID1', a: 'ADM', iat: 1,
+    keyString: 'KEY1', id: id || 'KEYID1', a: APP, iat: 1,
     exp: Math.floor(SIGNED_EXP / 1000), note: '',
     lastOnlineCheck: NOW, onlineExp: SIGNED_EXP, seenMax: NOW
 });
 
-(async () => {
-    console.log('===== Key ១ ➜ ឧបករណ៍ ១ (license seat) =====');
+const activate = (h) => vm.runInContext("activate('KEY1', '" + APP + "')", h.ctx);
+const status = (h) => vm.runInContext("getStatus('" + APP + "')", h.ctx);
 
-    missing.forEach((n) => ok('ត្រូវមាន `' + n + '()` ក្នុង license-verify.js', false, 'អវត្តមាន'));
+(async () => {
+    console.log('===== Key ១ ➜ ឧបករណ៍តាមពិដាន (license seat) =====');
+
+    missing.forEach((n) => ok('ត្រូវមាន `' + n + '` ក្នុងកូដ ship', false, 'អវត្តមាន'));
+    ok('ឈ្មោះ slot យ៉ាងតិច ២ (បើមាន ១ ពិដានមិនអាចលើសពី ១ ទេ)', SLOTS.length >= 2, SLOTS);
 
     // ── ១. ឧបករណ៍ទី ១ Activate បាន ហើយកក់កៅអី ─────────────────────────
     let srv = makeServer({});
     let h = build(srv);
-    let r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
+    let r = await activate(h);
     ok('ឧបករណ៍ទី ១ Activate បាន', r && r.valid === true, r);
-    ok('ហើយកៅអីត្រូវកក់ខាង server', !!(srv.seat && typeof srv.seat.device === 'string' && srv.seat.device.length >= 8), srv.seat);
-    const DEV1 = srv.seat ? srv.seat.device : '';
-    ok('ត្រា `at` ជាលេខវិជ្ជមាន', !!(srv.seat && typeof srv.seat.at === 'number' && srv.seat.at > 0), srv.seat);
+    ok('ហើយកៅអីត្រូវកក់ខាង server នៅ slot ដំបូង',
+        !!(srv.seats[SLOTS[0]] && typeof srv.seats[SLOTS[0]].device === 'string' && srv.seats[SLOTS[0]].device.length >= 8), srv.seats);
+    const DEV1 = srv.seats[SLOTS[0]] ? srv.seats[SLOTS[0]].device : '';
+    ok('ត្រា `at` ជាលេខវិជ្ជមាន', !!(srv.seats[SLOTS[0]] && srv.seats[SLOTS[0]].at > 0), srv.seats);
     ok('payload មានតែ ២ វាល (`$other: false` ក្នុង rules)',
-        !!srv.seat && Object.keys(srv.seat).sort().join(',') === 'at,device', srv.seat && Object.keys(srv.seat));
-    ok('record ត្រូវរក្សាទុកក្នុងឧបករណ៍', !!h.store['zoe_license_activation_ADM']);
-    ok('លេខសម្គាល់ឧបករណ៍ចងចាំក្នុង localStorage', typeof h.store['zoe_license_device_id'] === 'string'
-        && h.store['zoe_license_device_id'] === DEV1, h.store['zoe_license_device_id']);
+        !!srv.seats[SLOTS[0]] && Object.keys(srv.seats[SLOTS[0]]).sort().join(',') === 'at,device', Object.keys(srv.seats[SLOTS[0]] || {}));
+    ok('record ត្រូវរក្សាទុកក្នុងឧបករណ៍', !!h.store[RECORD_KEY]);
+    ok('លេខសម្គាល់ឧបករណ៍ចងចាំក្នុង localStorage', h.store['zoe_license_device_id'] === DEV1, h.store['zoe_license_device_id']);
 
-    // ── ២. ឧបករណ៍ទី ២ ដោយ Key ដដែល ➜ បដិសេធ ──────────────────────────
+    // ── ២. លំនាំដើម ១ ឧបករណ៍ ៖ ឧបករណ៍ទី ២ ➜ បដិសេធ ───────────────────
     // នេះជាការអះអាងស្នូល ៖ **រឿងតែមួយដែលអ្នកទិញចង់ធ្វើ**។
     let h2 = build(srv);
-    let r2 = await vm.runInContext("activate('KEY1', 'ADM')", h2.ctx);
-    ok('ឧបករណ៍ទី ២ ដោយ Key ដដែល ➜ **បដិសេធ**', r2 && r2.valid === false && r2.reason === 'seat-taken', r2);
-    ok('ហើយឧបករណ៍ទី ២ មិនរក្សាទុក record ទេ', !h2.store['zoe_license_activation_ADM'], h2.store['zoe_license_activation_ADM']);
-    ok('កៅអីនៅជារបស់ឧបករណ៍ទី ១ ដដែល', srv.seat && srv.seat.device === DEV1, srv.seat);
+    let r2 = await activate(h2);
+    ok('ពិដានលំនាំដើម ១ ៖ ឧបករណ៍ទី ២ ➜ **បដិសេធ**', r2 && r2.valid === false && r2.reason === 'seat-taken', r2);
+    ok('ហើយឧបករណ៍ទី ២ មិនរក្សាទុក record ទេ', !h2.store[RECORD_KEY], h2.store[RECORD_KEY]);
+    ok('កៅអីនៅជារបស់ឧបករណ៍ទី ១ ដដែល', srv.devices().join(',') === DEV1, srv.devices());
 
     // ── ៣. ឧបករណ៍ដដែល Activate ម្តងទៀត ➜ ត្រូវបាន (idempotent) ────────
     // ⛔ ទិសផ្ទុយ ៖ បើគ្មានការអះអាងនេះ ការកែ «បដិសេធគ្រប់ការសរសេរទី ២»
     //    នឹងបៃតង ខណៈអ្នកប្រើពិតដែលវាយ Key ម្តងទៀត ត្រូវជាប់សោ។
     let h3 = build(srv, { store: { zoe_license_device_id: DEV1 } });
-    let r3 = await vm.runInContext("activate('KEY1', 'ADM')", h3.ctx);
+    let r3 = await activate(h3);
     ok('ឧបករណ៍ **ដដែល** Activate ម្តងទៀត ➜ ត្រូវបាន', r3 && r3.valid === true, r3);
 
-    // ── ៤. ការពិនិត្យបន្តបន្ទាប់ ៖ កៅអីប្តូរម្ចាស់ ➜ ច្រានចេញ ─────────
-    let srv4 = makeServer({ seat: { device: 'ZZZOTHERDEVICE0001', at: NOW } });
-    let h4 = build(srv4, { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
-    let s4 = await vm.runInContext("getStatus('ADM')", h4.ctx);
-    ok('getStatus ៖ កៅអីជារបស់ឧបករណ៍ផ្សេង ➜ ត្រូវការ Activate ឡើងវិញ',
-        s4 && s4.state === 'required' && s4.reason === 'seat-taken', s4);
-    ok('ហើយ record ក្នុងឧបករណ៍នេះត្រូវលុប', !h4.store['zoe_license_activation_ADM']);
+    // ── ៤. ⛔ ពិដាន ២ ៖ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ ─────────────
+    // នេះជាមុខងារ «អតិថិជនមានទូរស័ព្ទច្រើន» ៖ វាត្រូវបើកឲ្យ **តាមចំនួន
+    // ដែលអ្នកលក់កំណត់** មិនមែនបើកចំហ។
+    let srvM = makeServer({ maxDevices: 2 });
+    let hA = build(srvM);
+    let rA = await activate(hA);
+    const DEVA = srvM.seats[SLOTS[0]] ? srvM.seats[SLOTS[0]].device : '';
+    let hB = build(srvM);
+    let rB = await activate(hB);
+    const DEVB = srvM.seats[SLOTS[1]] ? srvM.seats[SLOTS[1]].device : '';
+    let hC = build(srvM);
+    let rC = await activate(hC);
+    ok('ពិដាន ២ ៖ ឧបករណ៍ទី ១ ➜ ត្រូវបាន', rA && rA.valid === true, rA);
+    ok('ពិដាន ២ ៖ ឧបករណ៍ទី ២ ➜ **ត្រូវបាន**', rB && rB.valid === true, rB);
+    ok('ហើយវាអង្គុយលើ slot ទី ២ (មិនជាន់ slot ទី ១)',
+        !!DEVB && DEVB !== DEVA && srvM.seats[SLOTS[0]].device === DEVA, srvM.seats);
+    ok('ពិដាន ២ ៖ ឧបករណ៍ទី ៣ ➜ **បដិសេធ**', rC && rC.valid === false && rC.reason === 'seat-taken', rC);
+    ok('ហើយឧបករណ៍ទី ៣ មិនរក្សាទុក record ទេ', !hC.store[RECORD_KEY]);
+    ok('កៅអីនៅត្រឹម ២ ដដែល', srvM.devices().length === 2, srvM.devices().length);
 
-    // ── ៥. ⛔ ទិសផ្ទុយ ៖ កៅអីជារបស់ខ្លួន ➜ មិនប៉ះអ្វីទាំងអស់ ───────────
-    let srv5 = makeServer({ seat: { device: DEV1, at: NOW } });
-    let h5 = build(srv5, { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
-    let s5 = await vm.runInContext("getStatus('ADM')", h5.ctx);
-    ok('getStatus ៖ កៅអីជារបស់ខ្លួន ➜ នៅ active ដដែល', s5 && s5.state === 'active', s5);
-    ok('ហើយ record នៅដដែល', !!h5.store['zoe_license_activation_ADM']);
+    // ⛔ ទិសផ្ទុយ ៖ ឧបករណ៍ទាំង ២ ត្រូវនៅ active ដដែល (ការកក់ទី ២ មិន
+    //    ត្រូវដេញទី ១ ចេញ)។
+    let sA = await status(build(srvM, { store: { zoe_license_device_id: DEVA, [RECORD_KEY]: RECORD() } }));
+    let sB = await status(build(srvM, { store: { zoe_license_device_id: DEVB, [RECORD_KEY]: RECORD() } }));
+    ok('ឧបករណ៍ទី ១ នៅ active', sA && sA.state === 'active', sA);
+    ok('ឧបករណ៍ទី ២ ក៏ active ដែរ', sB && sB.state === 'active', sB);
 
-    // ── ៦. ⛔ «ផ្ទៀងផ្ទាត់មិនបាន ≠ ខុស» ៖ អានកៅអីមិនបាន ➜ មិនលុប ───────
-    let srv6 = makeServer({ seatDown: true });
-    let h6 = build(srv6, { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
-    let s6 = await vm.runInContext("getStatus('ADM')", h6.ctx);
-    ok('អានកៅអីមិនបាន (503) ➜ **មិនលុប** record', !!h6.store['zoe_license_activation_ADM'], s6);
-    ok('ហើយ App នៅដំណើរការដដែល', s6 && s6.state === 'active', s6);
+    // ── ៥. ⛔ ពិដានឈរនៅ server ៖ client សុំ slot ក្រៅជួរ ➜ បដិសេធ ─────
+    // (client មើលឃើញដោយអ្នកប្រើ ➜ ការកែលេខខាង client មិនត្រូវផ្តល់កៅអី)
+    let srvOut = makeServer({ maxDevices: 1, seats: { [SLOTS[0]]: { device: 'ZZZOTHERDEVICE0001', at: NOW } } });
+    let hOut = build(srvOut, { store: { zoe_license_device_id: 'FORGEDDEVICE000000001' } });
+    const forced = await vm.runInContext(
+        "claimSeat('" + APP + "', 'KEYID1', 'FORGEDDEVICE000000001', true, '" + SLOTS[1] + "')", hOut.ctx);
+    ok('⛔ ការកក់ slot ក្រៅពិដាន ➜ server បដិសេធ', forced && forced.ok === false, forced);
+    ok('ហើយកៅអីមិនប្រែ', srvOut.devices().join(',') === 'ZZZOTHERDEVICE0001', srvOut.devices());
 
-    // ── ៧. ទិន្នន័យចាស់ ៖ record មានស្រាប់ តែកៅអីទទេ ➜ ទទួលយកកៅអី ─────
-    // (ការតំឡើងដែល Activate មុនជុំនេះ ត្រូវតែបន្តដំណើរការ)
-    let srv7 = makeServer({ seat: null });
-    let h7 = build(srv7, { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
-    let s7 = await vm.runInContext("getStatus('ADM')", h7.ctx);
-    ok('record ចាស់ + កៅអីទទេ ➜ នៅ active', s7 && s7.state === 'active', s7);
-    ok('ហើយកៅអីត្រូវកក់ឲ្យឧបករណ៍នេះស្វ័យប្រវត្តិ', srv7.seat && srv7.seat.device === DEV1, srv7.seat);
+    // ── ៦. ⛔ ការបន្ថយពិដាន ៖ ឧបករណ៍លើសលែងប្រើបាន ────────────────────
+    let srvLow = makeServer({ maxDevices: 1, seats: {
+        [SLOTS[0]]: { device: 'ZZZOTHERDEVICE0001', at: NOW },
+        [SLOTS[1]]: { device: 'DEMOTEDDEVICE00001', at: NOW }
+    } });
+    let hLow = build(srvLow, { store: { zoe_license_device_id: 'DEMOTEDDEVICE00001', [RECORD_KEY]: RECORD() } });
+    let sLow = await status(hLow);
+    ok('បន្ថយពិដានមក ១ ➜ ឧបករណ៍លើសត្រូវការ Activate ឡើងវិញ',
+        sLow && sLow.state === 'required' && sLow.reason === 'seat-taken', sLow);
 
-    // ── ៨. ការប្រណាំង ៖ អានឃើញទទេ តែការកក់ត្រូវបដិសេធ ➜ ច្រានចេញ ──────
-    let srv8 = makeServer({ seat: null });
-    let h8 = build(srv8, { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
+    // ── ៧. ការប្រណាំង ៖ slot ដំបូងត្រូវយកមុន ➜ រំកិលទៅ slot បន្ទាប់ ────
+    // ⛔ បើគ្មានការព្យាយាម slot បន្ទាប់ទេ អតិថិជនដែលមានពិដាន ២ នឹងត្រូវ
+    //    បដិសេធដោយ **ការប្រណាំង** ទោះកៅអីនៅទំនេរ។
+    let srvRace = makeServer({ maxDevices: 2 });
+    let hRace = build(srvRace, { store: { zoe_license_device_id: 'RACELOSERDEVICE001' } });
+    const realRace = srvRace.fetch;
+    let sawPut = false;
+    srvRace.fetch = function (url, init) {
+        if (!sawPut && init && init.method === 'PUT' && String(url).indexOf('/' + SLOTS[0] + '.json') !== -1) {
+            sawPut = true;
+            srvRace.seats[SLOTS[0]] = { device: 'RACEWINNERDEVICE01', at: NOW };
+        }
+        return realRace(url, init);
+    };
+    let rRace = await activate(hRace);
+    ok('ការប្រណាំង ៖ អ្នកចាញ់រំកិលទៅ slot ទំនេរបន្ទាប់ ➜ Activate បាន', rRace && rRace.valid === true, rRace);
+    ok('ហើយ slot ទី ១ នៅជារបស់អ្នកឈ្នះ',
+        srvRace.seats[SLOTS[0]] && srvRace.seats[SLOTS[0]].device === 'RACEWINNERDEVICE01', srvRace.seats);
+
+    // ── ៨. ការប្រណាំងខណៈពិដាន ១ ➜ ច្រានចេញ ────────────────────────────
+    let srv8 = makeServer({});
+    let h8 = build(srv8, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
     const realFetch8 = srv8.fetch;
     let seen8 = false;
     srv8.fetch = function (url, init) {
         if (!seen8 && String(url).indexOf('/license_seats/') !== -1 && init && init.method === 'PUT') {
             seen8 = true;
-            srv8.seat = { device: 'RACEWINNERDEVICE01', at: NOW };
+            srv8.seats[SLOTS[0]] = { device: 'RACEWINNERDEVICE01', at: NOW };
         }
         return realFetch8(url, init);
     };
-    let s8 = await vm.runInContext("getStatus('ADM')", h8.ctx);
-    ok('ការប្រណាំង ៖ ឧបករណ៍ផ្សេងកក់មុន ➜ ច្រានចេញ',
+    let s8 = await status(h8);
+    ok('ការប្រណាំងខណៈពិដាន ១ ➜ ច្រានចេញ',
         s8 && s8.state === 'required' && s8.reason === 'seat-taken', s8);
 
-    // ── ៩. localStorage បិទ ៖ Activate បដិសេធ តែ record ចាស់មិនលុប ────
+    // ── ៩. កៅអីប្តូរម្ចាស់ ➜ ច្រានចេញ ─────────────────────────────────
+    let srv4 = makeServer({ seats: { [SLOTS[0]]: { device: 'ZZZOTHERDEVICE0001', at: NOW } } });
+    let h4 = build(srv4, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+    let s4 = await status(h4);
+    ok('getStatus ៖ កៅអីជារបស់ឧបករណ៍ផ្សេង ➜ ត្រូវការ Activate ឡើងវិញ',
+        s4 && s4.state === 'required' && s4.reason === 'seat-taken', s4);
+    ok('ហើយ record ក្នុងឧបករណ៍នេះត្រូវលុប', !h4.store[RECORD_KEY]);
+
+    // ── ១០. ⛔ ទិសផ្ទុយ ៖ កៅអីជារបស់ខ្លួន ➜ មិនប៉ះអ្វីទាំងអស់ ──────────
+    let srv5 = makeServer({ seats: { [SLOTS[0]]: { device: DEV1, at: NOW } } });
+    let h5 = build(srv5, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+    let s5 = await status(h5);
+    ok('getStatus ៖ កៅអីជារបស់ខ្លួន ➜ នៅ active ដដែល', s5 && s5.state === 'active', s5);
+    ok('ហើយ record នៅដដែល', !!h5.store[RECORD_KEY]);
+
+    // ── ១១. ⛔ «ផ្ទៀងផ្ទាត់មិនបាន ≠ ខុស» ៖ អានកៅអីមិនបាន ➜ មិនលុប ──────
+    let srv6 = makeServer({ seatDown: true });
+    let h6 = build(srv6, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+    let s6 = await status(h6);
+    ok('អានកៅអីមិនបាន (503) ➜ **មិនលុប** record', !!h6.store[RECORD_KEY], s6);
+    ok('ហើយ App នៅដំណើរការដដែល', s6 && s6.state === 'active', s6);
+
+    // ── ១២. ទិន្នន័យចាស់ ៖ record មានស្រាប់ តែកៅអីទទេ ➜ ទទួលយកកៅអី ────
+    // (ការតំឡើងដែល Activate មុនជុំនេះ ត្រូវតែបន្តដំណើរការ)
+    let srv7 = makeServer({});
+    let h7 = build(srv7, { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+    let s7 = await status(h7);
+    ok('record ចាស់ + កៅអីទទេ ➜ នៅ active', s7 && s7.state === 'active', s7);
+    ok('ហើយកៅអីត្រូវកក់ឲ្យឧបករណ៍នេះស្វ័យប្រវត្តិ', srv7.devices().join(',') === DEV1, srv7.devices());
+
+    // ── ១៣. localStorage បិទ ៖ Activate បដិសេធ តែ record ចាស់មិនលុប ───
     let srv9 = makeServer({});
     let h9 = build(srv9, { noStorage: true });
-    let r9 = await vm.runInContext("activate('KEY1', 'ADM')", h9.ctx);
+    let r9 = await activate(h9);
     ok('storage បិទ ➜ Activate បដិសេធ (មិនផ្តល់សិទ្ធិលើឧបករណ៍ដែលសម្គាល់មិនបាន)',
         r9 && r9.valid === false && r9.reason === 'device-unverified', r9);
-    ok('ហើយគ្មានកៅអីត្រូវកក់ទេ', srv9.seat === null, srv9.seat);
+    ok('ហើយគ្មានកៅអីត្រូវកក់ទេ', srv9.devices().length === 0, srv9.devices());
 
-    let srv9b = makeServer({ seat: { device: 'ZZZOTHERDEVICE0001', at: NOW } });
-    const store9b = { zoe_license_activation_ADM: RECORD() };
+    let srv9b = makeServer({ seats: { [SLOTS[0]]: { device: 'ZZZOTHERDEVICE0001', at: NOW } } });
+    const store9b = { [RECORD_KEY]: RECORD() };
     let h9b = build(srv9b, { store: store9b });
     // ⛔ ដក **តែ** កូនសោឧបករណ៍ ➜ សម្គាល់ឧបករណ៍មិនបាន តែ record នៅ
     vm.runInContext("localStorage.setItem = function () { throw new Error('blocked'); }", h9b.ctx);
-    let s9b = await vm.runInContext("getStatus('ADM')", h9b.ctx);
-    ok('សម្គាល់ឧបករណ៍មិនបាន ➜ **មិនលុប** record (fail-open)',
-        !!h9b.store['zoe_license_activation_ADM'], s9b);
+    let s9b = await status(h9b);
+    ok('សម្គាល់ឧបករណ៍មិនបាន ➜ **មិនលុប** record (fail-open)', !!h9b.store[RECORD_KEY], s9b);
 
-    // ── ១០. លំដាប់សាលក្រម ៖ Revoke ឈ្នះលើកៅអី ────────────────────────
-    let srv10 = makeServer({ key: { revoked: true, expiresAt: SIGNED_EXP }, seat: { device: 'ZZZOTHERDEVICE0001', at: NOW } });
+    // ── ១៤. លំដាប់សាលក្រម ៖ Revoke ឈ្នះលើកៅអី ─────────────────────────
+    let srv10 = makeServer({ key: { revoked: true, expiresAt: SIGNED_EXP }, seats: { [SLOTS[0]]: { device: 'ZZZOTHERDEVICE0001', at: NOW } } });
     let h10 = build(srv10, { store: { zoe_license_device_id: DEV1 } });
-    let r10 = await vm.runInContext("activate('KEY1', 'ADM')", h10.ctx);
+    let r10 = await activate(h10);
     ok('Key ដែល Revoke ➜ សារ «revoked» មិនមែន «seat-taken»',
         r10 && r10.valid === false && r10.reason === 'revoked', r10);
 
-    // ── ១១. ក្រៅបណ្តាញទាំងស្រុង ➜ ឥរិយាបថចាស់នៅដដែល ─────────────────
+    // ── ១៥. ក្រៅបណ្តាញទាំងស្រុង ➜ ឥរិយាបថចាស់នៅដដែល ──────────────────
     let srv11 = makeServer({ down: true });
     let h11 = build(srv11, { store: { zoe_license_device_id: DEV1 } });
-    let r11 = await vm.runInContext("activate('KEY1', 'ADM')", h11.ctx);
+    let r11 = await activate(h11);
     ok('ក្រៅបណ្តាញ ➜ «network» (ឥរិយាបថចាស់មិនប្រែ)',
         r11 && r11.valid === false && r11.reason === 'network', r11);
 
-    // ── ១១ខ. rules មិនទាន់ Publish ➜ សារត្រូវប្រាប់រឿងនោះ ────────────
+    // ── ១៦. rules មិនទាន់ Publish ➜ សារត្រូវប្រាប់រឿងនោះ ──────────────
     // ⛔ «ភ្ជាប់ Server មិនបាន» នឹងបញ្ជូនអ្នកប្រើទៅរកមូលហេតុខុស ៖ បណ្តាញ
     //    ដើរធម្មតា — អ្វីដែលខ្វះគឺជំហានដោយដៃរបស់អ្នកលក់។
     let srv11b = makeServer({ rulesMissing: true });
     let h11b = build(srv11b, { store: { zoe_license_device_id: DEV1 } });
-    let r11b = await vm.runInContext("activate('KEY1', 'ADM')", h11b.ctx);
+    let r11b = await activate(h11b);
     ok('rules មិនទាន់ Publish ➜ «seat-unavailable» មិនមែន «network»',
         r11b && r11b.valid === false && r11b.reason === 'seat-unavailable', r11b);
-    let h11c = build(makeServer({ rulesMissing: true }), { store: { zoe_license_device_id: DEV1, zoe_license_activation_ADM: RECORD() } });
-    let s11c = await vm.runInContext("getStatus('ADM')", h11c.ctx);
+    let h11c = build(makeServer({ rulesMissing: true }), { store: { zoe_license_device_id: DEV1, [RECORD_KEY]: RECORD() } });
+    let s11c = await status(h11c);
     ok('⛔ ហើយវា **មិនលុប** record របស់ឧបករណ៍ដែល Activate រួច',
-        !!h11c.store['zoe_license_activation_ADM'] && s11c.state === 'active', s11c);
+        !!h11c.store[RECORD_KEY] && s11c.state === 'active', s11c);
 
-    // ── ១២. `checkOnline()` ធម្មតា **មិនសរសេរ** អ្វីទេ ────────────────
+    // ── ១៧. `checkOnline()` ធម្មតា **មិនសរសេរ** អ្វីទេ ─────────────────
     // (វាជា API សាធារណៈ ➜ ការហៅវាមិនត្រូវកក់កៅអីដោយចៃដន្យ)
-    let srv12 = makeServer({ seat: null });
+    let srv12 = makeServer({});
     let h12 = build(srv12, { store: { zoe_license_device_id: DEV1 } });
-    await vm.runInContext("checkOnline('ADM', 'KEYID1')", h12.ctx);
+    await vm.runInContext("checkOnline('" + APP + "', 'KEYID1')", h12.ctx);
     ok('`checkOnline()` ដោយគ្មាន `claimSeat` ➜ គ្មានការសរសេរ',
-        srv12.seat === null && srv12.log.every((l) => l.indexOf('PUT') !== 0), srv12.log);
+        srv12.devices().length === 0 && srv12.log.every((l) => l.indexOf('PUT') !== 0), srv12.log);
 
-    // ── ជាន់អប្បបរមា ៖ ការអះអាងត្រូវប៉ះផ្លូវកៅអីពិត ───────────────────
-    const seatCalls = srv.log.concat(srv4.log, srv7.log).filter((l) => l.indexOf('/license_seats/') !== -1);
+    // ── ជាន់អប្បបរមា ៖ ការអះអាងត្រូវប៉ះផ្លូវកៅអីពិត ────────────────────
+    const seatCalls = srv.log.concat(srv4.log, srv7.log, srvM.log).filter((l) => l.indexOf('/license_seats/') !== -1);
     ok('ការវាស់ពិតជាឆ្លងកាត់ផ្លូវ `license_seats` (ជាន់អប្បបរមា)', seatCalls.length >= 4, seatCalls.length);
-    ok('ហើយមានការសរសេរ (PUT) យ៉ាងតិច ២', seatCalls.filter((l) => l.indexOf('PUT') === 0).length >= 2, seatCalls);
+    ok('ហើយមានការសរសេរ (PUT) យ៉ាងតិច ២', seatCalls.filter((l) => l.indexOf('PUT') === 0).length >= 2, seatCalls.length);
+    ok('ការសរសេរត្រូវចង្អុលទៅ slot មិនមែន node មេ',
+        seatCalls.filter((l) => l.indexOf('PUT') === 0).every((l) => new RegExp('/(' + SLOTS.join('|') + ')\\.json$').test(l)),
+        seatCalls.filter((l) => l.indexOf('PUT') === 0).slice(0, 3));
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;

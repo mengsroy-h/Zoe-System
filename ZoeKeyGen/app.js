@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.28';
+const APP_VERSION = '2.20.1';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -67,7 +67,7 @@ function blockFormSubmit(event) {
     if (event) event.preventDefault();
 }
 
-const LICENSE_APP_CODE = 'ADM';
+const LICENSE_APP_CODE = 'ZOE';
 
 function renderAppVersionLabels() {
     document.querySelectorAll('[data-app-version]').forEach((el) => {
@@ -1100,10 +1100,13 @@ function stripJsCommentsOutsideStrings(source) {
 }
 
 function matchingBraceIndex(source, start) {
+    const text = typeof source === 'string' ? source : '';
+    let from = Math.floor(Number(start));
+    if (!Number.isFinite(from) || from < 0) from = 0;
     let depth = 0;
     let quote = '';
-    for (let i = start; i < source.length; i++) {
-        const ch = source[i];
+    for (let i = from; i < text.length; i++) {
+        const ch = text[i];
         if (quote) {
             if (ch === '\\') {
                 i++;
@@ -1775,6 +1778,8 @@ async function generateLicenseKey() {
 
     const appSelect = LICENSE_APP_CODE;
     const days = parseFloat(document.getElementById('genDaysInput').value) || 0;
+    const devicesInput = document.getElementById('genDevicesInput');
+    const maxDevices = seatLimitOf(devicesInput ? devicesInput.value : 1);
     const note = document.getElementById('genNoteInput').value.trim();
 
     if (days <= 0) { alert('សុពលភាពត្រូវធំជាង 0 ថ្ងៃ!'); return; }
@@ -1801,7 +1806,8 @@ async function generateLicenseKey() {
         const targetPaths = [appSelect];
         const publicRecord = {
             expiresAt: getServerNow() + Math.round(days * 86400000),
-            revoked: false
+            revoked: false,
+            maxDevices: maxDevices
         };
         const metaRecord = {
             issuedAt: getServerNow(),
@@ -1886,8 +1892,8 @@ function copyGeneratedKey() {
     return copySensitiveText(text, () => lastGeneratedKey === text, () => showToast('✅ បានចម្លង Key!'));
 }
 
-const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ADM';
-const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ADM';
+const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_ZOE';
+const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_ZOE';
 let lastGeneratedSetupLink = '';
 
 function setupLinkDsnIsValid(dsn) {
@@ -1979,7 +1985,25 @@ let isSignedInUiActive = false;
 let keyListCache = [];
 let seatReadFailed = false;
 let keyListSessionGeneration = 0;
-const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
+const APP_LABELS = { ZOE: 'ZoeW', ALL: 'ទាំងអស់' };
+const LICENSE_SEAT_SLOT_NAMES = ['d1', 'd2', 'd3', 'd4', 'd5'];
+const LICENSE_SEAT_MAX = LICENSE_SEAT_SLOT_NAMES.length;
+function seatLimitOf(value) {
+    const n = Math.floor(Number(value));
+    if (!isFinite(n) || n < 1) return 1;
+    return n > LICENSE_SEAT_MAX ? LICENSE_SEAT_MAX : n;
+}
+function seatDevicesOf(node, limit) {
+    const out = [];
+    if (!node || typeof node !== 'object') return out;
+    LICENSE_SEAT_SLOT_NAMES.slice(0, seatLimitOf(limit)).forEach((slot) => {
+        const rec = node[slot];
+        if (rec && typeof rec === 'object' && typeof rec.device === 'string' && rec.device) {
+            out.push({ slot: slot, device: rec.device, at: typeof rec.at === 'number' ? rec.at : 0 });
+        }
+    });
+    return out;
+}
 
 function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2042,11 +2066,17 @@ async function refreshKeyList() {
             });
             const inconsistent = revokedFlags.some((v) => v !== revokedFlags[0])
                 || expiryValues.some((v) => v !== expiryValues[0]);
-            let seat = null;
-            paths.forEach((p) => { if (!seat && seatData[p] && seatData[p][id]) seat = seatData[p][id]; });
+            let seatNode = null;
+            paths.forEach((p) => { if (!seatNode && seatData[p] && seatData[p][id]) seatNode = seatData[p][id]; });
+            let maxDevices = 1;
+            paths.forEach((p) => {
+                const raw = entry.perApp[p] && entry.perApp[p].maxDevices;
+                if (typeof raw === 'number' && raw >= 1) maxDevices = seatLimitOf(raw);
+            });
             return Object.assign({ id: id }, legacyMeta, meta, {
                 scope: scope, paths: paths, perApp: entry.perApp,
-                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt, seat: seat
+                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt,
+                maxDevices: maxDevices, seatDevices: seatDevicesOf(seatNode, maxDevices)
             });
         });
 
@@ -2080,12 +2110,12 @@ function renderKeyList() {
         let seatHtml;
         if (seatReadFailed) {
             seatHtml = `<span class="badge badge-scope" title="${escapeHtml('អាន license_seats មិនបានទេ — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច')}">⚠️ ពិនិត្យមិនបាន</span>`;
-        } else if (row.seat && typeof row.seat.device === 'string') {
-            const boundAt = (typeof row.seat.at === 'number' && row.seat.at > 0)
-                ? new Date(row.seat.at).toLocaleDateString('km-KH') : '-';
-            seatHtml = `<span class="badge badge-active" title="${escapeHtml('ឧបករណ៍ ' + row.seat.device.slice(0, 6) + '… ចងនៅ ' + boundAt)}">📱 ចងរួច</span>`;
+        } else if (row.seatDevices.length > 0) {
+            const boundText = row.seatDevices.map((d) => d.device.slice(0, 6) + '… ចងនៅ '
+                + (d.at > 0 ? new Date(d.at).toLocaleDateString('km-KH') : '-')).join(' · ');
+            seatHtml = `<span class="badge badge-active" title="${escapeHtml(boundText)}">📱 ${row.seatDevices.length}/${escapeHtml(String(row.maxDevices))}</span>`;
         } else {
-            seatHtml = '<span class="badge badge-scope">📱 ទំនេរ</span>';
+            seatHtml = `<span class="badge badge-scope">📱 ទំនេរ (0/${escapeHtml(String(row.maxDevices))})</span>`;
         }
 
         if (row.inconsistent) {
@@ -2111,6 +2141,7 @@ function renderKeyList() {
                 <div class="btn-row">
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="devices">📱 ចំនួនឧបករណ៍</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="release">🔓 ដោះឧបករណ៍</button>
                 </div>
             </td>
@@ -2189,6 +2220,35 @@ async function toggleRevokeKey(id) {
     }
 }
 
+async function setKeySeatLimit(id) {
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) return;
+    const row = keyListCache.find((r) => r.id === id);
+    if (!row) return;
+    const answer = prompt('Key នេះ Activate បានលើឧបករណ៍ប៉ុន្មាន? (១ ដល់ ' + LICENSE_SEAT_MAX + ')', String(row.maxDevices));
+    if (answer === null) return;
+    const next = Math.floor(Number(String(answer).trim()));
+    if (!isFinite(next) || next < 1 || next > LICENSE_SEAT_MAX) {
+        alert('សូមវាយលេខចន្លោះ ១ ដល់ ' + LICENSE_SEAT_MAX + '!');
+        return;
+    }
+    if (next === row.maxDevices) return;
+    if (next < row.seatDevices.length
+        && !confirm('Key នេះចងនឹងឧបករណ៍ ' + row.seatDevices.length + ' រួចហើយ។\n\nការបន្ថយមក ' + next + ' ធ្វើឲ្យឧបករណ៍ដែលលើសលែងប្រើ Key នេះបាន។ បន្តទេ?')) return;
+    try {
+        await withTimeout(retryAsync(() => Promise.all(row.paths.map((p) => fb.update(fb.ref(operationDb, `license_keys/${p}/${id}`), { maxDevices: next }))), 3, 1000), 15000, 'Seat limit update timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        showToast('✅ Key នេះ Activate បានលើឧបករណ៍ ' + next + ' ហើយ!');
+        refreshKeyList();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'setKeySeatLimit' });
+        alert('កំណត់ចំនួនឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
+    }
+}
+
 async function releaseKeySeat(id) {
     const operation = captureSensitiveSession(true);
     const operationDb = db;
@@ -2199,11 +2259,11 @@ async function releaseKeySeat(id) {
         alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
         return;
     }
-    if (!row.seat) {
+    if (row.seatDevices.length === 0) {
         alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
         return;
     }
-    if (!confirm('ដោះឧបករណ៍ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ **ថ្មីតែមួយ** អាច Activate បាន។')) return;
+    if (!confirm('ដោះឧបករណ៍ទាំង ' + row.seatDevices.length + ' ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ថ្មីរហូតដល់ ' + row.maxDevices + ' អាច Activate បាន។')) return;
     try {
         await withTimeout(retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000), 15000, 'Release timed out');
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
@@ -2363,6 +2423,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = btn.dataset.keyId;
             if (btn.dataset.action === 'revoke') toggleRevokeKey(id);
             else if (btn.dataset.action === 'extend') openExtendModal(id);
+            else if (btn.dataset.action === 'devices') setKeySeatLimit(id);
             else if (btn.dataset.action === 'release') releaseKeySeat(id);
         });
     }

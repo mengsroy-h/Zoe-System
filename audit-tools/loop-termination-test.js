@@ -71,6 +71,33 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
+// ⛔ ច្បាប់ដដែលអនុវត្តលើ **App ទាំង ២** ➜ ការស្រង់ត្រូវដឹងឈ្មោះ App
+// (បើមិនដូច្នេះ ច្បាប់ចម្លងក្នុង ZoeKeyGen រអិលកាត់ស្ងាត់ៗ)។
+function sliceFnFrom(src, name) {
+    const start = src.indexOf('function ' + name + '(');
+    if (start === -1) return '';
+    let depth = 0, i = src.indexOf('{', start), started = false;
+    for (; i < src.length; i++) {
+        if (src[i] === '{') { depth++; started = true; }
+        else if (src[i] === '}') { depth--; if (started && depth === 0) { i++; break; } }
+    }
+    return src.slice(start, i);
+}
+
+function terminatesWithinApp(appName, names, callSrc, ms, heapMb) {
+    const src = readAppSrc(appName);
+    if (!src) return { ok: false, why: 'អាន ' + appName + '/app.js មិនបាន' };
+    const bodies = names.map((n) => sliceFnFrom(src, n));
+    if (bodies.some((b) => !b)) return { ok: false, why: 'ស្រង់តួ function មិនឃើញក្នុង ' + appName };
+    const script = bodies.join('\n') + '\n' + callSrc + '\nconsole.log("DONE");';
+    const res = spawnSync(process.execPath, ['--max-old-space-size=' + (heapMb || 192), '-e', script],
+        { timeout: ms, maxBuffer: 1024 * 1024, encoding: 'utf8' });
+    if (res.signal || res.status === null) return { ok: false, why: 'មិនឈប់ក្នុង ' + ms + ' ms (សម្លាប់ដោយ ' + res.signal + ')' };
+    if (res.status !== 0) return { ok: false, why: 'ធ្លាក់/OOM ៖ ' + String(res.stderr || '').split('\n').filter(Boolean).slice(-1)[0] };
+    if (String(res.stdout).indexOf('DONE') === -1) return { ok: false, why: 'មិនឈានដល់ចុងបញ្ចប់' };
+    return { ok: true };
+}
+
 // ⛔ ការរត់ត្រូវនៅក្នុង **process ដាច់ដោយឡែក** ៖ រង្វិលជុំមិនចេះឈប់ក្នុង
 // process ដដែល នឹងធ្វើឲ្យ checker ខ្លួនឯងព្យួរ ➜ `hang-guard` ធ្លាក់ជំនួស
 // ការធ្លាក់ដែលមានឈ្មោះ។ ពិដាន heap តូចធ្វើឲ្យ OOM មកលឿន។
@@ -211,6 +238,32 @@ const XLSX_STUB = 'const XLSX={utils:{encode_cell:()=>"A1"}};const ws={A1:{t:"n"
     const r = terminatesWithin(['forceSheetTextCells'], XLSX_STUB + 'forceSheetTextCells(ws,' + arg + ',[1,2]);', 4000, 192);
     ok('forceSheetTextCells(ws, ' + label + ') ឈប់', r.ok, r.why);
 });
+// ⛔ រូបរាងទី ៥ ៖ រង្វិលជុំដែល **ចំណុចចាប់ផ្តើម** មកពីអាគុយម៉ង់។
+//    វាស់បាន (2.37.1 · រកឃើញដោយការ fuzz helper សុទ្ធទាំងអស់ដោយ input អាក្រក់
+//    មិនមែនដោយការអានកូដ) ៖ `matchingBraceIndex('', -Infinity)` មិនចេះឈប់ —
+//    `i++` លើ `-Infinity` នៅដដែល ➜ `i < length` ពិតរហូត។ ⛔ ថ្នាក់នេះខុសពី
+//    ទី ៤ ៖ ពិដានមិនមែនបញ្ហា — **ចំណុចចាប់ផ្តើម** ទេ ➜ ការពិនិត្យលើ
+//    *ចំនួនជុំ* មិនចាប់វាទេ។ ⛔ វារស់នៅ **App ទាំង ២**។
+console.log('\n--- ៥. ចំណុចចាប់ផ្តើមមកពីអាគុយម៉ង់ (matchingBraceIndex) ---');
+['ZoeW', 'ZoeKeyGen'].forEach((app) => {
+    ['Infinity', '-Infinity', 'NaN', '-1', '1e12', 'null', 'undefined'].forEach((arg) => {
+        const r = terminatesWithinApp(app, ['matchingBraceIndex'],
+            'matchingBraceIndex("x={a:1};", ' + arg + ');', 4000, 192);
+        ok(app + ' ៖ matchingBraceIndex(src, ' + arg + ') ឈប់', r.ok, r.why);
+    });
+    // ⛔ ទិសផ្ទុយ ៖ ការបន្ថែមព្រំដែន មិនត្រូវខូចលទ្ធផលធម្មតា
+    const src = readAppSrc(app);
+    const body = sliceFnFrom(src, 'matchingBraceIndex');
+    const probe = spawnSync(process.execPath, ['-e', body
+        + '\nconsole.log(JSON.stringify([matchingBraceIndex("x={a:1};", 2), matchingBraceIndex("{}", 0), matchingBraceIndex("{", 0)]));'],
+        { timeout: 4000, encoding: 'utf8' });
+    let got = null;
+    try { got = JSON.parse(String(probe.stdout).trim().split('\n').pop()); } catch (e) {}
+    ok(app + ' ៖ ⛔ ទិសផ្ទុយ ៖ លទ្ធផលធម្មតានៅដដែល',
+        !!got && got[0] === 6 && got[1] === 1 && got[2] === -1,
+        JSON.stringify(got) + ' ' + String(probe.stderr || '').slice(0, 160));
+});
+
 // ⛔ ទិសផ្ទុយ ៖ ការបន្ថែមពិដាន មិនត្រូវខូចលទ្ធផលធម្មតា
 {
     const stub = 'const seen=[];const XLSX={utils:{encode_cell:(o)=>{seen.push(o.r+","+o.c);return "R"+o.r+"C"+o.c;}}};'

@@ -14,6 +14,8 @@
 
     const KEY_PREFIX = 'ZOEKEY-';
     const OFFLINE_GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+    const DEVICE_ID_KEY = 'zoe_license_device_id';
+    const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
 
     let serverTimeOffsetMs = 0;
     let serverTimeSynced = false;
@@ -148,16 +150,32 @@
         try { localStorage.removeItem(storageKey(appCode)); } catch (e) {}
     }
 
+    function getDeviceId() {
+        let existing = null;
+        try { existing = localStorage.getItem(DEVICE_ID_KEY); } catch (e) { return null; }
+        if (typeof existing === 'string' && DEVICE_ID_RE.test(existing)) return existing;
+        let fresh;
+        try { fresh = bytesToBase32(crypto.getRandomValues(new Uint8Array(15))); } catch (e) { return null; }
+        try { localStorage.setItem(DEVICE_ID_KEY, fresh); } catch (e) { return null; }
+        try { return localStorage.getItem(DEVICE_ID_KEY) === fresh ? fresh : null; } catch (e) { return null; }
+    }
+
     async function activate(keyString, appCode) {
         const result = await verifySignatureAndScope(keyString, appCode);
         if (!result.valid) return result;
-        const online = await checkOnline(appCode, result.payload.id, { priority: true });
+        const online = await checkOnline(appCode, result.payload.id, { priority: true, claimSeat: true });
         if (online.ok !== true) {
             return { valid: false, reason: online.reason || 'network', payload: result.payload };
         }
         if (!serverTimeSynced) await syncServerTime({ priority: true });
         if (!serverTimeSynced) {
             return { valid: false, reason: 'clock-unverified', payload: result.payload };
+        }
+        if (online.seat !== 'mine') {
+            let seatReason = 'network';
+            if (online.seat === 'no-device') seatReason = 'device-unverified';
+            else if (online.seat === 'seat-unavailable') seatReason = 'seat-unavailable';
+            return { valid: false, reason: seatReason, payload: result.payload };
         }
         const now = getServerNow();
         const ceiling = typeof online.expiresAt === 'number' ? online.expiresAt : result.payload.exp * 1000;
@@ -200,11 +218,11 @@
         return started;
     }
 
-    async function fetchWithBodyTimeout(url, readBody) {
+    async function fetchWithBodyTimeout(url, readBody, init) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), NET_TIMEOUT_MS);
         try {
-            const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+            const res = await fetch(url, Object.assign({ cache: 'no-store' }, init || {}, { signal: controller.signal }));
             const body = readBody ? await readBody(res) : undefined;
             return { res: res, body: body };
         } finally {
@@ -240,7 +258,60 @@
             if (typeof data.expiresAt === 'number' && getServerNow() > data.expiresAt) {
                 return { ok: false, reason: 'expired-server' };
             }
-            return { ok: true, expiresAt: data.expiresAt };
+            const deviceId = getDeviceId();
+            const seat = await readSeat(appCode, keyId, deviceId, priority);
+            if (seat.ok === false) return { ok: false, reason: 'seat-taken' };
+            if (seat.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+            if (seat.unclaimed && opts && opts.claimSeat) {
+                const claimed = await claimSeat(appCode, keyId, deviceId, priority);
+                if (claimed.ok === false) return { ok: false, reason: 'seat-taken' };
+                if (claimed.ok === true) return { ok: true, expiresAt: data.expiresAt, seat: 'mine' };
+            }
+            const seatState = (seat.reason === 'no-device' || seat.reason === 'seat-unavailable') ? seat.reason : 'unknown';
+            return { ok: true, expiresAt: data.expiresAt, seat: seatState };
+        } catch (e) {
+            return { ok: null, reason: 'network' };
+        }
+    }
+
+    function licenseSeatUrl(appCode, keyId) {
+        return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId + '.json';
+    }
+
+    async function readSeat(appCode, keyId, deviceId, priority) {
+        if (!deviceId) return { ok: null, reason: 'no-device' };
+        try {
+            const pending = sharedRequest('seat:' + appCode + '/' + keyId, priority,
+                () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId), (r) => (r.ok ? r.json() : null)));
+            if (!pending) return { ok: null, reason: 'network' };
+            const out = await pending;
+            if (out.res.status === 401 || out.res.status === 403) return { ok: null, reason: 'seat-unavailable' };
+            if (!out.res.ok) return { ok: null, reason: 'network' };
+            const data = out.body;
+            const holder = (data && typeof data.device === 'string') ? data.device : '';
+            if (!holder) return { ok: null, reason: 'unclaimed', unclaimed: true };
+            return holder === deviceId ? { ok: true } : { ok: false, reason: 'seat-taken' };
+        } catch (e) {
+            return { ok: null, reason: 'network' };
+        }
+    }
+
+    async function claimSeat(appCode, keyId, deviceId, priority) {
+        if (!deviceId) return { ok: null, reason: 'no-device' };
+        const stamp = Math.round(getServerNow());
+        const body = JSON.stringify({ device: deviceId, at: stamp > 0 ? stamp : 1 });
+        try {
+            const pending = sharedRequest('seat-claim:' + appCode + '/' + keyId, priority,
+                () => fetchWithBodyTimeout(licenseSeatUrl(appCode, keyId), null, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                }));
+            if (!pending) return { ok: null, reason: 'network' };
+            const out = await pending;
+            if (out.res.ok) return { ok: true };
+            if (out.res.status === 401 || out.res.status === 403) return { ok: false, reason: 'seat-taken' };
+            return { ok: null, reason: 'network' };
         } catch (e) {
             return { ok: null, reason: 'network' };
         }
@@ -319,7 +390,7 @@
             return { state: 'required', reason: sigCheck.reason };
         }
 
-        const online = await checkOnline(appCode, record.id);
+        const online = await checkOnline(appCode, record.id, { claimSeat: true });
         if (JSON.stringify(loadLocalRecord(appCode)) !== recordSnapshot) return recheck();
         if (online.ok === false) {
             clearLocalRecord(appCode);
@@ -399,6 +470,7 @@
         KEY_PREFIX: KEY_PREFIX,
         activate: activate,
         getStatus: getStatus,
+        getDeviceId: getDeviceId,
         deactivate: deactivate,
         verifyKeyString: verifyKeyString,
         parseKeyString: parseKeyString,

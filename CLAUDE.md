@@ -98,8 +98,8 @@ Netlify site ដាច់ដោយឡែក ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.8` (`zoew-v217`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.27` (`zoekeygen-v97`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.36.9` (`zoew-v218`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.19.28` (`zoekeygen-v98`) | `zoekeygen` |
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី
@@ -353,6 +353,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **License ↔ នាឡិកា** | ⛔ នាឡិកាដែលមិន sync **មិនអាចលុប** record បានទេ | `license-grace-test` |
 | **App ↔ ម៉ូឌុល License** | ⛔ ទង់ «sync រួច» ត្រូវបើកតែដោយតម្លៃ **ពី server ពិត** | `license-clock-trust-test` |
 | **License ↔ ការប្តូរម៉ោង** | ⛔ ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `license-clock-rollback-test` |
+| **Key ១ ➜ ឧបករណ៍ ១** | ⛔ **អ្នកសម្រេចឈរនៅ rules មិនមែននៅ client** — កូដ client មើលឃើញទាំងអស់ ➜ ការរាប់ឧបករណ៍ខាង client ជាការតុបតែង។ កៅអីរស់នៅ `license_seats/<appCode>/<keyId>` ក្នុង **License Project** ដែលសរសេរបានតែពេល (ក) គ្មានវត្តមាន **និង** Key នោះមានពិត ឬ (ខ) `device` ដដែល ➜ ⛔ ការលុបដោយ client បដិសេធ (បើអត់ ➜ ដោះកៅអីខ្លួនឯង ➜ គ្មានព្រំដែន)។ ⛔ **ការរាយបញ្ជីបដិសេធ** (`.read: true` ត្រឹម `$keyId`) ➜ គេរាប់អតិថិជនមិនបាន។ ⛔ `getDeviceId()` ត្រូវ **អានត្រឡប់វិញ** ក្រោយសរសេរ (private mode ➜ `setItem` ស្ងាត់ៗមិនជាប់)។ ⛔ **«សម្គាល់មិនបាន ≠ កៅអីជារបស់គេ»** ៖ អានកៅអីធ្លាក់ · storage បិទ ➜ `ok: null` ➜ **មិនលុប** record (ច្បាប់ដដែលនឹង `{ ok: null }` របស់បណ្តាញ) — មានតែសាលក្រម **`seat-taken` ពិត** ទេដែលលុប។ ⛔ ⛔ តែ `activate()` ជា **ការផ្តល់សិទ្ធិថ្មី** ➜ វាទាមទារ `seat === 'mine'` ពិត (ច្បាប់ «unverified ➜ រក្សាទុក តែកុំផ្តល់សិទ្ធិថ្មី»)។ ⛔ **ទិន្នន័យចាស់ត្រូវទទួលកៅអីស្វ័យប្រវត្តិ** ៖ record មានស្រាប់ + កៅអីទទេ ➜ កក់ឲ្យខ្លួន (បើអត់ ➜ deploy តែមួយ **ចាក់សោអតិថិជនទាំងអស់**)។ ⛔ **ទិសផ្ទុយ ២** ៖ ឧបករណ៍ **ដដែល** Activate ម្តងទៀតត្រូវបាន · `checkOnline()` ដោយគ្មាន `claimSeat` **មិនសរសេរ** អ្វីទេ។ ⛔ ការដោះឧបករណ៍ (ប្តូរទូរស័ព្ទ) ជារបស់ **admin តែម្នាក់** តាមប៊ូតុងក្នុង ZoeKeyGen។ ⚠️ **ការប្រុងប្រយ័ត្នដែលមិនទាន់វាស់** ៖ លើ iOS App ដែលដំឡើងលើអេក្រង់ដើម និង Safari ប្រើ Storage **ដាច់ពីគ្នា** ➜ ឯកសារណែនាំឲ្យដំឡើងជា PWA **មុន** Activate។ ⛔ កុំ «កែ» វាដោយធ្វើឲ្យ seat ធូរ — ដំណោះស្រាយគឺការដោះឧបករណ៍ | `license-seat-test` · `emu/license-seat-rules-test` |
 | ការការពារ inspect element | ⛔ ពង្រឹងមិនបានទេ — កុំព្យាយាម | 📝 (រចនាសម្ព័ន្ធ) |
 | **អ្នកប្រើសរសេរតួលេខ revenue ដោយផ្ទាល់** | ទទួលយកដោយចេតនា (គ្មាន backend) | 📝 |
 | **អត្តសញ្ញាណអតិថិជន ៖ លេខទូរស័ព្ទ** | ⛔ លេខដែលរក្សាទុកជាកូនសោ merge (`phone`+`scanDate`) និងជាមូលដ្ឋាននៃ `getPickupPhoneKey()` ➜ តួអក្សរកាកសំណល់តែមួយបំបែកអតិថិជនម្នាក់ជា **ពីរ**។ `normalizeOneStoredPhone()` ត្រូវលុប `= " '` **ស៊ីមេទ្រី ទាំងមុខ ទាំងចុង** (ទម្រង់ `="012…"` របស់ Sheets/Excel) — វាស់បាន (2.31.8) ៖ ខាងចុងមិនត្រូវលុប ➜ រក្សាទុក `012345678"`។ ⛔ សញ្ញាបំបែក **ខាងក្នុង** ត្រូវនៅដដែល (ការប្តូរទម្រង់បំបែក merge នឹងទិន្នន័យចាស់) | `phone-suggest-test` |
@@ -490,6 +491,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **នាឡិកាថយក្រោយ ➜ ពិដានល្បឿនបិទជាអចិន្ត្រៃយ៍** ➜ App លែងភ្ជាប់ឡើងវិញ · lookup ងាប់ · `setTimeout` យក្ស | `monotonic-gate-test.js` |
 | សំណើ License កកកុញ ➜ សំណើចាំបាច់ជាប់គាំង (ផ្លូវបណ្តាញទី ៣) | `license-network-pressure-test.js` |
 | App ប្រាប់ម៉ូឌុល License ថានាឡិកា «sync រួច» មុន handshake ➜ **លុប License របស់អតិថិជន** | `license-clock-trust-test.js` |
+| **Key តែមួយ Activate បានលើឧបករណ៍គ្មានដែនកំណត់** ➜ អតិថិជនចែករំលែក ឬលក់បន្ត Key | `license-seat-test.js` · `emu/license-seat-rules-test.js` |
 | ការបង្វិលនាឡិកាថយក្រោយ ➜ **reset ការអនុគ្រោះ** និង **ធ្វើឲ្យ Key ដែលផុតកំណត់រស់ឡើងវិញ** | `license-clock-rollback-test.js` |
 | ការសម្អាតស្វ័យប្រវត្តិ និង purge ធុងសំរាម រត់ដោយនាឡិកាឧបករណ៍ខុស ➜ **បាត់ទិន្នន័យ និងដកលុយ** | `cleanup-clock-guard-test.js` |
 | ថ្ងៃចំណូល/តម្រង/ម៉ោង គណនាតាមតំបន់ម៉ោងឧបករណ៍ ➜ ឧបករណ៍ ២ ចុះខុសថ្ងៃគ្នា | `khmer-timezone-test.js` |

@@ -32,22 +32,40 @@ const GRACE = 3 * 24 * 60 * 60 * 1000;
 function build(serverRecord, opts) {
     opts = opts || {};
     const store = Object.assign({}, opts.store);
+    const seat = { value: opts.seat === undefined ? null : opts.seat };
     const clock = { now: opts.now || 1000000 };
     const sandbox = {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
-        setTimeout, clearTimeout, Date, AbortController, Map, Set,
+        setTimeout, clearTimeout, Date, AbortController, Map, Set, Math, RegExp, Uint8Array,
+        crypto: { getRandomValues: (a) => { for (let i = 0; i < a.length; i++) a[i] = (i * 29 + 7) & 255; return a; } },
         localStorage: {
             getItem: (k) => (k in store ? store[k] : null),
             setItem: (k, v) => { store[k] = v; },
             removeItem: (k) => { delete store[k]; }
         },
-        fetch: () => (serverRecord === 'offline'
-            ? Promise.reject(new Error('offline'))
-            : Promise.resolve({
-                ok: true,
+        // ⛔ ផ្លូវ `license_seats` ជាស្នាមភ្ជាប់ពិត ➜ កុំ stub វាចោល ៖ server
+        //    ក្លែងត្រង់នេះអនុវត្ត rule ដដែលនឹងផលិតកម្ម (កក់បានពេលទទេ ឬពេល
+        //    ជាឧបករណ៍ដដែល)។ អ្នកយាមពេញលេញរបស់ថ្នាក់នេះគឺ `license-seat-test`។
+        fetch: (url, init) => {
+            if (serverRecord === 'offline') return Promise.reject(new Error('offline'));
+            const res = (status, body) => Promise.resolve({
+                ok: status >= 200 && status < 300,
+                status: status,
                 headers: { get: () => null },
-                json: () => Promise.resolve(serverRecord)
-            })),
+                json: () => Promise.resolve(body),
+                text: () => Promise.resolve(JSON.stringify(body))
+            });
+            if (String(url).indexOf('/license_seats/') !== -1) {
+                const method = (init && init.method) || 'GET';
+                if (method === 'GET') return res(200, seat.value);
+                let body = null;
+                try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
+                if (seat.value && seat.value.device !== body.device) return res(401, { error: 'Permission denied' });
+                seat.value = body;
+                return res(200, body);
+            }
+            return res(200, serverRecord);
+        },
         __store: store, __clock: clock
     };
     const ctx = vm.createContext(sandbox);
@@ -56,6 +74,18 @@ function build(serverRecord, opts) {
         var serverTimeOffsetMs = 0, serverTimeSynced = ${opts.serverTimeSynced === false ? 'false' : 'true'};
         const OFFLINE_GRACE_MS = ${GRACE};
         const LICENSE_DB_URL = 'https://example-rtdb.firebaseio.com';
+        const DEVICE_ID_KEY = 'zoe_license_device_id';
+        const DEVICE_ID_RE = /^[0-9A-Z]{20,32}$/;
+        function bytesToBase32(bytes) {
+            const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+            let bits = 0, value = 0, output = '';
+            for (let i = 0; i < bytes.length; i++) {
+                value = (value << 8) | bytes[i]; bits += 8;
+                while (bits >= 5) { output += alphabet[(value >>> (bits - 5)) & 31]; bits -= 5; }
+            }
+            if (bits > 0) output += alphabet[(value << (5 - bits)) & 31];
+            return output;
+        }
         const NET_TIMEOUT_MS = 10000;
         const NET_MAX_IN_FLIGHT = 2;
         const netInFlight = new Map();
@@ -68,7 +98,7 @@ function build(serverRecord, opts) {
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'getDeviceId', 'licenseSeatUrl', 'readSeat', 'claimSeat', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
     return { ctx, store, clock };
 }
 

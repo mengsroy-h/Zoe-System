@@ -1,4 +1,4 @@
-const APP_VERSION = '2.19.27';
+const APP_VERSION = '2.19.28';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1977,6 +1977,7 @@ function copySetupLink() {
 
 let isSignedInUiActive = false;
 let keyListCache = [];
+let seatReadFailed = false;
 let keyListSessionGeneration = 0;
 const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
 
@@ -1990,9 +1991,10 @@ async function refreshKeyList() {
     tbody.innerHTML = '<tr class="empty-row"><td colspan="6">កំពុងផ្ទុក...</td></tr>';
     const myGeneration = keyListSessionGeneration;
     try {
-        const [publicResult, metaResult] = await withTimeout(Promise.allSettled([
+        const [publicResult, metaResult, seatResult] = await withTimeout(Promise.allSettled([
             fb.get(fb.ref(db, 'license_keys')),
-            fb.get(fb.ref(db, 'license_keys_meta'))
+            fb.get(fb.ref(db, 'license_keys_meta')),
+            fb.get(fb.ref(db, 'license_seats'))
         ]), 15000, 'Refresh timed out');
         if (myGeneration !== keyListSessionGeneration) return;
         if (publicResult.status === 'rejected') throw publicResult.reason;
@@ -2003,6 +2005,9 @@ async function refreshKeyList() {
             if (window.ZoeErrors) ZoeErrors.capture(metaResult.reason, { context: 'refreshKeyList metaSnap' });
         }
         const metaData = (metaResult.status === 'fulfilled' && metaResult.value.exists()) ? metaResult.value.val() : {};
+        seatReadFailed = seatResult.status === 'rejected';
+        if (seatReadFailed) console.error(seatResult.reason);
+        const seatData = (seatResult.status === 'fulfilled' && seatResult.value.exists()) ? seatResult.value.val() : {};
 
         const byId = Object.create(null);
         [LICENSE_APP_CODE].forEach((appCode) => {
@@ -2037,9 +2042,11 @@ async function refreshKeyList() {
             });
             const inconsistent = revokedFlags.some((v) => v !== revokedFlags[0])
                 || expiryValues.some((v) => v !== expiryValues[0]);
+            let seat = null;
+            paths.forEach((p) => { if (!seat && seatData[p] && seatData[p][id]) seat = seatData[p][id]; });
             return Object.assign({ id: id }, legacyMeta, meta, {
                 scope: scope, paths: paths, perApp: entry.perApp,
-                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt
+                inconsistent: inconsistent, revoked: revoked, expiresAt: expiresAt, seat: seat
             });
         });
 
@@ -2070,6 +2077,17 @@ function renderKeyList() {
 
         const expStr = row.expiresAt ? new Date(row.expiresAt).toLocaleDateString('km-KH') : '-';
 
+        let seatHtml;
+        if (seatReadFailed) {
+            seatHtml = `<span class="badge badge-scope" title="${escapeHtml('អាន license_seats មិនបានទេ — សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច')}">⚠️ ពិនិត្យមិនបាន</span>`;
+        } else if (row.seat && typeof row.seat.device === 'string') {
+            const boundAt = (typeof row.seat.at === 'number' && row.seat.at > 0)
+                ? new Date(row.seat.at).toLocaleDateString('km-KH') : '-';
+            seatHtml = `<span class="badge badge-active" title="${escapeHtml('ឧបករណ៍ ' + row.seat.device.slice(0, 6) + '… ចងនៅ ' + boundAt)}">📱 ចងរួច</span>`;
+        } else {
+            seatHtml = '<span class="badge badge-scope">📱 ទំនេរ</span>';
+        }
+
         if (row.inconsistent) {
             const perAppText = row.paths.map((p) => (APP_LABELS[p] || p) + ' = '
                 + (row.perApp[p].revoked ? 'Revoked' : 'Active') + ', ផុតកំណត់ '
@@ -2088,11 +2106,12 @@ function renderKeyList() {
             <td>${escapeHtml(row.id)}</td>
             <td class="note-cell">${escapeHtml(row.note || '-')}</td>
             <td>${expStr}</td>
-            <td>${statusHtml}</td>
+            <td>${statusHtml} ${seatHtml}</td>
             <td>
                 <div class="btn-row">
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="revoke">${row.revoked ? '✅ សង្គ្រោះ' : '⛔ Revoke'}</button>
                     <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="extend">⏳ បន្ថែម</button>
+                    <button class="btn-mini" data-key-id="${escapeHtml(row.id)}" data-action="release">🔓 ដោះឧបករណ៍</button>
                 </div>
             </td>
         </tr>`;
@@ -2167,6 +2186,34 @@ async function toggleRevokeKey(id) {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'toggleRevokeKey' });
         alert('មិនអាចធ្វើបច្ចុប្បន្នភាពបានទេ!');
+    }
+}
+
+async function releaseKeySeat(id) {
+    const operation = captureSensitiveSession(true);
+    const operationDb = db;
+    if (!operation || !operationDb) return;
+    const row = keyListCache.find((r) => r.id === id);
+    if (!row) return;
+    if (seatReadFailed) {
+        alert('អាន license_seats មិនបានទេ! សូម Publish Firebase Rules ថ្មីជាមុនសិន (មើល README) រួចសាកល្បងម្តងទៀត។');
+        return;
+    }
+    if (!row.seat) {
+        alert('Key នេះមិនទាន់ចងនឹងឧបករណ៍ណាទេ — គ្មានអ្វីត្រូវដោះឡើយ។');
+        return;
+    }
+    if (!confirm('ដោះឧបករណ៍ចេញពី Key នេះ?\n\nក្រោយដោះ ឧបករណ៍ចាស់នឹងលែងប្រើ Key នេះបាន ហើយឧបករណ៍ **ថ្មីតែមួយ** អាច Activate បាន។')) return;
+    try {
+        await withTimeout(retryAsync(() => Promise.all(row.paths.map((p) => fb.set(fb.ref(operationDb, `license_seats/${p}/${id}`), null))), 3, 1000), 15000, 'Release timed out');
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        showToast('✅ បានដោះឧបករណ៍! ឧបករណ៍ថ្មីអាច Activate បានឥឡូវ។');
+        refreshKeyList();
+    } catch (e) {
+        if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
+        console.error(e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'releaseKeySeat' });
+        alert('ដោះឧបករណ៍មិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច រួចសាកល្បងម្តងទៀត។');
     }
 }
 
@@ -2316,6 +2363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const id = btn.dataset.keyId;
             if (btn.dataset.action === 'revoke') toggleRevokeKey(id);
             else if (btn.dataset.action === 'extend') openExtendModal(id);
+            else if (btn.dataset.action === 'release') releaseKeySeat(id);
         });
     }
 

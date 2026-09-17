@@ -33,7 +33,7 @@ function ok(label, cond, detail) {
     else { console.log('  FAIL   ' + label + (detail !== undefined ? '  got: ' + JSON.stringify(detail) : '')); fail++; }
 }
 
-async function build(publicData, metaData) {
+async function build(publicData, metaData, seatData) {
     const src = fs.readFileSync(APP_FILE, 'utf8');
     const log = { rendered: null, html: '' };
     const tbody = { innerHTML: '' };
@@ -47,7 +47,14 @@ async function build(publicData, metaData) {
         db: {},
         fb: {
             ref: (d, p) => ({ path: p }),
-            get: (ref) => Promise.resolve(snap(ref.path === 'license_keys' ? publicData : metaData))
+            // ⛔ ត្រូវបំបែកតាម path ពិត ៖ `license_seats` ជា node ទី ៣ ➜ ការ
+            //    ត្រឡប់ meta ជំនួសវា ធ្វើឲ្យស្លាកឧបករណ៍វាស់អ្វីផ្សេង។
+            get: (ref) => {
+                if (ref.path === 'license_keys') return Promise.resolve(snap(publicData));
+                if (ref.path === 'license_keys_meta') return Promise.resolve(snap(metaData));
+                if (seatData === 'fail') return Promise.reject(new Error('permission denied'));
+                return Promise.resolve(snap(seatData === undefined ? null : seatData));
+            }
         },
         __log: log
     };
@@ -56,6 +63,7 @@ async function build(publicData, metaData) {
     vm.runInContext(`
         var keyListCache = [];
         var keyListSessionGeneration = 0;
+        var seatReadFailed = false;
         const APP_LABELS = { ADM: 'ZoeW', ALL: 'ទាំងអស់' };
         function withTimeout(p) { return p; }
         function getServerNow() { return 0; }
@@ -66,6 +74,7 @@ async function build(publicData, metaData) {
     await vm.runInContext('refreshKeyList()', ctx);
     log.rendered = ctx.keyListCache;
     log.html = tbody.innerHTML;
+    log.seatReadFailed = ctx.seatReadFailed;
     return log;
 }
 
@@ -123,6 +132,24 @@ const meta = { ADM: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, K2
         ['__proto__', 'constructor', 'toString'].every((id) => r.rendered.some((entry) => entry.id === id)), r.rendered);
     ok('ID ពិសេសនៅអាចបង្ហាញ និងបញ្ជូនទៅប៊ូតុងបាន',
         ['__proto__', 'constructor', 'toString'].every((id) => r.html.includes('data-key-id="' + id + '"')), r.html);
+
+    // ── ស្លាកឧបករណ៍ ៖ សាលក្រម ៣ ដែលមិនត្រូវលាយគ្នា ──────────────────
+    // ⛔ «អានមិនបាន» មិនត្រូវបង្ហាញជា «ទំនេរ» ទេ — នោះនឹងធ្វើឲ្យអ្នកលក់
+    //    ជឿថា Key ទំនេរ ហើយចេញវាឲ្យអតិថិជនទី ២ (ច្បាប់ «មិនអាច
+    //    ផ្ទៀងផ្ទាត់ ≠ ខុស» លើផ្ទៃថ្មី)។
+    r = await build(activeKey, meta, null);
+    ok('គ្មានកៅអី ➜ ស្លាក «ទំនេរ»', r.html.indexOf('ទំនេរ') !== -1 && r.html.indexOf('ចងរួច') === -1, r.html.slice(0, 200));
+
+    r = await build(activeKey, meta, { ADM: { K1: { device: 'DEVICEAAAAAAAAAAAAAA', at: 1700000000000 } } });
+    ok('មានកៅអី ➜ ស្លាក «ចងរួច»', r.html.indexOf('ចងរួច') !== -1 && r.html.indexOf('ទំនេរ') === -1, r.html.slice(0, 200));
+    ok('ហើយ row ផ្ទុកកៅអី', !!(r.rendered[0] && r.rendered[0].seat && r.rendered[0].seat.device === 'DEVICEAAAAAAAAAAAAAA'), r.rendered[0] && r.rendered[0].seat);
+    ok('⛔ លេខសម្គាល់ឧបករណ៍ពេញ មិនឡើងដល់ DOM', r.html.indexOf('DEVICEAAAAAAAAAAAAAA') === -1);
+
+    r = await build(activeKey, meta, 'fail');
+    ok('⛔ អាន license_seats មិនបាន ➜ «ពិនិត្យមិនបាន» មិនមែន «ទំនេរ»',
+        r.html.indexOf('ពិនិត្យមិនបាន') !== -1 && r.html.indexOf('ទំនេរ') === -1, r.html.slice(0, 300));
+    ok('ហើយទង់ត្រូវលើកឡើង', r.seatReadFailed === true, r.seatReadFailed);
+    ok('⛔ ការធ្លាក់នោះមិនបំផ្លាញបញ្ជី Key', Array.isArray(r.rendered) && r.rendered.length === 1, r.rendered && r.rendered.length);
 
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));
     process.exit(fail === 0 ? 0 : 1);

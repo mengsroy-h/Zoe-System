@@ -64,7 +64,7 @@ async function main() {
 
             function build(store = {}) {
                 const requests = [];
-                const state = { verifyGate: null, fetchGate: null, afterVerify: null, cryptoPending: 0, online: true, records: { TEST_A: activeA, TEST_B: activeB } };
+                const state = { verifyGate: null, fetchGate: null, afterVerify: null, cryptoPending: 0, online: true, records: { TEST_A: activeA, TEST_B: activeB }, seats: {} };
                 class Clock extends Date {
                     constructor(...args) { super(...(args.length ? args : [NOW])); }
                     static now() { return NOW; }
@@ -99,7 +99,24 @@ async function main() {
                             }
                         }
                     },
-                    fetch: async (url) => {
+                    fetch: async (url, init) => {
+                        // ⛔ ផ្លូវ `license_seats` ជាស្នាមភ្ជាប់ពិត ➜ server ក្លែង
+                        //    ត្រង់នេះអនុវត្ត rule ដដែល (កក់បានពេលទទេ ឬពេលជា
+                        //    ឧបករណ៍ដដែល)។ អ្នកយាមពេញលេញគឺ `license-seat-test`។
+                        const seatMatch = /\/license_seats\/ADM\/(TEST_[AB])\.json$/.exec(url);
+                        if (seatMatch) {
+                            const sid = seatMatch[1];
+                            const method = (init && init.method) || 'GET';
+                            if (method === 'GET') {
+                                return { ok: true, status: 200, headers: { get: () => null }, json: async () => (state.seats[sid] || null) };
+                            }
+                            const body = JSON.parse(init.body);
+                            if (state.seats[sid] && state.seats[sid].device !== body.device) {
+                                return { ok: false, status: 401, headers: { get: () => null }, json: async () => ({ error: 'Permission denied' }) };
+                            }
+                            state.seats[sid] = body;
+                            return { ok: true, status: 200, headers: { get: () => null }, json: async () => body };
+                        }
                         const match = /\/license_keys\/ADM\/(TEST_[AB])\.json$/.exec(url);
                         if (!match) throw new Error('សំណើមិនស្ថិតក្នុងទិន្នន័យតេស្ត');
                         const id = match[1];

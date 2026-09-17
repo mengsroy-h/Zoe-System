@@ -60,8 +60,22 @@ ok('`checkOnline()` មាន guard ក្រៅបណ្តាញ',
     /async function checkOnline[\s\S]{0,320}networkLooksDown\(\)/.test(src));
 ok('`syncServerTime()` មាន guard ក្រៅបណ្តាញ',
     /async function syncServerTime[\s\S]{0,240}networkLooksDown\(\)/.test(src));
+// ⛔ ការអះអាងត្រូវវាស់ **ការធានា** មិនមែន *អក្សរពិត* នៃបន្ទាត់នោះ ៖
+//    ការបន្ថែម option ថ្មីចូល `checkOnline()` (ឧ. `claimSeat`) មិនត្រូវ
+//    ធ្វើឲ្យអ្នកយាមធ្លាក់ ខណៈការធានានៅដដែល — តែការ**ដក** `priority: true`
+//    ចេញ ត្រូវធ្វើឲ្យវាធ្លាក់ដដែល។
+const activateBody = (() => {
+    const i = src.indexOf('async function activate(');
+    if (i === -1) return '';
+    let depth = 0, started = false, j = src.indexOf('{', i);
+    for (; j < src.length; j++) {
+        if (src[j] === '{') { depth++; started = true; }
+        else if (src[j] === '}') { depth--; if (started && depth === 0) { j++; break; } }
+    }
+    return src.slice(i, j);
+})();
 ok('`activate()` ជាអាទិភាព — មិនត្រូវទប់ដោយពិដាន',
-    /checkOnline\(appCode, result\.payload\.id, \{ priority: true \}\)/.test(src));
+    activateBody.length > 0 && /checkOnline\(\s*appCode\s*,[^)]*priority:\s*true/.test(activateBody));
 // ⛔ ការរំលងត្រូវជា `ok: null` (មិនផ្ទៀងផ្ទាត់បាន) មិនមែន `ok: false` (បដិសេធ)
 ok('ការរំលងត្រឡប់ `{ ok: null }` — មិនលុប License ចោល',
     !/if \(!pending\) return \{ ok: false/.test(src)

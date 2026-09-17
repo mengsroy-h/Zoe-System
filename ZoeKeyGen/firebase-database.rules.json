@@ -25,6 +25,20 @@
       }
     },
 
+    "license_seats": {
+      ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+      "$appCode": {
+        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        "$keyId": {
+          ".read": true,
+          ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()))",
+          ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40",
+          "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
+          "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "license_keys_meta": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {

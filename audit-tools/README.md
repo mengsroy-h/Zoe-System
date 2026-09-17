@@ -282,8 +282,10 @@ bash audit-tools/emu/rules.sh
 | `license-clock-trust-test.js` | ទង់ «sync រួច» បើកតែដោយតម្លៃពី server ពិត | `LICENSECLOCK_APP_DIR` |
 | `license-clock-rollback-test.js` | ម៉ោងមិនអាចថយក្រោយ; Activate ត្រូវការសាលក្រម server | `LICROLLBACK_APP_DIR` |
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
+| `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍ ១** ៖ ឧបករណ៍ទី ២ ដោយ Key ដដែល ត្រូវបដិសេធ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
+| `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
-| `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ | — |
+| `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
 | `devtools-guard-test.js` | ការរកឃើញ DevTools (ZoeKeyGen) | `DEVGUARD_APP_DIR` |
 | `dependency-security-test.js` | dependency ដែល vendor ត្រូវចាក់សោដោយ hash | `DEPSEC_APP_DIR` |

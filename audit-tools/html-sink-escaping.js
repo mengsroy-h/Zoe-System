@@ -100,6 +100,7 @@ const BUILDER_ALLOW = {
     },
     ZoeKeyGen: {
         statusHtml: 'HTML សាងខាងលើពី badge ថេរ + escapeHtml()',
+        seatHtml: 'HTML សាងខាងលើពី badge ថេរ; លេខសម្គាល់ឧបករណ៍ និងកាលបរិច្ឆេទឆ្លង escapeHtml()',
         scopeHtml: 'HTML សាងខាងលើ; scopeLabel ឆ្លង escapeHtml()',
         scopeLabel: 'លទ្ធផលផ្ទាល់នៃ escapeHtml()',
         expStr: "toLocaleDateString('km-KH') ឬ '-'"

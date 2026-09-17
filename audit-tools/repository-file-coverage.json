@@ -780,6 +780,9 @@
     "audit-tools/ledger-failed-apply-revert-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/license-app-code-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/license-clock-rollback-test.js": {
       "policy": "guard-1"
     },

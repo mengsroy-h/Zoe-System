@@ -289,6 +289,75 @@ email និង token មិនលេចក្នុងចម្លើយ។ ⛔
 
 
 
+### [2.37.0 · 2.20.0] — 2026-09-17 · 🔑 កូដ App `ADM` ➜ `ZOE` · 📱 Key ១ ដាក់ឧបករណ៍ច្រើនបាន
+
+**App ទាំង ២ ប្រែ** (`zoew-v218` ➜ `zoew-v219` · `zoekeygen-v98` ➜
+`zoekeygen-v99`)។
+
+**សំណើម្ចាស់គម្រោង ២** ៖ (១) *«តើមាន App code សម្គាល់ធ្វើអីទៀត បើ app ឥឡូវ
+មានតែ ZoeW តែមួយ … ប្តូរ "ADM" ទៅជា "ZOE"»* និង (២) *«អោយមានកន្លែងថែម device
+សម្រាប់ key តែមួយបានផង ប្រសិនបើអតិថិជនមានទូរស័ព្ទច្រើន»*។
+
+#### ផ្លាស់ប្តូរ ៖ កូដ App `ADM` ➜ `ZOE`
+
+License Project ធ្លាប់បម្រើ App ៣ (`ADM` = ZoeAdmin · `ZOW` = ZoeW ·
+`SCN` = ZoeScan)។ ក្រោយការបញ្ចូលទាំង ៣ ជា ZoeW តែមួយ (កំណែ 2.0.0) កូដ ship
+ប្រើតែ `ADM` ខណៈ rules នៅរាយទាំង ៣។ ជុំនេះ ៖
+
+- `LICENSE_APP_CODE` ប្តូរទៅ **`'ZOE'`** ក្នុង App ទាំង ២
+- rules លែងរាយ `ZOW` និង `SCN` (`scope` នៅទទួល `ALL` សម្រាប់ Key ចាស់)
+- `APP_LABELS` · កូនសោ Setup Link (`zoekeygen_setup_url_ZOE` ·
+  `zoekeygen_setup_dsn_ZOE`) ប្តូរតាម
+
+⛔ **នេះជាការបំបែកដោយចេតនា** ៖ កូដនោះរស់នៅ **ខាងក្នុងហត្ថលេខា**
+(`payload.a`) ➜ កែមិនបាន ➜ **Key ដែលចេញរួចទាំងអស់ក្លាយជាមិនត្រឹមត្រូវ**
+ហើយឧបករណ៍ដែល Activate រួច បាត់ record (កូនសោ `zoe_license_activation_<កូដ>`
+ប្តូរ)។ ម្ចាស់គម្រោងទទួលយកតម្លៃនេះ ក្រោយបានឃើញការវាស់។
+
+#### បន្ថែម ៖ Key ១ ដាក់បានឧបករណ៍ ១–៥
+
+- ZoeKeyGen ៖ ប្រអប់ **«ចំនួនឧបករណ៍»** ពេលបង្កើត Key + ប៊ូតុង
+  **📱 ចំនួនឧបករណ៍** តាមជួរដេកដើម្បីកែក្រោយ
+- ស្លាកក្នុងតារាងប្តូរពី «📱 ចងរួច» ទៅ **«📱 ២/៣»** (ចំនួនចង/ពិដាន)
+- **🔓 ដោះឧបករណ៍** ឥឡូវដោះឧបករណ៍ដែលចងរួច **ទាំងអស់**
+
+⛔ **អ្នកសម្រេចឈរនៅ rules មិនមែននៅ client** ៖ ពិដានរស់នៅ
+`license_keys/ZOE/<keyId>/maxDevices` ដែលមានតែ admin សរសេរបាន ហើយកៅអីរស់នៅ
+slot `d1..d5`។ **RTDB rules រាប់កូនមិនបានទេ** ➜ ពិដានអនុវត្តដោយ **រាយឈ្មោះ
+slot** រួចប្រៀបនឹង `maxDevices`។ គ្មាន `maxDevices` = **១** (ដូចមុន)។
+
+#### ឧបករណ៍ audit
+
+- **`license-app-code-test.js` ថ្មី** (២០ ការអះអាង) ៖ rules មិនត្រូវរាយ App
+  ដែលកូដ ship មិនប្រើ · ZoeW និង ZoeKeyGen ត្រូវនិយាយកូដតែមួយ · ឈ្មោះ slot
+  ស៊ីគ្នាទាំង ៣ ឯកសារ · ពិដាន `maxDevices` ស្មើចំនួន slot។ **Mutation ៦ ➜
+  ចាប់បានទាំង ៦** (រួម ថតទទេ)។
+- `license-seat-test` សរសេរឡើងវិញ (១៥ ➜ **៤៤** ការអះអាង) ៖ បន្ថែមពិដាន ២ ·
+  ឧបករណ៍ទី ៣ បដិសេធ · slot ក្រៅពិដានបដិសេធ · ការបន្ថយពិដាន · ការប្រណាំង
+  រំកិលទៅ slot ទំនេរបន្ទាប់។
+- `emu/license-seat-rules-test` (២០ ➜ **៣៧**) លើ RTDB emulator ពិត ៖ ពិដានឈរ
+  នៅ server · client លើក `maxDevices` មិនបាន · `maxDevices` ក្រៅជួរបដិសេធ។
+  ⛔ វាស់បានក្នុងជុំនេះ ៖ ការអះអាងដំបូងប្រើ `owner()` ដែលជា **ម្ចាស់
+  project ➜ រំលង rules** ➜ បៃតងក្លែងក្លាយ; ត្រូវប្តូរទៅ `asUser(…, ADMIN)`។
+- `doc-scope-test` ៖ បញ្ជីកូដ ship បន្ថែម `license-verify.js` និង
+  `error-reporting.js` (កូនសោដែលរស់នៅទីនោះ ធ្លាប់ត្រូវរាយជា «ងាប់» ខុស)។
+- checker ៥ ដែលចាក់ `'ADM'` ជា literal ប្តូរទៅ **ដេរីវេពីកូដ ship** ៖
+  `license-grace` · `license-record-race` · `keylist-consistency` ·
+  `keygen-session-security` · `setup-link-roundtrip`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **Publish Firebase Rules ថ្មី** របស់ **License Project** (paste
+   [`ZoeKeyGen/firebase-database.rules.json`](../ZoeKeyGen/firebase-database.rules.json)
+   ចូល Console ➜ Publish)។ បើមិនធ្វើ ៖ Activate ទាំងអស់ធ្លាក់
+   `seat-unavailable`។
+២. ⛔ **ចេញ Key ថ្មីជូនអតិថិជនគ្រប់រូប** — Key ចាស់ (`a: 'ADM'`) លែងដើរ។
+   អតិថិជននឹងឃើញ «Key នេះមិនមែនសម្រាប់ ZoeW ទេ!» លើ Key ចាស់។
+៣. (ស្រេចចិត្ត) លុប node ចាស់ក្នុង Console ៖ `license_keys/ADM` ·
+   `license_keys_meta/ADM` · `license_seats/ADM`។
+៤. ZoeKeyGen ៖ បំពេញ **Setup URL** និង **Sentry DSN** ម្តងទៀត (កូនសោប្តូរ
+   តាមកូដ App)។
+
 ### [2.36.9 · 2.19.28] — 2026-09-16 · 🔐 **Key ១ Activate បានតែ ១ ឧបករណ៍**
 
 **សំណើម្ចាស់គម្រោង** ៖ *«Key activate ១ ដាក់ activate ZoeW ប៉ុន្មានក៏បាន

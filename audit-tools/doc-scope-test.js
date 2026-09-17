@@ -749,8 +749,11 @@ check(deadFns.length === 0,
 // ជំនាន់ក្រោយអានច្បាប់ដែលផ្ទុយនឹងកូដ។ `doc-scope-test` និង `user-guide-test`
 // **បៃតងទាំង ២** លើ tree នោះ។
 
+// ⛔ `license-verify.js` និង `error-reporting.js` ក៏ជាកូដ ship ដែរ ➜ កូនសោ
+// ដែលរស់នៅទីនោះ (ឧ. record របស់ License) មិនត្រូវរាយជា «ងាប់»។
 const SHIPPED_APP_TEXT = ['ZoeW/app.js', 'ZoeKeyGen/app.js', 'ZoeW/sw.js',
-    'ZoeKeyGen/sw.js', 'ZoeW/index.html', 'ZoeKeyGen/index.html']
+    'ZoeKeyGen/sw.js', 'ZoeW/index.html', 'ZoeKeyGen/index.html',
+    'ZoeW/license-verify.js', 'ZoeW/error-reporting.js']
     .map((rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (_) { return ''; } })
     .join('\n');
 

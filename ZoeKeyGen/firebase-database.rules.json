@@ -14,12 +14,13 @@
     "license_keys": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {
-        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        ".validate": "$appCode === 'ZOE'",
         "$keyId": {
           ".read": true,
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
-          "expiresAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
-          "revoked":   { ".validate": "newData.isBoolean()" },
+          "expiresAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
+          "revoked":    { ".validate": "newData.isBoolean()" },
+          "maxDevices": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
           "$other": { ".validate": false }
         }
       }
@@ -28,29 +29,32 @@
     "license_seats": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {
-        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        ".validate": "$appCode === 'ZOE'",
         "$keyId": {
           ".read": true,
-          ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()))",
-          ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40",
-          "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
-          "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },
-          "$other": { ".validate": false }
+          ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
+          "$slot": {
+            ".write": "(auth != null && root.child('user_roles').child(auth.uid).val() === 'admin') || (newData.exists() && root.child('license_keys').child($appCode).child($keyId).exists() && (!data.exists() || data.child('device').val() === newData.child('device').val()))",
+            ".validate": "newData.hasChildren(['device', 'at']) && $keyId.length >= 16 && $keyId.length <= 40 && ($slot === 'd1' || ($slot === 'd2' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 2) || ($slot === 'd3' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 3) || ($slot === 'd4' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 4) || ($slot === 'd5' && root.child('license_keys').child($appCode).child($keyId).child('maxDevices').val() >= 5))",
+            "device": { ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 64" },
+            "at":     { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "$other": { ".validate": false }
+          }
         }
       }
     },
     "license_keys_meta": {
       ".read": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
       "$appCode": {
-        ".validate": "$appCode === 'ADM' || $appCode === 'ZOW' || $appCode === 'SCN'",
+        ".validate": "$appCode === 'ZOE'",
         "$keyId": {
           ".write": "auth != null && root.child('user_roles').child(auth.uid).val() === 'admin'",
           "issuedAt":  { ".validate": "newData.isNumber() && newData.val() > 0" },
-          "scope":     { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN' || newData.val() === 'ALL')" },
+          "scope":     { ".validate": "newData.isString() && (newData.val() === 'ZOE' || newData.val() === 'ALL')" },
           "note":      { ".validate": "newData.isString()" },
           "createdBy": { ".validate": "newData.isString()" },
           "appPaths": {
-            "$idx": { ".validate": "newData.isString() && (newData.val() === 'ADM' || newData.val() === 'ZOW' || newData.val() === 'SCN')" }
+            "$idx": { ".validate": "newData.isString()" }
           },
           "$other": { ".validate": false }
         }

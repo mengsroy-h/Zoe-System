@@ -40,8 +40,15 @@ const encLine = (genSrc.match(/b64 = ([^;]+);/) || [])[1];
 check(!!encLine, 'រកឃើញបន្ទាត់ encode ក្នុង generateSetupLink()', genSrc.slice(0, 120));
 check(genSrc.indexOf('setupLinkAppSelect') === -1,
     'generateSetupLink() មិនអាស្រ័យលើប្រអប់ជ្រើសរើស App ទៀតទេ (App មានតែ ZoeW)');
-check(keygenSrc.indexOf("const LICENSE_APP_CODE = 'ADM';") !== -1,
-    "ZoeKeyGen រក្សា LICENSE_APP_CODE = 'ADM' (ការប្តូរធ្វើឲ្យ Key ដែលចេញរួចខូច)");
+// ⛔ កូនសោ Setup Link ចងនឹងកូដ App ➜ ការឃ្លាតធ្វើឲ្យតម្លៃដែលអ្នកលក់
+//    រក្សាទុក បាត់ស្ងាត់ៗ។ ការវាស់ត្រូវ **ដេរីវេ** មិនមែនចាក់ជា literal។
+//    (ការស៊ីគ្នារវាង ZoeW និង ZoeKeyGen ជារបស់ `license-app-code-test`។)
+const keygenAppCode = (keygenSrc.match(/const LICENSE_APP_CODE = '([A-Z]{2,8})';/) || [])[1];
+check(!!keygenAppCode, 'រកឃើញ LICENSE_APP_CODE ក្នុង ZoeKeyGen/app.js', keygenAppCode);
+check(!!keygenAppCode && keygenSrc.indexOf("const SETUP_LINK_URL_KEY = 'zoekeygen_setup_url_" + keygenAppCode + "';") !== -1,
+    'កូនសោ Setup Link ចងនឹងកូដ App ដដែល', keygenAppCode);
+check(!!keygenAppCode && keygenSrc.indexOf("const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_" + keygenAppCode + "';") !== -1,
+    'កូនសោ DSN ចងនឹងកូដ App ដដែល', keygenAppCode);
 check(keygenHtml.indexOf('<select') === -1,
     'index.html របស់ ZoeKeyGen គ្មានប្រអប់ជ្រើសរើស App ទៀតទេ');
 const linkLine = (genSrc.match(/lastGeneratedSetupLink = ([^;]+);/) || [])[1];

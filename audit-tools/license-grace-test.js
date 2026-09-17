@@ -29,10 +29,19 @@ function ok(label, cond, detail) {
 
 const GRACE = 3 * 24 * 60 * 60 * 1000;
 
+// ⛔ កូដ App និងឈ្មោះ slot ត្រូវដេរីវេពីកូដ ship មិនមែនចាក់ជា literal
+//    (literal = កាលបរិច្ឆេទផុតកំណត់ ៖ ការប្តូរកូដជុំក្រោយធ្វើឲ្យតេស្តវាស់
+//    App ដែលមិនមាន ហើយនៅតែបៃតង)។
+const APP = (fs.readFileSync(path.join(root, 'ZoeW/app.js'), 'utf8')
+    .match(/const LICENSE_APP_CODE = '([A-Z]{2,8})';/) || [])[1] || 'ZOE';
+const STORE_KEY = 'zoe_license_activation_' + APP;
+const SEAT_SLOTS = ((fs.readFileSync(FILE, 'utf8').match(/const LICENSE_SEAT_SLOTS = \[([^\]]*)\]/) || [])[1] || "'d1'")
+    .split(',').map((x) => x.trim().replace(/^'|'$/g, '')).filter(Boolean);
+
 function build(serverRecord, opts) {
     opts = opts || {};
     const store = Object.assign({}, opts.store);
-    const seat = { value: opts.seat === undefined ? null : opts.seat };
+    const seat = { value: opts.seat === undefined ? {} : opts.seat };
     const clock = { now: opts.now || 1000000 };
     const sandbox = {
         console, Promise, Error, JSON, Object, Array, Number, String, Boolean, isNaN,
@@ -57,11 +66,17 @@ function build(serverRecord, opts) {
             });
             if (String(url).indexOf('/license_seats/') !== -1) {
                 const method = (init && init.method) || 'GET';
-                if (method === 'GET') return res(200, seat.value);
+                const slotMatch = /\/license_seats\/[^/]+\/[^/]+\/([^/.]+)\.json$/.exec(String(url));
+                if (method === 'GET') {
+                    if (slotMatch) return res(200, seat.value[slotMatch[1]] || null);
+                    return res(200, Object.keys(seat.value).length ? seat.value : null);
+                }
+                if (!slotMatch || SEAT_SLOTS.indexOf(slotMatch[1]) !== 0) return res(401, { error: 'Permission denied' });
                 let body = null;
                 try { body = JSON.parse(init.body); } catch (e) { return res(400, null); }
-                if (seat.value && seat.value.device !== body.device) return res(401, { error: 'Permission denied' });
-                seat.value = body;
+                const held = seat.value[slotMatch[1]];
+                if (held && held.device !== body.device) return res(401, { error: 'Permission denied' });
+                seat.value[slotMatch[1]] = body;
                 return res(200, body);
             }
             return res(200, serverRecord);
@@ -88,17 +103,19 @@ function build(serverRecord, opts) {
         }
         const NET_TIMEOUT_MS = 10000;
         const NET_MAX_IN_FLIGHT = 2;
+        const LICENSE_SEAT_SLOTS = ${JSON.stringify(SEAT_SLOTS)};
+        const LICENSE_SEAT_CLAIM_TRIES = 2;
         const netInFlight = new Map();
         const statusInFlight = new Map();
         function getServerNow() { return __clock.now; }
         var __signedExp = ${(opts.now || 1000000) + 30 * 86400000};
         function verifyKeyString(keyString) {
             if (keyString.indexOf('BAD') !== -1) return Promise.resolve({ valid: false, reason: 'signature' });
-            return Promise.resolve({ valid: true, payload: { id: keyString, a: 'ADM', iat: 1, exp: Math.floor(__signedExp / 1000), note: '' } });
+            return Promise.resolve({ valid: true, payload: { id: keyString, a: '${APP}', iat: 1, exp: Math.floor(__signedExp / 1000), note: '' } });
         }
         function verifySignatureAndScope(keyString) { return verifyKeyString(keyString); }
     `, ctx);
-    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'getDeviceId', 'licenseSeatUrl', 'readSeat', 'claimSeat', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
+    vm.runInContext(sliceFns(src, ['networkLooksDown', 'sharedRequest', 'fetchWithBodyTimeout', 'storageKey', 'loadLocalRecord', 'saveLocalRecord', 'clearLocalRecord', 'recordSeenMark', 'monotonicNow', 'getDeviceId', 'licenseSeatUrl', 'seatLimitOf', 'seatHolderOf', 'readSeat', 'claimSeat', 'checkOnline', 'syncServerTime', 'activate', 'getStatus'].concat(src.includes('function checkLocalStatus(') ? ['checkLocalStatus'] : [])), ctx);
     return { ctx, store, clock };
 }
 
@@ -114,62 +131,62 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     // វាស់បានលើកូដមុនកែ ៖ `license-clock-rollback-test.js` ធ្លាក់ ១៦។
     // ច្បាប់ «unverified ➜ រក្សាទុក តែកុំផ្តល់សិទ្ធិថ្មី» ឥឡូវអនុវត្តពិត។
     let h = build('offline');
-    let r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
+    let r = await vm.runInContext("activate('KEY1', '" + APP + "')", h.ctx);
     ok('Activate ក្រៅបណ្ដាញ ➜ **បដិសេធ** (មិនផ្តល់សិទ្ធិលើអ្វីដែលផ្ទៀងផ្ទាត់មិនបាន)',
         r.valid === false && r.reason === 'network', r);
-    ok('ហើយមិនរក្សាទុក record ទេ', !h.store['zoe_license_activation_ADM']);
+    ok('ហើយមិនរក្សាទុក record ទេ', !h.store[STORE_KEY]);
 
     // ⛔ ទិសផ្ទុយ ៖ ការបដិសេធនោះមិនត្រូវប៉ះ Activation ដែលកំពុងដំណើរការ
     const live = JSON.stringify({
-        keyString: 'KEY1', id: 'KEY1', a: 'ADM', iat: 1,
+        keyString: 'KEY1', id: 'KEY1', a: APP, iat: 1,
         exp: Math.floor((1000000 + 30 * 86400000) / 1000),
         lastOnlineCheck: 1000000, onlineExp: 1000000 + 30 * 86400000, seenMax: 1000000
     });
-    h = build('offline', { store: { zoe_license_activation_ADM: live } });
-    let st = await vm.runInContext("getStatus('ADM')", h.ctx);
+    h = build('offline', { store: { [STORE_KEY]: live } });
+    let st = await vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('ក្រៅបណ្ដាញក្នុងអំឡុងអនុគ្រោះ ➜ នៅតែ active', st.state === 'active', st.state);
 
     h.clock.now = 1000000 + GRACE + 60000;
-    st = await vm.runInContext("getStatus('ADM')", h.ctx);
+    st = await vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('ហួសអនុគ្រោះ ➜ offline-grace-exceeded', st.state === 'offline-grace-exceeded', st.state);
 
-    r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
+    r = await vm.runInContext("activate('KEY1', '" + APP + "')", h.ctx);
     ok('Paste Key ដដែលឡើងវិញ ក្រៅបណ្ដាញ ➜ បដិសេធ', r.valid === false, r);
     ok('ហើយ Activation ចាស់មិនត្រូវលុប',
-        !!h.store['zoe_license_activation_ADM'] &&
-        JSON.parse(h.store['zoe_license_activation_ADM']).id === 'KEY1' &&
-        JSON.parse(h.store['zoe_license_activation_ADM']).lastOnlineCheck === 1000000,
-        h.store['zoe_license_activation_ADM']);
-    st = await vm.runInContext("getStatus('ADM')", h.ctx);
+        !!h.store[STORE_KEY] &&
+        JSON.parse(h.store[STORE_KEY]).id === 'KEY1' &&
+        JSON.parse(h.store[STORE_KEY]).lastOnlineCheck === 1000000,
+        h.store[STORE_KEY]);
+    st = await vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('ដូច្នេះនៅតែហួសអនុគ្រោះ (រន្ធត្រូវបានបិទ)',
         st.state === 'offline-grace-exceeded', st.state);
 
     // ⛔ បង្វិលនាឡិកាថយក្រោយ ➜ ការអនុគ្រោះមិនត្រូវ reset (floor `seenMax`)
     h.clock.now = 1000000 + 60000;
-    st = await vm.runInContext("getStatus('ADM')", h.ctx);
+    st = await vm.runInContext("getStatus('" + APP + "')", h.ctx);
     ok('បង្វិលនាឡិកាថយក្រោយ ➜ នៅតែហួសអនុគ្រោះ',
         st.state === 'offline-grace-exceeded', st.state);
 
     // 5. with network, the clock does move
-    h = build(LIVE, { store: { zoe_license_activation_ADM: JSON.stringify({ id: 'KEY1', lastOnlineCheck: 1 }) } });
+    h = build(LIVE, { store: { [STORE_KEY]: JSON.stringify({ id: 'KEY1', lastOnlineCheck: 1 }) } });
     h.clock.now = 1000000;
-    r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
-    rec = JSON.parse(h.store['zoe_license_activation_ADM']);
+    r = await vm.runInContext("activate('KEY1', '" + APP + "')", h.ctx);
+    rec = JSON.parse(h.store[STORE_KEY]);
     ok('មានបណ្ដាញ ➜ lastOnlineCheck ត្រូវរំកិល', rec.lastOnlineCheck === 1000000, rec.lastOnlineCheck);
     ok('ហើយយក expiresAt ពី Server', rec.onlineExp === LIVE.expiresAt, rec.onlineExp);
 
     // 6. a revoked key must be refused at activation time
     h = build({ revoked: true, expiresAt: 1000000 + 30 * 86400000 });
-    r = await vm.runInContext("activate('KEY1', 'ADM')", h.ctx);
+    r = await vm.runInContext("activate('KEY1', '" + APP + "')", h.ctx);
     ok('Key ដែល Revoke ➜ បដិសេធតាំងពី Activate', r.valid === false && r.reason === 'revoked', r);
-    ok('ហើយមិនរក្សាទុក record ទេ', !h.store['zoe_license_activation_ADM']);
+    ok('ហើយមិនរក្សាទុក record ទេ', !h.store[STORE_KEY]);
 
     // 7. refusing a bad key must not wipe a working activation
     const good = JSON.stringify({ id: 'KEYOK', keyString: 'KEYOK', exp: 9999999999, lastOnlineCheck: 1000000, onlineExp: 9999999999000 });
-    h = build({ revoked: true, expiresAt: 1 }, { store: { zoe_license_activation_ADM: good } });
-    r = await vm.runInContext("activate('KEYBADREVOKED', 'ADM')", h.ctx);
+    h = build({ revoked: true, expiresAt: 1 }, { store: { [STORE_KEY]: good } });
+    r = await vm.runInContext("activate('KEYBADREVOKED', '" + APP + "')", h.ctx);
     ok('Paste Key ខូច ➜ មិនលុប Activation ដែលកំពុងដំណើរការ',
-        h.store['zoe_license_activation_ADM'] === good, h.store['zoe_license_activation_ADM']);
+        h.store[STORE_KEY] === good, h.store[STORE_KEY]);
 
     // ── ⛔ ការបរាជ័យ **crypto** មិនត្រូវលុប License របស់អតិថិជន ──────────
     // 🔴 ថ្នាក់ដដែលនឹងច្បាប់ `{ ok: null }` របស់បណ្តាញ តែនៅលើអ័ក្ស **crypto**
@@ -208,27 +225,27 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         ctx.global = ctx;
         vm.createContext(ctx);
         vm.runInContext(LIC_SRC, ctx);
-        const payload = Buffer.from(JSON.stringify({ a: 'ADM', id: 'K1', iat: 1, exp: 99999999999 })).toString('base64url');
-        store['zoe_license_activation_ADM'] = JSON.stringify({
-            keyString: 'ZOEKEY-' + payload + '.AAAA', id: 'K1', a: 'ADM', iat: 1,
+        const payload = Buffer.from(JSON.stringify({ a: APP, id: 'K1', iat: 1, exp: 99999999999 })).toString('base64url');
+        store[STORE_KEY] = JSON.stringify({
+            keyString: 'ZOEKEY-' + payload + '.AAAA', id: 'K1', a: APP, iat: 1,
             exp: 99999999999, lastOnlineCheck: Date.now(), onlineExp: Date.now() + 86400000
         });
         return { L: ctx.window.ZoeLicense, store };
     }
-    const licHas = (b) => !!b.store['zoe_license_activation_ADM'];
+    const licHas = (b) => !!b.store[STORE_KEY];
 
     const lc1 = buildLic(true, true);
-    await lc1.L.getStatus('ADM');
+    await lc1.L.getStatus(APP);
     ok('⛔ crypto ដួលបណ្តោះអាសន្ន ➜ License **មិនត្រូវលុប**', licHas(lc1));
 
     const lc2 = buildLic(false, false);
-    const lcSt = await lc2.L.getStatus('ADM');
+    const lcSt = await lc2.L.getStatus(APP);
     ok('ហត្ថលេខាខុសពិត ➜ License **ត្រូវលុប** (fence មិនធ្លាយ)',
         !licHas(lc2) && lcSt.reason === 'signature', JSON.stringify(lcSt));
 
     const lc3 = buildLic(true, true);
-    const lcKey = 'ZOEKEY-' + Buffer.from(JSON.stringify({ a: 'ADM', id: 'K2', iat: 1, exp: 99999999999 })).toString('base64url') + '.AAAA';
-    const lcAct = await lc3.L.activate(lcKey, 'ADM');
+    const lcKey = 'ZOEKEY-' + Buffer.from(JSON.stringify({ a: APP, id: 'K2', iat: 1, exp: 99999999999 })).toString('base64url') + '.AAAA';
+    const lcAct = await lc3.L.activate(lcKey, APP);
     ok('activate ខណៈ crypto ដួល ➜ **បដិសេធ** (កុំផ្តល់សិទ្ធិលើអ្វីដែលផ្ទៀងផ្ទាត់មិនបាន)',
         lcAct.valid === false && lcAct.reason === 'verify-unavailable', JSON.stringify(lcAct));
 
@@ -253,8 +270,8 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
     {
         const signedExp = 2000000;
         const store = {
-            zoe_license_activation_ADM: JSON.stringify({
-                keyString: 'K1', id: 'K1', a: 'ADM', iat: 1,
+            [STORE_KEY]: JSON.stringify({
+                keyString: 'K1', id: 'K1', a: APP, iat: 1,
                 exp: Math.floor(signedExp / 1000),
                 lastOnlineCheck: 1000000,
                 onlineExp: signedExp
@@ -263,9 +280,9 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
 
         // ក. នាឡិកាឧបករណ៍ខុស (លោតទៅមុខ ១ ឆ្នាំ) ខណៈក្រៅបណ្តាញ
         const bad = build('offline', { store: JSON.parse(JSON.stringify(store)), now: signedExp + 365 * 86400000, serverTimeSynced: false });
-        const badSt = await vm.runInContext("getStatus('ADM')", bad.ctx);
+        const badSt = await vm.runInContext("getStatus('" + APP + "')", bad.ctx);
         ok('⛔ នាឡិកាមិនទាន់ sync + ក្រៅបណ្តាញ ➜ record **មិនត្រូវលុប**',
-            !!bad.store['zoe_license_activation_ADM'], JSON.stringify(badSt));
+            !!bad.store[STORE_KEY], JSON.stringify(badSt));
         ok('⛔ ហើយក៏ **មិនត្រូវផ្តល់សិទ្ធិ** ដែរ (មិនមែន active)',
             badSt.state !== 'active', JSON.stringify(badSt));
 
@@ -276,23 +293,23 @@ const LIVE = { revoked: false, expiresAt: 1000000 + 30 * 86400000 };
         //    ⛔ ការអះអាងនៅតែ **២ ខាង** ៖ មិនផ្តល់សិទ្ធិ **និង** មិនលុប។
         //    ការលុបនៅតែកើតឡើងលើសាលក្រម server ពិត — ជួរ «ឃ» ខាងក្រោម។
         const good = build('offline', { store: JSON.parse(JSON.stringify(store)), now: signedExp + 365 * 86400000, serverTimeSynced: true });
-        const goodSt = await vm.runInContext("getStatus('ADM')", good.ctx);
+        const goodSt = await vm.runInContext("getStatus('" + APP + "')", good.ctx);
         ok('⛔ នាឡិកា sync + ក្រៅបណ្តាញ + ហួសពិដាន ➜ **មិនផ្តល់សិទ្ធិ**',
             goodSt.state === 'offline-grace-exceeded', JSON.stringify(goodSt));
         ok('⛔ តែក៏ **មិនលុប** ដែរ (ការលុបទាមទារសាលក្រម server ពិត)',
-            !!good.store['zoe_license_activation_ADM'], Object.keys(good.store));
+            !!good.store[STORE_KEY], Object.keys(good.store));
 
         // គ. នាឡិកាមិន sync តែ Key **មិនទាន់** ផុតកំណត់ ➜ នៅ active ធម្មតា
         const fresh = build('offline', { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
-        const freshSt = await vm.runInContext("getStatus('ADM')", fresh.ctx);
+        const freshSt = await vm.runInContext("getStatus('" + APP + "')", fresh.ctx);
         ok('នាឡិកាមិន sync តែមិនទាន់ផុតកំណត់ ➜ នៅតែ active',
-            freshSt.state === 'active' && !!fresh.store['zoe_license_activation_ADM'], JSON.stringify(freshSt));
+            freshSt.state === 'active' && !!fresh.store[STORE_KEY], JSON.stringify(freshSt));
 
         // ឃ. server និយាយថាផុតកំណត់ ➜ សាលក្រមអាជ្ញាធរ ➜ ត្រូវលុប ទោះនាឡិកាមិន sync
         const served = build({ revoked: false, expiresAt: 1 }, { store: JSON.parse(JSON.stringify(store)), now: 1000000 + 1000, serverTimeSynced: false });
-        const servedSt = await vm.runInContext("getStatus('ADM')", served.ctx);
+        const servedSt = await vm.runInContext("getStatus('" + APP + "')", served.ctx);
         ok('សាលក្រម server (expired-server) ➜ ត្រូវលុបដដែល',
-            !served.store['zoe_license_activation_ADM'], JSON.stringify(servedSt));
+            !served.store[STORE_KEY], JSON.stringify(servedSt));
     }
 
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));

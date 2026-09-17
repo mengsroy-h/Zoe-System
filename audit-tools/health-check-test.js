@@ -83,7 +83,7 @@ function buildRuntime(over) {
         navigator: { onLine: o.online !== false, serviceWorker: o.sw === false ? {} : { controller: {} } },
         window: { ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
         ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },
-        LICENSE_APP_CODE: 'ADM',
+        LICENSE_APP_CODE: 'ZOE',
         ZTO_TEST_TIMEOUT_MS: o.testTimeoutMs || 11000,
         LOOKUP_TEST_TIMEOUT_MS: 20000,
         ZTO_AUTO_LOOKUP_TIMEOUT_MS: o.testTimeoutMs || 13000,

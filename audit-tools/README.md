@@ -194,6 +194,7 @@ bash audit-tools/emu/rules.sh
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
+| `connection-state-fuzz-test.js` | ស្ថានភាព listener លើ **លំដាប់ចៃដន្យ** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស · សារ «ភ្ជាប់មកវិញ» មុនពេល | `CONNFUZZ_APP_DIR` |
 
 #### នាឡិកា និងពេលវេលា
 

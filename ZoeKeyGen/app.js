@@ -1,4 +1,4 @@
-const APP_VERSION = '2.20.0';
+const APP_VERSION = '2.20.1';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -1100,10 +1100,13 @@ function stripJsCommentsOutsideStrings(source) {
 }
 
 function matchingBraceIndex(source, start) {
+    const text = typeof source === 'string' ? source : '';
+    let from = Math.floor(Number(start));
+    if (!Number.isFinite(from) || from < 0) from = 0;
     let depth = 0;
     let quote = '';
-    for (let i = start; i < source.length; i++) {
-        const ch = source[i];
+    for (let i = from; i < text.length; i++) {
+        const ch = text[i];
         if (quote) {
             if (ch === '\\') {
                 i++;

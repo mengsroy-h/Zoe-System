@@ -190,6 +190,86 @@ const meta = { [APP]: { K1: { issuedAt: 5, scope: 'ALL', note: 'ហាង A' }, 
     ok('ហើយទង់ត្រូវលើកឡើង', r.seatReadFailed === true, r.seatReadFailed);
     ok('⛔ ការធ្លាក់នោះមិនបំផ្លាញបញ្ជី Key', Array.isArray(r.rendered) && r.rendered.length === 1, r.rendered && r.rendered.length);
 
+    // ── អ្នកសរសេរខាង ZoeKeyGen ៖ ពិដានឧបករណ៍ និងការដោះ ────────────────
+    // ⛔ ផ្ទៃថ្មីដែល **គ្មាន checker ណាមួយសូម្បីតែរៀបរាប់ឈ្មោះ** ➜ ការប្តូរ
+    //    ផ្លូវសរសេរ · ការបាត់ clamp · ឬការដោះដែលប៉ះពិដាន នឹងរអិតកាត់ស្ងាត់ៗ។
+    const writes = await (async () => {
+        const src2 = fs.readFileSync(APP_FILE, 'utf8');
+        const results = [];
+        function run(fnName, row, answer, confirmYes, seatFail) {
+            const calls = [];
+            const box = { alerted: 0, toasts: 0, refreshed: 0 };
+            const sb = {
+                console, Promise, Error, JSON, Object, Array, Date, Number, String, Boolean,
+                isNaN, isFinite, Math, setTimeout, clearTimeout,
+                db: {}, window: {},
+                keyListCache: [row],
+                seatReadFailed: !!seatFail,
+                prompt: () => answer,
+                confirm: () => !!confirmYes,
+                alert: () => { box.alerted++; },
+                showToast: () => { box.toasts++; },
+                refreshKeyList: () => { box.refreshed++; },
+                captureSensitiveSession: () => ({ user: { email: 'a@x.com' } }),
+                isSensitiveSessionCurrent: () => true,
+                withTimeout: (pr) => pr,
+                retryAsync: (fn) => fn(),
+                fb: {
+                    ref: (d, path) => ({ path: path }),
+                    update: (ref, payload) => { calls.push(['update', ref.path, payload]); return Promise.resolve(); },
+                    set: (ref, value) => { calls.push(['set', ref.path, value]); return Promise.resolve(); }
+                }
+            };
+            const c = vm.createContext(sb);
+            vm.runInContext([realDecl(src2, 'LICENSE_SEAT_SLOT_NAMES'), realDecl(src2, 'LICENSE_SEAT_MAX')].join('\n'), c);
+            vm.runInContext(sliceFns(src2, ['seatLimitOf', 'setKeySeatLimit', 'releaseKeySeat']), c);
+            return vm.runInContext(fnName + "('" + row.id + "')", c).then(() => ({ calls, box }));
+        }
+        const baseRow = (over) => Object.assign({
+            id: 'K1', paths: [APP], maxDevices: 1, seatDevices: [], perApp: {}
+        }, over);
+        results.push(await run('setKeySeatLimit', baseRow(), '3', true));
+        results.push(await run('setKeySeatLimit', baseRow(), '0', true));
+        results.push(await run('setKeySeatLimit', baseRow(), '99', true));
+        results.push(await run('setKeySeatLimit', baseRow(), 'abc', true));
+        results.push(await run('setKeySeatLimit', baseRow(), null, true));
+        results.push(await run('setKeySeatLimit', baseRow({ maxDevices: 2 }), '2', true));
+        results.push(await run('setKeySeatLimit', baseRow({
+            maxDevices: 3, seatDevices: [{ slot: 'd1' }, { slot: 'd2' }, { slot: 'd3' }]
+        }), '1', false));
+        results.push(await run('releaseKeySeat', baseRow({ seatDevices: [{ slot: 'd1' }] }), null, true));
+        results.push(await run('releaseKeySeat', baseRow(), null, true));
+        results.push(await run('releaseKeySeat', baseRow({ seatDevices: [{ slot: 'd1' }] }), null, true, true));
+        return results;
+    })();
+
+    const [wOk, wZero, wBig, wText, wCancel, wSame, wLower, wRel, wRelEmpty, wRelFail] = writes;
+    ok('ពិដានថ្មីត្រឹមត្រូវ ➜ សរសេរ `maxDevices` ទៅ `license_keys`',
+        wOk.calls.length === 1 && wOk.calls[0][0] === 'update'
+        && wOk.calls[0][1] === 'license_keys/' + APP + '/K1'
+        && wOk.calls[0][2].maxDevices === 3, wOk.calls);
+    ok('⛔ លេខក្រៅជួរ (0) ➜ **មិនសរសេរ** ហើយប្រាប់អ្នកប្រើ',
+        wZero.calls.length === 0 && wZero.box.alerted === 1, wZero.calls);
+    ok('⛔ លេខធំជាងចំនួន slot ➜ **មិនសរសេរ**',
+        wBig.calls.length === 0 && wBig.box.alerted === 1, wBig.calls);
+    ok('⛔ អត្ថបទមិនមែនលេខ ➜ **មិនសរសេរ**',
+        wText.calls.length === 0 && wText.box.alerted === 1, wText.calls);
+    ok('⛔ បោះបង់ប្រអប់ ➜ មិនសរសេរ ហើយ**មិនរំខានអ្នកប្រើ**',
+        wCancel.calls.length === 0 && wCancel.box.alerted === 0, wCancel.calls);
+    ok('⛔ តម្លៃដដែល ➜ គ្មានការសរសេរឥតប្រយោជន៍', wSame.calls.length === 0, wSame.calls);
+    ok('⛔ បន្ថយក្រោមចំនួនឧបករណ៍ដែលចងរួច ➜ សួរជាមុន; បដិសេធ ➜ មិនសរសេរ',
+        wLower.calls.length === 0, wLower.calls);
+    ok('ដោះឧបករណ៍ ➜ លុប node `license_seats` ទាំងមូល',
+        wRel.calls.length === 1 && wRel.calls[0][0] === 'set'
+        && wRel.calls[0][1] === 'license_seats/' + APP + '/K1'
+        && wRel.calls[0][2] === null, wRel.calls);
+    ok('⛔ ទិសផ្ទុយ ៖ ការដោះ **មិនប៉ះ** `license_keys` ឬពិដាន',
+        wRel.calls.every((c) => c[1].indexOf('license_keys') === -1), wRel.calls);
+    ok('⛔ គ្មានឧបករណ៍ចងរួច ➜ មិនសរសេរ ហើយប្រាប់អ្នកប្រើ',
+        wRelEmpty.calls.length === 0 && wRelEmpty.box.alerted === 1, wRelEmpty.calls);
+    ok('⛔ អានកៅអីមិនបាន ➜ **មិនដោះ** (មិនអាចផ្ទៀងផ្ទាត់ ≠ ទំនេរ)',
+        wRelFail.calls.length === 0 && wRelFail.box.alerted === 1, wRelFail.calls);
+
     console.log('\n' + (fail === 0 ? '✅ ការធ្វើតេស្តទាំងអស់ជោគជ័យ (' + pass + ')' : '❌ FAILURES  pass=' + pass + ' fail=' + fail));
     process.exit(fail === 0 ? 0 : 1);
 })();

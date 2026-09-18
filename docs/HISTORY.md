@@ -342,6 +342,54 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.37.3 · 2.20.2] — 2026-09-18 · Deep Audit — បញ្ជីពាក្យសម្ងាត់ ២ មិនស៊ីគ្នា · ស្នាមភ្ជាប់ SW abort
+
+**ZoeW ប្រែ** (`zoew-v221` ➜ `zoew-v222`) **និង ZoeKeyGen ប្រែ**
+(`zoekeygen-v100` ➜ `zoekeygen-v101`) — `error-reporting.js` ship ក្នុង
+**ទាំង ២** ➜ ច្បាប់ ៦ ទាមទារឲ្យឡើងទាំង ២។
+
+#### សុវត្ថិភាព
+
+Sentry ចាប់ breadcrumb របស់ `console` **ដោយស្វ័យប្រវត្តិ** ដូច្នេះ redactor
+ជា **ជាន់ចុងក្រោយ** សម្រាប់ផ្លូវដែលគ្មាននរណាគ្រោងទុក។ វាមានបញ្ជីពាក្យ
+**ពីរ** ៖ មួយសម្រាប់ **កូនសោវត្ថុ** (`{headerValue: …}`) និងមួយសម្រាប់
+**ខ្សែអក្សរ** (`headerValue=…`)។ ជុំនេះវាស់ឃើញថាពួកវា **មិនស៊ីគ្នា** ៖
+
+- `headerValue` · `headerValueEnc` · `BOS-MAN-SESSION` — លាក់ជាកូនសោ
+  តែ **លេចជាខ្សែអក្សរ**។
+- `activationKey` · `keyString` · `licenseKey` (**Activation Key** ខ្លួនឯង —
+  secret ស្នូលនៃផលិតផល) — លាក់ជាខ្សែអក្សរ តែ **លេចជាកូនសោ**។
+
+ឥឡូវបញ្ជីទាំង ២ ស៊ីគ្នា ហើយ **ទិសផ្ទុយត្រូវរក្សា** ៖ `keyId` · `barcode` ·
+`count` · `id` · `path` · `patch` · `dispatch` · `headerName` · `phone` ·
+`cod` នៅ **មើលឃើញ** សម្រាប់ការ debug។
+
+#### ឧបករណ៍ audit
+
+- `sw-abort-propagation-test` ឥឡូវ **បើក handler `fetch` ពិត** (មិនត្រឹម
+  helper `timedFetch()`) លើ App ទាំង ២ ➜ ការដកការបញ្ជូន abort signal ចេញ
+  ពីផ្លូវ `navigate` ក្លាយជាការធ្លាក់ដែលមានឈ្មោះ។
+- `secret-hygiene` ៖ ផ្នែកថ្មីវាស់ **ទិសទាំង ២** (កូនសោ និងខ្សែអក្សរ)
+  ដោយឈ្មោះ **ដេរីវេពី `fieldsToBlank`** របស់កូដពិត។
+- `doc-scope-test` ៖ កាតាឡុក `emu/*` ដេរីវេពី `run-all.sh` ➜ checker
+  emulator ថ្មីត្រូវតែលេចក្នុងកថាខណ្ឌធ្លាក់ចុះនៃ Runbook។
+- `user-guide-test` ៖ ច្រកទ្វារលក្ខខណ្ឌ — ដរាបណា `LICENSE_SEAT_SLOTS`
+  ship នោះសៀវភៅត្រូវពន្យល់ពិដានចំនួនឧបករណ៍។
+
+#### អ្នកប្រើឃើញអ្វីខុសពីមុន
+
+- **សៀវភៅណែនាំក្នុង App** មានផ្នែកថ្មី **«ចំនួនឧបករណ៍ក្នុង Activation Key ១»**
+  ៖ ពន្យល់កៅអីឧបករណ៍ · អត្ថន័យនៃសារ «Key នេះប្រើគ្រប់ចំនួនឧបករណ៍ដែល
+  អនុញ្ញាតហើយ!» · ផ្លូវដោះស្រាយ (**📱 ចំនួនឧបករណ៍** / **🔓 ដោះឧបករណ៍**) ·
+  និងការព្រមានអំពី Storage ដាច់ពីគ្នារវាង PWA និង Safari លើ iPhone។
+- ⛔ **គ្មានការប្រែឥរិយាបថផ្សេងទៀតទេ** — ផ្លូវលុយ · ការស្កេន · ការសម្អាត
+  ស្វ័យប្រវត្តិ · ZTO នៅដដែលបេះបិទ។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+⛔ **គ្មាន** — គ្មានការកែ Firebase rules · គ្មានការប្តូរ Netlify env ·
+គ្មានការចេញ Key ថ្មី។ Netlify deploy ខ្លួនឯង។
+
 ### [2.37.2] — 2026-09-18 · ការរំខានពាក់កណ្តាល មិនត្រូវធ្វើឲ្យកញ្ចប់បាត់
 
 **ZoeW ប្រែ** (`zoew-v220` ➜ `zoew-v221`)។ ⛔ **ZoeKeyGen មិនប្រែ**
@@ -9638,6 +9686,122 @@ CSP ក៏មិនប្រែដែរ។
 ---
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន
+
+### 2026-09-18 · Deep Audit ជុំ 2.37.3 — «សំណុំបៃតង» ត្រូវវាស់ដោយឧបករណ៍ *ក្រៅ* សំណុំ
+
+**baseline ពិត** (RTDB emulator រត់ · CI parity) ៖ **១៨១ ពេញលេញ · ០ មួយផ្នែក ·
+០ រំលង**។ ដូច្នេះរាល់ការរកឃើញខាងក្រោម មកពីឧបករណ៍ដែល **មិនមែនជាផ្នែកនៃ
+សំណុំនោះ** — ការវាស់ដោយផ្ទាល់ និង mutation testing ឯករាជ្យ។
+
+#### ១. Mutation testing ឯករាជ្យ ៖ mutation ១២ ➜ រស់រាន ១
+
+រត់ checker **១៧២** (គ្រប់ឯកសារដែលទទួល `*_APP_DIR`; ដក meta ៣ ចេញ) ធៀបនឹង
+tree ដែលពុលដោយ mutation ១ ក្នុងមួយជុំ ៖
+
+| mutation | អ្នកចាប់ |
+|---|---|
+| SW ៖ ផ្លូវ `navigate` លែងបញ្ជូន `request.signal` | **គ្មាន (រស់រាន ១៧២)** |
+| SW ៖ កូនសោ cache ផ្ទុក query | `sw-cache-key-test` |
+| SW ៖ `networkOnly` បដិសេធ ជំនួស `Response.error()` | `sw-cache-failure-test` · `stall-guard-test` |
+| SW ៖ ដកពិដានសំណើធ្វើឲ្យស្រស់ខាងក្រោយ | `sw-revalidate-pressure-test` |
+| (control) បន្ថែមបន្ទាត់ទទេ | គ្មាន — **ត្រឹមត្រូវ** |
+| `online` លែងស្តារ listener ដែលងាប់ | `connection-recovery-test` |
+| `visibilitychange` លែងសាកផ្ទុក SDK ឡើងវិញ | `connection-recovery-test` |
+| ភ្ជាប់មកវិញ លែងដោះជួរ registry | `registry-release-test` |
+| ជុំបោស ZTO បាញ់លើ 2G | `zto-sync-banner-test` |
+| eviction បោះធាតុ **ថ្មីជាងគេ** | `zto-sync-banner-test` |
+| ជួរបោស **មិនបង្វិល** | `zto-sync-banner-test` |
+| សោ App លំនាំដើម **បិទ** | `app-lock-test` |
+
+⛔ **មេរៀន ៖ control mutation ចាំបាច់** — បើគ្មានវា ការ «រស់រាន» មិនបែងចែក
+ពី «អ្នកវាស់ខូច» បានទេ។
+
+#### ២. ថ្នាក់ដែលរស់រាន ៖ **checker ចាក់សោ helper ខណៈកំហុសរស់នៅ *ស្នាមភ្ជាប់***
+
+`sw-abort-propagation-test` ជំនាន់មុនហៅ `timedFetch(request)` **ដោយផ្ទាល់**
+➜ វាបញ្ជាក់ថា helper ភ្ជាប់ signal។ តែការសម្រេចថា *អ្វីត្រូវបញ្ជូនចូល*
+helper ឋិតនៅក្នុង handler `fetch` ៖
+
+```js
+const networkTarget  = request.mode === 'navigate' ? cacheKey : request;
+const networkOptions = request.mode === 'navigate' ? { signal: request.signal } : undefined;
+```
+
+លើផ្លូវ `navigate` គោលដៅជា **ខ្សែអក្សរ** (`'./index.html'`) — ខ្សែអក្សរ
+គ្មាន `.signal` ➜ **ផ្លូវតែមួយ** ដែល abort របស់អ្នកប្រើឡើងដល់បណ្តាញគឺ
+`networkOptions`។ ការដកវាចេញ ធ្វើឲ្យការចាកចេញពីទំព័រ (back · PTR reload ·
+ការចុចតំណថ្មីលឿន) បន្សល់សំណើរស់រហូតដល់ពិដាន **២០ វិ.**។
+
+**ការកែ** ៖ អ្នកយាមឥឡូវចុះឈ្មោះ `fetch` event ពិត · បាញ់ `respondWith` ·
+រួច abort ➜ signal ដែល `fetch()` ទទួល ត្រូវតែ **abort រួច**; បូក **ទិសផ្ទុយ**
+(សំណើដែលមិន abort មិនត្រូវរាយថា abort) និង **ជាន់អប្បបរមា** (≥ ១២ ការអះអាង)។
+លទ្ធផល ៖ tree ស្អាត **១៧** ok · tree ពុល **ធ្លាក់ ១ ដែលមានឈ្មោះ** · ថតទទេ
+**exit 1**។
+
+#### ៣. បញ្ជីពាក្យសម្ងាត់ ២ មិនស៊ីគ្នា (រកឃើញដោយ probe ឯករាជ្យ)
+
+ការវាស់មិនមែនការអានកូដ ៖ ដក `redactDeep` · `redactUrl` · `isSecretKeyName` ·
+`isSecretParamName` ចេញពី `error-reporting.js` ពិត រួចបាញ់ **corpus ថ្មី**
+(ឈ្មោះ secret ដែល *ប្រព័ន្ធនេះកាន់ពិត* × ៣ ទម្រង់ខ្សែអក្សរ)។ លទ្ធផលមុនកែ ៖
+
+| ឈ្មោះ | កូនសោវត្ថុ | ខ្សែអក្សរ |
+|---|---|---|
+| `headerValue` · `headerValueEnc` · `BOS-MAN-SESSION` · `bosManSession` | លាក់ | **លេច** |
+| `activationKey` · `keyString` · `licenseKey` | **លេច** | លាក់ |
+| `keyId` · `headerName` · `path` · `patch` · `dispatch` (ទិសផ្ទុយ) | មើលឃើញ | មើលឃើញ |
+
+មូលហេតុ ៖ `SECRET_KEY_PATTERN` ទទួល `header_value|proxy_key|bos_man_session`
+តាំងពី 2.36.3 តែ `SECRET_PARAM_PATTERN` **មិនបានទទួល**; ហើយបញ្ជីកូនសោគ្មាន
+ពាក្យណាដែលត្រូវនឹង **Activation Key** សោះ (ការបន្ថែម `key` ទទេ **មិនបាន**
+ព្រោះវានឹងលុប `keyId` ដែលច្បាប់ «keep case» ទាមទារឲ្យមើលឃើញ)។
+
+**ការកែ** ៖ `SECRET_PARAM_PATTERN` += `header_value|bos_man_session` ·
+`SECRET_KEY_PATTERN` += `activation_key|license_key|key_string`។
+`secret-hygiene` ឡើងពី **១៥៤ ➜ ២០០** ការអះអាង ហើយធ្លាក់ **១០ ដែលមានឈ្មោះ**
+លើ tree មុនកែ។ បញ្ជីវាល credential **ដេរីវេពី `fieldsToBlank`** ➜ វាល
+credential ថ្មីនៅជុំក្រោយចូលបញ្ជីដោយខ្លួនឯង។
+
+#### ៤. ឯកសារ ៖ កាតាឡុក `emu/*` ចាស់ · សៀវភៅខ្វះផ្ទៃដែល ship រួច
+
+- Runbook រាយ «គ្មាន emulator ➜ checker **៤** ធ្លាក់ចុះ» ខណៈ `run-all.sh`
+  រត់ **៥** (`emu/license-seat-rules` មកជាមួយ 2.37.0) ➜ session ដែលរាប់តាម
+  លេខរឹងសន្និដ្ឋានខុសថាមាន checker ១ ធ្លាក់ពិត។ ឥឡូវ `doc-scope-test`
+  ដេរីវេបញ្ជីពី `run "emu/…"` ហើយទាមទារឲ្យវាលេចក្នុង **កថាខណ្ឌធ្លាក់ចុះ**
+  ⛔ មិនមែនក្នុងឯកសារទាំងមូល (ឈ្មោះដដែលក្នុងតារាងស្នូលធ្វើឲ្យការស្កេន
+  ទូទាំងឯកសារ **ពិតដោយចៃដន្យ** — វាស់បាន ៖ ជំនាន់ដំបូងរបស់អ្នកយាមនេះ
+  **បៃតងលើ tree ដែលមានកំហុស**)។
+- ពិដានឧបករណ៍ក្នុង Key ១ ship តាំងពី 2.37.0 ហើយ README ទាំង ២ រៀបរាប់វា —
+  តែ `guide.html` (អ្វីដែល **អ្នកប្រើពិតអាន**) គ្មានពាក្យមួយម៉ាត់។
+  `user-guide-test` ឥឡូវ **ដកស្រង់សារពិត** ចេញពី `licenseFailureMessage()`
+  ➜ ធ្លាក់ **៣** លើ tree មុនកែ។
+
+#### ៥. អ្វីដែលវាស់ តែ **មិន** រកឃើញអ្វី (កុំវាស់ឡើងវិញដោយគ្មានហេតុផលថ្មី)
+
+- **fuzz helper សុទ្ធ** ៖ ស្រង់ function ថ្នាក់កំពូល **២៥៤** របស់ ZoeW
+  (ស្រង់បាន ១៨៣ ជាមួយ dependency closure) និង **២៨** របស់ ZoeKeyGen រួច
+  បាញ់ input អាក្រក់ **២៨** ក្នុង process ដាច់ដោយឡែក ➜ **គ្មានការព្យួរពិត**
+  (ការព្យួរ ២ ដែលឃើញ — `stripJsCommentsOutsideStrings` និង
+  `firebaseObjectTextToJson` — ទាមទារ `{length: 1e9}` ខណៈកន្លែងហៅ **តែមួយ**
+  ឆ្លងកាត់ `String(raw ?? '')` ➜ **មិនអាចកើត**) ហើយការបោះទាំងអស់មកពី
+  `{toString(){throw}}` · `Object.create(null)` · `Symbol` ➜ input ដែល
+  Firebase ផ្តល់មិនបាន។
+- **កាតាឡុកឈ្មោះ function ធៀបនឹង checker** ៖ ZoeW មាន **១៥០/៧៧០** function
+  ដែលឈ្មោះមិនលេចក្នុង checker ណាមួយ — ⛔ **នេះមិនមែនចន្លោះទេ** ៖ checker
+  ឥរិយាបថ (`zto-sync-banner-test` · `app-lock-test` …) រត់ App ពិតក្នុង
+  browser ➜ វាហៅ function ទាំងនោះដោយ **មិនចាំបាច់ដាក់ឈ្មោះ**។ ការផ្ទៀង
+  ដោយដៃលើ ៦ ឈ្មោះ (`code128SvgElement` · `rotateZtoSweepQueue` ·
+  `evictOneZtoPickupVerdict` · `saveZtoPickupStatus` · `ztoFastModeIsOn` ·
+  `appLockIsEnabled`) បញ្ជាក់ថាទាំង ៦ មានអ្នកវាស់ពិត (mutation ៣ ក្នុង
+  ចំណោមនោះត្រូវចាប់បាន)។ ⛔ **កុំសាង checker តាមបញ្ជីនោះ។**
+- `money-guardian-test` ក្នុងរបៀប **`MONEYGUARD_STRICT=1`** ៖ mutation លុយ
+  **១០/១០** ត្រូវចាប់បាន · អ្នកយាមទាំងអស់រត់បាន (គ្មាន SKIP)។
+- `?diag=1` របស់ Function ៖ ឆ្លងកាត់ `timingSafeEqualText(proxyKey, …)`
+  **មុន** អ្វីៗទាំងអស់ ហើយវាលដែលវាបញ្ចេញជា **fingerprint · ចំនួន · hostname**
+  ប៉ុណ្ណោះ — គ្មានតម្លៃ secret។
+- `verifyIdToken()` ៖ `alg` · `kid` · `aud ∈ FIREBASE_PROJECT_IDS` · `iss` ·
+  `exp`/`iat` ជាមួយ skew · `sub` · ហត្ថលេខា RS256 ពិតធៀបនឹង cert របស់ Google
+  — គ្រប់ជាន់មាន។ `siteCodeFromEmail()` មាន `@` នាំមុខ និង `$` បិទ ➜
+  `x@sub.zoew1.com` និង `…zoew1.com.evil.com` **មិនឆ្លង**។
 
 ### 2026-09-18 · ការសរសេរ ៤ ដងដាច់ពីគ្នា ➜ ការរំខានពាក់កណ្តាលលុបកញ្ចប់
 

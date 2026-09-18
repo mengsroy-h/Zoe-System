@@ -84,6 +84,30 @@ if (routeStart !== -1 && routeEnd > routeStart) {
 }
 check('Service Worker មិនបង្វែរ guide.html ឬ Netlify /guide ទៅ index.html', guideNavigationIsDistinct);
 
+// ⛔ **សៀវភៅណែនាំត្រូវពន្យល់ផ្ទៃអាជ្ញាប័ណ្ណដែល App *ពិតជា ship*។**
+// វាស់បាន (2.37.3) ៖ ពិដានឧបករណ៍ក្នុង Key ១ (`maxDevices` · កៅអី `d1..d5`)
+// ship តាំងពី 2.37.0 ហើយ README ទាំង ២ រៀបរាប់វា — តែ **សៀវភៅក្នុង App**
+// (អ្វីដែល *អ្នកប្រើ* អាន) គ្មានពាក្យមួយម៉ាត់សោះ ➜ អតិថិជនដែលឃើញ
+// «Key នេះប្រើគ្រប់ចំនួនឧបករណ៍…» គ្មានកន្លែងរកចម្លើយ ➜ គេសន្និដ្ឋានថា
+// Key ខូច។ ⛔ ច្រកទ្វារជា **លក្ខខណ្ឌ** ៖ វាទាមទារតែពេលកូដពិត ship
+// កៅអី ➜ ការដកមុខងារនោះចេញ ធ្វើឲ្យច្រកទ្វារធូរដោយខ្លួនឯង។
+(function () {
+    let licenseSrc = '';
+    try { licenseSrc = fs.readFileSync(path.join(appDir, 'license-verify.js'), 'utf8'); } catch (e) { licenseSrc = ''; }
+    const shipsSeats = /LICENSE_SEAT_SLOTS\s*=\s*\[/.test(licenseSrc);
+    if (!shipsSeats) return;
+    // ឃ្លាដែលអ្នកប្រើឃើញពិត ➜ ដេរីវេពី `licenseFailureMessage()` ក្នុង app.js
+    let appSrc = '';
+    try { appSrc = fs.readFileSync(path.join(appDir, 'app.js'), 'utf8'); } catch (e) { appSrc = ''; }
+    const seatMsg = /case 'seat-taken': return '([^']+)'/.exec(appSrc);
+    check('ជាន់អប្បបរមា ៖ ស្រង់សារ `seat-taken` ចេញពី `app.js` បាន', !!seatMsg);
+    const needle = seatMsg ? seatMsg[1].split('!')[0].trim() : '';
+    check('⛔ សៀវភៅពន្យល់ពិដានចំនួនឧបករណ៍ក្នុង Key ១', guide.includes('ចំនួនឧបករណ៍'));
+    check('⛔ សៀវភៅដកស្រង់សារ `seat-taken` ដែលអ្នកប្រើឃើញពិត',
+        !!needle && guide.includes(needle));
+    check('⛔ សៀវភៅប្រាប់ផ្លូវដោះស្រាយ (ដោះឧបករណ៍)', guide.includes('ដោះឧបករណ៍'));
+})();
+
 if (failures) {
     console.error('\n❌ user guide test ធ្លាក់ ' + failures + ' ចំណុច');
     process.exit(1);

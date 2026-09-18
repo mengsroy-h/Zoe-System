@@ -855,5 +855,48 @@ check(siteOffenders.length === 0,
     'ឯកសារដែលនៅរៀបរាប់ ៖ ' + siteOffenders.join(' · ')
     + '\n        ➜ លេខសាខាមកពី email របស់គណនី (`@zoew<លេខ>.com`) មិនមែនពីឧបករណ៍');
 
+// ⛔ **កាតាឡុក `emu/*` ៖ បញ្ជីក្នុងឯកសារ ត្រូវប្រៀបនឹង `run-all.sh` ពិត។**
+// Runbook ពន្យល់ថា «គ្មាន emulator ➜ checker ណាខ្លះធ្លាក់ចុះ» ដោយ **រាយ
+// ឈ្មោះ** ។ បញ្ជីរឹងបែបនោះជា **កាលបរិច្ឆេទផុតកំណត់** ៖ checker `emu/*`
+// ថ្មីនៅជុំក្រោយមិនលេចក្នុងបញ្ជី ➜ session ដែលរត់ដោយគ្មាន emulator ឃើញ
+// ការធ្លាក់ចុះច្រើនជាងឯកសារ ➜ សន្និដ្ឋានខុសថាមានការធ្លាក់ពិត ហើយចំណាយ
+// ជុំមួយទៅរកកំហុសដែលមិនមាន។ វាស់បាន (2.37.3) ៖ ឯកសាររាយ **៤** ខណៈ
+// `run-all.sh` រត់ **៥** — `emu/license-seat-rules` (2.37.0) គ្មានឈ្មោះសោះ។
+(function () {
+    let runAll = '';
+    try { runAll = fs.readFileSync(path.join(ROOT, 'audit-tools', 'run-all.sh'), 'utf8'); } catch (_) { runAll = ''; }
+    const labels = [];
+    const re = /run "(emu\/[a-z0-9-]+)"/g;
+    let m;
+    while ((m = re.exec(runAll)) !== null) if (labels.indexOf(m[1]) === -1) labels.push(m[1]);
+    check(labels.length >= 4, 'ជាន់អប្បបរមា ៖ ដេរីវេ checker `emu/*` ពី `run-all.sh` បានយ៉ាងតិច ៤',
+        'ឃើញ ' + labels.length + ' ៖ ' + labels.join(' · '));
+    // ⛔ វិសាលភាពត្រូវជា **កថាខណ្ឌនៃការធ្លាក់ចុះ** មិនមែនឯកសារទាំងមូល ៖
+    // ឈ្មោះដដែលលេចក្នុងតារាងស្នូល (`emu/license-seat-rules-test.js`) ធ្វើឲ្យ
+    // ការស្វែងរកទូទាំងឯកសារ **ពិតដោយចៃដន្យ** ➜ អ្នកយាមងងឹតទាំងស្រុង។
+    const degradeAt = claudeText.indexOf('គ្មាន RTDB emulator');
+    check(degradeAt !== -1, 'ជាន់អប្បបរមា ៖ រកកថាខណ្ឌ «គ្មាន RTDB emulator» ក្នុង CLAUDE.md បាន',
+        'រកមិនឃើញ');
+    const degradeBlock = degradeAt === -1 ? '' : claudeText.slice(degradeAt, degradeAt + 1400);
+    const missing = labels.filter((label) => degradeBlock.indexOf(label) === -1);
+    check(missing.length === 0,
+        '⛔ CLAUDE.md ៖ រាល់ checker `emu/*` ដែល `run-all.sh` រត់ ត្រូវមានឈ្មោះក្នុងកថាខណ្ឌធ្លាក់ចុះ',
+        'គ្មានឈ្មោះ ៖ ' + missing.join(' · '));
+    // ⛔ ទិសផ្ទុយ ៖ ឯកសារមិនត្រូវរាយ checker `emu/*` ដែល **លែងមាន**
+    const ghosts = (claudeText.match(/`emu\/[a-z0-9-]+/g) || [])
+        .map((raw) => raw.replace(/^`/, ''))
+        .filter((name, i, all) => all.indexOf(name) === i)
+        .filter((name) => name !== 'emu/ns')
+        .filter((name) => {
+            const base = name.slice(4);
+            return !fs.existsSync(path.join(ROOT, 'audit-tools', 'emu', base + '.js'))
+                && !fs.existsSync(path.join(ROOT, 'audit-tools', 'emu', base + '-test.js'))
+                && !fs.existsSync(path.join(ROOT, 'audit-tools', 'emu', base + '-emu-test.js'));
+        });
+    check(ghosts.length === 0,
+        '⛔ ទិសផ្ទុយ ៖ CLAUDE.md មិនត្រូវរាយ checker `emu/*` ដែលលែងមានក្នុងថត',
+        'ឈ្មោះខ្មោច ៖ ' + ghosts.join(' · '));
+})();
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

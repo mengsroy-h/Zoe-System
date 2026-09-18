@@ -177,6 +177,7 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
         // ⛔ ហេតុអ្វីវាសំខាន់ ៖ Sentry ចាប់ breadcrumb របស់ `console` **ដោយ
         // ស្វ័យប្រវត្តិ** ➜ redactor ជា **ជាន់ចុងក្រោយ** សម្រាប់ផ្លូវដែលគ្មាន
         // នរណាគ្រោងទុក។ ជាន់នោះមិនត្រូវពឹងលើការសន្មតថា «គ្មាននរណា log config»។
+        let derivedSecretNames = [];
         (function () {
             const appSrc = readApp('ZoeW');
             const toolSrc = readRepoFile('tools/zto-cookie-sync-windows/sync-zto-cookie.js');
@@ -201,6 +202,7 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
             if (ckRe) derived.add(ckRe[1]);
 
             const names = Array.from(derived);
+            derivedSecretNames = names.slice();
             // ⛔ ជាន់អប្បបរមា ៖ ការដេរីវេដែលធ្លាក់ ធ្វើឲ្យការអះអាងខាងក្រោម
             // ពិតដោយស្វ័យប្រវត្តិ ➜ ត្រូវរាយជា FAIL មិនមែនរំលង។
             ok('ជាន់អប្បបរមា ៖ ដេរីវេឈ្មោះវាល secret ពិតបានយ៉ាងតិច ៣',
@@ -227,6 +229,70 @@ console.log('\n=== ការលាក់ secret មុនផ្ញើទៅ Sent
                 .filter((k) => keepEv.extra[k] === '[redacted]');
             ok('⛔ ទិសផ្ទុយ ៖ ឈ្មោះមិនមែន secret ដែលមើលទៅស្រដៀង មិនត្រូវលាក់',
                 overRedacted.length === 0, 'ត្រូវលាក់ខុស ៖ ' + overRedacted.join(', '));
+        })();
+
+        // ⛔ **ចន្លោះទី ១គ ៖ បញ្ជីពាក្យ ២ មិនស៊ីគ្នា — secret ដដែល លាក់
+        // ម្ខាង លេចម្ខាង។** redactor មានបញ្ជីពាក្យ **ពីរ** ដែលដាច់ពីគ្នា ៖
+        //   · `SECRET_KEY_PATTERN`   ➜ ប្រើពេលឈ្មោះជា **កូនសោវត្ថុ** (`{headerValue: …}`)
+        //   · `SECRET_PARAM_PATTERN` ➜ ប្រើពេលឈ្មោះលេចក្នុង **ខ្សែអក្សរ** (`headerValue=…`)
+        // ការបន្ថែមទៅបញ្ជីមួយ ដោយភ្លេចមួយទៀត ធ្វើឲ្យ secret ដដែល **លាក់
+        // ម្ខាង លេចម្ខាង** ➜ ហើយ **ផ្លូវខ្សែអក្សរទើបជាផ្លូវធំបំផុត** ព្រោះ
+        // Sentry ចាប់ breadcrumb របស់ `console` ដោយស្វ័យប្រវត្តិ (`console.log('cfg',
+        // 'headerValue=' + v)` ជាទម្រង់ធម្មតា)។ វាស់បាន ៖ `headerValue` និង
+        // `BOS-MAN-SESSION` លាក់ជាកូនសោ តែ **លេចជាខ្សែអក្សរ**; `activationKey`
+        // លាក់ជាខ្សែអក្សរ តែ **លេចជាកូនសោ** — ខណៈ checker ១៨១ បៃតងទាំងអស់។
+        //
+        // ⛔ បញ្ជីត្រូវ **ដេរីវេពីកូដពិត** ៖ វាលដែល App ខ្លួនឯងចាត់ថាជា
+        // credential គឺវាលដែល `clearSensitiveModalFields()` លុបចេញ ➜ id ណា
+        // ដែលបញ្ចប់ដោយ `PinInput` · `PasswordInput` · `KeyInput` · `SecretInput`
+        // · `TokenInput` គឺជា secret តាមនិយមន័យរបស់ App ផ្ទាល់។ ការប្តូរឈ្មោះ
+        // វាល ឬការបន្ថែមវាល credential ថ្មី ➜ បញ្ជីដើរតាមដោយខ្លួនឯង។
+        (function () {
+            const appSrc = readApp('ZoeW');
+            const listMatch = /const fieldsToBlank = \[([\s\S]*?)\];/.exec(appSrc);
+            const ids = listMatch ? (listMatch[1].match(/'([^']+)'/g) || []).map((q) => q.slice(1, -1)) : [];
+            const credentialIds = ids.filter((id) => /(Pin|Password|Key|Secret|Token)Input$/.test(id));
+            const credentialNames = credentialIds.map((id) => id.replace(/Input$/, ''));
+
+            ok('ជាន់អប្បបរមា ៖ ដេរីវេវាល credential ពី `fieldsToBlank` បានយ៉ាងតិច ៤',
+                credentialNames.length >= 4, 'ដេរីវេបាន ៖ ' + credentialNames.join(', '));
+
+            credentialNames.forEach((name) => {
+                const probe = { extra: {} };
+                probe.extra[name] = 'CREDENTIAL_PROBE_VALUE';
+                api.redactEvent(probe);
+                ok('⛔ កូនសោ `' + name + '` (ដេរីវេពី `fieldsToBlank`) ត្រូវលាក់',
+                    probe.extra[name] === '[redacted]', String(probe.extra[name]));
+            });
+
+            // ⛔ **ទិសទី ២ ៖ ឈ្មោះដដែលក្នុង *ខ្សែអក្សរ*** — ៣ ទម្រង់ដែល
+            // breadcrumb ពិតបញ្ចេញ (`a=b` · `"a":"b"` · `a: b`)។
+            const stringNames = credentialNames.concat(derivedSecretNames);
+            ok('ជាន់អប្បបរមា ៖ មានឈ្មោះ secret យ៉ាងតិច ៦ សម្រាប់វាស់ផ្លូវខ្សែអក្សរ',
+                stringNames.length >= 6, 'ឃើញ ' + stringNames.length);
+            stringNames.forEach((name) => {
+                const forms = [
+                    name + '=STRING_PROBE_VALUE',
+                    '"' + name + '":"STRING_PROBE_VALUE"',
+                    name + ': STRING_PROBE_VALUE'
+                ];
+                forms.forEach((form) => {
+                    const out = api.redactEvent({ message: 'cfg ' + form }).message;
+                    ok('⛔ ខ្សែអក្សរ `' + form.slice(0, 44) + '` ត្រូវលាក់',
+                        out.indexOf('STRING_PROBE_VALUE') === -1, out);
+                });
+            });
+
+            // ⛔ **ទិសផ្ទុយ** ៖ ការពង្រីកបញ្ជី *ខ្សែអក្សរ* មិនត្រូវលេបឈ្មោះ
+            // ដែលមើលទៅស្រដៀង។ ⚠️ បញ្ជី param ធំជាងបញ្ជីកូនសោដោយចេតនា
+            // (`keyId=` លាក់ ខណៈ `{keyId}` នៅមើលឃើញ) ➜ ការវាស់ទិសផ្ទុយ
+            // ត្រូវប្រើតែឈ្មោះដែល **មិនស្ថិតក្នុងបញ្ជីណាមួយសោះ** (បញ្ជី param
+            // ផ្ទុកពាក្យ `key` ទទេ ➜ `keyId=` និង `pathKey=` លាក់ដោយចេតនា)។
+            ['headerName', 'path', 'patch', 'dispatch', 'compat'].forEach((name) => {
+                const out = api.redactEvent({ message: 'cfg ' + name + '=KEEP_PROBE_VALUE' }).message;
+                ok('⛔ ទិសផ្ទុយ ៖ `' + name + '=…` មិនត្រូវលាក់',
+                    out.indexOf('KEEP_PROBE_VALUE') !== -1, out);
+            });
         })();
 
         // ⛔ ចន្លោះទី ២ ៖ ការលាក់ធ្វើតែពេលតម្លៃជា **string**

@@ -5590,7 +5590,9 @@
                         continue;
                     }
                     try {
-                        await retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500);
+                        await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
+                            TRASH_WRITE_SLOW_NOTICE_MS,
+                            "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
                         restored++;
                     } catch (writeErr) {
                         continue;
@@ -5619,7 +5621,7 @@
         } finally {
             cleanupResumeInFlight = false;
         }
-        if (restored) showToast('♻️ ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុន ត្រូវបានបញ្ចប់វិញ ' + restored + ' កញ្ចប់។');
+        if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
         if (unverified) {
             if (window.ZoeErrors) ZoeErrors.capture(new Error('Interrupted cleanup resumed with unverified ledger'), { zone: 'money', context: 'resumeInterruptedCleanups unverified', itemCount: unverified });
             showToast('⚠️ កញ្ចប់ត្រូវបានស្តារចូលធុងសំរាមវិញ ប៉ុន្តែស្ថិតិប្រាក់មិនអាចផ្ទៀងផ្ទាត់បានទេ! សូមប្រាប់ Admin ពិនិត្យ។');

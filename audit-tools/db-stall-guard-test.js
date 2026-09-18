@@ -447,7 +447,25 @@ function runAbandonCleanup(mode) {
         sliceConst(zoewSrc, 'LOCK_STALL_RELEASE_MS'),
         'let serverClockTrusted = true, isDatabaseConnected = true;',
         sliceFrom(zoewSrc, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();'
+        'const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();',
+        // ⛔ journal នៃការសម្អាត (2.37.2) ៖ ការហៅរបស់វា fail-open ➜ បើ sandbox
+        //    ខ្វះឈ្មោះ វា **លាក់** ReferenceError ក្នុង `console.error` ➜ ផ្នែក
+        //    «dependency បាត់» របស់ checker នេះចាប់វា។ ដូច្នេះត្រូវផ្ទុកពិត។
+        sliceConst(zoewSrc, 'CLEANUP_JOURNAL_KEY') || "const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';",
+        sliceConst(zoewSrc, 'CLEANUP_JOURNAL_MAX') || 'const CLEANUP_JOURNAL_MAX = 200;',
+        sliceConst(zoewSrc, 'CLEANUP_STAGE_MOVED') || "const CLEANUP_STAGE_MOVED = 'moved';",
+        sliceConst(zoewSrc, 'CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
+        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        sliceFrom(zoewSrc, 'safeStoreGet') || 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
+        sliceFrom(zoewSrc, 'safeStoreSet') || 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
+        sliceFrom(zoewSrc, 'safeStoreRemove') || 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }',
+        sliceFrom(zoewSrc, 'cleanupJournalScope') || "function cleanupJournalScope() { return ''; }",
+        sliceFrom(zoewSrc, 'cleanupJournalScopeMismatch') || 'function cleanupJournalScopeMismatch() { return false; }',
+        sliceFrom(zoewSrc, 'readCleanupJournal') || 'function readCleanupJournal() { return []; }',
+        sliceFrom(zoewSrc, 'writeCleanupJournal') || 'function writeCleanupJournal() {}',
+        sliceFrom(zoewSrc, 'noteCleanupJournalEntry') || 'function noteCleanupJournalEntry() {}',
+        sliceFrom(zoewSrc, 'markCleanupJournalStage') || 'function markCleanupJournalStage() {}',
+        sliceFrom(zoewSrc, 'clearCleanupJournalEntry') || 'function clearCleanupJournalEntry() {}'
     ];
     for (const fn of CLEANUP_FNS) {
         const body = sliceFrom(zoewSrc, fn);

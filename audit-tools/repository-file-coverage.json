@@ -777,6 +777,9 @@
     "audit-tools/layout-thrash.js": {
       "policy": "guard-1"
     },
+    "audit-tools/cleanup-interrupt-atomicity-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/ledger-clamp-symmetry-test.js": {
       "policy": "guard-1"
     },

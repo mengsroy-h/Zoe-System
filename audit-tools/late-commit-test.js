@@ -110,7 +110,10 @@ const REAL_FNS = [
 ];
 // helper ថ្មីដែលការកែនាំមក — លើ tree មុនកែ វាអវត្តមាន ➜ stub ដើម្បីឲ្យការ
 // អះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)
-const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState'];
+const OPTIONAL_FNS = ['armLateCommit', 'viewListModalShowing', 'notifyIfSlow', 'settleLockWithin', 'reconcileCollectedPriceState',
+    'safeStoreGet', 'safeStoreSet', 'safeStoreRemove',
+    'cleanupJournalScope', 'cleanupJournalScopeMismatch',
+    'readCleanupJournal', 'writeCleanupJournal', 'noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry'];
 const fnSrc = {};
 const missing = [];
 for (const name of REAL_FNS) {
@@ -126,7 +129,12 @@ const optionalSrc = OPTIONAL_FNS.map((name) => extractFn(name)).filter(Boolean).
     // ⛔ `settleLockWithin` អវត្តមានលើ tree មុនកែ ➜ stub ដែល **រក្សាឥរិយាបថដើម**
     // (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់) ដើម្បីឲ្យការអះអាងឥរិយាបថនៅតែរត់។
     + (extractFn('settleLockWithin') ? '' : '\n\nfunction settleLockWithin(p) { return Promise.resolve(p); }')
-    + '\n\nfunction clearScannedRemovalInFlight() {}';
+    + '\n\nfunction clearScannedRemovalInFlight() {}'
+    // ⛔ journal នៃការសម្អាត ៖ លើ tree មុនកែវាអវត្តមាន ➜ stub ដើម្បីឲ្យ
+    //    ការអះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3)។
+    + (extractFn('noteCleanupJournalEntry') ? '' : '\n\nfunction noteCleanupJournalEntry() {}')
+    + (extractFn('markCleanupJournalStage') ? '' : '\n\nfunction markCleanupJournalStage() {}')
+    + (extractFn('clearCleanupJournalEntry') ? '' : '\n\nfunction clearCleanupJournalEntry() {}');
 
 // នាឡិកាមាត្រដ្ឋាន ៖ ពិដាន ១៥ វិ. ក្លាយជា ៣០០ms ➜ តេស្តលឿន តែកូដពិតមិនប្រែ
 const TIME_SCALE = 50;
@@ -277,6 +285,11 @@ function buildWorld(seed, opts) {
         extractConst('PICKUP_DATE_KEY_PATTERN') || 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;',
         extractConst('TRASH_WRITE_SLOW_NOTICE_MS') || 'const TRASH_WRITE_SLOW_NOTICE_MS = 15000;',
         extractConst('LOCK_STALL_RELEASE_MS') || 'const LOCK_STALL_RELEASE_MS = 15000;',
+        extractConst('CLEANUP_JOURNAL_KEY') || "const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';",
+        extractConst('CLEANUP_JOURNAL_MAX') || 'const CLEANUP_JOURNAL_MAX = 200;',
+        extractConst('CLEANUP_STAGE_MOVED') || "const CLEANUP_STAGE_MOVED = 'moved';",
+        extractConst('CLEANUP_STAGE_LEDGER') || "const CLEANUP_STAGE_LEDGER = 'ledger';",
+        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
         ...REAL_FNS.map((name) => fnSrc[name]),
         optionalSrc
     ].join('\n\n');

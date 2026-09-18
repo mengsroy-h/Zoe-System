@@ -37,7 +37,7 @@ function buildRunner(appFile) {
 
     // --- real block 1: claimAndCleanupItem's trash construction + revenue calls ---
     const claimBlock = slice(src,
-        '            let trashItem;\n            let revenueApplied = null;',
+        '            let trashItem;\n',
         '                    trashItem.isFromDeletion = true;\n                    trashItem.trashReason = \'pickup\';\n                    if (trashItem.barcodes && Array.isArray(trashItem.barcodes)) {\n                        trashItem.barcodes = trashItem.barcodes.map(b => ({ ...b, isFromDeletion: true }));\n                    }\n                }\n            }',
         'claim');
 
@@ -61,6 +61,20 @@ function buildRunner(appFile) {
     // វាស់អ្វីផ្សេង)។ `claimAndCleanupItem` និង `removeSingleBarcode` ហៅវា
     // តាំងពីកំណែ 2.30.2 ដែលរួបរួមរូបមន្តលុយទៅកន្លែងតែមួយ។
     const moneyHelper = fnBody(src, 'function recalcItemMoneyFromBarcodes(', 'recalcItemMoneyFromBarcodes');
+
+    // ⛔ ចាប់ពីកំណែ 2.37.2 ការដកលុយឈរ **ក្រោយ** ការសរសេរធុងសំរាម (journal នៃ
+    //    ការសម្អាត) ➜ វាលែងនៅក្នុងប្លុកដែលស្រង់។ ⛔ ការហៅត្រូវ **ស្រង់ចេញពី
+    //    កូដពិត** មិនមែនចម្លងដោយដៃ — សញ្ញា និងលំដាប់អាគុយម៉ង់គឺជាអ្វីដែល
+    //    តេស្តនេះការពារ។ លើ tree ចាស់ (`revenueApplied` ក្នុងប្លុក) ផ្លូវចាស់នៅដដែល។
+    const pendingStyle = src.indexOf('            if (!revenuePending) {') !== -1;
+    const ledgerCall = /addRevenueToDailyAndMonthlyRecord\(revenueScanDate,[^;]*?\)/.exec(src);
+    if (pendingStyle && !ledgerCall) throw new Error('cleanup ledger call not found');
+    const claimLedgerTail = pendingStyle
+        ? '            let revenueApplied = null;\n'
+          + '            if (revenuePending) revenueApplied = ' + ledgerCall[0] + ';\n'
+          + '            return { trashItem, revenueDeducted: !!revenueApplied };'
+        : '            return { trashItem, revenueDeducted: !!revenueApplied };';
+
 
     const prelude = moneyHelper + `
         var NOW = 1000000;
@@ -96,7 +110,7 @@ function buildRunner(appFile) {
     const script = new vm.Script(prelude + `
         function runClaim(claimedWhole, claimedPartial, reason, id) {
 ${claimBlock}
-            return { trashItem, revenueDeducted: !!revenueApplied };
+${claimLedgerTail}
         }
         function runRemoveBarcode(claimedParent, claimedBarcode) {
 ${removeBlock}

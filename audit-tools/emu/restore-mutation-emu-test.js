@@ -87,7 +87,8 @@ const FNS = AST.body.filter((node) => node.type === 'FunctionDeclaration');
 const NEEDED_CONSTANTS = new Set(['DB_OP_TIMEOUT_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'RESTORE_CLAIM_LEASE_MS',
     'DB_LISTENER_KEY_DELETED', 'DB_LISTENER_KEY_HISTORY', 'TWO_HOURS_MS', 'ABANDON_AGE_MS',
     'DAILY_COLLECTED_KEEP_DAYS', 'DAILY_COLLECTED_DAY_PATTERN', 'DB_LISTENER_KEY_DAILY_COLLECTED',
-    'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES']);
+    'PICKUP_DATE_KEY_PATTERN', 'APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES',
+    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER']);
 const CONSTANTS = AST.body.filter((node) => node.type === 'VariableDeclaration')
     .flatMap((node) => node.declarations.filter((decl) => NEEDED_CONSTANTS.has(decl.id.name))
         .map((decl) => 'const ' + SOURCE.slice(decl.start, decl.end) + ';'));
@@ -109,7 +110,8 @@ function tab(suffix, hooks) {
         scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
         activeRestoreClaims: new Map(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
-        confirm: () => true, alert: (message) => toasts.push(message)
+        confirm: () => true, alert: (message) => toasts.push(message),
+        appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()
     });
     vm.runInContext(CONSTANTS.join('\n') + '\n' + FNS.map((node) => SOURCE.slice(node.start, node.end)).join('\n'), context);
     Object.assign(context, {

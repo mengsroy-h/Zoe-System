@@ -237,7 +237,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         ok('ជាន់អប្បបរមា ៖ transaction បានចេញដំណើរពិត', w.log.txs >= 1, w.log.txs);
         ok('ជាន់អប្បបរមា ៖ ការសរសេរធុងសំរាមបានចេញដំណើរពិត', w.log.updates >= 1, w.log.updates);
         ok('សោត្រូវកាន់ខណៈការសរសេរនៅព្យួរ', w.ctx.__cleanupLock().length === 1, w.ctx.__cleanupLock());
-        ok('ជាន់អប្បបរមា ៖ លុយត្រូវបានដកក្នុងសតិរួច', w.ctx.__ledger().cod === -3.25, w.ctx.__ledger());
+        // ⛔ ចាប់ពីកំណែ 2.37.2 ការដកលុយឈរ **ក្រោយ** ការសរសេរធុងសំរាម (journal នៃ
+        //    ការសម្អាត) ➜ ខណៈការសរសេរព្យួរ ledger ត្រូវ **មិនទាន់ប្រែ**។ លើ tree
+        //    ចាស់ លំដាប់ផ្ទុយ ➜ ការរំពឹងទុកដេរីវេពី **កូដពិត** មិនមែនលេខថេរ។
+        const ledgerAfterTrashWrite = src.indexOf('revenuePending') !== -1;
+        ok(ledgerAfterTrashWrite
+            ? '⛔ ការសរសេរធុងសំរាមព្យួរ ➜ លុយ **មិនទាន់ដក** (ការដកឈរក្រោយការសរសេរ)'
+            : 'ជាន់អប្បបរមា ៖ លុយត្រូវបានដកក្នុងសតិរួច',
+            w.ctx.__ledger().cod === (ledgerAfterTrashWrite ? 0 : -3.25), w.ctx.__ledger());
 
         await sleep(WAIT_AFTER_TIMEOUT);
         ok('⛔ សោ `cleanupInFlight` ត្រូវដោះក្នុងពេលកំណត់ (ច្បាប់ ២ម៉ោង/៧ថ្ងៃ មិនងាប់)',

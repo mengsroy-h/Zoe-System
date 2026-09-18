@@ -1,4 +1,4 @@
-    const APP_VERSION = '2.37.1';
+    const APP_VERSION = '2.37.2';
 
     const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
     const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -4977,6 +4977,7 @@
             showToast('⚠️ មិនអាចភ្ជាប់ទិន្នន័យបានទេ! សូម Refresh ទំព័រ។');
         }
         if (!wasAlreadySignedIn) showLiveToast('signin');
+        resumeInterruptedCleanups();
         prefetchCustomerDataTableRowsIfConfigured();
         safeFocusScanner();
     }
@@ -5494,6 +5495,139 @@
         });
     }
 
+    const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';
+    const CLEANUP_JOURNAL_MAX = 200;
+    const CLEANUP_STAGE_MOVED = 'moved';
+    const CLEANUP_STAGE_LEDGER = 'ledger';
+    let cleanupResumeInFlight = false;
+
+    function readCleanupJournal() {
+        try {
+            const raw = safeStoreGet(appLocalStore, CLEANUP_JOURNAL_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(e => e && typeof e === 'object' && typeof e.id === 'string'
+                && e.trashItem && typeof e.trashItem.id === 'string' && /^[a-zA-Z0-9_-]+$/.test(e.trashItem.id));
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeCleanupJournal(entries) {
+        const list = Array.isArray(entries) ? entries.slice(-CLEANUP_JOURNAL_MAX) : [];
+        if (!list.length) {
+            safeStoreRemove(appLocalStore, CLEANUP_JOURNAL_KEY);
+            return;
+        }
+        try {
+            safeStoreSet(appLocalStore, CLEANUP_JOURNAL_KEY, JSON.stringify(list));
+        } catch (e) {}
+    }
+
+    function cleanupJournalScope() {
+        try {
+            const raw = safeStoreGet(appLocalStore, 'zoew_firebase_config');
+            if (!raw) return '';
+            const found = /databaseURL"?'?\s*:\s*["']([^"']+)["']/.exec(raw);
+            return found ? found[1] : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function cleanupJournalScopeMismatch(entry) {
+        if (!entry || typeof entry.scope !== 'string' || !entry.scope) return false;
+        const scope = cleanupJournalScope();
+        return !!scope && scope !== entry.scope;
+    }
+
+    function noteCleanupJournalEntry(entry) {
+        if (!entry || typeof entry.id !== 'string' || !entry.trashItem || typeof entry.trashItem.id !== 'string') return;
+        const list = readCleanupJournal().filter(e => e.trashItem.id !== entry.trashItem.id);
+        list.push(Object.assign({}, entry, { scope: cleanupJournalScope() }));
+        writeCleanupJournal(list);
+    }
+
+    function markCleanupJournalStage(trashId, stage) {
+        const list = readCleanupJournal();
+        let changed = false;
+        list.forEach((e) => { if (e.trashItem.id === trashId && e.stage !== stage) { e.stage = stage; changed = true; } });
+        if (changed) writeCleanupJournal(list);
+    }
+
+    function clearCleanupJournalEntry(trashId) {
+        const list = readCleanupJournal();
+        const next = list.filter(e => e.trashItem.id !== trashId);
+        if (next.length !== list.length) writeCleanupJournal(next);
+    }
+
+    async function resumeInterruptedCleanups() {
+        if (cleanupResumeInFlight || !db || !fb || !dbRefDeleted) return;
+        const list = readCleanupJournal();
+        if (!list.length) return;
+        cleanupResumeInFlight = true;
+        let restored = 0;
+        let unverified = 0;
+        try {
+            for (let i = 0; i < list.length; i++) {
+                const entry = list[i];
+                const trashItem = entry.trashItem;
+                if (cleanupJournalScopeMismatch(entry)) {
+                    clearCleanupJournalEntry(trashItem.id);
+                    continue;
+                }
+                let present = false;
+                try {
+                    const snap = await dbOp(fb.get(fb.ref(db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+                    present = snap.exists();
+                } catch (readErr) {
+                    continue;
+                }
+                if (!present) {
+                    if (entry.stage !== CLEANUP_STAGE_MOVED) {
+                        clearCleanupJournalEntry(trashItem.id);
+                        continue;
+                    }
+                    try {
+                        await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
+                            TRASH_WRITE_SLOW_NOTICE_MS,
+                            "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
+                        restored++;
+                    } catch (writeErr) {
+                        continue;
+                    }
+                }
+                const rev = entry.revenue;
+                if (entry.stage === CLEANUP_STAGE_MOVED && rev) {
+                    markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
+                    const cod = parseFloat(rev.cod) || 0;
+                    const dod = parseFloat(rev.dod) || 0;
+                    const count = parseFloat(rev.count) || 0;
+                    const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, -cod, -dod, -count);
+                    try {
+                        await correctRevenueLedgerToActual(rev.scanDate, applied, -cod, -dod, -count);
+                    } catch (ledgerErr) {
+                        if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId: entry.id });
+                    }
+                } else if (entry.stage === CLEANUP_STAGE_LEDGER && rev) {
+                    unverified++;
+                }
+                clearCleanupJournalEntry(trashItem.id);
+            }
+        } catch (resumeErr) {
+            console.error('resumeInterruptedCleanups failed', resumeErr);
+            if (window.ZoeErrors) ZoeErrors.capture(resumeErr, { zone: 'money', context: 'resumeInterruptedCleanups' });
+        } finally {
+            cleanupResumeInFlight = false;
+        }
+        if (restored) showToast('✅ បញ្ចប់ការសម្អាតស្វ័យប្រវត្តិដែលត្រូវរំខានពីមុនវិញ ' + restored + ' កញ្ចប់។');
+        if (unverified) {
+            if (window.ZoeErrors) ZoeErrors.capture(new Error('Interrupted cleanup resumed with unverified ledger'), { zone: 'money', context: 'resumeInterruptedCleanups unverified', itemCount: unverified });
+            showToast('⚠️ កញ្ចប់ត្រូវបានស្តារចូលធុងសំរាមវិញ ប៉ុន្តែស្ថិតិប្រាក់មិនអាចផ្ទៀងផ្ទាត់បានទេ! សូមប្រាប់ Admin ពិនិត្យ។');
+        }
+    }
+
     async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial) {
         const itemRef = fb.ref(db, `zoew_scan_history_cod_dod/${id}`);
         let clearClaimBlocked = false;
@@ -5622,7 +5756,7 @@
             if (!result.committed || (!claimedWhole && !claimedPartial)) return;
 
             let trashItem;
-            let revenueApplied = null;
+            let revenuePending = false;
             let revenueScanDate = null;
             let revenueCod = 0, revenueDod = 0, revenueCount = 0;
             if (claimedPartial) {
@@ -5650,7 +5784,7 @@
                     revenueCod = trashItem.cod;
                     revenueDod = trashItem.dod;
                     revenueCount = trashItem.count;
-                    revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+                    revenuePending = true;
                 }
             } else {
                 trashItem = { ...claimedWhole, id };
@@ -5670,7 +5804,7 @@
                     revenueCod = Math.round((parseFloat(trashItem.cod) || 0) * 100) / 100;
                     revenueDod = Math.round((parseFloat(trashItem.dod) || 0) * 100) / 100;
                     revenueCount = trashItem.barcodes && Array.isArray(trashItem.barcodes) ? trashItem.barcodes.length : (parseFloat(trashItem.count) || 1);
-                    revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+                    revenuePending = true;
                 } else {
                     trashItem.isFromDeletion = true;
                     trashItem.trashReason = 'pickup';
@@ -5682,6 +5816,19 @@
 
             stripHistoryOnlyMarkers(trashItem);
 
+            try {
+                noteCleanupJournalEntry({
+                    id: id,
+                    reason: reason,
+                    journalAt: getServerNow(),
+                    stage: CLEANUP_STAGE_MOVED,
+                    trashItem: trashItem,
+                    revenue: revenuePending ? { scanDate: revenueScanDate, cod: revenueCod, dod: revenueDod, count: revenueCount } : null
+                });
+            } catch (journalErr) {
+                console.error('Cleanup journal write failed', journalErr);
+            }
+
             deletedItems.unshift(trashItem);
             let trashSaved = false;
             await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
@@ -5689,32 +5836,39 @@
                 "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
                 trashSaved = true;
             }).catch(async (trashErr) => {
-                revertRevenueLedgerDelta(revenueApplied);
                 const staleIdx = deletedItems.findIndex(i => i.id === trashItem.id);
                 if (staleIdx !== -1) deletedItems.splice(staleIdx, 1);
                 console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
                 if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
 
                 try {
-                    const restoreResult = await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
-                    const restoredItem = (restoreResult && restoreResult.snapshot) ? restoreResult.snapshot.val() : null;
+                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
                 } catch (restoreErr) {
                     console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
                     if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
                     showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
                 }
             });
-            if (trashSaved && revenueApplied) {
-                correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
-                    -revenueCod, -revenueDod, -revenueCount).then((status) => {
-                    if (status && status.ok) return;
+            if (!trashSaved) return;
+            if (!revenuePending) {
+                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                return;
+            }
+            try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER); } catch (journalErr) {}
+            const revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+            try {
+                const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
+                    -revenueCod, -revenueDod, -revenueCount);
+                if (!status || !status.ok) {
                     const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
                     if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
                     showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
-                }, (ledgerErr) => {
-                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
-                });
+                }
+            } catch (ledgerErr) {
+                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
             }
+            try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
         };
         try {
             const cleanupTx = fb.runTransaction(fb.ref(db, `zoew_scan_history_cod_dod/${id}`), cleanupUpdater);
@@ -6220,12 +6374,14 @@
         setInterval(sweepRecallHighlights, 60000);
         setInterval(() => {
             runScheduledCleanup();
+            resumeInterruptedCleanups();
             scheduleZtoStatusSweep();
         }, 60000);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) return;
             sweepRecallHighlights();
             runScheduledCleanup();
+            resumeInterruptedCleanups();
             scheduleZtoStatusSweep();
             if (currentAppPage === 'entry') warmZtoLookupProxyNow();
         });

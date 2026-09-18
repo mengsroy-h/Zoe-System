@@ -234,6 +234,23 @@ function makeSandbox(store, now) {
         optionalFn(src, 'releaseStaleClearHistoryClaim', 'function releaseStaleClearHistoryClaim() {}'),
         // ⛔ ច្រកទ្វារនាឡិការបស់ការសម្អាត (2.20.5) ➜ ផ្ទុក function ពិត បូក
         // `serverClockTrusted = true` ដែលជាស្ថានភាព App ដែលភ្ជាប់រួច។
+        // ⛔ journal នៃការសម្អាត (2.37.2) ៖ វាធានាថាការរំខានពាក់កណ្តាលមិនលុប
+        // កញ្ចប់ ➜ ផ្ទុក function ពិត; tree មុនកែ ➜ stub គ្មានផលរំខាន។
+        optionalConst(src, 'CLEANUP_JOURNAL_KEY', "const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';"),
+        optionalConst(src, 'CLEANUP_JOURNAL_MAX', 'const CLEANUP_JOURNAL_MAX = 200;'),
+        optionalConst(src, 'CLEANUP_STAGE_MOVED', "const CLEANUP_STAGE_MOVED = 'moved';"),
+        optionalConst(src, 'CLEANUP_STAGE_LEDGER', "const CLEANUP_STAGE_LEDGER = 'ledger';"),
+        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        optionalFn(src, 'safeStoreGet', 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
+        optionalFn(src, 'safeStoreSet', 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
+        optionalFn(src, 'safeStoreRemove', 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
+        optionalFn(src, 'cleanupJournalScope', "function cleanupJournalScope() { return ''; }"),
+        optionalFn(src, 'cleanupJournalScopeMismatch', 'function cleanupJournalScopeMismatch() { return false; }'),
+        optionalFn(src, 'readCleanupJournal', 'function readCleanupJournal() { return []; }'),
+        optionalFn(src, 'writeCleanupJournal', 'function writeCleanupJournal() {}'),
+        optionalFn(src, 'noteCleanupJournalEntry', 'function noteCleanupJournalEntry() {}'),
+        optionalFn(src, 'markCleanupJournalStage', 'function markCleanupJournalStage() {}'),
+        optionalFn(src, 'clearCleanupJournalEntry', 'function clearCleanupJournalEntry() {}'),
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',

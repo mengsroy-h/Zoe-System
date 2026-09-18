@@ -69,8 +69,23 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'applyLedgerBucketDelta', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'cleanupClockIsTrustworthy',
     'claimAndCleanupItem'];
+// ⛔ journal នៃការសម្អាត (2.37.2) ៖ លើ tree មុនកែវាអវត្តមាន ➜ stub ដើម្បីឲ្យ
+//    ការអះអាងឥរិយាបថនៅតែរត់ (មេរៀន 2.19.3 ៖ កុំបញ្ឈប់ checker)។
+const OPTIONAL_FNS = {
+    safeStoreGet: 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }',
+    safeStoreSet: 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }',
+    safeStoreRemove: 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }',
+    cleanupJournalScope: "function cleanupJournalScope() { return ''; }",
+    cleanupJournalScopeMismatch: 'function cleanupJournalScopeMismatch() { return false; }',
+    readCleanupJournal: 'function readCleanupJournal() { return []; }',
+    writeCleanupJournal: 'function writeCleanupJournal() {}',
+    noteCleanupJournalEntry: 'function noteCleanupJournalEntry() {}',
+    markCleanupJournalStage: 'function markCleanupJournalStage() {}',
+    clearCleanupJournalEntry: 'function clearCleanupJournalEntry() {}'
+};
 const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS',
-    'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS'];
+    'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
+    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);
 const DAY = '2026-09-10';
@@ -123,6 +138,11 @@ function runCleanup(reason, barcodes, opts) {
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push('let serverClockTrusted = true, isDatabaseConnected = true;');
     parts.push('const cleanupInFlight = new Set();', 'const activeRestoreClaims = new Map();');
+    parts.push('const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();');
+    Object.keys(OPTIONAL_FNS).forEach((fn) => {
+        const body = sliceFrom(SRC, fn);
+        parts.push(body || OPTIONAL_FNS[fn]);
+    });
     const missing = [];
     FNS.forEach((fn) => {
         const body = sliceFrom(SRC, fn);

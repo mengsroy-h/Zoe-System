@@ -234,6 +234,24 @@ function buildWorld(historySeed, startNow) {
         // ស្ថានភាពធម្មតារបស់ App ដែលភ្ជាប់រួច។ ការចាក់ `() => true` ដោយដៃ
         // នឹងលាក់ការដកច្រកទ្វារនោះចេញ ➜ បៃតងក្លែងក្លាយ។
         'let serverClockTrusted = true, isDatabaseConnected = true;',
+        // ⛔ journal នៃការសម្អាត (2.37.2) ៖ វាធានាថាការរំខានពាក់កណ្តាលមិន
+        //    លុបកញ្ចប់ ➜ sandbox ត្រូវផ្ទុក **function ពិត**; លើ tree មុនកែ
+        //    វាអវត្តមាន ➜ stub (កុំបញ្ឈប់ checker)។
+        optionalPart(() => extractConst(src, 'CLEANUP_JOURNAL_KEY'), "const CLEANUP_JOURNAL_KEY = 'zoew_cleanup_journal_v1';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_JOURNAL_MAX'), 'const CLEANUP_JOURNAL_MAX = 200;'),
+        optionalPart(() => extractConst(src, 'CLEANUP_STAGE_MOVED'), "const CLEANUP_STAGE_MOVED = 'moved';"),
+        optionalPart(() => extractConst(src, 'CLEANUP_STAGE_LEDGER'), "const CLEANUP_STAGE_LEDGER = 'ledger';"),
+        'const appLocalStore = (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })();',
+        optionalPart(() => extractFn(src, 'safeStoreGet'), 'function safeStoreGet(store, key) { try { return store ? store.getItem(key) : null; } catch (e) { return null; } }'),
+        optionalPart(() => extractFn(src, 'safeStoreSet'), 'function safeStoreSet(store, key, value) { try { return store ? (store.setItem(key, String(value)), true) : false; } catch (e) { return false; } }'),
+        optionalPart(() => extractFn(src, 'safeStoreRemove'), 'function safeStoreRemove(store, key) { try { return store ? (store.removeItem(key), true) : false; } catch (e) { return false; } }'),
+        optionalPart(() => extractFn(src, 'cleanupJournalScope'), "function cleanupJournalScope() { return ''; }"),
+        optionalPart(() => extractFn(src, 'cleanupJournalScopeMismatch'), 'function cleanupJournalScopeMismatch() { return false; }'),
+        optionalPart(() => extractFn(src, 'readCleanupJournal'), 'function readCleanupJournal() { return []; }'),
+        optionalPart(() => extractFn(src, 'writeCleanupJournal'), 'function writeCleanupJournal() {}'),
+        optionalPart(() => extractFn(src, 'noteCleanupJournalEntry'), 'function noteCleanupJournalEntry() {}'),
+        optionalPart(() => extractFn(src, 'markCleanupJournalStage'), 'function markCleanupJournalStage() {}'),
+        optionalPart(() => extractFn(src, 'clearCleanupJournalEntry'), 'function clearCleanupJournalEntry() {}'),
         extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();',
         ...REAL_FNS.map((name) => extractFn(src, name)),

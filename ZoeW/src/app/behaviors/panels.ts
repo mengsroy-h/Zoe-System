@@ -1,7 +1,7 @@
 import { uiState } from '../../core/state';
 import { viewState } from '../../core/view-state';
 import { commitNow } from '../flush';
-import { elementOf } from '../refs';
+import { elementOf, setElementScrollTop } from '../refs';
 
 /**
  * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ច្បាប់ ១១ ៖ PTR · ចលនាផ្ទាំង · ការរមូរ)។
@@ -69,18 +69,18 @@ export function syncHistoryExpandedLock() {
     const expanded = !!sections.side && panelIsCollapsed(sections.panel);
     const wasExpanded = uiState.historyExpanded;
     const iosUnlock = wasExpanded && !expanded && usesIOSPanelHandoff();
-    if (expanded || iosUnlock) pages.scrollTop = 0;
+    if (expanded || iosUnlock) setElementScrollTop(pages, 0);
     uiState.historyExpanded = expanded;
     commitNow();
     if (expanded || iosUnlock) {
-        pages.scrollTop = 0;
+        setElementScrollTop(pages, 0);
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(() => {
                 if (uiState.historyExpanded !== expanded) return;
-                pages.scrollTop = 0;
+                setElementScrollTop(pages, 0);
                 if (iosUnlock) {
                     requestAnimationFrame(() => {
-                        if (!uiState.historyExpanded) pages.scrollTop = 0;
+                        if (!uiState.historyExpanded) setElementScrollTop(pages, 0);
                     });
                 }
             });

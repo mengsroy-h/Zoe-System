@@ -31,11 +31,9 @@ export const REF_NAMES = [
     'dataMainSection',
     'dataSideSection',
     'deletedSearchInput',
-    'dragHandle',
     'editBcCodInput',
     'editBcDodInput',
     'editPhoneInput',
-    'entryDragHandle',
     'entryListSearchInput',
     'entryMainSection',
     'entrySideSection',
@@ -76,12 +74,12 @@ export const REF_NAMES = [
     'phoneSuggestBox',
     'ptrIndicator',
     'rememberMeCheckbox',
+    'safeAreaProbe',
     'searchPhoneInput',
     'securityPinInput',
     'sentryDsnInput',
     'siApiPasswordInput',
     'siApiUrlInput',
-    'siDrop',
     'siFileInput',
     'siHeaderRowInput',
     'siModeSel',
@@ -291,6 +289,31 @@ export function setScrollTop(name: RefName, top: number): void {
     commitNow();
     const el = elementOf(name);
     if (el) el.scrollTop = top;
+}
+
+/**
+ * រមូរធាតុ (ដែលកាយវិការទទួលពី ref ឬពីការវាស់) **ដូចដែល DOM កំពុងឈរ** — គ្មាន `commitNow()`
+ * ⛔ ផ្លូវក្តៅនៃតំបន់ហាមចូល (PTR · ចលនាផ្ទាំង) ៖ លំដាប់ «រមូរ ➜ ប្តូរ state ➜ រមូរម្តងទៀត» ត្រូវដូចដើម។
+ */
+export function setElementScrollTop(el: Element | null | undefined, top: number): void {
+    if (el) (el as HTMLElement).scrollTop = top;
+}
+
+/** រមូរកូនទី `index` របស់ធាតុ ref ឲ្យចូលក្នុងការមើលឃើញ (`block: 'nearest'`) */
+export function scrollChildIntoView(name: RefName, index: number): void {
+    commitNow();
+    const el = elementOf(name);
+    const child = el ? el.children[index] : null;
+    if (child) child.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * ចលនា Web Animations លើធាតុ (FLIP របស់ផ្ទាំង) — React គ្មានការប្រកាសចលនា ➜ ref។
+ * ⛔ `null` ពេល browser គ្មាន `animate()` (អ្នកហៅធ្វើការបញ្ចប់ដោយខ្លួនឯង)។
+ */
+export function animateElement(el: Element | null | undefined, keyframes: Keyframe[], options: KeyframeAnimationOptions): Animation | null {
+    if (!el || typeof (el as HTMLElement).animate !== 'function') return null;
+    return (el as HTMLElement).animate(keyframes, options);
 }
 
 /* ── វីដេអូ (កាមេរ៉ា · ម៉ាស៊ីនស្កេន) ────────────────────────────────── */

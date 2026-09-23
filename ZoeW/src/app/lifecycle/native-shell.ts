@@ -6,6 +6,7 @@ import { switchAppPage } from '../../ui/page-nav';
 import { createBackHistory, screenOf, type BackHistory, type Screen } from './back-history';
 import { closeTopmostLayer } from './layers';
 import type { LifecycleScope } from './scope';
+import { elementOf } from '../refs';
 
 /**
  * ការភ្ជាប់សំបក native (Android · Capacitor) ទៅ App — **រត់តែលើ native**
@@ -77,14 +78,14 @@ function restoreScreen(target: Screen): void {
     if (target.page === 'entry' && target.mode && uiState.entryScanMode !== target.mode) setEntryScanMode(target.mode);
 }
 
-/** កម្ពស់ `env(safe-area-inset-top)` ពិត (px) — ០ ពេល WebView មិនពេញអេក្រង់ */
+/**
+ * កម្ពស់ `env(safe-area-inset-top)` ពិត (px) — ០ ពេល WebView មិនពេញអេក្រង់ ។
+ * អានពីធាតុវាស់ `SafeAreaProbe` (React គូរ) — ការវាស់ មិនមែនការសរសេរ DOM។
+ */
 export function statusBarInsetPx(): number {
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top)';
-    document.body.appendChild(probe);
-    const value = parseFloat(window.getComputedStyle(probe).paddingTop) || 0;
-    probe.remove();
-    return value;
+    const probe = elementOf('safeAreaProbe');
+    if (!probe) return 0;
+    return parseFloat(window.getComputedStyle(probe).paddingTop) || 0;
 }
 
 /**

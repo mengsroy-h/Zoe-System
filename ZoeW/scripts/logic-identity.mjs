@@ -42,26 +42,29 @@ const REACT_STATE = 'React ១០០% ៖ ';
 const ZONE_ALLOWED = {
     setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម' +
         ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម' +
-        ' ⊕ សំណើម្ចាស់គម្រោង (ស្តង់ដា App) ៖ ចាប់ផ្តើមតែ **៤០% ខាងលើ** · **ស្រទាប់បើក ➜ គ្មាន PTR** (ចងចាំនៅ `pointerdown`) · **ញ័រម្តង** ពេលឆ្លងព្រំដែន ។ វាស់បាន ៖ native-check mutation ៣/៣ ចាប់ · gesture-test ត្រូវបៃតង',
+        ' ⊕ សំណើម្ចាស់គម្រោង (ស្តង់ដា App) ៖ ចាប់ផ្តើមតែ **៤០% ខាងលើ** · **ស្រទាប់បើក ➜ គ្មាន PTR** (ចងចាំនៅ `pointerdown`) · **ញ័រម្តង** ពេលឆ្លងព្រំដែន ។ វាស់បាន ៖ native-check mutation ៣/៣ ចាប់ · gesture-test ត្រូវបៃតង' +
+        ' ⊕ React ១០០% (សំណើម្ចាស់គម្រោង) ៖ transform · opacity · class ចលនារបស់សញ្ញា ជា **`ptrState`** ដែល `PtrIndicator` គូរ (`renderNow()` ➜ ស៊ុមដដែល) · `MutationObserver` លើ class ➜ `uiState.subscribe` (ប្រភពនៃ class ទាំងនោះ) · ការរមូរ document តាម `resetDocumentScroll()` (លំដាប់ដដែល)',
     switchAppPage: REACT_STATE + '`.active` របស់ទំព័រ/Tab ដេរីវេពី `currentAppPage` ក្នុង JSX · `scrollTop = 0` តាម `setScrollTop()` (commit មុន) — លំដាប់ hide ➜ pull-up ➜ chrome ➜ lock ➜ scroll ដដែល',
     openSideDrawer: REACT_STATE + '`.open` · `aria-hidden` របស់របា Slide និង backdrop ដេរីវេពី `drawerOpen` ➜ ការហៅ refresh ទាំង ៥ ដដែល',
     closeSideDrawer: REACT_STATE + '`drawerOpen = false` ជំនួស `.open`/`aria-hidden`',
     isSideDrawerOpen: REACT_STATE + 'អាន `drawerOpen` (ប្រភពរបស់ `.open`) ជំនួស classList',
     activePanelSections: REACT_STATE + 'ទំព័រសកម្មអានពី `currentAppPage` (ប្រភពរបស់ `.active`) · ធាតុតាម ref · បន្ថែម `panel` (កូនសោ state របស់ផ្ទាំង)',
     entryScrollerInView: REACT_STATE + '`#lockerPanel` លាក់ ⇔ `entryModeShown !== \'locker\'` (JSX `PageEntry`) ➜ អានប្រភពដដែល',
-    syncHistoryExpandedLock: REACT_STATE + '`history-expanded` ជា `historyExpanded` + `commitNow()` ➜ `scrollTop = 0` មុន/ក្រោយ និង rAF ២ ជាន់ ដដែល',
+    syncHistoryExpandedLock: REACT_STATE + '`history-expanded` ជា `historyExpanded` + `commitNow()` ➜ `scrollTop = 0` មុន/ក្រោយ និង rAF ២ ជាន់ ដដែល (តាម `setElementScrollTop()` — គ្មាន commit បន្ថែម)',
+    panelGlideFrom: REACT_STATE + '`el.animate()` តាម `animateElement()` (ច្រកចេញ ref តែមួយក្នុង `refs.ts`) — keyframe · រយៈពេល · easing · ផ្លូវដោះ snap ២ ដដែល',
+    measureAppChromeSize: REACT_STATE + 'អថេរ CSS លើ `<html>` ជា state (`uiState.*Var`) ➜ `DocumentEffects` សរសេរ · `commitNow()` ចុងក្រោយ ➜ ចុះក្នុង tick ដដែល · ច្បាប់ «តម្លៃ ០ មិនសរសេរ» ដដែល',
     beginPanelGlideSnapPause: REACT_STATE + '`panel-gliding` ជា `panelGliding` + `commitNow()` ➜ snap ផ្អាក **មុន** `animate()` ដូចដើម · token/ownership ដដែល',
     endPanelGlideSnapPause: REACT_STATE + '`panelGliding = false` ជំនួស `classList.remove` — វាល `markImmediate` ➜ ចុះ DOM ក្នុង tick ដដែល (ios-panel-glide «cleanup»)',
     setupSwipeGestures: REACT_STATE + 'បន្ថែមកូនសោ `panel` ក្នុង config · scroller តាម ref',
     phoneSearchIsActive: REACT_STATE + '`.show` ជា `phoneSuggestOpen` · focus/តម្លៃតាម ref (`isFieldFocused` · `fieldValue`)',
-    bindPanelSwipe: REACT_STATE + '`.collapsed`/`.search-focus` អាន/សរសេរតាម `panelIsCollapsed()`/`setPanelCollapsed()`/`panelHasSearchFocus()` · `commitNow()` មុនវាស់ `beforeTop` · ការប្តូរនៅ `touchend` ដដែល (ថ្ងៃ slop 8/30 · ratio ដដែល)',
+    bindPanelSwipe: REACT_STATE + '`.collapsed`/`.search-focus` អាន/សរសេរតាម `panelIsCollapsed()`/`setPanelCollapsed()`/`panelHasSearchFocus()` · `commitNow()` មុនវាស់ `beforeTop` · ការប្តូរនៅ `touchend` ដដែល (ថ្ងៃ slop 8/30 · ratio ដដែល) · ការចុចដងអូស ➜ `onClick` របស់ JSX (`togglePanelFromHandle()` — តួដដែល) · listener `touch*` នៅ native (React ចាក់វាជា passive)',
     appChromeElements: REACT_STATE + 'navbar · tabbar តាម ref',
     showAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
     hideAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
     setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល',
-    positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref',
+    positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref · `style.width/left/top` ជា state (`phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ · ទទឹងចុះ DOM មុនវាស់កម្ពស់ ដូចដើម',
     setPhoneSearchPulledUp: REACT_STATE + '`.search-focus` ជា `dataPanelSearchFocus` · `.collapsed` ជា `dataPanelCollapsed`',
-    setupPhoneSuggestions: REACT_STATE + 'ធាតុតាម ref · `e.target` អានម្តង (ឥរិយាបថ `closest` ដដែល)',
+    setupPhoneSuggestions: REACT_STATE + 'listener របស់ប្រអប់ស្វែងរក/ប្រអប់ណែនាំ ➜ prop របស់ JSX (`onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ) តួដដែល · សល់តែ `scroll`/`resize` របស់ `window`',
 };
 
 

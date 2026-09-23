@@ -18,11 +18,21 @@ function useBodyClass(className: string, on: boolean): void {
 }
 
 /**
- * ធាតុដែលនៅ **ក្រៅ** root របស់ React (`<body>` · `document.title`) ក៏គូរពី
+ * អថេរ CSS លើ `<html>` ពី state (`measureAppChromeSize()`) ។ ⛔ `''` = មិនទាន់វាស់ ➜ មិនសរសេរ
+ * (CSS ប្រើលំនាំដើម `:root`) · ⛔ មិនដកវិញ ដូចដើម (តម្លៃចុងក្រោយនៅដដែល)។
+ */
+function useHtmlVar(name: string, value: string): void {
+    useLayoutEffect(() => {
+        if (value) document.documentElement.style.setProperty(name, value);
+    }, [name, value]);
+}
+
+/**
+ * ធាតុដែលនៅ **ក្រៅ** root របស់ React (`<html>` · `<body>` · `document.title`) ក៏គូរពី
  * state ដែរ ៖ component នេះមិនគូរអ្វីទេ — វាគ្រាន់តែធ្វើឲ្យ `<body>` ស៊ីនឹង
  * ឃ្លាំង ក្នុង `useLayoutEffect` (មុនការគូរលើអេក្រង់)។
  *
- * ⛔ វាជាកន្លែង **តែមួយ** ដែលប៉ះ `document.body` · `document.title` ក្នុង App —
+ * ⛔ វាជាកន្លែង **តែមួយ** ដែលប៉ះ `<html>` · `document.body` · `document.title` ក្នុង App —
  *    កូដមុខងារសរសេរតែ state។
  */
 export function DocumentEffects() {
@@ -41,6 +51,11 @@ export function DocumentEffects() {
     useBodyClass('boot-reveal', bootRevealing);
     useBodyClass('perf-lite', perfLite);
     useBodyClass('chrome-hidden', chromeHidden);
+
+    useHtmlVar('--chrome-top', useStoreValue(uiState, (s) => s.chromeTopVar));
+    useHtmlVar('--tabbar-height', useStoreValue(uiState, (s) => s.tabbarHeightVar));
+    useHtmlVar('--page-extension', useStoreValue(uiState, (s) => s.pageExtensionVar));
+    useHtmlVar('--chrome-bottom', useStoreValue(uiState, (s) => s.chromeBottomVar));
 
     useLayoutEffect(() => {
         const base = documentBaseTitle();

@@ -4,6 +4,12 @@
  * **មិនប៉ះ DOM ដោយផ្ទាល់សោះ** ៖ វាសរសេរតែ state ហើយ component គូរពី state។
  * នៅក្នុង `src/app/**` component ប្រើ **ref** មិនមែនការស្វែងរកតាម id។
  *
+ * ⛔ **ស្រទាប់ React ខ្លួនឯង** (`src/app/**` ៖ component · កាយវិការ · lifecycle) ក៏ត្រូវវាស់ដែរ ៖
+ *    **គ្មានការសរសេរ DOM** (class · style · attribute · អត្ថបទ · focus · រមូរ · ចលនា · listener
+ *    លើធាតុ) ក្រៅពី **ច្រកចេញ ២** ដែលមានហេតុផល និងពិដាន (`APP_ALLOWED`) ៖
+ *    `app/refs.ts` (ច្រកចេញរបស់ React ៖ focus · រមូរ · ចលនា · input uncontrolled) និង
+ *    `DocumentEffects` (`<html>`/`<body>` ក្រៅ `#root`)។ រាល់អ្វីផ្សេងត្រូវជា JSX។
+ *
  * ⛔ វិធីវាស់ជា **AST របស់ TypeScript** (មិនមែន regex) ៖ វារកការហៅ/ការចូលប្រើ
  *    ដែលប៉ះ DOM (`document.*` · `byId`/`qs`/`qsa` · `.classList` · `.style` ·
  *    `.textContent =` · `.innerHTML` · `.focus()` · `.setAttribute` · …)។
@@ -42,13 +48,57 @@ const ALLOWED = {
     [IO + ':.href =']: [2, IO_WHY + 'preconnect · តំណទាញយក (ធាតុដែលទើបសាង)'],
     [IO + ':document.querySelectorAll']: [1, IO_WHY + 'រក preconnect/dns-prefetch ដែលមានរួចក្នុង `<head>` (ក្រៅ React)'],
     [IO + ':document.head']: [2, IO_WHY + '`<head>` មិនមែនរបស់ React (`#root` ស្ថិតក្នុង `<body>`)'],
-    [IO + ':document.body']: [2, IO_WHY + 'តំណទាញយកបណ្តោះអាសន្ន — browser ខ្លះទាមទារឲ្យវាភ្ជាប់ document មុន `click()`'],
+    [IO + ':document.body']: [3, IO_WHY + 'តំណទាញយកបណ្តោះអាសន្ន — browser ខ្លះទាមទារឲ្យវាភ្ជាប់ document មុន `click()` · ទីតាំងរមូររបស់ `<body>` (`resetDocumentScroll`)'],
+    [IO + ':document.documentElement']: [2, IO_WHY + 'ទីតាំងរមូររបស់ `<html>` (`resetDocumentScroll`) — ក្រៅ `#root`'],
+    [IO + ':document.scrollingElement']: [1, IO_WHY + 'ធាតុរមូររបស់ document (`resetDocumentScroll`) — ក្រៅ `#root`'],
+    [IO + ':.scrollTop =']: [3, IO_WHY + 'រមូរ `scrollingElement` · `<html>` · `<body>` ទៅកំពូល (PTR មុនផ្ទុកឡើងវិញ)'],
+    [IO + ':.scrollTo()']: [1, IO_WHY + '`window.scrollTo(0, 0)` (`scrollWindowToTop`)'],
     [IO + ':.appendChild()']: [3, IO_WHY + 'ភ្ជាប់ធាតុដែលទើបសាងទៅ `<head>`/`<body>` (ក្រៅ `#root`)'],
     [IO + ':.removeChild()']: [1, IO_WHY + 'ដកតំណទាញយកបណ្តោះអាសន្នចេញវិញ'],
     [IO + ':.click()']: [1, IO_WHY + 'ចាប់ផ្តើមការទាញយក (វិធីតែមួយរបស់ browser)'],
     'services/camera.ts:elementOf()': [1, 'ការវាស់ ៖ `getCoverCropRect()` អាន `clientWidth/clientHeight` របស់ផ្ទៃវីដេអូ **រាល់ស៊ុម** (ref សម្រាប់ «measuring» — ច្រកចេញបន្ទាន់ដែល React ណែនាំ)'],
     'services/scan-engine.ts:elementOf()': [1, 'ការវាស់ ៖ ដូច `services/camera.ts` (ផ្លូវ ZXing)'],
+    'services/camera.ts:.muted =': [1, 'media playback ៖ `muted` ជា property (iOS បដិសេធ autoplay បើអត់) — React គ្មាន prop សម្រាប់ stream'],
+    'services/camera.ts:.srcObject =': [1, 'media playback ៖ React គ្មាន prop `srcObject` (stream កាមេរ៉ា) — ធាតុតាម `videoElement()`'],
+    'features/config-qr.ts:.srcObject =': [2, 'media playback ៖ ភ្ជាប់/ផ្តាច់ stream កាមេរ៉ា QR (React គ្មាន prop `srcObject`)'],
+    'features/daily-stats.ts:.srcObject =': [1, 'media playback ៖ ផ្តាច់ stream ពេលបិទកាមេរ៉ា (React គ្មាន prop `srcObject`)'],
+    'services/camera.ts:element.addEventListener()': [2, 'media playback ៖ `pause` · `loadedmetadata` របស់ stream កាមេរ៉ា (`{ once }` · ដកវិញដោយកូដកាមេរ៉ា)'],
+    'services/network.ts:element.addEventListener()': [1, '`AbortSignal` (មិនមែនធាតុ DOM) ៖ បញ្ជូនការបោះបង់បន្ត'],
 };
+
+/**
+ * ⛔ ស្រទាប់ React (`src/app/**`) ៖ ការសរសេរ DOM ដែលអនុញ្ញាត — **តែច្រកចេញដែល React ខ្លួនឯង
+ *    ណែនាំ** (ref សម្រាប់ focus · រមូរ · ចលនា · media · input uncontrolled) និងធាតុក្រៅ `#root`។
+ *    ពិដានតឹង (ចំនួនពិត = ពិដាន) ➜ ការសរសេរថ្មីមិនអាចរអិលចូលឯកសារដែលមានការលើកលែងរួច។
+ */
+const REFS = 'app/refs.ts';
+const REFS_WHY = 'ច្រកចេញរបស់ React (ref) — React គ្មានទម្រង់ប្រកាស (declarative) សម្រាប់ ';
+const DOC_FX = 'app/components/shell/DocumentEffects.tsx';
+const APP_ALLOWED = {
+    [REFS + ':.focus()']: [3, REFS_WHY + 'focus (`focusField` · ការសាកម្តងទៀតក្រោយការគូរ · `focusFieldAsIs`)'],
+    [REFS + ':.blur()']: [2, REFS_WHY + 'blur (`blurField` · `blurActiveElement`)'],
+    [REFS + ':.select()']: [1, REFS_WHY + 'ជ្រើសអត្ថបទក្នុងប្រអប់ (`selectFieldText`)'],
+    [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
+    [REFS + ':.value =']: [1, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue`)'],
+    [REFS + ':.checked =']: [1, 'input **uncontrolled** (`defaultChecked`) — React ណែនាំ ref សម្រាប់វា (`setFieldChecked`)'],
+    [REFS + ':.scrollTop =']: [2, REFS_WHY + 'ទីតាំងរមូរ (`setScrollTop` · `setElementScrollTop`)'],
+    [REFS + ':.scrollIntoView()']: [1, REFS_WHY + 'ការរមូរកូនឲ្យមើលឃើញ (`scrollChildIntoView`)'],
+    [REFS + ':.animate()']: [1, REFS_WHY + 'ចលនា Web Animations (FLIP របស់ផ្ទាំង · `animateElement`)'],
+    [REFS + ':element.addEventListener()']: [1, 'listener `change` native (`refWithNative`) — `onChange` របស់ React ជា `input` រាល់តួអក្សរ'],
+    [DOC_FX + ':.classList']: [1, '`<body>` ក្រៅ `#root` ➜ `useLayoutEffect` ពី state (លំនាំរបស់ React សម្រាប់ធាតុក្រៅ root)'],
+    [DOC_FX + ':.style']: [2, '`<body>` overflow · អថេរ CSS លើ `<html>` — ក្រៅ `#root` ➜ `useLayoutEffect` ពី state'],
+    'app/components/PageEntry.tsx:.muted =': [1, 'React មិនសរសេរ attribute `muted` (បញ្ហា React #10389) ➜ ref callback របស់ component ខ្លួនឯង (iOS autoplay)'],
+    'app/components/PageEntry.tsx:.setAttribute()': [1, 'ដូចខាងលើ ៖ attribute `muted` ដែល React មិនសរសេរ'],
+    'app/components/modals/ConfigQrScanModal.tsx:.muted =': [1, 'ដូច `PageEntry` (វីដេអូស្កេន QR)'],
+    'app/components/modals/ConfigQrScanModal.tsx:.setAttribute()': [1, 'ដូច `PageEntry` (វីដេអូស្កេន QR)'],
+    'app/behaviors/panel-motion.ts:element.addEventListener()': [9, 'កាយវិការអូសផ្ទាំង ៖ React ចាក់ listener `touch*` ជា **passive** នៅ root ➜ `preventDefault()` (iOS handoff) មិនដើរ ➜ listener native លើធាតុតាម ref'],
+    'app/lifecycle/scope.ts:element.addEventListener()': [1, '`scope.listen(target, …)` ៖ listener ដែល lifecycle ដកវិញពេល unmount (`window` · `visualViewport`)'],
+};
+const APP_WRITE_METHODS = new Set(['focus', 'blur', 'click', 'select', 'setAttribute', 'removeAttribute', 'toggleAttribute',
+    'appendChild', 'removeChild', 'insertBefore', 'replaceChildren', 'append', 'prepend', 'insertAdjacentHTML',
+    'scrollTo', 'scrollIntoView', 'animate', 'showPicker', 'setSelectionRange', 'createElement']);
+const GLOBAL_TARGETS = new Set(['document', 'window', 'window.visualViewport']);
+
 
 /**
  * ⛔ `elementOf()` · `modalElement()` ត្រឡប់ធាតុ DOM ឆៅ ➜ កូដមុខងារដែលកាន់វាអាចប៉ះ DOM តាម
@@ -57,7 +107,8 @@ const ALLOWED = {
  */
 const DOM_GLOBAL_CALLS = new Set(['byId', 'qs', 'qsa', 'elementOf', 'modalElement']);
 const DOM_PROPS_WRITE = new Set(['textContent', 'innerHTML', 'innerText', 'outerHTML', 'value', 'checked', 'disabled',
-    'hidden', 'placeholder', 'title', 'src', 'href', 'scrollTop', 'scrollLeft', 'className', 'selectedIndex', 'indeterminate', 'files']);
+    'hidden', 'placeholder', 'title', 'src', 'href', 'scrollTop', 'scrollLeft', 'className', 'selectedIndex', 'indeterminate', 'files',
+    'muted', 'srcObject']);
 const DOM_PROPS_ANY = new Set(['classList', 'style', 'dataset']);
 const DOM_METHODS = new Set(['focus', 'blur', 'click', 'select', 'setAttribute', 'removeAttribute', 'toggleAttribute',
     'appendChild', 'removeChild', 'insertBefore', 'replaceChildren', 'append', 'prepend', 'insertAdjacentHTML',
@@ -90,6 +141,8 @@ function findings(file) {
             if (isDocument(node.expression)) add(node, 'document.' + name);
             else if (DOM_PROPS_ANY.has(name)) add(node, '.' + name);
             else if (DOM_METHODS.has(name) && ts.isCallExpression(node.parent) && node.parent.expression === node) add(node, '.' + name + '()');
+            else if (name === 'addEventListener' && ts.isCallExpression(node.parent) && node.parent.expression === node &&
+                !GLOBAL_TARGETS.has(node.expression.getText(sf))) add(node, 'element.addEventListener()');
             else if (DOM_PROPS_WRITE.has(name) && ts.isBinaryExpression(node.parent) && node.parent.left === node &&
                 node.parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) add(node, '.' + name + ' =');
         }
@@ -146,6 +199,35 @@ for (const f of appFiles) {
         report.push(`${rel}:${hit.line}  ${hit.kind}  ${hit.text}`);
     }
 }
+/* src/app ៖ ការសរសេរ DOM ត្រឹមច្រកចេញដែលមានហេតុផល (`APP_ALLOWED`) */
+const isAppWrite = (kind) => kind === '.classList' || kind === '.style' || kind === '.dataset' || / =$/.test(kind) ||
+    kind === 'element.addEventListener()' || (/^\.(\w+)\(\)$/.test(kind) && APP_WRITE_METHODS.has(kind.slice(1, -2)));
+const appAllowUsed = new Set();
+const appAllowCount = {};
+let appWrites = 0;
+let appWritesSeen = 0;
+for (const f of appFiles) {
+    const rel = path.relative(SRC, f).split(path.sep).join('/');
+    for (const hit of findings(f)) {
+        if (!isAppWrite(hit.kind)) continue;
+        appWritesSeen++;
+        const key = rel + ':' + hit.kind;
+        if (APP_ALLOWED[key]) {
+            appAllowUsed.add(key);
+            appAllowCount[key] = (appAllowCount[key] || 0) + 1;
+            if (appAllowCount[key] <= APP_ALLOWED[key][0]) continue;
+        }
+        appWrites++;
+        report.push(`${rel}:${hit.line}  ${hit.kind}  ${hit.text}`);
+    }
+}
+ok('ជាន់អប្បបរមា ៖ ឧបករណ៍ឃើញការសរសេរ DOM ក្នុង src/app (ច្រកចេញ) >= 20', appWritesSeen >= 20, appWritesSeen);
+ok('ស្រទាប់ React (src/app) មិនសរសេរ DOM ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects`) — អ្វីផ្សេងជា JSX', appWrites === 0, appWrites);
+const appDead = Object.keys(APP_ALLOWED).filter((k) => !appAllowUsed.has(k));
+ok('បញ្ជីលើកលែងរបស់ src/app គ្មានធាតុងាប់', appDead.length === 0, appDead.join(', '));
+const appLoose = Object.keys(APP_ALLOWED).filter((k) => (appAllowCount[k] || 0) < APP_ALLOWED[k][0]);
+ok('ពិដានការលើកលែងរបស់ src/app តឹង (ចំនួនពិត = ពិដាន)', appLoose.length === 0, appLoose.map((k) => k + ' ' + (appAllowCount[k] || 0) + '/' + APP_ALLOWED[k][0]).join(', '));
+
 ok('កូដមុខងារ (core · domain · features · services · ui · platform) មិនប៉ះ DOM ដោយផ្ទាល់', violations === 0, violations);
 ok('component React មិនស្វែងរក DOM តាម id/selector (ប្រើ ref)', appQueries === 0, appQueries);
 const deadAllow = Object.keys(ALLOWED).filter((k) => !usedAllow.has(k));
@@ -248,5 +330,5 @@ if (violations) {
 if (LIST) for (const r of report) console.log('   ' + r);
 for (const l of oks) console.log('   ok   ' + l);
 for (const l of fails) console.log('   FAIL ' + l);
-console.log(`\n${fails.length ? '❌' : '✅'} react-purity — ${oks.length} ok, ${fails.length} FAIL · ការប៉ះ DOM ក្រៅ React ៖ ${violations} · ការស្វែងរកក្នុង component ៖ ${appQueries}`);
+console.log(`\n${fails.length ? '❌' : '✅'} react-purity — ${oks.length} ok, ${fails.length} FAIL · ការប៉ះ DOM ក្រៅ React ៖ ${violations} · ការសរសេរ DOM ក្នុងស្រទាប់ React ក្រៅច្រកចេញ ៖ ${appWrites} · ការស្វែងរកក្នុង component ៖ ${appQueries}`);
 process.exitCode = fails.length ? 1 : 0;

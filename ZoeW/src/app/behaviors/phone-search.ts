@@ -2,21 +2,19 @@ import { uiState } from '../../core/state';
 import { applyPhoneSuggestion, hidePhoneSuggestions, searchByPhone, setPhoneSuggestActive, showPhoneSuggestions } from '../../features/phone-suggest';
 import { showAppChrome } from '../../ui/chrome-autohide';
 import { commitNow } from '../flush';
-import { elementOf } from '../refs';
+import { elementOf, fieldValue, scrollChildIntoView } from '../refs';
 import { syncHistoryExpandedLock } from './panels';
 
 /**
  * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ៖ «Auto pull up») — ប្រអប់ស្វែងរកទាញឡើង និង
  * ទីតាំងប្រអប់ណែនាំលេខ។ តក្កវិជ្ជាដូចដើមបេះបិទ ៖ `.search-focus` · `.show`
  * ជា state ដែលចុះ DOM ភ្លាម មុនការវាស់។ ទីតាំងប្រអប់ (`style.top/left/width`)
- * គណនាពីការវាស់រាល់ស៊ុម ➜ សរសេរតាម ref (React មិនគ្រប់គ្រង `style` របស់វា)។
+ * គណនាពីការវាស់ ➜ **state** (`uiState.phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ។
+ * ព្រឹត្តិការណ៍របស់ប្រអប់ស្វែងរក ជា prop របស់ JSX (`onFocus` · `onBlur` · `onKeyDown` · `onInput`)។
  */
 
 export function scrollPhoneSuggestRowIntoView(index) {
-    commitNow();
-    const box = elementOf('phoneSuggestBox');
-    const row = box ? box.children[index] : null;
-    if (row) row.scrollIntoView({ block: 'nearest' });
+    scrollChildIntoView('phoneSuggestBox', index);
 }
 
 export function cssPx(value) {
@@ -33,15 +31,15 @@ export function positionPhoneSuggestBox() {
         hidePhoneSuggestions();
         return;
     }
-    const width = cssPx(rect.width);
-    if (box.style.width !== width) box.style.width = width;
-    const left = cssPx(rect.left);
-    if (box.style.left !== left) box.style.left = left;
+    // ⛔ ទទឹងត្រូវចុះ DOM **មុន** វាស់កម្ពស់ (ជួរណែនាំរុំតាមទទឹង) ➜ `commitNow()` មុន `offsetHeight`
+    uiState.phoneSuggestWidth = cssPx(rect.width);
+    uiState.phoneSuggestLeft = cssPx(rect.left);
+    commitNow();
     const boxHeight = box.offsetHeight;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const top = (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) ?
+    uiState.phoneSuggestTop = (spaceBelow < boxHeight + 12 && rect.top > boxHeight + 12) ?
         cssPx(rect.top - boxHeight - 4) : cssPx(rect.bottom + 4);
-    if (box.style.top !== top) box.style.top = top;
+    commitNow();
 }
 
 export function setPhoneSearchPulledUp(on) {
@@ -58,55 +56,60 @@ export function setPhoneSearchPulledUp(on) {
     setTimeout(positionPhoneSuggestBox, 340);
 }
 
+/* ── ព្រឹត្តិការណ៍របស់ប្រអប់ស្វែងរក (JSX ៖ `PageData` · `PhoneSuggestBox`) ─────────────── */
+
+/** `onFocus` ៖ ទាញប្រអប់ស្វែងរកឡើង រួចបង្ហាញការណែនាំ */
+export function phoneSearchFocused() {
+    setPhoneSearchPulledUp(true);
+    showPhoneSuggestions();
+}
+
+/** `onBlur` ៖ លាក់ការណែនាំក្រោយ ១៥០ms (ការចុចជួរណែនាំមកដល់មុន) */
+export function phoneSearchBlurred() {
+    if (uiState.phoneSuggestHideTimer) clearTimeout(uiState.phoneSuggestHideTimer);
+    uiState.phoneSuggestHideTimer = setTimeout(() => {
+        hidePhoneSuggestions();
+        if (!fieldValue('searchPhoneInput').trim()) setPhoneSearchPulledUp(false);
+    }, 150);
+}
+
+/** `onKeyDown` ៖ Escape · Enter · ព្រួញឡើង/ចុះ */
+export function phoneSearchKeyDown(e: { key: string; preventDefault(): void }) {
+    if (e.key === 'Escape') {
+        hidePhoneSuggestions();
+        return;
+    }
+    if (e.key === 'Enter') {
+        if (uiState.phoneSuggestActiveIndex >= 0 && uiState.phoneSuggestItems[uiState.phoneSuggestActiveIndex]) {
+            e.preventDefault();
+            applyPhoneSuggestion(uiState.phoneSuggestItems[uiState.phoneSuggestActiveIndex].phone);
+        } else {
+            hidePhoneSuggestions();
+            searchByPhone();
+        }
+        return;
+    }
+    if (!uiState.phoneSuggestItems.length) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPhoneSuggestActive(uiState.phoneSuggestActiveIndex + 1);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPhoneSuggestActive(uiState.phoneSuggestActiveIndex - 1);
+    }
+}
+
+/** ចុចជួរណែនាំទី `index` (ច្រកទ្វារដូចដើម ៖ ជួរត្រូវនៅមានក្នុងបញ្ជី) */
+export function pickPhoneSuggestion(index: number) {
+    if (isNaN(index) || !uiState.phoneSuggestItems[index]) return;
+    applyPhoneSuggestion(uiState.phoneSuggestItems[index].phone);
+}
+
+/**
+ * ការរមូរ/ប្តូរទំហំ **ទូទាំងទំព័រ** ➜ កំណត់ទីតាំងប្រអប់ណែនាំឡើងវិញ (រួមក្នុង rAF)។
+ * ⛔ listener របស់ `window` (មិនមែនធាតុរបស់ React) ➜ ចាក់ម្តងពេល boot។
+ */
 export function setupPhoneSuggestions() {
-    const phoneInput = elementOf<HTMLInputElement>('searchPhoneInput');
-    const box = elementOf('phoneSuggestBox');
-    if (!phoneInput || !box) return;
-    phoneInput.addEventListener('input', showPhoneSuggestions);
-    phoneInput.addEventListener('focus', () => {
-        setPhoneSearchPulledUp(true);
-        showPhoneSuggestions();
-    });
-    phoneInput.addEventListener('blur', () => {
-        if (uiState.phoneSuggestHideTimer) clearTimeout(uiState.phoneSuggestHideTimer);
-        uiState.phoneSuggestHideTimer = setTimeout(() => {
-            hidePhoneSuggestions();
-            if (!phoneInput.value.trim()) setPhoneSearchPulledUp(false);
-        }, 150);
-    });
-    phoneInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hidePhoneSuggestions();
-            return;
-        }
-        if (e.key === 'Enter') {
-            if (uiState.phoneSuggestActiveIndex >= 0 && uiState.phoneSuggestItems[uiState.phoneSuggestActiveIndex]) {
-                e.preventDefault();
-                applyPhoneSuggestion(uiState.phoneSuggestItems[uiState.phoneSuggestActiveIndex].phone);
-            } else {
-                hidePhoneSuggestions();
-                searchByPhone();
-            }
-            return;
-        }
-        if (!uiState.phoneSuggestItems.length) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setPhoneSuggestActive(uiState.phoneSuggestActiveIndex + 1);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setPhoneSuggestActive(uiState.phoneSuggestActiveIndex - 1);
-        }
-    });
-    box.addEventListener('mousedown', (e) => { e.preventDefault(); });
-    box.addEventListener('click', (e) => {
-        const target = e.target as any;
-        const row = target && target.closest ? target.closest('.phone-suggest-item') : null;
-        if (!row) return;
-        const index = parseInt(row.getAttribute('data-index'), 10);
-        if (isNaN(index) || !uiState.phoneSuggestItems[index]) return;
-        applyPhoneSuggestion(uiState.phoneSuggestItems[index].phone);
-    });
     let positionFrame = null;
     const schedulePositionPhoneSuggestBox = () => {
         if (positionFrame !== null) return;

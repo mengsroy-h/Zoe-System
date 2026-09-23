@@ -5,6 +5,8 @@ import { applyCameraZoomFromSlider } from '../../services/camera';
 import { onAct } from '../actions';
 import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
+import { hardwareScannerKeyPress } from '../behaviors/scanner-input';
+import { togglePanelFromHandle } from '../behaviors/panel-motion';
 import { EntryListTableBody } from './entry/EntryListTableBody';
 import { LockerListFilterSelect } from './entry/LockerListFilterSelect';
 import { LockerListTableBody } from './entry/LockerListTableBody';
@@ -30,7 +32,7 @@ function bindVideo(el: HTMLElement | null) {
 
 /** ផ្ទាំងកាមេរ៉ា ៖ ប្រអប់សុំសិទ្ធិ ⇄ វីដេអូ · zoom · ពិល */
 function CameraBox() {
-    const v = useStoreFields(viewState, ['cameraView', 'cameraZoomDisplay', 'cameraTorchDisplay', 'cameraOverlayDisplay', 'cameraZoomRange']);
+    const v = useStoreFields(viewState, ['cameraView', 'cameraZoomDisplay', 'cameraTorchDisplay', 'cameraOverlayDisplay', 'cameraZoomRange', 'cameraWebkitInline']);
     const torchOn = useStoreValue(scanState, (s) => s.torchOn);
     const closedOnce = v.cameraView === 'closed';
     const range = v.cameraZoomRange;
@@ -47,6 +49,7 @@ function CameraBox() {
                     playsInline
                     autoPlay
                     muted
+                    webkit-playsinline={v.cameraWebkitInline ? 'true' : undefined}
                     ref={bindVideo}
                 ></video>
                 <button
@@ -140,6 +143,7 @@ export function PageEntry() {
                                 ? 'ស្កេន Barcode ដើម្បីកំណត់ទីតាំង...'
                                 : (mode === 'remove' ? 'ស្កេន Barcode ដែលត្រូវដក...' : 'ស្កេន Barcode...')}
                             autoComplete="off"
+                            onKeyPress={hardwareScannerKeyPress}
                         />
                         <button type="button" className="btn-submit-barcode" onClick={onAct("submitManualBarcode")}>បញ្ជូន</button>
                     </div>
@@ -159,8 +163,8 @@ export function PageEntry() {
                 <div
                     className="drag-handle-bar"
                     id="entryDragHandle"
-                    ref={refTo('entryDragHandle')}
                     title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកបញ្ជី"
+                    onClick={() => togglePanelFromHandle('entry')}
                 ></div>
                 <div id="parcelPanel" className={mode === 'locker' ? 'hidden' : undefined}>
                     <div className="app-card panel-section">

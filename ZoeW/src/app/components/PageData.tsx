@@ -1,8 +1,12 @@
+import type { FormEvent } from 'react';
 import { uiState, ztoState } from '../../core/state';
 import { viewState } from '../../core/view-state';
 import { onAct } from '../actions';
 import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
+import { phoneSearchBlurred, phoneSearchFocused, phoneSearchKeyDown } from '../behaviors/phone-search';
+import { togglePanelFromHandle } from '../behaviors/panel-motion';
+import { showPhoneSuggestions } from '../../features/phone-suggest';
 import { ZtoSyncBanner } from './zto/ZtoSyncBanner';
 import { HistoryTableBody } from './history/HistoryTableBody';
 import { panelSectionClass, pageClass } from './shell/panel-classes';
@@ -13,6 +17,17 @@ const FILTERS = [
     { mode: 'dayBefore', id: 'btnFilterDayBefore', label: 'ម្សិលម្ងៃ' },
     { mode: 'all', id: 'btnFilterAll', label: 'ទាំងអស់' }
 ] as const;
+
+const debouncedPhoneSearch = onAct("debouncedSearchByPhone");
+
+/**
+ * `input` របស់ប្រអប់ស្វែងរកលេខ ៖ ការណែនាំ **មុន** ការស្វែងរក (លំដាប់ដូចដើម ៖ listener
+ * របស់ធាតុរត់មុន handler ដែលផ្ទេរតាម document)។
+ */
+function onPhoneSearchInput(e: FormEvent<HTMLInputElement>) {
+    showPhoneSuggestions();
+    debouncedPhoneSearch(e);
+}
 
 /** ប៊ូតុងតម្រងថ្ងៃ ៖ `active` តាម `uiState.currentFilterMode` (ថ្ងៃផ្សេង ➜ គ្មានប៊ូតុងណា active) */
 function DateFilterButtons() {
@@ -127,7 +142,10 @@ export function PageData() {
                                 ref={refTo('searchPhoneInput')}
                                 placeholder="ស្វែងរកលេខទូរស័ព្ទ..."
                                 autoComplete="off"
-                                onInput={onAct("debouncedSearchByPhone")}
+                                onInput={onPhoneSearchInput}
+                                onFocus={phoneSearchFocused}
+                                onBlur={phoneSearchBlurred}
+                                onKeyDown={phoneSearchKeyDown}
                             />
                             <button onClick={onAct("searchByPhone")}>🔍</button>
                         </div>
@@ -135,7 +153,7 @@ export function PageData() {
                 </div>
             </div>
             <div className="page-main" id="dataMainSection" ref={refTo('dataMainSection')}>
-                <div className="drag-handle-bar" id="dragHandle" ref={refTo('dragHandle')} title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកប្រវត្តិ"></div>
+                <div className="drag-handle-bar" id="dragHandle" title="អូសឡើង/ចុះ ដើម្បីបង្រួម ឬពង្រីកប្រវត្តិ" onClick={() => togglePanelFromHandle('data')}></div>
                 <div className="app-card history-section">
                     <button
                         className="header-more-btn"

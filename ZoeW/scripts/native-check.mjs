@@ -274,10 +274,64 @@ await scenario('១. boot លើ Android native', async () => {
 
     /* PTR លើ native ➜ reload */
     await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+    // ⛔ សញ្ញា PTR គូរដោយ React ពី `ptrState` ➜ វាស់ថាវា **ផ្លាស់ទីពិត** និង **ចុះ DOM ក្នុងការ dispatch
+    //    ដដែល** ៖ touch ដែល script បញ្ជូន **គ្មាន microtask checkpoint** រវាង listener ➜ ការអាន
+    //    `style.transform` ភ្លាមក្រោយ `dispatchEvent()` ឃើញតម្លៃចាស់ បើ React គូរពន្យារ (វាស់រួច ៖
+    //    touch របស់ CDP រត់ microtask រវាង listener ➜ mutation «ដក `renderNow`» រស់រាន)។
+    //    ចប់ដោយ `touchcancel` ➜ មិនផ្ទុកឡើងវិញ។
+    const ptrSync = await page.evaluate(async () => {
+        const pages = document.getElementById('appPages');
+        const ind = document.querySelector('.ptr-indicator');
+        const r = pages.getBoundingClientRect();
+        let point = null;
+        for (let y = r.top + 40; y < r.top + 260 && !point; y += 12) {
+            for (let x = 40; x < r.right - 40; x += 30) {
+                const el = document.elementFromPoint(x, y);
+                if (el && pages.contains(el) && !el.closest('input, textarea, select, button, a, .app-navbar, .page-tabbar')) { point = { x, y, el }; break; }
+            }
+        }
+        if (!point || !ind) return { found: false };
+        const make = (type, y) => {
+            const t = new Touch({ identifier: 9, target: point.el, clientX: point.x, clientY: y, pageX: point.x, pageY: y });
+            const live = type === 'touchmove' || type === 'touchstart' ? [t] : [];
+            return new TouchEvent(type, { bubbles: true, cancelable: true, composed: true, touches: live, targetTouches: live, changedTouches: [t] });
+        };
+        const frames = [];
+        let deferred = 0;
+        let ready = false;
+        point.el.dispatchEvent(make('touchstart', point.y));
+        for (let d = 6; d <= 300; d += 6) {
+            point.el.dispatchEvent(make('touchmove', point.y + d));
+            const now = ind.style.transform;
+            frames.push(now);
+            if (/\bready\b/.test(ind.className)) ready = true;
+            await new Promise((res) => setTimeout(res, 0));
+            if (ind.style.transform !== now) deferred++;
+        }
+        point.el.dispatchEvent(make('touchcancel', point.y + 300));
+        return { found: true, distinct: new Set(frames.filter(Boolean)).size, deferred, ready,
+            parkedClass: ind.className, parkedOpacity: ind.style.opacity };
+    });
+    ok('PTR ៖ សញ្ញា (React · `ptrState`) ផ្លាស់ទីតាមម្រាមដៃ (transform ≥ 10 ស៊ុមខុសគ្នា)', ptrSync.found && ptrSync.distinct >= 10, ptrSync);
+    ok('PTR ៖ សញ្ញាចុះ DOM **ក្នុងការ dispatch ដដែល** នៃ `touchmove` (គ្មានការគូរពន្យារ)', ptrSync.found && ptrSync.deferred === 0, ptrSync);
+    ok('PTR ៖ ឆ្លងព្រំដែន ➜ class `ready` (ភ្លាម)', ptrSync.ready === true, ptrSync);
+    ok('PTR ៖ `touchcancel` ➜ ត្រឡប់ទីតាំងដើម (`snapping` · opacity 0) ភ្លាម', /\bsnapping\b/.test(ptrSync.parkedClass || '') && ptrSync.parkedOpacity === '0', ptrSync);
+    const ticksBefore = (await calls(page, 'Haptics', 'impact').catch(() => [])).length;
+    await page.evaluate(() => {
+        const ind = document.querySelector('.ptr-indicator');
+        const log = window.__ptrLog = { classes: [] };
+        new MutationObserver(() => { log.classes.push(ind.className); }).observe(ind, { attributes: true, attributeFilter: ['class'] });
+    });
     const reloaded = page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true, () => false);
     const pulled = await pull(page, 300);
     ok('PTR ៖ រកចំណុចទាញបាន', pulled);
-    const ticks = await calls(page, 'Haptics', 'impact').catch(() => []);
+    const ptrEnd = await page.evaluate(() => {
+        const ind = document.querySelector('.ptr-indicator');
+        return { finalClass: ind.className, finalOpacity: ind.style.opacity, finalTransform: ind.style.transform };
+    }).catch((e) => ({ error: String(e) }));
+    ok('PTR ៖ លែងដៃ ➜ `spinning` · opacity 1 · ឈរនៅ translateY(50px)', /\bspinning\b/.test(ptrEnd.finalClass || '') &&
+        ptrEnd.finalOpacity === '1' && ptrEnd.finalTransform === 'translateY(50px)', ptrEnd);
+    const ticks = (await calls(page, 'Haptics', 'impact').catch(() => [])).slice(ticksBefore);
     ok('PTR ៖ ឆ្លងព្រំដែន ➜ ញ័រ **ម្តង** (Haptics.impact · LIGHT)', ticks.length === 1 && ticks[0].options.style === 'LIGHT', ticks);
     ok('PTR លើ native ៖ ទាញចុះ ➜ ផ្ទុកឡើងវិញ', await reloaded);
     await page.waitForTimeout(2500);

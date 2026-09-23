@@ -3,6 +3,7 @@ import { viewState } from '../../../core/view-state';
 import { act, onAct } from '../../actions';
 import { useStoreFields } from '../../hooks/useStore';
 import { refTo, refWithNative } from '../../refs';
+import { sheetDropEnter, sheetDropFile, sheetDropLeave } from '../../behaviors/sheet-drop';
 import { SiConfigSummary } from '../sheet/SheetImportParts';
 import { SiConfigMsg } from '../sheet/SheetImportParts';
 import { SiFileMsg } from '../sheet/SheetImportParts';
@@ -75,7 +76,8 @@ export function SheetImportModal() {
                             <span className="si-step">2</span>
                             {' '}ជ្រើសឯកសារ
                         </h4>
-                        <button type="button" className={v.siDropHot ? 'si-drop si-drop-hot' : 'si-drop'} id="siDrop" ref={refTo('siDrop')} onClick={onAct("pickSheetImportFile")}>
+                        <button type="button" className={v.siDropHot ? 'si-drop si-drop-hot' : 'si-drop'} id="siDrop" onClick={onAct("pickSheetImportFile")}
+                            onDragEnter={sheetDropEnter} onDragOver={sheetDropEnter} onDragLeave={sheetDropLeave} onDrop={sheetDropFile}>
                             <strong>ចុចដើម្បីជ្រើសឯកសារ</strong>
                             <span>ឬទម្លាក់ឯកសារនៅទីនេះ — .xlsx · .xls · .csv</span>
                         </button>

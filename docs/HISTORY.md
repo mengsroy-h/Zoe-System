@@ -342,6 +342,64 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.42.0] — 2026-09-23 · ZoeW ៖ **React ១០០% ពេញលេញ** — ស្រទាប់ React ខ្លួនឯងលែងសរសេរ DOM ក្រៅច្រកចេញ (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«2.41.0 ជា React ពេញលេញ 100% នៅ?»* ➜ ចម្លើយស្មោះត្រង់ ៖ **មិនទាន់** —
+*«ធ្វើទាំងអស់ អោយស្អាតពេញលេញជា React 100% ទៅ»*។
+
+**ZoeW ប្រែ** (`zoew-v226` ➜ `zoew-v227`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន (អ្នកប្រើ **មិនឃើញ** អ្វីប្រែ — ការរៀបចំខាងក្នុង)
+
+🔴 **អ្នកយាមជំនាន់មុនបៃតងក្លាយ** ៖ `purity:check` រាយ «ការប៉ះ DOM ក្រៅ React ៖ 0» ខណៈ
+`src/app/behaviors` (កាយវិការ) សរសេរ `style` · `classList` · `scrollTop` · `setAttribute` លើធាតុរបស់ React
+**~៤០ បន្ទាត់** — ព្រោះវាវាស់តែថតមុខងារ (`core` … `platform`) ➜ **លេខ 0 មិនមែនការវាស់ទាំង App**។
+
+| អ្វី | មុន (imperative) | ឥឡូវ (React) |
+|---|---|---|
+| សញ្ញា PTR (transform · opacity · `ready`/`snapping`/`spinning`) | `indicator.style.*` · `classList` រាល់ `touchmove` | ឃ្លាំង **`ptrState`** (អ្នកជាវតែមួយ) ➜ `PtrIndicator` គូរ · `renderNow()` ក្នុងការ dispatch ដដែល |
+| ការតាមដានថា PTR អាចកើត (listener non-passive) | `MutationObserver` លើ class របស់ធាតុ React | `uiState.subscribe` (ប្រភពនៃ class ទាំងនោះ) |
+| ទីតាំងប្រអប់ណែនាំលេខ | `box.style.width/left/top` | state `uiState.phoneSuggest*` ➜ `style` ក្នុង JSX |
+| ព្រឹត្តិការណ៍ប្រអប់ស្វែងរកលេខ · ប្រអប់ណែនាំ | `addEventListener` (input · focus · blur · keydown · mousedown · click) | `onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ |
+| ទម្លាក់ឯកសារ (នាំចូល Excel) | `addEventListener` (drag*) ក្នុង `setupSheetImportDropZone()` | `onDragEnter` · `onDragOver` · `onDragLeave` · `onDrop` |
+| Enter របស់ម៉ាស៊ីនស្កេន hardware | `addEventListener('keypress')` | `onKeyPress` |
+| ចុចដងអូសផ្ទាំង | `addEventListener('click')` ក្នុង `bindPanelSwipe` | `onClick` ➜ `togglePanelFromHandle()` (តួដដែល) |
+| អថេរ CSS `--chrome-*` លើ `<html>` | `document.documentElement.style.setProperty` | state ➜ `DocumentEffects` (`useLayoutEffect`) |
+| ធាតុវាស់ safe-area (Android) | `createElement` + `appendChild` + `remove` រាល់ការវាស់ | `SafeAreaProbe` (JSX · តែលើ native) + ref |
+| `webkit-playsinline` របស់វីដេអូ | `setAttribute` (`app/media.ts`) | ទង់ស្អិត `viewState.cameraWebkitInline` ➜ JSX (ឯកសារ `media.ts` ដកចេញ) |
+| សំណាញ់ ៦ វិ. ក្នុង `boot-flags.js` | ដាក់ class លើ `#bootSplash` របស់ React | **ដកចេញ** ៖ ផ្ទាំងជារបស់ React តែមួយ (bundle ដួល = គ្មានផ្ទាំង) · ផ្លូវបម្រុង ៦ វិ. នៅក្នុង React |
+| `scrollTop` · `scrollIntoView` · `animate()` ក្នុងកាយវិការ | សរសេរត្រង់ៗ | ច្រកចេញតែមួយ `src/app/refs.ts` · ការរមូរ document ➜ `platform/document-io.ts` |
+
+⛔ **អ្វីដែលនៅមិនមែន JSX ដោយចេតនា** (React ខ្លួនឯងគ្មានទម្រង់ប្រកាស) — រាប់ដោយអ្នកយាមជាមួយ
+**ហេតុផល និងពិដានតឹង** (`ZoeW/docs/ARCHITECTURE.md` ផ្នែក ១០ «ច្រកចេញ») ៖ focus · រមូរ · `animate()` ·
+input uncontrolled (`refs.ts`) · `<html>`/`<body>` (`DocumentEffects`) · `srcObject`/`muted` របស់ `<video>` ·
+listener `touch*` non-passive (React ចាក់វាជា passive) · listener លើ `document`/`window` · `<head>`/ការទាញយក
+(`document-io.ts`) · class លើ `<html>` **មុន** stylesheet (`boot-flags.js`)។
+
+#### អ្នកយាមថ្មី/ពង្រឹង
+
+- **`purity:check`** វាស់ `src/app/**` ផង ៖ ការសរសេរ DOM (class · style · attribute · អត្ថបទ · focus · រមូរ ·
+  ចលនា · listener លើធាតុ) **០** ក្រៅច្រកចេញ `APP_ALLOWED` (ពិដានតឹង · ធាតុងាប់ ➜ ធ្លាក់)។ Mutation **៦/៦**
+  ចាប់ ៖ `style` លើសញ្ញា PTR · `blur()` ក្នុងកាយវិការ · `focus()` លើសពិដានក្នុង `refs.ts` · `classList` ក្នុង
+  JSX handler · `el.animate()` ត្រង់ៗ · `addEventListener` លើធាតុថ្មី។
+- **`native-check`** (+៥) ៖ សញ្ញា PTR ផ្លាស់ទីតាមម្រាមដៃ · ចុះ DOM **ក្នុងការ dispatch ដដែល** · `ready` ·
+  `touchcancel` ➜ ត្រឡប់ភ្លាម · លែងដៃ ➜ `spinning`។ ⛔ វាស់រួច ៖ touch របស់ CDP រត់ microtask **រវាង
+  listener** ➜ ការវាស់ដំបូងមិនបែងចែក (mutation «ដក `renderNow`» **រស់រាន**) ➜ ប្តូរទៅ touch ដែល script
+  បញ្ជូន (គ្មាន checkpoint) ➜ mutation ដដែល **ធ្លាក់ ២**។
+
+#### អ្វីដែលវាស់បាន
+
+⟪FINAL42⟫
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0`–`2.41.0` នៅដដែល។
+២. **App Android** ៖ build APK ថ្មី (`npm run android:sync` ➜ Android Studio) — គ្មាន plugin ថ្មី។
+៣. សាកលើ **iPhone PWA និង Android ពិត** (តំបន់ដែលកូដប្រែ) ៖ ទាញចុះ (PTR) ➜ សញ្ញាវិលរលូន · ស្វែងរកលេខ
+   ➜ ប្រអប់ណែនាំលេចត្រង់ក្រោមប្រអប់ · ព្រួញ/Enter/ចុចជួរណែនាំ · ចុចដងអូសផ្ទាំង · ទម្លាក់ឯកសារ Excel
+   (កុំព្យូទ័រ) · ម៉ាស៊ីនស្កេន Bluetooth/USB (Enter) · កាមេរ៉ាលើ iPhone។
+៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
+
 ### [2.41.0] — 2026-09-23 · ZoeW ៖ **PTR តាមស្តង់ដា App** (តំបន់ខាងលើ · ស្រទាប់ · ញ័រ) · កំហុស ៥ ដែល `audit-tools` រកឃើញលើ `2.40.0` (branch · មិនទាន់ merge)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«សម្រួល PTR អោយកេះដើរតែពេលប្រអប់ប្រវត្តិមិនទាន់ហូតឡើងបានហើយ
@@ -383,7 +441,18 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 
 #### អ្វីដែលវាស់បាន
 
-⟪FINAL⟫
+| ការវាស់ | `main` (ZoeW ដើម) | `2.39.0` | `2.40.0` | **`2.41.0`** |
+|---|---|---|---|---|
+| `audit-tools/run-all.sh` (emulator · `CRUD_FLOW_STRICT=1` · `VERSIONSCOPE_STRICT=1`) ជោគជ័យ / ធ្លាក់ / រំលង | 180 / 1 / 0 | 61 / 120 / 0 | 59 / 122 / 0 | **61 / 120 / 0** |
+| ការអះអាងដែលធ្លាក់ (អត្ថបទមិនស្ទួន) | — | 766 | 815 | **781** |
+
+- ធៀប `2.40.0` ៖ ការអះអាងធ្លាក់ **ដកចេញ ៣៤** (ថ្នាក់ ៥ ក្នុងតារាងខាងលើ) · **ថ្មី ១** ៖ `page-nav` «បោះបង់ ➜
+  បិទប្រអប់» — វាស់ម្តងមួយ ៖ checker ចុច `[data-act="cancelLogout"]` ដែលលែងមាន (សកម្មភាពជា `onClick`)
+  ➜ ការចុចគ្មានអ្វីកើត ➜ **សំណល់នៃការវាស់** ដូច `2.39.0` បេះបិទ (`2.40.0` រាយ ok ដោយ **ចៃដន្យ** ៖ ប្រអប់
+  មិនដែលបើកសោះ ➜ «មិនបើក» ពិតដោយស្វ័យប្រវត្តិ)។
+- `main` ធ្លាក់ ១ (`repository-file-coverage`) ៖ `node_modules` ដែលមិនស្ថិតក្នុង git ក្នុង repo ស្រមោល — សំណល់នៃការវាស់។
+- ZoeW ខ្លួនឯង ៖ `verify` (purity 11 · vitest 61 · native-check 70 · android-check 48) · `logic:check` (function
+  ដើមបាត់ **០**) · `parity:all` (DOM/layout 721/721 × អេក្រង់ ៣ · deep · cleanup-rules 115) — **បៃតងទាំងអស់**។
 
 #### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

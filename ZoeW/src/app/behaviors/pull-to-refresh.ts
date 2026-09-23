@@ -1,11 +1,13 @@
 import { isNativeAndroid, pullToRefreshSupported } from '../../platform/native';
 import { hapticTick } from '../../platform/haptics';
 import { openModalIds } from '../../core/modals';
-import { securityState, uiState } from '../../core/state';
+import { ptrState, securityState, uiState, type PtrView } from '../../core/state';
 import { appSessionStore } from '../../core/storage';
 import { showAppChrome } from '../../ui/chrome-autohide';
 import { isSideDrawerOpen } from '../../ui/page-nav';
-import { elementOf } from '../refs';
+import { resetDocumentScroll } from '../../platform/document-io';
+import { renderNow } from '../flush';
+import { elementOf, setElementScrollTop } from '../refs';
 import { scrollerOf } from './chrome-autohide';
 import { activePanelSections, panelHasSearchFocus, panelIsCollapsed } from './panels';
 import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArbiter, touchByIdentifier } from './panel-motion';
@@ -13,9 +15,9 @@ import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArb
 /**
  * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ៖ «Pull-to-refresh លើ iOS PWA») — តក្កវិជ្ជា
  * ដូច `app.js` ដើមបេះបិទ ៖ `#appPages` តាម ref · ស្ថានភាពផ្ទាំងតាម state ·
- * សញ្ញា PTR (`PtrIndicator`) ជាធាតុរបស់ React ដែលកាយវិការនេះ **ធ្វើចលនា**
- * តាម ref (transform/opacity រាល់ `touchmove` — ការគូររបស់ React រាល់ស៊ុមនៃ
- * ម្រាមដៃ នឹងប្តូរភាពរលូន)។
+ * សញ្ញា PTR (`PtrIndicator`) គូរពី **`ptrState`** (transform · opacity · class ចលនា)។
+ * ⛔ រាល់ការប្តូរ ➜ `renderNow(ptrState)` ៖ ឃ្លាំងដាច់ដោយឡែក (អ្នកជាវតែមួយ) គូរ **ក្នុង
+ *    ស៊ុមដដែល** នៃ `touchmove` ដូចការសរសេរ `style` ផ្ទាល់ពីមុន (វាស់ ៖ native-check · gesture-test)។
  */
 
 /**
@@ -50,8 +52,7 @@ export function setupIOSPullToRefresh() {
     const pages = elementOf('appPages');
     if (!pages) return;
 
-    const indicator = ptrIndicatorElement();
-    if (!indicator) return;
+    if (!ptrIndicatorElement()) return;
 
     const AXIS_SLOP = 22;
     const ENGAGE_AT = 56;
@@ -81,6 +82,14 @@ export function setupIOSPullToRefresh() {
     let scrollerMemoValue = null;
     let readyTicked = false;
     let overlayAtPointerDown = false;
+    let view: PtrView = { transform: '', opacity: '', ready: false, snapping: false, spinning: false };
+
+    /** ប្តូរសញ្ញា PTR ➜ React គូរភ្លាម (ស៊ុមដដែល) */
+    function showIndicator(patch: Partial<PtrView>) {
+        view = { ...view, ...patch };
+        ptrState.view = view;
+        renderNow(ptrState);
+    }
 
     function scrollerForPull(target) {
         if (target === scrollerMemoTarget) return scrollerMemoValue;
@@ -101,9 +110,11 @@ export function setupIOSPullToRefresh() {
     function paint(distance) {
         const progress = Math.min(1, distance / TRIGGER_AT);
         const visible = Math.max(0, Math.min(1, (distance - INDICATOR_AT) / (TRIGGER_AT - INDICATOR_AT)));
-        indicator.style.transform = 'translateY(' + (REST_Y + distance) + 'px) rotate(' + Math.round(progress * 270) + 'deg)';
-        indicator.style.opacity = String(visible);
-        indicator.classList.toggle('ready', progress >= 1);
+        showIndicator({
+            transform: 'translateY(' + (REST_Y + distance) + 'px) rotate(' + Math.round(progress * 270) + 'deg)',
+            opacity: String(visible),
+            ready: progress >= 1
+        });
         // ⛔ ញ័រ **ម្តង** ពេលឆ្លងព្រំដែន «លែងដៃដើម្បីផ្ទុកឡើងវិញ» · ថយក្រោមព្រំដែន ➜ ត្រៀមម្តងទៀត
         if (progress >= 1 && !readyTicked) {
             readyTicked = true;
@@ -122,11 +133,7 @@ export function setupIOSPullToRefresh() {
         startScroller = null;
         startActiveScroller = null;
         readyTicked = false;
-        indicator.classList.add('snapping');
-        indicator.classList.remove('ready');
-        indicator.classList.remove('spinning');
-        indicator.style.opacity = '0';
-        indicator.style.transform = 'translateY(' + REST_Y + 'px)';
+        showIndicator({ snapping: true, ready: false, spinning: false, opacity: '0', transform: 'translateY(' + REST_Y + 'px)' });
         if (resetArbiter !== false) resetIOSTouchArbiter();
     }
 
@@ -231,14 +238,11 @@ export function setupIOSPullToRefresh() {
     }
 
     function resetScrollPosition() {
-        const root = document.scrollingElement || document.documentElement;
-        if (root) root.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        pages.scrollTop = 0;
-        const activeScroller = activePanelSections().scroller;
-        if (activeScroller) activeScroller.scrollTop = 0;
-        window.scrollTo(0, 0);
+        resetDocumentScroll(() => {
+            setElementScrollTop(pages, 0);
+            const activeScroller = activePanelSections().scroller;
+            if (activeScroller) setElementScrollTop(activeScroller, 0);
+        });
         showAppChrome();
     }
 
@@ -324,7 +328,7 @@ export function setupIOSPullToRefresh() {
         startActiveScroller = context.activeScroller;
         tracking = true;
         iosTouchArbiter.phase = 'tracking';
-        indicator.classList.remove('snapping');
+        showIndicator({ snapping: false });
     }, { passive: true });
 
     function onPullTouchMove(e) {
@@ -409,10 +413,7 @@ export function setupIOSPullToRefresh() {
             rememberScrollRestoration();
             markReload();
             resetScrollPosition();
-            indicator.classList.add('snapping');
-            indicator.classList.add('spinning');
-            indicator.style.opacity = '1';
-            indicator.style.transform = 'translateY(' + (REST_Y + TRIGGER_AT) + 'px)';
+            showIndicator({ snapping: true, spinning: true, opacity: '1', transform: 'translateY(' + (REST_Y + TRIGGER_AT) + 'px)' });
             setTimeout(() => window.location.reload(), 300);
             reloadWatchdog = setTimeout(() => {
                 refreshing = false;
@@ -448,13 +449,12 @@ export function setupIOSPullToRefresh() {
         reloadWatchdog = null;
     });
 
-    const pullAvailabilityObserver = new MutationObserver(syncPullMoveListener);
-    [pages, elementOf('dataSideSection'), elementOf('entrySideSection'),
-     elementOf('pageData'), elementOf('pageEntry')].forEach((el) => {
-        if (el) pullAvailabilityObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
-    });
+    // ⛔ listener `touchmove` (non-passive) ត្រូវមាន **មុន** `touchstart` (Safari កំណត់ cancelability
+    //    មុនវាចប់) ➜ តាមដាន **state** ដែលសម្រេចថា PTR អាចកើត (ផ្ទាំងបង្រួម · ស្វែងរក · ប្រវត្តិពង្រីក ·
+    //    ទំព័រ) — ដូចការតាមដាន class ពីមុន តែមិនអាន DOM។
+    uiState.subscribe(syncPullMoveListener);
 
     park();
     syncPullMoveListener();
-    indicator.classList.remove('snapping');
+    showIndicator({ snapping: false });
 }

@@ -93,6 +93,11 @@ export interface ViewState {
     cameraTorchDisplay: '' | 'none' | 'flex';
     cameraOverlayDisplay: '' | 'none' | 'flex';
     cameraZoomRange: { min: number; max: number; step: number } | null;
+    /**
+     * `#video[webkit-playsinline]` ៖ iOS ចាស់ត្រូវការវា **ពេល stream ចាប់ផ្តើម** ➜ ទង់ស្អិត
+     * (ដាក់ម្តង ហើយមិនដកចេញ ដូច `setAttribute` ដើម) · ចុះ DOM ភ្លាម មុន `srcObject`។
+     */
+    cameraWebkitInline: boolean;
 
     /* ── ទំព័រស្កេន ── */
     /**
@@ -213,6 +218,7 @@ export const viewState = createStore<ViewState>('viewState', {
     cameraTorchDisplay: '',
     cameraOverlayDisplay: '',
     cameraZoomRange: null,
+    cameraWebkitInline: false,
 
     entryModeShown: 'parcel',
     removeScanDetail: 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។',
@@ -271,7 +277,7 @@ export const viewState = createStore<ViewState>('viewState', {
 registerStore(viewState);
 // ⛔ ដូច `uiState` ៖ Category ក្នុងរបា Slide · សោ App · របៀបស្កេន ចុះ DOM ក្នុង tick ដដែល
 viewState.markImmediate(['drawerGroupsOpen', 'drawerGroupsHidden', 'appLockOpen', 'entryModeShown',
-    'ztoAutoCloseVisible', 'ztoListSyncDrawerVisible']);
+    'ztoAutoCloseVisible', 'ztoListSyncDrawerVisible', 'cameraWebkitInline']);
 
 /**
  * ការបម្លែងដូច setter `textContent`/`innerText` របស់ DOM បេះបិទ ៖ `null` ➜ `''` ·

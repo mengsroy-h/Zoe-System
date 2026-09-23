@@ -1,4 +1,3 @@
-import { prepareInlineVideo } from '../app/media';
 import { setFieldValue, videoElement } from '../app/refs';
 import { createScratchCanvas } from '../platform/document-io';
 import { scanState, securityState } from '../core/state';
@@ -56,7 +55,6 @@ export async function openConfigQrScanner() {
         const video = videoElement('configQrVideo');
         if (!video) throw new Error('configQrVideo missing');
         video.srcObject = securityState.configQrStream;
-        prepareInlineVideo(video, false);
         await video.play();
         runConfigQrLoop(video);
     } catch (e) {

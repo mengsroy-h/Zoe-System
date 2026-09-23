@@ -315,6 +315,22 @@ export interface UiState {
     historyExpanded: boolean;
     /** `#appPages.panel-gliding` (ផ្អាក scroll-snap អំឡុងចលនា) */
     panelGliding: boolean;
+    /**
+     * ទីតាំង `#phoneSuggestBox` (`style.width/left/top`) ដែល `positionPhoneSuggestBox()` វាស់
+     * ➜ `PhoneSuggestBox` គូរ។ `''` = មិនទាន់វាស់ (គ្មាន style ដូចដើម)។
+     */
+    phoneSuggestWidth: string;
+    phoneSuggestLeft: string;
+    phoneSuggestTop: string;
+    /**
+     * អថេរ CSS លើ `<html>` ដែល `measureAppChromeSize()` វាស់ ➜ `DocumentEffects` សរសេរ
+     * (`--chrome-top` · `--tabbar-height` · `--page-extension` · `--chrome-bottom`)។
+     * `''` = មិនទាន់វាស់ ➜ មិនសរសេរ (CSS ប្រើលំនាំដើម `:root`)។
+     */
+    chromeTopVar: string;
+    tabbarHeightVar: string;
+    pageExtensionVar: string;
+    chromeBottomVar: string;
 }
 
 export const uiState = createStore<UiState>('uiState', {
@@ -383,6 +399,13 @@ export const uiState = createStore<UiState>('uiState', {
     dataPanelSearchFocus: false,
     historyExpanded: false,
     panelGliding: false,
+    phoneSuggestWidth: '',
+    phoneSuggestLeft: '',
+    phoneSuggestTop: '',
+    chromeTopVar: '',
+    tabbarHeightVar: '',
+    pageExtensionVar: '',
+    chromeBottomVar: '',
 });
 registerStore(uiState);
 // ⛔ រចនាសម្ព័ន្ធ UI ដែល App ដើមប្តូរលើ DOM **ភ្លាម** (class/style) ➜ ចុះ DOM ក្នុង tick ដដែល
@@ -390,6 +413,27 @@ registerStore(uiState);
 uiState.markImmediate(['modalDisplay', 'drawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden']);
+
+/** សញ្ញា Pull-to-Refresh ដែល `PtrIndicator` គូរ (`null` = មុនកាយវិការចាប់ផ្តើម ➜ គ្មាន style) */
+export interface PtrView {
+    transform: string;
+    opacity: string;
+    ready: boolean;
+    snapping: boolean;
+    spinning: boolean;
+}
+
+/**
+ * ⛔ ឃ្លាំង **ដាច់ដោយឡែក** ៖ PTR សរសេររាល់ `touchmove` (រាល់ស៊ុមនៃម្រាមដៃ) ➜ ការដាក់វាក្នុង
+ *    `uiState` នឹងធ្វើឲ្យរាល់ component ដែលជាវ `uiState` គណនា selector ឡើងវិញរាល់ស៊ុម។
+ *    ឃ្លាំងនេះមានអ្នកជាវ **តែមួយ** (`PtrIndicator`) ហើយ `renderPtrNow()` គូរវាភ្លាម។
+ */
+export interface PtrState {
+    view: PtrView | null;
+}
+
+export const ptrState = createStore<PtrState>('ptrState', { view: null });
+registerStore(ptrState);
 
 export interface SecurityState {
     lookupSecretKey: any;

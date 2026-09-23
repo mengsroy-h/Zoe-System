@@ -22,10 +22,10 @@ export function hideBootSplash() {
  * ផ្លូវបម្រុងពេល boot ជាប់ (ឧ. chunk យឺត) ៖ បន្ទាប់ពី ៦ វិនាទី ផ្ទាំងបើកត្រូវ
  * រសាត់ចេញដោយខ្លួនឯង ដើម្បីកុំឲ្យអ្នកប្រើជាប់មុខផ្ទាំងបើកជារៀងរហូត។
  *
- * ⛔ មាន **២ ជាន់** ដោយចេតនា ៖ `boot-flags.js` (ដូចដើមបេះបិទ) ដើរ **ឯករាជ្យពី
- *    bundle** — បើ bundle ដួល ផ្ទាំងនៅតែរសាត់ (`boot-animation-test`)។ ជាន់នេះ
- *    ធ្វើឲ្យ **state** ដឹងដែរ ➜ `hideBootSplash()` ក្រោយមកមិនលេងចលនា reveal
- *    លើផ្ទាំងដែលរសាត់រួច (ដូចដើម ៖ វាឈប់ពេលមាន `boot-splash-out` រួច)។
+ * ⛔ **ជាន់តែមួយ** (React) ៖ ផ្ទាំងជារបស់ React ហើយកើតតែក្រោយ mount ➜ bundle ដួល =
+ *    គ្មានផ្ទាំង (មិនមែនផ្ទាំងជាប់)។ `boot-flags.js` របស់ ZoeW ដើមមានជាន់ទី ២ ព្រោះផ្ទាំង
+ *    ដើមជា markup ថេរក្នុង `index.html` — ផ្ទាំងនោះលែងមាន។ state ដឹង ➜ `hideBootSplash()`
+ *    ក្រោយមកមិនលេងចលនា reveal លើផ្ទាំងដែលរសាត់រួច (ដូចដើម)។
  */
 export function armBootSplashFallback() {
     setTimeout(() => {

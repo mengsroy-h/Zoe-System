@@ -1,6 +1,7 @@
 import { uiState } from '../../core/state';
 import { hideAppChrome, showAppChrome } from '../../ui/chrome-autohide';
 import { isSideDrawerOpen } from '../../ui/page-nav';
+import { commitNow } from '../flush';
 import { elementOf } from '../refs';
 
 export function appChromeElements() {
@@ -10,20 +11,27 @@ export function appChromeElements() {
     };
 }
 
+/**
+ * វាស់កម្ពស់របា ➜ អថេរ CSS លើ `<html>` (`--chrome-top` · `--tabbar-height` ·
+ * `--page-extension` · `--chrome-bottom`) ជា **state** ➜ `DocumentEffects` សរសេរវា។
+ * ⛔ `commitNow()` ចុងក្រោយ ៖ អ្នកហៅ (និងអ្នកវាស់) អាន layout ភ្លាមក្រោយហៅ (ដូចដើម)។
+ * ⛔ តម្លៃ ០ មិនសរសេរ (`--chrome-top` · `--chrome-bottom`) ដូចដើម ➜ CSS រក្សាតម្លៃមុន។
+ */
 export function measureAppChromeSize() {
     const { navbar, tabbar } = appChromeElements();
     if (navbar) {
         const topHeight = navbar.offsetHeight;
-        if (topHeight > 0) document.documentElement.style.setProperty('--chrome-top', topHeight + 'px');
+        if (topHeight > 0) uiState.chromeTopVar = topHeight + 'px';
     }
     if (tabbar) {
         const pageHeight = document.body.getBoundingClientRect().height;
         const pageExtension = Math.max(0, Math.round(pageHeight - window.innerHeight));
         const bottomHeight = Math.round(tabbar.offsetHeight + pageExtension);
-        document.documentElement.style.setProperty('--tabbar-height', Math.round(tabbar.offsetHeight) + 'px');
-        document.documentElement.style.setProperty('--page-extension', pageExtension + 'px');
-        if (bottomHeight > 0) document.documentElement.style.setProperty('--chrome-bottom', bottomHeight + 'px');
+        uiState.tabbarHeightVar = Math.round(tabbar.offsetHeight) + 'px';
+        uiState.pageExtensionVar = pageExtension + 'px';
+        if (bottomHeight > 0) uiState.chromeBottomVar = bottomHeight + 'px';
     }
+    commitNow();
 }
 
 export function scrollerOf(target) {

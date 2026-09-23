@@ -12,10 +12,10 @@ import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scan
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
 import { runSessionExpiryCheck } from '../../features/session';
-import { setupSheetImportDropZone } from '../behaviors/sheet-drop';
 import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
 import { refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
+import { scrollWindowToTop } from '../../platform/document-io';
 import { setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
@@ -63,7 +63,7 @@ function bootShell(scope: LifecycleScope): void {
     renderAppVersionLabels();
 
     if (window.visualViewport) {
-        scope.listen(window.visualViewport, 'resize', () => { window.scrollTo(0, 0); });
+        scope.listen(window.visualViewport, 'resize', scrollWindowToTop);
     }
 
     // ⛔ លើ native ឯកសារទាំងអស់ស្ថិតក្នុង APK រួចហើយ ➜ Service Worker គ្មានការងារ
@@ -188,7 +188,6 @@ function startInteractions(): void {
         setupVisibilityHandling();
         updateRecentPhonesList();
         setupPhoneSuggestions();
-        setupSheetImportDropZone();
     });
 }
 

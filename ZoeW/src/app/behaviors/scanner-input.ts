@@ -2,30 +2,27 @@ import { scanState, securityState, uiState } from '../../core/state';
 import { isMobileDevice } from '../../core/timezone';
 import { closeConfigQrScanner } from '../../features/config-qr';
 import { showCameraClosedBox, stopCurrentStream, submitManualBarcode } from '../../features/daily-stats';
-import { elementOf } from '../refs';
+import { focusFieldAsIs } from '../refs';
 
 /**
  * ម៉ាស៊ីនស្កេន hardware (Bluetooth/USB = ក្តារចុច) ៖ ចុចកន្លែងទំនេរលើ desktop ➜
- * focus ប្រអប់ស្កេន · Enter ➜ បញ្ជូន។ ⛔ វាស្តាប់ព្រឹត្តិការណ៍ **ទូទាំង document**
- * ➜ រស់នៅស្រទាប់ React (`src/app`) ហើយប៉ះប្រអប់តាម ref។
+ * focus ប្រអប់ស្កេន (listener **ទូទាំង document** ➜ ចាក់ពេល boot) · Enter ➜ បញ្ជូន
+ * (`onKeyPress` របស់ JSX ក្នុង `PageEntry`)។
  */
 export function setupHardwareScanner() {
-    const hwInput = elementOf('hwScannerInput');
-
     document.addEventListener('click', (e) => {
         const clickTarget = e.target as any;
         if (!uiState.isModalOpen && clickTarget.tagName !== 'INPUT' && clickTarget.tagName !== 'TEXTAREA' && clickTarget.tagName !== 'SELECT' && clickTarget.tagName !== 'BUTTON' && clickTarget.tagName !== 'A' && !isMobileDevice()) {
-            if (hwInput) hwInput.focus();
+            focusFieldAsIs('hwScannerInput');
         }
     });
+}
 
-    if (hwInput) {
-        hwInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitManualBarcode();
-            }
-        });
+/** `onKeyPress` របស់ `#hwScannerInput` ៖ Enter ➜ បញ្ជូន Barcode */
+export function hardwareScannerKeyPress(e: { key: string; preventDefault(): void }) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        submitManualBarcode();
     }
 }
 

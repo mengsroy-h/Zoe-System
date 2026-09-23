@@ -20,7 +20,7 @@ export function exposeGlobals() {
         //    ផ្ទុក chunk `native-plugins` ដែល SW មិន cache (ដោយចេតនា) ➜ ក្រៅបណ្តាញ build វាស់ដួល
         //    (វាស់បាន ៖ sw-shell-latency · offline-shell · sw-cache-key)
         ['./core/**/*.ts', './domain/**/*.ts', './features/**/*.ts', './services/**/*.ts', './ui/**/*.ts',
-            './app/behaviors/**/*.ts', './app/lifecycle/layers.ts', './app/refs.ts', './app/flush.ts', './app/media.ts'],
+            './app/behaviors/**/*.ts', './app/lifecycle/layers.ts', './app/refs.ts', './app/flush.ts'],
         { eager: true }
     );
     const w = window as any;

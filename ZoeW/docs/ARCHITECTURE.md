@@ -296,18 +296,29 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 ⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ (`buildHistoryRowHtml()` · `trashGroupRowHtml()`)
 **មិនចូល DOM** — វារស់ជា oracle សម្រាប់តេស្ត parity និង checker ស្តាទិច។
 
-### ⛔ អ្វីដែលនៅ imperative ដោយចេតនា (ច្រកចេញបន្ទាន់ដែល React ណែនាំ)
+### ⛔ ច្រកចេញ (escape hatch) — អ្វីតែមួយគត់ដែលមិនមែន JSX
 
-| កន្លែង | ហេតុអ្វី |
-|---|---|
-| ចលនារបស់ PTR (`style.transform` · class ចលនា រាល់ `touchmove`) · FLIP របស់ផ្ទាំង (`animate()`) | React គូរ *ធាតុ* (`PtrIndicator` · ផ្ទាំង) ចំណែកកាយវិការកាន់ *ចលនា* តាម ref ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
-| focus · តម្លៃ input · ការវាស់ · ការរមូរ | `src/app/refs.ts` (ref តាមឈ្មោះ) — input ជា **uncontrolled** ដោយចេតនា (មើលផ្នែក ១១) |
-| `<video>` របស់កាមេរ៉ា/QR (`srcObject` · `play()`) | media playback តាម ref (`videoElement()`) |
-| `<link rel=preconnect>` · `<script>` loader | ពួកវារស់ក្នុង `<head>` ដែល React មិនជាម្ចាស់ (`src/platform/document-io.ts`) |
-| `<canvas>`/`Image` ក្រៅអេក្រង់ (ស្កេន · QR) | មិនដែលចូល DOM ➜ វាមិនមែនការគូរ (`document-io.ts`) |
-| `<a download>` ដែលចុចរួចលុបភ្លាម | ការទាញយកត្រូវកើតក្នុង tick ដដែលនឹងការចុច (`document-io.ts`) |
-| `<body>` · `document.title` | នៅក្រៅ `#root` ➜ `DocumentEffects` ធ្វើឲ្យវាស៊ីនឹង state ក្នុង `useLayoutEffect` |
-| សំណាញ់ ៦ វិនាទីក្នុង `public/boot-flags.js` (រសាត់ `#bootSplash`) | ត្រូវដើរ **ឯករាជ្យពី bundle** ៖ bundle ដួល ➜ React គ្មានជីវិតដើម្បីលាក់ផ្ទាំង (`boot-animation-test`)។ ជាន់ទី ២ ក្នុង React (`armBootSplashFallback()`) ធ្វើឲ្យ state ដឹង |
+React ជាអ្នកសរសេរ **តែមួយ** នៃអ្វីៗក្នុង `#root` ៖ រចនាសម្ព័ន្ធ · class · style · attribute ·
+អត្ថបទ · ព្រឹត្តិការណ៍របស់ធាតុ (`onClick` · `onInput` · `onFocus` · `onDrop` …)។ អ្វីខាងក្រោមជា
+ប្រតិបត្តិការដែល **React ខ្លួនឯងគ្មានទម្រង់ប្រកាស (declarative)** ហើយឯកសាររបស់ React ណែនាំ
+ឲ្យធ្វើតាម ref — ពួកវារស់នៅ **កន្លែងកំណត់** ហើយ `npm run purity:check` រាប់វាជាមួយ **ហេតុផល
+និងពិដានចំនួន** (ការសរសេរថ្មីក្រៅកន្លែងទាំងនេះ ➜ ធ្លាក់)៖
+
+| កន្លែង | អ្វី | ហេតុអ្វីមិនមែន JSX |
+|---|---|---|
+| `src/app/refs.ts` | focus · blur · ជ្រើសអត្ថបទ · បើកផ្ទាំងជ្រើសឯកសារ · `scrollTop` · `scrollIntoView` · `animate()` (FLIP) · តម្លៃ input | React គ្មាន prop សម្រាប់វា — input ជា **uncontrolled** ដោយចេតនា (ផ្នែក ១១) |
+| `DocumentEffects` | class/overflow លើ `<body>` · អថេរ CSS លើ `<html>` (`--chrome-*`) · `document.title` | ក្រៅ `#root` ➜ `useLayoutEffect` ពី state (លំនាំរបស់ React សម្រាប់ធាតុក្រៅ root) |
+| `<video>` (`srcObject` · `muted` · `play()`) | stream កាមេរ៉ា/QR តាម `videoElement()` · attribute `muted` ក្នុង ref callback | React គ្មាន prop `srcObject` · React មិនសរសេរ attribute `muted` (បញ្ហា React #10389 · iOS autoplay) |
+| `app/behaviors/panel-motion.ts` | listener `touch*` native លើផ្ទាំង/តារាង | React ចាក់ listener `touch*` ជា **passive** នៅ root ➜ `preventDefault()` របស់ iOS handoff មិនដើរ |
+| listener លើ `document` · `window` · `visualViewport` | កាយវិការ PTR · ម៉ាស៊ីនស្កេន hardware · ការរមូរ/ប្តូរទំហំ | ព្រឹត្តិការណ៍ទូទាំងទំព័រ (មិនមែនធាតុរបស់ React) |
+| `src/platform/document-io.ts` | `<link rel=preconnect>` · `<script>` loader · `<a download>` បណ្តោះអាសន្ន · `<canvas>`/`Image` ក្រៅអេក្រង់ · ការរមូរ document | ក្រៅ `#root` ឬមិនដែលភ្ជាប់ document |
+| `public/boot-flags.js` | class `ios-standalone` · `native-android` · `boot-instant` លើ `<html>` · ប្តូរ `media` របស់ font | ត្រូវរត់ **មុន** stylesheet និងមុន React ផ្ទុក (បើអត់ ផ្ទាំងលោតពេលបើក) — ⛔ វា **មិនប៉ះ** ធាតុរបស់ React |
+
+⛔ **សញ្ញា PTR** (`PtrIndicator`) គូរពី **`ptrState`** (transform · opacity · class ចលនា) ៖ ឃ្លាំង
+ដាច់ដោយឡែកដែលមានអ្នកជាវ **តែមួយ** ហើយកាយវិការហៅ `renderNow(ptrState)` ➜ React គូរ **ក្នុង
+ស៊ុមដដែល** នៃ `touchmove` (ការគូរ div មួយ ~០.១ms) ដោយមិនប៉ះ component ផ្សេង។
+⛔ **ផ្ទាំងបើក** (`BootSplash`) ជារបស់ React តែមួយ ៖ bundle ដួល ➜ ផ្ទាំងមិនកើតសោះ (មិនមែនជាប់) ·
+boot ជាប់ក្រោយ mount ➜ ផ្លូវបម្រុង ៦ វិនាទី (`armBootSplashFallback()`)។
 
 ---
 
@@ -318,8 +329,8 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 | ស្រទាប់ | អាចធ្វើ | ⛔ មិនអាចធ្វើ |
 |---|---|---|
 | `src/core` · `domain` · `features` · `services` · `ui` · `platform` | សរសេរ **state** (`uiState` · `viewState` · …) · ហៅ helper របស់ `refs.ts` (focus · តម្លៃ · វាស់) | `document.*` · `getElementById` · `classList` · `style` · `textContent` · `innerHTML` · `setAttribute` · `.focus()` ត្រង់ៗ |
-| `src/app/components` | គូរពី state តាម JSX · ចង ref (`ref={refTo('name')}`) | ស្វែងរក DOM តាម id/selector |
-| `src/app/behaviors` · `lifecycle` | listener native (touch non-passive) · ចលនាតាម ref | សរសេរ class ដែលមានម្ចាស់ជា state (ត្រូវសរសេរ state) |
+| `src/app/components` | គូរពី state តាម JSX · ចង ref (`ref={refTo('name')}`) · ព្រឹត្តិការណ៍ជា prop (`onClick` · `onInput` · `onKeyDown` · `onDrop` …) | ស្វែងរក DOM តាម id/selector · សរសេរ DOM ក្នុង ref callback/effect (លើកលែងច្រកចេញ ៖ ផ្នែក ១០ «ច្រកចេញ») |
+| `src/app/behaviors` · `lifecycle` | listener លើ `document`/`window` · listener `touch*` native (non-passive) · ច្រកចេញតាម `refs.ts` | សរសេរ class/style/attribute/អត្ថបទ (ត្រូវសរសេរ **state**) · listener លើធាតុដែល JSX ធ្វើបាន |
 
 ### លំនាំ
 
@@ -350,7 +361,10 @@ const pin = fieldValue('securityPinInput');
 `npm run purity:check` (`scripts/react-purity-check.mjs` · AST របស់ TypeScript) ៖
 
 - កូដមុខងារប៉ះ DOM **០** កន្លែង (ការលើកលែងមានតែ `platform/document-io.ts` និង
-  ការវាស់ផ្ទៃវីដេអូ — រាល់ធាតុមាន **ហេតុផល និងពិដានចំនួន**; ពិដានធូរ ឬធាតុងាប់ ➜ ធ្លាក់)
+  ការវាស់ផ្ទៃវីដេអូ/media — រាល់ធាតុមាន **ហេតុផល និងពិដានចំនួន**; ពិដានធូរ ឬធាតុងាប់ ➜ ធ្លាក់)
+- **ស្រទាប់ React ខ្លួនឯង** (`src/app/**`) ៖ ការសរសេរ DOM (class · style · attribute · អត្ថបទ ·
+  focus · រមូរ · ចលនា · listener លើធាតុ) **០** ក្រៅច្រកចេញក្នុងតារាងខាងលើ (ពិដានតឹង ➜
+  ការសរសេរថ្មីក្នុងឯកសារដែលមានការលើកលែងរួច ក៏ធ្លាក់ដែរ)
 - `elementOf()` · `modalElement()` ក្នុងកូដមុខងារ រាប់ជាការប៉ះ DOM
 - component មិនស្វែងរក DOM តាម id/selector
 - **ឈ្មោះ ref គ្រប់ឈ្មោះត្រូវមាន `ref={…}` ពិតចង** (វាស់តាម AST មិនមែនវត្តមានអក្សរ) —

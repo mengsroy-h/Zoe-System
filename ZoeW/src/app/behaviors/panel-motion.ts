@@ -1,8 +1,8 @@
 import { uiState } from '../../core/state';
 import { hidePhoneSuggestions } from '../../features/phone-suggest';
 import { commitNow } from '../flush';
-import { elementOf, fieldValue, isFieldFocused } from '../refs';
-import { entryScrollerInView, panelHasSearchFocus, panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock, usesIOSPanelHandoff } from './panels';
+import { animateElement, elementOf, fieldValue, isFieldFocused, type RefName } from '../refs';
+import { entryScrollerInView, panelHasSearchFocus, panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock, usesIOSPanelHandoff, type PanelKey } from './panels';
 import { setPhoneSearchPulledUp } from './phone-search';
 
 /**
@@ -61,7 +61,7 @@ export function panelGlideFrom(el, beforeTop) {
     if (!isFinite(delta) || Math.abs(delta) < 2) return;
     const release = beginPanelGlideSnapPause();
     try {
-        const anim = el.animate([
+        const anim = animateElement(el, [
             { transform: 'translate3d(0,' + delta + 'px,0)' },
             { transform: 'translate3d(0,0,0)' }
         ], { duration: PANEL_GLIDE_MS, easing: PANEL_GLIDE_EASING });
@@ -77,7 +77,6 @@ export function setupSwipeGestures() {
         panel: 'data',
         sideId: 'dataSideSection',
         mainId: 'dataMainSection',
-        handleId: 'dragHandle',
         scroller: () => elementOf('tableResponsive'),
         blockCollapse: phoneSearchIsActive
     });
@@ -85,7 +84,6 @@ export function setupSwipeGestures() {
         panel: 'entry',
         sideId: 'entrySideSection',
         mainId: 'entryMainSection',
-        handleId: 'entryDragHandle',
         scroller: entryScrollerInView,
         blockCollapse: () => false
     });
@@ -292,17 +290,26 @@ export function bindPanelSwipe(config) {
 
     mainSection.addEventListener('touchend', (e) => finishMainSwipe(e, true));
     mainSection.addEventListener('touchcancel', (e) => finishMainSwipe(e, false));
+}
 
-    const dragHandle = elementOf(config.handleId);
-    if (dragHandle) {
-        dragHandle.addEventListener('click', () => {
-            if (!panelIsCollapsed(config.panel)) hidePhoneSuggestions();
-            setPhoneSearchPulledUp(false);
-            commitNow();
-            const beforeTop = mainSection.getBoundingClientRect().top;
-            setPanelCollapsed(config.panel, !panelIsCollapsed(config.panel));
-            syncHistoryExpandedLock();
-            panelGlideFrom(mainSection, beforeTop);
-        });
-    }
+const PANEL_SECTIONS: Record<PanelKey, { side: RefName; main: RefName }> = {
+    data: { side: 'dataSideSection', main: 'dataMainSection' },
+    entry: { side: 'entrySideSection', main: 'entryMainSection' }
+};
+
+/**
+ * `onClick` របស់ដងអូស (`#dragHandle` · `#entryDragHandle` ក្នុង JSX) ៖ បង្រួម ⇄ ពង្រីកផ្ទាំង
+ * ជាមួយចលនា FLIP ។ តក្កវិជ្ជាដូចដើមបេះបិទ (ច្រកទ្វារដូច `bindPanelSwipe` ៖ ផ្ទាំងទាំង ២ ត្រូវមាន)។
+ */
+export function togglePanelFromHandle(panel: PanelKey) {
+    const sections = PANEL_SECTIONS[panel];
+    const mainSection = elementOf(sections.main);
+    if (!elementOf(sections.side) || !mainSection) return;
+    if (!panelIsCollapsed(panel)) hidePhoneSuggestions();
+    setPhoneSearchPulledUp(false);
+    commitNow();
+    const beforeTop = mainSection.getBoundingClientRect().top;
+    setPanelCollapsed(panel, !panelIsCollapsed(panel));
+    syncHistoryExpandedLock();
+    panelGlideFrom(mainSection, beforeTop);
 }

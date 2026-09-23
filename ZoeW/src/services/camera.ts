@@ -1,5 +1,4 @@
 import { commitNow } from '../app/flush';
-import { prepareInlineVideo } from '../app/media';
 import { elementOf, setFieldValue, videoElement as videoRef } from '../app/refs';
 import { viewState } from '../core/view-state';
 import { scanState, uiState } from '../core/state';
@@ -50,7 +49,7 @@ export function requestCameraPermission() {
             const videoElement = videoRef('video');
             if(!videoElement) return;
 
-            prepareInlineVideo(videoElement, true);
+            viewState.cameraWebkitInline = true;
             videoElement.muted = true;
             videoElement.srcObject = stream;
 

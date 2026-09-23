@@ -7,4 +7,4 @@
  */
 // ⛔ បន្តលំដាប់ `zoew-vN` របស់ ZoeW ដើម (`zoew-v222`) ៖ App ជំនួស ZoeW លើ origin ដដែល
 //    ➜ SW ថ្មីត្រូវលុប cache ចាស់ (តម្រង `zoew-` ក្នុង `sw.ts`)។
-export const CACHE_VERSION = 'zoew-v226';
+export const CACHE_VERSION = 'zoew-v227';

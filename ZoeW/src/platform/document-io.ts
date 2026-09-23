@@ -9,6 +9,7 @@
  * - **ផ្ទៃគូរ/រូបភាពក្រៅអេក្រង់** សម្រាប់ឌិកូដ Barcode/QR — មិនដែលភ្ជាប់ទៅ document
  * - **វដ្តជីវិតរបស់ទំព័រ** (`readyState` · `visibilitychange` · `hidden`) — ជា
  *   ព្រឹត្តិការណ៍របស់ browser មិនមែន DOM ដែល React គូរ
+ * - **ទីតាំងរមូររបស់ document** (`<html>` · `<body>` · `window`) — ក្រៅ `#root`
  */
 
 /** ទំព័រផ្ទុកចប់ (`load` បាញ់រួច) */
@@ -24,6 +25,24 @@ export function documentIsHidden(): boolean {
 /** ស្តាប់ការប្តូរភាពមើលឃើញរបស់ទំព័រ */
 export function onDocumentVisibilityChange(fn: () => void): void {
     document.addEventListener('visibilitychange', fn);
+}
+
+/**
+ * រមូរ document ទៅកំពូល (`scrollingElement` · `<html>` · `<body>` · `window`) —
+ * `inner` រមូរធាតុរបស់ React (តាម `src/app/refs.ts`) **មុន** `window.scrollTo()` ដូចលំដាប់ដើម។
+ */
+export function resetDocumentScroll(inner?: () => void): void {
+    const root = document.scrollingElement || document.documentElement;
+    if (root) root.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    if (inner) inner();
+    scrollWindowToTop();
+}
+
+/** រមូរ `window` ទៅកំពូល (iOS រំកិលទំព័រពេលក្តារចុចលេច ➜ `visualViewport` resize) */
+export function scrollWindowToTop(): void {
+    window.scrollTo(0, 0);
 }
 
 /** ផ្ទៃគូរក្រៅអេក្រង់ (ឌិកូដ Barcode/QR) */

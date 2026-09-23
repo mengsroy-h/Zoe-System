@@ -100,12 +100,17 @@ ZoeW ដើមគ្មានការពិនិត្យសោះ។ កា�
 | **slot** | React ជាម្ចាស់ *មាតិកា* នៃធាតុដែលមានស្រាប់ | `historyTableBody` · `siChips` · `toastContainer` |
 | **element slot** | React ជាម្ចាស់ *ធាតុទាំងមូល* | `<select>` ទាំង ៧ (តម្លៃជា state ➜ ការទុកឲ្យ DOM កាន់តម្លៃ ខណៈ React គូរជម្រើស បង្កើតការប្រណាំងលំដាប់) |
 
-### អ្វីដែល *នៅ* imperative ដោយចេតនា
+### អ្វីដែល *នៅ* imperative ដោយចេតនា (ច្រកចេញ — React គ្មានទម្រង់ប្រកាស)
 
 | កន្លែង | ហេតុអ្វី |
 |---|---|
-| ចលនារបស់ PTR (`style.transform` រាល់ `touchmove`) · FLIP របស់ផ្ទាំង | React គូរ *ធាតុ* ចំណែកកាយវិការកាន់ *ចលនា* តាម ref (`src/app/behaviors/`) ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
-| focus · តម្លៃ input · ការវាស់ · ការរមូរ · វីដេអូកាមេរ៉ា | ref តាមឈ្មោះ (`src/app/refs.ts`) — ច្រកចេញបន្ទាន់ដែល React ណែនាំ |
+| focus · តម្លៃ input · ការរមូរ · FLIP របស់ផ្ទាំង (`animate()`) | ច្រកចេញតែមួយ `src/app/refs.ts` — ច្រកចេញបន្ទាន់ដែល React ណែនាំ (input ជា uncontrolled) |
+| វីដេអូកាមេរ៉ា (`srcObject` · `muted`) | React គ្មាន prop `srcObject` · React មិនសរសេរ attribute `muted` (iOS autoplay) |
+| listener `touch*` របស់ការអូសផ្ទាំង | React ចាក់ listener `touch*` ជា passive ➜ `preventDefault()` របស់ iOS មិនដើរ |
+| `<html>`/`<body>` (class · អថេរ CSS · overflow · title) | ក្រៅ `#root` ➜ `DocumentEffects` ពី state (`useLayoutEffect`) |
+
+⛔ **សញ្ញា PTR គូរដោយ React** (`ptrState` ➜ `PtrIndicator`) រាល់ `touchmove` ក្នុងការ dispatch ដដែល
+(`native-check` វាស់) — លែងជាការសរសេរ `style` ផ្ទាល់ទៀតហើយ។
 | `<link rel=preconnect>` · `<script>` loader · `<canvas>` ក្រៅអេក្រង់ · `<a download>` | នៅក្រៅ `#root` ឬមិនដែលចូល DOM ➜ រស់ក្នុង `src/platform/document-io.ts` តែមួយ (ការលើកលែងមានហេតុផល និងពិដានចំនួនក្នុង `purity:check`) |
 
 ⛔ ក្រៅពីនេះ **React ជាម្ចាស់ DOM តែមួយ** ៖ កូដមុខងារ (`core` · `domain` · `features` ·

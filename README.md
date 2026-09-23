@@ -1,11 +1,12 @@
 # Zoe-System — ប្រព័ន្ធគ្រប់គ្រងកញ្ចប់ទំនិញ
 
-ប្រព័ន្ធ PWA សម្រាប់អាជីវកម្មដឹកជញ្ជូន — សរសេរជា vanilla JavaScript
-គ្មាន framework គ្មាន build step ហើយ deploy ជា Netlify site static។
+ប្រព័ន្ធ PWA សម្រាប់អាជីវកម្មដឹកជញ្ជូន — **ZoeW** សរសេរលើ React + TypeScript
++ Vite (មាន build step) ចំណែក **ZoeKeyGen** ជា vanilla JavaScript គ្មាន build
+step; App ទាំង ២ deploy ជា Netlify site។
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.37.3` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet | `2.38.0` |
 | **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.20.2` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
@@ -26,7 +27,7 @@
   ដែលឡើងរាល់ពេលឯកសារ static ណាមួយប្រែ — វា **មិនមែន** ជាកំណែផលិតផលទេ។
 - កំណែបង្ហាញដល់អ្នកប្រើ **២ កន្លែងក្នុង ZoeW** (ប្រអប់ចូល និងខាងក្រោមរបា Slide)
   និង **១ កន្លែងក្នុង ZoeKeyGen**។ លេខកំណែ ZoeW អាចចុចបើក
-  **[សៀវភៅណែនាំ HTML](ZoeW/guide.html)** បាន។
+  **[សៀវភៅណែនាំ HTML](ZoeW/public/guide.html)** បាន។
 - ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[docs/HISTORY.md](docs/HISTORY.md)**។
 
 **ពិនិត្យកំណែឲ្យស៊ីគ្នា**
@@ -82,13 +83,14 @@ node audit-tools/version-bump-scope.js   # ឡើងកំណែតែ App ដ�
 
 ### ១. Deploy (ម្តងក្នុងមួយ App)
 
-App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក** — មិនមាន build step ទេ។
+App ទាំង ២ ជា **Netlify site ដាច់ដោយឡែក**។ `netlify.toml` ក្នុងថតនីមួយៗ
+កំណត់ build និង publish រួចរាល់ហើយ ៖
 
 | ការកំណត់ | ZoeW | ZoeKeyGen |
 |---|---|---|
 | Base directory | `ZoeW` | `ZoeKeyGen` |
-| Build command | (ទទេ) | (ទទេ) |
-| Publish directory | `.` | `.` |
+| Build command | `npm run build` | (ទទេ) |
+| Publish directory | `dist` | `.` |
 
 ⛔ **Firebase rules មិន deploy ស្វ័យប្រវត្តិទេ** — Netlify បម្រើតែឯកសារ static។
 រាល់ពេល `firebase-database.rules.json` ប្រែ ត្រូវ paste ចូល Firebase Console ➜

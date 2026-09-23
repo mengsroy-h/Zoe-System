@@ -1,0 +1,21 @@
+/**
+ * សញ្ញា Pull-to-Refresh ។
+ *
+ * ⛔ **ការបែងចែកភារកិច្ច** ៖ React ជាម្ចាស់ *វត្តមាន និងរចនាសម្ព័ន្ធ* របស់
+ *    ធាតុនេះ ចំណែក `setupIOSPullToRefresh()` ជាម្ចាស់ *ចលនា* (វាកែ
+ *    `style.transform` រាល់ `touchmove`)។ ការដាក់ចលនានោះចូល state របស់
+ *    React នឹងគូរឡើងវិញ **រាល់ស៊ុមនៃម្រាមដៃ** ➜ វាប្តូរឥរិយាបថនៃតំបន់ដែល
+ *    `CLAUDE.md` ហាមប៉ះ (PTR · ភាពរលូននៃការរមូរ)។
+ *
+ * ⛔ លក្ខខណ្ឌ `standalone === true` ត្រូវ **ដូច `setupIOSPullToRefresh()`
+ *    បេះបិទ** ៖ App ដើមសាងធាតុនេះ *តែលើ iOS standalone* ➜ ការគូរវាគ្រប់
+ *    ទីកន្លែង នឹងបន្ថែមធាតុដែល App ដើមគ្មាន (ការបាត់ parity)។
+ */
+export function PtrIndicator() {
+    if ((window.navigator as any).standalone !== true) return null;
+    return (
+        <div className="ptr-indicator" aria-hidden="true">
+            <div className="ptr-spinner"></div>
+        </div>
+    );
+}

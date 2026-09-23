@@ -1,31 +1,23 @@
-const CACHE_VERSION = 'zoew-v222';
+/// <reference lib="webworker" />
+declare const self: ServiceWorkerGlobalScope;
 
-const CORE_SHELL = [
-    './',
-    './index.html',
-    './guide.html',
-    './style.css',
-    './app.js',
-    './boot-flags.js',
-    './firebase-loader.js',
-    './license-verify.js',
-    './error-reporting.js',
-    './vendor/zxing-wasm.js',
-    './vendor/zxing_reader.wasm'
-];
+/* ⛔ បញ្ជីសំបកមិនសរសេរដោយដៃទៀតទេ។
+ * ក្នុង App ចាស់ `CORE_SHELL` ជាបញ្ជីរឹង ➜ ធនធានថ្មីដែលភ្លេចដាក់ចូល
+ * ធ្វើឲ្យការស្កេន **ស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ**។ ឥឡូវ Vite ចាក់វាចូល
+ * ពី `dist/` ពិត (មើល `serviceWorkerPlugin` ក្នុង `vite.config.mts`)។ */
+declare const __CACHE_VERSION__: string;
+declare const __CORE_SHELL__: string[];
+declare const __OPTIONAL_SHELL__: string[];
 
-const OPTIONAL_SHELL = [
-    './vendor/xlsx.full.min.js',
-    './manifest.json',
-    './icon-192.png',
-    './icon-512.png'
-];
+const CACHE_VERSION = __CACHE_VERSION__;
+const CORE_SHELL = __CORE_SHELL__;
+const OPTIONAL_SHELL = __OPTIONAL_SHELL__;
 
 const SHELL_PATHS = new Set(
     CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
 );
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
             .then((cache) => cache.addAll(CORE_SHELL).then(() => Promise.all(
@@ -35,7 +27,7 @@ self.addEventListener('install', (event) => {
     );
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', (event: ExtendableEvent) => {
     event.waitUntil(
         caches.keys().then((keys) =>
             Promise.all(keys.filter((key) => (key.startsWith('zoew-') || key.startsWith('zoeadmin-')) && key !== CACHE_VERSION).map((key) => caches.delete(key)))
@@ -46,7 +38,7 @@ self.addEventListener('activate', (event) => {
 const GUIDE_PATH = new URL('./guide.html', self.location.href).pathname;
 const GUIDE_PRETTY_PATH = GUIDE_PATH.replace(/\.html$/, '');
 
-function cacheKeyFor(request) {
+function cacheKeyFor(request: Request): string | Request {
     const url = new URL(request.url);
     if (request.mode === 'navigate') {
         return url.pathname === GUIDE_PATH || url.pathname === GUIDE_PRETTY_PATH ? './guide.html' : './index.html';
@@ -54,8 +46,9 @@ function cacheKeyFor(request) {
     return SHELL_PATHS.has(url.pathname) ? url.pathname : request;
 }
 
-function linkIsFrugal() {
-    const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+function linkIsFrugal(): boolean {
+    const nav = navigator as any;
+    const link = nav.connection || nav.mozConnection || nav.webkitConnection;
     if (!link) return false;
     if (link.saveData === true) return true;
     const type = String(link.effectiveType || '');
@@ -64,17 +57,17 @@ function linkIsFrugal() {
 
 const REVALIDATE_TIMEOUT_MS = 6000;
 const REVALIDATE_MAX_IN_FLIGHT = 3;
-const revalidateInFlight = new Set();
+const revalidateInFlight = new Set<string>();
 
-function revalidateShell(cache, request, cacheKey) {
-    if (navigator.onLine === false) return Promise.resolve();
+function revalidateShell(cache: Cache, request: Request, cacheKey: string | Request): Promise<void> {
+    if ((navigator.onLine as boolean) === false) return Promise.resolve();
     if (linkIsFrugal()) return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
     if (revalidateInFlight.has(key)) return Promise.resolve();
     if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT) return Promise.resolve();
     revalidateInFlight.add(key);
 
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const controller: AbortController | null = typeof AbortController === 'function' ? new AbortController() : null;
     let released = false;
     const release = () => {
         if (released) return;
@@ -82,7 +75,7 @@ function revalidateShell(cache, request, cacheKey) {
         clearTimeout(timer);
         revalidateInFlight.delete(key);
     };
-    const timer = setTimeout(() => {
+    const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
         if (controller) { try { controller.abort(); } catch (e) {} }
         release();
     }, REVALIDATE_TIMEOUT_MS);
@@ -96,13 +89,13 @@ function revalidateShell(cache, request, cacheKey) {
 
 const NETWORK_TIMEOUT_MS = 20000;
 
-function timedFetch(request, options) {
+function timedFetch(request: RequestInfo, options?: RequestInit): Promise<Response> {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const sourceSignal = (options && options.signal) || (request && request.signal) || null;
-    const opts = controller ? Object.assign({}, options || {}, { signal: controller.signal }) : options;
-    return new Promise((resolve, reject) => {
+    const sourceSignal: AbortSignal | null = (options && options.signal) || ((request as Request) && (request as Request).signal) || null;
+    const opts: RequestInit | undefined = controller ? Object.assign({}, options || {}, { signal: controller.signal }) : options;
+    return new Promise<Response>((resolve, reject) => {
         let settled = false;
-        let timer = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
         const stop = () => {
             if (timer !== null) {
                 clearTimeout(timer);
@@ -117,7 +110,7 @@ function timedFetch(request, options) {
             settled = true;
             if (controller) { try { controller.abort(); } catch (e) {} }
             stop();
-            const err = new Error('Aborted');
+            const err: any = new Error('Aborted');
             err.name = 'AbortError';
             reject(err);
         };
@@ -134,7 +127,7 @@ function timedFetch(request, options) {
             settled = true;
             if (controller) { try { controller.abort(); } catch (e) {} }
             stop();
-            const err = new Error('Network timed out');
+            const err: any = new Error('Network timed out');
             err.name = 'AbortError';
             reject(err);
         }, NETWORK_TIMEOUT_MS);
@@ -152,11 +145,11 @@ function timedFetch(request, options) {
     });
 }
 
-function networkOnly(request, options) {
+function networkOnly(request: RequestInfo, options?: RequestInit): Promise<Response> {
     return timedFetch(request, options).then((response) => response || Response.error(), () => Response.error());
 }
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', (event: FetchEvent) => {
     const { request } = event;
     if (request.method !== 'GET') return;
 
@@ -171,7 +164,7 @@ self.addEventListener('fetch', (event) => {
     const cacheKey = cacheKeyFor(request);
     const isShell = typeof cacheKey === 'string';
     const networkTarget = request.mode === 'navigate' ? cacheKey : request;
-    const networkOptions = request.mode === 'navigate' ? { signal: request.signal } : undefined;
+    const networkOptions: RequestInit | undefined = request.mode === 'navigate' ? { signal: request.signal } : undefined;
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>

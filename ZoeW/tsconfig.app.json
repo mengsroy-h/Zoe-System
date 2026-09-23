@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    "strict": true,
+
+    /* ⛔ `strictNullChecks` បិទដោយ *ចេតនា* ៖ កូដដែលផ្ទេរពី `app.js` មិនដែល
+       ពិនិត្យ `null` ទេ ➜ ការបន្ថែមការពិនិត្យថ្មី ជាការប្តូរ **ឥរិយាបថ**
+       មិនមែនការបន្ថែមសុវត្ថិភាព។ មើល `docs/TYPESCRIPT.md` ៖ ផ្លូវតឹង
+       បន្តិចម្តងៗ តាម module។ */
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": false,
+    "forceConsistentCasingInFileNames": true,
+
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vite/client"]
+  },
+  "include": ["src", "tests", "vite.config.mts", "scripts"]
+}

@@ -1,7 +1,9 @@
 # ZoeW — កម្មវិធីគ្រប់គ្រងកញ្ចប់
 
 PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្ធ Zoe។ ដំឡើងលើទូរស័ព្ទបាន ដំណើរការក្រៅបណ្តាញបាន
-ហើយប្រើ Firebase Realtime Database ជាប្រភពទិន្នន័យ។
+ហើយប្រើ Firebase Realtime Database ជាប្រភពទិន្នន័យ។ កូដសរសេរលើ **React +
+TypeScript + Vite** — ការអភិវឌ្ឍ · build · ការវាស់ parity ស្ថិតក្នុង
+**[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**។
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -11,12 +13,12 @@ PWA អាជីវកម្មចម្បងរបស់ប្រព័ន្�
 
 ## កំណែ
 
-កំណែបច្ចុប្បន្ន **`2.37.3`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
+កំណែបច្ចុប្បន្ន **`2.38.0`** — ជាកំណែ **របស់ ZoeW ផ្ទាល់** (ដាច់ពី ZoeKeyGen
 តាំងពី 2.19.4) ហើយត្រូវស៊ីនឹង `version` ក្នុង `manifest.json` **របស់ ZoeW**។
 
 - បង្ហាញ **២ កន្លែង** ៖ ប្រអប់ចូលប្រព័ន្ធ និងខាងក្រោមរបា Slide។ ចុចលើលេខ
-  កំណែដើម្បីបើក **[សៀវភៅណែនាំអ្នកប្រើប្រាស់](guide.html)** ជា HTML។
-- `CACHE_VERSION` ក្នុង `sw.js` (`zoew-vN`) ជាកូនសោ cache ដាច់ដោយឡែក ដែលឡើង
+  កំណែដើម្បីបើក **[សៀវភៅណែនាំអ្នកប្រើប្រាស់](public/guide.html)** ជា HTML។
+- `CACHE_VERSION` របស់ Service Worker (`zoew-vN`) ជាកូនសោ cache ដាច់ដោយឡែក ដែលឡើង
   រាល់ពេលឯកសារ static ណាមួយប្រែ។ កំណែថ្មីមកដល់តាមផ្លូវនោះ — ពេល Service
   Worker ថ្មីចាប់យក របាជូនដំណឹងលេចឡើងឲ្យអ្នកប្រើ Refresh។
 - ប្រវត្តិការផ្លាស់ប្តូរពេញលេញ ៖ **[docs/HISTORY.md](../docs/HISTORY.md)**។
@@ -148,8 +150,11 @@ Barcode ដែលយករួចចាប់ផ្តើមរយៈពេល **
 
 ### ១. Deploy
 
-Netlify site មួយ ដោយ **Base directory = `ZoeW`** · Build command **ទទេ** ·
-Publish directory **`.`**។ គ្មាន build step ទេ។
+Netlify site មួយ ដោយ **Base directory = `ZoeW`** (⛔ ប្រកាន់អក្សរតូចធំ) ·
+Build command **`npm run build`** · Publish directory **`dist`** · Functions
+directory **`netlify/functions`**។ `netlify.toml` ក្នុងថតនេះកំណត់ទាំងអស់នោះ
+រួចរាល់ហើយ — ជំហាន build និងការផ្ទៀងផ្ទាត់មុន deploy ស្ថិតក្នុង
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)។
 
 Firebase rules (`../firebase-database.rules.json`) ត្រូវ paste ចូល Firebase
 Console ➜ **Publish** ដោយដៃ។ ⛔ វាមិន deploy ស្វ័យប្រវត្តិទេ។
@@ -403,7 +408,8 @@ Lookup API និងការតភ្ជាប់នាំចូល Excel។ �
 ### ការការពារខាង Browser
 
 - **`script-src` គ្មាន `'unsafe-inline'`** ➜ អក្សរចម្លែកដែលចូលដល់ទំព័រ
-  មិនអាចរត់បានទេ។ ការចុចប៊ូតុងធ្វើតាម `data-act` បូក **បញ្ជីអនុញ្ញាត**។
+  មិនអាចរត់បានទេ។ ការចុចប៊ូតុងធ្វើតាម handler របស់ React ឬ `data-act`
+  បូក **បញ្ជីអនុញ្ញាត** ដែលពិនិត្យពេល build។
 - **គ្មាន `onclick=` សល់សោះ** ➜ ថ្នាក់កំហុស «escape ២ ជាន់» កើតមិនបាន។
 - **`frame-ancestors 'none'`** · **`object-src 'none'`** · **`base-uri 'self'`** ·
   HSTS · `X-Content-Type-Options: nosniff`។
@@ -480,8 +486,10 @@ Key នីមួយៗចងនឹង **ឧបករណ៍តាមពិដា�
 ម្ចាស់ software ទេ។ ការថតចម្លងទុក និងការការពារទិន្នន័យនោះ ជាការទទួល
 ខុសត្រូវរួមដែលត្រូវព្រមព្រៀងជាមួយអាជីវកម្មនីមួយៗ។
 
-⛔ App នេះ ship កូដភាគីទីបី **៣** ក្នុង `vendor/` (SheetJS · zxing-wasm ·
-ZXing-C++) ដែលមានអាជ្ញាប័ណ្ណរៀងៗខ្លួន — មិនស្ថិតក្រោមកម្មសិទ្ធិឯកជននេះទេ។
+⛔ App នេះ ship កូដភាគីទីបី **៣** ក្នុង `public/vendor/` (SheetJS ·
+zxing-wasm · ZXing-C++) បូក **React** (`react` · `react-dom` · `scheduler`)
+ដែល build ភ្ជាប់ចូល bundle — ពួកវាមានអាជ្ញាប័ណ្ណរៀងៗខ្លួន មិនស្ថិតក្រោម
+កម្មសិទ្ធិឯកជននេះទេ។
 
 ⛔ **អត្ថបទអាជ្ញាប័ណ្ណពេញលេញជាឯកសារគ្រប់គ្រង** — សេចក្តីសង្ខេបខាងលើមិន
 ជំនួសវាទេ ៖

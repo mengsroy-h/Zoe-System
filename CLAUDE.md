@@ -93,13 +93,28 @@
 
 ## ប្រព័ន្ធនេះជាអ្វី
 
-**PWA ចំនួន ២** (vanilla JS, គ្មាន framework, គ្មាន build step) — deploy ជា
-Netlify site ដាច់ដោយឡែក ៖
+**PWA ចំនួន ២** — deploy ជា Netlify site ដាច់ដោយឡែក ៖ **ZoeW** ជា **React +
+TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (គ្មាន build step) ៖
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.37.3` (`zoew-v222`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.38.0` (`zoew-v223`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.2` (`zoekeygen-v101`) | `zoekeygen` |
+
+> ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (កើតពី `app.js`
+> ដើមដោយ codemod ➜ **ឈ្មោះ function និងកូនសោ storage ដដែល**) ហើយ build ➜
+> `ZoeW/dist/`។ កន្លែងណាក្នុងឯកសារនេះនិយាយ «`ZoeW/app.js`» · «`ZoeW/index.html`» ·
+> «`ZoeW/sw.js`» ➜ **ច្បាប់នៅដដែល** តែកូដរស់នៅ `src/**` · JSX · `src/sw/sw.ts`។
+> ស្ថាបត្យកម្ម ៖ [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md) · ការអភិវឌ្ឍ
+> និងការវាស់ parity ៖ [`ZoeW/docs/DEVELOPMENT.md`](ZoeW/docs/DEVELOPMENT.md)។
+> 🔴 **checker ភាគច្រើនក្នុង `audit-tools/` មិនទាន់វាស់ App នេះបានទេ** — ពួកវាស្រង់
+> អត្ថបទពី `ZoeW/app.js` · អាន markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>`
+> (ការហៅខាងក្នុង module មិនឆ្លងកាត់ `window`) ➜ ជួរក្នុងតារាង «ច្បាប់ ➜ ឧបករណ៍»
+> ដែលយាម ZoeW **ភាគច្រើនមិនរត់**។ លេខដែលវាស់បាន ៖ `ZoeW/docs/PARITY-RESULTS.md`។
+> ⛔ `check-money.cmd` (`money-reality-check.js`) ក៏ស្រង់កូដលុយពី `ZoeW/app.js`
+> ដែរ ➜ វាស់លុយលើ dump ផលិតកម្មពី `main` រហូតដល់វាត្រូវផ្ទេរ។
+> ⛔ **កុំ merge ចូល `main`** មុនការផ្ទេរ checker និងការសាកលើ iPhone + Android
+> ពិត ៖ [`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ដំណាក់ ២។
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី

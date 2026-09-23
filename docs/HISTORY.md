@@ -342,6 +342,71 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.38.0] — 2026-09-23 · ZoeW ជា **React + TypeScript + Vite** (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់អោយ app ZoeW មាន framework និង build step
+ត្រឹមត្រូវ … កុំអោយបាត់មុខងារ ទោះ ០.១%»* រួច *«បើអាចជំនួស ZoeW បាន សូម commit
+push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»*។
+
+#### អ្វីដែលប្រែ
+
+- `ZoeW/` ទាំងមូលជំនួសដោយគម្រោង React 19 + TypeScript + Vite ៖ កូដតក្កវិជ្ជា
+  ក្នុង `src/core` · `src/domain` · `src/features` · `src/services` · `src/ui`
+  **កើតពី `app.js` ដើមដោយ codemod** (ឈ្មោះ function · ថេរ · កូនសោ storage
+  ដដែល) ហើយ UI ទាំងមូលជា React component។ `style.css` **ដូចដើម byte-for-byte**។
+- Netlify ៖ Build command `npm run build` · Publish `dist` (កំណត់ក្នុង
+  `ZoeW/netlify.toml`)។ Function ZTO **ដូចដើម byte-for-byte**។
+- `license-verify.js` · `error-reporting.js` នៅ byte-identical ជាមួយ ZoeKeyGen
+  (ឥឡូវរស់នៅ `ZoeW/public/`)។
+
+#### អ្វីដែលវាស់បាន (លម្អិត ៖ `ZoeW/docs/PARITY-RESULTS.md`)
+
+| ការវាស់ | លទ្ធផល |
+|---|---|
+| កាតាឡុក (function · ថេរ · state · `data-act` · id · កូនសោ storage · អត្ថបទ · CSS) | ១០០% ទាំង ៨ អ័ក្ស |
+| DOM និង layout ទំហំអេក្រង់ ៣ | ធាតុ ៧២១/៧២១ ដូចគ្នា |
+| ជំហាន ៧៩ (ផ្លូវលុយ · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF) × ៦ ជាន់ | ដូចគ្នាបេះបិទ ធៀបនឹង App ដើមដែលកំពុងរត់ |
+| function ធៀបដើមតាម token | ដូចគ្នា ៦៧៥ · ខុសដោយចេតនា ៦៤ · បាត់ ០ · តំបន់ហាមចូល ៣០/៣១ (`setupIOSPullToRefresh` ខុសដោយចេតនា) |
+| checker តំបន់ហាមចូលរបស់ `audit-tools/` លើ App React | `gesture` ១០៧ · `panel-motion` ៤៧ · `ios-panel-glide` ៣៨ — បៃតង |
+| **`audit-tools/run-all.sh` ទាំងមូល** (tree សម្រួល) | ✅ **៥៨** · ❌ **១២០** · ⏭️ ៣ (គ្មាន emulator) |
+
+⛔ **ការធ្លាក់ ១២០ ភាគច្រើនជា *រចនាសម្ព័ន្ធ*** — checker ស្រង់អត្ថបទពី
+`app.js` · អាន markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>` ដែលការហៅ
+ខាងក្នុង module មិនឆ្លងកាត់ ➜ **ពួកវាមិនបានវាស់ App នេះ**។ ⛔ ការធ្លាក់ទាំងនោះ
+**មិនត្រូវបានពិនិត្យម្តងមួយៗទាំងអស់ទេ** ➜ «រចនាសម្ព័ន្ធ» ជាការចាត់ថ្នាក់តាម
+គំរូ មិនមែនការធានា។ ការរត់ដោយផ្ទាល់លើ repo (គ្មាន tree សម្រួល) ៖ checker ZoeW
+ស្ទើរទាំងអស់ធ្លាក់ដោយ `ENOENT … ZoeW/app.js`។
+
+#### កំហុសពិតដែល checker ដើមរកឃើញ (parity មើលមិនឃើញ) — កែរួច
+
+| កំហុស | អ្នកចាប់ |
+|---|---|
+| `"type": "module"` ក្នុង `ZoeW/package.json` ➜ Node ផ្ទុក Function ZTO (`require`) ជា ES module ➜ `require is not defined` | `zto-proxy-test` |
+| `package-lock.json` ឃ្លាតពី `package.json` (ឈ្មោះ · កំណែ · `engines` · react ក្នុង `dependencies`) | `repository-contract-test` |
+| `ZoeW/README.md` ក្លាយជាឯកសារអ្នកអភិវឌ្ឍ ➜ បាត់ផ្នែក ៥ នៃច្បាប់ ៩ និងខ្លឹមសារ «របៀបប្រើ» | `doc-scope-test` |
+| build ship sourcemap ដែលផ្ទុក comment (ច្បាប់ ៣) | ការពិនិត្យដោយដៃ |
+| `firebase-loader.js` ក្នុង `public/` មាន comment (ច្បាប់ ៣) | `comments` |
+
+⛔ **មេរៀន** ៖ parity ប្រៀបធៀប **App** ចាស់នឹងថ្មី — តែ Function ខាង server ·
+`package.json` · ឯកសារ repo **ស្ថិតក្រៅ App** ➜ harness parity ក្លែង ZTO តាម
+`route` ហើយ **មិនដែលផ្ទុក Function ពិតសោះ**។ checker ដើមនៅតែចាំបាច់។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** ។ លក្ខខណ្ឌ ៖ (ក) សាកលើ **iPhone (PWA លើអេក្រង់
+   ដើម) និង Android ពិត** — PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ (ច្បាប់ ១១);
+   (ខ) checker របស់ `audit-tools/` ត្រូវវាស់ App នេះបានពិត (ផ្ទេរទៅ `src/**` ឬ
+   ហៅតាម module) និងចាត់ឯកសារថ្មីក្នុង `audit-tools/repository-file-coverage.json`
+   (ឥឡូវ `repository-file-coverage` ធ្លាក់ ៖ ឯកសារថ្មីគ្មានអ្នកយាម)។ លម្អិត ៖
+   `ZoeW/docs/MIGRATION.md` ដំណាក់ ២។
+២. ការសាកលើ deploy preview មាន **origin ផ្សេង** ➜ ត្រូវ Activate ម្តងទៀត ➜
+   ⛔ **ស៊ីកៅអីឧបករណ៍** (`maxDevices`) ➜ ប្រើ Key សាកល្បង ឬសុំ admin ដោះកៅអីក្រោយ
+   សាករួច។
+៣. ⛔ **`check-money.cmd` (`tools/money-check-windows/`) លែងដើរលើ branch នេះ** —
+   `money-reality-check.js` ស្រង់ **កូដលុយពិត** ពី `ZoeW/app.js` ដែលលែងមាន ➜
+   ការវាស់លុយលើ dump ផលិតកម្ម ត្រូវរត់ពី `main` រហូតដល់ឧបករណ៍នោះត្រូវផ្ទេរ។
+៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
+
 ### [2.37.3 · 2.20.2] — 2026-09-18 · Deep Audit — បញ្ជីពាក្យសម្ងាត់ ២ មិនស៊ីគ្នា · ស្នាមភ្ជាប់ SW abort
 
 **ZoeW ប្រែ** (`zoew-v221` ➜ `zoew-v222`) **និង ZoeKeyGen ប្រែ**

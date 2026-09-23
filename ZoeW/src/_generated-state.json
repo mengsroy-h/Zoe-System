@@ -1,0 +1,898 @@
+{
+  "firebaseState": [
+    {
+      "name": "authButtonIsLoggedIn",
+      "init": "false",
+      "line": 233
+    },
+    {
+      "name": "firebaseConfig",
+      "init": "null",
+      "line": 344
+    },
+    {
+      "name": "fb",
+      "init": "null",
+      "line": 345
+    },
+    {
+      "name": "auth",
+      "init": "null",
+      "line": 346
+    },
+    {
+      "name": "db",
+      "init": "null",
+      "line": 347
+    },
+    {
+      "name": "dbRefHistory",
+      "init": "null",
+      "line": 348
+    },
+    {
+      "name": "dbRefDeleted",
+      "init": "null",
+      "line": 349
+    },
+    {
+      "name": "dbRefDailyRevenue",
+      "init": "null",
+      "line": 350
+    },
+    {
+      "name": "dbRefMonthlyRevenue",
+      "init": "null",
+      "line": 351
+    },
+    {
+      "name": "dbRefDailyPickup",
+      "init": "null",
+      "line": 352
+    },
+    {
+      "name": "dbRefDailyCollected",
+      "init": "null",
+      "line": 353
+    },
+    {
+      "name": "dbRefExchangeRate",
+      "init": "null",
+      "line": 354
+    },
+    {
+      "name": "dbRefConnected",
+      "init": "null",
+      "line": 355
+    },
+    {
+      "name": "dbRefServerTimeOffset",
+      "init": "null",
+      "line": 356
+    },
+    {
+      "name": "authUnsubscribe",
+      "init": "null",
+      "line": 357
+    },
+    {
+      "name": "authRecoveryTimeout",
+      "init": "null",
+      "line": 358
+    },
+    {
+      "name": "authGeneration",
+      "init": "0",
+      "line": 359
+    },
+    {
+      "name": "sessionExpiryCheck",
+      "init": "'pending'",
+      "line": 360
+    },
+    {
+      "name": "isDatabaseConnected",
+      "init": "false",
+      "line": 361
+    },
+    {
+      "name": "hasEverConnectedToDatabase",
+      "init": "false",
+      "line": 362
+    },
+    {
+      "name": "networkJustReturned",
+      "init": "false",
+      "line": 363
+    },
+    {
+      "name": "autoLoginAttempted",
+      "init": "false",
+      "line": 388
+    },
+    {
+      "name": "isInitializingFirebase",
+      "init": "false",
+      "line": 394
+    },
+    {
+      "name": "serverTimeOffsetMs",
+      "init": "0",
+      "line": 422
+    },
+    {
+      "name": "serverClockTrusted",
+      "init": "false",
+      "line": 427
+    },
+    {
+      "name": "isDatabaseInitialized",
+      "init": "false",
+      "line": 441
+    },
+    {
+      "name": "dbListenersFailed",
+      "init": "false",
+      "line": 442
+    },
+    {
+      "name": "dbListenerRecoveryTimer",
+      "init": "null",
+      "line": 443
+    },
+    {
+      "name": "dbListenerRecoveryAttempt",
+      "init": "0",
+      "line": 444
+    },
+    {
+      "name": "lastDbListenerAttemptAt",
+      "init": "0",
+      "line": 445
+    },
+    {
+      "name": "dbListenerOutageNoticeShown",
+      "init": "false",
+      "line": 446
+    },
+    {
+      "name": "dbListenerPendingSeen",
+      "init": "0",
+      "line": 460
+    },
+    {
+      "name": "dbListenerProgressAt",
+      "init": "0",
+      "line": 461
+    },
+    {
+      "name": "dbListenerGeneration",
+      "init": "0",
+      "line": 462
+    },
+    {
+      "name": "infoListenersFailed",
+      "init": "false",
+      "line": 465
+    },
+    {
+      "name": "infoListenerRecoveryTimer",
+      "init": "null",
+      "line": 466
+    },
+    {
+      "name": "infoListenerRecoveryAttempt",
+      "init": "0",
+      "line": 467
+    },
+    {
+      "name": "infoListenerGeneration",
+      "init": "0",
+      "line": 468
+    },
+    {
+      "name": "reconnectWatchdogTimer",
+      "init": "null",
+      "line": 469
+    },
+    {
+      "name": "reconnectWatchdogAttempt",
+      "init": "0",
+      "line": 470
+    },
+    {
+      "name": "lastForcedReconnectAt",
+      "init": "0",
+      "line": 471
+    },
+    {
+      "name": "firebaseSdkRetryTimer",
+      "init": "null",
+      "line": 867
+    },
+    {
+      "name": "firebaseSdkRetryAttempt",
+      "init": "0",
+      "line": 868
+    },
+    {
+      "name": "lastFirebaseSdkAttemptAt",
+      "init": "0",
+      "line": 869
+    },
+    {
+      "name": "lastFirebaseSdkReloadAt",
+      "init": "0",
+      "line": 870
+    },
+    {
+      "name": "lateFirebaseSdkListenerArmed",
+      "init": "false",
+      "line": 871
+    },
+    {
+      "name": "firebaseSdkUnavailable",
+      "init": "false",
+      "line": 872
+    },
+    {
+      "name": "sdkUnavailableNoticeShown",
+      "init": "false",
+      "line": 873
+    },
+    {
+      "name": "sessionExpiryCheckInFlight",
+      "init": "false",
+      "line": 4672
+    },
+    {
+      "name": "licenseRecheckInFlight",
+      "init": "false",
+      "line": 4860
+    }
+  ],
+  "dataState": [
+    {
+      "name": "exchangeRateRiel",
+      "init": "parseFloat(safeStoreGet(appLocalStore, 'zoew_exchange_rate')) || 4100",
+      "line": 365
+    },
+    {
+      "name": "scanHistory",
+      "init": "[]",
+      "line": 392
+    },
+    {
+      "name": "deletedItems",
+      "init": "[]",
+      "line": 393
+    },
+    {
+      "name": "dailyRevenueData",
+      "init": "{}",
+      "line": 395
+    },
+    {
+      "name": "monthlyRevenueData",
+      "init": "{}",
+      "line": 396
+    },
+    {
+      "name": "dailyPickupData",
+      "init": "{}",
+      "line": 397
+    },
+    {
+      "name": "dailyCollectedData",
+      "init": "{}",
+      "line": 398
+    },
+    {
+      "name": "pickupResetInFlight",
+      "init": "false",
+      "line": 399
+    },
+    {
+      "name": "exchangeRateSaveInFlight",
+      "init": "false",
+      "line": 412
+    },
+    {
+      "name": "historyPatchFlushInFlight",
+      "init": "false",
+      "line": 416
+    },
+    {
+      "name": "registryReleaseFlushInFlight",
+      "init": "false",
+      "line": 420
+    },
+    {
+      "name": "pickupLedgerRepairDone",
+      "init": "false",
+      "line": 463
+    },
+    {
+      "name": "pickupLedgerRepairRunning",
+      "init": "false",
+      "line": 464
+    },
+    {
+      "name": "recentPhonesSignature",
+      "init": "null",
+      "line": 5404
+    },
+    {
+      "name": "deletedCleanupInFlight",
+      "init": "false",
+      "line": 5425
+    },
+    {
+      "name": "cleanupResumeInFlight",
+      "init": "false",
+      "line": 5502
+    },
+    {
+      "name": "clearHistoryInFlight",
+      "init": "false",
+      "line": 14592
+    }
+  ],
+  "scanState": [
+    {
+      "name": "codeReader",
+      "init": "null",
+      "line": 367
+    },
+    {
+      "name": "liveScanCodeReader",
+      "init": "null",
+      "line": 368
+    },
+    {
+      "name": "scanConfirmCode",
+      "init": "''",
+      "line": 369
+    },
+    {
+      "name": "scanConfirmCount",
+      "init": "0",
+      "line": 370
+    },
+    {
+      "name": "scanConfirmAt",
+      "init": "0",
+      "line": 371
+    },
+    {
+      "name": "scanVideoResumeTimer",
+      "init": "null",
+      "line": 372
+    },
+    {
+      "name": "currentStream",
+      "init": "null",
+      "line": 373
+    },
+    {
+      "name": "isCameraScanning",
+      "init": "false",
+      "line": 374
+    },
+    {
+      "name": "isCameraStarting",
+      "init": "false",
+      "line": 375
+    },
+    {
+      "name": "cameraRequestId",
+      "init": "0",
+      "line": 376
+    },
+    {
+      "name": "pendingLoadedMetadataHandler",
+      "init": "null",
+      "line": 377
+    },
+    {
+      "name": "nativeLoopActive",
+      "init": "false",
+      "line": 378
+    },
+    {
+      "name": "zxingLoopActive",
+      "init": "false",
+      "line": 379
+    },
+    {
+      "name": "liveScanWidthIndex",
+      "init": "-1",
+      "line": 380
+    },
+    {
+      "name": "liveScanCostEma",
+      "init": "0",
+      "line": 381
+    },
+    {
+      "name": "lastDecodedVideoTime",
+      "init": "-1",
+      "line": 382
+    },
+    {
+      "name": "staleFrameStreak",
+      "init": "0",
+      "line": 383
+    },
+    {
+      "name": "freshFrameGateUsable",
+      "init": "true",
+      "line": 384
+    },
+    {
+      "name": "currentVideoTrack",
+      "init": "null",
+      "line": 389
+    },
+    {
+      "name": "torchOn",
+      "init": "false",
+      "line": 390
+    },
+    {
+      "name": "pendingBarcode",
+      "init": "\"\"",
+      "line": 403
+    },
+    {
+      "name": "lastScannedCode",
+      "init": "\"\"",
+      "line": 404
+    },
+    {
+      "name": "lastScanTime",
+      "init": "0",
+      "line": 405
+    },
+    {
+      "name": "nativeDetector",
+      "init": "null",
+      "line": 437
+    },
+    {
+      "name": "ownCaptureCanvas",
+      "init": "null",
+      "line": 9634
+    },
+    {
+      "name": "ownCaptureCtx",
+      "init": "null",
+      "line": 9635
+    }
+  ],
+  "uiState": [
+    {
+      "name": "perfSamplePending",
+      "init": "false",
+      "line": 385
+    },
+    {
+      "name": "displayHz",
+      "init": "60",
+      "line": 386
+    },
+    {
+      "name": "displayHzMeasured",
+      "init": "false",
+      "line": 387
+    },
+    {
+      "name": "currentFilterMode",
+      "init": "'today'",
+      "line": 401
+    },
+    {
+      "name": "customFilterDate",
+      "init": "''",
+      "line": 402
+    },
+    {
+      "name": "editingItemId",
+      "init": "null",
+      "line": 406
+    },
+    {
+      "name": "markingItemId",
+      "init": "null",
+      "line": 407
+    },
+    {
+      "name": "activeEditingBarcode",
+      "init": "null",
+      "line": 409
+    },
+    {
+      "name": "activeParentItemId",
+      "init": "null",
+      "line": 410
+    },
+    {
+      "name": "pendingRestoreId",
+      "init": "null",
+      "line": 411
+    },
+    {
+      "name": "isModalOpen",
+      "init": "false",
+      "line": 438
+    },
+    {
+      "name": "phoneModalDismissPromptOpen",
+      "init": "false",
+      "line": 439
+    },
+    {
+      "name": "searchTimer",
+      "init": "null",
+      "line": 440
+    },
+    {
+      "name": "globalAudioCtx",
+      "init": "null",
+      "line": 472
+    },
+    {
+      "name": "lastEnteredLocker",
+      "init": "safeStoreGet(appLocalStore, 'last_entered_locker') || \"\"",
+      "line": 474
+    },
+    {
+      "name": "currentAppPage",
+      "init": "'data'",
+      "line": 7456
+    },
+    {
+      "name": "panelGlideTokens",
+      "init": "0",
+      "line": 7588
+    },
+    {
+      "name": "panelGlideEpoch",
+      "init": "0",
+      "line": 7589
+    },
+    {
+      "name": "panelGlideRelease",
+      "init": "null",
+      "line": 7590
+    },
+    {
+      "name": "chromeHidden",
+      "init": "false",
+      "line": 7872
+    },
+    {
+      "name": "pdfExportOriginalTitle",
+      "init": "null",
+      "line": 8780
+    },
+    {
+      "name": "monthlyReportMonth",
+      "init": "''",
+      "line": 8948
+    },
+    {
+      "name": "lastRecallSignature",
+      "init": "''",
+      "line": 9864
+    },
+    {
+      "name": "pendingHistoryViewRefresh",
+      "init": "null",
+      "line": 9865
+    },
+    {
+      "name": "phoneSuggestItems",
+      "init": "[]",
+      "line": 9897
+    },
+    {
+      "name": "phoneSuggestActiveIndex",
+      "init": "-1",
+      "line": 9898
+    },
+    {
+      "name": "phoneSuggestHideTimer",
+      "init": "null",
+      "line": 9899
+    },
+    {
+      "name": "deletedSearchQuery",
+      "init": "''",
+      "line": 10300
+    },
+    {
+      "name": "activeLocker",
+      "init": "safeStoreGet(appLocalStore, ACTIVE_LOCKER_KEY) || ''",
+      "line": 10303
+    },
+    {
+      "name": "entryScanMode",
+      "init": "safeStoreGet(appLocalStore, ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel'",
+      "line": 10304
+    },
+    {
+      "name": "lockerBarcodeIndex",
+      "init": "{}",
+      "line": 10305
+    },
+    {
+      "name": "pendingLockerCode",
+      "init": "null",
+      "line": 10306
+    },
+    {
+      "name": "lockerAssignGeneration",
+      "init": "0",
+      "line": 10307
+    },
+    {
+      "name": "pendingScannedRemoval",
+      "init": "null",
+      "line": 10308
+    },
+    {
+      "name": "scanRemoveInFlight",
+      "init": "null",
+      "line": 10309
+    },
+    {
+      "name": "pendingPermanentDeleteId",
+      "init": "null",
+      "line": 12953
+    }
+  ],
+  "securityState": [
+    {
+      "name": "lookupSecretKey",
+      "init": "null",
+      "line": 1288
+    },
+    {
+      "name": "pinTargetAction",
+      "init": "null",
+      "line": 1438
+    },
+    {
+      "name": "isVerifyingPin",
+      "init": "false",
+      "line": 1553
+    },
+    {
+      "name": "biometricUnlockInFlight",
+      "init": "false",
+      "line": 1610
+    },
+    {
+      "name": "appIsLocked",
+      "init": "false",
+      "line": 1898
+    },
+    {
+      "name": "appLockBusy",
+      "init": "false",
+      "line": 1899
+    },
+    {
+      "name": "appLockExcuseAt",
+      "init": "0",
+      "line": 1900
+    },
+    {
+      "name": "appLockVeiled",
+      "init": "false",
+      "line": 1901
+    },
+    {
+      "name": "configQrReader",
+      "init": "null",
+      "line": 2529
+    },
+    {
+      "name": "configQrStream",
+      "init": "null",
+      "line": 2530
+    },
+    {
+      "name": "configQrScanActive",
+      "init": "false",
+      "line": 2531
+    }
+  ],
+  "lookupState": [
+    {
+      "name": "customerDataTableRows",
+      "init": "null",
+      "line": 3449
+    },
+    {
+      "name": "customerDataTableFetchedAt",
+      "init": "0",
+      "line": 3450
+    },
+    {
+      "name": "customerDataTableFetchPromise",
+      "init": "null",
+      "line": 3451
+    },
+    {
+      "name": "customerDataTableSessionGeneration",
+      "init": "0",
+      "line": 3452
+    },
+    {
+      "name": "customerDataTableLastFailedAt",
+      "init": "0",
+      "line": 3453
+    },
+    {
+      "name": "ztoWarmSoonTimer",
+      "init": "null",
+      "line": 3463
+    },
+    {
+      "name": "ztoWarmSoonArmedAt",
+      "init": "0",
+      "line": 3464
+    },
+    {
+      "name": "customerTableRetryTimer",
+      "init": "null",
+      "line": 3465
+    },
+    {
+      "name": "customerTableFailStreak",
+      "init": "0",
+      "line": 3466
+    },
+    {
+      "name": "customerTableSoonTimer",
+      "init": "null",
+      "line": 3467
+    },
+    {
+      "name": "customerTableSoonArmedAt",
+      "init": "0",
+      "line": 3468
+    },
+    {
+      "name": "customerTableIsPartial",
+      "init": "false",
+      "line": 3469
+    },
+    {
+      "name": "sheetScriptVersionSeen",
+      "init": "null",
+      "line": 3470
+    },
+    {
+      "name": "ztoWarmupAt",
+      "init": "0",
+      "line": 3471
+    },
+    {
+      "name": "ztoWarmupInFlight",
+      "init": "false",
+      "line": 3472
+    },
+    {
+      "name": "lookupLockedNoticeShown",
+      "init": "false",
+      "line": 4195
+    },
+    {
+      "name": "pendingLookupUnlockBarcode",
+      "init": "''",
+      "line": 4196
+    },
+    {
+      "name": "pendingLookupUnlockResolve",
+      "init": "null",
+      "line": 4197
+    }
+  ],
+  "sheetImportState": [
+    {
+      "name": "sheetImportKey",
+      "init": "null",
+      "line": 2821
+    },
+    {
+      "name": "sheetImportUrl",
+      "init": "''",
+      "line": 2822
+    },
+    {
+      "name": "sheetImportPassword",
+      "init": "''",
+      "line": 2823
+    },
+    {
+      "name": "sheetImportWorkbook",
+      "init": "null",
+      "line": 2824
+    },
+    {
+      "name": "sheetImportSheetRows",
+      "init": "[]",
+      "line": 2825
+    },
+    {
+      "name": "sheetImportHeaders",
+      "init": "[]",
+      "line": 2826
+    },
+    {
+      "name": "sheetImportSignature",
+      "init": "''",
+      "line": 2827
+    },
+    {
+      "name": "sheetImportBusy",
+      "init": "false",
+      "line": 2828
+    }
+  ],
+  "ztoState": [
+    {
+      "name": "ztoStatusLoaded",
+      "init": "false",
+      "line": 13430
+    },
+    {
+      "name": "ztoStatusSweepTimer",
+      "init": "null",
+      "line": 13431
+    },
+    {
+      "name": "ztoStatusInFlight",
+      "init": "false",
+      "line": 13432
+    },
+    {
+      "name": "ztoStatusLastSweepAt",
+      "init": "0",
+      "line": 13433
+    },
+    {
+      "name": "ztoStatusFailStreak",
+      "init": "0",
+      "line": 13434
+    },
+    {
+      "name": "ztoStatusBannerSig",
+      "init": "''",
+      "line": 13435
+    },
+    {
+      "name": "ztoStatusModalSig",
+      "init": "''",
+      "line": 13436
+    },
+    {
+      "name": "ztoStatusSweepCursor",
+      "init": "0",
+      "line": 13437
+    },
+    {
+      "name": "ztoListSyncInFlight",
+      "init": "false",
+      "line": 13999
+    },
+    {
+      "name": "ztoListSyncResult",
+      "init": "null",
+      "line": 14000
+    }
+  ]
+}

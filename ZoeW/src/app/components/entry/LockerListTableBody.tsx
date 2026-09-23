@@ -1,0 +1,42 @@
+import { uiState } from '../../../core/state';
+import { useStore } from '../../hooks/useStore';
+
+export interface LockerListRow {
+    n: number;
+    phone: string;
+    lockerText: string;
+}
+
+export interface LockerListView {
+    rows: LockerListRow[];
+    overflow: number;
+}
+
+/** បញ្ជីកញ្ចប់តាមទីតាំង Locker (ទំព័រស្កេន ➜ ផ្ទាំង Locker)។ */
+export function LockerListTableBody() {
+    useStore(uiState);
+    const view = uiState.lockerListView as LockerListView | null;
+    if (!view || !view.rows.length) return null;
+    return (
+        <>
+            {view.rows.map((r) => (
+                <tr key={r.n}>
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text-muted)' }}>{r.n}</td>
+                    <td>
+                        {r.phone
+                            ? <span className="phone-cell">{r.phone}</span>
+                            : <span className="phone-empty">គ្មានលេខ</span>}
+                    </td>
+                    <td><span className="locker-badge">{r.lockerText}</span></td>
+                </tr>
+            ))}
+            {view.overflow > 0 && (
+                <tr>
+                    <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '8px' }}>
+                        ... និងមាន {view.overflow} ជួរដេកទៀត (សូមស្វែងរក ឬច្រោះតាមទីតាំង)
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+}

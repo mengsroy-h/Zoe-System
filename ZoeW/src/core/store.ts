@@ -1,0 +1,91 @@
+/**
+ * ឃ្លាំង state ដែល *ប្រកាសការប្រែ* ដោយខ្លួនឯង។
+ *
+ * ⛔ ហេតុផលនៃការរចនា ៖ តក្កវិជ្ជាអាជីវកម្មទាំងអស់ត្រូវផ្ទេរពី `app.js`
+ * **ដោយមិនប្តូរតួ** ➜ វានៅតែសរសេរ `dataState.scanHistory = x` ត្រង់ៗ។
+ * បើ store ជាវត្ថុធម្មតា React នឹង **មិនដឹង** ថាទិន្នន័យប្រែ។ Proxy
+ * នេះចាប់ការសរសេរ ហើយជូនដំណឹងក្នុង microtask តែមួយ (batched) ➜ កូដដែល
+ * ផ្ទេរមក មិនបាច់ដឹងអំពី React សោះ ហើយ React មិនបាច់ដឹងអំពីកូដដែលផ្ទេរមក។
+ */
+
+export type Listener = () => void;
+
+export interface StoreMeta {
+    readonly __name: string;
+    subscribe(fn: Listener): () => void;
+    /** បង្ខំការជូនដំណឹង ពេលកែ *ខាងក្នុង* វត្ថុ (ឧ. `map.set()`)។ */
+    touch(): void;
+    /** រូបភាពបច្ចុប្បន្នសម្រាប់ `useSyncExternalStore` (ប្តូរពេលមានការសរសេរ)។ */
+    version(): number;
+    /**
+     * ជូនដំណឹង **ភ្លាមៗ** ជំនួសការរង់ចាំ microtask។
+     * ⛔ ប្រើសម្រាប់ផ្លូវដែលត្រូវការ DOM ចុះមុនជំហានបន្ទាប់ — ឧ. ការ
+     *    បោះពុម្ព PDF ដែលហៅ `window.print()` ភ្លាមក្រោយគូរ។
+     */
+    flush(): void;
+}
+
+const registry: StoreMeta[] = [];
+
+export function createStore<T extends object>(name: string, initial: T): T & StoreMeta {
+    const listeners = new Set<Listener>();
+    let version = 0;
+    let queued = false;
+
+    const notify = () => {
+        queued = false;
+        for (const fn of [...listeners]) {
+            try { fn(); } catch (e) { /* អ្នកស្តាប់ម្នាក់ធ្លាក់ មិនត្រូវបញ្ឈប់អ្នកដទៃ */ }
+        }
+    };
+    const bump = () => {
+        version++;
+        if (queued) return;
+        queued = true;
+        queueMicrotask(notify);
+    };
+
+    const meta: StoreMeta = {
+        __name: name,
+        subscribe(fn: Listener) { listeners.add(fn); return () => { listeners.delete(fn); }; },
+        touch: bump,
+        version: () => version,
+        flush: () => { queued = false; notify(); }
+    };
+
+    const target = Object.assign(Object.create(null) as object, initial, meta) as T & StoreMeta;
+
+    return new Proxy(target, {
+        set(obj, prop, value) {
+            const prev = (obj as never as Record<PropertyKey, unknown>)[prop];
+            (obj as never as Record<PropertyKey, unknown>)[prop] = value;
+            if (!Object.is(prev, value)) bump();
+            return true;
+        },
+        deleteProperty(obj, prop) {
+            const had = prop in (obj as object);
+            delete (obj as never as Record<PropertyKey, unknown>)[prop];
+            if (had) bump();
+            return true;
+        }
+    }) as T & StoreMeta;
+}
+
+export function registerStore(store: StoreMeta): StoreMeta {
+    registry.push(store);
+    return store;
+}
+
+export function allStores(): readonly StoreMeta[] { return registry; }
+
+/** ជាវរាល់ store ក្នុងពេលតែមួយ (ប្រើដោយ `useAppState`)។ */
+export function subscribeAll(fn: Listener): () => void {
+    const offs = registry.map((s) => s.subscribe(fn));
+    return () => offs.forEach((off) => off());
+}
+
+export function globalVersion(): number {
+    let sum = 0;
+    for (const s of registry) sum += s.version();
+    return sum;
+}

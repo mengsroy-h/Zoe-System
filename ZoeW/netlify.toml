@@ -1,6 +1,10 @@
 [build]
-  publish = "."
+  command = "npm run build"
+  publish = "dist"
   functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
 
 [functions]
   node_bundler = "esbuild"
@@ -25,6 +29,12 @@
   for = "/index.html"
   [headers.values]
     Cache-Control = "no-cache"
+
+# ធនធានដែលមាន hash ក្នុងឈ្មោះ ➜ cache បានជារៀងរហូតដោយសុវត្ថិភាព
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
   for = "/*.js"

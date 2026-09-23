@@ -439,7 +439,7 @@
     "NOTICE": {
       "policy": "guard-7",
       "encoding": "lf-text",
-      "sha256": "117f9c6758026ddb59e6d3c4e7f1cf2fd40e260295a1935a42be3e6943667008"
+      "sha256": "ecfd6793e6e69831d290c9522f892359ecb32a514ceb9d698bc42a3ce37a44b6"
     },
     "README.md": {
       "policy": "guard-13"

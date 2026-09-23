@@ -1,0 +1,138 @@
+/**
+ * ភាពដូចគ្នានៃ **តក្កវិជ្ជា** ៖ function នីមួយៗក្នុង App ថ្មី ធៀបនឹង `app.js` ដើម
+ * **តាម token** (មិនមែនតាមឈ្មោះ)។
+ *
+ * ⛔ ហេតុអ្វី ៖ parity ស្តាទិចរាប់ថា function **មានឈ្មោះ** ១០០% — វាមិនប្រាប់ថា
+ *    **តួ** នៅដដែលឬអត់ទេ។ ឧបករណ៍នេះ ៖
+ *    ១. បញ្ជូនទាំង ២ ខាងតាម esbuild ដូចគ្នា (printer តែមួយ ➜ វង់ក្រចក · សញ្ញាសម្រង់)
+ *    ២. ធ្វើឲ្យស្មើតែការប្តូររបស់ codemod ដែល **មេកានិច** ៖ `uiState.x` ➜ `x` ·
+ *       `byId(` ➜ `document.getElementById(` · `qs(` ➜ `document.querySelector(` · `runOnWindowLoad(` ➜ `window.addEventListener('load', `
+ *    ៣. ប្រៀប token ➜ រាល់ function ដែលខុស = ការកែ **ដោយចេតនា** ដែលត្រូវពន្យល់បាន
+ *
+ * ⛔ តំបន់ហាមចូល (PTR · ចលនាផ្ទាំង · ការរមូរ) ត្រូវ **ដូចដើមបេះបិទ** លើកលែងការកែ
+ *    ដែលរាយក្នុង `ZONE_ALLOWED` ជាមួយហេតុផល ➜ ការកែថ្មីណាមួយ ធ្វើឲ្យឧបករណ៍ធ្លាក់។
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as acorn from 'acorn';
+import esbuild from 'esbuild';
+import { resolveOldRoot } from './old-app.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(HERE, '..');
+const OLD = fs.readFileSync(path.join(resolveOldRoot(HERE), 'app.js'), 'utf8');
+const STORES = new Set(['firebaseState', 'dataState', 'scanState', 'uiState', 'securityState', 'lookupState', 'sheetImportState', 'ztoState']);
+
+/** function តំបន់ហាមចូល (`CLAUDE.md` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · ការលាក់របា) */
+const ZONE_FILES = ['ui/pull-to-refresh.ts', 'ui/panel-motion.ts', 'ui/chrome-autohide.ts', 'ui/page-nav.ts'];
+const ZONE_EXTRA = ['setPhoneSearchPulledUp', 'positionPhoneSuggestBox', 'syncHistoryExpandedLock', 'activePanelSections', 'measureAppChromeSize'];
+/** ការកែក្នុងតំបន់ហាមចូលដែល **ទទួលយក** — រាល់ធាតុត្រូវមានហេតុផល */
+const ZONE_ALLOWED = {
+    setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម'
+};
+
+function printed(code, loader) {
+    return esbuild.transformSync(code, { loader, format: 'esm', target: 'es2022', minifyWhitespace: false, keepNames: false }).code;
+}
+
+function tokens(code) {
+    const out = [];
+    for (const t of acorn.tokenizer(code, { ecmaVersion: 'latest', sourceType: 'module' })) {
+        const label = t.type.label;
+        out.push(label === 'string' || label === 'template' || label === 'num' || label === 'name' || label === 'regexp'
+            ? label + ':' + String(t.value && t.value.pattern !== undefined ? '/' + t.value.pattern + '/' + t.value.flags : t.value)
+            : label);
+    }
+    // ⛔ ការប្តូរមេកានិចរបស់ codemod ➜ ធ្វើឲ្យស្មើ
+    const norm = [];
+    for (let i = 0; i < out.length; i++) {
+        const a = out[i];
+        if (a.startsWith('name:') && STORES.has(a.slice(5)) && out[i + 1] === '.' && (out[i + 2] || '').startsWith('name:')) {
+            norm.push(out[i + 2]); i += 2; continue;
+        }
+        if (a === 'name:byId') { norm.push('name:document', '.', 'name:getElementById'); continue; }
+        // `qs(sel)` = `document.querySelector(sel)` (`src/core/dom.ts`) — អាគុយម៉ង់នៅប្រៀបធៀបដដែល
+        // ⛔ `qsa` **មិន** ធ្វើឲ្យស្មើ ៖ វាត្រឡប់ Array មិនមែន NodeList
+        if (a === 'name:qs') { norm.push('name:document', '.', 'name:querySelector'); continue; }
+        if (a === 'name:runOnWindowLoad') { norm.push('name:window', '.', 'name:addEventListener', '(', 'string:load', ','); i += 1; continue; }
+        norm.push(a);
+    }
+    return norm;
+}
+
+function functionsOf(code, sourceType) {
+    const ast = acorn.parse(code, { ecmaVersion: 'latest', sourceType });
+    const map = new Map();
+    for (const n of ast.body) {
+        const fn = n.type === 'FunctionDeclaration' ? n
+            : (n.type === 'ExportNamedDeclaration' && n.declaration && n.declaration.type === 'FunctionDeclaration' ? n.declaration : null);
+        if (fn) map.set(fn.id.name, code.slice(fn.start, fn.end));
+    }
+    return map;
+}
+
+// ── ដើម ──
+const oldFns = functionsOf(OLD, 'script');
+const oldTok = new Map([...oldFns].map(([k, v]) => [k, tokens(printed(v, 'js'))]));
+
+// ── ថ្មី ──
+const newTok = new Map();
+const where = new Map();
+function walkDir(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) { if (!['app', 'sw', 'types', 'styles'].includes(e.name)) walkDir(full); continue; }
+        if (!e.name.endsWith('.ts') || e.name.endsWith('.d.ts')) continue;
+        const js = printed(fs.readFileSync(full, 'utf8'), 'ts');
+        for (const [name, src] of functionsOf(js, 'module')) {
+            newTok.set(name, tokens(printed(src.replace(/^export\s+/, ''), 'js')));
+            where.set(name, path.relative(path.join(ROOT, 'src'), full));
+        }
+    }
+}
+walkDir(path.join(ROOT, 'src'));
+
+let same = 0;
+const differ = [];
+const missing = [];
+for (const [name, t] of oldTok) {
+    const n = newTok.get(name);
+    if (!n) { missing.push(name); continue; }
+    if (n.length === t.length && n.every((x, i) => x === t[i])) same++;
+    else differ.push(name);
+}
+
+const zoneNames = new Set([...where].filter(([_n, f]) => ZONE_FILES.includes(f)).map(([n]) => n).concat(ZONE_EXTRA));
+const zoneDiff = differ.filter((n) => zoneNames.has(n));
+const zoneUnexplained = zoneDiff.filter((n) => !ZONE_ALLOWED[n]);
+const zoneTotal = [...zoneNames].filter((n) => oldTok.has(n)).length;
+
+console.log('╔══════════════════════════════════════════════════════════════════════╗');
+console.log('║  ភាពដូចគ្នានៃតក្កវិជ្ជា ៖ function នីមួយៗ ធៀបនឹង app.js ដើម តាម token ║');
+console.log('╚══════════════════════════════════════════════════════════════════════╝\n');
+console.log(`function ដើម ៖ ${oldTok.size}`);
+console.log(`✅ ដូចដើមបេះបិទ (តាម token)   ៖ ${same}`);
+console.log(`✏️  ខុស (ការកែដោយចេតនា)       ៖ ${differ.length}`);
+console.log(`${missing.length ? '❌' : '✅'} បាត់                       ៖ ${missing.length}${missing.length ? ' — ' + missing.join(' · ') : ''}`);
+console.log(`\n── តំបន់ហាមចូល (PTR · ចលនាផ្ទាំង · ការរមូរ · ការលាក់របា) ៖ ${zoneTotal} function ──`);
+console.log(`✅ ដូចដើមបេះបិទ ៖ ${zoneTotal - zoneDiff.length}/${zoneTotal}`);
+for (const n of zoneDiff) console.log(`${ZONE_ALLOWED[n] ? '✏️ ' : '❌'} ${n} (${where.get(n)})${ZONE_ALLOWED[n] ? ' — ' + ZONE_ALLOWED[n] : ' — ⛔ ការកែដែលគ្មានហេតុផល'}`);
+if (process.env.LOGIC_DIFF) {
+    for (const name of process.env.LOGIC_DIFF.split(',')) {
+        const a = oldTok.get(name) || []; const b = newTok.get(name) || [];
+        let i = 0; while (i < a.length && a[i] === b[i]) i++;
+        let ja = a.length - 1; let jb = b.length - 1;
+        while (ja >= i && jb >= i && a[ja] === b[jb]) { ja--; jb--; }
+        console.log(`\n── ${name} ── ខុសពី token ${i} ៖`);
+        console.log('   ដើម : ' + a.slice(Math.max(0, i - 6), ja + 2).join(' ').slice(0, 900));
+        console.log('   ថ្មី : ' + b.slice(Math.max(0, i - 6), jb + 2).join(' ').slice(0, 900));
+    }
+}
+if (process.env.LOGIC_LIST) { console.log('\nfunction ដែលខុស ៖'); differ.forEach((n) => console.log('   ' + n + ' (' + where.get(n) + ')')); }
+
+// ⛔ ជាន់អប្បបរមា ៖ ការស្កេនដែលរកមិនឃើញ function ដើម ឬរកតំបន់មិនឃើញ = វាស់មិនបាន
+if (oldTok.size < 700 || zoneTotal < 30) { console.error(`\n⛔ ការស្កេនតូចពេក (${oldTok.size} function · តំបន់ ${zoneTotal}) — វាស់មិនបាន`); process.exit(2); }
+const failed = missing.length + zoneUnexplained.length;
+console.log(failed ? `\n❌ ${failed} បញ្ហា` : `\n✅ គ្មាន function បាត់ · តំបន់ហាមចូលដូចដើម (លើកលែងការកែដែលមានហេតុផល)`);
+process.exit(failed ? 1 : 0);

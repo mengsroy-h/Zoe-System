@@ -21,8 +21,14 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 │  src/app/          React ៖ component · hook · handler        │
 │    components/       សំបកដែលកើតពី index.html ដើម             │
 │    components/<ផ្នែក>/  ការគូរទាំងអស់ (មើលផ្នែក ១០)            │
-│    hooks/            useStore()                              │
+│    hooks/            useStore() · useStoreValue()            │
+│    lifecycle/        boot ជាដំណាក់ · scope · សំបក native ·   │
+│                      ប្រវត្តិថយក្រោយ · ស្រទាប់ Back/Escape    │
 │    actions.ts        onAct() ➜ ចុះបញ្ជីសកម្មភាព               │
+├─────────────────────────────────────────────────────────────┤
+│  src/platform/     web ធៀប Android native (Capacitor) ៖       │
+│                     អ្នកសម្រេចតែមួយ · Export/Share/Print ·    │
+│                     ជីវមាត្រ Keystore · URL របស់ Function     │
 ├─────────────────────────────────────────────────────────────┤
 │  src/ui/           កាយវិការ និងចលនា (PTR · ការអូសផ្ទាំង ·     │
 │                     ការលាក់របា) បូក *តក្កវិជ្ជា* នៃការគូរ      │
@@ -113,20 +119,28 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 
 ## ៧. ដំណើរការចាប់ផ្តើម
 
-1. `index.html` ➜ `boot-flags.js` (ទង់ iOS · font) ➜ `zxing-wasm` ·
-   `firebase-loader` · `license-verify` · `error-reporting`
+1. `index.html` ➜ `boot-flags.js` (ទង់ iOS · ទង់ Android native · font) ➜
+   `zxing-wasm` · `firebase-loader` · `license-verify` · `error-reporting`
 2. `src/main.tsx` ➜ `createRoot(#root).render(<App/>)`
-3. `<App>` ➜ `useLayoutEffect` ➜ `runLegacyBootstrapStatements()`
-   — statement កម្រិតកំពូលទាំង ៨ របស់ `app.js` ដើម តាមលំដាប់ដដែល
-4. `runOnWindowLoad()` ➜ Firebase · License · listener · timer
+3. `<App>` ➜ `useLayoutEffect` ➜ `bootApplication(scope)`
+   (`src/app/lifecycle/boot.ts`) ➜ unmount ➜ `scope.dispose()`
+4. ដំណាក់ដែលមានឈ្មោះ តាមលំដាប់ដូច `<script>` ដើមបេះបិទ ៖
+   `bootShell` (សំបក · សោ App · Service Worker · សំបក native) ➜ `load` ➜
+   `startCoreServices` (Sentry · License · Setup Link · Firebase) ➜
+   `startPeriodicTasks` ➜ `startScanEngine` ➜ `startInteractions` (កាយវិការ ·
+   PTR) ➜ `startGlobalDismissals` ➜ `revealAppAfterBoot`
 
 ⛔ **ជំហានទី ៣ ប្រើ `useLayoutEffect` មិនមែន `useEffect`** ៖ កូដ imperative
 អាន DOM ភ្លាមៗ ➜ វាត្រូវរត់ក្រោយ DOM ចុះ តែមុនការគូរ ដូច `<script>` នៅចុង
 `<body>` ដើមបេះបិទ។
 
-⛔ **`runOnWindowLoad()` ជំនួស `window.addEventListener('load', …)`** ៖ React
-អាច mount *ក្រោយ* `load` ➜ អ្នកស្តាប់នឹងមិនបាញ់ជារៀងរហូត ➜ App មិនចាប់ផ្តើម
-សោះ ដោយស្ងាត់។
+⛔ **`scope.onLoad()` រត់ភ្លាមពេល `load` បាញ់រួច** ៖ React អាច mount *ក្រោយ*
+`load` ➜ អ្នកស្តាប់នឹងមិនបាញ់ជារៀងរហូត ➜ App មិនចាប់ផ្តើមសោះ ដោយស្ងាត់។
+
+⛔ **២ ប្រភេទនៃការចាប់ផ្តើម** (`src/app/lifecycle/scope.ts`) ៖ listener និង
+interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្លងកាត់ `scope.listen()`/`scope.every()`
+(ដកវិញពេល unmount); ការចាប់ផ្តើមដែលចាក់ listener ខាងក្នុងខ្លួន (Firebase ·
+កាយវិការ · PTR) ឆ្លងកាត់ `oncePerPage()` ➜ StrictMode/HMR មិនបង្កើតស្ទួន។
 
 ---
 

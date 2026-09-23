@@ -1,4 +1,5 @@
 import { ptrIndicatorElement } from './ptr-indicator';
+import { isNativeAndroid, pullToRefreshSupported } from '../platform/native';
 import { byId } from '../core/dom';
 import { securityState, uiState } from '../core/state';
 import { appSessionStore } from '../core/storage';
@@ -7,7 +8,8 @@ import { activePanelSections, isSideDrawerOpen } from './page-nav';
 import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArbiter, touchByIdentifier } from './panel-motion';
 
 export function setupIOSPullToRefresh() {
-    if (window.navigator.standalone !== true) return;
+    if (!pullToRefreshSupported()) return;
+    const claimBeforeSlop = isNativeAndroid();
 
     const pages = byId('appPages');
     if (!pages) return;
@@ -286,7 +288,10 @@ export function setupIOSPullToRefresh() {
         }
 
         if (!engaged) {
-            if (Math.abs(deltaY) < AXIS_SLOP && Math.abs(deltaX) < AXIS_SLOP) return;
+            if (Math.abs(deltaY) < AXIS_SLOP && Math.abs(deltaX) < AXIS_SLOP) {
+                if (claimBeforeSlop && deltaY > 0 && deltaY >= Math.abs(deltaX) * AXIS_RATIO && e.cancelable) e.preventDefault();
+                return;
+            }
             if (settlingScroll) cancelScrollSettling();
             if (deltaY <= 0 || deltaY < Math.abs(deltaX) * AXIS_RATIO) {
                 park();

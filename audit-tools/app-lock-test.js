@@ -170,7 +170,9 @@ check(/data-act="forgetAppLockPin"/.test(html), 'មានផ្លូវចេ�
 
 const initFn = sliceFn(appJs, 'initAppLock');
 check(initFn !== '', 'មាន initAppLock() ក្នុង app.js');
-check(/^\s{4}initAppLock\(\);\s*$/m.test(appJs),
+// ⛔ ZoeW React ហៅវាតាម `oncePerPage('app-lock', initAppLock)` ក្នុងដំណាក់ boot
+//    ដំបូង (មុន `load` ➜ មុន Firebase) ➜ ទម្រង់ទាំង ២ ជាការហៅ top level ដដែល។
+check(/^\s{4}(initAppLock\(\)|oncePerPage\(['"]app-lock['"], initAppLock\));\s*$/m.test(appJs),
     'initAppLock() ត្រូវហៅនៅ top level (មុន Firebase និងមុនការគូរទិន្នន័យ)');
 
 const armFn = sliceFn(appJs, 'appLockShouldArm');

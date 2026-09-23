@@ -29,7 +29,8 @@ const ZONE_FILES = ['ui/pull-to-refresh.ts', 'ui/panel-motion.ts', 'ui/chrome-au
 const ZONE_EXTRA = ['setPhoneSearchPulledUp', 'positionPhoneSuggestBox', 'syncHistoryExpandedLock', 'activePanelSections', 'measureAppChromeSize'];
 /** ការកែក្នុងតំបន់ហាមចូលដែល **ទទួលយក** — រាល់ធាតុត្រូវមានហេតុផល */
 const ZONE_ALLOWED = {
-    setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម'
+    setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម' +
+        ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម'
 };
 
 function printed(code, loader) {

@@ -7,3 +7,6 @@ dist-audit
 .original
 # លទ្ធផលកណ្តាលរបស់ codemod
 tools/_*
+# លទ្ធផល build របស់ native-check · rules:check (លុបខ្លួនឯងពេលចប់)
+.native-check-dist
+.rules-check-dist

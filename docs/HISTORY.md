@@ -342,6 +342,79 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.39.0] — 2026-09-23 · ZoeW ៖ **App Android (Capacitor)** · lifecycle ជាដំណាក់ · ការវាស់ច្បាប់លុយ/សម្អាត (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«រៀបចំគម្រោងថ្មីហ្នឹង អោយគាំទ្រការ setup Capacitor សម្រាប់តែ
+android ផង គាំទ្រ biometric, ptr, និង app logo … អោយ Capacitor ដំណើរការទាំងអស់
+បានពេញលេញ»* · *«រៀបចំគម្រោងថ្មី អោយមាន JSX, Component lifecycle និងតម្រង់ state
+management»* · *«អោយ APK មានលេខកំណែពិតផង»* · *«ដាក់ប្រវត្តិថយក្រោយ android ផង»* ·
+*«សូមផ្ទៀងផ្ទាត់ច្បាប់ លុប/ដក និង auto cleanup ២ម៉ោង ៧ថ្ងៃ ២ថ្ងៃ ៣០ថ្ងៃ ផង»*។
+
+**ZoeW ប្រែ** (`zoew-v223` ➜ `zoew-v224`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **App Android** (`ZoeW/android/` · appId `com.zoesystem.zoew`) ៖ logo ក្រហម-គូបស
+  (adaptive · themed · legacy · splash — កើតពីរូបមេ `resources/icon.svg`) ·
+  **លេខកំណែ APK = `APP_VERSION`** (`versionCode` = X×1000000 + Y×1000 + Z ដេរីវេពេល
+  Gradle build) · ជីវមាត្រតាម **Android Keystore** · PTR · **ប៊ូតុង Back ជាមួយ
+  ប្រវត្តិថយក្រោយ** (ម៉ឺនុយ/ប្រអប់/របា Slide ➜ អេក្រង់មុនម្តងមួយជំហាន ➜ បង្រួម
+  App · ⛔ មិនត្រឡប់ចូលរបៀប «ដក») · Export ➜ ផ្ទាំង Share · PDF ➜ PrintManager ·
+  សោ App ពេល pause/resume · បិទ backup (កៅអី License មិនត្រូវក្លែងតាមការស្តារ)។
+- **web/PWA ៖ មិនប្រែ** — លើកលែង ៖ ជួរ 🩺 «របៀបក្រៅបណ្ដាញ» លើ App Android និងសៀវភៅ
+  ណែនាំមានផ្នែក «App Android»។
+- ZTO Function ៖ CORS **តែ** origin `https://localhost` (App Android) — សំណើ web
+  (same-origin) ទទួល header ដូចមុនបេះបិទ។
+
+#### ស្ថាបត្យកម្ម (សម្រាប់ការអភិវឌ្ឍបន្ត ៖ `ZoeW/docs/EXTENDING.md`)
+
+- `src/boot/bootstrap-statements.ts` ➜ **`src/app/lifecycle/boot.ts`** ៖ ដំណាក់ដែលមាន
+  ឈ្មោះ តាមលំដាប់ដើមបេះបិទ · `LifecycleScope` (`listen`/`every`/`onLoad`/`onDispose`
+  ដកវិញពេល unmount) · `oncePerPage()` សម្រាប់ការចាប់ផ្តើមដែលដកវិញមិនបាន ➜
+  StrictMode/HMR មិនបង្កើត listener ស្ទួន។
+- `src/platform/` ៖ អ្នកសម្រេច web ធៀប native តែមួយ · plugin ផ្ទុកតាម dynamic
+  import ក្នុង chunk `native-plugins` ដែល Service Worker រំលង (web មិនផ្ទុកវាសោះ)។
+- `useStoreValue(store, select)` ៖ component គូរឡើងវិញតែពេលតម្លៃដែលអានប្រែ។
+- សោ App ៖ `noteAppLockAway()` ច្រានការហៅស្ទួន (`pause` + `visibilitychange`) —
+  បើអត់ ការហៅទី ២ ស៊ីការលើកលែងការខល ហើយចាក់សោខុស។ web ៖ ឥរិយាបថដដែល។
+
+#### អ្វីដែលវាស់បាន
+
+| ការវាស់ | លទ្ធផល |
+|---|---|
+| `npm run verify` (type · lint · test · build · parity · smoke · SW · doc · `android:check` · `native:check`) | ✅ ទាំងអស់ · vitest ៥៧ · `android:check` ៤៧ · `native:check` ៦០ |
+| `parity:dom` · `parity:live` · `parity:deep` ធៀប ZoeW ដើម | ធាតុ ៧២១/៧២១ · ១៨ ជំហាន · **៧៩ ជំហាន** ដូចគ្នាបេះបិទ |
+| `logic:check` | ដូចដើម ៦៦៣ · ខុសដោយចេតនា ៧៦ · បាត់ ០ · តំបន់ហាមចូល ៣០/៣១ (`setupIOSPullToRefresh` ខុសដោយហេតុផលកត់ត្រា) |
+| **`rules:check` (ថ្មី)** ៖ លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · កញ្ចប់លាយ · ២ថ្ងៃ · ៣០ថ្ងៃ (ទិន្នន័យ ±១ នាទី សងខាងព្រំដែន) · ledger ថ្ងៃ/ខែ · registry · ស្តារ | **១១៥/១១៥** លើ **ZoeW ដើម · React web · React Android** · DB ក្រោយរាល់ជំហាន = ZoeW ដើម |
+| mutation លើ `rules:check` ៖ ធុងសំរាម expired ប្រើ ៣០ ថ្ងៃ · ៧ ថ្ងៃ មិនសម្គាល់ `isDeducted` | **២/២ ចាប់បាន** |
+| mutation លើ `native:check` ៖ ដក `setupNativeShell` · ដកការចាប់មុន slop របស់ PTR | **២/២ ចាប់បាន** (តែការចាប់មុន slop ត្រូវការសេណារីយ៉ូ «latch របស់ Chromium» ៖ touch ក្លែងរបស់ CDP **មិន** ធ្លាក់ដោយគ្មានវា) |
+| mutation លើ `android:check` ៖ `versionName` literal · `allowBackup` · import static ពី plugin · `package.json` ≠ `APP_VERSION` | **៤/៤ ចាប់បាន** · ថតទទេ ➜ ៥៤ FAIL |
+| Gradle ពិត ៖ មុខងារដេរីវេកំណែ | `2.38.0` ➜ `2038000` · `2.39.10` ➜ `2039010` · លេខខូច ➜ build បដិសេធ |
+| `audit-tools/` តំបន់ហាមចូល លើ tree adapter | `gesture` ១០៧ · `panel-motion` ៤៧ · `ios-panel-glide` ៣៨ — ដូចជុំមុន |
+| `audit-tools/` លុយ/សម្អាត (`trash-modal` · `partial-pickup-cleanup` · `expired-trash-retention` · `policy` · …) | **ដូច baseline HEAD បេះបិទ** — តែពួកវា **មិនអាចវាស់ React** (គាំងពេលស្រង់ `app.js`) ➜ អ្នកវាស់ពិតគឺ `rules:check` និង `parity:deep` |
+| `app-lock-test` | ធ្លាក់ ១៥ = baseline (regex «ហៅ top level» ពង្រីកទទួល `oncePerPage('app-lock', initAppLock)`) |
+
+⛔ **អ្វីដែលមិនបានវាស់** ៖ APK **មិនបាន compile** ក្នុងម៉ាស៊ីននេះ (`dl.google.com`
+ត្រូវ proxy ហាម ➜ គ្មាន Android SDK/AGP) · កូដ Java របស់ plugin · WebView ពិត ·
+Keystore · ទូរស័ព្ទពិត។ `native:check` វាស់ផ្លូវ JS ដល់ព្រំដែន bridge **តែប៉ុណ្ណោះ**។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0` នៅដដែល (សាកលើ iPhone PWA +
+   Android ពិត · ផ្ទេរ checker · `repository-file-coverage` · `ZoeW/docs/MIGRATION.md`
+   ដំណាក់ ២)។
+២. **Build APK** ៖ `cd ZoeW && npm install && npm run android:sync && npm run
+   android:open` ➜ Android Studio ➜ Generate Signed APK។ ⛔ **រក្សា keystore** (បាត់ ➜
+   APK ថ្មីដំឡើងជាន់ចាស់មិនបាន) · ⛔ កុំ commit វា។
+៣. **ZTO Lookup ក្នុង App Android** ត្រូវការ Function ដែលមាន CORS ថ្មី ➜ ដំណើរការ
+   តែក្រោយ deploy កូដនេះទៅ `https://zoew.netlify.app` (តម្លៃក្នុង `ZoeW/.env.android`)។
+៤. **Firebase** ៖ បើ API key មានការរឹតបន្តឹង HTTP referrer ➜ បន្ថែម `https://localhost`។
+៥. **License** ៖ App Android និង PWA លើទូរស័ព្ទដដែល = **២ កៅអី** ក្នុង Key។
+៦. សាកលើទូរស័ព្ទពិតតាមតារាង ១៣ ជួរ ក្នុង `ZoeW/docs/ANDROID.md` ផ្នែក ៥ —
+   ⛔ ជាពិសេស **PTR** (តំបន់ហាមចូល ច្បាប់ ១១ — ប៉ះតាមសំណើច្បាស់ ផ្លូវ iOS មិនប្រែ) ·
+   ប៊ូតុង Back · ជីវមាត្រ (រួម «ក្រយៅដៃត្រូវប្តូរ») · របាស្ថានភាពលើ WebView ចាស់/ថ្មី។
+៧. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
+
 ### [2.38.0] — 2026-09-23 · ZoeW ជា **React + TypeScript + Vite** (branch · មិនទាន់ merge)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់អោយ app ZoeW មាន framework និង build step

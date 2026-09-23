@@ -7,6 +7,10 @@ import path from 'node:path';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
+/** chunk តែមួយដែលផ្ទុក plugin native ទាំងអស់ (មើល `manualChunks`) */
+const NATIVE_CHUNK = 'native-plugins';
+const NATIVE_CHUNK_RE = new RegExp('^\\./assets/' + NATIVE_CHUNK + '-[^/]+\\.js$');
+
 function readAppVersion(): string {
     const src = readFileSync(path.join(ROOT, 'src/core/version.ts'), 'utf8');
     const m = src.match(/APP_VERSION\s*=\s*'([^']+)'/);
@@ -48,7 +52,10 @@ function serviceWorkerPlugin(): Plugin {
             if (!existsSync(dist)) return;
             // ⛔ `.map` មិនចូល cache ៖ វាធំ (រាប់ MB) ហើយអ្នកប្រើមិនដែលទាញវា
             //    — មានតែ devtools ទេដែលសុំ ➜ ការដាក់វាក្នុងសំបក ស៊ីកូតា។
-            const emitted = walk(dist).filter((p) => p !== './sw.js' && !p.endsWith('.map'));
+            // ⛔ chunk របស់ plugin native (Capacitor) មិនចូល cache ៖ web មិនដែល
+            //    ផ្ទុកវា (`import()` តែលើ native) ហើយលើ native ឯកសារទាំងអស់
+            //    ស្ថិតក្នុង APK រួចហើយ ➜ Service Worker មិនត្រូវចុះឈ្មោះសោះ។
+            const emitted = walk(dist).filter((p) => p !== './sw.js' && !p.endsWith('.map') && !NATIVE_CHUNK_RE.test(p));
 
             // សំបកស្នូល ៖ អ្វីដែល App **មិនអាចដើរដោយគ្មាន** (atomic addAll)
             const core = emitted.filter((p) =>
@@ -113,6 +120,14 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) return 'react';
+                    // ⛔ plugin native ផ្ទុកតាម `import()` តែលើ Android ➜ ប្រមូលវា
+                    //    ចូល chunk តែមួយដែល Service Worker រំលង (web មិនធំឡើង)។
+                    //    ⛔ helper `__vitePreload` របស់ Vite ត្រូវមាន chunk ផ្ទាល់ខ្លួន ៖
+                    //    បើអត់ Rollup ដាក់វាចូល chunk native ➜ `index` import វាដោយ
+                    //    **static** ➜ web ផ្ទុក chunk native គ្រប់ពេល ហើយក្រៅបណ្តាញ App
+                    //    ចាប់ផ្តើមមិនកើត (chunk នោះមិននៅក្នុង cache)។
+                    if (id.includes('vite/preload-helper')) return 'preload-helper';
+                    if (/node_modules[\\/]@(capacitor|capgo)[\\/]/.test(id) || id.includes('/src/platform/native-biometric')) return NATIVE_CHUNK;
                     return undefined;
                 }
             }

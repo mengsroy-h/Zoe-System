@@ -13,7 +13,23 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-23 · ZoeW 2.38.0 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-23 · ZoeW 2.39.0 · ZoeKeyGen 2.20.2)
+
+📱 **ZoeW មាន App Android (Capacitor)** + lifecycle ជាដំណាក់ (`src/app/lifecycle/`) ·
+ស្រទាប់ `src/platform/` · ប្រវត្តិថយក្រោយ Android។ ផ្ទៃថ្មីដែល **គ្មាន checker
+របស់ `audit-tools/` វាស់** ៖ ផ្លូវ native ទាំងអស់ (bridge · plugin) — អ្នកយាមរបស់វា
+រស់នៅ `ZoeW/scripts/` (`android:check` · `native:check` · `rules:check`) ដែល
+`run-all.sh` **មិនហៅ** ➜ ⛔ ជុំក្រោយត្រូវរត់ `cd ZoeW && npm run verify && npm run
+parity:all` ដោយខ្លួនឯង។ ⛔ កូដ Java របស់ plugin · WebView ពិត · Keystore **គ្មាន
+អ្នកវាស់ក្នុងម៉ាស៊ីននេះ** (គ្មាន Android SDK — `dl.google.com` ត្រូវ proxy ហាម) ➜
+ការសាកលើទូរស័ព្ទពិត (`ZoeW/docs/ANDROID.md` ផ្នែក ៥) ជាអ្នកវាស់តែមួយ។
+
+✅ ច្បាប់ **លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ** វាស់ដោយការរត់ពិតលើ ZoeW ដើម ·
+React web · React Android (`rules:check` ១១៥/១១៥ · mutation ២/២ ចាប់) ➜ checker
+លុយ/សម្អាតរបស់ `audit-tools/` នៅតែ **មិនអាចវាស់ React** (ឆ្លើយដូច baseline HEAD
+បេះបិទ — គាំងពេលស្រង់ `app.js`) ➜ ការផ្ទេរពួកវានៅជាការងារដំបូង (ខាងក្រោម)។
+
+## តារាងជុំមុន (2026-09-23 · ZoeW 2.38.0 · ZoeKeyGen 2.20.2)
 
 🔴 **ZoeW ក្លាយជា React + TypeScript + Vite** (branch · មិនទាន់ merge) ➜ **ចំណុច
 ចាប់ផ្តើមនៃជុំបន្ទាប់មិនមែន «checker ណាក្រហម?» ទេ** — `run-all.sh` លើ App React

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ZoeW មិនចម្លងទិន្នន័យ App ទៅ backup ឬទូរស័ព្ទថ្មីទេ ៖ WebView storage ផ្ទុក
+    អត្តសញ្ញាណឧបករណ៍របស់ License (កៅអីក្នុង Key) និង secret ដែលអ៊ិនគ្រីបដោយ PIN
+    ➜ ការស្តារលើទូរស័ព្ទផ្សេងនឹងក្លែងកៅអីរបស់ឧបករណ៍ចាស់។ ទិន្នន័យអាជីវកម្ម
+    ស្ថិតលើ Firebase រួចហើយ ➜ ទូរស័ព្ទថ្មីគ្រាន់តែ Config និង Activate ឡើងវិញ។
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

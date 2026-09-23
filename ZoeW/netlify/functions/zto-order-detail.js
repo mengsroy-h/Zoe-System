@@ -1682,7 +1682,53 @@ function diagnosticsBody(config, headers, authKind, credential) {
     };
 }
 
+// ⛔ App Android (Capacitor) បម្រើពី `https://localhost` ➜ សំណើរបស់វាជា
+// cross-origin ហើយមាន header ផ្ទាល់ខ្លួន ➜ WebView ផ្ញើ preflight ហើយបដិសេធ
+// ចម្លើយដែលគ្មាន `Access-Control-Allow-Origin`។ ⛔ បញ្ជីអនុញ្ញាតជា origin
+// **ពិតប្រាកដ** (មិនមែន `*`) ហើយ CORS **មិនមែនការផ្ទៀងផ្ទាត់** ៖ សោ proxy និង
+// ID token នៅជាអ្នកសម្រេចដដែល។ ⛔ web (same-origin) មិនផ្ញើ `Origin` ដែលស្ថិត
+// ក្នុងបញ្ជី ➜ ចម្លើយរបស់វាដូចមុនបេះបិទ។
+const NATIVE_APP_ORIGINS = new Set(['https://localhost']);
+const CORS_HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
+
+function headerOf(event, name) {
+    const headers = (event && event.headers) || {};
+    const lower = name.toLowerCase();
+    for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === lower) return String(headers[key] || '');
+    }
+    return '';
+}
+
+function corsHeadersFor(event) {
+    const origin = headerOf(event, 'origin');
+    if (!NATIVE_APP_ORIGINS.has(origin)) return null;
+    const out = {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Max-Age': '600',
+        Vary: 'Origin'
+    };
+    const requested = headerOf(event, 'access-control-request-headers')
+        .split(',').map((h) => h.trim()).filter(Boolean);
+    if (requested.length && requested.length <= 12 && requested.every((h) => CORS_HEADER_NAME_RE.test(h))) {
+        out['Access-Control-Allow-Headers'] = requested.join(', ');
+    }
+    return out;
+}
+
+function withCors(event, response) {
+    const cors = corsHeadersFor(event);
+    if (!cors || !response || typeof response !== 'object') return response;
+    response.headers = Object.assign({}, response.headers || {}, cors);
+    return response;
+}
+
 exports.handler = async function handler(event) {
+    return withCors(event, await handleRequest(event));
+};
+
+async function handleRequest(event) {
     const startedAt = Date.now();
     if (event.httpMethod === 'OPTIONS') {
         await prewarmCookieCredential(event);
@@ -1874,7 +1920,7 @@ exports.handler = async function handler(event) {
         return json(200, Object.assign({}, notFoundBody, { cached: false }));
     }
     return outcome.response;
-};
+}
 
 exports.expireCookieCacheForTests = function expireCookieCacheForTests() {
     if (cookieState.at) cookieState.at = 1;

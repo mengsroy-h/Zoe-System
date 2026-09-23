@@ -8,6 +8,7 @@ import { updateRecentPhonesList } from './db-listeners';
 import { refreshEntryPagePanels } from '../ui/entry-list';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
+import { resolveNativeApiUrl } from '../platform/native';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -201,7 +202,7 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             cleanup();
             reject(timeoutErr);
         }, ms);
-        fetch(url, opts).then((res) => {
+        fetch(resolveNativeApiUrl(url), opts).then((res) => {
             if (settled) return null;
             if (!readBody) return { res: res, body: undefined };
             return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));

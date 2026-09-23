@@ -6,6 +6,7 @@ import { noteAppLockExcuse } from './app-lock';
 import { completePinUnlock, requestPinBeforeConfig } from './pin';
 import { verifyStoredPin } from '../services/crypto';
 import { showToast } from '../ui/toast';
+import { isNativeApp } from '../platform/native';
 
 export const BIOMETRIC_PRF_SALT = 'zoew-biometric-pin-wrap-v1';
 
@@ -29,7 +30,7 @@ export function readBiometricRecord() {
         if (!raw) return null;
         const rec = JSON.parse(raw);
         if (!rec || typeof rec.credentialId !== 'string' || !rec.credentialId) return null;
-        if (rec.mode !== 'prf' && rec.mode !== 'device') return null;
+        if (rec.mode !== 'prf' && rec.mode !== 'device' && rec.mode !== 'native') return null;
         if (!rec.wrapped || typeof rec.wrapped.iv !== 'string' || typeof rec.wrapped.data !== 'string') return null;
         if (rec.mode === 'device' && typeof rec.wrapKey !== 'string') return null;
         return rec;
@@ -50,6 +51,7 @@ export function writeBiometricRecord(rec) {
 export function clearBiometricRecord() {
     try {
         appLocalStore.removeItem(BIOMETRIC_STORAGE_KEY);
+        if (isNativeApp()) import('../platform/native-biometric').then((m) => m.nativeForgetPin(), () => {});
         return true;
     } catch (e) {
         return false;
@@ -61,6 +63,7 @@ export function isBiometricEnabled() {
 }
 
 export async function biometricPlatformAvailable() {
+    if (isNativeApp()) return import('../platform/native-biometric').then((m) => m.nativeBiometricAvailable(), () => false);
     try {
         if (!window.isSecureContext) return false;
         if (!window.PublicKeyCredential || !navigator.credentials) return false;
@@ -113,6 +116,11 @@ export async function biometricPrfBytes(credentialId) {
 }
 
 export async function enrollBiometricRecord(pin) {
+    if (isNativeApp()) {
+        const nativeBiometric = await import('../platform/native-biometric');
+        await nativeBiometric.nativeStorePin(pin);
+        return { mode: 'native', credentialId: nativeBiometric.NATIVE_BIOMETRIC_SERVER, wrapped: { iv: '', data: '' } };
+    }
     const credential = await navigator.credentials.create({
         publicKey: {
             challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -159,6 +167,16 @@ export async function biometricUnlockPin() {
     noteAppLockExcuse();
     const rec = readBiometricRecord();
     if (!rec) return '';
+    if (rec.mode === 'native') {
+        const result = await (await import('../platform/native-biometric')).nativeUnlockPin();
+        if (result.status === 'ok') return result.pin;
+        if (result.status === 'invalidated') {
+            clearBiometricRecord();
+            refreshBiometricUi();
+            showToast('⚠️ ក្រយៅដៃ/មុខក្នុងទូរស័ព្ទត្រូវបានប្តូរ ➜ ការចងចាស់លែងប្រើបាន! សូមវាយ PIN រួចបើកវាឡើងវិញក្នុងម៉ឺនុយការកំណត់។');
+        }
+        return '';
+    }
     if (rec.mode === 'prf') {
         const rawKey = await biometricPrfBytes(rec.credentialId);
         if (!rawKey) return '';
@@ -240,7 +258,9 @@ export async function startBiometricEnrollment(verifiedPin) {
         return;
     }
     if (!(await biometricPlatformAvailable())) {
-        alert('ឧបករណ៍នេះមិនគាំទ្រការស្កេនក្រយៅដៃ ឬមុខទេ។ ត្រូវការ iPhone/iPad (Safari) ឬ Android (Chrome) ដែលបានបើក Face ID / Touch ID / ក្រយៅដៃរួច ហើយបើកគេហទំព័រតាម HTTPS។');
+        alert(isNativeApp()
+            ? 'ទូរស័ព្ទនេះមិនទាន់បើកក្រយៅដៃ ឬមុខទេ។ សូមកំណត់វាក្នុង Settings របស់ Android ជាមុនសិន រួចសាកម្តងទៀត។'
+            : 'ឧបករណ៍នេះមិនគាំទ្រការស្កេនក្រយៅដៃ ឬមុខទេ។ ត្រូវការ iPhone/iPad (Safari) ឬ Android (Chrome) ដែលបានបើក Face ID / Touch ID / ក្រយៅដៃរួច ហើយបើកគេហទំព័រតាម HTTPS។');
         return;
     }
     securityState.biometricUnlockInFlight = true;
@@ -255,7 +275,7 @@ export async function startBiometricEnrollment(verifiedPin) {
             return;
         }
         refreshBiometricUi();
-        showToast(rec.mode === 'prf'
+        showToast(rec.mode === 'prf' || rec.mode === 'native'
             ? '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។'
             : '✅ បើករួច! លើកក្រោយស្កេនក្រយៅដៃ ឬមុខ ជំនួសការវាយ PIN។ (ឧបករណ៍នេះមិនគាំទ្រការចាក់សោដោយជីវមាត្រពេញលេញទេ — PIN ត្រូវរក្សាទុកក្នុងឧបករណ៍)');
     } catch (e) {

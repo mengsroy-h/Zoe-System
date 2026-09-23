@@ -98,7 +98,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel | `2.38.0` (`zoew-v223`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.39.0` (`zoew-v224`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.2` (`zoekeygen-v101`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (កើតពី `app.js`
@@ -115,6 +115,17 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > ដែរ ➜ វាស់លុយលើ dump ផលិតកម្មពី `main` រហូតដល់វាត្រូវផ្ទេរ។
 > ⛔ **កុំ merge ចូល `main`** មុនការផ្ទេរ checker និងការសាកលើ iPhone + Android
 > ពិត ៖ [`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ដំណាក់ ២។
+> 📱 **App Android (Capacitor · Android តែមួយ)** ៖ `ZoeW/android/` ·
+> [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md)។ ⛔ web ត្រូវ **fail closed** ៖
+> `src/platform/native.ts` ជាអ្នកសម្រេចតែមួយ · plugin ផ្ទុកតាម dynamic import តែលើ
+> native · ផ្លូវ web/iOS មិនប្រែ។ ⛔ **PTR លើ Android native** (សំណើច្បាស់របស់
+> ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
+> «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
+> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
+> plugin · web មិនផ្ទុកកូដ native) · `npm run native:check` (bridge ក្លែង ៖ Back ·
+> ប្រវត្តិ · pause/resume · Share/Print · ជីវមាត្រ · PTR/latch) · `npm run
+> rules:check` (លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ លើ ZoeW ដើម · web ·
+> Android)។ ⛔ **Back មិនត្រឡប់ចូលរបៀប «ដក» វិញ** (`safeScreen()`)។
 
 **គ្មានតួនាទី `admin`/`worker`/`scanner` ក្នុង App អាជីវកម្មទេ** — អ្នកប្រើដែល
 ចូលប្រព័ន្ធបាន (`auth != null`) មានសិទ្ធិដូចគ្នា។ ZoeKeyGen **នៅតែ** ប្រើតួនាទី

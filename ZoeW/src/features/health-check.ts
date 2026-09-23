@@ -16,6 +16,7 @@ import { dbListenerViewIsStale } from '../services/db-listeners';
 import { fetchWithTimeout, withTimeout } from '../services/network';
 import { openModalHelper } from '../ui/modal';
 import { closeSideDrawer } from '../ui/page-nav';
+import { isNativeApp } from '../platform/native';
 
 export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
 
@@ -129,6 +130,9 @@ export function healthStorageRow() {
 }
 
 export function healthServiceWorkerRow() {
+    if (isNativeApp()) {
+        return healthRow('ok', 'របៀបក្រៅបណ្ដាញ', 'App Android ៖ សំបក App ស្ថិតក្នុងកម្មវិធីរួចហើយ ➜ បើកបានពេលបណ្ដាញដាច់');
+    }
     if (!('serviceWorker' in navigator)) {
         return healthRow('warn', 'របៀបក្រៅបណ្ដាញ', 'Browser នេះមិនគាំទ្រ Service Worker');
     }

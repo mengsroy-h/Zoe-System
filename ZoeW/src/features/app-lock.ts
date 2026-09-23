@@ -77,6 +77,8 @@ export function appLockClickIsExcusable(target) {
 }
 
 export function noteAppLockAway() {
+    if (securityState.appLockAwayNoted) return;
+    securityState.appLockAwayNoted = true;
     const excused = elapsedSince(securityState.appLockExcuseAt) < APP_LOCK_EXCUSE_WINDOW_MS;
     securityState.appLockExcuseAt = 0;
     if (securityState.appIsLocked || excused || !appLockIsEnabled()) return;
@@ -85,6 +87,7 @@ export function noteAppLockAway() {
 }
 
 export function relockAppAfterAway() {
+    securityState.appLockAwayNoted = false;
     if (!securityState.appLockVeiled) return;
     securityState.appLockVeiled = false;
     showAppLockScreen();

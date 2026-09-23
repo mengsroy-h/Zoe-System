@@ -1,5 +1,5 @@
 import { uiState } from '../../../core/state';
-import { useStore } from '../../hooks/useStore';
+import { useStoreValue } from '../../hooks/useStore';
 
 /**
  * របាដាស់តឿន «មានកំណែថ្មី» ។
@@ -9,8 +9,8 @@ import { useStore } from '../../hooks/useStore';
  *    ចុច ✕ ➜ លុបចេញ ➜ ការហៅបន្ទាប់បង្ហាញវិញ (ដូចដើមបេះបិទ)។
  */
 export function UpdateBanner() {
-    useStore(uiState);
-    if (!uiState.updateBannerOpen) return null;
+    const open = useStoreValue(uiState, (s) => s.updateBannerOpen);
+    if (!open) return null;
     return (
         <div id="zoeUpdateBanner" className="app-update-banner">
             <span>🔄 មានកំណែថ្មីរបស់កម្មវិធី — សូម Refresh នៅពេលងាយស្រួល</span>

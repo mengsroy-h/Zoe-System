@@ -32,8 +32,8 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 
 | អ្វី | តម្លៃ | ដេរីវេពី |
 |---|---|---|
-| កំណែ App | `2.38.0` | [`src/core/version.ts`](../src/core/version.ts) |
-| កំណែ cache របស់ Service Worker | `zoew-v223` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
+| កំណែ App | `2.39.0` | [`src/core/version.ts`](../src/core/version.ts) |
+| កំណែ cache របស់ Service Worker | `zoew-v224` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
 | Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
 
 ⛔ `manifest.json` និង `index.html` **មិនផ្ទុកលេខកំណែជា literal ទេ** — ពួកវា
@@ -110,7 +110,8 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run parity:dom` | ប្រៀបធៀប DOM និង layout ពិតក្នុង browser |
 | `npm run parity:live` | ប្រៀបធៀប **ជាមួយទិន្នន័យពិត** (RTDB ក្លែងក្លាយ) រួមទាំងការសរសេរទៅ server |
 | `npm run parity:deep` | ប្រៀបធៀប **ផ្លូវលុយទាំងអស់** · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF — ៦ ជាន់រាល់ជំហាន (អេក្រង់ · ការសរសេរពេញ · DB ទាំងមូល · ប្រអប់ native · សំណើទៅ Apps Script/ZTO · សារ toast) |
-| `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ |
+| `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ បូក `rules:check` |
+| `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime |
 | `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
@@ -124,6 +125,12 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
 | `npm run test:watch` | Vitest ក្នុងរបៀបតាមដាន |
 | `npm run package` | ខ្ចប់ជា zip |
+| `npm run build:android` | build សម្រាប់ App Android (`--mode android` ➜ អាន `.env.android`) |
+| `npm run android:sync` | build Android រួចចម្លងចូល `android/` (`cap sync android`) |
+| `npm run android:open` | បើក `android/` ក្នុង Android Studio |
+| `npm run android:icons` | បង្កើត logo និង splash របស់ Android ពី `resources/icon.svg` |
+| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native |
+| `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) |
 
 ### Deploy ទៅ Netlify
 
@@ -136,20 +143,20 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 ⛔ **កុំដាក់ `netlify.toml` នៅ root របស់ repo** — Netlify អានវាសម្រាប់ site
 ទាំងអស់ ➜ វាបង្វែរ build របស់ App ផ្សេង។
 
-### ផលិត `src/` ឡើងវិញ
+### `src/` ជាប្រភពការពិត
 
 កូដក្នុង `src/core` · `src/domain` · `src/features` · `src/services` · `src/ui`
-· `src/boot` **កើតពី** `app.js` ដើមដោយ codemod បូកការកែក្នុង `tools/fixups.cjs` ៖
+**កើតពី** `app.js` ដើមដោយ codemod (`tools/`)។ ឥឡូវ `src/` ត្រូវបានកែដោយដៃ
+(lifecycle · platform · Android) ➜ **កែនៅក្នុង `src/` ដោយផ្ទាល់**។
+`npm run generate` នៅចាក់សោ (`ALLOW_REGENERATE=1`) ហើយ ⛔ **កុំរត់វា** ៖ វា
+សរសេរជាន់ `src/` ទាំងមូល ➜ ការកែទាំងនោះនឹងបាត់។ `tools/` នៅរក្សាទុកតែជា
+កំណត់ត្រានៃការផ្ទេរ និងជាប្រភពនៃបញ្ជី slot ដែល `doc:check` · `slot:check` អាន។
 
-```bash
-npm run original:fetch
-ALLOW_REGENERATE=1 npm run generate
-```
+### App Android (Capacitor)
 
-⛔ វា **សរសេរជាន់** `src/` ទាំងមូល ➜ ការកែដែលធ្វើដោយដៃក្នុង `src/` (មិនមែនក្នុង
-`tools/fixups.cjs`) នឹងបាត់ ➜ ដូច្នេះវាចាក់សោ។ ការផលិតឡើងវិញត្រូវផ្តល់ `src/`
-ដូចមុនបេះបិទ (ផ្ទៀងផ្ទាត់ដោយ `diff -r`) — បើមិនដូច ត្រូវមានការកែដែលមិនទាន់ចូល
-`fixups.cjs`។
+មើល [`ANDROID.md`](ANDROID.md) ៖ build APK · លេខកំណែ · logo · ការកំណត់ ·
+ការសាកលើទូរស័ព្ទពិត។ របៀបបន្ថែមមុខងារ (state · lifecycle · platform) ៖
+[`EXTENDING.md`](EXTENDING.md)។
 
 ---
 

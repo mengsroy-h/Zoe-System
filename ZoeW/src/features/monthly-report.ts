@@ -9,12 +9,13 @@ import { ledgerNumber } from '../domain/ledger';
 import { countPickedUpCustomers } from '../domain/pickup';
 import { noteAppLockExcuse } from './app-lock';
 import { updateDailyScheduleStats } from './daily-stats';
-import { collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, restoreAfterPdfExport, uncollectedValueByDate } from './export';
+import { collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, reportPrintFailure, restoreAfterPdfExport, uncollectedValueByDate } from './export';
 import { emptyViewMessage } from '../services/db-listeners';
 import { renderHistory } from '../ui/history-render';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
+import { printCurrentView, saveWorkbook } from '../platform/file-output';
 
 export const MONTHLY_REPORT_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
@@ -247,7 +248,7 @@ export async function exportMonthlyReportAsExcel() {
             { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 12 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'របាយការណ៍ខែ');
-        XLSX.writeFile(wb, monthlyReportFilenameBase() + '.xlsx', { bookSST: true });
+        await saveWorkbook(wb, monthlyReportFilenameBase() + '.xlsx');
         showToast("✅ បាន Export របាយការណ៍ប្រចាំខែជា Excel ជោគជ័យ!");
     } catch (e) {
         console.error("Monthly report Excel export failed:", e);
@@ -288,7 +289,7 @@ export function exportMonthlyReportAsPDF() {
     document.title = monthlyReportFilenameBase();
     window.addEventListener('afterprint', restoreAfterPdfExport);
     noteAppLockExcuse();
-    window.print();
+    reportPrintFailure(printCurrentView(document.title));
 }
 
 export function applyCurrentFilter() {

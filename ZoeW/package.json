@@ -1,7 +1,7 @@
 {
   "name": "zoew",
   "private": true,
-  "version": "2.38.0",
+  "version": "2.39.0",
   "description": "ZoeW — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (React + Vite)",
   "engines": {
     "node": "^22.17.0 || >=24.0.0"
@@ -11,15 +11,19 @@
     "build": "tsc -b --noEmit && vite build",
     "build:only": "vite build",
     "preview": "vite preview",
+    "build:android": "tsc -b --noEmit && vite build --mode android",
+    "android:icons": "node scripts/android-icons.mjs",
+    "android:sync": "npm run build:android && cap sync android",
+    "android:open": "cap open android",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "parity": "node scripts/parity-static.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run slot:check && npm run test && npm run build:only && npm run parity && npm run smoke && npm run sw:check && npm run doc:check",
+    "verify": "npm run typecheck && npm run lint && npm run slot:check && npm run test && npm run build:only && npm run parity && npm run smoke && npm run sw:check && npm run doc:check && npm run android:check && npm run native:check",
     "parity:dom": "node scripts/parity-dom.mjs",
     "parity:live": "node scripts/parity-live.mjs",
-    "parity:all": "npm run parity && npm run parity:dom && npm run parity:live && npm run parity:deep",
+    "parity:all": "npm run parity && npm run parity:dom && npm run parity:live && npm run parity:deep && npm run rules:check",
     "smoke": "node scripts/smoke.mjs",
     "audit:build": "node scripts/build-audit.mjs",
     "audit:run": "node scripts/run-audit-tools.mjs",
@@ -30,12 +34,24 @@
     "parity:deep": "node scripts/parity-deep.mjs",
     "slot:check": "node scripts/slot-ownership-check.mjs",
     "original:fetch": "bash scripts/fetch-original.sh",
-    "logic:check": "node scripts/logic-identity.mjs"
+    "logic:check": "node scripts/logic-identity.mjs",
+    "android:check": "node scripts/android-check.mjs",
+    "native:check": "node scripts/native-check.mjs",
+    "rules:check": "node scripts/cleanup-rules-check.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "11.0.2"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capgo/capacitor-native-biometric": "^8.6.11",
+    "@capgo/capacitor-printer": "^8.1.4",
     "@eslint/js": "^9.39.0",
     "@types/node": "^26.6.2",
     "@types/react": "^19.2.0",

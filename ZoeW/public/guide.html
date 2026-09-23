@@ -238,6 +238,7 @@
                 <li><a href="#lookup">Lookup និង ZTO</a></li>
                 <li><a href="#zto-list">ទាញបញ្ជីកញ្ចប់ពី ZTO</a></li>
                 <li><a href="#offline">Offline និង Update</a></li>
+                <li><a href="#android">App Android</a></li>
                 <li><a href="#backup">Backup និងឯកជនភាព</a></li>
                 <li><a href="#health">ពិនិត្យសុខភាព</a></li>
                 <li><a href="#troubleshooting">ដោះស្រាយបញ្ហា</a></li>
@@ -266,7 +267,7 @@
                     <li><strong>ដាក់ Activation Key</strong><br>ការផ្ទៀងផ្ទាត់លើកដំបូងត្រូវការអ៊ីនធឺណិត។</li>
                     <li><strong>កំណត់ Firebase និងចូលប្រព័ន្ធ</strong><br>ប្រើ Setup Link/QR ឬបញ្ចូល Config ដោយដៃ រួចចូលដោយគណនី Firebase។</li>
                     <li><strong>កំណត់ Security PIN</strong><br>PIN ការពារសកម្មភាពសំខាន់ និងអ៊ិនគ្រីបការកំណត់រសើបលើឧបករណ៍។</li>
-                    <li><strong>ដំឡើងជា PWA</strong><br>Android/Chrome៖ ម៉ឺនុយ browser → Install app។ iPhone/Safari៖ Share → Add to Home Screen។</li>
+                    <li><strong>ដំឡើងជា PWA</strong><br>Android/Chrome៖ ម៉ឺនុយ browser → Install app។ iPhone/Safari៖ Share → Add to Home Screen។ ឬប្រើ <a href="#android">App Android</a> ដែលអ្នកលក់ផ្ញើជាឯកសារ APK។</li>
                 </ol>
                 <div class="callout warning"><strong>កុំលុប browser data ដោយមិនចាំបាច់។</strong> វាអាចលុប Activation, PIN, cache Offline និងការកំណត់ដែលរក្សាទុកលើឧបករណ៍។ ទិន្នន័យក្នុង Firebase មិនត្រូវលុបតាមទេ។</div>
             </section>
@@ -591,6 +592,18 @@
                     <li>ចុច Refresh ពេលរបា Update បង្ហាញ។</li>
                     <li>បើនៅតែចាស់ សូមលុប PWA ហើយដំឡើងម្ដងទៀត តែត្រូវប្រាកដថាចាំ URL, Login និង PIN recovery plan។</li>
                 </ol>
+            </section>
+
+            <section id="android">
+                <h2>១៥ខ. App Android</h2>
+                <p>App Android ប្រើទិន្នន័យ Firebase និងច្បាប់លុយដូច web បេះបិទ។ លេខកំណែក្នុង Settings → Apps → ZoeW ស្មើលេខកំណែដែលបង្ហាញក្នុង App។</p>
+                <ul>
+                    <li><strong>ប៊ូតុង Back</strong>៖ បិទម៉ឺនុយ ប្រអប់ ឬរបា Slide ជាមុន → ត្រឡប់ទៅអេក្រង់មុនម្ដងមួយជំហាន (ទំព័រ និងរបៀបស្កេន) → ចុងក្រោយបង្រួម App។ Back មិនត្រឡប់ចូលរបៀប <strong>ដក</strong> វិញទេ វាត្រឡប់ជារបៀប <strong>កញ្ចប់</strong>។</li>
+                    <li><strong>ទាញចុះ</strong> នៅកំពូលបញ្ជី ដើម្បីផ្ទុកទិន្នន័យឡើងវិញ។</li>
+                    <li><strong>ក្រយៅដៃ/មុខ</strong> ប្រើផ្ទាំងជីវមាត្ររបស់ Android។ បើបន្ថែមក្រយៅដៃថ្មីក្នុងទូរស័ព្ទ App សុំឲ្យវាយ PIN ហើយបើកក្រយៅដៃម្ដងទៀត។</li>
+                    <li><strong>Export Excel/CSV</strong> បើកផ្ទាំង Share (Drive, Telegram, Excel…)។ <strong>PDF</strong> បើកផ្ទាំង Print → Save as PDF។</li>
+                </ul>
+                <div class="callout warning"><strong>App Android និង PWA លើទូរស័ព្ទដដែល រាប់ជា ២ ឧបករណ៍ក្នុង Key។</strong> ប្រើតែមួយ ឬសុំអ្នកលក់បន្ថែមចំនួនឧបករណ៍។ App មិន backup ទិន្នន័យទៅទូរស័ព្ទថ្មីទេ ដូច្នេះពេលប្ដូរទូរស័ព្ទ ត្រូវ Activate, Config និង Login ឡើងវិញ។</div>
             </section>
 
             <section id="backup">

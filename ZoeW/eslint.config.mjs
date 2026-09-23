@@ -8,9 +8,9 @@ export default tseslint.config(
 
     /* ── កូដ React និងកូដថ្មី ៖ វិន័យពេញ ──────────────────────────────── */
     {
-        files: ['src/app/**/*.{ts,tsx}', 'src/main.tsx', 'src/core/store.ts', 'src/core/dom.ts', 'src/core/lifecycle.ts', 'tests/**/*.{ts,tsx}'],
+        files: ['src/app/**/*.{ts,tsx}', 'src/platform/**/*.ts', 'src/main.tsx', 'src/core/store.ts', 'src/core/dom.ts', 'src/core/lifecycle.ts', 'tests/**/*.{ts,tsx}'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
-        languageOptions: { ecmaVersion: 2023, globals: globals.browser },
+        languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', XLSX: 'readonly' } },
         plugins: { 'react-hooks': reactHooks },
         rules: {
             ...reactHooks.configs.recommended.rules,
@@ -27,7 +27,7 @@ export default tseslint.config(
      *    ដែលចាប់ **កំហុសពិត** (អថេរស្ទួន · case ធ្លាក់ · `debugger`)។
      */
     {
-        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts', 'src/boot/**/*.ts'],
+        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', ZoeLicense: 'readonly', XLSX: 'readonly', ZXingWASM: 'readonly', Sentry: 'readonly', BarcodeDetector: 'readonly' } },
         rules: {
@@ -78,7 +78,7 @@ export default tseslint.config(
 
     /* ── Config របស់ build ──────────────────────────────────────────── */
     {
-        files: ['vite.config.mts', 'vitest.config.mts'],
+        files: ['vite.config.mts', 'vitest.config.mts', 'capacitor.config.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node } },
         rules: { '@typescript-eslint/no-explicit-any': 'off' }

@@ -1,6 +1,8 @@
-/* ⚠️ ឯកសារនេះ **កើតដោយស្វ័យប្រវត្តិ** — `node tools/gen-state.cjs`
- * ប្រភព ៖ អថេរ `let` កម្រិតកំពូលទាំង ១៧៦ របស់ ZoeW `app.js` ដើម។
- * ⛔ កុំកែដោយដៃ — កែផែនទីក្នុង `tools/modules.cjs` រួចបង្កើតឡើងវិញ។ */
+/* ឃ្លាំង state ទាំង ៨ របស់ App (ដើមកំណើត ៖ អថេរ `let` កម្រិតកំពូលរបស់ ZoeW
+ * `app.js` ដើម ដែល `tools/gen-state.cjs` ធ្លាប់ផលិត)។
+ * ⛔ ឥឡូវ `src/` ជា **ប្រភពការពិត** (`npm run generate` ចាក់សោ) ➜ កែទីនេះ
+ *    ដោយផ្ទាល់ ៖ វាលថ្មីត្រូវបន្ថែម **ទាំង** ក្នុង interface **និង** តម្លៃដើម។
+ *    របៀបជ្រើសឃ្លាំង និងរបៀបអានក្នុង component ៖ `docs/EXTENDING.md`។ */
 import { createStore, registerStore } from './store';
 import { appLocalStore, safeStoreGet } from './storage';
 import { ACTIVE_LOCKER_KEY, ENTRY_SCAN_MODE_KEY } from './storage-keys';
@@ -362,6 +364,7 @@ export interface SecurityState {
     appLockBusy: boolean;
     appLockExcuseAt: number;
     appLockVeiled: boolean;
+    appLockAwayNoted: boolean;
     configQrReader: any;
     configQrStream: any;
     configQrScanActive: boolean;
@@ -376,6 +379,7 @@ export const securityState = createStore<SecurityState>('securityState', {
     appLockBusy: false,
     appLockExcuseAt: 0,
     appLockVeiled: false,
+    appLockAwayNoted: false,
     configQrReader: null,
     configQrStream: null,
     configQrScanActive: false,

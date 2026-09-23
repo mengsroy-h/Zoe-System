@@ -1,8 +1,15 @@
 try {
     const isIOSStandalone = window.navigator.standalone === true;
     if (isIOSStandalone) document.documentElement.classList.add('ios-standalone');
+    let isNativeAndroid = false;
+    try {
+        const cap = window.Capacitor;
+        isNativeAndroid = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform() &&
+            typeof cap.getPlatform === 'function' && cap.getPlatform() === 'android');
+    } catch (e) {}
+    if (isNativeAndroid) document.documentElement.classList.add('native-android');
     const ptrReloadPending = sessionStorage.getItem('zoew_ptr_reload_pending') === '1';
-    if (isIOSStandalone && ptrReloadPending && 'scrollRestoration' in history) {
+    if ((isIOSStandalone || isNativeAndroid) && ptrReloadPending && 'scrollRestoration' in history) {
         history.scrollRestoration = 'manual';
     }
     if (ptrReloadPending) document.documentElement.classList.add('boot-instant');

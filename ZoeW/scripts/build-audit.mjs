@@ -43,7 +43,8 @@ const entry = path.join(OUT, '_entry.ts');
 writeFileSync(entry, `
 ${modules.map((m, i) => `import * as m${i} from '${m}';`).join('\n')}
 import { firebaseState, dataState, scanState, uiState, securityState, lookupState, sheetImportState, ztoState } from '../src/core/state';
-import { runLegacyBootstrapStatements } from '../src/boot/bootstrap-statements';
+import { bootApplication } from '../src/app/lifecycle/boot';
+import { createLifecycleScope } from '../src/app/lifecycle/scope';
 
 const STORES: Record<string, any> = { firebaseState, dataState, scanState, uiState, securityState, lookupState, sheetImportState, ztoState };
 const STATE_MAP: Record<string, string> = ${JSON.stringify(Object.fromEntries(Object.entries(stateGroups).flatMap(([store, fields]) => fields.map((f) => [f.name, store]))))};
@@ -61,7 +62,7 @@ for (const [field, store] of Object.entries(STATE_MAP)) {
         set: (v) => { STORES[store][field] = v; }
     });
 }
-runLegacyBootstrapStatements();
+bootApplication(createLifecycleScope());
 `);
 await build({
     entryPoints: [entry],

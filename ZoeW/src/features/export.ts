@@ -11,6 +11,7 @@ import { dbListenerViewIsStale, emptyViewMessage } from '../services/db-listener
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
+import { printCurrentView, saveTextFile, saveWorkbook } from '../platform/file-output';
 
 export const EXPORT_LIBS = {
     xlsx: { url: './vendor/xlsx.full.min.js' }
@@ -176,7 +177,7 @@ export async function exportDataAsExcel() {
         ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'ប្រវត្តិ');
-        XLSX.writeFile(wb, getExportFilenameBase() + '.xlsx', { bookSST: true });
+        await saveWorkbook(wb, getExportFilenameBase() + '.xlsx');
         showToast("✅ បាន Export ជា Excel ជោគជ័យ!");
     } catch (e) {
         console.error("Excel export failed:", e);
@@ -224,7 +225,15 @@ export function exportDataAsPDF() {
     document.title = getExportFilenameBase();
     window.addEventListener('afterprint', restoreAfterPdfExport);
     noteAppLockExcuse();
-    window.print();
+    reportPrintFailure(printCurrentView(document.title));
+}
+
+export function reportPrintFailure(printed: Promise<void> | void) {
+    if (!printed) return;
+    printed.catch((e) => {
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Native print failed:' });
+        showToast("❌ Export PDF បរាជ័យ!");
+    });
 }
 
 export function exportDataAsCsvForSheets() {
@@ -251,16 +260,14 @@ export function exportDataAsCsvForSheets() {
     });
 
     const csvContent = '\uFEFF' + lines.join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = getExportFilenameBase() + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast("✅ បាន Export ជា CSV ជោគជ័យ! បើក Google Sheets ➜ File ➜ Import ដើម្បីនាំចូល");
+    const doneMessage = "✅ បាន Export ជា CSV ជោគជ័យ! បើក Google Sheets ➜ File ➜ Import ដើម្បីនាំចូល";
+    const saved = saveTextFile(csvContent, getExportFilenameBase() + '.csv', 'text/csv;charset=utf-8;');
+    if (!saved) { showToast(doneMessage); return; }
+    saved.then(() => showToast(doneMessage), (e) => {
+        console.error("CSV export failed:", e);
+        if (window.ZoeErrors) ZoeErrors.capture(e, { context: "CSV export failed:" });
+        showToast(exportFailureMessage(e));
+    });
 }
 
 export function uncollectedBarcodeValue(entry) {

@@ -22,13 +22,13 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 
 
 ===============================================================================
-បញ្ជីកូដភាគីទីបី (៤)
+បញ្ជីកូដភាគីទីបី (៥)
 ===============================================================================
 
 -------------------------------------------------------------------------------
 ១. SheetJS Community Edition (xlsx) — កំណែ 0.20.3
 -------------------------------------------------------------------------------
-   ឯកសារដែល ship  : ZoeW/vendor/xlsx.full.min.js
+   ឯកសារដែល ship  : ZoeW/public/vendor/xlsx.full.min.js
    តួនាទី          : អាន និងសរសេរឯកសារ Excel (នាំចូល និង Export)
    អាជ្ញាប័ណ្ណ      : Apache License 2.0
    កម្មសិទ្ធិ       : Copyright (C) 2013-present SheetJS LLC
@@ -38,7 +38,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 -------------------------------------------------------------------------------
 ២. zxing-wasm — កំណែ 3.1.3 (កូដភ្ជាប់ JavaScript)
 -------------------------------------------------------------------------------
-   ឯកសារដែល ship  : ZoeW/vendor/zxing-wasm.js
+   ឯកសារដែល ship  : ZoeW/public/vendor/zxing-wasm.js
    តួនាទី          : កូដភ្ជាប់ (glue) រវាង JavaScript និងម៉ូឌុល WebAssembly
    អាជ្ញាប័ណ្ណ      : MIT License
    កម្មសិទ្ធិ       : Copyright (c) Sec-ant
@@ -48,7 +48,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 -------------------------------------------------------------------------------
 ៣. ZXing-C++ (zxing-cpp) — ចងក្រងជា WebAssembly
 -------------------------------------------------------------------------------
-   ឯកសារដែល ship  : ZoeW/vendor/zxing_reader.wasm
+   ឯកសារដែល ship  : ZoeW/public/vendor/zxing_reader.wasm
    តួនាទី          : ម៉ាស៊ីនអាន Barcode (Code 128) របស់ ZoeW
    អាជ្ញាប័ណ្ណ      : Apache License 2.0
    គេហទំព័រ        : https://github.com/zxing-cpp/zxing-cpp
@@ -71,6 +71,17 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
    ពាណិជ្ជសញ្ញា ៖ ពាក្យ «QR Code» ជាពាណិជ្ជសញ្ញាចុះបញ្ជីរបស់
    DENSO WAVE INCORPORATED — https://www.denso-wave.com/qrcode/
 
+-------------------------------------------------------------------------------
+៥. React · React DOM · Scheduler — កំណែ 19.3.0 · 19.3.0 · 0.28.0
+-------------------------------------------------------------------------------
+   ឯកសារដែល ship  : bundle របស់ ZoeW ក្នុង dist/assets/ (build ភ្ជាប់ចូល
+                     ពី npm ➜ វាមិនរស់ក្នុង repo ទេ តែវាត្រូវ ship)
+   តួនាទី          : គូរ UI របស់ ZoeW
+   អាជ្ញាប័ណ្ណ      : MIT License
+   កម្មសិទ្ធិ       : Copyright (c) Meta Platforms, Inc. and affiliates.
+   គេហទំព័រ        : https://react.dev/
+   អត្ថបទអាជ្ញាប័ណ្ណ : មើលផ្នែក «អត្ថបទ MIT License» ខាងក្រោម
+
 
 ===============================================================================
 កូដភាគីទីបីដែល មិន ត្រូវបាន ship ក្នុង repository នេះ
@@ -80,7 +91,9 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 មិនត្រូវបានចែកចាយក្នុង repository នេះទេ ហើយមិនត្រូវការ attribution ត្រង់
 នេះឡើយ។ ពួកវារាយទុកជាព័ត៌មានតែប៉ុណ្ណោះ ៖
 
-   @netlify/blobs 11.0.2  — ZoeW/package.json (npm)
+   @netlify/blobs 11.0.2  — ZoeW/package.json (npm · Function ខាង server)
+   Vite · TypeScript · ESLint · Vitest · esbuild — ZoeW/package.json
+                            (devDependencies ៖ ឧបករណ៍ build/តេស្ត មិន ship)
    playwright-core 1.62.1 — tools/zto-cookie-sync-windows/package.json (npm)
    Firebase JavaScript SDK — ផ្ទុកពី CDN របស់ Google ពេលដំណើរការ
    Sentry Browser SDK      — ផ្ទុកពី js.sentry-cdn.com ពេលដំណើរការ
@@ -88,7 +101,7 @@ Zoe-System ចែកចាយ (ship) កូដភាគីទីបីមួយ�
 
 
 ===============================================================================
-អត្ថបទ MIT License (អនុវត្តលើធាតុទី ២ និងទី ៤)
+អត្ថបទ MIT License (អនុវត្តលើធាតុទី ២ · ទី ៤ និងទី ៥)
 ===============================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining a

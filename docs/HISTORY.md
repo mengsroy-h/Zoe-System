@@ -342,6 +342,348 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.42.0] — 2026-09-23 · ZoeW ៖ **React ១០០% ពេញលេញ** — ស្រទាប់ React ខ្លួនឯងលែងសរសេរ DOM ក្រៅច្រកចេញ (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«2.41.0 ជា React ពេញលេញ 100% នៅ?»* ➜ ចម្លើយស្មោះត្រង់ ៖ **មិនទាន់** —
+*«ធ្វើទាំងអស់ អោយស្អាតពេញលេញជា React 100% ទៅ»*។
+
+**ZoeW ប្រែ** (`zoew-v226` ➜ `zoew-v227`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន (អ្នកប្រើ **មិនឃើញ** អ្វីប្រែ — ការរៀបចំខាងក្នុង)
+
+🔴 **អ្នកយាមជំនាន់មុនបៃតងក្លាយ** ៖ `purity:check` រាយ «ការប៉ះ DOM ក្រៅ React ៖ 0» ខណៈ
+`src/app/behaviors` (កាយវិការ) សរសេរ `style` · `classList` · `scrollTop` · `setAttribute` លើធាតុរបស់ React
+**~៤០ បន្ទាត់** — ព្រោះវាវាស់តែថតមុខងារ (`core` … `platform`) ➜ **លេខ 0 មិនមែនការវាស់ទាំង App**។
+
+| អ្វី | មុន (imperative) | ឥឡូវ (React) |
+|---|---|---|
+| សញ្ញា PTR (transform · opacity · `ready`/`snapping`/`spinning`) | `indicator.style.*` · `classList` រាល់ `touchmove` | ឃ្លាំង **`ptrState`** (អ្នកជាវតែមួយ) ➜ `PtrIndicator` គូរ · `renderNow()` ក្នុងការ dispatch ដដែល |
+| ការតាមដានថា PTR អាចកើត (listener non-passive) | `MutationObserver` លើ class របស់ធាតុ React | `uiState.subscribe` (ប្រភពនៃ class ទាំងនោះ) |
+| ទីតាំងប្រអប់ណែនាំលេខ | `box.style.width/left/top` | state `uiState.phoneSuggest*` ➜ `style` ក្នុង JSX |
+| ព្រឹត្តិការណ៍ប្រអប់ស្វែងរកលេខ · ប្រអប់ណែនាំ | `addEventListener` (input · focus · blur · keydown · mousedown · click) | `onInput` · `onFocus` · `onBlur` · `onKeyDown` · `onMouseDown` · `onClick` លើជួរ |
+| ទម្លាក់ឯកសារ (នាំចូល Excel) | `addEventListener` (drag*) ក្នុង `setupSheetImportDropZone()` | `onDragEnter` · `onDragOver` · `onDragLeave` · `onDrop` |
+| Enter របស់ម៉ាស៊ីនស្កេន hardware | `addEventListener('keypress')` | `onKeyPress` |
+| ចុចដងអូសផ្ទាំង | `addEventListener('click')` ក្នុង `bindPanelSwipe` | `onClick` ➜ `togglePanelFromHandle()` (តួដដែល) |
+| អថេរ CSS `--chrome-*` លើ `<html>` | `document.documentElement.style.setProperty` | state ➜ `DocumentEffects` (`useLayoutEffect`) |
+| ធាតុវាស់ safe-area (Android) | `createElement` + `appendChild` + `remove` រាល់ការវាស់ | `SafeAreaProbe` (JSX · តែលើ native) + ref |
+| `webkit-playsinline` របស់វីដេអូ | `setAttribute` (`app/media.ts`) | ទង់ស្អិត `viewState.cameraWebkitInline` ➜ JSX (ឯកសារ `media.ts` ដកចេញ) |
+| សំណាញ់ ៦ វិ. ក្នុង `boot-flags.js` | ដាក់ class លើ `#bootSplash` របស់ React | **ដកចេញ** ៖ ផ្ទាំងជារបស់ React តែមួយ (bundle ដួល = គ្មានផ្ទាំង) · ផ្លូវបម្រុង ៦ វិ. នៅក្នុង React |
+| `scrollTop` · `scrollIntoView` · `animate()` ក្នុងកាយវិការ | សរសេរត្រង់ៗ | ច្រកចេញតែមួយ `src/app/refs.ts` · ការរមូរ document ➜ `platform/document-io.ts` |
+
+⛔ **អ្វីដែលនៅមិនមែន JSX ដោយចេតនា** (React ខ្លួនឯងគ្មានទម្រង់ប្រកាស) — រាប់ដោយអ្នកយាមជាមួយ
+**ហេតុផល និងពិដានតឹង** (`ZoeW/docs/ARCHITECTURE.md` ផ្នែក ១០ «ច្រកចេញ») ៖ focus · រមូរ · `animate()` ·
+input uncontrolled (`refs.ts`) · `<html>`/`<body>` (`DocumentEffects`) · `srcObject`/`muted` របស់ `<video>` ·
+listener `touch*` non-passive (React ចាក់វាជា passive) · listener លើ `document`/`window` · `<head>`/ការទាញយក
+(`document-io.ts`) · class លើ `<html>` **មុន** stylesheet (`boot-flags.js`)។
+
+#### អ្នកយាមថ្មី/ពង្រឹង
+
+- **`purity:check`** វាស់ `src/app/**` ផង ៖ ការសរសេរ DOM (class · style · attribute · អត្ថបទ · focus · រមូរ ·
+  ចលនា · listener លើធាតុ) **០** ក្រៅច្រកចេញ `APP_ALLOWED` (ពិដានតឹង · ធាតុងាប់ ➜ ធ្លាក់)។ Mutation **៦/៦**
+  ចាប់ ៖ `style` លើសញ្ញា PTR · `blur()` ក្នុងកាយវិការ · `focus()` លើសពិដានក្នុង `refs.ts` · `classList` ក្នុង
+  JSX handler · `el.animate()` ត្រង់ៗ · `addEventListener` លើធាតុថ្មី។
+- **`native-check`** (+៥) ៖ សញ្ញា PTR ផ្លាស់ទីតាមម្រាមដៃ · ចុះ DOM **ក្នុងការ dispatch ដដែល** · `ready` ·
+  `touchcancel` ➜ ត្រឡប់ភ្លាម · លែងដៃ ➜ `spinning`។ ⛔ វាស់រួច ៖ touch របស់ CDP រត់ microtask **រវាង
+  listener** ➜ ការវាស់ដំបូងមិនបែងចែក (mutation «ដក `renderNow`» **រស់រាន**) ➜ ប្តូរទៅ touch ដែល script
+  បញ្ជូន (គ្មាន checkpoint) ➜ mutation ដដែល **ធ្លាក់ ២**។
+
+#### អ្វីដែលវាស់បាន
+
+| ការវាស់ | `2.41.0` | **`2.42.0`** |
+|---|---|---|
+| `audit-tools/run-all.sh` (emulator · strict) ជោគជ័យ / ធ្លាក់ / រំលង | 61 / 120 / 0 | **61 / 120 / 0** |
+| ការអះអាងដែលធ្លាក់ (អត្ថបទមិនស្ទួន) | 781 | **782** |
+
+- ស្ថានភាព checker **មិនប្រែមួយណាសោះ** · ការអះអាងធ្លាក់ **ថ្មី ១ តែប៉ុណ្ណោះ** ៖ `boot-animation` «សំណាញ់សុវត្ថិភាព
+  ក្នុង `boot-flags.js`» — ការស្វែងរក **អក្សរ** ក្នុង `boot-flags.js` ដែលដកចេញ **ដោយចេតនា** (ផ្ទាំងបើកជារបស់
+  React តែមួយ ➜ bundle ដួល = គ្មានផ្ទាំង · ផ្លូវបម្រុង ៦ វិ. ក្នុង React)។ ⛔ checker នោះវាស់ markup ថេរនៃ
+  `index.html` ដើម ដែល App React គ្មាន (`index.html` ផលិតកម្មមានតែ `#root`)។
+- តំបន់ហាមចូលនៅ **PASS** ដដែល ៖ `gesture` 107 (រួមការចាក់/ដក listener PTR តាមស្ថានភាពផ្ទាំង ➜ `uiState.subscribe`)
+  · `panel-motion` 47 · `ios-panel-glide` 38 · `history-menu` 57 · `layout-thrash` 5។
+- ZoeW ខ្លួនឯង ៖ `verify` (purity **15** · vitest 61 · android-check 48) · `native-check` **75** · `logic:check`
+  (function ដើមបាត់ **០** · ដកចេញដោយចេតនា ៥) · `parity:all` (DOM/layout 721/721 × ៣ · deep · cleanup-rules 115)
+  — **បៃតងទាំងអស់**។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0`–`2.41.0` នៅដដែល។
+២. **App Android** ៖ build APK ថ្មី (`npm run android:sync` ➜ Android Studio) — គ្មាន plugin ថ្មី។
+៣. សាកលើ **iPhone PWA និង Android ពិត** (តំបន់ដែលកូដប្រែ) ៖ ទាញចុះ (PTR) ➜ សញ្ញាវិលរលូន · ស្វែងរកលេខ
+   ➜ ប្រអប់ណែនាំលេចត្រង់ក្រោមប្រអប់ · ព្រួញ/Enter/ចុចជួរណែនាំ · ចុចដងអូសផ្ទាំង · ទម្លាក់ឯកសារ Excel
+   (កុំព្យូទ័រ) · ម៉ាស៊ីនស្កេន Bluetooth/USB (Enter) · កាមេរ៉ាលើ iPhone។
+៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
+
+### [2.41.0] — 2026-09-23 · ZoeW ៖ **PTR តាមស្តង់ដា App** (តំបន់ខាងលើ · ស្រទាប់ · ញ័រ) · កំហុស ៥ ដែល `audit-tools` រកឃើញលើ `2.40.0` (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«សម្រួល PTR អោយកេះដើរតែពេលប្រអប់ប្រវត្តិមិនទាន់ហូតឡើងបានហើយ
+និងពេលបើក modal ផ្សេងៗកុំអោយកេះ PTR ដោយកំណត់តំបន់កេះតែកំណាត់ខាងលើ និងញ័រផង
+ដូចទៅហ្នឹងស្តង់ដា App ផ្សេងៗ»*។
+
+**ZoeW ប្រែ** (`zoew-v225` ➜ `zoew-v226`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **PTR (ទាញចុះដើម្បីផ្ទុកឡើងវិញ)** — ⛔ តំបន់ហាមប៉ះ ច្បាប់ ១១ ៖ ប៉ះតាមសំណើច្បាស់ ៖
+  - ម្រាមដៃត្រូវ **ចាប់ផ្តើមក្នុង ៤០% ខាងលើ** នៃអេក្រង់ ➜ ការអូសពីពាក់កណ្តាល/បាត មិនផ្ទុក
+    ទំព័រដោយចៃដន្យ
+  - **ប្រអប់ · ម៉ឺនុយ (...) · របា Slide · សោ App បើក ➜ គ្មាន PTR** — រួមទាំង **ការប៉ះដែល
+    បិទម៉ឺនុយ** (វាបិទម៉ឺនុយប៉ុណ្ណោះ មិនផ្ទុកទំព័រ)
+  - **ញ័រម្តង** ពេលទាញគ្រប់ («លែងដៃដើម្បីផ្ទុក») — App Android (`@capacitor/haptics`)
+    និង Chrome លើ Android · ⛔ **iPhone មិនញ័រ** ៖ Safari មិនផ្តល់ API ញ័រដល់ទំព័រវែបទេ
+  - ផ្ទាំងប្រវត្តិហូតឡើង ➜ គ្មាន PTR (ដូចមុន — វាស់ម្តងទៀតដោយ `gesture-test`)
+- **ផ្ទាំងបើក App (splash)** ៖ សំណាញ់ ៦ វិនាទីក្នុង `boot-flags.js` ត្រឡប់មកវិញ ➜ បើកូដ App ដួល
+  ផ្ទាំងនៅតែរសាត់ (`2.40.0` ផ្លាស់វាចូល React ➜ ដើរតែពេល React នៅរស់)។
+
+#### កំហុសដែល `audit-tools/run-all.sh` (checker ដើម · ឯករាជ្យ) រកឃើញលើ `2.40.0`
+
+⛔ ការប្រៀបធៀប **តាមការអះអាងនីមួយៗ** (មិនត្រឹមស្ថានភាព checker) រវាង `2.39.0` និង
+`2.40.0` ៖ ការអះអាងធ្លាក់ថ្មី **៥៧** (និងបាត់ ៨ — ភាគច្រើនប្តូរតែអត្ថបទកំហុស `byId` ➜ `fieldValue`) — ភាគច្រើនលាក់ក្នុង checker ដែលក្រហមស្រាប់ ➜ វិភាគម្តងមួយ ៖
+
+| ថ្នាក់ | មូលហេតុ | ការកែ |
+|---|---|---|
+| **DOM មិនប្រែក្នុង tick ដដែល** (`duplicate-scan` · `item-money` · `duplicate-money` · `page-nav` · `app-lock` · `history-menu` · `ios-panel-glide`) | App ដើមកែ DOM ផ្ទាល់ ➜ ប្រអប់ · របា Slide · ម៉ឺនុយ · ផ្ទាំង ប្រែ **ភ្លាម**; React ២.៤០ ប្រែក្នុង microtask ➜ កូដ/អ្នកវាស់ដែលអានភ្លាមឃើញស្ថានភាពចាស់ (ឧ. ម៉ឺនុយមិនបិទ ខណៈចលនាបើកកំពុងរត់ · snap មិនត្រឡប់ក្រោយ cleanup) | **វាល `markImmediate`** ក្នុង store (រចនាសម្ព័ន្ធ UI ១៨ វាល) ➜ ចុះ DOM ក្នុង tick ដដែល — ⛔ រចនាសម្ព័ន្ធ មិនមែនការចាក់ `commitNow()` ម្តងមួយកន្លែង · អ្នកយាម ៖ `tests/native/immediate-ui.test.tsx` (mutation «បញ្ជីទទេ» ➜ ៤/៤ ធ្លាក់) |
+| **ក្រៅបណ្តាញ build វាស់ដួល** (`sw-shell-latency` · `offline-shell` · `sw-cache-key`) | glob `./platform/**` ក្នុង `expose-globals.ts` នាំ plugin Capacitor ជា static ➜ web ផ្ទុក chunk `native-plugins` ដែល SW មិន cache | ដក glob នោះ (build ផលិតកម្មមិនដែលរងផល ៖ `android:check` «web មិនផ្ទុកកូដ native») |
+| **សំណាញ់ splash** (`boot-animation`) | បាត់ពី `boot-flags.js` | ប្រគល់ដូច `2.39.0` បេះបិទ |
+| **ឈ្មោះ function ប៉ះគ្នាក្នុង bundle វាស់** (`cleanup-interrupt-atomicity` · `late-commit`) | helper ថ្មី `scrollTopOf()` ក្នុង `refs.ts` ប៉ះឈ្មោះ function ដើម ➜ esbuild ប្តូរឈ្មោះ `parseTimestampFromId2` · `buildHistoryRowHtml2` · `scrollTopOf2` ➜ checker ស្រង់តាមឈ្មោះមិនឃើញ | ដក helper ដែលមិនប្រើ និង import ដែលមិនប្រើ |
+| **CLAUDE.md យោង helper ដែលដកចេញ** (`doc-scope-test`) | `code128SvgElement()` | ➜ `Code128Svg` · `code128Bars()` |
+
+⛔ **ការធ្លាក់ថ្មីដែលនៅសល់ ជា «វាស់មិនបាន»** (ពិនិត្យម្តងមួយ ៖ ឥរិយាបថនៅដដែល) ៖ checker
+ស្តាទិចរកអក្សរក្នុងតួ function ដែលផ្លាស់ចូល helper (`blurActiveElement()` · `beginPdfPrint()` ·
+`injectScript()`) · យន្តការ delegation ដែលដកចេញដោយចេតនា · `ReferenceError` ក្នុង `vm` (helper ថ្មី) ·
+`doc-scope` កាត់ ១៦០០ តួលើ bundle (indent ២) ➜ រអិលចូល HTML ជួរដេក។
+
+#### អ្វីដែលវាស់បាន
+
+| ការវាស់ | `main` (ZoeW ដើម) | `2.39.0` | `2.40.0` | **`2.41.0`** |
+|---|---|---|---|---|
+| `audit-tools/run-all.sh` (emulator · `CRUD_FLOW_STRICT=1` · `VERSIONSCOPE_STRICT=1`) ជោគជ័យ / ធ្លាក់ / រំលង | 180 / 1 / 0 | 61 / 120 / 0 | 59 / 122 / 0 | **61 / 120 / 0** |
+| ការអះអាងដែលធ្លាក់ (អត្ថបទមិនស្ទួន) | — | 766 | 815 | **781** |
+
+- ធៀប `2.40.0` ៖ ការអះអាងធ្លាក់ **ដកចេញ ៣៤** (ថ្នាក់ ៥ ក្នុងតារាងខាងលើ) · **ថ្មី ១** ៖ `page-nav` «បោះបង់ ➜
+  បិទប្រអប់» — វាស់ម្តងមួយ ៖ checker ចុច `[data-act="cancelLogout"]` ដែលលែងមាន (សកម្មភាពជា `onClick`)
+  ➜ ការចុចគ្មានអ្វីកើត ➜ **សំណល់នៃការវាស់** ដូច `2.39.0` បេះបិទ (`2.40.0` រាយ ok ដោយ **ចៃដន្យ** ៖ ប្រអប់
+  មិនដែលបើកសោះ ➜ «មិនបើក» ពិតដោយស្វ័យប្រវត្តិ)។
+- `main` ធ្លាក់ ១ (`repository-file-coverage`) ៖ `node_modules` ដែលមិនស្ថិតក្នុង git ក្នុង repo ស្រមោល — សំណល់នៃការវាស់។
+- ZoeW ខ្លួនឯង ៖ `verify` (purity 11 · vitest 61 · native-check 70 · android-check 48) · `logic:check` (function
+  ដើមបាត់ **០**) · `parity:all` (DOM/layout 721/721 × អេក្រង់ ៣ · deep · cleanup-rules 115) — **បៃតងទាំងអស់**។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0`–`2.40.0` នៅដដែល។
+២. **App Android** ៖ build APK ថ្មី (`npm run android:sync` ➜ Android Studio) — plugin ថ្មី
+   `@capacitor/haptics` (សិទ្ធិ `VIBRATE` មានរួច)។
+៣. សាកលើ **iPhone PWA និង Android ពិត** ៖ ទាញចុះពីផ្នែកខាងលើ ➜ ផ្ទុក (Android ញ័រម្តង) ·
+   ទាញពីផ្នែកខាងក្រោម ➜ មិនផ្ទុក · ទាញពេលប្រអប់/ម៉ឺនុយបើក ➜ មិនផ្ទុក · ផ្ទាំងប្រវត្តិហូតឡើង ➜
+   មិនផ្ទុក។ ⛔ **តំបន់ ៤០% ជាលេខដែលអាចកែបាន** (`PTR_START_ZONE_RATIO`) — ប្រាប់បើចង់ធំ/តូចជាងនេះ។
+៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
+
+### [2.40.0] — 2026-09-23 · ZoeW ៖ **React ១០០%** — React ជាម្ចាស់ DOM តែមួយ (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់បាន ZoeW ថ្មីជា React ពេញលេញ 100% មិនមែនលាយ»* ·
+*«រៀបចំគម្រោងថ្មី អោយមាន JSX, Component lifecycle និងតម្រង់ state management ផង
+ដើម្បីថ្ងៃមុខទៅ ងាយស្រួលអភិវឌ្ឍន៍បន្ថែម ឬត្រូវពង្រីកថែម»*។
+
+**ZoeW ប្រែ** (`zoew-v224` ➜ `zoew-v225`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **ដូចមុនបេះបិទ** លើ web/PWA និង Android (parity ទាំង ៥ ជាន់ ខាងក្រោម) — លើកលែង
+  **ប្រអប់ធីក «ចងចាំអ៊ីមែល» ក្នុងប្រអប់ចូលប្រព័ន្ធ ដោះធីកបានវិញ** ៖ ក្នុង `2.39.0`
+  React ចាក់សោវា (`checked` គ្មាន `onChange`) — វាស់ក្នុង browser ៖ `2.39.0` ចុច ➜ នៅធីក ·
+  `2.40.0` ចុច ➜ ដោះធីក។ ⛔ ZoeW ដើមលើ `main` មិនដែលមានកំហុសនេះទេ។
+
+#### ស្ថាបត្យកម្ម (សម្រាប់ការអភិវឌ្ឍបន្ត ៖ `ZoeW/docs/ARCHITECTURE.md` ផ្នែក ១១ · `EXTENDING.md`)
+
+- **កូដមុខងារ** (`src/core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM
+  **០** កន្លែង (ពី **៧៧៤**) ៖ ប្រអប់ = `uiState.modalDisplay` (`<Modal>`) · អត្ថបទ/ទង់ =
+  `viewState` · class ស្ថានភាព (ផ្ទាំង · របា Slide · ម៉ឺនុយ · សោ App) = `uiState` ·
+  focus/តម្លៃ/វាស់/រមូរ = ref តាមឈ្មោះ (`src/app/refs.ts`) · `commitNow()` មុនរាល់ការវាស់។
+- **កាយវិការ · PTR · ចលនាផ្ទាំង · ការលាក់របា** ផ្លាស់ទៅ `src/app/behaviors/` (ស្រទាប់ React
+  តាម ref) — តក្កវិជ្ជាដដែល (`logic:check` ៖ តំបន់ហាមចូល ២០ function ខុសពីដើម **សុទ្ធតែ**
+  ការប្តូរ DOM ➜ state/ref ដែលមានហេតុផលម្តងមួយៗ · លំដាប់ · លក្ខខណ្ឌ · slop · ratio ដដែល)។
+- `setupActionDelegation()` ដកចេញ ៖ ការចុចទាំងអស់ឆ្លង `onAct()` តែមួយ ➜ គ្មាន listener
+  ទី ២ នៅកម្រិត `document` (ច្បាប់ ៤ នៃ «CSP និង `data-act`»)។
+- ការប៉ះ `document` ដែលមិនមែន UI (`<head>` · ទាញយក · canvas ក្រៅអេក្រង់ · វដ្តជីវិតទំព័រ)
+  រស់ក្នុង `src/platform/document-io.ts` តែមួយ។
+- Category ក្នុងរបា Slide ៖ `hidden` ជា state ដែល `refreshDrawerGroups()` សរសេរ (ដូចដើម ៖
+  ពេលបើករបា) — ការដេរីវេរាល់ការគូរ ធ្វើឲ្យ DOM ខុសពីដើម (`parity:dom` ចាប់បាន ៣/៣ អេក្រង់)។
+- `domText()` ៖ ការបម្លែងដូច setter `innerText` (`undefined` ➜ «undefined») ពេលតម្លៃមកពី
+  ទិន្នន័យ — JSX គូរ `{undefined}` ជាទទេ ➜ `parity:deep` ៤០ ជំហានធ្លាក់មុនកែ។
+
+#### អ្នកយាមថ្មី ៖ `npm run purity:check` (ក្នុង `verify`)
+
+| ការវាស់ | វាស់ថាវាធ្លាក់ |
+|---|---|
+| កូដមុខងារប៉ះ DOM ០ · ការលើកលែងមានហេតុផល **និងពិដានចំនួន** (ពិដានធូរ ឬធាតុងាប់ ➜ ធ្លាក់) | mutation ៣/៣ (`classList` ក្នុង feature · `createElement` ថ្មីក្នុង `document-io` · `elementOf` ក្នុង ui) |
+| **ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង** (AST មិនមែនវត្តមានអក្សរ) | ✅ ចាប់កំហុសពិតដែលការផ្ទេរជុំនេះបង្កើត ៖ `<video id="configQrVideo">` គ្មាន ref ➜ ស្កេន QR ពេល Config ធ្លាក់ «configQrVideo missing» (browser ៖ មុនកែ ប្រអប់បិទ គ្មាន stream · ក្រោយកែ stream ភ្ជាប់) — tsc · eslint បៃតងលើវា · ការស្កេនអក្សរជំនាន់ដំបូងក៏ **បៃតងក្លែងក្លាយ** (`refTo('x')` ដែលមិនដែលឈរលើ `ref=`) ➜ ប្តូរទៅ AST · mutation ២/២ |
+| គ្មាន input ដែល React ចាក់សោ (`value`/`checked` គ្មាន `onChange`) | ✅ tree `2.39.0` ➜ ធ្លាក់ ២ (`rememberMeCheckbox` · `zoomSlider`) |
+| ថតទទេ | ✅ ធ្លាក់ (ជាន់អប្បបរមា) |
+
+`slot:check` ពង្រីកទៅ `src/app/**/*.ts` និង `elementOf()` (កូដមុខងារលែងមាន `byId` ➜ ជាន់អប្បបរមា
+ចាស់ «ការចង byId >= 100» ធ្លាក់ «ការស្កេនតូចពេក» — វាស់រួចថាវានៅចាប់ `elementOf('phoneSuggestBox').textContent = ''`)។
+`src/audit-compat.ts` (**build វាស់តែប៉ុណ្ណោះ**) បកប្រែការសរសេរ class របស់ checker ដើម
+(`.collapsed` · `.chrome-hidden` …) ជា state ដដែល ➜ checker វាស់ App React ពិតដោយមិនកែ checker។
+
+#### អ្វីដែលវាស់បាន
+
+| ការវាស់ | លទ្ធផល |
+|---|---|
+| `npm run verify` (type · lint · slot · **purity** · test · build · parity · smoke · SW · doc · `android:check` · `native:check`) | ✅ ទាំងអស់ · vitest ៥៧ · `android:check` ៤៧ · `native:check` ៦០ |
+| `parity` · `parity:dom` · `parity:live` · `parity:deep` · `rules:check` ធៀប ZoeW ដើម | static ១០០% (function ៧៣៥/៧៣៥ + ដកចេញដោយចេតនា ៤ មានហេតុផល) · ធាតុ ៧២១/៧២១ × ៣ អេក្រង់ · ១៨/១៨ · **៧៩/៧៩** · **១១៥/១១៥** |
+| `logic:check` | ដូចដើម ៥២០ · ខុសដោយចេតនា ២១៥ · បាត់ ០ · ដកចេញដោយចេតនា ៤ · តំបន់ហាមចូល ៣៣ function (១៣ ដូចដើម · ២០ ខុសដោយហេតុផលកត់ត្រា) |
+| `audit-tools/run-all.sh` (emulator រត់) | កំពុងវាស់លើ `main` · `2.39.0` · `2.40.0` ➜ លទ្ធផលក្នុង commit បន្ទាប់ (`ZoeW/docs/PARITY-RESULTS.md` ផ្នែក ៥) |
+
+⛔ **អ្វីដែលមិនបានវាស់** ៖ iPhone PWA ពិត · Android ពិត · APK compile (ដូច `2.39.0`)។
+⛔ **តំបន់ហាមចូល (ច្បាប់ ១១) ត្រូវបានផ្លាស់ទីតាមសំណើច្បាស់** ៖ តក្កវិជ្ជាដដែល តែការសាកលើ
+ឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធ (PTR · អូសផ្ទាំង · ការលាក់របា) ជាលក្ខខណ្ឌមុន merge។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0` · `2.39.0` នៅដដែល។
+២. សាកលើ **iPhone PWA និង Android ពិត** ៖ PTR · អូសផ្ទាំងប្រវត្តិ/ស្កេន · ការលាក់របា Tab ·
+   ប្រអប់ស្វែងរកលេខ (auto pull up) · ម៉ាស៊ីនស្កេន hardware · ស្កេន QR ពេល Config ·
+   ប្រអប់ធីក «ចងចាំអ៊ីមែល»។
+៣. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify** · Android ៖ build APK ថ្មី
+   (`npm run android:sync`) បើចង់បានកំណែនេះលើទូរស័ព្ទ។
+
+### [2.39.0] — 2026-09-23 · ZoeW ៖ **App Android (Capacitor)** · lifecycle ជាដំណាក់ · ការវាស់ច្បាប់លុយ/សម្អាត (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«រៀបចំគម្រោងថ្មីហ្នឹង អោយគាំទ្រការ setup Capacitor សម្រាប់តែ
+android ផង គាំទ្រ biometric, ptr, និង app logo … អោយ Capacitor ដំណើរការទាំងអស់
+បានពេញលេញ»* · *«រៀបចំគម្រោងថ្មី អោយមាន JSX, Component lifecycle និងតម្រង់ state
+management»* · *«អោយ APK មានលេខកំណែពិតផង»* · *«ដាក់ប្រវត្តិថយក្រោយ android ផង»* ·
+*«សូមផ្ទៀងផ្ទាត់ច្បាប់ លុប/ដក និង auto cleanup ២ម៉ោង ៧ថ្ងៃ ២ថ្ងៃ ៣០ថ្ងៃ ផង»*។
+
+**ZoeW ប្រែ** (`zoew-v223` ➜ `zoew-v224`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលអ្នកប្រើឃើញ
+
+- **App Android** (`ZoeW/android/` · appId `com.zoesystem.zoew`) ៖ logo ក្រហម-គូបស
+  (adaptive · themed · legacy · splash — កើតពីរូបមេ `resources/icon.svg`) ·
+  **លេខកំណែ APK = `APP_VERSION`** (`versionCode` = X×1000000 + Y×1000 + Z ដេរីវេពេល
+  Gradle build) · ជីវមាត្រតាម **Android Keystore** · PTR · **ប៊ូតុង Back ជាមួយ
+  ប្រវត្តិថយក្រោយ** (ម៉ឺនុយ/ប្រអប់/របា Slide ➜ អេក្រង់មុនម្តងមួយជំហាន ➜ បង្រួម
+  App · ⛔ មិនត្រឡប់ចូលរបៀប «ដក») · Export ➜ ផ្ទាំង Share · PDF ➜ PrintManager ·
+  សោ App ពេល pause/resume · បិទ backup (កៅអី License មិនត្រូវក្លែងតាមការស្តារ)។
+- **web/PWA ៖ មិនប្រែ** — លើកលែង ៖ ជួរ 🩺 «របៀបក្រៅបណ្ដាញ» លើ App Android និងសៀវភៅ
+  ណែនាំមានផ្នែក «App Android»។
+- ZTO Function ៖ CORS **តែ** origin `https://localhost` (App Android) — សំណើ web
+  (same-origin) ទទួល header ដូចមុនបេះបិទ។
+
+#### ស្ថាបត្យកម្ម (សម្រាប់ការអភិវឌ្ឍបន្ត ៖ `ZoeW/docs/EXTENDING.md`)
+
+- `src/boot/bootstrap-statements.ts` ➜ **`src/app/lifecycle/boot.ts`** ៖ ដំណាក់ដែលមាន
+  ឈ្មោះ តាមលំដាប់ដើមបេះបិទ · `LifecycleScope` (`listen`/`every`/`onLoad`/`onDispose`
+  ដកវិញពេល unmount) · `oncePerPage()` សម្រាប់ការចាប់ផ្តើមដែលដកវិញមិនបាន ➜
+  StrictMode/HMR មិនបង្កើត listener ស្ទួន។
+- `src/platform/` ៖ អ្នកសម្រេច web ធៀប native តែមួយ · plugin ផ្ទុកតាម dynamic
+  import ក្នុង chunk `native-plugins` ដែល Service Worker រំលង (web មិនផ្ទុកវាសោះ)។
+- `useStoreValue(store, select)` ៖ component គូរឡើងវិញតែពេលតម្លៃដែលអានប្រែ។
+- សោ App ៖ `noteAppLockAway()` ច្រានការហៅស្ទួន (`pause` + `visibilitychange`) —
+  បើអត់ ការហៅទី ២ ស៊ីការលើកលែងការខល ហើយចាក់សោខុស។ web ៖ ឥរិយាបថដដែល។
+
+#### អ្វីដែលវាស់បាន
+
+| ការវាស់ | លទ្ធផល |
+|---|---|
+| `npm run verify` (type · lint · test · build · parity · smoke · SW · doc · `android:check` · `native:check`) | ✅ ទាំងអស់ · vitest ៥៧ · `android:check` ៤៧ · `native:check` ៦០ |
+| `parity:dom` · `parity:live` · `parity:deep` ធៀប ZoeW ដើម | ធាតុ ៧២១/៧២១ · ១៨ ជំហាន · **៧៩ ជំហាន** ដូចគ្នាបេះបិទ |
+| `logic:check` | ដូចដើម ៦៦៣ · ខុសដោយចេតនា ៧៦ · បាត់ ០ · តំបន់ហាមចូល ៣០/៣១ (`setupIOSPullToRefresh` ខុសដោយហេតុផលកត់ត្រា) |
+| **`rules:check` (ថ្មី)** ៖ លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · កញ្ចប់លាយ · ២ថ្ងៃ · ៣០ថ្ងៃ (ទិន្នន័យ ±១ នាទី សងខាងព្រំដែន) · ledger ថ្ងៃ/ខែ · registry · ស្តារ | **១១៥/១១៥** លើ **ZoeW ដើម · React web · React Android** · DB ក្រោយរាល់ជំហាន = ZoeW ដើម |
+| mutation លើ `rules:check` ៖ ធុងសំរាម expired ប្រើ ៣០ ថ្ងៃ · ៧ ថ្ងៃ មិនសម្គាល់ `isDeducted` | **២/២ ចាប់បាន** |
+| mutation លើ `native:check` ៖ ដក `setupNativeShell` · ដកការចាប់មុន slop របស់ PTR | **២/២ ចាប់បាន** (តែការចាប់មុន slop ត្រូវការសេណារីយ៉ូ «latch របស់ Chromium» ៖ touch ក្លែងរបស់ CDP **មិន** ធ្លាក់ដោយគ្មានវា) |
+| mutation លើ `android:check` ៖ `versionName` literal · `allowBackup` · import static ពី plugin · `package.json` ≠ `APP_VERSION` | **៤/៤ ចាប់បាន** · ថតទទេ ➜ ៥៤ FAIL |
+| Gradle ពិត ៖ មុខងារដេរីវេកំណែ | `2.38.0` ➜ `2038000` · `2.39.10` ➜ `2039010` · លេខខូច ➜ build បដិសេធ |
+| `audit-tools/` តំបន់ហាមចូល លើ tree adapter | `gesture` ១០៧ · `panel-motion` ៤៧ · `ios-panel-glide` ៣៨ — ដូចជុំមុន |
+| `audit-tools/` លុយ/សម្អាត (`trash-modal` · `partial-pickup-cleanup` · `expired-trash-retention` · `policy` · …) | **ដូច baseline HEAD បេះបិទ** — តែពួកវា **មិនអាចវាស់ React** (គាំងពេលស្រង់ `app.js`) ➜ អ្នកវាស់ពិតគឺ `rules:check` និង `parity:deep` |
+| `app-lock-test` | ធ្លាក់ ១៥ = baseline (regex «ហៅ top level» ពង្រីកទទួល `oncePerPage('app-lock', initAppLock)`) |
+
+⛔ **អ្វីដែលមិនបានវាស់** ៖ APK **មិនបាន compile** ក្នុងម៉ាស៊ីននេះ (`dl.google.com`
+ត្រូវ proxy ហាម ➜ គ្មាន Android SDK/AGP) · កូដ Java របស់ plugin · WebView ពិត ·
+Keystore · ទូរស័ព្ទពិត។ `native:check` វាស់ផ្លូវ JS ដល់ព្រំដែន bridge **តែប៉ុណ្ណោះ**។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0` នៅដដែល (សាកលើ iPhone PWA +
+   Android ពិត · ផ្ទេរ checker · `repository-file-coverage` · `ZoeW/docs/MIGRATION.md`
+   ដំណាក់ ២)។
+២. **Build APK** ៖ `cd ZoeW && npm install && npm run android:sync && npm run
+   android:open` ➜ Android Studio ➜ Generate Signed APK។ ⛔ **រក្សា keystore** (បាត់ ➜
+   APK ថ្មីដំឡើងជាន់ចាស់មិនបាន) · ⛔ កុំ commit វា។
+៣. **ZTO Lookup ក្នុង App Android** ត្រូវការ Function ដែលមាន CORS ថ្មី ➜ ដំណើរការ
+   តែក្រោយ deploy កូដនេះទៅ `https://zoew.netlify.app` (តម្លៃក្នុង `ZoeW/.env.android`)។
+៤. **Firebase** ៖ បើ API key មានការរឹតបន្តឹង HTTP referrer ➜ បន្ថែម `https://localhost`។
+៥. **License** ៖ App Android និង PWA លើទូរស័ព្ទដដែល = **២ កៅអី** ក្នុង Key។
+៦. សាកលើទូរស័ព្ទពិតតាមតារាង ១៣ ជួរ ក្នុង `ZoeW/docs/ANDROID.md` ផ្នែក ៥ —
+   ⛔ ជាពិសេស **PTR** (តំបន់ហាមចូល ច្បាប់ ១១ — ប៉ះតាមសំណើច្បាស់ ផ្លូវ iOS មិនប្រែ) ·
+   ប៊ូតុង Back · ជីវមាត្រ (រួម «ក្រយៅដៃត្រូវប្តូរ») · របាស្ថានភាពលើ WebView ចាស់/ថ្មី។
+៧. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
+
+### [2.38.0] — 2026-09-23 · ZoeW ជា **React + TypeScript + Vite** (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់អោយ app ZoeW មាន framework និង build step
+ត្រឹមត្រូវ … កុំអោយបាត់មុខងារ ទោះ ០.១%»* រួច *«បើអាចជំនួស ZoeW បាន សូម commit
+push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»*។
+
+#### អ្វីដែលប្រែ
+
+- `ZoeW/` ទាំងមូលជំនួសដោយគម្រោង React 19 + TypeScript + Vite ៖ កូដតក្កវិជ្ជា
+  ក្នុង `src/core` · `src/domain` · `src/features` · `src/services` · `src/ui`
+  **កើតពី `app.js` ដើមដោយ codemod** (ឈ្មោះ function · ថេរ · កូនសោ storage
+  ដដែល) ហើយ UI ទាំងមូលជា React component។ `style.css` **ដូចដើម byte-for-byte**។
+- Netlify ៖ Build command `npm run build` · Publish `dist` (កំណត់ក្នុង
+  `ZoeW/netlify.toml`)។ Function ZTO **ដូចដើម byte-for-byte**។
+- `license-verify.js` · `error-reporting.js` នៅ byte-identical ជាមួយ ZoeKeyGen
+  (ឥឡូវរស់នៅ `ZoeW/public/`)។
+
+#### អ្វីដែលវាស់បាន (លម្អិត ៖ `ZoeW/docs/PARITY-RESULTS.md`)
+
+| ការវាស់ | លទ្ធផល |
+|---|---|
+| កាតាឡុក (function · ថេរ · state · `data-act` · id · កូនសោ storage · អត្ថបទ · CSS) | ១០០% ទាំង ៨ អ័ក្ស |
+| DOM និង layout ទំហំអេក្រង់ ៣ | ធាតុ ៧២១/៧២១ ដូចគ្នា |
+| ជំហាន ៧៩ (ផ្លូវលុយ · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF) × ៦ ជាន់ | ដូចគ្នាបេះបិទ ធៀបនឹង App ដើមដែលកំពុងរត់ |
+| function ធៀបដើមតាម token | ដូចគ្នា ៦៧៥ · ខុសដោយចេតនា ៦៤ · បាត់ ០ · តំបន់ហាមចូល ៣០/៣១ (`setupIOSPullToRefresh` ខុសដោយចេតនា) |
+| checker តំបន់ហាមចូលរបស់ `audit-tools/` លើ App React | `gesture` ១០៧ · `panel-motion` ៤៧ · `ios-panel-glide` ៣៨ — បៃតង |
+| **`audit-tools/run-all.sh` ទាំងមូល** (tree សម្រួល) | ✅ **៥៨** · ❌ **១២០** · ⏭️ ៣ (គ្មាន emulator) |
+
+⛔ **ការធ្លាក់ ១២០ ភាគច្រើនជា *រចនាសម្ព័ន្ធ*** — checker ស្រង់អត្ថបទពី
+`app.js` · អាន markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>` ដែលការហៅ
+ខាងក្នុង module មិនឆ្លងកាត់ ➜ **ពួកវាមិនបានវាស់ App នេះ**។ ⛔ ការធ្លាក់ទាំងនោះ
+**មិនត្រូវបានពិនិត្យម្តងមួយៗទាំងអស់ទេ** ➜ «រចនាសម្ព័ន្ធ» ជាការចាត់ថ្នាក់តាម
+គំរូ មិនមែនការធានា។ ការរត់ដោយផ្ទាល់លើ repo (គ្មាន tree សម្រួល) ៖ checker ZoeW
+ស្ទើរទាំងអស់ធ្លាក់ដោយ `ENOENT … ZoeW/app.js`។
+
+#### កំហុសពិតដែល checker ដើមរកឃើញ (parity មើលមិនឃើញ) — កែរួច
+
+| កំហុស | អ្នកចាប់ |
+|---|---|
+| `"type": "module"` ក្នុង `ZoeW/package.json` ➜ Node ផ្ទុក Function ZTO (`require`) ជា ES module ➜ `require is not defined` | `zto-proxy-test` |
+| `package-lock.json` ឃ្លាតពី `package.json` (ឈ្មោះ · កំណែ · `engines` · react ក្នុង `dependencies`) | `repository-contract-test` |
+| `ZoeW/README.md` ក្លាយជាឯកសារអ្នកអភិវឌ្ឍ ➜ បាត់ផ្នែក ៥ នៃច្បាប់ ៩ និងខ្លឹមសារ «របៀបប្រើ» | `doc-scope-test` |
+| build ship sourcemap ដែលផ្ទុក comment (ច្បាប់ ៣) | ការពិនិត្យដោយដៃ |
+| `firebase-loader.js` ក្នុង `public/` មាន comment (ច្បាប់ ៣) | `comments` |
+
+⛔ **មេរៀន** ៖ parity ប្រៀបធៀប **App** ចាស់នឹងថ្មី — តែ Function ខាង server ·
+`package.json` · ឯកសារ repo **ស្ថិតក្រៅ App** ➜ harness parity ក្លែង ZTO តាម
+`route` ហើយ **មិនដែលផ្ទុក Function ពិតសោះ**។ checker ដើមនៅតែចាំបាច់។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** ។ លក្ខខណ្ឌ ៖ (ក) សាកលើ **iPhone (PWA លើអេក្រង់
+   ដើម) និង Android ពិត** — PTR · ចលនាផ្ទាំងប្រវត្តិ · ការរមូរ (ច្បាប់ ១១);
+   (ខ) checker របស់ `audit-tools/` ត្រូវវាស់ App នេះបានពិត (ផ្ទេរទៅ `src/**` ឬ
+   ហៅតាម module) និងចាត់ឯកសារថ្មីក្នុង `audit-tools/repository-file-coverage.json`
+   (ឥឡូវ `repository-file-coverage` ធ្លាក់ ៖ ឯកសារថ្មីគ្មានអ្នកយាម)។ លម្អិត ៖
+   `ZoeW/docs/MIGRATION.md` ដំណាក់ ២។
+២. ការសាកលើ deploy preview មាន **origin ផ្សេង** ➜ ត្រូវ Activate ម្តងទៀត ➜
+   ⛔ **ស៊ីកៅអីឧបករណ៍** (`maxDevices`) ➜ ប្រើ Key សាកល្បង ឬសុំ admin ដោះកៅអីក្រោយ
+   សាករួច។
+៣. ⛔ **`check-money.cmd` (`tools/money-check-windows/`) លែងដើរលើ branch នេះ** —
+   `money-reality-check.js` ស្រង់ **កូដលុយពិត** ពី `ZoeW/app.js` ដែលលែងមាន ➜
+   ការវាស់លុយលើ dump ផលិតកម្ម ត្រូវរត់ពី `main` រហូតដល់ឧបករណ៍នោះត្រូវផ្ទេរ។
+៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មានការប្តូរ env**។ ZoeKeyGen មិនប្រែ។
+
 ### [2.37.3 · 2.20.2] — 2026-09-18 · Deep Audit — បញ្ជីពាក្យសម្ងាត់ ២ មិនស៊ីគ្នា · ស្នាមភ្ជាប់ SW abort
 
 **ZoeW ប្រែ** (`zoew-v221` ➜ `zoew-v222`) **និង ZoeKeyGen ប្រែ**

@@ -13,7 +13,72 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-18 · ZoeW 2.37.3 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-23 · ZoeW 2.42.0 · ZoeKeyGen 2.20.2)
+
+⛔ **មេរៀនជុំ 2.42.0 ៖ «0» របស់អ្នកយាម ត្រូវសួរថា «0 នៃ *អ្វី*?»** — `purity:check` រាយ «ការប៉ះ DOM
+ក្រៅ React ៖ 0» ខណៈកាយវិការក្នុង `src/app/behaviors` សរសេរ `style`/`classList`/`scrollTop` លើធាតុរបស់
+React ~៤០ បន្ទាត់ ព្រោះវាស្កេនតែថតមុខងារ (សំណួរ ១)។ ឥឡូវ `src/app/**` ត្រូវវាស់ដែរ ជាមួយច្រកចេញ
+`APP_ALLOWED` (ពិដានតឹង)។ ⛔ **touch របស់ CDP រត់ microtask រវាង listener** ➜ ការអះអាង «គូរក្នុងស៊ុម
+ដដែល» ត្រូវប្រើ touch ដែល script បញ្ជូន (`dispatchEvent`) បើមិនដូច្នេះ mutation «គូរពន្យារ» រស់រាន។
+⛔ ចន្លោះដែលជុំក្រោយគួរសួរ ៖ checker ដើមដែលចាប់ listener តាម `addEventListener` ក្នុង `vm`
+(`phone-suggest-test` · `phone-search-swipe-test`) មើលមិនឃើញ handler ក្នុង JSX (`onFocus` · `onClick`)
+➜ ផ្លូវទាំងនោះវាស់បានតែក្នុង browser ពិត (parity:deep · `native-check`)។
+
+⛔ **មេរៀនសំខាន់ជុំនេះ ៖ «checker ក្រហមស្រាប់» លាក់ការថយក្រោយថ្មី** — ការប្រៀបធៀបតាម
+**ស្ថានភាព checker** រវាង `2.39.0` ➜ `2.40.0` បង្ហាញតែ ២ ការប្រែ ខណៈការប្រៀបធៀបតាម
+**ការអះអាងនីមួយៗ** បង្ហាញការធ្លាក់ថ្មី **៥៧** (ការថយក្រោយពិត ៥ ថ្នាក់)។ ⛔ ជុំក្រោយត្រូវ
+diff **សំណុំការអះអាងដែលធ្លាក់** (អត្ថបទ · លេខជំនួសដោយ `#`) មិនមែនត្រឹម PASS/FAIL។
+⛔ ថ្នាក់ថ្មីដែល React នាំមក ៖ **DOM ប្រែក្នុង microtask** ខណៈ App ដើមប្រែភ្លាម ➜ វាល
+`markImmediate` (`core/store.ts`) ជាអ្នកការពារ · វាលរចនាសម្ព័ន្ធ UI ថ្មីត្រូវបន្ថែមក្នុងបញ្ជីនោះ។
+📱 PTR ៖ តំបន់ ៤០% ខាងលើ · ស្រទាប់បើក ➜ គ្មាន PTR · ញ័រម្តង (សំណើម្ចាស់គម្រោង · `native-check`)។
+
+⚛️ **ZoeW ជា React ១០០%** ៖ កូដមុខងារប៉ះ DOM **០** កន្លែង (state/ref) · កាយវិការ · PTR ·
+ចលនាផ្ទាំង ផ្លាស់ទៅ `src/app/behaviors/` · អ្នកយាមថ្មី `npm run purity:check`។ ⛔ ចន្លោះ
+ដែលជុំក្រោយគួរសួរមុនគេ ៖ **ស្នាមភ្ជាប់ state ➜ DOM** ដែល parity មិនចុច (ឧ. ប្រអប់ធីក
+«ចងចាំអ៊ីមែល» ដែល React ចាក់សោក្នុង `2.39.0` ខណៈ parity ៧៩ ជំហានបៃតង) — `purity:check`
+ចាប់តែថ្នាក់ `value`/`checked` គ្មាន `onChange`; ⛔ **ព្រឹត្តិការណ៍ `onChange` របស់ React
+ស្តាប់ `input` មិនមែន `change`** ➜ ការប្រើ `onChange` ជំនួស `change` native ប្តូរចង្វាក់
+ការហៅ (រាល់ការវាយ) ដោយគ្មានអ្នកយាមរចនាសម្ព័ន្ធ (`refWithNative()` ជាផ្លូវត្រឹមត្រូវ)។
+⛔ checker ដើមដែលសរសេរ class លើ DOM ដោយផ្ទាល់ រត់តាមស្រទាប់បកប្រែ `src/audit-compat.ts`
+(build វាស់តែប៉ុណ្ណោះ) ➜ បើ checker ថ្មីសរសេរ class ស្ថានភាពផ្សេង (មិនមែន `.collapsed` ·
+`.search-focus` · `.history-expanded` · `.panel-gliding` · `.show` · `.chrome-hidden`) ត្រូវ
+បន្ថែមវាក្នុងបញ្ជីនោះ មិនមែនធ្វើឲ្យកូដផលិតកម្មអាន class វិញ។
+
+## តារាងជុំមុន (2026-09-23 · ZoeW 2.39.0 · ZoeKeyGen 2.20.2)
+
+📱 **ZoeW មាន App Android (Capacitor)** + lifecycle ជាដំណាក់ (`src/app/lifecycle/`) ·
+ស្រទាប់ `src/platform/` · ប្រវត្តិថយក្រោយ Android។ ផ្ទៃថ្មីដែល **គ្មាន checker
+របស់ `audit-tools/` វាស់** ៖ ផ្លូវ native ទាំងអស់ (bridge · plugin) — អ្នកយាមរបស់វា
+រស់នៅ `ZoeW/scripts/` (`android:check` · `native:check` · `rules:check`) ដែល
+`run-all.sh` **មិនហៅ** ➜ ⛔ ជុំក្រោយត្រូវរត់ `cd ZoeW && npm run verify && npm run
+parity:all` ដោយខ្លួនឯង។ ⛔ កូដ Java របស់ plugin · WebView ពិត · Keystore **គ្មាន
+អ្នកវាស់ក្នុងម៉ាស៊ីននេះ** (គ្មាន Android SDK — `dl.google.com` ត្រូវ proxy ហាម) ➜
+ការសាកលើទូរស័ព្ទពិត (`ZoeW/docs/ANDROID.md` ផ្នែក ៥) ជាអ្នកវាស់តែមួយ។
+
+✅ ច្បាប់ **លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ** វាស់ដោយការរត់ពិតលើ ZoeW ដើម ·
+React web · React Android (`rules:check` ១១៥/១១៥ · mutation ២/២ ចាប់) ➜ checker
+លុយ/សម្អាតរបស់ `audit-tools/` នៅតែ **មិនអាចវាស់ React** (ឆ្លើយដូច baseline HEAD
+បេះបិទ — គាំងពេលស្រង់ `app.js`) ➜ ការផ្ទេរពួកវានៅជាការងារដំបូង (ខាងក្រោម)។
+
+## តារាងជុំមុន (2026-09-23 · ZoeW 2.38.0 · ZoeKeyGen 2.20.2)
+
+🔴 **ZoeW ក្លាយជា React + TypeScript + Vite** (branch · មិនទាន់ merge) ➜ **ចំណុច
+ចាប់ផ្តើមនៃជុំបន្ទាប់មិនមែន «checker ណាក្រហម?» ទេ** — `run-all.sh` លើ App React
+(tree សម្រួល `ZoeW/scripts/build-audit.mjs`) ឆ្លើយ ✅ **៥៨** · ❌ **១២០** · ⏭️ ៣
+ហើយការធ្លាក់ភាគច្រើនមានន័យថា **checker មិនបានវាស់** (ស្រង់អត្ថបទពី `app.js` ·
+markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>`)។ លេខ និងការចាត់ថ្នាក់ ៖
+`ZoeW/docs/PARITY-RESULTS.md` · ផ្លូវផ្ទេរ ៖ `ZoeW/docs/MIGRATION.md` ដំណាក់ ២។
+
+⛔ **ការងារដំបូងរបស់ជុំក្រោយ** ៖ ផ្ទេរ checker ដែលយាម **លុយ** មុនគេ (តារាង
+«ច្បាប់ ➜ ឧបករណ៍» ជួរលុយ) ឲ្យវាស់ App React ពិត — ⛔ ហើយបញ្ជាក់ថាវា **ធ្លាក់**
+លើ mutation មុនជឿវា (ច្បាប់ «ឧបករណ៍ខ្លួនវា»)។ ⛔ **កុំ «ជួសជុល» ការធ្លាក់ដោយ
+ផ្តល់ `app.js` ចាស់ឲ្យ checker** — នោះជាការវាស់ឯកសារដែលមិន ship។
+
+checker ដើមរកឃើញកំហុសពិត ៥ ដែល parity មើលមិនឃើញ (Function ZTO ផ្ទុកជា ES
+module · lock ឃ្លាត · README ខុសច្បាប់ ៩ · sourcemap/comment) ➜ **ពួកវានៅតែ
+ជាអ្នកយាមដែលចាំបាច់** មិនមែនសំណល់ដែលត្រូវលុប។
+
+## តារាងជុំមុន (2026-09-18 · ZoeW 2.37.3 · ZoeKeyGen 2.20.2)
 
 ជុំនេះមកពីសំណើ **«វាស់ឡើងវិញទាំងអស់ ក្រែង audit tool បៃតងក្លាយ»**។ ដូច្នេះ
 ចំណុចចាប់ផ្តើមមិនមែន «checker ណាក្រហម?» ទេ — វាជា **ការវាស់ដោយឧបករណ៍ក្រៅ

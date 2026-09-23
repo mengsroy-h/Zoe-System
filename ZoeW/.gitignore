@@ -1,0 +1,12 @@
+# ផលិតផល build និង dependency — មិន commit
+node_modules
+dist
+dist-audit
+*.tsbuildinfo
+# ZoeW ដើមដែលទាញពី git សម្រាប់ការវាស់ parity (`npm run original:fetch`)
+.original
+# លទ្ធផលកណ្តាលរបស់ codemod
+tools/_*
+# លទ្ធផល build របស់ native-check · rules:check (លុបខ្លួនឯងពេលចប់)
+.native-check-dist
+.rules-check-dist

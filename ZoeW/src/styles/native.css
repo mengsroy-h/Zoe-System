@@ -1,0 +1,30 @@
+/*
+ * រចនាប័ទ្មសម្រាប់ **Android native (Capacitor)** តែប៉ុណ្ណោះ — គ្រប់ selector
+ * ឈរក្រោម `html.native-android` ដែល `boot-flags.js` ដាក់ **មុន** stylesheet
+ * ផ្ទុក ➜ web (browser · PWA · iOS) មិនប៉ះសោះ ហើយ `app.css` នៅដូច ZoeW ដើម
+ * បេះបិទ។
+ *
+ * ⛔ ច្បាប់ដដែលនឹង `html.ios-standalone` ៖ PTR របស់ App ជាម្ចាស់កាយវិការ
+ *    ទាញចុះ ➜ ឥទ្ធិពល overscroll របស់ WebView (glow/stretch) និងការរមូរ
+ *    ឆ្លងទៅ root ត្រូវបិទ។ `#appPages` នៅជាម្ចាស់នៃការរមូរ (ច្បាប់ PTR)។
+ * ⛔ **គ្មាន** `min-height` បូក safe-area ដូច iOS ៖ Capacitor (`SystemBars`
+ *    `insetsHandling: 'native'`) ដាក់ WebView ពេញអេក្រង់ ហើយ `env(safe-area-*)`
+ *    មានតម្លៃពិត ➜ `app.css` ប្រើវារួចហើយ។
+ */
+html.native-android,
+html.native-android body {
+    overscroll-behavior-y: none;
+}
+
+html.native-android .app-pages {
+    overscroll-behavior-y: contain;
+}
+
+/*
+ * ⛔ WebView របស់ Android ដាក់ពណ៌លើធាតុដែលចុច (`-webkit-tap-highlight-color`)
+ *    ខណៈ browser ធម្មតាដាក់វាជាស្រទាប់ថ្លាៗ ➜ លើ App ពេញអេក្រង់ វាមើលទៅ
+ *    ដូចប្រអប់ពណ៌ខៀវលោតឡើងរាល់ការចុច។
+ */
+html.native-android {
+    -webkit-tap-highlight-color: transparent;
+}

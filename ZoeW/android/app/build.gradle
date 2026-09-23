@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+// លេខកំណែរបស់ APK ដេរីវេពី APP_VERSION ពិតរបស់ App (src/core/version.ts)
+// ➜ APK · web · manifest.json និយាយលេខតែមួយជានិច្ច (គ្មាន literal ទី ២)។
+// versionCode = major × 1000000 + minor × 1000 + patch ➜ ឡើងជានិច្ចតាម APP_VERSION
+// (Android បដិសេធការដំឡើង APK ដែល versionCode ទាបជាងកំណែដែលមានរួច)។
+def zoewAppVersion() {
+    def source = rootProject.file('../src/core/version.ts').getText('UTF-8')
+    def matcher = (source =~ /APP_VERSION\s*=\s*'(\d+)\.(\d+)\.(\d+)'/)
+    if (!matcher.find()) {
+        throw new GradleException("APP_VERSION 'X.Y.Z' not found in src/core/version.ts")
+    }
+    def major = matcher.group(1) as int
+    def minor = matcher.group(2) as int
+    def patch = matcher.group(3) as int
+    if (minor > 999 || patch > 999 || major > 2000) {
+        throw new GradleException("APP_VERSION ${major}.${minor}.${patch} cannot map to a versionCode")
+    }
+    return [name: "${major}.${minor}.${patch}".toString(), code: major * 1000000 + minor * 1000 + patch]
+}
+
+def zoewVersion = zoewAppVersion()
+
+android {
+    namespace = "com.zoesystem.zoew"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.zoesystem.zoew"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode zoewVersion.code
+        versionName zoewVersion.name
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

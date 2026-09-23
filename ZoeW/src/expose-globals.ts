@@ -1,6 +1,6 @@
 import { dataState, firebaseState, lookupState, scanState, securityState, sheetImportState, uiState, ztoState } from './core/state';
 import groups from './_generated-state.json';
-import { installAuditClassAdapter } from './audit-compat';
+import { installAuditActionAnnotations, installAuditClassAdapter } from './audit-compat';
 
 /**
  * ⛔ កាយវិការ · PTR · ចលនាផ្ទាំង រស់ក្នុង `src/app/behaviors` (ស្រទាប់ React តាម ref)
@@ -30,6 +30,7 @@ export function exposeGlobals() {
         }
     }
     installAuditClassAdapter();
+    installAuditActionAnnotations();
     const stores: Record<string, any> = { firebaseState, dataState, scanState, uiState, securityState, lookupState, sheetImportState, ztoState };
     for (const [store, fields] of Object.entries(groups as Record<string, { name: string }[]>)) {
         for (const f of fields) {

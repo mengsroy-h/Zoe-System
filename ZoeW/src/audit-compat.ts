@@ -1,6 +1,7 @@
 import { commitNow } from './app/flush';
 import { elementOf, onRefChange, type RefName } from './app/refs';
 import { uiState } from './core/state';
+import { annotateActions } from './audit-annotate';
 
 /**
  * ⛔ សម្រាប់តែ build វាស់ (`VITE_EXPOSE_GLOBALS=1` ➜ `expose-globals.ts`) — **មិនដែលចូល
@@ -96,4 +97,17 @@ export function installAuditClassAdapter(): void {
         onRefChange(name, (el) => { if (el) wrap(el, bindings, false); });
     }
     commitNow();
+}
+
+/**
+ * attribute ផ្ទេរសកម្មភាព (`data-act` …) ពី prop ពិតរបស់ React (`audit-annotate.ts`) — ពេលដំឡើង និងរាល់
+ * ពេល React បន្ថែមធាតុ (ប្រអប់ · ជួរដេក · ម៉ឺនុយ)។ ⛔ build វាស់តែប៉ុណ្ណោះ។
+ */
+export function installAuditActionAnnotations(): void {
+    annotateActions(document.body);
+    new MutationObserver((records) => {
+        for (const r of records) {
+            for (const n of Array.from(r.addedNodes)) if (n.nodeType === 1) annotateActions(n as Element);
+        }
+    }).observe(document.body, { childList: true, subtree: true });
 }

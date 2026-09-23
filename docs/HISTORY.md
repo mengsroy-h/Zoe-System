@@ -389,7 +389,20 @@ listener `touch*` non-passive (React ចាក់វាជា passive) · listen
 
 #### អ្វីដែលវាស់បាន
 
-⟪FINAL42⟫
+| ការវាស់ | `2.41.0` | **`2.42.0`** |
+|---|---|---|
+| `audit-tools/run-all.sh` (emulator · strict) ជោគជ័យ / ធ្លាក់ / រំលង | 61 / 120 / 0 | **61 / 120 / 0** |
+| ការអះអាងដែលធ្លាក់ (អត្ថបទមិនស្ទួន) | 781 | **782** |
+
+- ស្ថានភាព checker **មិនប្រែមួយណាសោះ** · ការអះអាងធ្លាក់ **ថ្មី ១ តែប៉ុណ្ណោះ** ៖ `boot-animation` «សំណាញ់សុវត្ថិភាព
+  ក្នុង `boot-flags.js`» — ការស្វែងរក **អក្សរ** ក្នុង `boot-flags.js` ដែលដកចេញ **ដោយចេតនា** (ផ្ទាំងបើកជារបស់
+  React តែមួយ ➜ bundle ដួល = គ្មានផ្ទាំង · ផ្លូវបម្រុង ៦ វិ. ក្នុង React)។ ⛔ checker នោះវាស់ markup ថេរនៃ
+  `index.html` ដើម ដែល App React គ្មាន (`index.html` ផលិតកម្មមានតែ `#root`)។
+- តំបន់ហាមចូលនៅ **PASS** ដដែល ៖ `gesture` 107 (រួមការចាក់/ដក listener PTR តាមស្ថានភាពផ្ទាំង ➜ `uiState.subscribe`)
+  · `panel-motion` 47 · `ios-panel-glide` 38 · `history-menu` 57 · `layout-thrash` 5។
+- ZoeW ខ្លួនឯង ៖ `verify` (purity **15** · vitest 61 · android-check 48) · `native-check` **75** · `logic:check`
+  (function ដើមបាត់ **០** · ដកចេញដោយចេតនា ៥) · `parity:all` (DOM/layout 721/721 × ៣ · deep · cleanup-rules 115)
+  — **បៃតងទាំងអស់**។
 
 #### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 

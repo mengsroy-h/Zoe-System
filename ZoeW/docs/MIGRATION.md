@@ -62,6 +62,20 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
    (ឧបករណ៍ `check-money.cmd` ដែលអ្នកប្រើរត់លើ dump ផលិតកម្ម) ព្រោះវាស្រង់
    **កូដលុយពិត** ពី `ZoeW/app.js` ➜ ឥឡូវវា **លែងដើរ**។
 
+   **ស្រទាប់ build វាស់** (`npm run audit:build` ➜ `dist-audit/ZoeW`) — checker **មិនប្តូរ** ៖
+   - `app.js` = **ទិដ្ឋភាពអត្ថបទ** ពីប្រភព TypeScript (`scripts/checker-view.mjs`) ៖ លុបតែ syntax
+     របស់ type (ផ្ទៀងផ្ទាត់ token ទល់ token ជាមួយ `stripTypeScriptTypes` របស់ Node) · ទម្រង់ដើម ·
+     `<ឃ្លាំង>.<វាល>` ➜ `<វាល>` · `elementOf` ➜ `getElementById` · `commitNow` ទទេ។ ⛔ មិនដែលរត់។
+   - `index.html` = markup ដំបូងរបស់ React (Chromium ពិត ថតក្រោយ commit ដំបូង មុន boot) +
+     `data-act`/`data-args`/`data-on` ដែលអានពី prop ពិតរបស់ React (`src/audit-annotate.ts`)។
+     `createRoot()` សម្អាត markup នោះនៅ commit ដំបូង ➜ checker browser ឃើញ App រស់។
+   - ⛔ **សុពលភាព** ៖ `money-guardian` ចាក់ mutation លុយ **១០/១០** ចូលកូដ React ហើយអ្នកយាម **ចាប់បានទាំងអស់**។
+
+   **នៅសល់ (ត្រូវកែ checker ខ្លួនឯង)** ៖ ស្ថានភាពថ្មីរបស់ React (`uiState`/`viewState` វាលថ្មី) មិនមានក្នុង
+   sandbox `vm` · អត្ថបទ/`onAct("x")` ផ្លាស់ទៅ JSX · checker ដែលវាស់ `let` កម្រិត module (`state-hygiene`)
+   មើលមិនឃើញ state ក្នុងឃ្លាំង · `check-money.cmd` ត្រូវចង្អុលទៅ `dist-audit` · `run-all.sh` ត្រូវ build
+   `dist-audit` មុន។
+
 បន្ទាប់ពីលក្ខខណ្ឌទាំង ២ ឆ្លងកាត់តែប៉ុណ្ណោះ។ ផលិតកម្មប្រើ **origin ដដែល**
 ➜ Config · PIN · License · ការកំណត់ Locker · កុងតាក់ ZTO **នៅដដែល** ៖ អ្នកប្រើមិនបាច់
 តំឡើងឡើងវិញទេ។

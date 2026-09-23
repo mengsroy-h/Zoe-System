@@ -298,7 +298,15 @@ Function ដែល export ៖ 978
 | tree | ✅ ជោគជ័យ | ❌ ធ្លាក់ | ⏭️ រំលង |
 |---|---|---|---|
 | ZoeW ដើម (`main`) | 180 | 1 | 0 |
-| App React (branch នេះ) | 61 | 120 | 0 |
+| App React — build វាស់ចាស់ (អត្ថបទ esbuild · `index.html` ទទេ) | 61 | 120 | 0 |
+| App React — ស្រទាប់ build វាស់ ([`MIGRATION.md`](MIGRATION.md) ដំណាក់ ២) | **108** | **73** | 0 |
+
+- ⛔ **សុពលភាព** ៖ `money-guardian` ចាក់ mutation លុយ **១០/១០** ចូលកូដ React ➜ អ្នកយាម **ចាប់បានទាំងអស់**
+  (ការធ្លាក់ ១ របស់វាគឺ `price-edit-abort-test` មិនទាន់បៃតងលើ tree ស្អាត)។ checker លុយដែលបៃតង ៖ `policy-test` ·
+  `revenue-fuzz` · `ledger-clamp-symmetry` · `ledger-failed-apply-revert` · `monthly-ledger-agreement` ·
+  `pickup-ledger` · `pickup-barcode-identity` · `collected-mirror-*` · `cleanup-interrupt-atomicity` · `money-reality` …
+- ស្ថានភាព checker ពីបៃតង ➜ ក្រហម **១** ៖ `state-hygiene` (វាឃើញ `let` កម្រិត module ២ ថ្មីរបស់ឃ្លាំង ·
+  ⛔ ហើយវា **មិនឃើញ** state ក្នុងឃ្លាំងទាល់តែសោះ ➜ ត្រូវផ្ទេរ checker)។
 
 - `main` ធ្លាក់ ១ (`repository-file-coverage`) ៖ `node_modules` ក្រៅ git ក្នុង repo ស្រមោល — សំណល់នៃការវាស់។
 - ការធ្លាក់លើ App React ភាគច្រើនជា **សំណល់នៃការវាស់** ៖ checker ស្រង់អត្ថបទ/function តាមឈ្មោះពី `app.js`

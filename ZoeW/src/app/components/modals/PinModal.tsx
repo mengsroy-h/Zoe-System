@@ -1,21 +1,29 @@
+import { Modal } from './Modal';
+import { viewState } from '../../../core/view-state';
 import { onAct } from '../../actions';
+import { useStoreValue } from '../../hooks/useStore';
+import { refTo } from '../../refs';
+import { BiometricLabel } from '../shell/BiometricLabel';
 
 export function PinModal() {
+    const desc = useStoreValue(viewState, (s) => s.pinPromptVerifyText);
+    const biometricVisible = useStoreValue(viewState, (s) => s.pinBiometricVisible);
+    const biometricBusy = useStoreValue(viewState, (s) => s.pinBiometricBusy);
     return (
-        <div id="pinModal" className="modal" data-close="cancelPinEntryFlow">
+        <Modal id="pinModal" close="cancelPinEntryFlow">
             <div className="modal-content">
                 <h3>🔒 បញ្ចូល Security PIN</h3>
-                <p id="pinModalDesc">សូមវាយលេខកូដសុវត្ថិភាពដើម្បី Config ឬ Reconfig</p>
-                <input type="password" id="securityPinInput" placeholder="លេខកូដ PIN (ឧ. 0000)" autoComplete="off" />
+                <p id="pinModalDesc">{desc}</p>
+                <input type="password" id="securityPinInput" ref={refTo('securityPinInput')} placeholder="លេខកូដ PIN (ឧ. 0000)" autoComplete="off" />
                 <button
                     type="button"
                     className="btn-biometric"
                     id="pinBiometricBtn"
-                    style={{ display: "none" }}
+                    style={biometricVisible ? undefined : { display: "none" }}
+                    disabled={biometricBusy}
                     onClick={onAct("runBiometricUnlock")}
                 >
-                    <span className="bio-ico" aria-hidden="true">🫆</span>
-                    <span className="bio-label">ស្កេនក្រយៅដៃ ឬមុខ</span>
+                    <BiometricLabel busy={biometricBusy} />
                 </button>
                 <div className="modal-btns">
                     <div className="modal-btns-row">
@@ -24,6 +32,6 @@ export function PinModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

@@ -1,12 +1,12 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function RestoreWarningModal() {
     return (
-        <div
+        <Modal
             id="restoreWarningModal"
-            className="modal"
             style={{ zIndex: "1060" }}
-            data-close="cancelRestoreItem"
+            close="cancelRestoreItem"
         >
             <div className="modal-content">
                 <h3 style={{ color: "var(--warning)" }}>⚠️ បញ្ជាក់ការស្តារទិន្នន័យ</h3>
@@ -24,6 +24,6 @@ export function RestoreWarningModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

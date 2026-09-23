@@ -1,5 +1,5 @@
-import { renderNow } from '../app/flush';
-import { byId } from '../core/dom';
+import { commitNow } from '../app/flush';
+import { elementSize, fieldValue, rectOfElement, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { getZoneDateKey } from '../core/timezone';
@@ -15,17 +15,8 @@ import { requestPinBeforeConfig } from '../features/pin';
 import { openManualAdjustModal } from '../features/stats-modals';
 import { openRecentlyDeletedModal } from '../features/trash';
 
-export function dismissGlobalMoreMenuOutside(e) {
-    if (e.target && e.target.closest) {
-        if (e.target.closest('#globalMoreMenu')) return;
-        if (e.type === 'click' && e.target.closest('.more-btn, .header-more-btn')) return;
-    }
-    closeGlobalMoreMenu();
-}
-
 export function closeGlobalMoreMenu() {
-    const menu = byId('globalMoreMenu');
-    if (menu) menu.classList.remove('show');
+    uiState.moreMenuOpen = false;
 }
 
 export function moreMenuExport() { openExportDataModal(); closeGlobalMoreMenu(); }
@@ -50,19 +41,43 @@ export function moreMenuDelete(id?) { deleteSingleItem(id); closeGlobalMoreMenu(
 
 export function showGlobalMoreMenu(btn, event, items) {
     if (event) event.stopPropagation();
-    const rect = btn.getBoundingClientRect();
-    const menu = byId('globalMoreMenu');
-    const container = byId('menuContentContainer');
-    if(!menu || !container) return;
+    const rect = rectOfElement(btn);
+    if (!rect) return;
     uiState.moreMenuItems = items;
+    uiState.moreMenuOpen = true;
     uiState.touch();
-    // ⛔ `positionMenuSafely()` **វាស់** ទទឹង/កម្ពស់របស់ម៉ឺនុយ ដើម្បីកុំ
-    //    ឲ្យវាហៀរក្រៅអេក្រង់ ➜ ការវាស់មុនធាតុចុះ ផ្តល់ទំហំ **0** ➜ គ្មាន
-    //    ការទាញចូលវិញ ➜ ម៉ឺនុយហៀរ។ វាស់បាន (parity:live) ៖ left 245px
-    //    ធៀបនឹង 137px លើអេក្រង់ទូរស័ព្ទ ➜ ធាតុខាងក្នុងចុចមិនដល់។
-    renderNow(uiState);
-    menu.classList.add('show');
-    positionMenuSafely(menu, rect);
+    positionMenuSafely('globalMoreMenu', rect);
+}
+
+/**
+ * ទីតាំងម៉ឺនុយដែលមិនហៀរក្រៅអេក្រង់ (ក្រោមប៊ូតុង ឬលើវាពេលខ្វះកន្លែង)។
+ * ⛔ ម៉ឺនុយត្រូវ **ចុះ DOM នៅ `top: 0; left: 0`** មុនការវាស់ (`elementSize()`
+ *    បង្ខំការគូរ) ➜ ទទឹងមិនរួញដោយគែមអេក្រង់ ហើយធាតុខាងក្នុងមានរួច — វាស់បាន
+ *    (parity:live) ៖ ការវាស់មុនធាតុចុះ ➜ left 245px ធៀបនឹង 137px។
+ */
+export function positionMenuSafely(menuName, rect) {
+    uiState.moreMenuPosition = { top: 0, left: 0 };
+    const size = elementSize(menuName);
+    const menuHeight = size.height;
+    const menuWidth = size.width;
+    const windowHeight = window.innerHeight;
+    const windowWidth = window.innerWidth;
+
+    let topPos = rect.bottom + 4;
+    if (topPos + menuHeight > windowHeight - 10) {
+        topPos = rect.top - menuHeight - 4;
+    }
+    if (topPos < 10) topPos = 10;
+
+    let leftPos = rect.right - menuWidth;
+    if (leftPos < 10) leftPos = 10;
+    if (leftPos + menuWidth > windowWidth - 10) {
+        leftPos = windowWidth - menuWidth - 10;
+    }
+    if (leftPos < 10) leftPos = 10;
+
+    uiState.moreMenuPosition = { top: topPos, left: leftPos };
+    commitNow();
 }
 
 export function toggleHeaderMoreDropdown(btn?, event?) {
@@ -89,66 +104,20 @@ export function toggleMoreDropdown(btn?, event?, id?) {
     showGlobalMoreMenu(btn, event, items);
 }
 
-export function positionMenuSafely(menu, rect) {
-    menu.style.top = '0px';
-    menu.style.left = '0px';
-    const menuHeight = menu.offsetHeight;
-    const menuWidth = menu.offsetWidth;
-    const windowHeight = window.innerHeight;
-    const windowWidth = window.innerWidth;
-
-    let topPos = rect.bottom + 4;
-    if (topPos + menuHeight > windowHeight - 10) {
-        topPos = rect.top - menuHeight - 4;
-    }
-    if (topPos < 10) topPos = 10;
-
-    let leftPos = rect.right - menuWidth;
-    if (leftPos < 10) leftPos = 10;
-    if (leftPos + menuWidth > windowWidth - 10) {
-        leftPos = windowWidth - menuWidth - 10;
-    }
-    if (leftPos < 10) leftPos = 10;
-
-    menu.style.top = topPos + 'px';
-    menu.style.left = leftPos + 'px';
-}
-
 export function filterDataByDate(mode?) {
     uiState.currentFilterMode = mode;
     uiState.customFilterDate = '';
-    const customDateInput = byId('customDateInput');
-    if(customDateInput) customDateInput.value = '';
-
-    document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
-    if (mode === 'today') {
-        const el = byId('btnFilterToday');
-        if(el) el.classList.add('active');
-    }
-    if (mode === 'yesterday') {
-        const el = byId('btnFilterYesterday');
-        if(el) el.classList.add('active');
-    }
-    if (mode === 'dayBefore') {
-        const el = byId('btnFilterDayBefore');
-        if(el) el.classList.add('active');
-    }
-    if (mode === 'all') {
-        const el = byId('btnFilterAll');
-        if(el) el.classList.add('active');
-    }
+    setFieldValue('customDateInput', '');
 
     applyCurrentFilter();
 }
 
 export function filterDataByCustomDate() {
-    const customDateInput = byId('customDateInput');
-    const val = customDateInput ? customDateInput.value : '';
+    const val = fieldValue('customDateInput');
     if (!val) return;
 
     uiState.currentFilterMode = 'custom';
     uiState.customFilterDate = val;
-    document.querySelectorAll('.date-filter-btn').forEach(btn => btn.classList.remove('active'));
 
     applyCurrentFilter();
 }

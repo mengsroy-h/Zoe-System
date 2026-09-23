@@ -50,7 +50,7 @@ export function createStore<T extends object>(name: string, initial: T): T & Sto
         subscribe(fn: Listener) { listeners.add(fn); return () => { listeners.delete(fn); }; },
         touch: bump,
         version: () => version,
-        flush: () => { queued = false; notify(); }
+        flush: () => { if (queued) notify(); }
     };
 
     const target = Object.assign(Object.create(null) as object, initial, meta) as T & StoreMeta;

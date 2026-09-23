@@ -1,4 +1,5 @@
 import { lookupAction } from '../core/action-registry';
+import { modalMeta } from '../core/modals';
 import { dataState } from '../core/state';
 import { safeFocusScanner } from '../core/timezone';
 import { sanitizeInput } from '../domain/barcode';
@@ -6,25 +7,18 @@ import { collectedMoneyText, collectedRielText } from '../features/export';
 import { closeModal } from './modal';
 import { showToast } from './toast';
 
-export function topmostModal(openModals) {
-    let top = null;
-    let topZ = -Infinity;
-    openModals.forEach((m) => {
-        const parsed = parseInt(window.getComputedStyle(m).zIndex, 10);
-        const z = isNaN(parsed) ? 0 : parsed;
-        if (z >= topZ) { topZ = z; top = m; }
-    });
-    return top;
-}
-
-export function dismissModal(modalEl) {
-    if (!modalEl || modalEl.hasAttribute('data-nodismiss')) return;
-    const fnName = modalEl.getAttribute('data-close');
-    const closer = fnName ? lookupAction(fnName) : null;
+/**
+ * បិទប្រអប់ដោយ «ចុចខាងក្រៅ · Escape · Back» ៖ ប្រអប់ `noDismiss` មិនបិទ ·
+ * មាន `close` ➜ រត់សកម្មភាពនោះ (សម្អាតស្ថានភាពរបស់ប្រអប់) · អត់ ➜ `closeModal()`។
+ */
+export function dismissModal(modalId) {
+    const meta = modalId ? modalMeta(modalId) : null;
+    if (!meta || meta.noDismiss) return;
+    const closer = meta.close ? lookupAction(meta.close) : null;
     if (closer) {
         closer();
     } else {
-        closeModal(modalEl.id);
+        closeModal(modalId);
     }
 }
 

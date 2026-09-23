@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import { AppShell } from './components/AppShell';
+import { DocumentEffects } from './components/shell/DocumentEffects';
 import { PtrIndicator } from './components/shell/PtrIndicator';
 import { UpdateBanner } from './components/shell/UpdateBanner';
 import { bootApplication } from './lifecycle/boot';
@@ -16,12 +17,15 @@ import { createLifecycleScope } from './lifecycle/scope';
  * ដកវិញនូវរាល់ listener/interval ដែលដំណាក់ boot ចាក់ (មើល `lifecycle/scope.ts`)។
  */
 export function App() {
-    // ⛔ `useLayoutEffect` មិនមែន `useEffect` ៖ កូដ imperative អាន DOM តាម
-    //    `byId()` ភ្លាមៗ ➜ វាត្រូវរត់ **ក្រោយ DOM ចុះ តែមុនការគូរ** ដូច
-    //    `<script>` នៅចុង `<body>` របស់ ZoeW ដើមបេះបិទ។
+    // ⛔ `useLayoutEffect` + microtask ៖ boot រត់ **ក្រោយ DOM ចុះ តែមុនការគូរ
+    //    លើអេក្រង់** ដូច `<script>` នៅចុង `<body>` របស់ ZoeW ដើម ហើយ **ក្រៅ**
+    //    lifecycle របស់ React ➜ កូដមុខងារអាចហៅ `commitNow()` (focus · វាស់)
+    //    បាន (React ហាម `flushSync` ក្នុង effect)។
     useLayoutEffect(() => {
         const scope = createLifecycleScope();
-        bootApplication(scope);
+        queueMicrotask(() => {
+            if (!scope.disposed) bootApplication(scope);
+        });
         return () => scope.dispose();
     }, []);
 
@@ -31,6 +35,7 @@ export function App() {
     return (
         <>
             <AppShell />
+            <DocumentEffects />
             <UpdateBanner />
             <PtrIndicator />
         </>

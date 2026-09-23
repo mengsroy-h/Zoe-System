@@ -1,13 +1,17 @@
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function ExportDataModal() {
+    const v = useStoreFields(viewState, ['exportFilterLabel']);
     return (
-        <div id="exportDataModal" className="modal">
+        <Modal id="exportDataModal">
             <div className="modal-content">
                 <h3>📤 Export ទិន្នន័យ</h3>
                 <p>
                     Export ទិន្នន័យប្រវត្តិដែលកំពុងបង្ហាញ (តាមតម្រង «
-                    <span id="exportFilterLabel">ថ្ងៃនេះ</span>
+                    <span id="exportFilterLabel">{v.exportFilterLabel}</span>
                     ») ចេញជាឯកសារ
                 </p>
                 <div className="modal-btns" style={{ flexDirection: "column", gap: "8px" }}>
@@ -35,6 +39,6 @@ export function ExportDataModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["exportDataModal"] })}>បោះបង់</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

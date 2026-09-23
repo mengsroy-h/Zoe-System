@@ -1,10 +1,12 @@
-import { byId } from '../core/dom';
+import { blurActiveElement, focusField, isFieldFocused, setFieldValue, fieldValue } from '../app/refs';
+import { setupAppLockAwayGuard } from '../app/behaviors/app-lock-guard';
 import { firebaseState, securityState } from '../core/state';
+import { viewState } from '../core/view-state';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { APP_LOCK_PREF_KEY, APP_LOCK_SESSION_KEY } from '../core/storage-keys';
 import { safeFocusScanner } from '../core/timezone';
-import { biometricUnlockPin, clearBiometricRecord, isBiometricEnabled, refreshBiometricUi, setBiometricLabel } from './biometric';
+import { biometricUnlockPin, clearBiometricRecord, isBiometricEnabled, refreshBiometricUi } from './biometric';
 import { migrateLookupSecretIfNeeded } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { clearRememberedSession, showLoginModalWithPrefill } from './session';
@@ -67,15 +69,6 @@ export function noteAppLockExcuse() {
     securityState.appLockExcuseAt = Date.now();
 }
 
-export function appLockClickIsExcusable(target) {
-    if (!target || typeof target.closest !== 'function') return false;
-    if (target.closest(APP_LOCK_EXCUSE_SELECTOR)) return true;
-    const label = target.closest('label[for]');
-    if (!label) return false;
-    const bound = byId(label.htmlFor);
-    return !!bound && bound.tagName === 'INPUT' && bound.type === 'file';
-}
-
 export function noteAppLockAway() {
     if (securityState.appLockAwayNoted) return;
     securityState.appLockAwayNoted = true;
@@ -94,75 +87,39 @@ export function relockAppAfterAway() {
     if (isBiometricEnabled()) runAppLockBiometric(true);
 }
 
-export function setupAppLockAwayGuard() {
-    document.addEventListener('click', (e) => {
-        if (appLockClickIsExcusable(e.target)) noteAppLockExcuse();
-    }, true);
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) noteAppLockAway();
-        else relockAppAfterAway();
-    });
-}
-
 export function setAppLockMsg(text) {
-    const host = byId('appLockMsg');
-    if (host) host.textContent = text || '';
+    viewState.appLockMessage = text || '';
 }
 
 export function setAppLockBusy(busy) {
     securityState.appLockBusy = !!busy;
-    const submit = byId('appLockSubmitBtn');
-    if (submit) submit.disabled = !!busy;
-    const bio = byId('appLockBiometricBtn');
-    if (bio) {
-        bio.disabled = !!busy;
-        setBiometricLabel(bio, busy);
-    }
 }
 
 export function refreshAppLockUi() {
-    const state = byId('appLockToggleState');
-    if (state) state.textContent = !appLockPinIsSet() ? 'ត្រូវកំណត់ PIN' : (appLockIsEnabled() ? 'បើក' : 'បិទ');
-    const toggle = byId('appLockToggleBtn');
-    if (toggle) toggle.classList.toggle('is-on', appLockIsEnabled());
-    const bio = byId('appLockBiometricBtn');
-    if (bio) bio.classList.toggle('hidden', !isBiometricEnabled());
+    viewState.appLockToggleText = !appLockPinIsSet() ? 'ត្រូវកំណត់ PIN' : (appLockIsEnabled() ? 'បើក' : 'បិទ');
+    viewState.appLockToggleOn = appLockIsEnabled();
+    viewState.appLockBiometricVisible = isBiometricEnabled();
 }
 
 export function showAppLockScreen(keepSessionFlag?) {
     securityState.appIsLocked = true;
     if (keepSessionFlag !== true) clearAppUnlockedForSession();
-    document.body.classList.add('app-locked');
-    const screen = byId('appLockScreen');
-    if (screen) {
-        screen.classList.add('is-open');
-        screen.setAttribute('aria-hidden', 'false');
-    }
+    viewState.appLockOpen = true;
     setAppLockMsg('');
     setAppLockBusy(false);
     refreshAppLockUi();
-    const input = byId('appLockPinInput');
-    if (input) input.value = '';
-    const active = document.activeElement as any;
-    if (active && active !== input && typeof active.blur === 'function') {
-        try { active.blur(); } catch (e) { setAppLockMsg(''); }
+    setFieldValue('appLockPinInput', '');
+    if (!isFieldFocused('appLockPinInput')) {
+        try { blurActiveElement(); } catch (e) { setAppLockMsg(''); }
     }
-    if (input) {
-        try { input.focus(); } catch (e) { setAppLockMsg(''); }
-    }
+    try { focusField('appLockPinInput'); } catch (e) { setAppLockMsg(''); }
 }
 
 export function hideAppLockScreen() {
     securityState.appIsLocked = false;
     securityState.appLockVeiled = false;
-    document.body.classList.remove('app-locked');
-    const screen = byId('appLockScreen');
-    if (screen) {
-        screen.classList.remove('is-open');
-        screen.setAttribute('aria-hidden', 'true');
-    }
-    const input = byId('appLockPinInput');
-    if (input) input.value = '';
+    viewState.appLockOpen = false;
+    setFieldValue('appLockPinInput', '');
     setAppLockMsg('');
     setAppLockBusy(false);
 }
@@ -201,9 +158,8 @@ export async function completeAppUnlock(pin) {
 
 export async function verifyAppLockPin() {
     if (securityState.appLockBusy) return false;
-    const input = byId('appLockPinInput');
-    const entered = input ? input.value.trim() : '';
-    if (input) input.value = '';
+    const entered = fieldValue('appLockPinInput').trim();
+    setFieldValue('appLockPinInput', '');
     const waitLeft = appLockLockoutSecondsLeft();
     if (waitLeft > 0) {
         setAppLockMsg('បញ្ចូល PIN ខុសច្រើនដងពេក! សូមរង់ចាំ ' + waitLeft + ' វិនាទី។');

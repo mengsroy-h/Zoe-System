@@ -1,3 +1,4 @@
+import { downloadObjectUrl } from './document-io';
 import { noteAppLockExcuse } from '../features/app-lock';
 import { isNativeApp } from './native';
 
@@ -29,12 +30,7 @@ export function saveTextFile(text: string, filename: string, mimeType: string): 
     if (!isNativeApp()) {
         const blob = new Blob([text], { type: mimeType });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        downloadObjectUrl(url, filename);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         return;
     }

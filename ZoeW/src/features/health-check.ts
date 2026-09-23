@@ -1,5 +1,6 @@
+import { modalIsOpen } from '../core/modals';
 import { healthPendingRow, healthRow } from '../app/components/health/model';
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
 import { firebaseState, lookupState, securityState, uiState } from '../core/state';
 import { cleanupClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -239,8 +240,7 @@ export function openHealthCheck() {
 }
 
 export async function runHealthCheck() {
-    const btn = byId('healthRecheckBtn');
-    if (btn) btn.disabled = true;
+    viewState.healthRecheckBusy = true;
     // ⛔ ជួរ «កំពុងពិនិត្យ…» ដូចដើមបេះបិទ ៖ រូប ⏳ · គ្មាន .health-detail
     uiState.healthRows = [healthPendingRow()];
     uiState.touch();
@@ -249,9 +249,8 @@ export async function runHealthCheck() {
     rows.splice(3, 0, licenseRow);
     rows.push(lookupRow);
     // ⛔ លទ្ធផលយឺតមិនត្រូវគូរពេលប្រអប់បិទរួច (ច្បាប់ «ម្ចាស់ប្រអប់»)
-    const stillOpen = byId('healthCheckModal');
-    if (!stillOpen || stillOpen.style.display !== 'flex') return;
+    if (!modalIsOpen('healthCheckModal')) return;
     uiState.healthRows = rows;
     uiState.touch();
-    if (btn) btn.disabled = false;
+    viewState.healthRecheckBusy = false;
 }

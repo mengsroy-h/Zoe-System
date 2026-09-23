@@ -1,10 +1,12 @@
+import { refTo } from '../../refs';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { TrashSummaryBox } from '../trash/TrashSummaryBox';
 import { TrashTableBody } from '../trash/TrashTableBody';
 
 export function RecentlyDeletedModal() {
     return (
-        <div id="recentlyDeletedModal" className="modal">
+        <Modal id="recentlyDeletedModal">
             <div className="modal-content trash-modal-content">
                 <h3>🗑️ ធុងសំរាម</h3>
                 <p>ផុតកំណត់ ៨ថ្ងៃ៖ ២ ថ្ងៃ · ប្រភេទផ្សេង៖ ៣០ ថ្ងៃ</p>
@@ -12,7 +14,7 @@ export function RecentlyDeletedModal() {
                     <span className="icon">🔍</span>
                     <input
                         type="search"
-                        id="deletedSearchInput"
+                        id="deletedSearchInput" ref={refTo('deletedSearchInput')}
                         placeholder="ស្វែងរកលេខទូរស័ព្ទ ឬ Barcode..."
                         autoComplete="off"
                         onInput={onAct("filterRecentlyDeleted")}
@@ -39,6 +41,6 @@ export function RecentlyDeletedModal() {
                     <button className="btn-cancel" onClick={onAct("closeRecentlyDeletedModal")}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

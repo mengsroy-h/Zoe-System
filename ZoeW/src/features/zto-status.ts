@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { modalIsOpen } from '../core/modals';
+import { viewState } from '../core/view-state';
 import { dataState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -167,13 +168,9 @@ export function ztoAutoCloseEnabled() {
 
 export function refreshZtoAutoCloseUi() {
     const on = ztoAutoCloseEnabled();
-    const state = byId('ztoAutoCloseState');
-    if (state) state.textContent = on ? 'បើក' : 'បិទ';
-    const btn = byId('ztoAutoCloseBtn');
-    if (btn) {
-        btn.classList.toggle('is-on', on);
-        btn.classList.toggle('hidden', !ztoFastModeIsOn());
-    }
+    viewState.ztoAutoCloseText = on ? 'បើក' : 'បិទ';
+    viewState.ztoAutoCloseOn = on;
+    viewState.ztoAutoCloseVisible = ztoFastModeIsOn();
 }
 
 export function drawerZtoAutoCloseFlow() {
@@ -257,8 +254,6 @@ export function ztoStatusUnmeasuredCount(dataToScan = dataState.scanHistory, tra
 }
 
 export function renderZtoSyncBanner(dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
-    const banner = byId('ztoSyncBanner');
-    if (!banner) return;
     const pending = ztoStatusPendingCodes(dataToScan, trashToScan);
     const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
     const waiting = codes.length ? ztoStatusUnmeasuredCount(dataToScan, trashToScan) : 0;
@@ -270,7 +265,6 @@ export function renderZtoSyncBanner(dataToScan = dataState.scanHistory, trashToS
     if (signature === ztoState.ztoStatusBannerSig) return;
     ztoState.ztoStatusBannerSig = signature;
     if (!codes.length) {
-        banner.classList.add('hidden');
         ztoState.ztoBannerView = null;
         ztoState.touch();
         return;
@@ -285,7 +279,6 @@ export function renderZtoSyncBanner(dataToScan = dataState.scanHistory, trashToS
             + staleNote + ' — ចុចដើម្បីពិនិត្យម្តងទៀត'
     };
     ztoState.touch();
-    banner.classList.remove('hidden');
 }
 
 export const CODE128_PATTERNS = [
@@ -352,34 +345,12 @@ export function code128Bars(text) {
     return { bars: bars, width: x + CODE128_QUIET };
 }
 
-export function code128SvgElement(text) {
-    const drawing = code128Bars(text);
-    if (!drawing) return null;
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('class', 'zto-sync-bc');
-    svg.setAttribute('viewBox', '0 0 ' + drawing.width + ' ' + CODE128_HEIGHT);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('focusable', 'false');
-    for (let i = 0; i < drawing.bars.length; i++) {
-        const rect = document.createElementNS(NS, 'rect');
-        rect.setAttribute('x', String(drawing.bars[i][0]));
-        rect.setAttribute('y', '0');
-        rect.setAttribute('width', String(drawing.bars[i][1]));
-        rect.setAttribute('height', String(CODE128_HEIGHT));
-        svg.appendChild(rect);
-    }
-    return svg;
-}
 
 export function ztoSyncModalIsOpen() {
-    const el = byId('ztoSyncModal');
-    return !!el && el.style.display === 'flex';
+    return modalIsOpen('ztoSyncModal');
 }
 
 export function renderZtoSyncModalList(dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
-    const noteEl = byId('ztoSyncModalNote');
     const entries = ztoStatusFeatureConfig()
         ? ztoStatusPendingList(dataToScan, trashToScan) : [];
     const waiting = ztoStatusUnmeasuredCount(dataToScan, trashToScan);
@@ -388,9 +359,9 @@ export function renderZtoSyncModalList(dataToScan = dataState.scanHistory, trash
         + entries.map((entry) => entry.code + '~' + entry.phone + '~' + entry.locker).join(',');
     if (signature === ztoState.ztoStatusModalSig) return;
     ztoState.ztoStatusModalSig = signature;
-    if (noteEl) {
+    {
         const waitingNote = waiting ? ' កំពុងពិនិត្យបន្ត ' + waiting + ' ទៀត។' : '';
-        noteEl.innerText = entries.length
+        viewState.ztoSyncModalNote = entries.length
             ? 'ស្កេនលេខខាងក្រោមចូល ZTO Palm ដើម្បីបិទ។' + waitingNote
                 + (stale ? ' ' + VIEW_NOT_MEASURABLE_NOTICE : '')
             : emptyViewMessage(ZTO_SYNC_VIEW_KEYS, 'កញ្ចប់ដែលពិនិត្យរួច ត្រូវគ្នានឹង ZTO ទាំងអស់។') + waitingNote;

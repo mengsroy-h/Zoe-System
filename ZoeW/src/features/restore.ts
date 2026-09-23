@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { setModalDisplay } from '../core/modals';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { getFormattedDate } from '../core/timezone';
@@ -351,8 +351,7 @@ export async function executeRestoreItem() {
 
 export function promptPermanentDelete(id?) {
     uiState.pendingPermanentDeleteId = id;
-    const recentlyModal = byId('recentlyDeletedModal');
-    if (recentlyModal) recentlyModal.style.display = 'none';
+    setModalDisplay('recentlyDeletedModal', 'none');
     openModalHelper('permanentDeleteWarningModal');
 }
 

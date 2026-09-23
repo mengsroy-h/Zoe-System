@@ -1,12 +1,12 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LogoutConfirmModal() {
     return (
-        <div
+        <Modal
             id="logoutConfirmModal"
-            className="modal"
             style={{ zIndex: "1060" }}
-            data-close="cancelLogout"
+            close="cancelLogout"
         >
             <div className="modal-content">
                 <h3>🚪 ចាកចេញពីប្រព័ន្ធ</h3>
@@ -18,6 +18,6 @@ export function LogoutConfirmModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

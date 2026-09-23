@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldChecked, fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { LOOKUP_TEST_TIMEOUT_MS, ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
@@ -33,24 +34,18 @@ export async function migrateLookupSecretIfNeeded() {
 
 export function openLookupApiConfigModal() {
     const cfg = getLookupApiConfig() || {};
-    const setVal = (id, val) => { const el = byId(id); if (el) el.value = val || ''; };
+    const setVal = (id, val) => { setFieldValue(id, val || ''); };
 
-    const enabledCb = byId('lookupApiEnabledCheckbox');
-    if (enabledCb) enabledCb.checked = !!cfg.enabled;
+    setFieldChecked('lookupApiEnabledCheckbox', !!cfg.enabled);
 
-    const autoSubmitCb = byId('lookupApiAutoSubmitCheckbox');
-    if (autoSubmitCb) autoSubmitCb.checked = !!cfg.autoSubmit;
+    setFieldChecked('lookupApiAutoSubmitCheckbox', !!cfg.autoSubmit);
 
-    const fastModeCb = byId('lookupApiFastModeCheckbox');
-    if (fastModeCb) fastModeCb.checked = !!cfg.fastMode;
+    setFieldChecked('lookupApiFastModeCheckbox', !!cfg.fastMode);
 
     setVal('lookupApiUrlInput', cfg.url);
     setVal('lookupApiHeaderNameInput', cfg.headerName);
-    const headerValueIn = byId('lookupApiHeaderValueInput');
-    if (headerValueIn) {
-        headerValueIn.value = '';
-        headerValueIn.placeholder = (cfg.headerValueEnc || cfg.headerValue) ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
-    }
+    setFieldValue('lookupApiHeaderValueInput', '');
+    viewState.lookupHeaderValuePlaceholder = (cfg.headerValueEnc || cfg.headerValue) ? '•••••••• (មានរួច — ទុកទទេប្រសិនបើមិនចង់ប្តូរ)' : 'ឧ. Bearer xxxxx ឬ Secret Key';
     setVal('lookupApiPhoneFieldInput', cfg.phoneField || 'phone');
     setVal('lookupApiCodFieldInput', cfg.codField || 'cod');
     setVal('lookupApiDodFieldInput', cfg.dodField || 'dod');
@@ -59,18 +54,8 @@ export function openLookupApiConfigModal() {
 }
 
 export async function saveLookupApiConfig() {
-    const enabledCb = byId('lookupApiEnabledCheckbox');
-    const autoSubmitCb = byId('lookupApiAutoSubmitCheckbox');
-    const fastModeCb = byId('lookupApiFastModeCheckbox');
-    const urlIn = byId('lookupApiUrlInput');
-    const headerNameIn = byId('lookupApiHeaderNameInput');
-    const headerValueIn = byId('lookupApiHeaderValueInput');
-    const phoneFieldIn = byId('lookupApiPhoneFieldInput');
-    const codFieldIn = byId('lookupApiCodFieldInput');
-    const dodFieldIn = byId('lookupApiDodFieldInput');
-
-    let url = urlIn ? urlIn.value.trim() : '';
-    let enabled = enabledCb ? enabledCb.checked : false;
+    let url = fieldValue('lookupApiUrlInput').trim();
+    let enabled = fieldChecked('lookupApiEnabledCheckbox');
 
     if (enabled && (!url || !url.includes('{barcode}'))) {
         alert("URL ត្រូវតែមាន {barcode} ជាកន្លែងដាក់លេខបាកូដ! (ឧ. https://example.com/api?code={barcode})");
@@ -78,7 +63,7 @@ export async function saveLookupApiConfig() {
     }
 
     const existingCfg = getLookupApiConfig() || {};
-    const headerValueRaw = headerValueIn ? headerValueIn.value.trim() : '';
+    const headerValueRaw = fieldValue('lookupApiHeaderValueInput').trim();
     let headerValueEnc = existingCfg.headerValueEnc || null;
     let legacyHeaderValue = existingCfg.headerValue || '';
 
@@ -104,14 +89,14 @@ export async function saveLookupApiConfig() {
 
     const cfg: any = {
         enabled: enabled,
-        autoSubmit: autoSubmitCb ? autoSubmitCb.checked : false,
-        fastMode: fastModeCb ? fastModeCb.checked : false,
+        autoSubmit: fieldChecked('lookupApiAutoSubmitCheckbox'),
+        fastMode: fieldChecked('lookupApiFastModeCheckbox'),
         url: url,
-        headerName: headerNameIn ? headerNameIn.value.trim() : '',
+        headerName: fieldValue('lookupApiHeaderNameInput').trim(),
         headerValueEnc: headerValueEnc,
-        phoneField: (phoneFieldIn && phoneFieldIn.value.trim()) || 'phone',
-        codField: (codFieldIn && codFieldIn.value.trim()) || 'cod',
-        dodField: (dodFieldIn && dodFieldIn.value.trim()) || 'dod'
+        phoneField: fieldValue('lookupApiPhoneFieldInput').trim() || 'phone',
+        codField: fieldValue('lookupApiCodFieldInput').trim() || 'cod',
+        dodField: fieldValue('lookupApiDodFieldInput').trim() || 'dod'
     };
     if (legacyHeaderValue) cfg.headerValue = legacyHeaderValue;
 
@@ -120,7 +105,7 @@ export async function saveLookupApiConfig() {
         return;
     }
     clearCustomerDataTableCache();
-    if (headerValueIn) headerValueIn.value = '';
+    setFieldValue('lookupApiHeaderValueInput', '');
     closeModal('lookupApiConfigModal');
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -132,11 +117,7 @@ export async function saveLookupApiConfig() {
 }
 
 export async function testLookupApiConfig(btnEl?) {
-    const urlIn = byId('lookupApiUrlInput');
-    const headerNameIn = byId('lookupApiHeaderNameInput');
-    const headerValueIn = byId('lookupApiHeaderValueInput');
-
-    let url = urlIn ? urlIn.value.trim() : '';
+    let url = fieldValue('lookupApiUrlInput').trim();
     if (!url || !url.includes('{barcode}')) {
         alert("សូមបញ្ចូល URL ដែលមាន {barcode} ជាមុនសិន!");
         return;
@@ -147,16 +128,16 @@ export async function testLookupApiConfig(btnEl?) {
 
     const testUrl = url.replace('{barcode}', encodeURIComponent(testBarcode.trim()));
     const headers = {};
-    const hName = headerNameIn ? headerNameIn.value.trim() : '';
+    const hName = fieldValue('lookupApiHeaderNameInput').trim();
     const existingCfg = getLookupApiConfig() || {};
-    const typedValue = headerValueIn ? headerValueIn.value.trim() : '';
+    const typedValue = fieldValue('lookupApiHeaderValueInput').trim();
     const hValue = typedValue || (existingCfg.headerValueEnc ? await decryptLookupSecret(existingCfg.headerValueEnc) : (existingCfg.headerValue || ''));
     if (hValue && lookupApiSendsHeader({ url: url, headerName: hName })) headers[hName] = hValue;
 
     const testIsZto = lookupApiIsZto({ url: url });
     const testTimeoutMs = testIsZto ? ZTO_TEST_TIMEOUT_MS : LOOKUP_TEST_TIMEOUT_MS;
     showToast(testIsZto ? "⏳ កំពុងសាកល្បង ZTO..." : "⏳ កំពុងសាកល្បង API...");
-    if (btnEl) btnEl.disabled = true;
+    viewState.lookupTestBusy = true;
     const progressTimers = testIsZto ? [
         setTimeout(() => showToast("⏳ នៅរង់ចាំ ZTO ឆ្លើយតប...", 'warn'), 6000)
     ] : [];
@@ -172,6 +153,6 @@ export async function testLookupApiConfig(btnEl?) {
         alert("❌ បរាជ័យក្នុងការភ្ជាប់៖ " + (timedOut ? slowNote : e.message));
     } finally {
         progressTimers.forEach((timer) => clearTimeout(timer));
-        if (btnEl) btnEl.disabled = false;
+        viewState.lookupTestBusy = false;
     }
 }

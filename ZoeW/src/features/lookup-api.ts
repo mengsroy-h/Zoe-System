@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { setFieldValue } from '../app/refs';
 import { firebaseState, lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { fetchCustomerDataTableRows } from './customer-table';
@@ -129,8 +129,7 @@ export function openCustomerDataTableModal() {
         alert("ZTO Lookup មិនមានតារាងទិន្នន័យទាំងមូលទេ។ សូមស្កេន Barcode ដើម្បីស្វែងរកផ្ទាល់ពី ZTO។");
         return;
     }
-    const searchInput = byId('customerDataTableSearchInput');
-    if (searchInput) searchInput.value = '';
+    setFieldValue('customerDataTableSearchInput', '');
     openModalHelper('customerDataTableModal');
     fetchCustomerDataTableRows(false);
 }

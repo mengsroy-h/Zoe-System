@@ -8,6 +8,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { securityState } from '../../src/core/state';
 import { appLocalStore } from '../../src/core/storage';
 import { noteAppLockAway, noteAppLockExcuse, relockAppAfterAway } from '../../src/features/app-lock';
+import { DocumentEffects } from '../../src/app/components/shell/DocumentEffects';
+import { AppLockScreen } from '../../src/app/components/AppLockScreen';
+import { byId, mount, step, unmount } from './react-harness';
 
 beforeEach(() => {
     appLocalStore.setItem('zoew_security_pin_hash', 'test-hash');
@@ -15,10 +18,11 @@ beforeEach(() => {
     securityState.appLockVeiled = false;
     securityState.appLockAwayNoted = false;
     securityState.appLockExcuseAt = 0;
-    document.body.classList.remove('app-locked');
+    mount(<><DocumentEffects /><AppLockScreen /></>);
 });
 
 afterEach(() => {
+    unmount();
     appLocalStore.removeItem('zoew_security_pin_hash');
     securityState.appIsLocked = false;
     securityState.appLockVeiled = false;
@@ -38,11 +42,12 @@ describe('សោ App ៖ សញ្ញាចាកចេញស្ទួន', () =
     });
 
     it('ចាកចេញធម្មតា ➜ គ្រប (veil) ម្តង ➜ ត្រឡប់មក ➜ ចាក់សោម្តង', () => {
-        noteAppLockAway();
-        noteAppLockAway();
+        step(() => { noteAppLockAway(); noteAppLockAway(); });
         expect(securityState.appLockVeiled).toBe(true);
+        // ⛔ គ្រប **ពិត** ៖ class លើ `<body>` (DocumentEffects) និងអេក្រង់សោ (AppLockScreen) ដែល React គូរ
         expect(document.body.classList.contains('app-locked')).toBe(true);
-        relockAppAfterAway();
+        expect(byId('appLockScreen').classList.contains('is-open')).toBe(true);
+        step(() => relockAppAfterAway());
         expect(securityState.appLockVeiled).toBe(false);
         expect(securityState.appIsLocked).toBe(true);
     });

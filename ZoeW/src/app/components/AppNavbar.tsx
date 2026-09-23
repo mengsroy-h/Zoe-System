@@ -1,9 +1,22 @@
+import { viewState } from '../../core/view-state';
 import { onAct } from '../actions';
+import { useStoreFields } from '../hooks/useStore';
+import { refTo } from '../refs';
+
+/** class របស់ចំណុច/អត្ថបទស្ថានភាព (`renderConnectionStatus()`) */
+function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
+    if (status === null) return { dot: 'status-dot offline', text: undefined };
+    if (status === 'online') return { dot: 'status-dot', text: 'is-online' };
+    if (status === 'connecting') return { dot: 'status-dot offline connecting', text: 'is-connecting' };
+    return { dot: 'status-dot offline', text: 'is-offline' };
+}
 
 /** របាខាងលើ — ⛔ មិនលាក់តាមទិសរមូរ */
 export function AppNavbar() {
+    const v = useStoreFields(viewState, ['connectionStatus', 'connectionText']);
+    const cls = statusClasses(v.connectionStatus);
     return (
-        <header className="app-navbar">
+        <header className="app-navbar" ref={refTo('navbar')}>
             <button
                 type="button"
                 className="nav-menu-btn"
@@ -19,9 +32,9 @@ export function AppNavbar() {
                 <div className="brand-info">
                     <h1>ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់</h1>
                     <span>
-                        <div className="status-dot offline" id="statusDot"></div>
+                        <div className={cls.dot} id="statusDot"></div>
                         {' '}
-                        <span id="firebaseStatusText">ក្រៅបណ្ដាញ</span>
+                        <span id="firebaseStatusText" className={cls.text}>{v.connectionText}</span>
                     </span>
                 </div>
             </div>

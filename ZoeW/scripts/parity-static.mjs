@@ -13,6 +13,7 @@ import { parse } from 'acorn';
 import * as walk from 'acorn-walk';
 import { transformSync } from 'esbuild';
 import { resolveOldRoot } from './old-app.mjs';
+import { REMOVED, REMOVED_STRINGS } from './intentional-removals.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const NEW_ROOT = path.join(HERE, '..');
@@ -127,7 +128,9 @@ for (const s of newSources) for (const lit of stringLiterals(s.ast)) newStringSe
 // អត្ថបទក្នុង JSX ក៏រាប់ដែរ ➜ ស្កេនអត្ថបទឆៅរបស់ .tsx
 for (const s of newSources) if (s.file.endsWith('.tsx')) newStringSet.add(s.text);
 const newAllText = [...newStringSet].join('\u0000');
-const missingStrings = oldStrings.filter((s) => !newAllText.includes(s));
+const removedStrings = oldStrings.filter((s) => !newAllText.includes(s) && REMOVED_STRINGS[s]);
+const missingStrings = oldStrings.filter((s) => !newAllText.includes(s) && !REMOVED_STRINGS[s]);
+const deadRemovedStrings = Object.keys(REMOVED_STRINGS).filter((s) => !removedStrings.includes(s));
 
 /* ── ៤. កូនសោ storage និងផ្លូវ Firebase ────────────────────────────── */
 const STORAGE_RE = /^(zoew_|zoe_|zoeadmin_|last_entered_locker|remembered_email)/;
@@ -140,25 +143,34 @@ const missingKeys = oldKeys.filter((k) => !newKeySet.has(k));
 const oldIds = [...oldHtml.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
 const newIndexHtml = readFileSync(path.join(NEW_ROOT, 'index.html'), 'utf8');
 const newHtmlText = newSources.filter((s) => s.file.endsWith('.tsx')).map((s) => s.text).join('\n') + '\n' + newIndexHtml;
-const missingIds = oldIds.filter((id) => !newHtmlText.includes(`id="${id}"`));
+// ⛔ id ក្នុង JSX អាចជា literal លើ prop (`id="x"` · `headId="x"`) ឬក្នុងបញ្ជីទិន្នន័យដែល JSX គូរ
+//    (`{ id: 'x' }` ➜ `id={f.id}`)។ ការវាស់ **ធាតុពិតក្នុង DOM** គឺ `parity:dom`; នេះជាកាតាឡុកលឿន។
+const escapeRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const idLiteral = (id) => new RegExp('(?:\\bid|[a-z]Id)\\s*[=:]\\s*["\']' + escapeRe(id) + '["\']');
+const missingIds = oldIds.filter((id) => !newHtmlText.includes(`id="${id}"`) && !idLiteral(id).test(newHtmlText));
 
 /* ── ៦. CSS ដូចគ្នាបេះបិទ ──────────────────────────────────────────── */
 const newCss = readFileSync(path.join(NEW_ROOT, 'src/styles/app.css'), 'utf8');
 
 /* ── របាយការណ៍ ─────────────────────────────────────────────────────── */
-const missingFns = [...oldFns].filter((f) => !newFns.has(f));
+const removedFns = [...oldFns].filter((f) => !newFns.has(f) && REMOVED[f]);
+const missingFns = [...oldFns].filter((f) => !newFns.has(f) && !REMOVED[f]);
+// ⛔ ធាតុ REMOVED ដែល function នៅមាន ឬមិនមែនរបស់ដើម ➜ បញ្ជីងាប់ = ការលាក់កំហុសបន្ទាប់
+const deadRemoved = Object.keys(REMOVED).filter((f) => !removedFns.includes(f));
 const missingConsts = [...oldConsts].filter((c) => !newConsts.has(c) && !newStateFields.has(c));
 const missingLets = [...oldLets].filter((l) => !newStateFields.has(l));
 const missingActions = [...oldActions].filter((a) => !newActions.has(a));
 
 const rows = [
-    ['Function កម្រិតកំពូល', oldFns.size, oldFns.size - missingFns.length, missingFns],
+    ['Function កម្រិតកំពូល', oldFns.size - removedFns.length, oldFns.size - removedFns.length - missingFns.length, missingFns],
+    ['បញ្ជី «ដកចេញដោយចេតនា» មិនងាប់', Object.keys(REMOVED).length, Object.keys(REMOVED).length - deadRemoved.length, deadRemoved],
     ['ថេរ (const)', oldConsts.size, oldConsts.size - missingConsts.length, missingConsts],
     ['State (let)', oldLets.size, oldLets.size - missingLets.length, missingLets],
     ['សកម្មភាព (data-act)', oldActions.size, oldActions.size - missingActions.length, missingActions],
     ['id ក្នុង index.html', oldIds.length, oldIds.length - missingIds.length, missingIds],
     ['កូនសោ storage', oldKeys.length, oldKeys.length - missingKeys.length, missingKeys],
-    ['អត្ថបទដែលអ្នកប្រើអាន', oldStrings.length, oldStrings.length - missingStrings.length, missingStrings],
+    ['អត្ថបទដែលអ្នកប្រើអាន', oldStrings.length - removedStrings.length, oldStrings.length - removedStrings.length - missingStrings.length, missingStrings],
+    ['បញ្ជីអត្ថបទ «ដកចេញដោយចេតនា» មិនងាប់', Object.keys(REMOVED_STRINGS).length, Object.keys(REMOVED_STRINGS).length - deadRemovedStrings.length, deadRemovedStrings],
     ['style.css (byte)', 1, oldCss === newCss ? 1 : 0, oldCss === newCss ? [] : ['ឯកសារខុសគ្នា']]
 ];
 
@@ -173,6 +185,10 @@ for (const [label, total, found, missing] of rows) {
     console.log(`${ok ? '✅' : '❌'} ${label.padEnd(26)} ${String(found).padStart(5)}/${String(total).padEnd(5)}  ${pct}%`);
     if (!ok) missing.slice(0, 25).forEach((m) => console.log(`      • ${String(m).slice(0, 110)}`));
     if (missing.length > 25) console.log(`      … និង ${missing.length - 25} ទៀត`);
+}
+if (removedFns.length) {
+    console.log(`\n🗑️  function ដើមដែលដកចេញដោយចេតនា ៖ ${removedFns.length} (scripts/intentional-removals.mjs)`);
+    for (const f of removedFns) console.log(`      • ${f}`);
 }
 console.log(`\nModule ថ្មី ៖ ${newSources.length} ឯកសារ`);
 console.log(`Function ដែល export ៖ ${newFns.size}`);

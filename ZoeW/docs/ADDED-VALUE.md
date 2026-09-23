@@ -104,10 +104,13 @@ ZoeW ដើមគ្មានការពិនិត្យសោះ។ កា�
 
 | កន្លែង | ហេតុអ្វី |
 |---|---|
-| ចលនារបស់ PTR (`style.transform` រាល់ `touchmove`) | React គូរ *ធាតុ* ចំណែកកាយវិការកាន់ *ចលនា* ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
-| `<link rel=preconnect>` · `<script>` loader | ពួកវារស់ក្នុង `<head>` ដែល React មិនជាម្ចាស់ |
-| `<canvas>` ក្រៅអេក្រង់ (ស្កេន · QR · registry) | មិនដែលចូល DOM សោះ ➜ វាមិនមែនការគូរ |
-| `<a download>` ដែលចុចរួចលុបភ្លាម | ការទាញយកត្រូវកើតក្នុង tick ដដែលនឹងការចុច |
+| ចលនារបស់ PTR (`style.transform` រាល់ `touchmove`) · FLIP របស់ផ្ទាំង | React គូរ *ធាតុ* ចំណែកកាយវិការកាន់ *ចលនា* តាម ref (`src/app/behaviors/`) ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
+| focus · តម្លៃ input · ការវាស់ · ការរមូរ · វីដេអូកាមេរ៉ា | ref តាមឈ្មោះ (`src/app/refs.ts`) — ច្រកចេញបន្ទាន់ដែល React ណែនាំ |
+| `<link rel=preconnect>` · `<script>` loader · `<canvas>` ក្រៅអេក្រង់ · `<a download>` | នៅក្រៅ `#root` ឬមិនដែលចូល DOM ➜ រស់ក្នុង `src/platform/document-io.ts` តែមួយ (ការលើកលែងមានហេតុផល និងពិដានចំនួនក្នុង `purity:check`) |
+
+⛔ ក្រៅពីនេះ **React ជាម្ចាស់ DOM តែមួយ** ៖ កូដមុខងារ (`core` · `domain` · `features` ·
+`services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង — ប្រអប់ · អត្ថបទ · class ស្ថានភាព ·
+ប៊ូតុងរវល់ ជា state ដែល JSX គូរ (`ARCHITECTURE.md` ផ្នែក ១១)។
 
 ### អ្នកយាមដែលបន្ថែមក្នុងជុំនេះ
 
@@ -120,3 +123,4 @@ ZoeW ដើមគ្មានការពិនិត្យសោះ។ កា�
 | `reset:` ចាំបាច់ក្នុង `SLOTS` | slot ថ្មីដែលគ្មានការសម្អាតតាម store | ✅ (ការផលិតធ្លាក់) |
 | `npm run parity:deep` | ផ្លូវលុយ · ចាកចេញ · ZTO · Sheet · PDF ខុសពីដើម — **៦ ជាន់** រាល់ជំហាន | ✅ (ចាប់ ៖ App ស · ជួរ 🩺 ទទេ · `style=""`) |
 | `tests/health-row-parity` + type `HealthRow[]` | ជួរ 🩺 ត្រឡប់ HTML ជំនួស model | ✅ (TypeScript បដិសេធ) |
+| `npm run purity:check` | កូដមុខងារប៉ះ DOM ផ្ទាល់ (React លែងជាម្ចាស់តែមួយ) · component ស្វែងរក DOM តាម id · **ឈ្មោះ ref ដែលគ្មាន `ref={…}` ចង** (➜ `elementOf()` = `null` ជានិច្ច) | ✅ (ចាប់កំហុសពិត ៖ ស្កេន QR ពេល Config ធ្លាក់ «configQrVideo missing» — វាស់ក្នុង browser ៖ មុនកែ គ្មាន stream · ក្រោយកែ stream ភ្ជាប់ · mutation ៥/៥ ចាប់ · ថតទទេ ➜ ធ្លាក់) |

@@ -1,5 +1,5 @@
 import { scanState, uiState } from '../../core/state';
-import { renderAppVersionLabels, setupActionDelegation } from '../../core/actions';
+import { renderAppVersionLabels } from '../../core/actions';
 import { elapsedSince } from '../../core/elapsed';
 import { safeFocusScanner } from '../../core/timezone';
 import { resumeInterruptedCleanups, runScheduledCleanup } from '../../domain/cleanup';
@@ -8,12 +8,11 @@ import { initBiometricUi } from '../../features/biometric';
 import { applySetupLinkFromUrl } from '../../features/config';
 import { prefetchCustomerDataTableRowsIfConfigured } from '../../features/customer-table';
 import { CUSTOMER_TABLE_CACHE_MS } from '../../features/customer-table-prefetch';
-import { setupHardwareScanner, setupVisibilityHandling } from '../../features/daily-stats';
+import { setupHardwareScanner, setupVisibilityHandling } from '../behaviors/scanner-input';
 import { LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck } from '../../features/license';
 import { warmZtoLookupProxyNow } from '../../features/lookup-api';
-import { setupPhoneSuggestions } from '../../features/phone-suggest';
 import { runSessionExpiryCheck } from '../../features/session';
-import { setupSheetImportDropZone } from '../../features/sheet-import';
+import { setupSheetImportDropZone } from '../behaviors/sheet-drop';
 import { refreshZtoListSyncUi } from '../../features/zto-list-sync';
 import { refreshZtoAutoCloseUi, renderZtoSyncViews, scheduleZtoStatusSweep } from '../../features/zto-status';
 import { isNativeApp } from '../../platform/native';
@@ -23,19 +22,21 @@ import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
 import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
-import { setupChromeAutoHide } from '../../ui/chrome-autohide';
+import { setupChromeAutoHide } from '../behaviors/chrome-autohide';
 import { sweepRecallHighlights } from '../../ui/history-refresh';
 import { cleanupResources } from '../../ui/modal';
-import { closeGlobalMoreMenu, dismissGlobalMoreMenuOutside } from '../../ui/more-menu';
+import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
-import { setupSwipeGestures } from '../../ui/panel-motion';
+import { setupSwipeGestures } from '../behaviors/panel-motion';
+import { setupPhoneSuggestions } from '../behaviors/phone-search';
 import { setupAdaptivePerformance } from '../../ui/perf';
-import { setupIOSPullToRefresh } from '../../ui/pull-to-refresh';
+import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
-import { closeTopmostLayer } from './layers';
+import { closeTopmostLayer, dismissGlobalMoreMenuOutside, modalBackdropTarget } from './layers';
 import { setupNativeShell } from './native-shell';
 import { oncePerPage, type LifecycleScope } from './scope';
+import { elementOf } from '../refs';
 
 /**
  * ដំណើរការចាប់ផ្តើម App ជាដំណាក់កាលដែលមានឈ្មោះ។
@@ -64,8 +65,6 @@ function bootShell(scope: LifecycleScope): void {
     if (window.visualViewport) {
         scope.listen(window.visualViewport, 'resize', () => { window.scrollTo(0, 0); });
     }
-
-    oncePerPage('action-delegation', setupActionDelegation);
 
     // ⛔ លើ native ឯកសារទាំងអស់ស្ថិតក្នុង APK រួចហើយ ➜ Service Worker គ្មានការងារ
     //    ហើយ WebView របស់ Android មិនបញ្ជូនសំណើ SW តាមផ្លូវរបស់ Capacitor ទេ។
@@ -203,16 +202,15 @@ function startGlobalDismissals(scope: LifecycleScope): void {
     scope.listen(document, 'pointerdown', dismissGlobalMoreMenuOutside, { capture: true, passive: true });
     scope.listen(window, 'scroll', (e) => {
         const scrolled = e.target as any;
-        if (scrolled && scrolled.closest && scrolled.closest('#globalMoreMenu')) return;
+        const menu = elementOf('globalMoreMenu');
+        if (scrolled && scrolled.closest && menu && menu.contains(scrolled)) return;
         closeGlobalMoreMenu();
     }, { capture: true, passive: true });
     scope.listen(window, 'resize', closeGlobalMoreMenu);
 
     scope.listen(document, 'click', (e) => {
-        const clicked = e.target as any;
-        if (clicked && clicked.classList && clicked.classList.contains('modal') && clicked.style.display === 'flex') {
-            dismissModal(clicked);
-        }
+        const id = modalBackdropTarget(e.target);
+        if (id) dismissModal(id);
     });
     scope.listen(document, 'keydown', (e) => {
         if (e.key !== 'Escape') return;

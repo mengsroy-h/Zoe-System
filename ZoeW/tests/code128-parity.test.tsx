@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act as reactAct } from 'react';
 import { Code128Svg } from '../src/app/components/zto/Code128Svg';
-import { code128SvgElement } from '../src/features/zto-status';
+import { code128SvgElement } from './fixtures/code128-oracle';
 
 /**
  * ⛔ រូប Barcode ដែលគូរខុស ➜ **កញ្ចប់ខុសត្រូវបិទក្នុង ZTO** ។ កំណែដើម

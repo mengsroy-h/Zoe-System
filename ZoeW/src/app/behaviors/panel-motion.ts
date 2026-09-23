@@ -1,7 +1,17 @@
-import { byId } from '../core/dom';
-import { uiState } from '../core/state';
-import { hidePhoneSuggestions, setPhoneSearchPulledUp } from '../features/phone-suggest';
-import { entryScrollerInView, syncHistoryExpandedLock, usesIOSPanelHandoff } from './page-nav';
+import { uiState } from '../../core/state';
+import { hidePhoneSuggestions } from '../../features/phone-suggest';
+import { commitNow } from '../flush';
+import { elementOf, fieldValue, isFieldFocused } from '../refs';
+import { entryScrollerInView, panelHasSearchFocus, panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock, usesIOSPanelHandoff } from './panels';
+import { setPhoneSearchPulledUp } from './phone-search';
+
+/**
+ * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ច្បាប់ ១១) — ចលនាផ្ទាំង និងកាយវិការអូស។
+ * តក្កវិជ្ជាដូច `app.js` ដើមបេះបិទ ៖ ធាតុតាម ref · `.collapsed` /
+ * `.panel-gliding` ជា state ដែល **ចុះ DOM ភ្លាម** (`commitNow()`) មុនការវាស់
+ * FLIP ដូចការប្តូរ class ផ្ទាល់។ listener ជា native (`passive: false` លើ iOS
+ * — React `onTouchMove` ជា passive ➜ `preventDefault()` មិនដើរ)។
+ */
 
 export const PANEL_GLIDE_MS = 220;
 
@@ -16,11 +26,12 @@ export function panelMotionAllowed() {
 }
 
 export function beginPanelGlideSnapPause() {
-    const pages = byId('appPages');
+    const pages = elementOf('appPages');
     if (!pages) return () => {};
     const epoch = uiState.panelGlideEpoch;
     uiState.panelGlideTokens++;
-    pages.classList.add('panel-gliding');
+    uiState.panelGliding = true;
+    commitNow();
     if (uiState.panelGlideRelease !== null) clearTimeout(uiState.panelGlideRelease);
     uiState.panelGlideRelease = setTimeout(endPanelGlideSnapPause, PANEL_GLIDE_MS + PANEL_GLIDE_SNAP_GRACE_MS);
     let done = false;
@@ -40,8 +51,7 @@ export function endPanelGlideSnapPause() {
         clearTimeout(uiState.panelGlideRelease);
         uiState.panelGlideRelease = null;
     }
-    const pages = byId('appPages');
-    if (pages) pages.classList.remove('panel-gliding');
+    uiState.panelGliding = false;
 }
 
 export function panelGlideFrom(el, beforeTop) {
@@ -64,13 +74,15 @@ export function panelGlideFrom(el, beforeTop) {
 
 export function setupSwipeGestures() {
     bindPanelSwipe({
+        panel: 'data',
         sideId: 'dataSideSection',
         mainId: 'dataMainSection',
         handleId: 'dragHandle',
-        scroller: () => byId('tableResponsive'),
+        scroller: () => elementOf('tableResponsive'),
         blockCollapse: phoneSearchIsActive
     });
     bindPanelSwipe({
+        panel: 'entry',
         sideId: 'entrySideSection',
         mainId: 'entryMainSection',
         handleId: 'entryDragHandle',
@@ -81,10 +93,8 @@ export function setupSwipeGestures() {
 }
 
 export function phoneSearchIsActive() {
-    const box = byId('phoneSuggestBox');
-    if (box && box.classList.contains('show')) return true;
-    const input = byId('searchPhoneInput');
-    return !!(input && document.activeElement === input && input.value.trim());
+    if (uiState.phoneSuggestOpen) return true;
+    return !!(isFieldFocused('searchPhoneInput') && fieldValue('searchPhoneInput').trim());
 }
 
 export const iosTouchArbiter = { id: null, phase: 'idle', blockPanel: false };
@@ -125,8 +135,8 @@ export function touchByIdentifier(list, identifier) {
 }
 
 export function bindPanelSwipe(config) {
-    const sidebar = byId(config.sideId);
-    const mainSection = byId(config.mainId);
+    const sidebar = elementOf(config.sideId);
+    const mainSection = elementOf(config.mainId);
     if (!sidebar || !mainSection) return;
     const iosPanelHandoff = usesIOSPanelHandoff();
 
@@ -153,9 +163,10 @@ export function bindPanelSwipe(config) {
 
     function applyPanelAction(action) {
         if (!action) return;
+        commitNow();
         const beforeTop = mainSection.getBoundingClientRect().top;
-        if (action === 'collapse') sidebar.classList.add('collapsed');
-        else if (action === 'expand') sidebar.classList.remove('collapsed');
+        if (action === 'collapse') setPanelCollapsed(config.panel, true);
+        else if (action === 'expand') setPanelCollapsed(config.panel, false);
         else if (action === 'search') setPhoneSearchPulledUp(false);
         syncHistoryExpandedLock();
         panelGlideFrom(mainSection, beforeTop);
@@ -163,9 +174,9 @@ export function bindPanelSwipe(config) {
 
     function actionForMainDiff(diffY, diffX) {
         if (Math.abs(diffY) < Math.abs(diffX) * 1.6) return '';
-        if (diffY < -30 && !sidebar.classList.contains('collapsed') && !config.blockCollapse()) return 'collapse';
-        if (diffY > 30 && scrollerAtTop() && sidebar.classList.contains('collapsed')) return 'expand';
-        if (diffY > 30 && scrollerAtTop() && sidebar.classList.contains('search-focus')) return 'search';
+        if (diffY < -30 && !panelIsCollapsed(config.panel) && !config.blockCollapse()) return 'collapse';
+        if (diffY > 30 && scrollerAtTop() && panelIsCollapsed(config.panel)) return 'expand';
+        if (diffY > 30 && scrollerAtTop() && panelHasSearchFocus(config.panel)) return 'search';
         return '';
     }
 
@@ -217,17 +228,17 @@ export function bindPanelSwipe(config) {
         const downward = diffY > 0 && Math.abs(diffY) >= Math.abs(diffX) * 1.6;
         const reachedTop = scrollerAtTop();
         if (iosPanelHandoff && reachedTop && diffY >= 8 && downward &&
-            sidebar.classList.contains('collapsed') && e.cancelable) {
+            panelIsCollapsed(config.panel) && e.cancelable) {
             e.preventDefault();
         }
         if (!downward) scrollerPendingExpand = false;
-        else if (reachedTop && diffY > 30 && sidebar.classList.contains('collapsed')) scrollerPendingExpand = true;
+        else if (reachedTop && diffY > 30 && panelIsCollapsed(config.panel)) scrollerPendingExpand = true;
     };
     const scrollerScroll = () => {
         const downward = scrollerLastDiffY > 30 &&
             Math.abs(scrollerLastDiffY) >= Math.abs(scrollerLastDiffX) * 1.6;
         if (scrollerTouchId !== null && downward && scrollerAtTop() &&
-            sidebar.classList.contains('collapsed')) scrollerPendingExpand = true;
+            panelIsCollapsed(config.panel)) scrollerPendingExpand = true;
     };
     const finishScrollerSwipe = (e, apply) => {
         const endedTouchId = scrollerTouchId;
@@ -238,7 +249,7 @@ export function bindPanelSwipe(config) {
         if (endedTouch && finalDiffY >= 56 && panelMayYieldToPTR(endedTouchId)) blockPanelForIOSTouch('ptr');
         const finalDownward = !!endedTouch && finalDiffY > 30 &&
             Math.abs(finalDiffY) >= Math.abs(finalDiffX) * 1.6;
-        const shouldExpand = finalDownward && sidebar.classList.contains('collapsed') &&
+        const shouldExpand = finalDownward && panelIsCollapsed(config.panel) &&
             (iosPanelHandoff ? (scrollerPendingExpand || scrollerAtTop()) : scrollerAtTop());
         scrollerPendingExpand = false;
         scrollerTouchId = null;
@@ -246,8 +257,8 @@ export function bindPanelSwipe(config) {
         scrollerLastDiffX = 0;
         if (apply && shouldExpand && !panelBlockedForTouch(endedTouchId)) applyPanelAction('expand');
     };
-    [byId('tableResponsive'), byId('entryTableResponsive'),
-     byId('lockerTableResponsive')].forEach((el) => {
+    [elementOf('tableResponsive'), elementOf('entryTableResponsive'),
+     elementOf('lockerTableResponsive')].forEach((el) => {
         if (!el || !mainSection.contains(el)) return;
         el.addEventListener('touchstart', scrollerTouchStart, { passive: true });
         el.addEventListener('touchmove', scrollerTouchMove, { passive: !iosPanelHandoff });
@@ -282,13 +293,14 @@ export function bindPanelSwipe(config) {
     mainSection.addEventListener('touchend', (e) => finishMainSwipe(e, true));
     mainSection.addEventListener('touchcancel', (e) => finishMainSwipe(e, false));
 
-    const dragHandle = byId(config.handleId);
+    const dragHandle = elementOf(config.handleId);
     if (dragHandle) {
         dragHandle.addEventListener('click', () => {
-            if (!sidebar.classList.contains('collapsed')) hidePhoneSuggestions();
+            if (!panelIsCollapsed(config.panel)) hidePhoneSuggestions();
             setPhoneSearchPulledUp(false);
+            commitNow();
             const beforeTop = mainSection.getBoundingClientRect().top;
-            sidebar.classList.toggle('collapsed');
+            setPanelCollapsed(config.panel, !panelIsCollapsed(config.panel));
             syncHistoryExpandedLock();
             panelGlideFrom(mainSection, beforeTop);
         });

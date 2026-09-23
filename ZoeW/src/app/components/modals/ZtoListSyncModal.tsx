@@ -1,12 +1,16 @@
+import { refTo } from '../../refs';
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { ZtoListSyncBody } from '../zto/ZtoListSyncBody';
 
 export function ZtoListSyncModal() {
+    const v = useStoreFields(viewState, ['ztoListSyncNote']);
     return (
-        <div
+        <Modal
             id="ztoListSyncModal"
-            className="modal"
-            data-close="closeZtoListSyncModal"
+            close="closeZtoListSyncModal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="ztoListSyncTitle"
@@ -15,11 +19,11 @@ export function ZtoListSyncModal() {
                 <h3 id="ztoListSyncTitle">📥 បញ្ជីកញ្ចប់ពី ZTO</h3>
                 <div className="zto-list-range">
                     <label htmlFor="ztoListSyncFrom">ពីថ្ងៃ</label>
-                    <input type="date" id="ztoListSyncFrom" />
+                    <input type="date" id="ztoListSyncFrom" ref={refTo('ztoListSyncFrom')} />
                     <label htmlFor="ztoListSyncTo">ដល់ថ្ងៃ</label>
-                    <input type="date" id="ztoListSyncTo" />
+                    <input type="date" id="ztoListSyncTo" ref={refTo('ztoListSyncTo')} />
                 </div>
-                <p id="ztoListSyncNote"></p>
+                <p id="ztoListSyncNote">{v.ztoListSyncNote}</p>
                 <div className="zto-list-body" id="ztoListSyncBody">
                     <ZtoListSyncBody />
                 </div>
@@ -52,6 +56,6 @@ export function ZtoListSyncModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

@@ -7,12 +7,17 @@
  * វាស់បាន (`parity-deep`) ៖ វាយក្នុងប្រអប់ស្វែងរក ➜ ការណែនាំលេច ➜ សម្អាត
  * ➜ `hidePhoneSuggestions()` ធ្វើ `box.textContent = ''` ➜ App ស។
  *
- * ឧបករណ៍នេះស្កេន AST នៃកូដដែលផ្ទេរមក (`src/**` ក្រៅ `src/app/`) រក ៖
+ * ឧបករណ៍នេះស្កេន AST នៃឯកសារ `.ts` ទាំងអស់ក្នុង `src/` (កូដមុខងារ **និង** `src/app/` — behavior ·
+ * lifecycle · slot-resets ដែលអនុញ្ញាតឲ្យកាន់ធាតុតាម ref) រក ៖
  *   ក. `X.textContent|innerHTML|innerText|outerHTML = …`
  *   ខ. `X.appendChild|removeChild|replaceChildren|insertBefore|append|prepend|remove(…)`
  *   គ. `X.value = …` លើ **element slot** (select ដែល React គ្រប់គ្រងតម្លៃ)
- * ដែល `X` ចងនឹង `byId('<id ដែល React ជាម្ចាស់>')` — ដោយផ្ទាល់ ឬតាមរង្វិលជុំលើ
- * បញ្ជី id (`['a', 'b'].forEach((id) => { const el = byId(id); … })`)។
+ * ដែល `X` ចងនឹង `elementOf('<id ដែល React ជាម្ចាស់>')` (ឬ `getElementById`) — ដោយ
+ * ផ្ទាល់ ឬតាមរង្វិលជុំលើបញ្ជី id (`['a', 'b'].forEach((id) => { const el = elementOf(id); … })`)។
+ *
+ * ⛔ ក្នុង React ១០០% កូដមុខងារមិនកាន់ធាតុសោះ (`purity:check`) ➜ ហានិភ័យដែលនៅសល់
+ *    រស់ក្នុង `src/app/**` ៖ ឧ. `phoneSuggestBox` ជាទាំង slot (React គូរកូន) និង ref
+ *    (behavior វាស់ទីតាំង) ➜ `elementOf('phoneSuggestBox').textContent = ''` = App ស។
  *
  * ⛔ បញ្ជី id **ដេរីវេពី `SLOTS` / `ELEMENT_SLOTS` ពិត** ក្នុង `html-to-jsx.cjs`
  *    — slot ថ្មីចូលការវាស់ដោយស្វ័យប្រវត្តិ។
@@ -46,7 +51,7 @@ const CHILD_CALLS = new Set(['appendChild', 'removeChild', 'replaceChildren', 'i
 function files(dir, out = []) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, e.name);
-        if (e.isDirectory()) { if (full !== path.join(SRC, 'app')) files(full, out); }
+        if (e.isDirectory()) files(full, out);
         else if (e.name.endsWith('.ts') && !e.name.endsWith('.d.ts')) out.push(full);
     }
     return out;
@@ -73,7 +78,7 @@ for (const file of files(SRC)) {
         if (!n || n.type !== 'CallExpression') return null;
         const c = n.callee;
         const name = c.type === 'Identifier' ? c.name : (c.type === 'MemberExpression' && c.property.name);
-        if (name !== 'byId' && name !== 'getElementById') return null;
+        if (name !== 'byId' && name !== 'getElementById' && name !== 'elementOf') return null;
         const a = n.arguments[0];
         return a && a.type === 'Literal' && typeof a.value === 'string' ? a.value : (a && a.type === 'Identifier' ? '$' + a.name : null);
     };
@@ -142,9 +147,9 @@ for (const file of files(SRC)) {
 console.log('╔══════════════════════════════════════════════════════════════════════╗');
 console.log('║  ម្ចាស់ធាតុ ៖ កូដ imperative មិនត្រូវប៉ះកូនរបស់ slot React          ║');
 console.log('╚══════════════════════════════════════════════════════════════════════╝\n');
-console.log(`slot ${SLOT_IDS.size} · element slot ${ELEMENT_IDS.size} · ឯកសារ ${scanned} · អថេរចង byId ${bindings} · រង្វិលជុំដែលមានច្រកទ្វារ ${guardedLoops}`);
-// ⛔ ជាន់អប្បបរមា ៖ ការស្កេនដែលមិនឃើញការចង byId សោះ = មិនបានវាស់អ្វី
-if (scanned < 50 || bindings < 100) {
+console.log(`slot ${SLOT_IDS.size} · element slot ${ELEMENT_IDS.size} · ឯកសារ ${scanned} · អថេរចងធាតុ (elementOf/getElementById) ${bindings} · រង្វិលជុំដែលមានច្រកទ្វារ ${guardedLoops}`);
+// ⛔ ជាន់អប្បបរមា ៖ ការស្កេនដែលមិនឃើញការចងធាតុសោះ = មិនបានវាស់អ្វី (behavior ចងធាតុតាម ref ច្រើន)
+if (scanned < 50 || bindings < 10) {
     console.error(`⛔ ការស្កេនតូចពេក (ឯកសារ ${scanned} · ការចង ${bindings}) — វាស់មិនបាន`);
     process.exit(2);
 }

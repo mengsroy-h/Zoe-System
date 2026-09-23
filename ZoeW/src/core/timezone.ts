@@ -1,4 +1,4 @@
-import { byId } from './dom';
+import { activeElementIsTextField, focusFieldAsIs } from '../app/refs';
 import { securityState, uiState } from './state';
 import { getServerNow } from './clock';
 
@@ -90,13 +90,9 @@ export function isMobileDevice() {
 export function safeFocusScanner() {
     if (securityState.appIsLocked) return;
     if (!uiState.isModalOpen && !isMobileDevice()) {
-        const activeEl = document.activeElement;
-        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        if (activeElementIsTextField()) {
             return;
         }
-        const hwInput = byId('hwScannerInput');
-        if (hwInput) {
-            hwInput.focus();
-        }
+        focusFieldAsIs('hwScannerInput');
     }
 }

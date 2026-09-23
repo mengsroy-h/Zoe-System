@@ -1,8 +1,7 @@
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue, videoElement } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, scanState, securityState, uiState } from '../core/state';
-import { isMobileDevice } from '../core/timezone';
 import { countPickedUpCustomers, getPickupPhoneKey } from '../domain/pickup';
-import { closeConfigQrScanner } from './config-qr';
 import { getFilterTargetDateKey } from './export';
 import { triggerScanAction } from './scan-action';
 import { resetLiveScanQuality, resetScanConfirm } from '../services/scan-engine';
@@ -76,51 +75,25 @@ export function updateDailyScheduleStats(filteredList, isSearchScoped = false) {
         return sum + (!item.isClosed ? (parseFloat(item.count) || 1) : 0);
     }, 0);
 
-    const safeSetText = (id, text) => {
-        const el = byId(id);
-        if(el) el.innerText = text;
+    viewState.dataSummary = {
+        grandTotalCount: String(filteredRemainingCount),
+        todayTotalCount: String(selectedAllPackages),
+        todayClosedCount: String(selectedClosedCount),
+        todayPackagesPickedUpCount: String(selectedPackagesPickedUpCount),
+        summaryCodDollar: `$${codTotal.toFixed(2)}`,
+        summaryCodRiel: `${codRiel.toLocaleString()} ៛`,
+        summaryDodDollar: `$${dodTotal.toFixed(2)}`,
+        summaryDodRiel: `${dodRiel.toLocaleString()} ៛`,
+        summaryTotalDollar: `$${combinedTotalDollar.toFixed(2)}`,
+        summaryTotalRiel: `${totalRiel.toLocaleString()} ៛`
     };
-
-    safeSetText('grandTotalCount', filteredRemainingCount);
-    safeSetText('todayTotalCount', selectedAllPackages);
-    safeSetText('todayClosedCount', selectedClosedCount);
-    safeSetText('todayPackagesPickedUpCount', selectedPackagesPickedUpCount);
-
-    safeSetText('summaryCodDollar', `$${codTotal.toFixed(2)}`);
-    safeSetText('summaryCodRiel', `${codRiel.toLocaleString()} ៛`);
-    safeSetText('summaryDodDollar', `$${dodTotal.toFixed(2)}`);
-    safeSetText('summaryDodRiel', `${dodRiel.toLocaleString()} ៛`);
-    safeSetText('summaryTotalDollar', `$${combinedTotalDollar.toFixed(2)}`);
-    safeSetText('summaryTotalRiel', `${totalRiel.toLocaleString()} ៛`);
-}
-
-export function setupHardwareScanner() {
-    const hwInput = byId('hwScannerInput');
-
-    document.addEventListener('click', (e) => {
-        const clickTarget = e.target as any;
-        if (!uiState.isModalOpen && clickTarget.tagName !== 'INPUT' && clickTarget.tagName !== 'TEXTAREA' && clickTarget.tagName !== 'SELECT' && clickTarget.tagName !== 'BUTTON' && clickTarget.tagName !== 'A' && !isMobileDevice()) {
-            if (hwInput) hwInput.focus();
-        }
-    });
-
-    if (hwInput) {
-        hwInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitManualBarcode();
-            }
-        });
-    }
 }
 
 export function submitManualBarcode() {
     if (uiState.isModalOpen) return;
-    const hwInput = byId('hwScannerInput');
-    if(!hwInput) return;
-    let scannedCode = hwInput.value.trim();
+    let scannedCode = fieldValue('hwScannerInput').trim();
     if (scannedCode) {
-        hwInput.value = '';
+        setFieldValue('hwScannerInput', '');
         triggerScanAction(scannedCode);
     }
 }
@@ -131,7 +104,7 @@ export function stopCurrentStream() {
     scanState.nativeLoopActive = false;
     scanState.zxingLoopActive = false;
     if (scanState.pendingLoadedMetadataHandler) {
-        const pendingVideoEl = byId('video');
+        const pendingVideoEl = videoElement('video');
         if (pendingVideoEl) pendingVideoEl.removeEventListener('loadedmetadata', scanState.pendingLoadedMetadataHandler);
         scanState.pendingLoadedMetadataHandler = null;
     }
@@ -144,19 +117,18 @@ export function stopCurrentStream() {
     }
     scanState.currentVideoTrack = null;
     scanState.torchOn = false;
-    const overlay = byId('videoControlsOverlay');
-    if (overlay) overlay.style.display = 'none';
+    viewState.cameraOverlayDisplay = 'none';
     if (scanState.scanVideoResumeTimer) {
         clearTimeout(scanState.scanVideoResumeTimer);
         scanState.scanVideoResumeTimer = null;
     }
     resetScanConfirm();
     resetLiveScanQuality();
-    const videoElement = byId('video');
-    if (videoElement) {
-        videoElement.removeEventListener('pause', onScanVideoPause);
-        videoElement.pause();
-        videoElement.srcObject = null;
+    const video = videoElement('video');
+    if (video) {
+        video.removeEventListener('pause', onScanVideoPause);
+        video.pause();
+        video.srcObject = null;
     }
     if (scanState.codeReader && typeof scanState.codeReader.reset === 'function') {
         try {
@@ -166,15 +138,7 @@ export function stopCurrentStream() {
 }
 
 export function showCameraClosedBox() {
-    const permBox = byId('permission-box');
-    const vidContainer = byId('video-container');
-    if (vidContainer) vidContainer.style.display = 'none';
-    if (!permBox) return;
-    const msgEl = permBox.querySelector('p');
-    const btnEl = permBox.querySelector('button');
-    if (msgEl) msgEl.textContent = '📷 កាមេរ៉ាបានបិទ';
-    if (btnEl) btnEl.textContent = '🔓 បើកកាមេរ៉ាម្តងទៀត';
-    permBox.style.display = 'block';
+    viewState.cameraView = 'closed';
 }
 
 export function closeCameraManually() {
@@ -182,12 +146,3 @@ export function closeCameraManually() {
     showCameraClosedBox();
 }
 
-export function setupVisibilityHandling() {
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden && securityState.configQrScanActive) closeConfigQrScanner();
-        if (document.hidden && scanState.isCameraScanning) {
-            stopCurrentStream();
-            showCameraClosedBox();
-        }
-    });
-}

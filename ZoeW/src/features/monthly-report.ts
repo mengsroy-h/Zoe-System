@@ -1,5 +1,4 @@
-import { renderNow } from '../app/flush';
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
 import { STATS_DAILY_VIEW_KEYS } from '../core/text';
@@ -7,15 +6,14 @@ import { getFormattedClockTime, getZoneDateKey } from '../core/timezone';
 import { sanitizeInput } from '../domain/barcode';
 import { ledgerNumber } from '../domain/ledger';
 import { countPickedUpCustomers } from '../domain/pickup';
-import { noteAppLockExcuse } from './app-lock';
 import { updateDailyScheduleStats } from './daily-stats';
-import { collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, reportPrintFailure, restoreAfterPdfExport, uncollectedValueByDate } from './export';
+import { beginPdfPrint, collectedMoneyText, collectedRielText, collectedValueIsMeasurable, collectedValueOf, exportFailureMessage, forceSheetTextCells, loadScriptOnce, uncollectedValueByDate } from './export';
 import { emptyViewMessage } from '../services/db-listeners';
 import { renderHistory } from '../ui/history-render';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { getFilteredDataByDate } from '../ui/more-menu';
 import { showToast } from '../ui/toast';
-import { printCurrentView, saveWorkbook } from '../platform/file-output';
+import { saveWorkbook } from '../platform/file-output';
 
 export const MONTHLY_REPORT_MONTH_PATTERN = /^\d{4}-\d{2}$/;
 
@@ -172,8 +170,6 @@ export function monthlyReportMismatchNote(report) {
 }
 
 export function renderMonthlyReport() {
-    const body = byId('monthlyReportBody');
-    if (!body) return;
     // ⛔ តម្លៃមកពីឃ្លាំង មិនមែនពី DOM (មើល `MonthlyReportMonthSelect`)
     const report = buildMonthlyReport(uiState.monthlyReportMonth);
     if (!report.month || !report.days.length) {
@@ -261,8 +257,6 @@ export function exportMonthlyReportAsPDF() {
     const report = buildMonthlyReport(uiState.monthlyReportMonth);
     if (!report.days.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ខែនេះទេ!")); return; }
     closeModal('monthlyReportModal');
-    const printArea = byId('pdfExportPrintArea');
-    if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
     const totals = report.totals;
     const measurable = totals.collectedMeasurable;
     uiState.pdfExportView = {
@@ -284,12 +278,7 @@ export function exportMonthlyReportAsPDF() {
                 · ថ្ងៃមានប្រតិបត្តិការ ${totals.activeDays.toLocaleString()}
                 · នាំចេញនៅ ${getZoneDateKey(getServerNow(), 0) + ' ' + getFormattedClockTime(getServerNow())}`
     };
-    renderNow(uiState);
-    if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = document.title;
-    document.title = monthlyReportFilenameBase();
-    window.addEventListener('afterprint', restoreAfterPdfExport);
-    noteAppLockExcuse();
-    reportPrintFailure(printCurrentView(document.title));
+    beginPdfPrint(monthlyReportFilenameBase());
 }
 
 export function applyCurrentFilter() {
@@ -301,8 +290,7 @@ export function applyCurrentFilter() {
 
     let filteredData = getFilteredDataByDate();
 
-    const selectedFilterTitle = byId('selectedFilterTitle');
-    if(selectedFilterTitle) selectedFilterTitle.innerText = titleText;
+    viewState.selectedFilterTitle = titleText;
     renderHistory(filteredData);
     updateDailyScheduleStats(filteredData);
 }

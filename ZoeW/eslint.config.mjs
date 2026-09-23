@@ -51,6 +51,17 @@ export default tseslint.config(
         }
     },
 
+    /*
+     * ── កាយវិការ (តំបន់ហាមចូល) ដែលផ្ទេរ ១:១ ចូលស្រទាប់ React ────────────
+     * ⛔ `src/app/behaviors/**` ជាកូដ PTR · ចលនាផ្ទាំង · ការរមូរ ដែល **តក្កវិជ្ជា
+     *    ដូច `app.js` ដើមបេះបិទ** (`npm run logic:check`) ➜ វិន័យទន់ដូចកូដផ្ទេរ។
+     */
+    {
+        files: ['src/app/behaviors/**/*.ts'],
+        languageOptions: { globals: { ZoeLicense: 'readonly' } },
+        rules: { 'no-empty': 'off', 'prefer-const': 'off', '@typescript-eslint/no-unused-vars': 'off' }
+    },
+
     /* ── Service worker ─────────────────────────────────────────────── */
     {
         files: ['src/sw/**/*.ts'],

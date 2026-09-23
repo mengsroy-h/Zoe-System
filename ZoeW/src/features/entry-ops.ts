@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { normalizeStoredPhone } from '../core/text';
@@ -39,8 +40,7 @@ export function openCallMarkModal(id?) {
     const item = dataState.scanHistory.find(i => i.id === id);
     if (!item) return;
 
-    const callMarkPhoneText = byId('callMarkPhoneText');
-    if (callMarkPhoneText) callMarkPhoneText.innerText = item.phone;
+    viewState.callMarkPhoneText = domText(item.phone);
 
     openModalHelper('callMarkModal');
 }
@@ -86,21 +86,18 @@ export function openEditModal(id?) {
     const item = dataState.scanHistory.find(i => i.id === id);
     if(!item) return;
 
-    const editModalBarcodeText = byId('editModalBarcodeText');
-    if(editModalBarcodeText) editModalBarcodeText.innerText = item.barcode;
-    const editPhoneInput = byId('editPhoneInput');
-    if(editPhoneInput) editPhoneInput.value = item.phone === "គ្មានលេខ" ? "" : item.phone;
+    viewState.editModalBarcodeText = domText(item.barcode);
+    setFieldValue('editPhoneInput', item.phone === "គ្មានលេខ" ? "" : item.phone);
 
     openModalHelper('editPhoneModal');
 
     setTimeout(() => {
-        if(editPhoneInput) editPhoneInput.focus();
+        focusField('editPhoneInput');
     }, 150);
 }
 
 export function saveEditedPhone() {
-    const editPhoneInput = byId('editPhoneInput');
-    let newPhone = normalizeStoredPhone(editPhoneInput ? editPhoneInput.value : '');
+    let newPhone = normalizeStoredPhone(fieldValue('editPhoneInput'));
     if (!newPhone) {
         newPhone = "គ្មានលេខ";
     }
@@ -171,8 +168,7 @@ export function saveEditedPhone() {
             return false;
         });
         updateRecentPhonesList();
-        const searchInput = byId('searchPhoneInput');
-        if (searchInput) searchInput.value = '';
+        setFieldValue('searchPhoneInput', '');
         applyCurrentFilter();
         closeModal('editPhoneModal');
         return phoneSavePromise;

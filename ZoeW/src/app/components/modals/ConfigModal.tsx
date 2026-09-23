@@ -1,8 +1,10 @@
+import { refTo } from '../../refs';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function ConfigModal() {
     return (
-        <div id="configModal" className="modal">
+        <Modal id="configModal">
             <div className="modal-content">
                 <h3>⚙️ កំណត់រចនាសម្ព័ន្ធ Firebase</h3>
                 <p>
@@ -18,16 +20,16 @@ export function ConfigModal() {
                     <button type="button" className="btn-info" onClick={onAct("openConfigQrScanner")}>📷 ស្កេន QR (Setup Link)</button>
                 </div>
                 <textarea
-                    id="firebaseConfigInput"
+                    id="firebaseConfigInput" ref={refTo('firebaseConfigInput')}
                     placeholder={"បិទភ្ជាប់អ្វីដែល copy ពី Firebase Console ទាំងស្រុងបានតែម្តង៖\n\nconst firebaseConfig = {\n  apiKey: \"...\",\n  authDomain: \"...\",\n  databaseURL: \"...\",\n  projectId: \"...\"\n};"}
                 ></textarea>
                 <p style={{ marginTop: "14px" }}>🐞 Sentry DSN (Optional — សម្រាប់ Auto Bug Report):</p>
-                <input type="text" id="sentryDsnInput" placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx" />
+                <input type="text" id="sentryDsnInput" ref={refTo('sentryDsnInput')} placeholder="https://xxxx@xxxx.ingest.sentry.io/xxxx" />
                 <div className="modal-btns">
                     <button className="btn-confirm" id="configSaveBtn" onClick={onAct("saveFirebaseConfig")}>រក្សាទុក និងភ្ជាប់</button>
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["configModal"] })}>បោះបង់</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

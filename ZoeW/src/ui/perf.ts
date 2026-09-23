@@ -1,3 +1,4 @@
+import { viewState } from '../core/view-state';
 import { uiState } from '../core/state';
 
 export const DISPLAY_HZ_MIN = 10;
@@ -74,7 +75,7 @@ export function setupAdaptivePerformance() {
                     measureDisplayHz(() => {
                         sampleFramePace((secondRatio) => {
                             uiState.perfSamplePending = false;
-                            if (secondRatio >= PERF_LITE_RATIO) document.body.classList.add('perf-lite');
+                            if (secondRatio >= PERF_LITE_RATIO) viewState.perfLite = true;
                         });
                     });
                 }, PERF_SECOND_SAMPLE_DELAY_MS);

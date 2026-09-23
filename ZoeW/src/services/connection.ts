@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
+import { documentIsHidden, onDocumentVisibilityChange } from '../platform/document-io';
 import { firebaseState, ztoState } from '../core/state';
 import { serverClockOffsetIsFromServer } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
@@ -40,25 +41,15 @@ export function connectionIsSettlingIn() {
 }
 
 export function renderConnectionStatus() {
-    const statusDot = byId('statusDot');
-    const statusText = byId('firebaseStatusText');
     const online = connectionLooksOnline();
     const reconnecting = !online && firebaseState.isDatabaseConnected && firebaseState.dbListenersFailed && (navigator.onLine as boolean) !== false;
     const settling = !online && !reconnecting && connectionIsSettlingIn();
-    if (statusDot) {
-        statusDot.classList.toggle('offline', !online);
-        statusDot.classList.toggle('connecting', reconnecting || settling);
-    }
-    if (statusText) {
-        statusText.classList.toggle('is-online', online);
-        statusText.classList.toggle('is-connecting', !online && (reconnecting || settling));
-        statusText.classList.toggle('is-offline', !online && !reconnecting && !settling);
-        statusText.innerText = online
-            ? "ភ្ជាប់ Server រួចរាល់"
-            : (reconnecting
-                ? "កំពុងភ្ជាប់ឡើងវិញ..."
-                : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
-    }
+    viewState.connectionStatus = online ? 'online' : ((reconnecting || settling) ? 'connecting' : 'offline');
+    viewState.connectionText = online
+        ? "ភ្ជាប់ Server រួចរាល់"
+        : (reconnecting
+            ? "កំពុងភ្ជាប់ឡើងវិញ..."
+            : (settling ? "កំពុងភ្ជាប់..." : "ក្រៅបណ្ដាញ"));
     refreshLiveToasts();
 }
 
@@ -127,8 +118,8 @@ export function setupConnectionRecovery() {
         clearReconnectWatchdog();
         renderConnectionStatus();
     });
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) return;
+    onDocumentVisibilityChange(() => {
+        if (documentIsHidden()) return;
         renderConnectionStatus();
         retryFirebaseSdkNow();
         nudgeDatabaseConnection();

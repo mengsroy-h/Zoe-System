@@ -1,8 +1,18 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
+import { refTo } from '../../refs';
+
+const qrVideoRef = refTo('configQrVideo');
+
+/** ⛔ `muted` ត្រូវជា **property** ផង (React ដាក់តែ attribute) — iOS បដិសេធ autoplay បើអត់ */
+function bindQrVideo(el: HTMLElement | null) {
+    if (el) { (el as HTMLVideoElement).muted = true; el.setAttribute('muted', ''); }
+    qrVideoRef(el);
+}
 
 export function ConfigQrScanModal() {
     return (
-        <div id="configQrScanModal" className="modal" data-close="closeConfigQrScanner">
+        <Modal id="configQrScanModal" close="closeConfigQrScanner">
             <div className="modal-content">
                 <h3>📷 ស្កេន QR (Setup Link)</h3>
                 <p>ដាក់ QR Code ចូលក្នុងស៊ុមកាមេរ៉ា — Config នឹងបំពេញដោយស្វ័យប្រវត្តិ (មិនទាន់រក្សាទុក សូមចុច "រក្សាទុក" ម្តងទៀត)។</p>
@@ -12,12 +22,12 @@ export function ConfigQrScanModal() {
                     playsInline
                     muted
                     autoPlay
-                    ref={(el) => { if (el) { el.muted = true; el.setAttribute('muted', ''); } }}
+                    ref={bindQrVideo}
                 ></video>
                 <div className="modal-btns">
                     <button className="btn-cancel" onClick={onAct("closeConfigQrScanner")}>បោះបង់</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

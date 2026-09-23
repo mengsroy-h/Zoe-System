@@ -1,9 +1,10 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { CollectedStatsCards } from '../stats/StatsCards';
 
 export function CollectedStatsModal() {
     return (
-        <div id="collectedStatsModal" className="modal">
+        <Modal id="collectedStatsModal">
             <div className="modal-content">
                 <h3>💵 ចំណូលប្រចាំថ្ងៃ (តាមថ្ងៃយក)</h3>
                 <p>
@@ -27,6 +28,6 @@ export function CollectedStatsModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["collectedStatsModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

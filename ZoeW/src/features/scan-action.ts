@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, scanState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreSet } from '../core/storage';
@@ -47,19 +48,14 @@ export function triggerScanAction(barcode) {
     if (navigator.vibrate) navigator.vibrate(150);
 
     scanState.pendingBarcode = cleanBarcode;
-    const modalBcText = byId('modalBarcodeText');
-    if(modalBcText) modalBcText.innerText = cleanBarcode;
+    viewState.modalBarcodeText = cleanBarcode;
 
-    const modalPhoneInput = byId('modalPhoneInput');
-    if(modalPhoneInput) modalPhoneInput.value = "";
+    setFieldValue('modalPhoneInput', "");
 
-    const modalLockerInput = byId('modalLockerInput');
-    if(modalLockerInput) modalLockerInput.value = uiState.lastEnteredLocker;
+    setFieldValue('modalLockerInput', uiState.lastEnteredLocker);
 
-    const modalCodInput = byId('modalCodInput');
-    if(modalCodInput) modalCodInput.value = "";
-    const modalDodInput = byId('modalDodInput');
-    if(modalDodInput) modalDodInput.value = "";
+    setFieldValue('modalCodInput', "");
+    setFieldValue('modalDodInput', "");
 
     clearLookupStatus();
     openModalHelper('phoneModal');
@@ -68,10 +64,10 @@ export function triggerScanAction(barcode) {
     const lookupCfg = getLookupApiConfig();
     if (!lookupCfg || !lookupCfg.enabled) {
         setTimeout(() => {
-            if(modalPhoneInput) modalPhoneInput.focus();
+            focusField('modalPhoneInput');
         }, 150);
     } else {
-        armLookupFocus(modalPhoneInput, cleanBarcode, lookupPromise);
+        armLookupFocus('modalPhoneInput', cleanBarcode, lookupPromise);
     }
 }
 
@@ -91,16 +87,11 @@ export function dropOptimisticBarcode(code) {
 }
 
 export async function confirmPhone(isSkip = false) {
-    const phoneEl = byId('modalPhoneInput');
-    const lockerEl = byId('modalLockerInput');
-    const codEl = byId('modalCodInput');
-    const dodEl = byId('modalDodInput');
-
-    let phone = isSkip ? "គ្មានលេខ" : normalizeStoredPhone(phoneEl ? phoneEl.value : '');
-    let rawLocker = lockerEl ? lockerEl.value.trim() : '';
+    let phone = isSkip ? "គ្មានលេខ" : normalizeStoredPhone(fieldValue('modalPhoneInput'));
+    let rawLocker = fieldValue('modalLockerInput').trim();
     let locker = rawLocker;
-    let cod = codEl ? Math.round((parseFloat(codEl.value) || 0) * 100) / 100 : 0;
-    let dod = dodEl ? Math.round((parseFloat(dodEl.value) || 0) * 100) / 100 : 0;
+    let cod = Math.round((parseFloat(fieldValue('modalCodInput')) || 0) * 100) / 100;
+    let dod = Math.round((parseFloat(fieldValue('modalDodInput')) || 0) * 100) / 100;
 
     if (!Number.isFinite(cod) || cod < 0) cod = 0;
     if (!Number.isFinite(dod) || dod < 0) dod = 0;
@@ -127,14 +118,7 @@ export async function confirmPhone(isSkip = false) {
         return;
     }
 
-    const skipBtn = byId('phoneModalSkipBtn');
-    const confirmBtn = byId('phoneModalConfirmBtn');
-    const cancelBtn = byId('phoneModalCancelBtn');
-    const closeXBtn = byId('phoneModalCloseX');
-    if (skipBtn) skipBtn.disabled = true;
-    if (confirmBtn) confirmBtn.disabled = true;
-    if (cancelBtn) cancelBtn.disabled = true;
-    if (closeXBtn) closeXBtn.disabled = true;
+    viewState.phoneModalBusy = true;
 
     try {
         const claimPromise = claimBarcodeInRegistry(barcodeToSave);
@@ -192,10 +176,7 @@ export async function confirmPhone(isSkip = false) {
     } catch (e) {
         showToast(`⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
     } finally {
-        if (skipBtn) skipBtn.disabled = false;
-        if (confirmBtn) confirmBtn.disabled = false;
-        if (cancelBtn) cancelBtn.disabled = false;
-        if (closeXBtn) closeXBtn.disabled = false;
+        viewState.phoneModalBusy = false;
         warmZtoLookupProxyNow();
     }
 }

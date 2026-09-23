@@ -1,5 +1,5 @@
-import { byId } from '../core/dom';
 import { dataState, firebaseState, uiState } from '../core/state';
+import { viewState, type ScanRemoveTextId } from '../core/view-state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { ENTRY_SCAN_MODE_KEY } from '../core/storage-keys';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
@@ -32,15 +32,14 @@ export function findScannedRemovalTrash(code) {
     return dataState.deletedItems.find((item) => collectItemBarcodes(item).some((entry) => lockerCodeKey(entry) === key)) || null;
 }
 
-export function setScannedRemovalText(id, value) {
-    const element = byId(id);
-    if (element) element.textContent = String(value === null || value === undefined || value === '' ? '—' : value);
+export function setScannedRemovalText(id: ScanRemoveTextId, value) {
+    viewState.scanRemoveTexts = Object.assign({}, viewState.scanRemoveTexts, {
+        [id]: String(value === null || value === undefined || value === '' ? '—' : value)
+    });
 }
 
 export function refreshRemoveScanBanner() {
-    const detail = byId('removeScanBannerDetail');
-    if (!detail) return;
-    detail.textContent = uiState.scanRemoveInFlight
+    viewState.removeScanDetail = uiState.scanRemoveInFlight
         ? `កំពុងដក Barcode ${uiState.scanRemoveInFlight.barcodeCode}… សូមកុំស្កេនស្ទួន។`
         : 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
 }
@@ -137,33 +136,9 @@ export async function confirmScannedRemoval() {
 export function setEntryScanMode(mode?) {
     uiState.entryScanMode = mode === 'locker' ? 'locker' : (mode === 'remove' ? 'remove' : 'parcel');
     safeStoreSet(appLocalStore, ENTRY_SCAN_MODE_KEY, uiState.entryScanMode === 'remove' ? 'parcel' : uiState.entryScanMode);
-    const parcelBtn = byId('modeParcelBtn');
-    const lockerBtn = byId('modeLockerBtn');
-    const removeBtn = byId('modeRemoveBtn');
-    if (parcelBtn) parcelBtn.classList.toggle('active', uiState.entryScanMode === 'parcel');
-    if (lockerBtn) lockerBtn.classList.toggle('active', uiState.entryScanMode === 'locker');
-    if (removeBtn) removeBtn.classList.toggle('active', uiState.entryScanMode === 'remove');
-    if (parcelBtn) parcelBtn.setAttribute('aria-pressed', uiState.entryScanMode === 'parcel' ? 'true' : 'false');
-    if (lockerBtn) lockerBtn.setAttribute('aria-pressed', uiState.entryScanMode === 'locker' ? 'true' : 'false');
-    if (removeBtn) removeBtn.setAttribute('aria-pressed', uiState.entryScanMode === 'remove' ? 'true' : 'false');
-    const entryPage = byId('pageEntry');
-    if (entryPage) entryPage.classList.toggle('remove-scan-active', uiState.entryScanMode === 'remove');
-    const removeBanner = byId('removeScanBanner');
-    if (removeBanner) removeBanner.classList.toggle('hidden', uiState.entryScanMode !== 'remove');
+    viewState.entryModeShown = uiState.entryScanMode;
     refreshRemoveScanBanner();
-    const lockerPanel = byId('lockerPanel');
-    if (lockerPanel) lockerPanel.classList.toggle('hidden', uiState.entryScanMode !== 'locker');
-    const parcelPanel = byId('parcelPanel');
-    if (parcelPanel) parcelPanel.classList.toggle('hidden', uiState.entryScanMode === 'locker');
     if (uiState.entryScanMode !== 'locker') renderEntryList();
-    const hwInput = byId('hwScannerInput');
-    const hwLabel = byId('hardwareScannerLabel');
-    if (hwInput) hwInput.placeholder = uiState.entryScanMode === 'locker'
-        ? 'ស្កេន Barcode ដើម្បីកំណត់ទីតាំង...'
-        : (uiState.entryScanMode === 'remove' ? 'ស្កេន Barcode ដែលត្រូវដក...' : 'ស្កេន Barcode...');
-    if (hwLabel) hwLabel.textContent = uiState.entryScanMode === 'remove'
-        ? 'ស្កេន Barcode ដែលត្រូវដក (កាមេរ៉ា/Bluetooth/USB/វាយដោយដៃ)'
-        : 'ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ';
     if (uiState.entryScanMode === 'locker') {
         buildLockerBarcodeIndex();
         renderLockerList();

@@ -1,10 +1,11 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { MonthlyReportMonthSelect } from '../reports/MonthlyReportMonthSelect';
 import { MonthlyReportBody } from '../reports/MonthlyReportBody';
 
 export function MonthlyReportModal() {
     return (
-        <div id="monthlyReportModal" className="modal">
+        <Modal id="monthlyReportModal">
             <div className="modal-content">
                 <h3>📈 របាយការណ៍អាជីវកម្មប្រចាំខែ</h3>
                 <p>
@@ -41,6 +42,6 @@ export function MonthlyReportModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["monthlyReportModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

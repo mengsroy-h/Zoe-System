@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { elementOf } from '../app/refs';
+import { createScratchCanvas } from '../platform/document-io';
 import { scanState, uiState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { searchByPhone } from '../features/phone-suggest';
@@ -181,10 +182,10 @@ export function decodeLiveFrame(canvas) {
 
 export function startZxingVideoScan(videoElement) {
     scanState.zxingLoopActive = true;
-    const container = byId('video-container');
+    const container = elementOf('videoContainer');
 
     if (!scanState.ownCaptureCanvas) {
-        scanState.ownCaptureCanvas = document.createElement('canvas');
+        scanState.ownCaptureCanvas = createScratchCanvas();
         scanState.ownCaptureCtx = scanState.ownCaptureCanvas.getContext('2d', { willReadFrequently: true });
     }
 

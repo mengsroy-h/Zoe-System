@@ -1,9 +1,13 @@
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { BarcodeListContainer } from '../barcode/BarcodeListContainer';
 
 export function ViewListModal() {
+    const v = useStoreFields(viewState, ['listModalPhoneText']);
     return (
-        <div id="viewListModal" className="modal">
+        <Modal id="viewListModal">
             <div className="modal-content">
                 <h3>📦 បញ្ជីអីវ៉ាន់ទាំងអស់</h3>
                 <p style={{ marginBottom: "6px" }}>
@@ -11,7 +15,7 @@ export function ViewListModal() {
                     <strong
                         id="listModalPhoneText"
                         style={{ color: "var(--primary)", fontSize: "calc(12 * var(--fs-unit))" }}
-                    ></strong>
+                    >{v.listModalPhoneText}</strong>
                 </p>
                 <div
                     className="table-responsive"
@@ -25,6 +29,6 @@ export function ViewListModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["viewListModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

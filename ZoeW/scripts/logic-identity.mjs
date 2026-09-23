@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import * as acorn from 'acorn';
 import esbuild from 'esbuild';
 import { resolveOldRoot } from './old-app.mjs';
+import { REMOVED } from './intentional-removals.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -25,13 +26,43 @@ const OLD = fs.readFileSync(path.join(resolveOldRoot(HERE), 'app.js'), 'utf8');
 const STORES = new Set(['firebaseState', 'dataState', 'scanState', 'uiState', 'securityState', 'lookupState', 'sheetImportState', 'ztoState']);
 
 /** function តំបន់ហាមចូល (`CLAUDE.md` ៖ PTR · ចលនាផ្ទាំង · ការរមូរ · ការលាក់របា) */
-const ZONE_FILES = ['ui/pull-to-refresh.ts', 'ui/panel-motion.ts', 'ui/chrome-autohide.ts', 'ui/page-nav.ts'];
+const ZONE_FILES = ['app/behaviors/pull-to-refresh.ts', 'app/behaviors/panel-motion.ts', 'app/behaviors/panels.ts', 'app/behaviors/chrome-autohide.ts',
+    'app/behaviors/phone-search.ts', 'ui/chrome-autohide.ts', 'ui/page-nav.ts'];
 const ZONE_EXTRA = ['setPhoneSearchPulledUp', 'positionPhoneSuggestBox', 'syncHistoryExpandedLock', 'activePanelSections', 'measureAppChromeSize'];
+/**
+ * ⛔ «React ១០០%» (សំណើម្ចាស់គម្រោង) ៖ class · attribute · ការស្វែងរកតាម id ក្នុងតំបន់ហាមចូល
+ *    ក្លាយជា **state ដែល JSX គូរ** ឬ **ref** ➜ token ខុស ខណៈ **លំដាប់ · លក្ខខណ្ឌ · លេខ
+ *    (slop · ratio · ពិដាន) មិនប្រែ**។ រាល់ការវាស់ (`getBoundingClientRect` · `scrollTop`)
+ *    ឈរ **ក្រោយ** `commitNow()` ➜ DOM ដូច App ដើមពេលវាស់។ អ្នកយាមឥរិយាបថ ៖
+ *    gesture-test · panel-motion-test · ios-panel-glide-test · panel-snap-ownership-test ·
+ *    phone-search-swipe-test (ត្រូវបៃតងលើ tree ថ្មី)។
+ */
+const REACT_STATE = 'React ១០០% ៖ ';
 /** ការកែក្នុងតំបន់ហាមចូលដែល **ទទួលយក** — រាល់ធាតុត្រូវមានហេតុផល */
 const ZONE_ALLOWED = {
     setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម' +
-        ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម'
+        ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម',
+    switchAppPage: REACT_STATE + '`.active` របស់ទំព័រ/Tab ដេរីវេពី `currentAppPage` ក្នុង JSX · `scrollTop = 0` តាម `setScrollTop()` (commit មុន) — លំដាប់ hide ➜ pull-up ➜ chrome ➜ lock ➜ scroll ដដែល',
+    openSideDrawer: REACT_STATE + '`.open` · `aria-hidden` របស់របា Slide និង backdrop ដេរីវេពី `drawerOpen` ➜ ការហៅ refresh ទាំង ៥ ដដែល',
+    closeSideDrawer: REACT_STATE + '`drawerOpen = false` ជំនួស `.open`/`aria-hidden`',
+    isSideDrawerOpen: REACT_STATE + 'អាន `drawerOpen` (ប្រភពរបស់ `.open`) ជំនួស classList',
+    activePanelSections: REACT_STATE + 'ទំព័រសកម្មអានពី `currentAppPage` (ប្រភពរបស់ `.active`) · ធាតុតាម ref · បន្ថែម `panel` (កូនសោ state របស់ផ្ទាំង)',
+    entryScrollerInView: REACT_STATE + '`#lockerPanel` លាក់ ⇔ `entryModeShown !== \'locker\'` (JSX `PageEntry`) ➜ អានប្រភពដដែល',
+    syncHistoryExpandedLock: REACT_STATE + '`history-expanded` ជា `historyExpanded` + `commitNow()` ➜ `scrollTop = 0` មុន/ក្រោយ និង rAF ២ ជាន់ ដដែល',
+    beginPanelGlideSnapPause: REACT_STATE + '`panel-gliding` ជា `panelGliding` + `commitNow()` ➜ snap ផ្អាក **មុន** `animate()` ដូចដើម · token/ownership ដដែល',
+    endPanelGlideSnapPause: REACT_STATE + '`panelGliding = false` ជំនួស `classList.remove`',
+    setupSwipeGestures: REACT_STATE + 'បន្ថែមកូនសោ `panel` ក្នុង config · scroller តាម ref',
+    phoneSearchIsActive: REACT_STATE + '`.show` ជា `phoneSuggestOpen` · focus/តម្លៃតាម ref (`isFieldFocused` · `fieldValue`)',
+    bindPanelSwipe: REACT_STATE + '`.collapsed`/`.search-focus` អាន/សរសេរតាម `panelIsCollapsed()`/`setPanelCollapsed()`/`panelHasSearchFocus()` · `commitNow()` មុនវាស់ `beforeTop` · ការប្តូរនៅ `touchend` ដដែល (ថ្ងៃ slop 8/30 · ratio ដដែល)',
+    appChromeElements: REACT_STATE + 'navbar · tabbar តាម ref',
+    showAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
+    hideAppChrome: REACT_STATE + '`chrome-hidden` លើ `<body>` ដេរីវេពី `chromeHidden` (`DocumentEffects`)',
+    setupChromeAutoHide: REACT_STATE + '`#appPages` តាម ref · ពិដាន SHOW_AFTER/HIDE_AFTER · rAF coalesce ដដែល',
+    positionPhoneSuggestBox: REACT_STATE + '`commitNow()` មុនវាស់ · `.show` ជា `phoneSuggestOpen` · ធាតុតាម ref',
+    setPhoneSearchPulledUp: REACT_STATE + '`.search-focus` ជា `dataPanelSearchFocus` · `.collapsed` ជា `dataPanelCollapsed`',
+    setupPhoneSuggestions: REACT_STATE + 'ធាតុតាម ref · `e.target` អានម្តង (ឥរិយាបថ `closest` ដដែល)',
 };
+
 
 function printed(code, loader) {
     return esbuild.transformSync(code, { loader, format: 'esm', target: 'es2022', minifyWhitespace: false, keepNames: false }).code;
@@ -83,7 +114,7 @@ const where = new Map();
 function walkDir(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, e.name);
-        if (e.isDirectory()) { if (!['app', 'sw', 'types', 'styles'].includes(e.name)) walkDir(full); continue; }
+        if (e.isDirectory()) { if (!['sw', 'types', 'styles', 'components'].includes(e.name)) walkDir(full); continue; }
         if (!e.name.endsWith('.ts') || e.name.endsWith('.d.ts')) continue;
         const js = printed(fs.readFileSync(full, 'utf8'), 'ts');
         for (const [name, src] of functionsOf(js, 'module')) {
@@ -97,9 +128,10 @@ walkDir(path.join(ROOT, 'src'));
 let same = 0;
 const differ = [];
 const missing = [];
+const removed = [];
 for (const [name, t] of oldTok) {
     const n = newTok.get(name);
-    if (!n) { missing.push(name); continue; }
+    if (!n) { (REMOVED[name] ? removed : missing).push(name); continue; }
     if (n.length === t.length && n.every((x, i) => x === t[i])) same++;
     else differ.push(name);
 }
@@ -116,6 +148,11 @@ console.log(`function ដើម ៖ ${oldTok.size}`);
 console.log(`✅ ដូចដើមបេះបិទ (តាម token)   ៖ ${same}`);
 console.log(`✏️  ខុស (ការកែដោយចេតនា)       ៖ ${differ.length}`);
 console.log(`${missing.length ? '❌' : '✅'} បាត់                       ៖ ${missing.length}${missing.length ? ' — ' + missing.join(' · ') : ''}`);
+console.log(`🗑️  ដកចេញដោយចេតនា            ៖ ${removed.length}`);
+for (const n of removed) console.log(`   ${n} — ${REMOVED[n]}`);
+const deadRemoved = Object.keys(REMOVED).filter((n) => !removed.includes(n));
+if (deadRemoved.length) console.log(`❌ REMOVED ងាប់ (function នៅមាន ឬមិនមែនរបស់ដើម) ៖ ${deadRemoved.join(' · ')}`);
+const deadZone = Object.keys(ZONE_ALLOWED).filter((n) => !differ.includes(n));
 console.log(`\n── តំបន់ហាមចូល (PTR · ចលនាផ្ទាំង · ការរមូរ · ការលាក់របា) ៖ ${zoneTotal} function ──`);
 console.log(`✅ ដូចដើមបេះបិទ ៖ ${zoneTotal - zoneDiff.length}/${zoneTotal}`);
 for (const n of zoneDiff) console.log(`${ZONE_ALLOWED[n] ? '✏️ ' : '❌'} ${n} (${where.get(n)})${ZONE_ALLOWED[n] ? ' — ' + ZONE_ALLOWED[n] : ' — ⛔ ការកែដែលគ្មានហេតុផល'}`);
@@ -130,10 +167,19 @@ if (process.env.LOGIC_DIFF) {
         console.log('   ថ្មី : ' + b.slice(Math.max(0, i - 6), jb + 2).join(' ').slice(0, 900));
     }
 }
+if (process.env.LOGIC_DUMP) {
+    const dir = process.env.LOGIC_DUMP;
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of differ) {
+        fs.writeFileSync(path.join(dir, name + '.old'), (oldTok.get(name) || []).join('\n') + '\n');
+        fs.writeFileSync(path.join(dir, name + '.new'), (newTok.get(name) || []).join('\n') + '\n');
+    }
+}
 if (process.env.LOGIC_LIST) { console.log('\nfunction ដែលខុស ៖'); differ.forEach((n) => console.log('   ' + n + ' (' + where.get(n) + ')')); }
 
 // ⛔ ជាន់អប្បបរមា ៖ ការស្កេនដែលរកមិនឃើញ function ដើម ឬរកតំបន់មិនឃើញ = វាស់មិនបាន
 if (oldTok.size < 700 || zoneTotal < 30) { console.error(`\n⛔ ការស្កេនតូចពេក (${oldTok.size} function · តំបន់ ${zoneTotal}) — វាស់មិនបាន`); process.exit(2); }
-const failed = missing.length + zoneUnexplained.length;
+if (deadZone.length) console.log(`❌ ZONE_ALLOWED ងាប់ (function ដូចដើមវិញ ឬលែងមាន) ៖ ${deadZone.join(' · ')}`);
+const failed = missing.length + zoneUnexplained.length + deadRemoved.length + deadZone.length;
 console.log(failed ? `\n❌ ${failed} បញ្ហា` : `\n✅ គ្មាន function បាត់ · តំបន់ហាមចូលដូចដើម (លើកលែងការកែដែលមានហេតុផល)`);
 process.exit(failed ? 1 : 0);

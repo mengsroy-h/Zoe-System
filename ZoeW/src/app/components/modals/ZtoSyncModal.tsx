@@ -1,19 +1,22 @@
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { ZtoSyncList } from '../zto/ZtoSyncList';
 
 export function ZtoSyncModal() {
+    const v = useStoreFields(viewState, ['ztoSyncModalNote']);
     return (
-        <div
+        <Modal
             id="ztoSyncModal"
-            className="modal"
-            data-close="closeZtoSyncModal"
+            close="closeZtoSyncModal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="ztoSyncModalTitle"
         >
             <div className="modal-content zto-sync-modal-content">
                 <h3 id="ztoSyncModalTitle">🔄 កញ្ចប់ដែល ZTO មិនទាន់បិទ</h3>
-                <p id="ztoSyncModalNote"></p>
+                <p id="ztoSyncModalNote">{v.ztoSyncModalNote}</p>
                 <div className="zto-sync-list" id="ztoSyncList">
                     <ZtoSyncList />
                 </div>
@@ -38,6 +41,6 @@ export function ZtoSyncModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

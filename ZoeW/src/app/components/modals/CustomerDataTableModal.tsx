@@ -1,9 +1,14 @@
+import { refTo } from '../../refs';
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { CustomerTableBody } from '../customer/CustomerTableBody';
 
 export function CustomerDataTableModal() {
+    const v = useStoreFields(viewState, ['customerTableStatus']);
     return (
-        <div id="customerDataTableModal" className="modal">
+        <Modal id="customerDataTableModal">
             <div
                 className="modal-content"
                 style={{ textAlign: "left", display: "flex", flexDirection: "column", height: "88vh" }}
@@ -13,7 +18,7 @@ export function CustomerDataTableModal() {
                 <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "8px" }}>
                     <input
                         type="text"
-                        id="customerDataTableSearchInput"
+                        id="customerDataTableSearchInput" ref={refTo('customerDataTableSearchInput')}
                         placeholder="🔍 ស្វែងរក Barcode / លេខទូរស័ព្ទ..."
                         style={{ marginBottom: "0", textAlign: "left" }}
                         autoComplete="off"
@@ -30,7 +35,7 @@ export function CustomerDataTableModal() {
                 <p
                     id="customerDataTableStatus"
                     style={{ fontSize: "calc(10.5 * var(--fs-unit))", color: "var(--text-muted)", marginBottom: "6px" }}
-                ></p>
+                >{v.customerTableStatus}</p>
                 <div className="table-responsive" style={{ flex: "1", minHeight: "0" }}>
                     <table>
                         <thead>
@@ -50,6 +55,6 @@ export function CustomerDataTableModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["customerDataTableModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { sanitizePhoneNumber } from '../core/text';
@@ -8,8 +9,7 @@ import { ENTRY_LIST_MAX_ROWS, LOCKER_LIST_MAX_ROWS, buildLockerBarcodeIndex } fr
 import { normalizePhoneDigits } from '../features/phone-suggest';
 
 export function entryPageIsVisible() {
-    const page = byId('pageEntry');
-    return !!(page && page.classList.contains('active'));
+    return uiState.currentAppPage === 'entry';
 }
 
 export function refreshEntryPagePanels() {
@@ -23,13 +23,7 @@ export function refreshEntryPagePanels() {
 }
 
 export function renderEntryList() {
-    const tbody = byId('entryListTableBody');
-    const emptyState = byId('entryListEmptyState');
-    const countEl = byId('entryListCount');
-    if (!tbody) return;
-
-    const searchInput = byId('entryListSearchInput');
-    const search = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const search = fieldValue('entryListSearchInput').trim().toLowerCase();
     const searchDigits = normalizePhoneDigits(search);
     const todayStr = getFormattedDate(new Date(getServerNow()));
 
@@ -46,15 +40,15 @@ export function renderEntryList() {
     }
     rows = rows.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    if (countEl) countEl.innerText = String(rows.length);
+    viewState.entryListCountText = String(rows.length);
 
     if (!rows.length) {
         uiState.entryListView = [];
         uiState.touch();
-        if (emptyState) emptyState.classList.remove('hidden');
+        viewState.entryListEmpty = true;
         return;
     }
-    if (emptyState) emptyState.classList.add('hidden');
+    viewState.entryListEmpty = false;
 
     // ➜ `EntryListTableBody` (React) គូរជួរដេក
     uiState.entryListView = rows.slice(0, ENTRY_LIST_MAX_ROWS).map((it, i) => {
@@ -97,12 +91,7 @@ export function getItemLatestLockerTs(item) {
 }
 
 export function renderLockerList() {
-    const tbody = byId('lockerListTableBody');
-    const emptyState = byId('lockerListEmptyState');
-    if (!tbody) return;
-
-    const searchInput = byId('lockerListSearchInput');
-    const search = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const search = fieldValue('lockerListSearchInput').trim().toLowerCase();
 
     const allLockers = new Set();
     let assigned = [];
@@ -137,10 +126,10 @@ export function renderLockerList() {
     if (!assigned.length) {
         uiState.lockerListView = { rows: [], overflow: 0 };
         uiState.touch();
-        if (emptyState) emptyState.classList.remove('hidden');
+        viewState.lockerListEmpty = true;
         return;
     }
-    if (emptyState) emptyState.classList.add('hidden');
+    viewState.lockerListEmpty = false;
 
     uiState.lockerListView = {
         rows: assigned.slice(0, LOCKER_LIST_MAX_ROWS).map((row, i) => ({

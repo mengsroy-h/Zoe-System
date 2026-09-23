@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { lookupState, scanState, securityState, uiState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { normalizeStoredPhone } from '../core/text';
@@ -106,16 +107,11 @@ export function pumpAutoLookupQueue() {
 }
 
 export function clearLookupStatus() {
-    const el = byId('lookupStatus');
-    if (!el) return;
-    el.className = 'lookup-status';
-    el.textContent = '';
-    el.hidden = true;
+    viewState.lookupStatus = { kind: '', text: '' };
 }
 
 export function setLookupStatus(barcode, kind, text) {
-    const el = byId('lookupStatus');
-    if (!el || (barcode && (scanState.pendingBarcode !== barcode || !uiState.isModalOpen))) return false;
+    if (barcode && (scanState.pendingBarcode !== barcode || !uiState.isModalOpen)) return false;
     const classes = {
         loading: 'lookup-status-loading',
         success: 'lookup-status-success',
@@ -124,9 +120,7 @@ export function setLookupStatus(barcode, kind, text) {
         offline: 'lookup-status-offline',
         cache: 'lookup-status-cache'
     };
-    el.className = 'lookup-status ' + (classes[kind] || classes.warn);
-    el.textContent = String(text || '');
-    el.hidden = !text;
+    viewState.lookupStatus = { kind: classes[kind] || classes.warn, text: String(text || '') };
     return true;
 }
 
@@ -164,22 +158,19 @@ export function applyLookupFillToModal(barcode, phoneVal, codVal, dodVal, cfg) {
     let filledAny = false;
     let phoneWasAutoFilled = false;
 
-    const phoneEl = byId('modalPhoneInput');
-    if (phoneVal && phoneEl && !phoneEl.value) {
-        phoneEl.value = normalizeStoredPhone(phoneVal);
+    if (phoneVal && !fieldValue('modalPhoneInput')) {
+        setFieldValue('modalPhoneInput', normalizeStoredPhone(phoneVal));
         filledAny = true;
         phoneWasAutoFilled = true;
     }
 
-    const codEl = byId('modalCodInput');
-    if (codVal !== null && codVal !== undefined && !isNaN(parseFloat(codVal)) && codEl && !codEl.value) {
-        codEl.value = parseFloat(codVal);
+    if (codVal !== null && codVal !== undefined && !isNaN(parseFloat(codVal)) && !fieldValue('modalCodInput')) {
+        setFieldValue('modalCodInput', String(parseFloat(codVal)));
         filledAny = true;
     }
 
-    const dodEl = byId('modalDodInput');
-    if (dodVal !== null && dodVal !== undefined && !isNaN(parseFloat(dodVal)) && dodEl && !dodEl.value) {
-        dodEl.value = parseFloat(dodVal);
+    if (dodVal !== null && dodVal !== undefined && !isNaN(parseFloat(dodVal)) && !fieldValue('modalDodInput')) {
+        setFieldValue('modalDodInput', String(parseFloat(dodVal)));
         filledAny = true;
     }
 
@@ -221,7 +212,7 @@ export function lookupIsWorkingOn(barcode) {
     return String(lookupState.pendingLookupUnlockBarcode || '').trim().toUpperCase() === key;
 }
 
-export function armLookupFocus(phoneInput, barcode, lookupPromise) {
+export function armLookupFocus(phoneInputName, barcode, lookupPromise) {
     let focused = false;
     let fallbackTimer = null;
     let waitingForPin = false;
@@ -230,9 +221,9 @@ export function armLookupFocus(phoneInput, barcode, lookupPromise) {
     const focusIfEmpty = () => {
         if (focused || isPinFlowPending()) return;
         if (!uiState.isModalOpen || scanState.pendingBarcode !== barcode) return;
-        if (!phoneInput || phoneInput.value) return;
+        if (!phoneInputName || fieldValue(phoneInputName)) return;
         focused = true;
-        phoneInput.focus();
+        focusField(phoneInputName);
     };
     const armFallback = (ms) => {
         if (fallbackTimer !== null) clearTimeout(fallbackTimer);

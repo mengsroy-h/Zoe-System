@@ -1,20 +1,35 @@
-import { ptrIndicatorElement } from './ptr-indicator';
-import { isNativeAndroid, pullToRefreshSupported } from '../platform/native';
-import { byId } from '../core/dom';
-import { securityState, uiState } from '../core/state';
-import { appSessionStore } from '../core/storage';
-import { scrollerOf, showAppChrome } from './chrome-autohide';
-import { activePanelSections, isSideDrawerOpen } from './page-nav';
+import { isNativeAndroid, pullToRefreshSupported } from '../../platform/native';
+import { securityState, uiState } from '../../core/state';
+import { appSessionStore } from '../../core/storage';
+import { showAppChrome } from '../../ui/chrome-autohide';
+import { isSideDrawerOpen } from '../../ui/page-nav';
+import { elementOf } from '../refs';
+import { scrollerOf } from './chrome-autohide';
+import { activePanelSections, panelHasSearchFocus, panelIsCollapsed } from './panels';
 import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArbiter, touchByIdentifier } from './panel-motion';
+
+/**
+ * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ៖ «Pull-to-refresh លើ iOS PWA») — តក្កវិជ្ជា
+ * ដូច `app.js` ដើមបេះបិទ ៖ `#appPages` តាម ref · ស្ថានភាពផ្ទាំងតាម state ·
+ * សញ្ញា PTR (`PtrIndicator`) ជាធាតុរបស់ React ដែលកាយវិការនេះ **ធ្វើចលនា**
+ * តាម ref (transform/opacity រាល់ `touchmove` — ការគូររបស់ React រាល់ស៊ុមនៃ
+ * ម្រាមដៃ នឹងប្តូរភាពរលូន)។
+ */
+
+/** សញ្ញា PTR ដែល `PtrIndicator` គូរ (ref) */
+export function ptrIndicatorElement(): any {
+    return elementOf('ptrIndicator');
+}
 
 export function setupIOSPullToRefresh() {
     if (!pullToRefreshSupported()) return;
     const claimBeforeSlop = isNativeAndroid();
 
-    const pages = byId('appPages');
+    const pages = elementOf('appPages');
     if (!pages) return;
 
     const indicator = ptrIndicatorElement();
+    if (!indicator) return;
 
     const AXIS_SLOP = 22;
     const ENGAGE_AT = 56;
@@ -101,9 +116,10 @@ export function setupIOSPullToRefresh() {
     }
 
     function pullRefreshDisabledByPanelState() {
-        const side = activePanelSections().side;
-        return pages.classList.contains('history-expanded') || !!(side &&
-            (side.classList.contains('collapsed') || side.classList.contains('search-focus')));
+        const sections = activePanelSections();
+        const side = sections.side;
+        return uiState.historyExpanded || !!(side &&
+            (panelIsCollapsed(sections.panel) || panelHasSearchFocus(sections.panel)));
     }
 
     function capturePullContext(target) {
@@ -391,8 +407,8 @@ export function setupIOSPullToRefresh() {
     });
 
     const pullAvailabilityObserver = new MutationObserver(syncPullMoveListener);
-    [pages, byId('dataSideSection'), byId('entrySideSection'),
-     byId('pageData'), byId('pageEntry')].forEach((el) => {
+    [pages, elementOf('dataSideSection'), elementOf('entrySideSection'),
+     elementOf('pageData'), elementOf('pageEntry')].forEach((el) => {
         if (el) pullAvailabilityObserver.observe(el, { attributes: true, attributeFilter: ['class'] });
     });
 

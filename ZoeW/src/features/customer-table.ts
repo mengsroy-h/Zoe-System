@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { lookupState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { getFormattedClockTime } from '../core/timezone';
@@ -13,7 +14,6 @@ import { fetchWithTimeout, preconnectToLookupHost, retryAsync, retryTransientLoo
 
 export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const cfg = getLookupApiConfig();
-    const statusEl = byId('customerDataTableStatus');
     if (!lookupApiSupportsList(cfg)) return;
 
     const isFresh = lookupState.customerDataTableRows && (elapsedSince(lookupState.customerDataTableFetchedAt) < CUSTOMER_TABLE_CACHE_MS);
@@ -24,7 +24,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     }
 
     if (lookupState.customerDataTableFetchPromise) {
-        if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
+        viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
         return lookupState.customerDataTableFetchPromise;
     }
 
@@ -35,7 +35,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
     const listUrl = buildCustomerListApiUrl(cfg, wantFresh);
     if (!listUrl) return;
 
-    if (statusEl) statusEl.textContent = "កំពុងទាញយកទិន្នន័យ...";
+    viewState.customerTableStatus = "កំពុងទាញយកទិន្នន័យ...";
 
     const myGeneration = lookupState.customerDataTableSessionGeneration;
     lookupState.customerDataTableFetchPromise = (async () => {
@@ -72,8 +72,7 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
             lookupState.customerDataTableLastFailedAt = Date.now();
             scheduleCustomerTableRetry();
             if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'lookup', context: 'fetchCustomerDataTableRows' });
-            const curStatusEl = byId('customerDataTableStatus');
-            if (curStatusEl) curStatusEl.textContent = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
+            viewState.customerTableStatus = "❌ ទាញយកទិន្នន័យបរាជ័យ៖ " + (e && e.message === 'Customer table fetch timed out' ? "អស់ពេល (Timeout)" : (e && e.message ? e.message : ''));
             if (lookupState.customerDataTableRows) filterCustomerDataTable();
         } finally {
             if (myGeneration === lookupState.customerDataTableSessionGeneration) lookupState.customerDataTableFetchPromise = null;
@@ -84,18 +83,13 @@ export async function fetchCustomerDataTableRows(force?, wantFresh?) {
 }
 
 export function renderCustomerDataTableStatus(rows) {
-    const statusEl = byId('customerDataTableStatus');
-    if (!statusEl) return;
     const ts = lookupState.customerDataTableFetchedAt ? getFormattedClockTime(lookupState.customerDataTableFetchedAt) : '';
-    statusEl.textContent = rows.length + ' ជួរដេក' + (ts ? (' — ទាញយកចុងក្រោយ ' + ts) : '');
+    viewState.customerTableStatus = rows.length + ' ជួរដេក' + (ts ? (' — ទាញយកចុងក្រោយ ' + ts) : '');
 }
 
 export function filterCustomerDataTable() {
-    const body = byId('customerDataTableBody');
-    if (!body) return;
     const rows = lookupState.customerDataTableRows || [];
-    const searchInput = byId('customerDataTableSearchInput');
-    const q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+    const q = fieldValue('customerDataTableSearchInput').trim().toLowerCase();
 
     const filtered = q ? rows.filter((r) =>
         String(r.barcode || '').toLowerCase().indexOf(q) !== -1 ||
@@ -140,8 +134,7 @@ export function clearCustomerDataTableCache() {
     clearAutoLookupQueueRetries();
     lookupFastCache.clear();
     lookupState.customerTableView = null;
-    const statusEl = byId('customerDataTableStatus');
-    if (statusEl) statusEl.textContent = '';
+    viewState.customerTableStatus = '';
 }
 
 export function findCustomerDataTableRow(barcode) {

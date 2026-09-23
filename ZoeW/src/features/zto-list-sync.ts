@@ -1,5 +1,6 @@
+import { viewState } from '../core/view-state';
 import { ztoListGroupModel } from '../app/components/zto/model';
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
@@ -58,15 +59,10 @@ export function ztoListSyncEnabled() {
 
 export function refreshZtoListSyncUi() {
     const on = ztoListSyncEnabled();
-    const state = byId('ztoListSyncState');
-    if (state) state.textContent = on ? 'បើក' : 'បិទ';
-    const drawerBtn = byId('ztoListSyncDrawerBtn');
-    if (drawerBtn) {
-        drawerBtn.classList.toggle('is-on', on);
-        drawerBtn.classList.toggle('hidden', !ztoFastModeIsOn());
-    }
-    const btn = byId('ztoListSyncBtn');
-    if (btn) btn.classList.toggle('hidden', !(on && ztoStatusFeatureConfig()));
+    viewState.ztoListSyncText = on ? 'បើក' : 'បិទ';
+    viewState.ztoListSyncOn = on;
+    viewState.ztoListSyncDrawerVisible = ztoFastModeIsOn();
+    viewState.ztoListSyncBtnVisible = !!(on && ztoStatusFeatureConfig());
 }
 
 export function drawerZtoListSyncFlow() {
@@ -266,18 +262,17 @@ export async function fetchZtoListPage(cfg, from, to, page) {
 }
 
 export function ztoListSyncRangeFromInputs() {
-    const fromEl = byId('ztoListSyncFrom');
-    const toEl = byId('ztoListSyncTo');
-    const from = fromEl && fromEl.value ? String(fromEl.value).trim() : '';
-    const to = toEl && toEl.value ? String(toEl.value).trim() : '';
+    const fromValue = fieldValue('ztoListSyncFrom');
+    const toValue = fieldValue('ztoListSyncTo');
+    const from = fromValue ? String(fromValue).trim() : '';
+    const to = toValue ? String(toValue).trim() : '';
     const shape = /^\d{4}-\d{2}-\d{2}$/;
     if (!shape.test(from) || !shape.test(to) || to < from) return null;
     return { from: from, to: to };
 }
 
 export function setZtoListSyncNote(text) {
-    const el = byId('ztoListSyncNote');
-    if (el) el.innerText = text;
+    viewState.ztoListSyncNote = text;
 }
 
 export function ztoListGroupHtml(title, rows, toneClass) {
@@ -553,11 +548,9 @@ export function openZtoListSyncModal() {
         if (!isPinFlowPending()) requestPinBeforeConfig(openZtoListSyncModal, 'ztoListSync');
         return;
     }
-    const fromEl = byId('ztoListSyncFrom');
-    const toEl = byId('ztoListSyncTo');
     const now = getServerNow();
-    if (fromEl && !fromEl.value) fromEl.value = getZoneDateKey(now, -(ZTO_LIST_DEFAULT_DAYS - 1));
-    if (toEl && !toEl.value) toEl.value = getZoneDateKey(now, 0);
+    if (!fieldValue('ztoListSyncFrom')) setFieldValue('ztoListSyncFrom', getZoneDateKey(now, -(ZTO_LIST_DEFAULT_DAYS - 1)));
+    if (!fieldValue('ztoListSyncTo')) setFieldValue('ztoListSyncTo', getZoneDateKey(now, 0));
     ztoState.ztoListSyncResult = null;
     ztoListSignedProbe.clear();
     renderZtoListSyncPreview();

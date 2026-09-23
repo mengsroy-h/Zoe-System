@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, focusField, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
 import { safeFocusScanner } from '../core/timezone';
 import { resumeInterruptedCleanups } from '../domain/cleanup';
@@ -42,15 +43,11 @@ export async function ensureAppActivated() {
         closeModal('activationModal');
         return true;
     }
-    const msgEl = byId('activationModalMsg');
-    if (msgEl) {
-        msgEl.textContent = (status.state === 'offline-grace-exceeded')
-            ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
-            : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
-    }
+    viewState.activationMessage = (status.state === 'offline-grace-exceeded')
+        ? 'Key នេះនៅមានសុពលភាព ប៉ុន្តែត្រូវការភ្ជាប់អ៊ីនធឺណិតម្តងទៀត ដើម្បីផ្ទៀងផ្ទាត់។'
+        : (status.reason ? licenseFailureMessage(status.reason) : 'សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។');
     openModalHelper('activationModal');
-    const keyInput = byId('activationKeyInput');
-    if (keyInput) keyInput.focus();
+    focusField('activationKeyInput');
     return false;
 }
 
@@ -66,23 +63,20 @@ export function runPeriodicLicenseCheck() {
 }
 
 export async function submitActivationKey() {
-    const btn = byId('activationSubmitBtn');
-    if (btn && btn.disabled) return;
+    if (viewState.activationBusy) return;
     const sessionIsCurrent = captureAuthDatabaseGuard();
-    const originalBtnText = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'កំពុងផ្ទៀងផ្ទាត់...'; }
+    viewState.activationBusy = true;
     try {
-        const input = byId('activationKeyInput');
-        const keyStr = input ? input.value.trim() : '';
+        const keyStr = fieldValue('activationKeyInput').trim();
         if (!keyStr) { showToast('⚠️ សូមបញ្ចូល Activation Key!'); return; }
         const result = await withTimeout(ZoeLicense.activate(keyStr, LICENSE_APP_CODE), 30000, 'Activation timed out');
         if (!sessionIsCurrent()) return;
         if (!result.valid) {
-            if (input) input.value = '';
+            setFieldValue('activationKeyInput', '');
             showToast(licenseFailureMessage(result.reason));
             return;
         }
-        if (input) input.value = '';
+        setFieldValue('activationKeyInput', '');
         const activated = await withTimeout(ensureAppActivated(), 20000, 'Activation timed out');
         if (!sessionIsCurrent()) return;
         if (activated) {
@@ -102,7 +96,7 @@ export async function submitActivationKey() {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'submitActivationKey' });
         showToast('❌ កំហុសមិនរំពឹងទុក: ' + (e && e.message ? e.message : String(e)));
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalBtnText; }
+        viewState.activationBusy = false;
     }
 }
 

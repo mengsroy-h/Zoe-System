@@ -1,4 +1,8 @@
-import { onAct } from '../../actions';
+import { Modal } from './Modal';
+import { viewState } from '../../../core/view-state';
+import { act, onAct } from '../../actions';
+import { useStoreFields } from '../../hooks/useStore';
+import { refTo, refWithNative } from '../../refs';
 import { SiConfigSummary } from '../sheet/SheetImportParts';
 import { SiConfigMsg } from '../sheet/SheetImportParts';
 import { SiFileMsg } from '../sheet/SheetImportParts';
@@ -13,9 +17,16 @@ import { SiPreviewBody } from '../sheet/SheetImportParts';
 import { SiActionMsg } from '../sheet/SheetImportParts';
 import { SiClearMsg } from '../sheet/SheetImportParts';
 
+/** ⛔ `change` native (ពេលវាយចប់) ដូចដើម — មិនមែន `input` រាល់តួអក្សរ (ហៅ API) */
+const headerRowRef = refWithNative('siHeaderRowInput', 'change', () => act('applySheetImportHeaderRow'));
+
 export function SheetImportModal() {
+    const v = useStoreFields(viewState, ['siParts', 'siStatusFoot', 'siConfigSaving', 'siImportBtnDisabled', 'siImportBtnText',
+        'siClearBtnBusy', 'siDropHot']);
+    /** class ដើម + `hidden` ពេលផ្នែកមិនបង្ហាញ */
+    const part = (base: string, id: string) => (v.siParts[id] ? base : (base ? base + ' hidden' : 'hidden'));
     return (
-        <div id="sheetImportModal" className="modal" data-close="closeSheetImportModal">
+        <Modal id="sheetImportModal" close="closeSheetImportModal">
             <div className="modal-content si-modal-content">
                 <h3>📥 នាំចូល Excel ទៅ Sheet</h3>
                 <p>អាន .xlsx · .xls · .csv ពីឧបករណ៍ រួចសរសេរចូល Google Sheet ដដែលដែល «API ស្វែងរកអតិថិជន» ទាញយក។</p>
@@ -25,50 +36,53 @@ export function SheetImportModal() {
                             <span className="si-step">1</span>
                             {' '}ការតភ្ជាប់
                         </h4>
-                        <div id="siConfigSummary" className="si-summary hidden">
+                        <div id="siConfigSummary" className={part('si-summary', 'siConfigSummary')}>
                             <SiConfigSummary />
                         </div>
-                        <div id="siConfigForm">
+                        <div id="siConfigForm" className={v.siParts.siConfigForm ? undefined : 'hidden'}>
                             <label className="si-label" htmlFor="siApiUrlInput">Web app URL របស់ Apps Script</label>
                             <input
                                 type="url"
                                 id="siApiUrlInput"
+                                ref={refTo('siApiUrlInput')}
                                 placeholder="https://script.google.com/macros/s/.../exec"
                                 autoComplete="off"
                                 spellCheck="false"
                             />
                             <label className="si-label" htmlFor="siApiPasswordInput">ពាក្យសម្ងាត់នាំចូល (IMPORT_PASSWORD)</label>
-                            <input type="password" id="siApiPasswordInput" autoComplete="off" />
+                            <input type="password" id="siApiPasswordInput" ref={refTo('siApiPasswordInput')} autoComplete="off" />
                             <div className="modal-btns">
                                 <button
                                     type="button"
                                     className="btn-confirm"
                                     id="siConfigSaveBtn"
+                                    disabled={v.siConfigSaving}
                                     onClick={onAct("saveSheetImportConfig")}
                                 >
                                     សាកល្បង និងរក្សាទុក
                                 </button>
                             </div>
                         </div>
-                        <div className="modal-btns hidden" id="siConfigEditRow">
+                        <div className={part('modal-btns', 'siConfigEditRow')} id="siConfigEditRow">
                             <button type="button" className="btn-cancel" onClick={onAct("editSheetImportConfig")}>កែការតភ្ជាប់</button>
                         </div>
                         <div id="siConfigMsg" className="si-msg-host">
                             <SiConfigMsg />
                         </div>
                     </section>
-                    <section className="si-card hidden" id="siFileCard">
+                    <section className={part('si-card', 'siFileCard')} id="siFileCard">
                         <h4 className="si-card-title">
                             <span className="si-step">2</span>
                             {' '}ជ្រើសឯកសារ
                         </h4>
-                        <button type="button" className="si-drop" id="siDrop" onClick={onAct("pickSheetImportFile")}>
+                        <button type="button" className={v.siDropHot ? 'si-drop si-drop-hot' : 'si-drop'} id="siDrop" ref={refTo('siDrop')} onClick={onAct("pickSheetImportFile")}>
                             <strong>ចុចដើម្បីជ្រើសឯកសារ</strong>
                             <span>ឬទម្លាក់ឯកសារនៅទីនេះ — .xlsx · .xls · .csv</span>
                         </button>
                         <input
                             type="file"
                             id="siFileInput"
+                            ref={refTo('siFileInput')}
                             className="hidden"
                             accept=".xlsx,.xls,.csv,.tsv"
                             onChange={onAct("handleSheetImportFileInput", { self: true })}
@@ -77,7 +91,7 @@ export function SheetImportModal() {
                             <SiFileMsg />
                         </div>
                     </section>
-                    <section className="si-card hidden" id="siMapCard">
+                    <section className={part('si-card', 'siMapCard')} id="siMapCard">
                         <h4 className="si-card-title">
                             <span className="si-step">3</span>
                             {' '}ការផ្គូផ្គង Column
@@ -92,9 +106,9 @@ export function SheetImportModal() {
                                 <input
                                     type="number"
                                     id="siHeaderRowInput"
+                                    ref={headerRowRef}
                                     min={1}
-                                    value="1"
-                                    onChange={onAct("applySheetImportHeaderRow")}
+                                    defaultValue="1"
                                 />
                             </div>
                             <div className="si-field">
@@ -120,7 +134,7 @@ export function SheetImportModal() {
                         <div className="si-chips" id="siChips">
                             <SiChips />
                         </div>
-                        <div className="table-responsive si-preview hidden" id="siPreviewWrap">
+                        <div className={part('table-responsive si-preview', 'siPreviewWrap')} id="siPreviewWrap">
                             <table>
                                 <thead>
                                     <tr>
@@ -136,20 +150,20 @@ export function SheetImportModal() {
                             </table>
                         </div>
                     </section>
-                    <section className="si-card hidden" id="siActionCard">
+                    <section className={part('si-card', 'siActionCard')} id="siActionCard">
                         <h4 className="si-card-title">
                             <span className="si-step">4</span>
                             {' '}នាំចូល
                         </h4>
                         <label className="si-label" htmlFor="siModeSel">របៀបនាំចូល</label>
-                        <select id="siModeSel">
+                        <select id="siModeSel" ref={refTo('siModeSel')}>
                             <option value="replace">សម្អាតទិន្នន័យចាស់ រួចដាក់ថ្មីជំនួស (សម្រាប់ប្រើប្រចាំថ្ងៃ)</option>
                             <option value="upsert">បន្ថែមថ្មី + កែអ្វីដែលប្រែ</option>
                             <option value="newOnly">បន្ថែមតែ Barcode ថ្មី — មិនប៉ះជួរចាស់</option>
                         </select>
                         <div className="modal-btns">
                             <div className="modal-btns-row">
-                                <button type="button" className="btn-confirm" id="siImportBtn" onClick={onAct("runSheetImport")}>នាំចូលទៅ Sheet</button>
+                                <button type="button" className="btn-confirm" id="siImportBtn" disabled={v.siImportBtnDisabled} onClick={onAct("runSheetImport")}>{v.siImportBtnText}</button>
                                 <button type="button" className="btn-cancel" onClick={onAct("resetSheetImportFileSelection")}>ជ្រើសឯកសារផ្សេង</button>
                             </div>
                         </div>
@@ -157,7 +171,7 @@ export function SheetImportModal() {
                             <SiActionMsg />
                         </div>
                     </section>
-                    <section className="si-card si-card-danger hidden" id="siClearCard">
+                    <section className={part('si-card si-card-danger', 'siClearCard')} id="siClearCard">
                         <h4 className="si-card-title">
                             <span className="si-step si-step-warn">🗑️</span>
                             {' '}សម្អាតទិន្នន័យចាស់
@@ -172,21 +186,22 @@ export function SheetImportModal() {
                                 type="button"
                                 className="si-btn-danger"
                                 id="siClearBtn"
+                                disabled={v.siClearBtnBusy}
                                 onClick={onAct("runSheetImportClear")}
                             >
-                                សម្អាតទិន្នន័យក្នុង Sheet
+                                {v.siClearBtnBusy ? 'កំពុងសម្អាត...' : 'សម្អាតទិន្នន័យក្នុង Sheet'}
                             </button>
                         </div>
                         <div id="siClearMsg" className="si-msg-host">
                             <SiClearMsg />
                         </div>
                     </section>
-                    <p className="si-foot" id="siStatusFoot"></p>
+                    <p className="si-foot" id="siStatusFoot">{v.siStatusFoot}</p>
                 </div>
                 <div className="modal-btns">
                     <button type="button" className="btn-cancel" onClick={onAct("closeSheetImportModal")}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

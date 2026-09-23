@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, firebaseState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { armLateWrite, dbOp, dbOpStalled } from '../services/network';
@@ -7,8 +7,7 @@ import { closeModal, openModalHelper } from '../ui/modal';
 import { showToast } from '../ui/toast';
 
 export function openExchangeRateModal() {
-    const rateInput = byId('exchangeRateInput');
-    if(rateInput) rateInput.value = dataState.exchangeRateRiel;
+    setFieldValue('exchangeRateInput', String(dataState.exchangeRateRiel));
     openModalHelper('exchangeRateModal');
 }
 
@@ -23,8 +22,7 @@ export function captureAuthDatabaseGuard() {
 export async function saveExchangeRate() {
     if (dataState.exchangeRateSaveInFlight) return 'pending';
     const sessionIsCurrent = captureAuthDatabaseGuard();
-    const rateInput = byId('exchangeRateInput');
-    let val = rateInput ? (parseFloat(rateInput.value) || 4100) : 4100;
+    let val = parseFloat(fieldValue('exchangeRateInput')) || 4100;
     if (val <= 0) val = 4100;
 
     const previousRate = dataState.exchangeRateRiel;

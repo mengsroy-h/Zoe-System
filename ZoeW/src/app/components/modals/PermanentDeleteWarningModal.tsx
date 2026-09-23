@@ -1,12 +1,12 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function PermanentDeleteWarningModal() {
     return (
-        <div
+        <Modal
             id="permanentDeleteWarningModal"
-            className="modal"
             style={{ zIndex: "1060" }}
-            data-close="cancelPermanentDelete"
+            close="cancelPermanentDelete"
         >
             <div className="modal-content">
                 <h3 style={{ color: "#ef4444" }}>🗑️ លុបជាអចិន្ត្រៃយ៍</h3>
@@ -28,6 +28,6 @@ export function PermanentDeleteWarningModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

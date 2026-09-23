@@ -247,6 +247,8 @@ export interface UiState {
     phoneSuggestItems: any[];
     phoneSuggestActiveIndex: number;
     phoneSuggestHideTimer: any;
+    /** `#phoneSuggestBox.show` */
+    phoneSuggestOpen: boolean;
     deletedSearchQuery: string;
     activeLocker: any;
     entryScanMode: any;
@@ -280,6 +282,10 @@ export interface UiState {
     lockerGridView: any | null;
     /** មាតិកាម៉ឺនុយ (...) ➜ `MoreMenuContent` គូរ */
     moreMenuItems: any[] | null;
+    /** ម៉ឺនុយ (...) បើក (`#globalMoreMenu.show`) */
+    moreMenuOpen: boolean;
+    /** `style.top/left` របស់ម៉ឺនុយ (`null` = មិនដែលបើក) */
+    moreMenuPosition: { top: number; left: number } | null;
     /** ខែដែលអាចជ្រើស ➜ `MonthlyReportMonthSelect` គូរ */
     monthlyReportMonths: string[];
     /** ទីតាំងដែលអាចច្រោះ ➜ `LockerListFilterSelect` គូរ */
@@ -294,6 +300,21 @@ export interface UiState {
     updateBannerOpen: boolean;
     /** ស្ថានភាពប្រអប់នាំចូល Excel ➜ `SheetImport*` គូរ */
     sheetImportView: any | null;
+    /** `display` របស់ប្រអប់នីមួយៗ ➜ `<Modal>` គូរ (មើល `core/modals.ts`) */
+    modalDisplay: Record<string, 'flex' | 'none'>;
+    /** របា Slide បើក ➜ `SideDrawer` · `DrawerBackdrop` គូរ */
+    drawerOpen: boolean;
+    /* ⛔ តំបន់ហាមចូល (PTR · ចលនាផ្ទាំង) — class ដែលកាយវិការប្តូរ ➜ JSX គូរ */
+    /** `#dataSideSection.collapsed` */
+    dataPanelCollapsed: boolean;
+    /** `#entrySideSection.collapsed` */
+    entryPanelCollapsed: boolean;
+    /** `#dataSideSection.search-focus` (ប្រអប់ស្វែងរកទាញឡើង) */
+    dataPanelSearchFocus: boolean;
+    /** `#appPages.history-expanded` */
+    historyExpanded: boolean;
+    /** `#appPages.panel-gliding` (ផ្អាក scroll-snap អំឡុងចលនា) */
+    panelGliding: boolean;
 }
 
 export const uiState = createStore<UiState>('uiState', {
@@ -324,6 +345,7 @@ export const uiState = createStore<UiState>('uiState', {
     phoneSuggestItems: [],
     phoneSuggestActiveIndex: -1,
     phoneSuggestHideTimer: null,
+    phoneSuggestOpen: false,
     deletedSearchQuery: '',
     activeLocker: safeStoreGet(appLocalStore, ACTIVE_LOCKER_KEY) || '',
     entryScanMode: safeStoreGet(appLocalStore, ENTRY_SCAN_MODE_KEY) === 'locker' ? 'locker' : 'parcel',
@@ -345,6 +367,8 @@ export const uiState = createStore<UiState>('uiState', {
     viewListView: null,
     lockerGridView: null,
     moreMenuItems: null,
+    moreMenuOpen: false,
+    moreMenuPosition: null,
     monthlyReportMonths: [],
     lockerFilterOptions: [],
     lockerFilterValue: '',
@@ -352,6 +376,13 @@ export const uiState = createStore<UiState>('uiState', {
     toasts: [],
     updateBannerOpen: false,
     sheetImportView: null,
+    modalDisplay: {},
+    drawerOpen: false,
+    dataPanelCollapsed: false,
+    entryPanelCollapsed: false,
+    dataPanelSearchFocus: false,
+    historyExpanded: false,
+    panelGliding: false,
 });
 registerStore(uiState);
 

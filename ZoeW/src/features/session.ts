@@ -1,5 +1,7 @@
-import { resetReactOwned } from '../app/slot-resets';
-import { byId } from '../core/dom';
+import { blankElementById } from '../app/slot-resets';
+import { MODAL_IDS } from '../core/modals';
+import { fieldValue, setFieldChecked, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow, pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -9,7 +11,8 @@ import { isPinFlowPending } from './config';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { expandedTrashGroups } from './locker';
-import { hidePhoneSuggestions, setPhoneSearchPulledUp } from './phone-suggest';
+import { hidePhoneSuggestions } from './phone-suggest';
+import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
 import { clearSheetImportSession } from './sheet-import';
 import { ztoListSignedProbe } from './zto-list-sync';
 import { clearZtoPickupStatusStore } from './zto-status';
@@ -17,7 +20,7 @@ import { DB_OP_TIMEOUT_MS, withTimeout } from '../services/network';
 import { resetScanConfirm } from '../services/scan-engine';
 import { showAppChrome } from '../ui/chrome-autohide';
 import { closeModal, openModalHelper } from '../ui/modal';
-import { endPanelGlideSnapPause } from '../ui/panel-motion';
+import { endPanelGlideSnapPause } from '../app/behaviors/panel-motion';
 import { reannounceOrShowToast, refreshLiveToasts } from '../ui/toast';
 
 export const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
@@ -94,13 +97,10 @@ export function clearSensitiveModalFields() {
     hidePhoneSuggestions();
     setPhoneSearchPulledUp(false);
     clearZtoPickupStatusStore();
-    const ztoSyncBannerEl = byId('ztoSyncBanner');
-    if (ztoSyncBannerEl) ztoSyncBannerEl.classList.add('hidden');
     ztoState.ztoBannerView = null;
     ztoState.ztoSyncListView = null;
     ztoState.ztoStatusModalSig = '';
-    const ztoSyncNoteEl = byId('ztoSyncModalNote');
-    if (ztoSyncNoteEl) ztoSyncNoteEl.innerText = '';
+    viewState.ztoSyncModalNote = '';
     closeModal('ztoSyncModal');
     ztoState.ztoListPreview = null;
     ztoState.ztoListSyncResult = null;
@@ -161,38 +161,13 @@ export function clearSensitiveModalFields() {
         'ztoListSyncBody', 'ztoListSyncNote', 'ztoListSyncFrom', 'ztoListSyncTo'
     ];
     fieldsToBlank.forEach((id) => {
-        if (resetReactOwned(id)) return;
-        const el = byId(id);
-        if (!el) return;
-        if ('value' in el) el.value = '';
-        else el.textContent = '';
+        blankElementById(id);
     });
     uiState.lockerFilterOptions = [];
     uiState.lockerFilterValue = '';
     uiState.monthlyReportMonths = [];
-    const parcelBtn = byId('modeParcelBtn');
-    const lockerBtn = byId('modeLockerBtn');
-    const removeBtn = byId('modeRemoveBtn');
-    if (parcelBtn) parcelBtn.classList.add('active');
-    if (lockerBtn) lockerBtn.classList.remove('active');
-    if (removeBtn) removeBtn.classList.remove('active');
-    if (parcelBtn) parcelBtn.setAttribute('aria-pressed', 'true');
-    if (lockerBtn) lockerBtn.setAttribute('aria-pressed', 'false');
-    if (removeBtn) removeBtn.setAttribute('aria-pressed', 'false');
-    const entryPage = byId('pageEntry');
-    if (entryPage) entryPage.classList.remove('remove-scan-active');
-    const removeBanner = byId('removeScanBanner');
-    if (removeBanner) removeBanner.classList.add('hidden');
-    const lockerPanel = byId('lockerPanel');
-    if (lockerPanel) lockerPanel.classList.add('hidden');
-    const parcelPanel = byId('parcelPanel');
-    if (parcelPanel) parcelPanel.classList.remove('hidden');
-    const hwInput = byId('hwScannerInput');
-    if (hwInput) hwInput.placeholder = 'ស្កេន Barcode...';
-    const hwLabel = byId('hardwareScannerLabel');
-    if (hwLabel) hwLabel.textContent = 'ស្កេន Barcode (Bluetooth/USB) ឬវាយបញ្ចូលដោយដៃ';
-    const removeDetail = byId('removeScanBannerDetail');
-    if (removeDetail) removeDetail.textContent = 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
+    viewState.entryModeShown = 'parcel';
+    viewState.removeScanDetail = 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
     uiState.monthlyReportMonth = '';
 }
 
@@ -200,15 +175,13 @@ export function showLoginModalWithPrefill() {
     clearSensitiveModalFields();
     refreshLiveToasts();
     closeConfigQrScanner();
-    document.querySelectorAll('.modal').forEach((m) => {
-        if (m.id !== 'loginModal') closeModal(m.id);
+    MODAL_IDS.forEach((id) => {
+        if (id !== 'loginModal') closeModal(id);
     });
     openModalHelper('loginModal');
     const savedEmail = safeStoreGet(appLocalStore, 'remembered_email');
-    const emailInput = byId('loginEmailInput');
-    const rememberCb = byId('rememberMeCheckbox');
-    if (savedEmail && emailInput) {
-        emailInput.value = savedEmail;
-        if (rememberCb) rememberCb.checked = true;
+    if (savedEmail) {
+        setFieldValue('loginEmailInput', savedEmail);
+        setFieldChecked('rememberMeCheckbox', true);
     }
 }

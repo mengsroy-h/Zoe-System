@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { STATS_COLLECTED_VIEW_KEYS, STATS_DAILY_VIEW_KEYS } from '../core/text';
 import { getFormattedDate } from '../core/timezone';
@@ -21,32 +22,22 @@ export function isMonthKeyRetained(ymKey) {
 }
 
 export function openManualAdjustModal() {
-    const manualDateInput = byId('manualDateInput');
-    if(manualDateInput) manualDateInput.value = getFormattedDate();
-    const codChangeIn = byId('manualCodChangeInput');
-    if(codChangeIn) codChangeIn.value = '';
-    const dodChangeIn = byId('manualDodChangeInput');
-    if(dodChangeIn) dodChangeIn.value = '';
-    const countChangeIn = byId('manualCountChangeInput');
-    if(countChangeIn) countChangeIn.value = '';
-    const submitBtn = byId('manualAdjustSubmitBtn');
-    if(submitBtn) submitBtn.disabled = false;
+    setFieldValue('manualDateInput', getFormattedDate());
+    setFieldValue('manualCodChangeInput', '');
+    setFieldValue('manualDodChangeInput', '');
+    setFieldValue('manualCountChangeInput', '');
+    viewState.manualAdjustBusy = false;
     openModalHelper('manualAdjustModal');
 }
 
 export function submitManualAdjustment() {
-    const submitBtn = byId('manualAdjustSubmitBtn');
-    if (submitBtn && submitBtn.disabled) return;
+    if (viewState.manualAdjustBusy) return;
 
-    const dateInputEl = byId('manualDateInput');
-    const codChangeEl = byId('manualCodChangeInput');
-    const dodChangeEl = byId('manualDodChangeInput');
-    const countChangeEl = byId('manualCountChangeInput');
 
-    let dateVal = sanitizeInput(dateInputEl ? dateInputEl.value.trim() : '');
-    let codChange = codChangeEl ? (parseFloat(codChangeEl.value) || 0) : 0;
-    let dodChange = dodChangeEl ? (parseFloat(dodChangeEl.value) || 0) : 0;
-    let countChange = countChangeEl ? (parseInt(countChangeEl.value) || 0) : 0;
+    let dateVal = sanitizeInput(fieldValue('manualDateInput').trim());
+    let codChange = parseFloat(fieldValue('manualCodChangeInput')) || 0;
+    let dodChange = parseFloat(fieldValue('manualDodChangeInput')) || 0;
+    let countChange = parseInt(fieldValue('manualCountChangeInput')) || 0;
 
     if (!codChange && !dodChange && !countChange) {
         alert("សូមបញ្ចូលយ៉ាងហោចណាស់ការកែប្រែ COD, DOD ឬចំនួនកញ្ចប់មួយ!");
@@ -72,7 +63,7 @@ export function submitManualAdjustment() {
         }
     }
 
-    if (submitBtn) submitBtn.disabled = true;
+    viewState.manualAdjustBusy = true;
     const manualRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateVal, codChange, dodChange, countChange);
     correctRevenueLedgerToActual(dateVal, manualRevenueApplied, codChange, dodChange, countChange).then((status) => {
         if (status && status.ok) {
@@ -93,8 +84,6 @@ export function submitManualAdjustment() {
 }
 
 export function openDailyStatsModal() {
-    const container = byId('dailyStatsContainer');
-    if(!container) return;
 
     let sortedKeys = Object.keys(dataState.dailyRevenueData).sort().reverse();
     const uncollectedMap = uncollectedValueByDate();
@@ -121,8 +110,6 @@ export function openDailyStatsModal() {
 }
 
 export function openCollectedStatsModal() {
-    const container = byId('collectedStatsContainer');
-    if (!container) return;
 
     const days = Object.keys(dataState.dailyCollectedData || {})
         .filter((day) => DAILY_COLLECTED_DAY_PATTERN.test(day))

@@ -1,23 +1,21 @@
 import { uiState } from '../../../core/state';
-import { useStore } from '../../hooks/useStore';
+import { onAct } from '../../actions';
+import { useStoreValue } from '../../hooks/useStore';
 
 export interface MoreMenuItem { label: string; action: string; args?: string[]; cls?: string }
 
 /**
  * មាតិកាម៉ឺនុយ (...) ។
  *
- * ⛔ ប៊ូតុងទាំងនេះកាន់ `data-act` / `data-a1` ហើយ **គ្មាន `onClick`** ៖
- *    `setupActionDelegation()` នៅតែស្តាប់នៅកម្រិត `document` (ការគូរ
- *    ដែលជាខ្សែអក្សរ HTML ដូច `history-row.ts` នៅពឹងលើវា) ➜ ការចង
- *    handler ទី ២ លើធាតុដដែល នឹងធ្វើឲ្យសកម្មភាព **រត់ពីរដង**
- *    (ច្បាប់ ៤ នៃ «CSP និង `data-act`» — ធ្ងន់បំផុតលើការលុប)។
- *
- * ⛔ វាក៏ជាភាពស្មោះត្រង់នៃ DOM ដែរ ៖ ម៉ឺនុយដើមមាន attribute ទាំងនោះ ➜
- *    ការដកវាចេញ ធ្វើឲ្យអ្វីដែលពឹងលើវា (ឧបករណ៍វាស់ · តេស្ត) ខូច។
+ * ⛔ ការចុចឆ្លងកាត់ `onClick` របស់ React (ព្រំដែន `ACTION_REGISTRY` ដូចប៊ូតុង
+ *    ដទៃ) ➜ **គ្មាន** listener ទី ២ នៅកម្រិត `document` ទៀតទេ (ច្បាប់ ៤ នៃ
+ *    «CSP និង `data-act`» ៖ សកម្មភាពមិនត្រូវរត់ពីរដង)។
+ * ⛔ `data-act` / `data-a1` / `data-a2` នៅជា attribute **ពណ៌នា** សុទ្ធ ៖ DOM ដូច
+ *    ម៉ឺនុយដើមបេះបិទ (ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វី
+ *    ស្តាប់វាទេ។
  */
 export function MoreMenuContent() {
-    useStore(uiState);
-    const items = uiState.moreMenuItems as MoreMenuItem[] | null;
+    const items = useStoreValue(uiState, (s) => s.moreMenuItems) as MoreMenuItem[] | null;
     if (!items) return null;
     return (
         <>
@@ -26,7 +24,8 @@ export function MoreMenuContent() {
                     className={it.cls || undefined}
                     data-act={it.action}
                     data-a1={it.args && it.args.length > 0 ? it.args[0] : undefined}
-                    data-a2={it.args && it.args.length > 1 ? it.args[1] : undefined}>{it.label}</button>
+                    data-a2={it.args && it.args.length > 1 ? it.args[1] : undefined}
+                    onClick={onAct(it.action, { args: it.args })}>{it.label}</button>
             ))}
         </>
     );

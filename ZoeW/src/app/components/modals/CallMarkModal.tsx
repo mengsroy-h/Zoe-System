@@ -1,13 +1,17 @@
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function CallMarkModal() {
+    const v = useStoreFields(viewState, ['callMarkPhoneText']);
     return (
-        <div id="callMarkModal" className="modal">
+        <Modal id="callMarkModal">
             <div className="modal-content">
                 <h3>📞 សម្គាល់ការខល</h3>
                 <p>
                     លេខទូរស័ព្ទ៖{' '}
-                    <strong id="callMarkPhoneText" style={{ color: "var(--primary)" }}></strong>
+                    <strong id="callMarkPhoneText" style={{ color: "var(--primary)" }}>{v.callMarkPhoneText}</strong>
                 </p>
                 <div className="modal-btns" style={{ marginTop: "6px" }}>
                     <button
@@ -32,6 +36,6 @@ export function CallMarkModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["callMarkModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

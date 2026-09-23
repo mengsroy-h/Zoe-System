@@ -1,7 +1,11 @@
 import { dataState, firebaseState, lookupState, scanState, securityState, sheetImportState, uiState, ztoState } from './core/state';
 import groups from './_generated-state.json';
+import { installAuditClassAdapter } from './audit-compat';
 
 /**
+ * ⛔ កាយវិការ · PTR · ចលនាផ្ទាំង រស់ក្នុង `src/app/behaviors` (ស្រទាប់ React តាម ref)
+ *    ➜ ពួកវាត្រូវបង្ហាញដែរ បើមិនដូច្នេះ checker តំបន់ហាមចូលរកមិនឃើញ
+ *    `window.measureAppChromeSize` · `window.panelGlideFrom` … ហើយ **SKIP** ជំនួសការវាស់។
  * ⛔ សម្រាប់តែ build វាស់ (`VITE_EXPOSE_GLOBALS=1`) — **មិនដែលចូលផលិតកម្ម**
  *    (`main.tsx` import វាតែក្នុងសាខាដែល Vite ជំនួសជា `false` ពេល build ធម្មតា)។
  *
@@ -12,7 +16,8 @@ import groups from './_generated-state.json';
  */
 export function exposeGlobals() {
     const modules = import.meta.glob(
-        ['./core/**/*.ts', './domain/**/*.ts', './features/**/*.ts', './services/**/*.ts', './ui/**/*.ts', './boot/**/*.ts'],
+        ['./core/**/*.ts', './domain/**/*.ts', './features/**/*.ts', './services/**/*.ts', './ui/**/*.ts', './platform/**/*.ts',
+            './app/behaviors/**/*.ts', './app/lifecycle/layers.ts', './app/refs.ts', './app/flush.ts', './app/media.ts'],
         { eager: true }
     );
     const w = window as any;
@@ -21,6 +26,7 @@ export function exposeGlobals() {
             if (!(key in w)) w[key] = value;
         }
     }
+    installAuditClassAdapter();
     const stores: Record<string, any> = { firebaseState, dataState, scanState, uiState, securityState, lookupState, sheetImportState, ztoState };
     for (const [store, fields] of Object.entries(groups as Record<string, { name: string }[]>)) {
         for (const f of fields) {

@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
 import { appLocalStore, safeStoreGet } from '../core/storage';
 import { BIOMETRIC_STORAGE_KEY } from '../core/storage-keys';
@@ -195,28 +195,19 @@ export async function biometricUnlockPin() {
     return await unwrapPinWithRawKey(rec.wrapped, b64ToBytes(rec.wrapKey));
 }
 
-export function setBiometricLabel(btn, busy) {
-    if (!btn) return;
-    const label = typeof btn.querySelector === 'function' ? btn.querySelector('.bio-label') : null;
-    if (label) label.textContent = busy ? 'កំពុងស្កេន...' : 'ស្កេនក្រយៅដៃ ឬមុខ';
-    else btn.textContent = busy ? 'កំពុងស្កេន...' : '🫆 ស្កេនក្រយៅដៃ ឬមុខ';
+export function setBiometricLabel(target, busy) {
+    if (target === 'pin') viewState.pinBiometricBusy = !!busy;
 }
 
 export function setBiometricBusy(busy) {
-    const btn = byId('pinBiometricBtn');
-    if (!btn) return;
-    btn.disabled = !!busy;
-    setBiometricLabel(btn, busy);
+    setBiometricLabel('pin', busy);
 }
 
 export function refreshBiometricUi() {
     const enabled = isBiometricEnabled();
-    const state = byId('biometricToggleState');
-    if (state) state.textContent = enabled ? 'បើក' : 'បិទ';
-    const toggle = byId('biometricToggleBtn');
-    if (toggle) toggle.classList.toggle('is-on', enabled);
-    const pinBtn = byId('pinBiometricBtn');
-    if (pinBtn) pinBtn.style.display = enabled ? '' : 'none';
+    viewState.biometricToggleText = enabled ? 'បើក' : 'បិទ';
+    viewState.biometricToggleOn = enabled;
+    viewState.pinBiometricVisible = enabled;
 }
 
 export async function runBiometricUnlock() {
@@ -302,8 +293,6 @@ export function toggleBiometricUnlock() {
 export async function initBiometricUi() {
     refreshBiometricUi();
     const supported = await biometricPlatformAvailable();
-    const toggle = byId('biometricToggleBtn');
-    if (toggle) toggle.classList.toggle('is-unsupported', !supported);
-    const state = byId('biometricToggleState');
-    if (state && !supported && !isBiometricEnabled()) state.textContent = 'មិនគាំទ្រ';
+    viewState.biometricUnsupported = !supported;
+    if (!supported && !isBiometricEnabled()) viewState.biometricToggleText = 'មិនគាំទ្រ';
 }

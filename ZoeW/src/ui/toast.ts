@@ -27,7 +27,6 @@ function removeToastItem(id) {
     uiState.toasts = next;
 }
 
-import { byId } from '../core/dom';
 import { firebaseState } from '../core/state';
 import { dbListenerPendingPaths } from '../core/text';
 import { SESSION_EXPIRED_TOAST, SESSION_SIGNED_OUT_TOAST } from '../features/session';

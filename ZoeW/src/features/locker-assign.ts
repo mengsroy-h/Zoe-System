@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
 import { firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_HISTORY, sanitizePhoneNumber } from '../core/text';
@@ -56,8 +56,7 @@ export function handleLockerScan(code) {
             const occWho = occPhoneRaw ? ` (${occPhoneRaw})` : '';
             msg += ` (ចំណាំ៖ ទីតាំង ${uiState.activeLocker} មានកញ្ចប់ "${occupant.code}"${occWho} ស្ថិតនៅរួចហើយ)`;
         }
-        const warnText = byId('locationWarningText');
-        if (warnText) warnText.innerText = msg;
+        viewState.locationWarningText = msg;
         openModalHelper('locationWarningModal');
         return;
     }

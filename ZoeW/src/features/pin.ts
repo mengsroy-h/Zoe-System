@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { securityState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { markAppUnlockedForSession, refreshAppLockUi } from './app-lock';
@@ -71,10 +72,8 @@ export const PIN_PROMPT_MESSAGES = {
 
 export function applyPinPromptText(promptKey) {
     const texts = PIN_PROMPT_MESSAGES[promptKey] || PIN_PROMPT_MESSAGES.config;
-    const verifyDesc = byId('pinModalDesc');
-    if (verifyDesc) verifyDesc.textContent = texts.verify;
-    const setupDesc = byId('pinSetupModalDesc');
-    if (setupDesc) setupDesc.textContent = texts.setup;
+    viewState.pinPromptVerifyText = texts.verify;
+    viewState.pinPromptSetupText = texts.setup;
 }
 
 export function requestPinBeforeConfig(targetAction, promptKey) {
@@ -84,8 +83,7 @@ export function requestPinBeforeConfig(targetAction, promptKey) {
     if (!savedPin) {
         openModalHelper('pinSetupModal');
     } else {
-        const pinIn = byId('securityPinInput');
-        if(pinIn) pinIn.value = '';
+        setFieldValue('securityPinInput', '');
         openModalHelper('pinModal');
         refreshBiometricUi();
         if (isBiometricEnabled()) runBiometricUnlock();
@@ -93,8 +91,7 @@ export function requestPinBeforeConfig(targetAction, promptKey) {
 }
 
 export async function saveNewSecurityPin() {
-    const newPinIn = byId('newSecurityPinInput');
-    let pinVal = newPinIn ? newPinIn.value.trim() : '';
+    let pinVal = fieldValue('newSecurityPinInput').trim();
     if (!pinVal) {
         alert("សូមបញ្ចូលលេខ PIN ឱ្យបានត្រឹមត្រូវ!");
         return;
@@ -112,7 +109,7 @@ export async function saveNewSecurityPin() {
         alert("មិនអាចកំណត់ PIN បានទេ! សូមប្រើ HTTPS ហើយសាកល្បងម្តងទៀត។");
         return;
     } finally {
-        if (newPinIn) newPinIn.value = '';
+        setFieldValue('newSecurityPinInput', '');
     }
     closeModal('pinSetupModal');
     clearBiometricRecord();
@@ -126,9 +123,8 @@ export async function saveNewSecurityPin() {
 export async function verifySecurityPin() {
     if (securityState.isVerifyingPin) return;
 
-    const pinIn = byId('securityPinInput');
-    let enteredPin = pinIn ? pinIn.value.trim() : '';
-    if (pinIn) pinIn.value = '';
+    let enteredPin = fieldValue('securityPinInput').trim();
+    setFieldValue('securityPinInput', '');
     let savedPin = safeStoreGet(appLocalStore, 'zoew_security_pin_hash');
 
     const lockoutUntil = parseInt(safeStoreGet(appLocalStore, 'zoew_pin_lockout_until') || '0');

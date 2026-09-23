@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { modalIsOpen } from '../core/modals';
+import { addPreconnectHint } from '../platform/document-io';
 import { lookupState, uiState } from '../core/state';
 import { runAutomaticCleanupRules } from '../domain/cleanup';
 import { AUTO_LOOKUP_FAIL_COOLDOWN_MS, AUTO_LOOKUP_TRANSIENT_COOLDOWN_MS } from '../features/auto-lookup';
@@ -15,15 +16,7 @@ export function preconnectToOrigin(rawUrl) {
         if (!rawUrl) return;
         const parsed = new URL(rawUrl);
         if (!/^https?:$/.test(parsed.protocol)) return;
-        const origin = parsed.origin;
-        const already = Array.from(document.querySelectorAll('link[rel="preconnect"], link[rel="dns-prefetch"]'))
-            .some((l: any) => l.href.replace(/\/$/, '') === origin);
-        if (already) return;
-        const preconnect = document.createElement('link');
-        preconnect.rel = 'preconnect';
-        preconnect.href = origin;
-        preconnect.crossOrigin = 'anonymous';
-        document.head.appendChild(preconnect);
+        addPreconnectHint(parsed.origin);
     } catch (e) {}
 }
 
@@ -36,15 +29,7 @@ export function preconnectToLookupHost() {
 export function preconnectToDatabaseHost(cfg) {
     try {
         if (!cfg || !cfg.databaseURL) return;
-        const dbOrigin = new URL(cfg.databaseURL).origin;
-        const already = Array.from(document.querySelectorAll('link[rel="preconnect"], link[rel="dns-prefetch"]'))
-            .some((l: any) => l.href.replace(/\/$/, '') === dbOrigin);
-        if (already) return;
-        const preconnect = document.createElement('link');
-        preconnect.rel = 'preconnect';
-        preconnect.href = dbOrigin;
-        preconnect.crossOrigin = 'anonymous';
-        document.head.appendChild(preconnect);
+        addPreconnectHint(new URL(cfg.databaseURL).origin);
     } catch (e) {}
 }
 
@@ -157,8 +142,7 @@ export function notifyIfSlow(promise, ms, message) {
 }
 
 export function viewListModalShowing(itemId) {
-    const modalEl = byId('viewListModal');
-    return !!(modalEl && modalEl.style && modalEl.style.display === 'flex' && uiState.activeParentItemId === itemId);
+    return modalIsOpen('viewListModal') && uiState.activeParentItemId === itemId;
 }
 
 export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promise<any> {

@@ -1,18 +1,24 @@
+import { Modal } from './Modal';
+import { viewState } from '../../../core/view-state';
 import { onAct } from '../../actions';
+import { useStoreFields } from '../../hooks/useStore';
+import { refTo } from '../../refs';
 
 export function ActivationModal() {
+    const v = useStoreFields(viewState, ['activationMessage', 'activationBusy']);
     return (
-        <div id="activationModal" className="modal" style={{ display: "none" }} data-nodismiss="true">
+        <Modal id="activationModal" style={{ display: "none" }} noDismiss>
             <div className="modal-content">
                 <h3>🔑 ត្រូវការ Activation Key</h3>
-                <p id="activationModalMsg">សូមបញ្ចូល Activation Key សម្រាប់ ZoeW ដើម្បីបន្ត។</p>
+                <p id="activationModalMsg">{v.activationMessage}</p>
                 <textarea
                     id="activationKeyInput"
+                    ref={refTo('activationKeyInput')}
                     placeholder="ZOEKEY-..."
                     style={{ minHeight: "70px", fontFamily: "monospace", fontSize: "calc(11 * var(--fs-unit))" }}
                 ></textarea>
                 <div className="modal-btns">
-                    <button className="btn-confirm" id="activationSubmitBtn" onClick={onAct("submitActivationKey")}>ដាក់ Active</button>
+                    <button className="btn-confirm" id="activationSubmitBtn" disabled={v.activationBusy} onClick={onAct("submitActivationKey")}>{v.activationBusy ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'ដាក់ Active'}</button>
                     <button className="btn-cancel" id="activationLogoutBtn" onClick={onAct("logoutApp")}>ចាកចេញ</button>
                 </div>
                 <p
@@ -30,6 +36,6 @@ export function ActivationModal() {
                     {' '}តាម Telegram
                 </p>
             </div>
-        </div>
+        </Modal>
     );
 }

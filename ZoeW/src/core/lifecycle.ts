@@ -1,3 +1,5 @@
+import { documentLoadComplete } from '../platform/document-io';
+
 /**
  * ⛔ `app.js` ដើមផ្ទុកជា `<script>` នៅចុង `<body>` ➜ វាតែងតែឈរ **មុន**
  * ព្រឹត្តិការណ៍ `load`។ ក្នុង React ការចាប់ផ្តើមអាចកើតឡើង *ក្រោយ* `load`
@@ -8,7 +10,7 @@
  * ➜ រត់ភ្លាម; មិនទាន់ ➜ ចាំដដែល។
  */
 export function runOnWindowLoad(fn: () => void): void {
-    if (document.readyState === 'complete') {
+    if (documentLoadComplete()) {
         fn();
         return;
     }

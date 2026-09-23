@@ -1,16 +1,19 @@
+import { viewState } from '../../../core/view-state';
+import { useStoreFields } from '../../hooks/useStore';
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 
 export function LocationWarningModal() {
+    const v = useStoreFields(viewState, ['locationWarningText']);
     return (
-        <div
+        <Modal
             id="locationWarningModal"
-            className="modal"
             style={{ zIndex: "1065" }}
-            data-close="cancelLocationChange"
+            close="cancelLocationChange"
         >
             <div className="modal-content">
                 <h3 style={{ color: "var(--warning)" }}>⚠️ កញ្ចប់នេះមានទីតាំងស្រាប់</h3>
-                <p id="locationWarningText"></p>
+                <p id="locationWarningText">{v.locationWarningText}</p>
                 <div className="modal-btns" style={{ marginTop: "10px" }}>
                     <div className="modal-btns-row">
                         <button
@@ -24,6 +27,6 @@ export function LocationWarningModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

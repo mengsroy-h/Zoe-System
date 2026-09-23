@@ -1,12 +1,16 @@
 import { dataState, lookupState, uiState, ztoState } from '../core/state';
+import { viewState, type ScanRemoveTextId } from '../core/view-state';
 import { emptySheetImportView } from './components/sheet/model';
+import { REF_NAMES, setFieldValue, type RefName } from './refs';
 
 /**
- * ⛔ ឯកសារនេះ **ផលិតដោយ `tools/html-to-jsx.cjs`** — កុំកែដោយដៃ។
+ * ការសម្អាតធាតុតាម **id** (`clearSensitiveModalFields()` ៖ បញ្ជី `fieldsToBlank`)
+ * ត្រូវឆ្លងកាត់ **state/ref** មិនមែន DOM ៖ `el.textContent = ''` ដកកូនរបស់ React
+ * ពីក្រោមវា ➜ ការគូរបន្ទាប់ធ្លាក់ (`removeChild`) ➜ App ស ហើយទិន្នន័យអតិថិជន
+ * ដែលនៅក្នុង store ត្រឡប់មកវិញ។
  *
- * ធាតុដែល React ជាម្ចាស់ ត្រូវសម្អាតតាម **store** មិនមែនតាម DOM ៖
- * `el.textContent = ''` ដកកូនរបស់ React ពីក្រោមវា ➜ ការគូរបន្ទាប់ធ្លាក់
- * (`removeChild`) ➜ App ស ហើយទិន្នន័យអតិថិជនដែលនៅក្នុង store ត្រឡប់មកវិញ។
+ * ⛔ id ថ្មីក្នុង `fieldsToBlank` ត្រូវមានផ្លូវមួយខាងក្រោម (list · input · អត្ថបទ)
+ *    បើអត់ `blankElementById()` ត្រឡប់ `false` ➜ `npm test` ធ្លាក់។
  */
 export const REACT_OWNED_IDS: readonly string[] = ["historyTableBody","entryListTableBody","lockerListTableBody","trashSummaryBox","deletedTableBody","monthlyReportBody","dailyStatsContainer","collectedStatsContainer","customerDataTableBody","healthCheckList","barcodeListContainer","lockerGrid","menuContentContainer","phoneSuggestBox","recentPhonesList","ztoSyncBanner","ztoSyncList","ztoListSyncBody","pdfExportPrintArea","toastContainer","siConfigSummary","siConfigMsg","siFileMsg","siMapMsg","siActionMsg","siClearMsg","siChips","siPreviewBody","monthlyReportMonthSel","lockerListFilter","siSheetSel","siMapBarcode","siMapDod","siMapCod","siMapPhone"];
 
@@ -26,7 +30,42 @@ function sheetMapClear(id: string) {
     sheetPatch({ mapping: mapping });
 }
 
-/** សម្អាតធាតុតាម store បើ React ជាម្ចាស់វា ➜ `true`; បើមិនមែន ➜ `false` (អ្នកហៅសម្អាត DOM ខ្លួនឯង) */
+/** អត្ថបទសុទ្ធដែល JSX អានពី `viewState` (id ➜ ការកំណត់ជា `''`) */
+const TEXT_BLANKERS: Record<string, () => void> = {
+    listModalPhoneText: () => { viewState.listModalPhoneText = ''; },
+    callMarkPhoneText: () => { viewState.callMarkPhoneText = ''; },
+    editBcPcText: () => { viewState.editBcPcText = ''; },
+    editModalBarcodeText: () => { viewState.editModalBarcodeText = ''; },
+    modalBarcodeText: () => { viewState.modalBarcodeText = ''; },
+    locationWarningText: () => { viewState.locationWarningText = ''; },
+    entryListCount: () => { viewState.entryListCountText = ''; },
+    removeScanBannerDetail: () => { viewState.removeScanDetail = ''; },
+    hardwareScannerLabel: () => { /* ស្លាកដេរីវេពី `viewState.entryModeShown` (កំណត់ជា parcel ក្នុងផ្លូវដដែល) */ },
+    siStatusFoot: () => { viewState.siStatusFoot = ''; },
+    appLockMsg: () => { viewState.appLockMessage = ''; },
+    ztoListSyncNote: () => { viewState.ztoListSyncNote = ''; },
+};
+
+function blankScanRemoveText(id: ScanRemoveTextId): void {
+    viewState.scanRemoveTexts = Object.assign({}, viewState.scanRemoveTexts, { [id]: '' });
+}
+
+/**
+ * សម្អាតធាតុមួយតាម id ៖ បញ្ជីរបស់ React (store) · input (ref) · អត្ថបទ (`viewState`)។
+ * ត្រឡប់ `false` ពេល id មិនស្គាល់ (➜ តេស្តធ្លាក់ មិនមែនបាត់ស្ងាត់)។
+ */
+export function blankElementById(id: string): boolean {
+    if (resetReactOwned(id)) return true;
+    if ((REF_NAMES as readonly string[]).indexOf(id) !== -1) {
+        setFieldValue(id as RefName, '');
+        return true;
+    }
+    if (TEXT_BLANKERS[id]) { TEXT_BLANKERS[id](); return true; }
+    if (id in viewState.scanRemoveTexts) { blankScanRemoveText(id as ScanRemoveTextId); return true; }
+    return false;
+}
+
+/** សម្អាតធាតុតាម store បើ React ជាម្ចាស់វា ➜ `true`; បើមិនមែន ➜ `false` */
 export function resetReactOwned(id: string): boolean {
     switch (id) {
         case 'historyTableBody': uiState.historyView = null; return true;

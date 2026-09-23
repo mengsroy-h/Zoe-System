@@ -46,10 +46,30 @@ export function UpdateBanner() {
 - **`useStoreValue(store, select)`** ៖ component ថ្មី — គូរឡើងវិញតែពេល *តម្លៃដែល
   អាន* ប្រែ (primitive ប្រៀបតាម `Object.is`; object/array ចាត់ថាប្រែរាល់ការសរសេរ)
 - **`useStore(...stores)`** ៖ component ដែលអានវាលច្រើន ឬវត្ថុដែលកែខាងក្នុង
+- **`useStoreFields(store, ['a', 'b'])`** ៖ component ដែលអានវាលច្រើនពីឃ្លាំងតែមួយ
 - ⛔ ចលនារាល់ស៊ុម (PTR · អូសផ្ទាំង) **មិនចូល state របស់ React** — វារស់នៅ
-  `src/ui/` ហើយកែ `style` ដោយផ្ទាល់ (តំបន់ហាមចូល `CLAUDE.md` ច្បាប់ ១១)
+  `src/app/behaviors/` ហើយកែ `style` តាម ref (តំបន់ហាមចូល `CLAUDE.md` ច្បាប់ ១១)
 - ⛔ ធាតុដែល React ជាម្ចាស់ មិនត្រូវឲ្យកូដ imperative ប៉ះ **កូន** របស់វា
   (`npm run slot:check`)
+
+### កូដមុខងារ ៖ សរសេរ state មិនមែន DOM (React ១០០%)
+
+កូដក្នុង `src/core` · `domain` · `features` · `services` · `ui` · `platform` **មិនប៉ះ
+DOM សោះ** (`npm run purity:check`)។ អ្វីដែល `app.js` ដើមធ្វើលើ DOM មានផ្លូវថ្មីនីមួយៗ ៖
+
+| ត្រូវការ | ⛔ កុំធ្វើ | ✅ ធ្វើ |
+|---|---|---|
+| បើក/បិទប្រអប់ | `el.style.display = 'flex'` | `openModalHelper(id)` · `closeModal(id)` (ប្រអប់ថ្មី ៖ `<Modal id=…>` + បន្ថែម id ក្នុង `MODAL_IDS`) |
+| អត្ថបទ · ស្លាក · ប៊ូតុងរវល់ | `el.textContent = …` · `btn.disabled = …` | វាលក្នុង `viewState` (`src/core/view-state.ts`) ➜ JSX អាន |
+| class ស្ថានភាព (បើក · បង្រួម · លាក់) | `el.classList.toggle(…)` | វាលក្នុង `uiState` ➜ JSX គណនា `className` |
+| តម្លៃ input · focus · វាស់ · រមូរ | `byId(id).value` · `.focus()` | `fieldValue()` · `setFieldValue()` · `focusField()` · `elementRect()` · `setScrollTop()` (`src/app/refs.ts`) |
+| `<head>` · ទាញយកឯកសារ · canvas ក្រៅអេក្រង់ | `document.createElement(…)` | `src/platform/document-io.ts` |
+
+ធាតុថ្មីដែលត្រូវការ ref ៖ បន្ថែមឈ្មោះក្នុង `REF_NAMES` (`src/app/refs.ts`) **និង**
+ចង `ref={refTo('name')}` ក្នុង component — ឈ្មោះដែលគ្មាន `ref=` ចង ➜ `purity:check` ធ្លាក់។
+⛔ input ជា **uncontrolled** (`defaultValue` · `defaultChecked`) — `value`/`checked` ដែល
+គ្មាន `onChange` បង្កក input ជារៀងរហូត។ ⛔ ពេលកូដបន្ទាប់ **វាស់** អ្វីដែលទើបសរសេរ
+ក្នុង state ➜ `commitNow()` ជាមុន (helper របស់ `refs.ts` ធ្វើវាខ្លួនឯង)។
 
 ---
 
@@ -123,6 +143,7 @@ oncePerPage('my-setup', setupSomething);         // ម្តងក្នុង�
 | App ពិតក្នុង Chromium ជាមួយ bridge Android ក្លែង | `scripts/native-check.mjs` | `npm run native:check` |
 | ស្នាមភ្ជាប់ Android (កំណែ · appId · សិទ្ធិ · logo · plugin) | `scripts/android-check.mjs` | `npm run android:check` |
 | parity ជាមួយ ZoeW ដើម | `scripts/parity-*.mjs` | `npm run parity:all` |
+| React ១០០% (កូដមុខងារមិនប៉ះ DOM · ref ចងពិត) | `scripts/react-purity-check.mjs` | `npm run purity:check` |
 | ទាំងអស់ | — | `npm run verify` |
 
 ⛔ តេស្តថ្មីត្រូវ **ធ្លាក់លើកូដមុនកែ** — ដកការកែចេញម្តង ហើយមើលវាក្រហម

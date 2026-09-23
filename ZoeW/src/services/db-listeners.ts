@@ -1,4 +1,3 @@
-import { byId } from '../core/dom';
 import { dataState, firebaseState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';

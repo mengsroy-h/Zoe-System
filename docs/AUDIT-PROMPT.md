@@ -13,7 +13,21 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-23 · ZoeW 2.39.0 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-23 · ZoeW 2.40.0 · ZoeKeyGen 2.20.2)
+
+⚛️ **ZoeW ជា React ១០០%** ៖ កូដមុខងារប៉ះ DOM **០** កន្លែង (state/ref) · កាយវិការ · PTR ·
+ចលនាផ្ទាំង ផ្លាស់ទៅ `src/app/behaviors/` · អ្នកយាមថ្មី `npm run purity:check`។ ⛔ ចន្លោះ
+ដែលជុំក្រោយគួរសួរមុនគេ ៖ **ស្នាមភ្ជាប់ state ➜ DOM** ដែល parity មិនចុច (ឧ. ប្រអប់ធីក
+«ចងចាំអ៊ីមែល» ដែល React ចាក់សោក្នុង `2.39.0` ខណៈ parity ៧៩ ជំហានបៃតង) — `purity:check`
+ចាប់តែថ្នាក់ `value`/`checked` គ្មាន `onChange`; ⛔ **ព្រឹត្តិការណ៍ `onChange` របស់ React
+ស្តាប់ `input` មិនមែន `change`** ➜ ការប្រើ `onChange` ជំនួស `change` native ប្តូរចង្វាក់
+ការហៅ (រាល់ការវាយ) ដោយគ្មានអ្នកយាមរចនាសម្ព័ន្ធ (`refWithNative()` ជាផ្លូវត្រឹមត្រូវ)។
+⛔ checker ដើមដែលសរសេរ class លើ DOM ដោយផ្ទាល់ រត់តាមស្រទាប់បកប្រែ `src/audit-compat.ts`
+(build វាស់តែប៉ុណ្ណោះ) ➜ បើ checker ថ្មីសរសេរ class ស្ថានភាពផ្សេង (មិនមែន `.collapsed` ·
+`.search-focus` · `.history-expanded` · `.panel-gliding` · `.show` · `.chrome-hidden`) ត្រូវ
+បន្ថែមវាក្នុងបញ្ជីនោះ មិនមែនធ្វើឲ្យកូដផលិតកម្មអាន class វិញ។
+
+## តារាងជុំមុន (2026-09-23 · ZoeW 2.39.0 · ZoeKeyGen 2.20.2)
 
 📱 **ZoeW មាន App Android (Capacitor)** + lifecycle ជាដំណាក់ (`src/app/lifecycle/`) ·
 ស្រទាប់ `src/platform/` · ប្រវត្តិថយក្រោយ Android។ ផ្ទៃថ្មីដែល **គ្មាន checker

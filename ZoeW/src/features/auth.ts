@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { fieldChecked, fieldValue, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { appLocalStore, appSessionStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { AUTH_STUCK_RECOVERY_FLAG } from '../core/storage-keys';
@@ -87,23 +88,18 @@ export function loginWithFirebase() {
         checkPinAndOpenConfig();
         return;
     }
-    const loginBtn = byId('loginBtn');
-    if (loginBtn && loginBtn.disabled) return;
+    if (viewState.loginBusy) return;
 
-    const emailInput = byId('loginEmailInput');
-    const passInput = byId('loginPasswordInput');
-    const rememberCb = byId('rememberMeCheckbox');
-
-    const email = emailInput ? emailInput.value.trim() : '';
-    const password = passInput ? passInput.value : '';
-    const rememberMe = rememberCb ? rememberCb.checked : false;
+    const email = fieldValue('loginEmailInput').trim();
+    const password = fieldValue('loginPasswordInput');
+    const rememberMe = fieldChecked('rememberMeCheckbox');
 
     if (!email || !password) {
         alert("សូមបញ្ចូល អ៊ីមែល និង ពាក្យសម្ងាត់!");
         return;
     }
 
-    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'កំពុងចូល...'; }
+    viewState.loginBusy = true;
 
     const generationAtLogin = firebaseState.authGeneration;
 
@@ -129,19 +125,13 @@ export function loginWithFirebase() {
             alert("ការចូលប្រព័ន្ធមិនជោគជ័យ៖ " + error.message);
         })
         .finally(() => {
-            if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'ចូលប្រព័ន្ធ'; }
-            if (passInput) passInput.value = '';
+            viewState.loginBusy = false;
+            setFieldValue('loginPasswordInput', '');
         });
 }
 
 export function updateAuthButton(isLoggedIn) {
     firebaseState.authButtonIsLoggedIn = !!isLoggedIn;
-    const btn = byId('navAuthBtn');
-    if (!btn) return;
-    const ico = btn.querySelector('.ico');
-    const label = btn.querySelector('.drawer-auth-label');
-    if (ico) ico.textContent = firebaseState.authButtonIsLoggedIn ? '🚪' : '🔑';
-    if (label) label.textContent = firebaseState.authButtonIsLoggedIn ? 'ចាកចេញ' : 'ចូល';
 }
 
 export function logoutApp() {

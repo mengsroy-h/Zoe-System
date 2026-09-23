@@ -64,3 +64,45 @@ export function useStoreValue<S extends StoreMeta, R>(store: S, select: (state: 
 function isPrimitive(value: unknown): boolean {
     return value === null || (typeof value !== 'object' && typeof value !== 'function');
 }
+
+/**
+ * អាន **វាលច្រើន** ពីឃ្លាំងក្នុងពេលតែមួយ ហើយគូរឡើងវិញ **តែពេលវាលណាមួយក្នុង
+ * ចំណោមនោះប្រែ** (ប្រៀបធៀបរាក់ៗ តាម `Object.is` លើតម្លៃនីមួយៗ)។
+ *
+ * ```tsx
+ * const v = useStoreFields(viewState, ['appLockOpen', 'appLockMessage']);
+ * ```
+ *
+ * ⛔ សម្រាប់វាលដែលជា primitive ឬ array/object ដែល **ជំនួសទាំងមូល** ពេលប្រែ
+ *    (ដូចរាល់វាលក្នុង `viewState`) — វត្ថុដែលកែនៅនឹងកន្លែង ប្រើ `useStore()`។
+ */
+export function useStoreFields<S extends StoreMeta, K extends keyof S>(store: S, keys: readonly K[]): Pick<S, K> {
+    const cache = useRef<Snapshot<Pick<S, K>> | null>(null);
+    const snapshot = useSyncExternalStore(
+        (onChange) => store.subscribe(onChange),
+        () => {
+            const version = store.version();
+            const prev = cache.current;
+            if (prev && prev.version === version) return prev;
+            let same = !!prev;
+            const value = {} as Pick<S, K>;
+            for (const k of keys) {
+                value[k] = store[k];
+                if (same && !Object.is(prev!.value[k], store[k])) same = false;
+            }
+            if (same && prev) {
+                prev.version = version;
+                return prev;
+            }
+            const next = { version, value };
+            cache.current = next;
+            return next;
+        },
+        () => {
+            const value = {} as Pick<S, K>;
+            for (const k of keys) value[k] = store[k];
+            return { version: -1, value };
+        }
+    );
+    return snapshot.value;
+}

@@ -1,9 +1,10 @@
+import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { DailyStatsCards } from '../stats/StatsCards';
 
 export function DailyStatsModal() {
     return (
-        <div id="dailyStatsModal" className="modal">
+        <Modal id="dailyStatsModal">
             <div className="modal-content">
                 <h3>📅 កញ្ចប់ & ចំណូល (យករួច) ប្រចាំថ្ងៃ</h3>
                 <p>ទិន្នន័យរក្សាទុកក្នុង Database ជានិច្ច</p>
@@ -14,6 +15,6 @@ export function DailyStatsModal() {
                     <button className="btn-cancel" onClick={onAct("closeModal", { args: ["dailyStatsModal"] })}>បិទ</button>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

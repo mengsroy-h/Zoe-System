@@ -10,7 +10,10 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 
 > **តក្កវិជ្ជាអាជីវកម្មត្រូវផ្ទេរ ១:១ ។ React ជំនួសត្រឹម *ស្រទាប់គូរ*។**
 
-រាល់ការសម្រេចខាងក្រោមកើតចេញពីច្បាប់នោះ។
+ហើយស្រទាប់គូរនោះជា **React ១០០%** ៖ React ជាម្ចាស់ DOM **តែមួយគត់** —
+កូដមុខងារសរសេរតែ state ហើយ component គូរពី state (មើលផ្នែក ១១)។
+
+រាល់ការសម្រេចខាងក្រោមកើតចេញពីច្បាប់ទាំងនោះ។
 
 ---
 
@@ -18,21 +21,25 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  src/app/          React ៖ component · hook · handler        │
+│  src/app/          React ៖ ម្ចាស់ DOM តែមួយ                  │
 │    components/       សំបកដែលកើតពី index.html ដើម             │
 │    components/<ផ្នែក>/  ការគូរទាំងអស់ (មើលផ្នែក ១០)            │
-│    hooks/            useStore() · useStoreValue()            │
+│    behaviors/        កាយវិការ · PTR · ចលនាផ្ទាំង · ការលាក់របា │
+│                      · ម៉ាស៊ីនស្កេន hardware (តាម ref)         │
+│    hooks/            useStore() · useStoreValue() ·          │
+│                      useStoreFields()                        │
 │    lifecycle/        boot ជាដំណាក់ · scope · សំបក native ·   │
 │                      ប្រវត្តិថយក្រោយ · ស្រទាប់ Back/Escape    │
+│    refs.ts           ref តាមឈ្មោះ (focus · តម្លៃ input · វាស់) │
+│    flush.ts          commitNow() ➜ DOM ចុះមុនការវាស់          │
 │    actions.ts        onAct() ➜ ចុះបញ្ជីសកម្មភាព               │
 ├─────────────────────────────────────────────────────────────┤
 │  src/platform/     web ធៀប Android native (Capacitor) ៖       │
 │                     អ្នកសម្រេចតែមួយ · Export/Share/Print ·    │
 │                     ជីវមាត្រ Keystore · URL របស់ Function     │
 ├─────────────────────────────────────────────────────────────┤
-│  src/ui/           កាយវិការ និងចលនា (PTR · ការអូសផ្ទាំង ·     │
-│                     ការលាក់របា) បូក *តក្កវិជ្ជា* នៃការគូរ      │
-│                     ដែលផ្សាយចូលឃ្លាំង ➜ React គូរ             │
+│  src/ui/           *តក្កវិជ្ជា* នៃការគូរ (ប្រអប់ · ម៉ឺនុយ ·      │
+│                     ទំព័រ · toast · ប្រវត្តិ) ➜ សរសេរ state     │
 ├─────────────────────────────────────────────────────────────┤
 │  src/features/     មុខងារអាជីវកម្ម (ស្កេន · Locker · ZTO ·   │
 │                     នាំចូល · Export · របាយការណ៍ · សុវត្ថិភាព)  │
@@ -43,8 +50,8 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 │  src/services/     បណ្តាញ · Firebase · listener · crypto ·    │
 │                     កាមេរ៉ា · ម៉ាស៊ីនស្កេន                     │
 ├─────────────────────────────────────────────────────────────┤
-│  src/core/         ឃ្លាំង state · នាឡិកា · storage · DOM ·   │
-│                     តំបន់ម៉ោង · ចុះបញ្ជីសកម្មភាព               │
+│  src/core/         ឃ្លាំង state (រួម viewState · ប្រអប់) ·    │
+│                     នាឡិកា · storage · តំបន់ម៉ោង · សកម្មភាព   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,11 +71,15 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 | `firebaseState` | ការតភ្ជាប់ · listener · auth · នាឡិកា server |
 | `dataState` | ប្រវត្តិ · ធុងសំរាម · ledger · អត្រាប្រាក់ |
 | `scanState` | កាមេរ៉ា · ម៉ាស៊ីនស្កេន · barcode ដែលរង់ចាំ |
-| `uiState` | ប្រអប់ · តម្រង · ទំព័រ · Locker · ចលនា |
+| `uiState` | ប្រអប់ (`modalDisplay`) · តម្រង · ទំព័រ · ផ្ទាំង · របា Slide · ម៉ឺនុយ · Locker · ចលនា |
 | `securityState` | PIN · ក្រយៅដៃ · សោ App · កូនសោ Lookup |
 | `lookupState` | តារាងអតិថិជន · ការត្រៀម ZTO |
 | `sheetImportState` | ដំណើរការនាំចូល Excel |
 | `ztoState` | សាលក្រម ZTO · ជុំបោស · ការទាញបញ្ជី |
+
+បូក **`viewState`** (`src/core/view-state.ts`) ៖ អត្ថបទ · ស្លាក · ទង់រវល់ ·
+ស្ថានភាពប៊ូតុង ដែល `app.js` ដើមសរសេរចូល DOM ដោយផ្ទាល់ (`textContent` ·
+`disabled` · `style.display`) ➜ ឥឡូវជា state ដែល JSX អាន។
 
 ឃ្លាំងនីមួយៗជា **Proxy** ៖ ការសរសេរ `dataState.scanHistory = x` ត្រូវចាប់
 ហើយជូនដំណឹងក្នុង microtask តែមួយ។ React ជាវតាម `useSyncExternalStore`។
@@ -122,7 +133,7 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 1. `index.html` ➜ `boot-flags.js` (ទង់ iOS · ទង់ Android native · font) ➜
    `zxing-wasm` · `firebase-loader` · `license-verify` · `error-reporting`
 2. `src/main.tsx` ➜ `createRoot(#root).render(<App/>)`
-3. `<App>` ➜ `useLayoutEffect` ➜ `bootApplication(scope)`
+3. `<App>` ➜ `useLayoutEffect` ➜ microtask ➜ `bootApplication(scope)`
    (`src/app/lifecycle/boot.ts`) ➜ unmount ➜ `scope.dispose()`
 4. ដំណាក់ដែលមានឈ្មោះ តាមលំដាប់ដូច `<script>` ដើមបេះបិទ ៖
    `bootShell` (សំបក · សោ App · Service Worker · សំបក native) ➜ `load` ➜
@@ -130,9 +141,9 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
    `startPeriodicTasks` ➜ `startScanEngine` ➜ `startInteractions` (កាយវិការ ·
    PTR) ➜ `startGlobalDismissals` ➜ `revealAppAfterBoot`
 
-⛔ **ជំហានទី ៣ ប្រើ `useLayoutEffect` មិនមែន `useEffect`** ៖ កូដ imperative
-អាន DOM ភ្លាមៗ ➜ វាត្រូវរត់ក្រោយ DOM ចុះ តែមុនការគូរ ដូច `<script>` នៅចុង
-`<body>` ដើមបេះបិទ។
+⛔ **ជំហានទី ៣ ប្រើ `useLayoutEffect` + microtask** ៖ boot ត្រូវរត់ក្រោយ DOM ចុះ
+តែមុនការគូរ ដូច `<script>` នៅចុង `<body>` ដើមបេះបិទ — ហើយ **ក្រៅ** lifecycle
+របស់ React ព្រោះកូដមុខងារហៅ `commitNow()` (`flushSync`) ដែល React ហាមក្នុង effect។
 
 ⛔ **`scope.onLoad()` រត់ភ្លាមពេល `load` បាញ់រួច** ៖ React អាច mount *ក្រោយ*
 `load` ➜ អ្នកស្តាប់នឹងមិនបាញ់ជារៀងរហូត ➜ App មិនចាប់ផ្តើមសោះ ដោយស្ងាត់។
@@ -166,8 +177,11 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 | `tools/html-to-jsx.cjs` | បម្លែង `index.html` ➜ component · `data-act` ➜ handler |
 | `tools/generate.sh` | រត់ទាំង ៤ តាមលំដាប់ រួចពិនិត្យ type |
 
-⛔ ដំណើរការនេះ **ធ្វើម្តងទៀតបាន** ៖ លុប `src/` ចេញ រួចរត់ `tools/generate.sh`
-នោះទទួលលទ្ធផលដដែល។ ការកែដោយដៃក្នុងឯកសារដែលកើតដោយស្វ័យប្រវត្តិ នឹងបាត់។
+⛔ ឧបករណ៍ទាំងនេះជា **កំណត់ត្រានៃការផ្ទេរ** ៖ `src/` ជាប្រភពការពិត ហើយត្រូវបាន
+កែដោយដៃ (lifecycle · platform · Android · React ១០០%) ➜ ⛔ **កុំរត់ `tools/generate.sh`**
+(`npm run generate` ចាក់សោដោយ `ALLOW_REGENERATE=1`) — វានឹងសរសេរជាន់ `src/` ទាំងមូល
+ហើយនាំកូដដែលប៉ះ DOM ផ្ទាល់ត្រឡប់មកវិញ។ `html-to-jsx.cjs` នៅជាប្រភពនៃបញ្ជី slot
+ដែល `doc:check` · `slot:check` អាន។
 
 ---
 
@@ -232,10 +246,11 @@ renderX()  ➜  គណនា model សុទ្ធ  ➜  uiState.xView = model  
 ⛔ `renderX()` នៅរក្សា **ឈ្មោះ និងកន្លែងហៅដដែល** ➜ កូដដែលផ្ទេរមកមិនដឹងថា
 React មានវត្តមានសោះ។
 
-⛔ **ពេលកូដបន្ទាប់ *វាស់* អ្វីដែលទើបផ្សាយ ត្រូវហៅ `renderNow(store)`**
-(`flushSync`) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ**។ វាស់បាន ៖
+⛔ **ពេលកូដបន្ទាប់ *វាស់* អ្វីដែលទើបផ្សាយ ត្រូវហៅ `commitNow()`**
+(`flushSync` លើរាល់ឃ្លាំង) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ**។ វាស់បាន ៖
 `showGlobalMoreMenu()` វាស់ទទឹងម៉ឺនុយមុនធាតុចុះ ➜ គ្មានការទាញចូលវិញ ➜
-ម៉ឺនុយហៀរក្រៅអេក្រង់។ កន្លែងដែលត្រូវការវា ៖ ម៉ឺនុយ (...) និងផ្លូវបោះពុម្ព PDF។
+ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementRect()` ·
+`elementSize()` · `setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
 
 ### ⛔ កូដ imperative មិនត្រូវប៉ះ **កូន** របស់ធាតុដែល React ជាម្ចាស់
 
@@ -252,13 +267,15 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 | ត្រូវការ | ធ្វើ |
 |---|---|
 | សម្អាតមាតិកា slot | កែ **store** (`uiState.xView = null`) — React សម្អាតខ្លួនឯង |
-| សម្អាតតាមបញ្ជី id (ឧ. ពេលចាកចេញ) | `if (resetReactOwned(id)) return;` ជា **statement ដំបូង** នៃរង្វិលជុំ |
-| បន្ថែម slot ថ្មី | ប្រកាស `reset:` ក្នុង `SLOTS` (`tools/html-to-jsx.cjs`) — បើអត់ ការផលិត **ធ្លាក់** |
+| សម្អាតតាមបញ្ជី id (ឧ. ពេលចាកចេញ) | `blankElementById(id)` (`src/app/slot-resets.ts`) ៖ slot ➜ store · input ➜ ref · អត្ថបទ ➜ `viewState` — id មិនស្គាល់ ➜ `false` ➜ `npm test` ធ្លាក់ |
+| បន្ថែម slot ថ្មី | ប្រកាស `reset:` ក្នុង `SLOTS` (`tools/html-to-jsx.cjs`) ហើយបន្ថែមករណីក្នុង `resetReactOwned()` |
 
-អ្នកយាម ៖ `npm run slot:check` (ក្នុង `verify`) ស្កេន AST នៃកូដដែលផ្ទេរមក រកការប៉ះ
-កូនរបស់ id ដែល **ដេរីវេពី `SLOTS`/`ELEMENT_SLOTS` ពិត** — ទាំងដោយផ្ទាល់
-(`const box = byId('phoneSuggestBox')`) និងតាមរង្វិលជុំលើបញ្ជី id។ វាស់រួចថាវាធ្លាក់ ៖
-ការដក `resetReactOwned` ចេញ ➜ ៣១ កន្លែង · ការបន្ថែម `box.innerHTML = ''` ➜ ១ កន្លែង។
+អ្នកយាម ៖ `npm run slot:check` (ក្នុង `verify`) ស្កេន AST នៃ `.ts` ទាំងអស់ក្នុង `src/`
+(រួម `src/app/` ដែល behavior កាន់ធាតុតាម ref) រកការប៉ះកូនរបស់ id ដែល **ដេរីវេពី
+`SLOTS`/`ELEMENT_SLOTS` ពិត** — ទាំងដោយផ្ទាល់ (`const box = elementOf('phoneSuggestBox')`
+➜ `phoneSuggestBox` ជាទាំង slot និង ref) និងតាមរង្វិលជុំលើបញ្ជី id។ វាស់រួចថាវាធ្លាក់ ៖
+ការបន្ថែម `box.textContent = ''` លើ `elementOf('phoneSuggestBox')` ➜ ១ កន្លែង · ថតទទេ ➜
+«ការស្កេនតូចពេក»។ ក្នុងកូដមុខងារ `purity:check` ហាមការប៉ះ DOM ទាំងស្រុងរួចហើយ។
 
 ### ⛔ ប្រភេទរបស់ទិដ្ឋភាពដែល component អាន
 
@@ -268,22 +285,80 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 
 ### ⛔ សកម្មភាពនៃធាតុដែល React គូរ
 
-ធាតុដែលកាន់ `data-act` ត្រូវ **ជ្រើសផ្លូវតែមួយ** ៖
+រាល់ការចុចឆ្លងកាត់ **`onAct(...)`** (`onClick` របស់ React) ➜ `act()` ➜
+`lookupAction()` (`ACTION_REGISTRY` ពិនិត្យពេល build)។ ⛔ **គ្មាន listener នៅកម្រិត
+`document` ទៀតទេ** ៖ ការគូរទាំងអស់ជា JSX (គ្មាន HTML ជាខ្សែអក្សរណាចូល DOM) ➜
+listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត់ **ពីរដង** (ច្បាប់ ៤ នៃ «CSP និង `data-act`» —
+ធ្ងន់បំផុតលើការលុប)។
 
-| ផ្លូវ | ប្រើពេលណា |
-|---|---|
-| `data-act` (គ្មាន `onClick`) | ធាតុដែលរស់ក្នុងម៉ឺនុយ ឬក្នុងការគូរដែលនៅជាខ្សែអក្សរ HTML — `setupActionDelegation()` នៅតែស្តាប់នៅកម្រិត `document` |
-| `onAct(...)` (គ្មាន `data-act`) | ធាតុក្នុងសំបកដែល React គូរទាំងស្រុង |
+⛔ `data-act` · `data-a1` លើប៊ូតុងម៉ឺនុយ (...) នៅជា attribute **ពណ៌នា** សុទ្ធ
+(DOM ដូចដើម ➜ ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
+⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ (`buildHistoryRowHtml()` · `trashGroupRowHtml()`)
+**មិនចូល DOM** — វារស់ជា oracle សម្រាប់តេស្ត parity និង checker ស្តាទិច។
 
-⛔ **ទាំង ២ លើធាតុតែមួយ = សកម្មភាពរត់ពីរដង** (ច្បាប់ ៤ នៃ «CSP និង
-`data-act`» — ធ្ងន់បំផុតលើការលុប)។ វាស់បាន ៖ ការដក `data-act` ចេញពី
-ប៊ូតុងម៉ឺនុយ (...) ធ្វើឲ្យម៉ឺនុយទាំងមូលស្លាប់ ➜ `parity:live` ចាប់បាន។
-
-### ⛔ អ្វីដែលនៅ imperative ដោយចេតនា
+### ⛔ អ្វីដែលនៅ imperative ដោយចេតនា (ច្រកចេញបន្ទាន់ដែល React ណែនាំ)
 
 | កន្លែង | ហេតុអ្វី |
 |---|---|
-| ចលនារបស់ PTR (`style.transform` រាល់ `touchmove`) | React គូរ *ធាតុ* (`PtrIndicator`) ចំណែកកាយវិការកាន់ *ចលនា* ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
-| `<link rel=preconnect>` · `<script>` loader | ពួកវារស់ក្នុង `<head>` ដែល React មិនជាម្ចាស់ |
-| `<canvas>` ក្រៅអេក្រង់ (ស្កេន · QR · registry) | មិនដែលចូល DOM ➜ វាមិនមែនការគូរ |
-| `<a download>` ដែលចុចរួចលុបភ្លាម | ការទាញយកត្រូវកើតក្នុង tick ដដែលនឹងការចុច |
+| ចលនារបស់ PTR (`style.transform` · class ចលនា រាល់ `touchmove`) · FLIP របស់ផ្ទាំង (`animate()`) | React គូរ *ធាតុ* (`PtrIndicator` · ផ្ទាំង) ចំណែកកាយវិការកាន់ *ចលនា* តាម ref ៖ ការគូរឡើងវិញរាល់ស៊ុមនៃម្រាមដៃ ប្តូរឥរិយាបថនៃតំបន់ដែល `CLAUDE.md` ហាមប៉ះ |
+| focus · តម្លៃ input · ការវាស់ · ការរមូរ | `src/app/refs.ts` (ref តាមឈ្មោះ) — input ជា **uncontrolled** ដោយចេតនា (មើលផ្នែក ១១) |
+| `<video>` របស់កាមេរ៉ា/QR (`srcObject` · `play()`) | media playback តាម ref (`videoElement()`) |
+| `<link rel=preconnect>` · `<script>` loader | ពួកវារស់ក្នុង `<head>` ដែល React មិនជាម្ចាស់ (`src/platform/document-io.ts`) |
+| `<canvas>`/`Image` ក្រៅអេក្រង់ (ស្កេន · QR) | មិនដែលចូល DOM ➜ វាមិនមែនការគូរ (`document-io.ts`) |
+| `<a download>` ដែលចុចរួចលុបភ្លាម | ការទាញយកត្រូវកើតក្នុង tick ដដែលនឹងការចុច (`document-io.ts`) |
+| `<body>` · `document.title` | នៅក្រៅ `#root` ➜ `DocumentEffects` ធ្វើឲ្យវាស៊ីនឹង state ក្នុង `useLayoutEffect` |
+
+---
+
+## ១១. React ១០០% ៖ ម្ចាស់ DOM តែមួយ
+
+### ច្បាប់
+
+| ស្រទាប់ | អាចធ្វើ | ⛔ មិនអាចធ្វើ |
+|---|---|---|
+| `src/core` · `domain` · `features` · `services` · `ui` · `platform` | សរសេរ **state** (`uiState` · `viewState` · …) · ហៅ helper របស់ `refs.ts` (focus · តម្លៃ · វាស់) | `document.*` · `getElementById` · `classList` · `style` · `textContent` · `innerHTML` · `setAttribute` · `.focus()` ត្រង់ៗ |
+| `src/app/components` | គូរពី state តាម JSX · ចង ref (`ref={refTo('name')}`) | ស្វែងរក DOM តាម id/selector |
+| `src/app/behaviors` · `lifecycle` | listener native (touch non-passive) · ចលនាតាម ref | សរសេរ class ដែលមានម្ចាស់ជា state (ត្រូវសរសេរ state) |
+
+### លំនាំ
+
+```ts
+// ប្រអប់ ៖ state មិនមែន style.display
+openModalHelper('phoneModal');            // ➜ uiState.modalDisplay.phoneModal = 'flex'
+// អត្ថបទ/ទង់ ៖ state មិនមែន textContent/disabled
+viewState.lookupStatus = { text: '⏳ …', tone: 'busy' };
+// ផ្ទាំង ៖ state មិនមែន classList
+setPanelCollapsed('data', true);          // ➜ uiState.dataPanelCollapsed
+// focus · តម្លៃ ៖ ref
+focusField('modalPhoneInput');            // commitNow() មុន ➜ ប្រអប់ដែលទើបបើកចុះ DOM រួច
+const pin = fieldValue('securityPinInput');
+```
+
+- **ប្រអប់** ៖ `<Modal id close noDismiss>` (`components/modals/Modal.tsx`) គូរ
+  `display` ពី `uiState.modalDisplay[id]` ហើយចុះឈ្មោះ meta (`data-close` ·
+  `data-nodismiss`) ➜ `layers.ts` រកប្រអប់លើគេតាម z-index ដែលគណនាពិត។
+- **input ជា uncontrolled** ៖ DOM ជាប្រភពការពិតនៃអ្វីដែលអ្នកប្រើវាយ (ម៉ាស៊ីនស្កេន
+  hardware វាយលឿនបំផុត) ➜ `defaultValue`/`defaultChecked` មិនមែន `value`/`checked`
+  ដែលគ្មាន `onChange`។ ⛔ `onChange` របស់ React ស្តាប់ `input` (រាល់ការវាយ) — ពេល
+  ត្រូវការ `change` native ពិត ប្រើ `refWithNative(name, 'change', handler)`។
+- **`commitNow()`** មុនរាល់ការវាស់/focus/រមូរ ដែលពឹងលើ state ទើបសរសេរ — App ដើម
+  កែ DOM ផ្ទាល់ ➜ វាតែងតែ «ចុះភ្លាម»; នេះរក្សាលក្ខណៈនោះ។
+
+### អ្នកយាម
+
+`npm run purity:check` (`scripts/react-purity-check.mjs` · AST របស់ TypeScript) ៖
+
+- កូដមុខងារប៉ះ DOM **០** កន្លែង (ការលើកលែងមានតែ `platform/document-io.ts` និង
+  ការវាស់ផ្ទៃវីដេអូ — រាល់ធាតុមាន **ហេតុផល និងពិដានចំនួន**; ពិដានធូរ ឬធាតុងាប់ ➜ ធ្លាក់)
+- `elementOf()` · `modalElement()` ក្នុងកូដមុខងារ រាប់ជាការប៉ះ DOM
+- component មិនស្វែងរក DOM តាម id/selector
+- **ឈ្មោះ ref គ្រប់ឈ្មោះត្រូវមាន `ref={…}` ពិតចង** (វាស់តាម AST មិនមែនវត្តមានអក្សរ) —
+  ឈ្មោះគ្មានអ្នកចង = `elementOf()` ត្រឡប់ `null` ជានិច្ច ➜ មុខងារងាប់ស្ងាត់ៗ
+- **គ្មាន input ដែល React ចាក់សោ** ៖ `value`/`checked` ដោយគ្មាន `onChange`/`readOnly` ➜
+  React ស្តារតម្លៃក្រោយរាល់ការចុច ➜ អ្នកប្រើប្តូរវាមិនបាន (វាស់ក្នុង browser ៖ ប្រអប់ធីក
+  «ចងចាំអ៊ីមែល» ដោះធីកមិនបាន)
+
+⛔ **checker ដើមរបស់ `audit-tools/`** ខ្លះ «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class
+លើ DOM ផ្ទាល់ (ឧ. `.collapsed`)។ ក្នុង build វាស់តែប៉ុណ្ណោះ `src/audit-compat.ts`
+បកប្រែការសរសេរនោះជា state ដដែល (ការបញ្ចូល) ខណៈ `contains()` អាន DOM ដែល React
+គូរពិត (លទ្ធផល) ➜ checker វាស់ App React ពិត ដោយមិនកែ checker មួយបន្ទាត់។

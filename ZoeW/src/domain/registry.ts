@@ -1,3 +1,4 @@
+import { createScratchCanvas, loadScratchImage } from '../platform/document-io';
 import { dataState, firebaseState, scanState } from '../core/state';
 import { REGISTRY_RELEASE_QUEUE_MAX, REGISTRY_RELEASE_RETRY_MAX, pendingRegistryReleases } from '../core/clock';
 import { DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY } from '../core/text';
@@ -9,13 +10,12 @@ import { showToast } from '../ui/toast';
 
 export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
     if (!scanState.codeReader) return;
-    const img = new Image();
-    img.onload = async function () {
+    loadScratchImage(originalDataUrl, async function (img) {
         const maxDim = 1600;
         const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
         const baseW = Math.round(img.naturalWidth * scale);
         const baseH = Math.round(img.naturalHeight * scale);
-        const canvas = document.createElement('canvas');
+        const canvas = createScratchCanvas();
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         for (const deg of [0, 90, 270, 180]) {
@@ -38,11 +38,9 @@ export function decodeBarcodeFromImageDataUrl(originalDataUrl) {
             }
         }
         showToast("⚠️ រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។ សូមសាកល្បងថតរូបឲ្យច្បាស់ ត្រង់ៗ និងជិត Barcode ជាងនេះ ឬប្រើកាមេរ៉ាស្កេនផ្ទាល់។");
-    };
-    img.onerror = function () {
+    }, function () {
         showToast("⚠️ រកមិនឃើញ Barcode ក្នុងរូបភាពនេះទេ។");
-    };
-    img.src = originalDataUrl;
+    });
 }
 
 export function isBarcodeAlreadyUsed(code) {

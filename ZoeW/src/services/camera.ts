@@ -1,4 +1,7 @@
-import { byId } from '../core/dom';
+import { commitNow } from '../app/flush';
+import { prepareInlineVideo } from '../app/media';
+import { elementOf, setFieldValue, videoElement as videoRef } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { scanState, uiState } from '../core/state';
 import { noteAppLockExcuse } from '../features/app-lock';
 import { showCameraClosedBox, stopCurrentStream } from '../features/daily-stats';
@@ -42,16 +45,12 @@ export function requestCameraPermission() {
             scanState.isCameraScanning = true;
             scanState.isCameraStarting = false;
 
-            const permBox = byId('permission-box');
-            const vidContainer = byId('video-container');
-            if(permBox) permBox.style.display = 'none';
-            if(vidContainer) vidContainer.style.display = 'block';
+            viewState.cameraView = 'live';
 
-            const videoElement = byId('video');
+            const videoElement = videoRef('video');
             if(!videoElement) return;
 
-            videoElement.setAttribute('playsinline', 'true');
-            videoElement.setAttribute('webkit-playsinline', 'true');
+            prepareInlineVideo(videoElement, true);
             videoElement.muted = true;
             videoElement.srcObject = stream;
 
@@ -97,13 +96,9 @@ export function setupTrackCapabilities(stream) {
     scanState.currentVideoTrack = stream.getVideoTracks()[0] || null;
     scanState.torchOn = false;
 
-    const overlay = byId('videoControlsOverlay');
-    const zoomWrap = byId('zoomSliderWrap');
-    const zoomSlider = byId('zoomSlider');
-    const torchBtn = byId('torchToggleBtn');
-    if (zoomWrap) zoomWrap.style.display = 'none';
-    if (torchBtn) { torchBtn.style.display = 'none'; torchBtn.classList.remove('active'); }
-    if (overlay) overlay.style.display = 'none';
+    viewState.cameraZoomDisplay = 'none';
+    viewState.cameraTorchDisplay = 'none';
+    viewState.cameraOverlayDisplay = 'none';
 
     if (!scanState.currentVideoTrack || typeof scanState.currentVideoTrack.getCapabilities !== 'function') return;
 
@@ -115,27 +110,29 @@ export function setupTrackCapabilities(stream) {
         scanState.currentVideoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
     }
 
-    if (caps.zoom && zoomWrap && zoomSlider && caps.zoom.max > caps.zoom.min) {
-        zoomSlider.min = caps.zoom.min;
-        zoomSlider.max = caps.zoom.max;
-        zoomSlider.step = caps.zoom.step || 0.1;
+    if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+        viewState.cameraZoomRange = { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 };
         let settings: any = {};
         try { settings = scanState.currentVideoTrack.getSettings(); } catch (e) {}
-        zoomSlider.value = settings.zoom || caps.zoom.min;
-        zoomSlider.oninput = () => {
-            if (!scanState.currentVideoTrack) return;
-            scanState.currentVideoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(zoomSlider.value) }] }).catch(() => {});
-        };
-        zoomWrap.style.display = 'flex';
+        // ⛔ ព្រំដែនថ្មីត្រូវចុះ DOM **មុន** កំណត់តម្លៃ — បើអត់ browser clamp តម្លៃ
+        //    តាមព្រំដែនចាស់ (១..១) ➜ zoom ចាប់ផ្តើមនៅ ១ ជានិច្ច។
+        commitNow();
+        setFieldValue('zoomSlider', String(settings.zoom || caps.zoom.min));
+        viewState.cameraZoomDisplay = 'flex';
     }
 
-    if (caps.torch && torchBtn) {
-        torchBtn.style.display = 'flex';
+    if (caps.torch) {
+        viewState.cameraTorchDisplay = 'flex';
     }
 
-    if (overlay && (zoomWrap.style.display === 'flex' || torchBtn.style.display === 'flex')) {
-        overlay.style.display = 'flex';
+    if (viewState.cameraZoomDisplay === 'flex' || viewState.cameraTorchDisplay === 'flex') {
+        viewState.cameraOverlayDisplay = 'flex';
     }
+}
+
+export function applyCameraZoomFromSlider(value) {
+    if (!scanState.currentVideoTrack) return;
+    scanState.currentVideoTrack.applyConstraints({ advanced: [{ zoom: parseFloat(value) }] }).catch(() => {});
 }
 
 export function toggleTorch() {
@@ -144,8 +141,6 @@ export function toggleTorch() {
     scanState.currentVideoTrack.applyConstraints({ advanced: [{ torch: nextState }] })
         .then(() => {
             scanState.torchOn = nextState;
-            const torchBtn = byId('torchToggleBtn');
-            if (torchBtn) torchBtn.classList.toggle('active', scanState.torchOn);
         })
         .catch(() => {});
 }
@@ -169,7 +164,7 @@ export function getCoverCropRect(videoElement, container) {
 
 export function startFastNativeScan(videoElement) {
     scanState.nativeLoopActive = true;
-    const container = byId('video-container');
+    const container = elementOf('videoContainer');
     let lastCheck = 0;
     let nextDelay = LIVE_SCAN_MIN_INTERVAL_MS;
     async function renderLoop(timestamp) {

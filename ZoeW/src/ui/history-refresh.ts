@@ -1,4 +1,4 @@
-import { byId } from '../core/dom';
+import { fieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { sanitizePhoneNumber } from '../core/text';
@@ -15,8 +15,7 @@ export function scheduleHistoryViewRefresh() {
 }
 
 export function refreshCurrentHistoryView() {
-    const phoneInput = byId('searchPhoneInput');
-    if (phoneInput && sanitizePhoneNumber(phoneInput.value)) searchByPhone();
+    if (sanitizePhoneNumber(fieldValue('searchPhoneInput'))) searchByPhone();
     else applyCurrentFilter();
 }
 

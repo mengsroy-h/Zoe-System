@@ -1,12 +1,16 @@
+import { uiState } from '../../core/state';
 import { onAct } from '../actions';
+import { useStoreValue } from '../hooks/useStore';
+import { refTo } from '../refs';
 
-/** របា Tab ខាងក្រោម */
+/** របា Tab ខាងក្រោម — `active` តាម `uiState.currentAppPage` */
 export function PageTabBar() {
+    const page = useStoreValue(uiState, (s) => s.currentAppPage);
     return (
-        <nav className="page-tabbar" id="pageTabBar">
+        <nav className="page-tabbar" id="pageTabBar" ref={refTo('pageTabBar')}>
             <button
                 type="button"
-                className="page-tab active"
+                className={page === 'data' ? 'page-tab active' : 'page-tab'}
                 id="pageTabData"
                 onClick={onAct("switchAppPage", { args: ["data"] })}
             >
@@ -15,7 +19,7 @@ export function PageTabBar() {
             </button>
             <button
                 type="button"
-                className="page-tab"
+                className={page === 'entry' ? 'page-tab active' : 'page-tab'}
                 id="pageTabEntry"
                 onClick={onAct("switchAppPage", { args: ["entry"] })}
             >

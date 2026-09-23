@@ -6,50 +6,62 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { securityState, uiState } from '../../src/core/state';
 import { handleNativeBack } from '../../src/app/lifecycle/native-shell';
 import { createBackHistory, screenOf } from '../../src/app/lifecycle/back-history';
+import { openModalHelper } from '../../src/ui/modal';
+import { openSideDrawer } from '../../src/ui/page-nav';
+import { GlobalMoreMenu } from '../../src/app/components/GlobalMoreMenu';
+import { SideDrawer } from '../../src/app/components/SideDrawer';
+import { DrawerBackdrop } from '../../src/app/components/DrawerBackdrop';
+import { PhoneModal } from '../../src/app/components/modals/PhoneModal';
+import { byId, mount, step, unmount } from './react-harness';
 
-function el(html: string): HTMLElement {
-    const box = document.createElement('div');
-    box.innerHTML = html.trim();
-    const node = box.firstElementChild as HTMLElement;
-    document.body.appendChild(node);
-    return node;
-}
-
+/**
+ * ⛔ ការវាស់ឆ្លងកាត់ **component React ពិត** ៖ ស្ថានភាពបើក/បិទជា state
+ *    (`uiState.moreMenuOpen` · `drawerOpen` · `modalDisplay`) ហើយ class/`display`
+ *    ដែលអ្នកប្រើឃើញ ជាអ្វីដែល React គូរពីវា។
+ */
 beforeEach(() => {
-    document.body.innerHTML = '';
-    securityState.appIsLocked = false;
-    uiState.currentAppPage = 'data';
+    step(() => {
+        securityState.appIsLocked = false;
+        uiState.currentAppPage = 'data';
+        uiState.moreMenuOpen = false;
+        uiState.drawerOpen = false;
+        uiState.modalDisplay = {};
+    });
+    mount(<><GlobalMoreMenu /><SideDrawer /><DrawerBackdrop /><PhoneModal /></>);
 });
 
-afterEach(() => { document.body.innerHTML = ''; });
+afterEach(() => { unmount(); document.body.innerHTML = ''; });
 
 describe('handleNativeBack', () => {
     it('ម៉ឺនុយ (...) បើក ➜ បិទម៉ឺនុយ មិនបង្រួម', () => {
-        const menu = el('<div id="globalMoreMenu" class="more-menu show"></div>');
+        step(() => { uiState.moreMenuOpen = true; });
+        expect(byId('globalMoreMenu').classList.contains('show')).toBe(true);
         const minimize = vi.fn();
-        handleNativeBack(minimize);
-        expect(menu.classList.contains('show')).toBe(false);
+        step(() => handleNativeBack(minimize));
+        expect(byId('globalMoreMenu').classList.contains('show')).toBe(false);
         expect(minimize).not.toHaveBeenCalled();
     });
 
     it('ប្រអប់ data-nodismiss ➜ ស្រទាប់ស៊ីការចុច (មិនបង្រួម · មិនប្តូរទំព័រ)', () => {
-        const modal = el('<div id="pinModal" class="modal" data-nodismiss="1"></div>');
-        modal.style.display = 'flex';
-        uiState.currentAppPage = 'entry';
+        step(() => { openModalHelper('phoneModal'); uiState.currentAppPage = 'entry'; });
+        expect(byId('phoneModal').getAttribute('data-nodismiss')).toBe('true');
+        expect(byId('phoneModal').style.display).toBe('flex');
         const minimize = vi.fn();
-        handleNativeBack(minimize);
-        expect(modal.style.display).toBe('flex');
+        step(() => handleNativeBack(minimize));
+        expect(byId('phoneModal').style.display).toBe('flex');
         expect(minimize).not.toHaveBeenCalled();
         expect(uiState.currentAppPage).toBe('entry');
     });
 
     it('របា Slide បើក ➜ បិទវា', () => {
-        const drawer = el('<aside id="sideDrawer" class="open"></aside>');
-        const backdrop = el('<div id="drawerBackdrop" class="open"></div>');
+        step(() => openSideDrawer());
+        expect(byId('sideDrawer').classList.contains('open')).toBe(true);
+        expect(byId('drawerBackdrop').classList.contains('open')).toBe(true);
         const minimize = vi.fn();
-        handleNativeBack(minimize);
-        expect(drawer.classList.contains('open')).toBe(false);
-        expect(backdrop.classList.contains('open')).toBe(false);
+        step(() => handleNativeBack(minimize));
+        expect(byId('sideDrawer').classList.contains('open')).toBe(false);
+        expect(byId('sideDrawer').getAttribute('aria-hidden')).toBe('true');
+        expect(byId('drawerBackdrop').classList.contains('open')).toBe(false);
         expect(minimize).not.toHaveBeenCalled();
     });
 
@@ -84,14 +96,11 @@ describe('handleNativeBack', () => {
     });
 
     it('App ជាប់សោ ➜ បង្រួម ទោះមានប្រអប់ ឬទំព័រស្កេន', () => {
-        securityState.appIsLocked = true;
-        const modal = el('<div id="phoneModal" class="modal"></div>');
-        modal.style.display = 'flex';
-        uiState.currentAppPage = 'entry';
+        step(() => { openModalHelper('phoneModal'); uiState.currentAppPage = 'entry'; securityState.appIsLocked = true; });
         const minimize = vi.fn();
-        handleNativeBack(minimize);
+        step(() => handleNativeBack(minimize));
         expect(minimize).toHaveBeenCalledTimes(1);
-        expect(modal.style.display).toBe('flex');
+        expect(byId('phoneModal').style.display).toBe('flex');
         expect(uiState.currentAppPage).toBe('entry');
     });
 });

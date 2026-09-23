@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
+import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { ACTIVE_LOCKER_KEY, ENTRY_SCAN_MODE_KEY, LOCKER_COUNT_KEY, LOCKER_PREFIX_KEY } from '../core/storage-keys';
@@ -105,18 +106,14 @@ export function lockerErrorFeedback() {
 }
 
 export function openLockerSettingsModal() {
-    const prefixInput = byId('lockerPrefixInput');
-    const countInput = byId('lockerCountInput');
-    if (prefixInput) prefixInput.value = getLockerPrefix();
-    if (countInput) countInput.value = getLockerCount();
+    setFieldValue('lockerPrefixInput', String(getLockerPrefix()));
+    setFieldValue('lockerCountInput', String(getLockerCount()));
     openModalHelper('lockerSettingsModal');
 }
 
 export function saveLockerSettings() {
-    const prefixInput = byId('lockerPrefixInput');
-    const countInput = byId('lockerCountInput');
-    const prefix = (prefixInput ? prefixInput.value.trim() : '') || 'ទូ';
-    const count = clampLockerCount(countInput ? countInput.value : '');
+    const prefix = fieldValue('lockerPrefixInput').trim() || 'ទូ';
+    const count = clampLockerCount(fieldValue('lockerCountInput'));
     const previousPrefix = getLockerPrefix();
     const previousCount = getLockerCount();
     const prefixSaved = safeStoreSet(appLocalStore, LOCKER_PREFIX_KEY, prefix);
@@ -166,18 +163,15 @@ export function chooseLocker(val) {
 }
 
 export function selectCustomLocker() {
-    const input = byId('customLockerInput');
-    if (!input) return;
-    const val = input.value.trim();
+    const val = fieldValue('customLockerInput').trim();
     if (!isValidLockerName(val)) {
         showToast('⚠️ សូមបញ្ចូលទីតាំងពិតប្រាកដ (មិនអាចជា N/A និងមិនលើស 64 តួអក្សរ)!');
         return;
     }
-    input.value = '';
+    setFieldValue('customLockerInput', '');
     chooseLocker(val);
 }
 
 export function updateActiveLockerLabel() {
-    const label = byId('activeLockerLabel');
-    if (label) label.innerText = uiState.activeLocker || '-';
+    viewState.activeLockerLabel = uiState.activeLocker || '-';
 }

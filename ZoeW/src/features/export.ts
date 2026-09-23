@@ -1,5 +1,7 @@
-import { renderNow } from '../app/flush';
-import { byId } from '../core/dom';
+import { commitNow } from '../app/flush';
+import { documentBaseTitle } from '../app/components/shell/DocumentEffects';
+import { injectScript } from '../platform/document-io';
+import { viewState } from '../core/view-state';
 import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_DAILY_REVENUE, DB_LISTENER_KEY_DELETED, DB_LISTENER_KEY_HISTORY, STATS_DAILY_VIEW_KEYS, VIEW_NOT_MEASURABLE_TEXT } from '../core/text';
@@ -37,7 +39,6 @@ export function loadScriptOnce(key) {
     const lib = EXPORT_LIBS[key];
     const SCRIPT_LOAD_TIMEOUT_MS = 25000;
     const pending = new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
         let settled = false;
         let timer = null;
         const stop = () => {
@@ -54,20 +55,15 @@ export function loadScriptOnce(key) {
             err.code = code;
             reject(err);
         };
-        script.src = lib.url;
-        if (lib.integrity) {
-            script.integrity = lib.integrity;
-            script.crossOrigin = 'anonymous';
-        }
-        script.onload = () => {
+        const onLoad = () => {
             if (settled) return;
             settled = true;
             stop();
             resolve();
         };
-        script.onerror = () => failWith('SCRIPT_LOAD_FAILED', 'Failed to load ' + lib.url);
+        const onError = () => failWith('SCRIPT_LOAD_FAILED', 'Failed to load ' + lib.url);
         timer = setTimeout(() => failWith('SCRIPT_LOAD_TIMEOUT', 'Script load timed out: ' + lib.url), SCRIPT_LOAD_TIMEOUT_MS);
-        document.head.appendChild(script);
+        injectScript({ url: lib.url, integrity: lib.integrity, onLoad: onLoad, onError: onError });
     });
     loadedScriptPromises[key] = pending;
     return pending;
@@ -159,8 +155,7 @@ export function forceExportTextCells(ws, rowCount) {
 }
 
 export function openExportDataModal() {
-    const lbl = byId('exportFilterLabel');
-    if (lbl) lbl.innerText = getCurrentFilterLabel();
+    viewState.exportFilterLabel = getCurrentFilterLabel();
     openModalHelper('exportDataModal');
 }
 
@@ -188,7 +183,7 @@ export async function exportDataAsExcel() {
 
 export function restoreAfterPdfExport() {
     if (uiState.pdfExportOriginalTitle !== null) {
-        document.title = uiState.pdfExportOriginalTitle;
+        viewState.documentTitle = null;
         uiState.pdfExportOriginalTitle = null;
     }
     uiState.pdfExportView = null;
@@ -199,9 +194,6 @@ export function exportDataAsPDF() {
     const rows = buildExportRows();
     if (!rows.length) { showToast(emptyViewMessage(STATS_DAILY_VIEW_KEYS, "⚠️ គ្មានទិន្នន័យសម្រាប់ Export ទេ!")); return; }
     closeModal('exportDataModal');
-
-    const printArea = byId('pdfExportPrintArea');
-    if (!printArea) { showToast("❌ Export PDF បរាជ័យ!"); return; }
 
     const totalCod = Math.round(rows.reduce((sum, r) => sum + r.cod, 0) * 100) / 100;
     const totalDod = Math.round(rows.reduce((sum, r) => sum + r.dod, 0) * 100) / 100;
@@ -218,14 +210,21 @@ export function exportDataAsPDF() {
         },
         footer: 'នាំចេញនៅ ' + (getZoneDateKey(getServerNow(), 0) + ' ' + getFormattedClockTime(getServerNow()))
     };
-    // ⛔ `window.print()` អានDOM ភ្លាមៗ ➜ ការគូរត្រូវចប់ **មុន** វា
-    renderNow(uiState);
+    beginPdfPrint(getExportFilenameBase());
+}
 
-    if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = document.title;
-    document.title = getExportFilenameBase();
+/**
+ * បោះពុម្ពតំបន់ `PdfExportPrintArea` ៖ ចំណងជើង document = ឈ្មោះឯកសារ PDF
+ * (browser យកវាជាឈ្មោះ) ➜ ⛔ ទាំងតំបន់បោះពុម្ព និងចំណងជើង ត្រូវ **ចុះ DOM
+ * ភ្លាម** (`commitNow()`) មុន `window.print()` ដែលអាន DOM ភ្លាមៗ។
+ */
+export function beginPdfPrint(filenameBase: string) {
+    if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = documentBaseTitle();
+    viewState.documentTitle = filenameBase;
+    commitNow();
     window.addEventListener('afterprint', restoreAfterPdfExport);
     noteAppLockExcuse();
-    reportPrintFailure(printCurrentView(document.title));
+    reportPrintFailure(printCurrentView(filenameBase));
 }
 
 export function reportPrintFailure(printed: Promise<void> | void) {

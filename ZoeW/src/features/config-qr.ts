@@ -1,4 +1,6 @@
-import { byId } from '../core/dom';
+import { prepareInlineVideo } from '../app/media';
+import { setFieldValue, videoElement } from '../app/refs';
+import { createScratchCanvas } from '../platform/document-io';
 import { scanState, securityState } from '../core/state';
 import { decodeSetupPayload } from './config';
 import { CONFIG_QR_FORMAT_NAMES, CONFIG_QR_SCAN_WIDTH, buildReaderOptions, decodeBarcodeFromCanvasManual, scanEngineReady, scheduleScanFrame } from '../services/scan-engine';
@@ -25,7 +27,7 @@ export function closeConfigQrScanner() {
         try { securityState.configQrStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
         securityState.configQrStream = null;
     }
-    const video = byId('configQrVideo');
+    const video = videoElement('configQrVideo');
     if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
     securityState.configQrReader = null;
     closeModal('configQrScanModal');
@@ -51,10 +53,10 @@ export async function openConfigQrScanner() {
         securityState.configQrStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' }, audio: false
         });
-        const video = byId('configQrVideo');
+        const video = videoElement('configQrVideo');
         if (!video) throw new Error('configQrVideo missing');
         video.srcObject = securityState.configQrStream;
-        video.setAttribute('playsinline', 'true');
+        prepareInlineVideo(video, false);
         await video.play();
         runConfigQrLoop(video);
     } catch (e) {
@@ -73,7 +75,7 @@ export function runConfigQrLoop(videoElement) {
         if (!securityState.configQrScanActive) return;
         if (!busy && videoElement.readyState >= videoElement.HAVE_CURRENT_DATA && videoElement.videoWidth > 0) {
             if (!canvas) {
-                canvas = document.createElement('canvas');
+                canvas = createScratchCanvas();
                 ctx = canvas.getContext('2d', { willReadFrequently: true });
             }
             const width = Math.min(CONFIG_QR_SCAN_WIDTH, videoElement.videoWidth);
@@ -114,7 +116,6 @@ export function handleConfigQrResult(text) {
     }
 
     closeConfigQrScanner();
-    const cfgInput = byId('firebaseConfigInput');
-    if (cfgInput) cfgInput.value = JSON.stringify(parsed, null, 2);
+    setFieldValue('firebaseConfigInput', JSON.stringify(parsed, null, 2));
     showToast('✅ បានស្កេន QR ជោគជ័យ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
 }

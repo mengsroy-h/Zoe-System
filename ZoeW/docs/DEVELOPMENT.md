@@ -32,8 +32,8 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 
 | អ្វី | តម្លៃ | ដេរីវេពី |
 |---|---|---|
-| កំណែ App | `2.39.0` | [`src/core/version.ts`](../src/core/version.ts) |
-| កំណែ cache របស់ Service Worker | `zoew-v224` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
+| កំណែ App | `2.40.0` | [`src/core/version.ts`](../src/core/version.ts) |
+| កំណែ cache របស់ Service Worker | `zoew-v225` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
 | Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
 
 ⛔ `manifest.json` និង `index.html` **មិនផ្ទុកលេខកំណែជា literal ទេ** — ពួកវា
@@ -113,6 +113,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ បូក `rules:check` |
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
+| `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
 | `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime |
 | `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
 | `npm run original:fetch` | ទាញ ZoeW ដើម (vanilla JS) ពី git ចូល `.original/ZoeW` — អ្នកសម្រេចនៃការវាស់ parity |
@@ -147,7 +148,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 
 កូដក្នុង `src/core` · `src/domain` · `src/features` · `src/services` · `src/ui`
 **កើតពី** `app.js` ដើមដោយ codemod (`tools/`)។ ឥឡូវ `src/` ត្រូវបានកែដោយដៃ
-(lifecycle · platform · Android) ➜ **កែនៅក្នុង `src/` ដោយផ្ទាល់**។
+(lifecycle · platform · Android · React ១០០%) ➜ **កែនៅក្នុង `src/` ដោយផ្ទាល់**។
 `npm run generate` នៅចាក់សោ (`ALLOW_REGENERATE=1`) ហើយ ⛔ **កុំរត់វា** ៖ វា
 សរសេរជាន់ `src/` ទាំងមូល ➜ ការកែទាំងនោះនឹងបាត់។ `tools/` នៅរក្សាទុកតែជា
 កំណត់ត្រានៃការផ្ទេរ និងជាប្រភពនៃបញ្ជី slot ដែល `doc:check` · `slot:check` អាន។

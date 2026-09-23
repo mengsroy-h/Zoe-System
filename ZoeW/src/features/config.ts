@@ -1,4 +1,5 @@
-import { byId } from '../core/dom';
+import { modalIsOpen } from '../core/modals';
+import { fieldValue, setFieldValue } from '../app/refs';
 import { securityState } from '../core/state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { cancelPendingLookupUnlock } from './auto-lookup';
@@ -22,11 +23,9 @@ export function checkPinAndOpenConfig(isFirstTime = false) {
 export function openConfigModal() {
     const savedConfig = safeStoreGet(appLocalStore, 'zoew_firebase_config');
     if (savedConfig) {
-        const cfgInput = byId('firebaseConfigInput');
-        if(cfgInput) cfgInput.value = savedConfig;
+        setFieldValue('firebaseConfigInput', savedConfig);
     }
-    const dsnInput = byId('sentryDsnInput');
-    if (dsnInput && window.ZoeErrors) dsnInput.value = ZoeErrors.getDsn();
+    if (window.ZoeErrors) setFieldValue('sentryDsnInput', ZoeErrors.getDsn());
     openModalHelper('configModal');
 }
 
@@ -205,13 +204,10 @@ export function firebaseConfigErrorMessage(err) {
 }
 
 export function saveFirebaseConfig() {
-    const cfgInput = byId('firebaseConfigInput');
-    if(!cfgInput) return;
-    const raw = cfgInput.value.trim();
-    const dsnInput = byId('sentryDsnInput');
-    const dsnEntered = dsnInput ? dsnInput.value.trim() : '';
-    if (dsnInput && window.ZoeErrors) {
-        ZoeErrors.setDsn(dsnInput.value);
+    const raw = fieldValue('firebaseConfigInput').trim();
+    const dsnEntered = fieldValue('sentryDsnInput').trim();
+    if (window.ZoeErrors) {
+        ZoeErrors.setDsn(fieldValue('sentryDsnInput'));
         const sentryInit = ZoeErrors.init('zoew');
         if (dsnEntered && sentryInit && typeof sentryInit.then === 'function') {
             const warnSentry = () => showToast("⚠️ មិនអាចភ្ជាប់ Sentry បានទេ! សូមពិនិត្យ DSN ឬការតភ្ជាប់អ៊ីនធឺណិត");
@@ -229,7 +225,7 @@ export function saveFirebaseConfig() {
         alert(firebaseConfigErrorMessage(e));
         return;
     }
-    cfgInput.value = JSON.stringify(normalized.config, null, 2);
+    setFieldValue('firebaseConfigInput', JSON.stringify(normalized.config, null, 2));
     if (!safeStoreSet(appLocalStore, 'zoew_firebase_config', JSON.stringify(normalized.config))) {
         alert("រក្សាទុក Config មិនបានទេ! សូមពិនិត្យទំហំផ្ទុករបស់ browser។");
         return;
@@ -283,8 +279,7 @@ export function applySetupLinkFromUrl() {
             ZoeErrors.init('zoew');
         }
         openConfigModal();
-        const cfgInput = byId('firebaseConfigInput');
-        if (cfgInput) cfgInput.value = JSON.stringify(linkConfig, null, 2);
+        setFieldValue('firebaseConfigInput', JSON.stringify(linkConfig, null, 2));
         showToast(linkDsn
             ? '✅ Setup Link បានបំពេញ Config និងបើកការរាយការណ៍កំហុស! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"'
             : '✅ Setup Link បានបំពេញ Config ដោយស្វ័យប្រវត្តិ! សូមពិនិត្យ ហើយចុច "រក្សាទុក និងភ្ជាប់"');
@@ -304,7 +299,5 @@ export function cancelPinEntryFlow() {
 }
 
 export function isPinFlowPending() {
-    const pinEl = byId('pinModal');
-    const setupEl = byId('pinSetupModal');
-    return !!((pinEl && pinEl.style.display === 'flex') || (setupEl && setupEl.style.display === 'flex'));
+    return modalIsOpen('pinModal') || modalIsOpen('pinSetupModal');
 }

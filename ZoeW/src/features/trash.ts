@@ -1,5 +1,6 @@
+import { setModalDisplay } from '../core/modals';
 import { buildTrashRowModel, buildTrashSummaryModel } from '../app/components/trash/model';
-import { byId } from '../core/dom';
+import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { DB_LISTENER_KEY_DELETED } from '../core/text';
 import { barcodeEntriesOf, sanitizeInput } from '../domain/barcode';
@@ -94,8 +95,7 @@ export function trashGroupMatchesQuery(group, query) {
 }
 
 export function filterRecentlyDeleted() {
-    const input = byId('deletedSearchInput');
-    uiState.deletedSearchQuery = input ? input.value : '';
+    uiState.deletedSearchQuery = fieldValue('deletedSearchInput');
     renderRecentlyDeleted();
 }
 
@@ -109,14 +109,12 @@ export function toggleTrashGroup(key?) {
 export function closeRecentlyDeletedModal() {
     uiState.deletedSearchQuery = '';
     expandedTrashGroups.clear();
-    const input = byId('deletedSearchInput');
-    if (input) input.value = '';
+    setFieldValue('deletedSearchInput', '');
     closeModal('recentlyDeletedModal');
 }
 
 export function openRecentlyDeletedModal() {
-    const input = byId('deletedSearchInput');
-    if (input) input.value = uiState.deletedSearchQuery;
+    setFieldValue('deletedSearchInput', uiState.deletedSearchQuery);
     renderRecentlyDeleted();
     openModalHelper('recentlyDeletedModal');
 }
@@ -225,8 +223,7 @@ export function renderRecentlyDeleted() {
 
 export function promptRestoreDeletedItem(id?) {
     uiState.pendingRestoreId = id;
-    const recentlyModal = byId('recentlyDeletedModal');
-    if(recentlyModal) recentlyModal.style.display = 'none';
+    setModalDisplay('recentlyDeletedModal', 'none');
     openModalHelper('restoreWarningModal');
 }
 

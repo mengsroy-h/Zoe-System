@@ -8,7 +8,8 @@ function sheetImportViewNow(): any {
     return uiState.sheetImportView || emptySheetImportView();
 }
 
-import { byId } from '../core/dom';
+import { fieldValue, openFilePicker, setFieldValue } from '../app/refs';
+import { viewState } from '../core/view-state';
 import { sheetImportState } from '../core/state';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { SHEET_IMPORT_SECRET_SALT, SHEET_IMPORT_STORE_KEY } from '../core/storage-keys';
@@ -102,8 +103,8 @@ export function setSheetImportMsg(hostId, text, kind?) {
 }
 
 export function showSheetImportPart(id, on) {
-    const el = byId(id);
-    if (el) el.classList.toggle('hidden', !on);
+    if (viewState.siParts[id] === !!on) return;
+    viewState.siParts = Object.assign({}, viewState.siParts, { [id]: !!on });
 }
 
 export function sheetImportIsBinaryWorkbook(bytes) {
@@ -155,12 +156,10 @@ export function clearSheetImportSession() {
     sheetImportState.sheetImportHeaders = [];
     sheetImportState.sheetImportSignature = '';
     sheetImportState.sheetImportBusy = false;
-    ['siApiUrlInput', 'siApiPasswordInput', 'siFileInput'].forEach((id) => {
-        const el = byId(id);
-        if (el) el.value = '';
+    (['siApiUrlInput', 'siApiPasswordInput', 'siFileInput'] as const).forEach((id) => {
+        setFieldValue(id, '');
     });
-    const foot = byId('siStatusFoot');
-    if (foot) foot.textContent = '';
+    viewState.siStatusFoot = '';
     uiState.sheetImportView = emptySheetImportView();
     ['siConfigMsg', 'siFileMsg', 'siMapMsg', 'siActionMsg', 'siClearMsg'].forEach((id) => setSheetImportMsg(id, ''));
     ['siConfigSummary', 'siConfigEditRow', 'siFileCard', 'siMapCard', 'siActionCard', 'siClearCard', 'siPreviewWrap'].forEach((id) => showSheetImportPart(id, false));
@@ -242,8 +241,7 @@ export async function callSheetImportApi(action, extra, url?, password?) {
 }
 
 export function setSheetImportFoot(text) {
-    const foot = byId('siStatusFoot');
-    if (foot) foot.textContent = text;
+    viewState.siStatusFoot = text;
 }
 
 export function sheetImportStatusText(spreadsheetName, sheetName, rowCount) {
@@ -264,10 +262,8 @@ export async function refreshSheetImportStatus() {
 
 export async function saveSheetImportConfig() {
     if (sheetImportState.sheetImportBusy) return;
-    const urlIn = byId('siApiUrlInput');
-    const passIn = byId('siApiPasswordInput');
-    const url = urlIn ? urlIn.value.trim() : '';
-    const password = passIn ? passIn.value.trim() : '';
+    const url = fieldValue('siApiUrlInput').trim();
+    const password = fieldValue('siApiPasswordInput').trim();
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(url)) {
         setSheetImportMsg('siConfigMsg', 'URL ត្រូវជា Web app URL របស់ Apps Script ដែលបញ្ចប់ដោយ /exec', 'bad');
         return;
@@ -281,8 +277,7 @@ export async function saveSheetImportConfig() {
         return;
     }
     sheetImportState.sheetImportBusy = true;
-    const saveBtn = byId('siConfigSaveBtn');
-    if (saveBtn) saveBtn.disabled = true;
+    viewState.siConfigSaving = true;
     setSheetImportMsg('siConfigMsg', 'កំពុងសាកល្បងការតភ្ជាប់...', 'warn');
     try {
         const status = await callSheetImportApi('status', {}, url, password);
@@ -293,8 +288,8 @@ export async function saveSheetImportConfig() {
         }
         sheetImportState.sheetImportUrl = url;
         sheetImportState.sheetImportPassword = password;
-        if (urlIn) urlIn.value = '';
-        if (passIn) passIn.value = '';
+        setFieldValue('siApiUrlInput', '');
+        setFieldValue('siApiPasswordInput', '');
         setSheetImportMsg('siConfigMsg', '');
         showSheetImportConfigSummary();
         setSheetImportFoot(sheetImportStatusText(status.spreadsheetName, status.sheetName, status.rowCount));
@@ -302,14 +297,13 @@ export async function saveSheetImportConfig() {
     } catch (e) {
         setSheetImportMsg('siConfigMsg', e.message, 'bad');
     } finally {
-        if (saveBtn) saveBtn.disabled = false;
+        viewState.siConfigSaving = false;
         sheetImportState.sheetImportBusy = false;
     }
 }
 
 export function pickSheetImportFile() {
-    const input = byId('siFileInput');
-    if (input) input.click();
+    openFilePicker('siFileInput');
 }
 
 export function handleSheetImportFileInput(inputEl?) {
@@ -377,14 +371,12 @@ export async function loadSheetImportSelectedSheet() {
             break;
         }
     }
-    const headerIn = byId('siHeaderRowInput');
-    if (headerIn) headerIn.value = String(headerIndex + 1);
+    setFieldValue('siHeaderRowInput', String(headerIndex + 1));
     await applySheetImportHeaderRow();
 }
 
 export function sheetImportHeaderRowNumber() {
-    const headerIn = byId('siHeaderRowInput');
-    const parsed = parseInt(headerIn ? headerIn.value : '1', 10);
+    const parsed = parseInt(fieldValue('siHeaderRowInput'), 10);
     return isNaN(parsed) || parsed < 1 ? 1 : parsed;
 }
 
@@ -402,8 +394,7 @@ export async function applySheetImportHeaderRow() {
         sheetImportState.sheetImportSignature = prepared.signature;
         applySheetImportMapping(prepared.mapping);
         if (prepared.source === 'saved') {
-            const modeSel = byId('siModeSel');
-            if (prepared.mode && modeSel) modeSel.value = prepared.mode;
+            if (prepared.mode) setFieldValue('siModeSel', prepared.mode);
             setSheetImportMsg('siMapMsg', '✅ ប្រើការផ្គូផ្គងដែលរក្សាទុកពីលើកមុន', 'ok');
         } else if (prepared.source === 'auto') {
             setSheetImportMsg('siMapMsg', '✅ រកឃើញ Column ដោយស្វ័យប្រវត្តិ', 'ok');
@@ -473,7 +464,6 @@ export function addSheetImportChip(host, text, kind) {
 }
 
 export function renderSheetImportPreview() {
-    const importBtn = byId('siImportBtn');
     const rows = sheetImportMappedRows();
     const usable = rows.filter((r) => r[0] !== '');
     const seen = Object.create(null);
@@ -493,7 +483,7 @@ export function renderSheetImportPreview() {
         previewRows: usable.slice(0, SHEET_IMPORT_PREVIEW_ROWS).map((r) => [r[0], r[1].toFixed(2), r[2].toFixed(2), r[3]])
     });
     showSheetImportPart('siPreviewWrap', usable.length > 0);
-    if (importBtn) importBtn.disabled = usable.length === 0;
+    viewState.siImportBtnDisabled = usable.length === 0;
 }
 
 export async function runSheetImport() {
@@ -507,15 +497,11 @@ export async function runSheetImport() {
         setSheetImportMsg('siActionMsg', 'ឯកសារនេះមាន ' + rows.length + ' ជួរដេក ច្រើនជាងកម្រិត ' + SHEET_IMPORT_MAX_ROWS, 'bad');
         return;
     }
-    const modeSel = byId('siModeSel');
-    const mode = modeSel ? modeSel.value : 'replace';
+    const mode = fieldValue('siModeSel');
     if (mode === 'replace' && !confirm('ជួរដេកទាំងអស់ក្នុង Sheet នឹងត្រូវលុប រួចជំនួសដោយ ' + rows.length + ' ជួរដេកពីឯកសារនេះ។ តើបន្តទេ?')) return;
     sheetImportState.sheetImportBusy = true;
-    const importBtn = byId('siImportBtn');
-    if (importBtn) {
-        importBtn.disabled = true;
-        importBtn.textContent = 'កំពុងនាំចូល...';
-    }
+    viewState.siImportBtnDisabled = true;
+    viewState.siImportBtnText = 'កំពុងនាំចូល...';
     setSheetImportMsg('siActionMsg', '');
     try {
         const result = await callSheetImportApi('import', {
@@ -534,10 +520,8 @@ export async function runSheetImport() {
         setSheetImportMsg('siActionMsg', e.message, 'bad');
         showToast('❌ នាំចូលមិនបានទេ! ' + e.message);
     } finally {
-        if (importBtn) {
-            importBtn.disabled = false;
-            importBtn.textContent = 'នាំចូលទៅ Sheet';
-        }
+        viewState.siImportBtnDisabled = false;
+        viewState.siImportBtnText = 'នាំចូលទៅ Sheet';
         sheetImportState.sheetImportBusy = false;
     }
 }
@@ -546,11 +530,7 @@ export async function runSheetImportClear() {
     if (sheetImportState.sheetImportBusy) return;
     if (!confirm('ជួរដេកទាំងអស់ក្នុង tab គោលដៅនឹងត្រូវលុប ដោយទុកតែជួរ header។ សកម្មភាពនេះមិនអាចដកវិញបានទេ។ តើបន្តទេ?')) return;
     sheetImportState.sheetImportBusy = true;
-    const clearBtn = byId('siClearBtn');
-    if (clearBtn) {
-        clearBtn.disabled = true;
-        clearBtn.textContent = 'កំពុងសម្អាត...';
-    }
+    viewState.siClearBtnBusy = true;
     setSheetImportMsg('siClearMsg', '');
     try {
         const result = await callSheetImportApi('clear', { confirm: 'CLEAR' });
@@ -563,10 +543,7 @@ export async function runSheetImportClear() {
         setSheetImportMsg('siClearMsg', e.message, 'bad');
         showToast('❌ សម្អាតមិនបានទេ! ' + e.message);
     } finally {
-        if (clearBtn) {
-            clearBtn.disabled = false;
-            clearBtn.textContent = 'សម្អាតទិន្នន័យក្នុង Sheet';
-        }
+        viewState.siClearBtnBusy = false;
         sheetImportState.sheetImportBusy = false;
     }
 }
@@ -576,8 +553,7 @@ export function resetSheetImportFileSelection() {
     sheetImportState.sheetImportSheetRows = [];
     sheetImportState.sheetImportHeaders = [];
     sheetImportState.sheetImportSignature = '';
-    const fileIn = byId('siFileInput');
-    if (fileIn) fileIn.value = '';
+    setFieldValue('siFileInput', '');
     patchSheetImportView({ chips: [] });
     showSheetImportPart('siMapCard', false);
     showSheetImportPart('siActionCard', false);
@@ -585,24 +561,3 @@ export function resetSheetImportFileSelection() {
     ['siFileMsg', 'siMapMsg', 'siActionMsg'].forEach((id) => setSheetImportMsg(id, ''));
 }
 
-export function setupSheetImportDropZone() {
-    const drop = byId('siDrop');
-    if (!drop) return;
-    ['dragenter', 'dragover'].forEach((name) => {
-        drop.addEventListener(name, (evt) => {
-            evt.preventDefault();
-            drop.classList.add('si-drop-hot');
-        });
-    });
-    ['dragleave', 'drop'].forEach((name) => {
-        drop.addEventListener(name, (evt) => {
-            evt.preventDefault();
-            drop.classList.remove('si-drop-hot');
-        });
-    });
-    drop.addEventListener('drop', (evt) => {
-        if (evt.dataTransfer && evt.dataTransfer.files && evt.dataTransfer.files.length) {
-            handleSheetImportFile(evt.dataTransfer.files[0]);
-        }
-    });
-}

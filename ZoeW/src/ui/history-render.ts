@@ -1,5 +1,5 @@
 import { uiState } from '../core/state';
-import { byId } from '../core/dom';
+import { viewState } from '../core/view-state';
 import { dataState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
@@ -10,10 +10,7 @@ import { emptyViewMessage } from '../services/db-listeners';
 import { buildHistoryRowHtml } from './history-row';
 
 export function renderHistory(dataToRender = dataState.scanHistory) {
-    const tbody = byId('historyTableBody');
-    const countSpan = byId('count');
-    if (!tbody || !countSpan) return;
-    countSpan.innerText = dataToRender.length;
+    viewState.historyCountText = String(dataToRender.length);
 
     // ➜ `HistoryTableBody` (React) ជាអ្នកគូរជួរដេកឥឡូវនេះ។
     //   `touch()` ចាំបាច់ព្រោះកន្លែងហៅជាច្រើនកែ *វត្ថុខាងក្នុង* ដោយ

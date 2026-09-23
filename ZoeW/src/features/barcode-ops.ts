@@ -1,4 +1,6 @@
-import { byId } from '../core/dom';
+import { modalIsOpen, setModalDisplay } from '../core/modals';
+import { fieldValue, setFieldValue } from '../app/refs';
+import { domText, viewState } from '../core/view-state';
 import { dataState, firebaseState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { formatScanStamp, getFormattedDate } from '../core/timezone';
@@ -21,8 +23,7 @@ export function openViewListModal(id?) {
     const item = dataState.scanHistory.find(i => i.id === id);
     if (!item) return;
 
-    const listModalPhoneText = byId('listModalPhoneText');
-    if(listModalPhoneText) listModalPhoneText.innerText = item.phone;
+    viewState.listModalPhoneText = domText(item.phone);
 
     ensureBarcodeArrayForItem(item);
 
@@ -453,15 +454,11 @@ export function openEditBarcodePriceModal(itemId?, code?) {
     let currentCod = targetB ? (parseFloat(targetB.cod) || 0) : 0;
     let currentDod = targetB ? (parseFloat(targetB.dod) || 0) : 0;
 
-    const editBcPcText = byId('editBcPcText');
-    if(editBcPcText) editBcPcText.innerText = code;
-    const editBcCodInput = byId('editBcCodInput');
-    if(editBcCodInput) editBcCodInput.value = currentCod;
-    const editBcDodInput = byId('editBcDodInput');
-    if(editBcDodInput) editBcDodInput.value = currentDod;
+    viewState.editBcPcText = domText(code);
+    setFieldValue('editBcCodInput', String(currentCod));
+    setFieldValue('editBcDodInput', String(currentDod));
 
-    const viewListModal = byId('viewListModal');
-    if(viewListModal) viewListModal.style.display = 'none';
+    setModalDisplay('viewListModal', 'none');
     openModalHelper('editBarcodePriceModal');
 }
 
@@ -473,11 +470,9 @@ export function closeEditBarcodeModal() {
 }
 
 export function saveEditedBarcodePrice() {
-    const editBcCodInput = byId('editBcCodInput');
-    const editBcDodInput = byId('editBcDodInput');
 
-    let newCod = editBcCodInput ? Math.round((parseFloat(editBcCodInput.value) || 0) * 100) / 100 : 0;
-    let newDod = editBcDodInput ? Math.round((parseFloat(editBcDodInput.value) || 0) * 100) / 100 : 0;
+    let newCod = Math.round((parseFloat(fieldValue('editBcCodInput')) || 0) * 100) / 100;
+    let newDod = Math.round((parseFloat(fieldValue('editBcDodInput')) || 0) * 100) / 100;
     if (!Number.isFinite(newCod) || newCod < 0) newCod = 0;
     if (!Number.isFinite(newDod) || newDod < 0) newDod = 0;
 
@@ -609,8 +604,7 @@ export function saveEditedBarcodePrice() {
                 undoEditedPriceRevenue();
                 revertEditedPriceLocally();
                 refreshCurrentHistoryView();
-                const viewListEl = byId('viewListModal');
-                if (viewListEl && viewListEl.style.display === 'flex') openViewListModal(editedItemId);
+                if (modalIsOpen('viewListModal')) openViewListModal(editedItemId);
                 showToast("⚠️ កែប្រែទឹកប្រាក់មិនបានជោគជ័យ! ទិន្នន័យត្រូវបានត្រឡប់មកវិញ សូមសាកល្បងម្តងទៀត។");
                 if (err && window.ZoeErrors) ZoeErrors.capture(err, { zone: 'money', context: 'saveEditedBarcodePrice transaction failed' });
             };

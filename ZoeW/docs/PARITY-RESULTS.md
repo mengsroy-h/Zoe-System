@@ -13,17 +13,25 @@
 ║  របាយការណ៍ parity ៖ ZoeW (ដើម) ➜ ZoeW React (React + Vite)            ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-✅ Function កម្រិតកំពូល         739/739    100.00%
+✅ Function កម្រិតកំពូល         735/735    100.00%
+✅ បញ្ជី «ដកចេញដោយចេតនា» មិនងាប់     4/4      100.00%
 ✅ ថេរ (const)                  213/213    100.00%
 ✅ State (let)                  176/176    100.00%
 ✅ សកម្មភាព (data-act)          118/118    100.00%
 ✅ id ក្នុង index.html          263/263    100.00%
 ✅ កូនសោ storage                 46/46     100.00%
-✅ អត្ថបទដែលអ្នកប្រើអាន         778/778    100.00%
+✅ អត្ថបទដែលអ្នកប្រើអាន         777/777    100.00%
+✅ បញ្ជីអត្ថបទ «ដកចេញដោយចេតនា» មិនងាប់     1/1      100.00%
 ✅ style.css (byte)               1/1      100.00%
 
-Module ថ្មី ៖ 134 ឯកសារ
-Function ដែល export ៖ 813
+🗑️  function ដើមដែលដកចេញដោយចេតនា ៖ 4 (scripts/intentional-removals.mjs)
+      • readActionArgs
+      • runElementAction
+      • setupActionDelegation
+      • code128SvgElement
+
+Module ថ្មី ៖ 186 ឯកសារ
+Function ដែល export ៖ 978
 វាល state ៖ 176
 ```
 

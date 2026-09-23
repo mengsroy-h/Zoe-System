@@ -1,12 +1,15 @@
+import { Modal } from './Modal';
+import { viewState } from '../../../core/view-state';
+import { useStoreValue } from '../../hooks/useStore';
 import { onAct } from '../../actions';
 
 export function ScanRemoveModal() {
+    const texts = useStoreValue(viewState, (s) => s.scanRemoveTexts);
     return (
-        <div
+        <Modal
             id="scanRemoveModal"
-            className="modal"
             style={{ zIndex: "1065" }}
-            data-close="cancelScannedRemoval"
+            close="cancelScannedRemoval"
             role="dialog"
             aria-modal="true"
             aria-labelledby="scanRemoveModalTitle"
@@ -17,27 +20,27 @@ export function ScanRemoveModal() {
                 <dl className="scan-remove-preview">
                     <div className="scan-remove-field scan-remove-field-wide">
                         <dt>Barcode</dt>
-                        <dd id="scanRemoveBarcodeText"></dd>
+                        <dd id="scanRemoveBarcodeText">{texts.scanRemoveBarcodeText}</dd>
                     </div>
                     <div className="scan-remove-field scan-remove-field-wide">
                         <dt>លេខទូរស័ព្ទ</dt>
-                        <dd id="scanRemovePhoneText"></dd>
+                        <dd id="scanRemovePhoneText">{texts.scanRemovePhoneText}</dd>
                     </div>
                     <div className="scan-remove-field">
                         <dt>ទីតាំង Locker</dt>
-                        <dd id="scanRemoveLockerText"></dd>
+                        <dd id="scanRemoveLockerText">{texts.scanRemoveLockerText}</dd>
                     </div>
                     <div className="scan-remove-field">
                         <dt>ស្ថានភាព</dt>
-                        <dd id="scanRemoveStateText"></dd>
+                        <dd id="scanRemoveStateText">{texts.scanRemoveStateText}</dd>
                     </div>
                     <div className="scan-remove-field">
                         <dt>COD</dt>
-                        <dd id="scanRemoveCodText"></dd>
+                        <dd id="scanRemoveCodText">{texts.scanRemoveCodText}</dd>
                     </div>
                     <div className="scan-remove-field">
                         <dt>DOD</dt>
-                        <dd id="scanRemoveDodText"></dd>
+                        <dd id="scanRemoveDodText">{texts.scanRemoveDodText}</dd>
                     </div>
                 </dl>
                 <div className="scan-remove-warning">ការដកនេះនឹងកាត់ទឹកប្រាក់ និងចំនួនកញ្ចប់ចេញពីស្ថិតិភ្លាមៗ។ អ្នកអាចស្តារពីធុងសំរាម ដើម្បីបូកត្រឡប់វិញបាន។</div>
@@ -62,6 +65,6 @@ export function ScanRemoveModal() {
                     </div>
                 </div>
             </div>
-        </div>
+        </Modal>
     );
 }

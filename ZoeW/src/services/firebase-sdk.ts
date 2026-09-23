@@ -1,3 +1,4 @@
+import { openModalIds } from '../core/modals';
 import { firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
 import { appSessionStore, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -28,13 +29,7 @@ export function resetFirebaseSdkRetryHealth() {
 }
 
 export function anyModalIsOpen() {
-    const modals = document.querySelectorAll('.modal');
-    for (let i = 0; i < modals.length; i++) {
-        const el = modals[i] as any;
-        if (el.classList && el.classList.contains('active')) return true;
-        if (el.style && el.style.display === 'flex') return true;
-    }
-    return false;
+    return openModalIds().length > 0;
 }
 
 export function firebaseSdkReloadCount() {

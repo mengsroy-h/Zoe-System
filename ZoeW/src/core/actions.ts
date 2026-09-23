@@ -1,6 +1,5 @@
-import { lookupAction } from './action-registry';
 import { firebaseState } from './state';
-import { ACTION_ALLOWLIST } from './runtime';
+import { viewState } from './view-state';
 import { appLocalStore, safeStoreGet, safeStoreSet } from './storage';
 import { DRAWER_GROUP_KEY } from './storage-keys';
 import { APP_VERSION } from './version';
@@ -13,43 +12,6 @@ import { requestPinBeforeConfig } from '../features/pin';
 import { showLoginModalWithPrefill } from '../features/session';
 import { closeModal, openModalHelper } from '../ui/modal';
 import { drawerAction } from '../ui/page-nav';
-
-export function readActionArgs(el, event) {
-    const raw = el.getAttribute('data-args');
-    let args = [];
-    if (raw) {
-        try { args = JSON.parse(raw); } catch (e) { args = []; }
-        if (!Array.isArray(args)) args = [args];
-    } else {
-        const a1 = el.getAttribute('data-a1');
-        const a2 = el.getAttribute('data-a2');
-        if (a1 !== null) args.push(a1);
-        if (a2 !== null) args.push(a2);
-    }
-    if (el.getAttribute('data-evt')) args.unshift(event);
-    if (el.getAttribute('data-self')) args.unshift(el);
-    return args;
-}
-
-export function runElementAction(el, event) {
-    const name = el.getAttribute('data-act');
-    if (!name || ACTION_ALLOWLIST.indexOf(name) === -1) return;
-    const fn = lookupAction(name);
-    if (!fn) return;
-    fn.apply(null, readActionArgs(el, event));
-}
-
-export function setupActionDelegation() {
-    ['click', 'change', 'input', 'submit'].forEach((type) => {
-        document.addEventListener(type, (event) => {
-            const el = event.target && event.target.closest ? event.target.closest('[data-act]') : null;
-            if (!el) return;
-            const want = el.getAttribute('data-on') || 'click';
-            if (want !== type) return;
-            runElementAction(el, event);
-        });
-    });
-}
 
 export function submitLoginForm(event?) {
     if (event) event.preventDefault();
@@ -86,35 +48,40 @@ export function rememberDrawerGroups(keys) {
     safeStoreSet(appLocalStore, DRAWER_GROUP_KEY, keys.join(','));
 }
 
+/**
+ * ធាតុដែលអាចលាក់បាន ក្នុង Category នីមួយៗ ➜ Category ដែលធាតុទាំងអស់លាក់
+ * ត្រូវលាក់ទាំងក្បាល (`CLAUDE.md` ៖ «របា Slide ៖ Category បត់បាន»)។
+ * Category ដែលមិនមានក្នុងតារាងនេះ មិនដែលទទេទេ។
+ */
+export const DRAWER_GROUP_TOGGLES: Record<string, ReadonlyArray<'ztoAutoCloseVisible' | 'ztoListSyncDrawerVisible'>> = {
+    drawerGroupZto: ['ztoAutoCloseVisible', 'ztoListSyncDrawerVisible']
+};
+
 export function drawerGroupIsEmpty(group) {
-    const items = group.querySelectorAll('.drawer-group-body .drawer-item');
-    for (let i = 0; i < items.length; i++) {
-        if (!items[i].classList.contains('hidden')) return false;
+    const keys = DRAWER_GROUP_TOGGLES[group];
+    if (!keys) return false;
+    for (let i = 0; i < keys.length; i++) {
+        if (viewState[keys[i]]) return false;
     }
     return true;
 }
 
 export function applyDrawerGroupState(group, open) {
-    group.classList.toggle('is-open', open);
-    const head = group.querySelector('.drawer-group-head');
-    if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const at = viewState.drawerGroupsOpen.indexOf(group);
+    if (open && at === -1) viewState.drawerGroupsOpen = viewState.drawerGroupsOpen.concat([group]);
+    else if (!open && at !== -1) viewState.drawerGroupsOpen = viewState.drawerGroupsOpen.filter((g) => g !== group);
 }
 
 export function refreshDrawerGroups() {
-    const open = openDrawerGroupKeys();
-    document.querySelectorAll('#sideDrawer .drawer-group').forEach((group) => {
-        const empty = drawerGroupIsEmpty(group);
-        group.classList.toggle('hidden', empty);
-        applyDrawerGroupState(group, !empty && open.indexOf(group.id) !== -1);
-    });
+    viewState.drawerGroupsHidden = Object.keys(DRAWER_GROUP_TOGGLES).filter((key) => drawerGroupIsEmpty(key));
+    viewState.drawerGroupsOpen = openDrawerGroupKeys().filter((key) => !drawerGroupIsEmpty(key));
 }
 
-export function toggleDrawerGroup(el?) {
-    const group = el && el.closest ? el.closest('.drawer-group') : null;
-    if (!group || !group.id) return;
+export function toggleDrawerGroup(group?) {
+    if (!group) return;
     const open = openDrawerGroupKeys();
-    const at = open.indexOf(group.id);
-    if (at === -1) open.push(group.id);
+    const at = open.indexOf(group);
+    if (at === -1) open.push(group);
     else open.splice(at, 1);
     rememberDrawerGroups(open);
     applyDrawerGroupState(group, at === -1);
@@ -138,7 +105,5 @@ export function confirmLogout() {
 }
 
 export function renderAppVersionLabels() {
-    document.querySelectorAll('[data-app-version]').forEach((el) => {
-        el.textContent = 'កំណែប្រព័ន្ធ: ' + APP_VERSION;
-    });
+    viewState.appVersionLabel = 'កំណែប្រព័ន្ធ: ' + APP_VERSION;
 }

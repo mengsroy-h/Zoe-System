@@ -307,6 +307,7 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 | `<canvas>`/`Image` ក្រៅអេក្រង់ (ស្កេន · QR) | មិនដែលចូល DOM ➜ វាមិនមែនការគូរ (`document-io.ts`) |
 | `<a download>` ដែលចុចរួចលុបភ្លាម | ការទាញយកត្រូវកើតក្នុង tick ដដែលនឹងការចុច (`document-io.ts`) |
 | `<body>` · `document.title` | នៅក្រៅ `#root` ➜ `DocumentEffects` ធ្វើឲ្យវាស៊ីនឹង state ក្នុង `useLayoutEffect` |
+| សំណាញ់ ៦ វិនាទីក្នុង `public/boot-flags.js` (រសាត់ `#bootSplash`) | ត្រូវដើរ **ឯករាជ្យពី bundle** ៖ bundle ដួល ➜ React គ្មានជីវិតដើម្បីលាក់ផ្ទាំង (`boot-animation-test`)។ ជាន់ទី ២ ក្នុង React (`armBootSplashFallback()`) ធ្វើឲ្យ state ដឹង |
 
 ---
 

@@ -80,18 +80,19 @@ async function scenario(title, fn) {
 const calls = (page, plugin, method) => page.evaluate(([p, m]) => (window.__nativeCalls || []).filter((c) => c.plugin === p && (!m || c.method === m)), [plugin, method]);
 const fire = (page, plugin, event, data) => page.evaluate(([p, e, d]) => window.__fireNative(p, e, d), [plugin, event, data || {}]);
 
-async function pull(page, distance) {
-    const point = await page.evaluate(() => {
+async function pull(page, distance, fromY) {
+    const point = await page.evaluate((fromY) => {
         const pages = document.getElementById('appPages');
         const r = pages.getBoundingClientRect();
-        for (let y = r.top + 40; y < r.top + 260; y += 12) {
+        const y0 = typeof fromY === 'number' ? fromY : r.top + 40;
+        for (let y = y0; y < y0 + 220; y += 12) {
             for (let x = 40; x < r.right - 40; x += 30) {
                 const el = document.elementFromPoint(x, y);
                 if (el && pages.contains(el) && !el.closest('input, textarea, select, button, a, .app-navbar, .page-tabbar')) return { x, y };
             }
         }
         return null;
-    });
+    }, fromY);
     if (!point) return false;
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: point.x, y: point.y }] });
@@ -241,11 +242,43 @@ await scenario('១. boot លើ Android native', async () => {
     ok('Export PDF ៖ ត្រឡប់ពីផ្ទាំងបោះពុម្ព ➜ afterprint ➜ ចំណងជើងវិញ', (await page.title()) === titleBefore, await page.title());
     ok('Export PDF ៖ គ្មានសោ App ក្លែង (គ្មាន PIN)', locked0 === false);
 
+    /* PTR ៖ តំបន់កេះ · ស្រទាប់បើក · ញ័រ (សំណើម្ចាស់គម្រោង) */
+    const noReload = () => page.waitForEvent('framenavigated', { timeout: 3000 }).then(() => false, () => true);
+    await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
+    // ⛔ ចំណុចចាប់ផ្តើមត្រូវជាកន្លែងដែល PTR **នឹងកេះពិត** បើគ្មានច្បាប់តំបន់ ៖ តារាងប្រវត្តិ
+    //    (នៅកំពូល) ក្រោមតំបន់ ៤០% — មិនមែនប្រអប់ស្វែងរក (ដែល PTR មិនចាប់ទោះយ៉ាងណា)
+    const zone = await page.evaluate(() => {
+        const tr = document.getElementById('tableResponsive').getBoundingClientRect();
+        const bottom = Math.round(window.innerHeight * 0.4);
+        return { h: window.innerHeight, bottom, fromY: Math.max(bottom + 20, Math.round(tr.top) + 12) };
+    });
+    let stayed = noReload();
+    ok('PTR ៖ ចាប់ផ្តើមលើតារាងក្រោមតំបន់ខាងលើ (' + zone.fromY + 'px / ' + zone.h + ') ➜ រកចំណុចទាញបាន', await pull(page, 300, zone.fromY));
+    ok('PTR ៖ ចាប់ផ្តើមក្រោមតំបន់ខាងលើ ➜ មិនផ្ទុកឡើងវិញ', await stayed);
+    ok('PTR ៖ ចាប់ផ្តើមក្រោមតំបន់ខាងលើ ➜ មិនញ័រ', (await calls(page, 'Haptics', 'impact')).length === 0);
+    // ⛔ ស្រទាប់បើកដោយ **ការចុចពិត** (build ផលិតកម្មគ្មាន `window.*`)
+    await page.click('.header-more-btn');
+    await page.click('[data-act="moreMenuExchangeRate"]');
+    ok('PTR ៖ ប្រអប់បើកពិត (លក្ខខណ្ឌចាំបាច់)', await page.evaluate(() => document.getElementById('exchangeRateModal').style.display === 'flex'));
+    stayed = noReload();
+    await pull(page, 300);
+    ok('PTR ៖ ប្រអប់បើក ➜ មិនផ្ទុកឡើងវិញ', await stayed);
+    await page.keyboard.press('Escape');
+    await page.click('.header-more-btn');
+    ok('PTR ៖ ម៉ឺនុយ (...) បើកពិត (លក្ខខណ្ឌចាំបាច់)', await page.evaluate(() => document.getElementById('globalMoreMenu').classList.contains('show')));
+    stayed = noReload();
+    await pull(page, 300);
+    ok('PTR ៖ ការប៉ះដែលបិទម៉ឺនុយ (...) ➜ មិនផ្ទុកឡើងវិញ', await stayed);
+    ok('PTR ៖ ការប៉ះនោះបិទម៉ឺនុយពិត', await page.evaluate(() => !document.getElementById('globalMoreMenu').classList.contains('show')));
+    ok('PTR ៖ ស្រទាប់បើក ➜ មិនញ័រ', (await calls(page, 'Haptics', 'impact')).length === 0);
+
     /* PTR លើ native ➜ reload */
     await page.evaluate(() => { document.getElementById('appPages').scrollTop = 0; });
     const reloaded = page.waitForEvent('framenavigated', { timeout: 6000 }).then(() => true, () => false);
     const pulled = await pull(page, 300);
     ok('PTR ៖ រកចំណុចទាញបាន', pulled);
+    const ticks = await calls(page, 'Haptics', 'impact').catch(() => []);
+    ok('PTR ៖ ឆ្លងព្រំដែន ➜ ញ័រ **ម្តង** (Haptics.impact · LIGHT)', ticks.length === 1 && ticks[0].options.style === 'LIGHT', ticks);
     ok('PTR លើ native ៖ ទាញចុះ ➜ ផ្ទុកឡើងវិញ', await reloaded);
     await page.waitForTimeout(2500);
     ok('PTR ៖ ក្រោយផ្ទុកឡើងវិញ App ចាប់ផ្តើមម្តងទៀត', await page.evaluate(() => document.querySelectorAll('#historyTableBody tr').length > 0));

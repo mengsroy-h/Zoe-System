@@ -287,11 +287,6 @@ export function elementSize(name: RefName): { width: number; height: number } {
     return el ? { width: el.offsetWidth, height: el.offsetHeight } : { width: 0, height: 0 };
 }
 
-export function scrollTopOf(name: RefName): number {
-    const el = elementOf(name);
-    return el ? el.scrollTop : 0;
-}
-
 export function setScrollTop(name: RefName, top: number): void {
     commitNow();
     const el = elementOf(name);

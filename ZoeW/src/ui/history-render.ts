@@ -3,11 +3,9 @@ import { viewState } from '../core/view-state';
 import { dataState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { DB_LISTENER_KEY_HISTORY } from '../core/text';
-import { parseTimestampFromId, sanitizeInput } from '../domain/barcode';
 import { FOUR_HOURS_MS } from '../features/session';
 import { renderZtoSyncViews, scheduleZtoStatusSweep } from '../features/zto-status';
 import { emptyViewMessage } from '../services/db-listeners';
-import { buildHistoryRowHtml } from './history-row';
 
 export function renderHistory(dataToRender = dataState.scanHistory) {
     viewState.historyCountText = String(dataToRender.length);

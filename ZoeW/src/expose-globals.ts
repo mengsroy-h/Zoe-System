@@ -16,7 +16,10 @@ import { installAuditClassAdapter } from './audit-compat';
  */
 export function exposeGlobals() {
     const modules = import.meta.glob(
-        ['./core/**/*.ts', './domain/**/*.ts', './features/**/*.ts', './services/**/*.ts', './ui/**/*.ts', './platform/**/*.ts',
+        // ⛔ គ្មាន `./platform/**` ៖ `import.meta.glob` eager នាំ plugin Capacitor ចូលជា static ➜ web
+        //    ផ្ទុក chunk `native-plugins` ដែល SW មិន cache (ដោយចេតនា) ➜ ក្រៅបណ្តាញ build វាស់ដួល
+        //    (វាស់បាន ៖ sw-shell-latency · offline-shell · sw-cache-key)
+        ['./core/**/*.ts', './domain/**/*.ts', './features/**/*.ts', './services/**/*.ts', './ui/**/*.ts',
             './app/behaviors/**/*.ts', './app/lifecycle/layers.ts', './app/refs.ts', './app/flush.ts', './app/media.ts'],
         { eager: true }
     );

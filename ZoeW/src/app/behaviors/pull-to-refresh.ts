@@ -1,4 +1,6 @@
 import { isNativeAndroid, pullToRefreshSupported } from '../../platform/native';
+import { hapticTick } from '../../platform/haptics';
+import { openModalIds } from '../../core/modals';
 import { securityState, uiState } from '../../core/state';
 import { appSessionStore } from '../../core/storage';
 import { showAppChrome } from '../../ui/chrome-autohide';
@@ -15,6 +17,26 @@ import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArb
  * តាម ref (transform/opacity រាល់ `touchmove` — ការគូររបស់ React រាល់ស៊ុមនៃ
  * ម្រាមដៃ នឹងប្តូរភាពរលូន)។
  */
+
+/**
+ * ⛔ **តំបន់កេះ** (សំណើម្ចាស់គម្រោង ៖ ដូចស្តង់ដា App) ៖ PTR ចាប់តែពេលម្រាមដៃ **ចាប់ផ្តើម**
+ *    ក្នុង ៤០% ខាងលើនៃអេក្រង់ ➜ ការអូសចុះពីពាក់កណ្តាល/បាតអេក្រង់ (ឧ. ពេលរមូរបញ្ជី ឬ
+ *    អូសផ្ទាំង) មិនអាចផ្ទុកទំព័រឡើងវិញដោយចៃដន្យ។
+ */
+export const PTR_START_ZONE_RATIO = 0.4;
+
+export function ptrStartZoneBottom(): number {
+    return Math.round(window.innerHeight * PTR_START_ZONE_RATIO);
+}
+
+/**
+ * ⛔ ស្រទាប់ណាមួយបើក (ប្រអប់ · ម៉ឺនុយ (...) · របា Slide · សោ App) ➜ **គ្មាន PTR**។
+ *    `openModalIds()` ជាប្រភពការពិតនៃប្រអប់ (រួមប្រអប់ដែលបើកដោយមិនឆ្លង `isModalOpen`)។
+ */
+export function ptrBlockedByOverlay(): boolean {
+    return securityState.appIsLocked || uiState.isModalOpen || openModalIds().length > 0 ||
+        uiState.moreMenuOpen || isSideDrawerOpen();
+}
 
 /** សញ្ញា PTR ដែល `PtrIndicator` គូរ (ref) */
 export function ptrIndicatorElement(): any {
@@ -57,6 +79,8 @@ export function setupIOSPullToRefresh() {
     let pullMoveListening = false;
     let scrollerMemoTarget = null;
     let scrollerMemoValue = null;
+    let readyTicked = false;
+    let overlayAtPointerDown = false;
 
     function scrollerForPull(target) {
         if (target === scrollerMemoTarget) return scrollerMemoValue;
@@ -80,6 +104,13 @@ export function setupIOSPullToRefresh() {
         indicator.style.transform = 'translateY(' + (REST_Y + distance) + 'px) rotate(' + Math.round(progress * 270) + 'deg)';
         indicator.style.opacity = String(visible);
         indicator.classList.toggle('ready', progress >= 1);
+        // ⛔ ញ័រ **ម្តង** ពេលឆ្លងព្រំដែន «លែងដៃដើម្បីផ្ទុកឡើងវិញ» · ថយក្រោមព្រំដែន ➜ ត្រៀមម្តងទៀត
+        if (progress >= 1 && !readyTicked) {
+            readyTicked = true;
+            hapticTick();
+        } else if (progress < 1) {
+            readyTicked = false;
+        }
     }
 
     function park(resetArbiter?) {
@@ -90,6 +121,7 @@ export function setupIOSPullToRefresh() {
         travel = 0;
         startScroller = null;
         startActiveScroller = null;
+        readyTicked = false;
         indicator.classList.add('snapping');
         indicator.classList.remove('ready');
         indicator.classList.remove('spinning');
@@ -107,8 +139,7 @@ export function setupIOSPullToRefresh() {
     }
 
     function pullTargetBlocked(target) {
-        if (securityState.appIsLocked || uiState.isModalOpen || refreshing) return true;
-        if (isSideDrawerOpen()) return true;
+        if (refreshing || ptrBlockedByOverlay()) return true;
         if (!target || !target.closest) return false;
         if (target.closest('input, textarea, select, [contenteditable="true"], .app-navbar, .page-tabbar')) return true;
         const action = target.closest('button, a');
@@ -248,6 +279,14 @@ export function setupIOSPullToRefresh() {
         }
     }
 
+    // ⛔ ការប៉ះខាងក្រៅម៉ឺនុយ (...) បិទវានៅ `pointerdown` (capture) **មុន** `touchstart` ➜
+    //    ចងចាំស្ថានភាពស្រទាប់ **មុន** ការបិទនោះ (window capture ឈរមុន document capture) ➜
+    //    ការប៉ះដែលបិទស្រទាប់ មិនផ្ទុកទំព័រឡើងវិញ (ស្តង់ដា ៖ ការប៉ះដំបូងបិទស្រទាប់ប៉ុណ្ណោះ)
+    window.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse') return;
+        overlayAtPointerDown = ptrBlockedByOverlay();
+    }, { capture: true, passive: true });
+
     const restoringAfterPull = hasReloadMarker();
     if (restoringAfterPull) {
         if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -276,6 +315,9 @@ export function setupIOSPullToRefresh() {
         touchId = touch.identifier;
         startY = touch.clientY;
         startX = touch.clientX;
+        const overlayWasOpen = overlayAtPointerDown;
+        overlayAtPointerDown = false;
+        if (overlayWasOpen || startY > ptrStartZoneBottom()) return;
         const context = capturePullContext(e.target);
         if (!context) return;
         startScroller = context.scroller;

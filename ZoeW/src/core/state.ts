@@ -385,6 +385,11 @@ export const uiState = createStore<UiState>('uiState', {
     panelGliding: false,
 });
 registerStore(uiState);
+// ⛔ រចនាសម្ព័ន្ធ UI ដែល App ដើមប្តូរលើ DOM **ភ្លាម** (class/style) ➜ ចុះ DOM ក្នុង tick ដដែល
+//    (មើល `StoreMeta.markImmediate`)
+uiState.markImmediate(['modalDisplay', 'drawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
+    'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
+    'phoneSuggestOpen', 'chromeHidden']);
 
 export interface SecurityState {
     lookupSecretKey: any;

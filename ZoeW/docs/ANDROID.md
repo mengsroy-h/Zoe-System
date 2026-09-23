@@ -11,7 +11,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | មុខងារ | web / PWA | Android native |
 |---|---|---|
 | ជីវមាត្រ (ក្រយៅដៃ/មុខ) | WebAuthn | **BiometricPrompt + Android Keystore** (`@capgo/capacitor-native-biometric`) — PIN ចងនឹង `BIOMETRY_CURRENT_SET` ➜ ចុះឈ្មោះក្រយៅដៃថ្មីក្នុងទូរស័ព្ទ ➜ ការចងចាស់លែងប្រើបាន ហើយ App ប្រាប់ឲ្យបើកវាឡើងវិញ |
-| Pull-to-refresh | Chrome មាន PTR ផ្ទាល់ · iOS PWA ប្រើ PTR របស់ App | PTR របស់ App (ដូច iOS) បូក **ការចាប់មុន slop** របស់ Chromium |
+| Pull-to-refresh | Chrome មាន PTR ផ្ទាល់ · iOS PWA ប្រើ PTR របស់ App (ចាប់ផ្តើម ៤០% ខាងលើ · ស្រទាប់បើក ➜ គ្មាន PTR · ⛔ iPhone គ្មាន API ញ័រ) | PTR របស់ App (ដូច iOS) បូក **ការចាប់មុន slop** របស់ Chromium បូក **ញ័រម្តង** ពេលឆ្លងព្រំដែន (`@capacitor/haptics` · សិទ្ធិ `VIBRATE`) |
 | ប៊ូតុង/កាយវិការ Back | — | បិទម៉ឺនុយ/ប្រអប់/របា Slide ➜ **ប្រវត្តិថយក្រោយ** (ទំព័រ · របៀបស្កេន ម្តងមួយជំហាន · ⛔ មិនត្រឡប់ចូលរបៀប «ដក») ➜ បង្រួម App |
 | Export Excel/CSV | ទាញយក | សរសេរចូល cache ➜ ផ្ទាំង **Share** របស់ Android (Drive · Telegram · Excel …) |
 | Export PDF · របាយការណ៍ខែ PDF | `window.print()` | **PrintManager** របស់ Android (Save as PDF) |
@@ -105,7 +105,7 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 | ២ | Settings ➜ Apps ➜ ZoeW | កំណែ = `APP_VERSION` |
 | ៣ | Config · Login · Activate | ដូច PWA |
 | ៤ | ស្កេនដោយកាមេរ៉ា (លើកដំបូងសុំសិទ្ធិ) | កាមេរ៉ាបើក · ស្កេនបាន |
-| ៥ | ទាញចុះនៅកំពូលបញ្ជី | សញ្ញា PTR លេច ➜ ផ្ទុកឡើងវិញ · ⛔ កាយវិការអូសផ្ទាំងនៅដើរដូចមុន |
+| ៥ | ទាញចុះពីផ្នែកខាងលើ (៤០%) នៅកំពូលបញ្ជី · ទាញពីផ្នែកខាងក្រោម · ទាញពេលប្រអប់/ម៉ឺនុយបើក | ខាងលើ ➜ សញ្ញា PTR លេច · **ញ័រម្តង** ពេលគ្រប់ ➜ ផ្ទុកឡើងវិញ · ខាងក្រោម ឬពេលស្រទាប់បើក ➜ មិនផ្ទុក · ⛔ កាយវិការអូសផ្ទាំងនៅដើរដូចមុន |
 | ៦ | Back ៖ ម៉ឺនុយ · ប្រអប់ · របា Slide · ទំព័រ/របៀបស្កេន | បិទម្តងមួយ ➜ ត្រឡប់ម្តងមួយជំហាន ➜ បង្រួម App |
 | ៧ | បើកជីវមាត្រ ➜ បិទ App ➜ បើកវិញ | ផ្ទាំងក្រយៅដៃ ➜ ដោះសោ |
 | ៨ | បន្ថែមក្រយៅដៃថ្មីក្នុង Settings ➜ បើក App | សារ «ត្រូវបានប្តូរ» ➜ វាយ PIN |

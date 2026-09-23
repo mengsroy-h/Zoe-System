@@ -5,7 +5,11 @@ import { useStoreValue } from '../hooks/useStore';
 
 /**
  * ផ្ទាំងបើក — `boot-splash-out` (រសាត់) · `boot-splash-gone` គូរពី
- * `viewState.bootSplashPhase`។ ផ្លូវបម្រុង ៦ វិនាទីចាប់ផ្តើមពេល mount។
+ * `viewState.bootSplashPhase`។ ផ្លូវបម្រុង ៦ វិនាទីចាប់ផ្តើមពេល mount ។
+ *
+ * ⛔ `public/boot-flags.js` ក៏បន្ថែម class ទាំង ២ លើធាតុនេះដែរ (សំណាញ់ពេល bundle
+ *    ដួល) ➜ `className` ត្រូវតែ **ប្រែតែពេល phase ប្រែ** (React មិនសរសេរ DOM
+ *    ពេល prop ដដែល) — កុំបន្ថែម class ដែលប្រែញឹកញាប់លើធាតុនេះ។
  */
 export function BootSplash() {
     const phase = useStoreValue(viewState, (s) => s.bootSplashPhase);

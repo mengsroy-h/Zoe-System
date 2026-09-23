@@ -41,7 +41,8 @@ const REACT_STATE = 'React ១០០% ៖ ';
 /** ការកែក្នុងតំបន់ហាមចូលដែល **ទទួលយក** — រាល់ធាតុត្រូវមានហេតុផល */
 const ZONE_ALLOWED = {
     setupIOSPullToRefresh: 'សញ្ញា PTR ៖ React គូរធាតុ (`PtrIndicator`) ➜ កាយវិការ **រក** វា ជំនួស `createElement` · ចលនា (`style.transform`) មិនប្រែ ។ វាស់បាន ៖ gesture-test 107 · ios-panel-glide 38 · panel-motion 47 ដូចដើម' +
-        ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម',
+        ' ⊕ App Android (សំណើម្ចាស់គម្រោង) ៖ ច្រកទ្វារ `pullToRefreshSupported()` (iOS standalone **ឬ** Android native) · ការចាប់មុន slop **តែលើ Android native** (`claimBeforeSlop`) ➜ ផ្លូវ iOS និង browser មិនប្រែ ។ វាស់បាន ៖ native-check (ច្បាប់ latch របស់ Chromium ៖ ដកការចាប់មុន slop ➜ ធ្លាក់) · web គ្មាន PTR ដូចដើម' +
+        ' ⊕ សំណើម្ចាស់គម្រោង (ស្តង់ដា App) ៖ ចាប់ផ្តើមតែ **៤០% ខាងលើ** · **ស្រទាប់បើក ➜ គ្មាន PTR** (ចងចាំនៅ `pointerdown`) · **ញ័រម្តង** ពេលឆ្លងព្រំដែន ។ វាស់បាន ៖ native-check mutation ៣/៣ ចាប់ · gesture-test ត្រូវបៃតង',
     switchAppPage: REACT_STATE + '`.active` របស់ទំព័រ/Tab ដេរីវេពី `currentAppPage` ក្នុង JSX · `scrollTop = 0` តាម `setScrollTop()` (commit មុន) — លំដាប់ hide ➜ pull-up ➜ chrome ➜ lock ➜ scroll ដដែល',
     openSideDrawer: REACT_STATE + '`.open` · `aria-hidden` របស់របា Slide និង backdrop ដេរីវេពី `drawerOpen` ➜ ការហៅ refresh ទាំង ៥ ដដែល',
     closeSideDrawer: REACT_STATE + '`drawerOpen = false` ជំនួស `.open`/`aria-hidden`',
@@ -50,7 +51,7 @@ const ZONE_ALLOWED = {
     entryScrollerInView: REACT_STATE + '`#lockerPanel` លាក់ ⇔ `entryModeShown !== \'locker\'` (JSX `PageEntry`) ➜ អានប្រភពដដែល',
     syncHistoryExpandedLock: REACT_STATE + '`history-expanded` ជា `historyExpanded` + `commitNow()` ➜ `scrollTop = 0` មុន/ក្រោយ និង rAF ២ ជាន់ ដដែល',
     beginPanelGlideSnapPause: REACT_STATE + '`panel-gliding` ជា `panelGliding` + `commitNow()` ➜ snap ផ្អាក **មុន** `animate()` ដូចដើម · token/ownership ដដែល',
-    endPanelGlideSnapPause: REACT_STATE + '`panelGliding = false` ជំនួស `classList.remove`',
+    endPanelGlideSnapPause: REACT_STATE + '`panelGliding = false` ជំនួស `classList.remove` — វាល `markImmediate` ➜ ចុះ DOM ក្នុង tick ដដែល (ios-panel-glide «cleanup»)',
     setupSwipeGestures: REACT_STATE + 'បន្ថែមកូនសោ `panel` ក្នុង config · scroller តាម ref',
     phoneSearchIsActive: REACT_STATE + '`.show` ជា `phoneSuggestOpen` · focus/តម្លៃតាម ref (`isFieldFocused` · `fieldValue`)',
     bindPanelSwipe: REACT_STATE + '`.collapsed`/`.search-focus` អាន/សរសេរតាម `panelIsCollapsed()`/`setPanelCollapsed()`/`panelHasSearchFocus()` · `commitNow()` មុនវាស់ `beforeTop` · ការប្តូរនៅ `touchend` ដដែល (ថ្ងៃ slop 8/30 · ratio ដដែល)',

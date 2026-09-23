@@ -269,6 +269,9 @@ export const viewState = createStore<ViewState>('viewState', {
     pinPromptSetupText: 'សូមកំណត់លេខកូដ PIN សម្រាប់ការពារការ Config លើកក្រោយ',
 });
 registerStore(viewState);
+// ⛔ ដូច `uiState` ៖ Category ក្នុងរបា Slide · សោ App · របៀបស្កេន ចុះ DOM ក្នុង tick ដដែល
+viewState.markImmediate(['drawerGroupsOpen', 'drawerGroupsHidden', 'appLockOpen', 'entryModeShown',
+    'ztoAutoCloseVisible', 'ztoListSyncDrawerVisible']);
 
 /**
  * ការបម្លែងដូច setter `textContent`/`innerText` របស់ DOM បេះបិទ ៖ `null` ➜ `''` ·

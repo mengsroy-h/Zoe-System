@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import { allStores, type StoreMeta } from '../core/store';
+import { allStores, setImmediateCommit, type StoreMeta } from '../core/store';
 
 /**
  * បង្ខំ React ឲ្យគូរ **ភ្លាមៗ** ពីឃ្លាំងមួយដែលបានប្តូរ។
@@ -24,3 +24,6 @@ export function commitNow(): void {
         for (const s of allStores()) s.flush();
     });
 }
+
+// ⛔ វាលរចនាសម្ព័ន្ធ UI (`markImmediate`) ចុះ DOM ភ្លាមពេលសរសេរ ដូច App ដើមកែ DOM ផ្ទាល់
+setImmediateCommit(commitNow);

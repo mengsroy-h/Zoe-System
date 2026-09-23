@@ -24,7 +24,8 @@ export const FAKE_BRIDGE = function () {
             header('Filesystem', ['writeFile', 'removeListener']),
             header('Share', ['share', 'canShare', 'removeListener']),
             header('Printer', ['printWebView', 'removeListener']),
-            header('NativeBiometric', ['isAvailable', 'setCredentials', 'getSecureCredentials', 'deleteCredentials', 'removeListener'])
+            header('NativeBiometric', ['isAvailable', 'setCredentials', 'getSecureCredentials', 'deleteCredentials', 'removeListener']),
+            header('Haptics', ['impact', 'notification', 'vibrate', 'selectionStart', 'selectionChanged', 'selectionEnd', 'removeListener'])
         ],
         isNativePlatform: () => true,
         getPlatform: () => 'android',

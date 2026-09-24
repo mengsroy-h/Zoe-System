@@ -41,7 +41,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const srv = await serveDir(OUT);
 const seed = seedData();
 
-async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT } = {}) {
+async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT, safeAreaTop = 0 } = {}) {
     const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     const errors = [];
@@ -63,6 +63,12 @@ async function session({ native = true, storage = {}, session: sess = {}, respon
         const t = ${JSON.stringify(sess)}; for (const k in t) window.sessionStorage.setItem(k, t[k]); })();`);
     await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seed) + ');');
     await page.clock.install({ time: HARNESS_CLOCK_START });
+    /* ⛔ WebView ពេញអេក្រង់ ៖ `env(safe-area-inset-top)` ពិតតាម CDP (មិនមែន CSS ក្លែង) ➜ navbar ·
+       ធាតុវាស់ ទទួល padding ដូចលើទូរស័ព្ទ។ session CDP ត្រូវរស់ពេញសេណារីយ៉ូ (ការ override ជារបស់វា)។ */
+    if (safeAreaTop) {
+        const cdp = await ctx.newCDPSession(page);
+        await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: safeAreaTop } });
+    }
     await page.goto(`http://127.0.0.1:${srv.port}/index.html`, { waitUntil: 'load' });
     await page.waitForTimeout(2500);
     return { ctx, page, errors, requests };
@@ -171,7 +177,7 @@ await scenario('១. boot លើ Android native', async () => {
     ok('App ៖ ចុះឈ្មោះ backButton · pause · resume', ['backButton', 'pause', 'resume'].every((e) => events.includes(e)), events);
     const bars = await calls(page, 'SystemBars', 'setStyle');
     ok('SystemBars ៖ របាខាងក្រោម LIGHT', bars.some((c) => c.options.bar === 'NavigationBar' && c.options.style === 'LIGHT'), bars);
-    ok('SystemBars ៖ របាខាងលើ តាម inset (Chromium ៖ 0 ➜ LIGHT)', bars.some((c) => c.options.bar === 'StatusBar' && c.options.style === 'LIGHT'), bars);
+    ok('SystemBars ៖ របាខាងលើ មិនពេញអេក្រង់ (inset 0) ➜ LIGHT', bars.some((c) => c.options.bar === 'StatusBar' && c.options.style === 'LIGHT'), bars);
     ok('ជីវមាត្រ native ៖ isAvailable ➜ កុងតាក់មិន «មិនគាំទ្រ»', info.bioUnsupported === false && (await calls(page, 'NativeBiometric', 'isAvailable')).length > 0);
 
     /* ប៊ូតុង Back — ⛔ ម៉ឺនុយ (...) សាកមុនការប្តូរទំព័រ ៖ ក្នុង harness ក្រោយ
@@ -392,6 +398,38 @@ await scenario('៤. សោ App ពេលចាកចេញ (pause) និងត
     await page.waitForTimeout(150);
     ok('(Back) ពេលជាប់សោ ➜ បង្រួម App', (await calls(page, 'App', 'minimizeApp')).length === 1);
     await closeSession(s, 'pause/resume');
+});
+
+/* ── ៤ឃ. របាស្ថានភាពលើ WebView ពេញអេក្រង់ ─────────────────────────── */
+/*
+ * ⛔ របាស្ថានភាពជាស្រទាប់ថ្លាលើទំព័រ ➜ ពណ៌រូបតំណាងត្រូវផ្ទុយពន្លឺនឹង **ផ្ទៃពិត** នៅក្រោមវា។
+ *    ការសន្មត «inset > 0 ➜ navbar ក្រហម ➜ DARK» ធ្វើឲ្យរូបតំណាង **ស លើ navbar ស** (មើលមិនឃើញ ៖
+ *    របាយការណ៍អ្នកប្រើលើទូរស័ព្ទពិត)។ សេណារីយ៉ូនេះបើក safe-area ពិតតាម CDP រួចវាស់ **ការហៅ
+ *    plugin** ក្រោយការប្តូរ state (ប្រអប់បើក/បិទ) — ⛔ មិនមែនការហៅ function ដោយផ្ទាល់។
+ */
+await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថានភាព (WebView ពេញអេក្រង់ · safe-area 24px)', async () => {
+    const s = await session({ safeAreaTop: 24 });
+    const { page } = s;
+    const lastStatus = async () => {
+        const c = (await calls(page, 'SystemBars', 'setStyle')).filter((x) => x.options.bar === 'StatusBar');
+        return c.length ? c[c.length - 1].options.style : null;
+    };
+    const nav = await page.evaluate(() => {
+        const cs = getComputedStyle(document.querySelector('.app-navbar'));
+        const top = document.elementsFromPoint(200, 12)[0];
+        return { padTop: parseFloat(cs.paddingTop), bg: cs.backgroundColor, topIsNavbar: !!(top && top.closest('.app-navbar')) };
+    });
+    ok('(លក្ខខណ្ឌចាំបាច់) safe-area ពិត ៖ navbar ទទួល padding ពី env() ហើយឈរក្រោមរបា', nav.padTop >= 24 + 8 && nav.topIsNavbar, nav);
+    ok('navbar ស ក្រោមរបា ➜ រូបតំណាងខ្មៅ (LIGHT)', (await lastStatus()) === 'LIGHT', { style: await lastStatus(), bg: nav.bg });
+    await page.click('.daily-stats-btn');
+    await page.waitForTimeout(700);
+    ok('(លក្ខខណ្ឌចាំបាច់) ប្រអប់បើក', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display !== 'none'));
+    ok('ប្រអប់បើក (ផ្ទៃងងឹតថ្លាៗ) ➜ រូបតំណាងស (DARK)', (await lastStatus()) === 'DARK', await lastStatus());
+    await fire(page, 'App', 'backButton', { canGoBack: false });
+    await page.waitForTimeout(700);
+    ok('(លក្ខខណ្ឌចាំបាច់) Back ➜ ប្រអប់បិទ', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display === 'none'));
+    ok('បិទប្រអប់ ➜ រូបតំណាងខ្មៅវិញ (LIGHT)', (await lastStatus()) === 'LIGHT', await lastStatus());
+    await closeSession(s, 'របាស្ថានភាព');
 });
 
 /* ── ៥. web (គ្មាន bridge) ───────────────────────────────────────────── */

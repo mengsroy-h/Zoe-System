@@ -98,7 +98,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.0` (`zoew-v227`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.1` (`zoew-v228`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.2` (`zoekeygen-v101`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (កើតពី `app.js`

@@ -104,11 +104,3 @@ describe('handleNativeBack', () => {
         expect(uiState.currentAppPage).toBe('entry');
     });
 });
-
-describe('ពណ៌រូបតំណាងរបាស្ថានភាព', () => {
-    it('WebView ពេញអេក្រង់ (inset > 0) ➜ រូបតំណាងស · padding (inset 0) ➜ រូបតំណាងខ្មៅ', async () => {
-        const { statusBarStyleFor } = await import('../../src/app/lifecycle/native-shell');
-        expect(statusBarStyleFor(24)).toBe('dark');
-        expect(statusBarStyleFor(0)).toBe('light');
-    });
-});

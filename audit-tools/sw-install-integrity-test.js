@@ -33,7 +33,9 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const sw = fs.readFileSync(path.join(ROOT, 'ZoeW', 'sw.js'), 'utf8');
     const core = /const CORE_SHELL = \[([\s\S]*?)\];/.exec(sw);
     const list = core ? core[1] : '';
-    for (const need of ['./index.html', './app.js', './style.css', './vendor/zxing-wasm.js', './vendor/zxing_reader.wasm', './license-verify.js', './firebase-loader.js']) {
+    // ⛔ App React ៖ `app.js` · `style.css` ដើមក្លាយជា asset តាម hash ➜ ដេរីវេពី `<script>`/`<link>` ដែល index.html ពិតផ្ទុក
+    const shell = require('./react-view').swShell(ROOT);
+    for (const need of ['./index.html', shell.appJs, shell.appCss, './vendor/zxing-wasm.js', './vendor/zxing_reader.wasm', './license-verify.js', './firebase-loader.js']) {
         ok('ZoeW: «' + need + '» ជាធនធានស្នូល (បាត់ ➜ install ត្រូវធ្លាក់)',
             list.indexOf("'" + need + "'") !== -1, list.trim().slice(0, 200));
     }
@@ -87,7 +89,9 @@ function serve(dir, blocked) {
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 });
 
     // ជុំទី ១ — engine WASM បាត់។ SW **មិនត្រូវ** activate ដោយសំបកខូចទេ។
-    const partial = await page.evaluate(async () => {
+    // ⛔ asset JS ស្នូល ដេរីវេពី `CORE_SHELL` ពិត (App React ៖ `assets/index-<hash>.js`)
+    const APP_JS_PATH = require('./react-view').swShell(ROOT).appJs;
+    const partial = await page.evaluate(async (APP_JS) => {
         if (!navigator.serviceWorker) return { err: 'គ្មាន serviceWorker' };
         let installFailed = false;
         try {
@@ -109,10 +113,10 @@ function serve(dir, blocked) {
         for (const k of keys) {
             const c = await caches.open(k);
             if (await c.match('./vendor/zxing_reader.wasm')) cachedWasm = true;
-            if (await c.match('./app.js')) cachedAppJs = true;
+            if (await c.match(APP_JS)) cachedAppJs = true;
         }
         return { installFailed, cachedWasm, cachedAppJs, controlling: !!navigator.serviceWorker.controller };
-    });
+    }, APP_JS_PATH);
 
     ok('ធនធានស្នូលបាត់ ➜ install ធ្លាក់ (SW មិន activate ដោយសំបកខូច)',
         partial.installFailed === true, partial);
@@ -122,7 +126,7 @@ function serve(dir, blocked) {
     // ជុំទី ២ — បណ្តាញត្រឡប់មកធម្មតា ➜ install ត្រូវជោគជ័យពេញលេញ
     blocked.clear();
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 });
-    const healthy = await page.evaluate(async () => {
+    const healthy = await page.evaluate(async (APP_JS) => {
         const reg = await navigator.serviceWorker.register('./sw.js');
         // ⛔ `.ready` **គ្មានទីបញ្ចប់** បើ SW ជាប់ 'installing' ឬក្លាយជា
         // 'redundant' ដោយគ្មានអ្នកជំនួស។ `page.evaluate()` ក៏គ្មាន timeout ដែរ
@@ -137,13 +141,13 @@ function serve(dir, blocked) {
             const keys = await caches.keys();
             for (const k of keys) {
                 const c = await caches.open(k);
-                if ((await c.match('./vendor/zxing_reader.wasm')) && (await c.match('./app.js')) &&
+                if ((await c.match('./vendor/zxing_reader.wasm')) && (await c.match(APP_JS)) &&
                     (await c.match('./index.html'))) return { ok: true, key: k };
             }
             await new Promise((r) => setTimeout(r, 250));
         }
         return { ok: false };
-    });
+    }, APP_JS_PATH);
     ok('បណ្តាញត្រឡប់មកធម្មតា ➜ install ជោគជ័យ ហើយ engine ចូល cache ពេញលេញ',
         healthy.ok === true, healthy);
 

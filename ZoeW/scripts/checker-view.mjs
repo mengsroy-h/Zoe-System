@@ -225,8 +225,55 @@ function indentOutsideTemplates(js, fileName) {
 }
 
 /** module មួយ ➜ អត្ថបទក្នុងទិដ្ឋភាព */
+/**
+ * វង់ក្រចកដែល type erasure បន្សល់ ៖ `(navigator.onLine as boolean) === false` ➜ `(navigator.onLine) === false`។
+ * App ដើមសរសេរ `navigator.onLine === false` ➜ checker ដែលស្វែងរកទម្រង់នោះរកមិនឃើញ។ ដកវង់ក្រចកជុំវិញ
+ * **identifier / member chain សុទ្ធ** (គ្មានការហៅ) ⛔ ហើយផ្ទៀងផ្ទាត់ថា AST (acorn ដោយគ្មាន `preserveParens`)
+ * **ដូចគ្នាបេះបិទ** មុន/ក្រោយ ➜ វាប្តូរតែការសរសេរ មិនមែនអត្ថន័យ។
+ */
+function unwrapRedundantParens(js, fileName) {
+    const opts = { ecmaVersion: 'latest', sourceType: 'module' };
+    const simple = (n) => n.type === 'Identifier' || n.type === 'ThisExpression'
+        || (n.type === 'MemberExpression' && !n.optional && (!n.computed || n.property.type === 'Literal') && simple(n.object));
+    const ranges = [];
+    const visit = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'ParenthesizedExpression' && simple(n.expression)) {
+            ranges.push([n.start, n.start + 1], [n.end - 1, n.end]);
+        }
+        for (const k of Object.keys(n)) {
+            const v = n[k];
+            if (Array.isArray(v)) v.forEach(visit);
+            else if (v && typeof v === 'object' && typeof v.type === 'string') visit(v);
+        }
+    };
+    visit(acorn.parse(js, Object.assign({ preserveParens: true }, opts)));
+    if (!ranges.length) return js;
+    const out = applyRemovals(js, ranges);
+    const shape = (src) => JSON.stringify(acorn.parse(src, opts), (k, v) => (k === 'start' || k === 'end' || k === 'raw' ? undefined : v));
+    if (shape(out) !== shape(js)) throw new Error('unwrapRedundantParens ៖ AST ប្តូរក្នុង ' + fileName);
+    return out;
+}
+
+/**
+ * ទិដ្ឋភាព **script** (គ្មាន module · គ្មាន indent) ៖ `src/sw/sw.ts` ➜ `sw.js` ដែលអានបាន។ `defines` ៖ `{ __X__: 'literal JS' }`
+ * ជំនួស identifier ដូច `define` របស់ esbuild (ការជំនួសតាមអក្សរ លើព្រំដែនពាក្យ)។
+ */
+export function scriptView(tsSource, fileName, defines) {
+    let js = eraseTypes(tsSource, fileName);
+    js = unwrapRedundantParens(js, fileName);
+    for (const [name, value] of Object.entries(defines || {})) {
+        const re = new RegExp('\\b' + name + '\\b', 'g');
+        if (!re.test(js)) throw new Error('scriptView ៖ រក ' + name + ' មិនឃើញក្នុង ' + fileName);
+        js = js.replace(re, value);
+    }
+    js = removeComments(js);
+    return js.replace(/^\s+/, '');
+}
+
 export function moduleView(tsSource, fileName) {
     let js = eraseTypes(tsSource, fileName);
+    js = unwrapRedundantParens(js, fileName);
     js = replaceImportMetaEnv(js);
     js = removeComments(js);
     js = stripModuleSyntax(js, fileName);

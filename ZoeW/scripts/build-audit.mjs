@@ -5,7 +5,7 @@
  * ដែលសរសេរសម្រាប់ App ចាស់** មិនមែនដោយតេស្តដែលយើងសរសេរខ្លួនឯង។
  */
 import { build } from 'esbuild';
-import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx, stateDeclarations } from './checker-view.mjs';
+import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx, scriptView, stateDeclarations } from './checker-view.mjs';
 import { mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -178,6 +178,56 @@ execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js')
     stdio: ['ignore', 'ignore', 'inherit']
 });
 writeFileSync(path.join(APP, 'app.js'), appJs);
+
+/*
+ * ២ក. **Service Worker ដែលអានបាន** ៖ Vite (`serviceWorkerPlugin`) ship `sw.js` ដែល **minify** ➜ checker SW ដើម
+ *     (`timedFetch` · `revalidateShell` · `SHELL_PATHS` …) រកឈ្មោះមិនឃើញ។ `sw.js` ដើមគឺ `sw.ts` ដែលលុប type ចេញ
+ *     បូកថេរ ៣ ជា literal ➜ ទីនេះសាងវាឡើងវិញពី `src/sw/sw.ts` ពិត ដោយយកថេរទាំង ៣ ពី `sw.js` ដែល Vite សាង។
+ *     ⛔ ផ្ទៀងផ្ទាត់ ៖ build `sw.ts` ម្តងទៀតជាមួយតម្លៃដែលស្រង់ ➜ ត្រូវ **ស្មើ byte ទល់ byte** នឹងឯកសារដែល ship ➜
+ *     តម្លៃត្រឹមត្រូវ ហើយទិដ្ឋភាពជាប្រភពដដែល (type erasure ផ្ទៀងផ្ទាត់ token ទល់ token រួចហើយ)។
+ */
+{
+    const swPath = path.join(APP, 'sw.js');
+    const shipped = readFileSync(swPath, 'utf8');
+    const acornMod = await import('acorn');
+    const arrays = [];
+    const versions = [];
+    const walk = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'VariableDeclarator' && n.init) {
+            if (n.init.type === 'ArrayExpression' && n.init.elements.every((e) => e && e.type === 'Literal' && typeof e.value === 'string')) arrays.push(n.init.elements.map((e) => e.value));
+            if (n.init.type === 'Literal' && n.init.value === cacheVersion) versions.push(n.init.value);
+        }
+        for (const v of Object.values(n)) {
+            if (Array.isArray(v)) v.forEach(walk);
+            else if (v && typeof v === 'object' && typeof v.type === 'string') walk(v);
+        }
+    };
+    walk(acornMod.parse(shipped, { ecmaVersion: 'latest' }));
+    const core = arrays.filter((a) => a.includes('./index.html'));
+    const optional = arrays.filter((a) => !a.includes('./index.html'));
+    if (core.length !== 1 || optional.length !== 1 || versions.length !== 1) {
+        throw new Error('build-audit ៖ ស្រង់ថេររបស់ sw.js មិនបាន (core ' + core.length + ' · optional ' + optional.length + ' · version ' + versions.length + ')');
+    }
+    const swSource = readFileSync(path.join(ROOT, 'src/sw/sw.ts'), 'utf8');
+    const defines = {
+        __CACHE_VERSION__: JSON.stringify(cacheVersion),
+        __CORE_SHELL__: JSON.stringify(core[0]),
+        __OPTIONAL_SHELL__: JSON.stringify(optional[0])
+    };
+    const rebuilt = await build({
+        entryPoints: [path.join(ROOT, 'src/sw/sw.ts')], bundle: true, format: 'iife', target: 'es2020', minify: true, write: false, define: defines
+    });
+    if (rebuilt.outputFiles[0].text !== shipped) throw new Error('build-audit ៖ sw.ts + ថេរដែលស្រង់ ≠ sw.js ដែល ship');
+    const lit = (list) => '[\n' + list.map((u) => '    ' + JSON.stringify(u).replace(/^"|"$/g, "'")).join(',\n') + '\n]';
+    const view = scriptView(swSource, 'sw.ts', {
+        __CACHE_VERSION__: "'" + cacheVersion + "'",
+        __CORE_SHELL__: lit(core[0]),
+        __OPTIONAL_SHELL__: lit(optional[0])
+    });
+    writeFileSync(swPath, view);
+    console.log('sw.js ៖ ទិដ្ឋភាពអានបាន ' + view.split('\n').length + ' បន្ទាត់ (សំបកស្នូល ' + core[0].length + ' · ស្រេចចិត្ត ' + optional[0].length + ')');
+}
 
 /*
  * ២ខ. **markup ដំបូងរបស់ React ក្នុង `index.html`** ៖ checker ដើមអាន `index.html` ជា **អត្ថបទ** (id · អត្ថបទ ·

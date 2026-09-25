@@ -55,7 +55,9 @@ function ok(label, cond, detail) {
     // ត្រូវយកទៅរក្សាទុកជំនួសអ្វីដែលគេឃើញពេលចុច។
     const body = (/function saveFirebaseConfig\(\)[\s\S]*?\n    \}\n/.exec(app) || [''])[0];
     const awaitPos = body.indexOf('await');
-    const readPos = body.indexOf('cfgInput.value');
+    // ⛔ React ៖ វាលអានតាមច្រកចេញ `fieldValue('firebaseConfigInput')` (App ដើម ៖ `cfgInput.value`)
+    const reads = [body.indexOf('cfgInput.value'), body.indexOf("fieldValue('firebaseConfigInput')")].filter((i) => i !== -1);
+    const readPos = reads.length ? Math.min.apply(null, reads) : -1;
     ok('ZoeW: `saveFirebaseConfig()` អានប្រអប់ Config **មុន** `await` ណាមួយ',
         readPos !== -1 && (awaitPos === -1 || readPos < awaitPos),
         'read@' + readPos + ' await@' + awaitPos);

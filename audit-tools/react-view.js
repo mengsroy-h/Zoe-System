@@ -337,7 +337,36 @@ function jsxHandler(root, id, prop) {
     return { name: call.callee.name, args, raw };
 }
 
+/**
+ * សំបករបស់ Service Worker (`CORE_SHELL` · `OPTIONAL_SHELL`) ដែល `ZoeW/sw.js` **ពិត** ប្រកាស ➜ App React ដាក់ឈ្មោះ
+ * asset តាម hash (`./assets/index-<hash>.js`) ➜ checker ដែលធ្លាប់ចាក់ `./app.js` · `./style.css` ត្រូវដេរីវេពីទីនេះ។
+ */
+function swShell(root, app) {
+    const acorn = require('acorn');
+    const src = require('fs').readFileSync(require('path').join(root, app || 'ZoeW', 'sw.js'), 'utf8');
+    const out = {};
+    for (const st of acorn.parse(src, { ecmaVersion: 'latest' }).body) {
+        if (st.type !== 'VariableDeclaration') continue;
+        for (const d of st.declarations) {
+            if (d.id.type === 'Identifier' && (d.id.name === 'CORE_SHELL' || d.id.name === 'OPTIONAL_SHELL')
+                && d.init && d.init.type === 'ArrayExpression') {
+                out[d.id.name] = d.init.elements.map((e) => e.value);
+            }
+        }
+    }
+    if (!out.CORE_SHELL) throw new Error('react-view ៖ រក CORE_SHELL ក្នុង sw.js មិនឃើញ');
+    const core = out.CORE_SHELL;
+    return {
+        core, optional: out.OPTIONAL_SHELL || [],
+        // asset JS/CSS ចម្បងរបស់ App (ជំនួស `./app.js` · `./style.css` របស់ App ដើម)
+        appJs: core.find((u) => u === './app.js') || core.find((u) => /^\.\/assets\/index-[^/]+\.js$/.test(u))
+            || core.find((u) => /^\.\/assets\/.*\.js$/.test(u)),
+        appCss: core.find((u) => u === './style.css') || core.find((u) => /^\.\/assets\/.*\.css$/.test(u))
+    };
+}
+
 module.exports = {
+    swShell,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

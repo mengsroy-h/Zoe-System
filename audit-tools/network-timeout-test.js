@@ -34,14 +34,16 @@ ok('app.js មាន fetchWithTimeout ដែលប្រើ AbortController',
 ok('គ្មាន `withTimeout(fetch(` នៅសល់ (timeout ដែល abort មិនកើត)',
     !/withTimeout\(\s*fetch\(/.test(src),
     (src.match(/withTimeout\(\s*fetch\([^\n]*/g) || []).join('\n         '));
+// ⛔ ZoeW (React) ៖ helper បញ្ជូន URL តាម `resolveNativeApiUrl()` (App Android ៖ ផ្លូវ `/.netlify/` ➜ origin វែប ·
+//    web ➜ URL ដដែល) ➜ ទទួលរូបរាងនោះជាការហៅ helper ដដែល
 ok('រាល់ការហៅ fetch() ទៅ endpoint ខាងក្រៅឆ្លងកាត់ fetchWithTimeout',
     (src.match(/(?<!function )\bfetch\(/g) || []).length ===
-    (src.match(/fetch\(url, opts\)/g) || []).length,
+    (src.match(/fetch\((?:resolveNativeApiUrl\()?url\)?, opts\)/g) || []).length,
     'fetch ឆៅ៖ ' + (src.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).join(' | '));
 ok('timer ត្រូវរស់រហូតដល់អានតួចប់ (readBody ស្ថិតក្នុងបង្អួច timeout)',
     /readBody\(res\)/.test(src) && /clearTimeout\(timer\)/.test(src));
 ok('ការ abort ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង',
-    !/fetch\(url, opts\)\s*\.then\([^)]*\)\s*\.catch\(/.test(src));
+    !/fetch\((?:resolveNativeApiUrl\()?url\)?, opts\)\s*\.then\([^)]*\)\s*\.catch\(/.test(src));
 
 // === ផ្នែកទី ១ខ — license-verify.js ត្រូវគោរពច្បាប់ដដែល ===
 const licSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'license-verify.js'), 'utf8');
@@ -105,7 +107,9 @@ function extractFn(name) {
     return src.slice(at, end + 1);
 }
 let summaryPrinted = false;
-const FN = extractFn('fetchWithTimeout');
+// ⛔ React ៖ helper អាស្រ័យលើ `resolveNativeApiUrl()` (`platform/native.ts`) ➜ ចាក់កូដពិតរបស់វាផង (web ៖ គ្មាន Capacitor)
+const FN = extractFn('fetchWithTimeout') && ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl']
+    .map((n) => extractFn(n) || '').join('\n') + '\n' + extractFn('fetchWithTimeout');
 ok('ស្រង់ fetchWithTimeout ពិតចេញពី app.js បាន', !!FN);
 if (!FN) {
     // គ្មាន helper ➜ ផ្នែក browser គ្មានអ្វីត្រូវរត់។ ចាកចេញយ៉ាងស្អាតជំនួស

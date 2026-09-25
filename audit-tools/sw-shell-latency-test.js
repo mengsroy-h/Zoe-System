@@ -98,7 +98,8 @@ function serve(dir) {
 
     // --- ជុំទី ១ ៖ បណ្តាញធម្មតា ➜ ចុះឈ្មោះ SW និងបំពេញ cache ---
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 60000 });
-    const swReady = await page.evaluate(async () => {
+    // ⛔ asset JS ស្នូល ដេរីវេពី `CORE_SHELL` ពិត (App React ៖ `assets/index-<hash>.js`)
+    const swReady = await page.evaluate(async (APP_JS) => {
         if (!navigator.serviceWorker) return 'គ្មាន serviceWorker';
         const reg = await navigator.serviceWorker.register('./sw.js').catch((e) => String(e));
         if (typeof reg === 'string') return reg;
@@ -113,11 +114,11 @@ function serve(dir) {
         ]);
         for (let i = 0; i < 100; i++) {
             const keys = await caches.keys();
-            for (const k of keys) { const c = await caches.open(k); if (await c.match('./app.js')) return 'ok:' + k; }
+            for (const k of keys) { const c = await caches.open(k); if (await c.match(APP_JS)) return 'ok:' + k; }
             await new Promise((r) => setTimeout(r, 200));
         }
         return 'មិនចូល cache';
-    });
+    }, require('./react-view').swShell(ROOT).appJs);
     ok('service worker ចុះឈ្មោះ ហើយសំបកចូល cache', String(swReady).startsWith('ok:'), swReady);
     const controlled = await page.evaluate(async () => {
         for (let i = 0; i < 100; i++) { if (navigator.serviceWorker.controller) return true; await new Promise((r) => setTimeout(r, 100)); }

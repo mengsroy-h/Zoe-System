@@ -161,8 +161,15 @@ function seedBig(n) {
         const bootMs = Date.now() - t0;
 
         const m = await page.evaluate(() => {
-            const t = (fn, reps) => { const s = performance.now(); for (let i = 0; i < reps; i++) fn(); return (performance.now() - s) / reps; };
-            const bust = () => document.querySelectorAll('#historyTableBody tr').forEach((tr) => { delete tr.dataset.sig; });
+            // App React ៖ function សរសេរ state ហើយ React គូរក្នុង microtask ➜ ការវាស់ត្រូវរួម **commit ពិត** (`commitNow()` =
+            //    flushSync) បើមិនដូច្នេះវាវាស់តែការសាង model (ms តិចក្លែង) មិនមែនការគូរ DOM ដែល App ដើមធ្វើភ្លាម
+            const flush = typeof window.commitNow === 'function' ? () => window.commitNow() : () => {};
+            const t = (fn, reps) => { const s = performance.now(); for (let i = 0; i < reps; i++) { fn(); flush(); } return (performance.now() - s) / reps; };
+            const bust = () => {
+                document.querySelectorAll('#historyTableBody tr').forEach((tr) => { delete tr.dataset.sig; });
+                // App React ៖ cold = តារាងទទេ រួចគូរជួរទាំងអស់ឡើងវិញ (គ្មាន node ឲ្យ React reconcile)
+                if (window.uiState && 'historyView' in window.uiState) { window.uiState.historyView = []; flush(); }
+            };
             const renderCold = t(() => { bust(); window.applyCurrentFilter(); }, 5);
             const render = t(() => window.applyCurrentFilter(), 5);
             const listener = t(() => window.__fireHistory(), 5);
@@ -173,6 +180,8 @@ function seedBig(n) {
             const trashSearch = typeof window.filterRecentlyDeleted === 'function'
                 ? t(() => { const el = document.getElementById('deletedSearchInput');
                     if (el) { el.value = '0960000042'; window.filterRecentlyDeleted(); el.value = ''; window.filterRecentlyDeleted(); } }, 5) : -1;
+            // App React ៖ ជួរដេកគូរក្នុង microtask ➜ `commitNow()` ពិតមុនរាប់ (App ដើមសរសេរ DOM ភ្លាម)
+            if (typeof window.commitNow === 'function') window.commitNow();
             return {
                 render: Math.round(render), renderCold: Math.round(renderCold), listener: Math.round(listener),
                 suggest: Math.round(suggest), recent: Math.round(recent),
@@ -185,30 +194,44 @@ function seedBig(n) {
         // ការ sync ពី Firebase មិនត្រូវសាងផ្ទាំងទំព័រ ២ ឡើងវិញ ខណៈអ្នកប្រើនៅទំព័រ ១
         const hiddenPanelWork = await page.evaluate(async () => {
             const spy = { locker: 0, entry: 0 };
+            // App React ៖ ការហៅខាងក្នុង module មិនឆ្លង `window` ➜ spy លើ `window.renderXList` មិនឃើញអ្វីសោះ (០ ក្លែង)
+            //    ➜ វាស់ **ការសរសេរពិត** ៖ renderer នីមួយៗសរសេរ view ថ្មី (`uiState.entryListView` · `lockerListView`) ➜
+            //    reference ប្តូរ = ការសាងផ្ទាំងឡើងវិញពិត ១ ដង (ចំនួន ០/១ គ្រប់គ្រាន់សម្រាប់ការអះអាងទាំង ២ ទិស)
+            const reactViews = !!(window.uiState && 'entryListView' in window.uiState && 'lockerListView' in window.uiState);
             const origLocker = window.renderLockerList;
             const origEntry = window.renderEntryList;
-            window.renderLockerList = function () { spy.locker++; return origLocker.apply(this, arguments); };
-            window.renderEntryList = function () { spy.entry++; return origEntry.apply(this, arguments); };
+            if (!reactViews) {
+                window.renderLockerList = function () { spy.locker++; return origLocker.apply(this, arguments); };
+                window.renderEntryList = function () { spy.entry++; return origEntry.apply(this, arguments); };
+            }
+            let marks = null;
+            const mark = () => { if (reactViews) marks = { entry: window.uiState.entryListView, locker: window.uiState.lockerListView }; };
+            const collect = () => {
+                if (!reactViews) return { locker: spy.locker, entry: spy.entry };
+                return { locker: window.uiState.lockerListView !== marks.locker ? 1 : 0, entry: window.uiState.entryListView !== marks.entry ? 1 : 0 };
+            };
             const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
             window.switchAppPage('data');
             await wait(260);
-            spy.locker = 0; spy.entry = 0;
+            spy.locker = 0; spy.entry = 0; mark();
             window.__fireHistory();
             await wait(320);
-            const onDataPage = { locker: spy.locker, entry: spy.entry };
+            const onDataPage = collect();
 
             window.switchAppPage('entry');
             await wait(60);
-            spy.locker = 0; spy.entry = 0;
+            spy.locker = 0; spy.entry = 0; mark();
             window.__fireHistory();
             await wait(320);
-            const onEntryPage = { locker: spy.locker, entry: spy.entry };
+            const onEntryPage = collect();
             const mode = window.localStorage.getItem('zoe_entry_scan_mode') === 'locker' ? 'locker' : 'parcel';
             const entryRows = document.querySelectorAll('#entryListTableBody tr').length;
 
-            window.renderLockerList = origLocker;
-            window.renderEntryList = origEntry;
+            if (!reactViews) {
+                window.renderLockerList = origLocker;
+                window.renderEntryList = origEntry;
+            }
             window.switchAppPage('data');
             return { onDataPage, onEntryPage, mode, entryRows };
         });

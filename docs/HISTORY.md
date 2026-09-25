@@ -89,6 +89,11 @@
 - ✅ **iPhone ស្កេនបានវិញ** — ម្ចាស់គម្រោងបញ្ជាក់លើ iPhone ពិត ក្រោយ merge #252 (deploy `zoew-v232`)។
 - ✅ **APK ZoeW លើ Android ពិត** (sign ដោយ keystore `CN=ZoeW`) ៖ ស្កេន · ចូលប្រព័ន្ធ · PTR · Export ដើរទាំងអស់ — ម្ចាស់គម្រោងបញ្ជាក់។
 - ✅ **ZoeKeyGen ៖ ប៊ូតុងចូល/ចាកចេញ ១ ចុច = ១ សកម្មភាព** (`navAuthFlow()`) — ម្ចាស់គម្រោងបញ្ជាក់លើឧបករណ៍ពិត។
+- ✅ **ZoeKeyGen ៖ Reconfig កណ្តាលការផ្ទុក SDK — បិទដោយអ្នកយាម ជំនួសការសាកលើឧបករណ៍** (ការសម្រេចរបស់ម្ចាស់គម្រោង ៖
+  បណ្តាញពិតមិនដែលយឺតល្មម ហើយការសាកត្រូវ paste Config របស់ Project ផ្សេងចូលឧបករណ៍អ្នកលក់ពិត)។ `connection-recovery-test`
+  ផ្នែក ១៥ខ រត់ `initFirebase()` ពិតរបស់ ZoeKeyGen ដោយទប់ SDK កណ្តាលការផ្ទុក ➜ វាស់បាន ៖ ដក
+  `if (currentConfig !== savedConfig) initFirebase();` ចេញ ➜ **ធ្លាក់** (`got: ["https://old.example"]` · exit 1) · ទិសផ្ទុយ
+  (config មិនប្រែ ➜ init តែ ១ ដង) នៅបៃតង។
 - **iPhone ដែលស្កេនមិនបាន** ៖ បើក App ម្តង (SW ថ្មីដំឡើងខាងក្រោយ) ➜ **បិទ App ទាំងស្រុង** (អូសចេញពីបញ្ជី App) ➜ បើកម្តងទៀត ➜
   ស្កេនសាក។ ⛔ កុំ «លុប Website Data» ជាដំណោះស្រាយដំបូង — វាលុប PIN · ការចូល · កៅអី License (Device ID ថ្មី ➜ ត្រូវដោះក្នុង ZoeKeyGen)។
 - **App Android** ៖ ដំឡើង `ZoeW-2.42.4.apk` លើ Android ពិត ➜ ស្កេន · ចូលប្រព័ន្ធ · PTR · Export · ⛔ ZoeW Android ចាស់ដែល sign ដោយ

@@ -2166,9 +2166,6 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **ZoeKeyGen ៖ Reconfig កណ្តាលការផ្ទុក SDK** (អន្ទាក់រង់ចាំ មិនមែនកំហុសសកម្ម) — សាក ៖ DevTools ➜ **Slow 3G** ➜
-  Refresh ➜ ខណៈកំពុងផ្ទុក បើក Reconfig ➜ paste Config របស់ Project **ផ្សេង** ➜ Save ➜ App ត្រូវភ្ជាប់ Project **ថ្មី**
-  ដោយមិនបាច់ Refresh។ សញ្ញាខូច ៖ បញ្ជី Key នៅរាយ Project ចាស់។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

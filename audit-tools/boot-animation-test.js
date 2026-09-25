@@ -53,8 +53,12 @@ for (const app of APPS) {
     const sw = fs.readFileSync(path.join(ROOT, app, 'sw.js'), 'utf8');
 
     ok(app + ': ផ្ទាំង boot ស្ថិតក្នុង index.html', /id="bootSplash"/.test(html));
+    // App React ៖ `<body>` មាន mount តែមួយ (`#root`) ➜ ផ្ទាំងត្រូវជាធាតុដំបូងរបស់វា (markup ដែល React គូរពិត)
+    const isReact = fs.existsSync(path.join(ROOT, app, 'react-render.cjs'));
+    const comp = isReact ? fs.readFileSync(path.join(ROOT, app, 'components.js'), 'utf8') : '';
     ok(app + ': ផ្ទាំង boot ជាធាតុដំបូងក្នុង <body> (គ្របមុនអ្វីៗទាំងអស់)',
-        /<body>\s*<div class="boot-splash"/.test(html));
+        /<body>\s*<div class="boot-splash"/.test(html)
+        || (isReact && /<body>\s*<div id="root">\s*<div class="boot-splash"/.test(html)));
     ok(app + ': ផ្ទាំង boot មាន aria-hidden (screen reader រំលង)',
         /id="bootSplash"[^>]*aria-hidden="true"|aria-hidden="true"[^>]*id="bootSplash"/.test(html));
 
@@ -67,11 +71,19 @@ for (const app of APPS) {
         /function revealAppAfterBoot\(/.test(js) && /function hideBootSplash\(/.test(js));
     ok(app + ': app.js ហៅ revealAppAfterBoot ពេល boot',
         /\n\s*revealAppAfterBoot\(\);/.test(js));
+    // App React ៖ `hideBootSplash()` បន្ទាប `bootRevealing` ក្នុង setTimeout ហើយ `DocumentEffects` (JSX) ចង class ពី state នោះ
+    const hide = (js.match(/function hideBootSplash\(\) \{[\s\S]*?\n    \}/) || [''])[0];
     ok(app + ': class boot-reveal ត្រូវ **ដកចេញវិញ** ក្រោយចលនាចប់',
-        /classList\.remove\('boot-reveal'\)/.test(js), 'boot-reveal នៅជាប់ ➜ animation/stacking context សល់');
+        /classList\.remove\('boot-reveal'\)/.test(js)
+        || (isReact && /setTimeout\([\s\S]*?bootRevealing = false/.test(hide) && /useBodyClass\("boot-reveal", bootRevealing\)/.test(comp)),
+        'boot-reveal នៅជាប់ ➜ animation/stacking context សល់');
 
+    // App React ៖ ផ្ទាំងជារបស់ React (`BootSplash` · `id: "bootSplash"`) ➜ bundle ដួល = **គ្មានផ្ទាំង** (មិនមែនផ្ទាំងជាប់)
+    //    ហើយ boot យឺត ➜ `armBootSplashFallback()` (setTimeout) រសាត់ផ្ទាំងចេញពេល mount (browser វាស់ផ្លូវ bundle ដួលពិត)
+    const fallback = (js.match(/function armBootSplashFallback\(\) \{[\s\S]*?\n    \}/) || [''])[0];
     ok(app + ': **សំណាញ់សុវត្ថិភាព** ក្នុង boot-flags.js (app.js ដួល ➜ ផ្ទាំងនៅតែបាត់)',
-        /bootSplash/.test(flags) && /boot-splash-out/.test(flags) && /setTimeout/.test(flags),
+        (/bootSplash/.test(flags) && /boot-splash-out/.test(flags) && /setTimeout/.test(flags))
+        || (isReact && /id: "bootSplash"/.test(comp) && /armBootSplashFallback\(\)/.test(comp) && /setTimeout/.test(fallback)),
         'boot-flags.js គ្មានសំណាញ់ ➜ exception ក្នុង app.js = App ជាប់ក្រោមផ្ទាំងស');
     ok(app + ': boot-flags.js ស្ថិតក្នុង CORE_SHELL របស់ sw.js',
         /'\.\/boot-flags\.js'/.test(sw));
@@ -272,7 +284,19 @@ async function isolateBootContext(context, base) {
         await isolateBootContext(ctx2, base);
         const page2 = await ctx2.newPage();
         page2.on('pageerror', () => {});
-        await page2.route('**/app.js', (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'throw new Error("boot failure simulated");' }));
+        // App React ៖ index.html មិនផ្ទុក `app.js` (ទិដ្ឋភាពសម្រាប់ checker) ➜ ដួល **bundle ចូលពិត** (`<script type="module" src>`)
+        const entryHtml = fs.readFileSync(path.join(ROOT, 'ZoeW', 'index.html'), 'utf8');
+        const entry = (/<script type="module"[^>]*\bsrc="\.?\/?([^"]+)"/.exec(entryHtml) || [])[1];
+        const crashPattern = entry ? '**/' + entry.replace(/^.*\//, '') : '**/app.js';
+        ok('⛔ ជាន់អប្បបរមា ៖ ដេរីវេ script ចូលរបស់ App ពី index.html', !!entry || /<script[^>]*src="app\.js"/.test(entryHtml), crashPattern);
+        await page2.route(crashPattern, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: 'throw new Error("boot failure simulated");' }));
+        // App React ៖ `index.html` របស់ tree វាស់មាន markup prerender (សម្រាប់ checker អត្ថបទ) ដែលផលិតកម្ម **មិនមាន** ➜ ផ្លូវ
+        //    ដួលត្រូវបម្រើ `index.html` ដែល ship ពិត (`index.shipped.html` — build-audit) បើមិនដូច្នេះវាវាស់ផ្ទាំងក្លែង
+        const shippedPath = path.join(ROOT, 'ZoeW', 'index.shipped.html');
+        if (fs.existsSync(shippedPath)) {
+            const shipped = fs.readFileSync(shippedPath, 'utf8');
+            await page2.route(base + '/', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: shipped }));
+        }
         await page2.goto(base + '/', { waitUntil: 'domcontentloaded' });
         const rescued = await page2.waitForFunction(() => {
             const el = document.getElementById('bootSplash');

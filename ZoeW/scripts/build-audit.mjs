@@ -299,6 +299,9 @@ writeFileSync(path.join(APP, 'view-originals.js'), viewOriginals);
         const annotated = await page.evaluate(() => window.__zoeAnnotated);
         if (annotated < 80) throw new Error('build-audit ៖ ធាតុដែលមាន `data-act` តិចពេក ៖ ' + annotated);
         if (markup.length < 30000 || markup.split('\n').length < 400) throw new Error('build-audit ៖ markup ដំបូងតូចពេក ៖ ' + markup.length + ' តួ · ' + markup.split('\n').length + ' ជួរ');
+        // ⛔ `index.html` ដែល **ship ពិត** (`#root` ទទេ) រក្សាទុកជា `index.shipped.html` ៖ ផ្លូវ «bundle ដួល» ត្រូវវាស់លើ
+        //    អ្វីដែលអ្នកប្រើទទួល — markup prerender ខាងក្រោមមិនមែនជារបស់ផលិតកម្មទេ (វានឹងបន្សល់ផ្ទាំង boot ក្លែង)
+        writeFileSync(path.join(APP, 'index.shipped.html'), html);
         writeFileSync(htmlPath, html.replace('<div id="root"></div>', '<div id="root">' + markup + '</div>'));
         console.log('index.html ៖ markup ដំបូងរបស់ React ' + markup.length + ' តួ · ' + markup.split('\n').length + ' ជួរ · data-act ' + annotated);
     } finally {

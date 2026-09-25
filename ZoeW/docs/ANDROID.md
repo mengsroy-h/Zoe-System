@@ -40,6 +40,33 @@ npm run android:open     # បើក Android Studio
 APK ចាស់មិនបាន** (អតិថិជនត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN ·
 Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 
+### APK ពី GitHub Releases (ទាញយកងាយ)
+
+`.github/workflows/android-release.yml` build APK ដែល **sign រួច** ហើយបង្កើត **GitHub Release** មួយក្នុងមួយកំណែ
+(`zoew-android-v<APP_VERSION>` · ឯកសារ `ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION` ប្រែលើ `main` ឬចុច
+**Actions ➜ Android APK ➜ Run workflow**។ ទាញយក ៖ ទំព័រ repo ➜ **Releases** ➜ `ZoeW-<កំណែ>.apk` ➜ បើកលើទូរស័ព្ទ ➜ ដំឡើង។
+
+⛔ **keystore តែមួយជារៀងរហូត** ៖ APK ដែល sign ដោយ keystore ផ្សេង **ដំឡើងជាន់ App ចាស់មិនបាន** ➜ ត្រូវលុប App ចាស់ ➜
+បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី ➜ Key ដែលមានពិដានឧបករណ៍ ១ ត្រូវឲ្យ admin ដោះឧបករណ៍ចាស់ក្នុង
+ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទាល់តែសោះ** ពេលគ្មាន keystore (គ្មានការធ្លាក់ចុះទៅ debug key)។
+
+**ការរៀបចំ (ម្តង)** ៖
+
+1. បង្កើត keystore ម្តងគត់ (ឬប្រើ keystore ដែល sign APK ដែលអ្នកប្រើកំពុងប្រើ — បើមាន) ៖
+
+   ```bash
+   keytool -genkeypair -v -keystore zoew-release.jks -alias zoew -keyalg RSA -keysize 4096 -validity 36500
+   base64 -w0 zoew-release.jks > zoew-release.jks.b64      # Windows ៖ certutil -encode zoew-release.jks zoew-release.jks.b64
+   ```
+
+2. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៤ ៖ `ZOEW_KEYSTORE_BASE64` (ខ្លឹមសារ `.b64`) ·
+   `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` (`zoew`) · `ZOEW_KEY_PASSWORD`។
+3. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. drive ឯកជន ២ កន្លែង) — បាត់ keystore = App ដំឡើងជាន់
+   មិនបានទៀតទេ។ ⛔ កុំ commit វា (`.gitignore` ហាម `*.jks` · `*.keystore` ហើយ `npm run android:check` ពិនិត្យ)។
+
+`build.gradle` sign APK តែពេល env `ZOEW_KEYSTORE_FILE` មាន ➜ Android Studio (**Generate Signed App Bundle / APK**) នៅដើរ
+ដូចមុន។ `npm run android:check` ចាក់សោស្នាមភ្ជាប់ workflow ↔ `build.gradle` (ឈ្មោះ env · គ្មានផ្លូវ debug · `apksigner verify`)។
+
 ### លេខកំណែ APK
 
 `versionName` និង `versionCode` **ដេរីវេពី `APP_VERSION`** (`src/core/version.ts`)

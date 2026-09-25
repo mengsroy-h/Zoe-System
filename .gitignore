@@ -35,3 +35,7 @@ zto-import/.tmp-poison-*
 
 # Windows ZTO Cookie Sync: npm lock មូលដ្ឋាន (dependency ត្រូវបាន pin ក្នុង package.json)
 tools/zto-cookie-sync-windows/package-lock.json
+
+# ⛔ keystore សម្រាប់ sign APK ជា credential ពិត (មើល ZoeW/docs/ANDROID.md) — មិនត្រូវ commit ដាច់ខាត
+*.jks
+*.keystore

@@ -130,7 +130,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run android:sync` | build Android រួចចម្លងចូល `android/` (`cap sync android`) |
 | `npm run android:open` | បើក `android/` ក្នុង Android Studio |
 | `npm run android:icons` | បង្កើត logo និង splash របស់ Android ពី `resources/icon.svg` |
-| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ស្ថិតក្នុងខ្សែ template របស់ Capacitor ដែលដំឡើង |
+| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ស្ថិតក្នុងខ្សែ template របស់ Capacitor ដែលដំឡើង · workflow release APK ↔ keystore |
 | `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) |
 
 ### Deploy ទៅ Netlify

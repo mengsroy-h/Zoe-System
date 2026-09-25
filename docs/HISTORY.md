@@ -116,6 +116,19 @@ vanilla … HISTORY.md សម្រួលចោលខ្លះ … បំបែ�
   ការកែ ៖ `waitAuditBridge()` តែមួយក្នុង `audit-tools/react-view.js` (ពិដាន ២ វិ. — ខ្លីជាងការពន្យារបណ្តាញ ៥ វិ. ➜ chunk ដែល
   មិននៅក្នុង cache នៅតែធ្លាក់)។
 
+#### APK ពី GitHub Releases (សំណើម្ចាស់គម្រោង ៖ «Build apk ដាក់ក្នុង Github ជា release ឬ package … ងាយស្រួល download»)
+
+- **`.github/workflows/android-release.yml` (ថ្មី)** ៖ build web (`--mode android`) ➜ `cap sync` ➜ `gradlew assembleRelease` ➜
+  `apksigner verify` ➜ **GitHub Release** `zoew-android-v<APP_VERSION>` (`ZoeW-<កំណែ>.apk` + `.sha256`) ៖ ពេល `APP_VERSION`
+  ប្រែលើ `main` ឬចុច Run workflow · កំណែដែលមាន Release រួច ➜ មិន build ម្តងទៀត។
+- ⛔ **keystore តែមួយជារៀងរហូត** ៖ `build.gradle` sign តាម env (`ZOEW_KEYSTORE_FILE` …) តែពេល env មាន (Android Studio ដើរដូចមុន) ·
+  គ្មាន secret ➜ **មិន build** (⛔ គ្មានការធ្លាក់ចុះទៅ debug key របស់ runner ដែលប្រែរាល់ការរត់ ➜ APK ដំឡើងជាន់មិនបាន ➜
+  បាត់ PIN · កៅអី License) · keystore លុបចេញពី runner ជានិច្ច · `*.jks` · `*.keystore` ហាមក្នុង `.gitignore` (ធ្លាប់ comment ចោល)។
+- **អ្នកយាម** ៖ `android:check` ផ្នែក ៨ (ស្នាមភ្ជាប់ឈ្មោះ env workflow ↔ `build.gradle` · គ្មានផ្លូវ debug · លក្ខខណ្ឌ secret លើជំហាន
+  gradle · `apksigner verify` មុន Release · គ្មាន keystore ក្នុង tree) — probe **៤/៤** ធ្លាក់។
+- ⚠️ **APK មិនទាន់ build ក្នុងជុំនេះ** ៖ GitHub Actions របស់ម្ចាស់គម្រោងនៅអស់កូតា (job បញ្ចប់ក្នុង ២ វិ. គ្មានជំហាន) ហើយ
+  environment នៃ session នេះបិទ `dl.google.com` (Android SDK) ➜ វាស់មិនបាន។
+
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
 - **Netlify build ខ្លួនឯង** (App ទាំង ២) · គ្មានការកែ Firebase rules · គ្មាន env ថ្មី។

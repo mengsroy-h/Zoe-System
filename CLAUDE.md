@@ -126,7 +126,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
 > `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
-> plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor) · `npm run native:check` (bridge ក្លែង ៖ Back ·
+> plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
+> ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key) · `npm run native:check` (bridge ក្លែង ៖ Back ·
 > ប្រវត្តិ · pause/resume · Share/Print · ជីវមាត្រ · PTR/latch) · `npm run
 > rules:check` (លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ លើ ZoeW ដើម · web ·
 > Android)។ ⛔ **Back មិនត្រឡប់ចូលរបៀប «ដក» វិញ** (`safeScreen()`)។

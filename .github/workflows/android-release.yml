@@ -1,0 +1,153 @@
+# Build APK របស់ ZoeW (Capacitor · Android) ហើយបង្កើត **GitHub Release** ឲ្យទាញយកបានងាយ។
+#
+# ⛔ APK ត្រូវ sign ដោយ keystore **ដដែលជានិច្ច** ៖ Android បដិសេធការដំឡើង APK ជាន់ App ដែល sign ដោយ keystore
+#    ផ្សេង ➜ អ្នកប្រើត្រូវលុប App ចាស់ ➜ បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី)។
+#    ដូច្នេះ ៖ គ្មាន keystore ➜ **មិន build** (⛔ គ្មានការធ្លាក់ចុះទៅ debug key ដែលប្រែរាល់ការរត់)។
+#
+# Secret ៤ ដែលត្រូវកំណត់ក្នុង Settings ➜ Secrets and variables ➜ Actions (មើល ZoeW/docs/ANDROID.md) ៖
+#   · ZOEW_KEYSTORE_BASE64   — ឯកសារ keystore (.jks) ជា base64
+#   · ZOEW_KEYSTORE_PASSWORD — ពាក្យសម្ងាត់ keystore
+#   · ZOEW_KEY_ALIAS         — ឈ្មោះ key
+#   · ZOEW_KEY_PASSWORD      — ពាក្យសម្ងាត់ key
+#
+# ពេលរត់ ៖ ចុច «Run workflow» ដោយដៃ · ឬស្វ័យប្រវត្តិពេល `APP_VERSION` ប្រែលើ `main`។
+# Release មួយក្នុងមួយកំណែ (`zoew-android-v<APP_VERSION>`) ➜ កំណែដែលមាន Release រួច ➜ មិន build ម្តងទៀត។
+
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ZoeW/src/core/version.ts'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    name: Build APK ➜ GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: កំណែ និងស្លាក Release
+        id: meta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -e "const s=require('fs').readFileSync('ZoeW/src/core/version.ts','utf8');const m=s.match(/APP_VERSION\s*=\s*'([0-9]+\.[0-9]+\.[0-9]+)'/);if(!m)process.exit(1);console.log(m[1])")
+          TAG="zoew-android-v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release ${TAG} មានរួច — មិន build ម្តងទៀត (ឡើង APP_VERSION ដើម្បីបង្កើត Release ថ្មី)"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: ពិនិត្យ secret របស់ keystore
+        id: keystore
+        if: steps.meta.outputs.exists == 'false'
+        env:
+          KS: ${{ secrets.ZOEW_KEYSTORE_BASE64 }}
+          KSP: ${{ secrets.ZOEW_KEYSTORE_PASSWORD }}
+          KA: ${{ secrets.ZOEW_KEY_ALIAS }}
+          KP: ${{ secrets.ZOEW_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS" ] && [ -n "$KSP" ] && [ -n "$KA" ] && [ -n "$KP" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          MSG="secret ZOEW_KEYSTORE_BASE64 · ZOEW_KEYSTORE_PASSWORD · ZOEW_KEY_ALIAS · ZOEW_KEY_PASSWORD មិនទាន់គ្រប់ ➜ មិន build (មើល ZoeW/docs/ANDROID.md)"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::${MSG}"
+            exit 1
+          fi
+          echo "::warning::${MSG}"
+
+      - uses: actions/setup-java@v4
+        if: steps.keystore.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: actions/setup-node@v4
+        if: steps.keystore.outputs.ready == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ZoeW/package-lock.json
+
+      - name: Build web (--mode android) ➜ cap sync
+        if: steps.keystore.outputs.ready == 'true'
+        run: |
+          npm ci --prefix ZoeW
+          npm run android:check --prefix ZoeW
+          npm run android:sync --prefix ZoeW
+
+      - name: Build APK (release · sign)
+        if: steps.keystore.outputs.ready == 'true'
+        env:
+          KS: ${{ secrets.ZOEW_KEYSTORE_BASE64 }}
+          ZOEW_KEYSTORE_PASSWORD: ${{ secrets.ZOEW_KEYSTORE_PASSWORD }}
+          ZOEW_KEY_ALIAS: ${{ secrets.ZOEW_KEY_ALIAS }}
+          ZOEW_KEY_PASSWORD: ${{ secrets.ZOEW_KEY_PASSWORD }}
+        run: |
+          export ZOEW_KEYSTORE_FILE="$RUNNER_TEMP/zoew-release.jks"
+          printf '%s' "$KS" | base64 -d > "$ZOEW_KEYSTORE_FILE"
+          cd ZoeW/android
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleRelease
+
+      - name: ផ្ទៀងផ្ទាត់ហត្ថលេខា ➜ ដាក់ឈ្មោះ
+        if: steps.keystore.outputs.ready == 'true'
+        run: |
+          APK="ZoeW/android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK" || { echo "::error::រក APK ដែល sign រួចមិនឃើញ (${APK})"; exit 1; }
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee apk-certs.txt
+          OUT="ZoeW-${{ steps.meta.outputs.version }}.apk"
+          cp "$APK" "$OUT"
+          sha256sum "$OUT" | tee "$OUT.sha256"
+          {
+            echo "### ZoeW ${{ steps.meta.outputs.version }} (Android)"
+            echo ""
+            echo "- SHA-256 ៖ \`$(cut -d' ' -f1 "$OUT.sha256")\`"
+            echo "- វិញ្ញាបនបត្រ ៖ \`$(grep -m1 'SHA-256 digest' apk-certs.txt | sed 's/.*: //')\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: បង្កើត GitHub Release
+        if: steps.keystore.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OUT="ZoeW-${{ steps.meta.outputs.version }}.apk"
+          CERT=$(grep -m1 'SHA-256 digest' apk-certs.txt | sed 's/.*: //')
+          cat > notes.md <<EOF
+          ## ZoeW ${{ steps.meta.outputs.version }} — App Android
+
+          ១. ទាញ **${OUT}** ខាងក្រោម ➜ បើកលើទូរស័ព្ទ Android ➜ អនុញ្ញាត «ដំឡើងពីប្រភពនេះ» ➜ ដំឡើង។
+          ២. មាន ZoeW Android រួចហើយ ➜ ដំឡើងជាន់បានផ្ទាល់ (ទិន្នន័យ · PIN · Activation នៅដដែល)។
+
+          ⛔ បើទូរស័ព្ទរាយ «App not installed» ➜ App ចាស់ត្រូវ sign ដោយ keystore ផ្សេង (ឧ. build ពី Android Studio) ➜ មើល ZoeW/docs/ANDROID.md មុនលុប App ចាស់ (កៅអី License)។
+
+          - SHA-256 នៃ APK ៖ \`$(cut -d' ' -f1 "$OUT.sha256")\`
+          - វិញ្ញាបនបត្រ sign ៖ \`${CERT}\`
+          EOF
+          gh release create "${{ steps.meta.outputs.tag }}" "$OUT" "$OUT.sha256" \
+            --target "${{ github.sha }}" \
+            --title "ZoeW ${{ steps.meta.outputs.version }} (Android)" \
+            --notes-file notes.md
+
+      - name: លុប keystore ចេញពី runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/zoew-release.jks"

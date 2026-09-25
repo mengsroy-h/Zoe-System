@@ -264,7 +264,7 @@ function decodeEntities(t) {
     return t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
 }
 
-/** ធាតុដែលមាន `id` ក្នុង HTML ➜ `{ tag, className, innerHTML, text }` ឬ `null` */
+/** ធាតុដែលមាន `id` ក្នុង HTML ➜ `{ tag, className, hidden, innerHTML, text }` ឬ `null` */
 function elementById(html, id) {
     const re = new RegExp('<([a-zA-Z][\\w-]*)\\b[^>]*\\bid="' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*>');
     const m = re.exec(html);
@@ -274,6 +274,7 @@ function elementById(html, id) {
     return {
         tag: m[1].toLowerCase(),
         className: cls ? decodeEntities(cls[1]) : '',
+        hidden: /\shidden(=""|\s|>|$)/.test(m[0]),
         innerHTML: el ? el.innerHTML : '',
         text: el ? decodeEntities(el.innerHTML.replace(/<[^>]*>/g, '')) : ''
     };
@@ -284,13 +285,14 @@ function elementById(html, id) {
  * ពីស្ថានភាពបច្ចុប្បន្នរបស់ `vm` រួចស្រង់ធាតុតាម `id` (ធាតុបាត់ ➜ អត្ថបទទទេ · class ទទេ)។
  */
 function renderedElement(root, ctx, rel, exportName, id) {
-    const read = () => elementById(renderFromContext(root, ctx, rel, exportName), id) || { className: '', innerHTML: '', text: '' };
+    const read = () => elementById(renderFromContext(root, ctx, rel, exportName), id) || { className: '', hidden: true, innerHTML: '', text: '' };
     const classSet = () => new Set(read().className.split(/\s+/).filter(Boolean));
     return {
         get innerText() { return read().text; },
         get textContent() { return read().text; },
         get innerHTML() { return read().innerHTML; },
         get className() { return read().className; },
+        get hidden() { return read().hidden; },
         get classes() { const out = {}; classSet().forEach((c) => { out[c] = true; }); return out; },
         classList: { contains: (c) => classSet().has(c) }
     };

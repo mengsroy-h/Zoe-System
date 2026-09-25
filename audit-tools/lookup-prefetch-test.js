@@ -79,6 +79,24 @@ DECLS.forEach((n) => {
     if (m) decls.push(m[0]);
 });
 
+// ⛔ ZoeW ជា React ៖ ស្ថានភាព Lookup · ប្រអប់ · វាលបញ្ចូល ជាឃ្លាំង/ច្រកចេញ (`viewState` · `setModalDisplay()` ·
+//    `fieldValue()`) ➜ ស្រទាប់ React ពិតចូលរាល់ sandbox (stub របស់ sandbox នៅឈ្នះ)
+const { reactRuntime, renderedElement } = require('./react-view');
+// ⛔ `<body>` ជាធាតុក្រៅ root ៖ `DocumentEffects.tsx` ចាក់សោរមូរពី `uiState.isModalOpen` (`useLayoutEffect` ➜ SSR មិនរត់)
+//    ➜ ដេរីវេច្បាប់ពី bundle ពិត (ច្បាប់បាត់ ➜ `null` ➜ ការអះអាងធ្លាក់)
+const BODY_LOCK_RULE = (() => {
+    let text = '';
+    try { text = fs.readFileSync(path.join(ROOT, 'ZoeW', 'react-render.cjs'), 'utf8'); } catch (e) { return false; }
+    const m = /const (\w+) = useStoreValue\(uiState, \(s\) => s\.isModalOpen\);/.exec(text);
+    return !!m && text.indexOf('document.body.style.overflow = ' + m[1] + ' ? "hidden" : "";') !== -1;
+})();
+function bodyOverflow(ctx) { return BODY_LOCK_RULE ? (ctx.isModalOpen ? 'hidden' : '') : null; }
+
+function withReact(ctx) {
+    if (typeof ctx.queueMicrotask !== 'function') ctx.queueMicrotask = queueMicrotask;
+    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+}
+
 function makeClock() {
     let now = 0, seq = 0;
     const timers = new Map();
@@ -118,13 +136,16 @@ function build(opts) {
         pendingBarcode: o.pendingBarcode === undefined ? 'BC1' : o.pendingBarcode,
         getLookupApiConfig: () => (o.noCfg ? null : (o.cfg || { url: 'https://x/exec?code={barcode}&key=k', enabled: true })),
         URL: URL, Array: Array,
-        document: { querySelectorAll: () => [], createElement: () => ({}), head: { appendChild: () => {} } },
+        // ⛔ React ៖ `armLookupFocus()` ទទួល **ឈ្មោះ ref** (`fieldValue()`/`focusField()` ➜ `getElementById`)
+        document: { querySelectorAll: () => [], createElement: () => ({}), head: { appendChild: () => {} },
+            getElementById: (id) => (id === 'modalPhoneInput' ? ctx.__input || null : null) },
         fetchCustomerDataTableRows: (force) => { calls.push(!!force); return Promise.resolve(); },
         fetchWithTimeout: (url, options) => { warmCalls.push({ url: url, options: options }); return Promise.resolve({ res: { ok: true, status: 204 } }); },
         isPinFlowPending: () => !!o.pinPending,
         __calls: calls, __warmCalls: warmCalls, __clock: clock, __opts: o
     };
     vm.createContext(ctx);
+        withReact(ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
     FNS.forEach((n) => { if (src[n]) { try { vm.runInContext(src[n], ctx); } catch (e) {} } });
     if (o.inFlight) vm.runInContext('if (typeof autoLookupInFlight.set === "function") autoLookupInFlight.set("BC9", {}); else autoLookupInFlight.add("BC9");', ctx);
@@ -309,6 +330,7 @@ scenario('ការត្រៀមតំណទៅ Lookup API', () => {
             __added: added
         };
         vm.createContext(ctx);
+        withReact(ctx);
         vm.runInContext(sliceFn('preconnectToOrigin'), ctx);
         vm.runInContext(fnSrc, ctx);
         return ctx;
@@ -481,6 +503,11 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
         };
         ctx.window = ctx;
         vm.createContext(ctx);
+        withReact(ctx);
+        // ⛔ React ៖ ស្ថានភាព Lookup ជា `viewState.lookupStatus` ដែល `PhoneModal.tsx` គូរជា `#lookupStatus` ➜ `__status`
+        //    អាន className · textContent · hidden ពី **JSX ពិត**
+        Object.defineProperty(ctx, '__status', { configurable: true,
+            value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
         vm.runInContext(sliceFn('lookupApiIsZto'), ctx);
         vm.runInContext(sliceFn('lookupApiIsAppsScript') || 'function lookupApiIsAppsScript() { return false; }', ctx);
         vm.runInContext(sliceFn('lookupApiSendsHeader') || 'function lookupApiSendsHeader(cfg) { return !!(cfg && cfg.headerName); }', ctx);
@@ -549,8 +576,13 @@ scenario('ការស្វែងរកស្វ័យប្រវត្តិ 
 
 ok('Phone modal មានតំបន់ស្ថានភាព Lookup', HTML.indexOf('id="lookupStatus"') !== -1);
 ok('ស្ថានភាព Lookup ប្រកាសទៅ screen reader', /id="lookupStatus"[^>]*role="status"[^>]*aria-live="polite"/.test(HTML));
+// ⛔ React ៖ `setLookupStatus()` សរសេរតែអត្ថបទចូល `viewState` (គ្មាន `innerHTML`) ហើយ JSX គូរវាជា **text node** ➜
+//    វាស់លើការគូរពិត ៖ អត្ថបទមាន markup ត្រូវចេញជា entity មិនមែនធាតុ
 const lookupStatusFn = sliceFn('setLookupStatus') || '';
-ok('ស្ថានភាពប្រើ textContent ការពារ XSS', lookupStatusFn.indexOf('textContent') !== -1 && lookupStatusFn.indexOf('innerHTML') === -1);
+const xssStatus = require('./react-view').renderComponent(ROOT, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal',
+    { viewState: { lookupStatus: { kind: 'lookup-status-warn', text: '<img src=x onerror=alert(1)>' } } });
+ok('ស្ថានភាពប្រើ textContent ការពារ XSS', lookupStatusFn.indexOf('innerHTML') === -1
+    && xssStatus.indexOf('&lt;img src=x onerror=alert(1)&gt;') !== -1 && xssStatus.indexOf('<img src=x') === -1);
 
 scenario('ស្ថានភាព ZTO និង cooldown តាម Barcode មួយៗ', async () => {
     const ctx = buildAutoRuntime({ zto: true, fetchPlan: [false, true] });
@@ -631,6 +663,7 @@ scenario('ការទាញតារាង API ធម្មតាក៏ retry H
         };
         ctx.window = ctx;
         vm.createContext(ctx);
+        withReact(ctx);
         ['lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader',
             'lookupApiSupportsList', 'buildCustomerListApiUrl',
             'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync'].forEach((name) => {
@@ -731,8 +764,8 @@ scenario('⛔ បិទប្រអប់ PIN ➜ Lookup បន្តភ្ល�
         ok('⛔ ស្ថានភាពលែងជាប់នៅ «សូមវាយ PIN»',
             ctx.__status.textContent.indexOf('សូមវាយ PIN') === -1, ctx.__status.textContent);
         ok('ប្រអប់កញ្ចប់នៅតែបើក ➜ ការចាក់សោរមូរនៅដដែល',
-            ctx.isModalOpen === true && ctx.document.body.style.overflow === 'hidden',
-            [ctx.isModalOpen, ctx.document.body.style.overflow]);
+            ctx.isModalOpen === true && bodyOverflow(ctx) === 'hidden',
+            [ctx.isModalOpen, bodyOverflow(ctx)]);
         ok('Lookup Promise ចប់ក្រោយ ZTO ឆ្លើយ', settled === true, settled);
     });
 });
@@ -755,7 +788,7 @@ scenario('⛔ ចាកចេញ ៖ បិទប្រអប់ទាំងអ�
     ok('⛔ ចាកចេញ ➜ pendingBarcode ត្រូវសម្អាត', ctx.pendingBarcode === '', ctx.pendingBarcode);
     ok('⛔ ចាកចេញ ➜ editingItemId ត្រូវសម្អាត', ctx.editingItemId === null, ctx.editingItemId);
     ok('⛔ ចាកចេញ ➜ markingItemId ត្រូវសម្អាត', ctx.markingItemId === null, ctx.markingItemId);
-    ok('⛔ ចាកចេញ ➜ ដោះការចាក់សោរមូរ', ctx.document.body.style.overflow === '', ctx.document.body.style.overflow);
+    ok('⛔ ចាកចេញ ➜ ដោះការចាក់សោរមូរ', bodyOverflow(ctx) === '', bodyOverflow(ctx));
 });
 
 scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ចាស់ ➜ ស្ថានភាពត្រូវសម្អាតពិត', () => {
@@ -766,7 +799,7 @@ scenario('⛔ ទិសផ្ទុយ ៖ បិទប្រអប់ម្ច�
     ok('ជង់ប្រអប់ទទេ ➜ សម្អាត editingItemId និង markingItemId',
         ctx.editingItemId === null && ctx.markingItemId === null, [ctx.editingItemId, ctx.markingItemId]);
     ok('គ្មានប្រអប់ណាបើក ➜ ដោះការចាក់សោរមូររបស់ body',
-        ctx.document.body.style.overflow === '', ctx.document.body.style.overflow);
+        bodyOverflow(ctx) === '', bodyOverflow(ctx));
 
     const nested = buildAutoRuntime({ realModals: true });
     vm.runInContext('openModalHelper("editPhoneModal"); editingItemId = "E1"; openModalHelper("pinModal");', nested);
@@ -993,7 +1026,7 @@ function focusCase(label, opts, expectFocused) {
         if (opts.otherBarcode) vm.runInContext('pendingBarcode = "BC2";', ctx);
         let settle;
         ctx.__promise = new Promise((r) => { settle = r; });
-        vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+        vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
         const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
         const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
         ctx.__clock.advance(fallback - 1);
@@ -1021,7 +1054,7 @@ scenario('បិទ PIN រួច ➜ manual fallback ចាប់ពេលព�
     let settle;
     ctx.__promise = new Promise((r) => { settle = r; });
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
     ctx.__clock.advance(fallback + grace + 1);
@@ -1044,7 +1077,7 @@ scenario('focus តែម្តង', () => {
     let settle;
     ctx.__promise = new Promise((r) => { settle = r; });
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
     settle();
     return Promise.resolve().then(() => {
         ctx.__clock.advance(vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx) + 1);
@@ -1080,7 +1113,7 @@ function workingCase(label, opts, clearJs) {
         vm.runInContext('isModalOpen = true;', ctx);
         ok(label + ' ៖ លក្ខខណ្ឌចាំបាច់ — កូដយល់ថា Lookup កំពុងធ្វើការ',
             vm.runInContext('lookupIsWorkingOn("BC1")', ctx) === true);
-        vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+        vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
         const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
         const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
         ctx.__clock.advance(fallback + grace + 1);
@@ -1121,7 +1154,7 @@ scenario('⛔ ការរង់ចាំ Lookup ត្រូវមានពិ�
     ctx.__input = { value: '', focus: () => { focused++; } };
     ctx.__promise = new Promise(() => {});
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const max = vm.runInContext('LOOKUP_FOCUS_MAX_WAIT_MS', ctx);
     const ztoTimeout = vm.runInContext('ZTO_AUTO_LOOKUP_TIMEOUT_MS', ctx);
@@ -1147,7 +1180,7 @@ scenario('⛔ នាឡិកាថយក្រោយ ➜ fail-open (Keyboard �
     ctx.__input = { value: '', focus: () => { focused++; } };
     ctx.__promise = new Promise(() => {});
     vm.runInContext('isModalOpen = true;', ctx);
-    vm.runInContext('armLookupFocus(__input, "BC1", __promise);', ctx);
+    vm.runInContext('armLookupFocus("modalPhoneInput", "BC1", __promise);', ctx);
     const grace = vm.runInContext('LOOKUP_FOCUS_GRACE_MS', ctx);
     const fallback = vm.runInContext('LOOKUP_MANUAL_FALLBACK_MS', ctx);
     now -= 3600000;
@@ -1159,7 +1192,7 @@ scenario('⛔ នាឡិកាថយក្រោយ ➜ fail-open (Keyboard �
 const fetchFn = sliceFn('fetchCustomerDataTableRows') || '';
 ok('ការធ្លាក់ ➜ ហៅ scheduleCustomerTableRetry()', fetchFn.indexOf('scheduleCustomerTableRetry()') !== -1);
 ok('ជោគជ័យ ➜ ហៅ clearCustomerTableRetry()', fetchFn.indexOf('clearCustomerTableRetry()') !== -1);
-const scanFn = SRC.indexOf('armLookupFocus(modalPhoneInput');
+const scanFn = Math.max(SRC.indexOf('armLookupFocus(modalPhoneInput'), SRC.indexOf("armLookupFocus('modalPhoneInput'"));
 ok('ផ្លូវស្កេនប្រើ armLookupFocus()', scanFn !== -1);
 const cacheClear = sliceFn('clearCustomerDataTableCache') || '';
 ok('ការចាកចេញ/ប្តូរ Config ➜ លុបម៉ោងព្យាយាមវិញ', cacheClear.indexOf('clearCustomerTableRetry()') !== -1);

@@ -203,6 +203,7 @@ run "write-stall-guard" node audit-tools/write-stall-guard-test.js
 run "stall-lock-release" node audit-tools/stall-lock-release-test.js
 run "locker-claim-guard" node audit-tools/locker-claim-guard-test.js
 run "stale-clear-claim" node audit-tools/stale-clear-claim-test.js
+run "zoew-suite (ZoeW React ៖ tsc · lint · vitest · native · android)" node audit-tools/zoew-suite-test.js
 
 echo
 echo
@@ -272,6 +273,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     STALLLOCK_APP_DIR="$BASE" node audit-tools/stall-lock-release-test.js 2>&1 | tail -1 | sed 's/^/   stall-lock:      /'
     LOCKERCLAIM_APP_DIR="$BASE" node audit-tools/locker-claim-guard-test.js 2>&1 | tail -1 | sed 's/^/   locker-claim:    /'
     STALECLAIM_APP_DIR="$BASE" node audit-tools/stale-clear-claim-test.js 2>&1 | tail -1 | sed 's/^/   stale-clear:     /'
+    ZOEWSUITE_APP_DIR="$BASE" node audit-tools/zoew-suite-test.js 2>&1 | tail -1 | sed 's/^/   zoew-suite:      /'
     MARKER_APP_DIR="$BASE" node audit-tools/restore-marker-hygiene-test.js 2>&1 | tail -1 | sed 's/^/   marker-hygiene:  /'
     GESTURE_APP_DIR="$BASE" node audit-tools/gesture-test.js 2>&1 | tail -1 | sed 's/^/   gesture:         /'
     HISTORYMENU_APP_DIR="$BASE" node audit-tools/history-menu-dismiss-test.js 2>&1 | tail -1 | sed 's/^/   history-menu:    /'

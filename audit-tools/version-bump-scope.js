@@ -26,6 +26,16 @@ const ROOT = process.env.VERSIONSCOPE_APP_DIR
     : path.resolve(__dirname, '..');
 const BASE = process.env.VERSIONSCOPE_BASE || 'origin/main';
 const APPS = ['ZoeW', 'ZoeKeyGen'];
+// ⛔ App React ៖ `run-all.sh` វាស់ «root វាស់» (ZoeW = build វាស់ ដែលមាន `sw.js` អានបាន) ខណៈប្រវត្តិ git រស់នៅ repo ពិត
+//    ➜ `VERSIONSCOPE_GIT_DIR` ចង្អុលទៅ repo (លំនាំដើម = ROOT ដូចមុន)។
+const GIT_DIR = process.env.VERSIONSCOPE_GIT_DIR ? path.resolve(process.env.VERSIONSCOPE_GIT_DIR) : ROOT;
+// ⛔ ប្រភព React ៖ កំណែរស់នៅ `src/core/version.ts` · `src/sw/cache-version.ts` ហើយកូដ ship គឺ **អ្វីដែល Vite build**
+//    (src · public · index.html · vite.config) បូក dependency (`package.json`/lock ៖ React · Firebase ចូល bundle —
+//    ផ្ទុយពី App vanilla ដែល package.json ជា manifest របស់ server តែប៉ុណ្ណោះ)។ ស្ពាន build វាស់មិន ship ទេ។
+const REACT_VERSION_FILES = { app: 'src/core/version.ts', cache: 'src/sw/cache-version.ts' };
+const REACT_SHIPPED = /^(src\/|public\/|index\.html$|vite\.config\.mts$|package(-lock)?\.json$)/;
+const REACT_AUDIT_ONLY = /^src\/(expose-globals\.ts|audit-compat\.ts|audit-annotate\.ts|_generated-state\.json)$/;
+function isReactSource(app) { return fs.existsSync(path.join(GIT_DIR, app, 'src', 'main.tsx')); }
 
 // ឯកសារដែលបម្រើដល់អ្នកប្រើពិត — README/manifest មិនប៉ះឥរិយាបថ runtime
 const SHIPPED = /\.(js|css|html|wasm|json)$/;
@@ -51,7 +61,7 @@ function ok(label, cond, detail) {
 }
 
 function git(args) {
-    return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return execFileSync('git', args, { cwd: GIT_DIR, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
 }
 
 // ⛔ **ជាន់អប្បបរមាត្រូវមកមុន SKIP។** បើដាក់ SKIP មុន នោះថតដែលគ្មាន git
@@ -91,26 +101,33 @@ try {
 
 const changed = git(['diff', '--name-only', BASE]).split('\n').filter(Boolean);
 
-function cacheVersionOf(ref, app) {
-    let src;
-    try {
-        src = ref === null
-            ? fs.readFileSync(path.join(ROOT, app, 'sw.js'), 'utf8')
-            : git(['show', ref + ':' + app + '/sw.js']);
-    } catch (e) { return null; }
-    const m = src.match(/CACHE_VERSION\s*=\s*'([^']+)'/);
-    return m ? m[1] : null;
+// ប្រភពកំណែ ៖ ឯកសារ React (បើមាន) មុន ➜ ឯកសារ vanilla (`sw.js` · `app.js`) — ទាំងនៅ working tree និងនៅ ref
+function versionOf(ref, app, reactFile, vanillaFile, re) {
+    const candidates = [app + '/' + reactFile, app + '/' + vanillaFile];
+    for (const rel of candidates) {
+        let src;
+        try {
+            src = ref === null
+                ? fs.readFileSync(rel === candidates[0] ? path.join(GIT_DIR, rel) : path.join(ROOT, rel), 'utf8')
+                : git(['show', ref + ':' + rel]);
+        } catch (e) { continue; }
+        const m = src.match(re);
+        if (m) return m[1];
+    }
+    return null;
 }
-
+function cacheVersionOf(ref, app) {
+    return versionOf(ref, app, REACT_VERSION_FILES.cache, 'sw.js', /CACHE_VERSION\s*=\s*'([^']+)'/);
+}
 function appVersionOf(ref, app) {
-    let src;
-    try {
-        src = ref === null
-            ? fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8')
-            : git(['show', ref + ':' + app + '/app.js']);
-    } catch (e) { return null; }
-    const m = src.match(/APP_VERSION\s*=\s*'([^']+)'/);
-    return m ? m[1] : null;
+    return versionOf(ref, app, REACT_VERSION_FILES.app, 'app.js', /APP_VERSION\s*=\s*'([^']+)'/);
+}
+// ការប្រែដែល **លើសពី** បន្ទាត់កំណែ (ការឡើងកំណែទទេ ≠ ការកែពិត)
+function changedBeyond(file, versionLine) {
+    return git(['diff', '-U0', BASE, '--', file])
+        .split('\n')
+        .filter((l) => /^[+-]/.test(l) && !/^[+-][+-]/.test(l))
+        .some((l) => !versionLine.test(l));
 }
 
 // ⛔ ការបិទរន្ធនៃការលើកលែង `netlify/functions/` ខាងលើ។
@@ -144,6 +161,40 @@ for (const app of present) {
 
 let anyChecked = 0;
 for (const app of present) {
+    if (isReactSource(app)) {
+        const prefix = app + '/';
+        const reactFiles = changed.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length))
+            .filter((f) => REACT_SHIPPED.test(f) && !REACT_AUDIT_ONLY.test(f));
+        const versionOnly = new Map([
+            [REACT_VERSION_FILES.app, /APP_VERSION\s*=/],
+            [REACT_VERSION_FILES.cache, /CACHE_VERSION\s*=/],
+            ['package.json', /"version"\s*:/],
+            ['package-lock.json', /"version"\s*:/],
+            ['public/manifest.json', /"version"\s*:/]
+        ]);
+        let reactExists = true;
+        try { git(['cat-file', '-e', BASE + ':' + app + '/src/main.tsx']); } catch (e) { reactExists = false; }
+        // base ជា App vanilla ➜ ឯកសារ ship ទាំងអស់ប្រែ (ការជំនួសទាំងស្រុង) ➜ ការកែពិតតាមនិយមន័យ
+        const realFiles = reactExists
+            ? reactFiles.filter((f) => !versionOnly.has(f) || changedBeyond(prefix + f, versionOnly.get(f)))
+            : reactFiles;
+        const swBumpedR = cacheVersionOf(BASE, app) !== cacheVersionOf(null, app);
+        if (!reactFiles.length && !swBumpedR) continue;
+        anyChecked++;
+        if (realFiles.length) {
+            ok(app + ' (React) ៖ កូដដែល ship ប្រែ ➜ `CACHE_VERSION` ត្រូវឡើង',
+                swBumpedR, 'ឯកសារប្រែ៖ ' + realFiles.slice(0, 8).join(', ') + (realFiles.length > 8 ? ' …' : '') + ' តែ CACHE_VERSION នៅ ' + cacheVersionOf(null, app));
+            const av = appVersionOf(null, app), avBase = appVersionOf(BASE, app);
+            ok(app + ' (React) ៖ កូដដែល ship ប្រែ ➜ `APP_VERSION` ត្រូវឡើង',
+                !!av && av !== avBase, 'នៅ ' + av + ' ដដែល');
+        } else {
+            ok('⛔ ' + app + ' (React) ៖ គ្មានការកែពិត ➜ **មិនត្រូវឡើងកំណែ/cache**',
+                !swBumpedR,
+                'CACHE_VERSION ' + cacheVersionOf(BASE, app) + ' ➜ ' + cacheVersionOf(null, app)
+                    + ' ខណៈឯកសារ ship ប្រែតែបន្ទាត់កំណែ ➜ ការឡើងកំណែទទេបង្ខំអ្នកប្រើទាញសំបកទាំងមូលឡើងវិញ');
+        }
+        continue;
+    }
     const shipped = changed.filter((f) =>
         f.startsWith(app + '/') && SHIPPED.test(f) && !NOT_SHIPPED.test(f) && f !== app + '/sw.js');
     const swBumped = cacheVersionOf(BASE, app) !== cacheVersionOf(null, app);

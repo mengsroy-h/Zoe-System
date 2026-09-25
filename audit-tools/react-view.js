@@ -152,6 +152,21 @@ function reactRenderBundle(root) {
     return renderBundles.get(file);
 }
 
+/** ឃ្លាំងទាំងអស់របស់ bundle (`core/state` · `core/view-state` · …) ➜ `{ ឈ្មោះ export: ឃ្លាំង }` */
+function allBundleStores(m) {
+    if (m.__allStores) return m.__allStores;
+    const out = {};
+    const nss = [m.stores].concat((m.STATE_MODULES || []).map((_, i) => m['s' + i]));
+    for (const ns of nss) {
+        for (const key of Object.keys(ns || {})) {
+            const v = ns[key];
+            if (v && typeof v === 'object' && typeof v.subscribe === 'function' && typeof v.version === 'function') out[key] = v;
+        }
+    }
+    m.__allStores = out;
+    return out;
+}
+
 /**
  * គូរ component ពិត (`rel` ៖ `src/app/components/…tsx` · `exportName`) ជា HTML ។ `stores` ៖ `{ uiState: { វាល: តម្លៃ } }`
  * — view model ដែល function ពិតផលិតក្នុង `vm` (អាន `vm.runInContext('uiState.x', ctx)`) ➜ ចាក់ចូលឃ្លាំងរបស់ bundle ។
@@ -163,7 +178,7 @@ function renderComponent(root, rel, exportName, stores) {
     const Comp = m['c' + i][exportName];
     if (typeof Comp !== 'function') throw new Error('react-view ៖ ' + rel + ' មិន export ' + exportName);
     for (const [store, fields] of Object.entries(stores || {})) {
-        const target = m.stores[store];
+        const target = allBundleStores(m)[store];
         if (!target) throw new Error('react-view ៖ រកឃ្លាំង ' + store + ' មិនឃើញ');
         for (const [k, v] of Object.entries(fields)) target[k] = v;
     }
@@ -178,8 +193,7 @@ function renderFromContext(root, ctx, rel, exportName) {
     const vm = require('vm');
     const m = reactRenderBundle(root);
     const stores = {};
-    for (const store of Object.keys(m.stores)) {
-        if (!m.stores[store] || typeof m.stores[store].subscribe !== 'function') continue;
+    for (const store of Object.keys(allBundleStores(m))) {
         const fields = {};
         const own = vm.runInContext('typeof ' + store + ' === "object" && ' + store + ' ? Object.keys(' + store + ') : []', ctx);
         for (const k of own) {
@@ -246,7 +260,80 @@ function renderedContainer(root, ctx, rel, exportName) {
     };
 }
 
+function decodeEntities(t) {
+    return t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+}
+
+/** ធាតុដែលមាន `id` ក្នុង HTML ➜ `{ tag, className, innerHTML, text }` ឬ `null` */
+function elementById(html, id) {
+    const re = new RegExp('<([a-zA-Z][\\w-]*)\\b[^>]*\\bid="' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*>');
+    const m = re.exec(html);
+    if (!m) return null;
+    const el = topLevelElements(html.slice(m.index))[0];
+    const cls = /\bclass="([^"]*)"/.exec(m[0]);
+    return {
+        tag: m[1].toLowerCase(),
+        className: cls ? decodeEntities(cls[1]) : '',
+        innerHTML: el ? el.innerHTML : '',
+        text: el ? decodeEntities(el.innerHTML.replace(/<[^>]*>/g, '')) : ''
+    };
+}
+
+/**
+ * «ធាតុ» សម្រាប់ checker ដែលអាន `el.innerText` / `el.classList` ដូច App ដើម ៖ រាល់ការអានគូរ component ពិត
+ * ពីស្ថានភាពបច្ចុប្បន្នរបស់ `vm` រួចស្រង់ធាតុតាម `id` (ធាតុបាត់ ➜ អត្ថបទទទេ · class ទទេ)។
+ */
+function renderedElement(root, ctx, rel, exportName, id) {
+    const read = () => elementById(renderFromContext(root, ctx, rel, exportName), id) || { className: '', innerHTML: '', text: '' };
+    const classSet = () => new Set(read().className.split(/\s+/).filter(Boolean));
+    return {
+        get innerText() { return read().text; },
+        get textContent() { return read().text; },
+        get innerHTML() { return read().innerHTML; },
+        get className() { return read().className; },
+        get classes() { const out = {}; classSet().forEach((c) => { out[c] = true; }); return out; },
+        classList: { contains: (c) => classSet().has(c) }
+    };
+}
+
+/**
+ * handler ដែល JSX ពិតចងលើធាតុ `id` (`prop` ៖ `onClick` · `onFocus` …) ដេរីវេពីអត្ថបទ `react-render.cjs` ៖
+ *   `onFocus: phoneSearchFocused`            ➜ `{ name: 'phoneSearchFocused', args: null }` (ហៅជាមួយ event)
+ *   `onClick: () => togglePanelFromHandle("data")` ➜ `{ name: 'togglePanelFromHandle', args: ['data'] }`
+ *   `onClick: onAct("x", ["a"])`             ➜ `{ name: 'x', args: ['a'], act: true }`
+ * ⛔ រកមិនឃើញ ឬរូបរាងផ្សេង ➜ `null` (checker ត្រូវធ្លាក់ មិនមែនសន្មត)
+ */
+function jsxHandler(root, id, prop) {
+    const acorn = require('acorn');
+    const text = require('fs').readFileSync(require('path').join(root, 'ZoeW', 'react-render.cjs'), 'utf8');
+    const at = text.indexOf('id: ' + JSON.stringify(id) + ',');
+    if (at === -1) return null;
+    let depth = 0, open = -1;
+    for (let i = at; i >= 0; i--) {
+        const c = text[i];
+        if (c === '}') depth++;
+        else if (c === '{') { if (depth === 0) { open = i; break; } depth--; }
+    }
+    if (open === -1) return null;
+    let node;
+    try { node = acorn.parseExpressionAt(text, open, { ecmaVersion: 'latest' }); } catch (e) { return null; }
+    const property = (node.properties || []).find((p) => p.type === 'Property' && p.key && (p.key.name === prop || p.key.value === prop));
+    if (!property) return null;
+    const value = property.value;
+    const literal = (n) => (n.type === 'Literal' ? n.value
+        : n.type === 'ArrayExpression' ? n.elements.map(literal) : undefined);
+    if (value.type === 'Identifier') return { name: value.name, args: null };
+    const call = value.type === 'ArrowFunctionExpression' && value.body.type === 'CallExpression' ? value.body
+        : (value.type === 'CallExpression' ? value : null);
+    if (!call || call.callee.type !== 'Identifier') return null;
+    const args = call.arguments.map(literal);
+    if (args.some((v) => v === undefined)) return null;
+    if (value.type === 'CallExpression' && call.callee.name === 'onAct') return { name: args[0], args: args[1] || [], act: true };
+    if (value.type === 'CallExpression') return null;
+    return { name: call.callee.name, args };
+}
+
 module.exports = {
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
-    renderComponent, renderFromContext, renderedContainer, topLevelElements
+    renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

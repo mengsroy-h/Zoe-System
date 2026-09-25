@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.PERIODICGUARD_APP_DIR || path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8');
@@ -47,9 +48,13 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
     ok('មាន guard សម្រាប់ការពិនិត្យ Session ជាប្រចាំ', !!sessionFn);
     ok('មាន guard សម្រាប់ការពិនិត្យ License ជាប្រចាំ', !!licenseFn);
     ok('ការអាន Firebase token មាន timeout', /withTimeout\(\s*fb\.getIdTokenResult\(/.test(sliceFn('isFirebaseSessionExpired')));
+    // ⛔ ZoeW (React) ចុះឈ្មោះវដ្តតាម `scope.every(ms, fn)` (`app/lifecycle/scope.ts` ៖ dispose ពេល unmount) ➜
+    //    ទទួលវា **តែពេល** តួ `every()` ពិតជា `setInterval(fn, ms)` (ដេរីវេពីកូដ មិនមែនជឿឈ្មោះ)
+    const everyIsInterval = /\bevery\(ms, fn\)\s*\{[^}]*setInterval\(fn, ms\)/.test(source);
+    const interval = (fn, ms) => new RegExp('setInterval\\(' + fn + ',\\s*' + ms + '\\)').test(source)
+        || (everyIsInterval && new RegExp('\\.every\\(' + ms + ',\\s*' + fn + '\\)').test(source));
     ok('setInterval ហៅ helper ដែលមាន guard',
-        /setInterval\(runSessionExpiryCheck,\s*60000\)/.test(source)
-        && /setInterval\(runPeriodicLicenseCheck,\s*LICENSE_RECHECK_INTERVAL_MS\)/.test(source));
+        interval('runSessionExpiryCheck', '60000') && interval('runPeriodicLicenseCheck', 'LICENSE_RECHECK_INTERVAL_MS'));
 
     if (sessionFn && licenseFn) {
         let resolveSession;
@@ -108,7 +113,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             const armCounts = { session: 0, listeners: 0, expired: 0, toast: 0 };
             let resolveArmSession = null;
             const armCtx = vm.createContext({
-                Promise, console,
+                Promise, console, queueMicrotask,
                 authGeneration: 7,
                 auth: { currentUser: { uid: 'u1' } },
                 db: {},
@@ -132,6 +137,8 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 window: { ZoeErrors: { capture: () => {} } },
                 ZoeErrors: { capture: () => {} }
             });
+            // ⛔ ZoeW ជា React ៖ ប៊ូតុង/វាល Activation ជា `viewState` · `fieldValue()` ➜ ស្រទាប់ React ពិតចូល sandbox
+            vm.runInContext(reactRuntime(source, { context: armCtx }), armCtx);
             // ⛔ ទង់ចាប់ផ្តើមជា `'pending'` — **តម្លៃដើមពិតរបស់ `app.js`**
             vm.runInContext('let sessionExpiryCheckInFlight = false; let isDatabaseInitialized = false;'
                 + ' let sessionExpiryCheck = "pending";\n'
@@ -203,7 +210,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
         };
         const deferred = (entries) => new Promise((resolve, reject) => entries.push({ resolve, reject }));
         const context = vm.createContext({
-            Promise, Error, console: { error() {} },
+            Promise, Error, console: { error() {} }, queueMicrotask,
             authGeneration: 7, auth: { currentUser: { uid: 'u1' } }, db: {},
             LICENSE_APP_CODE: 'ZOE', isDatabaseInitialized: true, isModalOpen: false,
             ZoeLicense: {
@@ -224,6 +231,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
             window: { ZoeErrors: null },
             ZoeErrors: { capture: () => effects.push('error') }
         });
+        vm.runInContext(reactRuntime(source, { exclude: activationNames, context }), context);
         vm.runInContext('let licenseRecheckInFlight = false;\n' + activationFunctions, context);
         return { context, effects, reads, activations, timers, element };
     }
@@ -255,6 +263,8 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 if (change) changes[change](c);
                 h.element('activationKeyInput').value = 'KEY-NEW';
                 h.effects.length = 0;
+                // ⛔ សារក្នុងប្រអប់ Activation (`viewState.activationMessage` ➜ JSX) ក៏ជា UI ដែរ
+                const messageBefore = vm.runInContext('viewState.activationMessage', c);
                 if (request) request.resolve(surface === 'Activate ដំណាក់ទី១'
                     ? { valid: active, reason: 'revoked' }
                     : { state: active ? 'active' : 'inactive', reason: 'revoked' });
@@ -267,6 +277,7 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
                 if (change) {
                     ok('លទ្ធផលចាស់មិនកែ UI/arm/listener ៖ ' + label,
                         h.effects.length === 0 && h.element('activationKeyInput').value === 'KEY-NEW'
+                        && vm.runInContext('viewState.activationMessage', c) === messageBefore
                         && (surface !== 'Activate ដំណាក់ទី១' || h.reads.length === 0),
                         { effects: h.effects, input: h.element('activationKeyInput').value, reads: h.reads.length });
                 } else {
@@ -312,10 +323,12 @@ const AUTH_DATABASE_GUARD = sliceFn('captureAuthDatabaseGuard') || 'function cap
         const old = h.context.submitActivationKey();
         h.context.authGeneration++;
         await h.context.submitActivationKey();
-        ok('ប៊ូតុង Activate ចាស់នៅកាន់សោរហូតដល់ដោះ promise', h.activations.length === 1 && h.element('activationSubmitBtn').disabled);
+        // ⛔ React ៖ ប៊ូតុង `disabled` ជា `viewState.activationBusy` (JSX គូរ)
+        const busy = () => vm.runInContext('viewState.activationBusy', h.context);
+        ok('ប៊ូតុង Activate ចាស់នៅកាន់សោរហូតដល់ដោះ promise', h.activations.length === 1 && busy() === true);
         h.activations[0].resolve({ valid: false });
         await old;
-        ok('finally ចាស់ត្រូវដោះប៊ូតុង ដើម្បីវគ្គថ្មីអាចបន្ត', !h.element('activationSubmitBtn').disabled);
+        ok('finally ចាស់ត្រូវដោះប៊ូតុង ដើម្បីវគ្គថ្មីអាចបន្ត', busy() === false);
         h.element('activationKeyInput').value = 'KEY-NEW';
         const fresh = h.context.submitActivationKey();
         ok('ក្រោយដោះសោ វគ្គថ្មី Activate បានពិត', h.activations.length === 2);

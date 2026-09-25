@@ -143,6 +143,21 @@ const COUNTER = `(function () {
         for (let i = 0; i < records.length; i++) if (!alive(records[i].t)) n++;
         return n;
     };
+    // App React ៖ listener នៃធាតុរស់នៅ root (delegation) ➜ node ដែលបោះចោលមិនដឹក listener ➜ ការបញ្ជាក់ថាវដ្តពិតជា
+    // បោះ node ចោល ត្រូវរាប់ធាតុដែលដកចេញពី DOM (MutationObserver) · React ចំណាំដោយ container __reactContainer
+    let removed = 0;
+    const mo = new MutationObserver((list) => {
+        for (const m of list) for (const n of m.removedNodes) {
+            if (n.nodeType === 1) removed += 1 + n.getElementsByTagName('*').length;
+        }
+    });
+    const start = () => mo.observe(document.documentElement, { childList: true, subtree: true });
+    if (document.documentElement) start(); else add.call(document, 'readystatechange', start, { once: true });
+    window.__removedElements = () => removed;
+    window.__isReactApp = () => {
+        const root = document.getElementById('root');
+        return !!root && Object.keys(root).some((k) => k.indexOf('__reactContainer$') === 0);
+    };
 })();`;
 
 // SDK ក្លែង ៖ អនុញ្ញាតឲ្យវដ្ត login/logout · reconnect · reconfig រត់ពិត
@@ -208,6 +223,8 @@ async function boot(browser, port) {
 const snap = (page) => page.evaluate(() => ({
     dom: window.__listenerSnapshot(),
     detached: window.__listenerDetached(),
+    removed: window.__removedElements(),
+    react: window.__isReactApp(),
     nodes: document.getElementsByTagName('*').length,
     fb: typeof window.__fbLive === 'function' ? window.__fbLive() : {}
 }));
@@ -309,13 +326,21 @@ function grew(before, after, allowance) {
         });
         await page.waitForTimeout(400);
         const b4 = await snap(page);
-        await page.evaluate(async () => {
+        const cycle4 = await page.evaluate(async () => {
             const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            // ⛔ ភស្តុតាងថាវដ្តរត់ពិត ៖ ប្រអប់ Locker **បើកពិត** ហើយមានប៊ូតុងក្រឡា (រាប់ពេលវាលេច)
+            let opened = 0, cells = 0;
             for (let i = 0; i < 6; i++) {
                 if (typeof switchAppPage === 'function') { switchAppPage('entry'); await sleep(40); switchAppPage('data'); await sleep(40); }
                 if (typeof openLockerPicker === 'function') { try { openLockerPicker(); } catch (e) {} await sleep(30); }
+                const modal = document.getElementById('lockerPickerModal');
+                if (modal && getComputedStyle(modal).display !== 'none') {
+                    opened++;
+                    cells = Math.max(cells, modal.querySelectorAll('button').length);
+                }
                 if (typeof closeModal === 'function') { try { closeModal('lockerPickerModal'); } catch (e) {} await sleep(30); }
             }
+            return { opened, cells };
         });
         await page.waitForTimeout(700);
         const a4 = await snap(page);
@@ -328,9 +353,19 @@ function grew(before, after, allowance) {
         // កំពុងលាក់អ្វីមួយ ឬវដ្តមិនបានរត់ ➜ ការអះអាងខាងលើក្លាយជាទទេ។
         check(a4.nodes <= b4.nodes + NODE_ALLOWANCE,
             '⛔ ប្តូរទំព័រ + បើក/បិទ modal × 6 ➜ ចំនួន DOM node មិនកកកុញ', { before: b4.nodes, after: a4.nodes });
-        check((a4.detached - b4.detached) >= 100,
-            '⛔ ទិសផ្ទុយ ៖ វដ្ត Locker ពិតជាបោះបង់ node ដែលមាន listener (' + (a4.detached - b4.detached) + ' >= 100)',
-            { before: b4.detached, after: a4.detached });
+        if (a4.react) {
+            // App React ៖ ប៊ូតុង Locker ចងតាម prop (React delegation នៅ root) ➜ node ផ្តាច់ **មិនដឹក** listener (០ តាម
+            // រចនាសម្ព័ន្ធ) ➜ ទិសផ្ទុយត្រូវជា «វដ្តពិតជាបោះ node ចោល» ហើយ node ផ្តាច់ដែលដឹក listener ត្រូវនៅ ០
+            // ⛔ React រក្សាក្រឡាដដែល (reconcile) មិនសាងឡើងវិញរាល់ការបើក ➜ ភស្តុតាងថាវដ្តរត់ពិត = ប្រអប់បើក ៦/៦ ជាមួយ
+            //    ប៊ូតុងក្រឡា ≥ ២០ · ហើយ node ផ្តាច់ដែលដឹក listener នៅ ០
+            check(cycle4.opened === 6 && cycle4.cells >= 20 && (a4.detached - b4.detached) === 0,
+                '⛔ ទិសផ្ទុយ ៖ វដ្ត Locker ពិតជារត់ (ប្រអប់បើក ' + cycle4.opened + '/6 · ក្រឡា ' + cycle4.cells + ') ហើយគ្មាន node ផ្តាច់ដឹក listener',
+                { cycle4, removed: [b4.removed, a4.removed], detached: [b4.detached, a4.detached] });
+        } else {
+            check((a4.detached - b4.detached) >= 100,
+                '⛔ ទិសផ្ទុយ ៖ វដ្ត Locker ពិតជាបោះបង់ node ដែលមាន listener (' + (a4.detached - b4.detached) + ' >= 100)',
+                { before: b4.detached, after: a4.detached });
+        }
 
         // ── វដ្ត ៥ ៖ online/offline + visibilitychange × 8 ──────────
         const b5 = await snap(page);

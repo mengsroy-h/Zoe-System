@@ -121,6 +121,24 @@ function chainNames(src, body) {
     return out;
 }
 
+// App React ៖ ច្បាប់ខ្លះផ្លាស់ចូល helper (ឧ. `beginPdfPrint()` ➜ `noteAppLockExcuse()`) ➜ ដើរតាមខ្សែការហៅ (ជម្រៅកំណត់)
+function chainReaches(src, body, pattern, depth) {
+    // ⛔ ដើរតាមកម្រិត (BFS) ៖ DFS ជាមួយ `seen` សម្គាល់ function ដែលឃើញនៅកម្រិតជ្រៅពេក ថា «ឃើញរួច» ➜ ផ្លូវខ្លីជាងត្រូវរំលង
+    const seen = new Set();
+    let level = [body];
+    for (let d = 0; d <= depth && level.length; d++) {
+        if (level.some((b) => b && pattern.test(b))) return true;
+        const next = [];
+        level.forEach((b) => chainNames(src, b || '').forEach((n) => {
+            if (seen.has(n)) return;
+            seen.add(n);
+            next.push(sliceFn(src, n));
+        }));
+        level = next;
+    }
+    return false;
+}
+
 function chainKeys(src, body, depth) {
     const keys = [];
     const seen = {};
@@ -172,7 +190,24 @@ const initFn = sliceFn(appJs, 'initAppLock');
 check(initFn !== '', 'មាន initAppLock() ក្នុង app.js');
 // ⛔ ZoeW React ហៅវាតាម `oncePerPage('app-lock', initAppLock)` ក្នុងដំណាក់ boot
 //    ដំបូង (មុន `load` ➜ មុន Firebase) ➜ ទម្រង់ទាំង ២ ជាការហៅ top level ដដែល។
-check(/^\s{4}(initAppLock\(\)|oncePerPage\(['"]app-lock['"], initAppLock\));\s*$/m.test(appJs),
+// ⛔ App React ៖ ដំណាក់ boot ដំបូង `bootShell()` (មុន `load`) ហៅ `oncePerPage('app-lock', initAppLock)` ចំណែក Firebase
+//    ចាប់ផ្តើមក្នុង `scope.onLoad(…)` ក្រោយ ➜ វាស់ **លំដាប់ពិត** ៖ bootShell មុន onLoad · onLoad ឈានដល់ initFirebase ·
+//    bootShell ខ្លួនឯងមិនឈានដល់ initFirebase
+const bootFn = sliceFn(appJs, 'bootApplication');
+const shellFn = sliceFn(appJs, 'bootShell');
+const onLoadAt = bootFn.indexOf('scope.onLoad(');
+// ⛔ ការហៅដែលរុំក្នុង `scope.onLoad(…)` រត់ **ក្រោយ** `load` ➜ មិនរាប់ (ដកចេញមុនវាស់)
+let shellSync = shellFn;
+for (let at = shellSync.indexOf('scope.onLoad('); at !== -1; at = shellSync.indexOf('scope.onLoad(')) {
+    const end = matchBrace(shellSync, at + 'scope.onLoad'.length, '(', ')');
+    if (end === -1) break;
+    shellSync = shellSync.slice(0, at) + shellSync.slice(end + 1);
+}
+const reactBootOrder = /oncePerPage\(['"]app-lock['"], initAppLock\)/.test(shellSync)
+    && bootFn.indexOf('bootShell(') !== -1 && onLoadAt !== -1 && bootFn.indexOf('bootShell(') < onLoadAt
+    && chainReaches(appJs, bootFn.slice(onLoadAt), /\binitFirebase\(\)/, 3)
+    && !chainReaches(appJs, shellFn, /\binitFirebase\(\)/, 3);
+check(/^\s{4}(initAppLock\(\)|oncePerPage\(['"]app-lock['"], initAppLock\));\s*$/m.test(appJs) || reactBootOrder,
     'initAppLock() ត្រូវហៅនៅ top level (មុន Firebase និងមុនការគូរទិន្នន័យ)');
 
 const armFn = sliceFn(appJs, 'appLockShouldArm');
@@ -201,8 +236,12 @@ const focusFn = sliceFn(appJs, 'safeFocusScanner');
 check(/if \(appIsLocked\) return;/.test(focusFn),
     '⛔ ខណៈចាក់សោ ➜ ម៉ាស៊ីនស្កេន hardware មិនដណ្តើមយក focus ពីប្រអប់ PIN', focusFn);
 
-check(/function pullTargetBlocked\(target\) \{\s*\n\s*if \(appIsLocked \|\|/.test(appJs),
-    '⛔ ខណៈចាក់សោ ➜ PTR មិនកេះ (កុំឲ្យទាញចុះក្រោមសោ)');
+// App React ៖ លក្ខខណ្ឌដំបូងរបស់ `pullTargetBlocked()` ហៅ `ptrBlockedByOverlay()` (សោ · ប្រអប់ · ម៉ឺនុយ · របា Slide)
+//    ➜ វាស់ថាលក្ខខណ្ឌ `return true` ដំបូងឈានដល់ `appIsLocked` (ផ្ទាល់ ឬតាម helper)
+const ptrFirstGate = (/function pullTargetBlocked\(target\) \{\s*\n\s*if \(([^\n]*)\) return true;/.exec(appJs) || [])[1] || '';
+check(/function pullTargetBlocked\(target\) \{\s*\n\s*if \(appIsLocked \|\|/.test(appJs)
+    || (ptrFirstGate !== '' && chainReaches(appJs, ptrFirstGate, /\bappIsLocked\b/, 1)),
+    '⛔ ខណៈចាក់សោ ➜ PTR មិនកេះ (កុំឲ្យទាញចុះក្រោមសោ)', ptrFirstGate);
 
 const awayFn = sliceFn(appJs, 'noteAppLockAway');
 const backFn = sliceFn(appJs, 'relockAppAfterAway');
@@ -229,7 +268,7 @@ check(/showAppLockScreen\(\)/.test(backFn) && !/showAppLockScreen\(true\)/.test(
     '⛔ ការត្រឡប់មកវិញទើបចាក់សោពិត (លុបទង់វគ្គ ➜ Refresh មិនមែនផ្លូវរំលង)', backFn);
 check(/keepSessionFlag !== true\) clearAppUnlockedForSession\(\)/.test(showFn),
     'ការលុបទង់វគ្គជាជម្រើសដែលអ្នកហៅសម្រេច មិនមែនផលរំលងទេ', showFn);
-check(/blur\(\)/.test(showFn) && /appLockPinInput/.test(showFn),
+check(chainReaches(appJs, showFn, /\.blur\(\)/, 1) && /appLockPinInput/.test(showFn),
     '⛔ ការចាក់សោដក focus ពី App ➜ barcode របស់ម៉ាស៊ីនស្កេនមិនធ្លាក់ចូលវាល App ក្រោមសោ', showFn);
 
 check(/appLockExcuseAt = Date\.now\(\)/.test(excuseFn), 'noteAppLockExcuse() ដាក់ត្រាពេល', excuseFn);
@@ -240,7 +279,27 @@ check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'biometricUnlockPin')),
     'ការស្កេនជីវមាត្រត្រូវលើកលែង (ប្រអប់ system បាំង App)');
 check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'requestCameraPermission')),
     'ការសុំសិទ្ធិកាមេរ៉ាត្រូវលើកលែង');
-check(/noteAppLockExcuse\(\)/.test(sliceFn(appJs, 'exportDataAsPDF')),
+// ⛔ ការលើកលែងត្រូវនៅ **មុនការបោះពុម្ព** ក្នុង function ដំបូង (តាមខ្សែការហៅ) ដែលកេះការបោះពុម្ព — ការឈានដល់
+//    `noteAppLockExcuse()` តាមផ្លូវផ្សេង (ឧ. សាខា native នៃ `printCurrentView`) មិនគ្របផ្លូវ web ទេ
+function excusedBeforePrint(src, body, depth) {
+    const seen = new Set();
+    let level = [body];
+    for (let d = 0; d <= depth && level.length; d++) {
+        for (const b of level) {
+            const at = (b || '').search(/\b(?:printCurrentView|window\.print)\(/);
+            if (at !== -1) return b.slice(0, at).indexOf('noteAppLockExcuse()') !== -1;
+        }
+        const next = [];
+        level.forEach((b) => chainNames(src, b || '').forEach((n) => {
+            if (seen.has(n)) return;
+            seen.add(n);
+            next.push(sliceFn(src, n));
+        }));
+        level = next;
+    }
+    return false;
+}
+check(excusedBeforePrint(appJs, sliceFn(appJs, 'exportDataAsPDF'), 2),
     'ការបោះពុម្ព (Export PDF) ត្រូវលើកលែង');
 check(/input\[type="file"\]/.test(appJs) && /a\[href\^="tel:"\]/.test(appJs),
     'បញ្ជីលើកលែងគ្របការរើសឯកសារ និងតំណ tel: តាម DOM ផ្ទាល់');
@@ -588,6 +647,8 @@ async function withTimeout(promise, ms, label) {
             // មើលមិនឃើញវា; មានតែ hit-test ពិតទេដែលចាប់បាន។
             const top = await page.evaluate(() => {
                 if (typeof showUpdateAvailableBanner === 'function') showUpdateAvailableBanner();
+                // App React ៖ របាគូរពី state ក្នុង microtask ➜ `commitNow()` ពិត (ដូច App ដើមដែលសាងធាតុភ្លាម)
+                if (typeof commitNow === 'function') commitNow();
                 const lock = document.getElementById('appLockScreen');
                 const w = window.innerWidth, h = window.innerHeight;
                 const pts = [[w / 2, h - 6], [w / 2, h - 24], [w / 2, h / 2], [w / 2, 8], [6, h - 12]];

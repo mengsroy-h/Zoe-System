@@ -147,8 +147,12 @@ for (const app of ['ZoeW']) {
         /xlsx:\s*\{\s*url:\s*'\.\/vendor\/xlsx\.full\.min\.js'/.test(js));
     const loader = sliceFn(js, 'loadScriptOnce') || '';
     // `script.integrity = undefined` សរសេរ attribute ជា "undefined" ➜ SRI ធ្លាក់
-    ok('ZoeW ៖ loadScriptOnce ដាក់ integrity តែពេល lib ប្រកាសវា',
-        /if \(lib\.integrity\)/.test(loader), loader.slice(0, 200));
+    // App React ៖ ការសាង `<script>` ផ្លាស់ទៅច្រកចេញ `injectScript(spec)` (`platform/document-io.ts`) ➜ ច្រកទ្វារ
+    // ត្រូវឈរក្នុងវា ហើយ loader ត្រូវបញ្ជូន `integrity: lib.integrity` (មិនមែនតម្លៃថេរ)
+    const injector = /\binjectScript\(/.test(loader) ? (sliceFn(js, 'injectScript') || '') : '';
+    const guarded = /if \(lib\.integrity\)/.test(loader)
+        || (/integrity:\s*lib\.integrity\b/.test(loader) && /if \((\w+)\.integrity\) \{[^}]*script\.integrity = \1\.integrity/.test(injector));
+    ok('ZoeW ៖ loadScriptOnce ដាក់ integrity តែពេល lib ប្រកាសវា', guarded, (injector || loader).slice(0, 240));
 }
 
 // ── ៣. ធនធាននោះត្រូវនៅក្នុងសំបក ➜ Export ដើរពេលក្រៅបណ្ដាញដែរ ────────
@@ -245,11 +249,13 @@ function serve(dir, csp) {
         const js = read('ZoeW/app.js');
         const libs = sliceConst(js, 'EXPORT_LIBS');
         const loader = sliceFn(js, 'loadScriptOnce');
-        if (!libs || !loader) {
+        // App React ៖ ច្រកចេញ DOM ដែល loader ហៅ (`injectScript`) ត្រូវមកជាមួយ — វាជាកូដ ship ពិត មិនមែន stub
+        const injectorSrc = loader && /\binjectScript\(/.test(loader) ? sliceFn(js, 'injectScript') : '';
+        if (!libs || !loader || (/\binjectScript\(/.test(loader || '') && !injectorSrc)) {
             ok('ZoeW ៖ ស្រង់ EXPORT_LIBS និង loadScriptOnce ចេញបាន', false);
         } else {
             await page.evaluate('window.__exportProbe = (function () {\n' +
-                'const loadedScriptPromises = {};\n' + libs + '\n' + loader + '\n' +
+                'const loadedScriptPromises = {};\n' + libs + '\n' + (injectorSrc || '') + '\n' + loader + '\n' +
                 'return { load: () => loadScriptOnce(\'xlsx\'), url: EXPORT_LIBS.xlsx.url };\n})();');
 
             const out = await page.evaluate(() => window.__exportProbe.load().then(

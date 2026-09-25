@@ -276,10 +276,25 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
             const btn = tr.querySelector('.close-btn');
             if (!btn) return;
             let got = null;
-            const orig = window.toggleCloseStatus;
-            window.toggleCloseStatus = (a) => { got = a; };
-            btn.click();
-            window.toggleCloseStatus = orig;
+            if (typeof window.setupActionDelegation === 'function') {
+                const orig = window.toggleCloseStatus;
+                window.toggleCloseStatus = (a) => { got = a; };
+                btn.click();
+                window.toggleCloseStatus = orig;
+            } else {
+                // App React ៖ ការចុចហៅ `ACTION_REGISTRY` (មិនឆ្លង `window`) ➜ វាស់ **ការហៅពិត** ៖ `toggleCloseStatus()` ពិត
+                // ទៅដល់ `confirm()` **តែពេល** id រកឃើញ item បេះបិទ (`===`) ➜ confirm ឆ្លើយ `false` (គ្មានផលរំខាន)
+                // ហើយ id ដែលបញ្ជូនអានពី handler ពិតរបស់ React (`onAct(…, { args })`)
+                const key = Object.keys(btn).find((k) => k.startsWith('__reactProps$'));
+                const h = key && btn[key] && btn[key].onClick;
+                let confirms = 0;
+                const origConfirm = window.confirm;
+                window.confirm = () => { confirms++; return false; };
+                btn.click();
+                window.confirm = origConfirm;
+                const args = h && h.actionName === 'toggleCloseStatus' && h.actionOptions ? h.actionOptions.args : null;
+                got = confirms === 1 && args ? args[0] : null;
+            }
             out[id] = got;
         });
         Object.keys(originals).forEach((fn) => { window[fn] = originals[fn]; });
@@ -302,15 +317,31 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         names.forEach((name) => {
             const id = 'code_' + name;
             window.openViewListModal(id);
+            // App React ៖ ប្រអប់គូរក្នុង microtask ➜ `commitNow()` ពិត (flushSync) ដូច App ដើមដែលកែ DOM ភ្លាម
+            if (typeof window.commitNow === 'function') window.commitNow();
             const box = document.getElementById('barcodeListContainer') || document.querySelector('#viewListModal .barcode-list-item') && document.querySelector('#viewListModal');
             const container = document.querySelector('#viewListModal');
             const btn = container ? container.querySelector('.btn-toggle-bc-close') : null;
             if (!btn) { res[name] = { err: 'no button' }; return; }
             let got = null;
-            const orig = window.toggleIndividualBarcodeClose;
-            window.toggleIndividualBarcodeClose = (a, b) => { got = [a, b]; };
-            btn.click();
-            window.toggleIndividualBarcodeClose = orig;
+            if (typeof window.setupActionDelegation === 'function') {
+                const orig = window.toggleIndividualBarcodeClose;
+                window.toggleIndividualBarcodeClose = (a, b) => { got = [a, b]; };
+                btn.click();
+                window.toggleIndividualBarcodeClose = orig;
+            } else {
+                // App React ៖ `toggleIndividualBarcodeClose()` ពិតទៅដល់ `confirm()` តែពេល item **និង** barcode រកឃើញ
+                // បេះបិទ ហើយសារ confirm ផ្ទុក barcode ពិត ➜ វាស់ការហៅពិត (confirm ➜ `false` គ្មានផលរំខាន)
+                const key = Object.keys(btn).find((k) => k.startsWith('__reactProps$'));
+                const h = key && btn[key] && btn[key].onClick;
+                const asked = [];
+                const origConfirm = window.confirm;
+                window.confirm = (msg) => { asked.push(String(msg)); return false; };
+                btn.click();
+                window.confirm = origConfirm;
+                const args = h && h.actionName === 'toggleIndividualBarcodeClose' && h.actionOptions ? h.actionOptions.args : null;
+                got = asked.length === 1 && args && asked[0].indexOf(String(args[1])) !== -1 ? [args[0], args[1]] : null;
+            }
             res[name] = { got, handlers: list(container), imgs: container.querySelectorAll('img').length };
             void box;
             if (window.__xss) xssSeen = true;
@@ -336,10 +367,20 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         const handlers = tbody ? list(tbody) : ['no tbody'];
         const btns = tbody ? Array.from(tbody.querySelectorAll('button')).filter((b) => b.textContent.indexOf('🔄') !== -1) : [];
         const got = [];
-        const orig = window.promptRestoreDeletedItem;
-        window.promptRestoreDeletedItem = (a) => { got.push(a); };
-        btns.forEach((b) => b.click());
-        window.promptRestoreDeletedItem = orig;
+        if (typeof window.setupActionDelegation === 'function') {
+            const orig = window.promptRestoreDeletedItem;
+            window.promptRestoreDeletedItem = (a) => { got.push(a); };
+            btns.forEach((b) => b.click());
+            window.promptRestoreDeletedItem = orig;
+        } else {
+            // App React ៖ `promptRestoreDeletedItem()` ពិតសរសេរ `pendingRestoreId` (ឃ្លាំង) ➜ អាន state ពិតក្រោយរាល់ការចុច
+            btns.forEach((b) => {
+                window.pendingRestoreId = null;
+                b.click();
+                if (window.pendingRestoreId !== null && window.pendingRestoreId !== undefined) got.push(window.pendingRestoreId);
+            });
+            window.pendingRestoreId = null;
+        }
         return { got, handlers, imgs: tbody ? tbody.querySelectorAll('img').length : -1, xss: !!window.__xss, rows: btns.length };
     }, HANDLER_ATTRS);
     check(trash.rows === 10, 'ធុងសំរាមបង្ហាញ item សត្រូវទាំង ១០', 'rows=' + trash.rows);

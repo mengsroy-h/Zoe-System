@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderedContainer } = require('./react-view');
 
 const ROOT = process.env.EMPTYSTATE_APP_DIR || path.join(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -73,6 +74,8 @@ const WANT = ['sanitizeInput', 'ledgerNumber', 'statsMonthOf', 'statsPositive', 
     'trashGroupKeyOf', 'trashGroupSignature', 'trashItemCodes', 'trashItemPhone',
     'barcodeEntriesOf', 'formatScanStamp', 'buildHistoryRowContent', 'escapeAttr',
     'buildHistoryRowHtml',
+    // ⛔ React ៖ ធុងសំរាមផលិត view model (`trashSummary` · `trashView`) ជំនួស HTML
+    'buildTrashSummaryModel', 'buildTrashRowModel',
     'collectedValueIsMeasurable', 'dbListenerViewIsStale',
     'anyDbListenerViewIsStale', 'emptyViewMessage',
     // ⛔ អេក្រង់ទី ៦ និងទី ៧ ៖ របា និងប្រអប់ «ZTO មិនទាន់បិទ» — ពួកវាកើតក្រោយ
@@ -105,41 +108,27 @@ function sliceConstObject(name) {
 }
 const CONSTS = ['TRASH_REASON_META'].map(sliceConstObject).join('\n');
 
-function makeEl() {
-    return {
-        innerHTML: '', innerText: '', className: '', value: '', dataset: {}, style: {},
-        children: [],
-        appendChild(child) { this.children.push(child); return child; },
-        insertBefore(child, before) {
-            const at = this.children.indexOf(before);
-            if (at === -1) this.children.push(child); else this.children.splice(at, 0, child);
-            return child;
-        },
-        removeChild(child) {
-            const at = this.children.indexOf(child);
-            if (at !== -1) this.children.splice(at, 1);
-            return child;
-        },
-        setAttribute() {}, getAttribute() { return null; }, querySelector() { return null; },
-        querySelectorAll() { return []; },
-        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }
-    };
-}
 function textOf(html) {
     return String(html === undefined || html === null ? '' : html)
         .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// ⛔ ZoeW ជា React ៖ អេក្រង់សរសេរ view model ក្នុងឃ្លាំង ហើយ **JSX ពិត** គូរ ➜ «ធាតុផ្ទុក» នីមួយៗគូរ component
+//    ដែលឈរលើ id នោះ ពីស្ថានភាពរបស់ sandbox រាល់ការអាន (`react-view.js` ៖ `renderedContainer()`)
+const SCREEN_COMPONENTS = {
+    dailyStatsContainer: ['src/app/components/stats/StatsCards.tsx', 'DailyStatsCards'],
+    collectedStatsContainer: ['src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards'],
+    monthlyReportBody: ['src/app/components/reports/MonthlyReportBody.tsx', 'MonthlyReportBody'],
+    historyTableBody: ['src/app/components/history/HistoryTableBody.tsx', 'HistoryTableBody'],
+    deletedTableBody: ['src/app/components/trash/TrashTableBody.tsx', 'TrashTableBody'],
+    trashSummaryBox: ['src/app/components/trash/TrashSummaryBox.tsx', 'TrashSummaryBox'],
+    ztoSyncBanner: ['src/app/components/zto/ZtoSyncBanner.tsx', 'ZtoSyncBanner'],
+    ztoSyncList: ['src/app/components/zto/ZtoSyncList.tsx', 'ZtoSyncList']
+};
+
 function buildSandbox(state) {
-    const containers = {
-        dailyStatsContainer: makeEl(), collectedStatsContainer: makeEl(),
-        monthlyReportBody: makeEl(), monthlyReportMonthSel: makeEl(),
-        historyTableBody: makeEl(), count: makeEl(),
-        deletedTableBody: makeEl(), trashSummaryBox: makeEl(),
-        ztoSyncBanner: makeEl(), ztoSyncList: makeEl(), ztoSyncModalNote: makeEl()
-    };
     const sandbox = {
-        console, Set, Map, Array, Object, Math, JSON, String, Number,
+        console, queueMicrotask, Set, Map, Array, Object, Math, JSON, String, Number,
         isNaN, parseFloat, parseInt, isFinite, Date,
         scanHistory: state.scanHistory || [],
         deletedItems: state.deletedItems || [],
@@ -185,8 +174,7 @@ function buildSandbox(state) {
         getFormattedDate: () => '2026-09-09',
         getServerNow: () => Date.parse('2026-09-09T03:00:00Z'),
         openModalHelper: () => {},
-        document: { getElementById: (id) => containers[id] || null, createElement: () => makeEl() },
-        __containers: containers
+        document: { getElementById: () => null }
     };
     sandbox.ZTO_SYNC_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_HISTORY,
         sandbox.DB_LISTENER_KEY_DELETED];
@@ -194,7 +182,16 @@ function buildSandbox(state) {
         sandbox.DB_LISTENER_KEY_HISTORY, sandbox.DB_LISTENER_KEY_DELETED];
     sandbox.STATS_COLLECTED_VIEW_KEYS = [sandbox.DB_LISTENER_KEY_DAILY_COLLECTED];
     vm.createContext(sandbox);
+    vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);
     vm.runInContext(CONSTS + '\n' + bodies, sandbox);
+    sandbox.__containers = {};
+    for (const [id, [rel, name]] of Object.entries(SCREEN_COMPONENTS)) {
+        sandbox.__containers[id] = renderedContainer(ROOT, sandbox, rel, name);
+    }
+    // ⛔ កំណត់ចំណាំរបស់ប្រអប់ ZTO ជា `viewState.ztoSyncModalNote` (`ZtoSyncModal.tsx` គូរវាជាអត្ថបទ `<p>`)
+    Object.defineProperty(sandbox.__containers, 'ztoSyncModalNote', {
+        get: () => ({ innerText: vm.runInContext('viewState.ztoSyncModalNote', sandbox) })
+    });
     return sandbox;
 }
 

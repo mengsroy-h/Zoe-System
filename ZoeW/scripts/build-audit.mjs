@@ -251,6 +251,56 @@ writeFileSync(path.join(APP, 'app.js'), appJs);
     }
 }
 
+/*
+ * ២គ. **component ពិតសម្រាប់ checker `vm`** (`react-render.cjs`) ៖ App ដើមគូរតារាង/កាតដោយ `innerHTML` ក្នុង function
+ *     អាជីវកម្ម ➜ checker `vm` អាន HTML នោះ។ ក្នុង App React function អាជីវកម្មសរសេរ **view model** ក្នុងឃ្លាំង ហើយ
+ *     **JSX** គូរ ➜ HTML ដែលអ្នកប្រើឃើញ មិនមែនជាលទ្ធផលរបស់ function ទៀតទេ។ bundle នេះ (node · CJS) ផ្ទុក component
+ *     ទាំងអស់ក្រោម `src/app/components` បូកឃ្លាំង និង `renderToStaticMarkup()` ➜ `audit-tools/react-view.js`
+ *     (`renderComponent()`) ចាក់ view model ដែល function ពិតផលិតក្នុង `vm` ចូលឃ្លាំង ហើយគូរ **JSX ពិត** ជា HTML ។
+ *     ⛔ មិនមែនការចម្លង markup ក្នុង checker ៖ mutation លើ JSX ក៏ត្រូវចាប់បានដែរ។
+ */
+{
+    const components = [];
+    const walkComponents = (dir) => {
+        for (const name of readdirSync(dir).sort()) {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) walkComponents(full);
+            else if (name.endsWith('.tsx')) components.push(path.relative(ROOT, full).split(path.sep).join('/'));
+        }
+    };
+    walkComponents(path.join(ROOT, 'src/app/components'));
+    if (components.length < 50) throw new Error('build-audit ៖ component តិចពេក ៖ ' + components.length);
+    // ⛔ module `.ts` (មិនមែន `app/` · `sw/`) ៖ JSX ខ្លះហៅ helper ដែលអាន state កម្រិត module (ឧ. `emptyViewMessage()` ➜
+    //    `dbListenerPendingPaths`) ➜ `renderFromContext()` ធ្វើសមកាលកម្ម `Set`/`Map` ដែលបាន export ពី `vm` មុនគូរ
+    const stateModules = modules.filter((m) => !/\/(audit-compat|audit-annotate|expose-globals)$/.test(m));
+    const ssrEntry = path.join(OUT, '_ssr_entry.tsx');
+    writeFileSync(ssrEntry, components.map((rel, i) => `export * as c${i} from '../${rel.replace(/\.tsx$/, '')}';`).join('\n') +
+        '\n' + stateModules.map((rel, i) => `export * as s${i} from '${rel}';`).join('\n') +
+        `\nexport const STATE_MODULES = ${JSON.stringify(stateModules)};` +
+        `\nexport * as stores from '../src/core/state';\nexport { renderToStaticMarkup } from 'react-dom/server';\n` +
+        `export { createElement } from 'react';\nexport const FILES = ${JSON.stringify(components)};\n` +
+        // ⛔ វាលដែលទិដ្ឋភាព checker ប្រកាសជា `let` កម្រិតកំពូល (`<ឃ្លាំង>.<វាល>` ➜ `<វាល>`) ➜ `renderFromContext()` ចម្លងវាពី `vm`
+        `export const STATE_FIELDS = ${JSON.stringify(Object.fromEntries(Object.entries(stateGroups).map(([store, fields]) => [store, fields.map((f) => f.name)])))};\n`);
+    try {
+        await build({
+            entryPoints: [ssrEntry],
+            bundle: true,
+            platform: 'node',
+            format: 'cjs',
+            target: 'node18',
+            jsx: 'automatic',
+            logLevel: 'error',
+            legalComments: 'none',
+            define: { __APP_VERSION__: JSON.stringify(version), __CACHE_VERSION__: JSON.stringify(cacheVersion), 'process.env.NODE_ENV': '"production"' },
+            loader: { '.css': 'empty', '.svg': 'dataurl', '.png': 'dataurl' },
+            outfile: path.join(APP, 'react-render.cjs')
+        });
+    } finally {
+        rmSync(ssrEntry);
+    }
+    console.log('react-render.cjs ៖ component ' + components.length);
+}
+
 /* ៣. ឯកសារ repo ដែល checker អានជាអត្ថបទ — **ច្បាប់ចម្លងពី tree ថ្មី** */
 cpSync(path.join(ROOT, 'src/styles/app.css'), path.join(APP, 'style.css'));
 for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md']) {

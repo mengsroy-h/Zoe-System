@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.SETUP_APP_DIR || path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -27,16 +28,6 @@ function fakeDom(pinOpen) {
         setAttribute() {}, removeAttribute() {}, hasAttribute: () => false, getAttribute: () => null });
     ['pinModal', 'pinSetupModal', 'loginModal', 'configModal', 'firebaseConfigInput', 'configInput',
      'loginEmailInput', 'rememberMeCheckbox', 'securityPinInput', 'sentryDsnInput'].forEach(mk);
-    // `#appPages` ត្រូវតាមដាន class ពិត ➜ អាចអះអាងថាការចាកចេញដោះការផ្អាក
-    // `scroll-snap` នៃចលនាផ្ទាំង។ បើវាជាប់ ➜ PTR ស្លាប់នៅ session បន្ទាប់។
-    mk('appPages');
-    const pageClasses = new Set(['panel-gliding']);
-    els.appPages.classList = {
-        add: (c) => pageClasses.add(c),
-        remove: (c) => pageClasses.delete(c),
-        contains: (c) => pageClasses.has(c)
-    };
-    els.appPages._classes = pageClasses;
     if (pinOpen) els.pinModal.style.display = 'flex';
     return {
         getElementById: (id) => els[id] || null,
@@ -54,7 +45,7 @@ for (const app of ['ZoeW']) {
     for (const pinOpen of [false, true]) {
         console.log(`\n=== ${app} — logout while a Setup Link is armed (PIN modal ${pinOpen ? 'OPEN' : 'closed'}) ===`);
         const ctx = {
-            console,
+            console, queueMicrotask,
             document: fakeDom(pinOpen),
             localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
             hidePhoneSuggestions() {}, restoreAfterPdfExport() {}, closeConfigQrScanner() {},
@@ -67,6 +58,9 @@ for (const app of ['ZoeW']) {
         ctx.pendingRestoreId = null; ctx.pendingPermanentDeleteId = null;
         ctx.activeParentItemId = null; ctx.lookupSecretKey = 'secret';
         vm.createContext(ctx);
+        // ⛔ ZoeW ជា React ៖ ឃ្លាំង (`uiState` · `viewState` · `ztoState`) · `modalIsOpen()` · `blankElementById()` ជាកូដពិត
+        //    ដែល `clearSensitiveModalFields()` ឆ្លងកាត់ ➜ ចូល sandbox មុនមុខងារ (stub ក្នុង ctx នៅឈ្នះ)
+        vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
         // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
         // `appSessionStore` បូក `safeStoreGet()` ថ្មី។ sandbox ត្រូវផ្តល់ពួកវា
         // បើមិនដូច្នេះ function ដែលស្រង់ចូល vm បោះ ReferenceError។
@@ -111,7 +105,7 @@ for (const app of ['ZoeW']) {
         ctx.clearTimeout = () => {};
         const glidePauseFn = sliceFn(src, 'endPanelGlideSnapPause');
         if (glidePauseFn) vm.runInContext(glidePauseFn, ctx);
-        vm.runInContext('panelGlideTokens = 2; panelGlideRelease = 99;', ctx);
+        vm.runInContext('panelGlideTokens = 2; panelGlideRelease = 99; uiState.panelGliding = true;', ctx);
         vm.runInContext('scanConfirmCode = "ZTO9999000111"; scanConfirmCount = 1; scanConfirmAt = 123;', ctx);
         // ស្ថានភាពនាំចូល Excel (កំណែ 2.21.0) — ចាក់ **កូដពិត** មិនមែន stub ទទេ
         // ដូច្នេះតេស្តពិតជាបញ្ជាក់ថាការចាកចេញលុបកូនសោ AES · URL · ពាក្យសម្ងាត់
@@ -144,16 +138,16 @@ for (const app of ['ZoeW']) {
         vm.runInContext(sliceFn(src, 'showLoginModalWithPrefill'), ctx);
 
         let threw = null;
-        const pagesEl = ctx.document.getElementById('appPages');
         // ⛔ ដាក់ស្ថានភាពរសើបរបស់បញ្ជី ZTO **មុន** ការចាកចេញ — បើមិនដាក់
         // ការអះអាងខាងក្រោមនឹងបៃតងលើ map ទទេ = ការការពារដែលងាប់។
         vm.runInContext("ztoListSignedProbe.set('77130500000001', true);"
             + " ztoListSyncResult = { rows: [{ barcode: '77130500000001', phone: '0963897345' }] };", ctx);
         try { ctx.showLoginModalWithPrefill(); } catch (e) { threw = e; }
         ok(!!glidePauseFn, 'endPanelGlideSnapPause មានក្នុង app.js');
-        ok(pagesEl && !pagesEl._classes.has('panel-gliding'),
+        // ⛔ React ៖ `#appPages.panel-gliding` ជា `uiState.panelGliding` ដែល JSX គូរ
+        ok(vm.runInContext('uiState.panelGliding', ctx) === false,
             'ចាកចេញ ➜ ដោះការផ្អាក scroll-snap នៃចលនាផ្ទាំង (PTR នៅរស់)',
-            pagesEl ? [...pagesEl._classes] : null);
+            vm.runInContext('uiState.panelGliding', ctx));
         // អថេរ `let` ក្នុង vm មិនក្លាយជា property នៃ context ➜ ត្រូវអានតាម expression
         const glideState = vm.runInContext('({ tokens: panelGlideTokens, release: panelGlideRelease })', ctx);
         ok(glideState.tokens === 0 && glideState.release === null,
@@ -203,8 +197,9 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         classList: { contains: (c) => usesActive && open && c === 'active' }
     });
     for (const open of [false, true]) {
-        const ctx = { console, document: { getElementById: (id) => (id === 'pinModal' ? mkEl(open) : mkEl(false)) } };
+        const ctx = { console, queueMicrotask, document: { getElementById: (id) => (id === 'pinModal' ? mkEl(open) : mkEl(false)) } };
         vm.createContext(ctx);
+        if (app === 'ZoeW') vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
         vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
         vm.runInContext(fn, ctx);
         ok(ctx.isPinFlowPending() === open, `${app}: reports ${open ? 'pending' : 'not pending'} correctly`, ctx.isPinFlowPending());

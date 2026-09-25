@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderedContainer } = require('./react-view');
 
 const ROOT = process.env.STATSAGREE_APP_DIR || path.join(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -78,14 +79,6 @@ const bodies = WANT.map((n) => {
     return 'function ' + n + '() { return undefined; }';
 }).join('\n');
 
-// DOM ក្លែងតូច — គ្រប់តែអ្វីដែលអេក្រង់ស្ថិតិប្រើពិត
-function makeEl() {
-    const el = {
-        innerHTML: '', className: '', children: [],
-        appendChild(child) { this.children.push(child); return child; }
-    };
-    return el;
-}
 function cardTexts(container) {
     return container.children.map((c) => String(c.innerHTML || ''));
 }
@@ -97,10 +90,6 @@ function moneyAfter(html, label) {
 }
 
 function buildSandbox(state) {
-    const containers = {
-        dailyStatsContainer: makeEl(),
-        collectedStatsContainer: makeEl()
-    };
     const sandbox = {
         console,
         scanHistory: state.scanHistory || [],
@@ -125,14 +114,18 @@ function buildSandbox(state) {
         collectedValueIsMeasurable: () => state.measurable !== false,
         getFormattedDate: () => '2026-09-30',
         openModalHelper: () => {},
-        document: {
-            getElementById: (id) => containers[id] || null,
-            createElement: () => makeEl()
-        },
-        __containers: containers
+        document: { getElementById: () => null },
+        queueMicrotask
     };
     vm.createContext(sandbox);
+    // ⛔ ZoeW ជា React ៖ អេក្រង់សរសេរ view model ក្នុង `uiState` ➜ ឃ្លាំងពិតចូល sandbox មុនមុខងារ ហើយ «ធាតុផ្ទុក»
+    //    គូរ **JSX ពិត** (`StatsCards.tsx`) ពីស្ថានភាពរបស់ sandbox រាល់ការអាន
+    vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);
     vm.runInContext(bodies, sandbox);
+    sandbox.__containers = {
+        dailyStatsContainer: renderedContainer(ROOT, sandbox, 'src/app/components/stats/StatsCards.tsx', 'DailyStatsCards'),
+        collectedStatsContainer: renderedContainer(ROOT, sandbox, 'src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards')
+    };
     return sandbox;
 }
 

@@ -37,8 +37,29 @@ const REACT_HELPERS = [
     'documentLoadComplete', 'documentIsHidden', 'onDocumentVisibilityChange', 'resetDocumentScroll', 'scrollWindowToTop',
     'createScratchCanvas', 'loadScratchImage', 'addPreconnectHint', 'injectScript', 'downloadObjectUrl',
     // `src/platform/native.ts` ៖ អាន `window.Capacitor` ➜ ក្នុង sandbox (គ្មាន bridge) ជាផ្លូវ web ដូច App ដើម
-    'isNativeApp', 'isNativeAndroid', 'pullToRefreshSupported', 'resolveNativeApiUrl', 'nativeWebOrigin'
+    'isNativeApp', 'isNativeAndroid', 'pullToRefreshSupported', 'resolveNativeApiUrl', 'nativeWebOrigin',
+    // ការសម្អាតផ្ទៃ (`blankElementById()`) ៖ ជំនួស `el.value = ''` / `el.innerHTML = ''` របស់ App ដើម ➜ សរសេរ
+    // ឃ្លាំងដែល JSX គូរ (តារាង · ប្រអប់ · សារ) — `clearSensitiveModalFields()` ឆ្លងកាត់វា
+    'blankElementById', 'resetReactOwned', 'blankScanRemoveText',
+    'emptySheetImportView', 'sheetPatch', 'sheetMsgClear', 'sheetMapClear', 'patchSheetImportView', 'sheetImportViewNow'
 ];
+
+// ⛔ ថេរដែល helper ខាងលើអាន (`REF_NAMES` ៖ ឈ្មោះ ref ដែលចង `ref={…}` ពិត · `TEXT_BLANKERS` ៖ អត្ថបទ viewState)
+const REACT_CONSTS = ['REF_NAMES', 'TEXT_BLANKERS'];
+
+function sliceConst(src, name) {
+    const acorn = require('acorn');
+    const m = new RegExp('^( *)const ' + name + ' = ', 'm').exec(src);
+    if (!m) return null;
+    const at = m.index + m[1].length + ('const ' + name + ' = ').length;
+    let node;
+    try {
+        node = acorn.parseExpressionAt(src, at, { ecmaVersion: 'latest' });
+    } catch (e) {
+        throw new Error('react-view ៖ ញែក const ' + name + ' មិនបាន ៖ ' + e.message);
+    }
+    return 'const ' + name + ' = ' + src.slice(at, node.end) + ';';
+}
 
 function sliceFunction(src, name) {
     const re = new RegExp('^( *)(async\\s+)?function\\s+' + name.replace(/\$/g, '\\$') + '\\s*\\(', 'm');
@@ -107,6 +128,11 @@ function reactRuntime(src, options) {
     parts.push(storeDefinitions(src));
     const modalIds = /^ *const MODAL_IDS = \[[^\]]*\];/m.exec(src);
     if (modalIds) parts.push(modalIds[0].trim());
+    for (const name of REACT_CONSTS) {
+        if (exclude.has(name)) continue;
+        const c = sliceConst(src, name);
+        if (c) parts.push(c);
+    }
     for (const name of REACT_HELPERS) {
         if (exclude.has(name)) continue;
         const fn = sliceFunction(src, name);
@@ -115,4 +141,112 @@ function reactRuntime(src, options) {
     return parts.join('\n');
 }
 
-module.exports = { REACT_HELPERS, sliceFunction, storeDefinitions, reactRuntime };
+// ⛔ JSX ពិត ៖ `ZoeW/react-render.cjs` (build-audit ២គ) ផ្ទុក component ទាំងអស់ បូកឃ្លាំង និង `renderToStaticMarkup()`
+const renderBundles = new Map();
+function reactRenderBundle(root) {
+    const file = require('path').join(root, 'ZoeW', 'react-render.cjs');
+    if (!renderBundles.has(file)) {
+        if (!require('fs').existsSync(file)) throw new Error('react-view ៖ រក ' + file + ' មិនឃើញ (build-audit ២គ)');
+        renderBundles.set(file, require(file));
+    }
+    return renderBundles.get(file);
+}
+
+/**
+ * គូរ component ពិត (`rel` ៖ `src/app/components/…tsx` · `exportName`) ជា HTML ។ `stores` ៖ `{ uiState: { វាល: តម្លៃ } }`
+ * — view model ដែល function ពិតផលិតក្នុង `vm` (អាន `vm.runInContext('uiState.x', ctx)`) ➜ ចាក់ចូលឃ្លាំងរបស់ bundle ។
+ */
+function renderComponent(root, rel, exportName, stores) {
+    const m = reactRenderBundle(root);
+    const i = m.FILES.indexOf(rel);
+    if (i === -1) throw new Error('react-view ៖ រក component ' + rel + ' មិនឃើញ');
+    const Comp = m['c' + i][exportName];
+    if (typeof Comp !== 'function') throw new Error('react-view ៖ ' + rel + ' មិន export ' + exportName);
+    for (const [store, fields] of Object.entries(stores || {})) {
+        const target = m.stores[store];
+        if (!target) throw new Error('react-view ៖ រកឃ្លាំង ' + store + ' មិនឃើញ');
+        for (const [k, v] of Object.entries(fields)) target[k] = v;
+    }
+    return m.renderToStaticMarkup(m.createElement(Comp));
+}
+
+/**
+ * ចម្លង **ស្ថានភាពទាំងមូល** របស់ sandbox `vm` (វាលឃ្លាំង + វាល state ដើមដែលជា `let` កម្រិតកំពូល) ចូលឃ្លាំងរបស់ bundle
+ * រួចគូរ component ពិត ➜ HTML ដែល React គូរពីស្ថានភាពដដែលនឹងអ្វីដែល function ពិតទើបសរសេរ។
+ */
+function renderFromContext(root, ctx, rel, exportName) {
+    const vm = require('vm');
+    const m = reactRenderBundle(root);
+    const stores = {};
+    for (const store of Object.keys(m.stores)) {
+        if (!m.stores[store] || typeof m.stores[store].subscribe !== 'function') continue;
+        const fields = {};
+        const own = vm.runInContext('typeof ' + store + ' === "object" && ' + store + ' ? Object.keys(' + store + ') : []', ctx);
+        for (const k of own) {
+            const v = vm.runInContext(store + '[' + JSON.stringify(k) + ']', ctx);
+            if (typeof v !== 'function') fields[k] = v;
+        }
+        for (const k of (m.STATE_FIELDS[store] || [])) {
+            if (!/^[A-Za-z_$][\w$]*$/.test(k)) continue;
+            const has = vm.runInContext('(function () { try { ' + k + '; return true; } catch (e) { return false; } })()', ctx);
+            if (has) fields[k] = vm.runInContext(k, ctx);
+        }
+        stores[store] = fields;
+    }
+    // ⛔ `Set`/`Map` កម្រិត module (ឧ. `dbListenerPendingPaths`) ដែល helper ក្នុង JSX អាន ➜ ចម្លងមាតិកាពី `vm`
+    for (let i = 0; i < (m.STATE_MODULES || []).length; i++) {
+        const ns = m['s' + i];
+        for (const key of Object.keys(ns)) {
+            const local = ns[key];
+            if (!(local instanceof Set) && !(local instanceof Map)) continue;
+            const remote = vm.runInContext('(function () { try { return ' + key + '; } catch (e) { return undefined; } })()', ctx);
+            if (!remote || typeof remote.forEach !== 'function') continue;
+            local.clear();
+            if (local instanceof Set) remote.forEach((v) => local.add(v));
+            else remote.forEach((v, k) => local.set(k, v));
+        }
+    }
+    return renderComponent(root, rel, exportName, stores);
+}
+
+const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/** បំបែក HTML ជាធាតុកម្រិតកំពូល ➜ `[{ outerHTML, innerHTML }]` (អត្ថបទទទេរវាងធាតុរំលង) */
+function topLevelElements(html) {
+    const out = [];
+    const re = /<(\/?)([a-zA-Z][\w-]*)[^>]*?(\/?)>/g;
+    let depth = 0, start = -1, innerStart = -1, m;
+    while ((m = re.exec(html))) {
+        const closing = m[1] === '/';
+        const selfClosing = m[3] === '/' || VOID_TAGS.has(m[2].toLowerCase());
+        if (!closing) {
+            if (depth === 0) { start = m.index; innerStart = re.lastIndex; }
+            if (selfClosing) {
+                if (depth === 0) out.push({ outerHTML: html.slice(start, re.lastIndex), innerHTML: '' });
+                continue;
+            }
+            depth++;
+        } else {
+            depth--;
+            if (depth === 0) out.push({ outerHTML: html.slice(start, re.lastIndex), innerHTML: html.slice(innerStart, m.index) });
+        }
+    }
+    return out;
+}
+
+/**
+ * «ធាតុផ្ទុក» សម្រាប់ checker ដែលអាន `container.innerHTML` / `container.children[i].innerHTML` ដូច App ដើម ៖
+ * រាល់ការអានគូរ component ពិតពីស្ថានភាពបច្ចុប្បន្នរបស់ `vm` (getter) ➜ call site របស់ checker មិនប្រែ។
+ */
+function renderedContainer(root, ctx, rel, exportName) {
+    const html = () => renderFromContext(root, ctx, rel, exportName);
+    return {
+        get innerHTML() { return html(); },
+        get children() { return topLevelElements(html()); }
+    };
+}
+
+module.exports = {
+    REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
+    renderComponent, renderFromContext, renderedContainer, topLevelElements
+};

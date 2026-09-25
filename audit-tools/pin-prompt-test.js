@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.PINPROMPT_APP_DIR || path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -164,13 +165,19 @@ ok('ប៊ូតុងក្នុងរបា Slide នីមួយៗប្រ
 ok('គ្រប់ឈ្មោះក្នុង PIN_PROMPT_MESSAGES ត្រូវបានប្រើពិត (គ្មានសារស្លាប់)',
     keys.every((k) => usedKeys.has(k)), keys.filter((k) => !usedKeys.has(k)));
 
-console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិតចូល DOM ===');
+console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិតចូលអេក្រង់ ===');
 {
-    const desc = { textContent: '' };
-    const setupDesc = { textContent: '' };
+    // ⛔ ZoeW ជា React ៖ អត្ថបទប្រអប់ PIN ជា `viewState.pinPromptVerifyText` / `pinPromptSetupText` ដែល
+    //    JSX គូរ (`parity:dom` វាស់ការគូរ) ➜ `desc` · `setupDesc` ជាកញ្ចក់អានពីឃ្លាំងពិត
+    const readView = (k) => vm.runInContext('viewState.' + k, c2);
+    const desc = { get textContent() { return readView('pinPromptVerifyText'); },
+        set textContent(v) { vm.runInContext('viewState.pinPromptVerifyText = ' + JSON.stringify(v), c2); } };
+    const setupDesc = { get textContent() { return readView('pinPromptSetupText'); },
+        set textContent(v) { vm.runInContext('viewState.pinPromptSetupText = ' + JSON.stringify(v), c2); } };
+    const pinIn = { value: 'x' };
     const stored = {};
     const sandbox = {
-        console,
+        console, queueMicrotask,
         openConfigModal() { stored.opened = 'config'; },
         openModalHelper(id) { stored.modal = id; },
         localStorage: {
@@ -179,15 +186,14 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
         },
         document: {
             getElementById: (id) => {
-                if (id === 'pinModalDesc') return desc;
-                if (id === 'pinSetupModalDesc') return setupDesc;
-                if (id === 'securityPinInput') return { value: 'x' };
+                if (id === 'securityPinInput') return pinIn;
                 return null;
             }
         }
     };
     stored.ls = {};
     const c2 = vm.createContext(sandbox);
+    vm.runInContext(reactRuntime(appJs, { context: sandbox }), c2);
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', c2);
     vm.runInContext('let pinTargetAction = null;', c2);
     vm.runInContext(`
@@ -234,6 +240,9 @@ console.log('\n=== applyPinPromptText សរសេរអត្ថបទពិត
     vm.runInContext('__biometricEnabled = true; __log_biometricTried = 0;', c2);
     sandbox.requestPinBeforeConfig(null, 'config');
     ok('ជីវមាត្របើក ➜ សាកស្កេនភ្លាមពេលបើកប្រអប់ PIN', vm.runInContext('__log_biometricTried', c2) === 1);
+    pinIn.value = '1234';
+    sandbox.requestPinBeforeConfig(null, 'config');
+    ok('បើកប្រអប់ PIN ➜ សម្អាតវាលដែលវាយពីមុន', pinIn.value === '', pinIn.value);
 }
 
 console.log('\n' + (fail === 0 ? '✅ ជោគជ័យ ' + pass : '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')'));

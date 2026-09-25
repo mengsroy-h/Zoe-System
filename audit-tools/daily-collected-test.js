@@ -34,6 +34,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderedContainer } = require('./react-view');
 
 const ROOT = process.env.COLLECTED_APP_DIR
     ? path.resolve(process.env.COLLECTED_APP_DIR)
@@ -146,19 +147,20 @@ function makeSandbox(state) {
                 return Promise.resolve(true);
             }
         },
-        document: {
-            getElementById: () => box.__container,
-            createElement: () => ({ className: '', innerHTML: '', appendChild() {} })
-        },
+        document: { getElementById: () => null },
+        queueMicrotask,
         openModalHelper: () => { calls.toast.push('__modal'); }
     };
-    box.__container = { _kids: [], innerHTML: '', appendChild(el) { this._kids.push(el); } };
     box.globalThis = box;
     box.window = box;
     box.__calls = calls;
     box.__server = server;
     vm.createContext(box);
+    // ⛔ ZoeW ជា React ៖ `openCollectedStatsModal()` សរសេរ `uiState.collectedStatsView` ហើយ JSX (`StatsCards.tsx`) គូរ ➜
+    //    ឃ្លាំងពិតចូល sandbox · `__container` គូរ component ពិតពីស្ថានភាពរបស់ sandbox រាល់ការអាន
+    vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: box }), box);
     vm.runInContext(bodies, box);
+    box.__container = renderedContainer(ROOT, box, 'src/app/components/stats/StatsCards.tsx', 'CollectedStatsCards');
     return box;
 }
 
@@ -336,8 +338,9 @@ scenario('១២. ⛔ អេក្រង់ ៖ លេខដែលអ្នក�
         [DAY_A]: { c: { c: 10, d: 0 } }
     } });
     s.openCollectedStatsModal();
-    const html = s.__container._kids.map((k) => String(k.innerHTML || '')).join('\n');
-    ok('⛔ គូរកាតគ្រប់ថ្ងៃ', s.__container._kids.length === 2, s.__container._kids.length);
+    const kids = s.__container.children;
+    const html = kids.map((k) => String(k.innerHTML || '')).join('\n');
+    ok('⛔ គូរកាតគ្រប់ថ្ងៃ', kids.length === 2, kids.length);
     ok('⛔ ថ្ងៃថ្មីជាងឈរមុន', html.indexOf(DAY_B) < html.indexOf(DAY_A), html.slice(0, 120));
     ok('⛔ សរុប $10.00 លេចលើអេក្រង់ពិត', html.indexOf('$10.00') !== -1, html.slice(0, 400));
     ok('⛔ សេនមិនត្រូវបង្គត់ ៖ 6.47+2.5+1.03 = $10.00 ក៏ COD ត្រូវជា $7.50',

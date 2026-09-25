@@ -2,6 +2,7 @@ import { commitNow } from './app/flush';
 import { elementOf, type RefName } from './app/refs';
 import { uiState } from './core/state';
 import { annotateActions } from './audit-annotate';
+import { REACT_OWNED_IDS, resetReactOwned } from './app/slot-resets';
 
 /**
  * ⛔ សម្រាប់តែ build វាស់ (`VITE_EXPOSE_GLOBALS=1` ➜ `expose-globals.ts`) — **មិនដែលចូល
@@ -89,6 +90,69 @@ function wrap(el: Element, bindings: Binding[], adopt: boolean): void {
 }
 
 /**
+ * ⛔ ច្បាប់ដដែលលើ **មាតិកា** និង **ការបង្ហាញប្រអប់** ៖ checker ដើម «សម្អាតស្ថានភាព» ដោយ `el.innerHTML = ''`
+ *    (toast · របា ZTO …) និងលាក់ប្រអប់ដោយ `modal.style.display = 'none'`។ ក្នុង React ការដកកូនពីក្រោម React
+ *    ធ្វើឲ្យការគូរបន្ទាប់ធ្លាក់ (`removeChild`) ➜ ដើមឈើទាំងមូល unmount; ហើយ `style.display` ត្រង់ៗ មិនត្រូវ
+ *    `isModalOpen` ឃើញ ➜ checker វាស់ស្ថានភាពដែល App មិនដែលនៅ។
+ *    ➜ `innerHTML = ''` លើធាតុដែល React ជាម្ចាស់ ឆ្លង `resetReactOwned()` (ផ្លូវដដែលនឹង `clearSensitiveModalFields()`
+ *    ក្នុងផលិតកម្ម) · `style.display` លើប្រអប់ ➜ `uiState.modalDisplay`។ ⛔ React ខ្លួនឯងមិនសរសេរ `innerHTML` សោះ
+ *    (គ្មាន `dangerouslySetInnerHTML`) ហើយការសរសេរ `display` របស់ React ស្មើ state ជានិច្ច ➜ ឆ្លងកាត់ត្រង់ៗ។
+ */
+const nativeInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')!;
+const nativeStyle = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style')!;
+const slotWrapped = new WeakSet<Element>();
+
+function wrapOwnedSlot(el: Element, id: string): void {
+    if (slotWrapped.has(el)) return;
+    slotWrapped.add(el);
+    Object.defineProperty(el, 'innerHTML', {
+        configurable: true,
+        get: () => nativeInnerHTML.get!.call(el),
+        set: (v: string) => {
+            if (v === '' && resetReactOwned(id)) { commitNow(); return; }
+            nativeInnerHTML.set!.call(el, v);
+        }
+    });
+}
+
+function wrapModalStyle(el: HTMLElement): void {
+    if (slotWrapped.has(el)) return;
+    slotWrapped.add(el);
+    const id = el.id;
+    const real = () => nativeStyle.get!.call(el) as CSSStyleDeclaration;
+    const proxy = new Proxy({}, {
+        get(_t, prop) {
+            const st = real();
+            const v = (st as any)[prop];
+            return typeof v === 'function' ? v.bind(st) : v;
+        },
+        set(_t, prop, value) {
+            const st = real();
+            if (prop === 'display') {
+                const want = value ? String(value) : '';
+                if ((uiState.modalDisplay[id] || '') !== want) {
+                    const next: Record<string, any> = Object.assign({}, uiState.modalDisplay);
+                    if (want) next[id] = want; else delete next[id];
+                    uiState.modalDisplay = next;
+                    commitNow();
+                }
+            }
+            (st as any)[prop] = value;
+            return true;
+        }
+    });
+    Object.defineProperty(el, 'style', { configurable: true, get: () => proxy });
+}
+
+function wrapOwnedElements(): void {
+    for (const id of REACT_OWNED_IDS) {
+        const el = document.getElementById(id);
+        if (el) wrapOwnedSlot(el, id);
+    }
+    document.querySelectorAll<HTMLElement>('.modal[id]').forEach(wrapModalStyle);
+}
+
+/**
  * ⛔ ធាតុដែល React ចង **ក្រោយ** ការដំឡើង (mount យឺត · remount) ទទួលអ្នកបកប្រែតាម `MutationObserver` ៖
  *    ផលិតកម្មមិនត្រូវការការជូនដំណឹង «ref ប្តូរ» ទេ ➜ ច្រកនោះរស់ក្នុង build វាស់តែប៉ុណ្ណោះ (`wrapped` ការពារការរុំ ២ ដង)។
  */
@@ -103,7 +167,8 @@ export function installAuditClassAdapter(): void {
     commitNow();
     wrap(document.body, BODY_BINDINGS, true);
     wrapMountedRefs(true);
-    new MutationObserver(() => wrapMountedRefs(false)).observe(document.body, { childList: true, subtree: true });
+    wrapOwnedElements();
+    new MutationObserver(() => { wrapMountedRefs(false); wrapOwnedElements(); }).observe(document.body, { childList: true, subtree: true });
     commitNow();
 }
 

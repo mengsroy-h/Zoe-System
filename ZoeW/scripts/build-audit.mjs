@@ -151,11 +151,15 @@ rmSync(entry);
     // ⛔ តួ **ដើម** នៃ function ដែល override ➜ `view-originals.js` ៖ ការយោងក្នុងតួនោះ (ឧ. `commitNow` ➜ `allStores()`)
     //    ជាការយោងពិតក្នុងកូដ ship ដែលទិដ្ឋភាពជំនួស ➜ `function-surface` រាប់វា (បើអត់ វារាយ function រស់ថា «ងាប់»)
     const originals = [];
+    // ⛔ ព្រំដែន module ៖ `app.js` ដើមរៀបម៉ូឌុលជាប់គ្នាក្នុងឯកសារតែមួយ ➜ checker ខ្លះកាត់ «ម៉ូឌុល» តាមទីតាំងអក្សរ
+    //    (ឧ. ម៉ូឌុលស្ថានភាព ZTO)។ ក្នុង App React ម៉ូឌុលជា **ឯកសារ** ➜ `audit-module-views.json` ផ្ទុកទិដ្ឋភាពក្នុងមួយឯកសារ
+    const moduleViews = {};
     for (const rel of order) {
         const file = path.join(ROOT, rel);
         let view = moduleView(readFileSync(file, 'utf8'), file);
         for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement, originals);
         text += view;
+        moduleViews[rel] = view;
         // ⛔ state ដើមជា `let` កម្រិតកំពូល (ដូច `app.js` ដើម) ភ្លាមក្រោយឃ្លាំង ➜ dependency របស់តម្លៃដំបូងប្រកាសរួច
         if (rel === 'src/core/state.ts') text += stateDeclarations(view, stateGroups);
     }
@@ -165,6 +169,11 @@ rmSync(entry);
     if (aliased.count < 500) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` តិចពេក ៖ ' + aliased.count);
     writeFileSync(appPath, text);
     writeFileSync(path.join(APP, 'view-originals.js'), originals.join('\n\n') + '\n');
+    for (const rel of Object.keys(moduleViews)) {
+        const v = moduleViews[rel].replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
+        moduleViews[rel] = aliasStateFields(v, stateGroups).text;
+    }
+    writeFileSync(path.join(APP, 'audit-module-views.json'), JSON.stringify(moduleViews));
     console.log('ទិដ្ឋភាព checker ៖ module ' + order.length + ' · <ឃ្លាំង>.<វាល> ➜ <វាល> ' + aliased.count);
 }
 
@@ -177,6 +186,7 @@ rmSync(entry);
  *    ឯកសារចាស់ ហើយរាយការណ៍ថាបៃតងលើអ្វីដែលមិន ship។ */
 const appJs = readFileSync(path.join(APP, 'app.js'));
 const viewOriginals = readFileSync(path.join(APP, 'view-originals.js'));
+const moduleViewsJson = readFileSync(path.join(APP, 'audit-module-views.json'));
 execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', APP, '--emptyOutDir'], {
     cwd: ROOT,
     env: { ...process.env, VITE_EXPOSE_GLOBALS: '1' },
@@ -184,6 +194,7 @@ execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js')
 });
 writeFileSync(path.join(APP, 'app.js'), appJs);
 writeFileSync(path.join(APP, 'view-originals.js'), viewOriginals);
+writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
 
 /*
  * ២ក. **Service Worker ដែលអានបាន** ៖ Vite (`serviceWorkerPlugin`) ship `sw.js` ដែល **minify** ➜ checker SW ដើម

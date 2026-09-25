@@ -96,9 +96,37 @@ function serviceWorkerPlugin(): Plugin {
     };
 }
 
+/**
+ * ⛔ build វាស់តែប៉ុណ្ណោះ (`VITE_EXPOSE_GLOBALS=1`) — **មិនដែលចូលផលិតកម្ម**។
+ * App ដើមជា script សកល ➜ checker ជំនួស `window.fetchWithTimeout = stub` ហើយការហៅ **ខាងក្នុង** ក៏ឆ្លង stub នោះដែរ។
+ * ក្នុង ESM ការហៅខាងក្នុងឆ្លង binding របស់ module មិនមែន `window` ➜ stub គ្មានឥទ្ធិពល ➜ checker វាស់ «០ ការហៅ»។
+ * ➜ module នីមួយៗទទួល `__auditRebind(name, value)` ដែលសរសេរ binding នៃ `export function` ឡើងវិញ (ESM live binding ៖
+ *    អ្នក import ទាំងអស់ និងការហៅក្នុង module ឃើញតម្លៃថ្មី) ហើយ `expose-globals.ts` ភ្ជាប់វាទៅ setter នៃ `window.<name>`។
+ */
+const AUDIT_REBIND_RE = /[\\/]src[\\/](core|domain|features|services|ui|app[\\/]behaviors)[\\/].*\.ts$|[\\/]src[\\/]app[\\/](lifecycle[\\/]layers|refs|flush)\.ts$/;
+
+function auditRebindPlugin(): Plugin {
+    return {
+        name: 'zoew-audit-rebind',
+        enforce: 'pre',
+        transform(code, id) {
+            if (!AUDIT_REBIND_RE.test(id.split('?')[0])) return null;
+            const names = [...code.matchAll(/^export (?:async )?function\s*\*?\s*([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
+            if (!names.length) return null;
+            const cases = names.map((n) => `        case ${JSON.stringify(n)}: ${n} = value; return true;`).join('\n');
+            return {
+                code: code + `\nexport function __auditRebind(name: string, value: any): boolean {\n    switch (name) {\n${cases}\n    }\n    return false;\n}\n`,
+                map: null
+            };
+        }
+    };
+}
+
+const AUDIT_BUILD = process.env.VITE_EXPOSE_GLOBALS === '1';
+
 export default defineConfig({
     base: './',
-    plugins: [react(), serviceWorkerPlugin()],
+    plugins: [react(), serviceWorkerPlugin(), ...(AUDIT_BUILD ? [auditRebindPlugin()] : [])],
     resolve: {
         alias: { '@': path.resolve(ROOT, 'src') }
     },

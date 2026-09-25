@@ -26,8 +26,10 @@ function ok(label, condition, detail) {
 }
 
 ok('ជាន់អប្បបរមា៖ មាន ZoeW/app.js + index.html + style.css', !!app && !!html && !!css);
+// ⛔ markup ដែល React គូរ (prerender) សរសេរ `"` ក្នុង attribute ជា `&quot;` ➜ ប្រៀបលើតម្លៃ attribute ដែលឌិកូដ (ន័យដដែល)
+const htmlAttrs = html.replace(/&quot;/g, '"');
 ok('មានរបៀបទី ៣ «ស្កេនដកកញ្ចប់»',
-    /id="modeRemoveBtn"[^>]*data-act="setEntryScanMode"[^>]*\["remove"\][^>]*>[^<]*ដកកញ្ចប់/.test(html));
+    /id="modeRemoveBtn"[^>]*data-act="setEntryScanMode"[^>]*\["remove"\][^>]*>[^<]*ដកកញ្ចប់/.test(htmlAttrs));
 ok('មាន banner គ្រោះថ្នាក់សម្រាប់របៀបដក',
     /id="removeScanBanner"[^>]*role="status"/.test(html) && /id="removeScanBannerDetail"/.test(html));
 ok('មាន modal ផ្ទៀងផ្ទាត់ Barcode/Phone/Locker/COD/DOD',
@@ -44,9 +46,32 @@ ok('remove mode មិន persist ជារបៀបគ្រោះថ្នា�
     /entryScanMode\s*===\s*'remove'\s*\?\s*'parcel'\s*:\s*entryScanMode/.test(app));
 ok('គ្រប់ប្រភពស្កេនចូល trigger តែមួយ ហើយ remove mode មាន route ផ្ទាល់',
     /function triggerScanAction\(barcode\)[\s\S]{0,500}?entryScanMode\s*===\s*'remove'[\s\S]{0,180}?handleRemoveScan\(cleanBarcode\)/.test(app));
-ok('Preview ដាក់អក្សរតាម textContent មិនបញ្ចូល innerHTML',
-    /function setScannedRemovalText\([\s\S]{0,260}?\.textContent\s*=/.test(app) &&
-    !/scanRemove(?:Barcode|Phone|Locker|Cod|Dod)Text[^\n]{0,100}innerHTML/.test(app));
+// App React ៖ អត្ថបទ preview ជា state (`viewState.scanRemoveTexts`) ហើយ JSX ពិតគូរវាជា **កូនអត្ថបទ** ➜ វាស់ **ឥរិយាបថ** ៖
+// គូរប្រអប់ពិត (`react-render.cjs`) ដោយ payload HTML ក្នុងវាលនីមួយៗ ➜ ត្រូវចេញជាអក្សរ escape មិនមែនធាតុ។
+const REACT_BUNDLE = fs.existsSync(path.join(APP_DIR, 'react-render.cjs'));
+if (REACT_BUNDLE) {
+    const { renderComponent, elementById } = require('./react-view');
+    const PREVIEW_IDS = ['scanRemoveBarcodeText', 'scanRemovePhoneText', 'scanRemoveLockerText', 'scanRemoveCodText', 'scanRemoveDodText'];
+    const payload = (id) => '<img src=x data-probe="' + id + '">';
+    let rendered = '';
+    try {
+        const texts = {};
+        PREVIEW_IDS.forEach((id) => { texts[id] = payload(id); });
+        rendered = renderComponent(ROOT, 'src/app/components/modals/ScanRemoveModal.tsx', 'ScanRemoveModal', { viewState: { scanRemoveTexts: texts } });
+    } catch (e) {
+        rendered = '';
+    }
+    const cells = PREVIEW_IDS.map((id) => ({ id: id, el: elementById(rendered, id) }));
+    ok('Preview ដាក់អក្សរតាម textContent មិនបញ្ចូល innerHTML',
+        /function setScannedRemovalText\([\s\S]{0,260}?viewState\.scanRemoveTexts\s*=/.test(app) &&
+        !/scanRemove(?:Barcode|Phone|Locker|Cod|Dod)Text[^\n]{0,100}innerHTML/.test(app) &&
+        cells.every((c) => c.el && c.el.innerHTML.indexOf('&lt;img') !== -1 && !/<img/i.test(c.el.innerHTML)),
+        cells.map((c) => c.id + ':' + (c.el ? c.el.innerHTML.slice(0, 60) : 'missing')));
+} else {
+    ok('Preview ដាក់អក្សរតាម textContent មិនបញ្ចូល innerHTML',
+        /function setScannedRemovalText\([\s\S]{0,260}?\.textContent\s*=/.test(app) &&
+        !/scanRemove(?:Barcode|Phone|Locker|Cod|Dod)Text[^\n]{0,100}innerHTML/.test(app));
+}
 ok('ការរំលង native confirm ត្រូវចងនឹង in-flight item និង barcode ដូចគ្នា',
     /arguments\[2\]\s*===\s*'scan-confirmed'/.test(app) &&
     /scanRemoveInFlight\.itemId\s*===\s*itemId/.test(app) &&

@@ -365,8 +365,9 @@ function seedData() {
             // ឧបករណ៍ផ្សេងលុបកញ្ចប់នេះ ➜ ការកែទឹកប្រាក់មិនត្រូវធ្វើឲ្យវារស់ឡើងវិញ
             const revBeforeGhostEdit = await page.evaluate((dk) => ({ ...window.__fakeStore.zoew_daily_revenue_cod_dod[dk] }), seed._dateKey);
             await page.evaluate(() => {
-                const tc = document.getElementById('toastContainer');
-                if (tc) tc.innerHTML = '';
+                // App React ៖ toast ជាធាតុរបស់ React ➜ សម្អាតតាម state (`innerHTML = ''` ដក node ពីក្រោម React ➜ `removeChild` ធ្លាក់ ➜ ដើមឈើទាំងមូល unmount)
+                if (window.uiState && Array.isArray(window.uiState.toasts)) { window.uiState.toasts = []; if (window.commitNow) window.commitNow(); }
+                else { const tc = document.getElementById('toastContainer'); if (tc) tc.innerHTML = ''; }
                 window.openEditBarcodePriceModal('id_2000_ccc', 'DD1');
                 delete window.__fakeStore.zoew_scan_history_cod_dod.id_2000_ccc;
                 document.getElementById('editBcCodInput').value = '99';

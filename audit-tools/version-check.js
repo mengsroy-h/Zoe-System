@@ -74,7 +74,31 @@ for (const app of APPS) {
     check(`${app} ហៅ ${RENDER_FN}() យ៉ាងតិចម្ដង`, (called[app] || 0) >= 1, true);
     check(`${app} render យក APP_VERSION មិនមែនអក្សរដិត`, String(renderBody[app]).includes('APP_VERSION'), true);
 }
-check(`${RENDER_FN}() byte-identical ទាំង ២`, new Set(APPS.map((a) => renderBody[a])).size, 1);
+// ⛔ ZoeW ជា React ៖ `renderAppVersionLabels()` សរសេរ `viewState.appVersionLabel` ហើយ JSX (`LoginModal.tsx` ·
+//    `SideDrawer.tsx`) គូរវាទៅធាតុ `data-app-version` ➜ byte-identical ជាមួយ ZoeKeyGen (vanilla ៖ `textContent`) មិនអាច
+//    ទៅរួច។ អ្វីដែលត្រូវស៊ីគ្នាគឺ **អត្ថបទដែលអ្នកប្រើអាន** ៖ រត់ function ពិតនៃ App នីមួយៗ (APP_VERSION sentinel) រួច
+//    អានអត្ថបទពីធាតុ `data-app-version` ដែលគូររួច (React ៖ JSX ពិត · vanilla ៖ DOM ក្លែង)
+function renderedVersionLabels(app) {
+    const vm = require('vm');
+    const src = fs.readFileSync(path.join(root, app, 'app.js'), 'utf8');
+    const els = [{ textContent: '' }];
+    const ctx = { queueMicrotask, document: { querySelectorAll: () => els, getElementById: () => null } };
+    vm.createContext(ctx);
+    if (/\bfunction createStore\(/.test(src)) vm.runInContext(require('./react-view').reactRuntime(src, { context: ctx }), ctx);
+    const fn = require('./react-view').sliceFunction(src, RENDER_FN);
+    if (!fn) return [];
+    vm.runInContext("const APP_VERSION = '9.8.7';\n" + fn + '\n' + RENDER_FN + '();', ctx);
+    if (!/\bfunction createStore\(/.test(src)) return els.map((e) => e.textContent);
+    const { renderFromContext } = require('./react-view');
+    return ['src/app/components/modals/LoginModal.tsx:LoginModal', 'src/app/components/SideDrawer.tsx:SideDrawer'].map((spec) => {
+        const [rel, name] = spec.split(':');
+        const m = /data-app-version[^>]*>([^<]*)</.exec(renderFromContext(root, ctx, rel, name));
+        return m ? m[1] : null;
+    });
+}
+const labels = Object.fromEntries(APPS.map((a) => [a, renderedVersionLabels(a)]));
+check(`${RENDER_FN}() ៖ គ្រប់កន្លែងបង្ហាញកំណែ ដែលគូររួច មានអត្ថបទដូចគ្នាទាំង ២ App`,
+    new Set([].concat(...APPS.map((a) => labels[a]))).size === 1 && labels.ZoeW.length >= 2 && labels.ZoeW[0].includes('9.8.7'), true);
 
 // កន្លែងបង្ហាញកំណែត្រូវមានតែក្នុងកន្តុំដែលរាយខាងក្រោមប៉ុណ្ណោះ។ ការបន្ថែមកន្លែងថ្មី
 // ដោយចៃដន្យ (ឧ. ក្នុងតារាង ឬ modal ផ្សេង) ធ្វើឲ្យអ្នកប្រើឃើញកំណែច្រើនកន្លែងមិនស៊ីគ្នា។
@@ -98,7 +122,10 @@ for (const app of APPS) {
     const covered = new Set();
     slots.forEach((slot) => {
         const start = lines.findIndex((l) => l.includes(slot.open));
-        const closes = lines.findIndex((l, i) => i > start && l.trimEnd() === slot.close);
+        // ⛔ ធាតុបិទ = បន្ទាត់ `slot.close` ដែលមាន **indent ដូចបន្ទាត់បើក** (markup របស់ React ក្នុង `#root` មាន indent
+        //    តាមជម្រៅ ➜ ការប្រៀបធៀបនឹងជួរឈរ ០ រកមិនឃើញ)
+        const indent = start === -1 ? '' : lines[start].match(/^\s*/)[0];
+        const closes = lines.findIndex((l, i) => i > start && l.trimEnd() === indent + slot.close);
         const hit = at.find((i) => start !== -1 && i > start && i < closes);
         check(`${app} បង្ហាញកំណែក្នុង ${slot.label}`, hit !== undefined, true);
         if (hit !== undefined) covered.add(hit);

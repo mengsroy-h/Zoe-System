@@ -58,6 +58,25 @@ for (const app of APPS) {
         inner[1].split(',').map((s) => s.trim().split(/\s+as\s+/).pop().trim())
             .filter((s) => /^[A-Za-z_$][\w$]*$/.test(s)).forEach((n) => imported.add(n));
     });
+    // ⛔ ZoeW (React) ៖ loader ជា script ធម្មតាដែលផ្ទុក SDK តាម `import()` ថាមវន្ត ➜ `name: xMod.name` ជំនួស
+    //    `import { name } from` ។ «បាននាំចូល» = member ដែលអានពី **module ដែលភ្ជាប់ពី `import()` ពិត** ហើយឈ្មោះ key
+    //    **ស្មើ** ឈ្មោះ member (key ≠ member ➜ ការប្រើ fn ខុស ដោយស្ងាត់ៗ)
+    const dynamicMods = new Set();
+    const dynImports = (loaderSrc.match(/import\(BASE \+ '[^']+'\)/g) || []).length;
+    for (const m of loaderSrc.matchAll(/var (\w+) = mods\[(\d+)\];/g)) {
+        if (Number(m[2]) < dynImports) dynamicMods.add(m[1]);
+    }
+    const mismatched = [];
+    for (const m of decl[1].matchAll(/(\w+)\s*:\s*(\w+)\.(\w+)/g)) {
+        if (!dynamicMods.has(m[2])) continue;
+        if (m[1] === m[3]) imported.add(m[1]);
+        else mismatched.push(m[1] + ' ➜ ' + m[2] + '.' + m[3]);
+    }
+    if (dynamicMods.size) {
+        mismatched.length === 0
+            ? ok(app + ' ៖ loader ថាមវន្ត ៖ key នីមួយៗអានពី member ឈ្មោះដដែលនៃ module `import()` (' + dynamicMods.size + ' module)')
+            : bad(app + ' ៖ loader ថាមវន្ត ៖ key ≠ member (ការប្រើ function ខុសដោយស្ងាត់)', mismatched.join(', '));
+    }
     const exportedNotImported = [...exported].filter((n) => !imported.has(n) && !NOT_SDK_EXPORTS.has(n));
     exportedNotImported.length === 0
         ? ok(app + ' ៖ គ្រប់ឈ្មោះដែល export ត្រូវបាននាំចូលពិត')

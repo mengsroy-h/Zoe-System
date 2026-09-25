@@ -50,7 +50,19 @@ const EXPECTED_DIVERGENT = new Set([
     //                              `clearInfoListenerRecovery` · `handleInfoListenerError`)
     //                              ត្រូវនៅ byte-identical ទាំង ២ App។
     'connectionLooksOnline', 'renderConnectionStatus', 'setupConnectionRecovery', 'liveToastState',
-    'attachInfoListeners'
+    'attachInfoListeners',
+
+    // ⛔ ZoeW ជា React (ZoeKeyGen នៅជា vanilla) ៖ helper ខាងក្រោមធ្វើការងារដដែល តែ ZoeW សរសេរ **view model ក្នុងឃ្លាំង**
+    //    ដែល JSX គូរ ចំណែក ZoeKeyGen កែ DOM ផ្ទាល់ ➜ byte-identical មិនអាចទៅរួច។ ឥរិយាបថវាស់ដោយ checker របស់វា ៖
+    //   toast (`showToast` · `paintToast` · `armToastDismiss` · `dropOldestToast` · `showLiveToast` · `settleLiveToast` ·
+    //          `refreshLiveToasts`) — `uiState.toasts` ➜ `ToastList.tsx` (`toast-truth` · `toast-action-truth`)
+    //   `anyModalIsOpen` — `openModalIds()` ពី `MODAL_IDS` (ស្ថានភាពប្រអប់ជា state) (`connection-recovery`)
+    //   `hideBootSplash` · `showUpdateAvailableBanner` · `renderAppVersionLabels` — `viewState` ➜ JSX (`boot-animation` ·
+    //          `version-check`)
+    //   `fetchWithTimeout` — App Android បញ្ជូន `/.netlify/` តាម `resolveNativeApiUrl()` (web ៖ URL ដដែល) (`network-timeout`)
+    'showToast', 'paintToast', 'armToastDismiss', 'dropOldestToast', 'showLiveToast', 'settleLiveToast',
+    'refreshLiveToasts', 'anyModalIsOpen', 'hideBootSplash', 'showUpdateAvailableBanner', 'renderAppVersionLabels',
+    'fetchWithTimeout'
 ]);
 
 function walk(node, cb) {

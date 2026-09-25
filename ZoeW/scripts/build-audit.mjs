@@ -351,6 +351,37 @@ writeFileSync(path.join(APP, 'app.js'), appJs);
     console.log('react-render.cjs ៖ component ' + components.length);
 }
 
+/*
+ * ២ឃ. **ទិដ្ឋភាពអត្ថបទនៃ JSX** (`components.js`) ៖ ក្នុង App ដើម ការយោង function (handler · helper) ទាំងអស់រស់ក្នុង
+ *     `app.js` ➜ checker ដែលរាប់ការយោង (`function-surface` …) ឃើញវា។ ក្នុង App React ការយោងជាច្រើនរស់ក្នុង `.tsx`
+ *     (`onClick={togglePanelFromHandle}` …) ➜ ឯកសារនេះផ្ទុក `.tsx` ទាំងអស់ក្រោម `src/` ដែល esbuild បម្លែង (JSX ➜ JS ·
+ *     លុប type) ⛔ **មិនរត់** — សម្រាប់តែការអានជាអត្ថបទ។ ឯកសារនីមួយៗចាប់ផ្តើមដោយ marker `// === <ផ្លូវ>`
+ *     ហើយជា **module ដាច់ដោយឡែក** (import/export នៅដដែល) ➜ checker ត្រូវ tokenize មិនមែន parse ទាំងមូល។
+ */
+{
+    const { transform } = await import('esbuild');
+    const tsxFiles = [];
+    const walkAll = (dir) => {
+        for (const name of readdirSync(dir).sort()) {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) walkAll(full);
+            else if (name.endsWith('.tsx')) tsxFiles.push(full);
+        }
+    };
+    walkAll(path.join(ROOT, 'src'));
+    let text = '';
+    for (const file of tsxFiles) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const out = await transform(readFileSync(file, 'utf8'), {
+            loader: 'tsx', jsx: 'automatic', format: 'esm', target: 'es2020', legalComments: 'none', sourcefile: rel
+        });
+        text += '// === ' + rel + '\n' + out.code + '\n';
+    }
+    if (tsxFiles.length < 50) throw new Error('build-audit ៖ .tsx តិចពេក ៖ ' + tsxFiles.length);
+    writeFileSync(path.join(APP, 'components.js'), text);
+    console.log('components.js ៖ .tsx ' + tsxFiles.length + ' ឯកសារ · ' + text.split('\n').length + ' បន្ទាត់');
+}
+
 /* ៣. ឯកសារ repo ដែល checker អានជាអត្ថបទ — **ច្បាប់ចម្លងពី tree ថ្មី** */
 cpSync(path.join(ROOT, 'src/styles/app.css'), path.join(APP, 'style.css'));
 for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md']) {

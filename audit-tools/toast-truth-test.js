@@ -145,8 +145,17 @@ for (const app of APPS) {
     const css = read(app + '/style.css');
     const render = sliceFn(js, 'renderConnectionStatus') || '';
 
+    // App React ៖ `renderConnectionStatus()` សរសេរ `viewState.connectionStatus` ('online'·'connecting'·'offline')
+    // ហើយ `AppNavbar` (JSX) គូរ class `is-<ស្ថានភាព>` លើ `#firebaseStatusText` ➜ ពណ៌ពិតវាស់ក្នុង browser (ផ្នែក ៦)
+    let reactStatus = false;
+    if (fs.existsSync(path.join(ROOT, app, 'react-render.cjs'))) {
+        const { renderComponent, elementById } = require('./react-view');
+        reactStatus = /connectionStatus\s*=/.test(render) && ['online', 'connecting', 'offline'].every((k) =>
+            render.indexOf("'" + k + "'") !== -1 && new RegExp('\\bis-' + k + '\\b').test((elementById(renderComponent(ROOT,
+                'src/app/components/AppNavbar.tsx', 'AppNavbar', { viewState: { connectionStatus: k } }), 'firebaseStatusText') || {}).className || ''));
+    }
     ok(app + ' ៖ renderConnectionStatus ដាក់ class តាមស្ថានភាព',
-        /is-online/.test(render) && /is-connecting/.test(render) && /is-offline/.test(render));
+        (/is-online/.test(render) && /is-connecting/.test(render) && /is-offline/.test(render)) || reactStatus);
     ok(app + ' ៖ CSS ផ្តល់ពណ៌ដាច់ដោយឡែកឲ្យ is-online និង is-offline',
         /#firebaseStatusText\.is-online\s*\{/.test(css) && /#firebaseStatusText\.is-offline\s*\{/.test(css));
     ok(app + ' ៖ ស្លាកនោះលែងចាក់ពណ៌តែមួយថេរ',
@@ -169,7 +178,7 @@ for (const app of APPS) {
     ok(app + ' ៖ ហើយបញ្ជាក់ថាស្ថានភាពណាទើប «ចប់»', /settled: true/.test(state) && /settled: false/.test(state));
     const live = sliceFn(js, 'showLiveToast') || '';
     ok(app + ' ៖ toast ដែលរស់ តែងតែមានពេលកំណត់ (មិនស្ថិតជាប់អេក្រង់)',
-        /armToastDismiss\(toast, TOAST_LIVE_LIMIT_MS\)/.test(live));
+        /armToastDismiss\((?:toast|id), TOAST_LIVE_LIMIT_MS\)/.test(live));
 }
 
 // ── ៤. ZoeW ៖ ការទាញទិន្នន័យរួច ជាផ្នែកនៃសេចក្តីពិត ──────────────────
@@ -236,14 +245,17 @@ console.log('\n-- ៤ខ. វគ្គដែលបានបញ្ចប់ ➜ t
     ok('ZoeW ៖ សារផុតកំណត់លេចជាក់ស្តែងតែ **១** (មិនប្រកាសស្ទួន មិនបាត់)',
         /reannounceOrShowToast\(SESSION_EXPIRED_TOAST\)/.test(expire));
     const reannounce = sliceFn(js, 'reannounceOrShowToast') || '';
+    // App React ៖ toast ជាធាតុក្នុង `uiState.toasts` (`.show = true` ជំនួស `classList.add('show')`)
     ok('ZoeW ៖ បើ toast នោះនៅលើអេក្រង់ ➜ រស់វិញពេញ ៣ វិ. ជំនួសការបន្ថែមថ្មី',
-        /classList\.add\('show'\)/.test(reannounce) &&
-        /armToastDismiss\(items\[i\], TOAST_LIFETIME_MS\)/.test(reannounce) &&
+        (/classList\.add\('show'\)/.test(reannounce) || /list\[i\]\.show = true/.test(reannounce)) &&
+        /armToastDismiss\((?:items\[i\]|list\[i\]\.id), TOAST_LIFETIME_MS\)/.test(reannounce) &&
         /return showToast\(msg\);/.test(reannounce));
     ok('ZoeW ៖ ប្រអប់ login បើក ➜ អានសេចក្តីពិតឡើងវិញ',
         /refreshLiveToasts\(\)/.test(prefill));
+    // App React ៖ `refreshLiveToasts()` អានតែ `uiState.toasts` (គ្មាន DOM សោះ) ➜ vm គ្មាន document ក៏មិនបោះ
     ok('ZoeW ៖ refreshLiveToasts នៅត្រឡប់ចេញភ្លាមពេលគ្មាន toastContainer (តេស្ត vm)',
-        /return;/.test(refresh) && refresh.indexOf('return;') < refresh.indexOf('querySelectorAll('));
+        (/return;/.test(refresh) && refresh.indexOf('return;') < refresh.indexOf('querySelectorAll('))
+        || (refresh.length > 0 && !/\bdocument\b|querySelector/.test(refresh) && /uiState\.toasts/.test(refresh)));
     const expireRefreshAt = expire.indexOf('refreshLiveToasts()');
     ok('ZoeW ៖ ហើយការកែនោះកើតមុន fb.signOut (async) មិនមែនក្រោយ',
         expireRefreshAt !== -1 && signOutAt !== -1 && expireRefreshAt < signOutAt,
@@ -279,8 +291,42 @@ const PROBE_CONSTS_EXTRA = {
     ZoeKeyGen: ['SESSION_SIGNED_OUT_TOAST']
 };
 
+// App React ៖ toast ជា state (`uiState.toasts`) ដែល `ToastList` គូរ ➜ function ចម្លងដែលចាក់ចូលទំព័រ **មិនគូរអ្វីទេ** ➜
+// probe ប្រើ **function និង state ពិត** របស់ App (build វាស់ដាក់វាលើ `window` — `expose-globals.ts`) បូក `commitNow()`
+function buildReactProbe() {
+    return 'window.__toastProbe = (function () {\n' +
+        'const w = window;\n' +
+        'const flush = () => { if (typeof w.commitNow === "function") w.commitNow(); };\n' +
+        'return {\n' +
+        '  set(s) {\n' +
+        '    w.isDatabaseConnected = !!s.connected;\n' +
+        '    w.dbListenersFailed = !!s.listenersFailed;\n' +
+        '    w.isDatabaseInitialized = true;\n' +
+        '    w.firebaseSdkUnavailable = false;\n' +
+        '    w.reconnectWatchdogAttempt = s.watchdog || 0;\n' +
+        '    w.dbListenerPendingPaths.clear();\n' +
+        '    (s.pending || []).forEach((p) => w.dbListenerPendingPaths.add(p));\n' +
+        '    const session = s.session || "live";\n' +
+        '    w.sessionExpiryCheck = session;\n' +
+        '    w.auth = { currentUser: session === "out" ? null : { uid: "probe" } };\n' +
+        '  },\n' +
+        '  render: () => { w.renderConnectionStatus(); flush(); },\n' +
+        '  signin: () => { w.showLiveToast("signin"); flush(); },\n' +
+        '  clear: () => { w.uiState.toasts = []; flush(); },\n' +
+        '  flood: (n) => { for (let i = 0; i < n; i++) w.showToast("ស្កេនរួច " + i); flush(); },\n' +
+        '  count: () => document.querySelectorAll("#toastContainer .toast").length,\n' +
+        '  liveCount: () => document.querySelectorAll("#toastContainer [data-live-toast]").length\n' +
+        '};\n' +
+        '})();';
+}
+
 function buildProbe(app) {
     const js = read(app + '/app.js');
+    if (fs.existsSync(path.join(ROOT, app, 'react-render.cjs'))) {
+        const missing = ['renderConnectionStatus', 'showLiveToast', 'showToast', 'liveToastState', 'commitNow']
+            .filter((name) => !sliceFn(js, name));
+        return missing.length ? null : buildReactProbe();
+    }
     const parts = [];
     for (const name of PROBE_CONSTS.concat(PROBE_CONSTS_EXTRA[app] || [])) {
         const c = sliceConst(js, name);

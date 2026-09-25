@@ -377,6 +377,13 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
   **ត្រូវលុប** ៖ វាសរសេរជាន់ `src/` ទាំងមូល (អន្ទាក់) · `run-all.sh` ជំនួស `audit:run`។
 - **`.github/workflows/audit.yml`** ៖ ដំឡើង dependency របស់ ZoeW · job `firebase-rules` រត់ checker លើ tree វាស់
   (`ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh`) ➜ ពេលកូតា GitHub Actions ត្រឡប់មកវិញ CI មិនធ្លាក់ដោយ «រក `ZoeW/app.js` មិនឃើញ»។
+- 🔴 **`zoew-suite` (checker ថ្មី) ចាប់ការថយក្រោយភ្លាមក្នុងការរត់ដំបូង** ៖ ច្បាប់ CSS របស់ផ្ទាំង crash ត្រូវដាក់ក្នុង `app.css` ➜
+  `npm run parity` ធ្លាក់ (`app.css` ត្រូវដូច `style.css` ដើម **byte ទល់ byte**) ➜ ផ្លាស់ទៅ `react-root.css`។ មុនជុំនេះ parity
+  **គ្មាននរណារត់ក្នុង CI ទេ**។
+- 🔴 **checker CSS ស្តាទិចមើលតែពាក់កណ្តាលនៃ CSS/JSX** ៖ `style.css` របស់ tree វាស់ = `app.css` តែឯង (ខ្វះ `react-root.css` ·
+  `native.css`) ហើយ `css-classes` ស្កេនតែ markup **ដំបូង** (`index.html`) ➜ class **១១៦** ក្នុង JSX ដែលមិនគូរពេលដំបូង
+  (ផ្ទាំង crash · toast · បញ្ជីថាមវន្ត) គ្មានអ្នកវាស់។ ឥឡូវ `style.css` = CSS ដែល ship ពិត (តាមលំដាប់នាំចូលរបស់ `main.tsx`) ·
+  `css-classes` ស្កេន `components.js` ដែរ (១៨០ ➜ **២៩៦** class) ➜ probe «ដក `.app-crash-reload`» ធ្លាក់។
 - **Deep Audit (ការវាស់ក្រៅសំណុំ)** ៖ fuzz **ក្រៅជួរ seed លំនាំដើម** លើ App React — revenue (seed 100–113 × 50 ops) ·
   collected-value (seed 500+) · mirror (seed 300+) · connection-state (seed 700+ · ៥,៧៦០ ជំហាន) ➜ **បៃតងទាំង ៤**។ mutation
   `trashReason` របស់ «លុបទាំងអស់» ➜ `policy-test` · `trash-modal-test` ចាប់ (មិនមែនចន្លោះ ➜ មិនសាង checker ស្ទួន)។
@@ -386,8 +393,9 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 - `docs/HISTORY-ARCHIVE.md` · `docs/ARCHIVE-2026-09-03.md` ➜ **ផ្នែក ៣ · ៤** នៃឯកសារនេះ (តំណដែលបាក់បម្លែងជាអត្ថបទ) ·
   `ZoeW/docs/ADDED-VALUE.md` · `PARITY-RESULTS.md` ➜ **ផ្នែក ២**។ ⛔ លែងមានឯកសារបណ្ណសារដាច់ដោយឡែក (`CLAUDE.md` ច្បាប់ ៩)។
 - `CLAUDE.md` ៖ ការអះអាងចាស់ដែលគ្រោះថ្នាក់សម្រាប់ session ក្រោយត្រូវកែ — «checker ភាគច្រើនមិនទាន់វាស់ App React» · «`ZoeW/app.js`
-  ជាឯកសារកូដតែមួយ ~១៤,៤០០ បន្ទាត់ · function ជា global» · Runbook (`npm i acorn …` ➜ `npm ci --prefix ZoeW` · baseline
-  `origin/main` ដែលជា App vanilla ➜ `BASE_REF`) · ច្បាប់ ៣ (comment ក្នុង `src/**`)។
+  ជាឯកសារកូដតែមួយ ~១៤,៤០០ បន្ទាត់ · function ជា global» · Runbook (`npm i acorn …` ➜ `npm ci --prefix ZoeW` · `git diff … ZoeW/app.js` ➜
+  `ZoeW/src ZoeW/public`) · ច្បាប់ ៣ (comment ក្នុង `src/**`) · «កុំ merge មុនការផ្ទេរ checker» ➜ App React ជាផលិតកម្មរួច
+  (`main` = 2.42.1 · ផ្ទៀងផ្ទាត់តាម git)។
 - `ZoeW/docs/*` ៖ លេខ cache ចាស់ (`zoew-v227`) · ការអះអាង «manifest គ្មានលេខកំណែ» ខុស · PARITY.md ផ្នែក ៥ (checker «ធ្លាក់ដោយ
   រចនាសម្ព័ន្ធ») · MIGRATION.md លក្ខខណ្ឌទី ២ (សម្រេចរួច) ➜ កែតាមការពិត។ `guide.html` ៖ ដកកំណត់ត្រាប្រវត្តិ · បន្ថែមជំនួយសម្រាប់ផ្ទាំង
   «⚠️ App ជួបបញ្ហាក្នុងការបង្ហាញ»។

@@ -46,19 +46,19 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
 ⛔ **ការប្រើស្របគ្នាមានសុវត្ថិភាព** ៖ App ទាំង ២ សរសេរតាមច្បាប់ដដែល
 (transaction · registry · ledger) ➜ ពួកវាមើលឃើញគ្នាទៅវិញទៅមកដូចឧបករណ៍ ២។
 
-### ដំណាក់ ២ — merge ចូល `main`
+### ដំណាក់ ២ — merge ចូល `main` ✅ (App React ជាផលិតកម្មរួច)
 
-⛔ **លក្ខខណ្ឌ ២ មុន merge** ៖
+⛔ **លក្ខខណ្ឌ ២ ដែលត្រូវរក្សាសម្រាប់រាល់ PR បន្ទាប់** ៖
 
-១. ឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធឆ្លងកាត់ (ដំណាក់ ១)។
+១. PR ដែលប៉ះ PTR · ចលនាផ្ទាំង · ការរមូរ · ផ្លូវ native ➜ សាកលើឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធ (ដំណាក់ ១)។
 ២. **សំណុំ `audit-tools/run-all.sh` វាស់ App នេះបានពិត** ✅ — `run-all.sh` build tree វាស់
    (`scripts/build-audit.mjs` ➜ `dist-audit/ZoeW`) ហើយរត់ checker **ទាំងអស់** នៅទីនោះ (មើល
    [`PARITY.md`](PARITY.md) ផ្នែក ៥) · `zoew-suite-test.js` រត់អ្នកយាមផ្ទាល់ខ្លួនរបស់ React ·
-   `check-money.cmd` អានកូដលុយពី `audit-tools/money-core.js`។ ⛔ លក្ខខណ្ឌនេះ **ត្រូវរក្សា** រហូតដល់ merge ៖
+   `check-money.cmd` អានកូដលុយពី `audit-tools/money-core.js`។ ⛔ លក្ខខណ្ឌនេះ **ត្រូវរក្សា** ៖
    រត់ `bash audit-tools/run-all.sh` ពេញ (emulator រត់ · `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1`) ហើយ
-   **០ ធ្លាក់ · ០ មួយផ្នែក · ០ រំលង** មុន merge។
+   **០ ធ្លាក់ · ០ មួយផ្នែក · ០ រំលង** មុនរាល់ merge។
 
-បន្ទាប់ពីលក្ខខណ្ឌទាំង ២ ឆ្លងកាត់តែប៉ុណ្ណោះ។ ផលិតកម្មប្រើ **origin ដដែល**
+ផលិតកម្មប្រើ **origin ដដែល**
 ➜ Config · PIN · License · ការកំណត់ Locker · កុងតាក់ ZTO **នៅដដែល** ៖ អ្នកប្រើមិនបាច់
 តំឡើងឡើងវិញទេ។
 

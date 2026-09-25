@@ -116,8 +116,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > vitest · purity · native · android · parity) រត់តាម `zoew-suite-test.js` ក្នុង `run-all.sh`។
 > 💰 `check-money.cmd` (`money-reality-check.js`) អានកូដលុយពី **`audit-tools/money-core.js`** (ស្រង់ពីកូដ
 > ពិតដោយ `npm --prefix ZoeW run money:core`) ⛔ កូដលុយប្រែ ➜ ត្រូវបង្កើតវាឡើងវិញ (អ្នកយាមភាពស្រស់ធ្លាក់)។
-> ⛔ **កុំ merge ចូល `main`** មុនការសាកលើ iPhone + Android ពិត ៖
-> [`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ដំណាក់ ២។
+> ⛔ **App React ជាផលិតកម្មរួច** (`main` ផ្ទុក `ZoeW/src/**` — ផ្ទៀងផ្ទាត់ ៖ `git cat-file -e origin/main:ZoeW/src/main.tsx`)។
+> ការសាកលើ iPhone + Android ពិត ([`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ផ្នែក ៥) នៅតែជាការវាស់ដែលម៉ាស៊ីននេះធ្វើមិនបាន។
 > 📱 **App Android (Capacitor · Android តែមួយ)** ៖ `ZoeW/android/` ·
 > [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md)។ ⛔ web ត្រូវ **fail closed** ៖
 > `src/platform/native.ts` ជាអ្នកសម្រេចតែមួយ · plugin ផ្ទុកតាម dynamic import តែលើ
@@ -2054,7 +2054,7 @@ MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
 កុំសរសេរតេស្តលើកូដចម្លង។** ហើយ **ត្រូវបញ្ជាក់ថាតេស្តមិនទទេ** ៖
 
 ```bash
-BASE_REF=origin/main          # ⛔ មុន App React merge ចូល main ➜ ប្រើ commit មុនការកែរបស់អ្នក (មើលខាងក្រោម)
+BASE_REF=origin/main          # ឬ commit មុនការកែរបស់អ្នក (branch ដែលមាន commit មិនទាន់ merge ច្រើន)
 git fetch origin main
 rm -rf /tmp/baseline && mkdir /tmp/baseline
 git archive "$BASE_REF" | tar -x -C /tmp/baseline
@@ -2062,9 +2062,8 @@ bash audit-tools/run-all.sh /tmp/baseline   # ចំណុចដែល *គួ�
 ```
 
 បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវាមិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។
-*អន្ទាក់ ៖ ត្រូវ archive tree **មុនកែ** មិនមែន `HEAD` ដែលផ្ទុកការកែរួច។* ⛔ ខណៈ App React នៅលើ
-branch ៖ `origin/main` ជា ZoeW **vanilla** (App ផ្សេង) ➜ baseline ត្រូវជា **commit មុនការកែរបស់អ្នក**
-លើ branch ដដែល (`BASE_REF=<commit>`) — tree React ក្នុង baseline ក៏ត្រូវ build វាស់ដោយស្វ័យប្រវត្តិដែរ។
+*អន្ទាក់ ៖ ត្រូវ archive tree **មុនកែ** មិនមែន `HEAD` ដែលផ្ទុកការកែរួច។* tree React ក្នុង baseline ក៏ត្រូវ
+build វាស់ដោយស្វ័យប្រវត្តិដែរ (`run-all.sh` ធ្វើវា)។
 **Mutation ត្រូវតែពិត** — ការធ្វើ mutation ខ្សោយធ្វើឲ្យតេស្តជោគជ័យក្លែងក្លាយ
 ហើយ **ត្រូវ `grep` បញ្ជាក់ថា mutation នោះចុះលើឯកសារពិត** មុនជឿលទ្ធផល។
 

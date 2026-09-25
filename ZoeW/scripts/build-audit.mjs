@@ -403,7 +403,23 @@ writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
 }
 
 /* ៣. ឯកសារ repo ដែល checker អានជាអត្ថបទ — **ច្បាប់ចម្លងពី tree ថ្មី** */
-cpSync(path.join(ROOT, 'src/styles/app.css'), path.join(APP, 'style.css'));
+// ⛔ `style.css` = CSS ដែល **ship ពិត** ៖ រាល់ `.css` ដែល `src/main.tsx` នាំចូល តាមលំដាប់នាំចូល (Vite ប្រមូលវាចូល
+//    bundle តែមួយតាមលំដាប់នោះ ➜ cascade ដដែល) · comment ត្រូវលុប (Vite minify លុបវា)។ ⛔ ការចម្លងតែ `app.css`
+//    ធ្វើឲ្យ CSS ដែលមានតែក្នុង React (`react-root.css` · `native.css`) **មើលមិនឃើញ** ដោយ checker CSS ស្តាទិច
+//    (`css-classes` · `css-media-override` · `fluid-type-focus` · `css-var`)។
+{
+    const mainTsx = readFileSync(path.join(ROOT, 'src/main.tsx'), 'utf8');
+    const cssImports = [...mainTsx.matchAll(/^import '\.\/(styles\/[\w-]+\.css)';$/gm)].map((m) => m[1]);
+    if (cssImports[0] !== 'styles/app.css' || cssImports.length < 2) throw new Error('build-audit ៖ អាន CSS ដែល main.tsx នាំចូលមិនបាន ៖ ' + cssImports.join(' · '));
+    const css = cssImports.map((rel) => {
+        const text = readFileSync(path.join(ROOT, 'src', rel), 'utf8');
+        const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '');
+        if (/\/\*|\*\//.test(stripped)) throw new Error('build-audit ៖ លុប comment ពី ' + rel + ' មិនស្អាត');
+        return stripped.replace(/\n{3,}/g, '\n\n');
+    }).join('\n');
+    writeFileSync(path.join(APP, 'style.css'), css);
+    console.log('style.css ៖ ' + cssImports.join(' + '));
+}
 for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md']) {
     cpSync(path.join(ROOT, f), path.join(APP, f));
 }

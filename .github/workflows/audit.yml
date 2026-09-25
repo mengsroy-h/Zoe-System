@@ -159,6 +159,9 @@ jobs:
           sudo mkdir -p /opt/pw-browsers/chromium-1194
           sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+          # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
+          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          test -x /opt/pw-browsers/chromium
 
       - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
         run: npm ci --prefix ZoeW --no-audit --no-fund

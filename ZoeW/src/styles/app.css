@@ -1455,44 +1455,6 @@
             min-height: 36px;
             min-width: 36px;
         }
-        .app-crash {
-            position: fixed;
-            inset: 0;
-            z-index: 2000;
-            background: var(--body-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-        }
-        .app-crash-card {
-            background: var(--card-bg);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-            padding: 20px;
-            max-width: 420px;
-            width: 100%;
-            text-align: center;
-        }
-        .app-crash-title {
-            font-size: calc(18 * var(--fs-unit));
-            font-weight: 700;
-            margin: 0 0 8px;
-        }
-        .app-crash-body {
-            font-size: calc(14 * var(--fs-unit));
-            margin: 0 0 16px;
-        }
-        .app-crash-reload {
-            background: var(--primary);
-            color: #ffffff;
-            border: none;
-            border-radius: 8px;
-            font-size: calc(15 * var(--fs-unit));
-            padding: 10px 18px;
-            min-height: 46px;
-            cursor: pointer;
-        }
         .app-lock {
             display: none;
             position: fixed;

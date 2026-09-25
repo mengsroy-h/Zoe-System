@@ -1,7 +1,7 @@
-/* ឃ្លាំង state ទាំង ៨ របស់ App (ដើមកំណើត ៖ អថេរ `let` កម្រិតកំពូលរបស់ ZoeW
- * `app.js` ដើម ដែល `tools/gen-state.cjs` ធ្លាប់ផលិត)។
- * ⛔ ឥឡូវ `src/` ជា **ប្រភពការពិត** (`npm run generate` ចាក់សោ) ➜ កែទីនេះ
- *    ដោយផ្ទាល់ ៖ វាលថ្មីត្រូវបន្ថែម **ទាំង** ក្នុង interface **និង** តម្លៃដើម។
+/* ឃ្លាំង state ទាំង ៨ របស់ App (ដើមកំណើត ៖ អថេរ `let` កម្រិតកំពូលរបស់ ZoeW `app.js` ដើម —
+ * រូបភាពស្ថិរនៃឈ្មោះទាំងនោះ ៖ `src/_generated-state.json`)។
+ * ⛔ `src/` ជា **ប្រភពការពិត** ➜ កែទីនេះដោយផ្ទាល់ ៖ វាលថ្មីត្រូវបន្ថែម **ទាំង** ក្នុង interface
+ *    **និង** តម្លៃដើម។
  *    របៀបជ្រើសឃ្លាំង និងរបៀបអានក្នុង component ៖ `docs/EXTENDING.md`។ */
 import { createStore, registerStore } from './store';
 import { appLocalStore, safeStoreGet } from './storage';

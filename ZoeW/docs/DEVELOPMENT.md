@@ -3,8 +3,8 @@
 ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក្សាមុខងារទាំងស្រុង**
 នៃ ZoeW ដើម (vanilla JS)។ ឯកសារនេះសម្រាប់ **អ្នកអភិវឌ្ឍ** — របៀបប្រើ App
 ស្ថិតក្នុង [`../README.md`](../README.md)។ ភាពដូចគ្នាមិនមែនជាការអះអាងទេ — វា **ត្រូវបាន
-វាស់** ៖ វិធីសាស្ត្រក្នុង [`PARITY.md`](PARITY.md) និងលេខឆៅក្នុង
-[`PARITY-RESULTS.md`](PARITY-RESULTS.md) ។
+វាស់** ៖ វិធីសាស្ត្រក្នុង [`PARITY.md`](PARITY.md) (លេខដែលវាស់បានរស់នៅ
+[`../../docs/HISTORY.md`](../../docs/HISTORY.md) — ប្រវត្តិរស់នៅទីនោះតែមួយកន្លែង)។
 
 | វិមាត្រដែលវាស់ | លទ្ធផល |
 |---|---|
@@ -20,10 +20,10 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | ស្រទាប់ · ឃ្លាំង state · SW · ដំណើរការចាប់ផ្តើម |
 | [`PARITY.md`](PARITY.md) | របៀបវាស់ parity និងហេតុអ្វីបែបនោះ |
-| [`PARITY-RESULTS.md`](PARITY-RESULTS.md) | លទ្ធផលឆៅនៃការវាស់ |
 | [`MIGRATION.md`](MIGRATION.md) | ជំហានដាក់ឲ្យប្រើ និងការថយក្រោយវិញ |
 | [`TYPESCRIPT.md`](TYPESCRIPT.md) | វិន័យ type និងផ្លូវតឹងបន្តិចម្តងៗ |
-| [`ADDED-VALUE.md`](ADDED-VALUE.md) | ចន្លោះដែលរកឃើញ · ការពង្រឹង · ផ្លូវបន្ត |
+| [`EXTENDING.md`](EXTENDING.md) | កន្លែងដាក់កូដថ្មី (state · component · lifecycle · platform) |
+| [`ANDROID.md`](ANDROID.md) | App Android (Capacitor) |
 | [`../README.md`](../README.md) | របៀបប្រើ App (កំណែ · មុខងារ · របៀបប្រើប្រាស់ · សុវត្ថិភាព · អាជ្ញាប័ណ្ណ) |
 
 ---
@@ -32,12 +32,13 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 
 | អ្វី | តម្លៃ | ដេរីវេពី |
 |---|---|---|
-| កំណែ App | `2.42.2` | [`src/core/version.ts`](../src/core/version.ts) |
-| កំណែ cache របស់ Service Worker | `zoew-v227` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
+| កំណែ App | `APP_VERSION` | [`src/core/version.ts`](../src/core/version.ts) |
+| កំណែ cache របស់ Service Worker | `CACHE_VERSION` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
 | Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
 
-⛔ `manifest.json` និង `index.html` **មិនផ្ទុកលេខកំណែជា literal ទេ** — ពួកវា
-ទទួលវាពី `src/core/version.ts` អំឡុង build ➜ លេខ ៣ កន្លែងឃ្លាតគ្នាមិនកើត។
+⛔ `dist/manifest.json` ទទួលកំណែពី `src/core/version.ts` អំឡុង build (`vite.config.mts`) ហើយ `index.html`
+គ្មានលេខកំណែជា literal។ `public/manifest.json` នៅផ្ទុក literal ➜ `audit-tools/version-check.js` ចាក់សោឲ្យស៊ី ·
+`version-bump-scope.js` ចាក់សោថា កូដ ship ប្រែ ➜ ត្រូវឡើងកំណែ (`CLAUDE.md` ច្បាប់ ៦)។
 
 ---
 
@@ -114,14 +115,13 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
-| `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime |
+| `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) |
+| `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
 | `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
 | `npm run original:fetch` | ទាញ ZoeW ដើម (vanilla JS) ពី git ចូល `.original/ZoeW` — អ្នកសម្រេចនៃការវាស់ parity |
 | `npm run logic:check` | ប្រៀបធៀប function ទាំង ៧៣៩ ជាមួយដើម **តាម token** · តំបន់ហាមចូលត្រូវដូចដើម |
-| `npm run generate` | ផលិត `src/` ឡើងវិញពី ZoeW ដើម — ⛔ **ចាក់សោ** (វាសរសេរជាន់ `src/`) ៖ ត្រូវការ `ALLOW_REGENERATE=1` |
 | `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
-| `npm run audit:build` | រៀបចំ tree សម្រាប់ `audit-tools/` ដើម |
-| `npm run audit:run` | រត់ checker របស់ `audit-tools/` ធៀបនឹង tree នោះ |
+| `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |
 | `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
 | `npm run test:watch` | Vitest ក្នុងរបៀបតាមដាន |
@@ -146,12 +146,10 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 
 ### `src/` ជាប្រភពការពិត
 
-កូដក្នុង `src/core` · `src/domain` · `src/features` · `src/services` · `src/ui`
-**កើតពី** `app.js` ដើមដោយ codemod (`tools/`)។ ឥឡូវ `src/` ត្រូវបានកែដោយដៃ
-(lifecycle · platform · Android · React ១០០%) ➜ **កែនៅក្នុង `src/` ដោយផ្ទាល់**។
-`npm run generate` នៅចាក់សោ (`ALLOW_REGENERATE=1`) ហើយ ⛔ **កុំរត់វា** ៖ វា
-សរសេរជាន់ `src/` ទាំងមូល ➜ ការកែទាំងនោះនឹងបាត់។ `tools/` នៅរក្សាទុកតែជា
-កំណត់ត្រានៃការផ្ទេរ និងជាប្រភពនៃបញ្ជី slot ដែល `doc:check` · `slot:check` អាន។
+កូដក្នុង `src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ (ឈ្មោះ function និងកូនសោ storage ដដែលនឹង
+ZoeW vanilla ➜ `logic:check` · `parity` ប្រៀបធៀបបាន)។ ឧបករណ៍ codemod ដែលធ្លាប់ផលិតវាពី `app.js` ដើម
+ត្រូវលុបរួច (វាសរសេរជាន់ `src/` ទាំងមូល — អន្ទាក់)។ បញ្ជី slot ដែល `doc:check` · `slot:check` អាន
+រស់នៅ `scripts/slot-registry.cjs` (ផ្ទៀងផ្ទាត់ទល់នឹង `REACT_OWNED_IDS` និង component ពិត)។
 
 ### App Android (Capacitor)
 

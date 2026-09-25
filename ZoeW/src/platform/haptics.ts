@@ -23,5 +23,5 @@ export function hapticTick(): void {
     try {
         const nav = navigator as Navigator & { vibrate?: (pattern: number) => boolean };
         if (typeof nav.vibrate === 'function') nav.vibrate(HAPTIC_TICK_MS);
-    } catch (e) { /* fail-closed */ }
+    } catch { /* fail-closed */ }
 }

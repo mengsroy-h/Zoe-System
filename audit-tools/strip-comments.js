@@ -38,10 +38,12 @@ const EXTERNAL_LIB = new Set(['qrcode.js']);
 function shippedFiles() {
     const out = [];
     for (const app of APPS) {
-        const dir = path.join(ROOT, app);
+        // ZoeW React ៖ `src/**` ឆ្លង build (Vite លុប comment) ➜ ឯកសារដែល ship **ដដែលៗ** គឺ `public/*.js`
+        const base = fs.existsSync(path.join(ROOT, app, 'src', 'main.tsx')) ? app + '/public' : app;
+        const dir = path.join(ROOT, base);
         if (!fs.existsSync(dir)) continue;
         for (const name of fs.readdirSync(dir)) {
-            const rel = app + '/' + name;
+            const rel = base + '/' + name;
             if (VENDOR.test(rel) || EXTERNAL_LIB.has(name)) continue;
             if (name === 'test.js') continue;
             if (!/\.(js|css)$/.test(name)) continue;

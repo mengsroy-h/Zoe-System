@@ -6,6 +6,69 @@
 cd "$(dirname "$0")/.." || exit 1
 BASE="$1"
 
+# ── ZoeW React ៖ checker វាស់ «root វាស់» មិនមែនប្រភព ─────────────────────────
+# ZoeW ជា React (`ZoeW/src/**` ➜ Vite)។ checker ស្រង់ function ពី `ZoeW/app.js` · អាន markup ពី
+# `ZoeW/index.html` · បើក App ក្នុង browser ➜ ទាំងនោះរស់នៅ **build វាស់** (`ZoeW/scripts/build-audit.mjs`
+# ➜ `ZoeW/dist-audit/ZoeW` ៖ ទិដ្ឋភាពអត្ថបទនៃ src ពិត + bundle Vite ពិត + prerender)។ ដូច្នេះ run-all ៖
+#   ១. build វាស់ពីប្រភពពិត (ធ្លាក់ ➜ FAIL មិនមែនវាស់ build ចាស់)
+#   ២. ផ្គុំ root វាស់ ៖ ឯកសារ repo ទាំងអស់ លើកលែង ZoeW/ ដែលជំនួសដោយ build វាស់
+#   ៣. រត់ខ្លួនឯងឡើងវិញក្នុង root នោះ ➜ checker ទាំងអស់ (និង checker-coverage) ឃើញ tree តែមួយ
+# ⛔ checker ដែលវាស់ **repo** (git · ប្រភព) ចង្អុលទៅ repo ពិតតាម env ខាងក្រោម។
+# ⛔ `$BASE` (tree មុនកែ) ដែលជា React ក៏ត្រូវ build វាស់ដែរ; tree vanilla រត់ត្រង់ៗដូចមុន។
+zoe_measure_root() {  # <src root> <dst> <copy-mode: git|tar>
+    local src="$1" dst="$2" mode="$3"
+    rm -rf "$dst" && mkdir -p "$dst" || return 1
+    if [ "$mode" = git ]; then
+        (cd "$src" && git ls-files -z --cached --others --exclude-standard | grep -zv '^ZoeW/' \
+            | tar --null -T - -cf -) | tar -xf - -C "$dst" || return 1
+        [ -f "$src/audit-tools/emu/real.rules.json" ] && cp "$src/audit-tools/emu/real.rules.json" "$dst/audit-tools/emu/"
+    else
+        tar -C "$src" --exclude=./ZoeW --exclude=./node_modules --exclude=./.git -cf - . | tar -xf - -C "$dst" || return 1
+    fi
+    cp -r "$src/ZoeW/dist-audit/ZoeW" "$dst/ZoeW" || return 1
+    ln -s "$ZOE_NODE_MODULES" "$dst/node_modules"
+}
+zoe_build_audit() {  # <src root>
+    local log
+    [ -e "$1/ZoeW/node_modules" ] || ln -s "$ZOE_NODE_MODULES" "$1/ZoeW/node_modules"
+    if ! log=$( (cd "$1/ZoeW" && node scripts/build-audit.mjs) 2>&1 ); then
+        echo "*** FAIL *** build វាស់ធ្លាក់ ($1)"; printf '%s\n' "$log" | tail -20 | sed 's/^/      /'
+        return 1
+    fi
+}
+if [ -z "$ZOE_MEASURE_ROOT" ] && [ -f ZoeW/src/main.tsx ] && [ ! -f ZoeW/app.js ]; then
+    REPO="$(pwd)"
+    export ZOE_NODE_MODULES="$REPO/ZoeW/node_modules"
+    if [ ! -d "$ZOE_NODE_MODULES/vite" ] || [ ! -d "$ZOE_NODE_MODULES/playwright-core" ]; then
+        echo "*** FAIL *** ត្រូវការ dependency របស់ ZoeW (vite · acorn · playwright-core) — រត់ ៖ npm ci --prefix ZoeW"
+        exit 1
+    fi
+    echo "== ZoeW React ៖ build វាស់ពីប្រភពពិត (ZoeW/dist-audit) =="
+    zoe_build_audit "$REPO" || exit 1
+    MEASURE="$REPO/ZoeW/dist-audit/measure-root"
+    zoe_measure_root "$REPO" "$MEASURE" git || { echo "*** FAIL *** ផ្គុំ root វាស់មិនបាន"; exit 1; }
+    BASE_MEASURE=""
+    if [ "${BASE:+set}" = set ] && [ -d "$BASE" ]; then
+        BASE="$(cd "$BASE" && pwd)"
+        if [ -f "$BASE/ZoeW/src/main.tsx" ] && [ ! -f "$BASE/ZoeW/app.js" ]; then
+            zoe_build_audit "$BASE" || exit 1
+            BASE_MEASURE="$BASE/ZoeW/dist-audit/measure-root"
+            zoe_measure_root "$BASE" "$BASE_MEASURE" tar || { echo "*** FAIL *** ផ្គុំ root វាស់របស់ baseline មិនបាន"; exit 1; }
+        else
+            BASE_MEASURE="$BASE"
+        fi
+    fi
+    echo "   root វាស់ ៖ $MEASURE"
+    # ⛔ `ZOE_MEASURE_ONLY=1` ៖ ផ្គុំ root វាស់ហើយឈប់ (បន្ទាត់ចុងក្រោយ = ផ្លូវ) ➜ job ដែលរត់ checker
+    #    ជាក់លាក់ (ឧ. `emu/*` ក្នុង `.github/workflows/audit.yml`) វាស់ tree ដដែលនឹង run-all
+    if [ "$ZOE_MEASURE_ONLY" = 1 ]; then printf '%s\n' "$MEASURE"; exit 0; fi
+    export ZOE_MEASURE_ROOT="$MEASURE" ZOE_REPO_ROOT="$REPO" NODE_PATH="$ZOE_NODE_MODULES"
+    # checker កម្រិត repo ៖ git · ប្រភព React
+    export ZOEWSUITE_APP_DIR="${ZOEWSUITE_APP_DIR:-$REPO}" REPOCOVER_APP_DIR="${REPOCOVER_APP_DIR:-$REPO}" \
+        VERSIONSCOPE_GIT_DIR="${VERSIONSCOPE_GIT_DIR:-$REPO}"
+    exec bash "$MEASURE/audit-tools/run-all.sh" ${BASE_MEASURE:+"$BASE_MEASURE"}
+fi
+
 for d in node_modules audit-tools/node_modules "$HOME/node_modules" /tmp/claude-*/*/*/scratchpad/node_modules; do
     [ -d "$d/acorn" ] && export NODE_PATH="$d" && break
 done

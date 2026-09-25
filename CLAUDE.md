@@ -80,7 +80,7 @@
 > **៤. រាល់ការកែត្រូវពិនិត្យ *បន្ទាត់ដែលលុបចេញ* ដែរ។** ជុំ 2.25.4 កែកំហុសលុយ
 >    មួយ ហើយ **លុបការការពារ ៣ បន្ទាត់ចេញដោយចៃដន្យ** ក្នុង commit ដដែល ➜
 >    កំហុសលុយថ្មី ដោយគ្មាន checker ណាធ្លាក់។ មុន commit រាល់ជុំ ៖
->    `git diff origin/main -- ZoeW/app.js | grep '^-'` — **ការលុបដែលពន្យល់
+>    `git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'` — **ការលុបដែលពន្យល់
 >    មិនបាន គឺជាការថយក្រោយ**។ ⛔ ការលុបជា **ជំហានទី ១ ក្នុងចំណោម ៦** ៖
 >    មើល **«ការផ្ទៀងផ្ទាត់ផលប៉ះពាល់»** ក្នុង Runbook ជំហានទី ៣។
 >
@@ -98,23 +98,26 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.2` (`zoew-v229`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.3` (`zoew-v230`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.2` (`zoekeygen-v101`) | `zoekeygen` |
 
-> ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (កើតពី `app.js`
-> ដើមដោយ codemod ➜ **ឈ្មោះ function និងកូនសោ storage ដដែល**) ហើយ build ➜
-> `ZoeW/dist/`។ កន្លែងណាក្នុងឯកសារនេះនិយាយ «`ZoeW/app.js`» · «`ZoeW/index.html`» ·
-> «`ZoeW/sw.js`» ➜ **ច្បាប់នៅដដែល** តែកូដរស់នៅ `src/**` · JSX · `src/sw/sw.ts`។
-> ស្ថាបត្យកម្ម ៖ [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md) · ការអភិវឌ្ឍ
-> និងការវាស់ parity ៖ [`ZoeW/docs/DEVELOPMENT.md`](ZoeW/docs/DEVELOPMENT.md)។
-> 🔴 **checker ភាគច្រើនក្នុង `audit-tools/` មិនទាន់វាស់ App នេះបានទេ** — ពួកវាស្រង់
-> អត្ថបទពី `ZoeW/app.js` · អាន markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>`
-> (ការហៅខាងក្នុង module មិនឆ្លងកាត់ `window`) ➜ ជួរក្នុងតារាង «ច្បាប់ ➜ ឧបករណ៍»
-> ដែលយាម ZoeW **ភាគច្រើនមិនរត់**។ លេខដែលវាស់បាន ៖ `ZoeW/docs/PARITY-RESULTS.md`។
-> ⛔ `check-money.cmd` (`money-reality-check.js`) ក៏ស្រង់កូដលុយពី `ZoeW/app.js`
-> ដែរ ➜ វាស់លុយលើ dump ផលិតកម្មពី `main` រហូតដល់វាត្រូវផ្ទេរ។
-> ⛔ **កុំ merge ចូល `main`** មុនការផ្ទេរ checker និងការសាកលើ iPhone + Android
-> ពិត ៖ [`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ដំណាក់ ២។
+> ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
+> កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
+> (កែដោយដៃ)។ កន្លែងណាក្នុងឯកសារនេះនិយាយ «`ZoeW/app.js`» · «`ZoeW/index.html`» · «`ZoeW/sw.js`»
+> ➜ **ច្បាប់នៅដដែល** តែកូដរស់នៅ `src/**` · JSX · `src/sw/sw.ts`។ ស្ថាបត្យកម្ម ៖
+> [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md) · ការអភិវឌ្ឍ និងការវាស់ parity ៖
+> [`ZoeW/docs/DEVELOPMENT.md`](ZoeW/docs/DEVELOPMENT.md)។
+> 🔬 **`audit-tools/` វាស់ App React តាម *build វាស់*** (`ZoeW/scripts/build-audit.mjs` ➜
+> `ZoeW/dist-audit/ZoeW` ៖ ទិដ្ឋភាពអត្ថបទ `app.js` ពីប្រភព TS · `index.html` ដែល React គូរពិត ·
+> `sw.js` · bundle ពិតដែលបើក function លើ `window` តែក្នុង build វាស់)។ ⛔ `bash audit-tools/run-all.sh`
+> **build វាដោយខ្លួនឯង** ហើយរត់ checker ទាំងអស់លើ tree វាស់ (`ZoeW/dist-audit/measure-root`) —
+> ⛔ ការរត់ checker **ដោយផ្ទាល់លើ repo** (`node audit-tools/<x>.js`) វាស់ `ZoeW/app.js` ដែល **លែងមាន**
+> ➜ ធ្លាក់ «មិនឃើញកូដ» (មិនមែនកំហុសក្នុង App)។ អ្នកយាមផ្ទាល់ខ្លួនរបស់ ZoeW React (tsc · eslint ·
+> vitest · purity · native · android · parity) រត់តាម `zoew-suite-test.js` ក្នុង `run-all.sh`។
+> 💰 `check-money.cmd` (`money-reality-check.js`) អានកូដលុយពី **`audit-tools/money-core.js`** (ស្រង់ពីកូដ
+> ពិតដោយ `npm --prefix ZoeW run money:core`) ⛔ កូដលុយប្រែ ➜ ត្រូវបង្កើតវាឡើងវិញ (អ្នកយាមភាពស្រស់ធ្លាក់)។
+> ⛔ **កុំ merge ចូល `main`** មុនការសាកលើ iPhone + Android ពិត ៖
+> [`ZoeW/docs/MIGRATION.md`](ZoeW/docs/MIGRATION.md) ដំណាក់ ២។
 > 📱 **App Android (Capacitor · Android តែមួយ)** ៖ `ZoeW/android/` ·
 > [`ZoeW/docs/ANDROID.md`](ZoeW/docs/ANDROID.md)។ ⛔ web ត្រូវ **fail closed** ៖
 > `src/platform/native.ts` ជាអ្នកសម្រេចតែមួយ · plugin ផ្ទុកតាម dynamic import តែលើ
@@ -154,6 +157,9 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    ដែលផ្ទៀងផ្ទាត់ថាការសម្អាត **មិនប្តូរកូដ** (JS៖ diff token-for-token;
    CSS៖ diff declaration stream) ហើយបោះបង់ឯកសារណាដែលមិនប្រាកដ។
    **លើកលែង** ៖ `audit-tools/` · `*/test.js` · `vendor/` · `qrcode.js`។
+   ⛔ **ZoeW React** ៖ ច្បាប់គ្របឯកសារដែល ship **ដោយផ្ទាល់** (`ZoeW/public/*.js`) ចំណែក
+   `ZoeW/src/**` ត្រូវ Vite បង្រួម (minify ➜ comment មិនចេញដល់ browser) ➜ comment ក្នុង `src/**`
+   អនុញ្ញាត តែត្រូវពន្យល់ *ហេតុផលនៃកូដ* ប៉ុណ្ណោះ — ⛔ **មិនមែនប្រវត្តិកំហុស** (ច្បាប់ ៩)។
    ចំណេះដឹងត្រូវរស់នៅក្នុង **`CLAUDE.md`** (ច្បាប់) និង **`docs/HISTORY.md`**
    (ប្រវត្តិ) មិនមែនក្នុងកូដទេ។
 ៤. **`license-verify.js` និង `error-reporting.js` ត្រូវតែ byte-identical
@@ -183,8 +189,11 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    បូកការហាមប្រវត្តិកំហុស · កំណត់ត្រាតាមកំណែ · ចំនួន assertion ជា literal។
    ⛔⛔ **វិសាលភាពគឺ គ្រប់ឯកសារ `*.md` ក្នុង repo — មិនត្រឹម README ទេ**
    (សំណើម្ចាស់គម្រោង) ៖ **ប្រវត្តិកំហុសរស់នៅ [`docs/HISTORY.md`](docs/HISTORY.md)
-   *តែមួយកន្លែងគត់*។** ⛔ លើកលែង **តែ ២** ៖ `docs/` (ផ្ទះរបស់ប្រវត្តិ) និង
-   `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។
+   *តែមួយកន្លែងគត់*។** ⛔ លើកលែង **តែ ២** ៖ ថត `docs/` **នៅ root** (`HISTORY.md` ជាផ្ទះរបស់
+   ប្រវត្តិ · `AUDIT-PROMPT.md` ជា prompt ធ្វើការ) និង `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា *ត្រូវតែ*
+   យោងការវាស់ជាហេតុផលនៃច្បាប់)។ ⛔ ថត `docs` ក្នុង App (`ZoeW/docs/`) **មិនមែន** ការលើកលែងទេ។
+   ⛔ **គ្មានឯកសារបណ្ណសារដាច់ដោយឡែកទៀតទេ** ៖ បណ្ណសារចាស់ជា **ផ្នែក ៣ · ៤** នៃ `HISTORY.md` ➜
+   ប្រវត្តិថ្មីមិនត្រូវបំបែកទៅឯកសារទី ២ (ទោះវាវែងក៏ដោយ — ប្រើលិបិក្រមរបស់វា)។
    ⛔ អ្វីដែលហាមក្នុងឯកសារដទៃ ៖ លេខកំណែ (`កំណែ 2.x.y`) · សំណើចងនឹង
    កាលបរិច្ឆេទ (`សំណើម្ចាស់គម្រោង 2026-…`) · ការវាស់ចងនឹងកំណែ ឬកាលបរិច្ឆេទ។
    សរសេរជា **បច្ចុប្បន្នកាល** វិញ («វាដើរបែបនេះ») មិនមែន **ប្រវត្តិ**
@@ -875,10 +884,13 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 
 # 🏗️ ស្ថាបត្យកម្ម
 
-- **`ZoeW/app.js` ជាឯកសារកូដតែមួយ (~១៤,៤០០ បន្ទាត់)** សរសេរជា top-level
-  script indent ៤ ចន្លោះ **តែមិន wrap ក្នុង IIFE ទេ** — គ្រប់ `function`
-  declaration ជា global។ ⛔ **អថេរ `let`/`const` កម្រិត module មិនស្ថិតលើ
-  `window`** — សំខាន់ពេលសរសេរតេស្ត browser។
+- **ZoeW React ជា ES module ក្នុង `ZoeW/src/**`** (រចនាសម្ព័ន្ធស្រទាប់ ៖
+  [`ZoeW/docs/ARCHITECTURE.md`](ZoeW/docs/ARCHITECTURE.md))។ ⛔ **function មិនមែន global
+  ទេ** — មានតែ **build វាស់** (`VITE_EXPOSE_GLOBALS=1` ➜ `src/expose-globals.ts`) ដែលបើកវាលើ
+  `window` សម្រាប់ checker; ការជំនួស `window.<fn>` ក្នុងតេស្តដើរតាម plugin `zoew-audit-rebind`
+  (`vite.config.mts`) ➜ ⛔ **build ផលិតកម្មមិនដែលមាន bridge ទាំងនេះ** (`version-bump-scope`
+  មិនរាប់ឯកសារ audit-only ជាកូដ ship)។ ⛔ state រស់ក្នុងឃ្លាំង (`src/core/state.ts`) មិនមែន
+  `let` កម្រិត module ➜ តេស្តអានតាម `window.<ឈ្មោះវាល>` ក្នុង build វាស់។
 - **`zoew_scan_history_cod_dod` ជាប្រភពទិន្នន័យសំខាន់ *តែមួយ*។** App អានវា
   ដោយផ្ទាល់តាម `onValue(dbRefHistory)` ➜ `scanHistory`។ **គ្មាន projection
   ជាន់ទីពីរទេ** ➜ លែងមានថ្នាក់កំហុស «lookup និងប្រវត្តិបែកគ្នា»។
@@ -1983,9 +1995,14 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 «CI បៃតងលើ GitHub» ជាការរង់ចាំដែលមិនចប់។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
 
 ```bash
-npm i acorn playwright-core
+npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core (run-all build tree វាស់ពីវា)
 bash audit-tools/run-all.sh
 ```
+
+⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
+រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
+ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
+`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite`) ចំណាយ **~១ ម៉ោង** ➜ រត់វាជា background។
 
 ⛔ **គ្មាន RTDB emulator ➜ checker `emu/*` ទាំងអស់ធ្លាក់ចុះ — ហើយ `SKIP`
 មិនមែន `PASS` ទេ។** ⛔ **ចំនួនត្រូវរាប់ពីថតពិត** (`audit-tools/emu/*-test.js`
@@ -2037,14 +2054,17 @@ MONEYGUARD_STRICT=1 node audit-tools/money-guardian-test.js
 កុំសរសេរតេស្តលើកូដចម្លង។** ហើយ **ត្រូវបញ្ជាក់ថាតេស្តមិនទទេ** ៖
 
 ```bash
+BASE_REF=origin/main          # ⛔ មុន App React merge ចូល main ➜ ប្រើ commit មុនការកែរបស់អ្នក (មើលខាងក្រោម)
 git fetch origin main
 rm -rf /tmp/baseline && mkdir /tmp/baseline
-git archive origin/main | tar -x -C /tmp/baseline
+git archive "$BASE_REF" | tar -x -C /tmp/baseline
 bash audit-tools/run-all.sh /tmp/baseline   # ចំណុចដែល *គួរតែធ្លាក់* នឹងបង្ហាញ
 ```
 
 បើតេស្តថ្មីជោគជ័យលើ tree មុនកែ នោះវាមិនចាប់អ្វីទេ — សរសេរវាឡើងវិញ។
-*អន្ទាក់ ៖ ត្រូវ `git archive origin/main` មិនមែន `HEAD`។*
+*អន្ទាក់ ៖ ត្រូវ archive tree **មុនកែ** មិនមែន `HEAD` ដែលផ្ទុកការកែរួច។* ⛔ ខណៈ App React នៅលើ
+branch ៖ `origin/main` ជា ZoeW **vanilla** (App ផ្សេង) ➜ baseline ត្រូវជា **commit មុនការកែរបស់អ្នក**
+លើ branch ដដែល (`BASE_REF=<commit>`) — tree React ក្នុង baseline ក៏ត្រូវ build វាស់ដោយស្វ័យប្រវត្តិដែរ។
 **Mutation ត្រូវតែពិត** — ការធ្វើ mutation ខ្សោយធ្វើឲ្យតេស្តជោគជ័យក្លែងក្លាយ
 ហើយ **ត្រូវ `grep` បញ្ជាក់ថា mutation នោះចុះលើឯកសារពិត** មុនជឿលទ្ធផល។
 
@@ -2054,7 +2074,7 @@ bash audit-tools/run-all.sh /tmp/baseline   # ចំណុចដែល *គួ�
 node --check <ឯកសារ .js ដែលកែ>
 node audit-tools/strip-comments.js
 bash audit-tools/run-all.sh
-git diff origin/main -- ZoeW/app.js | grep '^-'   # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
+git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # ការលុបដែលពន្យល់មិនបាន = ការថយក្រោយ
 ```
 
 រួច bump `CACHE_VERSION` និង `APP_VERSION` ក្នុង App ណាដែលកូដ ship ប្រែ
@@ -2070,10 +2090,10 @@ git diff origin/main -- ZoeW/app.js | grep '^-'   # ការលុបដែល�
 
 | # | សំណួរ | របៀបវាស់ |
 |---|---|---|
-| ១ | **អ្វីត្រូវលុប?** | `git diff origin/main -- <ថត ship> \| grep '^-'` — ⛔ រាល់បន្ទាត់ត្រូវពន្យល់បាន |
-| ២ | **កូដ *ដែលមានស្រាប់* ត្រូវប៉ះប៉ុន្មាន?** | `git diff origin/main -U3` ➜ បំបែក «កូដថ្មី» ចេញពី «ការកែលើកូដចាស់»។ ផ្ទៃហានិភ័យពិតគឺក្រុមទី ២ ប៉ុណ្ណោះ |
+| ១ | **អ្វីត្រូវលុប?** | `git diff "$BASE_REF" -- <ថត ship> \| grep '^-'` — ⛔ រាល់បន្ទាត់ត្រូវពន្យល់បាន (`BASE_REF` ៖ Runbook ជំហានទី ២) |
+| ២ | **កូដ *ដែលមានស្រាប់* ត្រូវប៉ះប៉ុន្មាន?** | `git diff "$BASE_REF" -U3` ➜ បំបែក «កូដថ្មី» ចេញពី «ការកែលើកូដចាស់»។ ផ្ទៃហានិភ័យពិតគឺក្រុមទី ២ ប៉ុណ្ណោះ |
 | ៣ | **អ្នកណាប្រើអ្វីដែលខ្ញុំកែ?** | រូបរាងចម្លើយ · តម្លៃត្រឡប់ · ឈ្មោះវាល ➜ `grep` អ្នកប្រើ **ទាំងអស់** ហើយពិនិត្យថាគេអានតែវាលដែលមានឈ្មោះ (មិនរាប់ key) |
-| ៤ | **ឥរិយាបថប្រែទេ?** | ស្រង់ function **មុន** (`git show origin/main:<file>`) និង **ក្រោយ** ចូល `vm` រួចរត់ **ករណីដដែល** ➜ លទ្ធផលត្រូវដូចគ្នា |
+| ៤ | **ឥរិយាបថប្រែទេ?** | ស្រង់ function **មុន** (`git show "$BASE_REF":<file>`) និង **ក្រោយ** ចូល `vm` រួចរត់ **ករណីដដែល** ➜ លទ្ធផលត្រូវដូចគ្នា |
 | ៥ | **helper ថ្មីលើផ្លូវក្តៅ អាចបោះទេ?** | រត់វាលើ input អាក្រក់ (`undefined` · `null` · `NaN` · object · array) — ⛔ ការបោះនៅដើមផ្លូវ lookup សម្លាប់មុខងារទាំងមូល |
 | ៦ | **helper ចែករំលែកឬ?** | `error-reporting.js` · `license-verify.js` ship ក្នុង **App ទាំង ២** ➜ ការកែវាទាមទារឡើងកំណែ **ទាំង ២** (`version-bump-scope` ចាប់វា) |
 
@@ -2295,7 +2315,7 @@ Key នោះជា Key ចាស់ (`a: 'ADM'`) ជាមុនគេ** មុ
 | **Prompt សម្រាប់ជុំ audit បន្ទាប់** (បច្ចេកទេស · អន្ទាក់ harness · អ្វីដែលការវាស់បដិសេធ) | [`docs/AUDIT-PROMPT.md`](docs/AUDIT-PROMPT.md) |
 | ហេតុអ្វីច្បាប់មួយមាន · លេខដែលវាស់បាន · លទ្ធផល mutation | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ២** |
 | **រកឈ្មោះ checker តែមិនដឹងវារស់នៅឯណា** | [`docs/HISTORY.md`](docs/HISTORY.md) **🔎 លិបិក្រម** នៅចុងឯកសារ |
-| កំណែមុន 2.20.0 · អត្ថបទចាស់ដែលដកចេញពី `CLAUDE.md` | [`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md) · [`docs/ARCHIVE-2026-09-03.md`](docs/ARCHIVE-2026-09-03.md) |
+| កំណែមុន 2.20.0 · អត្ថបទចាស់ដែលដកចេញពី `CLAUDE.md` | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ៣ · ៤** (បណ្ណសារ) |
 | «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» របស់កំណែណាមួយ · អ្នកប្រើឃើញអ្វីខុសពីមុន | [`docs/HISTORY.md`](docs/HISTORY.md) **ផ្នែក ១** |
 | របៀបប្រើ App និងឧបករណ៍នីមួយៗ | `README.md` នៃថតនោះ |
 | បញ្ជី checker និងអ្វីដែលនីមួយៗវាស់ | [`audit-tools/README.md`](audit-tools/README.md) |

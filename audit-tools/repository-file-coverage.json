@@ -787,9 +787,6 @@
     "ZoeW/capacitor.config.ts": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/docs/ADDED-VALUE.md": {
-      "policy": "zoew-docs"
-    },
     "ZoeW/docs/ANDROID.md": {
       "policy": "zoew-docs"
     },
@@ -803,9 +800,6 @@
       "policy": "zoew-docs"
     },
     "ZoeW/docs/MIGRATION.md": {
-      "policy": "zoew-docs"
-    },
-    "ZoeW/docs/PARITY-RESULTS.md": {
       "policy": "zoew-docs"
     },
     "ZoeW/docs/PARITY.md": {
@@ -927,13 +921,13 @@
     "ZoeW/scripts/react-purity-check.mjs": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/scripts/run-audit-tools.mjs": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/scripts/serve.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/slot-ownership-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/slot-registry.cjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/smoke.mjs": {
@@ -1176,6 +1170,9 @@
     "ZoeW/src/app/components/sheet/model.ts": {
       "policy": "zoew-react-ui"
     },
+    "ZoeW/src/app/components/shell/AppErrorBoundary.tsx": {
+      "policy": "zoew-react-ui"
+    },
     "ZoeW/src/app/components/shell/BiometricLabel.tsx": {
       "policy": "zoew-react-ui"
     },
@@ -1252,6 +1249,9 @@
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/refs.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/root-errors.ts": {
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/slot-resets.ts": {
@@ -1554,6 +1554,9 @@
     "ZoeW/tests/native/react-harness.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native/render-crash.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/status-bar-tone.test.ts": {
       "policy": "zoew-self-verification"
     },
@@ -1570,27 +1573,6 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/toast-parity.test.tsx": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/codemod.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/fixups.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/gen-state.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/generate.sh": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/html-to-jsx.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/inventory.cjs": {
-      "policy": "zoew-self-verification"
-    },
-    "ZoeW/tools/modules.cjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tsconfig.app.json": {
@@ -1884,6 +1866,9 @@
     "audit-tools/loop-termination-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/money-core.js": {
+      "policy": "guard-5"
+    },
     "audit-tools/money-guardian-test.js": {
       "policy": "guard-1"
     },
@@ -2169,18 +2154,8 @@
     "audit-tools/zto-sync-banner-test.js": {
       "policy": "guard-1"
     },
-    "docs/ARCHIVE-2026-09-03.md": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "3ba736558c89747fbc0256e5bf3427d2b7ff5bad2c4b7fc9890e65153de78f0c"
-    },
     "docs/AUDIT-PROMPT.md": {
       "policy": "guard-36"
-    },
-    "docs/HISTORY-ARCHIVE.md": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "ddaae0ddad9dd99e8542544ba2f3118b7dc67fd218136f493143a3af1001456f"
     },
     "docs/HISTORY.md": {
       "policy": "guard-37"

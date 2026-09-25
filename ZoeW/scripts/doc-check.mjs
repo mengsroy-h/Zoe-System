@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -15,13 +16,11 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const fails = [];
 const oks = [];
 
-/* ── ១. បញ្ជី slot ក្នុង ARCHITECTURE.md ត្រូវស្មើនឹង html-to-jsx.cjs ── */
-const jsx = read('tools/html-to-jsx.cjs');
+/* ── ១. បញ្ជី slot ក្នុង ARCHITECTURE.md ត្រូវស្មើនឹង scripts/slot-registry.cjs ── */
+const REGISTRY = createRequire(import.meta.url)(path.join(ROOT, 'scripts/slot-registry.cjs'));
 function slotMap(name) {
-    const i = jsx.indexOf(`const ${name} = {`);
-    if (i === -1) throw new Error(`រក ${name} មិនឃើញ`);
-    const body = jsx.slice(i, jsx.indexOf('\n};', i));
-    return [...body.matchAll(/^ {4}(\w+): \{ component: '(\w+)'/gm)].map((m) => [m[1], m[2]]);
+    if (!REGISTRY[name]) throw new Error(`រក ${name} មិនឃើញ`);
+    return Object.entries(REGISTRY[name]).map(([id, e]) => [id, e.component]);
 }
 const slots = slotMap('SLOTS');
 const elementSlots = slotMap('ELEMENT_SLOTS');
@@ -68,7 +67,6 @@ const devDoc = read('docs/DEVELOPMENT.md');
 const missingScripts = scripts.filter((s) => !devDoc.includes('npm run ' + s) && s !== 'dev' && s !== 'test');
 if (missingScripts.length) fails.push('docs/DEVELOPMENT.md ខ្វះពាក្យបញ្ជា ៖ ' + missingScripts.join(' · '));
 else oks.push(`ពាក្យបញ្ជា ${scripts.length} មានឈ្មោះក្នុង docs/DEVELOPMENT.md`);
-if (!devDoc.includes(version)) fails.push(`docs/DEVELOPMENT.md មិនរាយកំណែ ${version}`);
 
 /* ── ៣ខ. README ត្រូវរាយកំណែជា «កំណែបច្ចុប្បន្ន» (ទម្រង់ដែល doc-scope-test អាន) ── */
 const claimed = (read('README.md').match(/កំណែបច្ចុប្បន្ន[^0-9]*`([0-9]+\.[0-9]+\.[0-9]+)`/) || [])[1];

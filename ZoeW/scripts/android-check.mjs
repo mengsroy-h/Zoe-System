@@ -13,7 +13,8 @@
  *   ៧. config build Android ↔ template របស់ Capacitor ដែលដំឡើង ៖ SDK · AndroidX ស្មើ ·
  *      AGP · Gradle · google-services ស្ថិតក្នុងខ្សែ major.minor ដដែល (patch ឡើងបាន)
  *   ៨. Release APK (`.github/workflows/android-release.yml`) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹងអ្វីដែល
- *      `build.gradle` អាន · គ្មានផ្លូវធ្លាក់ចុះទៅ debug key · keystore មិនចូល repo
+ *      `build.gradle` អាន · គ្មានផ្លូវធ្លាក់ចុះទៅ debug key · keystore មិនចូល repo · វិញ្ញាបនបត្រ APK
+ *      ត្រូវស្មើ pin `android/release-cert.sha256` មុន Release
  *
  *   node scripts/android-check.mjs   (ANDROIDCHECK_ROOT=<ថត> ដើម្បីចង្អុលទៅ tree ផ្សេង)
  */
@@ -214,6 +215,13 @@ const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || 
 ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
 ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
 ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
+const certPin = read('android/release-cert.sha256').trim();
+ok('វិញ្ញាបនបត្រ keystore pin ក្នុង android/release-cert.sha256 (SHA-256 · 64 hex)', /^[0-9a-f]{64}$/.test(certPin), certPin.slice(0, 12) + '…');
+const pinAt = releaseWf.indexOf('< ZoeW/android/release-cert.sha256');
+const pinGate = releaseWf.slice(pinAt, releaseWf.indexOf('gh release create'));
+ok('workflow ប្រៀបវិញ្ញាបនបត្រ APK នឹង pin (signer ១ តែមួយ) ហើយធ្លាក់មុន Release',
+    pinAt > 0 && releaseWf.indexOf('apksigner') < pinAt && /"\$SIGNERS" != "1"/.test(pinGate) &&
+    /"\$GOT" != "\$PIN"[^\n]*then[\s\S]*?exit 1/.test(pinGate));
 ok('keystore ត្រូវលុបចេញពី runner ជានិច្ច (if: always())', /if: always\(\)\s*\n\s*run: rm -f "\$RUNNER_TEMP\/zoew-release\.jks"/.test(releaseWf));
 const keystoreFiles = [];
 (function walkKs(dir) {

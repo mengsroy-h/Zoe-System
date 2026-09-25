@@ -487,8 +487,8 @@
       "guards": [
         "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "npm run android:check ផ្នែក ៨ (ក្នុង zoew-suite-test) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹង build.gradle · គ្មានផ្លូវ debug/unsigned · ជំហាន gradle មានលក្ខខណ្ឌ secret · apksigner verify មុន Release · keystore លុបជានិច្ច",
-      "limitation": "ការអះអាងលើអត្ថបទ workflow មិនបញ្ជាក់ថា Actions មានកូតា · secret ត្រូវកំណត់ · ឬ APK ពិត build បាន (គ្មាន Android SDK ក្នុង CI ក្នុង session)។"
+      "evidence": "npm run android:check ផ្នែក ៨ (ក្នុង zoew-suite-test) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹង build.gradle · គ្មានផ្លូវ debug/unsigned · ជំហាន gradle មានលក្ខខណ្ឌ secret · apksigner verify មុន Release · វិញ្ញាបនបត្រ APK ស្មើ pin ZoeW/android/release-cert.sha256 (signer ១ · exit 1 មុន Release) · keystore លុបជានិច្ច",
+      "limitation": "ការអះអាងលើអត្ថបទ workflow មិនបញ្ជាក់ថា Actions មានកូតា ឬ secret ត្រូវកំណត់ · build APK ពិតត្រូវការ Android SDK (dl.google.com) ដែល CI ក្នុង session មិនរត់ · pin ការពារ keystore ខុស តែមិនការពារការបាត់ keystore។"
     }
   },
   "files": {
@@ -788,6 +788,9 @@
     },
     "ZoeW/android/gradlew.bat": {
       "policy": "zoew-android"
+    },
+    "ZoeW/android/release-cert.sha256": {
+      "policy": "android-release"
     },
     "ZoeW/android/settings.gradle": {
       "policy": "zoew-android"

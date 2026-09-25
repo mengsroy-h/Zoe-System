@@ -39,6 +39,61 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.5] — 2026-09-25 · ZoeW ៖ **🔴 hotfix ៖ iPhone ស្កេន Barcode មិនបាន ក្រោយ ZXing-WASM 3.1.4** · APK 2.42.4 build ក្នុង session · pin វិញ្ញាបនបត្រ keystore (branch · មិនទាន់ merge)
+
+#### 🔴 iPhone ស្កេនមិនបាន (របាយការណ៍ម្ចាស់គម្រោង ក្រោយ merge 2.42.4)
+
+- **សញ្ញា** (Sentry breadcrumb) ៖ `LinkError: WebAssembly.instantiate(): Import #70 "a" "qa": function import requires a callable`
+  ➜ `Aborted(…)`។ Android មិនប៉ះ ព្រោះវាប្រើ `BarcodeDetector` ផ្ទាល់ (មិនមែន ZXing) — iPhone គ្មាន API នោះ ➜ ពឹង ZXing តែម្យ៉ាង។
+- **មូលហេតុវាស់បាន** ៖ `.wasm` 3.1.3 មាន import **៧៨** (#70 = `a.qa`) · 3.1.4 មាន **៧០** (គ្មាន #70) ➜ ឧបករណ៍ផ្ទុក
+  **JS 3.1.4 + wasm 3.1.3**។ ឯកសារ ២ ក្នុង repo ស៊ីគ្នា (`scan-engine-test` បៃតង) ➜ ការលាយកើតពី **cache** ៖ `netlify.toml`
+  ដាក់ `/*.wasm` ➜ `max-age=31536000, immutable` លើឈ្មោះ **គ្មាន hash** (`vendor/zxing_reader.wasm`) ខណៈ `/*.js` ➜ `no-cache`
+  ➜ SW ថ្មី `cache.addAll(CORE_SHELL)` (cache mode លំនាំដើម) យក wasm ចាស់ពី HTTP cache ចាក់ចូល cache ថ្មី ហើយ
+  `revalidateShell` ទាញពី HTTP cache ដដែល ➜ ពុលវាម្តងទៀតរាល់ពេលប្រើ។
+- ⛔ **checker ១៨២ បៃតងទាំងអស់** លើ tree នោះ ៖ គ្មាននរណាវាស់ «ការ deploy ជាន់ HTTP cache ចាស់» ហើយ **`ctx.route()` របស់
+  Playwright បិទ HTTP cache** ➜ checker SW ដែលមានស្រាប់ **មិនអាច** ឃើញថ្នាក់នេះទោះចង់ក៏ដោយ (វាស់ ៖ ជុំទី ៤ ថ្មីឆ្លងលើ tree ខូច
+  រហូតដល់ដក `route` ចេញ)។
+- **ការកែ** ៖ (១) `sw.ts` ៖ `FRESH = 'no-cache'` លើ install (`addAll` · `add`) · `revalidateShell` · ការទាញ shell ពេល cache
+  miss ➜ SW **មិនពឹង header** (HTTP cache ចាស់លើឧបករណ៍មិនប្រែតាម header ថ្មីទេ) · (២) `netlify.toml` ៖ `/*.wasm` · `/*.png` ➜
+  `no-cache` (ZoeKeyGen `/*.png` ដែរ · `immutable` នៅតែលើ `/assets/*` ដែលមាន hash ពី Vite) · (៣) `CACHE_VERSION` `zoew-v232` ➜
+  ឧបករណ៍ដំឡើង SW ថ្មីដែលទាញ wasm ស្រស់ ហើយការទាញ `no-cache` ក៏ **ព្យាបាល** entry ចាស់ក្នុង HTTP cache ដែរ។
+- **អ្នកយាម** ៖ `sw-install-integrity-test` ជុំទី ៤ (Chromium ពិត **គ្មាន route** · server បម្រើ wasm ជាមួយ `immutable` + ETag
+  ដោយចេតនា ➜ វាស់ SW តែម្នាក់ឯង) ៖ SW ថ្មីត្រូវទាញ B ពី server (មុនកែ ៖ **A · serverHits 0**) · revalidate ត្រូវនាំ C (មុនកែ ៖
+  ជាប់ A) ➜ **ធ្លាក់ ២ មុនកែ · ឆ្លងក្រោយកែ**។ `netlify-config-scope-test` ផ្នែក ៥ ៖ cache យូរ តែលើឯកសារដែលឈ្មោះមាន hash
+  (ដេរីវេពីឯកសារ ship ពិត · ទិសផ្ទុយ ៖ `/assets/*` ទទួលបាន) ➜ **ធ្លាក់ ៣ លើ `netlify.toml` របស់ `main`**។
+- **CI ពេញចាប់ checker មួយដែលបាក់** ៖ `adaptive-link-test` ស្រង់ `revalidateShell()` ចូល `vm` ➜ `FRESH` ថ្មីជាអថេរសេរី ➜
+  `ReferenceError` (សញ្ញាល្អ ៖ checker រត់កូដ ship ពិត)។ ការកែ ៖ ថេរខ្សែអក្សរកម្រិតកំពូលដែល `revalidateShell()` យោង ត្រូវ **ស្រង់ពី
+  `sw.js` ពិត** (មិនចាក់ក្នុង sandbox) · regex atomic ត្រូវទទួល `addAll(CORE_SHELL.map(…))` ដូច `sw-install-integrity-test`។
+
+#### APK 2.42.4 build ក្នុង session · keystore · pin
+
+- **build** (ក្រោយម្ចាស់គម្រោងបើក `dl.google.com` ក្នុង network របស់ environment — ការកែចូលជាធរមានលើ container ដែលកំពុងរត់
+  ក្រោយរង់ចាំប៉ុន្មាននាទី ៖ ស្ទង់រាល់ ៣០ វិ. ៤០៣ ➜ ២០០) ៖ cmdline-tools 23.0 (SHA-1 ផ្ទៀងនឹង repository XML) ➜
+  `platforms;android-36` · `build-tools;36.0.0` ➜ `android:sync` ➜ `gradlew assembleRelease` ក្នុង **ច្បាប់ចម្លង** នៃ commit។ វាស់លើ
+  APK ពិត ៖ `com.zoesystem.zoew` · `2.42.4` · versionCode `2042004` · minSdk 24 · targetSdk 36 · `allowBackup=false` · គ្មាន bridge
+  វាស់ · `apksigner verify` ✅ (v2 · signer ១)។ APK + `.sha256` ផ្ញើជូនម្ចាស់គម្រោងក្នុងការសន្ទនា (session គ្មាន API បង្កើត Release)។
+- **keystore ថ្មី** (ម្ចាស់គម្រោងជ្រើស ៖ «បង្កើត keystore ថ្មី») ៖ PKCS12 · RSA 4096 · អាយុ ៣០ ឆ្នាំ · `CN=ZoeW, O=Zoe System, C=KH` ·
+  alias `zoew` ➜ sign តាម **ផ្លូវ Gradle ដដែលនឹង workflow** (env `ZOEW_KEYSTORE_*`)។ keystore + ឯកសារ secret ៤ ផ្ញើជូនម្ចាស់គម្រោង
+  ⛔ **មិនចូល repo · មិនចូល PR**។
+- **pin វិញ្ញាបនបត្រ** `ZoeW/android/release-cert.sha256` (SHA-256 `c2a1b725…aecabd` · មិនសម្ងាត់) ៖ workflow ប្រៀបវិញ្ញាបនបត្រ APK
+  (signer ១ តែមួយ) នឹង pin ក្រោយ `apksigner verify` មុន Release ➜ secret ដែលចង្អុលទៅ keystore ផ្សេង = **គ្មាន Release**។ ច្បាប់
+  «keystore តែមួយជារៀងរហូត» ធ្លាប់ជា **អត្ថបទ** ➜ ឥឡូវជា **ឧបករណ៍**។ វាស់ ៖ ជំហាន shell ពិត (`bash -e` ដូច Actions) លើ output
+  `apksigner` ពិត ➜ keystore ត្រឹមត្រូវ **exit 0** · keystore ផ្សេង **exit 1** · មិន sign **exit 1**; `android:check` ផ្នែក ៨ ថ្មី ២ ➜
+  probe **៥/៥** ធ្លាក់។
+- **អន្ទាក់ build ដែលអ្នកយាមចាប់បាន** ៖ `node_modules` ជា **symlink** ក្នុងច្បាប់ចម្លង ➜ `cap sync` សរសេរផ្លូវ **absolute** ចូល
+  `capacitor.settings.gradle` ➜ `android:check` ផ្នែក ៥ ធ្លាក់ **៧** (ត្រឹមត្រូវ) · Maven Central ឆ្លើយ `429` ➜ រត់ Gradle ម្តងទៀត។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **merge PR ឆាប់តាមដែលអាច** ➜ Netlify build ខ្លួនឯង។ គ្មានការកែ Firebase rules · គ្មាន env ថ្មី។
+- **iPhone ដែលស្កេនមិនបាន** ៖ បើក App ម្តង (SW ថ្មីដំឡើងខាងក្រោយ) ➜ **បិទ App ទាំងស្រុង** (អូសចេញពីបញ្ជី App) ➜ បើកម្តងទៀត ➜
+  ស្កេនសាក។ ⛔ កុំ «លុប Website Data» ជាដំណោះស្រាយដំបូង — វាលុប PIN · ការចូល · កៅអី License (Device ID ថ្មី ➜ ត្រូវដោះក្នុង ZoeKeyGen)។
+- **App Android** ៖ ដំឡើង `ZoeW-2.42.4.apk` លើ Android ពិត ➜ ស្កេន · ចូលប្រព័ន្ធ · PTR · Export · ⛔ ZoeW Android ចាស់ដែល sign ដោយ
+  key ផ្សេង (ឧ. build ពី Android Studio) ➜ លុប App ចាស់ម្តង ➜ ដោះកៅអី License ក្នុង ZoeKeyGen។
+- ⛔ **keystore** ៖ រក្សា `zoew-release.jks` + `ZOEW-KEYSTORE-SECRETS.txt` (Password Manager + ច្បាប់ចម្លង ២ កន្លែង) · បាត់ = App
+  ដំឡើងជាន់មិនបានទៀត។ **កំណត់ secret ៤** (`ZOEW_KEYSTORE_BASE64` · `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` · `ZOEW_KEY_PASSWORD`)
+  **មុន merge** ➜ merge ប្តូរ `version.ts` លើ `main` ➜ workflow បង្កើត Release `zoew-android-v2.42.5` (ពេល Actions មានកូតា)។
+
 ### [2.42.4] — 2026-09-25 · ZoeW · ZoeKeyGen ៖ **ឡើងកំណែ toolchain និងបណ្ណាល័យទៅចុងក្រោយ** · ការថយក្រោយ ២ ដែលការឡើង Vite 8 នាំមក ត្រូវចាប់មុន ship
 
 **សំណើម្ចាស់គម្រោង** ៖ *«update អ្វីៗដែលមានក្នុង ZoeW ទៅ version ចុងក្រោយទាំងអស់ ដូចជា gradle, sdk, ឬផ្សេងៗ»* ·

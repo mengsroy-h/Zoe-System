@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.4` (`zoew-v231`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.5` (`zoew-v232`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.3` (`zoekeygen-v102`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -127,7 +127,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
 > `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
 > plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
-> ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key) · `npm run native:check` (bridge ក្លែង ៖ Back ·
+> ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
+> ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·
 > ប្រវត្តិ · pause/resume · Share/Print · ជីវមាត្រ · PTR/latch) · `npm run
 > rules:check` (លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ លើ ZoeW ដើម · web ·
 > Android)។ ⛔ **Back មិនត្រឡប់ចូលរបៀប «ដក» វិញ** (`safeScreen()`)។
@@ -329,7 +330,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | ជណ្តើរភ្ជាប់ឡើងវិញ | វដ្តមិនត្រូវកាត់ handshake | `reconnect-ladder-test` |
 | Timeout · retry | រាល់ `fetch` ត្រូវ abort ពិត | `network-timeout-test` |
 | សម្ពាធបណ្តាញ | ពិដានចំនួនស្របគ្នា | `network-pressure` · `license-network-pressure` |
-| Service worker | cache-first; Cache API បរាជ័យ ≠ App ដាច់; navigation ធម្មតា និង direct asset ដូច `/app.js` ➜ `index.html`; `guide.html` និង Netlify Pretty URL `/guide` ➜ cache សៀវភៅ; query រសើបមិនត្រូវជាប់ក្នុង cache key | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` |
+| Service worker | cache-first; ⛔ រាល់ការទាញដែលចាក់ចូល cache SW (install · revalidate · cache miss) ជា `cache: 'no-cache'` — HTTP cache ចាស់លើឧបករណ៍ (`immutable` លើឈ្មោះគ្មាន hash) មិនប្រែតាម header ថ្មី ➜ JS ថ្មី + wasm ចាស់ = `LinkError` ➜ iPhone ស្កេនមិនបាន · `immutable` អនុញ្ញាតតែលើឈ្មោះមាន hash (`/assets/*`); Cache API បរាជ័យ ≠ App ដាច់; navigation ធម្មតា និង direct asset ដូច `/app.js` ➜ `index.html`; `guide.html` និង Netlify Pretty URL `/guide` ➜ cache សៀវភៅ; query រសើបមិនត្រូវជាប់ក្នុង cache key | `sw-cache-failure-test` · `sw-shell-latency` · `sw-install-integrity` (ជុំទី ៤ ៖ HTTP cache ចាស់) · `sw-cache-key` · `sw-revalidate-pressure` · `offline-shell` · `user-guide-test` · `netlify-config-scope-test` ផ្នែក ៥ |
 | **ការរង់ចាំគ្មានពិដាន** | ⛔ បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ — មិនបោះកំហុស | `stall-guard-test` |
 | **រង្វិលជុំដែលមិនចេះឈប់** | ⛔ tab ដែលជាប់ **មិនឆ្លើយអ្វីទាំងអស់** (គ្មាន toast · ការរក្សាទុក · Sentry) ➜ ធ្ងន់ជាងការធ្លាក់ដែលមានឈ្មោះ។ ⛔ ព្រំដែនត្រូវជា **រចនាសម្ព័ន្ធ** ៖ នព្វន្ធលើ `Infinity` មិនឈប់ · លេខពី Firebase មិនមែនព្រំដែន · `Number.isFinite()` មិនគ្រប់គ្រាន់ (`1e12`) ➜ ពិដានតាមរចនាសម្ព័ន្ធពិត។ ⛔ រូបរាងដែលត្រូវវាស់ ៖ `while` · `do-while` · `for` គ្មានលក្ខខណ្ឌ · **`for` ដែលរាប់តាមលេខ** · **ចំណុចចាប់ផ្តើមពីអាគុយម៉ង់** (`matchingBraceIndex(src, -Infinity)` ➜ ធ្វើឲ្យចំណុចចាប់ផ្តើម **រឹង** ៖ `Number.isFinite` + `< 0 ➜ 0` ខាងក្នុង helper មិនមែនកន្លែងហៅ)។ ⛔ **clamp ម្ខាង** គឺគ្មានការការពារ ➜ `clampLockerCount()` ជាចំណុចច្របាច់ដែល **ការអាន និងការសរសេរ** ឆ្លងកាត់។ ⛔ ការវាស់ ៖ **រត់ពិតក្នុង process ដាច់ដោយឡែក** (ពិដានពេល + heap) · មាន **ទិសផ្ទុយ** (តម្លៃធម្មតាផ្តល់លទ្ធផលដដែល) · វិសាលភាព **App ទាំង ២** | `loop-termination-test` |
 | **ការហៅ Firebase ដែលព្យួរ** | ⛔ RTDB មិនបដិសេធពេលក្រៅបណ្តាញ — វាព្យួរ ➜ សោ in-flight ជាប់រហូត | `db-stall-guard-test` |
@@ -2170,6 +2171,11 @@ bash audit-tools/emu/rules.sh
   ដោយមិនបាច់ Refresh។ សញ្ញាខូច ៖ បញ្ជី Key នៅរាយ Project ចាស់។
 - ⏳ **ZoeKeyGen ៖ ប៊ូតុងចូល/ចាកចេញ ១ ចុច = ១ សកម្មភាព** — ចុច «🚪 ចាកចេញ» ម្តង ➜ ចាកចេញ **ហើយឈប់** (ប្រអប់ចូល
   មិនលោតឡើងវិញ) · ចុច «🔑 ចូល» ➜ ប្រអប់លេច **១ ដង**។ គ្មានអ្វីកើត ➜ ពិនិត្យ `navAuthFlow` ក្នុង `ACTION_ALLOWLIST`។
+- ⏳ **iPhone ៖ ស្កេន Barcode ក្រោយ hotfix HTTP cache** (`zoew-v232`) — បើក App ម្តង ➜ បិទ App ទាំងស្រុង ➜ បើកម្តងទៀត ➜ ស្កេន។
+  សញ្ញាខូច ៖ Sentry រាយ `LinkError … Import #70 "a" "qa"` ម្តងទៀត ➜ SW ថ្មីមិនទាន់ដំឡើង (⛔ កុំ «លុប Website Data» មុន — វាលុប PIN · កៅអី License)។
+- ⏳ **APK ZoeW (Android) ៖ keystore ថ្មី** (`CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — ម្ចាស់គម្រោងកាន់ keystore និង
+  ពាក្យសម្ងាត់។ សាក ៖ ដំឡើង APK លើ Android ពិត (ស្កេន · ចូលប្រព័ន្ធ · PTR · Export) · ⛔ App ចាស់ដែល sign ខុស key ➜ លុបម្តង +
+  ដោះកៅអី License ក្នុង ZoeKeyGen · secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **មុន** merge ➜ merge = workflow បង្កើត Release។
 - ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·

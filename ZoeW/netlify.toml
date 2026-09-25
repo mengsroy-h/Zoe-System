@@ -46,16 +46,18 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# ⛔ ឈ្មោះគ្មាន hash (vendor/zxing_reader.wasm · icon-*.png) ➜ `immutable` បង្កកកំណែចាស់ក្នុង HTTP cache ១ ឆ្នាំ
+#    ➜ wasm ចាស់ជួប zxing-wasm.js ថ្មី ➜ ស្កេនមិនបាន ➜ `no-cache` (ETag ➜ 304 ពេលមិនប្រែ)
 [[headers]]
   for = "/*.wasm"
   [headers.values]
     Content-Type = "application/wasm"
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "no-cache"
 
 [[headers]]
   for = "/*.png"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "no-cache"
 
 [[headers]]
   for = "/*"

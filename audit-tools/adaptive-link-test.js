@@ -65,6 +65,12 @@ for (const app of APPS) {
     ok(app + ': revalidateShell() ពិគ្រោះនឹងគុណភាពតំណ',
         !!revalidate && /linkIsFrugal\(\)/.test(revalidate));
     if (!revalidate || !frugal) continue;
+    // ថេរខ្សែអក្សរកម្រិតកំពូលដែល revalidateShell() យោង (ឧ. FRESH) ត្រូវស្រង់ពី sw.js ពិត
+    // មិនមែនចាក់ក្នុង sandbox — ការប្តូរតម្លៃរបស់វាត្រូវហូរមកដល់ការវាស់ដោយស្វ័យប្រវត្តិ
+    const stringConsts = (sw.match(/^const [A-Z_][A-Z0-9_]* = '[^'\n]*';$/gm) || [])
+        .filter((line) => new RegExp('\\b' + line.split(' ')[1] + '\\b').test(revalidate))
+        .join('\n');
+    const swCode = stringConsts + '\n' + frugal + '\n' + revalidate;
 
     for (const [label, connection, shouldFetch] of LINKS) {
         let fetched = 0;
@@ -78,7 +84,7 @@ for (const app of APPS) {
             revalidateInFlight: new Set()
         };
         vm.createContext(sandbox);
-        vm.runInContext(frugal + '\n' + revalidate, sandbox);
+        vm.runInContext(swCode, sandbox);
         const cache = { put: () => Promise.resolve() };
         vm.runInContext('revalidateShell(__cache, { url: "/app.js" }, "./app.js");',
             Object.assign(sandbox, { __cache: cache }));
@@ -96,7 +102,7 @@ for (const app of APPS) {
         REVALIDATE_TIMEOUT_MS: 6000, REVALIDATE_MAX_IN_FLIGHT: 4, revalidateInFlight: new Set()
     };
     vm.createContext(offBox);
-    vm.runInContext(frugal + '\n' + revalidate, offBox);
+    vm.runInContext(swCode, offBox);
     vm.runInContext('revalidateShell({ put: () => Promise.resolve() }, { url: "/app.js" }, "./app.js");', offBox);
     ok(app + ': ក្រៅបណ្តាញ ➜ រំលងដដែល', offFetched === 0, 'fetched=' + offFetched);
 }
@@ -120,7 +126,7 @@ for (const app of APPS) {
     if (!fs.existsSync(swPath)) continue;
     const sw = fs.readFileSync(swPath, 'utf8');
     ok(app + ': ធនធានស្នូលដំឡើងជា **ក្រុម** (atomic) ➜ cache-miss មិនកើតលើស្នូល',
-        /cache\.addAll\(CORE_SHELL\)/.test(sw));
+        /cache\.addAll\(CORE_SHELL[).]/.test(sw));
     const fetchHandler = sw.slice(sw.indexOf("addEventListener('fetch'"));
     ok(app + ': គ្មាន timeout បោះបង់លើផ្លូវ cache-miss',
         !/AbortController/.test(fetchHandler),

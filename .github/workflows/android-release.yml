@@ -10,6 +10,9 @@
 #   · ZOEW_KEY_ALIAS         — ឈ្មោះ key
 #   · ZOEW_KEY_PASSWORD      — ពាក្យសម្ងាត់ key
 #
+# វិញ្ញាបនបត្រ (SHA-256) របស់ keystore នោះ pin ក្នុង ZoeW/android/release-cert.sha256 ➜ secret ដែលចង្អុលទៅ keystore
+# ផ្សេង ➜ ជំហានផ្ទៀងផ្ទាត់ធ្លាក់ ➜ គ្មាន Release (APK ដែលទូរស័ព្ទដំឡើងជាន់មិនបាន មិនត្រូវចេញដល់អ្នកប្រើ)។
+#
 # ពេលរត់ ៖ ចុច «Run workflow» ដោយដៃ · ឬស្វ័យប្រវត្តិពេល `APP_VERSION` ប្រែលើ `main`។
 # Release មួយក្នុងមួយកំណែ (`zoew-android-v<APP_VERSION>`) ➜ កំណែដែលមាន Release រួច ➜ មិន build ម្តងទៀត។
 
@@ -114,7 +117,14 @@ jobs:
           APK="ZoeW/android/app/build/outputs/apk/release/app-release.apk"
           test -f "$APK" || { echo "::error::រក APK ដែល sign រួចមិនឃើញ (${APK})"; exit 1; }
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          "$APKSIGNER" verify --print-certs "$APK" | tee apk-certs.txt
+          "$APKSIGNER" verify -v --print-certs "$APK" | tee apk-certs.txt
+          SIGNERS=$(grep -m1 'Number of signers' apk-certs.txt | sed 's/.*: //')
+          GOT=$(grep -m1 'Signer #1 certificate SHA-256 digest' apk-certs.txt | sed 's/.*: //')
+          PIN=$(tr -d '[:space:]' < ZoeW/android/release-cert.sha256)
+          if [ "$SIGNERS" != "1" ] || [ -z "$GOT" ] || [ "$GOT" != "$PIN" ]; then
+            echo "::error::វិញ្ញាបនបត្រ sign (${GOT:-គ្មាន}) មិនស្មើ ZoeW/android/release-cert.sha256 (${PIN}) ➜ secret ចង្អុលទៅ keystore ផ្សេង ➜ មិនបង្កើត Release"
+            exit 1
+          fi
           OUT="ZoeW-${{ steps.meta.outputs.version }}.apk"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | tee "$OUT.sha256"

@@ -13,7 +13,14 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.4 · ZoeKeyGen 2.20.3)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.5 · ZoeKeyGen 2.20.3)
+
+⛔ **មេរៀនជុំ 2.42.5 ៖ checker ទាំងអស់វាស់ *ការដំឡើងលើកដំបូង* — គ្មាននរណាវាស់ *ការ deploy ជាន់ឧបករណ៍ដែលមាន cache ចាស់***
+— ZXing 3.1.4 ship ជាមួយ checker ១៨២ បៃតង ខណៈ iPhone ផ្ទុក JS ថ្មី + wasm ចាស់ពី HTTP cache (`immutable` លើឈ្មោះគ្មាន hash)
+➜ `LinkError` ➜ ស្កេនមិនបាន។ ⛔ **`ctx.route()` របស់ Playwright បិទ HTTP cache** ➜ checker ដែលប្រើ route មិនអាចឃើញថ្នាក់ cache
+ទាល់តែសោះ (ប្រើ `--host-resolver-rules` ជំនួស)។ ⛔ ពេលប្តូរ vendor ដែលឈ្មោះគ្មាន hash ៖ សួរ «ឧបករណ៍ដែលមានកំណែចាស់ក្នុង cache
+នឹងទទួលអ្វី?» ➜ `sw-install-integrity-test` ជុំទី ៤ · `netlify-config-scope-test` ផ្នែក ៥។ ⛔ វិភាគ Sentry ៖ ប្រៀបលេខ import
+ក្នុងសារ `LinkError` នឹង `WebAssembly.Module.imports()` នៃកំណែនីមួយៗ ➜ ដឹងភ្លាមថាឧបករណ៍ផ្ទុក wasm កំណែណា។
 
 ⛔ **មេរៀនជុំ 2.42.4 ៖ ការឡើង toolchain ប្តូរ *output* ខណៈ checker វាស់ *ប្រភព*** — Vite 8 (Rolldown · Lightning CSS · Oxc)
 ធ្វើឲ្យ web import chunk native ដោយ static (ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត ៖ `android:check` · `native:check` ចាប់) និងសរសេរ CSS

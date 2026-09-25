@@ -50,22 +50,29 @@ Activation)។ ⛔ កុំដាក់ keystore ក្នុង repo។
 បាត់ការចូលប្រព័ន្ធ · PIN · និង **កៅអី License** (Device ID ថ្មី ➜ Key ដែលមានពិដានឧបករណ៍ ១ ត្រូវឲ្យ admin ដោះឧបករណ៍ចាស់ក្នុង
 ZoeKeyGen មុន)។ ដូច្នេះ workflow **មិន build ទាល់តែសោះ** ពេលគ្មាន keystore (គ្មានការធ្លាក់ចុះទៅ debug key)។
 
+**keystore របស់ ZoeW មានរួច** (`CN=ZoeW, O=Zoe System, C=KH` · alias `zoew` · PKCS12 · RSA 4096) ហើយវិញ្ញាបនបត្ររបស់វា
+(SHA-256 · មិនសម្ងាត់) **pin** ក្នុង `android/release-cert.sha256`។ workflow ប្រៀបវិញ្ញាបនបត្រ APK នឹង pin **ក្រោយ
+`apksigner verify` និងមុន Release** ➜ secret ដែលចង្អុលទៅ keystore ផ្សេង ➜ ជំហានធ្លាក់ ➜ **គ្មាន Release** (APK ដែលទូរស័ព្ទ
+ដំឡើងជាន់មិនបាន មិនចេញដល់អ្នកប្រើ)។ ⛔ **កុំបង្កើត keystore ថ្មី** — ការប្តូរ keystore ដោយចេតនា (ឧ. បាត់ keystore) ត្រូវកែ
+`release-cert.sha256` ក្នុង commit ដដែល ហើយអ្នកប្រើ Android **ទាំងអស់** ត្រូវលុប App ចាស់ម្តង។
+
 **ការរៀបចំ (ម្តង)** ៖
 
-1. បង្កើត keystore ម្តងគត់ (ឬប្រើ keystore ដែល sign APK ដែលអ្នកប្រើកំពុងប្រើ — បើមាន) ៖
+1. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៤ ៖ `ZOEW_KEYSTORE_BASE64` (keystore ជា base64
+   បន្ទាត់តែមួយ) · `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` (`zoew`) · `ZOEW_KEY_PASSWORD` (ស្មើ `ZOEW_KEYSTORE_PASSWORD` —
+   PKCS12 ប្រើពាក្យសម្ងាត់តែមួយ)។ base64 ពី `zoew-release.jks` ៖ `base64 -w0 zoew-release.jks` · Windows PowerShell ៖
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("zoew-release.jks"))`។
+2. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. Password Manager + ច្បាប់ចម្លង ២ កន្លែង) — បាត់ keystore =
+   App ដំឡើងជាន់មិនបានទៀតទេ។ ⛔ កុំ commit វា (`.gitignore` ហាម `*.jks` · `*.keystore` ហើយ `npm run android:check` ពិនិត្យ)។
 
-   ```bash
-   keytool -genkeypair -v -keystore zoew-release.jks -alias zoew -keyalg RSA -keysize 4096 -validity 36500
-   base64 -w0 zoew-release.jks > zoew-release.jks.b64      # Windows ៖ certutil -encode zoew-release.jks zoew-release.jks.b64
-   ```
+`build.gradle` sign APK តែពេល env `ZOEW_KEYSTORE_FILE` មាន ➜ Android Studio (**Generate Signed App Bundle / APK** ដោយជ្រើស
+`zoew-release.jks`) នៅដើរដូចមុន។ `npm run android:check` ចាក់សោស្នាមភ្ជាប់ workflow ↔ `build.gradle` (ឈ្មោះ env · គ្មានផ្លូវ
+debug · `apksigner verify`) និង pin (ទម្រង់ SHA-256 · ការប្រៀបមុន Release)។
 
-2. GitHub ➜ Settings ➜ Secrets and variables ➜ Actions ➜ បន្ថែម secret ៤ ៖ `ZOEW_KEYSTORE_BASE64` (ខ្លឹមសារ `.b64`) ·
-   `ZOEW_KEYSTORE_PASSWORD` · `ZOEW_KEY_ALIAS` (`zoew`) · `ZOEW_KEY_PASSWORD`។
-3. ⛔ **រក្សា `zoew-release.jks` និងពាក្យសម្ងាត់ទុកក្រៅ repo** (ឧ. drive ឯកជន ២ កន្លែង) — បាត់ keystore = App ដំឡើងជាន់
-   មិនបានទៀតទេ។ ⛔ កុំ commit វា (`.gitignore` ហាម `*.jks` · `*.keystore` ហើយ `npm run android:check` ពិនិត្យ)។
-
-`build.gradle` sign APK តែពេល env `ZOEW_KEYSTORE_FILE` មាន ➜ Android Studio (**Generate Signed App Bundle / APK**) នៅដើរ
-ដូចមុន។ `npm run android:check` ចាក់សោស្នាមភ្ជាប់ workflow ↔ `build.gradle` (ឈ្មោះ env · គ្មានផ្លូវ debug · `apksigner verify`)។
+**Build ក្នុង session Claude (cloud)** ៖ network របស់ environment ត្រូវអនុញ្ញាត `dl.google.com` (និង `maven.google.com` ដែល
+បញ្ជូនបន្តទៅវា) ➜ SDK ៖ `cmdline-tools` ➜ `sdkmanager "platforms;android-36" "build-tools;36.0.0"` · `node_modules` ត្រូវជា
+**ច្បាប់ចម្លងពិត** (symlink ធ្វើឲ្យ `cap sync` សរសេរផ្លូវ absolute ចូល `capacitor.settings.gradle` ➜ `android:check` ផ្នែក ៥
+ធ្លាក់) · Maven Central ឆ្លើយ `429` ➜ រត់ Gradle ម្តងទៀត (dependency ដែលទាញរួចនៅក្នុង cache)។
 
 ### លេខកំណែ APK
 

@@ -13,6 +13,13 @@ const CACHE_VERSION = __CACHE_VERSION__;
 const CORE_SHELL = __CORE_SHELL__;
 const OPTIONAL_SHELL = __OPTIONAL_SHELL__;
 
+/* ⛔ រាល់ការទាញពីបណ្តាញដែលចាក់ចូល cache របស់ SW ត្រូវរំលង HTTP cache ចាស់ ៖ `no-cache` ➜ សំណើមានលក្ខខណ្ឌ
+ * (ETag ➜ 304 ពេលមិនប្រែ)។ ឯកសារគ្មាន hash ក្នុងឈ្មោះ (`vendor/zxing_reader.wasm` …) ដែលធ្លាប់ទទួល header
+ * `immutable` រស់ក្នុង HTTP cache រហូតដល់ ១ ឆ្នាំ ➜ cache mode លំនាំដើមនាំកំណែចាស់ចូល cache ថ្មី ខណៈ
+ * `zxing-wasm.js` ជាកំណែថ្មី ➜ JS និង wasm មិនស៊ីគ្នា (`LinkError`) ➜ ម៉ាស៊ីនស្កេន ZXing ស្លាប់ (iPhone គ្មាន
+ * BarcodeDetector)។ ការការពារនេះមិនពឹងលើ header របស់ server ទេ ព្រោះ HTTP cache ចាស់លើឧបករណ៍មិនប្រែតាម header ថ្មី។ */
+const FRESH: RequestCache = 'no-cache';
+
 const SHELL_PATHS = new Set(
     CORE_SHELL.concat(OPTIONAL_SHELL).map((url) => new URL(url, self.location.href).pathname)
 );
@@ -20,8 +27,8 @@ const SHELL_PATHS = new Set(
 self.addEventListener('install', (event: ExtendableEvent) => {
     event.waitUntil(
         caches.open(CACHE_VERSION)
-            .then((cache) => cache.addAll(CORE_SHELL).then(() => Promise.all(
-                OPTIONAL_SHELL.map((url) => cache.add(url).catch(() => {}))
+            .then((cache) => cache.addAll(CORE_SHELL.map((url) => new Request(url, { cache: FRESH }))).then(() => Promise.all(
+                OPTIONAL_SHELL.map((url) => cache.add(new Request(url, { cache: FRESH })).catch(() => {}))
             )))
             .then(() => self.skipWaiting())
     );
@@ -81,7 +88,7 @@ function revalidateShell(cache: Cache, request: Request, cacheKey: string | Requ
     }, REVALIDATE_TIMEOUT_MS);
 
     const target = typeof cacheKey === 'string' ? cacheKey : request;
-    return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
+    return fetch(target, controller ? { signal: controller.signal, cache: FRESH } : { cache: FRESH }).then((response) => {
         if (!response || !response.ok || response.redirected) { release(); return; }
         return cache.put(cacheKey, response.clone()).then(release, release);
     }, release);
@@ -164,7 +171,9 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     const cacheKey = cacheKeyFor(request);
     const isShell = typeof cacheKey === 'string';
     const networkTarget = request.mode === 'navigate' ? cacheKey : request;
-    const networkOptions: RequestInit | undefined = request.mode === 'navigate' ? { signal: request.signal } : undefined;
+    const networkOptions: RequestInit | undefined = request.mode === 'navigate'
+        ? { signal: request.signal, cache: FRESH }
+        : (isShell ? { cache: FRESH } : undefined);
 
     event.respondWith(
         caches.open(CACHE_VERSION).then((cache) =>

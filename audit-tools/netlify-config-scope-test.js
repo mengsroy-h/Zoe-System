@@ -197,6 +197,66 @@ found.forEach((rel) => {
     ok('config ' + rel + ' ៖ មាន checker យ៉ាងតិច ១ ដែលអានវា', referenced);
 });
 
+// ៥ — header cache យូរ (`immutable` · `max-age` ធំ) ត្រូវតែលើឯកសារដែល **ឈ្មោះមាន hash** ប៉ុណ្ណោះ
+//     ឈ្មោះគ្មាន hash + `immutable` ➜ ការ deploy ថ្មីមិនដល់ឧបករណ៍ដែលធ្លាប់ទាញវា (HTTP cache រហូតដល់ ១ ឆ្នាំ)
+//     ➜ `vendor/zxing_reader.wasm` ចាស់ជួប `zxing-wasm.js` ថ្មី ➜ `LinkError` ➜ iPhone ស្កេនមិនបាន។
+//     បញ្ជីឯកសារដេរីវេពីអ្វីដែល App ship ពិត (មិនមែនបញ្ជីរឹង)។
+console.log('\n=== ៥. cache យូរ តែលើឯកសារដែលឈ្មោះមាន hash ===');
+const HASHED = /[-.]([A-Za-z0-9_-]{8})\.[A-Za-z0-9]+$/;
+function isHashedName(rel) {
+    const m = HASHED.exec(path.basename(rel));
+    return !!m && /[0-9A-Z_]/.test(m[1]);
+}
+function servedFiles(app) {
+    const out = [];
+    const skip = new Set(['node_modules', 'android', 'src', 'scripts', 'tests', 'netlify', 'docs', 'dist-audit', 'resources', '.original', '.netlify']);
+    (function scan(dir, url) {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                if (skip.has(entry.name)) continue;
+                if (url === '' && (entry.name === 'public' || entry.name === 'dist')) scan(path.join(dir, entry.name), '');
+                else scan(path.join(dir, entry.name), url + '/' + entry.name);
+            } else out.push(url + '/' + entry.name);
+        }
+    })(path.join(ROOT, app), '');
+    return [...new Set(out)];
+}
+function longCacheBlocks(src) {
+    const blocks = [];
+    const re = /\[\[headers\]\]\s*\n\s*for\s*=\s*"([^"]+)"([\s\S]*?)(?=\n\s*\[\[|$)/g;
+    let m;
+    while ((m = re.exec(src))) {
+        const cc = /Cache-Control\s*=\s*"([^"]*)"/.exec(m[2]);
+        if (!cc) continue;
+        const maxAge = /max-age\s*=\s*(\d+)/.exec(cc[1]);
+        if (/immutable/.test(cc[1]) || (maxAge && Number(maxAge[1]) > 3600)) blocks.push({ pattern: m[1], value: cc[1] });
+    }
+    return blocks;
+}
+let hashedAccepted = 0;
+EXPECTED.forEach((rel) => {
+    const app = rel.split('/')[0];
+    const src = read(rel);
+    if (!src) return;
+    const files = servedFiles(app);
+    ok(app + ' ៖ ជាន់អប្បបរមា ៖ រកឯកសារដែល ship ឃើញ', files.length >= 5, files.length);
+    for (const b of longCacheBlocks(src)) {
+        const re = new RegExp('^' + b.pattern.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$');
+        const matched = files.filter((f) => re.test(f));
+        const unhashed = matched.filter((f) => !isHashedName(f));
+        ok(app + ' ៖ `' + b.pattern + '` (' + b.value + ') ត្រូវតែលើឯកសារដែលឈ្មោះមាន hash',
+            !unhashed.length, unhashed.slice(0, 6).join(' · '));
+        if (matched.length && !unhashed.length) hashedAccepted += matched.length;
+    }
+});
+// ⛔ ទិសផ្ទុយ ៖ asset ដែលមាន hash (Vite `/assets/*`) ត្រូវតែទទួល cache យូរបាន (អ្នកកំណត់ hash មិនតឹងពេក)
+ok('ទិសផ្ទុយ ៖ ឯកសារដែលមាន hash ទទួល cache យូរបាន (យ៉ាងតិច ១)', hashedAccepted >= 1, hashedAccepted);
+ok('ទិសផ្ទុយ ៖ អ្នកកំណត់ hash ៖ `index-Px_7oZO9.js` មាន · `zxing_reader.wasm` · `icon-192.png` · `error-reporting.js` គ្មាន',
+    isHashedName('/assets/index-Px_7oZO9.js') && !isHashedName('/vendor/zxing_reader.wasm') &&
+    !isHashedName('/icon-192.png') && !isHashedName('/error-reporting.js'));
+
 console.log('');
 console.log(fail ? ('❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')') : ('✅ គ្មានបញ្ហា — ok ' + pass));
 process.exit(fail ? 1 : 0);

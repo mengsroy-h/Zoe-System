@@ -27,7 +27,7 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
         /CORE_SHELL/.test(sw), 'រកមិនឃើញ CORE_SHELL');
     ok(app + ': ធនធានស្នូលមិនលេបការបរាជ័យទេ (គ្មាន .catch ទទេលើផ្លូវស្នូល)',
         /CORE_SHELL[\s\S]{0,400}?cache\.addAll\(/.test(sw) ||
-        /addAll\(CORE_SHELL\)/.test(sw), 'ធនធានស្នូលត្រូវប្រើ addAll ដែលធ្លាក់ជាក្រុម');
+        /addAll\(CORE_SHELL[).]/.test(sw), 'ធនធានស្នូលត្រូវប្រើ addAll ដែលធ្លាក់ជាក្រុម');
 }
 {
     const sw = fs.readFileSync(path.join(ROOT, 'ZoeW', 'sw.js'), 'utf8');
@@ -164,6 +164,96 @@ function serve(dir, blocked) {
         reader: typeof window.ZXingWASM !== 'undefined' && typeof window.ZXingWASM.readBarcodes === 'function'
     }));
     ok('ក្រោយ install ពេញលេញ ➜ បណ្តាញដាច់ តែការស្កេននៅដើរ', offline.hasShell && offline.reader, offline);
+
+    // ជុំទី ៤ — HTTP cache ចាស់ **មិនត្រូវ** ពុល cache របស់ SW។
+    // ⛔ `vendor/zxing_reader.wasm` គ្មាន hash ក្នុងឈ្មោះ ➜ ឧបករណ៍ដែលធ្លាប់ទទួលវាជាមួយ
+    //    `immutable` កាន់កំណែចាស់ក្នុង HTTP cache ១ ឆ្នាំ។ SW ដែលទាញ `CORE_SHELL` (ឬធ្វើឲ្យស្រស់ខាងក្រោយ)
+    //    ដោយ cache mode លំនាំដើម ទទួល `.wasm` ចាស់នោះ ខណៈ `zxing-wasm.js` (no-cache) ជាកំណែថ្មី
+    //    ➜ `LinkError` ➜ iPhone (គ្មាន BarcodeDetector) ស្កេនមិនបាន។ ការវាស់ដាក់ header **អាក្រក់**
+    //    (`immutable`) លើគ្រប់កំណែដោយចេតនា ➜ វាស់ SW តែម្នាក់ឯង មិនពឹងលើ `netlify.toml`។
+    {
+        const realSw = fs.readFileSync(path.join(dir, 'sw.js'), 'utf8');
+        const cvMatch = /zoew-v\d+/.exec(realSw);
+        ok('ជុំទី ៤ ៖ រក CACHE_VERSION ក្នុង sw.js ពិតឃើញ', !!cvMatch);
+        const realWasm = fs.readFileSync(path.join(dir, 'vendor', 'zxing_reader.wasm'));
+        // custom section (id 0) ➜ wasm នៅត្រឹមត្រូវ តែ byte ចុងក្រោយជាស្លាកកំណែ
+        const marked = (tag) => Buffer.concat([realWasm, Buffer.from([0x00, 0x0a, 0x08]), Buffer.from('zoe-mark' + tag, 'latin1')]);
+        const state = { tag: 'A', swTag: 'A', wasmHits: 0 };
+        const poison = await new Promise((res) => {
+            const s = http.createServer((req, rsp) => {
+                let p = decodeURIComponent(req.url.split('?')[0]);
+                if (p === '/') p = '/index.html';
+                if (p === '/vendor/zxing_reader.wasm') {
+                    state.wasmHits++;
+                    const etag = '"w-' + state.tag + '"';
+                    if (req.headers['if-none-match'] === etag) { rsp.writeHead(304, { ETag: etag }); return rsp.end(); }
+                    rsp.writeHead(200, { 'Content-Type': 'application/wasm', 'Cache-Control': 'public, max-age=31536000, immutable', ETag: etag });
+                    return rsp.end(marked(state.tag));
+                }
+                if (p === '/sw.js' && cvMatch) {
+                    rsp.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
+                    return rsp.end(realSw.split(cvMatch[0]).join(cvMatch[0] + '-' + state.swTag.toLowerCase()));
+                }
+                const f = path.join(dir, p);
+                if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                rsp.end(fs.readFileSync(f));
+            });
+            s.listen(0, '127.0.0.1', () => res(s));
+        });
+        const pOrigin = 'http://127.0.0.1:' + poison.address().port;
+        // ⛔ គ្មាន `route()` ៖ ការស្ទាក់សំណើរបស់ Playwright **បិទ HTTP cache** ➜ ស្ថានភាព «cache ចាស់» មិនដែលកើត
+        //    ➜ ជុំនេះឆ្លងលើ tree ដែលមានកំហុស (វាស់រួច)។ host ខាងក្រៅត្រូវបិទតាម resolver វិញ។
+        const pbrowser = await chromium.launch({ executablePath: CHROME, args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'] });
+        const pctx = await pbrowser.newContext({ viewport: { width: 412, height: 780 } });
+        const ppage = await pctx.newPage();
+        await ppage.goto(pOrigin + '/', { waitUntil: 'load', timeout: 30000 });
+
+        // អាន byte ចុងក្រោយនៃ `.wasm` ក្នុង cache SW ដែលឈ្មោះបញ្ចប់ដោយ suffix (ពិដានពេល ➜ មិនព្យួរ)
+        const readTag = (suffix, poke) => ppage.evaluate(async ({ suffix, poke }) => {
+            for (let i = 0; i < 48; i++) {
+                if (poke) { try { await fetch('./vendor/zxing_reader.wasm'); } catch (e) {} }
+                for (const k of await caches.keys()) {
+                    if (!k.endsWith(suffix)) continue;
+                    const r = await (await caches.open(k)).match('./vendor/zxing_reader.wasm');
+                    if (!r) continue;
+                    const b = new Uint8Array(await r.arrayBuffer());
+                    const tag = String.fromCharCode(b[b.length - 1]);
+                    if (!poke || tag === poke) return { key: k, tag };
+                    if (i === 47) return { key: k, tag };
+                }
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            return { key: null, tag: null };
+        }, { suffix, poke: poke || null });
+
+        await ppage.evaluate(() => navigator.serviceWorker.register('./sw.js').then(() => Promise.race([
+            navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 20000))
+        ])));
+        const first = await readTag('-a');
+        ok('ជុំទី ៤ ៖ SW ដំបូងចាក់ `.wasm` កំណែ A ចូល cache', first.tag === 'A', first);
+
+        // កំណែ B ចេញ (SW ថ្មី) ខណៈ HTTP cache នៅកាន់ A ជាមួយ `immutable`
+        state.tag = 'B';
+        state.swTag = 'B';
+        const hitsBefore = state.wasmHits;
+        await ppage.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg && reg.update()).catch(() => {}));
+        const second = await readTag('-b');
+        ok('ជុំទី ៤ ៖ SW ថ្មី install ទាញ `.wasm` ពី server មិនមែនពី HTTP cache ចាស់ (A ➜ B)',
+            second.tag === 'B', Object.assign({ serverHits: state.wasmHits - hitsBefore }, second));
+
+        // កំណែ C ចេញ ដោយគ្មាន SW ថ្មី ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយត្រូវនាំ C មក (មិនមែនជាប់ B ពី HTTP cache)
+        state.tag = 'C';
+        const third = await readTag('-b', 'C');
+        ok('ជុំទី ៤ ៖ ការធ្វើឲ្យស្រស់ខាងក្រោយ (revalidate) ទាញពី server មិនមែនពី HTTP cache ចាស់ (B ➜ C)',
+            third.tag === 'C', third);
+
+        await pbrowser.close();
+        await new Promise((r) => {
+            poison.close(r);
+            if (typeof poison.closeAllConnections === 'function') poison.closeAllConnections();
+        });
+    }
 
     await browser.close();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));

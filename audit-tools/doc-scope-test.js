@@ -473,7 +473,12 @@ const moreMenuLabels = (moreMenuBlock.match(/<button[^>]*>([^<]+)<\/button>/g) |
     .map((label) => String(label || '').replace(/\$\{[^}]*\}/g, '').replace(/\s*\([^)]*\)\s*$/, '').trim())
     // ⛔ ដកតែ emoji ខាងមុខ — អត្ថបទពិតត្រូវនៅដដែល
     .map((label) => label.replace(/^[^\p{L}\p{N}]+/u, '').trim())
-    .filter((label) => label.length >= 5);
+    .filter((label) => label.length >= 5)
+    // App React ៖ ធាតុម៉ឺនុយជា view-model `{ label: '…', action }` (JSX គូរ) ➜ ស្លាកជា string literal ទី ១ របស់ `label`
+    .concat((moreMenuBlock.match(/\blabel:\s*'([^']+)'/g) || [])
+        .map((m) => /'([^']+)'/.exec(m)[1].replace(/\s*\($/, '').replace(/\s*\([^)]*\)\s*$/, ''))
+        .map((label) => label.replace(/^[^\p{L}\p{N}]+/u, '').trim())
+        .filter((label) => label.length >= 5));
 
 // --- គ. ជួរ 🩺 ពិនិត្យសុខភាព ៖ ចំនួនដេរីវេពី `runHealthCheck()` ពិត --------
 const healthBlock = (() => {
@@ -485,7 +490,9 @@ const healthBlock = (() => {
     const end = rest.indexOf('\n    function ');
     return rest.slice(0, end === -1 ? 1200 : end);
 })();
-const healthRowCount = new Set((healthBlock.match(/health[A-Za-z]+Row\(\)/g) || [])).size;
+// ⛔ `healthPendingRow()` (App React) ជាជួរ «កំពុងពិនិត្យ…» បណ្តោះអាសន្ន មិនមែនជួរវាស់ទេ
+const healthRowCount = new Set((healthBlock.match(/health[A-Za-z]+Row\(\)/g) || [])
+    .filter((name) => name !== 'healthPendingRow()')).size;
 
 // --- ឃ. អេក្រង់ដែលប្រើ helper ចំណូល ៖ ចំនួនកន្លែងហៅ `collectedValueOf()` ---
 const collectedCallers = (uiApp.match(/collectedValueOf\(/g) || []).length
@@ -534,7 +541,11 @@ check(dupFences.length === 0,
     '⛔ ច្បាប់ ១២ ៖ ប្លុកពាក្យបញ្ជាដដែល មិនត្រូវរស់នៅ ២ ឯកសារ (ត្រូវយោង មិនចម្លង)',
     dupFences.map(([k, o]) => [...o].join(' ↔ ') + ' ៖ ' + k.split('\n')[0]).join('\n        '));
 
-const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length;
+// App React ៖ timer ចុះឈ្មោះតាម `scope.every(ms, fn)` (lifecycle ដកវិញពេល unmount) ➜ `setInterval(` តែមួយរស់ក្នុងតួ
+// `every()` ខ្លួនវា ➜ ការរាប់ = `setInterval(` ផ្ទាល់ (ក្រៅតួនោះ) + `scope.every(`
+const everyImpl = /\bevery\(ms, fn\) \{[^}]*\bsetInterval\(/.test(uiApp) ? 1 : 0;
+const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length - everyImpl
+    + (uiApp.match(/\bscope\.every\(/g) || []).length;
 check(intervalCount >= 3, 'ជាន់អប្បបរមា ៖ រាប់ `setInterval` ក្នុង `app.js` បានយ៉ាងតិច ៣',
     'រាប់បាន ' + intervalCount);
 const KH_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
@@ -784,6 +795,17 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
     const living = mdFiles.filter((f) => !isArchive(f));
     let linkCount = 0;
     const broken = [];
+    // App React ៖ tree វាស់ (`ZoeW/dist-audit/ZoeW`) មិនដឹក `src/` ➜ តំណទៅប្រភពវាស់តាមបញ្ជីឯកសារប្រភពពិត
+    // (`audit-source-files.json` — build-audit ដើរថតប្រភពពិត) ⛔ មិនមែនការលើកលែងងងឹត ៖ ផ្លូវត្រូវមានក្នុងបញ្ជី
+    let sourceFiles = null;
+    try { sourceFiles = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-source-files.json'), 'utf8'))); } catch (e) { sourceFiles = null; }
+    const zoewDir = path.join(ROOT, 'ZoeW');
+    const existsInSource = (abs) => {
+        if (!sourceFiles) return false;
+        const rel = path.relative(zoewDir, abs).split(path.sep).join('/');
+        if (rel.startsWith('..')) return false;
+        return sourceFiles.has(rel) || [...sourceFiles].some((f) => f.startsWith(rel.replace(/\/$/, '') + '/'));
+    };
     living.forEach((f) => {
         let txt = '';
         try { txt = fs.readFileSync(f, 'utf8'); } catch (e) { return; }
@@ -793,7 +815,8 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
             const target = m[1].split('#')[0].trim();
             if (!target || /^(https?:|mailto:)/.test(target)) continue;
             linkCount++;
-            if (!fs.existsSync(path.resolve(path.dirname(f), target))) {
+            const abs = path.resolve(path.dirname(f), target);
+            if (!fs.existsSync(abs) && !existsInSource(abs)) {
                 broken.push(path.relative(ROOT, f) + ' ➜ ' + target);
             }
         }

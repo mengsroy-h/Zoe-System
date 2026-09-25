@@ -394,6 +394,27 @@ for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md
     cpSync(path.join(ROOT, f), path.join(APP, f));
 }
 cpSync(path.join(ROOT, 'netlify', 'functions'), path.join(APP, 'netlify', 'functions'), { recursive: true });
+// ⛔ ឯកសារដែល `.md` យោង (`ZoeW/docs/*` · `ZoeW/public/guide.html`) ត្រូវមានក្នុង tree វាស់ដែរ ➜ `doc-scope` វាស់
+//    តំណពិត (បើអត់ វារាយតំណដាច់ ដែលមិនដាច់ក្នុង repo — ឬអាក្រក់ជាងនោះ ៖ ការដាច់ពិតលាក់ក្នុងសំណុំក្លែង)
+cpSync(path.join(ROOT, 'docs'), path.join(APP, 'docs'), { recursive: true });
+// ⛔ តំណទៅ **ប្រភព** (`../src/core/version.ts` · `public/guide.html` · `resources/icon.svg`) ៖ tree វាស់មិនដឹក `src/` ទេ
+//    (checker ដែលស្កេន `ZoeW/**` នឹងឃើញកូដ ២ ច្បាប់) ➜ បញ្ជីឯកសារប្រភពពិត (ផ្លូវតែប៉ុណ្ណោះ) ឲ្យ `doc-scope` វាស់តំណ
+{
+    const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-audit', '.git', '.gradle', 'build', '.idea']);
+    const files = [];
+    const walkSource = (dir, rel) => {
+        for (const name of readdirSync(dir).sort()) {
+            if (SKIP_DIRS.has(name)) continue;
+            const full = path.join(dir, name);
+            const next = rel ? rel + '/' + name : name;
+            if (statSync(full).isDirectory()) walkSource(full, next);
+            else files.push(next);
+        }
+    };
+    walkSource(ROOT, '');
+    if (files.length < 200 || !files.includes('src/core/version.ts')) throw new Error('build-audit ៖ បញ្ជីឯកសារប្រភពខ្លីពេក ៖ ' + files.length);
+    writeFileSync(path.join(APP, 'audit-source-files.json'), JSON.stringify(files) + '\n');
+}
 
 console.log('dist-audit រួចរាល់ ៖', APP);
 console.log('app.js:', (readFileSync(path.join(APP, 'app.js'), 'utf8').split('\n').length), 'បន្ទាត់');

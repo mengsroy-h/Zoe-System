@@ -79,7 +79,17 @@ function ztoStatusModuleSource(appSrc) {
     return appSrc.slice(from, tail + 6);
 }
 
-const ZTO_MODULE = ztoStatusModuleSource(APP_SRC);
+// App React ៖ ម៉ូឌុលជា **ឯកសារ** (`audit-module-views.json` ពី build វាស់) ➜ ម៉ូឌុលគឺឯកសារដែល **និយាមន័យ**
+// `recheckZtoPickupStatus` (ដេរីវេ មិនមែនឈ្មោះឯកសាររឹង) ➜ ការកាត់តាមទីតាំងអក្សរក្នុង `app.js` ដែលរៀបតាមឯកសារ
+// នឹងលាយម៉ូឌុលផ្សេងចូល ➜ token លុយក្លែងក្លាយ។
+function ztoStatusModuleOf(appDir, appSrc) {
+    const viewsFile = path.join(appDir, 'audit-module-views.json');
+    if (!fs.existsSync(viewsFile)) return ztoStatusModuleSource(appSrc);
+    const views = JSON.parse(fs.readFileSync(viewsFile, 'utf8'));
+    const owners = Object.keys(views).filter((rel) => /async function recheckZtoPickupStatus\s*\(/.test(views[rel]));
+    return owners.length === 1 ? views[owners[0]] : '';
+}
+const ZTO_MODULE = ztoStatusModuleOf(APP_DIR, APP_SRC);
 ok('លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់ម៉ូឌុលស្ថានភាព ZTO ចេញពី app.js ពិត',
     ZTO_MODULE.length > 2000 && ZTO_MODULE.indexOf('runZtoStatusSweep') !== -1,
     ZTO_MODULE.length);

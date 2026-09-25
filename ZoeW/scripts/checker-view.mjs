@@ -18,7 +18,8 @@
  *   ៦. **ស្រទាប់ចូល DOM របស់ React ➜ សមមូលដើម** (`VIEW_OVERRIDES`) ៖ `elementOf(name)` ➜
  *      `document.getElementById(name)` (ឈ្មោះ ref = id របស់ធាតុ — `refSelectorsFromJsx()` ផ្ទៀងផ្ទាត់ពី JSX
  *      ពិត ហើយធាតុដែលគ្មាន id ប្រើ selector ពិតរបស់វា) · `commitNow()`/`renderNow()` ➜ ទទេ (App ដើមកែ
- *      DOM ផ្ទាល់ ➜ គ្មានអ្វីត្រូវ «ចុះ»)។ ⛔ មានតែ function ទាំងនេះ — តក្កវិជ្ជាអាជីវកម្មមិនប៉ះ។
+ *      DOM ផ្ទាល់ ➜ គ្មានអ្វីត្រូវ «ចុះ») · ស្ថានភាពប្រអប់ (`core/modals.ts`) ➜ `style.display` · `data-close` ·
+ *      `data-nodismiss` របស់ធាតុ (អ្វីដែល `<Modal>` គូរ)។ ⛔ មានតែ function ទាំងនេះ — តក្កវិជ្ជាអាជីវកម្មមិនប៉ះ។
  */
 import ts from 'typescript';
 import * as acorn from 'acorn';
@@ -224,8 +225,55 @@ function indentOutsideTemplates(js, fileName) {
 }
 
 /** module មួយ ➜ អត្ថបទក្នុងទិដ្ឋភាព */
+/**
+ * វង់ក្រចកដែល type erasure បន្សល់ ៖ `(navigator.onLine as boolean) === false` ➜ `(navigator.onLine) === false`។
+ * App ដើមសរសេរ `navigator.onLine === false` ➜ checker ដែលស្វែងរកទម្រង់នោះរកមិនឃើញ។ ដកវង់ក្រចកជុំវិញ
+ * **identifier / member chain សុទ្ធ** (គ្មានការហៅ) ⛔ ហើយផ្ទៀងផ្ទាត់ថា AST (acorn ដោយគ្មាន `preserveParens`)
+ * **ដូចគ្នាបេះបិទ** មុន/ក្រោយ ➜ វាប្តូរតែការសរសេរ មិនមែនអត្ថន័យ។
+ */
+function unwrapRedundantParens(js, fileName) {
+    const opts = { ecmaVersion: 'latest', sourceType: 'module' };
+    const simple = (n) => n.type === 'Identifier' || n.type === 'ThisExpression'
+        || (n.type === 'MemberExpression' && !n.optional && (!n.computed || n.property.type === 'Literal') && simple(n.object));
+    const ranges = [];
+    const visit = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'ParenthesizedExpression' && simple(n.expression)) {
+            ranges.push([n.start, n.start + 1], [n.end - 1, n.end]);
+        }
+        for (const k of Object.keys(n)) {
+            const v = n[k];
+            if (Array.isArray(v)) v.forEach(visit);
+            else if (v && typeof v === 'object' && typeof v.type === 'string') visit(v);
+        }
+    };
+    visit(acorn.parse(js, Object.assign({ preserveParens: true }, opts)));
+    if (!ranges.length) return js;
+    const out = applyRemovals(js, ranges);
+    const shape = (src) => JSON.stringify(acorn.parse(src, opts), (k, v) => (k === 'start' || k === 'end' || k === 'raw' ? undefined : v));
+    if (shape(out) !== shape(js)) throw new Error('unwrapRedundantParens ៖ AST ប្តូរក្នុង ' + fileName);
+    return out;
+}
+
+/**
+ * ទិដ្ឋភាព **script** (គ្មាន module · គ្មាន indent) ៖ `src/sw/sw.ts` ➜ `sw.js` ដែលអានបាន។ `defines` ៖ `{ __X__: 'literal JS' }`
+ * ជំនួស identifier ដូច `define` របស់ esbuild (ការជំនួសតាមអក្សរ លើព្រំដែនពាក្យ)។
+ */
+export function scriptView(tsSource, fileName, defines) {
+    let js = eraseTypes(tsSource, fileName);
+    js = unwrapRedundantParens(js, fileName);
+    for (const [name, value] of Object.entries(defines || {})) {
+        const re = new RegExp('\\b' + name + '\\b', 'g');
+        if (!re.test(js)) throw new Error('scriptView ៖ រក ' + name + ' មិនឃើញក្នុង ' + fileName);
+        js = js.replace(re, value);
+    }
+    js = removeComments(js);
+    return js.replace(/^\s+/, '');
+}
+
 export function moduleView(tsSource, fileName) {
     let js = eraseTypes(tsSource, fileName);
+    js = unwrapRedundantParens(js, fileName);
     js = replaceImportMetaEnv(js);
     js = removeComments(js);
     js = stripModuleSyntax(js, fileName);
@@ -249,7 +297,7 @@ export function aliasStateFields(text, stateGroups) {
 }
 
 /** ជំនួសតួ function កម្រិតកំពូល `name` ក្នុងអត្ថបទ module (ត្រូវមានពិតម្តងគត់) */
-export function overrideFunction(text, name, replacement) {
+export function overrideFunction(text, name, replacement, originals) {
     const re = new RegExp('^(    )(async )?function ' + name + '\\s*\\(', 'm');
     const m = re.exec(text);
     if (!m) throw new Error('checker-view ៖ រក function ' + name + ' មិនឃើញ (override)');
@@ -262,6 +310,7 @@ export function overrideFunction(text, name, replacement) {
     }
     if (end < 0) throw new Error('checker-view ៖ តួ function ' + name + ' មិនបិទ');
     if (re.exec(text.slice(end))) throw new Error('checker-view ៖ function ' + name + ' មាន ២ ដង');
+    if (originals) originals.push(text.slice(m.index, end));
     return text.slice(0, m.index) + '    ' + replacement + text.slice(end);
 }
 
@@ -282,4 +331,42 @@ export function refSelectorsFromJsx(refNames, tsxSources) {
         selectors[name] = id ? '#' + id[1] : cls ? '.' + cls[1] : null;
     }
     return selectors;
+}
+
+/**
+ * ⛔ `let <វាល> = <តម្លៃដំបូង>;` កម្រិតកំពូល សម្រាប់ state ដើមនីមួយៗ (`_generated-state.json`) ៖ `app.js` ដើម
+ *    ប្រកាស state ជា `let` កម្រិតកំពូល ហើយ checker ស្រង់ការប្រកាសទាំងនោះ (`^ *let <ឈ្មោះ> = …$`) ចូល `vm`។
+ *    ក្នុង App React វាជាវាលរបស់ឃ្លាំង (`createStore(…, { <វាល>: <តម្លៃ> })`) ➜ ការប្រកាសសាងពី **object literal
+ *    ពិត** នៃឃ្លាំង (អត្ថបទតម្លៃដំបូងដដែលបេះបិទ) ➜ `aliasStateFields()` ធ្វើឲ្យ `<ឃ្លាំង>.<វាល>` = `<វាល>` រួចហើយ។
+ *    ⛔ វាលដែលរកមិនឃើញក្នុង literal ➜ បោះកំហុស (មិនទាយតម្លៃ)។
+ */
+export function stateDeclarations(stateModuleView, stateGroups) {
+    const ast = acorn.parse(stateModuleView, { ecmaVersion: 'latest', sourceType: 'script' });
+    const inits = {};
+    const visit = (node) => {
+        if (!node || typeof node.type !== 'string') return;
+        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'createStore' &&
+            node.arguments[0] && node.arguments[0].type === 'Literal' && node.arguments[1] && node.arguments[1].type === 'ObjectExpression') {
+            const store = node.arguments[0].value;
+            for (const prop of node.arguments[1].properties) {
+                if (prop.type !== 'Property' || prop.key.type !== 'Identifier') continue;
+                inits[store + '.' + prop.key.name] = stateModuleView.slice(prop.value.start, prop.value.end);
+            }
+        }
+        for (const key of Object.keys(node)) {
+            const v = node[key];
+            if (Array.isArray(v)) v.forEach(visit);
+            else if (v && typeof v.type === 'string') visit(v);
+        }
+    };
+    visit(ast);
+    const lines = [];
+    for (const [store, fields] of Object.entries(stateGroups)) {
+        for (const f of fields) {
+            const init = inits[store + '.' + f.name];
+            if (init === undefined) throw new Error('checker-view ៖ រកតម្លៃដំបូងរបស់ ' + store + '.' + f.name + ' មិនឃើញ');
+            lines.push('    let ' + f.name + ' = ' + init.replace(/\n\s*/g, ' ') + ';');
+        }
+    }
+    return lines.join('\n') + '\n';
 }

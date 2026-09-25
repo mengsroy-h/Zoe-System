@@ -20,7 +20,10 @@ for (const app of APPS) {
     for (const m of css.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) defined.add(m[1]);
 
     const used = new Map();
-    for (const file of ['index.html', 'app.js']) {
+    // ⛔ App React ៖ `index.html` ជា markup **ដំបូង** ប៉ុណ្ណោះ ➜ class ក្នុង JSX ដែលមិនគូរពេលដំបូង (ផ្ទាំង crash · toast ·
+    //    បញ្ជីថាមវន្ត) រស់តែក្នុង `components.js` (ទិដ្ឋភាពអត្ថបទនៃ `.tsx`) ➜ ត្រូវស្កេនវាដែរ ទាំង `className: "…"` និង
+    //    ផ្នែកថេរនៃ template (`className: \`a b ${x}\`` ➜ `a` · `b`)។
+    for (const file of ['index.html', 'app.js', 'components.js']) {
         const p = path.join(ROOT, app, file);
         if (!fs.existsSync(p)) continue;
         const src = fs.readFileSync(p, 'utf8');
@@ -36,6 +39,13 @@ for (const app of APPS) {
         }
         for (const m of src.matchAll(/className\s*=\s*['"]([^'"]+)['"]/g)) {
             m[1].split(/\s+/).forEach((c) => { if (c && !used.has(c)) used.set(c, file); });
+        }
+        for (const m of src.matchAll(/className:\s*(?:"([^"]*)"|`([^`]*)`)/g)) {
+            const text = m[1] !== undefined ? m[1] : m[2].replace(/\$\{[^}]*\}/g, ' ');
+            text.split(/\s+/).forEach((c) => {
+                if (!c || !/^-?[_a-zA-Z][\w-]*$/.test(c)) return;
+                if (!used.has(c)) used.set(c, file);
+            });
         }
     }
 

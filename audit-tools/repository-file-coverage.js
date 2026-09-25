@@ -94,7 +94,7 @@ for (const [rel, entry] of Object.entries(entries)) {
     usedPolicies.add(entry.policy);
     if (categories.includes(policy.category)) totals[policy.category]++;
     if (policy.category === 'manual' && !(rel === 'LICENSE' || rel === 'NOTICE'
-        || rel.startsWith('LICENSES/') || /^docs\/(?:HISTORY-ARCHIVE|ARCHIVE-[0-9-]+)\.md$/.test(rel))) {
+        || rel.startsWith('LICENSES/'))) {
         badEntries.push(rel + '៖ code/config មិនអាចចាត់ជា manual');
     }
     if (!actual.has(rel)) continue;

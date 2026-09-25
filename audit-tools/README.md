@@ -40,8 +40,11 @@
 ### ១. ដំឡើង dependency (ម្តងក្នុងមួយ session)
 
 ```bash
-npm i acorn playwright-core
+npm ci --prefix ZoeW
 ```
+
+ZoeW ជា React ➜ dependency របស់វា (`vite` · `acorn` · `playwright-core` · `esbuild`) ក៏ជា dependency របស់ checker ដែរ
+(`run-all.sh` ប្រើ `ZoeW/node_modules` ជា `NODE_PATH`)។
 
 | Package | ត្រូវការសម្រាប់ |
 |---|---|
@@ -65,12 +68,18 @@ bash audit-tools/run-all.sh
 **រត់វាមុនចាប់ផ្តើម និងក្រោយកែរាល់ដង។** បើវាបៃតងទាំងអស់ នោះមានន័យថា
 កំហុសដែលបានដោះស្រាយរួច មិនបានត្រឡប់មកវិញទេ។
 
+លើ ZoeW React វា **build tree វាស់** (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/measure-root` ៖ ឯកសារ repo
+ទាំងអស់ លើកលែង `ZoeW/` ដែលជំនួសដោយ build វាស់) រួចរត់ checker ទាំងអស់នៅទីនោះ។
+
 ### ៣. រត់តែមួយ
 
 ```bash
-node audit-tools/policy-test.js
-node audit-tools/trash-modal-test.js
+M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)   # build tree វាស់ ហើយឈប់
+cd "$M" && node audit-tools/policy-test.js
 ```
+
+⛔ `node audit-tools/<x>.js` **ពី root របស់ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន (ZoeW ជា React) ➜ ធ្លាក់
+«រកកូដមិនឃើញ» — មិនមែនកំហុសក្នុង App។
 
 ### ៤. រត់លើ tree ផ្សេង (បញ្ជាក់ថាតេស្តមិនទទេ)
 
@@ -170,7 +179,8 @@ bash audit-tools/emu/rules.sh
 | `collected-mirror-lifecycle-test.js` | កញ្ចក់ `zoew_daily_collected_cod_dod` ត្រូវដើរតាម ledger ៖ «ដក» កញ្ចប់ដែលយករួច ➜ លុបធាតុកញ្ចក់ · «ស្តារ» ➜ សាងវាឡើងវិញ **តែមួយ** លើថ្ងៃនៃ `closedAt` ថ្មី (រួមទាំងការផ្លាស់ចេញពីថ្ងៃចាស់) · ⛔ ទិសផ្ទុយ ៖ «លុប» មិនប៉ះ ledger ➜ ក៏មិនប៉ះកញ្ចក់។ App ពិតក្នុង Chromium + fake RTDB ដែលបដិសេធតាម rules ពិត | `COLLECTEDMIRROR_APP_DIR` |
 | `collected-mirror-fuzz-test.js` | **កញ្ចក់ `zoew_daily_collected_cod_dod` ត្រូវត្រឹមត្រូវលើ *លំដាប់ចៃដន្យ*** ៖ បិទ · បើកវិញ · ដក · លុប · ស្តារ · កែទឹកប្រាក់ តាមលំដាប់ចៃដន្យក្នុង App **ពិត** (Chromium + fake RTDB ដែលបដិសេធតាម rules ពិត)។ អយស្ករ**ឯករាជ្យ** ៖ Σ កញ្ចក់ = Σ barcode `isClosed && !isDeducted` គ្រប់កន្លែង (ដេរីវេពី `collected = ledger − open`) ➜ ការធ្លាក់ = អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា។ បូកអះអាង ៖ គ្មានកូនសោឈរលើ ២ ថ្ងៃ · គ្មានធាតុកំព្រា · តម្លៃត្រូវនឹង barcode ពិត · គ្មានការបដិសេធពី rules។ ⛔ ការវាស់ធ្វើ **ក្រោយរាល់ប្រតិបត្តិការ** មិនមែនត្រឹមចុងលំដាប់ — ការអះអាងតែនៅចុងធ្វើឲ្យប្រតិបត្តិការក្រោយៗ **លុបភស្តុតាង** នៃការធ្លាក់មុន (ស្នាមភ្ជាប់ «ដក» និង «ស្តារ» ត្រូវការលំដាប់ **ផ្ទុយគ្នា** ➜ ការចាប់មួយបាត់មួយទៀត) | `MIRRORFUZZ_APP_DIR` · `MFUZZ_RUNS` (៥) · `MFUZZ_RUN0` · `MFUZZ_OPS` (៨) |
 | `loop-termination-test.js` | **រង្វិលជុំក្នុងកូដ ship ត្រូវឈប់លើ input អាក្រក់** ៖ ស្រង់តួ function ពិតរួចរត់ក្នុង child process ដាច់ដោយឡែក (ពិដានពេល + ពិដាន heap) ➜ ការមិនចេះឈប់ក្លាយជាការធ្លាក់ដែលមានឈ្មោះ ជំនួស **tab ដែលជាប់ស្ងាត់ៗ**។ គ្រប ៖ `sheetImportColumnLetter` (`Infinity` ➜ `Math.floor(Infinity/26)-1` នៅ `Infinity`) · `legacyPickupPlaceholders` (ព្រំដែនមកពី Firebase ដែល rules ទាមទារត្រឹម `>= 0`) បូកទិសផ្ទុយ (តម្លៃធម្មតានៅត្រឹមត្រូវ) និងអ្នកយាមរចនាសម្ព័ន្ធលើ `while` **គ្រប់កន្លែង** ក្នុង `app.js` **របស់ App ទាំង ២** | `LOOPTERM_APP_DIR` |
-| `money-reality-check.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** (ត្រូវការឯកសារ dump) | 🩺 **ការវាស់លុយលើទិន្នន័យផលិតកម្មពិត — អានសុទ្ធសាធ** ៖ `node audit-tools/money-reality-check.js <dump.json|.json.gz>` (Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON)។ យកកូដលុយ **ពិត** ចេញពី `app.js` មករត់លើ dump ➜ ពិនិត្យ ៩ ៖ ledger ខែ = Σ ថ្ងៃ · លុយជួរដេក = Σ barcodes · ស្ថិតិយកជាអត្តសញ្ញាណ · លេខអវិជ្ជមាន/NaN · «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ · **កញ្ចក់ `zoew_daily_collected_cod_dod` ↔ ប្រវត្តិ** (❌ កូនសោបាត់ · ថ្ងៃទាំងមូលបាត់ · រាប់ស្ទួន · ទឹកប្រាក់ខុស · កូនសោនៅសល់ក្រោយបើកវិញ; ⚠️ ថ្ងៃខុស · កូនសោគ្មានម្ចាស់) · barcode ស្ទួន · កូនសោ registry កំព្រា · **«ស្កេនតាមថ្ងៃ» (`totalCount`) ↔ កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ** (⚠️ លម្អៀង ➜ ledger រាប់កញ្ចប់ដែលលែងមាន ➜ ចំណូលធំជាងការពិត)។ ⛔ **មិនបោះពុម្ពលេខទូរស័ព្ទ ឬ barcode** · **មិនភ្ជាប់បណ្តាញ** · **មិនសរសេរអ្វី** | `MONEYREAL_APP_DIR` |
+| `money-reality-check.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** (ត្រូវការឯកសារ dump) | 🩺 **ការវាស់លុយលើទិន្នន័យផលិតកម្មពិត — អានសុទ្ធសាធ** ៖ `node audit-tools/money-reality-check.js <dump.json|.json.gz>` (Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON)។ យកកូដលុយ **ពិត** (`ZoeW/app.js` ឬ លើ repo ZoeW React ៖ `money-core.js`) មករត់លើ dump ➜ ពិនិត្យ ៩ ៖ ledger ខែ = Σ ថ្ងៃ · លុយជួរដេក = Σ barcodes · ស្ថិតិយកជាអត្តសញ្ញាណ · លេខអវិជ្ជមាន/NaN · «ចំណូល (យករួច)» ដែលអេក្រង់នឹងបង្ហាញ · **កញ្ចក់ `zoew_daily_collected_cod_dod` ↔ ប្រវត្តិ** (❌ កូនសោបាត់ · ថ្ងៃទាំងមូលបាត់ · រាប់ស្ទួន · ទឹកប្រាក់ខុស · កូនសោនៅសល់ក្រោយបើកវិញ; ⚠️ ថ្ងៃខុស · កូនសោគ្មានម្ចាស់) · barcode ស្ទួន · កូនសោ registry កំព្រា · **«ស្កេនតាមថ្ងៃ» (`totalCount`) ↔ កញ្ចប់ដែលនៅក្នុងប្រព័ន្ធ** (⚠️ លម្អៀង ➜ ledger រាប់កញ្ចប់ដែលលែងមាន ➜ ចំណូលធំជាងការពិត)។ ⛔ **មិនបោះពុម្ពលេខទូរស័ព្ទ ឬ barcode** · **មិនភ្ជាប់បណ្តាញ** · **មិនសរសេរអ្វី** | `MONEYREAL_APP_DIR` |
+| `money-core.js` (ទិន្នន័យ មិនមែន checker) | កូដលុយពិត ២១ (function + ថេរ) ដែល `money-reality-check.js` អានលើ repo ZoeW React ដែលគ្មាន build (ឧ. `check-money.cmd` លើ Windows)។ ⛔ **កុំកែដោយដៃ** ៖ ផលិតដោយ `npm --prefix ZoeW run money:core` ពី src ពិត ហើយ `money-reality-test` ធ្លាក់ពេលវាចាស់ជាងកូដ | — |
 | `redact-dump.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔒 **សម្អាត dump ➜ ឯកសារដែលផ្ញើបាន** ៖ `node audit-tools/redact-dump.js <dump.json> [out.json]`។ ជំនួសលេខទូរស័ព្ទ · barcode · id ដោយ hash (salt **ចៃដន្យរាល់ការរត់** ➜ បញ្ច្រាសមិនបាន) · លុប Locker/ឈ្មោះ/token។ ⛔ រក្សា **រចនាសម្ព័ន្ធ និងទឹកប្រាក់** ➜ `money-reality-check` ឲ្យលទ្ធផល **ដូចគ្នាបេះបិទ** (វាស់បាន ៖ ការវាស់លុយ **មុន/ក្រោយសម្អាត ដូចគ្នាបេះបិទ** ➜ កំហុសដែលបញ្ចូល ត្រូវចាប់បានទាំង ២ ខាង)។ មានជាន់ស្កេនរកលេខទូរស័ព្ទសល់ ➜ exit 1 | — |
 | `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json|.json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
 | `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ mutation **៦/៦** ចាប់បាន; ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
@@ -191,6 +201,7 @@ bash audit-tools/emu/rules.sh
 | `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; sandbox ផ្គត់ផ្គង់ auth/database និង collected ref, អាន collected snapshot ពិត និងស្រង់ថេរពី App; ព្យួរ price write មុន HTTP acceptance រួច cleanup ឆ្លងអធ្រាត្រ និងកែ sibling ដោយ client ផ្សេង ដើម្បីវាស់ ETag conflict/retry; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
 | `emu/rules.sh` | rules ពិតលើ emulator ពិត | — |
 | `idtoken-fixture.js` | helper ៖ វិញ្ញាបនបត្រ និងការចុះហត្ថលេខា **Firebase ID token សាកល្បង** (RS256 ពិត) ➜ checker ដែលរត់ `zto-order-detail.js` ពិត វាស់ការផ្ទៀងផ្ទាត់ token ដោយមិនចម្លងតក្កវិជ្ជា (សោសាកល្បងប៉ុណ្ណោះ — គ្មានសិទ្ធិលើផលិតកម្ម) | — |
+| `react-view.js` | helper ៖ **ស្រទាប់ React** របស់ ZoeW (`createStore` · ឃ្លាំង · `fieldValue` · ប្រអប់ · `document-io`) ស្រង់ជា **កូដពិត** ពីទិដ្ឋភាព `app.js` ➜ checker ដែលស្រង់ function ចូល `vm` រត់តួអាជីវកម្មដែលហៅ helper ទាំងនោះបាន (DOM ក្លែងរបស់ checker នៅតែជាអ្វីដែលត្រូវវាស់) | — |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
@@ -224,6 +235,7 @@ bash audit-tools/emu/rules.sh
 | `stall-lock-release-test.js` | សោការងារដែលឈរខាងក្រោយ **ការសរសេរធុងសំរាមដែលព្យួរ** ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) · របៀបស្កេនដកងាប់ទាំងស្រុង | `STALLLOCK_APP_DIR` |
 | `locker-claim-guard-test.js` | ការកំណត់ Locker ជាន់នឹង «លុបទាំងអស់» ដែល claim រួច ➜ ការប្តូរបាត់ស្ងាត់ៗ ខណៈ toast រាយ ✅ | `LOCKERCLAIM_APP_DIR` |
 | `stale-clear-claim-test.js` | `clearClaim` ដែល lease ផុត ជាអន្ទាក់ស្ថាពរ ➜ ច្បាប់ ២ម៉ោង/៧ថ្ងៃ ងាប់លើកញ្ចប់នោះ (លុយមិនត្រូវដក) | `STALECLAIM_APP_DIR` |
+| `zoew-suite-test.js` | suite ផ្ទាល់ខ្លួនរបស់ ZoeW React (typecheck · lint · vitest · slot/purity · doc · android · logic · parity · build · sw · smoke · native · rules) ត្រូវរត់ពិតក្នុង run-all ➜ tests/scripts/android/config មិនខូចស្ងាត់ៗ; គ្មាន node_modules ឬ ZoeW ដើម ➜ FAIL មានឈ្មោះ (មិនមែន SKIP) | `ZOEWSUITE_APP_DIR` |
 | `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
 | `periodic-network-guard-test.js` | callback Activate ចាស់មិនប្ដូរ UI/listener របស់ auth/database ថ្មី · ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
@@ -314,7 +326,7 @@ bash audit-tools/emu/rules.sh
 | `toast-action-truth-test.js` | Toast សកម្មភាពសរសេរ៖ pending/reject/commit ពិត · static semantic marker ទាំង ២ App | `TOAST_ACTION_APP_DIR` |
 | `boot-runtime.js` · `boot-animation-test.js` | កំហុស runtime ពេល boot · ចលនា boot · ធនធានឆ្លង origin; សេណារីយ៉ូធម្មតាទប់សំណើក្រៅ origin ដើម្បីមិនពឹង CDN | `BOOT_APP_DIR` · `BOOTANIM_APP_DIR` |
 | `animation-cost.js` · `layout-thrash.js` | ចលនាដែលបង្កើត layout/paint រាល់ស៊ុម | `ANIM_APP_DIR` · `THRASH_APP_DIR` |
-| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSMEDIA_APP_DIR` |
+| `css-classes.js` · `css-media-override.js` | class គ្មានច្បាប់ (ស្កេន markup ដំបូង · `app.js` · **JSX ទាំងអស់** ក្នុង `components.js` — class ដែលមិនគូរពេលដំបូង ក៏ត្រូវមានច្បាប់) · ច្បាប់ `@media` ដែលស្លាប់ · **class variant ដែលឈរមុន base របស់វា** (specificity ស្មើ ➜ លំដាប់ឈ្នះ ➜ ការប្រកាសស្លាប់ស្ងាត់ៗ) | `CSSMEDIA_APP_DIR` |
 | `css-var-test.js` | `var(--x)` ដែលគ្មានការប្រកាស `--x` ➜ ច្បាប់ CSS ស្លាប់ស្ងាត់ៗ | `CSSVAR_APP_DIR` |
 | `listener-leak-test.js` | listener/node កកកុញឆ្លងវដ្តពិត | `LEAK_APP_DIR` · `LEAK_CHROME` |
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |

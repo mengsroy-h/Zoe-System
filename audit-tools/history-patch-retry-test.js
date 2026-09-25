@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.HISTPATCH_APP_DIR ? path.resolve(process.env.HISTPATCH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -91,7 +92,7 @@ function build(mode, opts) {
         console: { error: () => {}, log: () => {} },
         window: {},
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Math: Math,
-        setTimeout: setTimeout, clearTimeout: clearTimeout,
+        setTimeout: setTimeout, clearTimeout: clearTimeout, queueMicrotask: queueMicrotask,
         db: {}, dbRefHistory: {},
         authGeneration: 0,
         scanHistory: (opts && opts.scanHistory) || [],
@@ -127,6 +128,7 @@ function build(mode, opts) {
         }
     };
     vm.createContext(ctx);
+    vm.runInContext(reactRuntime(SRC, { exclude: FNS, context: ctx }), ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
     FNS.forEach((n) => { if (src[n]) { try { vm.runInContext(src[n], ctx); } catch (e) {} } });
     return ctx;

@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderComponent, renderFromContext } = require('./react-view');
 
 const ROOT = process.env.TRASH_APP_DIR || path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -183,7 +184,10 @@ const trashModalHtml = indexHtml.slice(indexHtml.indexOf('id="recentlyDeletedMod
 ok(trashModalHtml.indexOf(abandonLabel + expiredRetentionLabel) !== -1 &&
     trashModalHtml.indexOf('\u1794\u17d2\u179a\u1797\u17c1\u1791\u1795\u17d2\u179f\u17c1\u1784\u17d6 ' + retentionLabel) !== -1,
     'ចំណងជើងធុងសំរាមបង្ហាញថ្ងៃលំដាប់ដែលដេរីវេពីថេរ', { ABANDON_DAYS, ABANDON_LABEL_DAY });
-const trashRowsFn = sliceFn(src, 'renderRecentlyDeleted');
+// ⛔ ZoeW ជា React ៖ សារ «ជួរទៀត» រស់ក្នុង JSX (`TrashTableBody.tsx`) ➜ គូរ component ពិតជាមួយ `overflow > 0`
+//    ហើយវាស់អត្ថបទដែលអ្នកប្រើអាន (មិនមែនអត្ថបទ function)
+const trashRowsFn = renderComponent(ROOT, 'src/app/components/trash/TrashTableBody.tsx', 'TrashTableBody',
+    { uiState: { trashView: { empty: null, rows: [], overflow: 3 } } });
 ok(trashRowsFn.indexOf(expiredRetentionLabel) !== -1 && trashRowsFn.indexOf(retentionLabel) !== -1,
     'សារ «ជួរទៀត» បង្ហាញ retention ទាំង ២ និង ៣០ថ្ងៃ');
 ok(trashRowsFn.indexOf(abandonLabel) !== -1,
@@ -214,13 +218,15 @@ ok(!rules.rules.zoew_scan_history_cod_dod.$itemId.trashReason,
 console.log('\n=== ការចាត់ថ្នាក់ · ការ merge · តួលេខសរុប (កូដពិតក្នុង vm) ===');
 
 const ctx = {
-    console,
+    console, queueMicrotask,
     Map, Set, Math, JSON, Number, String, Array, Object, parseFloat, isNaN,
     document: { getElementById: () => null },
     sanitizeInput: (v) => String(v === undefined || v === null ? '' : v),
     exchangeRateRiel: 4100
 };
 vm.createContext(ctx);
+// ⛔ ZoeW ជា React ៖ `renderTrashSummary()` សរសេរ `uiState.trashSummary` (view model) ហើយ `TrashSummaryBox.tsx` គូរ
+vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
 [sliceConst(src, 'TRASH_REASON_META'),
  sliceFn(src, 'barcodeEntriesOf'),
  sliceFn(src, 'trashReasonOf'),
@@ -229,7 +235,7 @@ vm.createContext(ctx);
  sliceFn(src, 'trashGroupKeyOf'),
  sliceFn(src, 'buildTrashGroups'),
  sliceFn(src, 'trashGroupMatchesQuery'),
- sliceFn(src, 'trashSummaryCardHtml'),
+ sliceFn(src, 'buildTrashSummaryModel'),
  sliceFn(src, 'renderTrashSummary')].forEach((code, i) => {
     if (!code) { ok(false, 'ស្រង់កូដពិតបានលេខ ' + i); return; }
     vm.runInContext(code, ctx);
@@ -388,8 +394,8 @@ ok(/liveKeys = new Set\(allGroups\.map/.test(renderFn),
 console.log('\n=== តួលេខសរុបរបស់ធុងសំរាម (កូដពិត ➜ អាន HTML) ===');
 {
     let boxHtml = null;
-    ctx.document.getElementById = (id) => (id === 'trashSummaryBox'
-        ? { set innerHTML(v) { boxHtml = v; }, get innerHTML() { return boxHtml; } } : null);
+    // ⛔ «HTML ក្នុងប្រអប់» = JSX ពិត (`TrashSummaryBox.tsx`) គូរពី `uiState.trashSummary` ដែល function ពិតសរសេរ
+    const paint = () => { boxHtml = renderFromContext(ROOT, ctx, 'src/app/components/trash/TrashSummaryBox.tsx', 'TrashSummaryBox'); };
 
     // ក្រុមសាកល្បង ៖ តម្លៃ **មានសេន** ដោយចេតនា (លេខមូលលាក់ mutation នៃការបង្គត់)
     const groups = [
@@ -399,7 +405,7 @@ console.log('\n=== តួលេខសរុបរបស់ធុងសំរា�
         { reason: 'delete', total: 9.90, count: 1, codes: [], key: 'g4' }
     ];
     const rendered = (() => {
-        try { ctx.renderTrashSummary(groups, ''); return true; } catch (e) { return e; }
+        try { ctx.renderTrashSummary(groups, ''); paint(); return true; } catch (e) { return e; }
     })();
     ok(rendered === true, '⛔ លក្ខខណ្ឌចាំបាច់៖ `renderTrashSummary()` ពិតរត់ដល់ចប់', rendered);
     ok(typeof boxHtml === 'string' && boxHtml.length > 50,
@@ -459,6 +465,7 @@ console.log('\n=== តួលេខសរុបរបស់ធុងសំរា�
     // ⛔ ទិសផ្ទុយ ៖ គ្មានក្រុម ➜ $0.00 ទាំង ២ ខាង (មិនមែនបោះ ឬ NaN)
     boxHtml = null;
     ctx.renderTrashSummary([], '');
+    paint();
     const empty = String(boxHtml || '');
     ok(empty.indexOf('$0.00') !== -1 && empty.indexOf('NaN') === -1,
         '⛔ ទិសផ្ទុយ៖ ធុងសំរាមទទេ ➜ $0.00 គ្មាន NaN', empty.slice(0, 80));

@@ -19,8 +19,3 @@ export function emptySheetImportView(): SheetImportView {
     return { msgs: {}, summary: null, sheetNames: [], sheetValue: '', mapping: {}, chips: [], previewRows: [] };
 }
 
-/** ធានាថា `uiState.sheetImportView` មានរូបរាងពេញ មុនការកែផ្នែកណាមួយ */
-export function sheetImportViewOf(current: any): SheetImportView {
-    if (!current) return emptySheetImportView();
-    return current as SheetImportView;
-}

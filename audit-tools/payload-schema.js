@@ -29,6 +29,12 @@ const ITEM_VARS = new Set(['item', 'newItem', 'entry', 'updated', 'targetItem', 
     'resultingLiveItem', 'currentItem', 'freshItem', 'revertItem', 'existingItem']);
 const TRASH_VARS = new Set(['trashItem', 'removed', 'deletedItem']);
 const BARCODE_VARS = new Set(['b', 'bc', 'barcode', 'restoredBc', 'newBarcode', 'revertB']);
+// ⛔ ZoeW ជា React ៖ view model ក្នុងឃ្លាំង (មិនមែន payload Firebase) ដែលកូដហៅថា `item` ដែរ ➜ ការសម្គាល់តាម **ប្រភពនៃ
+//    ការប្រកាស** ៖ អថេរដែល `const <ឈ្មោះ> = <function>(...)` ក្នុង function ដដែល ជា view model មិនមែនកំណត់ត្រា
+//    ⛔ រាល់ធាតុមានហេតុផល — កុំបន្ថែមដោយគ្មានការតាមដានពិត
+const VIEW_MODEL_SOURCES = {
+    toastItem: 'toast ក្នុង `uiState.toasts` (`ToastList.tsx` គូរ) — គ្មានផ្លូវណាសរសេរវាទៅ Firebase'
+};
 
 function sliceLimitFor(src, at) {
     let depth = 0;
@@ -45,13 +51,37 @@ for (const app of ['ZoeW']) {
     const ast = acorn.parse(src, { ecmaVersion: 2022, locations: true });
 
     const found = { item: new Map(), trash: new Map(), barcode: new Map() };
+    const viewModelHits = new Map();
+    // ឈ្មោះដែលប្រកាសពី VIEW_MODEL_SOURCES ក្នុង function នីមួយៗ (រួម closure ខាងក្នុង)
+    const viewModelNamesIn = (fnNode) => {
+        const names = new Set();
+        (function scan(n) {
+            if (!n || typeof n !== 'object') return;
+            if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init && n.init.type === 'CallExpression'
+                && n.init.callee.type === 'Identifier' && VIEW_MODEL_SOURCES[n.init.callee.name]) names.add(n.id.name);
+            for (const k of Object.keys(n)) {
+                const v = n[k];
+                if (Array.isArray(v)) v.forEach(scan);
+                else if (v && typeof v === 'object' && v.type) scan(v);
+            }
+        })(fnNode);
+        return names;
+    };
+    let viewModelNames = new Set();
     (function walk(n) {
         if (!n || typeof n !== 'object') return;
+        const outer = viewModelNames;
+        if (n.type === 'FunctionDeclaration') viewModelNames = viewModelNamesIn(n);
         if (n.type === 'AssignmentExpression' && n.left.type === 'MemberExpression' &&
             !n.left.computed && n.left.object.type === 'Identifier' &&
             n.left.property.type === 'Identifier') {
-            const obj = n.left.object.name, prop = n.left.property.name;
+            let obj = n.left.object.name;
+            const prop = n.left.property.name;
             let bucket = null;
+            if (viewModelNames.has(obj)) {
+                viewModelHits.set(obj + '.' + prop, n.loc.start.line);
+                obj = null;
+            }
             if (ITEM_VARS.has(obj)) bucket = 'item';
             else if (TRASH_VARS.has(obj)) bucket = 'trash';
             else if (BARCODE_VARS.has(obj)) bucket = 'barcode';
@@ -62,7 +92,15 @@ for (const app of ['ZoeW']) {
             if (Array.isArray(v)) v.forEach(walk);
             else if (v && typeof v === 'object' && v.type) walk(v);
         }
+        viewModelNames = outer;
     })(ast);
+    // ⛔ ជាន់អប្បបរមា ៖ ការលើកលែងត្រូវមានអ្នកប្រើពិត (ធាតុងាប់ = សិទ្ធិលើស)
+    if (viewModelHits.size === 0) {
+        console.log('   FAIL  VIEW_MODEL_SOURCES គ្មានការសរសេរណាត្រូវលើកលែង ➜ ធាតុងាប់');
+        problems++;
+    } else {
+        console.log('   ok    view model មិនមែន payload ៖ ' + [...viewModelHits.keys()].join(' · '));
+    }
 
     // an item-shaped var travels BOTH ways (live record and trash record), so it is
     // checked against the union; the direction-specific danger is covered below.

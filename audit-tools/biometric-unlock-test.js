@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const crypto = require('crypto');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.BIOMETRIC_APP_DIR || path.join(__dirname, '..');
 
@@ -81,7 +82,7 @@ function makeEnv(opts) {
         TextEncoder, TextDecoder,
         btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
         atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-        Uint8Array, ArrayBuffer, JSON, Date, parseInt, Math, Promise,
+        Uint8Array, ArrayBuffer, JSON, Date, parseInt, Math, Promise, queueMicrotask,
         localStorage: {
             getItem: (k) => (k in store ? store[k] : null),
             setItem: (k, v) => { store[k] = String(v); },
@@ -134,6 +135,9 @@ function makeEnv(opts) {
     };
 
     const ctx = vm.createContext(sandbox);
+    // ⛔ ZoeW ជា React ៖ UI ជីវមាត្រ (ស្លាកកុងតាក់ · ប៊ូតុងក្នុងប្រអប់ PIN) ជា `viewState` ដែល JSX គូរ ➜
+    //    ស្រទាប់ React ពិត (ឃ្លាំង · `isNativeApp()` ផ្លូវ web) ចូល sandbox មុនមុខងារ
+    vm.runInContext(reactRuntime(src, { context: sandbox }), ctx);
     // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
     // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
     // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
@@ -165,6 +169,9 @@ function makeEnv(opts) {
     return { ctx, sandbox, log, els, store, prfKey };
 }
 
+// ⛔ អ្វីដែលអេក្រង់បង្ហាញ = `viewState` (JSX គូរវាដោយផ្ទាល់ — `parity:dom` វាស់ការគូរ)
+function view(e) { return vm.runInContext('viewState', e.ctx); }
+
 const PIN = '135790';
 const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).digest('hex');
 
@@ -182,8 +189,9 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         ok('ស្នើ authenticator ក្នុងឧបករណ៍ (platform)', create && create.attachment === 'platform');
         ok('តម្រូវឲ្យផ្ទៀងផ្ទាត់អ្នកប្រើ (ក្រយៅដៃ/មុខ)', create && create.uv === 'required');
         ok('ចង rp ទៅ hostname ពិត', create && create.rpId === 'app.example.com');
-        ok('UI ប្តូរទៅ «បើក»', e.els.biometricToggleState.textContent === 'បើក', e.els.biometricToggleState.textContent);
-        ok('ប៊ូតុងក្នុងប្រអប់ PIN លេចឡើង', e.els.pinBiometricBtn.style.display === '');
+        ok('UI ប្តូរទៅ «បើក»', view(e).biometricToggleText === 'បើក', view(e).biometricToggleText);
+        ok('កុងតាក់ក្នុងម៉ឺនុយ «បើក» (is-on)', view(e).biometricToggleOn === true);
+        ok('ប៊ូតុងក្នុងប្រអប់ PIN លេចឡើង', view(e).pinBiometricVisible === true);
     }
 
     console.log('\n=== ដោះសោដោយក្រយៅដៃ/មុខ ជំនួសការវាយ PIN ===');
@@ -197,6 +205,7 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         ok('⛔ ផ្លូវជីវមាត្រក៏រក្សាសោ Lookup ដែរ (មិនត្រឹមផ្លូវវាយ PIN)',
             e.sandbox.__rememberedKeys.length === 1, e.sandbox.__rememberedKeys);
         ok('ដោះសោបានជោគជ័យ', okUnlock === true);
+        ok('ប៊ូតុងស្កេនលែង «កំពុងស្កេន...» ក្រោយចប់', view(e).pinBiometricBusy === false);
         ok('បិទប្រអប់ PIN', e.log.modalsClosed.indexOf('pinModal') !== -1);
         ok('រត់សកម្មភាពគោលដៅ', e.log.target.indexOf('openConfigModal') !== -1);
         ok('ដោះកូនសោ Lookup API ចេញពី PIN ពិត',
@@ -279,8 +288,9 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
         await e.sandbox.startBiometricEnrollment(PIN);
         e.sandbox.toggleBiometricUnlock();
         ok('បិទ ➜ លុបការចង', !('zoew_biometric_unlock_v1' in e.store));
-        ok('UI ត្រឡប់ទៅ «បិទ»', e.els.biometricToggleState.textContent === 'បិទ');
-        ok('ប៊ូតុងក្នុងប្រអប់ PIN លាក់វិញ', e.els.pinBiometricBtn.style.display === 'none');
+        ok('UI ត្រឡប់ទៅ «បិទ»', view(e).biometricToggleText === 'បិទ', view(e).biometricToggleText);
+        ok('កុងតាក់ក្នុងម៉ឺនុយលែង «បើក»', view(e).biometricToggleOn === false);
+        ok('ប៊ូតុងក្នុងប្រអប់ PIN លាក់វិញ', view(e).pinBiometricVisible === false);
     }
     {
         const e = makeEnv({ prf: true, storage: { zoew_security_pin_hash: PIN_HASH } });
@@ -292,8 +302,9 @@ const PIN_HASH = 'pbkdf2:' + crypto.createHash('sha256').update('v2' + PIN).dige
     {
         const e = makeEnv({ platform: false, storage: { zoew_security_pin_hash: PIN_HASH } });
         await e.sandbox.initBiometricUi();
-        ok('ឧបករណ៍មិនគាំទ្រ ➜ ម៉ឺនុយបង្ហាញ «មិនគាំទ្រ»', e.els.biometricToggleState.textContent === 'មិនគាំទ្រ',
-            e.els.biometricToggleState.textContent);
+        ok('ឧបករណ៍មិនគាំទ្រ ➜ ម៉ឺនុយបង្ហាញ «មិនគាំទ្រ»', view(e).biometricToggleText === 'មិនគាំទ្រ',
+            view(e).biometricToggleText);
+        ok('ឧបករណ៍មិនគាំទ្រ ➜ កុងតាក់ទទួល is-unsupported', view(e).biometricUnsupported === true);
     }
 
     console.log('\n=== ការតភ្ជាប់ក្នុង index.html និង style.css ===');

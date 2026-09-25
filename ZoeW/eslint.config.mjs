@@ -27,7 +27,7 @@ export default tseslint.config(
      *    ដែលចាប់ **កំហុសពិត** (អថេរស្ទួន · case ធ្លាក់ · `debugger`)។
      */
     {
-        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts'],
+        files: ['src/core/**/*.ts', 'src/domain/**/*.ts', 'src/features/**/*.ts', 'src/services/**/*.ts', 'src/ui/**/*.ts', 'tests/oracles/**/*.ts'],
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: { ecmaVersion: 2023, globals: { ...globals.browser, ZoeErrors: 'readonly', ZoeLicense: 'readonly', XLSX: 'readonly', ZXingWASM: 'readonly', Sentry: 'readonly', BarcodeDetector: 'readonly' } },
         rules: {

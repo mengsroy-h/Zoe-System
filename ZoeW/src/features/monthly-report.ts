@@ -3,7 +3,6 @@ import { dataState, uiState } from '../core/state';
 import { PICKUP_DATE_KEY_PATTERN, getServerNow } from '../core/clock';
 import { STATS_DAILY_VIEW_KEYS } from '../core/text';
 import { getFormattedClockTime, getZoneDateKey } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
 import { ledgerNumber } from '../domain/ledger';
 import { countPickedUpCustomers } from '../domain/pickup';
 import { updateDailyScheduleStats } from './daily-stats';
@@ -159,14 +158,6 @@ export function monthlyReportRows(report) {
     rows.push(['សរុប', t.count, cell(t.collectedCod), cell(t.collectedDod), cell(t.collectedTotal),
         cell(t.pendingTotal), t.total, t.picked, t.customers]);
     return rows;
-}
-
-export function monthlyReportMismatchNote(report) {
-    if (!report.mismatch || !report.ledger) return '';
-    return `<p class="mrep-note">⚠️ លេខសរុបប្រចាំខែក្នុង Database (COD $${report.ledger.cod.toFixed(2)}
-            · DOD $${report.ledger.dod.toFixed(2)} · ${report.ledger.count.toLocaleString()} កញ្ចប់)
-            មិនត្រូវនឹងផលបូកតាមថ្ងៃទេ។ របាយការណ៍នេះប្រើ <b>លេខតាមថ្ងៃ</b> ជាមូលដ្ឋាន
-            ព្រោះវាជាកំណត់ត្រាដែលរក្សាទុករាល់ថ្ងៃ។</p>`;
 }
 
 export function renderMonthlyReport() {

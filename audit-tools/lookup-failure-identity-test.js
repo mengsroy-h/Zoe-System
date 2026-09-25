@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderedElement } = require('./react-view');
 
 const ROOT = process.env.LOOKUPFAILURE_APP_DIR ? path.resolve(process.env.LOOKUPFAILURE_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -136,7 +137,13 @@ function buildRuntime(plan) {
         __status: statusEl
     };
     ctx.window = ctx;
+    ctx.queueMicrotask = queueMicrotask;
     vm.createContext(ctx);
+    // ⛔ ZoeW ជា React ៖ ស្ថានភាព Lookup ជា `viewState.lookupStatus` ដែល `PhoneModal.tsx` គូរជា `#lookupStatus` ➜
+    //    ស្រទាប់ React ពិតចូល sandbox ហើយ `__status` អានអត្ថបទពី **JSX ពិត**
+    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
+    Object.defineProperty(ctx, '__status', { configurable: true,
+        value: renderedElement(ROOT, ctx, 'src/app/components/modals/PhoneModal.tsx', 'PhoneModal', 'lookupStatus') });
     ['elapsedSince', 'lookupApiIsZto', 'lookupApiIsAppsScript', 'lookupApiSendsHeader', 'safeLookupReason', 'setLookupStatus',
      'retryPendingLookupAfterUnlock', 'lookupResponseError', 'markLookupTimeoutNoRetry',
      'retryTransientLookupResponse', 'noteSheetScriptVersion', 'retryAsync', 'lookupFailureCooldownMs',

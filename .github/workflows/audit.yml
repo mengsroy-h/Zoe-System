@@ -26,7 +26,7 @@ jobs:
   firebase-rules:
     name: Firebase rules ↔ payload (RTDB emulator)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +41,18 @@ jobs:
 
       - name: ដំឡើង dependency
         run: npm install --no-save --no-audit --no-fund acorn firebase-tools
+
+      # ⛔ ZoeW ជា React ➜ checker វាស់ **tree វាស់** (`ZoeW/dist-audit/measure-root`) មិនមែន repo
+      #    (repo គ្មាន `ZoeW/app.js`) ➜ build វាដោយ `run-all.sh` ដដែល រួចរត់ checker ក្នុងថតនោះ។
+      - name: ដំឡើង dependency របស់ ZoeW (React)
+        run: npm ci --prefix ZoeW --no-audit --no-fund
+
+      - name: build វាស់ (ZoeW React ➜ tree វាស់)
+        run: |
+          set -euo pipefail
+          M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)
+          test -f "$M/ZoeW/app.js"
+          echo "MEASURE=$M" >> "$GITHUB_ENV"
 
       - name: Cache RTDB emulator jar
         uses: actions/cache@v4
@@ -72,19 +84,23 @@ jobs:
         env:
           CRUD_FLOW_STRICT: '1'
           CRUD_FLOW_MIN_ASSERTS: '70'
+        working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/crud-rules-flow.js
 
       - name: witness ដែលបន្សល់ មិនត្រូវចាក់សោ id (deadlock ៣ ខាង)
         env:
           CRUD_FLOW_STRICT: '1'
+        working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/restore-deadlock-test.js
 
       - name: «អនុវត្ត ➜ ដកវិញ» ជាគូបញ្ច្រាសពិត (ledger លើ RTDB ពិត)
+        working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/ledger-revert-emu-test.js
 
       - name: ស្តារកំពុងដំណើរការ មិនត្រូវជាន់ដោយលុប ដក ឬកែតម្លៃ
         env:
           CRUD_FLOW_STRICT: '1'
+        working-directory: ${{ env.MEASURE }}
         run: node audit-tools/emu/restore-mutation-emu-test.js
 
       # ⛔ job នេះ **មាន** emulator ➜ `MONEYGUARD_STRICT=1` ធ្វើឲ្យ SKIP របស់
@@ -94,9 +110,11 @@ jobs:
       - name: ថ្នាក់លុយត្រូវមានអ្នកយាមដែលក្រហមពិត
         env:
           MONEYGUARD_STRICT: '1'
+        working-directory: ${{ env.MEASURE }}
         run: node audit-tools/money-guardian-test.js
 
       - name: rules ↔ schema (ស្តាទិច)
+        working-directory: ${{ env.MEASURE }}
         run: |
           node audit-tools/payload-schema.js
           node audit-tools/rules-duplicate-keys.js
@@ -109,7 +127,7 @@ jobs:
   audit-suite:
     name: run-all.sh (រួមតេស្ត browser)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       # ⛔ `fetch-depth: 0` ចាំបាច់។ លំនាំដើម (`1`) ទាញតែ commit តែមួយ ➜
       # គ្មាន `origin/main` ➜ `version-bump-scope.js` **SKIP រាល់ការរត់**
@@ -141,6 +159,12 @@ jobs:
           sudo mkdir -p /opt/pw-browsers/chromium-1194
           sudo ln -sfn "$(dirname "$SRC")" /opt/pw-browsers/chromium-1194/chrome-linux
           test -x /opt/pw-browsers/chromium-1194/chrome-linux/chrome
+          # ZoeW React (`ZoeW/scripts/*.mjs` ៖ smoke · sw-check · native-check) ប្រើផ្លូវ `/opt/pw-browsers/chromium`
+          sudo ln -sfn /opt/pw-browsers/chromium-1194/chrome-linux/chrome /opt/pw-browsers/chromium
+          test -x /opt/pw-browsers/chromium
+
+      - name: ដំឡើង dependency របស់ ZoeW (React ៖ run-all.sh build tree វាស់ពីវា)
+        run: npm ci --prefix ZoeW --no-audit --no-fund
 
       - name: ត្រៀម base សម្រាប់ version-bump-scope
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main

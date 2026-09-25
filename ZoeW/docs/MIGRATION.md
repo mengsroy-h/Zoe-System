@@ -46,37 +46,19 @@ env ទាំងអស់ (`ZTO_*` · `ZTO_PROXY_KEY` …) នៅដដែល �
 ⛔ **ការប្រើស្របគ្នាមានសុវត្ថិភាព** ៖ App ទាំង ២ សរសេរតាមច្បាប់ដដែល
 (transaction · registry · ledger) ➜ ពួកវាមើលឃើញគ្នាទៅវិញទៅមកដូចឧបករណ៍ ២។
 
-### ដំណាក់ ២ — merge ចូល `main`
+### ដំណាក់ ២ — merge ចូល `main` ✅ (App React ជាផលិតកម្មរួច)
 
-⛔ **លក្ខខណ្ឌ ២ មុន merge** ៖
+⛔ **លក្ខខណ្ឌ ២ ដែលត្រូវរក្សាសម្រាប់រាល់ PR បន្ទាប់** ៖
 
-១. ឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធឆ្លងកាត់ (ដំណាក់ ១)។
-២. **សំណុំ `audit-tools/run-all.sh` ត្រូវវាស់ App នេះបានពិត** — ឥឡូវ checker
-   ភាគច្រើនធ្លាក់ដោយ **រចនាសម្ព័ន្ធ** (ស្រង់អត្ថបទពី `app.js` · អាន markup ថេរក្នុង
-   `index.html` · ជំនួស `window.<fn>`) ➜ ពួកវា **មិនបានវាស់** App នេះ (មើល
-   [`PARITY.md`](PARITY.md) ផ្នែក ៥)។ តារាង «ច្បាប់ ➜ ឧបករណ៍» នៃ `CLAUDE.md` ជា
-   **ការចងចាំ** របស់គម្រោង ➜ merge ខណៈអ្នកយាមមិនរត់ = បិទការការពារលុយ
-   ដែលសាងអស់ ២០០ ជុំ។ ការងារ ៖ ផ្ទេរ checker ទៅស្រង់ពី `src/**` (ឈ្មោះ function
-   ដដែល) ឬហៅតាម module ជំនួស `window` · ចាត់ឯកសារថ្មីក្នុង
-   `audit-tools/repository-file-coverage.json` · ⛔ ផ្ទេរ `money-reality-check.js`
-   (ឧបករណ៍ `check-money.cmd` ដែលអ្នកប្រើរត់លើ dump ផលិតកម្ម) ព្រោះវាស្រង់
-   **កូដលុយពិត** ពី `ZoeW/app.js` ➜ ឥឡូវវា **លែងដើរ**។
+១. PR ដែលប៉ះ PTR · ចលនាផ្ទាំង · ការរមូរ · ផ្លូវ native ➜ សាកលើឧបករណ៍ពិតទាំង ២ ប្រព័ន្ធ (ដំណាក់ ១)។
+២. **សំណុំ `audit-tools/run-all.sh` វាស់ App នេះបានពិត** ✅ — `run-all.sh` build tree វាស់
+   (`scripts/build-audit.mjs` ➜ `dist-audit/ZoeW`) ហើយរត់ checker **ទាំងអស់** នៅទីនោះ (មើល
+   [`PARITY.md`](PARITY.md) ផ្នែក ៥) · `zoew-suite-test.js` រត់អ្នកយាមផ្ទាល់ខ្លួនរបស់ React ·
+   `check-money.cmd` អានកូដលុយពី `audit-tools/money-core.js`។ ⛔ លក្ខខណ្ឌនេះ **ត្រូវរក្សា** ៖
+   រត់ `bash audit-tools/run-all.sh` ពេញ (emulator រត់ · `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1`) ហើយ
+   **០ ធ្លាក់ · ០ មួយផ្នែក · ០ រំលង** មុនរាល់ merge។
 
-   **ស្រទាប់ build វាស់** (`npm run audit:build` ➜ `dist-audit/ZoeW`) — checker **មិនប្តូរ** ៖
-   - `app.js` = **ទិដ្ឋភាពអត្ថបទ** ពីប្រភព TypeScript (`scripts/checker-view.mjs`) ៖ លុបតែ syntax
-     របស់ type (ផ្ទៀងផ្ទាត់ token ទល់ token ជាមួយ `stripTypeScriptTypes` របស់ Node) · ទម្រង់ដើម ·
-     `<ឃ្លាំង>.<វាល>` ➜ `<វាល>` · `elementOf` ➜ `getElementById` · `commitNow` ទទេ។ ⛔ មិនដែលរត់។
-   - `index.html` = markup ដំបូងរបស់ React (Chromium ពិត ថតក្រោយ commit ដំបូង មុន boot) +
-     `data-act`/`data-args`/`data-on` ដែលអានពី prop ពិតរបស់ React (`src/audit-annotate.ts`)។
-     `createRoot()` សម្អាត markup នោះនៅ commit ដំបូង ➜ checker browser ឃើញ App រស់។
-   - ⛔ **សុពលភាព** ៖ `money-guardian` ចាក់ mutation លុយ **១០/១០** ចូលកូដ React ហើយអ្នកយាម **ចាប់បានទាំងអស់**។
-
-   **នៅសល់ (ត្រូវកែ checker ខ្លួនឯង)** ៖ ស្ថានភាពថ្មីរបស់ React (`uiState`/`viewState` វាលថ្មី) មិនមានក្នុង
-   sandbox `vm` · អត្ថបទ/`onAct("x")` ផ្លាស់ទៅ JSX · checker ដែលវាស់ `let` កម្រិត module (`state-hygiene`)
-   មើលមិនឃើញ state ក្នុងឃ្លាំង · `check-money.cmd` ត្រូវចង្អុលទៅ `dist-audit` · `run-all.sh` ត្រូវ build
-   `dist-audit` មុន។
-
-បន្ទាប់ពីលក្ខខណ្ឌទាំង ២ ឆ្លងកាត់តែប៉ុណ្ណោះ។ ផលិតកម្មប្រើ **origin ដដែល**
+ផលិតកម្មប្រើ **origin ដដែល**
 ➜ Config · PIN · License · ការកំណត់ Locker · កុងតាក់ ZTO **នៅដដែល** ៖ អ្នកប្រើមិនបាច់
 តំឡើងឡើងវិញទេ។
 
@@ -89,9 +71,8 @@ Worker ចាស់ជំនួស SW ថ្មីនៅការបើកលើ
 
 ## ៣. Service Worker និងសំបកចាស់
 
-កំណែ cache ថ្មីជា `zoew-v223` ដែលបន្តលំដាប់ `zoew-v222` របស់ ZoeW ដើម។ SW លុប
-cache ដែលចាប់ផ្តើមដោយ `zoew-` ទាំងអស់ដែលមិនមែនជាកំណែបច្ចុប្បន្ន ➜ សំបកចាស់
-ត្រូវបោះចោលដោយស្វ័យប្រវត្តិ។
+`CACHE_VERSION` របស់ App React (`src/sw/cache-version.ts`) បន្តលំដាប់ `zoew-vN` របស់ ZoeW ដើម។ SW លុប
+cache ដែលចាប់ផ្តើមដោយ `zoew-` ទាំងអស់ដែលមិនមែនជាកំណែបច្ចុប្បន្ន ➜ សំបកចាស់ត្រូវបោះចោលដោយស្វ័យប្រវត្តិ។
 
 ⛔ បើអ្នកប្រើនៅតែឃើញ App ចាស់ ៖ វាជា Service Worker ចាស់ដែលនៅ control ។ វាត្រូវ
 ជំនួសខ្លួនក្នុងការបើកលើកក្រោយ (`skipWaiting` + `clients.claim`)។ បើចាំបាច់ ៖
@@ -107,8 +88,7 @@ cache ដែលចាប់ផ្តើមដោយ `zoew-` ទាំងអស�
 - `npm run verify` បៃតង
 - `npm run parity:deep` · `npm run logic:check` ៖ បើការកែប្រែឥរិយាបថ **ដោយចេតនា**
   ភាពខុសគ្នាធៀបនឹងដើមនឹងលេច — នោះជាការរំពឹងទុក ➜ ពន្យល់វាក្នុង `docs/HISTORY.md`
-- ⛔ `npm run generate` **ចាក់សោ** (វាសរសេរជាន់ `src/` ទាំងមូល) — ប្រើតែពេលចង់
-  ផលិតឡើងវិញពីដើមដោយដឹងច្បាស់ (`ALLOW_REGENERATE=1`)
+- `bash audit-tools/run-all.sh` (ពី root) បៃតង — CI ពេញក្នុង session
 
 ---
 

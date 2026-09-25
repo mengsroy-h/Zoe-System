@@ -140,6 +140,32 @@ for (const cfg of APPS) {
     check(cfg.name + '៖ inventory មាន dynamic action route >= ' + cfg.minRoutes,
         dynamicRoutes.size >= cfg.minRoutes, dynamicRoutes.size);
 
+    // ⛔ ZoeW ជា React ៖ ការយោងជាច្រើនរស់ក្នុង JSX (`onClick={togglePanelFromHandle}` · hook · helper របស់ component)
+    //    ➜ រាប់ identifier ក្នុង `components.js` (ទិដ្ឋភាពអត្ថបទនៃ `.tsx` — build-audit ២ឃ) ផង ⛔ **លើកលែង** បន្ទាត់
+    //    `import`/`export {…}` (ការនាំចូលដោយគ្មានការប្រើ មិនមែនការយោងទេ)
+    const componentsText = read(cfg.name + '/components.js');
+    if (componentsText) {
+        const body = componentsText.replace(/^import [^\n]*;$/gm, '').replace(/^export \{[\s\S]*?\};$/gm, '');
+        let jsxRefs = 0;
+        for (const t of acorn.tokenizer(body, { ecmaVersion: 'latest', sourceType: 'module' })) {
+            if (t.type.label !== 'name') continue;
+            identifierCounts.set(t.value, (identifierCounts.get(t.value) || 0) + 1);
+            jsxRefs++;
+        }
+        check(cfg.name + '៖ ជាន់អប្បបរមា ៖ រាប់ការយោងពី JSX (`components.js`) បាន', jsxRefs > 5000, jsxRefs);
+    }
+    // ⛔ តួ **ដើម** នៃ function ដែលទិដ្ឋភាព checker override (`view-originals.js` — build-audit ២) ៖ ការយោងក្នុងវា
+    //    (ឧ. `commitNow()` ➜ `allStores()`) ជាការយោងពិតក្នុងកូដ ship ➜ រាប់ ⛔ **លើកលែង** ឈ្មោះរបស់ function ដែលប្រកាស
+    //    (ការប្រកាសខ្លួនឯងមិនមែនការយោង)
+    const originalsText = read(cfg.name + '/view-originals.js');
+    if (originalsText) {
+        const body = originalsText.replace(/^(\s*)(async )?function [A-Za-z_$][\w$]*/gm, '$1$2function ');
+        for (const t of acorn.tokenizer(body, { ecmaVersion: 'latest', sourceType: 'module' })) {
+            if (t.type.label !== 'name') continue;
+            identifierCounts.set(t.value, (identifierCounts.get(t.value) || 0) + 1);
+        }
+    }
+
     const topNames = new Set(top.map((item) => item.name));
     const missingRoutes = [...dynamicRoutes].filter((name) => !topNames.has(name)).sort();
     check(cfg.name + '៖ data-act/data-close/allowlist ទាំងអស់មាន function ពិត',

@@ -120,7 +120,7 @@ npm test
 តារាងប្រវត្តិត្រូវសរសេរឡើងវិញជា React component ពិត។ ភាពដូចគ្នាត្រូវវាស់
 **មិនមែនសន្មត** ៖
 
-- `buildHistoryRowHtml()` ចាស់ ធៀបនឹង `<HistoryRow>` ថ្មី លើទិន្នន័យ
+- `buildHistoryRowHtml()` ចាស់ (oracle ក្នុង `tests/oracles/history-row-html.ts` — មិនចូលផលិតកម្ម) ធៀបនឹង `<HistoryRow>` ថ្មី លើទិន្នន័យ
   **ចៃដន្យ ៣០០ ធាតុ** ដែលគ្រប ៖ គ្មានលេខទូរស័ព្ទ · សញ្ញាខល ៤ ប្រភេទ ·
   បិទ/បើក · មាន/គ្មាន barcode · COD តែម្យ៉ាង · DOD តែម្យ៉ាង · ទាំង ២ ·
   សូន្យ · Locker ច្រើន · អក្សរដែលព្យាយាមចាក់ HTML
@@ -132,48 +132,24 @@ npm test
 ## ៥. checker របស់ `audit-tools/`
 
 ```bash
-npm run audit:build      # ➜ dist-audit/ZoeW
-npm run audit:run        # checker នីមួយៗ ចង្អុល *_APP_DIR មក tree នោះ
+bash audit-tools/run-all.sh      # ពី root របស់ repo ៖ build វាស់ + checker ទាំងអស់ (CI ក្នុង session)
 ```
 
-ឬរត់ `run-all.sh` ដូច CI លើ repo ស្រមោលដែល `ZoeW/` ជា `dist-audit/ZoeW` ។
+checker របស់ ZoeW ដើមត្រូវសរសេរសម្រាប់ស្ថាបត្យកម្ម **ឯកសារតែមួយ · global · អត្ថបទថេរ**។
+`scripts/build-audit.mjs` សាង **build វាស់** (`dist-audit/ZoeW`) ដែលផ្តល់រូបរាងនោះពីប្រភពពិត ៖
 
-checker ១៨០+ របស់ ZoeW ដើមត្រូវសរសេរសម្រាប់ស្ថាបត្យកម្ម **ឯកសារតែមួយ ·
-global · អត្ថបទថេរ**។ `scripts/build-audit.mjs` សាង tree ដែល ៖
+- **`app.js`** = ទិដ្ឋភាពអត្ថបទនៃ `src/**` (`scripts/checker-view.mjs` ៖ លុបតែ syntax របស់ type — ផ្ទៀងផ្ទាត់
+  token ទល់ token · `<ឃ្លាំង>.<វាល>` ➜ `<វាល>`) — ⛔ មិនដែលរត់ក្នុង browser ទេ ៖ វាសម្រាប់ checker ដែលស្រង់អត្ថបទ។
+- **`index.html`** = markup ដំបូងដែល React គូរពិត + `data-act` ពី prop ពិត (`src/audit-annotate.ts`)។
+- **`assets/` · `sw.js`** = build Vite ដដែលនឹងផលិតកម្ម បូក `VITE_EXPOSE_GLOBALS=1` ➜ function · state លើ `window`
+  (`src/expose-globals.ts`) និងការជំនួស `window.<fn>` ដែលឆ្លងដល់ការហៅខាងក្នុង module (plugin `zoew-audit-rebind`)។
+  ⛔ `npm run smoke` ចាក់សោថា bridge ទាំងនេះ **មិនចូល** build ផលិតកម្ម។
+- **`react-render.cjs` · `components.js` · `audit-module-views.json`** = ការគូរ JSX ពិត · ទិដ្ឋភាពអត្ថបទនៃ component ·
+  ទិដ្ឋភាពតាម module សម្រាប់ checker ដែលត្រូវការព្រំដែនឯកសារ។
 
-- **`index.html` · `assets/` · `sw.js`** = build របស់ Vite ដដែលនឹងផលិតកម្ម បូក
-  `VITE_EXPOSE_GLOBALS=1` ➜ checker browser បើក **App React ពិត**។
-- **`app.js`** = bundle IIFE ដែលមិន minify នៃ module តក្កវិជ្ជា — **មិនត្រូវ
-  `index.html` ផ្ទុក** ទេ ៖ វាមានសម្រាប់តែ checker ដែលស្រង់អត្ថបទ។
-- `netlify.toml` · `package.json` · Function · README = **ច្បាប់ចម្លងពី tree ថ្មី**
-  (⛔ មិនមែនឯកសាររបស់ ZoeW ដើម — នោះជាការវាស់ឯកសារចាស់)។
-
-### ⛔ អ្វីដែលវាបញ្ជាក់ និងមិនបញ្ជាក់
-
-checker ដែលវាស់ **ឥរិយាបថតាម browser ឬតាម `window`** ដើរ — រួមទាំង checker
-លុយ (`revenue-fuzz` · `ledger-clamp-symmetry` · `collected-mirror-*` ·
-`stats-truth` · `slow-write` · `field-shape`) និងតំបន់ហាមចូលទាំង ៣
-(`gesture` · `panel-motion` · `ios-panel-glide`)។
-
-checker ដែល **ធ្លាក់ដោយរចនាសម្ព័ន្ធ** មាន ៣ ថ្នាក់ ៖
-
-| ថ្នាក់ | ហេតុ | ឧទាហរណ៍ |
-|---|---|---|
-| ស្រង់អត្ថបទពី `app.js` | bundler សរសេរ `var` ជំនួស `const` · ប្តូរឈ្មោះពេលជាន់គ្នា (`sanitizeInput2`) · state ឥឡូវជា `firebaseState.db` · marker ផ្លាស់ទី · `sw.js` minify | `policy-test` · `html-sink-escaping` · `sw-cache-key` (ផ្នែកស្តាទិច) |
-| អាន markup ថេរក្នុង `index.html` | markup ឥឡូវជា JSX ➜ `index.html` មានតែ `#root` | `wiring` · `version-check` · `secret-hygiene` · `action-binding-test` |
-| ជំនួស `window.<fn>` ដើម្បីចាប់ ឬ stub | ការហៅខាងក្នុង module ឆ្លងកាត់ **ES binding** មិនមែន `window` ➜ ការជំនួសមិនប៉ះ | `duplicate-scan` (`window.showToast = …`) · `duplicate-money` |
-
-⛔ **ការធ្លាក់ទាំងនោះ មិនមែនភស្តុតាងថាគ្មានកំហុសទេ** — វាមានន័យថា
-**checker នោះមិនបានវាស់ App នេះ**។ ការវាស់ឥរិយាបថជំនួសរស់នៅផ្នែក ២ · ៣ · ៤
-ខាងលើ ហើយវាប្រៀបធៀបនឹង **App ចាស់ដែលកំពុងរត់ពិតៗ**។ ការផ្ទេរ checker ទាំងនោះ
-មកស្ថាបត្យកម្ម module ជាការងារដែលនៅសល់ (មើល [`MIGRATION.md`](MIGRATION.md))។
-
-⛔ **checker ដើមរកឃើញកំហុសពិតដែល parity មើលមិនឃើញ** ៖ `"type": "module"`
-ក្នុង `package.json` ធ្វើឲ្យ Node ផ្ទុក Function ZTO (`require`) ជា ES module ·
-`package-lock.json` ឃ្លាតពី `package.json` · sourcemap ship កូដដែលមាន
-comment · README ខុសច្បាប់ ៩ ➜ កែរួចទាំងអស់។ ⛔ មេរៀន ៖ parity ប្រៀបធៀប
-**App** ចាស់នឹងថ្មី តែ Function ខាង server និងឯកសារ repo **ស្ថិតក្រៅ** App ➜
-checker ដើមនៅតែចាំបាច់។
+`run-all.sh` ប្រមូល tree វាស់ (`dist-audit/measure-root`) ហើយរត់ checker **ទាំងអស់** នៅទីនោះ; checker កម្រិត repo
+(`version-bump-scope` · `repository-file-coverage` · `zoew-suite`) ចង្អុលទៅ repo ពិតតាម env។ ⛔ ការធ្លាក់របស់ checker
+លើ tree វាស់ = **កំហុសពិត ឬ checker ដែលមិនទាន់ស្គាល់ React** — មិនមែន «សំណល់នៃការវាស់» ដែលអាចមិនអើពើ។
 
 ---
 

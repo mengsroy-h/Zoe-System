@@ -103,7 +103,10 @@ const ACCEPTED = {
         currentAppPage: 'view preference, no customer data',
         lockerAssignGeneration: 'monotonic guard counter',
         appIsLocked: 'app-lock screen state, recomputed from scratch by initAppLock() on every page load; it guards a screen shown BEFORE sign-in, so it holds no customer data. Resetting it on logout would visually unlock a locked screen',
-        appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path'
+        appLockBusy: 'reentrancy guard for the unlock button; cleared by setAppLockBusy(false) in the finally of every unlock path',
+        // ⛔ React ៖ ស្រទាប់ឃ្លាំង (`core/store.ts`) — មិនមែនទិន្នន័យអតិថិជន
+        immediateCommit: 'React store plumbing: the commitNow() hook registered once by the React layer (a function, no customer data)',
+        immediateDepth: 'React store plumbing: reentrancy depth of commitImmediately(), always back to 0 in its finally (a number, no customer data)'
     }
 };
 ACCEPTED.ZoeKeyGen = Object.assign({}, ACCEPTED.ZoeW, {

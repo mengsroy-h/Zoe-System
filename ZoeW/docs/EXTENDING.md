@@ -63,7 +63,7 @@ DOM សោះ** ហើយ `src/app/**` (component · កាយវិការ ·
 | បើក/បិទប្រអប់ | `el.style.display = 'flex'` | `openModalHelper(id)` · `closeModal(id)` (ប្រអប់ថ្មី ៖ `<Modal id=…>` + បន្ថែម id ក្នុង `MODAL_IDS`) |
 | អត្ថបទ · ស្លាក · ប៊ូតុងរវល់ | `el.textContent = …` · `btn.disabled = …` | វាលក្នុង `viewState` (`src/core/view-state.ts`) ➜ JSX អាន |
 | class ស្ថានភាព (បើក · បង្រួម · លាក់) | `el.classList.toggle(…)` | វាលក្នុង `uiState` ➜ JSX គណនា `className` |
-| តម្លៃ input · focus · វាស់ · រមូរ | `byId(id).value` · `.focus()` | `fieldValue()` · `setFieldValue()` · `focusField()` · `elementRect()` · `setScrollTop()` (`src/app/refs.ts`) |
+| តម្លៃ input · focus · វាស់ · រមូរ | `byId(id).value` · `.focus()` | `fieldValue()` · `setFieldValue()` · `focusField()` · `elementSize()` · `setScrollTop()` (`src/app/refs.ts`) |
 | `<head>` · ទាញយកឯកសារ · canvas ក្រៅអេក្រង់ · រមូរ document | `document.createElement(…)` · `window.scrollTo()` | `src/platform/document-io.ts` |
 | ព្រឹត្តិការណ៍លើធាតុ (ចុច · វាយ · focus · ទម្លាក់ឯកសារ) | `el.addEventListener(…)` | prop របស់ JSX (`onClick` · `onInput` · `onKeyDown` · `onFocus` · `onDrop` …) — ⛔ native តែពេល React ធ្វើមិនបាន (`touch*` non-passive · `document`/`window`) |
 | ទីតាំង · ទំហំដែលវាស់ (ឧ. ប្រអប់ណែនាំ) | `el.style.top = …` | វាស់ ➜ វាលក្នុង `uiState` ➜ `style={…}` ក្នុង JSX (`commitNow()` មុនវាស់បន្ត) |

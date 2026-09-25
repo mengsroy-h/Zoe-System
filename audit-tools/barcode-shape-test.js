@@ -27,12 +27,16 @@ function extractFn(src, name) {
         sliceBalanced(src, braceAt, '{', '}');
 }
 
+// ⛔ ជ្រើសប្លុកតាម **ខ្លឹមសារ** (ប្លុកដែល normalize barcode) មិនមែនតាមលំដាប់ក្នុងឯកសារ ៖ `scanHistory.forEach`
+//    មានច្រើនកន្លែង (ការសម្អាត ២ម៉ោង/៧ថ្ងៃ ក៏ដើរតាមវា) ហើយលំដាប់ module ប្រែ ➜ «ទី ១» មិនមែនអត្តសញ្ញាណ។
 function extractNormalizer(src) {
     const anchor = 'scanHistory.forEach(item => {';
-    const at = src.indexOf(anchor);
-    if (at === -1) throw new Error('normalizer anchor not found');
-    const braceAt = src.indexOf('{', at + anchor.length - 1);
-    return sliceBalanced(src, braceAt, '{', '}');
+    for (let at = src.indexOf(anchor); at !== -1; at = src.indexOf(anchor, at + 1)) {
+        const braceAt = src.indexOf('{', at + anchor.length - 1);
+        const body = sliceBalanced(src, braceAt, '{', '}');
+        if (/normalizeBarcodesOf\(item\)/.test(body)) return body;
+    }
+    throw new Error('normalizer anchor not found');
 }
 
 function makeCtx(src) {

@@ -1,6 +1,7 @@
 const acorn = require('acorn');
 const fs = require('fs');
 const path = require('path');
+const { actionUsages } = require('./react-view');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const root = process.env.WIRING_APP_DIR ? path.resolve(process.env.WIRING_APP_DIR) : path.resolve(__dirname, '..');
@@ -53,6 +54,14 @@ for (const app of APPS) {
     // ច្បាប់ដដែលនៅដដែល៖ អ្វីដែល HTML យោង ត្រូវតែមានពិតក្នុង JS។
     const src = html + '\n' + js;
     const acts = new Set([...src.matchAll(/data-act="([^"$]+)"/g)].map((m) => m[1]));
+    // App React ៖ សកម្មភាពហៅតាម `onAct("x")` / `act("x")` ក្នុង JSX និងម៉ឺនុយ (...) ដែលគូរ `data-act={it.action}`
+    // ពី view-model ➜ ការដេរីវេតែមួយ `actionUsages()` (រួមជាមួយ `csp-enforced-test`)។
+    try {
+        const reactActs = actionUsages(path.join(root, app), js);
+        if (reactActs) reactActs.forEach((a) => acts.add(a));
+    } catch (e) {
+        bad(app, 'React action usages unreadable', e.message);
+    }
     if (acts.size === 0) bad(app, 'no data-act handlers found', 'ការចាប់ព្រឹត្តិការណ៍បាត់ទាំងស្រុង?');
     const allowBlock = (/const ACTION_ALLOWLIST = \[([\s\S]*?)\];/.exec(js) || [])[1];
     if (allowBlock === undefined) bad(app, 'ACTION_ALLOWLIST missing', 'dispatcher គ្មានបញ្ជីអនុញ្ញាត');

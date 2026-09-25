@@ -163,6 +163,8 @@ function dispatchFetch(sw, request) {
 }
 
 const req = (url, mode) => ({ url: url, method: 'GET', mode: mode || 'no-cors' });
+// ⛔ asset JS ស្នូលរបស់ App ដេរីវេពី `CORE_SHELL` ពិតរបស់ sw.js (App React ៖ `assets/index-<hash>.js` · ZoeKeyGen ៖ `app.js`)
+const shellJs = (app) => require('./react-view').swShell(ROOT, app).appJs.replace(/^\.\//, '');
 
 async function swSection() {
     for (const app of APPS) {
@@ -199,7 +201,7 @@ async function swSection() {
         {
             const clock = makeClock();
             const sw = loadSw(app, { clock: clock, cacheMode: 'open', seed: {} });
-            const p = dispatchFetch(sw, req('https://example.test/app.js'));
+            const p = dispatchFetch(sw, req('https://example.test/' + shellJs(app)));
             const out = await settlesWithin(p, SETTLE_BUDGET_MS, clock);
             ok(app + ' ៖ cache បរាជ័យ + បណ្តាញព្យួរ ➜ `networkOnly()` ត្រូវ settle',
                 !!out, 'មិន settle ➜ រាល់សំណើព្យួរអស់កល្ប');
@@ -213,8 +215,8 @@ async function swSection() {
         {
             const clock = makeClock();
             const cached = makeResponse(200, 'cached');
-            const sw = loadSw(app, { clock: clock, seed: { 'https://example.test/app.js': cached } });
-            const out = await settlesWithin(dispatchFetch(sw, req('https://example.test/app.js')), 50, clock);
+            const sw = loadSw(app, { clock: clock, seed: { ['https://example.test/' + shellJs(app)]: cached } });
+            const out = await settlesWithin(dispatchFetch(sw, req('https://example.test/' + shellJs(app))), 50, clock);
             ok(app + ' ៖ ⛔ ទិសផ្ទុយ — សំបកក្នុង cache ឆ្លើយភ្លាម ទោះបណ្តាញព្យួរ',
                 out && out.state === 'resolved' && out.value && out.value.__tag === 'cached',
                 JSON.stringify(out && out.value));
@@ -256,7 +258,10 @@ async function scriptSection() {
         }
     };
     ctx.globalThis = ctx;
+    ctx.queueMicrotask = queueMicrotask;
     vm.createContext(ctx);
+    // ⛔ React ៖ `loadScriptOnce()` សាង `<script>` តាមច្រកចេញ `injectScript()` (`platform/document-io.ts`) ➜ កូដពិតរបស់វា
+    vm.runInContext(require('./react-view').reactRuntime(src, { context: ctx }), ctx);
     vm.runInContext(body, ctx, { filename: 'ZoeW/app.js#loadScriptOnce' });
 
     const first = ctx.loadScriptOnce('xlsx');
@@ -296,7 +301,9 @@ async function scriptSection() {
             }
         };
         ctx2.globalThis = ctx2;
+        ctx2.queueMicrotask = queueMicrotask;
         vm.createContext(ctx2);
+        vm.runInContext(require('./react-view').reactRuntime(src, { context: ctx2 }), ctx2);
         vm.runInContext(body, ctx2, { filename: 'ZoeW/app.js#loadScriptOnce' });
         const good = ctx2.loadScriptOnce('xlsx');
         const res = await settlesWithin(good, 5000, clock2);

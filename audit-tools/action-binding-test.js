@@ -68,6 +68,71 @@ function actionElements(html) {
     return { map: map, names: names };
 }
 
+// App React ៖ តារាង selector ដែល `elementOf()` (ទិដ្ឋភាព `refs.ts`) ប្រកាស — គ្មាន function នេះ (App ដើម) ➜ `null`
+function elementOfSelectors(ast) {
+    let table = null;
+    walk(ast, (n) => {
+        if (table || n.type !== 'FunctionDeclaration' || !n.id || n.id.name !== 'elementOf') return;
+        walk(n.body, (o) => {
+            if (table || o.type !== 'ObjectExpression') return;
+            const map = new Map();
+            for (const p of o.properties) {
+                if (p.type !== 'Property' || p.computed || p.value.type !== 'Literal') return;
+                const key = p.key.type === 'Identifier' ? p.key.name : p.key.value;
+                map.set(String(key), p.value.value);
+            }
+            table = map;
+        });
+        if (!table) table = new Map();
+    });
+    return table;
+}
+function refIdOf(selectors, name) {
+    if (!selectors.has(name)) return name;
+    const sel = selectors.get(name);
+    return (typeof sel === 'string' && /^#[\w-]+$/.test(sel)) ? sel.slice(1) : null;
+}
+
+// App React ៖ អ្នកស្តាប់ native ដែល JSX ចងតាម `refWithNative('<ref>', '<evt>', handler)` (`components.js`)
+// ➜ វាជា `addEventListener` លើធាតុរបស់ React ដដែល ៖ បើធាតុនោះមាន `onX={onAct('a')}` ហើយ handler
+// native ក៏ហៅ `act('a')` ➜ សកម្មភាពរត់ ២ ដង។ `components.js` ជា module ច្រើនភ្ជាប់គ្នា ➜ parse ម្តងមួយ។
+// ⛔ ទិសផ្ទុយ ៖ ធាតុ JSX ដែលមាន `id` ហើយចង handler **មិនមែន** `onAct()` (`onInput={…}` · `onDrop={…}`) ជាការចង
+// JS សេរី ➜ វាចូលសំណាកទិសផ្ទុយ (`jsxBound`) ដូច `addEventListener` លើធាតុគ្មាន `data-act` ក្នុង App ដើម។
+function componentNativeBindings(text, selectors) {
+    const out = [];
+    const jsxBound = new Set();
+    const parts = text.split(/^\/\/ === (.+)$/m);
+    for (let i = 1; i < parts.length; i += 2) {
+        const file = parts[i].trim();
+        const ast = acorn.parse(parts[i + 1], { ecmaVersion: 2022, sourceType: 'module', locations: true });
+        walk(ast, (n) => {
+            if (n.type !== 'CallExpression' || n.callee.type !== 'Identifier' || n.callee.name !== 'refWithNative') return;
+            const [nameArg, evtArg, handler] = n.arguments;
+            if (!nameArg || nameArg.type !== 'Literal' || !evtArg || evtArg.type !== 'Literal') return;
+            const id = refIdOf(selectors || new Map(), String(nameArg.value));
+            let fn = null;
+            if (handler) walk(handler, (c) => {
+                if (fn || c.type !== 'CallExpression' || c.callee.type !== 'Identifier' || !/^(?:onAct|act)$/.test(c.callee.name)) return;
+                const a = c.arguments[0];
+                if (a && a.type === 'Literal' && typeof a.value === 'string') fn = a.value;
+            });
+            if (id) out.push({ id: id, evt: String(evtArg.value).toLowerCase(), fn: fn, where: file + ':' + n.loc.start.line });
+        });
+        walk(ast, (n) => {
+            if (n.type !== 'CallExpression' || n.callee.type !== 'Identifier' || !/^jsxs?$/.test(n.callee.name)) return;
+            const props = n.arguments[1];
+            if (!props || props.type !== 'ObjectExpression') return;
+            const key = (p) => p.type === 'Property' && !p.computed ? (p.key.type === 'Identifier' ? p.key.name : String(p.key.value)) : null;
+            const idProp = props.properties.find((p) => key(p) === 'id');
+            if (!idProp || idProp.value.type !== 'Literal' || typeof idProp.value.value !== 'string') return;
+            const free = props.properties.some((p) => /^on[A-Z]/.test(key(p) || '') &&
+                !(p.value.type === 'CallExpression' && p.value.callee.type === 'Identifier' && p.value.callee.name === 'onAct'));
+            if (free) jsxBound.add(idProp.value.value);
+        });
+    }
+    return { native: out, jsxBound: jsxBound };
+}
+
 // ធាតុដែលចងតាម JS ៖ id ➜ ការចង
 // ⛔ ការតាមដានអថេរត្រូវគោរព **scope** ៖ ឈ្មោះ `btn` រស់នៅក្នុង function
 // ដប់ៗ ➜ map សកលធ្វើឲ្យ `createElement('button')` ក្នុង function មួយ
@@ -83,12 +148,17 @@ function jsBindings(src) {
         if (!map.has(id)) map.set(id, new Map());
         if (!map.get(id).has(evt)) map.get(id).set(evt, info);
     }
+    // App React ៖ ធាតុរបស់ React រកតាម `elementOf('<ឈ្មោះ ref>')` (ទិដ្ឋភាព `refs.ts`) — ឈ្មោះ ref ជា id
+    // លើកលែងតែ selector ដែល `elementOf` ខ្លួនវាប្រកាស (`#id` ➜ id នោះ · class/`null` ➜ គ្មាន id)
+    const refSelectors = elementOfSelectors(ast);
     function idFromCall(node) {
         if (!node || node.type !== 'CallExpression') return null;
         const c = node.callee;
-        if (c.type !== 'MemberExpression' || c.property.name !== 'getElementById') return null;
         const a = node.arguments[0];
-        return (a && a.type === 'Literal' && typeof a.value === 'string') ? a.value : null;
+        const lit = (a && a.type === 'Literal' && typeof a.value === 'string') ? a.value : null;
+        if (c.type === 'Identifier' && c.name === 'elementOf' && refSelectors) return lit === null ? null : refIdOf(refSelectors, lit);
+        if (c.type !== 'MemberExpression' || c.property.name !== 'getElementById') return null;
+        return lit;
     }
     function isFn(n) {
         return n && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression'
@@ -125,11 +195,14 @@ function jsBindings(src) {
                 if (id) { note(propAssign, id, prop.slice(2), node.loc.start.line); foreignIds.add(id); }
             }
         }
+        // `scope.listen(target, evt, h)` (`createLifecycleScope()` របស់ App React) = `target.addEventListener(evt, h)`
+        const isListen = node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
+            && node.callee.property.name === 'listen' && node.arguments.length >= 3;
         if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression'
-            && node.callee.property.name === 'addEventListener') {
-            const a = node.arguments[0];
-            const h = node.arguments[1];
-            const id = idOf(node.callee.object);
+            && (node.callee.property.name === 'addEventListener' || isListen)) {
+            const a = node.arguments[isListen ? 1 : 0];
+            const h = node.arguments[isListen ? 2 : 1];
+            const id = idOf(isListen ? node.arguments[0] : node.callee.object);
             if (id && a && a.type === 'Literal' && typeof a.value === 'string') {
                 foreignIds.add(id);
                 note(sameName, id, String(a.value).toLowerCase(),
@@ -145,7 +218,7 @@ function jsBindings(src) {
         }
     }
     visit(ast, [new Map()]);
-    return { propAssign, sameName, foreignIds };
+    return { propAssign, sameName, foreignIds, refSelectors };
 }
 
 console.log('── 1. ធាតុ `data-act` មិនត្រូវមានអ្នកស្តាប់ទី ២ លើព្រឹត្តិការណ៍ដដែល');
@@ -171,6 +244,23 @@ APPS.forEach((app) => {
         return;
     }
     scannedElements += acts.size;
+    const compPath = path.join(ROOT, app, 'components.js');
+    if (fs.existsSync(compPath)) {
+        let native;
+        try {
+            native = componentNativeBindings(fs.readFileSync(compPath, 'utf8'), parsed.refSelectors);
+        } catch (e) {
+            ok(app + ' ៖ `components.js` ត្រូវ parse បាន', false, e.message);
+            return;
+        }
+        ok(app + ' ៖ ⛔ រកឃើញ `refWithNative()` ក្នុង JSX (ការស្កេនមិនទទេ)', native.native.length > 0, 'ឃើញ ' + native.native.length);
+        native.jsxBound.forEach((id) => parsed.foreignIds.add(id));
+        native.native.forEach((b) => {
+            parsed.foreignIds.add(b.id);
+            if (!parsed.sameName.has(b.id)) parsed.sameName.set(b.id, new Map());
+            if (!parsed.sameName.get(b.id).has(b.evt)) parsed.sameName.get(b.id).set(b.evt, { line: b.where, fn: b.fn });
+        });
+    }
 
     // ច្បាប់ ក ៖ `el.onX = fn` លើធាតុដែលមាន `data-act` រួច — អ្នកសរសេរ
     // ជឿថាខ្លួន *កំណត់* handler ខណៈការពិតវា **បន្ថែម** ផ្លូវទី ២។

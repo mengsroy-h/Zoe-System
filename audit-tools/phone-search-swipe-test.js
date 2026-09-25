@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderFromContext, elementById, jsxHandler, sliceConst } = require('./react-view');
 
 const ROOT = process.env.SWIPE_APP_DIR || path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -41,6 +42,37 @@ function makeClassList(initial) {
     };
 }
 
+// ⛔ ZoeW ជា React ៖ class របស់ផ្ទាំង (`collapsed` · `search-focus` · `history-expanded` · `show` · `hidden` · `active`)
+//    ជា **JSX ពិត** ដែលគូរពី state (`uiState.dataPanelCollapsed` …) ➜ `classList.contains()` អានពីការគូរពិតរបស់
+//    component (`AppPages.tsx` គូរ `PageData` · `PageEntry` ផង) មិនមែន Set ក្លែង។
+const APP_PAGES = ['src/app/components/AppPages.tsx', 'AppPages'];
+const RENDERED_IN = { phoneSuggestBox: ['src/app/components/PhoneSuggestBox.tsx', 'PhoneSuggestBox'] };
+// ⛔ **សម្រាប់ការរៀបចំសេណារីយ៉ូតែប៉ុណ្ណោះ** ៖ class ➜ state ដែល JSX អាន។ ការសរសេរនីមួយៗ **ផ្ទៀងផ្ទាត់** ថា JSX
+//    ពិតគូរ class នោះមែន (បើការផ្គូផ្គងខុស ➜ បោះ) ➜ តារាងនេះមិនអាចកុហកដោយស្ងាត់ទេ។
+const CLASS_STATE = {
+    dataSideSection: { collapsed: 'uiState.dataPanelCollapsed', 'search-focus': 'uiState.dataPanelSearchFocus' },
+    entrySideSection: { collapsed: 'uiState.entryPanelCollapsed' },
+    phoneSuggestBox: { show: 'uiState.phoneSuggestOpen' }
+};
+function renderedClassList(ctx, id) {
+    const [rel, name] = RENDERED_IN[id] || APP_PAGES;
+    const classes = () => {
+        const el = elementById(renderFromContext(ROOT, ctx, rel, name), id);
+        if (!el) throw new Error('JSX មិនគូរ #' + id);
+        return new Set(el.className.split(/\s+/).filter(Boolean));
+    };
+    const write = (c, on) => {
+        const target = (CLASS_STATE[id] || {})[c];
+        if (!target) throw new Error('គ្មាន state សម្រាប់ .' + c + ' លើ #' + id);
+        vm.runInContext(target + ' = ' + (on ? 'true' : 'false'), ctx);
+        if (classes().has(c) !== on) throw new Error('class ↔ state មិនស៊ីនឹង JSX ពិត ៖ #' + id + '.' + c);
+    };
+    return { contains: (c) => classes().has(c), add: (c) => write(c, true), remove: (c) => write(c, false) };
+}
+function declOf(src, name, fallback) {
+    return (src.match(new RegExp('^ *(?:let|const) ' + name + ' = .*$', 'm')) || [fallback])[0];
+}
+
 function buildEnv(src, opts) {
     const o = opts || {};
     const handlers = {};
@@ -65,26 +97,27 @@ function buildEnv(src, opts) {
     }, extra || {});
 
     const els = {
-        dataSideSection: mkEl('dataSideSection', { classList: makeClassList(o.sideClasses || []) }),
+        dataSideSection: mkEl('dataSideSection'),
         dataMainSection: mkEl('dataMainSection'),
         tableResponsive: mkEl('tableResponsive'),
         appPages: mkEl('appPages'),
-        pageData: mkEl('pageData', { classList: makeClassList(o.dataPageActive === false ? [] : ['active']) }),
-        pageEntry: mkEl('pageEntry', { classList: makeClassList(o.entryPageActive ? ['active'] : []) }),
-        entrySideSection: mkEl('entrySideSection', { classList: makeClassList(o.entrySideClasses || []) }),
+        pageData: mkEl('pageData'),
+        pageEntry: mkEl('pageEntry'),
+        entrySideSection: mkEl('entrySideSection'),
         entryMainSection: mkEl('entryMainSection'),
         entryDragHandle: mkEl('entryDragHandle'),
         entryTableResponsive: mkEl('entryTableResponsive'),
         lockerTableResponsive: mkEl('lockerTableResponsive'),
-        lockerPanel: mkEl('lockerPanel', { classList: makeClassList(['hidden']) }),
+        lockerPanel: mkEl('lockerPanel'),
         dragHandle: mkEl('dragHandle'),
-        phoneSuggestBox: mkEl('phoneSuggestBox', { classList: makeClassList(o.suggestOpen ? ['show'] : []) }),
+        phoneSuggestBox: mkEl('phoneSuggestBox'),
         searchPhoneInput: mkEl('searchPhoneInput', { value: o.searchActive ? '012' : '' })
     };
 
     const calls = { hideSuggest: 0, position: 0, frames: [], prevented: 0 };
     const ctx = {
-        console,
+        console, queueMicrotask,
+        clearTimeout: () => {},
         setTimeout: () => 0,
         requestAnimationFrame(fn) { calls.frames.push(fn); return calls.frames.length; },
         window: {
@@ -93,7 +126,6 @@ function buildEnv(src, opts) {
             CSS: { supports: (property, value) => !!o.iosWebKit && property === '-webkit-touch-callout' && value === 'none' }
         },
         scheduleChromeLayoutSettle() {},
-        hidePhoneSuggestions() { calls.hideSuggest++; els.phoneSuggestBox.classList.remove('show'); },
         clearZtoPickupStatusStore() {},
         positionPhoneSuggestBox() { calls.position++; },
         document: {
@@ -105,6 +137,14 @@ function buildEnv(src, opts) {
     ctx.window.document = ctx.document;
     ctx.CSS = ctx.window.CSS;
     vm.createContext(ctx);
+    vm.runInContext(reactRuntime(src, { context: ctx }), ctx);
+    // ទំព័រសកម្ម = `currentAppPage` (App ដើម ៖ class `.page.active`)
+    const page = o.entryPageActive ? 'entry' : (o.dataPageActive === false ? 'none' : 'data');
+    vm.runInContext('let currentAppPage = ' + JSON.stringify(page) + ';', ctx);
+    ['phoneSuggestHideTimer', 'phoneSuggestItems', 'phoneSuggestActiveIndex'].forEach((n, i) => {
+        vm.runInContext(declOf(src, n, ['let phoneSuggestHideTimer = null;', 'let phoneSuggestItems = [];', 'let phoneSuggestActiveIndex = -1;'][i]), ctx);
+    });
+    vm.runInContext(sliceConst(src, 'PANEL_SECTIONS') || 'const PANEL_SECTIONS = {};', ctx);
     vm.runInContext((src.match(/^ *let chromeHidden = .*$/m) || ['let chromeHidden = false;'])[0], ctx);
     vm.runInContext(sliceFn(src, 'showAppChrome'), ctx);
     vm.runInContext(sliceFn(src, 'entryScrollerInView'), ctx);
@@ -119,9 +159,27 @@ function buildEnv(src, opts) {
     vm.runInContext(sliceFn(src, 'panelMayYieldToPTR'), ctx);
     vm.runInContext(sliceFn(src, 'panelMotionAllowed'), ctx);
     vm.runInContext(sliceFn(src, 'panelGlideFrom'), ctx);
+    // ⛔ React ៖ ស្ថានភាពផ្ទាំងជា state (`setPanelCollapsed()` · `panelIsCollapsed()`) · ដងអូសជា `onClick` ក្នុង JSX
+    //    (`togglePanelFromHandle()`) · បញ្ជីស្នើបិទតាម `hidePhoneSuggestions()` ពិត (រាប់ការហៅ)
+    ['blockPanelForIOSTouch', 'setPanelCollapsed', 'panelIsCollapsed', 'panelHasSearchFocus', 'togglePanelFromHandle',
+        'hidePhoneSuggestions'].forEach((n) => vm.runInContext(sliceFn(src, n), ctx));
+    ctx.__calls = calls;
+    vm.runInContext('const __realHidePhoneSuggestions = hidePhoneSuggestions;'
+        + ' hidePhoneSuggestions = function () { __calls.hideSuggest++; return __realHidePhoneSuggestions(); };', ctx);
     vm.runInContext(sliceFn(src, 'bindPanelSwipe'), ctx);
     vm.runInContext(sliceFn(src, 'setupSwipeGestures'), ctx);
+    ['dataSideSection', 'entrySideSection', 'appPages', 'phoneSuggestBox', 'lockerPanel', 'pageData', 'pageEntry']
+        .forEach((id) => { els[id].classList = renderedClassList(ctx, id); });
+    (o.sideClasses || []).forEach((c) => els.dataSideSection.classList.add(c));
+    (o.entrySideClasses || []).forEach((c) => els.entrySideSection.classList.add(c));
+    if (o.suggestOpen) els.phoneSuggestBox.classList.add('show');
     ctx.setupSwipeGestures();
+    // ⛔ handler របស់ដងអូស ដេរីវេពី `onClick` ក្នុង JSX ពិត (`react-render.cjs`) មិនមែនការសន្មត
+    ['dragHandle', 'entryDragHandle'].forEach((id) => {
+        const h = jsxHandler(ROOT, id, 'onClick');
+        if (!h || typeof ctx[h.name] !== 'function') throw new Error('JSX ៖ រក onClick របស់ #' + id + ' មិនឃើញ');
+        (handlers[id] = handlers[id] || {}).click = () => ctx[h.name].apply(null, h.args || []);
+    });
     return { ctx, els, handlers, listenerOptions, calls };
 }
 
@@ -364,8 +422,16 @@ console.log('\n=== iOS ប្រគល់ gesture ពីតារាងទៅផ
     // **ចំណុចស្លាប់រស់**៖ បើ `panel-gliding` ជាប់ នោះចំណុច snap «បើក» ធ្លាក់
     // ត្រឹម scrollTop 71 ➜ PTR លែងកេះបានទាំងស្រុង។ ត្រូវមានផ្លូវដកចេញទាំង
     // ពេលចលនាចប់ (`finished`) និង timer សុវត្ថិភាព។
-    ok(/classList\.add\('panel-gliding'\)/.test(src) && /classList\.remove\('panel-gliding'\)/.test(src),
+    // ⛔ React ៖ ការផ្អាក = `uiState.panelGliding` ➜ `AppPages.tsx` គូរ `.panel-gliding` (វាស់លើ JSX ពិត)
+    const glideEnv = buildEnv(src, {});
+    ok(/uiState\.panelGliding = true/.test(sliceFn(src, 'beginPanelGlideSnapPause'))
+        && /uiState\.panelGliding = false/.test(sliceFn(src, 'endPanelGlideSnapPause')),
         'panelGlideFrom ផ្អាក snap ហើយមានផ្លូវដកចេញវិញ');
+    vm.runInContext('uiState.panelGliding = true;', glideEnv.ctx);
+    const glidingShown = glideEnv.els.appPages.classList.contains('panel-gliding');
+    vm.runInContext('uiState.panelGliding = false;', glideEnv.ctx);
+    ok(glidingShown && !glideEnv.els.appPages.classList.contains('panel-gliding'),
+        'JSX ពិតគូរ/ដក `.panel-gliding` តាមស្ថានភាពផ្អាក (snap ផ្អាក ➜ ត្រឡប់វិញ)');
     ok(/anim\.finished\.then\(release, release\)/.test(src),
         'ការដក snap pause ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង');
     ok(/setTimeout\(endPanelGlideSnapPause, PANEL_GLIDE_MS \+ PANEL_GLIDE_SNAP_GRACE_MS\)/.test(src),
@@ -459,8 +525,10 @@ console.log('\n=== ការតភ្ជាប់ក្នុង index.html ន�
     ok(/@supports \(-webkit-touch-callout: none\)[\s\S]*?\.app-pages\.history-expanded \.table-responsive\s*\{[\s\S]*?overscroll-behavior-y:\s*none/.test(css),
         'iOS full-screen list បិទ rubber-band ខាងក្នុង; Android CSS នៅក្រៅប្លុកនេះ');
     ok(src.indexOf('setupSwipeGestures();') !== -1, 'app.js ហៅ setupSwipeGestures() ពេលចាប់ផ្តើម');
-    ok(/phoneInput\.addEventListener\('focus'[\s\S]{0,120}setPhoneSearchPulledUp\(true\)/.test(src),
-        'focus លើប្រអប់ស្វែងរក ➜ ហៅ setPhoneSearchPulledUp(true)');
+    // ⛔ React ៖ `onFocus` ក្នុង JSX ពិត ➜ handler ដែលហៅ `setPhoneSearchPulledUp(true)`
+    const onFocus = jsxHandler(ROOT, 'searchPhoneInput', 'onFocus');
+    ok(!!onFocus && /setPhoneSearchPulledUp\(true\)/.test(sliceFn(src, onFocus.name)),
+        'focus លើប្រអប់ស្វែងរក ➜ ហៅ setPhoneSearchPulledUp(true)', onFocus);
     ok(/clearSensitiveModalFields\(\)\s*\{[\s\S]{0,200}setPhoneSearchPulledUp\(false\)/.test(src),
         'ចាកចេញ ➜ ដោះការហូតឡើងវិញ');
 }

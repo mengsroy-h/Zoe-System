@@ -560,10 +560,17 @@ scenario('⛔ មូលដ្ឋានតែមួយ ៖ ម៉ូឌុលស�
     });
     ok('⛔ ជាន់អប្បបរមា ៖ វាស់លើឯកសារ ១ ដែលមាន function ទាំង ២',
         users.every((n) => !!sliceFn(src, n)), users.filter((n) => !sliceFn(src, n)).join(', '));
-    const daily = bodyWithCallees('openDailyStatsModal');
-    ok('⛔ ម៉ូឌុលថ្ងៃមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត', daily.indexOf('ចំណូល (យករួច)') !== -1);
+    // ⛔ ZoeW ជា React ៖ ស្លាកកាតថ្ងៃរស់ក្នុង JSX (`StatsCards.tsx`) ➜ គូរ component ពិតដោយតម្លៃ sentinel ហើយវាស់ថា
+    //    ស្លាក «ចំណូល (យករួច)» អមដោយ **ចំណូលដែលយករួច** (មិនមែន ledger/តម្លៃទាំងអស់) និង «តម្លៃកញ្ចប់ទាំងអស់» នៅតែមាន
+    const { renderComponent } = require('./react-view');
+    const card = renderComponent(ROOT, 'src/app/components/stats/StatsCards.tsx', 'DailyStatsCards', { uiState: { dailyStatsView: {
+        empty: null, cards: [{ label: 'ថ្ងៃទី', key: '2026-09-01', count: 3, codText: '$1.01', dodText: '$0.10',
+            collectedText: '$1.11', collectedRielText: '4,551 ៛', totalText: '9.99', pendingText: '$8.88' }] } } });
+    const after = (label) => { const at = card.indexOf(label); return at === -1 ? '' : card.slice(at, at + 120); };
+    ok('⛔ ម៉ូឌុលថ្ងៃមិនបង្ហាញ ledger ជា «ចំណូល» ទៀត',
+        /ចំណូល \(យករួច\)៖ <strong>\$1\.11</.test(after('ចំណូល (យករួច)')), after('ចំណូល (យករួច)'));
     ok('⛔ ម៉ូឌុលថ្ងៃនៅតែបង្ហាញតម្លៃទាំងអស់ដែរ (តម្លាភាព)',
-        daily.indexOf('តម្លៃកញ្ចប់ទាំងអស់') !== -1);
+        after('តម្លៃកញ្ចប់ទាំងអស់').indexOf('$9.99') !== -1, after('តម្លៃកញ្ចប់ទាំងអស់'));
     ok('⛔ អេក្រង់ «ស្ថិតិ ៣ ខែ» ត្រូវបានដកចេញពិត ➜ គ្មានផ្ទៃទី ៣ ដែលអាចឃ្លាតទៀតទេ',
         src.indexOf('openMonthlyStatsModal') === -1 && src.indexOf('collectedValueForMonth') === -1);
 });
@@ -708,9 +715,12 @@ scenario('CSP ៖ ប៊ូតុងទាំងអស់ឆ្លងកាត�
     });
     ok('ប្រអប់ monthlyReportModal មានក្នុង index.html', html.indexOf('id="monthlyReportModal"') !== -1);
     ok('ប្រអប់មានកន្លែងបង្ហាញ monthlyReportBody', html.indexOf('id="monthlyReportBody"') !== -1);
+    // ⛔ ZoeW ជា React ៖ `onChange` ក្នុង JSX (React ចង listener — គ្មាន attribute `onchange=` ដែល CSP បដិសេធ) ➜
+    //    ដេរីវេ handler ពិតពី `react-render.cjs` ហើយវាស់ថាវាសរសេរខែដែលជ្រើស រួចគូររបាយការណ៍ឡើងវិញ
+    const monthChange = require('./react-view').jsxHandler(ROOT, 'monthlyReportMonthSel', 'onChange');
     ok('⛔ ការជ្រើសខែឆ្លងកាត់ data-act (គ្មាន onchange=)',
-        /id="monthlyReportMonthSel"[^>]*data-act="renderMonthlyReport"[^>]*data-on="change"/.test(html)
-        && !/onchange=/.test(html));
+        !!monthChange && /monthlyReportMonth = e\.target\.value/.test(monthChange.raw)
+        && /\bact\(\s*["']renderMonthlyReport["']\s*\)|\brenderMonthlyReport\(\)/.test(monthChange.raw) && !/onchange=/.test(html), monthChange && monthChange.raw);
     ok('⛔ ការសម្អាតពេលចាកចេញគ្រប monthlyReportBody',
         (sliceFn(src, 'clearSensitiveModalFields') || '').indexOf('monthlyReportBody') !== -1);
     ok('⛔ ការសម្អាតពេលចាកចេញ reset ខែដែលជ្រើស',

@@ -398,9 +398,11 @@
       "category": "behavior",
       "guards": [
         "audit-tools/function-surface-test.js",
-        "audit-tools/daily-collected-test.js"
+        "audit-tools/daily-collected-test.js",
+        "audit-tools/ui-flow-test.js",
+        "audit-tools/zoew-suite-test.js"
       ],
-      "evidence": "Function inventory និងតេស្តឥរិយាបថប្រមូលលុយរបស់ ZoeW អាន app.js ពិត។",
+      "evidence": "run-all.sh build ZoeW/dist-audit ពី src ពិត ➜ checker ស្រង់ function ពិតពី app.js (ទិដ្ឋភាពអត្ថបទនៃ src) ចូល vm និងរត់ bundle Vite ពិតក្នុង browser; zoew-suite រត់ tsc · vitest · logic/parity ធៀបនឹង ZoeW ដើម។",
       "limitation": "មាន inventory function និងសេណារីយ៉ូឥរិយាបថជាច្រើន។ ចំនួន function មិនមែនចំនួន function ដែលបានធ្វើ behavioral coverage ពេញលេញទេ។"
     },
     "guard-idtoken-fixture": {
@@ -411,6 +413,74 @@
       ],
       "evidence": "checker ទាំង ២ ចុះហត្ថលេខា RS256 ពិតដោយវិញ្ញាបនបត្ររបស់ម៉ូឌុលនេះ រួចរត់ `zto-order-detail.js` ពិត ➜ ការផ្ទៀងផ្ទាត់ទទួលយក token ត្រឹមត្រូវ និងបដិសេធ token ក្លែង/ផុត/Project ខុស",
       "limitation": "សោសាកល្បងប៉ុណ្ណោះ — វាមិនបញ្ជាក់ថា Google បង្វិលវិញ្ញាបនបត្រយ៉ាងណាលើផលិតកម្មទេ។"
+    },
+    "guard-react-view": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/price-edit-abort-test.js",
+        "audit-tools/late-commit-test.js",
+        "audit-tools/camera-resume-test.js",
+        "audit-tools/history-patch-retry-test.js",
+        "audit-tools/lookup-config-secret-test.js"
+      ],
+      "evidence": "checker ទាំងនេះរត់ស្រទាប់ React ពិតពីម៉ូឌុលនេះ ហើយ mutation លើតួអាជីវកម្ម (ការបញ្ច្រាសលុយ · ការ commit យឺត · សោ session · Secret plaintext) ធ្វើឲ្យពួកវាក្រហម",
+      "limitation": "ស្រទាប់ DOM ជាសមមូលក្នុងទិដ្ឋភាព (`elementOf` ➜ `getElementById` · ប្រអប់ ➜ `style.display`) — ការគូររបស់ React ខ្លួនឯងវាស់ដោយ checker browser និង parity មិនមែនដោយម៉ូឌុលនេះ។"
+    },
+    "zoew-react-ui": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/page-nav-test.js",
+        "audit-tools/gesture-test.js",
+        "audit-tools/semantic-ui-color-test.js",
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "component · hook · កាយវិការរបស់ React វាស់ក្នុង browser លើ build វាស់ (page-nav · gesture) និងគូរ JSX ពិតតាម react-render.cjs (semantic-ui-color); zoew-suite រត់ purity · slot · native bridge ក្លែង · vitest។",
+      "limitation": "វាស់លើ Chromium និង bridge native ក្លែង។ មិនបញ្ជាក់ WebKit ឬ Android WebView ពិត (ត្រូវសាកលើឧបករណ៍)។"
+    },
+    "zoew-audit-bridge": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/wiring.js",
+        "audit-tools/ui-flow-test.js",
+        "audit-tools/zto-sync-banner-test.js"
+      ],
+      "evidence": "ស្ពាន build វាស់ (expose-globals · audit-compat · build-audit · checker-view) ត្រូវ checker ទាំងនេះប្រើផ្ទាល់ ៖ បើវាខូច ការស្រង់ app.js ឬ window.<fn> ធ្លាក់មានឈ្មោះ។",
+      "limitation": "ស្ពាននេះមិន ship ក្នុងផលិតកម្ម។ ភាពត្រឹមត្រូវរបស់វាបញ្ជាក់តាមរយៈ checker ដែលប្រើវា មិនមែនតេស្តដាច់ដោយឡែក។"
+    },
+    "zoew-build": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/offline-shell-test.js",
+        "audit-tools/sw-install-integrity-test.js",
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "vite.config ដេរីវេ CORE_SHELL របស់ Service Worker ពី build ពិត ➜ offline-shell · sw-install-integrity វាស់ build នោះ; zoew-suite រត់ build ផលិតកម្ម + smoke + sw:check។",
+      "limitation": "build វាស់ និង build ផលិតកម្មចែក config តែមួយ; ការ deploy Netlify ពិតមិនស្ថិតក្នុងការវាស់នេះ។"
+    },
+    "zoew-self-verification": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "zoew-suite-test រត់ npm scripts ពិតរបស់ ZoeW (typecheck · lint · vitest · slot/purity · doc · android · logic · parity · build · sw · smoke · native · rules) ➜ tests/scripts/config ទាំងនេះត្រូវរត់ពិតរាល់ run-all។",
+      "limitation": "ឧបករណ៍ផលិតកូដ (tools/) រត់តែពេលផលិត src ឡើងវិញ; config ត្រូវការ node_modules របស់ ZoeW។"
+    },
+    "zoew-android": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "npm run android:check (កំណែ APK = APP_VERSION · appId · សិទ្ធិ · logo · plugin) និង native:check (bridge ក្លែង) ក្នុង zoew-suite-test។",
+      "limitation": "មិន build APK ពិតដោយ Gradle ក្នុង CI; ការដំឡើងលើឧបករណ៍ Android ពិតត្រូវសាកដោយដៃ។"
+    },
+    "zoew-docs": {
+      "category": "static",
+      "guards": [
+        "audit-tools/doc-scope-test.js",
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "doc-scope-test ស្កេន .md ពិត (វិសាលភាព · តំណ · ប្រវត្តិ) និង doc:check ក្នុង zoew-suite ប្រៀបតារាង slot/ស្ថាបត្យកម្មនឹងកូដ។",
+      "limitation": "ការយាមជាស្តាទិច; ភាពត្រឹមត្រូវនៃការពន្យល់ត្រូវ review ដោយមនុស្ស។"
     }
   },
   "files": {
@@ -493,43 +563,256 @@
     "ZoeKeyGen/sw.js": {
       "policy": "guard-24"
     },
+    "ZoeW/.env.android": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/.gitignore": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/.npmrc": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/README.md": {
       "policy": "guard-13"
     },
     "ZoeW/ZTO-SETUP-KH.md": {
       "policy": "guard-25"
     },
-    "ZoeW/app.js": {
-      "policy": "zoew-app"
+    "ZoeW/android/.gitignore": {
+      "policy": "zoew-android"
     },
-    "ZoeW/boot-flags.js": {
-      "policy": "guard-15"
+    "ZoeW/android/app/.gitignore": {
+      "policy": "zoew-android"
     },
-    "ZoeW/error-reporting.js": {
-      "policy": "guard-16"
+    "ZoeW/android/app/build.gradle": {
+      "policy": "zoew-android"
     },
-    "ZoeW/firebase-loader.js": {
-      "policy": "guard-18"
+    "ZoeW/android/app/capacitor.build.gradle": {
+      "policy": "zoew-android"
     },
-    "ZoeW/guide.html": {
-      "policy": "guard-26"
+    "ZoeW/android/app/proguard-rules.pro": {
+      "policy": "zoew-android"
     },
-    "ZoeW/icon-192.png": {
+    "ZoeW/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/AndroidManifest.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/java/com/zoesystem/zoew/MainActivity.java": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/drawable-land-hdpi/splash.png": {
       "policy": "guard-8",
-      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
+      "sha256": "6f0269941c909eaae814112398018066495bfe6a202873c9f623b7f7477fdf87"
     },
-    "ZoeW/icon-512.png": {
+    "ZoeW/android/app/src/main/res/drawable-land-mdpi/splash.png": {
       "policy": "guard-8",
-      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
+      "sha256": "0a999fb3960abcc00bcdb0d1f9b193d32d1b50b937f0106be4f3b84bc1d47396"
+    },
+    "ZoeW/android/app/src/main/res/drawable-land-xhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "de76369e2f110e01e30420b250814d624ea8a0c8eecc60023381d166a9d7a507"
+    },
+    "ZoeW/android/app/src/main/res/drawable-land-xxhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "e587332dc447801912a81390f574cd908ec431b7af4c50f64fdc9bcc1dbf1f1a"
+    },
+    "ZoeW/android/app/src/main/res/drawable-land-xxxhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "692afe1c57fea773748d3afc7be5c0014be5654d66b044c338b9d65f865c17ce"
+    },
+    "ZoeW/android/app/src/main/res/drawable-port-hdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "b6034c6d8e5587b47a51c5613f7bdfeefe0f88b28ca81516ad0a340cb2cc4bff"
+    },
+    "ZoeW/android/app/src/main/res/drawable-port-mdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "e4c5ebf8e40f784e193d2519031d1afa2cf18d8b6aac5103332c9e516af4a9f8"
+    },
+    "ZoeW/android/app/src/main/res/drawable-port-xhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "9726f1b95f31943e81609179eaf27ca4d8650b340662d9a8a5837b8c2dd0144c"
+    },
+    "ZoeW/android/app/src/main/res/drawable-port-xxhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "c5108b8348088d2971fa42d45800003ed0ef42fc4c57d2b96198285516ca7ee9"
+    },
+    "ZoeW/android/app/src/main/res/drawable-port-xxxhdpi/splash.png": {
+      "policy": "guard-8",
+      "sha256": "ce580db2cb1bc14647352fccfd9992c8aae635f35528d22de353a12df6e258d4"
+    },
+    "ZoeW/android/app/src/main/res/drawable/ic_launcher_background.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/drawable/splash.png": {
+      "policy": "guard-8",
+      "sha256": "0a999fb3960abcc00bcdb0d1f9b193d32d1b50b937f0106be4f3b84bc1d47396"
+    },
+    "ZoeW/android/app/src/main/res/layout/activity_main.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-hdpi/ic_launcher.png": {
+      "policy": "guard-8",
+      "sha256": "50ce5a7ec5de9e1f640b1dff158e1fd86162b7e2e5238a1b4a64888794a01746"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png": {
+      "policy": "guard-8",
+      "sha256": "e4b00663dbf5da10045d31a6bac92bd0dde70c6e3a185a4da811c3bfbc6d8748"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.png": {
+      "policy": "guard-8",
+      "sha256": "a57396f943f3f6c7d3de1bca8ac1c0919282a1dc44087318d6936a3343f307c5"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png": {
+      "policy": "guard-8",
+      "sha256": "9cf5d1c98d036375d29d5c97480da7dbc70c0a4cbf032ffdb619cbb1355d4a2f"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-mdpi/ic_launcher.png": {
+      "policy": "guard-8",
+      "sha256": "bf5d0b2aeb8c2687c0dd8b5e6aff48e16d1704f7e4b1282300362008f4a7e62b"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png": {
+      "policy": "guard-8",
+      "sha256": "11ec8609de1660e1794ab7fdffd335ed7d545e46bc6e79c684acc9b470f0bf28"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.png": {
+      "policy": "guard-8",
+      "sha256": "9f3140ed950f77b0ca1924721e223d6720a55ae9bf71ccb1546bd05002895f72"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png": {
+      "policy": "guard-8",
+      "sha256": "5f8298322ddcad45dee6c214feba33075f3b299a46b9891b0ee03f8bcf29dcb8"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": {
+      "policy": "guard-8",
+      "sha256": "ff440137a25c9dcb9ab535e6facd3b48392dc13b331dc63b330256b7eb375e8a"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png": {
+      "policy": "guard-8",
+      "sha256": "5e754230df8ca725332d913b2138ab55888a1fe43fa48519d358eed972d85442"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.png": {
+      "policy": "guard-8",
+      "sha256": "40c363b60123ccecb5d02adcf7d96af5e016016d1dd21c21dd080b1a58405924"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png": {
+      "policy": "guard-8",
+      "sha256": "d8f8ee4218d3fa815638c757eb215e9a12944cf536725e2eb5dfd7a5817ef701"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": {
+      "policy": "guard-8",
+      "sha256": "d63ed247a04b3afd3eee45e5101e65a61307c1fe40a237bbb11ef403ec6efc8c"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png": {
+      "policy": "guard-8",
+      "sha256": "171a5e9244f3f62d797e39102ae48ed6a41f4ccf26a6fb5d098a8d3452b43ba6"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.png": {
+      "policy": "guard-8",
+      "sha256": "640edb605f25bc711ec42d63ee8e96297626dc8c2f3c0dcd37807f4a26ebfe44"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png": {
+      "policy": "guard-8",
+      "sha256": "39729de020ab15cd9babed5be9c60f1af11ea6bf072a84aa285200d540374285"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": {
+      "policy": "guard-8",
+      "sha256": "00bd8d58f8eb55d77ef3823d2088a79742c16bf6a52a8a3fc91dc03bec3d515d"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png": {
+      "policy": "guard-8",
+      "sha256": "3df17fb8b8ec65945049bc0ec72e49a53c092f572152a2d6a65a38b3b38c4e86"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.png": {
+      "policy": "guard-8",
+      "sha256": "83ee3c3286bc54e244a7317d9b594b7e376ed542a8adf325c4bbbf333add58a7"
+    },
+    "ZoeW/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": {
+      "policy": "guard-8",
+      "sha256": "1de7117443b13f544ef6626864e00931ce8ca83ff64d2e17d05e27d44dacb091"
+    },
+    "ZoeW/android/app/src/main/res/values/ic_launcher_background.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/values/strings.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/values/styles.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/xml/data_extraction_rules.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/main/res/xml/file_paths.xml": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/build.gradle": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/capacitor.settings.gradle": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/gradle.properties": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/gradle/wrapper/gradle-wrapper.jar": {
+      "policy": "guard-8",
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    "ZoeW/android/gradle/wrapper/gradle-wrapper.properties": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/gradlew": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/gradlew.bat": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/settings.gradle": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/android/variables.gradle": {
+      "policy": "zoew-android"
+    },
+    "ZoeW/capacitor.config.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/docs/ANDROID.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/ARCHITECTURE.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/DEVELOPMENT.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/EXTENDING.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/MIGRATION.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/PARITY.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/docs/TYPESCRIPT.md": {
+      "policy": "zoew-docs"
+    },
+    "ZoeW/eslint.config.mjs": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/index.html": {
       "policy": "guard-19"
-    },
-    "ZoeW/license-verify.js": {
-      "policy": "guard-20"
-    },
-    "ZoeW/manifest.json": {
-      "policy": "guard-21"
     },
     "ZoeW/netlify.toml": {
       "policy": "guard-22"
@@ -543,20 +826,766 @@
     "ZoeW/package.json": {
       "policy": "guard-28"
     },
-    "ZoeW/style.css": {
-      "policy": "guard-23"
+    "ZoeW/public/boot-flags.js": {
+      "policy": "guard-15"
     },
-    "ZoeW/sw.js": {
-      "policy": "guard-24"
+    "ZoeW/public/error-reporting.js": {
+      "policy": "guard-16"
     },
-    "ZoeW/vendor/xlsx.full.min.js": {
+    "ZoeW/public/firebase-loader.js": {
+      "policy": "guard-18"
+    },
+    "ZoeW/public/guide.html": {
+      "policy": "guard-26"
+    },
+    "ZoeW/public/icon-192.png": {
+      "policy": "guard-8",
+      "sha256": "4c91cab29891b9590c5e03f81907c3a726ee9cda4698e042217e5d35b10dadeb"
+    },
+    "ZoeW/public/icon-512.png": {
+      "policy": "guard-8",
+      "sha256": "4faddadd2bb7f699d8efa619367d9237052c61e38051b65fe7cfded59cbbb973"
+    },
+    "ZoeW/public/license-verify.js": {
+      "policy": "guard-20"
+    },
+    "ZoeW/public/manifest.json": {
+      "policy": "guard-21"
+    },
+    "ZoeW/public/vendor/xlsx.full.min.js": {
       "policy": "guard-29"
     },
-    "ZoeW/vendor/zxing-wasm.js": {
+    "ZoeW/public/vendor/zxing-wasm.js": {
       "policy": "guard-30"
     },
-    "ZoeW/vendor/zxing_reader.wasm": {
+    "ZoeW/public/vendor/zxing_reader.wasm": {
       "policy": "guard-31"
+    },
+    "ZoeW/resources/icon.svg": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/android-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/android-icons.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/build-audit.mjs": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/scripts/checker-view.mjs": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/scripts/cleanup-rules-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/doc-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/fake-capacitor.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/fake-firebase.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/fetch-original.sh": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/intentional-removals.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/logic-identity.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/native-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/old-app.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/package.sh": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/parity-deep.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/parity-dom.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/parity-live.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/parity-static.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/react-purity-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/serve.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/slot-ownership-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/slot-registry.cjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/smoke.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/snapshot.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/sw-check.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/src/_generated-state.json": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/src/app/App.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/actions.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/app-lock-guard.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/chrome-autohide.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/panel-motion.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/panels.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/phone-search.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/pull-to-refresh.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/scanner-input.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/behaviors/sheet-drop.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/AppLockScreen.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/AppNavbar.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/AppPages.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/AppShell.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/BootSplash.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/DrawerBackdrop.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/GlobalMoreMenu.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PageData.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PageEntry.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PageTabBar.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PdfExportPrintArea.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PdfPrintArea.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/PhoneSuggestBox.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/RecentPhonesDatalist.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/RecentPhonesOptions.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/SideDrawer.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/ToastContainer.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/barcode/BarcodeListContainer.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/customer/CustomerTableBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/entry/EntryListTableBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/entry/LockerListFilterSelect.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/entry/LockerListTableBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/health/HealthCheckList.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/health/model.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/history/HistoryRow.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/history/HistoryTableBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/history/rowModel.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/locker/LockerGrid.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/menu/MoreMenuContent.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ActivationModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/CallMarkModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/CollectedStatsModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ConfigModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ConfigQrScanModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/CustomerDataTableModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/DailyStatsModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/EditBarcodePriceModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/EditPhoneModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ExchangeRateModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ExportDataModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/HealthCheckModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LocationWarningModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LockerPickerModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LockerSettingsModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LoginModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LogoutConfirmModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/LookupApiConfigModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ManualAdjustModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/Modal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/MonthlyReportModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/PermanentDeleteWarningModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/PhoneModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/PinModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/PinSetupModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/RecentlyDeletedModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/RestoreWarningModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ScanRemoveModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/SheetImportModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ViewListModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ZtoListSyncModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/modals/ZtoSyncModal.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/reports/MonthlyReportBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/reports/MonthlyReportMonthSelect.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/sheet/SheetImportParts.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/sheet/SheetImportSelects.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/sheet/model.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/AppErrorBoundary.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/BiometricLabel.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/DocumentEffects.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/PtrIndicator.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/SafeAreaProbe.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/UpdateBanner.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/panel-classes.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/stats/StatsCards.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/suggest/PhoneSuggestList.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/toast/ToastList.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/trash/TrashSummaryBox.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/trash/TrashTableBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/trash/model.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/zto/Code128Svg.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/zto/ZtoListSyncBody.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/zto/ZtoSyncBanner.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/zto/ZtoSyncList.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/zto/model.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/flush.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/hooks/useStore.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/back-history.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/boot.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/layers.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/native-shell.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/scope.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/lifecycle/status-bar-tone.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/refs.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/root-errors.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/slot-resets.ts": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/audit-annotate.ts": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/src/audit-compat.ts": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/src/core/action-registry.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/actions.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/clock.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/elapsed.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/modals.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/runtime.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/state.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/storage-keys.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/storage.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/store.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/text.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/timezone.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/version.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/core/view-state.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/barcode.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/cleanup.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/collected.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/ledger.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/pickup.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/domain/registry.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/expose-globals.ts": {
+      "policy": "zoew-audit-bridge"
+    },
+    "ZoeW/src/features/app-lock.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/auth.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/auto-lookup.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/barcode-ops.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/biometric.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/clear-history.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/config-qr.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/config.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/customer-table-prefetch.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/customer-table.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/daily-stats.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/entry-ops.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/exchange-rate.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/export.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/health-check.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/license.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/locker-assign.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/locker.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/lookup-api.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/lookup-config.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/monthly-report.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/phone-suggest.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/pin.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/restore.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/scan-action.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/scan-remove.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/session.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/sheet-import.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/stats-modals.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/trash.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/zto-list-sync.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/features/zto-status.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/main.tsx": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/document-io.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/file-output.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/haptics.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/native-biometric.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/platform/native.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/camera.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/connection.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/crypto.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/db-listeners.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/firebase-init.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/firebase-sdk.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/history-write.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/network.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/services/scan-engine.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/styles/app.css": {
+      "policy": "guard-23"
+    },
+    "ZoeW/src/styles/native.css": {
+      "policy": "guard-23"
+    },
+    "ZoeW/src/styles/react-root.css": {
+      "policy": "guard-23"
+    },
+    "ZoeW/src/sw/cache-version.ts": {
+      "policy": "guard-24"
+    },
+    "ZoeW/src/sw/sw.ts": {
+      "policy": "guard-24"
+    },
+    "ZoeW/src/types/globals.d.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/boot-splash.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/chrome-autohide.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/entry-list.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/history-refresh.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/history-render.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/modal-stack.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/modal.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/more-menu.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/page-nav.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/perf.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/src/ui/toast.ts": {
+      "policy": "zoew-app"
+    },
+    "ZoeW/tests/code128-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/fixtures/code128-oracle.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/health-row-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/history-row-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/app-lock-away.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/back-history.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/immediate-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/lifecycle-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/native-back.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/platform.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/react-harness.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/render-crash.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/status-bar-tone.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/zto-cors.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/oracles/health-row-html.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/oracles/history-row-html.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/setup.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/toast-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tsconfig.app.json": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tsconfig.json": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/vite.config.mts": {
+      "policy": "zoew-build"
+    },
+    "ZoeW/vitest.config.mts": {
+      "policy": "zoew-self-verification"
     },
     "audit-tools/README.md": {
       "policy": "guard-13"
@@ -595,6 +1624,9 @@
       "policy": "guard-1"
     },
     "audit-tools/cleanup-clock-guard-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/cleanup-interrupt-atomicity-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/clear-history-claim-test.js": {
@@ -777,9 +1809,6 @@
     "audit-tools/layout-thrash.js": {
       "policy": "guard-1"
     },
-    "audit-tools/cleanup-interrupt-atomicity-test.js": {
-      "policy": "guard-1"
-    },
     "audit-tools/ledger-clamp-symmetry-test.js": {
       "policy": "guard-1"
     },
@@ -836,6 +1865,9 @@
     },
     "audit-tools/loop-termination-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/money-core.js": {
+      "policy": "guard-5"
     },
     "audit-tools/money-guardian-test.js": {
       "policy": "guard-1"
@@ -917,6 +1949,9 @@
     },
     "audit-tools/raw-read-shape-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/react-view.js": {
+      "policy": "guard-react-view"
     },
     "audit-tools/reconnect-ladder-test.js": {
       "policy": "guard-1"
@@ -1083,6 +2118,9 @@
     "audit-tools/write-stall-guard-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/zoew-suite-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/zto-budget-test.js": {
       "policy": "guard-1"
     },
@@ -1116,18 +2154,8 @@
     "audit-tools/zto-sync-banner-test.js": {
       "policy": "guard-1"
     },
-    "docs/ARCHIVE-2026-09-03.md": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "3ba736558c89747fbc0256e5bf3427d2b7ff5bad2c4b7fc9890e65153de78f0c"
-    },
     "docs/AUDIT-PROMPT.md": {
       "policy": "guard-36"
-    },
-    "docs/HISTORY-ARCHIVE.md": {
-      "policy": "guard-7",
-      "encoding": "lf-text",
-      "sha256": "ddaae0ddad9dd99e8542544ba2f3118b7dc67fd218136f493143a3af1001456f"
     },
     "docs/HISTORY.md": {
       "policy": "guard-37"

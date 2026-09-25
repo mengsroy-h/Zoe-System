@@ -28,6 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view');
 
 const ROOT = process.env.LOOKUPFRESH_APP_DIR ? path.resolve(process.env.LOOKUPFRESH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -115,7 +116,9 @@ DECLS.forEach((n) => {
     if (m) decls.push(m[0]);
 });
 ok('Fast Mode checkbox មានក្នុង API modal', HTML.includes('id="lookupApiFastModeCheckbox"'));
-ok('Fast Mode ត្រូវបានរក្សាទុកក្នុង config', SRC.includes('fastMode: fastModeCb ? fastModeCb.checked : false'));
+// ⛔ React ៖ វាលធីកអានតាមច្រកចេញ `fieldChecked(<id>)` ➜ id ត្រូវស៊ីនឹងប្រអប់ធីកក្នុង index.html ពិត
+ok('Fast Mode ត្រូវបានរក្សាទុកក្នុង config', SRC.includes('fastMode: fastModeCb ? fastModeCb.checked : false')
+    || SRC.includes("fastMode: fieldChecked('lookupApiFastModeCheckbox')"));
 ok('Fast Mode cache ត្រូវបានអានមុន customer table', src.attemptAutoLookup && src.attemptAutoLookup.indexOf('getFastLookupRow') < src.attemptAutoLookup.indexOf('findCustomerDataTableRow'));
 ok('Fast Mode cache ត្រូវបានសម្អាតជាមួយ customer cache', src.clearCustomerDataTableCache && src.clearCustomerDataTableCache.includes('lookupFastCache.clear()'));
 ok('Fast Mode cache មាន TTL', src.getFastLookupRow && src.getFastLookupRow.includes('LOOKUP_FAST_CACHE_TTL_MS'));
@@ -214,6 +217,9 @@ function build(opts) {
         __net: net, __clock: clock
     };
     vm.createContext(ctx);
+    // ⛔ ZoeW ជា React ៖ ឃ្លាំង · `fieldValue()` · `viewState` ជាស្រទាប់ React ពិត (stub របស់ sandbox ឈ្នះ)
+    if (typeof ctx.queueMicrotask !== 'function') ctx.queueMicrotask = queueMicrotask;
+    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
     decls.forEach((d) => { try { vm.runInContext(d, ctx); } catch (e) {} });
     // ⛔ កូដពិតត្រូវចាក់ **ក្រោយ** stub ➜ វាឈ្នះជានិច្ច។
     FNS.forEach((n) => { if (src[n]) { try { vm.runInContext(src[n], ctx); } catch (e) {} } });
@@ -316,10 +322,12 @@ scenario('ការទាញបង្ខំបញ្ជូន fresh=1 ដល់�
 });
 
 scenario('ប៊ូតុង 🔄 ក្នុងតារាងអតិថិជនស្នើទិន្នន័យស្រស់', () => {
-    const m = HTML.match(/data-act="fetchCustomerDataTableRows"[^>]*data-args='(\[[^']*\])'/);
-    ok('រកឃើញប៊ូតុង 🔄', !!m, m && m[1]);
+    // ⛔ React ៖ `data-args` ក្នុង markup វាស់ (build-audit) ដេរីវេពី `onAct(..., { args })` ពិតរបស់ JSX ➜ quote ទាំង ២ ទម្រង់
+    const m = HTML.match(/data-act="fetchCustomerDataTableRows"[^>]*data-args=(?:'(\[[^']*\])'|"(\[[^"]*\])")/);
+    const rawArgs = m ? (m[1] || m[2] || '').replace(/&quot;/g, '"') : null;
+    ok('រកឃើញប៊ូតុង 🔄', !!m, rawArgs);
     let args = null;
-    try { args = m ? JSON.parse(m[1]) : null; } catch (e) { args = null; }
+    try { args = rawArgs ? JSON.parse(rawArgs) : null; } catch (e) { args = null; }
     ok('ប៊ូតុង 🔄 បញ្ជូន [true, true] (បង្ខំ + ស្រស់)',
         Array.isArray(args) && args[0] === true && args[1] === true, args);
 });
@@ -463,6 +471,9 @@ function runSheetApi(options) {
         }
     };
     vm.createContext(ctx);
+    // ⛔ ZoeW ជា React ៖ ឃ្លាំង · `fieldValue()` · `viewState` ជាស្រទាប់ React ពិត (stub របស់ sandbox ឈ្នះ)
+    if (typeof ctx.queueMicrotask !== 'function') ctx.queueMicrotask = queueMicrotask;
+    vm.runInContext(reactRuntime(SRC, { context: ctx }), ctx);
     vm.runInContext(GS, ctx, { filename: 'Code.gs' });
     return {
         calls: calls, store: store,

@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const acorn = require('acorn');
+const { reactRuntime, renderedElement } = require('./react-view');
 const ROOT = process.env.PANELSNAP_APP_DIR
     ? path.resolve(process.env.PANELSNAP_APP_DIR) : path.resolve(__dirname, '..');
 let pass = 0;
@@ -16,8 +17,10 @@ function check(condition, label) {
     else { fail++; console.log('  FAIL   ' + label); }
 }
 
+const APP_SOURCE = fs.readFileSync(path.join(ROOT, 'ZoeW/app.js'), 'utf8');
+
 function extractActualSource() {
-    const source = fs.readFileSync(path.join(ROOT, 'ZoeW/app.js'), 'utf8');
+    const source = APP_SOURCE;
     const required = new Set([
         'PANEL_GLIDE_MS', 'PANEL_GLIDE_EASING', 'PANEL_GLIDE_SNAP_GRACE_MS',
         'panelGlideTokens', 'panelGlideRelease', 'panelMotionAllowed',
@@ -58,13 +61,11 @@ function environment(code, options = {}) {
     let nextTimer = 1;
     let animationCalls = 0;
     const timers = new Map();
-    const classes = new Set();
     const context = vm.createContext({
         document: {
-            getElementById: id => id === 'appPages' && !options.missingPages ? {
-                classList: { add: value => classes.add(value), remove: value => classes.delete(value) }
-            } : null
+            getElementById: id => id === 'appPages' && !options.missingPages ? {} : null
         },
+        queueMicrotask,
         window: {
             innerWidth: options.width === undefined ? 412 : options.width,
             matchMedia: () => ({ matches: options.reducedMotion === true })
@@ -77,6 +78,10 @@ function environment(code, options = {}) {
         clearTimeout: id => timers.delete(id),
         isFinite
     });
+    // ⛔ ZoeW ជា React ៖ `#appPages.panel-gliding` ជា `uiState.panelGliding` ដែល `AppPages.tsx` គូរ ➜ ស្រទាប់ React ពិត
+    //    ចូល sandbox ហើយ `paused()` អាន class ពី **JSX ពិត** (មិនមែន classList ក្លែង)
+    vm.runInContext(reactRuntime(APP_SOURCE, { context }), context, { timeout: 1000 });
+    const pages = renderedElement(ROOT, context, 'src/app/components/AppPages.tsx', 'AppPages', 'appPages');
     vm.runInContext(code + '\nglobalThis.api = { panelGlideFrom, beginPanelGlideSnapPause, endPanelGlideSnapPause };',
         context, { timeout: 1000 });
 
@@ -113,7 +118,7 @@ function environment(code, options = {}) {
     }
     return {
         api: context.api, glide, tick,
-        paused: () => classes.has('panel-gliding'),
+        paused: () => pages.classList.contains('panel-gliding'),
         timers: () => timers.size,
         animationCalls: () => animationCalls
     };

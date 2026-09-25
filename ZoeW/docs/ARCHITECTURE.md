@@ -167,28 +167,26 @@ interval ដែលដំណាក់ boot ចាក់ផ្ទាល់ ឆ្�
 
 ---
 
-## ៩. ឧបករណ៍ដែលផលិតកូដ
+## ៩. ប្រភពការពិត និងឧបករណ៍ផលិតកូដ
 
-| ឧបករណ៍ | អ្វីដែលវាធ្វើ |
-|---|---|
-| `tools/codemod.cjs` | បំបែក `app.js` ➜ module · ប្តូរ `let` ជា `store.field` · សាង import · ចុះបញ្ជីសកម្មភាព |
-| `tools/gen-state.cjs` | ផលិត `src/core/state.ts` ពីអថេរ `let` ពិត |
-| `tools/fixups.cjs` | ការជួសជុល **type ប៉ុណ្ណោះ** (cast · annotation) — ធ្លាក់បើធាតុណាមួយរកមិនឃើញ |
-| `tools/html-to-jsx.cjs` | បម្លែង `index.html` ➜ component · `data-act` ➜ handler |
-| `tools/generate.sh` | រត់ទាំង ៤ តាមលំដាប់ រួចពិនិត្យ type |
+`src/**` ជា **ប្រភពការពិតតែមួយ** ហើយកែដោយដៃ។ ឧបករណ៍ codemod ដែលធ្លាប់ផលិតវាពី `app.js` ដើម ត្រូវលុបរួច
+(វាសរសេរជាន់ `src/` ទាំងមូល ➜ អន្ទាក់)។ ឯកសារដែលនៅតែ **ផលិត** ៖
 
-⛔ ឧបករណ៍ទាំងនេះជា **កំណត់ត្រានៃការផ្ទេរ** ៖ `src/` ជាប្រភពការពិត ហើយត្រូវបាន
-កែដោយដៃ (lifecycle · platform · Android · React ១០០%) ➜ ⛔ **កុំរត់ `tools/generate.sh`**
-(`npm run generate` ចាក់សោដោយ `ALLOW_REGENERATE=1`) — វានឹងសរសេរជាន់ `src/` ទាំងមូល
-ហើយនាំកូដដែលប៉ះ DOM ផ្ទាល់ត្រឡប់មកវិញ។ `html-to-jsx.cjs` នៅជាប្រភពនៃបញ្ជី slot
-ដែល `doc:check` · `slot:check` អាន។
+| ឯកសារ | ផលិតដោយ | ហេតុអ្វី |
+|---|---|---|
+| `dist-audit/**` | `scripts/build-audit.mjs` | build វាស់សម្រាប់ `audit-tools/` (មិន commit) |
+| `audit-tools/money-core.js` | `npm run money:core` | កូដលុយពិតសម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់) |
+| `src/_generated-state.json` | ⛔ **ស្ថិរ** (រូបភាពនៃ state ដើមរបស់ vanilla) | `parity` · build វាស់ ប្រើវាដើម្បីផ្គូ state ដើម |
+
+បញ្ជី slot (ផ្នែក ១០) រស់នៅ `scripts/slot-registry.cjs` ហើយ `slot:check` ផ្ទៀងផ្ទាត់វាទល់នឹង `REACT_OWNED_IDS`
+(`src/app/slot-resets.ts`) និង component ដែល export ពិត ➜ វាមិនមែនបញ្ជីរឹងឯករាជ្យទេ។
 
 ---
 
 ## ១០. ការគូរ ៖ slot និង element slot
 
-`tools/html-to-jsx.cjs` ចាក់ component របស់ React ចូលសំបកដែលកើតពី
-`index.html` តាម **id** ។ មាន ២ រូបរាង ៖
+component របស់ React ឈរក្នុងសំបក (`AppShell` · markup ដែលធ្លាប់ជា `index.html`) តាម **id** — បញ្ជីរស់នៅ
+`scripts/slot-registry.cjs`។ មាន ២ រូបរាង ៖
 
 | រូបរាង | React ជាម្ចាស់អ្វី | ហេតុអ្វីប្រើវា |
 |---|---|---|
@@ -249,8 +247,8 @@ React មានវត្តមានសោះ។
 ⛔ **ពេលកូដបន្ទាប់ *វាស់* អ្វីដែលទើបផ្សាយ ត្រូវហៅ `commitNow()`**
 (`flushSync` លើរាល់ឃ្លាំង) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ**។ វាស់បាន ៖
 `showGlobalMoreMenu()` វាស់ទទឹងម៉ឺនុយមុនធាតុចុះ ➜ គ្មានការទាញចូលវិញ ➜
-ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementRect()` ·
-`elementSize()` · `setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
+ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementSize()` ·
+`setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
 
 ### ⛔ កូដ imperative មិនត្រូវប៉ះ **កូន** របស់ធាតុដែល React ជាម្ចាស់
 
@@ -268,7 +266,7 @@ React ចេញពីក្រោមវា ➜ ការគូរបន្ទា
 |---|---|
 | សម្អាតមាតិកា slot | កែ **store** (`uiState.xView = null`) — React សម្អាតខ្លួនឯង |
 | សម្អាតតាមបញ្ជី id (ឧ. ពេលចាកចេញ) | `blankElementById(id)` (`src/app/slot-resets.ts`) ៖ slot ➜ store · input ➜ ref · អត្ថបទ ➜ `viewState` — id មិនស្គាល់ ➜ `false` ➜ `npm test` ធ្លាក់ |
-| បន្ថែម slot ថ្មី | ប្រកាស `reset:` ក្នុង `SLOTS` (`tools/html-to-jsx.cjs`) ហើយបន្ថែមករណីក្នុង `resetReactOwned()` |
+| បន្ថែម slot ថ្មី | ចុះឈ្មោះក្នុង `scripts/slot-registry.cjs` · បន្ថែមករណីក្នុង `resetReactOwned()` និង `REACT_OWNED_IDS` (`slot:check` ធ្លាក់បើ ២ បញ្ជីឃ្លាតគ្នា) · បន្ថែមជួរក្នុងតារាងខាងលើ (`doc:check`) |
 
 អ្នកយាម ៖ `npm run slot:check` (ក្នុង `verify`) ស្កេន AST នៃ `.ts` ទាំងអស់ក្នុង `src/`
 (រួម `src/app/` ដែល behavior កាន់ធាតុតាម ref) រកការប៉ះកូនរបស់ id ដែល **ដេរីវេពី
@@ -293,8 +291,10 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 
 ⛔ `data-act` · `data-a1` លើប៊ូតុងម៉ឺនុយ (...) នៅជា attribute **ពណ៌នា** សុទ្ធ
 (DOM ដូចដើម ➜ ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
-⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ (`buildHistoryRowHtml()` · `trashGroupRowHtml()`)
-**មិនចូល DOM** — វារស់ជា oracle សម្រាប់តេស្ត parity និង checker ស្តាទិច។
+⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ **មិនរស់ក្នុង `src/` ទៀតទេ** — JSX គូរពី model (`buildHistoryRowModel()` ·
+`buildTrashRowModel()` · `healthRow()` · `ztoListGroupModel()`)។ builder ដើមដែលតេស្ត parity ត្រូវការ រស់ជា
+**oracle** ក្នុង `tests/oracles/` (`history-row-html.ts` · `health-row-html.ts`) ➜ `function-surface` មិនរាយវាថាងាប់ ហើយ
+ផលិតកម្មមិនដឹកវា។
 
 ### ⛔ ច្រកចេញ (escape hatch) — អ្វីតែមួយគត់ដែលមិនមែន JSX
 

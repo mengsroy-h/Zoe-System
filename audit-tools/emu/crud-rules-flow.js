@@ -223,6 +223,10 @@ function makeSandbox(store, now) {
         // មិនប៉ះវា តែការត្រួតពិនិត្យរចនាសម្ព័ន្ធរកឃើញថាវាអវត្តមាន (2.25.8)។
         optionalFn(src, 'armLateCommit', 'function armLateCommit() { return false; }'),
         optionalFn(src, 'viewListModalShowing', 'function viewListModalShowing() { return false; }'),
+        // App React ៖ `viewListModalShowing()` អានស្ថានភាពប្រអប់តាម `modalIsOpen()` ➜ function ពិត (ទិដ្ឋភាពអាន DOM
+        // ដូច App ដើម ➜ `document.getElementById` ក្នុង sandbox ត្រឡប់ null ➜ «មិនបើក»); tree vanilla ➜ stub ដដែល។
+        optionalFn(src, 'modalDisplay', 'function modalDisplay() { return undefined; }'),
+        optionalFn(src, 'modalIsOpen', 'function modalIsOpen() { return false; }'),
         // ⛔ `settleLockWithin` ដោះសោការសម្អាត/ការស្កេនដក តាមពិដាន ដោយមិន
         // បោះបង់ការងារ ➜ ផ្ទុក function ពិត; tree មុនកែ ➜ stub ដែលរក្សា
         // ឥរិយាបថដើម (រង់ចាំពេញ · បញ្ជូនតម្លៃត្រឡប់)។

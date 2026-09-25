@@ -36,7 +36,7 @@ if defined REPO if not exist "!REPO!\audit-tools\money-reality-check.js" set "RE
 rem 3) ask the user once, then remember it
 if not defined REPO (
   echo This tool needs the Zoe-System project folder
-  echo   ^(it reads the real money code out of ZoeW\app.js^).
+  echo   ^(it reads the real money code of the app^).
   echo.
   echo If you do not have it: open the GitHub page, click Code, then
   echo Download ZIP, and unzip it somewhere like D:\Zoe-System.
@@ -56,9 +56,13 @@ if not exist "!REPO!\audit-tools\money-reality-check.js" (
   pause
   exit /b 1
 )
-if not exist "!REPO!\ZoeW\app.js" (
+set "MONEYCODE="
+if exist "!REPO!\ZoeW\app.js" set "MONEYCODE=1"
+if exist "!REPO!\audit-tools\money-core.js" set "MONEYCODE=1"
+if not defined MONEYCODE (
   echo.
-  echo ERROR: ZoeW\app.js not found inside !REPO!
+  echo ERROR: the money code was not found inside !REPO!
+  echo   Expected ZoeW\app.js or audit-tools\money-core.js
   echo   The project folder looks incomplete.
   echo.
   pause

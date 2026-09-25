@@ -105,15 +105,3 @@ export function registerStore(store: StoreMeta): StoreMeta {
 }
 
 export function allStores(): readonly StoreMeta[] { return registry; }
-
-/** ជាវរាល់ store ក្នុងពេលតែមួយ (ប្រើដោយ `useAppState`)។ */
-export function subscribeAll(fn: Listener): () => void {
-    const offs = registry.map((s) => s.subscribe(fn));
-    return () => offs.forEach((off) => off());
-}
-
-export function globalVersion(): number {
-    let sum = 0;
-    for (const s of registry) sum += s.version();
-    return sum;
-}

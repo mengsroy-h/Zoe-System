@@ -67,13 +67,15 @@ function listReadmeFiles(dir, rel, out) {
 // ឃើញតែ `README*.md` ➜ ឯកសារ «របៀបប្រើ» ឈ្មោះផ្សេង (`ZTO-SETUP-KH.md` ជាដើម)
 // ពឹងលើ **បញ្ជីរឹង** `CONTENT_ONLY` ➜ ឯកសារថ្មីឈ្មោះផ្សេងរអិលកាត់ទាំងស្រុង។
 // នេះជាថ្នាក់ «បញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់» ដដែល ➜ ដេរីវេពី **ថតពិត**។
-// ⛔ លើកលែង ៖ `docs/` (ផ្ទះរបស់ប្រវត្តិ) និង `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា
-// *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។
+// ⛔ លើកលែង ៖ `docs/` **នៅ root តែប៉ុណ្ណោះ** (ផ្ទះរបស់ប្រវត្តិ) និង `CLAUDE.md` (ឯកសារច្បាប់ ➜ វា
+// *ត្រូវតែ* យោងការវាស់ជាហេតុផលនៃច្បាប់)។ ⛔ ថត `docs` ក្នុង App (`ZoeW/docs/`) **មិនមែន** ផ្ទះរបស់ប្រវត្តិ ៖
+// ការលើកលែងតាម *ឈ្មោះថត* គ្រប់ជម្រៅ ធ្លាប់ធ្វើឲ្យ `ZoeW/docs/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ)
+// **គ្មាននរណាស្កេនសោះ** ➜ ប្រវត្តិរស់នៅ ២ កន្លែង ខណៈច្បាប់និយាយ «តែមួយ»។
 function listAllDocs(dir, rel, out) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
     entries.forEach((entry) => {
-        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'docs') return;
+        if (entry.name === 'node_modules' || entry.name === '.git' || (!rel && entry.name === 'docs')) return;
         const next = rel ? rel + '/' + entry.name : entry.name;
         if (entry.isDirectory()) listAllDocs(path.join(dir, entry.name), next, out);
         else if (/\.md$/i.test(entry.name) && next !== 'CLAUDE.md') out.push(next);
@@ -473,7 +475,12 @@ const moreMenuLabels = (moreMenuBlock.match(/<button[^>]*>([^<]+)<\/button>/g) |
     .map((label) => String(label || '').replace(/\$\{[^}]*\}/g, '').replace(/\s*\([^)]*\)\s*$/, '').trim())
     // ⛔ ដកតែ emoji ខាងមុខ — អត្ថបទពិតត្រូវនៅដដែល
     .map((label) => label.replace(/^[^\p{L}\p{N}]+/u, '').trim())
-    .filter((label) => label.length >= 5);
+    .filter((label) => label.length >= 5)
+    // App React ៖ ធាតុម៉ឺនុយជា view-model `{ label: '…', action }` (JSX គូរ) ➜ ស្លាកជា string literal ទី ១ របស់ `label`
+    .concat((moreMenuBlock.match(/\blabel:\s*'([^']+)'/g) || [])
+        .map((m) => /'([^']+)'/.exec(m)[1].replace(/\s*\($/, '').replace(/\s*\([^)]*\)\s*$/, ''))
+        .map((label) => label.replace(/^[^\p{L}\p{N}]+/u, '').trim())
+        .filter((label) => label.length >= 5));
 
 // --- គ. ជួរ 🩺 ពិនិត្យសុខភាព ៖ ចំនួនដេរីវេពី `runHealthCheck()` ពិត --------
 const healthBlock = (() => {
@@ -485,7 +492,9 @@ const healthBlock = (() => {
     const end = rest.indexOf('\n    function ');
     return rest.slice(0, end === -1 ? 1200 : end);
 })();
-const healthRowCount = new Set((healthBlock.match(/health[A-Za-z]+Row\(\)/g) || [])).size;
+// ⛔ `healthPendingRow()` (App React) ជាជួរ «កំពុងពិនិត្យ…» បណ្តោះអាសន្ន មិនមែនជួរវាស់ទេ
+const healthRowCount = new Set((healthBlock.match(/health[A-Za-z]+Row\(\)/g) || [])
+    .filter((name) => name !== 'healthPendingRow()')).size;
 
 // --- ឃ. អេក្រង់ដែលប្រើ helper ចំណូល ៖ ចំនួនកន្លែងហៅ `collectedValueOf()` ---
 const collectedCallers = (uiApp.match(/collectedValueOf\(/g) || []).length
@@ -534,7 +543,11 @@ check(dupFences.length === 0,
     '⛔ ច្បាប់ ១២ ៖ ប្លុកពាក្យបញ្ជាដដែល មិនត្រូវរស់នៅ ២ ឯកសារ (ត្រូវយោង មិនចម្លង)',
     dupFences.map(([k, o]) => [...o].join(' ↔ ') + ' ៖ ' + k.split('\n')[0]).join('\n        '));
 
-const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length;
+// App React ៖ timer ចុះឈ្មោះតាម `scope.every(ms, fn)` (lifecycle ដកវិញពេល unmount) ➜ `setInterval(` តែមួយរស់ក្នុងតួ
+// `every()` ខ្លួនវា ➜ ការរាប់ = `setInterval(` ផ្ទាល់ (ក្រៅតួនោះ) + `scope.every(`
+const everyImpl = /\bevery\(ms, fn\) \{[^}]*\bsetInterval\(/.test(uiApp) ? 1 : 0;
+const intervalCount = (uiApp.match(/\bsetInterval\(/g) || []).length - everyImpl
+    + (uiApp.match(/\bscope\.every\(/g) || []).length;
 check(intervalCount >= 3, 'ជាន់អប្បបរមា ៖ រាប់ `setInterval` ក្នុង `app.js` បានយ៉ាងតិច ៣',
     'រាប់បាន ' + intervalCount);
 const KH_DIGITS = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
@@ -608,8 +621,10 @@ check(screensClaim !== null && screensClaim === collectedCallers,
     'ឯកសាររាយ ' + screensClaim + ' ខណៈកូដហៅ ' + collectedCallers);
 
 const lineClaim = khmerToInt((claudeText.match(/`ZoeW\/app\.js`[^\n]*?~\s*([០-៩0-9,]+) បន្ទាត់/) || [])[1]);
-check(lineClaim !== null && Math.abs(lineClaim - appLineCount) / appLineCount <= 0.12,
-    '⛔ CLAUDE.md ៖ ទំហំ `ZoeW/app.js` ដែលរាយ ត្រូវនៅក្នុង ±១២% នៃការពិត',
+// ⛔ App React ៖ `ZoeW/app.js` ជា *ទិដ្ឋភាពវាស់* (មិនមែនឯកសារដែលមនុស្សកែ) ➜ CLAUDE.md លែងរាយទំហំវា។
+//    ការអះអាងដែល **មាន** នៅតែត្រូវស្រស់ (±១២%) — អវត្តមានមិនមែនការអះអាងខុសទេ។
+check(lineClaim === null || Math.abs(lineClaim - appLineCount) / appLineCount <= 0.12,
+    '⛔ CLAUDE.md ៖ ទំហំ `ZoeW/app.js` ដែលរាយ (បើមាន) ត្រូវនៅក្នុង ±១២% នៃការពិត',
     'ឯកសាររាយ ~' + lineClaim + ' ខណៈឯកសារពិតមាន ' + appLineCount + ' បន្ទាត់');
 
 // ⛔ ចំនួនតំបន់ 📝 ៖ ការអះអាងក្នុងក្បាលតារាងស្នូល ត្រូវស្មើចំនួនជួរ 📝 ពិត
@@ -763,10 +778,8 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
 // ⛔ តំណក្នុងស្រុកដែល **បាក់** ជាអន្ទាក់ស្ងាត់ ៖ session ក្រោយចុចតាមវា ➜
 // រកឯកសារមិនឃើញ ➜ ចំណាយពេលរក រួចសន្និដ្ឋានថាឯកសារនោះត្រូវលុប។
 // ⛔ ការវាស់ត្រូវ **ដេរីវេពីថតពិត** មិនមែនបញ្ជីរឹង។
-// ⛔ **បណ្ណសារលើកលែងដោយចេតនា** ៖ `docs/ARCHIVE-*.md` និង `HISTORY-ARCHIVE.md`
-//    ជារូបភាពនៃថ្ងៃដែលវាត្រូវសរសេរ ហើយក្បាលរបស់វា **ប្រាប់រឿងនោះរួចហើយ**
-//    (ឧ. «ការយោងទៅ `docs/BUG-HISTORY.md` … បញ្ចូលចូល `docs/HISTORY.md` រួច»)
-//    ➜ ការសរសេរជាន់លើបណ្ណសារ បំផ្លាញកំណត់ត្រា ដោយគ្មានតម្លៃត្រឡប់មកវិញ។
+// ⛔ **គ្មានការលើកលែងសម្រាប់បណ្ណសារទៀតទេ** ៖ ប្រវត្តិរស់នៅ `docs/HISTORY.md` តែមួយ (បណ្ណសារចាស់ជាផ្នែក ៣ · ៤
+//    របស់វា ហើយតំណដែលបាក់ក្នុងនោះត្រូវបម្លែងជាអត្ថបទពេលបញ្ចូល) ➜ ឯកសារ `*ARCHIVE*` ថ្មីក៏ត្រូវវាស់ដូចឯកសារដទៃ។
 {
     const mdFiles = [];
     const walkMd = (dir) => {
@@ -780,10 +793,20 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
         });
     };
     walkMd(ROOT);
-    const isArchive = (f) => /ARCHIVE|HISTORY-ARCHIVE/.test(path.basename(f));
-    const living = mdFiles.filter((f) => !isArchive(f));
+    const living = mdFiles;
     let linkCount = 0;
     const broken = [];
+    // App React ៖ tree វាស់ (`ZoeW/dist-audit/ZoeW`) មិនដឹក `src/` ➜ តំណទៅប្រភពវាស់តាមបញ្ជីឯកសារប្រភពពិត
+    // (`audit-source-files.json` — build-audit ដើរថតប្រភពពិត) ⛔ មិនមែនការលើកលែងងងឹត ៖ ផ្លូវត្រូវមានក្នុងបញ្ជី
+    let sourceFiles = null;
+    try { sourceFiles = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'ZoeW', 'audit-source-files.json'), 'utf8'))); } catch (e) { sourceFiles = null; }
+    const zoewDir = path.join(ROOT, 'ZoeW');
+    const existsInSource = (abs) => {
+        if (!sourceFiles) return false;
+        const rel = path.relative(zoewDir, abs).split(path.sep).join('/');
+        if (rel.startsWith('..')) return false;
+        return sourceFiles.has(rel) || [...sourceFiles].some((f) => f.startsWith(rel.replace(/\/$/, '') + '/'));
+    };
     living.forEach((f) => {
         let txt = '';
         try { txt = fs.readFileSync(f, 'utf8'); } catch (e) { return; }
@@ -793,7 +816,8 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
             const target = m[1].split('#')[0].trim();
             if (!target || /^(https?:|mailto:)/.test(target)) continue;
             linkCount++;
-            if (!fs.existsSync(path.resolve(path.dirname(f), target))) {
+            const abs = path.resolve(path.dirname(f), target);
+            if (!fs.existsSync(abs) && !existsInSource(abs)) {
                 broken.push(path.relative(ROOT, f) + ' ➜ ' + target);
             }
         }
@@ -802,10 +826,6 @@ check(SHIPPED_APP_TEXT.length > 200000, 'ជាន់អប្បបរមា �
     check(linkCount >= 100, 'ជាន់អប្បបរមា ៖ តំណក្នុងស្រុកយ៉ាងតិច ១០០', linkCount);
     check(broken.length === 0, '⛔ ឯកសាររស់ ៖ តំណក្នុងស្រុកទាំងអស់ត្រូវចង្អុលទៅឯកសារដែលមានពិត',
         broken.slice(0, 8).join(' · '));
-    // ⛔ ទិសផ្ទុយ ៖ បណ្ណសារត្រូវនៅក្រៅវិសាលភាព (បើអត់ ច្បាប់នេះនឹងបង្ខំឲ្យ
-    //    សរសេរជាន់លើកំណត់ត្រាចាស់)។
-    check(mdFiles.length > living.length, '⛔ ទិសផ្ទុយ ៖ បណ្ណសារត្រូវលើកលែងពិត',
-        mdFiles.length + ' ➜ ' + living.length);
 }
 
 // ⛔ កូនសោ storage ជា **ស្នាមភ្ជាប់ដែលដេរីវេបាន** ៖ ឈ្មោះមានទម្រង់ច្បាស់

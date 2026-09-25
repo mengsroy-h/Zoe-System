@@ -37,7 +37,7 @@ function report(file, name) {
     return { ...result, bytes, body: bytes.toString('utf8') };
 }
 function measured(body) {
-    return body.split(/\r?\n/).filter((line) => !line.startsWith('ឯកសារ ៖ ')).join('\n');
+    return body.split(/\r?\n/).filter((line) => !line.startsWith('ឯកសារ ៖ ') && !line.startsWith('កូដលុយ ៖ ')).join('\n');
 }
 
 // ទិន្នន័យប្រឌិតទាំងអស់៖ រួមមានលុយបើក/បិទ/ធុងសំរាម និងអត្តសញ្ញាណភ្ជាប់ឆ្លង node។
@@ -282,7 +282,38 @@ try {
             ok(label + ' ➜ exit ' + status, result.status === status && result.text.length > 0, result.status);
         });
         const missingApp = run('money-reality-check.js', [dump], { MONEYREAL_APP_DIR: emptyTree });
-        ok('money គ្មាន app.js ➜ exit 3 មិនមែនលុយខុស', missingApp.status === 3 && /app\.js not found/.test(missingApp.text));
+        ok('money គ្មានកូដលុយ ➜ exit 3 មិនមែនលុយខុស', missingApp.status === 3 && /money code not found/.test(missingApp.text));
+    });
+
+    // ⛔ ZoeW React ៖ repo ដែលអ្នកប្រើទាញ (Download ZIP) គ្មាន `ZoeW/app.js` ទេ ➜ CLI អានកូដលុយពី `audit-tools/money-core.js`
+    //    ដែលផលិតពី src ពិត។ វាស់ ២ ទិស ៖ (១) repo React (src/main.tsx + money-core) ➜ ការវាស់ **ដូច** ការអានពី app.js បេះបិទ;
+    //    (២) money-core ចាស់ជាងកូដ ➜ ធ្លាក់ (បើអត់ អ្នកប្រើវាស់លុយដោយរូបមន្តចាស់ ខណៈ App ship រូបមន្តថ្មី)។
+    scenario('ZoeW React ៖ money-core.js ស្រស់ និងផ្តល់ការវាស់ដូច app.js', () => {
+        const coreFile = path.join(ROOT, 'audit-tools', 'money-core.js');
+        const reactMeasure = fs.existsSync(path.join(ROOT, 'ZoeW', 'react-render.cjs'));
+        if (reactMeasure) {
+            const { moneyCoreText } = require(path.join(ROOT, 'audit-tools', 'money-reality-check.js'));
+            const fresh = moneyCoreText(fs.readFileSync(path.join(ROOT, 'ZoeW', 'app.js'), 'utf8'));
+            ok('កូដលុយក្នុង app.js (build វាស់) ស្រង់បានគ្រប់', fresh.missing.length === 0, fresh.missing);
+            ok('⛔ audit-tools/money-core.js ស្រស់ (ស្មើកូដលុយពិតរបស់ src) — ចាស់ ➜ រត់ `npm --prefix ZoeW run money:core`',
+                fs.existsSync(coreFile) && fs.readFileSync(coreFile, 'utf8') === fresh.text);
+        }
+        if (!fs.existsSync(coreFile)) return;
+        const reactTree = path.join(tempRoot, 'react-tree');
+        fs.mkdirSync(path.join(reactTree, 'ZoeW', 'src'), { recursive: true });
+        fs.mkdirSync(path.join(reactTree, 'audit-tools'), { recursive: true });
+        fs.writeFileSync(path.join(reactTree, 'ZoeW', 'src', 'main.tsx'), '');
+        fs.copyFileSync(coreFile, path.join(reactTree, 'audit-tools', 'money-core.js'));
+        const viaCore = run('money-reality-check.js', [dump], { MONEYREAL_APP_DIR: reactTree });
+        const viaApp = run('money-reality-check.js', [dump]);
+        ok('repo React (គ្មាន app.js) ➜ CLI អាន money-core.js ហើយ exit ដូច app.js',
+            viaCore.status === viaApp.status && /money-core\.js/.test(viaCore.text), [viaCore.status, viaApp.status]);
+        ok('repo React ➜ ការវាស់ដូចការអានពី app.js បេះបិទ', measured(viaCore.text) === measured(viaApp.text));
+        const staleTree = path.join(tempRoot, 'no-core-tree');
+        fs.mkdirSync(path.join(staleTree, 'ZoeW', 'src'), { recursive: true });
+        fs.writeFileSync(path.join(staleTree, 'ZoeW', 'src', 'main.tsx'), '');
+        const noCore = run('money-reality-check.js', [dump], { MONEYREAL_APP_DIR: staleTree });
+        ok('ទិសផ្ទុយ ៖ repo React គ្មាន money-core.js ➜ exit 3 (មិនវាស់ដោយគ្មានកូដ)', noCore.status === 3);
     });
 
     scenario('Windows launcher មានកិច្ចសន្យាការហៅ CLI ពេញលេញ', () => {

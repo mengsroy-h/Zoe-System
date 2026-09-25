@@ -3,8 +3,8 @@ import { buildTrashRowModel, buildTrashSummaryModel } from '../app/components/tr
 import { fieldValue, setFieldValue } from '../app/refs';
 import { dataState, uiState } from '../core/state';
 import { DB_LISTENER_KEY_DELETED } from '../core/text';
-import { barcodeEntriesOf, sanitizeInput } from '../domain/barcode';
-import { DELETED_LIST_MAX_ROWS, TRASH_CODES_PREVIEW, expandedTrashGroups } from './locker';
+import { barcodeEntriesOf } from '../domain/barcode';
+import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
 
@@ -119,77 +119,11 @@ export function openRecentlyDeletedModal() {
     openModalHelper('recentlyDeletedModal');
 }
 
-export function trashSummaryCardHtml(cls, head, note, bucket) {
-    const riel = Math.round(bucket.total * dataState.exchangeRateRiel);
-    return `<div class="trash-sum-card ${cls}">
-                    <div class="trash-sum-head">${head}</div>
-                    <div class="trash-sum-note">${note}</div>
-                    <div class="trash-sum-money">$${bucket.total.toFixed(2)}</div>
-                    <div class="trash-sum-riel">${riel.toLocaleString()} ៛</div>
-                    <div class="trash-sum-count">📦 ${bucket.count} កញ្ចប់</div>
-                </div>`;
-}
-
 export function renderTrashSummary(groups, query) {
     // ➜ `TrashSummaryBox` (React) គូរ។ រូបមន្តរស់ក្នុង `buildTrashSummaryModel()`
     //   ដែលដេរីវេ ២ ក្រុមពី `TRASH_REASON_META[r].deducted` ដដែល។
     uiState.trashSummary = buildTrashSummaryModel(groups, query);
     uiState.touch();
-}
-
-export function trashActionButtonsHtml(id) {
-    return `<div class="trash-row-actions">
-                    <button class="btn-sm trash-restore-btn" data-act="promptRestoreDeletedItem" data-a1="${sanitizeInput(id)}" title="ស្តារមកវិញ">🔄</button>
-                    <button class="btn-sm trash-purge-btn" data-act="promptPermanentDelete" data-a1="${sanitizeInput(id)}" title="លុបជាអចិន្ត្រៃយ៍">✖️</button>
-                </div>`;
-}
-
-export function trashGroupRowHtml(group) {
-    const meta = TRASH_REASON_META[group.reason] || TRASH_REASON_META.delete;
-    const expanded = expandedTrashGroups.has(group.key);
-    const codeTags = group.codes.slice(0, TRASH_CODES_PREVIEW)
-        .map((code) => `<span class="barcode-tag">${sanitizeInput(code)}</span>`).join(' ');
-    const moreCodes = group.codes.length > TRASH_CODES_PREVIEW
-        ? `<span class="trash-more-codes">+${group.codes.length - TRASH_CODES_PREVIEW}</span>` : '';
-    const whenText = [group.scanDate, group.time].filter(Boolean).join(' ') || 'មិនស្គាល់ពេល';
-    const riel = Math.round(group.total * dataState.exchangeRateRiel);
-    const actions = group.items.length === 1
-        ? trashActionButtonsHtml(group.items[0].id)
-        : `<button class="btn-sm trash-expand-btn" data-act="toggleTrashGroup" data-a1="${sanitizeInput(group.key)}" title="បង្ហាញធាតុនីមួយៗ">${expanded ? '▲' : '▼'} ${group.items.length}</button>`;
-
-    let html = `<tr class="trash-group-row">
-                <td>
-                    <div class="trash-cust">
-                        <strong>${sanitizeInput(group.phone)}</strong>
-                        <span class="trash-tag ${meta.cls}">${meta.label}</span>
-                    </div>
-                    <div class="trash-when">🕒 ${sanitizeInput(whenText)}</div>
-                    <div class="trash-codes">${codeTags}${moreCodes}</div>
-                </td>
-                <td>
-                    <div><span class="count-badge">📦 ${group.count}</span></div>
-                    <div class="trash-money">$${group.total.toFixed(2)}</div>
-                    <div class="trash-riel">${riel.toLocaleString()} ៛</div>
-                </td>
-                <td style="text-align: center;">${actions}</td>
-            </tr>`;
-
-    if (expanded && group.items.length > 1) {
-        group.items.forEach((item) => {
-            const totals = trashItemTotals(item);
-            const itemTotal = Math.round((totals.cod + totals.dod) * 100) / 100;
-            const codes = trashItemCodes(item);
-            const codeHtml = codes.length
-                ? codes.map((code) => `<span class="barcode-tag">${sanitizeInput(code)}</span>`).join(' ')
-                : '<span class="trash-more-codes">គ្មាន Barcode</span>';
-            html += `<tr class="trash-sub-row">
-                        <td>${codeHtml}</td>
-                        <td><span class="count-badge">📦 ${totals.count}</span> <span class="trash-money">$${itemTotal.toFixed(2)}</span></td>
-                        <td style="text-align: center;">${trashActionButtonsHtml(item.id)}</td>
-                    </tr>`;
-        });
-    }
-    return html;
 }
 
 export function renderRecentlyDeleted() {

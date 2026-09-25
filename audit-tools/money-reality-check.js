@@ -2,7 +2,9 @@
 //
 // ហេតុអ្វីវាមាន ៖ checker ក្នុង `run-all.sh` វាស់ **កូដ**។ គ្មានមួយណាវាស់ថា
 // **លុយក្នុងប្រព័ន្ធរបស់អ្នកថ្ងៃនេះ ត្រឹមត្រូវឬអត់** ទេ។ ឧបករណ៍នេះយកកូដលុយ
-// **ពិត** ចេញពី `ZoeW/app.js` មករត់លើ **dump ពិត** របស់អ្នក រួចរាយលេខ។
+// **ពិត** មករត់លើ **dump ពិត** របស់អ្នក រួចរាយលេខ។ ប្រភពកូដលុយ ៖ `ZoeW/app.js` (ZoeW vanilla ឬ build វាស់
+// របស់ ZoeW React) ឬ `audit-tools/money-core.js` (repo React ដែលគ្មាន build ៖ ផលិតពី src ពិតដោយ
+// `--emit-core` ហើយ `money-reality-test` ធ្លាក់ពេលវាចាស់ជាងកូដ)។
 //
 // របៀបប្រើ ៖
 //   Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON  (ឬ backup .json.gz)
@@ -13,7 +15,7 @@
 // ⛔ វា **មិនភ្ជាប់បណ្តាញ** និង **មិនសរសេរទៅ Firebase** ដាច់ខាត។
 //
 // Exit code ៖ 0 = គ្រប់យ៉ាងស៊ីគ្នា · 1 = **រកឃើញបញ្ហាពិត** ·
-//             2 = ប្រើខុសវិធី · 3 = **រត់មិនបាន** (គ្មានឯកសារ · JSON ខូច · app.js)
+//             2 = ប្រើខុសវិធី · 3 = **រត់មិនបាន** (គ្មានឯកសារ · JSON ខូច · កូដលុយ)
 // ⛔ 1 និង 3 ត្រូវបែងចែក — «ឧបករណ៍ខូច» មិនមែន «លុយខុស» ទេ។
 const fs = require('fs');
 const path = require('path');
@@ -22,40 +24,10 @@ const vm = require('vm');
 
 const ROOT = process.env.MONEYREAL_APP_DIR || path.join(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
+const MONEY_CORE = path.join(ROOT, 'audit-tools', 'money-core.js');
 const file = process.argv[2];
 
-let pass = 0, warn = 0, fail = 0;
-const notes = [];
-// ⛔ `cmd.exe` បំបែក UTF-8 Khmer កណ្តាលពាក្យ (ច្បាប់គម្រោង) ➜ ពេលមាន `--report`
-// របាយការណ៍ខ្មែរទៅ **ឯកសារ** ហើយអេក្រង់ទទួលតែ **ASCII អង់គ្លេស**។
-const argi = process.argv.indexOf('--report');
-const REPORT = argi !== -1 ? process.argv[argi + 1] : null;
-const LINES = [];
-function say(line) { LINES.push(line); if (!REPORT) console.log(line); }
-function ok(label, detail) { say('  ✅ ' + label + (detail ? '  — ' + detail : '')); pass++; }
-function bad(label, detail) { say('  ❌ ' + label + (detail ? '\n       ' + detail : '')); fail++; }
-function may(label, detail) { say('  ⚠️  ' + label + (detail ? '\n       ' + detail : '')); warn++; }
-function check(cond, label, detail) { cond ? ok(label, cond === true && detail ? detail : undefined) : bad(label, detail); }
-// ⛔ `check()` បោះពុម្ព `detail` ទាំងពេលជោគជ័យ ➜ ពន្យល់វែងនៃការធ្លាក់
-// នឹងអានថាជាបញ្ហា ខណៈវាបៃតង។ `must()` ៖ ជោគជ័យខ្លី · ធ្លាក់ទើបពន្យល់។
-function must(cond, label, detail) { cond ? ok(label) : bad(label, detail); }
-
-if (!file) {
-    console.log('របៀបប្រើ ៖ node audit-tools/money-reality-check.js <dump.json ឬ dump.json.gz>');
-    say('  យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON');
-    process.exit(2);
-}
-if (!fs.existsSync(APP_JS)) { console.log('ERROR: ZoeW/app.js not found at ' + APP_JS); process.exit(3); }
-if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(3); }
-
-let raw = fs.readFileSync(file);
-if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
-let db;
-try { db = JSON.parse(raw.toString('utf8')); }
-catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(3); }
-
-// ⛔ ស្រង់កូដលុយ **ពិត** ចេញពី app.js — កុំសរសេរតេស្តលើកូដចម្លង
-const SRC = fs.readFileSync(APP_JS, 'utf8');
+// ⛔ ស្រង់កូដលុយ **ពិត** — កុំសរសេរតេស្តលើកូដចម្លង
 function sliceFn(src, name) {
     let s = src.indexOf('function ' + name + '(');
     if (s === -1) return null;
@@ -78,18 +50,72 @@ const WANT = ['ledgerNumber', 'statsMonthOf', 'statsPositive', 'statsMoney', 'st
     'recalcItemMoneyFromBarcodes', 'barcodeRegistryKey', 'rawSnapshotToItemList',
     'pickupBarcodeKey', 'collectedMarkValueOf', 'appZoneParts', 'getZoneDateKey'];
 const WANT_CONST = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES'];
-const missing = [];
-const bodies = WANT_CONST.map((n) => {
-    const line = sliceConst(SRC, n);
-    if (line) return line;
-    missing.push(n);
-    return '';
-}).concat(WANT.map((n) => {
-    const b = sliceFn(SRC, n);
-    if (b) return b;
-    missing.push(n);
-    return 'function ' + n + '() { return undefined; }';
-})).join('\n');
+function extractMoneyCore(src) {
+    const missing = [];
+    const consts = WANT_CONST.map((n) => { const line = sliceConst(src, n); if (!line) missing.push(n); return line; });
+    const fns = WANT.map((n) => { const b = sliceFn(src, n); if (!b) missing.push(n); return b; });
+    return { consts, fns, missing };
+}
+const MONEY_CORE_HEADER = '// ⛔ ផលិតដោយ `node audit-tools/money-reality-check.js --emit-core ZoeW/dist-audit/ZoeW/app.js audit-tools/money-core.js`\n'
+    + '//    (`npm --prefix ZoeW run money:core`) ពីកូដលុយពិតរបស់ ZoeW React — កុំកែដោយដៃ។ `money-reality-test` ធ្លាក់ពេលវាចាស់ជាងកូដ។\n';
+function moneyCoreText(src) {
+    const { consts, fns, missing } = extractMoneyCore(src);
+    return { text: MONEY_CORE_HEADER + consts.concat(fns).filter(Boolean).join('\n\n') + '\n', missing };
+}
+module.exports = { moneyCoreText, WANT, WANT_CONST };
+if (require.main !== module) return;
+
+// ឧបករណ៍អ្នកអភិវឌ្ឍន៍ ៖ ផលិត `money-core.js` ពីទិដ្ឋភាព `app.js` (build វាស់) — អានសុទ្ធសាធលើ dump មិនប្រែ
+if (process.argv[2] === '--emit-core') {
+    const from = process.argv[3], to = process.argv[4];
+    if (!from || !to || !fs.existsSync(from)) { console.log('usage: node audit-tools/money-reality-check.js --emit-core <ZoeW/app.js> <out.js>'); process.exit(2); }
+    const core = moneyCoreText(fs.readFileSync(from, 'utf8'));
+    if (core.missing.length) { console.log('ERROR: money functions not found: ' + core.missing.join(', ')); process.exit(3); }
+    fs.writeFileSync(to, core.text);
+    console.log('wrote ' + to + ' (' + (WANT.length + WANT_CONST.length) + ' functions/constants)');
+    process.exit(0);
+}
+
+let pass = 0, warn = 0, fail = 0;
+const notes = [];
+// ⛔ `cmd.exe` បំបែក UTF-8 Khmer កណ្តាលពាក្យ (ច្បាប់គម្រោង) ➜ ពេលមាន `--report`
+// របាយការណ៍ខ្មែរទៅ **ឯកសារ** ហើយអេក្រង់ទទួលតែ **ASCII អង់គ្លេស**។
+const argi = process.argv.indexOf('--report');
+const REPORT = argi !== -1 ? process.argv[argi + 1] : null;
+const LINES = [];
+function say(line) { LINES.push(line); if (!REPORT) console.log(line); }
+function ok(label, detail) { say('  ✅ ' + label + (detail ? '  — ' + detail : '')); pass++; }
+function bad(label, detail) { say('  ❌ ' + label + (detail ? '\n       ' + detail : '')); fail++; }
+function may(label, detail) { say('  ⚠️  ' + label + (detail ? '\n       ' + detail : '')); warn++; }
+function check(cond, label, detail) { cond ? ok(label, cond === true && detail ? detail : undefined) : bad(label, detail); }
+// ⛔ `check()` បោះពុម្ព `detail` ទាំងពេលជោគជ័យ ➜ ពន្យល់វែងនៃការធ្លាក់
+// នឹងអានថាជាបញ្ហា ខណៈវាបៃតង។ `must()` ៖ ជោគជ័យខ្លី · ធ្លាក់ទើបពន្យល់។
+function must(cond, label, detail) { cond ? ok(label) : bad(label, detail); }
+
+if (!file) {
+    console.log('របៀបប្រើ ៖ node audit-tools/money-reality-check.js <dump.json ឬ dump.json.gz>');
+    say('  យក dump ៖ Firebase Console ➜ Realtime Database ➜ ⋮ ➜ Export JSON');
+    process.exit(2);
+}
+// ប្រភពកូដលុយ ៖ `ZoeW/app.js` (vanilla ឬ build វាស់) មុន ➜ `money-core.js` តែលើ repo ZoeW React (គ្មាន build)
+const REACT_SOURCE = fs.existsSync(path.join(ROOT, 'ZoeW', 'src', 'main.tsx'));
+const MONEY_SRC_FILE = fs.existsSync(APP_JS) ? APP_JS : (REACT_SOURCE && fs.existsSync(MONEY_CORE) ? MONEY_CORE : null);
+if (!MONEY_SRC_FILE) {
+    console.log('ERROR: money code not found in ' + ROOT + ' (need ZoeW/app.js, or audit-tools/money-core.js for ZoeW React)');
+    process.exit(3);
+}
+if (!fs.existsSync(file)) { console.log('ERROR: dump file not found: ' + file); process.exit(3); }
+
+let raw = fs.readFileSync(file);
+if (file.endsWith('.gz')) raw = zlib.gunzipSync(raw);
+let db;
+try { db = JSON.parse(raw.toString('utf8')); }
+catch (e) { console.log('ERROR: cannot read the file as JSON: ' + e.message); process.exit(3); }
+
+const SRC = fs.readFileSync(MONEY_SRC_FILE, 'utf8');
+const extracted = extractMoneyCore(SRC);
+const missing = extracted.missing;
+const bodies = extracted.consts.concat(extracted.fns.map((b, i) => b || 'function ' + WANT[i] + '() { return undefined; }')).join('\n');
 
 const N = {
     history: 'zoew_scan_history_cod_dod',
@@ -124,12 +150,13 @@ say('\n╔═══════════════════════�
 say('║  🩺 ការវាស់លុយលើទិន្នន័យពិត — អានសុទ្ធសាធ                ║');
 say('╚══════════════════════════════════════════════════════════╝');
 say('ឯកសារ ៖ ' + path.basename(file) + '  (' + (raw.length / 1024).toFixed(0) + ' KB)');
+say('កូដលុយ ៖ ' + path.relative(ROOT, MONEY_SRC_FILE).split(path.sep).join('/'));
 say('រក function លុយពិត ៖ ' + (WANT.length + WANT_CONST.length - missing.length) + '/' + (WANT.length + WANT_CONST.length)
     + (missing.length ? '  ⚠️ បាត់ ៖ ' + missing.join(', ') : ''));
-// ⛔ ច្បាប់ដដែលនឹងមុន («បាត់លើស ៣ ➜ នេះមិនមែន app.js ទេ») តែសរសេរធៀបនឹង
+// ⛔ ច្បាប់ដដែលនឹងមុន («បាត់លើស ៣ ➜ នេះមិនមែនកូដលុយរបស់ ZoeW ទេ») តែសរសេរធៀបនឹង
 // `missing` ➜ វាមិនធូរឡើងពេល WANT រីក (លេខថេរជាកាលបរិច្ឆេទផុតកំណត់)។
 if (missing.length > 3) {
-    console.log('ERROR: could not extract enough real money functions from app.js.'); process.exit(3);
+    console.log('ERROR: could not extract enough real money functions from ' + path.basename(MONEY_SRC_FILE) + '.'); process.exit(3);
 }
 say('\nទំហំទិន្នន័យ ៖ ប្រវត្តិ ' + history.length + ' ជួរដេក · ធុងសំរាម ' + deleted.length
     + ' · ថ្ងៃក្នុង ledger ' + Object.keys(daily).length + ' · ខែ ' + Object.keys(monthly).length);
@@ -373,7 +400,7 @@ if (!collectedDays.length && !collectedBadDays.length) {
     });
     say('  ┈┈ កញ្ចក់ ↔ ប្រវត្តិ ┈┈');
     if (!zoneReady) {
-        may('ស្រង់ helper តំបន់ម៉ោងចេញពី `app.js` មិនបាន — ប្រៀបកញ្ចក់មិនបាន',
+        may('ស្រង់ helper តំបន់ម៉ោងចេញពីកូដលុយមិនបាន — ប្រៀបកញ្ចក់មិនបាន',
             'នេះជា «វាស់មិនបាន» មិនមែន «ត្រឹមត្រូវ» ទេ — ⛔ កុំអានវាជាបៃតង');
     } else if (!collectedDays.length) {
         may('គ្មានថ្ងៃត្រឹមត្រូវក្នុងកញ្ចក់ — ប្រៀបនឹងប្រវត្តិមិនបាន');

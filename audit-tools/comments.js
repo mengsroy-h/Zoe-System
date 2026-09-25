@@ -11,11 +11,13 @@ const APPS = ['ZoeW', 'ZoeKeyGen'];
 const EXTERNAL = new Set(['qrcode.js', 'test.js']);
 const files = [];
 for (const app of APPS) {
-  const dir = path.join(APP_ROOT, app);
+  // ZoeW React (ប្រភព) ៖ ឯកសារដែល ship ដដែលៗ រស់នៅ `public/` (src ឆ្លង build ដែលលុប comment)
+  const base = fs.existsSync(path.join(APP_ROOT, app, 'src', 'main.tsx')) ? app + '/public' : app;
+  const dir = path.join(APP_ROOT, base);
   if (!fs.existsSync(dir)) continue;
   for (const name of fs.readdirSync(dir).sort()) {
     if (!/\.js$/.test(name) || EXTERNAL.has(name)) continue;
-    files.push(app + '/' + name);
+    files.push(base + '/' + name);
   }
 }
 if (!acorn) { console.log('acorn not available — falling back to regex scan'); }

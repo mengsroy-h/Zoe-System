@@ -67,7 +67,8 @@ const WRITE_ALLOW = {
     appendRestoreRevenueIncrements: 'ledger (daily/monthly) មិនមែន item',
     buildMonthlyReport: 'សរុបរបាយការណ៍ មិនមែន item',
     buildTrashGroups: 'ក្រុមបង្ហាញក្នុងធុងសំរាម មិនមែន item',
-    renderTrashSummary: 'តួលេខសរុបបង្ហាញ មិនមែន item',
+    // ⛔ React ៖ `renderTrashSummary()` គ្រាន់តែសរសេរ view model ➜ ការគណនាតួលេខសរុបរស់ក្នុង `buildTrashSummaryModel()`
+    buildTrashSummaryModel: 'តួលេខសរុបបង្ហាញ (view model របស់ TrashSummaryBox) មិនមែន item',
     uncollectedItemValue: 'តម្លៃមិនទាន់យក (out) មិនមែន item',
     uncollectedValueByDate: 'bucket សរុប មិនមែន item',
     saveEditedBarcodePrice: 'សរសេរលើ **barcode** (b/targetB/staleB) មិនមែន item',

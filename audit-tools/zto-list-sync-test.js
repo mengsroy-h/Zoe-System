@@ -1022,9 +1022,34 @@ function firstBody(requests) {
 
     // ⛔ ប៊ូតុងលើរបាប្រវត្តិត្រូវលេចតែពេលកុងតាក់បើក
     const refreshFn = extractFn(APP_SRC, 'refreshZtoListSyncUi') || '';
-    ok('⛔ `refreshZtoListSyncUi()` លាក់/បង្ហាញប៊ូតុងតាមកុងតាក់',
-        refreshFn.indexOf('ztoListSyncBtn') !== -1 && /hidden/.test(refreshFn),
-        refreshFn.slice(0, 300));
+    if (fs.existsSync(path.join(ROOT, 'ZoeW', 'react-render.cjs'))) {
+        // App React ៖ `refreshZtoListSyncUi()` សរសេរ `viewState` ហើយ `PageData` (JSX ពិត) គូរ class `hidden` ➜ វាស់
+        // **ប៊ូតុងដែលគូរ** ក្នុងស្ថានភាពកុងតាក់ ៣ (បិទ · បើក · បើកតែ Lookup មិនមែន ZTO) មិនមែនអត្ថបទ function
+        const { reactRuntime, renderedElement } = require('./react-view');
+        const state = { on: false, cfg: {} };
+        const rctx = {
+            console, queueMicrotask,
+            ztoListSyncEnabled: () => state.on, ztoFastModeIsOn: () => true, ztoStatusFeatureConfig: () => state.cfg
+        };
+        rctx.globalThis = rctx;
+        let seen = null;
+        try {
+            vm.createContext(rctx);
+            vm.runInContext(reactRuntime(APP_SRC, { context: rctx }), rctx);
+            vm.runInContext(refreshFn + '\nglobalThis.__refresh = refreshZtoListSyncUi;', rctx);
+            const btn = renderedElement(ROOT, rctx, 'src/app/components/PageData.tsx', 'PageData', 'ztoListSyncBtn');
+            const hiddenWhen = (on, cfg) => { state.on = on; state.cfg = cfg; rctx.__refresh(); return btn.classList.contains('hidden'); };
+            seen = { off: hiddenWhen(false, {}), on: hiddenWhen(true, {}), onNoZto: hiddenWhen(true, null), offAgain: hiddenWhen(false, {}) };
+        } catch (e) {
+            seen = { error: String(e && e.message) };
+        }
+        ok('⛔ `refreshZtoListSyncUi()` លាក់/បង្ហាញប៊ូតុងតាមកុងតាក់ (JSX ពិត ៖ បិទ ➜ លាក់ · បើក ➜ បង្ហាញ · Lookup មិនមែន ZTO ➜ លាក់)',
+            !!seen && seen.off === true && seen.on === false && seen.onNoZto === true && seen.offAgain === true, seen);
+    } else {
+        ok('⛔ `refreshZtoListSyncUi()` លាក់/បង្ហាញប៊ូតុងតាមកុងតាក់',
+            refreshFn.indexOf('ztoListSyncBtn') !== -1 && /hidden/.test(refreshFn),
+            refreshFn.slice(0, 300));
+    }
 
     // ═════════════════════════════════════════════════════════════════════
     console.log('\n== ១៣. ⛔ ច្រកទ្វារ «វាស់បាន» · ពិដានពេល · secret ==');
@@ -1555,7 +1580,8 @@ function firstBody(requests) {
                     && (ripeOwners[0] === 'classifyZtoListRows'
                         || new RegExp(ripeOwners[0] + '\\s*\\(').test(classifySrc)),
                     ripeOwners);
-                const groupHtmlFn = extractFn(APP_SRC, 'ztoListGroupHtml') || '';
+                // អ្នកសាងជួរមើលជាមុន ៖ `ztoListGroupHtml()` (App ដើម) ឬ `ztoListGroupModel()` (App React ➜ `ZtoListSyncBody`)
+                const groupHtmlFn = extractFn(APP_SRC, 'ztoListGroupHtml') || extractFn(APP_SRC, 'ztoListGroupModel') || '';
                 ok('⛔ ជួរដេកមើលជាមុនបង្ហាញមូលហេតុពិត (ស្នាមភ្ជាប់ទៅ `ZTO_LIST_SKIP_TEXT`)',
                     /ztoListSkipText\s*\(\s*row\.skip\s*\)/.test(groupHtmlFn), groupHtmlFn.slice(0, 200));
 

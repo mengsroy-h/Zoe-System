@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderedElement } = require('./react-view');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.CONNRECOVERY_APP_DIR ? path.resolve(process.env.CONNRECOVERY_APP_DIR) : root;
@@ -12,6 +13,15 @@ function ok(label, cond, detail) {
 }
 
 const SRC = fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8');
+
+// handler `visibilitychange` ហៅ `callee()` ក្នុងចម្ងាយ ៤០០ តួ។ ⛔ ZoeW (React) ចុះឈ្មោះតាមច្រកចេញ
+// `onDocumentVisibilityChange()` (`platform/document-io.ts`) ➜ ទទួលវា **តែពេល** តួរបស់វាពិតជាចង
+// `visibilitychange` (ដេរីវេពីកូដ មិនមែនជឿឈ្មោះ)
+function visibilityCalls(src, callee) {
+    const helper = /function onDocumentVisibilityChange\([^)]*\)\s*\{[^}]*addEventListener\('visibilitychange'/.test(src);
+    const head = helper ? '(visibilitychange|onDocumentVisibilityChange\\()' : 'visibilitychange';
+    return new RegExp(head + '[\\s\\S]{0,400}?' + callee + '\\(\\)').test(src);
+}
 
 function sliceFnFrom(source, name) {
     let start = source.indexOf('function ' + name + '(');
@@ -66,10 +76,13 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             window: { ZoeErrors: { capture: () => {} } },
             document: { getElementById: () => null },
             isDatabaseConnected: true,
+            queueMicrotask,
             showToast: (m) => state.toasts.push(m)
         };
         core.ZoeErrors = core.window.ZoeErrors;
         vm.createContext(core);
+        // ⛔ ZoeW ជា React ៖ ស្លាកស្ថានភាពការតភ្ជាប់ជា `viewState` ដែល JSX គូរ ➜ ឃ្លាំងពិតចូល sandbox
+        vm.runInContext(reactRuntime(SRC, { context: core }), core);
         // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
         // `appSessionStore` បូក `safeStoreGet()` ថ្មី។ sandbox ត្រូវផ្តល់ពួកវា
         // បើមិនដូច្នេះ function ដែលស្រង់ចូល vm បោះ ReferenceError។
@@ -222,8 +235,6 @@ function buildContext() {
     const refs = {};
     REAL_LISTENER_KEYS.forEach((k) => { refs[k] = { __path: k }; });
 
-    const statusDot = { classes: {}, classList: { toggle: (c, on) => { statusDot.classes[c] = !!on; } } };
-    const statusText = { innerText: '', classes: {}, classList: { toggle: (c, on) => { statusText.classes[c] = !!on; } } };
 
     const quietConsole = Object.assign({}, console, { error: () => {} });
     const ctx = {
@@ -235,9 +246,8 @@ function buildContext() {
         clearTimeout: clearTimeoutFake,
         navigator: { onLine: true },
         window: {},
-        document: {
-            getElementById: (id) => (id === 'statusDot' ? statusDot : (id === 'firebaseStatusText' ? statusText : null))
-        },
+        document: { getElementById: () => null },
+        queueMicrotask,
         fb,
         db: {},
         auth: { currentUser: { uid: 'u1' } },
@@ -275,6 +285,12 @@ function buildContext() {
     });
     ctx.window.ZoeErrors = ctx.ZoeErrors;
     vm.createContext(ctx);
+    // ⛔ ZoeW ជា React ៖ `renderConnectionStatus()` សរសេរ `viewState.connectionStatus`/`connectionText` ហើយ
+    //    `AppNavbar.tsx` គូរ `#statusDot`/`#firebaseStatusText` ➜ ឃ្លាំងពិតចូល sandbox · ធាតុទាំង ២ គូរ JSX ពិត
+    vm.runInContext(reactRuntime(SRC, { exclude: REQUIRED_FNS, context: ctx }), ctx);
+    const NAVBAR = 'src/app/components/AppNavbar.tsx';
+    const statusDot = renderedElement(appRoot, ctx, NAVBAR, 'AppNavbar', 'statusDot');
+    const statusText = renderedElement(appRoot, ctx, NAVBAR, 'AppNavbar', 'firebaseStatusText');
     vm.runInContext('if (typeof appLocalStore === \'undefined\') globalThis.appLocalStore = (typeof localStorage !== \'undefined\' ? localStorage : null); if (typeof appSessionStore === \'undefined\') globalThis.appSessionStore = (typeof sessionStorage !== \'undefined\' ? sessionStorage : null); if (typeof safeStoreGet !== \'function\') globalThis.safeStoreGet = function (s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }; if (typeof safeStoreSet !== \'function\') globalThis.safeStoreSet = function (s, k, v) { try { return s ? (s.setItem(k, String(v)), true) : false; } catch (e) { return false; } }; if (typeof safeStoreRemove !== \'function\') globalThis.safeStoreRemove = function (s, k) { try { return s ? (s.removeItem(k), true) : false; } catch (e) { return false; } };', ctx);
     if (ctx.appLocalStore === undefined) ctx.appLocalStore = ctx.localStorage || null;
     if (ctx.appSessionStore === undefined) ctx.appSessionStore = ctx.sessionStorage || null;
@@ -1152,7 +1168,10 @@ function buildContext() {
             // (module map របស់ browser cache ការបរាជ័យរហូតដល់ចាកចេញពីទំព័រ) ➜
             // ផ្លូវស្តារពិតគឺការផ្ទុកទំព័រឡើងវិញ។ stub នេះរាប់វា។
             window: { location: { reload: () => reloads.push(clock) } },
-            document: { querySelectorAll: () => [] },
+            // ⛔ ZoeW ជា React ៖ ស្ថានភាពប្រអប់ = `style.display` របស់ធាតុ (`modalIsOpen()` ក្នុងទិដ្ឋភាព) ➜ `__openModal`
+            document: { querySelectorAll: () => [], getElementById: (id) => (id === ctx.__openModal ? { style: { display: 'flex' } } : null) },
+            queueMicrotask,
+            __openModal: null,
             sessionStorage: {
                 getItem: (k) => (k in store ? store[k] : null),
                 setItem: (k, v) => { store[k] = String(v); },
@@ -1166,6 +1185,8 @@ function buildContext() {
         // browser បិទ site data) ➜ sandbox ត្រូវផ្តល់ alias នោះ។
         ctx.appSessionStore = ctx.sessionStorage;
         ctx.appLocalStore = ctx.localStorage || null;
+        // ⛔ ZoeW (React) តែប៉ុណ្ណោះ ៖ ZoeKeyGen នៅជា vanilla (គ្មានឃ្លាំង)
+        if (/\bfunction createStore\(/.test(appSrc)) vm.runInContext(reactRuntime(appSrc, { context: ctx }), ctx);
         new vm.Script([
             konst('FIREBASE_SDK_RETRY_STEPS_MS'),
             konst('FIREBASE_SDK_RETRY_MIN_GAP_MS') || '',
@@ -1258,7 +1279,7 @@ function buildContext() {
 
         // ⛔ កុំបំផ្លាញអ្វីដែលអ្នកប្រើកំពុងវាយ (PIN · Config)
         const r3 = buildSdkRetry(SRC);
-        r3.ctx.document.querySelectorAll = () => [{ classList: { contains: () => true }, style: {} }];
+        r3.ctx.__openModal = 'configModal';
         r3.ctx.api.retryFirebaseSdkNow();
         ok('⛔ មានប្រអប់បើកនៅ ➜ មិនផ្ទុកទំព័រឡើងវិញ (កុំលុបអ្វីដែលអ្នកប្រើកំពុងវាយ)',
             r3.reloads.length === 0, r3.reloads.length);
@@ -1309,8 +1330,7 @@ function buildContext() {
         [['ZoeW', SRC], ['ZoeKeyGen', KG2]].forEach(([name, src]) => {
             ok(name + ' ៖ `online` ដាស់ការស្តារ SDK',
                 /addEventListener\('online'[\s\S]{0,400}?retryFirebaseSdkNow\(\)/.test(src));
-            ok(name + ' ៖ ត្រឡប់មក foreground ក៏ដាស់ការស្តារ SDK ដែរ',
-                /visibilitychange[\s\S]{0,400}?retryFirebaseSdkNow\(\)/.test(src));
+            ok(name + ' ៖ ត្រឡប់មក foreground ក៏ដាស់ការស្តារ SDK ដែរ', visibilityCalls(src, 'retryFirebaseSdkNow'));
             ok(name + ' ៖ SDK ដែលមកដល់យឺត ត្រូវមានអ្នកទទួល (មិនរង់ចាំជណ្តើរ ១៥ វិ.)',
                 /function armLateFirebaseSdkListener\(/.test(src) &&
                 /firebaseSdkUnavailable = true;\s*\n\s*armLateFirebaseSdkListener\(\);/.test(src));
@@ -1424,7 +1444,7 @@ function buildContext() {
 // ទី ១ របស់កំណែ 2.20.1 ក្នុង CLAUDE.md ដោយផ្ទាល់។
 {
     ok('⛔ ZoeW ៖ `visibilitychange` ដាស់ **listener** ដែលធ្លាក់ (មិនត្រឹមតែ SDK)',
-        /visibilitychange[\s\S]{0,400}?retryFailedDbListenersNow\(\)/.test(SRC),
+        visibilityCalls(SRC, 'retryFailedDbListenersNow'),
         'handler `visibilitychange` មិនហៅ retryFailedDbListenersNow() ➜ ការដោះសោទូរស័ព្ទ '
         + 'ខណៈ WiFi ត្រឡប់មកវិញ មិនស្តារតារាងទេ');
     ok('⛔ ZoeW ៖ `online` ក៏ដាស់ listener ដែលធ្លាក់ដែរ',

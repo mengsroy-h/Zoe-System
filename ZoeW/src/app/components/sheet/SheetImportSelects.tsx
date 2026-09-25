@@ -1,6 +1,6 @@
 import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
-import { loadSheetImportSelectedSheet, renderSheetImportPreview } from '../../../features/sheet-import';
+import { act } from '../../actions';
 import { emptySheetImportView } from './model';
 
 function view(): any {
@@ -15,6 +15,7 @@ function setView(patch: any) {
  * Tab ក្នុងឯកសារ Excel។
  * ⛔ តម្លៃរស់ក្នុង store ➜ `loadSheetImportSelectedSheet()` លែងអាន
  *    `sel.value` ➜ លំដាប់ «គូរជម្រើស រួចអានតម្លៃ» លែងជាការប្រណាំង។
+ * ⛔ ការហៅឆ្លងកាត់ `act()` (ព្រំដែន `ACTION_REGISTRY`) ដូច `data-act` ដើម។
  */
 export function SiSheetSelect() {
     useStore(uiState);
@@ -22,7 +23,7 @@ export function SiSheetSelect() {
     return (
         <select id="siSheetSel"
             value={v.sheetValue}
-            onChange={(e) => { setView({ sheetValue: e.target.value }); loadSheetImportSelectedSheet(); }}>
+            onChange={(e) => { setView({ sheetValue: e.target.value }); act('loadSheetImportSelectedSheet'); }}>
             {v.sheetNames.map((name: string) => <option value={name} key={name}>{name}</option>)}
         </select>
     );
@@ -43,7 +44,7 @@ function MapSelect({ id }: { id: string }) {
                 const next = Object.assign({}, view().mapping);
                 next[id] = Object.assign({}, next[id] || { options: [], filled: false }, { value: e.target.value });
                 setView({ mapping: next });
-                renderSheetImportPreview();
+                act('renderSheetImportPreview');
             }}>
             {/* ⛔ មុន `fillSheetImportMappingSelects()` រត់ `<select>` ត្រូវ **ទទេ**
                 ដូចដើមបេះបិទ ៖ ធាតុលើស នៅពេលសម្រាក = ការបាត់ parity ។ */}

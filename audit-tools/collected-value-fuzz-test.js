@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime, renderComponent } = require('./react-view');
 
 const ROOT = process.env.COLLECTFUZZ_APP_DIR || path.join(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -83,9 +84,6 @@ const bodies = WANT.map((n) => {
     return 'function ' + n + '() { return undefined; }';
 }).join('\n');
 
-function makeEl() {
-    return { innerHTML: '', className: '', children: [], appendChild(c) { this.children.push(c); return c; } };
-}
 function moneyAfter(html, label) {
     const at = html.indexOf(label);
     if (at === -1) return null;
@@ -101,9 +99,8 @@ const LBL_ALL = 'តម្លៃកញ្ចប់ទាំងអស់';
 const LBL_PENDING = 'មិនទាន់យក';
 
 function buildSandbox(state) {
-    const containers = { dailyStatsContainer: makeEl(), collectedStatsContainer: makeEl() };
     const sandbox = {
-        console,
+        console, queueMicrotask,
         scanHistory: state.scanHistory, deletedItems: state.deletedItems,
         dailyRevenueData: state.dailyRevenueData, dailyPickupData: state.dailyPickupData,
         monthlyRevenueData: state.monthlyRevenueData,
@@ -121,10 +118,11 @@ function buildSandbox(state) {
         dbListenerFailedPaths: new Set(state.failed || []),
         getFormattedDate: () => '2026-09-30',
         openModalHelper: () => {},
-        document: { getElementById: (id) => containers[id] || null, createElement: () => makeEl() },
-        __containers: containers
+        document: { getElementById: () => null }
     };
     vm.createContext(sandbox);
+    // ⛔ ZoeW ជា React ៖ អេក្រង់សរសេរ view model ក្នុង `uiState` ហើយ JSX គូរ ➜ ឃ្លាំងពិតចូល sandbox មុនមុខងារ
+    vm.runInContext(reactRuntime(SRC, { exclude: WANT, context: sandbox }), sandbox);
     vm.runInContext(bodies, sandbox);
     return sandbox;
 }
@@ -216,7 +214,17 @@ function truthByDate(scanHistory, deletedItems) {
     return out;
 }
 
-function cardsOf(sb, which) { return sb.__containers[which].children.map((c) => String(c.innerHTML || '')); }
+// ⛔ «HTML ដែលអ្នកប្រើមើលឃើញ» = **JSX ពិត** (`StatsCards.tsx`) គូរពី view model ដែល `openDailyStatsModal()` ពិតផលិត
+const CARD_VIEWS = {
+    dailyStatsContainer: ['DailyStatsCards', 'dailyStatsView'],
+    collectedStatsContainer: ['CollectedStatsCards', 'collectedStatsView']
+};
+function cardsOf(sb, which) {
+    const [component, field] = CARD_VIEWS[which];
+    const html = renderComponent(ROOT, 'src/app/components/stats/StatsCards.tsx', component,
+        { uiState: { [field]: vm.runInContext('uiState.' + field, sb) } });
+    return html.split('<div class="stat-card-item">').slice(1);
+}
 function cardFor(cards, key) { return cards.find((h) => h.indexOf('៖ ' + key + '<') !== -1) || null; }
 function moneyValue(text) {
     const m = /^\$(-?[\d,]+\.\d{2})$/.exec(String(text || '').trim());

@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import { act as reactAct } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { buildHistoryRowHtml } from '../src/ui/history-row';
+import { buildHistoryRowHtml } from './oracles/history-row-html';
 import { buildHistoryRowModel } from '../src/app/components/history/rowModel';
 import { HistoryRow } from '../src/app/components/history/HistoryRow';
 import { dataState } from '../src/core/state';

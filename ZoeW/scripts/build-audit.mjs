@@ -5,7 +5,7 @@
  * ដែលសរសេរសម្រាប់ App ចាស់** មិនមែនដោយតេស្តដែលយើងសរសេរខ្លួនឯង។
  */
 import { build } from 'esbuild';
-import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx } from './checker-view.mjs';
+import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx, scriptView, stateDeclarations } from './checker-view.mjs';
 import { mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -128,20 +128,52 @@ rmSync(entry);
         'src/app/flush.ts': {
             commitNow: 'function commitNow() {}',
             renderNow: 'function renderNow(store) {}'
+        },
+        // ⛔ ប្រអប់ ៖ `<Modal>` គូរ `uiState.modalDisplay[id]` ជា `style.display` និង meta ជា `data-close` ·
+        //    `data-nodismiss` (`Modal.tsx`) ➜ សមមូលដើមគឺ DOM របស់ធាតុ (`el.style.display = …` ដូច App ដើម)។
+        //    `modalDisplay` ត្រូវបានចូលប្រើ **តែតាម function ទាំងនេះ** (វាស់រួច ៖ គ្មានអ្នកអាន `uiState.modalDisplay` ផ្ទាល់
+        //    ក្រៅ `core/modals.ts` លើកលែង `Modal.tsx`)។
+        'src/core/modals.ts': {
+            registerModalMeta: 'function registerModalMeta(id, value) {}',
+            unregisterModalMeta: 'function unregisterModalMeta(id) {}',
+            modalMeta: 'function modalMeta(id) {\n        const el = document.getElementById(id);\n        if (!el) return null;\n' +
+                '        const close = el.getAttribute ? el.getAttribute(\'data-close\') : null;\n' +
+                '        return { close: close || undefined, noDismiss: !!(el.getAttribute && el.getAttribute(\'data-nodismiss\') === \'true\') };\n    }',
+            modalIsMounted: 'function modalIsMounted(id) {\n        return !!document.getElementById(id);\n    }',
+            modalDisplay: 'function modalDisplay(id) {\n        const el = document.getElementById(id);\n' +
+                '        const d = el && el.style ? el.style.display : \'\';\n        return d === \'flex\' || d === \'none\' ? d : undefined;\n    }',
+            setModalDisplay: 'function setModalDisplay(id, display) {\n        if (!id || !modalIsMounted(id)) return;\n        const el = document.getElementById(id);\n' +
+                '        el.style.display = display;\n    }',
+            modalIsOpen: 'function modalIsOpen(id) {\n        return modalDisplay(id) === \'flex\';\n    }'
         }
     };
     let text = '';
+    // ⛔ តួ **ដើម** នៃ function ដែល override ➜ `view-originals.js` ៖ ការយោងក្នុងតួនោះ (ឧ. `commitNow` ➜ `allStores()`)
+    //    ជាការយោងពិតក្នុងកូដ ship ដែលទិដ្ឋភាពជំនួស ➜ `function-surface` រាប់វា (បើអត់ វារាយ function រស់ថា «ងាប់»)
+    const originals = [];
+    // ⛔ ព្រំដែន module ៖ `app.js` ដើមរៀបម៉ូឌុលជាប់គ្នាក្នុងឯកសារតែមួយ ➜ checker ខ្លះកាត់ «ម៉ូឌុល» តាមទីតាំងអក្សរ
+    //    (ឧ. ម៉ូឌុលស្ថានភាព ZTO)។ ក្នុង App React ម៉ូឌុលជា **ឯកសារ** ➜ `audit-module-views.json` ផ្ទុកទិដ្ឋភាពក្នុងមួយឯកសារ
+    const moduleViews = {};
     for (const rel of order) {
         const file = path.join(ROOT, rel);
         let view = moduleView(readFileSync(file, 'utf8'), file);
-        for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement);
+        for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement, originals);
         text += view;
+        moduleViews[rel] = view;
+        // ⛔ state ដើមជា `let` កម្រិតកំពូល (ដូច `app.js` ដើម) ភ្លាមក្រោយឃ្លាំង ➜ dependency របស់តម្លៃដំបូងប្រកាសរួច
+        if (rel === 'src/core/state.ts') text += stateDeclarations(view, stateGroups);
     }
     text = text.replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
     const aliased = aliasStateFields(text, stateGroups);
     text = aliased.text;
     if (aliased.count < 500) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` តិចពេក ៖ ' + aliased.count);
     writeFileSync(appPath, text);
+    writeFileSync(path.join(APP, 'view-originals.js'), originals.join('\n\n') + '\n');
+    for (const rel of Object.keys(moduleViews)) {
+        const v = moduleViews[rel].replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
+        moduleViews[rel] = aliasStateFields(v, stateGroups).text;
+    }
+    writeFileSync(path.join(APP, 'audit-module-views.json'), JSON.stringify(moduleViews));
     console.log('ទិដ្ឋភាព checker ៖ module ' + order.length + ' · <ឃ្លាំង>.<វាល> ➜ <វាល> ' + aliased.count);
 }
 
@@ -153,12 +185,66 @@ rmSync(entry);
  * ⛔ កុំប្រើ `index.html` ឬ `netlify.toml` របស់ ZoeW ដើមនៅទីនេះ — នោះជាការវាស់
  *    ឯកសារចាស់ ហើយរាយការណ៍ថាបៃតងលើអ្វីដែលមិន ship។ */
 const appJs = readFileSync(path.join(APP, 'app.js'));
+const viewOriginals = readFileSync(path.join(APP, 'view-originals.js'));
+const moduleViewsJson = readFileSync(path.join(APP, 'audit-module-views.json'));
 execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', APP, '--emptyOutDir'], {
     cwd: ROOT,
     env: { ...process.env, VITE_EXPOSE_GLOBALS: '1' },
     stdio: ['ignore', 'ignore', 'inherit']
 });
 writeFileSync(path.join(APP, 'app.js'), appJs);
+writeFileSync(path.join(APP, 'view-originals.js'), viewOriginals);
+writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
+
+/*
+ * ២ក. **Service Worker ដែលអានបាន** ៖ Vite (`serviceWorkerPlugin`) ship `sw.js` ដែល **minify** ➜ checker SW ដើម
+ *     (`timedFetch` · `revalidateShell` · `SHELL_PATHS` …) រកឈ្មោះមិនឃើញ។ `sw.js` ដើមគឺ `sw.ts` ដែលលុប type ចេញ
+ *     បូកថេរ ៣ ជា literal ➜ ទីនេះសាងវាឡើងវិញពី `src/sw/sw.ts` ពិត ដោយយកថេរទាំង ៣ ពី `sw.js` ដែល Vite សាង។
+ *     ⛔ ផ្ទៀងផ្ទាត់ ៖ build `sw.ts` ម្តងទៀតជាមួយតម្លៃដែលស្រង់ ➜ ត្រូវ **ស្មើ byte ទល់ byte** នឹងឯកសារដែល ship ➜
+ *     តម្លៃត្រឹមត្រូវ ហើយទិដ្ឋភាពជាប្រភពដដែល (type erasure ផ្ទៀងផ្ទាត់ token ទល់ token រួចហើយ)។
+ */
+{
+    const swPath = path.join(APP, 'sw.js');
+    const shipped = readFileSync(swPath, 'utf8');
+    const acornMod = await import('acorn');
+    const arrays = [];
+    const versions = [];
+    const walk = (n) => {
+        if (!n || typeof n.type !== 'string') return;
+        if (n.type === 'VariableDeclarator' && n.init) {
+            if (n.init.type === 'ArrayExpression' && n.init.elements.every((e) => e && e.type === 'Literal' && typeof e.value === 'string')) arrays.push(n.init.elements.map((e) => e.value));
+            if (n.init.type === 'Literal' && n.init.value === cacheVersion) versions.push(n.init.value);
+        }
+        for (const v of Object.values(n)) {
+            if (Array.isArray(v)) v.forEach(walk);
+            else if (v && typeof v === 'object' && typeof v.type === 'string') walk(v);
+        }
+    };
+    walk(acornMod.parse(shipped, { ecmaVersion: 'latest' }));
+    const core = arrays.filter((a) => a.includes('./index.html'));
+    const optional = arrays.filter((a) => !a.includes('./index.html'));
+    if (core.length !== 1 || optional.length !== 1 || versions.length !== 1) {
+        throw new Error('build-audit ៖ ស្រង់ថេររបស់ sw.js មិនបាន (core ' + core.length + ' · optional ' + optional.length + ' · version ' + versions.length + ')');
+    }
+    const swSource = readFileSync(path.join(ROOT, 'src/sw/sw.ts'), 'utf8');
+    const defines = {
+        __CACHE_VERSION__: JSON.stringify(cacheVersion),
+        __CORE_SHELL__: JSON.stringify(core[0]),
+        __OPTIONAL_SHELL__: JSON.stringify(optional[0])
+    };
+    const rebuilt = await build({
+        entryPoints: [path.join(ROOT, 'src/sw/sw.ts')], bundle: true, format: 'iife', target: 'es2020', minify: true, write: false, define: defines
+    });
+    if (rebuilt.outputFiles[0].text !== shipped) throw new Error('build-audit ៖ sw.ts + ថេរដែលស្រង់ ≠ sw.js ដែល ship');
+    const lit = (list) => '[\n' + list.map((u) => '    ' + JSON.stringify(u).replace(/^"|"$/g, "'")).join(',\n') + '\n]';
+    const view = scriptView(swSource, 'sw.ts', {
+        __CACHE_VERSION__: "'" + cacheVersion + "'",
+        __CORE_SHELL__: lit(core[0]),
+        __OPTIONAL_SHELL__: lit(optional[0])
+    });
+    writeFileSync(swPath, view);
+    console.log('sw.js ៖ ទិដ្ឋភាពអានបាន ' + view.split('\n').length + ' បន្ទាត់ (សំបកស្នូល ' + core[0].length + ' · ស្រេចចិត្ត ' + optional[0].length + ')');
+}
 
 /*
  * ២ខ. **markup ដំបូងរបស់ React ក្នុង `index.html`** ៖ checker ដើមអាន `index.html` ជា **អត្ថបទ** (id · អត្ថបទ ·
@@ -224,6 +310,9 @@ writeFileSync(path.join(APP, 'app.js'), appJs);
         const annotated = await page.evaluate(() => window.__zoeAnnotated);
         if (annotated < 80) throw new Error('build-audit ៖ ធាតុដែលមាន `data-act` តិចពេក ៖ ' + annotated);
         if (markup.length < 30000 || markup.split('\n').length < 400) throw new Error('build-audit ៖ markup ដំបូងតូចពេក ៖ ' + markup.length + ' តួ · ' + markup.split('\n').length + ' ជួរ');
+        // ⛔ `index.html` ដែល **ship ពិត** (`#root` ទទេ) រក្សាទុកជា `index.shipped.html` ៖ ផ្លូវ «bundle ដួល» ត្រូវវាស់លើ
+        //    អ្វីដែលអ្នកប្រើទទួល — markup prerender ខាងក្រោមមិនមែនជារបស់ផលិតកម្មទេ (វានឹងបន្សល់ផ្ទាំង boot ក្លែង)
+        writeFileSync(path.join(APP, 'index.shipped.html'), html);
         writeFileSync(htmlPath, html.replace('<div id="root"></div>', '<div id="root">' + markup + '</div>'));
         console.log('index.html ៖ markup ដំបូងរបស់ React ' + markup.length + ' តួ · ' + markup.split('\n').length + ' ជួរ · data-act ' + annotated);
     } finally {
@@ -232,12 +321,130 @@ writeFileSync(path.join(APP, 'app.js'), appJs);
     }
 }
 
+/*
+ * ២គ. **component ពិតសម្រាប់ checker `vm`** (`react-render.cjs`) ៖ App ដើមគូរតារាង/កាតដោយ `innerHTML` ក្នុង function
+ *     អាជីវកម្ម ➜ checker `vm` អាន HTML នោះ។ ក្នុង App React function អាជីវកម្មសរសេរ **view model** ក្នុងឃ្លាំង ហើយ
+ *     **JSX** គូរ ➜ HTML ដែលអ្នកប្រើឃើញ មិនមែនជាលទ្ធផលរបស់ function ទៀតទេ។ bundle នេះ (node · CJS) ផ្ទុក component
+ *     ទាំងអស់ក្រោម `src/app/components` បូកឃ្លាំង និង `renderToStaticMarkup()` ➜ `audit-tools/react-view.js`
+ *     (`renderComponent()`) ចាក់ view model ដែល function ពិតផលិតក្នុង `vm` ចូលឃ្លាំង ហើយគូរ **JSX ពិត** ជា HTML ។
+ *     ⛔ មិនមែនការចម្លង markup ក្នុង checker ៖ mutation លើ JSX ក៏ត្រូវចាប់បានដែរ។
+ */
+{
+    const components = [];
+    const walkComponents = (dir) => {
+        for (const name of readdirSync(dir).sort()) {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) walkComponents(full);
+            else if (name.endsWith('.tsx')) components.push(path.relative(ROOT, full).split(path.sep).join('/'));
+        }
+    };
+    walkComponents(path.join(ROOT, 'src/app/components'));
+    if (components.length < 50) throw new Error('build-audit ៖ component តិចពេក ៖ ' + components.length);
+    // ⛔ module `.ts` (មិនមែន `app/` · `sw/`) ៖ JSX ខ្លះហៅ helper ដែលអាន state កម្រិត module (ឧ. `emptyViewMessage()` ➜
+    //    `dbListenerPendingPaths`) ➜ `renderFromContext()` ធ្វើសមកាលកម្ម `Set`/`Map` ដែលបាន export ពី `vm` មុនគូរ
+    const stateModules = modules.filter((m) => !/\/(audit-compat|audit-annotate|expose-globals)$/.test(m));
+    const ssrEntry = path.join(OUT, '_ssr_entry.tsx');
+    writeFileSync(ssrEntry, components.map((rel, i) => `export * as c${i} from '../${rel.replace(/\.tsx$/, '')}';`).join('\n') +
+        '\n' + stateModules.map((rel, i) => `export * as s${i} from '${rel}';`).join('\n') +
+        `\nexport const STATE_MODULES = ${JSON.stringify(stateModules)};` +
+        `\nexport * as stores from '../src/core/state';\nexport { renderToStaticMarkup } from 'react-dom/server';\n` +
+        `export { createElement } from 'react';\nexport const FILES = ${JSON.stringify(components)};\n` +
+        // ⛔ វាលដែលទិដ្ឋភាព checker ប្រកាសជា `let` កម្រិតកំពូល (`<ឃ្លាំង>.<វាល>` ➜ `<វាល>`) ➜ `renderFromContext()` ចម្លងវាពី `vm`
+        `export const STATE_FIELDS = ${JSON.stringify(Object.fromEntries(Object.entries(stateGroups).map(([store, fields]) => [store, fields.map((f) => f.name)])))};\n`);
+    try {
+        await build({
+            entryPoints: [ssrEntry],
+            bundle: true,
+            platform: 'node',
+            format: 'cjs',
+            target: 'node18',
+            jsx: 'automatic',
+            logLevel: 'error',
+            legalComments: 'none',
+            define: { __APP_VERSION__: JSON.stringify(version), __CACHE_VERSION__: JSON.stringify(cacheVersion), 'process.env.NODE_ENV': '"production"' },
+            loader: { '.css': 'empty', '.svg': 'dataurl', '.png': 'dataurl' },
+            outfile: path.join(APP, 'react-render.cjs')
+        });
+    } finally {
+        rmSync(ssrEntry);
+    }
+    console.log('react-render.cjs ៖ component ' + components.length);
+}
+
+/*
+ * ២ឃ. **ទិដ្ឋភាពអត្ថបទនៃ JSX** (`components.js`) ៖ ក្នុង App ដើម ការយោង function (handler · helper) ទាំងអស់រស់ក្នុង
+ *     `app.js` ➜ checker ដែលរាប់ការយោង (`function-surface` …) ឃើញវា។ ក្នុង App React ការយោងជាច្រើនរស់ក្នុង `.tsx`
+ *     (`onClick={togglePanelFromHandle}` …) ➜ ឯកសារនេះផ្ទុក `.tsx` ទាំងអស់ក្រោម `src/` ដែល esbuild បម្លែង (JSX ➜ JS ·
+ *     លុប type) ⛔ **មិនរត់** — សម្រាប់តែការអានជាអត្ថបទ។ ឯកសារនីមួយៗចាប់ផ្តើមដោយ marker `// === <ផ្លូវ>`
+ *     ហើយជា **module ដាច់ដោយឡែក** (import/export នៅដដែល) ➜ checker ត្រូវ tokenize មិនមែន parse ទាំងមូល។
+ */
+{
+    const { transform } = await import('esbuild');
+    const tsxFiles = [];
+    const walkAll = (dir) => {
+        for (const name of readdirSync(dir).sort()) {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) walkAll(full);
+            else if (name.endsWith('.tsx')) tsxFiles.push(full);
+        }
+    };
+    walkAll(path.join(ROOT, 'src'));
+    let text = '';
+    for (const file of tsxFiles) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
+        const out = await transform(readFileSync(file, 'utf8'), {
+            loader: 'tsx', jsx: 'automatic', format: 'esm', target: 'es2020', legalComments: 'none', sourcefile: rel
+        });
+        text += '// === ' + rel + '\n' + out.code + '\n';
+    }
+    if (tsxFiles.length < 50) throw new Error('build-audit ៖ .tsx តិចពេក ៖ ' + tsxFiles.length);
+    writeFileSync(path.join(APP, 'components.js'), text);
+    console.log('components.js ៖ .tsx ' + tsxFiles.length + ' ឯកសារ · ' + text.split('\n').length + ' បន្ទាត់');
+}
+
 /* ៣. ឯកសារ repo ដែល checker អានជាអត្ថបទ — **ច្បាប់ចម្លងពី tree ថ្មី** */
-cpSync(path.join(ROOT, 'src/styles/app.css'), path.join(APP, 'style.css'));
+// ⛔ `style.css` = CSS ដែល **ship ពិត** ៖ រាល់ `.css` ដែល `src/main.tsx` នាំចូល តាមលំដាប់នាំចូល (Vite ប្រមូលវាចូល
+//    bundle តែមួយតាមលំដាប់នោះ ➜ cascade ដដែល) · comment ត្រូវលុប (Vite minify លុបវា)។ ⛔ ការចម្លងតែ `app.css`
+//    ធ្វើឲ្យ CSS ដែលមានតែក្នុង React (`react-root.css` · `native.css`) **មើលមិនឃើញ** ដោយ checker CSS ស្តាទិច
+//    (`css-classes` · `css-media-override` · `fluid-type-focus` · `css-var`)។
+{
+    const mainTsx = readFileSync(path.join(ROOT, 'src/main.tsx'), 'utf8');
+    const cssImports = [...mainTsx.matchAll(/^import '\.\/(styles\/[\w-]+\.css)';$/gm)].map((m) => m[1]);
+    if (cssImports[0] !== 'styles/app.css' || cssImports.length < 2) throw new Error('build-audit ៖ អាន CSS ដែល main.tsx នាំចូលមិនបាន ៖ ' + cssImports.join(' · '));
+    const css = cssImports.map((rel) => {
+        const text = readFileSync(path.join(ROOT, 'src', rel), 'utf8');
+        const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '');
+        if (/\/\*|\*\//.test(stripped)) throw new Error('build-audit ៖ លុប comment ពី ' + rel + ' មិនស្អាត');
+        return stripped.replace(/\n{3,}/g, '\n\n');
+    }).join('\n');
+    writeFileSync(path.join(APP, 'style.css'), css);
+    console.log('style.css ៖ ' + cssImports.join(' + '));
+}
 for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md']) {
     cpSync(path.join(ROOT, f), path.join(APP, f));
 }
 cpSync(path.join(ROOT, 'netlify', 'functions'), path.join(APP, 'netlify', 'functions'), { recursive: true });
+// ⛔ ឯកសារដែល `.md` យោង (`ZoeW/docs/*` · `ZoeW/public/guide.html`) ត្រូវមានក្នុង tree វាស់ដែរ ➜ `doc-scope` វាស់
+//    តំណពិត (បើអត់ វារាយតំណដាច់ ដែលមិនដាច់ក្នុង repo — ឬអាក្រក់ជាងនោះ ៖ ការដាច់ពិតលាក់ក្នុងសំណុំក្លែង)
+cpSync(path.join(ROOT, 'docs'), path.join(APP, 'docs'), { recursive: true });
+// ⛔ តំណទៅ **ប្រភព** (`../src/core/version.ts` · `public/guide.html` · `resources/icon.svg`) ៖ tree វាស់មិនដឹក `src/` ទេ
+//    (checker ដែលស្កេន `ZoeW/**` នឹងឃើញកូដ ២ ច្បាប់) ➜ បញ្ជីឯកសារប្រភពពិត (ផ្លូវតែប៉ុណ្ណោះ) ឲ្យ `doc-scope` វាស់តំណ
+{
+    const SKIP_DIRS = new Set(['node_modules', 'dist', 'dist-audit', '.git', '.gradle', 'build', '.idea']);
+    const files = [];
+    const walkSource = (dir, rel) => {
+        for (const name of readdirSync(dir).sort()) {
+            if (SKIP_DIRS.has(name)) continue;
+            const full = path.join(dir, name);
+            const next = rel ? rel + '/' + name : name;
+            if (statSync(full).isDirectory()) walkSource(full, next);
+            else files.push(next);
+        }
+    };
+    walkSource(ROOT, '');
+    if (files.length < 200 || !files.includes('src/core/version.ts')) throw new Error('build-audit ៖ បញ្ជីឯកសារប្រភពខ្លីពេក ៖ ' + files.length);
+    writeFileSync(path.join(APP, 'audit-source-files.json'), JSON.stringify(files) + '\n');
+}
 
 console.log('dist-audit រួចរាល់ ៖', APP);
 console.log('app.js:', (readFileSync(path.join(APP, 'app.js'), 'utf8').split('\n').length), 'បន្ទាត់');

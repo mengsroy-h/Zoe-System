@@ -121,7 +121,9 @@ function req(url, mode) {
 (async () => {
     for (const app of APPS) {
         console.log('\n== ' + app + ' ==');
-        const SHELL = 'https://example.test/app.js';
+        // ⛔ asset JS ស្នូលដេរីវេពី `CORE_SHELL` ពិតរបស់ sw.js (App React ៖ `assets/index-<hash>.js` · ZoeKeyGen ៖ `app.js`)
+        const SHELL_PATH = require('./react-view').swShell(ROOT, app).appJs.replace(/^\./, '');
+        const SHELL = 'https://example.test' + SHELL_PATH;
 
         // ១ — cache បើកមិនបាន + បណ្តាញដើរ ➜ ត្រូវបម្រើពីបណ្តាញ មិនមែនធ្លាក់
         {
@@ -214,7 +216,7 @@ function req(url, mode) {
         {
             const sw = loadSw(app, { cacheMode: null, networkByPath: true });
             const res = await dispatchFetch(sw, req(SHELL));
-            ok(app + ' ៖ ការផ្ទុក app.js ជា script នៅតែផ្តល់ JavaScript', res && res.__tag === '/app.js', sw.netCalls);
+            ok(app + ' ៖ ការផ្ទុក app.js ជា script នៅតែផ្តល់ JavaScript', res && res.__tag === SHELL_PATH, sw.netCalls);
         }
 
         for (const cacheMode of [null, 'open', 'match']) {

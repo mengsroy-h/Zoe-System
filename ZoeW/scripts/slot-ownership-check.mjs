@@ -19,12 +19,14 @@
  *    រស់ក្នុង `src/app/**` ៖ ឧ. `phoneSuggestBox` ជាទាំង slot (React គូរកូន) និង ref
  *    (behavior វាស់ទីតាំង) ➜ `elementOf('phoneSuggestBox').textContent = ''` = App ស។
  *
- * ⛔ បញ្ជី id **ដេរីវេពី `SLOTS` / `ELEMENT_SLOTS` ពិត** ក្នុង `html-to-jsx.cjs`
+ * ⛔ បញ្ជី id **ដេរីវេពី `SLOTS` / `ELEMENT_SLOTS`** ក្នុង `scripts/slot-registry.cjs` ដែលខ្លួនវា
+ *    ត្រូវផ្ទៀងផ្ទាត់ទល់នឹងកូដពិត (`REACT_OWNED_IDS` · component ដែល export) ខាងក្រោម
  *    — slot ថ្មីចូលការវាស់ដោយស្វ័យប្រវត្តិ។
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import * as acorn from 'acorn';
 import * as walk from 'acorn-walk';
 import esbuild from 'esbuild';
@@ -32,17 +34,32 @@ import esbuild from 'esbuild';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = process.env.SLOTCHECK_SRC || path.join(ROOT, 'src');
 
-const jsx = fs.readFileSync(path.join(ROOT, 'tools/html-to-jsx.cjs'), 'utf8');
-function ids(name) {
-    const i = jsx.indexOf(`const ${name} = {`);
-    const body = jsx.slice(i, jsx.indexOf('\n};', i));
-    return [...body.matchAll(/^ {4}(\w+): \{ component:/gm)].map((m) => m[1]);
-}
-const SLOT_IDS = new Set(ids('SLOTS'));
-const ELEMENT_IDS = new Set(ids('ELEMENT_SLOTS'));
+const REGISTRY = createRequire(import.meta.url)(path.join(ROOT, 'scripts/slot-registry.cjs'));
+const SLOT_IDS = new Set(Object.keys(REGISTRY.SLOTS));
+const ELEMENT_IDS = new Set(Object.keys(REGISTRY.ELEMENT_SLOTS));
 if (SLOT_IDS.size < 10 || ELEMENT_IDS.size < 2) {
     console.error(`⛔ អានបញ្ជី slot មិនបាន (${SLOT_IDS.size}/${ELEMENT_IDS.size}) — ឧបករណ៍មិនអាចវាស់អ្វីបានទេ`);
     process.exit(2);
+}
+
+// ⛔ បញ្ជីត្រូវស៊ីនឹងកូដពិត (បើមិនដូច្នេះ វាក្លាយជាបញ្ជីរឹង = កាលបរិច្ឆេទផុតកំណត់) ៖
+//    ១. id ទាំងអស់ ↔ `REACT_OWNED_IDS` (`src/app/slot-resets.ts` ៖ ការសម្អាតតាម store) — ទាំង ២ ទិស
+//    ២. `component` នីមួយៗ export ពិតពី `src/app/components/<from>.tsx`
+const registryDrift = [];
+{
+    const resets = fs.readFileSync(path.join(SRC, 'app', 'slot-resets.ts'), 'utf8');
+    const owned = JSON.parse((resets.match(/REACT_OWNED_IDS[^=]*=\s*(\[[^\]]*\])/) || [])[1] || 'null');
+    if (!Array.isArray(owned)) registryDrift.push('អាន REACT_OWNED_IDS ពី src/app/slot-resets.ts មិនបាន');
+    else {
+        const all = new Set([...SLOT_IDS, ...ELEMENT_IDS]);
+        owned.filter((id) => !all.has(id)).forEach((id) => registryDrift.push(`REACT_OWNED_IDS មាន #${id} តែ slot-registry គ្មាន`));
+        [...all].filter((id) => owned.indexOf(id) === -1).forEach((id) => registryDrift.push(`slot-registry មាន #${id} តែ REACT_OWNED_IDS គ្មាន (គ្មានការសម្អាតតាម store)`));
+    }
+    for (const [id, e] of Object.entries(Object.assign({}, REGISTRY.SLOTS, REGISTRY.ELEMENT_SLOTS))) {
+        const file = path.join(SRC, 'app', 'components', e.from + '.tsx');
+        const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+        if (!new RegExp(`export (?:function|const) ${e.component}\\b`).test(text)) registryDrift.push(`#${id} ➜ ${e.component} មិន export ពី components/${e.from}.tsx`);
+    }
 }
 
 const CHILD_PROPS = new Set(['textContent', 'innerHTML', 'innerText', 'outerHTML']);
@@ -153,6 +170,13 @@ if (scanned < 50 || bindings < 10) {
     console.error(`⛔ ការស្កេនតូចពេក (ឯកសារ ${scanned} · ការចង ${bindings}) — វាស់មិនបាន`);
     process.exit(2);
 }
+if (registryDrift.length) {
+    console.log('');
+    registryDrift.forEach((f) => console.log('❌ ' + f));
+    console.log(`\n❌ slot-registry ឃ្លាតពីកូដពិត ${registryDrift.length} កន្លែង`);
+    process.exit(1);
+}
+console.log(`បញ្ជី slot ស៊ីនឹង REACT_OWNED_IDS និង component ដែល export (${SLOT_IDS.size + ELEMENT_IDS.size})`);
 if (findings.length) {
     console.log('');
     findings.forEach((f) => console.log('❌ ' + f));

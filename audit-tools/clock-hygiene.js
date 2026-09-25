@@ -37,6 +37,8 @@ const SERVER_TIME_FIELDS = new Set([
 const LOCAL_CLOCK_OK = {
     'ZoeW/app.js': {
         '<top>': 'ថេរពេល boot splash និង throttle `reg.update()` — cosmetic/local',
+        // ⛔ React ៖ ការចុះឈ្មោះ Service Worker ផ្លាស់ពីកម្រិតកំពូលចូល function (lifecycle scope) — កូដដដែល
+        registerServiceWorker: 'throttle `reg.update()` ១៥ នាទី — cosmetic/local ហើយវាស់តាម `elapsedSince()` (ថយក្រោយ ➜ Infinity ➜ update ភ្លាម)',
         elapsedSince: 'ជាមូលដ្ឋាននៃពិដានល្បឿនទាំងអស់ — អានក្លាក់ឆៅ **ដើម្បីធ្វើឲ្យវាមានសុវត្ថិភាព** (ថយក្រោយ ➜ Infinity); ចាក់សោដោយ `monotonic-gate-test.js`',
         getServerNow: 'និយមន័យរបស់នាឡិកា server ខ្លួនឯង',
         verifySecurityPin: 'ការជាប់សោ PIN — local ដោយចេតនា (server មិនស្គាល់វា)',

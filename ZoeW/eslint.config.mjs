@@ -43,6 +43,10 @@ export default tseslint.config(
             'no-var': 'off',
             'prefer-spread': 'off',
             'prefer-rest-params': 'off',
+            // តម្លៃចាប់ផ្តើមការពារ (`let x = null; try { x = … } catch { x = null }`) និង `throw` ថ្មីក្នុង
+            // `catch` ដោយគ្មាន `cause` ជា style មិនមែនកំហុស ➜ ការបន្ថែម `cause` ក៏ប្តូររូបរាង event ដែល Sentry ទទួលដែរ។
+            'no-useless-assignment': 'off',
+            'preserve-caught-error': 'off',
             'no-redeclare': 'error',
             'no-dupe-keys': 'error',
             'no-fallthrough': 'error',

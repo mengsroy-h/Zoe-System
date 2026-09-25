@@ -13,7 +13,15 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.3 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.4 · ZoeKeyGen 2.20.3)
+
+⛔ **មេរៀនជុំ 2.42.4 ៖ ការឡើង toolchain ប្តូរ *output* ខណៈ checker វាស់ *ប្រភព*** — Vite 8 (Rolldown · Lightning CSS · Oxc)
+ធ្វើឲ្យ web import chunk native ដោយ static (ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត ៖ `android:check` · `native:check` ចាប់) និងសរសេរ CSS
+ឡើងវិញ ២,៣៩៧ បន្ទាត់ (**គ្មាននរណាចាប់** ព្រោះ checker CSS វាស់ CSS ប្រភព)។ ⛔ មុនឡើង toolchain ៖ ថត `dist` ទុកជា baseline
+ហើយ diff **output** (CSS · import graph · syntax ធៀប `build.target`)។ ⛔ ការឡើង Gradle/AGP/SDK លើសខ្សែ template របស់ Capacitor
+វាស់មិនបាននៅទីនេះ (គ្មាន Android SDK · `dl.google.com` បិទ) ➜ `android:check` ផ្នែក ៧ ចាក់សោ។ ⛔ កំណែ SDK ដែល **ផលិតកម្មរត់ពិត**
+វាស់បានពី event របស់ Sentry (`sdk.version`) មិនមែនពីកូដ (Loader ជ្រើសកំណែតាម Sentry settings)។
+
 
 ⛔ **មេរៀនជុំ 2.42.3 ៖ ការលើកលែងដែល *ធំជាងច្បាប់* = ចន្លោះស្ងាត់** — ច្បាប់ ៩ លើកលែង `docs/` **នៅ root** ខណៈ
 `doc-scope-test` រំលងថតឈ្មោះ `docs` **គ្រប់ជម្រៅ** ➜ `ZoeW/docs/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ) មិនដែលត្រូវ

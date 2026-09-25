@@ -10,10 +10,13 @@
  *   ៥. Plugin ៖ រាល់ plugin ក្នុង package.json ត្រូវ sync ចូល Android project
  *   ៦. Web មិនផ្ទុកកូដ native ៖ គ្មាន import static ពី `@capacitor/*`/`@capgo/*`
  *      ក្រៅ `src/platform/native-biometric.ts` · chunk native មិនចូល Service Worker
+ *   ៧. config build Android ↔ template របស់ Capacitor ដែលដំឡើង ៖ SDK · AndroidX ស្មើ ·
+ *      AGP · Gradle · google-services ស្ថិតក្នុងខ្សែ major.minor ដដែល (patch ឡើងបាន)
  *
  *   node scripts/android-check.mjs   (ANDROIDCHECK_ROOT=<ថត> ដើម្បីចង្អុលទៅ tree ផ្សេង)
  */
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -145,6 +148,53 @@ if (exists('dist/index.html')) {
     ok('entry មិន import chunk native ដោយ static', !!nativeChunk && !staticImports.includes(nativeChunk), staticImports.join(', '));
     ok('Service Worker មិន cache chunk native', !!nativeChunk && !read('dist/sw.js').includes(nativeChunk));
 }
+
+/* ── ៧. config build Android ↔ template របស់ Capacitor ─────────────────
+ * ⛔ plugin Capacitor ទាំងអស់ត្រូវបានសាកជាមួយ AGP · Gradle · SDK · AndroidX ដែល template របស់
+ *    Capacitor កំណែនោះប្រកាស។ ការឡើងលើសខ្សែនោះ (ឧ. AGP 9 · compileSdk 37 · androidx.core 1.19 ដែល
+ *    ទាមទារ AGP 9.1) ធ្លាក់តែពេល **build ក្នុង Android Studio** — ម៉ាស៊ីននេះគ្មាន Android SDK ➜ វាស់មិនបាន។
+ *    ទិសផ្ទុយ ៖ ឡើង Capacitor major តែភ្លេច config Android ➜ ក៏ធ្លាក់ដែរ (template ប្រែ)។ */
+function readTarGz(rel) {
+    const out = new Map();
+    let buf;
+    try { buf = zlib.gunzipSync(fs.readFileSync(path.join(ROOT, rel))); } catch { return out; }
+    for (let off = 0; off + 512 <= buf.length;) {
+        const header = buf.subarray(off, off + 512);
+        if (header.every((x) => x === 0)) break;
+        const str = (a, n) => header.subarray(a, a + n).toString('utf8').replace(/\0.*$/s, '');
+        const name = (str(345, 155) ? str(345, 155) + '/' : '') + str(0, 100);
+        const size = parseInt(str(124, 12).trim() || '0', 8);
+        out.set(name.replace(/^(\.\/|package\/)/, ''), buf.subarray(off + 512, off + 512 + size).toString('utf8'));
+        off += 512 + Math.ceil(size / 512) * 512;
+    }
+    return out;
+}
+const extOf = (src) => Object.fromEntries([...((src.match(/ext\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/(\w+)\s*=\s*'?([\w.]+)'?/g)].map((m) => [m[1], m[2]]));
+const verOf = (src, re) => ((src.match(re) || [])[1] || '').split('.').map(Number);
+const sameLine = (mine, tpl) => tpl.length >= 2 && mine.length >= 2 && mine[0] === tpl[0] && mine[1] === tpl[1] && (mine[2] || 0) >= (tpl[2] || 0);
+const tpl = readTarGz('node_modules/@capacitor/cli/assets/android-template.tar.gz');
+const tplExt = extOf(tpl.get('variables.gradle') || '');
+const myExt = extOf(read('android/variables.gradle'));
+ok('ជាន់អប្បបរមា ៖ អាន template Android របស់ Capacitor ដែលដំឡើង (ext >= 10)', Object.keys(tplExt).length >= 10, Object.keys(tplExt).length);
+const extDrift = Object.keys(tplExt).filter((k) => myExt[k] !== tplExt[k]).map((k) => `${k}=${myExt[k]} (template ${tplExt[k]})`);
+ok('variables.gradle (SDK · AndroidX) ស្មើ template របស់ Capacitor', Object.keys(tplExt).length >= 10 && !extDrift.length, extDrift.join(', '));
+const AGP_RE = /com\.android\.tools\.build:gradle:([\d.]+)/;
+const GMS_RE = /com\.google\.gms:google-services:([\d.]+)/;
+const GRADLE_RE = /gradle-([\d.]+)-(?:all|bin)\.zip/;
+const rootGradle = read('android/build.gradle');
+const wrapper = read('android/gradle/wrapper/gradle-wrapper.properties');
+for (const [label, mineSrc, tplSrc, re] of [
+    ['Android Gradle Plugin', rootGradle, tpl.get('build.gradle') || '', AGP_RE],
+    ['google-services', rootGradle, tpl.get('build.gradle') || '', GMS_RE],
+    ['Gradle wrapper', wrapper, tpl.get('gradle/wrapper/gradle-wrapper.properties') || '', GRADLE_RE]
+]) {
+    const mine = verOf(mineSrc, re);
+    const want = verOf(tplSrc, re);
+    ok(`${label} ស្ថិតក្នុងខ្សែ ${want.slice(0, 2).join('.')}.x របស់ template (patch >= ${want.join('.')})`, sameLine(mine, want), mine.join('.'));
+}
+const capMajor = (name) => Number((JSON.parse(read(`node_modules/${name}/package.json`) || '{}').version || '').split('.')[0]);
+const majors = ['@capacitor/core', '@capacitor/android', '@capacitor/cli'].map(capMajor);
+ok('@capacitor/core · android · cli ជា major ដដែល', majors.every((m) => m > 0 && m === majors[0]), majors.join(' · '));
 
 for (const line of oks) console.log('   ok   ' + line);
 for (const line of fails) console.log('   FAIL ' + line);

@@ -54,6 +54,29 @@ versionCode = X × 1000000 + Y × 1000 + Z         (ឡើងជានិច្�
 ការឡើង `APP_VERSION` តាមធម្មតាគ្រប់គ្រាន់។ `APP_VERSION` ខូច ➜ build **ធ្លាក់**
 (មិនចេញ APK លេខខុសស្ងាត់ៗ)។ `npm run android:check` ចាក់សោរូបមន្តនេះ។
 
+### កំណែ Gradle · Android Gradle Plugin · SDK
+
+config build Android (`android/variables.gradle` · `android/build.gradle` ·
+`android/gradle/wrapper/gradle-wrapper.properties`) ត្រូវស្ថិតក្នុងខ្សែដែល **Capacitor
+ដែលដំឡើង** ប្រកាសក្នុង template របស់វា ៖ SDK (`compileSdk` · `targetSdk` · `minSdk`) និង
+AndroidX **ស្មើ** template · AGP · Gradle · google-services **ឡើងបានតែ patch** ក្នុងខ្សែ
+major.minor ដដែល។ `npm run android:check` ចាក់សោវា។
+
+⛔ ហេតុផល ៖ plugin Capacitor ទាំងអស់ត្រូវបានសាកជាមួយខ្សែនោះ ហើយការឡើងលើស (AGP major ថ្មី ·
+`compileSdk` ថ្មី · AndroidX ដែលទាមទារ AGP ថ្មី) **ធ្លាក់តែពេល build ក្នុង Android Studio**
+— ម៉ាស៊ីន CI នៃ repo នេះគ្មាន Android SDK ➜ វាស់មិនបាន។
+
+ការឡើងលើសខ្សែនោះ = **ការឡើង Capacitor major** (ពេលវាចេញជា stable មិនមែន alpha/beta) ៖
+
+```bash
+cd ZoeW
+npm install @capacitor/core@latest @capacitor/android@latest @capacitor/cli@latest   # + plugin @capacitor/* · @capgo/* ដែលស៊ីគ្នា
+npx cap migrate          # Capacitor ធ្វើបច្ចុប្បន្នភាព config Android តាម template ថ្មី
+npm run android:check    # ផ្ទៀងផ្ទាត់ config ↔ template ថ្មី
+```
+
+រួច **build ក្នុង Android Studio និងសាកលើទូរស័ព្ទពិត** (ផ្នែក ៥) មុន merge។
+
 ### ការកំណត់ (`.env.android`)
 
 ```

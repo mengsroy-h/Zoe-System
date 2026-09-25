@@ -1,11 +1,11 @@
-        import { initializeApp, getApps, deleteApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+        import { initializeApp, getApps, deleteApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
         import {
             getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
             setPersistence, browserLocalPersistence, browserSessionPersistence, getIdTokenResult
-        } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
         import {
             getDatabase, ref, onValue, off, get, set, update, goOnline, goOffline, runTransaction
-        } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+        } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 
         window.firebaseSDK = {
             initializeApp, getApps, deleteApp,

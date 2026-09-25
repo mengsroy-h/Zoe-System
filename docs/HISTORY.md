@@ -339,6 +339,64 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.42.4] — 2026-09-25 · ZoeW · ZoeKeyGen ៖ **ឡើងកំណែ toolchain និងបណ្ណាល័យទៅចុងក្រោយ** · ការថយក្រោយ ២ ដែលការឡើង Vite 8 នាំមក ត្រូវចាប់មុន ship
+
+**សំណើម្ចាស់គម្រោង** ៖ *«update អ្វីៗដែលមានក្នុង ZoeW ទៅ version ចុងក្រោយទាំងអស់ ដូចជា gradle, sdk, ឬផ្សេងៗ»* ·
+*«មើល version របស់ firebase SDK, sentry, Xzing, sheet, pdf, excel, និង ផ្សេងៗ … បើ update ទៅជំនាន់ចុងក្រោយបានសូម update ចុះ»*។
+
+**ZoeW ប្រែ** (`zoew-v230` ➜ `zoew-v231`) · **ZoeKeyGen ប្រែ** (`zoekeygen-v101` ➜ `zoekeygen-v102` ៖ Firebase · Sentry fallback)។
+
+#### អ្វីដែលឡើង
+
+| ផ្នែក | មុន ➜ ក្រោយ | ការផ្ទៀងផ្ទាត់ |
+|---|---|---|
+| Firebase JS SDK (App ទាំង ២) | 12.17.1 ➜ **12.19.0** | ឈ្មោះ export ដែល loader ប្រើ (ZoeW ២២ · ZoeKeyGen ២១) មានក្នុង build CDN ពិត (npm) · `notifyAuthListeners` ក្នុង `@firebase/auth@1.13.6` ដូចដែល `auth-recovery-test` ធ្វើត្រាប់តាម |
+| ZXing-WASM (ម៉ាស៊ីនស្កេន) | 3.1.3 ➜ **3.1.4** | ឯកសារ vendor ចាស់ = build ផ្លូវការ byte ទល់ byte · ថ្មី ៖ API ដដែល ៤០ ឈ្មោះ · `ZXING_WASM_SHA256` ស្មើ sha256 នៃ `.wasm` |
+| Sentry fallback SDK (App ទាំង ២) | 7.120.3 ➜ **10.75.3** | Sentry ពិត (៣០ ថ្ងៃ) ៖ event ទាំងអស់មកពី SDK **10.71–10.75.3** តាម Loader · fallback 7.x **០ event** ➜ fallback = SDK ដែលផលិតកម្មបញ្ជាក់ថាដើរ។ ⛔ មិនមែន 11.0.0 (ចេញ ២ ថ្ងៃមុន · CDN វាស់មិនបានពីទីនេះ) |
+| Vite · plugin-react · Vitest | 7 · 5 · 3 ➜ **8.3 · 6.1 · 5.0** | `npm run verify` · CI ពេញ |
+| ESLint · @eslint/js · globals | 9 · 9 · 16 ➜ **10.11 · 10.0 · 17.12** | ច្បាប់ថ្មី ២ (`no-useless-assignment` · `preserve-caught-error`) ➜ ២៩ កន្លែង **អានទាំងអស់ ៖ ០ កំហុសពិត** (តម្លៃចាប់ផ្តើមការពារ · `throw` ក្នុង `catch`) |
+| TypeScript | 5.9.3 ➜ **6.0.3** | ⛔ មិនមែន 7.0 ៖ `typescript-eslint` ទាមទារ `<6.1.0` (npm បដិសេធ peer) · `baseUrl` (deprecated ក្នុង TS 6) ត្រូវដក |
+| esbuild · @netlify/blobs · floor ផ្សេងៗ | 0.25 ➜ **0.28** · 11.0.2 ➜ **11.1.1** | lockfile សាងថ្មីទាំងស្រុង |
+| Android Gradle Plugin · Gradle | 8.13.0 · 8.14.3 ➜ **8.13.2 · 8.14.5** | patch ចុងក្រោយក្នុងខ្សែដែល Capacitor 8 គាំទ្រ |
+| `playwright-core` (Windows helper) | 1.62.1 ➜ **1.63.0** | ដូច ZoeW |
+
+**មិនឡើង (វាស់រួច)** ៖ Capacitor 8.5.2 · plugin ទាំងអស់ · React 19.3 · SheetJS 0.20.3 · qrcode-generator 2.0.4 (`ZoeKeyGen/qrcode.js`)
+ជា **កំណែចុងក្រោយ stable រួចហើយ** · PDF ប្រើ print របស់ browser (គ្មានបណ្ណាល័យ)។ ⛔ **AGP 9 · Gradle 9 · compileSdk 37** ត្រូវការ
+**Capacitor 9** ដែលនៅជា **alpha** (`9.0.0-alpha.7`) — template របស់វាលើក `minSdk` ទៅ **26** (បោះ Android 7.x) ហើយ plugin `@capgo/*`
+គ្មានកំណែ 9 ទេ ➜ build Android វាស់មិនបាននៅទីនេះ (គ្មាន Android SDK) ➜ **មិនធ្វើ**។ `npm audit` ៖ ផលិតកម្ម **០**; dev ៣ moderate
+(`uuid` ក្នុង `@capacitor/cli` ➜ `xcode` ៖ ឧបករណ៍ iOS · មានតាំងពី `main` · ការកែ = បន្ថយ CLI) ➜ ទុកដដែល។
+
+#### ការថយក្រោយដែលការឡើងនាំមក — ចាប់មុន ship
+
+- 🔴 **Vite 8 (Rolldown) ៖ web ផ្ទុកកូដ native ហើយក្រៅបណ្តាញចាប់ផ្តើមមិនកើត**។ Rolldown បម្លែង `manualChunks` ទៅជា group ដែល
+  **ចាប់ dependency របស់ម៉ូឌុលដែលវាចាប់ផង** ➜ helper `__vitePreload` (plugin Capacitor ហៅ `import()`) ធ្លាក់ចូល chunk
+  `native-plugins` ➜ `index` import chunk នោះដោយ **static** ហើយ `index.html` preload វា ➜ Service Worker មិន cache chunk នោះ
+  ➜ **ក្រៅបណ្តាញ App ចាប់ផ្តើមមិនកើត**។ `android:check` ធ្លាក់ **២** · `native:check` ធ្លាក់ **១** (⛔ `smoke` · `sw:check` បៃតង)។
+  ការកែ ៖ `codeSplitting.groups` ជាមួយ `priority` ច្បាស់ (helper ៣ · react ២ · native ១)។
+- 🔴 **Lightning CSS (minifier CSS លំនាំដើមរបស់ Vite 8) សរសេរ CSS ឡើងវិញដោយគ្មានអ្នកវាស់**។ CSS ក្នុង build ខុសពី baseline
+  **២,៣៩៧ បន្ទាត់** ៖ រៀបលំដាប់ declaration (`-webkit-*` ឡើងលើ) · design token **១៣/៣៥** ត្រូវសរសេរឡើងវិញ (`#0066FF` ➜ `#06f` ·
+  `rgba(0,0,0,.05)` ➜ `#0000000d`) — ក្នុង CSS ដែលគ្រប PTR/ចលនាផ្ទាំង (តំបន់ហាមចូល) ខណៈ checker CSS/ប្លង់វាស់ CSS **ប្រភព**
+  (`build-audit.mjs`) ➜ **គ្មាននរណាឃើញ**។ ការកែ ៖ `cssMinify: 'esbuild'` ➜ CSS ក្នុង build **ស្មើ baseline byte ទល់ byte**
+  (លើកលែង marker `/*$vite$:1*/` នៅចុង)។
+
+#### អ្នកយាមថ្មី
+
+- `npm run smoke` ៖ (ក) JS ក្នុង build ត្រូវ parse បានក្នុង `build.target` (ដេរីវេពី `vite.config.mts`) — probe `target: 'esnext'` ➜
+  **៦ ឯកសារធ្លាក់**; (ខ) design token CSS ទៅដល់ build ដូចដែលសរសេរ — probe «ដក `cssMinify`» ➜ **ធ្លាក់** (token ត្រូវសរសេរឡើងវិញ)។
+- `npm run android:check` ផ្នែក ៧ ៖ config Android ↔ template របស់ Capacitor ដែលដំឡើង (SDK · AndroidX ស្មើ · AGP · Gradle ·
+  google-services ឡើងបានតែ patch) — probe **៥/៥** ធ្លាក់ (AGP 9.4.0 · compileSdk 37 · Gradle 9.8.0 · androidx.core 1.19.0 · AGP 8.12.0)។
+- `zto-cookie-sync-test` ៖ literal `'1.62.1'` (កាលបរិច្ឆេទផុតកំណត់) ➜ អះអាង **pin ជាកំណែជាក់លាក់** (probe `^1.63.0` ➜ ធ្លាក់)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **Netlify build ខ្លួនឯង** (App ទាំង ២) · គ្មានការកែ Firebase rules · គ្មាន env ថ្មី។
+- **សាកលើទូរស័ព្ទពិត (iPhone + Android)** ៖ ស្កេន Barcode (ZXing-WASM ថ្មី) · ចូលប្រព័ន្ធ (Firebase ថ្មី) · Export Excel · បើក App
+  ក្រៅបណ្តាញ។ ZoeKeyGen ៖ ចូលប្រព័ន្ធ · បញ្ជី Key។
+- **App Android** ៖ Android Studio ទាញ Gradle 8.14.5 និង AGP 8.13.2 ពេល Sync លើកដំបូង ➜ `npm run android:sync` ➜ build APK ➜ សាក។
+- **Windows helper (ស្រេចចិត្ត)** ៖ រត់ `setup.cmd` ម្តងទៀតដើម្បីទទួល `playwright-core` 1.63.0 (ការដំឡើងចាស់នៅដើរធម្មតា)។
+- **Sentry (ស្រេចចិត្ត · មិនទាន់ណែនាំ)** ៖ Loader កំពុងប្រើ **10.x** (ឡើង patch ដោយស្វ័យប្រវត្តិ)។ ការប្តូរទៅ 11.x ក្នុង Sentry ➜
+  Project Settings ➜ Client Keys ➜ Loader Script — ⛔ រង់ចាំ 11.x ចាស់ជាងនេះ។
+
 ### [2.42.3] — 2026-09-25 · ZoeW ៖ **អេក្រង់សលែងកើតពីកំហុស render តែមួយ** · CI ពេញរត់ក្នុង session · money checker លើ App React (branch · មិនទាន់ merge)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«Deep Audit project ទាំងមូល … វាស់ឡើងវិញទាំងអស់ … ពិនិត្យមើល sentry, money checker, អោយដើរជាមួយ React …

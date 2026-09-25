@@ -99,7 +99,7 @@ async function session(port, extraStorage = {}, zto = null) {
             await r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(out) });
             return;
         }
-        let body = {};
+        let body;
         try { body = JSON.parse(r.request().postData() || '{}'); } catch (e) { body = { raw: r.request().postData() }; }
         appsScript.push(body);
         const rows = body.payload && Array.isArray(body.payload.rows) ? body.payload.rows.length : 0;
@@ -176,7 +176,7 @@ async function session(port, extraStorage = {}, zto = null) {
 }
 
 const T = 4000;
-const named = (label, fn) => async (p) => { try { await fn(p); } catch (e) { const why = String(e.message).split('\n').filter((l) => /intercepts|not visible|not enabled|not stable|detached|outside/.test(l)).slice(-1)[0] || ''; throw new Error(label + ' ➜ ' + String(e.message).split('\n')[0] + (why ? ' · ' + why.trim() : '')); } };
+const named = (label, fn) => async (p) => { try { await fn(p); } catch (e) { const why = String(e.message).split('\n').filter((l) => /intercepts|not visible|not enabled|not stable|detached|outside/.test(l)).slice(-1)[0] || ''; throw new Error(label + ' ➜ ' + String(e.message).split('\n')[0] + (why ? ' · ' + why.trim() : ''), { cause: e }); } };
 const click = (sel) => named('ចុច ' + sel, (p) => p.click(sel, { timeout: T }));
 const fill = (sel, v) => named('វាយ ' + sel, (p) => p.fill(sel, v, { timeout: T }));
 const seq = (...fns) => async (p) => { for (const f of fns) { await f(p); await p.clock.runFor(300); await p.waitForTimeout(60); } };

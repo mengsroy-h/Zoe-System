@@ -115,7 +115,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
 | `npm run purity:check` | **React ១០០%** ៖ កូដមុខងារ (`core` · `domain` · `features` · `services` · `ui` · `platform`) ប៉ះ DOM **០** កន្លែង · ស្រទាប់ React (`src/app/**`) សរសេរ DOM **០** ក្រៅច្រកចេញ (`refs.ts` · `DocumentEffects` · ពិដានតឹង) · component មិនស្វែងរក DOM តាម id · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិតចង (មើល [`ARCHITECTURE.md`](ARCHITECTURE.md) ផ្នែក ១១) |
-| `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) |
+| `npm run smoke` | បើក App ដែល build រួច ហើយរកកំហុស runtime · ⛔ build ផលិតកម្មគ្មាន bridge វាស់ (`expose-globals` · `__auditRebind`) · syntax ក្នុង build ស្ថិតក្នុង `build.target` · design token CSS (`--x: value`) ទៅដល់ build ដូចដែលសរសេរ (minifier CSS មិនសរសេរតម្លៃឡើងវិញ) |
 | `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
 | `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
 | `npm run original:fetch` | ទាញ ZoeW ដើម (vanilla JS) ពី git ចូល `.original/ZoeW` — អ្នកសម្រេចនៃការវាស់ parity |
@@ -130,7 +130,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run android:sync` | build Android រួចចម្លងចូល `android/` (`cap sync android`) |
 | `npm run android:open` | បើក `android/` ក្នុង Android Studio |
 | `npm run android:icons` | បង្កើត logo និង splash របស់ Android ពី `resources/icon.svg` |
-| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native |
+| `npm run android:check` | ចាក់សោលេខកំណែ APK · appId · សិទ្ធិ · logo · plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ស្ថិតក្នុងខ្សែ template របស់ Capacitor ដែលដំឡើង |
 | `npm run native:check` | សាក App ជាមួយ bridge Capacitor ក្លែងក្នុង Chromium (Back · ប្រវត្តិ · pause/resume · Export/Share/Print · ជីវមាត្រ · PTR) |
 
 ### Deploy ទៅ Netlify

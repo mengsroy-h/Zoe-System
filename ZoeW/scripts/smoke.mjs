@@ -63,6 +63,38 @@ const bridgeOk = bridgeMarkers.length === 2 && probeNames.length === 2 && !leake
 if (bridgeOk) console.log(`✅ build ផលិតកម្មគ្មាន bridge វាស់ (សញ្ញា ${bridgeMarkers.length} · probe ${probeNames.join('/')})`);
 else console.log('⛔ bridge វាស់ចូល build ផលិតកម្ម ឬវាស់មិនបាន ៖ ' + JSON.stringify({ bridgeMarkers, probeNames, leakedOnWindow, bundleHits }));
 
+/* ⛔ syntax ដែល toolchain ចេញ ត្រូវស្ថិតក្នុង `build.target` ៖ ការឡើង Vite/minifier អាចបញ្ចេញ syntax ថ្មីជាង
+ *    ដែល browser ចាស់ (iPhone ចាស់) parse មិនបាន ➜ អេក្រង់ស ខណៈ Chromium ក្នុង checker ដើរធម្មតា។
+ *    កម្រិតដេរីវេពី `target` ពិតក្នុង `vite.config.mts` (App · Service Worker) មិនមែនលេខថេរ។ */
+const { parse } = await import('acorn');
+const targetYears = [...viteSrc.matchAll(/\btarget:\s*'es(\d{4})'/g)].map((m) => Number(m[1]));
+const ecmaVersion = targetYears.length ? Math.min(...targetYears) : 0;
+const DIST = path.join(ROOT, '..', 'dist');
+const syntaxFiles = fs.readdirSync(ASSETS).filter((f) => f.endsWith('.js')).map((f) => ['assets/' + f, 'module'])
+    .concat(fs.existsSync(path.join(DIST, 'sw.js')) ? [['sw.js', 'script']] : []);
+const syntaxBad = syntaxFiles.flatMap(([rel, sourceType]) => {
+    try { parse(fs.readFileSync(path.join(DIST, rel), 'utf8'), { ecmaVersion, sourceType }); return []; }
+    catch (e) { return [rel + ' ៖ ' + e.message]; }
+});
+const syntaxOk = targetYears.length >= 2 && ecmaVersion >= 2015 && syntaxFiles.length >= 4 && !syntaxBad.length;
+if (syntaxOk) console.log(`✅ syntax ក្នុង build ស្ថិតក្នុង ES${ecmaVersion} (${syntaxFiles.length} ឯកសារ)`);
+else console.log('⛔ syntax ក្នុង build លើស target ឬវាស់មិនបាន ៖ ' + JSON.stringify({ targetYears, syntaxFiles: syntaxFiles.length, syntaxBad }));
+
+/* ⛔ design token CSS (`--x: value`) ត្រូវទៅដល់ browser ដូចដែលសរសេរ ៖ minifier ខ្លះ (Lightning CSS ដែលជា
+ *    លំនាំដើមរបស់ Vite) សរសេរតម្លៃឡើងវិញ (`#0066FF` ➜ `#06f` · `rgba(…)` ➜ `#0000000d`) និងរៀបលំដាប់
+ *    declaration — ក្នុង CSS ដែលគ្រប PTR · ចលនាផ្ទាំង ខណៈ checker CSS វាស់ CSS **ប្រភព** មិនមែន CSS ដែល ship។
+ *    ការប្រៀបធៀបលុបតែចន្លោះ និង `0` មុខចំណុចទសភាគ (អ្វីដែល minify ដោយមិនប្តូរតម្លៃ)។ */
+const cssImports = [...fs.readFileSync(path.join(SRC, 'main.tsx'), 'utf8').matchAll(/^import\s+['"](\.[^'"]+\.css)['"]/gm)].map((m) => m[1]);
+const cssSource = cssImports.map((rel) => fs.readFileSync(path.join(SRC, rel), 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
+const shippedCss = fs.readdirSync(ASSETS).filter((f) => f.endsWith('.css')).map((f) => fs.readFileSync(path.join(ASSETS, f), 'utf8')).join('\n');
+const tokenNorm = (v) => v.replace(/\s+/g, '').replace(/(^|[^\d.])0+\.(\d)/g, '$1.$2');
+const authoredTokens = [...cssSource.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+);/g)].map((m) => [m[1], tokenNorm(m[2])]);
+const shippedTokens = new Set([...shippedCss.matchAll(/(--[\w-]+)\s*:\s*([^;{}]+)[;}]/g)].map((m) => m[1] + ':' + tokenNorm(m[2])));
+const tokenLost = authoredTokens.filter(([n, v]) => !shippedTokens.has(n + ':' + v)).map(([n, v]) => n + ':' + v);
+const tokenOk = cssImports.length >= 1 && authoredTokens.length >= 20 && !tokenLost.length;
+if (tokenOk) console.log(`✅ design token CSS ទៅដល់ build ដូចដែលសរសេរ (${authoredTokens.length} token · ${cssImports.length} ឯកសារ)`);
+else console.log('⛔ minifier CSS សរសេរ design token ឡើងវិញ ឬវាស់មិនបាន ៖ ' + JSON.stringify({ files: cssImports.length, tokens: authoredTokens.length, lost: tokenLost.slice(0, 8), lostCount: tokenLost.length }));
+
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk ? 1 : 0);

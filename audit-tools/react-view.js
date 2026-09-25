@@ -301,7 +301,8 @@ function renderedElement(root, ctx, rel, exportName, id) {
  *   `onFocus: phoneSearchFocused`            ➜ `{ name: 'phoneSearchFocused', args: null }` (ហៅជាមួយ event)
  *   `onClick: () => togglePanelFromHandle("data")` ➜ `{ name: 'togglePanelFromHandle', args: ['data'] }`
  *   `onClick: onAct("x", ["a"])`             ➜ `{ name: 'x', args: ['a'], act: true }`
- * ⛔ រកមិនឃើញ ឬរូបរាងផ្សេង ➜ `null` (checker ត្រូវធ្លាក់ មិនមែនសន្មត)
+ *   រូបរាងផ្សេង (arrow មានតួ) ➜ `{ name: null, raw: '<អត្ថបទតួ>' }` ➜ checker វាស់តួដោយខ្លួនឯង
+ * ⛔ រកមិនឃើញ ➜ `null` (checker ត្រូវធ្លាក់ មិនមែនសន្មត)
  */
 function jsxHandler(root, id, prop) {
     const acorn = require('acorn');
@@ -320,17 +321,18 @@ function jsxHandler(root, id, prop) {
     const property = (node.properties || []).find((p) => p.type === 'Property' && p.key && (p.key.name === prop || p.key.value === prop));
     if (!property) return null;
     const value = property.value;
+    const raw = text.slice(value.start, value.end);
     const literal = (n) => (n.type === 'Literal' ? n.value
         : n.type === 'ArrayExpression' ? n.elements.map(literal) : undefined);
-    if (value.type === 'Identifier') return { name: value.name, args: null };
+    if (value.type === 'Identifier') return { name: value.name, args: null, raw };
     const call = value.type === 'ArrowFunctionExpression' && value.body.type === 'CallExpression' ? value.body
         : (value.type === 'CallExpression' ? value : null);
-    if (!call || call.callee.type !== 'Identifier') return null;
+    if (!call || call.callee.type !== 'Identifier') return { name: null, args: null, raw };
     const args = call.arguments.map(literal);
-    if (args.some((v) => v === undefined)) return null;
-    if (value.type === 'CallExpression' && call.callee.name === 'onAct') return { name: args[0], args: args[1] || [], act: true };
-    if (value.type === 'CallExpression') return null;
-    return { name: call.callee.name, args };
+    if (args.some((v) => v === undefined)) return { name: null, args: null, raw };
+    if (value.type === 'CallExpression' && call.callee.name === 'onAct') return { name: args[0], args: args[1] || [], act: true, raw };
+    if (value.type === 'CallExpression') return { name: null, args: null, raw };
+    return { name: call.callee.name, args, raw };
 }
 
 module.exports = {

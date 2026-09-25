@@ -117,15 +117,33 @@ ok('គ្មានកន្លែងហៅ resetPickupStats() ដោយផ្�
 
 // ── ៣. ការតភ្ជាប់ម៉ឺនុយ ──────────────────────────────────────────────
 console.log('\n=== ៣. ប៊ូតុងក្នុងម៉ឺនុយ (...) នៅខាងលើ «លុបទាំងអស់» ===');
-const menuAt = SRC.indexOf('data-act="moreMenuResetPickup"');
-const clearAt = SRC.indexOf('data-act="moreMenuClearHistory"');
-ok('ម៉ឺនុយមានប៊ូតុង data-act="moreMenuResetPickup"', menuAt !== -1);
+// ⛔ ZoeW ជា React ៖ ម៉ឺនុយ (...) ជា view model (`uiState.moreMenuItems`) ដែល `MoreMenuContent.tsx` គូរ ➜ រត់
+//    `toggleHeaderMoreDropdown()` ពិតក្នុង vm រួចគូរ **JSX ពិត** ហើយវាស់ HTML ដែលអ្នកប្រើឃើញ។ ស្លាកតម្រងជា sentinel
+//    ដែលមាន `<` ➜ វាស់ទាំង «ស្លាកដេរីវេពីតម្រង» ទាំង «ការ escape»។
+const menuHtml = (() => {
+    const { reactRuntime, renderFromContext } = require('./react-view');
+    const box = { console, queueMicrotask, exchangeRateRiel: 4100, document: { getElementById: () => null },
+        getCurrentFilterLabel: () => '<b>FILTER-9</b>',
+        showGlobalMoreMenu: (btn, event, items) => { box.__items = items; } };
+    vm.createContext(box);
+    vm.runInContext(reactRuntime(SRC, { context: box }), box);
+    const fn = sliceFn('toggleHeaderMoreDropdown');
+    if (!fn) return '';
+    vm.runInContext(fn, box);
+    box.toggleHeaderMoreDropdown(null, null);
+    vm.runInContext('uiState.moreMenuItems = ' + JSON.stringify(box.__items || null) + ';', box);
+    return renderFromContext(ROOT, box, 'src/app/components/menu/MoreMenuContent.tsx', 'MoreMenuContent');
+})();
+const menuAt = menuHtml.indexOf('data-act="moreMenuResetPickup"');
+const clearAt = menuHtml.indexOf('data-act="moreMenuClearHistory"');
+ok('ម៉ឺនុយមានប៊ូតុង data-act="moreMenuResetPickup"', menuAt !== -1, menuHtml.slice(0, 200));
 ok('ប៊ូតុង Reset នៅ *ខាងលើ* ប៊ូតុងលុបទាំងអស់',
     menuAt !== -1 && clearAt !== -1 && menuAt < clearAt, [menuAt, clearAt]);
 ok('"moreMenuResetPickup" មានក្នុង ACTION_ALLOWLIST',
-    /"moreMenuResetPickup"/.test(SRC));
+    /"moreMenuResetPickup"/.test(SRC) || /\bmoreMenuResetPickup,/.test(SRC));
+const resetButton = menuAt === -1 ? '' : menuHtml.slice(menuAt, menuHtml.indexOf('</button>', menuAt));
 ok('ស្លាកប៊ូតុងបង្ហាញតម្រងដែលឈរលើ (អ្នកប្រើដឹងថា Reset អ្វី)',
-    /moreMenuResetPickup"[^<]*>[^<]*\$\{sanitizeInput\(getCurrentFilterLabel\(\)\)\}/.test(SRC));
+    resetButton.indexOf('&lt;b&gt;FILTER-9&lt;/b&gt;') !== -1 && resetButton.indexOf('<b>FILTER-9') === -1, resetButton);
 
 // ── ៤. ឥរិយាបថពិត — រត់ resetPickupStats() ក្នុង vm ──────────────────
 console.log('\n=== ៤. ឥរិយាបថពិត (កូដពិតក្នុង vm) ===');

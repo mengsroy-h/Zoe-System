@@ -35,6 +35,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.LATECOMMIT_APP_DIR ? path.resolve(process.env.LATECOMMIT_APP_DIR)
     : (process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, '..'));
@@ -235,7 +236,7 @@ function buildWorld(seed, opts) {
 
     const context = vm.createContext({
         console, Promise, Math, Date, JSON, Object, Array, String, Number, Boolean, Map, Set, Error, RegExp,
-        parseFloat, parseInt, isNaN, isFinite,
+        parseFloat, parseInt, isNaN, isFinite, queueMicrotask,
         setTimeout: scaled.setTimeout,
         clearTimeout: scaled.clearTimeout,
         window: {},
@@ -273,6 +274,7 @@ function buildWorld(seed, opts) {
     });
 
     const code = [
+        reactRuntime(src, { exclude: REAL_FNS.concat(OPTIONAL_FNS), context }),
         extractConst('TWO_HOURS_MS') || 'const TWO_HOURS_MS = 7200000;',
         extractConst('ABANDON_AGE_MS') || 'const ABANDON_AGE_MS = 604800000;',
         extractConst('DB_OP_TIMEOUT_MS') || 'const DB_OP_TIMEOUT_MS = 15000;',

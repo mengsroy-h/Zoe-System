@@ -18,7 +18,8 @@
  *   ៦. **ស្រទាប់ចូល DOM របស់ React ➜ សមមូលដើម** (`VIEW_OVERRIDES`) ៖ `elementOf(name)` ➜
  *      `document.getElementById(name)` (ឈ្មោះ ref = id របស់ធាតុ — `refSelectorsFromJsx()` ផ្ទៀងផ្ទាត់ពី JSX
  *      ពិត ហើយធាតុដែលគ្មាន id ប្រើ selector ពិតរបស់វា) · `commitNow()`/`renderNow()` ➜ ទទេ (App ដើមកែ
- *      DOM ផ្ទាល់ ➜ គ្មានអ្វីត្រូវ «ចុះ»)។ ⛔ មានតែ function ទាំងនេះ — តក្កវិជ្ជាអាជីវកម្មមិនប៉ះ។
+ *      DOM ផ្ទាល់ ➜ គ្មានអ្វីត្រូវ «ចុះ») · ស្ថានភាពប្រអប់ (`core/modals.ts`) ➜ `style.display` · `data-close` ·
+ *      `data-nodismiss` របស់ធាតុ (អ្វីដែល `<Modal>` គូរ)។ ⛔ មានតែ function ទាំងនេះ — តក្កវិជ្ជាអាជីវកម្មមិនប៉ះ។
  */
 import ts from 'typescript';
 import * as acorn from 'acorn';
@@ -282,4 +283,42 @@ export function refSelectorsFromJsx(refNames, tsxSources) {
         selectors[name] = id ? '#' + id[1] : cls ? '.' + cls[1] : null;
     }
     return selectors;
+}
+
+/**
+ * ⛔ `let <វាល> = <តម្លៃដំបូង>;` កម្រិតកំពូល សម្រាប់ state ដើមនីមួយៗ (`_generated-state.json`) ៖ `app.js` ដើម
+ *    ប្រកាស state ជា `let` កម្រិតកំពូល ហើយ checker ស្រង់ការប្រកាសទាំងនោះ (`^ *let <ឈ្មោះ> = …$`) ចូល `vm`។
+ *    ក្នុង App React វាជាវាលរបស់ឃ្លាំង (`createStore(…, { <វាល>: <តម្លៃ> })`) ➜ ការប្រកាសសាងពី **object literal
+ *    ពិត** នៃឃ្លាំង (អត្ថបទតម្លៃដំបូងដដែលបេះបិទ) ➜ `aliasStateFields()` ធ្វើឲ្យ `<ឃ្លាំង>.<វាល>` = `<វាល>` រួចហើយ។
+ *    ⛔ វាលដែលរកមិនឃើញក្នុង literal ➜ បោះកំហុស (មិនទាយតម្លៃ)។
+ */
+export function stateDeclarations(stateModuleView, stateGroups) {
+    const ast = acorn.parse(stateModuleView, { ecmaVersion: 'latest', sourceType: 'script' });
+    const inits = {};
+    const visit = (node) => {
+        if (!node || typeof node.type !== 'string') return;
+        if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'createStore' &&
+            node.arguments[0] && node.arguments[0].type === 'Literal' && node.arguments[1] && node.arguments[1].type === 'ObjectExpression') {
+            const store = node.arguments[0].value;
+            for (const prop of node.arguments[1].properties) {
+                if (prop.type !== 'Property' || prop.key.type !== 'Identifier') continue;
+                inits[store + '.' + prop.key.name] = stateModuleView.slice(prop.value.start, prop.value.end);
+            }
+        }
+        for (const key of Object.keys(node)) {
+            const v = node[key];
+            if (Array.isArray(v)) v.forEach(visit);
+            else if (v && typeof v.type === 'string') visit(v);
+        }
+    };
+    visit(ast);
+    const lines = [];
+    for (const [store, fields] of Object.entries(stateGroups)) {
+        for (const f of fields) {
+            const init = inits[store + '.' + f.name];
+            if (init === undefined) throw new Error('checker-view ៖ រកតម្លៃដំបូងរបស់ ' + store + '.' + f.name + ' មិនឃើញ');
+            lines.push('    let ' + f.name + ' = ' + init.replace(/\n\s*/g, ' ') + ';');
+        }
+    }
+    return lines.join('\n') + '\n';
 }

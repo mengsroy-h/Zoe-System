@@ -51,10 +51,11 @@ const EXTERNAL_CHECKERS = [{ f: '../zto-import/test.js', env: 'ZTO_IMPORT_APP_DI
 // ⛔ `idtoken-fixture.js` ជា **ម៉ូឌុលរួម** មិនមែន checker ៖ វាគ្មានការអះអាង
 // ផ្ទាល់ខ្លួន ➜ ការទាមទារ `*_APP_DIR` លើវាគ្មានន័យ។ អ្នកយាមរបស់វាគឺ checker
 // ទាំង ២ ដែល require វា (ចុះក្នុង `repository-file-coverage.json`) — ដូច
-// `emu/ns.js` ដែលត្រូវរំលងក្នុងការស្កេន `emu/` ដដែល។
+// `emu/ns.js` ដែលត្រូវរំលងក្នុងការស្កេន `emu/` ដដែល។ `react-view.js` ក៏ជាម៉ូឌុលរួមដូចគ្នា ៖ ស្រទាប់ React
+// (ឃ្លាំង · helper DOM/ប្រអប់) ពីទិដ្ឋភាព `app.js` សម្រាប់ checker ដែលស្រង់ function ចូល `vm`។
 const NOT_CHECKERS = new Set(['trimws.js', 'strip-comments.js', 'checker-coverage.js',
     'redact-dump.js', 'money-reality-check.js', 'registry-orphan-list.js',
-    'idtoken-fixture.js']);
+    'idtoken-fixture.js', 'react-view.js']);
 const CLI_GUARDS = new Map([
     ['money-reality-check.js', 'money-reality-test.js'],
     ['redact-dump.js', 'money-reality-test.js'],

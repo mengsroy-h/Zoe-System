@@ -411,6 +411,18 @@
       ],
       "evidence": "checker ទាំង ២ ចុះហត្ថលេខា RS256 ពិតដោយវិញ្ញាបនបត្ររបស់ម៉ូឌុលនេះ រួចរត់ `zto-order-detail.js` ពិត ➜ ការផ្ទៀងផ្ទាត់ទទួលយក token ត្រឹមត្រូវ និងបដិសេធ token ក្លែង/ផុត/Project ខុស",
       "limitation": "សោសាកល្បងប៉ុណ្ណោះ — វាមិនបញ្ជាក់ថា Google បង្វិលវិញ្ញាបនបត្រយ៉ាងណាលើផលិតកម្មទេ។"
+    },
+    "guard-react-view": {
+      "category": "behavior",
+      "guards": [
+        "audit-tools/price-edit-abort-test.js",
+        "audit-tools/late-commit-test.js",
+        "audit-tools/camera-resume-test.js",
+        "audit-tools/history-patch-retry-test.js",
+        "audit-tools/lookup-config-secret-test.js"
+      ],
+      "evidence": "checker ទាំងនេះរត់ស្រទាប់ React ពិតពីម៉ូឌុលនេះ ហើយ mutation លើតួអាជីវកម្ម (ការបញ្ច្រាសលុយ · ការ commit យឺត · សោ session · Secret plaintext) ធ្វើឲ្យពួកវាក្រហម",
+      "limitation": "ស្រទាប់ DOM ជាសមមូលក្នុងទិដ្ឋភាព (`elementOf` ➜ `getElementById` · ប្រអប់ ➜ `style.display`) — ការគូររបស់ React ខ្លួនឯងវាស់ដោយ checker browser និង parity មិនមែនដោយម៉ូឌុលនេះ។"
     }
   },
   "files": {
@@ -917,6 +929,9 @@
     },
     "audit-tools/raw-read-shape-test.js": {
       "policy": "guard-1"
+    },
+    "audit-tools/react-view.js": {
+      "policy": "guard-react-view"
     },
     "audit-tools/reconnect-ladder-test.js": {
       "policy": "guard-1"

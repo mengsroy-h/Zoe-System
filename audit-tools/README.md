@@ -191,6 +191,7 @@ bash audit-tools/emu/rules.sh
 | `emu/restore-mutation-emu-test.js` | លុប/ដក/កែតម្លៃចន្លោះ Restore · marker fence · cached history និង retry · អាយុ Barcode ស្តារធៀប siblings; sandbox ផ្គត់ផ្គង់ auth/database និង collected ref, អាន collected snapshot ពិត និងស្រង់ថេរពី App; ព្យួរ price write មុន HTTP acceptance រួច cleanup ឆ្លងអធ្រាត្រ និងកែ sibling ដោយ client ផ្សេង ដើម្បីវាស់ ETag conflict/retry; rules និង RTDB ពិត | `RESTOREMUTATION_APP_DIR` |
 | `emu/rules.sh` | rules ពិតលើ emulator ពិត | — |
 | `idtoken-fixture.js` | helper ៖ វិញ្ញាបនបត្រ និងការចុះហត្ថលេខា **Firebase ID token សាកល្បង** (RS256 ពិត) ➜ checker ដែលរត់ `zto-order-detail.js` ពិត វាស់ការផ្ទៀងផ្ទាត់ token ដោយមិនចម្លងតក្កវិជ្ជា (សោសាកល្បងប៉ុណ្ណោះ — គ្មានសិទ្ធិលើផលិតកម្ម) | — |
+| `react-view.js` | helper ៖ **ស្រទាប់ React** របស់ ZoeW (`createStore` · ឃ្លាំង · `fieldValue` · ប្រអប់ · `document-io`) ស្រង់ជា **កូដពិត** ពីទិដ្ឋភាព `app.js` ➜ checker ដែលស្រង់ function ចូល `vm` រត់តួអាជីវកម្មដែលហៅ helper ទាំងនោះបាន (DOM ក្លែងរបស់ checker នៅតែជាអ្វីដែលត្រូវវាស់) | — |
 | `emu/ns.js` | helper ៖ RTDB namespace **តែមួយក្នុងមួយការរត់** (`emuNamespace()`) ➜ checker `emu/*` ដែលរត់ស្របគ្នា មិនជាន់ទិន្នន័យគ្នា | — |
 | `rules-duplicate-keys.js` | rules JSON គ្មានកូនសោស្ទួន | — |
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |

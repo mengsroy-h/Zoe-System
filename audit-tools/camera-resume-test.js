@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.CAMERA_APP_DIR || path.join(__dirname, '..');
 let pass = 0, fail = 0;
@@ -76,9 +77,11 @@ function buildContext(opts) {
         setTimeout(fn, ms) { timers.push({ fn: fn, ms: ms }); return timers.length; },
         clearTimeout(handle) { if (timers[handle - 1]) timers[handle - 1] = null; },
         confirm(msg) { ctx.confirmCalls++; video.paused = true; return ctx.confirmResult; },
-        safeFocusScanner() { ctx.focusCalls++; }
+        safeFocusScanner() { ctx.focusCalls++; },
+        queueMicrotask
     };
     vm.createContext(ctx);
+    vm.runInContext(reactRuntime(src, { exclude: NEEDED, context: ctx }), ctx);
     ['currentStream', 'isCameraScanning', 'scanVideoResumeTimer', 'phoneModalDismissPromptOpen',
      'pendingBarcode', 'editingItemId', 'markingItemId', 'isModalOpen'].forEach((n) => {
         const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
@@ -137,7 +140,9 @@ console.log('\n=== ⛔ `navigator.mediaDevices` អវត្តមាន (បរ
                 __toasts: toasts
             };
             ctx.globalThis = ctx;
+            ctx.queueMicrotask = queueMicrotask;
             vm.createContext(ctx);
+            vm.runInContext(reactRuntime(src, { exclude: NEEDED, context: ctx }), ctx);
             ['isCameraStarting', 'cameraRequestId', 'currentStream', 'isCameraScanning',
              'nativeDetector', 'liveScanCodeReader', 'pendingLoadedMetadataHandler'].forEach((n) => {
                 const decl = (src.match(new RegExp('^ *let ' + n + ' = .*$', 'm')) || [])[0];
@@ -189,7 +194,9 @@ vm.runInContext('closeModal("phoneModal");', c);
 ok('បិទប្រអប់ចុងក្រោយ ➜ បន្តកាមេរ៉ា', c.video.playCalls === 1, c.video.playCalls);
 ok('បិទប្រអប់ចុងក្រោយ ➜ focus ត្រឡប់ទៅម៉ាស៊ីនស្កេន', c.focusCalls === 1, c.focusCalls);
 
-c = buildContext({ modals: { phoneModal: 'flex', editModal: 'flex' }, paused: true });
+// ⛔ ប្រអប់ទី ២ ត្រូវជាប្រអប់ **ពិត** របស់ App (`editPhoneModal`) ៖ App React រាប់ប្រអប់បើកតាមបញ្ជីប្រអប់ពិត
+//    (`MODAL_IDS`) មិនមែនគ្រប់ `.modal` ក្នុង DOM ➜ id ប្រឌិតមិនដែលជាស្ថានភាពដែលអាចកើត
+c = buildContext({ modals: { phoneModal: 'flex', editPhoneModal: 'flex' }, paused: true });
 vm.runInContext('closeModal("phoneModal");', c);
 ok('នៅមានប្រអប់មួយទៀតបើក ➜ មិនបន្តកាមេរ៉ា (វានៅត្រូវផ្អាកដដែល)', c.video.playCalls === 0, c.video.playCalls);
 
@@ -234,8 +241,9 @@ ok('កាមេរ៉ាបិទរួច ➜ pause មិនតាំង time
 console.log('\n=== ការតភ្ជាប់ក្នុង app.js ===');
 ok('beginScanning ចុះឈ្មោះ listener pause លើ <video>',
     /videoElement\.addEventListener\('pause', onScanVideoPause\)/.test(src));
+// ⛔ វាស់ **ក្នុងតួ `stopCurrentStream()`** (មិនមែនគ្រប់ទីកន្លែងក្នុងឯកសារ) ហើយមិនចងនឹងឈ្មោះអថេររបស់ធាតុ
 ok('stopCurrentStream ដក listener pause ចេញវិញ',
-    /videoElement\.removeEventListener\('pause', onScanVideoPause\)/.test(src));
+    /\b\w+\.removeEventListener\('pause', onScanVideoPause\)/.test(sliceFn(src, 'stopCurrentStream') || ''));
 ok('stopCurrentStream សម្អាត timer បន្តវីដេអូ',
     /clearTimeout\(scanVideoResumeTimer\)/.test(src));
 

@@ -46,6 +46,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.PRICEABORT_APP_DIR ? path.resolve(process.env.PRICEABORT_APP_DIR) : path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW');
@@ -122,7 +123,7 @@ function makeCtx(mode) {
 
     const ctx = {
         console, Math, JSON, parseFloat, parseInt, isNaN, isFinite, Date, Object, Array,
-        String, Number, Promise, Set, Map, Intl,
+        String, Number, Promise, Set, Map, Intl, queueMicrotask,
         setTimeout: (fn, ms) => setTimeout(fn, ms >= 10000 ? 0 : ms),
         clearTimeout,
         document: {
@@ -190,6 +191,8 @@ function makeCtx(mode) {
     // នឹងមិនឆ្លុះក្នុងតេស្ត ➜ ចាក់សោការសន្មតចាស់)។
     const DB_OP_TIMEOUT = /const DB_OP_TIMEOUT_MS = (\d+);/.exec(SRC);
     const COLLECTED_DAYS = /const DAILY_COLLECTED_KEEP_DAYS = (\d+);/.exec(SRC);
+    // ⛔ ស្រទាប់ React (វាលបញ្ចូល · ប្រអប់ · ឃ្លាំង) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
+    vm.runInContext(reactRuntime(SRC, { exclude: NEEDED }), ctx);
     vm.runInContext('const DB_OP_TIMEOUT_MS = ' + (DB_OP_TIMEOUT ? DB_OP_TIMEOUT[1] : '15000') + ';\n'
         + 'const DAILY_COLLECTED_KEEP_DAYS = ' + (COLLECTED_DAYS ? COLLECTED_DAYS[1] : '7') + ';\n'
         + 'const PICKUP_DATE_KEY_PATTERN = /^\\d{4}-\\d{2}-\\d{2}$/;\n'

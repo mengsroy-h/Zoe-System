@@ -5,7 +5,7 @@
  * ដែលសរសេរសម្រាប់ App ចាស់** មិនមែនដោយតេស្តដែលយើងសរសេរខ្លួនឯង។
  */
 import { build } from 'esbuild';
-import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx } from './checker-view.mjs';
+import { aliasStateFields, eraseTypes, moduleView, overrideFunction, refSelectorsFromJsx, stateDeclarations } from './checker-view.mjs';
 import { mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -128,6 +128,23 @@ rmSync(entry);
         'src/app/flush.ts': {
             commitNow: 'function commitNow() {}',
             renderNow: 'function renderNow(store) {}'
+        },
+        // ⛔ ប្រអប់ ៖ `<Modal>` គូរ `uiState.modalDisplay[id]` ជា `style.display` និង meta ជា `data-close` ·
+        //    `data-nodismiss` (`Modal.tsx`) ➜ សមមូលដើមគឺ DOM របស់ធាតុ (`el.style.display = …` ដូច App ដើម)។
+        //    `modalDisplay` ត្រូវបានចូលប្រើ **តែតាម function ទាំងនេះ** (វាស់រួច ៖ គ្មានអ្នកអាន `uiState.modalDisplay` ផ្ទាល់
+        //    ក្រៅ `core/modals.ts` លើកលែង `Modal.tsx`)។
+        'src/core/modals.ts': {
+            registerModalMeta: 'function registerModalMeta(id, value) {}',
+            unregisterModalMeta: 'function unregisterModalMeta(id) {}',
+            modalMeta: 'function modalMeta(id) {\n        const el = document.getElementById(id);\n        if (!el) return null;\n' +
+                '        const close = el.getAttribute ? el.getAttribute(\'data-close\') : null;\n' +
+                '        return { close: close || undefined, noDismiss: !!(el.getAttribute && el.getAttribute(\'data-nodismiss\') === \'true\') };\n    }',
+            modalIsMounted: 'function modalIsMounted(id) {\n        return !!document.getElementById(id);\n    }',
+            modalDisplay: 'function modalDisplay(id) {\n        const el = document.getElementById(id);\n' +
+                '        const d = el && el.style ? el.style.display : \'\';\n        return d === \'flex\' || d === \'none\' ? d : undefined;\n    }',
+            setModalDisplay: 'function setModalDisplay(id, display) {\n        if (!id) return;\n        const el = document.getElementById(id);\n' +
+                '        if (el) el.style.display = display;\n    }',
+            modalIsOpen: 'function modalIsOpen(id) {\n        return modalDisplay(id) === \'flex\';\n    }'
         }
     };
     let text = '';
@@ -136,6 +153,8 @@ rmSync(entry);
         let view = moduleView(readFileSync(file, 'utf8'), file);
         for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement);
         text += view;
+        // ⛔ state ដើមជា `let` កម្រិតកំពូល (ដូច `app.js` ដើម) ភ្លាមក្រោយឃ្លាំង ➜ dependency របស់តម្លៃដំបូងប្រកាសរួច
+        if (rel === 'src/core/state.ts') text += stateDeclarations(view, stateGroups);
     }
     text = text.replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
     const aliased = aliasStateFields(text, stateGroups);

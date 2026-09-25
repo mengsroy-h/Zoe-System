@@ -4,6 +4,7 @@ const path = require('path');
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const APP_ROOT = process.env.LOOKUPSEC_APP_DIR ? path.resolve(process.env.LOOKUPSEC_APP_DIR) : path.resolve(__dirname, '..');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 let pass = 0;
 let fail = 0;
@@ -77,8 +78,11 @@ function createRuntime(existing, key, encrypt, failStorage) {
         refreshZtoAutoCloseUi: () => {},
         refreshZtoListSyncUi: () => {},
         showToast: () => {},
-        alert: (message) => alerts.push(String(message))
+        alert: (message) => alerts.push(String(message)),
+        queueMicrotask
     });
+    // ⛔ ស្រទាប់ React (`fieldValue` · `fieldChecked` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
+    vm.runInContext(reactRuntime(source, { context }), context);
     // ⛔ កំណែ 2.22.5 ៖ កូដ ship ចូលប្រើ storage តាម shim `appLocalStore` /
     // `appSessionStore` (អាន `window.localStorage` ក្នុង `try` តែម្តង ព្រោះ
     // **getter ខ្លួនវាបោះ** ពេល browser បិទ site data)។
@@ -139,6 +143,24 @@ function createRuntime(existing, key, encrypt, failStorage) {
     const blocked = JSON.parse(typedNoKey.storage.get('zoew_lookup_api_config'));
     check(blocked.headerValue === 'legacy-secret' && typedNoKey.alerts.length === 1,
         'Lookup config: typed secret without PIN key is rejected without losing the existing legacy value', JSON.stringify({ blocked, alerts: typedNoKey.alerts }));
+
+    // ⛔ ផ្លូវស្នូល ៖ មានសោ PIN ហើយអ្នកប្រើវាយ Secret **ថ្មី** ➜ រក្សាទុកតែទម្រង់អ៊ិនគ្រីប (គ្មាន plaintext ថ្មី
+    //    ឬចាស់សល់)។ មុននេះគ្មានសេណារីយ៉ូណាដាក់ Secret ថ្មីជាមួយសោ ➜ mutation «រក្សា plaintext ផង» រស់រាន។
+    // ⛔ ការអ៊ិនគ្រីបក្លែងត្រឡប់ token **ស្រអាប់** ➜ អត្ថបទ Secret ណាមួយក្នុង storage = plaintext ពិត
+    const sealedTokens = [];
+    const typedWithKey = createRuntime(legacy, { key: true }, async (value) => {
+        const token = 'sealed#' + sealedTokens.length;
+        sealedTokens.push(value);
+        return token;
+    });
+    typedWithKey.elements.lookupApiHeaderValueInput.value = 'replacement-secret';
+    await typedWithKey.context.saveConfig();
+    const sealedRaw = typedWithKey.storage.get('zoew_lookup_api_config');
+    const sealed = JSON.parse(sealedRaw);
+    check(sealedTokens[sealed.headerValueEnc === undefined ? -1 : Number(String(sealed.headerValueEnc).split('#')[1])] === 'replacement-secret'
+        && !Object.prototype.hasOwnProperty.call(sealed, 'headerValue')
+        && sealedRaw.indexOf('replacement-secret') === -1 && sealedRaw.indexOf('legacy-secret') === -1,
+        'Lookup config: Secret ថ្មីជាមួយសោ PIN ➜ រក្សាទុកតែទម្រង់អ៊ិនគ្រីប (គ្មាន plaintext)', JSON.stringify(sealed));
 
     const quota = createRuntime(legacy, { key: true }, async (value) => `enc:${value}`, true);
     let closed = false;

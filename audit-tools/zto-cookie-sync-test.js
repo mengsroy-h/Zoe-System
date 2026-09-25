@@ -220,9 +220,9 @@ async function run() {
     }
 
     console.log('\n=== ៤. Windows DPAPI និង dependency ===');
-    ok('dependency pin តែ Playwright (គ្មាន Netlify CLI)',
+    ok('dependency pin តែ Playwright ជាកំណែជាក់លាក់ (គ្មាន Netlify CLI · គ្មានជួរ ^/~)',
         pkg.private === true && pkg.dependencies
-        && pkg.dependencies['playwright-core'] === '1.62.1'
+        && /^\d+\.\d+\.\d+$/.test(String(pkg.dependencies['playwright-core'] || ''))
         && !pkg.dependencies['netlify-cli']
         && Object.keys(pkg.dependencies).length === 1);
     ok('setup ដំឡើង dependency ដែល pin ក្នុង package.json',

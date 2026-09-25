@@ -1,5 +1,5 @@
 (function () {
-    var BASE = 'https://www.gstatic.com/firebasejs/12.17.1/';
+    var BASE = 'https://www.gstatic.com/firebasejs/12.19.0/';
     Promise.all([
         import(BASE + 'firebase-app.js'),
         import(BASE + 'firebase-auth.js'),

@@ -37,10 +37,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // ការ sign APK release តាម env (`.github/workflows/android-release.yml`) ៖ keystore ដដែលជានិច្ច ➜ APK ថ្មីដំឡើង
+    // ជាន់ App ចាស់បាន។ គ្មាន env ➜ មិនប៉ះ (Android Studio «Generate Signed APK» ដាក់ការ sign ដោយខ្លួនឯង)។
+    signingConfigs {
+        release {
+            def keystore = System.getenv('ZOEW_KEYSTORE_FILE')
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword System.getenv('ZOEW_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ZOEW_KEY_ALIAS')
+                keyPassword System.getenv('ZOEW_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (System.getenv('ZOEW_KEYSTORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

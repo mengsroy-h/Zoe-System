@@ -481,9 +481,20 @@
       ],
       "evidence": "doc-scope-test ស្កេន .md ពិត (វិសាលភាព · តំណ · ប្រវត្តិ) និង doc:check ក្នុង zoew-suite ប្រៀបតារាង slot/ស្ថាបត្យកម្មនឹងកូដ។",
       "limitation": "ការយាមជាស្តាទិច; ភាពត្រឹមត្រូវនៃការពន្យល់ត្រូវ review ដោយមនុស្ស។"
+    },
+    "android-release": {
+      "category": "static",
+      "guards": [
+        "audit-tools/zoew-suite-test.js"
+      ],
+      "evidence": "npm run android:check ផ្នែក ៨ (ក្នុង zoew-suite-test) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹង build.gradle · គ្មានផ្លូវ debug/unsigned · ជំហាន gradle មានលក្ខខណ្ឌ secret · apksigner verify មុន Release · keystore លុបជានិច្ច",
+      "limitation": "ការអះអាងលើអត្ថបទ workflow មិនបញ្ជាក់ថា Actions មានកូតា · secret ត្រូវកំណត់ · ឬ APK ពិត build បាន (គ្មាន Android SDK ក្នុង CI ក្នុង session)។"
     }
   },
   "files": {
+    ".github/workflows/android-release.yml": {
+      "policy": "android-release"
+    },
     ".github/workflows/audit.yml": {
       "policy": "guard-10"
     },
@@ -2156,6 +2167,9 @@
     },
     "docs/AUDIT-PROMPT.md": {
       "policy": "guard-36"
+    },
+    "docs/HISTORY-ARCHIVE.md": {
+      "policy": "guard-37"
     },
     "docs/HISTORY.md": {
       "policy": "guard-37"

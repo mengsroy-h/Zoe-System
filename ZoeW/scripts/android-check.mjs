@@ -10,10 +10,15 @@
  *   ៥. Plugin ៖ រាល់ plugin ក្នុង package.json ត្រូវ sync ចូល Android project
  *   ៦. Web មិនផ្ទុកកូដ native ៖ គ្មាន import static ពី `@capacitor/*`/`@capgo/*`
  *      ក្រៅ `src/platform/native-biometric.ts` · chunk native មិនចូល Service Worker
+ *   ៧. config build Android ↔ template របស់ Capacitor ដែលដំឡើង ៖ SDK · AndroidX ស្មើ ·
+ *      AGP · Gradle · google-services ស្ថិតក្នុងខ្សែ major.minor ដដែល (patch ឡើងបាន)
+ *   ៨. Release APK (`.github/workflows/android-release.yml`) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹងអ្វីដែល
+ *      `build.gradle` អាន · គ្មានផ្លូវធ្លាក់ចុះទៅ debug key · keystore មិនចូល repo
  *
  *   node scripts/android-check.mjs   (ANDROIDCHECK_ROOT=<ថត> ដើម្បីចង្អុលទៅ tree ផ្សេង)
  */
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -145,6 +150,84 @@ if (exists('dist/index.html')) {
     ok('entry មិន import chunk native ដោយ static', !!nativeChunk && !staticImports.includes(nativeChunk), staticImports.join(', '));
     ok('Service Worker មិន cache chunk native', !!nativeChunk && !read('dist/sw.js').includes(nativeChunk));
 }
+
+/* ── ៧. config build Android ↔ template របស់ Capacitor ─────────────────
+ * ⛔ plugin Capacitor ទាំងអស់ត្រូវបានសាកជាមួយ AGP · Gradle · SDK · AndroidX ដែល template របស់
+ *    Capacitor កំណែនោះប្រកាស។ ការឡើងលើសខ្សែនោះ (ឧ. AGP 9 · compileSdk 37 · androidx.core 1.19 ដែល
+ *    ទាមទារ AGP 9.1) ធ្លាក់តែពេល **build ក្នុង Android Studio** — ម៉ាស៊ីននេះគ្មាន Android SDK ➜ វាស់មិនបាន។
+ *    ទិសផ្ទុយ ៖ ឡើង Capacitor major តែភ្លេច config Android ➜ ក៏ធ្លាក់ដែរ (template ប្រែ)។ */
+function readTarGz(rel) {
+    const out = new Map();
+    let buf;
+    try { buf = zlib.gunzipSync(fs.readFileSync(path.join(ROOT, rel))); } catch { return out; }
+    for (let off = 0; off + 512 <= buf.length;) {
+        const header = buf.subarray(off, off + 512);
+        if (header.every((x) => x === 0)) break;
+        const str = (a, n) => header.subarray(a, a + n).toString('utf8').replace(/\0.*$/s, '');
+        const name = (str(345, 155) ? str(345, 155) + '/' : '') + str(0, 100);
+        const size = parseInt(str(124, 12).trim() || '0', 8);
+        out.set(name.replace(/^(\.\/|package\/)/, ''), buf.subarray(off + 512, off + 512 + size).toString('utf8'));
+        off += 512 + Math.ceil(size / 512) * 512;
+    }
+    return out;
+}
+const extOf = (src) => Object.fromEntries([...((src.match(/ext\s*\{([\s\S]*?)\}/) || [])[1] || '').matchAll(/(\w+)\s*=\s*'?([\w.]+)'?/g)].map((m) => [m[1], m[2]]));
+const verOf = (src, re) => ((src.match(re) || [])[1] || '').split('.').map(Number);
+const sameLine = (mine, tpl) => tpl.length >= 2 && mine.length >= 2 && mine[0] === tpl[0] && mine[1] === tpl[1] && (mine[2] || 0) >= (tpl[2] || 0);
+const tpl = readTarGz('node_modules/@capacitor/cli/assets/android-template.tar.gz');
+const tplExt = extOf(tpl.get('variables.gradle') || '');
+const myExt = extOf(read('android/variables.gradle'));
+ok('ជាន់អប្បបរមា ៖ អាន template Android របស់ Capacitor ដែលដំឡើង (ext >= 10)', Object.keys(tplExt).length >= 10, Object.keys(tplExt).length);
+const extDrift = Object.keys(tplExt).filter((k) => myExt[k] !== tplExt[k]).map((k) => `${k}=${myExt[k]} (template ${tplExt[k]})`);
+ok('variables.gradle (SDK · AndroidX) ស្មើ template របស់ Capacitor', Object.keys(tplExt).length >= 10 && !extDrift.length, extDrift.join(', '));
+const AGP_RE = /com\.android\.tools\.build:gradle:([\d.]+)/;
+const GMS_RE = /com\.google\.gms:google-services:([\d.]+)/;
+const GRADLE_RE = /gradle-([\d.]+)-(?:all|bin)\.zip/;
+const rootGradle = read('android/build.gradle');
+const wrapper = read('android/gradle/wrapper/gradle-wrapper.properties');
+for (const [label, mineSrc, tplSrc, re] of [
+    ['Android Gradle Plugin', rootGradle, tpl.get('build.gradle') || '', AGP_RE],
+    ['google-services', rootGradle, tpl.get('build.gradle') || '', GMS_RE],
+    ['Gradle wrapper', wrapper, tpl.get('gradle/wrapper/gradle-wrapper.properties') || '', GRADLE_RE]
+]) {
+    const mine = verOf(mineSrc, re);
+    const want = verOf(tplSrc, re);
+    ok(`${label} ស្ថិតក្នុងខ្សែ ${want.slice(0, 2).join('.')}.x របស់ template (patch >= ${want.join('.')})`, sameLine(mine, want), mine.join('.'));
+}
+const capMajor = (name) => Number((JSON.parse(read(`node_modules/${name}/package.json`) || '{}').version || '').split('.')[0]);
+const majors = ['@capacitor/core', '@capacitor/android', '@capacitor/cli'].map(capMajor);
+ok('@capacitor/core · android · cli ជា major ដដែល', majors.every((m) => m > 0 && m === majors[0]), majors.join(' · '));
+
+/* ── ៨. Release APK ↔ keystore ────────────────────────────────────────────
+ * ⛔ APK ត្រូវ sign ដោយ keystore **ដដែលជានិច្ច** ៖ keystore ផ្សេង ➜ Android បដិសេធការដំឡើងជាន់ ➜ អ្នកប្រើលុប App
+ *    ➜ បាត់ PIN · ការចូលប្រព័ន្ធ · កៅអី License (Device ID ថ្មី)។ debug key របស់ runner ប្រែរាល់ការរត់ ➜ ហាមជាដាច់ខាត។ */
+const releaseWf = read('../.github/workflows/android-release.yml');
+ok('ជាន់អប្បបរមា ៖ អាន workflow release APK បាន', releaseWf.length > 1000, releaseWf.length);
+const signEnv = [...new Set([...gradle.matchAll(/System\.getenv\('([A-Z0-9_]+)'\)/g)].map((m) => m[1]))];
+ok('build.gradle អាន env របស់ keystore យ៉ាងតិច ៤', signEnv.length >= 4, signEnv.join(' · '));
+const unset = signEnv.filter((n) => !new RegExp('\\b' + n + '\\b').test(releaseWf));
+ok('workflow កំណត់ env ទាំងអស់ដែល build.gradle អាន (ស្នាមភ្ជាប់ ២ ឯកសារ)', signEnv.length >= 4 && !unset.length, unset.join(' · '));
+ok('build.gradle ដាក់ signingConfig តែពេលមាន keystore (Android Studio នៅដើរធម្មតា)',
+    /if \(System\.getenv\('ZOEW_KEYSTORE_FILE'\)\)\s*\{\s*signingConfig signingConfigs\.release/.test(gradle));
+ok('workflow គ្មានផ្លូវ debug/unsigned (assembleDebug · debug.keystore)', releaseWf.length > 1000 && !/assembleDebug|debug\.keystore/.test(releaseWf));
+const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || [''])[0];
+ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
+ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
+ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
+ok('keystore ត្រូវលុបចេញពី runner ជានិច្ច (if: always())', /if: always\(\)\s*\n\s*run: rm -f "\$RUNNER_TEMP\/zoew-release\.jks"/.test(releaseWf));
+const keystoreFiles = [];
+(function walkKs(dir) {
+    let entries;
+    try { entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+        if (['node_modules', 'build', '.gradle', 'dist', 'dist-audit', '.original'].includes(e.name)) continue;
+        const rel = dir ? dir + '/' + e.name : e.name;
+        if (e.isDirectory()) walkKs(rel);
+        else if (/\.(jks|keystore)$/i.test(e.name)) keystoreFiles.push(rel);
+    }
+})('');
+ok('គ្មាន keystore ក្នុង tree របស់ ZoeW', !keystoreFiles.length, keystoreFiles.join(' · '));
+ok('android/.gitignore ហាម *.jks · *.keystore', /^\*\.jks$/m.test(read('android/.gitignore')) && /^\*\.keystore$/m.test(read('android/.gitignore')));
 
 for (const line of oks) console.log('   ok   ' + line);
 for (const line of fails) console.log('   FAIL ' + line);

@@ -49,7 +49,7 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
     else if (item.callMark === 'no-connect') { rowNumClass = 'row-num-no-connect'; rowNumLabel = 'ខល អត់ចូល'; }
     else if (item.callMark === 'wrong-number') { rowNumClass = 'row-num-wrong-number'; rowNumLabel = 'ខុសលេខ'; }
 
-    let lockerLoc: any = 'N/A';
+    let lockerLoc: any;
     if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0) {
         const allLockers = item.barcodes.map((b: any) => b.locker || 'N/A').filter((l: any) => l && l !== 'N/A');
         const uniqueLockers = [...new Set(allLockers)];
@@ -70,9 +70,9 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
 
     const totalPackageCount = item.barcodes && Array.isArray(item.barcodes) ? item.barcodes.length : (parseFloat(item.count) || 1);
 
-    let activeCod = 0;
-    let activeDod = 0;
-    let activeCount = parseFloat(item.count) || 1;
+    let activeCod: number;
+    let activeDod: number;
+    let activeCount: number;
     if (item.barcodes && Array.isArray(item.barcodes)) {
         activeCod = item.barcodes.filter((b: any) => !b.isClosed).reduce((sum: number, b: any) => sum + (parseFloat(b.cod) || 0), 0);
         activeDod = item.barcodes.filter((b: any) => !b.isClosed).reduce((sum: number, b: any) => sum + (parseFloat(b.dod) || 0), 0);

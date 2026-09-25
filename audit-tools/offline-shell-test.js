@@ -180,6 +180,7 @@ function serve(dir) {
         });`);
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 30000 }).catch((e) => { bootError = String(e); });
 
+    await require('./react-view').waitAuditBridge(page);
     const offline = await page.evaluate(() => ({
         title: document.title,
         hasShell: !!document.getElementById('appPages'),

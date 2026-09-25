@@ -2,7 +2,7 @@
 //
 // ច្បាប់ទី ៩ របស់ `CLAUDE.md` ចែងថា README ត្រូវសរសេរតែ **របៀបប្រើ** ៖
 // ⛔ គ្មានប្រវត្តិកំហុស · គ្មានកំណត់ត្រាតាមកំណែ · គ្មានចំនួន assertion ចាក់
-// ជា literal។ ប្រវត្តិទាំងអស់ទៅ `docs/HISTORY.md` **តែមួយកន្លែងគត់**។
+// ជា literal។ ប្រវត្តិទាំងអស់ទៅ `docs/HISTORY.md` / `docs/HISTORY-ARCHIVE.md` **តែមួយកន្លែងគត់**។
 //
 // 🔴 ហេតុអ្វីវាមាន (2026-09-10) ៖ ច្បាប់នោះសរសេររួចនៅ **២ កន្លែង**
 // (`CLAUDE.md` ច្បាប់ ៩ និង `audit-tools/README.md` ខ្លួនឯង) — ហើយវានៅតែ
@@ -182,17 +182,27 @@ check(/README សរសេរតែ \*{1,2}របៀបប្រើ\*{1,2}/.test
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ ៩ នៅរស់ក្នុង CLAUDE.md (មូលដ្ឋាននៃ checker នេះ)');
 // ⛔ ទិសផ្ទុយ ៖ ច្បាប់ដែលពង្រីកវិសាលភាពទៅ **គ្រប់ `.md`** ក៏ត្រូវរស់ក្នុង
 // `CLAUDE.md` ដែរ — បើអត់ ការស្កេនទូលាយក្លាយជាការចាក់សោគ្មានមូលដ្ឋាន។
-check(/ប្រវត្តិកំហុស.{0,40}`docs\/HISTORY\.md`.{0,40}តែមួយកន្លែងគត់/s.test(claude)
+check(/ប្រវត្តិកំហុស.{0,40}`docs\/HISTORY\.md`.{0,60}`docs\/HISTORY-ARCHIVE\.md`.{0,40}តែមួយកន្លែងគត់/s.test(claude)
+    && /គ្មានឯកសារប្រវត្តិទី ៣/.test(claude)
     && /គ្រប់ឯកសារ `\*\.md`|រាល់ឯកសារ `\*\.md`/.test(claude),
     '⛔ ទិសផ្ទុយ ៖ ច្បាប់ «ប្រវត្តិកំហុស ➜ HISTORY.md តែមួយកន្លែង» គ្របគ្រប់ `.md` នៅរស់ក្នុង CLAUDE.md');
 
 // ⛔ ទិសផ្ទុយ ២ ៖ docs/HISTORY.md ត្រូវ **ពិតជាកាន់** ប្រវត្តិនោះ — បើវាទទេ
 // នោះមានន័យថាប្រវត្តិត្រូវបានលុប មិនមែនផ្លាស់ទី។
-const hist = fs.existsSync(path.join(ROOT, 'docs/HISTORY.md'))
-    ? fs.readFileSync(path.join(ROOT, 'docs/HISTORY.md'), 'utf8') : '';
-check(/កំណែ|ជុំ/.test(hist) && hist.length > 50000,
-    '⛔ ទិសផ្ទុយ ៖ ប្រវត្តិត្រូវ *ផ្លាស់ទី* ទៅ docs/HISTORY.md មិនមែនត្រូវលុប',
-    'ទំហំ HISTORY.md = ' + hist.length);
+// ប្រវត្តិរស់នៅ ២ ឯកសារ (សំណើម្ចាស់គម្រោង ៖ សម័យ React ➜ `HISTORY.md` · សម័យ vanilla ➜ `HISTORY-ARCHIVE.md`) ➜
+// ការវាស់ត្រូវបូកទាំង ២ ហើយ `HISTORY.md` ត្រូវតភ្ជាប់ទៅ archive (បើអត់ ➜ archive ក្លាយជាឯកសារដែលគ្មាននរណារកឃើញ)។
+const readDoc = (rel) => (fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), 'utf8') : '');
+const hist = readDoc('docs/HISTORY.md');
+const histArchive = readDoc('docs/HISTORY-ARCHIVE.md');
+check(/កំណែ|ជុំ/.test(hist) && /កំណែ|ជុំ/.test(histArchive) && hist.length + histArchive.length > 50000,
+    '⛔ ទិសផ្ទុយ ៖ ប្រវត្តិត្រូវ *ផ្លាស់ទី* ទៅ docs/HISTORY.md · docs/HISTORY-ARCHIVE.md មិនមែនត្រូវលុប',
+    'ទំហំ HISTORY.md = ' + hist.length + ' · HISTORY-ARCHIVE.md = ' + histArchive.length);
+check(/\]\(HISTORY-ARCHIVE\.md\)/.test(hist),
+    '⛔ docs/HISTORY.md តភ្ជាប់ទៅ docs/HISTORY-ARCHIVE.md (archive ត្រូវរកឃើញបាន)');
+// ⛔ ឯកសារប្រវត្តិទី ៣ ក្នុង `docs/` = ប្រវត្តិដែលគ្មាននរណាអាន ➜ ច្បាប់ ៩ «គ្មានឯកសារប្រវត្តិទី ៣»។
+const extraHistory = (fs.existsSync(path.join(ROOT, 'docs')) ? fs.readdirSync(path.join(ROOT, 'docs')) : [])
+    .filter((n) => /\.md$/.test(n) && /HISTORY|ARCHIVE|CHANGELOG/i.test(n) && !['HISTORY.md', 'HISTORY-ARCHIVE.md'].includes(n));
+check(extraHistory.length === 0, '⛔ ច្បាប់ ៩ ៖ គ្មានឯកសារប្រវត្តិទី ៣ ក្នុង docs/', extraHistory.join(' · '));
 
 // ============================================================================
 // ផ្នែក ៤ — `docs/AUDIT-PROMPT.md` មិនត្រូវចាស់ស្ងាត់ៗ
@@ -693,6 +703,17 @@ function catalogued(name) {
 }
 const uncatalogued = checkerFiles.filter((rel) =>
     !catalogued(rel) && !catalogued(rel.split('/').pop()));
+// ⛔ លិបិក្រមនៅចុង `docs/HISTORY.md` ជាផ្លូវដែល session ក្រោយរកហេតុផលនៃ checker មួយ ➜ checker ណាដែលលេចក្នុង
+// ឯកសារប្រវត្តិ (ឈ្មោះដេរីវេពីថតពិត) តែគ្មានជួរក្នុងលិបិក្រម = ការពន្យល់ដែលរកមិនឃើញ។
+const histIndexAt = hist.indexOf('## 🔎 លិបិក្រម');
+const histIndex = histIndexAt === -1 ? '' : hist.slice(histIndexAt);
+const histBodies = (histIndexAt === -1 ? hist : hist.slice(0, histIndexAt)) + '\n' + histArchive;
+const unindexed = checkerFiles.map((rel) => rel.replace(/\.js$/, '')).filter((name) =>
+    new RegExp('(?<![\\w/-])' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])').test(histBodies)
+    && histIndex.indexOf('`' + name + '`') === -1);
+check(histIndex.length > 2000 && unindexed.length === 0,
+    '⛔ docs/HISTORY.md ៖ លិបិក្រមគ្រប checker ដែលលេចក្នុងឯកសារប្រវត្តិទាំង ២',
+    histIndexAt === -1 ? 'រកលិបិក្រមមិនឃើញ' : 'ខ្វះក្នុងលិបិក្រម ៖ ' + unindexed.join(' · '));
 check(checkerFiles.length >= 100, 'ជាន់អប្បបរមា ៖ រកឃើញ checker យ៉ាងតិច ១០០ ក្នុងថតពិត',
     'រកបាន ' + checkerFiles.length);
 check(uncatalogued.length === 0,

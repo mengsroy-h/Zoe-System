@@ -120,7 +120,7 @@ let documents = 0, links = 0;
 for (const [rel, entry] of Object.entries(entries)) {
     // ប្រវត្តិអាចយោងផ្លូវពីកំណែមុន; ឯកសារ .md ផ្សេងទៀតស្កេនស្វ័យប្រវត្តិ។
     // ការលុប metadata `links` មិនអាចធ្វើឲ្យឯកសារសកម្មគេចការពិនិត្យបានទេ។
-    if (!rel.endsWith('.md') || rel === 'docs/HISTORY.md' || !actual.has(rel)
+    if (!rel.endsWith('.md') || rel === 'docs/HISTORY.md' || rel === 'docs/HISTORY-ARCHIVE.md' || !actual.has(rel)
         || (policies[entry.policy] || {}).category === 'manual') continue;
     documents++;
     const source = read(rel).replace(/^([ \t]*)(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\2[^\n]*$/gm, '');

@@ -6,8 +6,8 @@ step; App ទាំង ២ deploy ជា Netlify site។
 
 | App | តួនាទី | កំណែ |
 |---|---|---|
-| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.42.3` |
-| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.20.2` |
+| **[ZoeW](ZoeW/README.md)** | App អាជីវកម្មចម្បង — ស្កេន បញ្ចូល គ្រប់គ្រងកញ្ចប់ និងនាំចូល Excel ទៅ Sheet (web/PWA និង App Android) | `2.42.4` |
+| **[ZoeKeyGen](ZoeKeyGen/README.md)** | ឧបករណ៍អ្នកលក់ — បង្កើត និងគ្រប់គ្រង Activation Key | `2.20.3` |
 
 > 📖 ឯកសារនេះសរសេរតែ **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព ·
 > អាជ្ញាប័ណ្ណ**។ ប្រវត្តិកំហុស និងហេតុផលនៃការសម្រេចនីមួយៗ ស្ថិតក្នុង
@@ -252,7 +252,8 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 
 | ឯកសារ | ខ្លឹមសារ |
 |---|---|
-| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** |
+| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** — សម័យ ZoeW React |
+| [docs/HISTORY-ARCHIVE.md](docs/HISTORY-ARCHIVE.md) | **បណ្ណសារប្រវត្តិសម័យ ZoeW vanilla** (អានបាន តែមិនបន្ថែម) |
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្មសម្រាប់អ្នកថែទាំ |
 | [audit-tools/](audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
 | [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |

@@ -140,23 +140,30 @@ export default defineConfig({
         emptyOutDir: true,
         assetsInlineLimit: 0,
         cssCodeSplit: false,
+        // ⛔ minifier CSS ជា esbuild (មិនមែន Lightning CSS លំនាំដើម) ៖ Lightning CSS រៀបលំដាប់ declaration
+        //    ឡើងវិញ និងប្តូរទម្រង់តម្លៃ ក្នុង CSS ដែលគ្រប PTR · ចលនាផ្ទាំង · safe-area — ហើយ checker CSS/ប្លង់
+        //    វាស់ CSS **ប្រភព** (`scripts/build-audit.mjs`) មិនមែន CSS ដែល minify ➜ ការប្តូរនោះគ្មានអ្នកវាស់។
+        cssMinify: 'esbuild',
         sourcemap: false,
         // ⛔ CSP គ្មាន 'unsafe-inline' ➜ polyfill ដែល Vite ចាក់ជា inline script
         //    ត្រូវបិទ បើមិនដូច្នេះ browser បដិសេធវាស្ងាត់ៗលើផលិតកម្ម។
         modulePreload: { polyfill: false },
-        rollupOptions: {
+        rolldownOptions: {
             output: {
-                manualChunks(id) {
-                    if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) return 'react';
-                    // ⛔ plugin native ផ្ទុកតាម `import()` តែលើ Android ➜ ប្រមូលវា
-                    //    ចូល chunk តែមួយដែល Service Worker រំលង (web មិនធំឡើង)។
-                    //    ⛔ helper `__vitePreload` របស់ Vite ត្រូវមាន chunk ផ្ទាល់ខ្លួន ៖
-                    //    បើអត់ Rollup ដាក់វាចូល chunk native ➜ `index` import វាដោយ
-                    //    **static** ➜ web ផ្ទុក chunk native គ្រប់ពេល ហើយក្រៅបណ្តាញ App
-                    //    ចាប់ផ្តើមមិនកើត (chunk នោះមិននៅក្នុង cache)។
-                    if (id.includes('vite/preload-helper')) return 'preload-helper';
-                    if (/node_modules[\\/]@(capacitor|capgo)[\\/]/.test(id) || id.includes('/src/platform/native-biometric')) return NATIVE_CHUNK;
-                    return undefined;
+                // ⛔ group មួយចាប់ **dependency** របស់ម៉ូឌុលដែលវាចាប់ផង (`includeDependenciesRecursively`)
+                //    ➜ ការបែងចែកត្រូវសម្រេចដោយ `priority` មិនមែនលំដាប់ `if` ទេ។
+                codeSplitting: {
+                    groups: [
+                        // ⛔ helper `__vitePreload` ត្រូវមាន chunk ផ្ទាល់ខ្លួន ហើយ priority ខ្ពស់ជាងគេ ៖
+                        //    plugin Capacitor ផ្ទុកផ្នែក web របស់វាតាម `import()` ➜ helper ជា dependency របស់វា ➜ បើអត់
+                        //    វាធ្លាក់ចូល chunk native ➜ `index` import chunk នោះដោយ **static** ➜ web ផ្ទុកវា
+                        //    គ្រប់ពេល ហើយក្រៅបណ្តាញ App ចាប់ផ្តើមមិនកើត (chunk នោះមិននៅក្នុង cache)។
+                        { name: 'preload-helper', test: /vite[\\/]preload-helper/, priority: 3 },
+                        { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
+                        // ⛔ plugin native ផ្ទុកតាម `import()` តែលើ Android ➜ ប្រមូលវាចូល chunk តែមួយ
+                        //    ដែល Service Worker រំលង (web មិនធំឡើង)។
+                        { name: NATIVE_CHUNK, test: /node_modules[\\/]@(capacitor|capgo)[\\/]|[\\/]src[\\/]platform[\\/]native-biometric/, priority: 1 }
+                    ]
                 }
             }
         }

@@ -13,7 +13,18 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.3 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.4 · ZoeKeyGen 2.20.3)
+
+⛔ **មេរៀនជុំ 2.42.4 ៖ ការឡើង toolchain ប្តូរ *output* ខណៈ checker វាស់ *ប្រភព*** — Vite 8 (Rolldown · Lightning CSS · Oxc)
+ធ្វើឲ្យ web import chunk native ដោយ static (ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត ៖ `android:check` · `native:check` ចាប់) និងសរសេរ CSS
+ឡើងវិញ ២,៣៩៧ បន្ទាត់ (**គ្មាននរណាចាប់** ព្រោះ checker CSS វាស់ CSS ប្រភព)។ ⛔ មុនឡើង toolchain ៖ ថត `dist` ទុកជា baseline
+ហើយ diff **output** (CSS · import graph · syntax ធៀប `build.target`)។ ⛔ ការឡើង Gradle/AGP/SDK លើសខ្សែ template របស់ Capacitor
+វាស់មិនបាននៅទីនេះ (គ្មាន Android SDK · `dl.google.com` បិទ) ➜ `android:check` ផ្នែក ៧ ចាក់សោ។ ⛔ កំណែ SDK ដែល **ផលិតកម្មរត់ពិត**
+វាស់បានពី event របស់ Sentry (`sdk.version`) មិនមែនពីកូដ (Loader ជ្រើសកំណែតាម Sentry settings)។
+⛔ **ប្រវត្តិរស់នៅ ២ ឯកសារ** ៖ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) · `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · អានបានតែ
+មិនបន្ថែម) — `grep` ទាំង ២។ ⛔ ក្នុងតារាងស្នូលរបស់ `CLAUDE.md` សរសេរតែ **ច្បាប់ខ្លី** (narrative «វាស់បាន» ទៅ HISTORY)។
+⛔ App React ដំឡើង bridge វាស់តាម dynamic import ➜ checker ត្រូវ `waitAuditBridge()` មុនអាន `window.<fn>`។
+
 
 ⛔ **មេរៀនជុំ 2.42.3 ៖ ការលើកលែងដែល *ធំជាងច្បាប់* = ចន្លោះស្ងាត់** — ច្បាប់ ៩ លើកលែង `docs/` **នៅ root** ខណៈ
 `doc-scope-test` រំលងថតឈ្មោះ `docs` **គ្រប់ជម្រៅ** ➜ `ZoeW/docs/*.md` (លទ្ធផល parity ឆៅ · ប្រវត្តិការរកឃើញ) មិនដែលត្រូវ
@@ -22,7 +33,7 @@
 `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច `(cd "$M" && node audit-tools/<x>.js)`។
 ⛔ React ៖ កំហុសដែល error boundary **ចាប់** ទៅត្រឹម `console.error` ➜ Sentry មិនឃើញ លុះត្រាតែ `onCaughtError`
 បញ្ជូនវា (`src/app/root-errors.ts`)។ ⛔ bridge វាស់ (`expose-globals` · `__auditRebind`) មិនត្រូវចូល build ផលិតកម្ម ➜
-`npm run smoke` វាស់ ២ ជាន់ (window · bundle)។ ⛔ ប្រវត្តិរស់នៅ `docs/HISTORY.md` **តែមួយ** (បណ្ណសារចាស់ជាផ្នែក ៣ · ៤)។
+`npm run smoke` វាស់ ២ ជាន់ (window · bundle)។ ⛔ ប្រវត្តិរស់នៅ `docs/HISTORY.md` (សម័យ React · ធាតុថ្មី) និង `docs/HISTORY-ARCHIVE.md` (សម័យ vanilla · អានបានតែមិនបន្ថែម) ប៉ុណ្ណោះ។
 
 ⛔ **មេរៀនជុំ 2.42.2 ៖ checker ដើមលើ App React ធ្លាក់ ឬ *វាស់អ្វីផ្សេង*** — វាស្រង់អត្ថបទពី `app.js` · អាន markup ថេរ ·
 ជំនួស `window.<fn>` (App React ហៅតាម module/`ACTION_REGISTRY` មិនឆ្លង `window`)។ ⛔ ការកែត្រូវវាស់ **ផល** ឬ **JSX ពិត**
@@ -520,4 +531,4 @@ node audit-tools/version-check.js && node audit-tools/version-bump-scope.js
   **មិនពិត** — ការវាស់ជុំទី ២ បង្ហាញផ្លូវ **ឧបករណ៍ទើប Activate** ដែល App
   ប្រើបាន ១០០% ➜ **កំហុសពិត កែរួចក្នុង 2.33.2**។ ⚠️ មេរៀន ៖ ការសន្និដ្ឋាន
   «វាកើតតែក្នុងស្ថានភាពដែលខូចរួចហើយ» ត្រូវ **វាស់ក្រាហ្វការហៅ** មុននិយាយ។
-- បញ្ជីវែងជាងនេះ ៖ `docs/HISTORY.md` ផ្នែក ២ ➜ «⚠️ អ្វីដែលការវាស់បដិសេធ»។
+- បញ្ជីវែងជាងនេះ ៖ `docs/HISTORY-ARCHIVE.md` ផ្នែក ២ ➜ «⚠️ អ្វីដែលការវាស់បដិសេធ»។

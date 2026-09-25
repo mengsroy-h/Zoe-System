@@ -57,8 +57,8 @@ function buildContext(app) {
         if (t) t.cleared = true;
     };
 
-    // Mirrors AuthImpl.notifyAuthListeners in @firebase/auth@1.13.4 (the version
-    // inside firebase@12.17.1, which these apps load from gstatic):
+    // Mirrors AuthImpl.notifyAuthListeners in @firebase/auth@1.13.6 (the version
+    // inside firebase@12.19.0, which these apps load from gstatic):
     //   const currentUid = this.currentUser?.uid ?? null;
     //   if (this.lastNotifiedUid !== currentUid) { ...authStateSubscription.next(...) }
     const auth = { currentUser: null, lastNotifiedUid: undefined, listeners: [] };

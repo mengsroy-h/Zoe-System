@@ -252,7 +252,8 @@ Token របស់ Windows helper អ៊ិនគ្រីបដោយ **Windows
 
 | ឯកសារ | ខ្លឹមសារ |
 |---|---|
-| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** |
+| [docs/HISTORY.md](docs/HISTORY.md) | **ប្រវត្តិកំណែ (ផ្នែក ១) និងប្រវត្តិកំហុស + ហេតុផលនៃច្បាប់នីមួយៗ (ផ្នែក ២)** — សម័យ ZoeW React |
+| [docs/HISTORY-ARCHIVE.md](docs/HISTORY-ARCHIVE.md) | **បណ្ណសារប្រវត្តិសម័យ ZoeW vanilla** (អានបាន តែមិនបន្ថែម) |
 | [CLAUDE.md](CLAUDE.md) | ច្បាប់ស្ថាបត្យកម្មសម្រាប់អ្នកថែទាំ |
 | [audit-tools/](audit-tools/README.md) | របៀបរត់ checker និងតេស្ត |
 | [ZoeW/ZTO-SETUP-KH.md](ZoeW/ZTO-SETUP-KH.md) | របៀបកំណត់ ZTO Lookup |

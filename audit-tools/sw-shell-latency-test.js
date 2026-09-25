@@ -131,6 +131,7 @@ function serve(dir) {
     const t0 = Date.now();
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 180000 });
     const warmMs = Date.now() - t0;
+    await require('./react-view').waitAuditBridge(page);
     const shell = await page.evaluate(() => ({
         hasShell: !!document.getElementById('appPages'),
         appJs: typeof window.initScanEngine === 'function'
@@ -172,6 +173,7 @@ function serve(dir) {
             setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
         });`);
     await page.goto(origin + '/', { waitUntil: 'load', timeout: 60000 }).catch((e) => { bootError = String(e); });
+    await require('./react-view').waitAuditBridge(page);
     const offline = await page.evaluate(() => ({
         hasShell: !!document.getElementById('appPages'),
         appJs: typeof window.initScanEngine === 'function',

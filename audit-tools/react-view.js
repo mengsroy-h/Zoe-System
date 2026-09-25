@@ -409,8 +409,23 @@ function actionUsages(appDir, js) {
     return used;
 }
 
+/**
+ * ⛔ App React ដំឡើង bridge វាស់ (`expose-globals`) តាម `import()` **អសមកាល** ➜ វាអាចមកដល់ **ក្រោយ** ព្រឹត្តិការណ៍ `load`
+ *    ➜ ការអាន `window.<fn>` ភ្លាមក្រោយ `goto(…, 'load')` ជាការប្រណាំង (ធ្លាក់ពេលម៉ាស៊ីនរវល់ មិនមែនពេល App ខូច)។
+ *    ពិដានខ្លី (២ វិ.) ដោយចេតនា ៖ chunk ដែលមកពី cache មកដល់ក្នុងរាប់ ms ចំណែក chunk ដែល **មិននៅក្នុង cache**
+ *    ត្រូវរង់ចាំបណ្តាញ (checker SW ពន្យារ ៥ វិ.) ➜ ការធ្លាក់ពិតនៅតែធ្លាក់។
+ */
+const AUDIT_BRIDGE_WAIT_MS = 2000;
+async function waitAuditBridge(page, name = 'initScanEngine', budgetMs = AUDIT_BRIDGE_WAIT_MS) {
+    return page.evaluate(async ([fn, budget]) => {
+        const t0 = Date.now();
+        while (typeof window[fn] !== 'function' && Date.now() - t0 < budget) await new Promise((r) => setTimeout(r, 25));
+        return typeof window[fn] === 'function';
+    }, [name, budgetMs]).catch(() => false);
+}
+
 module.exports = {
-    swShell, actionUsages,
+    swShell, actionUsages, waitAuditBridge, AUDIT_BRIDGE_WAIT_MS,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

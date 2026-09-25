@@ -259,6 +259,7 @@ const SETUP_B64 = Buffer.from(SETUP_JSON, 'utf8').toString('base64');
     });
     await page.goto(origin + '/?setup=' + encodeURIComponent(SETUP_B64), { waitUntil: 'load', timeout: 30000 })
         .catch(() => {});
+    await require('./react-view').waitAuditBridge(page);
     const offlineShell = await page.evaluate(() => ({
         hasShell: !!document.getElementById('appPages'),
         appJs: typeof window.initScanEngine === 'function'

@@ -12,7 +12,7 @@
 | # | បញ្ហា | របៀបដែលវាចាប់បាន | ការដោះស្រាយ |
 |---|---|---|---|
 | ១ | `body { display: flex }` ជាមួយ `order:` លើរបា ➜ ធាតុរុំរបស់ React នឹង **បំបែក layout desktop** | ការអានច្បាប់ CSS មុនសរសេរ + ការវាស់ layout | `#root { display: contents }` |
-| ២ | `window.addEventListener('load', …)` នឹង **មិនបាញ់ជារៀងរហូត** បើ React mount ក្រោយ `load` ➜ App មិនចាប់ផ្តើមសោះ | ការវិភាគលំដាប់ចាប់ផ្តើម | `runOnWindowLoad()` — រត់ភ្លាមបើផ្ទុករួច |
+| ២ | `window.addEventListener('load', …)` នឹង **មិនបាញ់ជារៀងរហូត** បើ React mount ក្រោយ `load` ➜ App មិនចាប់ផ្តើមសោះ | ការវិភាគលំដាប់ចាប់ផ្តើម | `scope.onLoad()` (`src/app/lifecycle/scope.ts`) — រត់ភ្លាមបើផ្ទុករួច |
 | ៣ | React **មិនដាក់ attribute `muted`** លើ `<video>` ➜ ច្បាប់ autoplay លើ iOS អាចបដិសេធកាមេរ៉ា | `parity-dom.mjs` ចាប់បានថា attribute បាត់ | `ref` ដែលដាក់ attribute មកវិញ |
 | ៤ | ការ dedent របស់ codemod កាត់ចូល **ខាងក្នុង template literal** ➜ HTML នាំចេញ និងរបាយការណ៍ប្រែ | ការវាស់អត្ថបទខ្មែរ ១០០% | dedent ក្លាយជា edit លើអត្ថបទដើម ដោយចេះជៀស quasi |
 

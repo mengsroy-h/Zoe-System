@@ -154,6 +154,17 @@ for (const cfg of APPS) {
         }
         check(cfg.name + '៖ ជាន់អប្បបរមា ៖ រាប់ការយោងពី JSX (`components.js`) បាន', jsxRefs > 5000, jsxRefs);
     }
+    // ⛔ តួ **ដើម** នៃ function ដែលទិដ្ឋភាព checker override (`view-originals.js` — build-audit ២) ៖ ការយោងក្នុងវា
+    //    (ឧ. `commitNow()` ➜ `allStores()`) ជាការយោងពិតក្នុងកូដ ship ➜ រាប់ ⛔ **លើកលែង** ឈ្មោះរបស់ function ដែលប្រកាស
+    //    (ការប្រកាសខ្លួនឯងមិនមែនការយោង)
+    const originalsText = read(cfg.name + '/view-originals.js');
+    if (originalsText) {
+        const body = originalsText.replace(/^(\s*)(async )?function [A-Za-z_$][\w$]*/gm, '$1$2function ');
+        for (const t of acorn.tokenizer(body, { ecmaVersion: 'latest', sourceType: 'module' })) {
+            if (t.type.label !== 'name') continue;
+            identifierCounts.set(t.value, (identifierCounts.get(t.value) || 0) + 1);
+        }
+    }
 
     const topNames = new Set(top.map((item) => item.name));
     const missingRoutes = [...dynamicRoutes].filter((name) => !topNames.has(name)).sort();

@@ -117,9 +117,11 @@ function stringLiterals(ast) {
 function visibleRuns(text) {
     // បំបែកនៅតួអក្សរវាក្យសម្ពន្ធ HTML ➜ អ្វីដែលនៅសល់ជា *អត្ថបទ* ឬ
     // *តម្លៃ attribute* (ដូច `title`) — ទាំង ២ អ្នកប្រើអានឃើញ។
+    // ⛔ ចន្លោះទទេបង្រួមជា ១ (HTML និង JSX បង្ហាញ `\n    ` ជាចន្លោះ ១ ដូចគ្នា) ➜ ការចុះបន្ទាត់/indent ផ្សេងគ្នា
+    //    មិនមែនអត្ថបទបាត់ទេ
     return String(text)
         .split(/[<>"'=]|\$\{/)
-        .map((s) => s.trim())
+        .map((s) => s.replace(/\s+/g, ' ').trim())
         .filter((s) => s && KHMER.test(s));
 }
 const oldStrings = [...new Set([...stringLiterals(oldAst)].flatMap(visibleRuns))];
@@ -127,7 +129,7 @@ const newStringSet = new Set();
 for (const s of newSources) for (const lit of stringLiterals(s.ast)) newStringSet.add(lit);
 // អត្ថបទក្នុង JSX ក៏រាប់ដែរ ➜ ស្កេនអត្ថបទឆៅរបស់ .tsx
 for (const s of newSources) if (s.file.endsWith('.tsx')) newStringSet.add(s.text);
-const newAllText = [...newStringSet].join('\u0000');
+const newAllText = [...newStringSet].join('\u0000').replace(/[ \t\r\n]+/g, ' ');
 const removedStrings = oldStrings.filter((s) => !newAllText.includes(s) && REMOVED_STRINGS[s]);
 const missingStrings = oldStrings.filter((s) => !newAllText.includes(s) && !REMOVED_STRINGS[s]);
 const deadRemovedStrings = Object.keys(REMOVED_STRINGS).filter((s) => !removedStrings.includes(s));

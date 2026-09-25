@@ -13,7 +13,12 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-24 · ZoeW 2.42.1 · ZoeKeyGen 2.20.2)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.2 · ZoeKeyGen 2.20.2)
+
+⛔ **មេរៀនជុំ 2.42.2 ៖ checker ដើមលើ App React ធ្លាក់ ឬ *វាស់អ្វីផ្សេង*** — វាស្រង់អត្ថបទពី `app.js` · អាន markup ថេរ ·
+ជំនួស `window.<fn>` (App React ហៅតាម module/`ACTION_REGISTRY` មិនឆ្លង `window`)។ ⛔ ការកែត្រូវវាស់ **ផល** ឬ **JSX ពិត**
+(`react-render.cjs` · `renderFromContext()`) មិនមែនចម្លង markup ចូល checker។ ⛔ **`tsc --noEmit -p .` មិនពិនិត្យអ្វីសោះ**
+(solution tsconfig) ➜ `npm run typecheck`។ ⛔ view override លុបការយោង ➜ `function-surface` អាន `view-originals.js`។
 
 ⛔ **មេរៀនជុំ 2.42.1 ៖ ស្ថានភាពដែល browser តេស្ត *មិនអាចមាន* ក៏ត្រូវវាស់ដែរ** — Chromium ឆ្លើយ
 `env(safe-area-inset-top)` = 0 ជានិច្ច ➜ ផ្លូវ «Android ពេញអេក្រង់» មិនដែលរត់ ហើយតេស្តឯកតាចាក់សោ

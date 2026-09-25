@@ -32,7 +32,7 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 
 | អ្វី | តម្លៃ | ដេរីវេពី |
 |---|---|---|
-| កំណែ App | `2.42.1` | [`src/core/version.ts`](../src/core/version.ts) |
+| កំណែ App | `2.42.2` | [`src/core/version.ts`](../src/core/version.ts) |
 | កំណែ cache របស់ Service Worker | `zoew-v227` | [`src/sw/cache-version.ts`](../src/sw/cache-version.ts) |
 | Node ដែលត្រូវការ | `^22.17` · `>=24` | `package.json` (`engines`) |
 

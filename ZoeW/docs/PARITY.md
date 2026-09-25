@@ -120,7 +120,7 @@ npm test
 តារាងប្រវត្តិត្រូវសរសេរឡើងវិញជា React component ពិត។ ភាពដូចគ្នាត្រូវវាស់
 **មិនមែនសន្មត** ៖
 
-- `buildHistoryRowHtml()` ចាស់ ធៀបនឹង `<HistoryRow>` ថ្មី លើទិន្នន័យ
+- `buildHistoryRowHtml()` ចាស់ (oracle ក្នុង `tests/oracles/history-row-html.ts` — មិនចូលផលិតកម្ម) ធៀបនឹង `<HistoryRow>` ថ្មី លើទិន្នន័យ
   **ចៃដន្យ ៣០០ ធាតុ** ដែលគ្រប ៖ គ្មានលេខទូរស័ព្ទ · សញ្ញាខល ៤ ប្រភេទ ·
   បិទ/បើក · មាន/គ្មាន barcode · COD តែម្យ៉ាង · DOD តែម្យ៉ាង · ទាំង ២ ·
   សូន្យ · Locker ច្រើន · អក្សរដែលព្យាយាមចាក់ HTML

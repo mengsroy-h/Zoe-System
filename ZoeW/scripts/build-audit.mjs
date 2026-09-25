@@ -142,16 +142,19 @@ rmSync(entry);
             modalIsMounted: 'function modalIsMounted(id) {\n        return !!document.getElementById(id);\n    }',
             modalDisplay: 'function modalDisplay(id) {\n        const el = document.getElementById(id);\n' +
                 '        const d = el && el.style ? el.style.display : \'\';\n        return d === \'flex\' || d === \'none\' ? d : undefined;\n    }',
-            setModalDisplay: 'function setModalDisplay(id, display) {\n        if (!id) return;\n        const el = document.getElementById(id);\n' +
-                '        if (el) el.style.display = display;\n    }',
+            setModalDisplay: 'function setModalDisplay(id, display) {\n        if (!id || !modalIsMounted(id)) return;\n        const el = document.getElementById(id);\n' +
+                '        el.style.display = display;\n    }',
             modalIsOpen: 'function modalIsOpen(id) {\n        return modalDisplay(id) === \'flex\';\n    }'
         }
     };
     let text = '';
+    // ⛔ តួ **ដើម** នៃ function ដែល override ➜ `view-originals.js` ៖ ការយោងក្នុងតួនោះ (ឧ. `commitNow` ➜ `allStores()`)
+    //    ជាការយោងពិតក្នុងកូដ ship ដែលទិដ្ឋភាពជំនួស ➜ `function-surface` រាប់វា (បើអត់ វារាយ function រស់ថា «ងាប់»)
+    const originals = [];
     for (const rel of order) {
         const file = path.join(ROOT, rel);
         let view = moduleView(readFileSync(file, 'utf8'), file);
-        for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement);
+        for (const [name, replacement] of Object.entries(VIEW_OVERRIDES[rel] || {})) view = overrideFunction(view, name, replacement, originals);
         text += view;
         // ⛔ state ដើមជា `let` កម្រិតកំពូល (ដូច `app.js` ដើម) ភ្លាមក្រោយឃ្លាំង ➜ dependency របស់តម្លៃដំបូងប្រកាសរួច
         if (rel === 'src/core/state.ts') text += stateDeclarations(view, stateGroups);
@@ -161,6 +164,7 @@ rmSync(entry);
     text = aliased.text;
     if (aliased.count < 500) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` តិចពេក ៖ ' + aliased.count);
     writeFileSync(appPath, text);
+    writeFileSync(path.join(APP, 'view-originals.js'), originals.join('\n\n') + '\n');
     console.log('ទិដ្ឋភាព checker ៖ module ' + order.length + ' · <ឃ្លាំង>.<វាល> ➜ <វាល> ' + aliased.count);
 }
 
@@ -172,12 +176,14 @@ rmSync(entry);
  * ⛔ កុំប្រើ `index.html` ឬ `netlify.toml` របស់ ZoeW ដើមនៅទីនេះ — នោះជាការវាស់
  *    ឯកសារចាស់ ហើយរាយការណ៍ថាបៃតងលើអ្វីដែលមិន ship។ */
 const appJs = readFileSync(path.join(APP, 'app.js'));
+const viewOriginals = readFileSync(path.join(APP, 'view-originals.js'));
 execFileSync(process.execPath, [path.join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--outDir', APP, '--emptyOutDir'], {
     cwd: ROOT,
     env: { ...process.env, VITE_EXPOSE_GLOBALS: '1' },
     stdio: ['ignore', 'ignore', 'inherit']
 });
 writeFileSync(path.join(APP, 'app.js'), appJs);
+writeFileSync(path.join(APP, 'view-originals.js'), viewOriginals);
 
 /*
  * ២ក. **Service Worker ដែលអានបាន** ៖ Vite (`serviceWorkerPlugin`) ship `sw.js` ដែល **minify** ➜ checker SW ដើម

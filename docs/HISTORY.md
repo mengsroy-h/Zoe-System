@@ -342,6 +342,65 @@ ledger នៅរាប់ពួកវា។ លំដាប់ដែលបង្
 ២. ⛔ **កុំសាងការជួសជុលស្វ័យប្រវត្តិ** — `CLAUDE.md` ៖ «ការជាប់អន្ទាក់ថ្លៃតិច
    ជាងលុយស្ទួន»។
 
+### [2.42.2] — 2026-09-25 · ZoeW ៖ **`audit-tools` វាស់ App React** · លុបកូដងាប់ ១៩ ដែល checker រកឃើញ (branch · មិនទាន់ merge)
+
+**សំណើម្ចាស់គម្រោង** ៖ *«ចាប់ផ្ដើមទាំងអស់ទៅ អោវាស់បានទាំង 181 ហ្នឹងមកអោយបានពេញលេញដូច ZoeW កាលនៅជា vanillajs»* ·
+*«បន្តធ្វើ checker ដែលនៅសល់ទាំងអស់ទៅ»*។
+
+**ZoeW ប្រែ** (`zoew-v228` ➜ `zoew-v229`) · **ZoeKeyGen មិនប្រែ**។
+
+#### អ្វីដែលខុសពីមុន (អ្នកប្រើ)
+
+- **គ្មានអ្វីដែលអ្នកប្រើមើលឃើញខុសពីមុនទេ**។ កូដ ship ដែលប្រែ ៖
+  - ជម្រើសខែរបស់របាយការណ៍ខែ · Tab ក្នុងឯកសារ Excel · ជម្រើសផ្គូផ្គងជួរឈរ ហៅសកម្មភាពតាម `act()` (ព្រំដែន
+    `ACTION_REGISTRY`) ជំនួសការហៅ function ដោយផ្ទាល់ — ឥរិយាបថដដែល (`act()` ➜ `lookupAction()` ➜ function ដដែល)។
+  - function ងាប់ **១៩** ត្រូវលុប ៖ builder HTML **៧** (`buildHistoryRowHtml` · `healthRowHtml` · `trashGroupRowHtml` ·
+    `trashActionButtonsHtml` · `trashSummaryCardHtml` · `monthlyReportMismatchNote` · `ztoListGroupHtml`) — JSX គូរពី
+    model រួចហើយ · helper ref **៧** (`fieldFiles` · `blurField` · `selectFieldText` · `activeElementTag` · `elementRect` ·
+    `refNameOf` · `onRefChange`) · store **២** (`subscribeAll` · `globalVersion`) · `runOnWindowLoad` + `documentLoadComplete`
+    (`scope.onLoad()` ជាអ្នកការពារពិត) · `sheetImportViewOf`។ builder ២ ដែលតេស្ត parity ត្រូវការ រស់ជា **oracle** ក្នុង
+    `ZoeW/tests/oracles/` (មិនចូលផលិតកម្ម)។
+
+#### `audit-tools` ៖ ទិដ្ឋភាព App React (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/ZoeW`)
+
+checker ដើមស្រង់អត្ថបទពី `ZoeW/app.js` · អាន markup ថេរក្នុង `index.html` · ជំនួស `window.<fn>` ➜ លើ App React
+ពួកវា **មិនរត់** ឬ **វាស់អ្វីផ្សេង**។ ឥឡូវ build វាស់ផលិត ៖
+
+| ឯកសារ | អ្វី |
+|---|---|
+| `app.js` | ទិដ្ឋភាពអត្ថបទពីប្រភព TypeScript (លុបតែ type · ផ្ទៀងផ្ទាត់ token ទល់ token) · `<ឃ្លាំង>.<វាល>` ➜ `<វាល>` |
+| `index.html` | markup ដំបូងរបស់ React ពិត + `data-act` ពី prop ពិត (`audit-annotate.ts`) |
+| `sw.js` | ទិដ្ឋភាពអានបានរបស់ `src/sw/sw.ts` — ផ្ទៀងផ្ទាត់ **byte ទល់ byte** នឹងឯកសារដែល ship |
+| `react-render.cjs` | SSR នៃ component ទាំងអស់ ➜ checker `vm` អាន **JSX ពិត** (មិនមែន markup ចម្លងដោយដៃ) |
+| `components.js` | ទិដ្ឋភាពអត្ថបទនៃ `.tsx` (ការយោង · `onAct()`) |
+| `view-originals.js` | តួ **ដើម** នៃ function ដែលទិដ្ឋភាព override (ការយោងរបស់វាជាការយោងពិត) |
+
+helper រួម ៖ `audit-tools/react-view.js` (`renderFromContext` · `actionUsages` · `swShell` …)។
+
+#### ការរកឃើញ (ការវាស់ មិនមែនការអាន)
+
+- 🔴 **`npx tsc --noEmit -p .` មិនពិនិត្យអ្វីសោះ** — `tsconfig.json` ជា solution file (`"files": []`) ➜ វាចេញ ០
+  ដោយស្ងាត់ ខណៈ `audit-compat.ts` នាំចូល export ដែលលុបរួច។ ⛔ ត្រូវប្រើ `npm run typecheck` (`tsc -b`)។
+- `function-surface` រាយ **១៩** ៖ ងាប់ពិត **១៧** (+ **២** ងាប់តាមខ្សែ ៖ `trashActionButtonsHtml` · `documentLoadComplete`) · **២**
+  ជាសំណល់នៃទិដ្ឋភាព (`allStores` · `modalIsMounted` — override លុបការយោង ➜ `view-originals.js`)។ `buildHistoryRowHtml()` ងាប់ **ជាច្បាប់ចម្លងទី ២ នៃរូបមន្តលុយរបស់ជួរដេក**
+  (`activeCod` · `activeDod` · Locker) ➜ `code-duplication` រាយ ២ (ច្បាប់ ១២ លើកូដ ៖ ជុំក្រោយកែមួយ ភ្លេចមួយ)។
+- `wiring` · `csp-enforced` ៖ ធាតុ **៣** ក្នុង `ACTION_ALLOWLIST` គ្មាន `act()` ណាហៅ (សិទ្ធិលើស) ➜ ការហៅឆ្លងកាត់ `act()` វិញ។
+- `html-sink-escaping` ៖ ក្នុង React គ្មាន HTML តាមការតភ្ជាប់ខ្សែអក្សរទៀតទេ ➜ ជាន់អប្បបរមា «រកឃើញ ≥ ១» មិនអាចពិតបាន ➜
+  ជំនួសដោយ **probe** (scanner ដដែលត្រូវរាប់ និងរាយ sink ដែលដាំ) បូក **គ្មាន `dangerouslySetInnerHTML`** ក្នុង JSX។
+- `action-binding` ៖ អ្នកស្តាប់ទី ២ ក្នុង React ចងតាម `refWithNative()` / `scope.listen(elementOf(…))` មិនមែន
+  `getElementById` ➜ mutation «`refWithNative` ហៅសកម្មភាពដដែលនឹង `onChange={onAct(…)}`» ត្រូវចាប់។
+- `csp-enforced` (browser) ៖ ការជំនួស `window.openViewListModal` / `window.loginWithFirebase` **មិនវាស់អ្វីទេ** លើ App React
+  (សកម្មភាពហៅតាម `ACTION_REGISTRY`) ➜ វាស់ **ផល** វិញ ៖ ប្រអប់បង្ហាញលេខ/Barcode របស់ `row1` · សារ «វាលទទេ» ពិតរបស់ `loginWithFirebase()`
+  (អានចេញពី `app.js`)។ mutation ៤/៤ ចាប់ (`lookupAction` · registry ឃ្លាត · `args` ខុស · `evt` បាត់)។
+- `parity-static` ៖ ការប្រៀបធៀបអត្ថបទបង្រួមចន្លោះទទេ (HTML និង JSX បង្ហាញ `\n    ` ជាចន្លោះ ១) — អត្ថបទព្រមានរបាយការណ៍ខែ
+  មិនបាត់ទេ វាខុសត្រឹម indent។
+
+#### ⛔ សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+១. ⛔ **កុំ merge ចូល `main`** — លក្ខខណ្ឌរបស់ `2.38.0`–`2.42.1` នៅដដែល (checker ដែលនៅសល់ · iPhone + Android ពិត)។
+២. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify** · App Android មិនចាំបាច់ build ថ្មី (គ្មានអ្វីអ្នកប្រើឃើញ)។
+៣. សាក ៖ 📊 របាយការណ៍ខែ ➜ ប្តូរខែ ➜ តារាងប្តូរ · នាំចូល Excel ➜ ប្តូរ Tab ➜ ជួរឈរបំពេញវិញ · ប្តូរជួរឈរ ➜ មើលជាមុនប្តូរ។
+
 ### [2.42.1] — 2026-09-24 · ZoeW ៖ **App Android ៖ រូបតំណាងរបាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញវិញ** (branch · មិនទាន់ merge)
 
 **របាយការណ៍អ្នកប្រើ (ទូរស័ព្ទ Android ពិត · រូបថតអេក្រង់)** ៖ *«App android fullscreen ស្អាត ហើយតែ status bar

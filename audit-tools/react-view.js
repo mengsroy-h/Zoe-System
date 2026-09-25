@@ -25,16 +25,16 @@
 //    `src/app/flush.ts` · `src/platform/document-io.ts`) — ពួកវាជា «ច្រកចេញ» ដែលជំនួសការប៉ះ DOM ផ្ទាល់របស់
 //    `app.js` ដើម (`byId(x).value` · `el.style.display = …` · `document.createElement('canvas')` …)
 const REACT_HELPERS = [
-    'elementOf', 'field', 'fieldValue', 'setFieldValue', 'fieldChecked', 'setFieldChecked', 'fieldFiles',
-    'focusField', 'focusFieldAsIs', 'blurField', 'selectFieldText', 'openFilePicker', 'isFieldFocused',
-    'activeElementIsTextField', 'activeElementTag', 'blurActiveElement',
-    'elementRect', 'rectOfElement', 'elementSize', 'setScrollTop', 'setElementScrollTop', 'scrollChildIntoView',
+    'elementOf', 'field', 'fieldValue', 'setFieldValue', 'fieldChecked', 'setFieldChecked',
+    'focusField', 'focusFieldAsIs', 'openFilePicker', 'isFieldFocused',
+    'activeElementIsTextField', 'blurActiveElement',
+    'rectOfElement', 'elementSize', 'setScrollTop', 'setElementScrollTop', 'scrollChildIntoView',
     'animateElement', 'videoElement',
     'registerModalMeta', 'unregisterModalMeta', 'modalMeta', 'modalIsMounted', 'modalDisplay', 'setModalDisplay',
     'modalIsOpen', 'openModalIds',
     'domText',
     'commitNow', 'renderNow',
-    'documentLoadComplete', 'documentIsHidden', 'onDocumentVisibilityChange', 'resetDocumentScroll', 'scrollWindowToTop',
+    'documentIsHidden', 'onDocumentVisibilityChange', 'resetDocumentScroll', 'scrollWindowToTop',
     'createScratchCanvas', 'loadScratchImage', 'addPreconnectHint', 'injectScript', 'downloadObjectUrl',
     // `src/platform/native.ts` ៖ អាន `window.Capacitor` ➜ ក្នុង sandbox (គ្មាន bridge) ជាផ្លូវ web ដូច App ដើម
     'isNativeApp', 'isNativeAndroid', 'pullToRefreshSupported', 'resolveNativeApiUrl', 'nativeWebOrigin',
@@ -365,8 +365,52 @@ function swShell(root, app) {
     };
 }
 
+/*
+ * សកម្មភាពដែល App React ហៅតាមឈ្មោះ (ព្រំដែន `ACTION_REGISTRY`) — ជំនួស `data-act="x"` ក្នុង HTML ដើម ៖
+ *   ១. `onAct("x")` / `act("x")` ក្នុង JSX (`components.js`)
+ *   ២. view-model `{ label, action: 'x' }` ក្នុង `app.js` ដែល JSX គូរជា `data-act={it.action}` (ម៉ឺនុយ (...))
+ * ⛔ ការហៅ function ដោយផ្ទាល់ (`renderX()`) មិនរាប់ — វាមិនឆ្លងកាត់ព្រំដែន ➜ ធាតុក្នុងបញ្ជីដែលគ្មាន `act()`
+ *    ណាហៅ = សិទ្ធិលើស។ គ្មាន `components.js` (App ដើម) ➜ `null`។ ការស្កេនទទេ ➜ បោះ (មិនមែនសំណុំទទេស្ងាត់)។
+ */
+function actionUsages(appDir, js) {
+    const fs = require('fs');
+    const path = require('path');
+    const acorn = require('acorn');
+    const compPath = path.join(appDir, 'components.js');
+    if (!fs.existsSync(compPath)) return null;
+    const comp = fs.readFileSync(compPath, 'utf8');
+    const used = new Set();
+    for (const m of comp.matchAll(/\b(?:onAct|act)\(\s*["']([A-Za-z_$][\w$]*)["']/g)) used.add(m[1]);
+    if (!used.size) throw new Error('react-view ៖ រក onAct()/act() ក្នុង components.js មិនឃើញ');
+    let menuItems = 0;
+    if (/"data-act":\s*[A-Za-z_$][\w$]*\.action\b/.test(comp)) {
+        const walk = (n, fn) => {
+            if (!n || typeof n.type !== 'string') return;
+            fn(n);
+            for (const k in n) {
+                if (k === 'type' || k === 'start' || k === 'end') continue;
+                const v = n[k];
+                if (Array.isArray(v)) v.forEach((c) => walk(c, fn));
+                else if (v && typeof v.type === 'string') walk(v, fn);
+            }
+        };
+        walk(acorn.parse(js, { ecmaVersion: 2022, sourceType: 'script' }), (n) => {
+            if (n.type !== 'ObjectExpression') return;
+            const prop = (k) => n.properties.find((p) => p.type === 'Property' && !p.computed &&
+                ((p.key.type === 'Identifier' && p.key.name === k) || (p.key.type === 'Literal' && p.key.value === k)));
+            const label = prop('label');
+            const action = prop('action');
+            if (!label || !action || action.value.type !== 'Literal' || typeof action.value.value !== 'string') return;
+            used.add(action.value.value);
+            menuItems++;
+        });
+        if (!menuItems) throw new Error('react-view ៖ JSX គូរ data-act={x.action} តែរក view-model { label, action } មិនឃើញ');
+    }
+    return used;
+}
+
 module.exports = {
-    swShell,
+    swShell, actionUsages,
     REACT_HELPERS, REACT_CONSTS, sliceFunction, sliceConst, storeDefinitions, reactRuntime,
     renderComponent, renderFromContext, renderedContainer, renderedElement, topLevelElements, elementById, jsxHandler
 };

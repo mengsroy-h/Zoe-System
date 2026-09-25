@@ -12,6 +12,7 @@
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { actionUsages } = require('./react-view');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.CSP_APP_DIR ? path.resolve(process.env.CSP_APP_DIR) : root;
@@ -59,15 +60,39 @@ for (const app of ['ZoeW', 'ZoeKeyGen']) {
 for (const app of ['ZoeW', 'ZoeKeyGen']) {
     const js = fs.readFileSync(path.join(appRoot, app, 'app.js'), 'utf8');
     ok(app + ': មានបញ្ជីសកម្មភាពដែលអនុញ្ញាត (ACTION_ALLOWLIST)', /const ACTION_ALLOWLIST = \[/.test(js));
-    ok(app + ': dispatcher ពិនិត្យបញ្ជីមុនហៅ (មិនហៅ window[name] ដោយងងឹត)',
-        /ACTION_ALLOWLIST\.indexOf\(name\) === -1\) return;/.test(js));
-    ok(app + ': មាន setupActionDelegation() ហើយត្រូវហៅពេល boot',
-        /function setupActionDelegation\(\)/.test(js) && /\n\s*setupActionDelegation\(\);/.test(js));
-    // រាល់ `data-act` ក្នុង HTML ត្រូវស្ថិតក្នុងបញ្ជី ហើយត្រូវជា function ពិត
-    const html = fs.readFileSync(path.join(appRoot, app, 'index.html'), 'utf8');
-    const used = [...new Set([...(html + js).matchAll(/data-act="([^"$]+)"/g)].map((m) => m[1]))];
     const allowBlock = (/const ACTION_ALLOWLIST = \[([\s\S]*?)\];/.exec(js) || [])[1] || '';
     const allowed = new Set([...allowBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+    // App React ៖ ព្រំដែនគឺ `act()` ➜ `lookupAction()` ➜ `ACTION_REGISTRY` (own property តែប៉ុណ្ណោះ) ហើយ **គ្មាន**
+    // listener delegation កម្រិត `document` ទៀតទេ (វានឹងធ្វើឲ្យសកម្មភាពរត់ ២ ដង ជាមួយ `onClick` របស់ React)
+    const isReact = /function lookupAction\(name\)/.test(js);
+    if (isReact) {
+        ok(app + ': dispatcher ពិនិត្យបញ្ជីមុនហៅ (`lookupAction()` ៖ own property នៃ ACTION_REGISTRY · ឈ្មោះក្រៅបញ្ជី ➜ មិនហៅ)',
+            /function lookupAction\(name\) \{\s*if \(!name \|\| !Object\.prototype\.hasOwnProperty\.call\(ACTION_REGISTRY, name\)\) return null;/.test(js) &&
+            /function act\(name, \.\.\.args\) \{\s*const fn = lookupAction\(name\);\s*if \(!fn\) \{[^}]*return;\s*\}\s*fn\(\.\.\.args\);/.test(js) &&
+            /function onAct\(name, opts\) \{[\s\S]*?\bact\(name, \.\.\.args\);/.test(js));
+        const registryBlock = (/const ACTION_REGISTRY = Object\.freeze\(\{([\s\S]*?)\}\);/.exec(js) || [])[1];
+        const registry = new Set([...(registryBlock || '').matchAll(/^\s*([A-Za-z_$][\w$]*),?\s*$/gm)].map((m) => m[1]));
+        const drift = [...allowed].filter((a) => !registry.has(a)).concat([...registry].filter((a) => !allowed.has(a)));
+        ok(app + ': ACTION_REGISTRY ត្រូវ freeze ហើយស្មើ ACTION_ALLOWLIST (គ្មានច្រកចូលទី ២)',
+            registryBlock !== undefined && registry.size > 0 && drift.length === 0, drift);
+        ok(app + ': គ្មាន delegation `data-act` កម្រិត document (React `onClick` ជាអ្នកស្តាប់តែមួយ)',
+            !/closest\(\s*['"]\[data-act\]/.test(js) && !/function setupActionDelegation\(/.test(js));
+    } else {
+        ok(app + ': dispatcher ពិនិត្យបញ្ជីមុនហៅ (មិនហៅ window[name] ដោយងងឹត)',
+            /ACTION_ALLOWLIST\.indexOf\(name\) === -1\) return;/.test(js));
+        ok(app + ': មាន setupActionDelegation() ហើយត្រូវហៅពេល boot',
+            /function setupActionDelegation\(\)/.test(js) && /\n\s*setupActionDelegation\(\);/.test(js));
+    }
+    // រាល់ `data-act` ក្នុង HTML ត្រូវស្ថិតក្នុងបញ្ជី ហើយត្រូវជា function ពិត
+    const html = fs.readFileSync(path.join(appRoot, app, 'index.html'), 'utf8');
+    const usedSet = new Set([...(html + js).matchAll(/data-act="([^"$]+)"/g)].map((m) => m[1]));
+    try {
+        const reactActs = actionUsages(path.join(appRoot, app), js);
+        if (reactActs) reactActs.forEach((a) => usedSet.add(a));
+    } catch (e) {
+        ok(app + ': អានសកម្មភាពដែល React ហៅបាន', false, e.message);
+    }
+    const used = [...usedSet];
     const notAllowed = used.filter((a) => !allowed.has(a));
     ok(app + ': រាល់ `data-act` ស្ថិតក្នុងបញ្ជីដែលអនុញ្ញាត', notAllowed.length === 0, notAllowed);
     const notDefined = [...allowed].filter((a) => !new RegExp('function ' + a + '\\s*\\(').test(js));
@@ -170,7 +195,12 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
             var m; try { m = String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown'); } catch (x) { m = 'unknown'; }
             setTimeout(function () { throw new Error('unhandledrejection: ' + m); }, 0);
         });`);
-    page.on('dialog', (d) => d.accept());
+    const dialogs = [];
+    page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
+    // សារដែល `loginWithFirebase()` បង្ហាញពេលវាលទទេ — អានចេញពី `app.js` ពិត (មិនមែន literal ទី ២)
+    const loginEmptyMessage = (/if \(!email \|\| !password\) \{\s*alert\((["'])([^"']+)\1\)/.exec(
+        fs.readFileSync(path.join(appRoot, 'ZoeW', 'app.js'), 'utf8')) || [])[2] || null;
+    ok('អានសារ «វាលទទេ» របស់ `loginWithFirebase()` ពី app.js បាន', !!loginEmptyMessage);
     await page.addInitScript(() => {
         window.__cspViolations = [];
         document.addEventListener('securitypolicyviolation', (e) => {
@@ -207,7 +237,14 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
         violations: window.__cspViolations || [],
         hasShell: !!document.getElementById('appPages'),
         appJs: typeof window.initScanEngine === 'function',
-        delegation: typeof window.setupActionDelegation === 'function',
+        // App React ៖ ធាតុ `data-act` ត្រូវមាន handler `onAct()` ពិតរបស់ React (actionName ស្មើ data-act)
+        delegation: typeof window.setupActionDelegation === 'function' || (() => {
+            const els = Array.from(document.querySelectorAll('[data-act]'));
+            return els.length > 0 && els.some((el) => {
+                const k = Object.keys(el).find((x) => x.startsWith('__reactProps$'));
+                return !!k && !!el[k] && Object.values(el[k]).some((h) => h && h.actionName === el.getAttribute('data-act'));
+            });
+        })(),
         iosClassHookRan: typeof window.ACTION_ALLOWLIST !== 'undefined' || true
     }));
     violations.push(...boot.violations);
@@ -245,32 +282,37 @@ const D = (() => { const t = new Date(); return t.getFullYear() + '-' + String(t
         if (!tr) return { err: 'no row' };
         const btn = tr.querySelector('[data-act="openViewListModal"]');
         if (!btn) return { err: 'no view-list button', html: tr.innerHTML.slice(0, 200) };
-        let got = null;
-        const orig = window.openViewListModal;
-        window.openViewListModal = (a) => { got = a; };
+        // ⛔ វាស់ **ផល** មិនមែនជំនួស `window.openViewListModal` — App React ហៅតាម `ACTION_REGISTRY` មិនឆ្លង `window`
+        // ➜ id ខុស = ប្រអប់មិនបង្ហាញលេខទូរស័ព្ទ/Barcode របស់ជួរ `row1`
+        const phoneEl = document.getElementById('listModalPhoneText');
+        const listEl = document.getElementById('barcodeListContainer');
+        const before = { phone: phoneEl ? phoneEl.textContent : null, list: listEl ? listEl.textContent : null };
         btn.click();
-        await new Promise((r) => setTimeout(r, 200));
-        window.openViewListModal = orig;
-        return { got };
+        await new Promise((r) => setTimeout(r, 300));
+        const phone = document.getElementById('listModalPhoneText');
+        const list = document.getElementById('barcodeListContainer');
+        const shown = !!phone && phone.textContent.indexOf('011222333') !== -1 && !!list && list.textContent.indexOf('BC1') !== -1;
+        return { before, got: shown ? 'row1' : null, phone: phone && phone.textContent, list: list && list.textContent.slice(0, 80) };
     });
-    ok('**ប៊ូតុងក្នុងជួរដេកនៅដើរ ហើយបញ្ជូន id ត្រឹមត្រូវ**', rowBtn.got === 'row1', rowBtn);
+    ok('**ប៊ូតុងក្នុងជួរដេកនៅដើរ ហើយបញ្ជូន id ត្រឹមត្រូវ**',
+        rowBtn.got === 'row1' && !!rowBtn.before && (rowBtn.before.phone || '').indexOf('011222333') === -1, rowBtn);
 
     // --- ការ submit ទម្រង់ (ផ្លូវចូលប្រព័ន្ធ — ព្រឹត្តិការណ៍ក្រៅ `click`) ---
+    dialogs.length = 0;
     const formSubmit = await page.evaluate(async () => {
         const form = document.querySelector('form[data-act="submitLoginForm"]');
         if (!form) return { err: 'no login form' };
-        let called = false, defaultPrevented = null;
-        const orig = window.loginWithFirebase;
-        window.loginWithFirebase = () => { called = true; };
+        let defaultPrevented = null;
+        // ⛔ វាស់ **ផល** ៖ វាលទទេ ➜ `loginWithFirebase()` ពិតបង្ហាញសារ «សូមបញ្ចូល…» (មិនជំនួស `window.*`)
         const ev = new Event('submit', { bubbles: true, cancelable: true });
         form.dispatchEvent(ev);
         defaultPrevented = ev.defaultPrevented;
-        await new Promise((r) => setTimeout(r, 150));
-        window.loginWithFirebase = orig;
-        return { called, defaultPrevented };
+        await new Promise((r) => setTimeout(r, 250));
+        return { defaultPrevented };
     });
+    formSubmit.called = !!loginEmptyMessage && dialogs.indexOf(loginEmptyMessage) !== -1;
     ok('**ការ submit ទម្រង់ចូលប្រព័ន្ធនៅដើរ** (`data-on="submit"`)',
-        formSubmit.called === true, formSubmit);
+        formSubmit.called === true, { formSubmit, dialogs, expected: loginEmptyMessage });
     ok('ការ submit ត្រូវបានទប់ (ទំព័រមិន reload)', formSubmit.defaultPrevented === true, formSubmit);
 
     const after = await page.evaluate(() => window.__cspViolations || []);

@@ -249,8 +249,8 @@ React មានវត្តមានសោះ។
 ⛔ **ពេលកូដបន្ទាប់ *វាស់* អ្វីដែលទើបផ្សាយ ត្រូវហៅ `commitNow()`**
 (`flushSync` លើរាល់ឃ្លាំង) ជាមុន — បើមិនដូច្នេះវាវាស់ DOM **មុនការគូរ**។ វាស់បាន ៖
 `showGlobalMoreMenu()` វាស់ទទឹងម៉ឺនុយមុនធាតុចុះ ➜ គ្មានការទាញចូលវិញ ➜
-ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementRect()` ·
-`elementSize()` · `setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
+ម៉ឺនុយហៀរក្រៅអេក្រង់។ helper របស់ `refs.ts` ដែលវាស់ (`elementSize()` ·
+`setScrollTop()` · `focusField()`) ហៅវាខ្លួនឯង។
 
 ### ⛔ កូដ imperative មិនត្រូវប៉ះ **កូន** របស់ធាតុដែល React ជាម្ចាស់
 
@@ -293,8 +293,10 @@ listener ទី ២ នឹងធ្វើឲ្យសកម្មភាពរត
 
 ⛔ `data-act` · `data-a1` លើប៊ូតុងម៉ឺនុយ (...) នៅជា attribute **ពណ៌នា** សុទ្ធ
 (DOM ដូចដើម ➜ ឧបករណ៍វាស់ `wiring` · `csp-enforced` អានវា) តែគ្មានអ្វីស្តាប់វាទេ។
-⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ (`buildHistoryRowHtml()` · `trashGroupRowHtml()`)
-**មិនចូល DOM** — វារស់ជា oracle សម្រាប់តេស្ត parity និង checker ស្តាទិច។
+⛔ helper ដែលសាង HTML ជាខ្សែអក្សរ **មិនរស់ក្នុង `src/` ទៀតទេ** — JSX គូរពី model (`buildHistoryRowModel()` ·
+`buildTrashRowModel()` · `healthRow()` · `ztoListGroupModel()`)។ builder ដើមដែលតេស្ត parity ត្រូវការ រស់ជា
+**oracle** ក្នុង `tests/oracles/` (`history-row-html.ts` · `health-row-html.ts`) ➜ `function-surface` មិនរាយវាថាងាប់ ហើយ
+ផលិតកម្មមិនដឹកវា។
 
 ### ⛔ ច្រកចេញ (escape hatch) — អ្វីតែមួយគត់ដែលមិនមែន JSX
 

@@ -40,7 +40,6 @@ const LOGIC_DIRS = ['core', 'domain', 'features', 'services', 'ui', 'platform'];
 const IO = 'platform/document-io.ts';
 const IO_WHY = 'ការប៉ះ `document` ដែល **មិនមែន UI** (មើល header របស់ឯកសារ) ៖ ';
 const ALLOWED = {
-    [IO + ':document.readyState']: [1, IO_WHY + 'វដ្តជីវិតទំព័រ (`runOnWindowLoad`)'],
     [IO + ':document.hidden']: [1, IO_WHY + 'វដ្តជីវិតទំព័រ (ការស្តារការតភ្ជាប់ពេលត្រឡប់មក)'],
     [IO + ':document.addEventListener']: [1, IO_WHY + '`visibilitychange` ជាព្រឹត្តិការណ៍របស់ browser មិនមែន DOM ដែល React គូរ'],
     [IO + ':document.createElement']: [4, IO_WHY + 'canvas ក្រៅអេក្រង់ · `<link rel=preconnect>` · `<script>` បណ្ណាល័យ · តំណទាញយក'],
@@ -76,8 +75,7 @@ const REFS_WHY = 'ច្រកចេញរបស់ React (ref) — React គ្
 const DOC_FX = 'app/components/shell/DocumentEffects.tsx';
 const APP_ALLOWED = {
     [REFS + ':.focus()']: [3, REFS_WHY + 'focus (`focusField` · ការសាកម្តងទៀតក្រោយការគូរ · `focusFieldAsIs`)'],
-    [REFS + ':.blur()']: [2, REFS_WHY + 'blur (`blurField` · `blurActiveElement`)'],
-    [REFS + ':.select()']: [1, REFS_WHY + 'ជ្រើសអត្ថបទក្នុងប្រអប់ (`selectFieldText`)'],
+    [REFS + ':.blur()']: [1, REFS_WHY + 'blur (`blurActiveElement`)'],
     [REFS + ':.click()']: [1, REFS_WHY + 'បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type=file>` (`openFilePicker`)'],
     [REFS + ':.value =']: [1, 'input **uncontrolled** (`defaultValue`) — React ណែនាំ ref សម្រាប់វា (`setFieldValue`)'],
     [REFS + ':.checked =']: [1, 'input **uncontrolled** (`defaultChecked`) — React ណែនាំ ref សម្រាប់វា (`setFieldChecked`)'],

@@ -235,12 +235,8 @@ function flattenPlus(node, out) {
     return out;
 }
 
-let concatCount = 0;
-for (const app of APPS) {
-    const allow = BUILDER_ALLOW[app] || {};
-    const file = path.join(ROOT, app, 'app.js');
-    if (!fs.existsSync(file)) continue;
-    const code = fs.readFileSync(file, 'utf8');
+function scanConcat(code, allow, label, sink) {
+    let count = 0;
     const ast = acorn.parse(code, { ecmaVersion: 2022, locations: true });
     walk(ast, (n) => {
         if (n.type !== 'BinaryExpression' || n.operator !== '+') return;
@@ -249,23 +245,54 @@ for (const app of APPS) {
         const parts = flattenPlus(n, []);
         const isHtml = parts.some((c) => c.type === 'Literal' && typeof c.value === 'string' && HTML_TAG.test(c.value));
         if (!isHtml) return;
-        concatCount++;
+        count++;
         const unsafe = [];
         parts.forEach((c) => {
             if (c.type === 'Literal') return;
             if (!isSafeExpr(c, allow)) unsafe.push(code.slice(c.start, c.end).replace(/\s+/g, ' ').slice(0, 72));
         });
         if (unsafe.length) {
-            offenders.push(app + '/app.js:' + n.loc.start.line + '  (concat)  '
+            sink.push(label + ':' + n.loc.start.line + '  (concat)  '
                 + [...new Set(unsafe)].slice(0, 4).join(' | '));
         }
     });
+    return count;
+}
+
+let concatCount = 0;
+let reactApps = 0;
+let jsxRawHtml = [];
+for (const app of APPS) {
+    const allow = BUILDER_ALLOW[app] || {};
+    const file = path.join(ROOT, app, 'app.js');
+    if (!fs.existsSync(file)) continue;
+    concatCount += scanConcat(fs.readFileSync(file, 'utf8'), allow, app + '/app.js', offenders);
+    // App React ៖ ផ្ទៃ HTML ឆៅតែមួយគត់ក្នុង JSX គឺ `dangerouslySetInnerHTML` (អត្ថបទ JSX ត្រូវ React escape ស្វ័យប្រវត្តិ)
+    const comp = path.join(ROOT, app, 'components.js');
+    if (fs.existsSync(comp)) {
+        reactApps++;
+        const text = fs.readFileSync(comp, 'utf8');
+        jsxRawHtml = jsxRawHtml.concat((text.match(/dangerouslySetInnerHTML/g) || []).map(() => app + '/components.js'));
+    }
 }
 
 ok('ស្កេន ' + scanned + ' ឯកសារ · រកឃើញ template HTML ' + sinkCount
     + ' កន្លែង · HTML តាមការតភ្ជាប់ខ្សែអក្សរ ' + concatCount + ' កន្លែង');
 if (concatCount > 0) {
     ok('ទម្រង់ HTML ទាំង ២ ត្រូវបានស្កេន (template literal **និង** ការតភ្ជាប់ខ្សែអក្សរ)');
+} else if (reactApps > 0) {
+    // ⛔ App React លុប HTML តាមការតភ្ជាប់ខ្សែអក្សរចោលទាំងស្រុង (JSX) ➜ `0` ជាការពិត មិនមែនសញ្ញា scanner ខូច —
+    //    តែ «0» ត្រូវតែ **អាចធ្លាក់បាន** ៖ probe ដាំ sink ដែលមិន escape ➜ scanner ដដែលត្រូវរាប់វា ហើយរាយវា
+    const probeSink = [];
+    const probeCount = scanConcat("function probe(x) { return '<b class=\"p\">' + x + '</b>'; }", {}, 'probe', probeSink);
+    const cleanSink = [];
+    const cleanCount = scanConcat("function probe(x) { return '<b>' + sanitizeInput(x) + '</b>'; }", {}, 'probe', cleanSink);
+    const probeLabel = '⛔ ជាន់អប្បបរមា (App React) ៖ probe — scanner ការតភ្ជាប់ខ្សែអក្សររាប់ និងរាយ sink ដែលដាំ';
+    if (probeCount === 1 && probeSink.length === 1 && cleanCount === 1 && cleanSink.length === 0) ok(probeLabel);
+    else bad(probeLabel, JSON.stringify({ probeCount, probeSink, cleanCount, cleanSink }));
+    const rawLabel = 'App React ៖ គ្មាន `dangerouslySetInnerHTML` ក្នុង JSX (ផ្ទៃ HTML ឆៅតែមួយរបស់ React)';
+    if (jsxRawHtml.length === 0) ok(rawLabel);
+    else bad(rawLabel, jsxRawHtml.length + ' កន្លែង ៖ ' + jsxRawHtml.join(', '));
 } else {
     bad('⛔ ជាន់អប្បបរមា ៖ ការស្កេន HTML តាមការតភ្ជាប់ខ្សែអក្សររកមិនឃើញអ្វីសោះ',
         'concatCount = 0 ➜ ទម្រង់នោះលែងត្រូវបានវាស់ (scanner ខូច ឬលំនាំប្រែ)');

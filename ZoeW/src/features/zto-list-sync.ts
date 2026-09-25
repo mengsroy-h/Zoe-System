@@ -7,7 +7,7 @@ import { appLocalStore, safeStoreGet, safeStoreSet } from '../core/storage';
 import { ZTO_LISTSYNC_KEY } from '../core/storage-keys';
 import { VIEW_NOT_MEASURABLE_NOTICE, VIEW_NOT_MEASURABLE_TEXT, ZTO_SYNC_VIEW_KEYS, normalizeStoredPhone } from '../core/text';
 import { getZoneDateKey, ztoScanStampMillis } from '../core/timezone';
-import { barcodeAbandonIsRipe, sanitizeInput } from '../domain/barcode';
+import { barcodeAbandonIsRipe } from '../domain/barcode';
 import { trashRetentionMs } from '../domain/cleanup';
 import { pickupBarcodeKey } from '../domain/pickup';
 import { claimBarcodeInRegistry, isBarcodeAlreadyUsed, releaseBarcodesInRegistry, releaseLateBarcodeClaim } from '../domain/registry';
@@ -273,30 +273,6 @@ export function ztoListSyncRangeFromInputs() {
 
 export function setZtoListSyncNote(text) {
     viewState.ztoListSyncNote = text;
-}
-
-export function ztoListGroupHtml(title, rows, toneClass) {
-    const shown = rows.slice(0, ZTO_LIST_PREVIEW_ROWS);
-    const groupMoreHtml = rows.length > shown.length
-        ? '<div class="zto-list-more">' + sanitizeInput('និង ' + (rows.length - shown.length) + ' ទៀត') + '</div>'
-        : '';
-    const groupRowsHtml = shown.length
-        ? shown.map((row) => {
-            const money = [
-                row.cod ? 'COD $' + row.cod.toFixed(2) : '',
-                row.dod ? 'DOD $' + row.dod.toFixed(2) : ''
-            ].filter(Boolean).join(' · ');
-            const meta = [row.phone || '—', money, row.at,
-                row.closedAtZto === true ? '🔒 ZTO បិទបញ្ជីរួច ➜ បញ្ចូលជា «យករួច»' : '',
-                ztoListSkipText(row.skip)].filter(Boolean).join(' · ');
-            return '<div class="zto-list-row">'
-                + '<span class="zto-list-code">' + sanitizeInput(row.barcode || '—') + '</span>'
-                + '<span class="zto-list-meta">' + sanitizeInput(meta) + '</span></div>';
-        }).join('')
-        : '<div class="zto-list-row zto-list-row-none">' + sanitizeInput('— គ្មាន —') + '</div>';
-    return `<div class="zto-list-group ${sanitizeInput(toneClass)}">`
-        + '<div class="zto-list-group-head">' + sanitizeInput(title + ' (' + rows.length + ')') + '</div>'
-        + groupRowsHtml + groupMoreHtml + '</div>';
 }
 
 export function renderZtoListSyncPreview() {

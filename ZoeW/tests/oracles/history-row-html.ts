@@ -1,6 +1,11 @@
-import { dataState } from '../core/state';
-import { formatScanStamp } from '../core/timezone';
-import { sanitizeInput } from '../domain/barcode';
+/**
+ * ⛔ **oracle របស់តេស្ត parity តែប៉ុណ្ណោះ** — builder HTML ដើមនៃជួរដេកប្រវត្តិ (រត់លើផលិតកម្មជាង ២០០ ជុំ audit)។
+ *    App គូរជួរដោយ `HistoryRow` (JSX) ពី `buildHistoryRowModel()` ➜ function នេះ **មិនចូលផលិតកម្ម** ទៀតទេ
+ *    ហើយរស់នៅទីនេះដើម្បីឲ្យ `history-row-parity.test.tsx` វាស់ JSX ធៀបនឹងវាលើទិន្នន័យចៃដន្យ។
+ */
+import { dataState } from '../../src/core/state';
+import { formatScanStamp } from '../../src/core/timezone';
+import { sanitizeInput } from '../../src/domain/barcode';
 
 export function buildHistoryRowHtml(item, rowNum, isOld, needsRecall) {
         let phoneDisplay = item.phone === "គ្មានលេខ" ? `<span style="color:#ef4444; font-style:italic;">គ្មានលេខ</span>` : `<span class="phone-clickable" data-act="openCallMarkModal" data-a1="${sanitizeInput(item.id)}" title="ចុចដើម្បីសម្គាល់ការខល">${sanitizeInput(item.phone)}</span>`;

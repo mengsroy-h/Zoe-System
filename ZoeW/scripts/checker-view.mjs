@@ -297,7 +297,7 @@ export function aliasStateFields(text, stateGroups) {
 }
 
 /** ជំនួសតួ function កម្រិតកំពូល `name` ក្នុងអត្ថបទ module (ត្រូវមានពិតម្តងគត់) */
-export function overrideFunction(text, name, replacement) {
+export function overrideFunction(text, name, replacement, originals) {
     const re = new RegExp('^(    )(async )?function ' + name + '\\s*\\(', 'm');
     const m = re.exec(text);
     if (!m) throw new Error('checker-view ៖ រក function ' + name + ' មិនឃើញ (override)');
@@ -310,6 +310,7 @@ export function overrideFunction(text, name, replacement) {
     }
     if (end < 0) throw new Error('checker-view ៖ តួ function ' + name + ' មិនបិទ');
     if (re.exec(text.slice(end))) throw new Error('checker-view ៖ function ' + name + ' មាន ២ ដង');
+    if (originals) originals.push(text.slice(m.index, end));
     return text.slice(0, m.index) + '    ' + replacement + text.slice(end);
 }
 

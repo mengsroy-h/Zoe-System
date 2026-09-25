@@ -6,7 +6,6 @@ import { cleanupClockIsTrustworthy } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, appSessionStore } from '../core/storage';
 import { DB_LISTENER_KEYS } from '../core/text';
-import { sanitizeInput } from '../domain/barcode';
 import { ZTO_TEST_TIMEOUT_MS } from './auto-lookup';
 import { lookupApiIsZto, safeLookupReason } from './customer-table-prefetch';
 import { LICENSE_APP_CODE } from './license';
@@ -22,14 +21,6 @@ import { isNativeApp } from '../platform/native';
 export const SHEET_SCRIPT_VERSION_EXPECTED = 1;
 
 export const HEALTH_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
-
-export function healthRowHtml(state, label, detail) {
-    const icon = HEALTH_ICONS[state] || HEALTH_ICONS.info;
-    const cls = 'health-row health-' + (HEALTH_ICONS[state] ? state : 'info');
-    return '<div class="' + cls + '"><span class="health-ico">' + sanitizeInput(icon) + '</span>'
-        + '<span class="health-text"><b>' + sanitizeInput(label) + '</b>'
-        + '<span class="health-detail">' + sanitizeInput(detail) + '</span></span></div>';
-}
 
 export function healthAgeText(mark) {
     const ms = elapsedSince(mark);

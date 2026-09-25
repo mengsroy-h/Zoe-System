@@ -95,7 +95,6 @@ export type RefName = (typeof REF_NAMES)[number];
 
 const elements = new Map<string, HTMLElement>();
 const binders = new Map<string, (el: HTMLElement | null) => void>();
-const listeners = new Map<string, Set<(el: HTMLElement | null) => void>>();
 
 /**
  * ref callback **ថេរ** សម្រាប់ឈ្មោះមួយ (callback ដដែលរាល់ការគូរ ➜ React មិន
@@ -107,8 +106,6 @@ export function refTo(name: RefName): (el: HTMLElement | null) => void {
         bind = (el: HTMLElement | null) => {
             if (el) elements.set(name, el);
             else elements.delete(name);
-            const subs = listeners.get(name);
-            if (subs) for (const fn of [...subs]) fn(el);
         };
         binders.set(name, bind);
     }
@@ -147,21 +144,6 @@ export function elementOf<T extends HTMLElement = HTMLElement>(name: RefName): T
     return (elements.get(name) as T | undefined) ?? null;
 }
 
-/** ជូនដំណឹងពេល ref ចង/ផ្តាច់ (សម្រាប់ behavior hook ដែលត្រូវការធាតុ) */
-export function onRefChange(name: RefName, fn: (el: HTMLElement | null) => void): () => void {
-    let subs = listeners.get(name);
-    if (!subs) { subs = new Set(); listeners.set(name, subs); }
-    subs.add(fn);
-    return () => { subs.delete(fn); };
-}
-
-/** ឈ្មោះ ref របស់ធាតុមួយ (ឬ `null`) */
-export function refNameOf(el: unknown): RefName | null {
-    if (!el) return null;
-    for (const [name, node] of elements) if (node === el) return name as RefName;
-    return null;
-}
-
 /* ── តម្លៃ input (uncontrolled) ───────────────────────────────────── */
 
 type FieldEl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -188,11 +170,6 @@ export function fieldChecked(name: RefName): boolean {
 export function setFieldChecked(name: RefName, checked: boolean): void {
     const el = field(name) as HTMLInputElement | null;
     if (el) el.checked = checked;
-}
-
-export function fieldFiles(name: RefName): FileList | null {
-    const el = field(name) as HTMLInputElement | null;
-    return el ? el.files : null;
 }
 
 /* ── focus ───────────────────────────────────────────────────────── */
@@ -222,16 +199,6 @@ export function focusFieldAsIs(name: RefName): void {
     if (el) el.focus();
 }
 
-export function blurField(name: RefName): void {
-    const el = elementOf(name);
-    if (el) el.blur();
-}
-
-export function selectFieldText(name: RefName): void {
-    const el = field(name) as HTMLInputElement | null;
-    if (el && typeof el.select === 'function') el.select();
-}
-
 /** បើកផ្ទាំងជ្រើសឯកសាររបស់ `<input type="file">` */
 export function openFilePicker(name: RefName): void {
     const el = elementOf(name);
@@ -251,23 +218,12 @@ export function activeElementIsTextField(): boolean {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
-export function activeElementTag(): string {
-    const el = document.activeElement as HTMLElement | null;
-    return el ? el.tagName : '';
-}
-
 export function blurActiveElement(): void {
     const el = document.activeElement as HTMLElement | null;
     if (el && typeof el.blur === 'function') el.blur();
 }
 
 /* ── ការវាស់ · ការរមូរ ─────────────────────────────────────────────── */
-
-export function elementRect(name: RefName): DOMRect | null {
-    commitNow();
-    const el = elementOf(name);
-    return el ? el.getBoundingClientRect() : null;
-}
 
 /**
  * វាសធាតុដែល **ព្រឹត្តិការណ៍របស់ React** ផ្តល់ (`event.currentTarget` តាម

@@ -7,15 +7,10 @@
  * - **script បណ្ណាល័យ** (SheetJS) ផ្ទុកតាមតម្រូវការ — `<head>` ដដែល
  * - **តំណទាញយក** បណ្តោះអាសន្ន — វិធីតែមួយដែល browser ចាប់ផ្តើមការទាញយកឯកសារ
  * - **ផ្ទៃគូរ/រូបភាពក្រៅអេក្រង់** សម្រាប់ឌិកូដ Barcode/QR — មិនដែលភ្ជាប់ទៅ document
- * - **វដ្តជីវិតរបស់ទំព័រ** (`readyState` · `visibilitychange` · `hidden`) — ជា
+ * - **វដ្តជីវិតរបស់ទំព័រ** (`visibilitychange` · `hidden`) — ជា
  *   ព្រឹត្តិការណ៍របស់ browser មិនមែន DOM ដែល React គូរ
  * - **ទីតាំងរមូររបស់ document** (`<html>` · `<body>` · `window`) — ក្រៅ `#root`
  */
-
-/** ទំព័រផ្ទុកចប់ (`load` បាញ់រួច) */
-export function documentLoadComplete(): boolean {
-    return document.readyState === 'complete';
-}
 
 /** ទំព័រត្រូវលាក់ (App ទៅខាងក្រោយ · អេក្រង់បិទ) */
 export function documentIsHidden(): boolean {

@@ -720,7 +720,7 @@ scenario('CSP ៖ ប៊ូតុងទាំងអស់ឆ្លងកាត�
     const monthChange = require('./react-view').jsxHandler(ROOT, 'monthlyReportMonthSel', 'onChange');
     ok('⛔ ការជ្រើសខែឆ្លងកាត់ data-act (គ្មាន onchange=)',
         !!monthChange && /monthlyReportMonth = e\.target\.value/.test(monthChange.raw)
-        && /renderMonthlyReport\(\)/.test(monthChange.raw) && !/onchange=/.test(html), monthChange && monthChange.raw);
+        && /\bact\(\s*["']renderMonthlyReport["']\s*\)|\brenderMonthlyReport\(\)/.test(monthChange.raw) && !/onchange=/.test(html), monthChange && monthChange.raw);
     ok('⛔ ការសម្អាតពេលចាកចេញគ្រប monthlyReportBody',
         (sliceFn(src, 'clearSensitiveModalFields') || '').indexOf('monthlyReportBody') !== -1);
     ok('⛔ ការសម្អាតពេលចាកចេញ reset ខែដែលជ្រើស',

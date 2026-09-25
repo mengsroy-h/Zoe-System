@@ -46,7 +46,7 @@ function sliceFn(name) {
     return SRC.slice(start, i);
 }
 
-const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
+const NEEDED = ['healthAgeText', 'healthNetworkRow', 'healthDatabaseRow',
     'healthClockRow', 'healthLicenseRow', 'healthCustomerTableRow', 'healthStorageRow',
     'healthServiceWorkerRow', 'healthLookupRow', 'ztoRenewalText', 'healthSheetScriptRow', 'clearCustomerDataTableCache', 'ztoDiagnosticsUrl', 'runHealthCheck',
     'openHealthCheck', 'safeLookupReason', 'lookupApiIsZto', 'lookupApiIsAppsScript',
@@ -60,6 +60,11 @@ const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
     ok('រកឃើញ function ' + n + '()', !!src[n]);
+});
+// App ដើម ៖ ជួរជាខ្សែអក្សរ HTML (`healthRowHtml()`) — App React លុបវាចេញ (JSX គូរពី `healthRow()`) ➜ យកតែពេលមាន
+['healthRowHtml'].forEach((n) => {
+    const body = sliceFn(n);
+    if (body) { src[n] = body; NEEDED.push(n); }
 });
 
 const SECRET = 'super-secret-proxy-key-9911';

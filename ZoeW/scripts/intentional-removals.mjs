@@ -11,6 +11,13 @@ export const REMOVED = {
     runElementAction: 'React ១០០% ៖ ច្រកទ្វារឈ្មោះសកម្មភាពរស់ក្នុង `act()` ➜ `lookupAction()` (`ACTION_REGISTRY` · `src/app/actions.ts`)',
     setupSheetImportDropZone: 'React ១០០% ៖ `dragenter`/`dragover`/`dragleave`/`drop` របស់ `#siDrop` ជា prop របស់ JSX (`SheetImportModal` ➜ `sheetDropEnter` · `sheetDropLeave` · `sheetDropFile`) — `preventDefault()` · `si-drop-hot` · លំដាប់ «ដក hot ➜ អានឯកសារ» ដដែល',
     code128SvgElement: 'React ១០០% ៖ `Code128Svg` (JSX) គូររូប Barcode ពី `code128Bars()` ដដែល · ច្បាប់ចម្លងដើមរស់ជា oracle ក្នុង `tests/fixtures/code128-oracle.ts` (តេស្ត parity អានវាវិញ)',
+    buildHistoryRowHtml: 'React ១០០% ៖ `HistoryRow` (JSX) គូរជួរពី `buildHistoryRowModel()` · ច្បាប់ចម្លងដើមរស់ជា oracle ក្នុង `tests/oracles/history-row-html.ts` (`history-row-parity.test.tsx` វាស់លើទិន្នន័យចៃដន្យ)',
+    healthRowHtml: 'React ១០០% ៖ `HealthCheckList` (JSX) គូរជួរពី `healthRow()` · ច្បាប់ចម្លងដើមរស់ជា oracle ក្នុង `tests/oracles/health-row-html.ts` (`health-row-parity.test.tsx`)',
+    trashGroupRowHtml: 'React ១០០% ៖ `TrashTableBody` (JSX) គូរជួរពី `buildTrashRowModel()` (រូបមន្តដដែល) — builder HTML លែងមានអ្នកហៅ (`function-surface`)',
+    trashActionButtonsHtml: 'React ១០០% ៖ ប៊ូតុង 🔄/✖️ ជា JSX ក្នុងជួរធុងសំរាម (`onAct(\'promptRestoreDeletedItem\')` · `onAct(\'promptPermanentDelete\')`) — helper នេះមានអ្នកហៅតែ `trashGroupRowHtml()`',
+    trashSummaryCardHtml: 'React ១០០% ៖ `TrashSummaryBox` (JSX) គូរកាតពី `buildTrashSummaryModel()` (២ ក្រុមដេរីវេពី `TRASH_REASON_META[r].deducted`) — builder HTML លែងមានអ្នកហៅ',
+    monthlyReportMismatchNote: 'React ១០០% ៖ `MonthlyReportBody` (JSX) គូរសារព្រមានដដែលពី `view.mismatch` (`renderMonthlyReport()`) — builder HTML លែងមានអ្នកហៅ',
+    ztoListGroupHtml: 'React ១០០% ៖ `ZtoListSyncBody` (JSX) គូរក្រុមពី `ztoListGroupModel()` (meta ដដែល រួម `ztoListSkipText(row.skip)`) — builder HTML លែងមានអ្នកហៅ',
 };
 
 /** អត្ថបទដែលអ្នកប្រើអាន (ដកចេញជាមួយសាខាដែលលែងអាចទៅដល់) */

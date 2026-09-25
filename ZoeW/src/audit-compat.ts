@@ -1,5 +1,5 @@
 import { commitNow } from './app/flush';
-import { elementOf, onRefChange, type RefName } from './app/refs';
+import { elementOf, type RefName } from './app/refs';
 import { uiState } from './core/state';
 import { annotateActions } from './audit-annotate';
 
@@ -88,14 +88,22 @@ function wrap(el: Element, bindings: Binding[], adopt: boolean): void {
     Object.defineProperty(el, 'classList', { configurable: true, get: () => proxy });
 }
 
+/**
+ * ⛔ ធាតុដែល React ចង **ក្រោយ** ការដំឡើង (mount យឺត · remount) ទទួលអ្នកបកប្រែតាម `MutationObserver` ៖
+ *    ផលិតកម្មមិនត្រូវការការជូនដំណឹង «ref ប្តូរ» ទេ ➜ ច្រកនោះរស់ក្នុង build វាស់តែប៉ុណ្ណោះ (`wrapped` ការពារការរុំ ២ ដង)។
+ */
+function wrapMountedRefs(adopt: boolean): void {
+    for (const [name, bindings] of REF_BINDINGS) {
+        const el = elementOf(name);
+        if (el) wrap(el, bindings, adopt);
+    }
+}
+
 export function installAuditClassAdapter(): void {
     commitNow();
     wrap(document.body, BODY_BINDINGS, true);
-    for (const [name, bindings] of REF_BINDINGS) {
-        const now = elementOf(name);
-        if (now) wrap(now, bindings, true);
-        onRefChange(name, (el) => { if (el) wrap(el, bindings, false); });
-    }
+    wrapMountedRefs(true);
+    new MutationObserver(() => wrapMountedRefs(false)).observe(document.body, { childList: true, subtree: true });
     commitNow();
 }
 

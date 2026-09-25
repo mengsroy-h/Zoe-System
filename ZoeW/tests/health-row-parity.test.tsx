@@ -10,7 +10,7 @@ import { createRoot } from 'react-dom/client';
 import { act as reactAct } from 'react';
 import { HealthCheckList } from '../src/app/components/health/HealthCheckList';
 import { healthPendingRow, healthRow } from '../src/app/components/health/model';
-import { healthRowHtml } from '../src/features/health-check';
+import { healthRowHtml } from './oracles/health-row-html';
 import { uiState } from '../src/core/state';
 
 function canon(el: Element): string {

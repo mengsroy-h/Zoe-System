@@ -2169,11 +2169,9 @@ bash audit-tools/emu/rules.sh
 - ⏳ **ZoeKeyGen ៖ Reconfig កណ្តាលការផ្ទុក SDK** (អន្ទាក់រង់ចាំ មិនមែនកំហុសសកម្ម) — សាក ៖ DevTools ➜ **Slow 3G** ➜
   Refresh ➜ ខណៈកំពុងផ្ទុក បើក Reconfig ➜ paste Config របស់ Project **ផ្សេង** ➜ Save ➜ App ត្រូវភ្ជាប់ Project **ថ្មី**
   ដោយមិនបាច់ Refresh។ សញ្ញាខូច ៖ បញ្ជី Key នៅរាយ Project ចាស់។
-- ⏳ **ZoeKeyGen ៖ ប៊ូតុងចូល/ចាកចេញ ១ ចុច = ១ សកម្មភាព** — ចុច «🚪 ចាកចេញ» ម្តង ➜ ចាកចេញ **ហើយឈប់** (ប្រអប់ចូល
-  មិនលោតឡើងវិញ) · ចុច «🔑 ចូល» ➜ ប្រអប់លេច **១ ដង**។ គ្មានអ្វីកើត ➜ ពិនិត្យ `navAuthFlow` ក្នុង `ACTION_ALLOWLIST`។
-- ⏳ **APK ZoeW (Android) ៖ keystore ថ្មី** (`CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — ម្ចាស់គម្រោងកាន់ keystore និង
-  ពាក្យសម្ងាត់។ សាក ៖ ដំឡើង APK លើ Android ពិត (ស្កេន · ចូលប្រព័ន្ធ · PTR · Export) · ⛔ App ចាស់ដែល sign ខុស key ➜ លុបម្តង +
-  ដោះកៅអី License ក្នុង ZoeKeyGen · secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **មុន** merge ➜ merge = workflow បង្កើត Release។
+- ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
+  បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
+  ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
 - ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·

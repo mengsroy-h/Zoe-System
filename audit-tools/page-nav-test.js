@@ -258,6 +258,8 @@ function seedData() {
     // class ដែលគ្មានច្បាប់ CSS ធ្វើឲ្យអ្នកយាមបៃតងលើអេក្រង់ដែលនៅដដែល។
     const moneyHue = await page.evaluate(() => {
         if (typeof filterDataByDate === 'function') filterDataByDate('all');
+        // App React ៖ ជួរដេកគូរក្នុង microtask ➜ `commitNow()` ពិត (App ដើមសរសេរ DOM ភ្លាម)
+        if (typeof commitNow === 'function') commitNow();
         const out = { rowsScanned: 0, cod: '', dod: '', sameRow: false };
         const trs = [...document.querySelectorAll('#historyTableBody tr')];
         for (const tr of trs) {
@@ -282,6 +284,7 @@ function seedData() {
     const entryList = await page.evaluate(() => {
         if (window.switchAppPage) window.switchAppPage('entry');
         if (window.setEntryScanMode) window.setEntryScanMode('parcel');
+        if (typeof window.commitNow === 'function') window.commitNow();
         const panel = document.getElementById('parcelPanel');
         const countEl = document.getElementById('entryListCount');
         return {
@@ -457,25 +460,47 @@ function seedData() {
         const realLogin = window.showLoginModalWithPrefill;
         const realLogout = window.logoutApp;
         let logins = 0, logouts = 0;
-        window.showLoginModalWithPrefill = function () { logins++; };
-        window.logoutApp = function () { logouts++; };
+        // App React ៖ ការហៅខាងក្នុង module មិនឆ្លង `window` ➜ រាប់ **ផលពិត** ៖ ការចាកចេញ = `fb.signOut()` ពិតរបស់ SDK
+        //    (រាប់តាម wrapper លើវត្ថុ SDK ដដែលដែល App កាន់) · ការចូល = ប្រអប់ login បើកពិត (commitNow ក្រោយការចុច)
+        const isReact = typeof window.setupActionDelegation !== 'function' && typeof window.commitNow === 'function';
+        const sdk = window.firebaseSDK;
+        const realSignOut = sdk && sdk.signOut;
+        const loginShown = () => {
+            const m = document.getElementById('loginModal');
+            return !!m && getComputedStyle(m).display !== 'none';
+        };
+        if (isReact) {
+            sdk.signOut = function () { logouts++; return realSignOut.apply(this, arguments); };
+        } else {
+            window.showLoginModalWithPrefill = function () { logins++; };
+            window.logoutApp = function () { logouts++; };
+        }
+        const settle = () => {
+            if (!isReact) return;
+            window.commitNow();
+            if (loginShown()) { logins++; if (typeof closeModal === 'function') closeModal('loginModal'); window.commitNow(); }
+        };
         const modalShown = () => {
             const m = document.getElementById('logoutConfirmModal');
             return !!m && getComputedStyle(m).display !== 'none';
         };
-        const tap = (sel) => { const el = document.querySelector(sel); if (el) el.click(); };
+        const tap = (sel) => { const el = document.querySelector(sel); if (el) el.click(); settle(); };
 
         // ១ ៖ មិនទាន់ចូលប្រព័ន្ធ ➜ ផ្លូវចូល រត់ **តែម្តង** គ្មានប្រអប់បញ្ជាក់
         updateAuthButton(false);
         openSideDrawer();
+        if (isReact) window.commitNow();
         btn.click();
+        settle();
         const loggedOut = { logins: logins, logouts: logouts, modal: modalShown() };
 
         // ២ ៖ ចូលរួច ➜ ចុច «ចាកចេញ» ត្រូវ **សួរមុន** មិនចាកចេញភ្លាម
         logins = 0; logouts = 0;
         updateAuthButton(true);
         openSideDrawer();
+        if (isReact) window.commitNow();
         btn.click();
+        settle();
         const asked = { logouts: logouts, modal: modalShown() };
 
         // ៣ ៖ «បោះបង់» ➜ បិទប្រអប់ ហើយ **មិនចាកចេញ**
@@ -485,10 +510,13 @@ function seedData() {
         // ៤ ៖ «យល់ព្រម» ➜ ចាកចេញ **តែម្តង**
         updateAuthButton(true);
         openSideDrawer();
+        if (isReact) window.commitNow();
         btn.click();
+        settle();
         tap('[data-act="confirmLogout"]');
         const confirmed = { logouts: logouts, modal: modalShown() };
 
+        if (isReact) sdk.signOut = realSignOut;
         window.showLoginModalWithPrefill = realLogin;
         window.logoutApp = realLogout;
         updateAuthButton(false);
@@ -506,6 +534,15 @@ function seedData() {
     check(!authFire.err && authFire.confirmed.logouts === 1 && authFire.confirmed.modal === false,
         '⛔ «យល់ព្រម» ➜ ចាកចេញ **តែម្តង** (គ្មាន listener ស្ទួន)', JSON.stringify(authFire));
 
+    // App React ៖ `logoutApp()` ពិតបើកប្រអប់ login **ក្រោយ** `signOut()` ដោះ (async) — App ដើមត្រូវជំនួសដោយ counter ➜
+    //    បិទវាវិញ បើមិនដូច្នេះ `triggerScanAction()` ខាងក្រោមឈប់ភ្លាម (`isModalOpen`) ហើយការវាស់ Locker ទទេ
+    await page.evaluate(async () => {
+        if (typeof window.setupActionDelegation === 'function' || typeof window.commitNow !== 'function') return;
+        await new Promise((r) => setTimeout(r, 80));
+        const m = document.getElementById('loginModal');
+        if (m && getComputedStyle(m).display !== 'none' && typeof closeModal === 'function') closeModal('loginModal');
+        window.commitNow();
+    });
     const moreMenu = await page.evaluate(() => {
         const btn = document.querySelector('.header-more-btn');
         if (!btn) return '';

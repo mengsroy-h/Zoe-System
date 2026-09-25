@@ -2171,8 +2171,6 @@ bash audit-tools/emu/rules.sh
   ដោយមិនបាច់ Refresh។ សញ្ញាខូច ៖ បញ្ជី Key នៅរាយ Project ចាស់។
 - ⏳ **ZoeKeyGen ៖ ប៊ូតុងចូល/ចាកចេញ ១ ចុច = ១ សកម្មភាព** — ចុច «🚪 ចាកចេញ» ម្តង ➜ ចាកចេញ **ហើយឈប់** (ប្រអប់ចូល
   មិនលោតឡើងវិញ) · ចុច «🔑 ចូល» ➜ ប្រអប់លេច **១ ដង**។ គ្មានអ្វីកើត ➜ ពិនិត្យ `navAuthFlow` ក្នុង `ACTION_ALLOWLIST`។
-- ⏳ **iPhone ៖ ស្កេន Barcode ក្រោយ hotfix HTTP cache** (`zoew-v232`) — បើក App ម្តង ➜ បិទ App ទាំងស្រុង ➜ បើកម្តងទៀត ➜ ស្កេន។
-  សញ្ញាខូច ៖ Sentry រាយ `LinkError … Import #70 "a" "qa"` ម្តងទៀត ➜ SW ថ្មីមិនទាន់ដំឡើង (⛔ កុំ «លុប Website Data» មុន — វាលុប PIN · កៅអី License)។
 - ⏳ **APK ZoeW (Android) ៖ keystore ថ្មី** (`CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — ម្ចាស់គម្រោងកាន់ keystore និង
   ពាក្យសម្ងាត់។ សាក ៖ ដំឡើង APK លើ Android ពិត (ស្កេន · ចូលប្រព័ន្ធ · PTR · Export) · ⛔ App ចាស់ដែល sign ខុស key ➜ លុបម្តង +
   ដោះកៅអី License ក្នុង ZoeKeyGen · secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **មុន** merge ➜ merge = workflow បង្កើត Release។

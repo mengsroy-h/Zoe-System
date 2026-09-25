@@ -210,14 +210,14 @@ ok('workflow កំណត់ env ទាំងអស់ដែល build.gradle អ
 ok('build.gradle ដាក់ signingConfig តែពេលមាន keystore (Android Studio នៅដើរធម្មតា)',
     /if \(System\.getenv\('ZOEW_KEYSTORE_FILE'\)\)\s*\{\s*signingConfig signingConfigs\.release/.test(gradle));
 ok('workflow គ្មានផ្លូវ debug/unsigned (assembleDebug · debug.keystore)', releaseWf.length > 1000 && !/assembleDebug|debug\.keystore/.test(releaseWf));
-const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n      - )/) || [''])[0];
+const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || [''])[0];
 ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
 ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
 ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
 ok('keystore ត្រូវលុបចេញពី runner ជានិច្ច (if: always())', /if: always\(\)\s*\n\s*run: rm -f "\$RUNNER_TEMP\/zoew-release\.jks"/.test(releaseWf));
 const keystoreFiles = [];
 (function walkKs(dir) {
-    let entries = [];
+    let entries;
     try { entries = fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
         if (['node_modules', 'build', '.gradle', 'dist', 'dist-audit', '.original'].includes(e.name)) continue;

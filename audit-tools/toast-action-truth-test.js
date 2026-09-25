@@ -3,6 +3,7 @@ const http = require('http');
 const path = require('path');
 const acorn = require('acorn');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = path.resolve(process.env.TOAST_ACTION_APP_DIR || path.join(__dirname, '..'));
 const APP_DIR = path.join(ROOT, 'ZoeW');
@@ -190,8 +191,11 @@ async function runRateSessionChecks() {
                     refreshCurrentHistoryView: () => effects.push('render'), closeModal() {},
                     document: { getElementById: () => ({ value: '4200' }) },
                     setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
-                    clearTimeout: (id) => timers.delete(id)
+                    clearTimeout: (id) => timers.delete(id),
+                    queueMicrotask
                 });
+                // ⛔ ស្រទាប់ React (`fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
+                vm.runInContext(reactRuntime(APP, { exclude: names, context }), context);
                 vm.runInContext('const DB_OP_TIMEOUT_MS = 15000;\n' + functions, context);
                 const pending = context.saveExchangeRate();
                 const timeout = [...timers.values()].find((entry) => entry.ms === 15000);
@@ -375,8 +379,13 @@ async function runBrowser() {
         await page.waitForFunction(() => typeof window.toggleCloseStatus === 'function' && document.getElementById('toastContainer'));
         await page.waitForTimeout(800);
 
-        const clearToasts = () => page.evaluate(() => { document.getElementById('toastContainer').textContent = ''; });
-        const toastText = () => page.evaluate(() => document.getElementById('toastContainer').textContent);
+        // ⛔ មិនលុប DOM របស់ `#toastContainer` ផ្ទាល់ ៖ React ជាម្ចាស់កូនរបស់វា ➜ ការលុបត្រង់ៗធ្វើឲ្យ tree ដួល។
+        //    «សម្អាត» = ចងចាំ toast ដែលមានរួច ➜ `toastText()` អានតែ toast **ថ្មី** (អ្វីដែលអ្នកប្រើឃើញក្រោយសកម្មភាព)។
+        const clearToasts = () => page.evaluate(() => {
+            window.__seenToasts = new WeakSet(Array.from(document.getElementById('toastContainer').children));
+        });
+        const toastText = () => page.evaluate(() => Array.from(document.getElementById('toastContainer').children)
+            .filter((el) => !(window.__seenToasts && window.__seenToasts.has(el))).map((el) => el.textContent).join(' '));
 
         await clearToasts();
         await page.evaluate(() => { window.__toastTruthControl.holdHistory(); window.__truthAction = window.toggleCloseStatus('id_close'); });

@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const ROOT = process.env.HEALTH_APP_DIR ? path.resolve(process.env.HEALTH_APP_DIR) : path.resolve(__dirname, '..');
 const APP_JS = path.join(ROOT, 'ZoeW', 'app.js');
@@ -52,7 +53,9 @@ const NEEDED = ['healthRowHtml', 'healthAgeText', 'healthNetworkRow', 'healthDat
     'sanitizeInput', 'elapsedSince', 'fetchWithTimeout', 'testLookupApiConfig',
     'attemptAutoLookup', 'lookupApiSendsHeader', 'retryAsync', 'lookupResponseError',
     'markLookupTimeoutNoRetry', 'lookupFailureCooldownMs', 'lookupFailureIsDefinitive',
-    'retryTransientLookupResponse', 'noteSheetScriptVersion', 'getNestedField', 'dropAutoLookupQueueEntry'];
+    'retryTransientLookupResponse', 'noteSheetScriptVersion', 'getNestedField', 'dropAutoLookupQueueEntry',
+    // ⛔ App React ៖ ជួរជា **model** (`healthRow()`) ដែល `HealthCheckList` គូរ មិនមែនខ្សែអក្សរ HTML
+    'healthRow', 'healthPendingRow'];
 const src = {};
 NEEDED.forEach((n) => {
     src[n] = sliceFn(n);
@@ -79,7 +82,7 @@ function buildRuntime(over) {
     const ctx = {
         console: { error: () => {}, log: () => {} },
         Object, Array, Promise, JSON, String, Number, Math, Date, Error, Set, Map,
-        isFinite, parseFloat, isNaN, URL, setTimeout, clearTimeout,
+        isFinite, parseFloat, isNaN, URL, setTimeout, clearTimeout, queueMicrotask,
         navigator: { onLine: o.online !== false, serviceWorker: o.sw === false ? {} : { controller: {} } },
         window: { ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) } },
         ZoeLicense: o.license === null ? null : { getStatus: o.license || (() => Promise.resolve({ state: 'active' })) },
@@ -153,11 +156,34 @@ function buildRuntime(over) {
     };
     ctx.globalThis = ctx;
     vm.createContext(ctx);
+    // ⛔ ស្រទាប់ React (ឃ្លាំង `uiState`/`viewState` · `fieldValue` · ប្រអប់) — កូដពិតពីទិដ្ឋភាព (`react-view.js`)
+    vm.runInContext(reactRuntime(SRC, { exclude: NEEDED, context: ctx }), ctx);
     const code = NEEDED.map((n) => src[n]).filter(Boolean).join('\n')
         + "\nconst HEALTH_ICONS = { ok: '\\u2705', warn: '\\u26a0\\ufe0f', bad: '\\u274c', info: '\\u2139\\ufe0f' };"
         + '\nglobalThis.api = { runHealthCheck, healthLookupRow, healthLicenseRow, healthClockRow, healthDatabaseRow, healthStorageRow, healthCustomerTableRow, healthNetworkRow, healthServiceWorkerRow, healthSheetScriptRow, ztoDiagnosticsUrl, testLookupApiConfig, attemptAutoLookup };';
     vm.runInContext(code, ctx);
-    return { api: ctx.api, fetches, pinPrompts, listEl, btnEl, alerts, lookupStatuses, fills };
+    // ⛔ ជួរ (model) ➜ markup ដដែលនឹងអ្វីដែល `HealthCheckList` គូរ (class · រូប · ស្លាក · ព័ត៌មាន) ➜ ការអះអាងលើ
+    //    អត្ថបទដែលអ្នកប្រើឃើញ នៅដដែល។ ខ្សែអក្សរ (App ចាស់) ឆ្លងកាត់ត្រង់ៗ។
+    const api = {};
+    for (const [name, fn] of Object.entries(ctx.api)) {
+        api[name] = typeof fn !== 'function' || !/^health.*Row$/.test(name) ? fn : (...args) => {
+            const out = fn(...args);
+            return out && typeof out.then === 'function' ? out.then(renderHealthRow) : renderHealthRow(out);
+        };
+    }
+    return { api, ctx, fetches, pinPrompts, listEl, btnEl, alerts, lookupStatuses, fills };
+}
+
+function escapeText(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+// markup ដដែលនឹង `HealthCheckList.tsx` ៖ `<div class={cls}><span health-ico>{icon}</span><span health-text><b>{label}</b>
+// <span health-detail>{detail}</span></span></div>` (គ្មាន `.health-detail` ពេល `detail === null`)
+function renderHealthRow(row) {
+    if (!row || typeof row !== 'object') return row;
+    return '<div class="' + escapeText(row.cls) + '"><span class="health-ico">' + escapeText(row.icon) + '</span>'
+        + '<span class="health-text"><b>' + escapeText(row.label) + '</b>'
+        + (row.detail === null ? '' : '<span class="health-detail">' + escapeText(row.detail) + '</span>') + '</span></div>';
 }
 
 const ZTO_CFG = { enabled: true, url: 'https://x.netlify.app/.netlify/functions/zto-order-detail?barcode={barcode}', headerName: 'X-Zoe-Proxy-Key', headerValueEnc: { data: [1], iv: [2] } };
@@ -394,11 +420,14 @@ const state = (html) => (/health-bad/.test(html) ? 'bad' : /health-warn/.test(ht
     {
         const rt = buildRuntime({ cfg: ZTO_CFG });
         await rt.api.runHealthCheck();
-        const html = rt.listEl.innerHTML;
+        // ⛔ App React ៖ `runHealthCheck()` សរសេរ `uiState.healthRows` (ជួរដែល `HealthCheckList` គូរ) និង
+        //    `viewState.healthRecheckBusy` (`disabled` របស់ប៊ូតុង) ➜ អានប្រភពទាំងនោះ
+        const liveRows = vm.runInContext('uiState.healthRows', rt.ctx) || [];
+        const html = liveRows.map(renderHealthRow).join('');
         const rows = (html.match(/class="health-row/g) || []).length;
         ok('runHealthCheck() បង្ហាញជួរគ្រប់ ៩', rows === 9, rows);
         ok('⛔ លទ្ធផលទាំងមូលមិនផ្ទុកតម្លៃសម្ងាត់', html.indexOf(SECRET) === -1);
-        ok('ប៊ូតុងពិនិត្យម្តងទៀតត្រូវដោះវិញក្រោយចប់', rt.btnEl.disabled === false);
+        ok('ប៊ូតុងពិនិត្យម្តងទៀតត្រូវដោះវិញក្រោយចប់', vm.runInContext('viewState.healthRecheckBusy', rt.ctx) === false);
     }
     {
         ok('⛔ Lookup មិនប្រើ Sheet ➜ ជួរកំណែ Script ជា ℹ️ (មិនពាក់ព័ន្ធ)',

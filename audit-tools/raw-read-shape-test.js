@@ -34,12 +34,16 @@ function extractArrow(src, anchor, argName) {
     return 'function (' + argName + ') ' + sliceBalanced(src, braceAt, '{', '}');
 }
 
+// ⛔ ជ្រើសប្លុកតាម **ខ្លឹមសារ** (ប្លុកដែល normalize barcode) មិនមែនតាមលំដាប់ ៖ `deletedItems.forEach` មានច្រើនកន្លែង
+//    (ការ purge ធុងសំរាមក៏ដើរតាមវា) ហើយលំដាប់ module ប្រែ ➜ «ទី ១» មិនមែនអត្តសញ្ញាណ។
 function extractTrashNormalizer(src) {
     const anchor = 'deletedItems.forEach(item => {';
-    const at = src.indexOf(anchor);
-    if (at === -1) throw new Error('trash normalizer anchor not found');
-    const braceAt = src.indexOf('{', at + anchor.length - 1);
-    return sliceBalanced(src, braceAt, '{', '}');
+    for (let at = src.indexOf(anchor); at !== -1; at = src.indexOf(anchor, at + 1)) {
+        const braceAt = src.indexOf('{', at + anchor.length - 1);
+        const body = sliceBalanced(src, braceAt, '{', '}');
+        if (/normalizeBarcodesOf\(item\)/.test(body)) return body;
+    }
+    throw new Error('trash normalizer anchor not found');
 }
 
 function makeCtx(src) {

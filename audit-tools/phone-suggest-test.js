@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { reactRuntime } = require('./react-view.js');
 
 const root = path.resolve(__dirname, '..');
 const appRoot = process.env.PHONE_APP_DIR ? path.resolve(process.env.PHONE_APP_DIR) : root;
@@ -96,13 +97,20 @@ function makeContext(app) {
         renderHistory: (rows) => { rendered.rows = rows; },
         updateDailyScheduleStats: () => {},
         applyCurrentFilter: () => { rendered.filterCalls++; rendered.rows = null; },
-        scheduleChromeLayoutSettle: () => {}
+        scheduleChromeLayoutSettle: () => {},
+        queueMicrotask,
+        requestAnimationFrame: (fn) => setTimeout(fn, 0)
     };
     const ctx = vm.createContext(sandbox);
 vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
     const names = ['sanitizePhoneNumber', 'updateRecentPhonesList', 'searchByPhone', 'openModalHelper', 'showAppChrome'];
-    const optional = ['cssPx', 'normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions'];
+    // ⛔ `phoneSearchFocused`/`phoneSearchBlurred` ៖ handler `onFocus`/`onBlur` ពិតរបស់ប្រអប់ស្វែងរក (JSX)
+    //    — App React មិនចាក់ listener តាម `addEventListener` ទៀតទេ
+    const optional = ['cssPx', 'normalizePhoneDigits', 'collectPhoneSuggestions', 'renderPhoneSuggestions', 'positionPhoneSuggestBox', 'showPhoneSuggestions', 'hidePhoneSuggestions', 'setupPhoneSuggestions',
+        'phoneSearchFocused', 'phoneSearchBlurred'];
     const src = fs.readFileSync(path.join(appRoot, app + '/app.js'), 'utf8');
+    // ⛔ ស្រទាប់ React (ឃ្លាំង · `fieldValue` · `isFieldFocused` · ប្រអប់) — កូដពិតពីទិដ្ឋភាពដដែល (`react-view.js`)
+    vm.runInContext(reactRuntime(src, { exclude: names.concat(optional), context: sandbox }), ctx);
     const present = optional.filter((n) => src.indexOf('function ' + n + '(') !== -1);
     const consts = src.match(/const PHONE_SUGGEST_MAX = \d+;/);
     const consts2 = src.match(/const RECENT_PHONES_MAX = \d+;/);
@@ -116,7 +124,17 @@ vm.runInContext('function setPhoneSearchPulledUp() {}', ctx);
         '\nlet isModalOpen = false;', ctx);
     vm.runInContext(slice(app + '/app.js', names.concat(present)), ctx);
     const maxRows = consts ? parseInt(consts[0].replace(/\D/g, ''), 10) : 8;
-    return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, listeners, has: (n) => present.indexOf(n) !== -1 };
+    // ⛔ App React ៖ ប្រអប់ណែនាំគូរពី `uiState.phoneSuggestOpen` (class `show`) និង `phoneSuggestItems` (ជួរ) ·
+    //    datalist គូរពី `dataState.recentPhonesOptions` ➜ ការវាស់អានប្រភពដែល component គូរពិត
+    //    (ការគូរខ្លួនឯងវាស់ដោយ parity/browser)។ ការ focus/blur ហៅ handler JSX ពិត។
+    const view = {
+        open: () => vm.runInContext('uiState.phoneSuggestOpen === true', ctx),
+        rows: () => vm.runInContext('phoneSuggestItems.length', ctx),
+        datalist: () => vm.runInContext('dataState.recentPhonesOptions', ctx)
+    };
+    listeners.focus = () => vm.runInContext('phoneSearchFocused()', ctx);
+    listeners.blur = () => vm.runInContext('phoneSearchBlurred()', ctx);
+    return { ctx, searchInput, suggestBox, datalistOptions, rendered, maxRows, listeners, view, has: (n) => present.indexOf(n) !== -1 };
 }
 
 // ⛔ លេខទូរស័ព្ទដែលរក្សាទុក ជា **អត្តសញ្ញាណអតិថិជន** ៖ វាជាកូនសោ merge
@@ -206,15 +224,15 @@ function itemsFixture() {
     if (h.has('showPhoneSuggestions')) {
         h.searchInput.value = '421';
         h.ctx.showPhoneSuggestions();
-        ok('បើកដុំស្នើលេខ', h.suggestBox.classList.contains('show'));
-        ok('មានជួរក្នុងដុំ', h.suggestBox.children.length > 0, h.suggestBox.children.length);
+        ok('បើកដុំស្នើលេខ', h.view.open());
+        ok('មានជួរក្នុងដុំ', h.view.rows() > 0, h.view.rows());
         h.ctx.hidePhoneSuggestions();
-        ok('បិទហើយ លុបទិន្នន័យចេញពី DOM',
-            !h.suggestBox.classList.contains('show') && h.suggestBox.children.length === 0,
-            h.suggestBox.children.length);
+        ok('បិទហើយ លុបទិន្នន័យចេញពីដុំ',
+            !h.view.open() && h.view.rows() === 0,
+            h.view.rows());
         h.searchInput.value = '999999';
         h.ctx.showPhoneSuggestions();
-        ok('គ្មានលទ្ធផល ➜ មិនបើកដុំទទេ', !h.suggestBox.classList.contains('show'));
+        ok('គ្មានលទ្ធផល ➜ មិនបើកដុំទទេ', !h.view.open());
     }
 
     console.log('-- តារាងស្វែងរក --');
@@ -235,9 +253,9 @@ function itemsFixture() {
     if (h.has('showPhoneSuggestions')) {
         h.searchInput.value = '421';
         h.ctx.showPhoneSuggestions();
-        ok('ដុំបើករួច មុនបើក modal', h.suggestBox.classList.contains('show'));
+        ok('ដុំបើករួច មុនបើក modal', h.view.open());
         h.ctx.openModalHelper('phoneModal');
-        ok('បើក modal ➜ ដុំបិទដោយស្វ័យប្រវត្តិ', !h.suggestBox.classList.contains('show'));
+        ok('បើក modal ➜ ដុំបិទដោយស្វ័យប្រវត្តិ', !h.view.open());
     }
 
     console.log('-- ទំហំ ២០០-៣០០ លេខ --');
@@ -252,24 +270,25 @@ function itemsFixture() {
         const first = h.ctx.collectPhoneSuggestions('200000');
         ok('លេខទី ១ (ចាស់ជាងគេ) ក៏នៅតែរកឃើញ', first.length === 1 && first[0].phone === '011200000', first.map((e) => e.phone));
         h.ctx.updateRecentPhonesList();
-        ok('datalist ផ្ទុកបាន ៣០០ លេខ', h.datalistOptions.length === 300, h.datalistOptions.length);
+        ok('datalist ផ្ទុកបាន ៣០០ លេខ', h.view.datalist().length === 300, h.view.datalist().length);
         h.ctx.scanHistory = itemsFixture();
     }
 
     console.log('-- datalist សម្រាប់វាលបញ្ចូលលេខ --');
     h.ctx.updateRecentPhonesList();
-    ok('លេខលើសពី ៣០ មិនត្រូវកាត់ចោល', h.datalistOptions.length === 43, h.datalistOptions.length);
-    ok('លេខថ្មីជាងគេនៅដើមបញ្ជី', h.datalistOptions[0] === '012-345 678', h.datalistOptions[0]);
+    ok('លេខលើសពី ៣០ មិនត្រូវកាត់ចោល', h.view.datalist().length === 43, h.view.datalist().length);
+    ok('លេខថ្មីជាងគេនៅដើមបញ្ជី', h.view.datalist()[0] === '012-345 678', h.view.datalist()[0]);
 
-    h.datalistOptions.length = 0;
+    // ⛔ «មិនសាង DOM ឡើងវិញ» ក្នុង React = **មិនសរសេរ state ថ្មី** (អត្តសញ្ញាណ array ដដែល ➜ React មិនគូរ)
+    const sameList = h.view.datalist();
     h.ctx.updateRecentPhonesList();
-    ok('ហៅម្ដងទៀតដោយទិន្នន័យដដែល ➜ មិនសាង DOM ឡើងវិញ', h.datalistOptions.length === 0, h.datalistOptions.length);
+    ok('ហៅម្ដងទៀតដោយទិន្នន័យដដែល ➜ មិនសាងបញ្ជីឡើងវិញ', h.view.datalist() === sameList);
     h.ctx.scanHistory = h.ctx.scanHistory.concat([{ id: 'z9', phone: '0777000111', createdAt: 9900, barcodes: [{ code: 'Z9' }] }]);
     h.ctx.updateRecentPhonesList();
-    ok('លេខថ្មីមកដល់ ➜ សាង DOM ឡើងវិញ', h.datalistOptions.length === 44 && h.datalistOptions[0] === '0777000111', h.datalistOptions.length);
+    ok('លេខថ្មីមកដល់ ➜ សាងបញ្ជីឡើងវិញ', h.view.datalist() !== sameList && h.view.datalist().length === 44 && h.view.datalist()[0] === '0777000111', h.view.datalist().length);
     h.ctx.scanHistory = itemsFixture();
     h.ctx.updateRecentPhonesList();
-    ok('"គ្មានលេខ" មិនចូល datalist', h.datalistOptions.indexOf('គ្មានលេខ') === -1);
+    ok('"គ្មានលេខ" មិនចូល datalist', h.view.datalist().indexOf('គ្មានលេខ') === -1);
 });
 
 function blurRaceCheck() {
@@ -281,14 +300,14 @@ function blurRaceCheck() {
         h.ctx.setupPhoneSuggestions();
         h.searchInput.value = '421';
         h.listeners.focus();
-        ok('focus ➜ ដុំបើក', h.suggestBox.classList.contains('show'));
+        ok('focus ➜ ដុំបើក', h.view.open());
         h.listeners.blur();
         h.listeners.focus();
         setTimeout(() => {
-            ok('focus ឡើងវិញក្នុង ១៥០ms ➜ ដុំនៅតែបើក', h.suggestBox.classList.contains('show'));
+            ok('focus ឡើងវិញក្នុង ១៥០ms ➜ ដុំនៅតែបើក', h.view.open());
             h.listeners.blur();
             setTimeout(() => {
-                ok('blur ហើយទុកចោល ➜ ដុំបិទ', !h.suggestBox.classList.contains('show'));
+                ok('blur ហើយទុកចោល ➜ ដុំបិទ', !h.view.open());
                 resolve();
             }, 260);
         }, 260);

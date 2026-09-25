@@ -61,6 +61,9 @@
   ដោយចេតនា ➜ វាស់ SW តែម្នាក់ឯង) ៖ SW ថ្មីត្រូវទាញ B ពី server (មុនកែ ៖ **A · serverHits 0**) · revalidate ត្រូវនាំ C (មុនកែ ៖
   ជាប់ A) ➜ **ធ្លាក់ ២ មុនកែ · ឆ្លងក្រោយកែ**។ `netlify-config-scope-test` ផ្នែក ៥ ៖ cache យូរ តែលើឯកសារដែលឈ្មោះមាន hash
   (ដេរីវេពីឯកសារ ship ពិត · ទិសផ្ទុយ ៖ `/assets/*` ទទួលបាន) ➜ **ធ្លាក់ ៣ លើ `netlify.toml` របស់ `main`**។
+- **CI ពេញចាប់ checker មួយដែលបាក់** ៖ `adaptive-link-test` ស្រង់ `revalidateShell()` ចូល `vm` ➜ `FRESH` ថ្មីជាអថេរសេរី ➜
+  `ReferenceError` (សញ្ញាល្អ ៖ checker រត់កូដ ship ពិត)។ ការកែ ៖ ថេរខ្សែអក្សរកម្រិតកំពូលដែល `revalidateShell()` យោង ត្រូវ **ស្រង់ពី
+  `sw.js` ពិត** (មិនចាក់ក្នុង sandbox) · regex atomic ត្រូវទទួល `addAll(CORE_SHELL.map(…))` ដូច `sw-install-integrity-test`។
 
 #### APK 2.42.4 build ក្នុង session · keystore · pin
 

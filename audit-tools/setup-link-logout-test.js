@@ -92,10 +92,12 @@ for (const app of ['ZoeW']) {
         ['deletedSearchQuery', 'expandedTrashGroups', 'pendingHistoryPatches', 'historyPatchFlushInFlight',
             'pendingRegistryReleases', 'registryReleaseFlushInFlight', 'ztoListSignedProbe',
             'ztoListSyncResult', 'ztoListSyncInFlight',
-         'appLockExcuseAt', 'appLockVeiled'].forEach((n) => {
+         'appLockExcuseAt', 'appLockVeiled', 'DELETED_LIST_MAX_ROWS', 'trashProbeOpens', 'trashRowLimit'].forEach((n) => {
             const decl = (src.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm')) || [])[0];
             if (decl) vm.runInContext(decl, ctx);
         });
+        const resetTrashProbeFn = sliceFn(src, 'resetTrashProbe');
+        if (resetTrashProbeFn) vm.runInContext(resetTrashProbeFn, ctx);
         // ស្ថានភាពចលនាផ្ទាំង — ចាក់ **កូដពិត** មិនមែន stub ទទេ ដើម្បីឲ្យ
         // តេស្តពិតជាបញ្ជាក់ថាការចាកចេញដោះការផ្អាក snap។
         ['panelGlideTokens', 'panelGlideEpoch', 'panelGlideRelease'].forEach((n) => {

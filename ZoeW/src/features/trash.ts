@@ -7,6 +7,7 @@ import { barcodeEntriesOf } from '../domain/barcode';
 import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
+import { isNativeAndroid } from '../platform/native';
 
 export const TRASH_REASON_META = {
     remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
@@ -113,7 +114,19 @@ export function closeRecentlyDeletedModal() {
     closeModal('recentlyDeletedModal');
 }
 
+export const TRASH_PROBE_SMALL_ROWS = 30;
+
+let trashProbeOpens = 0;
+let trashRowLimit = DELETED_LIST_MAX_ROWS;
+
+export function resetTrashProbe() {
+    trashProbeOpens = 0;
+    trashRowLimit = DELETED_LIST_MAX_ROWS;
+}
+
 export function openRecentlyDeletedModal() {
+    trashProbeOpens++;
+    trashRowLimit = isNativeAndroid() && trashProbeOpens % 2 === 1 ? TRASH_PROBE_SMALL_ROWS : DELETED_LIST_MAX_ROWS;
     setFieldValue('deletedSearchInput', uiState.deletedSearchQuery);
     renderRecentlyDeleted();
     openModalHelper('recentlyDeletedModal');
@@ -147,8 +160,8 @@ export function renderRecentlyDeleted() {
 
     uiState.trashView = {
         empty: null,
-        rows: groups.slice(0, DELETED_LIST_MAX_ROWS).map((group) => buildTrashRowModel(group, expandedTrashGroups)),
-        overflow: Math.max(0, groups.length - DELETED_LIST_MAX_ROWS)
+        rows: groups.slice(0, trashRowLimit).map((group) => buildTrashRowModel(group, expandedTrashGroups)),
+        overflow: Math.max(0, groups.length - trashRowLimit)
     };
     uiState.touch();
 }

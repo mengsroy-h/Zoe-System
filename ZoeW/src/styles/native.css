@@ -10,14 +10,3 @@ html.native-android .app-pages {
 html.native-android {
     -webkit-tap-highlight-color: transparent;
 }
-
-html.native-android .modal-content {
-    animation-name: modalPopInNative;
-    animation-timing-function: ease-out;
-}
-
-@keyframes modalPopInNative {
-    0% { opacity: 0; transform: scale(0.92) translateY(8px); }
-    60% { opacity: 1; transform: scale(1) translateY(-3px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); }
-}

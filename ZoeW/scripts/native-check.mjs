@@ -41,7 +41,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
 const srv = await serveDir(OUT);
 const seed = seedData();
 
-async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT, safeAreaTop = 0 } = {}) {
+async function session({ native = true, storage = {}, session: sess = {}, respond = RESPOND_DEFAULT, safeAreaTop = 0, data = seed } = {}) {
     const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     const errors = [];
@@ -61,7 +61,7 @@ async function session({ native = true, storage = {}, session: sess = {}, respon
     const store = Object.assign({ zoew_firebase_config: CONFIG, zoe_active_locker: 'A5' }, storage);
     await page.addInitScript(`(() => { const s = ${JSON.stringify(store)}; for (const k in s) window.localStorage.setItem(k, s[k]);
         const t = ${JSON.stringify(sess)}; for (const k in t) window.sessionStorage.setItem(k, t[k]); })();`);
-    await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(seed) + ');');
+    await page.addInitScript('(' + FAKE_SDK.toString() + ')(' + JSON.stringify(data) + ');');
     await page.clock.install({ time: HARNESS_CLOCK_START });
     /* ⛔ WebView ពេញអេក្រង់ ៖ `env(safe-area-inset-top)` ពិតតាម CDP (មិនមែន CSS ក្លែង) ➜ navbar ·
        ធាតុវាស់ ទទួល padding ដូចលើទូរស័ព្ទ។ session CDP ត្រូវរស់ពេញសេណារីយ៉ូ (ការ override ជារបស់វា)។ */
@@ -483,42 +483,48 @@ for (const [dur, css, why] of [
     });
 }
 
-/* ── ៤ច. ចលនាបើកប្រអប់ ៖ ទំហំមិនលើសទំហំដែលបានគូរ (APK) ────────────── */
+/* ── ៤ច. ការវាស់ពេលបើកធុងសំរាម (build វាស់ · APK តែមួយ) ─────────────────── */
 /*
- * ⛔ វីដេអូ APK (៩០fps · ស៊ុមម្តងមួយ) ៖ ប្រអប់ធុងសំរាម (២០០ ជួរ) គាំង ~៥៥ms **ត្រង់ពេលប្រអប់ពង្រីកដល់ scale ១,០** មុន overshoot
- *    (ទីតាំងគែមខាងលើ 78 ➜ 74 ➜ ឈរ ៦ ស៊ុម ➜ 71) · PWA ឆ្លងកាត់ចំណុចនោះរលូន។ Chromium គូររូបស្រទាប់ដែលមានចលនានៅទំហំ keyframe
- *    អតិបរមា ➜ easing overshoot (scale > ១) ទាមទារការគូរឡើងវិញ ➜ WebView គូរលើ thread ដែលគូរអេក្រង់ ➜ គាំង (Chrome គូរដាច់ពីគ្នា)។
- *    ⛔ ការប្តូរពណ៌របាស្ថានភាព (៤ង) មិនមែនមូលហេតុទេ ៖ វាកើត **ក្រោយ** ការគាំងជានិច្ច ហើយ 2.42.8 ដែលពន្យារវា នៅតែគាំង។
- *    សេណារីយ៉ូនេះវាស់ scale គណនាពិតរាល់ស៊ុមពេលបើកប្រអប់លើ APK ៖ ត្រូវ ≤ ១ (ចលនានៅមាន ៖ ចាប់ផ្តើម < ១)។
+ * ⛔ វីដេអូ APK 2.42.8 និង 2.42.9 ៖ ការគាំង ៥៥–៦៧ms កណ្តាលចលនាបើកធុងសំរាម នៅដដែល ទោះពន្យារ setStyle ហើយទោះលែងពង្រីក
+ *    លើសទំហំ ➜ សម្មតិកម្មទាំង ២ ខុស។ build នេះវាស់លើទូរស័ព្ទពិត ៖ ការបើកលើកសេស បង្ហាញតែ ៣០ ជួរ · លើកគូ ពេញ · រាល់ការបើកចេញសារ
+ *    🔬 (ចលនា · ស៊ុមឃ្លាតធំបំផុត · thread មេរវល់ធំបំផុត · longtask)។ សេណារីយ៉ូនេះបញ្ជាក់ថាការវាស់ដំណើរការ មុនអ្នកប្រើចំណាយពេល build ៖
+ *    APK ៖ លើកទី ១ = ៣០ ជួរ · លើកទី ២ = ពេញ · សារ 🔬 រាយចំនួនជួរពិត និងពេលចលនា ➜ web ៖ ពេញ ហើយគ្មានសារ 🔬 (ទិសផ្ទុយ)។
  */
-await scenario('៤ច. ចលនាបើកប្រអប់លើ APK មិនពង្រីកលើសទំហំដែលបានគូរ (scale ≤ ១)', async () => {
-    const s = await session();
-    const { page } = s;
-    const res = await page.evaluate(() => new Promise((resolve) => {
-        document.querySelector('.daily-stats-btn').click();
-        const t0 = performance.now();
-        let min = Infinity;
-        let max = -Infinity;
-        let lift = 0;
-        let frames = 0;
-        (function tick() {
-            const el = document.querySelector('#dailyStatsModal .modal-content');
-            if (el && getComputedStyle(document.getElementById('dailyStatsModal')).display !== 'none') {
-                const m = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform);
-                const scale = Math.hypot(m.a, m.b);
-                min = Math.min(min, scale);
-                max = Math.max(max, scale);
-                lift = Math.min(lift, m.f);
-                frames++;
-            }
-            if (performance.now() - t0 < 600) requestAnimationFrame(tick);
-            else resolve({ min: Math.round(min * 10000) / 10000, max: Math.round(max * 10000) / 10000, lift: Math.round(lift * 100) / 100, frames });
-        })();
+const trashSeed = JSON.parse(JSON.stringify(seed));
+for (let i = 0; i < 60; i++) {
+    const d = trashSeed.zoew_recently_deleted_cod_dod.d1;
+    trashSeed.zoew_recently_deleted_cod_dod['p' + i] = Object.assign({}, d, { id: 'p' + i, phone: '09' + String(1000000 + i),
+        barcodes: d.barcodes.map((b) => Object.assign({}, b, { code: 'PR' + i })) });
+}
+async function openTrashAndRead(page) {
+    await page.evaluate(() => document.querySelector('.header-more-btn').click());
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelector('[data-act="moreMenuRecentlyDeleted"]').click());
+    await page.waitForTimeout(1600);
+    const out = await page.evaluate(() => ({
+        rows: document.querySelectorAll('#recentlyDeletedModal .trash-group-row').length,
+        probe: Array.from(document.querySelectorAll('.toast')).map((t) => t.textContent).filter((t) => t.includes('🔬')).join(' | ')
     }));
-    ok('(លក្ខខណ្ឌចាំបាច់) ប្រអប់បើក ហើយចលនាពង្រីកនៅមាន (scale ចាប់ផ្តើម < ១)', res.frames > 5 && res.min < 0.99, res);
-    ok('⛔ scale មិនលើស ១ អំឡុងចលនា (មិនបង្ខំ WebView គូរតារាងធំឡើងវិញកណ្តាលចលនា)', res.max <= 1.0001, res);
-    ok('«លោត» នៅដដែល ៖ overshoot តាមការរំកិលឡើង (translateY < ០)', res.lift < -0.5, res);
-    await closeSession(s, 'ចលនាបើកប្រអប់');
+    await page.evaluate(() => document.querySelector('#recentlyDeletedModal .btn-cancel').click());
+    await page.waitForTimeout(3600);
+    return out;
+}
+await scenario('៤ច. ការវាស់ពេលបើកធុងសំរាម (APK ៖ ៣០ ជួរ / ពេញ ឆ្លាស់គ្នា · សារ 🔬)', async () => {
+    const w = await session({ native: false, data: trashSeed });
+    const web = await openTrashAndRead(w.page);
+    await closeSession(w, 'ការវាស់ធុងសំរាម web');
+    const full = web.rows;
+    ok('(លក្ខខណ្ឌចាំបាច់) web ៖ ធុងសំរាមពេញមានច្រើនជាង ៣០ ជួរ', full > 30, web);
+    ok('web ៖ គ្មានសារ 🔬 (ការវាស់ជារបស់ APK តែមួយ)', !web.probe, web);
+    const s = await session({ data: trashSeed });
+    const first = await openTrashAndRead(s.page);
+    const second = await openTrashAndRead(s.page);
+    ok('APK លើកទី ១ ៖ បង្ហាញតែ ៣០ ជួរ', first.rows === 30, first);
+    ok('APK លើកទី ២ ៖ បង្ហាញពេញដូច web', second.rows === full, { second, full });
+    ok('សារ 🔬 រាយចំនួនជួរពិត', first.probe.includes('ជួរ 30 ') && second.probe.includes('ជួរ ' + full + ' '), { first: first.probe, second: second.probe });
+    ok('សារ 🔬 វាស់ចលនាប្រអប់ពិត', /ចលនា \d+–\d+ms/.test(first.probe), first.probe);
+    ok('សារ 🔬 រាយស៊ុម · thread មេ · longtask', /ស៊ុមឃ្លាតធំបំផុត \d+ms@\d+/.test(first.probe) && /thread មេរវល់ធំបំផុត \d+ms@\d+/.test(first.probe) && /longtask /.test(first.probe), first.probe);
+    await closeSession(s, 'ការវាស់ធុងសំរាម APK');
 });
 
 /* ── ៥. web (គ្មាន bridge) ───────────────────────────────────────────── */
@@ -580,12 +586,6 @@ await scenario('៥. web ធម្មតា (គ្មាន bridge) ៖ មិ�
     const reloaded = page.waitForEvent('framenavigated', { timeout: 1500 }).then(() => true, () => false);
     await pull(page, 300);
     ok('PTR របស់ App មិនដើរលើ web', !(await reloaded));
-    const pop = await page.evaluate(() => {
-        document.querySelector('.daily-stats-btn').click();
-        const el = document.querySelector('#dailyStatsModal .modal-content');
-        return el ? { name: getComputedStyle(el).animationName, easing: getComputedStyle(el).animationTimingFunction } : null;
-    });
-    ok('ចលនាបើកប្រអប់លើ web ដូច ZoeW ដើម (modalPopIn + overshoot · ការកែ ៤ច ជារបស់ APK តែមួយ)', !!pop && pop.name === 'modalPopIn' && /1\.56/.test(pop.easing), pop);
     await closeSession(s, 'web');
 });
 

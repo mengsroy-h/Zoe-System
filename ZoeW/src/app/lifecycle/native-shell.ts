@@ -8,11 +8,18 @@ import { closeTopmostLayer } from './layers';
 import type { LifecycleScope } from './scope';
 import { elementOf } from '../refs';
 import { statusBarToneFor, type StatusBarTone } from './status-bar-tone';
+import { showToast } from '../../ui/toast';
 
 export function setupNativeShell(scope: LifecycleScope): void {
     if (!isNativeAndroid()) return;
     const history = createBackHistory(() => screenOf(uiState));
     scope.onDispose(uiState.subscribe(history.observe));
+    let trashWasOpen = false;
+    scope.onDispose(uiState.subscribe(() => {
+        const open = uiState.modalDisplay.recentlyDeletedModal === 'flex';
+        if (open && !trashWasOpen) probeTrashOpen(scope);
+        trashWasOpen = open;
+    }));
     Promise.all([import('@capacitor/app'), import('@capacitor/core')]).then(async ([{ App }, core]) => {
         if (scope.disposed) return;
         const handles = await Promise.all([
@@ -131,4 +138,62 @@ export function measureStatusBarTone(): StatusBarTone {
         if (window.ZoeErrors) ZoeErrors.capture(e, { context: 'Status bar tone measure failed' });
         return 'light';
     }
+}
+
+export const TRASH_PROBE_WINDOW_MS = 900;
+
+export function probeTrashOpen(scope: LifecycleScope): void {
+    const t0 = performance.now();
+    const rel = (t: number) => Math.round(t - t0);
+    const frames: number[] = [];
+    const ticks: number[] = [t0];
+    const longTasks: string[] = [];
+    let animFrom = -1;
+    let animTo = -1;
+    let observer: PerformanceObserver | null = null;
+    try {
+        observer = new PerformanceObserver((list) => {
+            list.getEntries().forEach((e) => { if (e.startTime + e.duration >= t0) longTasks.push(rel(e.startTime) + '+' + Math.round(e.duration)); });
+        });
+        observer.observe({ type: 'longtask', buffered: true });
+    } catch {
+        observer = null;
+    }
+    const tick = () => {
+        const now = performance.now();
+        ticks.push(now);
+        if (now - t0 < TRASH_PROBE_WINDOW_MS && !scope.disposed) setTimeout(tick, 0);
+    };
+    setTimeout(tick, 0);
+    const frame = () => {
+        const now = performance.now();
+        frames.push(now);
+        if (finiteAnimationsRunning().some((a) => { const el = (a.effect as KeyframeEffect | null)?.target as Element | null; return !!el && !!el.closest && !!el.closest('#recentlyDeletedModal'); })) {
+            if (animFrom < 0) animFrom = rel(now);
+            animTo = rel(now);
+        }
+        if (now - t0 < TRASH_PROBE_WINDOW_MS && !scope.disposed) requestAnimationFrame(frame);
+        else finish();
+    };
+    requestAnimationFrame(frame);
+    const widest = (list: number[]) => {
+        let gap = 0;
+        let at = 0;
+        for (let i = 1; i < list.length; i++) {
+            if (list[i] - list[i - 1] > gap) { gap = list[i] - list[i - 1]; at = list[i - 1]; }
+        }
+        return Math.round(gap) + 'ms@' + rel(at);
+    };
+    const finish = () => {
+        setTimeout(() => {
+            if (observer) { try { observer.disconnect(); } catch {} }
+            if (scope.disposed) return;
+            const rows = uiState.trashView && Array.isArray(uiState.trashView.rows) ? uiState.trashView.rows.length : 0;
+            showToast('🔬 វាស់ធុងសំរាម · ជួរ ' + rows
+                + ' · ចលនា ' + animFrom + '–' + animTo + 'ms'
+                + ' · ស៊ុមឃ្លាតធំបំផុត ' + widest(frames)
+                + ' · thread មេរវល់ធំបំផុត ' + widest(ticks)
+                + ' · longtask ' + (observer ? (longTasks.length ? longTasks.join(',') : '0') : 'n/a'), 'info');
+        }, 0);
+    };
 }

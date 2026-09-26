@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.9` (`zoew-v236`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.10` (`zoew-v237`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.5` (`zoekeygen-v104`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -128,7 +128,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
 > plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
 > ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
-> ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ ពណ៌របាស្ថានភាពប្តូរ **ក្រោយ** ចលនាប្រអប់ · ចលនាបើកប្រអប់ APK មិនពង្រីកលើស scale ១ (WebView គូរឡើងវិញលើ thread គូរអេក្រង់ ➜ គាំង · web រក្សា overshoot) · Back ·
+> ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ ពណ៌របាស្ថានភាពប្តូរ **ក្រោយ** ចលនាប្រអប់ · ការវាស់ពេលបើកធុងសំរាម (build វាស់ ៖ ៣០ ជួរ/ពេញ ឆ្លាស់ · សារ 🔬 · APK តែមួយ) · Back ·
 > ប្រវត្តិ · pause/resume · Share/Print · ជីវមាត្រ · PTR/latch) · `npm run
 > rules:check` (លុប/ដក · ២ម៉ោង · ៧ថ្ងៃ · ២ថ្ងៃ · ៣០ថ្ងៃ លើ ZoeW ដើម · web ·
 > Android)។ ⛔ **Back មិនត្រឡប់ចូលរបៀប «ដក» វិញ** (`safeScreen()`)។
@@ -2187,6 +2187,8 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **APK ៖ ធុងសំរាមគាំង ~៦០ms ពេលបើក (មូលហេតុមិនទាន់ដឹង)** — 2.42.10 ជា **build វាស់** (ការបើកលើកសេស ៣០ ជួរ · សារ 🔬 ·
+  `probeTrashOpen()` · `TRASH_PROBE_SMALL_ROWS` · `docs/HISTORY.md` [2.42.10]) ➜ ⛔ **កុំ merge** ទាំងស្ថានភាពនេះ ➜ ត្រូវវីដេអូពីអ្នកប្រើ រួច **ដកការវាស់ចេញ**។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

@@ -11,6 +11,7 @@ import { isPinFlowPending } from './config';
 import { closeConfigQrScanner } from './config-qr';
 import { restoreAfterPdfExport } from './export';
 import { expandedTrashGroups } from './locker';
+import { resetTrashProbe } from './trash';
 import { hidePhoneSuggestions } from './phone-suggest';
 import { setPhoneSearchPulledUp } from '../app/behaviors/phone-search';
 import { clearSheetImportSession } from './sheet-import';
@@ -123,6 +124,7 @@ export function clearSensitiveModalFields() {
     securityState.appLockVeiled = false;
     uiState.deletedSearchQuery = '';
     expandedTrashGroups.clear();
+    resetTrashProbe();
     uiState.activeParentItemId = null;
     securityState.lookupSecretKey = null;
     lookupState.sheetScriptVersionSeen = null;

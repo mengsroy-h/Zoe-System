@@ -304,6 +304,20 @@ function normalize(db) {
         rekey['<ថ្មី:' + t.trashReason + ':' + codes + '>'] = Object.assign({}, t, { id: '<id>' });
     }
     db = Object.assign({}, db, { zoew_recently_deleted_cod_dod: rekey });
+    // token `op` របស់ runLedgerTransaction() ជាអត្តសញ្ញាណការសរសេរ (ថ្មីរាល់ដង) មិនមែនលុយ ➜ ដកតែលើ record ledger ដែលមានរូបរាង token ពិត
+    for (const node of ['zoew_daily_revenue_cod_dod', 'zoew_monthly_revenue_cod_dod']) {
+        const map = db[node];
+        if (!map || typeof map !== 'object') continue;
+        const clean = {};
+        for (const [k, rec] of Object.entries(map)) {
+            if (rec && typeof rec === 'object' && typeof rec.op === 'string' && /^op_[a-z0-9]{8,}$/.test(rec.op)) {
+                const rest = Object.assign({}, rec);
+                delete rest.op;
+                clean[k] = rest;
+            } else clean[k] = rec;
+        }
+        db = Object.assign({}, db, { [node]: clean });
+    }
     const seededStamps = new Set();
     JSON.stringify(seed(), (k, v) => { if (typeof v === 'number' && /At$/.test(k)) seededStamps.add(v); return v; });
     return JSON.parse(JSON.stringify(db, (k, v) => {

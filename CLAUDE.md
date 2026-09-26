@@ -125,7 +125,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > native · ផ្លូវ web/iOS មិនប្រែ។ ⛔ **PTR លើ Android native** (សំណើច្បាស់របស់
 > ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
-> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
+> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo · ល្បឿនអេក្រង់ adaptive (`MainActivity` ស្នើ ≤១២០Hz តែពេលប៉ះ/រមូរ · ដោះពេលស្ងាត់ ➜ មិនជាប់ 60Hz · មិនស៊ីថ្មពេលទំនេរ) ·
 > plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
 > ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
 > ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·

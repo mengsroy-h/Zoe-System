@@ -18,6 +18,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | Service Worker | cache សំបក | មិនចុះឈ្មោះ (ឯកសារទាំងអស់ស្ថិតក្នុង APK រួច) |
 | សោ App ពេលចាកចេញ | `visibilitychange` | `pause`/`resume` របស់ Activity **បូក** `visibilitychange` (ការហៅស្ទួនត្រូវច្រានចេញ) |
 | ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` |
+| ល្បឿនអេក្រង់ (Hz) | Chrome រត់ 90/120Hz តាមទូរស័ព្ទ | **adaptive 10–120Hz** ៖ WebView ក្នុង App ដែលមិនស្នើ ត្រូវទូរស័ព្ទជាច្រើន (Xiaomi · Oppo · Vivo …) ចាក់ត្រឹម 60Hz ➜ `MainActivity` ស្នើ display mode ល្បឿនខ្ពស់បំផុត (ទំហំ pixel ដដែល · ពិដាន ១២០Hz) **ពេលម្រាមដៃប៉ះ/រមូរ** ហើយដោះការស្នើ ២ វិ. ក្រោយលើកម្រាមដៃ ឬពេលចាកចេញពី App ➜ ប្រព័ន្ធចុះល្បឿនខ្លួនឯង (ដល់ 10Hz លើអេក្រង់ LTPO) ➜ មិនស៊ីថ្មពេលទំនេរ · ⛔ មិនស្នើ 10Hz ផ្ទាល់ (កាមេរ៉ាស្កេន 30fps នឹងរាំង) · កំហុស ➜ ទុកឲ្យប្រព័ន្ធសម្រេច |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 
 ---
@@ -171,3 +172,4 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 | ១១ | ចាកចេញពី App ធម្មតា ➜ ត្រឡប់មក | សុំ PIN · task switcher មិនឃើញទិន្នន័យ |
 | ១២ | ZTO Lookup · 🩺 ពិនិត្យសុខភាព | ដូច PWA · ជួរ «របៀបក្រៅបណ្ដាញ» ✅ |
 | ១៣ | ទូរស័ព្ទ WebView ចាស់ ធៀបនឹងថ្មី · បើក/បិទប្រអប់ | របាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញជានិច្ច ៖ រូបតំណាង **ខ្មៅ** លើ navbar ស · **ស** ពេលប្រអប់ (ផ្ទៃងងឹត) បើក · ខ្មៅវិញពេលបិទ |
+| ១៤ | រមូរបញ្ជី · អូសផ្ទាំង · បើកម៉ឺនុយ លើទូរស័ព្ទអេក្រង់ 90/120Hz ធៀប APK នឹង PWA ក្នុង Chrome | ចលនារលូនដូចគ្នា (APK មិនជាប់ 60Hz) · ទុកទូរស័ព្ទស្ងាត់ ➜ ល្បឿនចុះវិញ (Developer options ➜ Show refresh rate) |

@@ -15,6 +15,7 @@
  *   ៨. Release APK (`.github/workflows/android-release.yml`) ៖ ឈ្មោះ env របស់ keystore ស្មើនឹងអ្វីដែល
  *      `build.gradle` អាន · គ្មានផ្លូវធ្លាក់ចុះទៅ debug key · keystore មិនចូល repo · វិញ្ញាបនបត្រ APK
  *      ត្រូវស្មើ pin `android/release-cert.sha256` មុន Release
+ *   ៩. ល្បឿនអេក្រង់ adaptive ៖ MainActivity ស្នើល្បឿនខ្ពស់បំផុត (≤១២០Hz · ទំហំដដែល) តែពេលប៉ះ/រមូរ ហើយដោះពេលស្ងាត់ · fail-open
  *
  *   node scripts/android-check.mjs   (ANDROIDCHECK_ROOT=<ថត> ដើម្បីចង្អុលទៅ tree ផ្សេង)
  */
@@ -69,6 +70,26 @@ ok('build.gradle namespace ស្មើ appId', gradle.includes(`namespace = "${
 ok('strings.xml package_name ស្មើ appId', read('android/app/src/main/res/values/strings.xml').includes(`<string name="package_name">${appId}</string>`));
 const mainActivity = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/MainActivity.java`);
 ok('MainActivity ស្ថិតក្នុង package របស់ appId', mainActivity.includes(`package ${appId};`));
+// ⛔ ល្បឿនអេក្រង់ adaptive (10–120Hz) ៖ PWA រត់ក្នុង Chrome (90/120Hz) ចំណែក WebView ក្នុង App ដែលមិនស្នើ ត្រូវ OEM ជាច្រើនចាក់ត្រឹម
+// 60Hz ➜ MainActivity ស្នើ display mode ល្បឿនខ្ពស់បំផុត (ទំហំ pixel ដដែល · ពិដាន ១២០Hz) **តែពេលប៉ះ/រមូរ** ហើយដោះការស្នើ (0 = ប្រព័ន្ធ
+// សម្រេច ➜ ចុះដល់ 10Hz លើអេក្រង់ LTPO) ពេលស្ងាត់ ➜ មិនស៊ីថ្មពេលទំនេរ · ⛔ មិនស្នើ 10Hz ផ្ទាល់ (កាមេរ៉ាស្កេន 30fps នឹងរាំង) · fail-open
+const javaMethod = (name) => (mainActivity.match(new RegExp('\\s' + name + '\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\n    \\}')) || [])[1] || '';
+const touchBody = javaMethod('dispatchTouchEvent');
+const boostBody = javaMethod('boostRefreshRate');
+const releaseBody = javaMethod('releaseRefreshRate');
+const pauseBody = javaMethod('onPause');
+const idleMs = Number((mainActivity.match(/IDLE_RELEASE_MS\s*=\s*(\d+)L?;/) || [])[1]);
+ok('ល្បឿនអេក្រង់ ៖ ការប៉ះ (DOWN · MOVE) ស្នើល្បឿនខ្ពស់', /ACTION_DOWN/.test(touchBody) && /ACTION_MOVE/.test(touchBody) && /boostRefreshRate\(\)/.test(touchBody));
+ok('... ⛔ ការប៉ះនៅតែបញ្ជូនទៅ WebView (super.dispatchTouchEvent)', /return\s+super\.dispatchTouchEvent\(event\);/.test(touchBody));
+ok('... លើកម្រាមដៃ ➜ ដោះការស្នើក្រោយស្ងាត់ (UP · CANCEL ➜ postDelayed)', /ACTION_UP/.test(touchBody) && /ACTION_CANCEL/.test(touchBody) && /postDelayed\(releaseRefresh,\s*IDLE_RELEASE_MS\)/.test(touchBody));
+ok('... រយៈស្ងាត់ ៥០០–៣០០០ ms (fling បញ្ចប់មុនចុះល្បឿន · មិនជាប់យូរ)', idleMs >= 500 && idleMs <= 3000, idleMs);
+ok('... ជ្រើសពី getSupportedModes() ➜ preferredDisplayModeId', /getSupportedModes\(\)/.test(boostBody) && /preferredDisplayModeId\s*=\s*best\.getModeId\(\)/.test(boostBody));
+ok('... រក្សាទំហំ pixel ដដែល (មិនប្តូរ resolution)', /getPhysicalWidth\(\)/.test(boostBody) && /getPhysicalHeight\(\)/.test(boostBody));
+ok('... ពិដាន ១២០Hz (មិនរត់ 144/165Hz ស៊ីថ្ម)', /getRefreshRate\(\)\s*>\s*MAX_REFRESH_HZ/.test(boostBody) && /MAX_REFRESH_HZ\s*=\s*12\d(\.\d+)?f?;/.test(mainActivity));
+ok('... ពេលស្ងាត់ ➜ preferredDisplayModeId = 0 (ប្រព័ន្ធ adaptive សម្រេច)', /preferredDisplayModeId\s*=\s*0;/.test(releaseBody));
+ok('... ចាកចេញពី App (onPause) ➜ ដោះការស្នើ', /removeCallbacks\(releaseRefresh\)/.test(pauseBody) && /releaseRefreshRate\(\)/.test(pauseBody));
+ok('... ⛔ មិនចាក់សោល្បឿនខ្ពស់ជាអចិន្ត្រៃយ៍ (គ្មានការស្នើក្នុង onCreate/onResume)', !/void\s+on(Create|Resume)\s*\([^)]*\)\s*\{[^}]*boostRefreshRate/.test(mainActivity));
+ok('... fail-open (កំហុស ➜ ប្រព័ន្ធសម្រេច)', [touchBody, boostBody, releaseBody].every((b) => /catch\s*\(RuntimeException/.test(b)));
 ok('webDir = dist (build របស់ Vite)', /webDir:\s*'dist'/.test(capConfig));
 ok('SystemBars insetsHandling = native', /insetsHandling:\s*'native'/.test(capConfig));
 

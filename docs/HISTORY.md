@@ -110,6 +110,22 @@
 - **ការកែ** (`error-reporting.js` App ទាំង ២ · byte-identical) ៖ អត្តសញ្ញាណ (`itemId` · `item` · `barcode` · `keyId` · `date` · `path`) ផ្សេងគ្នា ➜ ផ្ញើ
   (ពិដាន ៥/ហត្ថលេខា/បង្អួច) · ព្យុះលើ id ដដែលនៅតែទប់។ **អ្នកយាម** ៖ `sentry-load-race-test` ផ្នែក ៦ខ ➜ ធ្លាក់ ២ មុនកែ។
 
+#### 🟠 ៧. APK មិនរលូនដូច PWA លើ Android (APK តែប៉ុណ្ណោះ · web មិនប្រែ)
+
+- **អ្នកប្រើរាយការណ៍** ៖ ចលនាក្នុង APK «ដូច iOS PWA» មិនរលូនដូច PWA ក្នុង Chrome លើ Android។
+- **មូលហេតុ** ៖ PWA រត់ក្នុង Chrome ដែលទូរស័ព្ទអនុញ្ញាតឲ្យរត់ 90/120Hz។ WebView ក្នុង App ដែលមិនស្នើល្បឿន ត្រូវ OEM ជាច្រើនចាក់ត្រឹម
+  60Hz (Safari លើ iPhone ក៏បង្ហាញទំព័រវែបត្រឹម 60Hz ដែរ ➜ «ដូច iOS PWA»)។ `MainActivity` មិនដែលស្នើអ្វីសោះ។
+- **ការកែ (adaptive 10–120Hz តាមសំណើអ្នកប្រើ)** ៖ `MainActivity.dispatchTouchEvent()` ស្នើ display mode ល្បឿនខ្ពស់បំផុតដែលមានទំហំ pixel ដដែល
+  (ពិដាន ១២០Hz · `preferredDisplayModeId`) **ពេលម្រាមដៃប៉ះ/រមូរ** ហើយដោះការស្នើ (`0`) ២ វិ. ក្រោយលើកម្រាមដៃ ឬពេល `onPause` ➜ ប្រព័ន្ធចុះ
+  ល្បឿនខ្លួនឯង (ដល់ 10Hz លើអេក្រង់ LTPO)។ ⛔ មិនចាក់សោ 120Hz ជាអចិន្ត្រៃយ៍ (ស៊ីថ្មពេលទំនេរ) · ⛔ មិនស្នើ 10Hz ផ្ទាល់ (កាមេរ៉ាស្កេន 30fps នឹងរាំង) ·
+  ការប៉ះនៅតែបញ្ជូនទៅ WebView · កំហុសណាមួយ ➜ ប្រព័ន្ធសម្រេច។ compile លើ `android.jar` (API 35) ពិត គ្មាន warning។
+- **អ្នកយាម** ៖ `npm run android:check` (១១ ការអះអាង ➜ `MainActivity` ដើមធ្លាក់ ១០ · mutation ៦/៦ ចាប់ ៖ លេបការប៉ះ · មិនដោះពេលស្ងាត់ ·
+  `onPause` មិនដោះ · ចាក់សោក្នុង `onResume` · គ្មានពិដាន · ស្ងាត់យូរ ១០ វិ.)។ ⚠️ ឥទ្ធិពលលើអេក្រង់ វាស់បានតែលើទូរស័ព្ទពិត។
+- ⚠️ **ភាពខុសគ្នាទី ២ ដែលមិនទាន់កែ** ៖ APK ដាក់អ្នកស្តាប់ `touchmove` ដែលទប់ការរមូរ (PTR ដូច iOS) ខណៈ PWA Android គ្មាន ➜ ការចាប់ផ្តើម
+  រមូររង់ចាំ JavaScript។ វាជាតំបន់ហាមចូល (PTR) ➜ កែតែក្រោយវាស់លើទូរស័ព្ទពិតថា ការកែល្បឿនអេក្រង់មិនគ្រប់គ្រាន់។
+- **សកម្មភាពដោយដៃ** ៖ ប្រែតែកូដ Android ➜ **គ្មានការឡើងកំណែ web** (PWA មិនត្រូវទាញឡើងវិញ) ➜ ចេញក្នុង APK **2.42.7** ដែលមិនទាន់មាន Release ៖
+  ដោះ GitHub Actions ➜ **Actions ➜ Android APK ➜ Run workflow** លើ `main` (⛔ កុំ Re-run run ចាស់ ៖ វា build commit មុនការកែនេះ)។
+
 #### ឯកសារ
 
 - `ZoeW/docs/TYPESCRIPT.md` យោង `byId()` · `src/core/dom.ts` · `elInput`/`elDiv` · `HistoryItem`/`BarcodeEntry` ដែល **លែងមាន** ➜ សរសេរឡើងវិញតាម

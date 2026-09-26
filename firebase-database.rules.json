@@ -322,6 +322,9 @@
         "totalCount": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
         },
+        "op": {
+          ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 40"
+        },
         "$other": {
           ".validate": false
         }
@@ -378,6 +381,9 @@
         },
         "totalCount": {
           ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "op": {
+          ".validate": "newData.isString() && newData.val().length >= 8 && newData.val().length <= 40"
         },
         "$other": {
           ".validate": false

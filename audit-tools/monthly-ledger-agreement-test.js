@@ -94,7 +94,7 @@ const REQUIRED_FNS = [
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict',
     'ledgerMemoryCompensationClaimed', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta',
     'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
+    'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'appendRestoreRevenueIncrements',
     'getFormattedDate'
 ];
 const fnSrc = {};
@@ -179,7 +179,7 @@ function makeSandbox(opts) {
     vm.createContext(ctx);
     const order = ['getFormattedDate', 'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp',
         'revertLedgerRecordInMemory', 'applyLedgerBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict',
-        'ledgerMemoryCompensationClaimed', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+        'ledgerMemoryCompensationClaimed', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
         'alignMonthlyLedgerToDaily', 'commitRevenueBucketDelta', 'revertLedgerBucketOnServer',
         'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
         'appendRestoreRevenueIncrements'];

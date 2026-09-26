@@ -39,10 +39,10 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.42.7] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 ការសម្អាតដកលុយ ២ ដង · 🔴 barcode ស្ទួនក្រោយ `disconnect` · 🔴 SW លាយកំណែ ➜ ក្រៅបណ្តាញ App ស** · ការសម្គាល់ខលបាត់ · Sentry លេប id កញ្ចប់ (branch · មិនទាន់ merge)
+### [2.42.7] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 ការសម្អាតដកលុយ ២ ដង · 🔴 barcode ស្ទួនក្រោយ `disconnect` · 🔴 ការដក ledger បាត់ក្រោយ `disconnect` · 🔴 SW លាយកំណែ ➜ ក្រៅបណ្តាញ App ស** · ការសម្គាល់ខលបាត់ · Sentry លេប id កញ្ចប់ (branch · មិនទាន់ merge)
 
 **ZoeW** (`zoew-v233` ➜ `zoew-v234`) · **ZoeKeyGen** (`zoekeygen-v103` ➜ `zoekeygen-v104` ៖ `error-reporting.js` ចែករំលែក · `sw.js`)។
-⛔ **checker ១៧៧ បៃតងទាំងអស់ + `emu/*` ៦ បៃតង លើ tree មុនកែ** — កំហុសទាំង ៥ ខាងក្រោមគ្មានអ្នកវាស់សោះ។
+⛔ **checker ១៧៧ បៃតងទាំងអស់ + `emu/*` ៦ បៃតង លើ tree មុនកែ** — កំហុសទាំង ៦ ខាងក្រោមគ្មានអ្នកវាស់សោះ។
 
 #### 🔴 ១. ការសម្អាត ៧ ថ្ងៃ ដកលុយ ២ ដង (អ្នកស្តារ journal រត់ចំកណ្តាលការសម្អាតដែលនៅរស់)
 
@@ -69,8 +69,20 @@
   ⛔ ច្បាប់ទូទៅ ៖ «ស្មើតម្លៃដែលផ្ញើ» ជាភស្តុតាងតែពេលតម្លៃនោះជារបស់អ្នកសរសេរម្នាក់ (token · ទិន្នន័យកញ្ចប់)។
 - **អ្នកយាម** ៖ `tx-outcome-test` ផ្នែក ៥ (ធ្លាក់ ៣ មុនកែ) · `emu/tx-disconnect-emu-test` ផ្នែក គ (ធ្លាក់ ១ មុនកែ) · `money-guardian-test`
   mutation ថ្មី ➜ ក្រហម។
-- ⚠️ **សំណល់ដែលទទួលយក** ៖ ledger ថ្ងៃ/ខែ ក៏សម្រេចតាមតម្លៃដែរ ➜ ឧបករណ៍ ២ ដែលដក **ចំនួនដូចគ្នាបេះបិទ** (cod · dod · count) លើថ្ងៃដដែល
-  ក្នុងពេលតែមួយ **បូក** ការដាច់ចំពេលនោះ អាចធ្វើឲ្យការដកមួយបាត់។ ការកែពិតត្រូវការ token ក្នុងការសរសេរ (ប្តូរ rules) ➜ មិនធ្វើជុំនេះ។
+
+#### 🔴 ២ខ. ការដក ledger បាត់ ពេលឧបករណ៍ ២ ដកចំនួនដូចគ្នា + `disconnect` (ថ្នាក់ដដែលនឹង ២ លើ ledger ថ្ងៃ/ខែ)
+
+- **អ្វីដែលអ្នកប្រើអាចជួប** ៖ ឧបករណ៍ ២ ដក (ដក barcode · ការសម្អាត ៧ ថ្ងៃ) **ចំនួនដូចគ្នាបេះបិទ** (cod · dod · count) លើថ្ងៃដដែល ក្នុងពេលជិតគ្នា
+  ហើយការតភ្ជាប់របស់ម្ខាងដាច់មុន server ឆ្លើយ ➜ wrapper អាន REST ឃើញតម្លៃ **ស្មើតម្លៃដែលខ្លួនផ្ញើ** (តែជារបស់ឧបករណ៍ផ្សេង) ➜ ជឿ «applied» ➜
+  ការដកមួយបាត់ ➜ **ចំណូល និងចំនួនកញ្ចប់លើស** ជាអចិន្ត្រៃយ៍។
+- **វាស់បាន** ៖ `tx-outcome-test` ផ្នែក ៤ខ ៖ ឧបករណ៍ផ្សេង 100 ➜ 95 + ការដករបស់យើង ➜ ថ្ងៃនៅ **95** (ត្រូវ 90) · `emu/tx-disconnect-emu-test` ផ្នែក ឃ
+  (SDK ពិត + emulator + proxy ដែលសរសេរតម្លៃរបស់ឧបករណ៍ផ្សេង មុនកាត់ put របស់យើង) ➜ `committed: true · txOutcome: 'applied'` លើ tree មុនកែ។
+- **ការកែ** ៖ `runLedgerTransaction()` (ចំណុចច្របាច់តែមួយនៃ `commitDailyRevenueDelta` · `commitMonthlyRevenueDelta`) ដាក់ **token `op` តែមួយក្នុងមួយការ
+  សរសេរ** ក្នុង record ថ្ងៃ/ខែ ➜ តម្លៃដែលផ្ញើមានម្ចាស់តែម្នាក់ ➜ wrapper បែងចែកបាន។ rules (Business) ទទួល `op` ស្រេចចិត្ត (ខ្សែអក្សរ ៨–៤០ តួ)។
+  ⛔ **មិនខូចទោះ Publish rules មុន ឬក្រោយ deploy** ៖ rules ចាស់បដិសេធ `op` (`$other`) ➜ `permission_denied` ➜ ផ្ញើម្តងទៀតគ្មាន `op`
+  (ឥរិយាបថ 2.42.6 បេះបិទ · ចំណាយ ១ round trip បន្ថែមរហូតដល់ Publish)។ អ្នកអាន ledger ទាំងអស់អានតាមឈ្មោះវាល ➜ `op` មិនលេចក្នុងលេខណាមួយ។
+- **អ្នកយាម** ៖ `tx-outcome-test` ផ្នែក ៤ខ (ធ្លាក់មុនកែ · ទិសផ្ទុយ «rules មិនទាន់ Publish ➜ ចុះ ១ ដង» · `op` លើថ្ងៃ និងខែ) · `emu/tx-disconnect-emu-test`
+  ផ្នែក ឃ · `money-guardian-test` mutation «ledger ថ្ងៃលែងផ្ទុក `op`» ➜ ក្រហម · `revenue-rules-clamp-test` ដេរីវេ validator `op` ពី rules ពិត។
 
 #### 🔴 ៣. Service Worker ចាក់ឯកសារ deploy ថ្មីចូល cache ចាស់ ➜ ក្រៅបណ្តាញ App ស
 
@@ -108,7 +120,10 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- **គ្មានការកែ Firebase rules · គ្មាន env ថ្មី** ➜ merge ពេលម្ចាស់គម្រោងស្នើ ➜ Netlify build ខ្លួនឯង (`zoew-v234` · `zoekeygen-v104`)។
+- ⛔ **Firebase rules (Business) ប្រែ** ៖ បិទភ្ជាប់ `firebase-database.rules.json` ចូល Firebase Console (Project អាជីវកម្ម) ➜ Realtime Database ➜ Rules ➜
+  **Publish** (វាល `op` ក្នុង `zoew_daily_revenue_cod_dod/$date` និង `zoew_monthly_revenue_cod_dod/$month`)។ លំដាប់មិនសំខាន់ ៖ មុន Publish App ដើរដូច 2.42.6
+  (ចំណាយ ១ round trip បន្ថែមលើការសរសេរ ledger) · ក្រោយ Publish ការការពារ ២ខ សកម្ម។ ⛔ rules របស់ License (ZoeKeyGen) **មិនប្រែ**។
+- គ្មាន env ថ្មី ➜ merge ពេលម្ចាស់គម្រោងស្នើ ➜ Netlify build ខ្លួនឯង (`zoew-v234` · `zoekeygen-v104`)។
 - **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បើក App (online) ➜ បិទ WiFi/Data ➜ បិទ App ទាំងស្រុង ➜ បើកវិញក្រៅបណ្តាញ ➜ App ត្រូវបើក ហើយស្កេនបាន។
 - Sentry ៖ event `zone: money` ដដែលលើកញ្ចប់ផ្សេងគ្នាឥឡូវលេចដាច់ពីគ្នា (រហូតដល់ ៥ ក្នុង ១០ នាទី)។
 
@@ -861,7 +876,7 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
-### Deep audit 2.42.7 ៖ ហេតុអ្វី checker ១៨៣ បៃតងលើកំហុស ៥
+### Deep audit 2.42.7 ៖ ហេតុអ្វី checker ១៨៣ បៃតងលើកំហុស ៦
 
 - **ការសម្អាតដកលុយ ២ ដង** ៖ `cleanup-interrupt-atomicity-test` វាស់តែ **tab ដែលស្លាប់** («សម្លាប់ការសរសេរទី N» ➜ tab ថ្មីស្តារ) ➜
   ស្ថានភាព «អ្នកស្តាររត់ **ខណៈ** ការសម្អាតដែលនៅរស់កំពុងរង់ចាំការសរសេរធុងសំរាម» មិនដែលត្រូវដាក់ចូល (សំណួរ ៨ ៖ «ដាក់ប្រព័ន្ធក្នុង
@@ -870,15 +885,22 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 - **barcode ស្ទួន** ៖ fake SDK របស់ `tx-outcome-test` រត់ updater លើ **តម្លៃ server** ជានិច្ច ➜ ស្ថានភាព «cache ទទេ ➜ updater ឃើញ `null`
   ➜ ផ្ញើ `true`» (ឥរិយាបថ SDK ពិតលើ path គ្មាន listener) មិនដែលកើត ➜ registry មិនដែលផ្ញើ `true` លើកូនសោដែលមានរួច។ ⛔ មេរៀន ៖ ការ
   សម្រេចតាម **តម្លៃ** (មិនមែនអត្តសញ្ញាណ) មានលក្ខខណ្ឌលាក់ ៖ «តម្លៃនោះជារបស់ខ្ញុំតែម្នាក់» ➜ តម្លៃថេរ (`true` · `0` · `{}`) បំពានវា។
+- **ការដក ledger បាត់** ៖ លក្ខខណ្ឌលាក់ដដែល លើតម្លៃ **ដែលគណនា** ៖ ឧបករណ៍ ២ ដកចំនួនដូចគ្នាពីមូលដ្ឋានដដែល ➜ តម្លៃដូចគ្នាបេះបិទ។ fake SDK
+  មិនដែលដាក់ «ការសរសេររបស់ឧបករណ៍ផ្សេង *ចន្លោះ* ការផ្ញើ និងការអាន REST» ➜ proxy របស់ emulator ត្រូវការ `beforeCut` (សរសេរតម្លៃរបស់ឧបករណ៍
+  ផ្សេងមុនកាត់ put របស់យើង)។ ⛔ ការកែដែលត្រូវការការប្តូរ rules ត្រូវ **fail-open លើ rules ចាស់** (`permission_denied` ➜ ឥរិយាបថចាស់) ➜
+  លំដាប់ Publish/deploy មិនអាចបំបែក App បានទេ។
 - **SW លាយកំណែ** ៖ checker SW ទាំងអស់វាស់ **install ដែលជោគជ័យ** ឬ **SW ដដែលក្នុង deploy ដដែល** (ជុំទី ៤ ថែមទាំងអះអាងថា «C ដោយគ្មាន
   SW ថ្មី ➜ ត្រូវចូល cache») ➜ ស្ថានភាព «deploy ថ្មី · install ថ្មីធ្លាក់ · SW ចាស់នៅគ្រប់គ្រង» មិនដែលត្រូវវាស់។ ⛔ `#appPages` មិនមែន
   ភស្តុតាងថា App ចាប់ផ្តើម (index.html របស់ build វាស់មាន markup ស្រាប់) ➜ វាស់ **asset ដែល HTML ក្នុង cache យោង** ក្រៅបណ្តាញ។
 - **ការសម្គាល់ខល** ៖ `history-patch-retry-test` stub `runTransaction` ឲ្យបដិសេធ `disconnect` **ភ្លាម** ➜ wrapper 2.42.6 (ដែល *ពន្យារ*
   `disconnect`) ឈរ **ក្រៅ** sandbox ➜ ស្នាមភ្ជាប់ «wrapper ↔ ពិដាន `dbOp` ↔ ការចូលជួរ» គ្មានអ្នកវាស់ (សំណួរ ៧)។
 - **Sentry** ៖ `sentry-load-race-test` ផ្នែក ៦ វាស់ព្យុះលើ **សារដដែល គ្មានអត្តសញ្ញាណ** ➜ event ដដែលលើ **កញ្ចប់ផ្សេងគ្នា** មិនដែលត្រូវវាស់។
-- **Mutation** (`money-guardian-test` ១៤/១៤) ៖ «ដកច្រកទ្វារអ្នកស្តារ» ➜ `cleanup-interrupt-atomicity-test` ក្រហម · «registry ជឿ
+- **Mutation** (`money-guardian-test` ១៥/១៥) ៖ «ledger លែងផ្ទុក `op`» ➜ `tx-outcome-test` ក្រហម · «ដកច្រកទ្វារអ្នកស្តារ» ➜ `cleanup-interrupt-atomicity-test` ក្រហម · «registry ជឿ
   applied» ➜ `tx-outcome-test` ក្រហម · SW «ដកច្រកទ្វារ deploy» ➜ `sw-install-integrity-test` ជុំទី ៥ ក្រហម · «ចូលជួរលើការព្យួរណាក៏ដោយ» ➜
-  `history-patch-retry-test` ក្រហម ២ (ទិសផ្ទុយ)។
+  `history-patch-retry-test` ក្រហម ២ (ទិសផ្ទុយ)។ ⛔ អ្នកយាម ៨ × (១ + mutation ១៥) រត់ជាលំដាប់ **លើសពិដាន ៣០០ វិ.** របស់ `run-all.sh` (CI ជុំទី ១ ៖
+  «ព្យួរ») ➜ `money-guardian-test` រត់អ្នកយាម **ស្របគ្នា** (`MONEYGUARD_JOBS` · លំនាំដើម ≤ ៤) ➜ ~១៦០ វិ. ក្រោមបន្ទុក CI។
+- **`emu/crud-rules-flow`** (CI ជុំទី ១) ៖ sandbox ខ្វះ `markCleanupJournalLive` · `releaseCleanupJournalLive` · `navigator` ➜ checker ធ្លាក់
+  «dependency មិនមានក្នុង scope» (វាចាប់បានត្រឹមត្រូវ ៖ helper ថ្មីក្នុង `claimAndCleanupItem`) ➜ បន្ថែមក្នុងបញ្ជីស្រង់។
 
 ### `disconnect` ដែល server អនុវត្តរួច (2.42.6) ៖ ហេតុអ្វី checker ទាំងអស់មើលមិនឃើញ
 

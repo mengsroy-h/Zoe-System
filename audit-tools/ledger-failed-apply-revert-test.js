@@ -98,7 +98,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer',
     'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual', 'addRevenueToDailyAndMonthlyRecord',
-    'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
+    'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta', 'getFormattedDate',
     'confirmPhone', 'addOrUpdateEntry', 'removeSingleBarcode', 'claimAndCleanupItem', 'submitManualAdjustment'
 ];
 const fnSrc = {};
@@ -202,6 +202,7 @@ function makeSandbox(txPlan, opts) {
         + fnSrc.revertRevenueLedgerDelta + '\n'
         + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
+        + fnSrc.runLedgerTransaction + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n',
@@ -222,7 +223,11 @@ function seed(ctx, cod, dod, count) {
 }
 const dailyServer = (ctx) => ctx.__store.zoew_daily_revenue_cod_dod[DATE] || null;
 const monthlyServer = (ctx) => (ctx.__store.zoew_monthly_revenue_cod_dod || {})[MONTH] || null;
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// ⛔ token `op` ក្នុងការសរសេរ ledger ជាអត្តសញ្ញាណនៃការសរសេរ (wrapper `disconnect` ប្រៀបវា) មិនមែនលុយ ➜ ការប្រៀបលុយរំលងវា
+const moneyOnly = (v) => (v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.keys(v).filter((k) => k !== 'op').reduce((o, k) => { o[k] = moneyOnly(v[k]); return o; }, {})
+    : v);
+const same = (a, b) => JSON.stringify(moneyOnly(a)) === JSON.stringify(moneyOnly(b));
 
 (async () => {
     // ── ១. ⛔ ទិសផ្ទុយ ៖ ការអនុវត្តជោគជ័យ ➜ ការដកវិញនៅតែត្រូវដើរពេញលេញ ────

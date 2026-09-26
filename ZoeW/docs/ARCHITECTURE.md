@@ -107,13 +107,18 @@ ZoeW ដើមជា **ឯកសារតែមួយ ~១៤,៨០០ បន�
 
 ## ៥. Service Worker
 
-`src/sw/sw.ts` ជាការផ្ទេរ ១:១ នៃ `sw.js` ដើម ជាមួយការកែ **១** ៖ បញ្ជីសំបក
-លែងសរសេរដោយដៃ។ `vite.config.mts` អាន `dist/` ពិតក្រោយ build រួចចាក់វាចូល ៖
+`src/sw/sw.ts` ដើរ cache-first ដូច `sw.js` ដើម តែបញ្ជីសំបកលែងសរសេរដោយដៃ ៖ `vite.config.mts` អាន `dist/` ពិតក្រោយ build
+រួចចាក់វាចូល ៖
 
 - **សំបកស្នូល** (`cache.addAll` — atomic) ៖ `index.html` · `guide.html` ·
   bundle និង CSS ដែលមាន hash · helper · engine ស្កេន
 - **សំបកស្រេចចិត្ត** ៖ SheetJS · manifest · រូបតំណាង
 - ⛔ `.map` **មិនចូល cache** (វាធំ ហើយមានតែ devtools ទេដែលសុំ)
+- រាល់ការទាញដែលចាក់ចូល cache (install · ធ្វើឲ្យស្រស់ · cache miss) ប្រើ `cache: 'no-cache'` ➜ HTTP cache ចាស់លើឧបករណ៍មិនពុល
+  cache របស់ SW
+- ⛔ **deploy ថ្មីមកតាម install ជាក្រុមតែមួយផ្លូវ** ៖ ការធ្វើឲ្យស្រស់ខាងក្រោយសរសេរតែពេល `sw.js` លើ server នៅជាកំណែ
+  `CACHE_VERSION` ខ្លួនឯង (`shellDeployIsCurrent()`) ➜ SW ចាស់ដែលនៅគ្រប់គ្រង (install ថ្មីធ្លាក់) មិនលាយ `index.html` ថ្មី
+  ជាមួយ asset ចាស់ក្នុង cache (ក្រៅបណ្តាញ App ស) — មើល `CLAUDE.md` ជួរ «Service worker»
 
 ---
 

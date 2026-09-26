@@ -85,6 +85,10 @@
   `return`) ត្រូវ **បោះបង់** ➜ mutation «រំលងការផ្ទៀងផ្ទាត់ compile» ធ្លាក់។ ESLint `no-empty` ទទួល `allowEmptyCatch` (catch ទទេ = ការលេប
   ដោយចេតនា ដែលពីមុនមាន comment បំពេញ)។ ផ្ទៀងផ្ទាត់ ៖ `npm run verify` (tsc · eslint · slot · purity · vitest · build · parity · smoke ·
   sw · doc · android · native) · `logic:check` · `parity:dom/live/deep` · `rules:check` បៃតងទាំងអស់។
+- **អក្សរថៃ** ៖ ម្ចាស់គម្រោងចាប់បានថាការសន្ទនាលាយពាក្យថៃ (U+0E00–U+0E7F · ស្រដៀងខ្មែរ ➜ រអិលកាត់ភ្នែក) ➜ `doc-scope-test`
+  ស្កេនគ្រប់ឯកសារអត្ថបទក្នុង repo រួម `ZoeW/src/**` (វាស់ ៖ repo **០** ជួរ · commit **០**)។ probe ៖ អក្សរថៃក្នុង `docs/` ➜ FAIL ·
+  ក្នុង `ZoeW/src` ➜ FAIL · root វាស់រកប្រភពមិនឃើញ ➜ FAIL · ថតទទេ ➜ FAIL · ទិសផ្ទុយ ៖ អក្សរខ្មែរមិនត្រូវចាប់។ ⛔ វាចាប់ខ្លួនវាលើក
+  ដំបូង ៖ comment របស់ checker ដាក់ពាក្យថៃជាឧទាហរណ៍ ➜ ដកចេញ (probe សាងពី code point)។
 - `firebase@12.19.0` ចូល `devDependencies` របស់ ZoeW (SDK ពិតសម្រាប់ `emu/tx-disconnect-emu-test` · **មិន ship** — App ផ្ទុក SDK ពី CDN ដដែល)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ

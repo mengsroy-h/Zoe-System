@@ -939,5 +939,53 @@ check(siteOffenders.length === 0,
         'ឈ្មោះខ្មោច ៖ ' + ghosts.join(' · '));
 })();
 
+// ── អក្សរថៃ ធៀបនឹងអក្សរខ្មែរ ──────────────────────────────────────────────────────────
+// ⛔ ច្បាប់ ៧ ៖ រាល់ការសរសេរជាភាសាខ្មែរ។ អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ ➜ ពាក្យថៃដែលលាយចូល (ឧ. ពាក្យថៃដែលមានន័យ
+// ថា «ជុំ» សរសេរជំនួស «ជុំ») រអិលកាត់ភ្នែក។ វាស់បាន (2026-09-26) ៖ ម្ចាស់គម្រោងចាប់បានក្នុងការសន្ទនា មិនមែនឧបករណ៍ ➜ ឥឡូវស្កេន
+// គ្រប់ឯកសារអត្ថបទ (ដេរីវេពីថតពិត) រួមទាំងប្រភព ZoeW React ដែល root វាស់មិនផ្ទុក (ដេរីវេពីទីតាំង root វាស់ ដូច `comments.js`)។
+// ⛔ កុំសរសេរឧទាហរណ៍ជាអក្សរថៃ សូម្បីក្នុង comment នេះ ៖ probe សាងពី code point។
+(function () {
+    const THAI = /[\u0E00-\u0E7F]/;
+    const probeThai = String.fromCharCode(0x0E23, 0x0E2D, 0x0E1A);
+    const probeKhmer = String.fromCharCode(0x1787, 0x17BB, 0x17C6);
+    check(THAI.test(probeThai) && !THAI.test(probeKhmer),
+        'probe ៖ ការស្កេនចាប់អក្សរថៃ ហើយមិនចាប់អក្សរខ្មែរ (ទិសផ្ទុយ)', JSON.stringify({ thai: THAI.test(probeThai), khmer: THAI.test(probeKhmer) }));
+    const TEXT_EXT = /\.(md|js|mjs|cjs|ts|tsx|mts|css|html|json|sh|cmd|bat|ps1|gs|ya?ml|txt|toml|xml|gradle|java|properties)$/i;
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'dist', 'dist-audit', '.original', 'build', '.gradle', 'assets']);
+    const hits = [];
+    let scanned = 0;
+    const walk = (dir, rel) => {
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+        entries.forEach((entry) => {
+            const next = rel ? rel + '/' + entry.name : entry.name;
+            if (entry.isDirectory()) { if (!SKIP_DIRS.has(entry.name) && !/^\.tmp-/.test(entry.name)) walk(path.join(dir, entry.name), next); return; }
+            if (!entry.isFile() || !TEXT_EXT.test(entry.name) || /\.min\.js$/.test(entry.name)) return;
+            let text = '';
+            try { text = fs.readFileSync(path.join(dir, entry.name), 'utf8'); } catch (_) { return; }
+            scanned++;
+            if (!THAI.test(text)) return;
+            text.split('\n').forEach((line, i) => {
+                if (THAI.test(line)) hits.push(next + ':' + (i + 1) + '  ' + line.trim().slice(0, 80));
+            });
+        });
+    };
+    walk(ROOT, '');
+    const root = path.resolve(ROOT);
+    const suffix = path.join('ZoeW', 'dist-audit', 'measure-root');
+    const measureTree = fs.existsSync(path.join(root, 'ZoeW', 'audit-source-files.json'));
+    let reactSource = '';
+    if (root.endsWith(path.sep + suffix)) {
+        const candidate = path.join(root.slice(0, -suffix.length), 'ZoeW');
+        if (fs.existsSync(path.join(candidate, 'src', 'main.tsx'))) reactSource = candidate;
+    }
+    if (reactSource) walk(reactSource, 'ZoeW(ប្រភព)');
+    check(!measureTree || !!reactSource, 'root វាស់ ៖ រកប្រភព ZoeW React ឃើញ (អក្សរថៃក្នុង `src/**` វាស់បាន)',
+        'root វាស់ ' + root + ' តែរក `ZoeW/src/main.tsx` មិនឃើញ');
+    check(scanned >= 300, 'ជាន់អប្បបរមា ៖ ស្កេនឯកសារអត្ថបទយ៉ាងតិច ៣០០ រកអក្សរថៃ', 'ស្កេនបាន ' + scanned);
+    check(hits.length === 0, '⛔ គ្មានអក្សរថៃ (U+0E00–U+0E7F) ក្នុងឯកសារ repo — ច្បាប់ ៧ ៖ សរសេរជាភាសាខ្មែរ',
+        'រកឃើញ ' + hits.length + ' ជួរ ៖\n        ' + hits.slice(0, 10).join('\n        '));
+})();
+
 console.log('\n' + (fail ? 'FAIL ' + fail : 'PASS') + '  (' + pass + ')');
 process.exit(fail ? 1 : 0);

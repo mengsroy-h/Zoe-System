@@ -483,6 +483,44 @@ for (const [dur, css, why] of [
     });
 }
 
+/* ── ៤ច. ចលនាបើកប្រអប់ ៖ ទំហំមិនលើសទំហំដែលបានគូរ (APK) ────────────── */
+/*
+ * ⛔ វីដេអូ APK (៩០fps · ស៊ុមម្តងមួយ) ៖ ប្រអប់ធុងសំរាម (២០០ ជួរ) គាំង ~៥៥ms **ត្រង់ពេលប្រអប់ពង្រីកដល់ scale ១,០** មុន overshoot
+ *    (ទីតាំងគែមខាងលើ 78 ➜ 74 ➜ ឈរ ៦ ស៊ុម ➜ 71) · PWA ឆ្លងកាត់ចំណុចនោះរលូន។ Chromium គូររូបស្រទាប់ដែលមានចលនានៅទំហំ keyframe
+ *    អតិបរមា ➜ easing overshoot (scale > ១) ទាមទារការគូរឡើងវិញ ➜ WebView គូរលើ thread ដែលគូរអេក្រង់ ➜ គាំង (Chrome គូរដាច់ពីគ្នា)។
+ *    ⛔ ការប្តូរពណ៌របាស្ថានភាព (៤ង) មិនមែនមូលហេតុទេ ៖ វាកើត **ក្រោយ** ការគាំងជានិច្ច ហើយ 2.42.8 ដែលពន្យារវា នៅតែគាំង។
+ *    សេណារីយ៉ូនេះវាស់ scale គណនាពិតរាល់ស៊ុមពេលបើកប្រអប់លើ APK ៖ ត្រូវ ≤ ១ (ចលនានៅមាន ៖ ចាប់ផ្តើម < ១)។
+ */
+await scenario('៤ច. ចលនាបើកប្រអប់លើ APK មិនពង្រីកលើសទំហំដែលបានគូរ (scale ≤ ១)', async () => {
+    const s = await session();
+    const { page } = s;
+    const res = await page.evaluate(() => new Promise((resolve) => {
+        document.querySelector('.daily-stats-btn').click();
+        const t0 = performance.now();
+        let min = Infinity;
+        let max = -Infinity;
+        let lift = 0;
+        let frames = 0;
+        (function tick() {
+            const el = document.querySelector('#dailyStatsModal .modal-content');
+            if (el && getComputedStyle(document.getElementById('dailyStatsModal')).display !== 'none') {
+                const m = new DOMMatrixReadOnly(getComputedStyle(el).transform === 'none' ? undefined : getComputedStyle(el).transform);
+                const scale = Math.hypot(m.a, m.b);
+                min = Math.min(min, scale);
+                max = Math.max(max, scale);
+                lift = Math.min(lift, m.f);
+                frames++;
+            }
+            if (performance.now() - t0 < 600) requestAnimationFrame(tick);
+            else resolve({ min: Math.round(min * 10000) / 10000, max: Math.round(max * 10000) / 10000, lift: Math.round(lift * 100) / 100, frames });
+        })();
+    }));
+    ok('(លក្ខខណ្ឌចាំបាច់) ប្រអប់បើក ហើយចលនាពង្រីកនៅមាន (scale ចាប់ផ្តើម < ១)', res.frames > 5 && res.min < 0.99, res);
+    ok('⛔ scale មិនលើស ១ អំឡុងចលនា (មិនបង្ខំ WebView គូរតារាងធំឡើងវិញកណ្តាលចលនា)', res.max <= 1.0001, res);
+    ok('«លោត» នៅដដែល ៖ overshoot តាមការរំកិលឡើង (translateY < ០)', res.lift < -0.5, res);
+    await closeSession(s, 'ចលនាបើកប្រអប់');
+});
+
 /* ── ៥. web (គ្មាន bridge) ───────────────────────────────────────────── */
 await scenario('៤គ. ប្រវត្តិថយក្រោយ (Back ម្តងមួយជំហាន)', async () => {
     const s = await session();
@@ -542,6 +580,12 @@ await scenario('៥. web ធម្មតា (គ្មាន bridge) ៖ មិ�
     const reloaded = page.waitForEvent('framenavigated', { timeout: 1500 }).then(() => true, () => false);
     await pull(page, 300);
     ok('PTR របស់ App មិនដើរលើ web', !(await reloaded));
+    const pop = await page.evaluate(() => {
+        document.querySelector('.daily-stats-btn').click();
+        const el = document.querySelector('#dailyStatsModal .modal-content');
+        return el ? { name: getComputedStyle(el).animationName, easing: getComputedStyle(el).animationTimingFunction } : null;
+    });
+    ok('ចលនាបើកប្រអប់លើ web ដូច ZoeW ដើម (modalPopIn + overshoot · ការកែ ៤ច ជារបស់ APK តែមួយ)', !!pop && pop.name === 'modalPopIn' && /1\.56/.test(pop.easing), pop);
     await closeSession(s, 'web');
 });
 

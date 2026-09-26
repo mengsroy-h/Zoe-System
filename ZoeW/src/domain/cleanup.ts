@@ -161,6 +161,128 @@ export function clearCleanupJournalEntry(trashId) {
     if (next.length !== list.length) writeCleanupJournal(next);
 }
 
+export const cleanupJournalLive = new Map();
+
+export const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';
+
+export const CLEANUP_OWNERSHIP_WAIT_MS = 3000;
+
+export function cleanupLockManager() {
+    try {
+        const locks = typeof navigator !== 'undefined' && navigator ? navigator.locks : null;
+        return locks && typeof locks.request === 'function' ? locks : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+export function markCleanupJournalLive(trashId) {
+    if (typeof trashId !== 'string' || !trashId || cleanupJournalLive.has(trashId)) return;
+    let release = null;
+    const locks = cleanupLockManager();
+    if (locks) {
+        try {
+            const held = new Promise((resolve) => { release = resolve; });
+            const granted = locks.request(CLEANUP_LIVE_LOCK_PREFIX + trashId, () => held);
+            if (granted && typeof granted.catch === 'function') granted.catch(() => {});
+        } catch (e) {}
+    }
+    cleanupJournalLive.set(trashId, release);
+}
+
+export function releaseCleanupJournalLive(trashId) {
+    const release = cleanupJournalLive.get(trashId);
+    cleanupJournalLive.delete(trashId);
+    if (typeof release === 'function') release();
+}
+
+export function withCleanupEntryOwnership(trashId, run) {
+    if (cleanupJournalLive.has(trashId)) return Promise.resolve(false);
+    const locks = cleanupLockManager();
+    if (!locks) return Promise.resolve().then(run).then(() => true);
+    return new Promise((resolve, reject) => {
+        let phase = 'waiting';
+        const start = () => {
+            phase = 'running';
+            return Promise.resolve().then(run).then(() => resolve(true), reject);
+        };
+        const timer = setTimeout(() => {
+            if (phase !== 'waiting') return;
+            phase = 'abandoned';
+            resolve(false);
+        }, CLEANUP_OWNERSHIP_WAIT_MS);
+        const fallback = () => {
+            if (phase !== 'waiting') return;
+            clearTimeout(timer);
+            start();
+        };
+        try {
+            const request = locks.request(CLEANUP_LIVE_LOCK_PREFIX + trashId, { ifAvailable: true }, (lock) => {
+                if (phase !== 'waiting') return undefined;
+                clearTimeout(timer);
+                if (!lock) {
+                    phase = 'busy';
+                    resolve(false);
+                    return undefined;
+                }
+                return start();
+            });
+            if (request && typeof request.catch === 'function') request.catch(fallback);
+        } catch (e) {
+            fallback();
+        }
+    });
+}
+
+export async function resumeCleanupJournalEntry(trashId) {
+    const entry = readCleanupJournal().find((e) => e.trashItem.id === trashId);
+    if (!entry) return '';
+    const trashItem = entry.trashItem;
+    if (cleanupJournalScopeMismatch(entry)) {
+        clearCleanupJournalEntry(trashItem.id);
+        return '';
+    }
+    let present = false;
+    try {
+        const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
+        present = snap.exists();
+    } catch (readErr) {
+        return '';
+    }
+    let outcome = '';
+    if (!present) {
+        if (entry.stage !== CLEANUP_STAGE_MOVED) {
+            clearCleanupJournalEntry(trashItem.id);
+            return '';
+        }
+        try {
+            await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
+                TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
+            outcome = 'restored';
+        } catch (writeErr) {
+            return '';
+        }
+    }
+    const rev = entry.revenue;
+    if (entry.stage === CLEANUP_STAGE_MOVED && rev) {
+        markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
+        const cod = parseFloat(rev.cod) || 0;
+        const dod = parseFloat(rev.dod) || 0;
+        const count = parseFloat(rev.count) || 0;
+        const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, -cod, -dod, -count);
+        try {
+            await correctRevenueLedgerToActual(rev.scanDate, applied, -cod, -dod, -count);
+        } catch (ledgerErr) {
+            if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId: entry.id });
+        }
+    } else if (entry.stage === CLEANUP_STAGE_LEDGER && rev) {
+        outcome = 'unverified';
+    }
+    clearCleanupJournalEntry(trashItem.id);
+    return outcome;
+}
+
 export async function resumeInterruptedCleanups() {
     if (dataState.cleanupResumeInFlight || !firebaseState.db || !firebaseState.fb || !firebaseState.dbRefDeleted) return;
     const list = readCleanupJournal();
@@ -170,49 +292,14 @@ export async function resumeInterruptedCleanups() {
     let unverified = 0;
     try {
         for (let i = 0; i < list.length; i++) {
-            const entry = list[i];
-            const trashItem = entry.trashItem;
-            if (cleanupJournalScopeMismatch(entry)) {
-                clearCleanupJournalEntry(trashItem.id);
-                continue;
-            }
-            let present = false;
-            try {
-                const snap = await dbOp(firebaseState.fb.get(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${trashItem.id}`)));
-                present = snap.exists();
-            } catch (readErr) {
-                continue;
-            }
-            if (!present) {
-                if (entry.stage !== CLEANUP_STAGE_MOVED) {
-                    clearCleanupJournalEntry(trashItem.id);
-                    continue;
-                }
-                try {
-                    await notifyIfSlow(retryAsync(() => dbOp(saveSingleDeletedItemToFirebase(trashItem)), 3, 1500),
-                        TRASH_WRITE_SLOW_NOTICE_MS,
-                        "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងបញ្ចប់ការសម្អាតដែលត្រូវរំខានពីមុន… សូមកុំបិទ App។");
-                    restored++;
-                } catch (writeErr) {
-                    continue;
-                }
-            }
-            const rev = entry.revenue;
-            if (entry.stage === CLEANUP_STAGE_MOVED && rev) {
-                markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER);
-                const cod = parseFloat(rev.cod) || 0;
-                const dod = parseFloat(rev.dod) || 0;
-                const count = parseFloat(rev.count) || 0;
-                const applied = addRevenueToDailyAndMonthlyRecord(rev.scanDate, -cod, -dod, -count);
-                try {
-                    await correctRevenueLedgerToActual(rev.scanDate, applied, -cod, -dod, -count);
-                } catch (ledgerErr) {
-                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'resumeInterruptedCleanups ledger', itemId: entry.id });
-                }
-            } else if (entry.stage === CLEANUP_STAGE_LEDGER && rev) {
-                unverified++;
-            }
-            clearCleanupJournalEntry(trashItem.id);
+            const trashId = list[i].trashItem.id;
+            let outcome = '';
+            const owned = await withCleanupEntryOwnership(trashId, async () => {
+                outcome = await resumeCleanupJournalEntry(trashId);
+            });
+            if (!owned) continue;
+            if (outcome === 'restored') restored++;
+            else if (outcome === 'unverified') unverified++;
         }
     } catch (resumeErr) {
         console.error('resumeInterruptedCleanups failed', resumeErr);
@@ -443,6 +530,7 @@ export async function claimAndCleanupItem(id, reason) {
 
         stripHistoryOnlyMarkers(trashItem);
 
+        try { markCleanupJournalLive(trashItem.id); } catch (liveErr) {}
         try {
             noteCleanupJournalEntry({
                 id: id,
@@ -456,46 +544,50 @@ export async function claimAndCleanupItem(id, reason) {
             console.error('Cleanup journal write failed', journalErr);
         }
 
-        dataState.deletedItems.unshift(trashItem);
-        let trashSaved = false;
-        await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
-            TRASH_WRITE_SLOW_NOTICE_MS,
-            "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
-            trashSaved = true;
-        }).catch(async (trashErr) => {
-            const staleIdx = dataState.deletedItems.findIndex(i => i.id === trashItem.id);
-            if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
-            console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
-            if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
-
-            try {
-                await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
-                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
-            } catch (restoreErr) {
-                console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
-                if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
-                showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
-            }
-        });
-        if (!trashSaved) return;
-        if (!revenuePending) {
-            try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
-            return;
-        }
-        try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER); } catch (journalErr) {}
-        const revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
         try {
-            const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
-                -revenueCod, -revenueDod, -revenueCount);
-            if (!status || !status.ok) {
-                const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
-                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
-                showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
+            dataState.deletedItems.unshift(trashItem);
+            let trashSaved = false;
+            await notifyIfSlow(retryAsync(() => saveSingleDeletedItemToFirebase(trashItem), 4, 1500),
+                TRASH_WRITE_SLOW_NOTICE_MS,
+                "⏳ បណ្តាញឆ្លើយមិនចេញ — កំពុងរក្សាទុកការសម្អាតស្វ័យប្រវត្តិ… សូមកុំបិទ App។").then(() => {
+                trashSaved = true;
+            }).catch(async (trashErr) => {
+                const staleIdx = dataState.deletedItems.findIndex(i => i.id === trashItem.id);
+                if (staleIdx !== -1) dataState.deletedItems.splice(staleIdx, 1);
+                console.error('Trash write permanently failed for automatic cleanup of', id, trashErr);
+                if (window.ZoeErrors) ZoeErrors.capture(trashErr, { zone: 'money', context: 'claimAndCleanupItem trash write failed after retries', itemId: id, reason });
+
+                try {
+                    await restoreClaimedItemToScanHistory(id, claimedWhole, claimedPartial);
+                    try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                } catch (restoreErr) {
+                    console.error('Failed to restore item to scan history after trash write failure for', id, restoreErr);
+                    if (window.ZoeErrors) ZoeErrors.capture(restoreErr, { zone: 'money', context: 'claimAndCleanupItem restore-after-trash-failure also failed', itemId: id, reason });
+                    showToast('⚠️ បញ្ហាធ្ងន់ធ្ងរ៖ ទិន្នន័យកញ្ចប់ ' + id + ' អាចនឹងបាត់! សូមប្រាប់ Admin ត្រួតពិនិត្យភ្លាមៗ');
+                }
+            });
+            if (!trashSaved) return;
+            if (!revenuePending) {
+                try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+                return;
             }
-        } catch (ledgerErr) {
-            if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+            try { markCleanupJournalStage(trashItem.id, CLEANUP_STAGE_LEDGER); } catch (journalErr) {}
+            const revenueApplied = addRevenueToDailyAndMonthlyRecord(revenueScanDate, -revenueCod, -revenueDod, -revenueCount);
+            try {
+                const status = await correctRevenueLedgerToActual(revenueScanDate, revenueApplied,
+                    -revenueCod, -revenueDod, -revenueCount);
+                if (!status || !status.ok) {
+                    const ledgerErr = new Error('Automatic cleanup revenue reconciliation did not commit');
+                    if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+                    showToast('⚠️ ការសម្អាតបានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។');
+                }
+            } catch (ledgerErr) {
+                if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'claimAndCleanupItem ledger reconciliation', itemId: id, reason });
+            }
+            try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
+        } finally {
+            try { releaseCleanupJournalLive(trashItem.id); } catch (liveErr) {}
         }
-        try { clearCleanupJournalEntry(trashItem.id); } catch (journalErr) {}
     };
     try {
         const cleanupTx = firebaseState.fb.runTransaction(firebaseState.fb.ref(firebaseState.db, `zoew_scan_history_cod_dod/${id}`), cleanupUpdater);

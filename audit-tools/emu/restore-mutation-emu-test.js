@@ -16,6 +16,11 @@ const DATE = '2026-09-08';
 const MONTH = DATE.slice(0, 7);
 const NOW = Date.now();
 let pass = 0, fail = 0;
+function ledgerMoney(record) {
+    const r = record || {};
+    return { codDollar: r.codDollar, dodDollar: r.dodDollar, totalCount: r.totalCount };
+}
+
 function check(value, label, detail) {
     if (value) { pass++; console.log('  ok    ' + label); }
     else { fail++; console.log('  FAIL  ' + label + (detail === undefined ? '' : '\n        ' + JSON.stringify(detail))); }
@@ -200,7 +205,7 @@ async function runScenario(action) {
         action + '៖ ស្តារចប់មិនសល់ barcode ស្ទួនក្នុង trash', final.zoew_recently_deleted_cod_dod);
     check(daily.codDollar === 10 && daily.dodDollar === 2 && daily.totalCount === 1,
         action + '៖ ledger ថ្ងៃត្រឡប់ $12 និង ១ កញ្ចប់ ម្តងគត់', daily);
-    check(JSON.stringify(daily) === JSON.stringify(monthly), action + '៖ ledger ខែស្មើថ្ងៃ', monthly);
+    check(JSON.stringify(ledgerMoney(daily)) === JSON.stringify(ledgerMoney(monthly)), action + '៖ ledger ខែស្មើថ្ងៃ', monthly);
     check(restoring.toasts.some((message) => message.startsWith('✅')), action + '៖ restore បាន commit និងប្រកាសជោគជ័យពិត', restoring.toasts);
 
     if (live && !live.restoreClaimId && !live.restoreClaimToken) {
@@ -496,7 +501,7 @@ async function collectedCleanupScenario(mode) {
         label + '៖ history ជួរផ្សេងមិនត្រូវបានប៉ះ');
     const daily = final.zoew_daily_revenue_cod_dod[currentDay];
     const monthly = final.zoew_monthly_revenue_cod_dod[currentDay.slice(0, 7)];
-    check(daily.codDollar === 32.25 && daily.dodDollar === 2.25 && daily.totalCount === 2 && JSON.stringify(monthly) === JSON.stringify(daily),
+    check(daily.codDollar === 32.25 && daily.dodDollar === 2.25 && daily.totalCount === 2 && JSON.stringify(ledgerMoney(monthly)) === JSON.stringify(ledgerMoney(daily)),
         label + '៖ ledger ថ្ងៃនិងខែរក្សាផលបូកត្រឹមត្រូវក្រោយកែតម្លៃ', { daily, monthly });
     check(writer.toasts.some((message) => message.startsWith('✅')),
         label + '៖ ការកែតម្លៃបញ្ចប់ពិត និងប្រាប់ជោគជ័យ', writer.toasts);

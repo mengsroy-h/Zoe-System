@@ -362,7 +362,8 @@ function runPatch(mode) {
     vm.runInContext(sliceConst(zoewSrc, 'HISTORY_PATCH_QUEUE_MAX') || 'const HISTORY_PATCH_QUEUE_MAX = 50;', ctx);
     vm.runInContext('const pendingHistoryPatches = new Map();', ctx);
     vm.runInContext('let scanHistory = [' + JSON.stringify(item) + '];', ctx);
-    for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'patchHistoryItemFields']) {
+    vm.runInContext(sliceConst(zoewSrc, 'txDisconnectResolving') || 'const txDisconnectResolving = new WeakMap();', ctx);
+    for (const fn of ['historyPatchErrorIsDisconnect', 'queueHistoryPatchRetry', 'transactionDisconnectPending', 'patchHistoryItemFields']) {
         const s = sliceFrom(zoewSrc, fn);
         if (!s) return Promise.resolve({ missing: fn });
         vm.runInContext(s, ctx);

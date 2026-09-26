@@ -1,7 +1,8 @@
 import { dataState, firebaseState, uiState } from '../core/state';
 import { HISTORY_PATCH_QUEUE_MAX, HISTORY_PATCH_RETRY_MAX, pendingHistoryPatches } from '../core/clock';
 import { dropStaleRestoreMarkers, normalizeBarcodesOf } from '../domain/barcode';
-import { dbOp } from './network';
+import { dbOp, dbOpStalled } from './network';
+import { transactionDisconnectPending } from './tx-outcome';
 import { refreshCurrentHistoryView, scheduleHistoryViewRefresh } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 
@@ -156,7 +157,8 @@ export function patchHistoryItemFields(item, fields, previousFields, onServerIte
     };
     const handlePatchFailure = (error) => {
         if (!patchIsCurrent()) return false;
-        if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(error)
+        const cause = (dbOpStalled(error) && transactionDisconnectPending(patchTransaction)) || error;
+        if (opts && opts.retryOnDisconnect && historyPatchErrorIsDisconnect(cause)
             && queueHistoryPatchRetry(item.id, fields, previousFields, opts.queuedSuccessToast, opts.preserveQueuedFields)) {
             return 'queued';
         }

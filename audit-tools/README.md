@@ -166,7 +166,7 @@ bash audit-tools/emu/rules.sh
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `ledger-failed-apply-revert-test.js` | ការសរសេរ ledger **ធ្លាក់** រួចការដកវិញ **ជោគជ័យ** ➜ មិនត្រូវដកលេខដែលមិនដែលត្រូវបូក | `LEDGERFAIL_APP_DIR` |
-| `tx-outcome-test.js` | transaction ដែល SDK បដិសេធដោយ `disconnect` អាន **ចុះលើ server រួច** ➜ wrapper `runTransaction` សម្រេចលទ្ធផលពិតដោយអាន server (REST) · ការសម្អាតមិនបាត់ធុងសំរាម · ledger មិនដក ២ ដង · `disconnect` គ្មានគ្រោះមិនផ្ញើ Sentry money | `TXOUTCOME_APP_DIR` |
+| `tx-outcome-test.js` | transaction ដែល SDK បដិសេធដោយ `disconnect` អាន **ចុះលើ server រួច** ➜ wrapper `runTransaction` សម្រេចលទ្ធផលពិតដោយអាន server (REST) · ការសម្អាតមិនបាត់ធុងសំរាម · ledger មិនដក ២ ដង · `disconnect` គ្មានគ្រោះមិនផ្ញើ Sentry money · registry (`true` ថេរ) ក្រោយ `disconnect` មិនត្រូវជា `claimed` (updater លើ cache ទទេដូច SDK ពិត) · ledger ៖ ឧបករណ៍ផ្សេងសរសេរតម្លៃដូចគ្នា ➜ ការដករបស់យើងមិនបាត់ (token `op`) · rules ចាស់បដិសេធ `op` ➜ សរសេរ ១ ដង | `TXOUTCOME_APP_DIR` |
 | `monthly-ledger-agreement-test.js` | `monthly[M]` ត្រូវស្មើផលបូក `daily[d ∈ M]` — clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ ⛔ **បូក ៖ ការស្តារត្រូវបូកត្រឡប់គ្រប់វាល (COD·DOD·count) ចូលទាំងធុងថ្ងៃ និងធុងខែ** | `MONTHLYAGREE_APP_DIR` |
 | `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
 | `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
@@ -186,7 +186,7 @@ bash audit-tools/emu/rules.sh
 | `registry-orphan-list.js` ⚠️ **មិនរត់ក្នុង `run-all.sh`** | 🔑 **បញ្ជីកូនសោ `zoew_barcode_registry` កំព្រា ➜ ឯកសារ payload** ៖ `node audit-tools/registry-orphan-list.js <dump.json|.json.gz> [out.json]`។ ប្រើ `barcodeRegistryKey()` **ពិតចេញពី `app.js`**; ម្ចាស់រាប់ទាំង **ប្រវត្តិ និងធុងសំរាម**។ បញ្ចេញ `{"KEY":null,…}` សម្រាប់ `curl -X PATCH` (merge ➜ កូនសោដទៃមិនប៉ះ)។ ⛔ **មិនភ្ជាប់បណ្តាញ · មិនលុបអ្វី · មិនបោះពុម្ព barcode លើអេក្រង់**។ ច្រកទ្វារបដិសេធ **៤** ៖ គ្មាន node registry · dump គ្មានប្រវត្តិ+ធុងសំរាម · កំព្រា ១០០% · **dump ដែល `redact-dump.js` សម្អាតរួច** (កូនសោពិតជាអក្សរធំជានិច្ច ➜ បច្ច័យ hash អក្សរតូច = ស្នាមច្បាស់)។ បំបែកជាកញ្ចប់ ៥,០០០ | `REGORPHAN_APP_DIR` |
 | `registry-orphan-list-test.js` | **អ្នកយាមរបស់ឧបករណ៍ខាងលើ** ៖ រត់ឧបករណ៍ពិតជា process ដាច់ដោយឡែក លើ dump ក្លែង រួច **អានឯកសារលទ្ធផលពិត**។ ការអះអាងស្នូល ៖ ⛔ **កូនសោដែលមានម្ចាស់ មិនត្រូវចូលបញ្ជីលុបដាច់ខាត** (រួម barcode ក្នុងធុងសំរាម · barcodes ជា object · កូនសោអក្សរតូច)។ mutation **៦/៦** ចាប់បាន; ⛔ ទិសផ្ទុយ ៖ barcode ពិតដែល *មើលទៅដូច* hash (អក្សរធំ) មិនត្រូវបដិសេធ | `REGORPHANTEST_APP_DIR` |
 | `registry-release-test.js` | កូនសោ `zoew_barcode_registry` កំព្រា ➜ barcode ជាប់អន្ទាក់ · ជួរដោះត្រូវមានច្រកចេញទី ២ | `REGISTRY_APP_DIR` |
-| `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម | `MONEYGUARD_APP_DIR` |
+| `money-guardian-test.js` | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — បំបែកតក្កវិជ្ជាលុយ រួចទាមទារថាអ្នកយាមយ៉ាងតិច ១ ក្រហម · អ្នកយាមរត់ស្របគ្នា (ក្នុងពិដានរបស់ `run-all.sh`) | `MONEYGUARD_APP_DIR` · `MONEYGUARD_JOBS` |
 | `price-edit-abort-test.js` | ⛔ transaction ដែល **បោះបង់** ➜ ការបញ្ច្រាសលុយត្រូវរត់ដដែល · ការ **ព្យួរ** ≠ ការបរាជ័យ | `PRICEABORT_APP_DIR` |
 | `stale-write.js` | គ្មានការសរសេរ item ទាំងមូលពីសតិ | `STALEWRITE_APP_DIR` |
 | `compensation-order.js` | `.then(A).catch(B)` ដែល B ជាការសង្គ្រោះ | `COMP_APP_DIR` |
@@ -208,7 +208,7 @@ bash audit-tools/emu/rules.sh
 | `license-app-code-test.js` | rules របស់ License មិនរាយ App ដែលលុបចោលរួច · ZoeW និង ZoeKeyGen ប្រើកូដតែមួយ · ឈ្មោះ slot កៅអី និងពិដាន `maxDevices` ស៊ីគ្នាទាំង ៣ ឯកសារ | `APPCODE_APP_DIR` |
 | `connection-state-fuzz-test.js` | ស្ថានភាព listener លើ **លំដាប់ចៃដន្យ** ៖ ទង់សរុប ↔ សំណុំតាមកូនសោ · «គ្មានទិន្នន័យ» ខណៈវាស់មិនបាន · បងប្អូនប្រកាសជំនួស · សារ «ភ្ជាប់មកវិញ» មុនពេល | `CONNFUZZ_APP_DIR` |
 | `ledger-count-integrity-test.js` | ការដកលុយស្វ័យប្រវត្តិត្រូវដក **ចំនួនកញ្ចប់** (`totalCount`) ជាមួយលុយ លើ ledger **ពិត** (មិន stub) ៖ ថ្ងៃ · ខែ · សតិ ត្រូវស៊ីគ្នា; «យករួច» មិនប៉ះទាំង ២ | `LEDGERCOUNT_APP_DIR` |
-| `cleanup-interrupt-atomicity-test.js` | ការរំខានពាក់កណ្តាល (deploy · PTR · បិទ tab · បណ្តាញដាច់) មិនត្រូវធ្វើឲ្យកញ្ចប់បាត់ពីទាំងប្រវត្តិ ទាំងធុងសំរាម ៖ សម្លាប់ការសរសេរនៅគ្រប់ចំណុច រួចអះអាងការអភិរក្ស barcode បូកទិសផ្ទុយ (សាលក្រម ledger មិនច្បាស់ ➜ មិនប៉ះលុយ · មិនដាស់កញ្ចប់ដែល purge រួច) | `CLEANUPATOMIC_APP_DIR` |
+| `cleanup-interrupt-atomicity-test.js` | ការរំខានពាក់កណ្តាល (deploy · PTR · បិទ tab · បណ្តាញដាច់) មិនត្រូវធ្វើឲ្យកញ្ចប់បាត់ពីទាំងប្រវត្តិ ទាំងធុងសំរាម ៖ សម្លាប់ការសរសេរនៅគ្រប់ចំណុច រួចអះអាងការអភិរក្ស barcode បូកទិសផ្ទុយ (សាលក្រម ledger មិនច្បាស់ ➜ មិនប៉ះលុយ · មិនដាស់កញ្ចប់ដែល purge រួច) · អ្នកស្តាររត់ចំកណ្តាលការសម្អាតដែល **នៅរស់** (tab ដដែល · tab ទី ២ តាម Web Locks ក្លែង) ➜ លុយដកម្តងគត់ · tab ស្លាប់ ➜ ត្រូវបញ្ចប់ | `CLEANUPATOMIC_APP_DIR` |
 
 #### នាឡិកា និងពេលវេលា
 
@@ -240,8 +240,8 @@ bash audit-tools/emu/rules.sh
 | `late-commit-test.js` | ⛔ ការព្យួរ ≠ ការមិនកើត — transaction ដែល commit **យឺតក្រោយពិដាន** ត្រូវបញ្ចប់ការងារក្រោយ commit | `LATECOMMIT_APP_DIR` |
 | `periodic-network-guard-test.js` | callback Activate ចាស់មិនប្ដូរ UI/listener របស់ auth/database ថ្មី · ការងារតាមវដ្តមិនស៊ីបណ្តាញខុសពេល · ⛔ **ច្រកទ្វារ `sessionExpiryCheck` ដែលជាប់ `'pending'`** ➜ វដ្ត ៦០ វិ. មិនដែលរត់ ➜ ច្បាប់វគ្គ ៤ ម៉ោងងាប់ ៖ រាល់ផ្លូវដែលធ្វើឲ្យ App ប្រើបាន ត្រូវ arm វា (ការចូលប្រព័ន្ធ **និង** ការ Activate) | `PERIODICGUARD_APP_DIR` |
 | `adaptive-link-test.js` | ការងារស្រេចចិត្តសម្របតាម 2G/Data Saver (**fail open**) | `ADAPTIVE_APP_DIR` |
-| `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ | `HISTPATCH_APP_DIR` |
-| `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ | `SWINTEG_APP_DIR` |
+| `history-patch-retry-test.js` | ការដាច់បណ្តាញ ≠ ការបរាជ័យ — ការសរសេរត្រូវរត់ឡើងវិញ · ជាមួយ wrapper `disconnect` ពិត (ក្រៅបណ្តាញ · `fetch` ធ្លាក់) ការសម្គាល់ខលនៅតែចូលជួរ · ការព្យួរសុទ្ធនៅតែ revert | `HISTPATCH_APP_DIR` |
+| `sw-install-integrity-test.js` | SW មិន activate ដោយសំបកមិនពេញ · HTTP cache ចាស់មិនពុល cache SW · deploy ថ្មីដែល install ធ្លាក់ ➜ SW ចាស់មិនចាក់ឯកសារកំណែថ្មីចូល cache ចាស់ (asset ដែលសំបកយោងមានក្រៅបណ្តាញ) | `SWINTEG_APP_DIR` |
 | `sw-shell-latency-test.js` | សំបកដែល cache រួច មិនរង់ចាំបណ្តាញ | `SWLATENCY_APP_DIR` |
 | `sw-cache-key-test.js` | URL រសើប (Setup Link) មិនជាប់ក្នុង Cache Storage · `guide.html` និង Netlify `/guide` មាន route ផ្ទាល់ · direct navigation ទៅ `/app.js` នៅតែត្រឡប់ `index.html` | `SWKEY_APP_DIR` |
 | `sw-cache-failure-test.js` | Cache API បរាជ័យ ≠ App ដាច់ | `SWFAIL_APP_DIR` |
@@ -301,7 +301,7 @@ bash audit-tools/emu/rules.sh
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
 | `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
 | `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
-| `emu/tx-disconnect-emu-test.js` | ថ្នាក់ `disconnect` វាស់លើ **SDK Firebase ពិត** (កំណែដដែលនឹង CDN) · RTDB emulator ពិត · proxy TCP ៖ ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` ខណៈ server ប្រែរួច · wrapper ពិតរបស់ App សម្រេចត្រូវទាំង ២ ករណី | `TXEMU_APP_DIR` · `TXEMU_PORT` |
+| `emu/tx-disconnect-emu-test.js` | ថ្នាក់ `disconnect` វាស់លើ **SDK Firebase ពិត** (កំណែដដែលនឹង CDN) · RTDB emulator ពិត · proxy TCP ៖ ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` ខណៈ server ប្រែរួច · wrapper ពិតរបស់ App សម្រេចត្រូវទាំង ២ ករណី · registry ៖ SDK ពិតរត់ updater លើ cache ទទេ ➜ `claimBarcodeInRegistry()` ពិតមិន `claimed` លើ barcode ដែលចុះឈ្មោះរួច · ledger ៖ ឧបករណ៍ផ្សេងសរសេរតម្លៃដូចគ្នាមុន put របស់យើងត្រូវកាត់ ➜ `runLedgerTransaction()` ពិតមិន `committed` | `TXEMU_APP_DIR` · `TXEMU_PORT` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
@@ -334,7 +334,7 @@ bash audit-tools/emu/rules.sh
 | `wiring.js` | HTML ↔ JS មិនត្រូវគ្នា (`id` · `data-act` · `data-close`) | — |
 | `action-binding-test.js` | ធាតុ `data-act` ដែលទទួល `on*=` ខាង JS ➜ ការចុចរត់ ២ ផ្លូវ | `ACTIONBIND_APP_DIR` |
 | `perf-check.js` | ដំណើរការនៅទិន្នន័យធំ | `PERF_APP_DIR` |
-| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល | `SENTRYRACE_APP_DIR` |
+| `sentry-load-race-test.js` | Sentry មកយឺត ➜ កំហុសមិនធ្លាក់ចោល · ព្យុះ event ដដែលត្រូវទប់ តែ event លើកញ្ចប់/path ផ្សេងគ្នាត្រូវទៅដល់ (ពិដាន) | `SENTRYRACE_APP_DIR` |
 
 #### ការស្កេន · Export · ទម្លាប់គម្រោង
 

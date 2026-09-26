@@ -76,7 +76,7 @@ const REQUIRED_FNS = [
     'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp', 'revertLedgerRecordInMemory',
     'applyLedgerBucketDelta', 'commitRevenueBucketDelta',
     'ledgerZeroDelta', 'ledgerServerVerdict', 'ledgerMemoryCompensationClaimed', 'alignMonthlyLedgerToDaily', 'revertLedgerBucketOnServer', 'revertRevenueLedgerDelta', 'correctRevenueLedgerToActual',
-    'addRevenueToDailyAndMonthlyRecord', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'addRevenueToDailyAndMonthlyRecord', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'barcodeRegistryKey', 'pickupBarcodeKey', 'pickupSetSize', 'tallyPickupPhones',
     'legacyPickupPlaceholders', 'pickupSetFromRecord', 'buildPickupRecordFromSet', 'applyPickupMarksToSet',
     'applyPickupMarksInMemory', 'commitPickupMarks', 'markPickupBarcodes', 'revertPickupMarks', 'reapplyPickupMarks', 'getFormattedDate'
@@ -135,6 +135,24 @@ function allowedKeys(node) {
     if (!node) return null;
     return Object.keys(node).filter((k) => !k.startsWith('.') && k !== '$other');
 }
+// វាលខ្សែអក្សរ (ឧ. token `op` ក្នុង ledger) ៖ ព្រំដែនប្រវែងអានចេញពី rules ពិត ⛔ មិនមែន literal ក្នុង checker
+function stringFieldRule(node) {
+    const raw = node && node['.validate'];
+    if (typeof raw !== 'string' || !/^newData\.isString\(\)/.test(raw)) return null;
+    const min = /newData\.val\(\)\.length\s*>=\s*(\d+)/.exec(raw);
+    const max = /newData\.val\(\)\.length\s*<=\s*(\d+)/.exec(raw);
+    return { min: min ? Number(min[1]) : 0, max: max ? Number(max[1]) : Infinity };
+}
+const STRING_FIELDS = {};
+['zoew_daily_revenue_cod_dod/$date', 'zoew_monthly_revenue_cod_dod/$month'].forEach((p) => {
+    const parts = p.split('/');
+    const node = RULES[parts[0]] && RULES[parts[0]][parts[1]];
+    STRING_FIELDS[parts[0]] = {};
+    Object.keys(node || {}).forEach((k) => {
+        const rule = stringFieldRule(node[k]);
+        if (rule) STRING_FIELDS[parts[0]][k] = rule;
+    });
+});
 const ALLOWED = {
     'zoew_daily_revenue_cod_dod': allowedKeys(RULES.zoew_daily_revenue_cod_dod['$date']),
     'zoew_monthly_revenue_cod_dod': allowedKeys(RULES.zoew_monthly_revenue_cod_dod['$month']),
@@ -180,6 +198,12 @@ function makeSandbox(seed) {
                     if (typeof v[pk] !== 'number' || !isFinite(v[pk])) return 'pickedUpPhones/' + pk + ' មិនមែនលេខ';
                     if (!(v[pk] > 0)) return 'pickedUpPhones/' + pk + ' = ' + v[pk] + ' (ត្រូវ > 0)';
                 }
+                continue;
+            }
+            const stringRule = STRING_FIELDS[rootKey] && STRING_FIELDS[rootKey][key];
+            if (stringRule) {
+                if (typeof v !== 'string') return key + ' មិនមែនខ្សែអក្សរ';
+                if (v.length < stringRule.min || v.length > stringRule.max) return key + ' ប្រវែង ' + v.length + ' ក្រៅព្រំដែន';
                 continue;
             }
             if (typeof v !== 'number' || !isFinite(v)) return key + ' មិនមែនលេខ';
@@ -271,6 +295,7 @@ function makeSandbox(seed) {
         + fnSrc.revertRevenueLedgerDelta + '\n'
         + fnSrc.correctRevenueLedgerToActual + '\n'
         + fnSrc.addRevenueToDailyAndMonthlyRecord + '\n'
+        + fnSrc.runLedgerTransaction + '\n'
         + fnSrc.commitDailyRevenueDelta + '\n'
         + fnSrc.commitMonthlyRevenueDelta + '\n'
         + fnSrc.alignMonthlyLedgerToDaily + '\n'

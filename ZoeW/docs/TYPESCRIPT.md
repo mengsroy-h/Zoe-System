@@ -6,7 +6,7 @@
 
 | ជម្រើស | តម្លៃ | ហេតុអ្វី |
 |---|---|---|
-| `strictNullChecks` | `false` | កូដដែលផ្ទេរពី `app.js` មិនដែលពិនិត្យ `null` ទេ (ឧ. `byId('x').value`)។ ការបន្ថែមការពិនិត្យថ្មីជាការប្តូរ **ឥរិយាបថ** មិនមែនការបន្ថែមសុវត្ថិភាព |
+| `strictNullChecks` | `false` | កូដដែលផ្ទេរពី `app.js` មិនដែលពិនិត្យ `null` ទេ (ឧ. `dataState.scanHistory.find(…).barcodes` សន្មតថាមាន)។ ការបន្ថែមការពិនិត្យថ្មីជាការប្តូរ **ឥរិយាបថ** មិនមែនការបន្ថែមសុវត្ថិភាព |
 | `noImplicitAny` | `false` | Parameter របស់ function ដែលផ្ទេរមកគ្មាន type; ការដាក់ `any` ដោយដៃ ១,៥០០ កន្លែង មិនបន្ថែមព័ត៌មានអ្វីទេ |
 | `useUnknownInCatchVariables` | `false` | `catch (e) { … e.message … }` មានរាប់រយកន្លែង |
 
@@ -36,34 +36,27 @@
 ```
 
 ១. ជ្រើស module មួយ (ចាប់ផ្តើមពី `src/domain/*` — វាសុទ្ធសាធជាងគេ)
-២. ប្តូរ `byId('x')` ទៅជា accessor ដែលមាន type (`elInput` · `elButton` ·
-   `elDiv` ក្នុង `src/core/dom.ts`)
-៣. បន្ថែម interface ពិតជំនួស `any` (ចាប់ផ្តើមពី `HistoryItem` · `BarcodeEntry`)
+២. ការចូលប្រើ DOM មាន type រួចហើយ ៖ `elementOf<T>()` ក្នុង `src/app/refs.ts` ត្រឡប់ `T | null` ➜ កូដដែលប្រើវា
+   ត្រូវពិនិត្យ `null` រួចហើយ (មើលផ្នែក ៣)
+៣. បន្ថែម interface ពិតជំនួស `any` — ⛔ **មិនទាន់មាន** interface សម្រាប់កញ្ចប់ ឬ barcode ទេ (វាលឃ្លាំងក្នុង
+   `src/core/state.ts` ភាគច្រើនជា `any`) ➜ ចាប់ផ្តើមពីរូបរាងដែល Firebase rules ចាក់សោ (`firebase-database.rules.json`)
 ៤. រត់ `npm run verify` — បើ parity នៅបៃតង ការរឹងនោះមិនប្តូរឥរិយាបថទេ
 ៥. ពេល module ទាំងអស់រឹងរួច ➜ បើក `strictNullChecks` សកល រួចលុបផ្នែកនេះចោល
 
 ---
 
-## ៣. ហេតុអ្វី `byId()` ត្រឡប់ `any`
+## ៣. ការចូលប្រើ DOM ៖ `src/app/refs.ts`
 
-```ts
-export function byId(id: string): any {
-    return document.getElementById(id);
-}
-```
+App ជា React ១០០% ➜ ⛔ **គ្មាន `byId()` ទៀតទេ** ៖ កូដមុខងារមិនប៉ះ DOM ដោយផ្ទាល់ (`npm run purity:check`) ហើយ
+ការចូលប្រើដែលនៅសល់ឆ្លងកាត់ ref ដែលមានឈ្មោះក្នុង `REF_NAMES` (ចងដោយ `ref={refTo('…')}` ក្នុង JSX) ៖
 
-នេះ **មិនមែនជាភាពខ្ជិលទេ** ៖ `document.getElementById()` ត្រឡប់
-`HTMLElement | null` ហើយកូដដែលផ្ទេរមកសរសេរ `byId('x').value` ដោយសន្មតថា
-វាមាន។ ជម្រើស ៣ ៖
+| helper | ត្រឡប់ | ពេល ref មិនទាន់ចង |
+|---|---|---|
+| `elementOf<T>(name)` | `T \| null` | `null` ➜ អ្នកហៅត្រូវពិនិត្យ |
+| `fieldValue(name)` | `string` | `''` (ឥរិយាបថដូច `value` របស់វាលទទេ) |
+| `setFieldValue` · `setFieldChecked` · `focusField` | `void` | មិនធ្វើអ្វី |
 
-| ជម្រើស | លទ្ធផល |
-|---|---|
-| ត្រឡប់ `any` | ឥរិយាបថ **ដូច JS ដើមបេះបិទ** ✅ |
-| ត្រឡប់ `HTMLElement \| null` រួចបន្ថែម `?.` | ការហៅដែលធ្លាក់ ក្លាយជាការមិនធ្វើអ្វី ➜ **ប្តូរឥរិយាបថ** ❌ |
-| ត្រឡប់ `HTMLElement` ហើយបោះពេល `null` | ការហៅដែលធ្លាក់ ក្លាយជាការគាំង ➜ **ប្តូរឥរិយាបថ** ❌ |
-
-កូដ **ថ្មី** គួរប្រើ `elInput()` · `elButton()` · `elDiv()` ដែលត្រឡប់ type
-ពិត បូក `null` ➜ ការពិនិត្យជាកាតព្វកិច្ច។
+⛔ ឈ្មោះ ref ត្រូវមាននៅក្នុង `REF_NAMES` (type `RefName`) ➜ ឈ្មោះខុសជាកំហុស `tsc` មិនមែន `null` ស្ងាត់ៗពេលរត់។
 
 ---
 

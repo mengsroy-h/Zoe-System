@@ -80,6 +80,23 @@ export function addRevenueToDailyAndMonthlyRecord(scanDateStr, codToAdd, dodToAd
     };
 }
 
+export function runLedgerTransaction(ref, update) {
+    let op = 'op_';
+    try {
+        const bytes = new Uint8Array(12);
+        crypto.getRandomValues(bytes);
+        bytes.forEach((b) => { op += (b % 36).toString(36); });
+    } catch (e) {
+        op = 'op_';
+        for (let i = 0; i < 12; i++) op += Math.floor(Math.random() * 36).toString(36);
+    }
+    const send = (tagged) => firebaseState.fb.runTransaction(ref, (current) => update(current, tagged ? op : null));
+    return send(true).catch((error) => {
+        if (!/permission[_ ]denied/i.test(String((error && (error.code || error.message)) || error))) throw error;
+        return send(false);
+    });
+}
+
 export function ledgerZeroDelta() {
     return { cod: 0, dod: 0, count: 0 };
 }
@@ -221,14 +238,14 @@ export function commitDailyRevenueDelta(scanDateStr, codToAdd, dodToAdd, countTo
     const dateRef = firebaseState.fb.ref(firebaseState.db, `zoew_daily_revenue_cod_dod/${scanDateStr}`);
     let serverBefore = null;
     let serverAfter = null;
-    return firebaseState.fb.runTransaction(dateRef, (current) => {
+    return runLedgerTransaction(dateRef, (current, op) => {
         serverBefore = {
             codDollar: parseFloat(current && current.codDollar) || 0,
             dodDollar: parseFloat(current && current.dodDollar) || 0,
             totalCount: parseFloat(current && current.totalCount) || 0
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Daily', scanDateStr);
-        return serverAfter;
+        return op ? { ...serverAfter, op } : serverAfter;
     }).then((result) => {
         if (!result || !result.committed || !serverBefore || !serverAfter) {
             rollbackMemory();
@@ -257,7 +274,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
     }
     let serverBefore = null;
     let serverAfter = null;
-    return firebaseState.fb.runTransaction(firebaseState.dbRefMonthlyRevenue, (current) => {
+    return runLedgerTransaction(firebaseState.dbRefMonthlyRevenue, (current, op) => {
         const months = (current && typeof current === 'object') ? current : {};
         const existing = months[ymKey] || {};
         serverBefore = {
@@ -266,7 +283,7 @@ export function commitMonthlyRevenueDelta(ymKey, codToAdd, dodToAdd, countToAdd,
             totalCount: parseFloat(existing.totalCount) || 0
         };
         serverAfter = ledgerDeltaWithClamp(serverBefore, codToAdd, dodToAdd, countToAdd, 'Monthly', ymKey);
-        months[ymKey] = serverAfter;
+        months[ymKey] = op ? { ...serverAfter, op } : serverAfter;
 
         const latestThreeMonths = {};
         Object.keys(months).sort().reverse().slice(0, 3).forEach((key) => {

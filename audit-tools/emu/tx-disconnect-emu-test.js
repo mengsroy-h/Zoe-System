@@ -9,6 +9,10 @@
 //    ➜ ឯកសារនេះបញ្ជាក់គំរូនោះលើ SDK ពិត ហើយរត់ wrapper ពិតរបស់ App (`runTransactionResolved`) ទល់នឹង server ពិត ៖
 //    ក. ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` · server មានតម្លៃថ្មី · wrapper ➜ committed
 //    ខ. សំណើបាត់មុនដល់ server ➜ SDK បដិសេធ `disconnect` · server មិនប្រែ · wrapper ➜ not-applied
+//    គ. registry barcode (តម្លៃ `true` ថេរ) ៖ path គ្មាន listener ➜ SDK ពិតរត់ updater លើ cache ទទេ (`null`) ➜ ផ្ញើ `true`
+//       ➜ បើ barcode ចុះឈ្មោះរួចដោយកញ្ចប់ផ្សេង server មាន `true` ដដែល ➜ «ស្មើតម្លៃដែលផ្ញើ» មិនមែនភស្តុតាង ➜ មិនត្រូវ `claimed`
+//    ឃ. ledger ៖ ឧបករណ៍ផ្សេងដកចំនួនដូចគ្នាពីមូលដ្ឋានដដែល ខណៈសំណើរបស់យើងបាត់ ➜ តម្លៃលើ server ដូចយើងបេះបិទ ➜ token `op`
+//       ក្នុង `runLedgerTransaction()` ពិតរបស់ App ត្រូវធ្វើឲ្យ wrapper **មិន** ជឿ «applied»
 'use strict';
 
 process.exitCode = 1;
@@ -130,15 +134,20 @@ function serverStreamRewriter(state) {
 }
 
 function startProxy() {
-    const state = { mode: null, fired: 0, rewrites: 0, hostFrom: '', hostTo: '' };
+    const state = { mode: null, fired: 0, rewrites: 0, hostFrom: '', hostTo: '', beforeCut: null };
     const server = net.createServer((client) => {
         const upstream = net.connect(PORT, '127.0.0.1');
         const rewrite = serverStreamRewriter(state);
         const end = () => { client.destroy(); upstream.destroy(); };
+        let cut = false;
         client.on('data', (d) => {
+            if (cut) return;
             if (state.mode === 'drop-request' && clientFrameTexts(d).some((t) => /"a":"p"/.test(t) && /"h":/.test(t))) {
                 state.mode = null; state.fired++;
-                end();
+                cut = true;
+                const before = state.beforeCut;
+                state.beforeCut = null;
+                Promise.resolve(before ? before() : null).then(end, end);
                 return;
             }
             upstream.write(d);
@@ -213,10 +222,14 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
         const res = await fetch('http://127.0.0.1:' + PORT + '/' + p + '.json?ns=' + NS, { headers: { Authorization: 'Bearer owner' } });
         return res.json();
     };
+    const restWrite = async (p, value) => {
+        const res = await fetch('http://127.0.0.1:' + PORT + '/' + p + '.json?ns=' + NS, { method: 'PUT', headers: { Authorization: 'Bearer owner' }, body: JSON.stringify(value) });
+        return res.ok;
+    };
 
     const box = {
         console: { log: () => {}, error: () => {}, warn: () => {} },
-        JSON, Math, Object, Array, String, Number, Promise, Error, URL, Set, Map, Proxy, Reflect, RegExp,
+        JSON, Math, Object, Array, String, Number, Promise, Error, URL, Set, Map, WeakMap, Proxy, Reflect, RegExp,
         setTimeout, clearTimeout, AbortController, fetch,
         navigator: { onLine: true },
         resolveNativeApiUrl: (u) => u,
@@ -227,9 +240,10 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
     box.window = box;
     const ctx = vm.createContext(box);
     const parts = ['const txOutcomeUnknownReported = new Set();'];
-    ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS', 'TX_OUTCOME_MAX_WAIT_MS'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
+    ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS', 'TX_OUTCOME_MAX_WAIT_MS', 'txDisconnectResolving'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
     const FNS = ['elapsedSince', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
-        'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown', 'runTransactionResolved'];
+        'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown', 'runTransactionResolved',
+        'barcodeRegistryKey', 'claimBarcodeInRegistry', 'runLedgerTransaction'];
     const missing = FNS.filter((n) => !sliceFrom(SRC, n));
     check(missing.length === 0, 'wrapper ពិតរបស់ App មានក្នុងកូដ ship', missing);
     FNS.forEach((n) => { const s = sliceFrom(SRC, n); if (s) parts.push(s); });
@@ -299,6 +313,51 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
         check(proxy.state.fired >= 4, 'លក្ខខណ្ឌចាំបាច់ ៖ ការហៅតាម wrapper ក៏ត្រូវកាត់សំណើពិតដែរ', proxy.state.fired);
         check(!!(wrappedB && wrappedB.txOutcome === 'not-applied') && afterB2 && afterB2.codDollar === 10,
             '⛔⛔ wrapper ពិត ➜ not-applied ហើយ server មិនប្រែ (10)', { wrappedB, server: afterB2 });
+
+        console.log('\n── គ. registry barcode ៖ barcode ចុះឈ្មោះរួចដោយកញ្ចប់ផ្សេង + សំណើបាត់ ──');
+        check(await restWrite('zoew_barcode_registry/ZT7788990011', true), 'លក្ខខណ្ឌចាំបាច់ ៖ កូនសោ registry មានរួច (កញ្ចប់ផ្សេង)');
+        ctx.db = db;
+        ctx.fb = { ref: sdkDb.ref, runTransaction: (ref, fn, o) => ctx.runTransactionResolved(sdkDb, ref, fn, o) };
+        let sawNull = false;
+        await waitConnected();
+        proxy.state.mode = 'drop-request';
+        const firedBefore = proxy.state.fired;
+        const probeRaw = await (async () => {
+            try {
+                await sdkDb.runTransaction(sdkDb.ref(db, 'zoew_barcode_registry/ZT7788990011'), (cur) => { if (cur === null) sawNull = true; return cur === null ? true : undefined; });
+                return 'resolved';
+            } catch (e) { return String(e && e.message); }
+        })();
+        check(proxy.state.fired > firedBefore && probeRaw === 'disconnect', 'លក្ខខណ្ឌចាំបាច់ ៖ សំណើ put ត្រូវកាត់ ➜ SDK ពិតបដិសេធ `disconnect`', { probeRaw, fired: proxy.state.fired });
+        check(sawNull, '⛔ គំរូ ៖ SDK ពិតរត់ updater លើ cache ទទេ (`null`) ទោះ server មាន `true` ➜ ផ្ញើ `true`');
+        await waitConnected();
+        proxy.state.mode = 'drop-request';
+        let verdict = null;
+        try { verdict = await vm.runInContext('claimBarcodeInRegistry("ZT7788990011")', ctx); } catch (e) { verdict = 'throw:' + (e && e.message); }
+        check(await restRead('zoew_barcode_registry/ZT7788990011') === true, 'លក្ខខណ្ឌចាំបាច់ ៖ server នៅ `true` (ជារបស់កញ្ចប់ផ្សេង)');
+        check(verdict !== 'claimed', '⛔⛔ claim ពិតរបស់ App ➜ **មិនមែន** `claimed` (barcode ស្ទួន ➜ COD បូក ២ ដង)', verdict);
+
+        console.log('\n── ឃ. ledger ៖ ឧបករណ៍ផ្សេងដកចំនួនដូចគ្នា + សំណើរបស់យើងបាត់ ──');
+        await restWrite('ledger/c', { codDollar: 10, dodDollar: 0, totalCount: 2 });
+        sdkDb.onValue(sdkDb.ref(db, 'ledger/c'), () => {});
+        await settle(400);
+        await waitConnected();
+        const ledgerTx = vm.runInContext('typeof runLedgerTransaction === "function" ? runLedgerTransaction : null', ctx);
+        const next = (cur) => ({ codDollar: (cur && cur.codDollar || 0) - 5, dodDollar: 0, totalCount: (cur && cur.totalCount || 0) - 1 });
+        proxy.state.mode = 'drop-request';
+        proxy.state.beforeCut = () => restWrite('ledger/c', { codDollar: 5, dodDollar: 0, totalCount: 1 });
+        const firedBeforeD = proxy.state.fired;
+        let outD = null;
+        try {
+            const r = ledgerTx
+                ? await ledgerTx(sdkDb.ref(db, 'ledger/c'), (cur, op) => (op ? Object.assign(next(cur), { op }) : next(cur)))
+                : await resolved(sdkDb.ref(db, 'ledger/c'), next);
+            outD = { committed: r && r.committed, txOutcome: r && r.txOutcome };
+        } catch (e) { outD = { error: String(e && e.message), txOutcome: e && e.txOutcome }; }
+        const afterD = await restRead('ledger/c');
+        check(proxy.state.fired > firedBeforeD, 'លក្ខខណ្ឌចាំបាច់ ៖ សំណើ put របស់យើងត្រូវកាត់ (ការសរសេររបស់ឧបករណ៍ផ្សេងចុះមុន)', proxy.state.fired);
+        check(afterD && afterD.codDollar === 5 && !afterD.op, 'លក្ខខណ្ឌចាំបាច់ ៖ server មានតម្លៃដូចយើង (5) តែជារបស់ឧបករណ៍ផ្សេង', afterD);
+        check(!(outD && outD.committed), '⛔⛔ wrapper + runLedgerTransaction ពិត ➜ **មិនមែន** committed (ការដករបស់យើងមិនបានចុះ)', outD);
     } finally {
         try { sdkDb.goOffline(db); } catch (e) {}
         try { await sdkApp.deleteApp(app); } catch (e) {}

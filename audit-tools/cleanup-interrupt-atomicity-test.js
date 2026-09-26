@@ -71,17 +71,19 @@ const FNS = ['appZoneParts', 'getZoneDateKey', 'getFormattedDate', 'elapsedSince
     'recalcItemMoneyFromBarcodes', 'armLateCommit', 'notifyIfSlow', 'settleLockWithin',
     'ledgerNumber', 'ledgerZeroDelta', 'ledgerServerVerdict', 'alignMonthlyLedgerToDaily', 'correctRevenueLedgerToActual',
     'ledgerDeltaWithClamp', 'ledgerAppliedDelta', 'revertLedgerRecordInMemory', 'ledgerMemoryCompensationClaimed',
-    'applyLedgerBucketDelta', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
+    'applyLedgerBucketDelta', 'runLedgerTransaction', 'commitDailyRevenueDelta', 'commitMonthlyRevenueDelta',
     'addRevenueToDailyAndMonthlyRecord', 'revertRevenueLedgerDelta', 'restoreClaimedItemToScanHistory',
     'claimAndCleanupItem'];
 // ⛔ ឈ្មោះទាំងនេះជា **អ្នកស្តារ** ៖ គ្មានពួកវា ➜ ការរំខានមិនអាចសង្គ្រោះបាន។
 //    វាមិនត្រូវបញ្ឈប់ checker ទេ (ច្បាប់ «កុំបញ្ឈប់ពេលរកឈ្មោះមិនឃើញ — stub ជំនួស»)។
 const RECOVERY_FNS = ['noteCleanupJournalEntry', 'markCleanupJournalStage', 'clearCleanupJournalEntry',
     'readCleanupJournal', 'writeCleanupJournal', 'cleanupJournalScope', 'cleanupJournalScopeMismatch',
-    'resumeInterruptedCleanups'];
+    'cleanupLockManager', 'markCleanupJournalLive', 'releaseCleanupJournalLive', 'withCleanupEntryOwnership',
+    'resumeCleanupJournalEntry', 'resumeInterruptedCleanups'];
 const CONSTS = ['APP_TIME_ZONE', 'APP_TIME_ZONE_OFFSET_MINUTES', 'DB_OP_TIMEOUT_MS', 'TWO_HOURS_MS',
     'ABANDON_AGE_MS', 'TRASH_WRITE_SLOW_NOTICE_MS', 'LOCK_STALL_RELEASE_MS',
-    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER'];
+    'CLEANUP_JOURNAL_KEY', 'CLEANUP_JOURNAL_MAX', 'CLEANUP_STAGE_MOVED', 'CLEANUP_STAGE_LEDGER',
+    'CLEANUP_LIVE_LOCK_PREFIX', 'CLEANUP_OWNERSHIP_WAIT_MS', 'cleanupJournalLive'];
 
 const NOW = Date.UTC(2026, 8, 17, 6, 0, 0);
 const DAY = '2026-09-10';
@@ -96,7 +98,7 @@ const missingRecovery = [];
 function makeRun(opts) {
     opts = opts || {};
     const dieAfter = typeof opts.dieAfter === 'number' ? opts.dieAfter : Infinity;
-    const server = {
+    const server = opts.server || {
         history: { [ITEM_ID]: null },
         trash: {},
         daily: { [DAY]: { codDollar: START_COD, dodDollar: 3, totalCount: START_COUNT } },
@@ -140,6 +142,9 @@ function makeRun(opts) {
         update: (ref, obj) => {
             if (bump()) return hung();
             const base = (ref && ref.path) || '';
+            if (opts.trashGate && base === 'zoew_recently_deleted_cod_dod' && !opts.trashGate.open) {
+                return new Promise((resolve) => { opts.trashGate.waiters.push(() => resolve(fb.update(ref, obj))); });
+            }
             Object.keys(obj || {}).forEach((k) => {
                 const full = base ? base + '/' + k : k;
                 const seg = full.split('/');
@@ -187,6 +192,7 @@ function makeRun(opts) {
         setTimeout: (fn, ms) => { const id = setTimeout(fn, Math.min(ms || 0, 30)); timers.push(id); return id; },
         clearTimeout: (id) => clearTimeout(id),
         window: {}, ZoeErrors: null,
+        navigator: opts.locks ? { locks: opts.locks } : undefined,
         db: {}, fb,
         appLocalStore: store, appSessionStore: store,
         dbRefDeleted: { path: 'zoew_recently_deleted_cod_dod' },
@@ -234,6 +240,42 @@ function seedItem(run, barcodes, ageDays) {
 }
 
 function settle(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// ⛔ Web Locks ក្លែង ៖ ឈ្មោះ ➜ ត្រូវកាន់ · `ifAvailable` ➜ `null` ពេលកាន់រួច · tab ស្លាប់ ➜ browser ដោះ
+//    សោរបស់វា (`kill(name)`) ➜ tab ដែលនៅរស់ទើបអាចបញ្ចប់ការងារដែលត្រូវរំខានបាន។
+function makeLockManager() {
+    const held = new Map();
+    const queues = new Map();
+    let requests = 0;
+    const next = (name) => {
+        held.delete(name);
+        const q = queues.get(name);
+        if (q && q.length) q.shift()();
+    };
+    const grant = (name, cb) => {
+        const token = {};
+        held.set(name, token);
+        return Promise.resolve().then(() => cb({ name })).finally(() => { if (held.get(name) === token) next(name); });
+    };
+    return {
+        held,
+        requests: () => requests,
+        kill: (name) => next(name),
+        request(name, a, b) {
+            requests++;
+            const opts = typeof a === 'function' ? {} : (a || {});
+            const cb = typeof a === 'function' ? a : b;
+            if (held.has(name)) {
+                if (opts.ifAvailable) return Promise.resolve().then(() => cb(null));
+                return new Promise((resolve, reject) => {
+                    if (!queues.has(name)) queues.set(name, []);
+                    queues.get(name).push(() => grant(name, cb).then(resolve, reject));
+                });
+            }
+            return grant(name, cb);
+        }
+    };
+}
 
 const BARCODES = [
     { code: 'BC1', cod: 2.71, dod: 0, isClosed: false },
@@ -579,6 +621,114 @@ function packagePlaces(server) {
             r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD), run.server.daily[DAY]);
         ok('⛔ journal ធ្លាក់ ➜ ចំនួនកញ្ចប់នៅតែដក',
             run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+    }
+
+    // ── ៥ជ. ⛔⛔ ការសម្អាតដែល *នៅរស់* មិនមែន «ការរំខាន» ─────────────────
+    //    journal ចុះ **មុន** ការសរសេរធុងសំរាម ➜ ខណៈការសរសេរនោះកំពុងហោះ (បណ្តាញយឺត ·
+    //    ដាច់មួយភ្លែត) វដ្ត ៦០ វិ. ឬ `visibilitychange` ក្នុង **tab ដដែល** រត់
+    //    `resumeInterruptedCleanups()` ➜ វាឃើញធាតុ `moved` ដូចការរំខាន ➜ សរសេរធុងសំរាម
+    //    ម្ដងទៀត ហើយ **ដកលុយ** ➜ ពេលការសរសេរដើមចុះ ការសម្អាតដើមក៏ដកលុយដែរ ➜ ដក ២ ដង។
+    //    ⛔ អថេរ ៖ ការសម្អាត ១ ដង ➜ លុយដក **ម្តងគត់** ទោះអ្នកស្តាររត់ចំកណ្តាលក៏ដោយ។
+    async function liveCleanupWithResume(resumeCalls) {
+        const gate = { open: false, waiters: [] };
+        const run = makeRun({ trashGate: gate });
+        seedItem(run, BARCODES);
+        vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", run.ctx);
+        await settle(200);
+        const journaled = Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1);
+        const waiting = gate.waiters.length;
+        for (let i = 0; i < resumeCalls; i++) {
+            try { vm.runInContext('resumeInterruptedCleanups();', run.ctx); } catch (e) {}
+            await settle(150);
+        }
+        gate.open = true;
+        gate.waiters.splice(0).forEach((w) => w());
+        await settle(900);
+        run.timers.forEach(clearTimeout);
+        return { run, journaled, waiting };
+    }
+    {
+        const { run, journaled, waiting } = await liveCleanupWithResume(1);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ journal ចុះ ហើយការសរសេរធុងសំរាមកំពុងហោះ ពេលអ្នកស្តាររត់',
+            journaled && waiting === 1, { journaled, waiting });
+        ok('⛔⛔ អ្នកស្តាររត់ចំកណ្តាលការសម្អាតដែលនៅរស់ ➜ លុយដក **ម្តងគត់**',
+            r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD), run.server.daily[DAY]);
+        ok('⛔⛔ ... ហើយចំនួនកញ្ចប់ដក ៣ ម្តងគត់',
+            run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+        ok('⛔ ... ហើយ ledger ខែស្របគ្នា',
+            r2(run.server.monthly[MONTH].codDollar) === r2(START_COD - TOTAL_COD)
+            && run.server.monthly[MONTH].totalCount === START_COUNT - 3, run.server.monthly[MONTH]);
+        ok('⛔ ... ហើយធុងសំរាមមានធាតុ ១ (មិនស្ទួន)',
+            Object.keys(run.server.trash).length === 1, Object.keys(run.server.trash));
+        ok('⛔ ... ហើយ journal ត្រូវលុបពេលការសម្អាតចប់',
+            !Object.keys(run.storage).some((k) => k.indexOf('cleanup') !== -1), run.storage);
+        ok('⛔ ... ហើយគ្មានសារព្រមាន «មិនអាចផ្ទៀងផ្ទាត់» ក្លែងក្លាយ',
+            !run.toasts.some((t) => t.indexOf('មិនអាចផ្ទៀងផ្ទាត់') !== -1), run.toasts);
+    }
+    {
+        const { run } = await liveCleanupWithResume(3);
+        ok('⛔⛔ អ្នកស្តាររត់ ៣ ដង (វដ្ត + visibilitychange) ➜ លុយនៅតែដកម្តងគត់',
+            r2(run.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
+            && run.server.daily[DAY].totalCount === START_COUNT - 3, run.server.daily[DAY]);
+    }
+
+    // ── ៥ឈ. ⛔⛔ tab ២ លើឧបករណ៍ដដែល (`localStorage` រួម) ────────────────────
+    //    PWA + tab browser · tab ២ លើកុំព្យូទ័រ ៖ journal រួម តែការសម្អាតដែលនៅរស់រស់ក្នុង tab
+    //    **មួយទៀត** ➜ សំណុំក្នុង page មើលមិនឃើញ ➜ ភាពរស់ត្រូវវាស់តាម Web Locks (browser ដោះ
+    //    សោពេល tab ស្លាប់)។ ⛔ ទិសទាំង ២ ៖ tab រស់ ➜ មិនប៉ះ · tab ស្លាប់ ➜ ត្រូវបញ្ចប់ការងារ។
+    {
+        const locks = makeLockManager();
+        const storage = {};
+        const gate = { open: false, waiters: [] };
+        const tabA = makeRun({ trashGate: gate, locks, storage });
+        const tabB = makeRun({ locks, storage, server: tabA.server });
+        seedItem(tabA, BARCODES);
+        vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", tabA.ctx);
+        await settle(200);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ tab A កាន់សោរស់ ហើយ journal ចុះ',
+            locks.held.size === 1 && Object.keys(storage).some((k) => k.indexOf('cleanup') !== -1),
+            { held: [...locks.held.keys()], storage: Object.keys(storage) });
+        try { vm.runInContext('resumeInterruptedCleanups();', tabB.ctx); } catch (e) {}
+        await settle(300);
+        gate.open = true;
+        gate.waiters.splice(0).forEach((w) => w());
+        await settle(900);
+        try { vm.runInContext('resumeInterruptedCleanups();', tabB.ctx); } catch (e) {}
+        await settle(500);
+        tabA.timers.forEach(clearTimeout);
+        tabB.timers.forEach(clearTimeout);
+        ok('⛔⛔ tab B រត់អ្នកស្តារចំកណ្តាលការសម្អាតរស់របស់ tab A ➜ លុយដកម្តងគត់',
+            r2(tabA.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
+            && tabA.server.daily[DAY].totalCount === START_COUNT - 3, tabA.server.daily[DAY]);
+        ok('⛔ ... ហើយ ledger ខែស្របគ្នា',
+            r2(tabA.server.monthly[MONTH].codDollar) === r2(START_COD - TOTAL_COD)
+            && tabA.server.monthly[MONTH].totalCount === START_COUNT - 3, tabA.server.monthly[MONTH]);
+        ok('⛔ ... ហើយ tab B មិនបញ្ចេញសារ «មិនអាចផ្ទៀងផ្ទាត់» ក្លែងក្លាយ',
+            !tabB.toasts.some((t) => t.indexOf('⚠️') === 0), tabB.toasts);
+        ok('⛔ ... ហើយសោត្រូវដោះពេលការសម្អាតចប់', locks.held.size === 0, [...locks.held.keys()]);
+    }
+    {
+        const locks = makeLockManager();
+        const storage = {};
+        const tabA = makeRun({ dieAfter: 1, locks, storage });
+        seedItem(tabA, BARCODES);
+        vm.runInContext("claimAndCleanupItem('" + ITEM_ID + "', 'abandon');", tabA.ctx);
+        await settle(300);
+        tabA.timers.forEach(clearTimeout);
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ tab A ជាប់ ហើយកាន់សោ',
+            locks.held.size === 1 && !tabA.server.history[ITEM_ID] && Object.keys(tabA.server.trash).length === 0,
+            { held: [...locks.held.keys()], trash: Object.keys(tabA.server.trash) });
+        [...locks.held.keys()].forEach((name) => locks.kill(name));
+        const tabB = makeRun({ locks, storage, server: tabA.server });
+        try { vm.runInContext('resumeInterruptedCleanups();', tabB.ctx); } catch (e) {}
+        await settle(600);
+        tabB.timers.forEach(clearTimeout);
+        ok('⛔⛔ ទិសផ្ទុយ ៖ tab A ស្លាប់ (browser ដោះសោ) ➜ tab B បញ្ចប់ការសម្អាត',
+            Object.keys(tabB.server.trash).length === 1, Object.keys(tabB.server.trash));
+        ok('⛔⛔ ... ហើយលុយដកម្តងគត់',
+            r2(tabB.server.daily[DAY].codDollar) === r2(START_COD - TOTAL_COD)
+            && tabB.server.daily[DAY].totalCount === START_COUNT - 3, tabB.server.daily[DAY]);
+        ok('⛔ ... ហើយអ្នកស្តារពិតជាសួរសោ (មិនមែនរំលងវា)', locks.requests() >= 2, locks.requests());
     }
 
     // ── ៦. ⛔ អ្នកស្តារត្រូវមានឈ្មោះក្នុងកូដ ship ─────────────────────────

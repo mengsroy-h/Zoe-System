@@ -12,6 +12,13 @@ export const TX_OUTCOME_MAX_WAIT_MS = 60000;
 
 export const txOutcomeUnknownReported = new Set();
 
+export const txDisconnectResolving = new WeakMap();
+
+export function transactionDisconnectPending(promise) {
+    if (!promise || typeof promise !== 'object') return null;
+    return txDisconnectResolving.get(promise) || null;
+}
+
 export function transactionOutcomeUnknown(error) {
     if (!error) return false;
     return /^(?:Error:\s*)?disconnect$/i.test(String(error.message || error).trim());
@@ -146,21 +153,27 @@ export function runTransactionResolved(sdk, ref, updater, options) {
     } catch (e) {
         return Promise.reject(e);
     }
-    return Promise.resolve(started).catch((error) => {
+    const outcome = Promise.resolve(started).catch((error) => {
         if (!transactionOutcomeUnknown(error) || !ran || sent === undefined) throw error;
         const restUrl = txRestUrl(ref);
         if (!restUrl) throw error;
         const sentValue = sent;
         const priorValue = prior;
+        txDisconnectResolving.set(outcome, error);
         return txResolveOutcome(restUrl, sentValue, priorValue).then((resolved) => {
+            txDisconnectResolving.delete(outcome);
             if (resolved.outcome === 'applied') {
                 return { committed: true, snapshot: txSnapshotOf(ref, resolved.server), txOutcome: 'applied' };
             }
             try { error.txOutcome = resolved.outcome; } catch (e) {}
             if (resolved.outcome === 'unknown') reportTxOutcomeUnknown(restUrl);
             throw error;
+        }, (resolveErr) => {
+            txDisconnectResolving.delete(outcome);
+            throw resolveErr;
         });
     });
+    return outcome;
 }
 
 export function withTransactionOutcomeResolution(sdk) {

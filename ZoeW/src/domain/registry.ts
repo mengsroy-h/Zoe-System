@@ -66,7 +66,8 @@ export async function claimBarcodeInRegistry(code) {
             if (current === null) return true;
             return;
         });
-        return result.committed ? 'claimed' : 'taken';
+        if (!result || !result.committed) return 'taken';
+        return result.txOutcome === 'applied' ? 'unknown' : 'claimed';
     } catch (e) {
         return 'unknown';
     }

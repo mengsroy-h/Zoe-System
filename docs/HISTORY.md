@@ -39,6 +39,94 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.7] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 ការសម្អាតដកលុយ ២ ដង · 🔴 barcode ស្ទួនក្រោយ `disconnect` · 🔴 ការដក ledger បាត់ក្រោយ `disconnect` · 🔴 SW លាយកំណែ ➜ ក្រៅបណ្តាញ App ស** · ការសម្គាល់ខលបាត់ · Sentry លេប id កញ្ចប់ (branch · មិនទាន់ merge)
+
+**ZoeW** (`zoew-v233` ➜ `zoew-v234`) · **ZoeKeyGen** (`zoekeygen-v103` ➜ `zoekeygen-v104` ៖ `error-reporting.js` ចែករំលែក · `sw.js`)។
+⛔ **checker ១៧៧ បៃតងទាំងអស់ + `emu/*` ៦ បៃតង លើ tree មុនកែ** — កំហុសទាំង ៦ ខាងក្រោមគ្មានអ្នកវាស់សោះ។
+
+#### 🔴 ១. ការសម្អាត ៧ ថ្ងៃ ដកលុយ ២ ដង (អ្នកស្តារ journal រត់ចំកណ្តាលការសម្អាតដែលនៅរស់)
+
+- **អ្វីដែលអ្នកប្រើអាចជួប** ៖ បណ្តាញយឺត/ដាច់មួយភ្លែតខណៈការសម្អាត «ផុតកំណត់» កំពុងសរសេរធុងសំរាម ➜ វដ្ត ៦០ វិ. ឬការត្រឡប់មក App
+  (`visibilitychange`) ឬ tab ទី ២ លើឧបករណ៍ដដែល រត់ `resumeInterruptedCleanups()` ➜ វាឃើញធាតុ journal `moved` ដូចការរំខាន ➜ សរសេរ
+  ធុងសំរាមម្តងទៀត ហើយ **ដកលុយ** ➜ ពេលការសរសេរដើមចុះ ការសម្អាតដើមក៏ដកលុយដែរ ➜ **ស្ថិតិប្រាក់ និងចំនួនកញ្ចប់ដក ២ ដង**។
+- **វាស់បាន** (`cleanup-interrupt-atomicity-test` ផ្នែក ៥ជ · ការសម្អាតពិតលើ sandbox ពិត) ៖ ថ្ងៃ **$236.24 ➜ $214.10** (ត្រូវ $225.17) ·
+  ចំនួន **54 ➜ 48** (ត្រូវ 51) · ledger ខែដូចគ្នា។
+- **ការកែ** ៖ `withCleanupEntryOwnership()` ជាច្រកទ្វារតែមួយរបស់អ្នកស្តារ ៖ `cleanupJournalLive` (ការសម្អាតដែលនៅរស់ក្នុង page ដោះក្នុង
+  `finally`) · **Web Locks** `zoew-cleanup-live-<id>` ឆ្លង tab (browser ដោះសោពេល tab ស្លាប់ ➜ ការរំខានពិតនៅតែត្រូវបញ្ចប់) · fail-open
+  ពេលគ្មាន API (ឥរិយាបថដើម) · អ្នកស្តារអានធាតុ **ស្រស់** ពី journal ក្រោយបានសិទ្ធិ (មិនមែនច្បាប់ចម្លងចាស់ពីដើមជុំ)។
+- **អ្នកយាម** ៖ ផ្នែក ៥ជ (tab ដដែល ១ ដង · ៣ ដង) · ៥ឈ (tab ២ ជាមួយ Web Locks ក្លែង ៖ tab រស់ ➜ មិនប៉ះ · tab ស្លាប់ ➜ ត្រូវបញ្ចប់ ហើយដក ១ ដង)
+  ➜ **ធ្លាក់ ១៤ លើ tree មុនកែ** · `money-guardian-test` mutation ថ្មី (ដកច្រកទ្វារ) ➜ ក្រហម។
+
+#### 🔴 ២. barcode ស្ទួន ➜ COD បូក ២ ដង (registry ក្រោយ `disconnect` · ការថយក្រោយពី 2.42.6)
+
+- wrapper `disconnect` (2.42.6) សម្រេច «អនុវត្តរួច» ពេលតម្លៃ server **ស្មើតម្លៃដែលផ្ញើ**។ registry សរសេរ **`true` ថេរ** ហើយ path នោះ
+  គ្មាន listener ➜ SDK ពិតរត់ updater លើ cache ទទេ (`null`) ➜ ផ្ញើ `true` ➜ បើ barcode **ចុះឈ្មោះរួចដោយកញ្ចប់ផ្សេង** ហើយការតភ្ជាប់ដាច់មុន
+  server ឆ្លើយ `datastale` ➜ REST ឃើញ `true` ➜ `'claimed'` ➜ ការស្កេនត្រូវរក្សាទុក ➜ **barcode ស្ទួន ➜ COD បូក ២ ដង** (ជាន់ទី ៤ ជាសាលក្រម
+  server តែមួយ)។
+- **ភស្តុតាង SDK ពិត** (`emu/tx-disconnect-emu-test` ផ្នែក គ ៖ Firebase 12.19 + emulator + proxy កាត់ put) ៖ updater ឃើញ `null` ទោះ server
+  មាន `true` · `claimBarcodeInRegistry()` ពិតរបស់ App ឆ្លើយ **`claimed`** លើ tree មុនកែ។
+- **ការកែ** ៖ `txOutcome: 'applied'` លើ registry ➜ **`unknown`** (ច្បាប់ «ផ្ទៀងផ្ទាត់មិនបាន ≠ គ្មានស្ទួន» ៖ អន្ទាក់កូនសោកំព្រាថ្លៃតិចជាងលុយស្ទួន)។
+  ⛔ ច្បាប់ទូទៅ ៖ «ស្មើតម្លៃដែលផ្ញើ» ជាភស្តុតាងតែពេលតម្លៃនោះជារបស់អ្នកសរសេរម្នាក់ (token · ទិន្នន័យកញ្ចប់)។
+- **អ្នកយាម** ៖ `tx-outcome-test` ផ្នែក ៥ (ធ្លាក់ ៣ មុនកែ) · `emu/tx-disconnect-emu-test` ផ្នែក គ (ធ្លាក់ ១ មុនកែ) · `money-guardian-test`
+  mutation ថ្មី ➜ ក្រហម។
+
+#### 🔴 ២ខ. ការដក ledger បាត់ ពេលឧបករណ៍ ២ ដកចំនួនដូចគ្នា + `disconnect` (ថ្នាក់ដដែលនឹង ២ លើ ledger ថ្ងៃ/ខែ)
+
+- **អ្វីដែលអ្នកប្រើអាចជួប** ៖ ឧបករណ៍ ២ ដក (ដក barcode · ការសម្អាត ៧ ថ្ងៃ) **ចំនួនដូចគ្នាបេះបិទ** (cod · dod · count) លើថ្ងៃដដែល ក្នុងពេលជិតគ្នា
+  ហើយការតភ្ជាប់របស់ម្ខាងដាច់មុន server ឆ្លើយ ➜ wrapper អាន REST ឃើញតម្លៃ **ស្មើតម្លៃដែលខ្លួនផ្ញើ** (តែជារបស់ឧបករណ៍ផ្សេង) ➜ ជឿ «applied» ➜
+  ការដកមួយបាត់ ➜ **ចំណូល និងចំនួនកញ្ចប់លើស** ជាអចិន្ត្រៃយ៍។
+- **វាស់បាន** ៖ `tx-outcome-test` ផ្នែក ៤ខ ៖ ឧបករណ៍ផ្សេង 100 ➜ 95 + ការដករបស់យើង ➜ ថ្ងៃនៅ **95** (ត្រូវ 90) · `emu/tx-disconnect-emu-test` ផ្នែក ឃ
+  (SDK ពិត + emulator + proxy ដែលសរសេរតម្លៃរបស់ឧបករណ៍ផ្សេង មុនកាត់ put របស់យើង) ➜ `committed: true · txOutcome: 'applied'` លើ tree មុនកែ។
+- **ការកែ** ៖ `runLedgerTransaction()` (ចំណុចច្របាច់តែមួយនៃ `commitDailyRevenueDelta` · `commitMonthlyRevenueDelta`) ដាក់ **token `op` តែមួយក្នុងមួយការ
+  សរសេរ** ក្នុង record ថ្ងៃ/ខែ ➜ តម្លៃដែលផ្ញើមានម្ចាស់តែម្នាក់ ➜ wrapper បែងចែកបាន។ rules (Business) ទទួល `op` ស្រេចចិត្ត (ខ្សែអក្សរ ៨–៤០ តួ)។
+  ⛔ **មិនខូចទោះ Publish rules មុន ឬក្រោយ deploy** ៖ rules ចាស់បដិសេធ `op` (`$other`) ➜ `permission_denied` ➜ ផ្ញើម្តងទៀតគ្មាន `op`
+  (ឥរិយាបថ 2.42.6 បេះបិទ · ចំណាយ ១ round trip បន្ថែមរហូតដល់ Publish)។ អ្នកអាន ledger ទាំងអស់អានតាមឈ្មោះវាល ➜ `op` មិនលេចក្នុងលេខណាមួយ។
+- **អ្នកយាម** ៖ `tx-outcome-test` ផ្នែក ៤ខ (ធ្លាក់មុនកែ · ទិសផ្ទុយ «rules មិនទាន់ Publish ➜ ចុះ ១ ដង» · `op` លើថ្ងៃ និងខែ) · `emu/tx-disconnect-emu-test`
+  ផ្នែក ឃ · `money-guardian-test` mutation «ledger ថ្ងៃលែងផ្ទុក `op`» ➜ ក្រហម · `revenue-rules-clamp-test` ដេរីវេ validator `op` ពី rules ពិត។
+
+#### 🔴 ៣. Service Worker ចាក់ឯកសារ deploy ថ្មីចូល cache ចាស់ ➜ ក្រៅបណ្តាញ App ស
+
+- deploy ថ្មី ➜ SW ថ្មី install ~៣ MB (បណ្តាញយឺត · អ្នកប្រើបិទ App កណ្តាលទី ➜ install ធ្លាក់) ➜ SW ចាស់នៅគ្រប់គ្រង ហើយការធ្វើឲ្យស្រស់ខាងក្រោយ
+  សរសេរ `index.html` **ថ្មី** ចូល cache **ចាស់** ➜ HTML យោង `assets/index-<hash ថ្មី>.js` ដែលគ្មានក្នុង cache ➜ **បើកក្រៅបណ្តាញ App មិនចាប់ផ្តើម**
+  (ថ្នាក់ដដែលនឹង `zxing-wasm.js` ថ្មី + `.wasm` ចាស់ ➜ `LinkError` ➜ iPhone ស្កេនមិនបាន តាមទ្វារទី ២)។
+- **វាស់បាន** (Chromium ពិត · SW ពិត · គ្មាន route) ៖ cache `-a` ផ្ទុក HTML **B** · `index-…-b.js` ក្រៅបណ្តាញ **`ok: false`**។
+- **ការកែ** ៖ `shellDeployIsCurrent()` (App ទាំង ២) ៖ ការធ្វើឲ្យស្រស់សរសេរតែពេល `sw.js` លើ server នៅជាកំណែ `CACHE_VERSION` ខ្លួនឯង (memo ៦០ វិ. ·
+  ពិដានពេលដដែល · ធ្លាក់ ➜ មិនសរសេរ) ➜ deploy ថ្មីមកតាម install ជាក្រុម (atomic) តែមួយផ្លូវ · ការព្យាបាលក្នុង deploy ដដែល (ជុំទី ៤ ៖ B ➜ C) នៅដដែល។
+- **អ្នកយាម** ៖ `sw-install-integrity-test` ជុំទី ៥ (ធ្លាក់មុនកែ · mutation «ដកច្រកទ្វារ» ធ្លាក់) · `adaptive-link-test` ស្រង់ helper ពិត (async)។
+
+#### 🟠 ៤. ការសម្គាល់ «ខល» ពេលបណ្តាញដាច់ ➜ revert + «បរាជ័យ» (ការថយក្រោយពី 2.42.6)
+
+- wrapper `disconnect` អាន REST រហូតដល់ ៦០ វិ. ពេលបណ្តាញដាច់ ➜ `dbOp` (១៥ វិ.) ផុតមុន ➜ «stalled» ➜ `patchHistoryItemFields()` revert +
+  សារ «បរាជ័យ» ជំនួស **ការចូលជួរ** (កំហុស Sentry 2.20.1 ៖ ស្លាក «✔️ ខល» លោតត្រឡប់ ➜ ចុចខលលេខនោះម្តងទៀត)។ វាស់ (wrapper ពិត) ៖ ក្រៅបណ្តាញ
+  និង `fetch` ធ្លាក់ ➜ `saved: false · queued: 0`; SDK ឆៅ (មុន 2.42.6) ➜ `queued`។
+- **ការកែ** ៖ wrapper ចុះឈ្មោះ `transactionDisconnectPending(promise)` ខណៈកំពុងអាន server ➜ ពេល `dbOp` ផុត ការសម្រេចប្រើកំហុស `disconnect` ពិត
+  ➜ ចូលជួរ (ច្បាប់ «តែ `disconnect` ចូលជួរ» នៅដដែល · ការព្យួរសុទ្ធនៅតែ revert — ទិសផ្ទុយមានអ្នកយាម)។
+- **អ្នកយាម** ៖ `history-patch-retry-test` (wrapper ពិត ២ ស្ថានភាព + ទិសផ្ទុយ «ព្យួរសុទ្ធ») ➜ ធ្លាក់ ១០ មុនកែ · mutation «ចូលជួរលើការព្យួរណាក៏ដោយ» ធ្លាក់ ២។
+
+#### 🟠 ៥. Sentry លេប id កញ្ចប់ (ការដក event ស្ទួន 2.42.6)
+
+- ហត្ថលេខា = zone · context · message ➜ event លុយដដែលលើ **កញ្ចប់ផ្សេងគ្នា** ក្នុង ១០ នាទីត្រូវទប់ ➜ Admin មិនឃើញ `itemId` ទី ២ («ទិន្នន័យកញ្ចប់ …
+  អាចនឹងបាត់! សូមប្រាប់ Admin») · `runTransactionResolved` រាយការណ៍ ១ ដង/path តែ path ទី ២ ត្រូវទប់។
+- **ការកែ** (`error-reporting.js` App ទាំង ២ · byte-identical) ៖ អត្តសញ្ញាណ (`itemId` · `item` · `barcode` · `keyId` · `date` · `path`) ផ្សេងគ្នា ➜ ផ្ញើ
+  (ពិដាន ៥/ហត្ថលេខា/បង្អួច) · ព្យុះលើ id ដដែលនៅតែទប់។ **អ្នកយាម** ៖ `sentry-load-race-test` ផ្នែក ៦ខ ➜ ធ្លាក់ ២ មុនកែ។
+
+#### ឯកសារ
+
+- `ZoeW/docs/TYPESCRIPT.md` យោង `byId()` · `src/core/dom.ts` · `elInput`/`elDiv` · `HistoryItem`/`BarcodeEntry` ដែល **លែងមាន** ➜ សរសេរឡើងវិញតាម
+  `src/app/refs.ts` ពិត។ `CLAUDE.md` Runbook ៖ `money-guardian-test.js` រត់លើ repo React អាន `ZoeW/app.js` ដែលលែងមាន ➜ ផ្លាស់ `MONEYGUARD_STRICT=1`
+  ទៅលើ `run-all.sh` · emulator ដែលបើកដោយ `setsid nohup … &` ងាប់ពេល shell call ចប់ (វាស់បាន) ➜ ត្រូវ `curl` មុន run-all។
+  🔎 លិបិក្រមនៅចុងឯកសារនេះរាយ «ផ្នែក ២» សម្រាប់ checker **~១២០** ដែលមិនដែលលេចក្នុង `HISTORY.md` សោះ (ឧ. `boot-runtime` · `camera-resume-test`)
+  ➜ session ក្រោយរកការពន្យល់នៅកន្លែងខុស ➜ ជួរ `HISTORY.md` ដេរីវេឡើងវិញពីការលេចពិត (ឈ្មោះពេញ ឬឈ្មោះគ្មាន `-test`) · `—` = ការពន្យល់រស់តែក្នុង archive។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ⛔ **Firebase rules (Business) ប្រែ** ៖ បិទភ្ជាប់ `firebase-database.rules.json` ចូល Firebase Console (Project អាជីវកម្ម) ➜ Realtime Database ➜ Rules ➜
+  **Publish** (វាល `op` ក្នុង `zoew_daily_revenue_cod_dod/$date` និង `zoew_monthly_revenue_cod_dod/$month`)។ លំដាប់មិនសំខាន់ ៖ មុន Publish App ដើរដូច 2.42.6
+  (ចំណាយ ១ round trip បន្ថែមលើការសរសេរ ledger) · ក្រោយ Publish ការការពារ ២ខ សកម្ម។ ⛔ rules របស់ License (ZoeKeyGen) **មិនប្រែ**។
+- គ្មាន env ថ្មី ➜ merge ពេលម្ចាស់គម្រោងស្នើ ➜ Netlify build ខ្លួនឯង (`zoew-v234` · `zoekeygen-v104`)។
+- **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បើក App (online) ➜ បិទ WiFi/Data ➜ បិទ App ទាំងស្រុង ➜ បើកវិញក្រៅបណ្តាញ ➜ App ត្រូវបើក ហើយស្កេនបាន។
+- Sentry ៖ event `zone: money` ដដែលលើកញ្ចប់ផ្សេងគ្នាឥឡូវលេចដាច់ពីគ្នា (រហូតដល់ ៥ ក្នុង ១០ នាទី)។
+
 ### [2.42.6] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 transaction `disconnect` ដែល server អនុវត្តរួច** · Sentry លែងទទួលព្យុះកំហុសដដែល · កូដ React គ្មាន comment (branch · មិនទាន់ merge)
 
 #### 🔴 `disconnect` ≠ «មិនបានអនុវត្ត» (កំហុសលុយ · checker ១៨២+ បៃតងលើ tree នោះ)
@@ -788,6 +876,32 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### Deep audit 2.42.7 ៖ ហេតុអ្វី checker ១៨៣ បៃតងលើកំហុស ៦
+
+- **ការសម្អាតដកលុយ ២ ដង** ៖ `cleanup-interrupt-atomicity-test` វាស់តែ **tab ដែលស្លាប់** («សម្លាប់ការសរសេរទី N» ➜ tab ថ្មីស្តារ) ➜
+  ស្ថានភាព «អ្នកស្តាររត់ **ខណៈ** ការសម្អាតដែលនៅរស់កំពុងរង់ចាំការសរសេរធុងសំរាម» មិនដែលត្រូវដាក់ចូល (សំណួរ ៨ ៖ «ដាក់ប្រព័ន្ធក្នុង
+  *ស្ថានភាព* ណា?») ។ journal = «ការងារដែលអាចត្រូវរំខាន» ➜ ⛔ សួរជានិច្ច ៖ «**អ្នកណាផ្សេងទៀតអានវា ខណៈម្ចាស់នៅរស់?**» (វដ្ត ៦០ វិ. ·
+  `visibilitychange` · tab ទី ២ ដែលចែក `localStorage`)។
+- **barcode ស្ទួន** ៖ fake SDK របស់ `tx-outcome-test` រត់ updater លើ **តម្លៃ server** ជានិច្ច ➜ ស្ថានភាព «cache ទទេ ➜ updater ឃើញ `null`
+  ➜ ផ្ញើ `true`» (ឥរិយាបថ SDK ពិតលើ path គ្មាន listener) មិនដែលកើត ➜ registry មិនដែលផ្ញើ `true` លើកូនសោដែលមានរួច។ ⛔ មេរៀន ៖ ការ
+  សម្រេចតាម **តម្លៃ** (មិនមែនអត្តសញ្ញាណ) មានលក្ខខណ្ឌលាក់ ៖ «តម្លៃនោះជារបស់ខ្ញុំតែម្នាក់» ➜ តម្លៃថេរ (`true` · `0` · `{}`) បំពានវា។
+- **ការដក ledger បាត់** ៖ លក្ខខណ្ឌលាក់ដដែល លើតម្លៃ **ដែលគណនា** ៖ ឧបករណ៍ ២ ដកចំនួនដូចគ្នាពីមូលដ្ឋានដដែល ➜ តម្លៃដូចគ្នាបេះបិទ។ fake SDK
+  មិនដែលដាក់ «ការសរសេររបស់ឧបករណ៍ផ្សេង *ចន្លោះ* ការផ្ញើ និងការអាន REST» ➜ proxy របស់ emulator ត្រូវការ `beforeCut` (សរសេរតម្លៃរបស់ឧបករណ៍
+  ផ្សេងមុនកាត់ put របស់យើង)។ ⛔ ការកែដែលត្រូវការការប្តូរ rules ត្រូវ **fail-open លើ rules ចាស់** (`permission_denied` ➜ ឥរិយាបថចាស់) ➜
+  លំដាប់ Publish/deploy មិនអាចបំបែក App បានទេ។
+- **SW លាយកំណែ** ៖ checker SW ទាំងអស់វាស់ **install ដែលជោគជ័យ** ឬ **SW ដដែលក្នុង deploy ដដែល** (ជុំទី ៤ ថែមទាំងអះអាងថា «C ដោយគ្មាន
+  SW ថ្មី ➜ ត្រូវចូល cache») ➜ ស្ថានភាព «deploy ថ្មី · install ថ្មីធ្លាក់ · SW ចាស់នៅគ្រប់គ្រង» មិនដែលត្រូវវាស់។ ⛔ `#appPages` មិនមែន
+  ភស្តុតាងថា App ចាប់ផ្តើម (index.html របស់ build វាស់មាន markup ស្រាប់) ➜ វាស់ **asset ដែល HTML ក្នុង cache យោង** ក្រៅបណ្តាញ។
+- **ការសម្គាល់ខល** ៖ `history-patch-retry-test` stub `runTransaction` ឲ្យបដិសេធ `disconnect` **ភ្លាម** ➜ wrapper 2.42.6 (ដែល *ពន្យារ*
+  `disconnect`) ឈរ **ក្រៅ** sandbox ➜ ស្នាមភ្ជាប់ «wrapper ↔ ពិដាន `dbOp` ↔ ការចូលជួរ» គ្មានអ្នកវាស់ (សំណួរ ៧)។
+- **Sentry** ៖ `sentry-load-race-test` ផ្នែក ៦ វាស់ព្យុះលើ **សារដដែល គ្មានអត្តសញ្ញាណ** ➜ event ដដែលលើ **កញ្ចប់ផ្សេងគ្នា** មិនដែលត្រូវវាស់។
+- **Mutation** (`money-guardian-test` ១៥/១៥) ៖ «ledger លែងផ្ទុក `op`» ➜ `tx-outcome-test` ក្រហម · «ដកច្រកទ្វារអ្នកស្តារ» ➜ `cleanup-interrupt-atomicity-test` ក្រហម · «registry ជឿ
+  applied» ➜ `tx-outcome-test` ក្រហម · SW «ដកច្រកទ្វារ deploy» ➜ `sw-install-integrity-test` ជុំទី ៥ ក្រហម · «ចូលជួរលើការព្យួរណាក៏ដោយ» ➜
+  `history-patch-retry-test` ក្រហម ២ (ទិសផ្ទុយ)។ ⛔ អ្នកយាម ៨ × (១ + mutation ១៥) រត់ជាលំដាប់ **លើសពិដាន ៣០០ វិ.** របស់ `run-all.sh` (CI ជុំទី ១ ៖
+  «ព្យួរ») ➜ `money-guardian-test` រត់អ្នកយាម **ស្របគ្នា** (`MONEYGUARD_JOBS` · លំនាំដើម ≤ ៤) ➜ ~១៦០ វិ. ក្រោមបន្ទុក CI។
+- **`emu/crud-rules-flow`** (CI ជុំទី ១) ៖ sandbox ខ្វះ `markCleanupJournalLive` · `releaseCleanupJournalLive` · `navigator` ➜ checker ធ្លាក់
+  «dependency មិនមានក្នុង scope» (វាចាប់បានត្រឹមត្រូវ ៖ helper ថ្មីក្នុង `claimAndCleanupItem`) ➜ បន្ថែមក្នុងបញ្ជីស្រង់។
+
 ### `disconnect` ដែល server អនុវត្តរួច (2.42.6) ៖ ហេតុអ្វី checker ទាំងអស់មើលមិនឃើញ
 
 - **fake SDK ទាំងអស់ចាត់ «reject» = «មិនបានអនុវត្ត»** ➜ របៀបបរាជ័យទី ៥ («បដិសេធ តែអនុវត្តរួច») មិនដែលត្រូវដាក់ចូល។ ថ្នាក់នេះជា
@@ -1289,183 +1403,183 @@ Function ដែល export ៖ 978
 
 | Checker | `HISTORY.md` (សម័យ React) | `HISTORY-ARCHIVE.md` (សម័យ vanilla) |
 |---|---|---|
-| `action-binding-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `adaptive-link-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `animation-cost` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `app-lock-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `auth-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ |
-| `barcode-shape-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `biometric-unlock-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `boot-animation-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `boot-runtime` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `camera-resume-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `checker-coverage` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `cleanup-clock-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `cleanup-interrupt-atomicity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
-| `clear-history-finalization-fence-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `clock-basis-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `clock-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `code-duplication-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `collected-mirror-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `collected-mirror-lifecycle-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `collected-value-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `action-binding-test` | ផ្នែក ១ | ផ្នែក ១ |
+| `adaptive-link-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `animation-cost` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `app-lock-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `auth-recovery-test` | ផ្នែក ១ | ផ្នែក ៣ |
+| `barcode-shape-test` | — | ផ្នែក ២ |
+| `biometric-unlock-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `boot-animation-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `camera-resume-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `checker-coverage` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `cleanup-clock-guard-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
+| `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `clock-basis-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `clock-hygiene` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `code-duplication-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `collected-mirror-fuzz-test` | — | ផ្នែក ១ |
+| `collected-mirror-lifecycle-test` | — | ផ្នែក ១ |
+| `collected-value-fuzz-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `compensation-order` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `concurrent-scan-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `connection-recovery-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `connection-state-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `csp-enforced-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `csp-lazy-resource-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `css-classes` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `css-media-override` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `css-var-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `daily-collected-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `db-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `dependency-security-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
+| `compensation-order` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `concurrent-scan-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `connection-recovery-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `connection-state-fuzz-test` | — | ផ្នែក ១ |
+| `csp-enforced-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `csp-lazy-resource-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `css-classes` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `css-media-override` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `css-var-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `daily-collected-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `db-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `dependency-security-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `doc-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `dom-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `duplicate-money-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `duplicate-scan-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `empty-state-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `emu/crud-rules-flow` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `emu/ledger-revert-emu-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `emu/license-seat-rules-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
-| `emu/ns` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `emu/restore-deadlock-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
+| `dom-hygiene` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `duplicate-money-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `duplicate-scan-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `empty-state-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/crud-rules-flow` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `emu/ledger-revert-emu-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `emu/license-seat-rules-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `emu/ns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/restore-deadlock-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `emu/restore-mutation-emu-test` | — | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `expired-trash-retention-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `export-cells-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `field-shape-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `firebase-backup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `firebase-config-paste-test` | ផ្នែក ២ | ផ្នែក ៣ |
-| `fluid-type-focus-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `function-surface-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `gesture-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `google-sheets-cache-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `hang-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `health-check-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `history-menu-dismiss-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `history-patch-retry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `html-sink-escaping` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `inline-handler-xss-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `ios-panel-glide-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `item-money-integrity-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `keygen-session-security-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `keylist-consistency-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `khmer-timezone-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `late-commit-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `layout-check` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `layout-thrash` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `exit-code-integrity` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `expired-trash-retention-test` | ផ្នែក ១ | ផ្នែក ១ |
+| `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `firebase-backup-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `firebase-config-paste-test` | — | ផ្នែក ៣ |
+| `fluid-type-focus-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
+| `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `hang-guard` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `health-check-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `history-menu-dismiss-test` | — | ផ្នែក ២ |
+| `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `html-sink-escaping` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `ios-panel-glide-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `item-money-integrity-test` | — | ផ្នែក ១ |
+| `keygen-session-security-test` | — | ផ្នែក ២ |
+| `keylist-consistency-test` | — | ផ្នែក ១ |
+| `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `late-commit-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `layout-check` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `layout-thrash` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `ledger-count-integrity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
+| `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `ledger-failed-apply-revert-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `license-app-code-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
-| `license-clock-rollback-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `license-clock-trust-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `license-grace-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `license-network-pressure-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `license-record-race-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `license-seat-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
-| `listener-leak-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `listener-pending-key-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `locker-claim-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `lookup-burst-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `lookup-config-secret-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `lookup-failure-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `lookup-freshness-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `lookup-prefetch-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `loop-termination-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `money-guardian-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `money-reality-check` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `license-app-code-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `license-clock-rollback-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `license-clock-trust-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `license-grace-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `license-record-race-test` | — | ផ្នែក ២ |
+| `license-seat-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `locker-claim-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `lookup-burst-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-config-secret-test` | — | ផ្នែក ១ |
+| `lookup-failure-identity-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-freshness-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `lookup-prefetch-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
+| `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-reality-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
+| `monotonic-gate-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `monthly-report-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `netlify-config-scope-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `network-pressure-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `network-timeout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `offline-shell-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `page-nav-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `panel-motion-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `panel-snap-ownership-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `partial-pickup-cleanup-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `payload-schema` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `perf-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `periodic-network-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `phone-search-swipe-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `phone-suggest-test` | ផ្នែក ២ | ផ្នែក ១ |
+| `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `netlify-config-scope-test` | ផ្នែក ១ | ផ្នែក ២ |
+| `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `network-timeout-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `offline-shell-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `panel-snap-ownership-test` | — | ផ្នែក ២ |
+| `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `payload-schema` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `perf-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `periodic-network-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `phone-suggest-test` | — | ផ្នែក ១ |
 | `pickup-barcode-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `pickup-repair-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ |
-| `pickup-reset-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `pin-prompt-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
+| `pickup-repair-test` | — | ផ្នែក ១ · ផ្នែក ៣ |
+| `pickup-reset-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `pin-prompt-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `price-edit-abort-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `raw-read-shape-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `reconnect-ladder-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `redact-dump` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `registry-orphan-list` | ផ្នែក ២ | ផ្នែក ១ |
-| `registry-orphan-list-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `registry-release-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `registry-orphan-list` | — | ផ្នែក ១ |
+| `registry-orphan-list-test` | — | ផ្នែក ១ |
+| `registry-release-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `repository-contract-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `repository-file-coverage` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `restore-finalization-fence-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `restore-marker-hygiene-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `restore-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `restore-marker-hygiene-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `revenue-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `revenue-rules-clamp-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `rules-duplicate-keys` | ផ្នែក ២ | ផ្នែក ៣ |
-| `scan-engine-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `scan-remove-mode-test` | ផ្នែក ២ | ផ្នែក ១ |
-| `sdk-offline-boot-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sdk-surface` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `secret-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `semantic-ui-color-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `sentry-load-race-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `setup-link-browser-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `setup-link-logout-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `setup-link-roundtrip-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `shared-fns` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sheet-import-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `slow-write-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `stale-clear-claim-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `stale-write` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `stall-lock-release-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
+| `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `rules-duplicate-keys` | — | ផ្នែក ៣ |
+| `scan-engine-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `scan-remove-mode-test` | — | ផ្នែក ១ |
+| `sdk-offline-boot-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sdk-surface` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `secret-hygiene` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `semantic-ui-color-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `sentry-load-race-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `setup-link-browser-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `setup-link-logout-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `setup-link-roundtrip-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `shared-fns` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sheet-import-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `slow-write-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `stale-clear-claim-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `stale-write` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `stall-lock-release-test` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `state-hygiene` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `stats-collected-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
-| `stats-measurable-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `stats-screen-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `storage-blocked-boot-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
-| `storage-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `strip-comments` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ |
-| `sw-abort-propagation-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `sw-cache-failure-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-cache-key-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-install-integrity-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-revalidate-pressure-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `sw-shell-latency-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `toast-action-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `toast-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `trash-modal-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `stats-collected-truth-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `stats-measurable-gate-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `stats-screen-agreement-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `storage-blocked-boot-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
+| `storage-guard` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `strip-comments` | ផ្នែក ១ | ផ្នែក ១ |
+| `sw-abort-propagation-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `sw-cache-failure-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-cache-key-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-install-integrity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-revalidate-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `sw-shell-latency-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `toast-action-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `toast-truth-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `trash-modal-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `ts-comments` | ផ្នែក ១ | — |
 | `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `user-guide-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `version-bump-scope` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `version-check` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
-| `wiring` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zoew-suite-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `zto-budget-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `zto-cookie-capture-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
-| `zto-cookie-session-test` | ផ្នែក ២ | ផ្នែក ២ |
-| `zto-cookie-store-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zto-cookie-sync-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zto-list-sync-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `zto-negative-cache-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `zto-network-boundaries-test` | ផ្នែក ២ | ផ្នែក ២ |
+| `ui-flow-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `user-guide-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `version-bump-scope` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `version-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
+| `wiring` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `write-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `zoew-suite-test` | ផ្នែក ១ | — |
+| `zto-budget-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |
+| `zto-cookie-session-test` | — | ផ្នែក ២ |
+| `zto-cookie-store-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `zto-cookie-sync-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `zto-list-sync-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `zto-negative-cache-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `zto-network-boundaries-test` | — | ផ្នែក ២ |
 | `zto-proxy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
-| `zto-signed-status-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
-| `zto-sync-banner-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
+| `zto-signed-status-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `zto-sync-banner-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |

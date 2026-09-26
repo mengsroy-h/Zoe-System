@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v103';
+const CACHE_VERSION = 'zoekeygen-v104';
 
 const CORE_SHELL = [
     './',
@@ -58,6 +58,28 @@ const REVALIDATE_TIMEOUT_MS = 6000;
 const REVALIDATE_MAX_IN_FLIGHT = 3;
 const revalidateInFlight = new Set();
 
+const DEPLOY_CHECK_TTL_MS = 60000;
+let deployCheck = null;
+
+function shellDeployIsCurrent() {
+    const now = Date.now();
+    if (deployCheck && now >= deployCheck.at && now - deployCheck.at < DEPLOY_CHECK_TTL_MS) return deployCheck.current;
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => {
+        if (controller) { try { controller.abort(); } catch (e) {} }
+    }, REVALIDATE_TIMEOUT_MS);
+    const markers = ["'" + CACHE_VERSION + "'", '"' + CACHE_VERSION + '"'];
+    const current = fetch(self.location.href, controller ? { signal: controller.signal, cache: 'no-cache' } : { cache: 'no-cache' })
+        .then((response) => (response && response.ok ? response.text() : ''))
+        .then((text) => markers.some((marker) => text.indexOf(marker) !== -1), () => false)
+        .then((same) => {
+            clearTimeout(timer);
+            return same;
+        });
+    deployCheck = { at: now, current };
+    return current;
+}
+
 function revalidateShell(cache, request, cacheKey) {
     if (navigator.onLine === false) return Promise.resolve();
     if (linkIsFrugal()) return Promise.resolve();
@@ -80,9 +102,12 @@ function revalidateShell(cache, request, cacheKey) {
     }, REVALIDATE_TIMEOUT_MS);
 
     const target = typeof cacheKey === 'string' ? cacheKey : request;
-    return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
-        if (!response || !response.ok || response.redirected) { release(); return; }
-        return cache.put(cacheKey, response.clone()).then(release, release);
+    return shellDeployIsCurrent().then((current) => {
+        if (!current || released) { release(); return; }
+        return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
+            if (!response || !response.ok || response.redirected) { release(); return; }
+            return cache.put(cacheKey, response.clone()).then(release, release);
+        }, release);
     }, release);
 }
 

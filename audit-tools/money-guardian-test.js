@@ -20,11 +20,12 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFile } = require('child_process');
 
 const ROOT = process.env.MONEYGUARD_APP_DIR ? path.resolve(process.env.MONEYGUARD_APP_DIR) : path.join(__dirname, '..');
 const APP = path.join(ROOT, 'ZoeW', 'app.js');
 let pass = 0, fail = 0;
+process.exitCode = 1;
 const ok = (c, label, detail) => {
     if (c) { pass++; console.log('  ok    ' + label); }
     else { fail++; console.log('  FAIL  ' + label + (detail !== undefined ? '\n        ' + detail : '')); }
@@ -47,7 +48,8 @@ const GUARDS = [
     { file: 'ledger-failed-apply-revert-test.js', env: 'LEDGERFAIL_APP_DIR', needs: null },
     { file: 'pickup-barcode-identity-test.js', env: 'PICKUPID_APP_DIR', needs: null },
     { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null },
-    { file: 'tx-outcome-test.js', env: 'TXOUTCOME_APP_DIR', needs: null }
+    { file: 'tx-outcome-test.js', env: 'TXOUTCOME_APP_DIR', needs: null },
+    { file: 'cleanup-interrupt-atomicity-test.js', env: 'CLEANUPATOMIC_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
@@ -129,6 +131,21 @@ const MUTATIONS = [
         to: "        if (false) {"
     },
     {
+        name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',
+        from: '        if (cleanupJournalLive.has(trashId)) return Promise.resolve(false);',
+        to: ''
+    },
+    {
+        name: 'claim registry ជឿ «ស្មើតម្លៃដែលផ្ញើ» ក្រោយ `disconnect` (barcode ស្ទួន ➜ COD បូក ២ ដង)',
+        from: "            return result.txOutcome === 'applied' ? 'unknown' : 'claimed';",
+        to: "            return 'claimed';"
+    },
+    {
+        name: 'ledger ថ្ងៃលែងផ្ទុក token `op` (wrapper ច្រឡំការសរសេរតម្លៃដូចគ្នារបស់ឧបករណ៍ផ្សេង ➜ ការដកបាត់)',
+        from: '            return op ? { ...serverAfter, op } : serverAfter;',
+        to: '            return serverAfter;'
+    },
+    {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',
         from: '    function revertRevenueLedgerDelta(applied) {',
         to: '    function revertRevenueLedgerDelta(applied) { return applied; }\n    function revertRevenueLedgerDeltaDead(applied) {'
@@ -150,21 +167,42 @@ function runGuard(guard, appDir) {
     const env = Object.assign({}, process.env);
     env[guard.env] = appDir;
     if (process.env.MONEYGUARD_NO_EMU === '1') env.LEDGEREMU_PORT = '9099';
-    try {
-        const out = execFileSync(process.execPath, [path.join(__dirname, guard.file)],
-            { env, encoding: 'utf8', timeout: 240000, stdio: ['ignore', 'pipe', 'pipe'] });
-        return { code: 0, out: out };
-    } catch (e) {
-        return { code: e.status === undefined ? 1 : e.status, out: (e.stdout || '') + (e.stderr || '') };
-    }
+    return new Promise((resolve) => {
+        execFile(process.execPath, [path.join(__dirname, guard.file)],
+            { env, encoding: 'utf8', timeout: 240000, maxBuffer: 64 * 1024 * 1024 },
+            (err, stdout, stderr) => {
+                if (!err) { resolve({ code: 0, out: stdout || '' }); return; }
+                resolve({ code: typeof err.code === 'number' ? err.code : 1, out: (stdout || '') + (stderr || '') });
+            });
+    });
 }
 
+// ⛔ អ្នកយាមរត់ **ស្របគ្នា** (`MONEYGUARD_JOBS` · លំនាំដើម ≤ ៤) ៖ ៨ អ្នកយាម × (១ + mutation)
+// ការរត់ជាលំដាប់លើសពិដាន ៣០០ វិ. របស់ `run-all.sh` ➜ «ព្យួរ» ក្លែងក្លាយ។ អ្នកយាមនីមួយៗ
+// ឯករាជ្យ (emu namespace តាម pid · គ្មាន port ថេរ) ➜ លំដាប់លទ្ធផលនៅតាម mutation ដដែល។
+const JOBS = Math.max(1, Math.min(8, parseInt(process.env.MONEYGUARD_JOBS || '', 10) || Math.min(4, os.cpus().length || 1)));
+function runPool(tasks) {
+    const results = new Array(tasks.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < tasks.length) {
+            const i = next++;
+            results[i] = await tasks[i]();
+        }
+    };
+    const workers = [];
+    for (let i = 0; i < Math.min(JOBS, tasks.length); i++) workers.push(worker());
+    return Promise.all(workers).then(() => results);
+}
+
+(async () => {
 // ⛔ ជាន់ចាំបាច់ ៖ អ្នកយាមត្រូវ **បៃតងលើ tree ស្អាត** បើមិនដូច្នេះ «ក្រហម
 // លើ mutant» គ្មានន័យទេ (វាក្រហមជានិច្ច)។
 const alive = [];
 const absent = new Set();
-GUARDS.forEach((g) => {
-    const r = runGuard(g, ROOT);
+const cleanRuns = await runPool(GUARDS.map((g) => () => runGuard(g, ROOT)));
+GUARDS.forEach((g, i) => {
+    const r = cleanRuns[i];
     if (/^SKIP/m.test(r.out)) {
         if (g.needs) absent.add(g.needs);
         if (STRICT) { ok(false, '⛔ STRICT ៖ អ្នកយាម ' + g.file + ' SKIP (ត្រូវការ ' + (g.needs || 'dependency') + ')'); }
@@ -177,17 +215,25 @@ GUARDS.forEach((g) => {
 ok(alive.length > 0, '⛔ ជាន់អប្បបរមា៖ មានអ្នកយាមយ៉ាងតិច ១ ដែលរត់បាន', 'alive=' + alive.length);
 if (STRICT) ok(absent.size === 0, '⛔ STRICT ៖ អ្នកយាមទាំងអស់ត្រូវរត់បាន (គ្មាន SKIP)', Array.from(absent).join(', '));
 
+const mutants = MUTATIONS.map((m) => ({ m, dir: buildMutant(m) }));
+const tasks = [];
+mutants.forEach((entry, mi) => {
+    if (!entry.dir) return;
+    alive.forEach((g) => tasks.push({ mi, g, run: () => runGuard(g, entry.dir) }));
+});
+const verdicts = await runPool(tasks.map((t) => t.run));
+const caughtBy = mutants.map(() => []);
+tasks.forEach((t, i) => { if (verdicts[i].code !== 0) caughtBy[t.mi].push(t.g.file); });
+
 let applicable = 0;
-MUTATIONS.forEach((m) => {
-    const dir = buildMutant(m);
+mutants.forEach(({ m, dir }, mi) => {
     if (!dir) {
         ok(false, '⛔ mutation មិនអាចចាក់បាន (កូដប្រែរូបរាង?): ' + m.name,
             'ខ្សែអក្សរយុថ្កាលែងមានក្នុង app.js ➜ ការវាស់នេះមិនបានវាស់អ្វីទេ');
         return;
     }
     applicable++;
-    const caught = [];
-    alive.forEach((g) => { if (runGuard(g, dir).code !== 0) caught.push(g.file); });
+    const caught = caughtBy[mi];
     if (m.equivalent) {
         // ⛔⛔ **កុំអះអាងថាវានៅតែចាប់មិនបាន។** ការសរសេរ `ok(caught.length === 0)`
         // នឹងធ្វើឲ្យតេស្ត **ធ្លាក់ពេលនរណាម្នាក់ធ្វើឲ្យអ្នកយាមខ្លាំងជាងមុន** —
@@ -275,3 +321,4 @@ ok(applicable === MUTATIONS.length, '⛔ ជាន់អប្បបរមា៖
 
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')' : '✅ គ្មានបញ្ហា — ok ' + pass));
 process.exit(fail ? 1 : 0);
+})().catch((e) => { console.log('  FAIL  money-guardian បោះ: ' + (e && e.stack || e)); process.exit(1); });

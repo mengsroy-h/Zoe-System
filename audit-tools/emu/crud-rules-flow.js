@@ -168,6 +168,7 @@ function makeSandbox(store, now) {
     };
     const ctx = vm.createContext({
         console, setTimeout, clearTimeout, Promise, Math, Date, JSON, Set, Map, window: {}, ZoeErrors: null,
+        navigator: { onLine: true },
         db: {}, authGeneration: 0, fb,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
@@ -255,6 +256,12 @@ function makeSandbox(store, now) {
         optionalFn(src, 'noteCleanupJournalEntry', 'function noteCleanupJournalEntry() {}'),
         optionalFn(src, 'markCleanupJournalStage', 'function markCleanupJournalStage() {}'),
         optionalFn(src, 'clearCleanupJournalEntry', 'function clearCleanupJournalEntry() {}'),
+        // ⛔ ភាពរស់នៃការសម្អាត (2.42.7) ៖ អ្នកស្តារ journal មិនប៉ះការសម្អាតដែលនៅរស់ ➜ function ពិត (គ្មាន `navigator` ➜ គ្មាន Web Locks)
+        optionalConst(src, 'cleanupJournalLive', 'const cleanupJournalLive = new Map();'),
+        optionalConst(src, 'CLEANUP_LIVE_LOCK_PREFIX', "const CLEANUP_LIVE_LOCK_PREFIX = 'zoew-cleanup-live-';"),
+        optionalFn(src, 'cleanupLockManager', 'function cleanupLockManager() { return null; }'),
+        optionalFn(src, 'markCleanupJournalLive', 'function markCleanupJournalLive() {}'),
+        optionalFn(src, 'releaseCleanupJournalLive', 'function releaseCleanupJournalLive() {}'),
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
         'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';",
         // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**

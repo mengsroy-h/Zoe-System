@@ -11,6 +11,8 @@
     const REDACT_MAX_JSON_CHARS = 64 * 1024;
     const REPEAT_WINDOW_MS = 10 * 60 * 1000;
     const REPEAT_KEYS_MAX = 200;
+    const REPEAT_IDENTITY_KEYS = ['itemId', 'item', 'barcode', 'keyId', 'date', 'path'];
+    const REPEAT_IDENTITIES_MAX = 5;
 
     let loadPromise = null;
     let sentryReady = false;
@@ -359,14 +361,33 @@
         return zone.slice(0, 32) + '|' + context.slice(0, 160) + '|' + message.slice(0, 300);
     }
 
+    function repeatIdentity(extra) {
+        if (!extra || typeof extra !== 'object') return '';
+        const parts = [];
+        REPEAT_IDENTITY_KEYS.forEach((name) => {
+            const value = extra[name];
+            if (value === undefined || value === null || typeof value === 'object' || typeof value === 'function') return;
+            parts.push(name + '=' + String(value).slice(0, 80));
+        });
+        return parts.join('&');
+    }
+
     function admitRepeat(err, extra) {
         let key;
-        try { key = repeatSignature(err, extra); } catch (e) { return { suppressed: 0 }; }
+        let identity = '';
+        try {
+            key = repeatSignature(err, extra);
+            identity = repeatIdentity(extra);
+        } catch (e) { return { suppressed: 0 }; }
         const now = Date.now();
         const seen = repeatSeen.get(key);
         if (seen) {
             const age = now - seen.at;
             if (age >= 0 && age < REPEAT_WINDOW_MS) {
+                if (identity && !seen.identities.has(identity) && seen.identities.size < REPEAT_IDENTITIES_MAX) {
+                    seen.identities.add(identity);
+                    return { suppressed: 0 };
+                }
                 seen.suppressed++;
                 return null;
             }
@@ -375,7 +396,7 @@
             const oldest = repeatSeen.keys().next();
             if (!oldest.done) repeatSeen.delete(oldest.value);
         }
-        repeatSeen.set(key, { at: now, suppressed: 0 });
+        repeatSeen.set(key, { at: now, suppressed: 0, identities: new Set(identity ? [identity] : []) });
         return { suppressed: seen ? seen.suppressed : 0 };
     }
 

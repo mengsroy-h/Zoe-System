@@ -255,6 +255,99 @@ function serve(dir, blocked) {
         });
     }
 
+    // ជុំទី ៥ — ⛔⛔ deploy ថ្មីដែល SW ថ្មី install **មិនជោគជ័យ** (បណ្តាញយឺត/ដាច់ពាក់កណ្តាល · អ្នកប្រើបិទ App កណ្តាល
+    //    install ~៣ MB) ➜ SW ចាស់នៅគ្រប់គ្រង ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយ **មិនត្រូវចាក់ឯកសារកំណែថ្មី ចូល cache កំណែចាស់**។
+    //    ⛔ `index.html` ថ្មីយោង asset ថ្មី (ឈ្មោះ hash ថ្មី) ដែលមិនមាននៅក្នុង cache ចាស់ ➜ បើកក្រៅបណ្តាញ ➜ **App ស**
+    //    (ថ្នាក់ដដែលនឹង `zxing-wasm.js` ថ្មី + `.wasm` ចាស់ ➜ `LinkError` ➜ iPhone ស្កេនមិនបាន) ។ កំណែថ្មីមកតាម
+    //    `CACHE_VERSION` (install ជាក្រុម · atomic) តែមួយផ្លូវគត់។
+    {
+        const realSw = fs.readFileSync(path.join(dir, 'sw.js'), 'utf8');
+        const cvMatch = /zoew-v\d+/.exec(realSw);
+        const realIndex = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+        const appJs = (/\.\/assets\/index-[A-Za-z0-9_-]+\.js/.exec(realIndex) || [])[0] || '';
+        const appJsB = appJs.replace(/\.js$/, '-b.js');
+        ok('ជុំទី ៥ ៖ រក asset ចម្បង និង CACHE_VERSION ក្នុង build ពិតឃើញ', !!(cvMatch && appJs && realSw.indexOf("'" + appJs + "'") !== -1), { cv: cvMatch && cvMatch[0], appJs });
+        const state = { v: 'A', failGuide: false, down: false };
+        const sockets = new Set();
+        const srv = await new Promise((res) => {
+            const s = http.createServer((req, rsp) => {
+                if (state.down) { req.socket.destroy(); return; }
+                let p = decodeURIComponent(req.url.split('?')[0]);
+                if (p === '/') p = '/index.html';
+                const head = { 'Cache-Control': 'no-cache' };
+                if (p === '/index.html') {
+                    rsp.writeHead(200, Object.assign({ 'Content-Type': 'text/html' }, head));
+                    return rsp.end(state.v === 'A' ? realIndex : realIndex.split(appJs).join(appJsB));
+                }
+                if (p === '/sw.js' && cvMatch) {
+                    let body = realSw.split(cvMatch[0]).join(cvMatch[0] + '-' + state.v.toLowerCase());
+                    if (state.v === 'B') body = body.split("'" + appJs + "'").join("'" + appJsB + "'");
+                    rsp.writeHead(200, Object.assign({ 'Content-Type': 'application/javascript' }, head));
+                    return rsp.end(body);
+                }
+                if (p === '/guide.html' && state.failGuide) { rsp.writeHead(503); return rsp.end('busy'); }
+                if (appJsB && p === appJsB.slice(1)) p = appJs.slice(1);
+                const f = path.join(dir, p);
+                if (!f.startsWith(dir) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+                rsp.writeHead(200, Object.assign({ 'Content-Type': TYPES[path.extname(f)] || 'text/plain' }, head));
+                rsp.end(fs.readFileSync(f));
+            });
+            s.on('connection', (c) => { sockets.add(c); c.on('close', () => sockets.delete(c)); });
+            s.listen(0, '127.0.0.1', () => res(s));
+        });
+        const vOrigin = 'http://127.0.0.1:' + srv.address().port;
+        const vbrowser = await chromium.launch({ executablePath: CHROME, args: ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1'] });
+        const vctx = await vbrowser.newContext({ viewport: { width: 412, height: 780 } });
+        const vpage = await vctx.newPage();
+        const cachedIndex = () => vpage.evaluate(async () => {
+            const out = {};
+            for (const k of await caches.keys()) {
+                const r = await (await caches.open(k)).match('./index.html');
+                out[k] = r ? ((await r.text()).indexOf('-b.js') !== -1 ? 'B' : 'A') : null;
+            }
+            return out;
+        }).catch(() => ({}));
+        await vpage.goto(vOrigin + '/', { waitUntil: 'load', timeout: 30000 });
+        await vpage.evaluate(() => navigator.serviceWorker.register('./sw.js').then(() => Promise.race([
+            navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 20000))
+        ])));
+        await vpage.waitForTimeout(1500);
+        const keysA = Object.keys(await cachedIndex());
+        ok('ជុំទី ៥ ៖ លក្ខខណ្ឌចាំបាច់ ៖ SW កំណែ A ដំឡើង ហើយ cache សំបក', keysA.some((k) => /-a$/.test(k)), keysA);
+
+        state.v = 'B';
+        state.failGuide = true;
+        await vpage.reload({ waitUntil: 'load', timeout: 30000 }).catch(() => {});
+        await vpage.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg && reg.update()).catch(() => {}));
+        await vpage.waitForTimeout(4000);
+        const afterB = await cachedIndex();
+        const activeKeys = Object.keys(afterB);
+        ok('ជុំទី ៥ ៖ លក្ខខណ្ឌចាំបាច់ ៖ SW កំណែ B install មិនជោគជ័យ ➜ cache A នៅគ្រប់គ្រង',
+            activeKeys.some((k) => /-a$/.test(k) && afterB[k]) && !activeKeys.some((k) => /-b$/.test(k) && afterB[k]),
+            afterB);
+
+        state.down = true;
+        sockets.forEach((c) => c.destroy());
+        await vpage.reload({ waitUntil: 'load', timeout: 30000 }).catch(() => {});
+        await vpage.waitForTimeout(2500);
+        // ⛔ `index.html` របស់ build វាស់មាន markup ស្រាប់ ➜ `#appPages` មិនមែនភស្តុតាងថា JS រត់ ➜ វាស់ថា asset
+        //    ដែល HTML ក្នុង cache យោង **ទាញបានក្រៅបណ្តាញ** (ឆ្លង SW ដដែល)
+        const offline = await vpage.evaluate(async () => {
+            const out = [];
+            const refs = Array.from(document.querySelectorAll('script[src], link[rel="stylesheet"][href], link[rel="modulepreload"][href]'))
+                .map((x) => x.getAttribute('src') || x.getAttribute('href') || '').filter((u) => /assets\//.test(u));
+            for (const u of refs) {
+                try { const r = await fetch(u); out.push({ u, ok: r.ok }); } catch (e) { out.push({ u, ok: false }); }
+            }
+            return out;
+        }).catch((e) => [{ u: 'evaluate', ok: false, error: String(e) }]);
+        ok('ជុំទី ៥ ⛔⛔ ៖ deploy ថ្មីដែល install មិនជោគជ័យ ➜ ក្រៅបណ្តាញ asset ទាំងអស់ដែលសំបកយោង មាននៅក្នុង cache (មិនលាយកំណែ)',
+            offline.length >= 1 && offline.every((x) => x.ok), { caches: afterB, assets: offline });
+
+        await vbrowser.close();
+        await new Promise((r) => { srv.close(r); sockets.forEach((c) => c.destroy()); });
+    }
+
     await browser.close();
     console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
     process.exit(fail ? 1 : 0);

@@ -92,6 +92,20 @@ if (reactDir) {
     if (n) { console.log(`${rel}: comments=${n}`); dirty.push(rel + ' (' + n + ')'); }
   }
   console.log(`ZoeW React ៖ ស្កេន ${reactScanned} ឯកសារ`);
+  // Gradle (`android/**/*.gradle` · `gradle.properties`) ៖ ⛔ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT») លើកលែង
+  //    ព្រោះ `cap sync` សរសេរ header នោះវិញរាល់ដង (សម្គាល់តាម header ពិតក្នុង `ts-comments.js`)
+  const gradleFiles = tsComments.gradleShippedFiles(reactDir);
+  for (const file of gradleFiles) {
+    const rel = 'ZoeW/' + path.relative(reactDir, file).split(path.sep).join('/');
+    const n = tsComments.gradleScan(fs.readFileSync(file, 'utf8'), file).comments.length;
+    scanned++;
+    if (n) { console.log(`${rel}: comments=${n}`); dirty.push(rel + ' (' + n + ')'); }
+  }
+  console.log(`ZoeW Gradle ៖ ស្កេន ${gradleFiles.length} ឯកសារ`);
+  if (fs.existsSync(path.join(reactDir, 'android')) && gradleFiles.length < 3) {
+    console.log('\n❌ ជាន់អប្បបរមា Gradle ៖ រំពឹង >= 3 តែឃើញ ' + gradleFiles.length);
+    process.exit(1);
+  }
   const MIN_REACT_FILES = 50;
   if (reactScanned < MIN_REACT_FILES) {
     console.log('\n❌ ជាន់អប្បបរមា React ៖ រំពឹង >= ' + MIN_REACT_FILES + ' តែឃើញ ' + reactScanned);

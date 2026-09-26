@@ -1,9 +1,5 @@
 apply plugin: 'com.android.application'
 
-// លេខកំណែរបស់ APK ដេរីវេពី APP_VERSION ពិតរបស់ App (src/core/version.ts)
-// ➜ APK · web · manifest.json និយាយលេខតែមួយជានិច្ច (គ្មាន literal ទី ២)។
-// versionCode = major × 1000000 + minor × 1000 + patch ➜ ឡើងជានិច្ចតាម APP_VERSION
-// (Android បដិសេធការដំឡើង APK ដែល versionCode ទាបជាងកំណែដែលមានរួច)។
 def zoewAppVersion() {
     def source = rootProject.file('../src/core/version.ts').getText('UTF-8')
     def matcher = (source =~ /APP_VERSION\s*=\s*'(\d+)\.(\d+)\.(\d+)'/)
@@ -32,13 +28,9 @@ android {
         versionName zoewVersion.name
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // ការ sign APK release តាម env (`.github/workflows/android-release.yml`) ៖ keystore ដដែលជានិច្ច ➜ APK ថ្មីដំឡើង
-    // ជាន់ App ចាស់បាន។ គ្មាន env ➜ មិនប៉ះ (Android Studio «Generate Signed APK» ដាក់ការ sign ដោយខ្លួនឯង)។
     signingConfigs {
         release {
             def keystore = System.getenv('ZOEW_KEYSTORE_FILE')

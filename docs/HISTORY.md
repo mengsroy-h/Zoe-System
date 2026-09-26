@@ -59,7 +59,7 @@
   ការសម្អាតដែល commit យឺត ពិនិត្យ `cleanupClaimAccountedElsewhere()` (ធុងសំរាមលើ server · barcode ក្នុងធុងសំរាមថ្មីៗ) មុនសរសេរ ➜
   ឧបករណ៍ ២ មិនសរសេរធុងសំរាម/ដកលុយស្ទួន។
 - **អ្នកយាម** ៖ `tx-outcome-test` (sandbox ពិត · ការសម្អាត ២ ផ្លូវ · ledger · `unknown` · ការអានធ្លាក់មានព្រំដែន · wrapper អាន
-  `runTransaction` ពេលហៅ) ➜ **ធ្លាក់ ២០+ លើកូដមុនកែ** · `emu/tx-disconnect-emu-test` (SDK ពិត · emulator ពិត · ករណី applied និង
+  `runTransaction` ពេលហៅ) ➜ **ធ្លាក់ ១៩ លើកូដមុនកែ** (`❌ ធ្លាក់ 19 / ok 20`) · `emu/tx-disconnect-emu-test` (SDK ពិត · emulator ពិត · ករណី applied និង
   not-applied) ➜ **ធ្លាក់ ៣ លើកូដមុនកែ** · `money-guardian-test` mutation ២ ថ្មី (ដកការអាន server · ដកការពិនិត្យម្ចាស់ធុងសំរាម) ➜ ក្រហមពិត។
 
 #### Sentry ៖ ព្យុះកំហុសដដែល
@@ -89,6 +89,12 @@
   ស្កេនគ្រប់ឯកសារអត្ថបទក្នុង repo រួម `ZoeW/src/**` (វាស់ ៖ repo **០** ជួរ · commit **០**)។ probe ៖ អក្សរថៃក្នុង `docs/` ➜ FAIL ·
   ក្នុង `ZoeW/src` ➜ FAIL · root វាស់រកប្រភពមិនឃើញ ➜ FAIL · ថតទទេ ➜ FAIL · ទិសផ្ទុយ ៖ អក្សរខ្មែរមិនត្រូវចាប់។ ⛔ វាចាប់ខ្លួនវាលើក
   ដំបូង ៖ comment របស់ checker ដាក់ពាក្យថៃជាឧទាហរណ៍ ➜ ដកចេញ (probe សាងពី code point)។
+- **comment ក្នុង Gradle** (សំណើម្ចាស់គម្រោង · ក្រោយ merge #254) ៖ លុប comment **២៦** ក្នុង `android/build.gradle` · `android/app/build.gradle` ·
+  `android/gradle.properties`។ `ts-comments` មាន lexer Groovy (string · slashy regex · ការចែក) និង properties (ជួរបន្ត `\` មិនមែន comment) ➜
+  token ក្រៅ comment ត្រូវដូចគ្នាមុន/ក្រោយ។ ⛔ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT» ៖ `capacitor.build.gradle` ·
+  `capacitor.settings.gradle`) **លើកលែង** ព្រោះ `cap sync` សរសេរវាវិញ។ ភស្តុតាង ៖ APK `clean assembleRelease --rerun-tasks` មុន/ក្រោយ ➜
+  **SHA-256 ដដែល** (`8aed3e6c…86fc28` · ធាតុ ៩៤១ + CRC ដូចគ្នា) · `comments` ធ្លាក់លើ tree មុនសម្អាត (៨ · ៣ · ១៥) · fixture ក្នុង `repository-contract-test` ចាប់ mutation ២ (ដក slashy · ដក
+  continuation)។ ⛔ កំណែមិនឡើង (Gradle មិនមែនកូដ ship របស់ web ➜ `version-bump-scope`)។
 - `firebase@12.19.0` ចូល `devDependencies` របស់ ZoeW (SDK ពិតសម្រាប់ `emu/tx-disconnect-emu-test` · **មិន ship** — App ផ្ទុក SDK ពី CDN ដដែល)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
@@ -98,6 +104,13 @@
   disconnect but ownership unverified` — ⛔ វាមានន័យថា «ផ្ទៀងផ្ទាត់មិនបាន» ➜ ពិនិត្យ node នោះលើ Firebase Console (លុយមិនត្រូវប៉ះដោយ App)។
   event ដដែលៗឥឡូវមានវាល `suppressedRepeats` (ចំនួនដែលដកចេញក្នុង ១០ នាទី)។
 - **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បិទ WiFi ចំពេលកែទឹកប្រាក់ ➜ បើកវិញ ➜ លេខលើអេក្រង់ត្រូវស្មើ Firebase Console (មិនដក ២ ដង)។
+- ✅ **តេស្តផ្សេងៗ (កំណែ 2.42.6/2.20.4 · ZoeKeyGen · View Source · APK · Sentry) — ម្ចាស់គម្រោងរាយការណ៍ថាដើរទាំងអស់**។ «View Source ៖ គ្មាន
+  `<!--`» ៖ comment តែមួយដែលនៅសល់ (`This site is hosted on Netlify …` · `utm_source=ai-legible`) **Netlify បញ្ចូលនៅ Edge** ពេលផ្ញើទំព័រ
+  មិនមែនមកពី repo (`index.html` ក្នុង repo និងលទ្ធផល build មាន `<!--` **០**) ➜ ⛔ កុំសរសេរ Edge Function ដើម្បីលុបវា (ហានិភ័យលើ SW · CSP ·
+  ល្បឿន ដើម្បីអ្វីដែលគ្មានផលប៉ះពាល់)។ ZoeKeyGen មាន devtools guard ➜ ម្ចាស់គម្រោងចាត់ទុកចំណុចនោះបញ្ជាក់រួចតាម repo។
+- ✅ **តេស្តលុយលើឧបករណ៍ពិត — ម្ចាស់គម្រោងបញ្ជាក់ថាជោគជ័យទាំងអស់** (បញ្ចូល · កែតម្លៃ · បិទ/បើក «យក» · ដក · ស្តារ · ការដាច់បណ្តាញ
+  ចំពេលរក្សាទុក · លេខលើអេក្រង់ = Firebase Console រាល់ជំហាន)។ ⚠️ ជំហាន `disconnect` ដែលជោគជ័យ បញ្ជាក់ថា **គ្មានការថយក្រោយ** ប៉ុន្តែមិន
+  បញ្ជាក់ថាការដាច់ចំចន្លោះមិល្លីវិនាទីនោះទេ ➜ ភស្តុតាងនៃការកែនៅតែជា `emu/tx-disconnect-emu-test` (SDK ពិត)។
 - ⛔ សម្រាប់ developer ៖ `npm ci --prefix ZoeW` ម្តងទៀត (dependency `firebase` ថ្មី)។
 
 ### [2.42.5] — 2026-09-25 · ZoeW ៖ **🔴 hotfix ៖ iPhone ស្កេន Barcode មិនបាន ក្រោយ ZXing-WASM 3.1.4** · APK 2.42.4 build ក្នុង session · pin វិញ្ញាបនបត្រ keystore (merge #252)

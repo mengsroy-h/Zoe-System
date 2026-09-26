@@ -67,7 +67,13 @@ const FNS = ['patchHistoryItemFields', 'historyPatchErrorIsDisconnect', 'queueHi
     // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ៖ ការព្យួរ **មិនបោះកំហុស** ➜
     // បើគ្មានវា `historyPatchErrorIsDisconnect()` មិនដែលត្រូវហៅសោះ ➜
     // ការសម្គាល់ការខលបាត់ស្ងាត់ៗ (ថ្នាក់ដដែលនឹង 2.20.2 តាមទ្វារផ្សេង)។
-    'withTimeout', 'dbOp', 'dbOpStalled'];
+    'withTimeout', 'dbOp', 'dbOpStalled',
+    // ⛔ wrapper `disconnect` (`src/services/tx-outcome.ts`) រុំ `fb.runTransaction` **ពិត** ក្នុង `initFirebase()`
+    // ➜ វាប្តូរ `disconnect` ដែល SDK បោះភ្លាម ទៅជាការអាន REST ដែលអាចយូរជាងពិដាន `dbOp` ➜ ស្នាមភ្ជាប់នេះ
+    // ត្រូវវាស់ជាមួយ wrapper ពិត (មិនមែន stub `runTransaction` ដែលបដិសេធត្រង់ៗ)។
+    'elapsedSince', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue',
+    'txRestUrl', 'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown',
+    'transactionDisconnectPending', 'runTransactionResolved', 'withTransactionOutcomeResolution'];
 const src = {};
 FNS.forEach((n) => {
     src[n] = sliceFn(n);
@@ -75,7 +81,8 @@ FNS.forEach((n) => {
 });
 
 const DECLS = ['pendingHistoryPatches', 'HISTORY_PATCH_RETRY_MAX', 'HISTORY_PATCH_QUEUE_MAX', 'historyPatchFlushInFlight',
-    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS'];
+    'appLockExcuseAt', 'DB_OP_TIMEOUT_MS', 'TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS',
+    'TX_OUTCOME_MAX_WAIT_MS', 'txOutcomeUnknownReported', 'txDisconnectResolving'];
 const decls = [];
 DECLS.forEach((n) => {
     const m = SRC.match(new RegExp('^ *(?:let|const) ' + n + ' = .*$', 'm'));
@@ -92,7 +99,14 @@ function build(mode, opts) {
         console: { error: () => {}, log: () => {} },
         window: {},
         Object: Object, Array: Array, Promise: Promise, JSON: JSON, String: String, Math: Math,
-        setTimeout: setTimeout, clearTimeout: clearTimeout, queueMicrotask: queueMicrotask,
+        Number: Number, Set: Set, Map: Map, WeakMap: WeakMap, Error: Error, TypeError: TypeError, URL: URL, Date: Date,
+        setTimeout: (opts && opts.timeScale) ? ((f, ms) => setTimeout(f, Math.max(0, (ms || 0) / opts.timeScale))) : setTimeout,
+        clearTimeout: clearTimeout, queueMicrotask: queueMicrotask,
+        navigator: { onLine: !(opts && opts.offline) },
+        AbortController: AbortController,
+        fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+        firebaseConfig: { databaseURL: 'https://demo-zoew.firebaseio.com' },
+        auth: { currentUser: { getIdToken: () => Promise.resolve('token') } },
         db: {}, dbRefHistory: {},
         authGeneration: 0,
         scanHistory: (opts && opts.scanHistory) || [],
@@ -113,11 +127,18 @@ function build(mode, opts) {
         // ក្នុងផ្លូវស្តារ SDK)។ នេះជាផ្លូវដែលមិនឆ្លងកាត់ `.then(ok, fail)` ទេ។
         ref: (d, p) => {
             if (ctx.__mode.value === 'throw') throw new Error('Firebase App named [DEFAULT] already deleted');
-            return { path: p };
+            return { path: p, toString: () => 'https://demo-zoew.firebaseio.com/' + p };
         },
         runTransaction: (ref, updater) => {
             const m = ctx.__mode.value;
             if (m === 'disconnect') return Promise.reject(new Error('disconnect'));
+            if (m === 'hang') return new Promise(() => {});
+            if (m === 'disconnect-sent') {
+                // SDK ពិត ៖ updater រត់ ➜ transaction ផ្ញើ ➜ socket ដាច់មុន ack ➜ បដិសេធ `disconnect`
+                const sentId = String(ref.path).split('/').pop();
+                updater(server[sentId] ? JSON.parse(JSON.stringify(server[sentId])) : null);
+                return Promise.reject(new Error('disconnect'));
+            }
             if (m === 'denied') return Promise.reject(new Error('permission_denied'));
             const id = String(ref.path).split('/').pop();
             const cur = server[id] ? JSON.parse(JSON.stringify(server[id])) : null;
@@ -200,6 +221,46 @@ async function scenario(label, fn) {
         ok('ភ្ជាប់មកវិញ ➜ isCalled ទៅដល់ server', ctx.__server.id1.isCalled === true);
         ok('ភ្ជាប់មកវិញ ➜ នាឡិកា ៤ ម៉ោង reset ទៅដល់ server ដែរ',
             ctx.__server.id1.callMarkTime === 1700000000000, ctx.__server.id1.callMarkTime);
+    });
+
+    // ⛔ ស្នាមភ្ជាប់ wrapper `disconnect` ↔ ពិដាន `dbOp` ៖ SDK បដិសេធ `disconnect` ភ្លាម តែ wrapper អាន server តាម REST
+    //    មុនបញ្ជូនវាបន្ត ➜ ពេលបណ្តាញដាច់ពិត (ក្រៅបណ្តាញ · `fetch` ធ្លាក់) ការអាននោះវិលរហូតដល់ ៦០ វិ. ខណៈ `dbOp`
+    //    ផុតនៅ ១៥ វិ. ➜ «stalled» ➜ revert + «បរាជ័យ» ➜ ស្លាក «✔️ ខល» លោតត្រឡប់ ➜ អ្នកប្រើចុចខលម្តងទៀត (កំហុស
+    //    Sentry 2.20.1 ដដែល តាមទ្វារថ្មី)។ ⛔ SDK **បាន** បដិសេធ `disconnect` ➜ ច្បាប់ «តែ `disconnect` ចូលជួរ»
+    //    ត្រូវអនុវត្ត មិនមែនច្បាប់ «timeout ➜ revert» ទេ។ (ពេលវេលាក្នុង sandbox ពន្លឿន ×100)
+    for (const offline of [true, false]) {
+        const where = offline ? 'ក្រៅបណ្តាញ' : 'onLine តែ fetch ធ្លាក់';
+        await scenario('wrapper disconnect (' + where + ')', async () => {
+            const item = { id: 'id1', phone: '012345678', callMark: 'wrong-number', callMarkTime: 111 };
+            const server = { id1: { id: 'id1', phone: '012345678', callMark: 'wrong-number', callMarkTime: 111 } };
+            const ctx = build('disconnect-sent', { server: server, scanHistory: [item], markingItemId: 'id1', timeScale: 100, offline });
+            let wrapped = false;
+            try {
+                ctx.fb = vm.runInContext('withTransactionOutcomeResolution', ctx)(ctx.fb);
+                wrapped = !!ctx.fb.__txOutcomeResolved;
+            } catch (e) { wrapped = false; }
+            ok('លក្ខខណ្ឌចាំបាច់ ៖ fb ត្រូវរុំដោយ wrapper ពិត (' + where + ')', wrapped);
+            const saved = await vm.runInContext('setCallMark("no-connect")', ctx);
+            ok('⛔ wrapper + ' + where + ' ➜ ស្លាកមិន revert', ctx.scanHistory[0].callMark === 'no-connect', ctx.scanHistory[0].callMark);
+            ok('⛔ wrapper + ' + where + ' ➜ ចូលជួររង់ចាំ', saved === 'queued' && vm.runInContext('pendingHistoryPatches.size', ctx) === 1,
+                { saved, queued: vm.runInContext('pendingHistoryPatches.size', ctx) });
+            ok('⛔ wrapper + ' + where + ' ➜ គ្មាន toast «បរាជ័យ»', !ctx.__toasts.some((t) => /^⚠️/.test(t)), ctx.__toasts);
+            vm.runInContext('__mode.value = "ok";', ctx);
+            vm.runInContext('flushPendingHistoryPatches();', ctx);
+            await tick(); await tick(); await tick();
+            ok('⛔ wrapper + ' + where + ' ➜ ភ្ជាប់មកវិញ ការសម្គាល់ទៅដល់ server', ctx.__server.id1.callMark === 'no-connect', ctx.__server.id1.callMark);
+        });
+    }
+
+    // ⛔ ទិសផ្ទុយ ៖ ការព្យួរ **ដែល SDK មិនបានបដិសេធ `disconnect`** នៅតែជា timeout ➜ revert ដដែល (ច្បាប់ 2.20.2)
+    await scenario('wrapper ៖ ការព្យួរសុទ្ធ', async () => {
+        const item = { id: 'id1', phone: '012345678', callMark: 'wrong-number', callMarkTime: 111 };
+        const ctx = build('hang', { server: { id1: { ...item } }, scanHistory: [{ ...item }], markingItemId: 'id1', timeScale: 100 });
+        try { ctx.fb = vm.runInContext('withTransactionOutcomeResolution', ctx)(ctx.fb); } catch (e) {}
+        const saved = await vm.runInContext('setCallMark("no-connect")', ctx);
+        ok('ទិសផ្ទុយ ៖ ព្យួរដោយគ្មាន `disconnect` ➜ revert ដដែល', ctx.scanHistory[0].callMark === 'wrong-number', ctx.scanHistory[0].callMark);
+        ok('ទិសផ្ទុយ ៖ ព្យួរដោយគ្មាន `disconnect` ➜ មិនចូលជួរ', saved !== 'queued' && vm.runInContext('pendingHistoryPatches.size', ctx) === 0,
+            { saved, queued: vm.runInContext('pendingHistoryPatches.size', ctx) });
     });
 
     // ⛔ ទិសផ្ទុយ ៖ កំហុសដែលមិនមែនការដាច់បណ្តាញ ត្រូវ revert ដដែល

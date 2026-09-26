@@ -55,6 +55,10 @@ const LINKS = [
     ['Data Saver បើក (4g)', { effectiveType: '4g', saveData: true }, false]
 ];
 
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+const SW_URL = 'https://zoe.invalid/sw.js';
+
+(async () => {
 for (const app of APPS) {
     const swPath = path.join(ROOT, app, 'sw.js');
     if (!fs.existsSync(swPath)) continue;
@@ -67,18 +71,30 @@ for (const app of APPS) {
     if (!revalidate || !frugal) continue;
     // ថេរខ្សែអក្សរកម្រិតកំពូលដែល revalidateShell() យោង (ឧ. FRESH) ត្រូវស្រង់ពី sw.js ពិត
     // មិនមែនចាក់ក្នុង sandbox — ការប្តូរតម្លៃរបស់វាត្រូវហូរមកដល់ការវាស់ដោយស្វ័យប្រវត្តិ
+    // ⛔ helper ដែល revalidateShell() ហៅ (ឧ. `shellDeployIsCurrent()` ៖ មិនចាក់កំណែ deploy ថ្មីចូល cache ចាស់)
+    //    ត្រូវស្រង់ពី sw.js ពិតដែរ — stub វា = ស្នាមភ្ជាប់គ្មានអ្នកវាស់
+    const helpers = ['shellDeployIsCurrent'].filter((n) => new RegExp('\\b' + n + '\\(').test(revalidate))
+        .map((n) => sliceFn(sw, n)).filter(Boolean);
+    const referenced = [revalidate].concat(helpers).join('\n');
     const stringConsts = (sw.match(/^const [A-Z_][A-Z0-9_]* = '[^'\n]*';$/gm) || [])
-        .filter((line) => new RegExp('\\b' + line.split(' ')[1] + '\\b').test(revalidate))
+        .filter((line) => new RegExp('\\b' + line.split(' ')[1] + '\\b').test(referenced))
         .join('\n');
-    const swCode = stringConsts + '\n' + frugal + '\n' + revalidate;
+    const numberConsts = (sw.match(/^const DEPLOY_[A-Z0-9_]* = \d+;$/gm) || []).join('\n');
+    const lets = helpers.length ? (sw.match(/^let deployCheck = null;$/m) || [''])[0] : '';
+    const swCode = [stringConsts, numberConsts, lets, frugal].concat(helpers, [revalidate]).join('\n');
 
     for (const [label, connection, shouldFetch] of LINKS) {
         let fetched = 0;
         const sandbox = {
             navigator: { onLine: true, connection: connection },
-            setTimeout: setTimeout, clearTimeout: clearTimeout, Set: Set, String: String,
+            setTimeout: setTimeout, clearTimeout: clearTimeout, Set: Set, String: String, Date: Date,
+            self: { location: { href: SW_URL } },
             AbortController: function () { this.signal = {}; this.abort = function () {}; },
-            fetch: function () { fetched++; return Promise.resolve({ ok: true, redirected: false, clone: () => ({}) }); },
+            fetch: function (url) {
+                if (url === SW_URL) return Promise.resolve({ ok: true, text: () => Promise.resolve(sw) });
+                fetched++;
+                return Promise.resolve({ ok: true, redirected: false, clone: () => ({}) });
+            },
             REVALIDATE_TIMEOUT_MS: 6000,
             REVALIDATE_MAX_IN_FLIGHT: 4,
             revalidateInFlight: new Set()
@@ -88,6 +104,7 @@ for (const app of APPS) {
         const cache = { put: () => Promise.resolve() };
         vm.runInContext('revalidateShell(__cache, { url: "/app.js" }, "./app.js");',
             Object.assign(sandbox, { __cache: cache }));
+        await flush(); await flush(); await flush();
         ok(app + ': ' + label + ' ➜ ' + (shouldFetch ? 'ធ្វើឲ្យស្រស់' : 'រំលង'),
             (fetched > 0) === shouldFetch, 'fetched=' + fetched);
     }
@@ -104,8 +121,10 @@ for (const app of APPS) {
     vm.createContext(offBox);
     vm.runInContext(swCode, offBox);
     vm.runInContext('revalidateShell({ put: () => Promise.resolve() }, { url: "/app.js" }, "./app.js");', offBox);
+    await flush(); await flush();
     ok(app + ': ក្រៅបណ្តាញ ➜ រំលងដដែល', offFetched === 0, 'fetched=' + offFetched);
 }
+})().then(() => {
 
 // === ⛔ ផ្លូវ cache-miss របស់ sw.js ត្រូវនៅ **គ្មានពេលកំណត់** ===
 // ជុំ 2.17.5 បានពិចារណាបន្ថែម timeout លើ `fetch(request)` ក្នុងផ្លូវ cache-miss
@@ -172,3 +191,7 @@ console.log('\n=== ការទាញជាមុនត្រូវគោរព 
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' ok, ' + fail + ' fail');
 process.exit(fail === 0 ? 0 : 1);
+}).catch((e) => {
+    console.log('  FAIL  checker គាំង ៖ ' + (e && e.stack || e));
+    process.exit(1);
+});

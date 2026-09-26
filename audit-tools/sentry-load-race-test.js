@@ -228,6 +228,29 @@ async function readSentryLog(page) {
         await ctx.close();
     }
 
+    // ៦ខ — ⛔ ការទប់ព្យុះមិនត្រូវលេប *អត្តសញ្ញាណ* ៖ event លុយដដែល (សារ + context) លើ **កញ្ចប់ផ្សេងគ្នា** (`itemId`)
+    //    ឬ **path ផ្សេងគ្នា** ជាព័ត៌មានដាច់ដោយឡែក ➜ Admin ត្រូវការ id នីមួយៗដើម្បីពិនិត្យលើ Console
+    //    (សារ «ទិន្នន័យកញ្ចប់ … អាចនឹងបាត់! សូមប្រាប់ Admin»)។ ព្យុះលើ id ដដែលនៅតែទប់ · ពិដានអត្តសញ្ញាណក្នុងមួយបង្អួច។
+    {
+        const { ctx, page } = await makePage(browser, origin, 0);
+        await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        await waitForSdkLoad(page);
+        const out = await page.evaluate(() => {
+            const ctxName = 'claimAndCleanupItem trash write failed after retries';
+            window.ZoeErrors.capture(new Error('trash-fail'), { zone: 'money', context: ctxName, itemId: 'id_A' });
+            window.ZoeErrors.capture(new Error('trash-fail'), { zone: 'money', context: ctxName, itemId: 'id_B' });
+            for (let i = 0; i < 10; i++) window.ZoeErrors.capture(new Error('trash-fail'), { zone: 'money', context: ctxName, itemId: 'id_A' });
+            for (let i = 0; i < 20; i++) window.ZoeErrors.capture(new Error('tx-unknown'), { zone: 'money', context: 'runTransactionResolved', path: '/p/' + i });
+            return window.__log;
+        });
+        const ids = out.scopes.filter((x) => x.msg === 'trash-fail').map((x) => x.extra && x.extra.itemId);
+        ok('⛔ event លុយដដែលលើកញ្ចប់ ២ ផ្សេងគ្នា ➜ id ទាំង ២ ទៅដល់ Sentry', ids.indexOf('id_A') !== -1 && ids.indexOf('id_B') !== -1, ids);
+        ok('⛔ ទិសផ្ទុយ ៖ ព្យុះលើ id ដដែល ➜ នៅតែទប់ (id_A ១ ដង)', ids.filter((x) => x === 'id_A').length === 1, ids);
+        const paths = out.scopes.filter((x) => x.msg === 'tx-unknown').length;
+        ok('⛔ path ផ្សេងគ្នា ➜ ផ្ញើច្រើនជាង ១ តែមានពិដាន (កុំស៊ីកូតា)', paths >= 2 && paths <= 5, paths);
+        await ctx.close();
+    }
+
     // ៣ — លុប DSN ➜ ត្រូវផ្តាច់ client ពិត
     {
         const { ctx, page } = await makePage(browser, origin, 0);

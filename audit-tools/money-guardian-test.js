@@ -47,7 +47,8 @@ const GUARDS = [
     { file: 'ledger-failed-apply-revert-test.js', env: 'LEDGERFAIL_APP_DIR', needs: null },
     { file: 'pickup-barcode-identity-test.js', env: 'PICKUPID_APP_DIR', needs: null },
     { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null },
-    { file: 'tx-outcome-test.js', env: 'TXOUTCOME_APP_DIR', needs: null }
+    { file: 'tx-outcome-test.js', env: 'TXOUTCOME_APP_DIR', needs: null },
+    { file: 'cleanup-interrupt-atomicity-test.js', env: 'CLEANUPATOMIC_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
@@ -127,6 +128,16 @@ const MUTATIONS = [
         name: 'ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច',
         from: "        if (result.txOutcome === 'applied') {",
         to: "        if (false) {"
+    },
+    {
+        name: 'អ្នកស្តារ journal បញ្ចប់ការសម្អាតដែល *នៅរស់* ក្នុង tab ដដែល (ដកលុយ ២ ដង)',
+        from: '        if (cleanupJournalLive.has(trashId)) return Promise.resolve(false);',
+        to: ''
+    },
+    {
+        name: 'claim registry ជឿ «ស្មើតម្លៃដែលផ្ញើ» ក្រោយ `disconnect` (barcode ស្ទួន ➜ COD បូក ២ ដង)',
+        from: "            return result.txOutcome === 'applied' ? 'unknown' : 'claimed';",
+        to: "            return 'claimed';"
     },
     {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',

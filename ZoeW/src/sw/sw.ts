@@ -57,6 +57,28 @@ const REVALIDATE_TIMEOUT_MS = 6000;
 const REVALIDATE_MAX_IN_FLIGHT = 3;
 const revalidateInFlight = new Set<string>();
 
+const DEPLOY_CHECK_TTL_MS = 60000;
+let deployCheck: { at: number; current: Promise<boolean> } | null = null;
+
+function shellDeployIsCurrent(): Promise<boolean> {
+    const now = Date.now();
+    if (deployCheck && now >= deployCheck.at && now - deployCheck.at < DEPLOY_CHECK_TTL_MS) return deployCheck.current;
+    const controller: AbortController | null = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+        if (controller) { try { controller.abort(); } catch (e) {} }
+    }, REVALIDATE_TIMEOUT_MS);
+    const markers = ["'" + CACHE_VERSION + "'", '"' + CACHE_VERSION + '"'];
+    const current = fetch(self.location.href, controller ? { signal: controller.signal, cache: FRESH } : { cache: FRESH })
+        .then((response) => (response && response.ok ? response.text() : ''))
+        .then((text) => markers.some((marker) => text.indexOf(marker) !== -1), () => false)
+        .then((same) => {
+            clearTimeout(timer);
+            return same;
+        });
+    deployCheck = { at: now, current };
+    return current;
+}
+
 function revalidateShell(cache: Cache, request: Request, cacheKey: string | Request): Promise<void> {
     if ((navigator.onLine as boolean) === false) return Promise.resolve();
     if (linkIsFrugal()) return Promise.resolve();
@@ -79,9 +101,12 @@ function revalidateShell(cache: Cache, request: Request, cacheKey: string | Requ
     }, REVALIDATE_TIMEOUT_MS);
 
     const target = typeof cacheKey === 'string' ? cacheKey : request;
-    return fetch(target, controller ? { signal: controller.signal, cache: FRESH } : { cache: FRESH }).then((response) => {
-        if (!response || !response.ok || response.redirected) { release(); return; }
-        return cache.put(cacheKey, response.clone()).then(release, release);
+    return shellDeployIsCurrent().then((current) => {
+        if (!current || released) { release(); return; }
+        return fetch(target, controller ? { signal: controller.signal, cache: FRESH } : { cache: FRESH }).then((response) => {
+            if (!response || !response.ok || response.redirected) { release(); return; }
+            return cache.put(cacheKey, response.clone()).then(release, release);
+        }, release);
     }, release);
 }
 

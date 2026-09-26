@@ -161,7 +161,8 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    CSS៖ diff declaration stream) ហើយបោះបង់ឯកសារណាដែលមិនប្រាកដ។
    **លើកលែង** ៖ `audit-tools/` · `*/test.js` · `vendor/` · `qrcode.js`។
    ⛔ **ZoeW React ក៏គ្មាន comment ដែរ** (សំណើម្ចាស់គម្រោង) ៖ `ZoeW/public/*.js` · **`ZoeW/src/**`** (TS/TSX/CSS) ·
-   `ZoeW/netlify/functions/*.js` · config (`vite.config.mts` · `capacitor.config.ts` · `eslint.config.mjs` · …) · និង
+   `ZoeW/netlify/functions/*.js` · config (`vite.config.mts` · `capacitor.config.ts` · `eslint.config.mjs` · …) ·
+   **Gradle** (`android/**/*.gradle` · `gradle.properties` ⛔ លើកលែងឯកសារដែល Capacitor សាងឡើងវិញ ៖ header «DO NOT EDIT») និង
    **HTML ដែល ship** (`index.html` ទាំង ២ App · `guide.html`)។ `strip-comments.js` សម្អាត React តាម
    `ts-comments.js` (TypeScript AST · ផ្ទៀងផ្ទាត់ថា **esbuild compile មុន/ក្រោយដូចគ្នាបេះបិទ** ➜ ខុស ➜ មិនប៉ះឯកសារ ·
    `/// <reference …>` ជា directive ➜ រក្សា) ហើយ `comments.js` ធ្លាក់ពេល comment វិលមក។ ⛔ catch ទទេជាការលេបដោយចេតនា ➜

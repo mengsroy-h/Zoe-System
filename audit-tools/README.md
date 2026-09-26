@@ -348,7 +348,7 @@ bash audit-tools/emu/rules.sh
 | `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
 | `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel ⛔ **បូក ៖ គ្រប់ជួរឈរនាំចេញត្រូវផ្ទុកវាលរបស់របាយការណ៍ដែលចំណងជើងសន្យា** (ដេរីវេពីចំណងជើង) | `MREPORT_APP_DIR` |
 | `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល ⛔ និង listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (`noteDbListenerAlive` / `handleDbListenerError` ត្រូវផ្គូផ្គង `listenerRefs`) | `PENDINGKEY_APP_DIR` |
-| `comments.js` · `strip-comments.js` · `ts-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment — JS/CSS ដែល ship ដោយផ្ទាល់ · ប្រភព ZoeW React (`src/**` · Netlify Function · config ៖ `ts-comments.js` ប្រើ TypeScript AST ហើយផ្ទៀងផ្ទាត់ថា esbuild compile មុន/ក្រោយដូចគ្នា) · HTML ដែល ship | `COMMENTS_APP_DIR` · `STRIP_APP_DIR` |
+| `comments.js` · `strip-comments.js` · `ts-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment — JS/CSS ដែល ship ដោយផ្ទាល់ · ប្រភព ZoeW React (`src/**` · Netlify Function · config ៖ `ts-comments.js` ប្រើ TypeScript AST ហើយផ្ទៀងផ្ទាត់ថា esbuild compile មុន/ក្រោយដូចគ្នា) · Gradle (lexer Groovy/properties · token ក្រៅ comment ដូចគ្នា · ឯកសារដែល Capacitor សាងឡើងវិញលើកលែង) · HTML ដែល ship | `COMMENTS_APP_DIR` · `STRIP_APP_DIR` |
 | `trimws.js <files>` | លុប trailing whitespace | — |
 
 ### ៧. Allowlist — កុំបន្ថែមដោយគ្មានហេតុផល

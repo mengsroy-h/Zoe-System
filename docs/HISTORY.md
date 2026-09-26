@@ -59,7 +59,7 @@
   ការសម្អាតដែល commit យឺត ពិនិត្យ `cleanupClaimAccountedElsewhere()` (ធុងសំរាមលើ server · barcode ក្នុងធុងសំរាមថ្មីៗ) មុនសរសេរ ➜
   ឧបករណ៍ ២ មិនសរសេរធុងសំរាម/ដកលុយស្ទួន។
 - **អ្នកយាម** ៖ `tx-outcome-test` (sandbox ពិត · ការសម្អាត ២ ផ្លូវ · ledger · `unknown` · ការអានធ្លាក់មានព្រំដែន · wrapper អាន
-  `runTransaction` ពេលហៅ) ➜ **ធ្លាក់ ២០+ លើកូដមុនកែ** · `emu/tx-disconnect-emu-test` (SDK ពិត · emulator ពិត · ករណី applied និង
+  `runTransaction` ពេលហៅ) ➜ **ធ្លាក់ ១៩ លើកូដមុនកែ** (`❌ ធ្លាក់ 19 / ok 20`) · `emu/tx-disconnect-emu-test` (SDK ពិត · emulator ពិត · ករណី applied និង
   not-applied) ➜ **ធ្លាក់ ៣ លើកូដមុនកែ** · `money-guardian-test` mutation ២ ថ្មី (ដកការអាន server · ដកការពិនិត្យម្ចាស់ធុងសំរាម) ➜ ក្រហមពិត។
 
 #### Sentry ៖ ព្យុះកំហុសដដែល
@@ -89,6 +89,12 @@
   ស្កេនគ្រប់ឯកសារអត្ថបទក្នុង repo រួម `ZoeW/src/**` (វាស់ ៖ repo **០** ជួរ · commit **០**)។ probe ៖ អក្សរថៃក្នុង `docs/` ➜ FAIL ·
   ក្នុង `ZoeW/src` ➜ FAIL · root វាស់រកប្រភពមិនឃើញ ➜ FAIL · ថតទទេ ➜ FAIL · ទិសផ្ទុយ ៖ អក្សរខ្មែរមិនត្រូវចាប់។ ⛔ វាចាប់ខ្លួនវាលើក
   ដំបូង ៖ comment របស់ checker ដាក់ពាក្យថៃជាឧទាហរណ៍ ➜ ដកចេញ (probe សាងពី code point)។
+- **comment ក្នុង Gradle** (សំណើម្ចាស់គម្រោង · ក្រោយ merge #254) ៖ លុប comment **២៦** ក្នុង `android/build.gradle` · `android/app/build.gradle` ·
+  `android/gradle.properties`។ `ts-comments` មាន lexer Groovy (string · slashy regex · ការចែក) និង properties (ជួរបន្ត `\` មិនមែន comment) ➜
+  token ក្រៅ comment ត្រូវដូចគ្នាមុន/ក្រោយ។ ⛔ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT» ៖ `capacitor.build.gradle` ·
+  `capacitor.settings.gradle`) **លើកលែង** ព្រោះ `cap sync` សរសេរវាវិញ។ ភស្តុតាង ៖ APK `clean assembleRelease --rerun-tasks` មុន/ក្រោយ ➜
+  **SHA-256 ដដែល** (`8aed3e6c…86fc28` · ធាតុ ៩៤១ + CRC ដូចគ្នា) · `comments` ធ្លាក់លើ tree មុនសម្អាត (៨ · ៣ · ១៥) · fixture ក្នុង `repository-contract-test` ចាប់ mutation ២ (ដក slashy · ដក
+  continuation)។ ⛔ កំណែមិនឡើង (Gradle មិនមែនកូដ ship របស់ web ➜ `version-bump-scope`)។
 - `firebase@12.19.0` ចូល `devDependencies` របស់ ZoeW (SDK ពិតសម្រាប់ `emu/tx-disconnect-emu-test` · **មិន ship** — App ផ្ទុក SDK ពី CDN ដដែល)។
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ

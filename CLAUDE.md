@@ -2200,6 +2200,8 @@ bash audit-tools/emu/rules.sh
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000` ក្នុង Netlify env ជាការកំណត់ដោយចេតនា** (កូដលំនាំដើម `6000` · ZTO ឆ្លើយ ២,១–៥,៣ វិ.
   លើផលិតកម្ម · បង្អួចអាន Cookie លើ container ត្រជាក់) ➜ តម្លៃមិនមែន `6000` ក្នុង `?diag=1` មិនមែនកំហុស។ ⛔ កុំបង្កើន
   `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` (ស្មើពិដានសម្លាប់ Netlify)។
+- ⏳ **Publish rules របស់ Business ម្តងទៀត** (វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `docs/HISTORY.md` [2.42.7]) — មុន Publish App ដើរដូចមុន
+  (`permission_denied` ➜ សរសេរគ្មាន `op`) តែការការពារ «ការដក ledger បាត់ក្រោយ `disconnect`» មិនទាន់សកម្ម។
 - ✅ **Firebase rules របស់ Business និង License Project ត្រូវ Publish រួច** (`pickedUpBarcodes` · កូដ App `ZOE` ·
   `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច)។ ⛔ ការសរសេរស្ថិតិយកត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ (`$other` បដិសេធវាល
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។

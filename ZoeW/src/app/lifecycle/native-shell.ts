@@ -24,8 +24,18 @@ export function setupNativeShell(scope: LifecycleScope): void {
         const { SystemBars, SystemBarsStyle, SystemBarType } = core as any;
         if (!SystemBars) return;
         let applied = '';
+        let waiting = false;
         const applyBarStyles = () => {
-            if (scope.disposed) return;
+            if (scope.disposed || waiting) return;
+            const pending = finiteAnimationsRunning();
+            if (pending.length) {
+                waiting = true;
+                settleWithin(pending, STATUS_BAR_ANIMATION_WAIT_MAX_MS).then(() => {
+                    waiting = false;
+                    applyBarStyles();
+                });
+                return;
+            }
             const status = measureStatusBarTone();
             if (status === applied) return;
             applied = status;
@@ -73,6 +83,29 @@ export function statusBarInsetPx(): number {
 }
 
 export const STATUS_BAR_SETTLE_MS = 320;
+
+export const STATUS_BAR_ANIMATION_WAIT_MAX_MS = 1200;
+
+export function finiteAnimationsRunning(): Animation[] {
+    try {
+        if (typeof document.getAnimations !== 'function') return [];
+        return document.getAnimations().filter((a) => {
+            const timing = a.effect && typeof a.effect.getComputedTiming === 'function' ? a.effect.getComputedTiming() : null;
+            return a.playState === 'running' && !!timing && Number.isFinite(Number(timing.endTime));
+        });
+    } catch {
+        return [];
+    }
+}
+
+export function settleWithin(animations: Animation[], maxMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        setTimeout(finish, maxMs);
+        Promise.all(animations.map((a) => a.finished.then(() => {}, () => {}))).then(finish, finish);
+    });
+}
 
 const STATUS_BAR_SAMPLE_XS = [0.08, 0.3, 0.5, 0.7, 0.92];
 

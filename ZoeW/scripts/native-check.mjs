@@ -432,6 +432,57 @@ await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថា�
     await closeSession(s, 'របាស្ថានភាព');
 });
 
+/* ── ៤ង. ការប្តូររបាស្ថានភាព ↔ ចលនាប្រអប់ ─────────────────────────── */
+/*
+ * ⛔ `SystemBars.setStyle` ប្តូរពណ៌រូបតំណាង **និងគូរផ្ទៃបង្អួចឡើងវិញ** លើ thread របស់ Android ➜ WebView (ដែលគូរតាម
+ *    thread នោះ) គាំងមួយភ្លែត។ វាស់បានលើទូរស័ព្ទពិត (វីដេអូអ្នកប្រើ ៩០fps) ៖ ប្រអប់ធុងសំរាម (៣៥៤ ធាតុ ➜ គូរលើកដំបូងយឺត ➜
+ *    ចលនាចាប់ផ្តើមយឺត) ➜ ការវាស់ពណ៌ ៣២០ms ក្រោយការប្តូរ state ធ្លាក់ **កណ្តាលចលនា** ➜ គាំង ៧ ស៊ុម ➜ ផ្ទៃខាងក្រោយលោត ➜
+ *    រូបតំណាងប្តូរពណ៌ ៖ «កន្ត្រាក់» (PWA គ្មានការហៅនេះ ➜ រលូន)។ ប្រអប់តូចៗគូរលឿន ➜ ចលនាចប់មុន ➜ ការគាំងលើរូបស្ងៀម។
+ *    សេណារីយ៉ូនេះធ្វើត្រាប់ «ចលនានៅរត់ពេលការវាស់មកដល់» ដោយពន្យារចលនាប្រអប់ ហើយអះអាងថា setStyle មិនកើតក្នុងចលនា
+ *    តែកើតក្រោយវាចប់ (ពណ៌នៅត្រឹមត្រូវ)។
+ */
+for (const [dur, css, why] of [
+    [800, '.modal-content { animation-duration: 800ms !important; }', 'ផ្ទៃងងឹតពេញរួច តែប្រអប់នៅរំកិល (វីដេអូ)'],
+    [1500, '.modal, .modal-content { animation-duration: 1500ms !important; }', 'ផ្ទៃមិនទាន់ងងឹតនៅ ៣២០ms']
+]) {
+    await scenario(`៤ង. ពណ៌របាស្ថានភាពប្តូរក្រោយចលនាប្រអប់ ${dur}ms — ${why}`, async () => {
+        const s = await session({ safeAreaTop: 24 });
+        const { page } = s;
+        await page.addStyleTag({ content: css });
+        const res = await page.evaluate(() => new Promise((resolve) => {
+            const statusCalls = () => (window.__nativeCalls || []).filter((c) => c.plugin === 'SystemBars' && c.method === 'setStyle' && c.options && c.options.bar === 'StatusBar');
+            const running = () => document.getAnimations().filter((a) => {
+                const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+                const target = a.effect && a.effect.target;
+                return a.playState === 'running' && t && Number.isFinite(t.endTime) && !!(target && target.closest && target.closest('.modal'));
+            }).length;
+            const c0 = statusCalls().length;
+            document.querySelector('.daily-stats-btn').click();
+            const t0 = performance.now();
+            let seen = c0;
+            let sawAnimation = false;
+            const duringAnimation = [];
+            const after = [];
+            (function tick() {
+                const n = statusCalls().length;
+                const anim = running();
+                if (anim) sawAnimation = true;
+                if (n > seen) {
+                    const style = statusCalls()[n - 1].options.style;
+                    (anim ? duringAnimation : after).push({ t: Math.round(performance.now() - t0), style });
+                    seen = n;
+                }
+                if (performance.now() - t0 < 3200) requestAnimationFrame(tick);
+                else resolve({ sawAnimation, duringAnimation, after, last: (statusCalls().slice(-1)[0] || {}).options });
+            })();
+        }));
+        ok(`${dur}ms ៖ (លក្ខខណ្ឌចាំបាច់) ចលនាប្រអប់រត់ពិតពេលការវាស់មកដល់`, res.sawAnimation, res);
+        ok(`${dur}ms ៖ ⛔ setStyle មិនកើតក្នុងពេលចលនាប្រអប់កំពុងរត់ (WebView មិនគាំងកណ្តាលចលនា · រាប់តែចលនាក្នុង .modal)`, res.duringAnimation.length === 0, res.duringAnimation);
+        ok(`${dur}ms ៖ ក្រោយចលនាចប់ ➜ រូបតំណាងស (DARK) ត្រូវអនុវត្ត (មិនជាប់ខ្មៅលើផ្ទៃងងឹត)`, res.after.some((c) => c.style === 'DARK') && !!res.last && res.last.style === 'DARK', res);
+        await closeSession(s, `របាស្ថានភាព ↔ ចលនា ${dur}ms`);
+    });
+}
+
 /* ── ៥. web (គ្មាន bridge) ───────────────────────────────────────────── */
 await scenario('៤គ. ប្រវត្តិថយក្រោយ (Back ម្តងមួយជំហាន)', async () => {
     const s = await session();

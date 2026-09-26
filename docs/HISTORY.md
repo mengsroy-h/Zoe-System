@@ -104,6 +104,12 @@
   disconnect but ownership unverified` — ⛔ វាមានន័យថា «ផ្ទៀងផ្ទាត់មិនបាន» ➜ ពិនិត្យ node នោះលើ Firebase Console (លុយមិនត្រូវប៉ះដោយ App)។
   event ដដែលៗឥឡូវមានវាល `suppressedRepeats` (ចំនួនដែលដកចេញក្នុង ១០ នាទី)។
 - **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បិទ WiFi ចំពេលកែទឹកប្រាក់ ➜ បើកវិញ ➜ លេខលើអេក្រង់ត្រូវស្មើ Firebase Console (មិនដក ២ ដង)។
+- ✅ **តេស្តផ្សេងៗ (កំណែ 2.42.6/2.20.4 · ZoeKeyGen · View Source · APK · Sentry) — ម្ចាស់គម្រោងរាយការណ៍ថាដើរទាំងអស់**។ «View Source ៖ គ្មាន
+  `<!--`» ៖ comment តែមួយដែលនៅសល់ (`This site is hosted on Netlify …` · `utm_source=ai-legible`) **Netlify បញ្ចូលនៅ Edge** ពេលផ្ញើទំព័រ
+  មិនមែនមកពី repo (`index.html` ក្នុង repo និងលទ្ធផល build មាន `<!--` **០**) ➜ ⛔ កុំសរសេរ Edge Function ដើម្បីលុបវា (ហានិភ័យលើ SW · CSP ·
+  ល្បឿន ដើម្បីអ្វីដែលគ្មានផលប៉ះពាល់)។ ZoeKeyGen មាន devtools guard ➜ ម្ចាស់គម្រោងចាត់ទុកចំណុចនោះបញ្ជាក់រួចតាម repo។
+- ⏳ **តេស្តលុយលើឧបករណ៍ពិត** (បញ្ចូល · កែតម្លៃ · បិទ/បើក «យក» · ដក · ស្តារ · ការដាច់បណ្តាញចំពេលរក្សាទុក) — មិនទាន់បញ្ជាក់ ➜ `CLAUDE.md`
+  «📌 ការងារដែលនៅសល់»។
 - ⛔ សម្រាប់ developer ៖ `npm ci --prefix ZoeW` ម្តងទៀត (dependency `firebase` ថ្មី)។
 
 ### [2.42.5] — 2026-09-25 · ZoeW ៖ **🔴 hotfix ៖ iPhone ស្កេន Barcode មិនបាន ក្រោយ ZXing-WASM 3.1.4** · APK 2.42.4 build ក្នុង session · pin វិញ្ញាបនបត្រ keystore (merge #252)

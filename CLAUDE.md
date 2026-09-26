@@ -2185,11 +2185,6 @@ bash audit-tools/emu/rules.sh
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
-- ⏳ **2.42.6 ៖ តេស្តលុយលើឧបករណ៍ពិត** (wrapper `runTransaction` គ្របរាល់ការកែកញ្ចប់) ៖ ប្រើលេខទូរស័ព្ទ/Barcode តេស្ត (COD $10 · DOD $2) ➜
-  បញ្ចូល ➜ កែតម្លៃ $12 ➜ បិទ «យក» ➜ បើកវិញ ➜ ដក ➜ ស្តារ ➜ ⛔ សម្អាតដោយ **ដក** រួច ✖️ (មិនមែន «លុប» ៖ វាមិនដក ledger) ➜ លេខលើ 📅/💵 ត្រូវស្មើ
-  `zoew_daily_revenue_cod_dod/<ថ្ងៃ>` ក្នុង Console រាល់ជំហាន · ជំហាន `disconnect` ៖ ចុចរក្សាទុក ➜ Airplane mode ភ្លាម ➜ បិទវិញក្នុង ៣០ វិ. ➜
-  លេខ Console = អេក្រង់ · ⛔ មិនដែលដក/បូក ២ ដង។ ⚠️ ចន្លោះកំហុសខ្លីត្រឹមមិល្លីវិនាទី ➜ ការចុចដោយដៃពិបាកធ្វើឲ្យវាកើតឡើងវិញ (ភស្តុតាងនៃការកែ ៖
-  `emu/tx-disconnect-emu-test`) · ជំហានដែល **ខុស = កំហុសពិត**។ តារាងពេញ ៖ `docs/HISTORY.md` `[2.42.6]`។
 - ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·

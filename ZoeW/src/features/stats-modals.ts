@@ -33,7 +33,6 @@ export function openManualAdjustModal() {
 export function submitManualAdjustment() {
     if (viewState.manualAdjustBusy) return;
 
-
     let dateVal = sanitizeInput(fieldValue('manualDateInput').trim());
     let codChange = parseFloat(fieldValue('manualCodChangeInput')) || 0;
     let dodChange = parseFloat(fieldValue('manualDodChangeInput')) || 0;
@@ -94,8 +93,6 @@ export function openDailyStatsModal() {
     } else {
         uiState.dailyStatsView = {
             empty: null,
-            // ⛔ `collectedValueOf()` ត្រូវហៅ **ក្នុងមួយថ្ងៃ** — កម្រិតបូក
-            //   ជាការសម្រេចរបស់កន្លែងហៅ (មើលច្បាប់ «ជាន់ទី ៣ ៖ កម្រិតបូក»)។
             cards: sortedKeys.map((dateStr) => {
                 const data = dataState.dailyRevenueData[dateStr] || {};
                 return buildStatCardItem('ថ្ងៃទី', dateStr,

@@ -39,7 +39,7 @@ window.__log = { init: [], sent: [], scopes: [], closed: 0, unbound: 0 };
     var bound = false;
     window.Sentry = {
         init: function (o) { window.__log.init.push(o && o.dsn); bound = true; },
-        captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra) }); },
+        captureException: function (e, s) { if (!bound) return; window.__log.sent.push(String(e && e.message || e)); window.__log.scopes.push({ msg: String(e && e.message || e), tags: (s && s.tags) || null, hasExtra: !!(s && s.extra), extra: (s && s.extra) || null }); },
         setTag: function () {},
         close: function () { window.__log.closed++; bound = false; return Promise.resolve(true); },
         getCurrentHub: function () {
@@ -186,6 +186,45 @@ async function readSentryLog(page) {
             find('bad-zone') && find('bad-zone').tags === null, find('bad-zone'));
         ok('⛔ capture() គ្មាន extra សោះ នៅតែដំណើរការ',
             out.sent.indexOf('no-extra') !== -1, out.sent);
+        await ctx.close();
+    }
+
+    // ៦ — ⛔ Sentry storm ៖ event ដដែលៗ (សារ + context + zone ដូចគ្នា) មិនត្រូវស៊ីកូតា
+    //    វាស់បានលើ Sentry ផលិតកម្ម ៖ listener ដែលត្រូវបដិសេធ ➜ ៧ event រាល់ជុំស្តារ (៦៣ ក្នុង ២ នាទី) ·
+    //    `disconnect` លើការសម្អាតរាល់នាទី ➜ កូតាអស់ ➜ **ការជូនដំណឹង `zone: 'money'` ពិតបាត់**។
+    //    ច្បាប់ ៖ event ដំបូងនៃហត្ថលេខានីមួយៗផ្ញើជានិច្ច · ដដែលក្នុងបង្អួច ➜ ទប់ · ក្រោយបង្អួច ➜ ផ្ញើវិញ ជាមួយចំនួនដែលទប់ ·
+    //    នាឡិកាថយក្រោយ ➜ fail-open (ផ្ញើ)
+    {
+        const { ctx, page } = await makePage(browser, origin, 0);
+        await page.evaluate(() => window.ZoeErrors.init('zoew'));
+        await waitForSdkLoad(page);
+        const out = await page.evaluate(() => {
+            const realNow = Date.now;
+            let offset = 0;
+            Date.now = () => realNow() + offset;
+            for (let i = 0; i < 40; i++) window.ZoeErrors.capture(new Error('storm-err'), { context: 'Firebase listener error' });
+            window.ZoeErrors.capture(new Error('storm-err'), { context: 'another context' });
+            window.ZoeErrors.capture(new Error('storm-err'), { zone: 'money', context: 'Firebase listener error' });
+            window.ZoeErrors.capture(new Error('distinct-a'));
+            window.ZoeErrors.capture(new Error('distinct-b'));
+            const midSent = window.__log.sent.filter((m) => m === 'storm-err').length;
+            offset = 11 * 60 * 1000;
+            window.ZoeErrors.capture(new Error('storm-err'), { context: 'Firebase listener error' });
+            offset = -60 * 1000;
+            window.ZoeErrors.capture(new Error('distinct-a'));
+            Date.now = realNow;
+            return { log: window.__log, midSent };
+        });
+        const storm = out.log.scopes.filter((x) => x.msg === 'storm-err');
+        ok('លក្ខខណ្ឌចាំបាច់ ៖ event ដំបូងទៅដល់ Sentry', storm.length >= 1, storm.length);
+        ok('⛔ event ដដែល ៤០ ដងក្នុងបង្អួច ➜ ផ្ញើតែ ១ (context ដូចគ្នា)', out.midSent === 3, out.midSent);
+        ok('⛔ ទិសផ្ទុយ ៖ context ផ្សេង ឬ zone ផ្សេង ➜ ហត្ថលេខាផ្សេង ➜ ផ្ញើ', storm.filter((x) => x.extra && x.extra.context === 'another context').length === 1
+            && storm.filter((x) => x.tags && x.tags.zone === 'money').length === 1, storm.map((x) => x.extra));
+        ok('⛔ ទិសផ្ទុយ ៖ សារផ្សេងគ្នាទៅដល់ទាំងអស់', out.log.sent.indexOf('distinct-a') !== -1 && out.log.sent.indexOf('distinct-b') !== -1, out.log.sent);
+        const resent = storm.filter((x) => x.extra && x.extra.context === 'Firebase listener error' && !(x.tags && x.tags.zone));
+        ok('⛔ ក្រោយបង្អួចផុត ➜ ផ្ញើវិញ ជាមួយចំនួនដែលបានទប់ (suppressedRepeats = 39)',
+            resent.length === 2 && resent[1].extra.suppressedRepeats === 39, resent.map((x) => x.extra));
+        ok('⛔ នាឡិកាថយក្រោយ ➜ fail-open (ផ្ញើ មិនទប់ជារៀងរហូត)', out.log.sent.filter((m) => m === 'distinct-a').length === 2, out.log.sent);
         await ctx.close();
     }
 

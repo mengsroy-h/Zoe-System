@@ -36,8 +36,6 @@ export function openViewListModal(id?) {
         const bcDodRiel = Math.round(itemDod * dataState.exchangeRateRiel);
         const hasCod = itemCod > 0;
         const hasDod = itemDod > 0;
-        // ⛔ សាខាទាំង ៣ ដដែល ៖ COD+DOD ➜ ២ បន្ទាត់ បូកសរុប; DOD តែឯង ➜
-        //   បន្ទាត់ DOD; ករណីផ្សេង ➜ បន្ទាត់ COD (រួម ០.០០)។
         const money = [];
         let sum = null;
         if (hasCod && hasDod) {

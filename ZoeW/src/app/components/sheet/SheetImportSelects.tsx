@@ -11,12 +11,6 @@ function setView(patch: any) {
     uiState.sheetImportView = Object.assign({}, view(), patch);
 }
 
-/**
- * Tab ក្នុងឯកសារ Excel។
- * ⛔ តម្លៃរស់ក្នុង store ➜ `loadSheetImportSelectedSheet()` លែងអាន
- *    `sel.value` ➜ លំដាប់ «គូរជម្រើស រួចអានតម្លៃ» លែងជាការប្រណាំង។
- * ⛔ ការហៅឆ្លងកាត់ `act()` (ព្រំដែន `ACTION_REGISTRY`) ដូច `data-act` ដើម។
- */
 export function SiSheetSelect() {
     useStore(uiState);
     const v = view();
@@ -29,11 +23,6 @@ export function SiSheetSelect() {
     );
 }
 
-/**
- * ជម្រើសផ្គូផ្គងជួរឈរ (៤)។
- * ⛔ «— មិនប្រើ —» មានតម្លៃ `-1` ➜ វាជាសាលក្រម «វាលនេះមិនប្រើ» មិនមែន
- *    ជួរឈរទី ០ (ការច្រឡំ = COD ចូលវាល Barcode)។
- */
 function MapSelect({ id }: { id: string }) {
     useStore(uiState);
     const cfg = view().mapping[id] || { options: [], value: '', filled: false };
@@ -46,8 +35,6 @@ function MapSelect({ id }: { id: string }) {
                 setView({ mapping: next });
                 act('renderSheetImportPreview');
             }}>
-            {/* ⛔ មុន `fillSheetImportMappingSelects()` រត់ `<select>` ត្រូវ **ទទេ**
-                ដូចដើមបេះបិទ ៖ ធាតុលើស នៅពេលសម្រាក = ការបាត់ parity ។ */}
             {cfg.filled ? <option value="-1">— មិនប្រើ —</option> : null}
             {cfg.options.map((o: any) => <option value={o.value} key={o.value}>{o.label}</option>)}
         </select>

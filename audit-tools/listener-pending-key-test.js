@@ -373,7 +373,7 @@ async function runDrop(opts) {
         dbListenerPendingPaths: new Set(opts.pending),
         // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ**
         // «listener ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវមាន Set ទាំង ២។
-        dbListenerFailedPaths: new Set(opts.failed || []),
+        dbListenerFailedPaths: new Set(opts.failed || []), dbListenerReportedFailures: new Set(),
         deletedItems: opts.deletedItems,
         activeRestoreClaims: new Map((opts.activeClaims || []).map((id) => [id, {}]))
     };

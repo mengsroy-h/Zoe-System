@@ -415,7 +415,6 @@ export function fillSheetImportMappingSelects() {
     const mapping = Object.assign({}, sheetImportViewNow().mapping);
     Object.keys(SHEET_IMPORT_FIELD_SELECT_IDS).forEach((field) => {
         const id = SHEET_IMPORT_FIELD_SELECT_IDS[field];
-        // ⛔ តម្លៃដែលជ្រើសរួចត្រូវរក្សា — ដើមធ្វើតាម \`previous\` ដដែល។
         const prev = mapping[id] ? mapping[id].value : '-1';
         mapping[id] = { options: options, value: prev, filled: true };
     });

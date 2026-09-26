@@ -106,6 +106,7 @@ const ELAPSED_HELPER = sliceFn('elapsedSince') ||
             'let dbListenerOutageNoticeShown = false;\n' +
             'const dbListenerPendingPaths = new Set();\n' +
             'const dbListenerFailedPaths = new Set();\n' +
+            'const dbListenerReportedFailures = new Set();\n' +
         'let infoListenersFailed = false;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
         'let infoListenerRecoveryAttempt = 0;\n' +
@@ -321,6 +322,7 @@ function buildContext() {
         'let networkJustReturned = false;\n' +
         'const dbListenerPendingPaths = new Set();\n' +
         'const dbListenerFailedPaths = new Set();\n' +
+        'const dbListenerReportedFailures = new Set();\n' +
         'let infoListenersFailed = false;\n' +
         'let infoListenerGeneration = 0;\n' +
         'let infoListenerRecoveryTimer = null;\n' +
@@ -459,6 +461,35 @@ function buildContext() {
         .forEach((p) => t.listenerCallbacks[p].errCb(new Error('permission_denied')));
     const outage = t.log.toasts.filter((m) => m.indexOf('ដាចការទាញយកទិន្នន័យ') !== -1);
     ok('សារដាច់ការតភ្ជាប់បង្ហាញតែ ១ ដង (មិនមែន ៦)', outage.length === 1, t.log.toasts);
+}
+
+// ── ៣ខ. ⛔ Sentry ៖ listener ដែលត្រូវបដិសេធជាប់ៗ មិនត្រូវផ្ញើ event រាល់ជុំស្តារ ─────
+//    វាស់បានលើ Sentry ផលិតកម្ម (JAVASCRIPT-REACT-2) ៖ `permission_denied` លើ listener ទាំង ៧ ➜ ជណ្តើរស្តារ
+//    ចាក់ listener ឡើងវិញ (២ · ៥ · ១០ · ២០ · ៣០ វិ.) ➜ **៧ event រាល់ជុំ** (៦៣ event ក្នុង ២ នាទី · ~៨៤០/ម៉ោង/ឧបករណ៍)
+//    ➜ កូតា Sentry អស់ ➜ ការជូនដំណឹង `zone: 'money'` ពិតបាត់។ ច្បាប់ ៖ **១ event ក្នុងមួយ path ក្នុងមួយការដាច់**
+{
+    const t = buildContext();
+    t.api.initDatabaseListeners();
+    const fireAll = () => REAL_LISTENER_KEYS.forEach((p) => t.listenerCallbacks[p].errCb(new Error('permission_denied')));
+    fireAll();
+    const first = t.log.captures.length;
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ការដាច់ដំបូងរាយការណ៍ ១ ក្នុងមួយ path', first === REAL_LISTENER_KEYS.length, first);
+    let attachRounds = 0;
+    [3000, 6000, 11000, 21000, 31000, 31000].forEach((ms) => {
+        const before = t.log.attached.length;
+        t.advance(ms);
+        if (t.log.attached.length > before) { attachRounds++; fireAll(); }
+    });
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ជណ្តើរស្តារពិតជាចាក់ listener ឡើងវិញច្រើនជុំ', attachRounds >= 4, attachRounds);
+    ok('⛔ ការបដិសេធជាប់ៗ មិនផ្ញើ Sentry រាល់ជុំស្តារ (១ ក្នុងមួយ path ក្នុងមួយការដាច់)',
+        t.log.captures.length === REAL_LISTENER_KEYS.length, { captures: t.log.captures.length, rounds: attachRounds, paths: REAL_LISTENER_KEYS.length });
+    t.advance(31000);
+    const snap = (v) => ({ val: () => v });
+    REAL_LISTENER_KEYS.forEach((p) => t.listenerCallbacks[p].cb(snap(null)));
+    ok('លក្ខខណ្ឌចាំបាច់ ៖ ស្តារបាន', t.probe().dbListenersFailed === false, t.probe());
+    const beforeNew = t.log.captures.length;
+    t.listenerCallbacks.history.errCb(new Error('permission_denied'));
+    ok('⛔ ទិសផ្ទុយ ៖ ការដាច់ **ថ្មី** ក្រោយស្តាររួច ត្រូវរាយការណ៍ម្តងទៀត', t.log.captures.length === beforeNew + 1, t.log.captures.length - beforeNew);
 }
 
 // ── ៤. ការស្តារឡើងវិញដោយស្វ័យប្រវត្តិ ────────────────────────────────
@@ -1546,6 +1577,7 @@ function buildContext() {
             'function scheduleFirebaseSdkRetry() {}',
             'function checkPinAndOpenConfig() {}',
             'function showToast(m) { __log.toasts.push(m); }',
+            sliceFn('withTransactionOutcomeResolution') || 'function withTransactionOutcomeResolution(sdk) { return sdk; }',
             initSrc.replace('firebaseConfig = JSON.parse(savedConfig);',
                 'firebaseConfig = JSON.parse(savedConfig); __log.inits.push(firebaseConfig.databaseURL);'),
             'globalThis.__start = () => initFirebase();',

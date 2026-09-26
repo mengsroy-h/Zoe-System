@@ -50,7 +50,6 @@ export function renderEntryList() {
     }
     viewState.entryListEmpty = false;
 
-    // ➜ `EntryListTableBody` (React) គូរជួរដេក
     uiState.entryListView = rows.slice(0, ENTRY_LIST_MAX_ROWS).map((it, i) => {
         const codes = Array.isArray(it.barcodes) && it.barcodes.length
             ? it.barcodes.map((b) => String((b && b.code) || ''))
@@ -103,11 +102,8 @@ export function renderLockerList() {
         assigned.push({ item: it, lockers: lockers, ts: getItemLatestLockerTs(it) });
     });
 
-    // ➜ `LockerListFilterSelect` (React) គូរជម្រើស។ ⛔ តម្លៃដែលជ្រើស
-    //   រស់ក្នុងឃ្លាំង ➜ ការអាន `select.value` (ដែលអាចមកមុនការគូរ) បាត់ទៅ។
     const options = Array.from(allLockers).map(String).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     uiState.lockerFilterOptions = options;
-    // ⛔ ទីតាំងដែលលែងមាន ➜ តម្រងត្រូវរលត់ (ដូច browser ធ្វើពេល option បាត់)
     if (uiState.lockerFilterValue && options.indexOf(uiState.lockerFilterValue) === -1) uiState.lockerFilterValue = '';
     const lockerFilter = uiState.lockerFilterValue;
 

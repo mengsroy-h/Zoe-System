@@ -7,10 +7,6 @@ import { collectedMoneyText, collectedRielText } from '../features/export';
 import { closeModal } from './modal';
 import { showToast } from './toast';
 
-/**
- * បិទប្រអប់ដោយ «ចុចខាងក្រៅ · Escape · Back» ៖ ប្រអប់ `noDismiss` មិនបិទ ·
- * មាន `close` ➜ រត់សកម្មភាពនោះ (សម្អាតស្ថានភាពរបស់ប្រអប់) · អត់ ➜ `closeModal()`។
- */
 export function dismissModal(modalId) {
     const meta = modalId ? modalMeta(modalId) : null;
     if (!meta || meta.noDismiss) return;
@@ -23,9 +19,6 @@ export function dismissModal(modalId) {
 }
 
 export function buildStatCardItem(label, key, cod, dod, count, collectedValue, measurable) {
-    // ⛔ ឥឡូវវាត្រឡប់ **model** — React គូរ (`DailyStatsCards`)។ រូបមន្ត
-    //   នៅដដែល ៖ `collectedValue` ត្រូវគណនារួចដោយកន្លែងហៅ (កម្រិតបូក
-    //   ជាការសម្រេចរបស់កន្លែងហៅ) ហើយ `pending` clamp ត្រឹម ០។
     const totalD = Math.round((cod + dod) * 100) / 100;
     const collected = (collectedValue && typeof collectedValue === 'object')
         ? collectedValue : { cod: 0, dod: 0, total: 0 };

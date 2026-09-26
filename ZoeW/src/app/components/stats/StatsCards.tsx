@@ -24,7 +24,6 @@ export interface CollectedStatCard {
 
 export interface CardsView<T> { empty: string | null; cards: T[] }
 
-/** 📅 កញ្ចប់ប្រចាំថ្ងៃ — កាតមួយក្នុងមួយថ្ងៃស្កេន។ */
 export function DailyStatsCards() {
     useStore(uiState);
     const view = uiState.dailyStatsView as CardsView<DailyStatCard> | null;
@@ -54,7 +53,6 @@ export function DailyStatsCards() {
     );
 }
 
-/** 💵 ចំណូលប្រចាំថ្ងៃ — កាតមួយក្នុងមួយថ្ងៃ *យក* (មិនមែនថ្ងៃស្កេន)។ */
 export function CollectedStatsCards() {
     useStore(uiState);
     const view = uiState.collectedStatsView as CardsView<CollectedStatCard> | null;

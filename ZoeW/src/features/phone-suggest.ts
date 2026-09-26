@@ -50,14 +50,10 @@ export function collectPhoneSuggestions(rawQuery, limit?) {
 }
 
 export function renderPhoneSuggestions(matches) {
-    // ➜ `PhoneSuggestList` (React) គូរ។ ស្ថានភាពសកម្មនៅជា index ក្នុងឃ្លាំង
-    //   ➜ `setPhoneSuggestActive()` នៅដើរដដែល។
     uiState.phoneSuggestItems = matches;
     uiState.phoneSuggestActiveIndex = -1;
     uiState.touch();
 }
-
-
 
 export function showPhoneSuggestions() {
     if (uiState.phoneSuggestHideTimer) { clearTimeout(uiState.phoneSuggestHideTimer); uiState.phoneSuggestHideTimer = null; }
@@ -94,8 +90,6 @@ export function applyPhoneSuggestion(phone) {
     hidePhoneSuggestions();
     searchByPhone();
 }
-
-
 
 export function searchByPhone() {
     let phoneQuery = sanitizePhoneNumber(fieldValue('searchPhoneInput'));

@@ -23,8 +23,6 @@ function GroupRow({ row }: { row: TrashRowModel }) {
                 </div>
                 <div className="trash-when">🕒 {row.whenText}</div>
                 <div className="trash-codes">
-                    {/* ⛔ Fragment មិនមែន span ៖ ដើមភ្ជាប់ដោយ `join(' ')` ➜
-                        ធាតុរុំបន្ថែមនឹងប្តូរ DOM (និង CSS ដែលពឹងលើកូនផ្ទាល់)។ */}
                     {row.codes.map((code, i) => (
                         <Fragment key={code + i}>{i > 0 ? ' ' : null}<span className="barcode-tag">{code}</span></Fragment>
                     ))}
@@ -46,7 +44,6 @@ function GroupRow({ row }: { row: TrashRowModel }) {
     );
 }
 
-/** តារាងធុងសំរាម (ក្រុមតាម `trashReason`+`phone`+`scanDate`+`time`)។ */
 export function TrashTableBody() {
     useStore(uiState);
     const view = uiState.trashView as TrashView | null;
@@ -74,7 +71,6 @@ export function TrashTableBody() {
     );
 }
 
-/** ជួរក្រុម បូកជួររងពេលពន្លា — React Fragment រក្សាលំដាប់ `<tr>` ដដែល។ */
 function ObservedGroup({ row }: { row: TrashRowModel }) {
     return (
         <>

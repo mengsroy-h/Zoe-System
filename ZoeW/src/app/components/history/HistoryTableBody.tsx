@@ -10,14 +10,6 @@ import { HistoryRow } from './HistoryRow';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-/**
- * តួតារាងប្រវត្តិ។
- *
- * ⛔ វាជំនួស *រង្វិលជុំ diff ដោយដៃ* របស់ `renderHistory()` (សញ្ញា
- *    `tr.dataset.sig` · `insertBefore` · `tr.remove()`) ដោយការផ្គូផ្គង
- *    តាម `key` របស់ React ➜ ការរក្សាធាតុ DOM ដដែល (ដែល PTR · ម៉ឺនុយ
- *    និងការរមូរពឹងលើ) នៅតែមាន តែឥឡូវវាជាការធានារបស់ framework។
- */
 export function HistoryTableBody() {
     useStore(dataState, uiState);
 
@@ -36,7 +28,6 @@ export function HistoryTableBody() {
 
     const now = getServerNow();
     const rows = [];
-    // ⛔ លំដាប់ដូចដើមបេះបិទ ៖ ថ្មីជាងគេនៅលើ (រង្វិលជុំថយក្រោយ)។
     for (let i = view.length - 1; i >= 0; i--) {
         const item = view[i];
         const itemAgeTime = item.createdAt || parseTimestampFromId(item.id) || now;

@@ -213,11 +213,6 @@ export function exportDataAsPDF() {
     beginPdfPrint(getExportFilenameBase());
 }
 
-/**
- * បោះពុម្ពតំបន់ `PdfExportPrintArea` ៖ ចំណងជើង document = ឈ្មោះឯកសារ PDF
- * (browser យកវាជាឈ្មោះ) ➜ ⛔ ទាំងតំបន់បោះពុម្ព និងចំណងជើង ត្រូវ **ចុះ DOM
- * ភ្លាម** (`commitNow()`) មុន `window.print()` ដែលអាន DOM ភ្លាមៗ។
- */
 export function beginPdfPrint(filenameBase: string) {
     if (uiState.pdfExportOriginalTitle === null) uiState.pdfExportOriginalTitle = documentBaseTitle();
     viewState.documentTitle = filenameBase;

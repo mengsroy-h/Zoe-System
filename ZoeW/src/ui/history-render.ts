@@ -10,14 +10,9 @@ import { emptyViewMessage } from '../services/db-listeners';
 export function renderHistory(dataToRender = dataState.scanHistory) {
     viewState.historyCountText = String(dataToRender.length);
 
-    // ➜ `HistoryTableBody` (React) ជាអ្នកគូរជួរដេកឥឡូវនេះ។
-    //   `touch()` ចាំបាច់ព្រោះកន្លែងហៅជាច្រើនកែ *វត្ថុខាងក្នុង* ដោយ
-    //   មិនប្តូរ reference នៃ array ➜ Proxy មើលមិនឃើញ។
     uiState.historyView = dataToRender;
     uiState.touch();
 
-    // ⛔ ផ្លូវចេញមុនត្រូវរក្សា **ដូចដើមបេះបិទ** ៖ បញ្ជីទទេ ➜ ជុំបោស ZTO
-    //   មិនរត់ (បើរត់ វានឹងបាញ់សំណើលើអេក្រង់ទទេ)។
     if (dataToRender.length === 0) return;
 
     renderZtoSyncViews();

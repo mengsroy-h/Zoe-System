@@ -5,14 +5,6 @@ import { animateElement, elementOf, fieldValue, isFieldFocused, type RefName } f
 import { entryScrollerInView, panelHasSearchFocus, panelIsCollapsed, setPanelCollapsed, syncHistoryExpandedLock, usesIOSPanelHandoff, type PanelKey } from './panels';
 import { setPhoneSearchPulledUp } from './phone-search';
 
-/**
- * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ច្បាប់ ១១) — ចលនាផ្ទាំង និងកាយវិការអូស។
- * តក្កវិជ្ជាដូច `app.js` ដើមបេះបិទ ៖ ធាតុតាម ref · `.collapsed` /
- * `.panel-gliding` ជា state ដែល **ចុះ DOM ភ្លាម** (`commitNow()`) មុនការវាស់
- * FLIP ដូចការប្តូរ class ផ្ទាល់។ listener ជា native (`passive: false` លើ iOS
- * — React `onTouchMove` ជា passive ➜ `preventDefault()` មិនដើរ)។
- */
-
 export const PANEL_GLIDE_MS = 220;
 
 export const PANEL_GLIDE_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -297,10 +289,6 @@ const PANEL_SECTIONS: Record<PanelKey, { side: RefName; main: RefName }> = {
     entry: { side: 'entrySideSection', main: 'entryMainSection' }
 };
 
-/**
- * `onClick` របស់ដងអូស (`#dragHandle` · `#entryDragHandle` ក្នុង JSX) ៖ បង្រួម ⇄ ពង្រីកផ្ទាំង
- * ជាមួយចលនា FLIP ។ តក្កវិជ្ជាដូចដើមបេះបិទ (ច្រកទ្វារដូច `bindPanelSwipe` ៖ ផ្ទាំងទាំង ២ ត្រូវមាន)។
- */
 export function togglePanelFromHandle(panel: PanelKey) {
     const sections = PANEL_SECTIONS[panel];
     const mainSection = elementOf(sections.main);

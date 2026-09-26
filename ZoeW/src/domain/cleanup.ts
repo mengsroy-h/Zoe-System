@@ -15,6 +15,7 @@ import { ABANDON_AGE_MS, EXPIRED_TRASH_RETENTION_MS, TRASH_RETENTION_MS, TRASH_W
 import { dbListenerViewIsStale } from '../services/db-listeners';
 import { purgeDeletedItemsQuietly, saveSingleDeletedItemToFirebase } from '../services/history-write';
 import { LOCK_STALL_RELEASE_MS, armLateCommit, armLateWrite, dbOp, dbOpStalled, notifyIfSlow, retryAsync, settleLockWithin } from '../services/network';
+import { txReadServerValue, txRestUrl } from '../services/tx-outcome';
 import { recalcItemMoneyFromBarcodes } from '../ui/modal-stack';
 import { showToast } from '../ui/toast';
 
@@ -270,6 +271,27 @@ export async function restoreClaimedItemToScanHistory(id, claimedWhole, claimedP
     });
 }
 
+export const CLEANUP_FOREIGN_TRASH_WINDOW_MS = 15 * 60 * 1000;
+
+export async function cleanupClaimAccountedElsewhere(id, claimedWhole, claimedPartial) {
+    if (claimedWhole) {
+        const url = txRestUrl(firebaseState.fb.ref(firebaseState.db, `zoew_recently_deleted_cod_dod/${id}`));
+        if (!url) return 'unknown';
+        try {
+            const existing = await txReadServerValue(url);
+            return existing === null || existing === undefined ? 'ours' : 'elsewhere';
+        } catch (e) {
+            return 'unknown';
+        }
+    }
+    const codes = new Set(barcodeEntriesOf(claimedPartial && claimedPartial.barcodes).map(({ barcode }) => barcode.code));
+    if (!codes.size) return 'unknown';
+    const since = getServerNow() - CLEANUP_FOREIGN_TRASH_WINDOW_MS;
+    const foreign = dataState.deletedItems.some((t) => t && (parseFloat(t.deletedAt) || 0) >= since && Array.isArray(t.barcodes)
+        && t.barcodes.some((b) => b && codes.has(b.code)));
+    return foreign ? 'elsewhere' : 'ours';
+}
+
 export async function claimAndCleanupItem(id, reason) {
     if (!firebaseState.db || !id || !/^[a-zA-Z0-9_-]+$/.test(id) || cleanupInFlight.has(id)) return;
     cleanupInFlight.add(id);
@@ -352,6 +374,13 @@ export async function claimAndCleanupItem(id, reason) {
     };
     const finishCleanup = async (result) => {
         if (!result.committed || (!claimedWhole && !claimedPartial)) return;
+        if (result.txOutcome === 'applied') {
+            const owner = await cleanupClaimAccountedElsewhere(id, claimedWhole, claimedPartial);
+            if (owner !== 'ours') {
+                if (owner === 'unknown' && window.ZoeErrors) ZoeErrors.capture(new Error('Cleanup claim committed after disconnect but ownership unverified'), { zone: 'money', context: 'claimAndCleanupItem disconnect ownership', itemId: id, reason });
+                return;
+            }
+        }
 
         let trashItem;
         let revenuePending = false;
@@ -482,8 +511,12 @@ export async function claimAndCleanupItem(id, reason) {
         }
         await settleLockWithin(finishCleanup(result), LOCK_STALL_RELEASE_MS, 'claimAndCleanupItem ' + reason);
     } catch (e) {
-        console.error('Automatic cleanup transaction failed for', id, e);
-        if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'Automatic cleanup transaction failed for' });
+        if (e && e.txOutcome === 'not-applied') {
+            console.warn('Automatic cleanup transaction was not applied (disconnect) for', id);
+        } else {
+            console.error('Automatic cleanup transaction failed for', id, e);
+            if (window.ZoeErrors) ZoeErrors.capture(e, { zone: 'money', context: 'Automatic cleanup transaction failed for' });
+        }
     } finally {
         cleanupInFlight.delete(id);
     }

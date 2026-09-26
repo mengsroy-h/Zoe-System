@@ -1,10 +1,3 @@
-/**
- * ទិដ្ឋភាពរបស់ប្រអប់ «នាំចូល Excel ទៅ Sheet» ។
- *
- * ⛔ វត្ថុតែមួយកាន់ផ្ទៃទាំង ៦ ៖ សារ · សេចក្តីសង្ខេប · tab · ការផ្គូផ្គង ·
- *    chip · មើលជាមុន។ ការបំបែកជា state ៦ នឹងបង្កើតលំដាប់គូរ ៦ ដែល
- *    អាចឃ្លាតគ្នា — ⛔ ផ្ទៃទាំងនោះរាយលេខ *ដេរីវេពីទិន្នន័យតែមួយ*។
- */
 export type SheetImportView = {
     msgs: Record<string, { text: string; kind: string } | null>;
     summary: { url: string } | null;

@@ -38,14 +38,6 @@ import { setupNativeShell } from './native-shell';
 import { oncePerPage, type LifecycleScope } from './scope';
 import { elementOf } from '../refs';
 
-/**
- * ដំណើរការចាប់ផ្តើម App ជាដំណាក់កាលដែលមានឈ្មោះ។
- *
- * ⛔ **លំដាប់ជាផ្នែកនៃឥរិយាបថ** ៖ វាដូច `<script>` នៅចុង `<body>` របស់ ZoeW
- *    ដើមបេះបិទ (ឧ. `initAppLock()` មុនការគូរទិន្នន័យ · `switchAppPage('data')`
- *    មុន `setupSwipeGestures()` · `revealAppAfterBoot()` ចុងក្រោយ)។ ការប្តូរ
- *    លំដាប់ត្រូវវាស់ដោយ `npm run parity:deep` មុនជឿ។
- */
 export function bootApplication(scope: LifecycleScope): void {
     bootShell(scope);
     scope.onLoad(() => {
@@ -58,7 +50,6 @@ export function bootApplication(scope: LifecycleScope): void {
     });
 }
 
-/** ដំណាក់ ១ ៖ មុន `load` — សំបក · សោ App · Service Worker · សំបក native */
 function bootShell(scope: LifecycleScope): void {
     renderAppVersionLabels();
 
@@ -66,8 +57,6 @@ function bootShell(scope: LifecycleScope): void {
         scope.listen(window.visualViewport, 'resize', scrollWindowToTop);
     }
 
-    // ⛔ លើ native ឯកសារទាំងអស់ស្ថិតក្នុង APK រួចហើយ ➜ Service Worker គ្មានការងារ
-    //    ហើយ WebView របស់ Android មិនបញ្ជូនសំណើ SW តាមផ្លូវរបស់ Capacitor ទេ។
     if ('serviceWorker' in navigator && !isNativeApp()) {
         scope.onLoad(() => registerServiceWorker(scope));
     }
@@ -109,7 +98,6 @@ function registerServiceWorker(scope: LifecycleScope): void {
     });
 }
 
-/** ដំណាក់ ២ ៖ Sentry · License · Setup Link · Firebase · ZTO */
 function startCoreServices(): void {
     oncePerPage('core-services', () => {
         if (window.ZoeErrors) ZoeErrors.init('zoew');
@@ -122,7 +110,6 @@ function startCoreServices(): void {
     prefetchCustomerDataTableRowsIfConfigured();
 }
 
-/** ដំណាក់ ៣ ៖ ការងារតាមកាលកំណត់ — ដកវិញបានទាំងអស់ */
 function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(CUSTOMER_TABLE_CACHE_MS, () => {
         prefetchCustomerDataTableRowsIfConfigured();
@@ -145,7 +132,6 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     });
 }
 
-/** ដំណាក់ ៤ ៖ ម៉ាស៊ីនស្កេន Barcode */
 function startScanEngine(): void {
     oncePerPage('scan-engine', () => {
         (function waitForZXingThenInitScanEngine(deadline?: number) {
@@ -168,13 +154,6 @@ function startScanEngine(): void {
     });
 }
 
-/**
- * ដំណាក់ ៥ ៖ អន្តរកម្ម — កាយវិការ · PTR · ការលាក់របា · ម៉ាស៊ីនស្កេន hardware
- *
- * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ច្បាប់ ១១) ៖ `setupSwipeGestures` ·
- *    `setupChromeAutoHide` · `setupIOSPullToRefresh` ត្រូវហៅ **ម្តងក្នុងមួយ
- *    អាយុទំព័រ** តាមលំដាប់ដដែល — ពួកវាចាក់ listener ខាងក្នុងដែលដកវិញមិនបាន។
- */
 function startInteractions(): void {
     oncePerPage('interactions', () => {
         setupHardwareScanner();
@@ -191,7 +170,6 @@ function startInteractions(): void {
     });
 }
 
-/** ដំណាក់ ៦ ៖ ការបិទម៉ឺនុយ/ប្រអប់ពេលចុចខាងក្រៅ · Escape */
 function startGlobalDismissals(scope: LifecycleScope): void {
     scope.listen(document, 'click', (e) => {
         dismissGlobalMoreMenuOutside(e);

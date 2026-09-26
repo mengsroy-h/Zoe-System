@@ -109,7 +109,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_MONTHLY_REVENUE: readAppConst('DB_LISTENER_KEY_MONTHLY_REVENUE'),
         STATS_DAILY_VIEW_KEYS: [readAppConst('DB_LISTENER_KEY_DAILY_REVENUE'), readAppConst('DB_LISTENER_KEY_HISTORY'), readAppConst('DB_LISTENER_KEY_DELETED')],
         dbListenerPendingPaths: new Set(state.pending || []),
-        dbListenerFailedPaths: new Set(state.failed || []),
+        dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         MONTHLY_REPORT_MONEY_TOLERANCE: 0.005,
         collectedValueIsMeasurable: () => state.measurable !== false,
         getFormattedDate: () => '2026-09-30',

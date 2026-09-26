@@ -16,7 +16,6 @@ export interface BarcodeListRow {
     closed: boolean;
 }
 
-/** បញ្ជីកញ្ចប់ក្នុងជួរដេកមួយ (ប្រអប់ «📦 បញ្ជី»)។ */
 export function BarcodeListContainer() {
     useStore(uiState);
     const rows = uiState.viewListView as BarcodeListRow[] | null;

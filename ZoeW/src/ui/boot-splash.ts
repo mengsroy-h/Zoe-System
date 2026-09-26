@@ -18,15 +18,6 @@ export function hideBootSplash() {
     }, BOOT_REVEAL_CLEANUP_MS);
 }
 
-/**
- * ផ្លូវបម្រុងពេល boot ជាប់ (ឧ. chunk យឺត) ៖ បន្ទាប់ពី ៦ វិនាទី ផ្ទាំងបើកត្រូវ
- * រសាត់ចេញដោយខ្លួនឯង ដើម្បីកុំឲ្យអ្នកប្រើជាប់មុខផ្ទាំងបើកជារៀងរហូត។
- *
- * ⛔ **ជាន់តែមួយ** (React) ៖ ផ្ទាំងជារបស់ React ហើយកើតតែក្រោយ mount ➜ bundle ដួល =
- *    គ្មានផ្ទាំង (មិនមែនផ្ទាំងជាប់)។ `boot-flags.js` របស់ ZoeW ដើមមានជាន់ទី ២ ព្រោះផ្ទាំង
- *    ដើមជា markup ថេរក្នុង `index.html` — ផ្ទាំងនោះលែងមាន។ state ដឹង ➜ `hideBootSplash()`
- *    ក្រោយមកមិនលេងចលនា reveal លើផ្ទាំងដែលរសាត់រួច (ដូចដើម)។
- */
 export function armBootSplashFallback() {
     setTimeout(() => {
         if (viewState.bootSplashPhase !== 'shown') return;
@@ -45,9 +36,6 @@ export function revealAppAfterBoot() {
 }
 
 export function showUpdateAvailableBanner() {
-    // ⛔ ច្រកទ្វារ idempotent ដើមគឺវត្តមាននៃធាតុ `#zoeUpdateBanner` ➜ ទង់
-    //    នេះជំនួសវា **ទិសទាំង ២** ៖ ហៅ ២ ដង ➜ របា ១; ចុច ✕ ➜ ការហៅ
-    //    បន្ទាប់បង្ហាញវិញ។
     if (uiState.updateBannerOpen) return;
     uiState.updateBannerOpen = true;
 }

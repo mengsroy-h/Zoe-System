@@ -7,7 +7,6 @@ import path from 'node:path';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
-/** chunk តែមួយដែលផ្ទុក plugin native ទាំងអស់ (មើល `manualChunks`) */
 const NATIVE_CHUNK = 'native-plugins';
 const NATIVE_CHUNK_RE = new RegExp('^\\./assets/' + NATIVE_CHUNK + '-[^/]+\\.js$');
 
@@ -35,10 +34,6 @@ function walk(dir: string, base = dir): string[] {
     return out;
 }
 
-/**
- * ⛔ CORE_SHELL ក្នុង App ចាស់ត្រូវសរសេរដោយដៃ ➜ ឯកសារថ្មីដែលភ្លេចដាក់
- * ធ្វើឲ្យការស្កេនស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ។ ទីនេះវា **ដេរីវេពី build ពិត**។
- */
 function serviceWorkerPlugin(): Plugin {
     let outDir = 'dist';
     return {
@@ -50,14 +45,8 @@ function serviceWorkerPlugin(): Plugin {
         async closeBundle() {
             const dist = path.resolve(ROOT, outDir);
             if (!existsSync(dist)) return;
-            // ⛔ `.map` មិនចូល cache ៖ វាធំ (រាប់ MB) ហើយអ្នកប្រើមិនដែលទាញវា
-            //    — មានតែ devtools ទេដែលសុំ ➜ ការដាក់វាក្នុងសំបក ស៊ីកូតា។
-            // ⛔ chunk របស់ plugin native (Capacitor) មិនចូល cache ៖ web មិនដែល
-            //    ផ្ទុកវា (`import()` តែលើ native) ហើយលើ native ឯកសារទាំងអស់
-            //    ស្ថិតក្នុង APK រួចហើយ ➜ Service Worker មិនត្រូវចុះឈ្មោះសោះ។
             const emitted = walk(dist).filter((p) => p !== './sw.js' && !p.endsWith('.map') && !NATIVE_CHUNK_RE.test(p));
 
-            // សំបកស្នូល ៖ អ្វីដែល App **មិនអាចដើរដោយគ្មាន** (atomic addAll)
             const core = emitted.filter((p) =>
                 p === './index.html' ||
                 p === './guide.html' ||
@@ -87,7 +76,6 @@ function serviceWorkerPlugin(): Plugin {
             mkdirSync(dist, { recursive: true });
             writeFileSync(path.join(dist, 'sw.js'), result.outputFiles[0].text);
 
-            // manifest.json ៖ កំណែដេរីវេពី APP_VERSION ពិត (កុំចាក់ literal ២ កន్లែង)
             const manifestPath = path.join(dist, 'manifest.json');
             const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
             manifest.version = readAppVersion();
@@ -96,13 +84,6 @@ function serviceWorkerPlugin(): Plugin {
     };
 }
 
-/**
- * ⛔ build វាស់តែប៉ុណ្ណោះ (`VITE_EXPOSE_GLOBALS=1`) — **មិនដែលចូលផលិតកម្ម**។
- * App ដើមជា script សកល ➜ checker ជំនួស `window.fetchWithTimeout = stub` ហើយការហៅ **ខាងក្នុង** ក៏ឆ្លង stub នោះដែរ។
- * ក្នុង ESM ការហៅខាងក្នុងឆ្លង binding របស់ module មិនមែន `window` ➜ stub គ្មានឥទ្ធិពល ➜ checker វាស់ «០ ការហៅ»។
- * ➜ module នីមួយៗទទួល `__auditRebind(name, value)` ដែលសរសេរ binding នៃ `export function` ឡើងវិញ (ESM live binding ៖
- *    អ្នក import ទាំងអស់ និងការហៅក្នុង module ឃើញតម្លៃថ្មី) ហើយ `expose-globals.ts` ភ្ជាប់វាទៅ setter នៃ `window.<name>`។
- */
 const AUDIT_REBIND_RE = /[\\/]src[\\/](core|domain|features|services|ui|app[\\/]behaviors)[\\/].*\.ts$|[\\/]src[\\/]app[\\/](lifecycle[\\/]layers|refs|flush)\.ts$/;
 
 function auditRebindPlugin(): Plugin {
@@ -140,28 +121,15 @@ export default defineConfig({
         emptyOutDir: true,
         assetsInlineLimit: 0,
         cssCodeSplit: false,
-        // ⛔ minifier CSS ជា esbuild (មិនមែន Lightning CSS លំនាំដើម) ៖ Lightning CSS រៀបលំដាប់ declaration
-        //    ឡើងវិញ និងប្តូរទម្រង់តម្លៃ ក្នុង CSS ដែលគ្រប PTR · ចលនាផ្ទាំង · safe-area — ហើយ checker CSS/ប្លង់
-        //    វាស់ CSS **ប្រភព** (`scripts/build-audit.mjs`) មិនមែន CSS ដែល minify ➜ ការប្តូរនោះគ្មានអ្នកវាស់។
         cssMinify: 'esbuild',
         sourcemap: false,
-        // ⛔ CSP គ្មាន 'unsafe-inline' ➜ polyfill ដែល Vite ចាក់ជា inline script
-        //    ត្រូវបិទ បើមិនដូច្នេះ browser បដិសេធវាស្ងាត់ៗលើផលិតកម្ម។
         modulePreload: { polyfill: false },
         rolldownOptions: {
             output: {
-                // ⛔ group មួយចាប់ **dependency** របស់ម៉ូឌុលដែលវាចាប់ផង (`includeDependenciesRecursively`)
-                //    ➜ ការបែងចែកត្រូវសម្រេចដោយ `priority` មិនមែនលំដាប់ `if` ទេ។
                 codeSplitting: {
                     groups: [
-                        // ⛔ helper `__vitePreload` ត្រូវមាន chunk ផ្ទាល់ខ្លួន ហើយ priority ខ្ពស់ជាងគេ ៖
-                        //    plugin Capacitor ផ្ទុកផ្នែក web របស់វាតាម `import()` ➜ helper ជា dependency របស់វា ➜ បើអត់
-                        //    វាធ្លាក់ចូល chunk native ➜ `index` import chunk នោះដោយ **static** ➜ web ផ្ទុកវា
-                        //    គ្រប់ពេល ហើយក្រៅបណ្តាញ App ចាប់ផ្តើមមិនកើត (chunk នោះមិននៅក្នុង cache)។
                         { name: 'preload-helper', test: /vite[\\/]preload-helper/, priority: 3 },
                         { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 2 },
-                        // ⛔ plugin native ផ្ទុកតាម `import()` តែលើ Android ➜ ប្រមូលវាចូល chunk តែមួយ
-                        //    ដែល Service Worker រំលង (web មិនធំឡើង)។
                         { name: NATIVE_CHUNK, test: /node_modules[\\/]@(capacitor|capgo)[\\/]|[\\/]src[\\/]platform[\\/]native-biometric/, priority: 1 }
                     ]
                 }

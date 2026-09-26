@@ -81,6 +81,7 @@ function makeWorld() {
     vm.runInContext(`
         var dbListenerPendingPaths = new Set();
         var dbListenerFailedPaths = new Set();
+        var dbListenerReportedFailures = new Set();
         var dbListenersFailed = false;
         var dbListenerOutageNoticeShown = false;
         var dbListenerProgressAt = 0;

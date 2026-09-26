@@ -97,7 +97,7 @@ function buildSandbox(state) {
         DB_LISTENER_KEY_MONTHLY_REVENUE: readKey('DB_LISTENER_KEY_MONTHLY_REVENUE', 'monthlyRevenue'),
         VIEW_NOT_MEASURABLE_TEXT: readKey('VIEW_NOT_MEASURABLE_TEXT', '\u0001none\u0001'),
         dbListenerPendingPaths: new Set(state.pending || []),
-        dbListenerFailedPaths: new Set(state.failed || []),
+        dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         getFormattedDate: () => '2026-09-30',
         openModalHelper: () => {},
         document: { getElementById: () => null },

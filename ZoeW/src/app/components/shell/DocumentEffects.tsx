@@ -5,7 +5,6 @@ import { useStoreValue } from '../../hooks/useStore';
 
 let capturedBaseTitle: string | null = null;
 
-/** ចំណងជើងដើមរបស់ document (`<title>` ក្នុង `index.html`) */
 export function documentBaseTitle(): string {
     if (capturedBaseTitle === null) capturedBaseTitle = document.title;
     return capturedBaseTitle;
@@ -17,24 +16,12 @@ function useBodyClass(className: string, on: boolean): void {
     }, [className, on]);
 }
 
-/**
- * អថេរ CSS លើ `<html>` ពី state (`measureAppChromeSize()`) ។ ⛔ `''` = មិនទាន់វាស់ ➜ មិនសរសេរ
- * (CSS ប្រើលំនាំដើម `:root`) · ⛔ មិនដកវិញ ដូចដើម (តម្លៃចុងក្រោយនៅដដែល)។
- */
 function useHtmlVar(name: string, value: string): void {
     useLayoutEffect(() => {
         if (value) document.documentElement.style.setProperty(name, value);
     }, [name, value]);
 }
 
-/**
- * ធាតុដែលនៅ **ក្រៅ** root របស់ React (`<html>` · `<body>` · `document.title`) ក៏គូរពី
- * state ដែរ ៖ component នេះមិនគូរអ្វីទេ — វាគ្រាន់តែធ្វើឲ្យ `<body>` ស៊ីនឹង
- * ឃ្លាំង ក្នុង `useLayoutEffect` (មុនការគូរលើអេក្រង់)។
- *
- * ⛔ វាជាកន្លែង **តែមួយ** ដែលប៉ះ `<html>` · `document.body` · `document.title` ក្នុង App —
- *    កូដមុខងារសរសេរតែ state។
- */
 export function DocumentEffects() {
     const scrollLocked = useStoreValue(uiState, (s) => s.isModalOpen);
     const chromeHidden = useStoreValue(uiState, (s) => s.chromeHidden);

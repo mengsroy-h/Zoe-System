@@ -113,8 +113,6 @@ export function setupTrackCapabilities(stream) {
         viewState.cameraZoomRange = { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 };
         let settings: any = {};
         try { settings = scanState.currentVideoTrack.getSettings(); } catch (e) {}
-        // ⛔ ព្រំដែនថ្មីត្រូវចុះ DOM **មុន** កំណត់តម្លៃ — បើអត់ browser clamp តម្លៃ
-        //    តាមព្រំដែនចាស់ (១..១) ➜ zoom ចាប់ផ្តើមនៅ ១ ជានិច្ច។
         commitNow();
         setFieldValue('zoomSlider', String(settings.zoom || caps.zoom.min));
         viewState.cameraZoomDisplay = 'flex';

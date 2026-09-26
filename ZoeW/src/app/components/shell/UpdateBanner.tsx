@@ -1,13 +1,6 @@
 import { uiState } from '../../../core/state';
 import { useStoreValue } from '../../hooks/useStore';
 
-/**
- * របាដាស់តឿន «មានកំណែថ្មី» ។
- *
- * ⛔ ច្រកទ្វារភាព idempotent នៃដើមគឺ `byId('zoeUpdateBanner')` — ទង់
- *    `uiState.updateBannerOpen` ជំនួសវា **ទិសទាំង ២** ៖ ហៅ ២ ដង ➜ របា ១;
- *    ចុច ✕ ➜ លុបចេញ ➜ ការហៅបន្ទាប់បង្ហាញវិញ (ដូចដើមបេះបិទ)។
- */
 export function UpdateBanner() {
     const open = useStoreValue(uiState, (s) => s.updateBannerOpen);
     if (!open) return null;

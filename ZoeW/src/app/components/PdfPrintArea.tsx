@@ -9,12 +9,6 @@ export interface PdfTableView {
     footer: React.ReactNode;
 }
 
-/**
- * តំបន់បោះពុម្ព (មើលមិនឃើញលើអេក្រង់ — `.print-only`)។
- *
- * ⛔ jsPDF shape អក្សរខ្មែរមិនបាន ➜ ការនាំចេញ PDF ប្រើ print-to-PDF របស់
- *    browser។ កុំនាំ jsPDF មកវិញសម្រាប់អក្សរខ្មែរ។
- */
 export function PdfPrintArea() {
     useStore(uiState);
     const view = uiState.pdfExportView as PdfTableView | null;

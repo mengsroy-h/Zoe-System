@@ -9,12 +9,15 @@
     const REDACT_MAX_DEPTH = 12;
     const REDACT_MAX_NODES = 5000;
     const REDACT_MAX_JSON_CHARS = 64 * 1024;
+    const REPEAT_WINDOW_MS = 10 * 60 * 1000;
+    const REPEAT_KEYS_MAX = 200;
 
     let loadPromise = null;
     let sentryReady = false;
     let initGeneration = 0;
     let lateInitRequest = null;
     const queuedEvents = [];
+    const repeatSeen = new Map();
 
     function loadSentrySdk() {
         if (global.Sentry) return Promise.resolve(global.Sentry);
@@ -348,7 +351,38 @@
         }
     }
 
+    function repeatSignature(err, extra) {
+        let message = '';
+        try { message = String((err && (err.message || err)) || ''); } catch (e) {}
+        const context = extra && extra.context !== undefined ? String(extra.context) : '';
+        const zone = extra && typeof extra.zone === 'string' ? extra.zone : '';
+        return zone.slice(0, 32) + '|' + context.slice(0, 160) + '|' + message.slice(0, 300);
+    }
+
+    function admitRepeat(err, extra) {
+        let key;
+        try { key = repeatSignature(err, extra); } catch (e) { return { suppressed: 0 }; }
+        const now = Date.now();
+        const seen = repeatSeen.get(key);
+        if (seen) {
+            const age = now - seen.at;
+            if (age >= 0 && age < REPEAT_WINDOW_MS) {
+                seen.suppressed++;
+                return null;
+            }
+            repeatSeen.delete(key);
+        } else if (repeatSeen.size >= REPEAT_KEYS_MAX) {
+            const oldest = repeatSeen.keys().next();
+            if (!oldest.done) repeatSeen.delete(oldest.value);
+        }
+        repeatSeen.set(key, { at: now, suppressed: 0 });
+        return { suppressed: seen ? seen.suppressed : 0 };
+    }
+
     function capture(err, extra) {
+        const admitted = admitRepeat(err, extra);
+        if (!admitted) return;
+        if (admitted.suppressed) extra = Object.assign({}, extra && typeof extra === 'object' ? extra : {}, { suppressedRepeats: admitted.suppressed });
         if (sentryReady && global.Sentry && typeof global.Sentry.captureException === 'function') {
             sendToSentry(err, extra);
             return;

@@ -3,7 +3,6 @@ import { onAct } from '../actions';
 import { useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
 
-/** របា Tab ខាងក្រោម — `active` តាម `uiState.currentAppPage` */
 export function PageTabBar() {
     const page = useStoreValue(uiState, (s) => s.currentAppPage);
     return (

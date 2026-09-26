@@ -1,7 +1,6 @@
 import { ZTO_LIST_PREVIEW_ROWS, ztoListSkipText } from '../../../features/zto-list-sync';
 import type { ZtoListGroup } from './ZtoListSyncBody';
 
-/** ⛔ អត្ថបទ meta ដដែលនឹង `ztoListGroupHtml()` ដើម — កុំសរសេររូបមន្តទី ២។ */
 export function ztoListGroupModel(title: string, rows: any[], tone: string): ZtoListGroup {
     const shown = rows.slice(0, ZTO_LIST_PREVIEW_ROWS);
     return {

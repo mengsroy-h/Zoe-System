@@ -166,6 +166,7 @@ bash audit-tools/emu/rules.sh
 | `ledger-clamp-symmetry-test.js` | «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាសពិត — ការ clamp ត្រឹម 0 មិនត្រូវបង្កើតចំណូល | `CLAMPSYM_APP_DIR` |
 | `emu/ledger-revert-emu-test.js` | ដដែល តែវាស់លើ **RTDB emulator ពិត ជាមួយ rules ពិត** (មិនមែន stub) | `LEDGEREMU_APP_DIR` |
 | `ledger-failed-apply-revert-test.js` | ការសរសេរ ledger **ធ្លាក់** រួចការដកវិញ **ជោគជ័យ** ➜ មិនត្រូវដកលេខដែលមិនដែលត្រូវបូក | `LEDGERFAIL_APP_DIR` |
+| `tx-outcome-test.js` | transaction ដែល SDK បដិសេធដោយ `disconnect` អាន **ចុះលើ server រួច** ➜ wrapper `runTransaction` សម្រេចលទ្ធផលពិតដោយអាន server (REST) · ការសម្អាតមិនបាត់ធុងសំរាម · ledger មិនដក ២ ដង · `disconnect` គ្មានគ្រោះមិនផ្ញើ Sentry money | `TXOUTCOME_APP_DIR` |
 | `monthly-ledger-agreement-test.js` | `monthly[M]` ត្រូវស្មើផលបូក `daily[d ∈ M]` — clamp ក្នុងមួយធុង · ការសរសេរធ្លាក់ខាងម្ខាង · សាលក្រមរបស់ខែដែល node កាត់ចោល · float ឆៅក្នុងការស្តារ ⛔ **បូក ៖ ការស្តារត្រូវបូកត្រឡប់គ្រប់វាល (COD·DOD·count) ចូលទាំងធុងថ្ងៃ និងធុងខែ** | `MONTHLYAGREE_APP_DIR` |
 | `revenue-rules-clamp-test.js` | ⛔ តម្លៃដែល **rules ពិតបដិសេធ** ត្រូវ clamp មុនសរសេរ · revert ត្រូវដក **delta ដែល server អនុវត្ត** (ចំណូល **និង** ស្ថិតិយក) | `REVCLAMP_APP_DIR` |
 | `duplicate-money-test.js` | barcode ស្ទួន ➜ លុយបូកស្ទួន — ការរក្សាទុកត្រូវការសាលក្រម `'claimed'` ពិតពី server | `DUPMONEY_APP_DIR` |
@@ -300,6 +301,7 @@ bash audit-tools/emu/rules.sh
 | `license-record-race-test.js` | សាលក្រម License ចាស់មិនលុប/សរសេរជាន់ activation ថ្មី ឬស្តារ record ដែលបានលុប; ECDSA ពិត និងវគ្គពីរចែក storage | `LICRACE_APP_DIR` |
 | `license-seat-test.js` | **Key ១ ➜ ឧបករណ៍តាមពិដាន** ៖ ពិដានលំនាំដើម ១ ➜ ឧបករណ៍ទី ២ បដិសេធ · ពិដាន ២ ➜ ឧបករណ៍ទី ២ ត្រូវបាន តែទី ៣ បដិសេធ · ការប្រណាំងរំកិលទៅ slot ទំនេរ · ឧបករណ៍ដដែល Activate ម្តងទៀតបាន · អានកៅអីមិនបាន ➜ **មិនលុប** record | `LICSEAT_APP_DIR` |
 | `emu/license-seat-rules-test.js` | ច្បាប់ដដែល តែវាស់លើ **rules ពិត** របស់ License Project (RTDB emulator) ៖ អ្នកសម្រេចត្រូវឈរនៅ server មិនមែន client · ការដោះឧបករណ៍ជារបស់ admin តែម្នាក់ | `LICSEATEMU_APP_DIR` · `LICSEATEMU_PORT` |
+| `emu/tx-disconnect-emu-test.js` | ថ្នាក់ `disconnect` វាស់លើ **SDK Firebase ពិត** (កំណែដដែលនឹង CDN) · RTDB emulator ពិត · proxy TCP ៖ ack បាត់ក្រោយ server អនុវត្ត ➜ SDK បដិសេធ `disconnect` ខណៈ server ប្រែរួច · wrapper ពិតរបស់ App សម្រេចត្រូវទាំង ២ ករណី | `TXEMU_APP_DIR` · `TXEMU_PORT` |
 | `keygen-pin-flow-test.js` · `keygen-session-security-test.js` | ផ្លូវ PIN និង session របស់ ZoeKeyGen; Load Signing Key កណ្ដាល Generate មិនចាក់សោប៊ូតុងជាប់ | `KEYGEN_APP_DIR` |
 | `keylist-consistency-test.js` | meta ចាស់/ថ្មី merge ត្រឹមត្រូវ; ស្លាកឧបករណ៍មានសាលក្រម ៣ (ចងរួច · ទំនេរ · **ពិនិត្យមិនបាន**) ហើយលេខសម្គាល់ឧបករណ៍ពេញមិនឡើងដល់ DOM | `KEYLIST_APP_DIR` |
 | `auth-recovery-test.js` | ការស្ដារ session ពេលបណ្ដាញយឺត (ZoeKeyGen) | `AUTH_APP_DIR` |
@@ -346,7 +348,7 @@ bash audit-tools/emu/rules.sh
 | `export-cells-test.js` | លេខទូរស័ព្ទ/Barcode ជា TEXT ក្នុង XML · CSV មិនក្លាយជារូបមន្ត | — |
 | `monthly-report-test.js` | របាយការណ៍ខែ ៖ មូលដ្ឋានតែមួយ (ថ្ងៃ) · អានសុទ្ធសាធ · រូបរាងឆៅ · ថ្ងៃជា TEXT ក្នុង Excel ⛔ **បូក ៖ គ្រប់ជួរឈរនាំចេញត្រូវផ្ទុកវាលរបស់របាយការណ៍ដែលចំណងជើងសន្យា** (ដេរីវេពីចំណងជើង) | `MREPORT_APP_DIR` |
 | `listener-pending-key-test.js` | កូនសោដែលសួរ ត្រូវជាកូនសោដែលដាក់ចូល ⛔ និង listener នីមួយៗត្រូវរាយការណ៍ **កូនសោរបស់ខ្លួន** (`noteDbListenerAlive` / `handleDbListenerError` ត្រូវផ្គូផ្គង `listenerRefs`) | `PENDINGKEY_APP_DIR` |
-| `comments.js` · `strip-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment | `STRIP_APP_DIR` |
+| `comments.js` · `strip-comments.js` · `ts-comments.js` | កូដ App ដែល ship ត្រូវគ្មាន comment — JS/CSS ដែល ship ដោយផ្ទាល់ · ប្រភព ZoeW React (`src/**` · Netlify Function · config ៖ `ts-comments.js` ប្រើ TypeScript AST ហើយផ្ទៀងផ្ទាត់ថា esbuild compile មុន/ក្រោយដូចគ្នា) · HTML ដែល ship | `COMMENTS_APP_DIR` · `STRIP_APP_DIR` |
 | `trimws.js <files>` | លុប trailing whitespace | — |
 
 ### ៧. Allowlist — កុំបន្ថែមដោយគ្មានហេតុផល

@@ -108,7 +108,7 @@ function tab(suffix, hooks) {
         dailyRevenueData: { [DATE]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         monthlyRevenueData: { [MONTH]: { codDollar: 0, dodDollar: 0, totalCount: 0 } },
         scanHistory: [], deletedItems: [], scanRemoveInFlight: null, pendingRestoreId: null,
-        activeRestoreClaims: new Map(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(),
+        activeRestoreClaims: new Map(), cleanupInFlight: new Set(), staleRestoreMarkerSweeps: new Set(), dbListenerPendingPaths: new Set(), dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
         activeParentItemId: 'id_restore', activeEditingBarcode: 'RESTORE_BC',
         confirm: () => true, alert: (message) => toasts.push(message),
         appLocalStore: (function () { const d = {}; return { getItem: (k) => (Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } }; })()

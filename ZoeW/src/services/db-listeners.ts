@@ -12,6 +12,8 @@ import { debouncedRenderAfterHistorySync } from './network';
 import { rawSnapshotToItemList } from '../ui/modal-stack';
 import { refreshLiveToasts, showToast } from '../ui/toast';
 
+export const dbListenerReportedFailures = new Set();
+
 export function detachDatabaseListeners() {
     firebaseState.dbListenerGeneration++;
     if (!firebaseState.fb) return;
@@ -46,6 +48,7 @@ export function emptyViewMessage(pathKeys, emptyText) {
 export function noteDbListenerAlive(pathKey) {
     const wasPending = dbListenerPendingPaths.delete(pathKey);
     dbListenerFailedPaths.delete(pathKey);
+    dbListenerReportedFailures.delete(pathKey);
     flushPendingRegistryReleases();
     if (wasPending) {
         firebaseState.dbListenerProgressAt = Date.now();
@@ -97,6 +100,7 @@ export function resetDbListenerHealthState() {
     firebaseState.dbListenerOutageNoticeShown = false;
     dbListenerPendingPaths.clear();
     dbListenerFailedPaths.clear();
+    dbListenerReportedFailures.clear();
     firebaseState.dbListenerPendingSeen = 0;
     firebaseState.dbListenerProgressAt = 0;
     firebaseState.lastDbListenerAttemptAt = 0;
@@ -112,7 +116,11 @@ export function retryFailedDbListenersNow() {
 
 export function handleDbListenerError(err, pathKey) {
     console.error('Firebase listener error:', err);
-    if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
+    const reportKey = pathKey ? String(pathKey) : '*';
+    if (!dbListenerReportedFailures.has(reportKey)) {
+        dbListenerReportedFailures.add(reportKey);
+        if (window.ZoeErrors) ZoeErrors.capture(err, { context: 'Firebase listener error' });
+    }
     if (pathKey) dbListenerFailedPaths.add(pathKey);
     firebaseState.dbListenersFailed = true;
     renderConnectionStatus();

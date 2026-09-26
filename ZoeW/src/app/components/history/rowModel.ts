@@ -4,7 +4,6 @@ import { formatScanStamp } from '../../../core/timezone';
 export interface HistoryRowAction {
     action: string;
     args: string[];
-    /** `data-self` / `data-evt` ដូច `readActionArgs()` ដើម */
     self?: boolean;
     evt?: boolean;
 }
@@ -36,12 +35,6 @@ export interface HistoryRowModel {
     id: string;
 }
 
-/**
- * តក្កវិជ្ជានៃជួរដេក — **ដកចេញពី `buildHistoryRowHtml()` ដោយមិនប្តូរ
- * រូបមន្តណាមួយ**។ ការបំបែក *ទិន្នន័យ* ចេញពី *ការគូរ* ធ្វើឲ្យវាស់បាន ៖
- * `tests/history-row-parity.test.ts` រត់ទាំងផ្លូវចាស់ និងថ្មីលើទិន្នន័យ
- * ដដែល រួចប្រៀបធៀបលទ្ធផល។
- */
 export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, needsRecall: boolean): HistoryRowModel {
     let rowNumClass = '';
     let rowNumLabel = '';

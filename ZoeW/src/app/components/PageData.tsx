@@ -20,16 +20,11 @@ const FILTERS = [
 
 const debouncedPhoneSearch = onAct("debouncedSearchByPhone");
 
-/**
- * `input` របស់ប្រអប់ស្វែងរកលេខ ៖ ការណែនាំ **មុន** ការស្វែងរក (លំដាប់ដូចដើម ៖ listener
- * របស់ធាតុរត់មុន handler ដែលផ្ទេរតាម document)។
- */
 function onPhoneSearchInput(e: FormEvent<HTMLInputElement>) {
     showPhoneSuggestions();
     debouncedPhoneSearch(e);
 }
 
-/** ប៊ូតុងតម្រងថ្ងៃ ៖ `active` តាម `uiState.currentFilterMode` (ថ្ងៃផ្សេង ➜ គ្មានប៊ូតុងណា active) */
 function DateFilterButtons() {
     const mode = useStoreValue(uiState, (s) => s.currentFilterMode);
     return (
@@ -48,7 +43,6 @@ function DateFilterButtons() {
     );
 }
 
-/** តួលេខ «គ្រប់គ្រងប្រចាំថ្ងៃ» */
 function DataSummary() {
     const d = useStoreValue(viewState, (s) => s.dataSummary);
     const small = { fontSize: "calc(10 * var(--fs-unit))", color: "var(--text-muted)", margin: "0 2px" };
@@ -106,7 +100,6 @@ function DataSummary() {
     );
 }
 
-/** ទំព័រ ១ — ទិន្នន័យ */
 export function PageData() {
     const active = useStoreValue(uiState, (s) => s.currentAppPage === 'data');
     const panel = useStoreFields(uiState, ['dataPanelCollapsed', 'dataPanelSearchFocus']);

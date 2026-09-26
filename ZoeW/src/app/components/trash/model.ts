@@ -38,7 +38,6 @@ export interface TrashView {
     overflow: number;
 }
 
-/** ⛔ រូបមន្តដដែលនឹង `renderTrashSummary()` ដើម — កុំសរសេរឡើងវិញ។ */
 export function buildTrashSummaryModel(groups: any[], query: string): TrashSummaryModel {
     const deducted = { total: 0, count: 0 };
     const kept = { total: 0, count: 0 };
@@ -60,7 +59,6 @@ export function buildTrashSummaryModel(groups: any[], query: string): TrashSumma
     };
 }
 
-/** ⛔ រូបមន្តដដែលនឹង `trashGroupRowHtml()` ដើម។ */
 export function buildTrashRowModel(group: any, expandedKeys: Set<any>): TrashRowModel {
     const meta = TRASH_REASON_META[group.reason] || TRASH_REASON_META.delete;
     const expanded = expandedKeys.has(group.key);

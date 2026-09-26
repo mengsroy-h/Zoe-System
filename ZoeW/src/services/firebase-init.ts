@@ -7,6 +7,7 @@ import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from
 import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
 import { armLateFirebaseSdkListener, resetFirebaseSdkRetryHealth, scheduleFirebaseSdkRetry } from './firebase-sdk';
 import { preconnectToDatabaseHost, waitForFirebaseSDK } from './network';
+import { withTransactionOutcomeResolution } from './tx-outcome';
 import { showToast } from '../ui/toast';
 
 export async function initFirebase() {
@@ -22,7 +23,7 @@ export async function initFirebase() {
     try {
         firebaseState.firebaseConfig = JSON.parse(savedConfig);
         preconnectToDatabaseHost(firebaseState.firebaseConfig);
-        firebaseState.fb = await waitForFirebaseSDK();
+        firebaseState.fb = withTransactionOutcomeResolution(await waitForFirebaseSDK());
         firebaseState.firebaseSdkUnavailable = false;
         firebaseState.sdkUnavailableNoticeShown = false;
         resetFirebaseSdkRetryHealth();

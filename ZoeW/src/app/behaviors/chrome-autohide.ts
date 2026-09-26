@@ -11,12 +11,6 @@ export function appChromeElements() {
     };
 }
 
-/**
- * វាស់កម្ពស់របា ➜ អថេរ CSS លើ `<html>` (`--chrome-top` · `--tabbar-height` ·
- * `--page-extension` · `--chrome-bottom`) ជា **state** ➜ `DocumentEffects` សរសេរវា។
- * ⛔ `commitNow()` ចុងក្រោយ ៖ អ្នកហៅ (និងអ្នកវាស់) អាន layout ភ្លាមក្រោយហៅ (ដូចដើម)។
- * ⛔ តម្លៃ ០ មិនសរសេរ (`--chrome-top` · `--chrome-bottom`) ដូចដើម ➜ CSS រក្សាតម្លៃមុន។
- */
 export function measureAppChromeSize() {
     const { navbar, tabbar } = appChromeElements();
     if (navbar) {

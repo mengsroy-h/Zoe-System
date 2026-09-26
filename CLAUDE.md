@@ -99,8 +99,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.5` (`zoew-v232`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.3` (`zoekeygen-v102`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.6` (`zoew-v233`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.4` (`zoekeygen-v103`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
 > កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
@@ -160,9 +160,12 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    ដែលផ្ទៀងផ្ទាត់ថាការសម្អាត **មិនប្តូរកូដ** (JS៖ diff token-for-token;
    CSS៖ diff declaration stream) ហើយបោះបង់ឯកសារណាដែលមិនប្រាកដ។
    **លើកលែង** ៖ `audit-tools/` · `*/test.js` · `vendor/` · `qrcode.js`។
-   ⛔ **ZoeW React** ៖ ច្បាប់គ្របឯកសារដែល ship **ដោយផ្ទាល់** (`ZoeW/public/*.js`) ចំណែក
-   `ZoeW/src/**` ត្រូវ Vite បង្រួម (minify ➜ comment មិនចេញដល់ browser) ➜ comment ក្នុង `src/**`
-   អនុញ្ញាត តែត្រូវពន្យល់ *ហេតុផលនៃកូដ* ប៉ុណ្ណោះ — ⛔ **មិនមែនប្រវត្តិកំហុស** (ច្បាប់ ៩)។
+   ⛔ **ZoeW React ក៏គ្មាន comment ដែរ** (សំណើម្ចាស់គម្រោង) ៖ `ZoeW/public/*.js` · **`ZoeW/src/**`** (TS/TSX/CSS) ·
+   `ZoeW/netlify/functions/*.js` · config (`vite.config.mts` · `capacitor.config.ts` · `eslint.config.mjs` · …) · និង
+   **HTML ដែល ship** (`index.html` ទាំង ២ App · `guide.html`)។ `strip-comments.js` សម្អាត React តាម
+   `ts-comments.js` (TypeScript AST · ផ្ទៀងផ្ទាត់ថា **esbuild compile មុន/ក្រោយដូចគ្នាបេះបិទ** ➜ ខុស ➜ មិនប៉ះឯកសារ ·
+   `/// <reference …>` ជា directive ➜ រក្សា) ហើយ `comments.js` ធ្លាក់ពេល comment វិលមក។ ⛔ catch ទទេជាការលេបដោយចេតនា ➜
+   ESLint `no-empty` មាន `allowEmptyCatch` (កុំបន្ថែម comment ដើម្បីបំពេញវា)។
    ចំណេះដឹងត្រូវរស់នៅក្នុង **`CLAUDE.md`** (ច្បាប់) និង **`docs/HISTORY.md`**
    (ប្រវត្តិ) មិនមែនក្នុងកូដទេ។
 ៤. **`license-verify.js` និង `error-reporting.js` ត្រូវតែ byte-identical
@@ -296,6 +299,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ការ clamp ត្រឹម 0 ↔ ការដកវិញ** | ⛔ «អនុវត្ត ➜ ដកវិញ» ត្រូវជាគូបញ្ច្រាស **ពិត** — ដកតាម delta ដែល *server អនុវត្ត* | `ledger-clamp-symmetry-test` · `emu/ledger-revert-emu-test` |
 | **ការដកវិញក្រោយ clamp** | ⛔ revert ត្រូវដក **delta ពិតដែលអនុវត្ត** មិនមែន delta ដែលស្នើ | `revenue-rules-clamp-test` |
 | **ការដកវិញក្រោយការអនុវត្តដែល *ធ្លាក់*** | ⛔ ច្បាប់ «ដកតាម delta ពិតដែលអនុវត្ត» (ជួរខាងលើ) អនុវត្តលើសាលក្រម **`null`** ដែរ ៖ `null` = «server មិនបានអនុវត្ត» ➜ **គ្មានអ្វីត្រូវដក** (⛔ កុំធ្លាក់ចុះទៅ delta របស់សតិ)។ ការដកវិញក្នុងសតិត្រូវ **idempotent** ព្រោះ `catch` របស់ commit ដក memory រួចហើយ | `ledger-failed-apply-revert-test` |
+| **transaction ៖ `disconnect` ↔ លទ្ធផលពិត** | ⛔ `disconnect` = «មិនដឹង» មិនមែន «មិនបានអនុវត្ត» ➜ `runTransactionResolved()` (wrapper លើ `fb` តែមួយ) អាន server តាម REST មុនបញ្ច្រាស · `applied` ➜ ជោគជ័យ · `unknown` ➜ មិនប៉ះលុយ + Sentry money · ការសម្អាតយឺតមិនសរសេរធុងសំរាមស្ទួន | `tx-outcome-test` · `emu/tx-disconnect-emu-test` (SDK ពិត) · `money-guardian-test` |
 | **ស្ថិតិយក ៖ អត្តសញ្ញាណ** | ⛔ រាប់តាម **សំណុំ barcode** (`pickedUpBarcodes`) — លេខទាំង ២ ជា **កញ្ចក់ដេរីវេ** មិនមែន counter | `pickup-barcode-identity-test` · `pickup-ledger-test` |
 | **ស្ថិតិយក ↔ កូនសោ registry** | ⛔ កូនសោ barcode ត្រូវជា `barcodeRegistryKey()` ដដែល — កូនសោ ២ រូបមន្ត = ការរាប់ស្ទួន | `pickup-ledger-test` |
 | **ស្ថិតិយក ↔ សាលក្រម server** | ⛔ ការសរសេរជា **ស្ថានភាព idempotent** — គ្មាននព្វន្ធលើ `packagesPickedUp` | `revenue-rules-clamp-test` · `money-guardian-test` |
@@ -349,6 +353,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | CSP | គ្មាន `on*=`; ធនធានផ្ទុកយឺតត្រូវឆ្លង CSP | `csp-enforced-test` · `csp-lazy-resource-test` |
 | XSS | រាល់តម្លៃចូល HTML ត្រូវ `sanitizeInput()` (**ទាំង ២ ទម្រង់**) | `html-sink-escaping` · `inline-handler-xss-test` |
 | ការលេចធ្លាយ secret | redaction ដើរលើ event ទាំងមូល | `secret-hygiene` |
+| **Sentry ៖ ព្យុះកំហុសដដែល** | ⛔ listener ដែលបដិសេធជាប់ៗ រាយការណ៍ **១ ដង/path/ការដាច់** (`dbListenerReportedFailures` ➜ លុបពេល path រស់វិញ) · `ZoeErrors.capture()` ដក event ដដែល (zone·context·message) ក្នុង ១០ នាទី (`suppressedRepeats` · fail-open) — App ទាំង ២ | `connection-recovery-test` · `sentry-load-race-test` |
 | **ការជូនដំណឹងពីកំហុស** | ⛔ alert rule ស្វែងរកបានតែលើ **tag** ➜ ផ្លូវលុយត្រូវផ្ញើ `zone: 'money'` | `money-guardian-test` · `sentry-load-race-test` |
 | DOM · state ក្រោយចាកចេញ | គ្មានទិន្នន័យអតិថិជនសល់ | `dom-hygiene` · `state-hygiene` · `setup-link-logout-test` |
 | PTR · ចលនាផ្ទាំង · រមូរ | ⛔ កុំប៉ះដោយគ្មានការស្នើ | `gesture-test` · `panel-motion-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` · `phone-search-swipe-test` |
@@ -537,6 +542,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **កញ្ចក់ «ចំណូលប្រចាំថ្ងៃ» ឃ្លាតពី ledger លើ *លំដាប់ចៃដន្យ*** ➜ អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា (💵 អានកញ្ចក់ · 📅 គណនា `ledger − open`) | `collected-mirror-fuzz-test.js` |
 
 | **ការទាញបញ្ជីពី ZTO** ៖ ការកំណត់ខុសសម្លាប់ការស្កេន · ជួរដេកបាត់ស្ងាត់ៗ · barcode ស្ទួនក្នុងទំព័រតែមួយ ➜ លុយបូកស្ទួន · ឈ្មោះ/អាសយដ្ឋានហូរមក browser · កូនសោ cache ប៉ះគ្នារវាងបញ្ជី និង barcode · ការសរសេរលេចចូលផ្លូវ «មើលជាមុន» | `zto-list-sync-test.js` |
+| **transaction បដិសេធ `disconnect` តែ server commit រួច** ➜ ការសម្អាតបាត់កញ្ចប់ពីទាំង ២ កន្លែង · ledger ដក ២ ដង | `tx-outcome-test.js` · `emu/tx-disconnect-emu-test.js` |
 | **ledger ៖ «អនុវត្ត ➜ ដកវិញ» លែងជាគូបញ្ច្រាស** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ | `ledger-clamp-symmetry-test.js` · **`emu/ledger-revert-emu-test.js`** (RTDB ពិត + rules ពិត) |
 | **ការសរសេរ ledger ធ្លាក់ ➜ ការដកវិញ *ជោគជ័យ*** ➜ ចំណូលកើតឡើងពីអាកាសធាតុ · សតិឃ្លាតពី server · ការកែទឹកប្រាក់បាត់ស្ងាត់ៗ | `ledger-failed-apply-revert-test.js` |
 | **ថ្នាក់លុយគ្មានអ្នកយាមដែល *ក្រហមពិត*** | `money-guardian-test.js` (mutation ៧ ➜ អ្នកយាមត្រូវក្រហម) |
@@ -1224,10 +1230,10 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 
 # 🌐 បណ្តាញ · Service Worker · License
 
-## ⛔ ការព្យួរ ≠ ការធ្លាក់ — របៀបបរាជ័យ ៣ ដាច់ដោយឡែក
+## ⛔ ការព្យួរ ≠ ការធ្លាក់ — របៀបបរាជ័យ ៥ ដាច់ដោយឡែក
 
 នេះជាថ្នាក់កំហុសដែលវិលមកម្តងហើយម្តងទៀតតាមទ្វារផ្សេងៗ (2.22.4 · 2.23.1 ·
-2.25.6 · 2.25.8)។ dependency អាចបរាជ័យក្នុងរបៀប **៤** ៖
+2.25.6 · 2.25.8 · 2.42.6)។ dependency អាចបរាជ័យក្នុងរបៀប **៥** ៖
 
 | របៀប | អ្វីកើតឡើង | អ្វីដែលត្រូវការ |
 |---|---|---|
@@ -1235,9 +1241,16 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | **អវត្តមាន** | `TypeError` **synchronous** | ការពិនិត្យវត្តមានជាមុន — `.catch()` **ចាប់មិនបាន** |
 | **ព្យួរ** | មិនឆ្លើយ មិនបដិសេធ | **ពិដានពេល** ដែល settle ដោយរចនាសម្ព័ន្ធ |
 | **យឺត តែជោគជ័យ** | ដោះ **ក្រោយ** ពិដាន | **ការងារក្រោយ commit ត្រូវរត់ពេលវាមកដល់** |
+| **បដិសេធ តែអនុវត្តរួច** | `runTransaction` reject `disconnect` ខណៈ server **commit រួច** (ack បាត់) | **អាន server ពិតសិន** មុនបញ្ច្រាស (`runTransactionResolved()`) |
 
 ច្បាប់ ៖
 
+- ⛔ **`disconnect` ≠ «មិនបានអនុវត្ត»** — SDK បដិសេធ transaction ដែលបានផ្ញើរួចដោយ `disconnect` ពេលការតភ្ជាប់ដាច់មុន ack
+  (វាស់លើ SDK ពិត + emulator ពិត ៖ server ប្រែរួច ខណៈ promise reject)។ ⛔ `fb.get()` មិនមែនភស្តុតាង (listener សកម្ម ➜ ឆ្លើយពី
+  cache)។ `withTransactionOutcomeResolution()` រុំ `fb` **ម្តងក្នុង `initFirebase()`** ➜ រាល់ `fb.runTransaction` (ចំណុចច្របាច់តែមួយ ⛔
+  មិនមែនកែ ៤០+ កន្លែងហៅ) អាន **REST ជាមួយ ID token** ប្រៀបនឹងតម្លៃដែលបានផ្ញើ/មុនផ្ញើ ៖ `applied` ➜ **ជោគជ័យ** (`txOutcome:
+  'applied'`) · `not-applied` ➜ បដិសេធដដែល · `unknown` ➜ បដិសេធ + Sentry `zone: 'money'` (១ ដង/path)។ ⛔ ការសម្អាតដែល commit
+  យឺតត្រូវពិនិត្យថា **ឧបករណ៍ផ្សេងមិនបានសរសេរធុងសំរាមរួច** (`cleanupClaimAccountedElsewhere()`) មុនសរសេរ/ដកលុយ។
 - **`dbOp(promise, msg)` ជាផ្លូវតែមួយ** សម្រាប់ការហៅ Firebase ដែលឈរខាងក្រោយ
   សោ (`withTimeout(…, DB_OP_TIMEOUT_MS)` = ១៥ វិ.)។ ⛔ គ្មាន `await
   fb.<dataOp>(…)` ដោយផ្ទាល់ទៀតទេ។ សំណួរត្រឹមត្រូវគឺ «**តើសោនេះអាចជាប់បានទេ?**»
@@ -1971,7 +1984,7 @@ Test៖ **`netlify-config-scope-test.js`** (២១ assertion; ធ្លាក់
 «CI បៃតងលើ GitHub» ជាការរង់ចាំដែលមិនចប់។ (`backup.yml` ជារឿងដាច់ដោយឡែក។)
 
 ```bash
-npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core (run-all build tree វាស់ពីវា)
+npm ci --prefix ZoeW          # ZoeW React ៖ vite · acorn · playwright-core · firebase (SDK ពិតសម្រាប់ emu/tx-disconnect)
 bash audit-tools/run-all.sh
 ```
 
@@ -1987,7 +2000,7 @@ bash audit-tools/run-all.sh
 `emu/license-seat-rules` មកជាមួយ 2.37.0) ➜ session ដែលរាប់តាមលេខរឹង
 សន្និដ្ឋានខុសថាមាន checker ១ ធ្លាក់ពិត។ `doc-scope-test` ចាក់សោវាឥឡូវនេះ។
 វាស់បាន (2026-09-11) ៖ ការធ្លាក់ចុះមាន **២ រូបរាង** ➜
-`emu/restore-deadlock` · `emu/ledger-revert` · `emu/license-seat-rules`
+`emu/restore-deadlock` · `emu/ledger-revert` · `emu/license-seat-rules` · `emu/tx-disconnect`
 ចេញ **`SKIPPED`** ត្រង់ៗ ចំណែក `emu/crud-rules-flow` និង
 `emu/restore-mutation` ចេញ **`PARTIAL PASS (3; SKIP …)`** / **`(1; SKIP …)`**។ ⛔ រូបរាងទី ២ ជា
 គ្រោះថ្នាក់ជាង ព្រោះវា **ផ្ទុកពាក្យ `PASS`** ➜ ងាយអានរំលងជាបៃតង ខណៈ

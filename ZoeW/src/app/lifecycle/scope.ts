@@ -1,17 +1,3 @@
-/**
- * «វិសាលភាព lifecycle» ៖ រាល់ listener · interval · ការរង់ចាំ `load` ដែលដំណាក់
- * boot បង្កើត ត្រូវចុះឈ្មោះទីនេះ ➜ `dispose()` ដកវាចេញវិញទាំងអស់ពេល component
- * unmount (StrictMode · HMR · តេស្ត)។
- *
- * ⛔ **២ ប្រភេទនៃការចាប់ផ្តើម** ៖
- *    - **ដកវិញបាន** (listener · interval ដែលដំណាក់ boot ចាក់ផ្ទាល់) ➜ `listen()` ·
- *      `every()` ➜ ដកចេញពេល dispose ហើយចាក់ឡើងវិញពេល mount ម្តងទៀត។
- *    - **ម្តងក្នុងមួយអាយុទំព័រ** (`initFirebase()` · កាយវិការ · PTR …) ➜
- *      `oncePerPage()` ៖ វាចាក់ listener ខាងក្នុងខ្លួនដែលដកវិញមិនបាន ➜ ការរត់
- *      ២ ដង = listener ស្ទួន = សកម្មភាពរត់ ២ ដង (`listener-leak-test`)។
- * ⛔ កុំដាក់ការងារ «ម្តងក្នុងមួយអាយុទំព័រ» ក្នុង `listen()` ហើយកុំដាក់
- *    listener ដែលដកវិញបានក្នុង `oncePerPage()` — វានឹងបាត់ក្រោយ remount។
- */
 export interface LifecycleScope {
     readonly disposed: boolean;
     listen(target: EventTarget | null | undefined, type: string, handler: any, options?: boolean | AddEventListenerOptions): void;
@@ -40,8 +26,6 @@ export function createLifecycleScope(): LifecycleScope {
         },
         onLoad(fn) {
             if (disposed) return;
-            // ⛔ `load` អាចបាញ់រួច **មុន** React mount (chunk យឺត) ➜ រត់ភ្លាម
-            //    ជំនួសការរង់ចាំព្រឹត្តិការណ៍ដែលនឹងមិនមកទៀត។
             if (document.readyState === 'complete') { fn(); return; }
             const once = () => {
                 window.removeEventListener('load', once);
@@ -59,7 +43,7 @@ export function createLifecycleScope(): LifecycleScope {
             disposed = true;
             while (cleanups.length) {
                 const fn = cleanups.pop();
-                try { fn(); } catch { /* ការសម្អាតមួយធ្លាក់ មិនត្រូវបញ្ឈប់ការសម្អាតដទៃ */ }
+                try { fn(); } catch { }
             }
         }
     };

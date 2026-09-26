@@ -1,10 +1,6 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 
-/* ⛔ បញ្ជីសំបកមិនសរសេរដោយដៃទៀតទេ។
- * ក្នុង App ចាស់ `CORE_SHELL` ជាបញ្ជីរឹង ➜ ធនធានថ្មីដែលភ្លេចដាក់ចូល
- * ធ្វើឲ្យការស្កេន **ស្លាប់ស្ងាត់ៗពេលក្រៅបណ្តាញ**។ ឥឡូវ Vite ចាក់វាចូល
- * ពី `dist/` ពិត (មើល `serviceWorkerPlugin` ក្នុង `vite.config.mts`)។ */
 declare const __CACHE_VERSION__: string;
 declare const __CORE_SHELL__: string[];
 declare const __OPTIONAL_SHELL__: string[];
@@ -13,11 +9,6 @@ const CACHE_VERSION = __CACHE_VERSION__;
 const CORE_SHELL = __CORE_SHELL__;
 const OPTIONAL_SHELL = __OPTIONAL_SHELL__;
 
-/* ⛔ រាល់ការទាញពីបណ្តាញដែលចាក់ចូល cache របស់ SW ត្រូវរំលង HTTP cache ចាស់ ៖ `no-cache` ➜ សំណើមានលក្ខខណ្ឌ
- * (ETag ➜ 304 ពេលមិនប្រែ)។ ឯកសារគ្មាន hash ក្នុងឈ្មោះ (`vendor/zxing_reader.wasm` …) ដែលធ្លាប់ទទួល header
- * `immutable` រស់ក្នុង HTTP cache រហូតដល់ ១ ឆ្នាំ ➜ cache mode លំនាំដើមនាំកំណែចាស់ចូល cache ថ្មី ខណៈ
- * `zxing-wasm.js` ជាកំណែថ្មី ➜ JS និង wasm មិនស៊ីគ្នា (`LinkError`) ➜ ម៉ាស៊ីនស្កេន ZXing ស្លាប់ (iPhone គ្មាន
- * BarcodeDetector)។ ការការពារនេះមិនពឹងលើ header របស់ server ទេ ព្រោះ HTTP cache ចាស់លើឧបករណ៍មិនប្រែតាម header ថ្មី។ */
 const FRESH: RequestCache = 'no-cache';
 
 const SHELL_PATHS = new Set(

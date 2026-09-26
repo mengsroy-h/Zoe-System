@@ -1,12 +1,5 @@
 import { Component, type ReactNode } from 'react';
 
-/**
- * ⛔ App React ៖ កំហុសក្នុង render **មួយ** (ឧ. ទិន្នន័យ Firebase ដែលមានរូបរាងមិនរំពឹង) unmount ដើមឈើ **ទាំងមូល**
- *    ➜ អេក្រង់ស គ្មានប៊ូតុង គ្មានសារ។ App ដើម (vanilla) មិនដែលសដោយកំហុសតែមួយទេ (DOM នៅដដែល)។
- *    ➜ ព្រំដែននេះជំនួសអេក្រង់សដោយសារ និងប៊ូតុងផ្ទុកឡើងវិញ។ កំហុសខ្លួនវាត្រូវរាយការណ៍តាម `onCaughtError`
- *    របស់ `createRoot()` (`main.tsx`) ➜ `reportError()` ➜ Sentry និងអ្នកស្តាប់ `error` ឃើញវាដូចមុន។
- * ⛔ សារមិនសន្យាថា «ទិន្នន័យមិនបាត់» ៖ ការសរសេរដែលនៅក្នុងជួរក្រៅបណ្តាញ អាចមិនទាន់ចុះ។
- */
 interface Props { children: ReactNode }
 interface State { failed: boolean }
 

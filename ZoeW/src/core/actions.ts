@@ -48,11 +48,6 @@ export function rememberDrawerGroups(keys) {
     safeStoreSet(appLocalStore, DRAWER_GROUP_KEY, keys.join(','));
 }
 
-/**
- * ធាតុដែលអាចលាក់បាន ក្នុង Category នីមួយៗ ➜ Category ដែលធាតុទាំងអស់លាក់
- * ត្រូវលាក់ទាំងក្បាល (`CLAUDE.md` ៖ «របា Slide ៖ Category បត់បាន»)។
- * Category ដែលមិនមានក្នុងតារាងនេះ មិនដែលទទេទេ។
- */
 export const DRAWER_GROUP_TOGGLES: Record<string, ReadonlyArray<'ztoAutoCloseVisible' | 'ztoListSyncDrawerVisible'>> = {
     drawerGroupZto: ['ztoAutoCloseVisible', 'ztoListSyncDrawerVisible']
 };

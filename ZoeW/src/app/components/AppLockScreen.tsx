@@ -5,7 +5,6 @@ import { useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { BiometricLabel } from './shell/BiometricLabel';
 
-/** អេក្រង់ចាក់សោលើឧបករណ៍ — បើក/បិទ · សារ · ប៊ូតុង គូរពី `viewState` */
 export function AppLockScreen() {
     const open = useStoreValue(viewState, (s) => s.appLockOpen);
     const message = useStoreValue(viewState, (s) => s.appLockMessage);

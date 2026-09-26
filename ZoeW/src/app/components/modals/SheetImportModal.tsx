@@ -18,13 +18,11 @@ import { SiPreviewBody } from '../sheet/SheetImportParts';
 import { SiActionMsg } from '../sheet/SheetImportParts';
 import { SiClearMsg } from '../sheet/SheetImportParts';
 
-/** ⛔ `change` native (ពេលវាយចប់) ដូចដើម — មិនមែន `input` រាល់តួអក្សរ (ហៅ API) */
 const headerRowRef = refWithNative('siHeaderRowInput', 'change', () => act('applySheetImportHeaderRow'));
 
 export function SheetImportModal() {
     const v = useStoreFields(viewState, ['siParts', 'siStatusFoot', 'siConfigSaving', 'siImportBtnDisabled', 'siImportBtnText',
         'siClearBtnBusy', 'siDropHot']);
-    /** class ដើម + `hidden` ពេលផ្នែកមិនបង្ហាញ */
     const part = (base: string, id: string) => (v.siParts[id] ? base : (base ? base + ' hidden' : 'hidden'));
     return (
         <Modal id="sheetImportModal" close="closeSheetImportModal">

@@ -125,7 +125,6 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |
 | `npm run preview` | បម្រើ `dist/` ក្នុងស្រុកដើម្បីសាកមើល |
 | `npm run test:watch` | Vitest ក្នុងរបៀបតាមដាន |
-| `npm run package` | ខ្ចប់ជា zip |
 | `npm run build:android` | build សម្រាប់ App Android (`--mode android` ➜ អាន `.env.android`) |
 | `npm run android:sync` | build Android រួចចម្លងចូល `android/` (`cap sync android`) |
 | `npm run android:open` | បើក `android/` ក្នុង Android Studio |

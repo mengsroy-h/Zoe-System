@@ -1,12 +1,8 @@
 import { uiState } from '../core/state';
 
-// ── ស្ថានភាព toast ៖ បញ្ជីរស់នៅ «uiState.toasts» · timer រស់នៅទីនេះ ──
-// ⛔ timer **មិនមែន** ស្ថានភាពគូរ ➜ វាមិនត្រូវចូល store (ការដាក់វាចូល
-//    នឹងធ្វើឲ្យរាល់ setTimeout កេះការគូរឡើងវិញដោយឥតប្រយោជន៍)។
 let toastSeq = 0;
 const toastTimers = new Map();
 
-/** ទទួលទាំង id និងវត្ថុធាតុ ➜ ត្រឡប់ធាតុ **រស់** ក្នុងបញ្ជី (ឬ null) */
 function toastItem(ref): any {
     if (ref === null || ref === undefined) return null;
     const id = typeof ref === 'object' ? (ref as any).id : ref;
@@ -72,8 +68,6 @@ export function armToastDismiss(el, delay) {
         if (!live) return;
         live.show = false;
         uiState.touch();
-        // ⛔ ៣០០ ms ដដែលនឹងដើម ៖ វាជារយៈពេលនៃ transition ក្នុង `style.css`
-        //    ➜ ការដកធាតុមុននោះ លុបចលនាបាត់។
         setTimeout(() => removeToastItem(item.id), 300);
     }, delay));
 }
@@ -102,9 +96,6 @@ export function showToast(msg, kind?) {
         show: false,
         live: null
     }]);
-    // ⛔ ស៊ុមបន្ទាប់ទើបដាក់ `.show` — ដូច `appendChild` រួច `rAF`
-    //    របស់ដើម ៖ ធាតុត្រូវចុះក្នុង DOM **មុន** class ចលនាចូល បើមិនដូច្នេះ
-    //    browser មិនដំណើរការ transition ទេ។
     requestAnimationFrame(() => {
         const item = toastItem(id);
         if (!item) return;

@@ -195,6 +195,7 @@ run "emu/restore-deadlock" node audit-tools/emu/restore-deadlock-test.js
 run "emu/ledger-revert" node audit-tools/emu/ledger-revert-emu-test.js
 run "emu/restore-mutation" node audit-tools/emu/restore-mutation-emu-test.js
 run "emu/license-seat-rules" node audit-tools/emu/license-seat-rules-test.js
+run "emu/tx-disconnect" node audit-tools/emu/tx-disconnect-emu-test.js
 # ⛔ «សំណុំបៃតង» មិនមែនភស្តុតាង — ឧបករណ៍នេះបំបែកតក្កវិជ្ជាលុយដោយចេតនា
 # រួចទាមទារថា **អ្នកយាមយ៉ាងតិច ១ ត្រូវក្រហម**។ បើអ្នកយាមចុងក្រោយងងឹត
 # វាធ្លាក់ **មុន** កំហុសលុយបន្ទាប់ ship។
@@ -225,6 +226,7 @@ run "duplicate-money (browser ពិត)" node audit-tools/duplicate-money-test.
 run "item-money (browser ពិត)" node audit-tools/item-money-integrity-test.js
 run "stats-truth (browser ពិត)" node audit-tools/stats-collected-truth-test.js
 run "ledger-failed-apply-revert" node audit-tools/ledger-failed-apply-revert-test.js
+run "tx-outcome" node audit-tools/tx-outcome-test.js
 run "ledger-clamp-symmetry (browser ពិត)" node audit-tools/ledger-clamp-symmetry-test.js
 run "monthly-ledger-agreement" node audit-tools/monthly-ledger-agreement-test.js
 run "stats-screen-agreement" node audit-tools/stats-screen-agreement-test.js
@@ -348,6 +350,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     ITEMMONEY_APP_DIR="$BASE" node audit-tools/item-money-integrity-test.js 2>&1 | tail -1 | sed 's/^/   item-money:      /'
     STATSTRUTH_APP_DIR="$BASE" node audit-tools/stats-collected-truth-test.js 2>&1 | tail -1 | sed 's/^/   stats-truth:     /'
     LEDGERFAIL_APP_DIR="$BASE" node audit-tools/ledger-failed-apply-revert-test.js 2>&1 | tail -1 | sed 's/^/   ledger-failfirst:/'
+    TXOUTCOME_APP_DIR="$BASE" node audit-tools/tx-outcome-test.js 2>&1 | tail -1 | sed 's/^/   tx-outcome:     /'
     CLAMPSYM_APP_DIR="$BASE" node audit-tools/ledger-clamp-symmetry-test.js 2>&1 | tail -1 | sed 's/^/   clamp-symmetry:  /'
     MONTHLYAGREE_APP_DIR="$BASE" node audit-tools/monthly-ledger-agreement-test.js 2>&1 | tail -1 | sed 's/^/   monthly-agree:   /'
     STATSAGREE_APP_DIR="$BASE" node audit-tools/stats-screen-agreement-test.js 2>&1 | tail -1 | sed 's/^/   stats-agree:     /'
@@ -449,6 +452,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     LICRACE_APP_DIR="$BASE" node audit-tools/license-record-race-test.js 2>&1 | tail -1 | sed 's/^/   license-race:    /'
     LICSEAT_APP_DIR="$BASE" node audit-tools/license-seat-test.js 2>&1 | tail -1 | sed 's/^/   license-seat:    /'
     LICSEATEMU_APP_DIR="$BASE" node audit-tools/emu/license-seat-rules-test.js 2>&1 | tail -1 | sed 's/^/   license-seat-emu:/'
+    TXEMU_APP_DIR="$BASE" node audit-tools/emu/tx-disconnect-emu-test.js 2>&1 | tail -1 | sed 's/^/   tx-disconnect-emu:/'
     LOOKUPSEC_APP_DIR="$BASE" node audit-tools/lookup-config-secret-test.js 2>&1 | tail -1 | sed 's/^/   lookup-config-secret:/'
     PAYLOAD_APP_DIR="$BASE" node audit-tools/payload-schema.js 2>&1 | tail -1 | sed 's/^/   payload-schema:  /'
     PHONE_APP_DIR="$BASE" node audit-tools/phone-suggest-test.js 2>&1 | tail -1 | sed 's/^/   phone-suggest:   /'

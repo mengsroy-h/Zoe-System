@@ -917,9 +917,6 @@
     "ZoeW/scripts/old-app.mjs": {
       "policy": "zoew-self-verification"
     },
-    "ZoeW/scripts/package.sh": {
-      "policy": "zoew-self-verification"
-    },
     "ZoeW/scripts/parity-deep.mjs": {
       "policy": "zoew-self-verification"
     },
@@ -1481,6 +1478,9 @@
     "ZoeW/src/services/scan-engine.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/services/tx-outcome.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/styles/app.css": {
       "policy": "guard-23"
     },
@@ -1731,6 +1731,9 @@
       "policy": "guard-1"
     },
     "audit-tools/emu/license-seat-rules-test.js": {
+      "policy": "guard-1"
+    },
+    "audit-tools/emu/tx-disconnect-emu-test.js": {
       "policy": "guard-1"
     },
     "audit-tools/emu/ns.js": {
@@ -2113,6 +2116,12 @@
     },
     "audit-tools/trimws.js": {
       "policy": "guard-4"
+    },
+    "audit-tools/ts-comments.js": {
+      "policy": "guard-4"
+    },
+    "audit-tools/tx-outcome-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/ui-flow-test.js": {
       "policy": "guard-1"

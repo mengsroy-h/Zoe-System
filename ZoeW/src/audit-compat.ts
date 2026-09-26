@@ -4,23 +4,6 @@ import { uiState } from './core/state';
 import { annotateActions } from './audit-annotate';
 import { REACT_OWNED_IDS, resetReactOwned } from './app/slot-resets';
 
-/**
- * ⛔ សម្រាប់តែ build វាស់ (`VITE_EXPOSE_GLOBALS=1` ➜ `expose-globals.ts`) — **មិនដែលចូល
- *    ផលិតកម្ម**។
- *
- * checker ដើមខ្លះ «ដាក់ App ក្នុងស្ថានភាព» ដោយសរសេរ class លើ DOM ដោយផ្ទាល់ ឧ.
- * `side.classList.add('collapsed'); syncHistoryExpandedLock()` (gesture · panel-motion)។
- * ក្នុង App ដើម class **ជា** ស្ថានភាព; ក្នុង React វាជា **លទ្ធផល** ដែល JSX គូរពី state ➜
- * ការសរសេរ class ត្រង់ៗ (១) មិនត្រូវកូដដែលអាន state ឃើញ និង (២) ត្រូវ React លុបវិញ
- * ពេលគូរលើកក្រោយ ➜ checker វាស់ស្ថានភាពដែល App **មិនដែលនៅ**។
- *
- * ស្រទាប់នេះ **បកប្រែការបញ្ចូល** ៖ `classList.add/remove/toggle` នៃ class ដែលមានម្ចាស់ជា state
- * លើធាតុរបស់ React ➜ សរសេរ state ដដែល រួច `commitNow()` ➜ DOM ដែល checker **អាន**
- * គឺជាអ្វីដែល React គូរពិត។ ⛔ វាមិនក្លែង **លទ្ធផល** ណាមួយទេ ៖ `contains()` អាន DOM ពិត។
- * ⛔ class ផ្សេងទៀត (និងការសរសេរដែលស្មើ state រួចហើយ ឧ. `DocumentEffects`) ឆ្លងកាត់
- *    ត្រង់ៗទៅ `DOMTokenList` ពិត។
- */
-
 interface Binding {
     cls: string;
     get: () => boolean;
@@ -57,9 +40,6 @@ function wrap(el: Element, bindings: Binding[], adopt: boolean): void {
         b.set(on);
         return true;
     };
-    // ⛔ class ដែល checker សរសេរ **មុន** ស្រទាប់នេះដំឡើង (chunk វាស់ផ្ទុកក្រោយ) ➜ ទទួលយកវា ។
-    //    តែពេលដំឡើងប៉ុណ្ណោះ ហើយក្រោយ `commitNow()` (DOM = state) ➜ ភាពខុសគ្នាដែលនៅសល់
-    //    មកពីការសរសេរខាងក្រៅពិត មិនមែនពីការគូរដែលមិនទាន់ចុះ។
     if (adopt) for (const b of bindings) {
         const has = real().contains(b.cls);
         if (has !== b.get()) b.set(has);
@@ -89,15 +69,6 @@ function wrap(el: Element, bindings: Binding[], adopt: boolean): void {
     Object.defineProperty(el, 'classList', { configurable: true, get: () => proxy });
 }
 
-/**
- * ⛔ ច្បាប់ដដែលលើ **មាតិកា** និង **ការបង្ហាញប្រអប់** ៖ checker ដើម «សម្អាតស្ថានភាព» ដោយ `el.innerHTML = ''`
- *    (toast · របា ZTO …) និងលាក់ប្រអប់ដោយ `modal.style.display = 'none'`។ ក្នុង React ការដកកូនពីក្រោម React
- *    ធ្វើឲ្យការគូរបន្ទាប់ធ្លាក់ (`removeChild`) ➜ ដើមឈើទាំងមូល unmount; ហើយ `style.display` ត្រង់ៗ មិនត្រូវ
- *    `isModalOpen` ឃើញ ➜ checker វាស់ស្ថានភាពដែល App មិនដែលនៅ។
- *    ➜ `innerHTML = ''` លើធាតុដែល React ជាម្ចាស់ ឆ្លង `resetReactOwned()` (ផ្លូវដដែលនឹង `clearSensitiveModalFields()`
- *    ក្នុងផលិតកម្ម) · `style.display` លើប្រអប់ ➜ `uiState.modalDisplay`។ ⛔ React ខ្លួនឯងមិនសរសេរ `innerHTML` សោះ
- *    (គ្មាន `dangerouslySetInnerHTML`) ហើយការសរសេរ `display` របស់ React ស្មើ state ជានិច្ច ➜ ឆ្លងកាត់ត្រង់ៗ។
- */
 const nativeInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')!;
 const nativeStyle = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style')!;
 const slotWrapped = new WeakSet<Element>();
@@ -152,10 +123,6 @@ function wrapOwnedElements(): void {
     document.querySelectorAll<HTMLElement>('.modal[id]').forEach(wrapModalStyle);
 }
 
-/**
- * ⛔ ធាតុដែល React ចង **ក្រោយ** ការដំឡើង (mount យឺត · remount) ទទួលអ្នកបកប្រែតាម `MutationObserver` ៖
- *    ផលិតកម្មមិនត្រូវការការជូនដំណឹង «ref ប្តូរ» ទេ ➜ ច្រកនោះរស់ក្នុង build វាស់តែប៉ុណ្ណោះ (`wrapped` ការពារការរុំ ២ ដង)។
- */
 function wrapMountedRefs(adopt: boolean): void {
     for (const [name, bindings] of REF_BINDINGS) {
         const el = elementOf(name);
@@ -172,10 +139,6 @@ export function installAuditClassAdapter(): void {
     commitNow();
 }
 
-/**
- * attribute ផ្ទេរសកម្មភាព (`data-act` …) ពី prop ពិតរបស់ React (`audit-annotate.ts`) — ពេលដំឡើង និងរាល់
- * ពេល React បន្ថែមធាតុ (ប្រអប់ · ជួរដេក · ម៉ឺនុយ)។ ⛔ build វាស់តែប៉ុណ្ណោះ។
- */
 export function installAuditActionAnnotations(): void {
     annotateActions(document.body);
     new MutationObserver((records) => {

@@ -24,9 +24,12 @@ const fs = require('fs');
 const path = require('path');
 
 let acorn;
-try { acorn = require('acorn'); } catch (e) {
-    console.log('SKIP — ត្រូវការ acorn (npm i acorn)');
-    process.exit(0);
+for (const name of ['acorn', path.join(__dirname, '..', 'ZoeW', 'node_modules', 'acorn')]) {
+    try { acorn = require(name); break; } catch (e) {}
+}
+if (!acorn) {
+    console.log('FAIL — ត្រូវការ acorn (npm ci --prefix ZoeW)');
+    process.exit(1);
 }
 
 const ROOT = process.env.STRIP_APP_DIR || path.join(__dirname, '..');
@@ -136,10 +139,37 @@ function cssStream(src) {
         .trim();
 }
 
+// ZoeW React ៖ ប្រភព `src/**` · Netlify Function · config — សម្អាតតាម `ts-comments.js` (TypeScript AST +
+// ការផ្ទៀងផ្ទាត់ esbuild compile មុន/ក្រោយ) ⛔ មិនមែន acorn (វា parse TypeScript/JSX មិនបាន)
+const tsComments = require('./ts-comments');
+const REACT_DIR = path.join(ROOT, 'ZoeW');
+const REACT_MODE = fs.existsSync(path.join(REACT_DIR, 'src', 'main.tsx'));
+const reactFiles = REACT_MODE ? tsComments.reactShippedFiles(REACT_DIR) : [];
+const reactSet = new Set(reactFiles.map((f) => path.resolve(f)));
+
+// HTML ដែល ship ៖ លុបតែ `<!-- … -->` ដែលកាន់ **ជួរទាំងមូល** (ចំណុចផ្ទៀងផ្ទាត់ ៖ អត្ថបទក្រៅ comment មិនប្រែ
+// មួយ byte) ⛔ comment ក្នុងជួរជាមួយ markup ➜ FAIL (កែដោយដៃ មិនទាយ)
+function htmlShippedFiles() {
+    const out = [];
+    const add = (dir) => {
+        if (!fs.existsSync(dir)) return;
+        for (const name of fs.readdirSync(dir).sort()) if (/\.html$/.test(name)) out.push(path.join(dir, name));
+    };
+    if (REACT_MODE) { out.push(path.join(REACT_DIR, 'index.html')); add(path.join(REACT_DIR, 'public')); }
+    add(path.join(ROOT, 'ZoeKeyGen'));
+    return out.filter((f) => fs.existsSync(f));
+}
+function stripHtml(src) {
+    let removed = 0;
+    const text = src.replace(/\n[ \t]*<!--[\s\S]*?-->[ \t]*(?=\n)/g, () => { removed++; return ''; });
+    return { text, removed, leftover: (text.match(/<!--/g) || []).length };
+}
+const htmlSet = new Set(htmlShippedFiles().map((f) => path.resolve(f)));
+
 const args = process.argv.slice(2);
 const checkOnly = args.indexOf('--check') !== -1;
 const targets = args.filter((a) => a.indexOf('--') !== 0);
-const files = targets.length ? targets : shippedFiles();
+const files = targets.length ? targets : shippedFiles().concat(reactFiles, [...htmlSet]);
 
 let touched = 0;
 let failed = 0;
@@ -150,6 +180,48 @@ for (const rel of files) {
     if (!fs.existsSync(file)) { console.log('  រំលង (រកមិនឃើញ) ' + rel); continue; }
     const src = fs.readFileSync(file, 'utf8');
     const isCss = /\.css$/.test(file);
+
+    if (htmlSet.has(path.resolve(file)) || /\.html$/.test(file)) {
+        const res = stripHtml(src);
+        const shown = path.relative(ROOT, file);
+        if (res.leftover) { console.log('  FAIL  ' + shown + ' — comment ក្នុងជួរជាមួយ markup ' + res.leftover + ' (កែដោយដៃ)'); failed++; continue; }
+        if (!res.removed) { clean++; continue; }
+        if (checkOnly) { console.log('  ...   ' + shown + ' — មាន comment ' + res.removed + ' (មិនទាន់សម្អាត)'); touched++; continue; }
+        fs.writeFileSync(file, res.text);
+        console.log('  ok    ' + shown + ' — លុប comment ' + res.removed);
+        touched++;
+        continue;
+    }
+
+    if (reactSet.has(path.resolve(file)) || /\.(ts|tsx|mts)$/.test(file)) {
+        if (!tsComments.available()) {
+            console.log('  FAIL  ' + rel + ' — ត្រូវការ typescript + esbuild (npm ci --prefix ZoeW)');
+            failed++;
+            continue;
+        }
+        let res;
+        try { res = tsComments.stripSource(src, file); } catch (e) {
+            console.log('  FAIL  ' + rel + ' — parse បរាជ័យ: ' + (e && e.message));
+            failed++;
+            continue;
+        }
+        if (!res.count && res.text === src) { clean++; continue; }
+        if (res.unsafe) {
+            console.log('  FAIL  ' + rel + ' — បោះបង់ (លទ្ធផល compile ប្រែ)');
+            failed++;
+            continue;
+        }
+        const shown = path.relative(ROOT, file);
+        if (checkOnly) {
+            console.log('  ...   ' + shown + ' — មាន comment ' + res.count + ' (មិនទាន់សម្អាត)');
+            touched++;
+            continue;
+        }
+        fs.writeFileSync(file, res.text);
+        console.log('  ok    ' + shown + ' — លុប comment ' + res.count);
+        touched++;
+        continue;
+    }
 
     let result;
     let sourceType = 'script';

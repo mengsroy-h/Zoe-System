@@ -120,8 +120,6 @@ export function openRecentlyDeletedModal() {
 }
 
 export function renderTrashSummary(groups, query) {
-    // ➜ `TrashSummaryBox` (React) គូរ។ រូបមន្តរស់ក្នុង `buildTrashSummaryModel()`
-    //   ដែលដេរីវេ ២ ក្រុមពី `TRASH_REASON_META[r].deducted` ដដែល។
     uiState.trashSummary = buildTrashSummaryModel(groups, query);
     uiState.touch();
 }

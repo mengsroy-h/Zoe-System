@@ -2,7 +2,6 @@ import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
 import type { HealthRow } from './model';
 
-/** 🩺 ពិនិត្យសុខភាពប្រព័ន្ធ — ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · secret មិនឡើង DOM។ */
 export function HealthCheckList() {
     useStore(uiState);
     const rows = uiState.healthRows as HealthRow[] | null;

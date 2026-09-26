@@ -1,4 +1,3 @@
-/** ស្លាកប៊ូតុងស្កេនក្រយៅដៃ/មុខ (រួមគ្នា ៖ ប្រអប់ PIN · អេក្រង់ចាក់សោ) */
 export function BiometricLabel({ busy }: { busy: boolean }) {
     return (
         <>

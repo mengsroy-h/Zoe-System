@@ -24,55 +24,13 @@ const LOGIN_REDIRECT_RE = /https?:\/\/[^\s"']*(?:oauth|\/login\b|\/signin\b|sso[
 
 const PHONE_PATHS = ['consigneePhone', 'consigneeMobile', 'consigneeTel', 'receiverPhone', 'receiverMobile', 'recipientPhone', 'recipientMobile', 'phone', 'mobile'];
 const COD_PATHS = ['agentAmount', 'codAmount', 'collectionAmount', 'codFee', 'cod'];
-// ⛔ **`fcAmount` ជា DOD — លើ *ផ្លូវទាំង ២*** (ការវាស់របស់ម្ចាស់គម្រោង
-// 2026-09-11 លើបញ្ជី · 2026-09-15 លើ `/detail`) ៖ កញ្ចប់ `ztda` ដែល
-// អតិថិជនទទួល មាន `agentAmount: 0` (គ្មានប្រាក់ប្រមូលជំនួស) ប៉ុន្តែ
-// `fcAmount: 2.5` គឺជា **ថ្លៃដឹកដែលអតិថិជនបង់ពេលទទួល** = DOD ក្នុង
-// វាក្យស័ព្ទ ZoeW។ កញ្ចប់ Shopee មាន `fcAmount: 0.0` ➜ DOD 0 ដដែល។
-//
-// ⛔ **វាត្រូវឈរមុន `arrivalServiceCharge`** ៖ ZTO ផ្ញើវាលនោះ **ជានិច្ច
-// ដោយតម្លៃ `0.00`** ហើយ `pickNumber()` ត្រឡប់លេខដំបូងដែលរកឃើញ **រួមទាំង
-// `0`** ➜ បើវាឈរមុន ការស្វែងរកឈប់ត្រឹមនោះ ➜ **DOD 0 រាល់កញ្ចប់** ហើយ
-// វាល ៤ ខាងក្រោមក្លាយជា **កូដងាប់** (វាស់បាន 2.35.1 ៖ ការស្កេនឆ្លើយ
-// DOD 0 ខណៈការទាញបញ្ជីឆ្លើយ 2.5 លើ barcode តែមួយ)។
-//
-// ⛔ **`freightFee` មិនមែន DOD** ទោះវាស្មើ `fcAmount` លើកញ្ចប់ `payType: "CC"`
-// ក៏ដោយ ៖ លើកញ្ចប់បង់មុន វានៅមិនមែន 0 (ថ្លៃដឹកពិតជាមាន) ខណៈ `fcAmount`
-// ជា 0 ➜ ការយកវា = គិតលុយអតិថិជនលើថ្លៃដឹកដែលអ្នកផ្ញើបង់រួច។
 const DOD_PATHS = ['fcAmount', 'arrivalServiceCharge', 'dodAmount', 'arrivalCharge', 'serviceCharge', 'dod'];
 const BARCODE_PATHS = ['billCode', 'waybillNo', 'waybillCode', 'mailNo', 'barcode'];
 
-// ⛔ ផ្លូវ **បញ្ជី** (`/scan/page/scan`) ជាផ្លូវទី ២ ឆ្ពោះទៅ ZTO ៖ វាទាញ
-// កញ្ចប់តាម **ជួរកាលបរិច្ឆេទ** ជំនួសការសួរ barcode ម្តងមួយ។ សំបករបស់វា
-// ផ្ទុក **array** (`data.result[]`) ➜ `orderCandidates()` ដែលរកវត្ថុ
-// **តែមួយ** មិនស្រង់វាចេញបានទេ។ វាល barcode ក៏ផ្សេងដែរ ៖ `scanBillCode`។
-//
-// ⛔ **មុខងារនេះជាការស្រេចចិត្ត** — គ្មានលេខសាខាក្នុងសំណើ ➜ វាដេកលក់
-// ទាំងស្រុង ហើយការកំណត់ **ខុស** បិទតែវា មិនប៉ះការស្កេន (ច្បាប់ដដែលនឹង
-// `ZTO_FIELD_SIGNED` ៖ លេខទូរស័ព្ទ និងលុយសំខាន់ជាងបញ្ជី)។
-//
-// ⛔ **លេខសាខាមកពី *សំណើ* មិនមែនពី env ទៀតទេ** (សំណើម្ចាស់គម្រោង
-// 2026-09-14) ៖ `ZTO_LIST_SITE_CODE` ក្នុង Netlify ចាក់សោ deploy ទាំងមូល
-// ចូល **សាខាតែមួយ** ខណៈ ZoeW ត្រូវបម្រើសាខាច្រើន ➜ លេខសាខារស់ក្នុង
-// ZoeW របស់ឧបករណ៍នីមួយៗវិញ ហើយចូលមកជា `?site=`។ ⛔ ការបញ្ចាំងពិតឈរខាង
-// **ZTO** ៖ Cookie ជារបស់គណនីអាជីវកម្ម ➜ សាខាដែលគណនីនោះគ្មានសិទ្ធិ
-// ត្រឡប់បញ្ជីទទេ។ ⛔ ហើយលេខសាខាត្រូវចូល **កូនសោ cache** ជាដាច់ខាត —
-// បើមិនដូច្នេះ សាខា ក ទទួលបញ្ជីរបស់សាខា ខ ពី cache ➜ **COD របស់
-// អតិថិជនអ្នកដទៃចូល ZoeW**។
 const DEFAULT_LIST_URL = 'https://aargus-api.ztoglobal.com/scan/page/scan';
 const DEFAULT_LIST_SCAN_TYPE = '03';
-// ⛔ `scanTypeCode` ជាតម្រងដែល **ZTO** អនុវត្ត ➜ យើងផ្ទៀងផ្ទាត់វាមិនបាន។
-// ជួរដេកដែលត្រឡប់មកផ្ទុក `scanTypeDesc` ជាអត្ថបទ ➜ នោះជាជាន់ការពារ
-// **ខាងយើង** ៖ បើលេខកូដប្រែ ឬ ZTO បញ្ចូលប្រភេទស្កេនផ្សេង (ចេញដំណើរ ·
-// ប្រគល់) នោះកញ្ចប់ខុសនឹងចូល ZoeW ដោយស្ងាត់។ (សំណើម្ចាស់គម្រោង 2026-09-11។)
-// ⛔ ច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស» នៅដដែល ៖ ជួរដេកដែល **គ្មានវាលនេះ**
-// មិនត្រូវរំលង — មានតែ «មានវាល ហើយវាខុស» ទើបសម្គាល់។
 const DEFAULT_LIST_SCAN_DESC = 'អីវ៉ាន់មកដល់';
 const LIST_SCAN_DESC_PATHS = ['scanTypeDesc', 'scanTypeName', 'scanDesc'];
-// ⛔ **ជាន់ទី ២ ៖ កូដស្ថិរ។** `scanTypeDesc` ជាអត្ថបទដែល **បកប្រែ** ➜ វាប្រែ
-// តាមភាសារបស់គណនី ➜ ការពឹងលើវាតែម្យ៉ាងធ្វើឲ្យការប្តូរភាសាក្លាយជា **បញ្ជីទទេ
-// កុហក**។ `scanTypeCode` ជាកូដស្ថិរ ➜ ទាំង ២ ត្រូវពិនិត្យ **ឯករាជ្យ**
-// (សំណើម្ចាស់គម្រោង 2026-09-11 ៖ «អោយ sync តែ `03` + «អីវ៉ាន់មកដល់»»)។
 const LIST_SCAN_CODE_PATHS = ['scanTypeCode', 'scanType'];
 const LIST_SITE_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
 const LIST_SCAN_TYPE_RE = /^[A-Za-z0-9_-]{1,8}$/;
@@ -81,18 +39,11 @@ const LIST_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/;
 const LIST_RANGE_MAX_DAYS = 31;
 const LIST_ROW_MAX = 200;
 const LIST_CACHE_TTL_MAX_MS = 60000;
-// ⛔ បញ្ជីដាក់ `scanBillCode` **មុខគេ** ព្រោះជួរដេករបស់វាអាចផ្ទុក
-// `billCode` ផ្សេង (លេខមេ) ដែលមិនមែនលេខស្លាកដែលស្កេនចូល។ បញ្ជីដើម
-// នៅជាប្រភពតែមួយ ➜ **ការបន្ថែម មិនមែនការចម្លង**។
 const LIST_BARCODE_PATHS = ['scanBillCode'].concat(BARCODE_PATHS);
 const LIST_TIME_PATHS = ['scanTime', 'scanDate', 'createTime', 'operateTime'];
 
 const FIELD_SEPARATOR = '|';
 const CACHE_MAX = 200;
-// សាលក្រម «រកមិនឃើញ» មានអាយុខ្លីជាងលទ្ធផលពិតដោយចេតនា ៖ កញ្ចប់ដែល ZTO
-// មិនទាន់បញ្ចូល អាចលេចឡើងក្នុងប៉ុន្មាននាទីក្រោយ Arrival Scan ➜ TTL វែង
-// នឹងក្លាយជាការបដិសេធដែលកុហក។ ១៥ វិ. គ្រប់គ្រាន់ដើម្បីលេបការស្កេនម្តងទៀត
-// របស់អ្នកប្រើ ដោយមិនបាំងការត្រួតពិនិត្យឡើងវិញដែលស្មោះត្រង់។
 const NOT_FOUND_CACHE_TTL_DEFAULT_MS = 15000;
 const resultCache = new Map();
 const inFlight = new Map();
@@ -113,11 +64,6 @@ const COOKIE_BUDGET_RESERVE_MS = 1200;
 const COOKIE_READ_MIN_TIMEOUT_MS = 300;
 const COOKIE_WRITE_MIN_TIMEOUT_MS = 200;
 const COOKIE_REFRESH_RETRY_RESERVE_MS = 2500;
-// ⛔ ពេល **សតិទទេ** ការអាន Cookie មិនមែនការងារស្រេចចិត្តទេ — វា *ជាសំណើ
-// ទាំងមូល*។ ដូច្នេះការកក់ពេលឲ្យ upstream ពេញ `upstreamTimeoutMs` មុនការអាន
-// គឺខុសទិស ៖ វាបង្រួមបង្អួចអានរហូតតូចជាងអ្វីដែល store ត្រូវការពិត ➜ 503
-// ខណៈថវិកានៅសល់ច្រើន។ ជំនួសវិញ កក់ត្រឹម **ការហៅ upstream អប្បបរមា ១**
-// (`fetchOrder()` ទាមទារ `remaining > 1200` ហើយកាត់ `remaining − 200`)។
 const COOKIE_COLD_UPSTREAM_RESERVE_MS = 1500;
 
 const upstreamCookieSignal = { seenAt: 0, setCookie: false, names: [] };
@@ -339,19 +285,9 @@ function settleWithin(run, timeoutMs, label) {
     });
 }
 
-// ⛔ **Blobs មិនត្រូវជាចំណុចដាច់តែមួយ — ទាំងភាពអាចប្រើបាន ទាំងល្បឿន។**
-// ក្រោយ TTL ៦០ វិនាទី ការអានចាស់ឈរ **លើផ្លូវឆ្លើយតប** ➜ រាល់ការស្កេនរង់ចាំ
-// Netlify Blobs មុនហៅ ZTO ទោះបីជា Cookie ដដែលនៅក្នុងសតិក៏ដោយ។ ដូច្នេះពេលមាន
-// តម្លៃក្នុងសតិរួច ៖ ឆ្លើយភ្លាម រួចធ្វើឲ្យស្រស់ **ខាងក្រោយ**។ ⛔ ក្រោយ 401
-// (`invalidateCookieCache()`) ការអានត្រូវ **ទប់** វិញ — ទីនោះជាកន្លែងដែល
-// ការអានតម្លៃថ្មីពិតជាចាំបាច់មុនហៅ upstream។
 function refreshCookieInBackground(store) {
     if (cookieRefreshInFlight || !store) return;
     cookieRefreshInFlight = true;
-    // ⛔ Netlify អាច **បង្កក** container ភ្លាមក្រោយការឆ្លើយតប ➜ ការអាននេះអាច
-    // ដោះវិញយូរក្រោយមក ដោយកាន់ទិដ្ឋភាព **ចាស់**។ ខណៈនោះ Argus អាចបានប្តូរ
-    // session ហើយ (`adoptRenewedCookie`) ➜ ការសរសេរជាន់ដោយទិដ្ឋភាពចាស់នឹង
-    // បង្កើត 401 ដែលយើងទើបជៀសផុត។ ដូច្នេះអនុវត្តតែពេលសតិ **មិនប្រែ**។
     const seen = cookieState.version;
     settleWithin(
         () => store.getWithMetadata(COOKIE_STORE_KEY, { type: 'text' }),
@@ -386,19 +322,11 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
         : COOKIE_STORE_TIMEOUT_MS;
     let storeWitness = null;
     const opened = openCookieStore(netlifyEvent);
-    // ⛔ មូលហេតុត្រូវរស់រានពី cache ។ ការសរសេរ `storeReason = opened.reason`
-    // (ជា `''` ពេល store បើកបាន) មុនការពិនិត្យ cache លុបមូលហេតុនៃការអាន
-    // ដែលធ្លាក់ ៖ វាស់បានលើ Windows ពិត (2026-09-02) — helper សួរ
-    // `?diag=1` ១៤ ដង ហើយមើលឃើញ `source: env` ដោយ **គ្មានមូលហេតុ**។
     if (opened.reason) cookieState.storeReason = opened.reason;
     if (!skipCache && cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) {
         return currentCookieCredential(opened.store);
     }
     const blocking = !!(options && options.blocking);
-    // ⛔ ការធ្វើឲ្យស្រស់ខាងក្រោយ **មិនបង់ថ្លៃពេលរបស់សំណើនេះទេ** (វាមានពិដាន
-    // ផ្ទាល់ខ្លួន `COOKIE_STORE_TIMEOUT_MS`) ➜ ការចាក់សោវាក្រោយ `readTimeoutMs`
-    // ធ្វើឲ្យថវិកាតឹង **បង្កក Cookie ជារៀងរហូត** ៖ ការស្កេនលែងធ្វើឲ្យវាស្រស់
-    // ហើយ helper ដែលសរសេរ Cookie ថ្មី ត្រូវរង់ចាំការត្រៀមជុំក្រោយ។
     if (!skipCache && !blocking && !cookieState.mustRevalidate && cookieState.value && opened.store) {
         refreshCookieInBackground(opened.store);
         return currentCookieCredential(opened.store);
@@ -426,13 +354,6 @@ async function resolveCookieCredential(netlifyEvent, env, options) {
         }
     }
     if (opened.store && !(readTimeoutMs > 0)) cookieState.storeReason = 'budget';
-    // ⛔ **«អានឡើងវិញមិនបាន» ≠ «Cookie បាត់»** — ច្បាប់ដដែលនឹង `license-verify.js`
-    // («មិនអាចផ្ទៀងផ្ទាត់» ≠ «ខុស») អនុវត្តលើ Cookie ៖ Cookie blob ដែលមាន
-    // ក្នុងសតិ ត្រូវ **រស់** រហូតដល់មានសាលក្រម 401 ពិត (`mustRevalidate`)។
-    // ការសរសេរជាន់វាដោយ `ZTO_COOKIE` env ដែល **មិនមាន** បំផ្លាញ credential
-    // ដ៏ល្អ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតជានៅដដែល
-    // (វាស់បាន ៖ ៥/១០ ការស្កេនធ្លាក់ ជាមួយ `ZTO_UPSTREAM_TIMEOUT_MS=7500`)។
-    // វាក៏រក្សា **លំដាប់អាទិភាព** ដែលឯកសារចែងផង ៖ blob ឈ្នះលើ `ZTO_COOKIE`។
     if (!cookieState.mustRevalidate && cookieState.value) {
         return currentCookieCredential(opened.store);
     }
@@ -477,11 +398,6 @@ function noteCookieRenewal(session, response) {
     session.renewal = merged;
 }
 
-// ⛔ ពិដានល្បឿន និងថវិកាពេល ការពារ **ការសរសេរទៅ Blobs** — មិនមែនការចងចាំទេ។
-// Argus ទើបប្រគល់ session ថ្មីមកឲ្យយើងក្នុងសំណើនេះ ៖ ការបោះវាចោលទាំងស្រុង
-// ធ្វើឲ្យសំណើបន្ទាប់នៃ instance ដដែលផ្ញើ Cookie **ចាស់** ➜ 401 ដែលអាចជៀសបាន
-// ➜ អាន store ឡើងវិញ បូកការសាកម្តងទៀត (ថ្លៃមួយជុំពេញនៃថវិកា)។ ដូច្នេះការ
-// ចងចាំកើតឡើង **ជានិច្ច** ចំណែកការសរសេរនៅតែស្ថិតក្រោមពិដានដដែល។
 function adoptRenewedCookie(session, merged) {
     if (!merged || !cookieSessionIsCurrent(session)) return;
     const pending = cookieState.pendingRenewal;
@@ -650,11 +566,6 @@ function readFieldPaths(raw, defaults, label) {
     return merged.slice(0, 24);
 }
 
-// ⛔ ស្ថានភាព «បិទរួចនៅ ZTO» ជាវាល **ស្រេចចិត្ត** ៖ បើគ្មានការកំណត់ ➜ មុខងារ
-// ដេកលក់ទាំងស្រុង។ ⛔ ហើយការកំណត់ **ខុស មិនត្រូវសម្លាប់ lookup** ដូច
-// `ZTO_FIELD_PHONE` ដទៃទេ (ពួកនោះបោះ `ZtoConfigError` ➜ 503) — លេខទូរស័ព្ទ
-// និងលុយសំខាន់ជាងស្លាកស្ថានភាព ➜ ការកំណត់ខុសបិទតែមុខងារនេះ ហើយប្រាប់
-// មូលហេតុក្នុង `?diag=1`។
 function readSignedConfig(env) {
     const out = { paths: [], values: [], reason: '' };
     const rawPaths = String(env.ZTO_FIELD_SIGNED || '').trim();
@@ -681,9 +592,6 @@ function readSignedConfig(env) {
     return out;
 }
 
-// ⛔ **មិនបោះជាដាច់ខាត** ៖ ការកំណត់បញ្ជីខុសត្រូវបិទតែមុខងារបញ្ជី ហើយ
-// រាយមូលហេតុក្នុង `?diag=1` — មិនមែនបោះ `ZtoConfigError` ➜ 503 ដែលនឹង
-// **សម្លាប់ការស្កេន** ទាំងស្រុង។
 function readListConfig(env) {
     const out = {
         enabled: false, url: null, scanType: DEFAULT_LIST_SCAN_TYPE,
@@ -702,8 +610,6 @@ function readListConfig(env) {
     out.enabled = true;
     out.url = url;
     out.scanType = scanType;
-    // ⛔ អត្ថបទទទេ ជាការ **បិទជាន់នេះដោយចេតនា** (ZTO ប្តូរឈ្មោះ ➜ អ្នកប្រើ
-    // ត្រូវអាចដោះវាចេញភ្លាម ដោយមិនរង់ចាំ deploy កូដ)។ `undefined` ➜ លំនាំដើម។
     out.scanDesc = env.ZTO_LIST_SCAN_DESC === undefined
         ? DEFAULT_LIST_SCAN_DESC
         : String(env.ZTO_LIST_SCAN_DESC).trim();
@@ -719,26 +625,6 @@ function readListConfig(env) {
     return out;
 }
 
-// ⛔ សាលក្រម **៣** ដដែលនឹង `readListConfig()` ៖ អវត្តមាន ➜ `site:missing` ·
-// រូបរាងខុស ➜ `site:invalid` · ត្រឹមត្រូវ ➜ កូដ។ ⛔ វា **មិនបោះ** ៖ «បិទ»
-// មិនមែនកំហុស ➜ HTTP 200 គ្មានវាល `error` (ច្បាប់ដដែលនឹង `found:false`)។
-// ⛔ **លេខសាខាត្រូវមកពីអត្តសញ្ញាណ មិនមែនពី parameter របស់ client។**
-//
-// 🔴 ការវាស់របស់ម្ចាស់គម្រោង ៖ Cookie `BOS-MAN-SESSION` ផ្ទុកសិទ្ធិអាន
-// **ទូទាំងប្រទេស** ➜ លេខសាខាជាព្រំដែន **តែមួយ** ហើយវាធ្វើដំណើរជា
-// parameter ដែល client គ្រប់គ្រង ➜ អ្នកកាន់ `ZTO_PROXY_KEY` (សោដែល
-// **ចែករំលែក** ទៅគ្រប់ឧបករណ៍) អានបញ្ជីរបស់សាខា **ណាក៏បាន** ដោយហៅ
-// Function ដោយផ្ទាល់។ ការចងខាង client ទប់បានតែអ្នកប្រើស្មោះត្រង់។
-//
-// ដូច្នេះអ្នកសម្រេចឈរនៅ **server** ៖ Firebase **ID token** (RS256 ចុះ
-// ហត្ថលេខាដោយ Google) ➜ email ដែលផ្ទៀងផ្ទាត់រួច ➜ លេខសាខា។ ⛔ `?site=`
-// របស់ client ត្រូវ **បោះចោល**។
-//
-// ⛔ **ជាន់នេះឈរលើការគ្រប់គ្រងការបង្កើតគណនី** ៖ បើ Firebase បើក sign-up
-// សាធារណៈ អ្នកវាយប្រហារបង្កើត `x@zoew<សាខា>.com` ដោយខ្លួនឯង ➜ ត្រូវដក
-// «Enable create (sign-up)» ក្នុង Console។ `email_verified` **មិនត្រូវ
-// ទាមទារ** ព្រោះ domain ទាំងនោះមិនមែន domain ពិត (ម្ចាស់គម្រោងបង្កើត
-// គណនីដោយដៃ) ➜ ការទាមទារវានឹងបិទមុខងារទាំងស្រុង។
 const ID_TOKEN_HEADER = 'x-zoe-id-token';
 const FIREBASE_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 const FIREBASE_CERTS_TTL_MS = 60 * 60 * 1000;
@@ -752,8 +638,6 @@ const SITE_EMAIL_PREFIX_DEFAULT = 'zoew';
 
 const certsState = { at: 0, keys: null, inFlight: null };
 
-// ⛔ បញ្ជីបំបែកដោយ comma តាមលំនាំដដែលនឹង `ZTO_SIGNED_VALUES` (ច្បាប់ ១២)
-// ➜ ដកឃ្លា និងធាតុទទេមិនសំខាន់។
 function readProjectIds(env) {
     const raw = String((env && env.FIREBASE_PROJECT_IDS) || '').trim();
     if (!raw) return [];
@@ -768,7 +652,6 @@ function siteEmailPrefix(env) {
     return SITE_EMAIL_PREFIX_RE.test(raw) ? raw : SITE_EMAIL_PREFIX_DEFAULT;
 }
 
-// ⛔ `$` ជាចំណុចសំខាន់ ៖ បើគ្មានវា `…@zoew881859.com.evil.com` នឹងឆ្លង។
 function siteCodeFromEmail(email, prefix) {
     const text = String(email || '').trim().toLowerCase();
     const re = new RegExp('@' + prefix + '([0-9]{1,32})\\.com$');
@@ -800,9 +683,6 @@ function decodeIdToken(token) {
     return { header: header, payload: payload, signed: parts[0] + '.' + parts[1], signature: sig };
 }
 
-// ⛔ វិញ្ញាបនបត្ររបស់ Google **រួមសម្រាប់គ្រប់ Project** ➜ ការទាញតែម្ដង
-// បម្រើ Project ប៉ុន្មានក៏បាន។ cache ជាការចាំបាច់ ៖ ការទាញរាល់សំណើនឹង
-// ស៊ីថវិកា ហើយធ្វើឲ្យការស្កេនយឺត។
 async function firebaseCerts(timeoutMs) {
     if (certsState.keys && elapsedSince(certsState.at) < FIREBASE_CERTS_TTL_MS) return certsState.keys;
     if (certsState.inFlight) return certsState.inFlight;
@@ -827,7 +707,6 @@ async function firebaseCerts(timeoutMs) {
     return certsState.inFlight;
 }
 
-// ⛔ សាលក្រម ៣ ៖ `ok` · មូលហេតុដែល **មិនលេចតម្លៃ** · គ្មានការបោះ។
 async function verifyIdToken(token, projectIds, timeoutMs) {
     if (!token) return { ok: false, reason: 'idtoken:missing' };
     if (!projectIds.length) return { ok: false, reason: 'idtoken:project-unset' };
@@ -870,8 +749,6 @@ function listSiteCodeOf(raw) {
     return { code: text, reason: '' };
 }
 
-// ⛔ កាលបរិច្ឆេទត្រូវ **ពិត** មិនត្រឹមត្រូវនឹង regex ៖ `2026-02-31` ឆ្លង
-// `LIST_DATE_RE` តែរអិលទៅ `2026-03-03` ➜ ជួរដែលអ្នកប្រើមិនបានស្នើ។
 function listDateIsValid(text) {
     if (!LIST_DATE_RE.test(text)) return false;
     const at = Date.parse(text + 'T00:00:00Z');
@@ -908,9 +785,6 @@ function listRequestBody(listConfig, siteCode, range, page) {
     };
 }
 
-// ⛔ សំបកមាន **ជាន់** ៖ `{data:{pageNum,pages,total,result:[…]}}`។ ជួរដេក
-// ត្រូវរកឃើញជា **array** ពិត — `result` ដែលមិនមែន array ត្រូវជា **ការធ្លាក់**
-// មិនមែន «០ ជួរដេក» ស្ងាត់ៗ (០ ជួរដេកកុហក ធ្វើឲ្យអ្នកប្រើជឿថាថ្ងៃនោះទទេ)។
 function listContainerOf(upstream) {
     if (!upstream || typeof upstream !== 'object') return null;
     const roots = [upstream.data, upstream.result, upstream.data && upstream.data.data,
@@ -929,19 +803,11 @@ function listContainerOf(upstream) {
     return null;
 }
 
-// ⛔ កញ្ចប់ដែល **មិនមែនរបស់អតិថិជន** (ឆ្លងកាត់ · ផ្ទាល់ខ្លួន) មកជាមួយ
-// `consigneeMobile: "0"` ➜ វាមិនមែនលេខទូរស័ព្ទទេ។ ⛔ តែ `cod === 0`
-// **មិនមែនតម្រង** — កញ្ចប់ `taobao` ដែលបង់មុន មាន COD = 0 ស្របច្បាប់។
 function listPhoneIsPlaceholder(text) {
     const digits = String(text || '').replace(/[^0-9]/g, '');
     return !digits || /^0+$/.test(digits);
 }
 
-// ⛔ **ការបញ្ចាំងឈរនៅ server** ៖ ឈ្មោះ · អាសយដ្ឋាន · `fcAmount` (ថ្លៃដឹក)
-// មិនត្រូវឆ្លងកាត់ទេ — PII ដែលមិនប្រើ និងទំហំដែលមិនចាំបាច់។
-// ⛔ សាលក្រម ៣ ៖ `''` (ប្រើបាន) · `'scan-type'` (ប្រភេទស្កេនខុស) ·
-// `''` សម្រាប់ជួរដេកដែល **គ្មានវាល** — «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស»។
-// ⛔ តម្លៃពិតរបស់វាល **មិនឆ្លងកាត់ទៅ browser** — ត្រឹមសាលក្រម។
 function listScanTypeSkip(listConfig, candidates) {
     const code = pickText(candidates, LIST_SCAN_CODE_PATHS);
     if (code && code !== listConfig.scanType) return 'scan-type';
@@ -956,15 +822,8 @@ function projectListRow(config, row) {
     const candidates = [row];
     const phone = pickText(candidates, config.phonePaths);
     const cod = pickNumber(candidates, config.codPaths);
-    // ⛔ **ផ្លូវបញ្ជី និងផ្លូវស្កេនអានបញ្ជីវាលដដែល** (`config.dodPaths`) ➜ ទិន្នន័យ
-    // តែមួយមិនអាចឲ្យលេខ ២ ផ្សេងគ្នាបានទេ។ ⛔ `ZTO_FIELD_DOD` (បើកំណត់) ឈ្នះ
-    // ជានិច្ច ➜ ការប្តូរវាលនាពេលអនាគត នៅតែជា env តែម្យ៉ាង គ្មានការកែកូដ។
     const dod = pickNumber(candidates, config.dodPaths);
     const at = pickText(candidates, LIST_TIME_PATHS);
-    // ⛔ សាលក្រម «បិទរួច» ជា **ជាន់ទី ១** នៃច្រកទ្វារ «ចាស់ + បិទរួច ➜ បញ្ចូល»
-    // ខាង client ៖ បើជួរដេកបញ្ជីផ្ទុកវាល `ZTO_FIELD_SIGNED` នោះការវាស់ឥតថ្លៃ។
-    // ⛔ វាលអវត្តមាន ➜ `null` (**មិនទាន់វាស់**) មិនមែន `false` — client ត្រូវ
-    // ធ្លាក់ចុះទៅផ្លូវ `/detail` ក្នុងមួយ barcode ជំនួស។
     return {
         barcode: pickText(candidates, LIST_BARCODE_PATHS),
         phone: listPhoneIsPlaceholder(phone) ? '' : phone,
@@ -988,8 +847,6 @@ function listResponseBody(config, container, page, siteCode) {
         list: true,
         enabled: true,
         page: page,
-        // ⛔ លេខសាខាដែល **ដេរីវេពី token** ➜ UI បង្ហាញការពិត ជំនួសលេខដែល
-        // អ្នកប្រើវាយ (ដែល server បោះចោល)។ វាជាសាខារបស់គណនីខ្លួនឯង ➜ គ្មានការលេច។
         site: String(siteCode || ''),
         pages: Number.isFinite(pages) ? pages : (rows.length ? 1 : 0),
         total: Number.isFinite(total) ? total : rows.length,
@@ -1068,15 +925,10 @@ function readConfig(env) {
         cacheTtlMs: boundedInteger(env.ZTO_CACHE_TTL_MS, 60000, 0, 600000)
     };
 
-    // ⛔ TTL អវិជ្ជមានត្រូវ **មិនលើស** cache សរុប ➜ `ZTO_CACHE_TTL_MS=0`
-    // បិទទាំង ២ ផ្លូវក្នុងកន្លែងតែមួយ។
     config.notFoundCacheTtlMs = Math.min(
         boundedInteger(env.ZTO_NOT_FOUND_CACHE_TTL_MS, NOT_FOUND_CACHE_TTL_DEFAULT_MS, 0, 120000),
         config.cacheTtlMs);
 
-    // ⛔ បញ្ជីប្រែរាល់ការស្កេនថ្មីរបស់ ZTO ➜ TTL របស់វាខ្លីដោយចេតនា ហើយ
-    // ឈរ **ក្រោម** `cacheTtlMs` ➜ `ZTO_CACHE_TTL_MS=0` បិទគ្រប់ផ្លូវ cache
-    // ក្នុងកន្លែងតែមួយ។
     config.listCacheTtlMs = Math.min(config.cacheTtlMs, LIST_CACHE_TTL_MAX_MS);
 
     config.budgetMs = Math.min(24000, Math.max(config.budgetMs, config.upstreamTimeoutMs + 1500));
@@ -1127,8 +979,6 @@ function buildHeaders(config, env, cookie, wantsPost) {
         'Accept-Language': config.acceptLanguage,
         'User-Agent': config.userAgent
     };
-    // ⛔ ផ្លូវបញ្ជីជា POST ជានិច្ច ទោះ `ZTO_API_METHOD` ជា GET ➜ header
-    // ត្រូវដេរីវេពី **សំណើដែលនឹងចេញពិត** មិនមែនពី method លំនាំដើម។
     if (config.method === 'POST' || wantsPost) headers['Content-Type'] = 'application/json;charset=UTF-8';
     const wantsBrowserHeaders = config.sendBrowserHeaders === null
         ? authKind === 'cookie'
@@ -1160,9 +1010,6 @@ function ztoAuthRejected(response, upstream) {
     return /(?:session|token|cookie|login|auth).{0,32}(?:expired|invalid|required|missing|failed)|(?:expired|invalid).{0,16}(?:session|token|cookie)|not\s+(?:logged|signed)\s+in|unauthori[sz]ed|未登录|登录失效|登录过期/.test(message);
 }
 
-// ⛔ ចំណុចច្របាច់ **តែមួយ** នៃការអានកូដរបស់ upstream ៖ `upstreamSucceeded()`
-// និង `noteUpstreamReject()` ត្រូវអានវាល **ដដែល** តាមលំដាប់ **ដដែល** —
-// ច្បាប់ចម្លងទី ២ នឹងធ្វើឲ្យសាលក្រម និងការវិនិច្ឆ័យនិយាយផ្ទុយគ្នា។
 function upstreamCodeText(upstream) {
     if (!upstream || typeof upstream !== 'object' || Array.isArray(upstream)) return '';
     let raw = '';
@@ -1181,13 +1028,6 @@ function upstreamSucceeded(upstream) {
     return SUCCESS_CODE_RE.test(code);
 }
 
-// ⛔ **ការកត់ត្រា មិនមែនការសម្រេច** ៖ `ZTO_UPSTREAM_REJECTED` ជា **កន្តុំរួម**
-// ដែលលាយ «លេខមិនស្គាល់» (សាលក្រមស្ថាពរ — ការសាកម្តងទៀតឥតប្រយោជន៍) ជាមួយ
-// «ZTO ដាច់ពិត» (សាលក្រមបណ្តោះអាសន្ន — ការសាកម្តងទៀតត្រឹមត្រូវ)។ client
-// ព្យាយាម **២ ដង** លើទាំងពីរ ព្រោះ 5xx ជា retryable។ ⛔ ការបំបែកពួកវាត្រូវការ
-// **payload ពិតរបស់ ZTO** ដែលគ្មាននរណាធ្លាប់មើល ➜ ការទាយនឹងបាំងការដាច់ពិត។
-// ដូច្នេះជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ** ក្នុង `?diag=1` ⛔ ដោយ **មិនប្តូរ
-// សាលក្រម មិនប្តូរ cache មិនប្តូរការសាកម្តងទៀត** — ជុំក្រោយទើបសម្រេចដោយលេខ។
 function noteUpstreamReject(status, upstream) {
     upstreamRejectSignal.at = Date.now();
     upstreamRejectSignal.count++;
@@ -1240,18 +1080,6 @@ function pickText(candidates, paths) {
     return '';
 }
 
-// ⛔ **`pickNumber()` ជាចំណុចច្របាច់តែមួយនៃលុយ** — កន្លែងហៅទាំង ៤ សុទ្ធតែ
-// ជា COD ឬ DOD (ផ្លូវស្កេន និងផ្លូវបញ្ជី) ➜ ការសម្រេចត្រង់នេះគ្រប់ផ្លូវលុយ។
-//
-// ⛔ **លេខអវិជ្ជមាន clamp ត្រឹម `0`** ៖ ចំនួនទឹកប្រាក់ដែលត្រូវប្រមូល មិនអាច
-// អវិជ្ជមានបានទេ។ មុនកំណែ 2.35.1 វាមិនដែលឈានដល់អ្នកប្រើលើផ្លូវស្កេន ព្រោះ
-// `arrivalServiceCharge: 0.00` បាំងវាលខាងក្រោយទាំងអស់ — ការបន្ថែម `fcAmount`
-// បើកផ្លូវនោះ ➜ ច្រកទ្វារត្រូវឈរត្រង់នេះ (ច្បាប់ដដែលនឹង `revenue-rules-clamp-test`)។
-//
-// ⛔ **clamp មិនមែន «រំលងទៅវាលបន្ទាប់»** ៖ ការរំលងនឹងធ្វើឲ្យវាលអវិជ្ជមាន
-// លើកតម្លៃរបស់វាល *ផ្សេង* ឡើងជំនួសដោយស្ងាត់ ➜ លេខដែលអ្នកប្រើឃើញ លែងមកពី
-// វាលដែលឯកសារសន្យា។ ⛔ ហើយ `0` ជាចំនួនទឹកប្រាក់ **ត្រឹមត្រូវ** (កញ្ចប់ Shopee
-// មាន `fcAmount: 0.0` ពិតៗ) ➜ វាឈ្នះដដែល មិនត្រូវរំលងឡើយ។
 function pickNumber(candidates, paths) {
     for (let i = 0; i < candidates.length; i++) {
         for (let j = 0; j < paths.length; j++) {
@@ -1264,9 +1092,6 @@ function pickNumber(candidates, paths) {
     return null;
 }
 
-// ⛔ សាលក្រមមាន **៣** ៖ `true` (បិទរួចនៅ ZTO) · `false` (មិនទាន់បិទ) ·
-// `null` («មិនទាន់វាស់»)។ វាលដែលរកមិនឃើញ ត្រូវជា `null` ⛔ **មិនមែន `false`**
-// — នេះជាច្បាប់ «មិនអាចផ្ទៀងផ្ទាត់ ≠ ខុស» ដដែលនឹង `license-verify.js`។
 function pickSignedVerdict(candidates, signed) {
     if (!signed || !signed.paths.length || !signed.values.length) return null;
     for (let i = 0; i < candidates.length; i++) {
@@ -1303,9 +1128,6 @@ function abortError() {
     return error;
 }
 
-// ⛔ `plan` ជា **ការបន្ថែមស្រេចចិត្ត** មិនមែនផ្លូវទី ២ ៖ abort · សាលក្រម
-// auth · ការបន្តអាយុ Cookie · ការបម្លែង 429/5xx/HTML ត្រូវ **ប្រើរួម**។
-// ការចម្លងរង្វិលជុំនេះសម្រាប់បញ្ជី នឹងបង្កើតផ្លូវបណ្តាញដែលគ្មានអ្នកយាម។
 async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
     const controller = new AbortController();
     let timer = null;
@@ -1385,9 +1207,6 @@ async function requestOnce(config, headers, barcode, timeoutMs, session, plan) {
         }
 
         if (plan) {
-            // ⛔ សំបកដែលគ្មានជួរដេកជា **ការធ្លាក់** មិនមែន «រកមិនឃើញ» ៖
-            // `found:false` ជាសាលក្រមរបស់ barcode តែមួយ — បញ្ជីទទេពិត
-            // មកជា array ទទេ ដែលឆ្លងផ្លូវជោគជ័យដដែល។
             const built = plan.extract(upstream);
             if (!built) {
                 return {
@@ -1464,20 +1283,6 @@ function budgetLeftMs(config, startedAt) {
     return config.budgetMs - elapsedSince(startedAt);
 }
 
-// ⛔ **ការអាន Cookie លើ container *ត្រជាក់* មិនមែនការងារស្រេចចិត្តទេ។**
-// ពេលមានតម្លៃក្នុងសតិរួច ការអានជាការធ្វើឲ្យស្រស់ ➜ ថវិកាតឹង ➜ រំលងវាបាន
-// ដោយសុវត្ថិភាព។ តែពេល **សតិទទេ** (container ទើបត្រជាក់) ការរំលងការអាន
-// មិនសន្សំពេលទេ — វា **ធានាការធ្លាក់** ៖ គ្មាន Cookie ➜ គ្មានការហៅ upstream
-// សោះ ➜ HTTP 503 `ZTO_AUTH_NOT_CONFIGURED` ខណៈ Cookie ពិតអង្គុយក្នុង store។
-//
-// 🔴 វាស់បាន (2026-09-10) ៖ `ZTO_UPSTREAM_TIMEOUT_MS = 7500` (កំណត់ក្នុង
-// Netlify env ពិត) បូក budget លំនាំដើម ៩០០០ ➜ បង្អួច = ៣០០ ms នៅ elapsed 0
-// ហើយ **០** នៅ elapsed ១ ms ➜ ការស្កេនលើ container ត្រជាក់ធ្លាក់ 503។
-// ដូច្នេះកក់បង្អួចអប្បបរមាឲ្យការអាន ដរាបណាថវិកានៅសល់ពិត។ `fetchOrder()`
-// កាត់ `timeoutMs` តាម `remaining − 200` រួចហើយ ➜ ការចំណាយនេះ **មិនអាច
-// ធ្វើឲ្យលើសពិដាន ១០ វិនាទីរបស់ Netlify** បានទេ។
-// ⛔ ការទាញវិញ្ញាបនបត្រឈរ **ក្នុង** ថវិកា (ច្បាប់ដដែលនឹង Cookie store) ៖
-// ការដាក់វាក្រៅ នឹងធ្វើឲ្យ Netlify សម្លាប់ Function មុនវាឆ្លើយ។
 function certsTimeoutMs(config, startedAt) {
     const left = budgetLeftMs(config, startedAt) - config.upstreamTimeoutMs;
     if (left >= FIREBASE_CERTS_MAX_TIMEOUT_MS) return FIREBASE_CERTS_MAX_TIMEOUT_MS;
@@ -1486,23 +1291,13 @@ function certsTimeoutMs(config, startedAt) {
 
 function cookieReadTimeoutMs(config, startedAt) {
     const left = budgetLeftMs(config, startedAt);
-    // ⛔ សតិទទេ ➜ គ្មាន Cookie ➜ គ្មានការហៅ upstream សោះ ➜ ការអាន **ជា
-    // សំណើទាំងមូល**។ វាត្រូវទទួលពិដានរបស់ store ពេញ ដរាបណាថវិកានៅសល់
-    // អាចផ្ទុកការហៅ upstream អប្បបរមា ១។ 🔴 វាស់បាន (2026-09-15) ៖ តាម
-    // រូបមន្តចាស់ (កក់ `upstreamTimeoutMs` ពេញមុនការអាន) ការកំណត់ផលិតកម្ម
-    // `upstream 7000 · budget 9000` ផ្តល់បង្អួច **៨០០ ms** ➜ Blobs ដែល
-    // ឆ្លើយ ២,៥ វិ. លើ container ត្រជាក់ ធ្លាក់ 503 `ZTO_AUTH_NOT_CONFIGURED`
-    // ខណៈថវិកា **៧,២ វិ. នៅមិនទាន់ប្រើសោះ** ហើយ Cookie ពិតអង្គុយក្នុង store។
     if (!cookieState.value) {
         const cold = Math.min(COOKIE_STORE_TIMEOUT_MS,
             left - COOKIE_BUDGET_RESERVE_MS - COOKIE_COLD_UPSTREAM_RESERVE_MS);
         if (cold >= COOKIE_READ_MIN_TIMEOUT_MS) return cold;
-        // ថវិកាតឹងខ្លាំង ➜ កក់បង្អួចអប្បបរមា តែ **មិនលើសអ្វីដែលនៅសល់ពិត**
         const floor = Math.min(COOKIE_READ_MIN_TIMEOUT_MS, left - COOKIE_BUDGET_RESERVE_MS);
         return floor > 0 ? floor : 0;
     }
-    // ⛔ ទិសផ្ទុយ ៖ សតិមានតម្លៃ ➜ ការអានជាការធ្វើឲ្យស្រស់ **សុទ្ធសាធ** ➜
-    // វាមិនត្រូវលួចពេលរបស់ upstream ទេ ➜ រំលងពេលថវិកាតឹង។
     const room = left - COOKIE_BUDGET_RESERVE_MS - config.upstreamTimeoutMs;
     if (room >= COOKIE_READ_MIN_TIMEOUT_MS) return Math.min(COOKIE_STORE_TIMEOUT_MS, room);
     return 0;
@@ -1526,9 +1321,6 @@ async function retryAfterAuthRejected(netlifyEvent, config, barcode, startedAt, 
         return null;
     }
     if (!fresh.cookie || fresh.cookie === previousCookie) {
-        // ⛔ ការអានឡើងវិញ **ចាក់ cache ៦០ វិ. សាជាថ្មី** ជាផលរំខាន។ បើ
-        // Cookie មិនប្រែ នោះគ្មាន credential ថ្មីសម្រាប់សាក ➜ លុប cache ម្តងទៀត
-        // បើមិនដូច្នេះ Cookie ថ្មីដែល helper សរសេរក្រោយមក ត្រូវរង់ចាំ ៦០ វិ.
         invalidateCookieCache(fresh);
         return null;
     }
@@ -1558,10 +1350,6 @@ function storeCachedBody(key, body, negative) {
     }
 }
 
-// ⛔ សាលក្រម ២ ប្រភេទចែក cache តែមួយ តែ **អាយុខុសគ្នា** ៖ លទ្ធផលពិត
-// រស់តាម `ttlMs`; «រកមិនឃើញ» រស់តាម `negativeTtlMs` ដែលខ្លីជាង។ ការវាស់
-// អាយុឆ្លងកាត់ `elapsedSince()` ➜ នាឡិកាថយក្រោយ ➜ `Infinity` ➜ ធាតុផុត
-// ភ្លាម (fail-open ក្នុងទិសសុវត្ថិភាព — ច្បាប់ `monotonic-gate-test`)។
 function readCachedBody(key, ttlMs, negativeTtlMs) {
     const hit = resultCache.get(key);
     if (!hit) return null;
@@ -1595,9 +1383,6 @@ function configErrorResponse(error) {
     return json(503, body);
 }
 
-// ⛔ ការត្រៀម (OPTIONS) ឈរ **ក្រៅ** ផ្លូវស្កេន ➜ វាត្រូវ **បញ្ចប់** ការអាន
-// ពិត មិនមែនត្រឹមតាំងវាខាងក្រោយ។ នោះជាចំណុចទាំងមូលរបស់ការត្រៀម ៖ បង់ថ្លៃ
-// ការអាន Blobs នៅទីនេះ ដើម្បីកុំឲ្យការស្កេនបង់វា។
 async function prewarmCookieCredential(netlifyEvent) {
     if (cookieState.value && elapsedSince(cookieState.at) < COOKIE_CACHE_TTL_MS) return;
     try {
@@ -1640,11 +1425,6 @@ function diagnosticsBody(config, headers, authKind, credential) {
             signedValues: config.signed.values.length,
             signedReason: config.signed.reason || null
         },
-        // ⛔ ស្ថានភាព **បើក/បិទ + មូលហេតុ** ប៉ុណ្ណោះ ៖ លេខសាខាជាការកំណត់
-        // របស់អាជីវកម្ម ➜ វាមិនត្រូវលេចក្នុងចម្លើយវិនិច្ឆ័យទេ (ច្បាប់ដដែល
-        // នឹង `signedValues` ដែលរាយត្រឹម **ចំនួន**)។ ⛔ `siteFromRequest`
-        // ជា **ការពិតអំពីកំណែកូដ** មិនមែនតម្លៃ ៖ វាប្រាប់ថា server លែង
-        // កាន់លេខសាខា ➜ `site:missing` លែងលេចក្នុង `?diag=1` ទៀតហើយ។
         list: {
             enabled: config.list.enabled,
             siteFromRequest: true,
@@ -1682,12 +1462,6 @@ function diagnosticsBody(config, headers, authKind, credential) {
     };
 }
 
-// ⛔ App Android (Capacitor) បម្រើពី `https://localhost` ➜ សំណើរបស់វាជា
-// cross-origin ហើយមាន header ផ្ទាល់ខ្លួន ➜ WebView ផ្ញើ preflight ហើយបដិសេធ
-// ចម្លើយដែលគ្មាន `Access-Control-Allow-Origin`។ ⛔ បញ្ជីអនុញ្ញាតជា origin
-// **ពិតប្រាកដ** (មិនមែន `*`) ហើយ CORS **មិនមែនការផ្ទៀងផ្ទាត់** ៖ សោ proxy និង
-// ID token នៅជាអ្នកសម្រេចដដែល។ ⛔ web (same-origin) មិនផ្ញើ `Origin` ដែលស្ថិត
-// ក្នុងបញ្ជី ➜ ចម្លើយរបស់វាដូចមុនបេះបិទ។
 const NATIVE_APP_ORIGINS = new Set(['https://localhost']);
 const CORS_HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
 
@@ -1759,15 +1533,9 @@ async function handleRequest(event) {
     const wantsFreshCookie = wantsDiagnostics && String(query.fresh || '') === '1';
     const barcode = String(query.barcode || '').trim();
 
-    // ⛔ សាខាបញ្ជីឈរ **មុន** ការត្រួតពិនិត្យ `BARCODE_RE` ៖ សំណើបញ្ជី
-    // គ្មាន barcode សោះ ➜ ការដាក់វាក្រោយធ្វើឲ្យវាធ្លាក់ 400 ជានិច្ច។
     const wantsList = !wantsDiagnostics && String(query.list || '') === '1';
     let plan = null;
     if (wantsList) {
-        // ⛔ មុខងារបិទ ≠ កំហុស ➜ HTTP 200 **គ្មានវាល `error`** (ច្បាប់ដដែល
-        // នឹង `found:false` ៖ វាល `error` បង្ខំ client ចូល cooldown)។
-        // ⛔ លេខសាខាមកពី **អត្តសញ្ញាណ** មិនមែនពី `?site=` — មើលការពន្យល់
-        // នៅលើ `verifyIdToken()`។ `query.site` ត្រូវបោះចោលទាំងស្រុង។
         const projectIds = readProjectIds(process.env);
         const idToken = (event.headers && (event.headers[ID_TOKEN_HEADER] || event.headers['X-Zoe-Id-Token'])) || '';
         const auth = await verifyIdToken(idToken, projectIds, certsTimeoutMs(config, startedAt));
@@ -1813,11 +1581,6 @@ async function handleRequest(event) {
                 const container = listContainerOf(upstream);
                 return container ? listResponseBody(config, container, page, site.code) : null;
             },
-            // ⛔ កូនសោបញ្ជីត្រូវ **ផ្សេងតាមរចនាសម្ព័ន្ធ** ពីកូនសោ barcode ៖
-            // `BARCODE_RE` មិនអនុញ្ញាត `|` ➜ បច្ច័យ `|L|` មិនអាចប៉ះគ្នាបាន។
-            // ⛔ **លេខសាខាឈរក្នុងកូនសោដែរ** ៖ instance តែមួយបម្រើសាខាច្រើន
-            // ➜ កូនសោគ្មានសាខា នឹងបម្រើបញ្ជីរបស់សាខាមុនទៅសាខាបន្ទាប់
-            // (`LIST_SITE_CODE_RE` មិនអនុញ្ញាត `|` ➜ ប៉ះគ្នាមិនបាន)។
             cacheKey: config.fingerprint + '|L|' + config.list.fingerprint
                 + '|' + site.code + '|' + range.from + '|' + range.to + '|' + page,
             cacheTtlMs: config.listCacheTtlMs
@@ -1828,12 +1591,6 @@ async function handleRequest(event) {
         return json(400, { error: 'Invalid barcode', code: 'ZTO_BARCODE_INVALID' });
     }
 
-    // ⛔ **កូនសោ cache មិនត្រូវផ្ទុក fingerprint នៃ Cookie ទេ។** លទ្ធផលរបស់
-    // barcode មួយ ជាទិន្នន័យបញ្ជាទិញ — វា **មិនអាស្រ័យលើ session ណាដែលទៅយក**។
-    // ការដាក់ Cookie ចូលកូនសោធ្វើឲ្យ **រាល់ការបន្តអាយុ Cookie បោះ cache
-    // ទាំងមូលចោល** ហើយបង្ខំឲ្យអានឡើងវិញពី store មុនឆ្លើយ។ ការប្តូរ config
-    // (endpoint · field · method) នៅតែផ្លាស់កូនសោដដែល តាម `config.fingerprint`។
-    // ផលដែលវាស់បាន ៖ ការស្កេនដដែលក្នុង TTL ឆ្លើយ **ដោយមិនប៉ះ Netlify Blobs**។
     const cacheKey = plan ? plan.cacheKey : config.fingerprint + '|' + barcode.toUpperCase();
     if (!wantsDiagnostics) {
         const early = plan
@@ -1868,8 +1625,6 @@ async function handleRequest(event) {
         });
     }
 
-    // ⛔ ការចែក run (single-flight) នៅតែត្រូវ **ដាច់តាម Cookie** — សំណើ ២
-    // ដែលកាន់ session ខុសគ្នា មិនត្រូវចែកលទ្ធផលនៃការហៅដែលកំពុងដំណើរការទេ។
     const flightKey = cacheKey + '|' + (cookieFingerprint(session.cookie) || '-');
 
     let outcome;
@@ -1883,11 +1638,6 @@ async function handleRequest(event) {
         session.renewal = '';
         invalidateCookieCache(session);
         noteCookieRejected(session);
-        // ⛔ មូលហេតុទី ១ នៃ 401 គឺ **cache សតិ ៦០ វិ. របស់ instance នេះ**
-        // ដែលនៅកាន់ Cookie ចាស់ ខណៈ helper ទើបសរសេរ Cookie ថ្មីចូល Blobs។
-        // ដូច្នេះអានឡើងវិញដោយ `fresh` ១ ដង ហើយសាកម្តងទៀត **តែពេល
-        // fingerprint ប្រែ** — បើមិនប្រែ ➜ ឆ្លើយការបដិសេធ 401
-        // ភ្លាមដោយគ្មានការហៅ upstream ឥតប្រយោជន៍។
         const retried = await retryAfterAuthRejected(event, config, barcode, startedAt, session.cookie, plan);
         if (!retried) {
             return json(401, { error: 'ZTO authentication rejected', code: 'ZTO_AUTH_EXPIRED' });
@@ -1912,9 +1662,6 @@ async function handleRequest(event) {
         return json(200, Object.assign({}, outcome.body, { cached: false }));
     }
     if (outcome.kind === 'notFound') {
-        // ⛔ រូបរាងត្រូវនៅដដែល ៖ `found:false` **គ្មានវាល `error`** — បើដាក់
-        // `error` ចូល នោះ client បោះ «Lookup rejected» ➜ cooldown ៣០ វិ.
-        // (មេរៀន 2.25.0)។ ការ cache ប៉ះតែ *ចំនួនសំណើ* មិនប៉ះរូបរាងទេ។
         const notFoundBody = { success: false, found: false, barcode, code: 'ZTO_NOT_FOUND' };
         if (config.notFoundCacheTtlMs > 0) storeCachedBody(cacheKey, notFoundBody, true);
         return json(200, Object.assign({}, notFoundBody, { cached: false }));
@@ -1954,9 +1701,6 @@ exports.resetCachesForTests = function resetCachesForTests() {
     cookieState.renewAttemptEtag = '';
 };
 
-// ⛔ ច្រកសម្រាប់អ្នកយាមតែប៉ុណ្ណោះ ៖ បង្អួចអានរបស់ Cookie store ជា **អនុគមន៍
-// សុទ្ធ** នៃ (config · elapsed · តើមាន Cookie ក្នុងសតិឬទេ) ➜ អ្នកយាមអាចវាស់
-// វា **ដោយកំណត់ជាក់លាក់** ជំនួសការប្រណាំងលើគែម ១ ms ក្នុង handler ពិត។
 exports.cookieReadWindowForTests = function cookieReadWindowForTests(config, startedAt, hasMemoryCookie) {
     const saved = cookieState.value;
     cookieState.value = hasMemoryCookie ? 'probe=1' : '';

@@ -49,12 +49,6 @@ export function showGlobalMoreMenu(btn, event, items) {
     positionMenuSafely('globalMoreMenu', rect);
 }
 
-/**
- * ទីតាំងម៉ឺនុយដែលមិនហៀរក្រៅអេក្រង់ (ក្រោមប៊ូតុង ឬលើវាពេលខ្វះកន្លែង)។
- * ⛔ ម៉ឺនុយត្រូវ **ចុះ DOM នៅ `top: 0; left: 0`** មុនការវាស់ (`elementSize()`
- *    បង្ខំការគូរ) ➜ ទទឹងមិនរួញដោយគែមអេក្រង់ ហើយធាតុខាងក្នុងមានរួច — វាស់បាន
- *    (parity:live) ៖ ការវាស់មុនធាតុចុះ ➜ left 245px ធៀបនឹង 137px។
- */
 export function positionMenuSafely(menuName, rect) {
     uiState.moreMenuPosition = { top: 0, left: 0 };
     const size = elementSize(menuName);
@@ -95,7 +89,6 @@ export function toggleHeaderMoreDropdown(btn?, event?) {
 export function toggleMoreDropdown(btn?, event?, id?) {
     const item = dataState.scanHistory.find(i => i.id === id);
     const items = [];
-    // ⛔ «កែតម្លៃកញ្ចប់» លេចតែពេលមាន barcode ពិត (ដូចដើម)
     if (item && item.barcodes && item.barcodes.length > 0) {
         items.push({ label: '💵 កែតម្លៃកញ្ចប់', action: 'moreMenuViewList', args: [id] });
     }

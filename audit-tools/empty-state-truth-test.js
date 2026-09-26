@@ -169,7 +169,7 @@ function buildSandbox(state) {
         VIEW_NOT_MEASURABLE_TEXT: NOT_MEASURABLE,
         VIEW_NOT_MEASURABLE_NOTICE: '⏳ ' + NOT_MEASURABLE,
         dbListenerPendingPaths: new Set(state.pending || []),
-        dbListenerFailedPaths: new Set(state.failed || []),
+        dbListenerFailedPaths: new Set(state.failed || []), dbListenerReportedFailures: new Set(),
         monthlyReportMonth: state.month || '2026-09',
         getFormattedDate: () => '2026-09-09',
         getServerNow: () => Date.parse('2026-09-09T03:00:00Z'),

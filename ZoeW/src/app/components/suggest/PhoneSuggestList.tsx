@@ -2,7 +2,6 @@ import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
 import { pickPhoneSuggestion } from '../../behaviors/phone-search';
 
-/** បញ្ជីណែនាំលេខទូរស័ព្ទ (ក្រោមប្រអប់ស្វែងរក)។ */
 export function PhoneSuggestList() {
     useStore(uiState);
     const items = (uiState.phoneSuggestItems || []) as { phone: string; packages: number }[];

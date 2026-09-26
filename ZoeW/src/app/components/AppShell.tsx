@@ -42,10 +42,6 @@ import { LocationWarningModal } from './modals/LocationWarningModal';
 import { ToastContainer } from './ToastContainer';
 import { PdfExportPrintArea } from './PdfExportPrintArea';
 
-/**
- * ធាតុ root ទាំង 43 តាម **លំដាប់ដដែលនឹង `index.html` ដើម**។
- * ⚠️ លំដាប់ជាផ្នែកនៃឥរិយាបថ (CSS · `order` · កាយវិការរកធាតុបងប្អូន) — កុំរៀបឡើងវិញដោយគ្មានការវាស់ (`parity:dom`)។
- */
 export function AppShell() {
     return (
         <>

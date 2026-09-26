@@ -39,6 +39,67 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.6] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 transaction `disconnect` ដែល server អនុវត្តរួច** · Sentry លែងទទួលព្យុះកំហុសដដែល · កូដ React គ្មាន comment (branch · មិនទាន់ merge)
+
+#### 🔴 `disconnect` ≠ «មិនបានអនុវត្ត» (កំហុសលុយ · checker ១៨២+ បៃតងលើ tree នោះ)
+
+- **អ្វីដែលអ្នកប្រើអាចជួប** ៖ បណ្តាញដាច់ចំពេលការសម្អាតស្វ័យប្រវត្តិ (២ ម៉ោង/៧ ថ្ងៃ) ឬការកែទឹកប្រាក់ ➜ Firebase SDK បដិសេធ
+  transaction ដោយ `disconnect` ខណៈ server **commit រួច** (ack បាត់ក្នុងផ្លូវ) ➜ App ចាត់ទុកថា «មិនបានកើត» ៖ ការសម្អាត **មិនសរសេរ
+  ធុងសំរាម** (កញ្ចប់បាត់ពីទាំងប្រវត្តិ ទាំងធុងសំរាម) ហើយ **មិនដកលុយ** · ការកែ ledger ទៅតម្លៃពិត **ដក ២ ដង**។
+- **ភស្តុតាង** ៖ SDK Firebase ពិត (កំណែដដែលនឹង CDN `12.19.0`) + RTDB emulator ពិត + proxy TCP ដែលកាត់ការតភ្ជាប់ **ក្រោយ** frame
+  `put` របស់ transaction ទៅដល់ server ➜ promise reject `disconnect` ខណៈ server ប្រែរួច។ ⛔ `fb.get()` មិនអាចជាអ្នកសម្រេច ៖ listener
+  សកម្ម ➜ វាឆ្លើយពី cache ក្នុងស្រុក។ លើកូដមុនកែ (`tx-outcome-test`) ៖ កញ្ចប់ **មិនចូលធុងសំរាម** · ledger ថ្ងៃ/ខែ **នៅ 100**
+  (ត្រូវ 92.25) · ចំនួនកញ្ចប់ **20** (ត្រូវ 18) · `correctRevenueLedgerToActual` ៖ **100 ➜ 90** (ត្រូវ 95) · Sentry money ក្លែង
+  «Automatic cleanup transaction failed»។
+- **ការកែ** (ចំណុចច្របាច់តែមួយ ⛔ មិនមែនកែកន្លែងហៅ ៤០+) ៖ `src/services/tx-outcome.ts` ➜ `withTransactionOutcomeResolution()` រុំ
+  `fb` ម្តងក្នុង `initFirebase()` ➜ រាល់ `fb.runTransaction` ដែលបដិសេធ `disconnect` អាន server តាម **REST + ID token**
+  (`cache: 'no-store'` · host ត្រូវស៊ីនឹង `databaseURL` · ពិដានការអាន ៨ វិ. · ការព្យាយាមមានព្រំដែន ៣០ ដង/៦០ វិ.) ហើយប្រៀបនឹងតម្លៃ
+  **ដែលបានផ្ញើ** និង **មុនផ្ញើ** (ថតមុន updater កែ `current`) ៖ `applied` ➜ `{ committed: true, txOutcome: 'applied' }` · `not-applied`
+  ➜ បដិសេធដដែល (សម្គាល់ `txOutcome` ➜ ការសម្អាតលែងផ្ញើ Sentry money ក្លែង) · `unknown` ➜ បដិសេធ + Sentry `zone: 'money'` ១ ដង/path។
+  ការសម្អាតដែល commit យឺត ពិនិត្យ `cleanupClaimAccountedElsewhere()` (ធុងសំរាមលើ server · barcode ក្នុងធុងសំរាមថ្មីៗ) មុនសរសេរ ➜
+  ឧបករណ៍ ២ មិនសរសេរធុងសំរាម/ដកលុយស្ទួន។
+- **អ្នកយាម** ៖ `tx-outcome-test` (sandbox ពិត · ការសម្អាត ២ ផ្លូវ · ledger · `unknown` · ការអានធ្លាក់មានព្រំដែន · wrapper អាន
+  `runTransaction` ពេលហៅ) ➜ **ធ្លាក់ ២០+ លើកូដមុនកែ** · `emu/tx-disconnect-emu-test` (SDK ពិត · emulator ពិត · ករណី applied និង
+  not-applied) ➜ **ធ្លាក់ ៣ លើកូដមុនកែ** · `money-guardian-test` mutation ២ ថ្មី (ដកការអាន server · ដកការពិនិត្យម្ចាស់ធុងសំរាម) ➜ ក្រហមពិត។
+
+#### Sentry ៖ ព្យុះកំហុសដដែល
+
+- listener ដែល rules បដិសេធ (`permission_denied`) ត្រូវភ្ជាប់ឡើងវិញតាមជណ្តើរស្តារ ➜ **រាល់ជុំ × រាល់ path** ផ្ញើ event ទៅ Sentry
+  (វាស់ ៖ ៦ ជុំ × ៧ path = **៤៩ event** ក្នុងការដាច់តែមួយ ➜ ស៊ីកូតា Sentry · បាំងកំហុសពិត)។ ការកែ ៖ `dbListenerReportedFailures` ➜
+  **១ ដង/path/ការដាច់** (លុបពេល path រស់វិញ ➜ ការដាច់ថ្មីរាយការណ៍ម្តងទៀត) ➜ **៧**។ បូក `ZoeErrors.capture()` ក្នុង `error-reporting.js`
+  (App ទាំង ២ · byte-identical) ដក event ដដែល (zone · context · message) ក្នុង ១០ នាទី ហើយភ្ជាប់ `suppressedRepeats` ទៅ event បន្ទាប់
+  (ពិដាន ២០០ signature · នាឡិកាថយក្រោយ ➜ fail-open)។ អ្នកយាម ៖ `connection-recovery-test` ផ្នែក ៣ខ (មុនកែ ៖ `captures: 49`) ·
+  `sentry-load-race-test` ផ្នែក ៦។
+
+#### ZTO parity · សុវត្ថិភាព · ឯកសារ vanilla · comment
+
+- **ZTO ធៀប ZoeW vanilla** ៖ `logic:check` (តួ function ទាំងអស់ដូចដើម លើកលែងការកែដែលមានហេតុផល) + ការប្រៀបថេរ ZTO ទាំងអស់ ➜
+  **ស៊ីគ្នា** (គ្មានការកែ)។ **សុវត្ថិភាព** (XSS · secret · CSP · ការលាក់ Sentry) ៖ គ្មានចន្លោះថ្មី — event `unknown` ផ្ទុកតែ `pathname`
+  ហើយ ID token ក្នុង `?auth=` របស់ការអាន REST (breadcrumb `fetch`) ត្រូវលាក់ដោយ `SECRET_PARAM_PATTERN` ស្រាប់ (`secret-hygiene` វាស់ករណីនេះ)។
+- **ឯកសារសម័យ vanilla** ៖ ដក `ZoeW/scripts/package.sh` + script `npm run package` (ខ្ចប់ zip សម្រាប់ប្រគល់ពីសម័យផ្ទេរ · គ្មានអ្នកប្រើ)។
+  ⛔ `.original/` · `parity-*` · `logic-identity` · `old-app.mjs` **នៅដដែលដោយចេតនា** ៖ ពួកវាជាអ្នកយាម parity ដែលរត់ក្នុង `verify`/`parity:all`។
+- **comment** (សំណើម្ចាស់គម្រោង) ៖ លុប **៧០១** comment ក្នុង **១១៥** ឯកសារ (`src/**` · Netlify Function · config) និង HTML comment ៥
+  ក្នុង `index.html` ទាំង ២ App។ `ts-comments` (ថ្មី) ៖ TypeScript AST ➜ លុប ➜ **esbuild compile មុន/ក្រោយត្រូវដូចគ្នាបេះបិទ** (ខុស ➜
+  មិនប៉ះឯកសារ) · `/// <reference …>` រក្សា។ `comments` វាស់ប្រភព React (ដេរីវេពីទីតាំង root វាស់ ➜ baseline ក៏វាស់ដែរ · root វាស់ដែលរក
+  ប្រភពមិនឃើញ = FAIL) · `strip-comments` សម្អាត React/HTML។ `repository-contract-test` ៖ TSX ពិត + ករណី ASI (comment មានបន្ទាត់ថ្មីក្រោយ
+  `return`) ត្រូវ **បោះបង់** ➜ mutation «រំលងការផ្ទៀងផ្ទាត់ compile» ធ្លាក់។ ESLint `no-empty` ទទួល `allowEmptyCatch` (catch ទទេ = ការលេប
+  ដោយចេតនា ដែលពីមុនមាន comment បំពេញ)។ ផ្ទៀងផ្ទាត់ ៖ `npm run verify` (tsc · eslint · slot · purity · vitest · build · parity · smoke ·
+  sw · doc · android · native) · `logic:check` · `parity:dom/live/deep` · `rules:check` បៃតងទាំងអស់។
+- **អក្សរថៃ** ៖ ម្ចាស់គម្រោងចាប់បានថាការសន្ទនាលាយពាក្យថៃ (U+0E00–U+0E7F · ស្រដៀងខ្មែរ ➜ រអិលកាត់ភ្នែក) ➜ `doc-scope-test`
+  ស្កេនគ្រប់ឯកសារអត្ថបទក្នុង repo រួម `ZoeW/src/**` (វាស់ ៖ repo **០** ជួរ · commit **០**)។ probe ៖ អក្សរថៃក្នុង `docs/` ➜ FAIL ·
+  ក្នុង `ZoeW/src` ➜ FAIL · root វាស់រកប្រភពមិនឃើញ ➜ FAIL · ថតទទេ ➜ FAIL · ទិសផ្ទុយ ៖ អក្សរខ្មែរមិនត្រូវចាប់។ ⛔ វាចាប់ខ្លួនវាលើក
+  ដំបូង ៖ comment របស់ checker ដាក់ពាក្យថៃជាឧទាហរណ៍ ➜ ដកចេញ (probe សាងពី code point)។
+- `firebase@12.19.0` ចូល `devDependencies` របស់ ZoeW (SDK ពិតសម្រាប់ `emu/tx-disconnect-emu-test` · **មិន ship** — App ផ្ទុក SDK ពី CDN ដដែល)។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- **គ្មានការកែ Firebase rules · គ្មាន env ថ្មី** ➜ merge ពេលម្ចាស់គម្រោងស្នើ ➜ Netlify build ខ្លួនឯង (`zoew-v233` · `zoekeygen-v103`)។
+- **Sentry** ៖ event ថ្មីដែលអាចលេច ៖ `Transaction outcome unknown after disconnect` (`zone: money`) និង `Cleanup claim committed after
+  disconnect but ownership unverified` — ⛔ វាមានន័យថា «ផ្ទៀងផ្ទាត់មិនបាន» ➜ ពិនិត្យ node នោះលើ Firebase Console (លុយមិនត្រូវប៉ះដោយ App)។
+  event ដដែលៗឥឡូវមានវាល `suppressedRepeats` (ចំនួនដែលដកចេញក្នុង ១០ នាទី)។
+- **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បិទ WiFi ចំពេលកែទឹកប្រាក់ ➜ បើកវិញ ➜ លេខលើអេក្រង់ត្រូវស្មើ Firebase Console (មិនដក ២ ដង)។
+- ⛔ សម្រាប់ developer ៖ `npm ci --prefix ZoeW` ម្តងទៀត (dependency `firebase` ថ្មី)។
+
 ### [2.42.5] — 2026-09-25 · ZoeW ៖ **🔴 hotfix ៖ iPhone ស្កេន Barcode មិនបាន ក្រោយ ZXing-WASM 3.1.4** · APK 2.42.4 build ក្នុង session · pin វិញ្ញាបនបត្រ keystore (merge #252)
 
 #### 🔴 iPhone ស្កេនមិនបាន (របាយការណ៍ម្ចាស់គម្រោង ក្រោយ merge 2.42.4)
@@ -714,6 +775,24 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### `disconnect` ដែល server អនុវត្តរួច (2.42.6) ៖ ហេតុអ្វី checker ទាំងអស់មើលមិនឃើញ
+
+- **fake SDK ទាំងអស់ចាត់ «reject» = «មិនបានអនុវត្ត»** ➜ របៀបបរាជ័យទី ៥ («បដិសេធ តែអនុវត្តរួច») មិនដែលត្រូវដាក់ចូល។ ថ្នាក់នេះជា
+  «stub ដែលនិយាយមិនពិតអំពី dependency» ដូច «stub ដែលទទួលយកគ្រប់ការសរសេរ» ក្នុង `CLAUDE.md` ការព្រមាន ២។
+- **ការស្រាវជ្រាវ SDK** ៖ `repoAbortTransactions`/`cancelSentTransactions_` បដិសេធ transaction ស្ថានភាព `SENT` ដោយ `disconnect` ពេល
+  ការតភ្ជាប់ដាច់ — server អាចបានទទួល `put` រួច ➜ លទ្ធផល **មិនដឹង** តាមនិយមន័យ។ ការធ្វើឲ្យកើតឡើងវិញក្នុង emulator ពិតតម្រូវ proxy ដែល
+  (១) កាត់ **ក្រោយ** frame `put` (WebSocket frame ត្រូវ unmask ដើម្បីស្គាល់វា) និង (២) សរសេរ host ឡើងវិញ (SDK ទទួល host ខាងក្នុងពី
+  handshake ហើយភ្ជាប់ផ្ទាល់ទៅ `9000` រំលង proxy ➜ ជុំដំបូងនៃ `emu/tx-disconnect-emu-test` មិនកំណត់)។
+- **Mutation** (`money-guardian-test`) ៖ «wrapper បោះ error ដើមជានិច្ច» ➜ `tx-outcome-test` ក្រហម · «រំលងការពិនិត្យម្ចាស់ធុងសំរាម» ➜
+  `tx-outcome-test` ក្រហម (ធុងសំរាមស្ទួន + ដកលុយ ២ ដងលើឧបករណ៍ ២)។
+
+### Sentry storm (2.42.6)
+
+- `connection-recovery-test` ផ្នែក ៣ខ លើកូដមុនកែ ៖ `{"captures":49,"rounds":6,"paths":7}` ➜ ក្រោយកែ ៧ (១/path) · ទិសផ្ទុយ ៖ ការដាច់
+  **ថ្មី** ក្រោយស្តាររួច រាយការណ៍ម្តងទៀត។ ⛔ ការដកស្ទួនក្នុង `error-reporting.js` ជាជាន់ទី ២ ទូទៅ (App ទាំង ២) មិនមែនជំនួសជាន់ទី ១ ទេ ៖
+  វាមិនស្គាល់ «ការដាច់ថ្មី» ហើយបង្អួច ១០ នាទីរបស់វានឹងលេបការដាច់ថ្មីដែលកើតក្នុងបង្អួចនោះ។
+
+
 ### ការផ្ទេរ ZoeW ទៅ React ៖ ការរកឃើញ · ការពង្រឹង · លេខ parity ដែលវាស់បាន (ធ្លាប់ជា `ZoeW/docs/ADDED-VALUE.md` · `PARITY-RESULTS.md`)
 
 > ⛔ **បណ្ណសារ** ៖ លេខក្នុងនេះជារូបភាពនៃថ្ងៃដែលវាត្រូវវាស់ — ផលិតលេខថ្មីដោយ `npm --prefix ZoeW run parity:all` (វិធីសាស្ត្រ ៖
@@ -1241,6 +1320,7 @@ Function ដែល export ៖ 978
 | `emu/ns` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/restore-deadlock-test` | ផ្នែក ២ | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
+| `emu/tx-disconnect-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | ផ្នែក ២ | ផ្នែក ១ |
 | `export-cells-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -1356,6 +1436,8 @@ Function ដែល export ៖ 978
 | `toast-action-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `toast-truth-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `trash-modal-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
+| `ts-comments` | ផ្នែក ១ | — |
+| `tx-outcome-test` | ផ្នែក ១ · ផ្នែក ២ | — |
 | `ui-flow-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `user-guide-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `version-bump-scope` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

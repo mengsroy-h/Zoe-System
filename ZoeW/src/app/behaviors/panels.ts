@@ -3,17 +3,8 @@ import { viewState } from '../../core/view-state';
 import { commitNow } from '../flush';
 import { elementOf, setElementScrollTop } from '../refs';
 
-/**
- * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ច្បាប់ ១១ ៖ PTR · ចលនាផ្ទាំង · ការរមូរ)។
- * តក្កវិជ្ជាដូច `app.js` ដើមបេះបិទ — ប្តូរតែ **របៀបប៉ះ DOM** ៖ ធាតុតាម ref
- * (`elementOf`) · class តាម state (`uiState.dataPanelCollapsed` …) ដែល
- * **ចុះ DOM ភ្លាម** (`commitNow()`) មុនការវាស់/រមូរ ដូចការប្តូរ class ផ្ទាល់។
- * `npm run logic:check` រាយរាល់ function ដែលខុសពីដើម ជាមួយហេតុផល។
- */
-
 export type PanelKey = 'data' | 'entry';
 
-/** `.page-side.collapsed` របស់ផ្ទាំងមួយ */
 export function panelIsCollapsed(panel: PanelKey | null): boolean {
     if (panel === 'data') return uiState.dataPanelCollapsed;
     if (panel === 'entry') return uiState.entryPanelCollapsed;
@@ -25,7 +16,6 @@ export function setPanelCollapsed(panel: PanelKey, collapsed: boolean): void {
     else uiState.entryPanelCollapsed = collapsed;
 }
 
-/** `.page-side.search-focus` (មានតែផ្ទាំងទិន្នន័យ) */
 export function panelHasSearchFocus(panel: PanelKey | null): boolean {
     return panel === 'data' && uiState.dataPanelSearchFocus;
 }
@@ -50,7 +40,6 @@ export function activePanelSections() {
     return { panel: null, side: null, main: null, scroller: null };
 }
 
-/** `#lockerPanel` បង្ហាញ ⇔ `viewState.entryModeShown === 'locker'` (JSX គូរ `hidden` ពីវា) */
 export function entryScrollerInView() {
     const lockerVisible = viewState.entryModeShown === 'locker';
     return elementOf(lockerVisible ? 'lockerTableResponsive' : 'entryTableResponsive');

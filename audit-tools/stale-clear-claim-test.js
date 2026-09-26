@@ -111,7 +111,7 @@ const cleanupInFlight = new Set(), staleRestoreMarkerSweeps = new Set();
 const staleClearClaimSweeps = new Set();
 const activeRestoreClaims = new Map();
 const activeClearHistoryClaims = new Map();
-const dbListenerPendingPaths = new Set(), dbListenerFailedPaths = new Set();
+const dbListenerPendingPaths = new Set(), dbListenerFailedPaths = new Set(), dbListenerReportedFailures = new Set();
 const DB_LISTENER_KEY_DELETED = 'deleted';
 function getServerNow() { return ${NOW}; }
 function elapsedSince(m) { if (!m) return Infinity; const d = getServerNow() - m; return d < 0 ? Infinity : d; }

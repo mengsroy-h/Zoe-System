@@ -46,7 +46,8 @@ const GUARDS = [
     { file: 'revenue-rules-clamp-test.js', env: 'REVCLAMP_APP_DIR', needs: null },
     { file: 'ledger-failed-apply-revert-test.js', env: 'LEDGERFAIL_APP_DIR', needs: null },
     { file: 'pickup-barcode-identity-test.js', env: 'PICKUPID_APP_DIR', needs: null },
-    { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null }
+    { file: 'pickup-ledger-test.js', env: 'PICKUP_APP_DIR', needs: null },
+    { file: 'tx-outcome-test.js', env: 'TXOUTCOME_APP_DIR', needs: null }
 ];
 
 // mutation នៃ **តក្កវិជ្ជាលុយ** — នីមួយៗជាថ្នាក់កំហុសពិតដែលធ្លាប់កើត ឬអាចកើត
@@ -116,6 +117,16 @@ const MUTATIONS = [
         name: 'ស្ថិតិយក ៖ ការដកវិញមិនស្តារស្ថានភាពដើម',
         from: '        const marks = applied.previous.map((p) => ({ key: p.key, phoneKey: p.phoneKey, closed: !!p.closed }));',
         to: '        const marks = applied.marks;'
+    },
+    {
+        name: 'transaction ដែលបដិសេធ `disconnect` ចាត់ទុកជា «មិនបានអនុវត្ត» (wrapper បិទ ➜ ដកលុយ ២ ដង)',
+        from: "        if (!transactionOutcomeUnknown(error) || !ran || sent === undefined) throw error;",
+        to: "        throw error;"
+    },
+    {
+        name: 'ការសម្អាតក្រោយ `disconnect` មិនពិនិត្យថាឧបករណ៍ផ្សេងដកលុយរួច',
+        from: "        if (result.txOutcome === 'applied') {",
+        to: "        if (false) {"
     },
     {
         name: 'ការដកវិញត្រូវដកចេញទាំងស្រុង',

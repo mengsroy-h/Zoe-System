@@ -256,7 +256,10 @@ function makeSandbox(store, now) {
         optionalFn(src, 'markCleanupJournalStage', 'function markCleanupJournalStage() {}'),
         optionalFn(src, 'clearCleanupJournalEntry', 'function clearCleanupJournalEntry() {}'),
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
-        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';", 'const activeRestoreClaims = new Map();',
+        'const cleanupInFlight = new Set();', 'const staleRestoreMarkerSweeps = new Set();', 'const staleClearClaimSweeps = new Set();', 'const activeClearHistoryClaims = new Map();', 'const CLEAR_HISTORY_CLAIM_LEASE_MS = 120000;', 'const dbListenerPendingPaths = new Set();', 'const dbListenerFailedPaths = new Set();', 'const dbListenerReportedFailures = new Set();', "const DB_LISTENER_KEY_DELETED = 'deleted';",
+        // store ក្លែងមិនបដិសេធ `disconnect` ទេ ➜ `result.txOutcome === 'applied'` មិនកើត ➜ ផ្លូវនេះ **មិនត្រូវហៅ**
+        // (ការវាស់របស់វាជារបស់ `tx-outcome-test` · `emu/tx-disconnect-emu-test`) ➜ ហៅ = បោះ ➜ ធ្លាក់ មិនមែនបៃតងស្ងាត់
+        "async function cleanupClaimAccountedElsewhere() { throw new Error('crud-rules-flow: ផ្លូវ disconnect មិនត្រូវបានគំរូ'); }", 'const activeRestoreClaims = new Map();',
         'let deletedCleanupInFlight = false;',
         ...FNS.map((n) => extractFn(src, n)),
         'globalThis.api = { ' + FNS.join(', ') + ' };'

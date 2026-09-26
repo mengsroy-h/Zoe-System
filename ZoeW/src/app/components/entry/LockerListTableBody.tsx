@@ -12,7 +12,6 @@ export interface LockerListView {
     overflow: number;
 }
 
-/** បញ្ជីកញ្ចប់តាមទីតាំង Locker (ទំព័រស្កេន ➜ ផ្ទាំង Locker)។ */
 export function LockerListTableBody() {
     useStore(uiState);
     const view = uiState.lockerListView as LockerListView | null;

@@ -22,7 +22,6 @@ export interface MonthlyReportView {
     }[];
 }
 
-/** តួរបាយការណ៍អាជីវកម្មប្រចាំខែ (កាតសរុប · ចំណាំឃ្លាត · តារាងតាមថ្ងៃ)។ */
 export function MonthlyReportBody() {
     useStore(uiState);
     const view = uiState.monthlyReportView as MonthlyReportView | null;
@@ -49,8 +48,6 @@ export function MonthlyReportBody() {
                     ព្រោះវាជាកំណត់ត្រាដែលរក្សាទុករាល់ថ្ងៃ។</p>
             ) : null}
             <div className="mrep-table-wrap">
-                {/* ⛔ `.mrep-table` ត្រូវជា `width: max-content` — មិនមែន 100% —
-                    បើមិនដូច្នេះ `nowrap` ធ្វើឲ្យអត្ថបទហៀរជាន់គ្នា។ */}
                 <table className="mrep-table">
                     <thead><tr>{view.headers.map((h) => <th key={h}>{h}</th>)}</tr></thead>
                     <tbody>

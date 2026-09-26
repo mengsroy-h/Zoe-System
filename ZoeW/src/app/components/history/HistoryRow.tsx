@@ -57,14 +57,6 @@ function CallAction({ row }: { row: HistoryRowModel }) {
     );
 }
 
-/**
- * ជួរដេកមួយនៃតារាងប្រវត្តិ។
- *
- * ⛔ វាជំនួស `buildHistoryRowHtml()` ដែលសាង HTML ជាខ្សែអក្សរ។ ប្រយោជន៍
- *    ពិត ៖ React គេច escape **ដោយស្វ័យប្រវត្តិ** ➜ វិន័យ `sanitizeInput()`
- *    លែងជាចំណុចបរាជ័យតែមួយសម្រាប់ XSS។ ភាពដូចគ្នាត្រូវ **វាស់** ក្នុង
- *    `tests/history-row-parity.test.ts` មិនមែនសន្មត។
- */
 export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowModel }) {
     return (
         <>
@@ -75,9 +67,6 @@ export const HistoryRow = memo(function HistoryRow({ row }: { row: HistoryRowMod
             </td>
             <td>
                 <div className="customer-info-stack">
-                    {/* ⛔ `key` ផ្សេងៗក្នុងមួយវ៉ារ្យ៉ង់ ៖ បើអត់ React ប្រើ <span> ដដែលឡើងវិញ
-                        ហើយដក style ម្តងមួយៗ ➜ សល់ `style=""` ដែល App ដើម (innerHTML ថ្មី) គ្មាន។
-                        វាស់បាន (`parity-deep`) ពេលបិទកញ្ចប់ «ថ្មី» ➜ «យកហើយ»។ */}
                     <div className="cust-badge-line">
                         {row.calledBadge ? <span className="called-badge">ខល</span> : null}
                         {row.statusBadge === 'closed'

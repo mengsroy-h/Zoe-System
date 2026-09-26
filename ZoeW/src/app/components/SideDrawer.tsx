@@ -13,11 +13,6 @@ interface DrawerGroupProps {
     children: ReactNode;
 }
 
-/**
- * Category បត់បាន ៖ `is-open` ពី `viewState.drawerGroupsOpen` · `hidden` ពី
- * `viewState.drawerGroupsHidden` — ទាំង ២ សរសេរដោយ `refreshDrawerGroups()`
- * (ចំណុចច្របាច់តែមួយ ដែល `openSideDrawer()` ហៅ ដូច App ដើមបេះបិទ)។
- */
 function DrawerGroup({ id, headId, bodyId, icon, label, children }: DrawerGroupProps) {
     const v = useStoreFields(viewState, ['drawerGroupsOpen', 'drawerGroupsHidden']);
     const hidden = v.drawerGroupsHidden.indexOf(id) !== -1;
@@ -63,7 +58,6 @@ interface DrawerToggleProps {
     stateText: string;
 }
 
-/** ធាតុកុងតាក់ ៖ `is-on` · `hidden` · អត្ថបទស្ថានភាព គូរពី state */
 function DrawerToggle({ id, stateId, icon, label, action, on, visible = true, extraClass, stateText }: DrawerToggleProps) {
     let className = 'drawer-item drawer-toggle';
     if (!visible) className += ' hidden';
@@ -78,7 +72,6 @@ function DrawerToggle({ id, stateId, icon, label, action, on, visible = true, ex
     );
 }
 
-/** របា Slide (ម៉ឺនុយ) */
 export function SideDrawer() {
     const open = useStoreValue(uiState, (s) => s.drawerOpen);
     const loggedIn = useStoreValue(firebaseState, (s) => s.authButtonIsLoggedIn);

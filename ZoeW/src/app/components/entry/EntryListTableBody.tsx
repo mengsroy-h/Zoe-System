@@ -9,7 +9,6 @@ export interface EntryListRow {
     total: string;
 }
 
-/** បញ្ជីកញ្ចប់ដែលស្កេនថ្ងៃនេះ (ទំព័រស្កេន ➜ ផ្ទាំងកញ្ចប់)។ */
 export function EntryListTableBody() {
     useStore(uiState);
     const rows = uiState.entryListView as EntryListRow[] | null;

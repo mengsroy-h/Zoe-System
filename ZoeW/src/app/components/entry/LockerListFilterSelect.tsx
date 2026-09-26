@@ -2,11 +2,6 @@ import { uiState } from '../../../core/state';
 import { useStore } from '../../hooks/useStore';
 import { renderLockerList } from '../../../ui/entry-list';
 
-/**
- * តម្រងទីតាំងនៃបញ្ជី Locker។
- * ⛔ តម្លៃរស់ក្នុង `uiState.lockerFilterValue` ➜ `renderLockerList()`
- *    លែងអាន DOM ➜ លំដាប់ «គូរ រួចអាន» លែងសំខាន់។
- */
 export function LockerListFilterSelect() {
     useStore(uiState);
     const options = (uiState.lockerFilterOptions || []) as string[];

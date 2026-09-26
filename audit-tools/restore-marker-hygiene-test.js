@@ -174,6 +174,7 @@ function buildWorld(store, now) {
         // ⛔ ទិដ្ឋភាព `deleted` មិនគួរទុកចិត្ត = «មិនទាន់មកដល់» **ឬ** «listener
         // ងាប់» (កំណែ 2.20.8) ➜ sandbox ត្រូវផ្ទុក **helper ពិត** បូក Set ទាំង ២។
         'const dbListenerFailedPaths = new Set();',
+        'const dbListenerReportedFailures = new Set();',
         extractFnOptional(src, 'dbListenerViewIsStale')
             || 'function dbListenerViewIsStale(k) { return dbListenerPendingPaths.has(k); }',
         // ⛔ កូនសោដែលការការពារ marker សួរ — ត្រូវជាកូនសោ **ដដែល** ដែល

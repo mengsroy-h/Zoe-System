@@ -1,24 +1,7 @@
-/*
- * ⛔ ច្រកតែមួយរបស់ React (`#root`) មិនត្រូវលេចក្នុង layout ឡើយ។
- *
- * ហេតុផលដែលវាស់បាន ៖ `app.css` សរសេរ `body { display: flex; flex-direction:
- * column; }` ហើយនៅ `min-width: 992px` វាផ្តល់ `order:` ដល់ `.app-navbar`
- * និង `.page-tabbar` ➜ ច្បាប់ទាំងនោះឈរលើការសន្មតថាធាតុទាំងនោះជា
- * **កូនផ្ទាល់របស់ body**។ ធាតុរុំបន្ថែមមួយធ្វើឲ្យ `order` គ្មានប្រសិទ្ធភាព
- * ហើយកម្ពស់ ១០០% រលាយ។
- *
- * `display: contents` ដក `#root` ចេញពីដើមឈើ layout ទាំងស្រុង ➜ ខ្សែសង្វាក់
- * flex · កម្ពស់ · និងម្ចាស់នៃការរមូរ (`#appPages`) នៅដដែល **បេះបិទ**។
- * ⛔ កុំប្តូរវាទៅ `display: block` — នោះនឹងបំបែក layout របស់ desktop ស្ងាត់ៗ។
- */
 #root {
     display: contents;
 }
 
-/*
- * ផ្ទាំងជំនួសអេក្រង់សពេល render ធ្លាក់ (`AppErrorBoundary`) — មានតែក្នុង App React ➜ រស់នៅទីនេះ មិនមែន
- * `app.css` (ដែលត្រូវដូច `style.css` ដើម **byte ទល់ byte** ៖ `npm run parity`)។
- */
 .app-crash {
     position: fixed;
     inset: 0;

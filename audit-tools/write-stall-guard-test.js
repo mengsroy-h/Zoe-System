@@ -130,6 +130,7 @@ let registryReleaseFlushInFlight = false;
 const staleRestoreMarkerSweeps = new Set();
 const dbListenerPendingPaths = new Set();
 const dbListenerFailedPaths = new Set();
+const dbListenerReportedFailures = new Set();
 const RESTORE_CLAIM_LEASE_MS = 120000;
 const DB_LISTENER_KEY_HISTORY = 'history';
 const DB_LISTENER_KEY_DELETED = 'deleted';

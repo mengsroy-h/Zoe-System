@@ -107,7 +107,7 @@ const sandbox = {
     scanHistory: [],
     deletedItems: [],
     dbListenerPendingPaths: new Set(),
-    dbListenerFailedPaths: new Set(),
+    dbListenerFailedPaths: new Set(), dbListenerReportedFailures: new Set(),
     getServerNow: () => Date.UTC(2026, 8, 5, 3, 0, 0),
     fb: {
         update: (...a) => { writes.push(['update', a]); return Promise.resolve(); },

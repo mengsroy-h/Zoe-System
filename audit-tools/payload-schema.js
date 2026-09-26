@@ -151,7 +151,9 @@ for (const app of ['ZoeW']) {
     for (const fn of ['executeRestoreItem', 'restoreClaimedItemToScanHistory']) {
         const at = src.indexOf('function ' + fn + '(');
         if (at === -1) { console.log(`   note  ${fn} មិនមានក្នុង ${app}`); continue; }
-        const body = src.slice(at, at + 4000);
+        // ⛔ តួ function ពិត (ផ្គូ brace) មិនមែន ៤០០០ តួអក្សរថេរ ៖ function បន្ទាប់ដែលអាន `deletedAt` ត្រឹមត្រូវ
+        //    (ឧ. `cleanupClaimAccountedElsewhere`) ធ្លាប់ធ្លាក់ចូល window ➜ FAIL ក្លែង
+        const body = src.slice(at, at + sliceLimitFor(src, at));
         for (const f of trashOnly) {
             const stripped = body.includes('delete ' + 'itemToRestore.' + f) ||
                 body.includes('delete ' + 'updated.' + f) ||

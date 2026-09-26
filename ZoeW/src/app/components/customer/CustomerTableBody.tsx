@@ -7,7 +7,6 @@ export interface CustomerTableView {
     overflow: number;
 }
 
-/** តារាងអតិថិជនដែលទាញពី Lookup API (មើលជាមុន · ស្វែងរកខាងក្នុង)។ */
 export function CustomerTableBody() {
     useStore(lookupState);
     const view = lookupState.customerTableView as CustomerTableView | null;

@@ -1,16 +1,5 @@
 import { AccessControl, NativeBiometric } from '@capgo/capacitor-native-biometric';
 
-/**
- * ជីវមាត្រលើ Android native ៖ WebView របស់ Android **មិនគាំទ្រ WebAuthn**
- * ➜ ផ្លូវ `navigator.credentials` របស់ web ដើរមិនកើត។
- *
- * ⛔ គោលការណ៍ដដែលនឹង web ៖ ជីវមាត្រជាការ **ដោះសោ PIN** មិនមែនជំនួស PIN ។
- *    PIN ត្រូវរក្សាក្នុង Android Keystore ដោយ `BIOMETRY_CURRENT_SET` ➜ កូនសោ
- *    ឌិគ្រីបចងនឹងការផ្ទៀងផ្ទាត់ជីវមាត្រពិត (BiometricPrompt + CryptoObject)
- *    ស្មើនឹងរបៀប `prf` របស់ web — មិនមែន `device` (កូនសោក្នុង localStorage)។
- * ⛔ ការចុះឈ្មោះក្រយៅដៃថ្មីក្នុងទូរស័ព្ទ ធ្វើឲ្យកូនសោលែងប្រើបាន ➜
- *    `invalidated` ➜ App លុបការចង ហើយប្រាប់អ្នកប្រើ (មិនមែនធ្លាក់ស្ងាត់ៗ)។
- */
 export const NATIVE_BIOMETRIC_SERVER = 'zoew.biometric.pin.v1';
 
 export type NativeUnlockResult =
@@ -54,14 +43,6 @@ export async function nativeUnlockPin(): Promise<NativeUnlockResult> {
     }
 }
 
-/**
- * ⛔ plugin រាយការណ៍ «ក្រយៅដៃត្រូវបានប្តូរ» ជា **២ ដំណាក់** ៖ លើកដំបូង ➜
- *    `KeyPermanentlyInvalidatedException` ➜ វាលុបកូនសោ រួចឆ្លើយកូដ `0`
- *    («Biometric crypto object unavailable»); លើកក្រោយ ➜ កូដ `21` («No
- *    protected credentials found»)។ ទាំង ២ ជាសាលក្រមស្ថាពរ ➜ `invalidated`។
- * ⛔ កូដ `0` ផ្សេងៗ (Keystore ធ្លាក់បណ្តោះអាសន្ន) ➜ `cancelled` — «មិនអាច
- *    ផ្ទៀងផ្ទាត់» ≠ «ខុស» ➜ មិនលុបការចង។
- */
 export function nativeUnlockFailure(e: unknown): NativeUnlockResult {
     const code = String((e && (e as any).code) || '');
     const message = String((e && (e as any).message) || '');

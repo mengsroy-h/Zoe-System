@@ -161,7 +161,6 @@ export function monthlyReportRows(report) {
 }
 
 export function renderMonthlyReport() {
-    // ⛔ តម្លៃមកពីឃ្លាំង មិនមែនពី DOM (មើល `MonthlyReportMonthSelect`)
     const report = buildMonthlyReport(uiState.monthlyReportMonth);
     if (!report.month || !report.days.length) {
         uiState.monthlyReportView = { empty: emptyViewMessage(STATS_DAILY_VIEW_KEYS, 'គ្មានទិន្នន័យសម្រាប់ខែនេះទេ'), tiles: [], mismatch: null, headers: [], rows: [] };
@@ -170,7 +169,6 @@ export function renderMonthlyReport() {
     }
     const totals = report.totals;
     const measurable = totals.collectedMeasurable;
-    // ⛔ លំដាប់ និងអត្ថបទរបស់កាតត្រូវនៅដដែល — `monthly-report` ចាក់សោវា។
     const tiles = [
         { tone: 'money-collected', label: '💵 ចំណូលសរុប (យករួច)', value: collectedMoneyText(totals.collectedTotal, measurable), sub: collectedRielText(totals.collectedTotal, measurable) },
         { tone: 'money-collected', label: 'COD (យករួច)', value: collectedMoneyText(totals.collectedCod, measurable), sub: collectedRielText(totals.collectedCod, measurable) },
@@ -213,7 +211,6 @@ export function openMonthlyReportModal() {
     const currentMonth = getZoneDateKey(getServerNow(), 0).substring(0, 7);
     if (months.indexOf(currentMonth) === -1) months.unshift(currentMonth);
     if (months.indexOf(uiState.monthlyReportMonth) === -1) uiState.monthlyReportMonth = months[0] || currentMonth;
-    // ➜ `MonthlyReportMonthSelect` (React) គូរជម្រើស និងកាន់តម្លៃ
     uiState.monthlyReportMonths = months;
     uiState.touch();
     openModalHelper('monthlyReportModal');

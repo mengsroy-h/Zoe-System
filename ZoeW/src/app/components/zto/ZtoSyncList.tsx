@@ -6,7 +6,6 @@ import { code128Bars } from '../../../features/zto-status';
 export interface ZtoSyncEntry { code: string; phone: string; locker: string }
 export interface ZtoSyncListView { empty: string | null; entries: ZtoSyncEntry[] }
 
-/** បញ្ជីកញ្ចប់ដែល ZTO មិនទាន់បិទ — ⛔ តែសាលក្រម `false` ពិតប៉ុណ្ណោះ។ */
 export function ZtoSyncList() {
     useStore(ztoState);
     const view = ztoState.ztoSyncListView as ZtoSyncListView | null;
@@ -26,7 +25,6 @@ export function ZtoSyncList() {
                                 <span className="zto-sync-meta">{meta}</span>
                             </span>
                         </div>
-                        {/* ⛔ លេខដែលគូរមិនបាន ត្រូវប្រាប់អ្នកប្រើ — មិនមែនទុកទទេ */}
                         <div className={'zto-sync-bc-wrap' + (drawable ? '' : ' zto-sync-bc-none')}>
                             {drawable ? <Code128Svg code={entry.code} /> : '⚠️ លេខនេះគូរជារូប Barcode មិនបាន — សូមវាយដោយដៃ'}
                         </div>

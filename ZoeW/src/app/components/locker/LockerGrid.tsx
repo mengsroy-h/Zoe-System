@@ -4,7 +4,6 @@ import { chooseLocker } from '../../../features/locker';
 
 export interface LockerGridView { cells: string[]; active: string }
 
-/** ក្រឡាជ្រើសទីតាំង Locker — ⛔ ចំនួនឆ្លងកាត់ `clampLockerCount()` ជានិច្ច។ */
 export function LockerGrid() {
     useStore(uiState);
     const view = uiState.lockerGridView as LockerGridView | null;

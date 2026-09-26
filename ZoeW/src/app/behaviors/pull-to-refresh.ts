@@ -12,35 +12,17 @@ import { scrollerOf } from './chrome-autohide';
 import { activePanelSections, panelHasSearchFocus, panelIsCollapsed } from './panels';
 import { beginIOSTouch, blockPanelForIOSTouch, iosTouchArbiter, resetIOSTouchArbiter, touchByIdentifier } from './panel-motion';
 
-/**
- * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ៖ «Pull-to-refresh លើ iOS PWA») — តក្កវិជ្ជា
- * ដូច `app.js` ដើមបេះបិទ ៖ `#appPages` តាម ref · ស្ថានភាពផ្ទាំងតាម state ·
- * សញ្ញា PTR (`PtrIndicator`) គូរពី **`ptrState`** (transform · opacity · class ចលនា)។
- * ⛔ រាល់ការប្តូរ ➜ `renderNow(ptrState)` ៖ ឃ្លាំងដាច់ដោយឡែក (អ្នកជាវតែមួយ) គូរ **ក្នុង
- *    ស៊ុមដដែល** នៃ `touchmove` ដូចការសរសេរ `style` ផ្ទាល់ពីមុន (វាស់ ៖ native-check · gesture-test)។
- */
-
-/**
- * ⛔ **តំបន់កេះ** (សំណើម្ចាស់គម្រោង ៖ ដូចស្តង់ដា App) ៖ PTR ចាប់តែពេលម្រាមដៃ **ចាប់ផ្តើម**
- *    ក្នុង ៤០% ខាងលើនៃអេក្រង់ ➜ ការអូសចុះពីពាក់កណ្តាល/បាតអេក្រង់ (ឧ. ពេលរមូរបញ្ជី ឬ
- *    អូសផ្ទាំង) មិនអាចផ្ទុកទំព័រឡើងវិញដោយចៃដន្យ។
- */
 export const PTR_START_ZONE_RATIO = 0.4;
 
 export function ptrStartZoneBottom(): number {
     return Math.round(window.innerHeight * PTR_START_ZONE_RATIO);
 }
 
-/**
- * ⛔ ស្រទាប់ណាមួយបើក (ប្រអប់ · ម៉ឺនុយ (...) · របា Slide · សោ App) ➜ **គ្មាន PTR**។
- *    `openModalIds()` ជាប្រភពការពិតនៃប្រអប់ (រួមប្រអប់ដែលបើកដោយមិនឆ្លង `isModalOpen`)។
- */
 export function ptrBlockedByOverlay(): boolean {
     return securityState.appIsLocked || uiState.isModalOpen || openModalIds().length > 0 ||
         uiState.moreMenuOpen || isSideDrawerOpen();
 }
 
-/** សញ្ញា PTR ដែល `PtrIndicator` គូរ (ref) */
 export function ptrIndicatorElement(): any {
     return elementOf('ptrIndicator');
 }
@@ -84,7 +66,6 @@ export function setupIOSPullToRefresh() {
     let overlayAtPointerDown = false;
     let view: PtrView = { transform: '', opacity: '', ready: false, snapping: false, spinning: false };
 
-    /** ប្តូរសញ្ញា PTR ➜ React គូរភ្លាម (ស៊ុមដដែល) */
     function showIndicator(patch: Partial<PtrView>) {
         view = { ...view, ...patch };
         ptrState.view = view;
@@ -115,7 +96,6 @@ export function setupIOSPullToRefresh() {
             opacity: String(visible),
             ready: progress >= 1
         });
-        // ⛔ ញ័រ **ម្តង** ពេលឆ្លងព្រំដែន «លែងដៃដើម្បីផ្ទុកឡើងវិញ» · ថយក្រោមព្រំដែន ➜ ត្រៀមម្តងទៀត
         if (progress >= 1 && !readyTicked) {
             readyTicked = true;
             hapticTick();
@@ -283,9 +263,6 @@ export function setupIOSPullToRefresh() {
         }
     }
 
-    // ⛔ ការប៉ះខាងក្រៅម៉ឺនុយ (...) បិទវានៅ `pointerdown` (capture) **មុន** `touchstart` ➜
-    //    ចងចាំស្ថានភាពស្រទាប់ **មុន** ការបិទនោះ (window capture ឈរមុន document capture) ➜
-    //    ការប៉ះដែលបិទស្រទាប់ មិនផ្ទុកទំព័រឡើងវិញ (ស្តង់ដា ៖ ការប៉ះដំបូងបិទស្រទាប់ប៉ុណ្ណោះ)
     window.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse') return;
         overlayAtPointerDown = ptrBlockedByOverlay();
@@ -449,9 +426,6 @@ export function setupIOSPullToRefresh() {
         reloadWatchdog = null;
     });
 
-    // ⛔ listener `touchmove` (non-passive) ត្រូវមាន **មុន** `touchstart` (Safari កំណត់ cancelability
-    //    មុនវាចប់) ➜ តាមដាន **state** ដែលសម្រេចថា PTR អាចកើត (ផ្ទាំងបង្រួម · ស្វែងរក · ប្រវត្តិពង្រីក ·
-    //    ទំព័រ) — ដូចការតាមដាន class ពីមុន តែមិនអាន DOM។
     uiState.subscribe(syncPullMoveListener);
 
     park();

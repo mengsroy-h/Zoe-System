@@ -4,7 +4,6 @@ import { refTo } from '../../refs';
 
 const qrVideoRef = refTo('configQrVideo');
 
-/** ⛔ `muted` ត្រូវជា **property** ផង (React ដាក់តែ attribute) — iOS បដិសេធ autoplay បើអត់ */
 function bindQrVideo(el: HTMLElement | null) {
     if (el) { (el as HTMLVideoElement).muted = true; el.setAttribute('muted', ''); }
     qrVideoRef(el);

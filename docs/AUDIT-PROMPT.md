@@ -13,7 +13,15 @@
 
 ---
 
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-25 · ZoeW 2.42.5 · ZoeKeyGen 2.20.3)
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-26 · ZoeW 2.42.6 · ZoeKeyGen 2.20.4)
+
+⛔ **មេរៀនជុំ 2.42.6 ៖ fake SDK និយាយមិនពិតអំពី *ការបដិសេធ*** — fake ទាំងអស់ចាត់ `reject` = «មិនបានអនុវត្ត» ខណៈ SDK ពិតបដិសេធ
+transaction ដែលបានផ្ញើរួចដោយ `disconnect` ទោះ server commit ក៏ដោយ ➜ ការសម្អាតបាត់កញ្ចប់ · ledger ដក ២ ដង ជាមួយ checker ទាំងអស់បៃតង។
+⛔ មុនជឿ fake ៖ សួរ «SDK ពិតបដិសេធពេលណាខ្លះ ហើយ server ពិតនៅពេលនោះស្ថិតក្នុងស្ថានភាពណា?» ➜ វាស់លើ **SDK ពិត + emulator + proxy
+កាត់ការតភ្ជាប់** (`emu/tx-disconnect-emu-test` ៖ `put` frame ត្រូវ unmask · host ក្នុង handshake ត្រូវសរសេរឡើងវិញ បើមិនដូច្នេះ SDK
+រំលង proxy)។ ⛔ `fb.get()` ជាមួយ listener សកម្មឆ្លើយពី cache ➜ ភស្តុតាង server ពិតត្រូវជា REST។ ⛔ Sentry ៖ ជណ្តើរស្តារ × path
+= ព្យុះ event (៤៩ ក្នុងការដាច់តែមួយ) ➜ វាស់ **ចំនួន capture** ក្នុងការដាច់ មិនត្រឹម «តើមានការរាយការណ៍ឬអត់»។ ⛔ comment ក្នុង React
+លុបតាម `ts-comments.js` ដែលផ្ទៀងផ្ទាត់ esbuild compile ➜ កុំលុបដោយ regex។
 
 ⛔ **មេរៀនជុំ 2.42.5 ៖ checker ទាំងអស់វាស់ *ការដំឡើងលើកដំបូង* — គ្មាននរណាវាស់ *ការ deploy ជាន់ឧបករណ៍ដែលមាន cache ចាស់***
 — ZXing 3.1.4 ship ជាមួយ checker ១៨២ បៃតង ខណៈ iPhone ផ្ទុក JS ថ្មី + wasm ចាស់ពី HTTP cache (`immutable` លើឈ្មោះគ្មាន hash)

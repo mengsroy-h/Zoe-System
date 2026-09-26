@@ -1,4 +1,4 @@
-const APP_VERSION = '2.20.3';
+const APP_VERSION = '2.20.4';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();

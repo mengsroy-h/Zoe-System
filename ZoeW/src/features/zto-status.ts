@@ -258,8 +258,6 @@ export function renderZtoSyncBanner(dataToScan = dataState.scanHistory, trashToS
     const codes = pending.length && ztoStatusFeatureConfig() ? pending : [];
     const waiting = codes.length ? ztoStatusUnmeasuredCount(dataToScan, trashToScan) : 0;
     const stale = anyDbListenerViewIsStale(ZTO_SYNC_VIEW_KEYS);
-    // ⛔ ភាពមិនពេញ (`waiting` · `stale`) ត្រូវចូល signature ➜ បើមិនដូច្នេះ
-    //   cache បង្កកអត្ថបទចាស់ពេល listener ងាប់ *ក្រោយ*។
     const signature = codes.length + '|' + waiting + '|' + (stale ? '1' : '0') + '|'
         + codes.slice(0, ZTO_STATUS_BANNER_CODES).join(',');
     if (signature === ztoState.ztoStatusBannerSig) return;
@@ -344,7 +342,6 @@ export function code128Bars(text) {
     }
     return { bars: bars, width: x + CODE128_QUIET };
 }
-
 
 export function ztoSyncModalIsOpen() {
     return modalIsOpen('ztoSyncModal');

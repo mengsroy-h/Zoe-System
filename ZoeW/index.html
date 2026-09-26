@@ -3,10 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <script src="./boot-flags.js"></script>
-    <!-- `async` ➜ CDN ខាងក្រៅនេះ **មិនទប់ parser ទេ**។ `sw.js` បោះបង់សំណើឆ្លង origin
-         ដោយចេតនា ដូច្នេះ script នេះ **មិនដែលចូល cache** ➜ លើបណ្តាញ «ភ្ជាប់តែស្លាប់»
-         វាព្យួរ ហើយ `<body>` មិនទាន់សាងឡើងសោះ។ វាស់បាន៖ ១៨៩ ms ➜ ២០ វិនាទី។
-         `error-reporting.js` មានផ្លូវផ្ទុកយឺតរួចហើយ (`sentry-load-race-test.js`)។ -->
     <script async src="https://js.sentry-cdn.com/f03cf063db8e4b61057c43271019892d.min.js" crossorigin="anonymous"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ZoeW - ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់</title>
@@ -29,10 +25,6 @@
     <link rel="dns-prefetch" href="https://www.gstatic.com">
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
-    <!-- media="print" ➜ stylesheet ឆ្លង origin នេះ **មិនទប់ការគូរទេ**។ `boot-flags.js`
-         ប្តូរវាទៅ `all` ពេល DOM រួចរាល់។ វាស់បាន៖ ពេល fonts.googleapis.com ព្យួរ
-         App គូរបាននៅ ១៨៩ ms ជំនួស ២០ វិនាទី (អេក្រង់ស)។ ការប្តូរនេះជា CSP-safe
-         (គ្មាន `onload=`) ហើយ `display=swap` ធ្វើឲ្យអក្សរ swap ស្រាប់ហើយ។ -->
     <link id="webFontCss" media="print" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
@@ -44,9 +36,6 @@
     <script src="./firebase-loader.js"></script>
     <script src="./license-verify.js"></script>
     <script src="./error-reporting.js"></script>
-
-    <!-- ⛔ `style.css` ឥឡូវចូលតាម `src/main.tsx` ➜ Vite ដាក់វាជា
-         `<link>` ដែលមាន hash ពេល build ➜ cache មិនចាស់ដោយស្ងាត់។ -->
 </head>
 <body>
 <div id="root"></div>

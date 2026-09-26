@@ -24,13 +24,11 @@ function displayStyle(display: string): CSSProperties | undefined {
 
 const videoRef = refTo('video');
 
-/** ធាតុ `<video>` ៖ ⛔ `muted` ត្រូវជា **property** ផង (React ដាក់តែ attribute) — iOS បដិសេធ autoplay បើអត់ */
 function bindVideo(el: HTMLElement | null) {
     if (el) { (el as HTMLVideoElement).muted = true; el.setAttribute('muted', ''); }
     videoRef(el);
 }
 
-/** ផ្ទាំងកាមេរ៉ា ៖ ប្រអប់សុំសិទ្ធិ ⇄ វីដេអូ · zoom · ពិល */
 function CameraBox() {
     const v = useStoreFields(viewState, ['cameraView', 'cameraZoomDisplay', 'cameraTorchDisplay', 'cameraOverlayDisplay', 'cameraZoomRange', 'cameraWebkitInline']);
     const torchOn = useStoreValue(scanState, (s) => s.torchOn);
@@ -90,7 +88,6 @@ function CameraBox() {
     );
 }
 
-/** ទំព័រ ២ — ស្កេន */
 export function PageEntry() {
     const active = useStoreValue(uiState, (s) => s.currentAppPage === 'entry');
     const collapsed = useStoreValue(uiState, (s) => s.entryPanelCollapsed);

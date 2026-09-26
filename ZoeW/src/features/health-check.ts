@@ -232,14 +232,12 @@ export function openHealthCheck() {
 
 export async function runHealthCheck() {
     viewState.healthRecheckBusy = true;
-    // ⛔ ជួរ «កំពុងពិនិត្យ…» ដូចដើមបេះបិទ ៖ រូប ⏳ · គ្មាន .health-detail
     uiState.healthRows = [healthPendingRow()];
     uiState.touch();
     const rows = [healthNetworkRow(), healthDatabaseRow(), healthClockRow(), healthStorageRow(), healthServiceWorkerRow(), healthCustomerTableRow(), healthSheetScriptRow()];
     const [licenseRow, lookupRow] = await Promise.all([healthLicenseRow(), healthLookupRow()]);
     rows.splice(3, 0, licenseRow);
     rows.push(lookupRow);
-    // ⛔ លទ្ធផលយឺតមិនត្រូវគូរពេលប្រអប់បិទរួច (ច្បាប់ «ម្ចាស់ប្រអប់»)
     if (!modalIsOpen('healthCheckModal')) return;
     uiState.healthRows = rows;
     uiState.touch();

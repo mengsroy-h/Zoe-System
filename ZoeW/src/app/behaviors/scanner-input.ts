@@ -4,11 +4,6 @@ import { closeConfigQrScanner } from '../../features/config-qr';
 import { showCameraClosedBox, stopCurrentStream, submitManualBarcode } from '../../features/daily-stats';
 import { focusFieldAsIs } from '../refs';
 
-/**
- * ម៉ាស៊ីនស្កេន hardware (Bluetooth/USB = ក្តារចុច) ៖ ចុចកន្លែងទំនេរលើ desktop ➜
- * focus ប្រអប់ស្កេន (listener **ទូទាំង document** ➜ ចាក់ពេល boot) · Enter ➜ បញ្ជូន
- * (`onKeyPress` របស់ JSX ក្នុង `PageEntry`)។
- */
 export function setupHardwareScanner() {
     document.addEventListener('click', (e) => {
         const clickTarget = e.target as any;
@@ -18,7 +13,6 @@ export function setupHardwareScanner() {
     });
 }
 
-/** `onKeyPress` របស់ `#hwScannerInput` ៖ Enter ➜ បញ្ជូន Barcode */
 export function hardwareScannerKeyPress(e: { key: string; preventDefault(): void }) {
     if (e.key === 'Enter') {
         e.preventDefault();
@@ -26,7 +20,6 @@ export function hardwareScannerKeyPress(e: { key: string; preventDefault(): void
     }
 }
 
-/** ចាកចេញពី App (tab លាក់) ➜ បិទកាមេរ៉ា និងម៉ាស៊ីនស្កេន QR */
 export function setupVisibilityHandling() {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden && securityState.configQrScanActive) closeConfigQrScanner();

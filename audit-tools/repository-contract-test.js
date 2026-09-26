@@ -224,6 +224,23 @@ scenario('ឧបករណ៍សម្អាតរក្សាតម្លៃក�
         check('strip-comments ៖ លុប comment ហើយរក្សា string ដដែល',
             result.status === 0 && !cleaned.includes('សម្គាល់') && !cleaned.includes('ចុង')
             && cleaned.includes('"/* មិនមែន comment */"'));
+        // ZoeW React (`ts-comments.js`) ៖ TSX ពិត — directive `///` នៅដដែល · string/template រក្សា · `{/* */}` ក្នុង JSX ចេញ
+        const tsx = path.join(temp, 'sample.tsx');
+        fs.writeFileSync(tsx, '/// <reference lib="dom" />\n// សម្គាល់ TSX\nconst s: string = "// មិនមែន comment";\n'
+            + 'const t = `/* រក្សា */`;\nexport const C = () => <div>{/* JSX សម្គាល់ */}<span>{s}{t}</span></div>;\n');
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'audit-tools/strip-comments.js'), tsx], options);
+        const tsxOut = fs.readFileSync(tsx, 'utf8');
+        check('strip-comments (TSX) ៖ លុប comment · រក្សា directive/string/template',
+            result.status === 0 && !tsxOut.includes('សម្គាល់') && tsxOut.includes('/// <reference lib="dom" />')
+            && tsxOut.includes('"// មិនមែន comment"') && tsxOut.includes('`/* រក្សា */`') && !tsxOut.includes('{}'),
+            { status: result.status, out: tsxOut });
+        // ⛔ ទិសផ្ទុយ ៖ comment ដែលផ្ទុកបន្ទាត់ថ្មីក្រោយ `return` ជា ASI ➜ ការលុបវាប្តូរកូដ ➜ ត្រូវបោះបង់ មិនប៉ះឯកសារ
+        const asi = path.join(temp, 'asi.ts');
+        const asiSrc = 'export function f(x: number) {\n    return /*\n    */ x;\n}\n';
+        fs.writeFileSync(asi, asiSrc);
+        result = cp.spawnSync(process.execPath, [path.join(ROOT, 'audit-tools/strip-comments.js'), asi], options);
+        check('strip-comments (TS) ៖ ការលុបដែលប្តូរ compile ➜ បោះបង់ (exit ≠ 0) ហើយឯកសារនៅដដែល',
+            result.status !== 0 && fs.readFileSync(asi, 'utf8') === asiSrc, { status: result.status });
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 

@@ -5,7 +5,6 @@ export interface ZtoListRow { barcode: string; meta: string }
 export interface ZtoListGroup { title: string; tone: string; rows: ZtoListRow[]; more: number }
 export interface ZtoListPreview { empty: string | null; groups: ZtoListGroup[] }
 
-/** មើលជាមុននៃបញ្ជីដែលទាញពី ZTO — ⛔ ផ្លូវនេះ **មិនសរសេរអ្វីសោះ**។ */
 export function ZtoListSyncBody() {
     useStore(ztoState);
     const view = ztoState.ztoListPreview as ZtoListPreview | null;

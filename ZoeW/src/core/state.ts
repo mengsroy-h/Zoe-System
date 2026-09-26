@@ -1,8 +1,3 @@
-/* ឃ្លាំង state ទាំង ៨ របស់ App (ដើមកំណើត ៖ អថេរ `let` កម្រិតកំពូលរបស់ ZoeW `app.js` ដើម —
- * រូបភាពស្ថិរនៃឈ្មោះទាំងនោះ ៖ `src/_generated-state.json`)។
- * ⛔ `src/` ជា **ប្រភពការពិត** ➜ កែទីនេះដោយផ្ទាល់ ៖ វាលថ្មីត្រូវបន្ថែម **ទាំង** ក្នុង interface
- *    **និង** តម្លៃដើម។
- *    របៀបជ្រើសឃ្លាំង និងរបៀបអានក្នុង component ៖ `docs/EXTENDING.md`។ */
 import { createStore, registerStore } from './store';
 import { appLocalStore, safeStoreGet } from './storage';
 import { ACTIVE_LOCKER_KEY, ENTRY_SCAN_MODE_KEY } from './storage-keys';
@@ -134,7 +129,6 @@ export interface DataState {
     deletedCleanupInFlight: boolean;
     cleanupResumeInFlight: boolean;
     clearHistoryInFlight: boolean;
-    /** លេខទូរស័ព្ទសម្រាប់ `<datalist>` ➜ `RecentPhonesOptions` គូរ */
     recentPhonesOptions: string[];
 }
 
@@ -247,7 +241,6 @@ export interface UiState {
     phoneSuggestItems: any[];
     phoneSuggestActiveIndex: number;
     phoneSuggestHideTimer: any;
-    /** `#phoneSuggestBox.show` */
     phoneSuggestOpen: boolean;
     deletedSearchQuery: string;
     activeLocker: any;
@@ -258,75 +251,37 @@ export interface UiState {
     pendingScannedRemoval: any;
     scanRemoveInFlight: any;
     pendingPermanentDeleteId: any;
-    /** បញ្ជីដែល `renderHistory()` ផ្សាយ ➜ `HistoryTableBody` គូរ */
     historyView: any[] | null;
-    /** ជួរដេកដែល `renderEntryList()` ផ្សាយ ➜ `EntryListTableBody` គូរ */
     entryListView: any[] | null;
-    /** ជួរដេកដែល `renderLockerList()` ផ្សាយ ➜ `LockerListTableBody` គូរ */
     lockerListView: any | null;
-    /** តួលេខសរុបធុងសំរាម ➜ `TrashSummaryBox` គូរ */
     trashSummary: any | null;
-    /** ជួរក្រុមធុងសំរាម ➜ `TrashTableBody` គូរ */
     trashView: any | null;
-    /** របាយការណ៍ខែ ➜ `MonthlyReportBody` គូរ */
     monthlyReportView: any | null;
-    /** កាតស្ថិតិប្រចាំថ្ងៃ ➜ `DailyStatsCards` គូរ */
     dailyStatsView: any | null;
-    /** កាតចំណូលប្រចាំថ្ងៃ ➜ `CollectedStatsCards` គូរ */
     collectedStatsView: any | null;
-    /** ជួរពិនិត្យសុខភាព ➜ `HealthCheckList` គូរ */
     healthRows: import('../app/components/health/model').HealthRow[] | null;
-    /** បញ្ជី barcode ក្នុងប្រអប់ ➜ `BarcodeListContainer` គូរ */
     viewListView: any[] | null;
-    /** ក្រឡា Locker ➜ `LockerGrid` គូរ */
     lockerGridView: any | null;
-    /** មាតិកាម៉ឺនុយ (...) ➜ `MoreMenuContent` គូរ */
     moreMenuItems: any[] | null;
-    /** ម៉ឺនុយ (...) បើក (`#globalMoreMenu.show`) */
     moreMenuOpen: boolean;
-    /** `style.top/left` របស់ម៉ឺនុយ (`null` = មិនដែលបើក) */
     moreMenuPosition: { top: number; left: number } | null;
-    /** ខែដែលអាចជ្រើស ➜ `MonthlyReportMonthSelect` គូរ */
     monthlyReportMonths: string[];
-    /** ទីតាំងដែលអាចច្រោះ ➜ `LockerListFilterSelect` គូរ */
     lockerFilterOptions: string[];
-    /** តម្រងទីតាំងដែលជ្រើស (ជំនួសការអាន `select.value`) */
     lockerFilterValue: string;
-    /** តារាងសម្រាប់បោះពុម្ព ➜ `PdfPrintArea` គូរ */
     pdfExportView: any | null;
-    /** បញ្ជី toast ➜ `ToastList` គូរ (បញ្ជីជំនួស DOM registry ចាស់) */
     toasts: any[];
-    /** របា «មានកំណែថ្មី» ➜ `UpdateBanner` គូរ */
     updateBannerOpen: boolean;
-    /** ស្ថានភាពប្រអប់នាំចូល Excel ➜ `SheetImport*` គូរ */
     sheetImportView: any | null;
-    /** `display` របស់ប្រអប់នីមួយៗ ➜ `<Modal>` គូរ (មើល `core/modals.ts`) */
     modalDisplay: Record<string, 'flex' | 'none'>;
-    /** របា Slide បើក ➜ `SideDrawer` · `DrawerBackdrop` គូរ */
     drawerOpen: boolean;
-    /* ⛔ តំបន់ហាមចូល (PTR · ចលនាផ្ទាំង) — class ដែលកាយវិការប្តូរ ➜ JSX គូរ */
-    /** `#dataSideSection.collapsed` */
     dataPanelCollapsed: boolean;
-    /** `#entrySideSection.collapsed` */
     entryPanelCollapsed: boolean;
-    /** `#dataSideSection.search-focus` (ប្រអប់ស្វែងរកទាញឡើង) */
     dataPanelSearchFocus: boolean;
-    /** `#appPages.history-expanded` */
     historyExpanded: boolean;
-    /** `#appPages.panel-gliding` (ផ្អាក scroll-snap អំឡុងចលនា) */
     panelGliding: boolean;
-    /**
-     * ទីតាំង `#phoneSuggestBox` (`style.width/left/top`) ដែល `positionPhoneSuggestBox()` វាស់
-     * ➜ `PhoneSuggestBox` គូរ។ `''` = មិនទាន់វាស់ (គ្មាន style ដូចដើម)។
-     */
     phoneSuggestWidth: string;
     phoneSuggestLeft: string;
     phoneSuggestTop: string;
-    /**
-     * អថេរ CSS លើ `<html>` ដែល `measureAppChromeSize()` វាស់ ➜ `DocumentEffects` សរសេរ
-     * (`--chrome-top` · `--tabbar-height` · `--page-extension` · `--chrome-bottom`)។
-     * `''` = មិនទាន់វាស់ ➜ មិនសរសេរ (CSS ប្រើលំនាំដើម `:root`)។
-     */
     chromeTopVar: string;
     tabbarHeightVar: string;
     pageExtensionVar: string;
@@ -408,13 +363,10 @@ export const uiState = createStore<UiState>('uiState', {
     chromeBottomVar: '',
 });
 registerStore(uiState);
-// ⛔ រចនាសម្ព័ន្ធ UI ដែល App ដើមប្តូរលើ DOM **ភ្លាម** (class/style) ➜ ចុះ DOM ក្នុង tick ដដែល
-//    (មើល `StoreMeta.markImmediate`)
 uiState.markImmediate(['modalDisplay', 'drawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden']);
 
-/** សញ្ញា Pull-to-Refresh ដែល `PtrIndicator` គូរ (`null` = មុនកាយវិការចាប់ផ្តើម ➜ គ្មាន style) */
 export interface PtrView {
     transform: string;
     opacity: string;
@@ -423,11 +375,6 @@ export interface PtrView {
     spinning: boolean;
 }
 
-/**
- * ⛔ ឃ្លាំង **ដាច់ដោយឡែក** ៖ PTR សរសេររាល់ `touchmove` (រាល់ស៊ុមនៃម្រាមដៃ) ➜ ការដាក់វាក្នុង
- *    `uiState` នឹងធ្វើឲ្យរាល់ component ដែលជាវ `uiState` គណនា selector ឡើងវិញរាល់ស៊ុម។
- *    ឃ្លាំងនេះមានអ្នកជាវ **តែមួយ** (`PtrIndicator`) ហើយ `renderPtrNow()` គូរវាភ្លាម។
- */
 export interface PtrState {
     view: PtrView | null;
 }
@@ -485,7 +432,6 @@ export interface LookupState {
     lookupLockedNoticeShown: boolean;
     pendingLookupUnlockBarcode: string;
     pendingLookupUnlockResolve: any;
-    /** តារាងអតិថិជន ➜ `CustomerTableBody` គូរ */
     customerTableView: any | null;
 }
 
@@ -546,11 +492,8 @@ export interface ZtoState {
     ztoStatusSweepCursor: number;
     ztoListSyncInFlight: boolean;
     ztoListSyncResult: any;
-    /** របា «ZTO មិនទាន់បិទ» ➜ `ZtoSyncBanner` គូរ */
     ztoBannerView: any | null;
-    /** បញ្ជីក្នុងប្រអប់ ZTO ➜ `ZtoSyncList` គូរ */
     ztoSyncListView: any | null;
-    /** មើលជាមុននៃការទាញបញ្ជី ZTO ➜ `ZtoListSyncBody` គូរ */
     ztoListPreview: any | null;
 }
 

@@ -5,14 +5,6 @@ import { commitNow } from '../flush';
 import { elementOf, fieldValue, scrollChildIntoView } from '../refs';
 import { syncHistoryExpandedLock } from './panels';
 
-/**
- * ⛔ **តំបន់ហាមចូល** (`CLAUDE.md` ៖ «Auto pull up») — ប្រអប់ស្វែងរកទាញឡើង និង
- * ទីតាំងប្រអប់ណែនាំលេខ។ តក្កវិជ្ជាដូចដើមបេះបិទ ៖ `.search-focus` · `.show`
- * ជា state ដែលចុះ DOM ភ្លាម មុនការវាស់។ ទីតាំងប្រអប់ (`style.top/left/width`)
- * គណនាពីការវាស់ ➜ **state** (`uiState.phoneSuggest*`) ➜ `PhoneSuggestBox` គូរ។
- * ព្រឹត្តិការណ៍របស់ប្រអប់ស្វែងរក ជា prop របស់ JSX (`onFocus` · `onBlur` · `onKeyDown` · `onInput`)។
- */
-
 export function scrollPhoneSuggestRowIntoView(index) {
     scrollChildIntoView('phoneSuggestBox', index);
 }
@@ -31,7 +23,6 @@ export function positionPhoneSuggestBox() {
         hidePhoneSuggestions();
         return;
     }
-    // ⛔ ទទឹងត្រូវចុះ DOM **មុន** វាស់កម្ពស់ (ជួរណែនាំរុំតាមទទឹង) ➜ `commitNow()` មុន `offsetHeight`
     uiState.phoneSuggestWidth = cssPx(rect.width);
     uiState.phoneSuggestLeft = cssPx(rect.left);
     commitNow();
@@ -56,15 +47,11 @@ export function setPhoneSearchPulledUp(on) {
     setTimeout(positionPhoneSuggestBox, 340);
 }
 
-/* ── ព្រឹត្តិការណ៍របស់ប្រអប់ស្វែងរក (JSX ៖ `PageData` · `PhoneSuggestBox`) ─────────────── */
-
-/** `onFocus` ៖ ទាញប្រអប់ស្វែងរកឡើង រួចបង្ហាញការណែនាំ */
 export function phoneSearchFocused() {
     setPhoneSearchPulledUp(true);
     showPhoneSuggestions();
 }
 
-/** `onBlur` ៖ លាក់ការណែនាំក្រោយ ១៥០ms (ការចុចជួរណែនាំមកដល់មុន) */
 export function phoneSearchBlurred() {
     if (uiState.phoneSuggestHideTimer) clearTimeout(uiState.phoneSuggestHideTimer);
     uiState.phoneSuggestHideTimer = setTimeout(() => {
@@ -73,7 +60,6 @@ export function phoneSearchBlurred() {
     }, 150);
 }
 
-/** `onKeyDown` ៖ Escape · Enter · ព្រួញឡើង/ចុះ */
 export function phoneSearchKeyDown(e: { key: string; preventDefault(): void }) {
     if (e.key === 'Escape') {
         hidePhoneSuggestions();
@@ -99,16 +85,11 @@ export function phoneSearchKeyDown(e: { key: string; preventDefault(): void }) {
     }
 }
 
-/** ចុចជួរណែនាំទី `index` (ច្រកទ្វារដូចដើម ៖ ជួរត្រូវនៅមានក្នុងបញ្ជី) */
 export function pickPhoneSuggestion(index: number) {
     if (isNaN(index) || !uiState.phoneSuggestItems[index]) return;
     applyPhoneSuggestion(uiState.phoneSuggestItems[index].phone);
 }
 
-/**
- * ការរមូរ/ប្តូរទំហំ **ទូទាំងទំព័រ** ➜ កំណត់ទីតាំងប្រអប់ណែនាំឡើងវិញ (រួមក្នុង rAF)។
- * ⛔ listener របស់ `window` (មិនមែនធាតុរបស់ React) ➜ ចាក់ម្តងពេល boot។
- */
 export function setupPhoneSuggestions() {
     let positionFrame = null;
     const schedulePositionPhoneSuggestBox = () => {

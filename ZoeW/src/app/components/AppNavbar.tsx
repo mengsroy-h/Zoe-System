@@ -3,7 +3,6 @@ import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
 import { refTo } from '../refs';
 
-/** class របស់ចំណុច/អត្ថបទស្ថានភាព (`renderConnectionStatus()`) */
 function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
     if (status === null) return { dot: 'status-dot offline', text: undefined };
     if (status === 'online') return { dot: 'status-dot', text: 'is-online' };
@@ -11,7 +10,6 @@ function statusClasses(status: 'online' | 'connecting' | 'offline' | null) {
     return { dot: 'status-dot offline', text: 'is-offline' };
 }
 
-/** របាខាងលើ — ⛔ មិនលាក់តាមទិសរមូរ */
 export function AppNavbar() {
     const v = useStoreFields(viewState, ['connectionStatus', 'connectionText']);
     const cls = statusClasses(v.connectionStatus);

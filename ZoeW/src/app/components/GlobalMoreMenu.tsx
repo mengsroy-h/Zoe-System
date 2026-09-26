@@ -3,10 +3,6 @@ import { useStoreFields } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { MoreMenuContent } from './menu/MoreMenuContent';
 
-/**
- * ម៉ឺនុយ (...) សកល — បើក/បិទ · មាតិកា · ទីតាំង (`positionMenuSafely()`)
- * គូរពី state។
- */
 export function GlobalMoreMenu() {
     const v = useStoreFields(uiState, ['moreMenuOpen', 'moreMenuPosition']);
     const pos = v.moreMenuPosition;

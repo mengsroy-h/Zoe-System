@@ -14,7 +14,6 @@ function SummaryCard({ cls, head, note, bucket }: { cls: string; head: string; n
     );
 }
 
-/** តួលេខសរុបរបស់ធុងសំរាម — ⛔ ២ ក្រុមដេរីវេពី `TRASH_REASON_META[r].deducted`។ */
 export function TrashSummaryBox() {
     useStore(uiState);
     const s = uiState.trashSummary as TrashSummaryModel | null;

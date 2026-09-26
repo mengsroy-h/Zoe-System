@@ -7,7 +7,6 @@ function view(): any {
     return uiState.sheetImportView || emptySheetImportView();
 }
 
-/** ប្រអប់សារ (`si-msg`) — host មួយក្នុងចំណោម ៥ */
 function Msg({ host }: { host: string }) {
     useStore(uiState);
     const m = view().msgs[host];
@@ -21,7 +20,6 @@ export function SiMapMsg() { return <Msg host="siMapMsg" />; }
 export function SiActionMsg() { return <Msg host="siActionMsg" />; }
 export function SiClearMsg() { return <Msg host="siClearMsg" />; }
 
-/** សេចក្តីសង្ខេបនៃ Config ដែលរក្សាទុករួច */
 export function SiConfigSummary() {
     useStore(uiState);
     const s = view().summary;
@@ -34,7 +32,6 @@ export function SiConfigSummary() {
     );
 }
 
-/** chip សង្ខេបនៃការមើលជាមុន */
 export function SiChips() {
     useStore(uiState);
     return (
@@ -46,7 +43,6 @@ export function SiChips() {
     );
 }
 
-/** ជួរដេកមើលជាមុន — ជួរឈរ ១ និង ២ ជាលេខ (`si-num`) */
 export function SiPreviewBody() {
     useStore(uiState);
     return (

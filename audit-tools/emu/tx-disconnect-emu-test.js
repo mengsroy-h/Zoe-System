@@ -73,10 +73,67 @@ function clientFrameTexts(buf) {
     return out;
 }
 
+function wsFrameHeader(first, len) {
+    if (len < 126) return Buffer.from([first, len]);
+    if (len < 65536) { const h = Buffer.alloc(4); h[0] = first; h[1] = 126; h.writeUInt16BE(len, 2); return h; }
+    const h = Buffer.alloc(10); h[0] = first; h[1] = 127; h.writeBigUInt64BE(BigInt(len), 2); return h;
+}
+
+// server ➜ client ៖ emulator ប្រាប់ host ខាងក្នុងរបស់វា (`"h":"127.0.0.1:<PORT>"`) ក្នុង handshake ➜ SDK ភ្ជាប់ឡើងវិញទៅ host
+// នោះដោយផ្ទាល់ (រំលង proxy) ➜ សរសេរ host ក្នុង text frame ឡើងវិញជា host របស់ proxy ហើយ encode ប្រវែង frame ថ្មី
+// (port របស់ proxy ជា ephemeral ➜ ប្រវែងប្រែ)
+function serverStreamRewriter(state) {
+    let pending = Buffer.alloc(0);
+    let upgraded = false;
+    let passthrough = false;
+    return (chunk) => {
+        if (passthrough) return chunk;
+        pending = Buffer.concat([pending, chunk]);
+        const out = [];
+        if (!upgraded) {
+            const at = pending.indexOf('\r\n\r\n');
+            if (at === -1) return Buffer.alloc(0);
+            // ការអាន REST របស់ wrapper (HTTP ធម្មតា · មិនមែន 101) ក៏ឆ្លង proxy ដែរ ➜ បញ្ជូនត្រង់ៗ
+            if (!/^HTTP\/1\.1 101\b/.test(pending.slice(0, at).toString('latin1'))) {
+                passthrough = true;
+                const all = pending;
+                pending = Buffer.alloc(0);
+                return all;
+            }
+            out.push(pending.slice(0, at + 4));
+            pending = pending.slice(at + 4);
+            upgraded = true;
+        }
+        while (pending.length >= 2) {
+            const first = pending[0];
+            const b1 = pending[1];
+            let len = b1 & 0x7f;
+            let at = 2;
+            if (len === 126) { if (pending.length < 4) break; len = pending.readUInt16BE(2); at = 4; }
+            else if (len === 127) { if (pending.length < 10) break; len = Number(pending.readBigUInt64BE(2)); at = 10; }
+            if (b1 & 0x80) at += 4;
+            if (pending.length < at + len) break;
+            const frame = pending.slice(0, at + len);
+            const payload = pending.slice(at, at + len);
+            pending = pending.slice(at + len);
+            const text = (first & 0x0f) === 1 && !(b1 & 0x80) ? payload.toString('utf8') : null;
+            if (text !== null && state.hostFrom && text.includes(state.hostFrom)) {
+                const next = Buffer.from(text.split(state.hostFrom).join(state.hostTo), 'utf8');
+                out.push(wsFrameHeader(first, next.length), next);
+                state.rewrites++;
+            } else {
+                out.push(frame);
+            }
+        }
+        return Buffer.concat(out);
+    };
+}
+
 function startProxy() {
-    const state = { mode: null, fired: 0 };
+    const state = { mode: null, fired: 0, rewrites: 0, hostFrom: '', hostTo: '' };
     const server = net.createServer((client) => {
         const upstream = net.connect(PORT, '127.0.0.1');
+        const rewrite = serverStreamRewriter(state);
         const end = () => { client.destroy(); upstream.destroy(); };
         client.on('data', (d) => {
             if (state.mode === 'drop-request' && clientFrameTexts(d).some((t) => /"a":"p"/.test(t) && /"h":/.test(t))) {
@@ -87,7 +144,8 @@ function startProxy() {
             upstream.write(d);
         });
         upstream.on('data', (chunk) => {
-            const d = state.hostFrom ? Buffer.from(chunk.toString('latin1').split(state.hostFrom).join(state.hostTo), 'latin1') : chunk;
+            const d = rewrite(chunk);
+            if (!d.length) return;
             const s = d.toString('latin1');
             if (state.mode === 'drop-ack' && /"b":\{"s":"ok"/.test(s) && /"r":\d+/.test(s)) {
                 state.mode = null; state.fired++;
@@ -98,20 +156,14 @@ function startProxy() {
         });
         client.on('error', end); upstream.on('error', end); client.on('close', end); upstream.on('close', end);
     });
-    const tryListen = (attempt) => new Promise((resolve, reject) => {
-        const port = 9100 + Math.floor(Math.random() * 850);
-        const onError = () => { server.removeListener('listening', onOk); if (attempt < 40) resolve(tryListen(attempt + 1)); else reject(new Error('no free 4-digit port')); };
-        const onOk = () => { server.removeListener('error', onError); resolve(port); };
-        server.once('error', onError);
-        server.once('listening', onOk);
-        server.listen(port, '127.0.0.1');
-    });
-    return tryListen(0).then((port) => {
-        if (String(port).length === String(PORT).length) {
+    return new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+            const port = server.address().port;
             state.hostFrom = '127.0.0.1:' + PORT;
             state.hostTo = '127.0.0.1:' + port;
-        }
-        return { server, state, port };
+            resolve({ server, state, port });
+        });
     });
 }
 
@@ -200,6 +252,7 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
 
         console.log('\n── ក. ack បាត់ក្រោយ server អនុវត្ត ──');
         check(await waitConnected(), 'លក្ខខណ្ឌចាំបាច់ ៖ SDK ភ្ជាប់រួច មុនកាត់');
+        check(proxy.state.rewrites >= 1, 'លក្ខខណ្ឌចាំបាច់ ៖ host ក្នុង handshake ត្រូវសរសេរជា proxy (SDK មិនរំលង proxy)', proxy.state.rewrites);
         proxy.state.mode = 'drop-ack';
         let raw = null;
         try { await sdkDb.runTransaction(sdkDb.ref(db, 'ledger/a'), (cur) => ({ codDollar: (cur && cur.codDollar || 0) - 3 })); raw = 'resolved'; }

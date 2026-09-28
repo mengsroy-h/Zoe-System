@@ -101,16 +101,29 @@ ok('រាល់ `await server.close()` មាន `closeAllConnections()` ជា
     unclosed.length === 0, unclosed.join(', '));
 
 // ═══ ５. ⛔ ការវាស់ **ឥរិយាបថ** — checker ដែលព្យួរ ត្រូវក្លាយជា FAIL ═══
-// grep អាចត្រូវបញ្ឆោតដោយ comment ឬឈ្មោះ។ ការរត់ `run()` ពិតលើ script ដែល
+// grep អាចត្រូវបញ្ឆោតដោយ comment ឬឈ្មោះ។ ការរត់ម៉ាស៊ីនរត់ពិតលើ script ដែល
 // ព្យួរដោយចេតនា មិនអាចត្រូវបញ្ឆោតបានទេ។
+// ⛔ ម៉ាស៊ីនរត់រស់ចន្លោះ `#@runner-begin` / `#@runner-end` (lane ស្របគ្នា ៖ `run` ចុះបញ្ជី ·
+// `runall_drain` រត់) ➜ ស្រង់ប្លុកទាំងមូល។ tree ចាស់ (`run()` រត់ភ្លាម) ➜ ស្រង់តែ `run()` ដូចមុន
+// ➜ ឯកសារនេះនៅវាស់ baseline បាន។ ⛔ រត់ជាមួយ checker **បៃតង** ១ ទៀតស្របគ្នា ៖ ការព្យួរមួយ
+// មិនត្រូវលេបលទ្ធផលរបស់ checker ដទៃ ហើយ **env ត្រូវស្អាត** (RUNALL_STATE ទទេ) ➜ harness
+// មិនសរសេរចូល state ពិតរបស់ run-all ដែលកំពុងហៅឯកសារនេះ។
 let behaviour = { ran: false, out: '', ms: 0 };
-if (/^run\(\) \{/m.test(runall)) {
+const blockAt = runall.search(/^#@runner-begin$/m);
+const blockEnd = runall.search(/^#@runner-end$/m);
+let body = '';
+if (blockAt !== -1 && blockEnd > blockAt) body = runall.slice(blockAt, blockEnd) + '\n';
+else if (/^run\(\) \{/m.test(runall)) {
+    const runFn = runall.slice(runall.search(/^run\(\) \{/m));
+    body = runFn.slice(0, runFn.indexOf('\n}\n') + 3);
+}
+if (body) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-hang-'));
     const hangJs = path.join(tmp, 'hangy.js');
+    const greenJs = path.join(tmp, 'green.js');
     const harness = path.join(tmp, 'harness.sh');
     fs.writeFileSync(hangJs, "console.log('   ok    ចាប់ផ្តើម');\nsetInterval(() => {}, 1 << 30);\n");
-    const runFn = runall.slice(runall.search(/^run\(\) \{/m));
-    const body = runFn.slice(0, runFn.indexOf('\n}\n') + 3);
+    fs.writeFileSync(greenJs, "console.log('   ok    បៃតង');\n");
     fs.writeFileSync(harness,
         'pass=0; fail=0; skip=0; partial=0\n' +
         // ⛔ បង្ខំពិដានតូចត្រង់នេះ — កុំទទួលតម្លៃពីបរិស្ថាន បើមិនដូច្នេះ
@@ -118,16 +131,25 @@ if (/^run\(\) \{/m.test(runall)) {
         'CHECKER_TIMEOUT=5\n' +
         'if command -v timeout >/dev/null 2>&1; then HAS_TIMEOUT=1; else HAS_TIMEOUT=0; fi\n' +
         body +
-        '\nrun "សាកល្បង" node ' + JSON.stringify(hangJs) + '\necho "FAILCOUNT=$fail"\n');
+        '\nrun "សាកល្បង" node ' + JSON.stringify(hangJs) +
+        '\nrun "បៃតង" node ' + JSON.stringify(greenJs) +
+        '\nif declare -F runall_drain >/dev/null; then runall_drain; fi' +
+        '\necho "FAILCOUNT=$fail PASSCOUNT=$pass"\n');
+    const env = Object.assign({}, process.env, { RUNALL_JOBS: '2', RUNALL_STATE: '' });
+    delete env.RUNALL_ONLY; delete env.RUNALL_RESUME; delete env.RUNALL_TREE_HASH;
     const t0 = Date.now();
     try {
-        behaviour.out = execFileSync('bash', [harness], { encoding: 'utf8', timeout: 60000 });
+        behaviour.out = execFileSync('bash', [harness], { encoding: 'utf8', timeout: 60000, env });
         behaviour.ran = true;
     } catch (e) { behaviour.out = String((e && e.stdout) || e); }
     behaviour.ms = Date.now() - t0;
+    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
 }
 ok('⛔ ឥរិយាបថ៖ checker ដែលព្យួរ ➜ FAIL ដែលមានឈ្មោះ (មិនមែនការព្យួរ)',
-    behaviour.ran && /FAIL/.test(behaviour.out) && /FAILCOUNT=1/.test(behaviour.out),
+    behaviour.ran && /សាកល្បង[^\n]*FAIL[^\n]*ព្យួរ/.test(behaviour.out) && /FAILCOUNT=1 /.test(behaviour.out),
+    behaviour.out.trim().slice(0, 300));
+ok('⛔ ឥរិយាបថ៖ ការព្យួរមិនលេបលទ្ធផលរបស់ checker ដទៃ (បៃតង ➜ PASS)',
+    behaviour.ran && /បៃតង[^\n]*PASS/.test(behaviour.out) && /PASSCOUNT=1\b/.test(behaviour.out),
     behaviour.out.trim().slice(0, 300));
 ok('⛔ ឥរិយាបថ៖ ការផុតកំណត់ត្រូវគោរព `CHECKER_TIMEOUT` (ចប់ក្នុង < 60s)',
     behaviour.ran && behaviour.ms < 60000, 'ms=' + behaviour.ms);

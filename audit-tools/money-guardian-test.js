@@ -195,7 +195,20 @@ function runPool(tasks) {
     return Promise.all(workers).then(() => results);
 }
 
+function finish() {
+    console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')' : '✅ គ្មានបញ្ហា — ok ' + pass));
+    process.exit(fail ? 1 : 0);
+}
+
 (async () => {
+// ⛔ ក្នុងការរត់ជាកូន (ពុល) របស់ `exit-code-integrity` ការអះអាងទាំងអស់ធ្លាក់រួចហើយ ➜ អ្វីដែលត្រូវវាស់មានតែផ្លូវ
+// «ធ្លាក់ ➜ exit ≠ 0» ដែល `finish()` ជាអ្នកកាន់។ ការរត់អ្នកយាម × mutation ពេញ (~១៥០ វិ.) មិនអាចចប់ក្នុងថវិកា ៦០ វិ.
+// របស់កូន ➜ ជំនាន់មុនរបស់ `exit-code-integrity` រាប់ការផុតម៉ោងនោះជា «ត្រឹមត្រូវ» ហើយវាជាផ្នែកធំជាងគេនៃការរត់ ២៨០–៣៦៧ វិ.
+// ⛔ របៀបនេះ **មិនដែលបៃតង** (ok(false)) ➜ បើ `EXITCODE_CHILD` លេចចូលការរត់ធម្មតា វាក្រហម មិនមែនរំលងដោយស្ងាត់។
+if (process.env.EXITCODE_CHILD) {
+    ok(false, '⛔ EXITCODE_CHILD ៖ រំលងអ្នកយាម និង mutation (វាស់តែផ្លូវ exit) — របៀបនេះមិនដែលបៃតង');
+    finish();
+}
 // ⛔ ជាន់ចាំបាច់ ៖ អ្នកយាមត្រូវ **បៃតងលើ tree ស្អាត** បើមិនដូច្នេះ «ក្រហម
 // លើ mutant» គ្មានន័យទេ (វាក្រហមជានិច្ច)។
 const alive = [];
@@ -319,6 +332,5 @@ ok(applicable === MUTATIONS.length, '⛔ ជាន់អប្បបរមា៖
     }
 }
 
-console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ok ' + pass + ')' : '✅ គ្មានបញ្ហា — ok ' + pass));
-process.exit(fail ? 1 : 0);
+finish();
 })().catch((e) => { console.log('  FAIL  money-guardian បោះ: ' + (e && e.stack || e)); process.exit(1); });

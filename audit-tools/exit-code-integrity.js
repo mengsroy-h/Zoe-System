@@ -163,6 +163,107 @@ function poisonSource(src) {
 }
 
 const BUDGET_MS = parseInt(process.env.EXITCODE_TIMEOUT_MS || '60000', 10);
+// ⛔ ការពុលរត់ **ស្របគ្នាតាមចំនួនកំណត់** មិនមែនម្តងមួយៗ។
+// 🔴 វាស់បាន (2.42.8) ៖ checker កូន ១០៨ រត់ជាជួរ ➜ ២៨០ វិ. លើម៉ាស៊ីន ៤ CPU និង **៣៦៧ វិ.** លើម៉ាស៊ីនមួយទៀត ➜ លើសពិដាន
+// ៣០០ វិ. របស់ `run-all.sh` ➜ «*** FAIL *** (ព្យួរ)» ខណៈគ្មាន checker ណាខូចសោះ។ ការរត់ស្របគ្នាក្នុងពិដាន
+// (`EXITCODE_CONCURRENCY` · លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ២–៨) ជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ ដូច probe ថតទទេរបស់
+// `checker-coverage` ⛔ មិនមែនការបង្កើន `CHECKER_TIMEOUT` (នោះលាក់ checker ដែលព្យួរពិត)។
+const CONCURRENCY = (() => {
+    const asked = parseInt(process.env.EXITCODE_CONCURRENCY || '', 10);
+    if (Number.isFinite(asked) && asked >= 1) return Math.min(asked, 16);
+    let cpus = 2;
+    try { cpus = require('os').cpus().length || 2; } catch (e) {}
+    return Math.min(8, Math.max(2, cpus));
+})();
+// ⛔ `emu/*` ចែក RTDB emulator តែមួយ ➜ រត់ក្នុងផ្លូវតែមួយ (ម្តងមួយ) ស្របនឹងក្រុមផ្សេង។
+const SERIAL_LANE = (rel) => rel.startsWith('emu/');
+const OUT_CAP = 4 * 1024 * 1024;
+// ⛔ ពិដានពេល settle **តាមរចនាសម្ព័ន្ធ** ៖ SIGKILL នៅពេលផុតថវិកា ហើយបើ `close` មិនមក (ចៅដែលកាន់ pipe) ឬការសម្លាប់
+// ធ្លាក់ ➜ ឧបករណ៍កំណត់ម៉ោងទី ២ បញ្ចប់ការរង់ចាំ។ ដំណើរការឈប់ ➜ រង់ចាំ `close` តែ ២ វិ. ដើម្បីកុំឲ្យចៅដែលកាន់ stdout
+// ពន្យារសាលក្រមដែលដឹងរួច។
+const EXIT_TO_CLOSE_GRACE_MS = 2000;
+const HARD_GRACE_MS = 5000;
+const liveChildren = new Set();
+
+function runPoisonedChild(file, budgetMs) {
+    return new Promise((resolve) => {
+        const t0 = Date.now();
+        let out = '', settled = false, timedOut = false, exitCode = null, exitSignal = null, exited = false;
+        let graceTimer = null;
+        let child;
+        const finish = (code, signal) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(killTimer); clearTimeout(hardTimer); clearTimeout(graceTimer);
+            if (child) liveChildren.delete(child);
+            resolve({ code, signal, timedOut, out, ms: Date.now() - t0 });
+        };
+        const killTimer = setTimeout(() => {
+            timedOut = true;
+            try { child.kill('SIGKILL'); } catch (e) {}
+        }, budgetMs);
+        const hardTimer = setTimeout(() => finish(exited ? exitCode : null, exited ? exitSignal : 'SIGKILL'),
+            budgetMs + HARD_GRACE_MS);
+        try {
+            child = cp.spawn(process.execPath, [file], {
+                cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'],
+                env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' })
+            });
+        } catch (e) {
+            out = String(e && e.message || e);
+            finish(null, null);
+            return;
+        }
+        liveChildren.add(child);
+        const take = (chunk) => { if (out.length < OUT_CAP) out += chunk; };
+        child.stdout.setEncoding('utf8'); child.stdout.on('data', take);
+        child.stderr.setEncoding('utf8'); child.stderr.on('data', take);
+        child.on('error', (e) => { out += '\n' + String(e && e.message || e); finish(null, null); });
+        child.on('exit', (code, signal) => {
+            exited = true; exitCode = code; exitSignal = signal;
+            graceTimer = setTimeout(() => finish(code, signal), EXIT_TO_CLOSE_GRACE_MS);
+        });
+        child.on('close', (code, signal) => finish(exited ? exitCode : code, exited ? exitSignal : signal));
+    });
+}
+
+// ⛔⛔ **timeout · crash ≠ «ការធ្លាក់ឡើងដល់ exit code»**។ 🔴 ជំនាន់មុនរាប់ `rc = 'timeout/crash'` ជា `rc !== 0` ➜
+// «ត្រឹមត្រូវ» ➜ checker ដែល **ព្យួរ** ពេលការអះអាងធ្លាក់ (ដែលក្នុង `run-all.sh` ក្លាយជា FAIL (ព្យួរ) ឬ GitHub cancel
+// job) ត្រូវរាយថាបៃតង។ ដូច្នេះសាលក្រមមាន ៤ ៖ `failed` (exit ≠ 0 ពិត ➜ ល្អ) · `skipped` · `fake-green` ·
+// **`unverified`** (ផុតថវិកា · សម្លាប់ដោយ signal · បើកមិនកើត ➜ វាស់មិនបាន ➜ FAIL មិនមែនលើកលែង)។
+function poisonVerdict(r) {
+    if (!r || r.timedOut || typeof r.code !== 'number') return 'unverified';
+    if (r.code !== 0) return 'failed';
+    if (/^SKIP\b/m.test(String(r.out || ''))) return 'skipped';
+    return 'fake-green';
+}
+{
+    const cases = [
+        [{ code: 1, signal: null, timedOut: false, out: '' }, 'failed'],
+        [{ code: 2, signal: null, timedOut: false, out: 'SKIP x' }, 'failed'],
+        [{ code: 0, signal: null, timedOut: false, out: 'SKIP — គ្មាន emulator' }, 'skipped'],
+        [{ code: 0, signal: null, timedOut: false, out: '  FAIL  x' }, 'fake-green'],
+        [{ code: null, signal: 'SIGKILL', timedOut: true, out: '' }, 'unverified'],
+        [{ code: 1, signal: null, timedOut: true, out: '' }, 'unverified'],
+        [{ code: null, signal: 'SIGSEGV', timedOut: false, out: '' }, 'unverified'],
+        [{ code: null, signal: null, timedOut: false, out: 'spawn ENOENT' }, 'unverified'],
+        [null, 'unverified']
+    ];
+    const wrong = cases.filter(([r, want]) => poisonVerdict(r) !== want).map(([r, want]) => ({ r, want, got: poisonVerdict(r) }));
+    ok('សាលក្រមពុល ៖ timeout · signal · បើកមិនកើត ➜ unverified (មិនមែន «ធ្លាក់ត្រឹមត្រូវ»)', wrong.length === 0, wrong);
+}
+
+async function runPool(jobs, width, worker) {
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(width, jobs.length) }, async () => {
+        for (;;) {
+            const index = next++;
+            if (index >= jobs.length) return;
+            await worker(jobs[index]);
+        }
+    }));
+}
+
 const runnable = checkers.filter((rel) => {
     const src = fs.readFileSync(path.join(TOOLS, rel), 'utf8');
     return !/playwright-core/.test(src);       // browser checkers ៖ ថ្លៃពេក សម្រាប់ការពុល
@@ -207,134 +308,88 @@ function dropShadows() {
     for (const f of shadows) { try { fs.unlinkSync(f); } catch (e) {} }
     shadows.clear();
 }
-process.on('exit', dropShadows);
+// ⛔ កូនដែលកំពុងរត់ត្រូវសម្លាប់ពេលឪពុកចេញ (SIGTERM ពី `timeout` ក៏ដោយ) — បើមិនដូច្នេះ កូនដែលពុលហើយព្យួរ
+// ក្លាយជាកំព្រាស៊ី CPU ក្នុង checker បន្ទាប់ៗរបស់ `run-all.sh`។
+function killLiveChildren() {
+    for (const c of liveChildren) { try { c.kill('SIGKILL'); } catch (e) {} }
+    liveChildren.clear();
+}
+process.on('exit', () => { killLiveChildren(); dropShadows(); });
 ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach((sig) => {
-    process.on(sig, () => { dropShadows(); process.exit(1); });
+    process.on(sig, () => { killLiveChildren(); dropShadows(); process.exit(1); });
 });
 sweepPoisonLeftovers();
 
-let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [];
+let poisoned = 0, unpoisonable = [], fakeGreen = [], skippedInPoison = [], unverified = [];
 let ztoPoison = null;
-const poolTimeouts = [], budgetTimeouts = [];
+const timings = [];
 
-// ⛔ ការរត់ checker ពុល **ស្របគ្នាក្នុងព្រំដែន** (`EXITCODE_JOBS` · លំនាំដើម ≤ ៤)។ ជាជួរ វាចំណាយ ~២៩០ វិ.
-// (វាស់ 2026-09-28) = ៩៧% នៃពិដាន ៣០០ វិ. របស់ `run-all.sh` ➜ checker ថ្មីមួយទៀតធ្វើឲ្យវា «ព្យួរ»។
-// ⛔ សាលក្រមត្រូវ **ដូចការរត់ជាជួរបេះបិទ** ៖ checker ដែលផុតពិដានក្នុងការរត់ស្របគ្នា អាចផុតដោយសារ
-// ការប្រជែង CPU ➜ «ផុតពិដាន» ត្រូវរាប់ជា «មិនមែនបៃតងក្លែងក្លាយ» (ដូចមុន) **តែក្រោយការរត់ឡើងវិញម្នាក់ឯង**
-// (បើមិនដូច្នេះ checker ដែលចេញ exit 0 ក្នុង ៤០ វិ. ពេលម្នាក់ឯង អាចលាក់ខ្លួនក្រោយ «ផុតពិដាន»)។
-// ⛔ checker នីមួយៗរត់ក្រោម `timeout` (coreutils) ៖ ពិដានរស់ **ក្រៅ** process នេះ ➜ SIGKILL របស់
-// `checker-coverage` ផ្នែក ៥ មិនបន្សល់ checker ពុលដែលរត់គ្មានពិដាន ហើយ `timeout` សម្លាប់ **ក្រុម process**
-// ទាំងមូល (money-guardian ពុលបន្សល់អ្នកយាមកូន ៤ · zoew-suite ពុលបន្សល់ npm/vitest) ➜ គ្មាន CPU លេចធ្លាយ។
-const os = require('os');
-const JOBS = Math.max(1, Math.min(8, parseInt(process.env.EXITCODE_JOBS || '', 10) || Math.min(4, os.cpus().length || 1)));
-const HAS_TIMEOUT = (() => { try { return cp.spawnSync('timeout', ['--version'], { stdio: 'ignore' }).status === 0; } catch (e) { return false; } })();
-const children = new Set();
-function killChildren() {
-    for (const c of children) {
-        try { process.kill(-c.pid, 'SIGKILL'); } catch (e) { try { c.kill('SIGKILL'); } catch (e2) {} }
-    }
-}
-process.on('exit', killChildren);
-
-function runShadow(shadow) {
-    return new Promise((resolve) => {
-        const secs = String(Math.max(1, Math.ceil(BUDGET_MS / 1000)));
-        const cmd = HAS_TIMEOUT ? 'timeout' : process.execPath;
-        const args = HAS_TIMEOUT ? ['-k', '5', secs, process.execPath, shadow] : [shadow];
-        const t0 = Date.now();
-        let out = '', done = false, timer = null;
-        const child = cp.spawn(cmd, args, {
-            cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
-            env: Object.assign({}, process.env, { EXITCODE_CHILD: '1' })
-        });
-        children.add(child);
-        const finish = (rc, timedOut) => {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            children.delete(child);
-            resolve({ rc, out, ms: Date.now() - t0, timedOut });
-        };
-        child.stdout.on('data', (d) => { if (out.length < 16 * 1024 * 1024) out += d; });
-        child.stderr.on('data', (d) => { if (out.length < 16 * 1024 * 1024) out += d; });
-        // ពិដានបម្រុងក្នុង process (បើគ្មាន `timeout`) · និងជាន់ទី ២ បើ `timeout` ខ្លួនឯងមិនចេញ
-        timer = setTimeout(() => {
-            try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { try { child.kill('SIGKILL'); } catch (e2) {} }
-        }, BUDGET_MS + (HAS_TIMEOUT ? 15000 : 0));
-        child.on('error', () => finish('timeout/crash', false));
-        child.on('close', (code, signal) => {
-            if (code === null || signal) finish('timeout/crash', true);
-            else if (HAS_TIMEOUT && (code === 124 || code === 137)) finish('timeout/crash', true);
-            else finish(code, false);
-        });
-    });
-}
-
-const tasks = [];
-for (const rel of runnable) {
+async function poisonOne(rel) {
     const file = path.join(TOOLS, rel);
     const src = fs.readFileSync(file, 'utf8');
     const bad = poisonSource(src);
-    if (!bad) { unpoisonable.push(rel); continue; }
-    tasks.push({ rel, file, src, bad });
-}
-
-async function poisonRun(task) {
+    if (!bad) { unpoisonable.push(rel); return; }
     // ⛔ ស្រមោល **ក្បែរ** ឯកសារដើម — ថតដដែល ➜ `__dirname` ·
     // `require('./x')` · `__filename` នៅដំណើរការដូចដើម។
-    const shadow = path.join(path.dirname(task.file), POISON_PREFIX + process.pid + '-' + path.basename(task.file));
+    const shadow = path.join(path.dirname(file), POISON_PREFIX + process.pid + '-' + path.basename(file));
     shadows.add(shadow);
-    fs.writeFileSync(shadow, task.bad);
-    try { return await runShadow(shadow); }
-    finally {
+    fs.writeFileSync(shadow, bad);
+    let result;
+    try {
+        result = await runPoisonedChild(shadow, BUDGET_MS);
+    } finally {
         try { fs.unlinkSync(shadow); } catch (e) {}
         shadows.delete(shadow);
     }
+    poisoned++;
+    timings.push([rel, result.ms]);
+    const verdict = poisonVerdict(result);
+    if (rel === ZTO_IMPORT_TEST) {
+        const summary = /zto-import — (\d+) assertions passed, (\d+) failed/.exec(result.out);
+        ztoPoison = { rc: result.code, verdict, passed: summary ? Number(summary[1]) : null,
+            failed: summary ? Number(summary[2]) : null, unchanged: fs.readFileSync(file, 'utf8') === src };
+    }
+    if (verdict === 'failed') return;
+    if (verdict === 'unverified') {
+        unverified.push(rel + ' (' + (result.timedOut ? 'ផុតថវិកា ' + BUDGET_MS + 'ms' : 'signal=' + result.signal + ' code=' + result.code) + ')');
+        return;
+    }
+    // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
+    // នោះ **មិនបានអះអាងអ្វីសោះ** ហើយ `run-all.sh` រាយវាជា SKIPPED មិនមែន
+    // PASS។ ការពុលមិនអាចវាស់អ្វីបានទេ ពេលគ្មានការអះអាងណារត់។
+    // ឧ. `emu/*` ពេលគ្មាន RTDB emulator (CI ដាក់ `CRUD_FLOW_STRICT=1`
+    // ដែលបង្វែរ SKIP នោះទៅជាការធ្លាក់រួចហើយ) និង checker browser ពេល
+    // គ្មាន Chromium។ ⚠️ ការលើកលែងនេះត្រូវ **រាយឲ្យឃើញ** មិនស្ងាត់ —
+    // បើវាធំពេក នោះការវាស់មិនគ្របអ្វីទេ (មេរៀន «SKIP ធំពេក»)។
+    if (verdict === 'skipped') { skippedInPoison.push(rel); return; }
+    fakeGreen.push(rel);
 }
 
 (async () => {
+const startedAt = Date.now();
+// ⛔ ឯកសារនេះក៏ស្ថិតក្នុង `run-all.sh` ដែរ ➜ វាពុល **ខ្លួនឯង** រួចរត់ជាកូន។ បើកូនពុល checker ទាំងអស់ម្តងទៀត នោះវាជា
+// ការរត់ស្ទួនដែលមិនចប់ក្នុងថវិកា (វាស់បាន ៖ ជំនាន់មុនសម្លាប់វានៅ ៦០ វិ. រួចរាប់ «timeout» ជាការធ្លាក់ត្រឹមត្រូវ)។
+// ក្នុងការរត់ជាកូន ការអះអាងទាំងអស់ធ្លាក់រួចហើយ ➜ ការរំលងមិនបាត់ការវាស់អ្វីទេ (ដូចផ្នែក ៥ របស់ `checker-coverage`)។
+if (process.env.EXITCODE_CHILD) {
+    console.log('   (រំលងការពុល — កំពុងរត់ជាកូនរបស់ exit-code-integrity)');
+    runnable.length = 0;
+}
 try {
-    const results = new Array(tasks.length);
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(JOBS, tasks.length) }, async () => {
-        for (;;) {
-            const i = next++;
-            if (i >= tasks.length) return;
-            results[i] = await poisonRun(tasks[i]);
-        }
-    }));
-    // ⛔ ផុតពិដានពេលរត់ស្របគ្នា ➜ រត់ឡើងវិញ **ម្នាក់ឯង** (ពិដានដដែល) ➜ សាលក្រមដូចការរត់ជាជួរបេះបិទ
-    if (JOBS > 1) {
-        for (let i = 0; i < tasks.length; i++) {
-            if (!results[i].timedOut) continue;
-            poolTimeouts.push(tasks[i].rel);
-            results[i] = await poisonRun(tasks[i]);
-        }
-    }
-    tasks.forEach((task, i) => {
-        const { rc, out, timedOut } = results[i];
-        if (timedOut) budgetTimeouts.push(task.rel);
-        poisoned++;
-        if (task.rel === ZTO_IMPORT_TEST) {
-            const summary = /zto-import — (\d+) assertions passed, (\d+) failed/.exec(out);
-            ztoPoison = { rc, passed: summary ? Number(summary[1]) : null, failed: summary ? Number(summary[2]) : null,
-                unchanged: fs.readFileSync(task.file, 'utf8') === task.src };
-        }
-        if (rc !== 0) return;
-        // ⛔ ការចេញ exit 0 **ខណៈ SKIP** មិនមែនជាបៃតងក្លែងក្លាយទេ — checker
-        // នោះ **មិនបានអះអាងអ្វីសោះ** ហើយ `run-all.sh` រាយវាជា SKIPPED មិនមែន
-        // PASS។ ការពុលមិនអាចវាស់អ្វីបានទេ ពេលគ្មានការអះអាងណារត់។
-        // ឧ. `emu/*` ពេលគ្មាន RTDB emulator (CI ដាក់ `CRUD_FLOW_STRICT=1`
-        // ដែលបង្វែរ SKIP នោះទៅជាការធ្លាក់រួចហើយ) និង checker browser ពេល
-        // គ្មាន Chromium។ ⚠️ ការលើកលែងនេះត្រូវ **រាយឲ្យឃើញ** មិនស្ងាត់ —
-        // បើវាធំពេក នោះការវាស់មិនគ្របអ្វីទេ (មេរៀន «SKIP ធំពេក»)។
-        if (/^SKIP\b/m.test(out)) { skippedInPoison.push(task.rel); return; }
-        fakeGreen.push(task.rel);
-    });
+    const serial = runnable.filter(SERIAL_LANE);
+    const parallel = runnable.filter((rel) => !SERIAL_LANE(rel));
+    await Promise.all([
+        runPool(parallel, serial.length ? Math.max(1, CONCURRENCY - 1) : CONCURRENCY, poisonOne),
+        runPool(serial, 1, poisonOne)
+    ]);
 } finally {
+    killLiveChildren();
     dropShadows();
     sweepPoisonLeftovers();
 }
+const slowest = timings.slice().sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([rel, ms]) => rel + ' ' + (ms / 1000).toFixed(1) + 's').join(' · ');
+console.log('   (ពុល ' + timings.length + ' checker ក្នុង ' + ((Date.now() - startedAt) / 1000).toFixed(1)
+    + ' វិ. · ស្របគ្នា ' + CONCURRENCY + ' · យឺតជាងគេ ៖ ' + slowest + ')');
 
 const MIN_POISONED = 25;
 ok('zto-import/test.js ៖ ពុលការអះអាងពិតយ៉ាងតិច ៦៩ ➜ exit 1 ហើយឯកសារដើមមិនប្រែ',
@@ -344,6 +399,8 @@ ok('ជាន់អប្បបរមា៖ ពុល checker ដែលមិន
     poisoned >= MIN_POISONED, { poisoned, unpoisonable });
 ok('គ្មាន checker ណាចេញ exit 0 ខណៈការអះអាងទាំងអស់ធ្លាក់',
     fakeGreen.length === 0, fakeGreen);
+ok('⛔ គ្មាន checker ណាផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល (timeout ≠ ការធ្លាក់ឡើងដល់ exit code)',
+    unverified.length === 0, unverified);
 
 // ⛔ ការលើកលែង SKIP ត្រូវនៅ **តូច**។ បើ checker ភាគច្រើន SKIP នោះការវាស់
 // ឥរិយាបថនេះមិនគ្របអ្វីទេ ➜ បៃតងក្លែងក្លាយថ្នាក់ថ្មី (មេរៀន ៣គ)។
@@ -362,18 +419,6 @@ if (unpoisonable.length) {
         + unpoisonable.slice(0, 8).join(', ') + (unpoisonable.length > 8 ? ' …' : '') + ')');
 }
 
-if (budgetTimeouts.length) {
-    console.log('   (ផុតពិដាន ' + Math.round(BUDGET_MS / 1000) + ' វិ. ពេលម្នាក់ឯង ➜ រាប់ «មិនមែនបៃតងក្លែងក្លាយ» ដូចមុន: ' + budgetTimeouts.join(', ') + ')');
-}
-if (poolTimeouts.length) {
-    console.log('   (ផុតពិដានពេលស្របគ្នា ➜ រត់ឡើងវិញម្នាក់ឯង: ' + poolTimeouts.join(', ') + ')');
-}
-console.log('   (ការពុលរត់ស្របគ្នា ' + JOBS + (HAS_TIMEOUT ? ' · ពិដានដោយ `timeout`' : ' · ពិដានក្នុង process') + ')');
-
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);
-})().catch((error) => {
-    console.log('  FAIL  exit-code-integrity គាំង ➜ ' + (error && error.stack ? error.stack : error));
-    dropShadows();
-    process.exit(1);
-});
+})();

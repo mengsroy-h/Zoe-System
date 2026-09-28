@@ -39,6 +39,42 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.9] — 2026-09-28 · ZoeW ៖ **ហូតប្រអប់ប្រវត្តិលឿនជាងមុន ~១០ ដង** (PWA និង APK) · **ស្កេន ZTO លើ APK លែងចំណាយ preflight រាល់ការស្កេន** (branch · មិនទាន់ merge)
+
+**ZoeW `2.42.9` (`zoew-v236`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។
+
+#### អ្វីដែលអ្នកប្រើឃើញខុសពីមុន
+
+- **ហូតប្រអប់ប្រវត្តិ (ចុច/អូសដងអូស)** ៖ ពីមុន រាល់ការហូត browser គណនា layout នៃទំព័រទាំងមូលឡើងវិញ ➜ ចលនាគាំងមួយភ្លែតនៅដើម
+  (វាស់បាន ២៦០ ជួរ ៖ main thread ជាប់ **៥៧០–៦៦០ms** លើ CPU server · **៣.៤–៣.៧ វិ.** ពេល CPU យឺត ៤ ដងដូចទូរស័ព្ទធម្មតា) ➜ ឥឡូវ
+  **៣៤–៦៥ms** / **២៦០–៣៤៨ms**។ រូបរាង និងទីតាំងមិនប្រែ (វាស់ ៣៦ snapshot ៖ Android + iOS · ៣ ទំហំអេក្រង់ · ទំព័រ ២)។
+- **ស្កេន ZTO លើ APK** ៖ ម្ចាស់គម្រោងវាស់លើទូរស័ព្ទ ៖ PWA **០.៦–០.៧ វិ.** · APK **១.២–១.៧ វិ.** (ពេលខ្លះ ០.៧–០.៨)។ មូលហេតុ ៖ APK
+  (origin `https://localhost`) ហៅ Function ជា cross-origin ជាមួយ header ផ្ទាល់ខ្លួន ➜ WebView ផ្ញើ preflight OPTIONS មុន GET ហើយ cache
+  របស់ preflight ចងនឹង **URL ពេញ** ➜ barcode ក្នុង query = preflight **រាល់ការស្កេន** (២ ជុំទៅមក)។ វាស់ក្នុង Chromium ៖ ៥ សំណើ ➜
+  OPTIONS **៥**; URL ថេរ + query ក្នុង header `X-Zoe-Query` ➜ OPTIONS **១** (⛔ `cache: 'no-store'` រំលង cache preflight ➜ ៥ វិញ)។
+  ឥឡូវ APK ផ្ញើ query ក្នុង header ទៅ URL ថេរ (`nativeFunctionRequest()` ក្នុង `fetchWithTimeout` ជាច្រកតែមួយ) · Function អាន header
+  នោះពេលគ្មាន query string (query string ឈ្នះ · `__proto__` មិនពុល · ពិដាន ២០៤៨ តួ) · `Access-Control-Max-Age` 600 ➜ **7200**
+  (ពិដាន Chromium)។ web មិនប្រែ (same-origin គ្មាន preflight)។ ⛔ Function ចាស់ (មិនស្គាល់ header) ឆ្លើយ 400 ➜ App សាក URL
+  មាន query ម្តង ហើយចងចាំ (`lookupState.nativeQueryHeaderUnsupported`) ➜ APK ថ្មីមិនខូចពេល Netlify មិនទាន់ deploy។
+
+#### អ្នកយាម
+
+- `zto-proxy-test` ផ្នែក ២ខ (Function ៖ header ≡ query · query ឈ្នះ · `__proto__` · ពិដាន · Max-Age 7200 ➜ មុនកែធ្លាក់ ៥) ·
+  `ZoeW/tests/native/zto-preflight.test.ts` (១០ ៖ APK ➜ URL ថេរ · web/គ្មាន header/OPTIONS warm-up/origin ផ្សេង ➜ មិនប្រែ · ផ្លូវបម្រុង ៣
+  ករណី · mutation «`fetchWithTimeout` ត្រឡប់ទៅ `resolveNativeApiUrl`» ➜ ធ្លាក់) · `network-timeout-test` ៖ ច្បាប់ «`fetch(` តែក្នុង
+  `fetchWithTimeout`» ឥឡូវរាប់តាម **រចនាសម្ព័ន្ធ** (តួ function) មិនមែនផ្គូផ្គងអក្សរ `fetch(url, opts)`។
+- `panel-motion-test` ផ្នែក ៨ ៖ trace ពិតពេលហូត ➜ សមាមាត្រ object ដែល dirty ត្រូវ < ៥០% (មុនកែ **៩៧.៨%** ធ្លាក់ ៣/៣ viewport ·
+  ក្រោយកែ ៥៣/៥៣)។ checker តំបន់ហាមចូលទាំងអស់ឆ្លង ៖ `gesture-test` · `ios-panel-glide-test` · `panel-snap-ownership-test` ·
+  `phone-search-swipe-test` · `page-nav-test` · `layout-check` · `history-menu-dismiss-test`។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ⛔ **សាកលើ iPhone (PWA) និង Android (PWA + APK) ពិតមុន merge** (តំបន់ហាមចូល ៖ ចលនាផ្ទាំង) ៖ ហូតប្រអប់ប្រវត្តិឡើង/ចុះច្រើនដង ·
+  រមូរតារាងក្នុងរបៀបពង្រីក · ទាញចុះដើម្បី Refresh (PTR) · ប្តូរទំព័រ ២ · ពិនិត្យថាជួរចុងក្រោយមិនជាប់ក្រោមរបា Tab។
+- ⛔ **Netlify ត្រូវ deploy មុនចែក APK ថ្មី** (Function ស្គាល់ `X-Zoe-Query`)។ បើ APK មកមុន ៖ ដំណើរការដូចមុន (ផ្លូវបម្រុង) តែមិនទាន់លឿន។
+- វាស់លើ APK ពិតក្រោយ deploy ៖ ស្កេន ZTO ត្រូវចុះមកជិត PWA (០.៦–០.៨ វិ.) ក្រៅពីការស្កេនដំបូងក្នុងរយៈ ២ ម៉ោង។
+- គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
 ### [2.42.8] — 2026-09-28 · ZoeW · ZoeKeyGen ៖ Deep audit session/race · timeout ពិត · Service Worker
 
 **ZoeW `2.42.8` (`zoew-v235`) · ZoeKeyGen `2.20.6` (`zoekeygen-v105`)**។ មូលដ្ឋានវាស់៖ commit `443e4151c6395b30d0c6a351c1889e3d6a1d164e`។
@@ -940,14 +976,7 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
   **១៦៩៤ វិ. (២៨.២ នាទី) · ១៨៤ PASS**។ យឺតជាងគេ ៖ `exit-code-integrity` ២៩២ · `money-guardian` ១៦៥ · `zoew-suite` ១២៧ ·
   `revenue-fuzz` ១២៤ · `app-lock` ៩៨ · `ui-flow` ៩៥ · `checker-coverage` ៦៩ វិ.។
 - **វាស់ក្រោយ** (ម៉ាស៊ីនដដែល · ទង់ដដែល · `RUNALL_JOBS=4`) ៖ **៥៨៥ វិ. (៩.៧ នាទី) · ១៨៥ PASS** (session ថ្មី · គ្មាន state ➜ លំដាប់ពី `RUNALL_HINTS`) ➜ **លឿន ២.៩×**។ ផលបូកពេល checker ១៦៣៤ វិ. · ដំណាក់កាល meta ម្នាក់ឯង ~២១១ វិ. (`checker-coverage` ៦៨ + `exit-code-integrity` ១៤៣) + ដំណាក់កាលស្របគ្នា ~៣៦០ វិ. (≈ ផលបូក/៤ ➜ lane ពេញ)។ ជុំដំបូងគ្មាន `RUNALL_HINTS` ៖ ៦៥៤ វិ. (`zoew-suite` ចាប់ផ្តើមចុងក្រោយ)។ ⛔ ជាន់ក្រោមនៃពេលឥឡូវជា **ដំណាក់កាល meta** ៖ ការឲ្យវាជាន់ lane ផ្សេង ត្រូវវាស់ជាមុនថា ស្រមោល `.tmp-poison-*` មិនប៉ះ checker ដែលដើរថត `audit-tools/`
-- 🔴 **ការរកឃើញ ៖ `exit-code-integrity` ២៩២ វិ. = ៩៧% នៃពិដាន ៣០០ វិ.** — checker ថ្មីណាមួយ (រួមទាំង `runall-runner-test` ដែល
-  ពុលរត់ ~២០ វិ.) ធ្វើឲ្យ meta-checker ខ្លួនឯងរាយ «ព្យួរ»។ profile ៖ ពុល checker ១០៨ **ជាជួរ** (ផលបូក ២៨៩ វិ.) · តែ
-  `money-guardian` ពុលផុតពិដាន ៦០ វិ. ជានិច្ច ហើយ `execFileSync` សម្លាប់តែ node កូន ➜ អ្នកយាមកូន ៤ របស់វា **រត់ជាកំព្រា**
-  ស៊ី CPU របស់ checker បន្ទាប់។ ការកែ ៖ pool (`EXITCODE_JOBS` ≤ ៤) · កូននីមួយៗក្រោម `timeout` (សម្លាប់ **ក្រុម process** ·
-  រស់រានការ SIGKILL របស់ឪពុក) · ⛔ **ការផុតពិដានពេលស្របគ្នា ➜ រត់ឡើងវិញម្នាក់ឯង** ➜ សាលក្រមដូចការរត់ជាជួរបេះបិទ
-  (វាស់ ៖ ១៤២ វិ. · ពុល ១០៩ · គ្មានបៃតងក្លែងក្លាយ · `money-guardian` ផុតពិដានម្នាក់ឯងដូចមុន)។ `checker-coverage` ផ្នែក ៥
-  (SIGKILL `exit-code-integrity` ក្រោយ ២.៥ វិ.) សម្លាប់កូនកំព្រាតាមឈ្មោះស្រមោល `.tmp-poison-<pid>-` (PID ជាក់លាក់) ៖ វាស់
-  ឃើញ `money-guardian` ពុលកំព្រា + អ្នកយាមកូនរបស់វា ជាន់ដំណាក់កាល meta បន្ទាប់ ៦០ វិ.។
+- **`exit-code-integrity` ២៩២ វិ. = ៩៧% នៃពិដាន ៣០០ វិ.** ៖ branch នេះរកឃើញ និងកែវាដោយឡែក (pool + `timeout` + រត់ឡើងវិញម្នាក់ឯង ➜ ១៤២ វិ.) តែ `main` merge ការកែដ៏តឹងជាង (ផ្នែកបន្ទាប់ ៖ timeout = `unverified` · `money-guardian` រំលង matrix ពេលពុល ➜ ៧៥ វិ.) មុន ➜ ពេល merge **យកកំណែ `main` ទាំងស្រុង** ហើយដកការកែ និងការចាក់សោស្តាទិចរបស់ branch នេះចោល។ នៅសល់ ៖ `checker-coverage` ផ្នែក ៥ (SIGKILL `exit-code-integrity` ក្រោយ ២.៥ វិ.) សម្លាប់កូនពុលកំព្រាតាមឈ្មោះស្រមោល `.tmp-poison-<pid>-` (PID ជាក់លាក់ ៖ កូនដែលរត់ស្របគ្នាពេលឪពុកត្រូវ SIGKILL **គ្មានថវិកាទៀតទេ** ➜ រត់រហូតដល់ចប់ ជាន់ដំណាក់កាលបន្ទាប់ — វាស់ឃើញលើកំណែ pool ៖ `money-guardian` ពុល + អ្នកយាមកូន ៦០ វិ.)។
 - **lane ដែលវិភាគ/វាស់** ៖ (១) `checker-coverage` · `exit-code-integrity` **សរសេរ ហើយបោស** `.tmp-poison-*` ក្នុង
   `audit-tools/` — ការបោសរបស់ `exit-code-integrity` កូន (ផ្នែក ៥) លុបស្រមោលដែល `exit-code-integrity` មួយទៀតកំពុងរត់ ➜
   **excl** (រត់ម្នាក់ឯង) · (២) RTDB emulator តែមួយ ➜ `emu/*` + `money-guardian` **ម្តងមួយ** · (៣) browser ៖ **វាស់មុនសម្រេច** — checker browser ៤៦ តែឯង `RUNALL_JOBS=4 RUNALL_BROWSER_JOBS=4` **២ ជុំ** ➜ **០ ការធ្លាក់** (២២៥ វិ. ធៀបផលបូក ៨៥៨ វិ. = ៣.៨×) បូកការរត់ពេញស្របគ្នា (browser ៤ ជាមួយ lane ផ្សេង) ០ ការធ្លាក់ ➜ ការរត់ browser ១៣៨ ក្រោម ការប្រជែង ៤ ផ្លូវ គ្មានការធ្លាក់ ➜ លំនាំដើម `RUNALL_BROWSER_JOBS` = `RUNALL_JOBS` · (៤) **លំដាប់រត់** ៖ session ថ្មីគ្មាន state ➜ ជុំដំបូង `zoew-suite` (~១៣០ វិ.) ចាប់ផ្តើម **ចុងក្រោយ** (លំដាប់បញ្ជី) ➜ កន្ទុយវែង ➜ `RUNALL_HINTS` (checker យឺតជាងគេ ១៥ · ប៉ះតែលំដាប់) · (៥) `node --check` ក្នុង «ទម្លាប់គម្រោង» ធ្លាប់ `exit 1` **ក្នុង shell មេ** ➜ កំហុស syntax បញ្ឈប់ run-all ដោយគ្មានសេចក្តីសង្ខេប ➜ ឥឡូវជា FAIL ដែលមានឈ្មោះ (ពិនិត្យទាំង ២ ទិសលើ fixture)
@@ -955,10 +984,33 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
   លើ `run-all.sh` ជាជួរចាស់ (ស្របគ្នា ១ · គ្មាន state/RESUME/ONLY · TERM បន្សល់ `timeout`+node កំព្រា · បញ្ជី lane ទទេ) ·
   ផ្នែក ៦ ផ្ទៀង lane នៃបញ្ជីពិតទល់នឹងភស្តុតាងក្នុងប្រភព **ទាំង ២ ទិស** (ជំនាន់ដំបូងរាយខុស `license-seat-test` ·
   `doc-scope-test` ព្រោះ `emu/…js` លេចក្នុង **comment** ➜ ភស្តុតាងត្រូវកាត់ comment ដោយ acorn មុន) · `hang-guard` ស្រង់ប្លុក
-  `#@runner-begin`…`#@runner-end` (tree ចាស់ ➜ `run()`) រត់ checker ព្យួរ **ជាមួយ** checker បៃតង ហើយចាក់សោ pool + `timeout`
-  + ការរត់ឡើងវិញម្នាក់ឯងរបស់ `exit-code-integrity`។
+  `#@runner-begin`…`#@runner-end` (tree ចាស់ ➜ `run()`) រត់ checker ព្យួរ **ជាមួយ** checker បៃតង (ការព្យួរមិនលេបលទ្ធផលដទៃ)។
 - ⛔ **harness ត្រូវ env ស្អាត** ៖ checker រត់ជាកូនរបស់ run-all ពិត ➜ `RUNALL_STATE`/`RUNALL_ONLY`/`RUNALL_RESUME` ដែល export
   នឹងធ្វើឲ្យ fixture សរសេរចូល state ពិត ឬត្រូវត្រងចោល ➜ `hang-guard` · `runall-runner-test` លុប `RUNALL_*` មុនរត់ harness។
+
+### meta-checker លើសពិដាន ៣០០ វិ. ក្រោយ 2.42.8 ៖ `exit-code-integrity` រត់កូនជាជួរ · timeout ត្រូវរាប់ជា «ធ្លាក់ត្រឹមត្រូវ»
+
+- **អ្វីដែលឃើញ** ៖ ក្រោយ merge PR #259 `run-all.sh` ធ្លាក់ **១** ៖ `exit-code-integrity (meta)` «ព្យួរ — លើសពិដាន 300s» ខណៈ checker ផ្សេងឆ្លង។
+  កូដ App មិនពាក់ព័ន្ធ (ការកែប៉ះតែ `audit-tools/` ➜ App មិនឡើងកំណែ)។ ការអះអាង «គ្រប់ gate ជោគជ័យ» ក្នុងធាតុ 2.42.8 ផ្នែក ១ មកពីការរត់
+  ជាផ្នែករួចបូក log ➜ ការរត់ checker ដែលធ្លាក់ **ដាច់ដោយឡែក គ្មានពិដាន ៣០០ វិ.** លាក់ថ្នាក់នេះ។
+- **មូលហេតុឫសគល់ ២** ៖
+  1. វាពុល និងរត់ checker កូន **១០៨ ម្តងមួយៗ** (`execFileSync`) ➜ **២៨០ វិ.** លើម៉ាស៊ីន ៤ CPU និង **៣៦៧.៦ វិ.** លើម៉ាស៊ីនមួយទៀត ➜ checker ថ្មី
+     នីមួយៗរុញវាជិតពិដានបន្តិចម្តងៗ រហូតហួស។
+  2. កូនដែលផុតថវិកា ៦០ វិ. ទទួល `rc = 'timeout/crash'` ➜ `rc !== 0` ➜ រាប់ជា «ការធ្លាក់ឡើងដល់ exit code» ➜ checker ដែល **ព្យួរ** ពេលការអះអាង
+     ធ្លាក់ ត្រូវរាយបៃតង។ វាស់បាន ៖ `money-guardian-test` (ការរត់ធម្មតា **១៥៣ វិ.**) ផុត ៦០ វិ. រាល់ដង ហើយ `exit-code-integrity` ពុល **ខ្លួនឯង**
+     រួចរត់ការពុលទាំងមូលម្តងទៀតជាកូន រហូតត្រូវសម្លាប់ ➜ ~២ នាទីដែលមិនវាស់អ្វីសោះ។
+- **ការកែ** ៖ ការពុលរត់ **ស្របគ្នាក្នុងពិដាន** (`EXITCODE_CONCURRENCY` · លំនាំដើម = CPU ក្នុងចន្លោះ ២–៨ · `emu/*` ក្នុងផ្លូវតែមួយ) · settle តាម
+  រចនាសម្ព័ន្ធ (SIGKILL ពេលផុតថវិកា + timer ទី ២ · កូនដែលនៅរស់ត្រូវសម្លាប់ពេលឪពុកចេញ) · សាលក្រម ៤ ៖ `failed` · `skipped` · `fake-green` ·
+  **`unverified`** (ផុតថវិកា · signal · បើកមិនកើត ➜ FAIL) · ពេល `EXITCODE_CHILD` ៖ `exit-code-integrity` រំលងការពុល និង `money-guardian-test`
+  រំលងអ្នកយាម × mutation (ការអះអាងទាំងអស់ធ្លាក់រួចហើយ ➜ វាស់តែផ្លូវ exit · money-guardian ដាក់ `ok(false)` ➜ របៀបនោះមិនដែលបៃតង)។
+  លទ្ធផល ៖ **២៨០ វិ. ➜ ៧៥ វិ.** · កូន ១០៨ គ្មាន `unverified` · កូនយឺតជាងគេ `write-stall-guard-test` ~៣៨ វិ. (យឺតដោយ timer ពិត ៖ រត់តែឯង
+  ក៏ ៣៨.៥ វិ. ដដែល ➜ ថវិកា ៦០ វិ. មិនអាស្រ័យលើបន្ទុក CPU)។
+- **អ្នកយាម** ៖ `hang-guard` រត់ `exit-code-integrity.js` របស់ tree ដែលវាស់ លើ fixture ៤០ checker (មួយ **ព្យួរ** · ៨ **យឺត ២ វិ.** ពេលពុល) ➜
+  (ក) កូនដែលព្យួរ ➜ FAIL ដែលមានឈ្មោះ · (ខ) ចប់ < ១៤ វិ. (ជាជួរ ≥ ២០ វិ.)។ tree មុនកែ ៖ **ធ្លាក់ ២** (២១.១ វិ.) · mutation «timeout = ធ្លាក់
+  ត្រឹមត្រូវ» ➜ ធ្លាក់ ១ · mutation «ស្របគ្នា = ១» ➜ ធ្លាក់ ១ (២១.១ វិ.) · ក្រោយកែ **១១/១១** (fixture ៦.២ វិ.)។ `exit-code-integrity` ខ្លួនវាមាន
+  តារាងសាលក្រម ៩ ករណី (timeout · signal · spawn ធ្លាក់ ➜ `unverified`)។
+- ⛔ **មេរៀន** ៖ ការបង្កើន `CHECKER_TIMEOUT` **មិនមែនការកែ** — វាលាក់ checker ដែលព្យួរពិត។ ការរត់ស្របគ្នាក្នុងពិដានជាដំណោះស្រាយតាមរចនាសម្ព័ន្ធ
+  ដូច probe ថតទទេរបស់ `checker-coverage` និងអ្នកយាមរបស់ `money-guardian-test` ដែលធ្លាប់ជួបថ្នាក់ដដែល (2.42.7)។
 
 ### Deep audit 2.42.7 ៖ ហេតុអ្វី checker ១៨៣ បៃតងលើកំហុស ៦
 
@@ -1544,7 +1596,7 @@ Function ដែល export ៖ 978
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `hang-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `health-check-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `history-menu-dismiss-test` | — | ផ្នែក ២ |
+| `history-menu-dismiss-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `html-sink-escaping` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `inline-handler-xss-test` | — | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -1554,7 +1606,7 @@ Function ដែល export ៖ 978
 | `keylist-consistency-test` | — | ផ្នែក ១ |
 | `khmer-timezone-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `late-commit-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
-| `layout-check` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `layout-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `layout-thrash` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `ledger-clamp-symmetry-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `ledger-count-integrity-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -1584,16 +1636,16 @@ Function ដែល export ៖ 978
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `netlify-config-scope-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `network-timeout-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `network-timeout-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `offline-shell-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `page-nav-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `panel-motion-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `panel-snap-ownership-test` | — | ផ្នែក ២ |
+| `panel-snap-ownership-test` | ផ្នែក ១ | ផ្នែក ២ |
 | `partial-pickup-cleanup-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `payload-schema` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `perf-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `periodic-network-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
-| `phone-search-swipe-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `phone-search-swipe-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `phone-suggest-test` | — | ផ្នែក ១ |
 | `pickup-barcode-identity-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `pickup-ledger-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
@@ -1656,7 +1708,7 @@ Function ដែល export ៖ 978
 | `version-bump-scope` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `version-check` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `wiring` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `write-stall-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `write-stall-guard-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `zoew-suite-test` | ផ្នែក ១ | — |
 | `zto-budget-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `zto-cookie-capture-test` | — | ផ្នែក ១ · ផ្នែក ២ |

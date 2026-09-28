@@ -38,6 +38,7 @@ const REACT_HELPERS = [
     'createScratchCanvas', 'loadScratchImage', 'addPreconnectHint', 'injectScript', 'downloadObjectUrl',
     // `src/platform/native.ts` ៖ អាន `window.Capacitor` ➜ ក្នុង sandbox (គ្មាន bridge) ជាផ្លូវ web ដូច App ដើម
     'isNativeApp', 'isNativeAndroid', 'pullToRefreshSupported', 'resolveNativeApiUrl', 'nativeWebOrigin',
+    'nativeFunctionRequest', 'moveQueryToHeader',
     // ការសម្អាតផ្ទៃ (`blankElementById()`) ៖ ជំនួស `el.value = ''` / `el.innerHTML = ''` របស់ App ដើម ➜ សរសេរ
     // ឃ្លាំងដែល JSX គូរ (តារាង · ប្រអប់ · សារ) — `clearSensitiveModalFields()` ឆ្លងកាត់វា
     'blankElementById', 'resetReactOwned', 'blankScanRemoveText',
@@ -45,7 +46,7 @@ const REACT_HELPERS = [
 ];
 
 // ⛔ ថេរដែល helper ខាងលើអាន (`REF_NAMES` ៖ ឈ្មោះ ref ដែលចង `ref={…}` ពិត · `TEXT_BLANKERS` ៖ អត្ថបទ viewState)
-const REACT_CONSTS = ['REF_NAMES', 'TEXT_BLANKERS'];
+const REACT_CONSTS = ['REF_NAMES', 'TEXT_BLANKERS', 'NATIVE_QUERY_HEADER', 'NATIVE_QUERY_MAX'];
 
 function sliceConst(src, name) {
     const acorn = require('acorn');

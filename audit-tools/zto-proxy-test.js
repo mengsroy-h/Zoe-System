@@ -587,6 +587,42 @@ group('ថវិកាពេល ៖ នាឡិកាថយក្រោយ', as
         normalCalls >= 3, { upstreamCalls: normalCalls });
 });
 
+// ⛔ App Android (origin `https://localhost`) ហៅ Function ជា cross-origin ជាមួយ header ផ្ទាល់ខ្លួន ➜ browser ផ្ញើ
+//    preflight OPTIONS ហើយ cache របស់ preflight ចងនឹង **URL ពេញ** ➜ barcode ក្នុង query = preflight **រាល់ការស្កេន**
+//    (វាស់បានក្នុង Chromium ៖ ៥ សំណើ ➜ OPTIONS ៥; URL ថេរ + query ក្នុង header ➜ OPTIONS ១) ➜ APK ១.២–១.៧ វិ. ធៀប PWA ០.៦–០.៧ វិ.។
+//    ដូច្នេះ App ផ្ញើ query ក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ Function ត្រូវអានវា **ដូច query string បេះបិទ**។
+group('query ក្នុង header (APK)', async () => {
+    console.log('\n== ២ខ. APK ៖ query ក្នុង header `X-Zoe-Query` (URL ថេរ ➜ cache preflight) ==');
+    const lookup = async (query, headers) => {
+        resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
+        jsonResponder.last = null;
+        global.fetch = jsonResponder(ORDER);
+        const res = await call(query, headers);
+        return { res, upstream: jsonResponder.last ? JSON.stringify([jsonResponder.last.url, jsonResponder.last.options.body]) : null };
+    };
+    const viaQuery = await lookup({ barcode: '77130527210012' });
+    const viaHeader = await lookup({}, { 'x-zoe-query': 'barcode=77130527210012' });
+    ok('ជាន់អប្បបរមា ៖ query string ➜ 200 + ហៅ upstream', viaQuery.res.statusCode === 200 && !!viaQuery.upstream, viaQuery.res.body);
+    ok('⛔ header `x-zoe-query` ➜ ចម្លើយដូច query string បេះបិទ',
+        viaHeader.res.statusCode === viaQuery.res.statusCode && viaHeader.res.body === viaQuery.res.body, viaHeader.res.body);
+    ok('⛔ header `x-zoe-query` ➜ សំណើ upstream ដូចគ្នា', viaHeader.upstream === viaQuery.upstream, viaHeader.upstream);
+    const nullQuery = await (async () => {
+        resetEnv({ ZTO_COOKIE: 'BOS-MAN-SESSION=t' });
+        global.fetch = jsonResponder(ORDER);
+        return proxy.handler({ httpMethod: 'GET', headers: { 'x-zoe-proxy-key': KEY, 'X-Zoe-Query': 'barcode=77130527210012' }, queryStringParameters: null });
+    })();
+    ok('queryStringParameters = null + header (ឈ្មោះអក្សរធំ) ➜ 200', nullQuery.statusCode === 200 && nullQuery.body === viaQuery.res.body, nullQuery.body);
+    const both = await lookup({ barcode: '77130527210012' }, { 'x-zoe-query': 'barcode=<bad>' });
+    ok('ទិសផ្ទុយ ៖ query string ឈ្នះ header (header មិនអាចសរសេរជាន់)', both.res.body === viaQuery.res.body, both.res.body);
+    const proto = await lookup({}, { 'x-zoe-query': '__proto__=x&constructor=y&barcode=77130527210012' });
+    ok('⛔ `__proto__` ក្នុង header មិនពុល prototype', proto.res.statusCode === 200 && ({}).x === undefined && typeof ({}).constructor === 'function', proto.res.body);
+    const tooLong = await lookup({}, { 'x-zoe-query': 'barcode=77130527210012&pad=' + 'a'.repeat(4096) });
+    ok('header វែងពេក ➜ មិនអាន (400 គ្មាន barcode · មិនហៅ upstream)', tooLong.res.statusCode === 400 && !tooLong.upstream, tooLong.res.statusCode);
+    const preflight = await proxy.handler({ httpMethod: 'OPTIONS', headers: { origin: 'https://localhost', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-zoe-proxy-key, x-zoe-query' }, queryStringParameters: {} });
+    ok('preflight ពី https://localhost ➜ អនុញ្ញាត `x-zoe-query`', /x-zoe-query/.test(String(preflight.headers['Access-Control-Allow-Headers'] || '')), preflight.headers);
+    ok('⛔ preflight Max-Age = 7200 (ពិដានរបស់ Chromium/WebView)', preflight.headers['Access-Control-Max-Age'] === '7200', preflight.headers['Access-Control-Max-Age']);
+});
+
 group('ការវិនិច្ឆ័យ ?diag=1', async () => {
     console.log('\n== ១០. ការវិនិច្ឆ័យ ?diag=1 (បញ្ជាក់ថា API ផ្លូវការភ្ជាប់រួច) ==');
     resetEnv({ ZTO_AUTHORIZATION: 'Bearer super-secret-official-token', ZTO_API_URL: 'https://openapi.zto.com/v1/x' });

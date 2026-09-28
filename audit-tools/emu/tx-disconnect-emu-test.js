@@ -233,6 +233,8 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
         setTimeout, clearTimeout, AbortController, fetch,
         navigator: { onLine: true },
         resolveNativeApiUrl: (u) => u,
+        nativeFunctionRequest: (u, o) => ({ url: u, options: o }),
+        lookupState: { nativeQueryHeaderUnsupported: false },
         ZoeErrors: { capture: () => {} },
         firebaseConfig: { databaseURL: DB_URL },
         auth: { currentUser: { getIdToken: () => Promise.resolve('owner') } }

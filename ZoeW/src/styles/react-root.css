@@ -40,3 +40,12 @@
     min-height: 46px;
     cursor: pointer;
 }
+
+@media (max-width: 991px) {
+    .app-pages.history-expanded {
+        display: block;
+    }
+    .app-pages.history-expanded > .app-page.active {
+        height: 100%;
+    }
+}

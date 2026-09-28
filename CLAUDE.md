@@ -284,7 +284,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 |---|---|---|
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
-| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ | `hang-guard.js` |
+| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់។ ⛔ meta-checker ដែលរត់ checker កូនច្រើន (`checker-coverage` · `exit-code-integrity`) រត់ **ស្របគ្នាក្នុងពិដាន** មិនមែនជាជួរ ហើយកូនដែល **ផុតថវិកា** ខណៈពុល = FAIL (វាស់មិនបាន) មិនមែន «ធ្លាក់ត្រឹមត្រូវ» · ⛔ កុំកែការលើសពិដានដោយបង្កើន `CHECKER_TIMEOUT` (វាលាក់ checker ដែលព្យួរពិត) | `hang-guard.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ checker ត្រូវរត់ធម្មតា និង baseline; CLI ដែលទាមទារ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា | `checker-coverage.js` |
 | **ឯកសារគម្រោងទាំងមូល** | ⛔ ឯកសារថ្មីត្រូវមានការយាមក្នុង `repository-file-coverage.json`; ធាតុចាស់ ឬ guard ដែលបាត់ត្រូវធ្លាក់; ប្រភេទ integrity/manual មិនមែន behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
 | **របាយការណ៍ និងទិន្នន័យសម្រាប់ផ្ញើ** | ⛔ CLI ពិតត្រូវរកឃើញកំហុសលុយមុន/ក្រោយ redaction ដូចគ្នា; launcher មិនប្រកាសថាផ្ញើបានពេល redaction ធ្លាក់ | `money-reality-test.js` |

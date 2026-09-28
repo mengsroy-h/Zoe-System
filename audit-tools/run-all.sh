@@ -348,8 +348,16 @@ runall_select() {  # RUNALL_ONLY · RUNALL_RESUME ➜ J_ST[i] = hdr | queue | do
     return 0
 }
 
-runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នាក់ឯងពេលគ្មានអ្វីរត់) រួចយូរ ➜ មុន តាមពេល state មុន · គ្មាន ➜ លំដាប់បញ្ជី
-    local i rank hint
+# ⛔ ពេលប្រហែល (វិ.) របស់ checker យឺតជាងគេ ៖ ប្រើតែពេល state គ្មានពេលរបស់វា (session ថ្មីចាប់ផ្តើមពី clone ស្អាត ➜ គ្មាន
+#    `<git-dir>/zoe-runall-state.tsv`)។ ប៉ះតែ **លំដាប់រត់** (យូរ ➜ មុន ➜ កន្ទុយខ្លី) មិនដែលប៉ះសាលក្រម ➜ លេខចាស់ = យឺតជាងបន្តិច
+#    មិនខុស។ ឈ្មោះ = id ឯកសារ (audit-tools/<id>.js) · runall-runner-test ផ្ទៀងថាគ្មានឈ្មោះខ្មោច។ វាស់ ៖ ការរត់ជាជួរ 2026-09-28។
+RUNALL_HINTS="money-guardian-test:165 zoew-suite-test:130 revenue-fuzz-test:125 app-lock-test:100 ui-flow-test:95
+    collected-mirror-fuzz-test:50 write-stall-guard-test:40 gesture-test:35 fluid-type-focus-test:32 layout-check:30
+    sheet-import-test:30 cleanup-interrupt-atomicity-test:24 ledger-clamp-symmetry-test:24 late-commit-test:20 ios-panel-glide-test:20"
+runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នាក់ឯងពេលគ្មានអ្វីរត់) រួចយូរ ➜ មុន (state មុន · RUNALL_HINTS · lane) · ស្មើ ➜ លំដាប់បញ្ជី
+    local i rank hint h
+    local -A hints=()
+    for h in $RUNALL_HINTS; do hints[${h%%:*}]=$(( ${h##*:} * 1000 )); done
     RUNALL_ORDER=()
     if [ "$RUNALL_JOBS" -le 1 ]; then
         for ((i = 0; i < ${#J_KIND[@]}; i++)); do [ "${J_ST[$i]}" = queue ] && RUNALL_ORDER+=("$i"); done
@@ -360,7 +368,8 @@ runall_order() {  # ➜ RUNALL_ORDER ៖ excl មុន (រត់ម្នា�
             [ "${J_ST[$i]}" = queue ] || continue
             rank=1; [ "${J_LANE[$i]}" = excl ] && rank=0
             hint="${RS_MS[${J_LABEL[$i]}]:-}"
-            if [ -z "$hint" ]; then case "${J_LANE[$i]}" in emu) hint=30000 ;; browser) hint=12000 ;; *) hint=2000 ;; esac; fi
+            [ -z "$hint" ] && [ -n "${J_ID[$i]}" ] && hint="${hints[${J_ID[$i]}]:-}"
+            if [ -z "$hint" ]; then case "${J_LANE[$i]}" in emu) hint=15000 ;; browser) hint=12000 ;; *) hint=2000 ;; esac; fi
             printf '%s\t%s\t%s\n' "$rank" "$hint" "$i"
         done | LC_ALL=C sort -t "$(printf '\t')" -k1,1n -k2,2nr -k3,3n)
 }

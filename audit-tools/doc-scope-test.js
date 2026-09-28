@@ -749,10 +749,26 @@ function readSources(dir, out) {
 }
 const sourceText = SOURCE_DIRS.map((d) => path.join(ROOT, d))
     .reduce((acc, dir) => readSources(dir, acc), []).join('\n');
+// ⛔ ច្បាប់ក៏យោង function របស់ **shell** ដែរ (ឧ. `runall_lane()` ក្នុង `audit-tools/run-all.sh`) ➜ ស្កេន `.sh` ដាច់ដោយឡែក
+// តែលើទម្រង់ប្រកាស bash (`ឈ្មោះ() {`) ប៉ុណ្ណោះ ➜ លំនាំ JS ខាងលើមិនធូរដោយសារអត្ថបទ shell។
+function readShellSources(dir, out) {
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return out; }
+    entries.forEach((entry) => {
+        if (entry.name === 'node_modules' || entry.name === '.git') return;
+        const next = path.join(dir, entry.name);
+        if (entry.isDirectory()) readShellSources(next, out);
+        else if (/\.sh$/.test(entry.name)) out.push(fs.readFileSync(next, 'utf8'));
+    });
+    return out;
+}
+const shellText = SOURCE_DIRS.map((d) => path.join(ROOT, d))
+    .reduce((acc, dir) => readShellSources(dir, acc), []).join('\n');
 function nameIsDefined(name) {
     return new RegExp('(?:function|const|let|var|class)\\s+' + name + '\\b').test(sourceText)
         || new RegExp('\\b' + name + '\\s*[:=]\\s*(?:async\\s*)?(?:function|\\()').test(sourceText)
-        || new RegExp('\\.' + name + '\\s*\\(').test(sourceText);
+        || new RegExp('\\.' + name + '\\s*\\(').test(sourceText)
+        || new RegExp('^\\s*' + name + '\\s*\\(\\)\\s*\\{', 'm').test(shellText);
 }
 // ⛔ ស្កេន **រាល់ការហៅក្នុង backtick** មិនត្រឹម `x()` ទទេ ៖ ច្បាប់ភាគច្រើន
 // សរសេរ helper ជាមួយអាគុយម៉ង់ (`emptyViewMessage(pathKeys, emptyText)`) ➜

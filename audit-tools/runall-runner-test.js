@@ -329,13 +329,21 @@ async function sectionSix() {
         const h = path.join(dir, 'plan.sh');
         fs.writeFileSync(h, 'cd ' + JSON.stringify(ROOT) + ' || exit 1\n' + block + '\n'
             + runall.slice(listAt, listEnd).replace(/^#@runner-end$/m, '') + '\n'
-            + 'for i in "${!J_KIND[@]}"; do printf \'%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}"; done\n');
+            + 'for i in "${!J_KIND[@]}"; do printf \'%s\\t%s\\t%s\\t%s\\n\' "${J_KIND[$i]}" "${J_LABEL[$i]}" "${J_ID[$i]}" "${J_LANE[$i]}"; done\n'
+            + 'for h in $RUNALL_HINTS; do printf \'hint\\t%s\\t%s\\t-\\n\' "${h%%:*}" "${h##*:}"; done\n');
         const r = cp.spawnSync('bash', [h], { encoding: 'utf8', timeout: 60000, env: harnessEnv(dir) });
         plan = String(r.stdout || '').split('\n').filter(Boolean).map((l) => l.split('\t'))
             .filter((p) => p[0] !== 'hdr').map(([kind, label, id, laneName]) => ({ kind, label, id, lane: laneName }));
     }
+    const hintRows = plan.filter((p) => p.kind === 'hint');
+    plan = plan.filter((p) => p.kind !== 'hint');
     const jobs = plan.filter((p) => p.kind === 'job');
     ok('ជាន់អប្បបរមា ៖ ដេរីវេបញ្ជីពិតបាន >= 150 checker (ឃើញ ' + jobs.length + ')', jobs.length >= 150, jobs.length);
+    // RUNALL_HINTS ប៉ះតែលំដាប់រត់ — តែឈ្មោះខ្មោច (checker ដែលលែងមាន/ប្តូរឈ្មោះ) = ការបញ្ជាក់ក្លែងថា «វានៅរត់មុនគេ»
+    const planIds = new Set(jobs.map((j) => j.id));
+    const ghostHints = hintRows.filter((h) => !planIds.has(h.label) || !/^\d+$/.test(h.id)).map((h) => h.label + ':' + h.id);
+    ok('RUNALL_HINTS ៖ >= 5 ធាតុ · រាល់ឈ្មោះជា checker ក្នុងបញ្ជីពិត · វិនាទីជាលេខ (ឃើញ ' + hintRows.length + ')',
+        hintRows.length >= 5 && ghostHints.length === 0, ghostHints);
     const dup = plan.map((p) => p.label).filter((l, i, a) => a.indexOf(l) !== i);
     ok('⛔ ស្លាក checker មិនស្ទួន (ជាកូនសោរបស់ RUNALL_STATE · RUNALL_ONLY)', dup.length === 0, dup);
 

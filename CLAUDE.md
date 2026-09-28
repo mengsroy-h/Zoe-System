@@ -1999,7 +1999,7 @@ bash audit-tools/run-all.sh
 ⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
 រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
 ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
-`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite`) ចំណាយ **@@AFTER@@** លើ 4 CPU (ជាជួរ ៖ ~២៨ នាទី) ➜ រត់វាជា background។
+`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite`) ចំណាយ **~១០ នាទី** លើ 4 CPU (វាស់ ៥៨៥ វិ. · ជាជួរជំនាន់មុន ១៦៩៤ វិ.) ➜ រត់វាជា background។
 
 ⛔ **`run-all.sh` រត់ស្របគ្នា ហើយ *បន្តបាន*** (របៀបប្រើ ៖ [`audit-tools/README.md`](audit-tools/README.md) ផ្នែក ២) ៖
 lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំដែន 2–6) · output **តាមលំដាប់បញ្ជីជានិច្ច** · រាល់ checker ដែលចប់ត្រូវសរសេរ

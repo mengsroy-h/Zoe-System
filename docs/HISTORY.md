@@ -939,7 +939,7 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 - **វាស់មុន** (4 CPU · RTDB emulator · `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1` · tree `0ef79fc`) ៖
   **១៦៩៤ វិ. (២៨.២ នាទី) · ១៨៤ PASS**។ យឺតជាងគេ ៖ `exit-code-integrity` ២៩២ · `money-guardian` ១៦៥ · `zoew-suite` ១២៧ ·
   `revenue-fuzz` ១២៤ · `app-lock` ៩៨ · `ui-flow` ៩៥ · `checker-coverage` ៦៩ វិ.។
-- **វាស់ក្រោយ** (ម៉ាស៊ីនដដែល · ទង់ដដែល · `RUNALL_JOBS=4`) ៖ @@AFTER-DETAIL@@
+- **វាស់ក្រោយ** (ម៉ាស៊ីនដដែល · ទង់ដដែល · `RUNALL_JOBS=4`) ៖ **៥៨៥ វិ. (៩.៧ នាទី) · ១៨៥ PASS** (session ថ្មី · គ្មាន state ➜ លំដាប់ពី `RUNALL_HINTS`) ➜ **លឿន ២.៩×**។ ផលបូកពេល checker ១៦៣៤ វិ. · ដំណាក់កាល meta ម្នាក់ឯង ~២១១ វិ. (`checker-coverage` ៦៨ + `exit-code-integrity` ១៤៣) + ដំណាក់កាលស្របគ្នា ~៣៦០ វិ. (≈ ផលបូក/៤ ➜ lane ពេញ)។ ជុំដំបូងគ្មាន `RUNALL_HINTS` ៖ ៦៥៤ វិ. (`zoew-suite` ចាប់ផ្តើមចុងក្រោយ)។ ⛔ ជាន់ក្រោមនៃពេលឥឡូវជា **ដំណាក់កាល meta** ៖ ការឲ្យវាជាន់ lane ផ្សេង ត្រូវវាស់ជាមុនថា ស្រមោល `.tmp-poison-*` មិនប៉ះ checker ដែលដើរថត `audit-tools/`
 - 🔴 **ការរកឃើញ ៖ `exit-code-integrity` ២៩២ វិ. = ៩៧% នៃពិដាន ៣០០ វិ.** — checker ថ្មីណាមួយ (រួមទាំង `runall-runner-test` ដែល
   ពុលរត់ ~២០ វិ.) ធ្វើឲ្យ meta-checker ខ្លួនឯងរាយ «ព្យួរ»។ profile ៖ ពុល checker ១០៨ **ជាជួរ** (ផលបូក ២៨៩ វិ.) · តែ
   `money-guardian` ពុលផុតពិដាន ៦០ វិ. ជានិច្ច ហើយ `execFileSync` សម្លាប់តែ node កូន ➜ អ្នកយាមកូន ៤ របស់វា **រត់ជាកំព្រា**

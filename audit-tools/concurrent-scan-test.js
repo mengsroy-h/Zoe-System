@@ -156,6 +156,7 @@ function makeCtx(server, fbSet) {
         pickup,
         reconciliations
     };
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     vm.runInContext("var SCANNER_LOOKUP_BARCODE_INDEX_FIELD = '__zoeScannerLookupIndex';", ctx);
     vm.runInContext('var deletedItems = []; var activeRestoreClaims = new Map(); var dbListenerPendingPaths = new Set(); const DB_LISTENER_KEY_DELETED = "deleted";', ctx);

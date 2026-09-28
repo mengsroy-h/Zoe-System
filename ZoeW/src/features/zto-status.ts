@@ -1,6 +1,6 @@
 import { modalIsOpen } from '../core/modals';
 import { viewState } from '../core/view-state';
-import { dataState, securityState, uiState, ztoState } from '../core/state';
+import { dataState, firebaseState, lookupState, securityState, uiState, ztoState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { elapsedSince } from '../core/elapsed';
 import { appLocalStore, safeStoreGet, safeStoreRemove, safeStoreSet } from '../core/storage';
@@ -16,7 +16,7 @@ import { buildLookupRequestHeaders, lookupApiSendsHeader } from './lookup-api';
 import { getLookupApiConfig } from './lookup-config';
 import { requestPinBeforeConfig } from './pin';
 import { trashReasonOf } from './trash';
-import { ZTO_FAST_MODE_HINT } from './zto-list-sync';
+import { ZTO_FAST_MODE_HINT, ztoListSignedProbe } from './zto-list-sync';
 import { anyDbListenerViewIsStale, emptyViewMessage } from '../services/db-listeners';
 import { fetchWithTimeout, linkIsFrugal } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -40,6 +40,20 @@ export const ZTO_STATUS_BANNER_CODES = 3;
 export const ZTO_OPEN_RECHECK_MS = 60 * 60 * 1000;
 
 export const ztoPickupStatus = new Map();
+
+export function captureZtoSession() {
+    const generation = ztoState.ztoSessionGeneration;
+    const capturedAuthGeneration = firebaseState.authGeneration;
+    const lookupGeneration = lookupState.customerDataTableSessionGeneration;
+    const capturedDatabase = firebaseState.db;
+    return {
+        ownsLock: () => generation === ztoState.ztoSessionGeneration,
+        current: () => generation === ztoState.ztoSessionGeneration
+            && capturedAuthGeneration === firebaseState.authGeneration
+            && lookupGeneration === lookupState.customerDataTableSessionGeneration
+            && capturedDatabase === firebaseState.db
+    };
+}
 
 export function loadZtoPickupStatusOnce() {
     if (ztoState.ztoStatusLoaded) return;
@@ -69,6 +83,16 @@ export function saveZtoPickupStatus() {
 }
 
 export function clearZtoPickupStatusStore() {
+    ztoState.ztoSessionGeneration++;
+    clearTimeout(ztoState.ztoStatusSweepTimer);
+    ztoState.ztoStatusSweepTimer = null;
+    ztoState.ztoStatusInFlight = false;
+    ztoState.ztoStatusLastSweepAt = 0;
+    ztoState.ztoStatusSweepCursor = 0;
+    ztoState.ztoListSyncInFlight = false;
+    ztoState.ztoListSyncResult = null;
+    ztoState.ztoListPreview = null;
+    ztoListSignedProbe.clear();
     ztoPickupStatus.clear();
     ztoState.ztoStatusBannerSig = '';
     ztoState.ztoStatusModalSig = '';
@@ -428,8 +452,10 @@ export function scheduleZtoStatusSweep(delayMs?) {
 }
 
 export async function checkZtoStatusForBarcode(cfg, code) {
+    const session = captureZtoSession();
     const targetUrl = cfg.url.replace('{barcode}', encodeURIComponent(code));
     const headers = await buildLookupRequestHeaders(cfg);
+    if (!session.current()) return null;
     const out = await fetchWithTimeout(targetUrl, { headers }, ZTO_AUTO_LOOKUP_TIMEOUT_MS,
         'ZTO status timed out', (r) => r.json().catch(() => null));
     if (!out.res.ok) return null;
@@ -439,6 +465,7 @@ export async function checkZtoStatusForBarcode(cfg, code) {
 }
 
 export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistory, trashToScan = dataState.deletedItems) {
+    const session = captureZtoSession();
     const cfg = ztoStatusFeatureConfig();
     if (!cfg) return 0;
     if (ztoStatusSecretIsLocked(cfg)) return 0;
@@ -471,7 +498,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
     let attempted = 0;
     try {
         for (let i = 0; i < work.length; i++) {
-            if (!ztoStatusNetworkAllowed(force)) break;
+            if (!session.current() || !ztoStatusNetworkAllowed(force)) break;
             let answer = null;
             attempted++;
             try {
@@ -479,6 +506,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
             } catch (e) {
                 answer = null;
             }
+            if (!session.current()) return 0;
             if (!answer) continue;
             recorded++;
             setZtoPickupVerdict(work[i].code, answer.closed);
@@ -486,14 +514,16 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
                 measured++;
                 if (work[i].open && answer.closed === true) {
                     if (await autoCloseBarcodeFromZto(work[i], dataToScan)) autoClosed++;
+                    if (!session.current()) return 0;
                 }
                 renderZtoSyncViews(dataToScan, trashToScan);
             }
         }
     } finally {
-        ztoState.ztoStatusInFlight = false;
-        ztoState.ztoStatusSweepCursor += attempted || work.length;
+        if (session.ownsLock()) ztoState.ztoStatusInFlight = false;
+        if (session.current()) ztoState.ztoStatusSweepCursor += attempted || work.length;
     }
+    if (!session.current()) return 0;
     if (autoClosed > 0) {
         showToast('✅ ZTO បិទរួច ➜ បិទ ' + autoClosed + ' កញ្ចប់ក្នុង ZoeW ដោយស្វ័យប្រវត្តិ');
     }
@@ -507,6 +537,7 @@ export async function runZtoStatusSweep(force, dataToScan = dataState.scanHistor
 }
 
 export async function recheckZtoPickupStatus() {
+    const session = captureZtoSession();
     const cfg = ztoStatusFeatureConfig();
     if (!cfg) return;
     if (ztoStatusSecretIsLocked(cfg)) {
@@ -524,6 +555,7 @@ export async function recheckZtoPickupStatus() {
     }
     showToast('🔄 កំពុងពិនិត្យស្ថានភាពនៅ ZTO...');
     const measured = await runZtoStatusSweep(true);
+    if (!session.current()) return;
     if (!measured) {
         showToast('⚠️ ពិនិត្យស្ថានភាពនៅ ZTO មិនបាន — សូមសាកម្ដងទៀត');
         return;

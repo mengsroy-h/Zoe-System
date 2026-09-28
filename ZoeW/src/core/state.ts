@@ -482,6 +482,7 @@ export const sheetImportState = createStore<SheetImportState>('sheetImportState'
 registerStore(sheetImportState);
 
 export interface ZtoState {
+    ztoSessionGeneration: number;
     ztoStatusLoaded: boolean;
     ztoStatusSweepTimer: any;
     ztoStatusInFlight: boolean;
@@ -498,6 +499,7 @@ export interface ZtoState {
 }
 
 export const ztoState = createStore<ZtoState>('ztoState', {
+    ztoSessionGeneration: 0,
     ztoStatusLoaded: false,
     ztoStatusSweepTimer: null,
     ztoStatusInFlight: false,
@@ -513,4 +515,3 @@ export const ztoState = createStore<ZtoState>('ztoState', {
     ztoListPreview: null,
 });
 registerStore(ztoState);
-

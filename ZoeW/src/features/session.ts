@@ -94,6 +94,7 @@ export function runSessionExpiryCheck() {
 }
 
 export function clearSensitiveModalFields() {
+    viewState.phoneModalBusy = false;
     hidePhoneSuggestions();
     setPhoneSearchPulledUp(false);
     clearZtoPickupStatusStore();

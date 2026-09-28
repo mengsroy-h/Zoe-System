@@ -15,12 +15,14 @@ export function setupNativeShell(scope: LifecycleScope): void {
     scope.onDispose(uiState.subscribe(history.observe));
     Promise.all([import('@capacitor/app'), import('@capacitor/core')]).then(async ([{ App }, core]) => {
         if (scope.disposed) return;
-        const handles = await Promise.all([
-            App.addListener('backButton', () => handleNativeBack(() => { App.minimizeApp().catch(() => {}); }, history)),
-            App.addListener('pause', () => noteAppLockAway()),
-            App.addListener('resume', () => relockAppAfterAway())
-        ]);
-        scope.onDispose(() => handles.forEach((h) => { h.remove().catch(() => {}); }));
+        await Promise.all([
+            App.addListener('backButton', () => { if (!scope.disposed) handleNativeBack(() => { App.minimizeApp().catch(() => {}); }, history); }),
+            App.addListener('pause', () => { if (!scope.disposed) noteAppLockAway(); }),
+            App.addListener('resume', () => { if (!scope.disposed) relockAppAfterAway(); })
+        ].map((pending) => pending.then((handle) => {
+            scope.onDispose(() => { handle.remove().catch(() => {}); });
+        })));
+        if (scope.disposed) return;
         const { SystemBars, SystemBarsStyle, SystemBarType } = core as any;
         if (!SystemBars) return;
         let applied = '';

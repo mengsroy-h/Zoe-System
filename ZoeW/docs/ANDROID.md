@@ -98,7 +98,7 @@ major.minor ដដែល។ `npm run android:check` ចាក់សោវា។
 
 ⛔ ហេតុផល ៖ plugin Capacitor ទាំងអស់ត្រូវបានសាកជាមួយខ្សែនោះ ហើយការឡើងលើស (AGP major ថ្មី ·
 `compileSdk` ថ្មី · AndroidX ដែលទាមទារ AGP ថ្មី) **ធ្លាក់តែពេល build ក្នុង Android Studio**
-— ម៉ាស៊ីន CI នៃ repo នេះគ្មាន Android SDK ➜ វាស់មិនបាន។
+— Audit job វាស់ config/bridge តែប៉ុណ្ណោះ; workflow `Android APK` សាង APK ពិតពេលមាន SDK, secret និងកូតា។
 
 ការឡើងលើសខ្សែនោះ = **ការឡើង Capacitor major** (ពេលវាចេញជា stable មិនមែន alpha/beta) ៖
 

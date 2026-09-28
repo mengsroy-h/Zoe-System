@@ -1,6 +1,6 @@
 import { firebaseState } from '../core/state';
 import { elapsedSince } from '../core/elapsed';
-import { fetchWithTimeout } from './network';
+import { fetchWithTimeout, withTimeout } from './network';
 
 export const TX_OUTCOME_READ_TIMEOUT_MS = 8000;
 
@@ -79,15 +79,18 @@ export function txRestUrl(ref) {
     return url.toString();
 }
 
-export async function txReadServerValue(restUrl) {
+export async function txReadServerValue(restUrl, budgetMs = TX_OUTCOME_READ_TIMEOUT_MS) {
+    const startedAt = Date.now();
     const user = firebaseState.auth && firebaseState.auth.currentUser;
     if (!restUrl || !user || typeof user.getIdToken !== 'function') throw new Error('Transaction outcome read unavailable');
-    const token = await user.getIdToken();
-    if (!token) throw new Error('Transaction outcome read unavailable');
+    const token = await withTimeout(user.getIdToken(), budgetMs, 'Transaction outcome token timed out');
+    const remaining = budgetMs - elapsedSince(startedAt);
+    if (!token || !firebaseState.auth || firebaseState.auth.currentUser !== user) throw new Error('Transaction outcome read unavailable');
+    if (remaining <= 0) throw new Error('Transaction outcome read timed out');
     const url = new URL(restUrl);
     url.searchParams.set('auth', String(token));
     const out = await fetchWithTimeout(url.toString(), { cache: 'no-store', credentials: 'omit' },
-        TX_OUTCOME_READ_TIMEOUT_MS, 'Transaction outcome read timed out',
+        remaining, 'Transaction outcome read timed out',
         (res) => (res && res.ok ? res.json() : Promise.reject(new Error('HTTP ' + (res ? res.status : 0)))));
     return out.body === undefined ? null : out.body;
 }
@@ -98,15 +101,20 @@ export function txDelay(ms) {
 
 export async function txResolveOutcome(restUrl, sentValue, priorValue) {
     const startedAt = Date.now();
+    const capturedAuthGeneration = firebaseState.authGeneration;
     for (let attempt = 0; attempt < TX_OUTCOME_MAX_ATTEMPTS; attempt++) {
+        if (firebaseState.authGeneration !== capturedAuthGeneration) break;
+        let remaining = TX_OUTCOME_MAX_WAIT_MS - elapsedSince(startedAt);
+        if (remaining <= 0) break;
         if (attempt) {
-            if (elapsedSince(startedAt) >= TX_OUTCOME_MAX_WAIT_MS) break;
-            await txDelay(TX_OUTCOME_RETRY_GAP_MS);
+            await txDelay(Math.min(TX_OUTCOME_RETRY_GAP_MS, remaining));
         }
+        remaining = TX_OUTCOME_MAX_WAIT_MS - elapsedSince(startedAt);
+        if (remaining <= 0 || firebaseState.authGeneration !== capturedAuthGeneration) break;
         if ((navigator.onLine as boolean) === false) continue;
         let server;
         try {
-            server = await txReadServerValue(restUrl);
+            server = await txReadServerValue(restUrl, Math.min(TX_OUTCOME_READ_TIMEOUT_MS, remaining));
         } catch (e) {
             continue;
         }

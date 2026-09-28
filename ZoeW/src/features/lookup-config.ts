@@ -7,7 +7,7 @@ import { clearCustomerDataTableCache, prefetchCustomerDataTableRowsIfConfigured 
 import { lookupApiIsZto } from './customer-table-prefetch';
 import { lookupApiIsAppsScript, lookupApiSendsHeader } from './lookup-api';
 import { refreshZtoListSyncUi } from './zto-list-sync';
-import { refreshZtoAutoCloseUi } from './zto-status';
+import { clearZtoPickupStatusStore, refreshZtoAutoCloseUi } from './zto-status';
 import { decryptLookupSecret, encryptLookupSecret } from '../services/crypto';
 import { fetchWithTimeout } from '../services/network';
 import { closeModal, openModalHelper } from '../ui/modal';
@@ -105,6 +105,7 @@ export async function saveLookupApiConfig() {
         return;
     }
     clearCustomerDataTableCache();
+    clearZtoPickupStatusStore();
     setFieldValue('lookupApiHeaderValueInput', '');
     closeModal('lookupApiConfigModal');
     refreshZtoAutoCloseUi();

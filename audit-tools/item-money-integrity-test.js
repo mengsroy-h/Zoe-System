@@ -135,6 +135,7 @@ const WRITE_ALLOW = {
     check(!!helper, 'ស្រង់ `recalcItemMoneyFromBarcodes` ចេញពី app.js ពិត');
     if (helper) {
         const ctx = { Math, parseFloat, Number, Array, Object, JSON };
+        ctx.authGeneration = 0;
         vm.createContext(ctx);
         vm.runInContext(helper, ctx);
         const round2 = (x) => Math.round(x * 100) / 100;

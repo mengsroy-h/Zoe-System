@@ -1,6 +1,6 @@
 import { fieldValue, focusField, setFieldValue } from '../app/refs';
 import { viewState } from '../core/view-state';
-import { dataState, scanState, uiState } from '../core/state';
+import { dataState, firebaseState, scanState, uiState } from '../core/state';
 import { getServerNow } from '../core/clock';
 import { appLocalStore, safeStoreSet } from '../core/storage';
 import { normalizeStoredPhone } from '../core/text';
@@ -87,6 +87,9 @@ export function dropOptimisticBarcode(code) {
 }
 
 export async function confirmPhone(isSkip = false) {
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
     let phone = isSkip ? "គ្មានលេខ" : normalizeStoredPhone(fieldValue('modalPhoneInput'));
     let rawLocker = fieldValue('modalLockerInput').trim();
     let locker = rawLocker;
@@ -126,9 +129,10 @@ export async function confirmPhone(isSkip = false) {
         try {
             claim = await withTimeout(claimPromise, 15000, 'Barcode claim timed out');
         } catch (claimError) {
-            releaseLateBarcodeClaim(claimPromise, barcodeToSave);
+            if (current()) releaseLateBarcodeClaim(claimPromise, barcodeToSave);
             throw claimError;
         }
+        if (!current()) return;
         if (claim === 'taken') {
             rejectScanAndRefocus(`⚠️ លេខ Barcode នេះ (${barcodeToSave}) ត្រូវបានបញ្ចូលរួចហើយ! (ប្រហែលមកពី device ផ្សេង) សូមស្កេនម្ដងទៀត។`);
             return;
@@ -140,6 +144,7 @@ export async function confirmPhone(isSkip = false) {
         }
 
         const rollbackFailedSave = () => {
+            if (!current()) return;
             if (claim === 'claimed') releaseBarcodesInRegistry([barcodeToSave]);
             dropOptimisticBarcode(barcodeToSave);
             refreshCurrentHistoryView();
@@ -148,16 +153,20 @@ export async function confirmPhone(isSkip = false) {
         const savePromise = addOrUpdateEntry(barcodeToSave, phone, cod, dod, locker);
         try {
             const saveStatus = await withTimeout(savePromise, 15000, 'Save timed out');
+            if (!current()) return;
             if (saveStatus !== true) {
                 closeModal('phoneModal');
                 return;
             }
         } catch (saveError) {
+            if (!current()) return;
             if (saveError && saveError.message === 'Save timed out') {
                 savePromise.then((lateStatus) => {
+                    if (!current()) return;
                     if (lateStatus === true) showToast(`✅ (${barcodeToSave}) រក្សាទុកបានជោគជ័យ!`);
                     refreshCurrentHistoryView();
                 }, (lateErr) => {
+                    if (!current()) return;
                     rollbackFailedSave();
                     showToast(`⚠️ រក្សាទុក (${barcodeToSave}) បរាជ័យ! សូមស្កេនម្ដងទៀត។`);
                     if (window.ZoeErrors) ZoeErrors.capture(lateErr, { zone: 'data', context: 'savePhoneAndSave late write' });
@@ -174,10 +183,13 @@ export async function confirmPhone(isSkip = false) {
         closeModal('phoneModal');
         showToast("✅ រក្សាទុកបានជោគជ័យ!");
     } catch (e) {
+        if (!current()) return;
         showToast(`⚠️ រក្សាទុកបរាជ័យ! សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយសាកល្បងស្កេន (${barcodeToSave}) ម្ដងទៀត។`);
     } finally {
-        viewState.phoneModalBusy = false;
-        warmZtoLookupProxyNow();
+        if (current()) {
+            viewState.phoneModalBusy = false;
+            warmZtoLookupProxyNow();
+        }
     }
 }
 
@@ -198,14 +210,18 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
     }
 
     const scanRevenueApplied = addRevenueToDailyAndMonthlyRecord(dateString, cod, dod, 1);
+    const scanIsCurrent = () => typeof scanRevenueApplied.isCurrent !== 'function' || scanRevenueApplied.isCurrent();
     const reconcileSavedScanRevenue = () => {
+        if (!scanIsCurrent()) return Promise.resolve(false);
         return correctRevenueLedgerToActual(dateString, scanRevenueApplied, cod, dod, 1).then((status) => {
+            if (!scanIsCurrent()) return false;
             if (status && status.ok) return true;
             const ledgerErr = new Error('Scanned parcel revenue reconciliation did not commit');
             if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'addOrUpdateEntry ledger reconciliation', barcode });
             showToast(`⚠️ កញ្ចប់ (${barcode}) បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
             return false;
         }, (ledgerErr) => {
+            if (!scanIsCurrent()) return false;
             if (window.ZoeErrors) ZoeErrors.capture(ledgerErr, { zone: 'money', context: 'addOrUpdateEntry ledger reconciliation', barcode });
             showToast(`⚠️ កញ្ចប់ (${barcode}) បានរក្សាទុក ប៉ុន្តែស្ថិតិប្រាក់មិនទាន់ Sync ពេញលេញទេ! សូមប្រាប់ Admin។`);
             return false;
@@ -266,6 +282,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
         dataState.scanHistory.push(item);
         savePromise = mergeBarcodeIntoHistoryItem(item.id, mergeScannedBarcodeInto, item)
             .then((committedItem) => {
+                if (!scanIsCurrent()) return false;
                 if (!mergeAddedBarcode) {
                     revertRevenueLedgerDelta(scanRevenueApplied);
                     showToast(`⚠️ លេខ Barcode នេះ (${barcode}) មានក្នុងប្រព័ន្ធរួចហើយ!`);
@@ -273,6 +290,7 @@ export function addOrUpdateEntry(barcode, phone, cod, dod, locker = "N/A", stamp
                 }
                 return reconcileSavedScanRevenue();
             }, (err) => {
+                if (!scanIsCurrent()) throw err;
                 const revertIndex = dataState.scanHistory.findIndex(i => i.id === itemSnapshot.id);
                 if (revertIndex !== -1) dataState.scanHistory[revertIndex] = itemSnapshot;
                 refreshCurrentHistoryView();

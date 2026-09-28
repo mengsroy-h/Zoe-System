@@ -1,10 +1,10 @@
 # Zoe-System
 
-> ## ⚡ START HERE — អានទាំងឯកសារនេះមុនប៉ះកូដ
+> ## ⚡ START HERE — អានច្បាប់មុនប៉ះកូដ
 >
 > ឯកសារនេះសរសេរឲ្យ **session Claude ថ្មីទាំងស្រុង** អាចបន្តការងារបាន ដោយ
-> គ្មានប្រវត្តិការសន្ទនាមុន។ **វាខ្លីដោយចេតនា** — គោលដៅគឺឲ្យវា **ត្រូវបានអាន
-> ទាំងមូល** ។ ប្រវត្តិកំហុស · លេខដែលវាស់បាន · កំណត់ត្រាតាមកំណែ ស្ថិតក្នុង
+> គ្មានប្រវត្តិការសន្ទនាមុន។ ឯកសារនេះមានច្បាប់ និង runbook ច្រើន; ប្រើផែនទីខាងក្រោម
+> ដើម្បីរកផ្នែកពាក់ព័ន្ធ ហើយអានច្បាប់មុនកែ។ ប្រវត្តិកំហុស · លេខដែលវាស់បាន · កំណត់ត្រាតាមកំណែ ស្ថិតក្នុង
 > **[`docs/HISTORY.md`](docs/HISTORY.md)** (សម័យ React) និង **[`docs/HISTORY-ARCHIVE.md`](docs/HISTORY-ARCHIVE.md)**
 > (សម័យ vanilla) ដែលជា **ឯកសារយោង មិនមែនឯកសារអាន**។
 >
@@ -99,8 +99,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.7` (`zoew-v234`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.5` (`zoekeygen-v104`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.8` (`zoew-v235`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
 > កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
@@ -207,8 +207,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    `ZoeKeyGen/firebase-database.rules.json` (License)។
 ១១. **⛔ កុំប៉ះ PTR · ចលនាផ្ទាំងប្រវត្តិ · ភាពរលូននៃការរមូរ ដោយគ្មានការស្នើ
    ច្បាស់លាស់។** មើលផ្នែកបន្ទាប់។
-១២. **⛔ មុននឹងកត់ត្រាអ្វីថ្មីចូល `CLAUDE.md` ឬ `docs/HISTORY.md` ត្រូវ `grep` រកជាមុនសិន។** ឯកសារនេះខ្លីដោយចេតនា
-   — គោលដៅគឺឲ្យវា **ត្រូវបានអានទាំងមូល**។ ច្បាប់ស្ទួន ២ កន្លែង ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **ច្បាប់ ២ ផ្ទុយគ្នា** ➜
+១២. **⛔ មុននឹងកត់ត្រាអ្វីថ្មីចូល `CLAUDE.md` ឬ `docs/HISTORY.md` ត្រូវ `rg` រកជាមុនសិន។** ពង្រីកច្បាប់ដែលមានស្រាប់។ ច្បាប់ស្ទួន ២ កន្លែង ➜ ជុំក្រោយកែមួយ ភ្លេចមួយ ➜ **ច្បាប់ ២ ផ្ទុយគ្នា** ➜
    session បន្ទាប់ជឿមួយណាក៏បាន (វាកើតពិត ៣ ដង ៖ ច្បាប់ · នីតិវិធី emulator · «សំណួរ ១៣» — លម្អិតក្នុង
    `docs/HISTORY-ARCHIVE.md` ផ្នែក ៥)។ ⛔ ភាពស្ទួនឈឺចាប់នៅជុំក្រោយ ➜ លុបវា **ពេលឃើញ**។ ⛔ ឯកសារដទៃត្រូវ **យោង**
    ច្បាប់ក្នុងឯកសារនេះ មិនមែនចម្លងវា។ ⛔ ច្បាប់ដដែលលើសាខាថ្មី ➜ **ពង្រីកច្បាប់ដើម** · ជួរថ្មីក្នុងតារាងស្នូលតែពេល
@@ -235,7 +234,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 - តំបន់ទាំងនេះ **ត្រូវបានផ្ទៀងផ្ទាត់លើ iPhone និង Android ពិតរួចហើយ** —
   **វាមិនមែនជាកូដដែលមិនទាន់សាកទេ**។ កុំ «កែ» វាដោយផ្អែកលើការសង្ស័យ ការអានកូដ
   ឬទ្រឹស្តីអំពី WebKit។
-- បើ `run-all.sh` **បៃតង** នោះមិនមានអ្វីត្រូវកែក្នុងតំបន់នេះទេ។
+- `run-all.sh` **បៃតង** បញ្ជាក់តែសេណារីយ៉ូដែលបានរត់; វាមិនបញ្ជាក់ថាតំបន់នេះគ្មាន bug ទេ។ ការកែត្រូវមានភស្តុតាងបញ្ហាពិត។
   `gesture-test.js` · `panel-motion-test.js` · `ios-panel-glide-test.js` ·
   `panel-snap-ownership-test.js` និង `phone-search-swipe-test.js` ចាក់សោវាទុករួចហើយ។
 - កែបានតែពេល **អ្នកប្រើរាយការណ៍បញ្ហាពិត** (វីដេអូ ឬការពិពណ៌នាជាក់លាក់)។
@@ -430,7 +429,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 
 ---
 
-# 🧰 ថ្នាក់កំហុសដែលមាន *ឧបករណ៍រួចហើយ* — កុំរកដោយភ្នែក · កុំសាងស្ទួន
+# 🧰 ថ្នាក់កំហុសដែលមាន *ឧបករណ៍រួចហើយ* — អានកូដផ្គូផ្គងតេស្ត · កុំសាងស្ទួន
 
 > តារាងខាងលើ («ច្បាប់ ➜ ឧបករណ៍») ប្រាប់ថា **អ្វីដែលអ្នកមិនត្រូវបំពាន**។
 > តារាងនេះប្រាប់ថា **អ្វីដែលត្រូវបានវាស់រួច** ➜ កុំចំណាយពេលរកវាដោយភ្នែក
@@ -1403,6 +1402,10 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   **មិនដែលចូល cache** ➜ វាមិនអាចធ្វើឲ្យសំបកចាស់បានឡើយ (មូលហេតុនៃការលើកលែង
   ក្នុង `version-bump-scope.js` សម្រាប់ `netlify/` និង `tools/`)។
 
+- HTML ដែល cache រួចត្រូវនៅជាមួយកំណែ SW ដែលដំឡើងវា; មិន revalidate HTML ចូល cache ចាស់។
+  `shellDeployIsCurrent()` និង `revalidateShell()` ត្រូវ settle ក្នុង ៦ វិ. ទោះ fetch/body មិនស្តាប់ abort ឬគ្មាន AbortController។
+  អ្នកយាមពិត៖ `ZoeW/tests/sw-revalidation-timeout.test.ts` វាស់ SW របស់ App ទាំង ២។
+
 ## `license-verify.js` ជាផ្លូវបណ្តាញ **ទី ៣** — READ BEFORE TOUCHING IT
 
 វាជា **REST-only** (គ្មាន Firebase SDK ដោយការរចនា) ហើយមាន **helper បណ្តាញ
@@ -1527,10 +1530,10 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `@argus.ztoglobal.com` ➜ browser មិនត្រូវបញ្ជូនទៅ IdP ផង)។
   ⛔ **កុំនាំវាមកវិញដោយគ្មានភស្តុតាងថា IdP បើកឲ្យ server ក្រៅប្រទេស។**
 - **ថវិកាពេល ២ ជាន់** ៖ `ZTO_UPSTREAM_TIMEOUT_MS` (៦ វិ.) ក្នុងមួយសំណើ បូក
-  `ZTO_REQUEST_BUDGET_MS` (**៩ វិ.**) សរុប។ ⛔ **Netlify សម្លាប់ synchronous
-  function នៅ ១០ វិនាទី** ➜ ថវិកាលំនាំដើមត្រូវសមក្នុងនោះដក margin។ ពិដានខាង
+  `ZTO_REQUEST_BUDGET_MS` (**៩ វិ.**) សរុប។ នេះជាថវិកាឆ្លើយតបរបស់ App។
+  [ឯកសារ Netlify](https://docs.netlify.com/build/functions/configuration/) រាយ synchronous function ៦០ វិ.; កុំច្រឡំនឹងពិដាន streaming ១០ វិ.។ ពិដានខាង
   client ៖ `ZTO_AUTO_LOOKUP_TIMEOUT_MS` **១៣ វិ.** · `ZTO_TEST_TIMEOUT_MS`
-  **១១ វិ.** (>= ថវិកា server + ៣ វិ.)។
+  **១១ វិ.** (ថវិកា server ៩ វិ. + margin ៤/២ វិ. រៀងគ្នា)។
 - ⛔ **ការវាស់ថវិកាត្រូវឆ្លងកាត់ `elapsedSince()`** (ថយក្រោយ ➜ `Infinity` ➜
   fail-open) និង **ការ settle ត្រូវធានាដោយរចនាសម្ព័ន្ធ** (timer ពិតប្រណាំង
   នឹង `attempt()` បន្ថែមលើ `AbortController`)។
@@ -2037,9 +2040,9 @@ CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/ru
 `timeout` តាំងពីដើម · ឬសម្លាប់តាម **PID ជាក់លាក់** (`ps aux | grep …` រួច
 `kill <pid>`) បន្ទាប់ពីផ្ទៀងផ្ទាត់ថា PID នោះមិនមែន shell របស់អ្នក។
 
-## ជំហានទី ១ — កុំចាប់ផ្តើមដោយអានកូដពីដើមដល់ចប់
+## ជំហានទី ១ — អានកូដពិត និងសាកសេណារីយ៉ូដែល checker មិនទាន់គ្រប
 
-កំហុសថ្មី **ស្ទើរតែមិនដែលរកឃើញដោយការអានកូដដដែលឡើងវិញទេ**។ វារកឃើញដោយ ៖
+ប្រើលទ្ធផល checker ជាភស្តុតាងមួយផ្នែក។ អានផ្លូវកូដពិត ជាពិសេសចំណុច `await` ការប្ដូរ session និង callback យឺត ហើយសាកឥរិយាបថ៖
 
 - **ឧបករណ៍ថ្នាក់ថ្មី** — សាង checker សម្រាប់ថ្នាក់កំហុសមួយ ជាការវិនិយោគល្អជាងគេ
 - **កូដដែលទើប ship** — `git log --oneline <ចំណុចចុងក្រោយក្នុងឯកសារនេះ>..HEAD`
@@ -2199,7 +2202,7 @@ bash audit-tools/emu/rules.sh
   ក្នុង breadcrumb **មិនមែនកំហុស** (client អាន `reason` តែលើផ្លូវ `ZTO_CONFIG_INVALID`)។
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000` ក្នុង Netlify env ជាការកំណត់ដោយចេតនា** (កូដលំនាំដើម `6000` · ZTO ឆ្លើយ ២,១–៥,៣ វិ.
   លើផលិតកម្ម · បង្អួចអាន Cookie លើ container ត្រជាក់) ➜ តម្លៃមិនមែន `6000` ក្នុង `?diag=1` មិនមែនកំហុស។ ⛔ កុំបង្កើន
-  `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` (ស្មើពិដានសម្លាប់ Netlify)។
+  `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ (ថវិកា App មិនមែនពិដាន platform)។
 - ⏳ **Publish rules របស់ Business ម្តងទៀត** (វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `docs/HISTORY.md` [2.42.7]) — មុន Publish App ដើរដូចមុន
   (`permission_denied` ➜ សរសេរគ្មាន `op`) តែការការពារ «ការដក ledger បាត់ក្រោយ `disconnect`» មិនទាន់សកម្ម។
 - ✅ **Firebase rules របស់ Business និង License Project ត្រូវ Publish រួច** (`pickedUpBarcodes` · កូដ App `ZOE` ·

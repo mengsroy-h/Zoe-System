@@ -119,6 +119,7 @@ function buildWorld(mode) {
         window: { ZoeErrors: recorder },
         __log: log
     };
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
 
     const preamble = `

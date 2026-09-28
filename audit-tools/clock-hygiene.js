@@ -56,6 +56,7 @@ const LOCAL_CLOCK_OK = {
         warmZtoLookupProxyIfConfigured: 'ត្រាពេល warm-up ZTO ក្នុង cooldown ១០ នាទី — local សុទ្ធសាធ និងមិនប៉ះ retention/revenue',
         attemptAutoLookup: 'cooldown ក្រោយ Lookup បរាជ័យ — local',
         setZtoPickupVerdict: 'ត្រាពេលនៃសាលក្រម ZTO ក្នុង cache localStorage — TTL local សុទ្ធសាធ (មិនចូល Firebase · មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យសាលក្រម *ថ្មី* ត្រូវបោះចោល រាល់ការផ្ទុកឡើងវិញ ➜ ការហៅឥតឈប់ (`clock-basis-test.js`)',
+        txReadServerValue: 'ថវិកាអាន token + fetch + body ក្នុងសំណើតែមួយ; elapsedSince() មិនមែន timestamp ទិន្នន័យ ឬច្បាប់លុយ',
         txResolveOutcome: 'ត្រាពេលចាប់ផ្តើមការអានលទ្ធផល transaction ពី server ក្រោយ `disconnect` — ពិដានពេល local សុទ្ធសាធ (មិនចូល Firebase · មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() (`clock-basis-test.js`); នាឡិកាថយក្រោយ ➜ Infinity ➜ ឈប់ភ្លាមជា `unknown` (មិនប៉ះលុយ) · ព្រំដែនពិតជា `TX_OUTCOME_MAX_ATTEMPTS`',
         runZtoStatusSweep: 'ត្រាពេលនៃជុំបោស ZTO ចុងក្រោយ — ពិដានល្បឿន local សុទ្ធសាធ (មិនប៉ះ retention ឬលុយ) ហើយវាស់តាម elapsedSince() ➜ ⛔ វា **ត្រូវតែ** ជា Date.now() មិនមែន getServerNow(): មូលដ្ឋានលាយគ្នាធ្វើឲ្យ elapsedSince() ត្រឡប់ Infinity ➜ ពិដានរលាយ (`clock-basis-test.js`)',
         attemptDbListenerRecovery: 'ពិដានល្បឿននៃការស្តារ listener — local',

@@ -59,6 +59,8 @@ export function barcodeRegistryKey(code) {
 }
 
 export async function claimBarcodeInRegistry(code) {
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
     const key = barcodeRegistryKey(code);
     if (!firebaseState.db || !firebaseState.fb || !key) return 'unknown';
     try {
@@ -66,6 +68,7 @@ export async function claimBarcodeInRegistry(code) {
             if (current === null) return true;
             return;
         });
+        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return 'unknown';
         if (!result || !result.committed) return 'taken';
         return result.txOutcome === 'applied' ? 'unknown' : 'claimed';
     } catch (e) {
@@ -100,7 +103,10 @@ export function releaseRegistryKeys(keys) {
 
 export function releaseLateBarcodeClaim(claimPromise, code) {
     if (!claimPromise || typeof claimPromise.then !== 'function') return false;
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
     claimPromise.then((lateClaim) => {
+        if (operationDb !== firebaseState.db || operationAuth !== firebaseState.authGeneration) return;
         if (lateClaim === 'claimed') releaseBarcodesInRegistry([code]);
     }, () => {});
     return true;
@@ -114,12 +120,20 @@ export function releaseBarcodesInRegistry(codes) {
         if (key && keys.indexOf(key) === -1) keys.push(key);
     });
     if (!keys.length) return Promise.resolve();
-    return retryAsync(() => releaseRegistryKeys(keys).then((done) => {
-        if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
-        return true;
-    }), 3, 1200).then(() => {
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
+    return retryAsync(() => {
+        if (!current()) return Promise.resolve(false);
+        return releaseRegistryKeys(keys).then((done) => {
+            if (!done) throw new Error('REGISTRY_RELEASE_FAILED');
+            return true;
+        });
+    }, 3, 1200).then(() => {
+        if (!current()) return;
         keys.forEach((key) => pendingRegistryReleases.delete(key));
     }, () => {
+        if (!current()) return;
         queueRegistryReleaseRetry(keys, 1);
     });
 }
@@ -148,11 +162,16 @@ export function flushPendingRegistryReleases() {
     });
     if (!releasable.length) return;
     dataState.registryReleaseFlushInFlight = true;
+    const operationDb = firebaseState.db;
+    const operationAuth = firebaseState.authGeneration;
+    const current = () => operationDb === firebaseState.db && operationAuth === firebaseState.authGeneration;
     const keys = releasable.map((pair) => pair[0]);
-    const releaseFlushDone = () => { dataState.registryReleaseFlushInFlight = false; };
+    const releaseFlushDone = () => { if (current()) dataState.registryReleaseFlushInFlight = false; };
     releaseRegistryKeys(keys).then((done) => {
+        if (!current()) return;
         if (!done) releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
     }, () => {
+        if (!current()) return;
         releasable.forEach((pair) => queueRegistryReleaseRetry([pair[0]], pair[1].attempts + 1));
     }).then(releaseFlushDone, releaseFlushDone);
 }

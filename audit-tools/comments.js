@@ -7,6 +7,7 @@ const path = require('path');
 // ថត app អាច override បាន ដើម្បីឲ្យ `run-all.sh <baseline>` និង
 // `checker-coverage.js` បញ្ជាក់បានថា checker នេះពិតជាអានកូដមែន។
 const APP_ROOT = process.env.COMMENTS_APP_DIR ? path.resolve(process.env.COMMENTS_APP_DIR) : path.resolve(__dirname, '..');
+const isMeasureTree = fs.existsSync(path.join(APP_ROOT, 'ZoeW', 'audit-source-files.json'));
 const APPS = ['ZoeW', 'ZoeKeyGen'];
 const EXTERNAL = new Set(['qrcode.js', 'test.js']);
 const files = [];
@@ -17,6 +18,8 @@ for (const app of APPS) {
   if (!fs.existsSync(dir)) continue;
   for (const name of fs.readdirSync(dir).sort()) {
     if (!/\.js$/.test(name) || EXTERNAL.has(name)) continue;
+    // ទិដ្ឋភាព TSX ដែលបូក module មាន import ស្ទួន មិនមែនកូដ ship; វាស់ TSX ប្រភពទាំងអស់ខាងក្រោម។
+    if (isMeasureTree && app === 'ZoeW' && name === 'components.js') continue;
     files.push(base + '/' + name);
   }
 }
@@ -24,14 +27,14 @@ if (!acorn) { console.log('acorn not available — falling back to regex scan');
 const dirty = [];
 let scanned = 0;
 for (const f of files) {
-  const src = fs.readFileSync(f, 'utf8');
+  const src = fs.readFileSync(path.join(APP_ROOT, f), 'utf8');
   scanned++;
   if (acorn) {
     const comments = [];
     try {
       try { acorn.parse(src, { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'script' }); }
       catch (e) { comments.length = 0; acorn.parse(src, { ecmaVersion: 2022, onComment: comments, locations: true, sourceType: 'module' }); }
-    } catch (e) { console.log(`${f}: PARSE ERROR ${e.message}`); continue; }
+    } catch (e) { console.log(`${f}: PARSE ERROR ${e.message}`); dirty.push(f + ' (parse)'); continue; }
     console.log(`${f}: comments=${comments.length}` + (comments.length ? ' -> ' + comments.slice(0,5).map(c=>`L${c.loc.start.line}`).join(',') : ''));
     if (comments.length) dirty.push(f + ' (' + comments.length + ')');
   }
@@ -70,7 +73,6 @@ function reactSourceDir() {
   }
   return null;
 }
-const isMeasureTree = fs.existsSync(path.join(APP_ROOT, 'ZoeW', 'audit-source-files.json'));
 const reactDir = reactSourceDir();
 let reactScanned = 0;
 if (isMeasureTree && !reactDir) {
@@ -93,7 +95,7 @@ if (reactDir) {
   }
   console.log(`ZoeW React ៖ ស្កេន ${reactScanned} ឯកសារ`);
   // Gradle (`android/**/*.gradle` · `gradle.properties`) ៖ ⛔ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT») លើកលែង
-  //    ព្រោះ `cap sync` សរសេរ header នោះវិញរាល់ដង (សម្គាល់តាម header ពិតក្នុង `ts-comments.js`)
+  //    រួមទាំងថត Cordova បង្កើតដោយ `cap sync` និងរំលងក្នុង .gitignore (សម្គាល់ក្នុង `ts-comments.js`)
   const gradleFiles = tsComments.gradleShippedFiles(reactDir);
   for (const file of gradleFiles) {
     const rel = 'ZoeW/' + path.relative(reactDir, file).split(path.sep).join('/');

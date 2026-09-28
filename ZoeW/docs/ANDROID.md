@@ -17,7 +17,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | Export PDF · របាយការណ៍ខែ PDF | `window.print()` | **PrintManager** របស់ Android (Save as PDF) |
 | Service Worker | cache សំបក | មិនចុះឈ្មោះ (ឯកសារទាំងអស់ស្ថិតក្នុង APK រួច) |
 | សោ App ពេលចាកចេញ | `visibilitychange` | `pause`/`resume` របស់ Activity **បូក** `visibilitychange` (ការហៅស្ទួនត្រូវច្រានចេញ) |
-| ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` |
+| ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 
 ---
@@ -147,7 +147,9 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 ## ៤. សកម្មភាពដែលត្រូវធ្វើដោយដៃ (ម្តង)
 
 1. **Netlify** ៖ deploy ZoeW ដែលមាន CORS ថ្មីរបស់ ZTO Function (ដំណើរការ
-   ស្វ័យប្រវត្តិពេល merge)។ មុននោះ ZTO Lookup ក្នុង App Android ធ្លាក់។
+   ស្វ័យប្រវត្តិពេល merge)។ មុននោះ ZTO Lookup ក្នុង App Android ធ្លាក់។ ⛔ **deploy Netlify មុនចែក APK ថ្មី** ៖
+   Function ដែលមិនទាន់ស្គាល់ header `X-Zoe-Query` ឆ្លើយ 400 ➜ APK សាក URL មាន query វិញ (ដំណើរការ តែលឿនដូច APK
+   ចាស់ រហូតដល់ Function ថ្មី deploy ហើយ App ត្រូវបើកឡើងវិញ)។
 2. **Firebase (Project Business)** ៖ បើ API key មានការរឹតបន្តឹង *HTTP referrer*
    សូមបន្ថែម `https://localhost` (Google Cloud Console ➜ Credentials)។ បើគ្មាន
    ការរឹតបន្តឹង មិនបាច់ធ្វើអ្វីទេ។

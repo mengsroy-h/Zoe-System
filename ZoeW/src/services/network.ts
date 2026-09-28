@@ -9,7 +9,7 @@ import { updateRecentPhonesList } from './db-listeners';
 import { refreshEntryPagePanels } from '../ui/entry-list';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
-import { resolveNativeApiUrl } from '../platform/native';
+import { nativeFunctionRequest, resolveNativeApiUrl } from '../platform/native';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -186,7 +186,15 @@ export function fetchWithTimeout(url, options, ms, timeoutMsg, readBody?): Promi
             cleanup();
             reject(timeoutErr);
         }, ms);
-        fetch(resolveNativeApiUrl(url), opts).then((res) => {
+        const legacyUrl = resolveNativeApiUrl(url);
+        const request = lookupState.nativeQueryHeaderUnsupported ? { url: legacyUrl, options: opts } : nativeFunctionRequest(url, opts);
+        fetch(request.url, request.options).then((res) => {
+            if (request.url === legacyUrl || settled || !res || res.status !== 400) return res;
+            return fetch(legacyUrl, opts).then((legacy) => {
+                if (legacy && legacy.status !== 400) lookupState.nativeQueryHeaderUnsupported = true;
+                return legacy;
+            });
+        }).then((res) => {
             if (settled) return null;
             if (!readBody) return { res: res, body: undefined };
             return Promise.resolve(readBody(res)).then((body) => ({ res: res, body: body }));

@@ -192,6 +192,8 @@ function makeRun(opts) {
         navigator: { onLine: true },
         fetch: fetchFake,
         resolveNativeApiUrl: (u) => u,
+        nativeFunctionRequest: (u, o) => ({ url: u, options: o }),
+        lookupState: { nativeQueryHeaderUnsupported: false },
         ZoeErrors: { capture: (e, extra) => log.captures.push({ message: String(e && e.message || e), context: extra && extra.context, zone: extra && extra.zone }) },
         db: {}, rawFb: raw,
         firebaseConfig: { databaseURL: DB_URL },

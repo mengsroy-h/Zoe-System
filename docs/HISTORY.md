@@ -39,7 +39,7 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.42.9] — 2026-09-28 · ZoeW ៖ **ហូតប្រអប់ប្រវត្តិលឿនជាងមុន ~១០ ដង** (PWA និង APK) · **ស្កេន ZTO លើ APK លែងចំណាយ preflight រាល់ការស្កេន** (branch · មិនទាន់ merge)
+### [2.42.9] — 2026-09-28 · ZoeW ៖ **ហូតប្រអប់ប្រវត្តិលឿនជាងមុន ~១០ ដង** (PWA និង APK) · **ស្កេន ZTO លើ APK លែងចំណាយ preflight រាល់ការស្កេន** (merge រួចក្នុង PR #260)
 
 **ZoeW `2.42.9` (`zoew-v236`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។
 
@@ -69,13 +69,13 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- ⛔ **សាកលើ iPhone (PWA) និង Android (PWA + APK) ពិតមុន merge** (តំបន់ហាមចូល ៖ ចលនាផ្ទាំង) ៖ ហូតប្រអប់ប្រវត្តិឡើង/ចុះច្រើនដង ·
+- ⛔ **សាកលើ iPhone (PWA) និង Android (PWA + APK) ពិត** (merge រួចមុនការសាក · តំបន់ហាមចូល ៖ ចលនាផ្ទាំង) ៖ ហូតប្រអប់ប្រវត្តិឡើង/ចុះច្រើនដង ·
   រមូរតារាងក្នុងរបៀបពង្រីក · ទាញចុះដើម្បី Refresh (PTR) · ប្តូរទំព័រ ២ · ពិនិត្យថាជួរចុងក្រោយមិនជាប់ក្រោមរបា Tab។
-- ⛔ **Netlify ត្រូវ deploy មុនចែក APK ថ្មី** (Function ស្គាល់ `X-Zoe-Query`)។ បើ APK មកមុន ៖ ដំណើរការដូចមុន (ផ្លូវបម្រុង) តែមិនទាន់លឿន។
+- ⛔ **Netlify ត្រូវ deploy មុនចែក APK ថ្មី** (Function ស្គាល់ `X-Zoe-Query`) — ✅ ការ merge PR #260 deploy Netlify រួច ➜ build APK ពី `main`។
 - វាស់លើ APK ពិតក្រោយ deploy ៖ ស្កេន ZTO ត្រូវចុះមកជិត PWA (០.៦–០.៨ វិ.) ក្រៅពីការស្កេនដំបូងក្នុងរយៈ ២ ម៉ោង។
 - គ្មាន Firebase rules · គ្មាន env ថ្មី។
 
-### [2.42.8] — 2026-09-28 · ZoeW · ZoeKeyGen ៖ Deep audit session/race · timeout ពិត · Service Worker
+### [2.42.8] — 2026-09-28 · ZoeW · ZoeKeyGen ៖ Deep audit session/race · timeout ពិត · Service Worker (merge រួចក្នុង PR #259)
 
 **ZoeW `2.42.8` (`zoew-v235`) · ZoeKeyGen `2.20.6` (`zoekeygen-v105`)**។ មូលដ្ឋានវាស់៖ commit `443e4151c6395b30d0c6a351c1889e3d6a1d164e`។
 
@@ -120,7 +120,7 @@
 
 #### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
 
-- មិនកែ Firebase rules ក្នុងជុំនេះ។ PR មិនទាន់ merge/deploy។
+- មិនកែ Firebase rules ក្នុងជុំនេះ។ merge/deploy រួចក្នុង PR #259។
 - សាកលើ Android ពិត និង iPhone/PWA ពិត៖ network ប្ដូរ Wi-Fi/mobile/offline ខណៈ scan, ZTO និងការចាកចេញ/ចូលវិញ។
 - គ្មាន live ZTO credential ឬ Android signing keystore ក្នុងបរិស្ថាន audit; មិនអះអាងថាតេស្តគ្រប់ឧបករណ៍ ឬបានចេញ signed APK។
 - `npm run android:sync` បាន build web និង sync plugin ពិត។ ការសាក `./gradlew --no-daemon assembleDebug` ឈប់ពេលទាញ Gradle (`Network is unreachable`);
@@ -216,7 +216,7 @@
 - **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បើក App (online) ➜ បិទ WiFi/Data ➜ បិទ App ទាំងស្រុង ➜ បើកវិញក្រៅបណ្តាញ ➜ App ត្រូវបើក ហើយស្កេនបាន។
 - Sentry ៖ event `zone: money` ដដែលលើកញ្ចប់ផ្សេងគ្នាឥឡូវលេចដាច់ពីគ្នា (រហូតដល់ ៥ ក្នុង ១០ នាទី)។
 
-### [2.42.6] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 transaction `disconnect` ដែល server អនុវត្តរួច** · Sentry លែងទទួលព្យុះកំហុសដដែល · កូដ React គ្មាន comment (branch · មិនទាន់ merge)
+### [2.42.6] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 transaction `disconnect` ដែល server អនុវត្តរួច** · Sentry លែងទទួលព្យុះកំហុសដដែល · កូដ React គ្មាន comment (merge រួចក្នុង PR #254)
 
 #### 🔴 `disconnect` ≠ «មិនបានអនុវត្ត» (កំហុសលុយ · checker ១៨២+ បៃតងលើ tree នោះ)
 
@@ -453,7 +453,7 @@ vanilla … HISTORY.md សម្រួលចោលខ្លះ … បំបែ�
 - **Sentry (ស្រេចចិត្ត · មិនទាន់ណែនាំ)** ៖ Loader កំពុងប្រើ **10.x** (ឡើង patch ដោយស្វ័យប្រវត្តិ)។ ការប្តូរទៅ 11.x ក្នុង Sentry ➜
   Project Settings ➜ Client Keys ➜ Loader Script — ⛔ រង់ចាំ 11.x ចាស់ជាងនេះ។
 
-### [2.42.3] — 2026-09-25 · ZoeW ៖ **អេក្រង់សលែងកើតពីកំហុស render តែមួយ** · CI ពេញរត់ក្នុង session · money checker លើ App React (branch · មិនទាន់ merge)
+### [2.42.3] — 2026-09-25 · ZoeW ៖ **អេក្រង់សលែងកើតពីកំហុស render តែមួយ** · CI ពេញរត់ក្នុង session · money checker លើ App React (merge រួចក្នុង PR #250)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«Deep Audit project ទាំងមូល … វាស់ឡើងវិញទាំងអស់ … ពិនិត្យមើល sentry, money checker, អោយដើរជាមួយ React …
 រត់ CI ពិតជំនួស Github ព្រោះ Github action ខ្ញុំអស់ quota»* · *«មើល tool money checker ផង»*។
@@ -521,7 +521,7 @@ vanilla … HISTORY.md សម្រួលចោលខ្លះ … បំបែ�
 - **អ្នកប្រើ `check-money.cmd` លើ Windows** ៖ ត្រូវទាញថត repo ថ្មី (ឯកសារ `audit-tools/money-core.js` ចាំបាច់) — ថតចាស់ដែលគ្មាន
   `ZoeW/app.js` នឹងរាយ «money code not found»។
 
-### [2.42.2] — 2026-09-25 · ZoeW ៖ **`audit-tools` វាស់ App React** · លុបកូដងាប់ ១៩ ដែល checker រកឃើញ (branch · មិនទាន់ merge)
+### [2.42.2] — 2026-09-25 · ZoeW ៖ **`audit-tools` វាស់ App React** · លុបកូដងាប់ ១៩ ដែល checker រកឃើញ (merge រួចក្នុង PR #250)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«ចាប់ផ្ដើមទាំងអស់ទៅ អោវាស់បានទាំង 181 ហ្នឹងមកអោយបានពេញលេញដូច ZoeW កាលនៅជា vanillajs»* ·
 *«បន្តធ្វើ checker ដែលនៅសល់ទាំងអស់ទៅ»*។
@@ -580,7 +580,7 @@ helper រួម ៖ `audit-tools/react-view.js` (`renderFromContext` · `action
 ២. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify** · App Android មិនចាំបាច់ build ថ្មី (គ្មានអ្វីអ្នកប្រើឃើញ)។
 ៣. សាក ៖ 📊 របាយការណ៍ខែ ➜ ប្តូរខែ ➜ តារាងប្តូរ · នាំចូល Excel ➜ ប្តូរ Tab ➜ ជួរឈរបំពេញវិញ · ប្តូរជួរឈរ ➜ មើលជាមុនប្តូរ។
 
-### [2.42.1] — 2026-09-24 · ZoeW ៖ **App Android ៖ រូបតំណាងរបាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញវិញ** (branch · មិនទាន់ merge)
+### [2.42.1] — 2026-09-24 · ZoeW ៖ **App Android ៖ រូបតំណាងរបាស្ថានភាព (ម៉ោង · ថ្ម) មើលឃើញវិញ** (merge រួចក្នុង PR #250)
 
 **របាយការណ៍អ្នកប្រើ (ទូរស័ព្ទ Android ពិត · រូបថតអេក្រង់)** ៖ *«App android fullscreen ស្អាត ហើយតែ status bar
 អត់ប្រែពណ៌ មើល status bar អត់ឃើញ ធម្មតាពេលចូលផ្ទៃ ស status bar ដូទៅពណ៌ខ្មៅ»*។
@@ -621,7 +621,7 @@ helper រួម ៖ `audit-tools/react-view.js` (`renderFromContext` · `action
    បិទប្រអប់ ➜ **ខ្មៅវិញ** · បើករបា Slide · ចាក់សោ App (ចាកចេញ ➜ ត្រឡប់មក) ➜ មើលឃើញជានិច្ច។
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
 
-### [2.42.0] — 2026-09-23 · ZoeW ៖ **React ១០០% ពេញលេញ** — ស្រទាប់ React ខ្លួនឯងលែងសរសេរ DOM ក្រៅច្រកចេញ (branch · មិនទាន់ merge)
+### [2.42.0] — 2026-09-23 · ZoeW ៖ **React ១០០% ពេញលេញ** — ស្រទាប់ React ខ្លួនឯងលែងសរសេរ DOM ក្រៅច្រកចេញ (merge រួចក្នុង PR #247)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«2.41.0 ជា React ពេញលេញ 100% នៅ?»* ➜ ចម្លើយស្មោះត្រង់ ៖ **មិនទាន់** —
 *«ធ្វើទាំងអស់ អោយស្អាតពេញលេញជា React 100% ទៅ»*។
@@ -692,7 +692,7 @@ listener `touch*` non-passive (React ចាក់វាជា passive) · listen
    (កុំព្យូទ័រ) · ម៉ាស៊ីនស្កេន Bluetooth/USB (Enter) · កាមេរ៉ាលើ iPhone។
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
 
-### [2.41.0] — 2026-09-23 · ZoeW ៖ **PTR តាមស្តង់ដា App** (តំបន់ខាងលើ · ស្រទាប់ · ញ័រ) · កំហុស ៥ ដែល `audit-tools` រកឃើញលើ `2.40.0` (branch · មិនទាន់ merge)
+### [2.41.0] — 2026-09-23 · ZoeW ៖ **PTR តាមស្តង់ដា App** (តំបន់ខាងលើ · ស្រទាប់ · ញ័រ) · កំហុស ៥ ដែល `audit-tools` រកឃើញលើ `2.40.0` (merge រួចក្នុង PR #247)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«សម្រួល PTR អោយកេះដើរតែពេលប្រអប់ប្រវត្តិមិនទាន់ហូតឡើងបានហើយ
 និងពេលបើក modal ផ្សេងៗកុំអោយកេះ PTR ដោយកំណត់តំបន់កេះតែកំណាត់ខាងលើ និងញ័រផង
@@ -756,7 +756,7 @@ listener `touch*` non-passive (React ចាក់វាជា passive) · listen
    មិនផ្ទុក។ ⛔ **តំបន់ ៤០% ជាលេខដែលអាចកែបាន** (`PTR_START_ZONE_RATIO`) — ប្រាប់បើចង់ធំ/តូចជាងនេះ។
 ៤. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
 
-### [2.40.0] — 2026-09-23 · ZoeW ៖ **React ១០០%** — React ជាម្ចាស់ DOM តែមួយ (branch · មិនទាន់ merge)
+### [2.40.0] — 2026-09-23 · ZoeW ៖ **React ១០០%** — React ជាម្ចាស់ DOM តែមួយ (merge រួចក្នុង PR #247)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់បាន ZoeW ថ្មីជា React ពេញលេញ 100% មិនមែនលាយ»* ·
 *«រៀបចំគម្រោងថ្មី អោយមាន JSX, Component lifecycle និងតម្រង់ state management ផង
@@ -825,7 +825,7 @@ listener `touch*` non-passive (React ចាក់វាជា passive) · listen
 ៣. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify** · Android ៖ build APK ថ្មី
    (`npm run android:sync`) បើចង់បានកំណែនេះលើទូរស័ព្ទ។
 
-### [2.39.0] — 2026-09-23 · ZoeW ៖ **App Android (Capacitor)** · lifecycle ជាដំណាក់ · ការវាស់ច្បាប់លុយ/សម្អាត (branch · មិនទាន់ merge)
+### [2.39.0] — 2026-09-23 · ZoeW ៖ **App Android (Capacitor)** · lifecycle ជាដំណាក់ · ការវាស់ច្បាប់លុយ/សម្អាត (merge រួចក្នុង PR #247)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«រៀបចំគម្រោងថ្មីហ្នឹង អោយគាំទ្រការ setup Capacitor សម្រាប់តែ
 android ផង គាំទ្រ biometric, ptr, និង app logo … អោយ Capacitor ដំណើរការទាំងអស់
@@ -898,7 +898,7 @@ Keystore · ទូរស័ព្ទពិត។ `native:check` វាស់ផ�
    ប៊ូតុង Back · ជីវមាត្រ (រួម «ក្រយៅដៃត្រូវប្តូរ») · របាស្ថានភាពលើ WebView ចាស់/ថ្មី។
 ៧. ⛔ **គ្មានការកែ Firebase rules** · **គ្មាន env ថ្មីលើ Netlify**។
 
-### [2.38.0] — 2026-09-23 · ZoeW ជា **React + TypeScript + Vite** (branch · មិនទាន់ merge)
+### [2.38.0] — 2026-09-23 · ZoeW ជា **React + TypeScript + Vite** (merge រួចក្នុង PR #247)
 
 **សំណើម្ចាស់គម្រោង** ៖ *«ខ្ញុំចង់អោយ app ZoeW មាន framework និង build step
 ត្រឹមត្រូវ … កុំអោយបាត់មុខងារ ទោះ ០.១%»* រួច *«បើអាចជំនួស ZoeW បាន សូម commit

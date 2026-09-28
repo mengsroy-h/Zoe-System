@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.8` (`zoew-v235`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.9` (`zoew-v236`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -183,9 +183,10 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    **កូដ (ឈ្មោះអថេរ/function) នៅជាភាសាអង់គ្លេសដដែល**។ ⛔ **អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ** ➜ ពាក្យថៃដែល
    លាយចូលរអិលកាត់ភ្នែក (វាកើតពិតក្នុងការសន្ទនា) ➜ `doc-scope-test` ធ្លាក់ពេលមានអក្សរថៃក្នុងឯកសារអត្ថបទណាមួយនៃ repo (រួម
    `ZoeW/src/**`) · ⛔ កុំសរសេរឧទាហរណ៍ជាអក្សរថៃ សូម្បីក្នុង comment។
-៨. **រាល់ជុំ audit ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស) —
+៨. **រាល់ជុំ audit ដែលប្រែកូដ ship ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស · តែ App ដែលកែពិត — ច្បាប់ ៦) —
    **និងត្រូវបន្ថែមផ្នែកថ្មីក្នុង [`docs/HISTORY.md`](docs/HISTORY.md) ផ្នែក ១
-   ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។
+   ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។ ⛔ ជុំដែលប្រែតែ `audit-tools/` ឬឯកសារ ➜
+   **មិនឡើងកំណែ** (`version-bump-scope` ធ្លាក់បើឡើង) តែកត់ត្រាក្នុង `docs/HISTORY.md` **ផ្នែក ២** ជំនួសវិញ។
 ៩. **README សរសេរតែ *របៀបប្រើ*។** រាល់ README មានផ្នែក **៥** តាមលំដាប់ ៖
    **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**។
    ⛔ កុំសរសេរប្រវត្តិកំហុស ឬកំណត់ត្រាតាមកំណែ («កំណែ 2.23.4 កែ…») ក្នុង README។
@@ -284,7 +285,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 |---|---|---|
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
-| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ | `hang-guard.js` |
+| **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់។ ⛔ meta-checker ដែលរត់ checker កូនច្រើន (`checker-coverage` · `exit-code-integrity`) រត់ **ស្របគ្នាក្នុងពិដាន** មិនមែនជាជួរ ហើយកូនដែល **ផុតថវិកា** ខណៈពុល = FAIL (វាស់មិនបាន) មិនមែន «ធ្លាក់ត្រឹមត្រូវ» · ⛔ កុំកែការលើសពិដានដោយបង្កើន `CHECKER_TIMEOUT` (វាលាក់ checker ដែលព្យួរពិត) | `hang-guard.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ checker ត្រូវរត់ធម្មតា និង baseline; CLI ដែលទាមទារ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា | `checker-coverage.js` |
 | **ឯកសារគម្រោងទាំងមូល** | ⛔ ឯកសារថ្មីត្រូវមានការយាមក្នុង `repository-file-coverage.json`; ធាតុចាស់ ឬ guard ដែលបាត់ត្រូវធ្លាក់; ប្រភេទ integrity/manual មិនមែន behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
 | **របាយការណ៍ និងទិន្នន័យសម្រាប់ផ្ញើ** | ⛔ CLI ពិតត្រូវរកឃើញកំហុសលុយមុន/ក្រោយ redaction ដូចគ្នា; launcher មិនប្រកាសថាផ្ញើបានពេល redaction ធ្លាក់ | `money-reality-test.js` |
@@ -388,6 +389,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ចាក់សោ App ពេលបើក/ត្រឡប់មក** | សោមិនប៉ះ session ៤ ម៉ោង · Refresh និងការខលមិនចាក់សោ។ ⛔ អាយុទង់ដោះសោ = អាយុ `lookupSecretKey` ៖ `CryptoKey` រក្សាក្នុង **IndexedDB** (⛔ មិនមែន sessionStorage — នោះទាមទារ `extractable: true`) · ការលុបតាម `clearAppUnlockedForSession()` តែមួយ · ការការពារ ២ ជាន់ (`appLockShouldArm()` · ការលុបពេលចាក់សោ) វាស់ដាច់ពីគ្នា។ ⛔ កុងតាក់មាន **ទិសបិទ** ៖ ទង់ `zoew_app_lock_v1` ក្នុង `localStorage` · `appLockIsEnabled()` ជាអ្នកសម្រេចតែមួយ (ច្រកទ្វារ · ការបាំង task switcher · ស្លាក) · កូនសោអវត្តមាន = **បើក** (តែ `'0'` បិទ) · ការបិទឆ្លង PIN ជាមួយ `promptKey` ផ្ទាល់ខ្លួន `appLockOff` · ⛔ ការបិទសោ **មិនមែន** ការលុប PIN (PIN · session ៤ ម៉ោង · អ៊ីមែល នៅដដែល) | `app-lock-test` |
 | **ពិនិត្យសុខភាពប្រព័ន្ធ** | ⛔ អានសុទ្ធសាធ · មិនបង្ខំ PIN · «ពិនិត្យមិនបាន» ជា ⚠️ មិនមែន ❌ · secret មិនឡើងដល់ DOM · ⛔ **`fetchWithTimeout` ពិត មិន stub**។ ⛔ **ច្បាប់ដដែលអនុវត្តលើ *ទិសផ្ទុយ* ផង** ៖ **✅ ក៏ត្រូវវាស់ដែរ** — ការរាយ ✅ លើអ្វីដែលមិនបានវាស់ **អាក្រក់ជាង** ❌ ក្លែងក្លាយ ព្រោះវាបញ្ជូនអ្នកប្រើទៅរកមូលហេតុខុស។ វាស់បាន (2.30.5) ៖ ជួរ ZTO រាយ ✅ ត្រឹម **វត្តមាន** នៃ Cookie ខណៈការស្កេនឆ្លើយ «ផុតកំណត់» — សាលក្រម `authRejectedAgeMs`/`authAcceptedAgeMs` មានក្នុង `?diag=1` រួចហើយ តែគ្មាននរណាអាន។ ⛔ **`cookieState` ជារបស់ container នីមួយៗ** ➜ «មិនទាន់ដែលប្រើ» = **⚠️** មិនមែន ✅ ⛔ **ជួរ ZTO បង្ហាញការបន្តអាយុ Cookie ដែរ** ៖ `renewals > 0` ➜ ភស្តុតាងច្បាស់; `observed:false` ➜ **«មិនទាន់វាស់»** (⛔ មិនមែន «បន្តអាយុមិនបាន» — `upstreamCookieSignal` ជារបស់ container នីមួយៗ); `observed && !setCookie` ➜ Argus មិនផ្ញើ ➜ ត្រូវ Sync ដោយដៃ។ ⛔ ព័ត៌មាននេះ **មិនប្តូរសាលក្រម** ❌/⚠️/✅ ហើយ **ឈ្មោះ cookie មិនឡើងដល់ DOM** | `health-check-test` |
 | **នាំចូល Excel ទៅ Sheet (ក្នុង ZoeW)** | PIN ជាច្រកទ្វារ · សំណើត្រូវជា *simple request* · secret អ៊ិនគ្រីប | `sheet-import-test` |
+| **APK ↔ Function ZTO ៖ preflight** | ⛔ APK (origin `https://localhost`) ហៅ Function ជា cross-origin ➜ cache របស់ preflight ចងនឹង **URL ពេញ** ➜ query ត្រូវផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ (`nativeFunctionRequest()` ក្នុង `fetchWithTimeout` ជាច្រកតែមួយ · web មិនប្រែ) · ⛔ កុំប្រើ `cache: 'no-store'` លើផ្លូវនោះ (រំលង cache preflight) · Function អាន header តែពេលគ្មាន query string · Max-Age 7200 · Function ចាស់ ➜ 400 ➜ App សាក URL មាន query ហើយចងចាំ | `zto-proxy-test` ផ្នែក ២ខ · `ZoeW/tests/native/zto-preflight.test.ts` |
 | **Apps Script ↔ simple request** | ⛔ ច្បាប់ដដែលអនុវត្តលើ **ផ្លូវ Lookup ផង** — គ្មាន header ផ្ទាល់ខ្លួន ហើយ **មិនសុំ PIN** សម្រាប់វា | `lookup-prefetch-test` |
 | **នាំចូល CSV/TSV** | ⛔ លេខ 0 នាំមុខមិនត្រូវបាត់ (`raw` តែលើអត្ថបទ) | `sheet-import-test` |
 | **នាំចូលរួច ➜ ទិន្នន័យត្រូវមកភ្លាម** | តារាងបំពេញពីឯកសារ · `fresh=1` បើក cache · ការសម្អាតមិនរស់ឡើងវិញ | `lookup-freshness-test` |
@@ -1203,6 +1205,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **មិនមែន `width: 100%`** | `width:100%` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `nowrap` ធ្វើឲ្យអត្ថបទ **ហៀរជាន់គ្នា** ជំនួសការរមូរផ្តេក (`layout-check` ចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរក្នុងមួយក្រឡា) |
 | `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` — ⚠️ **តម្លៃ ២ នេះរស់នៅក្នុង `@media (max-width: 991px)` *២ ប្លុកដាច់ដោយឡែក*** (`scroll-padding-top` នៅប្លុកទី ១ · `padding-top` នៅប្លុកទី ២ ប្រហែល ៣០០ បន្ទាត់ក្រោម) ➜ **កែមួយ ត្រូវពិនិត្យមួយទៀត**។ ⛔ កុំរួមប្លុកទាំង ២ ដើម្បី «សម្អាត» — នោះប្តូរលំដាប់ cascade ក្នុងតំបន់ហាមចូល | បើភ្លេច ➜ **PTR ស្លាប់** (`panel-motion-test` ៖ `snapRestNearTop`) |
 | `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា |
+| `.app-pages.history-expanded` | ⛔ `display: block` + `> .app-page.active { height: 100% }` (`react-root.css` ឈ្នះ `display: flex` របស់ `app.css`) ⛔ **កុំប្តូរ `display` របស់ `.app-pages` តាមរបៀប** | ការប្តូរ `display` block ↔ flex លើ container ធំជាងគេ ➜ browser បង្កើត layout tree ឡើងវិញទាំងស្រុងរាល់ការហូត (វាស់បាន ៖ dirty ៩៧.៨% · Layout ៤៥៨–៥៥៩ms លើ ២៦០ ជួរ ➜ ក្រោយកែ ១ms) · ធរណីមាត្រដូចគ្នាក្នុង noise (Android + iOS · ៣ viewport) · `panel-motion-test` ផ្នែក ៨ វាស់ **សមាមាត្រ object ដែល dirty** ពី trace ពិត |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |
 | `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | safe-area នៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ ៥៣px លើ iPhone |
 | `@supports (-webkit-touch-callout: none)` | ផ្លូវ iOS ដាច់ដោយឡែក | `clip-path` មិនដើរលើ Safari |
@@ -1997,7 +2000,7 @@ bash audit-tools/run-all.sh
 ⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
 រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
 ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
-`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite`) ចំណាយ **~១ ម៉ោង** ➜ រត់វាជា background។
+`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite` · emulator ពិត) ចំណាយ **~២៥ នាទី** លើម៉ាស៊ីន ៤ CPU ➜ រត់វាជា background ហើយ **commit + push មុនពេលរង់ចាំ** (session ដែលអស់កូតាកណ្តាលការរង់ចាំ បាត់ការងារដែលមិនទាន់ push ទាំងស្រុង)។
 
 ⛔ **គ្មាន RTDB emulator ➜ checker `emu/*` ទាំងអស់ធ្លាក់ចុះ — ហើយ `SKIP`
 មិនមែន `PASS` ទេ។** ⛔ **ចំនួនត្រូវរាប់ពីថតពិត** (`audit-tools/emu/*-test.js`
@@ -2190,6 +2193,10 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **2.42.9 ត្រូវសាកលើឧបករណ៍ពិតមុន merge** (`docs/HISTORY.md` [2.42.9]) ៖ ហូតប្រអប់ប្រវត្តិលើ iPhone PWA · Android PWA · APK
+  (តំបន់ហាមចូល ៖ ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK **ក្រោយ Netlify deploy** (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ ⛔ ភាពខុសគ្នា
+  រចនាសម្ព័ន្ធដែលនៅសល់រវាង APK និង PWA Android ៖ អ្នកស្តាប់ `touchmove` **non-passive** របស់ PTR (មានតែលើ APK) ➜ ការរមូរដំបូងរង់ចាំ
+  main thread ➜ កុំកែដោយគ្មានការវាស់លើទូរស័ព្ទពិត (ច្បាប់ ១១)។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

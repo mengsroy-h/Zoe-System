@@ -1583,6 +1583,9 @@
     "ZoeW/tests/native/zto-cors.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native/zto-preflight.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/oracles/health-row-html.ts": {
       "policy": "zoew-self-verification"
     },

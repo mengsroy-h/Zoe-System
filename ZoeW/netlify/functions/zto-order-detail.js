@@ -1464,6 +1464,8 @@ function diagnosticsBody(config, headers, authKind, credential) {
 
 const NATIVE_APP_ORIGINS = new Set(['https://localhost']);
 const CORS_HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
+const QUERY_HEADER = 'x-zoe-query';
+const QUERY_HEADER_MAX = 2048;
 
 function headerOf(event, name) {
     const headers = (event && event.headers) || {};
@@ -1480,13 +1482,29 @@ function corsHeadersFor(event) {
     const out = {
         'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Max-Age': '600',
+        'Access-Control-Max-Age': '7200',
         Vary: 'Origin'
     };
     const requested = headerOf(event, 'access-control-request-headers')
         .split(',').map((h) => h.trim()).filter(Boolean);
     if (requested.length && requested.length <= 12 && requested.every((h) => CORS_HEADER_NAME_RE.test(h))) {
         out['Access-Control-Allow-Headers'] = requested.join(', ');
+    }
+    return out;
+}
+
+function requestQuery(event) {
+    const direct = event && event.queryStringParameters;
+    if (direct && typeof direct === 'object' && Object.keys(direct).length) return direct;
+    const raw = headerOf(event, QUERY_HEADER);
+    if (!raw || raw.length > QUERY_HEADER_MAX) return direct || {};
+    const out = Object.create(null);
+    try {
+        for (const [key, value] of new URLSearchParams(raw)) {
+            if (!(key in out)) out[key] = value;
+        }
+    } catch (_) {
+        return direct || {};
     }
     return out;
 }
@@ -1528,7 +1546,7 @@ async function handleRequest(event) {
         return configErrorResponse(error);
     }
 
-    const query = event.queryStringParameters || {};
+    const query = requestQuery(event);
     const wantsDiagnostics = String(query.diag || '') === '1';
     const wantsFreshCookie = wantsDiagnostics && String(query.fresh || '') === '1';
     const barcode = String(query.barcode || '').trim();

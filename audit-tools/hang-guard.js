@@ -132,5 +132,58 @@ ok('⛔ ឥរិយាបថ៖ checker ដែលព្យួរ ➜ FAIL ដ�
 ok('⛔ ឥរិយាបថ៖ ការផុតកំណត់ត្រូវគោរព `CHECKER_TIMEOUT` (ចប់ក្នុង < 60s)',
     behaviour.ran && behaviour.ms < 60000, 'ms=' + behaviour.ms);
 
+// ⛔ `exit-code-integrity` ជា meta-checker ធំជាងគេ ៖ វាពុល និងរត់ checker កូនជាង ១០០ ➜ ការរត់ជាជួរ (`execFileSync`)
+// ចំណាយ ២៨០–៣៦៧ វិ. ➜ លើសពិដាន ៣០០ វិ. របស់ `run-all.sh` ➜ «FAIL (ព្យួរ)» ខណៈគ្មាន checker ណាខូច (វាស់បាន 2.42.8)។
+// ហើយជំនាន់នោះរាប់កូនដែល **ផុតថវិកា** ថាជា «ការធ្លាក់ឡើងដល់ exit code» ➜ checker ដែលព្យួរពេលអះអាងធ្លាក់ ត្រូវរាយបៃតង។
+// ការវាស់ ៖ រត់ `exit-code-integrity.js` របស់ tree នេះលើ fixture ៤០ checker ដែលមួយ **ព្យួរ** និង ៨ **យឺត ២ វិ.** ពេលពុល។
+// (ក) កូនដែលព្យួរ ត្រូវលេចជា FAIL ដែលមានឈ្មោះ · (ខ) ពេលសរុបត្រូវតិចជាងផលបូកជាជួរ (≥ ២០ វិ.) ដោយរឹម ២ ដង។
+const eciPath = path.join(TOOLS, 'exit-code-integrity.js');
+if (process.env.EXITCODE_CHILD) {
+    ok('⛔ EXITCODE_CHILD ៖ រំលង fixture របស់ exit-code-integrity (របៀបនេះមិនដែលបៃតង)', false);
+} else if (!fs.existsSync(eciPath)) {
+    ok('រកឃើញ `exit-code-integrity.js` សម្រាប់ fixture', false, eciPath);
+} else {
+    const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-eci-fixture-'));
+    const fxTools = path.join(fx, 'audit-tools');
+    fs.mkdirSync(fxTools);
+    const names = [];
+    for (let i = 1; i <= 40; i++) {
+        const name = 'c' + String(i).padStart(2, '0');
+        names.push(name);
+        const onFail = name === 'c01' ? 'setInterval(() => {}, 1 << 30);'
+            : i <= 9 ? 'setTimeout(() => process.exit(1), 2000);'
+            : 'process.exit(1);';
+        fs.writeFileSync(path.join(fxTools, name + '.js'),
+            'let pass = 0, fail = 0;\n'
+            + 'function ok(label, cond, detail) { if (cond) pass++; else fail++; }\n'
+            + "ok('fixture', true);\n"
+            + 'if (fail) { ' + onFail + ' } else { process.exit(0); }\n');
+    }
+    fs.writeFileSync(path.join(fxTools, 'run-all.sh'),
+        'for t in ' + names.join(' ') + '; do\n    run "$t" node "audit-tools/$t.js"\ndone\n');
+    const env = Object.assign({}, process.env, {
+        EXITCODE_APP_DIR: fx, EXITCODE_TIMEOUT_MS: '4000', EXITCODE_CONCURRENCY: '4'
+    });
+    delete env.EXITCODE_CHILD;
+    let out = '', ran = false;
+    const t0 = Date.now();
+    try {
+        out = execFileSync(process.execPath, [eciPath], { env, encoding: 'utf8', timeout: 90000, stdio: ['ignore', 'pipe', 'pipe'] });
+        ran = true;
+    } catch (e) {
+        out = String((e && e.stdout) || '') + String((e && e.stderr) || '');
+        ran = e && typeof e.status === 'number';
+    }
+    const ms = Date.now() - t0;
+    try { fs.rmSync(fx, { recursive: true, force: true }); } catch (e) {}
+    ok('⛔ ឥរិយាបថ ៖ `exit-code-integrity` រត់ fixture ចប់ (មិនព្យួរ)', ran, out.trim().slice(-300));
+    const lines = out.split('\n');
+    const hangNamed = lines.some((l, i) => /^\s*FAIL\b/.test(l) && i + 1 < lines.length
+        && /c01\.js/.test(lines[i + 1]) && !/^\s*\(/.test(lines[i + 1]));
+    ok('⛔ ឥរិយាបថ ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ (timeout ≠ ការធ្លាក់ត្រឹមត្រូវ)',
+        hangNamed, lines.filter((l) => /FAIL|c01/.test(l)).join(' | ').slice(0, 300));
+    ok('⛔ ឥរិយាបថ ៖ ការពុលរត់ស្របគ្នា (ចប់ < ១៤ វិ. ; ជាជួរ ≥ ២០ វិ.)', ran && ms < 14000, 'ms=' + ms);
+}
+
 console.log('\n' + (fail ? '❌ ធ្លាក់ ' + fail + ' (ជោគជ័យ ' + pass + ')' : '✅ ជោគជ័យ ' + pass));
 process.exit(fail ? 1 : 0);

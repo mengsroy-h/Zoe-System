@@ -34,12 +34,27 @@ ok('app.js មាន fetchWithTimeout ដែលប្រើ AbortController',
 ok('គ្មាន `withTimeout(fetch(` នៅសល់ (timeout ដែល abort មិនកើត)',
     !/withTimeout\(\s*fetch\(/.test(src),
     (src.match(/withTimeout\(\s*fetch\([^\n]*/g) || []).join('\n         '));
-// ⛔ ZoeW (React) ៖ helper បញ្ជូន URL តាម `resolveNativeApiUrl()` (App Android ៖ ផ្លូវ `/.netlify/` ➜ origin វែប ·
-//    web ➜ URL ដដែល) ➜ ទទួលរូបរាងនោះជាការហៅ helper ដដែល
+// ⛔ ZoeW (React) ៖ helper បញ្ជូន URL តាម `resolveNativeApiUrl()` / `nativeFunctionRequest()` (App Android ៖ ផ្លូវ
+//    `/.netlify/` ➜ origin វែប · query ➜ header `X-Zoe-Query` ដើម្បី cache preflight · 400 ពី Function ចាស់ ➜ សាក URL ចាស់)
+//    ➜ ច្បាប់វាស់ជា **រចនាសម្ព័ន្ធ** ៖ `fetch(` ទាំងអស់ត្រូវនៅ **ក្នុងតួ `fetchWithTimeout`** (ការផ្គូផ្គងអក្សរ `fetch(url, opts)`
+//    នៃជំនាន់មុន បដិសេធការរៀបចំឡើងវិញដែលត្រឹមត្រូវ ហើយមិនដឹងថា fetch នៅក្នុង helper ណា)
+const fwtAt = src.indexOf('function fetchWithTimeout(');
+const fwtBody = (() => {
+    if (fwtAt === -1) return '';
+    let depth = 0, k = src.indexOf('{', fwtAt);
+    const start = k;
+    for (; k < src.length; k++) {
+        if (src[k] === '{') depth++;
+        else if (src[k] === '}') { depth--; if (!depth) break; }
+    }
+    return src.slice(start, k + 1);
+})();
+const rawFetch = (text) => (text.match(/(?<![\w.])fetch\(/g) || []).length;
+const outsideFetch = src.slice(0, fwtAt === -1 ? src.length : fwtAt) + src.slice(fwtAt === -1 ? src.length : fwtAt + fwtBody.length + 'function fetchWithTimeout('.length);
+ok('ជាន់អប្បបរមា ៖ មាន fetch( យ៉ាងតិច ១ ក្នុងតួ fetchWithTimeout', rawFetch(fwtBody) >= 1, 'inside=' + rawFetch(fwtBody));
 ok('រាល់ការហៅ fetch() ទៅ endpoint ខាងក្រៅឆ្លងកាត់ fetchWithTimeout',
-    (src.match(/(?<!function )\bfetch\(/g) || []).length ===
-    (src.match(/fetch\((?:resolveNativeApiUrl\()?url\)?, opts\)/g) || []).length,
-    'fetch ឆៅ៖ ' + (src.match(/^.*(?<!function )\bfetch\(.*$/gm) || []).join(' | '));
+    fwtAt !== -1 && rawFetch(outsideFetch) === 0,
+    'fetch ឆៅក្រៅ helper៖ ' + (outsideFetch.match(/^.*(?<![\w.])fetch\(.*$/gm) || []).join(' | '));
 ok('timer ត្រូវរស់រហូតដល់អានតួចប់ (readBody ស្ថិតក្នុងបង្អួច timeout)',
     /readBody\(res\)/.test(src) && /clearTimeout\(timer\)/.test(src));
 ok('ការ abort ប្រើ .then(ok, fail) ២ អាគុយម៉ង់ តាមច្បាប់គម្រោង',
@@ -108,8 +123,8 @@ function extractFn(name) {
 }
 let summaryPrinted = false;
 // ⛔ React ៖ helper អាស្រ័យលើ `resolveNativeApiUrl()` (`platform/native.ts`) ➜ ចាក់កូដពិតរបស់វាផង (web ៖ គ្មាន Capacitor)
-const FN = extractFn('fetchWithTimeout') && ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl']
-    .map((n) => extractFn(n) || '').join('\n') + '\n' + extractFn('fetchWithTimeout');
+const FN = extractFn('fetchWithTimeout') && ['bridge', 'isNativeApp', 'nativeWebOrigin', 'resolveNativeApiUrl', 'nativeFunctionRequest', 'moveQueryToHeader']
+    .map((n) => extractFn(n) || '').join('\n') + '\nvar lookupState = { nativeQueryHeaderUnsupported: false };\n' + extractFn('fetchWithTimeout');
 ok('ស្រង់ fetchWithTimeout ពិតចេញពី app.js បាន', !!FN);
 if (!FN) {
     // គ្មាន helper ➜ ផ្នែក browser គ្មានអ្វីត្រូវរត់។ ចាកចេញយ៉ាងស្អាតជំនួស

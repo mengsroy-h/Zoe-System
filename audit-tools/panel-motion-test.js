@@ -234,7 +234,32 @@ function seedBig(n) {
             out.hOverflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
             return out;
         });
+        // ៨ — ⛔ ការហូតប្រអប់ប្រវត្តិមិនត្រូវ **relayout ទំព័រទាំងមូល**។ វាស់បាន (trace ពិត · ២៦០ ជួរ · CPU ពិត) ៖
+        // `.app-pages.history-expanded` ប្តូរ `display` block ➜ flex ➜ browser បង្កើត layout tree ឡើងវិញ
+        // (dirtyObjects ១៦,៧៩២ / ១៦,៨៧៨ ➜ Layout ៤៣៧–៦៤៦ms រាល់ការហូត · ទូរស័ព្ទយឺតជាងនេះ ២–៥ ដង) ខណៈ
+        // ពេល `display` មិនប្រែ ➜ dirtyObjects ៦ · Layout ១–២ms។ ⛔ រង្វាស់ជា **សមាមាត្រ object ដែល dirty**
+        // (កំណត់ដោយរចនាសម្ព័ន្ធ មិនអាស្រ័យលើល្បឿនម៉ាស៊ីន) មិនមែនមិល្លីវិនាទី។
+        await browser.startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+        await page.evaluate(async () => {
+            const wait = (ms) => new Promise((x) => setTimeout(x, ms));
+            const handle = document.getElementById('dragHandle');
+            if (!handle) return;
+            handle.click(); await wait(500);
+            handle.click(); await wait(500);
+        });
+        const traceEvents = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
+        const layouts = traceEvents.filter((e) => e.name === 'Layout' && e.args && e.args.beginData
+            && typeof e.args.beginData.dirtyObjects === 'number' && e.args.beginData.totalObjects > 0);
+        const worst = layouts.reduce((m, e) => Math.max(m, e.args.beginData.dirtyObjects / e.args.beginData.totalObjects), 0);
+        const totalObjects = layouts.reduce((m, e) => Math.max(m, e.args.beginData.totalObjects), 0);
+        r.toggleLayouts = layouts.length;
+        r.toggleWorstDirty = worst;
+        r.toggleTotalObjects = totalObjects;
         const tag = vp.w + 'px';
+        ok(tag + ': ជាន់អប្បបរមា ៖ trace ឃើញ Layout ពេលហូត លើទំព័រ > ១០០០ object', layouts.length > 0 && totalObjects > 1000,
+            'layouts=' + layouts.length + ' objects=' + totalObjects);
+        ok(tag + ': ⛔ ហូតប្រអប់ប្រវត្តិមិន relayout ទំព័រទាំងមូល (object dirty < ៥០%)', layouts.length > 0 && worst < 0.5,
+            'dirty=' + Math.round(worst * 1000) / 10 + '% នៃ ' + totalObjects);
         ok(tag + ': ប៊ូតុងជួរដេកលែងមាន «កែ/ដក»', r.anyOldLabel === false, JSON.stringify(r.rowBtnTexts));
         ok(tag + ': លែងមានពណ៌លឿង inline', r.anyInlineYellow === false, '');
         ok(tag + ': ម៉ឺនុយ (...) នៅមានការកែតម្លៃកញ្ចប់', r.menuHasEdit === true, String(r.menuHasEdit));

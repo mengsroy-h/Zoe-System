@@ -17,7 +17,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | Export PDF · របាយការណ៍ខែ PDF | `window.print()` | **PrintManager** របស់ Android (Save as PDF) |
 | Service Worker | cache សំបក | មិនចុះឈ្មោះ (ឯកសារទាំងអស់ស្ថិតក្នុង APK រួច) |
 | សោ App ពេលចាកចេញ | `visibilitychange` | `pause`/`resume` របស់ Activity **បូក** `visibilitychange` (ការហៅស្ទួនត្រូវច្រានចេញ) |
-| ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` |
+| ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 
 ---
@@ -100,6 +100,11 @@ major.minor ដដែល។ `npm run android:check` ចាក់សោវា។
 `compileSdk` ថ្មី · AndroidX ដែលទាមទារ AGP ថ្មី) **ធ្លាក់តែពេល build ក្នុង Android Studio**
 — Audit job វាស់ config/bridge តែប៉ុណ្ណោះ; workflow `Android APK` សាង APK ពិតពេលមាន SDK, secret និងកូតា។
 
+⛔ **Android Studio ស្នើ «Upgrade Android Gradle Plugin / Gradle ទៅ 9.x»** (AGP Upgrade Assistant) ពេល Sync ៖ វាជា
+**ការណែនាំ** មិនមែនតម្រូវការទេ ➜ ចុច **Remind me tomorrow** ឬ **Don't ask for this project** ⛔ កុំចុច Upgrade។ Sync និង build
+ដើរដោយកំណែក្នុង repo (JDK 21)។ ការទទួលវាប្តូរ `build.gradle` · `gradle-wrapper.properties` ចេញពីខ្សែ template ➜
+`npm run android:check` ធ្លាក់ ហើយ plugin Capacitor អាច build មិនកើត។ បើ Sync **ធ្លាក់ពិត** (មិនមែនត្រឹមការស្នើ) សូមថតសារកំហុសទាំងមូល។
+
 ការឡើងលើសខ្សែនោះ = **ការឡើង Capacitor major** (ពេលវាចេញជា stable មិនមែន alpha/beta) ៖
 
 ```bash
@@ -142,7 +147,9 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
 ## ៤. សកម្មភាពដែលត្រូវធ្វើដោយដៃ (ម្តង)
 
 1. **Netlify** ៖ deploy ZoeW ដែលមាន CORS ថ្មីរបស់ ZTO Function (ដំណើរការ
-   ស្វ័យប្រវត្តិពេល merge)។ មុននោះ ZTO Lookup ក្នុង App Android ធ្លាក់។
+   ស្វ័យប្រវត្តិពេល merge)។ មុននោះ ZTO Lookup ក្នុង App Android ធ្លាក់។ ⛔ **deploy Netlify មុនចែក APK ថ្មី** ៖
+   Function ដែលមិនទាន់ស្គាល់ header `X-Zoe-Query` ឆ្លើយ 400 ➜ APK សាក URL មាន query វិញ (ដំណើរការ តែលឿនដូច APK
+   ចាស់ រហូតដល់ Function ថ្មី deploy ហើយ App ត្រូវបើកឡើងវិញ)។
 2. **Firebase (Project Business)** ៖ បើ API key មានការរឹតបន្តឹង *HTTP referrer*
    សូមបន្ថែម `https://localhost` (Google Cloud Console ➜ Credentials)។ បើគ្មាន
    ការរឹតបន្តឹង មិនបាច់ធ្វើអ្វីទេ។

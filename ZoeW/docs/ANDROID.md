@@ -100,6 +100,11 @@ major.minor ដដែល។ `npm run android:check` ចាក់សោវា។
 `compileSdk` ថ្មី · AndroidX ដែលទាមទារ AGP ថ្មី) **ធ្លាក់តែពេល build ក្នុង Android Studio**
 — Audit job វាស់ config/bridge តែប៉ុណ្ណោះ; workflow `Android APK` សាង APK ពិតពេលមាន SDK, secret និងកូតា។
 
+⛔ **Android Studio ស្នើ «Upgrade Android Gradle Plugin / Gradle ទៅ 9.x»** (AGP Upgrade Assistant) ពេល Sync ៖ វាជា
+**ការណែនាំ** មិនមែនតម្រូវការទេ ➜ ចុច **Remind me tomorrow** ឬ **Don't ask for this project** ⛔ កុំចុច Upgrade។ Sync និង build
+ដើរដោយកំណែក្នុង repo (JDK 21)។ ការទទួលវាប្តូរ `build.gradle` · `gradle-wrapper.properties` ចេញពីខ្សែ template ➜
+`npm run android:check` ធ្លាក់ ហើយ plugin Capacitor អាច build មិនកើត។ បើ Sync **ធ្លាក់ពិត** (មិនមែនត្រឹមការស្នើ) សូមថតសារកំហុសទាំងមូល។
+
 ការឡើងលើសខ្សែនោះ = **ការឡើង Capacitor major** (ពេលវាចេញជា stable មិនមែន alpha/beta) ៖
 
 ```bash

@@ -78,7 +78,7 @@ bash audit-tools/run-all.sh
 | env | លំនាំដើម | អត្ថន័យ |
 |---|---|---|
 | `RUNALL_JOBS` | ចំនួន CPU ក្នុងព្រំដែន 2–6 | ចំនួន checker ស្របគ្នា · `1` = ជាជួរ (លំដាប់ដូចបញ្ជី) |
-| `RUNALL_BROWSER_JOBS` | មើល `run-all.sh` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា |
+| `RUNALL_BROWSER_JOBS` | ស្មើ `RUNALL_JOBS` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា (បន្ថយបើសង្ស័យថាការធ្លាក់ browser មកពីការប្រជែង CPU) |
 | `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
 | `RUNALL_RESUME=1` | បិទ | រត់តែ checker ដែល **ធ្លាក់ ឬគ្មានលទ្ធផល** · លទ្ធផលផ្សេងយកពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
 | `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
@@ -98,6 +98,8 @@ cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # �
   **រត់ម្នាក់ឯង** (ពួកវាសរសេរ/បោសឯកសារស្រមោល `.tmp-poison-*` ក្នុង `audit-tools/` ហើយ fan out ខាងក្នុងរួចស្រាប់) ·
   checker ដែលប្រភពមាន `chromium.launch(` ➜ lane browser។ lane ដេរីវេពីប្រភព ហើយ `runall-runner-test.js` ផ្ទៀងវា។
 - `Ctrl-C` / `TERM` ➜ checker ដែលកំពុងរត់ត្រូវបញ្ឈប់ · លទ្ធផលដែលចប់រួចនៅក្នុង state ➜ `RUNALL_RESUME=1`។
+- លំដាប់ **រត់** (មិនមែនលំដាប់បោះពុម្ព) ៖ meta ម្នាក់ឯងមុន រួច checker យូរជាងគេមុន — ពេលពី state មុន ឬពី `RUNALL_HINTS` ក្នុង
+  `run-all.sh` ពេល session ថ្មីគ្មាន state (ប៉ះតែលំដាប់ មិនប៉ះសាលក្រម)។
 
 ### ៣. រត់តែមួយ
 

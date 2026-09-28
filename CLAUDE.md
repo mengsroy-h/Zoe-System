@@ -183,9 +183,10 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
    **កូដ (ឈ្មោះអថេរ/function) នៅជាភាសាអង់គ្លេសដដែល**។ ⛔ **អក្សរថៃ (U+0E00–U+0E7F) មើលទៅស្រដៀងខ្មែរ** ➜ ពាក្យថៃដែល
    លាយចូលរអិលកាត់ភ្នែក (វាកើតពិតក្នុងការសន្ទនា) ➜ `doc-scope-test` ធ្លាក់ពេលមានអក្សរថៃក្នុងឯកសារអត្ថបទណាមួយនៃ repo (រួម
    `ZoeW/src/**`) · ⛔ កុំសរសេរឧទាហរណ៍ជាអក្សរថៃ សូម្បីក្នុង comment។
-៨. **រាល់ជុំ audit ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស) —
+៨. **រាល់ជុំ audit ដែលប្រែកូដ ship ត្រូវឡើងកំណែ `APP_VERSION`** (PATCH សម្រាប់ជុំកែកំហុស · តែ App ដែលកែពិត — ច្បាប់ ៦) —
    **និងត្រូវបន្ថែមផ្នែកថ្មីក្នុង [`docs/HISTORY.md`](docs/HISTORY.md) ផ្នែក ១
-   ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។
+   ក្នុង commit ដដែល** ដោយបញ្ជាក់ **«សកម្មភាពដែលត្រូវធ្វើដោយដៃ»** ជានិច្ច។ ⛔ ជុំដែលប្រែតែ `audit-tools/` ឬឯកសារ ➜
+   **មិនឡើងកំណែ** (`version-bump-scope` ធ្លាក់បើឡើង) តែកត់ត្រាក្នុង `docs/HISTORY.md` **ផ្នែក ២** ជំនួសវិញ។
 ៩. **README សរសេរតែ *របៀបប្រើ*។** រាល់ README មានផ្នែក **៥** តាមលំដាប់ ៖
    **កំណែ · មុខងារ · របៀបប្រើប្រាស់ · ប្រព័ន្ធសុវត្ថិភាព · អាជ្ញាប័ណ្ណ**។
    ⛔ កុំសរសេរប្រវត្តិកំហុស ឬកំណត់ត្រាតាមកំណែ («កំណែ 2.23.4 កែ…») ក្នុង README។
@@ -1999,7 +2000,7 @@ bash audit-tools/run-all.sh
 ⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
 រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
 ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
-`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite`) ចំណាយ **~១ ម៉ោង** ➜ រត់វាជា background។
+`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite` · emulator ពិត) ចំណាយ **~២៥ នាទី** លើម៉ាស៊ីន ៤ CPU ➜ រត់វាជា background ហើយ **commit + push មុនពេលរង់ចាំ** (session ដែលអស់កូតាកណ្តាលការរង់ចាំ បាត់ការងារដែលមិនទាន់ push ទាំងស្រុង)។
 
 ⛔ **គ្មាន RTDB emulator ➜ checker `emu/*` ទាំងអស់ធ្លាក់ចុះ — ហើយ `SKIP`
 មិនមែន `PASS` ទេ។** ⛔ **ចំនួនត្រូវរាប់ពីថតពិត** (`audit-tools/emu/*-test.js`
@@ -2192,6 +2193,10 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **2.42.9 ត្រូវសាកលើឧបករណ៍ពិតមុន merge** (`docs/HISTORY.md` [2.42.9]) ៖ ហូតប្រអប់ប្រវត្តិលើ iPhone PWA · Android PWA · APK
+  (តំបន់ហាមចូល ៖ ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK **ក្រោយ Netlify deploy** (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ ⛔ ភាពខុសគ្នា
+  រចនាសម្ព័ន្ធដែលនៅសល់រវាង APK និង PWA Android ៖ អ្នកស្តាប់ `touchmove` **non-passive** របស់ PTR (មានតែលើ APK) ➜ ការរមូរដំបូងរង់ចាំ
+  main thread ➜ កុំកែដោយគ្មានការវាស់លើទូរស័ព្ទពិត (ច្បាប់ ១១)។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

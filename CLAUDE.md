@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.8` (`zoew-v235`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.9` (`zoew-v236`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -1203,6 +1203,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | `.mrep-table` | `width: max-content; min-width: 100%` ⛔ **មិនមែន `width: 100%`** | `width:100%` ចាក់តារាងឲ្យស្មើកន្សោម ➜ `nowrap` ធ្វើឲ្យអត្ថបទ **ហៀរជាន់គ្នា** ជំនួសការរមូរផ្តេក (`layout-check` ចាក់ជួរដេកសាកល្បងចូល រួចវាស់ការហៀរក្នុងមួយក្រឡា) |
 | `.app-pages` | `scroll-snap-type: y proximity` + `scroll-padding-top` ស្មើ `padding-top` — ⚠️ **តម្លៃ ២ នេះរស់នៅក្នុង `@media (max-width: 991px)` *២ ប្លុកដាច់ដោយឡែក*** (`scroll-padding-top` នៅប្លុកទី ១ · `padding-top` នៅប្លុកទី ២ ប្រហែល ៣០០ បន្ទាត់ក្រោម) ➜ **កែមួយ ត្រូវពិនិត្យមួយទៀត**។ ⛔ កុំរួមប្លុកទាំង ២ ដើម្បី «សម្អាត» — នោះប្តូរលំដាប់ cascade ក្នុងតំបន់ហាមចូល | បើភ្លេច ➜ **PTR ស្លាប់** (`panel-motion-test` ៖ `snapRestNearTop`) |
 | `#appPages.panel-gliding` | `scroll-snap-type: none` អំឡុងចលនា | `.page-main` ជា snap target ➜ WebKit snap ជាន់ចលនា |
+| `.app-pages.history-expanded` | ⛔ `display: block` + `> .app-page.active { height: 100% }` (`react-root.css` ឈ្នះ `display: flex` របស់ `app.css`) ⛔ **កុំប្តូរ `display` របស់ `.app-pages` តាមរបៀប** | ការប្តូរ `display` block ↔ flex លើ container ធំជាងគេ ➜ browser បង្កើត layout tree ឡើងវិញទាំងស្រុងរាល់ការហូត (វាស់បាន ៖ dirty ៩៧.៨% · Layout ៤៥៨–៥៥៩ms លើ ២៦០ ជួរ ➜ ក្រោយកែ ១ms) · ធរណីមាត្រដូចគ្នាក្នុង noise (Android + iOS · ៣ viewport) · `panel-motion-test` ផ្នែក ៨ វាស់ **សមាមាត្រ object ដែល dirty** ពី trace ពិត |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |
 | `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | safe-area នៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ ៥៣px លើ iPhone |
 | `@supports (-webkit-touch-callout: none)` | ផ្លូវ iOS ដាច់ដោយឡែក | `clip-path` មិនដើរលើ Safari |

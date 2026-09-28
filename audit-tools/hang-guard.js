@@ -79,6 +79,19 @@ ok('`checker-coverage` probe ថតទទេដោយ bounded parallelism (ម�
         && !/execFileSync\s*\(/.test(emptyProbeSrc),
     'ផ្នែក probe ថតទទេនៅតែរត់ checker ជាជួរ');
 
+// `exit-code-integrity` ពុល checker ១០០+ ។ ជាជួរ វាចំណាយ ~២៩០ វិ. (វាស់ 2026-09-28) = ៩៧% នៃពិដាន ៣០០ វិ. ➜
+// checker ថ្មីមួយទៀតធ្វើឲ្យ meta-checker ខ្លួនឯង «ព្យួរ»។ ចាក់សោ ៖ pool មានព្រំដែន · ពិដានក្រៅ process (`timeout`
+// សម្លាប់ក្រុម process ➜ money-guardian ពុលមិនបន្សល់អ្នកយាមកូនកំព្រា) · ⛔ ការផុតពិដានពេលស្របគ្នា **ត្រូវរត់
+// ឡើងវិញម្នាក់ឯង** (បើមិនដូច្នេះ ការប្រជែង CPU អាចលាក់ checker ដែលចេញ exit 0 ក្រោយ «ផុតពិដាន»)។
+const eciSrc = srcOf.get('exit-code-integrity.js') || '';
+ok('`exit-code-integrity` ពុលដោយ bounded parallelism + `timeout` + រត់ឡើងវិញម្នាក់ឯងពេលផុតពិដាន',
+    /EXITCODE_JOBS/.test(eciSrc)
+        && /Promise\.all\s*\(/.test(eciSrc)
+        && /'timeout'/.test(eciSrc) && /'-k'/.test(eciSrc)
+        && /timedOut\)\s*continue;[\s\S]{0,120}poolTimeouts\.push[\s\S]{0,80}await poisonRun\(/.test(eciSrc)
+        && !/execFileSync\s*\(/.test(eciSrc),
+    'ការពុលរត់ជាជួរ ឬគ្មានការរត់ឡើងវិញម្នាក់ឯងលើការផុតពិដាន');
+
 // ═══ ３. គ្មាន `navigator.serviceWorker.ready` ដែល await ដោយគ្មានពិដាន ═══
 // នេះជា **ការព្យួរពិត** ដែលធ្វើឲ្យ CI ដួល ២ ដង។
 const bareReady = [];

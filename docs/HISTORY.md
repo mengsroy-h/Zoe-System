@@ -929,6 +929,37 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### `run-all.sh` ស្របគ្នា · state ដែលបន្តបាន (2026-09-28 · ឧបករណ៍ប៉ុណ្ណោះ ➜ គ្មានការឡើងកំណែ App)
+
+⛔ **កូដ ship មិនប្រែ** (`ZoeW/` · `ZoeKeyGen/` មិនប៉ះ) ➜ `APP_VERSION`/`CACHE_VERSION` មិនឡើង (ច្បាប់ ៦ · `version-bump-scope`)។
+សកម្មភាពដែលត្រូវធ្វើដោយដៃ ៖ **គ្មាន**។
+
+- **មូលហេតុ** ៖ កូតា GitHub Actions អស់ ➜ `run-all.sh` ក្នុង session ជា CI តែមួយ។ checker ១៨៤ រត់ **ជាជួរ** តាម `run()`
+  ➜ session ដែលអស់កូតាកណ្តាលទី **បាត់លទ្ធផលទាំងមូល** (ម្ចាស់គម្រោងផ្គុំ log មួយផ្នែកៗដោយដៃ)។
+- **វាស់មុន** (4 CPU · RTDB emulator · `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1` · tree `0ef79fc`) ៖
+  **១៦៩៤ វិ. (២៨.២ នាទី) · ១៨៤ PASS**។ យឺតជាងគេ ៖ `exit-code-integrity` ២៩២ · `money-guardian` ១៦៥ · `zoew-suite` ១២៧ ·
+  `revenue-fuzz` ១២៤ · `app-lock` ៩៨ · `ui-flow` ៩៥ · `checker-coverage` ៦៩ វិ.។
+- **វាស់ក្រោយ** (ម៉ាស៊ីនដដែល · ទង់ដដែល · `RUNALL_JOBS=4`) ៖ @@AFTER-DETAIL@@
+- 🔴 **ការរកឃើញ ៖ `exit-code-integrity` ២៩២ វិ. = ៩៧% នៃពិដាន ៣០០ វិ.** — checker ថ្មីណាមួយ (រួមទាំង `runall-runner-test` ដែល
+  ពុលរត់ ~២០ វិ.) ធ្វើឲ្យ meta-checker ខ្លួនឯងរាយ «ព្យួរ»។ profile ៖ ពុល checker ១០៨ **ជាជួរ** (ផលបូក ២៨៩ វិ.) · តែ
+  `money-guardian` ពុលផុតពិដាន ៦០ វិ. ជានិច្ច ហើយ `execFileSync` សម្លាប់តែ node កូន ➜ អ្នកយាមកូន ៤ របស់វា **រត់ជាកំព្រា**
+  ស៊ី CPU របស់ checker បន្ទាប់។ ការកែ ៖ pool (`EXITCODE_JOBS` ≤ ៤) · កូននីមួយៗក្រោម `timeout` (សម្លាប់ **ក្រុម process** ·
+  រស់រានការ SIGKILL របស់ឪពុក) · ⛔ **ការផុតពិដានពេលស្របគ្នា ➜ រត់ឡើងវិញម្នាក់ឯង** ➜ សាលក្រមដូចការរត់ជាជួរបេះបិទ
+  (វាស់ ៖ ១៤២ វិ. · ពុល ១០៩ · គ្មានបៃតងក្លែងក្លាយ · `money-guardian` ផុតពិដានម្នាក់ឯងដូចមុន)។ `checker-coverage` ផ្នែក ៥
+  (SIGKILL `exit-code-integrity` ក្រោយ ២.៥ វិ.) សម្លាប់កូនកំព្រាតាមឈ្មោះស្រមោល `.tmp-poison-<pid>-` (PID ជាក់លាក់) ៖ វាស់
+  ឃើញ `money-guardian` ពុលកំព្រា + អ្នកយាមកូនរបស់វា ជាន់ដំណាក់កាល meta បន្ទាប់ ៦០ វិ.។
+- **lane ដែលវិភាគ/វាស់** ៖ (១) `checker-coverage` · `exit-code-integrity` **សរសេរ ហើយបោស** `.tmp-poison-*` ក្នុង
+  `audit-tools/` — ការបោសរបស់ `exit-code-integrity` កូន (ផ្នែក ៥) លុបស្រមោលដែល `exit-code-integrity` មួយទៀតកំពុងរត់ ➜
+  **excl** (រត់ម្នាក់ឯង) · (២) RTDB emulator តែមួយ ➜ `emu/*` + `money-guardian` **ម្តងមួយ** · (៣) browser ៖ @@BROWSER@@
+- **អ្នកយាម** ៖ `runall-runner-test` (ឥរិយាបថ ៖ checker ក្លែងដេក/ធ្លាក់/SKIP/ព្យួរ ➜ ចន្លោះ start/end ពិត) **ធ្លាក់ ២៦**
+  លើ `run-all.sh` ជាជួរចាស់ (ស្របគ្នា ១ · គ្មាន state/RESUME/ONLY · TERM បន្សល់ `timeout`+node កំព្រា · បញ្ជី lane ទទេ) ·
+  ផ្នែក ៦ ផ្ទៀង lane នៃបញ្ជីពិតទល់នឹងភស្តុតាងក្នុងប្រភព **ទាំង ២ ទិស** (ជំនាន់ដំបូងរាយខុស `license-seat-test` ·
+  `doc-scope-test` ព្រោះ `emu/…js` លេចក្នុង **comment** ➜ ភស្តុតាងត្រូវកាត់ comment ដោយ acorn មុន) · `hang-guard` ស្រង់ប្លុក
+  `#@runner-begin`…`#@runner-end` (tree ចាស់ ➜ `run()`) រត់ checker ព្យួរ **ជាមួយ** checker បៃតង ហើយចាក់សោ pool + `timeout`
+  + ការរត់ឡើងវិញម្នាក់ឯងរបស់ `exit-code-integrity`។
+- ⛔ **harness ត្រូវ env ស្អាត** ៖ checker រត់ជាកូនរបស់ run-all ពិត ➜ `RUNALL_STATE`/`RUNALL_ONLY`/`RUNALL_RESUME` ដែល export
+  នឹងធ្វើឲ្យ fixture សរសេរចូល state ពិត ឬត្រូវត្រងចោល ➜ `hang-guard` · `runall-runner-test` លុប `RUNALL_*` មុនរត់ harness។
+
 ### Deep audit 2.42.7 ៖ ហេតុអ្វី checker ១៨៣ បៃតងលើកំហុស ៦
 
 - **ការសម្អាតដកលុយ ២ ដង** ៖ `cleanup-interrupt-atomicity-test` វាស់តែ **tab ដែលស្លាប់** («សម្លាប់ការសរសេរទី N» ➜ tab ថ្មីស្តារ) ➜
@@ -1466,7 +1497,7 @@ Function ដែល export ៖ 978
 | `boot-animation-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `boot-runtime` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `camera-resume-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
-| `checker-coverage` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `checker-coverage` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `cleanup-clock-guard-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `cleanup-interrupt-atomicity-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ · ផ្នែក ៥ |
 | `clear-history-finalization-fence-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
@@ -1501,7 +1532,7 @@ Function ដែល export ៖ 978
 | `emu/restore-deadlock-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `emu/restore-mutation-emu-test` | — | ផ្នែក ២ · ផ្នែក ៥ |
 | `emu/tx-disconnect-emu-test` | ផ្នែក ១ · ផ្នែក ២ | — |
-| `exit-code-integrity` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `exit-code-integrity` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `expired-trash-retention-test` | ផ្នែក ១ | ផ្នែក ១ |
 | `export-cells-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `field-shape-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
@@ -1511,7 +1542,7 @@ Function ដែល export ៖ 978
 | `function-surface-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ៤ |
 | `gesture-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `google-sheets-cache-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
-| `hang-guard` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
+| `hang-guard` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `health-check-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `history-menu-dismiss-test` | — | ផ្នែក ២ |
 | `history-patch-retry-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
@@ -1534,7 +1565,7 @@ Function ដែល export ៖ 978
 | `license-grace-test` | — | ផ្នែក ១ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-network-pressure-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `license-record-race-test` | — | ផ្នែក ២ |
-| `license-seat-test` | — | ផ្នែក ១ · ផ្នែក ៥ |
+| `license-seat-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៥ |
 | `listener-leak-test` | — | ផ្នែក ១ · ផ្នែក ៤ |
 | `listener-pending-key-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `locker-claim-guard-test` | — | ផ្នែក ១ · ផ្នែក ២ |
@@ -1584,6 +1615,7 @@ Function ដែល export ៖ 978
 | `revenue-fuzz-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `revenue-rules-clamp-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ · ផ្នែក ៥ |
 | `rules-duplicate-keys` | — | ផ្នែក ៣ |
+| `runall-runner-test` | ផ្នែក ២ | — |
 | `scan-engine-test` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `scan-remove-mode-test` | — | ផ្នែក ១ |
 | `sdk-offline-boot-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

@@ -338,6 +338,22 @@ if (process.env.EXITCODE_CHILD) {
             killed = true;
         } catch (e) {}
         try { runSync(process.execPath, ['-e', 'setTimeout(()=>{},700)'], { stdio: 'ignore' }); } catch (e) {}
+        // ⛔ `exit-code-integrity` រត់ checker ពុលស្របគ្នា ក្រោម `timeout` (ម្ចាស់ក្រុម process របស់ខ្លួន) ➜ SIGKILL
+        // របស់វាបន្សល់កូនកំព្រារហូតដល់ពិដាន ៦០ វិ. (វាស់បាន ៖ money-guardian ពុល + អ្នកយាមកូន ៤ ជាន់ដំណាក់កាលបន្ទាប់
+        // របស់ run-all) ➜ សម្លាប់ក្រុម process ដែល cmdline មានស្រមោល `.tmp-poison-<pid កូន>-` តាម **PID ជាក់លាក់**
+        // (មិនមែន `pkill -f` ៖ លំនាំនោះផ្គូផ្គង shell ខ្លួនឯង)។ Linux តែប៉ុណ្ណោះ (`/proc`) · ផ្សេង ➜ ពិដាន ៦០ វិ. នៅដដែល។
+        const orphanTag = '.tmp-poison-' + child.pid + '-';
+        let reaped = 0;
+        let procs = [];
+        try { procs = fs.readdirSync('/proc').filter((n) => /^\d+$/.test(n)); } catch (e) {}
+        for (const pid of procs) {
+            let cmd = '';
+            try { cmd = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8'); } catch (e) { continue; }
+            if (cmd.indexOf(orphanTag) === -1) continue;
+            try { process.kill(-Number(pid), 'SIGKILL'); reaped++; }
+            catch (e) { try { process.kill(Number(pid), 'SIGKILL'); reaped++; } catch (e2) {} }
+        }
+        if (reaped) console.log('    (សម្លាប់ checker ពុលកំព្រា ' + reaped + ' process ក្រោយ SIGKILL)');
         const after = snapshot();
         const changed = [];
         for (const [f, h] of before) if (after.get(f) !== h) changed.push(path.basename(f));

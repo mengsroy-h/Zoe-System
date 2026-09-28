@@ -128,6 +128,7 @@ function buildContext() {
             runTransaction: (ref, fn) => restTransaction('/' + ref.path, fn)
         }
     };
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     // ⛔ tree ចាស់គ្មាន helper ថ្មី ➜ ត្រូវធ្លាក់ **ដោយមានឈ្មោះ** មិនមែន
     // ដោយ stack trace ដែលមើលទៅដូចកំហុសឧបករណ៍ (មេរៀន «ការធ្លាក់ក្លែងក្លាយ»)។

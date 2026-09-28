@@ -6,13 +6,13 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 វាស់** ៖ វិធីសាស្ត្រក្នុង [`PARITY.md`](PARITY.md) (លេខដែលវាស់បានរស់នៅ
 [`../../docs/HISTORY.md`](../../docs/HISTORY.md) — ប្រវត្តិរស់នៅ `docs/HISTORY*.md` ប៉ុណ្ណោះ)។
 
-| វិមាត្រដែលវាស់ | លទ្ធផល |
+| វិមាត្រដែលវាស់ | វិសាលភាពភស្តុតាង |
 |---|---|
-| Function · ថេរ · state · សកម្មភាព · id · កូនសោ storage · អត្ថបទ · CSS | ១០០% |
-| ធាតុ DOM និង layout (ទំហំអេក្រង់ ៣) | ដូចគ្នាបេះបិទ |
-| តារាង · ស្ថិតិ · លុយ · **ការសរសេរទៅ server** (ទិន្នន័យពិត) | ដូចគ្នាបេះបិទ |
-| ជំហានអន្តរកម្ម ១៨ | ដូចគ្នាបេះបិទ |
-| កំហុស runtime | ០ |
+| Function · ថេរ · state · សកម្មភាព · id · កូនសោ storage · អត្ថបទ · CSS | កាតាឡុក និងភាពខុសគ្នាតាមប្រភេទ; មិនមែន behavioral coverage ១០០% |
+| ធាតុ DOM និង layout (ទំហំអេក្រង់ ៣) | ប្រៀបធៀបសេណារីយ៉ូក្នុង script |
+| តារាង · ស្ថិតិ · លុយ · **ការសរសេរទៅ server** | fixture និង RTDB ក្លែងក្នុង parity; តេស្ត emulator នៅ `audit-tools/emu/` ដាច់ដោយឡែក |
+| ជំហានអន្តរកម្ម ១៨ | ផ្លូវដែល script ចុច; មិនគ្របគ្រប់ race ឬឧបករណ៍ |
+| កំហុស runtime | រកកំហុសក្នុងសេណារីយ៉ូដែលរត់; លទ្ធផលតាមជុំស្ថិតក្នុង HISTORY |
 
 ### ឯកសារ
 
@@ -78,7 +78,7 @@ ZoeW សរសេរលើ **React 19 + TypeScript + Vite** ដោយ **រក�
 ### ដំឡើង និងអភិវឌ្ឍ
 
 ```bash
-npm install
+npm ci
 npm run dev              # server អភិវឌ្ឍន៍ (http://localhost:5173)
 ```
 
@@ -110,7 +110,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run parity` | ប្រៀបធៀបកាតាឡុក App ថ្មីនឹង ZoeW ដើម |
 | `npm run parity:dom` | ប្រៀបធៀប DOM និង layout ពិតក្នុង browser |
 | `npm run parity:live` | ប្រៀបធៀប **ជាមួយទិន្នន័យពិត** (RTDB ក្លែងក្លាយ) រួមទាំងការសរសេរទៅ server |
-| `npm run parity:deep` | ប្រៀបធៀប **ផ្លូវលុយទាំងអស់** · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF — ៦ ជាន់រាល់ជំហាន (អេក្រង់ · ការសរសេរពេញ · DB ទាំងមូល · ប្រអប់ native · សំណើទៅ Apps Script/ZTO · សារ toast) |
+| `npm run parity:deep` | ប្រៀបធៀប **ផ្លូវលុយក្នុងសេណារីយ៉ូតេស្ត** · ចាកចេញ/ចូលវិញ · ZTO · Google Sheet · PDF — ៦ ជាន់រាល់ជំហាន (អេក្រង់ · ការសរសេរពេញ · DB ទាំងមូល · ប្រអប់ native · សំណើទៅ Apps Script/ZTO · សារ toast) |
 | `npm run parity:all` | រត់ការវាស់ parity ទាំង ៤ បូក `rules:check` |
 | `npm run rules:check` | វាស់ច្បាប់ **លុប/ដក** និងការសម្អាត **២ ម៉ោង · ៧ ថ្ងៃ · ២ ថ្ងៃ · ៣០ ថ្ងៃ** ដោយទិន្នន័យសងខាងព្រំដែន (±១ នាទី) លើ ZoeW ដើម · React web · React Android រួចប្រៀបធៀប DB |
 | `npm run slot:check` | ផ្ទៀងផ្ទាត់ថាកូដ imperative **មិនប៉ះកូន** របស់ធាតុដែល React ជាម្ចាស់ (បើប៉ះ ➜ App ស) |
@@ -119,7 +119,7 @@ React ខ្លួនវាត្រូវ **បដិសេធ** (ការប�
 | `npm run money:core` | ស្រង់កូដលុយពិតចូល `audit-tools/money-core.js` សម្រាប់ `check-money.cmd` (អ្នកយាមភាពស្រស់ធ្លាក់ពេលកូដលុយប្រែ) |
 | `npm run sw:check` | ផ្ទៀងផ្ទាត់ថា Service Worker cache សំបកពេញលេញ |
 | `npm run original:fetch` | ទាញ ZoeW ដើម (vanilla JS) ពី git ចូល `.original/ZoeW` — អ្នកសម្រេចនៃការវាស់ parity |
-| `npm run logic:check` | ប្រៀបធៀប function ទាំង ៧៣៩ ជាមួយដើម **តាម token** · តំបន់ហាមចូលត្រូវដូចដើម |
+| `npm run logic:check` | ដេរីវេ function ពីប្រភព រួចប្រៀបធៀបជាមួយដើម **តាម token** · តំបន់ហាមចូលត្រូវដូចដើម |
 | `npm run doc:check` | ផ្ទៀងផ្ទាត់ថាការអះអាងក្នុងឯកសារស៊ីនឹងកូដ (បញ្ជី slot · កំណែ · ពាក្យបញ្ជា) |
 | `npm run audit:build` | build វាស់ (`dist-audit/ZoeW`) សម្រាប់ `audit-tools/` — ⛔ `bash audit-tools/run-all.sh` (ពី root) build វាដោយខ្លួនឯង ហើយរត់ checker ទាំងអស់ |
 | `npm run build:only` | build ដោយរំលងការពិនិត្យ type (ប្រើក្នុង `verify` ដែលពិនិត្យរួច) |

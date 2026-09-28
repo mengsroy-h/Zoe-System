@@ -1249,7 +1249,7 @@ function firstBody(requests) {
         'pickupBarcodeKey', 'normalizeStoredPhone', 'normalizeOneStoredPhone',
         'ztoScanStampMillis', 'appZoneWallClockToMillis', 'appZoneParts',
         'barcodeAbandonIsRipe'];
-    IMPORT_NAMES.push('ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
+    IMPORT_NAMES.push('captureZtoSession', 'ztoListSkipText', 'getZoneDateKey', 'trashRetentionMs',
         'ztoListSignedVerdict', 'ztoListRowAgeState', 'ztoListRowNeedsSignedProbe',
         'resolveZtoListSignedVerdicts', 'markZtoListRowPickedUp');
     const importParts = IMPORT_NAMES.map((name) => fnOrStub(APP_SRC, name));
@@ -1266,6 +1266,7 @@ function firstBody(requests) {
         const calls = { claim: [], save: [], release: [], toast: [], probe: [], close: [] };
         const box = {
             console: console,
+            db: {}, authGeneration: 0, ztoSessionGeneration: 0, customerDataTableSessionGeneration: 0,
             scanHistory: [], deletedItems: [],
             ztoListSyncInFlight: false,
             ztoListSyncResult: null,

@@ -176,6 +176,7 @@ function makeSandbox(opts) {
         __store: store, __writes: writes, __setPath: setPath
     };
     ctx.window = ctx;
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     const order = ['getFormattedDate', 'ledgerNumber', 'ledgerAppliedDelta', 'ledgerDeltaWithClamp',
         'revertLedgerRecordInMemory', 'applyLedgerBucketDelta', 'ledgerZeroDelta', 'ledgerServerVerdict',

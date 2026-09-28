@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v104';
+const CACHE_VERSION = 'zoekeygen-v105';
 
 const CORE_SHELL = [
     './',
@@ -63,52 +63,79 @@ let deployCheck = null;
 
 function shellDeployIsCurrent() {
     const now = Date.now();
-    if (deployCheck && now >= deployCheck.at && now - deployCheck.at < DEPLOY_CHECK_TTL_MS) return deployCheck.current;
+    if (deployCheck && now >= deployCheck.at && now - deployCheck.at < DEPLOY_CHECK_TTL_MS)
+        return deployCheck.current;
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = setTimeout(() => {
-        if (controller) { try { controller.abort(); } catch (e) {} }
-    }, REVALIDATE_TIMEOUT_MS);
     const markers = ["'" + CACHE_VERSION + "'", '"' + CACHE_VERSION + '"'];
-    const current = fetch(self.location.href, controller ? { signal: controller.signal, cache: 'no-cache' } : { cache: 'no-cache' })
-        .then((response) => (response && response.ok ? response.text() : ''))
-        .then((text) => markers.some((marker) => text.indexOf(marker) !== -1), () => false)
-        .then((same) => {
+    const current = new Promise((resolve) => {
+        let settled = false;
+        const finish = (same) => {
+            if (settled)
+                return;
+            settled = true;
             clearTimeout(timer);
-            return same;
-        });
+            resolve(same);
+        };
+        const timer = setTimeout(() => {
+            finish(false);
+            if (controller) {
+                try {
+                    controller.abort();
+                }
+                catch (e) { }
+            }
+        }, REVALIDATE_TIMEOUT_MS);
+        Promise.resolve().then(() => fetch(self.location.href, controller ? { signal: controller.signal, cache: 'no-cache' } : { cache: 'no-cache' }))
+            .then((response) => (!settled && response && response.ok ? response.text() : ''))
+            .then((text) => finish(markers.some((marker) => text.indexOf(marker) !== -1)), () => finish(false));
+    });
     deployCheck = { at: now, current };
     return current;
 }
 
 function revalidateShell(cache, request, cacheKey) {
-    if (navigator.onLine === false) return Promise.resolve();
-    if (linkIsFrugal()) return Promise.resolve();
+    if (navigator.onLine === false)
+        return Promise.resolve();
+    if (linkIsFrugal())
+        return Promise.resolve();
     const key = typeof cacheKey === 'string' ? cacheKey : request.url;
-    if (revalidateInFlight.has(key)) return Promise.resolve();
-    if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT) return Promise.resolve();
+    if (/\.html$/i.test(key))
+        return Promise.resolve();
+    if (revalidateInFlight.has(key))
+        return Promise.resolve();
+    if (revalidateInFlight.size >= REVALIDATE_MAX_IN_FLIGHT)
+        return Promise.resolve();
     revalidateInFlight.add(key);
-
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    let released = false;
-    const release = () => {
-        if (released) return;
-        released = true;
-        clearTimeout(timer);
-        revalidateInFlight.delete(key);
-    };
-    const timer = setTimeout(() => {
-        if (controller) { try { controller.abort(); } catch (e) {} }
-        release();
-    }, REVALIDATE_TIMEOUT_MS);
-
-    const target = typeof cacheKey === 'string' ? cacheKey : request;
-    return shellDeployIsCurrent().then((current) => {
-        if (!current || released) { release(); return; }
-        return fetch(target, controller ? { signal: controller.signal } : undefined).then((response) => {
-            if (!response || !response.ok || response.redirected) { release(); return; }
-            return cache.put(cacheKey, response.clone()).then(release, release);
-        }, release);
-    }, release);
+    return new Promise((resolve) => {
+        let released = false;
+        const release = () => {
+            if (released) return;
+            released = true;
+            clearTimeout(timer);
+            revalidateInFlight.delete(key);
+            resolve();
+        };
+        const timer = setTimeout(() => {
+            release();
+            if (controller) {
+                try {
+                    controller.abort();
+                }
+                catch (e) { }
+            }
+        }, REVALIDATE_TIMEOUT_MS);
+        const target = typeof cacheKey === 'string' ? cacheKey : request;
+        shellDeployIsCurrent().then((current) => {
+            if (!current || released)
+                return;
+            return fetch(target, controller ? { signal: controller.signal, cache: 'no-cache' } : { cache: 'no-cache' }).then((response) => {
+                if (released || !response || !response.ok || response.redirected)
+                    return;
+                return cache.put(cacheKey, response.clone());
+            });
+        }).then(release, release);
+    });
 }
 
 const NETWORK_TIMEOUT_MS = 20000;

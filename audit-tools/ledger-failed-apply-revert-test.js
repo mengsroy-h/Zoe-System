@@ -186,6 +186,7 @@ function makeSandbox(txPlan, opts) {
         __store: store, __calls: calls
     };
     ctx.window = ctx;
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     vm.runInContext(
         fnSrc.getFormattedDate + '\n'

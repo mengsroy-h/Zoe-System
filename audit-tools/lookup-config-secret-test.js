@@ -73,6 +73,7 @@ function createRuntime(existing, key, encrypt, failStorage) {
         lookupSecretKey: key,
         encryptLookupSecret: encrypt,
         clearCustomerDataTableCache: () => {},
+        clearZtoPickupStatusStore: () => {},
         prefetchCustomerDataTableRowsIfConfigured: () => {},
         closeModal: () => {},
         refreshZtoAutoCloseUi: () => {},

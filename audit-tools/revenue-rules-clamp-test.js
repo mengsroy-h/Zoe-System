@@ -279,6 +279,7 @@ function makeSandbox(seed) {
         __store: store, __rejected: rejected, __accepted: accepted, __failWith: failWith
     };
     ctx.window = ctx;
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     vm.runInContext(
         fnSrc.getFormattedDate + '\n'

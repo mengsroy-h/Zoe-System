@@ -18,7 +18,7 @@ import { safeLookupReason } from './customer-table-prefetch';
 import { buildLookupRequestHeaders, ztoIdToken } from './lookup-api';
 import { requestPinBeforeConfig } from './pin';
 import { addOrUpdateEntry, dropOptimisticBarcode } from './scan-action';
-import { checkZtoStatusForBarcode, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
+import { captureZtoSession, checkZtoStatusForBarcode, ztoFastModeIsOn, ztoStatusFeatureConfig, ztoStatusSecretIsLocked } from './zto-status';
 import { anyDbListenerViewIsStale } from '../services/db-listeners';
 import { armLateWrite, fetchWithTimeout, withTimeout } from '../services/network';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
@@ -103,6 +103,7 @@ export function ztoListRowNeedsSignedProbe(raw, now) {
 }
 
 export async function resolveZtoListSignedVerdicts(cfg, rows) {
+    const session = captureZtoSession();
     if (!cfg || !Array.isArray(rows)) return 0;
     const now = getServerNow();
     const seen = new Set();
@@ -117,7 +118,7 @@ export async function resolveZtoListSignedVerdicts(cfg, rows) {
     }
     let measured = 0;
     for (let i = 0; i < pending.length; i++) {
-        if ((navigator.onLine as boolean) === false) break;
+        if (!session.current() || (navigator.onLine as boolean) === false) break;
         setZtoListSyncNote('⏳ កំពុងពិនិត្យស្ថានភាព ZTO ' + (i + 1) + '/' + pending.length + '...');
         let verdict = null;
         try {
@@ -126,6 +127,7 @@ export async function resolveZtoListSignedVerdicts(cfg, rows) {
         } catch (e) {
             verdict = null;
         }
+        if (!session.current()) return 0;
         if (typeof verdict === 'boolean') {
             ztoListSignedProbe.set(pending[i].key, verdict);
             measured++;
@@ -230,10 +232,13 @@ export function buildZtoListApiUrl(cfg, from, to, page) {
 }
 
 export async function fetchZtoListPage(cfg, from, to, page) {
+    const session = captureZtoSession();
     const url = buildZtoListApiUrl(cfg, from, to, page);
     if (!url) return null;
     const headers = await buildLookupRequestHeaders(cfg);
+    if (!session.current()) return null;
     const idToken = await ztoIdToken();
+    if (!session.current()) return null;
     if (!idToken) {
         const missing: any = new Error('ZTO_LIST_NOT_CONFIGURED');
         missing.listReason = 'idtoken:missing';
@@ -306,6 +311,7 @@ export function renderZtoListSyncPreview() {
 }
 
 export async function runZtoListSyncPreview() {
+    const session = captureZtoSession();
     const cfg = ztoStatusFeatureConfig();
     if (!cfg) {
         showToast('⚠️ ត្រូវកំណត់ API ស្វែងរក ZTO ជាមុនសិន');
@@ -337,6 +343,7 @@ export async function runZtoListSyncPreview() {
     try {
         for (let page = 1; page <= ZTO_LIST_CLIENT_MAX_PAGES; page++) {
             const body = await fetchZtoListPage(cfg, range.from, range.to, page);
+            if (!session.current()) return;
             if (!body) break;
             for (let i = 0; i < body.rows.length; i++) rows.push(body.rows[i]);
             const reported = Number(body.pages);
@@ -346,6 +353,7 @@ export async function runZtoListSyncPreview() {
             if (page >= pages) break;
         }
         await resolveZtoListSignedVerdicts(cfg, rows);
+        if (!session.current()) return;
         ztoState.ztoListSyncResult = {
             rows: rows,
             from: range.from,
@@ -356,6 +364,7 @@ export async function runZtoListSyncPreview() {
         renderZtoListSyncPreview();
         showToast('✅ ទាញបញ្ជីពី ZTO បាន ' + rows.length + ' ជួរដេក');
     } catch (e) {
+        if (!session.current()) return;
         ztoState.ztoListSyncResult = null;
         ztoListSignedProbe.clear();
         renderZtoListSyncPreview();
@@ -374,7 +383,7 @@ export async function runZtoListSyncPreview() {
             showToast('⚠️ ទាញបញ្ជីពី ZTO មិនបាន — សូមសាកម្ដងទៀត');
         }
     } finally {
-        ztoState.ztoListSyncInFlight = false;
+        if (session.ownsLock()) ztoState.ztoListSyncInFlight = false;
     }
 }
 
@@ -392,6 +401,7 @@ export async function markZtoListRowPickedUp(code) {
 }
 
 export async function importZtoListRows() {
+    const session = captureZtoSession();
     if (ztoState.ztoListSyncInFlight) {
         showToast('⏳ កំពុងដំណើរការរួចហើយ...');
         return;
@@ -440,6 +450,7 @@ export async function importZtoListRows() {
     const savedDates = new Set();
     try {
         for (let i = 0; i < queue.length; i++) {
+            if (!session.current()) return;
             const row = queue[i];
             setZtoListSyncNote('⏳ កំពុងបញ្ចូល ' + (i + 1) + '/' + queue.length + '...');
             if ((navigator.onLine as boolean) === false) break;
@@ -450,12 +461,14 @@ export async function importZtoListRows() {
                 claim = await withTimeout(claimPromise, 15000,
                     'Barcode claim timed out');
             } catch (e) {
-                releaseLateBarcodeClaim(claimPromise, row.barcode);
+                if (session.current()) releaseLateBarcodeClaim(claimPromise, row.barcode);
                 claim = 'unknown';
             }
+            if (!session.current()) return;
             if (claim === 'taken') { taken++; continue; }
             if (claim !== 'claimed') { failed++; continue; }
             const rollbackImportedRow = () => {
+                if (!session.current()) return;
                 releaseBarcodesInRegistry([row.barcode]);
                 dropOptimisticBarcode(row.barcode);
                 refreshCurrentHistoryView();
@@ -465,6 +478,7 @@ export async function importZtoListRows() {
             const savePromise = addOrUpdateEntry(row.barcode, row.phone, row.cod, row.dod, 'N/A', row.stampMs, closedStampMs);
             try {
                 const status = await withTimeout(savePromise, 15000, 'Save timed out');
+                if (!session.current()) return;
                 if (status === true) {
                     saved++;
                     savedDates.add(rowDateKey);
@@ -474,10 +488,11 @@ export async function importZtoListRows() {
                 }
                 else failed++;
             } catch (e) {
+                if (!session.current()) return;
                 if (e && e.message === 'Save timed out') {
                     pending++;
                     savedDates.add(rowDateKey);
-                    armLateWrite(savePromise, refreshCurrentHistoryView, rollbackImportedRow,
+                    armLateWrite(savePromise, () => { if (session.current()) refreshCurrentHistoryView(); }, rollbackImportedRow,
                         'ZTO list import save');
                 } else {
                     failed++;
@@ -486,8 +501,9 @@ export async function importZtoListRows() {
             }
         }
     } finally {
-        ztoState.ztoListSyncInFlight = false;
+        if (session.ownsLock()) ztoState.ztoListSyncInFlight = false;
     }
+    if (!session.current()) return;
     ztoState.ztoListSyncResult = null;
     ztoListSignedProbe.clear();
     renderZtoListSyncPreview();

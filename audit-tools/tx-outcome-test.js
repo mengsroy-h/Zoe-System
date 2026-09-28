@@ -212,6 +212,7 @@ function makeRun(opts) {
         monthlyRevenueData: clone(server.zoew_monthly_revenue_cod_dod)
     };
     box.window = box;
+    box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = [];
     TX_CONSTS.concat(APP_CONSTS).forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });

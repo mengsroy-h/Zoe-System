@@ -134,6 +134,7 @@ function runCleanup(reason, barcodes, opts) {
         dailyRevenueData: { [DAY]: { codDollar: startCod, dodDollar: 3, totalCount: startCount } },
         monthlyRevenueData: { [MONTH]: { codDollar: startCod, dodDollar: 3, totalCount: startCount } }
     };
+    box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = CONSTS.map((c) => sliceConst(SRC, c)).filter(Boolean);
     parts.push('let serverClockTrusted = true, isDatabaseConnected = true;');

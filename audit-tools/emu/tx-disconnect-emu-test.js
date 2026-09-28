@@ -238,10 +238,11 @@ const settle = (ms) => new Promise((r) => setTimeout(r, ms));
         auth: { currentUser: { getIdToken: () => Promise.resolve('owner') } }
     };
     box.window = box;
+    box.authGeneration = 0;
     const ctx = vm.createContext(box);
     const parts = ['const txOutcomeUnknownReported = new Set();'];
     ['TX_OUTCOME_READ_TIMEOUT_MS', 'TX_OUTCOME_RETRY_GAP_MS', 'TX_OUTCOME_MAX_ATTEMPTS', 'TX_OUTCOME_MAX_WAIT_MS', 'txDisconnectResolving'].forEach((c) => { const s = sliceConst(SRC, c); if (s) parts.push(s); });
-    const FNS = ['elapsedSince', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
+    const FNS = ['elapsedSince', 'withTimeout', 'fetchWithTimeout', 'transactionOutcomeUnknown', 'txCloneJson', 'txCanonical', 'txSameValue', 'txRestUrl',
         'txReadServerValue', 'txDelay', 'txResolveOutcome', 'txSnapshotOf', 'reportTxOutcomeUnknown', 'runTransactionResolved',
         'barcodeRegistryKey', 'claimBarcodeInRegistry', 'runLedgerTransaction'];
     const missing = FNS.filter((n) => !sliceFrom(SRC, n));

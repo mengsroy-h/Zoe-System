@@ -1,7 +1,10 @@
 import { dataState, firebaseState, uiState } from '../core/state';
-import { pendingHistoryPatches } from '../core/clock';
+import { viewState } from '../core/view-state';
+import { pendingHistoryPatches, pendingRegistryReleases } from '../core/clock';
 import { appLocalStore, safeStoreGet } from '../core/storage';
 import { setupAuthListener } from '../features/auth';
+import { clearCustomerDataTableCache } from '../features/customer-table';
+import { clearZtoPickupStatusStore } from '../features/zto-status';
 import { checkPinAndOpenConfig } from '../features/config';
 import { attachInfoListeners, detachInfoListeners, renderConnectionStatus } from './connection';
 import { detachDatabaseListeners, resetDbListenerHealthState } from './db-listeners';
@@ -31,6 +34,11 @@ export async function initFirebase() {
         const existingApps = firebaseState.fb.getApps();
         if (existingApps.length) {
             firebaseState.authGeneration++;
+            viewState.phoneModalBusy = false;
+            pendingRegistryReleases.clear();
+            dataState.registryReleaseFlushInFlight = false;
+            clearCustomerDataTableCache();
+            clearZtoPickupStatusStore();
             pendingHistoryPatches.clear();
             dataState.historyPatchFlushInFlight = false;
             detachDatabaseListeners();

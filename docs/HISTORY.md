@@ -39,7 +39,60 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
-### [2.42.7] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 ការសម្អាតដកលុយ ២ ដង · 🔴 barcode ស្ទួនក្រោយ `disconnect` · 🔴 ការដក ledger បាត់ក្រោយ `disconnect` · 🔴 SW លាយកំណែ ➜ ក្រៅបណ្តាញ App ស** · ការសម្គាល់ខលបាត់ · Sentry លេប id កញ្ចប់ (branch · មិនទាន់ merge)
+### [2.42.8] — 2026-09-28 · ZoeW · ZoeKeyGen ៖ Deep audit session/race · timeout ពិត · Service Worker
+
+**ZoeW `2.42.8` (`zoew-v235`) · ZoeKeyGen `2.20.6` (`zoekeygen-v105`)**។ មូលដ្ឋានវាស់៖ commit `443e4151c6395b30d0c6a351c1889e3d6a1d164e`។
+
+- **ZTO ចម្លើយយឺតឆ្លង session/config**៖ សាលក្រម និងបញ្ជីអតិថិជនអាចត្រឡប់ចូល state/storage ក្រោយ logout។ ការបរាជ័យចាស់ក៏អាចដោះសោការទាញថ្មី។
+  ការងារនីមួយៗចាប់ generation របស់ session/auth/config និង database; ពិនិត្យក្រោយ `await` និងមុនការសរសេរ។ សម្អាត timer និងសាលក្រមពេលប្ដូរ config។
+  គ្របការទាញបញ្ជី ការពិនិត្យ signed និងការនាំចូលជាបាច់; ការងារចាស់មិនបង្ហាញ toast ឬប្ដូរ lock របស់ការងារថ្មី។
+- **Registry និង ledger ឆ្លង database**៖ late claim/retry អាចដោះ barcode នៅ project ថ្មី; ការតម្រឹមថ្ងៃ/ខែ និងសំណងអាចប៉ះ ledger ថ្មី។
+  វាស់មុនកែ៖ សំណង scan ចាស់ធ្វើឲ្យប្រាក់ក្នុងសតិ project ថ្មី **100 ➜ 95**។ ការកែចង callback/retry នឹង database និង auth generation ដើម។
+  ការស្កេនដែលបានចាប់ផ្តើមសរសេររួចមិនត្រូវបញ្ច្រាសដោយសារតែ timeout ទេ; សាលក្រម `disconnect` នៅតែ `applied / not-applied / unknown`។
+- **Firebase outcome read ជាប់លើ token**៖ `getIdToken()` ព្យួរអាចរំលងពិដានអាន ៨ វិ. និងសរុប ៦០ វិ.។ ពិដានថ្មីគ្រប token + fetch + body និងថវិកាសល់ពិត។
+  token មកយឺតមិនបង្កើតសំណើក្រោយ timeout; ការរង់ចាំមិនបន្តទៅ auth session ថ្មី។
+- **SW របស់ App ទាំង ២**៖ deploy probe/revalidation ដែលគ្រាន់តែ abort អាចទុក `waitUntil` ជាប់។ Promise ឥឡូវ settle ក្នុង ៦ វិ. ទោះគ្មាន AbortController
+  ឬ fetch/body មិនស្តាប់ abort; response headers ដែលមកក្រោយ timeout មិនសរសេរ cache។ HTML ដែលដំឡើងរួចមិន revalidate ទៅកំណែថ្មីក្នុង cache ចាស់។
+- **Capacitor Android listener**៖ listener មួយបដិសេធក្នុង `Promise.all` ធ្វើឲ្យ handle ផ្សេងគ្មានការសម្អាត។ ចុះ cleanup តាម handle នីមួយៗ
+  ពេលវាមកដល់ និងមិនឲ្យ callback ឬ native style បន្តក្រោយ scope dispose។ តេស្តទាំង ២ ធ្លាក់មុនកែ និងឆ្លងក្រោយកែ។
+- **Firebase project switch**៖ retry queue និងសាលក្រម ZTO ដែលមានស្រាប់ក៏ត្រូវសម្អាត មុនភ្ជាប់ project ថ្មី; តេស្តហៅ `initFirebase()` ពិត។
+- **Dependency**៖ pin `xcode > uuid` ទៅ `11.1.1` តាម scoped override ដើម្បីដក advisory `GHSA-w5hq-g745-h8pq` ពី build tooling។
+  បានសាក `require('xcode')` និង `generateUuid()` ពិត; មិន downgrade Capacitor CLI។
+- **ឯកសារ**៖ កែ CLAUDE.md ដែលណែនាំឲ្យជឿ checker បៃតង និងមិនអានកូដ; កែពិដាន Netlify ដែលច្រឡំ synchronous នឹង streaming។
+  កែ DEVELOPMENT/PARITY មិនឲ្យកាតាឡុក ១០០% ក្លាយជា behavioral coverage ១០០%; ដក pragma TypeScript ដែលមិនមាន។
+  ការយោងកំណែ App និង cache ស៊ីនឹងកូដ។ ពិនិត្យ inventory `.md` ទាំង ២២; archive ជាប្រវត្តិ មិនយកមកអះអាងអំពីកូដបច្ចុប្បន្ន។
+
+#### ភស្តុតាងតេស្ត
+
+- តេស្ត regression ៦ ឯកសារក្នុង `ZoeW/tests/` នាំចូល module/SW ពិត។ លើ tree មុនកែ៖ **២៧ ធ្លាក់ · ២ ជោគជ័យ / ២៩** (exit 1)។
+  អ្វីដែលក្លែងគឺព្រំដែន network/Firebase/Capacitor bridge និង timer ដើម្បីបង្ខំ race; មិនក្លែង function ដែលត្រូវវាស់។
+- ក្រោយកែ regression ទាំង **២៩ / ២៩** ឆ្លងកាត់។
+- **Local CI គ្រប ១៨៤ gates** របស់ `run-all.sh`៖ រួមលទ្ធផលពីការរត់ ២ ផ្នែកដែលបានបន្តក្រោយ session ផ្អាក និងការរត់ checker ដែលធ្លាក់ឡើងវិញ។
+  លទ្ធផលចុងក្រោយគ្រប់ gate ជោគជ័យ; គ្មាន SKIP ឬ partial pass។ ប្រើ `CRUD_FLOW_STRICT=1`, `VERSIONSCOPE_STRICT=1`, `MONEYGUARD_STRICT=1`។
+  RTDB emulator ពិត ៦ checker ឆ្លង **៣៤៦ assertions**; Chromium ពិតគ្រប offline/online, SW, retry/timeout, XSS/CSP, app lock, listener leak និង performance។
+- `zoew-suite-test.js` ឆ្លងជាឯករាជ្យ (exit 0)៖ **១៤ npm tasks** រួម typecheck, lint, Vitest, parity, web build, smoke, Android config, native bridge និង cleanup rules។
+  `npm ci`, `npm run android:sync` និង `npm audit` បានរត់ពិត; audit ចុងក្រោយ **០ vulnerability**។ បរិស្ថានវាស់៖ Node 24 · Chromium 153 · RTDB emulator 4.11.2។
+- ការរត់ដំបូងឃើញកំហុសបរិស្ថាន ២៖ Node Firebase SDK មិនគោរព bypass proxy សម្រាប់ loopback និង WASM ក្នុង oracle ដើមខ្វះ។
+  តេស្ត `emu/tx-disconnect` រត់ SDK ទៅ `127.0.0.1` ផ្ទាល់ដោយ `env -u HTTP_PROXY -u http_proxy` រួចឆ្លង **២៥ assertions**។
+  WASM oracle ទាញពី `zxing-wasm@3.1.3` ហើយផ្ទៀងផ្ទាត់ Git blob **`8f72ed6ac38fe375787ba13d71c7872bbaa7f1a7`** ស្មើ commit ដើម មុនរត់ suite ឡើងវិញ។
+- Fixture VM ចាស់បន្ថែម auth generation និង dependency របស់ session; assertions ចាស់រក្សាទុក។ បានស្រង់ `money-core.js` ឡើងវិញ; byte នៅដដែល (ការកែ session មិននៅក្នុង core ដែលឧបករណ៍នោះស្រង់)។
+- `cleanup-clock-guard-test.js` និង `restore-marker-hygiene-test.js` ធ្លាប់រាយបៃតង ខណៈ log មាន `ReferenceError` ដែល catch លាក់ទុក។
+  បន្ថែមការអះអាងថាគ្មាន runtime error មិនបានរំពឹងទុក៖ មុនកែ fixture ទាំង ២ ក្រហមពិត; ផ្ទុក helper timeout/lock ពិតរួច ឆ្លង **១៧ និង ២៧** assertions។
+- `comments.js` ធ្លាប់អាន JavaScript តាម cwd ទោះបានស្នើ root ផ្សេង និងមិនរាប់ parse error ជាការធ្លាក់។ តេស្តថ្មី ៣ ក្រហមមុនកែ ឆ្លងក្រោយកែ។
+  ថត Cordova ដែល `cap sync` បង្កើតមិនត្រូវ strip marker; Gradle របស់គម្រោងនៅតែវាស់។ `repository-contract-test.js` ឆ្លង **៤៣** assertions។
+  ទិដ្ឋភាព JSX សម្រាប់ audit ដែលបូក module ចូលគ្នាមាន import ស្ទួន; checker វាស់ TSX ប្រភពទាំងអស់ជំនួសការចាត់ទិដ្ឋភាពនោះជាកូដ ship។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- មិនកែ Firebase rules ក្នុងជុំនេះ។ PR មិនទាន់ merge/deploy។
+- សាកលើ Android ពិត និង iPhone/PWA ពិត៖ network ប្ដូរ Wi-Fi/mobile/offline ខណៈ scan, ZTO និងការចាកចេញ/ចូលវិញ។
+- គ្មាន live ZTO credential ឬ Android signing keystore ក្នុងបរិស្ថាន audit; មិនអះអាងថាតេស្តគ្រប់ឧបករណ៍ ឬបានចេញ signed APK។
+- `npm run android:sync` បាន build web និង sync plugin ពិត។ ការសាក `./gradlew --no-daemon assembleDebug` ឈប់ពេលទាញ Gradle (`Network is unreachable`);
+  URL redirect ទៅ GitHub distribution ក៏ timeout តាម proxy។ បរិស្ថាននេះមាន Java 17 និងគ្មាន Android SDK; release workflow ត្រូវការ Java 21 និង keystore ដើម។
+- បើប្ដូរ Firebase project ខណៈ write កំពុង pending ត្រូវពិនិត្យទិន្នន័យ project ដើមក្រោយត្រឡប់មកវិញ៖ ការទប់ការសរសេរឆ្លង project
+  មិនអាចធានាថា multi-step operation ដើមបានបញ្ចប់ទាំងអស់ក្រោយ logout ទេ។
+
+### [2.42.7] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 ការសម្អាតដកលុយ ២ ដង · 🔴 barcode ស្ទួនក្រោយ `disconnect` · 🔴 ការដក ledger បាត់ក្រោយ `disconnect` · 🔴 SW លាយកំណែ ➜ ក្រៅបណ្តាញ App ស** · ការសម្គាល់ខលបាត់ · Sentry លេប id កញ្ចប់ (merge រួចក្នុង PR #256)
 
 **ZoeW** (`zoew-v233` ➜ `zoew-v234`) · **ZoeKeyGen** (`zoekeygen-v103` ➜ `zoekeygen-v104` ៖ `error-reporting.js` ចែករំលែក · `sw.js`)។
 ⛔ **checker ១៧៧ បៃតងទាំងអស់ + `emu/*` ៦ បៃតង លើ tree មុនកែ** — កំហុសទាំង ៦ ខាងក្រោមគ្មានអ្នកវាស់សោះ។
@@ -1492,6 +1545,7 @@ Function ដែល export ៖ 978
 | `lookup-prefetch-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
 | `loop-termination-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-guardian-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
+| `money-core` | ផ្នែក ១ (កូដស្រង់សម្រាប់ money checker) | — |
 | `money-reality-check` | ផ្នែក ១ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
 | `money-reality-test` | ផ្នែក ២ | ផ្នែក ២ |
 | `monotonic-gate-test` | — | ផ្នែក ១ · ផ្នែក ៤ |

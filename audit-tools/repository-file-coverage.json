@@ -1547,6 +1547,9 @@
     "ZoeW/tests/history-row-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/ledger-session-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/app-lock-away.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1557,6 +1560,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/lifecycle-scope.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/listener-race.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/native-back.test.tsx": {
@@ -1583,10 +1589,22 @@
     "ZoeW/tests/oracles/history-row-html.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/registry-session-race.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/setup.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/sw-revalidation-timeout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/toast-parity.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/tx-outcome-timeout.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/zto-session-race.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tsconfig.app.json": {
@@ -1733,9 +1751,6 @@
     "audit-tools/emu/license-seat-rules-test.js": {
       "policy": "guard-1"
     },
-    "audit-tools/emu/tx-disconnect-emu-test.js": {
-      "policy": "guard-1"
-    },
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
     },
@@ -1747,6 +1762,9 @@
     },
     "audit-tools/emu/rules.sh": {
       "policy": "guard-33"
+    },
+    "audit-tools/emu/tx-disconnect-emu-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/exit-code-integrity.js": {
       "policy": "guard-1"

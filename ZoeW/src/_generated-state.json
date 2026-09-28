@@ -845,6 +845,11 @@
   ],
   "ztoState": [
     {
+      "name": "ztoSessionGeneration",
+      "init": "0",
+      "line": 13429
+    },
+    {
       "name": "ztoStatusLoaded",
       "init": "false",
       "line": 13430

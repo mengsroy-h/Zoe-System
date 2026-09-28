@@ -114,6 +114,7 @@ function buildWorld(mode) {
         window: { ZoeErrors: errorRecorder },
         __log: log
     };
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
 
     // `hang` ➜ promise ដែលមិនដោះ មិនបដិសេធ (RTDB ក្រៅបណ្តាញពិត)

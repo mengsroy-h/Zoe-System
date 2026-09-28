@@ -112,6 +112,7 @@ function makeCtx(behaviour) {
         __calls: calls
     };
     ctx.window = ctx;
+    ctx.authGeneration = 0;
     vm.createContext(ctx);
     // `dbOp` ពិតរុំដោយ withTimeout; ទីនេះយើងគ្រាន់តែបញ្ជូនបន្ត
     vm.runInContext('function dbOp(p) { return Promise.resolve(p); }', ctx);

@@ -186,7 +186,7 @@ function buildWorld(historySeed, startNow) {
         })
     };
 
-    const context = vm.createContext({
+    const context = vm.createContext({ authGeneration: 0,
         console,
         setTimeout,
         clearTimeout,

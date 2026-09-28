@@ -263,6 +263,45 @@ scenario('ឧបករណ៍សម្អាតរក្សាតម្លៃក�
         result = cp.spawnSync(process.execPath, [path.join(ROOT, 'audit-tools/strip-comments.js'), generated], options);
         check('strip-comments (Gradle) ៖ ឯកសារដែល Capacitor សាងឡើងវិញ (header «DO NOT EDIT») មិនប៉ះ',
             result.status === 0 && fs.readFileSync(generated, 'utf8') === generatedSrc);
+        const android = path.join(temp, 'android');
+        const cordova = path.join(android, 'capacitor-cordova-android-plugins');
+        const custom = path.join(android, 'app', 'capacitor-cordova-android-plugins');
+        fs.mkdirSync(cordova, { recursive: true });
+        fs.mkdirSync(custom, { recursive: true });
+        fs.writeFileSync(path.join(android, 'build.gradle'), '// សម្គាល់របស់គម្រោង\n');
+        fs.writeFileSync(path.join(cordova, 'build.gradle'), '// SUB-PROJECT DEPENDENCIES START\n');
+        fs.writeFileSync(path.join(custom, 'build.gradle'), '// សម្គាល់របស់គម្រោង\n');
+        const gradleFiles = require('./ts-comments').gradleShippedFiles(temp);
+        check('Gradle ៖ មិនលុប marker ក្នុងថត Cordova ដែល cap sync បង្កើត',
+            !gradleFiles.includes(path.join(cordova, 'build.gradle')));
+        check('Gradle ៖ នៅតែវាស់ឯកសាររបស់គម្រោងក្រោយ cap sync',
+            gradleFiles.includes(path.join(android, 'build.gradle')));
+        check('Gradle ៖ មិនរំលងថតឈ្មោះដូចគ្នាក្រៅ root ដែល Capacitor បង្កើត',
+            gradleFiles.includes(path.join(custom, 'build.gradle')));
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+scenario('comment checker វាស់ root ដែលបានស្នើ និងមិនលាក់ parse error', () => {
+    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-comment-root-'));
+    try {
+        for (const app of ['ZoeW', 'ZoeKeyGen']) {
+            fs.mkdirSync(path.join(temp, app));
+            for (let i = 0; i < 3; i++) fs.writeFileSync(path.join(temp, app, 'fixture-' + i + '.js'), 'const value = 1;\n');
+        }
+        const run = () => cp.spawnSync(process.execPath, [path.join(__dirname, 'comments.js')], {
+            cwd: ROOT, encoding: 'utf8', timeout: 10000,
+            env: { ...process.env, COMMENTS_APP_DIR: temp }
+        });
+        let result = run();
+        check('comments ៖ root ផ្សេងពី cwd ដែលស្អាតត្រូវឆ្លង', result.status === 0, result.stdout + result.stderr);
+        const file = path.join(temp, 'ZoeW', 'fixture-0.js');
+        fs.writeFileSync(file, '// សម្គាល់ដែលត្រូវចាប់\nconst value = 1;\n');
+        result = run();
+        check('comments ៖ ចាប់ comment ក្នុង root ដែលបានស្នើ', result.status === 1 && /comments=1/.test(result.stdout));
+        fs.writeFileSync(file, 'const value = 1;\n');
+        fs.writeFileSync(path.join(temp, 'ZoeW', 'components.js'), 'const value = ;\n');
+        result = run();
+        check('comments ៖ parse error ត្រូវធ្លាក់', result.status === 1 && /PARSE ERROR/.test(result.stdout));
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
 

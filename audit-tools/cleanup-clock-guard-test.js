@@ -39,6 +39,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const unexpectedErrors = [];
+const auditConsole = { ...console, error: (...args) => unexpectedErrors.push(args.map(String).join(' ')) };
 
 const ROOT = process.env.CLEANUPCLOCK_APP_DIR
     ? path.resolve(process.env.CLEANUPCLOCK_APP_DIR)
@@ -119,7 +121,7 @@ function buildWorld(opts) {
     const log = { claims: [], purges: [], staleMarkerClears: [] };
 
     const ctx = {
-        console, Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map,
+        console: auditConsole, Promise, JSON, Object, Array, Number, String, Boolean, Math, Set, Map,
         setTimeout, clearTimeout, isNaN, parseFloat, parseInt,
         Date: FakeDate,
         navigator: { onLine: !!opts.online },
@@ -133,6 +135,10 @@ function buildWorld(opts) {
         extractConst(src, 'ABANDON_AGE_MS'),
         extractConst(src, 'EXPIRED_TRASH_RETENTION_MS'),
         extractConst(src, 'TRASH_RETENTION_MS'),
+        extractConst(src, 'DB_OP_TIMEOUT_MS'),
+        extractFn(src, 'withTimeout'),
+        extractFn(src, 'dbOp'),
+        extractFn(src, 'dbOpStalled'),
         'let serverTimeOffsetMs = 0;',
         'let serverClockTrusted = false;',
         'let isDatabaseConnected = false, hasEverConnectedToDatabase = false;',
@@ -336,6 +342,7 @@ function freshSeed() {
             /cleanupClockIsTrustworthy\s*\(\s*\)/.test(purge));
     }
 
+    ok('fixture មិនលាក់ runtime error ដែលមិនបានរំពឹងទុក', unexpectedErrors.length === 0, unexpectedErrors);
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exit(fail ? 1 : 0);
 })();

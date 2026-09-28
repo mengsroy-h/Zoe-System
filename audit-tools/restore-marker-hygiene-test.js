@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const unexpectedErrors = [];
+const auditConsole = { ...console, error: (...args) => unexpectedErrors.push(args.map(String).join(' ')) };
 
 // ⛔ **stub ledger ត្រូវស៊ីនឹងកិច្ចសន្យាពិត។** `addRevenueToDailyAndMonthlyRecord()`
 // ពិត clamp ត្រឹម 0 ហើយ **ត្រឡប់ delta ដែលអនុវត្តពិត** ដែល
@@ -152,7 +154,7 @@ function buildWorld(store, now) {
         })
     };
     const context = vm.createContext({
-        console, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
+        console: auditConsole, setTimeout, clearTimeout, Promise, Math, Date, JSON, window: {},
         db: {}, fb,
         dbRefDeleted: fb.ref({}, 'zoew_recently_deleted_cod_dod'),
         dbRefHistory: fb.ref({}, 'zoew_scan_history_cod_dod'),
@@ -167,6 +169,7 @@ function buildWorld(store, now) {
         extractConst(src, 'TWO_HOURS_MS'), extractConst(src, 'ABANDON_AGE_MS'), extractConst(src, 'RESTORE_CLAIM_LEASE_MS'), extractConst(src, 'EXPIRED_TRASH_RETENTION_MS'), extractConst(src, 'TRASH_RETENTION_MS'),
         // ⛔ ពិដានការហៅ Firebase (db-stall-guard) ជាហេដ្ឋារចនាសម្ព័ន្ធរួម ➜ function ពិត
         extractConst(src, 'DB_OP_TIMEOUT_MS'), extractFn(src, 'withTimeout'), extractFn(src, 'dbOp'), extractFn(src, 'dbOpStalled'),
+        extractConst(src, 'LOCK_STALL_RELEASE_MS'), extractFn(src, 'settleLockWithin'),
         // ⛔ `runAutomaticCleanupRules()` មានច្រកទ្វារនាឡិកា (2.20.5) ➜ ផ្ទុក
         // function ពិត បូក `serverClockTrusted = true` (ស្ថានភាព App ភ្ជាប់រួច)។
         'let serverClockTrusted = true, isDatabaseConnected = true;', extractFn(src, 'cleanupClockIsTrustworthy'),
@@ -369,6 +372,7 @@ async function scenarioAutoPurgeReleasesDeadClaim() {
     await scenarioTrashNeverCarriesMarkers();
     await scenarioPurgeReleasesDeadClaim();
     await scenarioAutoPurgeReleasesDeadClaim();
+    check(unexpectedErrors.length === 0, 'fixture មិនលាក់ runtime error ដែលមិនបានរំពឹងទុក', unexpectedErrors);
     console.log('\n' + pass + ' ok, ' + fail + ' fail');
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

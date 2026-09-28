@@ -286,6 +286,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន** — ថតទទេ ➜ គ្មានមួយណាបៃតង; ⛔ `ok()` ដែលទទួល **តែស្លាក** មិនត្រូវហៅដោយលក្ខខណ្ឌ | `checker-coverage.js` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ **«សំណុំបៃតង» មិនមែនភស្តុតាង** — រាល់ថ្នាក់លុយត្រូវមានអ្នកយាមដែល *ក្រហមពិត* | `money-guardian-test.js` |
 | **ឧបករណ៍ខ្លួនវា** | checker ត្រូវ **អាចធ្លាក់បាន ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់។ ⛔ meta-checker ដែលរត់ checker កូនច្រើន (`checker-coverage` · `exit-code-integrity`) រត់ **ស្របគ្នាក្នុងពិដាន** មិនមែនជាជួរ ហើយកូនដែល **ផុតថវិកា** ខណៈពុល = FAIL (វាស់មិនបាន) មិនមែន «ធ្លាក់ត្រឹមត្រូវ» · ⛔ កុំកែការលើសពិដានដោយបង្កើន `CHECKER_TIMEOUT` (វាលាក់ checker ដែលព្យួរពិត) | `hang-guard.js` |
+| **ឧបករណ៍ខ្លួនវា ៖ ម៉ាស៊ីនរត់ `run-all.sh`** | ⛔ lane ស្របគ្នាមានព្រំដែន តែ output **តាមលំដាប់បញ្ជីជានិច្ច** · `emu/*` + `money-guardian` ម្តងមួយ (emulator តែមួយ) · checker ដែលសរសេរ/បោស `.tmp-poison-*` (`checker-coverage` · `exit-code-integrity`) **រត់ម្នាក់ឯង** · lane ដេរីវេពីប្រភព ហើយផ្ទៀង **ទាំង ២ ទិស** (checker ថ្មីដែលប្រើ emulator ឬបោសស្រមោល ➜ ត្រូវចូល `runall_lane()`) · `RUNALL_STATE` សរសេរ **ភ្លាមពេល checker ចប់** · `RUNALL_RESUME=1` **បដិសេធលើ tree ផ្សេង** (hash មាតិកា + ទង់ `*_STRICT`) · `RUNALL_ONLY` ឈ្មោះមិនស្គាល់ ➜ បដិសេធ ហើយការរត់មិនពេញ **មិនដែលរាយ «ជោគជ័យទាំងអស់»** · TERM មិនបន្សល់ process កំព្រា | `runall-runner-test` · `hang-guard` |
 | **ឧបករណ៍ខ្លួនវា** | ⛔ រាល់ checker ត្រូវរត់ធម្មតា និង baseline; CLI ដែលទាមទារ dump ត្រូវមាន fixture checker; CI និង runner ត្រូវស៊ីគ្នា | `checker-coverage.js` |
 | **ឯកសារគម្រោងទាំងមូល** | ⛔ ឯកសារថ្មីត្រូវមានការយាមក្នុង `repository-file-coverage.json`; ធាតុចាស់ ឬ guard ដែលបាត់ត្រូវធ្លាក់; ប្រភេទ integrity/manual មិនមែន behavioral coverage | `repository-file-coverage.js` · `repository-contract-test.js` |
 | **របាយការណ៍ និងទិន្នន័យសម្រាប់ផ្ញើ** | ⛔ CLI ពិតត្រូវរកឃើញកំហុសលុយមុន/ក្រោយ redaction ដូចគ្នា; launcher មិនប្រកាសថាផ្ញើបានពេល redaction ធ្លាក់ | `money-reality-test.js` |
@@ -541,6 +542,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **បណ្តាញ «ភ្ជាប់តែស្លាប់» ព្យួរ** ➜ `respondWith` មិន settle · Export Excel ជាប់ជារៀងរហូត | `stall-guard-test.js` |
 | **checker ខ្លួនវាបៃតងក្លែងក្លាយ** — ជោគជ័យលើថតទទេ · ចង្អុលទៅ tree ផ្សេងមិនបាន · បិទបាំងការអះអាង | `checker-coverage.js` (**រត់នេះមុនគេ**) |
 | **checker ខ្លួនវាព្យួរ** ➜ GitHub cancel job នៅនាទីទី ៣០ ដោយគ្មានឈ្មោះ checker សោះ | `hang-guard.js` (**រត់នេះមុនគេដែរ**) |
+| **ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា** ៖ lane ស្របគ្នា · លំដាប់ output · state/resume/only · lane នៃបញ្ជីពិត ↔ ភស្តុតាងប្រភព | `runall-runner-test.js` |
 | **checker បោះ «FAIL» តែចេញ exit 0** ➜ `run-all.sh` រាយថា PASS | `exit-code-integrity.js` (**រត់នេះមុនគេដែរ**) |
 | **រង្វិលជុំដែលមិនចេះឈប់ ➜ tab ជាប់ស្ងាត់ៗ** ៖ នព្វន្ធលើ `Infinity` · ព្រំដែនដែលមកពីលេខក្នុង Firebase | `loop-termination-test.js` |
 | **កញ្ចក់ «ចំណូលប្រចាំថ្ងៃ» ឃ្លាតពី ledger លើ *លំដាប់ចៃដន្យ*** ➜ អេក្រង់លុយ ២ និយាយផ្ទុយគ្នា (💵 អានកញ្ចក់ · 📅 គណនា `ledger − open`) | `collected-mirror-fuzz-test.js` |
@@ -2000,7 +2002,16 @@ bash audit-tools/run-all.sh
 ⛔ `run-all.sh` លើ repo React **build tree វាស់ដោយខ្លួនឯង** (`ZoeW/dist-audit/measure-root`) ហើយ
 រត់ checker ទាំងអស់នៅទីនោះ ➜ ⛔ ការរត់ checker មួយ **ដោយផ្ទាល់លើ repo** វាស់ `ZoeW/app.js` ដែលលែងមាន។
 ចង់រត់ checker មួយតែឯង ៖ `M=$(ZOE_MEASURE_ONLY=1 bash audit-tools/run-all.sh | tail -1)` រួច
-`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite` · emulator ពិត) ចំណាយ **~២៥ នាទី** លើម៉ាស៊ីន ៤ CPU ➜ រត់វាជា background ហើយ **commit + push មុនពេលរង់ចាំ** (session ដែលអស់កូតាកណ្តាលការរង់ចាំ បាត់ការងារដែលមិនទាន់ push ទាំងស្រុង)។
+`(cd "$M" && node audit-tools/<x>.js)`។ ⛔ CI ពេញ (រួម `zoew-suite` · emulator ពិត) ចំណាយ **~១០ នាទី** លើម៉ាស៊ីន ៤ CPU (វាស់ ៥៨៥ វិ. មុន merge `exit-code-integrity` ៧៥ វិ. របស់ main · ជាជួរជំនាន់មុន ១៦៩៤ វិ.) ➜ រត់វាជា background ហើយ **commit + push មុនពេលរង់ចាំ** (session ដែលអស់កូតាកណ្តាលការរង់ចាំ បាត់ការងារដែលមិនទាន់ push ទាំងស្រុង)។
+
+⛔ **`run-all.sh` រត់ស្របគ្នា ហើយ *បន្តបាន*** (របៀបប្រើ ៖ [`audit-tools/README.md`](audit-tools/README.md) ផ្នែក ២) ៖
+lane `RUNALL_JOBS` (លំនាំដើម = CPU ក្នុងព្រំដែន 2–6) · output **តាមលំដាប់បញ្ជីជានិច្ច** · រាល់ checker ដែលចប់ត្រូវសរសេរ
+ចូល `RUNALL_STATE` (`<git-dir>/zoe-runall-state.tsv`) **ភ្លាម** ➜ session ដែលអស់កូតាកណ្តាលទី ៖ session បន្ទាប់រត់
+`RUNALL_RESUME=1` **ជាមួយទង់ `*_STRICT` ដដែល** (វាចូល hash) ➜ រត់តែ checker ដែលធ្លាក់ ឬគ្មានលទ្ធផល ⛔ **កុំផ្គុំ log ដោយដៃ**។
+⛔ tree ប្រែ (ឯកសារណាមួយ · ទង់ STRICT) ➜ RESUME **បដិសេធ** ៖ លទ្ធផលចាស់មិនមែនភស្តុតាងរបស់ tree ថ្មី ➜ រត់ពេញ។
+⛔ `RUNALL_ONLY=…` = **«មិនពេញលេញ»** — មិនមែនភស្តុតាងថា tree បៃតង (សេចក្តីសង្ខេបមិនរាយ «ជោគជ័យទាំងអស់» ទេ)។
+⛔ checker ថ្មីដែលប្រើ emulator ឬសរសេរ/បោស `.tmp-poison-*` ត្រូវចូល lane `emu`/`excl` ក្នុង `runall_lane()` —
+`runall-runner-test` ធ្លាក់បើភ្លេច។ ⛔ `RUNALL_JOBS=1` ផ្តល់លំដាប់ជាជួរដូចមុន (សម្រាប់ដេញតាមការធ្លាក់ដែលសង្ស័យថាមកពីការរត់ស្របគ្នា)។
 
 ⛔ **គ្មាន RTDB emulator ➜ checker `emu/*` ទាំងអស់ធ្លាក់ចុះ — ហើយ `SKIP`
 មិនមែន `PASS` ទេ។** ⛔ **ចំនួនត្រូវរាប់ពីថតពិត** (`audit-tools/emu/*-test.js`

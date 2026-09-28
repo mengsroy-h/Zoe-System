@@ -71,6 +71,36 @@ bash audit-tools/run-all.sh
 លើ ZoeW React វា **build tree វាស់** (`ZoeW/scripts/build-audit.mjs` ➜ `ZoeW/dist-audit/measure-root` ៖ ឯកសារ repo
 ទាំងអស់ លើកលែង `ZoeW/` ដែលជំនួសដោយ build វាស់) រួចរត់ checker ទាំងអស់នៅទីនោះ។
 
+**lane ស្របគ្នា** — checker រត់ស្របគ្នាក្នុងព្រំដែន ហើយ output **តាមលំដាប់បញ្ជីជានិច្ច** (checker នីមួយៗសរសេរ
+ចូលឯកសារដាច់ ➜ បោះពុម្ពពេលអ្នកនៅខាងមុខចប់)។ ជួរនីមួយៗមានពេលវេលា ហើយចុងក្រោយមានសេចក្តីសង្ខេប ៖ ពេលរត់ ·
+ឈ្មោះ checker **❌ ធ្លាក់ · ◐ មួយផ្នែក · ⊘ រំលង** · **១០ យឺតជាងគេ**។
+
+| env | លំនាំដើម | អត្ថន័យ |
+|---|---|---|
+| `RUNALL_JOBS` | ចំនួន CPU ក្នុងព្រំដែន 2–6 | ចំនួន checker ស្របគ្នា · `1` = ជាជួរ (លំដាប់ដូចបញ្ជី) |
+| `RUNALL_BROWSER_JOBS` | ស្មើ `RUNALL_JOBS` | checker ដែលបើក Chromium ស្របគ្នាអតិបរមា (បន្ថយបើសង្ស័យថាការធ្លាក់ browser មកពីការប្រជែង CPU) |
+| `RUNALL_STATE` | `<git-dir>/zoe-runall-state.tsv` | ឯកសារលទ្ធផល ៖ ១ បន្ទាត់/checker (ស្លាក · សាលក្រម · វិនាទី · hash របស់ tree · អត្ថបទ) សរសេរ **ភ្លាមពេល checker ចប់** · ទទេ (`RUNALL_STATE=`) = បិទ |
+| `RUNALL_RESUME=1` | បិទ | រត់តែ checker ដែល **ធ្លាក់ ឬគ្មានលទ្ធផល** · លទ្ធផលផ្សេងយកពី state (សម្គាល់ `↺`) · ⛔ **បដិសេធ** (exit 2) បើ tree ប្រែ |
+| `RUNALL_ONLY=a,b` | — | រត់តែ checker ដែលមានឈ្មោះ (ស្លាកក្នុង output ឬ `audit-tools/<ឈ្មោះ>.js` ដូច `money-guardian-test` · `emu/ledger-revert-emu-test`) · ឈ្មោះមិនស្គាល់ ➜ បដិសេធ · សេចក្តីសង្ខេបប្រកាស «មិនពេញលេញ» |
+
+```bash
+bash audit-tools/run-all.sh                                   # ពេញ (lane ស្របគ្នា)
+RUNALL_RESUME=1 bash audit-tools/run-all.sh                   # session ងាប់កណ្តាលទី ➜ បន្តតែអ្វីដែលខ្វះ/ធ្លាក់
+RUNALL_ONLY=layout-check,emu/crud-rules-flow bash audit-tools/run-all.sh   # រត់ឡើងវិញតែ ២
+cat "$(git rev-parse --absolute-git-dir)/zoe-runall-state.tsv"               # មើលវឌ្ឍនភាពខណៈកំពុងរត់
+```
+
+- **hash របស់ tree** = មាតិកាឯកសារដែល git ឃើញ (tracked + untracked មិន ignore) · `audit-tools/emu/real.rules.json` ·
+  ទង់ `*_STRICT` ➜ ការកែឯកសារណាមួយ ឬការប្តូរទង់ STRICT = tree ថ្មី ➜ `RUNALL_RESUME=1` បដិសេធ ហើយត្រូវរត់ពេញ។
+- `RUNALL_ONLY` (គ្មាន RESUME) រត់ឡើងវិញ **ទោះលទ្ធផលមុនជាអ្វីក៏ដោយ** (ឧ. `PARTIAL` ព្រោះ emulator មិនទាន់ឡើង) ហើយ
+  បន្ថែមលទ្ធផលចូល state របស់ tree ដដែល។
+- lane ៖ `emu/*` និង `money-guardian` **ម្តងមួយ** (RTDB emulator តែមួយ) · `checker-coverage` និង `exit-code-integrity`
+  **រត់ម្នាក់ឯង** (ពួកវាសរសេរ/បោសឯកសារស្រមោល `.tmp-poison-*` ក្នុង `audit-tools/` ហើយ fan out ខាងក្នុងរួចស្រាប់) ·
+  checker ដែលប្រភពមាន `chromium.launch(` ➜ lane browser។ lane ដេរីវេពីប្រភព ហើយ `runall-runner-test.js` ផ្ទៀងវា។
+- `Ctrl-C` / `TERM` ➜ checker ដែលកំពុងរត់ត្រូវបញ្ឈប់ · លទ្ធផលដែលចប់រួចនៅក្នុង state ➜ `RUNALL_RESUME=1`។
+- លំដាប់ **រត់** (មិនមែនលំដាប់បោះពុម្ព) ៖ meta ម្នាក់ឯងមុន រួច checker យូរជាងគេមុន — ពេលពី state មុន ឬពី `RUNALL_HINTS` ក្នុង
+  `run-all.sh` ពេល session ថ្មីគ្មាន state (ប៉ះតែលំដាប់ មិនប៉ះសាលក្រម)។
+
 ### ៣. រត់តែមួយ
 
 ```bash
@@ -139,6 +169,7 @@ bash audit-tools/emu/rules.sh
 | `repository-contract-test.js` | ផ្ទៀងផ្ទាត់ Apps Script manifest, CSV template, backup config example និង package lock ធៀបនឹងកិច្ចសន្យាកូដដែលប្រើវា | `REPOCONTRACT_APP_DIR` |
 | `money-reality-test.js` | រត់ CLI របាយការណ៍ និង redaction លើ fixture ពិត; លទ្ធផលមុន/ក្រោយត្រូវស៊ីគ្នា; ទិន្នន័យរសើបត្រូវលាក់; launcher មិនប្រកាសជោគជ័យពេល redaction ធ្លាក់។ ⛔ **ការឃ្លាតរវាងកញ្ចក់ `zoew_daily_collected_cod_dod` និងប្រវត្តិ ត្រូវចេញ exit 1 ពិត** (៥ អ័ក្ស បូកជាន់អប្បបរមា «វិសាលភាពទទេ») ហើយ ៤ សេណារីយ៉ូទិសផ្ទុយត្រូវ **នៅ exit 0** ៖ កញ្ចក់ស៊ីគ្នា (រួម barcode បិទក្នុងធុងសំរាម) · កូនសោគ្មានម្ចាស់ · ថ្ងៃខុស · barcode ដែលបិទមុនកញ្ចក់ចាប់ផ្តើម | `MONEYREALTEST_APP_DIR` |
 | `hang-guard.js` | checker ត្រូវអាចធ្លាក់បាន **ក្នុងពេលកំណត់** — ការព្យួរ ≠ ការធ្លាក់ · រត់ `exit-code-integrity.js` លើ fixture ៤០ checker ៖ កូនដែលព្យួរពេលពុល ➜ FAIL ដែលមានឈ្មោះ · ការពុលរត់ស្របគ្នា | `HANGGUARD_APP_DIR` |
+| `runall-runner-test.js` | ម៉ាស៊ីនរត់ `run-all.sh` ខ្លួនវា (ប្លុក `#@runner-begin`…`#@runner-end` ពិត លើ checker ក្លែង) ៖ ស្របគ្នាពិត (វាស់ពីចន្លោះ start/end) · output តាមលំដាប់បញ្ជី ≡ ជាជួរ · emu ម្តងមួយ · meta ម្នាក់ឯង · browser មានពិដាន · ព្យួរ ➜ FAIL · state/`RUNALL_RESUME` (tree ផ្សេង ➜ បដិសេធ)/`RUNALL_ONLY` (ឈ្មោះមិនស្គាល់ ➜ បដិសេធ) · TERM មិនបន្សល់ process កំព្រា · lane នៃបញ្ជីពិតត្រូវនឹងភស្តុតាងក្នុងប្រភព (ទាំង ២ ទិស) | `RUNALLRUNNER_APP_DIR` |
 | `exit-code-integrity.js` | ការធ្លាក់ត្រូវឡើងដល់ **exit code** — «FAIL» ដែលចេញ exit 0 = បៃតងក្លែងក្លាយ · ពុល checker កូន **ស្របគ្នា** (`emu/*` ម្តងមួយ) · កូនដែលផុតថវិកា ឬស្លាប់ដោយ signal ខណៈពុល = FAIL (វាស់មិនបាន) · បោះពុម្ពពេលសរុប និងកូនយឺតជាងគេ ៥ | `EXITCODE_APP_DIR` · `EXITCODE_CONCURRENCY` (លំនាំដើម = ចំនួន CPU ក្នុងចន្លោះ ២–៨) · `EXITCODE_TIMEOUT_MS` (ថវិកាកូនមួយ · លំនាំដើម ៦០០០០) |
 | `shared-fns.js` | helper ដែលចែករំលែក ZoeW ↔ ZoeKeyGen ត្រូវ byte-identical | — |
 | `version-check.js` | `app.js` ↔ `manifest.json` ↔ `index.html` ក្នុង App នីមួយៗ | `VERSION_APP_DIR` |

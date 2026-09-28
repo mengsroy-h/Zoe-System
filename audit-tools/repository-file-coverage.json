@@ -298,10 +298,11 @@
       "category": "behavior",
       "guards": [
         "audit-tools/hang-guard.js",
+        "audit-tools/runall-runner-test.js",
         "audit-tools/checker-coverage.js"
       ],
-      "evidence": "audit-tools/hang-guard.js រត់ run() ពិតលើ script ព្យួរ; checker-coverage.js ផ្ទៀងផ្ទាត់ wiring និង baseline",
-      "limitation": "ការចេញ exit 0 អាចមាន SKIP/PARTIAL PASS; ត្រូវអានរបាយការណ៍ suite ជាមួយលទ្ធផលនីមួយៗ។"
+      "evidence": "audit-tools/hang-guard.js និង audit-tools/runall-runner-test.js រត់ម៉ាស៊ីនរត់ពិត (#@runner-begin…#@runner-end) លើ checker ក្លែង ៖ ព្យួរ · lane ស្របគ្នា · លំដាប់ output · state/resume/only · TERM · lane នៃបញ្ជីពិតធៀបភស្តុតាងប្រភព; checker-coverage.js ផ្ទៀងផ្ទាត់ wiring និង baseline",
+      "limitation": "ការចេញ exit 0 អាចមាន SKIP/PARTIAL PASS; ត្រូវអានរបាយការណ៍ suite ជាមួយលទ្ធផលនីមួយៗ។ ការរត់ស្របគ្នាពិតលើ checker browser ត្រូវវាស់ដោយការរត់ពេញ (ពេលវេលាប្រែតាមម៉ាស៊ីន)។"
     },
     "guard-36": {
       "category": "static",
@@ -2035,6 +2036,9 @@
     },
     "audit-tools/run-all.sh": {
       "policy": "guard-35"
+    },
+    "audit-tools/runall-runner-test.js": {
+      "policy": "guard-1"
     },
     "audit-tools/scan-engine-test.js": {
       "policy": "guard-1"

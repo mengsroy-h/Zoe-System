@@ -178,11 +178,26 @@ function serve(dir, blocked) {
         const realWasm = fs.readFileSync(path.join(dir, 'vendor', 'zxing_reader.wasm'));
         // custom section (id 0) ➜ wasm នៅត្រឹមត្រូវ តែ byte ចុងក្រោយជាស្លាកកំណែ
         const marked = (tag) => Buffer.concat([realWasm, Buffer.from([0x00, 0x0a, 0x08]), Buffer.from('zoe-mark' + tag, 'latin1')]);
-        const state = { tag: 'A', swTag: 'A', wasmHits: 0, swHits: 0 };
+        const state = { tag: 'A', swTag: 'A', wasmHits: 0, swHits: 0, delayPath: null };
+        // ⛔ install ដាក់ `CORE_SHELL` (រួម `.wasm`) សិន រួចទើប `OPTIONAL_SHELL` ➜ `skipWaiting()` ➜ `clients.claim()` ➜ `.wasm` នៅក្នុង cache
+        //    ថ្មី ≠ SW ថ្មីគ្រប់គ្រងទំព័រ។ ពេលម៉ាស៊ីនរវល់ ចន្លោះនោះលើស ១២ វិ. ➜ ជំហាន C ឆ្លង SW **ចាស់** (ដែលបដិសេធ revalidate ត្រឹមត្រូវ ព្រោះ
+        //    deploy ប្តូរ) ➜ ធ្លាក់ម្តងម្កាល (វាស់បាន ៖ `serverSwHits: 1 · serverWasmHits: 0 · effectiveType: 4g`)។ ដូច្នេះការវាស់ពន្យារ
+        //    ឯកសារ `OPTIONAL_SHELL` ទី ១ (ដេរីវេពី sw.js ពិត) ពេល install B ➜ ចន្លោះនោះកើត **ជានិច្ច** ហើយ checker ត្រូវរង់ចាំ B ចាប់យកទំព័រពិត។
+        const optMatch = /OPTIONAL_SHELL\s*=\s*\[\s*['"]\.\/([^'"]+)['"]/.exec(realSw);
+        const optionalFirst = optMatch ? '/' + optMatch[1] : null;
+        ok('ជុំទី ៤ ៖ រក `OPTIONAL_SHELL` ក្នុង sw.js ពិតឃើញ', !!optionalFirst);
         const poison = await new Promise((res) => {
             const s = http.createServer((req, rsp) => {
                 let p = decodeURIComponent(req.url.split('?')[0]);
                 if (p === '/') p = '/index.html';
+                if (state.delayPath && p === state.delayPath) {
+                    state.delayPath = null;
+                    const f = path.join(dir, p);
+                    return setTimeout(() => {
+                        rsp.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'text/plain', 'Cache-Control': 'no-cache' });
+                        rsp.end(fs.existsSync(f) ? fs.readFileSync(f) : '');
+                    }, 13000);
+                }
                 if (p === '/vendor/zxing_reader.wasm') {
                     state.wasmHits++;
                     const etag = '"w-' + state.tag + '"';
@@ -238,10 +253,25 @@ function serve(dir, blocked) {
         state.tag = 'B';
         state.swTag = 'B';
         const hitsBefore = state.wasmHits;
+        state.delayPath = optionalFirst;
         await ppage.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg && reg.update()).catch(() => {}));
         const second = await readTag('-b');
         ok('ជុំទី ៤ ៖ SW ថ្មី install ទាញ `.wasm` ពី server មិនមែនពី HTTP cache ចាស់ (A ➜ B)',
             second.tag === 'B', Object.assign({ serverHits: state.wasmHits - hitsBefore }, second));
+        const racing = await ppage.evaluate(() => navigator.serviceWorker.getRegistration()
+            .then((reg) => !!(reg && (reg.installing || reg.waiting)))).catch(() => false);
+        ok('ជុំទី ៤ ៖ លក្ខខណ្ឌចាំបាច់ ៖ `.wasm` B នៅក្នុង cache ខណៈ SW B **មិនទាន់** គ្រប់គ្រង (ចន្លោះប្រណាំងកើតពិត)', racing);
+        const taken = await ppage.evaluate(async () => {
+            for (let i = 0; i < 160; i++) {
+                const reg = await navigator.serviceWorker.getRegistration();
+                const keys = await caches.keys();
+                if (reg && !reg.installing && !reg.waiting && navigator.serviceWorker.controller
+                    && keys.some((k) => k.endsWith('-b')) && !keys.some((k) => k.endsWith('-a'))) return true;
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            return false;
+        }).catch(() => false);
+        ok('ជុំទី ៤ ៖ លក្ខខណ្ឌចាំបាច់ ៖ SW B ចាប់យកទំព័រ (cache `-a` លុប) មុនជំហាន C', taken);
 
         // កំណែ C ចេញ ដោយគ្មាន SW ថ្មី ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយត្រូវនាំ C មក (មិនមែនជាប់ B ពី HTTP cache)
         state.tag = 'C';

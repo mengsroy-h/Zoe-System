@@ -2152,6 +2152,9 @@ git diff "$BASE_REF" -- ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'   # ការ
   បរាជ័យដែល checker ១២៣ **មិនដែលសាកសោះ** រហូតដល់ 2.25.5។
 - **ការធ្វើតេស្តការប្រណាំងត្រូវដាក់ការសរសេររបស់ឧបករណ៍ផ្សេង *ក្នុងចន្លោះ*
   នៃការអាន និងការសរសេរ** មិនមែនក្រោយវាទេ។
+- ⛔ **`.wasm`/asset ថ្មីនៅក្នុង cache ≠ SW ថ្មីគ្រប់គ្រងទំព័រ** — `install` ដាក់ `OPTIONAL_SHELL` ក្រោយ `CORE_SHELL` រួចទើប `skipWaiting()` ➜
+  `clients.claim()` ➜ ការវាស់ដែលត្រូវការ SW ថ្មី ត្រូវរង់ចាំ `installing`/`waiting` ទទេ **និង** cache ចាស់លុប (`sw-install-integrity-test` ជុំទី ៤ ៖ ធ្លាក់
+  ម្តងម្កាលពេលម៉ាស៊ីនរវល់ ➜ ឥឡូវពន្យារ `OPTIONAL_SHELL` ដោយចេតនា ➜ ចន្លោះប្រណាំងកើតជានិច្ច)។
 - **`renderHistory` មាន cache តាមជួរ** (`tr.dataset.sig`) — ការវាស់ដំណើរការ
   ត្រូវលុប `sig` ចោលមុន។
 - **Fuzz ដែលកេះការសម្អាតត្រូវចាស់ត្រា *តាម barcode* មិនមែនតាមកញ្ចប់** —

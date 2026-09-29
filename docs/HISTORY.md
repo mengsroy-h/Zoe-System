@@ -1476,12 +1476,15 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
   `clients.matchAll()` ដូច `notificationclick`។ ⛔ ពិដាន ១៥ នាទីវាស់ដោយនាឡិកាទំព័រដែលរំកិល (`Date.now` ក្នុង `addInitScript`) ➜ ទិសផ្ទុយ
   «មុនពិដាន ➜ គ្មានការហៅ» ចាប់ការដកពិដាន។ `notifyDrawerOpen` · `notifyFeedInFlight` **មិនបើកលើ `window`** (មិននៅក្នុង `_generated-state.json`) ➜
   អានពី DOM (`#notifyDrawer.open` · `#zoeUpdateBanner`) និងការហៅ server។
-- **`sw-install-integrity-test` ជុំទី ៤ (B ➜ C) ធ្លាក់ម្តងក្នុង N24** ដែលកែតែ `push.ts` ➜ មិនមែនការចាប់ពិត · cache `-b` នៅ `B` ពេញ ១២ វិ.។ ⛔ «flake» មិនមែន
-  មូលហេតុ ➜ ជំហានទី ១ ៖ ការធ្លាក់ឥឡូវរាយ `serverWasmHits` · `serverSwHits` · `navigator.connection` · SW ដែលគ្រប់គ្រង។ ការសាកក្រោមបន្ទុក ៖ ៨ ដងស្របគ្នា
-  ➜ ៨/៨ · ៨ ដងស្របគ្នា + អ្នកស៊ី CPU ៦ លើម៉ាស៊ីន ៤ CPU ➜ ៨/៨ ➜ **មិនអាចបង្កើតឡើងវិញបាន** (១ ក្នុង ~៣០ ការរត់ក្នុង mutation batch)។ ⛔ មិនទាន់អះអាងមូលហេតុ ៖
-  ករណីដែលនៅសល់គឺ (ក) `linkIsFrugal()` ក្នុង SW (`navigator.connection` ដែល Chromium ប៉ាន់ស្មានពី RTT ពិត ➜ ម៉ាស៊ីនរវល់ ➜ «យឺត» ➜ revalidate រំលង
-  **ដោយចេតនា**) ឬ (ខ) `shellDeployIsCurrent()` លើសពិដាន ៦ វិ. ➜ សាលក្រម `false` ត្រូវ cache ៦០ វិ. ➜ ការធ្លាក់លើកក្រោយនឹងប្រាប់ (`serverSwHits` ០ + `serverWasmHits` ០
-  ➜ (ក) · `serverSwHits` ≥ ១ + `serverWasmHits` ០ ➜ (ខ))។ ⛔ កុំបង្កើនពិដាន ១២ វិ. របស់ជុំនេះមុនដឹងមូលហេតុ (វាលាក់ (ខ) ដែលជាកំហុសផលិតកម្ម)។
+- **`sw-install-integrity-test` ជុំទី ៤ (B ➜ C) ធ្លាក់ម្តងម្កាល ៖ ការប្រណាំងក្នុង checker (App ត្រឹមត្រូវ)** — ធ្លាក់ក្នុង N24 (កែតែ `push.ts`) និងម្តងទៀតក្នុង CI ពេញ។
+  ⛔ «flake» មិនមែនមូលហេតុ ➜ ជំហានទី ១ ៖ ការធ្លាក់រាយមូលហេតុ ➜ CI ពេញ ៖ `serverWasmHits: 0 · serverSwHits: 1 · effectiveType: 4g · controller: activated` ➜
+  **មិនមែន** link «frugal» · `sw.js` ត្រូវទាញ ១ ដង តែ `.wasm` មិនដែល ➜ SW **A** (ចាស់) នៅគ្រប់គ្រង ៖ វាពិនិត្យ deploy ឃើញ `-b` ➜ មិន revalidate (**ត្រឹមត្រូវ** តាមច្បាប់
+  «មិនចាក់ឯកសារ deploy ថ្មីចូល cache ចាស់»)។ មូលហេតុ ៖ `install` ដាក់ `CORE_SHELL` (រួម `.wasm`) សិន រួចទើប `OPTIONAL_SHELL` ➜ `skipWaiting()` ➜ `clients.claim()`
+  ខណៈជំហាន B របស់ checker ឈប់រង់ចាំពេល `.wasm` ចូល cache `-b` ➜ ពេលម៉ាស៊ីនរវល់ ចន្លោះនោះលើសបង្អួច ១២ វិ.។ ⛔ ការសាកក្រោមបន្ទុក ១៦ ដង (រួម CPU ពេញ) **មិន**
+  បង្កើតវាឡើងវិញ — ការពន្យារដោយចេតនាទើបបង្កើតបាន ៖ server សាកល្បងពន្យារ `OPTIONAL_SHELL` ទី ១ (ដេរីវេពី `sw.js` ពិត) ១៣ វិ. ពេល install B ➜ ចន្លោះប្រណាំង
+  កើត **ជានិច្ច** (លក្ខខណ្ឌចាំបាច់ថ្មី) ➜ កំណែគ្មានការរង់ចាំ ធ្លាក់ **ជាប់លាប់** ដោយហត្ថលេខាដូចការធ្លាក់ក្នុង CI បេះបិទ · កំណែកែ (រង់ចាំ B ចាប់យកទំព័រ ៖ `installing`/`waiting`
+  ទទេ · cache `-a` លុប) ➜ **២៧/២៧**។ ⛔ មេរៀន ៖ ការរង់ចាំ «ទិន្នន័យថ្មីនៅក្នុង cache» មិនមែន «SW ថ្មីគ្រប់គ្រង» · ការប្រណាំងដែលកើតម្តងម្កាល ត្រូវបង្កើត
+  **ដោយការពន្យារដោយចេតនា** មិនមែនដោយការរត់ច្រើនដង។
 
 ### Mutation testing ផ្នែកបណ្តាញ ៖ ១៥ mutation ➜ ចន្លោះ ២ · equivalent ១ · control ១ (2026-09-29 · ZoeW 2.45.4)
 

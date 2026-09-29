@@ -612,12 +612,18 @@ const GESTURE = function (steps) {
         const pages = document.getElementById('appPages');
         // គែម **ដែលមើលឃើញ** = គែមប្រអប់ ដក clip inset។ ចាប់ពីកំណែ 2.11.0
         // ប្រអប់មានកម្ពស់ថេរ ➜ អ្វីដែលប្រែគឺការកាត់រូបភាព មិនមែន layout ទេ។
+        // ⛔ clip រស់លើ **កាត** ផង (ស៊ុមក្លែងរបស់ Android) ➜ វាស់គ្រប់ឪពុករហូតដល់ `.page-main`
         const snap = () => {
             const main = table.closest('.page-main');
-            const m = /inset\(([^)]*)\)/.exec(getComputedStyle(main).clipPath || '');
-            const ins = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
-            const vis = Math.min(table.getBoundingClientRect().bottom,
-                                 main.getBoundingClientRect().bottom - ins);
+            let vis = table.getBoundingClientRect().bottom;
+            for (let el = table.parentElement; el; el = el.parentElement) {
+                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath || '');
+                if (m) {
+                    const tk = m[1].split('round')[0].trim().split(/\s+/);
+                    vis = Math.min(vis, el.getBoundingClientRect().bottom - (parseFloat(tk.length >= 3 ? tk[2] : tk[0]) || 0));
+                }
+                if (el === main) break;
+            }
             return { h: table.clientHeight, top: Math.round(table.getBoundingClientRect().top),
                      pad: window.getComputedStyle(pages).paddingBottom, vis: Math.round(vis) };
         };
@@ -675,13 +681,18 @@ const GESTURE = function (steps) {
         const card = document.querySelector('#dataMainSection .history-section') ||
                      document.getElementById('dataMainSection');
         const main = table.closest('.page-main');
-        const m = /inset\(([^)]*)\)/.exec(getComputedStyle(main).clipPath || '');
-        const clipBottom = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
+        let visible = table.getBoundingClientRect().bottom;
+        for (let el = table.parentElement; el; el = el.parentElement) {
+            const m = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath || '');
+            if (m) {
+                const tk = m[1].split('round')[0].trim().split(/\s+/);
+                visible = Math.min(visible, el.getBoundingClientRect().bottom - (parseFloat(tk.length >= 3 ? tk[2] : tk[0]) || 0));
+            }
+            if (el === main) break;
+        }
         return {
             tableBottom: Math.round(table.getBoundingClientRect().bottom),
-            tableVisibleBottom: Math.round(Math.min(table.getBoundingClientRect().bottom,
-                                                    main.getBoundingClientRect().bottom - clipBottom)),
-            clipBottom: Math.round(clipBottom),
+            tableVisibleBottom: Math.round(visible),
             cardBottom: Math.round(card.getBoundingClientRect().bottom),
             tabbarTop: Math.round(tabbar.getBoundingClientRect().top),
             tabbarH: Math.round(tabbar.getBoundingClientRect().height),
@@ -691,9 +702,11 @@ const GESTURE = function (steps) {
     ok('កម្ពស់របា Tab ត្រូវបានវាស់ចូល --chrome-bottom', /^[0-9.]+px$/.test(bottomRoom.chromeBottom), bottomRoom);
     // ការអះអាងត្រូវមាន **២ ខាង**៖ មិនលិចក្រោមរបា *និង* មិនឈប់ខ្ពស់ជាងរបា។
     // កំណែ 2.11.0 ដំបូងអះអាងតែម្ខាង ➜ ចន្លោះទទេ 19–53px រអិលកាត់ ហើយអ្នកប្រើ
-    // រាយការណ៍ថា «បាំងក្រាស់ណាស់»។ ការកាត់ត្រូវចុះ **ចំគែមរបាពិត**។
-    ok('ពេលរបា Tab ឲ្យឃើញ ➜ គែមតារាងដែលមើលឃើញ ចុះចំគែមខាងលើរបា (±4px)',
-        Math.abs(bottomRoom.tableVisibleBottom - bottomRoom.tabbarTop) <= 4, bottomRoom);
+    // រាយការណ៍ថា «បាំងក្រាស់ណាស់»។ ⛔ ឥឡូវកាតឈប់ខាងលើរបា **៨px ដូច iOS** ជាមួយស៊ុមក្រោមកាតដែលគូរ
+    // (អ្នកប្រើប្រៀបរូបថត iPhone/Android) — ការកាត់ចំគែមរបាពីមុន បាំងគែមក្រោម និងជ្រុងមូលរបស់កាតជានិច្ច។
+    ok('ពេលរបា Tab ឲ្យឃើញ ➜ កាតដែលមើលឃើញឈប់ខាងលើរបា ៨px ដូច iOS (6–10px)',
+        bottomRoom.tabbarTop - bottomRoom.tableVisibleBottom >= 6 &&
+        bottomRoom.tabbarTop - bottomRoom.tableVisibleBottom <= 10, bottomRoom);
     const filled = await page.evaluate(async () => {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         const card = document.querySelector('#dataMainSection .history-section');
@@ -797,10 +810,16 @@ const GESTURE = function (steps) {
             tableVisibleBottom: (() => {
                 const t = document.getElementById('tableResponsive');
                 const mn = t.closest('.page-main');
-                const m = /inset\(([^)]*)\)/.exec(getComputedStyle(mn).clipPath || '');
-                const inset = m ? (parseFloat(m[1].trim().split(/\s+/)[2]) || 0) : 0;
-                return Math.round(Math.min(t.getBoundingClientRect().bottom,
-                                           mn.getBoundingClientRect().bottom - inset));
+                let vis = t.getBoundingClientRect().bottom;
+                for (let el = t.parentElement; el; el = el.parentElement) {
+                    const m = /inset\(([^)]*)\)/.exec(getComputedStyle(el).clipPath || '');
+                    if (m) {
+                        const tk = m[1].split('round')[0].trim().split(/\s+/);
+                        vis = Math.min(vis, el.getBoundingClientRect().bottom - (parseFloat(tk.length >= 3 ? tk[2] : tk[0]) || 0));
+                    }
+                    if (el === mn) break;
+                }
+                return Math.round(vis);
             })(),
             barTop: Math.round(tabbar.getBoundingClientRect().top),
             viewportH: Math.round(window.innerHeight)

@@ -323,7 +323,20 @@ const MEASURE_OWNERSHIP = async () => {
         await page.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(120)) + ',' + (mode === 'ios') + ');');
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 5, null, { timeout: 30000 });
-        if (mode === 'ios' && iosBlock) await page.addStyleTag({ content: iosBlock });
+        if (mode === 'ios' && iosBlock) {
+            await page.addStyleTag({ content: iosBlock });
+            // ⛔ iOS ពិតមិនផ្គូផ្គង `@supports (not (-webkit-touch-callout: none))` ➜ ដកប្លុកទាំងនោះចេញ (ស៊ុមក្លែងរបស់ Android)
+            await page.evaluate(() => {
+                const walk = (list, owner) => {
+                    for (let i = list.length - 1; i >= 0; i--) {
+                        const r = list[i];
+                        if (r instanceof CSSSupportsRule && /not\s*\(\s*-webkit-touch-callout/.test(r.conditionText)) owner.deleteRule(i);
+                        else if (r.cssRules) walk(r.cssRules, r);
+                    }
+                };
+                for (const sh of Array.from(document.styleSheets)) { let rules; try { rules = sh.cssRules; } catch (e) { continue; } walk(rules, sh); }
+            });
+        }
         await page.waitForTimeout(300);
 
         const gate = await page.evaluate(() => ({

@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.2` (`zoew-v243`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.45.3` (`zoew-v244`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.22.0` (`zoekeygen-v108`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -1059,6 +1059,14 @@ Android)។ **បរិស្ថាន audit ជា Chromium — `env(safe-area-
   ហើយ `.page-main` មាន `clip-path: inset(0 0 calc(var(--tabbar-height) - 8px) 0 …)`។
   ⛔ **ត្រូវប្រើ `--tabbar-height` មិនមែន `--chrome-bottom`** (វារួម safe-area
   ដែលនៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ជាងគែមរបា ៥៣px លើ iPhone)។
+  ⛔ **ស៊ុមក្រោមកាតត្រូវដូច iOS pixel ទល់ pixel** (សំណើម្ចាស់គម្រោង · រូបថត iPhone ធៀប Android ៖ ការកាត់ចំគែមរបា បាំងគែមក្រោម
+  ជ្រុងមូល និងកម្លាតរបស់កាតជានិច្ច) ៖ `react-root.css` ក្នុង `@supports (not (-webkit-touch-callout: none)) and selector(:has(*))`
+  កាត់ **`.app-card`** (មិនមែន `.page-main`) ត្រឹម `--tabbar-height` ➜ កាតឈប់ខាងលើរបា **៨px** ហើយ **គូរក្លែង** គែមតារាង (`::before`
+  + ស្រមោលពណ៌ `--card-bg` គ្រប់ជួរដេកដែលលាក់) និងគែមកាត (`::after` · ចាប់ការចុច ➜ មិនទៅប៊ូតុងដែលលាក់)។ ⛔ ទាំងអស់ជា **paint** ៖
+  កម្ពស់កន្សោមរមូរមិនប្រែ · `chrome-hidden` ដក clip + `visibility: hidden` (⛔ កុំប្តូរ `position`/`content` តាមស្ថានភាពរបា —
+  នោះជា layout)។ ⛔ កាតដែល `.empty-state` ជាកូនចុងក្រោយ ៖ `margin-bottom: var(--tabbar-height)` លើសារ · តារាងទទេគ្មាន padding ·
+  គ្មាន `::before` (បើអត់ សារ «មិនទាន់មាន…» លិចក្រោមរបា)។ ⛔ ការក្លែង iOS ក្នុង checker ត្រូវ **ដកប្លុក `not (-webkit-touch-callout…)`**
+  ចេញផង (`dropAndroidOnlyCss`)។ អ្នកយាម ៖ `panel-motion-test` ផ្នែក ៩ (ប្រៀបរូបថត Android/iOS · ៥ សេណារីយ៉ូ × ៣ viewport)។
 - **ផ្លូវ iOS** ៖ `@supports (-webkit-touch-callout: none)` — កាតមានកម្ពស់ពិត
   ហើយ **រីកចុះមកបំពេញ**។ `clip-path` **មិនដើរលើ Safari**។ ⚠️ Chromium ត្រឡប់
   `false` សម្រាប់ `-webkit-touch-callout` ➜ ច្បាប់ក្នុងប្លុកនោះ **មិនដែលត្រូវ
@@ -1217,6 +1225,7 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
 | `.app-pages.history-expanded` | ⛔ `display: block` + `> .app-page.active { height: 100% }` (`react-root.css` ឈ្នះ `display: flex` របស់ `app.css`) ⛔ **កុំប្តូរ `display` របស់ `.app-pages` តាមរបៀប** | ការប្តូរ `display` block ↔ flex លើ container ធំជាងគេ ➜ browser បង្កើត layout tree ឡើងវិញទាំងស្រុងរាល់ការហូត (វាស់បាន ៖ dirty ៩៧.៨% · Layout ៤៥៨–៥៥៩ms លើ ២៦០ ជួរ ➜ ក្រោយកែ ១ms) · ធរណីមាត្រដូចគ្នាក្នុង noise (Android + iOS · ៣ viewport) · `panel-motion-test` ផ្នែក ៨ វាស់ **សមាមាត្រ object ដែល dirty** ពី trace ពិត |
 | `.table-responsive` | `padding-bottom: var(--tabbar-height)` | កក់កន្លែងរបា **ខាងក្នុងកន្សោមរមូរ** ➜ ប៉ះតែ `scrollHeight` |
 | `.page-main` | `clip-path` ប្រើ `--tabbar-height` **មិនមែន** `--chrome-bottom` | safe-area នៅ *ក្រោម* viewport ➜ កាត់ខ្ពស់ ៥៣px លើ iPhone |
+| `.app-card` ក្នុង `.page-main` (Android · `react-root.css`) | `clip-path` ត្រឹម `--tabbar-height` + `::before`/`::after` គូរគែមតារាង/កាត ⛔ paint តែប៉ុណ្ណោះ | ស៊ុមក្រោមកាតដូច iOS ដោយមិនប្តូរកម្ពស់កន្សោមរមូរ (`panel-motion-test` ផ្នែក ៩ · មើល «ការលាក់របាតាមទិសរមូរ») |
 | `@supports (-webkit-touch-callout: none)` | ផ្លូវ iOS ដាច់ដោយឡែក | `clip-path` មិនដើរលើ Safari |
 | `.boot-splash` | `pointer-events: none` ជានិច្ច | ផ្ទាំងតុបតែងមិនលេបការចុច |
 | `.boot-splash-bar > span` | រំកិល **ខាងក្នុងរបា** (`width: 40%`, `translateX(0 → 150%)`) | `translateX(-100%)` លើ span ពេញទទឹង ➜ `left = -38` នៅ 320px |
@@ -2210,6 +2219,10 @@ bash audit-tools/emu/rules.sh
 
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
+
+- ⏳ **2.45.3 ៖ មើលស៊ុមក្រោមប្រអប់ប្រវត្តិ និងបញ្ជីទំព័រស្កេនលើ Android (APK + Chrome) ធៀប iPhone** (`docs/HISTORY.md` [2.45.3]) ៖ គែមក្រោម ·
+  ជ្រុងមូល · កម្លាត ៨px ខាងលើរបា Tab · រមូរចុះ ➜ របាលាក់ ➜ កាតរីកចុះបំពេញ · រមូរតារាងនៅរលូនដូចមុន (តំបន់ហាមចូល ៖ ការរមូរ) · ចុចត្រង់
+  គែមក្រោមកាតមិនបើកខល/បិទ។ ⛔ iPhone មិនត្រូវប្រែសោះ (ប្លុកថ្មីមិនផ្គូផ្គង Safari)។
 
 - ⏳ **2.45.1 (merge រួច · PR #266) ៖ ប្រៀប «ស៊ុមកក 5 នាទីចុងក្រោយ» (ជើងរបា Slide ក្រោមលេខ Hz) រវាង APK និង PWA លើទូរស័ព្ទ Android ដដែល** ក្រោយឈរលើ
   filter «ទាំងអស់» រមូរ និងហូតផ្ទាំងប្រវត្តិ ១–២ នាទី (`docs/HISTORY.md` [2.45.1])។ តារាងប្រវត្តិឥឡូវគូរ ៥០ ជួរ ➜ បើ APK នៅតែ «អាក់» ត្រូវប្រៀបលេខនេះមុន

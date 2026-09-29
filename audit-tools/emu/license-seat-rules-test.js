@@ -65,7 +65,8 @@ function loadAnnouncementsUrl() {
     const ctx = { window: win, navigator: { onLine: true }, console, setTimeout, clearTimeout, TextEncoder, crypto: require('crypto').webcrypto };
     vm.createContext(ctx);
     try {
-        vm.runInContext(fs.readFileSync(path.join(ROOT, 'ZoeW/public/license-verify.js'), 'utf8'), ctx);
+        const file = ['ZoeW/public/license-verify.js', 'ZoeW/license-verify.js'].map((rel) => path.join(ROOT, rel)).find((f) => fs.existsSync(f));
+        vm.runInContext(fs.readFileSync(file, 'utf8'), ctx);
     } catch (e) {
         return null;
     }

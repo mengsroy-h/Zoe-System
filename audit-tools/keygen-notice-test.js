@@ -57,7 +57,7 @@ function realDecl(name) {
 const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
     'noticeIdsToTrim', 'noticeRowsOf', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
     'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession'];
-const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET'];
+const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL'];
 
 const fnSources = FN_NAMES.map((n) => [n, sliceFn(n)]);
 const declSources = DECL_NAMES.map((n) => [n, realDecl(n)]);
@@ -118,6 +118,7 @@ function build(options) {
         var noticeListCache = [];
         var noticeReadFailed = false;
         var isSendingNotice = false;
+        var noticeSendOwner = null;
     `, ctx);
     vm.runInContext(declSources.map((x) => (x[1] || '').replace(/^const /, 'var ')).join('\n'), ctx);
     vm.runInContext(fnSources.map((x) => x[1] || '').join('\n\n'), ctx);
@@ -245,6 +246,28 @@ async function run() {
         ok('⛔ logout កណ្តាលការផ្ញើ ➜ គ្មាន toast', h.log.toasts.length === 0, h.log.toasts);
         ok('⛔ logout កណ្តាលការផ្ញើ ➜ មិនទាញបញ្ជីក្រោយ', h.log.refreshes === 0, h.log.refreshes);
     }
+    {
+        const oldCommit = deferred();
+        const newCommit = deferred();
+        let n = 0;
+        const h = build({ update: () => (++n === 1 ? oldCommit.promise : newCommit.promise) });
+        fill(h, kinds[0], 'ចាស់', '');
+        const oldTask = h.ctx.sendNotice();
+        await drain();
+        vm.runInContext('noticeSendOwner = null; isSendingNotice = false; invalidateSensitiveSession();', h.ctx);
+        fill(h, kinds[0], 'ថ្មី', '');
+        const newTask = h.ctx.sendNotice();
+        await drain();
+        ok('logout ➜ វគ្គថ្មីផ្ញើបានភ្លាម (មិនជាប់ការផ្ញើចាស់)', h.log.updates.length === 2, h.log.updates.length);
+        oldCommit.resolve();
+        await oldTask;
+        await drain();
+        ok('⛔ ការផ្ញើចាស់ចប់ ➜ មិនដោះប៊ូតុងរបស់ការផ្ញើថ្មី', h.el('noticeSendBtn').disabled === true && h.ctx.isSendingNotice === true);
+        newCommit.resolve();
+        await newTask;
+        await drain();
+        ok('ការផ្ញើថ្មីចប់ ➜ ប៊ូតុងបើកវិញ', h.el('noticeSendBtn').disabled === false && h.el('noticeSendBtn').textContent === h.ctx.NOTICE_SEND_LABEL);
+    }
 
     console.log('-- ៥. sendNotice ៖ server បដិសេធ --');
     {
@@ -366,9 +389,10 @@ async function run() {
     console.log('-- ៩. logout សម្អាតផ្ទៃដំណឹង --');
     {
         const logoutFn = sliceFn('showLoginModalWithPrefill') || '';
-        ok('showLoginModalWithPrefill() សម្អាត noticeListCache · #noticeListBody · វាលចំណងជើង/ខ្លឹមសារ',
+        ok('showLoginModalWithPrefill() សម្អាត noticeListCache · #noticeListBody · វាលចំណងជើង/ខ្លឹមសារ · ប៊ូតុង/សោផ្ញើ',
             /noticeListCache = \[\]/.test(logoutFn) && /noticeListBody/.test(logoutFn)
-            && /noticeTitleInput/.test(logoutFn) && /noticeBodyInput/.test(logoutFn));
+            && /noticeTitleInput/.test(logoutFn) && /noticeBodyInput/.test(logoutFn)
+            && /noticeSendOwner = null/.test(logoutFn) && /isSendingNotice = false/.test(logoutFn) && /noticeSendBtn/.test(logoutFn));
         const afterAdmin = sliceFn('verifyAdminRoleThenProceed') || '';
         ok('ក្រោយផ្ទៀងផ្ទាត់ admin ➜ ទាញបញ្ជីដំណឹង', /refreshNoticeList\(\)/.test(afterAdmin));
     }

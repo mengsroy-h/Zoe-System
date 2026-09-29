@@ -1285,6 +1285,10 @@ function showLoginModalWithPrefill() {
     if (keyListBody) keyListBody.innerHTML = '';
     noticeListCache = [];
     noticeReadFailed = false;
+    noticeSendOwner = null;
+    isSendingNotice = false;
+    const noticeSendBtn = document.getElementById('noticeSendBtn');
+    if (noticeSendBtn) { noticeSendBtn.disabled = false; noticeSendBtn.textContent = NOTICE_SEND_LABEL; }
     const noticeListBody = document.getElementById('noticeListBody');
     if (noticeListBody) noticeListBody.innerHTML = '';
     const noticeTitleInput = document.getElementById('noticeTitleInput');
@@ -2339,9 +2343,11 @@ const NOTICE_BODY_MAX = 600;
 const NOTICE_KEEP_MAX = 20;
 const NOTICE_KIND_LABELS = { notice: '📢 សេចក្តីប្រកាស', maintenance: '🛠️ ការថែទាំប្រព័ន្ធ' };
 const NOTICE_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
+const NOTICE_SEND_LABEL = '📨 ផ្ញើដំណឹង';
 let noticeListCache = [];
 let noticeReadFailed = false;
 let isSendingNotice = false;
+let noticeSendOwner = null;
 
 function noticeBucketPath() {
     return 'license_announcements/' + LICENSE_APP_CODE;
@@ -2402,7 +2408,7 @@ function setNoticeSendBusy(busy) {
     const btn = document.getElementById('noticeSendBtn');
     if (!btn) return;
     btn.disabled = !!busy;
-    btn.textContent = busy ? '⏳ កំពុងផ្ញើ...' : '📨 ផ្ញើដំណឹង';
+    btn.textContent = busy ? '⏳ កំពុងផ្ញើ...' : NOTICE_SEND_LABEL;
 }
 
 async function refreshNoticeList() {
@@ -2463,6 +2469,8 @@ async function sendNotice() {
     if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
     const bucket = noticeBucketPath();
     const id = newNoticeId(built.payload.at);
+    const owner = {};
+    noticeSendOwner = owner;
     isSendingNotice = true;
     setNoticeSendBusy(true);
     let write = null;
@@ -2497,8 +2505,11 @@ async function sendNotice() {
             alert('ផ្ញើដំណឹងមិនបានទេ! សូមប្រាកដថា Firebase Rules ថ្មីត្រូវបាន Publish រួច ហើយពិនិត្យអ៊ីនធឺណិត រួចសាកល្បងម្តងទៀត។');
         }
     } finally {
-        isSendingNotice = false;
-        setNoticeSendBusy(false);
+        if (noticeSendOwner === owner) {
+            noticeSendOwner = null;
+            isSendingNotice = false;
+            setNoticeSendBusy(false);
+        }
     }
 }
 

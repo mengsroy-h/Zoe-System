@@ -49,8 +49,17 @@ check(!!keygenAppCode && keygenSrc.indexOf("const SETUP_LINK_URL_KEY = 'zoekeyge
     'កូនសោ Setup Link ចងនឹងកូដ App ដដែល', keygenAppCode);
 check(!!keygenAppCode && keygenSrc.indexOf("const SETUP_LINK_DSN_KEY = 'zoekeygen_setup_dsn_" + keygenAppCode + "';") !== -1,
     'កូនសោ DSN ចងនឹងកូដ App ដដែល', keygenAppCode);
-check(keygenHtml.indexOf('<select') === -1,
-    'index.html របស់ ZoeKeyGen គ្មានប្រអប់ជ្រើសរើស App ទៀតទេ');
+// ⛔ វាស់ **ប្រអប់ជ្រើសរើស App** មិនមែនគ្រប់ `<select>` ៖ ប្រអប់ផ្សេង (ឧ. ប្រភេទដំណឹង) ត្រូវអនុញ្ញាត ➜ ប្រអប់ដែល id
+//    និយាយពី App ឬមាន option ជាកូដ App (អក្សរធំ ២–៨ តួ ដូច `LICENSE_APP_CODE`) ទើបរាប់។
+const appSelectsIn = (html) => [...html.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/g)].filter((m) =>
+    /id="[^"]*App[^"]*"/i.test(m[1]) || /<option value="[A-Z]{2,8}"/.test(m[2]));
+const appSelects = appSelectsIn(keygenHtml);
+check(appSelects.length === 0 && keygenHtml.indexOf('setupLinkAppSelect') === -1,
+    'index.html របស់ ZoeKeyGen គ្មានប្រអប់ជ្រើសរើស App ទៀតទេ', appSelects.map((m) => m[1]));
+check(appSelectsIn('<select id="setupLinkAppSelect"><option value="ZOE">ZoeW</option></select>').length === 1
+    && appSelectsIn('<select id="x"><option value="ZOE">ZoeW</option></select>').length === 1
+    && appSelectsIn('<select id="noticeKindInput"><option value="notice">a</option></select>').length === 0,
+    'ទិសផ្ទុយ ៖ ការស្កេនចាប់ប្រអប់ជ្រើសរើស App គំរូ · មិនចាប់ប្រអប់ផ្សេង');
 const linkLine = (genSrc.match(/lastGeneratedSetupLink = ([^;]+);/) || [])[1];
 check(!!linkLine, 'រកឃើញបន្ទាត់សាង Link');
 

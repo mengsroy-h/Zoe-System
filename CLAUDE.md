@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.10` (`zoew-v237`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.11` (`zoew-v238`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -125,7 +125,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 > native · ផ្លូវ web/iOS មិនប្រែ។ ⛔ **PTR លើ Android native** (សំណើច្បាស់របស់
 > ម្ចាស់គម្រោង — ច្បាប់ ១១) ឆ្លងកាត់ `setupIOSPullToRefresh()` ដដែល បូក
 > «ការចាប់មុន slop» **តែលើ Android native** ➜ ផ្លូវ iOS មិនប្រែ។ អ្នកយាម ៖
-> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo ·
+> `npm run android:check` (កំណែ APK = `APP_VERSION` · appId · សិទ្ធិ · logo · **ល្បឿនអេក្រង់** (`MainActivity` ស្នើ mode Hz ខ្ពស់បំផុតក្នុងទំហំដដែល ⛔ កុំដកចេញ — ROM ជាច្រើនកំណត់ App ត្រឹម 60Hz ខណៈ Chrome 120Hz) ·
 > plugin · web មិនផ្ទុកកូដ native · config Gradle/AGP/SDK ↔ template Capacitor · workflow release APK ↔ keystore ៖
 > ⛔ APK sign ដោយ keystore **តែមួយជារៀងរហូត** · គ្មានផ្លូវ debug key · វិញ្ញាបនបត្រ pin ក្នុង `ZoeW/android/release-cert.sha256`
 > ➜ keystore ផ្សេង = គ្មាន Release · ⛔ keystore **មិនដែលចូល repo** — វារស់តែនៅម្ចាស់គម្រោង និង GitHub secret) · `npm run native:check` (bridge ក្លែង ៖ Back ·
@@ -2205,6 +2205,7 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **2.42.11 (branch) ៖ ប្រៀបលេខ «អេក្រង់ NNHz · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11])។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។
 - ⏳ **2.42.9 (PR #260) និង 2.42.10 (PR #264) merge រួច តែមិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9] · [2.42.10]) ៖
   ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម **លើ filter «ទាំងអស់» ជួរដេកច្រើន** លើ iPhone PWA · Android PWA · APK (តំបន់ហាមចូល ៖
   ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK ដែល build ពី `main` (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ បញ្ហាលេចលើឧបករណ៍ពិត ➜

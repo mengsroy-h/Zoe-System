@@ -47,6 +47,49 @@ export function measureDisplayHz(done) {
     requestAnimationFrame(tick);
 }
 
+export const DISPLAY_RATE_SAMPLES = 30;
+
+export const DISPLAY_RATE_MAX_HZ = 240;
+
+let displayRateSampling = false;
+
+export function engineLabel(ua) {
+    const text = String(ua || '');
+    const chrome = text.match(/Chrome\/(\d+)/);
+    if (chrome) return (/;\s*wv\)/.test(text) ? 'WebView ' : 'Chrome ') + chrome[1];
+    const safari = text.match(/Version\/(\d+)[^)]*Safari/) || text.match(/Version\/(\d+)/);
+    if (safari && /AppleWebKit/.test(text)) return 'Safari ' + safari[1];
+    return '';
+}
+
+export function displayRateLabel(hz, engine) {
+    const parts = [];
+    if (isFinite(hz) && hz > 0) parts.push('អេក្រង់ ' + Math.max(DISPLAY_HZ_MIN, Math.min(DISPLAY_RATE_MAX_HZ, Math.round(hz))) + 'Hz');
+    if (engine) parts.push(engine);
+    return parts.join(' · ');
+}
+
+export function measureDisplayRateForDrawer() {
+    if (displayRateSampling || typeof requestAnimationFrame !== 'function') return;
+    displayRateSampling = true;
+    const gaps = [];
+    let last = 0;
+    const tick = (timestamp) => {
+        if (last && timestamp > last) gaps.push(timestamp - last);
+        last = timestamp;
+        if (gaps.length < DISPLAY_RATE_SAMPLES) { requestAnimationFrame(tick); return; }
+        displayRateSampling = false;
+        gaps.sort((a, b) => a - b);
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        viewState.displayRateText = displayRateLabel(1000 / gaps[gaps.length >> 1], engineLabel(ua));
+    };
+    try {
+        requestAnimationFrame(tick);
+    } catch (e) {
+        displayRateSampling = false;
+    }
+}
+
 export function sampleFramePace(done) {
     const longFrameMs = longFrameThresholdMs();
     let frames = 0;

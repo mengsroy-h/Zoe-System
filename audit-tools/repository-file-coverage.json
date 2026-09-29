@@ -1560,6 +1560,9 @@
     "ZoeW/tests/native/back-history.test.ts": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/native/display-rate.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/native/immediate-ui.test.tsx": {
       "policy": "zoew-self-verification"
     },

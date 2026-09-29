@@ -69,6 +69,28 @@ ok('build.gradle namespace ស្មើ appId', gradle.includes(`namespace = "${
 ok('strings.xml package_name ស្មើ appId', read('android/app/src/main/res/values/strings.xml').includes(`<string name="package_name">${appId}</string>`));
 const mainActivity = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/MainActivity.java`);
 ok('MainActivity ស្ថិតក្នុង package របស់ appId', mainActivity.includes(`package ${appId};`));
+/* ⛔ ល្បឿនអេក្រង់ ៖ ROM ជាច្រើនឲ្យ Chrome រត់ 90/120Hz តែកំណត់ App ផ្សេងត្រឹម 60Hz បើ App មិនស្នើ ➜ APK ត្រូវស្នើ mode ល្បឿនខ្ពស់បំផុត
+      (ទំហំដដែល) រាល់ onCreate និង onResume ហើយការបរាជ័យមិនត្រូវធ្វើឲ្យ App គាំង */
+const javaMethodBody = (src, signature) => {
+    const at = src.indexOf(signature);
+    if (at === -1) return '';
+    const open = src.indexOf('{', at);
+    let depth = 0;
+    for (let i = open; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) return src.slice(open, i + 1);
+    }
+    return '';
+};
+ok('MainActivity ៖ onCreate ស្នើល្បឿនអេក្រង់ខ្ពស់បំផុត', /preferHighestRefreshRate\(\)/.test(javaMethodBody(mainActivity, 'void onCreate(')));
+ok('MainActivity ៖ onResume ស្នើម្តងទៀត (ត្រឡប់ពី App ផ្សេង)', /preferHighestRefreshRate\(\)/.test(javaMethodBody(mainActivity, 'void onResume(')));
+const refreshBody = javaMethodBody(mainActivity, 'void preferHighestRefreshRate(');
+ok('MainActivity ៖ កំណត់ preferredDisplayModeId តាម mode ដែលជ្រើស', /preferredDisplayModeId\s*=\s*best\.getModeId\(\)/.test(refreshBody) && /setAttributes\(/.test(refreshBody));
+ok('MainActivity ៖ ការបរាជ័យមិនគាំង App (catch RuntimeException)', /catch\s*\(\s*RuntimeException/.test(refreshBody));
+const pickBody = javaMethodBody(mainActivity, 'Display.Mode highestRefreshMode(');
+ok('MainActivity ៖ ជ្រើសតែ mode ទំហំដដែល ហើយ refresh ខ្ពស់ជាង',
+    /boolean sameSize = mode\.getPhysicalWidth\(\) == current\.getPhysicalWidth\(\)\s*&& mode\.getPhysicalHeight\(\) == current\.getPhysicalHeight\(\);/.test(pickBody) &&
+    /if \(sameSize && mode\.getRefreshRate\(\) > best\.getRefreshRate\(\)\) best = mode;/.test(pickBody));
 ok('webDir = dist (build របស់ Vite)', /webDir:\s*'dist'/.test(capConfig));
 ok('SystemBars insetsHandling = native', /insetsHandling:\s*'native'/.test(capConfig));
 

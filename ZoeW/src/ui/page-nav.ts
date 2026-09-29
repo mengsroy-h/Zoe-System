@@ -11,6 +11,7 @@ import { setEntryScanMode } from '../features/scan-remove';
 import { refreshZtoListSyncUi } from '../features/zto-list-sync';
 import { refreshZtoAutoCloseUi } from '../features/zto-status';
 import { showAppChrome } from './chrome-autohide';
+import { measureDisplayRateForDrawer } from './perf';
 
 export function switchAppPage(page?) {
     const target = page === 'entry' ? 'entry' : 'data';
@@ -40,6 +41,7 @@ export function openSideDrawer() {
     refreshZtoListSyncUi();
     refreshDrawerGroups();
     uiState.drawerOpen = true;
+    measureDisplayRateForDrawer();
 }
 
 export function closeSideDrawer() {

@@ -10,6 +10,7 @@ export type DataSummaryId = 'grandTotalCount' | 'todayTotalCount' | 'todayClosed
 
 export interface ViewState {
     appVersionLabel: string;
+    displayRateText: string;
 
     connectionStatus: 'online' | 'connecting' | 'offline' | null;
     connectionText: string;
@@ -101,6 +102,7 @@ export interface ViewState {
 
 export const viewState = createStore<ViewState>('viewState', {
     appVersionLabel: '',
+    displayRateText: '',
     connectionStatus: null,
     connectionText: 'ក្រៅបណ្ដាញ',
     bootSplashPhase: 'shown',

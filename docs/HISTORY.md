@@ -39,6 +39,44 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.42.11] — 2026-09-29 · ZoeW ៖ **APK ស្នើល្បឿនអេក្រង់ខ្ពស់បំផុត** · **លេខ Hz ពិត និងកំណែ WebView ក្នុងរបា Slide** (branch · មិនទាន់ merge)
+
+**ZoeW `2.42.11` (`zoew-v238`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។
+
+**របាយការណ៍ម្ចាស់គម្រោង** ៖ *«APK build ថ្មីហើយនៅតែមិនរលូនដូច PWA កែកែមិនចេះចប់ សន្និដ្ធានមិនដែលត្រូវសោះចឹង?»*
+
+#### ការសារភាព និងការវាស់ឡើងវិញ
+
+- ជុំ 2.42.9–2.42.10 កាត់ការងារដែលមាន **ទាំង PWA ទាំង APK** (វាស់ក្នុង Chromium លើ server) ➜ វាធ្វើឲ្យទាំង ២ លឿនជាងមុន តែ **មិនប៉ះគម្លាត
+  APK ធៀប PWA** ទេ ព្រោះម៉ាស៊ីន audit **មិនមែន Android WebView**។ កំហុសនៃការសន្និដ្ឋាន ៖ ការអះអាងថា «APK នឹងរលូនដូច PWA» ដោយគ្មានការវាស់លើ WebView។
+- ការពិនិត្យគ្រប់អ្វីដែល APK ខុសពី PWA ៖ `MainActivity` ជា template ទទេ · theme ប្តូរមុនសាង WebView (គ្មាន overdraw) · `SystemBars`
+  ធ្វើការតែពេលពណ៌ប្រែ · JS តែលើ native ៖ PTR `touchmove` non-passive + ការវាស់ពណ៌របាស្ថានភាព (តូច ~១៥ ms/ការហូតក្រោម CPU ×4)។
+  ➜ ការសាងគម្រោង Android ឡើងវិញពី template **មិនប្តូរ WebView ទេ**។ ភាពខុសគ្នាធំដែលនៅសល់គឺ **បរិស្ថានរត់** ៖ ROM Android ជាច្រើន
+  (ColorOS/Realme UI/Funtouch/HyperOS/One UI adaptive) ឲ្យ Chrome រត់ 90/120Hz តែកំណត់ App ផ្សេងត្រឹម **60Hz** លុះត្រាតែ App ស្នើ ➜
+  App យើងមិនដែលស្នើ។ ⚠️ នេះជា **សម្មតិកម្ម** ដែលម៉ាស៊ីននេះវាស់មិនបាន ➜ ជុំនេះបន្ថែម **ឧបករណ៍វាស់លើទូរស័ព្ទ** ជាមួយការកែ។
+
+#### ការកែ
+
+- `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`WindowManager.LayoutParams.preferredDisplayModeId` · API ផ្លូវការ) រាល់
+  `onCreate`/`onResume` · ការបរាជ័យមិនគាំង App។ ផ្ទៀងផ្ទាត់ ៖ compile ជាមួយ framework Android 14 ពិត (Robolectric `android-all` ·
+  `-Werror`) · ការជ្រើស mode ៧/៧ ករណី (60 ➜ 120Hz · មិនប្តូរទំហំ · null)។ ⛔ build APK ពេញធ្វើមិនបាននៅទីនេះ (`dl.google.com` ត្រូវបិទ)។
+- ជើងរបា Slide បង្ហាញ **«អេក្រង់ NNHz · WebView/Chrome/Safari វវ»** វាស់ពី rAF រាល់ពេលបើករបា (median ៣០ ស៊ុម) ➜ ម្ចាស់គម្រោងប្រៀប
+  PWA ធៀប APK លើទូរស័ព្ទដដែលបាន។
+
+#### អ្នកយាម
+
+- `npm run android:check` ៖ onCreate/onResume ស្នើ · `preferredDisplayModeId = best.getModeId()` · ជ្រើសតែទំហំដដែល + refresh ខ្ពស់ជាង ·
+  `catch (RuntimeException …)` — mutation **៦/៦** ចាប់បាន (រួម `true || …` ដែល regex ជំនាន់ដំបូងខកខាន)។
+- `ZoeW/tests/native/display-rate.test.tsx` (៧ ៖ UA WebView/Chrome/Safari · 120/90/60Hz ពី rAF ក្លែង · ការហៅស្ទួន · rAF បោះ · `SideDrawer` ពិត ·
+  `openSideDrawer()` កេះ) — mutation **៤/៤** ចាប់បាន។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- ⛔ **build APK ថ្មីពី branch/`main` ក្រោយ merge** ➜ បើករបា Slide ក្នុង APK និងក្នុង PWA (Chrome) លើទូរស័ព្ទដដែល ➜ ប្រាប់លេខ Hz ទាំង ២ ៖
+  APK 120 ≈ PWA 120 តែនៅមិនរលូន ➜ មូលហេតុផ្សេង (ជុំក្រោយវាស់តាម `chrome://inspect` លើ debug build) · APK 60 ខណៈ PWA 120 ➜ ROM
+  មិនគោរពការស្នើ ➜ បើក «Refresh rate/Smooth display» សម្រាប់ ZoeW ក្នុង Settings។
+- គ្មាន Firebase rules · គ្មាន env ថ្មី។
+
 ### [2.42.10] — 2026-09-29 · ZoeW ៖ **ជួរដេកច្រើន (filter «ទាំងអស់») ៖ ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម លែងគូរតារាងទាំងមូលឡើងវិញ** (merge រួចក្នុង PR #264)
 
 **ZoeW `2.42.10` (`zoew-v237`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.20.6`)។

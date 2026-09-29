@@ -95,7 +95,7 @@ beforeEach(() => {
     posts.length = 0;
     try { localStorage.clear(); } catch {}
     uiState.pushStatus = 'unknown';
-    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, scheduleAttemptAt: 0, scheduleInFlight: false });
+    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, nativeWanted: false, scheduleAttemptAt: 0, scheduleInFlight: false });
     pushNativeBuild.fcm = true;
     setLicense(LICENSE);
     delete (window as any).Capacitor;
@@ -249,6 +249,59 @@ describe('APK (FCM)', () => {
         expect(pn.register).not.toHaveBeenCalled();
         await ensureNativePushListeners();
         expect(pn.addListener).not.toHaveBeenCalledWith('registration', expect.anything());
+    });
+
+    it('⛔ បិទ ➜ ប្រាប់ server ឲ្យលុប token (មិនត្រឹម unregister ដែលធ្លាក់ស្ងាត់ពេលក្រៅបណ្តាញ) · token យឺត/ថ្មីក្រោយបិទ មិនបើកវិញដោយស្ងាត់', async () => {
+        stubServer();
+        const token = 'fcmToken:' + 'y'.repeat(40);
+        expect(await enablePush()).toBe(true);
+        await pn.listeners.registration({ value: token });
+        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
+        pn.unregister.mockClear();
+        expect(await disablePush()).toBe(true);
+        expect(uiState.pushStatus).toBe('off');
+        expect(posts.find((x) => x.op === 'unsubscribe')?.body).toMatchObject({ sub: { kind: 'fcm', token } });
+        expect(pn.unregister).toHaveBeenCalled();
+        const subscribes = posts.filter((x) => x.op === 'subscribe').length;
+        await pn.listeners.registration({ value: 'fcmToken:' + 'z'.repeat(40) });
+        await new Promise((r) => setTimeout(r, 0));
+        expect(posts.filter((x) => x.op === 'subscribe').length).toBe(subscribes);
+        expect(uiState.pushStatus).toBe('off');
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(false);
+    });
+
+    it('⛔ បិទខណៈ token កំពុងចុះឈ្មោះ (resync) ➜ server ឆ្លើយក្រោយ ➜ មិនបើកវិញ ហើយលុបការចុះឈ្មោះនោះចេញវិញ', async () => {
+        const token = 'fcmToken:' + 'w'.repeat(40);
+        localStorage.setItem(PUSH_STATE_KEY, JSON.stringify({ on: true, kind: 'fcm', token: token, syncedAt: 1, schedSig: '', schedAt: 0 }));
+        uiState.pushStatus = 'on';
+        let release: (v: Response) => void = () => {};
+        vi.stubGlobal('fetch', vi.fn((url: string, init: any = {}) => {
+            const op = new URL(url, 'https://x.invalid/').searchParams.get('op') || '';
+            posts.push({ op, body: init.body ? JSON.parse(init.body) : null });
+            if (op === 'subscribe') return new Promise<Response>((r) => { release = r; });
+            return Promise.resolve(jsonResponse({ ok: true }));
+        }));
+        await ensureNativePushListeners();
+        const late = pn.listeners.registration({ value: token });
+        await vi.waitFor(() => expect(posts.some((x) => x.op === 'subscribe')).toBe(true));
+        expect(await disablePush()).toBe(true);
+        release(jsonResponse({ ok: true }));
+        await late;
+        await new Promise((r) => setTimeout(r, 0));
+        expect(uiState.pushStatus).toBe('off');
+        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(false);
+        expect(posts.filter((x) => x.op === 'unsubscribe').length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('⛔ មិនដែលបើក ➜ token ពី FCM auto-init ពេល boot មិនចុះឈ្មោះ server ហើយមិនប្រកាស «បើករួច»', async () => {
+        stubServer();
+        refreshPushStatus();
+        expect(uiState.pushStatus).toBe('off');
+        await ensureNativePushListeners();
+        await pn.listeners.registration({ value: 'fcmToken:' + 'a'.repeat(40) });
+        await new Promise((r) => setTimeout(r, 0));
+        expect(posts.filter((x) => x.op === 'subscribe').length).toBe(0);
+        expect(uiState.pushStatus).toBe('off');
     });
 
     it('បដិសេធសិទ្ធិ ➜ denied មិន register', async () => {

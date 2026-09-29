@@ -19,11 +19,12 @@ import { fileURLToPath } from 'node:url';
 import { serveDir } from './serve.mjs';
 import { FAKE_SDK, HARNESS_CLOCK_START, LICENSE_STUB, seedData } from './fake-firebase.mjs';
 import { resolveOldRoot } from './old-app.mjs';
-import { SNAPSHOT } from './snapshot.mjs';
+import { INTENTIONAL_UI, SNAPSHOT } from './snapshot.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OLD_DIR = resolveOldRoot(HERE);
-const NEW_DIR = path.join(HERE, '..', 'dist');
+// ZOEW_PARITY_DIST ៖ build ឯកជន (`npm run build:parity`) ➜ run-all មិនប្រណាំង `dist` ជាមួយ zoew-suite
+const NEW_DIR = process.env.ZOEW_PARITY_DIST ? path.resolve(process.env.ZOEW_PARITY_DIST) : path.join(HERE, '..', 'dist');
 const CONFIG = JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' });
 const seed = seedData();
 
@@ -51,7 +52,10 @@ function idSignatures(dump) {
 }
 
 function normalize(value, sig = new Map()) {
-    let text = JSON.stringify(value, (k, v) => (typeof v === 'number' && v >= T_CUT && v < T_CUT + 86400000 * 2 ? '<t>' : v));
+    // ⛔ ledger ថ្ងៃ/ខែ ផ្ទុក token `op` (ZoeW 2.42.7 ៖ សម្គាល់ការសរសេររបស់ខ្លួនពេល `disconnect`) ➜ App ដើមគ្មានវា ➜ ប្រៀបដោយដកវាចេញ
+    //    (តម្លៃលុយ/ចំនួនក្បែរវានៅប្រៀបដដែល · ការអះអាងរបស់ token ខ្លួនវា ៖ `tx-outcome-test` · `emu/tx-disconnect-emu-test`)
+    let text = JSON.stringify(value, (k, v) => (k === 'op' && typeof v === 'string' && /^op_[a-z0-9]+$/.test(v) ? undefined
+        : typeof v === 'number' && v >= T_CUT && v < T_CUT + 86400000 * 2 ? '<t>' : v));
     text = text.replace(/\b(1[3-9]|2[0-3]):\d\d:\d\d \(2026-09-22\)/g, '<time>');
     // ⛔ claim token (restore/clear) ជាតម្លៃចៃដន្យ **បណ្តោះអាសន្ន** ➜ ប្រៀបធៀបវត្តមាន មិនមែនតម្លៃ
     text = text.replace(/\b(restore|clear)_id_\d{12,14}_[a-z0-9]+_[a-z0-9]+\b/g, '$1_<token>');
@@ -383,7 +387,7 @@ const firstDiff = (x, y) => {
 };
 
 async function state(S) {
-    const snap = await S.page.evaluate(SNAPSHOT, { skipToasts: true });
+    const snap = await S.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI });
     const toastAll = await S.page.evaluate(() => window.__toastLog || []);
     const toasts = toastAll.slice(S.toastMark).join(' ‖ ');
     S.toastMark = toastAll.length;
@@ -413,7 +417,7 @@ async function runScenario(title, steps, storage = {}, zto = null) {
     const A = await session(oldSrv.port, storage, zto);
     const B = await session(newSrv.port, storage, zto);
     await state(A); await state(B);   // មូលដ្ឋាន ៖ ការសរសេរពេលផ្ទុកត្រូវ parity-live វាស់រួច
-    let prevTree = (await A.page.evaluate(SNAPSHOT, { skipToasts: true })).tree;
+    let prevTree = (await A.page.evaluate(SNAPSHOT, { skipToasts: true, ui: INTENTIONAL_UI })).tree;
     const DEBUG = () => ({
         modals: Array.from(document.querySelectorAll('.modal')).filter((m) => m.style.display === 'flex').map((m) => m.id),
         siFileMsg: (document.getElementById('siFileMsg') || {}).textContent,

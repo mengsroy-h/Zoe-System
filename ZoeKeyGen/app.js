@@ -258,10 +258,13 @@ const FIREBASE_SDK_RETRY_MIN_GAP_MS = 3000;
 const FIREBASE_SDK_RELOAD_KEY = 'zoe_firebase_sdk_reload_count';
 const FIREBASE_SDK_RELOAD_MAX = 3;
 const FIREBASE_SDK_RELOAD_MIN_GAP_MS = 20000;
+const FIREBASE_SDK_PROBE_URL = 'https://www.gstatic.com/generate_204';
+const FIREBASE_SDK_PROBE_TIMEOUT_MS = 8000;
 let firebaseSdkRetryTimer = null;
 let firebaseSdkRetryAttempt = 0;
 let lastFirebaseSdkAttemptAt = 0;
 let lastFirebaseSdkReloadAt = 0;
+let firebaseSdkProbeInFlight = false;
 let infoListenersFailed = false;
 let infoListenerRecoveryTimer = null;
 let infoListenerRecoveryAttempt = 0;
@@ -303,17 +306,38 @@ function firebaseSdkReloadCount() {
     }
 }
 
-function reloadForFirebaseSdk() {
+function probeFirebaseSdkHost() {
+    try {
+        return fetchWithTimeout(FIREBASE_SDK_PROBE_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', credentials: 'omit' },
+            FIREBASE_SDK_PROBE_TIMEOUT_MS, 'Firebase SDK probe timed out').then(() => true, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+function firebaseSdkReloadAllowed() {
     if (!firebaseSdkUnavailable) return false;
     if (typeof window.firebaseSDK !== 'undefined' && window.firebaseSDK) return false;
     if (navigator.onLine === false) return false;
     if (anyModalIsOpen()) return false;
-    const used = firebaseSdkReloadCount();
-    if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
-    if (elapsedSince(lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
-    lastFirebaseSdkReloadAt = Date.now();
-    safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
-    window.location.reload();
+    if (firebaseSdkReloadCount() >= FIREBASE_SDK_RELOAD_MAX) return false;
+    return elapsedSince(lastFirebaseSdkReloadAt) >= FIREBASE_SDK_RELOAD_MIN_GAP_MS;
+}
+
+function reloadForFirebaseSdk() {
+    if (!firebaseSdkReloadAllowed()) return false;
+    if (firebaseSdkProbeInFlight) return true;
+    firebaseSdkProbeInFlight = true;
+    probeFirebaseSdkHost().then((reachable) => {
+        firebaseSdkProbeInFlight = false;
+        if (reachable && firebaseSdkReloadAllowed()) {
+            lastFirebaseSdkReloadAt = Date.now();
+            safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(firebaseSdkReloadCount() + 1));
+            window.location.reload();
+            return;
+        }
+        if (firebaseSdkUnavailable) scheduleFirebaseSdkRetry();
+    });
     return true;
 }
 

@@ -23,8 +23,15 @@ const APP = path.join(ROOT, 'ZoeW');
 const STEP_TIMEOUT_MS = Number(process.env.ZOEWSUITE_STEP_TIMEOUT_MS || 240000);
 
 // ⛔ លំដាប់ ៖ ឧបករណ៍លឿន និងឋិតិវន្តមុន ➜ ការធ្លាក់មូលដ្ឋាន (type) បង្ហាញមុនការរត់ browser
-const STEPS = ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
-    'logic:check', 'parity', 'build:only', 'sw:check', 'smoke', 'native:check', 'rules:check'];
+// ⛔ `--parity` (ការងារ run-all ដាច់ដោយឡែក ព្រោះពិដាន ៣០០ វិ./checker) ៖ parity DOM · layout · live · deep ធៀប ZoeW ដើម។
+//    វាធ្លាប់នៅក្រៅ CI ➜ ក្រហម ៧៩/៧៩ · ១៨/១៨ · ៣/៣ តាំងពី 2.43.0 ដោយគ្មាននរណាដឹង (អ្នកយាមដែលគ្មាននរណារត់ = គ្មានអ្នកយាម)។
+//    ⛔ build ចូល `dist-parity` ឯកជន (`ZOEW_PARITY_DIST`) និង ZoeW ដើមចូលថតឯកជន (`ORIGINAL_DIR`) ➜ មិនប្រណាំង `dist` ·
+//    `.original` ជាមួយ zoew-suite ដែលរត់ស្របគ្នាក្នុង lane ផ្សេង
+const PARITY = process.argv.includes('--parity');
+const STEPS = PARITY ? ['build:parity', 'parity:dom', 'parity:live', 'parity:deep']
+    : ['typecheck', 'lint', 'slot:check', 'purity:check', 'test', 'doc:check', 'android:check',
+        'logic:check', 'parity', 'build:only', 'sw:check', 'smoke', 'native:check', 'rules:check'];
+const STEP_ENV = {};
 
 let pass = 0, fail = 0;
 function ok(label) { pass++; console.log('  ok    ' + label); }
@@ -55,7 +62,16 @@ const hasModules = fs.existsSync(path.join(APP, 'node_modules', 'vite')) && fs.e
 if (isReactSource && !hasModules) bad('dependency របស់ ZoeW ត្រូវដំឡើង (npm ci --prefix ZoeW)', path.join(APP, 'node_modules'));
 
 // ZoeW ដើម (vanilla) ជាអ្នកសម្រេច parity/logic ➜ ទាញពី git បើអវត្តមាន
-if (isReactSource && hasModules && !fs.existsSync(path.join(APP, '.original', 'ZoeW', 'app.js'))) {
+if (isReactSource && hasModules && PARITY) {
+    const own = fs.mkdtempSync(path.join(require('os').tmpdir(), 'zoew-parity-original-'));
+    const r = cp.spawnSync('bash', [path.join(APP, 'scripts', 'fetch-original.sh')], {
+        cwd: APP, encoding: 'utf8', timeout: 60000, env: Object.assign({}, process.env, { ORIGINAL_DIR: own })
+    });
+    if (r.status !== 0) bad('ទាញ ZoeW ដើមពី git ចូលថតឯកជន សម្រាប់ parity', tail(r.stdout + r.stderr, 4));
+    STEP_ENV.OLD_APP_DIR = path.join(own, 'ZoeW');
+    STEP_ENV.ZOEW_PARITY_DIST = path.join(APP, 'dist-parity');
+    process.on('exit', () => { try { fs.rmSync(own, { recursive: true, force: true }); } catch (e) {} });
+} else if (isReactSource && hasModules && !fs.existsSync(path.join(APP, '.original', 'ZoeW', 'app.js'))) {
     const r = cp.spawnSync('bash', [path.join(APP, 'scripts', 'fetch-original.sh')], { cwd: APP, encoding: 'utf8', timeout: 60000 });
     if (r.status !== 0) bad('ទាញ ZoeW ដើមពី git (`npm run original:fetch`) សម្រាប់ parity/logic', tail(r.stdout + r.stderr, 4));
 }
@@ -69,7 +85,7 @@ if (isReactSource && hasModules && !missing.length) {
             timeout: STEP_TIMEOUT_MS,
             killSignal: 'SIGKILL',
             maxBuffer: 64 * 1024 * 1024,
-            env: Object.assign({}, process.env, { FORCE_COLOR: '0', NO_COLOR: '1' })
+            env: Object.assign({}, process.env, { FORCE_COLOR: '0', NO_COLOR: '1' }, STEP_ENV)
         });
         const secs = ((Date.now() - started) / 1000).toFixed(1);
         if (r.error && r.error.code === 'ETIMEDOUT') bad('npm run ' + step + ' (ព្យួរ លើស ' + STEP_TIMEOUT_MS / 1000 + 's)', tail(r.stdout + r.stderr, 6));

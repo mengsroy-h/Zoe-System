@@ -686,6 +686,7 @@ run "stall-lock-release" node audit-tools/stall-lock-release-test.js
 run "locker-claim-guard" node audit-tools/locker-claim-guard-test.js
 run "stale-clear-claim" node audit-tools/stale-clear-claim-test.js
 run "zoew-suite (ZoeW React ៖ tsc · lint · vitest · native · android)" node audit-tools/zoew-suite-test.js
+run "zoew-parity (ZoeW React ៖ DOM · layout · live · deep ធៀប ZoeW ដើម)" node audit-tools/zoew-suite-test.js --parity
 
 section "== ខ្សែសង្វាក់នាំចូល (zto-import) =="
 # ⚠️ វាធ្លាប់នៅ **ក្រៅ** ឯកសារនេះ ដោយហេតុផលថា «មិនមែនជាផ្នែករបស់ App»។

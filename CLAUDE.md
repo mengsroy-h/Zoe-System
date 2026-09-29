@@ -1347,6 +1347,11 @@ attribute `on*=` និង `<script>` inline នឹងត្រូវ browser **
   `reloadForFirebaseSdk()` មានពិដាន **៤** ៖ `firebaseSdkUnavailable` ·
   `navigator.onLine !== false` · **`anyModalIsOpen()` ➜ មិនផ្ទុកឡើងវិញ** ·
   `FIREBASE_SDK_RELOAD_MAX` (៣)/`MIN_GAP` (២០ វិ.)។
+  ⛔ **`navigator.onLine` និយាយមិនពិត** (WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យអស់លុយ) ➜ ពិដាន ៣ អស់ក្នុង ~១ នាទី ខណៈបណ្តាញស្លាប់ ➜ ពេលមកវិញ
+  SDK **មិនដែលស្តារ** ➜ ការផ្ទុកឡើងវិញត្រូវ **វាស់ការឈានដល់ host របស់ SDK ជាមុន** (`probeFirebaseSdkHost()` ៖ `FIREBASE_SDK_PROBE_URL` ·
+  no-cors · ពិដានពេល) · ឈានមិនដល់ ➜ **មិនចំណាយពិដាន** តែជណ្តើរនៅរស់ · ការវាស់មួយហោះម្តង (`firebaseSdkProbeInFlight`) · ច្រកទ្វារពិនិត្យ
+  **ម្តងទៀតក្រោយការវាស់** (ប្រអប់ទើបបើក ➜ មិនផ្ទុក) · ⛔ CSP `connect-src` ត្រូវអនុញ្ញាត origin នោះ (បើអត់ fetch បោះដូចបណ្តាញដាច់ ➜
+  **មិនដែលផ្ទុកឡើងវិញ**) · App ទាំង ២ (`connection-recovery-test` ១០ខ៥ · `netlify-config-scope-test` ឃ)។
   ⛔ `recoverFirebaseSdk()` ត្រូវចាកចេញភ្លាមពេល `!firebaseSdkUnavailable`។
 - **ជណ្តើរស្តារ listener មិនត្រូវកាត់ផ្តាច់ resync ដែលកំពុងដើរ** —
   `dbListenerResyncIsProgressing()` ជាអ្នកសម្រេច ជាមួយ

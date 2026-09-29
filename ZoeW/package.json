@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc -b --noEmit && vite build",
     "build:only": "vite build",
+    "build:parity": "vite build --outDir dist-parity --emptyOutDir",
     "preview": "vite preview",
     "build:android": "tsc -b --noEmit && vite build --mode android",
     "android:icons": "node scripts/android-icons.mjs",

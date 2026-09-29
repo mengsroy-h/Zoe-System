@@ -10,10 +10,12 @@ import { serveDir } from './serve.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveOldRoot } from './old-app.mjs';
+import { INTENTIONAL_UI } from './snapshot.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OLD_DIR = resolveOldRoot(HERE);
-const NEW_DIR = path.join(HERE, '..', 'dist');
+// ZOEW_PARITY_DIST ៖ build ឯកជន (`npm run build:parity`) ➜ run-all មិនប្រណាំង `dist` ជាមួយ zoew-suite
+const NEW_DIR = process.env.ZOEW_PARITY_DIST ? path.resolve(process.env.ZOEW_PARITY_DIST) : path.join(HERE, '..', 'dist');
 
 const VIEWPORTS = [
     { name: 'ទូរស័ព្ទ  390×844', width: 390, height: 844 },
@@ -24,8 +26,9 @@ const VIEWPORTS = [
 /** attribute ដែលរំពឹងថាខុស ៖ សកម្មភាពប្តូរពី delegation ➜ handler របស់ React */
 const IGNORED_ATTRS = new Set(['data-act', 'data-args', 'data-a1', 'data-a2', 'data-evt', 'data-self', 'data-on']);
 
-const FINGERPRINT = (ignored) => {
+const FINGERPRINT = ({ ignored, ui }) => {
     const skip = new Set(ignored);
+    const matches = (el, sel) => !!(sel && el.matches && el.matches(sel));
     const out = [];
     const walk = (el, depth) => {
         if (el.id === 'root' && el.tagName === 'DIV') { // ធាតុរុំរបស់ React
@@ -33,6 +36,10 @@ const FINGERPRINT = (ignored) => {
             return;
         }
         if (el.tagName === 'SCRIPT' || el.tagName === 'LINK' || el.tagName === 'STYLE') return;
+        // ⛔ ការខុសគ្នាដោយចេតនា ៖ បញ្ជីតែមួយ `INTENTIONAL_UI` (`snapshot.mjs`) ដែល parity ទាំង ៣ ប្រើរួម
+        if (matches(el, ui.skip)) return;
+        const opaque = matches(el, ui.opaque);
+        const floating = matches(el, ui.floating);
         // ⛔ React សរសេរ `style` ឡើងវិញពីវត្ថុ (`margin: 0px 2px`) ខណៈ HTML
         //    ដើមសរសេរ `margin:0 2px`។ តម្លៃ *ដូចគ្នា* ➜ ធ្វើទម្រង់ឲ្យដូចគ្នា
         //    មុនប្រៀបធៀប ដើម្បីកុំឲ្យភាពខុសគ្នាក្លែងក្លាយបាំងភាពខុសគ្នាពិត។
@@ -45,9 +52,10 @@ const FINGERPRINT = (ignored) => {
             probe.style.cssText = v;
             return Array.from(probe.style).map((prop) => prop + ':' + probe.style.getPropertyValue(prop)).sort().join(';');
         };
+        const styleOf = (v) => (floating ? normStyle(v).split(';').filter((d) => !/^(top|left):/.test(d)).join(';') : normStyle(v));
         const attrs = Array.from(el.attributes)
             .filter((a) => !skip.has(a.name))
-            .map((a) => a.name + '=' + (a.name === 'style' ? normStyle(a.value) : a.value))
+            .map((a) => a.name + '=' + (a.name === 'style' ? styleOf(a.value) : a.value))
             .sort()
             .join('|');
         // អត្ថបទដែល *អ្នកប្រើឃើញ* ៖ ភ្ជាប់ text node ជាប់គ្នាមុនច្របាច់ចន្លោះ
@@ -60,7 +68,8 @@ const FINGERPRINT = (ignored) => {
             .trim()
             // ⛔ ស្លាកកំណែខុសគ្នាដោយចេតនា (App ថ្មីមានកំណែថ្មី) ➜ ធ្វើឲ្យស្មើតែស្លាកនោះ
             .replace(/^(កំណែប្រព័ន្ធ: )\d+\.\d+\.\d+$/, '$1<កំណែ>');
-        out.push(`${'  '.repeat(Math.min(depth, 12))}${el.tagName}[${attrs}]${ownText ? '::' + ownText : ''}`);
+        out.push(`${'  '.repeat(Math.min(depth, 12))}${el.tagName}[${attrs}]${ownText && !opaque ? '::' + ownText : ''}`);
+        if (opaque) return;
         for (const c of el.children) walk(c, depth + 1);
     };
     for (const c of document.body.children) walk(c, 0);
@@ -105,7 +114,7 @@ async function snapshot(port, viewport) {
     });
     await page.goto(`http://127.0.0.1:${port}/index.html`, { waitUntil: 'load' }).catch(() => {});
     await page.waitForTimeout(2200);
-    const fingerprint = await page.evaluate(FINGERPRINT, [...IGNORED_ATTRS]);
+    const fingerprint = await page.evaluate(FINGERPRINT, { ignored: [...IGNORED_ATTRS], ui: INTENTIONAL_UI });
     const geometry = await page.evaluate(GEOMETRY);
     await ctx.close();
     return { fingerprint, geometry };
@@ -132,12 +141,30 @@ for (const vp of VIEWPORTS) {
     // ⛔ CSS minifier របស់ build សរសេរ `0.5px` ជា `.5px` — តម្លៃដដែល
     //    តាមស្តង់ដារ CSS ➜ ធ្វើឲ្យទម្រង់ដូចគ្នាមុនប្រៀបធៀប។
     const normalize = (s) => s.replace(/([\s(,+*\/-])0\.(\d)/g, '$1.$2');
+    // ⛔ navbar ទាបជាងដើមដោយចេតនា (`INTENTIONAL_UI.navbarShrinkPx`) ➜ ទទួលយក **តែ** δ ពិតប្រាកដនោះ ៖ y ស្មើ ឬ y − δ ·
+    //    កម្ពស់ស្មើ ឬ + δ (ផ្ទាំងដែលបំពេញអេក្រង់) · x · ទទឹង · តម្លៃ CSS ផ្សេង ត្រូវស្មើ ➜ ការរំកិលផ្សេង (ឧ. ៥៦px) នៅតែធ្លាក់
+    const navOf = (g) => (g.find((e) => e && e.key === '.app-navbar') || {}).rect;
+    const navA = navOf(a.geometry);
+    const navB = navOf(b.geometry);
+    const shrink = navA && navB ? navA[3] - navB[3] : 0;
+    const declaredShift = shrink !== 0 && shrink === INTENTIONAL_UI.navbarShrinkPx;
+    const shiftedOk = (ea, eb) => {
+        if (!declaredShift || !ea || !eb || !Array.isArray(ea.rect) || !Array.isArray(eb.rect)) return false;
+        const rest = (e) => normalize(JSON.stringify(Object.assign({}, e, { rect: null })));
+        if (rest(ea) !== rest(eb)) return false;
+        const [xa, ya, wa, ha] = ea.rect;
+        const [xb, yb, wb, hb] = eb.rect;
+        if (xa !== xb || wa !== wb) return false;
+        if (ea.key === '.app-navbar') return ya === yb && hb === ha - shrink;
+        return (yb === ya || yb === ya - shrink) && (hb === ha || hb === ha + shrink);
+    };
     const geoDiffs = [];
     for (let i = 0; i < a.geometry.length; i++) {
         const x = normalize(JSON.stringify(a.geometry[i]));
         const y = normalize(JSON.stringify(b.geometry[i]));
-        if (x !== y) geoDiffs.push({ key: (a.geometry[i] || {}).key, old: x, now: y });
+        if (x !== y && !shiftedOk(a.geometry[i], b.geometry[i])) geoDiffs.push({ key: (a.geometry[i] || {}).key, old: x, now: y });
     }
+    if (declaredShift) console.log(`   ℹ️  ${vp.name.trim()} ៖ navbar ទាបជាងដើម ${shrink}px (ដោយចេតនា · INTENTIONAL_UI.navbarShrinkPx)`);
 
     const ok = diffs.length === 0 && geoDiffs.length === 0;
     if (!ok) failures++;

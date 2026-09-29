@@ -226,6 +226,11 @@
       "line": 870
     },
     {
+      "name": "firebaseSdkProbeInFlight",
+      "init": "false",
+      "line": 870
+    },
+    {
       "name": "lateFirebaseSdkListenerArmed",
       "init": "false",
       "line": 871

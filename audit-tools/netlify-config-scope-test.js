@@ -176,6 +176,19 @@ EXPECTED.forEach((rel) => {
     } else {
         ok(app + ' ៖ គ្មានប្រអប់ Apps Script ➜ មិនបង្ខំ host នោះ (ទិសផ្ទុយ)', true);
     }
+
+    // ឃ. ការវាស់ការឈានដល់ host របស់ SDK (`FIREBASE_SDK_PROBE_URL` ដែល fetch មុនផ្ទុកទំព័រឡើងវិញ) ➜ connect-src ត្រូវអនុញ្ញាត
+    //     origin នោះ ⛔ បើ CSP ទប់ ➜ fetch បោះដូចបណ្តាញដាច់ ➜ App **មិនដែលផ្ទុកឡើងវិញ** ➜ SDK មិនស្តារ (ច្រកទ្វារបិទជាប់ស្ងាត់ៗ)
+    const probe = /const FIREBASE_SDK_PROBE_URL = '([^']+)'/.exec(read(app + '/app.js'));
+    if (probe) {
+        derived++;
+        const origin = new URL(probe[1]).origin;
+        const connect = directive(csp, 'connect-src').split(/\s+/);
+        ok(app + ' ៖ App វាស់ `' + origin + '` មុនផ្ទុក SDK ឡើងវិញ ➜ `connect-src` ត្រូវអនុញ្ញាតវា', connect.indexOf(origin) !== -1,
+            directive(csp, 'connect-src'));
+    } else {
+        ok(app + ' ៖ គ្មានការវាស់ host SDK ➜ មិនបង្ខំ (ទិសផ្ទុយ)', true);
+    }
 });
 
 ok('⛔ ជាន់អប្បបរមា៖ តម្រូវការដេរីវេយ៉ាងតិច ៣ បានបាញ់ពិត', derived >= 3, derived);

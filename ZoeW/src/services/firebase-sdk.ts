@@ -4,6 +4,7 @@ import { elapsedSince } from '../core/elapsed';
 import { appSessionStore, safeStoreRemove, safeStoreSet } from '../core/storage';
 import { FIREBASE_SDK_RELOAD_KEY } from '../core/storage-keys';
 import { initFirebase } from './firebase-init';
+import { fetchWithTimeout } from './network';
 
 export const FIREBASE_SDK_RETRY_STEPS_MS = [5000, 10000, 20000, 30000, 60000];
 
@@ -12,6 +13,10 @@ export const FIREBASE_SDK_RETRY_MIN_GAP_MS = 3000;
 export const FIREBASE_SDK_RELOAD_MAX = 3;
 
 export const FIREBASE_SDK_RELOAD_MIN_GAP_MS = 20000;
+
+export const FIREBASE_SDK_PROBE_URL = 'https://www.gstatic.com/generate_204';
+
+export const FIREBASE_SDK_PROBE_TIMEOUT_MS = 8000;
 
 export function clearFirebaseSdkRetry() {
     if (firebaseState.firebaseSdkRetryTimer) {
@@ -41,17 +46,38 @@ export function firebaseSdkReloadCount() {
     }
 }
 
-export function reloadForFirebaseSdk() {
+export function probeFirebaseSdkHost() {
+    try {
+        return fetchWithTimeout(FIREBASE_SDK_PROBE_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', credentials: 'omit' },
+            FIREBASE_SDK_PROBE_TIMEOUT_MS, 'Firebase SDK probe timed out').then(() => true, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+export function firebaseSdkReloadAllowed() {
     if (!firebaseState.firebaseSdkUnavailable) return false;
     if (typeof window.firebaseSDK !== 'undefined' && window.firebaseSDK) return false;
     if ((navigator.onLine as boolean) === false) return false;
     if (anyModalIsOpen()) return false;
-    const used = firebaseSdkReloadCount();
-    if (used >= FIREBASE_SDK_RELOAD_MAX) return false;
-    if (elapsedSince(firebaseState.lastFirebaseSdkReloadAt) < FIREBASE_SDK_RELOAD_MIN_GAP_MS) return false;
-    firebaseState.lastFirebaseSdkReloadAt = Date.now();
-    safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(used + 1));
-    window.location.reload();
+    if (firebaseSdkReloadCount() >= FIREBASE_SDK_RELOAD_MAX) return false;
+    return elapsedSince(firebaseState.lastFirebaseSdkReloadAt) >= FIREBASE_SDK_RELOAD_MIN_GAP_MS;
+}
+
+export function reloadForFirebaseSdk() {
+    if (!firebaseSdkReloadAllowed()) return false;
+    if (firebaseState.firebaseSdkProbeInFlight) return true;
+    firebaseState.firebaseSdkProbeInFlight = true;
+    probeFirebaseSdkHost().then((reachable) => {
+        firebaseState.firebaseSdkProbeInFlight = false;
+        if (reachable && firebaseSdkReloadAllowed()) {
+            firebaseState.lastFirebaseSdkReloadAt = Date.now();
+            safeStoreSet(appSessionStore, FIREBASE_SDK_RELOAD_KEY, String(firebaseSdkReloadCount() + 1));
+            window.location.reload();
+            return;
+        }
+        if (firebaseState.firebaseSdkUnavailable) scheduleFirebaseSdkRetry();
+    });
     return true;
 }
 

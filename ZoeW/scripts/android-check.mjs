@@ -112,6 +112,13 @@ ok('FCM ៖ channel លំនាំដើមក្នុង manifest = FCM_CHANN
 ok('FCM ៖ រូបតំណាងតូច (monochrome vector) មានពិត', /default_notification_icon"\s+android:resource="@drawable\/ic_stat_notify"/.test(manifest) &&
     /<vector[\s\S]*android:fillColor="#FFFFFFFF"/.test(read('android/app/src/main/res/drawable/ic_stat_notify.xml')));
 ok('google-services.json មិនចូល repo (android/.gitignore)', /^app\/google-services\.json$/m.test(read('android/.gitignore')));
+const manifestPermissions = new Set([...manifest.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<uses-permission\s+android:name="([^"]+)"/g)].map((m) => m[1]));
+const listFiles = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? listFiles(path.join(dir, e.name)) : /\.(ts|tsx)$/.test(e.name) ? [path.join(dir, e.name)] : []));
+const onlineUsers = listFiles('src').filter((f) => /navigator\.onLine|['"](online|offline)['"]/.test(read(f)));
+ok('⛔ សិទ្ធិ ACCESS_NETWORK_STATE ៖ WebView ផ្តល់ navigator.onLine · online/offline តែពេលមានសិទ្ធិនេះ (បើអត់ ➜ onLine = true ជានិច្ច)',
+    onlineUsers.length > 0 && manifestPermissions.has('android.permission.ACCESS_NETWORK_STATE'),
+    'ឯកសារដែលពឹង onLine ' + onlineUsers.length + ' · សិទ្ធិ ' + [...manifestPermissions].join(','));
 
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };

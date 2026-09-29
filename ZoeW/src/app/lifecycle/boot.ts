@@ -31,7 +31,7 @@ import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
-import { setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
+import { noteScrollFrameRate, setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
@@ -48,6 +48,7 @@ export function bootApplication(scope: LifecycleScope): void {
         startScanEngine();
         startInteractions();
         startGlobalDismissals(scope);
+        scope.listen(window, 'scroll', noteScrollFrameRate, { capture: true, passive: true });
         revealAppAfterBoot();
     });
 }

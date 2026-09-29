@@ -167,6 +167,23 @@ function run(plan) {
               () => ({ calls: ctx.__calls, text: ctx.__status.textContent, ctx }));
 }
 
+// កូដកំហុស ➜ HTTP status ដែល Function ZTO **ពិតជាផ្ញើ** (ស្រង់ពី `json(NNN, { … code: 'ZTO_…' })` ឬ `const body = { … code }` ➜ `json(NNN, body)`)
+function functionErrorCodes() {
+    let fnSrc = '';
+    try { fnSrc = fs.readFileSync(path.join(ROOT, 'ZoeW', 'netlify', 'functions', 'zto-order-detail.js'), 'utf8'); } catch (e) { fnSrc = ''; }
+    const out = new Map();
+    const re = /code:\s*'(ZTO_[A-Z_]+)'/g;
+    let m;
+    while ((m = re.exec(fnSrc))) {
+        const before = fnSrc.slice(Math.max(0, m.index - 160), m.index);
+        const opened = before.lastIndexOf('json(');
+        let status = opened !== -1 ? (/^json\((\d{3})\s*,/.exec(before.slice(opened)) || [])[1] : undefined;
+        if (!status) status = (/json\((\d{3})\s*,\s*body\)/.exec(fnSrc.slice(m.index, m.index + 400)) || [])[1];
+        if (status && !out.has(m[1])) out.set(m[1], Number(status));
+    }
+    return out;
+}
+
 const scenarios = [];
 function scenario(label, fn) { scenarios.push({ label, fn }); }
 
@@ -248,6 +265,33 @@ scenario('Cooldown ត្រូវឆ្លើយតបនឹងប្រភេ�
     const definitive = vm.runInContext('lookupFailureCooldownMs("definitive")', transient.ctx);
     ok('⛔ ទិសផ្ទុយ ៖ សាលក្រមស្ថាពររក្សា cooldown វែងដដែល',
         definitive === transient.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, definitive);
+
+    // ⛔ ផ្លូវពិត ៖ cooldown ដែល `attemptAutoLookup()` **កត់ត្រា** ត្រូវតាមប្រភេទកូដដែល Function **ពិតជាផ្ញើ** (ដេរីវេពី
+    //    `zto-order-detail.js` មិនមែនបញ្ជីរឹង) ៖ សាលក្រម auth/config ➜ cooldown វែង · 429/5xx ផ្សេង ➜ cooldown ខ្លី។
+    //    ⛔ ការអះអាងលើ `lookupFailureCooldownMs("definitive")` តែឯងមិនឃើញថា **កូដណា** ទៅដល់ «definitive» ទេ ៖ វាស់បាន (2.45.4)
+    //    mutation «ដក `ZTO_AUTH_NOT_CONFIGURED` ពី `lookupFailureIsDefinitive()`» រស់រានលើ checker lookup ទាំង ៧ ព្រោះកូដនោះមកជាមួយ
+    //    **HTTP 503** (មិនមែន 401/403) ➜ មានតែការពិនិត្យកូដទេដែលធ្វើឲ្យវាស្ថាពរ ➜ ស្កេនម្តងទៀតរាល់ ៦ វិ. ទៅ Cookie ដែលមិនទាន់កំណត់។
+    //    ⚠️ `ZTO_AUTH_EXPIRED` មកជាមួយ **401** ➜ ការដកវាចេញពីបញ្ជីកូដ ជា equivalent mutant (សារ `HTTP 401` ធ្វើឲ្យវាស្ថាពរដដែល)។
+    const fnCodes = functionErrorCodes();
+    const DEFINITIVE_CODE_RE = /^ZTO_(?!LIST_)[A-Z_]*(AUTH|CONFIG)[A-Z_]*$/;
+    const definitiveCodes = [...fnCodes.keys()].filter((c) => DEFINITIVE_CODE_RE.test(c));
+    const transientCodes = [...fnCodes.keys()].filter((c) => !DEFINITIVE_CODE_RE.test(c) && !/^ZTO_LIST_/.test(c) && fnCodes.get(c) >= 429);
+    ok('កូដកំហុសរបស់ Function ស្រង់បាន (ជាន់អប្បបរមា ៖ auth/config ≥ ៣ · បណ្តោះអាសន្ន ≥ ៣ · មាន 503 ≥ ១)',
+        definitiveCodes.length >= 3 && transientCodes.length >= 3 && definitiveCodes.some((c) => fnCodes.get(c) === 503),
+        { definitive: definitiveCodes.map((c) => c + ':' + fnCodes.get(c)), transient: transientCodes.map((c) => c + ':' + fnCodes.get(c)) });
+    for (const code of definitiveCodes) {
+        const r = await run([{ status: fnCodes.get(code), code }]);
+        const entry = r.ctx.autoLookupFailureAt.get('BC1');
+        const ms = entry && typeof entry === 'object' ? entry.ms : -1;
+        ok('⛔ ' + code + ' (HTTP ' + fnCodes.get(code) + ') ➜ cooldown សាលក្រមស្ថាពរ', ms === r.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, ms);
+    }
+    for (const code of transientCodes) {
+        const r = await run([{ status: fnCodes.get(code), code }]);
+        const entry = r.ctx.autoLookupFailureAt.get('BC1');
+        const ms = entry && typeof entry === 'object' ? entry.ms : -1;
+        ok('⛔ ទិសផ្ទុយ ៖ ' + code + ' (HTTP ' + fnCodes.get(code) + ') ➜ cooldown បណ្តោះអាសន្ន (ខ្លីជាងសាលក្រមស្ថាពរ)',
+            ms > 0 && ms < r.ctx.AUTO_LOOKUP_FAIL_COOLDOWN_MS, ms);
+    }
 
     // អ្នកប្រើត្រូវដឹងថាត្រូវរង់ចាំប៉ុន្មាន — សារត្រូវផ្គូផ្គងនឹង cooldown ពិត
     const again = await run([{ reject: 'timeout' }]);

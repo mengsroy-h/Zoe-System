@@ -2220,41 +2220,24 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **2.45.3 ៖ មើលស៊ុមក្រោមប្រអប់ប្រវត្តិ និងបញ្ជីទំព័រស្កេនលើ Android (APK + Chrome) ធៀប iPhone** (`docs/HISTORY.md` [2.45.3]) ៖ គែមក្រោម ·
-  ជ្រុងមូល · កម្លាត ៨px ខាងលើរបា Tab · រមូរចុះ ➜ របាលាក់ ➜ កាតរីកចុះបំពេញ · រមូរតារាងនៅរលូនដូចមុន (តំបន់ហាមចូល ៖ ការរមូរ) · ចុចត្រង់
-  គែមក្រោមកាតមិនបើកខល/បិទ។ ⛔ iPhone មិនត្រូវប្រែសោះ (ប្លុកថ្មីមិនផ្គូផ្គង Safari)។
-
-- ⏳ **2.45.1 (merge រួច · PR #266) ៖ ប្រៀប «ស៊ុមកក 5 នាទីចុងក្រោយ» (ជើងរបា Slide ក្រោមលេខ Hz) រវាង APK និង PWA លើទូរស័ព្ទ Android ដដែល** ក្រោយឈរលើ
-  filter «ទាំងអស់» រមូរ និងហូតផ្ទាំងប្រវត្តិ ១–២ នាទី (`docs/HISTORY.md` [2.45.1])។ តារាងប្រវត្តិឥឡូវគូរ ៥០ ជួរ ➜ បើ APK នៅតែ «អាក់» ត្រូវប្រៀបលេខនេះមុន
-  ⛔ កុំកែកូដដោយគ្មានលេខ។ iPhone មិនបង្ហាញបន្ទាត់នេះទេ (Safari វាស់មិនបាន)។
-- ⏳ **2.45.0 / ZoeKeyGen 2.22.0 (merge រួច · PR #266) ៖ រៀបចំ Push** (`docs/HISTORY.md` [2.45.0]) ៖ `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` (`node ZoeW/scripts/gen-vapid.mjs`) · `FCM_SERVICE_ACCOUNT` (License Project) ក្នុង Netlify env របស់ ZoeW · Android app `com.zoesystem.zoew` ក្នុង License Project ➜ `google-services.json` ➜ GitHub secret `ZOEW_GOOGLE_SERVICES_JSON` ➜ build APK ថ្មី។ សាក ៖ បើកលើ iPhone PWA (Home Screen) · Android Chrome · APK ➜ ផ្ញើដំណឹងពី ZoeKeyGen ➜ លោតភ្លាមទោះ App បិទ · ចុច ➜ ផ្ទាំង 🔔 · ព្រឹកបន្ទាប់ម៉ោង ៨ ➜ ការរំលឹកកញ្ចប់ជិតផុតកំណត់ (បើមាន)។
-- ⏳ **2.44.0 / ZoeKeyGen 2.21.0 (merge រួច · PR #266) ៖ Publish rules របស់ License Project** (`ZoeKeyGen/firebase-database.rules.json` ៖ node `license_announcements`) ➜ បើមិនទាន់ ZoeKeyGen រាយ «⚠️ អានបញ្ជីដំណឹងមិនបាន» ហើយការផ្ញើធ្លាក់ · ZoeW មិនឃើញដំណឹង (ដំណើរការផ្សេងៗនៅដដែល)។ ក្រោយ Publish ៖ ផ្ញើដំណឹងសាកពី ZoeKeyGen ➜ មើលផ្ទាំង 🔔 លើ PWA និង APK · លុបវា ➜ វាបាត់ពេលទាញលើកក្រោយ។
-- ⏳ **2.43.0 / ZoeKeyGen 2.20.7 (merge រួច · PR #266) ៖ មើល logo និងផ្ទាំង 🔔 លើ iPhone PWA · Android PWA · APK** — ផ្ទាំងបើកពីស្តាំ · badge · កញ្ចប់ជិតផុតកំណត់ ·
-  សារពី `announcements.json` (APK ទាញតាម `VITE_NATIVE_WEB_ORIGIN` ➜ ត្រូវការ deploy ដែលមាន header CORS ក្នុង `netlify.toml`)។
-- ⏳ **2.42.11 · 2.45.2 ៖ ប្រៀបលេខ «ពេលរមូរ NNfps» (បន្ទាត់ «ស៊ុម App … · ពេលរមូរ … · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide) រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11] · [2.45.2])។ ⛔ អេក្រង់ LTPO (10–120Hz) ឲ្យ «ស៊ុម App 60fps» ពេលស្ងៀម ➜ ប្រៀបតែ «ពេលរមូរ» (រមូរតារាងមុនបើករបា)។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។
-- ⏳ **2.42.9 (PR #260) និង 2.42.10 (PR #264) merge រួច តែមិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9] · [2.42.10]) ៖
-  ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម **លើ filter «ទាំងអស់» ជួរដេកច្រើន** លើ iPhone PWA · Android PWA · APK (តំបន់ហាមចូល ៖
-  ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK ដែល build ពី `main` (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ បញ្ហាលេចលើឧបករណ៍ពិត ➜
-  ប្រៀបនឹងកំណែមុនសិន មុនសង្ស័យកូដផ្សេង។ ⛔ អ្វីដែលវាស់រួចតែនៅសល់ (មិនទាន់កែ · ត្រូវវាស់លើទូរស័ព្ទពិតមុន · ច្បាប់ ១១) ៖ PrePaint/HitTest
-  ដែលកើនតាមទំហំ DOM ពេលហូត (`will-change: transform` លើ `.page-main` បន្ថយ PrePaint ~៣០–៥០% ក្នុង Chromium) · layout តារាងធុងសំរាម
-  ២០០ ក្រុម · `touchmove` **non-passive** របស់ PTR (មានតែលើ APK ➜ ការរមូរដំបូងរង់ចាំ main thread)។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។
+  ⛔ វាស់បាន (2026-09-29) ៖ **០ Release** · run `Android APK` ទាំងអស់ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា) ➜ មិនមែនភស្តុតាងថា secret ខុស។
 - ⏳ **Backup ស្វ័យប្រវត្តិ — អ្នកប្រើពន្យារដោយចេតនា** (⛔ កុំដាស់តឿនរាល់ជុំ) ៖ `backup.yml` មិន backup អ្វីទេ រហូតដល់
   secret `ZOE_BACKUP_TARGETS` · `ZOE_BACKUP_PASSPHRASE` ត្រូវកំណត់ ([`firebase-backup/README.md`](firebase-backup/README.md)
   ជំហានទី ៦) ➜ Run workflow ម្តង ➜ **ទាញ artifact មកសាកស្តារ** (backup ដែលមិនទាន់សាកស្តារ មិនទាន់ជា backup) ·
   backup ឈប់ស្ងាត់ ➜ ពិនិត្យ **Actions** មុន (GitHub ផ្អាក schedule ក្រោយ repo ស្ងាត់ ៦០ ថ្ងៃ)។
+  ⛔ វាស់បាន (2026-09-29) ៖ run តាមកាលវិភាគ #21–#25 ធ្លាក់ក្នុង ~២ វិ. **គ្មាន runner** (កូតា Actions) ➜ **គ្មាន backup ណាមួយត្រូវបានបង្កើតទេ**។
 - ✅ **Sentry event ពី barcode តេស្ត (`ZTO_UPSTREAM_REJECTED`) — អ្នកប្រើសម្រេចថាមិនកែ** (កញ្ចប់តេស្តដែលគ្មានក្នុង ZTO)។
   ⛔ កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់ (បាំងការដាច់ ZTO ពិត) — មើលជួរ `ZTO_UPSTREAM_REJECTED` ក្នុងតារាងស្នូល · `lookupReason: ""`
   ក្នុង breadcrumb **មិនមែនកំហុស** (client អាន `reason` តែលើផ្លូវ `ZTO_CONFIG_INVALID`)។
 - ✅ **`ZTO_UPSTREAM_TIMEOUT_MS = 7000` ក្នុង Netlify env ជាការកំណត់ដោយចេតនា** (កូដលំនាំដើម `6000` · ZTO ឆ្លើយ ២,១–៥,៣ វិ.
   លើផលិតកម្ម · បង្អួចអាន Cookie លើ container ត្រជាក់) ➜ តម្លៃមិនមែន `6000` ក្នុង `?diag=1` មិនមែនកំហុស។ ⛔ កុំបង្កើន
   `ZTO_REQUEST_BUDGET_MS` ដល់ `10000` ដោយមិនវាស់ផ្លូវ client ឡើងវិញ (ថវិកា App មិនមែនពិដាន platform)។
-- ⏳ **Publish rules របស់ Business ម្តងទៀត** (វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `docs/HISTORY.md` [2.42.7]) — មុន Publish App ដើរដូចមុន
-  (`permission_denied` ➜ សរសេរគ្មាន `op`) តែការការពារ «ការដក ledger បាត់ក្រោយ `disconnect`» មិនទាន់សកម្ម។
 - ✅ **Firebase rules របស់ Business និង License Project ត្រូវ Publish រួច** (`pickedUpBarcodes` · កូដ App `ZOE` ·
-  `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច)។ ⛔ ការសរសេរស្ថិតិយកត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ (`$other` បដិសេធវាល
+  `maxDevices` · slot កៅអី · Key ថ្មីចេញរួច · វាល `op` ក្នុង ledger ថ្ងៃ/ខែ · `license_announcements`)។ ✅ Push (VAPID · FCM · `google-services.json`)
+  កំណត់រួច។ ⛔ ការសរសេរស្ថិតិយកត្រូវបដិសេធ ➜ ពិនិត្យ rules មុនកូដ (`$other` បដិសេធវាល
   ដែលមិនស្គាល់) · Activate ធ្លាក់ `seat-unavailable`/«Key នេះមិនមែនសម្រាប់ ZoeW» ➜ ពិនិត្យថាជា Key ចាស់ (`a: 'ADM'`) មុន។
 
 ---

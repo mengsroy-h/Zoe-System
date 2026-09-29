@@ -7,9 +7,9 @@ import { useStoreFields, useStoreValue } from '../hooks/useStore';
 import { refTo } from '../refs';
 import { hardwareScannerKeyPress } from '../behaviors/scanner-input';
 import { togglePanelFromHandle } from '../behaviors/panel-motion';
-import { EntryListTableBody } from './entry/EntryListTableBody';
+import { MemoEntryListTableBody } from './entry/EntryListTableBody';
 import { LockerListFilterSelect } from './entry/LockerListFilterSelect';
-import { LockerListTableBody } from './entry/LockerListTableBody';
+import { MemoLockerListTableBody } from './entry/LockerListTableBody';
 import { panelSectionClass } from './shell/panel-classes';
 
 const MODES: ReadonlyArray<{ mode: EntryMode; id: string; label: string; extra?: string }> = [
@@ -193,7 +193,7 @@ export function PageEntry() {
                                     </tr>
                                 </thead>
                                 <tbody id="entryListTableBody">
-                                    <EntryListTableBody />
+                                    <MemoEntryListTableBody />
                                 </tbody>
                             </table>
                         </div>
@@ -236,7 +236,7 @@ export function PageEntry() {
                                     </tr>
                                 </thead>
                                 <tbody id="lockerListTableBody">
-                                    <LockerListTableBody />
+                                    <MemoLockerListTableBody />
                                 </tbody>
                             </table>
                         </div>

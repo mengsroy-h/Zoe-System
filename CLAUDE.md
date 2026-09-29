@@ -99,7 +99,7 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.9` (`zoew-v236`) | `zoew` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.10` (`zoew-v237`) | `zoew` |
 | **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
@@ -423,6 +423,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ «រកមិនឃើញ»** | ⛔ ≠ កំហុស — HTTP 200 `found:false` គ្មានវាល `error` | `zto-proxy-test` |
 | **ZTO ៖ `ZTO_UPSTREAM_REJECTED` ជាកន្តុំរួម** | ⛔ វាលាយ **សាលក្រមស្ថាពរ** («លេខមិនស្គាល់» ៖ លេខតេស្ត · កញ្ចប់មិនមែន ZTO ➜ ការសាកម្តងទៀត **ឥតប្រយោជន៍**) ជាមួយ **សាលក្រមបណ្តោះអាសន្ន** («ZTO ដាច់ពិត» ➜ ការសាកម្តងទៀត **ត្រឹមត្រូវ**)។ ខាង client 5xx ជា retryable ➜ ការស្កេនលេខមិនស្គាល់ចំណាយ **២ ជុំ** រួចចេញ Sentry event។ ⛔ **កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់** — នោះនឹងបាំង **ការដាច់របស់ ZTO ពិត**។ ⛔ ហើយ **កុំទាយកូដណាមួយ** ៖ ការបំបែកត្រូវការ **payload ពិតរបស់ ZTO**។ ដូច្នេះជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ** ៖ `noteUpstreamReject()` កត់ `count · status · code` ចូល `?diag=1` ⛔ **ដោយមិនប្តូរសាលក្រម · cache · ការសាកម្តងទៀត** ➜ ជុំក្រោយសម្រេចដោយ **លេខ** មិនមែនការស្មាន។ ⛔ កូដត្រូវអានតាម `upstreamCodeText()` ដែលជា **ចំណុចច្របាច់តែមួយ** រួមនឹង `upstreamSucceeded()` (ច្បាប់ចម្លងទី ២ ➜ សាលក្រម និងការវិនិច្ឆ័យនិយាយផ្ទុយគ្នា) ហើយត្រូវឆ្លង `SAFE_REASON_RE` ➜ **សារឆៅរបស់ upstream មិនលេច** | `zto-proxy-test` |
 | **React ១០០% ៖ ម្ចាស់ DOM តែមួយ (ZoeW)** | ⛔ កូដមុខងារ **មិនប៉ះ DOM** ៖ ប្រអប់ = `uiState.modalDisplay` · អត្ថបទ/ទង់ = `viewState` · focus/តម្លៃ/វាស់ = `src/app/refs.ts` · ការលើកលែងក្នុង `platform/document-io.ts` (ហេតុផល + ពិដាន)។ ⛔ ស្រទាប់ React (`src/app/**`) ៖ class · style · attribute · អត្ថបទ · listener ជា JSX; ការសរសេរ DOM ដែលនៅសល់ (focus · រមូរ · `animate()` · input uncontrolled · `<html>`/`<body>` · `touch*` non-passive · `muted`) តែក្នុងច្រកចេញ `APP_ALLOWED`។ ⛔ សញ្ញា PTR គូរពី `ptrState` (មិនមែន `uiState`) · `boot-flags.js` មិនប៉ះធាតុរបស់ React · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិត (AST) · `commitNow()` មុនការវាស់/focus · input ជា **uncontrolled** (`defaultValue`/`defaultChecked`) · checker ដើមដែលសរសេរ class បកប្រែតែក្នុង build វាស់ (`src/audit-compat.ts`) | `npm run purity:check` (ZoeW) |
+| **បញ្ជីធំៗ ↔ ការគូរឡើងវិញ (ZoeW)** | ⛔ តារាងប្រវត្តិ **គ្មានពិដាន** (filter «ទាំងអស់» = ជួរដេករាប់ពាន់) ➜ body នៃបញ្ជី subscribe **តែវាល view របស់ខ្លួន** (`useStoreFields`) មិនមែន `useStore(uiState)` ទាំងមូល — វាល `markImmediate` (ហូតប្រអប់ · ម៉ឺនុយ · ប្រអប់ · `chromeHidden` ខណៈរមូរ) commit **ភ្លាម** ➜ ការគូរជួរដេកទាំងអស់រត់ខាងក្នុងផ្លូវចលនា។ ⛔ ឪពុកដែលគូរឡើងវិញរាល់ការហូត (`PageData` · `PageEntry`) ប្រើកំណែ `Memo…` (function ដើមនៅ export សម្រាប់ `react-view`) · `HistoryRow` ប្រៀបតាម **តម្លៃ** (`sameHistoryRowModel()` — Firebase ផ្តល់ object ថ្មីរាល់ snapshot)។ ⛔ ទិសផ្ទុយ ៖ ធាតុកែនៅនឹងកន្លែង + `renderHistory()` ត្រូវគូរ (`historyRenderSeq` ⛔ មិនមែន `uiState.touch()`) · listener ធ្លាក់ពេលបញ្ជីទទេ ➜ សារ «វាស់មិនបាន» (`firebaseState`) · អ្នកផលិត view ផ្សេងត្រូវ assign object **ថ្មី** (ការកែនៅនឹងកន្លែងមិនកេះការគូរ) | `ZoeW/tests/list-render-scope.test.tsx` |
 | **Toolchain ↔ អ្វីដែល ship (ZoeW)** | ⛔ checker CSS/ប្លង់វាស់ CSS **ប្រភព** ហើយ Chromium parse syntax ថ្មីបាន ➜ ការឡើង Vite/minifier អាចប្តូរ **output** ដោយគ្មានអ្នកវាស់។ ⛔ minifier CSS ជា **esbuild** (`cssMinify`) ៖ Lightning CSS (លំនាំដើម Vite) សរសេរ design token ឡើងវិញ និងរៀបលំដាប់ declaration ក្នុង CSS ដែលគ្រប PTR/ចលនាផ្ទាំង · JS ក្នុង build ត្រូវ parse បានក្នុង `build.target` (iPhone ចាស់) · ⛔ chunk ត្រូវបែងចែកតាម `codeSplitting` + `priority` (Rolldown ចាប់ dependency របស់ group ➜ helper `__vitePreload` ធ្លាក់ចូល chunk native ➜ web ផ្ទុកវា ➜ **ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត**)។ ⛔ config Android (SDK · AndroidX · AGP · Gradle) ស្ថិតក្នុងខ្សែ template របស់ **Capacitor ដែលដំឡើង** — លើសខ្សែនោះ = ឡើង Capacitor major (`ZoeW/docs/ANDROID.md`) ព្រោះ build Android វាស់មិនបាននៅទីនេះ | `npm run smoke` · `npm run android:check` · `npm run native:check` (ZoeW) |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
@@ -2204,11 +2205,12 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **2.42.9 merge រួច (PR #260) តែមិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9]) ៖ ហូតប្រអប់ប្រវត្តិលើ iPhone PWA ·
-  Android PWA · APK (តំបន់ហាមចូល ៖ ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK ដែល build ពី `main` (Netlify deploy រួច · រំពឹង
-  ~០.៦–០.៨ វិ. ដូច PWA)។ បញ្ហាលេចលើឧបករណ៍ពិត ➜ ប្រៀបនឹង 2.42.8 មុនសង្ស័យកូដផ្សេង។ ⛔ ភាពខុសគ្នា
-  រចនាសម្ព័ន្ធដែលនៅសល់រវាង APK និង PWA Android ៖ អ្នកស្តាប់ `touchmove` **non-passive** របស់ PTR (មានតែលើ APK) ➜ ការរមូរដំបូងរង់ចាំ
-  main thread ➜ កុំកែដោយគ្មានការវាស់លើទូរស័ព្ទពិត (ច្បាប់ ១១)។
+- ⏳ **2.42.9 (merge រួច · PR #260) និង 2.42.10 (branch) មិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9] · [2.42.10]) ៖
+  ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម **លើ filter «ទាំងអស់» ជួរដេកច្រើន** លើ iPhone PWA · Android PWA · APK (តំបន់ហាមចូល ៖
+  ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK ដែល build ពី `main` (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ បញ្ហាលេចលើឧបករណ៍ពិត ➜
+  ប្រៀបនឹងកំណែមុនសិន មុនសង្ស័យកូដផ្សេង។ ⛔ អ្វីដែលវាស់រួចតែនៅសល់ (មិនទាន់កែ · ត្រូវវាស់លើទូរស័ព្ទពិតមុន · ច្បាប់ ១១) ៖ PrePaint/HitTest
+  ដែលកើនតាមទំហំ DOM ពេលហូត (`will-change: transform` លើ `.page-main` បន្ថយ PrePaint ~៣០–៥០% ក្នុង Chromium) · layout តារាងធុងសំរាម
+  ២០០ ក្រុម · `touchmove` **non-passive** របស់ PTR (មានតែលើ APK ➜ ការរមូរដំបូងរង់ចាំ main thread)។
 - ⏳ **Release APK ស្វ័យប្រវត្តិ** (keystore `CN=ZoeW` · pin `ZoeW/android/release-cert.sha256`) — workflow `Android APK` មិនទាន់
   បង្កើត Release ទេ រហូតដល់ secret ៤ (`ZoeW/docs/ANDROID.md`) ត្រូវកំណត់ **និង** កូតា GitHub Actions វិលមក ➜ **Run workflow** ដោយដៃ។
   ⛔ keystore ផ្សេង ➜ ជំហានផ្ទៀង pin ធ្លាក់ ➜ គ្មាន Release (ត្រឹមត្រូវ) · ⛔ កុំបង្កើត keystore ថ្មី។

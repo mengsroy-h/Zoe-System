@@ -102,3 +102,24 @@ export function buildHistoryRowModel(item: any, rowNum: number, isOld: boolean, 
         closeIsReopen: !!item.isClosed
     };
 }
+
+function sameFlatValue(a: unknown, b: unknown): boolean {
+    if (Object.is(a, b)) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+    const keys = Object.keys(a);
+    if (keys.length !== Object.keys(b).length) return false;
+    for (const k of keys) {
+        if (!Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+    }
+    return true;
+}
+
+export function sameHistoryRowModel(a: HistoryRowModel, b: HistoryRowModel): boolean {
+    if (a === b) return true;
+    const keys = Object.keys(a) as (keyof HistoryRowModel)[];
+    if (keys.length !== Object.keys(b).length) return false;
+    for (const k of keys) {
+        if (!sameFlatValue(a[k], b[k])) return false;
+    }
+    return true;
+}

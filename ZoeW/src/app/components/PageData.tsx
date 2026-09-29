@@ -8,7 +8,7 @@ import { phoneSearchBlurred, phoneSearchFocused, phoneSearchKeyDown } from '../b
 import { togglePanelFromHandle } from '../behaviors/panel-motion';
 import { showPhoneSuggestions } from '../../features/phone-suggest';
 import { ZtoSyncBanner } from './zto/ZtoSyncBanner';
-import { HistoryTableBody } from './history/HistoryTableBody';
+import { MemoHistoryTableBody } from './history/HistoryTableBody';
 import { panelSectionClass, pageClass } from './shell/panel-classes';
 
 const FILTERS = [
@@ -194,7 +194,7 @@ export function PageData() {
                                 </tr>
                             </thead>
                             <tbody id="historyTableBody">
-                                <HistoryTableBody />
+                                <MemoHistoryTableBody />
                             </tbody>
                         </table>
                     </div>

@@ -252,6 +252,7 @@ export interface UiState {
     scanRemoveInFlight: any;
     pendingPermanentDeleteId: any;
     historyView: any[] | null;
+    historyRenderSeq: number;
     entryListView: any[] | null;
     lockerListView: any | null;
     trashSummary: any | null;
@@ -327,6 +328,7 @@ export const uiState = createStore<UiState>('uiState', {
     scanRemoveInFlight: null,
     pendingPermanentDeleteId: null,
     historyView: null,
+    historyRenderSeq: 0,
     entryListView: null,
     lockerListView: null,
     trashSummary: null,

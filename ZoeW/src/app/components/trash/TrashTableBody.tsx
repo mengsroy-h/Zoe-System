@@ -1,8 +1,10 @@
 import { Fragment } from 'react';
 import { uiState } from '../../../core/state';
-import { useStore } from '../../hooks/useStore';
+import { useStoreFields } from '../../hooks/useStore';
 import { onAct } from '../../actions';
 import type { TrashRowModel, TrashView } from './model';
+
+const TRASH_VIEW_FIELDS = ['trashView'] as const;
 
 function RowActions({ id }: { id: string }) {
     return (
@@ -45,8 +47,7 @@ function GroupRow({ row }: { row: TrashRowModel }) {
 }
 
 export function TrashTableBody() {
-    useStore(uiState);
-    const view = uiState.trashView as TrashView | null;
+    const view = useStoreFields(uiState, TRASH_VIEW_FIELDS).trashView as TrashView | null;
     if (!view) return null;
 
     if (view.empty !== null) {

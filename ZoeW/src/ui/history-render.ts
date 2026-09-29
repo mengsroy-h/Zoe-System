@@ -11,7 +11,7 @@ export function renderHistory(dataToRender = dataState.scanHistory) {
     viewState.historyCountText = String(dataToRender.length);
 
     uiState.historyView = dataToRender;
-    uiState.touch();
+    uiState.historyRenderSeq = uiState.historyRenderSeq + 1;
 
     if (dataToRender.length === 0) return;
 

@@ -20,7 +20,7 @@ export const PUSH_SCHEDULE_MIN_GAP_MS = 10 * 60 * 1000;
 export const PUSH_SCHEDULE_REFRESH_MS = 6 * 60 * 60 * 1000;
 export const FCM_CHANNEL_ID = 'zoew_notify';
 export const PUSH_OPEN_PARAM = 'notify';
-export const pushNativeBuild = { fcm: __FCM_CONFIGURED__ };
+export const pushNativeBuild = { fcm: typeof __FCM_CONFIGURED__ !== 'undefined' && __FCM_CONFIGURED__ === true };
 
 export const PUSH_STATUS_TEXT: Record<PushStatus, string> = {
     unknown: '⏳ កំពុងពិនិត្យ…',
@@ -44,7 +44,7 @@ interface PushSaved {
     schedAt: number;
 }
 
-const runtime = {
+export const pushRuntime = {
     nativeListeners: false,
     nativeEnabling: false,
     scheduleAttemptAt: 0,
@@ -194,10 +194,10 @@ function loadNativePush(): Promise<any> {
 
 async function onNativeToken(token: string) {
     const license = activationKey();
-    if (!license) { setStatus('no-license'); runtime.nativeEnabling = false; return; }
+    if (!license) { setStatus('no-license'); pushRuntime.nativeEnabling = false; return; }
     const reply = await postPush('subscribe', { license: license, platform: 'android', sub: { kind: 'fcm', token: token } });
-    const enabling = runtime.nativeEnabling;
-    runtime.nativeEnabling = false;
+    const enabling = pushRuntime.nativeEnabling;
+    pushRuntime.nativeEnabling = false;
     if (replyOk(reply)) {
         writeSaved({ on: true, kind: 'fcm', syncedAt: Date.now() });
         setStatus('on');
@@ -208,18 +208,18 @@ async function onNativeToken(token: string) {
 }
 
 export async function ensureNativePushListeners(PN?: any) {
-    if (runtime.nativeListeners || !isNativeAndroid() || !pushNativeBuild.fcm) return;
-    runtime.nativeListeners = true;
+    if (pushRuntime.nativeListeners || !isNativeAndroid() || !pushNativeBuild.fcm) return;
+    pushRuntime.nativeListeners = true;
     try {
         const plugin = PN || await loadNativePush();
         await plugin.addListener('registration', (t: any) => { if (t && typeof t.value === 'string') onNativeToken(t.value); });
         await plugin.addListener('registrationError', () => {
-            if (runtime.nativeEnabling) { runtime.nativeEnabling = false; setStatus('error'); }
+            if (pushRuntime.nativeEnabling) { pushRuntime.nativeEnabling = false; setStatus('error'); }
         });
         await plugin.addListener('pushNotificationActionPerformed', () => { openNotifyDrawer(); });
         await plugin.addListener('pushNotificationReceived', () => { fetchNotifyFeed(true); });
     } catch (e) {
-        runtime.nativeListeners = false;
+        pushRuntime.nativeListeners = false;
     }
 }
 
@@ -241,11 +241,11 @@ async function enableNative(): Promise<boolean> {
             vibration: true
         });
         await ensureNativePushListeners(PN);
-        runtime.nativeEnabling = true;
+        pushRuntime.nativeEnabling = true;
         await PN.register();
         return true;
     } catch (e) {
-        runtime.nativeEnabling = false;
+        pushRuntime.nativeEnabling = false;
         setStatus('error');
         return false;
     }
@@ -350,18 +350,18 @@ export function scheduleSignature(times: number[]): string {
 
 export function syncExpirySchedule(force?: boolean): Promise<boolean> {
     const saved = readSaved();
-    if (!saved.on || runtime.scheduleInFlight) return Promise.resolve(false);
+    if (!saved.on || pushRuntime.scheduleInFlight) return Promise.resolve(false);
     if (!firebaseState.isDatabaseInitialized || dbListenerViewIsStale(DB_LISTENER_KEY_HISTORY)) return Promise.resolve(false);
-    if (!force && elapsedSince(runtime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
+    if (!force && elapsedSince(pushRuntime.scheduleAttemptAt) < PUSH_SCHEDULE_MIN_GAP_MS) return Promise.resolve(false);
     const license = activationKey();
     if (!license) return Promise.resolve(false);
     const times = expiryScheduleTimes(dataState.scanHistory, getServerNow());
     const sig = scheduleSignature(times);
     if (!force && sig === saved.schedSig && elapsedSince(saved.schedAt) < PUSH_SCHEDULE_REFRESH_MS) return Promise.resolve(false);
-    runtime.scheduleAttemptAt = Date.now();
-    runtime.scheduleInFlight = true;
+    pushRuntime.scheduleAttemptAt = Date.now();
+    pushRuntime.scheduleInFlight = true;
     return postPush('schedule', { license: license, times: times }).then((reply) => {
-        runtime.scheduleInFlight = false;
+        pushRuntime.scheduleInFlight = false;
         if (!replyOk(reply)) return false;
         writeSaved({ schedSig: sig, schedAt: Date.now() });
         return true;
@@ -389,9 +389,3 @@ export function handleServiceWorkerMessage(data: any) {
     else if (data.type === 'zoew-push') fetchNotifyFeed(true);
 }
 
-export function resetPushRuntimeForTests() {
-    runtime.nativeListeners = false;
-    runtime.nativeEnabling = false;
-    runtime.scheduleAttemptAt = 0;
-    runtime.scheduleInFlight = false;
-}

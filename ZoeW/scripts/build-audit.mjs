@@ -77,7 +77,7 @@ await build({
     //    (`minify: false`)
     keepNames: false,
     legalComments: 'none',
-    define: { __APP_VERSION__: JSON.stringify(version), __CACHE_VERSION__: JSON.stringify(cacheVersion) },
+    define: { __APP_VERSION__: JSON.stringify(version), __CACHE_VERSION__: JSON.stringify(cacheVersion), __FCM_CONFIGURED__: 'false' },
     outfile: path.join(APP, 'app.js')
 });
 rmSync(entry);
@@ -163,14 +163,14 @@ rmSync(entry);
         // ⛔ state ដើមជា `let` កម្រិតកំពូល (ដូច `app.js` ដើម) ភ្លាមក្រោយឃ្លាំង ➜ dependency របស់តម្លៃដំបូងប្រកាសរួច
         if (rel === 'src/core/state.ts') text += stateDeclarations(view, stateGroups);
     }
-    text = text.replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
+    text = text.replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion)).replace(/__FCM_CONFIGURED__/g, 'false');
     const aliased = aliasStateFields(text, stateGroups);
     text = aliased.text;
     if (aliased.count < 500) throw new Error('build-audit ៖ ការប្តូរ `<ឃ្លាំង>.<វាល>` តិចពេក ៖ ' + aliased.count);
     writeFileSync(appPath, text);
     writeFileSync(path.join(APP, 'view-originals.js'), originals.join('\n\n') + '\n');
     for (const rel of Object.keys(moduleViews)) {
-        const v = moduleViews[rel].replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion));
+        const v = moduleViews[rel].replace(/__APP_VERSION__/g, JSON.stringify(version)).replace(/__CACHE_VERSION__/g, JSON.stringify(cacheVersion)).replace(/__FCM_CONFIGURED__/g, 'false');
         moduleViews[rel] = aliasStateFields(v, stateGroups).text;
     }
     writeFileSync(path.join(APP, 'audit-module-views.json'), JSON.stringify(moduleViews));

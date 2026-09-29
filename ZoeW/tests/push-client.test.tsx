@@ -34,7 +34,7 @@ import { ABANDON_AGE_MS } from '../src/features/session';
 import { abandonAtOf, expiryScheduleTimes, NOTIFY_SCHEDULE_HORIZON_MS } from '../src/features/notifications';
 import {
     FCM_CHANNEL_ID, PUSH_STATE_KEY, PUSH_STATUS_TEXT, consumePushOpenRequest, disablePush, enablePush, handleServiceWorkerMessage,
-    pushNativeBuild, pushSupport, refreshPushStatus, resetPushRuntimeForTests, syncExpirySchedule, ensureNativePushListeners
+    pushNativeBuild, pushRuntime, pushSupport, refreshPushStatus, syncExpirySchedule, ensureNativePushListeners
 } from '../src/features/push';
 import { closeSideDrawer } from '../src/ui/page-nav';
 import { NotifyDrawer } from '../src/app/components/NotifyDrawer';
@@ -92,7 +92,7 @@ beforeEach(() => {
     posts.length = 0;
     try { localStorage.clear(); } catch {}
     uiState.pushStatus = 'unknown';
-    resetPushRuntimeForTests();
+    Object.assign(pushRuntime, { nativeListeners: false, nativeEnabling: false, scheduleAttemptAt: 0, scheduleInFlight: false });
     pushNativeBuild.fcm = true;
     setLicense(LICENSE);
     delete (window as any).Capacitor;
@@ -136,7 +136,7 @@ describe('បើក/បិទ លើ web', () => {
         expect(order[0]).toBe('requestPermission');
         expect(await p).toBe(true);
         expect(uiState.pushStatus).toBe('on');
-        const key = w.pushManager.subscribe.mock.calls[0][0].applicationServerKey as Uint8Array;
+        const key = ((w.pushManager.subscribe.mock.calls[0] as any[])[0] as any).applicationServerKey as Uint8Array;
         expect(key.length).toBe(65);
         expect(key[0]).toBe(4);
         const sub = posts.find((x) => x.op === 'subscribe')!;
@@ -212,7 +212,7 @@ describe('APK (FCM)', () => {
         stubServer();
         expect(await enablePush()).toBe(true);
         expect(pn.requestPermissions).toHaveBeenCalled();
-        expect(pn.createChannel.mock.calls[0][0]).toMatchObject({ id: FCM_CHANNEL_ID, importance: 5 });
+        expect((pn.createChannel.mock.calls[0] as any[])[0]).toMatchObject({ id: FCM_CHANNEL_ID, importance: 5 });
         expect(pn.register).toHaveBeenCalled();
         expect(uiState.pushStatus).toBe('busy');
         await pn.listeners.registration({ value: 'fcmToken:' + 'x'.repeat(40) });

@@ -103,6 +103,7 @@ export const ACTION_ALLOWLIST = [
     "selectCustomLocker",
     "setCallMark",
     "setEntryScanMode",
+    "showMoreTrashRows",
     "submitActivationKey",
     "submitAppLockForm",
     "submitLoginForm",

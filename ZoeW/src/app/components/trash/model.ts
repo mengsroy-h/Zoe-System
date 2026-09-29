@@ -35,6 +35,7 @@ export interface TrashRowModel {
 export interface TrashView {
     empty: string | null;
     rows: TrashRowModel[];
+    more: number;
     overflow: number;
 }
 

@@ -23,7 +23,7 @@ import { confirmPhone } from '../features/scan-action';
 import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '../features/scan-remove';
 import { applySheetImportHeaderRow, closeSheetImportModal, drawerSheetImportFlow, editSheetImportConfig, handleSheetImportFileInput, loadSheetImportSelectedSheet, pickSheetImportFile, renderSheetImportPreview, resetSheetImportFileSelection, runSheetImport, runSheetImportClear, saveSheetImportConfig } from '../features/sheet-import';
 import { openCollectedStatsModal, openDailyStatsModal, submitManualAdjustment } from '../features/stats-modals';
-import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, toggleTrashGroup } from '../features/trash';
+import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, showMoreTrashRows, toggleTrashGroup } from '../features/trash';
 import { closeZtoListSyncModal, drawerZtoListSyncFlow, importZtoListRows, openZtoListSyncModal, runZtoListSyncPreview } from '../features/zto-list-sync';
 import { closeZtoSyncModal, drawerZtoAutoCloseFlow, openZtoSyncModal, recheckZtoPickupStatus } from '../features/zto-status';
 import { requestCameraPermission, toggleTorch } from '../services/camera';
@@ -139,6 +139,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     selectCustomLocker,
     setCallMark,
     setEntryScanMode,
+    showMoreTrashRows,
     submitActivationKey,
     submitAppLockForm,
     submitLoginForm,

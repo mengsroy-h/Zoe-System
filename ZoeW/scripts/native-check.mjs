@@ -421,10 +421,26 @@ await scenario('៤ឃ. ពណ៌រូបតំណាងរបាស្ថា�
     });
     ok('(លក្ខខណ្ឌចាំបាច់) safe-area ពិត ៖ navbar ទទួល padding ពី env() ហើយឈរក្រោមរបា', nav.padTop >= 24 + 8 && nav.topIsNavbar, nav);
     ok('navbar ស ក្រោមរបា ➜ រូបតំណាងខ្មៅ (LIGHT)', (await lastStatus()) === 'LIGHT', { style: await lastStatus(), bg: nav.bg });
+    /* ⛔ ការវាស់ពណ៌ = `elementsFromPoint` ×៥ + `getComputedStyle` ➜ បង្ខំ layout + hit-test ទំព័រទាំងមូល ➜ វាត្រូវរត់តែពេល
+       **ស្រទាប់ក្រោមរបា** ប្រែ (ប្រអប់ · របា Slide · ផ្ទាំង 🔔 · សោ App) ⛔ មិនមែនរាល់ការប្រែ uiState (ហូតប្រអប់ · លាក់របា ·
+       toast) ៖ វាស់បានលើ ៥០០ ជួរ ≈ ៦០ ms/ការហូត ក្រោម CPU ×4 កណ្តាលចលនា ហើយវាមានតែក្នុង APK (PWA គ្មាន)។ */
+    await page.evaluate(() => {
+        const orig = Document.prototype.elementsFromPoint;
+        window.__efpCalls = 0;
+        Document.prototype.elementsFromPoint = function (x, y) { window.__efpCalls++; return orig.call(this, x, y); };
+    });
+    await page.click('#dragHandle');
+    await page.waitForTimeout(900);
+    await page.click('#dragHandle');
+    await page.waitForTimeout(900);
+    ok('(លក្ខខណ្ឌចាំបាច់) ការហូតប្រអប់ប្រវត្តិបានរត់ (uiState ប្រែ)', await page.evaluate(() => typeof window.__efpCalls === 'number'));
+    ok('ហូតប្រអប់ ២ ដង (គ្មានស្រទាប់ក្រោមរបាប្រែ) ➜ មិនវាស់ពណ៌ (គ្មាន elementsFromPoint)', (await page.evaluate(() => window.__efpCalls)) === 0,
+        await page.evaluate(() => window.__efpCalls));
     await page.click('.daily-stats-btn');
     await page.waitForTimeout(700);
     ok('(លក្ខខណ្ឌចាំបាច់) ប្រអប់បើក', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display !== 'none'));
     ok('ប្រអប់បើក (ផ្ទៃងងឹតថ្លាៗ) ➜ រូបតំណាងស (DARK)', (await lastStatus()) === 'DARK', await lastStatus());
+    ok('ទិសផ្ទុយ ៖ ប្រអប់បើក (ស្រទាប់ប្រែ) ➜ វាស់ពណ៌ពិត', (await page.evaluate(() => window.__efpCalls)) > 0, await page.evaluate(() => window.__efpCalls));
     await fire(page, 'App', 'backButton', { canGoBack: false });
     await page.waitForTimeout(700);
     ok('(លក្ខខណ្ឌចាំបាច់) Back ➜ ប្រអប់បិទ', await page.evaluate(() => getComputedStyle(document.getElementById('dailyStatsModal')).display === 'none'));

@@ -1,7 +1,7 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { uiState } from '../../../core/state';
 import { useStoreFields } from '../../hooks/useStore';
-import { onAct } from '../../actions';
+import { act, onAct } from '../../actions';
 import type { TrashRowModel, TrashView } from './model';
 
 const TRASH_VIEW_FIELDS = ['trashView'] as const;
@@ -61,6 +61,7 @@ export function TrashTableBody() {
             {view.rows.map((row) => (
                 <ObservedGroup key={row.key} row={row} />
             ))}
+            {view.more > 0 ? <TrashMoreRow more={view.more} shown={view.rows.length} /> : null}
             {view.overflow > 0 && (
                 <tr>
                     <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '8px' }}>
@@ -69,6 +70,30 @@ export function TrashTableBody() {
                 </tr>
             )}
         </>
+    );
+}
+
+function TrashMoreRow({ more, shown }: { more: number; shown: number }) {
+    const ref = useRef<HTMLTableRowElement | null>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof IntersectionObserver !== 'function') return;
+        const root = el.closest('.trash-table-wrap');
+        let fired = false;
+        const io = new IntersectionObserver((entries) => {
+            if (fired || !entries.some((e) => e.isIntersecting)) return;
+            fired = true;
+            act('showMoreTrashRows');
+        }, { root, rootMargin: '0px 0px 240px 0px' });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [shown]);
+    return (
+        <tr className="trash-more-row" ref={ref}>
+            <td colSpan={3} style={{ textAlign: 'center', padding: '8px' }}>
+                <button type="button" className="btn-sm trash-more-btn" onClick={onAct('showMoreTrashRows')}>⬇️ បង្ហាញ {more} ក្រុមទៀត</button>
+            </td>
+        </tr>
     );
 }
 

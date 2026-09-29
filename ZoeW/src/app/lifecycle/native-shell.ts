@@ -1,4 +1,5 @@
 import { securityState, uiState } from '../../core/state';
+import { viewState } from '../../core/view-state';
 import { noteAppLockAway, relockAppAfterAway } from '../../features/app-lock';
 import { setEntryScanMode } from '../../features/scan-remove';
 import { isNativeAndroid } from '../../platform/native';
@@ -38,13 +39,18 @@ export function setupNativeShell(scope: LifecycleScope): void {
         scope.listen(window, 'resize', applyBarStyles);
         let frame = 0;
         let settle: ReturnType<typeof setTimeout> | null = null;
+        let layers = statusBarLayerSignature();
         const scheduleBarStyles = () => {
+            const next = statusBarLayerSignature();
+            if (next === layers) return;
+            layers = next;
             if (!frame) frame = requestAnimationFrame(() => { frame = 0; applyBarStyles(); });
             if (settle) clearTimeout(settle);
             settle = setTimeout(() => { settle = null; applyBarStyles(); }, STATUS_BAR_SETTLE_MS);
         };
         scope.onDispose(uiState.subscribe(scheduleBarStyles));
         scope.onDispose(securityState.subscribe(scheduleBarStyles));
+        scope.onDispose(viewState.subscribe(scheduleBarStyles));
         scope.onDispose(() => {
             if (frame) cancelAnimationFrame(frame);
             if (settle) clearTimeout(settle);
@@ -66,6 +72,13 @@ export function handleNativeBack(minimize: () => void, history?: BackHistory): v
 function restoreScreen(target: Screen): void {
     if (uiState.currentAppPage !== target.page) switchAppPage(target.page);
     if (target.page === 'entry' && target.mode && uiState.entryScanMode !== target.mode) setEntryScanMode(target.mode);
+}
+
+export function statusBarLayerSignature(): string {
+    const shown = uiState.modalDisplay || {};
+    const modals = Object.keys(shown).filter((id) => shown[id] === 'flex').sort().join(',');
+    return [modals, uiState.drawerOpen ? 1 : 0, uiState.notifyDrawerOpen ? 1 : 0, uiState.moreMenuOpen ? 1 : 0,
+        securityState.appIsLocked ? 1 : 0, viewState.appLockOpen ? 1 : 0, viewState.bootSplashPhase].join('|');
 }
 
 export function statusBarInsetPx(): number {

@@ -257,6 +257,7 @@ export interface UiState {
     lockerListView: any | null;
     trashSummary: any | null;
     trashView: any | null;
+    trashRenderLimit: number;
     monthlyReportView: any | null;
     dailyStatsView: any | null;
     collectedStatsView: any | null;
@@ -340,6 +341,7 @@ export const uiState = createStore<UiState>('uiState', {
     lockerListView: null,
     trashSummary: null,
     trashView: null,
+    trashRenderLimit: 20,
     monthlyReportView: null,
     dailyStatsView: null,
     collectedStatsView: null,

@@ -55,7 +55,7 @@ function realDecl(name) {
 }
 
 const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
-    'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
+    'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'fetchWithTimeout', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
     'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession'];
 const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',
     'ZOEW_PUSH_ORIGIN', 'NOTICE_PUSH_KICK_TIMEOUT_MS'];

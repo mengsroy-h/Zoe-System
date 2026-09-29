@@ -2407,24 +2407,15 @@ function noticeRowsOf(raw) {
 }
 
 function kickNoticePush() {
-    if (typeof fetch !== 'function') return Promise.resolve(false);
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    let timer = null;
-    return new Promise((resolve) => {
-        timer = setTimeout(() => {
-            if (controller) { try { controller.abort(); } catch (e) {} }
-            resolve(false);
-        }, NOTICE_PUSH_KICK_TIMEOUT_MS);
-        fetch(ZOEW_PUSH_ORIGIN + '/.netlify/functions/push?op=kick', {
+    try {
+        return fetchWithTimeout(ZOEW_PUSH_ORIGIN + '/.netlify/functions/push?op=kick', {
             method: 'POST',
             mode: 'no-cors',
-            cache: 'no-store',
-            signal: controller ? controller.signal : undefined
-        }).then(() => resolve(true), () => resolve(false));
-    }).then((ok) => {
-        clearTimeout(timer);
-        return ok;
-    });
+            cache: 'no-store'
+        }, NOTICE_PUSH_KICK_TIMEOUT_MS, 'Notice push kick timed out').then(() => true, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
 }
 
 function setNoticeSendBusy(busy) {

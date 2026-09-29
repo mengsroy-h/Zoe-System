@@ -267,6 +267,9 @@ describe('កាលវិភាគផុតកំណត់ (ផ្ញើទៅ s
         expect(abandonAtOf({ code: 'C', isClosed: true }, parentAt, NOW, NOTIFY_SCHEDULE_HORIZON_MS)).toBe(-1);
         expect(abandonAtOf(b, NOW - ABANDON_AGE_MS - 1, NOW, NOTIFY_SCHEDULE_HORIZON_MS)).toBe(-1);
         expect(abandonAtOf(b, NOW + NOTIFY_SCHEDULE_HORIZON_MS, NOW, NOTIFY_SCHEDULE_HORIZON_MS)).toBe(-1);
+        expect(abandonAtOf(b, parentAt, NOW, Infinity)).toBe(-1);
+        expect(abandonAtOf(b, parentAt, NaN, NOTIFY_SCHEDULE_HORIZON_MS)).toBe(-1);
+        expect(abandonAtOf(b, parentAt, NOW, -1)).toBe(-1);
     });
 
     it('ផ្ញើតែម៉ោង (គ្មានលេខទូរស័ព្ទ/barcode) · រំលងជួរដេកបិទ/កំពុង Clear · ទិដ្ឋភាពមិនស្រស់ ➜ មិនផ្ញើ · មិនប្រែ ➜ មិនផ្ញើម្តងទៀត', async () => {

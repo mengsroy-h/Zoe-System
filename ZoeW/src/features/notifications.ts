@@ -71,13 +71,16 @@ export const NOTIFY_SCHEDULE_HORIZON_MS = 8 * 24 * NOTIFY_HOUR_MS;
 export const NOTIFY_SCHEDULE_STEP_MS = 60 * 1000;
 export const NOTIFY_SCHEDULE_MAX = 2000;
 
+export const NOTIFY_SCHEDULE_SEARCH_MAX = 64;
+
 export function abandonAtOf(barcode, parentAt, now, horizonMs) {
     if (!barcode || barcode.isClosed) return -1;
+    if (!isFinite(now) || !isFinite(horizonMs) || horizonMs <= 0) return -1;
     if (barcodeAbandonIsRipe(barcode, parentAt, now)) return -1;
     let hi = now + horizonMs;
     if (!barcodeAbandonIsRipe(barcode, parentAt, hi)) return -1;
     let lo = now;
-    while (hi - lo > NOTIFY_SCHEDULE_STEP_MS) {
+    for (let step = 0; step < NOTIFY_SCHEDULE_SEARCH_MAX && hi - lo > NOTIFY_SCHEDULE_STEP_MS; step++) {
         const mid = Math.floor((lo + hi) / 2);
         if (barcodeAbandonIsRipe(barcode, parentAt, mid)) hi = mid;
         else lo = mid;

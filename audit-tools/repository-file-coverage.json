@@ -2201,6 +2201,9 @@
     "audit-tools/sw-cache-key-test.js": {
       "policy": "guard-1"
     },
+    "audit-tools/sw-client-wiring-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/sw-install-integrity-test.js": {
       "policy": "guard-1"
     },

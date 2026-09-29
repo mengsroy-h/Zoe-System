@@ -279,6 +279,7 @@ bash audit-tools/emu/rules.sh
 | `sw-cache-failure-test.js` | Cache API បរាជ័យ ≠ App ដាច់ | `SWFAIL_APP_DIR` |
 | `sw-revalidate-pressure-test.js` | ការធ្វើឲ្យសំបកស្រស់ មិនស៊ីកូតាការតភ្ជាប់ | `SWREVAL_APP_DIR` |
 | `sw-abort-propagation-test.js` | SW គោរព caller abort | `SWABORT_APP_DIR` |
+| `sw-client-wiring-test.js` | ខ្សែភ្ជាប់ SW ↔ ទំព័រ ក្នុង `registerServiceWorker()` លើ App · SW · Chromium ពិត ៖ សារដែល SW ពិតផ្ញើ (`zoew-open-notify` ➜ ផ្ទាំង 🔔 · `zoew-push` ➜ ទាញដំណឹង · ប្រភេទដេរីវេពី `sw.js`) · `visibilitychange`/`focus`/`online` ➜ `reg.update()` ក្រោយពិដាន ១៥ នាទី · deploy ថ្មី ➜ `controllerchange` ➜ ផ្ទាំង «មានកំណែថ្មី» (ទិសផ្ទុយ ៖ ការដំឡើងដំបូង · សារមិនស្គាល់ · មុនពិដាន) | `SWWIRE_APP_DIR` |
 | `offline-shell-test.js` | ស្កេនដើរពេលបណ្តាញដាច់ (គ្មានការពឹងលើ CDN) | `OFFLINE_APP_DIR` |
 | `sdk-surface.js` | `fb.X` ដែល loader មិន export ➜ `undefined` ស្ងាត់ | `SDKSURFACE_APP_DIR` |
 | `sdk-offline-boot-test.js` | បើកក្រៅបណ្តាញ ➜ ស្ថានភាព «ក្រៅបណ្ដាញ» មិនមែនប្រអប់ Config | `SDKBOOT_APP_DIR` |

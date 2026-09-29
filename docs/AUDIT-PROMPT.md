@@ -29,7 +29,9 @@
 ជាភស្តុតាងដែលខ្លាំងជាងការអាន rules។ (៥) mutation testing ផ្នែកបណ្តាញ (១៥ + M11b) ៖ M14 រស់ព្រោះ checker ស្រង់តែ function មានឈ្មោះ
 ខណៈ handler `offline`/`online` ជា arrow ក្នុង `setupConnectionRecovery()` ➜ ⛔ សួរ «handler ព្រឹត្តិការណ៍ណាខ្លះគ្មាននរណារត់?»។ M11b រស់ព្រោះការអះអាង
 cooldown វាស់ **ថេរ** មិនមែនផ្លូវពិត ➜ ⛔ ពេលកូដមួយក្លាយជាស្ថាពរដោយ **កូដ ឬ HTTP status** ត្រូវវាស់កូដដែលមក **ជាមួយ status ផ្សេង** (503) — ករណី 401
-(M11) ជា equivalent ➜ កុំចាក់សោវា។ លទ្ធផលពេញ ៖ `docs/HISTORY.md` ផ្នែក ២។
+(M11) ជា equivalent ➜ កុំចាក់សោវា។ (៦) mutation ជុំ ២ ៖ ខ្សែភ្ជាប់ SW ↔ ទំព័រ (`'message'` · `controllerchange` · `visibilitychange` ក្នុង
+`registerServiceWorker()`) រស់រានទាំង ៣ ខណៈ **ចុងទាំង ២** មានតេស្ត ➜ ⛔ ពេលឃើញ «SW ផ្ញើ X មានតេស្ត · handler X មានតេស្ត» សួរ «អ្នកណារត់ផ្លូវពីចុងមួយទៅចុងមួយទៀត?»
+➜ `ctx.serviceWorkers()` ➜ `evaluate` ក្នុង SW ពិត (`sw-client-wiring-test`)។ លទ្ធផលពេញ ៖ `docs/HISTORY.md` ផ្នែក ២។
 
 ## តារាងជុំមុន (2026-09-29 · ZoeW 2.45.3 · ZoeKeyGen 2.22.0)
 

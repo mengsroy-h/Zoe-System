@@ -218,6 +218,7 @@
 - ⛔ **APK** ៖ License Project ➜ Add app ➜ Android `com.zoesystem.zoew` ➜ `google-services.json` ➜ GitHub secret `ZOEW_GOOGLE_SERVICES_JSON` ➜ build APK ថ្មី។
 - Deploy ZoeW (Function `push` · `push-cron` · Blobs រត់ដោយខ្លួនឯង) និង ZoeKeyGen (CSP `connect-src` ថ្មី)។ គ្មាន Firebase rules ថ្មី។
 - iPhone ៖ ត្រូវដំឡើង PWA លើ Home Screen (iOS 16.4+)។
+- ✅ **ធ្វើរួច** ៖ ម្ចាស់គម្រោងបញ្ជាក់ (2026-09-29) ថា env Push · `google-services.json` កំណត់រួច ហើយដំណើរការត្រឹមត្រូវ។
 
 ### [2.44.0] — 2026-09-29 · ZoeKeyGen `2.21.0` ៖ **ផ្ញើដំណឹងទៅ ZoeW** · ZoeW ៖ **ដំណឹងពីអ្នកលក់ក្នុងផ្ទាំង 🔔** (merge រួច · PR #267 ➜ PR #266)
 
@@ -261,6 +262,7 @@
   (node ថ្មី `license_announcements`)។ មុន Publish ៖ ZoeKeyGen រាយ «⚠️ អានបញ្ជីដំណឹងមិនបាន» ហើយការផ្ញើធ្លាក់ · ZoeW មិនឃើញដំណឹង (អ្វីផ្សេងដើរដូចមុន)។
 - Deploy ZoeKeyGen និង ZoeW (Netlify ពី `main`) · ⛔ APK ៖ កូដអានដំណឹងនៅក្នុង bundle ➜ **build APK ថ្មី** (ក្រោយនោះ ដំណឹងថ្មីៗទៅដល់ដោយមិន build ទៀត)។
 - ⚠️ ដំណឹង **អ្នកណាក៏អានបាន** (ដូច `announcements.json`) — កុំដាក់ព័ត៌មានសម្ងាត់ លេខទូរស័ព្ទអតិថិជន ឬ Key។
+- ✅ **ធ្វើរួច** ៖ ម្ចាស់គម្រោងបញ្ជាក់ (2026-09-29) ថា rules របស់ License Project Publish រួច ហើយដំណឹងដំណើរការត្រឹមត្រូវ។
 
 ### [2.43.0] — 2026-09-29 · ZoeW ៖ **ផ្ទាំងជូនដំណឹង 🔔 (ខាងស្តាំ)** · **logo ដូច App icon** · ZoeKeyGen `2.20.7` ៖ **logo ដូច App icon** (merge រួច · PR #266)
 
@@ -593,6 +595,7 @@
 - គ្មាន env ថ្មី ➜ merge ពេលម្ចាស់គម្រោងស្នើ ➜ Netlify build ខ្លួនឯង (`zoew-v234` · `zoekeygen-v104`)។
 - **សាកលើឧបករណ៍ពិត (ស្រេចចិត្ត)** ៖ បើក App (online) ➜ បិទ WiFi/Data ➜ បិទ App ទាំងស្រុង ➜ បើកវិញក្រៅបណ្តាញ ➜ App ត្រូវបើក ហើយស្កេនបាន។
 - Sentry ៖ event `zone: money` ដដែលលើកញ្ចប់ផ្សេងគ្នាឥឡូវលេចដាច់ពីគ្នា (រហូតដល់ ៥ ក្នុង ១០ នាទី)។
+- ✅ **ធ្វើរួច** ៖ ម្ចាស់គម្រោងបញ្ជាក់ (2026-09-29) ថា rules របស់ Business (វាល `op`) Publish រួច ➜ ការការពារ ២ខ សកម្ម។
 
 ### [2.42.6] — 2026-09-26 · ZoeW · ZoeKeyGen ៖ **Deep audit ៖ 🔴 transaction `disconnect` ដែល server អនុវត្តរួច** · Sentry លែងទទួលព្យុះកំហុសដដែល · កូដ React គ្មាន comment (merge រួចក្នុង PR #254)
 

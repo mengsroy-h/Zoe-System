@@ -112,10 +112,17 @@ function barcodeRegistryKey(code) {
         return normalized.replace(/[.#$\[\]\/\x00-\x1F\x7F]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'));
     }
 
-function rawSnapshotToItemList(data) {
-        if (!data) return [];
-        if (Array.isArray(data)) return data.filter(item => item !== null);
-        return Object.keys(data).map(key => { const v = data[key]; if (v && !v.id) v.id = key; return v; });
+function rawSnapshotToItemList(data, label) {
+        if (!data || typeof data !== 'object') return [];
+        const isRecord = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+        const list = Array.isArray(data)
+            ? data.filter(isRecord)
+            : Object.keys(data).filter((key) => isRecord(data[key])).map((key) => { const v = data[key]; if (!v.id) v.id = key; return v; });
+        const total = Array.isArray(data) ? data.filter((item) => item !== null && item !== undefined).length : Object.keys(data).length;
+        if (list.length !== total && window.ZoeErrors) {
+            ZoeErrors.capture(new Error('Skipped non-object records in snapshot'), { zone: 'data', context: 'rawSnapshotToItemList ' + (label || ''), skipped: total - list.length });
+        }
+        return list;
     }
 
 function pickupBarcodeKey(code) {

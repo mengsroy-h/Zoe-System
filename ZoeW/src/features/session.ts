@@ -170,6 +170,8 @@ export function clearSensitiveModalFields() {
     viewState.entryModeShown = 'parcel';
     viewState.removeScanDetail = 'ស្កេន Barcode ហើយផ្ទៀងផ្ទាត់ព័ត៌មានមុនដក។';
     uiState.monthlyReportMonth = '';
+    uiState.notifyDrawerOpen = false;
+    uiState.notifyView = null;
 }
 
 export function showLoginModalWithPrefill() {

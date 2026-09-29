@@ -556,7 +556,7 @@ for t in policy-test auth-recovery-test keylist-consistency-test \
          cleanup-clock-guard-test expired-trash-retention-test khmer-timezone-test monotonic-gate-test \
          phone-suggest-test phone-search-swipe-test \
          pin-prompt-test biometric-unlock-test keygen-pin-flow-test \
-         keygen-session-security-test \
+         keygen-session-security-test keygen-notice-test \
          barcode-shape-test setup-link-logout-test \
          raw-read-shape-test devtools-guard-test concurrent-scan-test \
          restore-finalization-fence-test \
@@ -851,6 +851,7 @@ if [ -n "$BASE" ] && [ -d "$BASE" ]; then
     SINK_APP_DIR="$BASE" node audit-tools/html-sink-escaping.js 2>&1 | tail -1 | sed 's/^/   html-sink-escaping:/'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-pin-flow-test.js 2>&1 | tail -1 | sed 's/^/   keygen-pin-flow: /'
     KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-session-security-test.js 2>&1 | tail -1 | sed 's/^/   keygen-session:  /'
+    KEYGEN_APP_DIR="$BASE" node audit-tools/keygen-notice-test.js 2>&1 | tail -1 | sed 's/^/   keygen-notice:   /'
     KEYLIST_APP_DIR="$BASE" node audit-tools/keylist-consistency-test.js 2>&1 | tail -1 | sed 's/^/   keylist-consistency:/'
     LICGRACE_APP_DIR="$BASE" node audit-tools/license-grace-test.js 2>&1 | tail -1 | sed 's/^/   license-grace:   /'
     LICROLLBACK_APP_DIR="$BASE" node audit-tools/license-clock-rollback-test.js 2>&1 | tail -1 | sed 's/^/   license-rollback:/'

@@ -1,11 +1,13 @@
+import { uiState } from '../../../core/state';
 import { viewState } from '../../../core/view-state';
-import { useStoreFields } from '../../hooks/useStore';
+import { useStoreFields, useStoreValue } from '../../hooks/useStore';
 import { Modal } from './Modal';
 import { onAct } from '../../actions';
 import { ZtoSyncList } from '../zto/ZtoSyncList';
 
 export function ZtoSyncModal() {
     const v = useStoreFields(viewState, ['ztoSyncModalNote']);
+    const open = useStoreValue(uiState, (s) => s.modalDisplay.ztoSyncModal === 'flex');
     return (
         <Modal
             id="ztoSyncModal"
@@ -18,7 +20,7 @@ export function ZtoSyncModal() {
                 <h3 id="ztoSyncModalTitle">🔄 កញ្ចប់ដែល ZTO មិនទាន់បិទ</h3>
                 <p id="ztoSyncModalNote">{v.ztoSyncModalNote}</p>
                 <div className="zto-sync-list" id="ztoSyncList">
-                    <ZtoSyncList />
+                    <ZtoSyncList key={open ? 'open' : 'closed'} />
                 </div>
                 <div className="modal-btns">
                     <div className="modal-btns-row">

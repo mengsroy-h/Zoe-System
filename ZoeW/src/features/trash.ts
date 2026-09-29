@@ -8,6 +8,8 @@ import { DELETED_LIST_MAX_ROWS, expandedTrashGroups } from './locker';
 import { emptyViewMessage } from '../services/db-listeners';
 import { closeModal, openModalHelper } from '../ui/modal';
 
+export const TRASH_PAGE_ROWS = 20;
+
 export const TRASH_REASON_META = {
     remove: { label: 'ដក', cls: 'trash-tag-remove', deducted: true },
     expired: { label: 'ផុតកំណត់', cls: 'trash-tag-expired', deducted: true },
@@ -96,6 +98,7 @@ export function trashGroupMatchesQuery(group, query) {
 
 export function filterRecentlyDeleted() {
     uiState.deletedSearchQuery = fieldValue('deletedSearchInput');
+    uiState.trashRenderLimit = TRASH_PAGE_ROWS;
     renderRecentlyDeleted();
 }
 
@@ -113,8 +116,19 @@ export function closeRecentlyDeletedModal() {
     closeModal('recentlyDeletedModal');
 }
 
+export function showMoreTrashRows() {
+    uiState.trashRenderLimit = Math.min(DELETED_LIST_MAX_ROWS, trashRenderCap() + TRASH_PAGE_ROWS);
+    renderRecentlyDeleted();
+}
+
+export function trashRenderCap() {
+    const limit = Number(uiState.trashRenderLimit);
+    return Math.min(DELETED_LIST_MAX_ROWS, Math.max(TRASH_PAGE_ROWS, Number.isFinite(limit) ? limit : TRASH_PAGE_ROWS));
+}
+
 export function openRecentlyDeletedModal() {
     setFieldValue('deletedSearchInput', uiState.deletedSearchQuery);
+    uiState.trashRenderLimit = TRASH_PAGE_ROWS;
     renderRecentlyDeleted();
     openModalHelper('recentlyDeletedModal');
 }
@@ -139,15 +153,19 @@ export function renderRecentlyDeleted() {
                 ? 'រកមិនឃើញលេខ ឬ Barcode នេះក្នុងធុងសំរាមទេ'
                 : emptyViewMessage([DB_LISTENER_KEY_DELETED], 'គ្មានទិន្នន័យដែលបានលុបទេ'),
             rows: [],
+            more: 0,
             overflow: 0
         };
         uiState.touch();
         return;
     }
 
+    const cap = trashRenderCap();
+    const listed = Math.min(groups.length, DELETED_LIST_MAX_ROWS);
     uiState.trashView = {
         empty: null,
-        rows: groups.slice(0, DELETED_LIST_MAX_ROWS).map((group) => buildTrashRowModel(group, expandedTrashGroups)),
+        rows: groups.slice(0, cap).map((group) => buildTrashRowModel(group, expandedTrashGroups)),
+        more: Math.max(0, listed - cap),
         overflow: Math.max(0, groups.length - DELETED_LIST_MAX_ROWS)
     };
     uiState.touch();

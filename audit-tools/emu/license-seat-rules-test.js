@@ -18,6 +18,7 @@ process.exitCode = 1;
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const vm = require('vm');
 const { emuNamespace } = require('./ns.js');
 
 const ROOT = process.env.LICSEATEMU_APP_DIR ? path.resolve(process.env.LICSEATEMU_APP_DIR) : path.join(__dirname, '..', '..');
@@ -32,6 +33,46 @@ const APP = (fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8')
 const SLOTS = ((fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8')
     .match(/const LICENSE_SEAT_SLOT_NAMES = \[([^\]]*)\]/) || [])[1] || "'d1'")
     .split(',').map((x) => x.trim().replace(/^'|'$/g, '')).filter(Boolean);
+
+// ⛔ ដំណឹង ៖ payload · id · URL អាន ត្រូវមកពីកូដ ship ពិត (ZoeKeyGen សរសេរ ·
+//    license-verify.js ដែល ZoeW ប្រើដើម្បីអាន) មិនមែនសរសេរដោយដៃ ➜ ស្នាមភ្ជាប់
+//    ZoeKeyGen ➜ rules ➜ ZoeW ត្រូវវាស់ពិត។
+function sliceFn(source, name) {
+    const start = source.indexOf('function ' + name + '(');
+    if (start === -1) return null;
+    let depth = 0;
+    let i = source.indexOf('{', start);
+    for (; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+    }
+    return source.slice(start, i);
+}
+function loadNoticeWriter() {
+    const src = fs.readFileSync(path.join(ROOT, 'ZoeKeyGen/app.js'), 'utf8');
+    const decls = ['NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET']
+        .map((name) => (src.match(new RegExp('^const ' + name + ' = .*;$', 'm')) || [])[0]);
+    const fns = ['cleanNoticeText', 'buildNoticePayload', 'newNoticeId'].map((name) => sliceFn(src, name));
+    if (decls.some((d) => !d) || fns.some((f) => !f)) return null;
+    const ctx = { crypto: require('crypto').webcrypto, Uint8Array, String, Math, Object, isFinite };
+    vm.createContext(ctx);
+    vm.runInContext(decls.join('\n') + '\n' + fns.join('\n\n')
+        + '\nthis.api = { buildNoticePayload, newNoticeId, NOTICE_TITLE_MAX, NOTICE_BODY_MAX, NOTICE_KIND_LABELS };', ctx);
+    return ctx.api;
+}
+function loadAnnouncementsUrl() {
+    const win = {};
+    const ctx = { window: win, navigator: { onLine: true }, console, setTimeout, clearTimeout, TextEncoder, crypto: require('crypto').webcrypto };
+    vm.createContext(ctx);
+    try {
+        const file = ['ZoeW/public/license-verify.js', 'ZoeW/license-verify.js'].map((rel) => path.join(ROOT, rel)).find((f) => fs.existsSync(f));
+        vm.runInContext(fs.readFileSync(file, 'utf8'), ctx);
+    } catch (e) {
+        return null;
+    }
+    const api = win.ZoeLicense || ctx.ZoeLicense;
+    return api && typeof api.announcementsUrl === 'function' ? api.announcementsUrl : null;
+}
 
 const KEY1 = 'ABCDEFGH12345678JKLM';
 const DEV_A = 'DEVICEAAAAAAAAAAAAAA';
@@ -236,6 +277,85 @@ const keyPath = (keyId) => '/license_keys/' + APP + '/' + keyId + '.json';
     check(allowed(relAll), 'admin ដោះឧបករណ៍ទាំងអស់ ➜ អនុញ្ញាត', relAll.status);
     const afterRel = await anon('GET', seatPath(KEY3));
     check((afterRel.body || '').trim() === 'null', 'ហើយកៅអីទាំងអស់ត្រូវទំនេរ', afterRel.body);
+
+    // ── ១២. ⛔ ដំណឹង ZoeKeyGen ➜ ZoeW ៖ admin សរសេរ · អ្នកណាក៏អាន · schema ចាក់សោ ─
+    const notice = loadNoticeWriter();
+    check(!!notice, '⛔ លក្ខខណ្ឌចាំបាច់ ៖ ស្រង់ buildNoticePayload/newNoticeId ពី ZoeKeyGen/app.js បាន');
+    const annUrl = loadAnnouncementsUrl();
+    check(!!annUrl, '⛔ លក្ខខណ្ឌចាំបាច់ ៖ license-verify.js បើក announcementsUrl()');
+    if (notice && annUrl) {
+        const bucket = '/license_announcements/' + APP;
+        const annPath = (id) => bucket + '/' + id + '.json';
+        const kinds = Object.keys(notice.NOTICE_KIND_LABELS);
+        check(kinds.length >= 2, '⛔ លក្ខខណ្ឌចាំបាច់ ៖ ប្រភេទដំណឹងយ៉ាងតិច ២', kinds);
+        const ids = [];
+        for (let i = 0; i < kinds.length; i++) {
+            const at = 1700000000000 + i * 1000;
+            const built = notice.buildNoticePayload(kinds[i], 'ចំណងជើង ' + i, i ? 'ខ្លឹមសារ\nបន្ទាត់ ២' : '', at);
+            const id = notice.newNoticeId(at);
+            ids.push(id);
+            const w = await asUser('PUT', annPath(id), built.payload, ADMIN);
+            check(allowed(w), '⛔ payload ពិតរបស់ ZoeKeyGen (' + kinds[i] + ') ➜ admin សរសេរបាន', w.status + ' ' + w.body.slice(0, 80));
+        }
+        const at3 = 1700000009000;
+        const third = notice.buildNoticePayload(kinds[0], 'ចុងក្រោយ', '', at3);
+        const id3 = notice.newNoticeId(at3);
+        ids.push(id3);
+        const trimNew = {};
+        trimNew[bucket.slice(1) + '/' + id3] = third.payload;
+        const multi = await asUser('PATCH', '/.json', trimNew, ADMIN);
+        check(allowed(multi), '⛔ ការសរសេរ multi-path ពី root (ដូច sendNotice) ➜ អនុញ្ញាត', multi.status + ' ' + multi.body.slice(0, 80));
+
+        const anonWrite = await anon('PUT', annPath(notice.newNoticeId(1700000100000)), third.payload);
+        check(denied(anonWrite), '⛔ គ្មាន auth សរសេរដំណឹង ➜ **បដិសេធ**', anonWrite.status);
+        const plainWrite = await asUser('PUT', annPath(notice.newNoticeId(1700000100000)), third.payload, PLAIN);
+        check(denied(plainWrite), '⛔ អ្នកប្រើមិនមែន admin សរសេរដំណឹង ➜ **បដិសេធ**', plainWrite.status);
+        const anonEdit = await anon('PATCH', annPath(ids[0]), { title: 'ក្លែង' });
+        check(denied(anonEdit), '⛔ គ្មាន auth កែដំណឹងដែលមានស្រាប់ ➜ **បដិសេធ**', anonEdit.status);
+
+        // ⛔ ZoeW អានតាម URL ពិតរបស់ license-verify.js (គ្មាន auth · orderBy $key · limitToLast)
+        const toEmu = (url) => url.replace(/^https?:\/\/[^/]+/, '');
+        const readAll = await anon('GET', toEmu(annUrl(APP, 20)));
+        const all = JSON.parse(readAll.body || 'null') || {};
+        check(allowed(readAll) && ids.every((id) => all[id]), 'ZoeW អានបញ្ជីដំណឹងដោយគ្មាន auth ➜ អនុញ្ញាត ហើយឃើញគ្រប់ដំណឹង', readAll.status + ' ' + readAll.body.slice(0, 80));
+        const readTwo = await anon('GET', toEmu(annUrl(APP, 2)));
+        const two = Object.keys(JSON.parse(readTwo.body || 'null') || {}).sort();
+        check(allowed(readTwo) && two.length === 2 && two.join() === ids.slice().sort().slice(-2).join(),
+            '⛔ limitToLast ២ ➜ បានតែ ២ ដំណឹងថ្មីជាងគេ (id តម្រៀបតាមពេល)', two);
+        const listRoot = await anon('GET', '/license_announcements.json');
+        check(denied(listRoot), 'រាយបញ្ជីគ្រប់ appCode ➜ បដិសេធ (អានបានតែ bucket របស់ App)', listRoot.status);
+
+        const bad = async (label, id, payload) => {
+            const r = await asUser('PUT', annPath(id), payload, ADMIN);
+            check(!allowed(r), '⛔ ' + label + ' ➜ បដិសេធ (សូម្បី admin)', r.status);
+        };
+        const okId = notice.newNoticeId(1700000200000);
+        await bad('ប្រភេទ `update` (ក្លែងកំណែ App)', okId, { kind: 'update', title: 'x', at: 1700000200000 });
+        await bad('ចំណងជើងលើស ' + notice.NOTICE_TITLE_MAX + ' តួ', okId, { kind: kinds[0], title: 'ក'.repeat(notice.NOTICE_TITLE_MAX + 1), at: 1700000200000 });
+        await bad('ខ្លឹមសារលើស ' + notice.NOTICE_BODY_MAX + ' តួ', okId, { kind: kinds[0], title: 'x', body: 'ក'.repeat(notice.NOTICE_BODY_MAX + 1), at: 1700000200000 });
+        await bad('ចំណងជើងទទេ', okId, { kind: kinds[0], title: '', at: 1700000200000 });
+        await bad('វាលបន្ថែម', okId, { kind: kinds[0], title: 'x', at: 1700000200000, by: 'a@x.com' });
+        await bad('ខ្វះ `at`', okId, { kind: kinds[0], title: 'x' });
+        await bad('id ក្រៅទម្រង់', 'x1700000200000', { kind: kinds[0], title: 'x', at: 1700000200000 });
+        const deadApp = await asUser('PUT', '/license_announcements/ZOW/' + okId + '.json', { kind: kinds[0], title: 'x', at: 1700000200000 }, ADMIN);
+        check(!allowed(deadApp), '⛔ ដំណឹងទៅ App ដែលលុបចោលរួច ➜ បដិសេធ', deadApp.status);
+        // ⛔ ទិសផ្ទុយ ៖ ព្រំដែនពិតត្រូវទទួល (បើអត់ ZoeKeyGen អនុញ្ញាតអ្វីដែល rules បដិសេធ)
+        const edge = notice.buildNoticePayload(kinds[0], 'ក'.repeat(notice.NOTICE_TITLE_MAX), 'ក'.repeat(notice.NOTICE_BODY_MAX), 1700000300000);
+        check(!!edge.payload, '⛔ ទិសផ្ទុយ ៖ ZoeKeyGen ទទួលចំណងជើង/ខ្លឹមសារត្រឹមព្រំដែន', edge);
+        if (edge.payload) {
+            const edgeW = await asUser('PUT', annPath(notice.newNoticeId(1700000300000)), edge.payload, ADMIN);
+            check(allowed(edgeW), '⛔ ទិសផ្ទុយ ៖ rules ទទួលចំណងជើង/ខ្លឹមសារត្រឹមព្រំដែនដដែល', edgeW.status + ' ' + edgeW.body.slice(0, 80));
+        }
+        const over = notice.buildNoticePayload(kinds[0], 'ក'.repeat(notice.NOTICE_TITLE_MAX + 1), '', 1700000300000);
+        check(!over.payload, '⛔ ZoeKeyGen បដិសេធចំណងជើងលើសព្រំដែន មុនផ្ញើ', over);
+
+        const anonDel = await anon('DELETE', annPath(ids[0]));
+        check(denied(anonDel), '⛔ គ្មាន auth លុបដំណឹង ➜ **បដិសេធ**', anonDel.status);
+        const adminDel = await asUser('DELETE', annPath(ids[0]), undefined, ADMIN);
+        check(allowed(adminDel), 'admin លុបដំណឹង ➜ អនុញ្ញាត', adminDel.status);
+        const afterDel = await anon('GET', toEmu(annUrl(APP, 20)));
+        check(!(JSON.parse(afterDel.body || 'null') || {})[ids[0]], 'ហើយ ZoeW លែងឃើញដំណឹងដែលលុប', afterDel.body.slice(0, 80));
+    }
 
     console.log('\n' + pass + ' ok, ' + fail + ' FAIL');
     process.exitCode = fail === 0 ? 0 : 1;

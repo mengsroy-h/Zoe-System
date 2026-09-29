@@ -10,6 +10,7 @@ import { refreshEntryPagePanels } from '../ui/entry-list';
 import { refreshCurrentHistoryView } from '../ui/history-refresh';
 import { showToast } from '../ui/toast';
 import { nativeFunctionRequest, resolveNativeApiUrl } from '../platform/native';
+import { refreshNotifyView } from '../features/notifications';
 
 export function preconnectToOrigin(rawUrl) {
     try {
@@ -65,6 +66,7 @@ export const debouncedRenderAfterHistorySync = debounce(() => {
     refreshCurrentHistoryView();
     updateRecentPhonesList();
     refreshEntryPagePanels();
+    refreshNotifyView();
 }, 120);
 
 export function withTimeout(promise, ms, timeoutMsg) {

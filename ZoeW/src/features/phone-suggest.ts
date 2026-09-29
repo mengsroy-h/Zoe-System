@@ -103,7 +103,7 @@ export function searchByPhone() {
         if (!queryDigits) return item.phone.includes(phoneQuery);
         return normalizePhoneDigits(item.phone).indexOf(queryDigits) !== -1;
     });
-    renderHistory(searched);
+    renderHistory(searched, 'search|' + (queryDigits || phoneQuery));
     updateDailyScheduleStats(searched, true);
 }
 

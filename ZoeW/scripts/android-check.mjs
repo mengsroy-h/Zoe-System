@@ -69,6 +69,28 @@ ok('build.gradle namespace ស្មើ appId', gradle.includes(`namespace = "${
 ok('strings.xml package_name ស្មើ appId', read('android/app/src/main/res/values/strings.xml').includes(`<string name="package_name">${appId}</string>`));
 const mainActivity = read(`android/app/src/main/java/${(appId || '').split('.').join('/')}/MainActivity.java`);
 ok('MainActivity ស្ថិតក្នុង package របស់ appId', mainActivity.includes(`package ${appId};`));
+/* ⛔ ល្បឿនអេក្រង់ ៖ ROM ជាច្រើនឲ្យ Chrome រត់ 90/120Hz តែកំណត់ App ផ្សេងត្រឹម 60Hz បើ App មិនស្នើ ➜ APK ត្រូវស្នើ mode ល្បឿនខ្ពស់បំផុត
+      (ទំហំដដែល) រាល់ onCreate និង onResume ហើយការបរាជ័យមិនត្រូវធ្វើឲ្យ App គាំង */
+const javaMethodBody = (src, signature) => {
+    const at = src.indexOf(signature);
+    if (at === -1) return '';
+    const open = src.indexOf('{', at);
+    let depth = 0;
+    for (let i = open; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}' && --depth === 0) return src.slice(open, i + 1);
+    }
+    return '';
+};
+ok('MainActivity ៖ onCreate ស្នើល្បឿនអេក្រង់ខ្ពស់បំផុត', /preferHighestRefreshRate\(\)/.test(javaMethodBody(mainActivity, 'void onCreate(')));
+ok('MainActivity ៖ onResume ស្នើម្តងទៀត (ត្រឡប់ពី App ផ្សេង)', /preferHighestRefreshRate\(\)/.test(javaMethodBody(mainActivity, 'void onResume(')));
+const refreshBody = javaMethodBody(mainActivity, 'void preferHighestRefreshRate(');
+ok('MainActivity ៖ កំណត់ preferredDisplayModeId តាម mode ដែលជ្រើស', /preferredDisplayModeId\s*=\s*best\.getModeId\(\)/.test(refreshBody) && /setAttributes\(/.test(refreshBody));
+ok('MainActivity ៖ ការបរាជ័យមិនគាំង App (catch RuntimeException)', /catch\s*\(\s*RuntimeException/.test(refreshBody));
+const pickBody = javaMethodBody(mainActivity, 'Display.Mode highestRefreshMode(');
+ok('MainActivity ៖ ជ្រើសតែ mode ទំហំដដែល ហើយ refresh ខ្ពស់ជាង',
+    /boolean sameSize = mode\.getPhysicalWidth\(\) == current\.getPhysicalWidth\(\)\s*&& mode\.getPhysicalHeight\(\) == current\.getPhysicalHeight\(\);/.test(pickBody) &&
+    /if \(sameSize && mode\.getRefreshRate\(\) > best\.getRefreshRate\(\)\) best = mode;/.test(pickBody));
 ok('webDir = dist (build របស់ Vite)', /webDir:\s*'dist'/.test(capConfig));
 ok('SystemBars insetsHandling = native', /insetsHandling:\s*'native'/.test(capConfig));
 
@@ -82,6 +104,14 @@ ok('ហាមផ្ទេរទិន្នន័យទៅទូរស័ព្�
     /<device-transfer>[\s\S]*domain="root"[\s\S]*<\/device-transfer>/.test(read('android/app/src/main/res/xml/data_extraction_rules.xml')));
 ok('FileProvider សម្រាប់ Share (Export)', manifest.includes('androidx.core.content.FileProvider') &&
     read('android/app/src/main/res/xml/file_paths.xml').includes('<cache-path'));
+const pushSrc = read('src/features/push.ts');
+const fcmChannel = (pushSrc.match(/export const FCM_CHANNEL_ID = '([a-z_]+)';/) || [])[1] || '';
+ok('សិទ្ធិ POST_NOTIFICATIONS (Android 13+ ៖ ជូនដំណឹង FCM)', manifest.includes('android.permission.POST_NOTIFICATIONS'));
+ok('FCM ៖ channel លំនាំដើមក្នុង manifest = FCM_CHANNEL_ID ក្នុង push.ts', !!fcmChannel &&
+    new RegExp('default_notification_channel_id"\\s+android:value="' + fcmChannel + '"').test(manifest), fcmChannel);
+ok('FCM ៖ រូបតំណាងតូច (monochrome vector) មានពិត', /default_notification_icon"\s+android:resource="@drawable\/ic_stat_notify"/.test(manifest) &&
+    /<vector[\s\S]*android:fillColor="#FFFFFFFF"/.test(read('android/app/src/main/res/drawable/ic_stat_notify.xml')));
+ok('google-services.json មិនចូល repo (android/.gitignore)', /^app\/google-services\.json$/m.test(read('android/.gitignore')));
 
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
@@ -115,7 +145,7 @@ for (const name of plugins) {
     const dir = `../node_modules/${name}/android`;
     ok(`plugin ${name} sync ចូល Android project`, settings.includes(dir));
 }
-for (const want of ['@capacitor/app', '@capgo/capacitor-native-biometric', '@capacitor/filesystem', '@capacitor/share', '@capgo/capacitor-printer']) {
+for (const want of ['@capacitor/app', '@capgo/capacitor-native-biometric', '@capacitor/filesystem', '@capacitor/share', '@capgo/capacitor-printer', '@capacitor/push-notifications']) {
     ok(`plugin ដែល App ពឹង ៖ ${want}`, plugins.includes(want));
 }
 
@@ -215,6 +245,12 @@ const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || 
 ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
 ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
 ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
+const gsjAt = releaseWf.indexOf('ZoeW/android/app/google-services.json');
+const webBuildAt = releaseWf.indexOf('npm run android:sync');
+ok('FCM ៖ workflow សរសេរ google-services.json **មុន** build web (បើក __FCM_CONFIGURED__) ហើយផ្ទៀង package',
+    gsjAt > 0 && webBuildAt > gsjAt && releaseWf.includes('ZOEW_GOOGLE_SERVICES_JSON') && releaseWf.includes("package_name==='com.zoesystem.zoew'"));
+ok('FCM ៖ vite ដេរីវេ __FCM_CONFIGURED__ ពីវត្តមាន android/app/google-services.json',
+    /__FCM_CONFIGURED__:\s*JSON\.stringify\(existsSync\(path\.join\(ROOT, 'android\/app\/google-services\.json'\)\)\)/.test(read('vite.config.mts')));
 const certPin = read('android/release-cert.sha256').trim();
 ok('វិញ្ញាបនបត្រ keystore pin ក្នុង android/release-cert.sha256 (SHA-256 · 64 hex)', /^[0-9a-f]{64}$/.test(certPin), certPin.slice(0, 12) + '…');
 const pinAt = releaseWf.indexOf('< ZoeW/android/release-cert.sha256');

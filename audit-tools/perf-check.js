@@ -236,6 +236,30 @@ function seedBig(n) {
             return { onDataPage, onEntryPage, mode, entryRows };
         });
 
+        // ⛔ តារាងប្រវត្តិគូរជាទំព័រ (សំណើម្ចាស់គម្រោង ៖ «APK អាក់ពេលឈរលើ ទាំងអស់ ➜ បង្ហាញ ៥០ ជួរ ហើយពេលរមូរជិតដល់ចុង
+        //    ចាំបន្ថែមចូលទៀត»)។ vitest វាស់តក្កវិជ្ជាជាមួយ IntersectionObserver ក្លែង ➜ ត្រង់នេះវាស់ **Chromium ពិត** ៖ filter «ទាំងអស់»
+        //    ➜ តែទំព័រដំបូង · ការរមូរកន្សោមរមូរពិតដល់ចុង ➜ observer ពិតបាញ់ ➜ ជួរកើនពិត។ ទំហំទំព័រដេរីវេពី `app.js` ពិត។
+        const pageRowsMatch = fs.readFileSync(path.join(ROOT, app, 'app.js'), 'utf8').match(/HISTORY_PAGE_ROWS\s*=\s*(\d+)/);
+        const PAGE_ROWS = pageRowsMatch ? Number(pageRowsMatch[1]) : NaN;
+        const paging = await page.evaluate(async () => {
+            const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            const flush = typeof window.commitNow === 'function' ? () => window.commitNow() : () => {};
+            window.filterDataByDate('all');
+            flush();
+            await wait(300);
+            const body = document.getElementById('historyTableBody');
+            const sc = document.getElementById('tableResponsive');
+            const count = () => body.querySelectorAll('tr[data-id]').length;
+            const total = window.uiState && Array.isArray(window.uiState.historyView) ? window.uiState.historyView.length : -1;
+            const first = count();
+            const moreRow = !!body.querySelector('.history-more-row');
+            const scrollable = !!sc && sc.scrollHeight > sc.clientHeight + 1;
+            if (sc) sc.scrollTop = sc.scrollHeight;
+            for (let i = 0; i < 20 && count() === first; i++) { await wait(100); flush(); }
+            return { total, first, moreRow, scrollable, afterScroll: count() };
+        });
+        console.log('    តារាងប្រវត្តិ «ទាំងអស់» ៖ ' + JSON.stringify(paging) + ' page=' + PAGE_ROWS);
+
         // ការវាយអក្សរពិតក្នុងប្រអប់ស្វែងរក (ផ្លូវពេញ៖ ច្រោះ + ដុំស្នើលេខ + render)
         const typeMs = await page.evaluate(() => {
             const el = document.getElementById('searchPhoneInput');
@@ -273,6 +297,10 @@ function seedBig(n) {
             check(m.trashSearch < 0 || m.trashSearch < 900,
                 app + ': ស្វែងរកក្នុងធុងសំរាម < 900ms នៅ ' + ORDERS + ' ធាតុ', 'trashSearch=' + m.trashSearch + 'ms');
             check(m.trashRows > 0, app + ': ធុងសំរាមមានជួរដេកពិត (seed មិនទទេ)', 'trashRows=' + m.trashRows);
+            check(PAGE_ROWS > 0 && paging.total > 2 * PAGE_ROWS && paging.first === PAGE_ROWS && paging.moreRow,
+                app + ': តារាងប្រវត្តិ filter «ទាំងអស់» គូរតែទំព័រដំបូង (' + PAGE_ROWS + ' ជួរ) + ជួរ «បង្ហាញទៀត»', JSON.stringify(paging) + ' page=' + PAGE_ROWS);
+            check(paging.scrollable && paging.afterScroll > paging.first && paging.afterScroll <= paging.total,
+                app + ': រមូរកន្សោមតារាងដល់ចុង ➜ IntersectionObserver ពិតទាញជួរបន្ថែម', JSON.stringify(paging));
         }
         await ctx.close(); server.close();
     }

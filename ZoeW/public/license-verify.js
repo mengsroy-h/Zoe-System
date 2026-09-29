@@ -142,6 +142,11 @@
         } catch (e) { return null; }
     }
 
+    function activationKeyString(appCode) {
+        const record = loadLocalRecord(appCode);
+        return record && typeof record.keyString === 'string' ? record.keyString : '';
+    }
+
     function saveLocalRecord(appCode, record) {
         try { localStorage.setItem(storageKey(appCode), JSON.stringify(record)); } catch (e) {}
     }
@@ -288,6 +293,15 @@
     function licenseSeatUrl(appCode, keyId, slot) {
         return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_seats/' + appCode + '/' + keyId
             + (slot ? '/' + slot : '') + '.json';
+    }
+
+    function announcementsUrl(appCode, limit) {
+        if (!LICENSE_DB_URL || LICENSE_DB_URL.indexOf('REPLACE_WITH') === 0) return '';
+        if (!/^[A-Z]{2,8}$/.test(String(appCode || ''))) return '';
+        const n = Math.floor(Number(limit));
+        const cap = isFinite(n) && n >= 1 ? Math.min(n, 50) : 20;
+        return LICENSE_DB_URL.replace(/\/+$/, '') + '/license_announcements/' + appCode
+            + '.json?orderBy=%22%24key%22&limitToLast=' + cap;
     }
 
     function seatLimitOf(maxDevices) {
@@ -504,6 +518,8 @@
         verifyKeyString: verifyKeyString,
         parseKeyString: parseKeyString,
         checkOnline: checkOnline,
+        announcementsUrl: announcementsUrl,
+        activationKeyString: activationKeyString,
         signNewKey: signNewKey,
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,

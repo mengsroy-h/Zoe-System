@@ -20,6 +20,8 @@ import { setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
+import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
+import { consumePushOpenRequest, ensureNativePushListeners, handleServiceWorkerMessage, refreshPushStatus, resyncPush, syncExpirySchedule } from '../../features/push';
 import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
 import { setupChromeAutoHide } from '../behaviors/chrome-autohide';
@@ -29,7 +31,7 @@ import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
-import { setupAdaptivePerformance } from '../../ui/perf';
+import { setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
@@ -92,6 +94,8 @@ function registerServiceWorker(scope: LifecycleScope): void {
         scope.every(30 * 60 * 1000, throttledSwUpdate);
     }).catch(() => {});
 
+    scope.listen(navigator.serviceWorker, 'message', (event: MessageEvent) => handleServiceWorkerMessage(event.data));
+
     const hadControllerAtLoad = !!navigator.serviceWorker.controller;
     scope.listen(navigator.serviceWorker, 'controllerchange', () => {
         if (hadControllerAtLoad) showUpdateAvailableBanner();
@@ -104,6 +108,11 @@ function startCoreServices(): void {
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();
+        initNotifications();
+        refreshPushStatus();
+        consumePushOpenRequest();
+        ensureNativePushListeners();
+        resyncPush();
     });
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -117,6 +126,10 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(60000, runSessionExpiryCheck);
     scope.every(LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck);
     scope.every(60000, sweepRecallHighlights);
+    scope.every(NOTIFY_FEED_INTERVAL_MS, () => {
+        notifyPeriodicTick();
+        syncExpirySchedule();
+    });
     scope.every(60000, () => {
         runScheduledCleanup();
         resumeInterruptedCleanups();
@@ -128,6 +141,9 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        notifyPeriodicTick();
+        resyncPush();
+        syncExpirySchedule();
         if (uiState.currentAppPage === 'entry') warmZtoLookupProxyNow();
     });
 }
@@ -163,6 +179,7 @@ function startInteractions(): void {
         setupSwipeGestures();
         setupChromeAutoHide();
         setupAdaptivePerformance();
+        startJankMonitor();
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();

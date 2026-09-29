@@ -18,6 +18,7 @@ App Android ជា **សំបក native** ជុំវិញ build របស់
 | Service Worker | cache សំបក | មិនចុះឈ្មោះ (ឯកសារទាំងអស់ស្ថិតក្នុង APK រួច) |
 | សោ App ពេលចាកចេញ | `visibilitychange` | `pause`/`resume` របស់ Activity **បូក** `visibilitychange` (ការហៅស្ទួនត្រូវច្រានចេញ) |
 | ZTO Lookup | `/.netlify/functions/…` same-origin | URL ពេញ ៖ `VITE_NATIVE_WEB_ORIGIN` + Function អនុញ្ញាត CORS ពី `https://localhost` · query ផ្ញើក្នុង header `X-Zoe-Query` ទៅ URL ថេរ ➜ preflight OPTIONS ១ ដង/២ ម៉ោង (មិនមែនរាល់ការស្កេន) · Function ចាស់ឆ្លើយ 400 ➜ App សាក URL មាន query ហើយចងចាំសម្រាប់ session នោះ |
+| ល្បឿនអេក្រង់ | Chrome រត់តាមល្បឿនអេក្រង់ (90/120Hz) | ROM ជាច្រើនកំណត់ App ត្រឹម **60Hz** បើ App មិនស្នើ ➜ `MainActivity` ស្នើ mode ល្បឿនខ្ពស់បំផុតក្នុងទំហំដដែល (`preferredDisplayModeId`) រាល់ `onCreate`/`onResume` · លេខ Hz ពិត និងកំណែ WebView បង្ហាញក្រោមលេខកំណែក្នុងរបា Slide (ប្រៀបនឹង Chrome លើទូរស័ព្ទដដែលបាន) · ROM ខ្លះនៅតែកំណត់តាមការកំណត់ «Refresh rate» ក្នុង Settings ➜ ពិនិត្យលេខ Hz ជាមុន · បន្ទាត់ «ស៊ុមកក 5 នាទីចុងក្រោយ» (`long-animation-frame` · Android តែប៉ុណ្ណោះ) រាប់ស៊ុមដែលកក ➜ ប្រៀប APK និង Chrome ក្រោយប្រើដូចគ្នា ១–២ នាទី |
 | Backup ទិន្នន័យ App | — | **បិទ** (`allowBackup=false` · `dataExtractionRules`) ៖ កៅអី License និង secret មិនត្រូវចម្លងទៅទូរស័ព្ទផ្សេង |
 
 ---
@@ -155,6 +156,13 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
    ការរឹតបន្តឹង មិនបាច់ធ្វើអ្វីទេ។
 3. **License** ៖ ទូរស័ព្ទមួយដែលប្រើទាំង PWA និង App Android = **២ ឧបករណ៍**
    (storage ដាច់ពីគ្នា) ➜ ត្រូវប្រើកៅអី ២ ក្នុង Key ឬដោះឧបករណ៍ចាស់ក្នុង ZoeKeyGen។
+4. **ការជូនដំណឹងលើទូរស័ព្ទ (FCM)** ៖ Firebase Console របស់ **License Project** (Project រួមតែមួយ — មិនមែន Project របស់
+   អតិថិជនណាម្នាក់) ➜ **Add app ➜ Android** ➜ package `com.zoesystem.zoew` ➜ ទាញ `google-services.json` ➜ GitHub secret
+   **`ZOEW_GOOGLE_SERVICES_JSON`** (JSON ឬ base64)។ workflow សរសេរវាចូល `android/app/` **មុន** build web ហើយផ្ទៀងថា
+   package ត្រឹមត្រូវ · build ក្នុងម៉ាស៊ីន ៖ ដាក់ឯកសារនោះក្នុង `android/app/` ⛔ **មិនចូល repo** (`android/.gitignore`)។
+   គ្មានឯកសារ ➜ APK នៅដំណើរការធម្មតា តែផ្ទាំង 🔔 ប្រាប់ «មិនទាន់ភ្ជាប់ FCM» ហើយ App **មិនហៅ** plugin push ទាល់តែសោះ
+   (`FirebaseMessaging` គ្មាន `google-services.json` ធ្វើឲ្យ App គាំង) ➜ ច្រកទ្វារ `__FCM_CONFIGURED__` ពេល build។
+   server ផ្ញើតាម `FCM_SERVICE_ACCOUNT` (Netlify env) — មើល [README](../README.md) ផ្នែក ១១។
 
 ---
 

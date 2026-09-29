@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { dataState, firebaseState, uiState } from '../../../core/state';
 import { getServerNow } from '../../../core/clock';
 import { parseTimestampFromId } from '../../../domain/barcode';
@@ -6,12 +6,14 @@ import { emptyViewMessage } from '../../../services/db-listeners';
 import { DB_LISTENER_KEY_HISTORY } from '../../../core/text';
 import { FOUR_HOURS_MS } from '../../../features/session';
 import { useStore, useStoreFields } from '../../hooks/useStore';
+import { act, onAct } from '../../actions';
+import { HISTORY_PAGE_ROWS, historyRenderCap } from '../../../ui/history-render';
 import { buildHistoryRowModel } from './rowModel';
 import { HistoryRow } from './HistoryRow';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-const HISTORY_VIEW_FIELDS = ['historyView', 'historyRenderSeq'] as const;
+const HISTORY_VIEW_FIELDS = ['historyView', 'historyRenderSeq', 'historyRenderLimit'] as const;
 
 export function HistoryTableBody() {
     useStore(dataState, firebaseState);
@@ -30,7 +32,8 @@ export function HistoryTableBody() {
 
     const now = getServerNow();
     const rows = [];
-    for (let i = view.length - 1; i >= 0; i--) {
+    const stop = Math.max(0, view.length - historyRenderCap());
+    for (let i = view.length - 1; i >= stop; i--) {
         const item = view[i];
         const itemAgeTime = item.createdAt || parseTimestampFromId(item.id) || now;
         const isOld = (now - itemAgeTime) > TWENTY_FOUR_HOURS_MS;
@@ -43,7 +46,31 @@ export function HistoryTableBody() {
             </tr>
         );
     }
+    if (stop > 0) rows.push(<HistoryMoreRow key="history-more" more={stop} shown={view.length - stop} />);
     return <>{rows}</>;
+}
+
+function HistoryMoreRow({ more, shown }: { more: number; shown: number }) {
+    const ref = useRef<HTMLTableRowElement | null>(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof IntersectionObserver !== 'function') return;
+        let fired = false;
+        const io = new IntersectionObserver((entries) => {
+            if (fired || !entries.some((e) => e.isIntersecting)) return;
+            fired = true;
+            act('showMoreHistoryRows');
+        }, { root: el.closest('.table-responsive'), rootMargin: '0px 0px 600px 0px' });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [shown]);
+    return (
+        <tr className="history-more-row" ref={ref}>
+            <td colSpan={4} style={{ textAlign: 'center', padding: '10px' }}>
+                <button type="button" className="btn-sm history-more-btn" onClick={onAct('showMoreHistoryRows')}>⬇️ បង្ហាញ {Math.min(more, HISTORY_PAGE_ROWS)} ជួរទៀត (នៅសល់ {more})</button>
+            </td>
+        </tr>
+    );
 }
 
 export const MemoHistoryTableBody = memo(HistoryTableBody);

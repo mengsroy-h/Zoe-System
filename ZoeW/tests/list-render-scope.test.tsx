@@ -39,7 +39,7 @@ import { RecentlyDeletedModal } from '../src/app/components/modals/RecentlyDelet
 import { dataState, firebaseState, uiState } from '../src/core/state';
 import { viewState } from '../src/core/view-state';
 import { DB_LISTENER_KEY_HISTORY, VIEW_NOT_MEASURABLE_NOTICE, dbListenerFailedPaths } from '../src/core/text';
-import { renderHistory } from '../src/ui/history-render';
+import { HISTORY_PAGE_ROWS, renderHistory } from '../src/ui/history-render';
 import { mount, step, unmount } from './native/react-harness';
 
 type ListId = 'history' | 'entry' | 'locker' | 'trash';
@@ -56,7 +56,7 @@ function counted<T extends object>(list: ListId, row: T, phone: string): T {
     return row;
 }
 
-const N = 60;
+const N = HISTORY_PAGE_ROWS - 10;
 
 function makeRows(n: number) {
     return Array.from({ length: n }, (_, i) => counted('history', {

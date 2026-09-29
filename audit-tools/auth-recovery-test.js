@@ -180,6 +180,7 @@ function buildContext(app) {
         function updateAuthButton(v) { __log.authButton = v; }
         function initDatabaseListeners() { if (listenersAttached) return; listenersAttached = true; __log.dbInit++; }
         function refreshKeyList() { __log.dbInit++; }
+        function refreshNoticeList() {}
         function showLockerPicker() {}
         function detachDatabaseListeners() {}
         function renderList() {}

@@ -61,14 +61,12 @@
         .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
         .brand-mark {
-            display: inline-grid;
+            display: block;
+            flex: none;
             width: 42px;
             height: 42px;
-            place-items: center;
-            border-radius: 12px;
-            background: #FFFFFF;
-            color: var(--brand);
-            font-size: 20px;
+            border-radius: 22%;
+            box-shadow: 0 0 0 2px rgba(255,255,255,.85);
         }
         .back-link {
             display: inline-flex;
@@ -202,7 +200,7 @@
     <a class="skip-link" href="#main-content">រំលងទៅមាតិកាសំខាន់</a>
     <header class="topbar">
         <div class="topbar-inner">
-            <div class="brand"><span class="brand-mark" aria-hidden="true">Z</span><span>ZoeW · ឯកសារផ្លូវការ</span></div>
+            <div class="brand"><svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><linearGradient id="guideLogoBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e31837"/><stop offset="1" stop-color="#c3122d"/></linearGradient><linearGradient id="guideLogoLeft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdebec"/><stop offset="1" stop-color="#fce4e6"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#guideLogoBg)"/><g stroke-width="8" stroke-linejoin="round"><path d="M256 162 L363 217 L256 272 L149 217 Z" fill="#fffcfc" stroke="#fffcfc"/><path d="M149 217 L256 272 L256 388 L149 333 Z" fill="url(#guideLogoLeft)" stroke="url(#guideLogoLeft)"/><path d="M256 272 L363 217 L363 333 L256 388 Z" fill="#fce0e2" stroke="#fce0e2"/><path d="M256 269 L256 392" stroke="#e31837" stroke-width="10" stroke-linecap="round" fill="none"/></g></svg><span>ZoeW · ឯកសារផ្លូវការ</span></div>
             <a class="back-link" href="./index.html">← ត្រឡប់ទៅ App</a>
         </div>
     </header>
@@ -326,6 +324,7 @@
                             <tr><td>ស្កេន</td><td>របៀបបញ្ចូលកញ្ចប់/Locker/ដកកញ្ចប់ កាមេរ៉ា hardware scanner រូបភាព និងវាយ Barcode</td></tr>
                             <tr><td>របា Slide</td><td>Firebase, Lookup API, តារាងអតិថិជន, Locker, Google Sheet, Health Check, PIN, ជីវមាត្រ និង Login</td></tr>
                             <tr><td>ម៉ឺនុយ (…) </td><td>Export, របាយការណ៍ខែ, កែទឹកប្រាក់, អត្រាប្ដូរប្រាក់, ធុងសំរាម, Reset និងលុបទាំងអស់</td></tr>
+                            <tr><td>ជូនដំណឹង 🔔</td><td>ប៊ូតុងជ្រុងស្តាំខាងលើ បើកផ្ទាំងពីខាងស្តាំ ៖ កញ្ចប់ជិតផុតកំណត់ ព័ត៌មានកំណែ App សេចក្តីប្រកាស/ការថែទាំ ដំណឹងពីអ្នកលក់ និងស្លាក Powered By ZoeW</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -385,6 +384,7 @@
                 <h2>៨. ស្វែងរក និងគ្រប់គ្រងកំណត់ត្រា</h2>
                 <ul>
                     <li>ប្រើតម្រង <strong>ថ្ងៃនេះ · ម្សិលមិញ · ម្សិលម្ងៃ · ទាំងអស់</strong> ឬជ្រើសថ្ងៃជាក់លាក់។</li>
+                    <li>តារាងបង្ហាញ <strong>៥០ ជួរថ្មីបំផុត</strong>មុន ហើយទាញ ៥០ ជួរទៀតដោយស្វ័យប្រវត្តិពេលរមូរជិតដល់ចុងក្រោម (ឬចុច <strong>«⬇️ បង្ហាញ … ជួរទៀត»</strong>)។ ចំនួនកញ្ចប់សរុបនៅក្បាលតារាងរាប់ទាំងអស់ · ប្តូរតម្រង ឬស្វែងរក ➜ ត្រឡប់ទៅ ៥០ ជួរដំបូង។</li>
                     <li>ស្វែងរកតាមកន្ទុយលេខទូរស័ព្ទ ៣–៤ ខ្ទង់។</li>
                     <li>ចុច <strong>📦 បញ្ជី</strong> ដើម្បីមើល Barcode នីមួយៗក្នុងកញ្ចប់។</li>
                     <li>ចុច 📞 ដើម្បីខល ហើយសម្គាល់ អត់លើក, អត់ចូល ឬខុសលេខតាមស្ថានភាពពិត។</li>
@@ -586,6 +586,14 @@
                     <li>សារ <strong>⏳ នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ</strong> មានន័យថាការងារចូលជួររង់ចាំ។ កុំចុចសកម្មភាពដដែលម្ដងទៀត។</li>
                     <li>ពេលមានកំណែថ្មី របាជូនដំណឹងបង្ហាញឲ្យ Refresh។ រង់ចាំការងារសំខាន់ចប់សិន មុន Refresh។</li>
                 </ul>
+                <h3>ផ្ទាំងជូនដំណឹង 🔔</h3>
+                <ul>
+                    <li>លេខក្រហមលើ 🔔 = កញ្ចប់ជិតផុតកំណត់ + សារមិនទាន់អាន + កំណែថ្មីដែលទាញរួច។ ចុច 🔔 ដើម្បីបើក ហើយបិទវិញ ➜ សារត្រូវរាប់ថាបានអាន។</li>
+                    <li><strong>📲 ជូនដំណឹងលើទូរស័ព្ទ</strong> ៖ ចុច «🔔 បើកការជូនដំណឹង» ហើយអនុញ្ញាត ➜ ដំណឹងពីអ្នកលក់ និងការរំលឹកកញ្ចប់ជិតផុតកំណត់ (រាល់ព្រឹក ម៉ោង ៨ តាមទិន្នន័យពេលបើក App ចុងក្រោយ) លោតលើទូរស័ព្ទ ទោះ App បិទ។ ចុចលើការជូនដំណឹង ➜ បើកផ្ទាំងនេះ។ iPhone ត្រូវដំឡើង ZoeW លើ Home Screen សិន។ បដិសេធរួច ➜ បើកវិញក្នុង Settings របស់ទូរស័ព្ទ។</li>
+                    <li><strong>📦 កញ្ចប់ជិតផុតកំណត់</strong> ៖ កញ្ចប់មិនទាន់យក ដែលនឹងដល់ច្បាប់ ៧ ថ្ងៃ ក្នុង ២៤ ម៉ោងខាងមុខ (ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ និងដកលុយ)។ ទាក់ទងអតិថិជន ឬបិទ «យក» មុនពេលនោះ។ បើឃើញ «⏳ … មិនទាន់មកដល់» មានន័យថាទិន្នន័យមិនទាន់ទាញចប់ មិនមែន «គ្មាន» ទេ។</li>
+                    <li><strong>📱 កំណែ App</strong> ៖ កំណែបច្ចុប្បន្ន និងថាមានកំណែថ្មីឬអត់ (App Android ត្រូវដំឡើង APK ថ្មី)។</li>
+                    <li><strong>📢 សេចក្តីប្រកាស និងការថែទាំ</strong> ៖ សារពីអ្នកគ្រប់គ្រងប្រព័ន្ធ (ការឡើងកំណែ ការថែទាំ) និង <strong>ដំណឹងដែលអ្នកលក់ផ្ញើពី ZoeKeyGen</strong> (២០ ចុងក្រោយ) ទាញពី server ពេលបើក App ពេលបើកផ្ទាំង 🔔 ពេលត្រឡប់មកវិញ និងរាល់ ៥ នាទី — មិនចាំបាច់ Update App។ ពេលក្រៅបណ្តាញ ផ្ទាំងបង្ហាញដំណឹងដែលទាញចុងក្រោយ។ ប៊ូតុង <strong>🧹 សម្អាត</strong> លាក់ដំណឹងទាំងនោះ និងលុបការជូនដំណឹងលើរបាទូរស័ព្ទ (ដំណឹងថ្មីនៅលេចធម្មតា · បញ្ជីកញ្ចប់ជិតផុតកំណត់មិនត្រូវសម្អាតទេ ព្រោះវាជាទិន្នន័យពិត)។</li>
+                </ul>
                 <h3>បើកំណែមិនទាន់ផ្លាស់</h3>
                 <ol>
                     <li>ភ្ជាប់បណ្តាញល្អ ហើយបិទ/បើក App ម្ដង។</li>
@@ -602,6 +610,7 @@
                     <li><strong>ទាញចុះ</strong> ពីផ្នែកខាងលើនៃអេក្រង់ នៅកំពូលបញ្ជី ដើម្បីផ្ទុកទិន្នន័យឡើងវិញ។ ទូរស័ព្ទញ័រម្ដងពេលទាញគ្រប់ ➜ លែងដៃដើម្បីផ្ទុក។ ពេលប្រអប់ ម៉ឺនុយ ឬរបា Slide បើក ឬពេលផ្ទាំងប្រវត្តិហូតឡើងពេញអេក្រង់ ការទាញចុះមិនផ្ទុកទំព័រឡើងវិញទេ។</li>
                     <li><strong>ក្រយៅដៃ/មុខ</strong> ប្រើផ្ទាំងជីវមាត្ររបស់ Android។ បើបន្ថែមក្រយៅដៃថ្មីក្នុងទូរស័ព្ទ App សុំឲ្យវាយ PIN ហើយបើកក្រយៅដៃម្ដងទៀត។</li>
                     <li><strong>Export Excel/CSV</strong> បើកផ្ទាំង Share (Drive, Telegram, Excel…)។ <strong>PDF</strong> បើកផ្ទាំង Print → Save as PDF។</li>
+                    <li><strong>ភាពរលូន</strong>៖ បើករបា Slide ➜ ក្រោមលេខកំណែ មានលេខ <strong>Hz</strong> (ចង្វាក់អេក្រង់ពិត) និងកំណែ WebView។ ប្រៀបនឹង PWA ក្នុង Chrome លើទូរស័ព្ទដដែល។ បើ App បង្ហាញ 60Hz ខណៈ Chrome បង្ហាញ 90/120Hz សូមបើក «Refresh rate» ឬ «Smooth display» ក្នុង Settings របស់ទូរស័ព្ទសម្រាប់ ZoeW។ បន្ទាត់ខាងក្រោមវា <strong>«ស៊ុមកក 5 នាទីចុងក្រោយ ៖ N ដង · យូរបំផុត X ms»</strong> រាប់ស៊ុមដែលកក (Android) — លេខតិច = រលូន។ ប្រៀបលេខនេះរវាង App Android និង PWA បន្ទាប់ពីប្រើដូចគ្នា ១–២ នាទី (iPhone មិនបង្ហាញបន្ទាត់នេះទេ)។</li>
                 </ul>
                 <div class="callout warning"><strong>App Android និង PWA លើទូរស័ព្ទដដែល រាប់ជា ២ ឧបករណ៍ក្នុង Key។</strong> ប្រើតែមួយ ឬសុំអ្នកលក់បន្ថែមចំនួនឧបករណ៍។ App មិន backup ទិន្នន័យទៅទូរស័ព្ទថ្មីទេ ដូច្នេះពេលប្ដូរទូរស័ព្ទ ត្រូវ Activate, Config និង Login ឡើងវិញ។</div>
             </section>

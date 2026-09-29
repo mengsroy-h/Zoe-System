@@ -279,6 +279,6 @@ export function applyCurrentFilter() {
     let filteredData = getFilteredDataByDate();
 
     viewState.selectedFilterTitle = titleText;
-    renderHistory(filteredData);
+    renderHistory(filteredData, 'filter|' + uiState.currentFilterMode + '|' + (uiState.currentFilterMode === 'custom' ? uiState.customFilterDate : ''));
     updateDailyScheduleStats(filteredData);
 }

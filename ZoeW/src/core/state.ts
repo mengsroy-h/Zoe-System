@@ -253,10 +253,13 @@ export interface UiState {
     pendingPermanentDeleteId: any;
     historyView: any[] | null;
     historyRenderSeq: number;
+    historyRenderLimit: number;
+    historyViewKey: string;
     entryListView: any[] | null;
     lockerListView: any | null;
     trashSummary: any | null;
     trashView: any | null;
+    trashRenderLimit: number;
     monthlyReportView: any | null;
     dailyStatsView: any | null;
     collectedStatsView: any | null;
@@ -275,6 +278,16 @@ export interface UiState {
     sheetImportView: any | null;
     modalDisplay: Record<string, 'flex' | 'none'>;
     drawerOpen: boolean;
+    notifyDrawerOpen: boolean;
+    notifyView: import('../features/notifications').NotifyView | null;
+    notifyFeed: import('../features/notifications').NotifyFeedItem[];
+    notifySellerFeed: import('../features/notifications').NotifyFeedItem[];
+    pushStatus: import('../features/push').PushStatus;
+    notifyDismissedIds: string[];
+    notifySeenIds: string[];
+    notifyFeedFetchedAt: number;
+    notifyFeedInFlight: boolean;
+    updateReady: boolean;
     dataPanelCollapsed: boolean;
     entryPanelCollapsed: boolean;
     dataPanelSearchFocus: boolean;
@@ -329,10 +342,13 @@ export const uiState = createStore<UiState>('uiState', {
     pendingPermanentDeleteId: null,
     historyView: null,
     historyRenderSeq: 0,
+    historyRenderLimit: 50,
+    historyViewKey: '',
     entryListView: null,
     lockerListView: null,
     trashSummary: null,
     trashView: null,
+    trashRenderLimit: 20,
     monthlyReportView: null,
     dailyStatsView: null,
     collectedStatsView: null,
@@ -351,6 +367,16 @@ export const uiState = createStore<UiState>('uiState', {
     sheetImportView: null,
     modalDisplay: {},
     drawerOpen: false,
+    notifyDrawerOpen: false,
+    notifyView: null,
+    notifyFeed: [],
+    notifySellerFeed: [],
+    pushStatus: 'unknown',
+    notifyDismissedIds: [],
+    notifySeenIds: [],
+    notifyFeedFetchedAt: 0,
+    notifyFeedInFlight: false,
+    updateReady: false,
     dataPanelCollapsed: false,
     entryPanelCollapsed: false,
     dataPanelSearchFocus: false,
@@ -365,7 +391,7 @@ export const uiState = createStore<UiState>('uiState', {
     chromeBottomVar: '',
 });
 registerStore(uiState);
-uiState.markImmediate(['modalDisplay', 'drawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
+uiState.markImmediate(['modalDisplay', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden']);
 

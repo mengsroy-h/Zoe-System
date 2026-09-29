@@ -23,7 +23,7 @@ import { confirmPhone } from '../features/scan-action';
 import { cancelScannedRemoval, confirmScannedRemoval, setEntryScanMode } from '../features/scan-remove';
 import { applySheetImportHeaderRow, closeSheetImportModal, drawerSheetImportFlow, editSheetImportConfig, handleSheetImportFileInput, loadSheetImportSelectedSheet, pickSheetImportFile, renderSheetImportPreview, resetSheetImportFileSelection, runSheetImport, runSheetImportClear, saveSheetImportConfig } from '../features/sheet-import';
 import { openCollectedStatsModal, openDailyStatsModal, submitManualAdjustment } from '../features/stats-modals';
-import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, toggleTrashGroup } from '../features/trash';
+import { cancelRestoreItem, closeRecentlyDeletedModal, filterRecentlyDeleted, promptRestoreDeletedItem, showMoreTrashRows, toggleTrashGroup } from '../features/trash';
 import { closeZtoListSyncModal, drawerZtoListSyncFlow, importZtoListRows, openZtoListSyncModal, runZtoListSyncPreview } from '../features/zto-list-sync';
 import { closeZtoSyncModal, drawerZtoAutoCloseFlow, openZtoSyncModal, recheckZtoPickupStatus } from '../features/zto-status';
 import { requestCameraPermission, toggleTorch } from '../services/camera';
@@ -32,6 +32,9 @@ import { renderEntryList, renderLockerList } from '../ui/entry-list';
 import { closeModal, dismissPhoneModal } from '../ui/modal';
 import { filterDataByCustomDate, filterDataByDate, moreMenuClearHistory, moreMenuDelete, moreMenuEditPhone, moreMenuExchangeRate, moreMenuExport, moreMenuManualAdjust, moreMenuMonthlyReport, moreMenuRecentlyDeleted, moreMenuResetPickup, moreMenuViewList, toggleHeaderMoreDropdown, toggleMoreDropdown } from '../ui/more-menu';
 import { closeSideDrawer, openSideDrawer, switchAppPage } from '../ui/page-nav';
+import { openNotifyDrawer } from '../features/notifications';
+import { showMoreHistoryRows } from '../ui/history-render';
+import { clearNotifications, togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
     applySheetImportHeaderRow,
@@ -105,6 +108,9 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openEditModal,
     openHealthCheck,
     openLockerPicker,
+    openNotifyDrawer,
+    togglePush,
+    clearNotifications,
     openSideDrawer,
     openViewListModal,
     openZtoListSyncModal,
@@ -137,6 +143,8 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     selectCustomLocker,
     setCallMark,
     setEntryScanMode,
+    showMoreTrashRows,
+    showMoreHistoryRows,
     submitActivationKey,
     submitAppLockForm,
     submitLoginForm,

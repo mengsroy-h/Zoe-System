@@ -13,147 +13,19 @@
 
 ---
 
-## ⏸️ ការងារនៅសល់ពីជុំ Deep Audit ដែលកាត់កណ្តាល (2026-09-29) — ⛔ session បន្ទាប់អានត្រង់នេះមុនគេ
+## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-29 · ZoeW 2.45.4 · ZoeKeyGen 2.22.0)
 
-> ជុំនេះអស់ usage មុនបញ្ចប់។ ⛔ **branch `claude/pwa-ios-android-frame-xrv56s` មិនទាន់ merge · គ្មាន PR** (កុំបង្កើត PR/merge
-> ដោយគ្មានការស្នើ)។ ផ្ទៀងផ្ទាត់ស្ថានភាពដោយ git ៖ `git log --oneline origin/main..origin/claude/pwa-ios-android-frame-xrv56s`
-> ➜ ត្រូវឃើញ commit WIP «Deep audit (WIP)…» និង commit plan នេះ។ ⛔ **កំណែមិនទាន់ឡើង** (ZoeW នៅ `2.45.3`) ➜
-> `version-bump-scope` (STRICT) នឹងធ្លាក់រហូតដល់ជំហាន ៥ ខាងក្រោម — **ត្រឹមត្រូវ មិនមែនកំហុស**។
-> ⛔ លុបផ្នែកនេះទាំងមូលពេលការងារចប់ (វាជាផែនការ មិនមែនច្បាប់)។
+⛔ **មេរៀនជុំ 2.45.4 ៖ «ការព្យួរ ≠ ការធ្លាក់» វិលមកតាមទ្វារទី ៦ · handler ព្រឹត្តិការណ៍គ្មាននរណារត់ · កូដដែល HTTP status បិទបាំង** —
+(១) ស្ថានភាព `busy` របស់ Push ជា **សោ** តែការរង់ចាំខាងក្រោយវា (`pushManager.*` · ព្រឹត្តិការណ៍ `registration` របស់ FCM) គ្មានពិដាន ➜ ⛔ រាល់
+ស្ថានភាព UI ដែល **បដិសេធការចុច** ត្រូវសួរ «អ្វីដោះវា ប្រសិនបើ dependency **ព្យួរ**?» (`push-client.test.tsx` ៖ fake timers + promise មិនដែលដោះ)។
+(២) record មិនមែន object តែមួយក្រោម `$itemId` ធ្វើឲ្យ callback `onValue` បោះ ➜ listener ជាប់ «pending» គ្រប់ឧបករណ៍ ➜ ⛔ fake snapshot ត្រូវមាន
+**រូបរាង record ខុស** មិនត្រឹមវាលខុស (`field-shape-test` context ទី ២)។ (៣) animation `infinite` ពេល App ស្ងៀម ➜ LTPO ចុះ Hz មិនបាន ➜ វាស់ដោយ
+**trace DrawFrame ពិត** + probe ទិសផ្ទុយ (`perf-check`)។ (៤) mutation testing ផ្នែកបណ្តាញ (១៥ + M11b) ៖ M14 រស់ព្រោះ checker ស្រង់តែ function មានឈ្មោះ
+ខណៈ handler `offline`/`online` ជា arrow ក្នុង `setupConnectionRecovery()` ➜ ⛔ សួរ «handler ព្រឹត្តិការណ៍ណាខ្លះគ្មាននរណារត់?»។ M11b រស់ព្រោះការអះអាង
+cooldown វាស់ **ថេរ** មិនមែនផ្លូវពិត ➜ ⛔ ពេលកូដមួយក្លាយជាស្ថាពរដោយ **កូដ ឬ HTTP status** ត្រូវវាស់កូដដែលមក **ជាមួយ status ផ្សេង** (503) — ករណី 401
+(M11) ជា equivalent ➜ កុំចាក់សោវា។ លទ្ធផលពេញ ៖ `docs/HISTORY.md` ផ្នែក ២។
 
-### ១. អ្វីដែលធ្វើរួច (ក្នុង commit WIP · មានអ្នកយាម · បញ្ជាក់ថាអ្នកយាមធ្លាក់លើ `main`)
-
-| # | កំហុស | ការកែ | អ្នកយាម (លើ `main` ➜ ក្រោយកែ) |
-|---|---|---|---|
-| A | **record មិនមែន object** (ខ្សែអក្សរ/លេខ/bool) តែមួយក្រោម `zoew_scan_history_cod_dod` ឬធុងសំរាម ➜ callback `onValue` បោះ ➜ listener ជាប់ «pending» ➜ **តារាងប្រវត្តិ/ធុងសំរាមងាប់លើគ្រប់ឧបករណ៍** | `rawSnapshotToItemList(data, label)` (`src/ui/modal-stack.ts`) រំលងធាតុមិនមែន object + Sentry `zone: 'data'` · `db-listeners.ts` បញ្ជូនស្លាក `'history'`/`'deleted'` | `field-shape-test` context ទី ២ ៖ FAIL 5 ➜ 16/16 · ថតទទេ exit 1 |
-| B | **ចំណុចស្ថានភាព online (`.status-dot::after`) pulse `infinite`** ➜ browser គូរស៊ុមជាប់ៗ ខណៈ App ស្ងៀម (DrawFrame **146** ក្នុង ៣ វិ.) ➜ អេក្រង់ LTPO 10–120Hz មិនអាចចុះ Hz ទាប · ស៊ីថ្ម | `react-root.css` ៖ `.status-dot::after { animation-iteration-count: 3; }` (ស្ថានភាព `connecting` នៅ `infinite` ដោយ specificity ខ្ពស់ជាង) | `perf-check` ផ្នែក «ស៊ុមពេលស្ងៀម» ៖ DrawFrame ≤ 3 + probe ទិសផ្ទុយ (animation infinite ចាក់ចូល ➜ ≥ 30) + `connecting` នៅ pulse ៖ FAIL ➜ 0 ស៊ុម (17/17) |
-| — | ឯកសារ ៖ ពាក្យបញ្ជាចាស់ក្នុង `docs/AUDIT-PROMPT.md` ជំហាន ០/៣/៤ (រត់ checker ផ្ទាល់លើ repo) ➜ យោង Runbook · Runbook ជំហាន ៣ មានទង់ STRICT · `firebase-backup/README.md` `rename()` ➜ `renameSync()` | — | — |
-
-### ២. រកឃើញ តែមិនទាន់កែ ៖ C — Push «⏳ កំពុងភ្ជាប់…» ជាប់ជារៀងរហូត (ថ្នាក់ «ការព្យួរ ≠ ការធ្លាក់»)
-
-`uiState.pushStatus === 'busy'` ជា **សោ** (`togglePush()` `return` ពេល busy) តែការរង់ចាំខាងក្រោយវា **គ្មានពិដាន** ក្នុង `src/features/push.ts` ៖
-- web ៖ `reg.pushManager.getSubscription()` · `reg.pushManager.subscribe(...)` ក្នុង `subscribeWeb()` · `getSubscription()` និង `sub.unsubscribe()` ក្នុង `disablePush()` · `navigator.serviceWorker.ready` ក្នុង `resyncPush()` (គ្មានសោ តែគួររុំដូចគ្នា)។
-- APK ៖ `enableNative()` ដាក់ `nativeEnabling = true` ➜ `PN.register()` ➜ រង់ចាំព្រឹត្តិការណ៍ `registration` ដែលអាច **មិនដែលមក** (FCM គ្មានបណ្តាញ/គ្មាន Google services) ➜ busy ជារៀងរហូត។
-
-ផែនការ (⛔ ឧបករណ៍មុន) ៖
-1. បន្ថែម describe ខាងក្រោមចូល `ZoeW/tests/push-client.test.tsx` (បន្ថែម `togglePush` · `PUSH_TIMEOUT_MS` · `PUSH_NATIVE_REGISTER_TIMEOUT_MS` ក្នុង import ពី `../src/features/push`) ➜ រត់ `npx --prefix ZoeW vitest run tests/push-client.test.tsx` ➜ **ត្រូវធ្លាក់** លើ tree បច្ចុប្បន្ន (សេណារីយ៉ូចុងក្រោយ «token មកទាន់ពេល» ជាទិសផ្ទុយ ➜ ត្រូវបៃតងទាំងមុន/ក្រោយ)។
-2. កែ ៖ រុំ `getSubscription`/`subscribe`/`unsubscribe`/`ready` ដោយ `withTimeout(…, PUSH_TIMEOUT_MS, …)` (មាន import រួច) · APK ៖ `export const PUSH_NATIVE_REGISTER_TIMEOUT_MS = 20000;` ហើយក្រោយ `await PN.register()` តាំង `setTimeout` ៖ បើ `pushRuntime.nativeEnabling && uiState.pushStatus === 'busy'` ➜ `nativeEnabling = false` · `setStatus('error')`។ ⛔ token ដែលមកយឺត ត្រូវបញ្ចប់ការងារ (`onNativeToken()` សរសេរ `on` រួចហើយពេល reply ok — កុំបិទផ្លូវនោះ)។
-3. កត់ក្នុង CLAUDE.md ជួរ «ការជូនដំណឹងលើទូរស័ព្ទ (Push · ZoeW)» ៖ «⛔ សោ `busy` មានពិដានគ្រប់ការរង់ចាំ (web ៖ `withTimeout` · APK ៖ watchdog token)» — ⛔ ពង្រីកជួរដើម កុំបង្កើតជួរថ្មី (ច្បាប់ ១២)។
-
-```ts
-describe('⛔ ការព្យួរ ≠ ការធ្លាក់ ៖ ស្ថានភាព «កំពុងភ្ជាប់» មិនត្រូវជាប់ជារៀងរហូត', () => {
-    beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
-    afterEach(() => { vi.useRealTimers(); });
-
-    it('web ៖ pushManager.subscribe() ព្យួរ ➜ error ក្នុងពិដាន (មិនមែន busy) · ចុចម្តងទៀតបាន', async () => {
-        const w = stubWebPush('granted');
-        stubServer();
-        w.pushManager.subscribe.mockImplementationOnce(() => new Promise(() => {}));
-        let done: boolean | null = null;
-        enablePush().then((v) => { done = v; });
-        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
-        expect(done).toBe(false);
-        expect(uiState.pushStatus).toBe('error');
-        expect(await togglePush()).toBe(true);
-        expect(uiState.pushStatus).toBe('on');
-    });
-
-    it('web ៖ pushManager.getSubscription() ព្យួរ ➜ error ក្នុងពិដាន · បិទ ➜ off ក្នុងពិដាន', async () => {
-        const w = stubWebPush('granted');
-        stubServer();
-        w.pushManager.getSubscription.mockImplementation(() => new Promise(() => {}));
-        let done: boolean | null = null;
-        enablePush().then((v) => { done = v; });
-        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
-        expect(done).toBe(false);
-        expect(uiState.pushStatus).toBe('error');
-        let off: boolean | null = null;
-        disablePush().then((v) => { off = v; });
-        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
-        expect(off).toBe(true);
-        expect(uiState.pushStatus).toBe('off');
-    });
-
-    it('web ៖ sub.unsubscribe() ព្យួរ ➜ បិទនៅតែចប់ (off) ក្នុងពិដាន', async () => {
-        const w = stubWebPush('granted');
-        stubServer();
-        expect(await enablePush()).toBe(true);
-        w.sub.unsubscribe.mockImplementationOnce(() => new Promise(() => {}));
-        let off: boolean | null = null;
-        disablePush().then((v) => { off = v; });
-        await vi.advanceTimersByTimeAsync(PUSH_TIMEOUT_MS + 50);
-        expect(off).toBe(true);
-        expect(uiState.pushStatus).toBe('off');
-        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(false);
-    });
-
-    it('APK ៖ register() ចប់ តែ token មិនដែលមក ➜ error ក្នុងពិដាន · token មកយឺត ➜ on (ការងារបញ្ចប់)', async () => {
-        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
-        stubServer();
-        expect(await enablePush()).toBe(true);
-        expect(uiState.pushStatus).toBe('busy');
-        await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS + 50);
-        expect(uiState.pushStatus).toBe('error');
-        expect(pushRuntime.nativeEnabling).toBe(false);
-        await pn.listeners.registration({ value: 'fcmToken:' + 'y'.repeat(40) });
-        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
-        expect(JSON.parse(localStorage.getItem(PUSH_STATE_KEY)!).on).toBe(true);
-    });
-
-    it('APK ៖ token មកទាន់ពេល ➜ watchdog មិនសរសេរជាន់ on', async () => {
-        (window as any).Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
-        stubServer();
-        expect(await enablePush()).toBe(true);
-        await pn.listeners.registration({ value: 'fcmToken:' + 'z'.repeat(40) });
-        await vi.waitFor(() => expect(uiState.pushStatus).toBe('on'));
-        await vi.advanceTimersByTimeAsync(PUSH_NATIVE_REGISTER_TIMEOUT_MS + 50);
-        expect(uiState.pushStatus).toBe('on');
-    });
-});
-```
-
-### ៣. Mutation testing (ភារកិច្ចរកអ្នកយាមបៃតងក្លែងក្លាយ) — មិនទាន់ចប់
-
-harness (ក្នុង scratchpad · បាត់ជាមួយ container) ៖ ក្នុងមួយ mutation កែឯកសារ `ZoeW/src` ១ កន្លែង ➜ `RUNALL_ONLY=<subset បណ្តាញ ៣១ checker រួម zoew-suite-test> bash audit-tools/run-all.sh` ➜ ស្តារឯកសារ (~១៩០ វិ./mutation)។ ⛔ អាន **`❌ ធ្លាក់ (N) ៖ <ឈ្មោះ>`** ក្នុង log — បន្ទាត់ checker ជា `*** FAIL ***` (regex `\d+s\s+FAIL` ខកខានវា ➜ រាយ «SURVIVED» ខុស)។ ⛔ កុំកែ `ZoeW/src`/`ZoeW/tests` ខណៈ harness រត់។
-
-| Mutation | ឯកសារ ➜ ការកែ | លទ្ធផល |
-|---|---|---|
-| M01 | `connection.ts` ៖ `visibilitychange` មិនហៅ `retryFailedDbListenersNow()` | ✅ ចាប់ដោយ `connection-recovery-test` |
-| M02 | `connection.ts` ៖ `.info/connected=true` មិនហៅ `flushPendingHistoryPatches()` | ✅ ចាប់ដោយ `history-patch-retry-test` |
-| M03 | `connection.ts` ៖ ដក `RECONNECT_FORCE_MIN_GAP_MS` ពី `forceDatabaseReconnect` | ⏳ មិនទាន់វាស់ |
-| M04 | `connection.ts` ៖ `.info/serverTimeOffset` ងាប់ ➜ `isDatabaseConnected = false` | ⏳ |
-| M05 | `db-listeners.ts` ៖ ដក `dbListenerReportedFailures.delete(pathKey)` | ⏳ |
-| M06 | `db-listeners.ts` ៖ ដកច្រកទ្វារជំនាន់ពី callback `dailyCollected` | ⏳ |
-| M07 | `network.ts` ៖ timeout របស់ `fetchWithTimeout` មិន `controller.abort()` | ⏳ |
-| M08 | `network.ts` ៖ `retryAsync` មិនគោរព `err.noRetry` | ⏳ |
-| M09 | `sw.ts` ៖ ដក `if (/\.html$/i.test(key)) return` (revalidate HTML ចូល cache) | ⏳ |
-| M10 | `firebase-sdk.ts` ៖ ដក `if (anyModalIsOpen()) return false` | ⏳ |
-| M11 | `network.ts` ៖ `ZTO_AUTH_EXPIRED` លែងជាសាលក្រមស្ថាពរ | ⏳ |
-| M12 | `connection.ts` ៖ `online` មិនដាក់ `networkJustReturned = true` | ⏳ |
-| M13 | `history-write.ts` ៖ `/disconnect\|already deleted/i` ➜ `/disconnect/i` | ⏳ |
-| M14 | `connection.ts` ៖ `offline` មិន `clearReconnectWatchdog()` | ⏳ |
-| M15 | `network.ts` ៖ ប្តូរឈ្មោះអថេរក្នុងស្រុក `timer` (**control ៖ ត្រូវរស់រាន**) | ⏳ |
-
-mutation ណារស់រាន (លើកលែង M15) ➜ ពង្រីក checker ម្ចាស់ (ច្បាប់ ១២ ៖ ពង្រីក មិនសាងស្ទួន) ➜ បញ្ជាក់ថាវាធ្លាក់ ➜ កែ។
-
-### ៤. ពិនិត្យរួច — គ្មានកំហុស (កុំចំណាយពេលម្តងទៀត)
-
-- ឯកសារ `.md` ទាំងអស់ ៖ ផ្លូវឯកសារ · env var · កូនសោ storage · ឈ្មោះ function ក្នុង backtick ស៊ីនឹងកូដពិត (ការលើកលែងសុទ្ធតែចេតនា ៖ env ដែលត្រូវលុប · placeholder · វាល API របស់ ZTO)។
-- សុវត្ថិភាព ៖ គ្មាន secret ពិតក្នុង repo (មានតែ key សាកល្បងក្នុង `audit-tools/idtoken-fixture.js`) · React `src` គ្មាន HTML sink · ZoeKeyGen `innerHTML` ទាំងអស់ឆ្លង `escapeHtml()` · `push-core.mjs` (ECDSA · SSRF allowlist · ETag at-most-once) · ZTO function (`timingSafeEqual` · CORS តែ `https://localhost`)។
-- ល្បឿន ៖ `nearExpiryView()` ~៣ms / `expiryScheduleTimes()` ~២ms លើ ៣,០០០ ជួរដេក (Chromium desktop) · `callRecallBlink` (`infinite`) ជាសញ្ញាអាជីវកម្មលើតែជួរដេកដែលត្រូវខលវិញ ➜ ទុកដដែល។
-- ជម្រើស (មិនទាន់ធ្វើ · ត្រូវ Publish ដោយដៃ) ៖ rules `.validate: newData.hasChildren()` លើ `$itemId` ប្រវត្តិ/ធុងសំរាម ដើម្បីបដិសេធ record មិនមែន object តាំងពីខាង server (ពង្រឹង A)។
-
-### ៥. បញ្ចប់ជុំ (តាមលំដាប់)
-
-1. បញ្ចប់ ២ និង ៣ ខាងលើ។
-2. ឡើងកំណែ ZoeW ➜ `2.45.4` / `zoew-v245` ៖ `src/core/version.ts` · `src/sw/cache-version.ts` · `public/manifest.json` · `package.json` + `package-lock.json` · `public/announcements.json` (ធាតុ `update` ថ្មីបំផុត) · `README.md` (root) · `ZoeW/README.md` · តារាងក្បាល `CLAUDE.md` · ក្បាលតារាងឯកសារនេះ។ ZoeKeyGen **មិនឡើង** (មិនប៉ះ)។
-3. `docs/HISTORY.md` ផ្នែក ១ ធាតុ [2.45.4] (A · B · C + «សកម្មភាពដែលត្រូវធ្វើដោយដៃ» ៖ គ្មាន rules ត្រូវ Publish បើមិនជ្រើសជម្រើសខាងលើ) + ផ្នែក ២/លិបិក្រមបើយោងឈ្មោះ checker ថ្មី · ជួរ CSS invariant `.status-dot::after` ក្នុង CLAUDE.md បន្ថែម «pulse ៣ ជុំ រួចឈប់ (ស៊ុមពេលស្ងៀម)»។
-4. `node audit-tools/strip-comments.js` ➜ emulator តាម CLAUDE.md Runbook ជំហាន ០ ➜ `CRUD_FLOW_STRICT=1 VERSIONSCOPE_STRICT=1 MONEYGUARD_STRICT=1 bash audit-tools/run-all.sh` (ត្រូវ «ជោគជ័យទាំងអស់ · មួយផ្នែក ០ · រំលង ០») ➜ `git diff origin/main -- ZoeW/src ZoeW/public | grep '^-'`។
-5. លុបផ្នែក ⏸️ នេះ · commit · push ទៅ `claude/pwa-ios-android-frame-xrv56s` · រាយការណ៍ជាខ្មែរជាមួយលេខ។
-
----
-
-## តារាង «អ្វីដែលប្រែធៀបនឹងជុំមុន» (2026-09-29 · ZoeW 2.45.3 · ZoeKeyGen 2.22.0)
+## តារាងជុំមុន (2026-09-29 · ZoeW 2.45.3 · ZoeKeyGen 2.22.0)
 
 ⛔ **មេរៀនជុំ 2.42.7 ៖ «ការងារដែលនៅរស់» ធៀបនឹង «ការងារដែលត្រូវរំខាន» — និង «ស្មើតម្លៃ» ≠ «ជារបស់ខ្ញុំ»** — កំហុស ៦ បៃតងលើ
 checker ១៨៣ ៖ (១) journal ការសម្អាតត្រូវអ្នកស្តារ (វដ្ត ៦០ វិ. · `visibilitychange` · tab ទី ២) អាន **ខណៈម្ចាស់នៅរស់** ➜ ដកលុយ ២ ដង ៖
@@ -622,6 +494,10 @@ ZoeW/src ZoeW/public ZoeKeyGen | grep '^-'`) — `version-check` · `version-bum
 | មូលដ្ឋាននាឡិការបស់ mirror ចំណូល | `closedAt` · `staleCollectedDays` · cutoff សុទ្ធតែឈរលើ `getServerNow()` ➜ ស៊ីគ្នា |
 | ឈ្មោះឯកសារដែលឯកសារយោង (`*.cmd` · `*.ps1` · `*.js`) | មានពិតទាំងអស់ក្នុង `tools/` |
 | env របស់ ZTO Function ធៀបនឹង `ZTO-SETUP-KH.md` | បាត់ ៣ (`ZTO_USER_AGENT` · `ZTO_BROWSER_ORIGIN` · `ZTO_ACCEPT_LANGUAGE`) ➜ **បន្ថែមចូលឯកសារ** មិនមែនកំហុសកូដ |
+| **2.45.4** ៖ ឯកសារ `.md` ទាំងអស់ (ផ្លូវឯកសារ · env var · កូនសោ storage · ឈ្មោះ function ក្នុង backtick) | ស៊ីនឹងកូដពិត (ការលើកលែងសុទ្ធតែចេតនា ៖ env ដែលត្រូវលុប · placeholder · វាល API របស់ ZTO) |
+| **2.45.4** ៖ សុវត្ថិភាព (secret ក្នុង repo · HTML sink ក្នុង React `src` · `innerHTML` របស់ ZoeKeyGen · `push-core.mjs` · ZTO Function) | គ្មាន secret ពិត (តែ key សាកល្បងក្នុង `audit-tools/idtoken-fixture.js`) · React គ្មាន HTML sink · ZoeKeyGen ឆ្លង `escapeHtml()` · ECDSA · SSRF allowlist · ETag at-most-once · `timingSafeEqual` · CORS តែ `https://localhost` |
+| **2.45.4** ៖ ល្បឿន `nearExpiryView()` / `expiryScheduleTimes()` លើ ៣,០០០ ជួរដេក · `callRecallBlink` (`infinite`) | ~៣ms / ~២ms (Chromium desktop) · `callRecallBlink` ជាសញ្ញាអាជីវកម្មលើតែជួរដេកដែលត្រូវខលវិញ ➜ ទុកដដែល |
+| **2.45.4** ៖ mutation បណ្តាញ M01–M10 · M12 · M13 | ចាប់ទាំងអស់ដោយ checker ដែលមានស្រាប់ (តារាងក្នុង `docs/HISTORY.md` ផ្នែក ២) |
 
 ## 📎 ចំណាំដែលការវាស់បដិសេធរួច (កុំសាកឡើងវិញ)
 

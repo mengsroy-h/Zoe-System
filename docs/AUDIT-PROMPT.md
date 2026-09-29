@@ -21,7 +21,12 @@
 (២) record មិនមែន object តែមួយក្រោម `$itemId` ធ្វើឲ្យ callback `onValue` បោះ ➜ listener ជាប់ «pending» គ្រប់ឧបករណ៍ ➜ ⛔ fake snapshot ត្រូវមាន
 **រូបរាង record ខុស** មិនត្រឹមវាលខុស (`field-shape-test` context ទី ២) · ⛔ ខាង server ៖ node rules ដែលមាន schema កូន ពិនិត្យតែ **កូន** ➜ primitive
 រំលងការពិនិត្យទាំងស្រុង (ចន្លោះ ១៩ ក្នុង rules ២ ឯកសារ) ➜ `rules-shape.js` ដេរីវេ node ពី rules ពិត · emulator វាស់ពីរជំហាន (control ត្រូវ **ទៅដល់** node មុនជឿការបដិសេធ)។ (៣) animation `infinite` ពេល App ស្ងៀម ➜ LTPO ចុះ Hz មិនបាន ➜ វាស់ដោយ
-**trace DrawFrame ពិត** + probe ទិសផ្ទុយ (`perf-check`)។ (៤) mutation testing ផ្នែកបណ្តាញ (១៥ + M11b) ៖ M14 រស់ព្រោះ checker ស្រង់តែ function មានឈ្មោះ
+**trace DrawFrame ពិត** + probe ទិសផ្ទុយ (`perf-check`) — ⛔ **ហើយការវាស់នោះខ្លួនឯងមានចំណុចងងឹត** ៖ DrawFrame រាប់តែ compositor ➜ animation
+**ពណ៌** (`background-color`) រត់លើ main thread ហើយ headless មិនចេញ DrawFrame ➜ ប៊ូតុង «ខលម្តងទៀត» ភ្លឹបជារៀងរហូត (main **១៨១ / ៣ វិ.**) ខណៈការវាស់រាយ ០ ➜
+រាប់ **BeginMainThreadFrame** ដែរ · probe ទិសផ្ទុយ **ម្តងមួយប្រភេទ** (compositor · main) · seed ត្រូវមានធាតុដែលកេះ animation (ជួរដេក «មិនលើក» ៣ ម៉ោង+)។
+(៤) ⛔ **fake SDK ទទួលគ្រប់ការសរសេរ ➜ ការកែ rules គ្មានអ្នកវាស់ខាងការបដិសេធ** ៖ កត់ការសរសេរពិតរបស់ App ពី fuzz (`FUZZ_CAPTURE`) រួច replay លើ emulator
+ជាមួយ rules ពិត ជាអ្នកប្រើ (`emu/app-writes-rules-test` ៖ ៤០២ ការសរសេរ · បដិសេធ ០ · probe ភាពរសើប ៨០) · ការប្រៀប rules ចាស់/ថ្មីលើការសរសេរដដែល (៩៥៥ ➜ ០/០)
+ជាភស្តុតាងដែលខ្លាំងជាងការអាន rules។ (៥) mutation testing ផ្នែកបណ្តាញ (១៥ + M11b) ៖ M14 រស់ព្រោះ checker ស្រង់តែ function មានឈ្មោះ
 ខណៈ handler `offline`/`online` ជា arrow ក្នុង `setupConnectionRecovery()` ➜ ⛔ សួរ «handler ព្រឹត្តិការណ៍ណាខ្លះគ្មាននរណារត់?»។ M11b រស់ព្រោះការអះអាង
 cooldown វាស់ **ថេរ** មិនមែនផ្លូវពិត ➜ ⛔ ពេលកូដមួយក្លាយជាស្ថាពរដោយ **កូដ ឬ HTTP status** ត្រូវវាស់កូដដែលមក **ជាមួយ status ផ្សេង** (503) — ករណី 401
 (M11) ជា equivalent ➜ កុំចាក់សោវា។ លទ្ធផលពេញ ៖ `docs/HISTORY.md` ផ្នែក ២។

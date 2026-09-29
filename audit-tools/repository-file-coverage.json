@@ -1829,6 +1829,9 @@
     "audit-tools/emu/ns.js": {
       "policy": "guard-32"
     },
+    "audit-tools/emu/app-writes-rules-test.js": {
+      "policy": "guard-1"
+    },
     "audit-tools/emu/restore-deadlock-test.js": {
       "policy": "guard-1"
     },

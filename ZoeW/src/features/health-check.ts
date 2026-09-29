@@ -231,6 +231,7 @@ export function openHealthCheck() {
 }
 
 export async function runHealthCheck() {
+    const run = ++uiState.healthRunSeq;
     viewState.healthRecheckBusy = true;
     uiState.healthRows = [healthPendingRow()];
     uiState.touch();
@@ -238,7 +239,7 @@ export async function runHealthCheck() {
     const [licenseRow, lookupRow] = await Promise.all([healthLicenseRow(), healthLookupRow()]);
     rows.splice(3, 0, licenseRow);
     rows.push(lookupRow);
-    if (!modalIsOpen('healthCheckModal')) return;
+    if (run !== uiState.healthRunSeq || !modalIsOpen('healthCheckModal')) return;
     uiState.healthRows = rows;
     uiState.touch();
     viewState.healthRecheckBusy = false;

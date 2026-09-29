@@ -316,40 +316,77 @@ function seedBig(n) {
             if (u.startsWith('http://127.0.0.1:' + port)) return r.continue();
             return r.abort();
         });
+        // ⛔ ស្ថានភាពត្រូវ **ដាក់ចូល** ៖ ជួរដេក «ខលម្តងទៀត» (`callMark` មិនលើក · លើស ៤ ម៉ោង) ជាទិដ្ឋភាពប្រចាំថ្ងៃ ➜ seed គ្មានវា
+        //    = ការវាស់ដែលមិនដែលឃើញ animation របស់ប៊ូតុង `.call-btn-recall` (2.45.4 ៖ ពណ៌ផ្ទៃ `infinite` ➜ main thread គូររាល់ vsync)។
+        const idleSeed = seedBig(30);
+        Object.keys(idleSeed.zoew_scan_history_cod_dod).slice(0, 2).forEach((id) => {
+            Object.assign(idleSeed.zoew_scan_history_cod_dod[id], { callMark: 'no-answer', callMarkTime: Date.now() - 5 * 3600 * 1000 });
+        });
         await idle.addInitScript(`window.localStorage.setItem('zoew_firebase_config', ${JSON.stringify(JSON.stringify({ apiKey: 'k', databaseURL: 'https://fake-default-rtdb.firebaseio.com', projectId: 'p' }))});`);
-        await idle.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(seedBig(30)) + ');');
+        await idle.addInitScript('(' + BOOT.toString() + ')(' + JSON.stringify(idleSeed) + ');');
         await idle.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
         await idle.waitForFunction(() => document.querySelectorAll('#historyTableBody tr').length > 0, null, { timeout: 30000 });
+        const recallAtStart = await idle.evaluate(() => ({
+            buttons: document.querySelectorAll('.call-btn-recall').length,
+            blinking: document.getAnimations().filter((a) => a.animationName === 'callRecallBlink' && a.playState === 'running').length
+        }));
         await idle.waitForTimeout(8000);
-        const drawFrames = async (ms) => {
-            await browser.startTracing(idle, { categories: ['disabled-by-default-devtools.timeline.frame', 'viz'] });
+        // ⛔ **DrawFrame តែម្យ៉ាងខ្វាក់** ចំពោះ animation ដែលគូរលើ main thread (ពណ៌ · paint) ៖ វាស់បាន (2.45.4) ប៊ូតុង «ខលម្តងទៀត» ២
+        //    ➜ DrawFrame **០** ខណៈ BeginMainThreadFrame **៣៥៧** · Paint **៧០៤** ក្នុង ៣ វិ. ➜ ត្រូវរាប់ **ទាំង ២** ហើយ probe ទិសផ្ទុយម្នាក់ៗ។
+        const idleFrames = async (ms) => {
+            await browser.startTracing(idle, { categories: ['disabled-by-default-devtools.timeline.frame', 'devtools.timeline', 'viz'] });
             await idle.waitForTimeout(ms);
             const ev = JSON.parse((await browser.stopTracing()).toString()).traceEvents || [];
-            return ev.filter((e) => e.name === 'DrawFrame').length;
+            return { draw: ev.filter((e) => e.name === 'DrawFrame').length, main: ev.filter((e) => e.name === 'BeginMainThreadFrame').length };
         };
-        const idleState = await idle.evaluate(() => ({
-            dot: (document.querySelector('.status-dot') || {}).className || '',
-            lite: document.body.classList.contains('perf-lite'),
-            running: document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x')
-        }));
-        const idleFrames = await drawFrames(3000);
+        const idleState = await idle.evaluate(() => {
+            const colorOf = (el) => (el ? getComputedStyle(el).backgroundColor : '');
+            const probeEl = document.createElement('i');
+            probeEl.style.backgroundColor = 'var(--action-danger)';
+            document.body.appendChild(probeEl);
+            const danger = getComputedStyle(probeEl).backgroundColor;
+            probeEl.remove();
+            return {
+                dot: (document.querySelector('.status-dot') || {}).className || '',
+                lite: document.body.classList.contains('perf-lite'),
+                running: document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x'),
+                danger: danger,
+                recallColor: colorOf(document.querySelector('.call-btn-recall')),
+                plainColor: colorOf(document.querySelector('.call-btn:not(.call-btn-recall)'))
+            };
+        });
+        const idleMeasured = await idleFrames(3000);
         const probe = await idle.addStyleTag({ content: '.status-dot::after{animation:pulseDot 1s infinite!important}' });
         await idle.waitForTimeout(200);
-        const probeFrames = await drawFrames(2000);
+        const probeFrames = (await idleFrames(2000)).draw;
         await probe.evaluate((el) => el.remove());
+        const mainProbe = await idle.addStyleTag({ content: '@keyframes zoeIdleProbe{50%{background-color:#ff0000}} .app-navbar{animation:zoeIdleProbe 1s infinite!important}' });
+        await idle.waitForTimeout(200);
+        const mainProbeFrames = (await idleFrames(2000)).main;
+        await mainProbe.evaluate((el) => el.remove());
         await idle.evaluate(() => { window.viewState.connectionStatus = 'connecting'; if (typeof window.commitNow === 'function') window.commitNow(); });
         await idle.waitForTimeout(8000);
         const connecting = await idle.evaluate(() => ({
             dot: (document.querySelector('.status-dot') || {}).className || '',
             running: document.getAnimations().filter((a) => a.playState === 'running').map((a) => a.animationName || 'x')
         }));
-        console.log('    ស្ងៀម ៣ វិ. ៖ DrawFrame=' + idleFrames + ' · probe infinite ២ វិ. ៖ ' + probeFrames + ' · ' + JSON.stringify(idleState));
+        console.log('    ស្ងៀម ៣ វិ. ៖ ' + JSON.stringify(idleMeasured) + ' · probe compositor ២ វិ. ៖ DrawFrame=' + probeFrames +
+            ' · probe main thread ២ វិ. ៖ BeginMainThreadFrame=' + mainProbeFrames + ' · recall ' + JSON.stringify(recallAtStart) + ' · ' + JSON.stringify(idleState));
         if (!REPORT) {
             check(idleState.dot === 'status-dot' && !idleState.lite,
                 app + ': ស្ងៀម ៖ លក្ខខណ្ឌចាំបាច់ — online (`status-dot`) និងមិនមែន perf-lite', JSON.stringify(idleState));
-            check(probeFrames >= 30, app + ': ស្ងៀម ៖ probe ទិសផ្ទុយ — animation infinite ត្រូវឃើញស៊ុម (ការវាស់រសើប)', 'DrawFrame=' + probeFrames);
-            check(idleFrames <= 3 && idleState.running.length === 0,
-                app + ': ⛔ App ស្ងៀម online មិនគូរស៊ុម (គ្មាន animation infinite) ➜ LTPO ចុះល្បឿនបាន', 'DrawFrame=' + idleFrames + ' running=' + JSON.stringify(idleState.running));
+            check(recallAtStart.buttons >= 1,
+                app + ': ស្ងៀម ៖ លក្ខខណ្ឌចាំបាច់ — ជួរដេក «ខលម្តងទៀត» ត្រូវបានគូរ (ស្ថានភាពត្រូវដាក់ចូល)', JSON.stringify(recallAtStart));
+            check(probeFrames >= 30, app + ': ស្ងៀម ៖ probe ទិសផ្ទុយ — animation compositor ត្រូវឃើញ DrawFrame (ការវាស់រសើប)', 'DrawFrame=' + probeFrames);
+            check(mainProbeFrames >= 30, app + ': ស្ងៀម ៖ probe ទិសផ្ទុយ — animation main thread (ពណ៌) ត្រូវឃើញ BeginMainThreadFrame (ការវាស់រសើប)', 'BeginMainThreadFrame=' + mainProbeFrames);
+            check(idleMeasured.draw <= 3 && idleMeasured.main <= 3 && idleState.running.length === 0,
+                app + ': ⛔ App ស្ងៀម online (មានជួរដេក «ខលម្តងទៀត») មិនគូរស៊ុម — ទាំង compositor ទាំង main thread ➜ LTPO ចុះល្បឿនបាន',
+                JSON.stringify(idleMeasured) + ' running=' + JSON.stringify(idleState.running));
+            check(recallAtStart.blinking >= 1,
+                app + ': ប៊ូតុង «ខលម្តងទៀត» ភ្លឹបពេលលេចដំបូង (សញ្ញាទាក់ចំណាប់អារម្មណ៍នៅដដែល)', JSON.stringify(recallAtStart));
+            check(idleState.recallColor !== '' && idleState.recallColor === idleState.danger && idleState.plainColor !== idleState.danger,
+                app + ': ⛔ ក្រោយឈប់ភ្លឹប ប៊ូតុង «ខលម្តងទៀត» នៅពណ៌ក្រហម (`--action-danger`) ជាប់ · ប៊ូតុងខលធម្មតាមិនក្រហម — សញ្ញាមិនបាត់',
+                JSON.stringify({ recall: idleState.recallColor, plain: idleState.plainColor, danger: idleState.danger }));
             check(/connecting/.test(connecting.dot) && connecting.running.indexOf('pulseDot') !== -1,
                 app + ': «កំពុងភ្ជាប់» នៅតែភ្លឹប (សញ្ញាសកម្មភាពពិត មិនត្រូវបិទជាមួយ)', JSON.stringify(connecting));
         }

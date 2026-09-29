@@ -55,6 +55,7 @@
 }
 
 .status-dot::after { animation-iteration-count: 3; }
+.call-btn-recall { background-color: var(--action-danger); animation-iteration-count: 5.5; }
 
 .nav-bell-btn {
     position: relative;

@@ -178,7 +178,7 @@ function serve(dir, blocked) {
         const realWasm = fs.readFileSync(path.join(dir, 'vendor', 'zxing_reader.wasm'));
         // custom section (id 0) ➜ wasm នៅត្រឹមត្រូវ តែ byte ចុងក្រោយជាស្លាកកំណែ
         const marked = (tag) => Buffer.concat([realWasm, Buffer.from([0x00, 0x0a, 0x08]), Buffer.from('zoe-mark' + tag, 'latin1')]);
-        const state = { tag: 'A', swTag: 'A', wasmHits: 0 };
+        const state = { tag: 'A', swTag: 'A', wasmHits: 0, swHits: 0 };
         const poison = await new Promise((res) => {
             const s = http.createServer((req, rsp) => {
                 let p = decodeURIComponent(req.url.split('?')[0]);
@@ -191,6 +191,7 @@ function serve(dir, blocked) {
                     return rsp.end(marked(state.tag));
                 }
                 if (p === '/sw.js' && cvMatch) {
+                    state.swHits++;
                     rsp.writeHead(200, { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' });
                     return rsp.end(realSw.split(cvMatch[0]).join(cvMatch[0] + '-' + state.swTag.toLowerCase()));
                 }
@@ -244,9 +245,18 @@ function serve(dir, blocked) {
 
         // កំណែ C ចេញ ដោយគ្មាន SW ថ្មី ➜ ការធ្វើឲ្យស្រស់ខាងក្រោយត្រូវនាំ C មក (មិនមែនជាប់ B ពី HTTP cache)
         state.tag = 'C';
+        const wasmBefore = state.wasmHits;
+        const swBefore = state.swHits;
         const third = await readTag('-b', 'C');
+        // ⛔ ការធ្លាក់ត្រូវប្រាប់ *មូលហេតុ* ៖ revalidate មិនដែលទៅដល់ server (link «frugal» · សាលក្រម deploy ចាស់ ·
+        //    SW ដែលគ្រប់គ្រងខុស) ធៀបនឹង server ឆ្លើយ C តែ cache មិនប្រែ
+        const why = third.tag === 'C' ? null : await ppage.evaluate(() => {
+            const link = navigator.connection || {};
+            const ctl = navigator.serviceWorker.controller;
+            return { effectiveType: link.effectiveType || null, saveData: link.saveData === true, rtt: link.rtt, controller: ctl ? ctl.scriptURL.split('/').pop() + ':' + ctl.state : null };
+        }).catch((e) => ({ probe: String(e && e.message) }));
         ok('ជុំទី ៤ ៖ ការធ្វើឲ្យស្រស់ខាងក្រោយ (revalidate) ទាញពី server មិនមែនពី HTTP cache ចាស់ (B ➜ C)',
-            third.tag === 'C', third);
+            third.tag === 'C', Object.assign({ serverWasmHits: state.wasmHits - wasmBefore, serverSwHits: state.swHits - swBefore }, third, why || {}));
 
         await pbrowser.close();
         await new Promise((r) => {

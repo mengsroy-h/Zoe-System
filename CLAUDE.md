@@ -2211,14 +2211,14 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
-- ⏳ **2.45.1 (branch) ៖ ប្រៀប «ស៊ុមកក 5 នាទីចុងក្រោយ» (ជើងរបា Slide ក្រោមលេខ Hz) រវាង APK និង PWA លើទូរស័ព្ទ Android ដដែល** ក្រោយឈរលើ
+- ⏳ **2.45.1 (merge រួច · PR #266) ៖ ប្រៀប «ស៊ុមកក 5 នាទីចុងក្រោយ» (ជើងរបា Slide ក្រោមលេខ Hz) រវាង APK និង PWA លើទូរស័ព្ទ Android ដដែល** ក្រោយឈរលើ
   filter «ទាំងអស់» រមូរ និងហូតផ្ទាំងប្រវត្តិ ១–២ នាទី (`docs/HISTORY.md` [2.45.1])។ តារាងប្រវត្តិឥឡូវគូរ ៥០ ជួរ ➜ បើ APK នៅតែ «អាក់» ត្រូវប្រៀបលេខនេះមុន
   ⛔ កុំកែកូដដោយគ្មានលេខ។ iPhone មិនបង្ហាញបន្ទាត់នេះទេ (Safari វាស់មិនបាន)។
-- ⏳ **2.45.0 / ZoeKeyGen 2.22.0 (branch) ៖ រៀបចំ Push** (`docs/HISTORY.md` [2.45.0]) ៖ `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` (`node ZoeW/scripts/gen-vapid.mjs`) · `FCM_SERVICE_ACCOUNT` (License Project) ក្នុង Netlify env របស់ ZoeW · Android app `com.zoesystem.zoew` ក្នុង License Project ➜ `google-services.json` ➜ GitHub secret `ZOEW_GOOGLE_SERVICES_JSON` ➜ build APK ថ្មី។ សាក ៖ បើកលើ iPhone PWA (Home Screen) · Android Chrome · APK ➜ ផ្ញើដំណឹងពី ZoeKeyGen ➜ លោតភ្លាមទោះ App បិទ · ចុច ➜ ផ្ទាំង 🔔 · ព្រឹកបន្ទាប់ម៉ោង ៨ ➜ ការរំលឹកកញ្ចប់ជិតផុតកំណត់ (បើមាន)។
-- ⏳ **2.44.0 / ZoeKeyGen 2.21.0 (branch) ៖ Publish rules របស់ License Project** (`ZoeKeyGen/firebase-database.rules.json` ៖ node `license_announcements`) ➜ បើមិនទាន់ ZoeKeyGen រាយ «⚠️ អានបញ្ជីដំណឹងមិនបាន» ហើយការផ្ញើធ្លាក់ · ZoeW មិនឃើញដំណឹង (ដំណើរការផ្សេងៗនៅដដែល)។ ក្រោយ Publish ៖ ផ្ញើដំណឹងសាកពី ZoeKeyGen ➜ មើលផ្ទាំង 🔔 លើ PWA និង APK · លុបវា ➜ វាបាត់ពេលទាញលើកក្រោយ។
-- ⏳ **2.43.0 / ZoeKeyGen 2.20.7 (branch) ៖ មើល logo និងផ្ទាំង 🔔 លើ iPhone PWA · Android PWA · APK** — ផ្ទាំងបើកពីស្តាំ · badge · កញ្ចប់ជិតផុតកំណត់ ·
+- ⏳ **2.45.0 / ZoeKeyGen 2.22.0 (merge រួច · PR #266) ៖ រៀបចំ Push** (`docs/HISTORY.md` [2.45.0]) ៖ `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` (`node ZoeW/scripts/gen-vapid.mjs`) · `FCM_SERVICE_ACCOUNT` (License Project) ក្នុង Netlify env របស់ ZoeW · Android app `com.zoesystem.zoew` ក្នុង License Project ➜ `google-services.json` ➜ GitHub secret `ZOEW_GOOGLE_SERVICES_JSON` ➜ build APK ថ្មី។ សាក ៖ បើកលើ iPhone PWA (Home Screen) · Android Chrome · APK ➜ ផ្ញើដំណឹងពី ZoeKeyGen ➜ លោតភ្លាមទោះ App បិទ · ចុច ➜ ផ្ទាំង 🔔 · ព្រឹកបន្ទាប់ម៉ោង ៨ ➜ ការរំលឹកកញ្ចប់ជិតផុតកំណត់ (បើមាន)។
+- ⏳ **2.44.0 / ZoeKeyGen 2.21.0 (merge រួច · PR #266) ៖ Publish rules របស់ License Project** (`ZoeKeyGen/firebase-database.rules.json` ៖ node `license_announcements`) ➜ បើមិនទាន់ ZoeKeyGen រាយ «⚠️ អានបញ្ជីដំណឹងមិនបាន» ហើយការផ្ញើធ្លាក់ · ZoeW មិនឃើញដំណឹង (ដំណើរការផ្សេងៗនៅដដែល)។ ក្រោយ Publish ៖ ផ្ញើដំណឹងសាកពី ZoeKeyGen ➜ មើលផ្ទាំង 🔔 លើ PWA និង APK · លុបវា ➜ វាបាត់ពេលទាញលើកក្រោយ។
+- ⏳ **2.43.0 / ZoeKeyGen 2.20.7 (merge រួច · PR #266) ៖ មើល logo និងផ្ទាំង 🔔 លើ iPhone PWA · Android PWA · APK** — ផ្ទាំងបើកពីស្តាំ · badge · កញ្ចប់ជិតផុតកំណត់ ·
   សារពី `announcements.json` (APK ទាញតាម `VITE_NATIVE_WEB_ORIGIN` ➜ ត្រូវការ deploy ដែលមាន header CORS ក្នុង `netlify.toml`)។
-- ⏳ **2.42.11 (branch) ៖ ប្រៀបលេខ «អេក្រង់ NNHz · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11])។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។
+- ⏳ **2.42.11 (merge រួច · PR #266) ៖ ប្រៀបលេខ «អេក្រង់ NNHz · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11])។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។
 - ⏳ **2.42.9 (PR #260) និង 2.42.10 (PR #264) merge រួច តែមិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9] · [2.42.10]) ៖
   ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម **លើ filter «ទាំងអស់» ជួរដេកច្រើន** លើ iPhone PWA · Android PWA · APK (តំបន់ហាមចូល ៖
   ចលនាផ្ទាំង · PTR) និងពេលស្កេន ZTO លើ APK ដែល build ពី `main` (រំពឹង ~០.៦–០.៨ វិ. ដូច PWA)។ បញ្ហាលេចលើឧបករណ៍ពិត ➜

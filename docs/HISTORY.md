@@ -1712,6 +1712,7 @@ Function ដែល export ៖ 978
 | `policy-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `price-edit-abort-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `raw-read-shape-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៤ |
+| `react-view` | ផ្នែក ១ | — |
 | `reconnect-ladder-test` | — | ផ្នែក ៣ · ផ្នែក ៤ |
 | `redact-dump` | — | ផ្នែក ១ · ផ្នែក ២ |
 | `registry-orphan-list` | — | ផ្នែក ១ |

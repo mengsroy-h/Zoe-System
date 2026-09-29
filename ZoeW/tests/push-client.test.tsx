@@ -349,6 +349,8 @@ describe('ផ្ទាំង 🔔 ៖ ផ្នែក «ជូនដំណឹង
         step(() => { uiState.pushStatus = 'needs-install'; });
         expect(document.getElementById('notifyPushBtn')).toBeNull();
         expect(document.getElementById('notifyPushStatus')!.textContent).toContain('Add to Home Screen');
+        const icon = (document.querySelector('#notifyPushSection .notify-section-title')!.textContent || '').trim().split(' ')[0];
+        for (const text of Object.values(PUSH_STATUS_TEXT)) expect(text.startsWith(icon), text).toBe(false);
     });
 });
 

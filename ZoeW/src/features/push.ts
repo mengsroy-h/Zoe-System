@@ -25,7 +25,7 @@ export const pushNativeBuild = { fcm: typeof __FCM_CONFIGURED__ !== 'undefined' 
 export const PUSH_STATUS_TEXT: Record<PushStatus, string> = {
     unknown: '⏳ កំពុងពិនិត្យ…',
     unsupported: '⚠️ Browser នេះមិនគាំទ្រការជូនដំណឹងលើទូរស័ព្ទ',
-    'needs-install': '📲 iPhone ៖ ចុច Share ➜ «Add to Home Screen» រួចបើក ZoeW ពីរូបនៅលើអេក្រង់ ទើបបើកការជូនដំណឹងបាន',
+    'needs-install': 'iPhone ៖ ចុច Share ➜ «Add to Home Screen» រួចបើក ZoeW ពីរូបនៅលើអេក្រង់ ទើបបើកការជូនដំណឹងបាន',
     'native-unconfigured': '⚠️ APK នេះមិនទាន់ភ្ជាប់ FCM (google-services.json) — សូមដំឡើង APK ថ្មី',
     'no-license': '⚠️ ឧបករណ៍នេះមិនទាន់ Activate — ការជូនដំណឹងត្រូវការ Activation Key',
     off: 'ការជូនដំណឹងលើទូរស័ព្ទបិទ — បើកវាដើម្បីទទួលដំណឹងពីអ្នកលក់ និងកញ្ចប់ជិតផុតកំណត់ ទោះ App បិទ',

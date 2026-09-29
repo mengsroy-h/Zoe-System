@@ -616,9 +616,6 @@
     "ZoeW/android/app/proguard-rules.pro": {
       "policy": "zoew-android"
     },
-    "ZoeW/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java": {
-      "policy": "zoew-android"
-    },
     "ZoeW/android/app/src/main/AndroidManifest.xml": {
       "policy": "zoew-android"
     },
@@ -777,9 +774,6 @@
       "policy": "zoew-android"
     },
     "ZoeW/android/app/src/main/res/xml/file_paths.xml": {
-      "policy": "zoew-android"
-    },
-    "ZoeW/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java": {
       "policy": "zoew-android"
     },
     "ZoeW/android/build.gradle": {

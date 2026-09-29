@@ -39,6 +39,48 @@
 
 ## 📗 ផ្នែក ១ — កំណត់ត្រាតាមកំណែ (សម័យ React · អ្នកប្រើឃើញអ្វីខុសពីមុន)
 
+### [2.45.5] — 2026-09-30 · ZoeW · ZoeKeyGen `2.22.1` ៖ **Deep audit ៖ ភ្ជាប់ Server វិញដោយខ្លួនឯង ក្រោយបណ្តាញ «ភ្ជាប់តែស្លាប់» · App Android ដឹងពេលអ៊ីនធឺណិតដាច់/មកវិញ · បិទ Push លើ APK ឈប់ទទួលពិត · parity ធៀប ZoeW ដើមរស់ឡើងវិញ**
+
+**ZoeW `2.45.5`** (`zoew-v245` ➜ `zoew-v246`) · **ZoeKeyGen `2.22.1`** (`zoekeygen-v108` ➜ `zoekeygen-v109`)។ ⛔ rules មិនប្រែ ➜ គ្មាន Publish។
+
+#### អ្វីដែលខុសពីមុន
+
+- **🔴 SDK Firebase លែងជាប់ «ក្រៅបណ្ដាញ» ក្រោយបណ្តាញ «ភ្ជាប់តែស្លាប់»** (App ទាំង ២) ៖ SDK ផ្ទុកពី `www.gstatic.com` ➜ ការផ្ទុកធ្លាក់ម្តង
+  module map របស់ browser ចងចាំការបរាជ័យពេញអាយុទំព័រ ➜ ផ្លូវស្តារតែមួយគឺ **ផ្ទុកទំព័រឡើងវិញ** (ពិដាន ៣/វគ្គ)។ តែ `navigator.onLine` **កុហក** លើ
+  WiFi គ្មានអ៊ីនធឺណិត · ទិន្នន័យទូរស័ព្ទអស់លុយ · App Android (ខាងក្រោម) ➜ ជណ្តើរចំណាយការផ្ទុក ៣ ដងក្នុង ~១ នាទី **ខណៈបណ្តាញស្លាប់** (រាល់ដងធ្លាក់ដដែល ·
+  អ្នកប្រើឃើញ App ផ្ទុកខ្លួនឯង ៣ ដង) ➜ ពេលអ៊ីនធឺណិតមកវិញ SDK **មិនដែលស្តារ** ➜ «ក្រៅបណ្ដាញ» រហូតដល់អ្នកប្រើ Refresh ដោយដៃ។ ការកែ ៖ មុនចំណាយការផ្ទុក
+  App **វាស់ការឈានដល់ host របស់ SDK** (`HEAD https://www.gstatic.com/generate_204` · no-cors · ៨ វិ.) ៖ ឈានមិនដល់ ➜ មិនផ្ទុក (ពិដាននៅដដែល) តែជណ្តើរ
+  បន្តវាស់ · ឈានដល់ ➜ ផ្ទុក · ការវាស់មួយហោះម្តង · ប្រអប់ទើបបើកខណៈវាស់ ➜ មិនផ្ទុក (PIN · Config មិនបាត់)។ CSP `connect-src` ទាំង ២ site អនុញ្ញាត
+  `https://www.gstatic.com` (បើអត់ fetch ត្រូវ CSP ទប់ដូចបណ្តាញដាច់ ➜ **មិនដែលផ្ទុកឡើងវិញ** — វាស់ក្នុង Chromium ៖ CSP ចាស់ ➜ violation `connect-src`)។
+- **🔴 App Android ៖ ស្ថានភាពបណ្តាញពិត** ៖ WebView ផ្តល់ `navigator.onLine` និង `online`/`offline` **តែពេល** App មានសិទ្ធិ `ACCESS_NETWORK_STATE`
+  (ផ្ទៀងក្នុងប្រភព Chromium `WebViewChromiumAwInit` កំណែ 120 · 130 ៖ `NetworkChangeNotifier` ចាប់ផ្តើមតែក្រោមលក្ខខណ្ឌនេះ)។ APK មិនដែលស្នើវា ➜
+  `onLine = true` ជានិច្ច · `online`/`offline` មិនដែលបាញ់ ➜ អ៊ីនធឺណិតមកវិញ ➜ រង់ចាំជណ្តើរ (ដល់ ៦០ វិ.) · ដាច់ ➜ «កំពុងភ្ជាប់…» ~៣៥ វិ. មុន «ក្រៅបណ្ដាញ» ·
+  🩺 «អ៊ីនធឺណិត ✅ ភ្ជាប់» ខណៈគ្មានបណ្តាញ · ការងារស្រេចចិត្ត (ZTO · ដំណឹង) សាកបណ្តាញពេលក្រៅបណ្តាញ។ ការកែ ៖ ស្នើសិទ្ធិនោះ (សិទ្ធិធម្មតា · **គ្មានប្រអប់សុំ**)។
+- **App Android ៖ បិទការជូនដំណឹង ➜ ឈប់ទទួលពិត** ៖ ការបិទហៅតែ `unregister()` (`deleteToken()` ដែល **ធ្លាក់ស្ងាត់ពេលក្រៅបណ្តាញ**) ដោយមិនប្រាប់ server ➜
+  server នៅផ្ញើ ➜ ដំណឹងនៅលោត ខណៈប៊ូតុងរាយ «បិទ»។ ការកែ ៖ ផ្ញើ `unsubscribe` token (រក្សាក្នុង `zoew_push_v1`) មុន `unregister()`។
+- **App Android ៖ token ដែលអ្នកប្រើមិនបានស្នើ មិនបើក Push ដោយស្ងាត់** ៖ callback `registration` ទទួល token **ណាក៏ដោយ** ➜ (១) token ពី FCM auto-init
+  ពេល boot (អ្នកប្រើមិនដែលបើក) ចុះឈ្មោះ server ហើយប៊ូតុងរាយ «✅ បើករួច» · (២) token យឺត (resync) ដែលមកដល់ **ក្រោយ** អ្នកប្រើបិទ បើកវាវិញ។ ការកែ ៖
+  ទទួល token តែពេលអ្នកប្រើចង់បើក (`nativeWanted` · `nativeEnabling` · `saved.on`) · ការចុះឈ្មោះដែលចប់ក្រោយការបិទ ➜ លុបវាចេញវិញ · token យឺតក្រោយ
+  watchdog (អ្នកប្រើចុចបើក) នៅតែបញ្ចប់ជា «បើក» ដូចមុន។
+
+#### អ្នកយាម
+
+- `connection-recovery-test` ១០ខ៥ (App ទាំង ២ · sandbox ៖ ការឈានដល់ host = up/down/hang) ៖ tree មុនកែ **FAIL ១៦** (ផ្ទុកឡើងវិញ ៣ ដងខណៈបណ្តាញស្លាប់ ·
+  មកវិញ ➜ ០) ➜ **២១៩/២១៩**។ ⛔ sandbox ចាស់ ៖ `document.querySelectorAll()` ឆ្លើយ `[]` ជានិច្ច ➜ ច្រកទ្វារ «ប្រអប់បើក» របស់ **ZoeKeyGen** មិនដែលត្រូវវាស់ (តែ
+  ZoeW) ➜ ឥឡូវ `__openModal` លេចតាមផ្លូវ `.modal` ដែរ។
+- `netlify-config-scope-test` ឃ (ដេរីវេ ៖ `FIREBASE_SDK_PROBE_URL` ➜ `connect-src` ត្រូវមាន origin) ៖ ZoeKeyGen ធ្លាក់មុនកែ CSP ➜ ✅។
+- `npm run android:check` ៖ `ACCESS_NETWORK_STATE` (ដេរីវេ ៖ ឯកសារ `src/**` ដែលពឹង `onLine`/`online`/`offline` ១៨) ៖ tree មុនកែ **FAIL ១** ➜ **៨១/៨១**។
+- `ZoeW/tests/push-client.test.tsx` ៣ សេណារីយ៉ូ (បិទ ➜ `unsubscribe` · token យឺតក្រោយបិទ · auto-init ពេល boot) ៖ កូដមុនកែ **FAIL ៣** ➜ **២៩/២៩**។
+- **parity ធៀប ZoeW ដើម រស់ឡើងវិញ + ចូល CI** (ការងារ `zoew-parity`) — លម្អិតក្នុងផ្នែក ២។
+
+#### សកម្មភាពដែលត្រូវធ្វើដោយដៃ
+
+- Deploy **ZoeW** និង **ZoeKeyGen** (CSP ថ្មីមកជាមួយ `netlify.toml` ក្នុង deploy ដដែល) · **build APK ថ្មី** (សិទ្ធិ `ACCESS_NETWORK_STATE` ចូលតែតាម APK ថ្មី)។
+  គ្មាន env ថ្មី · rules មិនប្រែ។
+- សាកលើឧបករណ៍ពិត ៖ APK បើក Airplane mode ➜ «ក្រៅបណ្ដាញ» ក្នុងប៉ុន្មានវិនាទី · បិទវិញ ➜ «ភ្ជាប់ Server រួចរាល់» ភ្លាម · 🩺 «អ៊ីនធឺណិត» ត្រឹមត្រូវ ·
+  បិទ Push លើ APK ខណៈអ៊ីនធឺណិតអន់ ➜ ដំណឹងពីអ្នកលក់លើកក្រោយមិនលោត · web ៖ បើក App ខណៈ WiFi គ្មានអ៊ីនធឺណិត ➜ App **មិនផ្ទុកខ្លួនឯងម្តងហើយម្តងទៀត** ·
+  អ៊ីនធឺណិតមកវិញ ➜ ភ្ជាប់វិញដោយមិន Refresh។
+
 ### [2.45.4] — 2026-09-29 · ZoeW ៖ **Deep audit ៖ ប្រវត្តិ/ធុងសំរាមលែងងាប់ដោយ record ខូចតែមួយ · rules ទាមទារ object · ចំណុច «ភ្ជាប់ Server» និងប៊ូតុង «ខលម្តងទៀត» ឈប់គូរស៊ុមពេលស្ងៀម · Push «⏳ កំពុងភ្ជាប់…» លែងជាប់ជារៀងរហូត**
 
 **ZoeW `2.45.4` (`zoew-v244` ➜ `zoew-v245`)**។ ⛔ **ZoeKeyGen មិនប្រែ** (`2.22.0` · មានតែ `ZoeKeyGen/firebase-database.rules.json` ដែលមិនមែនកូដ ship)។
@@ -1444,6 +1486,55 @@ push ចូល ZoeW»* និង *«រត់ full suits ហើយ commit push»
 
 ## 🐛 ផ្នែក ២ — ប្រវត្តិកំហុស និងលេខដែលវាស់បាន (សម័យ React)
 
+### Deep audit 2.45.5 ៖ `navigator.onLine` ដែលកុហក · អ្នកយាម parity ដែលគ្មាននរណារត់ (2026-09-30 · ZoeW 2.45.5 · ZoeKeyGen 2.22.1)
+
+baseline (tree មិនប៉ះ · emulator · `*_STRICT`) ៖ **១៨៨ ពេញលេញ · ០ មួយផ្នែក · ០ រំលង · ០ ធ្លាក់** (៥៦៩ វិ.)។ កំហុសទាំងអស់ខាងក្រោម **បៃតងលើសំណុំនោះ**។
+
+**១. `navigator.onLine` កុហក ➜ ការស្តារ SDK ចំណាយពិដានខណៈបណ្តាញស្លាប់** ៖ រកឃើញដោយសួរ «តើ *អ្វីខ្លះ* ពឹងលើ `onLine`?» (ឯកសារ `src/**` ១៨) បន្ទាប់ពី
+ផ្ទៀងក្នុងប្រភព Chromium ថា WebView គ្មាន `ACCESS_NETWORK_STATE` ឲ្យ `onLine = true` ជានិច្ច។ `reloadForFirebaseSdk()` ជឿ `onLine` ជាសាលក្រម «មានបណ្តាញ» ➜
+ពិដាន ៣ អស់ក្នុង ~៦០–៩០ វិ. ➜ ក្រោយនោះ checker ចាស់ **អះអាង** «ក្រោយអស់ពិដាន ការស្តារត្រឡប់ទៅជណ្តើរចាស់» — ជណ្តើរដែល **មិនអាចជោគជ័យ** (module map
+ចងចាំការបរាជ័យ) ➜ ការអះអាងនោះចាក់សោស្ថានភាពជាប់។ ⛔ មេរៀន ៖ ពិដានដែល **អស់ដោយគ្មានសាលក្រមពិត** ជាអន្ទាក់ស្ថាពរដូច «កូនសោ registry កំព្រា» ➜
+មុនចំណាយពិដាន ត្រូវ **វាស់** លក្ខខណ្ឌដែលធ្វើឲ្យការចំណាយមានប្រយោជន៍។ ⛔ ការវាស់ខ្លួនវាត្រូវឆ្លង CSP ➜ `netlify-config-scope-test` ឃ ដេរីវេ origin ពីកូដ
+(Chromium ពិត ៖ CSP ចាស់ ➜ `connect-src` violation · fetch បោះ ➜ ការវាស់ «ឈានមិនដល់» ជារៀងរហូត ➜ ការកែក្លាយជា «មិនដែលផ្ទុកឡើងវិញ»)។
+
+**២. Push លើ APK** ៖ ការបិទមិនប្រាប់ server (web ប្រាប់) — រកឃើញដោយ **តារាងប្រៀបធៀបបងប្អូន** web ↔ native នៃ `disablePush()`។ callback `registration`
+ទទួល token ដោយមិនសួរ «អ្នកប្រើចង់បើកទេ?» — រកឃើញដោយអានកូដ plugin Capacitor ពិត (`MessagingService.onNewToken` ➜ `registration` ពេល FCM auto-init)។
+⛔ ច្រកទ្វារដំបូង (ផ្អែកលើ `saved.on`) **បំបែកកិច្ចសន្យាចាស់** «token យឺតក្រោយ watchdog នៅតែបញ្ចប់ជា on» (តេស្តចាស់ធ្លាក់ ១) ➜ ចេតនាអ្នកប្រើត្រូវជា
+វាលដាច់ដោយឡែក (`nativeWanted`) មិនមែនដេរីវេពីស្ថានភាព UI។
+
+**៣. 🔴 អ្នកយាម parity ធៀប ZoeW ដើម ក្រហមស្ងាត់ៗ តាំងពី 2.43.0** ៖ `npm run parity:all` ➜ `parity:dom` **❌ ៣/៣** អេក្រង់ · `parity:live` **១៨/១៨** ជំហានខុស ·
+`parity:deep` **៧៩/៧៩** ជំហានខុស — លើ `main` ផងដែរ (ផ្ទៀងលើ tree មុនកែ)។ មូលហេតុ ៖ `zoew-suite` រត់តែ `parity` (កាតាឡុក) ➜ DOM · live · deep
+**មិនដែលរត់ក្នុង CI** ➜ ផ្ទៃថ្មីដោយចេតនា (ផ្ទាំង 🔔 · logo SVG · ល្បឿនស៊ុមក្នុងរបា Slide · token `op`) ធ្វើឲ្យគ្រប់ជំហានក្រហម ➜ ការខុសគ្នាពិតណាក៏ដោយ
+លិចក្នុងសំលេងរំខាន។ ការខុសគ្នាពិតប្រាកដមានតែ **២ ប្រភេទ** នៅ `parity:deep` (logo · `op`) ➜ ការកែ ៖ បញ្ជីតែមួយ `INTENTIONAL_UI` (`scripts/snapshot.mjs` ·
+skip ៦ selector · opaque ២ · floating ២ · navbar −១៤px លើទូរស័ព្ទ) ➜ **DOM ៧២០/៧២០ × ៣ · layout ១៨/១៨ × ៣ · live ១៨/១៨ · deep ៧៩/៧៩** ហើយការងារ `zoew-parity`
+(`zoew-suite-test.js --parity` · ១៦៨ វិ. · `dist-parity/` និង ZoeW ដើមក្នុងថតឯកជន ➜ មិនប្រណាំង `dist/`/`.original/` ជាមួយ `zoew-suite`)។
+
+mutation លើ `dist` (ផ្ទៀងថាការលើកលែងមិនបិទបាំងការខុសគ្នាពិត) ៖
+
+| # | mutation | លទ្ធផល |
+|---|---|---|
+| M1 | CSS `.page-main` −៥៦px (ច្បាប់ដែល **មិនអនុវត្ត** ក្នុងស្ថានភាពដែលវាស់) | រស់រាន — ⛔ mutation មិនទៅដល់អេក្រង់ (មិនមែនចន្លោះ) |
+| M2 | ខ្សែអក្សរ «ធុងសំរាម» ទី ១ ក្នុង bundle (សារ **មិនបានគូរ**) | រស់រាន — ⛔ ដដែល |
+| M3 | រូប 📷 របា Tab ➜ 📸 (គូរពិត) | `parity:dom` ❌ ៣/៣ · `parity:live` ❌ ១៨ |
+| M4 | `.page-side { margin-top: 56px }` | `parity:dom` ❌ ៣/៣ (layout ១៧ · ១៧ · ១៤ /១៨) |
+| M5 | navbar កម្ពស់ខុសពី −១៤px ដែលប្រកាស | `parity:dom` ❌ ៣/៣ |
+| M6 | ផ្លូវ ledger ថ្ងៃប្តូរឈ្មោះ | `parity:deep` ❌ ៧២ ជំហាន |
+
+⛔ មេរៀន M1/M2 ៖ «mutation រស់រាន» មានន័យតែពេល mutation **ទៅដល់ផ្ទៃដែលវាស់** — ផ្ទៀងវាជាមុន (grep ថាវាចុះលើឯកសារ **និង** ថាវាគូរ/រត់ក្នុងសេណារីយ៉ូ)
+មុនសន្និដ្ឋាន «ចន្លោះ»។
+
+**៤. ការវាស់ដែល *បដិសេធ* សម្មតិកម្ម** (កុំវាស់ឡើងវិញដោយគ្មានហេតុផលថ្មី) ៖
+- `MainActivity` `preferredDisplayModeId` (mode Hz ខ្ពស់បំផុត) **មិនចាក់សោ** ល្បឿនអេក្រង់ ៖ AOSP `DisplayModeDirector` Android 12 · 13 · 14 បម្លែងវាជា
+  `Vote.forBaseModeRefreshRate()` ដែលរក្សាជួរ physical/render `[0, ∞]` ➜ LTPO នៅចុះ Hz ពេលស្ងៀមបាន (Android 11 មិនបានពិនិត្យ)។
+- ទង់ busy/in-flight ៣៥ កន្លែង ៖ រាល់មួយមាន `finally` · `withTimeout` · ឬការដោះពេលបើកប្រអប់វិញ (`manualAdjustBusy`) ➜ គ្មានថ្នាក់ «ការព្យួរ ≠ ការធ្លាក់» ថ្មី។
+- Push server (`push-core.mjs`) ៖ SSRF (host push ពិតតែប៉ុណ្ណោះ) · License ECDSA + Revoke · ledger ETag ➜ គ្មានកំហុស។ `unsubscribe` គ្មាន License ជាការរចនា
+  (endpoint/token ជា secret របស់ឧបករណ៍)។
+- XSS ៖ `ZoeW/src/**` គ្មាន `innerHTML`/`dangerouslySetInnerHTML` · URL ថាមវន្តតែ `tel:` · SW `notificationclick` ដាក់ URL ក្នុង origin។
+- secret ក្នុង repo ៖ មានតែ fixture តេស្ត (API key ក្លែង · private key សម្រាប់ចុះហត្ថលេខា ID token ក្លែងក្នុង `idtoken-fixture.js`)។
+
+**៥. ការសម្អាត** ៖ លុប `ExampleUnitTest.java` · `ExampleInstrumentedTest.java` (template Capacitor · package `com.getcapacitor.myapp`) — តេស្ត instrumented
+អះអាង package `com.getcapacitor.app` ➜ **ធ្លាក់** បើនរណារត់វាលើ `com.zoesystem.zoew` ➜ ជាឯកសារបំភ្លៃ មិនមែនអ្នកយាម។
+
 ### Mutation testing ជុំ ២ ៖ ១៥ mutation + ៣ ផ្ទៀងផ្ទាត់ ➜ ចន្លោះ ៣ (ខ្សែភ្ជាប់ SW ↔ ទំព័រ) · control ១ (2026-09-29 · ZoeW 2.45.4)
 
 - **វិធី** ៖ ដូចជុំ ១ តែរត់ក្នុង **git worktree ដាច់ដោយឡែក** (tree ធ្វើការមិនប៉ះ) · subset checker ៣០ ក្នុងមួយ mutation (~១៩០ វិ.)។ ⛔ worktree
@@ -2197,7 +2288,7 @@ Function ដែល export ៖ 978
 | `monotonic-gate-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ៤ |
 | `monthly-ledger-agreement-test` | ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ |
 | `monthly-report-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៥ |
-| `netlify-config-scope-test` | ផ្នែក ១ | ផ្នែក ២ |
+| `netlify-config-scope-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ២ |
 | `network-pressure-test` | — | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `network-timeout-test` | ផ្នែក ១ · ផ្នែក ២ | ផ្នែក ១ · ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |
 | `offline-shell-test` | ផ្នែក ១ | ផ្នែក ២ · ផ្នែក ៣ · ផ្នែក ៤ |

@@ -61,14 +61,12 @@
         .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
         .brand-mark {
-            display: inline-grid;
+            display: block;
+            flex: none;
             width: 42px;
             height: 42px;
-            place-items: center;
-            border-radius: 12px;
-            background: #FFFFFF;
-            color: var(--brand);
-            font-size: 20px;
+            border-radius: 22%;
+            box-shadow: 0 0 0 2px rgba(255,255,255,.85);
         }
         .back-link {
             display: inline-flex;
@@ -202,7 +200,7 @@
     <a class="skip-link" href="#main-content">រំលងទៅមាតិកាសំខាន់</a>
     <header class="topbar">
         <div class="topbar-inner">
-            <div class="brand"><span class="brand-mark" aria-hidden="true">Z</span><span>ZoeW · ឯកសារផ្លូវការ</span></div>
+            <div class="brand"><svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><defs><linearGradient id="guideLogoBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e31837"/><stop offset="1" stop-color="#c3122d"/></linearGradient><linearGradient id="guideLogoLeft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdebec"/><stop offset="1" stop-color="#fce4e6"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#guideLogoBg)"/><g stroke-width="8" stroke-linejoin="round"><path d="M256 162 L363 217 L256 272 L149 217 Z" fill="#fffcfc" stroke="#fffcfc"/><path d="M149 217 L256 272 L256 388 L149 333 Z" fill="url(#guideLogoLeft)" stroke="url(#guideLogoLeft)"/><path d="M256 272 L363 217 L363 333 L256 388 Z" fill="#fce0e2" stroke="#fce0e2"/><path d="M256 269 L256 392" stroke="#e31837" stroke-width="10" stroke-linecap="round" fill="none"/></g></svg><span>ZoeW · ឯកសារផ្លូវការ</span></div>
             <a class="back-link" href="./index.html">← ត្រឡប់ទៅ App</a>
         </div>
     </header>
@@ -326,6 +324,7 @@
                             <tr><td>ស្កេន</td><td>របៀបបញ្ចូលកញ្ចប់/Locker/ដកកញ្ចប់ កាមេរ៉ា hardware scanner រូបភាព និងវាយ Barcode</td></tr>
                             <tr><td>របា Slide</td><td>Firebase, Lookup API, តារាងអតិថិជន, Locker, Google Sheet, Health Check, PIN, ជីវមាត្រ និង Login</td></tr>
                             <tr><td>ម៉ឺនុយ (…) </td><td>Export, របាយការណ៍ខែ, កែទឹកប្រាក់, អត្រាប្ដូរប្រាក់, ធុងសំរាម, Reset និងលុបទាំងអស់</td></tr>
+                            <tr><td>ជូនដំណឹង 🔔</td><td>ប៊ូតុងជ្រុងស្តាំខាងលើ បើកផ្ទាំងពីខាងស្តាំ ៖ កញ្ចប់ជិតផុតកំណត់ ព័ត៌មានកំណែ App សេចក្តីប្រកាស/ការថែទាំ និងស្លាក Powered By ZoeW</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -585,6 +584,13 @@
                     <li>នៅ Offline អ្នកអាចបើក App និងប្រើធនធានដែលបាន cache ប៉ុន្តែការផ្ទៀងផ្ទាត់ server និងការសរសេរខ្លះត្រូវរង់ចាំបណ្តាញ។</li>
                     <li>សារ <strong>⏳ នឹងបញ្ចប់ដោយស្វ័យប្រវត្តិ</strong> មានន័យថាការងារចូលជួររង់ចាំ។ កុំចុចសកម្មភាពដដែលម្ដងទៀត។</li>
                     <li>ពេលមានកំណែថ្មី របាជូនដំណឹងបង្ហាញឲ្យ Refresh។ រង់ចាំការងារសំខាន់ចប់សិន មុន Refresh។</li>
+                </ul>
+                <h3>ផ្ទាំងជូនដំណឹង 🔔</h3>
+                <ul>
+                    <li>លេខក្រហមលើ 🔔 = កញ្ចប់ជិតផុតកំណត់ + សារមិនទាន់អាន + កំណែថ្មីដែលទាញរួច។ ចុច 🔔 ដើម្បីបើក ហើយបិទវិញ ➜ សារត្រូវរាប់ថាបានអាន។</li>
+                    <li><strong>📦 កញ្ចប់ជិតផុតកំណត់</strong> ៖ កញ្ចប់មិនទាន់យក ដែលនឹងដល់ច្បាប់ ៧ ថ្ងៃ ក្នុង ២៤ ម៉ោងខាងមុខ (ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ និងដកលុយ)។ ទាក់ទងអតិថិជន ឬបិទ «យក» មុនពេលនោះ។ បើឃើញ «⏳ … មិនទាន់មកដល់» មានន័យថាទិន្នន័យមិនទាន់ទាញចប់ មិនមែន «គ្មាន» ទេ។</li>
+                    <li><strong>📱 កំណែ App</strong> ៖ កំណែបច្ចុប្បន្ន និងថាមានកំណែថ្មីឬអត់ (App Android ត្រូវដំឡើង APK ថ្មី)។</li>
+                    <li><strong>📢 សេចក្តីប្រកាស និងការថែទាំ</strong> ៖ សារពីអ្នកគ្រប់គ្រងប្រព័ន្ធ (ការឡើងកំណែ ការថែទាំ) ទាញពី server ពេលបើក App ពេលត្រឡប់មកវិញ និងរាល់ ៥ នាទី។</li>
                 </ul>
                 <h3>បើកំណែមិនទាន់ផ្លាស់</h3>
                 <ol>

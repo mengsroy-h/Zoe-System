@@ -6,6 +6,7 @@ import { AppPages } from './AppPages';
 import { PageTabBar } from './PageTabBar';
 import { DrawerBackdrop } from './DrawerBackdrop';
 import { SideDrawer } from './SideDrawer';
+import { NotifyDrawer } from './NotifyDrawer';
 import { PinModal } from './modals/PinModal';
 import { PinSetupModal } from './modals/PinSetupModal';
 import { ConfigModal } from './modals/ConfigModal';
@@ -53,6 +54,7 @@ export function AppShell() {
             <PageTabBar />
             <DrawerBackdrop />
             <SideDrawer />
+            <NotifyDrawer />
             <PinModal />
             <PinSetupModal />
             <ConfigModal />

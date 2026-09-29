@@ -60,6 +60,12 @@
     Cache-Control = "no-cache"
 
 [[headers]]
+  for = "/announcements.json"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"

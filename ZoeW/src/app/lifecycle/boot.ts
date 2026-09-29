@@ -20,6 +20,7 @@ import { setupConnectionRecovery } from '../../services/connection';
 import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
+import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
 import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
 import { setupChromeAutoHide } from '../behaviors/chrome-autohide';
@@ -104,6 +105,7 @@ function startCoreServices(): void {
         if (window.ZoeLicense) window.ZoeLicense.syncServerTime().catch(() => {});
         applySetupLinkFromUrl();
         initFirebase();
+        initNotifications();
     });
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -117,6 +119,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(60000, runSessionExpiryCheck);
     scope.every(LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck);
     scope.every(60000, sweepRecallHighlights);
+    scope.every(NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick);
     scope.every(60000, () => {
         runScheduledCleanup();
         resumeInterruptedCleanups();
@@ -128,6 +131,7 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         runScheduledCleanup();
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
+        notifyPeriodicTick();
         if (uiState.currentAppPage === 'entry') warmZtoLookupProxyNow();
     });
 }

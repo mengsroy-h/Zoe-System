@@ -1,0 +1,133 @@
+import { uiState } from '../../core/state';
+import { APP_VERSION } from '../../core/version';
+import { NOTIFY_NEAR_EXPIRY_HOURS, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { isNativeApp } from '../../platform/native';
+import { onAct } from '../actions';
+import { useStoreFields } from '../hooks/useStore';
+
+const KIND_ICON: Record<string, string> = { update: '🆕', maintenance: '🛠️', notice: '📢' };
+
+function hoursText(h: number): string {
+    return h <= 0 ? 'ដល់ពេលហើយ' : '≤ ' + h + ' ម៉ោង';
+}
+
+function ExpirySection({ view }: { view: NotifyView | null }) {
+    const measurable = !!(view && view.measurable);
+    const rows = measurable && view ? view.rows : [];
+    return (
+        <section className="notify-section" id="notifyExpirySection">
+            <div className="notify-section-title">📦 កញ្ចប់ជិតផុតកំណត់</div>
+            {measurable && view && view.packages > 0 ? (
+                <>
+                    <div className="notify-summary is-warn" id="notifyExpirySummary">
+                        <strong>{view.packages}</strong> កញ្ចប់ · <strong>{view.customers}</strong> អតិថិជន
+                        {' '}នឹងផុតកំណត់ក្នុង {NOTIFY_NEAR_EXPIRY_HOURS} ម៉ោងខាងមុខ ➜ ប្រព័ន្ធដកចេញស្វ័យប្រវត្តិ (ដកលុយ) បើមិនទាន់យក
+                    </div>
+                    <ul className="notify-expiry-list" id="notifyExpiryList">
+                        {rows.map((row) => (
+                            <li key={row.key} className="notify-expiry-row">
+                                <span className="notify-expiry-phone">{row.phone || '—'}</span>
+                                <span className="notify-expiry-meta">
+                                    {row.count} កញ្ចប់{row.locker ? ' · ' + row.locker : ''}
+                                </span>
+                                <span className={row.hoursLeft <= 0 ? 'notify-expiry-left is-due' : 'notify-expiry-left'}>{hoursText(row.hoursLeft)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    {view.more > 0 ? <div className="notify-more">… និង {view.more} ជួរទៀត</div> : null}
+                </>
+            ) : (
+                <div className="notify-summary" id="notifyExpirySummary">{view ? view.emptyText : '⏳ កំពុងរៀបចំ…'}</div>
+            )}
+        </section>
+    );
+}
+
+function VersionSection({ feed, updateReady }: { feed: NotifyFeedItem[]; updateReady: boolean }) {
+    const newer = newerAppVersion(feed);
+    let status;
+    if (updateReady) {
+        status = (
+            <>
+                <div className="notify-summary is-info">🔄 កំណែថ្មីបានទាញរួច — Refresh ដើម្បីប្រើវា</div>
+                <button type="button" className="notify-refresh-btn" onClick={() => window.location.reload()}>Refresh ឥឡូវនេះ</button>
+            </>
+        );
+    } else if (newer) {
+        status = (
+            <div className="notify-summary is-info">
+                🆕 កំណែ {newer} មានហើយ — {isNativeApp() ? 'សូមដំឡើង APK ថ្មី' : 'App នឹងទាញវាដោយស្វ័យប្រវត្តិ (ឬ Refresh)'}
+            </div>
+        );
+    } else if (feed.length) {
+        status = <div className="notify-summary">✅ អ្នកកំពុងប្រើកំណែចុងក្រោយ</div>;
+    } else {
+        status = <div className="notify-summary">⚠️ មិនទាន់ទាញព័ត៌មានកំណែពី Server បាន</div>;
+    }
+    return (
+        <section className="notify-section" id="notifyVersionSection">
+            <div className="notify-section-title">📱 កំណែ App</div>
+            <div className="notify-version-line">កំណែបច្ចុប្បន្ន ៖ <strong>{APP_VERSION}</strong></div>
+            {status}
+        </section>
+    );
+}
+
+function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] }) {
+    return (
+        <section className="notify-section" id="notifyFeedSection">
+            <div className="notify-section-title">📢 សេចក្តីប្រកាស និងការថែទាំ</div>
+            {feed.length ? (
+                <ul className="notify-feed-list" id="notifyFeedList">
+                    {feed.map((item) => (
+                        <li key={item.id} className={'notify-feed-item kind-' + item.kind}>
+                            <div className="notify-feed-head">
+                                <span className="notify-feed-ico" aria-hidden="true">{KIND_ICON[item.kind] || '📢'}</span>
+                                <span className="notify-feed-title">{item.title}</span>
+                                {seen.indexOf(item.id) === -1 ? <span className="notify-new-tag">ថ្មី</span> : null}
+                            </div>
+                            {item.date ? <div className="notify-feed-date">{item.date}</div> : null}
+                            {item.body ? <div className="notify-feed-body">{item.body}</div> : null}
+                            {item.points.length ? (
+                                <ul className="notify-feed-points">
+                                    {item.points.map((p, i) => <li key={i}>{p}</li>)}
+                                </ul>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <div className="notify-summary">គ្មានសេចក្តីប្រកាសទេ</div>
+            )}
+        </section>
+    );
+}
+
+export function NotifyDrawer() {
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySeenIds', 'updateReady']);
+    const open = s.notifyDrawerOpen;
+    return (
+        <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
+            <div className="drawer-head">
+                <div className="drawer-title">🔔 ជូនដំណឹង</div>
+                <button
+                    type="button"
+                    className="drawer-close"
+                    title="បិទ"
+                    aria-label="បិទ"
+                    onClick={onAct("closeSideDrawer")}
+                >
+                    ✖
+                </button>
+            </div>
+            <div className="drawer-body">
+                <ExpirySection view={s.notifyView} />
+                <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
+                <FeedSection feed={s.notifyFeed} seen={s.notifySeenIds} />
+            </div>
+            <div className="drawer-foot notify-foot">
+                <div className="credit-tag">Powered By ZoeW</div>
+            </div>
+        </aside>
+    );
+}

@@ -841,6 +841,9 @@
     "ZoeW/package.json": {
       "policy": "guard-28"
     },
+    "ZoeW/public/announcements.json": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/public/boot-flags.js": {
       "policy": "guard-15"
     },
@@ -1003,6 +1006,9 @@
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/GlobalMoreMenu.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/NotifyDrawer.tsx": {
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/PageData.tsx": {
@@ -1183,6 +1189,9 @@
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/shell/AppErrorBoundary.tsx": {
+      "policy": "zoew-react-ui"
+    },
+    "ZoeW/src/app/components/shell/AppIconMark.tsx": {
       "policy": "zoew-react-ui"
     },
     "ZoeW/src/app/components/shell/BiometricLabel.tsx": {
@@ -1401,6 +1410,9 @@
     "ZoeW/src/features/monthly-report.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/notifications.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/phone-suggest.ts": {
       "policy": "zoew-app"
     },
@@ -1533,6 +1545,9 @@
     "ZoeW/src/ui/toast.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/tests/app-icon-logo.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/code128-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1591,6 +1606,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/zto-preflight.test.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/notifications.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/oracles/health-row-html.ts": {

@@ -50,7 +50,10 @@ const SHIPPED = /\.(js|css|html|wasm|json)$/;
 // Netlify — វាមិនដែលចូលសំបករបស់ `sw.js` ទេ ➜ ការបន្ថែម dependency ខាង server
 // មិនត្រូវបង្ខំអ្នកប្រើទាញសំបក PWA ទាំងមូលឡើងវិញឡើយ (ច្បាប់ទី ៦ ដដែល)។
 // ការលើកលែងនេះក៏ត្រូវចាក់សោដោយការអះអាងលើបញ្ជីសំបកខាងក្រោមដែរ។
-const NOT_SHIPPED = /(README|netlify\.toml|netlify\/functions\/|firebase-database\.rules\.json|\/test\.js$|\/package(-lock)?\.json$)/;
+// ⛔ `public/announcements.json` (សារជូនដំណឹង/ថែទាំ) ជា **ទិន្នន័យ** ដែល App ទាញ network-only — វាមិនចូលសំបករបស់ `sw.js`
+//    ➜ សារថែទាំបន្ទាន់មិនត្រូវបង្ខំអ្នកប្រើទាញសំបក PWA ឡើងវិញ (ច្បាប់ទី ៦)។ ចាក់សោដោយការអះអាងលើបញ្ជីសំបកខាងក្រោមដូចគ្នា។
+const FEED_DATA = /(^|\/)announcements\.json$/;
+const NOT_SHIPPED = /(README|netlify\.toml|netlify\/functions\/|firebase-database\.rules\.json|\/test\.js$|\/package(-lock)?\.json$|(^|\/)announcements\.json$)/;
 const BUILD_MANIFEST = /package(-lock)?\.json$/;
 const SERVER_ONLY_DIRS = /(^|\/)(netlify|tools)\//;
 
@@ -152,6 +155,10 @@ for (const app of present) {
         leaked.length === 0,
         'ឃើញ ' + leaked.join(', ') + ' ➜ ការលើកលែង `netlify/functions/` ក្នុង '
             + 'NOT_SHIPPED លែងសុវត្ថិភាព ➜ ការកែឯកសារនោះនឹងទុកអ្នកប្រើនឹងសំបកចាស់');
+    const feeds = entries.filter((e) => FEED_DATA.test(e));
+    ok('⛔ ' + app + ' ៖ សំបកគ្មាន `announcements.json` (សារត្រូវទាញ network-only)',
+        feeds.length === 0,
+        'ឃើញ ' + feeds.join(', ') + ' ➜ ការលើកលែងក្នុង NOT_SHIPPED លែងសុវត្ថិភាព ➜ សារថែទាំនឹងជាប់ក្នុង cache ចាស់');
     const manifests = entries.filter((e) => BUILD_MANIFEST.test(e));
     ok('⛔ ' + app + ' ៖ សំបកគ្មាន `package.json` / `package-lock.json`',
         manifests.length === 0,
@@ -164,7 +171,7 @@ for (const app of present) {
     if (isReactSource(app)) {
         const prefix = app + '/';
         const reactFiles = changed.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length))
-            .filter((f) => REACT_SHIPPED.test(f) && !REACT_AUDIT_ONLY.test(f));
+            .filter((f) => REACT_SHIPPED.test(f) && !REACT_AUDIT_ONLY.test(f) && !FEED_DATA.test(f));
         const versionOnly = new Map([
             [REACT_VERSION_FILES.app, /APP_VERSION\s*=/],
             [REACT_VERSION_FILES.cache, /CACHE_VERSION\s*=/],

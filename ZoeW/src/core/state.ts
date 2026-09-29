@@ -275,6 +275,13 @@ export interface UiState {
     sheetImportView: any | null;
     modalDisplay: Record<string, 'flex' | 'none'>;
     drawerOpen: boolean;
+    notifyDrawerOpen: boolean;
+    notifyView: import('../features/notifications').NotifyView | null;
+    notifyFeed: import('../features/notifications').NotifyFeedItem[];
+    notifySeenIds: string[];
+    notifyFeedFetchedAt: number;
+    notifyFeedInFlight: boolean;
+    updateReady: boolean;
     dataPanelCollapsed: boolean;
     entryPanelCollapsed: boolean;
     dataPanelSearchFocus: boolean;
@@ -351,6 +358,13 @@ export const uiState = createStore<UiState>('uiState', {
     sheetImportView: null,
     modalDisplay: {},
     drawerOpen: false,
+    notifyDrawerOpen: false,
+    notifyView: null,
+    notifyFeed: [],
+    notifySeenIds: [],
+    notifyFeedFetchedAt: 0,
+    notifyFeedInFlight: false,
+    updateReady: false,
     dataPanelCollapsed: false,
     entryPanelCollapsed: false,
     dataPanelSearchFocus: false,
@@ -365,7 +379,7 @@ export const uiState = createStore<UiState>('uiState', {
     chromeBottomVar: '',
 });
 registerStore(uiState);
-uiState.markImmediate(['modalDisplay', 'drawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
+uiState.markImmediate(['modalDisplay', 'drawerOpen', 'notifyDrawerOpen', 'moreMenuOpen', 'moreMenuPosition', 'currentAppPage',
     'dataPanelCollapsed', 'entryPanelCollapsed', 'dataPanelSearchFocus', 'historyExpanded', 'panelGliding',
     'phoneSuggestOpen', 'chromeHidden']);
 

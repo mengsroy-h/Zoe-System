@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'zoekeygen-v105';
+const CACHE_VERSION = 'zoekeygen-v106';
 
 const CORE_SHELL = [
     './',
@@ -9,12 +9,12 @@ const CORE_SHELL = [
     './firebase-loader.js',
     './license-verify.js',
     './error-reporting.js',
-    './qrcode.js'
+    './qrcode.js',
+    './icon-192.png'
 ];
 
 const OPTIONAL_SHELL = [
     './manifest.json',
-    './icon-192.png',
     './icon-512.png'
 ];
 

@@ -99,8 +99,8 @@ TypeScript + Vite** (មាន build step) · **ZoeKeyGen** ជា vanilla JS (�
 
 | App | តួនាទី | កំណែឥឡូវ | Sentry tag |
 |---|---|---|---|
-| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.42.11` (`zoew-v238`) | `zoew` |
-| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.6` (`zoekeygen-v105`) | `zoekeygen` |
+| **ZoeW** | App អាជីវកម្មតែមួយ — បញ្ចូល/កែកញ្ចប់, COD/DOD, ទីតាំង Locker, ស្ថិតិ, Export, នាំចូល Excel · មានជា **App Android** (Capacitor) ផង | `2.43.0` (`zoew-v239`) | `zoew` |
+| **ZoeKeyGen** | ឧបករណ៍អ្នកលក់ — បង្កើត/Revoke/Extend Activation Key និង Setup Link/QR។ ប្រើ **Firebase Project ដាច់ដោយឡែក** | `2.20.7` (`zoekeygen-v106`) | `zoekeygen` |
 
 > ⛔ **ZoeW ជា React ចាប់ពី `2.38.0`** — កូដរស់នៅ `ZoeW/src/**` (**ឈ្មោះ function និង
 > កូនសោ storage ដដែលនឹង ZoeW vanilla**) ហើយ build ➜ `ZoeW/dist/`។ `src/**` ជា **ប្រភពការពិតតែមួយ**
@@ -424,6 +424,7 @@ server) · `tools/zto-cookie-sync-windows/` (helper Windows) · `firebase-backup
 | **ZTO ៖ `ZTO_UPSTREAM_REJECTED` ជាកន្តុំរួម** | ⛔ វាលាយ **សាលក្រមស្ថាពរ** («លេខមិនស្គាល់» ៖ លេខតេស្ត · កញ្ចប់មិនមែន ZTO ➜ ការសាកម្តងទៀត **ឥតប្រយោជន៍**) ជាមួយ **សាលក្រមបណ្តោះអាសន្ន** («ZTO ដាច់ពិត» ➜ ការសាកម្តងទៀត **ត្រឹមត្រូវ**)។ ខាង client 5xx ជា retryable ➜ ការស្កេនលេខមិនស្គាល់ចំណាយ **២ ជុំ** រួចចេញ Sentry event។ ⛔ **កុំធ្វើឲ្យវាស្ងាត់ទាំងអស់** — នោះនឹងបាំង **ការដាច់របស់ ZTO ពិត**។ ⛔ ហើយ **កុំទាយកូដណាមួយ** ៖ ការបំបែកត្រូវការ **payload ពិតរបស់ ZTO**។ ដូច្នេះជំហានទី ១ គឺ **ធ្វើឲ្យវាមើលឃើញ** ៖ `noteUpstreamReject()` កត់ `count · status · code` ចូល `?diag=1` ⛔ **ដោយមិនប្តូរសាលក្រម · cache · ការសាកម្តងទៀត** ➜ ជុំក្រោយសម្រេចដោយ **លេខ** មិនមែនការស្មាន។ ⛔ កូដត្រូវអានតាម `upstreamCodeText()` ដែលជា **ចំណុចច្របាច់តែមួយ** រួមនឹង `upstreamSucceeded()` (ច្បាប់ចម្លងទី ២ ➜ សាលក្រម និងការវិនិច្ឆ័យនិយាយផ្ទុយគ្នា) ហើយត្រូវឆ្លង `SAFE_REASON_RE` ➜ **សារឆៅរបស់ upstream មិនលេច** | `zto-proxy-test` |
 | **React ១០០% ៖ ម្ចាស់ DOM តែមួយ (ZoeW)** | ⛔ កូដមុខងារ **មិនប៉ះ DOM** ៖ ប្រអប់ = `uiState.modalDisplay` · អត្ថបទ/ទង់ = `viewState` · focus/តម្លៃ/វាស់ = `src/app/refs.ts` · ការលើកលែងក្នុង `platform/document-io.ts` (ហេតុផល + ពិដាន)។ ⛔ ស្រទាប់ React (`src/app/**`) ៖ class · style · attribute · អត្ថបទ · listener ជា JSX; ការសរសេរ DOM ដែលនៅសល់ (focus · រមូរ · `animate()` · input uncontrolled · `<html>`/`<body>` · `touch*` non-passive · `muted`) តែក្នុងច្រកចេញ `APP_ALLOWED`។ ⛔ សញ្ញា PTR គូរពី `ptrState` (មិនមែន `uiState`) · `boot-flags.js` មិនប៉ះធាតុរបស់ React · ឈ្មោះ ref គ្រប់ឈ្មោះមាន `ref={…}` ពិត (AST) · `commitNow()` មុនការវាស់/focus · input ជា **uncontrolled** (`defaultValue`/`defaultChecked`) · checker ដើមដែលសរសេរ class បកប្រែតែក្នុង build វាស់ (`src/audit-compat.ts`) | `npm run purity:check` (ZoeW) |
 | **បញ្ជីធំៗ ↔ ការគូរឡើងវិញ (ZoeW)** | ⛔ តារាងប្រវត្តិ **គ្មានពិដាន** (filter «ទាំងអស់» = ជួរដេករាប់ពាន់) ➜ body នៃបញ្ជី subscribe **តែវាល view របស់ខ្លួន** (`useStoreFields`) មិនមែន `useStore(uiState)` ទាំងមូល — វាល `markImmediate` (ហូតប្រអប់ · ម៉ឺនុយ · ប្រអប់ · `chromeHidden` ខណៈរមូរ) commit **ភ្លាម** ➜ ការគូរជួរដេកទាំងអស់រត់ខាងក្នុងផ្លូវចលនា។ ⛔ ឪពុកដែលគូរឡើងវិញរាល់ការហូត (`PageData` · `PageEntry`) ប្រើកំណែ `Memo…` (function ដើមនៅ export សម្រាប់ `react-view`) · `HistoryRow` ប្រៀបតាម **តម្លៃ** (`sameHistoryRowModel()` — Firebase ផ្តល់ object ថ្មីរាល់ snapshot)។ ⛔ ទិសផ្ទុយ ៖ ធាតុកែនៅនឹងកន្លែង + `renderHistory()` ត្រូវគូរ (`historyRenderSeq` ⛔ មិនមែន `uiState.touch()`) · listener ធ្លាក់ពេលបញ្ជីទទេ ➜ សារ «វាស់មិនបាន» (`firebaseState`) · អ្នកផលិត view ផ្សេងត្រូវ assign object **ថ្មី** (ការកែនៅនឹងកន្លែងមិនកេះការគូរ) | `ZoeW/tests/list-render-scope.test.tsx` |
+| **ផ្ទាំងជូនដំណឹង 🔔 (ZoeW)** | ⛔ «ជិតផុតកំណត់» សួរ **`barcodeAbandonIsRipe()` ដដែល** នឹងការសម្អាត ៧ ថ្ងៃ (គ្មានរូបមន្តព្រំដែនទី ២) · អានសុទ្ធសាធ (មិនប៉ះលុយ/Firebase) · ទិដ្ឋភាពប្រវត្តិមិនស្រស់ ឬ Database មិនទាន់ភ្ជាប់ ➜ «វាស់មិនបាន» · ចាកចេញ ➜ បញ្ជីលុបចេញពី DOM។ ⛔ ផ្ទាំង 🔔 និងរបា Slide ជា **ស្រទាប់តែមួយ** (`isSideDrawerOpen()` រាប់ទាំង ២ ➜ PTR · Back · Escape · ផ្ទៃខាងក្រោយ)។ ⛔ សារ ៖ `public/announcements.json` ទាញ **network-only** (មិនចូលសំបក SW · APK តាម `VITE_NATIVE_WEB_ORIGIN` + CORS) ➜ **រាល់ការឡើងកំណែ ZoeW ត្រូវមានធាតុ `update` ថ្មីបំផុត = `APP_VERSION`** · សារ `maintenance` សុទ្ធ **មិនឡើងកំណែ** (`version-bump-scope` មិនរាប់វា)។ ⛔ logo ក្នុង App (navbar · boot splash · guide) = App icon ដេរីវេពី `resources/icon.svg` / `manifest.json` របស់ ZoeKeyGen | `ZoeW/tests/notifications.test.tsx` · `ZoeW/tests/app-icon-logo.test.tsx` · `version-bump-scope` |
 | **Toolchain ↔ អ្វីដែល ship (ZoeW)** | ⛔ checker CSS/ប្លង់វាស់ CSS **ប្រភព** ហើយ Chromium parse syntax ថ្មីបាន ➜ ការឡើង Vite/minifier អាចប្តូរ **output** ដោយគ្មានអ្នកវាស់។ ⛔ minifier CSS ជា **esbuild** (`cssMinify`) ៖ Lightning CSS (លំនាំដើម Vite) សរសេរ design token ឡើងវិញ និងរៀបលំដាប់ declaration ក្នុង CSS ដែលគ្រប PTR/ចលនាផ្ទាំង · JS ក្នុង build ត្រូវ parse បានក្នុង `build.target` (iPhone ចាស់) · ⛔ chunk ត្រូវបែងចែកតាម `codeSplitting` + `priority` (Rolldown ចាប់ dependency របស់ group ➜ helper `__vitePreload` ធ្លាក់ចូល chunk native ➜ web ផ្ទុកវា ➜ **ក្រៅបណ្តាញចាប់ផ្តើមមិនកើត**)។ ⛔ config Android (SDK · AndroidX · AGP · Gradle) ស្ថិតក្នុងខ្សែ template របស់ **Capacitor ដែលដំឡើង** — លើសខ្សែនោះ = ឡើង Capacitor major (`ZoeW/docs/ANDROID.md`) ព្រោះ build Android វាស់មិនបាននៅទីនេះ | `npm run smoke` · `npm run android:check` · `npm run native:check` (ZoeW) |
 | **config Netlify ↔ site ២** | ⛔ **គ្មាន root `netlify.toml`** — វាត្រូវអានសម្រាប់ site ទាំង ២ ➜ បង្វែរ build របស់ App មួយទៀត | `netlify-config-scope-test` |
 | **config Netlify ↔ តម្រូវការ App** | ⛔ CSP · `functions` · header ត្រូវស៊ីនឹងអ្វីដែល App **ពិតជា ship** | `netlify-config-scope-test` |
@@ -898,6 +899,7 @@ debounce ២.៥ វិ. · `isBarcodeAlreadyUsed()` (២ ជាន់) · **`cl
 | របា Slide (ម៉ឺនុយ) | `sideDrawer` | **Category ៤ បត់បាន** (`.drawer-group`, បត់ជាលំនាំដើម, ស្ថានភាពក្នុង `zoew_drawer_groups_v1`) ៖ **ការតភ្ជាប់ និងទិន្នន័យ** (Config / Reconfig · API ស្វែងរកអតិថិជន · តារាងអតិថិជន · នាំចូល Excel ទៅ Sheet) · **ZTO** (បិទតាម ZTO ស្វ័យប្រវត្តិ · ទាញបញ្ជីកញ្ចប់ពី ZTO — ⛔ ២ នេះ និង**ក្បាល Category ខ្លួនវា** លេចតែពេល Fast Mode គូស) · **ចាក់សោ និងសុវត្ថិភាព** (ចាក់សោពេលបើក App · ចូលដោយក្រយៅដៃ ឬមុខ) · **ឧបករណ៍** (កំណត់ទូ Locker · ពិនិត្យសុខភាពប្រព័ន្ធ)។ ⛔ **ចូល/ចាកចេញ ឈរក្នុង `.drawer-foot`** ជាមួយលេខកំណែ មិនមែនក្នុង `.drawer-body` |
 | ប៊ូតុង (...) ខាងលើ | `globalMoreMenu` | Export Data · របាយការណ៍អាជីវកម្មប្រចាំខែ · កែទឹកប្រាក់/កញ្ចប់ (PIN) · អត្រាប្រាក់ · ធុងសំរាម · Reset ចំនួនយករួច (PIN) · លុបទាំងអស់ (PIN) |
 | ប៊ូតុង (...) តាមជួរ | `globalMoreMenu` | កែតម្លៃកញ្ចប់ · កែលេខទូរស័ព្ទ · លុប |
+| ផ្ទាំងជូនដំណឹង (🔔 ជ្រុងស្តាំ navbar) | `notifyDrawer` | បើកពីខាងស្តាំ ៖ 📦 កញ្ចប់ជិតផុតកំណត់ (២៤ ម៉ោង) · 📱 កំណែ App · 📢 សេចក្តីប្រកាស/ថែទាំ (`public/announcements.json`) · ⛔ **«Powered By ZoeW» ឈរក្នុងជើងផ្ទាំងនេះ** មិនមែន navbar |
 
 ម៉ឺនុយ (...) ខាងលើ និងតាមជួរ ត្រូវបិទពេលចាប់ផ្តើមអូសផ្ទាំងខាងក្រៅ ឬ
 រមូរប្រវត្តិ។ ការចុច/រមូរខាងក្នុងម៉ឺនុយនៅប្រើបាន។ ការអូសផ្ទាំងដោយ transform
@@ -2189,7 +2191,7 @@ bash audit-tools/emu/rules.sh
   non-secure context ដែល App **មិនអាចដំណើរការបានសោះ**)។
 - **`waitForZXingThenInitScanEngine()` ប្រើនាឡិកាឆៅ** — ទុកចោលដោយចេតនា
   (មិនប៉ះទិន្នន័យ ឬលុយ)។
-- **`setInterval` ទាំង ៦ របស់ ZoeW រត់ខណៈទំព័រ `hidden`** — ⛔ **កុំបន្ថែម
+- **`setInterval` ទាំង ៧ របស់ ZoeW រត់ខណៈទំព័រ `hidden`** — ⛔ **កុំបន្ថែម
   ច្រកទ្វារ `document.hidden`** ៖ browser throttle រួចហើយ ហើយច្រកទ្វារបង្កើត
   ហានិភ័យថា cache តារាងអតិថិជន **ចាស់ពេលអ្នកប្រើត្រឡប់មក**។
 - **`revenue-fuzz` មិនកេះផ្លូវ «៧ ថ្ងៃ + កញ្ចប់លាយ»** — សំណាញ់ការពារនៃផ្លូវនោះ
@@ -2205,6 +2207,8 @@ bash audit-tools/emu/rules.sh
 > ⛔ **ទុកតែអ្វីដែល *អ្នកប្រើមិនទាន់បញ្ជាក់* ឬ *ការសម្រេចដែលនៅរស់*។** អ្នកប្រើបញ្ជាក់ថាដំណើរការលើឧបករណ៍ពិត ➜
 > លុបធាតុចេញពីទីនេះ (កំណត់ត្រាអចិន្ត្រៃយ៍រស់ក្នុង `docs/HISTORY*.md`)។
 
+- ⏳ **2.43.0 / ZoeKeyGen 2.20.7 (branch) ៖ មើល logo និងផ្ទាំង 🔔 លើ iPhone PWA · Android PWA · APK** — ផ្ទាំងបើកពីស្តាំ · badge · កញ្ចប់ជិតផុតកំណត់ ·
+  សារពី `announcements.json` (APK ទាញតាម `VITE_NATIVE_WEB_ORIGIN` ➜ ត្រូវការ deploy ដែលមាន header CORS ក្នុង `netlify.toml`)។
 - ⏳ **2.42.11 (branch) ៖ ប្រៀបលេខ «អេក្រង់ NNHz · WebView វវ» ក្រោមលេខកំណែក្នុងរបា Slide រវាង APK និង PWA (Chrome) លើទូរស័ព្ទដដែល** ➜ លេខនោះសម្រេចជំហានបន្ទាប់ (`docs/HISTORY.md` [2.42.11])។ ⛔ កុំអះអាងថា APK «រលូនដូច PWA» ដោយគ្មានលេខនេះ ឬ trace ពី `chrome://inspect`។
 - ⏳ **2.42.9 (PR #260) និង 2.42.10 (PR #264) merge រួច តែមិនទាន់សាកលើឧបករណ៍ពិត** (`docs/HISTORY.md` [2.42.9] · [2.42.10]) ៖
   ហូតប្រអប់ប្រវត្តិ · រមូរ · បើកធុងសំរាម **លើ filter «ទាំងអស់» ជួរដេកច្រើន** លើ iPhone PWA · Android PWA · APK (តំបន់ហាមចូល ៖

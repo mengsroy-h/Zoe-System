@@ -8,6 +8,7 @@ import { showCameraClosedBox, stopCurrentStream } from '../features/daily-stats'
 import { warmZtoLookupProxyNow } from '../features/lookup-api';
 import { hidePhoneSuggestions } from '../features/phone-suggest';
 import { setEntryScanMode } from '../features/scan-remove';
+import { markNotifyFeedSeen } from '../features/notifications';
 import { refreshZtoListSyncUi } from '../features/zto-list-sync';
 import { refreshZtoAutoCloseUi } from '../features/zto-status';
 import { showAppChrome } from './chrome-autohide';
@@ -40,16 +41,20 @@ export function openSideDrawer() {
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
     refreshDrawerGroups();
+    if (uiState.notifyDrawerOpen) markNotifyFeedSeen();
+    uiState.notifyDrawerOpen = false;
     uiState.drawerOpen = true;
     measureDisplayRateForDrawer();
 }
 
 export function closeSideDrawer() {
+    if (uiState.notifyDrawerOpen) markNotifyFeedSeen();
     uiState.drawerOpen = false;
+    uiState.notifyDrawerOpen = false;
 }
 
 export function isSideDrawerOpen() {
-    return uiState.drawerOpen;
+    return uiState.drawerOpen || uiState.notifyDrawerOpen;
 }
 
 export function drawerAction(fn) {

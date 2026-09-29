@@ -68,6 +68,7 @@ export const ACTION_ALLOWLIST = [
     "openEditModal",
     "openLockerPicker",
     "openCollectedStatsModal",
+    "openNotifyDrawer",
     "openSideDrawer",
     "openViewListModal",
     "openZtoListSyncModal",

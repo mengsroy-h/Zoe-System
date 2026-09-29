@@ -36,6 +36,7 @@ export function revealAppAfterBoot() {
 }
 
 export function showUpdateAvailableBanner() {
+    uiState.updateReady = true;
     if (uiState.updateBannerOpen) return;
     uiState.updateBannerOpen = true;
 }

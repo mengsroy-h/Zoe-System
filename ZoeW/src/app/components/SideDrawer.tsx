@@ -77,6 +77,7 @@ export function SideDrawer() {
     const loggedIn = useStoreValue(firebaseState, (s) => s.authButtonIsLoggedIn);
     const versionLabel = useStoreValue(viewState, (s) => s.appVersionLabel);
     const displayRate = useStoreValue(viewState, (s) => s.displayRateText);
+    const jank = useStoreValue(viewState, (s) => s.jankText);
     const v = useStoreFields(viewState, ['ztoAutoCloseOn', 'ztoAutoCloseVisible', 'ztoAutoCloseText', 'ztoListSyncOn',
         'ztoListSyncDrawerVisible', 'ztoListSyncText', 'appLockToggleOn', 'appLockToggleText', 'biometricToggleOn',
         'biometricUnsupported', 'biometricToggleText']);
@@ -186,6 +187,7 @@ export function SideDrawer() {
                     aria-label="បើកសៀវភៅណែនាំ ZoeW"
                 >{versionLabel}</a>
                 {displayRate ? <div className="app-copyright-line" id="displayRateLine">{displayRate}</div> : null}
+                {jank ? <div className="app-copyright-line" id="jankLine">{jank}</div> : null}
                 <div className="app-copyright-line">រក្សាសិទ្ធិគ្រប់យ៉ាង © 2026 ហ៊ុន ម៉េង ស្រូយ (MENGSROY HEN)</div>
                 <div className="app-copyright-line app-copyright-en">Copyright © 2026 MENGSROY HEN. All rights reserved.</div>
             </div>

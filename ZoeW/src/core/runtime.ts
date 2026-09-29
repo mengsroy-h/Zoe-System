@@ -106,6 +106,7 @@ export const ACTION_ALLOWLIST = [
     "setCallMark",
     "setEntryScanMode",
     "showMoreTrashRows",
+    "showMoreHistoryRows",
     "submitActivationKey",
     "submitAppLockForm",
     "submitLoginForm",

@@ -253,6 +253,8 @@ export interface UiState {
     pendingPermanentDeleteId: any;
     historyView: any[] | null;
     historyRenderSeq: number;
+    historyRenderLimit: number;
+    historyViewKey: string;
     entryListView: any[] | null;
     lockerListView: any | null;
     trashSummary: any | null;
@@ -340,6 +342,8 @@ export const uiState = createStore<UiState>('uiState', {
     pendingPermanentDeleteId: null,
     historyView: null,
     historyRenderSeq: 0,
+    historyRenderLimit: 50,
+    historyViewKey: '',
     entryListView: null,
     lockerListView: null,
     trashSummary: null,

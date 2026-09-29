@@ -12,7 +12,7 @@ import { markNotifyFeedSeen } from '../features/notifications';
 import { refreshZtoListSyncUi } from '../features/zto-list-sync';
 import { refreshZtoAutoCloseUi } from '../features/zto-status';
 import { showAppChrome } from './chrome-autohide';
-import { measureDisplayRateForDrawer } from './perf';
+import { measureDisplayRateForDrawer, refreshJankText } from './perf';
 
 export function switchAppPage(page?) {
     const target = page === 'entry' ? 'entry' : 'data';
@@ -45,6 +45,7 @@ export function openSideDrawer() {
     uiState.notifyDrawerOpen = false;
     uiState.drawerOpen = true;
     measureDisplayRateForDrawer();
+    refreshJankText();
 }
 
 export function closeSideDrawer() {

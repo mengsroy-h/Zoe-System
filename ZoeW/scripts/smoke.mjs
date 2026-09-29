@@ -95,6 +95,27 @@ const tokenOk = cssImports.length >= 1 && authoredTokens.length >= 20 && !tokenL
 if (tokenOk) console.log(`✅ design token CSS ទៅដល់ build ដូចដែលសរសេរ (${authoredTokens.length} token · ${cssImports.length} ឯកសារ)`);
 else console.log('⛔ minifier CSS សរសេរ design token ឡើងវិញ ឬវាស់មិនបាន ៖ ' + JSON.stringify({ files: cssImports.length, tokens: authoredTokens.length, lost: tokenLost.slice(0, 8), lostCount: tokenLost.length }));
 
+/* ⛔ «ស៊ុមកក» ក្នុងរបា Slide ត្រូវវាស់ពី build ផលិតកម្មពិត ៖ vitest វាស់ helper និង SideDrawer តែមិនឃើញថា boot ពិតជា
+ *    ចាប់ផ្តើម observer ឬអត់ ➜ បង្កើតស៊ុមកក ១ ដែលដឹងថាយូរ ≥ 150ms រួចបើករបា Slide ➜ បន្ទាត់ `#jankLine` ត្រូវលេច ហើយ
+ *    «យូរបំផុត» ត្រូវ ≥ រយៈពេលដែលបង្កើត។ Chromium គាំទ្រ `long-animation-frame` ➜ គ្មានបន្ទាត់ = boot មិនចាប់ផ្តើមការវាស់។ */
+const JANK_BUSY_MS = 150;
+await page.evaluate((busy) => new Promise((resolve) => requestAnimationFrame(() => {
+    const end = performance.now() + busy;
+    while (performance.now() < end) { /* ស៊ុមកកដោយចេតនា */ }
+    requestAnimationFrame(() => setTimeout(resolve, 100));
+})), JANK_BUSY_MS);
+await page.evaluate(() => document.getElementById('navMenuBtn').click());
+await page.waitForTimeout(300);
+const jank = await page.evaluate(() => {
+    const line = document.getElementById('jankLine');
+    return { text: line ? line.textContent : null, supported: (window.PerformanceObserver && PerformanceObserver.supportedEntryTypes) || [] };
+});
+const jankMax = jank.text ? Number((jank.text.match(/(\d+)ms/) || [])[1]) : NaN;
+const jankCount = jank.text ? Number((jank.text.match(/៖ (\d+) ដង/) || [])[1]) : NaN;
+const jankOk = jank.supported.includes('long-animation-frame') && jankCount >= 1 && jankMax >= JANK_BUSY_MS;
+if (jankOk) console.log(`✅ ស៊ុមកកត្រូវវាស់ពី boot ពិត ៖ «${jank.text}»`);
+else console.log('⛔ បន្ទាត់ «ស៊ុមកក» មិនលេច ឬលេខខុស (boot មិនចាប់ផ្តើម observer?) ៖ ' + JSON.stringify(jank));
+
 await browser.close();
 server.close();
-process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk ? 1 : 0);
+process.exit(noisy.length || !bridgeOk || !syntaxOk || !tokenOk || !jankOk ? 1 : 0);

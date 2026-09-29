@@ -31,7 +31,7 @@ import { closeGlobalMoreMenu } from '../../ui/more-menu';
 import { switchAppPage } from '../../ui/page-nav';
 import { setupSwipeGestures } from '../behaviors/panel-motion';
 import { setupPhoneSuggestions } from '../behaviors/phone-search';
-import { setupAdaptivePerformance } from '../../ui/perf';
+import { setupAdaptivePerformance, startJankMonitor } from '../../ui/perf';
 import { setupIOSPullToRefresh } from '../behaviors/pull-to-refresh';
 import { showToast } from '../../ui/toast';
 import { dismissModal } from '../../ui/modal-stack';
@@ -179,6 +179,7 @@ function startInteractions(): void {
         setupSwipeGestures();
         setupChromeAutoHide();
         setupAdaptivePerformance();
+        startJankMonitor();
         setupIOSPullToRefresh();
         setupVisibilityHandling();
         updateRecentPhonesList();

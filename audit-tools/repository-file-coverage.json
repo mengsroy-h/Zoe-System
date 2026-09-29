@@ -1579,6 +1579,9 @@
     "ZoeW/tests/health-row-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
+    "ZoeW/tests/history-paging.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/tests/history-row-parity.test.tsx": {
       "policy": "zoew-self-verification"
     },
@@ -1601,6 +1604,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/immediate-ui.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/native/jank-meter.test.tsx": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/native/lifecycle-scope.test.ts": {

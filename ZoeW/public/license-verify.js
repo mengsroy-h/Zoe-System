@@ -142,6 +142,11 @@
         } catch (e) { return null; }
     }
 
+    function activationKeyString(appCode) {
+        const record = loadLocalRecord(appCode);
+        return record && typeof record.keyString === 'string' ? record.keyString : '';
+    }
+
     function saveLocalRecord(appCode, record) {
         try { localStorage.setItem(storageKey(appCode), JSON.stringify(record)); } catch (e) {}
     }
@@ -514,6 +519,7 @@
         parseKeyString: parseKeyString,
         checkOnline: checkOnline,
         announcementsUrl: announcementsUrl,
+        activationKeyString: activationKeyString,
         signNewKey: signNewKey,
         generateKeyPair: generateKeyPair,
         getServerNow: getServerNow,

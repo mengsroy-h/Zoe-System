@@ -1,7 +1,7 @@
 {
   "name": "zoew",
   "private": true,
-  "version": "2.44.0",
+  "version": "2.45.0",
   "description": "ZoeW — ប្រព័ន្ធគ្រប់គ្រងអីវ៉ាន់ (React + Vite)",
   "engines": {
     "node": "^22.17.0 || >=24.0.0"
@@ -39,6 +39,7 @@
     "money:core": "node scripts/build-audit.mjs && node ../audit-tools/money-reality-check.js --emit-core dist-audit/ZoeW/app.js ../audit-tools/money-core.js"
   },
   "dependencies": {
+    "@capacitor/push-notifications": "^8.1.2",
     "@netlify/blobs": "11.1.1"
   },
   "devDependencies": {

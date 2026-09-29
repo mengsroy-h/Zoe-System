@@ -115,7 +115,8 @@ export default defineConfig({
     },
     define: {
         __APP_VERSION__: JSON.stringify(readAppVersion()),
-        __CACHE_VERSION__: JSON.stringify(readCacheVersion())
+        __CACHE_VERSION__: JSON.stringify(readCacheVersion()),
+        __FCM_CONFIGURED__: JSON.stringify(existsSync(path.join(ROOT, 'android/app/google-services.json')))
     },
     build: {
         target: 'es2020',

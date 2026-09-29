@@ -658,6 +658,9 @@
     "ZoeW/android/app/src/main/res/drawable/ic_launcher_background.xml": {
       "policy": "zoew-android"
     },
+    "ZoeW/android/app/src/main/res/drawable/ic_stat_notify.xml": {
+      "policy": "zoew-android"
+    },
     "ZoeW/android/app/src/main/res/drawable/splash.png": {
       "policy": "guard-8",
       "sha256": "0a999fb3960abcc00bcdb0d1f9b193d32d1b50b937f0106be4f3b84bc1d47396"
@@ -833,8 +836,17 @@
     "ZoeW/netlify.toml": {
       "policy": "guard-22"
     },
+    "ZoeW/netlify/functions/push-cron.mjs": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/netlify/functions/push.mjs": {
+      "policy": "zoew-self-verification"
+    },
     "ZoeW/netlify/functions/zto-order-detail.js": {
       "policy": "guard-27"
+    },
+    "ZoeW/netlify/lib/push-core.mjs": {
+      "policy": "zoew-self-verification"
     },
     "ZoeW/package-lock.json": {
       "policy": "guard-2"
@@ -908,6 +920,9 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/fetch-original.sh": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/scripts/gen-vapid.mjs": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/scripts/intentional-removals.mjs": {
@@ -1420,6 +1435,9 @@
     "ZoeW/src/features/pin.ts": {
       "policy": "zoew-app"
     },
+    "ZoeW/src/features/push.ts": {
+      "policy": "zoew-app"
+    },
     "ZoeW/src/features/restore.ts": {
       "policy": "zoew-app"
     },
@@ -1619,6 +1637,12 @@
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/oracles/history-row-html.ts": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/push-client.test.tsx": {
+      "policy": "zoew-self-verification"
+    },
+    "ZoeW/tests/push-server.test.ts": {
       "policy": "zoew-self-verification"
     },
     "ZoeW/tests/registry-session-race.test.ts": {

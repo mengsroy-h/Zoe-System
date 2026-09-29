@@ -76,6 +76,7 @@ export const ACTION_ALLOWLIST = [
     "pickSheetImportFile",
     "promptPermanentDelete",
     "promptRestoreDeletedItem",
+    "togglePush",
     "closeZtoListSyncModal",
     "closeZtoSyncModal",
     "recheckZtoPickupStatus",

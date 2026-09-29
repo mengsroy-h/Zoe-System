@@ -33,6 +33,7 @@ import { closeModal, dismissPhoneModal } from '../ui/modal';
 import { filterDataByCustomDate, filterDataByDate, moreMenuClearHistory, moreMenuDelete, moreMenuEditPhone, moreMenuExchangeRate, moreMenuExport, moreMenuManualAdjust, moreMenuMonthlyReport, moreMenuRecentlyDeleted, moreMenuResetPickup, moreMenuViewList, toggleHeaderMoreDropdown, toggleMoreDropdown } from '../ui/more-menu';
 import { closeSideDrawer, openSideDrawer, switchAppPage } from '../ui/page-nav';
 import { openNotifyDrawer } from '../features/notifications';
+import { togglePush } from '../features/push';
 
 export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.freeze({
     applySheetImportHeaderRow,
@@ -107,6 +108,7 @@ export const ACTION_REGISTRY: Record<string, (...args: any[]) => any> = Object.f
     openHealthCheck,
     openLockerPicker,
     openNotifyDrawer,
+    togglePush,
     openSideDrawer,
     openViewListModal,
     openZtoListSyncModal,

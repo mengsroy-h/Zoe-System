@@ -21,6 +21,7 @@ import { restoreLookupSecretKey } from '../../services/crypto';
 import { updateRecentPhonesList } from '../../services/db-listeners';
 import { initFirebase } from '../../services/firebase-init';
 import { initNotifications, NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick } from '../../features/notifications';
+import { consumePushOpenRequest, ensureNativePushListeners, handleServiceWorkerMessage, refreshPushStatus, resyncPush, syncExpirySchedule } from '../../features/push';
 import { NATIVE_SCAN_FORMAT_NAMES, initScanEngine, scanEngineReady } from '../../services/scan-engine';
 import { revealAppAfterBoot, showUpdateAvailableBanner } from '../../ui/boot-splash';
 import { setupChromeAutoHide } from '../behaviors/chrome-autohide';
@@ -93,6 +94,8 @@ function registerServiceWorker(scope: LifecycleScope): void {
         scope.every(30 * 60 * 1000, throttledSwUpdate);
     }).catch(() => {});
 
+    scope.listen(navigator.serviceWorker, 'message', (event: MessageEvent) => handleServiceWorkerMessage(event.data));
+
     const hadControllerAtLoad = !!navigator.serviceWorker.controller;
     scope.listen(navigator.serviceWorker, 'controllerchange', () => {
         if (hadControllerAtLoad) showUpdateAvailableBanner();
@@ -106,6 +109,10 @@ function startCoreServices(): void {
         applySetupLinkFromUrl();
         initFirebase();
         initNotifications();
+        refreshPushStatus();
+        consumePushOpenRequest();
+        ensureNativePushListeners();
+        resyncPush();
     });
     refreshZtoAutoCloseUi();
     refreshZtoListSyncUi();
@@ -119,7 +126,10 @@ function startPeriodicTasks(scope: LifecycleScope): void {
     scope.every(60000, runSessionExpiryCheck);
     scope.every(LICENSE_RECHECK_INTERVAL_MS, runPeriodicLicenseCheck);
     scope.every(60000, sweepRecallHighlights);
-    scope.every(NOTIFY_FEED_INTERVAL_MS, notifyPeriodicTick);
+    scope.every(NOTIFY_FEED_INTERVAL_MS, () => {
+        notifyPeriodicTick();
+        syncExpirySchedule();
+    });
     scope.every(60000, () => {
         runScheduledCleanup();
         resumeInterruptedCleanups();
@@ -132,6 +142,8 @@ function startPeriodicTasks(scope: LifecycleScope): void {
         resumeInterruptedCleanups();
         scheduleZtoStatusSweep();
         notifyPeriodicTick();
+        resyncPush();
+        syncExpirySchedule();
         if (uiState.currentAppPage === 'entry') warmZtoLookupProxyNow();
     });
 }

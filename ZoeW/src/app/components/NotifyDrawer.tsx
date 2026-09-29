@@ -1,6 +1,7 @@
 import { uiState } from '../../core/state';
 import { APP_VERSION } from '../../core/version';
 import { NOTIFY_EXPIRY_HOURS_MAX, combinedNotifyFeed, newerAppVersion, type NotifyFeedItem, type NotifyView } from '../../features/notifications';
+import { PUSH_STATUS_TEXT, type PushStatus } from '../../features/push';
 import { isNativeApp } from '../../platform/native';
 import { onAct } from '../actions';
 import { useStoreFields } from '../hooks/useStore';
@@ -15,6 +16,28 @@ const KIND_CLASS: Record<string, string> = {
 
 function hoursText(h: number): string {
     return h <= 0 ? 'ដល់ពេលហើយ' : '≤ ' + h + ' ម៉ោង';
+}
+
+function PushSection({ status }: { status: PushStatus }) {
+    const canToggle = status === 'on' || status === 'off' || status === 'error' || status === 'server-off';
+    const cls = status === 'on' ? 'notify-summary is-info' : (status === 'denied' || status === 'error' || status === 'server-off' ? 'notify-summary is-warn' : 'notify-summary');
+    return (
+        <section className="notify-section" id="notifyPushSection">
+            <div className="notify-section-title">📲 ជូនដំណឹងលើទូរស័ព្ទ</div>
+            <div className={cls} id="notifyPushStatus">{PUSH_STATUS_TEXT[status] || PUSH_STATUS_TEXT.unknown}</div>
+            {canToggle || status === 'busy' ? (
+                <button
+                    type="button"
+                    className={status === 'on' ? 'notify-refresh-btn notify-push-btn is-on' : 'notify-refresh-btn notify-push-btn'}
+                    id="notifyPushBtn"
+                    disabled={status === 'busy'}
+                    onClick={onAct("togglePush")}
+                >
+                    {status === 'on' ? '🔕 បិទការជូនដំណឹង' : (status === 'busy' ? '⏳ កំពុងភ្ជាប់…' : '🔔 បើកការជូនដំណឹង')}
+                </button>
+            ) : null}
+        </section>
+    );
 }
 
 function ExpirySection({ view }: { view: NotifyView | null }) {
@@ -110,7 +133,7 @@ function FeedSection({ feed, seen }: { feed: NotifyFeedItem[]; seen: string[] })
 }
 
 export function NotifyDrawer() {
-    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'updateReady']);
+    const s = useStoreFields(uiState, ['notifyDrawerOpen', 'notifyView', 'notifyFeed', 'notifySellerFeed', 'notifySeenIds', 'updateReady', 'pushStatus']);
     const open = s.notifyDrawerOpen;
     return (
         <aside className={open ? 'side-drawer side-drawer-right open' : 'side-drawer side-drawer-right'} id="notifyDrawer" aria-hidden={open ? 'false' : 'true'}>
@@ -127,6 +150,7 @@ export function NotifyDrawer() {
                 </button>
             </div>
             <div className="drawer-body">
+                <PushSection status={s.pushStatus} />
                 <ExpirySection view={s.notifyView} />
                 <VersionSection feed={s.notifyFeed} updateReady={s.updateReady} />
                 <FeedSection feed={combinedNotifyFeed(s.notifyFeed, s.notifySellerFeed)} seen={s.notifySeenIds} />

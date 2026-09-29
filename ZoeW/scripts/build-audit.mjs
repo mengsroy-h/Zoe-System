@@ -420,10 +420,11 @@ writeFileSync(path.join(APP, 'audit-module-views.json'), moduleViewsJson);
     writeFileSync(path.join(APP, 'style.css'), css);
     console.log('style.css ៖ ' + cssImports.join(' + '));
 }
-for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md']) {
+for (const f of ['netlify.toml', 'package.json', 'package-lock.json', 'README.md', 'ZTO-SETUP-KH.md', '.env.android']) {
     cpSync(path.join(ROOT, f), path.join(APP, f));
 }
 cpSync(path.join(ROOT, 'netlify', 'functions'), path.join(APP, 'netlify', 'functions'), { recursive: true });
+cpSync(path.join(ROOT, 'netlify', 'lib'), path.join(APP, 'netlify', 'lib'), { recursive: true });
 // ⛔ ឯកសារដែល `.md` យោង (`ZoeW/docs/*` · `ZoeW/public/guide.html`) ត្រូវមានក្នុង tree វាស់ដែរ ➜ `doc-scope` វាស់
 //    តំណពិត (បើអត់ វារាយតំណដាច់ ដែលមិនដាច់ក្នុង repo — ឬអាក្រក់ជាងនោះ ៖ ការដាច់ពិតលាក់ក្នុងសំណុំក្លែង)
 cpSync(path.join(ROOT, 'docs'), path.join(APP, 'docs'), { recursive: true });

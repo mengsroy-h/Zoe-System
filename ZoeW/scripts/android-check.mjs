@@ -104,6 +104,14 @@ ok('ហាមផ្ទេរទិន្នន័យទៅទូរស័ព្�
     /<device-transfer>[\s\S]*domain="root"[\s\S]*<\/device-transfer>/.test(read('android/app/src/main/res/xml/data_extraction_rules.xml')));
 ok('FileProvider សម្រាប់ Share (Export)', manifest.includes('androidx.core.content.FileProvider') &&
     read('android/app/src/main/res/xml/file_paths.xml').includes('<cache-path'));
+const pushSrc = read('src/features/push.ts');
+const fcmChannel = (pushSrc.match(/export const FCM_CHANNEL_ID = '([a-z_]+)';/) || [])[1] || '';
+ok('សិទ្ធិ POST_NOTIFICATIONS (Android 13+ ៖ ជូនដំណឹង FCM)', manifest.includes('android.permission.POST_NOTIFICATIONS'));
+ok('FCM ៖ channel លំនាំដើមក្នុង manifest = FCM_CHANNEL_ID ក្នុង push.ts', !!fcmChannel &&
+    new RegExp('default_notification_channel_id"\\s+android:value="' + fcmChannel + '"').test(manifest), fcmChannel);
+ok('FCM ៖ រូបតំណាងតូច (monochrome vector) មានពិត', /default_notification_icon"\s+android:resource="@drawable\/ic_stat_notify"/.test(manifest) &&
+    /<vector[\s\S]*android:fillColor="#FFFFFFFF"/.test(read('android/app/src/main/res/drawable/ic_stat_notify.xml')));
+ok('google-services.json មិនចូល repo (android/.gitignore)', /^app\/google-services\.json$/m.test(read('android/.gitignore')));
 
 /* ── ៤. Logo ──────────────────────────────────────────────────────────── */
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
@@ -137,7 +145,7 @@ for (const name of plugins) {
     const dir = `../node_modules/${name}/android`;
     ok(`plugin ${name} sync ចូល Android project`, settings.includes(dir));
 }
-for (const want of ['@capacitor/app', '@capgo/capacitor-native-biometric', '@capacitor/filesystem', '@capacitor/share', '@capgo/capacitor-printer']) {
+for (const want of ['@capacitor/app', '@capgo/capacitor-native-biometric', '@capacitor/filesystem', '@capacitor/share', '@capgo/capacitor-printer', '@capacitor/push-notifications']) {
     ok(`plugin ដែល App ពឹង ៖ ${want}`, plugins.includes(want));
 }
 
@@ -237,6 +245,12 @@ const gradleStep = (releaseWf.match(/- name: Build APK[\s\S]*?(?=\n {6}- )/) || 
 ok('ជំហាន gradle រត់តែពេល secret keystore គ្រប់', /assembleRelease/.test(gradleStep) && /if: steps\.keystore\.outputs\.ready == 'true'/.test(gradleStep));
 ok('workflow ផ្ទៀងហត្ថលេខា (apksigner verify) មុន Release', /apksigner"? verify/i.test(releaseWf) && releaseWf.indexOf('apksigner') < releaseWf.indexOf('gh release create'));
 ok('កំណែ Release ដេរីវេពី src/core/version.ts', releaseWf.includes('ZoeW/src/core/version.ts'));
+const gsjAt = releaseWf.indexOf('ZoeW/android/app/google-services.json');
+const webBuildAt = releaseWf.indexOf('npm run android:sync');
+ok('FCM ៖ workflow សរសេរ google-services.json **មុន** build web (បើក __FCM_CONFIGURED__) ហើយផ្ទៀង package',
+    gsjAt > 0 && webBuildAt > gsjAt && releaseWf.includes('ZOEW_GOOGLE_SERVICES_JSON') && releaseWf.includes("package_name==='com.zoesystem.zoew'"));
+ok('FCM ៖ vite ដេរីវេ __FCM_CONFIGURED__ ពីវត្តមាន android/app/google-services.json',
+    /__FCM_CONFIGURED__:\s*JSON\.stringify\(existsSync\(path\.join\(ROOT, 'android\/app\/google-services\.json'\)\)\)/.test(read('vite.config.mts')));
 const certPin = read('android/release-cert.sha256').trim();
 ok('វិញ្ញាបនបត្រ keystore pin ក្នុង android/release-cert.sha256 (SHA-256 · 64 hex)', /^[0-9a-f]{64}$/.test(certPin), certPin.slice(0, 12) + '…');
 const pinAt = releaseWf.indexOf('< ZoeW/android/release-cert.sha256');

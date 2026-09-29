@@ -67,10 +67,25 @@ export function hoursUntilAbandon(barcode, parentAt, now) {
     return -1;
 }
 
-export function nearExpiryView(history, now, stale): NotifyView {
-    const rows: NotifyExpiryRow[] = [];
-    const phones = new Set();
-    let packages = 0;
+export const NOTIFY_SCHEDULE_HORIZON_MS = 8 * 24 * NOTIFY_HOUR_MS;
+export const NOTIFY_SCHEDULE_STEP_MS = 60 * 1000;
+export const NOTIFY_SCHEDULE_MAX = 2000;
+
+export function abandonAtOf(barcode, parentAt, now, horizonMs) {
+    if (!barcode || barcode.isClosed) return -1;
+    if (barcodeAbandonIsRipe(barcode, parentAt, now)) return -1;
+    let hi = now + horizonMs;
+    if (!barcodeAbandonIsRipe(barcode, parentAt, hi)) return -1;
+    let lo = now;
+    while (hi - lo > NOTIFY_SCHEDULE_STEP_MS) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (barcodeAbandonIsRipe(barcode, parentAt, mid)) hi = mid;
+        else lo = mid;
+    }
+    return hi;
+}
+
+function eachOpenParcel(history, now, visit) {
     const list = Array.isArray(history) ? history : [];
     for (let i = 0; i < list.length; i++) {
         const item = list[i];
@@ -80,6 +95,28 @@ export function nearExpiryView(history, now, stale): NotifyView {
         const barcodes = Array.isArray(item.barcodes) && item.barcodes.length
             ? item.barcodes
             : [{ code: item.barcode, isClosed: !!item.isClosed, locker: item.locker }];
+        visit(item, parentAt, barcodes);
+    }
+}
+
+export function expiryScheduleTimes(history, now): number[] {
+    const times: number[] = [];
+    eachOpenParcel(history, now, (item, parentAt, barcodes) => {
+        for (let j = 0; j < barcodes.length && times.length < NOTIFY_SCHEDULE_MAX; j++) {
+            const b = barcodes[j];
+            if (!b || typeof b !== 'object') continue;
+            const at = abandonAtOf(b, parentAt, now, NOTIFY_SCHEDULE_HORIZON_MS);
+            if (at > 0) times.push(at);
+        }
+    });
+    return times.sort((a, b) => a - b);
+}
+
+export function nearExpiryView(history, now, stale): NotifyView {
+    const rows: NotifyExpiryRow[] = [];
+    const phones = new Set();
+    let packages = 0;
+    eachOpenParcel(history, now, (item, parentAt, barcodes) => {
         let count = 0;
         let soonest = Infinity;
         let locker = '';
@@ -92,7 +129,7 @@ export function nearExpiryView(history, now, stale): NotifyView {
             if (h < soonest) soonest = h;
             if (!locker && b.locker && b.locker !== 'N/A') locker = String(b.locker);
         }
-        if (!count) continue;
+        if (!count) return;
         packages += count;
         const phone = String(item.phone || '');
         phones.add(phone);
@@ -103,7 +140,7 @@ export function nearExpiryView(history, now, stale): NotifyView {
             count: count,
             hoursLeft: soonest
         });
-    }
+    });
     rows.sort((a, b) => a.hoursLeft - b.hoursLeft || b.count - a.count);
     return {
         measurable: !stale,
@@ -318,10 +355,18 @@ export function fetchNotifyFeed(userAsked?) {
         });
 }
 
+export function clearAppBadge() {
+    try {
+        const nav: any = navigator;
+        if (nav && typeof nav.clearAppBadge === 'function') Promise.resolve(nav.clearAppBadge()).catch(() => {});
+    } catch (e) {}
+}
+
 export function openNotifyDrawer() {
     uiState.drawerOpen = false;
     refreshNotifyView();
     uiState.notifyDrawerOpen = true;
+    clearAppBadge();
     fetchNotifyFeed(true);
 }
 

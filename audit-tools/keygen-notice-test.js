@@ -55,9 +55,10 @@ function realDecl(name) {
 }
 
 const FN_NAMES = ['noticeBucketPath', 'cleanNoticeText', 'buildNoticePayload', 'noticeErrorMessage', 'newNoticeId',
-    'noticeIdsToTrim', 'noticeRowsOf', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
+    'noticeIdsToTrim', 'noticeRowsOf', 'kickNoticePush', 'setNoticeSendBusy', 'refreshNoticeList', 'renderNoticeList',
     'sendNotice', 'deleteNotice', 'escapeHtml', 'captureSensitiveSession', 'isSensitiveSessionCurrent', 'invalidateSensitiveSession'];
-const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL'];
+const DECL_NAMES = ['LICENSE_APP_CODE', 'NOTICE_TITLE_MAX', 'NOTICE_BODY_MAX', 'NOTICE_KEEP_MAX', 'NOTICE_KIND_LABELS', 'NOTICE_ID_ALPHABET', 'NOTICE_SEND_LABEL',
+    'ZOEW_PUSH_ORIGIN', 'NOTICE_PUSH_KICK_TIMEOUT_MS'];
 
 const fnSources = FN_NAMES.map((n) => [n, sliceFn(n)]);
 const declSources = DECL_NAMES.map((n) => [n, realDecl(n)]);
@@ -84,11 +85,12 @@ function build(options) {
         if (!elements[id]) elements[id] = { id, value: '', textContent: '', innerHTML: '', disabled: false };
         return elements[id];
     };
-    const log = { alerts: [], toasts: [], confirms: [], updates: [], sets: [], gets: [], refreshes: 0, captures: 0 };
+    const log = { alerts: [], toasts: [], confirms: [], updates: [], sets: [], gets: [], refreshes: 0, captures: 0, kicks: [] };
     const user = { uid: 'admin-1' };
     const sandbox = {
         console: { log() {}, error() {}, warn() {} },
-        Promise, Error, JSON, String, Number, Object, Array, Uint8Array, Math, Date, isFinite, setTimeout, clearTimeout,
+        Promise, Error, JSON, String, Number, Object, Array, Uint8Array, Math, Date, isFinite, setTimeout, clearTimeout, AbortController,
+        fetch: (url, init) => { log.kicks.push({ url, init }); return opts.kick ? opts.kick(url, init) : Promise.resolve({ ok: false, status: 0 }); },
         crypto: require('crypto').webcrypto,
         confirm: (m) => { log.confirms.push(m); return opts.confirm !== false; },
         alert: (m) => log.alerts.push(m),
@@ -229,6 +231,9 @@ async function run() {
         ok('ក្រោយ commit ៖ toast ✅', h.log.toasts.length === 1 && h.log.toasts[0].startsWith('✅'), h.log.toasts);
         ok('ក្រោយ commit ៖ សម្អាតវាល', h.el('noticeTitleInput').value === '' && h.el('noticeBodyInput').value === '');
         ok('ក្រោយ commit ៖ ទាញបញ្ជីឡើងវិញ', h.log.refreshes >= 1, h.log.refreshes);
+        ok('⛔ ក្រោយ commit ៖ ដាស់ push ភ្លាម ១ ដង (POST no-cors ទៅ Function push របស់ ZoeW)', h.log.kicks.length === 1
+            && h.log.kicks[0].url === h.ctx.ZOEW_PUSH_ORIGIN + '/.netlify/functions/push?op=kick'
+            && h.log.kicks[0].init.method === 'POST' && h.log.kicks[0].init.mode === 'no-cors', h.log.kicks);
         ok('ប៊ូតុងផ្ញើបើកវិញ', h.el('noticeSendBtn').disabled === false);
     }
 
@@ -279,6 +284,7 @@ async function run() {
         ok('បដិសេធ ➜ គ្មាន toast ✅', h.log.toasts.length === 0, h.log.toasts);
         ok('បដិសេធ ➜ វាលនៅដដែល (មិនបាត់អត្ថបទ)', h.el('noticeTitleInput').value === 'ក' && h.el('noticeBodyInput').value === 'ខ');
         ok('បដិសេធ ➜ ផ្ញើទៅ Sentry', h.log.captures >= 1);
+        ok('⛔ បដិសេធ ➜ មិនដាស់ push (គ្មានដំណឹងថ្មី)', h.log.kicks.length === 0, h.log.kicks.length);
     }
 
     console.log('-- ៦. sendNotice ៖ ព្យួរ ➜ commit យឺត --');
@@ -296,10 +302,12 @@ async function run() {
             h.log.alerts.length === 1 && h.log.alerts[0].includes('មិនទាន់បញ្ជាក់') && !h.log.alerts[0].includes('ផ្ញើដំណឹងមិនបាន'), h.log.alerts);
         ok('ព្យួរ ➜ គ្មាន toast ✅ មុន commit', h.log.toasts.length === 0, h.log.toasts);
         ok('ព្យួរ ➜ វាលនៅដដែល', h.el('noticeTitleInput').value === 'ក');
+        ok('⛔ ព្យួរ ➜ មិនទាន់ដាស់ push', h.log.kicks.length === 0, h.log.kicks.length);
         commit.resolve();
         await drain();
         ok('⛔ commit យឺត ➜ toast ✅ «ដំណឹងដែលរង់ចាំ»', h.log.toasts.length === 1 && h.log.toasts[0].includes('រង់ចាំ'), h.log.toasts);
         ok('⛔ commit យឺត ➜ ទាញបញ្ជីឡើងវិញ', h.log.refreshes >= 1, h.log.refreshes);
+        ok('⛔ commit យឺត ➜ ដាស់ push ពេលនោះ', h.log.kicks.length === 1, h.log.kicks.length);
     }
     {
         const commit = deferred();
@@ -384,6 +392,26 @@ async function run() {
         await hd.ctx.refreshNoticeList();
         await hd.ctx.deleteNotice(idA);
         ok('លុបធ្លាក់ ➜ alert · គ្មាន toast ✅', hd.log.alerts.length === 1 && hd.log.toasts.length === 0, hd.log);
+    }
+
+    console.log('-- ៨ខ. kickNoticePush ៖ ព្យួរ/ធ្លាក់ មិនបោះ · origin ស៊ីនឹង ZoeW ពិត · CSP អនុញ្ញាត --');
+    {
+        const hang = build({ kick: () => new Promise(() => {}) });
+        vm.runInContext('NOTICE_PUSH_KICK_TIMEOUT_MS = 30;', hang.ctx);
+        const r1 = await hang.ctx.kickNoticePush();
+        ok('ព្យួរ ➜ ដោះក្នុងពិដាន (false) មិនព្យួរតាម', r1 === false);
+        const fail = build({ kick: () => Promise.reject(new TypeError('CSP')) });
+        ok('ធ្លាក់ (CSP/បណ្តាញ) ➜ false មិនបោះ', (await fail.ctx.kickNoticePush()) === false);
+        const good = build({ kick: () => Promise.resolve({ ok: false, status: 0, type: 'opaque' }) });
+        ok('ចម្លើយ opaque (no-cors) ➜ true', (await good.ctx.kickNoticePush()) === true);
+        const envAndroid = readOr('ZoeW/.env.android');
+        const origin = (envAndroid.match(/^VITE_NATIVE_WEB_ORIGIN=(\S+)$/m) || [])[1] || '';
+        ok('⛔ ZOEW_PUSH_ORIGIN = origin ពិតរបស់ ZoeW (ZoeW/.env.android)', !!origin && origin === probe.ctx.ZOEW_PUSH_ORIGIN, { origin, kg: probe.ctx.ZOEW_PUSH_ORIGIN });
+        const csp = (readOr('ZoeKeyGen/netlify.toml').match(/connect-src ([^;]+);/) || [])[1] || '';
+        ok('⛔ CSP connect-src របស់ ZoeKeyGen អនុញ្ញាត origin នោះ (បើអត់ ការដាស់ស្លាប់ស្ងាត់)', csp.split(/\s+/).indexOf(probe.ctx.ZOEW_PUSH_ORIGIN) !== -1, csp);
+        const fnFile = readOr('ZoeW/netlify/functions/push.mjs');
+        const core = readOr('ZoeW/netlify/lib/push-core.mjs');
+        ok('⛔ Function push មាន op=kick ពិត', /op === 'kick'/.test(core) && /handlePushRequest/.test(fnFile));
     }
 
     console.log('-- ៩. logout សម្អាតផ្ទៃដំណឹង --');

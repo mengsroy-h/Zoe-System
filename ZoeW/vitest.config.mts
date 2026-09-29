@@ -10,7 +10,8 @@ export default defineConfig({
     resolve: { alias: { '@': path.resolve(ROOT, 'src') } },
     define: {
         __APP_VERSION__: JSON.stringify('test'),
-        __CACHE_VERSION__: JSON.stringify('test')
+        __CACHE_VERSION__: JSON.stringify('test'),
+        __FCM_CONFIGURED__: JSON.stringify(true)
     },
     test: {
         environment: 'happy-dom',

@@ -90,6 +90,21 @@ jobs:
           cache: npm
           cache-dependency-path: ZoeW/package-lock.json
 
+      - name: google-services.json (FCM ៖ ជូនដំណឹងលើទូរស័ព្ទ · ស្រេចចិត្ត)
+        if: steps.keystore.outputs.ready == 'true'
+        env:
+          GSJ: ${{ secrets.ZOEW_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GSJ" ]; then
+            echo "::warning::គ្មាន secret ZOEW_GOOGLE_SERVICES_JSON ➜ APK នេះគ្មានការជូនដំណឹងលើទូរស័ព្ទ (App ប្រាប់អ្នកប្រើ)"
+            exit 0
+          fi
+          case "$GSJ" in
+            "{"*) printf '%s' "$GSJ" > ZoeW/android/app/google-services.json ;;
+            *) printf '%s' "$GSJ" | base64 -d > ZoeW/android/app/google-services.json ;;
+          esac
+          node -e "const j=require('./ZoeW/android/app/google-services.json'); const ok=(j.client||[]).some((c)=>c&&c.client_info&&c.client_info.android_client_info&&c.client_info.android_client_info.package_name==='com.zoesystem.zoew'); if(!ok){console.error('google-services.json មិនមែនសម្រាប់ com.zoesystem.zoew');process.exit(1)}"
+
       - name: Build web (--mode android) ➜ cap sync
         if: steps.keystore.outputs.ready == 'true'
         run: |

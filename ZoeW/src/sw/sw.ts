@@ -233,3 +233,63 @@ self.addEventListener('fetch', (event: FetchEvent) => {
         ).catch(() => networkOnly(networkTarget, networkOptions))
     );
 });
+
+const PUSH_TITLE_MAX = 120;
+const PUSH_BODY_MAX = 240;
+
+function pushOpenUrl(raw: unknown): string {
+    try {
+        const url = new URL(typeof raw === 'string' && raw ? raw : './?notify=1', self.registration.scope);
+        return url.origin === self.location.origin ? url.href : new URL('./?notify=1', self.registration.scope).href;
+    } catch (e) {
+        return self.registration.scope;
+    }
+}
+
+function readPushData(event: PushEvent): Record<string, unknown> {
+    try {
+        const data = event.data ? event.data.json() : null;
+        return data && typeof data === 'object' ? data : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+self.addEventListener('push', (event: PushEvent) => {
+    const data = readPushData(event);
+    const title = String(data.title || 'ZoeW').slice(0, PUSH_TITLE_MAX);
+    const body = String(data.body || '').slice(0, PUSH_BODY_MAX);
+    const tag = String(data.tag || 'zoew').slice(0, 64);
+    const options: NotificationOptions & Record<string, unknown> = {
+        body: body,
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        tag: tag,
+        renotify: true,
+        timestamp: Date.now(),
+        data: { url: pushOpenUrl(data.url) }
+    };
+    const nav = self.navigator as any;
+    event.waitUntil(Promise.all([
+        self.registration.showNotification(title, options),
+        Promise.resolve().then(() => (nav && typeof nav.setAppBadge === 'function' ? nav.setAppBadge() : null)).catch(() => {}),
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then((list) => list.forEach((client) => client.postMessage({ type: 'zoew-push' })))
+            .catch(() => {})
+    ]));
+});
+
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
+    event.notification.close();
+    const target = pushOpenUrl(event.notification.data && event.notification.data.url);
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+            const client = list.find((c) => new URL(c.url).origin === self.location.origin) as WindowClient | undefined;
+            if (client) {
+                client.postMessage({ type: 'zoew-open-notify' });
+                return client.focus().catch(() => self.clients.openWindow(target));
+            }
+            return self.clients.openWindow(target);
+        }).catch(() => self.clients.openWindow(target))
+    );
+});

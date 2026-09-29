@@ -156,6 +156,13 @@ npm run android:icons    # ➜ android/app/src/main/res (legacy · round · adap
    ការរឹតបន្តឹង មិនបាច់ធ្វើអ្វីទេ។
 3. **License** ៖ ទូរស័ព្ទមួយដែលប្រើទាំង PWA និង App Android = **២ ឧបករណ៍**
    (storage ដាច់ពីគ្នា) ➜ ត្រូវប្រើកៅអី ២ ក្នុង Key ឬដោះឧបករណ៍ចាស់ក្នុង ZoeKeyGen។
+4. **ការជូនដំណឹងលើទូរស័ព្ទ (FCM)** ៖ Firebase Console របស់ **License Project** (Project រួមតែមួយ — មិនមែន Project របស់
+   អតិថិជនណាម្នាក់) ➜ **Add app ➜ Android** ➜ package `com.zoesystem.zoew` ➜ ទាញ `google-services.json` ➜ GitHub secret
+   **`ZOEW_GOOGLE_SERVICES_JSON`** (JSON ឬ base64)។ workflow សរសេរវាចូល `android/app/` **មុន** build web ហើយផ្ទៀងថា
+   package ត្រឹមត្រូវ · build ក្នុងម៉ាស៊ីន ៖ ដាក់ឯកសារនោះក្នុង `android/app/` ⛔ **មិនចូល repo** (`android/.gitignore`)។
+   គ្មានឯកសារ ➜ APK នៅដំណើរការធម្មតា តែផ្ទាំង 🔔 ប្រាប់ «មិនទាន់ភ្ជាប់ FCM» ហើយ App **មិនហៅ** plugin push ទាល់តែសោះ
+   (`FirebaseMessaging` គ្មាន `google-services.json` ធ្វើឲ្យ App គាំង) ➜ ច្រកទ្វារ `__FCM_CONFIGURED__` ពេល build។
+   server ផ្ញើតាម `FCM_SERVICE_ACCOUNT` (Netlify env) — មើល [README](../README.md) ផ្នែក ១១។
 
 ---
 

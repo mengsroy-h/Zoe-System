@@ -53,6 +53,7 @@ declare global {
     /** ចាក់ដោយ Vite `define` ➜ ដេរីវេពី `src/core/version.ts` ពិត។ */
     const __APP_VERSION__: string;
     const __CACHE_VERSION__: string;
+    const __FCM_CONFIGURED__: boolean;
 }
 
 export {};

@@ -1,4 +1,4 @@
-const APP_VERSION = '2.21.0';
+const APP_VERSION = '2.22.0';
 
 const appLocalStore = (function () { try { return window.localStorage; } catch (e) { return null; } })();
 const appSessionStore = (function () { try { return window.sessionStorage; } catch (e) { return null; } })();
@@ -2344,6 +2344,8 @@ const NOTICE_KEEP_MAX = 20;
 const NOTICE_KIND_LABELS = { notice: '📢 សេចក្តីប្រកាស', maintenance: '🛠️ ការថែទាំប្រព័ន្ធ' };
 const NOTICE_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 const NOTICE_SEND_LABEL = '📨 ផ្ញើដំណឹង';
+const ZOEW_PUSH_ORIGIN = 'https://zoew.netlify.app';
+const NOTICE_PUSH_KICK_TIMEOUT_MS = 8000;
 let noticeListCache = [];
 let noticeReadFailed = false;
 let isSendingNotice = false;
@@ -2402,6 +2404,27 @@ function noticeRowsOf(raw) {
         body: String(raw[id].body || ''),
         at: typeof raw[id].at === 'number' ? raw[id].at : 0
     }));
+}
+
+function kickNoticePush() {
+    if (typeof fetch !== 'function') return Promise.resolve(false);
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    let timer = null;
+    return new Promise((resolve) => {
+        timer = setTimeout(() => {
+            if (controller) { try { controller.abort(); } catch (e) {} }
+            resolve(false);
+        }, NOTICE_PUSH_KICK_TIMEOUT_MS);
+        fetch(ZOEW_PUSH_ORIGIN + '/.netlify/functions/push?op=kick', {
+            method: 'POST',
+            mode: 'no-cors',
+            cache: 'no-store',
+            signal: controller ? controller.signal : undefined
+        }).then(() => resolve(true), () => resolve(false));
+    }).then((ok) => {
+        clearTimeout(timer);
+        return ok;
+    });
 }
 
 function setNoticeSendBusy(busy) {
@@ -2488,7 +2511,8 @@ async function sendNotice() {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
         if (titleEl) titleEl.value = '';
         if (bodyEl) bodyEl.value = '';
-        showToast('✅ បានផ្ញើដំណឹង! ZoeW នឹងឃើញវាក្នុងផ្ទាំង 🔔 ពេលវាទាញលើកក្រោយ');
+        showToast('✅ បានផ្ញើដំណឹង! ZoeW នឹងឃើញវាក្នុងផ្ទាំង 🔔 ហើយទូរស័ព្ទដែលបើកការជូនដំណឹងនឹងលោតភ្លាម');
+        kickNoticePush();
         refreshNoticeList();
     } catch (e) {
         if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
@@ -2498,6 +2522,7 @@ async function sendNotice() {
             write.then(() => {
                 if (!isSensitiveSessionCurrent(operation, true) || db !== operationDb) return;
                 showToast('✅ ដំណឹងដែលរង់ចាំ ត្រូវបានផ្ញើរួចហើយ!');
+                kickNoticePush();
                 refreshNoticeList();
             }, () => {});
             alert('⏳ ការផ្ញើមិនទាន់បញ្ជាក់ទេ (អ៊ីនធឺណិតយឺត ឬដាច់)។ ដំណឹងអាចនឹងផ្ញើដោយស្វ័យប្រវត្តិពេលភ្ជាប់វិញ — សូមចុច 🔄 Refresh មើលបញ្ជីខាងក្រោម មុនផ្ញើម្តងទៀត។');

@@ -280,6 +280,7 @@ export interface UiState {
     notifyView: import('../features/notifications').NotifyView | null;
     notifyFeed: import('../features/notifications').NotifyFeedItem[];
     notifySellerFeed: import('../features/notifications').NotifyFeedItem[];
+    pushStatus: import('../features/push').PushStatus;
     notifySeenIds: string[];
     notifyFeedFetchedAt: number;
     notifyFeedInFlight: boolean;
@@ -365,6 +366,7 @@ export const uiState = createStore<UiState>('uiState', {
     notifyView: null,
     notifyFeed: [],
     notifySellerFeed: [],
+    pushStatus: 'unknown',
     notifySeenIds: [],
     notifyFeedFetchedAt: 0,
     notifyFeedInFlight: false,

@@ -108,6 +108,9 @@
 .notify-more { font-size: calc(11 * var(--fs-unit)); color: var(--text-muted); text-align: center; }
 .notify-version-line { font-size: calc(11.5 * var(--fs-unit)); color: var(--text-main); }
 .notify-refresh-btn { min-height: 40px; border: none; border-radius: var(--radius-md); background: var(--action-primary); color: #ffffff; font-size: calc(12 * var(--fs-unit)); font-weight: 700; cursor: pointer; }
+.notify-push-btn { width: 100%; margin-top: 8px; }
+.notify-push-btn.is-on { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); }
+.notify-push-btn:disabled { opacity: 0.6; cursor: default; }
 .notify-feed-item { padding: 8px 10px; border-radius: var(--radius-md); background: var(--body-bg); border-left: 3px solid var(--border-color); }
 .notify-feed-item.notify-kind-update { border-left-color: var(--action-primary); }
 .notify-feed-item.notify-kind-maintenance { border-left-color: var(--warning); }
